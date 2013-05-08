@@ -1,0 +1,58 @@
+// Copyright (c) 2013 Conformal Systems LLC.
+// Use of this source code is governed by an ISC
+// license that can be found in the LICENSE file.
+
+package btcwire
+
+import (
+	"fmt"
+	"io"
+)
+
+// MsgMemPool implements the Message interface and represents a bitcoin mempool
+// message.  It is used to request a list of transactions still in the active
+// memory pool of a relay.
+//
+// This message has no payload and was not added until protocol versions
+// starting with BIP0035Version.
+type MsgMemPool struct{}
+
+// BtcDecode decodes r using the bitcoin protocol encoding into the receiver.
+// This is part of the Message interface implementation.
+func (msg *MsgMemPool) BtcDecode(r io.Reader, pver uint32) error {
+	if pver < BIP0035Version {
+		err := fmt.Errorf("mempool message invalid for protocol version: %d", pver)
+		return err
+	}
+
+	return nil
+}
+
+// BtcEncode encodes the receiver to w using the bitcoin protocol encoding.
+// This is part of the Message interface implementation.
+func (msg *MsgMemPool) BtcEncode(w io.Writer, pver uint32) error {
+	if pver < BIP0035Version {
+		err := fmt.Errorf("mempool message invalid for protocol version: %d", pver)
+		return err
+	}
+
+	return nil
+}
+
+// Command returns the protocol command string for the message.  This is part
+// of the Message interface implementation.
+func (msg *MsgMemPool) Command() string {
+	return cmdMemPool
+}
+
+// MaxPayloadLength returns the maximum length the payload can be for the
+// receiver.  This is part of the Message interface implementation.
+func (msg *MsgMemPool) MaxPayloadLength(pver uint32) uint32 {
+	return 0
+}
+
+// NewMsgPong returns a new bitcoin pong message that conforms to the Message
+// interface.  See MsgPong for details.
+func NewMsgMemPool() *MsgMemPool {
+	return &MsgMemPool{}
+}

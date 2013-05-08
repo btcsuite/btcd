@@ -1,0 +1,119 @@
+// Copyright (c) 2013 Conformal Systems LLC.
+// Use of this source code is governed by an ISC
+// license that can be found in the LICENSE file.
+
+package btcwire
+
+import (
+	"fmt"
+	"io"
+)
+
+// MaxBlockHeadersPerMsg is the maximum number of block headers that can be in
+// a single bitcoin headers message.
+const MaxBlockHeadersPerMsg = 2000
+
+// MsgHeaders implements the Message interface and represents a bitcoin headers
+// message.  It is used to deliver block header information in response
+// to a getheaders message (MsgGetHeaders).  The maximum number of block headers
+// per message is currently 2000.  See MsgGetHeaders for details on requesting
+// the headers.
+type MsgHeaders struct {
+	Headers []*BlockHeader
+}
+
+// AddBlockHeader adds a new block header to the message.
+func (msg *MsgHeaders) AddBlockHeader(bh *BlockHeader) error {
+	if len(msg.Headers)+1 > MaxBlockHeadersPerMsg {
+		str := "MsgHeaders.AddBlockHeader: too many block headers " +
+			"for message [max %v]"
+		return fmt.Errorf(str, MaxBlockHeadersPerMsg)
+	}
+
+	msg.Headers = append(msg.Headers, bh)
+	return nil
+}
+
+// BtcDecode decodes r using the bitcoin protocol encoding into the receiver.
+// This is part of the Message interface implementation.
+func (msg *MsgHeaders) BtcDecode(r io.Reader, pver uint32) error {
+	count, err := readVarInt(r, pver)
+	if err != nil {
+		return err
+	}
+
+	// Limit to max block headers per message.
+	if count > MaxBlockHeadersPerMsg {
+		str := "MsgHeaders.BtcDecode: too many block headers in message [%v]"
+		return fmt.Errorf(str, count)
+	}
+
+	for i := uint64(0); i < count; i++ {
+		bh := BlockHeader{}
+		err := readBlockHeader(r, pver, &bh)
+		if err != nil {
+			return err
+		}
+
+		// Ensure the transaction count is zero for headers.
+		if bh.TxnCount > 0 {
+			str := "MsgHeaders.BtcDecode: block headers may not " +
+				"contain transactions [%v]"
+			return fmt.Errorf(str, count)
+		}
+		msg.AddBlockHeader(&bh)
+	}
+
+	return nil
+}
+
+// BtcEncode encodes the receiver to w using the bitcoin protocol encoding.
+// This is part of the Message interface implementation.
+func (msg *MsgHeaders) BtcEncode(w io.Writer, pver uint32) error {
+	// Limit to max block headers per message.
+	count := len(msg.Headers)
+	if count > MaxBlockHeadersPerMsg {
+		str := "MsgHeaders.BtcEncode: too many block headers in message [%v]"
+		return fmt.Errorf(str, count)
+	}
+
+	err := writeVarInt(w, pver, uint64(count))
+	if err != nil {
+		return err
+	}
+
+	for _, bh := range msg.Headers {
+		// Ensure block headers do not contain a transaction count.
+		if bh.TxnCount > 0 {
+			str := "MsgHeaders.BtcEncode: block headers " +
+				"may not contain transactions [%v]"
+			return fmt.Errorf(str, count)
+		}
+
+		err := writeBlockHeader(w, pver, bh)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+// Command returns the protocol command string for the message.  This is part
+// of the Message interface implementation.
+func (msg *MsgHeaders) Command() string {
+	return cmdHeaders
+}
+
+// MaxPayloadLength returns the maximum length the payload can be for the
+// receiver.  This is part of the Message interface implementation.
+func (msg *MsgHeaders) MaxPayloadLength(pver uint32) uint32 {
+	// Num headers (varInt) + max allowed headers.
+	return maxVarIntPayload + (maxBlockHeaderPayload * MaxBlockHeadersPerMsg)
+}
+
+// NewMsgGetHeaders returns a new bitcoin headers message that conforms to the
+// Message interface.  See MsgHeaders for details.
+func NewMsgHeaders() *MsgHeaders {
+	return &MsgHeaders{}
+}
