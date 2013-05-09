@@ -8,6 +8,7 @@ import (
 	"bytes"
 	"github.com/conformal/btcwire"
 	"github.com/davecgh/go-spew/spew"
+	"io"
 	"reflect"
 	"testing"
 )
@@ -188,6 +189,53 @@ func TestPingWire(t *testing.T) {
 		if !reflect.DeepEqual(msg, test.out) {
 			t.Errorf("BtcDecode #%d\n got: %s want: %s", i,
 				spew.Sdump(msg), spew.Sdump(test.out))
+			continue
+		}
+	}
+}
+
+// TestPingWireErrors performs negative tests against wire encode and decode
+// of MsgPing to confirm error paths work correctly.
+func TestPingWireErrors(t *testing.T) {
+	pver := btcwire.ProtocolVersion
+
+	tests := []struct {
+		in       *btcwire.MsgPing // Value to encode
+		buf      []byte           // Wire encoding
+		pver     uint32           // Protocol version for wire encoding
+		max      int              // Max size of fixed buffer to induce errors
+		writeErr error            // Expected write error
+		readErr  error            // Expected read error
+	}{
+		// Latest protocol version with intentional read/write errors.
+		{
+			&btcwire.MsgPing{Nonce: 123123}, // 0x1e0f3
+			[]byte{0xf3, 0xe0, 0x01, 0x00},
+			pver,
+			2,
+			io.ErrShortWrite,
+			io.ErrUnexpectedEOF,
+		},
+	}
+
+	t.Logf("Running %d tests", len(tests))
+	for i, test := range tests {
+		// Encode to wire format.
+		w := newFixedWriter(test.max)
+		err := test.in.BtcEncode(w, test.pver)
+		if err != test.writeErr {
+			t.Errorf("BtcEncode #%d wrong error got: %v, want :%v",
+				i, err, test.writeErr)
+			continue
+		}
+
+		// Decode from wire format.
+		var msg btcwire.MsgPing
+		r := newFixedReader(test.max, test.buf)
+		err = msg.BtcDecode(r, test.pver)
+		if err != test.readErr {
+			t.Errorf("BtcDecode #%d wrong error got: %v, want :%v",
+				i, err, test.readErr)
 			continue
 		}
 	}
