@@ -70,7 +70,7 @@ func NewShaHash(newHash []byte) (*ShaHash, error) {
 // NewShaHashFromStr converts a hash string in the standard bitcoin big-endian
 // form to a ShaHash (which is little-endian).
 func NewShaHashFromStr(hash string) (*ShaHash, error) {
-	// Return error is hash string is too long.
+	// Return error if hash string is too long.
 	if len(hash) > MaxHashStringSize {
 		return nil, ErrHashStrSize
 	}
