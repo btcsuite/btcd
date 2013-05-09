@@ -97,6 +97,12 @@ func makeEmptyMessage(command string) (Message, error) {
 	case cmdHeaders:
 		msg = &MsgHeaders{}
 
+	case cmdAlert:
+		msg = &MsgAlert{}
+
+	case cmdMemPool:
+		msg = &MsgMemPool{}
+
 	default:
 		return nil, fmt.Errorf("unhandled command [%s]", command)
 	}

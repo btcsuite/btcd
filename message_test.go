@@ -48,6 +48,8 @@ func TestMessage(t *testing.T) {
 	msgPong := btcwire.NewMsgPong(123123)
 	msgGetHeaders := btcwire.NewMsgGetHeaders()
 	msgHeaders := btcwire.NewMsgHeaders()
+	msgAlert := btcwire.NewMsgAlert("payload", "signature")
+	msgMemPool := btcwire.NewMsgMemPool()
 
 	tests := []struct {
 		in     btcwire.Message    // Value to encode
@@ -69,6 +71,8 @@ func TestMessage(t *testing.T) {
 		{msgPong, msgPong, pver, btcwire.MainNet},
 		{msgGetHeaders, msgGetHeaders, pver, btcwire.MainNet},
 		{msgHeaders, msgHeaders, pver, btcwire.MainNet},
+		{msgAlert, msgAlert, pver, btcwire.MainNet},
+		{msgMemPool, msgMemPool, pver, btcwire.MainNet},
 	}
 
 	t.Logf("Running %d tests", len(tests))
