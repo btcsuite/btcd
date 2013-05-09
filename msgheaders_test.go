@@ -12,12 +12,6 @@ import (
 	"testing"
 )
 
-var dumpmessage bool = false
-var checkverbose = true
-
-const time1 uint32 = 1363020888
-const time2 uint32 = 1363021079
-
 // TestHeaders tests the MsgHeaders API.
 func TestHeaders(t *testing.T) {
 	pver := uint32(60002)
