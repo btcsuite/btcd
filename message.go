@@ -117,7 +117,7 @@ type messageHeader struct {
 	checksum [4]byte    // 4 bytes
 }
 
-// readMessageHeader reads a bitcoin messager header from r.
+// readMessageHeader reads a bitcoin message header from r.
 func readMessageHeader(r io.Reader) (*messageHeader, error) {
 	var command [commandSize]byte
 
@@ -195,14 +195,9 @@ func readMessage(r io.Reader, pver uint32, hdr *messageHeader) (Message, []byte,
 
 	// Read payload.
 	payload := make([]byte, hdr.length)
-	n, err := io.ReadFull(r, payload)
+	_, err = io.ReadFull(r, payload)
 	if err != nil {
 		return nil, nil, err
-	}
-	if uint32(n) != hdr.length {
-		str := "readMessage: failed to read payload - Read %v " +
-			"bytes, but payload size is %v bytes."
-		return nil, nil, fmt.Errorf(str, n, hdr.length)
 	}
 
 	// Test checksum.
