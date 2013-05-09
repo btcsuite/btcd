@@ -14,7 +14,7 @@ import (
 const BlockVersion uint32 = 2
 
 // Version 4 bytes + Timestamp 4 bytes + Bits 4 bytes + Nonce 4 bytes +
-// TxnCount (varInt) + PrevBlock and MarkleRoot hashes.
+// TxnCount (varInt) + PrevBlock and MerkleRoot hashes.
 const maxBlockHeaderPayload = 16 + maxVarIntPayload + (HashSize * 2)
 
 // BlockHeader defines information about a block and is used in the bitcoin

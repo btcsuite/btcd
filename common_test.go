@@ -22,7 +22,7 @@ type fakeRandReader struct {
 }
 
 // Read returns the fake reader error and the lesser of the fake reader value
-// and the length p.
+// and the length of p.
 func (r *fakeRandReader) Read(p []byte) (int, error) {
 	n := r.n
 	if n > len(p) {

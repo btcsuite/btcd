@@ -104,7 +104,6 @@ func (msg *MsgBlock) BtcDecodeTxLoc(r *bytes.Buffer, pver uint32) ([]TxLoc, erro
 // BtcEncode encodes the receiver to w using the bitcoin protocol encoding.
 // This is part of the Message interface implementation.
 func (msg *MsgBlock) BtcEncode(w io.Writer, pver uint32) error {
-	// XXX: Max transactions?
 	msg.Header.TxnCount = uint64(len(msg.Transactions))
 
 	err := writeBlockHeader(w, pver, &msg.Header)
