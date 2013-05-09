@@ -145,7 +145,7 @@ func readMessageHeader(r io.Reader) (*messageHeader, error) {
 // prevent rogue nodes from causing massive memory allocation through forging
 // header length.
 func discardInput(r io.Reader, n uint32) {
-	maxSize := uint32(10240) // 2k at a time
+	maxSize := uint32(10 * 1024) // 10k at a time
 	numReads := n / maxSize
 	bytesRemaining := n % maxSize
 	if n > 0 {
