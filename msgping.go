@@ -8,7 +8,7 @@ import (
 	"io"
 )
 
-// MsgPong implements the Message interface and represents a bitcoin ping
+// MsgPing implements the Message interface and represents a bitcoin ping
 // message.
 //
 // For versions BIP0031Version and earlier, it is used primarily to confirm
