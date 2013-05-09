@@ -128,7 +128,7 @@ func TestVarIntWireErrors(t *testing.T) {
 		w := newFixedWriter(test.max)
 		err := btcwire.TstWriteVarInt(w, test.pver, test.in)
 		if err != test.writeErr {
-			t.Errorf("writeVarInt #%d wrong error got: %v, want :%v",
+			t.Errorf("writeVarInt #%d wrong error got: %v, want: %v",
 				i, err, test.writeErr)
 			continue
 		}
@@ -137,7 +137,7 @@ func TestVarIntWireErrors(t *testing.T) {
 		r := newFixedReader(test.max, test.buf)
 		_, err = btcwire.TstReadVarInt(r, test.pver)
 		if err != test.readErr {
-			t.Errorf("readVarInt #%d wrong error got: %v, want :%v",
+			t.Errorf("readVarInt #%d wrong error got: %v, want: %v",
 				i, err, test.readErr)
 			continue
 		}
@@ -227,7 +227,7 @@ func TestVarStringWireErrors(t *testing.T) {
 		w := newFixedWriter(test.max)
 		err := btcwire.TstWriteVarString(w, test.pver, test.in)
 		if err != test.writeErr {
-			t.Errorf("writeVarString #%d wrong error got: %v, want :%v",
+			t.Errorf("writeVarString #%d wrong error got: %v, want: %v",
 				i, err, test.writeErr)
 			continue
 		}
@@ -236,7 +236,7 @@ func TestVarStringWireErrors(t *testing.T) {
 		r := newFixedReader(test.max, test.buf)
 		_, err = btcwire.TstReadVarString(r, test.pver)
 		if err != test.readErr {
-			t.Errorf("readVarString #%d wrong error got: %v, want :%v",
+			t.Errorf("readVarString #%d wrong error got: %v, want: %v",
 				i, err, test.readErr)
 			continue
 		}
