@@ -80,8 +80,8 @@ negotiated.
 Bitcoin Network
 
 The bitcoin network is a magic number which is used to identify the start of a
-and which bitcoin network the message applies to.  This package provides the
-following constants:
+message and which bitcoin network the message applies to.  This package provides
+the following constants:
 
 	btcwire.MainNet
 	btcwire.TestNet
