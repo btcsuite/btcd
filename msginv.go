@@ -27,7 +27,7 @@ func (msg *MsgInv) AddInvVect(iv *InvVect) error {
 	if len(msg.InvList)+1 > MaxInvPerMsg {
 		str := fmt.Sprintf("too many invvect in message [max %v]",
 			MaxInvPerMsg)
-		return messageError("MsgInv.AddAddress", str)
+		return messageError("MsgInv.AddInvVect", str)
 	}
 
 	msg.InvList = append(msg.InvList, iv)
@@ -67,7 +67,7 @@ func (msg *MsgInv) BtcEncode(w io.Writer, pver uint32) error {
 	count := len(msg.InvList)
 	if count > MaxInvPerMsg {
 		str := fmt.Sprintf("too many invvect in message [%v]", count)
-		return messageError("MsgInv.BtcDecode", str)
+		return messageError("MsgInv.BtcEncode", str)
 	}
 
 	err := writeVarInt(w, pver, uint64(count))
