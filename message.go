@@ -226,6 +226,7 @@ func ReadMessage(r io.Reader, pver uint32, btcnet BitcoinNet) (Message, []byte, 
 
 	// Check for messages from the wrong bitcoin network.
 	if hdr.magic != btcnet {
+		discardInput(r, hdr.length)
 		str := fmt.Sprintf("message from other network [%v]", hdr.magic)
 		return nil, nil, messageError("ReadMessage", str)
 	}

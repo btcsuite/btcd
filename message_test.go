@@ -176,6 +176,10 @@ func TestReadMessageWireErrors(t *testing.T) {
 	badMessageBytes := makeHeader(btcnet, "addr", 1, 0xeaadc31c)
 	badMessageBytes = append(badMessageBytes, 0x2)
 
+	// Wire encoded bytes for a message which the header claims has 15k
+	// bytes of data to discard.
+	discardBytes := makeHeader(btcnet, "bogus", 15*1024, 0)
+
 	tests := []struct {
 		buf     []byte             // Wire encoding
 		pver    uint32             // Protocol version for wire encoding
@@ -264,6 +268,15 @@ func TestReadMessageWireErrors(t *testing.T) {
 			btcnet,
 			len(badMessageBytes),
 			io.EOF,
+		},
+
+		// 15k bytes of data to discard.
+		{
+			discardBytes,
+			pver,
+			btcnet,
+			len(discardBytes),
+			&btcwire.MessageError{},
 		},
 	}
 
