@@ -10,6 +10,12 @@ licensed under the liberal ISC license.
 There is an associated blog post about the release of this package
 [here](https://blog.conformal.com/btcwire-the-bitcoin-wire-protocol-package-from-btcd/).
 
+This package is one of the core packages from btcd, an alternative full-node
+implementation of bitcoin which is under active development by Conformal.
+Although it was primarily written for btcd, this package has intentionally been
+designed so it can be used as a standalone package for any projects needing to
+interface with bitcoin peers at the wire protocol level.
+
 ## Documentation
 
 Full `go doc` style documentation for the project can be viewed online without
