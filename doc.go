@@ -103,7 +103,6 @@ switch or type assertion.  An example of a type switch follows:
 	case *btcwire.MsgBlock:
 		// The message is a pointer to a MsgBlock struct.
 		fmt.Printf("Number of tx in block: %v", msg.Header.TxnCount)
-
 	}
 
 Reading Messages
@@ -144,8 +143,9 @@ Errors
 Most errors returned by this package are either the raw errors provided by
 underlying calls to read/write from streams, or raw strings that describe
 the error.  See the documentation of each function for any exceptions.  NOTE:
-This will change soon as the package should return errors that can be
-programatically tested.
+This is currently undergoing change to return errors of type MessageError for
+issues which are not io related so the caller can differentiate between
+general io errors and malformed messages.
 
 Bitcoin Improvement Proposals
 

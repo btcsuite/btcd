@@ -130,13 +130,6 @@ func readMessageHeader(r io.Reader) (*messageHeader, error) {
 	// Strip trailing zeros from command string.
 	hdr.command = string(bytes.TrimRight(command[:], string(0)))
 
-	// Enforce maximum message payload.
-	if hdr.length > maxMessagePayload {
-		str := "readMessageHeader: message payload is too large - " +
-			"Header indicates %d bytes, but max message payload is %d bytes."
-		return nil, fmt.Errorf(str, hdr.length, maxMessagePayload)
-	}
-
 	return &hdr, nil
 }
 
@@ -182,9 +175,10 @@ func WriteMessage(w io.Writer, msg Message, pver uint32, btcnet BitcoinNet) erro
 
 	// Enforce maximum message payload.
 	if lenp > maxMessagePayload {
-		str := "WriteMessage: message payload is too large - " +
-			"Encoded %d bytes, but maximum message payload is %d bytes."
-		return fmt.Errorf(str, lenp, maxMessagePayload)
+		str := fmt.Sprintf("message payload is too large - encoded "+
+			"%d bytes, but maximum message payload is %d bytes",
+			lenp, maxMessagePayload)
+		return messageError("WriteMessage", str)
 	}
 
 	// Create header for the message.
@@ -206,9 +200,9 @@ func WriteMessage(w io.Writer, msg Message, pver uint32, btcnet BitcoinNet) erro
 		return err
 	}
 	if n != lenp {
-		str := "WriteMessage: failed to write payload. " +
-			"Wrote %v bytes, but payload size is %v bytes."
-		return fmt.Errorf(str, n, lenp)
+		str := fmt.Sprintf("failed to write payload - wrote %v bytes, "+
+			"payload size is %v bytes", n, lenp)
+		return messageError("WriteMessage", str)
 	}
 	return nil
 }
@@ -221,23 +215,34 @@ func ReadMessage(r io.Reader, pver uint32, btcnet BitcoinNet) (Message, []byte, 
 		return nil, nil, err
 	}
 
-	if hdr.magic != btcnet {
-		str := "ReadMessage: message from other network [%v]"
-		return nil, nil, fmt.Errorf(str, hdr.magic)
+	// Enforce maximum message payload.
+	if hdr.length > maxMessagePayload {
+		str := fmt.Sprintf("message payload is too large - header "+
+			"indicates %d bytes, but max message payload is %d "+
+			"bytes.", hdr.length, maxMessagePayload)
+		return nil, nil, messageError("ReadMessage", str)
+
 	}
 
+	// Check for messages from the wrong bitcoin network.
+	if hdr.magic != btcnet {
+		str := fmt.Sprintf("message from other network [%v]", hdr.magic)
+		return nil, nil, messageError("ReadMessage", str)
+	}
+
+	// Check for malformed commands.
 	command := hdr.command
 	if !utf8.ValidString(command) {
 		discardInput(r, hdr.length)
-		str := "readMessage: invalid command %v"
-		return nil, nil, fmt.Errorf(str, []byte(command))
+		str := fmt.Sprintf("invalid command %v", []byte(command))
+		return nil, nil, messageError("ReadMessage", str)
 	}
 
 	// Create struct of appropriate message type based on the command.
 	msg, err := makeEmptyMessage(command)
 	if err != nil {
 		discardInput(r, hdr.length)
-		return nil, nil, fmt.Errorf("readMessage: %v", err)
+		return nil, nil, messageError("ReadMessage", err.Error())
 	}
 
 	// Check for maximum length based on the message type as a malicious client
@@ -246,10 +251,10 @@ func ReadMessage(r io.Reader, pver uint32, btcnet BitcoinNet) (Message, []byte, 
 	mpl := msg.MaxPayloadLength(pver)
 	if hdr.length > mpl {
 		discardInput(r, hdr.length)
-		str := "ReadMessage: payload exceeds max length - Header " +
-			"indicates %v bytes, but max payload size for messages of type " +
-			"[%v] is %v."
-		return nil, nil, fmt.Errorf(str, hdr.length, command, mpl)
+		str := fmt.Sprintf("payload exceeds max length - header "+
+			"indicates %v bytes, but max payload size for "+
+			"messages of type [%v] is %v.", hdr.length, command, mpl)
+		return nil, nil, messageError("ReadMessage", str)
 	}
 
 	// Read payload.
@@ -262,9 +267,10 @@ func ReadMessage(r io.Reader, pver uint32, btcnet BitcoinNet) (Message, []byte, 
 	// Test checksum.
 	checksum := DoubleSha256(payload)[0:4]
 	if !bytes.Equal(checksum[:], hdr.checksum[:]) {
-		str := "readMessage: payload checksum failed - Header " +
-			"indicates %v, but actual checksum is %v."
-		return nil, nil, fmt.Errorf(str, hdr.checksum, checksum)
+		str := fmt.Sprintf("payload checksum failed - header "+
+			"indicates %v, but actual checksum is %v.",
+			hdr.checksum, checksum)
+		return nil, nil, messageError("ReadMessage", str)
 	}
 
 	// Unmarshal message.
