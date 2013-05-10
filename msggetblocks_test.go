@@ -108,9 +108,9 @@ func TestGetBlocksWire(t *testing.T) {
 	}
 
 	// MsgGetBlocks message with no block locators or stop hash.
-	NoLocators := btcwire.NewMsgGetBlocks(&btcwire.ShaHash{})
-	NoLocators.ProtocolVersion = pver
-	NoLocatorsEncoded := []byte{
+	noLocators := btcwire.NewMsgGetBlocks(&btcwire.ShaHash{})
+	noLocators.ProtocolVersion = pver
+	noLocatorsEncoded := []byte{
 		0x62, 0xea, 0x00, 0x00, // Protocol version 60002
 		0x00, // Varint for number of block locator hashes
 		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
@@ -120,10 +120,11 @@ func TestGetBlocksWire(t *testing.T) {
 	}
 
 	// MsgGetBlocks message with multiple block locators and a stop hash.
-	MultiLocators := btcwire.NewMsgGetBlocks(hashStop)
-	MultiLocators.AddBlockLocatorHash(hashLocator2)
-	MultiLocators.AddBlockLocatorHash(hashLocator)
-	MultiLocatorsEncoded := []byte{
+	multiLocators := btcwire.NewMsgGetBlocks(hashStop)
+	multiLocators.AddBlockLocatorHash(hashLocator2)
+	multiLocators.AddBlockLocatorHash(hashLocator)
+	multiLocators.ProtocolVersion = pver
+	multiLocatorsEncoded := []byte{
 		0x62, 0xea, 0x00, 0x00, // Protocol version 60002
 		0x02, // Varint for number of block locator hashes
 		0xe0, 0xde, 0x06, 0x44, 0x68, 0x13, 0x2c, 0x63,
@@ -148,81 +149,81 @@ func TestGetBlocksWire(t *testing.T) {
 	}{
 		// Latest protocol version with no block locators.
 		{
-			NoLocators,
-			NoLocators,
-			NoLocatorsEncoded,
+			noLocators,
+			noLocators,
+			noLocatorsEncoded,
 			btcwire.ProtocolVersion,
 		},
 
 		// Latest protocol version with multiple block locators.
 		{
-			MultiLocators,
-			MultiLocators,
-			MultiLocatorsEncoded,
+			multiLocators,
+			multiLocators,
+			multiLocatorsEncoded,
 			btcwire.ProtocolVersion,
 		},
 
 		// Protocol version BIP0035Version with no block locators.
 		{
-			NoLocators,
-			NoLocators,
-			NoLocatorsEncoded,
+			noLocators,
+			noLocators,
+			noLocatorsEncoded,
 			btcwire.BIP0035Version,
 		},
 
 		// Protocol version BIP0035Version with multiple block locators.
 		{
-			MultiLocators,
-			MultiLocators,
-			MultiLocatorsEncoded,
+			multiLocators,
+			multiLocators,
+			multiLocatorsEncoded,
 			btcwire.BIP0035Version,
 		},
 
 		// Protocol version BIP0031Version with no block locators.
 		{
-			NoLocators,
-			NoLocators,
-			NoLocatorsEncoded,
+			noLocators,
+			noLocators,
+			noLocatorsEncoded,
 			btcwire.BIP0031Version,
 		},
 
 		// Protocol version BIP0031Versionwith multiple block locators.
 		{
-			MultiLocators,
-			MultiLocators,
-			MultiLocatorsEncoded,
+			multiLocators,
+			multiLocators,
+			multiLocatorsEncoded,
 			btcwire.BIP0031Version,
 		},
 
 		// Protocol version NetAddressTimeVersion with no block locators.
 		{
-			NoLocators,
-			NoLocators,
-			NoLocatorsEncoded,
+			noLocators,
+			noLocators,
+			noLocatorsEncoded,
 			btcwire.NetAddressTimeVersion,
 		},
 
 		// Protocol version NetAddressTimeVersion multiple block locators.
 		{
-			MultiLocators,
-			MultiLocators,
-			MultiLocatorsEncoded,
+			multiLocators,
+			multiLocators,
+			multiLocatorsEncoded,
 			btcwire.NetAddressTimeVersion,
 		},
 
 		// Protocol version MultipleAddressVersion with no block locators.
 		{
-			NoLocators,
-			NoLocators,
-			NoLocatorsEncoded,
+			noLocators,
+			noLocators,
+			noLocatorsEncoded,
 			btcwire.MultipleAddressVersion,
 		},
 
 		// Protocol version MultipleAddressVersion multiple block locators.
 		{
-			MultiLocators,
-			MultiLocators,
-			MultiLocatorsEncoded,
+			multiLocators,
+			multiLocators,
+			multiLocatorsEncoded,
 			btcwire.MultipleAddressVersion,
 		},
 	}
