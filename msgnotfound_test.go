@@ -8,6 +8,7 @@ import (
 	"bytes"
 	"github.com/conformal/btcwire"
 	"github.com/davecgh/go-spew/spew"
+	"io"
 	"reflect"
 	"testing"
 )
@@ -218,5 +219,104 @@ func TestNotFoundWire(t *testing.T) {
 				spew.Sdump(msg), spew.Sdump(test.out))
 			continue
 		}
+	}
+}
+
+// TestNotFoundWireErrors performs negative tests against wire encode and decode
+// of MsgNotFound to confirm error paths work correctly.
+func TestNotFoundWireErrors(t *testing.T) {
+	pver := btcwire.ProtocolVersion
+	btcwireErr := &btcwire.MessageError{}
+
+	// Block 203707 hash.
+	hashStr := "3264bc2ac36a60840790ba1d475d01367e7c723da941069e9dc"
+	blockHash, err := btcwire.NewShaHashFromStr(hashStr)
+	if err != nil {
+		t.Errorf("NewShaHashFromStr: %v", err)
+	}
+
+	iv := btcwire.NewInvVect(btcwire.InvVect_Block, blockHash)
+
+	// Base message used to induce errors.
+	baseNotFound := btcwire.NewMsgNotFound()
+	baseNotFound.AddInvVect(iv)
+	baseNotFoundEncoded := []byte{
+		0x02,                   // Varint for number of inv vectors
+		0x02, 0x00, 0x00, 0x00, // InvVect_Block
+		0xdc, 0xe9, 0x69, 0x10, 0x94, 0xda, 0x23, 0xc7,
+		0xe7, 0x67, 0x13, 0xd0, 0x75, 0xd4, 0xa1, 0x0b,
+		0x79, 0x40, 0x08, 0xa6, 0x36, 0xac, 0xc2, 0x4b,
+		0x26, 0x03, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // Block 203707 hash
+	}
+
+	// Message that forces an error by having more than the max allowed inv
+	// vectors.
+	maxNotFound := btcwire.NewMsgNotFound()
+	for i := 0; i < btcwire.MaxInvPerMsg; i++ {
+		maxNotFound.AddInvVect(iv)
+	}
+	maxNotFound.InvList = append(maxNotFound.InvList, iv)
+	maxNotFoundEncoded := []byte{
+		0xfd, 0x51, 0xc3, // Varint for number of inv vectors (50001)
+	}
+
+	tests := []struct {
+		in       *btcwire.MsgNotFound // Value to encode
+		buf      []byte               // Wire encoding
+		pver     uint32               // Protocol version for wire encoding
+		max      int                  // Max size of fixed buffer to induce errors
+		writeErr error                // Expected write error
+		readErr  error                // Expected read error
+	}{
+		// Latest protocol version with intentional read/write errors.
+		// Force error in inventory vector count
+		{baseNotFound, baseNotFoundEncoded, pver, 0, io.ErrShortWrite, io.EOF},
+		// Force error in inventory list.
+		{baseNotFound, baseNotFoundEncoded, pver, 1, io.ErrShortWrite, io.EOF},
+		// Force error with greater than max inventory vectors.
+		{maxNotFound, maxNotFoundEncoded, pver, 3, btcwireErr, btcwireErr},
+	}
+
+	t.Logf("Running %d tests", len(tests))
+	for i, test := range tests {
+		// Encode to wire format.
+		w := newFixedWriter(test.max)
+		err := test.in.BtcEncode(w, test.pver)
+		if reflect.TypeOf(err) != reflect.TypeOf(test.writeErr) {
+			t.Errorf("BtcEncode #%d wrong error got: %v, want: %v",
+				i, err, test.writeErr)
+			continue
+		}
+
+		// For errors which are not of type btcwire.MessageError, check
+		// them for equality.
+		if _, ok := err.(*btcwire.MessageError); !ok {
+			if err != test.writeErr {
+				t.Errorf("BtcEncode #%d wrong error got: %v, "+
+					"want: %v", i, err, test.writeErr)
+				continue
+			}
+		}
+
+		// Decode from wire format.
+		var msg btcwire.MsgNotFound
+		r := newFixedReader(test.max, test.buf)
+		err = msg.BtcDecode(r, test.pver)
+		if reflect.TypeOf(err) != reflect.TypeOf(test.readErr) {
+			t.Errorf("BtcDecode #%d wrong error got: %v, want: %v",
+				i, err, test.readErr)
+			continue
+		}
+
+		// For errors which are not of type btcwire.MessageError, check
+		// them for equality.
+		if _, ok := err.(*btcwire.MessageError); !ok {
+			if err != test.readErr {
+				t.Errorf("BtcEncode #%d wrong error got: %v, "+
+					"want: %v", i, err, test.readErr)
+				continue
+			}
+		}
+
 	}
 }
