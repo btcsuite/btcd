@@ -268,12 +268,12 @@ func TestGetDataWireErrors(t *testing.T) {
 		writeErr error               // Expected write error
 		readErr  error               // Expected read error
 	}{
-		//// Latest protocol version with intentional read/write errors.
-		//// Force error in inventory vector count
+		// Latest protocol version with intentional read/write errors.
+		// Force error in inventory vector count
 		{baseGetData, baseGetDataEncoded, pver, 0, io.ErrShortWrite, io.EOF},
-		//// Force error in inventory list.
+		// Force error in inventory list.
 		{baseGetData, baseGetDataEncoded, pver, 1, io.ErrShortWrite, io.EOF},
-		//// Force error with greater than max inventory vectors.
+		// Force error with greater than max inventory vectors.
 		{maxGetData, maxGetDataEncoded, pver, 3, btcwireErr, btcwireErr},
 	}
 
