@@ -15,7 +15,7 @@ import (
 
 // TestBlock tests the MsgBlock API.
 func TestBlock(t *testing.T) {
-	pver := uint32(60002)
+	pver := btcwire.ProtocolVersion
 
 	// Block 1 header.
 	prevHash := &blockOne.Header.PrevBlock
@@ -67,8 +67,13 @@ func TestBlock(t *testing.T) {
 	return
 }
 
+// TestBlockTxShas tests the ability to generate a slice of all transaction
+// hashes from a block accurately.
 func TestBlockTxShas(t *testing.T) {
-	pver := btcwire.ProtocolVersion
+	// Use protocol version 60002 specifically here instead of the latest
+	// because the test data is using bytes encoded with that protocol
+	// version.
+	pver := uint32(60002)
 
 	// Block 1, transaction 1 hash.
 	hashStr := "0e3e2357e806b6cdb1f70b54c3a3a17b6714ee1f0e68bebb44a74b1efd512098"
@@ -89,8 +94,12 @@ func TestBlockTxShas(t *testing.T) {
 	}
 }
 
+// TestBlockSha tests the ability to generate the hash of a block accurately.
 func TestBlockSha(t *testing.T) {
-	pver := btcwire.ProtocolVersion
+	// Use protocol version 60002 specifically here instead of the latest
+	// because the test data is using bytes encoded with that protocol
+	// version.
+	pver := uint32(60002)
 
 	// Block 1 hash.
 	hashStr := "839a8e6886ab5951d76f411475428afc90947ee320161bbf18eb6048"
@@ -250,6 +259,7 @@ var blockOne btcwire.MsgBlock = btcwire.MsgBlock{
 	},
 }
 
+// Bytes encoded with protocol version 60002.
 var blockOneBytes = []byte{
 	0x01, 0x00, 0x00, 0x00, // Version 1
 	0x6f, 0xe2, 0x8c, 0x0a, 0xb6, 0xf1, 0xb3, 0x72,
