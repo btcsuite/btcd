@@ -151,7 +151,7 @@ func writeVarString(w io.Writer, pver uint32, str string) error {
 
 // randomUint64 returns a cryptographically random uint64 value.  This
 // unexported version takes a reader primarily to ensure the error paths
-// can be properly by passing a fake reader in the tests.
+// can be properly tested by passing a fake reader in the tests.
 func randomUint64(r io.Reader) (uint64, error) {
 	b := make([]byte, 8)
 	n, err := r.Read(b)
