@@ -12,7 +12,7 @@ import (
 const (
 	MainPort               = "8333"
 	TestNetPort            = "18333"
-	ProtocolVersion uint32 = 60002
+	ProtocolVersion uint32 = 70001
 	TxVersion              = 1
 
 	// MultipleAddressVersion is the protocol version which added multiple
@@ -30,6 +30,11 @@ const (
 	// BIP0035Version is the protocol version which added the mempool
 	// message (pver >= BIP0035Version).
 	BIP0035Version uint32 = 60002
+
+	// BIP0037Version is the protocol version which added new connection
+	// bloom filtering related messages and extended the version message
+	// with a relay flag (pver >= BIP0037Version).
+	BIP0037Version uint32 = 70001
 )
 
 // ServiceFlag identifies services supported by a bitcoin peer.
