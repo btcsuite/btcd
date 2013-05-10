@@ -87,12 +87,6 @@ func TstWriteBlockHeader(w io.Writer, pver uint32, bh *BlockHeader) error {
 	return writeBlockHeader(w, pver, bh)
 }
 
-// TstReadMessage makes the internal readMessage function available to
-// the test package.
-func TstReadMessage(r io.Reader, pver uint32, hdr *messageHeader) (Message, []byte, error) {
-	return readMessage(r, pver, hdr)
-}
-
 // TstReadMessageHeader makes the internal readMessageHeader function available
 // to the test package.
 func TstReadMessageHeader(r io.Reader) (*messageHeader, error) {

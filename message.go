@@ -160,64 +160,6 @@ func discardInput(r io.Reader, n uint32) {
 	}
 }
 
-// readMessage reads the next bitcoin message from r for the provided protocol
-// version and message header.
-func readMessage(r io.Reader, pver uint32, hdr *messageHeader) (Message, []byte, error) {
-	if hdr == nil {
-		return nil, nil, fmt.Errorf("readMessage: nil header")
-	}
-
-	command := hdr.command
-	if !utf8.ValidString(command) {
-		discardInput(r, hdr.length)
-		str := "readMessage: invalid command %v"
-		return nil, nil, fmt.Errorf(str, []byte(command))
-	}
-
-	// Create struct of appropriate message type based on the command.
-	msg, err := makeEmptyMessage(command)
-	if err != nil {
-		discardInput(r, hdr.length)
-		return nil, nil, fmt.Errorf("readMessage: %v", err)
-	}
-
-	// Check for maximum length based on the message type as a malicious client
-	// could otherwise create a well-formed header and set the length to max
-	// numbers in order to exhaust the machine's memory.
-	mpl := msg.MaxPayloadLength(pver)
-	if hdr.length > mpl {
-		discardInput(r, hdr.length)
-		str := "ReadMessage: payload exceeds max length - Header " +
-			"indicates %v bytes, but max payload size for messages of type " +
-			"[%v] is %v."
-		return nil, nil, fmt.Errorf(str, hdr.length, command, mpl)
-	}
-
-	// Read payload.
-	payload := make([]byte, hdr.length)
-	_, err = io.ReadFull(r, payload)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	// Test checksum.
-	checksum := DoubleSha256(payload)[0:4]
-	if !bytes.Equal(checksum[:], hdr.checksum[:]) {
-		str := "readMessage: payload checksum failed - Header " +
-			"indicates %v, but actual checksum is %v."
-		return nil, nil, fmt.Errorf(str, hdr.checksum, checksum)
-	}
-
-	// Unmarshal message.
-	pr := bytes.NewBuffer(payload)
-	err = msg.BtcDecode(pr, pver)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	return msg, payload, nil
-}
-
 // WriteMessage writes a bitcoin Message to w including the necessary header
 // information.
 func WriteMessage(w io.Writer, msg Message, pver uint32, btcnet BitcoinNet) error {
@@ -271,7 +213,8 @@ func WriteMessage(w io.Writer, msg Message, pver uint32, btcnet BitcoinNet) erro
 	return nil
 }
 
-// ReadMessage reads, validates, and parses the next bitcoin Message from r.
+// ReadMessage reads, validates, and parses the next bitcoin Message from r for
+// the provided protocol version and bitcoin network.
 func ReadMessage(r io.Reader, pver uint32, btcnet BitcoinNet) (Message, []byte, error) {
 	hdr, err := readMessageHeader(r)
 	if err != nil {
@@ -283,5 +226,53 @@ func ReadMessage(r io.Reader, pver uint32, btcnet BitcoinNet) (Message, []byte, 
 		return nil, nil, fmt.Errorf(str, hdr.magic)
 	}
 
-	return readMessage(r, pver, hdr)
+	command := hdr.command
+	if !utf8.ValidString(command) {
+		discardInput(r, hdr.length)
+		str := "readMessage: invalid command %v"
+		return nil, nil, fmt.Errorf(str, []byte(command))
+	}
+
+	// Create struct of appropriate message type based on the command.
+	msg, err := makeEmptyMessage(command)
+	if err != nil {
+		discardInput(r, hdr.length)
+		return nil, nil, fmt.Errorf("readMessage: %v", err)
+	}
+
+	// Check for maximum length based on the message type as a malicious client
+	// could otherwise create a well-formed header and set the length to max
+	// numbers in order to exhaust the machine's memory.
+	mpl := msg.MaxPayloadLength(pver)
+	if hdr.length > mpl {
+		discardInput(r, hdr.length)
+		str := "ReadMessage: payload exceeds max length - Header " +
+			"indicates %v bytes, but max payload size for messages of type " +
+			"[%v] is %v."
+		return nil, nil, fmt.Errorf(str, hdr.length, command, mpl)
+	}
+
+	// Read payload.
+	payload := make([]byte, hdr.length)
+	_, err = io.ReadFull(r, payload)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	// Test checksum.
+	checksum := DoubleSha256(payload)[0:4]
+	if !bytes.Equal(checksum[:], hdr.checksum[:]) {
+		str := "readMessage: payload checksum failed - Header " +
+			"indicates %v, but actual checksum is %v."
+		return nil, nil, fmt.Errorf(str, hdr.checksum, checksum)
+	}
+
+	// Unmarshal message.
+	pr := bytes.NewBuffer(payload)
+	err = msg.BtcDecode(pr, pver)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return msg, payload, nil
 }
