@@ -28,7 +28,7 @@ func (msg *MsgGetData) AddInvVect(iv *InvVect) error {
 	if len(msg.InvList)+1 > MaxInvPerMsg {
 		str := fmt.Sprintf("too many invvect in message [max %v]",
 			MaxInvPerMsg)
-		return messageError("MsgAddr.AddInvVect", str)
+		return messageError("MsgGetData.AddInvVect", str)
 	}
 
 	msg.InvList = append(msg.InvList, iv)
