@@ -8,6 +8,7 @@ import (
 	"bytes"
 	"github.com/conformal/btcwire"
 	"github.com/davecgh/go-spew/spew"
+	"io"
 	"net"
 	"reflect"
 	"testing"
@@ -209,6 +210,83 @@ func TestNetAddressWire(t *testing.T) {
 		if !reflect.DeepEqual(na, test.out) {
 			t.Errorf("readNetAddress #%d\n got: %s want: %s", i,
 				spew.Sdump(na), spew.Sdump(test.out))
+			continue
+		}
+	}
+}
+
+// TestNetAddressWireErrors performs negative tests against wire encode and
+// decode NetAddress to confirm error paths work correctly.
+func TestNetAddressWireErrors(t *testing.T) {
+	pver := btcwire.ProtocolVersion
+	pverNAT := btcwire.NetAddressTimeVersion - 1
+
+	// baseNetAddr is used in the various tests as a baseline NetAddress.
+	baseNetAddr := btcwire.NetAddress{
+		Timestamp: time.Unix(0x495fab29, 0), // 2009-01-03 12:15:05 -0600 CST
+		Services:  btcwire.SFNodeNetwork,
+		IP:        net.ParseIP("127.0.0.1"),
+		Port:      8333,
+	}
+
+	tests := []struct {
+		in       *btcwire.NetAddress // Value to encode
+		buf      []byte              // Wire encoding
+		pver     uint32              // Protocol version for wire encoding
+		ts       bool                // Include timestamp flag
+		max      int                 // Max size of fixed buffer to induce errors
+		writeErr error               // Expected write error
+		readErr  error               // Expected read error
+	}{
+		// Latest protocol version with timestamp and intentional
+		// read/write errors.
+		// Force errors on timestamp.
+		{&baseNetAddr, []byte{}, pver, true, 0, io.ErrShortWrite, io.EOF},
+		// Force errors on services.
+		{&baseNetAddr, []byte{}, pver, true, 4, io.ErrShortWrite, io.EOF},
+		// Force errors on ip.
+		{&baseNetAddr, []byte{}, pver, true, 12, io.ErrShortWrite, io.EOF},
+		// Force errors on port.
+		{&baseNetAddr, []byte{}, pver, true, 28, io.ErrShortWrite, io.EOF},
+
+		// Latest protocol version with no timestamp and intentional
+		// read/write errors.
+		// Force errors on services.
+		{&baseNetAddr, []byte{}, pver, false, 0, io.ErrShortWrite, io.EOF},
+		// Force errors on ip.
+		{&baseNetAddr, []byte{}, pver, false, 8, io.ErrShortWrite, io.EOF},
+		// Force errors on port.
+		{&baseNetAddr, []byte{}, pver, false, 24, io.ErrShortWrite, io.EOF},
+
+		// Protocol version before NetAddressTimeVersion with timestamp
+		// flag set (should not have timestamp due to old protocol
+		// version) and  intentional read/write errors.
+		// Force errors on services.
+		{&baseNetAddr, []byte{}, pverNAT, true, 0, io.ErrShortWrite, io.EOF},
+		// Force errors on ip.
+		{&baseNetAddr, []byte{}, pverNAT, true, 8, io.ErrShortWrite, io.EOF},
+		// Force errors on port.
+		{&baseNetAddr, []byte{}, pverNAT, true, 24, io.ErrShortWrite, io.EOF},
+	}
+
+	t.Logf("Running %d tests", len(tests))
+	for i, test := range tests {
+		// Encode to wire format.
+		w := newFixedWriter(test.max)
+		err := btcwire.TstWriteNetAddress(w, test.pver, test.in, test.ts)
+		if err != test.writeErr {
+			t.Errorf("writeNetAddress #%d wrong error got: %v, want: %v",
+				i, err, test.writeErr)
+			continue
+		}
+
+		// Decode from wire format.
+		var na btcwire.NetAddress
+		r := newFixedReader(test.max, test.buf)
+		err = btcwire.TstReadNetAddress(r, test.pver, &na, test.ts)
+		if err != test.readErr {
+			t.Errorf("readNetAddress #%d wrong error got: %v, want: %v",
+				i, err, test.readErr)
 			continue
 		}
 	}
