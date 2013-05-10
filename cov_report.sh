@@ -4,7 +4,7 @@
 # The gocov tool my be obtained with the following command:
 #   go get github.com/awx/gocov/gocov
 #
-# It will be installed it $GOPATH/bin, so ensure that location is in your $PATH.
+# It will be installed to $GOPATH/bin, so ensure that location is in your $PATH.
 
 # Check for gocov.
 type gocov >/dev/null 2>&1
