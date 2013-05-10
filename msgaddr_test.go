@@ -8,6 +8,7 @@ import (
 	"bytes"
 	"github.com/conformal/btcwire"
 	"github.com/davecgh/go-spew/spew"
+	"io"
 	"net"
 	"reflect"
 	"testing"
@@ -201,5 +202,119 @@ func TestAddrWire(t *testing.T) {
 				spew.Sdump(msg), spew.Sdump(test.out))
 			continue
 		}
+	}
+}
+
+// TestAddrWireErrors performs negative tests against wire encode and decode
+// of MsgAddr to confirm error paths work correctly.
+func TestAddrWireErrors(t *testing.T) {
+	pver := btcwire.ProtocolVersion
+	pverMA := btcwire.MultipleAddressVersion
+	btcwireErr := &btcwire.MessageError{}
+
+	// A couple of NetAddresses to use for testing.
+	na := &btcwire.NetAddress{
+		Timestamp: time.Unix(0x495fab29, 0), // 2009-01-03 12:15:05 -0600 CST
+		Services:  btcwire.SFNodeNetwork,
+		IP:        net.ParseIP("127.0.0.1"),
+		Port:      8333,
+	}
+	na2 := &btcwire.NetAddress{
+		Timestamp: time.Unix(0x495fab29, 0), // 2009-01-03 12:15:05 -0600 CST
+		Services:  btcwire.SFNodeNetwork,
+		IP:        net.ParseIP("192.168.0.1"),
+		Port:      8334,
+	}
+
+	// Address message with multiple addresses.
+	baseAddr := btcwire.NewMsgAddr()
+	baseAddr.AddAddresses(na, na2)
+	baseAddrEncoded := []byte{
+		0x02,                   // Varint for number of addresses
+		0x29, 0xab, 0x5f, 0x49, // Timestamp
+		0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // SFNodeNetwork
+		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+		0x00, 0x00, 0xff, 0xff, 0x7f, 0x00, 0x00, 0x01, // IP 127.0.0.1
+		0x20, 0x8d, // Port 8333 in big-endian
+		0x29, 0xab, 0x5f, 0x49, // Timestamp
+		0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // SFNodeNetwork
+		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+		0x00, 0x00, 0xff, 0xff, 0xc0, 0xa8, 0x00, 0x01, // IP 192.168.0.1
+		0x20, 0x8e, // Port 8334 in big-endian
+
+	}
+
+	// Message that forces an error by having more than the max allowed
+	// addresses.
+	maxAddr := btcwire.NewMsgAddr()
+	for i := 0; i < btcwire.MaxAddrPerMsg; i++ {
+		maxAddr.AddAddress(na)
+	}
+	maxAddr.AddrList = append(maxAddr.AddrList, na)
+	maxAddrEncoded := []byte{
+		0xfd, 0x03, 0xe9, // Varint for number of addresses (1001)
+	}
+
+	tests := []struct {
+		in       *btcwire.MsgAddr // Value to encode
+		buf      []byte           // Wire encoding
+		pver     uint32           // Protocol version for wire encoding
+		max      int              // Max size of fixed buffer to induce errors
+		writeErr error            // Expected write error
+		readErr  error            // Expected read error
+	}{
+		// Latest protocol version with intentional read/write errors.
+		// Force error in addresses count
+		{baseAddr, baseAddrEncoded, pver, 0, io.ErrShortWrite, io.EOF},
+		// Force error in address list.
+		{baseAddr, baseAddrEncoded, pver, 1, io.ErrShortWrite, io.EOF},
+		// Force error with greater than max inventory vectors.
+		{maxAddr, maxAddrEncoded, pver, 3, btcwireErr, btcwireErr},
+		// Force error with greater than max inventory vectors for
+		// protocol versions before multiple addresses were allowed.
+		{maxAddr, maxAddrEncoded, pverMA - 1, 3, btcwireErr, btcwireErr},
+	}
+
+	t.Logf("Running %d tests", len(tests))
+	for i, test := range tests {
+		// Encode to wire format.
+		w := newFixedWriter(test.max)
+		err := test.in.BtcEncode(w, test.pver)
+		if reflect.TypeOf(err) != reflect.TypeOf(test.writeErr) {
+			t.Errorf("BtcEncode #%d wrong error got: %v, want: %v",
+				i, err, test.writeErr)
+			continue
+		}
+
+		// For errors which are not of type btcwire.MessageError, check
+		// them for equality.
+		if _, ok := err.(*btcwire.MessageError); !ok {
+			if err != test.writeErr {
+				t.Errorf("BtcEncode #%d wrong error got: %v, "+
+					"want: %v", i, err, test.writeErr)
+				continue
+			}
+		}
+
+		// Decode from wire format.
+		var msg btcwire.MsgAddr
+		r := newFixedReader(test.max, test.buf)
+		err = msg.BtcDecode(r, test.pver)
+		if reflect.TypeOf(err) != reflect.TypeOf(test.readErr) {
+			t.Errorf("BtcDecode #%d wrong error got: %v, want: %v",
+				i, err, test.readErr)
+			continue
+		}
+
+		// For errors which are not of type btcwire.MessageError, check
+		// them for equality.
+		if _, ok := err.(*btcwire.MessageError); !ok {
+			if err != test.readErr {
+				t.Errorf("BtcEncode #%d wrong error got: %v, "+
+					"want: %v", i, err, test.readErr)
+				continue
+			}
+		}
+
 	}
 }
