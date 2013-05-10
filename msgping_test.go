@@ -224,7 +224,7 @@ func TestPingWireErrors(t *testing.T) {
 		w := newFixedWriter(test.max)
 		err := test.in.BtcEncode(w, test.pver)
 		if err != test.writeErr {
-			t.Errorf("BtcEncode #%d wrong error got: %v, want :%v",
+			t.Errorf("BtcEncode #%d wrong error got: %v, want: %v",
 				i, err, test.writeErr)
 			continue
 		}
@@ -234,7 +234,7 @@ func TestPingWireErrors(t *testing.T) {
 		r := newFixedReader(test.max, test.buf)
 		err = msg.BtcDecode(r, test.pver)
 		if err != test.readErr {
-			t.Errorf("BtcDecode #%d wrong error got: %v, want :%v",
+			t.Errorf("BtcDecode #%d wrong error got: %v, want: %v",
 				i, err, test.readErr)
 			continue
 		}
