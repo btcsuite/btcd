@@ -15,6 +15,10 @@ import (
 	"io"
 )
 
+// MaxMessagePayload makes the internal maxMessagePayload constant available to
+// the test package.
+const MaxMessagePayload uint32 = maxMessagePayload
+
 // TstRandomUint64 makes the internal randomUint64 function available to the
 // test package.
 func TstRandomUint64(r io.Reader) (uint64, error) {
