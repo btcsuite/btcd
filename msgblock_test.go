@@ -8,6 +8,7 @@ import (
 	"bytes"
 	"github.com/conformal/btcwire"
 	"github.com/davecgh/go-spew/spew"
+	"io"
 	"reflect"
 	"testing"
 	"time"
@@ -195,6 +196,64 @@ func TestBlockWire(t *testing.T) {
 		if !reflect.DeepEqual(&msg, test.out) {
 			t.Errorf("BtcDecode #%d\n got: %s want: %s", i,
 				spew.Sdump(&msg), spew.Sdump(test.out))
+			continue
+		}
+	}
+}
+
+// TestBlockWireErrors performs negative tests against wire encode and decode
+// of MsgBlock to confirm error paths work correctly.
+func TestBlockWireErrors(t *testing.T) {
+	// Use protocol version 60002 specifically here instead of the latest
+	// because the test data is using bytes encoded with that protocol
+	// version.
+	pver := uint32(60002)
+
+	tests := []struct {
+		in       *btcwire.MsgBlock // Value to encode
+		buf      []byte            // Wire encoding
+		pver     uint32            // Protocol version for wire encoding
+		max      int               // Max size of fixed buffer to induce errors
+		writeErr error             // Expected write error
+		readErr  error             // Expected read error
+	}{
+		// Latest protocol version with intentional read/write errors.
+		// Force error in version.
+		{&blockOne, []byte{}, pver, 0, io.ErrShortWrite, io.EOF},
+		// Force error in prev block hash.
+		{&blockOne, []byte{}, pver, 4, io.ErrShortWrite, io.EOF},
+		// Force error in merkle root.
+		{&blockOne, []byte{}, pver, 36, io.ErrShortWrite, io.EOF},
+		// Force error in timestamp.
+		{&blockOne, []byte{}, pver, 68, io.ErrShortWrite, io.EOF},
+		// Force error in difficulty bits.
+		{&blockOne, []byte{}, pver, 72, io.ErrShortWrite, io.EOF},
+		// Force error in header nonce.
+		{&blockOne, []byte{}, pver, 76, io.ErrShortWrite, io.EOF},
+		// Force error in transaction count.
+		{&blockOne, []byte{}, pver, 80, io.ErrShortWrite, io.EOF},
+		// Force error in transactions.
+		{&blockOne, blockOneBytes, pver, 81, io.ErrShortWrite, io.EOF},
+	}
+
+	t.Logf("Running %d tests", len(tests))
+	for i, test := range tests {
+		// Encode to wire format.
+		w := newFixedWriter(test.max)
+		err := test.in.BtcEncode(w, test.pver)
+		if err != test.writeErr {
+			t.Errorf("BtcEncode #%d wrong error got: %v, want: %v",
+				i, err, test.writeErr)
+			continue
+		}
+
+		// Decode from wire format.
+		var msg btcwire.MsgBlock
+		r := newFixedReader(test.max, test.buf)
+		err = msg.BtcDecode(r, test.pver)
+		if err != test.readErr {
+			t.Errorf("BtcDecode #%d wrong error got: %v, want: %v",
+				i, err, test.readErr)
 			continue
 		}
 	}
