@@ -67,6 +67,13 @@ func TestShaHash(t *testing.T) {
 	if err == nil {
 		t.Errorf("SetBytes: failed to received expected err - got: nil")
 	}
+
+	// Invalid size for NewShaHash.
+	invalidHash := make([]byte, btcwire.HashSize+1)
+	_, err = btcwire.NewShaHash(invalidHash)
+	if err == nil {
+		t.Errorf("NewShaHash: failed to received expected err - got: nil")
+	}
 }
 
 // TestShaHashString  tests the stringized output for sha hashes.
