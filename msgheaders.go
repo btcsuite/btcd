@@ -25,9 +25,9 @@ type MsgHeaders struct {
 // AddBlockHeader adds a new block header to the message.
 func (msg *MsgHeaders) AddBlockHeader(bh *BlockHeader) error {
 	if len(msg.Headers)+1 > MaxBlockHeadersPerMsg {
-		str := "MsgHeaders.AddBlockHeader: too many block headers " +
-			"for message [max %v]"
-		return fmt.Errorf(str, MaxBlockHeadersPerMsg)
+		str := fmt.Sprintf("too many block headers in message [max %v]",
+			MaxBlockHeadersPerMsg)
+		return messageError("MsgHeaders.AddBlockHeader", str)
 	}
 
 	msg.Headers = append(msg.Headers, bh)
@@ -44,8 +44,9 @@ func (msg *MsgHeaders) BtcDecode(r io.Reader, pver uint32) error {
 
 	// Limit to max block headers per message.
 	if count > MaxBlockHeadersPerMsg {
-		str := "MsgHeaders.BtcDecode: too many block headers in message [%v]"
-		return fmt.Errorf(str, count)
+		str := fmt.Sprintf("too many block headers for message "+
+			"[count %v, max %v]", count, MaxBlockHeadersPerMsg)
+		return messageError("MsgHeaders.BtcDecode", str)
 	}
 
 	for i := uint64(0); i < count; i++ {
@@ -57,9 +58,9 @@ func (msg *MsgHeaders) BtcDecode(r io.Reader, pver uint32) error {
 
 		// Ensure the transaction count is zero for headers.
 		if bh.TxnCount > 0 {
-			str := "MsgHeaders.BtcDecode: block headers may not " +
-				"contain transactions [%v]"
-			return fmt.Errorf(str, count)
+			str := fmt.Sprintf("block headers may not contain "+
+				"transactions [count %v]", bh.TxnCount)
+			return messageError("MsgHeaders.BtcDecode", str)
 		}
 		msg.AddBlockHeader(&bh)
 	}
@@ -73,8 +74,9 @@ func (msg *MsgHeaders) BtcEncode(w io.Writer, pver uint32) error {
 	// Limit to max block headers per message.
 	count := len(msg.Headers)
 	if count > MaxBlockHeadersPerMsg {
-		str := "MsgHeaders.BtcEncode: too many block headers in message [%v]"
-		return fmt.Errorf(str, count)
+		str := fmt.Sprintf("too many block headers for message "+
+			"[count %v, max %v]", count, MaxBlockHeadersPerMsg)
+		return messageError("MsgHeaders.BtcEncode", str)
 	}
 
 	err := writeVarInt(w, pver, uint64(count))
@@ -85,9 +87,9 @@ func (msg *MsgHeaders) BtcEncode(w io.Writer, pver uint32) error {
 	for _, bh := range msg.Headers {
 		// Ensure block headers do not contain a transaction count.
 		if bh.TxnCount > 0 {
-			str := "MsgHeaders.BtcEncode: block headers " +
-				"may not contain transactions [%v]"
-			return fmt.Errorf(str, count)
+			str := fmt.Sprintf("block headers may not contain "+
+				"transactions [count %v]", bh.TxnCount)
+			return messageError("MsgHeaders.BtcEncode", str)
 		}
 
 		err := writeBlockHeader(w, pver, bh)
