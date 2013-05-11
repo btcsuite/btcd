@@ -26,9 +26,9 @@ func (msg *MsgPong) BtcDecode(r io.Reader, pver uint32) error {
 	// NOTE: <= is not a mistake here.  The BIP0031 was defined as AFTER
 	// the version unlike most others.
 	if pver <= BIP0031Version {
-		err := fmt.Errorf("pong message invalid for protocol version: %d",
-			pver)
-		return err
+		str := fmt.Sprintf("pong message invalid for protocol "+
+			"version %d", pver)
+		return messageError("MsgPong.BtcDecode", str)
 	}
 
 	err := readElement(r, &msg.Nonce)
@@ -45,9 +45,9 @@ func (msg *MsgPong) BtcEncode(w io.Writer, pver uint32) error {
 	// NOTE: <= is not a mistake here.  The BIP0031 was defined as AFTER
 	// the version unlike most others.
 	if pver <= BIP0031Version {
-		err := fmt.Errorf("pong message invalid for protocol version: %d",
-			pver)
-		return err
+		str := fmt.Sprintf("pong message invalid for protocol "+
+			"version %d", pver)
+		return messageError("MsgPong.BtcEncode", str)
 	}
 
 	err := writeElement(w, msg.Nonce)
