@@ -8,6 +8,7 @@ import (
 	"bytes"
 	"github.com/conformal/btcwire"
 	"github.com/davecgh/go-spew/spew"
+	"io"
 	"reflect"
 	"testing"
 )
@@ -153,7 +154,6 @@ func TestPongWire(t *testing.T) {
 		out  btcwire.MsgPong // Expected decoded message
 		buf  []byte          // Wire encoding
 		pver uint32          // Protocol version for wire encoding
-		err  error           // expected error
 	}{
 		// Latest protocol version.
 		{
@@ -161,7 +161,6 @@ func TestPongWire(t *testing.T) {
 			btcwire.MsgPong{Nonce: 123123}, // 0x1e0f3
 			[]byte{0xf3, 0xe0, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00},
 			btcwire.ProtocolVersion,
-			nil,
 		},
 
 		// Protocol version BIP0031Version+1
@@ -170,17 +169,7 @@ func TestPongWire(t *testing.T) {
 			btcwire.MsgPong{Nonce: 456456}, // 0x6f708
 			[]byte{0x08, 0xf7, 0x06, 0x00, 0x00, 0x00, 0x00, 0x00},
 			btcwire.BIP0031Version + 1,
-			nil,
 		},
-
-		// Protocol version BIP0031Version
-		//{
-		//	btcwire.MsgPong{Nonce: 789789}, // 0xc0d1d
-		//	btcwire.MsgPong{Nonce: 0},      // No nonce for pver
-		//	[]byte{},                        // No nonce for pver
-		//	btcwire.BIP0031Version,
-		//	nil, /// Need err type....
-		//},
 	}
 
 	t.Logf("Running %d tests", len(tests))
@@ -188,7 +177,7 @@ func TestPongWire(t *testing.T) {
 		// Encode the message to wire format.
 		var buf bytes.Buffer
 		err := test.in.BtcEncode(&buf, test.pver)
-		if err != test.err {
+		if err != nil {
 			t.Errorf("BtcEncode #%d error %v", i, err)
 			continue
 		}
@@ -202,7 +191,7 @@ func TestPongWire(t *testing.T) {
 		var msg btcwire.MsgPong
 		rbuf := bytes.NewBuffer(test.buf)
 		err = msg.BtcDecode(rbuf, test.pver)
-		if err != test.err {
+		if err != nil {
 			t.Errorf("BtcDecode #%d error %v", i, err)
 			continue
 		}
@@ -211,5 +200,76 @@ func TestPongWire(t *testing.T) {
 				spew.Sdump(msg), spew.Sdump(test.out))
 			continue
 		}
+	}
+}
+
+// TestPongWireErrors performs negative tests against wire encode and decode
+// of MsgPong to confirm error paths work correctly.
+func TestPongWireErrors(t *testing.T) {
+	pver := btcwire.ProtocolVersion
+	pverNoPong := btcwire.BIP0031Version
+	btcwireErr := &btcwire.MessageError{}
+
+	basePong := btcwire.NewMsgPong(123123) // 0x1e0f3
+	basePongEncoded := []byte{
+		0xf3, 0xe0, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00,
+	}
+
+	tests := []struct {
+		in       *btcwire.MsgPong // Value to encode
+		buf      []byte           // Wire encoding
+		pver     uint32           // Protocol version for wire encoding
+		max      int              // Max size of fixed buffer to induce errors
+		writeErr error            // Expected write error
+		readErr  error            // Expected read error
+	}{
+		// Latest protocol version with intentional read/write errors.
+		// Force error in nonce.
+		{basePong, basePongEncoded, pver, 0, io.ErrShortWrite, io.EOF},
+		// Force error due to unsupported protocol version.
+		{basePong, basePongEncoded, pverNoPong, 4, btcwireErr, btcwireErr},
+	}
+
+	t.Logf("Running %d tests", len(tests))
+	for i, test := range tests {
+		// Encode to wire format.
+		w := newFixedWriter(test.max)
+		err := test.in.BtcEncode(w, test.pver)
+		if reflect.TypeOf(err) != reflect.TypeOf(test.writeErr) {
+			t.Errorf("BtcEncode #%d wrong error got: %v, want: %v",
+				i, err, test.writeErr)
+			continue
+		}
+
+		// For errors which are not of type btcwire.MessageError, check
+		// them for equality.
+		if _, ok := err.(*btcwire.MessageError); !ok {
+			if err != test.writeErr {
+				t.Errorf("BtcEncode #%d wrong error got: %v, "+
+					"want: %v", i, err, test.writeErr)
+				continue
+			}
+		}
+
+		// Decode from wire format.
+		var msg btcwire.MsgPong
+		r := newFixedReader(test.max, test.buf)
+		err = msg.BtcDecode(r, test.pver)
+		if reflect.TypeOf(err) != reflect.TypeOf(test.readErr) {
+			t.Errorf("BtcDecode #%d wrong error got: %v, want: %v",
+				i, err, test.readErr)
+			continue
+		}
+
+		// For errors which are not of type btcwire.MessageError, check
+		// them for equality.
+		if _, ok := err.(*btcwire.MessageError); !ok {
+			if err != test.readErr {
+				t.Errorf("BtcEncode #%d wrong error got: %v, "+
+					"want: %v", i, err, test.readErr)
+				continue
+			}
+		}
+
 	}
 }
