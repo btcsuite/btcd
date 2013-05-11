@@ -8,6 +8,7 @@ import (
 	"bytes"
 	"github.com/conformal/btcwire"
 	"github.com/davecgh/go-spew/spew"
+	"io"
 	"reflect"
 	"testing"
 )
@@ -209,5 +210,139 @@ func TestHeadersWire(t *testing.T) {
 				spew.Sdump(&msg), spew.Sdump(test.out))
 			continue
 		}
+	}
+}
+
+// TestHeadersWireErrors performs negative tests against wire encode and decode
+// of MsgHeaders to confirm error paths work correctly.
+func TestHeadersWireErrors(t *testing.T) {
+	pver := btcwire.ProtocolVersion
+	btcwireErr := &btcwire.MessageError{}
+
+	hash := btcwire.GenesisHash
+	merkleHash := blockOne.Header.MerkleRoot
+	bits := uint32(0x1d00ffff)
+	nonce := uint32(0x9962e301)
+	bh := btcwire.NewBlockHeader(&hash, &merkleHash, bits, nonce)
+	bh.Version = blockOne.Header.Version
+	bh.Timestamp = blockOne.Header.Timestamp
+
+	// Headers message with one header.
+	oneHeader := btcwire.NewMsgHeaders()
+	oneHeader.AddBlockHeader(bh)
+	oneHeaderEncoded := []byte{
+		0x01,                   // VarInt for number of headers.
+		0x01, 0x00, 0x00, 0x00, // Version 1
+		0x6f, 0xe2, 0x8c, 0x0a, 0xb6, 0xf1, 0xb3, 0x72,
+		0xc1, 0xa6, 0xa2, 0x46, 0xae, 0x63, 0xf7, 0x4f,
+		0x93, 0x1e, 0x83, 0x65, 0xe1, 0x5a, 0x08, 0x9c,
+		0x68, 0xd6, 0x19, 0x00, 0x00, 0x00, 0x00, 0x00, // PrevBlock
+		0x98, 0x20, 0x51, 0xfd, 0x1e, 0x4b, 0xa7, 0x44,
+		0xbb, 0xbe, 0x68, 0x0e, 0x1f, 0xee, 0x14, 0x67,
+		0x7b, 0xa1, 0xa3, 0xc3, 0x54, 0x0b, 0xf7, 0xb1,
+		0xcd, 0xb6, 0x06, 0xe8, 0x57, 0x23, 0x3e, 0x0e, // MerkleRoot
+		0x61, 0xbc, 0x66, 0x49, // Timestamp
+		0xff, 0xff, 0x00, 0x1d, // Bits
+		0x01, 0xe3, 0x62, 0x99, // Nonce
+		0x00, // TxnCount (0 for headers message)
+	}
+
+	// Message that forces an error by having more than the max allowed
+	// headers.
+	maxHeaders := btcwire.NewMsgHeaders()
+	for i := 0; i < btcwire.MaxBlockHeadersPerMsg; i++ {
+		maxHeaders.AddBlockHeader(bh)
+	}
+	maxHeaders.Headers = append(maxHeaders.Headers, bh)
+	maxHeadersEncoded := []byte{
+		0xfd, 0xd1, 0x07, // Varint for number of addresses (2001)7D1
+	}
+
+	// Intentionally invalid block header that has a transaction count used
+	// to force errors.
+	bhTrans := btcwire.NewBlockHeader(&hash, &merkleHash, bits, nonce)
+	bhTrans.Version = blockOne.Header.Version
+	bhTrans.Timestamp = blockOne.Header.Timestamp
+	bhTrans.TxnCount = 1
+
+	transHeader := btcwire.NewMsgHeaders()
+	transHeader.AddBlockHeader(bhTrans)
+	transHeaderEncoded := []byte{
+		0x01,                   // VarInt for number of headers.
+		0x01, 0x00, 0x00, 0x00, // Version 1
+		0x6f, 0xe2, 0x8c, 0x0a, 0xb6, 0xf1, 0xb3, 0x72,
+		0xc1, 0xa6, 0xa2, 0x46, 0xae, 0x63, 0xf7, 0x4f,
+		0x93, 0x1e, 0x83, 0x65, 0xe1, 0x5a, 0x08, 0x9c,
+		0x68, 0xd6, 0x19, 0x00, 0x00, 0x00, 0x00, 0x00, // PrevBlock
+		0x98, 0x20, 0x51, 0xfd, 0x1e, 0x4b, 0xa7, 0x44,
+		0xbb, 0xbe, 0x68, 0x0e, 0x1f, 0xee, 0x14, 0x67,
+		0x7b, 0xa1, 0xa3, 0xc3, 0x54, 0x0b, 0xf7, 0xb1,
+		0xcd, 0xb6, 0x06, 0xe8, 0x57, 0x23, 0x3e, 0x0e, // MerkleRoot
+		0x61, 0xbc, 0x66, 0x49, // Timestamp
+		0xff, 0xff, 0x00, 0x1d, // Bits
+		0x01, 0xe3, 0x62, 0x99, // Nonce
+		0x01, // TxnCount (should be 0 for headers message, but 1 to force error)
+	}
+
+	tests := []struct {
+		in       *btcwire.MsgHeaders // Value to encode
+		buf      []byte              // Wire encoding
+		pver     uint32              // Protocol version for wire encoding
+		max      int                 // Max size of fixed buffer to induce errors
+		writeErr error               // Expected write error
+		readErr  error               // Expected read error
+	}{
+		// Latest protocol version with intentional read/write errors.
+		// Force error in header count.
+		{oneHeader, oneHeaderEncoded, pver, 0, io.ErrShortWrite, io.EOF},
+		// Force error in block header.
+		{oneHeader, oneHeaderEncoded, pver, 5, io.ErrShortWrite, io.EOF},
+		// Force error with greater than max headers.
+		{maxHeaders, maxHeadersEncoded, pver, 3, btcwireErr, btcwireErr},
+		// Force error with included transactions.
+		{transHeader, transHeaderEncoded, pver, len(transHeaderEncoded), btcwireErr, btcwireErr},
+	}
+
+	t.Logf("Running %d tests", len(tests))
+	for i, test := range tests {
+		// Encode to wire format.
+		w := newFixedWriter(test.max)
+		err := test.in.BtcEncode(w, test.pver)
+		if reflect.TypeOf(err) != reflect.TypeOf(test.writeErr) {
+			t.Errorf("BtcEncode #%d wrong error got: %v, want: %v",
+				i, err, test.writeErr)
+			continue
+		}
+
+		// For errors which are not of type btcwire.MessageError, check
+		// them for equality.
+		if _, ok := err.(*btcwire.MessageError); !ok {
+			if err != test.writeErr {
+				t.Errorf("BtcEncode #%d wrong error got: %v, "+
+					"want: %v", i, err, test.writeErr)
+				continue
+			}
+		}
+
+		// Decode from wire format.
+		var msg btcwire.MsgHeaders
+		r := newFixedReader(test.max, test.buf)
+		err = msg.BtcDecode(r, test.pver)
+		if reflect.TypeOf(err) != reflect.TypeOf(test.readErr) {
+			t.Errorf("BtcDecode #%d wrong error got: %v, want: %v",
+				i, err, test.readErr)
+			continue
+		}
+
+		// For errors which are not of type btcwire.MessageError, check
+		// them for equality.
+		if _, ok := err.(*btcwire.MessageError); !ok {
+			if err != test.readErr {
+				t.Errorf("BtcEncode #%d wrong error got: %v, "+
+					"want: %v", i, err, test.readErr)
+				continue
+			}
+		}
+
 	}
 }
