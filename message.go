@@ -160,8 +160,9 @@ func WriteMessage(w io.Writer, msg Message, pver uint32, btcnet BitcoinNet) erro
 
 	cmd := msg.Command()
 	if len(cmd) > commandSize {
-		str := "WriteMessage: command is too long [%s]"
-		return fmt.Errorf(str, command)
+		str := fmt.Sprintf("command [%s] is too long [max %v]",
+			cmd, commandSize)
+		return messageError("WriteMessage", str)
 	}
 	copy(command[:], []byte(cmd))
 
