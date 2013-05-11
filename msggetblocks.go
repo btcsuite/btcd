@@ -37,9 +37,9 @@ type MsgGetBlocks struct {
 // AddBlockLocatorHash adds a new block locator hash to the message.
 func (msg *MsgGetBlocks) AddBlockLocatorHash(hash *ShaHash) error {
 	if len(msg.BlockLocatorHashes)+1 > MaxBlockLocatorsPerMsg {
-		str := "MsgGetBlocks.AddBlockLocatorHash: too many block " +
-			"locator hashes for message [max %v]"
-		return fmt.Errorf(str, MaxBlockLocatorsPerMsg)
+		str := fmt.Sprintf("too many block locator hashes for message [max %v]",
+			MaxBlockLocatorsPerMsg)
+		return messageError("MsgGetBlocks.AddBlockLocatorHash", str)
 	}
 
 	msg.BlockLocatorHashes = append(msg.BlockLocatorHashes, hash)
@@ -60,8 +60,9 @@ func (msg *MsgGetBlocks) BtcDecode(r io.Reader, pver uint32) error {
 		return err
 	}
 	if count > MaxBlockLocatorsPerMsg {
-		str := "%v: too many block locator hashes in message [%v]"
-		return fmt.Errorf(str, "MsgGetBlocks.BtcDecode", count)
+		str := fmt.Sprintf("too many block locator hashes for message "+
+			"[count %v, max %v]", count, MaxBlockLocatorsPerMsg)
+		return messageError("MsgGetBlocks.BtcDecode", str)
 	}
 
 	for i := uint64(0); i < count; i++ {
@@ -86,8 +87,9 @@ func (msg *MsgGetBlocks) BtcDecode(r io.Reader, pver uint32) error {
 func (msg *MsgGetBlocks) BtcEncode(w io.Writer, pver uint32) error {
 	count := len(msg.BlockLocatorHashes)
 	if count > MaxBlockLocatorsPerMsg {
-		str := "%v: too many block locator hashes in message [%v]"
-		return fmt.Errorf(str, "MsgGetBlocks.BtcEncode", count)
+		str := fmt.Sprintf("too many block locator hashes for message "+
+			"[count %v, max %v]", count, MaxBlockLocatorsPerMsg)
+		return messageError("MsgGetBlocks.BtcEncode", str)
 	}
 
 	err := writeElement(w, msg.ProtocolVersion)
