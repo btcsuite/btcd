@@ -95,8 +95,9 @@ func (msg *MsgVersion) BtcDecode(r io.Reader, pver uint32) error {
 		return err
 	}
 	if len(userAgent) > MaxUserAgentLen {
-		str := "MsgVersion.BtcDecode: user agent too long [max %v]"
-		return fmt.Errorf(str, MaxUserAgentLen)
+		str := fmt.Sprintf("user agent too long [len %v, max %v]",
+			len(userAgent), MaxUserAgentLen)
+		return messageError("MsgVersion.BtcDecode", str)
 	}
 	msg.UserAgent = userAgent
 
@@ -112,8 +113,9 @@ func (msg *MsgVersion) BtcDecode(r io.Reader, pver uint32) error {
 // This is part of the Message interface implementation.
 func (msg *MsgVersion) BtcEncode(w io.Writer, pver uint32) error {
 	if len(msg.UserAgent) > MaxUserAgentLen {
-		str := "MsgVersion.BtcEncode: user agent too long [max %v]"
-		return fmt.Errorf(str, MaxUserAgentLen)
+		str := fmt.Sprintf("user agent too long [len %v, max %v]",
+			len(msg.UserAgent), MaxUserAgentLen)
+		return messageError("MsgVersion.BtcEncode", str)
 	}
 
 	err := writeElements(w, msg.ProtocolVersion, msg.Services,
