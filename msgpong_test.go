@@ -265,7 +265,7 @@ func TestPongWireErrors(t *testing.T) {
 		// them for equality.
 		if _, ok := err.(*btcwire.MessageError); !ok {
 			if err != test.readErr {
-				t.Errorf("BtcEncode #%d wrong error got: %v, "+
+				t.Errorf("BtcDecode #%d wrong error got: %v, "+
 					"want: %v", i, err, test.readErr)
 				continue
 			}
