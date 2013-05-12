@@ -241,21 +241,20 @@ func TestBlockWireErrors(t *testing.T) {
 		writeErr error             // Expected write error
 		readErr  error             // Expected read error
 	}{
-		// Latest protocol version with intentional read/write errors.
 		// Force error in version.
-		{&blockOne, []byte{}, pver, 0, io.ErrShortWrite, io.EOF},
+		{&blockOne, blockOneBytes, pver, 0, io.ErrShortWrite, io.EOF},
 		// Force error in prev block hash.
-		{&blockOne, []byte{}, pver, 4, io.ErrShortWrite, io.EOF},
+		{&blockOne, blockOneBytes, pver, 4, io.ErrShortWrite, io.EOF},
 		// Force error in merkle root.
-		{&blockOne, []byte{}, pver, 36, io.ErrShortWrite, io.EOF},
+		{&blockOne, blockOneBytes, pver, 36, io.ErrShortWrite, io.EOF},
 		// Force error in timestamp.
-		{&blockOne, []byte{}, pver, 68, io.ErrShortWrite, io.EOF},
+		{&blockOne, blockOneBytes, pver, 68, io.ErrShortWrite, io.EOF},
 		// Force error in difficulty bits.
-		{&blockOne, []byte{}, pver, 72, io.ErrShortWrite, io.EOF},
+		{&blockOne, blockOneBytes, pver, 72, io.ErrShortWrite, io.EOF},
 		// Force error in header nonce.
-		{&blockOne, []byte{}, pver, 76, io.ErrShortWrite, io.EOF},
+		{&blockOne, blockOneBytes, pver, 76, io.ErrShortWrite, io.EOF},
 		// Force error in transaction count.
-		{&blockOne, []byte{}, pver, 80, io.ErrShortWrite, io.EOF},
+		{&blockOne, blockOneBytes, pver, 80, io.ErrShortWrite, io.EOF},
 		// Force error in transactions.
 		{&blockOne, blockOneBytes, pver, 81, io.ErrShortWrite, io.EOF},
 	}
