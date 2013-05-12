@@ -196,14 +196,9 @@ func WriteMessage(w io.Writer, msg Message, pver uint32, btcnet BitcoinNet) erro
 	}
 
 	// Write payload.
-	n, err := w.Write(payload)
+	_, err = w.Write(payload)
 	if err != nil {
 		return err
-	}
-	if n != lenp {
-		str := fmt.Sprintf("failed to write payload - wrote %v bytes, "+
-			"payload size is %v bytes", n, lenp)
-		return messageError("WriteMessage", str)
 	}
 	return nil
 }
