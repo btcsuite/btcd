@@ -303,3 +303,66 @@ func TestReadMessageWireErrors(t *testing.T) {
 		}
 	}
 }
+
+// TestWriteMessageWireErrors performs negative tests against wire encoding from
+// concrete messages to confirm error paths work correctly.
+func TestWriteMessageWireErrors(t *testing.T) {
+	pver := btcwire.ProtocolVersion
+	btcnet := btcwire.MainNet
+	btcwireErr := &btcwire.MessageError{}
+
+	// Fake message with a command that is too long.
+	badCommandMsg := &fakeMessage{command: "somethingtoolong"}
+
+	// Fake message with a problem during encoding
+	encodeErrMsg := &fakeMessage{forceEncodeErr: true}
+
+	// Fake message that has a payload which exceed max.
+	exceedPayload := make([]byte, btcwire.MaxMessagePayload+1)
+	exceedPayloadErrMsg := &fakeMessage{payload: exceedPayload}
+
+	bogusPayload := []byte{0x01, 0x02, 0x03, 0x04}
+	bogusMsg := &fakeMessage{command: "bogus", payload: bogusPayload}
+
+	tests := []struct {
+		msg    btcwire.Message    // Message to encode
+		pver   uint32             // Protocol version for wire encoding
+		btcnet btcwire.BitcoinNet // Bitcoin network for wire encoding
+		max    int                // Max size of fixed buffer to induce errors
+		err    error              // Expected error
+	}{
+		// Command too long.
+		{badCommandMsg, pver, btcnet, 0, btcwireErr},
+		// Force error in payload encode.
+		{encodeErrMsg, pver, btcnet, 0, btcwireErr},
+		// Force error due to exceeding max payload size.
+		{exceedPayloadErrMsg, pver, btcnet, 0, btcwireErr},
+		// Force error in header write.
+		{bogusMsg, pver, btcnet, 0, io.ErrShortWrite},
+		// Force error in payload write.
+		{bogusMsg, pver, btcnet, 24, io.ErrShortWrite},
+	}
+
+	t.Logf("Running %d tests", len(tests))
+	for i, test := range tests {
+		// Encode wire format.
+		w := newFixedWriter(test.max)
+		err := btcwire.WriteMessage(w, test.msg, test.pver, test.btcnet)
+		if reflect.TypeOf(err) != reflect.TypeOf(test.err) {
+			t.Errorf("WriteMessage #%d wrong error got: %v <%T>, "+
+				"want: %T", i, err, err, test.err)
+			continue
+		}
+
+		// For errors which are not of type btcwire.MessageError, check
+		// them for equality.
+		if _, ok := err.(*btcwire.MessageError); !ok {
+			if err != test.err {
+				t.Errorf("ReadMessage #%d wrong error got: %v <%T>, "+
+					"want: %v <%T>", i, err, err,
+					test.err, test.err)
+				continue
+			}
+		}
+	}
+}
