@@ -279,6 +279,15 @@ func TestBlockWireErrors(t *testing.T) {
 				i, err, test.readErr)
 			continue
 		}
+
+		var txLocMsg btcwire.MsgBlock
+		rbuf := bytes.NewBuffer(test.buf[0:test.max])
+		_, err = txLocMsg.BtcDecodeTxLoc(rbuf, test.pver)
+		if err != test.readErr {
+			t.Errorf("BtcDecodeTxLoc #%d wrong error got: %v, want: %v",
+				i, err, test.readErr)
+			continue
+		}
 	}
 }
 
