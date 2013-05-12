@@ -124,16 +124,18 @@ func TestBlockSha(t *testing.T) {
 // of transaction inputs and outputs and protocol versions.
 func TestBlockWire(t *testing.T) {
 	tests := []struct {
-		in   *btcwire.MsgBlock // Message to encode
-		out  *btcwire.MsgBlock // Expected decoded message
-		buf  []byte            // Wire encoding
-		pver uint32            // Protocol version for wire encoding
+		in     *btcwire.MsgBlock // Message to encode
+		out    *btcwire.MsgBlock // Expected decoded message
+		buf    []byte            // Wire encoding
+		txLocs []btcwire.TxLoc   // Expected transaction locations
+		pver   uint32            // Protocol version for wire encoding
 	}{
 		// Latest protocol version.
 		{
 			&blockOne,
 			&blockOne,
 			blockOneBytes,
+			blockOneTxLocs,
 			btcwire.ProtocolVersion,
 		},
 
@@ -142,6 +144,7 @@ func TestBlockWire(t *testing.T) {
 			&blockOne,
 			&blockOne,
 			blockOneBytes,
+			blockOneTxLocs,
 			btcwire.BIP0035Version,
 		},
 
@@ -150,6 +153,7 @@ func TestBlockWire(t *testing.T) {
 			&blockOne,
 			&blockOne,
 			blockOneBytes,
+			blockOneTxLocs,
 			btcwire.BIP0031Version,
 		},
 
@@ -158,6 +162,7 @@ func TestBlockWire(t *testing.T) {
 			&blockOne,
 			&blockOne,
 			blockOneBytes,
+			blockOneTxLocs,
 			btcwire.NetAddressTimeVersion,
 		},
 
@@ -166,6 +171,7 @@ func TestBlockWire(t *testing.T) {
 			&blockOne,
 			&blockOne,
 			blockOneBytes,
+			blockOneTxLocs,
 			btcwire.MultipleAddressVersion,
 		},
 	}
@@ -196,6 +202,24 @@ func TestBlockWire(t *testing.T) {
 		if !reflect.DeepEqual(&msg, test.out) {
 			t.Errorf("BtcDecode #%d\n got: %s want: %s", i,
 				spew.Sdump(&msg), spew.Sdump(test.out))
+			continue
+		}
+
+		var txLocMsg btcwire.MsgBlock
+		rbuf = bytes.NewBuffer(test.buf)
+		txLocs, err := txLocMsg.BtcDecodeTxLoc(rbuf, test.pver)
+		if err != nil {
+			t.Errorf("BtcDecodeTxLoc #%d error %v", i, err)
+			continue
+		}
+		if !reflect.DeepEqual(&txLocMsg, test.out) {
+			t.Errorf("BtcDecodeTxLoc #%d\n got: %s want: %s", i,
+				spew.Sdump(&txLocMsg), spew.Sdump(test.out))
+			continue
+		}
+		if !reflect.DeepEqual(txLocs, test.txLocs) {
+			t.Errorf("BtcDecodeTxLoc #%d\n got: %s want: %s", i,
+				spew.Sdump(txLocs), spew.Sdump(test.txLocs))
 			continue
 		}
 	}
@@ -318,7 +342,7 @@ var blockOne btcwire.MsgBlock = btcwire.MsgBlock{
 	},
 }
 
-// Bytes encoded with protocol version 60002.
+// Block one bytes encoded with protocol version 60002.
 var blockOneBytes = []byte{
 	0x01, 0x00, 0x00, 0x00, // Version 1
 	0x6f, 0xe2, 0x8c, 0x0a, 0xb6, 0xf1, 0xb3, 0x72,
@@ -358,4 +382,10 @@ var blockOneBytes = []byte{
 	0xee,                   // 65-byte signature
 	0xac,                   // OP_CHECKSIG
 	0x00, 0x00, 0x00, 0x00, // Lock time
+}
+
+// Transaction location information for block one trasnactions as encoded with
+// protocol version 60002.
+var blockOneTxLocs = []btcwire.TxLoc{
+	btcwire.TxLoc{TxStart: 81, TxLen: 134},
 }
