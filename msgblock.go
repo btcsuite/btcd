@@ -73,8 +73,8 @@ func (msg *MsgBlock) BtcDecode(r io.Reader, pver uint32) error {
 }
 
 // BtcDecodeTxLoc decodes r using the bitcoin protocol encoding into the
-// receiver and returns a slice containing the start and length each transaction
-// within the raw data.
+// receiver and returns a slice containing the start and length of each
+// transaction within the raw data.
 func (msg *MsgBlock) BtcDecodeTxLoc(r *bytes.Buffer, pver uint32) ([]TxLoc, error) {
 	var fullLen int
 	fullLen = r.Len()
@@ -144,10 +144,9 @@ func (msg *MsgBlock) BlockSha(pver uint32) (ShaHash, error) {
 func (msg *MsgBlock) TxShas(pver uint32) ([]ShaHash, error) {
 	var shaList []ShaHash
 	for _, tx := range msg.Transactions {
-		sha, err := tx.TxSha(pver)
-		if err != nil {
-			return nil, err
-		}
+		// Ignore error here since TxSha can't fail in the current
+		// implementation except due to run-time panics.
+		sha, _ := tx.TxSha(pver)
 		shaList = append(shaList, sha)
 	}
 	return shaList, nil

@@ -87,15 +87,21 @@ func (msg *MsgTx) AddTxOut(to *TxOut) {
 
 // TxSha generates the ShaHash name for the transaction.
 func (tx *MsgTx) TxSha(pver uint32) (ShaHash, error) {
-	var txsha ShaHash
-	var wbuf bytes.Buffer
-	err := tx.BtcEncode(&wbuf, pver)
-	if err != nil {
-		return txsha, err
-	}
-	txsha.SetBytes(DoubleSha256(wbuf.Bytes()))
+	// Encode the transaction and calculate double sha256 on the result.
+	// Ignore the error returns since the only way the encode could fail
+	// is being out of memory or due to nil pointers, both of which would
+	// cause a run-time panic.  Also, SetBytes can't fail here due to the
+	// fact DoubleSha256 always returns a []byte of the right size
+	// regardless of input.
+	var buf bytes.Buffer
+	var sha ShaHash
+	_ = tx.BtcEncode(&buf, pver)
+	_ = sha.SetBytes(DoubleSha256(buf.Bytes()))
 
-	return txsha, nil
+	// Even though this function can't currently fail, it still returns
+	// a potential error to help future proof the API should a failure
+	// become possible.
+	return sha, nil
 }
 
 // Copy creates a deep copy of a transaction so that the original does not get

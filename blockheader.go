@@ -50,19 +50,22 @@ type BlockHeader struct {
 const blockHashLen = 80
 
 // BlockSha computes the block identifier hash for the given block header.
-func (h *BlockHeader) BlockSha(pver uint32) (sha ShaHash, err error) {
+func (h *BlockHeader) BlockSha(pver uint32) (ShaHash, error) {
+	// Encode the header and run double sha256 everything prior to the
+	// number of transactions.  Ignore the error returns since there is no
+	// way the encode could fail except being out of memory which would
+	// cause a run-time panic.  Also, SetBytes can't fail here due to the
+	// fact DoubleSha256 always returns a []byte of the right size
+	// regardless of input.
 	var buf bytes.Buffer
-	err = writeBlockHeader(&buf, pver, h)
-	if err != nil {
-		return
-	}
+	var sha ShaHash
+	_ = writeBlockHeader(&buf, pver, h)
+	_ = sha.SetBytes(DoubleSha256(buf.Bytes()[0:blockHashLen]))
 
-	err = sha.SetBytes(DoubleSha256(buf.Bytes()[0:blockHashLen]))
-	if err != nil {
-		return
-	}
-
-	return
+	// Even though this function can't currently fail, it still returns
+	// a potential error to help future proof the API should a failure
+	// become possible.
+	return sha, nil
 }
 
 // NewBlockHeader returns a new BlockHeader using the provided previous block
