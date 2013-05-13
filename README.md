@@ -103,7 +103,6 @@ from a remote peer is:
 - Implement alert message decoding/encoding
 - Implement bloom filter messages (filterload, filteradd, filterclear,
   merkleblock) as defined in [BIP 0037](https://en.bitcoin.it/wiki/BIP_0037)
-- Increase test coverage to 100%
 
 ## GPG Verification Key
 
