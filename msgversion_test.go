@@ -8,8 +8,10 @@ import (
 	"bytes"
 	"github.com/conformal/btcwire"
 	"github.com/davecgh/go-spew/spew"
+	"io"
 	"net"
 	"reflect"
+	"strings"
 	"testing"
 	"time"
 )
@@ -221,6 +223,112 @@ func TestVersionWire(t *testing.T) {
 			t.Errorf("BtcDecode #%d\n got: %s want: %s", i,
 				spew.Sdump(msg), spew.Sdump(test.out))
 			continue
+		}
+	}
+}
+
+// TestVersionWireErrors performs negative tests against wire encode and
+// decode of MsgGetHeaders to confirm error paths work correctly.
+func TestVersionWireErrors(t *testing.T) {
+	// Use protocol version 60002 specifically here instead of the latest
+	// because the test data is using bytes encoded with that protocol
+	// version.
+	pver := uint32(60002)
+	btcwireErr := &btcwire.MessageError{}
+
+	// Copy the base version and change the user agent to exceed max limits.
+	bvc := *baseVersion
+	exceedUAVer := &bvc
+	newUA := "/" + strings.Repeat("t", btcwire.MaxUserAgentLen-8+1) + ":0.0.1/"
+	exceedUAVer.UserAgent = newUA
+
+	// Encode the new UA length as a varint.
+	var newUAVarIntBuf bytes.Buffer
+	err := btcwire.TstWriteVarInt(&newUAVarIntBuf, pver, uint64(len(newUA)))
+	if err != nil {
+		t.Errorf("writeVarInt: error %v", err)
+	}
+
+	// Make a new buffer big enough to hold the base version plus the new
+	// bytes for the bigger varint to hold the new size of the user agent
+	// and the new user agent string.  Then stich it all together.
+	newLen := len(baseVersionEncoded) - len(baseVersion.UserAgent)
+	newLen = newLen + len(newUAVarIntBuf.Bytes()) - 1 + len(newUA)
+	exceedUAVerEncoded := make([]byte, newLen)
+	copy(exceedUAVerEncoded, baseVersionEncoded[0:80])
+	copy(exceedUAVerEncoded[80:], newUAVarIntBuf.Bytes())
+	copy(exceedUAVerEncoded[83:], []byte(newUA))
+	copy(exceedUAVerEncoded[83+len(newUA):], baseVersionEncoded[97:100])
+
+	tests := []struct {
+		in       *btcwire.MsgVersion // Value to encode
+		buf      []byte              // Wire encoding
+		pver     uint32              // Protocol version for wire encoding
+		max      int                 // Max size of fixed buffer to induce errors
+		writeErr error               // Expected write error
+		readErr  error               // Expected read error
+	}{
+		// Force error in protocol version.
+		{baseVersion, baseVersionEncoded, pver, 0, io.ErrShortWrite, io.EOF},
+		// Force error in services.
+		{baseVersion, baseVersionEncoded, pver, 4, io.ErrShortWrite, io.EOF},
+		// Force error in timestamp.
+		{baseVersion, baseVersionEncoded, pver, 12, io.ErrShortWrite, io.EOF},
+		// Force error in remote address.
+		{baseVersion, baseVersionEncoded, pver, 20, io.ErrShortWrite, io.EOF},
+		// Force error in local address.
+		{baseVersion, baseVersionEncoded, pver, 46, io.ErrShortWrite, io.EOF},
+		// Force error in nonce.
+		{baseVersion, baseVersionEncoded, pver, 72, io.ErrShortWrite, io.EOF},
+		// Force error in user agent length.
+		{baseVersion, baseVersionEncoded, pver, 80, io.ErrShortWrite, io.EOF},
+		// Force error in user agent.
+		{baseVersion, baseVersionEncoded, pver, 81, io.ErrShortWrite, io.EOF},
+		// Force error in last block.
+		{baseVersion, baseVersionEncoded, pver, 97, io.ErrShortWrite, io.EOF},
+		// Force error due to user agent too big.
+		{exceedUAVer, exceedUAVerEncoded, pver, newLen, btcwireErr, btcwireErr},
+	}
+
+	t.Logf("Running %d tests", len(tests))
+	for i, test := range tests {
+		// Encode to wire format.
+		w := newFixedWriter(test.max)
+		err := test.in.BtcEncode(w, test.pver)
+		if reflect.TypeOf(err) != reflect.TypeOf(test.writeErr) {
+			t.Errorf("BtcEncode #%d wrong error got: %v, want: %v",
+				i, err, test.writeErr)
+			continue
+		}
+
+		// For errors which are not of type btcwire.MessageError, check
+		// them for equality.
+		if _, ok := err.(*btcwire.MessageError); !ok {
+			if err != test.writeErr {
+				t.Errorf("BtcEncode #%d wrong error got: %v, "+
+					"want: %v", i, err, test.writeErr)
+				continue
+			}
+		}
+
+		// Decode from wire format.
+		var msg btcwire.MsgVersion
+		r := newFixedReader(test.max, test.buf)
+		err = msg.BtcDecode(r, test.pver)
+		if reflect.TypeOf(err) != reflect.TypeOf(test.readErr) {
+			t.Errorf("BtcDecode #%d wrong error got: %v, want: %v",
+				i, err, test.readErr)
+			continue
+		}
+
+		// For errors which are not of type btcwire.MessageError, check
+		// them for equality.
+		if _, ok := err.(*btcwire.MessageError); !ok {
+			if err != test.readErr {
+				t.Errorf("BtcDecode #%d wrong error got: %v, "+
+					"want: %v", i, err, test.readErr)
+				continue
+			}
 		}
 	}
 }
