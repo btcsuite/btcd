@@ -147,57 +147,6 @@ func TestVersion(t *testing.T) {
 // TestAlertWire tests the MsgAlert wire encode and decode for various protocol
 // versions.
 func TestVersionWire(t *testing.T) {
-	// baseNetAddrYou is used in the various tests as a baseline remote
-	// NetAddress.
-	baseNetAddrYou := btcwire.NetAddress{
-		Timestamp: time.Time{}, // Zero value -- no timestamp in version
-		Services:  btcwire.SFNodeNetwork,
-		IP:        net.ParseIP("192.168.0.1"),
-		Port:      8333,
-	}
-
-	// baseNetAddrMe is used in the various tests as a baseline local
-	// NetAddress.
-	baseNetAddrMe := btcwire.NetAddress{
-		Timestamp: time.Time{}, // Zero value -- no timestamp in version
-		Services:  btcwire.SFNodeNetwork,
-		IP:        net.ParseIP("127.0.0.1"),
-		Port:      8333,
-	}
-
-	// baseVersion is used in the various tests as a baseline version.
-	baseVersion := &btcwire.MsgVersion{
-		ProtocolVersion: 60002,
-		Services:        btcwire.SFNodeNetwork,
-		Timestamp:       time.Unix(0x495fab29, 0), // 2009-01-03 12:15:05 -0600 CST)
-		AddrYou:         baseNetAddrYou,
-		AddrMe:          baseNetAddrMe,
-		Nonce:           123123, // 0x1e0f3
-		UserAgent:       "/btcdtest:0.0.1/",
-		LastBlock:       234234, // 0x392fa
-	}
-
-	baseVersionEncoded := []byte{
-		0x62, 0xea, 0x00, 0x00, // Protocol version 60002
-		0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // SFNodeNetwork
-		0x29, 0xab, 0x5f, 0x49, 0x00, 0x00, 0x00, 0x00, // 64-bit Timestamp
-		// AddrYou -- No timestamp for NetAddress in version message
-		0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // SFNodeNetwork
-		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-		0x00, 0x00, 0xff, 0xff, 0xc0, 0xa8, 0x00, 0x01, // IP 192.168.0.1
-		0x20, 0x8d, // Port 8333 in big-endian
-		// AddrMe -- No timestamp for NetAddress in version message
-		0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // SFNodeNetwork
-		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-		0x00, 0x00, 0xff, 0xff, 0x7f, 0x00, 0x00, 0x01, // IP 127.0.0.1
-		0x20, 0x8d, // Port 8333 in big-endian
-		0xf3, 0xe0, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, // Nonce
-		0x10, // Varint for user agent length
-		0x2f, 0x62, 0x74, 0x63, 0x64, 0x74, 0x65, 0x73,
-		0x74, 0x3a, 0x30, 0x2e, 0x30, 0x2e, 0x31, 0x2f, // User agent
-		0xfa, 0x92, 0x03, 0x00, // Last block
-	}
-
 	tests := []struct {
 		in   *btcwire.MsgVersion // Message to encode
 		out  *btcwire.MsgVersion // Expected decoded message
@@ -274,4 +223,49 @@ func TestVersionWire(t *testing.T) {
 			continue
 		}
 	}
+}
+
+// baseVersion is used in the various tests as a baseline MsgVersion.
+var baseVersion *btcwire.MsgVersion = &btcwire.MsgVersion{
+	ProtocolVersion: 60002,
+	Services:        btcwire.SFNodeNetwork,
+	Timestamp:       time.Unix(0x495fab29, 0), // 2009-01-03 12:15:05 -0600 CST)
+	AddrYou: btcwire.NetAddress{
+		Timestamp: time.Time{}, // Zero value -- no timestamp in version
+		Services:  btcwire.SFNodeNetwork,
+		IP:        net.ParseIP("192.168.0.1"),
+		Port:      8333,
+	},
+	AddrMe: btcwire.NetAddress{
+		Timestamp: time.Time{}, // Zero value -- no timestamp in version
+		Services:  btcwire.SFNodeNetwork,
+		IP:        net.ParseIP("127.0.0.1"),
+		Port:      8333,
+	},
+	Nonce:     123123, // 0x1e0f3
+	UserAgent: "/btcdtest:0.0.1/",
+	LastBlock: 234234, // 0x392fa
+}
+
+// baseVersionEncoded is the wire encoded bytes for baseVersion using protocol
+// version 60002 and is used in the various tests.
+var baseVersionEncoded []byte = []byte{
+	0x62, 0xea, 0x00, 0x00, // Protocol version 60002
+	0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // SFNodeNetwork
+	0x29, 0xab, 0x5f, 0x49, 0x00, 0x00, 0x00, 0x00, // 64-bit Timestamp
+	// AddrYou -- No timestamp for NetAddress in version message
+	0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // SFNodeNetwork
+	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+	0x00, 0x00, 0xff, 0xff, 0xc0, 0xa8, 0x00, 0x01, // IP 192.168.0.1
+	0x20, 0x8d, // Port 8333 in big-endian
+	// AddrMe -- No timestamp for NetAddress in version message
+	0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // SFNodeNetwork
+	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+	0x00, 0x00, 0xff, 0xff, 0x7f, 0x00, 0x00, 0x01, // IP 127.0.0.1
+	0x20, 0x8d, // Port 8333 in big-endian
+	0xf3, 0xe0, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, // Nonce
+	0x10, // Varint for user agent length
+	0x2f, 0x62, 0x74, 0x63, 0x64, 0x74, 0x65, 0x73,
+	0x74, 0x3a, 0x30, 0x2e, 0x30, 0x2e, 0x31, 0x2f, // User agent
+	0xfa, 0x92, 0x03, 0x00, // Last block
 }
