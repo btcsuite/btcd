@@ -19,7 +19,7 @@ type Message struct {
 
 // Reply is the general form of the reply from the bitcoin client.
 // The form of the Result part varies from one command to the next so it
-// is currently implimented as an interface.
+// is currently implemented as an interface.
 type Reply struct {
 	Result interface{} `json:"result"`
 	Error  *Error      `json:"error"`
