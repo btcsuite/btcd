@@ -140,12 +140,11 @@ from a remote peer is:
 
 Errors
 
-Most errors returned by this package are either the raw errors provided by
-underlying calls to read/write from streams, or raw strings that describe
-the error.  See the documentation of each function for any exceptions.  NOTE:
-This is currently undergoing change to return errors of type MessageError for
-issues which are not io related so the caller can differentiate between
-general io errors and malformed messages.
+Errors returned by this package are either the raw errors provided by underlying
+calls to read/write from streams such as io.EOF, io.ErrUnexpectedEOF, and
+io.ErrShortWrite, or of type btcwire.MessageError.  This allows the caller to
+differentiate between general IO errors and malformed messages through type
+assertions.
 
 Bitcoin Improvement Proposals
 
