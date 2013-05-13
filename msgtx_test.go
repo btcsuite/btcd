@@ -8,6 +8,7 @@ import (
 	"bytes"
 	"github.com/conformal/btcwire"
 	"github.com/davecgh/go-spew/spew"
+	"io"
 	"reflect"
 	"testing"
 )
@@ -296,6 +297,73 @@ func TestTxWire(t *testing.T) {
 		if !reflect.DeepEqual(&msg, test.out) {
 			t.Errorf("BtcDecode #%d\n got: %s want: %s", i,
 				spew.Sdump(&msg), spew.Sdump(test.out))
+			continue
+		}
+	}
+}
+
+// TestTxWireErrors performs negative tests against wire encode and decode
+// of MsgTx to confirm error paths work correctly.
+func TestTxWireErrors(t *testing.T) {
+	// Use protocol version 60002 specifically here instead of the latest
+	// because the test data is using bytes encoded with that protocol
+	// version.
+	pver := uint32(60002)
+
+	tests := []struct {
+		in       *btcwire.MsgTx // Value to encode
+		buf      []byte         // Wire encoding
+		pver     uint32         // Protocol version for wire encoding
+		max      int            // Max size of fixed buffer to induce errors
+		writeErr error          // Expected write error
+		readErr  error          // Expected read error
+	}{
+		// Force error in version.
+		{multiTx, multiTxEncoded, pver, 0, io.ErrShortWrite, io.EOF},
+		// Force error in number of transaction inputs.
+		{multiTx, multiTxEncoded, pver, 4, io.ErrShortWrite, io.EOF},
+		// Force error in transaction input previous block hash.
+		{multiTx, multiTxEncoded, pver, 5, io.ErrShortWrite, io.EOF},
+		// Force error in transaction input previous block hash.
+		{multiTx, multiTxEncoded, pver, 5, io.ErrShortWrite, io.EOF},
+		// Force error in transaction input previous block output index.
+		{multiTx, multiTxEncoded, pver, 37, io.ErrShortWrite, io.EOF},
+		// Force error in transaction input signature script length.
+		{multiTx, multiTxEncoded, pver, 41, io.ErrShortWrite, io.EOF},
+		// Force error in transaction input signature script.
+		{multiTx, multiTxEncoded, pver, 42, io.ErrShortWrite, io.EOF},
+		// Force error in transaction input sequence.
+		{multiTx, multiTxEncoded, pver, 49, io.ErrShortWrite, io.EOF},
+		// Force error in number of transaction outputs.
+		{multiTx, multiTxEncoded, pver, 53, io.ErrShortWrite, io.EOF},
+		// Force error in transaction output value.
+		{multiTx, multiTxEncoded, pver, 54, io.ErrShortWrite, io.EOF},
+		// Force error in transaction output pk script length.
+		{multiTx, multiTxEncoded, pver, 62, io.ErrShortWrite, io.EOF},
+		// Force error in transaction output pk script.
+		{multiTx, multiTxEncoded, pver, 63, io.ErrShortWrite, io.EOF},
+		// Force error in transaction output lock time.
+		{multiTx, multiTxEncoded, pver, 130, io.ErrShortWrite, io.EOF},
+	}
+
+	t.Logf("Running %d tests", len(tests))
+	for i, test := range tests {
+		// Encode to wire format.
+		w := newFixedWriter(test.max)
+		err := test.in.BtcEncode(w, test.pver)
+		if err != test.writeErr {
+			t.Errorf("BtcEncode #%d wrong error got: %v, want: %v",
+				i, err, test.writeErr)
+			continue
+		}
+
+		// Decode from wire format.
+		var msg btcwire.MsgTx
+		r := newFixedReader(test.max, test.buf)
+		err = msg.BtcDecode(r, test.pver)
+		if err != test.readErr {
+			t.Errorf("BtcDecode #%d wrong error got: %v, want: %v",
+				i, err, test.readErr)
 			continue
 		}
 	}
