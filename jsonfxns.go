@@ -14,9 +14,9 @@ import (
 )
 
 // MarshallAndSend takes the reply structure, marshalls it to json, and
-// sends it back to the http writer, returning a log message and an error if
-// there is one.
-func MarshallAndSend(rawReply Reply, w http.ResponseWriter) (string, error) {
+// sends it back to the io.Writer (most likely an http.ResponseWriter).
+// returning a log message and an error if there is one.
+func MarshallAndSend(rawReply Reply, w io.Writer) (string, error) {
 	finalReply, err := json.Marshal(rawReply)
 	if err != nil {
 		msg := fmt.Sprintf("[RPCS] Error Marshalling reply: %v", err)

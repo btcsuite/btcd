@@ -1,10 +1,10 @@
 
-github.com/conformal/btcjson/jsonapi.go	 JsonCreateMessage	 100.00% (310/310)
-github.com/conformal/btcjson/jsonfxns.go JsonGetRaw		 100.00% (6/6)
-github.com/conformal/btcjson/jsonapi.go	 jsonWithArgs		 100.00% (5/5)
-github.com/conformal/btcjson/jsonfxns.go jsonRpcSend		 100.00% (4/4)
-github.com/conformal/btcjson/jsonapi.go	 JsonRpcCommand		 66.67% (18/27)
-github.com/conformal/btcjson/jsonapi.go	 readResultCmd		 40.00% (20/50)
-github.com/conformal/btcjson/jsonfxns.go JsonMarshallAndSend	 0.00% (0/7)
-github.com/conformal/btcjson		 -------------------	 88.75% (363/409)
+github.com/conformal/btcjson/jsonapi.go	 CreateMessage	 100.00% (310/310)
+github.com/conformal/btcjson/jsonfxns.go MarshallAndSend 100.00% (7/7)
+github.com/conformal/btcjson/jsonfxns.go GetRaw		 100.00% (6/6)
+github.com/conformal/btcjson/jsonapi.go	 jsonWithArgs	 100.00% (5/5)
+github.com/conformal/btcjson/jsonfxns.go jsonRpcSend	 100.00% (4/4)
+github.com/conformal/btcjson/jsonapi.go	 RpcCommand	 66.67% (18/27)
+github.com/conformal/btcjson/jsonapi.go	 readResultCmd	 40.00% (20/50)
+github.com/conformal/btcjson		 --------------- 90.46% (370/409)
 
