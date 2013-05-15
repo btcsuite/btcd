@@ -2,10 +2,10 @@ btcwire
 =======
 
 Package btcwire implements the bitcoin wire protocol.  A comprehensive suite of
-tests is provided to ensure proper functionality.  See `test_coverage.txt` for
-the gocov coverage report.  Alternatively, if you are running a POSIX OS, you
-can run the `cov_report.sh` script for a real-time report.  Package btcwire is
-licensed under the liberal ISC license.
+tests with 100% test coverage is provided to ensure proper functionality.  See
+`test_coverage.txt` for the gocov coverage report.  Alternatively, if you are
+running a POSIX OS, you can run the `cov_report.sh` script for a real-time
+report.  Package btcwire is licensed under the liberal ISC license.
 
 There is an associated blog post about the release of this package
 [here](https://blog.conformal.com/btcwire-the-bitcoin-wire-protocol-package-from-btcd/).
