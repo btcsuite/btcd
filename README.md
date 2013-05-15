@@ -55,7 +55,7 @@ function. It accepts any `io.Reader`, but typically this will be a `net.Conn`
 to a remote node running a bitcoin peer.  Example syntax is:
 
 ```Go
-	// Use the most recent protocol verison supported by the package and the
+	// Use the most recent protocol version supported by the package and the
 	// main bitcoin network.
 	pver := btcwire.ProtocolVersion
 	btcnet := btcwire.MainNet
@@ -80,7 +80,7 @@ to a remote node running a bitcoin peer. Example syntax to request addresses
 from a remote peer is:
 
 ```Go
-	// Use the most recent protocol verison supported by the package and the
+	// Use the most recent protocol version supported by the package and the
 	// main bitcoin network.
 	pver := btcwire.ProtocolVersion
 	btcnet := btcwire.MainNet
