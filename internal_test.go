@@ -17,30 +17,57 @@ cases which are either not possible or can't reliably be tested via the public
 interface. The functions are only exported while the tests are being run.
 */
 
+var resulttests = []struct {
+	cmd  string
+	msg  []byte
+	comp bool
+	pass bool
+}{
+	// Generate a fake message to make sure we can encode and decode it and
+	// get the same thing back.
+	{"getblockcount",
+		[]byte(`{"result":226790,"error":{"code":1,"message":"No Error"},"id":"btcd"}`),
+		true, true},
+	// Generate a fake message to make sure we don't make a command from it.
+	{"anycommand", []byte(`{"result":"test","id":1}`), false, false},
+	{"anycommand", []byte(`{some junk}`), false, false},
+	{"getinfo", []byte(`{"error":null,"result":null,"id":"test"}`), false, true},
+	{"getinfo", []byte(`{"error":null,"result":null}`), false, false},
+	{"getinfo", []byte(`{"error":null,"id":1,"result":[{"a":"b"}]}`), false, false},
+	{"getblock", []byte(`{"error":null,"id":1,"result":[{"a":"b"}]}`), false, false},
+	{"getrawtransaction", []byte(`{"error":null,"id":1,"result":[{"a":"b"}]}`), false, false},
+	{"decoderawtransaction", []byte(`{"error":null,"id":1,"result":[{"a":"b"}]}`), false, false},
+}
+
 // TestReadResultCmd tests that readResultCmd can properly unmarshall the
 // returned []byte that contains a json reply for both known and unknown
 // messages.
 func TestReadResultCmd(t *testing.T) {
-	// Generate a fake message to make sure we can encode and decode it and
-	// get the same thing back.
-	msg := []byte(`{"result":226790,"error":{"code":1,"message":"No Error"},"id":"btcd"}`)
-	result, err := readResultCmd("getblockcount", msg)
-	if err != nil {
-		t.Errorf("Reading json reply to struct failed. %v", err)
+	for i, tt := range resulttests {
+		result, err := readResultCmd(tt.cmd, tt.msg)
+		if tt.pass {
+			if err != nil {
+				t.Errorf("Should read result: %d %v", i, err)
+			}
+			// Due to the pointer for the Error and other structs,
+			// we can't always guarantee byte for byte comparison.
+			if tt.comp {
+				msg2, err := json.Marshal(result)
+				if err != nil {
+					t.Errorf("Should unmarshal result: %d %v", i, err)
+				}
+				if bytes.Compare(tt.msg, msg2) != 0 {
+					t.Errorf("json byte arrays differ. %d %v %v", i, tt.msg, msg2)
+				}
+			}
+
+		} else {
+			if err == nil {
+				t.Errorf("Should fail: %d, %s", i, tt.msg)
+			}
+		}
 	}
-	msg2, err := json.Marshal(result)
-	if err != nil {
-		t.Errorf("Converting struct back to json bytes failed. %v", err)
-	}
-	if bytes.Compare(msg, msg2) != 0 {
-		t.Errorf("json byte arrays differ.")
-	}
-	// Generate a fake message to make sure we don't make a command from it.
-	msg = []byte(`{"result":"test","id":1}`)
-	_, err = readResultCmd("anycommand", msg)
-	if err == nil {
-		t.Errorf("Incorrect json accepted.")
-	}
+
 	return
 }
 
