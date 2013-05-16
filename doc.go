@@ -46,43 +46,66 @@ describing the error.
 
 id is simply the id of the requester.
 
+RPC Server Authentication
+
+All RPC calls must be authenticated with a username and password.  The specifics
+on how to configure the RPC server varies depending on the specific bitcoin
+implementation.  For bitcoind, this is accomplished by setting rpcuser and
+rpcpassword in the file ~/.bitcoin/bitcoin.conf.  The default local address
+of bitcoind is 127.0.0.1:8332.
+
 Usage
 
-To use this package, check it out from github:
+The general pattern to use this package consists of generating a message (see
+the full list on the official bitcoin wiki), sending the message, and handling
+the result after asserting its type.
 
- go get github.com/conformal/btcjson
+For commands where the reply structure is known, such as getinfo, one can
+directly access the fields in the Reply structure by type asserting the
+reply to the appropriate concrete type.
 
-Import it as usual:
+	// Create a getinfo message.
+	msg, err := btcjson.CreateMessage("getinfo")
+	if err != nil {
+		// Log and handle error.
+	}
 
- import	"github.com/conformal/btcjson"
+	// Send the message to server using the appropriate username and
+	// password.
+	reply, err := btcjson.RpcCommand(user, password, server, msg)
+	if err != nil {
+		// Log and handle error.
+	}
 
-Generate the message you want (see the full list on the official bitcoin wiki):
+	// Ensure there is a result and type assert it to a btcjson.InfoResult.
+	if reply.Result != nil {
+		if info, ok := reply.Result.(btcjson.InfoResult); ok {
+			fmt.Println("balance =", info.Balance)
+		}
+	}
 
- msg, err := btcjson.CreateMessage("getinfo")
+For other commands where this package does not yet provide a concrete
+implementation for the reply, such as getrawmempool, the reply uses a generic
+interface so one can access individual items as follows:
 
-And then send the message:
+	// Create a getrawmempool message.
+	msg, err := btcjson.CreateMessage("getrawmempool")
+	if err != nil {
+		// Log and handle error.
+	}
 
- reply, err := btcjson.RpcCommand(user, password, server, msg)
+	// Send the message to server using the appropriate username and
+	// password.
+	reply, err := btcjson.RpcCommand(user, password, server, msg)
+	if err != nil {
+		// Log and handle error.
+	}
 
-Since rpc calls must be authenticated, RpcCommand requires a
-username and password along with the address of the server.  For
-details, see the documentation for your bitcoin implementation.
-
-For convenience, this can be set for bitcoind by setting rpcuser and
-rpcpassword in the file ~/.bitcoin/bitcoin.conf with a default local
-address of: 127.0.0.1:8332
-
-For commands where the reply structure is known (such as getblock),
-one can directly access the fields in the Reply structure.  For other
-commands, the reply uses an interface so one can access individual
-items like:
-
- if reply.Result != nil {
-     info := reply.Result.(map[string]interface{})
-     balance, ok := info["balance"].(float64)
- }
-
-(with appropriate error checking at all steps of course).
-
+	// Ensure there is a result and type assert it to an interface slice.
+	if reply.Result != nil {
+		if mempool, ok := reply.Result.([]interface{}); ok {
+			fmt.Println("num mempool entries =", len(mempool))
+		}
+	}
 */
 package btcjson
