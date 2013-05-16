@@ -15,6 +15,7 @@ type fakeMessage struct {
 	command        string
 	payload        []byte
 	forceEncodeErr bool
+	forceLenErr    bool
 }
 
 // BtcDecode doesn't do anything.  It just satisfies the btcwire.Message
@@ -45,8 +46,14 @@ func (msg *fakeMessage) Command() string {
 	return msg.command
 }
 
-// MaxPayloadLength simply returns 0.  It is only here to satisfy the
-// btcwire.Message interface.
+// MaxPayloadLength returns the length of the payload field of fake message
+// or a smaller value if the forceLenErr flag of the fake message is set.  It
+// satisfies the btcwire.Message interface.
 func (msg *fakeMessage) MaxPayloadLength(pver uint32) uint32 {
-	return 0
+	lenp := uint32(len(msg.payload))
+	if msg.forceLenErr {
+		return lenp - 1
+	}
+
+	return lenp
 }

@@ -1,6 +1,6 @@
 
 github.com/conformal/btcwire/message.go		 ReadMessage				 100.00% (37/37)
-github.com/conformal/btcwire/message.go		 WriteMessage				 100.00% (27/27)
+github.com/conformal/btcwire/message.go		 WriteMessage				 100.00% (31/31)
 github.com/conformal/btcwire/msgtx.go		 MsgTx.BtcDecode			 100.00% (25/25)
 github.com/conformal/btcwire/msgversion.go	 MsgVersion.BtcDecode			 100.00% (25/25)
 github.com/conformal/btcwire/msgtx.go		 MsgTx.Copy				 100.00% (24/24)
@@ -149,5 +149,5 @@ github.com/conformal/btcwire/msgversion.go	 NewMsgVersion				 100.00% (1/1)
 github.com/conformal/btcwire/netaddress.go	 NetAddress.AddService			 100.00% (1/1)
 github.com/conformal/btcwire/shahash.go		 ShaHash.IsEqual			 100.00% (1/1)
 github.com/conformal/btcwire/invvect.go		 NewInvVect				 100.00% (1/1)
-github.com/conformal/btcwire			 ---------------------------------	 100.00% (923/923)
+github.com/conformal/btcwire			 ---------------------------------	 100.00% (927/927)
 

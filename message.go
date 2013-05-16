@@ -15,7 +15,7 @@ import (
 // header.  Shorter commands must be zero padded.
 const commandSize = 12
 
-// maxMessagePayload is the maximum byes a message can be regardless of other
+// maxMessagePayload is the maximum bytes a message can be regardless of other
 // individual limits imposed by messages themselves.
 const maxMessagePayload = (1024 * 1024 * 32) // 32MB
 
@@ -158,6 +158,7 @@ func discardInput(r io.Reader, n uint32) {
 func WriteMessage(w io.Writer, msg Message, pver uint32, btcnet BitcoinNet) error {
 	var command [commandSize]byte
 
+	// Enforce max command size.
 	cmd := msg.Command()
 	if len(cmd) > commandSize {
 		str := fmt.Sprintf("command [%s] is too long [max %v]",
@@ -166,6 +167,7 @@ func WriteMessage(w io.Writer, msg Message, pver uint32, btcnet BitcoinNet) erro
 	}
 	copy(command[:], []byte(cmd))
 
+	// Encode the message payload.
 	var bw bytes.Buffer
 	err := msg.BtcEncode(&bw, pver)
 	if err != nil {
@@ -174,11 +176,20 @@ func WriteMessage(w io.Writer, msg Message, pver uint32, btcnet BitcoinNet) erro
 	payload := bw.Bytes()
 	lenp := len(payload)
 
-	// Enforce maximum message payload.
+	// Enforce maximum overall message payload.
 	if lenp > maxMessagePayload {
 		str := fmt.Sprintf("message payload is too large - encoded "+
 			"%d bytes, but maximum message payload is %d bytes",
 			lenp, maxMessagePayload)
+		return messageError("WriteMessage", str)
+	}
+
+	// Enforce maximum message payload based on the message type.
+	mpl := msg.MaxPayloadLength(pver)
+	if uint32(lenp) > mpl {
+		str := fmt.Sprintf("message payload is too large - encoded "+
+			"%d bytes, but maximum message payload size for "+
+			"messages of type [%s] is %d.", lenp, cmd, mpl)
 		return messageError("WriteMessage", str)
 	}
 

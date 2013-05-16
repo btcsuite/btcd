@@ -317,10 +317,16 @@ func TestWriteMessageWireErrors(t *testing.T) {
 	// Fake message with a problem during encoding
 	encodeErrMsg := &fakeMessage{forceEncodeErr: true}
 
-	// Fake message that has a payload which exceed max.
-	exceedPayload := make([]byte, btcwire.MaxMessagePayload+1)
-	exceedPayloadErrMsg := &fakeMessage{payload: exceedPayload}
+	// Fake message that has payload which exceeds max overall message size.
+	exceedOverallPayload := make([]byte, btcwire.MaxMessagePayload+1)
+	exceedOverallPayloadErrMsg := &fakeMessage{payload: exceedOverallPayload}
 
+	// Fake message that has payload which exceeds max allowed per message.
+	exceedPayload := make([]byte, 1)
+	exceedPayloadErrMsg := &fakeMessage{payload: exceedPayload, forceLenErr: true}
+
+	// Fake message that is used to force errors in the header and payload
+	// writes.
 	bogusPayload := []byte{0x01, 0x02, 0x03, 0x04}
 	bogusMsg := &fakeMessage{command: "bogus", payload: bogusPayload}
 
@@ -335,7 +341,9 @@ func TestWriteMessageWireErrors(t *testing.T) {
 		{badCommandMsg, pver, btcnet, 0, btcwireErr},
 		// Force error in payload encode.
 		{encodeErrMsg, pver, btcnet, 0, btcwireErr},
-		// Force error due to exceeding max payload size.
+		// Force error due to exceeding max overall message payload size.
+		{exceedOverallPayloadErrMsg, pver, btcnet, 0, btcwireErr},
+		// Force error due to exceeding max payload for message type.
 		{exceedPayloadErrMsg, pver, btcnet, 0, btcwireErr},
 		// Force error in header write.
 		{bogusMsg, pver, btcnet, 0, io.ErrShortWrite},
