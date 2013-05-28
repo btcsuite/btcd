@@ -156,7 +156,8 @@ func (b *Block) ProtocolVersion() uint32 {
 }
 
 // TxLoc() returns the offsets and lengths of each transaction in a raw block.
-// It is used to allow fast indexing into the
+// It is used to allow fast indexing into transactions within the raw byte
+// stream.
 func (b *Block) TxLoc() (txlocD []btcwire.TxLoc, err error) {
 	rawMsg, pver, err := b.Bytes()
 	if err != nil {
