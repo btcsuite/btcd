@@ -1,0 +1,16 @@
+
+github.com/conformal/btcutil/block.go	 Block.TxShas			 100.00% (10/10)
+github.com/conformal/btcutil/block.go	 Block.Sha			 100.00% (5/5)
+github.com/conformal/btcutil/block.go	 NewBlockFromBlockAndBytes	 100.00% (1/1)
+github.com/conformal/btcutil/block.go	 Block.MsgBlock			 100.00% (1/1)
+github.com/conformal/btcutil/block.go	 Block.ProtocolVersion		 100.00% (1/1)
+github.com/conformal/btcutil/block.go	 Block.Height			 100.00% (1/1)
+github.com/conformal/btcutil/block.go	 Block.SetHeight		 100.00% (1/1)
+github.com/conformal/btcutil/block.go	 NewBlock			 100.00% (1/1)
+github.com/conformal/btcutil/block.go	 Block.Bytes			 88.89% (8/9)
+github.com/conformal/btcutil/block.go	 NewBlockFromBytes		 85.71% (6/7)
+github.com/conformal/btcutil/block.go	 Block.TxSha			 81.82% (9/11)
+github.com/conformal/btcutil/block.go	 Block.TxLoc			 0.00% (0/9)
+github.com/conformal/btcutil/block.go	 OutOfRangeError.Error		 0.00% (0/1)
+github.com/conformal/btcutil		 -------------------------	 75.86% (44/58)
+
