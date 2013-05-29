@@ -21,7 +21,7 @@ var ErrHashStrSize = fmt.Errorf("Max hash length is %v chars", MaxHashStringSize
 type ShaHash [HashSize]byte
 
 // String returns the ShaHash in the standard bitcoin big-endian form.
-func (hash *ShaHash) String() string {
+func (hash ShaHash) String() string {
 	hashstr := ""
 	for i := range hash {
 		hashstr += fmt.Sprintf("%02x", hash[HashSize-1-i])
