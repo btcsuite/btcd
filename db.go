@@ -85,6 +85,11 @@ type Db interface {
 	// into the database.
 	InsertBlock(block *btcutil.Block) (blockid int64, err error)
 
+	// InsertBlockData stores a block hash and its associated data block with a
+	// previous sha of `prevSha' and a version of `pver'.  This function is
+	// DEPRECATED and should not be used.
+	InsertBlockData(sha *btcwire.ShaHash, prevSha *btcwire.ShaHash, pver uint32, buf []byte) (blockid int64, err error)
+
 	// InsertTx inserts a tx hash and its associated data into the database
 	InsertTx(txsha *btcwire.ShaHash, blockidx int64, txoff int, txlen int, usedbuf []byte) (err error)
 

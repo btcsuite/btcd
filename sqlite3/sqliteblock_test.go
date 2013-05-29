@@ -9,7 +9,6 @@ import (
 	"fmt"
 	"github.com/conformal/btcdb"
 	"github.com/conformal/btcdb/sqlite3"
-	"github.com/conformal/btcutil"
 	"github.com/conformal/btcwire"
 	"os"
 	"testing"
