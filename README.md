@@ -5,7 +5,7 @@ Package btcdb provides a database interface for the bitcoin block chain and
 transactions.  There is a test suite which is aiming to reach 100% code coverage
 coverage.  See `test_coverage.txt` for the current coverage (using gocov).  On a
 UNIX-like OS, the script `cov_report.sh` can be used to generate the report.
-Package btcjson is licensed under the liberal ISC license.
+Package btcdb is licensed under the liberal ISC license.
 
 ## Sample Use
 
