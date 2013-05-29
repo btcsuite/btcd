@@ -64,7 +64,7 @@ var txqueries []string = []string{
 	txtmpFetchLocationByShaStmt: "SELECT blockid, txoff, txlen FROM txtmp WHERE key = ?;",
 	txMigrateCopy:               "INSERT INTO tx (key, blockid, txoff, txlen, data) SELECT key, blockid, txoff, txlen, data FROM txtmp;",
 	txMigrateClear:              "DELETE from txtmp;",
-	txMigratePrep:               "DROP index uniquetx;",
+	txMigratePrep:               "DROP index IF EXISTS uniquetx;",
 	txMigrateFinish:             "CREATE UNIQUE INDEX IF NOT EXISTS uniquetx ON tx (key);",
 	txMigrateCount:              "SELECT COUNT(*) FROM txtmp;",
 	txPragmaVacuumOn:            "PRAGMA auto_vacuum = FULL;",
