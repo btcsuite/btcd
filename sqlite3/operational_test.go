@@ -49,6 +49,7 @@ func testOperationalMode(t *testing.T, mode int) {
 		return
 	}
 	defer os.Remove(dbname)
+	defer db.Close()
 
 	switch mode {
 	case dbTmDefault: // default
@@ -72,13 +73,16 @@ func testOperationalMode(t *testing.T, mode int) {
 
 	testdatafile := filepath.Join("testdata", "blocks1-256.bz2")
 	blocks, err := loadBlocks(t, testdatafile)
+	if err != nil {
+		t.Errorf("Unable to load blocks from test data for mode %v: %v",
+			mode, err)
+		return
+	}
 
-	var height = int64(1)
 	err = nil
-	for ; height < int64(len(blocks)); height++ {
-
+out:
+	for height := int64(1); height < int64(len(blocks)); height++ {
 		block := blocks[height]
-
 		if mode != dbTmNoVerify {
 			// except for NoVerify which does not allow lookups check inputs
 			mblock := block.MsgBlock()
@@ -116,19 +120,20 @@ func testOperationalMode(t *testing.T, mode int) {
 			for _, txe := range txlist {
 				if txe.Err != nil {
 					t.Errorf("tx list fetch failed %v err %v ", txe.Sha, txe.Err)
+					break out
 				}
 			}
 
 		}
 
-		t.Logf("Inserting Block %v", height)
 		newheight, err := db.InsertBlock(block)
 		if err != nil {
 			t.Errorf("failed to insert block %v err %v", height, err)
+			break out
 		}
 		if newheight != height {
 			t.Errorf("height mismatch expect %v returned %v", height, newheight)
-
+			break out
 		}
 	}
 
@@ -165,6 +170,7 @@ func testBackout(t *testing.T, mode int) {
 		return
 	}
 	defer os.Remove(dbname)
+	defer db.Close()
 
 	switch mode {
 	case dbTmDefault: // default
@@ -186,22 +192,19 @@ func testBackout(t *testing.T, mode int) {
 
 	testdatafile := filepath.Join("testdata", "blocks1-256.bz2")
 	blocks, err := loadBlocks(t, testdatafile)
-
 	if len(blocks) < 120 {
 		t.Errorf("test data too small")
 		return
 	}
 
-	var height = int64(1)
 	err = nil
-	for ; height < int64(len(blocks)); height++ {
-
+	for height := int64(1); height < int64(len(blocks)); height++ {
 		if height == 100 {
-			t.Logf("sync")
+			t.Logf("Syncing at block height 100")
 			db.Sync()
 		}
 		if height == 120 {
-			t.Logf("wha?")
+			t.Logf("Simulating unexpected application quit")
 			// Simulate unexpected application quit
 			db.RollbackClose()
 			break
@@ -209,14 +212,14 @@ func testBackout(t *testing.T, mode int) {
 
 		block := blocks[height]
 
-		t.Logf("Inserting Block %v", height)
 		newheight, err := db.InsertBlock(block)
 		if err != nil {
 			t.Errorf("failed to insert block %v err %v", height, err)
+			break
 		}
 		if newheight != height {
 			t.Errorf("height mismatch expect %v returned %v", height, newheight)
-
+			break
 		}
 	}
 
@@ -228,6 +231,7 @@ func testBackout(t *testing.T, mode int) {
 		t.Errorf("Failed to open test database %v", err)
 		return
 	}
+	defer db.Close()
 
 	sha, err := blocks[99].Sha()
 	if err != nil {
@@ -249,12 +253,12 @@ func testBackout(t *testing.T, mode int) {
 	_, err = db.FetchBlockBySha(sha)
 	if err == nil {
 		t.Errorf("loaded block 110 from db, failure expected")
+		return
 	}
 
 	block := blocks[110]
 	mblock := block.MsgBlock()
 	txsha, err := mblock.Transactions[0].TxSha(block.ProtocolVersion())
-	t.Logf("txsha %v", txsha)
 	_, _, _, err = db.FetchTxBySha(&txsha)
 	_, err = db.FetchTxUsedBySha(&txsha)
 
@@ -265,6 +269,7 @@ func testBackout(t *testing.T, mode int) {
 	err = db.InsertTx(&txsha, 99, 1024, 1048, oldused)
 	if err == nil {
 		t.Errorf("dup insert of tx succeeded")
+		return
 	}
 }
 
@@ -294,14 +299,14 @@ func loadBlocks(t *testing.T, file string) (blocks []*btcutil.Block, err error) 
 	// block 0 isn't really there, put in nil
 	blocks = append(blocks, block)
 
-	var height = int64(1)
 	err = nil
-	for ; err == nil; height++ {
+	for height := int64(1); err == nil; height++ {
 		var rintbuf uint32
 		err = binary.Read(dr, binary.LittleEndian, &rintbuf)
 		if err == io.EOF {
 			// hit end of file at expected offset: no warning
 			height--
+			err = nil
 			break
 		}
 		if err != nil {
