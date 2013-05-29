@@ -7,8 +7,8 @@ package sqlite3_test
 import (
 	"compress/bzip2"
 	"encoding/binary"
-	"github.com/confomral/btcdb"
-	"github.com/confomral/btcdb/db_sqlite"
+	"github.com/conformal/btcdb"
+	"github.com/conformal/btcdb/sqlite3"
 	"github.com/conformal/btcutil"
 	"github.com/conformal/btcwire"
 	"io"
@@ -223,7 +223,7 @@ func testBackout(t *testing.T, mode int) {
 	// db was closed at height 120, so no cleanup is possible.
 
 	// reopen db
-	db, err = btcdb.NewDB("sqlite", dbname)
+	db, err = btcdb.OpenDB("sqlite", dbname)
 	if err != nil {
 		t.Errorf("Failed to open test database %v", err)
 		return
