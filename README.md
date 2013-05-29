@@ -2,10 +2,11 @@ btcdb
 =====
 
 Package btcdb provides a database interface for the bitcoin block chain and
-transactions.  There is a test suite which is aiming to reach 100% code coverage
-coverage.  See `test_coverage.txt` for the current coverage (using gocov).  On a
-UNIX-like OS, the script `cov_report.sh` can be used to generate the report.
-Package btcdb is licensed under the liberal ISC license.
+transactions.  There is a test suite with a high percentage of code coverage
+coverage.  See `test_coverage.txt` for the current coverage (using gocov).
+Alternatively, if you are running a POSIX OS, you can run the cov_report.sh
+script for a real-time report.  Package btcdb is licensed under the liberal
+ISC license.
 
 Note that the main `Db` interface is not yet finalized, so it is subject to
 change.
