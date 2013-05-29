@@ -11,7 +11,6 @@ import (
 	"github.com/conformal/btcdb/sqlite3"
 	"github.com/conformal/btcutil"
 	"github.com/conformal/btcwire"
-	"github.com/conformal/seelog"
 	"os"
 	"testing"
 )
@@ -246,15 +245,6 @@ func testIterator(t *testing.T, db btcdb.Db, shas []btcwire.ShaHash,
 }
 
 func TestBdb(t *testing.T) {
-	log, err := seelog.LoggerFromWriterWithMinLevel(os.Stdout,
-		seelog.InfoLvl)
-	if err != nil {
-		t.Errorf("failed to create logger: %v", err)
-		return
-	}
-	defer log.Flush()
-	btcdb.UseLogger(log)
-
 	// Ignore db remove errors since it means we didn't have an old one.
 	_ = os.Remove("tstdb1")
 	db, err := btcdb.CreateDB("sqlite", "tstdb1")
