@@ -256,6 +256,14 @@ func TestNewBlockFromBlockAndBytes(t *testing.T) {
 
 // TestBlockErrors tests the error paths for the Block API.
 func TestBlockErrors(t *testing.T) {
+	// Ensure out of range errors are as expected.
+	wantErr := "transaction index -1 is out of range - max 3"
+	testErr := btcutil.OutOfRangeError(wantErr)
+	if testErr.Error() != wantErr {
+		t.Errorf("OutOfRangeError: wrong error - got %v, want %v",
+			testErr.Error(), wantErr)
+	}
+
 	// Encode the test block to bytes.
 	pver := btcwire.ProtocolVersion
 	var block100000Buf bytes.Buffer
