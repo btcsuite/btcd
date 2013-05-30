@@ -9,6 +9,7 @@ import (
 	"github.com/conformal/btcutil"
 	"github.com/conformal/btcwire"
 	"github.com/davecgh/go-spew/spew"
+	"io"
 	"reflect"
 	"testing"
 	"time"
@@ -250,6 +251,27 @@ func TestNewBlockFromBlockAndBytes(t *testing.T) {
 	if msgBlock := b.MsgBlock(); !reflect.DeepEqual(msgBlock, &Block100000) {
 		t.Errorf("MsgBlock: mismatched MsgBlock - got %v, want %v",
 			spew.Sdump(msgBlock), spew.Sdump(&Block100000))
+	}
+}
+
+// TestBlockErrors tests the error paths for the Block API.
+func TestBlockErrors(t *testing.T) {
+	// Encode the test block to bytes.
+	pver := btcwire.ProtocolVersion
+	var block100000Buf bytes.Buffer
+	err := Block100000.BtcEncode(&block100000Buf, pver)
+	if err != nil {
+		t.Errorf("BtcEncode: %v", err)
+	}
+	block100000Bytes := block100000Buf.Bytes()
+
+	// Truncate the block byte buffer to force errors.
+	shortBytes := block100000Bytes[:80]
+	_, err = btcutil.NewBlockFromBytes(shortBytes, pver)
+	if err != io.EOF {
+		t.Errorf("NewBlockFromBytes: did not get expected error - "+
+			"got %v, want %v", err, io.EOF)
+		return
 	}
 }
 
