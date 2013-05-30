@@ -2,11 +2,10 @@ btcutil
 =======
 
 Package btcutil provides bitcoin-specific convenience functions and types.
-The test coverage is currently ~76%, however it will improved to 100% in the
-near future.  See `test_coverage.txt` for the gocov coverage report.
-Alternatively, if you are running a POSIX OS, you can run the `cov_report.sh`
-script for a real-time report.  Package btcutil is licensed under the liberal
-ISC license.
+A comprehensive suite of tests is provided to ensure proper functionality.  See
+`test_coverage.txt` for the gocov coverage report.  Alternatively, if you are
+running a POSIX OS, you can run the `cov_report.sh` script for a real-time
+report.  Package btcutil is licensed under the liberal ISC license.
 
 This package was developed for btcd, an alternative full-node implementation of
 bitcoin which is under active development by Conformal.  Although it was
