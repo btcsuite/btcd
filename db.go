@@ -54,43 +54,44 @@ type Db interface {
 	// cache the underlying object if desired.
 	FetchBlockBySha(sha *btcwire.ShaHash) (blk *btcutil.Block, err error)
 
-	// FetchBlockShaByIdx returns a block sha based on its height in the
+	// FetchBlockShaByIdx returns a block hash based on its height in the
 	// blockchain.
 	FetchBlockShaByIdx(blkid int64) (sha *btcwire.ShaHash, err error)
 
-	// FetchIdxRange looks up a range of block by the start and ending ids.
-	// Fetch is inclusive of the start id and exclusive of the ending id. If
-	// the special id `AllShas' is provided as endid then FetchIdxRange will
-	// fetch all shas from startid until no more shas are present.
+	// FetchIdxRange looks up a range of blocks by the start and ending
+	// heights.  Fetch is inclusive of the start height and exclusive of the
+	// ending height. To fetch all hashes from the start height until no
+	// more are present, use the special id `AllShas'.
 	FetchIdxRange(startid, endid int64) (rshalist []btcwire.ShaHash, err error)
 
-	// FetchTxAllBySha returns several pieces of data regarding the given sha.
+	// FetchTxAllBySha returns a
 	FetchTxAllBySha(txsha *btcwire.ShaHash) (rtx *btcwire.MsgTx, rtxbuf []byte, rpver uint32, rblksha *btcwire.ShaHash, err error)
 
 	// FetchTxBufBySha returns the raw bytes and associated protocol version
-	// for the transaction with the requested sha.
+	// for the transaction with the requested hash.
 	FetchTxBufBySha(txsha *btcwire.ShaHash) (txbuf []byte, rpver uint32, err error)
 
-	// FetchTxBySha returns some data for the given Tx Sha.
+	// FetchTxBySha returns some data for the given transaction hash.
 	FetchTxBySha(txsha *btcwire.ShaHash) (rtx *btcwire.MsgTx, rpver uint32, blksha *btcwire.ShaHash, err error)
 
-	// FetchTxByShaList returns a TxListReply given an array of ShaHash, look up the transactions
-	// and return them in a TxListReply array.
+	// FetchTxByShaList returns a TxListReply given an array of transaction
+	// hashes.
 	FetchTxByShaList(txShaList []*btcwire.ShaHash) []*TxListReply
 
-	// FetchTxUsedBySha returns the used/spent buffer for a given transaction.
+	// FetchTxUsedBySha returns the used/spent buffer for a given
+	// transaction hash.
 	FetchTxUsedBySha(txsha *btcwire.ShaHash) (spentbuf []byte, err error)
 
-	// InsertBlock inserts the block data and transaction data from a block
+	// InsertBlock inserts raw block and transaction data from a block
 	// into the database.
 	InsertBlock(block *btcutil.Block) (blockid int64, err error)
 
-	// InsertBlockData stores a block hash and its associated data block with a
-	// previous sha of `prevSha' and a version of `pver'.  This function is
-	// DEPRECATED and should not be used.
+	// InsertBlockData stores a block hash and its associated data block
+	// with the given previous hash and protocol version into the database.
 	InsertBlockData(sha *btcwire.ShaHash, prevSha *btcwire.ShaHash, pver uint32, buf []byte) (blockid int64, err error)
 
-	// InsertTx inserts a tx hash and its associated data into the database
+	// InsertTx stores a transaction hash and its associated data into the
+	// database.
 	InsertTx(txsha *btcwire.ShaHash, blockidx int64, txoff int, txlen int, usedbuf []byte) (err error)
 
 	// InvalidateBlockCache releases all cached blocks.
@@ -105,17 +106,17 @@ type Db interface {
 	// NewIterateBlocks returns an iterator for all blocks in database.
 	NewIterateBlocks() (pbi BlockIterator, err error)
 
-	// NewestSha provides an interface to quickly look up the sha of
-	// the most recent (end) of the block chain.
+	// NewestSha provides an interface to quickly look up the hash of
+	// the most recent (end) block of the block chain.
 	NewestSha() (sha *btcwire.ShaHash, blkid int64, err error)
 
 	// RollbackClose discards the recent database changes to the previously
 	// saved data at last Sync and closes the database.
 	RollbackClose()
 
-	// SetDBInsertMode provides hints to the database to how the application
-	// is running.  This allows the database to work in optimized modes when
-	// the database may be very busy.
+	// SetDBInsertMode provides hints to the database about how the
+	// application is running.  This allows the database to work in
+	// optimized modes when the database may be very busy.
 	SetDBInsertMode(InsertMode)
 
 	// Sync verifies that the database is coherent on disk and no
