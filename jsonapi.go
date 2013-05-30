@@ -12,7 +12,7 @@ import (
 // Message contains a message to be sent to the bitcoin client.
 type Message struct {
 	Jsonrpc string      `json:"jsonrpc"`
-	Id      string      `json:"id"`
+	Id      interface{} `json:"id"`
 	Method  string      `json:"method"`
 	Params  interface{} `json:"params"`
 }
@@ -24,7 +24,7 @@ type Reply struct {
 	Result interface{} `json:"result"`
 	Error  *Error      `json:"error"`
 	// This has to be a pointer for go to put a null in it when empty.
-	Id *string `json:"id"`
+	Id *interface{} `json:"id"`
 }
 
 // InfoResult contains the data returned by the getinfo command.
@@ -618,7 +618,7 @@ func readResultCmd(cmd string, message []byte) (Reply, error) {
 	}
 	// Take care of the parts that are the same for all replies.
 	var jsonErr Error
-	var id string
+	var id interface{}
 	err = json.Unmarshal(objmap["error"], &jsonErr)
 	if err != nil {
 		err = fmt.Errorf("Error unmarshalling json reply: %v", err)
