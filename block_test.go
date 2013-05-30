@@ -153,6 +153,26 @@ func TestBlock(t *testing.T) {
 
 		}
 	}
+
+	// Transaction offsets and length for the transaction in Block100000.
+	wantTxLocs := []btcwire.TxLoc{
+		btcwire.TxLoc{TxStart: 81, TxLen: 135},
+		btcwire.TxLoc{TxStart: 216, TxLen: 259},
+		btcwire.TxLoc{TxStart: 475, TxLen: 257},
+		btcwire.TxLoc{TxStart: 732, TxLen: 225},
+	}
+
+	// Ensure the transaction location information is accurate.
+	txLocs, err := b.TxLoc()
+	if err != nil {
+		t.Errorf("TxLoc: %v", err)
+		return
+	}
+	if !reflect.DeepEqual(txLocs, wantTxLocs) {
+		t.Errorf("TxLoc: mismatched transaction location information "+
+			"- got %v, want %v", spew.Sdump(txLocs),
+			spew.Sdump(wantTxLocs))
+	}
 }
 
 // TestNewBlockFromBytes tests creation of a Block from raw bytes.
