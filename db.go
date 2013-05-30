@@ -64,7 +64,8 @@ type Db interface {
 	// more are present, use the special id `AllShas'.
 	FetchIdxRange(startid, endid int64) (rshalist []btcwire.ShaHash, err error)
 
-	// FetchTxAllBySha returns a
+	// FetchTxAllBySha returns several pieces of data for a given
+	// transaction hash.
 	FetchTxAllBySha(txsha *btcwire.ShaHash) (rtx *btcwire.MsgTx, rtxbuf []byte, rpver uint32, rblksha *btcwire.ShaHash, err error)
 
 	// FetchTxBufBySha returns the raw bytes and associated protocol version
