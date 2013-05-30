@@ -151,13 +151,14 @@ func (db *SqliteDb) blkExistsSha(sha *btcwire.ShaHash) bool {
 	return true
 }
 
-// FetchBlockShaByIdx returns a block sha based on its height in the blockchain.
-func (db *SqliteDb) FetchBlockShaByIdx(blkid int64) (sha *btcwire.ShaHash, err error) {
+// FetchBlockShaByHeight returns a block hash based on its height in the
+// block chain.
+func (db *SqliteDb) FetchBlockShaByHeight(height int64) (sha *btcwire.ShaHash, err error) {
 	var row *sql.Row
 	db.dbLock.Lock()
 	defer db.dbLock.Unlock()
 
-	blockidx := blkid + 1 // skew between btc blockid and sql
+	blockidx := height + 1 // skew between btc blockid and sql
 
 	row = db.blkStmts[blkFetchIdx].QueryRow(blockidx)
 
@@ -171,21 +172,21 @@ func (db *SqliteDb) FetchBlockShaByIdx(blkid int64) (sha *btcwire.ShaHash, err e
 	return &shaval, nil
 }
 
-// FetchIdxRange looks up a range of block by the start and ending ids.
-// Fetch is inclusive of the start id and exclusive of the ending id. If the
-// special id `AllShas' is provided as endid then FetchIdxRange will fetch all
-// shas from startid until no more shas are present.
-func (db *SqliteDb) FetchIdxRange(startid, endid int64) (rshalist []btcwire.ShaHash, err error) {
+// FetchHeightRange looks up a range of blocks by the start and ending
+// heights.  Fetch is inclusive of the start height and exclusive of the
+// ending height. To fetch all hashes from the start height until no
+// more are present, use the special id `AllShas'.
+func (db *SqliteDb) FetchHeightRange(startHeight, endHeight int64) (rshalist []btcwire.ShaHash, err error) {
 	db.dbLock.Lock()
 	defer db.dbLock.Unlock()
 
-	startidx := startid + 1 // skew between btc blockid and sql
+	startidx := startHeight + 1 // skew between btc block height and sql
 
 	var endidx int64
-	if endid == btcdb.AllShas {
+	if endHeight == btcdb.AllShas {
 		endidx = btcdb.AllShas // no skew if asking for all
 	} else {
-		endidx = endid + 1 // skew between btc blockid and sql
+		endidx = endHeight + 1 // skew between btc block height and sql
 	}
 	rows, err := db.blkStmts[blkFetchIdxList].Query(startidx, endidx)
 	if err != nil {
@@ -209,7 +210,7 @@ func (db *SqliteDb) FetchIdxRange(startid, endid int64) (rshalist []btcwire.ShaH
 	if err == nil {
 		rshalist = shalist
 	}
-	log.Tracef("FetchIdxRange idx %v %v returned %v shas err %v", startid, endid, len(shalist), err)
+	log.Tracef("FetchIdxRange idx %v %v returned %v shas err %v", startHeight, endHeight, len(shalist), err)
 	return
 }
 

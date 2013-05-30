@@ -137,7 +137,7 @@ func (db *SqliteDb) FetchTxAllBySha(txsha *btcwire.ShaHash) (rtx *btcwire.MsgTx,
 		return
 	}
 
-	blksha, err := db.FetchBlockShaByIdx(bidx)
+	blksha, err := db.FetchBlockShaByHeight(bidx)
 	if err != nil {
 		log.Warnf("block idx lookup %v to %v", bidx, err)
 		return

@@ -141,7 +141,7 @@ func testFetch(t *testing.T, db btcdb.Db, shas []btcwire.ShaHash,
 		}
 
 		// Fetch the sha by index and ensure it matches.
-		tsha, err := db.FetchBlockShaByIdx(int64(i))
+		tsha, err := db.FetchBlockShaByHeight(int64(i))
 		if err != nil {
 			t.Errorf("can't fetch sha at index %d: %v", i, err)
 			continue
@@ -174,7 +174,7 @@ func testFetch(t *testing.T, db btcdb.Db, shas []btcwire.ShaHash,
 
 	for _, test := range fetchIdxTests {
 		t.Logf("numSha: %d - Fetch from %d to %d\n", numShas, test.start, test.end)
-		if shalist, err := db.FetchIdxRange(test.start, test.end); err == nil {
+		if shalist, err := db.FetchHeightRange(test.start, test.end); err == nil {
 			compareArray(t, shalist, test.exp, test.test, sync)
 		} else {
 			t.Errorf("failed to fetch index range for %s (%s)",
