@@ -166,11 +166,11 @@ func (b *Block) TxLoc() (txlocD []btcwire.TxLoc, err error) {
 	rbuf := bytes.NewBuffer(rawMsg)
 
 	var mblock btcwire.MsgBlock
-	txloc, err := mblock.BtcDecodeTxLoc(rbuf, pver)
+	txLocs, err := mblock.BtcDecodeTxLoc(rbuf, pver)
 	if err != nil {
 		return
 	}
-	return txloc, err
+	return txLocs, err
 }
 
 // Height returns the saved height of the block in the blockchain.  This value
