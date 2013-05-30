@@ -265,6 +265,13 @@ func TestBlockErrors(t *testing.T) {
 	}
 	block100000Bytes := block100000Buf.Bytes()
 
+	// Create a new block from the encoded bytes.
+	b, err := btcutil.NewBlockFromBytes(block100000Bytes, pver)
+	if err != nil {
+		t.Errorf("NewBlockFromBytes: %v", err)
+		return
+	}
+
 	// Truncate the block byte buffer to force errors.
 	shortBytes := block100000Bytes[:80]
 	_, err = btcutil.NewBlockFromBytes(shortBytes, pver)
@@ -272,6 +279,18 @@ func TestBlockErrors(t *testing.T) {
 		t.Errorf("NewBlockFromBytes: did not get expected error - "+
 			"got %v, want %v", err, io.EOF)
 		return
+	}
+
+	// Ensure TxSha returns expected error on invalid indices.
+	_, err = b.TxSha(-1)
+	if _, ok := err.(btcutil.OutOfRangeError); !ok {
+		t.Errorf("TxSha: wrong error - got: %v <%T>, "+
+			"want: <%T>", err, err, btcutil.OutOfRangeError(""))
+	}
+	_, err = b.TxSha(len(Block100000.Transactions) + 1)
+	if _, ok := err.(btcutil.OutOfRangeError); !ok {
+		t.Errorf("TxSha: wrong error - got: %v <%T>, "+
+			"want: <%T>", err, err, btcutil.OutOfRangeError(""))
 	}
 }
 
