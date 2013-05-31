@@ -243,3 +243,26 @@ func TestRpcReply(t *testing.T) {
 	}
 	return
 }
+
+var idtests = []struct {
+	testId []interface{}
+	pass   bool
+}{
+	{[]interface{}{"string test"}, true},
+	{[]interface{}{1}, true},
+	{[]interface{}{1.0}, true},
+	{[]interface{}{nil}, true},
+	{[]interface{}{make(chan int)}, false},
+}
+
+// TestIsValidIdType tests that IsValidIdType allows (and disallows the correct
+// types.
+func TestIsValidIdType(t *testing.T) {
+	for _, tt := range idtests {
+		res := btcjson.IsValidIdType(tt.testId[0])
+		if res != tt.pass {
+			t.Errorf("Incorrect type result %v.", tt)
+		}
+	}
+	return
+}
