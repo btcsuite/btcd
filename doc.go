@@ -3,10 +3,10 @@
 // license that can be found in the LICENSE file.
 
 /*
-Package btcdb provides a database interface for the bitcoin block chain.
+Package btcdb provides a database interface for the Bitcoin block chain.
 
-As of May 2013, there are over 235,000 blocks in the bitcoin block chain and
-and over 17 million transactions (which turns out to be over 11Gb of data).
+As of May 2013, there are over 235,000 blocks in the Bitcoin block chain and
+and over 17 million transactions (which turns out to be over 11GB of data).
 btcdb provides a database layer to store and retrieve this data in a fairly
 simple and efficient manner.  The use of this should not require specific
 knowledge of the database backend used although currently only db_sqlite is
