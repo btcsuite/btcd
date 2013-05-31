@@ -167,9 +167,9 @@ func testFetch(t *testing.T, db btcdb.Db, shas []btcwire.ShaHash,
 		{midBlockID, endBlockID, shas[midBlockID-1 : endBlockID-1],
 			"fetch second half"},
 
-		// Nonexistant off the end.
+		// Nonexistent off the end.
 		{endBlockID, endBlockID * 2, []btcwire.ShaHash{},
-			"fetch nonexistant"},
+			"fetch nonexistent"},
 	}
 
 	for _, test := range fetchIdxTests {
@@ -182,9 +182,9 @@ func testFetch(t *testing.T, db btcdb.Db, shas []btcwire.ShaHash,
 		}
 	}
 
-	// Try and fetch nonexistant sha.
+	// Try and fetch nonexistent sha.
 	if db.ExistsSha(&badSha) {
-		t.Errorf("non existant sha exists (%s)!", sync)
+		t.Errorf("nonexistent sha exists (%s)!", sync)
 	}
 	_, _, _, err := sqlite3.FetchSha(db, &badSha)
 	if err == nil {

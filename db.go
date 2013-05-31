@@ -14,8 +14,8 @@ var (
 	PrevShaMissing = errors.New("Previous sha missing from database")
 	TxShaMissing   = errors.New("Requested Tx does not exist")
 	DuplicateSha   = errors.New("Duplicate insert attempted")
-	DbDoesNotExist = errors.New("Non-existant database")
-	DbUnknownType  = errors.New("Non-existant database type")
+	DbDoesNotExist = errors.New("Non-existent database")
+	DbUnknownType  = errors.New("Non-existent database type")
 )
 
 // AllShas is a special value that can be used as the final sha when requesting
