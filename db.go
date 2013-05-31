@@ -133,6 +133,8 @@ type Db interface {
 	Sync()
 }
 
+// BlockIterator defines a generic interface for an iterator through the block
+// chain.
 type BlockIterator interface {
 	// Close shuts down the iterator when done walking blocks in the database.
 	Close()
@@ -144,12 +146,16 @@ type BlockIterator interface {
 	Row() (key *btcwire.ShaHash, pver uint32, buf []byte, err error)
 }
 
+// DriverDB defines a structure for backend drivers to use when they registered
+// themselves as a backend which implements the Db interface.
 type DriverDB struct {
 	DbType string
 	Create func(argstr string) (pbdb Db, err error)
 	Open   func(filepath string) (pbdb Db, err error)
 }
 
+// TxListReply is used to return individual transaction information when
+// data about multiple transactions is requested in a single call.
 type TxListReply struct {
 	Sha *btcwire.ShaHash
 	Tx  *btcwire.MsgTx

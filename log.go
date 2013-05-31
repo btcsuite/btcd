@@ -51,6 +51,7 @@ func SetLogWriter(w io.Writer) error {
 	return nil
 }
 
+// GetLog returns the currently active logger.
 func GetLog() seelog.LoggerInterface {
 	return log
 }
