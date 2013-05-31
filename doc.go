@@ -29,28 +29,27 @@ At the highest level, the use of this packages just requires that you
 import it, setup a database, insert some data into it, and optionally,
 query the data back.  In a more concrete example:
 
-        // Import packages
+        // Import packages.
         import (
                "github.com/conformal/btcdb"
-               _ "github.com/conformal/btcdb/db_sqlite"
+               _ "github.com/conformal/btcdb/sqlite3"
         )
 
-	// Create a database
-        dbname := "dbexample"
-        db, err := btcdb.CreateDB("sqlite", dbname)
+	// Create a database and schedule it to be closed on exit.
+        dbName := "example.db"
+        db, err := btcdb.CreateDB("sqlite", dbName)
 	if err != nil {
-		fmt.Printf("Failed to open database %v", err)
-		return
+		// Log and handle the error
+	}
+	defer db.Close()
+
+        // Insert a block.
+        newHeight, err := db.InsertBlock(block)
+	if err != nil {
+		// Log and handle the error
 	}
 
-        // Insert a block
-        newheight, err := db.InsertBlock(block)
-	if err != nil {
-		fmt.Printf("failed to insert block %v err %v", height, err)
-	}
-
-        // Sync the database
+        // Sync the database.
         db.Sync()
-
 */
 package btcdb
