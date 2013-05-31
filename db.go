@@ -51,7 +51,7 @@ type Db interface {
 	ExistsSha(sha *btcwire.ShaHash) (exists bool)
 
 	// FetchBlockBySha returns a btcutil Block.  The implementation may
-	// cache the underlying object if desired.
+	// cache the underlying data if desired.
 	FetchBlockBySha(sha *btcwire.ShaHash) (blk *btcutil.Block, err error)
 
 	// FetchBlockShaByHeight returns a block hash based on its height in the
@@ -65,18 +65,21 @@ type Db interface {
 	FetchHeightRange(startHeight, endHeight int64) (rshalist []btcwire.ShaHash, err error)
 
 	// FetchTxAllBySha returns several pieces of data for a given
-	// transaction hash.
+	// transaction hash.  The implementation may cache the underlying data
+	// if desired.
 	FetchTxAllBySha(txsha *btcwire.ShaHash) (rtx *btcwire.MsgTx, rtxbuf []byte, rpver uint32, rblksha *btcwire.ShaHash, err error)
 
 	// FetchTxBufBySha returns the raw bytes and associated protocol version
-	// for the transaction with the requested hash.
+	// for the transaction with the requested hash.  The implementation may
+	// cache the underlying data if desired.
 	FetchTxBufBySha(txsha *btcwire.ShaHash) (txbuf []byte, rpver uint32, err error)
 
-	// FetchTxBySha returns some data for the given transaction hash.
+	// FetchTxBySha returns some data for the given transaction hash. The
+	// implementation may cache the underlying data if desired.
 	FetchTxBySha(txsha *btcwire.ShaHash) (rtx *btcwire.MsgTx, rpver uint32, blksha *btcwire.ShaHash, err error)
 
 	// FetchTxByShaList returns a TxListReply given an array of transaction
-	// hashes.
+	// hashes.  The implementation may cache the underlying data if desired.
 	FetchTxByShaList(txShaList []*btcwire.ShaHash) []*TxListReply
 
 	// FetchTxUsedBySha returns the used/spent buffer for a given
@@ -131,6 +134,7 @@ type BlockIterator interface {
 
 	// NextRow iterates thru all blocks in database.
 	NextRow() bool
+
 	// Row returns row data for block iterator.
 	Row() (key *btcwire.ShaHash, pver uint32, buf []byte, err error)
 }
