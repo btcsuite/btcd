@@ -11,11 +11,11 @@ import (
 	"crypto/sha1"
 	"crypto/sha256"
 	"fmt"
+	"github.com/conformal/btcec"
 	"github.com/conformal/btcwire"
 	"github.com/davecgh/go-spew/spew"
 	"hash"
 	"math/big"
-	"opensource.conformal.com/go/btcd/btcec"
 )
 
 // An opcode defines the information related to a btcscript opcode.
