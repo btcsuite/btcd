@@ -11,5 +11,16 @@ A Block defines a bitcoin block that provides easier and more efficient
 manipulation of raw wire protocol blocks.  It also memoizes hashes for the
 block and its transactions on their first access so subsequent accesses don't
 have to repeat the relatively expensive hashing operations.
+
+Base58 Usage
+
+To decode a base58 string:
+
+ rawData := btcutil.Base58Decode(encodedData)
+
+Similarly, to encode the same data:
+
+ encodedData := btcutil.Base58Encode(rawData)
+
 */
 package btcutil
