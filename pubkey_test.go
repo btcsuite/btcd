@@ -109,8 +109,8 @@ var pubKeyTests = []pubKeyTest{
 		isValid: false,
 	},
 	pubKeyTest{
-		name: "wrong length)",
-		key: []byte{0x05},
+		name:    "wrong length)",
+		key:     []byte{0x05},
 		isValid: false,
 	},
 }
