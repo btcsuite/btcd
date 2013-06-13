@@ -34,9 +34,7 @@ func MarshallAndSend(rawReply Reply, w io.Writer) (string, error) {
 func jsonRpcSend(user string, password string, server string, message []byte) (*http.Response, error) {
 	resp, err := http.Post("http://"+user+":"+password+"@"+server,
 		"application/json", bytes.NewBuffer(message))
-	if err != nil {
-		err = fmt.Errorf("Error Sending json message.")
-	}
+
 	return resp, err
 }
 

@@ -708,7 +708,7 @@ func RpcCommand(user string, password string, server string, message []byte) (Re
 	}
 	resp, err := jsonRpcSend(user, password, server, message)
 	if err != nil {
-		err := fmt.Errorf("Error Sending json message.")
+		err := fmt.Errorf("Error sending json message: "+err.Error())
 		return result, err
 	}
 	body, err := GetRaw(resp.Body)
