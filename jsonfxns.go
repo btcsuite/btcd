@@ -11,6 +11,7 @@ import (
 	"io"
 	"io/ioutil"
 	"net/http"
+	"regexp"
 )
 
 // MarshallAndSend takes the reply structure, marshalls it to json, and
@@ -34,7 +35,10 @@ func MarshallAndSend(rawReply Reply, w io.Writer) (string, error) {
 func jsonRpcSend(user string, password string, server string, message []byte) (*http.Response, error) {
 	resp, err := http.Post("http://"+user+":"+password+"@"+server,
 		"application/json", bytes.NewBuffer(message))
-
+	// We do not want to log the username/password in the errors.
+	re := regexp.MustCompile(`http://\w+:\w+`)
+	errString := re.ReplaceAllString(fmt.Sprintf("%v", err), "")
+	err = fmt.Errorf(errString)
 	return resp, err
 }
 
