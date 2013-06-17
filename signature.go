@@ -58,15 +58,17 @@ func ParseSignature(sigStr []byte, curve elliptic.Curve) (*Signature, error) {
 
 	// Length of signature R.
 	rLen := int(sigStr[index])
-	if rLen < 0 || rLen > len(sigStr)-index {
+	// must be positive, must be able to fit in another 0x2, <len> <s>
+	// hence the -3. We assume that the length must be at least one byte.
+	index++
+	if rLen <= 0 || rLen > len(sigStr)-index-3 {
 		return nil, errors.New("malformed signature: bogus R length")
 	}
-	index++
 
 	// Then R itself.
 	signature.R = new(big.Int).SetBytes(sigStr[index : index+rLen])
 	index += rLen
-	// 0x02
+	// 0x02. length already checked in previous if.
 	if sigStr[index] != 0x02 {
 		return nil, errors.New("malformed signature: no 2nd int marker")
 	}
@@ -74,10 +76,11 @@ func ParseSignature(sigStr []byte, curve elliptic.Curve) (*Signature, error) {
 
 	// Length of signature S.
 	sLen := int(sigStr[index])
-	if sLen < 0 || sLen > len(sigStr)-index {
+	index++
+	// S should be the rest of the string.
+	if sLen <= 0 || sLen > len(sigStr)-index {
 		return nil, errors.New("malformed signature: bogus S length")
 	}
-	index++
 
 	// Then S itself.
 	signature.S = new(big.Int).SetBytes(sigStr[index : index+sLen])
