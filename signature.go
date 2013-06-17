@@ -44,7 +44,6 @@ func ParseSignature(sigStr []byte, curve elliptic.Curve) (*Signature, error) {
 	siglen := sigStr[index]
 	index++
 	if int(siglen+2) != len(sigStr) {
-		fmt.Printf("siglen: %v, len: %v\n", siglen, len(sigStr))
 		return nil, errors.New("malformed signature: bad length")
 	}
 	// trim the slice we're working on so we only look at what matters.
