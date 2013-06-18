@@ -71,11 +71,11 @@ var StackErrElementTooBig = errors.New("Element in script too large")
 
 // StackErrUnknownAddress is returned when ScriptToAddress does not recognise
 // the pattern of the script and thus can not find the address for payment.
-var StackErrUnknownAddress = fmt.Errorf("non-recognised address")
+var StackErrUnknownAddress = errors.New("non-recognised address")
 
 // StackErrScriptFailed is returned when at the end of a script the boolean
 // on top of the stack is false signifying that the script has failed.
-var StackErrScriptFailed = fmt.Errorf("execute fail, fail on stack")
+var StackErrScriptFailed = errors.New("execute fail, fail on stack")
 
 // Bip16Activation is the timestamp where BIP0016 is valid to use in the
 // blockchain.  To be used to determine if BIP0016 should be called for or not.
