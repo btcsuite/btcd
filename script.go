@@ -413,7 +413,7 @@ func (m *Script) Step() (done bool, err error) {
 	// prepare for next instruction
 	m.scriptoff++
 	if m.scriptoff >= len(m.scripts[m.scriptidx]) {
-		// should only be == from checks before
+		m.numOps = 0 // number of ops is per script.
 		m.scriptoff = 0
 		if m.scriptidx == 0 && m.bip16 {
 			m.savedFirstStack = m.GetStack()
