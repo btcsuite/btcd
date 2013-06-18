@@ -77,6 +77,15 @@ var StackErrUnknownAddress = errors.New("non-recognised address")
 // on top of the stack is false signifying that the script has failed.
 var StackErrScriptFailed = errors.New("execute fail, fail on stack")
 
+// StackErrScriptUnfinished is returned when CheckErrorCondition is called
+// on a script that has not finished executing.
+var StackErrScriptUnfinished = errors.New("Error check when script unfinished")
+
+// StackErrEmpyStack is returned when the stack is empty at the end of
+// execution. Normal operation requires that a boolean is on top of the stack
+// when the scripts have finished executing.
+var StackErrEmptyStack = errors.New("Stack empty at end of execution")
+
 // Bip16Activation is the timestamp where BIP0016 is valid to use in the
 // blockchain.  To be used to determine if BIP0016 should be called for or not.
 // This timestamp corresponds to Sun Apr 1 00:00:00 UTC 2012.
@@ -358,8 +367,21 @@ func (s *Script) Execute() (err error) {
 			return dstr + astr
 		}))
 	}
+
+	return s.CheckErrorCondition()
+}
+
+// CheckErrorCondition returns nil if the running script has ended and was
+// successful, leaving a a true boolean on the stack. An error otherwise,
+// including if the script has not finished.
+func (s *Script) CheckErrorCondition() (err error) {
+	// Check we are actually done. if pc is past the end of script array
+	// then we have run out of scripts to run.
+	if s.scriptidx < len(s.scripts) {
+		return StackErrScriptUnfinished
+	}
 	if s.dstack.Depth() < 1 {
-		return fmt.Errorf("stack empty at end of execution")
+		return StackErrEmptyStack
 	}
 	v, err := s.dstack.PopBool()
 	if err == nil && v == false {
@@ -367,8 +389,8 @@ func (s *Script) Execute() (err error) {
 		log.Tracef("%v", func() string {
 			dis0, _ := s.DisasmScript(0)
 			dis1, _ := s.DisasmScript(1)
-			return fmt.Sprintf("script0: %s\n script1: %s",
-				dis0, dis1)
+			return fmt.Sprintf("scripts failed: script0: %s\n"+
+				"script1: %s", dis0, dis1)
 		})
 		err = StackErrScriptFailed
 	}
@@ -376,7 +398,6 @@ func (s *Script) Execute() (err error) {
 		// conditional execution stack context left active
 		err = StackErrMissingEndif
 	}
-
 	return err
 }
 
@@ -416,17 +437,18 @@ func (m *Script) Step() (done bool, err error) {
 		m.numOps = 0 // number of ops is per script.
 		m.scriptoff = 0
 		if m.scriptidx == 0 && m.bip16 {
+			m.scriptidx++
 			m.savedFirstStack = m.GetStack()
 		} else if m.scriptidx == 1 && m.bip16 {
-			// Check for successful completion of script
-			v, err := m.dstack.PopBool()
+			// Put us past the end for CheckErrorCondition()
+			m.scriptidx++
+			// We check script ran ok, if so then we pull
+			// the script out of the first stack and executre that.
+			err := m.CheckErrorCondition()
 			if err != nil {
 				return false, err
 			}
-			if v == false {
-				return false, StackErrScriptFailed
-			}
-			// check that first element on stack is a bool
+
 			script := m.savedFirstStack[len(m.savedFirstStack)-1]
 			pops, err := parseScript(script)
 			if err != nil {
@@ -436,8 +458,9 @@ func (m *Script) Step() (done bool, err error) {
 			// Set stack to be the stack from first script
 			// minus the script itself
 			m.SetStack(m.savedFirstStack[:len(m.savedFirstStack)-1])
+		} else {
+			m.scriptidx++
 		}
-		m.scriptidx++
 		// there are zero length scripts in the wild
 		if m.scriptidx < len(m.scripts) && m.scriptoff >= len(m.scripts[m.scriptidx]) {
 			m.scriptidx++
