@@ -170,7 +170,70 @@ var stackTests = []stackTest{
 		btcscript.StackErrUnderflow,
 		[][]byte{},
 	},
-	// XXX test popInt -> byte format matters here.
+	{
+		"popInt 0",
+		[][]byte{{0x0}},
+		func(stack *btcscript.Stack) error {
+			v, err := stack.PopInt()
+			if err != nil {
+				return err
+			}
+			if v.Sign() != 0 {
+				return errors.New("0 != 0 on popInt")
+			}
+			return nil
+		},
+		nil,
+		[][]byte{},
+	},
+	{
+		"popInt -0",
+		[][]byte{{0x80}},
+		func(stack *btcscript.Stack) error {
+			v, err := stack.PopInt()
+			if err != nil {
+				return err
+			}
+			if v.Sign() != 0 {
+				return errors.New("-0 != 0 on popInt")
+			}
+			return nil
+		},
+		nil,
+		[][]byte{},
+	},
+	{
+		"popInt 1",
+		[][]byte{{0x01}},
+		func(stack *btcscript.Stack) error {
+			v, err := stack.PopInt()
+			if err != nil {
+				return err
+			}
+			if v.Cmp(big.NewInt(1)) != 0 {
+				return errors.New("1 != 1 on popInt")
+			}
+			return nil
+		},
+		nil,
+		[][]byte{},
+	},
+	{
+		"popInt 1 leading 0",
+		[][]byte{{0x00000001}},
+		func(stack *btcscript.Stack) error {
+			v, err := stack.PopInt()
+			if err != nil {
+				return err
+			}
+			if v.Cmp(big.NewInt(1)) != 0 {
+				return errors.New("1 != 1 on popInt")
+			}
+			return nil
+		},
+		nil,
+		[][]byte{},
+	},
 	{
 		"dup",
 		[][]byte{{1}},
