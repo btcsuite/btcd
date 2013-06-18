@@ -51,11 +51,6 @@ func fromInt(v *big.Int) []byte {
 	// Int.Bytes() trims leading zeros for us, so we don't have to.
 	b := v.Bytes()
 	if len(b) == 0 {
-		// negative 0
-		if negative {
-			return []byte{0x80}
-		}
-		// normal 0
 		return []byte{}
 	}
 	arr := make([]byte, len(b))
