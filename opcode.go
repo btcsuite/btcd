@@ -654,7 +654,7 @@ func (pop *parsedOpcode) exec(s *Script) error {
 	// *sigh* bitcoind pretty much mandates that we violate layering here.
 	// Any opcode that isn't just adding data to the stack counts here
 	// as an operation.
-	if pop.opcode.value < OP_16 {
+	if pop.opcode.value > OP_16 {
 		s.numOps++
 		if s.numOps > MaxOpsPerScript {
 			return StackErrTooManyOperations
