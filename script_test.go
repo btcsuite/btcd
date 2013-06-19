@@ -1264,3 +1264,75 @@ func TestScriptTypes(t *testing.T) {
 		testScriptType(t, &scriptTypeTests[i])
 	}
 }
+
+// This test sets the pc to a deliberately bad result then confirms that Step()
+//  and Disasm fail correctly.
+func TestBadPC(t *testing.T) {
+	type pcTest struct {
+		script, off int
+	}
+	pcTests := []pcTest{
+		pcTest{
+			script:2,
+			off:0,
+		},
+		pcTest{
+			script: 0,
+			off: 2,
+		},
+	}
+	// tx with almost empty scripts.
+	tx := &btcwire.MsgTx{
+		Version: 1,
+		TxIn: []*btcwire.TxIn{
+			&btcwire.TxIn{
+				PreviousOutpoint: btcwire.OutPoint{
+					Hash: btcwire.ShaHash([32]byte{
+						0xc9, 0x97, 0xa5, 0xe5,
+						0x6e, 0x10, 0x41, 0x02,
+						0xfa, 0x20, 0x9c, 0x6a,
+						0x85, 0x2d, 0xd9, 0x06,
+						0x60, 0xa2, 0x0b, 0x2d,
+						0x9c, 0x35, 0x24, 0x23,
+						0xed, 0xce, 0x25, 0x85,
+						0x7f, 0xcd, 0x37, 0x04,
+					}),
+					Index: 0,
+				},
+				SignatureScript: []uint8{btcscript.OP_NOP},
+				Sequence: 4294967295,
+			},
+		},
+		TxOut: []*btcwire.TxOut{
+			&btcwire.TxOut{
+				Value: 1000000000,
+				PkScript: []byte{},
+			},
+		},
+		LockTime: 0,
+	}
+	pkScript := []byte{btcscript.OP_NOP}
+
+	for _, test := range pcTests {
+		engine, err :=  btcscript.NewScript(tx.TxIn[0].SignatureScript,
+			pkScript, 0, tx, 70001, false)
+		if err != nil {
+			t.Errorf("Failed to create script: %v", err)
+		}
+
+		// set to after all scripts
+		engine.TstSetPC(test.script, test.off)
+
+		_, err = engine.Step()
+		if err == nil {
+			t.Errorf("Step with invalid pc (%v) succeeds!", test)
+			continue
+		}
+
+		_, err = engine.DisasmPC()
+		if err == nil {
+			t.Errorf("DisasmPC with invalid pc (%v) succeeds!",
+				test)
+		}
+	}
+}

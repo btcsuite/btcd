@@ -42,3 +42,10 @@ func TstTypeOfScript(script []byte) TstScriptType {
 	}
 	return TstScriptType(typeOfScript(pops))
 }
+
+// TestSetPC allows the test modules to set the program counter to whatever they
+// want.
+func (s *Script) TstSetPC(script, off int) {
+	s.scriptidx = script
+	s.scriptoff = off
+}
