@@ -12,8 +12,8 @@ import (
 // MaxBlocksPerMsg is the maximum number of blocks allowed per message.
 const MaxBlocksPerMsg = 500
 
-// maxBlockPayload is the maximum bytes a block message can be.
-const maxBlockPayload = (1024 * 1024) // 1MB
+// MaxBlockPayload is the maximum bytes a block message can be.
+const MaxBlockPayload = (1024 * 1024) // 1MB
 
 // TxLoc holds locator data for the offset and length of where a transaction is
 // located within a MsgBlock data buffer.
@@ -135,7 +135,7 @@ func (msg *MsgBlock) Command() string {
 func (msg *MsgBlock) MaxPayloadLength(pver uint32) uint32 {
 	// Block header at 81 bytes + max transactions which can vary up to the
 	// maxBlockPayload (including the block header).
-	return maxBlockPayload
+	return MaxBlockPayload
 }
 
 // BlockSha computes the block identifier hash for this block.
