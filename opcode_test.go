@@ -542,6 +542,8 @@ type detailedTest struct {
 	altafter       [][]byte
 	disassembly    string
 	disassemblyerr error
+	nSigOps	       int // should have same return as disassembly error
+	nPreciseSigOps	  int // should have same return as disassembly error
 }
 
 var detailedTests = []detailedTest{
@@ -2115,12 +2117,16 @@ var detailedTests = []detailedTest{
 		script:         []byte{btcscript.OP_1, btcscript.OP_CHECKSIG},
 		expectedReturn: btcscript.StackErrUnderflow,
 		disassembly:    "OP_1 OP_CHECKSIG",
+		nSigOps:	1,
+		nPreciseSigOps: 1,
 	},
 	{
 		name:           "OP_CHECKSIG no arg",
 		script:         []byte{btcscript.OP_CHECKSIG},
 		expectedReturn: btcscript.StackErrUnderflow,
 		disassembly:    "OP_CHECKSIG",
+		nSigOps:	1,
+		nPreciseSigOps: 1,
 	},
 	{
 		name: "OP_CHECKSIGVERIFY one arg",
@@ -2128,18 +2134,24 @@ var detailedTests = []detailedTest{
 			btcscript.OP_CHECKSIGVERIFY},
 		expectedReturn: btcscript.StackErrUnderflow,
 		disassembly:    "OP_1 OP_CHECKSIGVERIFY",
+		nSigOps:	1,
+		nPreciseSigOps: 1,
 	},
 	{
 		name:           "OP_CHECKSIGVERIFY no arg",
 		script:         []byte{btcscript.OP_CHECKSIGVERIFY},
 		expectedReturn: btcscript.StackErrUnderflow,
 		disassembly:    "OP_CHECKSIGVERIFY",
+		nSigOps:	1,
+		nPreciseSigOps: 1,
 	},
 	{
 		name:           "OP_CHECK_MULTISIG no args",
 		script:         []byte{btcscript.OP_CHECK_MULTISIG},
 		expectedReturn: btcscript.StackErrUnderflow,
 		disassembly:    "OP_CHECK_MULTISIG",
+		nSigOps:	20,
+		nPreciseSigOps: 20,
 	},
 	{
 		name: "OP_CHECK_MULTISIG huge number",
@@ -2148,6 +2160,8 @@ var detailedTests = []detailedTest{
 			btcscript.OP_CHECK_MULTISIG},
 		expectedReturn: btcscript.StackErrNumberTooBig,
 		disassembly:    "010203040506070809 OP_CHECK_MULTISIG",
+		nSigOps:		20,
+		nPreciseSigOps: 	20,
 	},
 	{
 		name: "OP_CHECK_MULTISIG too many keys",
@@ -2155,6 +2169,8 @@ var detailedTests = []detailedTest{
 			btcscript.OP_CHECK_MULTISIG},
 		expectedReturn: btcscript.StackErrTooManyPubkeys,
 		disassembly:    "15 OP_CHECK_MULTISIG",
+		nSigOps:		20,
+		nPreciseSigOps: 	20,
 	},
 	{
 		name: "OP_CHECK_MULTISIG lying about pubkeys",
@@ -2162,6 +2178,8 @@ var detailedTests = []detailedTest{
 			btcscript.OP_CHECK_MULTISIG},
 		expectedReturn: btcscript.StackErrUnderflow,
 		disassembly:    "OP_1 OP_CHECK_MULTISIG",
+		nSigOps:		20,
+		nPreciseSigOps: 	1,
 	},
 	{
 		// pubkey comes from blockchain
@@ -2180,6 +2198,8 @@ var detailedTests = []detailedTest{
 			btcscript.OP_CHECK_MULTISIG},
 		expectedReturn: btcscript.StackErrUnderflow,
 		disassembly:    "04ae1a62fe09c5f51b13905f07f06b99a2f7159b2225f374cd378d71302fa28414e7aab37397f554a7df5f142c21c1b7303b8a0626f1baded5c72a704f7e6cd84c OP_1 OP_CHECK_MULTISIG",
+		nSigOps:		20,
+		nPreciseSigOps: 	1,
 	},
 	{
 		// pubkey comes from blockchain
@@ -2200,6 +2220,8 @@ var detailedTests = []detailedTest{
 			btcscript.OP_CHECK_MULTISIG},
 		expectedReturn: btcscript.StackErrNumberTooBig,
 		disassembly:    "010203040506070809 04ae1a62fe09c5f51b13905f07f06b99a2f7159b2225f374cd378d71302fa28414e7aab37397f554a7df5f142c21c1b7303b8a0626f1baded5c72a704f7e6cd84c OP_1 OP_CHECK_MULTISIG",
+		nSigOps:		20,
+		nPreciseSigOps: 	1,
 	},
 	{
 		name: "OP_CHECK_MULTISIG too few sigs",
@@ -2217,6 +2239,8 @@ var detailedTests = []detailedTest{
 			btcscript.OP_CHECK_MULTISIG},
 		expectedReturn: btcscript.StackErrUnderflow,
 		disassembly:    "OP_1 04ae1a62fe09c5f51b13905f07f06b99a2f7159b2225f374cd378d71302fa28414e7aab37397f554a7df5f142c21c1b7303b8a0626f1baded5c72a704f7e6cd84c OP_1 OP_CHECK_MULTISIG",
+		nSigOps:		20,
+		nPreciseSigOps: 	1,
 	},
 	{
 		// pubkey and sig comes from blockchain, are unrelated
@@ -2245,6 +2269,8 @@ var detailedTests = []detailedTest{
 			btcscript.OP_CHECK_MULTISIG},
 		after:       [][]byte{{0}},
 		disassembly: "OP_1 304402204e45e16932b8af514961a1d3a1a25fdf3f4f7732e9d624c6c61548ab5fb8cd410220181522ec8eca07de4860a4acdd12909d831cc56cbbac4622082221a8768d1d0901 OP_1 04ae1a62fe09c5f51b13905f07f06b99a2f7159b2225f374cd378d71302fa28414e7aab37397f554a7df5f142c21c1b7303b8a0626f1baded5c72a704f7e6cd84c OP_1 OP_CHECK_MULTISIG",
+		nSigOps:		20,
+		nPreciseSigOps: 	1,
 	},
 	{
 		// invalid pubkey means that it fails to validate, not an
@@ -2266,6 +2292,8 @@ var detailedTests = []detailedTest{
 			btcscript.OP_CHECK_MULTISIG},
 		after:       [][]byte{{0}},
 		disassembly: "OP_1 304402204e45e16932b8af514961a1d3a1a25fdf3f4f7732e9d624c6c61548ab5fb8cd410220181522ec8eca07de4860a4acdd12909d831cc56cbbac4622082221a8768d1d0901 OP_1 OP_1 OP_1 OP_CHECK_MULTISIG",
+		nSigOps:		20,
+		nPreciseSigOps: 	1,
 	},
 	// XXX(oga) Test multisig when extra arg is missing. needs valid sig.
 	// disabled opcodes
@@ -2274,6 +2302,8 @@ var detailedTests = []detailedTest{
 		script:         []byte{btcscript.OP_CHECKMULTISIGVERIFY},
 		expectedReturn: btcscript.StackErrUnderflow,
 		disassembly:    "OP_CHECKMULTISIGVERIFY",
+		nSigOps:		20,
+		nPreciseSigOps: 	20,
 	},
 	{
 		name: "OP_CHECKMULTISIGVERIFY huge number",
@@ -2282,6 +2312,8 @@ var detailedTests = []detailedTest{
 			btcscript.OP_CHECKMULTISIGVERIFY},
 		expectedReturn: btcscript.StackErrNumberTooBig,
 		disassembly:    "010203040506070809 OP_CHECKMULTISIGVERIFY",
+		nSigOps:		20,
+		nPreciseSigOps: 	20,
 	},
 	{
 		name: "OP_CHECKMULTISIGVERIFY too many keys",
@@ -2289,6 +2321,8 @@ var detailedTests = []detailedTest{
 			btcscript.OP_CHECKMULTISIGVERIFY},
 		expectedReturn: btcscript.StackErrTooManyPubkeys,
 		disassembly:    "15 OP_CHECKMULTISIGVERIFY",
+		nSigOps:		20,
+		nPreciseSigOps: 	20,
 	},
 	{
 		name: "OP_CHECKMULTISIGVERIFY lying about pubkeys",
@@ -2296,6 +2330,8 @@ var detailedTests = []detailedTest{
 			btcscript.OP_CHECKMULTISIGVERIFY},
 		expectedReturn: btcscript.StackErrUnderflow,
 		disassembly:    "OP_1 OP_CHECKMULTISIGVERIFY",
+		nSigOps:		20,
+		nPreciseSigOps: 	1,
 	},
 	{
 		// pubkey comes from blockchain
@@ -2314,6 +2350,8 @@ var detailedTests = []detailedTest{
 			btcscript.OP_CHECKMULTISIGVERIFY},
 		expectedReturn: btcscript.StackErrUnderflow,
 		disassembly:    "04ae1a62fe09c5f51b13905f07f06b99a2f7159b2225f374cd378d71302fa28414e7aab37397f554a7df5f142c21c1b7303b8a0626f1baded5c72a704f7e6cd84c OP_1 OP_CHECKMULTISIGVERIFY",
+		nSigOps:		20,
+		nPreciseSigOps: 	1,
 	},
 	{
 		name: "OP_CHECKMULTISIGVERIFY sigs huge no",
@@ -2333,6 +2371,8 @@ var detailedTests = []detailedTest{
 			btcscript.OP_CHECKMULTISIGVERIFY},
 		expectedReturn: btcscript.StackErrNumberTooBig,
 		disassembly:    "010203040506070809 04ae1a62fe09c5f51b13905f07f06b99a2f7159b2225f374cd378d71302fa28414e7aab37397f554a7df5f142c21c1b7303b8a0626f1baded5c72a704f7e6cd84c OP_1 OP_CHECKMULTISIGVERIFY",
+		nSigOps:		20,
+		nPreciseSigOps: 	1,
 	},
 	{
 		name: "OP_CHECKMULTISIGVERIFY too few sigs",
@@ -2350,6 +2390,8 @@ var detailedTests = []detailedTest{
 			btcscript.OP_CHECKMULTISIGVERIFY},
 		expectedReturn: btcscript.StackErrUnderflow,
 		disassembly:    "OP_1 04ae1a62fe09c5f51b13905f07f06b99a2f7159b2225f374cd378d71302fa28414e7aab37397f554a7df5f142c21c1b7303b8a0626f1baded5c72a704f7e6cd84c OP_1 OP_CHECKMULTISIGVERIFY",
+		nSigOps:		20,
+		nPreciseSigOps: 	1,
 	},
 	{
 		// pubkey and sig comes from blockchain, are unrelated
@@ -2378,6 +2420,8 @@ var detailedTests = []detailedTest{
 			btcscript.OP_CHECKMULTISIGVERIFY},
 		expectedReturn: btcscript.StackErrVerifyFailed,
 		disassembly:    "OP_1 304402204e45e16932b8af514961a1d3a1a25fdf3f4f7732e9d624c6c61548ab5fb8cd410220181522ec8eca07de4860a4acdd12909d831cc56cbbac4622082221a8768d1d0901 OP_1 04ae1a62fe09c5f51b13905f07f06b99a2f7159b2225f374cd378d71302fa28414e7aab37397f554a7df5f142c21c1b7303b8a0626f1baded5c72a704f7e6cd84c OP_1 OP_CHECKMULTISIGVERIFY",
+		nSigOps:		20,
+		nPreciseSigOps: 	1,
 	},
 	{
 		// invalid pubkey means that it fails to validate, not an
@@ -2399,6 +2443,8 @@ var detailedTests = []detailedTest{
 			btcscript.OP_CHECKMULTISIGVERIFY},
 		expectedReturn: btcscript.StackErrVerifyFailed,
 		disassembly:    "OP_1 304402204e45e16932b8af514961a1d3a1a25fdf3f4f7732e9d624c6c61548ab5fb8cd410220181522ec8eca07de4860a4acdd12909d831cc56cbbac4622082221a8768d1d0901 OP_1 OP_1 OP_1 OP_CHECKMULTISIGVERIFY",
+		nSigOps:		20,
+		nPreciseSigOps: 	1,
 	},
 	{
 		// 201 operations + one push, should just fit limits
@@ -3032,6 +3078,8 @@ var detailedTests = []detailedTest{
 		},
 		expectedReturn: btcscript.StackErrTooManyOperations,
 		disassembly:      "OP_1 OP_DUP OP_DROP OP_DUP OP_DROP OP_DUP OP_DROP OP_DUP OP_DROP OP_DUP OP_DROP OP_DUP OP_DROP OP_DUP OP_DROP OP_DUP OP_DROP OP_DUP OP_DROP OP_DUP OP_DROP OP_DUP OP_DROP OP_DUP OP_DROP OP_DUP OP_DROP OP_DUP OP_DROP OP_DUP OP_DROP OP_DUP OP_DROP OP_DUP OP_DROP OP_DUP OP_DROP OP_DUP OP_DROP OP_DUP OP_DROP OP_DUP OP_DROP OP_DUP OP_DROP OP_DUP OP_DROP OP_DUP OP_DROP OP_DUP OP_DROP OP_DUP OP_DROP OP_DUP OP_DROP OP_DUP OP_DROP OP_DUP OP_DROP OP_DUP OP_DROP OP_DUP OP_DROP OP_DUP OP_DROP OP_DUP OP_DROP OP_DUP OP_DROP OP_DUP OP_DROP OP_DUP OP_DROP OP_DUP OP_DROP OP_DUP OP_DROP OP_DUP OP_DROP OP_DUP OP_DROP OP_DUP OP_DROP OP_DUP OP_DROP OP_DUP OP_DROP OP_DUP OP_DROP OP_DUP OP_DROP OP_DUP OP_DROP OP_DUP OP_DROP OP_DUP OP_DROP OP_DUP OP_DROP OP_DUP OP_DROP OP_DUP OP_DROP OP_DUP OP_DROP OP_DUP OP_DROP OP_DUP OP_DROP OP_DUP OP_DROP OP_DUP OP_DROP OP_DUP OP_DROP OP_DUP OP_DROP OP_DUP OP_DROP OP_DUP OP_DROP OP_DUP OP_DROP OP_DUP OP_DROP OP_DUP OP_DROP OP_DUP OP_DROP OP_DUP OP_DROP OP_DUP OP_DROP OP_DUP OP_DROP OP_DUP OP_DROP OP_DUP OP_DROP OP_DUP OP_DROP OP_DUP OP_DROP OP_DUP OP_DROP OP_DUP OP_DROP OP_DUP OP_DROP OP_DUP OP_DROP OP_DUP OP_DROP OP_DUP OP_DROP OP_DUP OP_DROP OP_DUP OP_DROP OP_DUP OP_DROP OP_DUP OP_DROP OP_DUP OP_DROP OP_DUP OP_DROP OP_DUP OP_DROP OP_DUP OP_DROP OP_DUP OP_DROP OP_DUP OP_DROP OP_DUP OP_DROP OP_DUP OP_DROP OP_DUP OP_DROP OP_DUP OP_DROP OP_DUP OP_DROP OP_DUP OP_DROP OP_DUP OP_DROP OP_DUP OP_DROP OP_DUP OP_DROP OP_DUP OP_DROP OP_DUP OP_DROP OP_DUP OP_DROP OP_DUP OP_DROP OP_1 OP_1 OP_1 OP_1 OP_2 OP_CHECK_MULTISIG",
+		nSigOps:		20,
+		nPreciseSigOps: 	2,
 	},
 	{
 		name:           "OP_CAT disabled",
@@ -3733,5 +3781,67 @@ func testDisasmString(t *testing.T, test *detailedTest) {
 func TestDisasmStrings(t *testing.T) {
 	for i := range detailedTests {
 		testDisasmString(t, &detailedTests[i])
+	}
+}
+
+// A basic test of GetSigOpCount for most opcodes, we do this by
+// running the same test for every one of the detailed tests. Since
+// disassembly errors are always parse errors, and so are
+// sigops count errors we use the same error code.
+// While this isn't as precise as using full transaction scripts, this gives
+// us coverage over a wider range of opcodes.
+func TestSigOps(t *testing.T) {
+	for _, test := range detailedTests {
+		count, err := btcscript.GetSigOpCount(test.script)
+		if err != nil {
+			if err != test.disassemblyerr {
+				t.Errorf("%s: unexpected error. exp \"%v\""+
+					"got \"%v\"", test.name,
+					test.disassemblyerr, err)
+			}
+			continue
+		}
+		if test.disassemblyerr != nil {
+			t.Errorf("%s: no error when expected \"%v\"", 
+				test.name, test.disassemblyerr)
+			continue
+		}
+		if count != test.nSigOps {
+			t.Errorf("%s: expected count of %d, got %d", test.name,
+				test.nSigOps, count)
+			
+		}
+	}
+}
+
+// A basic test of GetPreciseSigOpCount for most opcodes, we do this by
+// running the same test for every one of the detailed tests with a fake
+// sigscript. Sicne disassembly errors are always parse errors, and so are
+// sigops count errors we use the same error code.
+// While this isn't as precise as using full transaction scripts, this gives
+// us coverage over a wider range of opcodes. See script_test.go for tests
+// using real transactions to provide a bit more coverage.
+func TestPreciseSigOps(t *testing.T) {
+	for _, test := range detailedTests {
+		count, err := btcscript.GetPreciseSigOpCount(
+			[]byte{btcscript.OP_1}, test.script, false)
+		if err != nil {
+			if err != test.disassemblyerr {
+				t.Errorf("%s: unexpected error. exp \"%v\""+
+					"got \"%v\"", test.name,
+					test.disassemblyerr, err)
+			}
+			continue
+		}
+		if test.disassemblyerr != nil {
+			t.Errorf("%s: no error when expected \"%v\"", 
+				test.name, test.disassemblyerr)
+			continue
+		}
+		if count != test.nPreciseSigOps {
+			t.Errorf("%s: expected count of %d, got %d", test.name,
+				test.nPreciseSigOps, count)
+			
+		}
 	}
 }

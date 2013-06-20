@@ -715,3 +715,87 @@ func (s *Script) GetAltStack() [][]byte {
 func (s *Script) SetAltStack(data [][]byte) {
 	setStack(&s.astack, data)
 }
+
+// GetSigOpCount provides a quick count of the number of signature operations
+// in a script. a CHECKSIG operations counts for 1, and a CHECK_MULTISIG for 20.
+func  GetSigOpCount(script [] byte) (int, error) {
+	pops, err := parseScript(script)
+	if err != nil {
+		return 0, err
+	}
+
+	return getSigOpCount(pops, false), nil
+}
+
+// GetPreciseSigOpCount returns the number of signature operations in
+// scriptPubKey. If bip16 is true then scriptSig may be searched for the
+// Pay-To-Script-Hash script in order to find the precise number of signature
+// operations in the transaction.
+func GetPreciseSigOpCount(scriptSig, scriptPubKey []byte, bip16 bool) (int, error) {
+	pops, err := parseScript(scriptPubKey)
+	if err != nil {
+		return 0, err
+	}
+	// non P2SH transactions just treated as normal.
+	if !(bip16 && isScriptHash(pops)) {
+		return getSigOpCount(pops, true), nil
+	}
+
+	// Ok so this is P2SH, get the contained script and count it..
+
+	sigPops, err := parseScript(scriptSig)
+	if err != nil {
+		return 0, err
+	}
+	if !isPushOnly(sigPops) || len(sigPops) == 0 {
+		return 0, nil
+	}
+
+	shScript := sigPops[len(sigPops) - 1].data
+	// Means that sigPops is jus OP_1 - OP_16, no sigops there.
+	if shScript == nil {
+		return 0, nil
+	}
+
+	shPops, err := parseScript(shScript)
+	if err != nil {
+		return 0, err
+	}
+
+	return getSigOpCount(shPops, true), nil
+}
+
+// getSigOpCount is the implementation function for counting the number of
+// signature operations in the script provided by pops. If precise mode is
+// requested then we attempt to count the number of operations for a multisig
+// op. Otherwise we use the maximum.
+func getSigOpCount(pops []parsedOpcode, precise bool) int {
+	nSigs := 0
+	for i, pop := range pops {
+		switch pop.opcode.value {
+		case OP_CHECKSIG:
+			fallthrough;
+		case OP_CHECKSIGVERIFY:
+			nSigs++
+		case OP_CHECK_MULTISIG:
+			fallthrough;
+		case OP_CHECKMULTISIGVERIFY:
+			// If we are being precise then look for familiar
+			// patterns for multisig, for now all we recognise is
+			// OP_1 - OP_16 to signify the number of pubkeys. 
+			// Otherwise, we use the max of 20.
+			if precise && i > 0 &&
+				pops[i - 1].opcode.value >= OP_1 &&
+				pops[i - 1].opcode.value <= OP_16 {
+				nSigs +=  int(pops[i-1].opcode.value -
+					(OP_1 - 1))
+			} else {
+				nSigs += MaxPubKeysPerMultiSig
+			}
+		default:
+			// not a sigop.
+		}
+	}
+
+	return nSigs
+}

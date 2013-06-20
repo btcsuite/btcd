@@ -19,6 +19,7 @@ type txTest struct {
 	bip16      bool
 	err        error
 	shouldFail bool
+	nSigOps    int
 }
 
 var txTests = []txTest{
@@ -121,6 +122,7 @@ var txTests = []txTest{
 			0x12, 0xa3, btcscript.OP_CHECKSIG,
 		},
 		idx: 0,
+		nSigOps: 1,
 	},
 	// Previous test with the value of one output changed.
 	txTest{
@@ -221,6 +223,7 @@ var txTests = []txTest{
 		},
 		idx: 0,
 		err: btcscript.StackErrScriptFailed,
+		nSigOps: 1,
 	},
 	txTest{
 		name: "CheckSig invalid signature",
@@ -322,6 +325,7 @@ var txTests = []txTest{
 		},
 		idx:        0,
 		shouldFail: true,
+		nSigOps: 1,
 	},
 	txTest{
 		name: "CheckSig invalid pubkey",
@@ -422,6 +426,7 @@ var txTests = []txTest{
 		},
 		idx:        0,
 		shouldFail: true,
+		nSigOps: 1,
 	},
 	// tx 599e47a8114fe098103663029548811d2651991b62397e057f0c863c2bc9f9ea
 	// uses checksig with SigHashNone.
@@ -523,6 +528,7 @@ var txTests = []txTest{
 		},
 		idx:   0,
 		bip16: true, // after threshold
+		nSigOps: 1,
 	},
 	// tx 51bf528ecf3c161e7c021224197dbe84f9a8564212f6207baa014c01a1668e1e
 	// first instance of an AnyoneCanPay signature in the blockchain
@@ -646,6 +652,7 @@ var txTests = []txTest{
 		},
 		idx:   0,
 		bip16: true, // after threshold
+		nSigOps: 1,
 	},
 	// tx 6d36bc17e947ce00bb6f12f8e7a56a1585c5a36188ffa2b05e10b4743273a74b
 	// Uses OP_CODESEPARATOR and OP_CHECKMULTISIG
@@ -768,6 +775,7 @@ var txTests = []txTest{
 		},
 		idx:   1,
 		bip16: false,
+		nSigOps: 0, // multisig is in the pkScript!
 	},
 	// same as previous but with one byte changed to make signature fail
 	txTest{
@@ -890,6 +898,7 @@ var txTests = []txTest{
 		idx:   1,
 		bip16: false,
 		err:   btcscript.StackErrScriptFailed,
+		nSigOps: 0, // multisig is in the pkScript!
 	},
 	// tx e5779b9e78f9650debc2893fd9636d827b26b4ddfa6a8172fe8708c924f5c39d
 	// First P2SH transaction in the blockchain
@@ -948,6 +957,7 @@ var txTests = []txTest{
 		},
 		idx:   0,
 		bip16: true,
+		nSigOps: 0, // no signature ops in the pushed script.
 	},
 }
 
@@ -987,6 +997,25 @@ func testTx(t *testing.T, test txTest) {
 func TestTX(t *testing.T) {
 	for i := range txTests {
 		testTx(t, txTests[i])
+	}
+}
+
+func TestGetPreciseSignOps(t *testing.T) {
+	for _, test := range txTests {
+		count, err := btcscript.GetPreciseSigOpCount(
+			test.tx.TxIn[test.idx].SignatureScript, test.pkScript,
+			test.bip16)
+		// all tx currently parse
+		if err != nil {
+			t.Errorf("%s: unexpected error. got \"%v\"",
+				test.name, err)
+			continue
+		}
+		if count != test.nSigOps {
+			t.Errorf("%s: expected count of %d, got %d", test.name,
+				test.nSigOps, count)
+			
+		}
 	}
 }
 
