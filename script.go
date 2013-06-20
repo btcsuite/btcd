@@ -325,9 +325,6 @@ func NewScript(scriptSig []byte, scriptPubKey []byte, txidx int, tx *btcwire.Msg
 		m.bip16 = true
 	}
 
-	for i, _ := range tx.TxIn {
-		tx.TxIn[i].SignatureScript = []byte{}
-	}
 	m.tx = *tx
 	m.txidx = txidx
 	m.pver = pver
