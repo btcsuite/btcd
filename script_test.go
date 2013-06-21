@@ -1365,3 +1365,91 @@ func TestBadPC(t *testing.T) {
 		}
 	}
 }
+
+// Most codepaths in CheckErrorCondition() are testd elsewhere, this tests
+// the execute early test.
+func TestCheckErrorCondition(t *testing.T) {
+	// tx with almost empty scripts.
+	tx := &btcwire.MsgTx{
+		Version: 1,
+		TxIn: []*btcwire.TxIn{
+			&btcwire.TxIn{
+				PreviousOutpoint: btcwire.OutPoint{
+					Hash: btcwire.ShaHash([32]byte{
+						0xc9, 0x97, 0xa5, 0xe5,
+						0x6e, 0x10, 0x41, 0x02,
+						0xfa, 0x20, 0x9c, 0x6a,
+						0x85, 0x2d, 0xd9, 0x06,
+						0x60, 0xa2, 0x0b, 0x2d,
+						0x9c, 0x35, 0x24, 0x23,
+						0xed, 0xce, 0x25, 0x85,
+						0x7f, 0xcd, 0x37, 0x04,
+					}),
+					Index: 0,
+				},
+				SignatureScript: []uint8{},
+				Sequence: 4294967295,
+			},
+		},
+		TxOut: []*btcwire.TxOut{
+			&btcwire.TxOut{
+				Value: 1000000000,
+				PkScript: []byte{},
+			},
+		},
+		LockTime: 0,
+	}
+	pkScript := []byte{
+		btcscript.OP_NOP,
+		btcscript.OP_NOP,
+		btcscript.OP_NOP,
+		btcscript.OP_NOP,
+		btcscript.OP_NOP,
+		btcscript.OP_NOP,
+		btcscript.OP_NOP,
+		btcscript.OP_NOP,
+		btcscript.OP_NOP,
+		btcscript.OP_NOP,
+		btcscript.OP_TRUE,
+	}
+
+	engine, err := btcscript.NewScript(tx.TxIn[0].SignatureScript, pkScript,
+		0, tx, 70001, false)
+	if err != nil {
+		t.Errorf("failed to create script: %v", err)
+	}
+
+	for i := 0; i < len(pkScript) - 1; i++ {
+		done, err := engine.Step()
+		if err != nil {
+			t.Errorf("failed to step %dth time: %v", i, err)
+			return
+		}
+		if done {
+			t.Errorf("finshed early on %dth time", i)
+			return
+		}
+
+		err = engine.CheckErrorCondition()
+		if err != btcscript.StackErrScriptUnfinished {
+			t.Errorf("got unexepected error %v on %dth iteration",
+				err, i)
+			return
+		}
+	}
+	done, err := engine.Step()
+	if err != nil {
+		t.Errorf("final step failed %v", err)
+		return
+	}
+	if !done {
+		t.Errorf("final step isn't done!")
+		return
+	}
+
+	err = engine.CheckErrorCondition()
+	if err != nil {
+		t.Errorf("unexpected error %v on final check", err)
+	}
+}
+
