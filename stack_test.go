@@ -235,7 +235,7 @@ var stackTests = []stackTest{
 		[][]byte{},
 	},
 	{
-		"PushInt 0", 
+		"PushInt 0",
 		[][]byte{},
 		func(stack *btcscript.Stack) error {
 			stack.PushInt(big.NewInt(0))
@@ -245,7 +245,7 @@ var stackTests = []stackTest{
 		[][]byte{{}},
 	},
 	{
-		"PushInt 1", 
+		"PushInt 1",
 		[][]byte{},
 		func(stack *btcscript.Stack) error {
 			stack.PushInt(big.NewInt(1))
@@ -255,7 +255,7 @@ var stackTests = []stackTest{
 		[][]byte{{0x1}},
 	},
 	{
-		"PushInt -1", 
+		"PushInt -1",
 		[][]byte{},
 		func(stack *btcscript.Stack) error {
 			stack.PushInt(big.NewInt(-1))
@@ -265,7 +265,7 @@ var stackTests = []stackTest{
 		[][]byte{{0x81}},
 	},
 	{
-		"PushInt two bytes", 
+		"PushInt two bytes",
 		[][]byte{},
 		func(stack *btcscript.Stack) error {
 			stack.PushInt(big.NewInt(256))
@@ -276,7 +276,7 @@ var stackTests = []stackTest{
 		[][]byte{{0x00, 0x01}},
 	},
 	{
-		"PushInt leading zeros", 
+		"PushInt leading zeros",
 		[][]byte{},
 		func(stack *btcscript.Stack) error {
 			// this will have the highbit set
@@ -284,7 +284,7 @@ var stackTests = []stackTest{
 			return nil
 		},
 		nil,
-		[][]byte{{0x80, 0x00 }},
+		[][]byte{{0x80, 0x00}},
 	},
 	{
 		"dup",

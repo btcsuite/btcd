@@ -121,7 +121,7 @@ var txTests = []txTest{
 			0xc0, 0x3f, 0x99, 0x9b, 0x86, 0x43, 0xf6, 0x56, 0xb4,
 			0x12, 0xa3, btcscript.OP_CHECKSIG,
 		},
-		idx: 0,
+		idx:     0,
 		nSigOps: 1,
 	},
 	// Previous test with the value of one output changed.
@@ -221,8 +221,8 @@ var txTests = []txTest{
 			0xc0, 0x3f, 0x99, 0x9b, 0x86, 0x43, 0xf6, 0x56, 0xb4,
 			0x12, 0xa3, btcscript.OP_CHECKSIG,
 		},
-		idx: 0,
-		err: btcscript.StackErrScriptFailed,
+		idx:     0,
+		err:     btcscript.StackErrScriptFailed,
 		nSigOps: 1,
 	},
 	txTest{
@@ -325,7 +325,7 @@ var txTests = []txTest{
 		},
 		idx:        0,
 		shouldFail: true,
-		nSigOps: 1,
+		nSigOps:    1,
 	},
 	txTest{
 		name: "CheckSig invalid pubkey",
@@ -426,7 +426,7 @@ var txTests = []txTest{
 		},
 		idx:        0,
 		shouldFail: true,
-		nSigOps: 1,
+		nSigOps:    1,
 	},
 	// tx 599e47a8114fe098103663029548811d2651991b62397e057f0c863c2bc9f9ea
 	// uses checksig with SigHashNone.
@@ -526,8 +526,8 @@ var txTests = []txTest{
 			btcscript.OP_EQUALVERIFY,
 			btcscript.OP_CHECKSIG,
 		},
-		idx:   0,
-		bip16: true, // after threshold
+		idx:     0,
+		bip16:   true, // after threshold
 		nSigOps: 1,
 	},
 	// tx 51bf528ecf3c161e7c021224197dbe84f9a8564212f6207baa014c01a1668e1e
@@ -650,8 +650,8 @@ var txTests = []txTest{
 			btcscript.OP_EQUALVERIFY,
 			btcscript.OP_CHECKSIG,
 		},
-		idx:   0,
-		bip16: true, // after threshold
+		idx:     0,
+		bip16:   true, // after threshold
 		nSigOps: 1,
 	},
 	// tx 6d36bc17e947ce00bb6f12f8e7a56a1585c5a36188ffa2b05e10b4743273a74b
@@ -773,8 +773,8 @@ var txTests = []txTest{
 			0x4f, 0x13,
 			btcscript.OP_NOP2, btcscript.OP_DROP,
 		},
-		idx:   1,
-		bip16: false,
+		idx:     1,
+		bip16:   false,
 		nSigOps: 0, // multisig is in the pkScript!
 	},
 	// same as previous but with one byte changed to make signature fail
@@ -895,9 +895,9 @@ var txTests = []txTest{
 			0x4f, 0x13,
 			btcscript.OP_NOP2, btcscript.OP_DROP,
 		},
-		idx:   1,
-		bip16: false,
-		err:   btcscript.StackErrScriptFailed,
+		idx:     1,
+		bip16:   false,
+		err:     btcscript.StackErrScriptFailed,
 		nSigOps: 0, // multisig is in the pkScript!
 	},
 	// tx e5779b9e78f9650debc2893fd9636d827b26b4ddfa6a8172fe8708c924f5c39d
@@ -955,8 +955,8 @@ var txTests = []txTest{
 			0xae, 0x88,
 			btcscript.OP_EQUAL,
 		},
-		idx:   0,
-		bip16: true,
+		idx:     0,
+		bip16:   true,
 		nSigOps: 0, // no signature ops in the pushed script.
 	},
 }
@@ -1014,7 +1014,7 @@ func TestGetPreciseSignOps(t *testing.T) {
 		if count != test.nSigOps {
 			t.Errorf("%s: expected count of %d, got %d", test.name,
 				test.nSigOps, count)
-			
+
 		}
 	}
 }
@@ -1302,12 +1302,12 @@ func TestBadPC(t *testing.T) {
 	}
 	pcTests := []pcTest{
 		pcTest{
-			script:2,
-			off:0,
+			script: 2,
+			off:    0,
 		},
 		pcTest{
 			script: 0,
-			off: 2,
+			off:    2,
 		},
 	}
 	// tx with almost empty scripts.
@@ -1329,12 +1329,12 @@ func TestBadPC(t *testing.T) {
 					Index: 0,
 				},
 				SignatureScript: []uint8{btcscript.OP_NOP},
-				Sequence: 4294967295,
+				Sequence:        4294967295,
 			},
 		},
 		TxOut: []*btcwire.TxOut{
 			&btcwire.TxOut{
-				Value: 1000000000,
+				Value:    1000000000,
 				PkScript: []byte{},
 			},
 		},
@@ -1343,7 +1343,7 @@ func TestBadPC(t *testing.T) {
 	pkScript := []byte{btcscript.OP_NOP}
 
 	for _, test := range pcTests {
-		engine, err :=  btcscript.NewScript(tx.TxIn[0].SignatureScript,
+		engine, err := btcscript.NewScript(tx.TxIn[0].SignatureScript,
 			pkScript, 0, tx, 70001, false)
 		if err != nil {
 			t.Errorf("Failed to create script: %v", err)
@@ -1388,12 +1388,12 @@ func TestCheckErrorCondition(t *testing.T) {
 					Index: 0,
 				},
 				SignatureScript: []uint8{},
-				Sequence: 4294967295,
+				Sequence:        4294967295,
 			},
 		},
 		TxOut: []*btcwire.TxOut{
 			&btcwire.TxOut{
-				Value: 1000000000,
+				Value:    1000000000,
 				PkScript: []byte{},
 			},
 		},
@@ -1419,7 +1419,7 @@ func TestCheckErrorCondition(t *testing.T) {
 		t.Errorf("failed to create script: %v", err)
 	}
 
-	for i := 0; i < len(pkScript) - 1; i++ {
+	for i := 0; i < len(pkScript)-1; i++ {
 		done, err := engine.Step()
 		if err != nil {
 			t.Errorf("failed to step %dth time: %v", i, err)
@@ -1452,4 +1452,3 @@ func TestCheckErrorCondition(t *testing.T) {
 		t.Errorf("unexpected error %v on final check", err)
 	}
 }
-

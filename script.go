@@ -718,7 +718,7 @@ func (s *Script) SetAltStack(data [][]byte) {
 
 // GetSigOpCount provides a quick count of the number of signature operations
 // in a script. a CHECKSIG operations counts for 1, and a CHECK_MULTISIG for 20.
-func  GetSigOpCount(script [] byte) (int, error) {
+func GetSigOpCount(script []byte) (int, error) {
 	pops, err := parseScript(script)
 	if err != nil {
 		return 0, err
@@ -751,7 +751,7 @@ func GetPreciseSigOpCount(scriptSig, scriptPubKey []byte, bip16 bool) (int, erro
 		return 0, nil
 	}
 
-	shScript := sigPops[len(sigPops) - 1].data
+	shScript := sigPops[len(sigPops)-1].data
 	// Means that sigPops is jus OP_1 - OP_16, no sigops there.
 	if shScript == nil {
 		return 0, nil
@@ -774,20 +774,20 @@ func getSigOpCount(pops []parsedOpcode, precise bool) int {
 	for i, pop := range pops {
 		switch pop.opcode.value {
 		case OP_CHECKSIG:
-			fallthrough;
+			fallthrough
 		case OP_CHECKSIGVERIFY:
 			nSigs++
 		case OP_CHECK_MULTISIG:
-			fallthrough;
+			fallthrough
 		case OP_CHECKMULTISIGVERIFY:
 			// If we are being precise then look for familiar
 			// patterns for multisig, for now all we recognise is
-			// OP_1 - OP_16 to signify the number of pubkeys. 
+			// OP_1 - OP_16 to signify the number of pubkeys.
 			// Otherwise, we use the max of 20.
 			if precise && i > 0 &&
-				pops[i - 1].opcode.value >= OP_1 &&
-				pops[i - 1].opcode.value <= OP_16 {
-				nSigs +=  int(pops[i-1].opcode.value -
+				pops[i-1].opcode.value >= OP_1 &&
+				pops[i-1].opcode.value <= OP_16 {
+				nSigs += int(pops[i-1].opcode.value -
 					(OP_1 - 1))
 			} else {
 				nSigs += MaxPubKeysPerMultiSig
