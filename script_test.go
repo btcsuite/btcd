@@ -1001,6 +1001,8 @@ func TestTX(t *testing.T) {
 }
 
 func TestGetPreciseSignOps(t *testing.T) {
+	// First we go over the range of tests in testTx and count the sigops in
+	// them.
 	for _, test := range txTests {
 		count, err := btcscript.GetPreciseSigOpCount(
 			test.tx.TxIn[test.idx].SignatureScript, test.pkScript,
@@ -1009,6 +1011,79 @@ func TestGetPreciseSignOps(t *testing.T) {
 		if err != nil {
 			t.Errorf("%s: unexpected error. got \"%v\"",
 				test.name, err)
+			continue
+		}
+		if count != test.nSigOps {
+			t.Errorf("%s: expected count of %d, got %d", test.name,
+				test.nSigOps, count)
+
+		}
+	}
+
+	// Now we go over a number of tests to hit the more awkward error
+	// conditions in the P2SH cases..
+
+	type psocTest struct {
+		name string
+		scriptSig []byte
+		nSigOps int
+		err  error
+	}
+	psocTests := []psocTest{
+		psocTest{
+			name: "scriptSig doesn't parse",
+			scriptSig: []byte{btcscript.OP_PUSHDATA1, 2},
+			err: btcscript.StackErrShortScript,
+		},
+		psocTest{
+			name: "scriptSig isn't push only",
+			scriptSig: []byte{btcscript.OP_1, btcscript.OP_DUP},
+			nSigOps: 0,
+		},
+		psocTest{
+			name: "scriptSig length 0",
+			scriptSig: []byte{},
+			nSigOps: 0,
+		},
+		psocTest{
+			name: "No script at the end",
+			// No script at end but still push only.
+			scriptSig: []byte{btcscript.OP_1, btcscript.OP_1},
+			nSigOps: 0,
+		},
+		// pushed script doesn't parse.
+		psocTest{
+			name: "pushed script doesn't parse",
+			scriptSig: []byte{btcscript.OP_DATA_2,
+				btcscript.OP_PUSHDATA1, 2},
+			err: btcscript.StackErrShortScript,
+		},
+	}
+	// The signature in the p2sh script is nonsensical for the tests since
+	// this script will never be executed. What matters is that it matches
+	// the right pattern.
+	pkScript := []byte{
+		btcscript.OP_HASH160,
+		btcscript.OP_DATA_20,
+		0x43, 0x3e, 0xc2, 0xac, 0x1f, 0xfa, 0x1b, 0x7b, 0x7d,
+		0x02, 0x7f, 0x56, 0x45, 0x29, 0xc5, 0x71, 0x97, 0xf9,
+		0xae, 0x88,
+		btcscript.OP_EQUAL,
+	}
+	for _, test := range psocTests {
+		count, err := btcscript.GetPreciseSigOpCount(
+			test.scriptSig, pkScript, true)
+		// all tx currently parse
+		if err != nil {
+			if err != test.err {
+			t.Errorf("%s: unexpected error. got \"%v\" exp: \"%v\"",
+				test.name, err, test.err)
+			}
+			continue
+		}
+		if test.err != nil {
+			t.Errorf("%s: expected error \"%v\" got none",
+				test.name, test.err)
 			continue
 		}
 		if count != test.nSigOps {
