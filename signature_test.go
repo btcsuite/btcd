@@ -151,7 +151,13 @@ var signatureTests = []signatureTest{
 			0x9d, 0x83, 0x1c, 0xc5, 0x6c, 0xbb, 0xac, 0x46, 0x22,
 			0x08, 0x22, 0x21, 0xa8, 0x76, 0x8d, 0x1d, 0x09, 0x01,
 		},
-		isValid: false,
+
+		// This test is now passing (used to be failing) because there
+		// are signatures in the blockchain that have trailing zero
+		// bytes before the hashtype. So ParseSignature was fixed to 
+		// permit buffers with trailing nonsense after the actual
+		// signature.
+		isValid: true,
 	},
 	signatureTest{
 		name: "X == N ",
