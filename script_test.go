@@ -20,6 +20,7 @@ type txTest struct {
 	err        error
 	shouldFail bool
 	nSigOps    int
+	sigOpsErr  error
 }
 
 var txTests = []txTest{
@@ -959,6 +960,126 @@ var txTests = []txTest{
 		bip16:   true,
 		nSigOps: 0, // no signature ops in the pushed script.
 	},
+	// next few tests are modified versions of previous to hit p2sh error
+	// cases.
+	txTest{
+		// sigscript changed so that pkscript hash will not match.
+		name: "P2SH - bad hash",
+		tx: &btcwire.MsgTx{
+			Version: 1,
+			TxIn: []*btcwire.TxIn{
+				&btcwire.TxIn{
+					PreviousOutpoint: btcwire.OutPoint{
+						Hash: btcwire.ShaHash([32]byte{
+							0x6d, 0x58, 0xf8, 0xa3,
+							0xaa, 0x43, 0x0b, 0x84,
+							0x78, 0x52, 0x3a, 0x65,
+							0xc2, 0x03, 0xa2, 0x7b,
+							0xb8, 0x81, 0x17, 0x8c,
+							0xb1, 0x23, 0x13, 0xaf,
+							0xde, 0x29, 0xf9, 0x2e,
+							0xd7, 0x56, 0xaa, 0x7e,
+						}),
+						Index: 0,
+					},
+					SignatureScript: []byte{
+						btcscript.OP_DATA_2,
+						// OP_3 OP_8
+						0x53, 0x58,
+					},
+					Sequence: 4294967295,
+				},
+			},
+			TxOut: []*btcwire.TxOut{
+				&btcwire.TxOut{
+					Value: 1000000,
+					PkScript: []byte{
+						btcscript.OP_DUP,
+						btcscript.OP_HASH160,
+						btcscript.OP_DATA_20,
+						0x5b, 0x69, 0xd8, 0xb9, 0xdf,
+						0xa6, 0xe4, 0x12, 0x26, 0x47,
+						0xe1, 0x79, 0x4e, 0xaa, 0x3b,
+						0xfc, 0x11, 0x1f, 0x70, 0xef,
+						btcscript.OP_EQUALVERIFY,
+						btcscript.OP_CHECKSIG,
+					},
+				},
+			},
+			LockTime: 0,
+		},
+		pkScript: []byte{
+			btcscript.OP_HASH160,
+			btcscript.OP_DATA_20,
+			0x43, 0x3e, 0xc2, 0xac, 0x1f, 0xfa, 0x1b, 0x7b, 0x7d,
+			0x02, 0x7f, 0x56, 0x45, 0x29, 0xc5, 0x71, 0x97, 0xf9,
+			0xae, 0x88,
+			btcscript.OP_EQUAL,
+		},
+		idx:     0,
+		err:     btcscript.StackErrScriptFailed,
+		bip16:   true,
+		nSigOps: 0, // no signature ops in the pushed script.
+	},
+	txTest{
+		// sigscript changed so that pkscript hash will not match.
+		name: "P2SH - doesn't parse",
+		tx: &btcwire.MsgTx{
+			Version: 1,
+			TxIn: []*btcwire.TxIn{
+				&btcwire.TxIn{
+					PreviousOutpoint: btcwire.OutPoint{
+						Hash: btcwire.ShaHash([32]byte{
+							0x6d, 0x58, 0xf8, 0xa3,
+							0xaa, 0x43, 0x0b, 0x84,
+							0x78, 0x52, 0x3a, 0x65,
+							0xc2, 0x03, 0xa2, 0x7b,
+							0xb8, 0x81, 0x17, 0x8c,
+							0xb1, 0x23, 0x13, 0xaf,
+							0xde, 0x29, 0xf9, 0x2e,
+							0xd7, 0x56, 0xaa, 0x7e,
+						}),
+						Index: 0,
+					},
+					SignatureScript: []byte{
+						btcscript.OP_DATA_2,
+						// pushed script.
+						btcscript.OP_DATA_2, 0x1,
+					},
+					Sequence: 4294967295,
+				},
+			},
+			TxOut: []*btcwire.TxOut{
+				&btcwire.TxOut{
+					Value: 1000000,
+					PkScript: []byte{
+						btcscript.OP_DUP,
+						btcscript.OP_HASH160,
+						btcscript.OP_DATA_20,
+						0x5b, 0x69, 0xd8, 0xb9, 0xdf,
+						0xa6, 0xe4, 0x12, 0x26, 0x47,
+						0xe1, 0x79, 0x4e, 0xaa, 0x3b,
+						0xfc, 0x11, 0x1f, 0x70, 0xef,
+						btcscript.OP_EQUALVERIFY,
+						btcscript.OP_CHECKSIG,
+					},
+				},
+			},
+			LockTime: 0,
+		},
+		pkScript: []byte{
+			btcscript.OP_HASH160,
+			btcscript.OP_DATA_20,
+			0xd4, 0x8c, 0xe8, 0x6c, 0x69, 0x8f, 0x24, 0x68, 0x29,
+			0x92, 0x1b, 0xa9, 0xfb, 0x2a, 0x84, 0x4a, 0xe2, 0xad,
+			0xba, 0x67, 
+			btcscript.OP_EQUAL,
+		},
+		idx:     0,
+		err:     btcscript.StackErrShortScript,
+		bip16:   true,
+		sigOpsErr: btcscript.StackErrShortScript,
+	},
 }
 
 // Test a number of tx from the blockchain to test otherwise difficult to test
@@ -1009,7 +1130,14 @@ func TestGetPreciseSignOps(t *testing.T) {
 			test.bip16)
 		// all tx currently parse
 		if err != nil {
-			t.Errorf("%s: unexpected error. got \"%v\"",
+			if err != test.sigOpsErr {
+				t.Errorf("%s: unexpected error. got \"%v\"",
+					test.name, err)
+			}
+			continue
+		}
+		if test.sigOpsErr != nil {
+			t.Errorf("%s: expected error \"%v\" but got success",
 				test.name, err)
 			continue
 		}
