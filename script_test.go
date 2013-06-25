@@ -15,12 +15,13 @@ type txTest struct {
 	name       string
 	tx         *btcwire.MsgTx
 	pkScript   []byte // output script of previous tx
-	idx        int
-	bip16      bool
-	err        error
-	shouldFail bool
-	nSigOps    int
-	sigOpsErr  error
+	idx        int    // tx idx to be run.
+	bip16      bool   // is bip16 active?
+	parseErr   error  // failure of NewScript
+	err        error  // Failure of Executre
+	shouldFail bool   // Execute should fail with nonspecified error.
+	nSigOps    int    // result of GetPreciseSigOpsCount
+	sigOpsErr  error  // failure of GetPreciseSigOpsCount()
 }
 
 var txTests = []txTest{
@@ -1072,13 +1073,76 @@ var txTests = []txTest{
 			btcscript.OP_DATA_20,
 			0xd4, 0x8c, 0xe8, 0x6c, 0x69, 0x8f, 0x24, 0x68, 0x29,
 			0x92, 0x1b, 0xa9, 0xfb, 0x2a, 0x84, 0x4a, 0xe2, 0xad,
-			0xba, 0x67, 
+			0xba, 0x67,
 			btcscript.OP_EQUAL,
 		},
-		idx:     0,
-		err:     btcscript.StackErrShortScript,
-		bip16:   true,
+		idx:       0,
+		err:       btcscript.StackErrShortScript,
+		bip16:     true,
 		sigOpsErr: btcscript.StackErrShortScript,
+	},
+	txTest{
+		// sigscript changed so to be non pushonly.
+		name: "P2SH - non pushonly",
+		tx: &btcwire.MsgTx{
+			Version: 1,
+			TxIn: []*btcwire.TxIn{
+				&btcwire.TxIn{
+					PreviousOutpoint: btcwire.OutPoint{
+						Hash: btcwire.ShaHash([32]byte{
+							0x6d, 0x58, 0xf8, 0xa3,
+							0xaa, 0x43, 0x0b, 0x84,
+							0x78, 0x52, 0x3a, 0x65,
+							0xc2, 0x03, 0xa2, 0x7b,
+							0xb8, 0x81, 0x17, 0x8c,
+							0xb1, 0x23, 0x13, 0xaf,
+							0xde, 0x29, 0xf9, 0x2e,
+							0xd7, 0x56, 0xaa, 0x7e,
+						}),
+						Index: 0,
+					},
+					// doesn't have to match signature.
+					// will never run.
+					SignatureScript: []byte{
+
+						btcscript.OP_DATA_2,
+						// pushed script.
+						btcscript.OP_DATA_1, 0x1,
+						btcscript.OP_DUP,
+					},
+					Sequence: 4294967295,
+				},
+			},
+			TxOut: []*btcwire.TxOut{
+				&btcwire.TxOut{
+					Value: 1000000,
+					PkScript: []byte{
+						btcscript.OP_DUP,
+						btcscript.OP_HASH160,
+						btcscript.OP_DATA_20,
+						0x5b, 0x69, 0xd8, 0xb9, 0xdf,
+						0xa6, 0xe4, 0x12, 0x26, 0x47,
+						0xe1, 0x79, 0x4e, 0xaa, 0x3b,
+						0xfc, 0x11, 0x1f, 0x70, 0xef,
+						btcscript.OP_EQUALVERIFY,
+						btcscript.OP_CHECKSIG,
+					},
+				},
+			},
+			LockTime: 0,
+		},
+		pkScript: []byte{
+			btcscript.OP_HASH160,
+			btcscript.OP_DATA_20,
+			0x43, 0x3e, 0xc2, 0xac, 0x1f, 0xfa, 0x1b, 0x7b, 0x7d,
+			0x02, 0x7f, 0x56, 0x45, 0x29, 0xc5, 0x71, 0x97, 0xf9,
+			0xae, 0x88,
+			btcscript.OP_EQUAL,
+		},
+		idx:      0,
+		parseErr: btcscript.StackErrP2SHNonPushOnly,
+		bip16:    true,
+		nSigOps:  0, // no signature ops in the pushed script.
 	},
 }
 
@@ -1093,8 +1157,15 @@ func testTx(t *testing.T, test txTest) {
 		test.tx.TxIn[test.idx].SignatureScript, test.pkScript,
 		test.idx, test.tx, 70001, test.bip16)
 	if err != nil {
-		t.Errorf("Failed to parse %s: %v", test.name, err)
+		if err != test.parseErr {
+			t.Errorf("Failed to parse %s: got \"%v\" expected "+
+				"\"%v\"", test.name, err, test.parseErr)
+		}
 		return
+	}
+	if test.parseErr != nil {
+		t.Errorf("%s: parse succeeded when expecting \"%v\"", test.name,
+			test.parseErr)
 	}
 
 	err = engine.Execute()
@@ -1152,32 +1223,32 @@ func TestGetPreciseSignOps(t *testing.T) {
 	// conditions in the P2SH cases..
 
 	type psocTest struct {
-		name string
+		name      string
 		scriptSig []byte
-		nSigOps int
-		err  error
+		nSigOps   int
+		err       error
 	}
 	psocTests := []psocTest{
 		psocTest{
-			name: "scriptSig doesn't parse",
+			name:      "scriptSig doesn't parse",
 			scriptSig: []byte{btcscript.OP_PUSHDATA1, 2},
-			err: btcscript.StackErrShortScript,
+			err:       btcscript.StackErrShortScript,
 		},
 		psocTest{
-			name: "scriptSig isn't push only",
+			name:      "scriptSig isn't push only",
 			scriptSig: []byte{btcscript.OP_1, btcscript.OP_DUP},
-			nSigOps: 0,
+			nSigOps:   0,
 		},
 		psocTest{
-			name: "scriptSig length 0",
+			name:      "scriptSig length 0",
 			scriptSig: []byte{},
-			nSigOps: 0,
+			nSigOps:   0,
 		},
 		psocTest{
 			name: "No script at the end",
 			// No script at end but still push only.
 			scriptSig: []byte{btcscript.OP_1, btcscript.OP_1},
-			nSigOps: 0,
+			nSigOps:   0,
 		},
 		// pushed script doesn't parse.
 		psocTest{
@@ -1204,8 +1275,8 @@ func TestGetPreciseSignOps(t *testing.T) {
 		// all tx currently parse
 		if err != nil {
 			if err != test.err {
-			t.Errorf("%s: unexpected error. got \"%v\" exp: \"%v\"",
-				test.name, err, test.err)
+				t.Errorf("%s: unexpected error. got \"%v\" exp: \"%v\"",
+					test.name, err, test.err)
 			}
 			continue
 		}

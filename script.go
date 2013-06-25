@@ -86,6 +86,12 @@ var StackErrScriptUnfinished = errors.New("Error check when script unfinished")
 // when the scripts have finished executing.
 var StackErrEmptyStack = errors.New("Stack empty at end of execution")
 
+// StackErrP2SHNonPushOnly is returned when a Pay-to-Script-Hash transaction
+// is encountered and the ScriptSig does operations other than push data (in
+// violation of bip16).
+var StackErrP2SHNonPushOnly = errors.New("pay to script hash with non " +
+	"pushonly input")
+
 // Bip16Activation is the timestamp where BIP0016 is valid to use in the
 // blockchain.  To be used to determine if BIP0016 should be called for or not.
 // This timestamp corresponds to Sun Apr 1 00:00:00 UTC 2012.
@@ -319,8 +325,7 @@ func NewScript(scriptSig []byte, scriptPubKey []byte, txidx int, tx *btcwire.Msg
 		// if we are pay to scripthash then we only accept input
 		// scripts that push data
 		if !isPushOnly(m.scripts[0]) {
-			return nil, errors.New("pay to script hash with non " +
-				"pushonly input")
+			return nil, StackErrP2SHNonPushOnly
 		}
 		m.bip16 = true
 	}
