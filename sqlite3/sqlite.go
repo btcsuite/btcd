@@ -468,7 +468,7 @@ func (db *SqliteDb) rePlayTransaction() (err error) {
 // DropAfterBlockBySha will remove any blocks from the database after the given block.
 // It terminates any existing transaction and performs its operations in an
 // atomic transaction, it is terminated (committed) before exit.
-func (db *SqliteDb) DropAfterBlockBySha(sha btcwire.ShaHash) (err error) {
+func (db *SqliteDb) DropAfterBlockBySha(sha *btcwire.ShaHash) (err error) {
 	var row *sql.Row
 	db.dbLock.Lock()
 	defer db.dbLock.Unlock()

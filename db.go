@@ -49,7 +49,7 @@ type Db interface {
 	// the given block.  It terminates any existing transaction and performs
 	// its operations in an atomic transaction which is commited before
 	// the function returns.
-	DropAfterBlockBySha(btcwire.ShaHash) (err error)
+	DropAfterBlockBySha(*btcwire.ShaHash) (err error)
 
 	// ExistsSha returns whether or not the given block hash is present in
 	// the database.
