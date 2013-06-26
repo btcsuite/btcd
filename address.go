@@ -91,7 +91,10 @@ func ScriptToAddress(script []byte) (ScriptType, string, error) {
 		{ScriptStrange, scrNoAddr, 33, []pkbytes{{0, OP_DATA_32}}, false},
 		{ScriptStrange, scrNoAddr, 33, []pkbytes{{0, OP_HASH160}, {1, OP_DATA_20}, {22, OP_EQUAL}}, false},
 	}
+	return scriptToAddressTemplate(script, validformats)
+}
 
+func scriptToAddressTemplate(script []byte, validformats []pkformat) (ScriptType, string, error) {
 	var format pkformat
 	var success bool
 	for _, format = range validformats {
@@ -106,8 +109,8 @@ func ScriptToAddress(script []byte) (ScriptType, string, error) {
 		success = true
 		for _, pkbyte := range format.databytes {
 			if pkbyte.off >= len(script) {
-				success = false
-				break
+				return ScriptUnknown, "Unknown",
+					StackErrInvalidAddrOffset
 			}
 			if script[pkbyte.off] != pkbyte.val {
 				log.Tracef("off at byte %v %v %v", pkbyte.off, script[pkbyte.off], pkbyte.val)
@@ -122,23 +125,22 @@ func ScriptToAddress(script []byte) (ScriptType, string, error) {
 		}
 	}
 
-	if success == false && len(script) > 1 {
-		// check for a few special case
-		if script[len(script)-1] == OP_CHECK_MULTISIG {
-			// Multisig ScriptPubKey
-			return ScriptStrange, "Unknown", nil
-		}
-		if script[0] == OP_0 && (len(script) <= 75 && byte(len(script)) == script[1]+2) {
-			// Multisig ScriptSig
-			return ScriptStrange, "Unknown", nil
-		}
-		if script[0] == OP_HASH160 && len(script) == 23 && script[22] == OP_EQUAL {
-			// Multisig ScriptSig
-			return ScriptStrange, "Unknown", nil
-		}
-		if script[0] == OP_DATA_36 && len(script) == 37 {
-			// Multisig ScriptSig
-			return ScriptStrange, "Unknown", nil
+	if success == false {
+		if len(script) > 1 {
+			// check for a few special case
+			if script[len(script)-1] == OP_CHECK_MULTISIG {
+				return ScriptStrange, "Unknown", nil
+			}
+			if script[0] == OP_0 && (len(script) <= 75 && byte(len(script)) == script[1]+2) {
+				return ScriptStrange, "Unknown", nil
+			}
+			if script[0] == OP_HASH160 && len(script) == 23 && script[22] == OP_EQUAL {
+				return ScriptStrange, "Unknown", nil
+			}
+			if script[0] == OP_DATA_36 && len(script) == 37 {
+				// Multisig ScriptSig
+				return ScriptStrange, "Unknown", nil
+			}
 		}
 
 		return ScriptUnknown, "Unknown", StackErrUnknownAddress
@@ -175,7 +177,7 @@ func ScriptToAddress(script []byte) (ScriptType, string, error) {
 		pubkey := script[1:34]
 		abuf = calcHash160(pubkey)
 	default:
-		log.Warnf("parsetype is %v", format.parsetype)
+		return ScriptUnknown, "Unknown", StackErrInvalidParseType
 	}
 
 	if abuf != nil {

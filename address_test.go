@@ -170,6 +170,9 @@ var addressTests = []addressTest{
 		address: "Unknown",
 		class:   btcscript.ScriptStrange,
 	},
+	{script: []byte{},
+		shouldFail: btcscript.StackErrUnknownAddress,
+	},
 }
 
 func TestAddresses(t *testing.T) {

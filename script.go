@@ -92,6 +92,14 @@ var StackErrEmptyStack = errors.New("Stack empty at end of execution")
 var StackErrP2SHNonPushOnly = errors.New("pay to script hash with non " +
 	"pushonly input")
 
+// StackErrInvalidParseType is an internal error returned from ScriptToAddress
+// ony if the internal data tables are wrong.
+var StackErrInvalidParseType = errors.New("internal error: invalid parsetype found")
+
+// StackErrInvalidAddrOffset is an internal error returned from ScriptToAddress
+// ony if the internal data tables are wrong.
+var StackErrInvalidAddrOffset = errors.New("internal error: invalid offset found")
+
 // Bip16Activation is the timestamp where BIP0016 is valid to use in the
 // blockchain.  To be used to determine if BIP0016 should be called for or not.
 // This timestamp corresponds to Sun Apr 1 00:00:00 UTC 2012.

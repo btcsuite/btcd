@@ -4,6 +4,10 @@
 
 package btcscript
 
+import (
+	"testing"
+)
+
 // this file is present to export some internal interfaces so that we can
 // test them reliably.
 
@@ -48,4 +52,67 @@ func TstTypeOfScript(script []byte) TstScriptType {
 func (s *Script) TstSetPC(script, off int) {
 	s.scriptidx = script
 	s.scriptoff = off
+}
+
+// Tests for internal error cases in ScriptToAddress.
+// We pass bad format definitions to  ScriptToAddrss to make sure the internal
+// checks work correctly. This is located in internal_test.go and not address.go
+// because of the ridiculous amount of internal types/constants that would
+// otherwise need to be exported here.
+
+type pkformatTest struct {
+	name   string
+	format pkformat
+	script []byte
+	ty     ScriptType
+	err    error
+}
+
+var TstPkFormats = []pkformatTest{
+	pkformatTest{
+		name: "bad offset",
+		format: pkformat{
+			addrtype:  ScriptAddr,
+			parsetype: scrNoAddr,
+			length:    4,
+			databytes: []pkbytes{{0, OP_1}, {1, OP_2}, {2,
+				OP_3}, /* wrong - too long */ {9, OP_4}},
+			allowmore: true,
+		},
+		script: []byte{OP_1, OP_2, OP_3, OP_4},
+		err:    StackErrInvalidAddrOffset,
+	},
+	pkformatTest{
+		name: "Bad parsetype",
+		format: pkformat{
+			addrtype:  ScriptAddr,
+			parsetype: 8, // invalid type
+			length:    4,
+			databytes: []pkbytes{{0, OP_1}, {1, OP_2}, {2,
+				OP_3}, /* wrong - too long */ {3, OP_4}},
+			allowmore: true,
+		},
+		script: []byte{OP_1, OP_2, OP_3, OP_4},
+		err:    StackErrInvalidParseType,
+	},
+}
+
+func TestBadPkFormat(t *testing.T) {
+	for _, test := range TstPkFormats {
+		ty, addr, err := scriptToAddressTemplate(test.script,
+			[]pkformat{test.format})
+		if err != nil {
+			if err != test.err {
+				t.Errorf("%s got error \"%v\". Was expecrting "+
+					"\"%v\"", test.name, err, test.err)
+			}
+			continue
+		}
+		if ty != test.ty {
+			t.Errorf("%s: unexpected type \"%s\". Wanted \"%s\" (addr %v)",
+				test.name, ty, test.ty, addr)
+			continue
+		}
+	}
+
 }
