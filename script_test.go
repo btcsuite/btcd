@@ -1675,6 +1675,13 @@ var scriptTypeTests = []scriptTypeTest{
 		},
 		scripttype: btcscript.TstNonStandardTy,
 	},
+	scriptTypeTest{
+		name: "doesn't parse",
+		script: []byte{
+			btcscript.OP_DATA_5, 0x1, 0x2, 0x3, 0x4,
+		},
+		scripttype: btcscript.TstNonStandardTy,
+	},
 }
 
 func testScriptType(t *testing.T, test *scriptTypeTest) {
@@ -1688,6 +1695,17 @@ func testScriptType(t *testing.T, test *scriptTypeTest) {
 func TestScriptTypes(t *testing.T) {
 	for i := range scriptTypeTests {
 		testScriptType(t, &scriptTypeTests[i])
+	}
+}
+
+func TestIsPayToScriptHash(t *testing.T) {
+	for _, test := range scriptTypeTests {
+		shouldBe := (test.scripttype == btcscript.TstScriptHashTy)
+		p2sh := btcscript.IsPayToScriptHash(test.script)
+		if p2sh != shouldBe {
+			t.Errorf("%s: epxected p2sh %v, got %v", test.name,
+				shouldBe, p2sh)
+		}
 	}
 }
 

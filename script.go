@@ -180,6 +180,16 @@ func isScriptHash(pops []parsedOpcode) bool {
 		pops[2].opcode.value == OP_EQUAL
 }
 
+// IsPayToScriptHash returns true if the script is in the standard
+// Pay-To-Script-Hash format, false otherwise.
+func IsPayToScriptHash(script []byte) bool {
+	pops, err := parseScript(script)
+	if err != nil {
+		return false
+	}
+	return isScriptHash(pops)
+}
+
 // isMultiSig returns true if the passed script is a multisig transaction, false
 // otherwise.
 func isMultiSig(pops []parsedOpcode) bool {
