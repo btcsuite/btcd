@@ -1144,6 +1144,57 @@ var txTests = []txTest{
 		bip16:    true,
 		nSigOps:  0, // no signature ops in the pushed script.
 	},
+	txTest{
+		// sigscript changed so to be non pushonly.
+		name: "empty pkScript",
+		tx: &btcwire.MsgTx{
+			Version: 1,
+			TxIn: []*btcwire.TxIn{
+				&btcwire.TxIn{
+					PreviousOutpoint: btcwire.OutPoint{
+						Hash: btcwire.ShaHash([32]byte{
+							0x6d, 0x58, 0xf8, 0xa3,
+							0xaa, 0x43, 0x0b, 0x84,
+							0x78, 0x52, 0x3a, 0x65,
+							0xc2, 0x03, 0xa2, 0x7b,
+							0xb8, 0x81, 0x17, 0x8c,
+							0xb1, 0x23, 0x13, 0xaf,
+							0xde, 0x29, 0xf9, 0x2e,
+							0xd7, 0x56, 0xaa, 0x7e,
+						}),
+						Index: 0,
+					},
+					// doesn't have to match signature.
+					// will never run.
+					SignatureScript: []byte{
+						btcscript.OP_TRUE,
+					},
+					Sequence: 4294967295,
+				},
+			},
+			TxOut: []*btcwire.TxOut{
+				&btcwire.TxOut{
+					Value: 1000000,
+					PkScript: []byte{
+						btcscript.OP_DUP,
+						btcscript.OP_HASH160,
+						btcscript.OP_DATA_20,
+						0x5b, 0x69, 0xd8, 0xb9, 0xdf,
+						0xa6, 0xe4, 0x12, 0x26, 0x47,
+						0xe1, 0x79, 0x4e, 0xaa, 0x3b,
+						0xfc, 0x11, 0x1f, 0x70, 0xef,
+						btcscript.OP_EQUALVERIFY,
+						btcscript.OP_CHECKSIG,
+					},
+				},
+			},
+			LockTime: 0,
+		},
+		pkScript: []byte{},
+		idx:      0,
+		bip16:    true,
+		nSigOps:  0, // no signature ops in the pushed script.
+	},
 }
 
 // Test a number of tx from the blockchain to test otherwise difficult to test

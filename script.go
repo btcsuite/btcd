@@ -314,9 +314,11 @@ func NewScript(scriptSig []byte, scriptPubKey []byte, txidx int, tx *btcwire.Msg
 			return nil, err
 		}
 
-		// if the first scripts(s) are empty, must set the PC to the next script.
-		if len(scr) == 0 {
-			// yes this could end up setting to an invalid intial PC if all scripts were empty
+		// If the first scripts(s) are empty, must start on later ones.
+		if i == 0 && len(scr) == 0 {
+			// This could end up seeing an invalid initial pc if
+			// all scripts were empty. However, that is an invalid
+			// case and should fail.
 			m.scriptidx = i + 1
 		}
 	}
