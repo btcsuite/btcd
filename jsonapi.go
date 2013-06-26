@@ -742,3 +742,36 @@ func IsValidIdType(id interface{}) bool {
 		return false
 	}
 }
+
+// JSONToAmount Safely converts a floating point value to an int.
+// Clearly not all floating point numbers can be converted to ints (there
+// is no one-to-one mapping, but bitcoin's json api returns most numbers as
+// floats which are not safe to use when handling money.  Since bitcoins can
+// only be divided in a limited way, this methods works for the amounts returned
+// by the json api.  It is not for general use.
+// This follows the method described at:
+// https://en.bitcoin.it/wiki/Proper_Money_Handling_%28JSON-RPC%29
+func JSONToAmount(jsonAmount float64) (int64, error) {
+	var amount int64
+	var err error
+	if jsonAmount > 1.797693134862315708145274237317043567981e+300 {
+		err := fmt.Errorf("Error %d is too large to convert", jsonAmount)
+		return amount, err
+	}
+	if jsonAmount < -1.797693134862315708145274237317043567981e+300 {
+		err := fmt.Errorf("Error %d is too small to convert", jsonAmount)
+		return amount, err
+	}
+	tempVal := 1e8 * jsonAmount
+	// So we round properly.  float won't == 0 and if it did, that
+	// would be converted fine anyway.
+	if tempVal < 0 {
+		tempVal = tempVal - 0.5
+	}
+	if tempVal > 0 {
+		tempVal = tempVal + 0.5
+	}
+	// Then just rely on the integer truncating
+	amount = int64(tempVal)
+	return amount, err
+}

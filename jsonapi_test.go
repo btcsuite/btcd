@@ -256,12 +256,43 @@ var idtests = []struct {
 }
 
 // TestIsValidIdType tests that IsValidIdType allows (and disallows the correct
-// types.
+// types).
 func TestIsValidIdType(t *testing.T) {
 	for _, tt := range idtests {
 		res := btcjson.IsValidIdType(tt.testId[0])
 		if res != tt.pass {
 			t.Errorf("Incorrect type result %v.", tt)
+		}
+	}
+	return
+}
+
+var floattests = []struct {
+	in   float64
+	out  int64
+	pass bool
+}{
+	{1.0, 100000000, true},
+	{-1.0, -100000000, true},
+	{0.0, 0, true},
+	{0.00000001, 1, true},
+	{-0.00000001, -1, true},
+	{-1.0e307, 0, false},
+	{1.0e307, 0, false},
+}
+
+// TestJSONtoAmount tests that JSONtoAmount returns the proper values.
+func TestJSONtoAmount(t *testing.T) {
+	for _, tt := range floattests {
+		res, err := btcjson.JSONToAmount(tt.in)
+		if tt.pass {
+			if res != tt.out || err != nil {
+				t.Errorf("Should not fail: ", tt.in)
+			}
+		} else {
+			if err == nil {
+				t.Errorf("Should not pass: ", tt.in)
+			}
 		}
 	}
 	return
