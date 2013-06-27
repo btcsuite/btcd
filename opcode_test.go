@@ -2005,6 +2005,15 @@ var detailedTests = []detailedTest{
 		disassembly:    "OP_SHA1",
 	},
 	{
+		name:   "OP_SHA1",
+		before: [][]byte{{0x01, 0x02, 0x03, 0x04, 0x05, 0x06}},
+		script: []byte{btcscript.OP_SHA1},
+		after: [][]byte{{0x5d, 0x21, 0x1b, 0xad, 0x8f, 0x4e,
+			0xe7, 0x0e, 0x16, 0xc7, 0xd3, 0x43, 0xa8, 0x38, 0xfc,
+			0x34, 0x4a, 0x1e, 0xd9, 0x61}},
+		disassembly: "OP_SHA1",
+	},
+	{
 		name:           "OP_SHA256 no args",
 		before:         [][]byte{},
 		script:         []byte{btcscript.OP_SHA256},
