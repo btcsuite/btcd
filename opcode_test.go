@@ -3885,11 +3885,24 @@ func testOpcode(t *testing.T, test *detailedTest) {
 	// disassemble.
 	var disScript, disPC string
 	if test.disassembly != "" {
-		var err error
+		dis0, err := engine.DisasmScript(0)
+		if err != nil {
+			t.Errorf("failed to disassemble script0 for %s: %v",
+				test.name, err)
+		}
+		if dis0 != "" {
+			t.Errorf("disassembly of empty script gave \"%s\"",
+				test.name, dis0)
+		}
 		disScript, err = engine.DisasmScript(1)
 		if err != nil {
 			t.Errorf("failed to disassemble script for %s: %v",
 				test.name, err)
+		}
+		_, err = engine.DisasmScript(2)
+		if err != btcscript.StackErrInvalidIndex {
+			t.Errorf("%s: got unexpected error for invalid "+
+				"disassembly index: \"%v\"", test.name, err)
 		}
 	}
 

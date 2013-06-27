@@ -100,6 +100,10 @@ var StackErrInvalidParseType = errors.New("internal error: invalid parsetype fou
 // ony if the internal data tables are wrong.
 var StackErrInvalidAddrOffset = errors.New("internal error: invalid offset found")
 
+// StackErrInvalidIndex is returned when an out-of-bounds index was passed to
+// a function.
+var StackErrInvalidIndex = errors.New("Invalid script index")
+
 // Bip16Activation is the timestamp where BIP0016 is valid to use in the
 // blockchain.  To be used to determine if BIP0016 should be called for or not.
 // This timestamp corresponds to Sun Apr 1 00:00:00 UTC 2012.
@@ -521,7 +525,7 @@ func (m *Script) validPC() error {
 // ``idx''.  Where 0 is the scriptSig and 1 is the scriptPubKey.
 func (m *Script) DisasmScript(idx int) (disstr string, err error) {
 	if idx >= len(m.scripts) {
-		return "", fmt.Errorf("Invalid script index")
+		return "", StackErrInvalidIndex
 	}
 	for i := range m.scripts[idx] {
 		disstr = disstr + m.disasm(idx, i) + "\n"
