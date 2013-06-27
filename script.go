@@ -258,6 +258,12 @@ func typeOfScript(pops []parsedOpcode) scriptType {
 // parseScript preparses the script in bytes into a list of parsedOpcodes while
 // applying a number of sanity checks.
 func parseScript(script []byte) ([]parsedOpcode, error) {
+	return parseScriptTemplate(script, opcodemap)
+}
+
+// parseScriptTemplate is the same as parseScript but allows the passing of the
+// template list for testing purposes.
+func parseScriptTemplate(script []byte, opcodemap map[byte]*opcode) ([]parsedOpcode, error) {
 	retScript := []parsedOpcode{}
 	for i := 0; i < len(script); {
 		instr := script[i]

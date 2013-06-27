@@ -116,3 +116,22 @@ func TestBadPkFormat(t *testing.T) {
 	}
 
 }
+
+// Internal tests for opcodde parsing with bad data templates.
+func TestParseOpcode(t *testing.T) {
+	fakemap := make(map[byte]*opcode)
+	// deep copy
+	for k, v := range opcodemap {
+		fakemap[k] = v
+	}
+	// wrong length -8.
+	fakemap[OP_PUSHDATA4] = &opcode{value: OP_PUSHDATA4,
+		name: "OP_PUSHDATA4", length: -8, opfunc: opcodePushData}
+
+	// this script would be fine if -8 was a valid length.
+	_, err := parseScriptTemplate([]byte{OP_PUSHDATA4, 0x1, 0x00, 0x00,
+		0x00, 0x00, 0x00, 0x00, 0x00}, fakemap)
+	if err == nil {
+		t.Errorf("no error with dodgy opcode map!")
+	}
+}
