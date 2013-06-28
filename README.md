@@ -1,11 +1,11 @@
 btcscript
 =========
 
-Package btcscript implements the bitcoin transaction scripts.  There is a test
-suite which is aiming to reach 100% code coverage.  See
-`test_coverage.txt` for the current coverage (using gocov).  On a
-UNIX-like OS, the script `cov_report.sh` can be used to generate the
-report.  Package btcscript is licensed under the liberal ISC license.
+Package btcscript implements the bitcoin transaction scripts.  There is
+a comprehensive test suite. `test_coverage.txt` contains the current
+coverage statistics (generated using gocov).  On a UNIX-like OS, the
+script `cov_report.sh` can be used to generate the report.  Package
+btcscript is licensed under the liberal ISC license.
 
 This package is one of the core packages from btcd, an alternative full-node
 implementation of bitcoin which is under active development by Conformal.
