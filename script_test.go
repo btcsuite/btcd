@@ -1536,7 +1536,7 @@ func TestRemoveOpcodeByDatas(t *testing.T) {
 type scriptTypeTest struct {
 	name       string
 	script     []byte
-	scripttype btcscript.TstScriptType
+	scripttype btcscript.ScriptClass
 }
 
 var scriptTypeTests = []scriptTypeTest{
@@ -1555,7 +1555,7 @@ var scriptTypeTests = []scriptTypeTest{
 			0x12, 0xa3,
 			btcscript.OP_CHECKSIG,
 		},
-		scripttype: btcscript.TstPubKeyTy,
+		scripttype: btcscript.PubKeyTy,
 	},
 	// tx 599e47a8114fe098103663029548811d2651991b62397e057f0c863c2bc9f9ea
 	scriptTypeTest{
@@ -1570,7 +1570,7 @@ var scriptTypeTests = []scriptTypeTest{
 			btcscript.OP_EQUALVERIFY,
 			btcscript.OP_CHECKSIG,
 		},
-		scripttype: btcscript.TstPubKeyHashTy,
+		scripttype: btcscript.PubKeyHashTy,
 	},
 	// part of tx 6d36bc17e947ce00bb6f12f8e7a56a1585c5a36188ffa2b05e10b4743273a74b
 	// codeseparator parts have been elided. (bitcoind's checks for multisig
@@ -1587,7 +1587,7 @@ var scriptTypeTests = []scriptTypeTest{
 			btcscript.OP_TRUE,
 			btcscript.OP_CHECK_MULTISIG,
 		},
-		scripttype: btcscript.TstMultiSigTy,
+		scripttype: btcscript.MultiSigTy,
 	},
 	// tx e5779b9e78f9650debc2893fd9636d827b26b4ddfa6a8172fe8708c924f5c39d
 	// P2SH
@@ -1601,7 +1601,7 @@ var scriptTypeTests = []scriptTypeTest{
 			0xae, 0x88,
 			btcscript.OP_EQUAL,
 		},
-		scripttype: btcscript.TstScriptHashTy,
+		scripttype: btcscript.ScriptHashTy,
 	},
 	// The next few are almost multisig (it is the more complex script type)
 	// but with various changes to make it fail.
@@ -1618,7 +1618,7 @@ var scriptTypeTests = []scriptTypeTest{
 			btcscript.OP_TRUE,
 			btcscript.OP_CHECK_MULTISIG,
 		},
-		scripttype: btcscript.TstNonStandardTy,
+		scripttype: btcscript.NonStandardTy,
 	},
 	scriptTypeTest{
 		name: "strange 2",
@@ -1629,7 +1629,7 @@ var scriptTypeTests = []scriptTypeTest{
 			btcscript.OP_TRUE,
 			btcscript.OP_CHECK_MULTISIG,
 		},
-		scripttype: btcscript.TstNonStandardTy,
+		scripttype: btcscript.NonStandardTy,
 	},
 	scriptTypeTest{
 		name: "strange 3",
@@ -1649,7 +1649,7 @@ var scriptTypeTests = []scriptTypeTest{
 			// No number.
 			btcscript.OP_CHECK_MULTISIG,
 		},
-		scripttype: btcscript.TstNonStandardTy,
+		scripttype: btcscript.NonStandardTy,
 	},
 	scriptTypeTest{
 		name: "strange 4",
@@ -1664,7 +1664,7 @@ var scriptTypeTests = []scriptTypeTest{
 			btcscript.OP_TRUE,
 			btcscript.OP_CHECKMULTISIGVERIFY,
 		},
-		scripttype: btcscript.TstNonStandardTy,
+		scripttype: btcscript.NonStandardTy,
 	},
 	scriptTypeTest{
 		name: "strange 5",
@@ -1673,19 +1673,19 @@ var scriptTypeTests = []scriptTypeTest{
 			btcscript.OP_TRUE,
 			btcscript.OP_CHECK_MULTISIG,
 		},
-		scripttype: btcscript.TstNonStandardTy,
+		scripttype: btcscript.NonStandardTy,
 	},
 	scriptTypeTest{
 		name: "doesn't parse",
 		script: []byte{
 			btcscript.OP_DATA_5, 0x1, 0x2, 0x3, 0x4,
 		},
-		scripttype: btcscript.TstNonStandardTy,
+		scripttype: btcscript.NonStandardTy,
 	},
 }
 
 func testScriptType(t *testing.T, test *scriptTypeTest) {
-	scripttype := btcscript.TstTypeOfScript(test.script)
+	scripttype := btcscript.GetScriptClass(test.script)
 	if scripttype != test.scripttype {
 		t.Errorf("%s: expected %s got %s", test.name, test.scripttype,
 			scripttype)
@@ -1700,7 +1700,7 @@ func TestScriptTypes(t *testing.T) {
 
 func TestIsPayToScriptHash(t *testing.T) {
 	for _, test := range scriptTypeTests {
-		shouldBe := (test.scripttype == btcscript.TstScriptHashTy)
+		shouldBe := (test.scripttype == btcscript.ScriptHashTy)
 		p2sh := btcscript.IsPayToScriptHash(test.script)
 		if p2sh != shouldBe {
 			t.Errorf("%s: epxected p2sh %v, got %v", test.name,

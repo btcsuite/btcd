@@ -29,24 +29,6 @@ func TstRemoveOpcodeByData(pkscript []byte, data []byte) ([]byte, error) {
 	return unparseScript(pops), nil
 }
 
-type TstScriptType scriptType
-
-const (
-	TstPubKeyTy      TstScriptType = TstScriptType(pubKeyTy)
-	TstPubKeyHashTy                = TstScriptType(pubKeyHashTy)
-	TstScriptHashTy                = TstScriptType(scriptHashTy)
-	TstMultiSigTy                  = TstScriptType(multiSigTy)
-	TstNonStandardTy               = TstScriptType(nonStandardTy)
-)
-
-func TstTypeOfScript(script []byte) TstScriptType {
-	pops, err := parseScript(script)
-	if err != nil {
-		return TstNonStandardTy
-	}
-	return TstScriptType(typeOfScript(pops))
-}
-
 // TestSetPC allows the test modules to set the program counter to whatever they
 // want.
 func (s *Script) TstSetPC(script, off int) {

@@ -125,16 +125,16 @@ const (
 	MaxScriptElementSize  = 520 // Max bytes pushable to the stack.
 )
 
-// ScriptType is an enumeration for the list of standard types of script.
-type scriptType byte
+// ScriptClass is an enumeration for the list of standard types of script.
+type ScriptClass byte
 
-// Types of script payment known about in the blockchain.
+// Classes of script payment known about in the blockchain.
 const (
-	pubKeyTy      scriptType = iota // Pay pubkey.
-	pubKeyHashTy                    // Pay pubkey hash.
-	scriptHashTy                    // Pay to script hash.
-	multiSigTy                      // Multi signature.
-	nonStandardTy                   // None of the above.
+	PubKeyTy      ScriptClass = iota // Pay pubkey.
+	PubKeyHashTy                    // Pay pubkey hash.
+	ScriptHashTy                    // Pay to script hash.
+	MultiSigTy                      // Multi signature.
+	NonStandardTy                   // None of the above.
 )
 
 // Script is the virtual machine that executes btcscripts.
@@ -237,21 +237,31 @@ func isPushOnly(pops []parsedOpcode) bool {
 	return true
 }
 
+// GetScriptClass returns the class of the script passed. If the script does not
+// parse then NonStandardTy will be returned.
+func GetScriptClass(script []byte) ScriptClass {
+	pops, err := parseScript(script)
+	if err != nil {
+		return NonStandardTy
+	}
+	return typeOfScript(pops)
+}
+
 // scriptType returns the type of the script being inspected from the known
 // standard types.
-func typeOfScript(pops []parsedOpcode) scriptType {
+func typeOfScript(pops []parsedOpcode) ScriptClass {
 	// XXX dubious optimisation: order these in order of popularity in the
 	// blockchain
 	if isPubkey(pops) {
-		return pubKeyTy
+		return PubKeyTy
 	} else if isPubkeyHash(pops) {
-		return pubKeyHashTy
+		return PubKeyHashTy
 	} else if isScriptHash(pops) {
-		return scriptHashTy
+		return ScriptHashTy
 	} else if isMultiSig(pops) {
-		return multiSigTy
+		return MultiSigTy
 	}
-	return nonStandardTy
+	return NonStandardTy
 
 }
 
