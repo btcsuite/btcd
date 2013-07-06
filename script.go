@@ -46,7 +46,7 @@ var StackErrInvalidOpcode = errors.New("Invalid Opcode")
 // encountered.
 var StackErrReservedOpcode = errors.New("Reserved Opcode")
 
-// StackErrEarlyReturn is returned when OP_RETURN is exectured in the script.
+// StackErrEarlyReturn is returned when OP_RETURN is executed in the script.
 var StackErrEarlyReturn = errors.New("Script returned early")
 
 // StackErrNoIf is returned if an OP_ELSE or OP_ENDIF is encountered without
@@ -378,7 +378,7 @@ func NewScript(scriptSig []byte, scriptPubKey []byte, txidx int, tx *btcwire.Msg
 	return &m, nil
 }
 
-// Execute will execturte all script in the script engine and return either nil
+// Execute will execute all script in the script engine and return either nil
 // for successful validation or an error if one occurred.
 func (s *Script) Execute() (err error) {
 	done := false
