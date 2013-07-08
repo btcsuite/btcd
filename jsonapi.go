@@ -209,7 +209,7 @@ func CreateMessage(message string, args ...interface{}) ([]byte, error) {
 	// One required string
 	case "backupwallet", "decoderawtransaction", "dumpprivkey",
 		"encryptwallet", "getaccount", "getaccountaddress",
-		"getaddressbyaccount", "getblock",
+		"getaddressesbyaccount", "getblock",
 		"gettransaction", "sendrawtransaction", "validateaddress":
 		if len(args) != 1 {
 			err = fmt.Errorf("%s requires one argument", message)
@@ -708,7 +708,7 @@ func RpcCommand(user string, password string, server string, message []byte) (Re
 	}
 	resp, err := jsonRpcSend(user, password, server, message)
 	if err != nil {
-		err := fmt.Errorf("Error sending json message: "+err.Error())
+		err := fmt.Errorf("Error sending json message: " + err.Error())
 		return result, err
 	}
 	body, err := GetRaw(resp.Body)
