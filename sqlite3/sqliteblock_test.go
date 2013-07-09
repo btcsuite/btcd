@@ -278,7 +278,7 @@ func TestBdb(t *testing.T) {
 	testFetch(t, db, testShas, "post sync")
 
 	for i := len(testShas) - 1; i >= 0; i-- {
-		err := db.DropAfterBlockBySha(testShas[i])
+		err := db.DropAfterBlockBySha(&testShas[i])
 		if err != nil {
 			t.Errorf("drop after %d failed %v", i, err)
 			break
