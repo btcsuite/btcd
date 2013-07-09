@@ -69,6 +69,10 @@ type Db interface {
 	// more are present, use the special id `AllShas'.
 	FetchHeightRange(startHeight, endHeight int64) (rshalist []btcwire.ShaHash, err error)
 
+	// ExistsTxSha returns whether or not the given tx hash is present in
+	// the database
+	ExistsTxSha(sha *btcwire.ShaHash) (exists bool)
+
 	// FetchTxAllBySha returns several pieces of data for a given
 	// transaction hash.  The implementation may cache the underlying data
 	// if desired.

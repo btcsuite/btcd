@@ -94,6 +94,11 @@ out:
 					}
 					origintxsha := &txin.PreviousOutpoint.Hash
 					txneededList = append(txneededList, origintxsha)
+
+					if !db.ExistsTxSha(origintxsha) {
+						t.Errorf("referenced tx not found %v ", origintxsha)
+					}
+
 					_, _, _, _, err := db.FetchTxAllBySha(origintxsha)
 					if err != nil {
 						t.Errorf("referenced tx not found %v err %v ", origintxsha, err)
@@ -259,6 +264,11 @@ func testBackout(t *testing.T, mode int) {
 	block := blocks[110]
 	mblock := block.MsgBlock()
 	txsha, err := mblock.Transactions[0].TxSha(block.ProtocolVersion())
+	exists := db.ExistsTxSha(&txsha)
+	if exists {
+		t.Errorf("tx %v exists in db, failure expected")
+	}
+
 	_, _, _, err = db.FetchTxBySha(&txsha)
 	_, err = db.FetchTxUsedBySha(&txsha)
 

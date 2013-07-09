@@ -45,6 +45,8 @@ const (
 	txPragmaVacuumOn
 	txPragmaVacuumOff
 	txVacuum
+	txExistsShaStmt
+	txtmpExistsShaStmt
 )
 
 var blkqueries []string = []string{
@@ -70,6 +72,8 @@ var txqueries []string = []string{
 	txPragmaVacuumOn:            "PRAGMA auto_vacuum = FULL;",
 	txPragmaVacuumOff:           "PRAGMA auto_vacuum = NONE;",
 	txVacuum:                    "VACUUM;",
+	txExistsShaStmt:	     "SELECT blockid FROM tx WHERE key = ?;",
+	txtmpExistsShaStmt:	     "SELECT blockid FROM txtmp WHERE key = ?;",
 }
 
 var log seelog.LoggerInterface = seelog.Disabled

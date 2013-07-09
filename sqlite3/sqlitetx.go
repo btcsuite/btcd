@@ -72,11 +72,55 @@ func (db *SqliteDb) insertTx(txsha *btcwire.ShaHash, blockidx int64, txoff int, 
 	return
 }
 
-// FetchLocationBySha looks up the Tx sha information by name.
-func (db *SqliteDb) FetchLocationBySha(txsha *btcwire.ShaHash) (blockidx int64, txoff int, txlen int, err error) {
+// ExistsTxSha returns if the given tx sha exists in the database
+func (db *SqliteDb) ExistsTxSha(txsha *btcwire.ShaHash) (exists bool) {
 	db.dbLock.Lock()
 	defer db.dbLock.Unlock()
 
+	if _, ok := db.fetchTxCache(txsha); ok {
+		return true
+	}
+
+	return db.existsTxSha(txsha)
+}
+
+
+// existsTxSha returns if the given tx sha exists in the database.o
+// Must be called with the db lock held.
+func (db *SqliteDb) existsTxSha(txsha *btcwire.ShaHash) (exists bool) {
+	var blockid uint32
+
+	txop := db.txop(txExistsShaStmt)
+	row := txop.QueryRow(txsha.String())
+	err := row.Scan(&blockid)
+
+	if err == sql.ErrNoRows {
+		txop = db.txop(txtmpExistsShaStmt)
+		row = txop.QueryRow(txsha.String())
+		err := row.Scan(&blockid)
+
+		if err == sql.ErrNoRows {
+			return false
+		}
+		if err != nil {
+			log.Warnf("txTmpExistsTxSha: fail %v", err)
+			return false
+		}
+		log.Warnf("txtmpExistsTxSha: success")
+		return true
+	}
+
+	if err != nil {
+		// ignore real errors?
+		log.Warnf("existsTxSha: fail %v", err)
+		return false
+	}
+
+	return true
+}
+
+// FetchLocationBySha looks up the Tx sha information by name.
+func (db *SqliteDb) FetchLocationBySha(txsha *btcwire.ShaHash) (blockidx int64, txoff int, txlen int, err error) {
 	return db.fetchLocationBySha(txsha)
 }
 
