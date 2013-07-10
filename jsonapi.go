@@ -665,6 +665,23 @@ func readResultCmd(cmd string, message []byte) (Reply, error) {
 			return result, err
 		}
 		result.Result = res
+	case "getaddressesbyaccount":
+		var res []string
+		err = json.Unmarshal(objmap["result"], &res)
+		if err != nil {
+			err = fmt.Errorf("Error unmarshalling json reply: %v", err)
+			return result, err
+		}
+		result.Result = res
+	// For commands that return a single item, we get it with the
+	// correct concrete type for free (but treat them seperately
+	// for clarity.
+	case "getblockcount":
+		err = json.Unmarshal(message, &result)
+		if err != nil {
+			err = fmt.Errorf("Error unmarshalling json reply: %v", err)
+			return result, err
+		}
 	// For anything else put it in an interface.  All the data is still
 	// there, just a little less convenient to deal with.
 	default:

@@ -37,6 +37,8 @@ var resulttests = []struct {
 	{"getblock", []byte(`{"error":null,"id":1,"result":[{"a":"b"}]}`), false, false},
 	{"getrawtransaction", []byte(`{"error":null,"id":1,"result":[{"a":"b"}]}`), false, false},
 	{"decoderawtransaction", []byte(`{"error":null,"id":1,"result":[{"a":"b"}]}`), false, false},
+	{"getaddressesbyaccount", []byte(`{"error":null,"id":1,"result":[{"a":"b"}]}`), false, false},
+	{"getaddressesbyaccount", []byte(`{"error":null,"id":1,"result":["test"]}`), false, true},
 }
 
 // TestReadResultCmd tests that readResultCmd can properly unmarshall the
