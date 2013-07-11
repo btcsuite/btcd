@@ -674,8 +674,8 @@ func readResultCmd(cmd string, message []byte) (Reply, error) {
 		}
 		result.Result = res
 	// For commands that return a single item, we get it with the
-	// correct concrete type for free (but treat them seperately
-	// for clarity.
+	// correct concrete type for free (but treat them separately
+	// for clarity).
 	case "getblockcount":
 		err = json.Unmarshal(message, &result)
 		if err != nil {

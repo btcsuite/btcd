@@ -35,8 +35,11 @@ var resulttests = []struct {
 	{"getinfo", []byte(`{"error":null,"result":null}`), false, false},
 	{"getinfo", []byte(`{"error":null,"id":1,"result":[{"a":"b"}]}`), false, false},
 	{"getblock", []byte(`{"error":null,"id":1,"result":[{"a":"b"}]}`), false, false},
+	{"getblock", []byte(`{"result":{"hash":"000000","confirmations":16007,"size":325648},"error":null,"id":1}`), false, true},
 	{"getrawtransaction", []byte(`{"error":null,"id":1,"result":[{"a":"b"}]}`), false, false},
+	{"getrawtransaction", []byte(`{"error":null,"id":1,"result":{"hex":"somejunk","version":1}}`), false, true},
 	{"decoderawtransaction", []byte(`{"error":null,"id":1,"result":[{"a":"b"}]}`), false, false},
+	{"decoderawtransaction", []byte(`{"error":null,"id":1,"result":{"Txid":"something"}}`), false, true},
 	{"getaddressesbyaccount", []byte(`{"error":null,"id":1,"result":[{"a":"b"}]}`), false, false},
 	{"getaddressesbyaccount", []byte(`{"error":null,"id":1,"result":["test"]}`), false, true},
 }
