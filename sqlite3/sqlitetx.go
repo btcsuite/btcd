@@ -12,16 +12,16 @@ import (
 )
 
 // InsertTx inserts a tx hash and its associated data into the database.
-func (db *SqliteDb) InsertTx(txsha *btcwire.ShaHash, blockidx int64, txoff int, txlen int, usedbuf []byte) (err error) {
+func (db *SqliteDb) InsertTx(txsha *btcwire.ShaHash, height int64, txoff int, txlen int, usedbuf []byte) (err error) {
 	db.dbLock.Lock()
 	defer db.dbLock.Unlock()
 
-	return db.insertTx(txsha, blockidx, txoff, txlen, usedbuf)
+	return db.insertTx(txsha, height, txoff, txlen, usedbuf)
 }
 
 // insertTx inserts a tx hash and its associated data into the database.
 // Must be called with db lock held.
-func (db *SqliteDb) insertTx(txsha *btcwire.ShaHash, blockidx int64, txoff int, txlen int, usedbuf []byte) (err error) {
+func (db *SqliteDb) insertTx(txsha *btcwire.ShaHash, height int64, txoff int, txlen int, usedbuf []byte) (err error) {
 
 	tx := &db.txState
 	if tx.tx == nil {
@@ -30,7 +30,7 @@ func (db *SqliteDb) insertTx(txsha *btcwire.ShaHash, blockidx int64, txoff int, 
 			return
 		}
 	}
-	blockid := blockidx + 1
+	blockid := height + 1
 	txd := tTxInsertData{txsha: txsha, blockid: blockid, txoff: txoff, txlen: txlen, usedbuf: usedbuf}
 
 	log.Tracef("inserting tx %v for block %v off %v len %v",
@@ -84,7 +84,6 @@ func (db *SqliteDb) ExistsTxSha(txsha *btcwire.ShaHash) (exists bool) {
 	return db.existsTxSha(txsha)
 }
 
-
 // existsTxSha returns if the given tx sha exists in the database.o
 // Must be called with the db lock held.
 func (db *SqliteDb) existsTxSha(txsha *btcwire.ShaHash) (exists bool) {
@@ -126,7 +125,7 @@ func (db *SqliteDb) FetchLocationBySha(txsha *btcwire.ShaHash) (blockidx int64, 
 
 // fetchLocationBySha look up the Tx sha information by name.
 // Must be called with db lock held.
-func (db *SqliteDb) fetchLocationBySha(txsha *btcwire.ShaHash) (blockidx int64, txoff int, txlen int, err error) {
+func (db *SqliteDb) fetchLocationBySha(txsha *btcwire.ShaHash) (height int64, txoff int, txlen int, err error) {
 	var row *sql.Row
 	var blockid int64
 	var ttxoff int
@@ -156,10 +155,47 @@ func (db *SqliteDb) fetchLocationBySha(txsha *btcwire.ShaHash) (blockidx int64, 
 		log.Warnf("FetchLocationBySha: fail %v", err)
 		return
 	}
-	blockidx = blockid - 1
+	height = blockid - 1
 	txoff = ttxoff
 	txlen = ttxlen
 	return
+}
+
+// fetchLocationUsedBySha look up the Tx sha information by name.
+// Must be called with db lock held.
+func (db *SqliteDb) fetchLocationUsedBySha(txsha *btcwire.ShaHash) (rheight int64, rtxoff int, rtxlen int, rspentbuf []byte, err error) {
+	var row *sql.Row
+	var blockid int64
+	var txoff int
+	var txlen int
+	var txspent []byte
+
+	rowBytes := txsha.String()
+	txop := db.txop(txFetchLocUsedByShaStmt)
+	row = txop.QueryRow(rowBytes)
+
+	err = row.Scan(&blockid, &txoff, &txlen, &txspent)
+	if err == sql.ErrNoRows {
+		txop = db.txop(txtmpFetchLocUsedByShaStmt)
+		row = txop.QueryRow(rowBytes)
+
+		err = row.Scan(&blockid, &txoff, &txlen, &txspent)
+		if err == sql.ErrNoRows {
+			err = btcdb.TxShaMissing
+			return
+		}
+		if err != nil {
+			log.Warnf("txtmp FetchLocationBySha: fail %v",
+				err)
+			return
+		}
+	}
+	if err != nil {
+		log.Warnf("FetchLocationBySha: fail %v", err)
+		return
+	}
+	height := blockid - 1
+	return height, txoff, txlen, txspent, nil
 }
 
 // FetchTxUsedBySha returns the used/spent buffer for a given transaction.

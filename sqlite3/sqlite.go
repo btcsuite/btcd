@@ -34,9 +34,15 @@ const (
 	txInsertStmt = iota
 	txFetchUsedByShaStmt
 	txFetchLocationByShaStmt
+	txFetchLocUsedByShaStmt
+	txUpdateUsedByShaStmt
+
 	txtmpInsertStmt
 	txtmpFetchUsedByShaStmt
 	txtmpFetchLocationByShaStmt
+	txtmpFetchLocUsedByShaStmt
+	txtmpUpdateUsedByShaStmt
+
 	txMigrateCopy
 	txMigrateClear
 	txMigratePrep
@@ -58,22 +64,28 @@ var blkqueries []string = []string{
 }
 
 var txqueries []string = []string{
-	txInsertStmt:                "INSERT INTO tx (key, blockid, txoff, txlen, data) VALUES(?, ?, ?, ?, ?);",
-	txFetchUsedByShaStmt:        "SELECT data FROM tx WHERE key = ?;",
-	txFetchLocationByShaStmt:    "SELECT blockid, txoff, txlen FROM tx WHERE key = ?;",
+	txInsertStmt:             "INSERT INTO tx (key, blockid, txoff, txlen, data) VALUES(?, ?, ?, ?, ?);",
+	txFetchUsedByShaStmt:     "SELECT data FROM tx WHERE key = ?;",
+	txFetchLocationByShaStmt: "SELECT blockid, txoff, txlen FROM tx WHERE key = ?;",
+	txFetchLocUsedByShaStmt:  "SELECT blockid, txoff, txlen, data FROM tx WHERE key = ?;",
+	txUpdateUsedByShaStmt:    "UPDATE tx SET data = ? WHERE key  = ?;",
+
 	txtmpInsertStmt:             "INSERT INTO txtmp (key, blockid, txoff, txlen, data) VALUES(?, ?, ?, ?, ?);",
 	txtmpFetchUsedByShaStmt:     "SELECT data FROM txtmp WHERE key = ?;",
 	txtmpFetchLocationByShaStmt: "SELECT blockid, txoff, txlen FROM txtmp WHERE key = ?;",
-	txMigrateCopy:               "INSERT INTO tx (key, blockid, txoff, txlen, data) SELECT key, blockid, txoff, txlen, data FROM txtmp;",
-	txMigrateClear:              "DELETE from txtmp;",
-	txMigratePrep:               "DROP index IF EXISTS uniquetx;",
-	txMigrateFinish:             "CREATE UNIQUE INDEX IF NOT EXISTS uniquetx ON tx (key);",
-	txMigrateCount:              "SELECT COUNT(*) FROM txtmp;",
-	txPragmaVacuumOn:            "PRAGMA auto_vacuum = FULL;",
-	txPragmaVacuumOff:           "PRAGMA auto_vacuum = NONE;",
-	txVacuum:                    "VACUUM;",
-	txExistsShaStmt:	     "SELECT blockid FROM tx WHERE key = ?;",
-	txtmpExistsShaStmt:	     "SELECT blockid FROM txtmp WHERE key = ?;",
+	txtmpFetchLocUsedByShaStmt:  "SELECT blockid, txoff, txlen, data FROM txtmp WHERE key = ?;",
+	txtmpUpdateUsedByShaStmt:    "UPDATE txtmp SET data = ? WHERE key = ?;",
+
+	txMigrateCopy:      "INSERT INTO tx (key, blockid, txoff, txlen, data) SELECT key, blockid, txoff, txlen, data FROM txtmp;",
+	txMigrateClear:     "DELETE from txtmp;",
+	txMigratePrep:      "DROP index IF EXISTS uniquetx;",
+	txMigrateFinish:    "CREATE UNIQUE INDEX IF NOT EXISTS uniquetx ON tx (key);",
+	txMigrateCount:     "SELECT COUNT(*) FROM txtmp;",
+	txPragmaVacuumOn:   "PRAGMA auto_vacuum = FULL;",
+	txPragmaVacuumOff:  "PRAGMA auto_vacuum = NONE;",
+	txVacuum:           "VACUUM;",
+	txExistsShaStmt:    "SELECT blockid FROM tx WHERE key = ?;",
+	txtmpExistsShaStmt: "SELECT blockid FROM txtmp WHERE key = ?;",
 }
 
 var log seelog.LoggerInterface = seelog.Disabled
@@ -269,6 +281,8 @@ func newOrCreateSqliteDB(filepath string, create bool) (pbdb btcdb.Db, err error
 
 	bdb.blockCache.maxcount = 150
 	bdb.blockCache.blockMap = map[btcwire.ShaHash]*blockCacheObj{}
+	bdb.blockCache.blockMap = map[btcwire.ShaHash]*blockCacheObj{}
+	bdb.blockCache.blockHeightMap = map[int64]*blockCacheObj{}
 	bdb.txCache.maxcount = 2000
 	bdb.txCache.txMap = map[btcwire.ShaHash]*txCacheObj{}
 
@@ -325,6 +339,8 @@ func (db *SqliteDb) RollbackClose() {
 		err := tx.tx.Rollback()
 		if err != nil {
 			log.Debugf("Rollback failed: %v", err)
+		} else {
+			tx.tx = nil
 		}
 	}
 	db.close()
@@ -477,8 +493,6 @@ func (db *SqliteDb) DropAfterBlockBySha(sha *btcwire.ShaHash) (err error) {
 	db.dbLock.Lock()
 	defer db.dbLock.Unlock()
 
-	db.InvalidateCache()
-
 	// This is a destructive operation and involves multiple requests
 	// so requires a transaction, terminate any transaction to date
 	// and start a new transaction
@@ -491,6 +505,27 @@ func (db *SqliteDb) DropAfterBlockBySha(sha *btcwire.ShaHash) (err error) {
 		return err
 	}
 
+	var startheight int64
+
+	if db.lastBlkShaCached {
+		startheight = db.lastBlkIdx
+	} else {
+		querystr := "SELECT blockid FROM block ORDER BY blockid DESC;"
+
+		tx := &db.txState
+		if tx.tx != nil {
+			row = tx.tx.QueryRow(querystr)
+		} else {
+			row = db.sqldb.QueryRow(querystr)
+		}
+		var startblkidx int64
+		err = row.Scan(&startblkidx)
+		if err != nil {
+			log.Warnf("DropAfterBlockBySha:unable to fetch blockheight %v", err)
+			return err
+		}
+		startheight = startblkidx
+	}
 	// also drop any cached sha data
 	db.lastBlkShaCached = false
 
@@ -499,22 +534,61 @@ func (db *SqliteDb) DropAfterBlockBySha(sha *btcwire.ShaHash) (err error) {
 	tx := &db.txState
 	row = tx.tx.QueryRow(querystr, sha.Bytes())
 
-	var blockidx uint64
-	err = row.Scan(&blockidx)
+	var keepidx int64
+	err = row.Scan(&keepidx)
 	if err != nil {
 		// XXX
 		db.endTx(false)
 		return err
 	}
 
-	_, err = tx.tx.Exec("DELETE FROM txtmp WHERE blockid > ?", blockidx)
+	for height := startheight; height > keepidx; height = height - 1 {
+		var blk *btcutil.Block
+		blkc, ok := db.fetchBlockHeightCache(height)
+
+		if ok {
+			blk = blkc.blk
+		} else {
+			// must load the block from the db
+			sha, err = db.fetchBlockShaByHeight(height - 1)
+			if err != nil {
+				return
+			}
+
+			var buf []byte
+			var pver uint32
+
+			buf, pver, _, err = db.fetchSha(*sha)
+			if err != nil {
+				return
+			}
+
+			blk, err = btcutil.NewBlockFromBytes(buf, pver)
+			if err != nil {
+				return
+			}
+		}
+
+		for _, tx := range blk.MsgBlock().Transactions {
+			err = db.unSpend(tx)
+			if err != nil {
+				return
+			}
+		}
+	}
+
+	// invalidate the cache after possibly using cached entries for block
+	// lookup to unspend coins in them
+	db.InvalidateCache()
+
+	_, err = tx.tx.Exec("DELETE FROM txtmp WHERE blockid > ?", keepidx)
 	if err != nil {
 		// XXX
 		db.endTx(false)
 		return err
 	}
 
-	_, err = tx.tx.Exec("DELETE FROM tx WHERE blockid > ?", blockidx)
+	_, err = tx.tx.Exec("DELETE FROM tx WHERE blockid > ?", keepidx)
 	if err != nil {
 		// XXX
 		db.endTx(false)
@@ -522,7 +596,7 @@ func (db *SqliteDb) DropAfterBlockBySha(sha *btcwire.ShaHash) (err error) {
 	}
 
 	// delete from block last in case of foreign keys
-	_, err = tx.tx.Exec("DELETE FROM block WHERE blockid > ?", blockidx)
+	_, err = tx.tx.Exec("DELETE FROM block WHERE blockid > ?", keepidx)
 	if err != nil {
 		// XXX
 		db.endTx(false)
@@ -604,6 +678,9 @@ func (db *SqliteDb) InsertBlock(block *btcutil.Block) (height int64, err error) 
 		}
 		spentbuflen := (len(tx.TxOut) + 7) / 8
 		spentbuf := make([]byte, spentbuflen, spentbuflen)
+		for i := uint(len(tx.TxOut) % 8); i < 8; i++ {
+			spentbuf[spentbuflen-1] |= (byte(1) << i)
+		}
 
 		err = db.insertTx(&txsha, newheight, txloc[txidx].TxStart, txloc[txidx].TxLen, spentbuf)
 		if err != nil {
@@ -611,6 +688,12 @@ func (db *SqliteDb) InsertBlock(block *btcutil.Block) (height int64, err error) 
 			var oBlkIdx int64
 			oBlkIdx, _, _, err = db.fetchLocationBySha(&txsha)
 			log.Warnf("oblkidx %v err %v", oBlkIdx, err)
+
+			return
+		}
+		err = db.doSpend(tx)
+		if err != nil {
+			log.Warnf("block %v idx %v failed to spend tx %v %v err %v", &blocksha, newheight, &txsha, txidx, err)
 
 			return
 		}
@@ -674,4 +757,101 @@ func (db *SqliteDb) SetDBInsertMode(newmode btcdb.InsertMode) {
 		// XXX
 		db.UseTempTX = false
 	}
+}
+func (db *SqliteDb) doSpend(tx *btcwire.MsgTx) error {
+	for txinidx := range tx.TxIn {
+		txin := tx.TxIn[txinidx]
+
+		inTxSha := txin.PreviousOutpoint.Hash
+		inTxidx := txin.PreviousOutpoint.Index
+
+		if inTxidx == ^uint32(0) {
+			continue
+		}
+
+		//log.Infof("spending %v %v",  &inTxSha, inTxidx)
+
+		err := db.setSpentData(&inTxSha, inTxidx)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (db *SqliteDb) unSpend(tx *btcwire.MsgTx) error {
+	for txinidx := range tx.TxIn {
+		txin := tx.TxIn[txinidx]
+
+		inTxSha := txin.PreviousOutpoint.Hash
+		inTxidx := txin.PreviousOutpoint.Index
+
+		if inTxidx == ^uint32(0) {
+			continue
+		}
+
+		err := db.clearSpentData(&inTxSha, inTxidx)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (db *SqliteDb) setSpentData(sha *btcwire.ShaHash, idx uint32) error {
+	return db.setclearSpentData(sha, idx, true)
+}
+
+func (db *SqliteDb) clearSpentData(sha *btcwire.ShaHash, idx uint32) error {
+	return db.setclearSpentData(sha, idx, false)
+}
+
+func (db *SqliteDb) setclearSpentData(txsha *btcwire.ShaHash, idx uint32, set bool) error {
+	var spentdata []byte
+	usingtmp := false
+	txop := db.txop(txFetchUsedByShaStmt)
+	row := txop.QueryRow(txsha.String())
+	err := row.Scan(&spentdata)
+	if err != nil {
+		// if the error is simply didn't fine continue otherwise
+		// retun failure
+
+		usingtmp = true
+		txop = db.txop(txtmpFetchUsedByShaStmt)
+		row := txop.QueryRow(txsha.String())
+		err := row.Scan(&spentdata)
+		if err != nil {
+			log.Warnf("Failed to locate spent data - %v %v", txsha, err)
+			return err
+		}
+	}
+	byteidx := idx / 8
+	byteoff := idx % 8
+
+	interestingsha := txsha.String() == "866504b0d6242c237e484b49c6a5db1c234e9a1547e96b7ba3d690cabccbf6b0"
+
+	if interestingsha {
+		fmt.Printf("txdata was %v ", spentdata)
+	}
+	if set {
+		spentdata[byteidx] |= (byte(1) << byteoff)
+	} else {
+		spentdata[byteidx] &= ^(byte(1) << byteoff)
+	}
+	txc, cached := db.fetchTxCache(txsha)
+	if cached {
+		txc.spent = spentdata
+	}
+	if interestingsha {
+		fmt.Printf("now %v\n", spentdata)
+	}
+
+	if usingtmp {
+		txop = db.txop(txtmpUpdateUsedByShaStmt)
+	} else {
+		txop = db.txop(txUpdateUsedByShaStmt)
+	}
+	_, err = txop.Exec(spentdata, txsha.String())
+
+	return err
 }

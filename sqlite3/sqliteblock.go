@@ -94,9 +94,6 @@ func (db *SqliteDb) insertBlockData(sha *btcwire.ShaHash, prevSha *btcwire.ShaHa
 func (db *SqliteDb) fetchSha(sha btcwire.ShaHash) (buf []byte, pver uint32,
 	blkid int64, err error) {
 
-	db.dbLock.Lock()
-	defer db.dbLock.Unlock()
-
 	row := db.blkStmts[blkFetchSha].QueryRow(sha.Bytes())
 
 	var blockidx int64
@@ -154,9 +151,16 @@ func (db *SqliteDb) blkExistsSha(sha *btcwire.ShaHash) bool {
 // FetchBlockShaByHeight returns a block hash based on its height in the
 // block chain.
 func (db *SqliteDb) FetchBlockShaByHeight(height int64) (sha *btcwire.ShaHash, err error) {
-	var row *sql.Row
 	db.dbLock.Lock()
 	defer db.dbLock.Unlock()
+
+	return db.fetchBlockShaByHeight(height)
+}
+
+// fetchBlockShaByHeight returns a block hash based on its height in the
+// block chain.
+func (db *SqliteDb) fetchBlockShaByHeight(height int64) (sha *btcwire.ShaHash, err error) {
+	var row *sql.Row
 
 	blockidx := height + 1 // skew between btc blockid and sql
 

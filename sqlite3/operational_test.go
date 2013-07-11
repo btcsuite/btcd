@@ -246,7 +246,7 @@ func testBackout(t *testing.T, mode int) {
 	_ = db.ExistsSha(sha)
 	_, err = db.FetchBlockBySha(sha)
 	if err != nil {
-		t.Errorf("failed to load block 99 from db", err)
+		t.Errorf("failed to load block 99 from db %v", err)
 	}
 
 	sha, err = blocks[110].Sha()
@@ -266,7 +266,7 @@ func testBackout(t *testing.T, mode int) {
 	txsha, err := mblock.Transactions[0].TxSha(block.ProtocolVersion())
 	exists := db.ExistsTxSha(&txsha)
 	if exists {
-		t.Errorf("tx %v exists in db, failure expected")
+		t.Errorf("tx %v exists in db, failure expected", txsha)
 	}
 
 	_, _, _, err = db.FetchTxBySha(&txsha)

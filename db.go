@@ -161,9 +161,11 @@ type DriverDB struct {
 // TxListReply is used to return individual transaction information when
 // data about multiple transactions is requested in a single call.
 type TxListReply struct {
-	Sha *btcwire.ShaHash
-	Tx  *btcwire.MsgTx
-	Err error
+	Sha     *btcwire.ShaHash
+	Tx      *btcwire.MsgTx
+	Height  int64
+	TxSpent []bool
+	Err     error
 }
 
 // driverList holds all of the registered database backends.
