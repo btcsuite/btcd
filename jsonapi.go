@@ -673,11 +673,12 @@ func readResultCmd(cmd string, message []byte) (Reply, error) {
 			return result, err
 		}
 		result.Result = res
-	// For commands that return a single item, we get it with the
-	// correct concrete type for free (but treat them separately
+	// For commands that return a single item (or no items), we get it with
+	// the correct concrete type for free (but treat them separately
 	// for clarity).
 	case "getblockcount", "getbalance", "getblocknumber", "getgenerate",
-		"getconnetioncount", "getdifficulty", "gethashespersec":
+		"getconnetioncount", "getdifficulty", "gethashespersec",
+		"setgenerate":
 		err = json.Unmarshal(message, &result)
 		if err != nil {
 			err = fmt.Errorf("Error unmarshalling json reply: %v", err)
