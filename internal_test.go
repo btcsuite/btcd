@@ -42,6 +42,10 @@ var resulttests = []struct {
 	{"decoderawtransaction", []byte(`{"error":null,"id":1,"result":{"Txid":"something"}}`), false, true},
 	{"getaddressesbyaccount", []byte(`{"error":null,"id":1,"result":[{"a":"b"}]}`), false, false},
 	{"getaddressesbyaccount", []byte(`{"error":null,"id":1,"result":["test"]}`), false, true},
+	{"getmininginfo", []byte(`{"error":null,"id":1,"result":[{"a":"b"}]}`), false, false},
+	{"getmininginfo", []byte(`{"error":null,"id":1,"result":{"generate":true}}`), false, true},
+	{"getrawmempool", []byte(`{"error":null,"id":1,"result":[{"a":"b"}]}`), false, false},
+	{"getrawmempool", []byte(`{"error":null,"id":1,"result":["test"]}`), false, true},
 }
 
 // TestReadResultCmd tests that readResultCmd can properly unmarshall the

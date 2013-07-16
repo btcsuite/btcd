@@ -111,6 +111,20 @@ type Vout struct {
 	} `json:"scriptPubKey"`
 }
 
+// GetMiningInfoResult models the data from the getmininginfo command.
+type GetMiningInfoResult struct {
+	CurrentBlockSize float64 `json:"currentblocksize"`
+	Difficulty       float64 `json:"difficulty"`
+	Errors           string  `json:"errors"`
+	Generate         bool    `json:"generate"`
+	GenProcLimit     float64 `json:"genproclimit"`
+	PooledTx         float64 `json:"pooledtx"`
+	Testnet          bool    `json:"testnet"`
+	Blocks           float64 `json:"blocks"`
+	CurrentBlockTx   float64 `json:"currentblocktx"`
+	HashesPerSec     float64 `json:"hashespersec"`
+}
+
 // Error models the error field of the json returned by a bitcoin client.  When
 // there is no error, this should be a nil pointer to produce the null in the
 // json that bitcoind produces.
@@ -665,8 +679,16 @@ func readResultCmd(cmd string, message []byte) (Reply, error) {
 			return result, err
 		}
 		result.Result = res
-	case "getaddressesbyaccount":
+	case "getaddressesbyaccount", "getrawmempool":
 		var res []string
+		err = json.Unmarshal(objmap["result"], &res)
+		if err != nil {
+			err = fmt.Errorf("Error unmarshalling json reply: %v", err)
+			return result, err
+		}
+		result.Result = res
+	case "getmininginfo":
+		var res GetMiningInfoResult
 		err = json.Unmarshal(objmap["result"], &res)
 		if err != nil {
 			err = fmt.Errorf("Error unmarshalling json reply: %v", err)
@@ -678,7 +700,7 @@ func readResultCmd(cmd string, message []byte) (Reply, error) {
 	// for clarity).
 	case "getblockcount", "getbalance", "getblocknumber", "getgenerate",
 		"getconnetioncount", "getdifficulty", "gethashespersec",
-		"setgenerate":
+		"setgenerate", "stop", "settxfee":
 		err = json.Unmarshal(message, &result)
 		if err != nil {
 			err = fmt.Errorf("Error unmarshalling json reply: %v", err)
