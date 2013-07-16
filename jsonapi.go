@@ -781,11 +781,11 @@ func JSONToAmount(jsonAmount float64) (int64, error) {
 	var amount int64
 	var err error
 	if jsonAmount > 1.797693134862315708145274237317043567981e+300 {
-		err := fmt.Errorf("Error %d is too large to convert", jsonAmount)
+		err := fmt.Errorf("Error %v is too large to convert", jsonAmount)
 		return amount, err
 	}
 	if jsonAmount < -1.797693134862315708145274237317043567981e+300 {
-		err := fmt.Errorf("Error %d is too small to convert", jsonAmount)
+		err := fmt.Errorf("Error %v is too small to convert", jsonAmount)
 		return amount, err
 	}
 	tempVal := 1e8 * jsonAmount

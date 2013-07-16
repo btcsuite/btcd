@@ -287,11 +287,11 @@ func TestJSONtoAmount(t *testing.T) {
 		res, err := btcjson.JSONToAmount(tt.in)
 		if tt.pass {
 			if res != tt.out || err != nil {
-				t.Errorf("Should not fail: ", tt.in)
+				t.Errorf("Should not fail: %v", tt.in)
 			}
 		} else {
 			if err == nil {
-				t.Errorf("Should not pass: ", tt.in)
+				t.Errorf("Should not pass: %v", tt.in)
 			}
 		}
 	}
