@@ -31,6 +31,7 @@ var resulttests = []struct {
 	// Generate a fake message to make sure we don't make a command from it.
 	{"anycommand", []byte(`{"result":"test","id":1}`), false, false},
 	{"anycommand", []byte(`{some junk}`), false, false},
+	{"anycommand", []byte(`{"error":null,"result":null,"id":"test"}`), false, true},
 	{"getinfo", []byte(`{"error":null,"result":null,"id":"test"}`), false, true},
 	{"getinfo", []byte(`{"error":null,"result":null}`), false, false},
 	{"getinfo", []byte(`{"error":null,"id":1,"result":[{"a":"b"}]}`), false, false},

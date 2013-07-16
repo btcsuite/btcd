@@ -646,55 +646,44 @@ func readResultCmd(cmd string, message []byte) (Reply, error) {
 
 	// If it is a command where we have already worked out the reply,
 	// generate put the results in the proper structure.
+	// We handle the error condition after the switch statement.
 	switch cmd {
 	case "getinfo":
 		var res InfoResult
 		err = json.Unmarshal(objmap["result"], &res)
-		if err != nil {
-			err = fmt.Errorf("Error unmarshalling json reply: %v", err)
-			return result, err
+		if err == nil {
+			result.Result = res
 		}
-		result.Result = res
 	case "getblock":
 		var res BlockResult
 		err = json.Unmarshal(objmap["result"], &res)
-		if err != nil {
-			err = fmt.Errorf("Error unmarshalling json reply: %v", err)
-			return result, err
+		if err == nil {
+			result.Result = res
 		}
-		result.Result = res
 	case "getrawtransaction":
 		var res TxRawResult
 		err = json.Unmarshal(objmap["result"], &res)
-		if err != nil {
-			err = fmt.Errorf("Error unmarshalling json reply: %v", err)
-			return result, err
+		if err == nil {
+			result.Result = res
 		}
-		result.Result = res
 	case "decoderawtransaction":
 		var res TxRawDecodeResult
 		err = json.Unmarshal(objmap["result"], &res)
-		if err != nil {
-			err = fmt.Errorf("Error unmarshalling json reply: %v", err)
-			return result, err
+		if err == nil {
+			result.Result = res
 		}
-		result.Result = res
 	case "getaddressesbyaccount", "getrawmempool":
 		var res []string
 		err = json.Unmarshal(objmap["result"], &res)
-		if err != nil {
-			err = fmt.Errorf("Error unmarshalling json reply: %v", err)
-			return result, err
+		if err == nil {
+			result.Result = res
 		}
-		result.Result = res
 	case "getmininginfo":
 		var res GetMiningInfoResult
 		err = json.Unmarshal(objmap["result"], &res)
-		if err != nil {
-			err = fmt.Errorf("Error unmarshalling json reply: %v", err)
-			return result, err
+		if err == nil {
+			result.Result = res
 		}
-		result.Result = res
 	// For commands that return a single item (or no items), we get it with
 	// the correct concrete type for free (but treat them separately
 	// for clarity).
@@ -702,18 +691,14 @@ func readResultCmd(cmd string, message []byte) (Reply, error) {
 		"getconnetioncount", "getdifficulty", "gethashespersec",
 		"setgenerate", "stop", "settxfee":
 		err = json.Unmarshal(message, &result)
-		if err != nil {
-			err = fmt.Errorf("Error unmarshalling json reply: %v", err)
-			return result, err
-		}
 	// For anything else put it in an interface.  All the data is still
 	// there, just a little less convenient to deal with.
 	default:
 		err = json.Unmarshal(message, &result)
-		if err != nil {
-			err = fmt.Errorf("Error unmarshalling json reply: %v", err)
-			return result, err
-		}
+	}
+	if err != nil {
+		err = fmt.Errorf("Error unmarshalling json reply: %v", err)
+		return result, err
 	}
 	// Only want the error field when there is an actual error to report.
 	if jsonErr.Code != 0 {
