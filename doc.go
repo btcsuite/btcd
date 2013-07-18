@@ -1,38 +1,32 @@
-btcchain
-========
+// Copyright (c) 2013 Conformal Systems LLC.
+// Use of this source code is governed by an ISC
+// license that can be found in the LICENSE file.
 
+/*
 Package btcchain implements bitcoin block handling and chain selection rules.
-The test coverage is currently only around 60%, but will be increasing over
-time. See `test_coverage.txt` for the gocov coverage report.  Alternatively, if
-you are running a POSIX OS, you can run the `cov_report.sh` script for a
-real-time report.  Package btcchain is licensed under the liberal ISC license.
 
-There is an associated blog post about the release of this package
-[here](https://blog.conformal.com/btcchain-the-bitcoin-chain-package-from-bctd/).
+The bitcoin block handling and chain selection rules are an integral, and quite
+likely the most important, part of bitcoin.  Unfortunately, at the time of
+this writing, these rules are also largely undocumented and had to be
+ascertained from the bitcoind source code.  At its core, bitcoin is a
+distributed consensus of which blocks are valid and which ones will comprise the
+main block chain (public ledger) that ultimately determines accepted
+transactions, so it is extremely important that fully validating nodes agree on
+all rules.
 
-This package is one of the core packages from btcd, an alternative full-node
-implementation of bitcoin which is under active development by Conformal.
-Although it was primarily written for btcd, this package has intentionally been
-designed so it can be used as a standalone package for any projects needing to
-handle processing of blocks into the bitcoin block chain.
+At a high level, this package provides support for inserting new blocks into
+the block chain according to the aforementioned rules.  It includes
+functionality such as rejecting duplicate blocks, ensuring blocks and
+transactions follow all rules, orphan handling, and best chain selection along
+with reorganization.
 
-## Documentation
+Since this package does not deal with other bitcoin specifics such as network
+communication or wallets, it provides a notification system which gives the
+caller a high level of flexibility in how they want to react to certain events
+such as orphan blocks which need their parents requested and newly connected
+main chain blocks which might result in wallet updates.
 
-Full `go doc` style documentation for the project can be viewed online without
-installing this package by using the GoDoc site here:
-http://godoc.org/github.com/conformal/btcchain
-
-You can also view the documentation locally once the package is installed with
-the `godoc` tool by running `godoc -http=":6060"` and pointing your browser to
-http://localhost:6060/pkg/github.com/conformal/btcchain
-
-## Installation
-
-```bash
-$ go get github.com/conformal/btcchain
-```
-
-## Bitcoin Chain Processing Overview
+Bitcoin Chain Processing Overview
 
 Before a block is allowed into the block chain, it must go through an intensive
 series of validation rules.  The following list serves as a general outline of
@@ -67,12 +61,11 @@ is by no means exhaustive:
    coins
  - Insert the block into the block database
 
-## Block Processing Example
+Block Processing Example
 
 The following example program demonstrates processing a block.  This example
 intentionally causes an error by attempting to process a duplicate block.
 
-```Go
 	package main
 
 	import (
@@ -109,36 +102,23 @@ intentionally causes an error by attempting to process a duplicate block.
 			return
 		}
 	}
-```
 
-## TODO
+Errors
 
-- Increase test coverage
-- Add testnet specific rules
-- Profile and optimize
-- Expose some APIs for block verification (without actually inserting it) and
-  transaction input lookups
+Errors returned by this package are either the raw errors provided by underlying
+calls or of type btcchain.RuleError.  This allows the caller to differentiate
+between unexpected errors, such as database errors, versus errors due to rule
+violations through type assertions.
 
-## GPG Verification Key
+Bitcoin Improvement Proposals
 
-All official release tags are signed by Conformal so users can ensure the code
-has not been tampered with and is coming from Conformal.  To verify the
-signature perform the following:
+This package includes spec changes outlined by the following BIPs:
 
-- Download the public key from the Conformal website at
-  https://opensource.conformal.com/GIT-GPG-KEY-conformal.txt
+		BIP0016 (https://en.bitcoin.it/wiki/BIP_0016)
+		BIP0030 (https://en.bitcoin.it/wiki/BIP_0030)
 
-- Import the public key into your GPG keyring:
-  ```bash
-  gpg --import GIT-GPG-KEY-conformal.txt
-  ```
+Other important information
 
-- Verify the release tag with the following command where `TAG_NAME` is a
-  placeholder for the specific tag:
-  ```bash
-  git tag -v TAG_NAME
-  ```
-
-## License
-
-Package btcchain is licensed under the liberal ISC License.
+This package does not yet implement all of the unique rules for testnet.
+*/
+package btcchain
