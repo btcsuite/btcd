@@ -5,17 +5,12 @@
 package sqlite3_test
 
 import (
-	//"compress/bzip2"
-	//"encoding/binary"
 	"github.com/conformal/btcdb"
 	"github.com/conformal/btcdb/sqlite3"
 	"github.com/conformal/btcutil"
 	"github.com/conformal/btcwire"
-	//"io"
-	"fmt"
 	"os"
 	"path/filepath"
-	//"strings"
 	"testing"
 )
 
@@ -149,7 +144,6 @@ endtest:
 		for _, spend := range txInList {
 			itxe := txlookupmap[spend.Hash]
 			if itxe.TxSpent[spend.Index] == false {
-				fmt.Printf("?? txin %v:%v is unspent %v\n", spend.Hash, spend.Index, itxe.TxSpent)
 				t.Errorf("txin %v:%v is unspent %v", spend.Hash, spend.Index, itxe.TxSpent)
 			}
 		}
@@ -188,7 +182,6 @@ endtest:
 		for _, spend := range txInList {
 			itxe := txlookupmap[spend.Hash]
 			if itxe.TxSpent[spend.Index] == true {
-				fmt.Printf("?? txin %v:%v is spent %v\n", spend.Hash, spend.Index, itxe.TxSpent)
 				t.Errorf("txin %v:%v is unspent %v", spend.Hash, spend.Index, itxe.TxSpent)
 			}
 		}
@@ -209,7 +202,6 @@ endtest:
 		for _, spend := range txInList {
 			itxe := txlookupmap[spend.Hash]
 			if itxe.TxSpent[spend.Index] == false {
-				fmt.Printf("?? txin %v:%v is unspent %v\n", spend.Hash, spend.Index, itxe.TxSpent)
 				t.Errorf("txin %v:%v is unspent %v", spend.Hash, spend.Index, itxe.TxSpent)
 			}
 		}

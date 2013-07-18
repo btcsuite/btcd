@@ -7,7 +7,6 @@ package sqlite3
 import (
 	"bytes"
 	"container/list"
-	"fmt"
 	"github.com/conformal/btcdb"
 	"github.com/conformal/btcutil"
 	"github.com/conformal/btcwire"
@@ -141,11 +140,6 @@ func (db *SqliteDb) FetchTxByShaList(txShaList []*btcwire.ShaHash) []*btcdb.TxLi
 				btxspent[idx] = (txspent[byteidx] & (byte(1) << byteoff)) != 0
 			}
 		}
-		interestingsha := txsha.String() == "866504b0d6242c237e484b49c6a5db1c234e9a1547e96b7ba3d690cabccbf6b"
-		if interestingsha {
-			fmt.Printf("usage of sha %v is %v\n", txsha, btxspent)
-		}
-		fmt.Printf("usage of sha %v is %v\n", txsha, btxspent)
 		txlre := btcdb.TxListReply{Sha: txsha, Tx: tx, Height: height, TxSpent: btxspent, Err: err}
 		replies = append(replies, &txlre)
 	}

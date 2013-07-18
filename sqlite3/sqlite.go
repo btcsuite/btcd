@@ -828,11 +828,6 @@ func (db *SqliteDb) setclearSpentData(txsha *btcwire.ShaHash, idx uint32, set bo
 	byteidx := idx / 8
 	byteoff := idx % 8
 
-	interestingsha := txsha.String() == "866504b0d6242c237e484b49c6a5db1c234e9a1547e96b7ba3d690cabccbf6b0"
-
-	if interestingsha {
-		fmt.Printf("txdata was %v ", spentdata)
-	}
 	if set {
 		spentdata[byteidx] |= (byte(1) << byteoff)
 	} else {
@@ -841,9 +836,6 @@ func (db *SqliteDb) setclearSpentData(txsha *btcwire.ShaHash, idx uint32, set bo
 	txc, cached := db.fetchTxCache(txsha)
 	if cached {
 		txc.spent = spentdata
-	}
-	if interestingsha {
-		fmt.Printf("now %v\n", spentdata)
 	}
 
 	if usingtmp {
