@@ -678,8 +678,10 @@ func (db *SqliteDb) InsertBlock(block *btcutil.Block) (height int64, err error) 
 		}
 		spentbuflen := (len(tx.TxOut) + 7) / 8
 		spentbuf := make([]byte, spentbuflen, spentbuflen)
-		for i := uint(len(tx.TxOut) % 8); i < 8; i++ {
-			spentbuf[spentbuflen-1] |= (byte(1) << i)
+		if len(tx.TxOut)%8 != 0 {
+			for i := uint(len(tx.TxOut) % 8); i < 8; i++ {
+				spentbuf[spentbuflen-1] |= (byte(1) << i)
+			}
 		}
 
 		err = db.insertTx(&txsha, newheight, txloc[txidx].TxStart, txloc[txidx].TxLen, spentbuf)
