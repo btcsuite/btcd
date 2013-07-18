@@ -13,6 +13,7 @@ package btcchain
 
 import (
 	"github.com/conformal/btcutil"
+	"time"
 )
 
 // TstCheckBlockSanity makes the internal checkBlockSanity function available to
@@ -25,4 +26,10 @@ func TstCheckBlockSanity(block *btcutil.Block) error {
 // available to the test package.
 func TstSetCoinbaseMaturity(maturity int64) {
 	coinbaseMaturity = maturity
+}
+
+// TstTimeSorter makes the internal timeSorter type available to the test
+// package.
+func TstTimeSorter(times []time.Time) timeSorter {
+	return timeSorter(times)
 }
