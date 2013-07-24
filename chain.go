@@ -413,6 +413,7 @@ func (b *BlockChain) calcPastMedianTime(startNode *blockNode) (time.Time, error)
 		var err error
 		iterNode, err = b.getPrevNodeFromNode(iterNode)
 		if err != nil {
+			log.Errorf("getPrevNodeFromNode: %v", err)
 			return time.Time{}, err
 		}
 	}

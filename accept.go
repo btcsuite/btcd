@@ -19,6 +19,7 @@ func (b *BlockChain) maybeAcceptBlock(block *btcutil.Block) error {
 	// if this is the genesis block.
 	prevNode, err := b.getPrevNodeFromBlock(block)
 	if err != nil {
+		log.Errorf("getPrevNodeFromBlock: %v", err)
 		return err
 	}
 
@@ -34,6 +35,7 @@ func (b *BlockChain) maybeAcceptBlock(block *btcutil.Block) error {
 	blockHeader := block.MsgBlock().Header
 	expectedDifficulty, err := b.calcNextRequiredDifficulty(prevNode, block)
 	if err != nil {
+		log.Errorf("calcNextRequiredDifficulty: %v", err)
 		return err
 	}
 	blockDifficulty := blockHeader.Bits
@@ -47,6 +49,7 @@ func (b *BlockChain) maybeAcceptBlock(block *btcutil.Block) error {
 	// the last several blocks (medianTimeBlocks).
 	medianTime, err := b.calcPastMedianTime(prevNode)
 	if err != nil {
+		log.Errorf("calcPastMedianTime: %v", err)
 		return err
 	}
 	if !blockHeader.Timestamp.After(medianTime) {
@@ -147,6 +150,7 @@ func (b *BlockChain) maybeAcceptBlock(block *btcutil.Block) error {
 	// also handles validation of the transaction scripts.
 	err = b.connectBestChain(newNode, block)
 	if err != nil {
+		log.Errorf("connectBestChain: %v", err)
 		return err
 	}
 
