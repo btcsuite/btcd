@@ -190,7 +190,17 @@ func (b *BlockChain) calcEasiestDifficulty(bits uint32, duration time.Duration) 
 	// Choose the correct proof of work limit for the active network.
 	powLimit := b.netParams().powLimit
 
-	// TODO(davec): Testnet has special rules.
+	// The test network rules allow minimum difficulty blocks after more
+	// than twice the desired amount of time needed to generate a block has
+	// elapsed.
+	switch b.btcnet {
+	case btcwire.TestNet:
+		fallthrough
+	case btcwire.TestNet3:
+		if durationVal > int64(targetSpacing)*2 {
+			return BigToCompact(powLimit)
+		}
+	}
 
 	// Since easier difficulty equates to higher numbers, the easiest
 	// difficulty for a given duration is the largest value possible given
@@ -210,6 +220,36 @@ func (b *BlockChain) calcEasiestDifficulty(bits uint32, duration time.Duration) 
 	return BigToCompact(newTarget)
 }
 
+// findPrevTestNetDifficulty returns the difficulty of the previous block which
+// did not have the special testnet minimum difficulty rule applied.
+func (b *BlockChain) findPrevTestNetDifficulty(startNode *blockNode) (uint32, error) {
+	// Search backwards through the chain for the last block without
+	// the special rule applied.
+	powLimitBits := BigToCompact(b.netParams().powLimit)
+	iterNode := startNode
+	for iterNode != nil && iterNode.height%blocksPerRetarget != 0 && iterNode.bits == powLimitBits {
+		// Get the previous block node.  This function is used over
+		// simply accessing iterNode.parent directly as it will
+		// dynamically create previous block nodes as needed.  This
+		// helps allow only the pieces of the chain that are needed
+		// to remain in memory.
+		var err error
+		iterNode, err = b.getPrevNodeFromNode(iterNode)
+		if err != nil {
+			log.Errorf("getPrevNodeFromNode: %v", err)
+			return 0, err
+		}
+	}
+
+	// Return the found difficulty or the minimum difficulty if no
+	// appropriate block was found.
+	lastBits := powLimitBits
+	if iterNode != nil {
+		lastBits = iterNode.bits
+	}
+	return lastBits, nil
+}
+
 // calcNextRequiredDifficulty calculates the required difficulty for the block
 // after the passed previous block node based on the difficulty retarget rules.
 func (b *BlockChain) calcNextRequiredDifficulty(lastNode *blockNode, block *btcutil.Block) (uint32, error) {
@@ -224,8 +264,40 @@ func (b *BlockChain) calcNextRequiredDifficulty(lastNode *blockNode, block *btcu
 	// Return the previous block's difficulty requirements if this block
 	// is not at a difficulty retarget interval.
 	if (lastNode.height+1)%blocksPerRetarget != 0 {
-		// TODO(davec): Testnet has special rules.
-		return lastNode.bits, nil
+		// The difficulty rules differ between networks.
+		switch b.btcnet {
+		// The test network rules allow minimum difficulty blocks after
+		// more than twice the desired amount of time needed to generate
+		// a block has elapsed.
+		case btcwire.TestNet:
+			fallthrough
+		case btcwire.TestNet3:
+			// Return minimum difficulty when more than twice the
+			// desired amount of time needed to generate a block has
+			// elapsed.
+			newBlockTime := block.MsgBlock().Header.Timestamp
+			allowMinTime := lastNode.timestamp.Add(targetSpacing * 2)
+			if newBlockTime.After(allowMinTime) {
+				return BigToCompact(powLimit), nil
+			}
+
+			// The block was mined within the desired timeframe, so
+			// return the difficulty for the last block which did
+			// not have the special minimum difficulty rule applied.
+			prevBits, err := b.findPrevTestNetDifficulty(lastNode)
+			if err != nil {
+				return 0, err
+			}
+			return prevBits, nil
+
+		// For the main network (or any unrecognized networks), simply
+		// return the previous block's difficulty.
+		case btcwire.MainNet:
+			fallthrough
+		default:
+			// Return the previous block's difficulty requirements.
+			return lastNode.bits, nil
+		}
 	}
 
 	// Get the block node at the previous retarget (targetTimespan days
