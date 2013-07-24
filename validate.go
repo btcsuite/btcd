@@ -267,7 +267,7 @@ func checkTransactionSanity(tx *btcwire.MsgTx) error {
 // checkProofOfWork ensures the block header bits which indicate the target
 // difficulty is in min/max range and that the block hash is less than the
 // target difficulty as claimed.
-func checkProofOfWork(block *btcutil.Block) error {
+func (b *BlockChain) checkProofOfWork(block *btcutil.Block) error {
 	// The target difficulty must be larger than zero.
 	header := block.MsgBlock().Header
 	target := CompactToBig(header.Bits)
@@ -278,6 +278,7 @@ func checkProofOfWork(block *btcutil.Block) error {
 	}
 
 	// The target difficulty must be less than the maximum allowed.
+	powLimit := b.netParams().powLimit
 	if target.Cmp(powLimit) > 0 {
 		str := fmt.Sprintf("block target difficulty of %064x is "+
 			"higher than max of %064x", target, powLimit)
@@ -407,7 +408,7 @@ func countP2SHSigOps(msgTx *btcwire.MsgTx, isCoinBaseTx bool, txStore map[btcwir
 
 // checkBlockSanity performs some preliminary checks on a block to ensure it is
 // sane before continuing with block processing.  These checks are context free.
-func checkBlockSanity(block *btcutil.Block) error {
+func (b *BlockChain) checkBlockSanity(block *btcutil.Block) error {
 	// NOTE: bitcoind does size limits checking here, but the size limits
 	// have already been checked by btcwire for incoming blocks.  Also,
 	// btcwire checks the size limits on send too, so there is no need
@@ -416,7 +417,7 @@ func checkBlockSanity(block *btcutil.Block) error {
 	// Ensure the proof of work bits in the block header is in min/max range
 	// and the block hash is less than the target value described by the
 	// bits.
-	err := checkProofOfWork(block)
+	err := b.checkProofOfWork(block)
 	if err != nil {
 		return err
 	}

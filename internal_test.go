@@ -18,8 +18,8 @@ import (
 
 // TstCheckBlockSanity makes the internal checkBlockSanity function available to
 // the test package.
-func TstCheckBlockSanity(block *btcutil.Block) error {
-	return checkBlockSanity(block)
+func (b *BlockChain) TstCheckBlockSanity(block *btcutil.Block) error {
+	return b.checkBlockSanity(block)
 }
 
 // TstSetCoinbaseMaturity makes the ability to set the coinbase maturity

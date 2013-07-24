@@ -95,7 +95,7 @@ func (b *BlockChain) ProcessBlock(block *btcutil.Block) error {
 	}
 
 	// Perform preliminary sanity checks on the block and its transactions.
-	err = checkBlockSanity(block)
+	err = b.checkBlockSanity(block)
 	if err != nil {
 		return err
 	}
@@ -129,7 +129,7 @@ func (b *BlockChain) ProcessBlock(block *btcutil.Block) error {
 		// expected based on elapsed time since the last checkpoint and
 		// maximum adjustment allowed by the retarget rules.
 		duration := blockHeader.Timestamp.Sub(checkpointTime)
-		requiredTarget := CompactToBig(calcEasiestDifficulty(
+		requiredTarget := CompactToBig(b.calcEasiestDifficulty(
 			checkpointHeader.Bits, duration))
 		currentTarget := CompactToBig(blockHeader.Bits)
 		if currentTarget.Cmp(requiredTarget) > 0 {

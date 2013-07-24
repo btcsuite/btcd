@@ -339,7 +339,7 @@ func (b *BlockChain) getPrevNodeFromNode(node *blockNode) (*blockNode, error) {
 	}
 
 	// Genesis block.
-	if node.hash.IsEqual(&btcwire.GenesisHash) {
+	if node.hash.IsEqual(b.netParams().genesisHash) {
 		return nil, nil
 	}
 
@@ -393,7 +393,7 @@ func (b *BlockChain) isMajorityVersion(minVer uint32, startNode *blockNode, numR
 func (b *BlockChain) calcPastMedianTime(startNode *blockNode) (time.Time, error) {
 	// Genesis block.
 	if startNode == nil {
-		return btcwire.GenesisBlock.Header.Timestamp, nil
+		return b.netParams().genesisBlock.Header.Timestamp, nil
 	}
 
 	// Create a slice of the previous few block timestamps used to calculate

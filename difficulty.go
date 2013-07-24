@@ -6,6 +6,7 @@ package btcchain
 
 import (
 	"fmt"
+	"github.com/conformal/btcutil"
 	"github.com/conformal/btcwire"
 	"math/big"
 	"time"
@@ -50,10 +51,6 @@ var (
 	// oneLsh256 is 1 shifted left 256 bits.  It is defined here to avoid
 	// the overhead of creating it multiple times.
 	oneLsh256 = new(big.Int).Lsh(bigOne, 256)
-
-	// powLimit is the highest proof of work value a bitcoin block can have.
-	// It is the value 2^224 - 1.
-	powLimit = new(big.Int).Sub(new(big.Int).Lsh(bigOne, 224), bigOne)
 )
 
 // ShaHashToBig converts a btcwire.ShaHash into a big.Int that can be used to
@@ -185,10 +182,13 @@ func calcWork(bits uint32) *big.Rat {
 // can have given starting difficulty bits and a duration.  It is mainly used to
 // verify that claimed proof of work by a block is sane as compared to a
 // known good checkpoint.
-func calcEasiestDifficulty(bits uint32, duration time.Duration) uint32 {
+func (b *BlockChain) calcEasiestDifficulty(bits uint32, duration time.Duration) uint32 {
 	// Convert types used in the calculations below.
 	durationVal := int64(duration)
 	adjustmentFactor := big.NewInt(retargetAdjustmentFactor)
+
+	// Choose the correct proof of work limit for the active network.
+	powLimit := b.netParams().powLimit
 
 	// TODO(davec): Testnet has special rules.
 
@@ -212,7 +212,10 @@ func calcEasiestDifficulty(bits uint32, duration time.Duration) uint32 {
 
 // calcNextRequiredDifficulty calculates the required difficulty for the block
 // after the passed previous block node based on the difficulty retarget rules.
-func (b *BlockChain) calcNextRequiredDifficulty(lastNode *blockNode) (uint32, error) {
+func (b *BlockChain) calcNextRequiredDifficulty(lastNode *blockNode, block *btcutil.Block) (uint32, error) {
+	// Choose the correct proof of work limit for the active network.
+	powLimit := b.netParams().powLimit
+
 	// Genesis block.
 	if lastNode == nil {
 		return BigToCompact(powLimit), nil

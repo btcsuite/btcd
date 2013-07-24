@@ -32,7 +32,7 @@ func (b *BlockChain) maybeAcceptBlock(block *btcutil.Block) error {
 	// calculated difficulty based on the previous block and difficulty
 	// retarget rules.
 	blockHeader := block.MsgBlock().Header
-	expectedDifficulty, err := b.calcNextRequiredDifficulty(prevNode)
+	expectedDifficulty, err := b.calcNextRequiredDifficulty(prevNode, block)
 	if err != nil {
 		return err
 	}

@@ -6,15 +6,31 @@ package btcchain_test
 
 import (
 	"github.com/conformal/btcchain"
+	"github.com/conformal/btcdb"
 	"github.com/conformal/btcutil"
 	"github.com/conformal/btcwire"
+	"os"
 	"testing"
 	"time"
 )
 
 func TestCheckBlockSanity(t *testing.T) {
+	// Create a new test database.
+	dbName := "cbsanitytest.db"
+	_ = os.Remove(dbName)
+	db, err := btcdb.CreateDB("sqlite", dbName)
+	if err != nil {
+		t.Errorf("Error creating db: %v\n", err)
+	}
+	defer os.Remove(dbName)
+	defer db.Close()
+
+	// Create a new BlockChain instance using the underlying database for
+	// the main bitcoin network and ignore notifications.
+	chain := btcchain.New(db, btcwire.MainNet, nil)
+
 	block := btcutil.NewBlock(&Block100000, btcwire.ProtocolVersion)
-	err := btcchain.TstCheckBlockSanity(block)
+	err = chain.TstCheckBlockSanity(block)
 	if err != nil {
 		t.Errorf("CheckBlockSanity: %v", err)
 	}
