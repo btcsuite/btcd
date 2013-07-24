@@ -111,7 +111,6 @@ func TestVarIntWireErrors(t *testing.T) {
 		writeErr error  // Expected write error
 		readErr  error  // Expected read error
 	}{
-		// Latest protocol version with intentional read/write errors.
 		// Force errors on discriminant.
 		{0, []byte{0x00}, pver, 0, io.ErrShortWrite, io.EOF},
 		// Force errors on 2-byte read/write.

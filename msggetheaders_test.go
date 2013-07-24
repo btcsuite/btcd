@@ -311,7 +311,6 @@ func TestGetHeadersWireErrors(t *testing.T) {
 	}
 	maxGetHeaders.BlockLocatorHashes = append(maxGetHeaders.BlockLocatorHashes,
 		&btcwire.GenesisHash)
-	//maxGetHeaders.InvList = append(maxGetData.InvList, iv)
 	maxGetHeadersEncoded := []byte{
 		0x62, 0xea, 0x00, 0x00, // Protocol version 60002
 		0xfd, 0xf5, 0x01, // Varint for number of block loc hashes (501)

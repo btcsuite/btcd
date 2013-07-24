@@ -268,7 +268,6 @@ func TestNotFoundWireErrors(t *testing.T) {
 		writeErr error                // Expected write error
 		readErr  error                // Expected read error
 	}{
-		// Latest protocol version with intentional read/write errors.
 		// Force error in inventory vector count
 		{baseNotFound, baseNotFoundEncoded, pver, 0, io.ErrShortWrite, io.EOF},
 		// Force error in inventory list.
