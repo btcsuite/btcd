@@ -144,7 +144,8 @@ func (b *BlockChain) ProcessBlock(block *btcutil.Block) error {
 	prevHash := &blockHeader.PrevBlock
 	if !prevHash.IsEqual(zeroHash) && !b.blockExists(prevHash) {
 		// Add the orphan block to the orphan pool.
-		log.Infof("Adding orphan block %v", blockHash)
+		log.Infof("Adding orphan block %v with parent %v", blockHash,
+			prevHash)
 		b.addOrphanBlock(block)
 
 		// Get the hash for the head of the orphaned block chain for
