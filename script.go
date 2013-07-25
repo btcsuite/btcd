@@ -272,14 +272,15 @@ func parseScript(script []byte) ([]parsedOpcode, error) {
 }
 
 // parseScriptTemplate is the same as parseScript but allows the passing of the
-// template list for testing purposes.
+// template list for testing purposes. On error we return the list of parsed
+// opcodes so far.
 func parseScriptTemplate(script []byte, opcodemap map[byte]*opcode) ([]parsedOpcode, error) {
 	retScript := []parsedOpcode{}
 	for i := 0; i < len(script); {
 		instr := script[i]
 		op, ok := opcodemap[instr]
 		if !ok {
-			return nil, StackErrInvalidOpcode
+			return retScript, StackErrInvalidOpcode
 		}
 		pop := parsedOpcode{opcode: op}
 		// parse data out of instruction.
@@ -289,7 +290,7 @@ func parseScriptTemplate(script []byte, opcodemap map[byte]*opcode) ([]parsedOpc
 			i++
 		case op.length > 1:
 			if len(script[i:]) < op.length {
-				return nil, StackErrShortScript
+				return retScript, StackErrShortScript
 			}
 			// slice out the data.
 			pop.data = script[i+1 : i+op.length]
@@ -306,7 +307,9 @@ func parseScriptTemplate(script []byte, opcodemap map[byte]*opcode) ([]parsedOpc
 			case -4:
 				l, err = scriptUInt32(script[off:])
 			default:
-				return nil, fmt.Errorf("invalid opcode length %d", op.length)
+				return retScript,
+					fmt.Errorf("invalid opcode length %d",
+					op.length)
 			}
 
 			if err != nil {
@@ -314,10 +317,10 @@ func parseScriptTemplate(script []byte, opcodemap map[byte]*opcode) ([]parsedOpc
 			}
 			off = i + 1 - op.length // beginning of data
 			if int(l) > len(script[off:]) {
-				return nil, StackErrShortScript
+				return retScript, StackErrShortScript
 			}
 			if l > MaxScriptElementSize {
-				return nil, StackErrElementTooBig
+				return retScript, StackErrElementTooBig
 			}
 			pop.data = script[off : off+int(l)]
 			i += 1 - op.length + int(l)
@@ -763,11 +766,12 @@ func (s *Script) SetAltStack(data [][]byte) {
 
 // GetSigOpCount provides a quick count of the number of signature operations
 // in a script. a CHECKSIG operations counts for 1, and a CHECK_MULTISIG for 20.
+// If the script fails to parse, then the count up to the point of failure is
+// returned.
 func GetSigOpCount(script []byte) int {
-	pops, err := parseScript(script)
-	if err != nil {
-		return 0 
-	}
+	// We don't check error since parseScript returns the parsed-up-to-error
+	// list of pops.
+	pops, _ := parseScript(script)
 
 	return getSigOpCount(pops, false)
 }
@@ -775,12 +779,12 @@ func GetSigOpCount(script []byte) int {
 // GetPreciseSigOpCount returns the number of signature operations in
 // scriptPubKey. If bip16 is true then scriptSig may be searched for the
 // Pay-To-Script-Hash script in order to find the precise number of signature
-// operations in the transaction.
+// operations in the transaction. If the script fails to parse, then the 
+// count up to the point of failure is returned.
 func GetPreciseSigOpCount(scriptSig, scriptPubKey []byte, bip16 bool) int {
-	pops, err := parseScript(scriptPubKey)
-	if err != nil {
-		return 0
-	}
+	// We don't check error since parseScript returns the parsed-up-to-error
+	// list of pops.
+	pops, _ := parseScript(scriptPubKey)
 	// non P2SH transactions just treated as normal.
 	if !(bip16 && isScriptHash(pops)) {
 		return getSigOpCount(pops, true)
@@ -802,10 +806,7 @@ func GetPreciseSigOpCount(scriptSig, scriptPubKey []byte, bip16 bool) int {
 		return 0
 	}
 
-	shPops, err := parseScript(shScript)
-	if err != nil {
-		return 0
-	}
+	shPops, _ := parseScript(shScript)
 
 	return getSigOpCount(shPops, true)
 }
