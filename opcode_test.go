@@ -4004,20 +4004,7 @@ func TestDisasmStrings(t *testing.T) {
 // us coverage over a wider range of opcodes.
 func TestSigOps(t *testing.T) {
 	for _, test := range detailedTests {
-		count, err := btcscript.GetSigOpCount(test.script)
-		if err != nil {
-			if err != test.disassemblyerr {
-				t.Errorf("%s: unexpected error. exp \"%v\""+
-					"got \"%v\"", test.name,
-					test.disassemblyerr, err)
-			}
-			continue
-		}
-		if test.disassemblyerr != nil {
-			t.Errorf("%s: no error when expected \"%v\"",
-				test.name, test.disassemblyerr)
-			continue
-		}
+		count := btcscript.GetSigOpCount(test.script)
 		if count != test.nSigOps {
 			t.Errorf("%s: expected count of %d, got %d", test.name,
 				test.nSigOps, count)
@@ -4035,21 +4022,8 @@ func TestSigOps(t *testing.T) {
 // using real transactions to provide a bit more coverage.
 func TestPreciseSigOps(t *testing.T) {
 	for _, test := range detailedTests {
-		count, err := btcscript.GetPreciseSigOpCount(
+		count := btcscript.GetPreciseSigOpCount(
 			[]byte{btcscript.OP_1}, test.script, false)
-		if err != nil {
-			if err != test.disassemblyerr {
-				t.Errorf("%s: unexpected error. exp \"%v\""+
-					"got \"%v\"", test.name,
-					test.disassemblyerr, err)
-			}
-			continue
-		}
-		if test.disassemblyerr != nil {
-			t.Errorf("%s: no error when expected \"%v\"",
-				test.name, test.disassemblyerr)
-			continue
-		}
 		if count != test.nPreciseSigOps {
 			t.Errorf("%s: expected count of %d, got %d", test.name,
 				test.nPreciseSigOps, count)

@@ -21,7 +21,6 @@ type txTest struct {
 	err        error  // Failure of Executre
 	shouldFail bool   // Execute should fail with nonspecified error.
 	nSigOps    int    // result of GetPreciseSigOpsCount
-	sigOpsErr  error  // failure of GetPreciseSigOpsCount()
 }
 
 var txTests = []txTest{
@@ -1079,7 +1078,6 @@ var txTests = []txTest{
 		idx:       0,
 		err:       btcscript.StackErrShortScript,
 		bip16:     true,
-		sigOpsErr: btcscript.StackErrShortScript,
 	},
 	txTest{
 		// sigscript changed so to be non pushonly.
@@ -1247,22 +1245,9 @@ func TestGetPreciseSignOps(t *testing.T) {
 	// First we go over the range of tests in testTx and count the sigops in
 	// them.
 	for _, test := range txTests {
-		count, err := btcscript.GetPreciseSigOpCount(
+		count := btcscript.GetPreciseSigOpCount(
 			test.tx.TxIn[test.idx].SignatureScript, test.pkScript,
 			test.bip16)
-		// all tx currently parse
-		if err != nil {
-			if err != test.sigOpsErr {
-				t.Errorf("%s: unexpected error. got \"%v\"",
-					test.name, err)
-			}
-			continue
-		}
-		if test.sigOpsErr != nil {
-			t.Errorf("%s: expected error \"%v\" but got success",
-				test.name, err)
-			continue
-		}
 		if count != test.nSigOps {
 			t.Errorf("%s: expected count of %d, got %d", test.name,
 				test.nSigOps, count)
@@ -1321,21 +1306,8 @@ func TestGetPreciseSignOps(t *testing.T) {
 		btcscript.OP_EQUAL,
 	}
 	for _, test := range psocTests {
-		count, err := btcscript.GetPreciseSigOpCount(
+		count := btcscript.GetPreciseSigOpCount(
 			test.scriptSig, pkScript, true)
-		// all tx currently parse
-		if err != nil {
-			if err != test.err {
-				t.Errorf("%s: unexpected error. got \"%v\" exp: \"%v\"",
-					test.name, err, test.err)
-			}
-			continue
-		}
-		if test.err != nil {
-			t.Errorf("%s: expected error \"%v\" got none",
-				test.name, test.err)
-			continue
-		}
 		if count != test.nSigOps {
 			t.Errorf("%s: expected count of %d, got %d", test.name,
 				test.nSigOps, count)

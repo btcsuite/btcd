@@ -763,51 +763,51 @@ func (s *Script) SetAltStack(data [][]byte) {
 
 // GetSigOpCount provides a quick count of the number of signature operations
 // in a script. a CHECKSIG operations counts for 1, and a CHECK_MULTISIG for 20.
-func GetSigOpCount(script []byte) (int, error) {
+func GetSigOpCount(script []byte) int {
 	pops, err := parseScript(script)
 	if err != nil {
-		return 0, err
+		return 0 
 	}
 
-	return getSigOpCount(pops, false), nil
+	return getSigOpCount(pops, false)
 }
 
 // GetPreciseSigOpCount returns the number of signature operations in
 // scriptPubKey. If bip16 is true then scriptSig may be searched for the
 // Pay-To-Script-Hash script in order to find the precise number of signature
 // operations in the transaction.
-func GetPreciseSigOpCount(scriptSig, scriptPubKey []byte, bip16 bool) (int, error) {
+func GetPreciseSigOpCount(scriptSig, scriptPubKey []byte, bip16 bool) int {
 	pops, err := parseScript(scriptPubKey)
 	if err != nil {
-		return 0, err
+		return 0
 	}
 	// non P2SH transactions just treated as normal.
 	if !(bip16 && isScriptHash(pops)) {
-		return getSigOpCount(pops, true), nil
+		return getSigOpCount(pops, true)
 	}
 
 	// Ok so this is P2SH, get the contained script and count it..
 
 	sigPops, err := parseScript(scriptSig)
 	if err != nil {
-		return 0, err
+		return 0
 	}
 	if !isPushOnly(sigPops) || len(sigPops) == 0 {
-		return 0, nil
+		return 0
 	}
 
 	shScript := sigPops[len(sigPops)-1].data
 	// Means that sigPops is jus OP_1 - OP_16, no sigops there.
 	if shScript == nil {
-		return 0, nil
+		return 0
 	}
 
 	shPops, err := parseScript(shScript)
 	if err != nil {
-		return 0, err
+		return 0
 	}
 
-	return getSigOpCount(shPops, true), nil
+	return getSigOpCount(shPops, true)
 }
 
 // getSigOpCount is the implementation function for counting the number of
