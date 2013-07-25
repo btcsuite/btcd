@@ -5,35 +5,11 @@
 package sqlite3
 
 import (
-	"bytes"
 	"database/sql"
 	"github.com/conformal/btcdb"
 	"github.com/conformal/btcwire"
 	_ "github.com/mattn/go-sqlite3"
 )
-
-// insertGenesisBlock inserts the genesis block of the block chain into the
-// database.
-func insertGenesisBlock(db *sql.DB) error {
-	// Encode the genesis block to raw bytes.
-	pver := uint32(btcwire.ProtocolVersion)
-	var buf bytes.Buffer
-	err := btcwire.GenesisBlock.BtcEncode(&buf, pver)
-	if err != nil {
-		return err
-	}
-
-	// Insert the genesis block along with its hash and protocol encoding
-	// version.
-	sql := blkqueries[blkInsertSha]
-	sha := btcwire.GenesisHash
-	_, err = db.Exec(sql, sha.Bytes(), pver, buf.Bytes())
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
 
 // InsertBlockData stores a block hash and its associated data block with a
 // previous sha of `prevSha' and a version of `pver'.
@@ -56,12 +32,18 @@ func (db *SqliteDb) insertBlockData(sha *btcwire.ShaHash, prevSha *btcwire.ShaHa
 		}
 	}
 
-	var prevOk bool
-	var blkid int64
-
-	prevOk = db.blkExistsSha(prevSha) // exists -> ok
-	if !prevOk {
-		return 0, btcdb.PrevShaMissing
+	// It is an error if the previous block does not already exist in the
+	// database, unless there are no blocks at all.
+	if prevOk := db.blkExistsSha(prevSha); !prevOk {
+		var numBlocks uint64
+		querystr := "SELECT COUNT(blockid) FROM block;"
+		err := db.sqldb.QueryRow(querystr).Scan(&numBlocks)
+		if err != nil {
+			return 0, err
+		}
+		if numBlocks != 0 {
+			return 0, btcdb.PrevShaMissing
+		}
 	}
 
 	result, err := db.blkStmts[blkInsertSha].Exec(sha.Bytes(), pver, buf)
@@ -69,7 +51,7 @@ func (db *SqliteDb) insertBlockData(sha *btcwire.ShaHash, prevSha *btcwire.ShaHa
 		return
 	}
 
-	blkid, err = result.LastInsertId()
+	blkid, err := result.LastInsertId()
 	if err != nil {
 		return 0, err
 	}
@@ -218,8 +200,9 @@ func (db *SqliteDb) FetchHeightRange(startHeight, endHeight int64) (rshalist []b
 	return
 }
 
-// NewestSha provides an interface to quickly look up the sha of
-// the most recent (end) of the block chain.
+// NewestSha returns the hash and block height of the most recent (end) block of
+// the block chain.  It will return the zero hash, -1 for the block height, and
+// no error (nil) if there are not any blocks in the database yet.
 func (db *SqliteDb) NewestSha() (sha *btcwire.ShaHash, blkid int64, err error) {
 	var row *sql.Row
 	var blockidx int64
@@ -245,6 +228,9 @@ func (db *SqliteDb) NewestSha() (sha *btcwire.ShaHash, blkid int64, err error) {
 
 	var shabytes []byte
 	err = row.Scan(&shabytes, &blockidx)
+	if err == sql.ErrNoRows {
+		return &btcwire.ShaHash{}, -1, nil
+	}
 	if err == nil {
 		var retsha btcwire.ShaHash
 		retsha.SetBytes(shabytes)

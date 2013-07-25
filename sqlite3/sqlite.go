@@ -178,12 +178,6 @@ func createDB(db *sql.DB) error {
 		}
 	}
 
-	// Insert the genesis block.
-	err := insertGenesisBlock(db)
-	if err != nil {
-		return err
-	}
-
 	return nil
 }
 
@@ -610,8 +604,10 @@ func (db *SqliteDb) DropAfterBlockBySha(sha *btcwire.ShaHash) (err error) {
 	return
 }
 
-// InsertBlock inserts the block data and transaction data from a block
-// into the database.
+// InsertBlock inserts raw block and transaction data from a block into the
+// database.  The first block inserted into the database will be treated as the
+// genesis block.  Every subsequent block insert requires the referenced parent
+// block to already exist.
 func (db *SqliteDb) InsertBlock(block *btcutil.Block) (height int64, err error) {
 	db.dbLock.Lock()
 	defer db.dbLock.Unlock()

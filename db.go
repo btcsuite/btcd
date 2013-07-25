@@ -96,7 +96,9 @@ type Db interface {
 	FetchTxUsedBySha(txsha *btcwire.ShaHash) (spentbuf []byte, err error)
 
 	// InsertBlock inserts raw block and transaction data from a block
-	// into the database.
+	// into the database.  The first block inserted into the database
+	// will be treated as the genesis block.  Every subsequent block insert
+	// requires the referenced parent block to already exist.
 	InsertBlock(block *btcutil.Block) (height int64, err error)
 
 	// InsertBlockData stores a block hash and its associated data block
@@ -119,8 +121,10 @@ type Db interface {
 	// NewIterateBlocks returns an iterator for all blocks in database.
 	NewIterateBlocks() (pbi BlockIterator, err error)
 
-	// NewestSha provides an interface to quickly look up the hash of
-	// the most recent (end) block of the block chain.
+	// NewestSha returns the hash and block height of the most recent (end)
+	// block of the block chain.  It will return the zero hash, -1 for
+	// the block height, and no error (nil) if there are not any blocks in
+	// the database yet.
 	NewestSha() (sha *btcwire.ShaHash, height int64, err error)
 
 	// RollbackClose discards the recent database changes to the previously

@@ -21,35 +21,39 @@ although a block can have a variable number of transactions.  Along
 with these two items, several convenience functions for dealing with
 the database are provided as well as functions to query specific items
 that may be present in a block or tx (although many of these are in
-the db_sqlite subpackage).
+the sqlite3 subpackage).
 
 Usage
 
 At the highest level, the use of this packages just requires that you
 import it, setup a database, insert some data into it, and optionally,
-query the data back.  In a more concrete example:
+query the data back.  The first block inserted into the database will be
+treated as the genesis block.  Every subsequent block insert requires the
+referenced parent block to already exist.  In a more concrete example:
 
-        // Import packages.
-        import (
-               "github.com/conformal/btcdb"
-               _ "github.com/conformal/btcdb/sqlite3"
-        )
+	// Import packages.
+	import (
+		"github.com/conformal/btcdb"
+		_ "github.com/conformal/btcdb/sqlite3"
+		"github.com/conformal/btcutil"
+		"github.com/conformal/btcwire"
+	)
 
 	// Create a database and schedule it to be closed on exit.
-        dbName := "example.db"
-        db, err := btcdb.CreateDB("sqlite", dbName)
+	dbName := "example.db"
+	db, err := btcdb.CreateDB("sqlite", dbName)
 	if err != nil {
 		// Log and handle the error
 	}
 	defer db.Close()
 
-        // Insert a block.
-        newHeight, err := db.InsertBlock(block)
+
+	// Insert the main network genesis block.
+	pver := btcwire.ProtocolVersion
+	genesis := btcutil.NewBlock(&btcwire.GenesisBlock, pver)
+	newHeight, err := db.InsertBlock(block)
 	if err != nil {
 		// Log and handle the error
 	}
-
-        // Sync the database.
-        db.Sync()
 */
 package btcdb

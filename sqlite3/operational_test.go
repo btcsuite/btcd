@@ -81,7 +81,7 @@ func testOperationalMode(t *testing.T, mode int) {
 
 	err = nil
 out:
-	for height := int64(1); height < int64(len(blocks)); height++ {
+	for height := int64(0); height < int64(len(blocks)); height++ {
 		block := blocks[height]
 		if mode != dbTmNoVerify {
 			// except for NoVerify which does not allow lookups check inputs
@@ -203,7 +203,7 @@ func testBackout(t *testing.T, mode int) {
 	}
 
 	err = nil
-	for height := int64(1); height < int64(len(blocks)); height++ {
+	for height := int64(0); height < int64(len(blocks)); height++ {
 		if height == 100 {
 			t.Logf("Syncing at block height 100")
 			db.Sync()
@@ -305,10 +305,11 @@ func loadBlocks(t *testing.T, file string) (blocks []*btcutil.Block, err error) 
 		}
 	}()
 
-	var block *btcutil.Block
-	// block 0 isn't really there, put in nil
-	blocks = append(blocks, block)
+	// Set the first block as the genesis block.
+	genesis := btcutil.NewBlock(&btcwire.GenesisBlock, btcwire.ProtocolVersion)
+	blocks = append(blocks, genesis)
 
+	var block *btcutil.Block
 	err = nil
 	for height := int64(1); err == nil; height++ {
 		var rintbuf uint32
