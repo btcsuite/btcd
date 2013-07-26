@@ -84,8 +84,8 @@ message and which bitcoin network the message applies to.  This package provides
 the following constants:
 
 	btcwire.MainNet
-	btcwire.TestNet
-	btcwire.TestNet3
+	btcwire.TestNet  (Regression test network)
+	btcwire.TestNet3 (Test network version 3)
 
 Determining Message Type
 

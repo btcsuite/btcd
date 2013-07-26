@@ -83,7 +83,12 @@ type BitcoinNet uint32
 // this package does not provide that functionality since it's generally a
 // better idea to simply disconnect clients that are misbehaving over TCP.
 const (
-	MainNet  BitcoinNet = 0xd9b4bef9
-	TestNet  BitcoinNet = 0xdab5bffa
+	// Main bitcoin network.
+	MainNet BitcoinNet = 0xd9b4bef9
+
+	// Regression test network.
+	TestNet BitcoinNet = 0xdab5bffa
+
+	// Test network version 3.
 	TestNet3 BitcoinNet = 0x0709110b
 )
