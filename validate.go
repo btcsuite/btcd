@@ -605,11 +605,11 @@ func (b *BlockChain) checkBIP0030(node *blockNode, block *btcutil.Block) error {
 // checkTransactionInputs performs a series of checks on the inputs to a
 // transaction to ensure they are valid.  An example of some of the checks
 // include verifying all inputs exist, ensuring the coinbase seasoning
-// requirements are met, validating all values and fees are in the legal range
-// and the total output amount doesn't exceed the input amount, and verifying
-// the signatures to prove the spender was the owner of the bitcoins and
-// therefore allowed to spend them.  As it checks the inputs, it also calculates
-// the total fees for the transaction and returns that value.
+// requirements are met, detecting double spends, validating all values and fees
+// are in the legal range and the total output amount doesn't exceed the input
+// amount, and verifying the signatures to prove the spender was the owner of
+// the bitcoins and therefore allowed to spend them.  As it checks the inputs,
+// it also calculates the total fees for the transaction and returns that value.
 func checkTransactionInputs(tx *btcwire.MsgTx, txHeight int64, txStore map[btcwire.ShaHash]*txData) (int64, error) {
 	// Coinbase transactions have no inputs.
 	if isCoinBase(tx) {
@@ -693,6 +693,9 @@ func checkTransactionInputs(tx *btcwire.MsgTx, txHeight int64, txStore map[btcwi
 				maxSatoshi)
 			return 0, RuleError(str)
 		}
+
+		// Mark the referenced output as spent.
+		originTx.spent[originTxIndex] = true
 	}
 
 	// Calculate the total output amount for this transaction.  It is safe
