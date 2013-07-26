@@ -10,10 +10,11 @@ import (
 )
 
 const (
-	MainPort               = "8333"
-	TestNetPort            = "18333"
-	ProtocolVersion uint32 = 70001
-	TxVersion              = 1
+	MainPort                  = "8333"
+	TestNetPort               = "18333"
+	RegressionTestPort        = "18444"
+	ProtocolVersion    uint32 = 70001
+	TxVersion                 = 1
 
 	// MultipleAddressVersion is the protocol version which added multiple
 	// addresses per message (pver >= MultipleAddressVersion).
