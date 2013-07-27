@@ -21,6 +21,7 @@ const (
 // InvType represents the allowed types of inventory vectors.  See InvVect.
 type InvType uint32
 
+// These constants define the various supported inventory vector types.
 const (
 	InvVect_Error InvType = 0
 	InvVect_Tx    InvType = 1
