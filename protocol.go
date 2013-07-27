@@ -24,8 +24,6 @@ const (
 	// ProtocolVersion is the latest protocol version this package supports.
 	ProtocolVersion uint32 = 70001
 
-	TxVersion = 1
-
 	// MultipleAddressVersion is the protocol version which added multiple
 	// addresses per message (pver >= MultipleAddressVersion).
 	MultipleAddressVersion uint32 = 209

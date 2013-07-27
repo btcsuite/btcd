@@ -9,6 +9,9 @@ import (
 	"io"
 )
 
+// TxVersion is the current latest supported transaction version.
+const TxVersion = 1
+
 // MaxTxInSequenceNum is the maximum sequence number the sequence field
 // of a transaction input can be.
 const MaxTxInSequenceNum uint32 = 0xffffffff
