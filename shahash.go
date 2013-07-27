@@ -12,8 +12,12 @@ import (
 
 // Size of array used to store sha hashes.  See ShaHash.
 const HashSize = 32
+
+// MaxHashStringSize is the maximum length of a ShaHash hash string.
 const MaxHashStringSize = HashSize * 2
 
+// ErrHashStrSize describes an error that indicates the caller specified a hash
+// string that has too many characters.
 var ErrHashStrSize = fmt.Errorf("Max hash length is %v chars", MaxHashStringSize)
 
 // ShaHash is used in several of the bitcoin messages and common structures.  It

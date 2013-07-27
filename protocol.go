@@ -10,11 +10,21 @@ import (
 )
 
 const (
-	MainPort                  = "8333"
-	TestNetPort               = "18333"
-	RegressionTestPort        = "18444"
-	ProtocolVersion    uint32 = 70001
-	TxVersion                 = 1
+	// MainPort is the port used by default on the main network.
+	MainPort = "8333"
+
+	// TestNetPort is the port used by default on the test network (version
+	// 3).
+	TestNetPort = "18333"
+
+	// RegressionTestPort is the port used by default on the regression test
+	// network.
+	RegressionTestPort = "18444"
+
+	// ProtocolVersion is the latest protocol version this package supports.
+	ProtocolVersion uint32 = 70001
+
+	TxVersion = 1
 
 	// MultipleAddressVersion is the protocol version which added multiple
 	// addresses per message (pver >= MultipleAddressVersion).
@@ -42,6 +52,7 @@ const (
 type ServiceFlag uint64
 
 const (
+	// SFNodeNetwork is a flag used to indicate a peer is a full node.
 	SFNodeNetwork ServiceFlag = 1 << iota
 )
 
