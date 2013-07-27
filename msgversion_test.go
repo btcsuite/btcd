@@ -334,7 +334,7 @@ func TestVersionWireErrors(t *testing.T) {
 }
 
 // baseVersion is used in the various tests as a baseline MsgVersion.
-var baseVersion *btcwire.MsgVersion = &btcwire.MsgVersion{
+var baseVersion = &btcwire.MsgVersion{
 	ProtocolVersion: 60002,
 	Services:        btcwire.SFNodeNetwork,
 	Timestamp:       time.Unix(0x495fab29, 0), // 2009-01-03 12:15:05 -0600 CST)
@@ -357,7 +357,7 @@ var baseVersion *btcwire.MsgVersion = &btcwire.MsgVersion{
 
 // baseVersionEncoded is the wire encoded bytes for baseVersion using protocol
 // version 60002 and is used in the various tests.
-var baseVersionEncoded []byte = []byte{
+var baseVersionEncoded = []byte{
 	0x62, 0xea, 0x00, 0x00, // Protocol version 60002
 	0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // SFNodeNetwork
 	0x29, 0xab, 0x5f, 0x49, 0x00, 0x00, 0x00, 0x00, // 64-bit Timestamp

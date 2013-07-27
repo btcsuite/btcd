@@ -370,7 +370,7 @@ func TestTxWireErrors(t *testing.T) {
 }
 
 // multiTx is a MsgTx with an input and output and used in various tests.
-var multiTx *btcwire.MsgTx = &btcwire.MsgTx{
+var multiTx = &btcwire.MsgTx{
 	Version: 1,
 	TxIn: []*btcwire.TxIn{
 		&btcwire.TxIn{
@@ -407,7 +407,7 @@ var multiTx *btcwire.MsgTx = &btcwire.MsgTx{
 
 // multiTxEncoded is the wire encoded bytes for multiTx using protocol version
 // 60002 and is used in the various tests.
-var multiTxEncoded []byte = []byte{
+var multiTxEncoded = []byte{
 	0x01, 0x00, 0x00, 0x00, // Version
 	0x01, // Varint for number of input transactions
 	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,

@@ -54,7 +54,7 @@ var genesisCoinbaseTx = MsgTx{
 
 // GenesisHash is the hash of the first block in the block chain for the main
 // network (genesis block).
-var GenesisHash ShaHash = ShaHash{
+var GenesisHash = ShaHash{
 	0x6f, 0xe2, 0x8c, 0x0a, 0xb6, 0xf1, 0xb3, 0x72,
 	0xc1, 0xa6, 0xa2, 0x46, 0xae, 0x63, 0xf7, 0x4f,
 	0x93, 0x1e, 0x83, 0x65, 0xe1, 0x5a, 0x08, 0x9c,
@@ -63,7 +63,7 @@ var GenesisHash ShaHash = ShaHash{
 
 // GenesisMerkleRoot is the hash of the first transaction in the genesis block
 // for the main network.
-var GenesisMerkleRoot ShaHash = ShaHash{
+var GenesisMerkleRoot = ShaHash{
 	0x3b, 0xa3, 0xed, 0xfd, 0x7a, 0x7b, 0x12, 0xb2,
 	0x7a, 0xc7, 0x2c, 0x3e, 0x67, 0x76, 0x8f, 0x61,
 	0x7f, 0xc8, 0x1b, 0xc3, 0x88, 0x8a, 0x51, 0x32,
@@ -72,7 +72,7 @@ var GenesisMerkleRoot ShaHash = ShaHash{
 
 // GenesisBlock defines the genesis block of the block chain which serves as the
 // public transaction ledger for the main network.
-var GenesisBlock MsgBlock = MsgBlock{
+var GenesisBlock = MsgBlock{
 	Header: BlockHeader{
 		Version:    1,
 		PrevBlock:  ShaHash{},                // 0000000000000000000000000000000000000000000000000000000000000000
@@ -87,7 +87,7 @@ var GenesisBlock MsgBlock = MsgBlock{
 
 // TestNetGenesisHash is the hash of the first block in the block chain for the
 // regression test network (genesis block).
-var TestNetGenesisHash ShaHash = ShaHash{
+var TestNetGenesisHash = ShaHash{
 	0x06, 0x22, 0x6e, 0x46, 0x11, 0x1a, 0x0b, 0x59,
 	0xca, 0xaf, 0x12, 0x60, 0x43, 0xeb, 0x5b, 0xbf,
 	0x28, 0xc3, 0x4f, 0x3a, 0x5e, 0x33, 0x2a, 0x1f,
@@ -97,11 +97,11 @@ var TestNetGenesisHash ShaHash = ShaHash{
 // TestNetGenesisMerkleRoot is the hash of the first transaction in the genesis
 // block for the regression test network.  It is the same as the merkle root for
 // the main network.
-var TestNetGenesisMerkleRoot ShaHash = GenesisMerkleRoot
+var TestNetGenesisMerkleRoot = GenesisMerkleRoot
 
 // TestNetGenesisBlock defines the genesis block of the block chain which serves
 // as the public transaction ledger for the regression test network.
-var TestNetGenesisBlock MsgBlock = MsgBlock{
+var TestNetGenesisBlock = MsgBlock{
 	Header: BlockHeader{
 		Version:    1,
 		PrevBlock:  ShaHash{},                // 0000000000000000000000000000000000000000000000000000000000000000
@@ -116,7 +116,7 @@ var TestNetGenesisBlock MsgBlock = MsgBlock{
 
 // TestNet3GenesisHash is the hash of the first block in the block chain for the
 // test network (version 3).
-var TestNet3GenesisHash ShaHash = ShaHash{
+var TestNet3GenesisHash = ShaHash{
 	0x43, 0x49, 0x7f, 0xd7, 0xf8, 0x26, 0x95, 0x71,
 	0x08, 0xf4, 0xa3, 0x0f, 0xd9, 0xce, 0xc3, 0xae,
 	0xba, 0x79, 0x97, 0x20, 0x84, 0xe9, 0x0e, 0xad,
@@ -126,11 +126,11 @@ var TestNet3GenesisHash ShaHash = ShaHash{
 // TestNet3GenesisMerkleRoot is the hash of the first transaction in the genesis
 // block for the test network (version 3).  It is the same as the merkle root
 // for the main network.
-var TestNet3GenesisMerkleRoot ShaHash = GenesisMerkleRoot
+var TestNet3GenesisMerkleRoot = GenesisMerkleRoot
 
 // TestNet3GenesisBlock defines the genesis block of the block chain which
 // serves as the public transaction ledger for the test network (version 3).
-var TestNet3GenesisBlock MsgBlock = MsgBlock{
+var TestNet3GenesisBlock = MsgBlock{
 	Header: BlockHeader{
 		Version:    1,
 		PrevBlock:  ShaHash{},                 // 0000000000000000000000000000000000000000000000000000000000000000

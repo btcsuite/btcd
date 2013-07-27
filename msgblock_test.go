@@ -291,7 +291,7 @@ func TestBlockWireErrors(t *testing.T) {
 	}
 }
 
-var blockOne btcwire.MsgBlock = btcwire.MsgBlock{
+var blockOne = btcwire.MsgBlock{
 	Header: btcwire.BlockHeader{
 		Version: 1,
 		PrevBlock: btcwire.ShaHash([btcwire.HashSize]byte{ // Make go vet happy.
