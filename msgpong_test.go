@@ -99,7 +99,7 @@ func TestPongBIP0031(t *testing.T) {
 	readmsg := btcwire.NewMsgPong(0)
 	err = readmsg.BtcDecode(&buf, pver)
 	if err == nil {
-		t.Errorf("decode of MsgPong succeeded when it shouldn't have",
+		t.Errorf("decode of MsgPong succeeded when it shouldn't have %v",
 			spew.Sdump(buf))
 	}
 
