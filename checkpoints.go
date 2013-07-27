@@ -15,9 +15,9 @@ import (
 // best block chain that a good checkpoint candidate must be.
 const CheckpointConfirmations = 2016
 
-// A checkpoint is a known good point in the block chain.  Using checkpoints
-// allows a few optimizations for old blocks during initial download and also
-// prevents forks from old blocks.
+// Checkpoint identifies a known good point in the block chain.  Using
+// checkpoints allows a few optimizations for old blocks during initial download
+// and also prevents forks from old blocks.
 //
 // Each checkpoint is selected by the core developers based upon several
 // factors.  See the documentation for IsCheckpointCandidate for details
