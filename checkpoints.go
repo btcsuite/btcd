@@ -11,6 +11,8 @@ import (
 	"github.com/conformal/btcwire"
 )
 
+// CheckpointConfirmations is the number of blocks before the end of the current
+// best block chain that a good checkpoint candidate must be.
 const CheckpointConfirmations = 2016
 
 // A checkpoint is a known good point in the block chain.  Using checkpoints
