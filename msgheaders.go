@@ -114,7 +114,7 @@ func (msg *MsgHeaders) MaxPayloadLength(pver uint32) uint32 {
 	return maxVarIntPayload + (maxBlockHeaderPayload * MaxBlockHeadersPerMsg)
 }
 
-// NewMsgGetHeaders returns a new bitcoin headers message that conforms to the
+// NewMsgHeaders returns a new bitcoin headers message that conforms to the
 // Message interface.  See MsgHeaders for details.
 func NewMsgHeaders() *MsgHeaders {
 	return &MsgHeaders{}

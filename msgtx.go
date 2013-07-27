@@ -13,7 +13,7 @@ import (
 // of a transaction input can be.
 const MaxTxInSequenceNum uint32 = 0xffffffff
 
-// Outpoint defines a bitcoin data type that is used to track previous
+// OutPoint defines a bitcoin data type that is used to track previous
 // transaction outputs.
 type OutPoint struct {
 	Hash  ShaHash
