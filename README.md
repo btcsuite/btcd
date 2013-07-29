@@ -82,18 +82,36 @@ intentionally causes an error by attempting to process a duplicate block.
 		_ "github.com/conformal/btcdb/sqlite3"
 		"github.com/conformal/btcutil"
 		"github.com/conformal/btcwire"
+		"os"
 	)
 
 	func main() {
-		// First, we create a new database to store the accepted blocks into.
-		// Typically this would be opening an existing database, but we create
-		// a new db here so this is a complete working example.
-		db, err := btcdb.CreateDB("sqlite", "example.db")
+		// Create a new database to store the accepted blocks into.  Typically
+		// this would be opening an existing database, but we create a new db
+		// here so this is a complete working example.  Also, typically the
+		// calls to os.Remove would not be used either, but again, we want
+		// a complete working example here, so we make sure to remove the
+		// database.
+		dbName := "example.db"
+		_ = os.Remove(dbName)
+		db, err := btcdb.CreateDB("sqlite", dbName)
 		if err != nil {
 			fmt.Printf("Failed to create database: %v\n", err)
 			return
 		}
+		defer os.Remove(dbName) // Ignore error.
 		defer db.Close()
+
+		// Insert the main network genesis block.  This is part of the initial
+		// database setup.  Like above, this typically would not be needed when
+		// opening an existing database.
+		pver := btcwire.ProtocolVersion
+		genesisBlock := btcutil.NewBlock(&btcwire.GenesisBlock, pver)
+		_, err = db.InsertBlock(genesisBlock)
+		if err != nil {
+			fmt.Printf("Failed to insert genesis block: %v\n", err)
+			return
+		}
 
 		// Create a new BlockChain instance using the underlying database for
 		// the main bitcoin network and ignore notifications.
@@ -102,8 +120,7 @@ intentionally causes an error by attempting to process a duplicate block.
 		// Process a block.  For this example, we are going to intentionally
 		// cause an error by trying to process the genesis block which already
 		// exists.
-		block := btcutil.NewBlock(&btcwire.GenesisBlock, btcwire.ProtocolVersion)
-		err = chain.ProcessBlock(block)
+		err = chain.ProcessBlock(genesisBlock)
 		if err != nil {
 			fmt.Printf("Failed to process block: %v\n", err)
 			return
