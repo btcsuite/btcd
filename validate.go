@@ -304,37 +304,23 @@ func (b *BlockChain) checkProofOfWork(block *btcutil.Block) error {
 // input and output scripts in the provided transaction.  This uses the
 // quicker, but imprecise, signature operation counting mechanism from
 // btcscript.
-func countSigOps(msgTx *btcwire.MsgTx, isCoinBaseTx bool) (int, error) {
-	// Choose the starting transaction input based on whether this is a
-	// coinbase transaction since the coinbase input script should not be
-	// executed.
-	txIns := msgTx.TxIn
-	if isCoinBaseTx {
-		txIns = txIns[1:]
-	}
-
+func countSigOps(msgTx *btcwire.MsgTx) int {
 	// Accumulate the number of signature operations in all transaction
-	// inputs (except the first input if this is a coinbase transaction).
+	// inputs.
 	totalSigOps := 0
-	for _, txIn := range txIns {
-		numSigOps, err := btcscript.GetSigOpCount(txIn.SignatureScript)
-		if err != nil {
-			return 0, err
-		}
+	for _, txIn := range msgTx.TxIn {
+		numSigOps := btcscript.GetSigOpCount(txIn.SignatureScript)
 		totalSigOps += numSigOps
 	}
 
 	// Accumulate the number of signature operations in all transaction
 	// outputs.
 	for _, txOut := range msgTx.TxOut {
-		numSigOps, err := btcscript.GetSigOpCount(txOut.PkScript)
-		if err != nil {
-			return 0, err
-		}
+		numSigOps := btcscript.GetSigOpCount(txOut.PkScript)
 		totalSigOps += numSigOps
 	}
 
-	return totalSigOps, nil
+	return totalSigOps
 }
 
 // countP2SHSigOps returns the number of signature operations for all input
@@ -360,7 +346,7 @@ func countP2SHSigOps(msgTx *btcwire.MsgTx, isCoinBaseTx bool, txStore map[btcwir
 		// Ensure the referenced input transaction is available.
 		txInHash := &txIn.PreviousOutpoint.Hash
 		originTx, exists := txStore[*txInHash]
-		if !exists {
+		if !exists || originTx.err != nil || originTx.tx == nil {
 			return 0, fmt.Errorf("unable to find input transaction "+
 				"%v referenced from transaction %v", txHash,
 				txInHash)
@@ -385,11 +371,8 @@ func countP2SHSigOps(msgTx *btcwire.MsgTx, isCoinBaseTx bool, txStore map[btcwir
 		// Count the precise number of signature operations in the
 		// referenced public key script.
 		sigScript := txIn.SignatureScript
-		numSigOps, err := btcscript.GetPreciseSigOpCount(sigScript,
-			pkScript, true)
-		if err != nil {
-			return 0, err
-		}
+		numSigOps := btcscript.GetPreciseSigOpCount(sigScript, pkScript,
+			true)
 
 		// We could potentially overflow the accumulator so check for
 		// overflow.
@@ -492,21 +475,11 @@ func (b *BlockChain) checkBlockSanity(block *btcutil.Block) error {
 	// The number of signature operations must be less than the maximum
 	// allowed per block.
 	totalSigOps := 0
-	for i, tx := range transactions {
-		// Since the first (and only the first) transaction has already
-		// been verified above to be a coinbase transaction, use i == 0
-		// as an optimization for the flag to countSigOps for whether
-		// or not the transaction is a coinbase transaction rather than
-		// having to do a full coinbase check again.
-		numSigOps, err := countSigOps(tx, i == 0)
-		if err != nil {
-			return err
-		}
-
+	for _, tx := range transactions {
 		// We could potentially overflow the accumulator so check for
 		// overflow.
 		lastSigOps := totalSigOps
-		totalSigOps += numSigOps
+		totalSigOps += countSigOps(tx)
 		if totalSigOps < lastSigOps || totalSigOps > maxSigOpsPerBlock {
 			str := fmt.Sprintf("block contains too many signature "+
 				"operations - got %v, max %v", totalSigOps,
@@ -783,16 +756,14 @@ func (b *BlockChain) checkConnectBlock(node *blockNode, block *btcutil.Block) er
 	transactions := block.MsgBlock().Transactions
 	totalSigOps := 0
 	for i, tx := range transactions {
-		// Since the first (and only the first) transaction has already
-		// been verified to be a coinbase transaction, use i == 0
-		// as an optimization for the flag to countSigOps for whether
-		// or not the transaction is a coinbase transaction rather than
-		// having to do a full coinbase check again.
-		numsigOps, err := countSigOps(tx, i == 0)
-		if err != nil {
-			return err
-		}
+		numsigOps := countSigOps(tx)
 		if enforceBIP0016 {
+			// Since the first (and only the first) transaction has
+			// already been verified to be a coinbase transaction,
+			// use i == 0 as an optimization for the flag to
+			// countP2SHSigOps for whether or not the transaction is
+			// a coinbase transaction rather than having to do a
+			// full coinbase check again.
 			numP2SHSigOps, err := countP2SHSigOps(tx, i == 0,
 				txInputStore)
 			if err != nil {
