@@ -64,7 +64,7 @@ func (db *SqliteDb) fetchBlockBySha(sha *btcwire.ShaHash) (blk *btcutil.Block, e
 
 	buf, pver, height, err := db.fetchSha(*sha)
 	if err != nil {
-		return
+		return nil, err
 	}
 
 	blk, err = btcutil.NewBlockFromBytes(buf, pver)
