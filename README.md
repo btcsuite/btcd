@@ -33,7 +33,7 @@ change.
 	// Insert the main network genesis block.
 	pver := btcwire.ProtocolVersion
 	genesis := btcutil.NewBlock(&btcwire.GenesisBlock, pver)
-	newHeight, err := db.InsertBlock(block)
+	newHeight, err := db.InsertBlock(genesis)
 	if err != nil {
 		// Log and handle the error
 	}
