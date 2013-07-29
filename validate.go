@@ -426,9 +426,11 @@ func (b *BlockChain) checkBlockSanity(block *btcutil.Block) error {
 	}
 
 	// A block must not have more than one coinbase.
-	for _, tx := range transactions[1:] {
+	for i, tx := range transactions[1:] {
 		if isCoinBase(tx) {
-			return RuleError("block contains more than one coinbase")
+			str := fmt.Sprintf("block contains second coinbase at "+
+				"index %d", i)
+			return RuleError(str)
 		}
 	}
 
