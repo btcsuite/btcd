@@ -319,9 +319,6 @@ func parseScriptTemplate(script []byte, opcodemap map[byte]*opcode) ([]parsedOpc
 			if int(l) > len(script[off:]) {
 				return retScript, StackErrShortScript
 			}
-			if l > MaxScriptElementSize {
-				return retScript, StackErrElementTooBig
-			}
 			pop.data = script[off : off+int(l)]
 			i += 1 - op.length + int(l)
 		}

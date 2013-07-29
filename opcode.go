@@ -736,6 +736,11 @@ func opcodeFalse(op *parsedOpcode, s *Script) error {
 }
 
 func opcodePushData(op *parsedOpcode, s *Script) error {
+	// This max script element test must occur at execution time instead
+	// of parse time to match bitcoind behaviour.
+	if len(op.data) > MaxScriptElementSize {
+		return StackErrElementTooBig
+	}
 	s.dstack.PushByteArray(op.data)
 	return nil
 }
