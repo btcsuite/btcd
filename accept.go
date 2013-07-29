@@ -28,6 +28,7 @@ func (b *BlockChain) maybeAcceptBlock(block *btcutil.Block) error {
 	if prevNode != nil {
 		blockHeight = prevNode.height + 1
 	}
+	block.SetHeight(blockHeight)
 
 	// Ensure the difficulty specified in the block header matches the
 	// calculated difficulty based on the previous block and difficulty
