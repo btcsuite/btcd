@@ -193,16 +193,17 @@ func (b *BlockChain) fetchTxList(node *blockNode, txList []*btcwire.ShaHash) (ma
 // for more details on what the point of view entails.
 func (b *BlockChain) fetchInputTransactions(node *blockNode, block *btcutil.Block) (map[btcwire.ShaHash]*txData, error) {
 	// Build a map of in-flight transactions because some of the inputs in
-	// this block could be referencing other transactions in this block
-	// which are not yet in the chain.
-	txInFlight := map[btcwire.ShaHash]*btcwire.MsgTx{}
-	for i, tx := range block.MsgBlock().Transactions {
+	// this block could be referencing other transactions earlier in this
+	// block which are not yet in the chain.
+	txInFlight := map[btcwire.ShaHash]int{}
+	transactions := block.MsgBlock().Transactions
+	for i := range transactions {
 		// Get transaction hash.  It's safe to ignore the error since
 		// it's already cached in the nominal code path and the only
 		// way it can fail is if the index is out of range which is
 		// impossible here.
 		txHash, _ := block.TxSha(i)
-		txInFlight[*txHash] = tx
+		txInFlight[*txHash] = i
 	}
 
 	// Loop through all of the transaction inputs (except for the coinbase
@@ -210,7 +211,7 @@ func (b *BlockChain) fetchInputTransactions(node *blockNode, block *btcutil.Bloc
 	// what is already known (in-flight).
 	var txNeededList []*btcwire.ShaHash
 	txStore := make(map[btcwire.ShaHash]*txData)
-	for _, tx := range block.MsgBlock().Transactions[1:] {
+	for i, tx := range transactions[1:] {
 		for _, txIn := range tx.TxIn {
 			// Add an entry to the transaction store for the needed
 			// transaction with it set to missing by default.
@@ -218,13 +219,23 @@ func (b *BlockChain) fetchInputTransactions(node *blockNode, block *btcutil.Bloc
 			txD := &txData{hash: originHash, err: btcdb.TxShaMissing}
 			txStore[*originHash] = txD
 
-			// The transaction is already in-flight, so update the
-			// transaction store acccordingly.  Otherwise, we need
-			// it.
-			if tx, ok := txInFlight[*originHash]; ok {
-				txD.tx = tx
+			// It is acceptable for a transaction input to reference
+			// the output of another transaction in this block only
+			// if the referenced transaction comes before the
+			// current one in this block.  Update the transaction
+			// store acccordingly when this is the case.  Otherwise,
+			// we still need the transaction.
+			//
+			// NOTE: The >= is correct here because i is one less
+			// than the actual position of the transaction within
+			// the block due to skipping the coinbase.
+			if inFlightIndex, ok := txInFlight[*originHash]; ok &&
+				i >= inFlightIndex {
+
+				originTx := transactions[inFlightIndex]
+				txD.tx = originTx
 				txD.blockHeight = node.height
-				txD.spent = make([]bool, len(tx.TxOut))
+				txD.spent = make([]bool, len(originTx.TxOut))
 				txD.err = nil
 			} else {
 				txNeededList = append(txNeededList, originHash)
