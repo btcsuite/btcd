@@ -686,7 +686,7 @@ func (db *SqliteDb) InsertBlock(block *btcutil.Block) (height int64, err error) 
 
 		err = db.insertTx(&txsha, newheight, txloc[txidx].TxStart, txloc[txidx].TxLen, spentbuf)
 		if err != nil {
-			log.Warnf("block %v idx %v failed to insert tx %v %v err %v", &blocksha, newheight, &txsha, txidx, err)
+			log.Warnf("block %v idx %v failed to insert tx %v %v err %v", blocksha, newheight, &txsha, txidx, err)
 			var oBlkIdx int64
 			oBlkIdx, _, _, err = db.fetchLocationBySha(&txsha)
 			log.Warnf("oblkidx %v err %v", oBlkIdx, err)
@@ -695,7 +695,7 @@ func (db *SqliteDb) InsertBlock(block *btcutil.Block) (height int64, err error) 
 		}
 		err = db.doSpend(tx)
 		if err != nil {
-			log.Warnf("block %v idx %v failed to spend tx %v %v err %v", &blocksha, newheight, &txsha, txidx, err)
+			log.Warnf("block %v idx %v failed to spend tx %v %v err %v", blocksha, newheight, &txsha, txidx, err)
 
 			return
 		}
