@@ -21,39 +21,50 @@ type Params struct {
 	// PowLimit is the highest proof of work value a bitcoin block can have
 	// for the specific network.
 	PowLimit *big.Int
+
+	// PowLimitBits is the highest proof of work value a bitcoin block can
+	// have represented in compact form.  See CompactToBig for more details
+	// on compact form.
+	PowLimitBits uint32
 }
+
+// mainPowLimit is the highest proof of work value a bitcoin block can have for
+// the main network.  It is the value 2^224 - 1.
+var mainPowLimit = new(big.Int).Sub(new(big.Int).Lsh(bigOne, 224), bigOne)
 
 // mainNetParams contains parameters specific to the main network
 // (btcwire.MainNet).
 var mainNetParams = Params{
 	GenesisBlock: &btcwire.GenesisBlock,
 	GenesisHash:  &btcwire.GenesisHash,
-
-	// PowLimit is the highest proof of work value a bitcoin block can have.
-	// It is the value 2^224 - 1 for the main network.
-	PowLimit: new(big.Int).Sub(new(big.Int).Lsh(bigOne, 224), bigOne),
+	PowLimit:     mainPowLimit,
+	PowLimitBits: BigToCompact(mainPowLimit),
 }
+
+// regressionPowLimit is the highest proof of work value a bitcoin block can
+// have.  It is the value 2^256 - 1.
+var regressionPowLimit = new(big.Int).Sub(new(big.Int).Lsh(bigOne, 255), bigOne)
 
 // regressionParams contains parameters specific to the regression test network
 // (btcwire.TestNet).
 var regressionParams = Params{
 	GenesisBlock: &btcwire.TestNetGenesisBlock,
 	GenesisHash:  &btcwire.TestNetGenesisHash,
-
-	// PowLimit is the highest proof of work value a bitcoin block can have.
-	// It is the value 2^256 - 1 for the regression test network.
-	PowLimit: new(big.Int).Sub(new(big.Int).Lsh(bigOne, 255), bigOne),
+	PowLimit:     regressionPowLimit,
+	PowLimitBits: BigToCompact(regressionPowLimit),
 }
+
+// testNetPowLimit is the highest proof of work value a bitcoin block can have
+// for the test network (version 3).  It is the value 2^224 - 1.
+var testNetPowLimit = new(big.Int).Sub(new(big.Int).Lsh(bigOne, 224), bigOne)
 
 // testNet3Params contains parameters specific to the test network (version 3)
 // (btcwire.TestNet3).
 var testNet3Params = Params{
 	GenesisBlock: &btcwire.TestNet3GenesisBlock,
 	GenesisHash:  &btcwire.TestNet3GenesisHash,
-
-	// PowLimit is the highest proof of work value a bitcoin block can have.
-	// It is the value 2^224 - 1 for the test network (version 3).
-	PowLimit: new(big.Int).Sub(new(big.Int).Lsh(bigOne, 224), bigOne),
+	PowLimit:     testNetPowLimit,
+	PowLimitBits: BigToCompact(testNetPowLimit),
 }
 
 // chainParams returns chain parameters specific to the bitcoin network

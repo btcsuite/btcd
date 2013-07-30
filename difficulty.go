@@ -189,6 +189,7 @@ func (b *BlockChain) calcEasiestDifficulty(bits uint32, duration time.Duration) 
 
 	// Choose the correct proof of work limit for the active network.
 	powLimit := b.chainParams().PowLimit
+	powLimitBits := b.chainParams().PowLimitBits
 
 	// The test network rules allow minimum difficulty blocks after more
 	// than twice the desired amount of time needed to generate a block has
@@ -198,7 +199,7 @@ func (b *BlockChain) calcEasiestDifficulty(bits uint32, duration time.Duration) 
 		fallthrough
 	case btcwire.TestNet3:
 		if durationVal > int64(targetSpacing)*2 {
-			return BigToCompact(powLimit)
+			return powLimitBits
 		}
 	}
 
@@ -225,7 +226,7 @@ func (b *BlockChain) calcEasiestDifficulty(bits uint32, duration time.Duration) 
 func (b *BlockChain) findPrevTestNetDifficulty(startNode *blockNode) (uint32, error) {
 	// Search backwards through the chain for the last block without
 	// the special rule applied.
-	powLimitBits := BigToCompact(b.chainParams().PowLimit)
+	powLimitBits := b.chainParams().PowLimitBits
 	iterNode := startNode
 	for iterNode != nil && iterNode.height%blocksPerRetarget != 0 && iterNode.bits == powLimitBits {
 		// Get the previous block node.  This function is used over
@@ -255,10 +256,11 @@ func (b *BlockChain) findPrevTestNetDifficulty(startNode *blockNode) (uint32, er
 func (b *BlockChain) calcNextRequiredDifficulty(lastNode *blockNode, block *btcutil.Block) (uint32, error) {
 	// Choose the correct proof of work limit for the active network.
 	powLimit := b.chainParams().PowLimit
+	powLimitBits := b.chainParams().PowLimitBits
 
 	// Genesis block.
 	if lastNode == nil {
-		return BigToCompact(powLimit), nil
+		return powLimitBits, nil
 	}
 
 	// Return the previous block's difficulty requirements if this block
@@ -278,7 +280,7 @@ func (b *BlockChain) calcNextRequiredDifficulty(lastNode *blockNode, block *btcu
 			newBlockTime := block.MsgBlock().Header.Timestamp
 			allowMinTime := lastNode.timestamp.Add(targetSpacing * 2)
 			if newBlockTime.After(allowMinTime) {
-				return BigToCompact(powLimit), nil
+				return powLimitBits, nil
 			}
 
 			// The block was mined within the desired timeframe, so
