@@ -60,8 +60,9 @@ var checkpointDataMainNet = checkpointData{
 	checkpointsByHeight: nil, // Automatically generated in init.
 }
 
-// checkpointDataTestNet contains checkpoint data for the test network.
-var checkpointDataTestNet = checkpointData{
+// checkpointDataTestNet3 contains checkpoint data for the test network (version
+// 3).
+var checkpointDataTestNet3 = checkpointData{
 	checkpoints: []Checkpoint{
 		{546, newShaHashFromStr("000000002a936ca763904c3c35fce2f3556c559c0214345d31b1bcebf76acb70")},
 	},
@@ -89,18 +90,18 @@ func (b *BlockChain) DisableCheckpoints(disable bool) {
 func (b *BlockChain) checkpointData() *checkpointData {
 	switch b.btcnet {
 	case btcwire.TestNet3:
-		return &checkpointDataTestNet
+		return &checkpointDataTestNet3
 	case btcwire.MainNet:
-		fallthrough
-	default:
 		return &checkpointDataMainNet
 	}
+	return nil
 }
 
 // LatestCheckpoint returns the most recent checkpoint (regardless of whether it
-// is already known).  When checkpoints are disabled it will return nil.
+// is already known).  When checkpoints are disabled or there are no checkpoints
+// for the active network, it will return nil.
 func (b *BlockChain) LatestCheckpoint() *Checkpoint {
-	if b.noCheckpoints {
+	if b.noCheckpoints || b.checkpointData() == nil {
 		return nil
 	}
 
@@ -112,7 +113,7 @@ func (b *BlockChain) LatestCheckpoint() *Checkpoint {
 // match the hard-coded checkpoint data.  It also returns true if there is no
 // checkpoint data for the passed block height.
 func (b *BlockChain) verifyCheckpoint(height int64, hash *btcwire.ShaHash) bool {
-	if b.noCheckpoints {
+	if b.noCheckpoints || b.checkpointData() == nil {
 		return true
 	}
 
@@ -130,7 +131,7 @@ func (b *BlockChain) verifyCheckpoint(height int64, hash *btcwire.ShaHash) bool 
 // associated block.  It returns nil if a checkpoint can't be found (this should
 // really only happen for blocks before the first checkpoint).
 func (b *BlockChain) findLatestKnownCheckpoint() (*btcutil.Block, error) {
-	if b.noCheckpoints {
+	if b.noCheckpoints || b.checkpointData() == nil {
 		return nil, nil
 	}
 
@@ -248,7 +249,7 @@ func init() {
 	// when the package loads.
 	checkpointInitializeList := []*checkpointData{
 		&checkpointDataMainNet,
-		&checkpointDataTestNet,
+		&checkpointDataTestNet3,
 	}
 	for _, data := range checkpointInitializeList {
 		data.checkpointsByHeight = make(map[int64]*Checkpoint)
