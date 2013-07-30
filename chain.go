@@ -620,6 +620,19 @@ func (b *BlockChain) reorganizeChain(detachNodes, attachNodes *list.List) error 
 		delete(b.blockCache, *n.hash)
 	}
 
+	// Log the point where the chain forked.
+	firstAttachNode := attachNodes.Front().Value.(*blockNode)
+	forkNode, err := b.getPrevNodeFromNode(firstAttachNode)
+	if err == nil {
+		log.Infof("REORGANIZE: Chain forks at %v", forkNode.hash)
+	}
+
+	// Log the old and new best chain heads.
+	firstDetachNode := detachNodes.Front().Value.(*blockNode)
+	lastAttachNode := attachNodes.Back().Value.(*blockNode)
+	log.Infof("REORGANIZE: Old best chain head was %v", firstDetachNode.hash)
+	log.Infof("REORGANIZE: New best chain head is %v", lastAttachNode.hash)
+
 	return nil
 }
 
@@ -670,8 +683,25 @@ func (b *BlockChain) connectBestChain(node *blockNode, block *btcutil.Block) err
 	if node.workSum.Cmp(b.bestChain.workSum) <= 0 {
 		// Connect the parent node to this node.
 		node.inMainChain = false
-		if node.parent != nil {
-			node.parent.children = append(node.parent.children, node)
+		node.parent.children = append(node.parent.children, node)
+
+		// Find the fork point.
+		fork := node
+		for ; fork.parent != nil; fork = fork.parent {
+			if fork.inMainChain {
+				break
+			}
+		}
+
+		// Log information about how the block is forking the chain.
+		if fork.hash.IsEqual(node.parent.hash) {
+			log.Infof("FORK: Block %v forks the chain at height %d"+
+				"/block %v, but does not cause a reorganize",
+				node.hash, fork.height, fork.hash)
+		} else {
+			log.Infof("EXTEND FORK: Block %v extends a side chain "+
+				"which forks the chain at height %d/block %v",
+				node.hash, fork.height, fork.hash)
 		}
 		return nil
 	}
@@ -686,6 +716,7 @@ func (b *BlockChain) connectBestChain(node *blockNode, block *btcutil.Block) err
 	detachNodes, attachNodes := b.getReorganizeNodes(node)
 
 	// Reorganize the chain.
+	log.Infof("REORGANIZE: Block %v is causing a reorganize.", node.hash)
 	err := b.reorganizeChain(detachNodes, attachNodes)
 	if err != nil {
 		return err
