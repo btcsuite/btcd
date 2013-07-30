@@ -712,7 +712,7 @@ func (b *BlockChain) checkConnectBlock(node *blockNode, block *btcutil.Block) er
 
 	// The coinbase for the Genesis block is not spendable, so just return
 	// now.
-	if node.hash.IsEqual(&btcwire.GenesisHash) {
+	if node.hash.IsEqual(b.netParams().genesisHash) {
 		return nil
 	}
 
