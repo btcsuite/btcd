@@ -653,7 +653,18 @@ func (s *Script) calcScriptHash(script []parsedOpcode, hashType byte) []byte {
 			}
 		}
 	case SigHashSingle:
-		// resize output array to up to and including current output
+		if txidx >= len(txCopy.TxOut) {
+			// This was created by a buggy implementation.
+			// In this case we do the same as bitcoind and bitcoinj
+			// and return 1 (as a uint256 little endian) as an
+			// error. Unfortunately this was not checked anywhere
+			// and thus is treated as the actual
+			// hash.
+			hash := make([]byte, 32)
+			hash[0] = 0x01
+			return hash
+		}
+		// Resize output array to up to and including requested index.
 		txCopy.TxOut = txCopy.TxOut[:txidx+1]
 		// all but  current output get zeroed out
 		for i := 0; i < txidx; i++ {
