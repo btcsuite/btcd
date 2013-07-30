@@ -452,8 +452,9 @@ func (b *BlockChain) checkBlockSanity(block *btcutil.Block) error {
 	merkles := BuildMerkleTreeStore(block)
 	calculatedMerkleRoot := merkles[len(merkles)-1]
 	if !header.MerkleRoot.IsEqual(calculatedMerkleRoot) {
-		str := fmt.Sprintf("block merkle root is invalid - got %v, "+
-			"want %v", calculatedMerkleRoot, header.MerkleRoot)
+		str := fmt.Sprintf("block merkle root is invalid - block "+
+			"header indicates %v, but calculated value is %v",
+			header.MerkleRoot, calculatedMerkleRoot)
 		return RuleError(str)
 	}
 
