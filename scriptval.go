@@ -71,7 +71,7 @@ func validateAllTxIn(txsha *btcwire.ShaHash, txValidator *btcwire.MsgTx, pver ui
 
 	processFunc := func(txInIdx int) {
 		log.Tracef("validating tx %v input %v len %v",
-			&txsha, currentItem, len(job))
+			txsha, currentItem, len(job))
 		txin := job[txInIdx]
 		originTxSha := &txin.PreviousOutpoint.Hash
 		origintxidx := txin.PreviousOutpoint.Index
@@ -113,7 +113,7 @@ func validateAllTxIn(txsha *btcwire.ShaHash, txValidator *btcwire.MsgTx, pver ui
 	}
 	for i := 0; i < len(job); i++ {
 		if resultErrors[i] != nil {
-			log.Warnf("tx %v failed input %v, err %v", &txsha, i, resultErrors[i])
+			log.Warnf("tx %v failed input %v, err %v", txsha, i, resultErrors[i])
 		}
 	}
 	return
