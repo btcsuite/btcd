@@ -188,7 +188,7 @@ func (b *BlockChain) calcEasiestDifficulty(bits uint32, duration time.Duration) 
 	adjustmentFactor := big.NewInt(retargetAdjustmentFactor)
 
 	// Choose the correct proof of work limit for the active network.
-	powLimit := b.netParams().powLimit
+	powLimit := b.chainParams().PowLimit
 
 	// The test network rules allow minimum difficulty blocks after more
 	// than twice the desired amount of time needed to generate a block has
@@ -225,7 +225,7 @@ func (b *BlockChain) calcEasiestDifficulty(bits uint32, duration time.Duration) 
 func (b *BlockChain) findPrevTestNetDifficulty(startNode *blockNode) (uint32, error) {
 	// Search backwards through the chain for the last block without
 	// the special rule applied.
-	powLimitBits := BigToCompact(b.netParams().powLimit)
+	powLimitBits := BigToCompact(b.chainParams().PowLimit)
 	iterNode := startNode
 	for iterNode != nil && iterNode.height%blocksPerRetarget != 0 && iterNode.bits == powLimitBits {
 		// Get the previous block node.  This function is used over
@@ -254,7 +254,7 @@ func (b *BlockChain) findPrevTestNetDifficulty(startNode *blockNode) (uint32, er
 // after the passed previous block node based on the difficulty retarget rules.
 func (b *BlockChain) calcNextRequiredDifficulty(lastNode *blockNode, block *btcutil.Block) (uint32, error) {
 	// Choose the correct proof of work limit for the active network.
-	powLimit := b.netParams().powLimit
+	powLimit := b.chainParams().PowLimit
 
 	// Genesis block.
 	if lastNode == nil {

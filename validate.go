@@ -278,7 +278,7 @@ func (b *BlockChain) checkProofOfWork(block *btcutil.Block) error {
 	}
 
 	// The target difficulty must be less than the maximum allowed.
-	powLimit := b.netParams().powLimit
+	powLimit := b.chainParams().PowLimit
 	if target.Cmp(powLimit) > 0 {
 		str := fmt.Sprintf("block target difficulty of %064x is "+
 			"higher than max of %064x", target, powLimit)
@@ -712,7 +712,7 @@ func (b *BlockChain) checkConnectBlock(node *blockNode, block *btcutil.Block) er
 
 	// The coinbase for the Genesis block is not spendable, so just return
 	// now.
-	if node.hash.IsEqual(b.netParams().genesisHash) {
+	if node.hash.IsEqual(b.chainParams().GenesisHash) {
 		return nil
 	}
 
