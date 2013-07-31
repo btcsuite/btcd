@@ -50,6 +50,12 @@ type blockCacheObj struct {
 func (db *SqliteDb) FetchBlockBySha(sha *btcwire.ShaHash) (blk *btcutil.Block, err error) {
 	db.dbLock.Lock()
 	defer db.dbLock.Unlock()
+	return db.fetchBlockBySha(sha)
+}
+
+// fetchBlockBySha - return a btcutil Block, object may be a cached.
+// Must be called with db lock held.
+func (db *SqliteDb) fetchBlockBySha(sha *btcwire.ShaHash) (blk *btcutil.Block, err error) {
 
 	blkcache, ok := db.fetchBlockCache(sha)
 	if ok {
@@ -128,6 +134,9 @@ func (db *SqliteDb) insertBlockCache(sha *btcwire.ShaHash, blk *btcutil.Block) {
 // FetchTxByShaList given a array of ShaHash, look up the transactions
 // and return them in a TxListReply array.
 func (db *SqliteDb) FetchTxByShaList(txShaList []*btcwire.ShaHash) []*btcdb.TxListReply {
+	db.dbLock.Lock()
+	defer db.dbLock.Unlock()
+
 	var replies []*btcdb.TxListReply
 	for _, txsha := range txShaList {
 		tx, _, _, _, height, txspent, err := db.fetchTxDataBySha(txsha)
@@ -171,7 +180,7 @@ func (db *SqliteDb) fetchTxDataBySha(txsha *btcwire.ShaHash) (rtx *btcwire.MsgTx
 		return
 	}
 
-	blksha, err = db.FetchBlockShaByHeight(height)
+	blksha, err = db.fetchBlockShaByHeight(height)
 	if err != nil {
 		log.Warnf("block idx lookup %v to %v", height, err)
 		return
@@ -179,7 +188,7 @@ func (db *SqliteDb) fetchTxDataBySha(txsha *btcwire.ShaHash) (rtx *btcwire.MsgTx
 	log.Tracef("transaction %v is at block %v %v tx %v",
 		txsha, blksha, height, toff)
 
-	blk, err = db.FetchBlockBySha(blksha)
+	blk, err = db.fetchBlockBySha(blksha)
 	if err != nil {
 		log.Warnf("unable to fetch block %v %v ",
 			height, &blksha)

@@ -120,6 +120,8 @@ func (db *SqliteDb) existsTxSha(txsha *btcwire.ShaHash) (exists bool) {
 
 // FetchLocationBySha looks up the Tx sha information by name.
 func (db *SqliteDb) FetchLocationBySha(txsha *btcwire.ShaHash) (blockidx int64, txoff int, txlen int, err error) {
+	db.dbLock.Lock()
+	defer db.dbLock.Unlock()
 	return db.fetchLocationBySha(txsha)
 }
 
