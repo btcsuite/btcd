@@ -171,11 +171,18 @@ func BigToCompact(n *big.Int) uint32 {
 // accumulated must be the inverse of the difficulty.  Also, in order to avoid
 // potential division by zero and really small floating point numbers, add 1 to
 // the denominator and multiply the numerator by 2^256.
-func calcWork(bits uint32) *big.Rat {
-	// (1 << 256) / (difficultyNum + 1)
+func calcWork(bits uint32) *big.Int {
+	// Return a work value of zero if the passed difficulty bits represent
+	// a negative number. Note this should not happen in practice with valid
+	// blocks, but an invalid block could trigger it.
 	difficultyNum := CompactToBig(bits)
+	if difficultyNum.Sign() <= 0 {
+		return big.NewInt(0)
+	}
+
+	// (1 << 256) / (difficultyNum + 1)
 	denominator := new(big.Int).Add(difficultyNum, bigOne)
-	return new(big.Rat).SetFrac(oneLsh256, denominator)
+	return new(big.Int).Div(oneLsh256, denominator)
 }
 
 // calcEasiestDifficulty calculates the easiest possible difficulty that a block

@@ -38,7 +38,7 @@ type blockNode struct {
 
 	// workSum is the total amount of work in the chain up to and including
 	// this node.
-	workSum *big.Rat
+	workSum *big.Int
 
 	// inMainChain denotes whether the block node is currently on the
 	// the main chain or not.  This is used to help find the common
@@ -85,7 +85,7 @@ type orphanBlock struct {
 // down the chain.  It is used primarily to allow a new node to be dynamically
 // inserted from the database into the memory chain prior to nodes we already
 // have and update their work values accordingly.
-func addChildrenWork(node *blockNode, work *big.Rat) {
+func addChildrenWork(node *blockNode, work *big.Int) {
 	for _, childNode := range node.children {
 		childNode.workSum.Add(childNode.workSum, work)
 		addChildrenWork(childNode, work)
