@@ -131,10 +131,10 @@ type ScriptClass byte
 // Classes of script payment known about in the blockchain.
 const (
 	PubKeyTy      ScriptClass = iota // Pay pubkey.
-	PubKeyHashTy                    // Pay pubkey hash.
-	ScriptHashTy                    // Pay to script hash.
-	MultiSigTy                      // Multi signature.
-	NonStandardTy                   // None of the above.
+	PubKeyHashTy                     // Pay pubkey hash.
+	ScriptHashTy                     // Pay to script hash.
+	MultiSigTy                       // Multi signature.
+	NonStandardTy                    // None of the above.
 )
 
 // Script is the virtual machine that executes btcscripts.
@@ -309,7 +309,7 @@ func parseScriptTemplate(script []byte, opcodemap map[byte]*opcode) ([]parsedOpc
 			default:
 				return retScript,
 					fmt.Errorf("invalid opcode length %d",
-					op.length)
+						op.length)
 			}
 
 			if err != nil {
@@ -787,7 +787,7 @@ func GetSigOpCount(script []byte) int {
 // GetPreciseSigOpCount returns the number of signature operations in
 // scriptPubKey. If bip16 is true then scriptSig may be searched for the
 // Pay-To-Script-Hash script in order to find the precise number of signature
-// operations in the transaction. If the script fails to parse, then the 
+// operations in the transaction. If the script fails to parse, then the
 // count up to the point of failure is returned.
 func GetPreciseSigOpCount(scriptSig, scriptPubKey []byte, bip16 bool) int {
 	// We don't check error since parseScript returns the parsed-up-to-error

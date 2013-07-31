@@ -1075,9 +1075,9 @@ var txTests = []txTest{
 			0xba, 0x67,
 			btcscript.OP_EQUAL,
 		},
-		idx:       0,
-		err:       btcscript.StackErrShortScript,
-		bip16:     true,
+		idx:   0,
+		err:   btcscript.StackErrShortScript,
+		bip16: true,
 	},
 	txTest{
 		// sigscript changed so to be non pushonly.
