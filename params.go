@@ -42,7 +42,7 @@ var mainNetParams = Params{
 }
 
 // regressionPowLimit is the highest proof of work value a bitcoin block can
-// have.  It is the value 2^256 - 1.
+// have for the regression test network.  It is the value 2^256 - 1.
 var regressionPowLimit = new(big.Int).Sub(new(big.Int).Lsh(bigOne, 255), bigOne)
 
 // regressionParams contains parameters specific to the regression test network
