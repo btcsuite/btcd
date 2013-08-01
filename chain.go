@@ -15,8 +15,17 @@ import (
 	"time"
 )
 
-// maxOrphanBlocks is the maximum number of orphan blocks that can be queued.
-const maxOrphanBlocks = 100
+const (
+	// maxOrphanBlocks is the maximum number of orphan blocks that can be
+	// queued.
+	maxOrphanBlocks = 100
+
+	// minMemoryNodes is the minimum number of consecutive nodes needed
+	// in memory in order to perform all necessary validation.  It is used
+	// to determine when it's safe to prune nodes from memory without
+	// causing constant dynamic reloading.
+	minMemoryNodes = blocksPerRetarget
+)
 
 // blockNode represents a block within the block chain and is primarily used to
 // aid in selecting the best chain to be the main chain.  The main chain is
@@ -32,6 +41,12 @@ type blockNode struct {
 
 	// hash is the double sha 256 of the block.
 	hash *btcwire.ShaHash
+
+	// parentHash is the double sha 256 of the parent block.  This is kept
+	// here over simply relying on parent.hash directly since block nodes
+	// are sparse and the parent node might not be in memory when its hash
+	// is needed.
+	parentHash *btcwire.ShaHash
 
 	// height is the position in the block chain.
 	height int64
@@ -63,12 +78,13 @@ func newBlockNode(block *btcutil.Block) *blockNode {
 
 	blockHeader := block.MsgBlock().Header
 	node := blockNode{
-		hash:      blockSha,
-		workSum:   calcWork(blockHeader.Bits),
-		height:    block.Height(),
-		version:   blockHeader.Version,
-		bits:      blockHeader.Bits,
-		timestamp: blockHeader.Timestamp,
+		hash:       blockSha,
+		parentHash: &blockHeader.PrevBlock,
+		workSum:    calcWork(blockHeader.Bits),
+		height:     block.Height(),
+		version:    blockHeader.Version,
+		bits:       blockHeader.Bits,
+		timestamp:  blockHeader.Timestamp,
 	}
 	return &node
 }
@@ -359,6 +375,99 @@ func (b *BlockChain) getPrevNodeFromNode(node *blockNode) (*blockNode, error) {
 	}
 
 	return prevBlockNode, nil
+}
+
+// removeBlockNode removes the passed block node from the memory chain by
+// unlinking all of its children and removing it from the the node and
+// dependency indices.
+func (b *BlockChain) removeBlockNode(node *blockNode) error {
+	if node.parent != nil {
+		return fmt.Errorf("removeBlockNode must be called with a "+
+			" node at the front of the chain - node %v", node.hash)
+	}
+
+	// Remove the node from the node index.
+	delete(b.index, *node.hash)
+
+	// Unlink all of the node's children.
+	for _, child := range node.children {
+		child.parent = nil
+	}
+	node.children = nil
+
+	// Remove the reference from the dependency index.
+	prevHash := node.parentHash
+	if children, ok := b.depNodes[*prevHash]; ok {
+		// Find the node amongst the children of the
+		// dependencies for the parent hash and remove it.
+		for i, child := range children {
+			if child == node {
+				copy(children[i:], children[i+1:])
+				children[len(children)-1] = nil
+				b.depNodes[*prevHash] = children[:len(children)-1]
+			}
+		}
+
+		// Remove the map entry altogether if there are no
+		// longer any nodes which depend on the parent hash.
+		if len(b.depNodes[*prevHash]) == 0 {
+			delete(b.depNodes, *prevHash)
+		}
+	}
+
+	return nil
+}
+
+// pruneBlockNodes removes references to old block nodes which are no longer
+// needed so they may be garbage collected.  In order to validate block rules
+// and choose the best chain, only a portion of the nodes which form the block
+// chain are needed in memory.  This function walks the chain backwards from the
+// current best chain to find any nodes before the first needed block node.
+func (b *BlockChain) pruneBlockNodes() error {
+	// Nothing to do if there is not a best chain selected yet.
+	if b.bestChain == nil {
+		return nil
+	}
+
+	// Walk the chain backwards to find what should be the new root node.
+	// Intentionally use node.parent instead of getPrevNodeFromNode since
+	// the latter loads the node and the goal is to find nodes still in
+	// memory that can be pruned.
+	newRootNode := b.bestChain
+	for i := int64(0); i < minMemoryNodes-1 && newRootNode != nil; i++ {
+		newRootNode = newRootNode.parent
+	}
+
+	// Nothing to do if there are not enough nodes.
+	if newRootNode == nil || newRootNode.parent == nil {
+		return nil
+	}
+
+	// Push the nodes to delete on a list in reverse order since it's easier
+	// to prune them going forwards than it is backwards.  This will
+	// typically end up being a single node since pruning is currently done
+	// just before each new node is created.  However, that might be tuned
+	// later to only prune at intervals, so the code needs to account for
+	// the possibility of multiple nodes.
+	deleteNodes := list.New()
+	for node := newRootNode.parent; node != nil; node = node.parent {
+		deleteNodes.PushFront(node)
+	}
+
+	// Loop through each node to prune, unlink its children, remove it from
+	// the dependency index, and remove it from the node index.
+	for e := deleteNodes.Front(); e != nil; e = e.Next() {
+		node := e.Value.(*blockNode)
+		err := b.removeBlockNode(node)
+		if err != nil {
+			return err
+		}
+	}
+
+	// Set the new root node.
+	b.root = newRootNode
+
+	return nil
 }
 
 // isMajorityVersion determines if a previous number of blocks in the chain

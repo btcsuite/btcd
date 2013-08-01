@@ -136,6 +136,13 @@ func (b *BlockChain) maybeAcceptBlock(block *btcutil.Block) error {
 		}
 	}
 
+	// Prune block nodes which are no longer needed before creating a new
+	// node.
+	err = b.pruneBlockNodes()
+	if err != nil {
+		return err
+	}
+
 	// Create a new block node for the block and add it to the in-memory
 	// block chain (could be either a side chain or the main chain).
 	newNode := newBlockNode(block)
