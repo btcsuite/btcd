@@ -156,6 +156,10 @@ out:
 		}
 	}
 
+
+	// now that db is populated, do some additional test
+	testFetchRangeHeight(t, db, blocks)
+
 	switch mode {
 	case dbTmDefault: // default
 		// no cleanup
@@ -366,4 +370,54 @@ func loadBlocks(t *testing.T, file string) (blocks []*btcutil.Block, err error) 
 		blocks = append(blocks, block)
 	}
 	return
+}
+
+
+func testFetchRangeHeight(t *testing.T, db btcdb.Db, blocks []*btcutil.Block) () {
+
+	var testincrement int64 = 50
+	var testcnt int64       = 100
+
+	shanames := make([]*btcwire.ShaHash, len(blocks))
+
+	nBlocks := int64(len(blocks))
+
+	for i := range blocks {
+		blockSha, err := blocks[i].Sha()
+		if err != nil {
+			t.Errorf("FetchRangeHeight: unexpected failure computing block sah %v", err)
+		}
+		shanames[i] = blockSha
+	}
+
+	for startheight := int64(0); startheight < nBlocks; startheight += testincrement {
+		endheight := startheight + testcnt
+
+		if endheight > nBlocks {
+			endheight = btcdb.AllShas
+		}
+
+		shalist, err := db.FetchHeightRange(startheight, endheight)
+		if err != nil {
+			t.Errorf("FetchRangeHeight: unexpected failure looking up shas %v", err)
+		}
+
+		if endheight == btcdb.AllShas {
+			if int64(len(shalist)) != nBlocks - startheight {
+				t.Errorf("FetchRangeHeight: expected A %v shas, got %v", nBlocks - startheight, len(shalist))
+			}
+		} else {
+			if int64(len(shalist)) != testcnt {
+				t.Errorf("FetchRangeHeight: expected %v shas, got %v", testcnt, len(shalist))
+			}
+		}
+
+		for i := range shalist {
+			if *shanames[int64(i)+startheight] != shalist[i] {
+				t.Errorf("FetchRangeHeight: mismatch sha at %v requested range %v %v ", int64(i)+startheight, startheight, endheight)
+			}
+		}
+	}
+
+
 }
