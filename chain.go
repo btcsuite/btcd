@@ -6,6 +6,7 @@ package btcchain
 
 import (
 	"container/list"
+	"errors"
 	"fmt"
 	"github.com/conformal/btcdb"
 	"github.com/conformal/btcutil"
@@ -26,6 +27,11 @@ const (
 	// causing constant dynamic reloading.
 	minMemoryNodes = blocksPerRetarget
 )
+
+// ErrIndexAlreadyInitialized describes an error that indicates the block index
+// is already initialized.
+var ErrIndexAlreadyInitialized = errors.New("the block index can only be " +
+	"initialized before it has been modified")
 
 // blockNode represents a block within the block chain and is primarily used to
 // aid in selecting the best chain to be the main chain.  The main chain is
@@ -245,6 +251,53 @@ func (b *BlockChain) addOrphanBlock(block *btcutil.Block) {
 	b.prevOrphans[*prevHash] = append(b.prevOrphans[*prevHash], oBlock)
 
 	return
+}
+
+// GenerateInitialIndex is an optional function which generates the required
+// number of initial block nodes in an optimized fashion.  This is optional
+// because the memory block index is sparse and previous nodes are dynamically
+// loaded as needed.  However, during initial startup (when there are no nodes
+// in memory yet), dynamically loading all of the required nodes on the fly in
+// the usual way is much slower than preloading them.
+//
+// This function can only be called once and it must be called before any nodes
+// are added to the block index.  ErrIndexAlreadyInitialized is returned if
+// the former is not the case.  In practice, this means the function should be
+// called directly after New.
+func (b *BlockChain) GenerateInitialIndex() error {
+	// Return an error if the has already been modified.
+	if b.root != nil {
+		return ErrIndexAlreadyInitialized
+	}
+
+	// Grab the latest block height for the main chain from the database.
+	_, endHeight, err := b.db.NewestSha()
+	if err != nil {
+		return err
+	}
+
+	// Calculate the starting height based on the minimum number of nodes
+	// needed in memory.
+	startHeight := endHeight - (minMemoryNodes + 1)
+	if startHeight < 0 {
+		startHeight = 0
+	}
+
+	// Loop forwards through each block loading the node into the index for
+	// the block.
+	for i := startHeight; i <= endHeight; i++ {
+		hash, err := b.db.FetchBlockShaByHeight(i)
+		if err != nil {
+			return err
+		}
+
+		_, err = b.loadBlockNode(hash)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 // loadBlockNode loads the block identified by hash from the block database,
