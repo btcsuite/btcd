@@ -140,6 +140,20 @@ out:
 			t.Errorf("height mismatch expect %v returned %v", height, newheight)
 			break out
 		}
+
+		newSha, blkid, err := db.NewestSha()
+		if err != nil {
+			t.Errorf("failed to obtain latest sha %v %v", height, err)
+		}
+
+		if blkid != height {
+			t.Errorf("height doe not match latest block height %v %v", blkid, height, err)
+		}
+
+		blkSha, _ := block.Sha()
+		if *newSha != *blkSha {
+			t.Errorf("Newest block sha does not match freshly inserted one %v %v ",  newSha, blkSha, err)
+		}
 	}
 
 	switch mode {
