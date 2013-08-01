@@ -359,17 +359,9 @@ func (b *BlockChain) getPrevNodeFromNode(node *blockNode) (*blockNode, error) {
 		return nil, nil
 	}
 
-	// Load the actual block for this block node from the db to ascertain
-	// the previous hash.
-	block, err := b.db.FetchBlockBySha(node.hash)
-	if err != nil {
-		return nil, err
-	}
-
 	// Dynamically load the previous block from the block database, create
 	// a new block node for it, and update the memory chain accordingly.
-	prevHash := &block.MsgBlock().Header.PrevBlock
-	prevBlockNode, err := b.loadBlockNode(prevHash)
+	prevBlockNode, err := b.loadBlockNode(node.parentHash)
 	if err != nil {
 		return nil, err
 	}
