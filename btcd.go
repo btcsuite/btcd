@@ -9,14 +9,10 @@ import (
 	"github.com/conformal/btcchain"
 	"github.com/conformal/btcdb"
 	"github.com/conformal/btcscript"
-	"github.com/conformal/btcwire"
 	"github.com/conformal/seelog"
-	"math/rand"
 	"net"
 	"os"
 	"runtime"
-	"strconv"
-	"time"
 )
 
 // These constants are used by the dns seed code to pick a random last seen
@@ -141,42 +137,6 @@ func btcdMain() error {
 		return err
 	}
 	server.Start()
-
-	// only ask dns for peers if we don't have a list of initial seeds.
-	if !cfg.DisableDNSSeed {
-		proxy := ""
-		if cfg.Proxy != "" && cfg.UseTor {
-			proxy = cfg.Proxy
-		}
-		seedpeers := dnsDiscover(activeNetParams.dnsSeeds, proxy)
-		addresses := make([]*btcwire.NetAddress, len(seedpeers))
-		// if this errors then we have *real* problems
-		intPort, _ := strconv.Atoi(activeNetParams.peerPort)
-		for i, peer := range seedpeers {
-			addresses[i] = new(btcwire.NetAddress)
-			addresses[i].SetAddress(peer, uint16(intPort))
-			// bitcoind seeds with addresses from
-			// a time randomly selected between 3
-			// and 7 days ago.
-			addresses[i].Timestamp = time.Now().Add(-1 *
-				time.Second * time.Duration(secondsIn3Days+
-				rand.Int31n(secondsIn4Days)))
-		}
-
-		server.addrManager.AddAddresses(addresses)
-		// XXX if this is empty do we want to use hardcoded
-		// XXX peers like bitcoind does?
-	}
-
-	peers := cfg.ConnectPeers
-	if len(peers) == 0 {
-		peers = cfg.AddPeers
-	}
-	// Connect to initial peers.
-	for _, addr := range peers {
-		// Connect to peer and add it to the server.
-		server.ConnectPeerAsync(addr, true)
-	}
 
 	server.WaitForShutdown()
 	return nil

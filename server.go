@@ -9,8 +9,8 @@ import (
 	"fmt"
 	"github.com/conformal/btcdb"
 	"github.com/conformal/btcwire"
-	"github.com/conformal/go-socks"
 	"net"
+	"strconv"
 	"sync"
 	"time"
 )
@@ -21,6 +21,9 @@ const supportedServices = btcwire.SFNodeNetwork
 // connectionRetryInterval is the amount of time to wait in between retries
 // when connecting to persistent peers.
 const connectionRetryInterval = time.Second * 10
+
+// defaultMaxOutbound is the default number of max outbound peers.
+const defaultMaxOutbound = 8
 
 // directionString is a helper function that returns a string that represents
 // the direction of a connection (inbound or outbound).
@@ -53,6 +56,7 @@ type server struct {
 	newPeers      chan *peer
 	donePeers     chan *peer
 	banPeers      chan *peer
+	wakeup        chan bool
 	relayInv      chan *btcwire.InvVect
 	broadcast     chan broadcastMsg
 	wg            sync.WaitGroup
@@ -62,29 +66,33 @@ type server struct {
 
 // handleAddPeerMsg deals with adding new peers.  It is invoked from the
 // peerHandler goroutine.
-func (s *server) handleAddPeerMsg(peers *list.List, banned map[string]time.Time, p *peer) {
+func (s *server) handleAddPeerMsg(peers *list.List, banned map[string]time.Time, p *peer) bool {
+	if p == nil {
+		return false
+	}
+
 	// Ignore new peers if we're shutting down.
 	direction := directionString(p.inbound)
 	if s.shutdown {
 		log.Infof("[SRVR] New peer %s (%s) ignored - server is "+
-			"shutting down", p.conn.RemoteAddr(), direction)
+			"shutting down", p.addr, direction)
 		p.Shutdown()
-		return
+		return false
 	}
 
 	// Disconnect banned peers.
-	host, _, err := net.SplitHostPort(p.conn.RemoteAddr().String())
+	host, _, err := net.SplitHostPort(p.addr)
 	if err != nil {
 		log.Errorf("[SRVR] %v", err)
 		p.Shutdown()
-		return
+		return false
 	}
 	if banEnd, ok := banned[host]; ok {
 		if time.Now().Before(banEnd) {
 			log.Debugf("[SRVR] Peer %s is banned for another %v - "+
 				"disconnecting", host, banEnd.Sub(time.Now()))
 			p.Shutdown()
-			return
+			return false
 		}
 
 		log.Infof("[SRVR] Peer %s is no longer banned", host)
@@ -96,43 +104,52 @@ func (s *server) handleAddPeerMsg(peers *list.List, banned map[string]time.Time,
 	// Limit max number of total peers.
 	if peers.Len() >= cfg.MaxPeers {
 		log.Infof("[SRVR] Max peers reached [%d] - disconnecting "+
-			"peer %s (%s)", cfg.MaxPeers, p.conn.RemoteAddr(),
-			direction)
+			"peer %s (%s)", cfg.MaxPeers, p.addr, direction)
 		p.Shutdown()
-		return
+		// TODO(oga) how to handle permanent peers here?
+		// they should be rescheduled.
+		return false
 	}
 
 	// Add the new peer and start it.
-	log.Infof("[SRVR] New peer %s (%s)", p.conn.RemoteAddr(), direction)
+	log.Infof("[SRVR] New peer %s (%s)", p.addr, direction)
 	peers.PushBack(p)
-	p.Start()
+	if p.inbound {
+		p.Start()
+	}
+
+	return true
 }
 
 // handleDonePeerMsg deals with peers that have signalled they are done.  It is
 // invoked from the peerHandler goroutine.
-func (s *server) handleDonePeerMsg(peers *list.List, p *peer) {
+func (s *server) handleDonePeerMsg(peers *list.List, p *peer) bool {
 	direction := directionString(p.inbound)
 	for e := peers.Front(); e != nil; e = e.Next() {
 		if e.Value == p {
-			peers.Remove(e)
-			log.Infof("[SRVR] Removed peer %s (%s)",
-				p.conn.RemoteAddr(), direction)
 
 			// Issue an asynchronous reconnect if the peer was a
 			// persistent outbound connection.
-			if !p.inbound && p.persistent {
-				addr := p.conn.RemoteAddr().String()
-				s.ConnectPeerAsync(addr, true)
+			if !p.inbound && p.persistent && !s.shutdown {
+				// attempt reconnect.
+				addr := p.addr
+				e.Value = newOutboundPeer(s, addr, true)
+				return false
 			}
-			return
+			peers.Remove(e)
+			log.Infof("[SRVR] Removed peer %s (%s)", p.addr,
+				direction)
+			return true
 		}
 	}
+	log.Warnf("[SRVR] Lost peer %v that we never had!", p)
+	return false
 }
 
 // handleBanPeerMsg deals with banning peers.  It is invoked from the
 // peerHandler goroutine.
 func (s *server) handleBanPeerMsg(banned map[string]time.Time, p *peer) {
-	host, _, err := net.SplitHostPort(p.conn.RemoteAddr().String())
+	host, _, err := net.SplitHostPort(p.addr)
 	if err != nil {
 		log.Errorf("[SRVR] %v", err)
 		return
@@ -172,8 +189,12 @@ func (s *server) handleBroadcastMsg(peers *list.List, bmsg *broadcastMsg) {
 				excluded = true
 			}
 		}
+		p := e.Value.(*peer)
+		// Don't broadcast to still connecting outbound peers .
+		if p.conn == nil {
+			excluded = true
+		}
 		if !excluded {
-			p := e.Value.(*peer)
 			p.QueueMessage(bmsg.message)
 		}
 	}
@@ -192,7 +213,7 @@ func (s *server) listenHandler(listener net.Listener) {
 			}
 			continue
 		}
-		s.AddPeer(newPeer(s, conn, true, false))
+		s.AddPeer(newPeer(s, conn))
 	}
 	s.wg.Done()
 	log.Tracef("[SRVR] Listener handler done for %s", listener.Addr())
@@ -213,17 +234,80 @@ func (s *server) peerHandler() {
 	log.Tracef("[SRVR] Starting peer handler")
 	peers := list.New()
 	bannedPeers := make(map[string]time.Time)
+	outboundPeers := 0
+	maxOutbound := defaultMaxOutbound
+	if cfg.MaxPeers < maxOutbound {
+		maxOutbound = cfg.MaxPeers
+	}
+	var wakeupTimer *time.Timer = nil
+
+	// Do initial DNS seeding to populate address manager.
+	if !cfg.DisableDNSSeed {
+		proxy := ""
+		if cfg.Proxy != "" && cfg.UseTor {
+			proxy = cfg.Proxy
+		}
+		for _, seeder := range activeNetParams.dnsSeeds {
+			seedpeers := dnsDiscover(seeder, proxy)
+			if len(seedpeers) == 0 {
+				continue
+			}
+			addresses := make([]*btcwire.NetAddress, len(seedpeers))
+			// if this errors then we have *real* problems
+			intPort, _ := strconv.Atoi(activeNetParams.peerPort)
+			for i, peer := range seedpeers {
+				addresses[i] = new(btcwire.NetAddress)
+				addresses[i].SetAddress(peer, uint16(intPort))
+				// bitcoind seeds with addresses from
+				// a time randomly selected between 3
+				// and 7 days ago.
+				addresses[i].Timestamp = time.Now().Add(-1 *
+					time.Second * time.Duration(secondsIn3Days+
+					s.addrManager.rand.Int31n(secondsIn4Days)))
+			}
+
+			// Bitcoind uses a lookup of the dns seeder here. This
+			// is rather strange since the values looked up by the
+			// DNS seed lookups will vary quite a lot.
+			// to replicate this behaviour we put all addresses as
+			// having come from the first one.
+			s.addrManager.AddAddresses(addresses, addresses[0])
+		}
+		// XXX if this is empty do we want to use hardcoded
+		// XXX peers like bitcoind does?
+	}
+
+	// Start up persistent peers.
+	permanentPeers := cfg.ConnectPeers
+	if len(permanentPeers) == 0 {
+		permanentPeers = cfg.AddPeers
+	}
+	for _, addr := range permanentPeers {
+		if s.handleAddPeerMsg(peers, bannedPeers,
+			newOutboundPeer(s, addr, true)) {
+			outboundPeers++
+		}
+	}
+
+	// if nothing else happens, wake us up soon.
+	time.AfterFunc(10*time.Second, func() { s.wakeup <- true })
 
 	// Live while we're not shutting down or there are still connected peers.
 	for !s.shutdown || peers.Len() != 0 {
 		select {
 		// New peers connected to the server.
 		case p := <-s.newPeers:
-			s.handleAddPeerMsg(peers, bannedPeers, p)
+			if s.handleAddPeerMsg(peers, bannedPeers, p) &&
+				!p.inbound {
+				outboundPeers++
+			}
 
 		// Disconnected peers.
 		case p := <-s.donePeers:
-			s.handleDonePeerMsg(peers, p)
+			// handleDonePeerMsg return true if it removed a peer
+			if s.handleDonePeerMsg(peers, p) {
+				outboundPeers--
+			}
 
 		// Peer to ban.
 		case p := <-s.banPeers:
@@ -238,6 +322,10 @@ func (s *server) peerHandler() {
 		case bmsg := <-s.broadcast:
 			s.handleBroadcastMsg(peers, &bmsg)
 
+		// Used by timers below to wake us back up.
+		case <-s.wakeup:
+			// this page left intentionally blank
+
 		// Shutdown the peer handler.
 		case <-s.quit:
 			// Shutdown peers.
@@ -246,6 +334,98 @@ func (s *server) peerHandler() {
 				p.Shutdown()
 			}
 		}
+
+		// Timer was just to make sure we woke up again soon. so cancel
+		// and remove it as soon as we next come around.
+		if wakeupTimer != nil {
+			wakeupTimer.Stop()
+			wakeupTimer = nil
+		}
+
+		// Only try connect to more peers if we actually need more
+		if outboundPeers >= maxOutbound || s.shutdown {
+			continue
+		}
+		groups := make(map[string]int)
+		for e := peers.Front(); e != nil; e = e.Next() {
+			peer := e.Value.(*peer)
+			if !peer.inbound {
+				groups[GroupKey(peer.na)]++
+			}
+		}
+
+		tries := 0
+		for outboundPeers < maxOutbound &&
+			peers.Len() < cfg.MaxPeers && !s.shutdown {
+			// We bias like bitcoind does, 10 for no outgoing
+			// up to 90 (8) for the selection of new vs tried
+			//addresses.
+
+			nPeers := outboundPeers
+			if nPeers > 8 {
+				nPeers = 8
+			}
+			addr := s.addrManager.GetAddress("any", 10+nPeers*10)
+			if addr == nil {
+				break
+			}
+			key := GroupKey(addr.na)
+			// Address will not be invalid, local or unroutable
+			// because addrmanager rejects those on addition.
+			// Just check that we don't already have an address
+			// in the same group so that we are not connecting
+			// to the same network segment at the expense of
+			// others. bitcoind breaks out of the loop here, but
+			// we continue to try other addresses.
+			if groups[key] != 0 {
+				continue
+			}
+
+			tries++
+			// After 100 bad tries exit the loop and we'll try again
+			// later.
+			if tries > 100 {
+				break
+			}
+
+			// XXX if we have limited that address skip
+
+			// only allow recent nodes (10mins) after we failed 30
+			// times
+			if time.Now().After(addr.lastattempt.Add(10*time.Minute)) &&
+				tries < 30 {
+				continue
+			}
+
+			// allow nondefault ports after 50 failed tries.
+			if fmt.Sprintf("%d", addr.na.Port) !=
+				activeNetParams.peerPort && tries < 50 {
+				continue
+			}
+
+			addrStr := NetAddressKey(addr.na)
+
+			tries = 0
+			// any failure will be due to banned peers etc. we have
+			// already checked that we have room for more peers.
+			if s.handleAddPeerMsg(peers, bannedPeers,
+				newOutboundPeer(s, addrStr, false)) {
+				outboundPeers++
+				groups[key]++
+			}
+		}
+
+		// We we need more peers, wake up in ten seconds and try again.
+		if outboundPeers < maxOutbound && peers.Len() < cfg.MaxPeers {
+			time.AfterFunc(10*time.Second, func() {
+				s.wakeup <- true
+			})
+		}
+	}
+
+	if wakeupTimer != nil {
+		wakeupTimer.Stop()
+		wakeupTimer = nil
 	}
 
 	s.blockManager.Stop()
@@ -277,52 +457,6 @@ func (s *server) BroadcastMessage(msg btcwire.Message, exclPeers ...*peer) {
 	// broadcast and refrain from broadcasting again.
 	bmsg := broadcastMsg{message: msg, excludePeers: exclPeers}
 	s.broadcast <- bmsg
-}
-
-// ConnectPeerAsync attempts to asynchronously connect to addr.  If successful,
-// a new peer is created and added to the server's peer list.
-func (s *server) ConnectPeerAsync(addr string, persistent bool) {
-	// Don't try to connect to a peer if the server is shutting down.
-	if s.shutdown {
-		return
-	}
-
-	go func() {
-		// Select which dial method to call depending on whether or
-		// not a proxy is configured.  Also, add proxy information to
-		// logged address if needed.
-		dial := net.Dial
-		faddr := addr
-		if cfg.Proxy != "" {
-			proxy := &socks.Proxy{cfg.Proxy, cfg.ProxyUser, cfg.ProxyPass}
-			dial = proxy.Dial
-			faddr = fmt.Sprintf("%s via proxy %s", addr, cfg.Proxy)
-		}
-
-		// Attempt to connect to the peer.  If the connection fails and
-		// this is a persistent connection, retry after the retry
-		// interval.
-		for !s.shutdown {
-			log.Debugf("[SRVR] Attempting to connect to %s", faddr)
-			conn, err := dial("tcp", addr)
-			if err != nil {
-				log.Errorf("[SRVR] %v", err)
-				if !persistent {
-					return
-				}
-				log.Infof("[SRVR] Retrying connection to %s "+
-					"in %s", faddr, connectionRetryInterval)
-				time.Sleep(connectionRetryInterval)
-				continue
-			}
-
-			// Connection was successful so log it and create a new
-			// peer.
-			log.Infof("[SRVR] Connected to %s", conn.RemoteAddr())
-			s.AddPeer(newPeer(s, conn, false, persistent))
-			return
-		}
-	}()
 }
 
 // Start begins accepting connections from peers.
@@ -465,6 +599,7 @@ func newServer(addr string, db btcdb.Db, btcnet btcwire.BitcoinNet) (*server, er
 		newPeers:    make(chan *peer, cfg.MaxPeers),
 		donePeers:   make(chan *peer, cfg.MaxPeers),
 		banPeers:    make(chan *peer, cfg.MaxPeers),
+		wakeup:      make(chan bool),
 		relayInv:    make(chan *btcwire.InvVect, cfg.MaxPeers),
 		broadcast:   make(chan broadcastMsg, cfg.MaxPeers),
 		quit:        make(chan bool),
