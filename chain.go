@@ -445,13 +445,7 @@ func (b *BlockChain) removeBlockNode(node *blockNode) error {
 	if children, ok := b.depNodes[*prevHash]; ok {
 		// Find the node amongst the children of the
 		// dependencies for the parent hash and remove it.
-		for i, child := range children {
-			if child == node {
-				copy(children[i:], children[i+1:])
-				children[len(children)-1] = nil
-				b.depNodes[*prevHash] = children[:len(children)-1]
-			}
-		}
+		b.depNodes[*prevHash] = removeChildNode(children, node)
 
 		// Remove the map entry altogether if there are no
 		// longer any nodes which depend on the parent hash.
