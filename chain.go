@@ -194,9 +194,10 @@ func (b *BlockChain) removeOrphanBlock(orphan *orphanBlock) {
 		if hash.IsEqual(orphanHash) {
 			copy(orphans[i:], orphans[i+1:])
 			orphans[len(orphans)-1] = nil
-			b.prevOrphans[*prevHash] = orphans[:len(orphans)-1]
+			orphans = orphans[:len(orphans)-1]
 		}
 	}
+	b.prevOrphans[*prevHash] = orphans
 
 	// Remove the map entry altogether if there are no longer any orphans
 	// which depend on the parent hash.
