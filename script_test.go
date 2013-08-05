@@ -1204,7 +1204,7 @@ var txTests = []txTest{
 func testTx(t *testing.T, test txTest) {
 	engine, err := btcscript.NewScript(
 		test.tx.TxIn[test.idx].SignatureScript, test.pkScript,
-		test.idx, test.tx, 70001, test.bip16)
+		test.idx, test.tx, test.bip16)
 	if err != nil {
 		if err != test.parseErr {
 			t.Errorf("Failed to parse %s: got \"%v\" expected "+
@@ -1731,7 +1731,7 @@ func TestBadPC(t *testing.T) {
 
 	for _, test := range pcTests {
 		engine, err := btcscript.NewScript(tx.TxIn[0].SignatureScript,
-			pkScript, 0, tx, 70001, false)
+			pkScript, 0, tx, false)
 		if err != nil {
 			t.Errorf("Failed to create script: %v", err)
 		}
@@ -1801,7 +1801,7 @@ func TestCheckErrorCondition(t *testing.T) {
 	}
 
 	engine, err := btcscript.NewScript(tx.TxIn[0].SignatureScript, pkScript,
-		0, tx, 70001, false)
+		0, tx, false)
 	if err != nil {
 		t.Errorf("failed to create script: %v", err)
 	}

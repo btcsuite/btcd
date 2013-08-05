@@ -147,7 +147,6 @@ type Script struct {
 	astack          Stack // alt stack
 	tx              btcwire.MsgTx
 	txidx           int
-	pver            uint32
 	condStack       []int
 	numOps          int
 	bip16           bool     // treat execution as pay-to-script-hash
@@ -341,7 +340,7 @@ func unparseScript(pops []parsedOpcode) []byte {
 // a signature script scriptSig and a pubkeyscript scriptPubKey. If bip16 is
 // true then it will be treated as if the bip16 threshhold has passed and thus
 // pay-to-script hash transactions will be fully validated.
-func NewScript(scriptSig []byte, scriptPubKey []byte, txidx int, tx *btcwire.MsgTx, pver uint32, bip16 bool) (*Script, error) {
+func NewScript(scriptSig []byte, scriptPubKey []byte, txidx int, tx *btcwire.MsgTx, bip16 bool) (*Script, error) {
 	var m Script
 	scripts := [][]byte{scriptSig, scriptPubKey}
 	m.scripts = make([][]parsedOpcode, len(scripts))
@@ -372,7 +371,6 @@ func NewScript(scriptSig []byte, scriptPubKey []byte, txidx int, tx *btcwire.Msg
 
 	m.tx = *tx
 	m.txidx = txidx
-	m.pver = pver
 	m.condStack = []int{OpCondTrue}
 
 	return &m, nil
@@ -692,7 +690,7 @@ func (s *Script) calcScriptHash(script []parsedOpcode, hashType byte) []byte {
 	}
 
 	var wbuf bytes.Buffer
-	txCopy.BtcEncode(&wbuf, s.pver)
+	txCopy.Serialize(&wbuf)
 	// Append LE 4 bytes hash type
 	binary.Write(&wbuf, binary.LittleEndian, uint32(hashType))
 

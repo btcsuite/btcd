@@ -25,8 +25,7 @@ can be found at https://en.bitcoin.it/wiki/Script
 ```Go
 	pkscript := txS.TxOut[origintxidx].PkScript
 	engine, err := btcscript.NewScript(sigScript, pkscript, txInIdx,
-		txValidator, pver,
-		timestamp.After(btcscript.Bip16Activation))
+		txValidator, timestamp.After(btcscript.Bip16Activation))
 	err = engine.Execute()
 ```
 

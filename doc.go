@@ -40,13 +40,12 @@ engine to validate a transaction.
 
 	// ValidateTx validates the txIdx'th input of tx. The output transaction
 	// corresponding to the this input is the txInIdx'th output of txIn. The
-	// block timestamp of tx is timestamp and the protocol version involved
-	// is pver.
-	func ValidateTx(tx *btcwire.MsgTx, txIdx int, txIn *btcwire.MsgTx, txInIdx int, pver int, timestamp time.Time) {
+	// block timestamp of tx is timestamp.
+	func ValidateTx(tx *btcwire.MsgTx, txIdx int, txIn *btcwire.MsgTx, txInIdx int, timestamp time.Time) {
 		pkScript := txIn.TxOut[txInIdx].PkScript
 		sigScript := tx.txIn[TxIdx]
 		engine, err := btcscript.NewScript(sigScript, pkScript, txInIdx,
-			tx, pver, timestamp.After(btcscript.Bip16Activation))
+			tx, timestamp.After(btcscript.Bip16Activation))
 		return engine.Execute()
 	}
 

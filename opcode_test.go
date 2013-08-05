@@ -494,7 +494,7 @@ func testScript(t *testing.T, script []byte) (err error) {
 	tx.TxOut[0].PkScript = script
 
 	engine, err := btcscript.NewScript(tx.TxIn[0].SignatureScript,
-		tx.TxOut[0].PkScript, 0, tx, 1, false)
+		tx.TxOut[0].PkScript, 0, tx, false)
 	if err != nil {
 		return err
 	}
@@ -3875,7 +3875,7 @@ func testOpcode(t *testing.T, test *detailedTest) {
 	tx.TxOut[0].PkScript = test.script
 
 	engine, err := btcscript.NewScript(tx.TxIn[0].SignatureScript,
-		tx.TxOut[0].PkScript, 0, tx, 1, false)
+		tx.TxOut[0].PkScript, 0, tx, false)
 	if err != nil {
 		if err != test.expectedReturn {
 			t.Errorf("Error return not expected %s: %v %v",
