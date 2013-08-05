@@ -358,6 +358,66 @@ func TestBlockSerialize(t *testing.T) {
 	}
 }
 
+// TestBlockSerializeErrors performs negative tests against wire encode and
+// decode of MsgBlock to confirm error paths work correctly.
+func TestBlockSerializeErrors(t *testing.T) {
+	tests := []struct {
+		in       *btcwire.MsgBlock // Value to encode
+		buf      []byte            // Serialized data
+		max      int               // Max size of fixed buffer to induce errors
+		writeErr error             // Expected write error
+		readErr  error             // Expected read error
+	}{
+		// Force error in version.
+		{&blockOne, blockOneBytes, 0, io.ErrShortWrite, io.EOF},
+		// Force error in prev block hash.
+		{&blockOne, blockOneBytes, 4, io.ErrShortWrite, io.EOF},
+		// Force error in merkle root.
+		{&blockOne, blockOneBytes, 36, io.ErrShortWrite, io.EOF},
+		// Force error in timestamp.
+		{&blockOne, blockOneBytes, 68, io.ErrShortWrite, io.EOF},
+		// Force error in difficulty bits.
+		{&blockOne, blockOneBytes, 72, io.ErrShortWrite, io.EOF},
+		// Force error in header nonce.
+		{&blockOne, blockOneBytes, 76, io.ErrShortWrite, io.EOF},
+		// Force error in transaction count.
+		{&blockOne, blockOneBytes, 80, io.ErrShortWrite, io.EOF},
+		// Force error in transactions.
+		{&blockOne, blockOneBytes, 81, io.ErrShortWrite, io.EOF},
+	}
+
+	t.Logf("Running %d tests", len(tests))
+	for i, test := range tests {
+		// Serialize the block.
+		w := newFixedWriter(test.max)
+		err := test.in.Serialize(w)
+		if err != test.writeErr {
+			t.Errorf("Serialize #%d wrong error got: %v, want: %v",
+				i, err, test.writeErr)
+			continue
+		}
+
+		// Deserialize the block.
+		var block btcwire.MsgBlock
+		r := newFixedReader(test.max, test.buf)
+		err = block.Deserialize(r)
+		if err != test.readErr {
+			t.Errorf("Deserialize #%d wrong error got: %v, want: %v",
+				i, err, test.readErr)
+			continue
+		}
+
+		var txLocBlock btcwire.MsgBlock
+		rbuf := bytes.NewBuffer(test.buf[0:test.max])
+		_, err = txLocBlock.DeserializeTxLoc(rbuf)
+		if err != test.readErr {
+			t.Errorf("DeserializeTxLoc #%d wrong error got: %v, want: %v",
+				i, err, test.readErr)
+			continue
+		}
+	}
+}
+
 var blockOne = btcwire.MsgBlock{
 	Header: btcwire.BlockHeader{
 		Version: 1,

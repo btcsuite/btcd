@@ -432,6 +432,67 @@ func TestTxSerialize(t *testing.T) {
 	}
 }
 
+// TestTxSerializeErrors performs negative tests against wire encode and decode
+// of MsgTx to confirm error paths work correctly.
+func TestTxSerializeErrors(t *testing.T) {
+	tests := []struct {
+		in       *btcwire.MsgTx // Value to encode
+		buf      []byte         // Serialized data
+		max      int            // Max size of fixed buffer to induce errors
+		writeErr error          // Expected write error
+		readErr  error          // Expected read error
+	}{
+		// Force error in version.
+		{multiTx, multiTxEncoded, 0, io.ErrShortWrite, io.EOF},
+		// Force error in number of transaction inputs.
+		{multiTx, multiTxEncoded, 4, io.ErrShortWrite, io.EOF},
+		// Force error in transaction input previous block hash.
+		{multiTx, multiTxEncoded, 5, io.ErrShortWrite, io.EOF},
+		// Force error in transaction input previous block hash.
+		{multiTx, multiTxEncoded, 5, io.ErrShortWrite, io.EOF},
+		// Force error in transaction input previous block output index.
+		{multiTx, multiTxEncoded, 37, io.ErrShortWrite, io.EOF},
+		// Force error in transaction input signature script length.
+		{multiTx, multiTxEncoded, 41, io.ErrShortWrite, io.EOF},
+		// Force error in transaction input signature script.
+		{multiTx, multiTxEncoded, 42, io.ErrShortWrite, io.EOF},
+		// Force error in transaction input sequence.
+		{multiTx, multiTxEncoded, 49, io.ErrShortWrite, io.EOF},
+		// Force error in number of transaction outputs.
+		{multiTx, multiTxEncoded, 53, io.ErrShortWrite, io.EOF},
+		// Force error in transaction output value.
+		{multiTx, multiTxEncoded, 54, io.ErrShortWrite, io.EOF},
+		// Force error in transaction output pk script length.
+		{multiTx, multiTxEncoded, 62, io.ErrShortWrite, io.EOF},
+		// Force error in transaction output pk script.
+		{multiTx, multiTxEncoded, 63, io.ErrShortWrite, io.EOF},
+		// Force error in transaction output lock time.
+		{multiTx, multiTxEncoded, 130, io.ErrShortWrite, io.EOF},
+	}
+
+	t.Logf("Running %d tests", len(tests))
+	for i, test := range tests {
+		// Serialize the transaction.
+		w := newFixedWriter(test.max)
+		err := test.in.Serialize(w)
+		if err != test.writeErr {
+			t.Errorf("Serialize #%d wrong error got: %v, want: %v",
+				i, err, test.writeErr)
+			continue
+		}
+
+		// Deserialize the transaction.
+		var tx btcwire.MsgTx
+		r := newFixedReader(test.max, test.buf)
+		err = tx.Deserialize(r)
+		if err != test.readErr {
+			t.Errorf("Deserialize #%d wrong error got: %v, want: %v",
+				i, err, test.readErr)
+			continue
+		}
+	}
+}
+
 // multiTx is a MsgTx with an input and output and used in various tests.
 var multiTx = &btcwire.MsgTx{
 	Version: 1,
