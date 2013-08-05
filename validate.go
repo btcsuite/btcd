@@ -334,7 +334,7 @@ func countP2SHSigOps(msgTx *btcwire.MsgTx, isCoinBaseTx bool, txStore map[btcwir
 	}
 
 	// TODO(davec): Need to pass the cached version in.
-	txHash, err := msgTx.TxSha(btcwire.ProtocolVersion)
+	txHash, err := msgTx.TxSha()
 	if err != nil {
 		return 0, err
 	}
@@ -593,7 +593,7 @@ func checkTransactionInputs(tx *btcwire.MsgTx, txHeight int64, txStore map[btcwi
 	}
 
 	// TODO(davec): Need to pass the cached version in.
-	txHash, err := tx.TxSha(btcwire.ProtocolVersion)
+	txHash, err := tx.TxSha()
 	if err != nil {
 		return 0, err
 	}

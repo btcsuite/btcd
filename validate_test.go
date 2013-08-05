@@ -29,7 +29,7 @@ func TestCheckBlockSanity(t *testing.T) {
 	// the main bitcoin network and ignore notifications.
 	chain := btcchain.New(db, btcwire.MainNet, nil)
 
-	block := btcutil.NewBlock(&Block100000, btcwire.ProtocolVersion)
+	block := btcutil.NewBlock(&Block100000)
 	err = chain.TstCheckBlockSanity(block)
 	if err != nil {
 		t.Errorf("CheckBlockSanity: %v", err)

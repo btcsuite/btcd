@@ -7,13 +7,12 @@ package btcchain_test
 import (
 	"github.com/conformal/btcchain"
 	"github.com/conformal/btcutil"
-	"github.com/conformal/btcwire"
 	"testing"
 )
 
 // TestMerkle tests the BuildMerkleTreeStore API.
 func TestMerkle(t *testing.T) {
-	block := btcutil.NewBlock(&Block100000, btcwire.ProtocolVersion)
+	block := btcutil.NewBlock(&Block100000)
 	merkles := btcchain.BuildMerkleTreeStore(block)
 	calculatedMerkleRoot := merkles[len(merkles)-1]
 	wantMerkle := &Block100000.Header.MerkleRoot

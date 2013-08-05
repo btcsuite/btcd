@@ -22,7 +22,7 @@ type txData struct {
 }
 
 // connectTransactions updates the passed map by applying transaction and
-// spend information for all the transactions in the passed block. Only
+// spend information for all the transactions in the passed block.  Only
 // transactions in the passed map are updated.
 func connectTransactions(txStore map[btcwire.ShaHash]*txData, block *btcutil.Block) error {
 	// Loop through all of the transactions in the block to see if any of
@@ -243,7 +243,7 @@ func (b *BlockChain) fetchInputTransactions(node *blockNode, block *btcutil.Bloc
 		}
 	}
 
-	// Request the input transaction from the point of view of the node.
+	// Request the input transactions from the point of view of the node.
 	txNeededStore, err := b.fetchTxList(node, txNeededList)
 	if err != nil {
 		return nil, err

@@ -122,7 +122,7 @@ func loadBlocks(filename string) (blocks []*btcutil.Block, err error) {
 		// read block
 		dr.Read(rbytes)
 
-		block, err = btcutil.NewBlockFromBytes(rbytes, btcwire.ProtocolVersion)
+		block, err = btcutil.NewBlockFromBytes(rbytes)
 		if err != nil {
 			return
 		}

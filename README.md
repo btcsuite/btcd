@@ -105,8 +105,7 @@ intentionally causes an error by attempting to process a duplicate block.
 		// Insert the main network genesis block.  This is part of the initial
 		// database setup.  Like above, this typically would not be needed when
 		// opening an existing database.
-		pver := btcwire.ProtocolVersion
-		genesisBlock := btcutil.NewBlock(&btcwire.GenesisBlock, pver)
+		genesisBlock := btcutil.NewBlock(&btcwire.GenesisBlock)
 		_, err = db.InsertBlock(genesisBlock)
 		if err != nil {
 			fmt.Printf("Failed to insert genesis block: %v\n", err)
