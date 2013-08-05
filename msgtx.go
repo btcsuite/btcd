@@ -168,6 +168,8 @@ func (tx *MsgTx) Copy() *MsgTx {
 
 // BtcDecode decodes r using the bitcoin protocol encoding into the receiver.
 // This is part of the Message interface implementation.
+// See Deserialize for decoding transactions stored to disk, such as in a
+// database, as opposed to decoding transactions from the wire.
 func (msg *MsgTx) BtcDecode(r io.Reader, pver uint32) error {
 	err := readElement(r, &msg.Version)
 	if err != nil {
@@ -210,8 +212,27 @@ func (msg *MsgTx) BtcDecode(r io.Reader, pver uint32) error {
 	return nil
 }
 
+// Deserialize decodes a transaction from r into the receiver using a format
+// that is suitable for long-term storage such as a database while respecting
+// the Version field in the transaction.  This function differs from BtcDecode
+// in that BtcDecode decodes from the bitcoin wire protocol as it was sent
+// across the network.  The wire encoding can technically differ depending on
+// the protocol version and doesn't even really need to match the format of a
+// stored transaction at all.  As of the time this comment was written, the
+// encoded transaction is the same in both instances, but there is a distinct
+// difference and separating the two allows the API to be flexible enough to
+// deal with changes.
+func (msg *MsgTx) Deserialize(r io.Reader) error {
+	// At the current time, there is no difference between the wire encoding
+	// at protocol version 0 and the stable long-term storage format.  As
+	// a result, make use of BtcDecode.
+	return msg.BtcDecode(r, 0)
+}
+
 // BtcEncode encodes the receiver to w using the bitcoin protocol encoding.
 // This is part of the Message interface implementation.
+// See Serialize for encoding transactions to be stored to disk, such as in a
+// database, as opposed to encoding transactions for the wire.
 func (msg *MsgTx) BtcEncode(w io.Writer, pver uint32) error {
 	err := writeElement(w, msg.Version)
 	if err != nil {
@@ -250,6 +271,24 @@ func (msg *MsgTx) BtcEncode(w io.Writer, pver uint32) error {
 	}
 
 	return nil
+}
+
+// Serialize encodes the transaction to w using a format that suitable for
+// long-term storage such as a database while respecting the Version field in
+// the transaction.  This function differs from BtcEncode in that BtcEncode
+// encodes the transaction to the bitcoin wire protocol in order to be sent
+// across the network.  The wire encoding can technically differ depending on
+// the protocol version and doesn't even really need to match the format of a
+// stored transaction at all.  As of the time this comment was written, the
+// encoded transaction is the same in both instances, but there is a distinct
+// difference and separating the two allows the API to be flexible enough to
+// deal with changes.
+func (msg *MsgTx) Serialize(w io.Writer) error {
+	// At the current time, there is no difference between the wire encoding
+	// at protocol version 0 and the stable long-term storage format.  As
+	// a result, make use of BtcEncode.
+	return msg.BtcEncode(w, 0)
+
 }
 
 // Command returns the protocol command string for the message.  This is part

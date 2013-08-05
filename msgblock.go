@@ -57,6 +57,8 @@ func (msg *MsgBlock) ClearTransactions() {
 
 // BtcDecode decodes r using the bitcoin protocol encoding into the receiver.
 // This is part of the Message interface implementation.
+// See Deserialize for decoding blocks stored to disk, such as in a database, as
+// opposed to decoding blocks from the wire.
 func (msg *MsgBlock) BtcDecode(r io.Reader, pver uint32) error {
 	err := readBlockHeader(r, pver, &msg.Header)
 	if err != nil {
@@ -79,18 +81,17 @@ func (msg *MsgBlock) BtcDecode(r io.Reader, pver uint32) error {
 // receiver and returns a slice containing the start and length of each
 // transaction within the raw data.
 func (msg *MsgBlock) BtcDecodeTxLoc(r *bytes.Buffer, pver uint32) ([]TxLoc, error) {
-	var fullLen int
-	fullLen = r.Len()
-
+	fullLen := r.Len()
 	err := readBlockHeader(r, pver, &msg.Header)
 	if err != nil {
 		return nil, err
 	}
 
-	var txLocs []TxLoc
-	txLocs = make([]TxLoc, msg.Header.TxnCount)
-
-	for i := uint64(0); i < msg.Header.TxnCount; i++ {
+	// Decode each transaction while keeping track of its location within
+	// the byte stream.
+	txCount := msg.Header.TxnCount
+	txLocs := make([]TxLoc, txCount)
+	for i := uint64(0); i < txCount; i++ {
 		txLocs[i].TxStart = fullLen - r.Len()
 		tx := MsgTx{}
 		err := tx.BtcDecode(r, pver)
@@ -104,8 +105,58 @@ func (msg *MsgBlock) BtcDecodeTxLoc(r *bytes.Buffer, pver uint32) ([]TxLoc, erro
 	return txLocs, nil
 }
 
+// Deserialize decodes a block from r into the receiver using a format that is
+// suitable for long-term storage such as a database while respecting the
+// Version field in the block.  This function differs from BtcDecode in that
+// BtcDecode decodes from the bitcoin wire protocol as it was sent across the
+// network.  The wire encoding can technically differ depending on the protocol
+// version and doesn't even really need to match the format of a stored block at
+// all.  As of the time this comment was written, the encoded block is the same
+// in both instances, but there is a distinct difference and separating the two
+// allows the API to be flexible enough to deal with changes.
+func (msg *MsgBlock) Deserialize(r io.Reader) error {
+	// At the current time, there is no difference between the wire encoding
+	// at protocol version 0 and the stable long-term storage format.  As
+	// a result, make use of BtcDecode.
+	return msg.BtcDecode(r, 0)
+}
+
+// DeserializeTxLoc decodes r in the same manner Deserialize does, but it takes
+// a byte buffer instead of a generic reader and returns a slice containing the start and length of
+// each transaction within the raw data that is being deserialized.
+func (msg *MsgBlock) DeserializeTxLoc(r *bytes.Buffer) ([]TxLoc, error) {
+	fullLen := r.Len()
+
+	// At the current time, there is no difference between the wire encoding
+	// at protocol version 0 and the stable long-term storage format.  As
+	// a result, make use of existing wire protocol functions.
+	err := readBlockHeader(r, 0, &msg.Header)
+	if err != nil {
+		return nil, err
+	}
+
+	// Deserialize each transaction while keeping track of its location
+	// within the byte stream.
+	txCount := msg.Header.TxnCount
+	txLocs := make([]TxLoc, txCount)
+	for i := uint64(0); i < txCount; i++ {
+		txLocs[i].TxStart = fullLen - r.Len()
+		tx := MsgTx{}
+		err := tx.Deserialize(r)
+		if err != nil {
+			return nil, err
+		}
+		msg.Transactions = append(msg.Transactions, &tx)
+		txLocs[i].TxLen = (fullLen - r.Len()) - txLocs[i].TxStart
+	}
+
+	return txLocs, nil
+}
+
 // BtcEncode encodes the receiver to w using the bitcoin protocol encoding.
 // This is part of the Message interface implementation.
+// See Serialize for encoding blocks to be stored to disk, such as in a
+// database, as opposed to encoding blocks for the wire.
 func (msg *MsgBlock) BtcEncode(w io.Writer, pver uint32) error {
 	msg.Header.TxnCount = uint64(len(msg.Transactions))
 
@@ -122,6 +173,22 @@ func (msg *MsgBlock) BtcEncode(w io.Writer, pver uint32) error {
 	}
 
 	return nil
+}
+
+// Serialize encodes the block to w using a format that suitable for long-term
+// storage such as a database while respecting the Version field in the block.
+// This function differs from BtcEncode in that BtcEncode encodes the block to
+// the bitcoin wire protocol in order to be sent across the network.  The wire
+// encoding can technically differ depending on the protocol version and doesn't
+// even really need to match the format of a stored block at all.  As of the
+// time this comment was written, the encoded block is the same in both
+// instances, but there is a distinct difference and separating the two allows
+// the API to be flexible enough to deal with changes.
+func (msg *MsgBlock) Serialize(w io.Writer) error {
+	// At the current time, there is no difference between the wire encoding
+	// at protocol version 0 and the stable long-term storage format.  As
+	// a result, make use of BtcEncode.
+	return msg.BtcEncode(w, 0)
 }
 
 // Command returns the protocol command string for the message.  This is part
