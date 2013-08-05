@@ -25,13 +25,12 @@ func (e OutOfRangeError) Error() string {
 }
 
 // Block defines a bitcoin block that provides easier and more efficient
-// manipulation of raw wire protocol blocks.  It also memoizes hashes for the
-// block and its transactions on their first access so subsequent accesses don't
-// have to repeat the relatively expensive hashing operations.
+// manipulation of raw blocks.  It also memoizes hashes for the block and its
+// transactions on their first access so subsequent accesses don't have to
+// repeat the relatively expensive hashing operations.
 type Block struct {
 	msgBlock        *btcwire.MsgBlock  // Underlying MsgBlock
-	rawBlock        []byte             // Raw wire encoded bytes for the block
-	protocolVersion uint32             // Protocol version used to encode rawBlock
+	serializedBlock []byte             // Serialized bytes for the block
 	blockSha        *btcwire.ShaHash   // Cached block hash
 	blockHeight     int64              // Height in the main block chain
 	txShas          []*btcwire.ShaHash // Cached transaction hashes
@@ -44,28 +43,26 @@ func (b *Block) MsgBlock() *btcwire.MsgBlock {
 	return b.msgBlock
 }
 
-// Bytes returns the raw wire protocol encoded bytes for the Block and the
-// protocol version used to encode it.  This is equivalent to calling BtcEncode
-// on the underlying btcwire.MsgBlock, however it caches the result so
-// subsequent calls are more efficient.
-func (b *Block) Bytes() ([]byte, uint32, error) {
-	// Return the cached raw block bytes and associated protocol version if
-	// it has already been generated.
-	if len(b.rawBlock) != 0 {
-		return b.rawBlock, b.protocolVersion, nil
+// Bytes returns the serialized bytes for the Block.  This is equivalent to
+// calling Serialize on the underlying btcwire.MsgBlock, however it caches the
+// result so subsequent calls are more efficient.
+func (b *Block) Bytes() ([]byte, error) {
+	// Return the cached serialized bytes if it has already been generated.
+	if len(b.serializedBlock) != 0 {
+		return b.serializedBlock, nil
 	}
 
-	// Encode the MsgBlock into raw block bytes.
+	// Serialize the MsgBlock.
 	var w bytes.Buffer
-	err := b.msgBlock.BtcEncode(&w, b.protocolVersion)
+	err := b.msgBlock.Serialize(&w)
 	if err != nil {
-		return nil, 0, err
+		return nil, err
 	}
-	rawBlock := w.Bytes()
+	serializedBlock := w.Bytes()
 
-	// Cache the encoded bytes and return them.
-	b.rawBlock = rawBlock
-	return rawBlock, b.protocolVersion, nil
+	// Cache the serialized bytes and return them.
+	b.serializedBlock = serializedBlock
+	return serializedBlock, nil
 }
 
 // Sha returns the block identifier hash for the Block.  This is equivalent to
@@ -79,7 +76,7 @@ func (b *Block) Sha() (*btcwire.ShaHash, error) {
 
 	// Generate the block hash.  Ignore the error since BlockSha can't
 	// currently fail.
-	sha, _ := b.msgBlock.BlockSha(b.protocolVersion)
+	sha, _ := b.msgBlock.BlockSha()
 
 	// Cache the block hash and return it.
 	b.blockSha = &sha
@@ -112,7 +109,7 @@ func (b *Block) TxSha(txNum int) (*btcwire.ShaHash, error) {
 
 	// Generate the hash for the transaction.  Ignore the error since TxSha
 	// can't currently fail.
-	sha, _ := b.msgBlock.Transactions[txNum].TxSha(b.protocolVersion)
+	sha, _ := b.msgBlock.Transactions[txNum].TxSha()
 
 	// Cache the transaction hash and return it.
 	b.txShas[txNum] = &sha
@@ -140,7 +137,7 @@ func (b *Block) TxShas() ([]*btcwire.ShaHash, error) {
 	for i, hash := range b.txShas {
 		if hash == nil {
 			// Ignore the error since TxSha can't currently fail.
-			sha, _ := b.msgBlock.Transactions[i].TxSha(b.protocolVersion)
+			sha, _ := b.msgBlock.Transactions[i].TxSha()
 			b.txShas[i] = &sha
 		}
 	}
@@ -149,79 +146,69 @@ func (b *Block) TxShas() ([]*btcwire.ShaHash, error) {
 	return b.txShas, nil
 }
 
-// ProtocolVersion returns the protocol version that was used to create the
-// underlying btcwire.MsgBlock.
-func (b *Block) ProtocolVersion() uint32 {
-	return b.protocolVersion
-}
-
 // TxLoc returns the offsets and lengths of each transaction in a raw block.
 // It is used to allow fast indexing into transactions within the raw byte
 // stream.
 func (b *Block) TxLoc() ([]btcwire.TxLoc, error) {
-	rawMsg, pver, err := b.Bytes()
+	rawMsg, err := b.Bytes()
 	if err != nil {
 		return nil, err
 	}
 	rbuf := bytes.NewBuffer(rawMsg)
 
 	var mblock btcwire.MsgBlock
-	txLocs, err := mblock.BtcDecodeTxLoc(rbuf, pver)
+	txLocs, err := mblock.DeserializeTxLoc(rbuf)
 	if err != nil {
 		return nil, err
 	}
 	return txLocs, err
 }
 
-// Height returns the saved height of the block in the blockchain.  This value
+// Height returns the saved height of the block in the block chain.  This value
 // will be BlockHeightUnknown if it hasn't already explicitly been set.
 func (b *Block) Height() int64 {
 	return b.blockHeight
 }
 
-// SetHeight sets the height of the block in the blockchain.
+// SetHeight sets the height of the block in the block chain.
 func (b *Block) SetHeight(height int64) {
 	b.blockHeight = height
 }
 
 // NewBlock returns a new instance of a bitcoin block given an underlying
-// btcwire.MsgBlock and protocol version.  See Block.
-func NewBlock(msgBlock *btcwire.MsgBlock, pver uint32) *Block {
+// btcwire.MsgBlock.  See Block.
+func NewBlock(msgBlock *btcwire.MsgBlock) *Block {
 	return &Block{
-		msgBlock:        msgBlock,
-		protocolVersion: pver,
-		blockHeight:     BlockHeightUnknown,
+		msgBlock:    msgBlock,
+		blockHeight: BlockHeightUnknown,
 	}
 }
 
 // NewBlockFromBytes returns a new instance of a bitcoin block given the
-// raw wire encoded bytes and protocol version used to encode those bytes.
-// See Block.
-func NewBlockFromBytes(rawBlock []byte, pver uint32) (*Block, error) {
-	// Decode the raw block bytes into a MsgBlock.
+// serialized bytes.  See Block.
+func NewBlockFromBytes(serializedBlock []byte) (*Block, error) {
+	// Deserialize the bytes into a MsgBlock.
 	var msgBlock btcwire.MsgBlock
-	br := bytes.NewBuffer(rawBlock)
-	err := msgBlock.BtcDecode(br, pver)
+	br := bytes.NewBuffer(serializedBlock)
+	err := msgBlock.Deserialize(br)
 	if err != nil {
 		return nil, err
 	}
 
 	b := Block{
 		msgBlock:        &msgBlock,
-		rawBlock:        rawBlock,
-		protocolVersion: pver,
+		serializedBlock: serializedBlock,
 		blockHeight:     BlockHeightUnknown,
 	}
 	return &b, nil
 }
 
 // NewBlockFromBlockAndBytes returns a new instance of a bitcoin block given
-// an underlying btcwire.MsgBlock, protocol version and raw Block.  See Block.
-func NewBlockFromBlockAndBytes(msgBlock *btcwire.MsgBlock, rawBlock []byte, pver uint32) *Block {
+// an underlying btcwire.MsgBlock and the serialized bytes for it.  See Block.
+func NewBlockFromBlockAndBytes(msgBlock *btcwire.MsgBlock, serializedBlock []byte) *Block {
 	return &Block{
 		msgBlock:        msgBlock,
-		rawBlock:        rawBlock,
-		protocolVersion: pver,
+		serializedBlock: serializedBlock,
 		blockHeight:     BlockHeightUnknown,
 	}
 }

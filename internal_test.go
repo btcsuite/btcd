@@ -11,8 +11,9 @@ interface. The functions are only exported while the tests are being run.
 
 package btcutil
 
-// SetBlockBytes sets the internal raw block byte buffer to the passed buffer.
-// It is used to inject errors and only available to the test package.
+// SetBlockBytes sets the internal serialized block byte buffer to the passed
+// buffer.  It is used to inject errors and is only available to the test
+// package.
 func (b *Block) SetBlockBytes(buf []byte) {
-	b.rawBlock = buf
+	b.serializedBlock = buf
 }

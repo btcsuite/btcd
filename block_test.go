@@ -17,14 +17,9 @@ import (
 
 // TestBlock tests the API for Block.
 func TestBlock(t *testing.T) {
-	pver := btcwire.ProtocolVersion
-	b := btcutil.NewBlock(&Block100000, pver)
+	b := btcutil.NewBlock(&Block100000)
 
 	// Ensure we get the same data back out.
-	if gotPver := b.ProtocolVersion(); gotPver != pver {
-		t.Errorf("ProtocolVersion: wrong protocol version - got %v, want %v",
-			gotPver, pver)
-	}
 	if msgBlock := b.MsgBlock(); !reflect.DeepEqual(msgBlock, &Block100000) {
 		t.Errorf("MsgBlock: mismatched MsgBlock - got %v, want %v",
 			spew.Sdump(msgBlock), spew.Sdump(&Block100000))
@@ -89,7 +84,7 @@ func TestBlock(t *testing.T) {
 	}
 
 	// Create a new block to nuke all cached data.
-	b = btcutil.NewBlock(&Block100000, pver)
+	b = btcutil.NewBlock(&Block100000)
 
 	// Request slice of all transaction shas multiple times to test
 	// generation and caching.
@@ -125,33 +120,27 @@ func TestBlock(t *testing.T) {
 		}
 	}
 
-	// Encode the test block to bytes.
+	// Serialize the test block.
 	var block100000Buf bytes.Buffer
-	err = Block100000.BtcEncode(&block100000Buf, pver)
+	err = Block100000.Serialize(&block100000Buf)
 	if err != nil {
-		t.Errorf("BtcEncode: %v", err)
+		t.Errorf("Serialize: %v", err)
 	}
 	block100000Bytes := block100000Buf.Bytes()
 
-	// Request raw bytes multiple times to test generation and caching.
+	// Request serialized bytes multiple times to test generation and
+	// caching.
 	for i := 0; i < 2; i++ {
-		rawBytes, tmpPver, err := b.Bytes()
+		serializedBytes, err := b.Bytes()
 		if err != nil {
 			t.Errorf("Bytes: %v", err)
 			continue
 		}
-		if !bytes.Equal(rawBytes, block100000Bytes) {
+		if !bytes.Equal(serializedBytes, block100000Bytes) {
 			t.Errorf("Bytes #%d wrong bytes - got %v, want %v", i,
-				spew.Sdump(rawBytes),
+				spew.Sdump(serializedBytes),
 				spew.Sdump(block100000Bytes))
 			continue
-		}
-		if tmpPver != pver {
-			t.Errorf("Bytes #%d wrong protocol version - "+
-				"got %v, want %v", i, spew.Sdump(rawBytes),
-				spew.Sdump(block100000Bytes))
-			continue
-
 		}
 	}
 
@@ -176,38 +165,33 @@ func TestBlock(t *testing.T) {
 	}
 }
 
-// TestNewBlockFromBytes tests creation of a Block from raw bytes.
+// TestNewBlockFromBytes tests creation of a Block from serialized bytes.
 func TestNewBlockFromBytes(t *testing.T) {
-	// Encode the test block to bytes.
-	pver := btcwire.ProtocolVersion
+	// Serialize the test block.
 	var block100000Buf bytes.Buffer
-	err := Block100000.BtcEncode(&block100000Buf, pver)
+	err := Block100000.Serialize(&block100000Buf)
 	if err != nil {
-		t.Errorf("BtcEncode: %v", err)
+		t.Errorf("Serialize: %v", err)
 	}
 	block100000Bytes := block100000Buf.Bytes()
 
-	// Create a new block from the encoded bytes.
-	b, err := btcutil.NewBlockFromBytes(block100000Bytes, pver)
+	// Create a new block from the serialized bytes.
+	b, err := btcutil.NewBlockFromBytes(block100000Bytes)
 	if err != nil {
 		t.Errorf("NewBlockFromBytes: %v", err)
 		return
 	}
 
 	// Ensure we get the same data back out.
-	rawBytes, tmpPver, err := b.Bytes()
+	serializedBytes, err := b.Bytes()
 	if err != nil {
 		t.Errorf("Bytes: %v", err)
 		return
 	}
-	if !bytes.Equal(rawBytes, block100000Bytes) {
+	if !bytes.Equal(serializedBytes, block100000Bytes) {
 		t.Errorf("Bytes: wrong bytes - got %v, want %v",
-			spew.Sdump(rawBytes),
+			spew.Sdump(serializedBytes),
 			spew.Sdump(block100000Bytes))
-	}
-	if tmpPver != pver {
-		t.Errorf("Bytes: wrong protocol version - got %v, want %v",
-			tmpPver, pver)
 	}
 
 	// Ensure the generated MsgBlock is correct.
@@ -220,33 +204,27 @@ func TestNewBlockFromBytes(t *testing.T) {
 // TestNewBlockFromBlockAndBytes tests creation of a Block from a MsgBlock and
 // raw bytes.
 func TestNewBlockFromBlockAndBytes(t *testing.T) {
-	// Encode the test block to bytes.
-	pver := btcwire.ProtocolVersion
+	// Serialize the test block.
 	var block100000Buf bytes.Buffer
-	err := Block100000.BtcEncode(&block100000Buf, pver)
+	err := Block100000.Serialize(&block100000Buf)
 	if err != nil {
-		t.Errorf("BtcEncode: %v", err)
+		t.Errorf("Serialize: %v", err)
 	}
 	block100000Bytes := block100000Buf.Bytes()
 
-	// Create a new block from the encoded bytes.
-	b := btcutil.NewBlockFromBlockAndBytes(&Block100000,
-		block100000Bytes, pver)
+	// Create a new block from the serialized bytes.
+	b := btcutil.NewBlockFromBlockAndBytes(&Block100000, block100000Bytes)
 
 	// Ensure we get the same data back out.
-	rawBytes, tmpPver, err := b.Bytes()
+	serializedBytes, err := b.Bytes()
 	if err != nil {
 		t.Errorf("Bytes: %v", err)
 		return
 	}
-	if !bytes.Equal(rawBytes, block100000Bytes) {
+	if !bytes.Equal(serializedBytes, block100000Bytes) {
 		t.Errorf("Bytes: wrong bytes - got %v, want %v",
-			spew.Sdump(rawBytes),
+			spew.Sdump(serializedBytes),
 			spew.Sdump(block100000Bytes))
-	}
-	if tmpPver != pver {
-		t.Errorf("Bytes: wrong protocol version - got %v, want %v",
-			tmpPver, pver)
 	}
 	if msgBlock := b.MsgBlock(); !reflect.DeepEqual(msgBlock, &Block100000) {
 		t.Errorf("MsgBlock: mismatched MsgBlock - got %v, want %v",
@@ -264,17 +242,16 @@ func TestBlockErrors(t *testing.T) {
 			testErr.Error(), wantErr)
 	}
 
-	// Encode the test block to bytes.
-	pver := btcwire.ProtocolVersion
+	// Serialize the test block.
 	var block100000Buf bytes.Buffer
-	err := Block100000.BtcEncode(&block100000Buf, pver)
+	err := Block100000.Serialize(&block100000Buf)
 	if err != nil {
-		t.Errorf("BtcEncode: %v", err)
+		t.Errorf("Serialize: %v", err)
 	}
 	block100000Bytes := block100000Buf.Bytes()
 
-	// Create a new block from the encoded bytes.
-	b, err := btcutil.NewBlockFromBytes(block100000Bytes, pver)
+	// Create a new block from the serialized bytes.
+	b, err := btcutil.NewBlockFromBytes(block100000Bytes)
 	if err != nil {
 		t.Errorf("NewBlockFromBytes: %v", err)
 		return
@@ -282,7 +259,7 @@ func TestBlockErrors(t *testing.T) {
 
 	// Truncate the block byte buffer to force errors.
 	shortBytes := block100000Bytes[:80]
-	_, err = btcutil.NewBlockFromBytes(shortBytes, pver)
+	_, err = btcutil.NewBlockFromBytes(shortBytes)
 	if err != io.EOF {
 		t.Errorf("NewBlockFromBytes: did not get expected error - "+
 			"got %v, want %v", err, io.EOF)
