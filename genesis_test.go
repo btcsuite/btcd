@@ -14,11 +14,9 @@ import (
 // TestGenesisBlock tests the genesis block of the main network for validity by
 // checking the encoded bytes and hashes.
 func TestGenesisBlock(t *testing.T) {
-	pver := uint32(60002)
-
 	// Encode the genesis block to raw bytes.
 	var buf bytes.Buffer
-	err := btcwire.GenesisBlock.BtcEncode(&buf, pver)
+	err := btcwire.GenesisBlock.Serialize(&buf)
 	if err != nil {
 		t.Errorf("TestGenesisBlock: %v", err)
 		return
@@ -33,7 +31,7 @@ func TestGenesisBlock(t *testing.T) {
 	}
 
 	// Check hash of the block against expected hash.
-	hash, err := btcwire.GenesisBlock.Header.BlockSha(pver)
+	hash, err := btcwire.GenesisBlock.BlockSha()
 	if err != nil {
 		t.Errorf("BlockSha: %v", err)
 	}
@@ -48,11 +46,9 @@ func TestGenesisBlock(t *testing.T) {
 // TestTestNetGenesisBlock tests the genesis block of the regression test
 // network for validity by checking the encoded bytes and hashes.
 func TestTestNetGenesisBlock(t *testing.T) {
-	pver := uint32(60002)
-
 	// Encode the genesis block to raw bytes.
 	var buf bytes.Buffer
-	err := btcwire.TestNetGenesisBlock.BtcEncode(&buf, pver)
+	err := btcwire.TestNetGenesisBlock.Serialize(&buf)
 	if err != nil {
 		t.Errorf("TestTestNetGenesisBlock: %v", err)
 		return
@@ -68,7 +64,7 @@ func TestTestNetGenesisBlock(t *testing.T) {
 	}
 
 	// Check hash of the block against expected hash.
-	hash, err := btcwire.TestNetGenesisBlock.Header.BlockSha(pver)
+	hash, err := btcwire.TestNetGenesisBlock.BlockSha()
 	if err != nil {
 		t.Errorf("BlockSha: %v", err)
 	}
@@ -83,11 +79,9 @@ func TestTestNetGenesisBlock(t *testing.T) {
 // TestTestNet3GenesisBlock tests the genesis block of the test network (version
 // 3) for validity by checking the encoded bytes and hashes.
 func TestTestNet3GenesisBlock(t *testing.T) {
-	pver := uint32(60002)
-
 	// Encode the genesis block to raw bytes.
 	var buf bytes.Buffer
-	err := btcwire.TestNet3GenesisBlock.BtcEncode(&buf, pver)
+	err := btcwire.TestNet3GenesisBlock.Serialize(&buf)
 	if err != nil {
 		t.Errorf("TestTestNet3GenesisBlock: %v", err)
 		return
@@ -103,7 +97,7 @@ func TestTestNet3GenesisBlock(t *testing.T) {
 	}
 
 	// Check hash of the block against expected hash.
-	hash, err := btcwire.TestNet3GenesisBlock.Header.BlockSha(pver)
+	hash, err := btcwire.TestNet3GenesisBlock.BlockSha()
 	if err != nil {
 		t.Errorf("BlockSha: %v", err)
 	}

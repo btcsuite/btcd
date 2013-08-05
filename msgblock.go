@@ -206,17 +206,17 @@ func (msg *MsgBlock) MaxPayloadLength(pver uint32) uint32 {
 }
 
 // BlockSha computes the block identifier hash for this block.
-func (msg *MsgBlock) BlockSha(pver uint32) (ShaHash, error) {
-	return msg.Header.BlockSha(pver)
+func (msg *MsgBlock) BlockSha() (ShaHash, error) {
+	return msg.Header.BlockSha()
 }
 
 // TxShas returns a slice of hashes of all of transactions in this block.
-func (msg *MsgBlock) TxShas(pver uint32) ([]ShaHash, error) {
+func (msg *MsgBlock) TxShas() ([]ShaHash, error) {
 	var shaList []ShaHash
 	for _, tx := range msg.Transactions {
 		// Ignore error here since TxSha can't fail in the current
 		// implementation except due to run-time panics.
-		sha, _ := tx.TxSha(pver)
+		sha, _ := tx.TxSha()
 		shaList = append(shaList, sha)
 	}
 	return shaList, nil

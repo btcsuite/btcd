@@ -121,8 +121,6 @@ func TestTx(t *testing.T) {
 
 // TestTxSha tests the ability to generate the hash of a transaction accurately.
 func TestTxSha(t *testing.T) {
-	pver := btcwire.ProtocolVersion
-
 	// Hash of first transaction from block 113875.
 	hashStr := "f051e59b5e2503ac626d03aaeac8ab7be2d72ba4b7e97119c5852d70d52dcb86"
 	wantHash, err := btcwire.NewShaHashFromStr(hashStr)
@@ -162,7 +160,7 @@ func TestTxSha(t *testing.T) {
 	msgTx.LockTime = 0
 
 	// Ensure the hash produced is expected.
-	txHash, err := msgTx.TxSha(pver)
+	txHash, err := msgTx.TxSha()
 	if err != nil {
 		t.Errorf("TxSha: %v", err)
 	}

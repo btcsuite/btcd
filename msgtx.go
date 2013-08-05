@@ -89,7 +89,7 @@ func (msg *MsgTx) AddTxOut(to *TxOut) {
 }
 
 // TxSha generates the ShaHash name for the transaction.
-func (tx *MsgTx) TxSha(pver uint32) (ShaHash, error) {
+func (tx *MsgTx) TxSha() (ShaHash, error) {
 	// Encode the transaction and calculate double sha256 on the result.
 	// Ignore the error returns since the only way the encode could fail
 	// is being out of memory or due to nil pointers, both of which would
@@ -98,7 +98,7 @@ func (tx *MsgTx) TxSha(pver uint32) (ShaHash, error) {
 	// regardless of input.
 	var buf bytes.Buffer
 	var sha ShaHash
-	_ = tx.BtcEncode(&buf, pver)
+	_ = tx.Serialize(&buf)
 	_ = sha.SetBytes(DoubleSha256(buf.Bytes()))
 
 	// Even though this function can't currently fail, it still returns

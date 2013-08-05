@@ -71,11 +71,6 @@ func TestBlock(t *testing.T) {
 // TestBlockTxShas tests the ability to generate a slice of all transaction
 // hashes from a block accurately.
 func TestBlockTxShas(t *testing.T) {
-	// Use protocol version 60002 specifically here instead of the latest
-	// because the test data is using bytes encoded with that protocol
-	// version.
-	pver := uint32(60002)
-
 	// Block 1, transaction 1 hash.
 	hashStr := "0e3e2357e806b6cdb1f70b54c3a3a17b6714ee1f0e68bebb44a74b1efd512098"
 	wantHash, err := btcwire.NewShaHashFromStr(hashStr)
@@ -85,7 +80,7 @@ func TestBlockTxShas(t *testing.T) {
 	}
 
 	wantShas := []btcwire.ShaHash{*wantHash}
-	shas, err := blockOne.TxShas(pver)
+	shas, err := blockOne.TxShas()
 	if err != nil {
 		t.Errorf("TxShas: %v", err)
 	}
@@ -97,11 +92,6 @@ func TestBlockTxShas(t *testing.T) {
 
 // TestBlockSha tests the ability to generate the hash of a block accurately.
 func TestBlockSha(t *testing.T) {
-	// Use protocol version 60002 specifically here instead of the latest
-	// because the test data is using bytes encoded with that protocol
-	// version.
-	pver := uint32(60002)
-
 	// Block 1 hash.
 	hashStr := "839a8e6886ab5951d76f411475428afc90947ee320161bbf18eb6048"
 	wantHash, err := btcwire.NewShaHashFromStr(hashStr)
@@ -110,7 +100,7 @@ func TestBlockSha(t *testing.T) {
 	}
 
 	// Ensure the hash produced is expected.
-	blockHash, err := blockOne.BlockSha(pver)
+	blockHash, err := blockOne.BlockSha()
 	if err != nil {
 		t.Errorf("BlockSha: %v", err)
 	}
@@ -477,7 +467,7 @@ var blockOne = btcwire.MsgBlock{
 	},
 }
 
-// Block one bytes encoded with protocol version 60002.
+// Block one serialized bytes.
 var blockOneBytes = []byte{
 	0x01, 0x00, 0x00, 0x00, // Version 1
 	0x6f, 0xe2, 0x8c, 0x0a, 0xb6, 0xf1, 0xb3, 0x72,
@@ -519,8 +509,7 @@ var blockOneBytes = []byte{
 	0x00, 0x00, 0x00, 0x00, // Lock time
 }
 
-// Transaction location information for block one trasnactions as encoded with
-// protocol version 60002.
+// Transaction location information for block one transactions.
 var blockOneTxLocs = []btcwire.TxLoc{
 	btcwire.TxLoc{TxStart: 81, TxLen: 134},
 }
