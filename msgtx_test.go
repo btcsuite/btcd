@@ -119,6 +119,7 @@ func TestTx(t *testing.T) {
 	return
 }
 
+// TestTxSha tests the ability to generate the hash of a transaction accurately.
 func TestTxSha(t *testing.T) {
 	pver := btcwire.ProtocolVersion
 
@@ -364,6 +365,68 @@ func TestTxWireErrors(t *testing.T) {
 		if err != test.readErr {
 			t.Errorf("BtcDecode #%d wrong error got: %v, want: %v",
 				i, err, test.readErr)
+			continue
+		}
+	}
+}
+
+// TestTxSerialize tests MsgTx serialize and deserialize.
+func TestTxSerialize(t *testing.T) {
+	noTx := btcwire.NewMsgTx()
+	noTx.Version = 1
+	noTxEncoded := []byte{
+		0x01, 0x00, 0x00, 0x00, // Version
+		0x00,                   // Varint for number of input transactions
+		0x00,                   // Varint for number of output transactions
+		0x00, 0x00, 0x00, 0x00, // Lock time
+	}
+
+	tests := []struct {
+		in  *btcwire.MsgTx // Message to encode
+		out *btcwire.MsgTx // Expected decoded message
+		buf []byte         // Serialized data
+	}{
+		// No transactions.
+		{
+			noTx,
+			noTx,
+			noTxEncoded,
+		},
+
+		// Multiple transactions.
+		{
+			multiTx,
+			multiTx,
+			multiTxEncoded,
+		},
+	}
+
+	t.Logf("Running %d tests", len(tests))
+	for i, test := range tests {
+		// Serialize the transaction.
+		var buf bytes.Buffer
+		err := test.in.Serialize(&buf)
+		if err != nil {
+			t.Errorf("Serialize #%d error %v", i, err)
+			continue
+		}
+		if !bytes.Equal(buf.Bytes(), test.buf) {
+			t.Errorf("Serialize #%d\n got: %s want: %s", i,
+				spew.Sdump(buf.Bytes()), spew.Sdump(test.buf))
+			continue
+		}
+
+		// Deserialize the transaction.
+		var tx btcwire.MsgTx
+		rbuf := bytes.NewBuffer(test.buf)
+		err = tx.Deserialize(rbuf)
+		if err != nil {
+			t.Errorf("Deserialize #%d error %v", i, err)
+			continue
+		}
+		if !reflect.DeepEqual(&tx, test.out) {
+			t.Errorf("Deserialize #%d\n got: %s want: %s", i,
+				spew.Sdump(&tx), spew.Sdump(test.out))
 			continue
 		}
 	}

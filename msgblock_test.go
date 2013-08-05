@@ -291,6 +291,73 @@ func TestBlockWireErrors(t *testing.T) {
 	}
 }
 
+// TestBlockSerialize tests MsgBlock serialize and deserialize.
+func TestBlockSerialize(t *testing.T) {
+	tests := []struct {
+		in     *btcwire.MsgBlock // Message to encode
+		out    *btcwire.MsgBlock // Expected decoded message
+		buf    []byte            // Serialized data
+		txLocs []btcwire.TxLoc   // Expected transaction locations
+	}{
+		{
+			&blockOne,
+			&blockOne,
+			blockOneBytes,
+			blockOneTxLocs,
+		},
+	}
+
+	t.Logf("Running %d tests", len(tests))
+	for i, test := range tests {
+		// Serialize the block.
+		var buf bytes.Buffer
+		err := test.in.Serialize(&buf)
+		if err != nil {
+			t.Errorf("Serialize #%d error %v", i, err)
+			continue
+		}
+		if !bytes.Equal(buf.Bytes(), test.buf) {
+			t.Errorf("Serialize #%d\n got: %s want: %s", i,
+				spew.Sdump(buf.Bytes()), spew.Sdump(test.buf))
+			continue
+		}
+
+		// Deserialize the block.
+		var block btcwire.MsgBlock
+		rbuf := bytes.NewBuffer(test.buf)
+		err = block.Deserialize(rbuf)
+		if err != nil {
+			t.Errorf("Deserialize #%d error %v", i, err)
+			continue
+		}
+		if !reflect.DeepEqual(&block, test.out) {
+			t.Errorf("Deserialize #%d\n got: %s want: %s", i,
+				spew.Sdump(&block), spew.Sdump(test.out))
+			continue
+		}
+
+		// Deserialize the block while gathering transaction location
+		// information.
+		var txLocBlock btcwire.MsgBlock
+		rbuf = bytes.NewBuffer(test.buf)
+		txLocs, err := txLocBlock.DeserializeTxLoc(rbuf)
+		if err != nil {
+			t.Errorf("DeserializeTxLoc #%d error %v", i, err)
+			continue
+		}
+		if !reflect.DeepEqual(&txLocBlock, test.out) {
+			t.Errorf("DeserializeTxLoc #%d\n got: %s want: %s", i,
+				spew.Sdump(&txLocBlock), spew.Sdump(test.out))
+			continue
+		}
+		if !reflect.DeepEqual(txLocs, test.txLocs) {
+			t.Errorf("DeserializeTxLoc #%d\n got: %s want: %s", i,
+				spew.Sdump(txLocs), spew.Sdump(test.txLocs))
+			continue
+		}
+	}
+}
+
 var blockOne = btcwire.MsgBlock{
 	Header: btcwire.BlockHeader{
 		Version: 1,
