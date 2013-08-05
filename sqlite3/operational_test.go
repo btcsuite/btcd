@@ -281,7 +281,7 @@ func testBackout(t *testing.T, mode int) {
 
 	block := blocks[110]
 	mblock := block.MsgBlock()
-	txsha, err := mblock.Transactions[0].TxSha(block.ProtocolVersion())
+	txsha, err := mblock.Transactions[0].TxSha()
 	exists := db.ExistsTxSha(&txsha)
 	if exists {
 		t.Errorf("tx %v exists in db, failure expected", txsha)
@@ -292,7 +292,7 @@ func testBackout(t *testing.T, mode int) {
 
 	block = blocks[99]
 	mblock = block.MsgBlock()
-	txsha, err = mblock.Transactions[0].TxSha(block.ProtocolVersion())
+	txsha, err = mblock.Transactions[0].TxSha()
 	oldused, err := db.FetchTxUsedBySha(&txsha)
 	err = db.InsertTx(&txsha, 99, 1024, 1048, oldused)
 	if err == nil {
@@ -324,7 +324,7 @@ func loadBlocks(t *testing.T, file string) (blocks []*btcutil.Block, err error) 
 	}()
 
 	// Set the first block as the genesis block.
-	genesis := btcutil.NewBlock(&btcwire.GenesisBlock, btcwire.ProtocolVersion)
+	genesis := btcutil.NewBlock(&btcwire.GenesisBlock)
 	blocks = append(blocks, genesis)
 
 	var block *btcutil.Block
@@ -355,14 +355,7 @@ func loadBlocks(t *testing.T, file string) (blocks []*btcutil.Block, err error) 
 		// read block
 		dr.Read(rbytes)
 
-		var pver uint32
-		switch {
-		case height < 200000:
-			pver = 1
-		case height >= 200000:
-			pver = 2
-		}
-		block, err = btcutil.NewBlockFromBytes(rbytes, pver)
+		block, err = btcutil.NewBlockFromBytes(rbytes)
 		if err != nil {
 			t.Errorf("failed to parse block %v", height)
 			return

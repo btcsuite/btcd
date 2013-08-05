@@ -550,14 +550,12 @@ func (db *SqliteDb) DropAfterBlockBySha(sha *btcwire.ShaHash) (err error) {
 			}
 
 			var buf []byte
-			var pver uint32
-
-			buf, pver, _, err = db.fetchSha(*sha)
+			buf, _, _, err = db.fetchSha(*sha)
 			if err != nil {
 				return
 			}
 
-			blk, err = btcutil.NewBlockFromBytes(buf, pver)
+			blk, err = btcutil.NewBlockFromBytes(buf)
 			if err != nil {
 				return
 			}
@@ -624,7 +622,7 @@ func (db *SqliteDb) InsertBlock(block *btcutil.Block) (int64, error) {
 	}
 
 	mblock := block.MsgBlock()
-	rawMsg, pver, err := block.Bytes()
+	rawMsg, err := block.Bytes()
 	if err != nil {
 		log.Warnf("Failed to obtain raw block sha %v", blocksha)
 		return -1, err
@@ -637,7 +635,7 @@ func (db *SqliteDb) InsertBlock(block *btcutil.Block) (int64, error) {
 
 	// Insert block into database
 	newheight, err := db.insertBlockData(blocksha, &mblock.Header.PrevBlock,
-		pver, rawMsg)
+		0, rawMsg)
 	if err != nil {
 		log.Warnf("Failed to insert block %v %v %v", blocksha,
 			&mblock.Header.PrevBlock, err)
@@ -672,7 +670,7 @@ func (db *SqliteDb) InsertBlock(block *btcutil.Block) (int64, error) {
 	// detect this condition and 'accept' the block.
 	for txidx, tx := range mblock.Transactions {
 		var txsha btcwire.ShaHash
-		txsha, err = tx.TxSha(pver)
+		txsha, err = tx.TxSha()
 		if err != nil {
 			log.Warnf("failed to compute tx name block %v idx %v err %v", blocksha, txidx, err)
 			return -1, err

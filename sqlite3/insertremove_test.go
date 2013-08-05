@@ -101,7 +101,7 @@ endtest:
 				}
 
 			}
-			txshaname, _ := tx.TxSha(block.ProtocolVersion())
+			txshaname, _ := tx.TxSha()
 			txlookupList = append(txlookupList, &txshaname)
 			txOutList = append(txOutList, &txshaname)
 		}

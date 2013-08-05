@@ -49,8 +49,7 @@ referenced parent block to already exist.  In a more concrete example:
 
 
 	// Insert the main network genesis block.
-	pver := btcwire.ProtocolVersion
-	genesis := btcutil.NewBlock(&btcwire.GenesisBlock, pver)
+	genesis := btcutil.NewBlock(&btcwire.GenesisBlock)
 	newHeight, err := db.InsertBlock(genesis)
 	if err != nil {
 		// Log and handle the error

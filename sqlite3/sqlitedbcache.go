@@ -62,12 +62,12 @@ func (db *SqliteDb) fetchBlockBySha(sha *btcwire.ShaHash) (blk *btcutil.Block, e
 		return blkcache.blk, nil
 	}
 
-	buf, pver, height, err := db.fetchSha(*sha)
+	buf, _, height, err := db.fetchSha(*sha)
 	if err != nil {
 		return nil, err
 	}
 
-	blk, err = btcutil.NewBlockFromBytes(buf, pver)
+	blk, err = btcutil.NewBlockFromBytes(buf)
 	if err != nil {
 		return
 	}
@@ -195,7 +195,7 @@ func (db *SqliteDb) fetchTxDataBySha(txsha *btcwire.ShaHash) (rtx *btcwire.MsgTx
 		return
 	}
 
-	blkbuf, pver, err = blk.Bytes()
+	blkbuf, err = blk.Bytes()
 	if err != nil {
 		log.Warnf("unable to decode block %v %v", height, &blksha)
 		return
@@ -264,7 +264,7 @@ func (db *SqliteDb) FetchTxAllBySha(txsha *btcwire.ShaHash) (rtx *btcwire.MsgTx,
 		return
 	}
 
-	blkbuf, pver, err = blk.Bytes()
+	blkbuf, err = blk.Bytes()
 	if err != nil {
 		log.Warnf("unable to decode block %v %v", height, &blksha)
 		return
