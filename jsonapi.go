@@ -689,7 +689,8 @@ func readResultCmd(cmd string, message []byte) (Reply, error) {
 	// for clarity).
 	case "getblockcount", "getbalance", "getblocknumber", "getgenerate",
 		"getconnetioncount", "getdifficulty", "gethashespersec",
-		"setgenerate", "stop", "settxfee":
+		"setgenerate", "stop", "settxfee", "getaccount",
+		"getnewaddress":
 		err = json.Unmarshal(message, &result)
 	// For anything else put it in an interface.  All the data is still
 	// there, just a little less convenient to deal with.
