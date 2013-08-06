@@ -290,7 +290,7 @@ func TestBlockErrors(t *testing.T) {
 
 // Block100000 defines block 100,000 of the block chain.  It is used to
 // test Block operations.
-var Block100000 btcwire.MsgBlock = btcwire.MsgBlock{
+var Block100000 = btcwire.MsgBlock{
 	Header: btcwire.BlockHeader{
 		Version: 1,
 		PrevBlock: btcwire.ShaHash([32]byte{ // Make go vet happy.
