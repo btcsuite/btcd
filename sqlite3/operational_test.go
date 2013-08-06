@@ -147,12 +147,12 @@ out:
 		}
 
 		if blkid != height {
-			t.Errorf("height doe not match latest block height %v %v", blkid, height, err)
+			t.Errorf("height does not match latest block height %v %v", blkid, height)
 		}
 
 		blkSha, _ := block.Sha()
 		if *newSha != *blkSha {
-			t.Errorf("Newest block sha does not match freshly inserted one %v %v ",  newSha, blkSha, err)
+			t.Errorf("Newest block sha does not match freshly inserted one %v %v ",  newSha, blkSha)
 		}
 	}
 
