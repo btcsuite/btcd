@@ -23,18 +23,20 @@ import (
 //      https://bitcointalk.org/index.php?topic=155054.0;all
 
 // KoblitzCurve supports a koblitz curve implementation that fits the ECC Curve
-// interface.
+// interface from crypto/elliptic.
 type KoblitzCurve struct {
 	*elliptic.CurveParams
 	q *big.Int
 }
 
+// Params returns the parameters fro the curve.
 func (curve *KoblitzCurve) Params() *elliptic.CurveParams {
 	return curve.CurveParams
 }
 
-// Return boolean if the point (x,y) is on the curve.
-// Differs from normal curve algorithm since a = 0 not -3
+// IsOnCurve returns boolean if the point (x,y) is on the curve.
+// Part of the elliptic.Curve interface. This function differs from the
+// crypto/elliptic algorithm since a = 0 not -3.
 func (curve *KoblitzCurve) IsOnCurve(x, y *big.Int) bool {
 	// y² = x³ + b
 	y2 := new(big.Int).Mul(y, y) //y²
@@ -78,6 +80,8 @@ func (curve *KoblitzCurve) affineFromJacobian(x, y, z *big.Int) (xOut, yOut *big
 	return
 }
 
+// Add returns the sum of (x1,y1 and (x2,y2). Part of the elliptic.Curve
+// interface.
 func (curve *KoblitzCurve) Add(x1, y1, x2, y2 *big.Int) (*big.Int, *big.Int) {
 	z1 := zForAffine(x1, y1)
 	z2 := zForAffine(x2, y2)
@@ -162,6 +166,7 @@ func (curve *KoblitzCurve) addJacobian(x1, y1, z1, x2, y2, z2 *big.Int) (*big.In
 	return x3, y3, z3
 }
 
+// Double returns 2*(x1,y1). Part of the elliptic.Curve interface.
 func (curve *KoblitzCurve) Double(x1, y1 *big.Int) (*big.Int, *big.Int) {
 	z1 := zForAffine(x1, y1)
 	return curve.affineFromJacobian(curve.doubleJacobian(x1, y1, z1))
@@ -201,6 +206,8 @@ func (curve *KoblitzCurve) doubleJacobian(x, y, z *big.Int) (*big.Int, *big.Int,
 	return x3, y3, z3
 }
 
+// ScalarMult returns k*(Bx, By) where k is a big endian integer.
+// Part of the elliptic.Curve interface.
 func (curve *KoblitzCurve) ScalarMult(Bx, By *big.Int, k []byte) (*big.Int, *big.Int) {
 	Bz := new(big.Int).SetInt64(1)
 	x, y, z := new(big.Int), new(big.Int), new(big.Int)
@@ -218,10 +225,15 @@ func (curve *KoblitzCurve) ScalarMult(Bx, By *big.Int, k []byte) (*big.Int, *big
 	return curve.affineFromJacobian(x, y, z)
 }
 
+// ScalarBaseMult returns k*G where G is the base point of the group and k is a
+// big endian integer.
+// Part of the elliptic.Curve interface.
 func (curve *KoblitzCurve) ScalarBaseMult(k []byte) (*big.Int, *big.Int) {
 	return curve.ScalarMult(curve.Gx, curve.Gy, k)
 }
 
+// QPlus1Div4 returns the Q+1/4 constant for the curve for use in calculating
+// square roots via exponention.
 func (curve *KoblitzCurve) QPlus1Div4() *big.Int {
 	if curve.q == nil {
 		curve.q = new(big.Int).Div(new(big.Int).Add(secp256k1.P, big.NewInt(1)), big.NewInt(4))
@@ -229,8 +241,7 @@ func (curve *KoblitzCurve) QPlus1Div4() *big.Int {
 	return curve.q
 }
 
-//curve parameters taken from:
-//http://www.secg.org/collateral/sec2_final.pdf
+// Curve parameters taken from: http://www.secg.org/collateral/sec2_final.pdf
 var initonce sync.Once
 var secp256k1 KoblitzCurve
 
@@ -249,7 +260,7 @@ func initS256() {
 	secp256k1.BitSize = 256
 }
 
-// P521 returns a Curve which implements P-521 (see FIPS 186-3, section D.2.5)
+// S256 returns a Curve which implements secp256k1.
 func S256() *KoblitzCurve {
 	initonce.Do(initAll)
 	return &secp256k1

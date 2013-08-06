@@ -20,8 +20,9 @@ const (
 	pubkeyHybrid            = 0x6 // y_bit + x coord + y coord
 )
 
-// Parse a public key for a koblitz curve from a bytestring into a
-// ecdsa.Publickey, verifying that it is valid.
+// ParsePubKey parses a public key for a koblitz curve from a bytestring into a
+// ecdsa.Publickey, verifying that it is valid. It supports compressed,
+// uncompressed and hybrid signature formats.
 func ParsePubKey(pubKeyStr []byte, curve *KoblitzCurve) (key *ecdsa.PublicKey, err error) {
 	pubkey := ecdsa.PublicKey{}
 	pubkey.Curve = curve

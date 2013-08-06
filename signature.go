@@ -11,11 +11,14 @@ import (
 	"math/big"
 )
 
+// Signature is a type representing an ecdsa signature.
 type Signature struct {
 	R *big.Int
 	S *big.Int
 }
 
+// ParseSignature parses a signature in DER format for the curve type `curve'
+// into a Signature type, perfoming some basic sanity checks.
 func ParseSignature(sigStr []byte, curve elliptic.Curve) (*Signature, error) {
 	// Originally this code used encoding/asn1 in order to parse the
 	// signature, but a number of problems were found with this approach.
