@@ -107,7 +107,7 @@ out:
 		}
 		if height == 248 {
 			for _, tx := range mblock.Transactions {
-				txsha, err := tx.TxSha(block.ProtocolVersion())
+				txsha, err := tx.TxSha()
 				_, _, _, _, err = db.FetchTxAllBySha(&txsha)
 				if err == nil {
 					t.Errorf("referenced tx found, should not have been %v, ", txsha)
