@@ -1,0 +1,100 @@
+// Copyright (c) 2013 Conformal Systems LLC.
+// Use of this source code is governed by an ISC
+// license that can be found in the LICENSE file.
+
+package main
+
+import (
+	"github.com/conformal/btcchain"
+	"github.com/conformal/btcwire"
+	"math/big"
+)
+
+// activeNetParams is a pointer to the parameters specific to the
+// currently active bitcoin network.
+var activeNetParams = netParams(defaultBtcnet)
+
+// params is used to group parameters for various networks such as the main
+// network and test networks.
+type params struct {
+	dbName       string
+	btcnet       btcwire.BitcoinNet
+	genesisBlock *btcwire.MsgBlock
+	genesisHash  *btcwire.ShaHash
+	powLimit     *big.Int
+	powLimitBits uint32
+	peerPort     string
+	listenPort   string
+	rpcPort      string
+	dnsSeeds     []string
+}
+
+// mainNetParams contains parameters specific to the main network
+// (btcwire.MainNet).
+var mainNetParams = params{
+	dbName:       "btcd.db",
+	btcnet:       btcwire.MainNet,
+	genesisBlock: btcchain.ChainParams(btcwire.MainNet).GenesisBlock,
+	genesisHash:  btcchain.ChainParams(btcwire.MainNet).GenesisHash,
+	powLimit:     btcchain.ChainParams(btcwire.MainNet).PowLimit,
+	powLimitBits: btcchain.ChainParams(btcwire.MainNet).PowLimitBits,
+	listenPort:   btcwire.MainPort,
+	peerPort:     btcwire.MainPort,
+	rpcPort:      "8332",
+	dnsSeeds: []string{
+		"seed.bitcoin.sipa.be",
+		"dnsseed.bluematt.me",
+		"dnsseed.bitcoin.dashjr.org",
+		"bitseed.xf2.org",
+	},
+}
+
+// regressionParams contains parameters specific to the regression test network
+// (btcwire.TestNet).
+var regressionParams = params{
+	dbName:       "btcd_regtest.db",
+	btcnet:       btcwire.TestNet,
+	genesisBlock: btcchain.ChainParams(btcwire.TestNet).GenesisBlock,
+	genesisHash:  btcchain.ChainParams(btcwire.TestNet).GenesisHash,
+	powLimit:     btcchain.ChainParams(btcwire.TestNet).PowLimit,
+	powLimitBits: btcchain.ChainParams(btcwire.TestNet).PowLimitBits,
+	listenPort:   btcwire.RegressionTestPort,
+	peerPort:     btcwire.TestNetPort,
+	rpcPort:      "18332",
+	dnsSeeds:     []string{},
+}
+
+// testNet3Params contains parameters specific to the test network (version 3)
+// (btcwire.TestNet3).
+var testNet3Params = params{
+	dbName:       "btcd_testnet.db",
+	btcnet:       btcwire.TestNet3,
+	genesisBlock: btcchain.ChainParams(btcwire.TestNet3).GenesisBlock,
+	genesisHash:  btcchain.ChainParams(btcwire.TestNet3).GenesisHash,
+	powLimit:     btcchain.ChainParams(btcwire.TestNet3).PowLimit,
+	powLimitBits: btcchain.ChainParams(btcwire.TestNet3).PowLimitBits,
+	listenPort:   btcwire.TestNetPort,
+	peerPort:     btcwire.TestNetPort,
+	rpcPort:      "18332",
+	dnsSeeds: []string{
+		"testnet-seed.bitcoin.petertodd.org",
+		"testnet-seed.bluematt.me",
+	},
+}
+
+// netParams returns parameters specific to the passed bitcoin network.
+func netParams(btcnet btcwire.BitcoinNet) *params {
+	switch btcnet {
+	case btcwire.TestNet:
+		return &regressionParams
+
+	case btcwire.TestNet3:
+		return &testNet3Params
+
+	// Return main net by default.
+	case btcwire.MainNet:
+		fallthrough
+	default:
+		return &mainNetParams
+	}
+}
