@@ -9,13 +9,13 @@ import (
 	"strings"
 )
 
-// Alphabet used by BTC
+// alphabet is the modified base58 alphabet used by Bitcoin.
 const alphabet = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz"
 
 var bigRadix = big.NewInt(58)
 var bigZero = big.NewInt(0)
 
-// Shared function to Base58 decode to a []byte
+// Base58Decode decodes a modified base58 string to a byte slice.
 func Base58Decode(b string) []byte {
 	answer := big.NewInt(0)
 	j := big.NewInt(1)
@@ -48,7 +48,7 @@ func Base58Decode(b string) []byte {
 	return val
 }
 
-// Shared function to Base58 encode a []byte
+// Base58Encode encodes a byte slice to a modified base58 string.
 func Base58Encode(b []byte) string {
 	x := new(big.Int)
 	x.SetBytes(b)
