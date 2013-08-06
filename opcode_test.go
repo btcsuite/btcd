@@ -3896,16 +3896,16 @@ func testOpcode(t *testing.T, test *detailedTest) {
 	if test.disassembly != "" {
 		dis0, err := engine.DisasmScript(0)
 		if err != nil {
-			t.Errorf("failed to disassemble script0 for %s: %v",
+			t.Errorf("%s: failed to disassemble script0: %v",
 				test.name, err)
 		}
 		if dis0 != "" {
-			t.Errorf("disassembly of empty script gave \"%s\"",
+			t.Errorf("%s: disassembly of empty script gave \"%s\"",
 				test.name, dis0)
 		}
 		disScript, err = engine.DisasmScript(1)
 		if err != nil {
-			t.Errorf("failed to disassemble script for %s: %v",
+			t.Errorf("%s: failed to disassemble script: %v",
 				test.name, err)
 		}
 		_, err = engine.DisasmScript(2)
