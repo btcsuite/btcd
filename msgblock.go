@@ -77,34 +77,6 @@ func (msg *MsgBlock) BtcDecode(r io.Reader, pver uint32) error {
 	return nil
 }
 
-// BtcDecodeTxLoc decodes r using the bitcoin protocol encoding into the
-// receiver and returns a slice containing the start and length of each
-// transaction within the raw data.
-func (msg *MsgBlock) BtcDecodeTxLoc(r *bytes.Buffer, pver uint32) ([]TxLoc, error) {
-	fullLen := r.Len()
-	err := readBlockHeader(r, pver, &msg.Header)
-	if err != nil {
-		return nil, err
-	}
-
-	// Decode each transaction while keeping track of its location within
-	// the byte stream.
-	txCount := msg.Header.TxnCount
-	txLocs := make([]TxLoc, txCount)
-	for i := uint64(0); i < txCount; i++ {
-		txLocs[i].TxStart = fullLen - r.Len()
-		tx := MsgTx{}
-		err := tx.BtcDecode(r, pver)
-		if err != nil {
-			return nil, err
-		}
-		msg.Transactions = append(msg.Transactions, &tx)
-		txLocs[i].TxLen = (fullLen - r.Len()) - txLocs[i].TxStart
-	}
-
-	return txLocs, nil
-}
-
 // Deserialize decodes a block from r into the receiver using a format that is
 // suitable for long-term storage such as a database while respecting the
 // Version field in the block.  This function differs from BtcDecode in that

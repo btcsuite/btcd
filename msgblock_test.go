@@ -194,24 +194,6 @@ func TestBlockWire(t *testing.T) {
 				spew.Sdump(&msg), spew.Sdump(test.out))
 			continue
 		}
-
-		var txLocMsg btcwire.MsgBlock
-		rbuf = bytes.NewBuffer(test.buf)
-		txLocs, err := txLocMsg.BtcDecodeTxLoc(rbuf, test.pver)
-		if err != nil {
-			t.Errorf("BtcDecodeTxLoc #%d error %v", i, err)
-			continue
-		}
-		if !reflect.DeepEqual(&txLocMsg, test.out) {
-			t.Errorf("BtcDecodeTxLoc #%d\n got: %s want: %s", i,
-				spew.Sdump(&txLocMsg), spew.Sdump(test.out))
-			continue
-		}
-		if !reflect.DeepEqual(txLocs, test.txLocs) {
-			t.Errorf("BtcDecodeTxLoc #%d\n got: %s want: %s", i,
-				spew.Sdump(txLocs), spew.Sdump(test.txLocs))
-			continue
-		}
 	}
 }
 
@@ -266,15 +248,6 @@ func TestBlockWireErrors(t *testing.T) {
 		err = msg.BtcDecode(r, test.pver)
 		if err != test.readErr {
 			t.Errorf("BtcDecode #%d wrong error got: %v, want: %v",
-				i, err, test.readErr)
-			continue
-		}
-
-		var txLocMsg btcwire.MsgBlock
-		rbuf := bytes.NewBuffer(test.buf[0:test.max])
-		_, err = txLocMsg.BtcDecodeTxLoc(rbuf, test.pver)
-		if err != test.readErr {
-			t.Errorf("BtcDecodeTxLoc #%d wrong error got: %v, want: %v",
 				i, err, test.readErr)
 			continue
 		}
