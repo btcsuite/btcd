@@ -33,7 +33,8 @@ var (
 //
 // See loadConfig for details on the configuration load process.
 type config struct {
-	DebugLevel     string        `short:"d" long:"debuglevel" description:"Logging level {trace, debug, info, warn, error, critical}"`
+	ConfigFile     string        `short:"C" long:"configfile" description:"Path to configuration file"`
+	DbDir          string        `short:"b" long:"dbdir" description:"Directory to store database"`
 	AddPeers       []string      `short:"a" long:"addpeer" description:"Add a peer to connect with at startup"`
 	ConnectPeers   []string      `long:"connect" description:"Connect only to the specified peers at startup"`
 	SeedPeer       string        `short:"s" long:"seedpeer" description:"Retrieve peer addresses from this peer and then disconnect"`
@@ -41,8 +42,6 @@ type config struct {
 	MaxPeers       int           `long:"maxpeers" description:"Max number of inbound and outbound peers"`
 	BanDuration    time.Duration `long:"banduration" description:"How long to ban misbehaving peers.  Valid time units are {s, m, h}.  Minimum 1 second"`
 	VerifyDisabled bool          `long:"noverify" description:"Disable block/transaction verification -- WARNING: This option can be dangerous and is for development use only"`
-	ConfigFile     string        `short:"C" long:"configfile" description:"Path to configuration file"`
-	DbDir          string        `short:"b" long:"dbdir" description:"Directory to store database"`
 	RpcUser        string        `short:"u" long:"rpcuser" description:"Username for rpc connections"`
 	RpcPass        string        `short:"P" long:"rpcpass" description:"Password for rpc connections"`
 	RpcPort        string        `short:"r" long:"rpcport" description:"Listen for json/rpc messages on this port"`
@@ -50,6 +49,7 @@ type config struct {
 	DisableDNSSeed bool          `long:"nodnsseed" description:"Disable DNS seeding for peers"`
 	TestNet3       bool          `long:"testnet" description:"Use the test network"`
 	RegressionTest bool          `long:"regtest" description:"Use the regression test network"`
+	DebugLevel     string        `short:"d" long:"debuglevel" description:"Logging level {trace, debug, info, warn, error, critical}"`
 }
 
 // btcdHomeDir returns an OS appropriate home directory for btcd.
