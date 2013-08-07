@@ -38,7 +38,6 @@ type config struct {
 	ConnectPeers   []string      `long:"connect" description:"Connect only to the specified peers at startup"`
 	SeedPeer       string        `short:"s" long:"seedpeer" description:"Retrieve peer addresses from this peer and then disconnect"`
 	Port           string        `short:"p" long:"port" description:"Listen for connections on this port (default: 8333, testnet: 18333)"`
-	RpcPort        string        `short:"r" long:"rpcport" description:"Listen for json/rpc messages on this port"`
 	MaxPeers       int           `long:"maxpeers" description:"Max number of inbound and outbound peers"`
 	BanDuration    time.Duration `long:"banduration" description:"How long to ban misbehaving peers.  Valid time units are {s, m, h}.  Minimum 1 second"`
 	VerifyDisabled bool          `long:"noverify" description:"Disable block/transaction verification -- WARNING: This option can be dangerous and is for development use only"`
@@ -46,7 +45,8 @@ type config struct {
 	DbDir          string        `short:"b" long:"dbdir" description:"Directory to store database"`
 	RpcUser        string        `short:"u" long:"rpcuser" description:"Username for rpc connections"`
 	RpcPass        string        `short:"P" long:"rpcpass" description:"Password for rpc connections"`
-	DisableRpc     bool          `long:"norpc" description:"Disable built-in RPC server"`
+	RpcPort        string        `short:"r" long:"rpcport" description:"Listen for json/rpc messages on this port"`
+	DisableRpc     bool          `long:"norpc" description:"Disable built-in RPC server -- NOTE: The RPC server is disabled by default if no rpcuser/rpcpass is specified"`
 	DisableDNSSeed bool          `long:"nodnsseed" description:"Disable DNS seeding for peers"`
 	TestNet3       bool          `long:"testnet" description:"Use the test network"`
 	RegressionTest bool          `long:"regtest" description:"Use the regression test network"`
