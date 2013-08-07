@@ -10,8 +10,10 @@ import (
 	"github.com/conformal/btcdb"
 	"github.com/conformal/btcutil"
 	"github.com/conformal/btcwire"
+	"github.com/conformal/go-socks"
 	"github.com/davecgh/go-spew/spew"
 	"net"
+	"strconv"
 	"sync"
 	"time"
 )
@@ -28,6 +30,45 @@ func minUint32(a, b uint32) uint32 {
 		return a
 	}
 	return b
+}
+
+// newNetAddress attempts to extract the IP address and port from the passed
+// net.Addr interface and create a bitcoin NetAddress structure using that
+// information.
+func newNetAddress(addr net.Addr, services btcwire.ServiceFlag) (*btcwire.NetAddress, error) {
+	// addr will be a net.TCPAddr when not using a proxy.
+	if tcpAddr, ok := addr.(*net.TCPAddr); ok {
+		ip := tcpAddr.IP
+		port := uint16(tcpAddr.Port)
+		na := btcwire.NewNetAddressIPPort(ip, port, services)
+		return na, nil
+	}
+
+	// addr will be a socks.ProxiedAddr when using a proxy.
+	if proxiedAddr, ok := addr.(*socks.ProxiedAddr); ok {
+		ip := net.ParseIP(proxiedAddr.Host)
+		if ip == nil {
+			ip = net.ParseIP("0.0.0.0")
+		}
+		port := uint16(proxiedAddr.Port)
+		na := btcwire.NewNetAddressIPPort(ip, port, services)
+		return na, nil
+	}
+
+	// For the most part, addr should be one of the two above cases, but
+	// to be safe, fall back to trying to parse the information from the
+	// address string as a last resort.
+	host, portStr, err := net.SplitHostPort(addr.String())
+	if err != nil {
+		return nil, err
+	}
+	ip := net.ParseIP(host)
+	port, err := strconv.ParseUint(portStr, 10, 16)
+	if err != nil {
+		return nil, err
+	}
+	na := btcwire.NewNetAddressIPPort(ip, uint16(port), services)
+	return na, nil
 }
 
 // peer provides a bitcoin peer for handling bitcoin communications.
@@ -58,11 +99,23 @@ func (p *peer) pushVersionMsg() error {
 		return err
 	}
 
-	msg, err := btcwire.NewMsgVersionFromConn(p.conn, p.server.nonce,
-		userAgent, int32(blockNum))
+	// Create a NetAddress for the local IP.  Don't assume any services
+	// until we know otherwise.
+	naMe, err := newNetAddress(p.conn.LocalAddr(), 0)
 	if err != nil {
 		return err
 	}
+
+	// Create a NetAddress for the remote IP.  Don't assume any services
+	// until we know otherwise.
+	naYou, err := newNetAddress(p.conn.RemoteAddr(), 0)
+	if err != nil {
+		return err
+	}
+
+	// Version message.
+	msg := btcwire.NewMsgVersion(naMe, naYou, p.server.nonce, userAgent,
+		int32(blockNum))
 
 	// XXX: bitcoind appears to always enable the full node services flag
 	// of the remote peer netaddress field in the version message regardless
@@ -152,14 +205,13 @@ func (p *peer) handleVersionMsg(msg *btcwire.MsgVersion) {
 		// TODO: Only do this if we're listening, not doing the initial
 		// block download, and are routable.
 		// Advertise the local address.
-		na, err := btcwire.NewNetAddress(p.conn.LocalAddr(), p.services)
+		na, err := newNetAddress(p.conn.LocalAddr(), p.services)
 		if err != nil {
 			log.Errorf("[PEER] %v", err)
 			p.disconnect = true
 			p.conn.Close()
 			return
 		}
-		na.Services = p.services
 		addresses := map[string]*btcwire.NetAddress{
 			NetAddressKey(na): na,
 		}
