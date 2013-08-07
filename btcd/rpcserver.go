@@ -22,14 +22,14 @@ import (
 // rpcServer holds the items the rpc server may need to access (config,
 // shutdown, main server, etc.)
 type rpcServer struct {
-	started  bool
-	shutdown bool
-	server   *server
-	wg       sync.WaitGroup
-	rpcport  string
-	username string
-	password string
-	listener net.Listener
+	started   bool
+	shutdown  bool
+	server    *server
+	wg        sync.WaitGroup
+	rpcport   string
+	username  string
+	password  string
+	listeners []net.Listener
 }
 
 // Start is used by server.go to start the rpc listener.
@@ -42,14 +42,16 @@ func (s *rpcServer) Start() {
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		jsonRpcRead(w, r, s)
 	})
-	listenAddr := net.JoinHostPort("", s.rpcport)
-	httpServer := &http.Server{Addr: listenAddr}
-	go func() {
-		log.Infof("[RPCS] RPC server listening on %s", s.listener.Addr())
-		httpServer.Serve(s.listener)
-		s.wg.Done()
-	}()
-	s.wg.Add(1)
+	httpServer := &http.Server{}
+	for _, listener := range s.listeners {
+		go func(listener net.Listener) {
+			log.Infof("[RPCS] RPC server listening on %s", listener.Addr())
+			httpServer.Serve(listener)
+			log.Tracef("[RPCS] RPC listener done for %s", listener.Addr())
+			s.wg.Done()
+		}(listener)
+		s.wg.Add(1)
+	}
 	s.started = true
 }
 
@@ -60,10 +62,12 @@ func (s *rpcServer) Stop() error {
 		return nil
 	}
 	log.Warnf("[RPCS] RPC server shutting down")
-	err := s.listener.Close()
-	if err != nil {
-		log.Errorf("[RPCS] Problem shutting down rpc: %v", err)
-		return err
+	for _, listener := range s.listeners {
+		err := listener.Close()
+		if err != nil {
+			log.Errorf("[RPCS] Problem shutting down rpc: %v", err)
+			return err
+		}
 	}
 	log.Infof("[RPCS] RPC server shutdown complete")
 	s.wg.Wait()
@@ -81,13 +85,26 @@ func newRpcServer(s *server) (*rpcServer, error) {
 	rpc.username = cfg.RpcUser
 	rpc.password = cfg.RpcPass
 
-	listenAddr := net.JoinHostPort("", rpc.rpcport)
-	listener, err := net.Listen("tcp", listenAddr)
+	// IPv4 listener.
+	var listeners []net.Listener
+	listenAddr4 := net.JoinHostPort("127.0.0.1", rpc.rpcport)
+	listener4, err := net.Listen("tcp4", listenAddr4)
 	if err != nil {
 		log.Errorf("[RPCS] Couldn't create listener: %v", err)
 		return nil, err
 	}
-	rpc.listener = listener
+	listeners = append(listeners, listener4)
+
+	// IPv6 listener.
+	listenAddr6 := net.JoinHostPort("::1", rpc.rpcport)
+	listener6, err := net.Listen("tcp6", listenAddr6)
+	if err != nil {
+		log.Errorf("[RPCS] Couldn't create listener: %v", err)
+		return nil, err
+	}
+	listeners = append(listeners, listener6)
+
+	rpc.listeners = listeners
 	return &rpc, err
 }
 

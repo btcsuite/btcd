@@ -40,7 +40,7 @@ type broadcastMsg struct {
 // bitcoin peers.
 type server struct {
 	nonce         uint64
-	listener      net.Listener
+	listeners     []net.Listener
 	btcnet        btcwire.BitcoinNet
 	started       bool
 	shutdown      bool
@@ -162,10 +162,10 @@ func (s *server) handleBroadcastMsg(peers *list.List, bmsg *broadcastMsg) {
 
 // listenHandler is the main listener which accepts incoming connections for the
 // server.  It must be run as a goroutine.
-func (s *server) listenHandler() {
-	log.Infof("[SRVR] Server listening on %s", s.listener.Addr())
+func (s *server) listenHandler(listener net.Listener) {
+	log.Infof("[SRVR] Server listening on %s", listener.Addr())
 	for !s.shutdown {
-		conn, err := s.listener.Accept()
+		conn, err := listener.Accept()
 		if err != nil {
 			// Only log the error if we're not forcibly shutting down.
 			if !s.shutdown {
@@ -176,14 +176,14 @@ func (s *server) listenHandler() {
 		s.AddPeer(newPeer(s, conn, true, false))
 	}
 	s.wg.Done()
-	log.Tracef("[SRVR] Listener handler done for %s", s.listener.Addr())
+	log.Tracef("[SRVR] Listener handler done for %s", listener.Addr())
 }
 
 // peerHandler is used to handle peer operations such as adding and removing
 // peers to and from the server, banning peers, and broadcasting messages to
 // peers.  It must be run a a goroutine.
 func (s *server) peerHandler() {
-	log.Tracef("[SRVR] Starting peer handler for %s", s.listener.Addr())
+	log.Tracef("[SRVR] Starting peer handler")
 	peers := list.New()
 	bannedPeers := make(map[string]time.Time)
 
@@ -218,7 +218,7 @@ func (s *server) peerHandler() {
 		}
 	}
 	s.wg.Done()
-	log.Tracef("[SRVR] Peer handler done on %s", s.listener.Addr())
+	log.Tracef("[SRVR] Peer handler done")
 }
 
 // AddPeer adds a new peer that has already been connected to the server.
@@ -283,9 +283,12 @@ func (s *server) Start() {
 	}
 
 	log.Trace("[SRVR] Starting server")
-	go s.listenHandler()
+	for _, listener := range s.listeners {
+		go s.listenHandler(listener)
+		s.wg.Add(1)
+	}
 	go s.peerHandler()
-	s.wg.Add(2)
+	s.wg.Add(1)
 	s.addrManager.Start()
 	s.blockManager.Start()
 	if !cfg.DisableRpc {
@@ -305,15 +308,17 @@ func (s *server) Stop() error {
 
 	log.Warnf("[SRVR] Server shutting down")
 	s.shutdown = true
-	s.quit <- true
+	close(s.quit)
 	if !cfg.DisableRpc {
 		s.rpcServer.Stop()
 	}
 	s.addrManager.Stop()
 	s.blockManager.Stop()
-	err := s.listener.Close()
-	if err != nil {
-		return err
+	for _, listener := range s.listeners {
+		err := listener.Close()
+		if err != nil {
+			return err
+		}
 	}
 	return nil
 }
@@ -374,14 +379,24 @@ func newServer(addr string, db btcdb.Db, btcnet btcwire.BitcoinNet) (*server, er
 		return nil, err
 	}
 
-	listener, err := net.Listen("tcp", addr)
+	// IPv4 listener.
+	var listeners []net.Listener
+	listener4, err := net.Listen("tcp4", addr)
 	if err != nil {
 		return nil, err
 	}
+	listeners = append(listeners, listener4)
+
+	// IPv6 listener.
+	listener6, err := net.Listen("tcp6", addr)
+	if err != nil {
+		return nil, err
+	}
+	listeners = append(listeners, listener6)
 
 	s := server{
 		nonce:       nonce,
-		listener:    listener,
+		listeners:   listeners,
 		btcnet:      btcnet,
 		addrManager: NewAddrManager(),
 		newPeers:    make(chan *peer, cfg.MaxPeers),
