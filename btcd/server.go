@@ -379,20 +379,22 @@ func newServer(addr string, db btcdb.Db, btcnet btcwire.BitcoinNet) (*server, er
 		return nil, err
 	}
 
-	// IPv4 listener.
 	var listeners []net.Listener
-	listener4, err := net.Listen("tcp4", addr)
-	if err != nil {
-		return nil, err
-	}
-	listeners = append(listeners, listener4)
+	if !cfg.DisableListen {
+		// IPv4 listener.
+		listener4, err := net.Listen("tcp4", addr)
+		if err != nil {
+			return nil, err
+		}
+		listeners = append(listeners, listener4)
 
-	// IPv6 listener.
-	listener6, err := net.Listen("tcp6", addr)
-	if err != nil {
-		return nil, err
+		// IPv6 listener.
+		listener6, err := net.Listen("tcp6", addr)
+		if err != nil {
+			return nil, err
+		}
+		listeners = append(listeners, listener6)
 	}
-	listeners = append(listeners, listener6)
 
 	s := server{
 		nonce:       nonce,

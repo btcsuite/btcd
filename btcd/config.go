@@ -38,6 +38,7 @@ type config struct {
 	AddPeers       []string      `short:"a" long:"addpeer" description:"Add a peer to connect with at startup"`
 	ConnectPeers   []string      `long:"connect" description:"Connect only to the specified peers at startup"`
 	SeedPeer       string        `short:"s" long:"seedpeer" description:"Retrieve peer addresses from this peer and then disconnect"`
+	DisableListen  bool          `long:"nolisten" description:"Disable listening for incoming connections -- NOTE: Listening is automatically disabled if the --connect option is used"`
 	Port           string        `short:"p" long:"port" description:"Listen for connections on this port (default: 8333, testnet: 18333)"`
 	MaxPeers       int           `long:"maxpeers" description:"Max number of inbound and outbound peers"`
 	BanDuration    time.Duration `long:"banduration" description:"How long to ban misbehaving peers.  Valid time units are {s, m, h}.  Minimum 1 second"`
@@ -258,7 +259,7 @@ func loadConfig() (*config, []string, error) {
 	// Connect means no seeding or listening.
 	if len(cfg.ConnectPeers) > 0 {
 		cfg.DisableDNSSeed = true
-		// XXX turn off server listening.
+		cfg.DisableListen = true
 	}
 
 	// The RPC server is disabled if no username or password is provided.
