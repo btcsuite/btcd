@@ -12,6 +12,7 @@ import (
 	"net"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 )
 
@@ -33,6 +34,7 @@ var (
 //
 // See loadConfig for details on the configuration load process.
 type config struct {
+	ShowVersion    bool          `short:"V" long:"version" description:"Display version information and exit"`
 	ConfigFile     string        `short:"C" long:"configfile" description:"Path to configuration file"`
 	DbDir          string        `short:"b" long:"dbdir" description:"Directory to store database"`
 	AddPeers       []string      `short:"a" long:"addpeer" description:"Add a peer to connect with at startup"`
@@ -177,7 +179,7 @@ func loadConfig() (*config, []string, error) {
 	}
 
 	// Pre-parse the command line options to see if an alternative config
-	// file was specified.
+	// file or the version flag was specified.
 	preCfg := cfg
 	preParser := flags.NewParser(&preCfg, flags.Default)
 	_, err := preParser.Parse()
@@ -186,6 +188,14 @@ func loadConfig() (*config, []string, error) {
 			preParser.WriteHelp(os.Stderr)
 		}
 		return nil, nil, err
+	}
+
+	// Show the version and exit if the version flag was specified.
+	if preCfg.ShowVersion {
+		appName := filepath.Base(os.Args[0])
+		appName = strings.TrimSuffix(appName, filepath.Ext(appName))
+		fmt.Println(appName, "version", version())
+		os.Exit(0)
 	}
 
 	// Load additional config from file.
