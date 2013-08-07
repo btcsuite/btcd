@@ -261,6 +261,11 @@ func loadConfig() (*config, []string, error) {
 		// XXX turn off server listening.
 	}
 
+	// The RPC server is disabled if no username or password is provided.
+	if cfg.RpcUser == "" || cfg.RpcPass == "" {
+		cfg.DisableRpc = true
+	}
+
 	// Add default port to all added peer addresses if needed and remove
 	// duplicate addresses.
 	cfg.AddPeers = normalizeAndRemoveDuplicateAddresses(cfg.AddPeers)
