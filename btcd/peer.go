@@ -12,7 +12,6 @@ import (
 	"github.com/conformal/btcwire"
 	"github.com/davecgh/go-spew/spew"
 	"net"
-	"opensource.conformal.com/go/btcd-internal/addrmgr"
 	"sync"
 	"time"
 )
@@ -162,7 +161,7 @@ func (p *peer) handleVersionMsg(msg *btcwire.MsgVersion) {
 		}
 		na.Services = p.services
 		addresses := map[string]*btcwire.NetAddress{
-			addrmgr.NetAddressKey(na): na,
+			NetAddressKey(na): na,
 		}
 		p.pushAddrMsg(addresses)
 
@@ -404,7 +403,7 @@ func (p *peer) pushAddrMsg(addresses map[string]*btcwire.NetAddress) error {
 	msg := btcwire.NewMsgAddr()
 	for _, na := range addresses {
 		// Filter addresses the peer already knows about.
-		if p.knownAddresses[addrmgr.NetAddressKey(na)] {
+		if p.knownAddresses[NetAddressKey(na)] {
 			continue
 		}
 
@@ -461,7 +460,7 @@ func (p *peer) handleAddrMsg(msg *btcwire.MsgAddr) {
 		}
 
 		// Add address to known addresses for this peer.
-		p.knownAddresses[addrmgr.NetAddressKey(na)] = true
+		p.knownAddresses[NetAddressKey(na)] = true
 	}
 
 	// Add addresses to server address manager.  The address manager handles

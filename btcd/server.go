@@ -9,7 +9,6 @@ import (
 	"github.com/conformal/btcdb"
 	"github.com/conformal/btcwire"
 	"net"
-	"opensource.conformal.com/go/btcd-internal/addrmgr"
 	"sync"
 	"time"
 )
@@ -46,7 +45,7 @@ type server struct {
 	started       bool
 	shutdown      bool
 	shutdownSched bool
-	addrManager   *addrmgr.AddrManager
+	addrManager   *AddrManager
 	rpcServer     *rpcServer
 	blockManager  *blockManager
 	newPeers      chan *peer
@@ -384,7 +383,7 @@ func newServer(addr string, db btcdb.Db, btcnet btcwire.BitcoinNet) (*server, er
 		nonce:       nonce,
 		listener:    listener,
 		btcnet:      btcnet,
-		addrManager: addrmgr.New(),
+		addrManager: NewAddrManager(),
 		newPeers:    make(chan *peer, cfg.MaxPeers),
 		donePeers:   make(chan *peer, cfg.MaxPeers),
 		banPeers:    make(chan *peer, cfg.MaxPeers),

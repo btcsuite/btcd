@@ -2,12 +2,11 @@
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
-package main_test
+package main
 
 import (
 	"github.com/conformal/btcwire"
 	"net"
-	"opensource.conformal.com/go/btcd-internal/addrmgr"
 	"testing"
 	"time"
 )
@@ -101,7 +100,7 @@ func TestNetAddressKey(t *testing.T) {
 
 	t.Logf("Running %d tests", len(naTests))
 	for i, test := range naTests {
-		key := addrmgr.NetAddressKey(&test.in)
+		key := NetAddressKey(&test.in)
 		if key != test.want {
 			t.Errorf("NetAddressKey #%d\n got: %s want: %s", i, key, test.want)
 			continue
