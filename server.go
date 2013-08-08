@@ -6,6 +6,7 @@ package main
 
 import (
 	"container/list"
+	"fmt"
 	"github.com/conformal/btcdb"
 	"github.com/conformal/btcwire"
 	"github.com/conformal/go-socks"
@@ -249,16 +250,22 @@ func (s *server) ConnectPeerAsync(addr string, persistent bool) {
 	}
 
 	go func() {
+		// Select which dial method to call depending on whether or
+		// not a proxy is configured.  Also, add proxy information to
+		// logged address if needed.
 		dial := net.Dial
+		faddr := addr
 		if cfg.Proxy != "" {
 			proxy := &socks.Proxy{cfg.Proxy, cfg.ProxyUser, cfg.ProxyPass}
 			dial = proxy.Dial
+			faddr = fmt.Sprintf("%s via proxy %s", addr, cfg.Proxy)
 		}
+
 		// Attempt to connect to the peer.  If the connection fails and
 		// this is a persistent connection, retry after the retry
 		// interval.
 		for !s.shutdown {
-			log.Debugf("[SRVR] Attempting to connect to %s", addr)
+			log.Debugf("[SRVR] Attempting to connect to %s", faddr)
 			conn, err := dial("tcp", addr)
 			if err != nil {
 				log.Errorf("[SRVR] %v", err)
@@ -266,7 +273,7 @@ func (s *server) ConnectPeerAsync(addr string, persistent bool) {
 					return
 				}
 				log.Infof("[SRVR] Retrying connection to %s "+
-					"in %s", addr, connectionRetryInterval)
+					"in %s", faddr, connectionRetryInterval)
 				time.Sleep(connectionRetryInterval)
 				continue
 			}
