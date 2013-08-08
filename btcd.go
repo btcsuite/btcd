@@ -19,7 +19,7 @@ import (
 	"time"
 )
 
-const userAgent = "/btcd:0.0.1/"
+var userAgent = fmt.Sprintf("/btcd:%d.%d.%d/", appMajor, appMinor, appPatch)
 
 // used by the dns seed code to pick a random last seen time
 const (
