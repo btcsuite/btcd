@@ -40,7 +40,7 @@ type config struct {
 	AddPeers       []string      `short:"a" long:"addpeer" description:"Add a peer to connect with at startup"`
 	ConnectPeers   []string      `long:"connect" description:"Connect only to the specified peers at startup"`
 	SeedPeer       string        `short:"s" long:"seedpeer" description:"Retrieve peer addresses from this peer and then disconnect"`
-	DisableListen  bool          `long:"nolisten" description:"Disable listening for incoming connections -- NOTE: Listening is automatically disabled if the --connect option is used"`
+	DisableListen  bool          `long:"nolisten" description:"Disable listening for incoming connections -- NOTE: Listening is automatically disabled if the --connect option is used or if the --proxy option is used without the --tor option"`
 	Port           string        `short:"p" long:"port" description:"Listen for connections on this port (default: 8333, testnet: 18333)"`
 	MaxPeers       int           `long:"maxpeers" description:"Max number of inbound and outbound peers"`
 	BanDuration    time.Duration `long:"banduration" description:"How long to ban misbehaving peers.  Valid time units are {s, m, h}.  Minimum 1 second"`
@@ -50,10 +50,10 @@ type config struct {
 	RpcPort        string        `short:"r" long:"rpcport" description:"Listen for json/rpc messages on this port"`
 	DisableRpc     bool          `long:"norpc" description:"Disable built-in RPC server -- NOTE: The RPC server is disabled by default if no rpcuser/rpcpass is specified"`
 	DisableDNSSeed bool          `long:"nodnsseed" description:"Disable DNS seeding for peers"`
-	Proxy          string        `long:"proxy" description:"Connect via SOCKS5 proxy (127.0.0.1:9050)"`
+	Proxy          string        `long:"proxy" description:"Connect via SOCKS5 proxy (eg. 127.0.0.1:9050)"`
 	ProxyUser      string        `long:"proxyuser" description:"Username for proxy server"`
 	ProxyPass      string        `long:"proxypass" description:"Password for proxy server"`
-	Tor            bool          `long:"tor" description:"The Proxy being used is Tor"`
+	UseTor         bool          `long:"tor" description:"Specifies the proxy server used is a Tor node"`
 	TestNet3       bool          `long:"testnet" description:"Use the test network"`
 	RegressionTest bool          `long:"regtest" description:"Use the regression test network"`
 	DebugLevel     string        `short:"d" long:"debuglevel" description:"Logging level {trace, debug, info, warn, error, critical}"`
@@ -268,6 +268,20 @@ func loadConfig() (*config, []string, error) {
 		fmt.Fprintln(os.Stderr, err)
 		parser.WriteHelp(os.Stderr)
 		return nil, nil, err
+	}
+
+	// --tor requires --proxy to be set.
+	if cfg.UseTor && cfg.Proxy == "" {
+		str := "%s: the --tor option requires --proxy to be set"
+		err := errors.New(fmt.Sprintf(str, "loadConfig"))
+		fmt.Fprintln(os.Stderr, err)
+		parser.WriteHelp(os.Stderr)
+		return nil, nil, err
+	}
+
+	// --proxy without --tor means no listening.
+	if cfg.Proxy != "" && !cfg.UseTor {
+		cfg.DisableListen = true
 	}
 
 	// Connect means no seeding or listening.

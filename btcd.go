@@ -136,8 +136,11 @@ func btcdMain() error {
 
 	// only ask dns for peers if we don't have a list of initial seeds.
 	if !cfg.DisableDNSSeed {
-		// XXX need a proxy config entry
-		seedpeers := dnsDiscover(activeNetParams.dnsSeeds, "")
+		proxy := ""
+		if cfg.Proxy != "" && cfg.UseTor {
+			proxy = cfg.Proxy
+		}
+		seedpeers := dnsDiscover(activeNetParams.dnsSeeds, proxy)
 		addresses := make([]*btcwire.NetAddress, len(seedpeers))
 		// if this errors then we have *real* problems
 		intPort, _ := strconv.Atoi(activeNetParams.peerPort)
