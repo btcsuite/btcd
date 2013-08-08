@@ -61,7 +61,6 @@ type server struct {
 // handleAddPeerMsg deals with adding new peers.  It is invoked from the
 // peerHandler goroutine.
 func (s *server) handleAddPeerMsg(peers *list.List, banned map[string]time.Time, p *peer) {
-
 	// Ignore new peers if we're shutting down.
 	direction := directionString(p.inbound)
 	if s.shutdown {
