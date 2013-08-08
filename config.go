@@ -50,6 +50,10 @@ type config struct {
 	RpcPort        string        `short:"r" long:"rpcport" description:"Listen for json/rpc messages on this port"`
 	DisableRpc     bool          `long:"norpc" description:"Disable built-in RPC server -- NOTE: The RPC server is disabled by default if no rpcuser/rpcpass is specified"`
 	DisableDNSSeed bool          `long:"nodnsseed" description:"Disable DNS seeding for peers"`
+	Proxy          string        `long:"proxy" description:"Connect via SOCKS5 proxy (127.0.0.1:9050)"`
+	ProxyUser      string        `long:"proxyuser" description:"Username for proxy server"`
+	ProxyPass      string        `long:"proxypass" description:"Password for proxy server"`
+	Tor            bool          `long:"tor" description:"The Proxy being used is Tor"`
 	TestNet3       bool          `long:"testnet" description:"Use the test network"`
 	RegressionTest bool          `long:"regtest" description:"Use the regression test network"`
 	DebugLevel     string        `short:"d" long:"debuglevel" description:"Logging level {trace, debug, info, warn, error, critical}"`
