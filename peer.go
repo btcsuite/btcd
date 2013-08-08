@@ -703,12 +703,6 @@ func (p *peer) Start() error {
 	p.wg.Add(2)
 	p.started = true
 
-	// If server is shutting down, don't even start watchdog
-	if p.server.shutdown {
-		log.Debug("[PEER] server is shutting down")
-		return nil
-	}
-
 	return nil
 }
 
