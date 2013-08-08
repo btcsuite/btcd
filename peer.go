@@ -7,6 +7,7 @@ package main
 import (
 	"bytes"
 	"errors"
+	"fmt"
 	"github.com/conformal/btcdb"
 	"github.com/conformal/btcutil"
 	"github.com/conformal/btcwire"
