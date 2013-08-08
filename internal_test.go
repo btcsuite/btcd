@@ -47,6 +47,10 @@ var resulttests = []struct {
 	{"getmininginfo", []byte(`{"error":null,"id":1,"result":{"generate":true}}`), false, true},
 	{"getrawmempool", []byte(`{"error":null,"id":1,"result":[{"a":"b"}]}`), false, false},
 	{"getrawmempool", []byte(`{"error":null,"id":1,"result":["test"]}`), false, true},
+	{"validateaddress", []byte(`{"error":null,"id":1,"result":{"isvalid":false}}`), false, true},
+	{"validateaddress", []byte(`{"error":null,"id":1,"result":{false}}`), false, false},
+	{"signrawtransaction", []byte(`{"error":null,"id":1,"result":{"hex":"something","complete":false}}`), false, true},
+	{"signrawtransaction", []byte(`{"error":null,"id":1,"result":{false}}`), false, false},
 }
 
 // TestReadResultCmd tests that readResultCmd can properly unmarshall the

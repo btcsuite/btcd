@@ -125,6 +125,22 @@ type GetMiningInfoResult struct {
 	HashesPerSec     float64 `json:"hashespersec"`
 }
 
+// ValidateAddressResult models the data from the validateaddress command.
+type ValidateAddressResult struct {
+	IsValid      bool   `json:"isvalid"`
+	Address      string `json:"address,omitempty"`
+	IsMine       bool   `json:"ismine,omitempty"`
+	IsScript     bool   `json:"isscript,omitempty"`
+	PubKey       string `json:"pubkey,omitempty"`
+	IsCompressed bool   `json:"iscompressed,omitempty"`
+	Account      string `json:"account,omitempty"`
+}
+
+type SignRawTransactionResult struct {
+	Hex      string `json:"hex"`
+	Complete bool   `json:"complete"`
+}
+
 // Error models the error field of the json returned by a bitcoin client.  When
 // there is no error, this should be a nil pointer to produce the null in the
 // json that bitcoind produces.
@@ -500,28 +516,28 @@ func CreateMessage(message string, args ...interface{}) ([]byte, error) {
 			return finalMessage, err
 		}
 		finalMessage, err = jsonWithArgs(message, args)
-	// Must be a set of 3 strings and a float (any number of those)
+	// Must be a set of string, int, string, float (any number of those).
 	case "createrawtransaction":
 		if len(args)%4 != 0 || len(args) == 0 {
 			err = fmt.Errorf("Wrong number of arguments for %s", message)
 			return finalMessage, err
 		}
 		type vlist struct {
-			Vin  string `json:"vin"`
-			Vout string `json:"vout"`
+			Txid string `json:"txid"`
+			Vout int    `json:"vout"`
 		}
 		vList := make([]vlist, len(args)/4)
 		addresses := make(map[string]float64)
 		for i := 0; i < len(args)/4; i += 1 {
-			vin, ok1 := args[(i*4)+0].(string)
-			vout, ok2 := args[(i*4)+1].(string)
+			txid, ok1 := args[(i*4)+0].(string)
+			vout, ok2 := args[(i*4)+1].(int)
 			add, ok3 := args[(i*4)+2].(string)
 			amt, ok4 := args[(i*4)+3].(float64)
 			if !ok1 || !ok2 || !ok3 || !ok4 {
 				err = fmt.Errorf("Incorrect arguement types.")
 				return finalMessage, err
 			}
-			vList[i].Vin = vin
+			vList[i].Txid = txid
 			vList[i].Vout = vout
 			addresses[add] = amt
 		}
@@ -578,9 +594,9 @@ func CreateMessage(message string, args ...interface{}) ([]byte, error) {
 			return finalMessage, err
 		}
 		finalMessage, err = jsonWithArgs(message, args)
-	// one required string (hex) and at least one set of 4 other strings.
+	// one required string (hex) and sets of 4 optional strings.
 	case "signrawtransaction":
-		if (len(args)-1)%4 != 0 || len(args) < 5 {
+		if len(args) < 1 || (len(args)-1)%4 != 0 {
 			err = fmt.Errorf("Wrong number of arguments for %s", message)
 			return finalMessage, err
 		}
@@ -684,13 +700,25 @@ func readResultCmd(cmd string, message []byte) (Reply, error) {
 		if err == nil {
 			result.Result = res
 		}
+	case "validateaddress":
+		var res ValidateAddressResult
+		err = json.Unmarshal(objmap["result"], &res)
+		if err == nil {
+			result.Result = res
+		}
+	case "signrawtransaction":
+		var res SignRawTransactionResult
+		err = json.Unmarshal(objmap["result"], &res)
+		if err == nil {
+			result.Result = res
+		}
 	// For commands that return a single item (or no items), we get it with
 	// the correct concrete type for free (but treat them separately
 	// for clarity).
 	case "getblockcount", "getbalance", "getblocknumber", "getgenerate",
 		"getconnetioncount", "getdifficulty", "gethashespersec",
 		"setgenerate", "stop", "settxfee", "getaccount",
-		"getnewaddress":
+		"getnewaddress", "sendtoaddress", "createrawtransaction":
 		err = json.Unmarshal(message, &result)
 	// For anything else put it in an interface.  All the data is still
 	// there, just a little less convenient to deal with.
