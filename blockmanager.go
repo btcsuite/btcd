@@ -425,17 +425,6 @@ func loadBlockDB() (btcdb.Db, error) {
 		if err != nil {
 			return nil, err
 		}
-
-		// Insert the appropriate genesis block for the bitcoin network
-		// being connected to.
-		genesis := btcutil.NewBlock(activeNetParams.genesisBlock)
-		_, err := db.InsertBlock(genesis)
-		if err != nil {
-			db.Close()
-			return nil, err
-		}
-		log.Infof("[BMGR] Inserted genesis block %v",
-			activeNetParams.genesisHash)
 	}
 
 	// Get the latest block height from the database.
@@ -444,6 +433,21 @@ func loadBlockDB() (btcdb.Db, error) {
 		db.Close()
 		return nil, err
 	}
+
+	// Insert the appropriate genesis block for the bitcoin network being
+	// connected to if needed.
+	if height == -1 {
+		genesis := btcutil.NewBlock(activeNetParams.genesisBlock)
+		_, err := db.InsertBlock(genesis)
+		if err != nil {
+			db.Close()
+			return nil, err
+		}
+		log.Infof("[BMGR] Inserted genesis block %v",
+			activeNetParams.genesisHash)
+		height = 0
+	}
+
 	log.Infof("[BMGR] Block database loaded with block height %d", height)
 	return db, nil
 }
