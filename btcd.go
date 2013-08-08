@@ -19,8 +19,6 @@ import (
 	"time"
 )
 
-var userAgent = fmt.Sprintf("/btcd:%d.%d.%d/", appMajor, appMinor, appPatch)
-
 // used by the dns seed code to pick a random last seen time
 const (
 	secondsIn3Days int32 = 24 * 60 * 60 * 3

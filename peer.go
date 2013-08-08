@@ -20,6 +20,10 @@ import (
 
 const outputBufferSize = 50
 
+// userAgent is the user agent string used to identify ourselves to other
+// bitcoin peers.
+var userAgent = fmt.Sprintf("/btcd:%d.%d.%d/", appMajor, appMinor, appPatch)
+
 // zeroHash is the zero value hash (all zeros).  It is defined as a convenience.
 var zeroHash btcwire.ShaHash
 
