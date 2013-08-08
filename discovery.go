@@ -144,11 +144,11 @@ func torLookupIP(host, proxy string) ([]net.IP, error) {
 	return addr, nil
 }
 
-// dnsDiscover looks up the list of peers resolved by dns for all hosts in
-// seeders. If proxy is not "" then this is used as a tor proxy for the
-// resolution. If any errors occur then that seeder that errored will not have
+// dnsDiscover looks up the list of peers resolved by DNS for all hosts in
+// seeders. If proxy is not "" then it is used as a tor proxy for the
+// resolution. If any errors occur then the seeder that errored will not have
 // any hosts in the list. Therefore if all hosts failed an empty slice of
-// strings  will be returned.
+// strings will be returned.
 func dnsDiscover(seeders []string, proxy string) []net.IP {
 	peers := []net.IP{}
 	for _, seeder := range seeders {

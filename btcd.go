@@ -19,7 +19,8 @@ import (
 	"time"
 )
 
-// used by the dns seed code to pick a random last seen time
+// These constants are used by the dns seed code to pick a random last seen
+// time.
 const (
 	secondsIn3Days int32 = 24 * 60 * 60 * 3
 	secondsIn4Days int32 = 24 * 60 * 60 * 4

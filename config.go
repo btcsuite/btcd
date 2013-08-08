@@ -45,9 +45,9 @@ type config struct {
 	MaxPeers       int           `long:"maxpeers" description:"Max number of inbound and outbound peers"`
 	BanDuration    time.Duration `long:"banduration" description:"How long to ban misbehaving peers.  Valid time units are {s, m, h}.  Minimum 1 second"`
 	VerifyDisabled bool          `long:"noverify" description:"Disable block/transaction verification -- WARNING: This option can be dangerous and is for development use only"`
-	RpcUser        string        `short:"u" long:"rpcuser" description:"Username for rpc connections"`
-	RpcPass        string        `short:"P" long:"rpcpass" description:"Password for rpc connections"`
-	RpcPort        string        `short:"r" long:"rpcport" description:"Listen for json/rpc messages on this port"`
+	RpcUser        string        `short:"u" long:"rpcuser" description:"Username for RPC connections"`
+	RpcPass        string        `short:"P" long:"rpcpass" description:"Password for RPC connections"`
+	RpcPort        string        `short:"r" long:"rpcport" description:"Listen for JSON/RPC messages on this port"`
 	DisableRpc     bool          `long:"norpc" description:"Disable built-in RPC server -- NOTE: The RPC server is disabled by default if no rpcuser/rpcpass is specified"`
 	DisableDNSSeed bool          `long:"nodnsseed" description:"Disable DNS seeding for peers"`
 	Proxy          string        `long:"proxy" description:"Connect via SOCKS5 proxy (eg. 127.0.0.1:9050)"`
@@ -120,6 +120,8 @@ func removeDuplicateAddresses(addrs []string) []string {
 	return result
 }
 
+// normalizeAndRemoveDuplicateAddresses return a new slice with all the passed
+// addresses normalized and duplicates removed.
 func normalizeAndRemoveDuplicateAddresses(addrs []string) []string {
 	for i, addr := range addrs {
 		addrs[i] = normalizePeerAddress(addr)
