@@ -150,6 +150,13 @@ func jsonRpcRead(w http.ResponseWriter, r *http.Request, s *rpcServer) {
 
 	// Deal with commands
 	switch message.Method {
+	case "stop":
+		rawReply = btcjson.Reply{
+			Result: "btcd stopping.",
+			Error:  nil,
+			Id:     &message.Id,
+		}
+		s.server.Stop()
 	case "getblockcount":
 		_, maxidx, _ := s.server.db.NewestSha()
 		rawReply = btcjson.Reply{
