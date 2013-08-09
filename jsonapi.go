@@ -141,6 +141,16 @@ type SignRawTransactionResult struct {
 	Complete bool   `json:"complete"`
 }
 
+type ListUnSpentResult struct {
+	TxId          string  `json:"txid"`
+	Vout          float64 `json:"vout"`
+	Address       string  `json:"address"`
+	Account       string  `json:"account"`
+	ScriptPubKey  string  `json:"scriptPubKey"`
+	Amount        float64 `json:"amount"`
+	Confirmations float64 `json:"confirmations"`
+}
+
 // Error models the error field of the json returned by a bitcoin client.  When
 // there is no error, this should be a nil pointer to produce the null in the
 // json that bitcoind produces.
@@ -708,6 +718,12 @@ func readResultCmd(cmd string, message []byte) (Reply, error) {
 		}
 	case "signrawtransaction":
 		var res SignRawTransactionResult
+		err = json.Unmarshal(objmap["result"], &res)
+		if err == nil {
+			result.Result = res
+		}
+	case "listunspent":
+		var res []ListUnSpentResult
 		err = json.Unmarshal(objmap["result"], &res)
 		if err == nil {
 			result.Result = res

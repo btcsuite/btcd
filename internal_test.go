@@ -51,6 +51,8 @@ var resulttests = []struct {
 	{"validateaddress", []byte(`{"error":null,"id":1,"result":{false}}`), false, false},
 	{"signrawtransaction", []byte(`{"error":null,"id":1,"result":{"hex":"something","complete":false}}`), false, true},
 	{"signrawtransaction", []byte(`{"error":null,"id":1,"result":{false}}`), false, false},
+	{"listunspent", []byte(`{"error":null,"id":1,"result":[{"txid":"something"}]}`), false, true},
+	{"listunspent", []byte(`{"error":null,"id":1,"result":[{"txid"}]}`), false, false},
 }
 
 // TestReadResultCmd tests that readResultCmd can properly unmarshall the
