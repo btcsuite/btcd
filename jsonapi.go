@@ -649,9 +649,10 @@ func CreateMessageWithId(message string, id interface{}, args ...interface{}) ([
 			return finalMessage, err
 		}
 		finalMessage, err = jsonWithArgs(message, id, args)
-	// one required string (hex) and sets of 4 optional strings.
+	// one required string (hex) and optional sets of one string, one int,
+	// and one string along with another optional string.
 	case "signrawtransaction":
-		if len(args) < 1 || (len(args)-1)%4 != 0 {
+		if len(args) < 1 {
 			err = fmt.Errorf("Wrong number of arguments for %s", message)
 			return finalMessage, err
 		}
@@ -662,26 +663,42 @@ func CreateMessageWithId(message string, id interface{}, args ...interface{}) ([
 		}
 		type txlist struct {
 			Txid         string `json:"txid"`
-			Vout         string `json:"vout"`
+			Vout         int    `json:"vout"`
 			ScriptPubKey string `json:"scriptPubKey"`
 		}
-		txList := make([]txlist, (len(args)-1)/4)
-		pkeyList := make([]string, (len(args)-1)/4)
-		for i := 0; i < len(args)/4; i += 1 {
-			txid, ok1 := args[(i*4)+0].(string)
-			vout, ok2 := args[(i*4)+1].(string)
-			spkey, ok3 := args[(i*4)+2].(string)
-			pkey, ok4 := args[(i*4)+3].(string)
+		txList := make([]txlist, 1)
+
+		if len(args) > 1 {
+			txid, ok2 := args[1].(string)
+			vout, ok3 := args[2].(int)
+			spkey, ok4 := args[3].(string)
 			if !ok1 || !ok2 || !ok3 || !ok4 {
 				err = fmt.Errorf("Incorrect arguement types.")
 				return finalMessage, err
 			}
-			txList[i].Txid = txid
-			txList[i].Vout = vout
-			txList[i].ScriptPubKey = spkey
-			pkeyList[i] = pkey
+			txList[0].Txid = txid
+			txList[0].Vout = vout
+			txList[0].ScriptPubKey = spkey
 		}
-		finalMessage, err = jsonWithArgs(message, id, []interface{}{args[0].(string), txList, pkeyList})
+		/*
+			pkeyList := make([]string, (len(args)-1)/4)
+			for i := 0; i < len(args)/4; i += 1 {
+				fmt.Println(args[(i*4)+4])
+				txid, ok1 := args[(i*4)+1].(string)
+				vout, ok2 := args[(i*4)+2].(int)
+				spkey, ok3 := args[(i*4)+3].(string)
+				pkey, ok4 := args[(i*4)+4].(string)
+				if !ok1 || !ok2 || !ok3 || !ok4 {
+					err = fmt.Errorf("Incorrect arguement types.")
+					return finalMessage, err
+				}
+				txList[i].Txid = txid
+				txList[i].Vout = vout
+				txList[i].ScriptPubKey = spkey
+				pkeyList[i] = pkey
+			}
+		*/
+		finalMessage, err = jsonWithArgs(message, id, []interface{}{args[0].(string), txList})
 	// Any other message
 	default:
 		err = fmt.Errorf("Not a valid command: %s", message)
@@ -780,7 +797,8 @@ func ReadResultCmd(cmd string, message []byte) (Reply, error) {
 	case "getblockcount", "getbalance", "getblocknumber", "getgenerate",
 		"getconnetioncount", "getdifficulty", "gethashespersec",
 		"setgenerate", "stop", "settxfee", "getaccount",
-		"getnewaddress", "sendtoaddress", "createrawtransaction":
+		"getnewaddress", "sendtoaddress", "createrawtransaction",
+		"sendrawtransaction":
 		err = json.Unmarshal(message, &result)
 	// For anything else put it in an interface.  All the data is still
 	// there, just a little less convenient to deal with.
