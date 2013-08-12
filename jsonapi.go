@@ -664,10 +664,10 @@ func CreateMessage(message string, args ...interface{}) ([]byte, error) {
 	return finalMessage, err
 }
 
-// readResultCmd unmarshalls the json reply with data struct for specific
+// ReadResultCmd unmarshalls the json reply with data struct for specific
 // commands or an interface if it is not a command where we already have a
 // struct ready.
-func readResultCmd(cmd string, message []byte) (Reply, error) {
+func ReadResultCmd(cmd string, message []byte) (Reply, error) {
 	var result Reply
 	var err error
 	var objmap map[string]json.RawMessage
@@ -797,19 +797,38 @@ func RpcCommand(user string, password string, server string, message []byte) (Re
 		err := fmt.Errorf("Error, no method specified.")
 		return result, err
 	}
+	body, err := RpcRawCommand(user, password, server, message)
+	if err != nil {
+		err := fmt.Errorf("Error getting json reply: %v", err)
+		return result, err
+	}
+	result, err = ReadResultCmd(method, body)
+	if err != nil {
+		err := fmt.Errorf("Error reading json message: %v", err)
+		return result, err
+	}
+	return result, err
+}
+
+// RpcRawCommand takes a message generated from one of the routines above
+// along with the login/server info, sends it, and gets a reply, returning
+// the raw []byte response for use with ReadResultCmd.
+func RpcRawCommand(user string, password string, server string, message []byte) ([]byte, error) {
+	var result []byte
+	var msg interface{}
+	err := json.Unmarshal(message, &msg)
+	if err != nil {
+		err := fmt.Errorf("Error, message does not appear to be valid json: %v", err)
+		return result, err
+	}
 	resp, err := jsonRpcSend(user, password, server, message)
 	if err != nil {
 		err := fmt.Errorf("Error sending json message: " + err.Error())
 		return result, err
 	}
-	body, err := GetRaw(resp.Body)
+	result, err = GetRaw(resp.Body)
 	if err != nil {
 		err := fmt.Errorf("Error getting json reply: %v", err)
-		return result, err
-	}
-	result, err = readResultCmd(method, body)
-	if err != nil {
-		err := fmt.Errorf("Error reading json message: %v", err)
 		return result, err
 	}
 	return result, err
