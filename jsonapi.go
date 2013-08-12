@@ -796,7 +796,7 @@ func RpcCommand(user string, password string, server string, message []byte) (Re
 }
 
 // IsValidIdType checks that the Id field (which can go in any of the json
-// messages is valid.  json rpc 1.0 allows any (json) type, but we still need
+// messages) is valid.  json rpc 1.0 allows any (json) type, but we still need
 // to prevent values that cannot be marshalled from going in.  json rpc 2.0
 // (which bitcoind follows for some parts) only allows string, number, or null,
 // so we restrict to that list.  Ths is only necessary if you manually marshal
