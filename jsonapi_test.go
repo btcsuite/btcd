@@ -162,6 +162,11 @@ var cmdtests = []struct {
 	{"signrawtransaction", []interface{}{"hexstring", 1, "test2", "test3", "test4"}, false},
 	{"signrawtransaction", []interface{}{"hexstring", "test", 2, "test3", "test4"}, false},
 	{"signrawtransaction", []interface{}{"hexstring", "test", "test2", 3, "test4"}, false},
+	{"listsinceblock", []interface{}{"test", "test"}, true},
+	{"listsinceblock", []interface{}{"test", "test", "test"}, false},
+	{"listsinceblock", []interface{}{"test"}, true},
+	{"listsinceblock", []interface{}{}, true},
+	{"listsinceblock", []interface{}{1, "test"}, false},
 	{"fakecommand", nil, false},
 }
 

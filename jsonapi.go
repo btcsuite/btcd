@@ -262,7 +262,7 @@ func CreateMessage(message string, args ...interface{}) ([]byte, error) {
 		}
 		finalMessage, err = jsonWithArgs(message, args)
 	// Two required strings
-	case "listsinceblock", "setaccount", "signmessage", "walletpassphrase",
+	case "setaccount", "signmessage", "walletpassphrase",
 		"walletpassphrasechange":
 		if len(args) != 2 {
 			err = fmt.Errorf("Missing arguments for %s", message)
@@ -437,6 +437,26 @@ func CreateMessage(message string, args ...interface{}) ([]byte, error) {
 			return finalMessage, err
 		}
 		finalMessage, err = jsonWithArgs(message, args)
+	// Two optional strings
+	case "listsinceblock":
+		if len(args) > 2 {
+			err = fmt.Errorf("Wrong number of arguments for %s", message)
+			return finalMessage, err
+		}
+		ok1 := true
+		ok2 := true
+		if len(args) >= 1 {
+			_, ok1 = args[0].(string)
+		}
+		if len(args) == 2 {
+			_, ok2 = args[1].(string)
+		}
+		if !ok1 || !ok2 {
+			err = fmt.Errorf("Optional arguments must be strings for %s", message)
+			return finalMessage, err
+		}
+		finalMessage, err = jsonWithArgs(message, args)
+
 	// Two required strings, one required float, one optional int,
 	// two optional strings.
 	case "sendfrom":
