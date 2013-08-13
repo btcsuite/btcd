@@ -773,11 +773,9 @@ func ReadResultCmd(cmd string, message []byte) (Reply, error) {
 	return result, err
 }
 
-// RpcCommand takes a message generated from one of the routines above
-// along with the login/server info, sends it, and gets a reply, returning
-// a go struct with the result.
-func RpcCommand(user string, password string, server string, message []byte) (Reply, error) {
-	var result Reply
+// JSONGetMethod takes a message and tries to find the bitcoin command that it
+// is in reply to so it can be processed further.
+func JSONGetMethod(message []byte) (string, error) {
 	// Need this so we can tell what kind of message we are sending
 	// so we can unmarshal it properly.
 	var method string
@@ -785,7 +783,7 @@ func RpcCommand(user string, password string, server string, message []byte) (Re
 	err := json.Unmarshal(message, &msg)
 	if err != nil {
 		err := fmt.Errorf("Error, message does not appear to be valid json: %v", err)
-		return result, err
+		return method, err
 	}
 	m := msg.(map[string]interface{})
 	for k, v := range m {
@@ -795,6 +793,18 @@ func RpcCommand(user string, password string, server string, message []byte) (Re
 	}
 	if method == "" {
 		err := fmt.Errorf("Error, no method specified.")
+		return method, err
+	}
+	return method, err
+}
+
+// RpcCommand takes a message generated from one of the routines above
+// along with the login/server info, sends it, and gets a reply, returning
+// a go struct with the result.
+func RpcCommand(user string, password string, server string, message []byte) (Reply, error) {
+	var result Reply
+	method, err := JSONGetMethod(message)
+	if err != nil {
 		return result, err
 	}
 	body, err := RpcRawCommand(user, password, server, message)
