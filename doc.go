@@ -96,7 +96,7 @@ switch or type assertion.  An example of a type switch follows:
 
 	// Assumes msg is already a valid concrete message such as one created
 	// via NewMsgVersion or read via ReadMessage.
-	switch msg.(type) {
+	switch msg := msg.(type) {
 	case *btcwire.MsgVersion:
 		// The message is a pointer to a MsgVersion struct.
 		fmt.Printf("Protocol version: %v", msg.ProtocolVersion)
