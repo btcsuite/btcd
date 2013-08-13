@@ -22,19 +22,19 @@ interface. The functions are only exported while the tests are being run.
 func TestJsonWithArgs(t *testing.T) {
 	cmd := "list"
 	var args interface{}
-	_, err := jsonWithArgs(cmd, args)
+	_, err := jsonWithArgs(cmd, "test", args)
 	if err != nil {
 		t.Errorf("Could not make json with no args. %v", err)
 	}
 
 	channel := make(chan int)
-	_, err = jsonWithArgs(cmd, channel)
+	_, err = jsonWithArgs(cmd, "test", channel)
 	if _, ok := err.(*json.UnsupportedTypeError); !ok {
 		t.Errorf("Message with channel should fail. %v", err)
 	}
 
 	var comp complex128
-	_, err = jsonWithArgs(cmd, comp)
+	_, err = jsonWithArgs(cmd, "test", comp)
 	if _, ok := err.(*json.UnsupportedTypeError); !ok {
 		t.Errorf("Message with complex part should fail. %v", err)
 	}

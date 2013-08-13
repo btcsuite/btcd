@@ -159,11 +159,11 @@ type Error struct {
 	Message string `json:"message,omitempty"`
 }
 
-// jsonWithArgs takes a command and an interface which contains an array
-// of the arguments for that command.  It knows NOTHING about the commands so
-// all error checking of the arguments must happen before it is called.
-func jsonWithArgs(command string, args interface{}) ([]byte, error) {
-	rawMessage := Message{"1.0", "btcd", command, args}
+// jsonWithArgs takes a command, an id,  and an interface which contains an
+// array of the arguments for that command.  It knows NOTHING about the commands
+//  so all error checking of the arguments must happen before it is called.
+func jsonWithArgs(command string, id string, args interface{}) ([]byte, error) {
+	rawMessage := Message{"1.0", id, command, args}
 	finalMessage, err := json.Marshal(rawMessage)
 	if err != nil {
 		return nil, err
@@ -178,6 +178,17 @@ func jsonWithArgs(command string, args interface{}) ([]byte, error) {
 // described at:
 // https://en.bitcoin.it/wiki/Original_Bitcoin_client/API_Calls_list
 func CreateMessage(message string, args ...interface{}) ([]byte, error) {
+	finalMessage, err := CreateMessageWithId(message, "btcd", args...)
+	return finalMessage, err
+}
+
+// CreateMessage takes a string, an id,  and the optional arguments for it.
+// Then, if it is a recognized bitcoin json message, generates the json message
+//  ready to send off to the daemon or server.
+// It is capable of handeling all of the commands from the standard client,
+// described at:
+// https://en.bitcoin.it/wiki/Original_Bitcoin_client/API_Calls_list
+func CreateMessageWithId(message string, id string, args ...interface{}) ([]byte, error) {
 	var finalMessage []byte
 	var err error
 	// Different commands have different required and optional arguments.
@@ -193,7 +204,7 @@ func CreateMessage(message string, args ...interface{}) ([]byte, error) {
 			err = fmt.Errorf("Too many arguments for %s", message)
 			return finalMessage, err
 		}
-		finalMessage, err = jsonWithArgs(message, args)
+		finalMessage, err = jsonWithArgs(message, id, args)
 	// One optional int
 	case "listaccounts":
 		if len(args) > 1 {
@@ -207,7 +218,7 @@ func CreateMessage(message string, args ...interface{}) ([]byte, error) {
 				return finalMessage, err
 			}
 		}
-		finalMessage, err = jsonWithArgs(message, args)
+		finalMessage, err = jsonWithArgs(message, id, args)
 	// One required int
 	case "getblockhash":
 		if len(args) != 1 {
@@ -219,7 +230,7 @@ func CreateMessage(message string, args ...interface{}) ([]byte, error) {
 			err = fmt.Errorf("Argument must be int for %s", message)
 			return finalMessage, err
 		}
-		finalMessage, err = jsonWithArgs(message, args)
+		finalMessage, err = jsonWithArgs(message, id, args)
 	// One required float
 	case "settxfee":
 		if len(args) != 1 {
@@ -231,7 +242,7 @@ func CreateMessage(message string, args ...interface{}) ([]byte, error) {
 			err = fmt.Errorf("Argument must be float64 for %s", message)
 			return finalMessage, err
 		}
-		finalMessage, err = jsonWithArgs(message, args)
+		finalMessage, err = jsonWithArgs(message, id, args)
 	// One optional string
 	case "getmemorypool", "getnewaddress", "getwork", "help":
 		if len(args) > 1 {
@@ -245,7 +256,7 @@ func CreateMessage(message string, args ...interface{}) ([]byte, error) {
 				return finalMessage, err
 			}
 		}
-		finalMessage, err = jsonWithArgs(message, args)
+		finalMessage, err = jsonWithArgs(message, id, args)
 	// One required string
 	case "backupwallet", "decoderawtransaction", "dumpprivkey",
 		"encryptwallet", "getaccount", "getaccountaddress",
@@ -260,7 +271,7 @@ func CreateMessage(message string, args ...interface{}) ([]byte, error) {
 			err = fmt.Errorf("Argument must be string for %s", message)
 			return finalMessage, err
 		}
-		finalMessage, err = jsonWithArgs(message, args)
+		finalMessage, err = jsonWithArgs(message, id, args)
 	// Two required strings
 	case "setaccount", "signmessage", "walletpassphrase",
 		"walletpassphrasechange":
@@ -274,7 +285,7 @@ func CreateMessage(message string, args ...interface{}) ([]byte, error) {
 			err = fmt.Errorf("Arguments must be string for %s", message)
 			return finalMessage, err
 		}
-		finalMessage, err = jsonWithArgs(message, args)
+		finalMessage, err = jsonWithArgs(message, id, args)
 	// Three required strings
 	case "verifymessage":
 		if len(args) != 3 {
@@ -288,7 +299,7 @@ func CreateMessage(message string, args ...interface{}) ([]byte, error) {
 			err = fmt.Errorf("Arguments must be string for %s", message)
 			return finalMessage, err
 		}
-		finalMessage, err = jsonWithArgs(message, args)
+		finalMessage, err = jsonWithArgs(message, id, args)
 	// One required bool, one optional string
 	case "getaddednodeinfo":
 		if len(args) > 2 || len(args) == 0 {
@@ -304,7 +315,7 @@ func CreateMessage(message string, args ...interface{}) ([]byte, error) {
 			err = fmt.Errorf("Arguments must be bool and optionally string for %s", message)
 			return finalMessage, err
 		}
-		finalMessage, err = jsonWithArgs(message, args)
+		finalMessage, err = jsonWithArgs(message, id, args)
 	// One required bool, one optional int
 	case "setgenerate":
 		if len(args) > 2 || len(args) == 0 {
@@ -320,7 +331,7 @@ func CreateMessage(message string, args ...interface{}) ([]byte, error) {
 			err = fmt.Errorf("Arguments must be bool and optionally int for %s", message)
 			return finalMessage, err
 		}
-		finalMessage, err = jsonWithArgs(message, args)
+		finalMessage, err = jsonWithArgs(message, id, args)
 	// One optional string, one optional int
 	case "getbalance", "getreceivedbyaccount":
 		if len(args) > 2 {
@@ -339,7 +350,7 @@ func CreateMessage(message string, args ...interface{}) ([]byte, error) {
 			err = fmt.Errorf("Optional arguments must be string and int for %s", message)
 			return finalMessage, err
 		}
-		finalMessage, err = jsonWithArgs(message, args)
+		finalMessage, err = jsonWithArgs(message, id, args)
 	// One required string, one optional int
 	case "addnode", "getrawtransaction", "getreceivedbyaddress":
 		if len(args) > 2 || len(args) == 0 {
@@ -355,7 +366,7 @@ func CreateMessage(message string, args ...interface{}) ([]byte, error) {
 			err = fmt.Errorf("Arguments must be string and optionally int for %s", message)
 			return finalMessage, err
 		}
-		finalMessage, err = jsonWithArgs(message, args)
+		finalMessage, err = jsonWithArgs(message, id, args)
 	// One optional int, one optional bool
 	case "listreceivedbyaccount", "listreceivedbyaddress":
 		if len(args) > 2 {
@@ -374,7 +385,7 @@ func CreateMessage(message string, args ...interface{}) ([]byte, error) {
 			err = fmt.Errorf("Optional arguments must be int and bool for %s", message)
 			return finalMessage, err
 		}
-		finalMessage, err = jsonWithArgs(message, args)
+		finalMessage, err = jsonWithArgs(message, id, args)
 	// One optional string, two optional ints
 	case "listtransactions":
 		if len(args) > 3 {
@@ -397,7 +408,7 @@ func CreateMessage(message string, args ...interface{}) ([]byte, error) {
 			err = fmt.Errorf("Optional arguments must be string  and up to two ints for %s", message)
 			return finalMessage, err
 		}
-		finalMessage, err = jsonWithArgs(message, args)
+		finalMessage, err = jsonWithArgs(message, id, args)
 	// One required string, one optional string, one optional bool
 	case "importprivkey":
 		if len(args) > 3 || len(args) == 0 {
@@ -417,7 +428,7 @@ func CreateMessage(message string, args ...interface{}) ([]byte, error) {
 			err = fmt.Errorf("Arguments must be string and optionally string and bool for %s", message)
 			return finalMessage, err
 		}
-		finalMessage, err = jsonWithArgs(message, args)
+		finalMessage, err = jsonWithArgs(message, id, args)
 	// Two optional ints
 	case "listunspent":
 		if len(args) > 2 {
@@ -436,7 +447,7 @@ func CreateMessage(message string, args ...interface{}) ([]byte, error) {
 			err = fmt.Errorf("Optional arguments must be ints for %s", message)
 			return finalMessage, err
 		}
-		finalMessage, err = jsonWithArgs(message, args)
+		finalMessage, err = jsonWithArgs(message, id, args)
 	// Two optional strings
 	case "listsinceblock":
 		if len(args) > 2 {
@@ -455,7 +466,7 @@ func CreateMessage(message string, args ...interface{}) ([]byte, error) {
 			err = fmt.Errorf("Optional arguments must be strings for %s", message)
 			return finalMessage, err
 		}
-		finalMessage, err = jsonWithArgs(message, args)
+		finalMessage, err = jsonWithArgs(message, id, args)
 
 	// Two required strings, one required float, one optional int,
 	// two optional strings.
@@ -483,7 +494,7 @@ func CreateMessage(message string, args ...interface{}) ([]byte, error) {
 			err = fmt.Errorf("Arguments must be string, string, float64 and optionally int and two strings for %s", message)
 			return finalMessage, err
 		}
-		finalMessage, err = jsonWithArgs(message, args)
+		finalMessage, err = jsonWithArgs(message, id, args)
 	// Two required strings, one required float, one optional int,
 	// one optional string.
 	case "move":
@@ -506,7 +517,7 @@ func CreateMessage(message string, args ...interface{}) ([]byte, error) {
 			err = fmt.Errorf("Arguments must be string, string, float64 and optionally int and string for %s", message)
 			return finalMessage, err
 		}
-		finalMessage, err = jsonWithArgs(message, args)
+		finalMessage, err = jsonWithArgs(message, id, args)
 	// One required strings, one required float, two optional strings
 	case "sendtoaddress":
 		if len(args) > 4 || len(args) < 2 {
@@ -527,7 +538,7 @@ func CreateMessage(message string, args ...interface{}) ([]byte, error) {
 			err = fmt.Errorf("Arguments must be string, float64 and optionally two strings for %s", message)
 			return finalMessage, err
 		}
-		finalMessage, err = jsonWithArgs(message, args)
+		finalMessage, err = jsonWithArgs(message, id, args)
 	// required int, required pair of keys (string), optional string
 	case "addmultisignaddress":
 		if len(args) > 4 || len(args) < 3 {
@@ -545,7 +556,7 @@ func CreateMessage(message string, args ...interface{}) ([]byte, error) {
 			err = fmt.Errorf("Arguments must be int, two string and optionally one for %s", message)
 			return finalMessage, err
 		}
-		finalMessage, err = jsonWithArgs(message, args)
+		finalMessage, err = jsonWithArgs(message, id, args)
 	// Must be a set of string, int, string, float (any number of those).
 	case "createrawtransaction":
 		if len(args)%4 != 0 || len(args) == 0 {
@@ -571,7 +582,7 @@ func CreateMessage(message string, args ...interface{}) ([]byte, error) {
 			vList[i].Vout = vout
 			addresses[add] = amt
 		}
-		finalMessage, err = jsonWithArgs(message, []interface{}{vList, addresses})
+		finalMessage, err = jsonWithArgs(message, id, []interface{}{vList, addresses})
 	// string, string/float pairs, optional int, and string
 	case "sendmany":
 		if len(args) < 3 {
@@ -611,7 +622,7 @@ func CreateMessage(message string, args ...interface{}) ([]byte, error) {
 				}
 			}
 		}
-		finalMessage, err = jsonWithArgs(message, []interface{}{args[0].(string), addresses, minconf, comment})
+		finalMessage, err = jsonWithArgs(message, id, []interface{}{args[0].(string), addresses, minconf, comment})
 	// bool and an array of stuff
 	case "lockunspent":
 		if len(args) < 2 {
@@ -623,7 +634,7 @@ func CreateMessage(message string, args ...interface{}) ([]byte, error) {
 			err = fmt.Errorf("Incorrect arguement types.")
 			return finalMessage, err
 		}
-		finalMessage, err = jsonWithArgs(message, args)
+		finalMessage, err = jsonWithArgs(message, id, args)
 	// one required string (hex) and sets of 4 optional strings.
 	case "signrawtransaction":
 		if len(args) < 1 || (len(args)-1)%4 != 0 {
@@ -656,7 +667,7 @@ func CreateMessage(message string, args ...interface{}) ([]byte, error) {
 			txList[i].ScriptPubKey = spkey
 			pkeyList[i] = pkey
 		}
-		finalMessage, err = jsonWithArgs(message, []interface{}{args[0].(string), txList, pkeyList})
+		finalMessage, err = jsonWithArgs(message, id, []interface{}{args[0].(string), txList, pkeyList})
 	// Any other message
 	default:
 		err = fmt.Errorf("Not a valid command: %s", message)
