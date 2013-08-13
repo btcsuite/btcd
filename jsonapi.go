@@ -162,7 +162,7 @@ type Error struct {
 // jsonWithArgs takes a command, an id,  and an interface which contains an
 // array of the arguments for that command.  It knows NOTHING about the commands
 //  so all error checking of the arguments must happen before it is called.
-func jsonWithArgs(command string, id string, args interface{}) ([]byte, error) {
+func jsonWithArgs(command string, id interface{}, args interface{}) ([]byte, error) {
 	rawMessage := Message{"1.0", id, command, args}
 	finalMessage, err := json.Marshal(rawMessage)
 	if err != nil {
@@ -188,7 +188,7 @@ func CreateMessage(message string, args ...interface{}) ([]byte, error) {
 // It is capable of handeling all of the commands from the standard client,
 // described at:
 // https://en.bitcoin.it/wiki/Original_Bitcoin_client/API_Calls_list
-func CreateMessageWithId(message string, id string, args ...interface{}) ([]byte, error) {
+func CreateMessageWithId(message string, id interface{}, args ...interface{}) ([]byte, error) {
 	var finalMessage []byte
 	var err error
 	// Different commands have different required and optional arguments.
