@@ -168,6 +168,9 @@ var cmdtests = []struct {
 	{"listsinceblock", []interface{}{"test"}, true},
 	{"listsinceblock", []interface{}{}, true},
 	{"listsinceblock", []interface{}{1, "test"}, false},
+	{"walletpassphrase", []interface{}{"test", 1}, true},
+	{"walletpassphrase", []interface{}{"test"}, false},
+	{"walletpassphrase", []interface{}{"test", "test"}, false},
 	{"fakecommand", nil, false},
 }
 
