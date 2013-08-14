@@ -627,6 +627,12 @@ func (b *blockManager) handleNotifyMsg(notification *btcchain.Notification) {
 			b.server.txMemPool.removeTransaction(tx)
 		}
 
+		// Notify frontends
+		if r := b.server.rpcServer; r != nil {
+			go r.NotifyBlockConnected(block)
+			go r.NotifyNewTxListeners(b.server.db, block)
+		}
+
 	// A block has been disconnected from the main block chain.
 	case btcchain.NTBlockDisconnected:
 		block, ok := notification.Data.(*btcutil.Block)
@@ -645,6 +651,11 @@ func (b *blockManager) handleNotifyMsg(notification *btcchain.Notification) {
 				// the transaction pool.
 				b.server.txMemPool.removeTransaction(tx)
 			}
+		}
+
+		// Notify frontends
+		if r := b.server.rpcServer; r != nil {
+			go r.NotifyBlockDisconnected(block)
 		}
 	}
 }
