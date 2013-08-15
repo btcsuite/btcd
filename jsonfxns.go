@@ -46,7 +46,7 @@ func jsonRpcSend(user string, password string, server string, message []byte) (*
 }
 
 // GetRaw should be called after JsonRpcSend.  It reads and returns
-// the reply (which you can then call readResult() on) and closes the
+// the reply (which you can then call ReadResultCmd() on) and closes the
 // connection.
 func GetRaw(resp io.ReadCloser) ([]byte, error) {
 	body, err := ioutil.ReadAll(resp)
