@@ -93,6 +93,7 @@ type peer struct {
 	lastBlock       int32
 	wg              sync.WaitGroup
 	outputQueue     chan btcwire.Message
+	blockProcessed  chan bool
 	quit            chan bool
 }
 
@@ -633,11 +634,7 @@ out:
 			break out
 		}
 
-		// Some messages are handled directly, while other messages
-		// are sent to a queue to be processed.  Directly handling
-		// getdata and getblocks messages makes it impossible for a peer
-		// to spam with requests.  However, it means that our getdata
-		// requests to it may not get prompt replies.
+		// Handle each supported message type.
 		switch msg := rmsg.(type) {
 		case *btcwire.MsgVersion:
 			p.handleVersionMsg(msg)
@@ -662,8 +659,20 @@ out:
 			p.server.BroadcastMessage(msg, p)
 
 		case *btcwire.MsgBlock:
+			// Queue the block up to be handled by the block
+			// manager and intentionally block further receives
+			// until the bitcoin block is fully processed and known
+			// good or bad.  This helps prevent a malicious peer
+			// from queueing up a bunch of bad blocks before
+			// disconnecting (or being disconnected) and wasting
+			// memory.  Additionally, this behavior is depended on
+			// by at least the block acceptance test tool as the
+			// reference implementation processes blocks in the same
+			// thread and therefore blocks further messages until
+			// the bitcoin block has been fully processed.
 			block := btcutil.NewBlockFromBlockAndBytes(msg, buf)
-			p.server.blockManager.QueueBlock(block)
+			p.server.blockManager.QueueBlock(block, p)
+			<-p.blockProcessed
 
 		case *btcwire.MsgInv:
 			p.server.blockManager.QueueInv(msg, p)
@@ -783,6 +792,7 @@ func newPeer(s *server, conn net.Conn, inbound bool, persistent bool) *peer {
 		persistent:      persistent,
 		knownAddresses:  make(map[string]bool),
 		outputQueue:     make(chan btcwire.Message, outputBufferSize),
+		blockProcessed:  make(chan bool, 1),
 		quit:            make(chan bool),
 	}
 	return &p

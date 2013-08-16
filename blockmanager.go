@@ -31,6 +31,7 @@ type inventoryItem struct {
 // so the block handler has access to that information.
 type blockMsg struct {
 	block *btcutil.Block
+	peer  *peer
 }
 
 // invMsg packages a bitcoin inv message and the peer it came from together
@@ -209,8 +210,9 @@ out:
 	for !b.shutdown {
 		select {
 		// Handle new block messages.
-		case msg := <-b.blockQueue:
-			b.handleBlockMsg(msg.block)
+		case bmsg := <-b.blockQueue:
+			b.handleBlockMsg(bmsg.block)
+			bmsg.peer.blockProcessed <- true
 
 		// Handle new inventory messages.
 		case msg := <-b.invQueue:
@@ -287,13 +289,14 @@ out:
 }
 
 // QueueBlock adds the passed block message and peer to the block handling queue.
-func (b *blockManager) QueueBlock(block *btcutil.Block) {
+func (b *blockManager) QueueBlock(block *btcutil.Block, p *peer) {
 	// Don't accept more blocks if we're shutting down.
 	if b.shutdown {
+		p.blockProcessed <- false
 		return
 	}
 
-	bmsg := blockMsg{block: block}
+	bmsg := blockMsg{block: block, peer: p}
 	b.blockQueue <- &bmsg
 }
 
