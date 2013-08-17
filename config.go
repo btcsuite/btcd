@@ -216,6 +216,11 @@ func loadConfig() (*config, []string, error) {
 		log.Warnf("%v", err)
 	}
 
+	// Don't add peers from the config file when in regression test mode.
+	if preCfg.RegressionTest && len(cfg.AddPeers) > 0 {
+		cfg.AddPeers = nil
+	}
+
 	// Parse command line options again to ensure they take precedence.
 	remainingArgs, err := parser.Parse()
 	if err != nil {
