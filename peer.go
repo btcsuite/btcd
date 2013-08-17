@@ -204,19 +204,21 @@ func (p *peer) handleVersionMsg(msg *btcwire.MsgVersion) {
 
 	// Outbound connections.
 	if !p.inbound {
-		// TODO: Only do this if we're listening, not doing the initial
-		// block download, and are routable.
-		// Advertise the local address.
-		na, err := newNetAddress(p.conn.LocalAddr(), p.services)
-		if err != nil {
-			log.Errorf("[PEER] %v", err)
-			p.Disconnect()
-			return
+		// TODO(davec): Only do this if not doing the initial block
+		// download and the local address is routable.
+		if !cfg.DisableListen {
+			// Advertise the local address.
+			na, err := newNetAddress(p.conn.LocalAddr(), p.services)
+			if err != nil {
+				log.Errorf("[PEER] %v", err)
+				p.Disconnect()
+				return
+			}
+			addresses := map[string]*btcwire.NetAddress{
+				NetAddressKey(na): na,
+			}
+			p.pushAddrMsg(addresses)
 		}
-		addresses := map[string]*btcwire.NetAddress{
-			NetAddressKey(na): na,
-		}
-		p.pushAddrMsg(addresses)
 
 		// Request known addresses if the server address manager needs
 		// more and the peer has a protocol version new enough to
