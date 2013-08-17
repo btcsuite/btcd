@@ -122,11 +122,16 @@ func removeChildNode(children []*blockNode, node *blockNode) []*blockNode {
 	if node == nil {
 		return children
 	}
-	for i, n := range children {
-		if n.hash.IsEqual(node.hash) {
+
+	// An indexing for loop is intentionally used over a range here as range
+	// does not reevaluate the slice on each iteration nor does it adjust
+	// the index for the modified slice.
+	for i := 0; i < len(children); i++ {
+		if children[i].hash.IsEqual(node.hash) {
 			copy(children[i:], children[i+1:])
 			children[len(children)-1] = nil
 			return children[:len(children)-1]
+			i--
 		}
 	}
 	return children
@@ -186,15 +191,19 @@ func (b *BlockChain) removeOrphanBlock(orphan *orphanBlock) {
 	orphanHash, _ := orphan.block.Sha()
 	delete(b.orphans, *orphanHash)
 
-	// Remove the reference from the previous orphan index too.
+	// Remove the reference from the previous orphan index too.  An indexing
+	// for loop is intentionally used over a range here as range does not
+	// reevaluate the slice on each iteration nor does it adjust the index
+	// for the modified slice.
 	prevHash := &orphan.block.MsgBlock().Header.PrevBlock
 	orphans := b.prevOrphans[*prevHash]
-	for i, ob := range orphans {
-		hash, _ := ob.block.Sha()
+	for i := 0; i < len(orphans); i++ {
+		hash, _ := orphans[i].block.Sha()
 		if hash.IsEqual(orphanHash) {
 			copy(orphans[i:], orphans[i+1:])
 			orphans[len(orphans)-1] = nil
 			orphans = orphans[:len(orphans)-1]
+			i--
 		}
 	}
 	b.prevOrphans[*prevHash] = orphans
