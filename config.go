@@ -179,11 +179,6 @@ func loadConfig() (*config, []string, error) {
 		DbDir:       defaultDbDir,
 	}
 
-	// A config file in the current directory takes precedence.
-	if fileExists(defaultConfigFilename) {
-		cfg.ConfigFile = defaultConfigFilename
-	}
-
 	// Pre-parse the command line options to see if an alternative config
 	// file or the version flag was specified.
 	preCfg := cfg
