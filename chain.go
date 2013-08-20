@@ -13,6 +13,7 @@ import (
 	"github.com/conformal/btcwire"
 	"math/big"
 	"sort"
+	"sync"
 	"time"
 )
 
@@ -152,6 +153,7 @@ type BlockChain struct {
 	orphans       map[btcwire.ShaHash]*orphanBlock
 	prevOrphans   map[btcwire.ShaHash][]*orphanBlock
 	oldestOrphan  *orphanBlock
+	orphanLock    sync.RWMutex
 	blockCache    map[btcwire.ShaHash]*btcutil.Block
 	noVerify      bool
 	noCheckpoints bool
@@ -166,9 +168,16 @@ func (b *BlockChain) DisableVerify(disable bool) {
 	b.noVerify = disable
 }
 
-// getOrphanRoot returns the head of the chain for the provided hash from the
+// GetOrphanRoot returns the head of the chain for the provided hash from the
 // map of orphan blocks.
-func (b *BlockChain) getOrphanRoot(hash *btcwire.ShaHash) *btcwire.ShaHash {
+//
+// This function is safe for concurrent access.
+func (b *BlockChain) GetOrphanRoot(hash *btcwire.ShaHash) *btcwire.ShaHash {
+	// Protect concurrent access.  Using a read lock only so multiple
+	// readers can query without blocking each other.
+	b.orphanLock.RLock()
+	defer b.orphanLock.RUnlock()
+
 	// Keep looping while the parent of each orphaned block is
 	// known and is an orphan itself.
 	orphanRoot := hash
@@ -188,6 +197,10 @@ func (b *BlockChain) getOrphanRoot(hash *btcwire.ShaHash) *btcwire.ShaHash {
 // removeOrphanBlock removes the passed orphan block from the orphan pool and
 // previous orphan index.
 func (b *BlockChain) removeOrphanBlock(orphan *orphanBlock) {
+	// Protect concurrent access.
+	b.orphanLock.Lock()
+	defer b.orphanLock.Unlock()
+
 	// Remove the orphan block from the orphan pool.  It's safe to ignore
 	// the error on Sha since it's cached.
 	orphanHash, _ := orphan.block.Sha()
@@ -248,6 +261,12 @@ func (b *BlockChain) addOrphanBlock(block *btcutil.Block) {
 	// Get the block sha.  It is safe to ignore the error here since any
 	// errors would've been caught prior to calling this function.
 	blockSha, _ := block.Sha()
+
+	// Protect concurrent access.  This is intentionally done here instead
+	// of near the top since removeOrphanBlock does its own locking and
+	// the range iterator is not invalidated by removing map entries.
+	b.orphanLock.Lock()
+	b.orphanLock.Unlock()
 
 	// Insert the block into the orphan map with an expiration time
 	// 1 hour from now.
