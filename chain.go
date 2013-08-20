@@ -168,6 +168,29 @@ func (b *BlockChain) DisableVerify(disable bool) {
 	b.noVerify = disable
 }
 
+// IsKnownOrphan returns whether the passed hash is currently a known orphan.
+// Keep in mind that only a limited number of orphans are held onto for a
+// limited amount of time, so this function must not be used as an absolute
+// way to test if a block is an orphan block.  A full block (as opposed to just
+// its hash) must be passed to ProcessBlock for that purpose.  However, calling
+// ProcessBlock with an orphan that already exists results in an error, so this
+// function provides a mechanism for a caller to intelligently detect *recent*
+// duplicate orphans and react accordingly.
+//
+// This function is safe for concurrent access.
+func (b *BlockChain) IsKnownOrphan(hash *btcwire.ShaHash) bool {
+	// Protect concurrent access.  Using a read lock only so multiple
+	// readers can query without blocking each other.
+	b.orphanLock.RLock()
+	defer b.orphanLock.RUnlock()
+
+	if _, exists := b.orphans[*hash]; exists {
+		return true
+	}
+
+	return false
+}
+
 // GetOrphanRoot returns the head of the chain for the provided hash from the
 // map of orphan blocks.
 //
