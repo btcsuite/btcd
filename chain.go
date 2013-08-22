@@ -168,19 +168,21 @@ func (b *BlockChain) DisableVerify(disable bool) {
 
 // getOrphanRoot returns the head of the chain for the provided hash from the
 // map of orphan blocks.
-func (b *BlockChain) getOrphanRoot(sha *btcwire.ShaHash) *btcwire.ShaHash {
+func (b *BlockChain) getOrphanRoot(hash *btcwire.ShaHash) *btcwire.ShaHash {
 	// Keep looping while the parent of each orphaned block is
 	// known and is an orphan itself.
-	prevHash := sha
+	orphanRoot := hash
+	prevHash := hash
 	for {
 		orphan, exists := b.orphans[*prevHash]
 		if !exists {
 			break
 		}
+		orphanRoot = prevHash
 		prevHash = &orphan.block.MsgBlock().Header.PrevBlock
 	}
 
-	return prevHash
+	return orphanRoot
 }
 
 // removeOrphanBlock removes the passed orphan block from the orphan pool and
