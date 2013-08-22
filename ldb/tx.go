@@ -60,28 +60,24 @@ func (db *LevelDb) formatTx(txu *txUpdateObj) ([]byte, error) {
 
 	err := binary.Write(&txW, binary.LittleEndian, blkHeight)
 	if err != nil {
-		fmt.Printf("fail encoding blkHeight %v\n", err)
 		err = fmt.Errorf("Write fail")
 		return nil, err
 	}
 
 	err = binary.Write(&txW, binary.LittleEndian, txOff)
 	if err != nil {
-		fmt.Printf("fail encoding txoff %v\n", err)
 		err = fmt.Errorf("Write fail")
 		return nil, err
 	}
 
 	err = binary.Write(&txW, binary.LittleEndian, txLen)
 	if err != nil {
-		fmt.Printf("fail encoding txlen %v\n", err)
 		err = fmt.Errorf("Write fail")
 		return nil, err
 	}
 
 	err = binary.Write(&txW, binary.LittleEndian, spentbuf)
 	if err != nil {
-		fmt.Printf("fail encoding spentbuf %v\n", err)
 		err = fmt.Errorf("Write fail")
 		return nil, err
 	}
@@ -93,8 +89,8 @@ func (db *LevelDb) getTxData(txsha *btcwire.ShaHash) (rblkHeight int64,
 	rtxOff int, rtxLen int, rspentBuf []byte, err error) {
 	var buf []byte
 
-	key := shaToKey(txsha)
-	buf, err = db.tShaDb.Get(key, db.ro)
+	key := shaTxToKey(txsha)
+	buf, err = db.lDb.Get(key, db.ro)
 	if err != nil {
 		return
 	}
@@ -121,7 +117,6 @@ func (db *LevelDb) getTxData(txsha *btcwire.ShaHash) (rblkHeight int64,
 	spentBuf := make([]byte, dr.Len())
 	err = binary.Read(dr, binary.LittleEndian, spentBuf)
 	if err != nil {
-		fmt.Printf("fail encoding spentbuf %v\n", err)
 		err = fmt.Errorf("Db Corrupt 4")
 		return
 	}

@@ -6,7 +6,6 @@ package ldb
 
 import (
 	"bytes"
-	"fmt"
 	"github.com/conformal/btcdb"
 	"github.com/conformal/btcutil"
 	"github.com/conformal/btcwire"
@@ -78,7 +77,6 @@ func (db *LevelDb) fetchTxDataBySha(txsha *btcwire.ShaHash) (rtx *btcwire.MsgTx,
 
 	blksha, blkbuf, err = db.getBlkByHeight(blkHeight)
 	if err != nil {
-		fmt.Printf("failed to get block %v %v\n", blkHeight, err)
 		return
 	}
 

@@ -24,9 +24,9 @@ func (db *LevelDb) InsertBlockData(sha *btcwire.ShaHash, prevSha *btcwire.ShaHas
 func (db *LevelDb) getBlkLoc(sha *btcwire.ShaHash) (int64, error) {
 	var blkHeight int64
 
-	key := sha.Bytes()
+	key := shaBlkToKey(sha)
 
-	data, err := db.bShaDb.Get(key, db.ro)
+	data, err := db.lDb.Get(key, db.ro)
 
 	if err != nil {
 		return 0, err
@@ -48,8 +48,9 @@ func (db *LevelDb) getBlkByHeight(blkHeight int64) (rsha *btcwire.ShaHash, rbuf 
 
 	key := int64ToKey(blkHeight)
 
-	blkVal, err = db.bBlkDb.Get(key, db.ro)
+	blkVal, err = db.lDb.Get(key, db.ro)
 	if err != nil {
+		log.Tracef("failed to find height %v", blkHeight)
 		return // exists ???
 	}
 
@@ -89,7 +90,7 @@ func (db *LevelDb) setBlk(sha *btcwire.ShaHash, blkHeight int64, buf []byte) err
 		err = fmt.Errorf("Write Fail")
 		return err
 	}
-	shaKey := sha.Bytes()
+	shaKey := shaBlkToKey(sha)
 
 	blkKey := int64ToKey(blkHeight)
 
@@ -98,9 +99,9 @@ func (db *LevelDb) setBlk(sha *btcwire.ShaHash, blkHeight int64, buf []byte) err
 	copy(blkVal[0:], shaB)
 	copy(blkVal[len(shaB):], buf)
 
-	db.bShaBatch().Put(shaKey, lw.Bytes())
+	db.lBatch().Put(shaKey, lw.Bytes())
 
-	db.bBlkBatch().Put(blkKey, blkVal)
+	db.lBatch().Put(blkKey, blkVal)
 
 	return nil
 }
@@ -110,7 +111,8 @@ func (db *LevelDb) setBlk(sha *btcwire.ShaHash, blkHeight int64, buf []byte) err
 // insertSha shall be called with db lock held
 func (db *LevelDb) insertBlockData(sha *btcwire.ShaHash, prevSha *btcwire.ShaHash, buf []byte) (blockid int64, err error) {
 
-	oBlkHeight, err := db.getBlkLoc(prevSha)
+	var oBlkHeight int64
+	oBlkHeight, err = db.getBlkLoc(prevSha)
 
 	if err != nil {
 		// check current block count
@@ -119,6 +121,9 @@ func (db *LevelDb) insertBlockData(sha *btcwire.ShaHash, prevSha *btcwire.ShaHas
 		//	return
 		// }
 		oBlkHeight = -1
+		if db.nextBlock != 0 {
+			return 0, err
+		}
 	}
 
 	// TODO(drahn) check curfile filesize, increment curfile if this puts it over
@@ -222,7 +227,7 @@ func (db *LevelDb) FetchHeightRange(startHeight, endHeight int64) (rshalist []bt
 		// TODO(drahn) fix blkFile from height
 
 		key := int64ToKey(height)
-		blkVal, lerr := db.bBlkDb.Get(key, db.ro)
+		blkVal, lerr := db.lDb.Get(key, db.ro)
 		if lerr != nil {
 			break
 		}
@@ -248,8 +253,9 @@ func (db *LevelDb) NewestSha() (rsha *btcwire.ShaHash, rblkid int64, err error) 
 	defer db.dbLock.Unlock()
 
 	if db.lastBlkIdx == -1 {
+		rblkid = db.lastBlkIdx 
 		err = fmt.Errorf("Empty Database")
-		return
+		return 
 	}
 	sha := db.lastBlkSha
 

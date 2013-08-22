@@ -5,6 +5,7 @@
 package ldb_test
 
 import (
+	"fmt"
 	"github.com/conformal/btcdb"
 	_ "github.com/conformal/btcdb/ldb"
 	"github.com/conformal/btcutil"
@@ -33,8 +34,8 @@ func loadblocks(t *testing.T) []*btcutil.Block {
 
 func TestUnspentInsert(t *testing.T) {
 	testUnspentInsert(t, dbTmDefault)
-	testUnspentInsert(t, dbTmNormal)
-	testUnspentInsert(t, dbTmFast)
+	//testUnspentInsert(t, dbTmNormal)
+	//testUnspentInsert(t, dbTmFast)
 }
 
 // insert every block in the test chain
@@ -44,7 +45,7 @@ func TestUnspentInsert(t *testing.T) {
 // the associated txout set to spent.
 func testUnspentInsert(t *testing.T, mode int) {
 	// Ignore db remove errors since it means we didn't have an old one.
-	dbname := "tstdbuspnt1"
+	dbname := fmt.Sprintf("tstdbuspnt1.%d", mode)
 	_ = os.RemoveAll(dbname)
 	db, err := btcdb.CreateDB("leveldb", dbname)
 	if err != nil {
