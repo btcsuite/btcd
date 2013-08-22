@@ -168,6 +168,40 @@ func (b *BlockChain) DisableVerify(disable bool) {
 	b.noVerify = disable
 }
 
+// HaveInventory returns whether or not the chain instance has the inventory
+// represented by the passed inventory vector.  This includes checking all of
+// the various places inventory can be when it is in different states such as
+// part of the main chain, on a side chain, and orphans.
+//
+// This function is safe for concurrent access.
+func (b *BlockChain) HaveInventory(inventoryVector *btcwire.InvVect) bool {
+	switch inventoryVector.Type {
+	case btcwire.InvVect_Block:
+		// Check the main chain and side chains.
+		if b.blockExists(&inventoryVector.Hash) {
+			return true
+		}
+
+		// Check orphan blocks.
+		if b.IsKnownOrphan(&inventoryVector.Hash) {
+			return true
+		}
+
+	case btcwire.InvVect_Tx:
+		// TODO(davec): Need to ultimately maintain a transaction pool
+		// of transactions that are not already in a block and check
+		// for the existing transaction there too.
+
+		// Check if the transaction exists from the point of view of the
+		// end of the main chain.
+		return b.db.ExistsTxSha(&inventoryVector.Hash)
+	}
+
+	// The requested inventory is either not known or is an unsupported
+	// type (which also implies it is not known).
+	return false
+}
+
 // IsKnownOrphan returns whether the passed hash is currently a known orphan.
 // Keep in mind that only a limited number of orphans are held onto for a
 // limited amount of time, so this function must not be used as an absolute
