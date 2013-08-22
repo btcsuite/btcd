@@ -576,7 +576,7 @@ func (db *SqliteDb) DropAfterBlockBySha(sha *btcwire.ShaHash) (err error) {
 	return db.delFromDB(keepidx)
 }
 
-func (db *SqliteDb) delFromDB(keepidx int64) (error) {
+func (db *SqliteDb) delFromDB(keepidx int64) error {
 	tx := &db.txState
 	_, err := tx.tx.Exec("DELETE FROM txtmp WHERE blockid > ?", keepidx)
 	if err != nil {
@@ -649,7 +649,7 @@ func (db *SqliteDb) InsertBlock(block *btcutil.Block) (int64, error) {
 		if success {
 			return
 		}
-			
+
 		for txidx := 0; txidx <= txinsertidx; txidx++ {
 			tx := mblock.Transactions[txidx]
 
@@ -659,7 +659,7 @@ func (db *SqliteDb) InsertBlock(block *btcutil.Block) (int64, error) {
 			}
 		}
 
-		err = db.delFromDB(newheight -1)
+		err = db.delFromDB(newheight - 1)
 		if err != nil {
 			log.Warnf("Error during block insert unwind %v %v", blocksha, err)
 		}

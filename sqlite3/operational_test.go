@@ -152,10 +152,9 @@ out:
 
 		blkSha, _ := block.Sha()
 		if *newSha != *blkSha {
-			t.Errorf("Newest block sha does not match freshly inserted one %v %v ",  newSha, blkSha)
+			t.Errorf("Newest block sha does not match freshly inserted one %v %v ", newSha, blkSha)
 		}
 	}
-
 
 	// now that db is populated, do some additional test
 	testFetchRangeHeight(t, db, blocks)
@@ -365,11 +364,10 @@ func loadBlocks(t *testing.T, file string) (blocks []*btcutil.Block, err error) 
 	return
 }
 
-
-func testFetchRangeHeight(t *testing.T, db btcdb.Db, blocks []*btcutil.Block) () {
+func testFetchRangeHeight(t *testing.T, db btcdb.Db, blocks []*btcutil.Block) {
 
 	var testincrement int64 = 50
-	var testcnt int64       = 100
+	var testcnt int64 = 100
 
 	shanames := make([]*btcwire.ShaHash, len(blocks))
 
@@ -396,8 +394,8 @@ func testFetchRangeHeight(t *testing.T, db btcdb.Db, blocks []*btcutil.Block) ()
 		}
 
 		if endheight == btcdb.AllShas {
-			if int64(len(shalist)) != nBlocks - startheight {
-				t.Errorf("FetchRangeHeight: expected A %v shas, got %v", nBlocks - startheight, len(shalist))
+			if int64(len(shalist)) != nBlocks-startheight {
+				t.Errorf("FetchRangeHeight: expected A %v shas, got %v", nBlocks-startheight, len(shalist))
 			}
 		} else {
 			if int64(len(shalist)) != testcnt {
@@ -411,6 +409,5 @@ func testFetchRangeHeight(t *testing.T, db btcdb.Db, blocks []*btcutil.Block) ()
 			}
 		}
 	}
-
 
 }

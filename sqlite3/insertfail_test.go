@@ -50,7 +50,7 @@ func failtestOperationalMode(t *testing.T, mode int) {
 			t.Errorf("not right type")
 		}
 	case dbTmNoVerify: // validated block
-		// no point in testing this 
+		// no point in testing this
 		return
 	}
 
@@ -72,7 +72,7 @@ out:
 		block := blocks[height]
 
 		mblock := block.MsgBlock()
-		blockname, _ :=  block.Sha()
+		blockname, _ := block.Sha()
 
 		if height == 248 {
 			// time to corrupt the datbase, to see if it leaves the block or tx in the db
@@ -89,7 +89,6 @@ out:
 				t.Errorf("deleted tx found %v", origintxsha)
 			}
 		}
-
 
 		if height == 248 {
 		}
@@ -120,7 +119,7 @@ out:
 				t.Errorf("block still present after failed insert")
 			}
 			// if we got here with no error, testing was successful
-			break out 
+			break out
 		}
 		if newheight != height {
 			t.Errorf("height mismatch expect %v returned %v", height, newheight)
