@@ -379,10 +379,13 @@ func (b *BlockChain) GenerateInitialIndex() error {
 			return err
 		}
 
-		_, err = b.loadBlockNode(hash)
+		node, err := b.loadBlockNode(hash)
 		if err != nil {
 			return err
 		}
+
+		// This node is now the end of the best chain.
+		b.bestChain = node
 	}
 
 	return nil
