@@ -348,8 +348,8 @@ func countP2SHSigOps(msgTx *btcwire.MsgTx, isCoinBaseTx bool, txStore map[btcwir
 		originTx, exists := txStore[*txInHash]
 		if !exists || originTx.err != nil || originTx.tx == nil {
 			return 0, fmt.Errorf("unable to find input transaction "+
-				"%v referenced from transaction %v", txHash,
-				txInHash)
+				"%v referenced from transaction %v", txInHash,
+				txHash)
 		}
 
 		// Ensure the output index in the referenced transaction is
