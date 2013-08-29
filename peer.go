@@ -6,8 +6,10 @@ package main
 
 import (
 	"bytes"
+	"container/list"
 	"errors"
 	"fmt"
+	"github.com/conformal/btcchain"
 	"github.com/conformal/btcdb"
 	"github.com/conformal/btcutil"
 	"github.com/conformal/btcwire"
@@ -91,6 +93,7 @@ type peer struct {
 	versionKnown    bool
 	knownAddresses  map[string]bool
 	lastBlock       int32
+	requestQueue    *list.List
 	wg              sync.WaitGroup
 	outputQueue     chan btcwire.Message
 	blockProcessed  chan bool
@@ -230,18 +233,20 @@ func (p *peer) handleVersionMsg(msg *btcwire.MsgVersion) {
 	}
 
 	// Request latest blocks if the peer has blocks we're interested in.
-	// XXX: Ask block manager for latest so we get in-flight too...
-	sha, lastBlock, err := p.server.db.NewestSha()
+	_, lastBlock, err := p.server.db.NewestSha()
 	if err != nil {
 		log.Errorf("[PEER] %v", err)
 		p.Disconnect()
 	}
 	// If the peer has blocks we're interested in.
 	if p.lastBlock > int32(lastBlock) {
-		stopHash := btcwire.ShaHash{}
-		gbmsg := btcwire.NewMsgGetBlocks(&stopHash)
-		p.server.blockManager.AddBlockLocators(sha, gbmsg)
-		p.outputQueue <- gbmsg
+		locator, err := p.server.blockManager.blockChain.LatestBlockLocator()
+		if err != nil {
+			log.Error("[PEER] Failed to get block locator for the "+
+				"latest block: %v", err)
+			p.Disconnect()
+		}
+		p.pushGetBlocksMsg(locator, &zeroHash)
 	}
 
 	// TODO: Relay alerts.
@@ -279,6 +284,115 @@ func (p *peer) pushBlockMsg(sha btcwire.ShaHash) error {
 	}
 	p.QueueMessage(blk.MsgBlock())
 	return nil
+}
+
+// pushGetBlocksMsg send a getblocks message for the provided block locator
+// and stop hash.
+func (p *peer) pushGetBlocksMsg(locator btcchain.BlockLocator, stopHash *btcwire.ShaHash) error {
+	msg := btcwire.NewMsgGetBlocks(stopHash)
+	for _, hash := range locator {
+		err := msg.AddBlockLocatorHash(hash)
+		if err != nil {
+			return err
+		}
+	}
+	p.QueueMessage(msg)
+	return nil
+}
+
+// handleInvMsg is invoked when a peer receives an inv bitcoin message and is
+// used to examine the inventory being advertised by the remote peer and react
+// accordingly.
+//
+// NOTE: This will need to have tx handling added as well when they are
+// supported.
+func (p *peer) handleInvMsg(msg *btcwire.MsgInv) {
+	// Attempt to find the final block in the inventory list.  There may
+	// not be one.
+	lastBlock := -1
+	invVects := msg.InvList
+	for i := len(invVects) - 1; i >= 0; i-- {
+		if invVects[i].Type == btcwire.InvVect_Block {
+			lastBlock = i
+			break
+		}
+	}
+
+	// Request the advertised inventory if we don't already have it.  Also,
+	// request parent blocks of orphans if we receive one we already have.
+	// Finally, attempt to detect potential stalls due to long side chains
+	// we already have and request more blocks to prevent them.
+	chain := p.server.blockManager.blockChain
+	for i, iv := range invVects {
+		switch iv.Type {
+		case btcwire.InvVect_Block:
+			if !chain.HaveInventory(iv) {
+				// Add it to the request queue.
+				p.requestQueue.PushBack(iv)
+				continue
+			}
+
+			// The block is an orphan block that we already have.
+			// When the existing orphan was processed, it requested
+			// the missing parent blocks.  When this scenario
+			// happens, it means there were more blocks missing
+			// than are allowed into a single inventory message.  As
+			// a result, once this peer requested the final
+			// advertised block, the remote peer noticed and is now
+			// resending the orphan block as an available block
+			// to signal there are more missing blocks that need to
+			// be requested.
+			if chain.IsKnownOrphan(&iv.Hash) {
+				// Request blocks starting at the latest known
+				// up to the root of the orphan that just came
+				// in.
+				orphanRoot := chain.GetOrphanRoot(&iv.Hash)
+				locator, err := chain.LatestBlockLocator()
+				if err != nil {
+					log.Error("[PEER] Failed to get block "+
+						"locator for the latest block: "+
+						"%v", err)
+					continue
+				}
+				p.pushGetBlocksMsg(locator, orphanRoot)
+				continue
+			}
+
+			// We already have the final block advertised by this
+			// inventory message, so force a request for more.  This
+			// should only really happen if we're on a really long
+			// side chain.
+			if i == lastBlock {
+				// Request blocks after this one up to the
+				// final one the remote peer knows about (zero
+				// stop hash).
+				locator := chain.BlockLocatorFromHash(&iv.Hash)
+				p.pushGetBlocksMsg(locator, &zeroHash)
+			}
+
+		// Ignore unsupported inventory types.
+		default:
+			continue
+		}
+	}
+
+	// Request as much as possible at once.  Anything that won't fit into
+	// the request will be requested on the next inv message.
+	numRequested := 0
+	gdmsg := btcwire.NewMsgGetData()
+	for e := p.requestQueue.Front(); e != nil; e = p.requestQueue.Front() {
+		iv := e.Value.(*btcwire.InvVect)
+		gdmsg.AddInvVect(iv)
+		p.requestQueue.Remove(e)
+
+		numRequested++
+		if numRequested >= btcwire.MaxInvPerMsg {
+			break
+		}
+	}
+	if len(gdmsg.InvList) > 0 {
+		p.QueueMessage(gdmsg)
+	}
 }
 
 // handleGetData is invoked when a peer receives a getdata bitcoin message and
@@ -340,8 +454,8 @@ func (p *peer) handleGetBlocksMsg(msg *btcwire.MsgGetBlocks) {
 	}
 
 	// Don't attempt to fetch more than we can put into a single message.
-	if endIdx-startIdx > btcwire.MaxInvPerMsg {
-		endIdx = startIdx + btcwire.MaxInvPerMsg
+	if endIdx-startIdx > btcwire.MaxBlocksPerMsg {
+		endIdx = startIdx + btcwire.MaxBlocksPerMsg
 	}
 
 	// Fetch the inventory from the block database.
@@ -677,7 +791,7 @@ out:
 			<-p.blockProcessed
 
 		case *btcwire.MsgInv:
-			p.server.blockManager.QueueInv(msg, p)
+			p.handleInvMsg(msg)
 
 		case *btcwire.MsgGetData:
 			p.handleGetDataMsg(msg)
@@ -793,6 +907,7 @@ func newPeer(s *server, conn net.Conn, inbound bool, persistent bool) *peer {
 		inbound:         inbound,
 		persistent:      persistent,
 		knownAddresses:  make(map[string]bool),
+		requestQueue:    list.New(),
 		outputQueue:     make(chan btcwire.Message, outputBufferSize),
 		blockProcessed:  make(chan bool, 1),
 		quit:            make(chan bool),
