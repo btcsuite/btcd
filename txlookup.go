@@ -60,22 +60,31 @@ func connectTransactions(txStore map[btcwire.ShaHash]*txData, block *btcutil.Blo
 // transactions in the passed map are updated.
 func disconnectTransactions(txStore map[btcwire.ShaHash]*txData, block *btcutil.Block) error {
 	// Loop through all of the transactions in the block to see if any of
-	// them are ones were need to undo based on the results map.
+	// them are ones that need to be undone based on the transaction store.
 	for i, tx := range block.MsgBlock().Transactions {
 		txHash, err := block.TxSha(i)
 		if err != nil {
 			return err
 		}
 
-		// Remove this transaction from the transaction store (this is a
-		// no-op if it's not there).
-		delete(txStore, *txHash)
+		// Clear this transaction from the transaction store if needed.
+		// Only clear it rather than deleting it because the transaction
+		// connect code relies on its presence to decide whether or not
+		// to update the store and any transactions which exist on both
+		// sides of a fork would otherwise not be updated.
+		if txD, exists := txStore[*txHash]; exists {
+			txD.tx = nil
+			txD.blockHeight = 0
+			txD.spent = nil
+			txD.err = btcdb.TxShaMissing
+		}
 
 		// Unspend the origin transaction output.
 		for _, txIn := range tx.TxIn {
 			originHash := &txIn.PreviousOutpoint.Hash
 			originIndex := txIn.PreviousOutpoint.Index
-			if originTx, exists := txStore[*originHash]; exists {
+			originTx, exists := txStore[*originHash]
+			if exists && originTx.tx != nil && originTx.err == nil {
 				originTx.spent[originIndex] = false
 			}
 		}
