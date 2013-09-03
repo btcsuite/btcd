@@ -178,8 +178,8 @@ func (p *peer) handleVersionMsg(msg *btcwire.MsgVersion) {
 		p.protocolVersion, p.conn.RemoteAddr())
 	p.lastBlock = msg.LastBlock
 
-	// Set the supported services for the peer to what the remote
-	// peer advertised.
+	// Set the supported services for the peer to what the remote peer
+	// advertised.
 	p.services = msg.Services
 
 	// Inbound connections.
@@ -232,22 +232,8 @@ func (p *peer) handleVersionMsg(msg *btcwire.MsgVersion) {
 		}
 	}
 
-	// Request latest blocks if the peer has blocks we're interested in.
-	_, lastBlock, err := p.server.db.NewestSha()
-	if err != nil {
-		log.Errorf("[PEER] %v", err)
-		p.Disconnect()
-	}
-	// If the peer has blocks we're interested in.
-	if p.lastBlock > int32(lastBlock) {
-		locator, err := p.server.blockManager.blockChain.LatestBlockLocator()
-		if err != nil {
-			log.Error("[PEER] Failed to get block locator for the "+
-				"latest block: %v", err)
-			p.Disconnect()
-		}
-		p.pushGetBlocksMsg(locator, &zeroHash)
-	}
+	// Signal the block manager this peer is a new sync candidate.
+	p.server.blockManager.newCandidates <- p
 
 	// TODO: Relay alerts.
 }
@@ -808,9 +794,11 @@ out:
 		}
 	}
 
-	// Ensure connection is closed and notify server that the peer is done.
+	// Ensure connection is closed and notify server and block manager that
+	// the peer is done.
 	p.Disconnect()
 	p.server.donePeers <- p
+	p.server.blockManager.donePeers <- p
 	p.quit <- true
 
 	p.wg.Done()
