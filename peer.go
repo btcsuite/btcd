@@ -178,12 +178,12 @@ func (p *peer) handleVersionMsg(msg *btcwire.MsgVersion) {
 		p.protocolVersion, p.conn.RemoteAddr())
 	p.lastBlock = msg.LastBlock
 
+	// Set the supported services for the peer to what the remote
+	// peer advertised.
+	p.services = msg.Services
+
 	// Inbound connections.
 	if p.inbound {
-		// Set the supported services for the peer to what the remote
-		// peer advertised.
-		p.services = msg.Services
-
 		// Send version.
 		err := p.pushVersionMsg()
 		if err != nil {
