@@ -468,27 +468,35 @@ func (p *peer) handleGetBlocksMsg(msg *btcwire.MsgGetBlocks) {
 // handleGetBlocksMsg is invoked when a peer receives a getheaders bitcoin
 // message.
 func (p *peer) handleGetHeadersMsg(msg *btcwire.MsgGetHeaders) {
-	var err error
-	startIdx := int64(0)
+	// Attempt to look up the height of the provided stop hash.
 	endIdx := btcdb.AllShas
-
-	// Return all block hashes to the latest one (up to max per message) if
-	// no stop hash was specified.
-	// Attempt to find the ending index of the stop hash if specified.
-	if !msg.HashStop.IsEqual(&zeroHash) {
-		block, err := p.server.db.FetchBlockBySha(&msg.HashStop)
-		if err != nil {
-			// Fetch all if we dont recognize the stop hash.
-			endIdx = btcdb.AllShas
-		}
-		endIdx = block.Height()
+	block, err := p.server.db.FetchBlockBySha(&msg.HashStop)
+	if err == nil {
+		endIdx = block.Height() + 1
 	}
 
-	// TODO(davec): This should have some logic to utilize the additional
-	// locator hashes to ensure the proper chain.
+	// There are no block locators so a specific header is being requested
+	// as identified by the stop hash.
+	if len(msg.BlockLocatorHashes) == 0 {
+		// No blocks with the stop hash were found so there is nothing
+		// to do.  Just return.  This behavior mirrors the reference
+		// implementation.
+		if endIdx == btcdb.AllShas {
+			return
+		}
+
+		// Send the requested block header.
+		headersMsg := btcwire.NewMsgHeaders()
+		hdr := block.MsgBlock().Header // copy
+		hdr.TxnCount = 0
+		headersMsg.AddBlockHeader(&hdr)
+		p.QueueMessage(headersMsg)
+		return
+	}
+
+	// Find the most recent known block based on the block locator.
+	startIdx := int64(-1)
 	for _, hash := range msg.BlockLocatorHashes {
-		// TODO(drahn) does using the caching interface make sense
-		// on index lookups ?
 		block, err := p.server.db.FetchBlockBySha(hash)
 		if err == nil {
 			// Start with the next hash since we know this one.
@@ -497,33 +505,57 @@ func (p *peer) handleGetHeadersMsg(msg *btcwire.MsgGetHeaders) {
 		}
 	}
 
+	// When the block locator refers to an unknown block, just return an
+	// empty headers message.  This behavior mirrors the reference
+	// implementation.
+	if startIdx == -1 {
+		headersMsg := btcwire.NewMsgHeaders()
+		p.QueueMessage(headersMsg)
+		return
+	}
+
 	// Don't attempt to fetch more than we can put into a single message.
 	if endIdx-startIdx > btcwire.MaxBlockHeadersPerMsg {
 		endIdx = startIdx + btcwire.MaxBlockHeadersPerMsg
 	}
 
-	// Fetch the inventory from the block database.
-	hashList, err := p.server.db.FetchHeightRange(startIdx, endIdx)
-	if err != nil {
-		log.Warnf("lookup returned %v ", err)
-		return
-	}
-
-	// Nothing to send.
-	if len(hashList) == 0 {
-		return
-	}
-
-	// Generate inventory vectors and push the inventory message.
+	// Generate headers message and send it.
+	//
+	// The FetchBlockBySha call is limited to a maximum number of hashes
+	// per invocation.  Since the maximum number of headers per message
+	// might be larger, call it multiple times with the appropriate indices
+	// as needed.
 	headersMsg := btcwire.NewMsgHeaders()
-	for _, hash := range hashList {
-		block, err := p.server.db.FetchBlockBySha(&hash)
+	for start := startIdx; start < endIdx; {
+		// Fetch the inventory from the block database.
+		hashList, err := p.server.db.FetchHeightRange(start, endIdx)
 		if err != nil {
-			log.Warnf("[PEER] badness %v", err)
+			log.Warnf("[PEER] Header lookup failed: %v", err)
+			return
 		}
-		hdr := block.MsgBlock().Header // copy
-		hdr.TxnCount = 0
-		headersMsg.AddBlockHeader(&hdr)
+
+		// The database did not return any further hashes.  Break out of
+		// the loop now.
+		if len(hashList) == 0 {
+			break
+		}
+
+		// Add headers to the message.
+		for _, hash := range hashList {
+			block, err := p.server.db.FetchBlockBySha(&hash)
+			if err != nil {
+				log.Warnf("[PEER] Lookup of known block hash "+
+					"failed: %v", err)
+				continue
+			}
+			hdr := block.MsgBlock().Header // copy
+			hdr.TxnCount = 0
+			headersMsg.AddBlockHeader(&hdr)
+		}
+
+		// Start at the next block header after the latest one on the
+		// next loop iteration.
+		start += int64(len(hashList))
 	}
 	p.QueueMessage(headersMsg)
 }
