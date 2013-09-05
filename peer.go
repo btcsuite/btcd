@@ -495,7 +495,10 @@ func (p *peer) handleGetHeadersMsg(msg *btcwire.MsgGetHeaders) {
 	}
 
 	// Find the most recent known block based on the block locator.
-	startIdx := int64(-1)
+	// It's the block after the genesis block if no other blocks in the
+	// provided locator are known.  This does mean the client will start
+	// over with the genesis block if unknown block locators are provided.
+	startIdx := int64(1)
 	for _, hash := range msg.BlockLocatorHashes {
 		block, err := p.server.db.FetchBlockBySha(hash)
 		if err == nil {
@@ -503,15 +506,6 @@ func (p *peer) handleGetHeadersMsg(msg *btcwire.MsgGetHeaders) {
 			startIdx = block.Height() + 1
 			break
 		}
-	}
-
-	// When the block locator refers to an unknown block, just return an
-	// empty headers message.  This behavior mirrors the reference
-	// implementation.
-	if startIdx == -1 {
-		headersMsg := btcwire.NewMsgHeaders()
-		p.QueueMessage(headersMsg)
-		return
 	}
 
 	// Don't attempt to fetch more than we can put into a single message.
