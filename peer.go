@@ -94,6 +94,7 @@ type peer struct {
 	knownAddresses  map[string]bool
 	lastBlock       int32
 	requestQueue    *list.List
+	continueHash    *btcwire.ShaHash
 	wg              sync.WaitGroup
 	outputQueue     chan btcwire.Message
 	blockProcessed  chan bool
@@ -269,6 +270,22 @@ func (p *peer) pushBlockMsg(sha btcwire.ShaHash) error {
 		return err
 	}
 	p.QueueMessage(blk.MsgBlock())
+
+	// When the peer requests the final block that was advertised in
+	// response to a getblocks message which requested more blocks than
+	// would fit into a single message, send it a new inventory message
+	// to trigger it to issue another getblocks message for the next
+	// batch of inventory.
+	if p.continueHash != nil && p.continueHash.IsEqual(&sha) {
+		hash, _, err := p.server.db.NewestSha()
+		if err == nil {
+			invMsg := btcwire.NewMsgInv()
+			iv := btcwire.NewInvVect(btcwire.InvVect_Block, hash)
+			invMsg.AddInvVect(iv)
+			p.QueueMessage(invMsg)
+			p.continueHash = nil
+		}
+	}
 	return nil
 }
 
@@ -410,27 +427,24 @@ out:
 
 // handleGetBlocksMsg is invoked when a peer receives a getdata bitcoin message.
 func (p *peer) handleGetBlocksMsg(msg *btcwire.MsgGetBlocks) {
-	var err error
-	startIdx := int64(0)
-	endIdx := btcdb.AllShas
-
 	// Return all block hashes to the latest one (up to max per message) if
 	// no stop hash was specified.
 	// Attempt to find the ending index of the stop hash if specified.
+	endIdx := btcdb.AllShas
 	if !msg.HashStop.IsEqual(&zeroHash) {
 		block, err := p.server.db.FetchBlockBySha(&msg.HashStop)
-		if err != nil {
-			// Fetch all if we dont recognize the stop hash.
-			endIdx = btcdb.AllShas
+		if err == nil {
+			endIdx = block.Height() + 1
 		}
-		endIdx = block.Height()
 	}
 
-	// TODO(davec): This should have some logic to utilize the additional
-	// locator hashes to ensure the proper chain.
+	// Find the most recent known block based on the block locator.
+	// Use the block after the genesis block if no other blocks in the
+	// provided locator are known.  This does mean the client will start
+	// over with the genesis block if unknown block locators are provided.
+	// This mirrors the behavior in the reference implementation.
+	startIdx := int64(1)
 	for _, hash := range msg.BlockLocatorHashes {
-		// TODO(drahn) does using the caching interface make sense
-		// on index lookups ?
 		block, err := p.server.db.FetchBlockBySha(hash)
 		if err == nil {
 			// Start with the next hash since we know this one.
@@ -440,29 +454,55 @@ func (p *peer) handleGetBlocksMsg(msg *btcwire.MsgGetBlocks) {
 	}
 
 	// Don't attempt to fetch more than we can put into a single message.
+	autoContinue := false
 	if endIdx-startIdx > btcwire.MaxBlocksPerMsg {
 		endIdx = startIdx + btcwire.MaxBlocksPerMsg
+		autoContinue = true
 	}
 
-	// Fetch the inventory from the block database.
-	hashList, err := p.server.db.FetchHeightRange(startIdx, endIdx)
-	if err != nil {
-		log.Warnf(" lookup returned %v ", err)
-		return
+	// Generate inventory message.
+	//
+	// The FetchBlockBySha call is limited to a maximum number of hashes
+	// per invocation.  Since the maximum number of inventory per message
+	// might be larger, call it multiple times with the appropriate indices
+	// as needed.
+	invMsg := btcwire.NewMsgInv()
+	for start := startIdx; start < endIdx; {
+		// Fetch the inventory from the block database.
+		hashList, err := p.server.db.FetchHeightRange(start, endIdx)
+		if err != nil {
+			log.Warnf("[PEER] Block lookup failed: %v", err)
+			return
+		}
+
+		// The database did not return any further hashes.  Break out of
+		// the loop now.
+		if len(hashList) == 0 {
+			break
+		}
+
+		// Add block inventory to the message.
+		for _, hash := range hashList {
+			hashCopy := hash
+			iv := btcwire.NewInvVect(btcwire.InvVect_Block, &hashCopy)
+			invMsg.AddInvVect(iv)
+		}
+		start += int64(len(hashList))
 	}
 
-	// Nothing to send.
-	if len(hashList) == 0 {
-		return
+	// Send the inventory message if there is anything to send.
+	if len(invMsg.InvList) > 0 {
+		invListLen := len(invMsg.InvList)
+		if autoContinue && invListLen == btcwire.MaxBlocksPerMsg {
+			// Intentionally use a copy of the final hash so there
+			// is not a reference into the inventory slice which
+			// would prevent the entire slice from being eligible
+			// for GC as soon as it's sent.
+			continueHash := invMsg.InvList[invListLen-1].Hash
+			p.continueHash = &continueHash
+		}
+		p.QueueMessage(invMsg)
 	}
-
-	// Generate inventory vectors and push the inventory message.
-	inv := btcwire.NewMsgInv()
-	for _, hash := range hashList {
-		iv := btcwire.InvVect{Type: btcwire.InvVect_Block, Hash: hash}
-		inv.AddInvVect(&iv)
-	}
-	p.QueueMessage(inv)
 }
 
 // handleGetBlocksMsg is invoked when a peer receives a getheaders bitcoin
@@ -495,9 +535,10 @@ func (p *peer) handleGetHeadersMsg(msg *btcwire.MsgGetHeaders) {
 	}
 
 	// Find the most recent known block based on the block locator.
-	// It's the block after the genesis block if no other blocks in the
+	// Use the block after the genesis block if no other blocks in the
 	// provided locator are known.  This does mean the client will start
 	// over with the genesis block if unknown block locators are provided.
+	// This mirrors the behavior in the reference implementation.
 	startIdx := int64(1)
 	for _, hash := range msg.BlockLocatorHashes {
 		block, err := p.server.db.FetchBlockBySha(hash)
