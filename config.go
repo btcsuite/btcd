@@ -9,6 +9,8 @@ import (
 	"fmt"
 	"github.com/conformal/btcwire"
 	"github.com/conformal/go-flags"
+	_ "github.com/conformal/btcdb/sqlite3"
+	_ "github.com/conformal/btcdb/ldb"
 	"net"
 	"os"
 	"path/filepath"
@@ -56,6 +58,7 @@ type config struct {
 	UseTor         bool          `long:"tor" description:"Specifies the proxy server used is a Tor node"`
 	TestNet3       bool          `long:"testnet" description:"Use the test network"`
 	RegressionTest bool          `long:"regtest" description:"Use the regression test network"`
+	DbType	       string         `long:"dbtype" description:"DB backend to use for Block Chain"`
 	DebugLevel     string        `short:"d" long:"debuglevel" description:"Logging level {trace, debug, info, warn, error, critical}"`
 }
 
@@ -303,5 +306,43 @@ func loadConfig() (*config, []string, error) {
 	cfg.ConnectPeers =
 		normalizeAndRemoveDuplicateAddresses(cfg.ConnectPeers)
 
+
+	// determine which database backend to use
+	// would be interesting of btcdb had a 'supportedDBs() []string'
+	// API to populate this field.
+	knownDbs := []string { "leveldb", "sqlite" }
+	defaultDb := "sqlite"
+
+	if len(cfg.DbType) == 0 {
+		// if db was not specified, use heuristic to see what
+		// type the database is (if the specified database is a
+		// file then it is sqlite3, if it is a directory assume
+		// it is leveldb, if not found default to type _____
+		dbPath := filepath.Join(cfg.DbDir, activeNetParams.dbName)
+
+		fi, err := os.Stat(dbPath)
+		if err == nil {
+			if fi.IsDir() {
+				cfg.DbType = "leveldb" 
+			} else {
+				cfg.DbType = "sqlite" 
+			} 
+		} else {
+			cfg.DbType = defaultDb
+		}
+	} else {
+		// does checking this here really make sense ?
+		typeVerified := false
+		for _, dbtype := range knownDbs {
+			if cfg.DbType == dbtype {
+				typeVerified = true
+			}
+		}
+		if typeVerified == false {
+			err := fmt.Errorf("Specified database type [%v] not in list of supported databases: %v", cfg.DbType, knownDbs)
+			fmt.Fprintln(os.Stderr, err)
+			return nil, nil, err
+		}
+	}
 	return &cfg, remainingArgs, nil
 }

@@ -8,7 +8,6 @@ import (
 	"container/list"
 	"github.com/conformal/btcchain"
 	"github.com/conformal/btcdb"
-	_ "github.com/conformal/btcdb/sqlite3"
 	"github.com/conformal/btcutil"
 	"github.com/conformal/btcwire"
 	"os"
@@ -397,7 +396,7 @@ func newBlockManager(s *server) *blockManager {
 func loadBlockDB() (btcdb.Db, error) {
 	dbPath := filepath.Join(cfg.DbDir, activeNetParams.dbName)
 	log.Infof("[BMGR] Loading block database from '%s'", dbPath)
-	db, err := btcdb.OpenDB("sqlite", dbPath)
+	db, err := btcdb.OpenDB(cfg.DbType, dbPath)
 	if err != nil {
 		// Return the error if it's not because the database doesn't
 		// exist.
@@ -410,7 +409,7 @@ func loadBlockDB() (btcdb.Db, error) {
 		if err != nil {
 			return nil, err
 		}
-		db, err = btcdb.CreateDB("sqlite", dbPath)
+		db, err = btcdb.CreateDB(cfg.DbType, dbPath)
 		if err != nil {
 			return nil, err
 		}
