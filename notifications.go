@@ -70,7 +70,9 @@ func (b *BlockChain) sendNotification(typ NotificationType, data interface{}) {
 		return
 	}
 
-	// Generate and send the notification.
-	n := Notification{Type: typ, Data: data}
-	b.notifications <- &n
+	// Generate and send the notification asynchronously.
+	go func() {
+		n := Notification{Type: typ, Data: data}
+		b.notifications <- &n
+	}()
 }
