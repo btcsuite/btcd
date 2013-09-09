@@ -45,8 +45,8 @@ type LevelDb struct {
 
 	// leveldb pieces
 	lDb *leveldb.DB
-	ro     *opt.ReadOptions
-	wo     *opt.WriteOptions
+	ro  *opt.ReadOptions
+	wo  *opt.WriteOptions
 
 	lbatch *leveldb.Batch
 
@@ -134,7 +134,7 @@ func openDB(dbpath string, flag opt.OptionsFlag) (pbdb btcdb.Db, err error) {
 	var tlDb *leveldb.DB
 	defer func() {
 		if err == nil {
-			db.lDb =  tlDb
+			db.lDb = tlDb
 
 			db.txUpdateMap = map[btcwire.ShaHash]*txUpdateObj{}
 
@@ -200,12 +200,12 @@ func (db *LevelDb) Close() {
 func (db *LevelDb) DropAfterBlockBySha(sha *btcwire.ShaHash) (rerr error) {
 	db.dbLock.Lock()
 	defer db.dbLock.Unlock()
-	defer func () {
+	defer func() {
 		if rerr == nil {
 			rerr = db.processBatches()
 
 		}
-	} ()
+	}()
 
 	startheight := db.nextBlock - 1
 
@@ -256,12 +256,11 @@ func (db *LevelDb) DropAfterBlockBySha(sha *btcwire.ShaHash) (rerr error) {
 func (db *LevelDb) InsertBlock(block *btcutil.Block) (height int64, rerr error) {
 	db.dbLock.Lock()
 	defer db.dbLock.Unlock()
-	defer func () {
+	defer func() {
 		if rerr == nil {
 			rerr = db.processBatches()
 		}
-	} ()
-
+	}()
 
 	blocksha, err := block.Sha()
 	if err != nil {
@@ -448,12 +447,12 @@ func int64ToKey(keyint int64) []byte {
 }
 
 func shaBlkToKey(sha *btcwire.ShaHash) []byte {
-	shaB := sha.Bytes() 
+	shaB := sha.Bytes()
 	return shaB
 }
 
 func shaTxToKey(sha *btcwire.ShaHash) []byte {
-	shaB := sha.Bytes() 
+	shaB := sha.Bytes()
 	shaB = append(shaB, "tx"...)
 	return shaB
 }

@@ -282,7 +282,6 @@ func testBackout(t *testing.T, mode int) {
 	}
 }
 
-
 var savedblocks []*btcutil.Block
 
 func loadBlocks(t *testing.T, file string) (blocks []*btcutil.Block, err error) {

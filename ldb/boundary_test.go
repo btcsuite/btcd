@@ -13,7 +13,7 @@ import (
 // we need to test for empty databas and make certain it returns proper value
 
 func TestEmptyDB(t *testing.T) {
-	
+
 	dbname := "tstdbempty"
 	_ = os.RemoveAll(dbname)
 	db, err := btcdb.CreateDB("leveldb", dbname)
