@@ -73,7 +73,6 @@ func OpenDB(dbpath string) (btcdb.Db, error) {
 	if err != nil {
 		return nil, err
 	}
-	log.Info("Opening DB\n")
 
 	// Need to find last block and tx
 
@@ -126,8 +125,6 @@ blocknarrow:
 	ldb.lastBlkSha = *lastSha
 	ldb.lastBlkIdx = lastknownblock
 	ldb.nextBlock = lastknownblock + 1
-
-	log.Info("Opening DB: completed\n")
 
 	return db, nil
 }
