@@ -352,7 +352,7 @@ func (p *peer) handleInvMsg(msg *btcwire.MsgInv) {
 				orphanRoot := chain.GetOrphanRoot(&iv.Hash)
 				locator, err := chain.LatestBlockLocator()
 				if err != nil {
-					log.Error("[PEER] Failed to get block "+
+					log.Errorf("[PEER] Failed to get block "+
 						"locator for the latest block: "+
 						"%v", err)
 					continue

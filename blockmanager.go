@@ -94,7 +94,7 @@ func (b *blockManager) startSync(peers *list.List) {
 	if bestPeer != nil {
 		locator, err := b.blockChain.LatestBlockLocator()
 		if err != nil {
-			log.Error("[BMGR] Failed to get block locator for the "+
+			log.Errorf("[BMGR] Failed to get block locator for the "+
 				"latest block: %v", err)
 			return
 		}
@@ -269,12 +269,13 @@ out:
 // connected to and disconnected from the main chain.
 func (b *blockManager) handleNotifyMsg(notification *btcchain.Notification) {
 	switch notification.Type {
+	// An orphan block has been accepted by the block chain.
 	case btcchain.NTOrphanBlock:
 		orphanRoot := notification.Data.(*btcwire.ShaHash)
 		if peer, exists := b.blockPeer[*orphanRoot]; exists {
 			locator, err := b.blockChain.LatestBlockLocator()
 			if err != nil {
-				log.Error("[BMGR] Failed to get block locator "+
+				log.Errorf("[BMGR] Failed to get block locator "+
 					"for the latest block: %v", err)
 				break
 			}
