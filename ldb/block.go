@@ -253,9 +253,7 @@ func (db *LevelDb) NewestSha() (rsha *btcwire.ShaHash, rblkid int64, err error) 
 	defer db.dbLock.Unlock()
 
 	if db.lastBlkIdx == -1 {
-		rblkid = db.lastBlkIdx 
-		err = fmt.Errorf("Empty Database")
-		return 
+		return &btcwire.ShaHash{}, -1, nil
 	}
 	sha := db.lastBlkSha
 
