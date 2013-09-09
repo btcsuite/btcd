@@ -21,7 +21,17 @@ import (
 	"time"
 )
 
-const outputBufferSize = 50
+const (
+	outputBufferSize = 50
+
+	// invTrickleSize is the maximum amount of inventory to send in a single
+	// message when trickling inventory to remote peers.
+	maxInvTrickleSize = 1000
+
+	// maxKnownInventory is the maximum number of items to keep in the known
+	// inventory cache.
+	maxKnownInventory = 20000
+)
 
 // userAgent is the user agent string used to identify ourselves to other
 // bitcoin peers.
@@ -92,13 +102,38 @@ type peer struct {
 	persistent      bool
 	versionKnown    bool
 	knownAddresses  map[string]bool
+	knownInventory  *MruInventoryMap
+	knownInvMutex   sync.Mutex
 	lastBlock       int32
 	requestQueue    *list.List
+	invSendQueue    *list.List
 	continueHash    *btcwire.ShaHash
 	wg              sync.WaitGroup
 	outputQueue     chan btcwire.Message
+	outputInvChan   chan *btcwire.InvVect
 	blockProcessed  chan bool
 	quit            chan bool
+}
+
+// isKnownInventory returns whether or not the peer is known to have the passed
+// inventory.  It is safe for concurrent access.
+func (p *peer) isKnownInventory(invVect *btcwire.InvVect) bool {
+	p.knownInvMutex.Lock()
+	defer p.knownInvMutex.Unlock()
+
+	if p.knownInventory.Exists(invVect) {
+		return true
+	}
+	return false
+}
+
+// addKnownInventory adds the passed inventory to the cache of known inventory
+// for the peer.  It is safe for concurrent access.
+func (p *peer) addKnownInventory(invVect *btcwire.InvVect) {
+	p.knownInvMutex.Lock()
+	defer p.knownInvMutex.Unlock()
+
+	p.knownInventory.Add(invVect)
 }
 
 // pushVersionMsg sends a version message to the connected peer using the
@@ -289,7 +324,7 @@ func (p *peer) pushBlockMsg(sha btcwire.ShaHash) error {
 	return nil
 }
 
-// pushGetBlocksMsg send a getblocks message for the provided block locator
+// pushGetBlocksMsg sends a getblocks message for the provided block locator
 // and stop hash.
 func (p *peer) pushGetBlocksMsg(locator btcchain.BlockLocator, stopHash *btcwire.ShaHash) error {
 	msg := btcwire.NewMsgGetBlocks(stopHash)
@@ -301,6 +336,38 @@ func (p *peer) pushGetBlocksMsg(locator btcchain.BlockLocator, stopHash *btcwire
 	}
 	p.QueueMessage(msg)
 	return nil
+}
+
+// handleBlockMsg is invoked when a peer receives a block bitcoin message.  It
+// blocks until the bitcoin block has been fully processed.
+func (p *peer) handleBlockMsg(msg *btcwire.MsgBlock, buf []byte) {
+	// Convert the raw MsgBlock to a btcutil.Block which
+	// provides some convience methods and things such as
+	// hash caching.
+	block := btcutil.NewBlockFromBlockAndBytes(msg, buf)
+
+	// Add the block to the known inventory for the peer.
+	hash, err := block.Sha()
+	if err != nil {
+		log.Errorf("Unable to get block hash: %v", err)
+		return
+	}
+	iv := btcwire.NewInvVect(btcwire.InvVect_Block, hash)
+	p.addKnownInventory(iv)
+
+	// Queue the block up to be handled by the block
+	// manager and intentionally block further receives
+	// until the bitcoin block is fully processed and known
+	// good or bad.  This helps prevent a malicious peer
+	// from queueing up a bunch of bad blocks before
+	// disconnecting (or being disconnected) and wasting
+	// memory.  Additionally, this behavior is depended on
+	// by at least the block acceptance test tool as the
+	// reference implementation processes blocks in the same
+	// thread and therefore blocks further messages until
+	// the bitcoin block has been fully processed.
+	p.server.blockManager.QueueBlock(block, p)
+	<-p.blockProcessed
 }
 
 // handleInvMsg is invoked when a peer receives an inv bitcoin message and is
@@ -329,6 +396,11 @@ func (p *peer) handleInvMsg(msg *btcwire.MsgInv) {
 	for i, iv := range invVects {
 		switch iv.Type {
 		case btcwire.InvVect_Block:
+			// Add the inventory to the cache of known inventory
+			// for the peer.
+			p.addKnownInventory(iv)
+
+			// Request the inventory if we don't already have it.
 			if !chain.HaveInventory(iv) {
 				// Add it to the request queue.
 				p.requestQueue.PushBack(iv)
@@ -722,7 +794,12 @@ func (p *peer) readMessage() (msg btcwire.Message, buf []byte, err error) {
 }
 
 // writeMessage sends a bitcoin Message to the peer with logging.
-func (p *peer) writeMessage(msg btcwire.Message) error {
+func (p *peer) writeMessage(msg btcwire.Message) {
+	// Don't do anything if we're disconnecting.
+	if p.disconnect == true {
+		return
+	}
+
 	log.Debugf("[PEER] Sending command [%v] to %s", msg.Command(),
 		p.conn.RemoteAddr())
 
@@ -743,9 +820,10 @@ func (p *peer) writeMessage(msg btcwire.Message) error {
 	// Write the message to the peer.
 	err := btcwire.WriteMessage(p.conn, msg, p.protocolVersion, p.btcnet)
 	if err != nil {
-		return err
+		p.Disconnect()
+		log.Errorf("[PEER] %v", err)
+		return
 	}
-	return nil
 }
 
 // isAllowedByRegression returns whether or not the passed error is allowed by
@@ -828,20 +906,7 @@ out:
 			p.server.BroadcastMessage(msg, p)
 
 		case *btcwire.MsgBlock:
-			// Queue the block up to be handled by the block
-			// manager and intentionally block further receives
-			// until the bitcoin block is fully processed and known
-			// good or bad.  This helps prevent a malicious peer
-			// from queueing up a bunch of bad blocks before
-			// disconnecting (or being disconnected) and wasting
-			// memory.  Additionally, this behavior is depended on
-			// by at least the block acceptance test tool as the
-			// reference implementation processes blocks in the same
-			// thread and therefore blocks further messages until
-			// the bitcoin block has been fully processed.
-			block := btcutil.NewBlockFromBlockAndBytes(msg, buf)
-			p.server.blockManager.QueueBlock(block, p)
-			<-p.blockProcessed
+			p.handleBlockMsg(msg, buf)
 
 		case *btcwire.MsgInv:
 			p.handleInvMsg(msg)
@@ -876,18 +941,48 @@ out:
 // goroutine.  It uses a buffered channel to serialize output messages while
 // allowing the sender to continue running asynchronously.
 func (p *peer) outHandler() {
+	trickleTicker := time.NewTicker(time.Second * 10)
 out:
 	for {
 		select {
 		case msg := <-p.outputQueue:
-			// Don't send anything if we're disconnected.
-			if p.disconnect {
+			p.writeMessage(msg)
+
+		case iv := <-p.outputInvChan:
+			p.invSendQueue.PushBack(iv)
+
+		case <-trickleTicker.C:
+			// Don't send anything if we're disconnecting or there
+			// is no queued inventory.
+			if p.disconnect || p.invSendQueue.Len() == 0 {
 				continue
 			}
-			err := p.writeMessage(msg)
-			if err != nil {
-				p.Disconnect()
-				log.Errorf("[PEER] %v", err)
+
+			// Create a new inventory message, populate it with as
+			// much per
+			invMsg := btcwire.NewMsgInv()
+			for e := p.invSendQueue.Front(); e != nil; e = p.invSendQueue.Front() {
+				iv := p.invSendQueue.Remove(e).(*btcwire.InvVect)
+
+				// Don't send inventory that became known after
+				// the initial check.
+				if p.isKnownInventory(iv) {
+					continue
+				}
+
+				invMsg.AddInvVect(iv)
+				if len(invMsg.InvList) >= maxInvTrickleSize {
+					p.writeMessage(invMsg)
+					invMsg = btcwire.NewMsgInv()
+				}
+
+				// Add the inventory that is being relayed to
+				// the known inventory for the peer.
+				p.addKnownInventory(iv)
+			}
+			if len(invMsg.InvList) > 0 {
+				log.Infof("Relaying %d inv to %v", len(invMsg.InvList), p.conn.RemoteAddr())
+				p.writeMessage(invMsg)
 			}
 
 		case <-p.quit:
@@ -903,6 +998,20 @@ out:
 // it is automatically rate limited and safe for concurrent access.
 func (p *peer) QueueMessage(msg btcwire.Message) {
 	p.outputQueue <- msg
+}
+
+// QueueInventory adds the passed inventory to the inventory send queue which
+// might not be sent right away, rather it is trickled to the peer in batches.
+// Inventory that the peer is already known to have is ignored.  It is safe for
+// concurrent access.
+func (p *peer) QueueInventory(invVect *btcwire.InvVect) {
+	// Don't add the inventory to the send queue if the peer is
+	// already known to have it.
+	if p.isKnownInventory(invVect) {
+		return
+	}
+
+	p.outputInvChan <- invVect
 }
 
 // Start begins processing input and output messages.  It also sends the initial
@@ -962,8 +1071,11 @@ func newPeer(s *server, conn net.Conn, inbound bool, persistent bool) *peer {
 		inbound:         inbound,
 		persistent:      persistent,
 		knownAddresses:  make(map[string]bool),
+		knownInventory:  NewMruInventoryMap(maxKnownInventory),
 		requestQueue:    list.New(),
+		invSendQueue:    list.New(),
 		outputQueue:     make(chan btcwire.Message, outputBufferSize),
+		outputInvChan:   make(chan *btcwire.InvVect, outputBufferSize),
 		blockProcessed:  make(chan bool, 1),
 		quit:            make(chan bool),
 	}

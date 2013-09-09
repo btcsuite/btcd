@@ -285,9 +285,21 @@ func (b *blockManager) handleNotifyMsg(notification *btcchain.Notification) {
 			break
 		}
 
+	// A block has been accepted into the block chain.
 	case btcchain.NTBlockAccepted:
-		// TODO(davec): Relay inventory, but don't relay old inventory
-		// during initial block download.
+		block, ok := notification.Data.(*btcutil.Block)
+		if !ok {
+			log.Warnf("[BMGR] Chain notification type not a block.")
+			break
+		}
+
+		// It's ok to ignore the error here since the notification is
+		// coming from the chain code which has already cached the hash.
+		hash, _ := block.Sha()
+
+		// Generate the inventory vector and relay it.
+		iv := btcwire.NewInvVect(btcwire.InvVect_Block, hash)
+		b.server.RelayInventory(iv)
 	}
 }
 

@@ -53,6 +53,7 @@ type server struct {
 	newPeers      chan *peer
 	donePeers     chan *peer
 	banPeers      chan *peer
+	relayInv      chan *btcwire.InvVect
 	broadcast     chan broadcastMsg
 	wg            sync.WaitGroup
 	quit          chan bool
@@ -143,6 +144,24 @@ func (s *server) handleBanPeerMsg(banned map[string]time.Time, p *peer) {
 
 }
 
+// handleRelayInvMsg deals with relaying inventory to peer that are not already
+// known to have it.  It is invoked from the peerHandler goroutine.
+func (s *server) handleRelayInvMsg(peers *list.List, iv *btcwire.InvVect) {
+	// TODO(davec): Don't relay inventory during the initial block chain
+	// download.
+
+	// Loop through all connected peers and relay the inventory to those
+	// which are not already known to have it.
+	for e := peers.Front(); e != nil; e = e.Next() {
+		p := e.Value.(*peer)
+
+		// Queue the inventory to be relayed with the next batch.  It
+		// will be ignored if the peer is already known to have the
+		// inventory.
+		p.QueueInventory(iv)
+	}
+}
+
 // handleBroadcastMsg deals with broadcasting messages to peers.  It is invoked
 // from the peerHandler goroutine.
 func (s *server) handleBroadcastMsg(peers *list.List, bmsg *broadcastMsg) {
@@ -158,7 +177,6 @@ func (s *server) handleBroadcastMsg(peers *list.List, bmsg *broadcastMsg) {
 			p.QueueMessage(bmsg.message)
 		}
 	}
-
 }
 
 // listenHandler is the main listener which accepts incoming connections for the
@@ -211,6 +229,10 @@ func (s *server) peerHandler() {
 		case p := <-s.banPeers:
 			s.handleBanPeerMsg(bannedPeers, p)
 
+		// New inventory to potentially be relayed to other peers.
+		case invMsg := <-s.relayInv:
+			s.handleRelayInvMsg(peers, invMsg)
+
 		// Message to broadcast to all connected peers except those
 		// which are excluded by the message.
 		case bmsg := <-s.broadcast:
@@ -240,6 +262,12 @@ func (s *server) AddPeer(p *peer) {
 // BanPeer bans a peer that has already been connected to the server by ip.
 func (s *server) BanPeer(p *peer) {
 	s.banPeers <- p
+}
+
+// RelayInventory relays the passed inventory to all connected peers that are
+// not already known to have it.
+func (s *server) RelayInventory(invVect *btcwire.InvVect) {
+	s.relayInv <- invVect
 }
 
 // BroadcastMessage sends msg to all peers currently connected to the server
@@ -437,6 +465,7 @@ func newServer(addr string, db btcdb.Db, btcnet btcwire.BitcoinNet) (*server, er
 		newPeers:    make(chan *peer, cfg.MaxPeers),
 		donePeers:   make(chan *peer, cfg.MaxPeers),
 		banPeers:    make(chan *peer, cfg.MaxPeers),
+		relayInv:    make(chan *btcwire.InvVect, cfg.MaxPeers),
 		broadcast:   make(chan broadcastMsg, cfg.MaxPeers),
 		quit:        make(chan bool),
 		db:          db,
