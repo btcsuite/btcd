@@ -271,8 +271,9 @@ func (b *blockManager) handleNotifyMsg(notification *btcchain.Notification) {
 	switch notification.Type {
 	// An orphan block has been accepted by the block chain.
 	case btcchain.NTOrphanBlock:
-		orphanRoot := notification.Data.(*btcwire.ShaHash)
-		if peer, exists := b.blockPeer[*orphanRoot]; exists {
+		orphanHash := notification.Data.(*btcwire.ShaHash)
+		if peer, exists := b.blockPeer[*orphanHash]; exists {
+			orphanRoot := b.blockChain.GetOrphanRoot(orphanHash)
 			locator, err := b.blockChain.LatestBlockLocator()
 			if err != nil {
 				log.Errorf("[BMGR] Failed to get block locator "+
