@@ -489,7 +489,7 @@ func (db *LevelDb) processBatches() error {
 
 		err = db.lDb.Write(db.lbatch, db.wo)
 		if err != nil {
-			fmt.Printf("batch failed %v\n", err)
+			log.Tracef("batch failed %v\n", err)
 			return err
 		}
 		db.lbatch.Reset()

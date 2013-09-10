@@ -36,7 +36,7 @@ func (db *LevelDb) getBlkLoc(sha *btcwire.ShaHash) (int64, error) {
 	dr := bytes.NewBuffer(data)
 	err = binary.Read(dr, binary.LittleEndian, &blkHeight)
 	if err != nil {
-		fmt.Printf("get getBlkLoc len %v\n", len(data))
+		log.Tracef("get getBlkLoc len %v\n", len(data))
 		err = fmt.Errorf("Db Corrupt 0")
 		return 0, err
 	}
