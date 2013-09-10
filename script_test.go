@@ -6,8 +6,11 @@ package btcscript_test
 
 import (
 	"bytes"
+	"crypto/ecdsa"
+	"github.com/conformal/btcec"
 	"github.com/conformal/btcscript"
 	"github.com/conformal/btcwire"
+	"math/big"
 	"testing"
 )
 
@@ -1837,5 +1840,397 @@ func TestCheckErrorCondition(t *testing.T) {
 	err = engine.CheckErrorCondition()
 	if err != nil {
 		t.Errorf("unexpected error %v on final check", err)
+	}
+}
+
+func TestPayToPubKeyHashScript(t *testing.T) {
+	validaddr := []byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15,
+		16, 17, 18, 19, 20}
+	invalidaddr := validaddr[:len(validaddr)-2]
+
+	expected := []byte{btcscript.OP_DUP, btcscript.OP_HASH160,
+		btcscript.OP_DATA_20, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12,
+		13, 14, 15, 16, 17, 18, 19, 20, btcscript.OP_EQUALVERIFY,
+		btcscript.OP_CHECKSIG}
+
+	script, err := btcscript.PayToPubKeyHashScript(validaddr)
+	if err != nil {
+		t.Error(err)
+		return
+	}
+	if !bytes.Equal(script, expected) {
+		t.Error("Unexpected script result.")
+		return
+	}
+
+	_, err = btcscript.PayToPubKeyHashScript(invalidaddr)
+	if err == nil {
+		t.Error("Erroneously created script for invalid address.")
+		return
+	}
+}
+
+type TstSigScript struct {
+	name               string
+	inputs             []TstInput
+	hashtype           byte
+	compress           bool
+	scriptAtWrongIndex bool
+}
+
+type TstInput struct {
+	txout              *btcwire.TxOut
+	sigscriptGenerates bool
+	inputValidates     bool
+	indexOutOfRange    bool
+	invalidReader      bool
+}
+
+var coinbaseOutPoint = &btcwire.OutPoint{
+	Index: (1 << 32) - 1,
+}
+
+// Pregenerated private key, with associated public key and pkScripts
+// for the uncompressed and compressed hash160.
+var (
+	privkeyD = []byte{0x6b, 0x0f, 0xd8, 0xda, 0x54, 0x22, 0xd0, 0xb7,
+		0xb4, 0xfc, 0x4e, 0x55, 0xd4, 0x88, 0x42, 0xb3, 0xa1, 0x65,
+		0xac, 0x70, 0x7f, 0x3d, 0xa4, 0x39, 0x5e, 0xcb, 0x3b, 0xb0,
+		0xd6, 0x0e, 0x06, 0x92}
+	pubkeyX = []byte{0xb2, 0x52, 0xf0, 0x49, 0x85, 0x78, 0x03, 0x03, 0xc8,
+		0x7d, 0xce, 0x51, 0x7f, 0xa8, 0x69, 0x0b, 0x91, 0x95, 0xf4,
+		0xf3, 0x5c, 0x26, 0x73, 0x05, 0x05, 0xa2, 0xee, 0xbc, 0x09,
+		0x38, 0x34, 0x3a}
+	pubkeyY = []byte{0xb7, 0xc6, 0x7d, 0xb2, 0xe1, 0xff, 0xc8, 0x43, 0x1f,
+		0x63, 0x32, 0x62, 0xaa, 0x60, 0xc6, 0x83, 0x30, 0xbd, 0x24,
+		0x7e, 0xef, 0xdb, 0x6f, 0x2e, 0x8d, 0x56, 0xf0, 0x3c, 0x9f,
+		0x6d, 0xb6, 0xf8}
+	uncompressedPkScript = []byte{0x76, 0xa9, 0x14, 0xd1, 0x7c, 0xb5,
+		0xeb, 0xa4, 0x02, 0xcb, 0x68, 0xe0, 0x69, 0x56, 0xbf, 0x32,
+		0x53, 0x90, 0x0e, 0x0a, 0x86, 0xc9, 0xfa, 0x88, 0xac}
+	compressedPkScript = []byte{0x76, 0xa9, 0x14, 0x27, 0x4d, 0x9f, 0x7f,
+		0x61, 0x7e, 0x7c, 0x7a, 0x1c, 0x1f, 0xb2, 0x75, 0x79, 0x10,
+		0x43, 0x65, 0x68, 0x27, 0x9d, 0x86, 0x88, 0xac}
+	shortPkScript = []byte{0x76, 0xa9, 0x14, 0xd1, 0x7c, 0xb5,
+		0xeb, 0xa4, 0x02, 0xcb, 0x68, 0xe0, 0x69, 0x56, 0xbf, 0x32,
+		0x53, 0x90, 0x0e, 0x0a, 0x88, 0xac}
+	uncompressedAddrStr = "1L6fd93zGmtzkK6CsZFVVoCwzZV3MUtJ4F"
+	compressedAddrStr   = "14apLppt9zTq6cNw8SDfiJhk9PhkZrQtYZ"
+)
+
+// Pretend output amounts.
+const coinbaseVal = 2500000000
+const fee = 5000000
+
+var SigScriptTests = []TstSigScript{
+	TstSigScript{
+		name: "one input uncompressed",
+		inputs: []TstInput{
+			TstInput{
+				txout:              btcwire.NewTxOut(coinbaseVal, uncompressedPkScript),
+				sigscriptGenerates: true,
+				inputValidates:     true,
+				indexOutOfRange:    false,
+			},
+		},
+		hashtype:           btcscript.SigHashAll,
+		compress:           false,
+		scriptAtWrongIndex: false,
+	},
+	TstSigScript{
+		name: "two inputs uncompressed",
+		inputs: []TstInput{
+			TstInput{
+				txout:              btcwire.NewTxOut(coinbaseVal, uncompressedPkScript),
+				sigscriptGenerates: true,
+				inputValidates:     true,
+				indexOutOfRange:    false,
+			},
+			TstInput{
+				txout:              btcwire.NewTxOut(coinbaseVal+fee, uncompressedPkScript),
+				sigscriptGenerates: true,
+				inputValidates:     true,
+				indexOutOfRange:    false,
+			},
+		},
+		hashtype:           btcscript.SigHashAll,
+		compress:           false,
+		scriptAtWrongIndex: false,
+	},
+	TstSigScript{
+		name: "one input compressed",
+		inputs: []TstInput{
+			TstInput{
+				txout:              btcwire.NewTxOut(coinbaseVal, compressedPkScript),
+				sigscriptGenerates: true,
+				inputValidates:     true,
+				indexOutOfRange:    false,
+			},
+		},
+		hashtype:           btcscript.SigHashAll,
+		compress:           true,
+		scriptAtWrongIndex: false,
+	},
+	TstSigScript{
+		name: "two inputs compressed",
+		inputs: []TstInput{
+			TstInput{
+				txout:              btcwire.NewTxOut(coinbaseVal, compressedPkScript),
+				sigscriptGenerates: true,
+				inputValidates:     true,
+				indexOutOfRange:    false,
+			},
+			TstInput{
+				txout:              btcwire.NewTxOut(coinbaseVal+fee, compressedPkScript),
+				sigscriptGenerates: true,
+				inputValidates:     true,
+				indexOutOfRange:    false,
+			},
+		},
+		hashtype:           btcscript.SigHashAll,
+		compress:           true,
+		scriptAtWrongIndex: false,
+	},
+	TstSigScript{
+		name: "hashtype SigHashNone",
+		inputs: []TstInput{
+			TstInput{
+				txout:              btcwire.NewTxOut(coinbaseVal, uncompressedPkScript),
+				sigscriptGenerates: true,
+				inputValidates:     true,
+				indexOutOfRange:    false,
+			},
+		},
+		hashtype:           btcscript.SigHashNone,
+		compress:           false,
+		scriptAtWrongIndex: false,
+	},
+	TstSigScript{
+		name: "hashtype SigHashSingle",
+		inputs: []TstInput{
+			TstInput{
+				txout:              btcwire.NewTxOut(coinbaseVal, uncompressedPkScript),
+				sigscriptGenerates: true,
+				inputValidates:     true,
+				indexOutOfRange:    false,
+			},
+		},
+		hashtype:           btcscript.SigHashSingle,
+		compress:           false,
+		scriptAtWrongIndex: false,
+	},
+	TstSigScript{
+		name: "hashtype SigHashAnyoneCanPay",
+		inputs: []TstInput{
+			TstInput{
+				txout:              btcwire.NewTxOut(coinbaseVal, uncompressedPkScript),
+				sigscriptGenerates: true,
+				inputValidates:     true,
+				indexOutOfRange:    false,
+			},
+		},
+		hashtype:           btcscript.SigHashAnyOneCanPay,
+		compress:           false,
+		scriptAtWrongIndex: false,
+	},
+	TstSigScript{
+		name: "hashtype non-standard",
+		inputs: []TstInput{
+			TstInput{
+				txout:              btcwire.NewTxOut(coinbaseVal, uncompressedPkScript),
+				sigscriptGenerates: true,
+				inputValidates:     true,
+				indexOutOfRange:    false,
+			},
+		},
+		hashtype:           0x04,
+		compress:           false,
+		scriptAtWrongIndex: false,
+	},
+	TstSigScript{
+		name: "invalid compression",
+		inputs: []TstInput{
+			TstInput{
+				txout:              btcwire.NewTxOut(coinbaseVal, uncompressedPkScript),
+				sigscriptGenerates: true,
+				inputValidates:     false,
+				indexOutOfRange:    false,
+			},
+		},
+		hashtype:           btcscript.SigHashAll,
+		compress:           true,
+		scriptAtWrongIndex: false,
+	},
+	TstSigScript{
+		name: "short PkScript",
+		inputs: []TstInput{
+			TstInput{
+				txout:              btcwire.NewTxOut(coinbaseVal, shortPkScript),
+				sigscriptGenerates: false,
+				indexOutOfRange:    false,
+			},
+		},
+		hashtype:           btcscript.SigHashAll,
+		compress:           false,
+		scriptAtWrongIndex: false,
+	},
+	TstSigScript{
+		name: "valid script at wrong index",
+		inputs: []TstInput{
+			TstInput{
+				txout:              btcwire.NewTxOut(coinbaseVal, uncompressedPkScript),
+				sigscriptGenerates: true,
+				inputValidates:     true,
+				indexOutOfRange:    false,
+			},
+			TstInput{
+				txout:              btcwire.NewTxOut(coinbaseVal+fee, uncompressedPkScript),
+				sigscriptGenerates: true,
+				inputValidates:     true,
+				indexOutOfRange:    false,
+			},
+		},
+		hashtype:           btcscript.SigHashAll,
+		compress:           false,
+		scriptAtWrongIndex: true,
+	},
+	TstSigScript{
+		name: "index out of range",
+		inputs: []TstInput{
+			TstInput{
+				txout:              btcwire.NewTxOut(coinbaseVal, uncompressedPkScript),
+				sigscriptGenerates: true,
+				inputValidates:     true,
+				indexOutOfRange:    false,
+			},
+			TstInput{
+				txout:              btcwire.NewTxOut(coinbaseVal+fee, uncompressedPkScript),
+				sigscriptGenerates: true,
+				inputValidates:     true,
+				indexOutOfRange:    false,
+			},
+		},
+		hashtype:           btcscript.SigHashAll,
+		compress:           false,
+		scriptAtWrongIndex: true,
+	},
+	TstSigScript{
+		name: "invalid reader",
+		inputs: []TstInput{
+			TstInput{
+				txout:              btcwire.NewTxOut(coinbaseVal, uncompressedPkScript),
+				invalidReader:      true,
+				sigscriptGenerates: false,
+			},
+		},
+		hashtype:           btcscript.SigHashAll,
+		compress:           false,
+		scriptAtWrongIndex: true,
+	},
+}
+
+// Test the sigscript generation for valid and invalid inputs, all
+// hashtypes, and with and without compression.  This test creates
+// sigscripts to spend fake coinbase inputs, as sigscripts cannot be
+// created for the MsgTxs in txTests, since they come from the blockchain
+// and we don't have the private keys.
+func TestSignatureScript(t *testing.T) {
+	privkey := &ecdsa.PrivateKey{
+		PublicKey: ecdsa.PublicKey{
+			Curve: btcec.S256(),
+			X:     new(big.Int),
+			Y:     new(big.Int),
+		},
+		D: new(big.Int),
+	}
+	privkey.D.SetBytes(privkeyD)
+	privkey.PublicKey.X.SetBytes(pubkeyX)
+	privkey.PublicKey.Y.SetBytes(pubkeyY)
+
+nexttest:
+	for i := range SigScriptTests {
+		tx := btcwire.NewMsgTx()
+
+		output := btcwire.NewTxOut(500, []byte{btcscript.OP_RETURN})
+		tx.AddTxOut(output)
+
+		for _ = range SigScriptTests[i].inputs {
+			txin := btcwire.NewTxIn(coinbaseOutPoint, nil)
+			tx.AddTxIn(txin)
+		}
+
+		var script []byte
+		var err error
+		for j := range tx.TxIn {
+			var idx int
+			if SigScriptTests[i].inputs[j].indexOutOfRange {
+				t.Errorf("at test %v", SigScriptTests[i].name)
+				idx = len(SigScriptTests[i].inputs)
+			} else {
+				idx = j
+			}
+			if SigScriptTests[i].inputs[j].invalidReader {
+				script, err = btcscript.TstSignatureScriptCustomReader(
+					new(bytes.Buffer), tx, idx,
+					SigScriptTests[i].inputs[j].txout.PkScript,
+					SigScriptTests[i].hashtype,
+					privkey,
+					SigScriptTests[i].compress)
+			} else {
+				script, err = btcscript.SignatureScript(tx, idx,
+					SigScriptTests[i].inputs[j].txout.PkScript,
+					SigScriptTests[i].hashtype,
+					privkey,
+					SigScriptTests[i].compress)
+			}
+
+			if (err == nil) != SigScriptTests[i].inputs[j].sigscriptGenerates {
+				if err == nil {
+					t.Errorf("passed test '%v' incorrectly",
+						SigScriptTests[i].name)
+				} else {
+					t.Errorf("failed test '%v': %v",
+						SigScriptTests[i].name, err)
+				}
+				continue nexttest
+			}
+			if !SigScriptTests[i].inputs[j].sigscriptGenerates {
+				// done with this test
+				continue nexttest
+			}
+
+			tx.TxIn[j].SignatureScript = script
+		}
+
+		// If testing using a correct sigscript but for an incorrect
+		// index, use last input script for first input.  Requires > 0
+		// inputs for test.
+		if SigScriptTests[i].scriptAtWrongIndex {
+			tx.TxIn[0].SignatureScript = script
+			SigScriptTests[i].inputs[0].inputValidates = false
+		}
+
+		// Validate tx input scripts
+		for j, txin := range tx.TxIn {
+			engine, err := btcscript.NewScript(txin.SignatureScript,
+				SigScriptTests[i].inputs[j].txout.PkScript,
+				j, tx, true)
+			if err != nil {
+				t.Errorf("cannot create script vm for test %v: %v",
+					SigScriptTests[i].name, err)
+				continue nexttest
+			}
+			err = engine.Execute()
+			if (err == nil) != SigScriptTests[i].inputs[j].inputValidates {
+				if err == nil {
+					t.Errorf("passed test '%v' validation incorrectly: %v",
+						SigScriptTests[i].name, err)
+				} else {
+					t.Errorf("failed test '%v' validation: %v",
+						SigScriptTests[i].name, err)
+				}
+				continue nexttest
+			}
+		}
 	}
 }

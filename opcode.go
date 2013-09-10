@@ -10,6 +10,7 @@ import (
 	"crypto/ecdsa"
 	"crypto/sha1"
 	"crypto/sha256"
+	"encoding/binary"
 	"fmt"
 	"github.com/conformal/btcec"
 	"github.com/conformal/btcwire"
@@ -687,36 +688,51 @@ func (pop *parsedOpcode) print(oneline bool) string {
 	return retString
 }
 
-func (pop *parsedOpcode) bytes() []byte {
+func (pop *parsedOpcode) bytes() ([]byte, error) {
 	var retbytes []byte
 	if pop.opcode.length > 0 {
 		retbytes = make([]byte, 1, pop.opcode.length)
 	} else {
-		retbytes = make([]byte, 1, 1 + len(pop.data) -
+		retbytes = make([]byte, 1, 1+len(pop.data)-
 			pop.opcode.length)
 	}
 
 	retbytes[0] = pop.opcode.value
 	if pop.opcode.length == 1 {
-		return retbytes
+		if len(pop.data) != 0 {
+			return nil, StackErrInvalidOpcode
+		}
+		return retbytes, nil
 	}
+	nbytes := pop.opcode.length
 	if pop.opcode.length < 0 {
 		l := len(pop.data)
 		// tempting just to hardcode to avoid the complexity here.
 		switch pop.opcode.length {
 		case -1:
 			retbytes = append(retbytes, byte(l))
+			nbytes = int(retbytes[1]) + len(retbytes)
 		case -2:
 			retbytes = append(retbytes, byte(l&0xff),
 				byte(l>>8&0xff))
+			nbytes = int(binary.LittleEndian.Uint16(retbytes[1:])) +
+				len(retbytes)
 		case -4:
 			retbytes = append(retbytes, byte(l&0xff),
 				byte((l>>8)&0xff), byte((l>>16)&0xff),
 				byte((l>>24)&0xff))
+			nbytes = int(binary.LittleEndian.Uint32(retbytes[1:])) +
+				len(retbytes)
 		}
 	}
 
-	return append(retbytes, pop.data...)
+	retbytes = append(retbytes, pop.data...)
+
+	if len(retbytes) != nbytes {
+		return nil, StackErrInvalidOpcode
+	}
+
+	return retbytes, nil
 }
 
 // opcode implementation functions from here
@@ -840,7 +856,7 @@ func opcodeEndif(op *parsedOpcode, s *Script) error {
 		return StackErrNoIf
 	}
 
-	stk := make([]int, len(s.condStack) -1, len(s.condStack) -1)
+	stk := make([]int, len(s.condStack)-1, len(s.condStack)-1)
 	copy(stk, s.condStack[1:])
 	s.condStack = stk
 	return nil
@@ -1457,7 +1473,7 @@ func opcodeCheckSig(op *parsedOpcode, s *Script) error {
 	// the script if present.
 	subScript = removeOpcodeByData(subScript, sigStr)
 
-	hash := s.calcScriptHash(subScript, hashType)
+	hash := calcScriptHash(subScript, hashType, &s.tx, s.txidx)
 
 	pubKey, err := btcec.ParsePubKey(pkStr, btcec.S256())
 	if err != nil {
@@ -1576,7 +1592,7 @@ func opcodeCheckMultiSig(op *parsedOpcode, s *Script) error {
 		// get hashtype from original byte string
 		hashType := sigStrings[i][len(sigStrings[i])-1]
 
-		hash := s.calcScriptHash(script, hashType)
+		hash := calcScriptHash(script, hashType, &s.tx, s.txidx)
 	inner:
 		// Find first pubkey that successfully validates signature.
 		// we start off the search from the key that was successful

@@ -6,11 +6,16 @@ package btcscript
 
 import (
 	"bytes"
+	"crypto/ecdsa"
+	"crypto/rand"
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"github.com/conformal/btcec"
 	"github.com/conformal/btcwire"
 	"github.com/davecgh/go-spew/spew"
+	"io"
+	"math/big"
 	"time"
 )
 
@@ -338,12 +343,16 @@ func parseScriptTemplate(script []byte, opcodemap map[byte]*opcode) ([]parsedOpc
 
 // unparseScript reversed the action of parseScript and returns the
 // parsedOpcodes as a list of bytes
-func unparseScript(pops []parsedOpcode) []byte {
+func unparseScript(pops []parsedOpcode) ([]byte, error) {
 	script := make([]byte, 0, len(pops))
 	for _, pop := range pops {
-		script = append(script, pop.bytes()...)
+		b, err := pop.bytes()
+		if err != nil {
+			return nil, err
+		}
+		script = append(script, b...)
 	}
-	return script
+	return script, nil
 }
 
 // NewScript returns a new script engine for the provided tx and input idx with
@@ -625,22 +634,23 @@ func DisasmString(buf []byte) (string, error) {
 // calcScriptHash will, given the a script and hashtype for the current
 // scriptmachine, calculate the doubleSha256 hash of the transaction and
 // script to be used for signature signing and verification.
-func (s *Script) calcScriptHash(script []parsedOpcode, hashType byte) []byte {
+func calcScriptHash(script []parsedOpcode, hashType byte, tx *btcwire.MsgTx, idx int) []byte {
 
 	// remove all instances of OP_CODESEPARATOR still left in the script
 	script = removeOpcode(script, OP_CODESEPARATOR)
 
 	// Make a deep copy of the transaction, zeroing out the script
 	// for all inputs that are not currently being processed.
-	txCopy := s.tx.Copy()
-	txidx := s.txidx
+	txCopy := tx.Copy()
 	for i := range txCopy.TxIn {
 		var txIn btcwire.TxIn
 		txIn = *txCopy.TxIn[i]
 		txCopy.TxIn[i] = &txIn
-		if i == txidx {
-			txCopy.TxIn[txidx].SignatureScript =
-				unparseScript(script)
+		if i == idx {
+			// unparseScript cannot fail here, because removeOpcode
+			// above only returns a valid script.
+			sigscript, _ := unparseScript(script)
+			txCopy.TxIn[idx].SignatureScript = sigscript
 		} else {
 			txCopy.TxIn[i].SignatureScript = []byte{}
 		}
@@ -656,12 +666,12 @@ func (s *Script) calcScriptHash(script []parsedOpcode, hashType byte) []byte {
 	case SigHashNone:
 		txCopy.TxOut = txCopy.TxOut[0:0] // empty slice
 		for i := range txCopy.TxIn {
-			if i != txidx {
+			if i != idx {
 				txCopy.TxIn[i].Sequence = 0
 			}
 		}
 	case SigHashSingle:
-		if txidx >= len(txCopy.TxOut) {
+		if idx >= len(txCopy.TxOut) {
 			// This was created by a buggy implementation.
 			// In this case we do the same as bitcoind and bitcoinj
 			// and return 1 (as a uint256 little endian) as an
@@ -673,15 +683,15 @@ func (s *Script) calcScriptHash(script []parsedOpcode, hashType byte) []byte {
 			return hash
 		}
 		// Resize output array to up to and including requested index.
-		txCopy.TxOut = txCopy.TxOut[:txidx+1]
+		txCopy.TxOut = txCopy.TxOut[:idx+1]
 		// all but  current output get zeroed out
-		for i := 0; i < txidx; i++ {
+		for i := 0; i < idx; i++ {
 			txCopy.TxOut[i].Value = -1
 			txCopy.TxOut[i].PkScript = []byte{}
 		}
 		// Sequence on all other inputs is 0, too.
 		for i := range txCopy.TxIn {
-			if i != txidx {
+			if i != idx {
 				txCopy.TxIn[i].Sequence = 0
 			}
 		}
@@ -695,8 +705,8 @@ func (s *Script) calcScriptHash(script []parsedOpcode, hashType byte) []byte {
 		// nothing special here
 	}
 	if hashType&SigHashAnyOneCanPay != 0 {
-		txCopy.TxIn = txCopy.TxIn[s.txidx : s.txidx+1]
-		txidx = 0
+		txCopy.TxIn = txCopy.TxIn[idx : idx+1]
+		idx = 0
 	}
 
 	var wbuf bytes.Buffer
@@ -860,4 +870,106 @@ func getSigOpCount(pops []parsedOpcode, precise bool) int {
 	}
 
 	return nSigs
+}
+
+// PayToPubKeyHashScript creates a new script to pay a transaction
+// output to a 20-byte pubkey hash.
+func PayToPubKeyHashScript(pubKeyHash []byte) (pkScript []byte, err error) {
+	pops := []parsedOpcode{
+		parsedOpcode{
+			opcode: opcodemap[OP_DUP],
+		},
+		parsedOpcode{
+			opcode: opcodemap[OP_HASH160],
+		},
+		parsedOpcode{
+			opcode: opcodemap[OP_DATA_20],
+			data:   pubKeyHash,
+		},
+		parsedOpcode{
+			opcode: opcodemap[OP_EQUALVERIFY],
+		},
+		parsedOpcode{
+			opcode: opcodemap[OP_CHECKSIG],
+		},
+	}
+	return unparseScript(pops)
+}
+
+// SignatureScript creates an input signature script for tx to spend
+// BTC sent from a previous output to the owner of privkey.  tx must
+// include all transaction inputs and outputs, however txin scripts are
+// allowed to be filled or empty. The returned script is calculated to
+// be used as the idx'th txin sigscript for tx. subscript is the PkScript
+// of the previous output being used as the idx'th input.  privkey is
+// serialized in either a compressed or uncompressed format based on
+// compress.  This format must match the same format used to generate
+// the payment address, or the script validation will fail.
+func SignatureScript(tx *btcwire.MsgTx, idx int, subscript []byte, hashType byte, privkey *ecdsa.PrivateKey, compress bool) ([]byte, error) {
+
+	return signatureScriptCustomReader(rand.Reader, tx, idx, subscript,
+		hashType, privkey, compress)
+}
+
+// This function exists so we can test ecdsa.Sign's error for an invalid
+// reader.
+func signatureScriptCustomReader(reader io.Reader, tx *btcwire.MsgTx, idx int,
+	subscript []byte, hashType byte, privkey *ecdsa.PrivateKey,
+	compress bool) ([]byte, error) {
+
+	parsedScript, err := parseScript(subscript)
+	if err != nil {
+		return nil, fmt.Errorf("cannot parse output script: %v", err)
+	}
+	hash := calcScriptHash(parsedScript, hashType, tx, idx)
+	r, s, err := ecdsa.Sign(reader, privkey, hash)
+	if err != nil {
+		return nil, fmt.Errorf("cannot sign tx input: %s", err)
+	}
+	sig := append(sigDER(r, s), hashType)
+
+	pk := (*btcec.PublicKey)(&privkey.PublicKey)
+	var pubkeyOpcode *parsedOpcode
+	if compress {
+		pubkeyOpcode = &parsedOpcode{
+			opcode: opcodemap[OP_DATA_33],
+			data:   pk.SerializeCompressed(),
+		}
+	} else {
+		pubkeyOpcode = &parsedOpcode{
+			opcode: opcodemap[OP_DATA_65],
+			data:   pk.SerializeUncompressed(),
+		}
+	}
+	pops := []parsedOpcode{
+		parsedOpcode{
+			opcode: opcodemap[byte(len(sig))],
+			data:   sig,
+		},
+		*pubkeyOpcode,
+	}
+	return unparseScript(pops)
+}
+
+// sigDER returns the ECDSA signature r, s in the DER format used by
+// signature scripts.  The signature does not include the appended hashtype.
+//
+// encoding/asn1 is broken so we hand roll this output:
+//
+//  0x30 <length> 0x02 <length r> r 0x02 <length s> s
+func sigDER(r, s *big.Int) []byte {
+	// total length of returned signature is 1 byte for each magic and
+	// length (6 total), plus lengths of r and s
+	length := 6 + len(r.Bytes()) + len(s.Bytes())
+	b := make([]byte, length, length)
+
+	b[0] = 0x30
+	b[1] = byte(length - 2)
+	b[2] = 0x02
+	b[3] = byte(len(r.Bytes()))
+	offset := copy(b[4:], r.Bytes()) + 4
+	b[offset] = 0x02
+	b[offset+1] = byte(len(s.Bytes()))
+	copy(b[offset+2:], s.Bytes())
+	return b
 }
