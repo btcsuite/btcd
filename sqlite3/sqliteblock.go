@@ -23,12 +23,12 @@ func (db *SqliteDb) InsertBlockData(sha *btcwire.ShaHash, prevSha *btcwire.ShaHa
 // insertSha stores a block hash and its associated data block with a
 // previous sha of `prevSha' and a version of `pver'.
 // insertSha shall be called with db lock held
-func (db *SqliteDb) insertBlockData(sha *btcwire.ShaHash, prevSha *btcwire.ShaHash, pver uint32, buf []byte) (blockid int64, err error) {
+func (db *SqliteDb) insertBlockData(sha *btcwire.ShaHash, prevSha *btcwire.ShaHash, pver uint32, buf []byte) (int64, error) {
 	tx := &db.txState
 	if tx.tx == nil {
-		err = db.startTx()
+		err := db.startTx()
 		if err != nil {
-			return
+			return 0, err
 		}
 	}
 
@@ -48,7 +48,7 @@ func (db *SqliteDb) insertBlockData(sha *btcwire.ShaHash, prevSha *btcwire.ShaHa
 
 	result, err := db.blkStmts[blkInsertSha].Exec(sha.Bytes(), pver, buf)
 	if err != nil {
-		return
+		return 0, err
 	}
 
 	blkid, err := result.LastInsertId()
@@ -68,8 +68,7 @@ func (db *SqliteDb) insertBlockData(sha *btcwire.ShaHash, prevSha *btcwire.ShaHa
 	tx.txInsertList = append(tx.txInsertList, bid)
 	tx.txDataSz += len(buf)
 
-	blockid = blkid
-	return
+	return blkid, nil
 }
 
 // fetchSha returns the datablock and pver for the given ShaHash.
