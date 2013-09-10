@@ -36,7 +36,7 @@ func TestEmptyDB(t *testing.T) {
 
 	sha, height, err := db.NewestSha()
 	if !sha.IsEqual(&btcwire.ShaHash{}) {
-		t.Errorf("sha not nil")
+		t.Errorf("sha not zero hash")
 	}
 	if height != -1 {
 		t.Errorf("height not -1 %v", height)
