@@ -6,6 +6,7 @@ package ldb_test
 
 import (
 	"github.com/conformal/btcdb"
+	"github.com/conformal/btcwire"
 	"os"
 	"testing"
 )
@@ -34,8 +35,7 @@ func TestEmptyDB(t *testing.T) {
 	defer db.Close()
 
 	sha, height, err := db.NewestSha()
-
-	if sha != nil {
+	if !sha.IsEqual(&btcwire.ShaHash{}) {
 		t.Errorf("sha not nil")
 	}
 	if height != -1 {
