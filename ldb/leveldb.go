@@ -170,7 +170,13 @@ func CreateDB(dbpath string) (btcdb.Db, error) {
 	log = btcdb.GetLog()
 
 	// No special setup needed, just OpenBB
-	return openDB(dbpath, opt.OFCreateIfMissing)
+	db, err := openDB(dbpath, opt.OFCreateIfMissing)
+	if err == nil {
+		ldb := db.(*LevelDb)
+		ldb.lastBlkIdx = -1
+		ldb.nextBlock = 0
+	}
+	return db, err
 }
 
 func (db *LevelDb) close() {
