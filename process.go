@@ -148,11 +148,8 @@ func (b *BlockChain) ProcessBlock(block *btcutil.Block) error {
 			prevHash)
 		b.addOrphanBlock(block)
 
-		// Get the hash for the head of the orphaned block chain for
-		// this block and notify the caller so it can request missing
-		// blocks.
-		orphanRoot := b.GetOrphanRoot(blockHash)
-		b.sendNotification(NTOrphanBlock, orphanRoot)
+		// Notify the caller so it can request missing blocks.
+		b.sendNotification(NTOrphanBlock, blockHash)
 		return nil
 	}
 

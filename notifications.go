@@ -14,8 +14,9 @@ type NotificationType int
 // Constants for the type of a notification message.
 const (
 	// NTOrphanBlock indicates an orphan block was processed and the
-	// associated block hash is the root of all known orphans which should
-	// be used to request the missing blocks.
+	// associated block hash should be passed to the GetOrphanRoot function
+	// to find the root of all known orphans which should then be used to
+	// request the missing blocks.
 	NTOrphanBlock NotificationType = iota
 
 	// NTBlockAccepted indicates the associated block was accepted into
