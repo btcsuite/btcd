@@ -5,13 +5,16 @@
 package btcec_test
 
 import (
+	"bytes"
 	"github.com/conformal/btcec"
+	"github.com/davecgh/go-spew/spew"
 	"testing"
 )
 
 type pubKeyTest struct {
 	name    string
 	key     []byte
+	format  byte
 	isValid bool
 }
 
@@ -30,6 +33,7 @@ var pubKeyTests = []pubKeyTest{
 			0xb4, 0x12, 0xa3,
 		},
 		isValid: true,
+		format:  btcec.TstPubkeyUncompressed,
 	},
 	pubKeyTest{
 		name: "uncompressed x changed",
@@ -82,6 +86,7 @@ var pubKeyTests = []pubKeyTest{
 			0xb4, 0x12, 0xa3,
 		},
 		isValid: true,
+		format:  btcec.TstPubkeyHybrid,
 	},
 	pubKeyTest{
 		name: "uncompressed as hybrid wrong",
@@ -105,6 +110,7 @@ var pubKeyTests = []pubKeyTest{
 			0xa9, 0xa1, 0xf4, 0x80, 0x9d, 0x3b, 0x4d,
 		},
 		isValid: true,
+		format:  btcec.TstPubkeyCompressed,
 	},
 	// from tx fdeb8e72524e8dab0da507ddbaf5f88fe4a933eb10a66bc4745bb0aa11ea393c
 	pubKeyTest{
@@ -115,6 +121,7 @@ var pubKeyTests = []pubKeyTest{
 			0x7f, 0x5b, 0x2a, 0x4b, 0x7d, 0x44, 0x8e,
 		},
 		isValid: true,
+		format:  btcec.TstPubkeyCompressed,
 	},
 	pubKeyTest{
 		name: "compressed claims uncompressed (ybit = 0)",
@@ -195,7 +202,7 @@ var pubKeyTests = []pubKeyTest{
 
 func TestPubKeys(t *testing.T) {
 	for _, test := range pubKeyTests {
-		_, err := btcec.ParsePubKey(test.key, btcec.S256())
+		pk, err := btcec.ParsePubKey(test.key, btcec.S256())
 		if err != nil {
 			if test.isValid {
 				t.Errorf("%s pubkey failed when shouldn't %v",
@@ -206,6 +213,22 @@ func TestPubKeys(t *testing.T) {
 		if !test.isValid {
 			t.Errorf("%s counted as valid when it should fail",
 				test.name)
+			continue
+		}
+		var pkStr []byte
+		switch test.format {
+		case btcec.TstPubkeyUncompressed:
+			pkStr = (*btcec.PublicKey)(pk).SerializeUncompressed()
+		case btcec.TstPubkeyCompressed:
+			pkStr = (*btcec.PublicKey)(pk).SerializeCompressed()
+		case btcec.TstPubkeyHybrid:
+			pkStr = (*btcec.PublicKey)(pk).SerializeHybrid()
+		}
+		if !bytes.Equal(test.key, pkStr) {
+			t.Errorf("%s pubkey: serialized keys do not match.",
+				test.name)
+			spew.Dump(test.key)
+			spew.Dump(pkStr)
 		}
 	}
 }

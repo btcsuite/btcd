@@ -154,7 +154,7 @@ var signatureTests = []signatureTest{
 
 		// This test is now passing (used to be failing) because there
 		// are signatures in the blockchain that have trailing zero
-		// bytes before the hashtype. So ParseSignature was fixed to 
+		// bytes before the hashtype. So ParseSignature was fixed to
 		// permit buffers with trailing nonsense after the actual
 		// signature.
 		isValid: true,

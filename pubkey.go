@@ -16,8 +16,8 @@ func isOdd(a *big.Int) bool {
 
 const (
 	pubkeyCompressed   byte = 0x2 // y_bit + x coord
-	pubkeyUncompressed      = 0x4 // x coord + y coord
-	pubkeyHybrid            = 0x6 // y_bit + x coord + y coord
+	pubkeyUncompressed byte = 0x4 // x coord + y coord
+	pubkeyHybrid       byte = 0x6 // y_bit + x coord + y coord
 )
 
 // ParsePubKey parses a public key for a koblitz curve from a bytestring into a
@@ -87,4 +87,43 @@ func ParsePubKey(pubKeyStr []byte, curve *KoblitzCurve) (key *ecdsa.PublicKey, e
 		return nil, fmt.Errorf("pubkey isn't on secp265k1 curve")
 	}
 	return &pubkey, nil
+}
+
+// PublicKey is an ecdsa.PublicKey with additional functions to
+// serialize in uncompressed, compressed, and hybrid formats.
+type PublicKey ecdsa.PublicKey
+
+// SerializeUncompressed serializes a public key in a 65-byte uncompressed
+// format.
+func (p *PublicKey) SerializeUncompressed() []byte {
+	b := make([]byte, 65)
+	b[0] = pubkeyUncompressed
+	copy(b[1:33], p.X.Bytes())
+	copy(b[33:], p.Y.Bytes())
+	return b
+}
+
+// SerializeCompressed serializes a public key in a 33-byte compressed format.
+func (p *PublicKey) SerializeCompressed() []byte {
+	b := make([]byte, 33)
+	format := pubkeyCompressed
+	if isOdd(p.Y) {
+		format |= 0x1
+	}
+	b[0] = format
+	copy(b[1:33], p.X.Bytes())
+	return b
+}
+
+// SerializeHybrid serializes a public key in a 65-byte hybrid format.
+func (p *PublicKey) SerializeHybrid() []byte {
+	b := make([]byte, 65)
+	format := pubkeyHybrid
+	if isOdd(p.Y) {
+		format |= 0x1
+	}
+	b[0] = format
+	copy(b[1:33], p.X.Bytes())
+	copy(b[33:], p.Y.Bytes())
+	return b
 }
