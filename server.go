@@ -213,7 +213,7 @@ func (s *server) listenHandler(listener net.Listener) {
 			}
 			continue
 		}
-		s.AddPeer(newPeer(s, conn))
+		s.AddPeer(newInboundPeer(s, conn))
 	}
 	s.wg.Done()
 	log.Tracef("[SRVR] Listener handler done for %s", listener.Addr())

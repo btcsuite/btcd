@@ -12,6 +12,7 @@ import (
 	"math/rand"
 	"net"
 	"os"
+	"path/filepath"
 	"strconv"
 	"sync"
 	"time"
@@ -20,7 +21,12 @@ import (
 const (
 	// maxAddresses identifies the maximum number of addresses that the
 	// address manager will track.
-	maxAddresses         = 2500
+	maxAddresses = 2500
+
+	// needAddressThreshold is the number of addresses under which the
+	// address manager will claim to need more addresses.
+	needAddressThreshold = 1000
+
 	newAddressBufferSize = 50
 
 	// dumpAddressInterval is the interval used to dump the address
@@ -94,12 +100,11 @@ func (a *AddrManager) updateAddress(netAddr, srcAddr *btcwire.NetAddress) {
 }
 
 // bad returns true if the address in question has not been tried in the last
-// minute and  meets one of the following
-// criteria:
-// 1) It claims to be from the future.
-// 2) It hasn't been seen in over a month.
-// 3) It has failed at least three times and never succeeded.
-// 4) It has failed ten times in the last week.
+// minute and meets one of the following criteria:
+// 1) It claims to be from the future
+// 2) It hasn't been seen in over a month
+// 3) It has failed at least three times and never succeeded
+// 4) It has failed ten times in the last week
 // All addresses that meet these criteria are assumed to be worthless and not
 // worth keeping hold of.
 func bad(ka *knownAddress) bool {
@@ -132,7 +137,7 @@ func bad(ka *knownAddress) bool {
 	return false
 }
 
-// chance returns the selection probability for a known address. The priority
+// chance returns the selection probability for a known address.  The priority
 // depends upon how recent the address has been seen, how recent it was last
 // attempted and how often attempts to connect to it have failed.
 func chance(ka *knownAddress) float64 {
@@ -146,7 +151,7 @@ func chance(ka *knownAddress) float64 {
 		if ka.na.Timestamp.IsZero() {
 			// use unix epoch to match bitcoind.
 			dur = now.Sub(time.Unix(0, 0))
-		
+
 		} else {
 			dur = now.Sub(ka.na.Timestamp)
 		}
@@ -165,12 +170,12 @@ func chance(ka *knownAddress) float64 {
 
 	c = 600.0 / (600.0 + lastSeen)
 
-	// very recent attempts are less likely to be retried.
+	// Very recent attempts are less likely to be retried.
 	if lastTry > 60.0*10.0 {
 		c *= 0.01
 	}
 
-	// failed attempts deprioritise
+	// Failed attempts deprioritise.
 	if ka.attempts > 0 {
 		c /= (float64(ka.attempts) * 1.5)
 	}
@@ -213,7 +218,7 @@ func (a *AddrManager) expireNew() {
 // pickTried selects an address from the tried bucket to be evicted.
 // We just choose the eldest.
 func (a *AddrManager) pickTried() *list.Element {
-	var oldest *knownAddress 
+	var oldest *knownAddress
 	var oldestElem *list.Element
 	for e := a.addrTried.Front(); e != nil; e = e.Next() {
 		ka := e.Value.(*knownAddress)
@@ -226,6 +231,8 @@ func (a *AddrManager) pickTried() *list.Element {
 	return oldestElem
 }
 
+// knownAddress tracks information about a known network address that is used
+// to determine how viable an address is.
 type knownAddress struct {
 	na          *btcwire.NetAddress
 	attempts    int
@@ -280,38 +287,36 @@ out:
 func (a *AddrManager) savePeers() {
 	// May give some way to specify this later.
 	filename := "peers.json"
+	filePath := filepath.Join(cfg.DataDir, filename)
 
 	var toSave JsonSave
 
 	list := a.AddressCacheFlat()
-	log.Info("LIST ", list)
 	toSave.AddrList = list
 
-	w, err := os.Create(filename)
+	w, err := os.Create(filePath)
 	if err != nil {
-		log.Error("Error opening file: ", filename, err)
+		log.Error("Error opening file: ", filePath, err)
 	}
 	enc := json.NewEncoder(w)
 	defer w.Close()
 	enc.Encode(&toSave)
-	log.Info("Saving peer list.")
 }
 
 // loadPeers loads the known address from the saved file.  If empty, missing, or
 // malformed file, just don't load anything and start fresh
 func (a *AddrManager) loadPeers() {
-	log.Info("Loading saved peers")
-
 	// May give some way to specify this later.
 	filename := "peers.json"
+	filePath := filepath.Join(cfg.DataDir, filename)
 
-	_, err := os.Stat(filename)
+	_, err := os.Stat(filePath)
 	if os.IsNotExist(err) {
-		log.Debugf("%s does not exist.\n", filename)
+		log.Debugf("%s does not exist.\n", filePath)
 	} else {
-		r, err := os.Open(filename)
+		r, err := os.Open(filePath)
 		if err != nil {
-			log.Error("Error opening file: ", filename, err)
+			log.Error("Error opening file: ", filePath, err)
 			return
 		}
 		defer r.Close()
@@ -320,7 +325,7 @@ func (a *AddrManager) loadPeers() {
 		dec := json.NewDecoder(r)
 		err = dec.Decode(&inList)
 		if err != nil {
-			log.Error("Error reading:", filename, err)
+			log.Error("Error reading:", filePath, err)
 			return
 		}
 		log.Debug("Adding ", len(inList.AddrList), " saved peers.")
@@ -420,7 +425,7 @@ func (a *AddrManager) AddAddressByIP(addrIP string) {
 func (a *AddrManager) NeedMoreAddresses() bool {
 	// NumAddresses handles concurrent access for us.
 
-	return a.NumAddresses()+1 <= maxAddresses
+	return a.NumAddresses() < needAddressThreshold
 }
 
 // NumAddresses returns the number of addresses known to the address manager.
@@ -474,7 +479,7 @@ func (a *AddrManager) AddressCacheFlat() []string {
 func NewAddrManager() *AddrManager {
 	am := AddrManager{
 		rand:      rand.New(rand.NewSource(time.Now().UnixNano())),
-		addrIndex:   make(map[string]*knownAddress),
+		addrIndex: make(map[string]*knownAddress),
 		addrNew:   make(map[string]*knownAddress),
 		addrTried: list.New(),
 		quit:      make(chan bool),
@@ -519,8 +524,7 @@ func (a *AddrManager) GetAddress(class string, newBias int) *knownAddress {
 		for {
 			// Pick a random entry in the list
 			e := a.addrTried.Front()
-			for i := a.rand.Int63n(int64(a.addrTried.Len()));
-				i > 0; i-- {
+			for i := a.rand.Int63n(int64(a.addrTried.Len())); i > 0; i-- {
 				e = e.Next()
 			}
 			ka := e.Value.(*knownAddress)
@@ -601,8 +605,8 @@ func (a *AddrManager) Connected(addr *btcwire.NetAddress) {
 	}
 }
 
-// Good marks the given address as good. To be called after a successful
-// connection and version exchange. If the address is unkownto the addresss
+// Good marks the given address as good.  To be called after a successful
+// connection and version exchange.  If the address is unknown to the addresss
 // manager it will be ignored.
 func (a *AddrManager) Good(addr *btcwire.NetAddress) {
 	a.mtx.Lock()

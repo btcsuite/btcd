@@ -297,6 +297,9 @@ func (b *blockManager) handleNotifyMsg(notification *btcchain.Notification) {
 			peer.pushGetBlocksMsg(locator, orphanRoot)
 			delete(b.blockPeer, *orphanRoot)
 			break
+		} else {
+			log.Warnf("Notification for orphan %v with no peer",
+				orphanHash)
 		}
 
 	// A block has been accepted into the block chain.

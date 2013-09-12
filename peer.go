@@ -232,14 +232,14 @@ func (p *peer) handleVersionMsg(msg *btcwire.MsgVersion) {
 		}
 	}
 
-	var err error
-	// Set up a netaddress for the peer to be used with addrmanager..
-	p.na, err = newNetAddress(p.conn.RemoteAddr(), p.services)
+	// Set up a NetAddress for the peer to be used with AddrManager.
+	na, err := newNetAddress(p.conn.RemoteAddr(), p.services)
 	if err != nil {
 		log.Errorf("[PEER] %v", err)
 		p.Disconnect()
 		return
 	}
+	p.na = na
 
 	// Send verack.
 	p.outputQueue <- btcwire.NewMsgVerAck()
@@ -265,15 +265,18 @@ func (p *peer) handleVersionMsg(msg *btcwire.MsgVersion) {
 		// Request known addresses if the server address manager needs
 		// more and the peer has a protocol version new enough to
 		// include a timestamp with addresses.
-		// XXX bitcoind only does this if we have < 1000 addresses, not
-		// the max of 2400
 		hasTimestamp := p.protocolVersion >= btcwire.NetAddressTimeVersion
 		if p.server.addrManager.NeedMoreAddresses() && hasTimestamp {
 			p.outputQueue <- btcwire.NewMsgGetAddr()
 		}
-		// Add inbound peer address to the server address manager.
+
+		// Mark the address as a known good address.
 		p.server.addrManager.Good(p.na)
 	} else {
+		// A peer might not be advertising the same address that it
+		// actually connected from.  One example of why this can happen
+		// is with NAT.  Only add the address to the address manager if
+		// the addresses agree.
 		if NetAddressKey(&msg.AddrMe) == NetAddressKey(p.na) {
 			p.server.addrManager.AddAddress(p.na, p.na)
 			p.server.addrManager.Good(p.na)
@@ -893,8 +896,8 @@ out:
 			break out
 		}
 
-		markConnected := false
 		// Handle each supported message type.
+		markConnected := false
 		switch msg := rmsg.(type) {
 		case *btcwire.MsgVersion:
 			p.handleVersionMsg(msg)
@@ -942,6 +945,9 @@ out:
 			log.Debugf("[PEER] Received unhandled message of type %v: Fix Me",
 				rmsg.Command())
 		}
+
+		// Mark the address as currently connected and working as of
+		// now if one of the messages that trigger
 		if markConnected && !p.disconnect {
 			if p.na == nil {
 				log.Warnf("we're getting stuff before we " +
@@ -1085,39 +1091,17 @@ func (p *peer) Shutdown() {
 	p.wg.Wait()
 }
 
-// newPeer returns a new bitcoin peer for the provided server and connection.
-// Use start to begin processing incoming and outgoing messages.
-func newPeer(s *server, conn net.Conn) *peer {
+// newPeerBase returns a new base bitcoin peer for the provided server and
+// inbound flag.  This is used by the newInboundPeer and newOutboundPeer
+// functions to perform base setup needed by both types of peers.
+func newPeerBase(s *server, inbound bool) *peer {
 	p := peer{
 		server:          s,
 		protocolVersion: btcwire.ProtocolVersion,
 		btcnet:          s.btcnet,
 		services:        btcwire.SFNodeNetwork,
-		conn:            conn,
-		addr:            conn.RemoteAddr().String(),
 		timeConnected:   time.Now(),
-		inbound:         true,
-		persistent:      false,
-		knownAddresses:  make(map[string]bool),
-		outputQueue:     make(chan btcwire.Message, outputBufferSize),
-		quit:            make(chan bool),
-	}
-	return &p
-}
-
-// newOutbountPeer returns a new bitcoin peer for the provided server and
-// address and connects to it asynchronously. If the connetion is successful
-// then the peer will also be started.
-func newOutboundPeer(s *server, addr string, persistent bool) *peer {
-	p := peer{
-		server:          s,
-		protocolVersion: btcwire.ProtocolVersion,
-		btcnet:          s.btcnet,
-		services:        btcwire.SFNodeNetwork,
-		addr:            addr,
-		timeConnected:   time.Now(),
-		inbound:         false,
-		persistent:      persistent,
+		inbound:         inbound,
 		knownAddresses:  make(map[string]bool),
 		knownInventory:  NewMruInventoryMap(maxKnownInventory),
 		requestQueue:    list.New(),
@@ -1127,29 +1111,50 @@ func newOutboundPeer(s *server, addr string, persistent bool) *peer {
 		blockProcessed:  make(chan bool, 1),
 		quit:            make(chan bool),
 	}
-	// set up p.na with a temporary address that we are connecting to with
-	// faked up service flags. We will replace this with the real one after
-	// version negotiation is successful. The only failure case here would
+	return &p
+}
+
+// newPeer returns a new inbound bitcoin peer for the provided server and
+// connection.  Use Start to begin processing incoming and outgoing messages.
+func newInboundPeer(s *server, conn net.Conn) *peer {
+	p := newPeerBase(s, true)
+	p.conn = conn
+	p.addr = conn.RemoteAddr().String()
+	return p
+}
+
+// newOutbountPeer returns a new outbound bitcoin peer for the provided server and
+// address and connects to it asynchronously. If the connection is successful
+// then the peer will also be started.
+func newOutboundPeer(s *server, addr string, persistent bool) *peer {
+	p := newPeerBase(s, false)
+	p.addr = addr
+	p.persistent = persistent
+
+	// Setup p.na with a temporary address that we are connecting to with
+	// faked up service flags.  We will replace this with the real one after
+	// version negotiation is successful.  The only failure case here would
 	// be if the string was incomplete for connection so can't be split
-	// into address and port, and thus this would be invalid anyway. In
-	// which case we return nil to be handled by the caller.
-	// This must be done before we fork off the goroutine because as soon
-	// as this function returns the peer must have a valid netaddress.
+	// into address and port, and thus this would be invalid anyway.  In
+	// which case we return nil to be handled by the caller.  This must be
+	// done before we fork off the goroutine because as soon as this
+	// function returns the peer must have a valid netaddress.
 	ip, portStr, err := net.SplitHostPort(addr)
 	if err != nil {
-		log.Errorf("tried to create a new outbound peer with invalid "+
+		log.Errorf("Tried to create a new outbound peer with invalid "+
 			"address %s: %v", addr, err)
 		return nil
 	}
 
 	port, err := strconv.ParseUint(portStr, 10, 16)
 	if err != nil {
-		log.Errorf("tried to create a new outbound peer with invalid "+
+		log.Errorf("Tried to create a new outbound peer with invalid "+
 			"port %s: %v", portStr, err)
 		return nil
 	}
 	p.na = btcwire.NewNetAddressIPPort(net.ParseIP(ip), uint16(port), 0)
 
+	p.wg.Add(1)
 	go func() {
 		// Select which dial method to call depending on whether or
 		// not a proxy is configured.  Also, add proxy information to
@@ -1161,7 +1166,6 @@ func newOutboundPeer(s *server, addr string, persistent bool) *peer {
 			dial = proxy.Dial
 			faddr = fmt.Sprintf("%s via proxy %s", addr, cfg.Proxy)
 		}
-		p.wg.Add(1)
 
 		// Attempt to connect to the peer.  If the connection fails and
 		// this is a persistent connection, retry after the retry
@@ -1170,10 +1174,10 @@ func newOutboundPeer(s *server, addr string, persistent bool) *peer {
 			log.Debugf("[SRVR] Attempting to connect to %s", faddr)
 			conn, err := dial("tcp", addr)
 			if err != nil {
-				log.Errorf("[SRVR] failed to connect to %s: %v",
+				log.Errorf("[SRVR] Failed to connect to %s: %v",
 					faddr, err)
 				if !persistent {
-					p.server.donePeers <- &p
+					p.server.donePeers <- p
 					p.wg.Done()
 					return
 				}
@@ -1183,11 +1187,10 @@ func newOutboundPeer(s *server, addr string, persistent bool) *peer {
 				continue
 			}
 
-			// while we were sleeping trying to get connect then
-			// the server may have scheduled a shutdown. In that
-			// case we ditch the connection immediately.
+			// While we were sleeping trying to connect, the server
+			// may have scheduled a shutdown.  In that case ditch
+			// the peer immediately.
 			if !s.shutdown {
-
 				p.server.addrManager.Attempt(p.na)
 
 				// Connection was successful so log it and start peer.
@@ -1195,8 +1198,9 @@ func newOutboundPeer(s *server, addr string, persistent bool) *peer {
 				p.conn = conn
 				p.Start()
 			} else {
-				p.server.donePeers <- &p
+				p.server.donePeers <- p
 			}
+
 			// We are done here, Start() will have grabbed
 			// additional waitgroup entries if we are not shutting
 			// down.
@@ -1204,5 +1208,5 @@ func newOutboundPeer(s *server, addr string, persistent bool) *peer {
 			return
 		}
 	}()
-	return &p
+	return p
 }
