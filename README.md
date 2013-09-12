@@ -11,7 +11,6 @@ yet.
 The following is a list of major items remaining before production release:
 
 - Implement multi-peer support
-- Implement block realy
 - Implement transaction mempool & relay
 - Complete address manager
 - Documentation
