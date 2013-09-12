@@ -37,7 +37,7 @@ func (db *SqliteDb) insertBlockData(sha *btcwire.ShaHash, prevSha *btcwire.ShaHa
 	if prevOk := db.blkExistsSha(prevSha); !prevOk {
 		var numBlocks uint64
 		querystr := "SELECT COUNT(blockid) FROM block;"
-		err := db.sqldb.QueryRow(querystr).Scan(&numBlocks)
+		err := tx.tx.QueryRow(querystr).Scan(&numBlocks)
 		if err != nil {
 			return 0, err
 		}
