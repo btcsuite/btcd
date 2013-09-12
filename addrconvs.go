@@ -1,3 +1,7 @@
+// Copyright (c) 2013 Conformal Systems LLC.
+// Use of this source code is governed by an ISC
+// license that can be found in the LICENSE file.
+
 package btcutil
 
 import (
@@ -15,7 +19,7 @@ var ErrAddrUnknownNet = errors.New("unrecognized network identifier byte")
 // ErrMalformedAddress describes an error where an address is improperly
 // formatted, either due to an incorrect length of the hashed pubkey or
 // a non-matching checksum.
-var ErrMalformedAddress  = errors.New("malformed address")
+var ErrMalformedAddress = errors.New("malformed address")
 
 // Constants used to specify which network a payment address belongs
 // to.  Mainnet address cannot be used on the Testnet, and vice versa.
