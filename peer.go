@@ -958,8 +958,8 @@ out:
 				continue
 			}
 
-			// Create a new inventory message, populate it with as
-			// much per
+			// Create and send as many inv messages as needed to
+			// drain the inventory send queue.
 			invMsg := btcwire.NewMsgInv()
 			for e := p.invSendQueue.Front(); e != nil; e = p.invSendQueue.Front() {
 				iv := p.invSendQueue.Remove(e).(*btcwire.InvVect)
@@ -981,7 +981,6 @@ out:
 				p.addKnownInventory(iv)
 			}
 			if len(invMsg.InvList) > 0 {
-				log.Infof("Relaying %d inv to %v", len(invMsg.InvList), p.conn.RemoteAddr())
 				p.writeMessage(invMsg)
 			}
 
