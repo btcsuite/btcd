@@ -22,6 +22,7 @@ import (
 )
 
 const (
+	// outputBufferSize is the number of elements the output channels use.
 	outputBufferSize = 50
 
 	// invTrickleSize is the maximum amount of inventory to send in a single
