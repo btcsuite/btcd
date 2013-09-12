@@ -103,8 +103,8 @@ func (a *AddrManager) Start() {
 
 	log.Trace("[AMGR] Starting address manager")
 
-	go a.addressHandler()
 	a.wg.Add(1)
+	go a.addressHandler()
 	a.started = true
 }
 

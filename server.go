@@ -337,14 +337,14 @@ func (s *server) Start() {
 	// Start all the listeners.  There will not be any if listening is
 	// disabled.
 	for _, listener := range s.listeners {
-		go s.listenHandler(listener)
 		s.wg.Add(1)
+		go s.listenHandler(listener)
 	}
 
 	// Start the peer handler which in turn starts the address and block
 	// managers.
-	go s.peerHandler()
 	s.wg.Add(1)
+	go s.peerHandler()
 
 	// Start the RPC server if it's not disabled.
 	if !cfg.DisableRpc {

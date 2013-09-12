@@ -44,13 +44,13 @@ func (s *rpcServer) Start() {
 	})
 	httpServer := &http.Server{}
 	for _, listener := range s.listeners {
+		s.wg.Add(1)
 		go func(listener net.Listener) {
 			log.Infof("[RPCS] RPC server listening on %s", listener.Addr())
 			httpServer.Serve(listener)
 			log.Tracef("[RPCS] RPC listener done for %s", listener.Addr())
 			s.wg.Done()
 		}(listener)
-		s.wg.Add(1)
 	}
 	s.started = true
 }

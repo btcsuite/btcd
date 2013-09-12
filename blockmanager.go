@@ -350,10 +350,10 @@ func (b *blockManager) Start() {
 	}
 
 	log.Trace("[BMGR] Starting block manager")
+	b.wg.Add(3)
 	go b.syncHandler()
 	go b.blockHandler()
 	go b.chainNotificationHandler()
-	b.wg.Add(3)
 	b.started = true
 }
 
