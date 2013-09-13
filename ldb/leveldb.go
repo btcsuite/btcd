@@ -13,7 +13,6 @@ import (
 	"github.com/syndtr/goleveldb/leveldb"
 	"github.com/syndtr/goleveldb/leveldb/opt"
 	"os"
-	"path/filepath"
 	"runtime"
 	"sync"
 )
@@ -156,8 +155,7 @@ func openDB(dbpath string, flag opt.OptionsFlag) (pbdb btcdb.Db, err error) {
 		}
 	}
 
-	lDbName := filepath.Join(dbpath, "btcd.ldb")
-	tlDb, err = leveldb.OpenFile(lDbName, &opt.Options{Flag: flag})
+	tlDb, err = leveldb.OpenFile(dbpath, &opt.Options{Flag: flag})
 	if err != nil {
 		return
 	}
