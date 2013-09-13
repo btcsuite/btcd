@@ -394,7 +394,7 @@ func newBlockManager(s *server) *blockManager {
 
 // loadBlockDB opens the block database and returns a handle to it.
 func loadBlockDB() (btcdb.Db, error) {
-	dbPath := filepath.Join(cfg.DbDir, activeNetParams.dbName)
+	dbPath := filepath.Join(cfg.DataDir, activeNetParams.dbName)
 	log.Infof("[BMGR] Loading block database from '%s'", dbPath)
 	db, err := btcdb.OpenDB(cfg.DbType, dbPath)
 	if err != nil {
@@ -405,7 +405,7 @@ func loadBlockDB() (btcdb.Db, error) {
 		}
 
 		// Create the db if it does not exist.
-		err = os.MkdirAll(cfg.DbDir, 0700)
+		err = os.MkdirAll(cfg.DataDir, 0700)
 		if err != nil {
 			return nil, err
 		}

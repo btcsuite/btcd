@@ -29,7 +29,7 @@ const (
 
 var (
 	defaultConfigFile = filepath.Join(btcdHomeDir(), defaultConfigFilename)
-	defaultDbDir      = filepath.Join(btcdHomeDir(), "db")
+	defaultDataDir    = filepath.Join(btcdHomeDir(), "db")
 )
 
 // config defines the configuration options for btcd.
@@ -38,7 +38,7 @@ var (
 type config struct {
 	ShowVersion    bool          `short:"V" long:"version" description:"Display version information and exit"`
 	ConfigFile     string        `short:"C" long:"configfile" description:"Path to configuration file"`
-	DbDir          string        `short:"b" long:"dbdir" description:"Directory to store database"`
+	DataDir        string        `short:"b" long:"datadir" description:"Directory to store data"`
 	AddPeers       []string      `short:"a" long:"addpeer" description:"Add a peer to connect with at startup"`
 	ConnectPeers   []string      `long:"connect" description:"Connect only to the specified peers at startup"`
 	SeedPeer       string        `short:"s" long:"seedpeer" description:"Retrieve peer addresses from this peer and then disconnect"`
@@ -58,7 +58,7 @@ type config struct {
 	UseTor         bool          `long:"tor" description:"Specifies the proxy server used is a Tor node"`
 	TestNet3       bool          `long:"testnet" description:"Use the test network"`
 	RegressionTest bool          `long:"regtest" description:"Use the regression test network"`
-	DbType	       string         `long:"dbtype" description:"DB backend to use for Block Chain"`
+	DbType         string        `long:"dbtype" description:"DB backend to use for Block Chain"`
 	DebugLevel     string        `short:"d" long:"debuglevel" description:"Logging level {trace, debug, info, warn, error, critical}"`
 }
 
@@ -179,7 +179,7 @@ func loadConfig() (*config, []string, error) {
 		MaxPeers:    defaultMaxPeers,
 		BanDuration: defaultBanDuration,
 		ConfigFile:  defaultConfigFile,
-		DbDir:       defaultDbDir,
+		DataDir:     defaultDataDir,
 	}
 
 	// Pre-parse the command line options to see if an alternative config
@@ -317,7 +317,7 @@ func loadConfig() (*config, []string, error) {
 		// type the database is (if the specified database is a
 		// file then it is sqlite3, if it is a directory assume
 		// it is leveldb, if not found default to type _____
-		dbPath := filepath.Join(cfg.DbDir, activeNetParams.dbName)
+		dbPath := filepath.Join(cfg.DataDir, activeNetParams.dbName)
 
 		fi, err := os.Stat(dbPath)
 		if err == nil {
