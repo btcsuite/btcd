@@ -7,10 +7,10 @@ package main
 import (
 	"errors"
 	"fmt"
+	_ "github.com/conformal/btcdb/ldb"
+	_ "github.com/conformal/btcdb/sqlite3"
 	"github.com/conformal/btcwire"
 	"github.com/conformal/go-flags"
-	_ "github.com/conformal/btcdb/sqlite3"
-	_ "github.com/conformal/btcdb/ldb"
 	"net"
 	"os"
 	"path/filepath"
@@ -306,11 +306,10 @@ func loadConfig() (*config, []string, error) {
 	cfg.ConnectPeers =
 		normalizeAndRemoveDuplicateAddresses(cfg.ConnectPeers)
 
-
 	// determine which database backend to use
 	// would be interesting of btcdb had a 'supportedDBs() []string'
 	// API to populate this field.
-	knownDbs := []string { "leveldb", "sqlite" }
+	knownDbs := []string{"leveldb", "sqlite"}
 	defaultDb := "sqlite"
 
 	if len(cfg.DbType) == 0 {
@@ -323,10 +322,10 @@ func loadConfig() (*config, []string, error) {
 		fi, err := os.Stat(dbPath)
 		if err == nil {
 			if fi.IsDir() {
-				cfg.DbType = "leveldb" 
+				cfg.DbType = "leveldb"
 			} else {
-				cfg.DbType = "sqlite" 
-			} 
+				cfg.DbType = "sqlite"
+			}
 		} else {
 			cfg.DbType = defaultDb
 		}
