@@ -17,7 +17,7 @@ var activeNetParams = netParams(defaultBtcnet)
 // params is used to group parameters for various networks such as the main
 // network and test networks.
 type params struct {
-	dbName       string
+	netName      string
 	btcnet       btcwire.BitcoinNet
 	genesisBlock *btcwire.MsgBlock
 	genesisHash  *btcwire.ShaHash
@@ -32,7 +32,7 @@ type params struct {
 // mainNetParams contains parameters specific to the main network
 // (btcwire.MainNet).
 var mainNetParams = params{
-	dbName:       "btcd.db",
+	netName:      "mainnet",
 	btcnet:       btcwire.MainNet,
 	genesisBlock: btcchain.ChainParams(btcwire.MainNet).GenesisBlock,
 	genesisHash:  btcchain.ChainParams(btcwire.MainNet).GenesisHash,
@@ -52,7 +52,7 @@ var mainNetParams = params{
 // regressionParams contains parameters specific to the regression test network
 // (btcwire.TestNet).
 var regressionParams = params{
-	dbName:       "btcd_regtest.db",
+	netName:      "regtest",
 	btcnet:       btcwire.TestNet,
 	genesisBlock: btcchain.ChainParams(btcwire.TestNet).GenesisBlock,
 	genesisHash:  btcchain.ChainParams(btcwire.TestNet).GenesisHash,
@@ -67,7 +67,7 @@ var regressionParams = params{
 // testNet3Params contains parameters specific to the test network (version 3)
 // (btcwire.TestNet3).
 var testNet3Params = params{
-	dbName:       "btcd_testnet.db",
+	netName:      "testnet",
 	btcnet:       btcwire.TestNet3,
 	genesisBlock: btcchain.ChainParams(btcwire.TestNet3).GenesisBlock,
 	genesisHash:  btcchain.ChainParams(btcwire.TestNet3).GenesisHash,

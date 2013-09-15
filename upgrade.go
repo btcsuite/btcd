@@ -4,7 +4,73 @@
 
 package main
 
+import (
+	"os"
+	"path/filepath"
+)
+
+// upgradeDBPathNet moves the database for a specific network from its
+// location prior to btcd version 0.2.0 and uses heuristics to ascertain the old
+// database type to rename to the new format.
+func upgradeDBPathNet(oldDbPath, netName string) error {
+	// Prior to version 0.2.0, the database was named the same thing for
+	// both sqlite and leveldb.  Use heuristics to figure out the type
+	// of the database and move it to the new path and name introduced with
+	// version 0.2.0 accordingly.
+	fi, err := os.Stat(oldDbPath)
+	if err == nil {
+		oldDbType := "sqlite"
+		if fi.IsDir() {
+			oldDbType = "leveldb"
+		}
+
+		// The new database name is based on the database type and
+		// resides in the a directory named after the network type.
+		newDbRoot := filepath.Join(filepath.Dir(cfg.DataDir), netName)
+		newDbName := blockDbNamePrefix + "_" + oldDbType
+		if oldDbType == "sqlite" {
+			newDbName = newDbName + ".db"
+		}
+		newDbPath := filepath.Join(newDbRoot, newDbName)
+
+		// Create the new path if needed.
+		err = os.MkdirAll(newDbRoot, 0700)
+		if err != nil {
+			return err
+		}
+
+		// Move and rename the old database.
+		err := os.Rename(oldDbPath, newDbPath)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+// upgradeDBPaths moves the databases from their locations prior to btcd
+// version 0.2.0 to their new locations.
+func upgradeDBPaths() error {
+	// Prior to version 0.2.0, the databases were in the "db" directory and
+	// their names were suffixed by "testnet" and "regtest" for their
+	// respective networks.  Check for the old database and update it to the
+	// new path introduced with version 0.2.0 accodingly.
+	oldDbRoot := filepath.Join(btcdHomeDir(), "db")
+	upgradeDBPathNet(filepath.Join(oldDbRoot, "btcd.db"), "mainnet")
+	upgradeDBPathNet(filepath.Join(oldDbRoot, "btcd_testnet.db"), "testnet")
+	upgradeDBPathNet(filepath.Join(oldDbRoot, "btcd_regtest.db"), "regtest")
+
+	// Remove the old db directory.
+	err := os.RemoveAll(oldDbRoot)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
 // doUpgrades performs upgrades to btcd as new versions require it.
 func doUpgrades() error {
-	return nil
+	return upgradeDBPaths()
 }

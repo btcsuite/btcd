@@ -25,11 +25,13 @@ const (
 	defaultMaxPeers       = 8
 	defaultBanDuration    = time.Hour * 24
 	defaultVerifyEnabled  = false
+	defaultDbType         = "sqlite"
 )
 
 var (
 	defaultConfigFile = filepath.Join(btcdHomeDir(), defaultConfigFilename)
-	defaultDataDir    = filepath.Join(btcdHomeDir(), "db")
+	defaultDataDir    = filepath.Join(btcdHomeDir(), "data")
+	knownDbTypes      = []string{"leveldb", "sqlite"}
 )
 
 // config defines the configuration options for btcd.
@@ -58,7 +60,7 @@ type config struct {
 	UseTor         bool          `long:"tor" description:"Specifies the proxy server used is a Tor node"`
 	TestNet3       bool          `long:"testnet" description:"Use the test network"`
 	RegressionTest bool          `long:"regtest" description:"Use the regression test network"`
-	DbType         string        `long:"dbtype" description:"DB backend to use for Block Chain"`
+	DbType         string        `long:"dbtype" description:"Database backend to use for the Block Chain"`
 	DebugLevel     string        `short:"d" long:"debuglevel" description:"Logging level {trace, debug, info, warn, error, critical}"`
 }
 
@@ -96,6 +98,19 @@ func validLogLevel(logLevel string) bool {
 	case "critical":
 		return true
 	}
+	return false
+}
+
+// validDbType returns whether or not dbType is a supported database type.
+func validDbType(dbType string) bool {
+	// Would be interesting if btcdb had a 'SupportedDBs() []string'
+	// API to populate this field.
+	for _, knownType := range knownDbTypes {
+		if dbType == knownType {
+			return true
+		}
+	}
+
 	return false
 }
 
@@ -180,6 +195,7 @@ func loadConfig() (*config, []string, error) {
 		BanDuration: defaultBanDuration,
 		ConfigFile:  defaultConfigFile,
 		DataDir:     defaultDataDir,
+		DbType:      defaultDbType,
 	}
 
 	// Pre-parse the command line options to see if an alternative config
@@ -249,12 +265,31 @@ func loadConfig() (*config, []string, error) {
 
 	// Validate debug log level.
 	if !validLogLevel(cfg.DebugLevel) {
-		str := "%s: The specified debug level is invalid -- parsed [%v]"
+		str := "%s: The specified debug level [%v] is invalid"
 		err := errors.New(fmt.Sprintf(str, "loadConfig", cfg.DebugLevel))
 		fmt.Fprintln(os.Stderr, err)
 		parser.WriteHelp(os.Stderr)
 		return nil, nil, err
 	}
+
+	// Validate database type.
+	if !validDbType(cfg.DbType) {
+		str := "%s: The specified database type [%v] is invalid -- " +
+			"supported types %v"
+		err := errors.New(fmt.Sprintf(str, "loadConfig", cfg.DbType,
+			knownDbTypes))
+		fmt.Fprintln(os.Stderr, err)
+		parser.WriteHelp(os.Stderr)
+		return nil, nil, err
+	}
+
+	// Append the network type to the data directory so it is "namespaced"
+	// per network.  In addition to the block database, there are other
+	// pieces of data that are saved to disk such as address manager state.
+	// All data is specific to a network, so namespacing the data directory
+	// means each individual piece of serialized data does not have to
+	// worry about changing names per network and such.
+	cfg.DataDir = filepath.Join(cfg.DataDir, activeNetParams.netName)
 
 	// Don't allow ban durations that are too short.
 	if cfg.BanDuration < time.Duration(time.Second) {
@@ -303,45 +338,7 @@ func loadConfig() (*config, []string, error) {
 	// Add default port to all added peer addresses if needed and remove
 	// duplicate addresses.
 	cfg.AddPeers = normalizeAndRemoveDuplicateAddresses(cfg.AddPeers)
-	cfg.ConnectPeers =
-		normalizeAndRemoveDuplicateAddresses(cfg.ConnectPeers)
+	cfg.ConnectPeers = normalizeAndRemoveDuplicateAddresses(cfg.ConnectPeers)
 
-	// determine which database backend to use
-	// would be interesting of btcdb had a 'supportedDBs() []string'
-	// API to populate this field.
-	knownDbs := []string{"leveldb", "sqlite"}
-	defaultDb := "sqlite"
-
-	if len(cfg.DbType) == 0 {
-		// if db was not specified, use heuristic to see what
-		// type the database is (if the specified database is a
-		// file then it is sqlite3, if it is a directory assume
-		// it is leveldb, if not found default to type _____
-		dbPath := filepath.Join(cfg.DataDir, activeNetParams.dbName)
-
-		fi, err := os.Stat(dbPath)
-		if err == nil {
-			if fi.IsDir() {
-				cfg.DbType = "leveldb"
-			} else {
-				cfg.DbType = "sqlite"
-			}
-		} else {
-			cfg.DbType = defaultDb
-		}
-	} else {
-		// does checking this here really make sense ?
-		typeVerified := false
-		for _, dbtype := range knownDbs {
-			if cfg.DbType == dbtype {
-				typeVerified = true
-			}
-		}
-		if typeVerified == false {
-			err := fmt.Errorf("Specified database type [%v] not in list of supported databases: %v", cfg.DbType, knownDbs)
-			fmt.Fprintln(os.Stderr, err)
-			return nil, nil, err
-		}
-	}
 	return &cfg, remainingArgs, nil
 }

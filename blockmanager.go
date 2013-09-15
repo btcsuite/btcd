@@ -18,6 +18,11 @@ import (
 
 const (
 	chanBufferSize = 50
+
+	// blockDbNamePrefix is the prefix for the block database name.  The
+	// database type is appended to this value to form the full block
+	// database name.
+	blockDbNamePrefix = "blocks"
 )
 
 // blockMsg packages a bitcoin block message and the peer it came from together
@@ -394,7 +399,13 @@ func newBlockManager(s *server) *blockManager {
 
 // loadBlockDB opens the block database and returns a handle to it.
 func loadBlockDB() (btcdb.Db, error) {
-	dbPath := filepath.Join(cfg.DataDir, activeNetParams.dbName)
+	// The database name is based on the database type.
+	dbName := blockDbNamePrefix + "_" + cfg.DbType
+	if cfg.DbType == "sqlite" {
+		dbName = dbName + ".db"
+	}
+	dbPath := filepath.Join(cfg.DataDir, dbName)
+
 	log.Infof("[BMGR] Loading block database from '%s'", dbPath)
 	db, err := btcdb.OpenDB(cfg.DbType, dbPath)
 	if err != nil {
