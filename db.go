@@ -206,3 +206,13 @@ func OpenDB(dbtype string, argstr string) (pbdb Db, err error) {
 	}
 	return nil, DbUnknownType
 }
+
+// SupportedDBs returns a slice of strings that represent the database drivers
+// that have been registered and are therefore supported.
+func SupportedDBs() []string {
+	var supportedDBs []string
+	for _, drv := range driverList {
+		supportedDBs = append(supportedDBs, drv.DbType)
+	}
+	return supportedDBs
+}
