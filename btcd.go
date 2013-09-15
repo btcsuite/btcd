@@ -112,6 +112,13 @@ func btcdMain() error {
 		loggers = setLogLevel(cfg.DebugLevel)
 	}
 
+	// Perform upgrades to btcd as new versions require it.
+	err = doUpgrades()
+	if err != nil {
+		log.Errorf("%v", err)
+		return err
+	}
+
 	// Load the block database.
 	db, err := loadBlockDB()
 	if err != nil {
