@@ -397,6 +397,34 @@ func newBlockManager(s *server) *blockManager {
 	return &bm
 }
 
+// removeRegressionDB removes the existing regression test database if running
+// in regression test mode and it already exists.
+func removeRegressionDB(dbPath string) error {
+	// Dont do anything if not in regression test mode.
+	if !cfg.RegressionTest {
+		return nil
+	}
+
+	// Remove the old regression test database if it already exists.
+	fi, err := os.Stat(dbPath)
+	if err == nil {
+		log.Infof("[BMGR] Removing regression test database from '%s'", dbPath)
+		if fi.IsDir() {
+			err := os.RemoveAll(dbPath)
+			if err != nil {
+				return err
+			}
+		} else {
+			err := os.Remove(dbPath)
+			if err != nil {
+				return err
+			}
+		}
+	}
+
+	return nil
+}
+
 // loadBlockDB opens the block database and returns a handle to it.
 func loadBlockDB() (btcdb.Db, error) {
 	// The database name is based on the database type.
@@ -405,6 +433,10 @@ func loadBlockDB() (btcdb.Db, error) {
 		dbName = dbName + ".db"
 	}
 	dbPath := filepath.Join(cfg.DataDir, dbName)
+
+	// The regression test is special in that it needs a clean database for
+	// each run, so remove it now if it already exists.
+	removeRegressionDB(dbPath)
 
 	log.Infof("[BMGR] Loading block database from '%s'", dbPath)
 	db, err := btcdb.OpenDB(cfg.DbType, dbPath)
