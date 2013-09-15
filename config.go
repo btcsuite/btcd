@@ -7,6 +7,7 @@ package main
 import (
 	"errors"
 	"fmt"
+	"github.com/conformal/btcdb"
 	_ "github.com/conformal/btcdb/ldb"
 	_ "github.com/conformal/btcdb/sqlite3"
 	"github.com/conformal/btcwire"
@@ -31,7 +32,7 @@ const (
 var (
 	defaultConfigFile = filepath.Join(btcdHomeDir(), defaultConfigFilename)
 	defaultDataDir    = filepath.Join(btcdHomeDir(), "data")
-	knownDbTypes      = []string{"leveldb", "sqlite"}
+	knownDbTypes      = btcdb.SupportedDBs()
 )
 
 // config defines the configuration options for btcd.
@@ -103,8 +104,6 @@ func validLogLevel(logLevel string) bool {
 
 // validDbType returns whether or not dbType is a supported database type.
 func validDbType(dbType string) bool {
-	// Would be interesting if btcdb had a 'SupportedDBs() []string'
-	// API to populate this field.
 	for _, knownType := range knownDbTypes {
 		if dbType == knownType {
 			return true
