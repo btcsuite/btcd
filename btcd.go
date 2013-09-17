@@ -113,8 +113,9 @@ func btcdMain() error {
 	// See if we want to enable profiling.
 	if cfg.Profile != "" {
 		go func() {
-			log.Errorf("%v", http.ListenAndServe(
-				net.JoinHostPort("", cfg.Profile), nil))
+			listenAddr := net.JoinHostPort("", cfg.Profile)
+			log.Infof("[BTCD] Profile server listening on %s", listenAddr)
+			log.Errorf("%v", http.ListenAndServe(listenAddr, nil))
 		}()
 	}
 
