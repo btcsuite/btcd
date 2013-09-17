@@ -171,6 +171,9 @@ func (s *server) handleRelayInvMsg(peers *list.List, iv *btcwire.InvVect) {
 	// which are not already known to have it.
 	for e := peers.Front(); e != nil; e = e.Next() {
 		p := e.Value.(*peer)
+		if p.conn == nil {
+			continue
+		}
 
 		// Queue the inventory to be relayed with the next batch.  It
 		// will be ignored if the peer is already known to have the
