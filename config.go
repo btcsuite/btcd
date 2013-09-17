@@ -285,6 +285,7 @@ func loadConfig() (*config, []string, error) {
 	}
 
 	// Validate profile port number
+	if cfg.Profile != "" {
 	profilePort, err := strconv.Atoi(cfg.Profile)
 	if err != nil || profilePort < 1024 || profilePort > 65535 {
 		str := "%s: The profile port must be between 1024 and 65535"
@@ -293,6 +294,7 @@ func loadConfig() (*config, []string, error) {
 		parser.WriteHelp(os.Stderr)
 		return nil, nil, err
 	}
+}
 
 	// Append the network type to the data directory so it is "namespaced"
 	// per network.  In addition to the block database, there are other
