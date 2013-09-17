@@ -261,9 +261,7 @@ func (p *peer) handleVersionMsg(msg *btcwire.MsgVersion) {
 				p.Disconnect()
 				return
 			}
-			addresses := map[string]*btcwire.NetAddress{
-				NetAddressKey(na): na,
-			}
+			addresses := []*btcwire.NetAddress{na}
 			p.pushAddrMsg(addresses)
 		}
 
@@ -640,7 +638,7 @@ func (p *peer) handleGetAddrMsg(msg *btcwire.MsgGetAddr) {
 
 // pushAddrMsg sends one, or more, addr message(s) to the connected peer using
 // the provided addresses.
-func (p *peer) pushAddrMsg(addresses map[string]*btcwire.NetAddress) error {
+func (p *peer) pushAddrMsg(addresses []*btcwire.NetAddress) error {
 	// Nothing to send.
 	if len(addresses) == 0 {
 		return nil
@@ -712,6 +710,8 @@ func (p *peer) handleAddrMsg(msg *btcwire.MsgAddr) {
 	// Add addresses to server address manager.  The address manager handles
 	// the details of things such as preventing duplicate addresses, max
 	// addresses, and last seen updates.
+	// XXX bitcoind gives a 2 hour time penalty here, do we want to do the
+	// same?
 	p.server.addrManager.AddAddresses(msg.AddrList, p.na)
 }
 
