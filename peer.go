@@ -230,7 +230,7 @@ func (p *peer) handleVersionMsg(msg *btcwire.MsgVersion) {
 		// Send version.
 		err := p.pushVersionMsg()
 		if err != nil {
-			log.Errorf("[PEER] %v", err)
+			log.Errorf("[PEER] Can't send version message: %v", err)
 			p.Disconnect()
 			return
 		}
@@ -239,7 +239,7 @@ func (p *peer) handleVersionMsg(msg *btcwire.MsgVersion) {
 	// Set up a NetAddress for the peer to be used with AddrManager.
 	na, err := newNetAddress(p.conn.RemoteAddr(), p.services)
 	if err != nil {
-		log.Errorf("[PEER] %v", err)
+		log.Errorf("[PEER] Can't get remote address: %v", err)
 		p.Disconnect()
 		return
 	}
@@ -256,7 +256,8 @@ func (p *peer) handleVersionMsg(msg *btcwire.MsgVersion) {
 			// Advertise the local address.
 			na, err := newNetAddress(p.conn.LocalAddr(), p.services)
 			if err != nil {
-				log.Errorf("[PEER] %v", err)
+				log.Errorf("[PEER] Can't advertise local "+
+					"address: %v", err)
 				p.Disconnect()
 				return
 			}
@@ -631,7 +632,7 @@ func (p *peer) handleGetAddrMsg(msg *btcwire.MsgGetAddr) {
 	// Push the addresses.
 	err := p.pushAddrMsg(addrCache)
 	if err != nil {
-		log.Errorf("[PEER] %v", err)
+		log.Errorf("[PEER] Can't push address message: %v", err)
 		p.Disconnect()
 		return
 	}
@@ -775,7 +776,7 @@ func (p *peer) writeMessage(msg btcwire.Message) {
 	err := btcwire.WriteMessage(p.conn, msg, p.protocolVersion, p.btcnet)
 	if err != nil {
 		p.Disconnect()
-		log.Errorf("[PEER] %v", err)
+		log.Errorf("[PEER] Can't send message: %v", err)
 		return
 	}
 }
@@ -818,13 +819,14 @@ out:
 			// regression test mode and the error is one of the
 			// allowed errors.
 			if cfg.RegressionTest && p.isAllowedByRegression(err) {
-				log.Errorf("[PEER] %v", err)
+				log.Errorf("[PEER] Allowed regression test"+
+					"error: %v", err)
 				continue
 			}
 
 			// Only log the error if we're not forcibly disconnecting.
 			if !p.disconnect {
-				log.Errorf("[PEER] %v", err)
+				log.Errorf("[PEER] Can't read message: %v", err)
 			}
 			break out
 		}
@@ -998,7 +1000,8 @@ func (p *peer) Start() error {
 	if !p.inbound {
 		err := p.pushVersionMsg()
 		if err != nil {
-			log.Errorf("[PEER] %v", err)
+			log.Errorf("[PEER] Can't send outbound version "+
+				"message %v", err)
 			p.conn.Close()
 			return err
 		}
