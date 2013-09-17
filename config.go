@@ -15,6 +15,7 @@ import (
 	"net"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -62,6 +63,7 @@ type config struct {
 	TestNet3       bool          `long:"testnet" description:"Use the test network"`
 	RegressionTest bool          `long:"regtest" description:"Use the regression test network"`
 	DbType         string        `long:"dbtype" description:"Database backend to use for the Block Chain"`
+	Profile        string        `long:"profile" description:"Enable HTTP profiling on given port -- NOTE port must be between 1024 and 65536"`
 	DebugLevel     string        `short:"d" long:"debuglevel" description:"Logging level {trace, debug, info, warn, error, critical}"`
 }
 
@@ -277,6 +279,16 @@ func loadConfig() (*config, []string, error) {
 			"supported types %v"
 		err := errors.New(fmt.Sprintf(str, "loadConfig", cfg.DbType,
 			knownDbTypes))
+		fmt.Fprintln(os.Stderr, err)
+		parser.WriteHelp(os.Stderr)
+		return nil, nil, err
+	}
+
+	// Validate profile port number
+	profilePort, err := strconv.Atoi(cfg.Profile)
+	if err != nil || profilePort < 1024 || profilePort > 65535 {
+		str := "%s: The profile port must be between 1024 and 65535"
+		err := errors.New(fmt.Sprintf(str, "loadConfig"))
 		fmt.Fprintln(os.Stderr, err)
 		parser.WriteHelp(os.Stderr)
 		return nil, nil, err

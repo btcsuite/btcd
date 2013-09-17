@@ -11,6 +11,8 @@ import (
 	"github.com/conformal/btcscript"
 	"github.com/conformal/seelog"
 	"net"
+	"net/http"
+	_ "net/http/pprof"
 	"os"
 	"runtime"
 )
@@ -106,6 +108,14 @@ func btcdMain() error {
 	// Change the logging level if needed.
 	if cfg.DebugLevel != defaultLogLevel {
 		loggers = setLogLevel(cfg.DebugLevel)
+	}
+
+	// See if we want to enable profiling
+	if cfg.Profile != "" {
+		go func() {
+			log.Errorf("%v", http.ListenAndServe(
+				net.JoinHostPort("", cfg.Profile), nil))
+		}()
 	}
 
 	// Perform upgrades to btcd as new versions require it.
