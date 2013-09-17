@@ -11,6 +11,7 @@ import (
 	"github.com/conformal/btcwire"
 	"github.com/conformal/seelog"
 	"github.com/syndtr/goleveldb/leveldb"
+	"github.com/syndtr/goleveldb/leveldb/cache"
 	"github.com/syndtr/goleveldb/leveldb/opt"
 	"os"
 	"runtime"
@@ -155,7 +156,10 @@ func openDB(dbpath string, flag opt.OptionsFlag) (pbdb btcdb.Db, err error) {
 		}
 	}
 
-	tlDb, err = leveldb.OpenFile(dbpath, &opt.Options{Flag: flag})
+	tlDb, err = leveldb.OpenFile(dbpath, &opt.Options{Flag: flag,
+		BlockCache:      cache.EmptyCache{},
+		MaxOpenFiles:    256,
+		CompressionType: opt.NoCompression})
 	if err != nil {
 		return
 	}
