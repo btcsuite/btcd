@@ -6,7 +6,7 @@ package main
 
 import (
 	"container/list"
-	"fmt"
+	//"fmt"
 	"github.com/conformal/btcdb"
 	"github.com/conformal/btcwire"
 	"net"
@@ -354,73 +354,73 @@ func (s *server) peerHandler() {
 			}
 		}
 
-		tries := 0
-		for outboundPeers < maxOutbound &&
-			peers.Len() < cfg.MaxPeers && !s.shutdown {
-			// We bias like bitcoind does, 10 for no outgoing
-			// up to 90 (8) for the selection of new vs tried
-			//addresses.
+		//tries := 0
+		//for outboundPeers < maxOutbound &&
+		//	peers.Len() < cfg.MaxPeers && !s.shutdown {
+		//	// We bias like bitcoind does, 10 for no outgoing
+		//	// up to 90 (8) for the selection of new vs tried
+		//	//addresses.
 
-			nPeers := outboundPeers
-			if nPeers > 8 {
-				nPeers = 8
-			}
-			addr := s.addrManager.GetAddress("any", 10+nPeers*10)
-			if addr == nil {
-				break
-			}
-			key := GroupKey(addr.na)
-			// Address will not be invalid, local or unroutable
-			// because addrmanager rejects those on addition.
-			// Just check that we don't already have an address
-			// in the same group so that we are not connecting
-			// to the same network segment at the expense of
-			// others. bitcoind breaks out of the loop here, but
-			// we continue to try other addresses.
-			if groups[key] != 0 {
-				continue
-			}
+		//	nPeers := outboundPeers
+		//	if nPeers > 8 {
+		//		nPeers = 8
+		//	}
+		//	addr := s.addrManager.GetAddress("any", 10+nPeers*10)
+		//	if addr == nil {
+		//		break
+		//	}
+		//	key := GroupKey(addr.na)
+		//	// Address will not be invalid, local or unroutable
+		//	// because addrmanager rejects those on addition.
+		//	// Just check that we don't already have an address
+		//	// in the same group so that we are not connecting
+		//	// to the same network segment at the expense of
+		//	// others. bitcoind breaks out of the loop here, but
+		//	// we continue to try other addresses.
+		//	if groups[key] != 0 {
+		//		continue
+		//	}
 
-			tries++
-			// After 100 bad tries exit the loop and we'll try again
-			// later.
-			if tries > 100 {
-				break
-			}
+		//	tries++
+		//	// After 100 bad tries exit the loop and we'll try again
+		//	// later.
+		//	if tries > 100 {
+		//		break
+		//	}
 
-			// XXX if we have limited that address skip
+		//	// XXX if we have limited that address skip
 
-			// only allow recent nodes (10mins) after we failed 30
-			// times
-			if time.Now().After(addr.lastattempt.Add(10*time.Minute)) &&
-				tries < 30 {
-				continue
-			}
+		//	// only allow recent nodes (10mins) after we failed 30
+		//	// times
+		//	if time.Now().After(addr.lastattempt.Add(10*time.Minute)) &&
+		//		tries < 30 {
+		//		continue
+		//	}
 
-			// allow nondefault ports after 50 failed tries.
-			if fmt.Sprintf("%d", addr.na.Port) !=
-				activeNetParams.peerPort && tries < 50 {
-				continue
-			}
+		//	// allow nondefault ports after 50 failed tries.
+		//	if fmt.Sprintf("%d", addr.na.Port) !=
+		//		activeNetParams.peerPort && tries < 50 {
+		//		continue
+		//	}
 
-			addrStr := NetAddressKey(addr.na)
+		//	addrStr := NetAddressKey(addr.na)
 
-			tries = 0
-			// any failure will be due to banned peers etc. we have
-			// already checked that we have room for more peers.
-			if s.handleAddPeerMsg(peers, bannedPeers,
-				newOutboundPeer(s, addrStr, false)) {
-				outboundPeers++
-				groups[key]++
-			}
-		}
+		//	tries = 0
+		//	// any failure will be due to banned peers etc. we have
+		//	// already checked that we have room for more peers.
+		//	if s.handleAddPeerMsg(peers, bannedPeers,
+		//		newOutboundPeer(s, addrStr, false)) {
+		//		outboundPeers++
+		//		groups[key]++
+		//	}
+		//}
 
 		// We we need more peers, wake up in ten seconds and try again.
-		if outboundPeers < maxOutbound && peers.Len() < cfg.MaxPeers {
-			time.AfterFunc(10*time.Second, func() {
-				s.wakeup <- true
-			})
-		}
+		//if outboundPeers < maxOutbound && peers.Len() < cfg.MaxPeers {
+		//	time.AfterFunc(10*time.Second, func() {
+		//		s.wakeup <- true
+		//	})
+		//}
 	}
 
 	if wakeupTimer != nil {
