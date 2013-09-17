@@ -110,7 +110,7 @@ func btcdMain() error {
 		loggers = setLogLevel(cfg.DebugLevel)
 	}
 
-	// See if we want to enable profiling
+	// See if we want to enable profiling.
 	if cfg.Profile != "" {
 		go func() {
 			log.Errorf("%v", http.ListenAndServe(
