@@ -25,7 +25,7 @@ const (
 )
 
 var (
-	log seelog.LoggerInterface = seelog.Disabled
+	log = seelog.Disabled
 	cfg *config
 )
 

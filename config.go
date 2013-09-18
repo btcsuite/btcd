@@ -5,7 +5,6 @@
 package main
 
 import (
-	"errors"
 	"fmt"
 	"github.com/conformal/btcdb"
 	_ "github.com/conformal/btcdb/ldb"
@@ -51,10 +50,10 @@ type config struct {
 	MaxPeers       int           `long:"maxpeers" description:"Max number of inbound and outbound peers"`
 	BanDuration    time.Duration `long:"banduration" description:"How long to ban misbehaving peers.  Valid time units are {s, m, h}.  Minimum 1 second"`
 	VerifyDisabled bool          `long:"noverify" description:"Disable block/transaction verification -- WARNING: This option can be dangerous and is for development use only"`
-	RpcUser        string        `short:"u" long:"rpcuser" description:"Username for RPC connections"`
-	RpcPass        string        `short:"P" long:"rpcpass" description:"Password for RPC connections"`
-	RpcPort        string        `short:"r" long:"rpcport" description:"Listen for JSON/RPC messages on this port"`
-	DisableRpc     bool          `long:"norpc" description:"Disable built-in RPC server -- NOTE: The RPC server is disabled by default if no rpcuser/rpcpass is specified"`
+	RPCUser        string        `short:"u" long:"rpcuser" description:"Username for RPC connections"`
+	RPCPass        string        `short:"P" long:"rpcpass" description:"Password for RPC connections"`
+	RPCPort        string        `short:"r" long:"rpcport" description:"Listen for JSON/RPC messages on this port"`
+	DisableRPC     bool          `long:"norpc" description:"Disable built-in RPC server -- NOTE: The RPC server is disabled by default if no rpcuser/rpcpass is specified"`
 	DisableDNSSeed bool          `long:"nodnsseed" description:"Disable DNS seeding for peers"`
 	Proxy          string        `long:"proxy" description:"Connect via SOCKS5 proxy (eg. 127.0.0.1:9050)"`
 	ProxyUser      string        `long:"proxyuser" description:"Username for proxy server"`
@@ -173,8 +172,8 @@ func updateConfigWithActiveParams(cfg *config) {
 		cfg.Port = activeNetParams.listenPort
 	}
 
-	if cfg.RpcPort == netParams(defaultBtcnet).rpcPort {
-		cfg.RpcPort = activeNetParams.rpcPort
+	if cfg.RPCPort == netParams(defaultBtcnet).rpcPort {
+		cfg.RPCPort = activeNetParams.rpcPort
 	}
 }
 
@@ -205,7 +204,7 @@ func loadConfig() (*config, []string, error) {
 	cfg := config{
 		DebugLevel:  defaultLogLevel,
 		Port:        netParams(defaultBtcnet).listenPort,
-		RpcPort:     netParams(defaultBtcnet).rpcPort,
+		RPCPort:     netParams(defaultBtcnet).rpcPort,
 		MaxPeers:    defaultMaxPeers,
 		BanDuration: defaultBanDuration,
 		ConfigFile:  defaultConfigFile,
@@ -263,7 +262,7 @@ func loadConfig() (*config, []string, error) {
 	if cfg.TestNet3 && cfg.RegressionTest {
 		str := "%s: The testnet and regtest params can't be used " +
 			"together -- choose one of the two"
-		err := errors.New(fmt.Sprintf(str, "loadConfig"))
+		err := fmt.Errorf(str, "loadConfig")
 		fmt.Fprintln(os.Stderr, err)
 		parser.WriteHelp(os.Stderr)
 		return nil, nil, err
@@ -281,7 +280,7 @@ func loadConfig() (*config, []string, error) {
 	// Validate debug log level.
 	if !validLogLevel(cfg.DebugLevel) {
 		str := "%s: The specified debug level [%v] is invalid"
-		err := errors.New(fmt.Sprintf(str, "loadConfig", cfg.DebugLevel))
+		err := fmt.Errorf(str, "loadConfig", cfg.DebugLevel)
 		fmt.Fprintln(os.Stderr, err)
 		parser.WriteHelp(os.Stderr)
 		return nil, nil, err
@@ -291,8 +290,7 @@ func loadConfig() (*config, []string, error) {
 	if !validDbType(cfg.DbType) {
 		str := "%s: The specified database type [%v] is invalid -- " +
 			"supported types %v"
-		err := errors.New(fmt.Sprintf(str, "loadConfig", cfg.DbType,
-			knownDbTypes))
+		err := fmt.Errorf(str, "loadConfig", cfg.DbType, knownDbTypes)
 		fmt.Fprintln(os.Stderr, err)
 		parser.WriteHelp(os.Stderr)
 		return nil, nil, err
@@ -303,7 +301,7 @@ func loadConfig() (*config, []string, error) {
 		profilePort, err := strconv.Atoi(cfg.Profile)
 		if err != nil || profilePort < 1024 || profilePort > 65535 {
 			str := "%s: The profile port must be between 1024 and 65535"
-			err := errors.New(fmt.Sprintf(str, "loadConfig"))
+			err := fmt.Errorf(str, "loadConfig")
 			fmt.Fprintln(os.Stderr, err)
 			parser.WriteHelp(os.Stderr)
 			return nil, nil, err
@@ -322,7 +320,7 @@ func loadConfig() (*config, []string, error) {
 	// Don't allow ban durations that are too short.
 	if cfg.BanDuration < time.Duration(time.Second) {
 		str := "%s: The banduration option may not be less than 1s -- parsed [%v]"
-		err := errors.New(fmt.Sprintf(str, "loadConfig", cfg.BanDuration))
+		err := fmt.Errorf(str, "loadConfig", cfg.BanDuration)
 		fmt.Fprintln(os.Stderr, err)
 		parser.WriteHelp(os.Stderr)
 		return nil, nil, err
@@ -332,7 +330,7 @@ func loadConfig() (*config, []string, error) {
 	if len(cfg.AddPeers) > 0 && len(cfg.ConnectPeers) > 0 {
 		str := "%s: the --addpeer and --connect options can not be " +
 			"mixed"
-		err := errors.New(fmt.Sprintf(str, "loadConfig"))
+		err := fmt.Errorf(str, "loadConfig")
 		fmt.Fprintln(os.Stderr, err)
 		parser.WriteHelp(os.Stderr)
 		return nil, nil, err
@@ -341,7 +339,7 @@ func loadConfig() (*config, []string, error) {
 	// --tor requires --proxy to be set.
 	if cfg.UseTor && cfg.Proxy == "" {
 		str := "%s: the --tor option requires --proxy to be set"
-		err := errors.New(fmt.Sprintf(str, "loadConfig"))
+		err := fmt.Errorf(str, "loadConfig")
 		fmt.Fprintln(os.Stderr, err)
 		parser.WriteHelp(os.Stderr)
 		return nil, nil, err
@@ -359,8 +357,8 @@ func loadConfig() (*config, []string, error) {
 	}
 
 	// The RPC server is disabled if no username or password is provided.
-	if cfg.RpcUser == "" || cfg.RpcPass == "" {
-		cfg.DisableRpc = true
+	if cfg.RPCUser == "" || cfg.RPCPass == "" {
+		cfg.DisableRPC = true
 	}
 
 	// Add default port to all added peer addresses if needed and remove

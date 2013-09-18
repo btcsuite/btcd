@@ -239,7 +239,7 @@ func (s *server) peerHandler() {
 	if cfg.MaxPeers < maxOutbound {
 		maxOutbound = cfg.MaxPeers
 	}
-	var wakeupTimer *time.Timer = nil
+	var wakeupTimer *time.Timer
 
 	// Do initial DNS seeding to populate address manager.
 	if !cfg.DisableDNSSeed {
@@ -481,7 +481,7 @@ func (s *server) Start() {
 	go s.peerHandler()
 
 	// Start the RPC server if it's not disabled.
-	if !cfg.DisableRpc {
+	if !cfg.DisableRPC {
 		s.rpcServer.Start()
 	}
 
@@ -509,7 +509,7 @@ func (s *server) Stop() error {
 	}
 
 	// Shutdown the RPC server if it's not disabled.
-	if !cfg.DisableRpc {
+	if !cfg.DisableRPC {
 		s.rpcServer.Stop()
 	}
 
@@ -615,7 +615,7 @@ func newServer(addr string, db btcdb.Db, btcnet btcwire.BitcoinNet) (*server, er
 	}
 	log.Infof("[BMGR] Block index generation complete")
 
-	if !cfg.DisableRpc {
+	if !cfg.DisableRPC {
 		s.rpcServer, err = newRpcServer(&s)
 		if err != nil {
 			return nil, err

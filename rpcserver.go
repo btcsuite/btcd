@@ -40,7 +40,7 @@ func (s *rpcServer) Start() {
 
 	log.Trace("[RPCS] Starting RPC server")
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		jsonRpcRead(w, r, s)
+		jsonRPCRead(w, r, s)
 	})
 	httpServer := &http.Server{}
 	for _, listener := range s.listeners {
@@ -75,15 +75,15 @@ func (s *rpcServer) Stop() error {
 	return nil
 }
 
-// newRpcServer returns a new instance of the rpcServer struct.
-func newRpcServer(s *server) (*rpcServer, error) {
+// newRPCServer returns a new instance of the rpcServer struct.
+func newRPCServer(s *server) (*rpcServer, error) {
 	rpc := rpcServer{
 		server: s,
 	}
 	// Get values from config
-	rpc.rpcport = cfg.RpcPort
-	rpc.username = cfg.RpcUser
-	rpc.password = cfg.RpcPass
+	rpc.rpcport = cfg.RPCPort
+	rpc.username = cfg.RPCUser
+	rpc.password = cfg.RPCPass
 
 	// IPv4 listener.
 	var listeners []net.Listener
@@ -108,9 +108,9 @@ func newRpcServer(s *server) (*rpcServer, error) {
 	return &rpc, err
 }
 
-// jsonRpcRead is the main function that handles reading messages, getting
+// jsonRPCRead is the main function that handles reading messages, getting
 // the data the message requests, and writing the reply.
-func jsonRpcRead(w http.ResponseWriter, r *http.Request, s *rpcServer) {
+func jsonRPCRead(w http.ResponseWriter, r *http.Request, s *rpcServer) {
 	_ = spew.Dump
 	r.Close = true
 	if s.shutdown == true {

@@ -144,8 +144,8 @@ func chance(ka *knownAddress) float64 {
 	c := 1.0
 
 	now := time.Now()
-	var lastSeen float64 = 0.0
-	var lastTry float64 = 0.0
+	var lastSeen float64
+	var lastTry float64
 	if !ka.na.Timestamp.After(now) {
 		var dur time.Duration
 		if ka.na.Timestamp.IsZero() {
@@ -462,7 +462,7 @@ func (a *AddrManager) AddressCacheFlat() []string {
 
 	a.mtx.Lock()
 	defer a.mtx.Unlock()
-	for k, _ := range a.addrNew {
+	for k := range a.addrNew {
 		allAddr = append(allAddr, k)
 	}
 
