@@ -1162,7 +1162,11 @@ func newOutboundPeer(s *server, addr string, persistent bool) *peer {
 		dial := net.Dial
 		faddr := addr
 		if cfg.Proxy != "" {
-			proxy := &socks.Proxy{cfg.Proxy, cfg.ProxyUser, cfg.ProxyPass}
+			proxy := &socks.Proxy{
+				Addr:     cfg.Proxy,
+				Username: cfg.ProxyUser,
+				Password: cfg.ProxyPass,
+			}
 			dial = proxy.Dial
 			faddr = fmt.Sprintf("%s via proxy %s", addr, cfg.Proxy)
 		}

@@ -557,7 +557,6 @@ func (a *AddrManager) GetAddress(class string, newBias int) *knownAddress {
 			factor *= 1.2
 		}
 	}
-	return nil
 }
 
 func (a *AddrManager) find(addr *btcwire.NetAddress) *knownAddress {
