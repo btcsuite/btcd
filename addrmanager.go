@@ -296,7 +296,7 @@ func (a *AddrManager) savePeers() {
 
 	w, err := os.Create(filePath)
 	if err != nil {
-		log.Error("Error opening file: ", filePath, err)
+		log.Error("[AMGR] Error opening file: ", filePath, err)
 	}
 	enc := json.NewEncoder(w)
 	defer w.Close()
@@ -312,11 +312,11 @@ func (a *AddrManager) loadPeers() {
 
 	_, err := os.Stat(filePath)
 	if os.IsNotExist(err) {
-		log.Debugf("%s does not exist.\n", filePath)
+		log.Debugf("[AMGR] %s does not exist.", filePath)
 	} else {
 		r, err := os.Open(filePath)
 		if err != nil {
-			log.Error("Error opening file: ", filePath, err)
+			log.Error("[AMGR] Error opening file: ", filePath, err)
 			return
 		}
 		defer r.Close()
@@ -325,10 +325,10 @@ func (a *AddrManager) loadPeers() {
 		dec := json.NewDecoder(r)
 		err = dec.Decode(&inList)
 		if err != nil {
-			log.Error("Error reading:", filePath, err)
+			log.Error("[AMGR] Error reading:", filePath, err)
 			return
 		}
-		log.Debug("Adding ", len(inList.AddrList), " saved peers.")
+		log.Debug("[AMGR] Adding ", len(inList.AddrList), " saved peers.")
 		if len(inList.AddrList) > 0 {
 			for _, ip := range inList.AddrList {
 				a.AddAddressByIP(ip)
@@ -408,12 +408,12 @@ func (a *AddrManager) AddAddressByIP(addrIP string) {
 	na.Timestamp = time.Now()
 	na.IP = net.ParseIP(addr)
 	if na.IP == nil {
-		log.Error("Invalid ip address:", addr)
+		log.Error("[AMGR] Invalid ip address:", addr)
 		return
 	}
 	port, err := strconv.ParseUint(portStr, 10, 0)
 	if err != nil {
-		log.Error("Invalid port: ", portStr, err)
+		log.Error("[AMGR] Invalid port: ", portStr, err)
 		return
 	}
 	na.Port = uint16(port)
