@@ -91,31 +91,34 @@ func newNetAddress(addr net.Addr, services btcwire.ServiceFlag) (*btcwire.NetAdd
 
 // peer provides a bitcoin peer for handling bitcoin communications.
 type peer struct {
-	server          *server
-	protocolVersion uint32
-	btcnet          btcwire.BitcoinNet
-	services        btcwire.ServiceFlag
-	started         bool
-	conn            net.Conn
-	addr            string
-	na              *btcwire.NetAddress
-	timeConnected   time.Time
-	inbound         bool
-	disconnect      bool
-	persistent      bool
-	versionKnown    bool
-	knownAddresses  map[string]bool
-	knownInventory  *MruInventoryMap
-	knownInvMutex   sync.Mutex
-	lastBlock       int32
-	requestQueue    *list.List
-	invSendQueue    *list.List
-	continueHash    *btcwire.ShaHash
-	wg              sync.WaitGroup
-	outputQueue     chan btcwire.Message
-	outputInvChan   chan *btcwire.InvVect
-	blockProcessed  chan bool
-	quit            chan bool
+	server             *server
+	protocolVersion    uint32
+	btcnet             btcwire.BitcoinNet
+	services           btcwire.ServiceFlag
+	started            bool
+	conn               net.Conn
+	addr               string
+	na                 *btcwire.NetAddress
+	timeConnected      time.Time
+	inbound            bool
+	disconnect         bool
+	persistent         bool
+	versionKnown       bool
+	knownAddresses     map[string]bool
+	knownInventory     *MruInventoryMap
+	knownInvMutex      sync.Mutex
+	lastBlock          int32
+	prevGetBlocksBegin *btcwire.ShaHash
+	prevGetBlocksStop  *btcwire.ShaHash
+	prevGetBlockMutex  sync.Mutex
+	requestQueue       *list.List
+	invSendQueue       *list.List
+	continueHash       *btcwire.ShaHash
+	wg                 sync.WaitGroup
+	outputQueue        chan btcwire.Message
+	outputInvChan      chan *btcwire.InvVect
+	blockProcessed     chan bool
+	quit               chan bool
 }
 
 // isKnownInventory returns whether or not the peer is known to have the passed
@@ -340,8 +343,30 @@ func (p *peer) pushBlockMsg(sha btcwire.ShaHash) error {
 }
 
 // pushGetBlocksMsg sends a getblocks message for the provided block locator
-// and stop hash.
+// and stop hash.  It will ignore back-to-back duplicate requests.
 func (p *peer) pushGetBlocksMsg(locator btcchain.BlockLocator, stopHash *btcwire.ShaHash) error {
+	p.prevGetBlockMutex.Lock()
+	defer p.prevGetBlockMutex.Unlock()
+
+	// Extract the begin hash from the block locator, if one was specified,
+	// to use for filtering duplicate getblocks requests.
+	// request.
+	var beginHash *btcwire.ShaHash
+	if len(locator) > 0 {
+		beginHash = locator[0]
+	}
+
+	// Filter duplicate getblocks requests.
+	if p.prevGetBlocksStop != nil && p.prevGetBlocksBegin != nil &&
+		beginHash != nil && stopHash.IsEqual(p.prevGetBlocksStop) &&
+		beginHash.IsEqual(p.prevGetBlocksBegin) {
+
+		log.Tracef("[PEER] Filtering duplicate [getblocks] with begin "+
+			"hash %v, stop hash %v", beginHash, stopHash)
+		return nil
+	}
+
+	// Construct the getblocks request and queue it to be sent.
 	msg := btcwire.NewMsgGetBlocks(stopHash)
 	for _, hash := range locator {
 		err := msg.AddBlockLocatorHash(hash)
@@ -350,6 +375,11 @@ func (p *peer) pushGetBlocksMsg(locator btcchain.BlockLocator, stopHash *btcwire
 		}
 	}
 	p.QueueMessage(msg)
+
+	// Update the previous getblocks request information for filtering
+	// duplicates.
+	p.prevGetBlocksBegin = beginHash
+	p.prevGetBlocksStop = stopHash
 	return nil
 }
 
