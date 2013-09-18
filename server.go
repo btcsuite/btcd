@@ -616,7 +616,7 @@ func newServer(addr string, db btcdb.Db, btcnet btcwire.BitcoinNet) (*server, er
 	log.Infof("[BMGR] Block index generation complete")
 
 	if !cfg.DisableRPC {
-		s.rpcServer, err = newRpcServer(&s)
+		s.rpcServer, err = newRPCServer(&s)
 		if err != nil {
 			return nil, err
 		}
