@@ -34,6 +34,7 @@ var (
 	btcdHomeDir       = btcutil.AppDataDir("btcd", false)
 	defaultConfigFile = filepath.Join(btcdHomeDir, defaultConfigFilename)
 	defaultDataDir    = filepath.Join(btcdHomeDir, defaultDataDirname)
+	defaultListener   = net.JoinHostPort("", netParams(defaultBtcnet).listenPort)
 	knownDbTypes      = btcdb.SupportedDBs()
 )
 
@@ -47,7 +48,7 @@ type config struct {
 	AddPeers           []string      `short:"a" long:"addpeer" description:"Add a peer to connect with at startup"`
 	ConnectPeers       []string      `long:"connect" description:"Connect only to the specified peers at startup"`
 	DisableListen      bool          `long:"nolisten" description:"Disable listening for incoming connections -- NOTE: Listening is automatically disabled if the --connect option is used or if the --proxy option is used without the --tor option"`
-	Port               string        `short:"p" long:"port" description:"Listen for connections on this port (default: 8333, testnet: 18333)"`
+	Listeners          []string      `long:"listen" description:"Listen for connections on this interface/port (default all interfaces port: 8333, testnet: 18333)"`
 	MaxPeers           int           `long:"maxpeers" description:"Max number of inbound and outbound peers"`
 	BanDuration        time.Duration `long:"banduration" description:"How long to ban misbehaving peers.  Valid time units are {s, m, h}.  Minimum 1 second"`
 	RPCUser            string        `short:"u" long:"rpcuser" description:"Username for RPC connections"`
@@ -112,16 +113,6 @@ func validDbType(dbType string) bool {
 	return false
 }
 
-// normalizePeerAddress returns addr with the default peer port appended if
-// there is not already a port specified.
-func normalizePeerAddress(addr string) string {
-	_, _, err := net.SplitHostPort(addr)
-	if err != nil {
-		return net.JoinHostPort(addr, activeNetParams.peerPort)
-	}
-	return addr
-}
-
 // removeDuplicateAddresses returns a new slice with all duplicate entries in
 // addrs removed.
 func removeDuplicateAddresses(addrs []string) []string {
@@ -136,15 +127,36 @@ func removeDuplicateAddresses(addrs []string) []string {
 	return result
 }
 
-// normalizeAndRemoveDuplicateAddresses return a new slice with all the passed
-// addresses normalized and duplicates removed.
-func normalizeAndRemoveDuplicateAddresses(addrs []string) []string {
-	for i, addr := range addrs {
-		addrs[i] = normalizePeerAddress(addr)
+// normalizeAddress returns addr with the passed default port appended if
+// there is not already a port specified.
+func normalizeAddress(addr, defaultPort string) string {
+	_, _, err := net.SplitHostPort(addr)
+	if err != nil {
+		return net.JoinHostPort(addr, defaultPort)
 	}
-	addrs = removeDuplicateAddresses(addrs)
+	return addr
+}
 
-	return addrs
+// normalizeAddresses returns a new slice with all the passed peer addresses
+// normalized with the given default port, and all duplicates removed.
+func normalizeAddresses(addrs []string, defaultPort string) []string {
+	for i, addr := range addrs {
+		addrs[i] = normalizeAddress(addr, defaultPort)
+	}
+
+	return removeDuplicateAddresses(addrs)
+}
+
+// cleanListenAddresses returns a new slice with all the passed peer addresses
+// normalized and duplicates removed.
+func cleanListenAddresses(addrs []string) []string {
+	return normalizeAddresses(addrs, activeNetParams.listenPort)
+}
+
+// cleanPeerAddresses returns a new slice with all the passed peer addresses
+// normalized and duplicates removed.
+func cleanPeerAddresses(addrs []string) []string {
+	return normalizeAddresses(addrs, activeNetParams.peerPort)
 }
 
 // updateConfigWithActiveParams update the passed config with parameters
@@ -152,9 +164,10 @@ func normalizeAndRemoveDuplicateAddresses(addrs []string) []string {
 // object are the default so options specified by the user on the command line
 // are not overridden.
 func updateConfigWithActiveParams(cfg *config) {
-	if cfg.Port == netParams(defaultBtcnet).listenPort {
-		cfg.Port = activeNetParams.listenPort
-	}
+	// Even though there should only be one default, a duplicate might
+	// have been specified via the config file or CLI options.  So, make
+	// sure to update all default entries rather than only the first one
+	// found.  Duplicates are removed later.
 
 	if cfg.RPCPort == netParams(defaultBtcnet).rpcPort {
 		cfg.RPCPort = activeNetParams.rpcPort
@@ -187,7 +200,6 @@ func loadConfig() (*config, []string, error) {
 	// Default config.
 	cfg := config{
 		DebugLevel:  defaultLogLevel,
-		Port:        netParams(defaultBtcnet).listenPort,
 		RPCPort:     netParams(defaultBtcnet).rpcPort,
 		MaxPeers:    defaultMaxPeers,
 		BanDuration: defaultBanDuration,
@@ -329,15 +341,24 @@ func loadConfig() (*config, []string, error) {
 		return nil, nil, err
 	}
 
-	// --proxy without --tor means no listening.
-	if cfg.Proxy != "" && !cfg.UseTor {
+	// --proxy or --connect without --listen disables listening.
+	if (cfg.Proxy != "" || len(cfg.ConnectPeers) > 0) &&
+		len(cfg.Listeners) == 0 {
 		cfg.DisableListen = true
 	}
 
-	// Connect means no seeding or listening.
+	// Connect means no DNS seeding.
 	if len(cfg.ConnectPeers) > 0 {
 		cfg.DisableDNSSeed = true
-		cfg.DisableListen = true
+	}
+
+	// Add the default listener if none were specified. The default
+	// listener is all addresses on the listen port for the network
+	// we are to connect to.
+	if len(cfg.Listeners) == 0 {
+		cfg.Listeners = []string{
+			net.JoinHostPort("", activeNetParams.listenPort),
+		}
 	}
 
 	// The RPC server is disabled if no username or password is provided.
@@ -345,10 +366,14 @@ func loadConfig() (*config, []string, error) {
 		cfg.DisableRPC = true
 	}
 
+	// Add default port to all listner addresses if needed and remove
+	// duplicate addresses.
+	cfg.Listeners = cleanListenAddresses(cfg.Listeners)
+
 	// Add default port to all added peer addresses if needed and remove
 	// duplicate addresses.
-	cfg.AddPeers = normalizeAndRemoveDuplicateAddresses(cfg.AddPeers)
-	cfg.ConnectPeers = normalizeAndRemoveDuplicateAddresses(cfg.ConnectPeers)
+	cfg.AddPeers = cleanPeerAddresses(cfg.AddPeers)
+	cfg.ConnectPeers = cleanPeerAddresses(cfg.ConnectPeers)
 
 	return &cfg, remainingArgs, nil
 }

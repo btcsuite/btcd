@@ -89,10 +89,11 @@ func btcdMain() error {
 	})
 
 	// Create server and start it.
-	listenAddr := net.JoinHostPort("", cfg.Port)
-	server, err := newServer(listenAddr, db, activeNetParams.btcnet)
+	server, err := newServer(cfg.Listeners, db, activeNetParams.btcnet)
 	if err != nil {
-		log.Errorf("Unable to start server on %v: %v", listenAddr, err)
+		// TODO(oga) this logging could do with some beautifying.
+		log.Errorf("Unable to start server on %v: %v",
+			cfg.Listeners, err)
 		return err
 	}
 	server.Start()

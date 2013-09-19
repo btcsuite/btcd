@@ -11,6 +11,7 @@ import (
 	"github.com/conformal/btcdb"
 	"github.com/conformal/btcwire"
 	"net"
+	"runtime"
 	"strconv"
 	"sync"
 	"sync/atomic"
@@ -765,30 +766,74 @@ func (s *server) ScheduleShutdown(duration time.Duration) {
 	}()
 }
 
+func parseListeners(addrs []string) ([]string, []string, error) {
+	ipv4ListenAddrs := make([]string, 0, len(cfg.Listeners)*2)
+	ipv6ListenAddrs := make([]string, 0, len(cfg.Listeners)*2)
+	for _, addr := range cfg.Listeners {
+		host, _, err := net.SplitHostPort(addr)
+		if err != nil {
+			// shouldn't happen, should have already been normalized.
+			return nil, nil, err
+		}
+
+		// Empty host or host of * on plan9 is both IPv4 and
+		// IPv6.
+		if host == "" || (host == "*" && runtime.GOOS == "plan9") {
+			ipv4ListenAddrs = append(ipv4ListenAddrs, addr)
+			ipv6ListenAddrs = append(ipv6ListenAddrs, addr)
+			continue
+		}
+
+		// Parse the IP.
+		ip := net.ParseIP(host)
+		if ip == nil {
+			return nil, nil, err
+		}
+
+		if ip.To4() == nil {
+			ipv6ListenAddrs = append(ipv6ListenAddrs, addr)
+		} else {
+			ipv4ListenAddrs = append(ipv4ListenAddrs, addr)
+		}
+	}
+	return ipv4ListenAddrs, ipv6ListenAddrs, nil
+}
+
 // newServer returns a new btcd server configured to listen on addr for the
 // bitcoin network type specified in btcnet.  Use start to begin accepting
 // connections from peers.
-func newServer(addr string, db btcdb.Db, btcnet btcwire.BitcoinNet) (*server, error) {
+func newServer(listenAddrs []string, db btcdb.Db, btcnet btcwire.BitcoinNet) (*server, error) {
 	nonce, err := btcwire.RandomUint64()
 	if err != nil {
 		return nil, err
 	}
 
-	var listeners []net.Listener
+	ipv4ListenAddrs, ipv6ListenAddrs, err := parseListeners(listenAddrs)
+	listeners := make([]net.Listener, 0,
+		len(ipv6ListenAddrs)+len(ipv4ListenAddrs))
 	if !cfg.DisableListen {
-		// IPv4 listener.
-		listener4, err := net.Listen("tcp4", addr)
-		if err != nil {
-			return nil, err
+		for _, addr := range ipv4ListenAddrs {
+			listener, err := net.Listen("tcp4", addr)
+			if err != nil {
+				log.Warnf("SRVR: Can't listen on %s: %v", addr,
+					err)
+				continue
+			}
+			listeners = append(listeners, listener)
 		}
-		listeners = append(listeners, listener4)
 
-		// IPv6 listener.
-		listener6, err := net.Listen("tcp6", addr)
-		if err != nil {
-			return nil, err
+		for _, addr := range ipv6ListenAddrs {
+			listener, err := net.Listen("tcp6", addr)
+			if err != nil {
+				log.Warnf("SRVR: Can't listen on %s: %v", addr,
+					err)
+				continue
+			}
+			listeners = append(listeners, listener)
 		}
-		listeners = append(listeners, listener6)
+		if len(listeners) == 0 {
+			return nil, errors.New("SRVR: No valid listen address")
+		}
 	}
 
 	s := server{
