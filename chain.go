@@ -132,7 +132,6 @@ func removeChildNode(children []*blockNode, node *blockNode) []*blockNode {
 			copy(children[i:], children[i+1:])
 			children[len(children)-1] = nil
 			return children[:len(children)-1]
-			i--
 		}
 	}
 	return children
