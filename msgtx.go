@@ -300,7 +300,7 @@ func (msg *MsgTx) Command() string {
 // MaxPayloadLength returns the maximum length the payload can be for the
 // receiver.  This is part of the Message interface implementation.
 func (msg *MsgTx) MaxPayloadLength(pver uint32) uint32 {
-	return maxMessagePayload
+	return MaxBlockPayload
 }
 
 // NewMsgTx returns a new bitcoin tx message that conforms to the Message
