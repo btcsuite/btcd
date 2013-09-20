@@ -400,6 +400,28 @@ func (p *peer) PushGetBlocksMsg(locator btcchain.BlockLocator, stopHash *btcwire
 	return nil
 }
 
+// handleTxMsg is invoked when a peer receives a tx bitcoin message.  It blocks
+// until the bitcoin transaction has been fully processed.  Unlock the block
+// handler this does not serialize all transactions through a single thread
+// transactions don't rely on the previous one in a linear fashion like blocks.
+func (p *peer) handleTxMsg(msg *btcwire.MsgTx) {
+	// Add the transaction to the known inventory for the peer.
+	hash, err := msg.TxSha()
+	if err != nil {
+		log.Errorf("Unable to get transaction hash: %v", err)
+		return
+	}
+	iv := btcwire.NewInvVect(btcwire.InvVect_Tx, &hash)
+	p.addKnownInventory(iv)
+
+	// Process the transaction.
+	err = p.server.txMemPool.ProcessTransaction(msg)
+	if err != nil {
+		log.Errorf("Failed to process transaction %v: %v", hash, err)
+		return
+	}
+}
+
 // handleBlockMsg is invoked when a peer receives a block bitcoin message.  It
 // blocks until the bitcoin block has been fully processed.
 func (p *peer) handleBlockMsg(msg *btcwire.MsgBlock, buf []byte) {
@@ -836,7 +858,7 @@ out:
 			// regression test mode and the error is one of the
 			// allowed errors.
 			if cfg.RegressionTest && p.isAllowedByRegression(err) {
-				log.Errorf("[PEER] Allowed regression test"+
+				log.Errorf("[PEER] Allowed regression test "+
 					"error: %v", err)
 				continue
 			}
@@ -882,6 +904,9 @@ out:
 		case *btcwire.MsgAlert:
 			p.server.BroadcastMessage(msg, p)
 
+		case *btcwire.MsgTx:
+			p.handleTxMsg(msg)
+
 		case *btcwire.MsgBlock:
 			p.handleBlockMsg(msg, buf)
 
@@ -905,7 +930,7 @@ out:
 		}
 
 		// Mark the address as currently connected and working as of
-		// now if one of the messages that trigger
+		// now if one of the messages that trigger it was processed.
 		if markConnected && atomic.LoadInt32(&p.disconnect) == 0 {
 			if p.na == nil {
 				log.Warnf("we're getting stuff before we " +

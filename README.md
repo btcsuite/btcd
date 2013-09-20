@@ -10,9 +10,6 @@ yet.
 
 The following is a list of major items remaining before production release:
 
-- Implement multi-peer support
-- Implement transaction mempool & relay
-- Complete address manager
 - Documentation
 - A lot of code cleanup
 - Optimize

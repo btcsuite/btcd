@@ -326,20 +326,25 @@ func (b *blockManager) handleInvMsg(imsg *invMsg) {
 	// request parent blocks of orphans if we receive one we already have.
 	// Finally, attempt to detect potential stalls due to long side chains
 	// we already have and request more blocks to prevent them.
+	chain := b.blockChain
 	for i, iv := range invVects {
-		switch iv.Type {
-		case btcwire.InvVect_Block:
-			// Add the inventory to the cache of known inventory
-			// for the peer.
-			imsg.peer.addKnownInventory(iv)
+		// Ignore unsupported inventory types.
+		if iv.Type != btcwire.InvVect_Block && iv.Type != btcwire.InvVect_Tx {
+			continue
+		}
 
-			// Request the inventory if we don't already have it.
-			if !b.blockChain.HaveInventory(iv) {
-				// Add it to the request queue.
-				imsg.peer.requestQueue.PushBack(iv)
-				continue
-			}
+		// Add the inventory to the cache of known inventory
+		// for the peer.
+		imsg.peer.addKnownInventory(iv)
 
+		// Request the inventory if we don't already have it.
+		if !chain.HaveInventory(iv) {
+			// Add it to the request queue.
+			imsg.peer.requestQueue.PushBack(iv)
+			continue
+		}
+
+		if iv.Type == btcwire.InvVect_Block {
 			// The block is an orphan block that we already have.
 			// When the existing orphan was processed, it requested
 			// the missing parent blocks.  When this scenario
@@ -350,13 +355,12 @@ func (b *blockManager) handleInvMsg(imsg *invMsg) {
 			// resending the orphan block as an available block
 			// to signal there are more missing blocks that need to
 			// be requested.
-			if b.blockChain.IsKnownOrphan(&iv.Hash) {
+			if chain.IsKnownOrphan(&iv.Hash) {
 				// Request blocks starting at the latest known
 				// up to the root of the orphan that just came
 				// in.
-				orphanRoot := b.blockChain.GetOrphanRoot(
-					&iv.Hash)
-				locator, err := b.blockChain.LatestBlockLocator()
+				orphanRoot := chain.GetOrphanRoot(&iv.Hash)
+				locator, err := chain.LatestBlockLocator()
 				if err != nil {
 					log.Errorf("[PEER] Failed to get block "+
 						"locator for the latest block: "+
@@ -375,14 +379,9 @@ func (b *blockManager) handleInvMsg(imsg *invMsg) {
 				// Request blocks after this one up to the
 				// final one the remote peer knows about (zero
 				// stop hash).
-				locator := b.blockChain.BlockLocatorFromHash(
-					&iv.Hash)
+				locator := chain.BlockLocatorFromHash(&iv.Hash)
 				imsg.peer.PushGetBlocksMsg(locator, &zeroHash)
 			}
-
-		// Ignore unsupported inventory types.
-		default:
-			continue
 		}
 	}
 
@@ -390,7 +389,8 @@ func (b *blockManager) handleInvMsg(imsg *invMsg) {
 	// the request will be requested on the next inv message.
 	numRequested := 0
 	gdmsg := btcwire.NewMsgGetData()
-	for e := imsg.peer.requestQueue.Front(); e != nil; e = imsg.peer.requestQueue.Front() {
+	requestQueue := imsg.peer.requestQueue
+	for e := requestQueue.Front(); e != nil; e = requestQueue.Front() {
 		iv := e.Value.(*btcwire.InvVect)
 		imsg.peer.requestQueue.Remove(e)
 		// check that no one else has asked for this. if so we don't
@@ -487,7 +487,7 @@ func (b *blockManager) handleNotifyMsg(notification *btcchain.Notification) {
 
 		block, ok := notification.Data.(*btcutil.Block)
 		if !ok {
-			log.Warnf("[BMGR] Chain notification type not a block.")
+			log.Warnf("[BMGR] Chain accepted notification is not a block.")
 			break
 		}
 
@@ -498,6 +498,40 @@ func (b *blockManager) handleNotifyMsg(notification *btcchain.Notification) {
 		// Generate the inventory vector and relay it.
 		iv := btcwire.NewInvVect(btcwire.InvVect_Block, hash)
 		b.server.RelayInventory(iv)
+
+	// A block has been connected to the main block chain.
+	case btcchain.NTBlockConnected:
+		block, ok := notification.Data.(*btcutil.Block)
+		if !ok {
+			log.Warnf("[BMGR] Chain connected notification is not a block.")
+			break
+		}
+
+		// Remove all of the transactions (except the coinbase) in the
+		// connected block from the transaction pool.
+		for _, tx := range block.MsgBlock().Transactions[1:] {
+			b.server.txMemPool.removeTransaction(tx)
+		}
+
+	// A block has been disconnected from the main block chain.
+	case btcchain.NTBlockDisconnected:
+		block, ok := notification.Data.(*btcutil.Block)
+		if !ok {
+			log.Warnf("[BMGR] Chain disconnected notification is not a block.")
+			break
+		}
+
+		// Reinsert all of the transactions (except the coinbase) into
+		// the transaction pool.
+		for _, tx := range block.MsgBlock().Transactions[1:] {
+			err := b.server.txMemPool.ProcessTransaction(tx)
+			if err != nil {
+				// Remove the transaction and all transactions
+				// that depend on it if it wasn't accepted into
+				// the transaction pool.
+				b.server.txMemPool.removeTransaction(tx)
+			}
+		}
 	}
 }
 

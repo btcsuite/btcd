@@ -45,6 +45,7 @@ type server struct {
 	addrManager   *AddrManager
 	rpcServer     *rpcServer
 	blockManager  *blockManager
+	txMemPool     *txMemPool
 	newPeers      chan *peer
 	donePeers     chan *peer
 	banPeers      chan *peer
@@ -117,7 +118,6 @@ func (s *server) handleAddPeerMsg(peers *list.List, banned map[string]time.Time,
 func (s *server) handleDonePeerMsg(peers *list.List, p *peer) bool {
 	for e := peers.Front(); e != nil; e = e.Next() {
 		if e.Value == p {
-
 			// Issue an asynchronous reconnect if the peer was a
 			// persistent outbound connection.
 			if !p.inbound && p.persistent &&
@@ -589,6 +589,7 @@ func newServer(addr string, db btcdb.Db, btcnet btcwire.BitcoinNet) (*server, er
 		return nil, err
 	}
 	s.blockManager = bm
+	s.txMemPool = newTxMemPool(&s)
 
 	if !cfg.DisableRPC {
 		s.rpcServer, err = newRPCServer(&s)
