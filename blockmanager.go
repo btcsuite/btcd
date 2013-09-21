@@ -327,7 +327,7 @@ out:
 	for !b.shutdown {
 		select {
 		case notification := <-b.chainNotify:
-			b.handleNotifyMsg(notification)
+			go b.handleNotifyMsg(notification)
 
 		case <-b.quit:
 			break out
