@@ -959,6 +959,38 @@ func (b *BlockChain) connectBestChain(node *blockNode, block *btcutil.Block) err
 	return nil
 }
 
+// IsCurrent returns whether or not the chain believes it is current.  Several
+// factors are used to guess, but the key factors that allow the chain to
+// believe it is current are:
+//  - Latest block height is after the latest checkpoint (if enabled)
+//  - Latest block has a timestamp newer than 24 hours ago
+//
+// This function is NOT safe for concurrent access.
+func (b *BlockChain) IsCurrent() bool {
+	// Not current if there isn't a main (best) chain yet.
+	if b.bestChain == nil {
+		return false
+	}
+
+	// Not current if the latest main (best) chain height is before the
+	// latest known good checkpoint (when checkpoints are enabled).
+	checkpoint := b.LatestCheckpoint()
+	if checkpoint != nil && b.bestChain.height < checkpoint.Height {
+		return false
+	}
+
+	// Not current if the latest best block has a timestamp before 24 hours
+	// ago.
+	now := time.Now()
+	if b.bestChain.timestamp.Before(now.Add(-24 * time.Hour)) {
+		return false
+	}
+
+	// The chain appears to be current if the above checks did not report
+	// otherwise.
+	return true
+}
+
 // New returns a BlockChain instance for the passed bitcoin network using the
 // provided backing database.  It accepts a callback on which notifications
 // will be sent when various events take place.  See the documentation for
