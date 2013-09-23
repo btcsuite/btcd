@@ -105,7 +105,7 @@ func (db *LevelDb) FetchTxAllBySha(txsha *btcwire.ShaHash) (rtx *btcwire.MsgTx, 
 
 	tx, txbuf, pver, blksha, _, _, err := db.fetchTxDataBySha(txsha)
 
-	return tx, txbuf, pver, blksha, nil
+	return tx, txbuf, pver, blksha, err
 }
 
 // FetchTxBySha returns some data for the given Tx Sha.
