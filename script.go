@@ -274,7 +274,7 @@ func parseScript(script []byte) ([]parsedOpcode, error) {
 // template list for testing purposes. On error we return the list of parsed
 // opcodes so far.
 func parseScriptTemplate(script []byte, opcodemap map[byte]*opcode) ([]parsedOpcode, error) {
-	retScript := []parsedOpcode{}
+	retScript := make([]parsedOpcode, 0, len(script))
 	for i := 0; i < len(script); {
 		instr := script[i]
 		op, ok := opcodemap[instr]
@@ -329,7 +329,7 @@ func parseScriptTemplate(script []byte, opcodemap map[byte]*opcode) ([]parsedOpc
 // unparseScript reversed the action of parseScript and returns the
 // parsedOpcodes as a list of bytes
 func unparseScript(pops []parsedOpcode) []byte {
-	script := []byte{}
+	script := make([]byte, 0, len(pops))
 	for _, pop := range pops {
 		script = append(script, pop.bytes()...)
 	}
@@ -574,7 +574,7 @@ func (s *Script) subScript() []parsedOpcode {
 // removeOpcode will remove any opcode matching ``opcode'' from the opcode
 // stream in pkscript
 func removeOpcode(pkscript []parsedOpcode, opcode byte) []parsedOpcode {
-	retScript := []parsedOpcode{}
+	retScript := make([]parsedOpcode, 0, len(pkscript))
 	for _, pop := range pkscript {
 		if pop.opcode.value != opcode {
 			retScript = append(retScript, pop)
@@ -586,7 +586,7 @@ func removeOpcode(pkscript []parsedOpcode, opcode byte) []parsedOpcode {
 // removeOpcodeByData will return the pkscript minus any opcodes that would
 // push the data in ``data'' to the stack.
 func removeOpcodeByData(pkscript []parsedOpcode, data []byte) []parsedOpcode {
-	retScript := []parsedOpcode{}
+	retScript := make([]parsedOpcode, 0, len(pkscript))
 	for _, pop := range pkscript {
 		if !bytes.Equal(pop.data, data) {
 			retScript = append(retScript, pop)

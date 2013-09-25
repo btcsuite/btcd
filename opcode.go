@@ -688,7 +688,15 @@ func (pop *parsedOpcode) print(oneline bool) string {
 }
 
 func (pop *parsedOpcode) bytes() []byte {
-	retbytes := []byte{pop.opcode.value}
+	var retbytes []byte
+	if pop.opcode.length > 0 {
+		retbytes = make([]byte, 1, pop.opcode.length)
+	} else {
+		retbytes = make([]byte, 1, 1 + len(pop.data) -
+			pop.opcode.length)
+	}
+
+	retbytes[0] = pop.opcode.value
 	if pop.opcode.length == 1 {
 		return retbytes
 	}
@@ -708,11 +716,7 @@ func (pop *parsedOpcode) bytes() []byte {
 		}
 	}
 
-	for i := range pop.data {
-		retbytes = append(retbytes, pop.data[i])
-	}
-
-	return retbytes
+	return append(retbytes, pop.data...)
 }
 
 // opcode implementation functions from here
