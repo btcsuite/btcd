@@ -16,13 +16,16 @@ import (
 func TestEmptyDB(t *testing.T) {
 
 	dbname := "tstdbempty"
+	dbnamever := dbname + ".ver"
 	_ = os.RemoveAll(dbname)
+	_ = os.RemoveAll(dbnamever)
 	db, err := btcdb.CreateDB("leveldb", dbname)
 	if err != nil {
 		t.Errorf("Failed to open test database %v", err)
 		return
 	}
 	defer os.RemoveAll(dbname)
+	defer os.RemoveAll(dbnamever)
 
 	sha, height, err := db.NewestSha()
 	if !sha.IsEqual(&btcwire.ShaHash{}) {

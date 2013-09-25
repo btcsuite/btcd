@@ -11,5 +11,12 @@ The performance is generally high although it goes down with database
 size.
 
 Many of the block or tx specific functions for btcdb are in this subpackage.
+
+Database version number is stored in a flat file <dbname>.ver
+Currently a single (littlendian) integer in the file. If there is
+additional data to save in the future, the presense of additional
+data can be indicated by changing the version number, then parsing the
+file differently.
+
 */
 package ldb

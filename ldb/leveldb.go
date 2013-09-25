@@ -5,6 +5,7 @@
 package ldb
 
 import (
+	"encoding/binary"
 	"fmt"
 	"github.com/conformal/btcdb"
 	"github.com/conformal/btcutil"
@@ -129,9 +130,13 @@ blocknarrow:
 	return db, nil
 }
 
+var CurrentDBVersion int32 = 1
+
 func openDB(dbpath string, flag opt.OptionsFlag) (pbdb btcdb.Db, err error) {
 	var db LevelDb
 	var tlDb *leveldb.DB
+	var dbversion int32
+
 	defer func() {
 		if err == nil {
 			db.lDb = tlDb
@@ -156,12 +161,58 @@ func openDB(dbpath string, flag opt.OptionsFlag) (pbdb btcdb.Db, err error) {
 		}
 	}
 
-	tlDb, err = leveldb.OpenFile(dbpath, &opt.Options{Flag: flag,
+	needVersionFile := false
+	verfile := dbpath + ".ver"
+	fi, ferr := os.Open(verfile)
+	if ferr == nil {
+		defer fi.Close()
+
+		ferr = binary.Read(fi, binary.LittleEndian, &dbversion)
+		if ferr != nil {
+			dbversion = ^0
+		}
+	} else {
+		if flag&opt.OFCreateIfMissing != 0 {
+			needVersionFile = true
+		}
+	}
+
+	opts := &opt.Options{Flag: flag,
 		BlockCache:      cache.EmptyCache{},
 		MaxOpenFiles:    256,
-		CompressionType: opt.NoCompression})
+		CompressionType: opt.NoCompression,
+	}
+
+	switch dbversion {
+	case 0:
+		opts = &opt.Options{Flag: flag}
+	case 1:
+		// uses defaults from above
+	default:
+		err = fmt.Errorf("unsupported db version %v", dbversion)
+		return
+	}
+
+	tlDb, err = leveldb.OpenFile(dbpath, opts)
 	if err != nil {
 		return
+	}
+
+	// If we opened the database successfully on 'create'
+	// update the
+	if needVersionFile {
+		fo, ferr := os.Create(verfile)
+		if ferr != nil {
+			// TODO(design) close and delete database?
+			err = ferr
+			return
+		}
+		defer fo.Close()
+		dbversion = CurrentDBVersion
+		err = binary.Write(fo, binary.LittleEndian, dbversion)
+		if err != nil {
+			return
+		}
 	}
 
 	return

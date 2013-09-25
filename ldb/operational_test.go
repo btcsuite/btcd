@@ -42,13 +42,16 @@ func testOperationalMode(t *testing.T, mode int) {
 
 	// Ignore db remove errors since it means we didn't have an old one.
 	dbname := fmt.Sprintf("tstdbop1.%d", mode)
+	dbnamever := dbname + ".ver"
 	_ = os.RemoveAll(dbname)
+	_ = os.RemoveAll(dbnamever)
 	db, err := btcdb.CreateDB("leveldb", dbname)
 	if err != nil {
 		t.Errorf("Failed to open test database %v", err)
 		return
 	}
 	defer os.RemoveAll(dbname)
+	defer os.RemoveAll(dbnamever)
 	defer db.Close()
 
 	switch mode {
@@ -177,13 +180,16 @@ func testBackout(t *testing.T, mode int) {
 	t.Logf("mode %v", mode)
 	// Ignore db remove errors since it means we didn't have an old one.
 	dbname := fmt.Sprintf("tstdbop2.%d", mode)
+	dbnamever := dbname + ".ver"
 	_ = os.RemoveAll(dbname)
+	_ = os.RemoveAll(dbnamever)
 	db, err := btcdb.CreateDB("leveldb", dbname)
 	if err != nil {
 		t.Errorf("Failed to open test database %v", err)
 		return
 	}
 	defer os.RemoveAll(dbname)
+	defer os.RemoveAll(dbnamever)
 	defer db.Close()
 
 	switch mode {
