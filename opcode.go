@@ -653,7 +653,8 @@ func (pop *parsedOpcode) conditional() bool {
 func (pop *parsedOpcode) exec(s *Script) error {
 	// *sigh* bitcoind pretty much mandates that we violate layering here.
 	// Any opcode that isn't just adding data to the stack counts here
-	// as an operation.
+	// as an operation. Note that OP_RESERVED is less than OP_16 and thus
+	// is counted as a push opcode here.
 	if pop.opcode.value > OP_16 {
 		s.numOps++
 		if s.numOps > MaxOpsPerScript {
