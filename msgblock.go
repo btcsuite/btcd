@@ -9,6 +9,13 @@ import (
 	"io"
 )
 
+// defaultTransactionAlloc is the default size used for the backing array
+// for transactions.  The transaction array will dynamically grow as needed, but
+// this figure is intended to provide enough space for the number of
+// transactions in the vast majority of blocks without needing to grow the
+// backing array multiple times.
+const defaultTransactionAlloc = 2048
+
 // MaxBlocksPerMsg is the maximum number of blocks allowed per message.
 const MaxBlocksPerMsg = 500
 
@@ -51,7 +58,7 @@ func (msg *MsgBlock) AddTransaction(tx *MsgTx) error {
 // ClearTransactions removes all transactions from the message and updates
 // Header.TxnCount accordingly.
 func (msg *MsgBlock) ClearTransactions() {
-	msg.Transactions = []*MsgTx{}
+	msg.Transactions = make([]*MsgTx, 0, defaultTransactionAlloc)
 	msg.Header.TxnCount = 0
 }
 
@@ -65,6 +72,7 @@ func (msg *MsgBlock) BtcDecode(r io.Reader, pver uint32) error {
 		return err
 	}
 
+	msg.Transactions = make([]*MsgTx, 0, msg.Header.TxnCount)
 	for i := uint64(0); i < msg.Header.TxnCount; i++ {
 		tx := MsgTx{}
 		err := tx.BtcDecode(r, pver)
@@ -110,6 +118,7 @@ func (msg *MsgBlock) DeserializeTxLoc(r *bytes.Buffer) ([]TxLoc, error) {
 	// Deserialize each transaction while keeping track of its location
 	// within the byte stream.
 	txCount := msg.Header.TxnCount
+	msg.Transactions = make([]*MsgTx, 0, txCount)
 	txLocs := make([]TxLoc, txCount)
 	for i := uint64(0); i < txCount; i++ {
 		txLocs[i].TxStart = fullLen - r.Len()
@@ -184,7 +193,7 @@ func (msg *MsgBlock) BlockSha() (ShaHash, error) {
 
 // TxShas returns a slice of hashes of all of transactions in this block.
 func (msg *MsgBlock) TxShas() ([]ShaHash, error) {
-	var shaList []ShaHash
+	shaList := make([]ShaHash, 0, len(msg.Transactions))
 	for _, tx := range msg.Transactions {
 		// Ignore error here since TxSha can't fail in the current
 		// implementation except due to run-time panics.
@@ -198,6 +207,7 @@ func (msg *MsgBlock) TxShas() ([]ShaHash, error) {
 // Message interface.  See MsgBlock for details.
 func NewMsgBlock(blockHeader *BlockHeader) *MsgBlock {
 	return &MsgBlock{
-		Header: *blockHeader,
+		Header:       *blockHeader,
+		Transactions: make([]*MsgTx, 0, defaultTransactionAlloc),
 	}
 }

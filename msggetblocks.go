@@ -65,6 +65,7 @@ func (msg *MsgGetBlocks) BtcDecode(r io.Reader, pver uint32) error {
 		return messageError("MsgGetBlocks.BtcDecode", str)
 	}
 
+	msg.BlockLocatorHashes = make([]*ShaHash, 0, count)
 	for i := uint64(0); i < count; i++ {
 		sha := ShaHash{}
 		err := readElement(r, &sha)
@@ -136,7 +137,8 @@ func (msg *MsgGetBlocks) MaxPayloadLength(pver uint32) uint32 {
 // fields.
 func NewMsgGetBlocks(hashStop *ShaHash) *MsgGetBlocks {
 	return &MsgGetBlocks{
-		ProtocolVersion: ProtocolVersion,
-		HashStop:        *hashStop,
+		ProtocolVersion:    ProtocolVersion,
+		BlockLocatorHashes: make([]*ShaHash, 0, MaxBlockLocatorsPerMsg),
+		HashStop:           *hashStop,
 	}
 }

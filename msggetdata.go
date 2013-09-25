@@ -49,6 +49,7 @@ func (msg *MsgGetData) BtcDecode(r io.Reader, pver uint32) error {
 		return messageError("MsgGetData.BtcDecode", str)
 	}
 
+	msg.InvList = make([]*InvVect, 0, count)
 	for i := uint64(0); i < count; i++ {
 		iv := InvVect{}
 		err := readInvVect(r, pver, &iv)
@@ -102,5 +103,7 @@ func (msg *MsgGetData) MaxPayloadLength(pver uint32) uint32 {
 // NewMsgGetData returns a new bitcoin getdata message that conforms to the
 // Message interface.  See MsgGetData for details.
 func NewMsgGetData() *MsgGetData {
-	return &MsgGetData{}
+	return &MsgGetData{
+		InvList: make([]*InvVect, 0, defaultInvListAlloc),
+	}
 }

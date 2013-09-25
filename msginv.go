@@ -9,6 +9,15 @@ import (
 	"io"
 )
 
+// defaultInvListAlloc is the default size used for the backing array for an
+// inventory list.  The array will dynamically grow as needed, but this
+// figure is intended to provide enough space for the max number of inventory
+// vectors in a *typical* inventory message without needing to grow the backing
+// array multiple times.  Technically, the list can grow to MaxInvPerMsg, but
+// rather than using that large figure, this figure more accurately reflects the
+// typical case.
+const defaultInvListAlloc = 1000
+
 // MsgInv implements the Message interface and represents a bitcoin inv message.
 // It is used to advertise a peer's known data such as blocks and transactions
 // through inventory vectors.  It may be sent unsolicited to inform other peers
@@ -48,6 +57,7 @@ func (msg *MsgInv) BtcDecode(r io.Reader, pver uint32) error {
 		return messageError("MsgInv.BtcDecode", str)
 	}
 
+	msg.InvList = make([]*InvVect, 0, count)
 	for i := uint64(0); i < count; i++ {
 		iv := InvVect{}
 		err := readInvVect(r, pver, &iv)
@@ -101,5 +111,7 @@ func (msg *MsgInv) MaxPayloadLength(pver uint32) uint32 {
 // NewMsgInv returns a new bitcoin inv message that conforms to the Message
 // interface.  See MsgInv for details.
 func NewMsgInv() *MsgInv {
-	return &MsgInv{}
+	return &MsgInv{
+		InvList: make([]*InvVect, 0, defaultInvListAlloc),
+	}
 }

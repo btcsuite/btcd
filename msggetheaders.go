@@ -62,6 +62,7 @@ func (msg *MsgGetHeaders) BtcDecode(r io.Reader, pver uint32) error {
 		return messageError("MsgGetHeaders.BtcDecode", str)
 	}
 
+	msg.BlockLocatorHashes = make([]*ShaHash, 0, count)
 	for i := uint64(0); i < count; i++ {
 		sha := ShaHash{}
 		err := readElement(r, &sha)
@@ -132,5 +133,7 @@ func (msg *MsgGetHeaders) MaxPayloadLength(pver uint32) uint32 {
 // NewMsgGetHeaders returns a new bitcoin getheaders message that conforms to
 // the Message interface.  See MsgGetHeaders for details.
 func NewMsgGetHeaders() *MsgGetHeaders {
-	return &MsgGetHeaders{}
+	return &MsgGetHeaders{
+		BlockLocatorHashes: make([]*ShaHash, 0, MaxBlockLocatorsPerMsg),
+	}
 }

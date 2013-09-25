@@ -46,6 +46,7 @@ func (msg *MsgNotFound) BtcDecode(r io.Reader, pver uint32) error {
 		return messageError("MsgNotFound.BtcDecode", str)
 	}
 
+	msg.InvList = make([]*InvVect, 0, count)
 	for i := uint64(0); i < count; i++ {
 		iv := InvVect{}
 		err := readInvVect(r, pver, &iv)
@@ -100,5 +101,7 @@ func (msg *MsgNotFound) MaxPayloadLength(pver uint32) uint32 {
 // NewMsgNotFound returns a new bitcoin notfound message that conforms to the
 // Message interface.  See MsgNotFound for details.
 func NewMsgNotFound() *MsgNotFound {
-	return &MsgNotFound{}
+	return &MsgNotFound{
+		InvList: make([]*InvVect, 0, defaultInvListAlloc),
+	}
 }

@@ -9,6 +9,13 @@ import (
 	"io"
 )
 
+// defaultTxInOutAlloc is the default size used for the backing array for
+// transaction inputs and outputs.  The array will dynamically grow as needed,
+// but this figure is intended to provide enough space for the number of
+// inputs and outputs in a typical transaction without needing to grow the
+// backing array multiple times.
+const defaultTxInOutAlloc = 15
+
 // TxVersion is the current latest supported transaction version.
 const TxVersion = 1
 
@@ -110,9 +117,12 @@ func (tx *MsgTx) TxSha() (ShaHash, error) {
 // Copy creates a deep copy of a transaction so that the original does not get
 // modified when the copy is manipulated.
 func (tx *MsgTx) Copy() *MsgTx {
-	// Create new tx and start by copying primitive values.
+	// Create new tx and start by copying primitive values and making space
+	// for the transaction inputs and outputs.
 	newTx := MsgTx{
 		Version:  tx.Version,
+		TxIn:     make([]*TxIn, 0, len(tx.TxIn)),
+		TxOut:    make([]*TxOut, 0, len(tx.TxOut)),
 		LockTime: tx.LockTime,
 	}
 
@@ -181,6 +191,7 @@ func (msg *MsgTx) BtcDecode(r io.Reader, pver uint32) error {
 		return err
 	}
 
+	msg.TxIn = make([]*TxIn, 0, count)
 	for i := uint64(0); i < count; i++ {
 		ti := TxIn{}
 		err = readTxIn(r, pver, msg.Version, &ti)
@@ -195,6 +206,7 @@ func (msg *MsgTx) BtcDecode(r io.Reader, pver uint32) error {
 		return err
 	}
 
+	msg.TxOut = make([]*TxOut, 0, count)
 	for i := uint64(0); i < count; i++ {
 		to := TxOut{}
 		err = readTxOut(r, pver, msg.Version, &to)
@@ -309,7 +321,11 @@ func (msg *MsgTx) MaxPayloadLength(pver uint32) uint32 {
 // to indicate the transaction is valid immediately as opposed to some time in
 // future.
 func NewMsgTx() *MsgTx {
-	return &MsgTx{Version: TxVersion}
+	return &MsgTx{
+		Version: TxVersion,
+		TxIn:    make([]*TxIn, 0, defaultTxInOutAlloc),
+		TxOut:   make([]*TxOut, 0, defaultTxInOutAlloc),
+	}
 }
 
 // readOutPoint reads the next sequence of bytes from r as an OutPoint.
