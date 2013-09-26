@@ -108,6 +108,7 @@ type peer struct {
 	knownInventory     *MruInventoryMap
 	knownInvMutex      sync.Mutex
 	lastBlock          int32
+	retrycount         int64
 	prevGetBlocksBegin *btcwire.ShaHash
 	prevGetBlocksStop  *btcwire.ShaHash
 	prevGetBlockMutex  sync.Mutex
@@ -1208,6 +1209,8 @@ func newOutboundPeer(s *server, addr string, persistent bool) *peer {
 			log.Debugf("[SRVR] Attempting to connect to %s", faddr)
 			conn, err := dial("tcp", addr)
 			if err != nil {
+				baseRetryInterval := time.Second * 10
+				p.retrycount += 1
 				log.Errorf("[SRVR] Failed to connect to %s: %v",
 					faddr, err)
 				if !persistent {
@@ -1215,9 +1218,11 @@ func newOutboundPeer(s *server, addr string, persistent bool) *peer {
 					p.wg.Done()
 					return
 				}
+				scaledRetryInterval := baseRetryInterval.Nanoseconds() * p.retrycount / 2
+				scaledRetrySeconds := time.Duration(scaledRetryInterval)
 				log.Infof("[SRVR] Retrying connection to %s "+
-					"in %s", faddr, connectionRetryInterval)
-				time.Sleep(connectionRetryInterval)
+					"in %v", faddr, scaledRetrySeconds)
+				time.Sleep(scaledRetrySeconds)
 				continue
 			}
 
