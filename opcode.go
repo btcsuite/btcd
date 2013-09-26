@@ -840,7 +840,9 @@ func opcodeEndif(op *parsedOpcode, s *Script) error {
 		return StackErrNoIf
 	}
 
-	s.condStack = s.condStack[1:]
+	stk := make([]int, len(s.condStack) -1, len(s.condStack) -1)
+	copy(stk, s.condStack[1:])
+	s.condStack = stk
 	return nil
 }
 
