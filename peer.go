@@ -1234,6 +1234,7 @@ func newOutboundPeer(s *server, addr string, persistent bool) *peer {
 				// Connection was successful so log it and start peer.
 				log.Infof("[SRVR] Connected to %s", conn.RemoteAddr())
 				p.conn = conn
+				p.retrycount = 0
 				p.Start()
 			} else {
 				p.server.donePeers <- p
