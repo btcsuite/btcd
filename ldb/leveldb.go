@@ -177,8 +177,9 @@ func openDB(dbpath string, flag opt.OptionsFlag) (pbdb btcdb.Db, err error) {
 		}
 	}
 
+	myCache := cache.NewEmptyCache()
 	opts := &opt.Options{Flag: flag,
-		BlockCache:      cache.EmptyCache{},
+		BlockCache:      myCache,
 		MaxOpenFiles:    256,
 		CompressionType: opt.NoCompression,
 	}
