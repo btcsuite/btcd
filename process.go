@@ -38,10 +38,15 @@ func (b *BlockChain) blockExists(hash *btcwire.ShaHash) bool {
 // It repeats the process for the newly accepted blocks (to detect further
 // orphans which may no longer be orphans) until there are no more.
 func (b *BlockChain) processOrphans(hash *btcwire.ShaHash) error {
-	processHashes := []*btcwire.ShaHash{hash}
+	// Start with processing at least the passed hash.  Leave a little room
+	// for additional orphan blocks that need to be processed without
+	// needing to grow the array in the common case.
+	processHashes := make([]*btcwire.ShaHash, 0, 10)
+	processHashes = append(processHashes, hash)
 	for len(processHashes) > 0 {
 		// Pop the first hash to process from the slice.
 		processHash := processHashes[0]
+		processHashes[0] = nil // Prevent GC leak.
 		processHashes = processHashes[1:]
 
 		// Look up all orphans that are parented by the block we just

@@ -215,10 +215,20 @@ func (b *BlockChain) fetchInputTransactions(node *blockNode, block *btcutil.Bloc
 		txInFlight[*txHash] = i
 	}
 
+	// Make a reasonable guess for the maximum number of needed input
+	// transactions to use as the starting point for the needed transactions
+	// array.  The array will dynamically grow as needed, but it's much less
+	// overhead to avoid growing and copying the array multiple times in the
+	// common case.  Each block usually has no more than ten inputs per
+	// transaction, so use that as a reasonable starting point.  A block
+	// with 2,000 transactions would only result in around 156KB on a 64-bit
+	// system using this approach.
+	maxNeededHint := (len(transactions) - 1) * 10
+	txNeededList := make([]*btcwire.ShaHash, 0, maxNeededHint)
+
 	// Loop through all of the transaction inputs (except for the coinbase
 	// which has no inputs) collecting them into lists of what is needed and
 	// what is already known (in-flight).
-	var txNeededList []*btcwire.ShaHash
 	txStore := make(map[btcwire.ShaHash]*txData)
 	for i, tx := range transactions[1:] {
 		for _, txIn := range tx.TxIn {

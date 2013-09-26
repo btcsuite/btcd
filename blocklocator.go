@@ -29,7 +29,8 @@ type BlockLocator []*btcwire.ShaHash
 //    consist of the passed hash
 func (b *BlockChain) BlockLocatorFromHash(hash *btcwire.ShaHash) BlockLocator {
 	// The locator contains the requested hash at the very least.
-	locator := BlockLocator([]*btcwire.ShaHash{hash})
+	locator := make(BlockLocator, 0, btcwire.MaxBlockLocatorsPerMsg)
+	locator = append(locator, hash)
 
 	// Nothing more to do if a locator for the genesis hash was requested.
 	if hash.IsEqual(b.chainParams().GenesisHash) {
