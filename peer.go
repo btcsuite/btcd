@@ -1209,7 +1209,6 @@ func newOutboundPeer(s *server, addr string, persistent bool) *peer {
 			log.Debugf("[SRVR] Attempting to connect to %s", faddr)
 			conn, err := dial("tcp", addr)
 			if err != nil {
-				baseRetryInterval := time.Second * 10
 				p.retrycount += 1
 				log.Errorf("[SRVR] Failed to connect to %s: %v",
 					faddr, err)
@@ -1218,11 +1217,11 @@ func newOutboundPeer(s *server, addr string, persistent bool) *peer {
 					p.wg.Done()
 					return
 				}
-				scaledRetryInterval := baseRetryInterval.Nanoseconds() * p.retrycount / 2
-				scaledRetrySeconds := time.Duration(scaledRetryInterval)
+				scaledInterval := connectionRetryInterval.Nanoseconds() * p.retrycount / 2
+				scaledDuration := time.Duration(scaledInterval)
 				log.Infof("[SRVR] Retrying connection to %s "+
-					"in %v", faddr, scaledRetrySeconds)
-				time.Sleep(scaledRetrySeconds)
+					"in %s", faddr, scaledDuration)
+				time.Sleep(scaledDuration)
 				continue
 			}
 
