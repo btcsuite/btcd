@@ -345,7 +345,7 @@ func (p *peer) pushBlockMsg(sha btcwire.ShaHash) error {
 
 // pushGetBlocksMsg sends a getblocks message for the provided block locator
 // and stop hash.  It will ignore back-to-back duplicate requests.
-func (p *peer) pushGetBlocksMsg(locator btcchain.BlockLocator, stopHash *btcwire.ShaHash) error {
+func (p *peer) PushGetBlocksMsg(locator btcchain.BlockLocator, stopHash *btcwire.ShaHash) error {
 	p.prevGetBlockMutex.Lock()
 	defer p.prevGetBlockMutex.Unlock()
 
@@ -418,102 +418,10 @@ func (p *peer) handleBlockMsg(msg *btcwire.MsgBlock, buf []byte) {
 
 // handleInvMsg is invoked when a peer receives an inv bitcoin message and is
 // used to examine the inventory being advertised by the remote peer and react
-// accordingly.
-//
-// NOTE: This will need to have tx handling added as well when they are
-// supported.
+// accordingly. We pass the message down to blockmanager which will call
+// PushMessage with any appropraite responses.
 func (p *peer) handleInvMsg(msg *btcwire.MsgInv) {
-	// Attempt to find the final block in the inventory list.  There may
-	// not be one.
-	lastBlock := -1
-	invVects := msg.InvList
-	for i := len(invVects) - 1; i >= 0; i-- {
-		if invVects[i].Type == btcwire.InvVect_Block {
-			lastBlock = i
-			break
-		}
-	}
-
-	// Request the advertised inventory if we don't already have it.  Also,
-	// request parent blocks of orphans if we receive one we already have.
-	// Finally, attempt to detect potential stalls due to long side chains
-	// we already have and request more blocks to prevent them.
-	chain := p.server.blockManager.blockChain
-	for i, iv := range invVects {
-		switch iv.Type {
-		case btcwire.InvVect_Block:
-			// Add the inventory to the cache of known inventory
-			// for the peer.
-			p.addKnownInventory(iv)
-
-			// Request the inventory if we don't already have it.
-			if !chain.HaveInventory(iv) {
-				// Add it to the request queue.
-				p.requestQueue.PushBack(iv)
-				continue
-			}
-
-			// The block is an orphan block that we already have.
-			// When the existing orphan was processed, it requested
-			// the missing parent blocks.  When this scenario
-			// happens, it means there were more blocks missing
-			// than are allowed into a single inventory message.  As
-			// a result, once this peer requested the final
-			// advertised block, the remote peer noticed and is now
-			// resending the orphan block as an available block
-			// to signal there are more missing blocks that need to
-			// be requested.
-			if chain.IsKnownOrphan(&iv.Hash) {
-				// Request blocks starting at the latest known
-				// up to the root of the orphan that just came
-				// in.
-				orphanRoot := chain.GetOrphanRoot(&iv.Hash)
-				locator, err := chain.LatestBlockLocator()
-				if err != nil {
-					log.Errorf("[PEER] Failed to get block "+
-						"locator for the latest block: "+
-						"%v", err)
-					continue
-				}
-				p.pushGetBlocksMsg(locator, orphanRoot)
-				continue
-			}
-
-			// We already have the final block advertised by this
-			// inventory message, so force a request for more.  This
-			// should only really happen if we're on a really long
-			// side chain.
-			if i == lastBlock {
-				// Request blocks after this one up to the
-				// final one the remote peer knows about (zero
-				// stop hash).
-				locator := chain.BlockLocatorFromHash(&iv.Hash)
-				p.pushGetBlocksMsg(locator, &zeroHash)
-			}
-
-		// Ignore unsupported inventory types.
-		default:
-			continue
-		}
-	}
-
-	// Request as much as possible at once.  Anything that won't fit into
-	// the request will be requested on the next inv message.
-	numRequested := 0
-	gdmsg := btcwire.NewMsgGetData()
-	for e := p.requestQueue.Front(); e != nil; e = p.requestQueue.Front() {
-		iv := e.Value.(*btcwire.InvVect)
-		gdmsg.AddInvVect(iv)
-		p.requestQueue.Remove(e)
-
-		numRequested++
-		if numRequested >= btcwire.MaxInvPerMsg {
-			break
-		}
-	}
-	if len(gdmsg.InvList) > 0 {
-		p.QueueMessage(gdmsg)
-	}
+	p.server.blockManager.QueueInv(msg, p)
 }
 
 // handleGetData is invoked when a peer receives a getdata bitcoin message and
