@@ -236,6 +236,16 @@ func isPushOnly(pops []parsedOpcode) bool {
 	return true
 }
 
+// IsPushOnlyScript returns whether or not the passed script only pushes data.
+// If the script does not parse false will be returned.
+func IsPushOnlyScript(script []byte) bool {
+	pops, err := parseScript(script)
+	if err != nil {
+		return false
+	}
+	return isPushOnly(pops)
+}
+
 // GetScriptClass returns the class of the script passed. If the script does not
 // parse then NonStandardTy will be returned.
 func GetScriptClass(script []byte) ScriptClass {
