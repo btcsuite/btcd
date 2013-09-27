@@ -320,8 +320,8 @@ func (b *blockManager) handleInvMsg(imsg *invMsg) {
 
 			// We already have the final block advertised by this
 			// inventory message, so force a request for more.  This
-			// should only really happen if we're on a really long
-			// side chain.
+			// should only happen if we're on a really long side
+			// chain.
 			if i == lastBlock {
 				// Request blocks after this one up to the
 				// final one the remote peer knows about (zero
@@ -376,6 +376,8 @@ out:
 		case bmsg := <-b.blockQueue:
 			b.handleBlockMsg(bmsg)
 			bmsg.peer.blockProcessed <- true
+
+		// Handle new inventory messages.
 		case imsg := <-b.invQueue:
 			b.handleInvMsg(imsg)
 
@@ -464,7 +466,7 @@ func (b *blockManager) QueueBlock(block *btcutil.Block, p *peer) {
 
 // QueueInv adds the passed inv message and peer to the block handling queue.
 func (b *blockManager) QueueInv(inv *btcwire.MsgInv, p *peer) {
-	// No channel handlign ehre because peers do not need to block on inv
+	// No channel handling here because peers do not need to block on inv
 	// messages.
 	if b.shutdown {
 		return
