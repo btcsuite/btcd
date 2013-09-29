@@ -118,12 +118,11 @@ func (b *blockManager) startSync(peers *list.List) {
 		bestPeer.PushGetBlocksMsg(locator, &zeroHash)
 		b.syncPeer = bestPeer
 	}
-
 }
 
 // handleNewCandidateMsg deals with new peers that have signalled they may
 // be considered as a sync peer (they have already successfully negotiated).  It
-// also start syncing if needed.  It is invoked from the syncHandler goroutine.
+// also starts syncing if needed.  It is invoked from the syncHandler goroutine.
 func (b *blockManager) handleNewCandidateMsg(peers *list.List, p *peer) {
 	// Ignore if in the process of shutting down.
 	if b.shutdown {
@@ -390,13 +389,12 @@ out:
 	log.Trace("[BMGR] Block handler done")
 }
 
-// handleNotifyMsg handles notifications from btcchain.  Currently it doesn't
-// respond to any notifications, but the idea is that it requests missing blocks
-// in response to orphan notifications and updates the wallet for blocks
-// connected to and disconnected from the main chain.
+// handleNotifyMsg handles notifications from btcchain.  It does things such
+// as request orphan block parents and relay accepted blocks to connected peers.
 func (b *blockManager) handleNotifyMsg(notification *btcchain.Notification) {
 	switch notification.Type {
-	// An orphan block has been accepted by the block chain.
+	// An orphan block has been accepted by the block chain.  Request
+	// its parents from the peer that sent it.
 	case btcchain.NTOrphanBlock:
 		b.blockPeerMutex.Lock()
 		defer b.blockPeerMutex.Unlock()
@@ -412,13 +410,13 @@ func (b *blockManager) handleNotifyMsg(notification *btcchain.Notification) {
 			}
 			peer.PushGetBlocksMsg(locator, orphanRoot)
 			delete(b.blockPeer, *orphanRoot)
-			break
 		} else {
 			log.Warnf("Notification for orphan %v with no peer",
 				orphanHash)
 		}
 
-	// A block has been accepted into the block chain.
+	// A block has been accepted into the block chain.  Relay it to other
+	// peers.
 	case btcchain.NTBlockAccepted:
 		block, ok := notification.Data.(*btcutil.Block)
 		if !ok {
