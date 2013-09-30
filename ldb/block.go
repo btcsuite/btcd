@@ -9,8 +9,34 @@ import (
 	"encoding/binary"
 	"fmt"
 	"github.com/conformal/btcdb"
+	"github.com/conformal/btcutil"
 	"github.com/conformal/btcwire"
 )
+
+// FetchBlockBySha - return a btcutil Block
+func (db *LevelDb) FetchBlockBySha(sha *btcwire.ShaHash) (blk *btcutil.Block, err error) {
+	db.dbLock.Lock()
+	defer db.dbLock.Unlock()
+	return db.fetchBlockBySha(sha)
+}
+
+// fetchBlockBySha - return a btcutil Block
+// Must be called with db lock held.
+func (db *LevelDb) fetchBlockBySha(sha *btcwire.ShaHash) (blk *btcutil.Block, err error) {
+
+	buf, height, err := db.fetchSha(sha)
+	if err != nil {
+		return
+	}
+
+	blk, err = btcutil.NewBlockFromBytes(buf)
+	if err != nil {
+		return
+	}
+	blk.SetHeight(height)
+
+	return
+}
 
 func (db *LevelDb) getBlkLoc(sha *btcwire.ShaHash) (int64, error) {
 	var blkHeight int64

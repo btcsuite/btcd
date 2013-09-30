@@ -52,6 +52,7 @@ type LevelDb struct {
 	lastBlkIdx       int64
 
 	txUpdateMap map[btcwire.ShaHash]*txUpdateObj
+	txSpentUpdateMap map[btcwire.ShaHash]*spentTxUpdate
 }
 
 var self = btcdb.DriverDB{DbType: "leveldb", Create: CreateDB, Open: OpenDB}
@@ -136,6 +137,7 @@ func openDB(dbpath string, flag opt.OptionsFlag) (pbdb btcdb.Db, err error) {
 			db.lDb = tlDb
 
 			db.txUpdateMap = map[btcwire.ShaHash]*txUpdateObj{}
+			db.txSpentUpdateMap = make(map[btcwire.ShaHash]*spentTxUpdate)
 
 			pbdb = &db
 		}
@@ -350,30 +352,6 @@ func (db *LevelDb) InsertBlock(block *btcutil.Block) (height int64, rerr error) 
 			log.Warnf("failed to compute tx name block %v idx %v err %v", blocksha, txidx, err)
 			return 0, err
 		}
-		// Some old blocks contain duplicate transactions
-		// Attempt to cleanly bypass this problem
-		// http://blockexplorer.com/b/91842
-		// http://blockexplorer.com/b/91880
-		if newheight == 91842 {
-			dupsha, err := btcwire.NewShaHashFromStr("d5d27987d2a3dfc724e359870c6644b40e497bdc0589a033220fe15429d88599")
-			if err != nil {
-				panic("invalid sha string in source")
-			}
-			if txsha.IsEqual(dupsha) {
-				//log.Tracef("skipping sha %v %v", dupsha, newheight)
-				continue
-			}
-		}
-		if newheight == 91880 {
-			dupsha, err := btcwire.NewShaHashFromStr("e3bf3d07d4b0375638d5f1db5255fe07ba2c4cb067cd81b84ee974b6585fb468")
-			if err != nil {
-				panic("invalid sha string in source")
-			}
-			if txsha.IsEqual(dupsha) {
-				//log.Tracef("skipping sha %v %v", dupsha, newheight)
-				continue
-			}
-		}
 		spentbuflen := (len(tx.TxOut) + 7) / 8
 		spentbuf := make([]byte, spentbuflen, spentbuflen)
 		if len(tx.TxOut)%8 != 0 {
@@ -384,10 +362,53 @@ func (db *LevelDb) InsertBlock(block *btcutil.Block) (height int64, rerr error) 
 
 		err = db.insertTx(txsha, newheight, txloc[txidx].TxStart, txloc[txidx].TxLen, spentbuf)
 		if err != nil {
-			log.Warnf("block %v idx %v failed to insert tx %v %v err %v", blocksha, newheight, txsha, txidx, err)
+			log.Warnf("block %v idx %v failed to insert tx %v %v err %v", blocksha, newheight, &txsha, txidx, err)
 
 			return
 		}
+
+		// Some old blocks contain duplicate transactions
+		// Attempt to cleanly bypass this problem by marking the
+		// first as fully spent.
+		// http://blockexplorer.com/b/91812 dup in 91842
+		// http://blockexplorer.com/b/91722 dup in 91880
+		if newheight == 91812 {
+			dupsha, err := btcwire.NewShaHashFromStr("d5d27987d2a3dfc724e359870c6644b40e497bdc0589a033220fe15429d88599")
+			if err != nil {
+				panic("invalid sha string in source")
+			}
+			if txsha.IsEqual(dupsha) {
+				// marking TxOut[0] as spent
+				po :=  btcwire.NewOutPoint(dupsha, 0)
+				txI := btcwire.NewTxIn(po, []byte("garbage"))
+
+				var spendtx btcwire.MsgTx 
+				spendtx.AddTxIn(txI)
+				err = db.doSpend(&spendtx)
+				if err != nil {
+					log.Warnf("block %v idx %v failed to spend tx %v %v err %v", blocksha, newheight, &txsha, txidx, err)
+				}
+			}
+		}
+		if newheight == 91722 {
+			dupsha, err := btcwire.NewShaHashFromStr("e3bf3d07d4b0375638d5f1db5255fe07ba2c4cb067cd81b84ee974b6585fb468")
+			if err != nil {
+				panic("invalid sha string in source")
+			}
+			if txsha.IsEqual(dupsha) {
+				// marking TxOut[0] as spent
+				po :=  btcwire.NewOutPoint(dupsha, 0)
+				txI := btcwire.NewTxIn(po, []byte("garbage"))
+
+				var spendtx btcwire.MsgTx 
+				spendtx.AddTxIn(txI)
+				err = db.doSpend(&spendtx)
+				if err != nil {
+					log.Warnf("block %v idx %v failed to spend tx %v %v err %v", blocksha, newheight, &txsha, txidx, err)
+				}
+			}
+		}
+
 		err = db.doSpend(tx)
 		if err != nil {
 			log.Warnf("block %v idx %v failed to spend tx %v %v err %v", blocksha, newheight, txsha, txidx, err)
@@ -467,7 +488,38 @@ func (db *LevelDb) setclearSpentData(txsha *btcwire.ShaHash, idx uint32, set boo
 		var txU txUpdateObj
 		blkHeight, txOff, txLen, spentData, err := db.getTxData(txsha)
 		if err != nil {
-			return err
+			// setting a fully spent tx is an error.
+			if set == true {
+				return err
+			}
+			// if we are clearing a tx and it wasn't found
+			// in the tx table, it could be in the fully spent
+			// (duplicates) table.
+			spentTxList, err := db.getTxFullySpent(txsha)
+			if err != nil {
+				return err
+			}
+
+			// need to reslice the list to exclude the most recent.
+			sTx := spentTxList [len(spentTxList) -1]
+			spentTxList [len(spentTxList) -1] = nil
+			if len (spentTxList) == 1 {
+				// write entry to delete tx from spent pool
+				// XXX
+			} else {
+				spentTxList = spentTxList [:len(spentTxList)-1]
+				// XXX format sTxList and set update Table
+			}
+
+			// Create 'new' Tx update data.
+			blkHeight = sTx.blkHeight
+			txOff = sTx.txoff
+			txLen = sTx.txlen 
+			spentbuflen := (sTx.numTxO + 7) / 8
+			spentData = make([]byte, spentbuflen, spentbuflen)
+			for i := range spentData {
+				spentData[i] = ^byte(0)
+			}
 		}
 
 		txU.txSha = txsha
@@ -488,7 +540,51 @@ func (db *LevelDb) setclearSpentData(txsha *btcwire.ShaHash, idx uint32, set boo
 		txUo.spentData[byteidx] &= ^(byte(1) << byteoff)
 	}
 
-	db.txUpdateMap[*txsha] = txUo
+	// check for fully spent Tx
+	fullySpent := true
+	for _, val := range txUo.spentData { 
+		if val != ^byte(0) {
+			fullySpent = false
+			break
+		}
+	}
+	if fullySpent {
+		var txSu *spentTxUpdate
+		// Look up Tx in fully spent table
+		if txSuOld, ok := db.txSpentUpdateMap[*txsha] ; ok {
+			txSu = txSuOld
+		} else {
+			var txSuStore spentTxUpdate
+			txSu = &txSuStore 
+
+			txSuOld, err := db.getTxFullySpent(txsha)
+			if err == nil {
+				txSu.txl = txSuOld
+			}
+		}
+
+		// Fill in spentTx
+		var sTx spentTx
+		sTx.blkHeight = txUo.blkHeight
+		sTx.txoff = txUo.txoff
+		sTx.txlen = txUo.txlen
+		// XXX -- there is no way to comput the real TxOut 
+		// from the spent array. 
+		sTx.numTxO = 8 * len(txUo.spentData)
+
+		// append this txdata to fully spent txlist
+		txSu.txl = append(txSu.txl, &sTx)
+
+		// mark txsha as deleted in the txUpdateMap
+		log.Tracef("***tx %v is fully spent\n", txsha)
+
+		db.txSpentUpdateMap[*txsha] = txSu
+
+		txUo.delete = true
+		db.txUpdateMap[*txsha] = txUo
+	} else {
+		db.txUpdateMap[*txsha] = txUo
+	}
 
 	return nil
 }
@@ -509,6 +605,12 @@ func shaTxToKey(sha *btcwire.ShaHash) []byte {
 	return shaB
 }
 
+func shaSpentTxToKey(sha *btcwire.ShaHash) []byte {
+	shaB := sha.Bytes()
+	shaB = append(shaB, "sx"...)
+	return shaB
+}
+
 func (db *LevelDb) lBatch() *leveldb.Batch {
 	if db.lbatch == nil {
 		db.lbatch = new(leveldb.Batch)
@@ -519,7 +621,7 @@ func (db *LevelDb) lBatch() *leveldb.Batch {
 func (db *LevelDb) processBatches() error {
 	var err error
 
-	if len(db.txUpdateMap) != 0 || db.lbatch != nil {
+	if len(db.txUpdateMap) != 0 || len(db.txSpentUpdateMap) != 0 || db.lbatch != nil {
 		if db.lbatch == nil {
 			db.lbatch = new(leveldb.Batch)
 		}
@@ -538,6 +640,20 @@ func (db *LevelDb) processBatches() error {
 				db.lbatch.Put(key, txdat)
 			}
 		}
+		for txSha, txSu := range db.txSpentUpdateMap {
+			key := shaSpentTxToKey(&txSha)
+			if txSu.delete {
+				//log.Infof("deleting tx %v", txSha)
+				db.lbatch.Delete(key)
+			} else {
+				//log.Infof("inserting tx %v", txSha)
+				txdat, err := db.formatTxFullySpent(txSu.txl)
+				if err != nil {
+					return err
+				}
+				db.lbatch.Put(key, txdat)
+			}
+		}
 
 		err = db.lDb.Write(db.lbatch, db.wo)
 		if err != nil {
@@ -546,6 +662,7 @@ func (db *LevelDb) processBatches() error {
 		}
 		db.lbatch.Reset()
 		db.txUpdateMap = map[btcwire.ShaHash]*txUpdateObj{}
+		db.txSpentUpdateMap = make(map[btcwire.ShaHash]*spentTxUpdate)
 	}
 
 	return nil
