@@ -740,8 +740,6 @@ func (b *BlockChain) connectBlock(node *blockNode, block *btcutil.Block) error {
 		return err
 	}
 
-	// TODO(davec): Remove transactions from memory transaction pool.
-
 	// Add the new node to the memory main chain indices for faster
 	// lookups.
 	node.inMainChain = true
@@ -777,8 +775,6 @@ func (b *BlockChain) disconnectBlock(node *blockNode, block *btcutil.Block) erro
 	if err != nil {
 		return err
 	}
-
-	// TODO(davec): Put transactions back in memory transaction pool.
 
 	// Put block in the side chain cache.
 	node.inMainChain = false
