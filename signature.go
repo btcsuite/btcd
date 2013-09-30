@@ -100,16 +100,16 @@ func ParseSignature(sigStr []byte, curve elliptic.Curve) (*Signature, error) {
 	// FWIW the ecdsa spec states that R and S must be | 1, N - 1 |
 	// but crypto/ecdsa only checks for Sign != 0. Mirror that.
 	if signature.R.Sign() != 1 {
-		return nil, errors.New("Signature R isn't 1 or more")
+		return nil, errors.New("signature R isn't 1 or more")
 	}
 	if signature.S.Sign() != 1 {
-		return nil, errors.New("Signature S isn't 1 or more")
+		return nil, errors.New("signature S isn't 1 or more")
 	}
 	if signature.R.Cmp(curve.Params().N) >= 0 {
-		return nil, errors.New("Signature R is >= curve.N")
+		return nil, errors.New("signature R is >= curve.N")
 	}
 	if signature.S.Cmp(curve.Params().N) >= 0 {
-		return nil, errors.New("Signature S is >= curve.N")
+		return nil, errors.New("signature S is >= curve.N")
 	}
 
 	return signature, nil
