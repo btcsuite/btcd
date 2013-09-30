@@ -130,9 +130,7 @@ intentionally causes an error by attempting to process a duplicate block.
 ## TODO
 
 - Increase test coverage
-- Profile and optimize
-- Expose some APIs for block verification (without actually inserting it) and
-  transaction input lookups
+- Expose some APIs for block verification (without actually inserting it)
 
 ## GPG Verification Key
 
