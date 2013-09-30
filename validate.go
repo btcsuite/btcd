@@ -327,7 +327,7 @@ func countSigOps(msgTx *btcwire.MsgTx) int {
 // transactions which are of the pay-to-script-hash type.  This uses the
 // precise, signature operation counting mechanism from btcscript which requires
 // access to the input transaction scripts.
-func countP2SHSigOps(msgTx *btcwire.MsgTx, isCoinBaseTx bool, txStore map[btcwire.ShaHash]*txData) (int, error) {
+func countP2SHSigOps(msgTx *btcwire.MsgTx, isCoinBaseTx bool, txStore TxStore) (int, error) {
 	// Coinbase transactions have no interesting inputs.
 	if isCoinBaseTx {
 		return 0, nil
@@ -346,7 +346,7 @@ func countP2SHSigOps(msgTx *btcwire.MsgTx, isCoinBaseTx bool, txStore map[btcwir
 		// Ensure the referenced input transaction is available.
 		txInHash := &txIn.PreviousOutpoint.Hash
 		originTx, exists := txStore[*txInHash]
-		if !exists || originTx.err != nil || originTx.tx == nil {
+		if !exists || originTx.Err != nil || originTx.Tx == nil {
 			return 0, fmt.Errorf("unable to find input transaction "+
 				"%v referenced from transaction %v", txInHash,
 				txHash)
@@ -355,7 +355,7 @@ func countP2SHSigOps(msgTx *btcwire.MsgTx, isCoinBaseTx bool, txStore map[btcwir
 		// Ensure the output index in the referenced transaction is
 		// available.
 		originTxIndex := txIn.PreviousOutpoint.Index
-		if originTxIndex >= uint32(len(originTx.tx.TxOut)) {
+		if originTxIndex >= uint32(len(originTx.Tx.TxOut)) {
 			return 0, fmt.Errorf("out of bounds input index %d in "+
 				"transaction %v referenced from transaction %v",
 				originTxIndex, txInHash, txHash)
@@ -363,7 +363,7 @@ func countP2SHSigOps(msgTx *btcwire.MsgTx, isCoinBaseTx bool, txStore map[btcwir
 
 		// We're only interested in pay-to-script-hash types, so skip
 		// this input if it's not one.
-		pkScript := originTx.tx.TxOut[originTxIndex].PkScript
+		pkScript := originTx.Tx.TxOut[originTxIndex].PkScript
 		if !btcscript.IsPayToScriptHash(pkScript) {
 			continue
 		}
@@ -519,10 +519,11 @@ func checkSerializedHeight(coinbaseTx *btcwire.MsgTx, wantHeight int64) error {
 	return nil
 }
 
-// isTransactionSpent returns whether or not the provided transaction is fully
-// spent.  A fully spent transaction is one where all outputs have been spent.
-func isTransactionSpent(tx *txData) bool {
-	for _, isOutputSpent := range tx.spent {
+// isTransactionSpent returns whether or not the provided transaction data
+// describes a fully spent transaction.  A fully spent transaction is one where
+// all outputs have been spent.
+func isTransactionSpent(txD *TxData) bool {
+	for _, isOutputSpent := range txD.Spent {
 		if !isOutputSpent {
 			return false
 		}
@@ -552,7 +553,7 @@ func (b *BlockChain) checkBIP0030(node *blockNode, block *btcutil.Block) error {
 
 	// Examine the resulting data about the requested transactions.
 	for _, txD := range txResults {
-		switch txD.err {
+		switch txD.Err {
 		// A duplicate transaction was not found.  This is the most
 		// common case.
 		case btcdb.TxShaMissing:
@@ -564,14 +565,14 @@ func (b *BlockChain) checkBIP0030(node *blockNode, block *btcutil.Block) error {
 			if !isTransactionSpent(txD) {
 				str := fmt.Sprintf("tried to overwrite "+
 					"transaction %v at block height %d "+
-					"that is not fully spent", txD.hash,
-					txD.blockHeight)
+					"that is not fully spent", txD.Hash,
+					txD.BlockHeight)
 				return RuleError(str)
 			}
 
 		// Some other unexpected error occurred.  Return it now.
 		default:
-			return txD.err
+			return txD.Err
 		}
 	}
 
@@ -586,7 +587,7 @@ func (b *BlockChain) checkBIP0030(node *blockNode, block *btcutil.Block) error {
 // amount, and verifying the signatures to prove the spender was the owner of
 // the bitcoins and therefore allowed to spend them.  As it checks the inputs,
 // it also calculates the total fees for the transaction and returns that value.
-func checkTransactionInputs(tx *btcwire.MsgTx, txHeight int64, txStore map[btcwire.ShaHash]*txData) (int64, error) {
+func checkTransactionInputs(tx *btcwire.MsgTx, txHeight int64, txStore TxStore) (int64, error) {
 	// Coinbase transactions have no inputs.
 	if isCoinBase(tx) {
 		return 0, nil
@@ -611,8 +612,8 @@ func checkTransactionInputs(tx *btcwire.MsgTx, txHeight int64, txStore map[btcwi
 
 		// Ensure the transaction is not spending coins which have not
 		// yet reached the required coinbase maturity.
-		if isCoinBase(originTx.tx) {
-			originHeight := originTx.blockHeight
+		if isCoinBase(originTx.Tx) {
+			originHeight := originTx.BlockHeight
 			blocksSincePrev := txHeight - originHeight
 			if blocksSincePrev < coinbaseMaturity {
 				str := fmt.Sprintf("tried to spend coinbase "+
@@ -626,12 +627,12 @@ func checkTransactionInputs(tx *btcwire.MsgTx, txHeight int64, txStore map[btcwi
 
 		// Ensure the transaction is not double spending coins.
 		originTxIndex := txIn.PreviousOutpoint.Index
-		if originTxIndex >= uint32(len(originTx.spent)) {
+		if originTxIndex >= uint32(len(originTx.Spent)) {
 			return 0, fmt.Errorf("out of bounds input index %d in "+
 				"transaction %v referenced from transaction %v",
 				originTxIndex, txInHash, txHash)
 		}
-		if originTx.spent[originTxIndex] {
+		if originTx.Spent[originTxIndex] {
 			str := fmt.Sprintf("transaction %v tried to double "+
 				"spend coins from transaction %v", txHash,
 				txInHash)
@@ -644,7 +645,7 @@ func checkTransactionInputs(tx *btcwire.MsgTx, txHeight int64, txStore map[btcwi
 		// a transaction are in a unit value known as a satoshi.  One
 		// bitcoin is a quantity of satoshi as defined by the
 		// satoshiPerBitcoin constant.
-		originTxSatoshi := originTx.tx.TxOut[originTxIndex].Value
+		originTxSatoshi := originTx.Tx.TxOut[originTxIndex].Value
 		if originTxSatoshi < 0 {
 			str := fmt.Sprintf("transaction output has negative "+
 				"value of %v", originTxSatoshi)
@@ -671,7 +672,7 @@ func checkTransactionInputs(tx *btcwire.MsgTx, txHeight int64, txStore map[btcwi
 		}
 
 		// Mark the referenced output as spent.
-		originTx.spent[originTxIndex] = true
+		originTx.Spent[originTxIndex] = true
 	}
 
 	// Calculate the total output amount for this transaction.  It is safe

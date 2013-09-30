@@ -60,10 +60,11 @@ func validateTxIn(txInIdx int, txin *btcwire.TxIn, txSha *btcwire.ShaHash, tx *b
 	return nil
 }
 
-// validateAllTxIn validates the scripts for all of the passed transaction
-// inputs using multiple goroutines.
-func validateAllTxIn(txsha *btcwire.ShaHash, txValidator *btcwire.MsgTx, timestamp time.Time, job []*btcwire.TxIn, txStore map[btcwire.ShaHash]*txData) (err error) {
+// validateAllTxIn validates the scripts for the passed transaction using
+// multiple goroutines.
+func validateAllTxIn(tx *btcwire.MsgTx, txHash *btcwire.ShaHash, timestamp time.Time, txStore TxStore) (err error) {
 	c := make(chan txValidate)
+	job := tx.TxIn
 	resultErrors := make([]error, len(job))
 
 	var currentItem int
@@ -71,7 +72,7 @@ func validateAllTxIn(txsha *btcwire.ShaHash, txValidator *btcwire.MsgTx, timesta
 
 	processFunc := func(txInIdx int) {
 		log.Tracef("validating tx %v input %v len %v",
-			txsha, currentItem, len(job))
+			txHash, currentItem, len(job))
 		txin := job[txInIdx]
 		originTxSha := &txin.PreviousOutpoint.Hash
 		origintxidx := txin.PreviousOutpoint.Index
@@ -84,10 +85,10 @@ func validateAllTxIn(txsha *btcwire.ShaHash, txValidator *btcwire.MsgTx, timesta
 				fmt.Printf("obj not found in txStore %v",
 					originTxSha)
 			}
-			originTx = txInfo.tx
+			originTx = txInfo.Tx
 		}
-		err := validateTxIn(txInIdx, job[txInIdx], txsha, txValidator,
-			timestamp, originTx)
+		err := validateTxIn(txInIdx, job[txInIdx], txHash, tx, timestamp,
+			originTx)
 		r := txValidate{txInIdx, err}
 		c <- r
 	}
@@ -113,7 +114,7 @@ func validateAllTxIn(txsha *btcwire.ShaHash, txValidator *btcwire.MsgTx, timesta
 	}
 	for i := 0; i < len(job); i++ {
 		if resultErrors[i] != nil {
-			log.Warnf("tx %v failed input %v, err %v", txsha, i, resultErrors[i])
+			log.Warnf("tx %v failed input %v, err %v", txHash, i, resultErrors[i])
 		}
 	}
 	return
@@ -121,11 +122,11 @@ func validateAllTxIn(txsha *btcwire.ShaHash, txValidator *btcwire.MsgTx, timesta
 
 // checkBlockScripts executes and validates the scripts for all transactions in
 // the passed block.
-func checkBlockScripts(block *btcutil.Block, txStore map[btcwire.ShaHash]*txData) error {
+func checkBlockScripts(block *btcutil.Block, txStore TxStore) error {
 	timestamp := block.MsgBlock().Header.Timestamp
 	for i, tx := range block.MsgBlock().Transactions {
 		txHash, _ := block.TxSha(i)
-		err := validateAllTxIn(txHash, tx, timestamp, tx.TxIn, txStore)
+		err := validateAllTxIn(tx, txHash, timestamp, txStore)
 		if err != nil {
 			return err
 		}
