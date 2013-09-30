@@ -110,8 +110,8 @@ func isCoinBase(msgTx *btcwire.MsgTx) bool {
 	return true
 }
 
-// isFinalized determines whether or not a transaction is finalized.
-func isFinalizedTransaction(msgTx *btcwire.MsgTx, blockHeight int64, blockTime time.Time) bool {
+// IsFinalizedTransaction determines whether or not a transaction is finalized.
+func IsFinalizedTransaction(msgTx *btcwire.MsgTx, blockHeight int64, blockTime time.Time) bool {
 	// Lock time of zero means the transaction is finalized.
 	lockTime := msgTx.LockTime
 	if lockTime == 0 {

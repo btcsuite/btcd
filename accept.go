@@ -60,7 +60,7 @@ func (b *BlockChain) maybeAcceptBlock(block *btcutil.Block) error {
 
 	// Ensure all transactions in the block are finalized.
 	for i, tx := range block.MsgBlock().Transactions {
-		if !isFinalizedTransaction(tx, blockHeight, blockHeader.Timestamp) {
+		if !IsFinalizedTransaction(tx, blockHeight, blockHeader.Timestamp) {
 			// Use the TxSha function from the block rather
 			// than the transaction itself since the block version
 			// is cached.  Also, it's safe to ignore the error here
