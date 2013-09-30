@@ -1,6 +1,6 @@
 
 github.com/conformal/btcjson/jsonapi.go	 CreateMessageWithId	 100.00% (332/332)
-github.com/conformal/btcjson/jsonapi.go	 ReadResultCmd		 100.00% (63/63)
+github.com/conformal/btcjson/jsonapi.go	 ReadResultCmd		 100.00% (64/64)
 github.com/conformal/btcjson/jsonapi.go	 JSONToAmount		 100.00% (15/15)
 github.com/conformal/btcjson/jsonapi.go	 JSONGetMethod		 100.00% (14/14)
 github.com/conformal/btcjson/jsonfxns.go jsonRpcSend		 100.00% (7/7)
@@ -11,5 +11,5 @@ github.com/conformal/btcjson/jsonapi.go	 IsValidIdType		 100.00% (3/3)
 github.com/conformal/btcjson/jsonapi.go	 CreateMessage		 100.00% (2/2)
 github.com/conformal/btcjson/jsonapi.go	 RpcCommand		 61.54% (8/13)
 github.com/conformal/btcjson/jsonapi.go	 RpcRawCommand		 53.33% (8/15)
-github.com/conformal/btcjson		 -------------------	 97.51% (470/482)
+github.com/conformal/btcjson		 -------------------	 97.52% (471/483)
 
