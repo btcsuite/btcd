@@ -60,9 +60,9 @@ func validateTxIn(txInIdx int, txin *btcwire.TxIn, txSha *btcwire.ShaHash, tx *b
 	return nil
 }
 
-// validateAllTxIn validates the scripts for the passed transaction using
-// multiple goroutines.
-func validateAllTxIn(tx *btcwire.MsgTx, txHash *btcwire.ShaHash, timestamp time.Time, txStore TxStore) (err error) {
+// ValidateTransactionScripts validates the scripts for the passed transaction
+// using multiple goroutines.
+func ValidateTransactionScripts(tx *btcwire.MsgTx, txHash *btcwire.ShaHash, timestamp time.Time, txStore TxStore) (err error) {
 	c := make(chan txValidate)
 	job := tx.TxIn
 	resultErrors := make([]error, len(job))
@@ -126,7 +126,7 @@ func checkBlockScripts(block *btcutil.Block, txStore TxStore) error {
 	timestamp := block.MsgBlock().Header.Timestamp
 	for i, tx := range block.MsgBlock().Transactions {
 		txHash, _ := block.TxSha(i)
-		err := validateAllTxIn(tx, txHash, timestamp, txStore)
+		err := ValidateTransactionScripts(tx, txHash, timestamp, txStore)
 		if err != nil {
 			return err
 		}
