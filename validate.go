@@ -579,7 +579,7 @@ func (b *BlockChain) checkBIP0030(node *blockNode, block *btcutil.Block) error {
 	return nil
 }
 
-// checkTransactionInputs performs a series of checks on the inputs to a
+// CheckTransactionInputs performs a series of checks on the inputs to a
 // transaction to ensure they are valid.  An example of some of the checks
 // include verifying all inputs exist, ensuring the coinbase seasoning
 // requirements are met, detecting double spends, validating all values and fees
@@ -587,7 +587,7 @@ func (b *BlockChain) checkBIP0030(node *blockNode, block *btcutil.Block) error {
 // amount, and verifying the signatures to prove the spender was the owner of
 // the bitcoins and therefore allowed to spend them.  As it checks the inputs,
 // it also calculates the total fees for the transaction and returns that value.
-func checkTransactionInputs(tx *btcwire.MsgTx, txHeight int64, txStore TxStore) (int64, error) {
+func CheckTransactionInputs(tx *btcwire.MsgTx, txHeight int64, txStore TxStore) (int64, error) {
 	// Coinbase transactions have no inputs.
 	if IsCoinBase(tx) {
 		return 0, nil
@@ -797,7 +797,7 @@ func (b *BlockChain) checkConnectBlock(node *blockNode, block *btcutil.Block) er
 	// bounds.
 	var totalFees int64
 	for _, tx := range transactions {
-		txFee, err := checkTransactionInputs(tx, node.height, txInputStore)
+		txFee, err := CheckTransactionInputs(tx, node.height, txInputStore)
 		if err != nil {
 			return err
 		}
