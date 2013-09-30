@@ -89,12 +89,12 @@ func isNullOutpoint(outpoint *btcwire.OutPoint) bool {
 	return false
 }
 
-// isCoinBase determines whether or not a transaction is a coinbase.  A coinbase
+// IsCoinBase determines whether or not a transaction is a coinbase.  A coinbase
 // is a special transaction created by miners that has no inputs.  This is
 // represented in the block chain by a transaction with a single input that has
 // a previous output transaction index set to the maximum value along with a
 // zero hash.
-func isCoinBase(msgTx *btcwire.MsgTx) bool {
+func IsCoinBase(msgTx *btcwire.MsgTx) bool {
 	// A coin base must only have one transaction input.
 	if len(msgTx.TxIn) != 1 {
 		return false
@@ -241,7 +241,7 @@ func checkTransactionSanity(tx *btcwire.MsgTx) error {
 	}
 
 	// Coinbase script length must be between min and max length.
-	if isCoinBase(tx) {
+	if IsCoinBase(tx) {
 		slen := len(tx.TxIn[0].SignatureScript)
 		if slen < minCoinbaseScriptLen || slen > maxCoinbaseScriptLen {
 			str := fmt.Sprintf("coinbase transaction script length "+
@@ -421,13 +421,13 @@ func (b *BlockChain) checkBlockSanity(block *btcutil.Block) error {
 	}
 
 	// The first transaction in a block must be a coinbase.
-	if !isCoinBase(transactions[0]) {
+	if !IsCoinBase(transactions[0]) {
 		return RuleError("first transaction in block is not a coinbase")
 	}
 
 	// A block must not have more than one coinbase.
 	for i, tx := range transactions[1:] {
-		if isCoinBase(tx) {
+		if IsCoinBase(tx) {
 			str := fmt.Sprintf("block contains second coinbase at "+
 				"index %d", i)
 			return RuleError(str)
@@ -589,7 +589,7 @@ func (b *BlockChain) checkBIP0030(node *blockNode, block *btcutil.Block) error {
 // it also calculates the total fees for the transaction and returns that value.
 func checkTransactionInputs(tx *btcwire.MsgTx, txHeight int64, txStore TxStore) (int64, error) {
 	// Coinbase transactions have no inputs.
-	if isCoinBase(tx) {
+	if IsCoinBase(tx) {
 		return 0, nil
 	}
 
@@ -612,7 +612,7 @@ func checkTransactionInputs(tx *btcwire.MsgTx, txHeight int64, txStore TxStore) 
 
 		// Ensure the transaction is not spending coins which have not
 		// yet reached the required coinbase maturity.
-		if isCoinBase(originTx.Tx) {
+		if IsCoinBase(originTx.Tx) {
 			originHeight := originTx.BlockHeight
 			blocksSincePrev := txHeight - originHeight
 			if blocksSincePrev < coinbaseMaturity {
