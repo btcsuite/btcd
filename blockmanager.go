@@ -545,7 +545,7 @@ func (b *blockManager) Stop() error {
 
 // newBlockManager returns a new bitcoin block manager.
 // Use Start to begin processing asynchronous block and inv updates.
-func newBlockManager(s *server) *blockManager {
+func newBlockManager(s *server) (*blockManager, error) {
 	chainNotify := make(chan *btcchain.Notification)
 	bm := blockManager{
 		server:           s,
@@ -562,7 +562,16 @@ func newBlockManager(s *server) *blockManager {
 		quit:             make(chan bool),
 	}
 	bm.blockChain.DisableVerify(cfg.VerifyDisabled)
-	return &bm
+
+	log.Infof("[BMGR] Generating initial block node index.  This may " +
+		"take a while...")
+	err := bm.blockChain.GenerateInitialIndex()
+	if err != nil {
+		return nil, err
+	}
+	log.Infof("[BMGR] Block index generation complete")
+
+	return &bm, nil
 }
 
 // removeRegressionDB removes the existing regression test database if running

@@ -608,15 +608,11 @@ func newServer(addr string, db btcdb.Db, btcnet btcwire.BitcoinNet) (*server, er
 		quit:        make(chan bool),
 		db:          db,
 	}
-	s.blockManager = newBlockManager(&s)
-
-	log.Infof("[BMGR] Generating initial block node index.  This may " +
-		"take a while...")
-	err = s.blockManager.blockChain.GenerateInitialIndex()
+	bm, err := newBlockManager(&s)
 	if err != nil {
 		return nil, err
 	}
-	log.Infof("[BMGR] Block index generation complete")
+	s.blockManager = bm
 
 	if !cfg.DisableRPC {
 		s.rpcServer, err = newRPCServer(&s)
