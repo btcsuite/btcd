@@ -107,6 +107,7 @@ type peer struct {
 	knownAddresses     map[string]bool
 	knownInventory     *MruInventoryMap
 	knownInvMutex      sync.Mutex
+	requestedBlocks    map[btcwire.ShaHash]bool // owned by blockmanager.
 	lastBlock          int32
 	retrycount         int64
 	prevGetBlocksBegin *btcwire.ShaHash
@@ -287,7 +288,7 @@ func (p *peer) handleVersionMsg(msg *btcwire.MsgVersion) {
 	}
 
 	// Signal the block manager this peer is a new sync candidate.
-	p.server.blockManager.newCandidates <- p
+	p.server.blockManager.NewPeer(p)
 
 	// TODO: Relay alerts.
 }
@@ -903,7 +904,7 @@ out:
 	// the peer is done.
 	p.Disconnect()
 	p.server.donePeers <- p
-	p.server.blockManager.donePeers <- p
+	p.server.blockManager.DonePeer(p)
 	p.quit <- true
 
 	p.wg.Done()
@@ -1046,6 +1047,7 @@ func newPeerBase(s *server, inbound bool) *peer {
 		inbound:         inbound,
 		knownAddresses:  make(map[string]bool),
 		knownInventory:  NewMruInventoryMap(maxKnownInventory),
+		requestedBlocks: make(map[btcwire.ShaHash]bool),
 		requestQueue:    list.New(),
 		invSendQueue:    list.New(),
 		outputQueue:     make(chan btcwire.Message, outputBufferSize),
