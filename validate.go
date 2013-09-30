@@ -173,9 +173,9 @@ func calcBlockSubsidy(height int64) int64 {
 	return baseSubsidy >> uint(height/subsidyHalvingInterval)
 }
 
-// checkTransactionSanity performs some preliminary checks on a transaction to
+// CheckTransactionSanity performs some preliminary checks on a transaction to
 // ensure it is sane.  These checks are context free.
-func checkTransactionSanity(tx *btcwire.MsgTx) error {
+func CheckTransactionSanity(tx *btcwire.MsgTx) error {
 	// A transaction must have at least one input.
 	if len(tx.TxIn) == 0 {
 		return RuleError("transaction has no inputs")
@@ -437,7 +437,7 @@ func (b *BlockChain) checkBlockSanity(block *btcutil.Block) error {
 	// Do some preliminary checks on each transaction to ensure they are
 	// sane before continuing.
 	for _, tx := range transactions {
-		err := checkTransactionSanity(tx)
+		err := CheckTransactionSanity(tx)
 		if err != nil {
 			return err
 		}
