@@ -5,7 +5,9 @@
 package main
 
 import (
+	"encoding/base64"
 	"encoding/json"
+	"fmt"
 	"github.com/conformal/btcchain"
 	"github.com/conformal/btcjson"
 	"github.com/conformal/btcscript"
@@ -40,7 +42,14 @@ func (s *rpcServer) Start() {
 
 	log.Trace("[RPCS] Starting RPC server")
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		jsonRPCRead(w, r, s)
+		login := s.username + ":" + s.password
+		auth := "Basic " + base64.StdEncoding.EncodeToString([]byte(login))
+		if r.Header["Authorization"][0] == auth {
+			jsonRPCRead(w, r, s)
+		} else {
+			log.Warnf("[RPCS] Auth failure.")
+			jsonAuthFail(w, r, s)
+		}
 	})
 	httpServer := &http.Server{}
 	for _, listener := range s.listeners {
@@ -106,6 +115,11 @@ func newRPCServer(s *server) (*rpcServer, error) {
 
 	rpc.listeners = listeners
 	return &rpc, err
+}
+
+// jsonAuthFail sends a message back to the client if the http auth is rejected.
+func jsonAuthFail(w http.ResponseWriter, r *http.Request, s *rpcServer) {
+	fmt.Fprint(w, "401 Unauthorized.\n")
 }
 
 // jsonRPCRead is the main function that handles reading messages, getting
