@@ -1127,6 +1127,11 @@ func newOutboundPeer(s *server, addr string, persistent bool) *peer {
 				}
 				scaledInterval := connectionRetryInterval.Nanoseconds() * p.retrycount / 2
 				scaledDuration := time.Duration(scaledInterval)
+				if s.shutdown {
+					p.server.donePeers <- p
+					p.wg.Done()
+					return
+				}
 				log.Infof("[SRVR] Retrying connection to %s "+
 					"in %s", faddr, scaledDuration)
 				time.Sleep(scaledDuration)
