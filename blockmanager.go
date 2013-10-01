@@ -213,6 +213,14 @@ func (b *blockManager) handleBlockMsg(bmsg *blockMsg) {
 	// Keep track of which peer the block was sent from so the notification
 	// handler can request the parent blocks from the appropriate peer.
 	blockSha, _ := bmsg.block.Sha()
+
+	// If we didnt' ask for this block then the peer is misbehaving.
+	if _, ok := bmsg.peer.requestedBlocks[*blockSha]; !ok {
+		log.Warnf("[BMGR] Got unreqeusted block from %s, disconnecting",
+			bmsg.peer.addr)
+		bmsg.peer.Disconnect()
+		return
+	}
 	b.blockPeerMutex.Lock()
 	b.blockPeer[*blockSha] = bmsg.peer
 	b.blockPeerMutex.Unlock()
