@@ -244,7 +244,6 @@ func (s *server) peerHandler() {
 	if cfg.MaxPeers < maxOutbound {
 		maxOutbound = cfg.MaxPeers
 	}
-	var wakeupTimer *time.Timer
 
 	// Do initial DNS seeding to populate address manager.
 	if !cfg.DisableDNSSeed {
@@ -341,13 +340,6 @@ out:
 			break out
 		}
 
-		// Timer was just to make sure we woke up again soon. so cancel
-		// and remove it as soon as we next come around.
-		if wakeupTimer != nil {
-			wakeupTimer.Stop()
-			wakeupTimer = nil
-		}
-
 		// Only try connect to more peers if we actually need more
 		if outboundPeers >= maxOutbound || len(cfg.ConnectPeers) > 0 ||
 			atomic.LoadInt32(&s.shutdown) != 0 {
@@ -429,11 +421,6 @@ out:
 				s.wakeup <- true
 			})
 		}
-	}
-
-	if wakeupTimer != nil {
-		wakeupTimer.Stop()
-		wakeupTimer = nil
 	}
 
 	s.blockManager.Stop()
