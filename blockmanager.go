@@ -406,6 +406,10 @@ out:
 			default:
 				// bitch and whine.
 			}
+
+		case not := <- b.chainNotifySink:
+			b.handleNotifyMsg(not)
+
 		case <-b.quit:
 			break out
 		}
@@ -459,25 +463,6 @@ func (b *blockManager) handleNotifyMsg(notification *btcchain.Notification) {
 	}
 }
 
-// chainNotificationSinkHandler is the sink for the chain notification handler.
-// It actually responds to the notifications so the main chain notification
-// handler does not block chain while processing notifications.  It must be run
-// as a goroutine.
-func (b *blockManager) chainNotificationSinkHandler() {
-out:
-	for {
-		select {
-		case notification := <-b.chainNotifySink:
-			b.handleNotifyMsg(notification)
-
-		case <-b.quit:
-			break out
-		}
-	}
-	b.wg.Done()
-	log.Trace("[BMGR] Chain notification sink done")
-}
-
 // chainNotificationHandler is the handler for asynchronous notifications from
 // btcchain.  It must be run as a goroutine.
 func (b *blockManager) chainNotificationHandler() {
@@ -491,10 +476,10 @@ out:
 		// Sending on a nil channel always blocks and hence is ignored
 		// by select.  Thus enable send only when the list is non-empty.
 		var firstItem *btcchain.Notification
-		var chainNotifySink chan *btcchain.Notification
+		var chainNotifySink chan interface{}
 		if pending.Len() > 0 {
 			firstItem = pending.Front().Value.(*btcchain.Notification)
-			chainNotifySink = b.chainNotifySink
+			chainNotifySink = b.msgChan
 		}
 
 		select {
@@ -562,9 +547,8 @@ func (b *blockManager) Start() {
 	}
 
 	log.Trace("[BMGR] Starting block manager")
-	b.wg.Add(3)
+	b.wg.Add(2)
 	go b.blockHandler()
-	go b.chainNotificationSinkHandler()
 	go b.chainNotificationHandler()
 }
 
