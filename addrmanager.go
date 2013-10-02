@@ -418,6 +418,8 @@ type serialisedAddrManager struct {
 // savePeers saves all the known addresses to a file so they can be read back
 // in at next run.
 func (a *AddrManager) savePeers() {
+	a.mtx.Lock()
+	defer a.mtx.Unlock()
 	// First we make a serialisable datastructure so we can encode it to
 	// json.
 
@@ -474,6 +476,9 @@ func (a *AddrManager) savePeers() {
 // loadPeers loads the known address from the saved file.  If empty, missing, or
 // malformed file, just don't load anything and start fresh
 func (a *AddrManager) loadPeers() {
+	a.mtx.Lock()
+	defer a.mtx.Unlock()
+
 	// May give some way to specify this later.
 	filename := "peers.json"
 	filePath := filepath.Join(cfg.DataDir, filename)
@@ -492,7 +497,7 @@ func (a *AddrManager) loadPeers() {
 		return
 	}
 	log.Infof("[AMGR] Successfuly loaded %d addresses from %s",
-		a.NumAddresses(), filePath)
+		a.nNew + a.nTried, filePath)
 }
 
 func (a *AddrManager) deserialisePeers(filePath string) error {
