@@ -764,6 +764,10 @@ func NetAddressKey(na *btcwire.NetAddress) string {
 // have not been used recently and should not pick 'close' addresses
 // consecutively.
 func (a *AddrManager) GetAddress(class string, newBias int) *knownAddress {
+	if a.NumAddresses() == 0 {
+		return nil
+	}
+
 	// Protect concurrent access.
 	a.mtx.Lock()
 	defer a.mtx.Unlock()
