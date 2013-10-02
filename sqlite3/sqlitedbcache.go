@@ -228,8 +228,8 @@ func (db *SqliteDb) fetchTxDataBySha(txsha *btcwire.ShaHash) (rtx *btcwire.MsgTx
 	return &tx, txbuf, pver, blksha, height, txspent, nil
 }
 
-// FetchTxAllBySha returns several pieces of data regarding the given sha.
-func (db *SqliteDb) FetchTxAllBySha(txsha *btcwire.ShaHash) (rtx *btcwire.MsgTx, rtxbuf []byte, rpver uint32, rblksha *btcwire.ShaHash, err error) {
+// FetchTxBySha returns several pieces of data regarding the given sha.
+func (db *SqliteDb) FetchTxBySha(txsha *btcwire.ShaHash) (rtx *btcwire.MsgTx, rpver uint32, rblksha *btcwire.ShaHash, err error) {
 	var pver uint32
 	var blksha *btcwire.ShaHash
 	var height int64
@@ -240,7 +240,7 @@ func (db *SqliteDb) FetchTxAllBySha(txsha *btcwire.ShaHash) (rtx *btcwire.MsgTx,
 
 	// Check Tx cache
 	if txc, ok := db.fetchTxCache(txsha); ok {
-		return txc.tx, txc.txbuf, txc.pver, &txc.blksha, nil
+		return txc.tx, txc.pver, &txc.blksha, nil
 	}
 
 	// If not cached load it
@@ -293,20 +293,7 @@ func (db *SqliteDb) FetchTxAllBySha(txsha *btcwire.ShaHash) (rtx *btcwire.MsgTx,
 	txc.blksha = *blksha
 	db.insertTxCache(&txc)
 
-	return &tx, txbuf, pver, blksha, nil
-}
-
-// FetchTxBySha returns some data for the given Tx Sha.
-func (db *SqliteDb) FetchTxBySha(txsha *btcwire.ShaHash) (rtx *btcwire.MsgTx, rpver uint32, blksha *btcwire.ShaHash, err error) {
-	rtx, _, rpver, blksha, err = db.FetchTxAllBySha(txsha)
-	return
-}
-
-// FetchTxBufBySha return the bytestream data and associated protocol version.
-// for the given Tx Sha
-func (db *SqliteDb) FetchTxBufBySha(txsha *btcwire.ShaHash) (txbuf []byte, rpver uint32, err error) {
-	_, txbuf, rpver, _, err = db.FetchTxAllBySha(txsha)
-	return
+	return &tx, pver, blksha, nil
 }
 
 // fetchTxCache look up the given transaction in the Tx cache.

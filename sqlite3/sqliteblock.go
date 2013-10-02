@@ -11,15 +11,6 @@ import (
 	_ "github.com/mattn/go-sqlite3"
 )
 
-// InsertBlockData stores a block hash and its associated data block with a
-// previous sha of `prevSha' and a version of `pver'.
-func (db *SqliteDb) InsertBlockData(sha *btcwire.ShaHash, prevSha *btcwire.ShaHash, pver uint32, buf []byte) (blockid int64, err error) {
-	db.dbLock.Lock()
-	defer db.dbLock.Unlock()
-
-	return db.insertBlockData(sha, prevSha, pver, buf)
-}
-
 // insertSha stores a block hash and its associated data block with a
 // previous sha of `prevSha' and a version of `pver'.
 // insertSha shall be called with db lock held

@@ -11,14 +11,6 @@ import (
 	_ "github.com/mattn/go-sqlite3"
 )
 
-// InsertTx inserts a tx hash and its associated data into the database.
-func (db *SqliteDb) InsertTx(txsha *btcwire.ShaHash, height int64, txoff int, txlen int, usedbuf []byte) (err error) {
-	db.dbLock.Lock()
-	defer db.dbLock.Unlock()
-
-	return db.insertTx(txsha, height, txoff, txlen, usedbuf)
-}
-
 // insertTx inserts a tx hash and its associated data into the database.
 // Must be called with db lock held.
 func (db *SqliteDb) insertTx(txsha *btcwire.ShaHash, height int64, txoff int, txlen int, usedbuf []byte) (err error) {
