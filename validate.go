@@ -604,7 +604,7 @@ func CheckTransactionInputs(tx *btcwire.MsgTx, txHeight int64, txStore TxStore) 
 		// Ensure the input is available.
 		txInHash := &txIn.PreviousOutpoint.Hash
 		originTx, exists := txStore[*txInHash]
-		if !exists {
+		if !exists || originTx.Err != nil || originTx.Tx == nil {
 			str := fmt.Sprintf("unable to find input transaction "+
 				"%v for transaction %v", txInHash, txHash)
 			return 0, RuleError(str)
