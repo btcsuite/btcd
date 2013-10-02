@@ -121,7 +121,7 @@ func (b *blockManager) startSync(peers *list.List) {
 		}
 
 		log.Infof("[BMGR] Syncing to block height %d from peer %v",
-			bestPeer.lastBlock, bestPeer.conn.RemoteAddr())
+			bestPeer.lastBlock, bestPeer.addr)
 		bestPeer.PushGetBlocksMsg(locator, &zeroHash)
 		b.syncPeer = bestPeer
 	}

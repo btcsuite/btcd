@@ -173,7 +173,7 @@ func (s *server) handleRelayInvMsg(peers *list.List, iv *btcwire.InvVect) {
 	// which are not already known to have it.
 	for e := peers.Front(); e != nil; e = e.Next() {
 		p := e.Value.(*peer)
-		if p.conn == nil {
+		if !p.Connected() {
 			continue
 		}
 
@@ -196,7 +196,7 @@ func (s *server) handleBroadcastMsg(peers *list.List, bmsg *broadcastMsg) {
 		}
 		p := e.Value.(*peer)
 		// Don't broadcast to still connecting outbound peers .
-		if p.conn == nil {
+		if !p.Connected() {
 			excluded = true
 		}
 		if !excluded {
