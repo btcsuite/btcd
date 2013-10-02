@@ -73,16 +73,6 @@ type Db interface {
 	// the database
 	ExistsTxSha(sha *btcwire.ShaHash) (exists bool)
 
-	// FetchTxAllBySha returns several pieces of data for a given
-	// transaction hash.  The implementation may cache the underlying data
-	// if desired.
-	FetchTxAllBySha(txsha *btcwire.ShaHash) (rtx *btcwire.MsgTx, rtxbuf []byte, rpver uint32, rblksha *btcwire.ShaHash, err error)
-
-	// FetchTxBufBySha returns the raw bytes and associated protocol version
-	// for the transaction with the requested hash.  The implementation may
-	// cache the underlying data if desired.
-	FetchTxBufBySha(txsha *btcwire.ShaHash) (txbuf []byte, rpver uint32, err error)
-
 	// FetchTxBySha returns some data for the given transaction hash. The
 	// implementation may cache the underlying data if desired.
 	FetchTxBySha(txsha *btcwire.ShaHash) (rtx *btcwire.MsgTx, rpver uint32, blksha *btcwire.ShaHash, err error)
@@ -91,23 +81,11 @@ type Db interface {
 	// hashes.  The implementation may cache the underlying data if desired.
 	FetchTxByShaList(txShaList []*btcwire.ShaHash) []*TxListReply
 
-	// FetchTxUsedBySha returns the used/spent buffer for a given
-	// transaction hash.
-	FetchTxUsedBySha(txsha *btcwire.ShaHash) (spentbuf []byte, err error)
-
 	// InsertBlock inserts raw block and transaction data from a block
 	// into the database.  The first block inserted into the database
 	// will be treated as the genesis block.  Every subsequent block insert
 	// requires the referenced parent block to already exist.
 	InsertBlock(block *btcutil.Block) (height int64, err error)
-
-	// InsertBlockData stores a block hash and its associated data block
-	// with the given previous hash and protocol version into the database.
-	InsertBlockData(sha *btcwire.ShaHash, prevSha *btcwire.ShaHash, pver uint32, buf []byte) (blockid int64, err error)
-
-	// InsertTx stores a transaction hash and its associated data into the
-	// database.
-	InsertTx(txsha *btcwire.ShaHash, blockHeight int64, txoff int, txlen int, usedbuf []byte) (err error)
 
 	// InvalidateBlockCache releases all cached blocks.
 	InvalidateBlockCache()
