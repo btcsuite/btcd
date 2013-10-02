@@ -209,7 +209,7 @@ func (p *peer) handleVersionMsg(msg *btcwire.MsgVersion) {
 
 	// Limit to one version message per peer.
 	if p.versionKnown {
-		log.Errorf("[PEER] Only one version message per peer is allowed %s.",
+		p.logError("[PEER] Only one version message per peer is allowed %s.",
 			p.conn.RemoteAddr())
 		p.Disconnect()
 		return
@@ -231,7 +231,7 @@ func (p *peer) handleVersionMsg(msg *btcwire.MsgVersion) {
 		// Send version.
 		err := p.pushVersionMsg()
 		if err != nil {
-			log.Errorf("[PEER] Can't send version message: %v", err)
+			p.logError("[PEER] Can't send version message: %v", err)
 			p.Disconnect()
 			return
 		}
@@ -240,7 +240,7 @@ func (p *peer) handleVersionMsg(msg *btcwire.MsgVersion) {
 	// Set up a NetAddress for the peer to be used with AddrManager.
 	na, err := newNetAddress(p.conn.RemoteAddr(), p.services)
 	if err != nil {
-		log.Errorf("[PEER] Can't get remote address: %v", err)
+		p.logError("[PEER] Can't get remote address: %v", err)
 		p.Disconnect()
 		return
 	}
@@ -257,7 +257,7 @@ func (p *peer) handleVersionMsg(msg *btcwire.MsgVersion) {
 			// Advertise the local address.
 			na, err := newNetAddress(p.conn.LocalAddr(), p.services)
 			if err != nil {
-				log.Errorf("[PEER] Can't advertise local "+
+				p.logError("[PEER] Can't advertise local "+
 					"address: %v", err)
 				p.Disconnect()
 				return
@@ -631,7 +631,7 @@ func (p *peer) handleGetAddrMsg(msg *btcwire.MsgGetAddr) {
 	// Push the addresses.
 	err := p.pushAddrMsg(addrCache)
 	if err != nil {
-		log.Errorf("[PEER] Can't push address message: %v", err)
+		p.logError("[PEER] Can't push address message: %v", err)
 		p.Disconnect()
 		return
 	}
@@ -684,7 +684,7 @@ func (p *peer) handleAddrMsg(msg *btcwire.MsgAddr) {
 
 	// A message that has no addresses is invalid.
 	if len(msg.AddrList) == 0 {
-		log.Errorf("[PEER] Command [%s] from %s does not contain any addresses",
+		p.logError("[PEER] Command [%s] from %s does not contain any addresses",
 			msg.Command(), p.conn.RemoteAddr())
 		p.Disconnect()
 		return
@@ -777,7 +777,7 @@ func (p *peer) writeMessage(msg btcwire.Message) {
 	err := btcwire.WriteMessage(p.conn, msg, p.protocolVersion, p.btcnet)
 	if err != nil {
 		p.Disconnect()
-		log.Errorf("[PEER] Can't send message: %v", err)
+		p.logError("[PEER] Can't send message: %v", err)
 		return
 	}
 }
@@ -827,14 +827,14 @@ out:
 
 			// Only log the error if we're not forcibly disconnecting.
 			if atomic.LoadInt32(&p.disconnect) == 0 {
-				log.Errorf("[PEER] Can't read message: %v", err)
+				p.logError("[PEER] Can't read message: %v", err)
 			}
 			break out
 		}
 
 		// Ensure version message comes first.
 		if _, ok := rmsg.(*btcwire.MsgVersion); !ok && !p.versionKnown {
-			log.Errorf("[PEER] A version message must precede all others")
+			p.logError("[PEER] A version message must precede all others")
 			break out
 		}
 
@@ -904,7 +904,10 @@ out:
 	// the peer is done.
 	p.Disconnect()
 	p.server.donePeers <- p
-	p.server.blockManager.DonePeer(p)
+	// Only tell blockmanager we are gone if we ever told it we existed.
+	if p.versionKnown {
+		p.server.blockManager.DonePeer(p)
+	}
 
 	log.Tracef("[PEER] Peer input handler done for %s", p.conn.RemoteAddr())
 }
@@ -999,7 +1002,7 @@ func (p *peer) Start() error {
 	if !p.inbound {
 		err := p.pushVersionMsg()
 		if err != nil {
-			log.Errorf("[PEER] Can't send outbound version "+
+			p.logError("[PEER] Can't send outbound version "+
 				"message %v", err)
 			p.conn.Close()
 			return err
@@ -1085,14 +1088,14 @@ func newOutboundPeer(s *server, addr string, persistent bool) *peer {
 	// function returns the peer must have a valid netaddress.
 	ip, portStr, err := net.SplitHostPort(addr)
 	if err != nil {
-		log.Errorf("Tried to create a new outbound peer with invalid "+
+		p.logError("Tried to create a new outbound peer with invalid "+
 			"address %s: %v", addr, err)
 		return nil
 	}
 
 	port, err := strconv.ParseUint(portStr, 10, 16)
 	if err != nil {
-		log.Errorf("Tried to create a new outbound peer with invalid "+
+		p.logError("Tried to create a new outbound peer with invalid "+
 			"port %s: %v", portStr, err)
 		return nil
 	}
@@ -1122,7 +1125,7 @@ func newOutboundPeer(s *server, addr string, persistent bool) *peer {
 			conn, err := dial("tcp", addr)
 			if err != nil {
 				p.retrycount += 1
-				log.Errorf("[SRVR] Failed to connect to %s: %v",
+				log.Debugf("[SRVR] Failed to connect to %s: %v",
 					faddr, err)
 				if !persistent {
 					p.server.donePeers <- p
@@ -1130,7 +1133,7 @@ func newOutboundPeer(s *server, addr string, persistent bool) *peer {
 				}
 				scaledInterval := connectionRetryInterval.Nanoseconds() * p.retrycount / 2
 				scaledDuration := time.Duration(scaledInterval)
-				log.Infof("[SRVR] Retrying connection to %s "+
+				log.Debugf("[SRVR] Retrying connection to %s "+
 					"in %s", faddr, scaledDuration)
 				time.Sleep(scaledDuration)
 				continue
@@ -1143,7 +1146,8 @@ func newOutboundPeer(s *server, addr string, persistent bool) *peer {
 				p.server.addrManager.Attempt(p.na)
 
 				// Connection was successful so log it and start peer.
-				log.Infof("[SRVR] Connected to %s", conn.RemoteAddr())
+				log.Debugf("[SRVR] Connected to %s",
+					conn.RemoteAddr())
 				p.conn = conn
 				p.retrycount = 0
 				p.Start()
@@ -1153,4 +1157,13 @@ func newOutboundPeer(s *server, addr string, persistent bool) *peer {
 		}
 	}()
 	return p
+}
+
+// logError makes sure that we only log errors loudly on user peers.
+func (p *peer) logError(fmt string, args...interface{}) {
+	if p.persistent {
+		log.Errorf(fmt, args...)
+	} else {
+		log.Debugf(fmt, args...)
+	}
 }

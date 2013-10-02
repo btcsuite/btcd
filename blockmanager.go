@@ -136,6 +136,8 @@ func (b *blockManager) handleNewPeerMsg(peers *list.List, p *peer) {
 		return
 	}
 
+	log.Infof("[BMGR] New valid peer %s", p.addr)
+
 	// The peer is not a candidate for sync if it's not a full node.
 	if p.services&btcwire.SFNodeNetwork != btcwire.SFNodeNetwork {
 		return
@@ -160,6 +162,8 @@ func (b *blockManager) handleDonePeerMsg(peers *list.List, p *peer) {
 			break
 		}
 	}
+
+	log.Infof("[BMGR] Lost peer %s", p.addr)
 
 	// Attempt to find a new peer to sync from if the quitting peer is the
 	// sync peer.

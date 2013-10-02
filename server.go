@@ -84,7 +84,7 @@ func (s *server) handleAddPeerMsg(peers *list.List, banned map[string]time.Time,
 	// Disconnect banned peers.
 	host, _, err := net.SplitHostPort(p.addr)
 	if err != nil {
-		log.Errorf("[SRVR] %v", err)
+		log.Debugf("[SRVR] can't split hostport %v", err)
 		p.Shutdown()
 		return false
 	}
@@ -113,7 +113,7 @@ func (s *server) handleAddPeerMsg(peers *list.List, banned map[string]time.Time,
 	}
 
 	// Add the new peer and start it.
-	log.Infof("[SRVR] New peer %s (%s)", p.addr, direction)
+	log.Debugf("[SRVR] New peer %s (%s)", p.addr, direction)
 	peers.PushBack(p)
 	if p.inbound {
 		p.Start()
@@ -139,7 +139,7 @@ func (s *server) handleDonePeerMsg(peers *list.List, p *peer) bool {
 				return false
 			}
 			peers.Remove(e)
-			log.Infof("[SRVR] Removed peer %s (%s)", p.addr,
+			log.Debugf("[SRVR] Removed peer %s (%s)", p.addr,
 				direction)
 			return true
 		}
@@ -153,7 +153,7 @@ func (s *server) handleDonePeerMsg(peers *list.List, p *peer) bool {
 func (s *server) handleBanPeerMsg(banned map[string]time.Time, p *peer) {
 	host, _, err := net.SplitHostPort(p.addr)
 	if err != nil {
-		log.Errorf("[SRVR] %v", err)
+		log.Debugf("[SRVR] can't split ban peer %s %v", p.addr, err)
 		return
 	}
 	direction := directionString(p.inbound)
@@ -214,7 +214,8 @@ func (s *server) listenHandler(listener net.Listener) {
 		if err != nil {
 			// Only log the error if we're not forcibly shutting down.
 			if atomic.LoadInt32(&s.shutdown) == 0 {
-				log.Errorf("[SRVR] %v", err)
+				log.Errorf("[SRVR] can't accept connection: %v",
+					err)
 			}
 			continue
 		}
