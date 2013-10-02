@@ -12,6 +12,7 @@ import (
 	"net"
 	"strconv"
 	"sync"
+	"sync/atomic"
 	"time"
 )
 
@@ -48,8 +49,8 @@ type server struct {
 	listeners     []net.Listener
 	btcnet        btcwire.BitcoinNet
 	started       bool
-	shutdown      bool
-	shutdownSched bool
+	shutdown      int32 // atomic
+	shutdownSched int32 // atomic
 	addrManager   *AddrManager
 	rpcServer     *rpcServer
 	blockManager  *blockManager
@@ -73,7 +74,7 @@ func (s *server) handleAddPeerMsg(peers *list.List, banned map[string]time.Time,
 
 	// Ignore new peers if we're shutting down.
 	direction := directionString(p.inbound)
-	if s.shutdown {
+	if atomic.LoadInt32(&s.shutdown) != 0 {
 		log.Infof("[SRVR] New peer %s (%s) ignored - server is "+
 			"shutting down", p.addr, direction)
 		p.Shutdown()
@@ -130,7 +131,8 @@ func (s *server) handleDonePeerMsg(peers *list.List, p *peer) bool {
 
 			// Issue an asynchronous reconnect if the peer was a
 			// persistent outbound connection.
-			if !p.inbound && p.persistent && !s.shutdown {
+			if !p.inbound && p.persistent &&
+				atomic.LoadInt32(&s.shutdown) == 0 {
 				// attempt reconnect.
 				addr := p.addr
 				e.Value = newOutboundPeer(s, addr, true)
@@ -207,11 +209,11 @@ func (s *server) handleBroadcastMsg(peers *list.List, bmsg *broadcastMsg) {
 // server.  It must be run as a goroutine.
 func (s *server) listenHandler(listener net.Listener) {
 	log.Infof("[SRVR] Server listening on %s", listener.Addr())
-	for !s.shutdown {
+	for atomic.LoadInt32(&s.shutdown) == 0 {
 		conn, err := listener.Accept()
 		if err != nil {
 			// Only log the error if we're not forcibly shutting down.
-			if !s.shutdown {
+			if atomic.LoadInt32(&s.shutdown) == 0 {
 				log.Errorf("[SRVR] %v", err)
 			}
 			continue
@@ -295,8 +297,8 @@ func (s *server) peerHandler() {
 	// if nothing else happens, wake us up soon.
 	time.AfterFunc(10*time.Second, func() { s.wakeup <- true })
 
-	// Live while we're not shutting down or there are still connected peers.
-	for !s.shutdown || peers.Len() != 0 {
+out:
+	for {
 		select {
 		// New peers connected to the server.
 		case p := <-s.newPeers:
@@ -336,6 +338,7 @@ func (s *server) peerHandler() {
 				p := e.Value.(*peer)
 				p.Shutdown()
 			}
+			break out
 		}
 
 		// Timer was just to make sure we woke up again soon. so cancel
@@ -346,7 +349,8 @@ func (s *server) peerHandler() {
 		}
 
 		// Only try connect to more peers if we actually need more
-		if outboundPeers >= maxOutbound || s.shutdown {
+		if outboundPeers >= maxOutbound ||
+			atomic.LoadInt32(&s.shutdown) != 0 {
 			continue
 		}
 		groups := make(map[string]int)
@@ -359,7 +363,8 @@ func (s *server) peerHandler() {
 
 		tries := 0
 		for outboundPeers < maxOutbound &&
-			peers.Len() < cfg.MaxPeers && !s.shutdown {
+			peers.Len() < cfg.MaxPeers &&
+			atomic.LoadInt32(&s.shutdown) == 0 {
 			// We bias like bitcoind does, 10 for no outgoing
 			// up to 90 (8) for the selection of new vs tried
 			//addresses.
@@ -494,16 +499,16 @@ func (s *server) Start() {
 // Stop gracefully shuts down the server by stopping and disconnecting all
 // peers and the main listener.
 func (s *server) Stop() error {
-	if s.shutdown {
+	// Make sure this only happens once.
+	if atomic.AddInt32(&s.shutdown, 1) != 1 {
 		log.Infof("[SRVR] Server is already in the process of shutting down")
 		return nil
 	}
 
 	log.Warnf("[SRVR] Server shutting down")
 
-	// Set the shutdown flag and stop all the listeners.  There will not be
-	// any listeners if listening is disabled.
-	s.shutdown = true
+	// Stop all the listeners.  There will not be any listeners if
+	// listening is disabled.
 	for _, listener := range s.listeners {
 		err := listener.Close()
 		if err != nil {
@@ -532,7 +537,7 @@ func (s *server) WaitForShutdown() {
 // on remaining duration.
 func (s *server) ScheduleShutdown(duration time.Duration) {
 	// Don't schedule shutdown more than once.
-	if s.shutdownSched {
+	if atomic.AddInt32(&s.shutdownSched, 1) != 1 {
 		return
 	}
 	log.Warnf("[SRVR] Server shutdown in %v", duration)
@@ -565,7 +570,6 @@ func (s *server) ScheduleShutdown(duration time.Duration) {
 			}
 		}
 	}()
-	s.shutdownSched = true
 }
 
 // newServer returns a new btcd server configured to listen on addr for the

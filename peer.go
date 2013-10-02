@@ -18,6 +18,7 @@ import (
 	"net"
 	"strconv"
 	"sync"
+	"sync/atomic"
 	"time"
 )
 
@@ -101,7 +102,7 @@ type peer struct {
 	na                 *btcwire.NetAddress
 	timeConnected      time.Time
 	inbound            bool
-	disconnect         bool
+	disconnect         int32 // only to be used atomically
 	persistent         bool
 	versionKnown       bool
 	knownAddresses     map[string]bool
@@ -116,7 +117,6 @@ type peer struct {
 	requestQueue       *list.List
 	invSendQueue       *list.List
 	continueHash       *btcwire.ShaHash
-	wg                 sync.WaitGroup
 	outputQueue        chan btcwire.Message
 	outputInvChan      chan *btcwire.InvVect
 	blockProcessed     chan bool
@@ -692,7 +692,7 @@ func (p *peer) handleAddrMsg(msg *btcwire.MsgAddr) {
 
 	for _, na := range msg.AddrList {
 		// Don't add more address if we're disconnecting.
-		if p.disconnect {
+		if atomic.LoadInt32(&p.disconnect) != 0 {
 			return
 		}
 
@@ -752,7 +752,7 @@ func (p *peer) readMessage() (msg btcwire.Message, buf []byte, err error) {
 // writeMessage sends a bitcoin Message to the peer with logging.
 func (p *peer) writeMessage(msg btcwire.Message) {
 	// Don't do anything if we're disconnecting.
-	if p.disconnect == true {
+	if atomic.LoadInt32(&p.disconnect) != 0 {
 		return
 	}
 
@@ -812,7 +812,7 @@ func (p *peer) isAllowedByRegression(err error) bool {
 // goroutine.
 func (p *peer) inHandler() {
 out:
-	for !p.disconnect {
+	for atomic.LoadInt32(&p.disconnect) == 0 {
 		rmsg, buf, err := p.readMessage()
 		if err != nil {
 			// In order to allow regression tests with malformed
@@ -826,7 +826,7 @@ out:
 			}
 
 			// Only log the error if we're not forcibly disconnecting.
-			if !p.disconnect {
+			if atomic.LoadInt32(&p.disconnect) == 0 {
 				log.Errorf("[PEER] Can't read message: %v", err)
 			}
 			break out
@@ -890,7 +890,7 @@ out:
 
 		// Mark the address as currently connected and working as of
 		// now if one of the messages that trigger
-		if markConnected && !p.disconnect {
+		if markConnected && atomic.LoadInt32(&p.disconnect) == 0 {
 			if p.na == nil {
 				log.Warnf("we're getting stuff before we " +
 					"got a version message. that's bad")
@@ -905,9 +905,7 @@ out:
 	p.Disconnect()
 	p.server.donePeers <- p
 	p.server.blockManager.DonePeer(p)
-	p.quit <- true
 
-	p.wg.Done()
 	log.Tracef("[PEER] Peer input handler done for %s", p.conn.RemoteAddr())
 }
 
@@ -928,7 +926,8 @@ out:
 		case <-trickleTicker.C:
 			// Don't send anything if we're disconnecting or there
 			// is no queued inventory.
-			if p.disconnect || p.invSendQueue.Len() == 0 {
+			if atomic.LoadInt32(&p.disconnect) != 0 ||
+				p.invSendQueue.Len() == 0 {
 				continue
 			}
 
@@ -962,7 +961,6 @@ out:
 			break out
 		}
 	}
-	p.wg.Done()
 	log.Tracef("[PEER] Peer output handler done for %s", p.conn.RemoteAddr())
 }
 
@@ -1011,7 +1009,6 @@ func (p *peer) Start() error {
 	// Start processing input and output.
 	go p.inHandler()
 	go p.outHandler()
-	p.wg.Add(2)
 	p.started = true
 
 	return nil
@@ -1020,7 +1017,11 @@ func (p *peer) Start() error {
 // Disconnect disconnects the peer by closing the connection.  It also sets
 // a flag so the impending shutdown can be detected.
 func (p *peer) Disconnect() {
-	p.disconnect = true
+	// did we win the race?
+	if atomic.AddInt32(&p.disconnect, 1) != 1 {
+		return
+	}
+	close(p.quit)
 	if p.conn != nil {
 		p.conn.Close()
 	}
@@ -1031,7 +1032,6 @@ func (p *peer) Disconnect() {
 func (p *peer) Shutdown() {
 	log.Tracef("[PEER] Shutdown peer %s", p.addr)
 	p.Disconnect()
-	p.wg.Wait()
 }
 
 // newPeerBase returns a new base bitcoin peer for the provided server and
@@ -1098,7 +1098,6 @@ func newOutboundPeer(s *server, addr string, persistent bool) *peer {
 	}
 	p.na = btcwire.NewNetAddressIPPort(net.ParseIP(ip), uint16(port), 0)
 
-	p.wg.Add(1)
 	go func() {
 		// Select which dial method to call depending on whether or
 		// not a proxy is configured.  Also, add proxy information to
@@ -1118,7 +1117,7 @@ func newOutboundPeer(s *server, addr string, persistent bool) *peer {
 		// Attempt to connect to the peer.  If the connection fails and
 		// this is a persistent connection, retry after the retry
 		// interval.
-		for !s.shutdown {
+		for atomic.LoadInt32(&p.disconnect) == 0 {
 			log.Debugf("[SRVR] Attempting to connect to %s", faddr)
 			conn, err := dial("tcp", addr)
 			if err != nil {
@@ -1127,7 +1126,6 @@ func newOutboundPeer(s *server, addr string, persistent bool) *peer {
 					faddr, err)
 				if !persistent {
 					p.server.donePeers <- p
-					p.wg.Done()
 					return
 				}
 				scaledInterval := connectionRetryInterval.Nanoseconds() * p.retrycount / 2
@@ -1141,7 +1139,7 @@ func newOutboundPeer(s *server, addr string, persistent bool) *peer {
 			// While we were sleeping trying to connect, the server
 			// may have scheduled a shutdown.  In that case ditch
 			// the peer immediately.
-			if !s.shutdown {
+			if atomic.LoadInt32(&p.disconnect) == 0 {
 				p.server.addrManager.Attempt(p.na)
 
 				// Connection was successful so log it and start peer.
@@ -1149,14 +1147,8 @@ func newOutboundPeer(s *server, addr string, persistent bool) *peer {
 				p.conn = conn
 				p.retrycount = 0
 				p.Start()
-			} else {
-				p.server.donePeers <- p
 			}
 
-			// We are done here, Start() will have grabbed
-			// additional waitgroup entries if we are not shutting
-			// down.
-			p.wg.Done()
 			return
 		}
 	}()
