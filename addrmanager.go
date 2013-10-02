@@ -499,7 +499,7 @@ func (a *AddrManager) deserialisePeers(filePath string) error {
 
 	_, err := os.Stat(filePath)
 	if os.IsNotExist(err) {
-		return fmt.Errorf("%s does not exist.\n", filePath)
+		return nil
 	}
 	r, err := os.Open(filePath)
 	if err != nil {
