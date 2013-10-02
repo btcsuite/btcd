@@ -48,7 +48,7 @@ type server struct {
 	nonce         uint64
 	listeners     []net.Listener
 	btcnet        btcwire.BitcoinNet
-	started       bool
+	started       int32 // atomic
 	shutdown      int32 // atomic
 	shutdownSched int32 // atomic
 	addrManager   *AddrManager
@@ -458,7 +458,7 @@ func (s *server) BroadcastMessage(msg btcwire.Message, exclPeers ...*peer) {
 // Start begins accepting connections from peers.
 func (s *server) Start() {
 	// Already started?
-	if s.started {
+	if atomic.AddInt32(&s.started, 1) != 1 {
 		return
 	}
 
@@ -480,8 +480,6 @@ func (s *server) Start() {
 	if !cfg.DisableRPC {
 		s.rpcServer.Start()
 	}
-
-	s.started = true
 }
 
 // Stop gracefully shuts down the server by stopping and disconnecting all

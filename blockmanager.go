@@ -13,6 +13,7 @@ import (
 	"os"
 	"path/filepath"
 	"sync"
+	"sync/atomic"
 	"time"
 )
 
@@ -60,8 +61,8 @@ type txMsg struct {
 // incoming blocks.
 type blockManager struct {
 	server            *server
-	started           bool
-	shutdown          bool
+	started           int32
+	shutdown          int32
 	blockChain        *btcchain.BlockChain
 	blockPeer         map[btcwire.ShaHash]*peer
 	requestedBlocks   map[btcwire.ShaHash]bool
@@ -132,7 +133,7 @@ func (b *blockManager) startSync(peers *list.List) {
 // also starts syncing if needed.  It is invoked from the syncHandler goroutine.
 func (b *blockManager) handleNewPeerMsg(peers *list.List, p *peer) {
 	// Ignore if in the process of shutting down.
-	if b.shutdown {
+	if atomic.LoadInt32(&b.shutdown) != 0 {
 		return
 	}
 
@@ -385,7 +386,7 @@ func (b *blockManager) handleInvMsg(imsg *invMsg) {
 func (b *blockManager) blockHandler() {
 	candidatePeers := list.New()
 out:
-	for !b.shutdown {
+	for {
 		select {
 		case m := <-b.msgChan:
 			switch msg := m.(type) {
@@ -486,7 +487,7 @@ func (b *blockManager) chainNotificationHandler() {
 	// when it sends notifications while retaining order.
 	pending := list.New()
 out:
-	for !b.shutdown {
+	for {
 		// Sending on a nil channel always blocks and hence is ignored
 		// by select.  Thus enable send only when the list is non-empty.
 		var firstItem *btcchain.Notification
@@ -514,7 +515,7 @@ out:
 // NewPeer informs the blockmanager of a newly active peer.
 func (b *blockManager) NewPeer(p *peer) {
 	// Ignore if we are shutting down.
-	if b.shutdown {
+	if atomic.LoadInt32(&b.shutdown) != 0 {
 		return
 	}
 	b.msgChan <- &newPeerMsg{peer: p}
@@ -523,7 +524,7 @@ func (b *blockManager) NewPeer(p *peer) {
 // QueueBlock adds the passed block message and peer to the block handling queue.
 func (b *blockManager) QueueBlock(block *btcutil.Block, p *peer) {
 	// Don't accept more blocks if we're shutting down.
-	if b.shutdown {
+	if atomic.LoadInt32(&b.shutdown) != 0 {
 		p.blockProcessed <- false
 		return
 	}
@@ -536,7 +537,7 @@ func (b *blockManager) QueueBlock(block *btcutil.Block, p *peer) {
 func (b *blockManager) QueueInv(inv *btcwire.MsgInv, p *peer) {
 	// No channel handling here because peers do not need to block on inv
 	// messages.
-	if b.shutdown {
+	if atomic.LoadInt32(&b.shutdown) != 0 {
 		return
 	}
 
@@ -547,7 +548,7 @@ func (b *blockManager) QueueInv(inv *btcwire.MsgInv, p *peer) {
 // DonePeer informs the blockmanager that a peer has disconnected.
 func (b *blockManager) DonePeer(p *peer) {
 	// Ignore if we are shutting down.
-	if b.shutdown {
+	if atomic.LoadInt32(&b.shutdown) != 0 {
 		return
 	}
 	b.msgChan <- &donePeerMsg{peer: p}
@@ -556,7 +557,7 @@ func (b *blockManager) DonePeer(p *peer) {
 // Start begins the core block handler which processes block and inv messages.
 func (b *blockManager) Start() {
 	// Already started?
-	if b.started {
+	if atomic.AddInt32(&b.started, 1) != 1 {
 		return
 	}
 
@@ -565,20 +566,18 @@ func (b *blockManager) Start() {
 	go b.blockHandler()
 	go b.chainNotificationSinkHandler()
 	go b.chainNotificationHandler()
-	b.started = true
 }
 
 // Stop gracefully shuts down the block manager by stopping all asynchronous
 // handlers and waiting for them to finish.
 func (b *blockManager) Stop() error {
-	if b.shutdown {
+	if atomic.AddInt32(&b.shutdown, 1) != 1 {
 		log.Warnf("[BMGR] Block manager is already in the process of " +
 			"shutting down")
 		return nil
 	}
 
 	log.Infof("[BMGR] Block manager shutting down")
-	b.shutdown = true
 	close(b.quit)
 	b.wg.Wait()
 	return nil

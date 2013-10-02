@@ -20,6 +20,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"sync"
+	"sync/atomic"
 	"time"
 )
 
@@ -325,8 +326,8 @@ type AddrManager struct {
 	addrIndex map[string]*knownAddress // address key to ka for all addrs.
 	addrNew   [newBucketCount]map[string]*knownAddress
 	addrTried [triedBucketCount]*list.List
-	started   bool
-	shutdown  bool
+	started   int32
+	shutdown  int32
 	wg        sync.WaitGroup
 	quit      chan bool
 	nTried    int
@@ -380,19 +381,17 @@ func (a *AddrManager) getTriedBucket(netAddr *btcwire.NetAddress) int {
 func (a *AddrManager) addressHandler() {
 	dumpAddressTicker := time.NewTicker(dumpAddressInterval)
 out:
-	for !a.shutdown {
+	for {
 		select {
 		case <-dumpAddressTicker.C:
-			if !a.shutdown {
-				a.savePeers()
-			}
+			a.savePeers()
 
 		case <-a.quit:
-			a.savePeers()
 			break out
 		}
 	}
 	dumpAddressTicker.Stop()
+	a.savePeers()
 	a.wg.Done()
 	log.Trace("[AMGR] Address handler done")
 }
@@ -607,32 +606,31 @@ func deserialiseNetAddress(addr string) (*btcwire.NetAddress, error) {
 // addresses, timeouts, and interval based writes.
 func (a *AddrManager) Start() {
 	// Already started?
-	if a.started {
+	if atomic.AddInt32(&a.started, 1) != 1 {
 		return
 	}
 
 	log.Trace("[AMGR] Starting address manager")
 
 	a.wg.Add(1)
-	go a.addressHandler()
-	a.started = true
 
 	// Load peers we already know about from file.
 	a.loadPeers()
+
+	// Start the address ticker to save addresses periodically.
+	go a.addressHandler()
 }
 
 // Stop gracefully shuts down the address manager by stopping the main handler.
 func (a *AddrManager) Stop() error {
-	if a.shutdown {
+	if atomic.AddInt32(&a.shutdown, 1) != 1 {
 		log.Warnf("[AMGR] Address manager is already in the process of " +
 			"shutting down")
 		return nil
 	}
 
 	log.Infof("[AMGR] Address manager shutting down")
-	a.savePeers()
-	a.shutdown = true
-	a.quit <- true
+	close(a.quit)
 	a.wg.Wait()
 	return nil
 }

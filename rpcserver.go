@@ -19,13 +19,14 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 )
 
 // rpcServer holds the items the rpc server may need to access (config,
 // shutdown, main server, etc.)
 type rpcServer struct {
-	started   bool
-	shutdown  bool
+	started   int32
+	shutdown  int32
 	server    *server
 	wg        sync.WaitGroup
 	rpcport   string
@@ -36,7 +37,7 @@ type rpcServer struct {
 
 // Start is used by server.go to start the rpc listener.
 func (s *rpcServer) Start() {
-	if s.started {
+	if atomic.AddInt32(&s.started, 1) != 1 {
 		return
 	}
 
@@ -61,12 +62,11 @@ func (s *rpcServer) Start() {
 			s.wg.Done()
 		}(listener)
 	}
-	s.started = true
 }
 
 // Stop is used by server.go to stop the rpc listener.
 func (s *rpcServer) Stop() error {
-	if s.shutdown {
+	if atomic.AddInt32(&s.shutdown, 1) != 1 {
 		log.Infof("[RPCS] RPC server is already in the process of shutting down")
 		return nil
 	}
@@ -80,7 +80,6 @@ func (s *rpcServer) Stop() error {
 	}
 	log.Infof("[RPCS] RPC server shutdown complete")
 	s.wg.Wait()
-	s.shutdown = true
 	return nil
 }
 
@@ -127,7 +126,7 @@ func jsonAuthFail(w http.ResponseWriter, r *http.Request, s *rpcServer) {
 func jsonRPCRead(w http.ResponseWriter, r *http.Request, s *rpcServer) {
 	_ = spew.Dump
 	r.Close = true
-	if s.shutdown == true {
+	if atomic.LoadInt32(&s.shutdown) != 0 {
 		return
 	}
 	var rawReply btcjson.Reply

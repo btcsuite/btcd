@@ -96,7 +96,7 @@ type peer struct {
 	protocolVersion    uint32
 	btcnet             btcwire.BitcoinNet
 	services           btcwire.ServiceFlag
-	started            bool
+	started            int32
 	conn               net.Conn
 	addr               string
 	na                 *btcwire.NetAddress
@@ -993,7 +993,7 @@ func (p *peer) QueueInventory(invVect *btcwire.InvVect) {
 // version message for outbound connections to start the negotiation process.
 func (p *peer) Start() error {
 	// Already started?
-	if p.started {
+	if atomic.AddInt32(&p.started, 1) != 1 {
 		return nil
 	}
 
@@ -1013,7 +1013,6 @@ func (p *peer) Start() error {
 	// Start processing input and output.
 	go p.inHandler()
 	go p.outHandler()
-	p.started = true
 
 	return nil
 }
