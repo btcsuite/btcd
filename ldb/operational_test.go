@@ -93,25 +93,9 @@ out:
 						t.Errorf("referenced tx not found %v ", origintxsha)
 					}
 
-					_, _, _, _, err := db.FetchTxAllBySha(origintxsha)
-					if err != nil {
-						t.Errorf("referenced tx not found %v err %v ", origintxsha, err)
-					}
-					_, _, _, _, err = db.FetchTxAllBySha(origintxsha)
-					if err != nil {
-						t.Errorf("referenced tx not found %v err %v ", origintxsha, err)
-					}
 					_, _, _, err = db.FetchTxBySha(origintxsha)
 					if err != nil {
 						t.Errorf("referenced tx not found %v err %v ", origintxsha, err)
-					}
-					_, _, err = db.FetchTxBufBySha(origintxsha)
-					if err != nil {
-						t.Errorf("referenced tx not found %v err %v ", origintxsha, err)
-					}
-					_, err = db.FetchTxUsedBySha(origintxsha)
-					if err != nil {
-						t.Errorf("tx used fetch fail %v err %v ", origintxsha, err)
 					}
 				}
 			}
@@ -277,11 +261,6 @@ func testBackout(t *testing.T, mode int) {
 	}
 
 	_, _, _, err = db.FetchTxBySha(&txsha)
-	if err != nil {
-		t.Errorf("tx %v not located db\n", txsha)
-		return
-	}
-	_, err = db.FetchTxUsedBySha(&txsha)
 	if err != nil {
 		t.Errorf("tx %v not located db\n", txsha)
 		return

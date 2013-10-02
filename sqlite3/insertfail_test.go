@@ -84,7 +84,7 @@ out:
 			txin := tx.TxIn[0]
 			origintxsha := &txin.PreviousOutpoint.Hash
 			sqlite3.KillTx(db, origintxsha)
-			_, _, _, _, err = db.FetchTxAllBySha(origintxsha)
+			_, _, _, err = db.FetchTxBySha(origintxsha)
 			if err == nil {
 				t.Errorf("deleted tx found %v", origintxsha)
 			}
@@ -107,7 +107,7 @@ out:
 		if height == 248 {
 			for _, tx := range mblock.Transactions {
 				txsha, err := tx.TxSha()
-				_, _, _, _, err = db.FetchTxAllBySha(&txsha)
+				_, _, _, err = db.FetchTxBySha(&txsha)
 				if err == nil {
 					t.Errorf("referenced tx found, should not have been %v, ", txsha)
 				}

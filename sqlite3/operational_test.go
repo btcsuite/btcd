@@ -99,25 +99,9 @@ out:
 						t.Errorf("referenced tx not found %v ", origintxsha)
 					}
 
-					_, _, _, _, err := db.FetchTxAllBySha(origintxsha)
-					if err != nil {
-						t.Errorf("referenced tx not found %v err %v ", origintxsha, err)
-					}
-					_, _, _, _, err = db.FetchTxAllBySha(origintxsha)
-					if err != nil {
-						t.Errorf("referenced tx not found %v err %v ", origintxsha, err)
-					}
 					_, _, _, err = db.FetchTxBySha(origintxsha)
 					if err != nil {
 						t.Errorf("referenced tx not found %v err %v ", origintxsha, err)
-					}
-					_, _, err = db.FetchTxBufBySha(origintxsha)
-					if err != nil {
-						t.Errorf("referenced tx not found %v err %v ", origintxsha, err)
-					}
-					_, err = db.FetchTxUsedBySha(origintxsha)
-					if err != nil {
-						t.Errorf("tx used fetch fail %v err %v ", origintxsha, err)
 					}
 				}
 			}
@@ -287,17 +271,7 @@ func testBackout(t *testing.T, mode int) {
 	}
 
 	_, _, _, err = db.FetchTxBySha(&txsha)
-	_, err = db.FetchTxUsedBySha(&txsha)
-
-	block = blocks[99]
-	mblock = block.MsgBlock()
-	txsha, err = mblock.Transactions[0].TxSha()
-	oldused, err := db.FetchTxUsedBySha(&txsha)
-	err = db.InsertTx(&txsha, 99, 1024, 1048, oldused)
-	if err == nil {
-		t.Errorf("dup insert of tx succeeded")
-		return
-	}
+	_, _, _, err = db.FetchTxBySha(&txsha)
 }
 
 func loadBlocks(t *testing.T, file string) (blocks []*btcutil.Block, err error) {
