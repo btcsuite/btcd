@@ -497,7 +497,7 @@ func (a *AddrManager) loadPeers() {
 		return
 	}
 	log.Infof("[AMGR] Successfuly loaded %d addresses from %s",
-		a.nNew + a.nTried, filePath)
+		a.nNew+a.nTried, filePath)
 }
 
 func (a *AddrManager) deserialisePeers(filePath string) error {
@@ -1016,9 +1016,9 @@ func RFC3964(na *btcwire.NetAddress) bool {
 	return rfc3964.Contains(na.IP)
 }
 
-// RFC4193 IPv6 unique local (FC00::/15)
+// RFC4193 IPv6 unique local (FC00::/7)
 var rfc4193 = net.IPNet{IP: net.ParseIP("FC00::"),
-	Mask: net.CIDRMask(15, 128)}
+	Mask: net.CIDRMask(7, 128)}
 
 func RFC4193(na *btcwire.NetAddress) bool {
 	return rfc4193.Contains(na.IP)
@@ -1033,7 +1033,7 @@ func RFC4380(na *btcwire.NetAddress) bool {
 }
 
 // RFC4843 IPv6 ORCHID: (2001:10::/28)
-var rfc4843 = net.IPNet{IP: net.ParseIP("2001;10::"),
+var rfc4843 = net.IPNet{IP: net.ParseIP("2001:10::"),
 	Mask: net.CIDRMask(28, 128)}
 
 func RFC4843(na *btcwire.NetAddress) bool {
@@ -1049,7 +1049,7 @@ func RFC4862(na *btcwire.NetAddress) bool {
 }
 
 // RFC6052: IPv6 well known prefix (64:FF9B::/96)
-var rfc6052 = net.IPNet{IP: net.ParseIP("64::FF9B::"),
+var rfc6052 = net.IPNet{IP: net.ParseIP("64:FF9B::"),
 	Mask: net.CIDRMask(96, 128)}
 
 func RFC6052(na *btcwire.NetAddress) bool {
