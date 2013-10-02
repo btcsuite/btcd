@@ -349,7 +349,7 @@ out:
 		}
 
 		// Only try connect to more peers if we actually need more
-		if outboundPeers >= maxOutbound ||
+		if outboundPeers >= maxOutbound || len(cfg.ConnectPeers) > 0 ||
 			atomic.LoadInt32(&s.shutdown) != 0 {
 			continue
 		}
