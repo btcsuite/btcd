@@ -1162,7 +1162,7 @@ func newOutboundPeer(s *server, addr string, persistent bool) *peer {
 }
 
 // logError makes sure that we only log errors loudly on user peers.
-func (p *peer) logError(fmt string, args...interface{}) {
+func (p *peer) logError(fmt string, args ...interface{}) {
 	if p.persistent {
 		log.Errorf(fmt, args...)
 	} else {

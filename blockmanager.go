@@ -409,7 +409,7 @@ out:
 				// bitch and whine.
 			}
 
-		case not := <- b.chainNotifySink:
+		case not := <-b.chainNotifySink:
 			b.handleNotifyMsg(not)
 
 		case <-b.quit:
