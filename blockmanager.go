@@ -73,8 +73,6 @@ type blockManager struct {
 	processingReqs    bool
 	syncPeer          *peer
 	msgChan           chan interface{}
-	chainNotify       chan *btcchain.Notification
-	chainNotifySink   chan *btcchain.Notification
 	wg                sync.WaitGroup
 	quit              chan bool
 }
@@ -407,9 +405,6 @@ out:
 				// bitch and whine.
 			}
 
-		case not := <-b.chainNotifySink:
-			b.handleNotifyMsg(not)
-
 		case <-b.quit:
 			break out
 		}
@@ -463,40 +458,6 @@ func (b *blockManager) handleNotifyMsg(notification *btcchain.Notification) {
 	}
 }
 
-// chainNotificationHandler is the handler for asynchronous notifications from
-// btcchain.  It must be run as a goroutine.
-func (b *blockManager) chainNotificationHandler() {
-
-	// pending is a list to queue notifications in order until the they can
-	// be processed by the sink.  This is used to prevent blocking chain
-	// when it sends notifications while retaining order.
-	pending := list.New()
-out:
-	for {
-		// Sending on a nil channel always blocks and hence is ignored
-		// by select.  Thus enable send only when the list is non-empty.
-		var firstItem *btcchain.Notification
-		var chainNotifySink chan interface{}
-		if pending.Len() > 0 {
-			firstItem = pending.Front().Value.(*btcchain.Notification)
-			chainNotifySink = b.msgChan
-		}
-
-		select {
-		case notification := <-b.chainNotify:
-			pending.PushBack(notification)
-
-		case chainNotifySink <- firstItem:
-			pending.Remove(pending.Front())
-
-		case <-b.quit:
-			break out
-		}
-	}
-	b.wg.Done()
-	log.Trace("[BMGR] Chain notification handler done")
-}
-
 // NewPeer informs the blockmanager of a newly active peer.
 func (b *blockManager) NewPeer(p *peer) {
 	// Ignore if we are shutting down.
@@ -547,9 +508,8 @@ func (b *blockManager) Start() {
 	}
 
 	log.Trace("[BMGR] Starting block manager")
-	b.wg.Add(2)
+	b.wg.Add(1)
 	go b.blockHandler()
-	go b.chainNotificationHandler()
 }
 
 // Stop gracefully shuts down the block manager by stopping all asynchronous
@@ -570,18 +530,15 @@ func (b *blockManager) Stop() error {
 // newBlockManager returns a new bitcoin block manager.
 // Use Start to begin processing asynchronous block and inv updates.
 func newBlockManager(s *server) (*blockManager, error) {
-	chainNotify := make(chan *btcchain.Notification)
 	bm := blockManager{
 		server:           s,
-		blockChain:       btcchain.New(s.db, s.btcnet, chainNotify),
 		blockPeer:        make(map[btcwire.ShaHash]*peer),
 		requestedBlocks:  make(map[btcwire.ShaHash]bool),
 		lastBlockLogTime: time.Now(),
 		msgChan:          make(chan interface{}, cfg.MaxPeers*3),
-		chainNotify:      chainNotify,
-		chainNotifySink:  make(chan *btcchain.Notification),
 		quit:             make(chan bool),
 	}
+	bm.blockChain = btcchain.New(s.db, s.btcnet, bm.handleNotifyMsg)
 	bm.blockChain.DisableVerify(cfg.VerifyDisabled)
 
 	log.Infof("[BMGR] Generating initial block node index.  This may " +
