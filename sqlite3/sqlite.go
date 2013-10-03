@@ -210,6 +210,10 @@ func newOrCreateSqliteDB(filepath string, create bool) (pbdb btcdb.Db, err error
 		return nil, err
 	}
 
+	db.Exec("PRAGMA page_size=4096;")
+	db.Exec("PRAGMA foreign_keys=ON;")
+	db.Exec("PRAGMA journal_mode=WAL;")
+
 	dbverstmt, err := db.Prepare("SELECT version FROM dbversion;")
 	if err != nil {
 		// about the only reason this would fail is that the database
@@ -242,8 +246,6 @@ func newOrCreateSqliteDB(filepath string, create bool) (pbdb btcdb.Db, err error
 		log.Warnf("mismatch db version: %v expected %v\n", version, dbVersion)
 		return nil, fmt.Errorf("Invalid version in database")
 	}
-	db.Exec("PRAGMA foreign_keys = ON;")
-	db.Exec("PRAGMA journal_mode=WAL;")
 	bdb.sqldb = db
 
 	bdb.blkStmts = make([]*sql.Stmt, len(blkqueries))
