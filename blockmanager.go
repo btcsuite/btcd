@@ -304,6 +304,31 @@ func (b *blockManager) handleTxMsg(tmsg *txMsg) {
 	}
 }
 
+// current returns true if we believe we are synced with our peers, false if we
+// still have blocks to check
+func (b *blockManager) current() bool {
+	if !b.blockChain.IsCurrent() {
+		return false
+	}
+
+	// if blockChain thinks we are current and we have no syncPeer it
+	// is probably right.
+	if b.syncPeer == nil {
+		return true
+	}
+
+	_, height, err := b.server.db.NewestSha()
+	// No matter what chain thinks, if we are below the block we are
+	// syncing to we are not current.
+	// TODO(oga) we can get chain to return the height of each block when we
+	// parse an orphan, which would allow us to update the height of peers
+	// from what it was at initial handshake.
+	if err != nil || height < int64(b.syncPeer.lastBlock) {
+		return false
+	}
+	return true
+}
+
 // handleBlockMsg handles block messages from all peers.
 func (b *blockManager) handleBlockMsg(bmsg *blockMsg) {
 	// Keep track of which peer the block was sent from so the notification
@@ -407,7 +432,7 @@ func (b *blockManager) haveInventory(invVect *btcwire.InvVect) bool {
 func (b *blockManager) handleInvMsg(imsg *invMsg) {
 	// Ignore invs from peers that aren't the sync if we are not current.
 	// Helps prevent fetching a mass of orphans.
-	if imsg.peer != b.syncPeer && !b.blockChain.IsCurrent() {
+	if imsg.peer != b.syncPeer && !b.current() {
 		return
 	}
 
@@ -595,7 +620,8 @@ func (b *blockManager) handleNotifyMsg(notification *btcchain.Notification) {
 	case btcchain.NTBlockAccepted:
 		// Don't relay if we are not current. Other peers that are
 		// current should already know about it.
-		if !b.blockChain.IsCurrent() {
+
+		if !b.current() {
 			return
 		}
 
