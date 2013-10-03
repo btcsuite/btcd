@@ -370,7 +370,7 @@ func jsonRPCRead(w http.ResponseWriter, r *http.Request, s *rpcServer) {
 		} else {
 			txSha, _ := btcwire.NewShaHashFromStr(tx)
 			var txS *btcwire.MsgTx
-			txS, _, blksha, err := s.server.db.FetchTxBySha(txSha)
+			txList, err  := s.server.db.FetchTxBySha(txSha)
 			if err != nil {
 				log.Errorf("[RPCS] Error fetching tx: %v", err)
 				jsonError := btcjson.Error{
@@ -386,6 +386,10 @@ func jsonRPCRead(w http.ResponseWriter, r *http.Request, s *rpcServer) {
 				log.Tracef("[RPCS] reply: %v", rawReply)
 				break
 			}
+
+			lastTx := len(txList) - 1
+			txS = txList[lastTx].Tx
+			blksha := txList[lastTx].BlkSha
 			blk, err := s.server.db.FetchBlockBySha(blksha)
 			if err != nil {
 				log.Errorf("[RPCS] Error fetching sha: %v", err)
