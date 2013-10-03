@@ -272,6 +272,11 @@ func (b *blockManager) handleBlockMsg(bmsg *blockMsg) {
 // NOTE: This will need to have tx handling added as well when they are
 // supported.
 func (b *blockManager) handleInvMsg(imsg *invMsg) {
+	// Ignore invs from peers that aren't the sync if we are not current.
+	// Helps prevent fetching a mass of orphans.
+	if imsg.peer != b.syncPeer && !b.blockChain.IsCurrent() {
+		return
+	}
 	// Attempt to find the final block in the inventory list.  There may
 	// not be one.
 	lastBlock := -1
@@ -439,6 +444,13 @@ func (b *blockManager) handleNotifyMsg(notification *btcchain.Notification) {
 	// A block has been accepted into the block chain.  Relay it to other
 	// peers.
 	case btcchain.NTBlockAccepted:
+		// Don't relay if we are not current. Other peers that are
+		// current should already know about it.
+
+		if !b.blockChain.IsCurrent() {
+			return
+		}
+
 		block, ok := notification.Data.(*btcutil.Block)
 		if !ok {
 			log.Warnf("[BMGR] Chain notification type not a block.")
