@@ -163,19 +163,19 @@ func (b *blockManager) handleDonePeerMsg(peers *list.List, p *peer) {
 
 	log.Infof("[BMGR] Lost peer %s", p)
 
-	// Attempt to find a new peer to sync from if the quitting peer is the
-	// sync peer.
-	if b.syncPeer != nil && b.syncPeer == p {
-		b.syncPeer = nil
-		b.startSync(peers)
-	}
-
 	// remove requested blocks from the global map so that they will be
 	// fetched from elsewhere next time we get an inv.
 	// TODO(oga) we could possibly here check which peers have these blocks
 	// and request them now to speed things up a little.
 	for k := range p.requestedBlocks {
 		delete(b.requestedBlocks, k)
+	}
+
+	// Attempt to find a new peer to sync from if the quitting peer is the
+	// sync peer.
+	if b.syncPeer != nil && b.syncPeer == p {
+		b.syncPeer = nil
+		b.startSync(peers)
 	}
 }
 
