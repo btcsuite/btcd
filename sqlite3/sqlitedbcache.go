@@ -131,9 +131,9 @@ func (db *SqliteDb) insertBlockCache(sha *btcwire.ShaHash, blk *btcutil.Block) {
 	bc.blockMap[blkObj.sha] = &blkObj
 }
 
-// FetchTxByShaList given a array of ShaHash, look up the transactions
+// FetchUnSpentTxByShaList given a array of ShaHash, look up the transactions
 // and return them in a TxListReply array.
-func (db *SqliteDb) FetchTxByShaList(txShaList []*btcwire.ShaHash) []*btcdb.TxListReply {
+func (db *SqliteDb) FetchUnSpentTxByShaList(txShaList []*btcwire.ShaHash) []*btcdb.TxListReply {
 	db.dbLock.Lock()
 	defer db.dbLock.Unlock()
 
@@ -229,30 +229,44 @@ func (db *SqliteDb) fetchTxDataBySha(txsha *btcwire.ShaHash) (rtx *btcwire.MsgTx
 }
 
 // FetchTxBySha returns several pieces of data regarding the given sha.
-func (db *SqliteDb) FetchTxBySha(txsha *btcwire.ShaHash) (rtx *btcwire.MsgTx, rpver uint32, rblksha *btcwire.ShaHash, err error) {
+func (db *SqliteDb) FetchTxBySha(txsha *btcwire.ShaHash) ([]*btcdb.TxListReply, error) {
 	var pver uint32
 	var blksha *btcwire.ShaHash
 	var height int64
 	var toff int
 	var tlen int
+	var txspent []byte
 	var blk *btcutil.Block
 	var blkbuf []byte
+	var err error
 
 	// Check Tx cache
 	if txc, ok := db.fetchTxCache(txsha); ok {
-		return txc.tx, txc.pver, &txc.blksha, nil
+		replies := make ([]*btcdb.TxListReply, 1)
+
+		tx := txc.tx
+		btxspent := make([]bool, len(tx.TxOut), len(tx.TxOut))
+		for idx := range tx.TxOut {
+			byteidx := idx / 8
+			byteoff := uint(idx % 8)
+			btxspent[idx] = (txc.spent[byteidx] & (byte(1) << byteoff)) != 0
+		}
+
+		txlre := btcdb.TxListReply{Sha: txsha, Tx: tx, BlkSha: &txc.blksha, Height: txc.height, TxSpent: btxspent, Err: nil}
+		replies[0] = &txlre
+		return replies, nil
 	}
 
 	// If not cached load it
-	height, toff, tlen, err = db.FetchLocationBySha(txsha)
+	height, toff, tlen, txspent, err = db.fetchLocationUsedBySha(txsha)
 	if err != nil {
-		return
+		return []*btcdb.TxListReply{}, err
 	}
 
 	blksha, err = db.FetchBlockShaByHeight(height)
 	if err != nil {
 		log.Warnf("block idx lookup %v to %v", height, err)
-		return
+		return []*btcdb.TxListReply{}, err
 	}
 	log.Tracef("transaction %v is at block %v %v tx %v",
 		txsha, blksha, height, toff)
@@ -261,13 +275,13 @@ func (db *SqliteDb) FetchTxBySha(txsha *btcwire.ShaHash) (rtx *btcwire.MsgTx, rp
 	if err != nil {
 		log.Warnf("unable to fetch block %v %v ",
 			height, &blksha)
-		return
+		return []*btcdb.TxListReply{}, err
 	}
 
 	blkbuf, err = blk.Bytes()
 	if err != nil {
 		log.Warnf("unable to decode block %v %v", height, &blksha)
-		return
+		return []*btcdb.TxListReply{}, err
 	}
 
 	txbuf := make([]byte, tlen)
@@ -279,7 +293,7 @@ func (db *SqliteDb) FetchTxBySha(txsha *btcwire.ShaHash) (rtx *btcwire.MsgTx, rp
 	if err != nil {
 		log.Warnf("unable to decode tx block %v %v txoff %v txlen %v",
 			height, &blksha, toff, tlen)
-		return
+		return []*btcdb.TxListReply{}, err
 	}
 
 	// Shove data into TxCache
@@ -290,10 +304,22 @@ func (db *SqliteDb) FetchTxBySha(txsha *btcwire.ShaHash) (rtx *btcwire.MsgTx, rp
 	txc.txbuf = txbuf
 	txc.pver = pver
 	txc.height = height
+	txc.spent = txspent
 	txc.blksha = *blksha
 	db.insertTxCache(&txc)
 
-	return &tx, pver, blksha, nil
+
+	btxspent := make([]bool, len(tx.TxOut), len(tx.TxOut))
+	for idx := range tx.TxOut {
+		byteidx := idx / 8
+		byteoff := uint(idx % 8)
+		btxspent[idx] = (txspent[byteidx] & (byte(1) << byteoff)) != 0
+	}
+
+	replies := make ([]*btcdb.TxListReply, 1)
+	txlre := btcdb.TxListReply{Sha: txsha, Tx: &tx, BlkSha: blksha, Height: height, TxSpent: btxspent, Err: err}
+	replies[0] = &txlre
+	return replies, nil
 }
 
 // fetchTxCache look up the given transaction in the Tx cache.

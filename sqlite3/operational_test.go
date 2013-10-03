@@ -99,13 +99,13 @@ out:
 						t.Errorf("referenced tx not found %v ", origintxsha)
 					}
 
-					_, _, _, err = db.FetchTxBySha(origintxsha)
+					_, err = db.FetchTxBySha(origintxsha)
 					if err != nil {
 						t.Errorf("referenced tx not found %v err %v ", origintxsha, err)
 					}
 				}
 			}
-			txlist := db.FetchTxByShaList(txneededList)
+			txlist := db.FetchUnSpentTxByShaList(txneededList)
 			for _, txe := range txlist {
 				if txe.Err != nil {
 					t.Errorf("tx list fetch failed %v err %v ", txe.Sha, txe.Err)
@@ -270,8 +270,8 @@ func testBackout(t *testing.T, mode int) {
 		t.Errorf("tx %v exists in db, failure expected", txsha)
 	}
 
-	_, _, _, err = db.FetchTxBySha(&txsha)
-	_, _, _, err = db.FetchTxBySha(&txsha)
+	_, err = db.FetchTxBySha(&txsha)
+	_, err = db.FetchTxBySha(&txsha)
 }
 
 func loadBlocks(t *testing.T, file string) (blocks []*btcutil.Block, err error) {

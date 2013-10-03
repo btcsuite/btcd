@@ -75,11 +75,11 @@ type Db interface {
 
 	// FetchTxBySha returns some data for the given transaction hash. The
 	// implementation may cache the underlying data if desired.
-	FetchTxBySha(txsha *btcwire.ShaHash) (rtx *btcwire.MsgTx, rpver uint32, blksha *btcwire.ShaHash, err error)
+	FetchTxBySha(txsha *btcwire.ShaHash) ([]*TxListReply, error)
 
 	// FetchTxByShaList returns a TxListReply given an array of transaction
 	// hashes.  The implementation may cache the underlying data if desired.
-	FetchTxByShaList(txShaList []*btcwire.ShaHash) []*TxListReply
+	FetchUnSpentTxByShaList(txShaList []*btcwire.ShaHash) ([]*TxListReply)
 
 	// InsertBlock inserts raw block and transaction data from a block
 	// into the database.  The first block inserted into the database
@@ -145,6 +145,7 @@ type DriverDB struct {
 type TxListReply struct {
 	Sha     *btcwire.ShaHash
 	Tx      *btcwire.MsgTx
+	BlkSha	*btcwire.ShaHash
 	Height  int64
 	TxSpent []bool
 	Err     error

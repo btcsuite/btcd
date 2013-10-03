@@ -36,15 +36,15 @@ func (db *LevelDb) fetchBlockBySha(sha *btcwire.ShaHash) (blk *btcutil.Block, er
 	return
 }
 
-// FetchTxByShaList given a array of ShaHash, look up the transactions
+// FetchUnSpentTxByShaList given a array of ShaHash, look up the transactions
 // and return them in a TxListReply array.
-func (db *LevelDb) FetchTxByShaList(txShaList []*btcwire.ShaHash) []*btcdb.TxListReply {
+func (db *LevelDb) FetchUnSpentTxByShaList(txShaList []*btcwire.ShaHash) []*btcdb.TxListReply {
 	db.dbLock.Lock()
 	defer db.dbLock.Unlock()
 
 	replies := make([]*btcdb.TxListReply, len(txShaList))
 	for i, txsha := range txShaList {
-		tx, _, _, _, height, txspent, err := db.fetchTxDataBySha(txsha)
+		tx, blockSha, height, txspent, err := db.fetchTxDataBySha(txsha)
 		btxspent := []bool{}
 		if err == nil {
 			btxspent = make([]bool, len(tx.TxOut), len(tx.TxOut))
@@ -54,15 +54,14 @@ func (db *LevelDb) FetchTxByShaList(txShaList []*btcwire.ShaHash) []*btcdb.TxLis
 				btxspent[idx] = (txspent[byteidx] & (byte(1) << byteoff)) != 0
 			}
 		}
-		txlre := btcdb.TxListReply{Sha: txsha, Tx: tx, Height: height, TxSpent: btxspent, Err: err}
+		txlre := btcdb.TxListReply{Sha: txsha, Tx: tx, BlkSha: blockSha, Height: height, TxSpent: btxspent, Err: err}
 		replies[i] = &txlre
 	}
 	return replies
 }
 
 // fetchTxDataBySha returns several pieces of data regarding the given sha.
-func (db *LevelDb) fetchTxDataBySha(txsha *btcwire.ShaHash) (rtx *btcwire.MsgTx, rtxbuf []byte, rpver uint32, rblksha *btcwire.ShaHash, rheight int64, rtxspent []byte, err error) {
-	var pver uint32
+func (db *LevelDb) fetchTxDataBySha(txsha *btcwire.ShaHash) (rtx *btcwire.MsgTx, rblksha *btcwire.ShaHash, rheight int64, rtxspent []byte, err error) {
 	var blksha *btcwire.ShaHash
 	var blkHeight int64
 	var txspent []byte
@@ -83,9 +82,7 @@ func (db *LevelDb) fetchTxDataBySha(txsha *btcwire.ShaHash) (rtx *btcwire.MsgTx,
 	//log.Trace("transaction %v is at block %v %v txoff %v, txlen %v\n",
 	//	txsha, blksha, blkHeight, txOff, txLen)
 
-	txbuf := make([]byte, txLen)
-	copy(txbuf[:], blkbuf[txOff:txOff+txLen])
-	rbuf := bytes.NewBuffer(txbuf)
+	rbuf := bytes.NewBuffer(blkbuf[txOff:txOff+txLen])
 
 	var tx btcwire.MsgTx
 	err = tx.Deserialize(rbuf)
@@ -95,13 +92,28 @@ func (db *LevelDb) fetchTxDataBySha(txsha *btcwire.ShaHash) (rtx *btcwire.MsgTx,
 		return
 	}
 
-	return &tx, txbuf, pver, blksha, blkHeight, txspent, nil
+	return &tx, blksha, blkHeight, txspent, nil
 }
 
 // FetchTxBySha returns some data for the given Tx Sha.
-func (db *LevelDb) FetchTxBySha(txsha *btcwire.ShaHash) (rtx *btcwire.MsgTx, rpver uint32, blksha *btcwire.ShaHash, err error) {
-	rtx, _, rpver, blksha, _, _, err = db.fetchTxDataBySha(txsha)
-	return
+func (db *LevelDb) FetchTxBySha(txsha *btcwire.ShaHash) ([]*btcdb.TxListReply, error) {
+	tx, blksha, height, txspent, err := db.fetchTxDataBySha(txsha)
+	if err != nil {
+		return []*btcdb.TxListReply{}, err
+	}
+
+	replies := make ([]*btcdb.TxListReply, 1)
+
+	btxspent := make([]bool, len(tx.TxOut), len(tx.TxOut))
+	for idx := range tx.TxOut {
+		byteidx := idx / 8
+		byteoff := uint(idx % 8)
+		btxspent[idx] = (txspent[byteidx] & (byte(1) << byteoff)) != 0
+	}
+
+	txlre := btcdb.TxListReply{Sha: txsha, Tx: tx, BlkSha: blksha, Height: height, TxSpent: btxspent, Err: err}
+	replies[0] = &txlre
+	return replies, nil
 }
 
 // InvalidateTxCache clear/release all cached transactions.

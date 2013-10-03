@@ -12,15 +12,6 @@ import (
 	"github.com/conformal/btcwire"
 )
 
-// InsertBlockData stores a block hash and its associated data block with a
-// previous sha of `prevSha' and a version of `pver'.
-func (db *LevelDb) InsertBlockData(sha *btcwire.ShaHash, prevSha *btcwire.ShaHash, pver uint32, buf []byte) (blockid int64, err error) {
-	db.dbLock.Lock()
-	defer db.dbLock.Unlock()
-
-	return db.insertBlockData(sha, prevSha, buf)
-}
-
 func (db *LevelDb) getBlkLoc(sha *btcwire.ShaHash) (int64, error) {
 	var blkHeight int64
 
@@ -107,7 +98,7 @@ func (db *LevelDb) setBlk(sha *btcwire.ShaHash, blkHeight int64, buf []byte) err
 }
 
 // insertSha stores a block hash and its associated data block with a
-// previous sha of `prevSha' and a version of `pver'.
+// previous sha of `prevSha'.
 // insertSha shall be called with db lock held
 func (db *LevelDb) insertBlockData(sha *btcwire.ShaHash, prevSha *btcwire.ShaHash, buf []byte) (blockid int64, err error) {
 
@@ -144,7 +135,7 @@ func (db *LevelDb) insertBlockData(sha *btcwire.ShaHash, prevSha *btcwire.ShaHas
 	return blkHeight, nil
 }
 
-// fetchSha returns the datablock and pver for the given ShaHash.
+// fetchSha returns the datablock for the given ShaHash.
 func (db *LevelDb) fetchSha(sha *btcwire.ShaHash) (rbuf []byte,
 	rblkHeight int64, err error) {
 	var blkHeight int64

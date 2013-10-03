@@ -27,11 +27,6 @@ const (
 
 var log seelog.LoggerInterface = seelog.Disabled
 
-type tBlockInsertData struct {
-	sha  btcwire.ShaHash
-	pver uint32
-	buf  []byte
-}
 type tTxInsertData struct {
 	txsha   *btcwire.ShaHash
 	blockid int64

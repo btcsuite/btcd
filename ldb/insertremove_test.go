@@ -104,7 +104,7 @@ endtest:
 		}
 
 		txneededmap := map[btcwire.ShaHash]*btcdb.TxListReply{}
-		txlist := db.FetchTxByShaList(txneededList)
+		txlist := db.FetchUnSpentTxByShaList(txneededList)
 		for _, txe := range txlist {
 			if txe.Err != nil {
 				t.Errorf("tx list fetch failed %v err %v ", txe.Sha, txe.Err)
@@ -130,7 +130,7 @@ endtest:
 		}
 
 		txlookupmap := map[btcwire.ShaHash]*btcdb.TxListReply{}
-		txlist = db.FetchTxByShaList(txlookupList)
+		txlist = db.FetchUnSpentTxByShaList(txlookupList)
 		for _, txe := range txlist {
 			if txe.Err != nil {
 				t.Errorf("tx list fetch failed %v err %v ", txe.Sha, txe.Err)
@@ -166,7 +166,7 @@ endtest:
 		}
 
 		txlookupmap = map[btcwire.ShaHash]*btcdb.TxListReply{}
-		txlist = db.FetchTxByShaList(txlookupList)
+		txlist = db.FetchUnSpentTxByShaList(txlookupList)
 		for _, txe := range txlist {
 			if txe.Err != nil {
 				if _, ok := txneededmap[*txe.Sha]; ok {
@@ -188,7 +188,7 @@ endtest:
 			break endtest
 		}
 		txlookupmap = map[btcwire.ShaHash]*btcdb.TxListReply{}
-		txlist = db.FetchTxByShaList(txlookupList)
+		txlist = db.FetchUnSpentTxByShaList(txlookupList)
 		for _, txe := range txlist {
 			if txe.Err != nil {
 				t.Errorf("tx list fetch failed %v err %v ", txe.Sha, txe.Err)
