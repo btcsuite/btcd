@@ -113,7 +113,7 @@ func fetchTxListMain(db btcdb.Db, txList []*btcwire.ShaHash) TxStore {
 	// Ask the database (main chain) for the list of transactions.  This
 	// will return the information from the point of view of the end of the
 	// main chain.
-	txReplyList := db.FetchTxByShaList(txList)
+	txReplyList := db.FetchUnSpentTxByShaList(txList)
 	for _, txReply := range txReplyList {
 		// Lookup the existing results entry to modify.  Skip
 		// this reply if there is no corresponding entry in
