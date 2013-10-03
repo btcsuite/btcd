@@ -98,26 +98,9 @@ func (db *LevelDb) fetchTxDataBySha(txsha *btcwire.ShaHash) (rtx *btcwire.MsgTx,
 	return &tx, txbuf, pver, blksha, blkHeight, txspent, nil
 }
 
-// FetchTxAllBySha returns several pieces of data regarding the given sha.
-func (db *LevelDb) FetchTxAllBySha(txsha *btcwire.ShaHash) (rtx *btcwire.MsgTx, rtxbuf []byte, rpver uint32, rblksha *btcwire.ShaHash, err error) {
-	db.dbLock.Lock()
-	defer db.dbLock.Unlock()
-
-	tx, txbuf, pver, blksha, _, _, err := db.fetchTxDataBySha(txsha)
-
-	return tx, txbuf, pver, blksha, err
-}
-
 // FetchTxBySha returns some data for the given Tx Sha.
 func (db *LevelDb) FetchTxBySha(txsha *btcwire.ShaHash) (rtx *btcwire.MsgTx, rpver uint32, blksha *btcwire.ShaHash, err error) {
-	rtx, _, rpver, blksha, err = db.FetchTxAllBySha(txsha)
-	return
-}
-
-// FetchTxBufBySha return the bytestream data and associated protocol version.
-// for the given Tx Sha
-func (db *LevelDb) FetchTxBufBySha(txsha *btcwire.ShaHash) (txbuf []byte, rpver uint32, err error) {
-	_, txbuf, rpver, _, err = db.FetchTxAllBySha(txsha)
+	rtx, _, rpver, blksha, _, _, err = db.fetchTxDataBySha(txsha)
 	return
 }
 
