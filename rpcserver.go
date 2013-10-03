@@ -45,7 +45,8 @@ func (s *rpcServer) Start() {
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		login := s.username + ":" + s.password
 		auth := "Basic " + base64.StdEncoding.EncodeToString([]byte(login))
-		if r.Header["Authorization"][0] == auth {
+		authhdr := r.Header["Authorization"]
+		if len(authhdr) > 0 && authhdr[0] == auth {
 			jsonRPCRead(w, r, s)
 		} else {
 			log.Warnf("[RPCS] Auth failure.")
