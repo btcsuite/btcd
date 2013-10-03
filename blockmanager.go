@@ -137,7 +137,14 @@ func (b *blockManager) handleNewPeerMsg(peers *list.List, p *peer) {
 		return
 	}
 
-	log.Infof("[BMGR] New valid peer %s", p.addr)
+	var boundness string
+	if p.inbound {
+		boundness = "inbound"
+	} else {
+		boundness = "outbound"
+	}
+
+	log.Infof("[BMGR] New valid peer %s (%s)", p.addr, boundness)
 
 	// The peer is not a candidate for sync if it's not a full node.
 	if p.services&btcwire.SFNodeNetwork != btcwire.SFNodeNetwork {
