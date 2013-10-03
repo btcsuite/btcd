@@ -11,6 +11,10 @@ import (
 // NotificationType represents the type of a notification message.
 type NotificationType int
 
+// NotificationCallback is used for a caller to provide a callback for
+// notifications about various chain events.
+type NotificationCallback func(*Notification)
+
 // Constants for the type of a notification message.
 const (
 	// NTOrphanBlock indicates an orphan block was processed and the
@@ -50,10 +54,9 @@ func (n NotificationType) String() string {
 	return fmt.Sprintf("Unknown Notification Type (%d)", int(n))
 }
 
-// Notification defines an asynchronous notification that is sent to the caller
-// over the notification channel provided during the call to New and consists
-// of a notification type as well as associated data that depends on the type as
-// follows:
+// Notification defines notification that is sent to the caller via the callback
+// function provided during the call to New and consists of a notification type
+// as well as associated data that depends on the type as follows:
 // 	- NTOrphanBlock:       *btcwire.ShaHash
 // 	- NTBlockAccepted:     *btcutil.Block
 // 	- NTBlockConnected:    *btcutil.Block
@@ -64,7 +67,8 @@ type Notification struct {
 }
 
 // sendNotification sends a notification with the passed type and data if the
-// caller requested notifications by providing a channel in the call to New.
+// caller requested notifications by providing a callback function in the call
+// to New.
 func (b *BlockChain) sendNotification(typ NotificationType, data interface{}) {
 	// Ignore it if the caller didn't request notifications.
 	if b.notifications == nil {
@@ -73,5 +77,5 @@ func (b *BlockChain) sendNotification(typ NotificationType, data interface{}) {
 
 	// Generate and send the notification.
 	n := Notification{Type: typ, Data: data}
-	b.notifications <- &n
+	b.notifications(&n)
 }

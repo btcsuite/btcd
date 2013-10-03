@@ -144,7 +144,7 @@ func removeChildNode(children []*blockNode, node *blockNode) []*blockNode {
 type BlockChain struct {
 	db            btcdb.Db
 	btcnet        btcwire.BitcoinNet
-	notifications chan *Notification
+	notifications NotificationCallback
 	root          *blockNode
 	bestChain     *blockNode
 	index         map[btcwire.ShaHash]*blockNode
@@ -960,12 +960,12 @@ func (b *BlockChain) connectBestChain(node *blockNode, block *btcutil.Block) err
 }
 
 // New returns a BlockChain instance for the passed bitcoin network using the
-// provided backing database.  It accepts a channel on which asynchronous
-// notifications will be sent when various events take place.  See the
-// documentation for Notification and NotificationType for details on the
-// types and contents of notifications.  The provided channel can be nil if the
-// caller is not interested in receiving notifications.
-func New(db btcdb.Db, btcnet btcwire.BitcoinNet, c chan *Notification) *BlockChain {
+// provided backing database.  It accepts a callback on which notifications
+// will be sent when various events take place.  See the documentation for
+// Notification and NotificationType for details on the types and contents of
+// notifications.  The provided callback can be nil if the caller is not
+// interested in receiving notifications.
+func New(db btcdb.Db, btcnet btcwire.BitcoinNet, c NotificationCallback) *BlockChain {
 	b := BlockChain{
 		db:            db,
 		btcnet:        btcnet,
