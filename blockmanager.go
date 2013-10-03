@@ -216,12 +216,19 @@ func (b *blockManager) handleBlockMsg(bmsg *blockMsg) {
 	// handler can request the parent blocks from the appropriate peer.
 	blockSha, _ := bmsg.block.Sha()
 
-	// If we didnt' ask for this block then the peer is misbehaving.
+	// If we didn't ask for this block then the peer is misbehaving.
 	if _, ok := bmsg.peer.requestedBlocks[*blockSha]; !ok {
-		log.Warnf("[BMGR] Got unreqeusted block from %s, disconnecting",
-			bmsg.peer.addr)
-		bmsg.peer.Disconnect()
-		return
+		// The regression test intentionally sends some blocks twice
+		// to test duplicate block insertion fails.  Don't disconnect
+		// the peer or ignore the block when we're in regression test
+		// mode in this case so the chain code is actually fed the
+		// duplicate blocks.
+		if !cfg.RegressionTest {
+			log.Warnf("[BMGR] Got unrequested block %v from %s -- "+
+				"disconnecting", blockSha, bmsg.peer.addr)
+			bmsg.peer.Disconnect()
+			return
+		}
 	}
 	b.blockPeer[*blockSha] = bmsg.peer
 
