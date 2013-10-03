@@ -165,7 +165,8 @@ func (b *blockManager) handleDonePeerMsg(peers *list.List, p *peer) {
 		}
 	}
 
-	log.Infof("[BMGR] Lost peer %s", p.addr)
+	log.Infof("[BMGR] Lost peer %s (%s)", p.addr,
+		directionString(p.inbound))
 
 	// Attempt to find a new peer to sync from if the quitting peer is the
 	// sync peer.
