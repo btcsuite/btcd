@@ -66,7 +66,6 @@ type blockManager struct {
 	blockChain        *btcchain.BlockChain
 	blockPeer         map[btcwire.ShaHash]*peer
 	requestedBlocks   map[btcwire.ShaHash]bool
-	blockPeerMutex    sync.Mutex
 	receivedLogBlocks int64
 	receivedLogTx     int64
 	lastBlockLogTime  time.Time
@@ -224,9 +223,7 @@ func (b *blockManager) handleBlockMsg(bmsg *blockMsg) {
 		bmsg.peer.Disconnect()
 		return
 	}
-	b.blockPeerMutex.Lock()
 	b.blockPeer[*blockSha] = bmsg.peer
-	b.blockPeerMutex.Unlock()
 
 	// Process the block to include validation, best chain selection, orphan
 	// handling, etc.
@@ -239,9 +236,7 @@ func (b *blockManager) handleBlockMsg(bmsg *blockMsg) {
 	delete(b.requestedBlocks, *blockSha)
 
 	if err != nil {
-		b.blockPeerMutex.Lock()
 		delete(b.blockPeer, *blockSha)
-		b.blockPeerMutex.Unlock()
 		log.Warnf("[BMGR] Failed to process block %v: %v", blockSha, err)
 		return
 	}
@@ -249,9 +244,7 @@ func (b *blockManager) handleBlockMsg(bmsg *blockMsg) {
 	// Don't keep track of the peer that sent the block any longer if it's
 	// not an orphan.
 	if !b.blockChain.IsKnownOrphan(blockSha) {
-		b.blockPeerMutex.Lock()
 		delete(b.blockPeer, *blockSha)
-		b.blockPeerMutex.Unlock()
 	}
 
 	// Log info about the new block height.
@@ -420,9 +413,6 @@ func (b *blockManager) handleNotifyMsg(notification *btcchain.Notification) {
 	// An orphan block has been accepted by the block chain.  Request
 	// its parents from the peer that sent it.
 	case btcchain.NTOrphanBlock:
-		b.blockPeerMutex.Lock()
-		defer b.blockPeerMutex.Unlock()
-
 		orphanHash := notification.Data.(*btcwire.ShaHash)
 		if peer, exists := b.blockPeer[*orphanHash]; exists {
 			orphanRoot := b.blockChain.GetOrphanRoot(orphanHash)
