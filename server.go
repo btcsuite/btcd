@@ -26,15 +26,6 @@ const connectionRetryInterval = time.Second * 10
 // defaultMaxOutbound is the default number of max outbound peers.
 const defaultMaxOutbound = 8
 
-// directionString is a helper function that returns a string that represents
-// the direction of a connection (inbound or outbound).
-func directionString(inbound bool) string {
-	if inbound {
-		return "inbound"
-	}
-	return "outbound"
-}
-
 // broadcastMsg provides the ability to house a bitcoin message to be broadcast
 // to all connected peers except specified excluded peers.
 type broadcastMsg struct {
@@ -73,10 +64,9 @@ func (s *server) handleAddPeerMsg(peers *list.List, banned map[string]time.Time,
 	}
 
 	// Ignore new peers if we're shutting down.
-	direction := directionString(p.inbound)
 	if atomic.LoadInt32(&s.shutdown) != 0 {
-		log.Infof("[SRVR] New peer %s (%s) ignored - server is "+
-			"shutting down", p.addr, direction)
+		log.Infof("[SRVR] New peer %s ignored - server is shutting "+
+			"down", p)
 		p.Shutdown()
 		return false
 	}
@@ -105,7 +95,7 @@ func (s *server) handleAddPeerMsg(peers *list.List, banned map[string]time.Time,
 	// Limit max number of total peers.
 	if peers.Len() >= cfg.MaxPeers {
 		log.Infof("[SRVR] Max peers reached [%d] - disconnecting "+
-			"peer %s (%s)", cfg.MaxPeers, p.addr, direction)
+			"peer %s", cfg.MaxPeers, p)
 		p.Shutdown()
 		// TODO(oga) how to handle permanent peers here?
 		// they should be rescheduled.
@@ -113,7 +103,7 @@ func (s *server) handleAddPeerMsg(peers *list.List, banned map[string]time.Time,
 	}
 
 	// Add the new peer and start it.
-	log.Debugf("[SRVR] New peer %s (%s)", p.addr, direction)
+	log.Debugf("[SRVR] New peer %s", p)
 	peers.PushBack(p)
 	if p.inbound {
 		p.Start()
@@ -125,7 +115,6 @@ func (s *server) handleAddPeerMsg(peers *list.List, banned map[string]time.Time,
 // handleDonePeerMsg deals with peers that have signalled they are done.  It is
 // invoked from the peerHandler goroutine.
 func (s *server) handleDonePeerMsg(peers *list.List, p *peer) bool {
-	direction := directionString(p.inbound)
 	for e := peers.Front(); e != nil; e = e.Next() {
 		if e.Value == p {
 
@@ -133,14 +122,11 @@ func (s *server) handleDonePeerMsg(peers *list.List, p *peer) bool {
 			// persistent outbound connection.
 			if !p.inbound && p.persistent &&
 				atomic.LoadInt32(&s.shutdown) == 0 {
-				// attempt reconnect.
-				addr := p.addr
-				e.Value = newOutboundPeer(s, addr, true)
+				e.Value = newOutboundPeer(s, p.addr, true)
 				return false
 			}
 			peers.Remove(e)
-			log.Debugf("[SRVR] Removed peer %s (%s)", p.addr,
-				direction)
+			log.Debugf("[SRVR] Removed peer %s", p)
 			return true
 		}
 	}
