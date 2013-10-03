@@ -49,7 +49,6 @@ type config struct {
 	Port           string        `short:"p" long:"port" description:"Listen for connections on this port (default: 8333, testnet: 18333)"`
 	MaxPeers       int           `long:"maxpeers" description:"Max number of inbound and outbound peers"`
 	BanDuration    time.Duration `long:"banduration" description:"How long to ban misbehaving peers.  Valid time units are {s, m, h}.  Minimum 1 second"`
-	VerifyDisabled bool          `long:"noverify" description:"Disable block/transaction verification -- WARNING: This option can be dangerous and is for development use only"`
 	RPCUser        string        `short:"u" long:"rpcuser" description:"Username for RPC connections"`
 	RPCPass        string        `short:"P" long:"rpcpass" description:"Password for RPC connections"`
 	RPCPort        string        `short:"r" long:"rpcport" description:"Listen for JSON/RPC messages on this port"`

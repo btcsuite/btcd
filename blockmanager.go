@@ -536,7 +536,6 @@ func newBlockManager(s *server) (*blockManager, error) {
 		quit:             make(chan bool),
 	}
 	bm.blockChain = btcchain.New(s.db, s.btcnet, bm.handleNotifyMsg)
-	bm.blockChain.DisableVerify(cfg.VerifyDisabled)
 
 	log.Infof("[BMGR] Generating initial block node index.  This may " +
 		"take a while...")
