@@ -422,7 +422,7 @@ func (p *peer) handleTxMsg(msg *btcwire.MsgTx) {
 		// so log it as such.  Otherwise, something really did go wrong,
 		// so log it as an actual error.
 		if _, ok := err.(TxRuleError); ok {
-			log.Warnf("Rejected transaction %v: %v", hash, err)
+			log.Infof("Rejected transaction %v: %v", hash, err)
 		} else {
 			log.Errorf("Failed to process transaction %v: %v", hash, err)
 		}

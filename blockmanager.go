@@ -283,7 +283,7 @@ func (b *blockManager) handleBlockMsg(bmsg *blockMsg) {
 		// it as such.  Otherwise, something really did go wrong, so log
 		// it as an actual error.
 		if _, ok := err.(btcchain.RuleError); ok {
-			log.Warnf("[BMGR] Rejected block %v: %v", blockSha, err)
+			log.Infof("[BMGR] Rejected block %v: %v", blockSha, err)
 		} else {
 			log.Errorf("[BMGR] Failed to process block %v: %v", blockSha, err)
 		}
