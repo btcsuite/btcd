@@ -44,7 +44,6 @@ type config struct {
 	DataDir        string        `short:"b" long:"datadir" description:"Directory to store data"`
 	AddPeers       []string      `short:"a" long:"addpeer" description:"Add a peer to connect with at startup"`
 	ConnectPeers   []string      `long:"connect" description:"Connect only to the specified peers at startup"`
-	SeedPeer       string        `short:"s" long:"seedpeer" description:"Retrieve peer addresses from this peer and then disconnect"`
 	DisableListen  bool          `long:"nolisten" description:"Disable listening for incoming connections -- NOTE: Listening is automatically disabled if the --connect option is used or if the --proxy option is used without the --tor option"`
 	Port           string        `short:"p" long:"port" description:"Listen for connections on this port (default: 8333, testnet: 18333)"`
 	MaxPeers       int           `long:"maxpeers" description:"Max number of inbound and outbound peers"`
