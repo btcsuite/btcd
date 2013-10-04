@@ -1029,6 +1029,25 @@ func (p *peer) QueueInventory(invVect *btcwire.InvVect) {
 	p.outputInvChan <- invVect
 }
 
+// Connected returns whether or not the peer is currently connected.
+func (p *peer) Connected() bool {
+	return atomic.LoadInt32(&p.connected) != 0 &&
+		atomic.LoadInt32(&p.disconnect) == 0
+}
+
+// Disconnect disconnects the peer by closing the connection.  It also sets
+// a flag so the impending shutdown can be detected.
+func (p *peer) Disconnect() {
+	// did we win the race?
+	if atomic.AddInt32(&p.disconnect, 1) != 1 {
+		return
+	}
+	close(p.quit)
+	if atomic.LoadInt32(&p.connected) != 0 {
+		p.conn.Close()
+	}
+}
+
 // Start begins processing input and output messages.  It also sends the initial
 // version message for outbound connections to start the negotiation process.
 func (p *peer) Start() error {
@@ -1055,19 +1074,6 @@ func (p *peer) Start() error {
 	go p.outHandler()
 
 	return nil
-}
-
-// Disconnect disconnects the peer by closing the connection.  It also sets
-// a flag so the impending shutdown can be detected.
-func (p *peer) Disconnect() {
-	// did we win the race?
-	if atomic.AddInt32(&p.disconnect, 1) != 1 {
-		return
-	}
-	close(p.quit)
-	if atomic.LoadInt32(&p.connected) != 0 {
-		p.conn.Close()
-	}
 }
 
 // Shutdown gracefully shuts down the peer by disconnecting it and waiting for
@@ -1208,9 +1214,4 @@ func (p *peer) logError(fmt string, args ...interface{}) {
 	} else {
 		log.Debugf(fmt, args...)
 	}
-}
-
-func (p *peer) Connected() bool {
-	return atomic.LoadInt32(&p.connected) != 0 &&
-		atomic.LoadInt32(&p.disconnect) == 0
 }
