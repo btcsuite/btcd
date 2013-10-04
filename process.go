@@ -85,7 +85,7 @@ func (b *BlockChain) ProcessBlock(block *btcutil.Block) error {
 	if err != nil {
 		return err
 	}
-	log.Debugf("Processing block %v", blockHash)
+	log.Tracef("Processing block %v", blockHash)
 
 	// The block must not already exist in the main chain or side chains.
 	if b.blockExists(blockHash) {
