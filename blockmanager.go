@@ -413,13 +413,10 @@ func (b *blockManager) handleInvMsg(imsg *invMsg) {
 
 // blockHandler is the main handler for the block manager.  It must be run
 // as a goroutine.  It processes block and inv messages in a separate goroutine
-// from the peer handlers so the block (MsgBlock) and tx (MsgTx) messages are
-// handled by a single thread without needing to lock memory data structures.
-// This is important because the block manager controls which blocks are needed
-// and how the fetching should proceed.
-//
-// NOTE: Tx messages need to be handled here too.
-// (either that or block and tx need to be handled in separate threads)
+// from the peer handlers so the block (MsgBlock) messages are handled by a
+// single thread without needing to lock memory data structures.  This is
+// important because the block manager controls which blocks are needed and how
+// the fetching should proceed.
 func (b *blockManager) blockHandler() {
 	candidatePeers := list.New()
 out:
@@ -480,7 +477,9 @@ func (b *blockManager) handleNotifyMsg(notification *btcchain.Notification) {
 	case btcchain.NTBlockAccepted:
 		// Don't relay if we are not current. Other peers that are
 		// current should already know about it.
-
+		// TODO(davec): This should really be over in RelayInventory
+		// in server to stop all relays, but chain is not concurrent
+		// safe at this time, so call it here to single thread access.
 		if !b.blockChain.IsCurrent() {
 			return
 		}
