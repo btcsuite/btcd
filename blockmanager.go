@@ -10,6 +10,7 @@ import (
 	"github.com/conformal/btcdb"
 	"github.com/conformal/btcutil"
 	"github.com/conformal/btcwire"
+	"net"
 	"os"
 	"path/filepath"
 	"sync"
@@ -98,8 +99,12 @@ func (b *blockManager) startSync(peers *list.List) {
 		p := e.Value.(*peer)
 
 		// Remove sync candidate peers that are no longer candidates due
-		// to passing their latest known block.
-		if p.lastBlock <= int32(height) {
+		// to passing their latest known block.  NOTE: The < is
+		// intentional as opposed to <=.  While techcnically the peer
+		// doesn't have a later block when it's equal, it will likely
+		// have one soon so it is a reasonable choice.  It also allows
+		// the case where both are at 0 such as during regression test.
+		if p.lastBlock < int32(height) {
 			peers.Remove(e)
 			continue
 		}
@@ -125,6 +130,34 @@ func (b *blockManager) startSync(peers *list.List) {
 	}
 }
 
+// isSyncCandidate returns whether or not the peer is a candidate to consider
+// syncing from.
+func (b *blockManager) isSyncCandidate(p *peer) bool {
+	// Typically a peer is not a candidate for sync if it's not a full node,
+	// however regression test is special in that the regression tool is
+	// not a full node and still needs to be considered a sync candidate.
+	if cfg.RegressionTest {
+		// The peer is not a candidate if it's not coming from localhost
+		// or the hostname can't be determined for some reason.
+		host, _, err := net.SplitHostPort(p.addr)
+		if err != nil {
+			return false
+		}
+
+		if host != "127.0.0.1" && host != "localhost" {
+			return false
+		}
+	} else {
+		// The peer is not a candidate for sync if it's not a full node.
+		if p.services&btcwire.SFNodeNetwork != btcwire.SFNodeNetwork {
+			return false
+		}
+	}
+
+	// Candidate if all checks passed.
+	return true
+}
+
 // handleNewPeerMsg deals with new peers that have signalled they may
 // be considered as a sync peer (they have already successfully negotiated).  It
 // also starts syncing if needed.  It is invoked from the syncHandler goroutine.
@@ -136,8 +169,8 @@ func (b *blockManager) handleNewPeerMsg(peers *list.List, p *peer) {
 
 	log.Infof("[BMGR] New valid peer %s", p)
 
-	// The peer is not a candidate for sync if it's not a full node.
-	if p.services&btcwire.SFNodeNetwork != btcwire.SFNodeNetwork {
+	// Ignore the peer if it's not a sync candidate.
+	if !b.isSyncCandidate(p) {
 		return
 	}
 
@@ -277,6 +310,7 @@ func (b *blockManager) handleInvMsg(imsg *invMsg) {
 	if imsg.peer != b.syncPeer && !b.blockChain.IsCurrent() {
 		return
 	}
+
 	// Attempt to find the final block in the inventory list.  There may
 	// not be one.
 	lastBlock := -1
