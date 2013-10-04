@@ -507,7 +507,7 @@ func (a *AddrManager) deserialisePeers(filePath string) error {
 	}
 	r, err := os.Open(filePath)
 	if err != nil {
-		return fmt.Errorf("%s error opening file: ", filePath, err)
+		return fmt.Errorf("%s error opening file: %v", filePath, err)
 	}
 	defer r.Close()
 
