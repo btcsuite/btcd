@@ -417,7 +417,15 @@ func (p *peer) handleTxMsg(msg *btcwire.MsgTx) {
 	// Process the transaction.
 	err = p.server.txMemPool.ProcessTransaction(msg)
 	if err != nil {
-		log.Errorf("Failed to process transaction %v: %v", hash, err)
+		// When the error is a rule error, it means the transaction was
+		// simply rejected as opposed to something actually going wrong,
+		// so log it as such.  Otherwise, something really did go wrong,
+		// so log it as an actual error.
+		if _, ok := err.(TxRuleError); ok {
+			log.Warnf("Rejected transaction %v: %v", hash, err)
+		} else {
+			log.Errorf("Failed to process transaction %v: %v", hash, err)
+		}
 		return
 	}
 }
