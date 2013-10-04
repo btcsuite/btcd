@@ -277,7 +277,16 @@ func (b *blockManager) handleBlockMsg(bmsg *blockMsg) {
 
 	if err != nil {
 		delete(b.blockPeer, *blockSha)
-		log.Warnf("[BMGR] Failed to process block %v: %v", blockSha, err)
+
+		// When the error is a rule error, it means the block was simply
+		// rejected as opposed to something actually going wrong, so log
+		// it as such.  Otherwise, something really did go wrong, so log
+		// it as an actual error.
+		if _, ok := err.(btcchain.RuleError); ok {
+			log.Warnf("[BMGR] Rejected block %v: %v", blockSha, err)
+		} else {
+			log.Errorf("[BMGR] Failed to process block %v: %v", blockSha, err)
+		}
 		return
 	}
 
