@@ -99,8 +99,8 @@ func disconnectTransactions(txStore TxStore, block *btcutil.Block) error {
 	return nil
 }
 
-// fetchTxList fetches transaction data about the provided list of transactions
-// from the point of view of the end of the main chain.
+// fetchTxListMain fetches transaction data about the provided list of
+// transactions from the point of view of the end of the main chain.
 func fetchTxListMain(db btcdb.Db, txList []*btcwire.ShaHash) TxStore {
 	// The transaction store map needs to have an entry for every requested
 	// transaction.  By default, all the transactions are marked as missing.
