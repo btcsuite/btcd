@@ -663,7 +663,7 @@ func (mp *txMemPool) maybeAcceptTransaction(tx *btcwire.MsgTx, isOrphan *bool) e
 	mp.addTransaction(tx, &txHash)
 
 	mp.lock.RLock()
-	log.Infof("[TXMP] Accepted transaction %v (pool size: %v)", txHash,
+	log.Debugf("[TXMP] Accepted transaction %v (pool size: %v)", txHash,
 		len(mp.pool))
 	mp.lock.RUnlock()
 
