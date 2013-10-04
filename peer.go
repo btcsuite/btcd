@@ -1065,7 +1065,7 @@ func (p *peer) Disconnect() {
 		return
 	}
 	close(p.quit)
-	if p.Connected() {
+	if atomic.LoadInt32(&p.connected) != 0 {
 		p.conn.Close()
 	}
 }
