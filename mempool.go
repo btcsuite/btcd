@@ -222,8 +222,8 @@ func checkTransactionStandard(tx *btcwire.MsgTx, height int64) error {
 		// Each transaction input signature script must only contain
 		// opcodes which push data onto the stack.
 		if !btcscript.IsPushOnlyScript(txIn.SignatureScript) {
-			return fmt.Errorf("transaction input %d: signature " +
-				"script is not push only")
+			return fmt.Errorf("transaction input %d: signature "+
+				"script is not push only", i)
 		}
 	}
 
