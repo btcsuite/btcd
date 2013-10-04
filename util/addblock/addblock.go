@@ -1,6 +1,6 @@
-/*
- * Copyright (c) 2013 Conformal Systems LLC.
- */
+// Copyright (c) 2013 Conformal Systems LLC.
+// Use of this source code is governed by an ISC
+// license that can be found in the LICENSE file.
 
 package main
 
@@ -9,9 +9,9 @@ import (
 	"flag"
 	"fmt"
 	"github.com/conformal/btcdb"
-	"github.com/conformal/btcutil"
-	_ "github.com/conformal/btcdb/sqlite3"
 	_ "github.com/conformal/btcdb/ldb"
+	_ "github.com/conformal/btcdb/sqlite3"
+	"github.com/conformal/btcutil"
 	"github.com/conformal/btcwire"
 	"github.com/conformal/seelog"
 	"io"
@@ -37,8 +37,8 @@ type bufQueue struct {
 
 type blkQueue struct {
 	complete chan bool
-	height int64
-	blk *btcutil.Block
+	height   int64
+	blk      *btcutil.Block
 }
 
 func main() {

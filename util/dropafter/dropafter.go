@@ -57,7 +57,7 @@ func main() {
 	datadir = filepath.Join(datadir, "mainnet")
 
 	blockDbNamePrefix := "blocks"
-        dbName := blockDbNamePrefix + "_" + dbType
+	dbName := blockDbNamePrefix + "_" + dbType
 	if dbType == "sqlite" {
 		dbName = dbName + ".db"
 	}
@@ -109,7 +109,6 @@ func getSha(db btcdb.Db, str string) (btcwire.ShaHash, error) {
 	}
 	return *sha, nil
 }
-
 
 var ntxcnt int64
 var txspendcnt int64
@@ -180,18 +179,18 @@ func parsesha(argstr string) (argtype int, height int64, psha *btcwire.ShaHash, 
 
 // btcdHomeDir returns an OS appropriate home directory for btcd.
 func btcdHomeDir() string {
-        // Search for Windows APPDATA first.  This won't exist on POSIX OSes.
-        appData := os.Getenv("APPDATA")
-        if appData != "" {
-                return filepath.Join(appData, "btcd")
-        }
+	// Search for Windows APPDATA first.  This won't exist on POSIX OSes.
+	appData := os.Getenv("APPDATA")
+	if appData != "" {
+		return filepath.Join(appData, "btcd")
+	}
 
-        // Fall back to standard HOME directory that works for most POSIX OSes.
-        home := os.Getenv("HOME")
-        if home != "" {
-                return filepath.Join(home, ".btcd")
-        }
+	// Fall back to standard HOME directory that works for most POSIX OSes.
+	home := os.Getenv("HOME")
+	if home != "" {
+		return filepath.Join(home, ".btcd")
+	}
 
-        // In the worst case, use the current directory.
-        return "."
+	// In the worst case, use the current directory.
+	return "."
 }

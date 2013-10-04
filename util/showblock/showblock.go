@@ -10,8 +10,8 @@ import (
 	"flag"
 	"fmt"
 	"github.com/conformal/btcdb"
-	_ "github.com/conformal/btcdb/sqlite3"
 	_ "github.com/conformal/btcdb/ldb"
+	_ "github.com/conformal/btcdb/sqlite3"
 	"github.com/conformal/btcwire"
 	"github.com/conformal/seelog"
 	"github.com/davecgh/go-spew/spew"
@@ -70,12 +70,11 @@ func main() {
 	datadir = filepath.Join(datadir, "mainnet")
 
 	blockDbNamePrefix := "blocks"
-        dbName := blockDbNamePrefix + "_" + dbType
+	dbName := blockDbNamePrefix + "_" + dbType
 	if dbType == "sqlite" {
 		dbName = dbName + ".db"
 	}
 	dbPath := filepath.Join(datadir, dbName)
-
 
 	log.Infof("loading db %v", dbType)
 	db, err := btcdb.OpenDB(dbType, dbPath)
@@ -266,18 +265,18 @@ func parsesha(argstr string) (argtype int, height int64, psha *btcwire.ShaHash, 
 
 // btcdHomeDir returns an OS appropriate home directory for btcd.
 func btcdHomeDir() string {
-        // Search for Windows APPDATA first.  This won't exist on POSIX OSes.
-        appData := os.Getenv("APPDATA")
-        if appData != "" {
-                return filepath.Join(appData, "btcd")
-        }
+	// Search for Windows APPDATA first.  This won't exist on POSIX OSes.
+	appData := os.Getenv("APPDATA")
+	if appData != "" {
+		return filepath.Join(appData, "btcd")
+	}
 
-        // Fall back to standard HOME directory that works for most POSIX OSes.
-        home := os.Getenv("HOME")
-        if home != "" {
-                return filepath.Join(home, ".btcd")
-        }
+	// Fall back to standard HOME directory that works for most POSIX OSes.
+	home := os.Getenv("HOME")
+	if home != "" {
+		return filepath.Join(home, ".btcd")
+	}
 
-        // In the worst case, use the current directory.
-        return "."
+	// In the worst case, use the current directory.
+	return "."
 }
