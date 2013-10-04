@@ -1,0 +1,13 @@
+btcd 0.3.0 Alpha - Dependency Commits
+-------------------------------------
+btcchain	4151416b16a7b76e54eeec5ae4da7a99f91ad2b9
+btcdb		e4d3f259912ab65f1ee64635bab536ded54b6ef9
+btcec		e748650cc8303352d91afb12270ec0c2d6769064
+btcjson		5444d262b80de5056fce0d6a9194c0ade3a73268
+btcscript	a5f81fc5457eec41c1438f12b0d92a27a586039f
+btcutil		867149f4705b6227a9edcba3e69cf292c5d1901a
+btcwire		5f971e10e626cdb48d2ef0dd834d943408274280
+go-flags	b7c08f54e16afa16e5f2194895d25f31fefeb99b
+go-socks	92ce162c38f029f7fa66c4336b8b5168f2c75d78
+goleveldb	88ef664c9e3f806fd3dcd79f2dcb70292f8cf91d
+seelog		6b91ad56123bb473755caa213db2bde5422177bf
