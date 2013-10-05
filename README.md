@@ -20,9 +20,10 @@ transactions).
 
 One key difference between btcd and bitcoind is that btcd does *NOT* include
 wallet functionality and this was a very intentional design decision. See the
-blog entry at https://blog.conformal.com/btcd-finally for more details.  This
-means you can't actually make or receive payments directly with btcd.  That
-functionality will be provided by the forthcoming btcwallet and btcgui.
+blog entry [here](https://blog.conformal.com/btcd-not-your-moms-bitcoin-daemon)
+for more details.  This means you can't actually make or receive payments
+directly with btcd.  That functionality will be provided by the forthcoming
+btcwallet and btcgui.
 
 ## Installation
 
