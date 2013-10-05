@@ -465,7 +465,7 @@ func (p *peer) handleBlockMsg(msg *btcwire.MsgBlock, buf []byte) {
 // handleInvMsg is invoked when a peer receives an inv bitcoin message and is
 // used to examine the inventory being advertised by the remote peer and react
 // accordingly. We pass the message down to blockmanager which will call
-// PushMessage with any appropraite responses.
+// PushMessage with any appropriate responses.
 func (p *peer) handleInvMsg(msg *btcwire.MsgInv) {
 	p.server.blockManager.QueueInv(msg, p)
 }
@@ -1084,8 +1084,7 @@ func (p *peer) Start() error {
 	return nil
 }
 
-// Shutdown gracefully shuts down the peer by disconnecting it and waiting for
-// all goroutines to finish.
+// Shutdown gracefully shuts down the peer by disconnecting it.
 func (p *peer) Shutdown() {
 	log.Tracef("[PEER] Shutdown peer %s", p.addr)
 	p.Disconnect()
