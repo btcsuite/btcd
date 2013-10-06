@@ -143,28 +143,3 @@ func (db *LevelDb) existsTxSha(txSha *btcwire.ShaHash) (exists bool) {
 
 	return false
 }
-
-// FetchLocationBySha looks up the Tx sha information by name.
-func (db *LevelDb) FetchLocationBySha(txsha *btcwire.ShaHash) (blockidx int64, txoff int, txlen int, err error) {
-	db.dbLock.Lock()
-	defer db.dbLock.Unlock()
-	err = fmt.Errorf("obsolete function")
-	return
-}
-
-// FetchTxUsedBySha returns the used/spent buffer for a given transaction.
-func (db *LevelDb) FetchTxUsedBySha(txSha *btcwire.ShaHash) (spentbuf []byte, err error) {
-	db.dbLock.Lock()
-	defer db.dbLock.Unlock()
-
-	_, _, _, spentbuf, err = db.getTxData(txSha)
-	if err != nil {
-		return
-	}
-	return // spentbuf has the value already
-}
-
-func (db *LevelDb) fetchLocationUsedBySha(txsha *btcwire.ShaHash) error {
-	// delete me
-	return fmt.Errorf("Deleted function")
-}
