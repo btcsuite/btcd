@@ -56,6 +56,12 @@ func TestReorganization(t *testing.T) {
 	defer os.Remove(dbname)
 	defer db.Close()
 
+	// Insert the main network genesis block.
+	genesis := btcutil.NewBlock(&btcwire.GenesisBlock)
+	if _, err := db.InsertBlock(genesis); err != nil {
+		t.Errorf("Failed to insert genesis block: %v", err)
+	}
+
 	// Since we're not dealing with the real block chain, disable
 	// checkpoints and set the coinbase maturity to 1.
 	blockChain := btcchain.New(db, btcwire.MainNet, nil)
