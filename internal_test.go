@@ -13,6 +13,7 @@ package btcchain
 
 import (
 	"github.com/conformal/btcutil"
+	"github.com/conformal/btcwire"
 	"time"
 )
 
@@ -32,4 +33,10 @@ func TstSetCoinbaseMaturity(maturity int64) {
 // package.
 func TstTimeSorter(times []time.Time) timeSorter {
 	return timeSorter(times)
+}
+
+// TstCheckSerializedHeight makes the internal checkSerializedHeight function
+// available to the test package.
+func TstCheckSerializedHeight(coinbaseTx *btcwire.MsgTx, wantHeight int64) error {
+	return checkSerializedHeight(coinbaseTx, wantHeight)
 }

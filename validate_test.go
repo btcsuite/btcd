@@ -9,7 +9,9 @@ import (
 	"github.com/conformal/btcdb"
 	"github.com/conformal/btcutil"
 	"github.com/conformal/btcwire"
+	"math"
 	"os"
+	"reflect"
 	"testing"
 	"time"
 )
@@ -33,6 +35,54 @@ func TestCheckBlockSanity(t *testing.T) {
 	err = chain.TstCheckBlockSanity(block)
 	if err != nil {
 		t.Errorf("CheckBlockSanity: %v", err)
+	}
+}
+
+// TestCheckSerializedHeight tests the checkSerializedHeight function with
+// various serialized heights and also does negative tests to ensure errors
+// and handled properly.
+func TestCheckSerializedHeight(t *testing.T) {
+	// Create an empty coinbase template to be used in the tests below.
+	coinbaseOutpoint := btcwire.NewOutPoint(&btcwire.ShaHash{}, math.MaxUint32)
+	coinbaseTx := btcwire.NewMsgTx()
+	coinbaseTx.Version = 2
+	coinbaseTx.AddTxIn(btcwire.NewTxIn(coinbaseOutpoint, nil))
+
+	//
+	tests := []struct {
+		sigScript  []byte // Serialized data
+		wantHeight int64  // Expected height
+		err        error  // Expected error type
+	}{
+		// No serialized height length.
+		{[]byte{}, 0, btcchain.RuleError("")},
+		// Serialized height length with no height bytes.
+		{[]byte{0x02}, 0, btcchain.RuleError("")},
+		// Serialized height length with too few height bytes.
+		{[]byte{0x02, 0x4a}, 0, btcchain.RuleError("")},
+		// Serialized height that needs 2 bytes to encode.
+		{[]byte{0x02, 0x4a, 0x52}, 21066, nil},
+		// Serialized height that needs 2 bytes to encode, but backwards
+		// endianness.
+		{[]byte{0x02, 0x4a, 0x52}, 19026, btcchain.RuleError("")},
+		// Serialized height that needs 3 bytes to encode.
+		{[]byte{0x03, 0x40, 0x0d, 0x03}, 200000, nil},
+		// Serialized height that needs 3 bytes to encode, but backwards
+		// endianness.
+		{[]byte{0x03, 0x40, 0x0d, 0x03}, 1074594560, btcchain.RuleError("")},
+	}
+
+	t.Logf("Running %d tests", len(tests))
+	for i, test := range tests {
+		tx := coinbaseTx.Copy()
+		tx.TxIn[0].SignatureScript = test.sigScript
+
+		err := btcchain.TstCheckSerializedHeight(tx, test.wantHeight)
+		if reflect.TypeOf(err) != reflect.TypeOf(test.err) {
+			t.Errorf("checkSerializedHeight #%d wrong error type "+
+				"got: %v <%T>, want: %T", i, err, err, test.err)
+			continue
+		}
 	}
 }
 

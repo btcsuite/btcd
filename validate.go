@@ -498,17 +498,26 @@ func (b *BlockChain) checkBlockSanity(block *btcutil.Block) error {
 // transaction starts with the serialized block height of wantHeight.
 func checkSerializedHeight(coinbaseTx *btcwire.MsgTx, wantHeight int64) error {
 	sigScript := coinbaseTx.TxIn[0].SignatureScript
-	if len(sigScript) < 4 {
+	if len(sigScript) < 1 {
 		str := "the coinbase signature script for blocks of " +
 			"version %d or greater must start with the " +
-			"serialized block height"
+			"length of the serialized block height"
 		str = fmt.Sprintf(str, serializedHeightVersion)
 		return RuleError(str)
 	}
 
-	serializedHeightBytes := make([]byte, 4, 4)
-	copy(serializedHeightBytes, sigScript[1:4])
-	serializedHeight := binary.LittleEndian.Uint32(serializedHeightBytes)
+	serializedLen := int(sigScript[0])
+	if len(sigScript[1:]) < serializedLen {
+		str := "the coinbase signature script for blocks of " +
+			"version %d or greater must start with the " +
+			"serialized block height"
+		str = fmt.Sprintf(str, serializedLen)
+		return RuleError(str)
+	}
+
+	serializedHeightBytes := make([]byte, 8, 8)
+	copy(serializedHeightBytes, sigScript[1:serializedLen+1])
+	serializedHeight := binary.LittleEndian.Uint64(serializedHeightBytes)
 	if int64(serializedHeight) != wantHeight {
 		str := fmt.Sprintf("the coinbase signature script serialized "+
 			"block height is %d when %d was expected",
