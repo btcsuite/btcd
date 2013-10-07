@@ -157,8 +157,14 @@ func main() {
 	// Use all processor cores.
 	runtime.GOMAXPROCS(runtime.NumCPU())
 
+	// Up some limits.
+	err := setLimits()
+	if err != nil {
+		os.Exit(1)
+	}
+
 	// Work around defer not working after os.Exit()
-	err := btcdMain()
+	err = btcdMain()
 	if err != nil {
 		os.Exit(1)
 	}
