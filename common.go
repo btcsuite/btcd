@@ -53,7 +53,7 @@ func writeElements(w io.Writer, elements ...interface{}) error {
 // readVarInt reads a variable length integer from r and returns it as a uint64.
 func readVarInt(r io.Reader, pver uint32) (uint64, error) {
 	b := make([]byte, 1)
-	_, err := r.Read(b)
+	_, err := io.ReadFull(r, b)
 	if err != nil {
 		return 0, err
 	}
