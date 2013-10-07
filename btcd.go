@@ -17,13 +17,6 @@ import (
 	"runtime"
 )
 
-// These constants are used by the dns seed code to pick a random last seen
-// time.
-const (
-	secondsIn3Days int32 = 24 * 60 * 60 * 3
-	secondsIn4Days int32 = 24 * 60 * 60 * 4
-)
-
 var (
 	log = seelog.Disabled
 	cfg *config

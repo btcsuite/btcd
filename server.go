@@ -16,15 +16,25 @@ import (
 	"time"
 )
 
-// supportedServices describes which services are supported by the server.
-const supportedServices = btcwire.SFNodeNetwork
+// These constants are used by the DNS seed code to pick a random last seen
+// time.
+const (
+	secondsIn3Days int32 = 24 * 60 * 60 * 3
+	secondsIn4Days int32 = 24 * 60 * 60 * 4
+)
 
-// connectionRetryInterval is the amount of time to wait in between retries
-// when connecting to persistent peers.
-const connectionRetryInterval = time.Second * 10
+const (
+	// supportedServices describes which services are supported by the
+	// server.
+	supportedServices = btcwire.SFNodeNetwork
 
-// defaultMaxOutbound is the default number of max outbound peers.
-const defaultMaxOutbound = 8
+	// connectionRetryInterval is the amount of time to wait in between
+	// retries when connecting to persistent peers.
+	connectionRetryInterval = time.Second * 10
+
+	// defaultMaxOutbound is the default number of max outbound peers.
+	defaultMaxOutbound = 8
+)
 
 // broadcastMsg provides the ability to house a bitcoin message to be broadcast
 // to all connected peers except specified excluded peers.
