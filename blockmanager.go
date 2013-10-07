@@ -129,6 +129,8 @@ func (b *blockManager) startSync(peers *list.List) {
 			bestPeer.lastBlock, bestPeer.addr)
 		bestPeer.PushGetBlocksMsg(locator, &zeroHash)
 		b.syncPeer = bestPeer
+	} else {
+		log.Warnf("[BMGR] No sync peer candidates available")
 	}
 }
 
