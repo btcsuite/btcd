@@ -547,12 +547,13 @@ func (b *blockManager) handleNotifyMsg(notification *btcchain.Notification) {
 	}
 }
 
-// NewPeer informs the blockmanager of a newly active peer.
+// NewPeer informs the block manager of a newly active peer.
 func (b *blockManager) NewPeer(p *peer) {
 	// Ignore if we are shutting down.
 	if atomic.LoadInt32(&b.shutdown) != 0 {
 		return
 	}
+
 	b.msgChan <- &newPeerMsg{peer: p}
 }
 
@@ -564,8 +565,7 @@ func (b *blockManager) QueueBlock(block *btcutil.Block, p *peer) {
 		return
 	}
 
-	bmsg := blockMsg{block: block, peer: p}
-	b.msgChan <- &bmsg
+	b.msgChan <- &blockMsg{block: block, peer: p}
 }
 
 // QueueInv adds the passed inv message and peer to the block handling queue.
@@ -576,8 +576,7 @@ func (b *blockManager) QueueInv(inv *btcwire.MsgInv, p *peer) {
 		return
 	}
 
-	imsg := invMsg{inv: inv, peer: p}
-	b.msgChan <- &imsg
+	b.msgChan <- &invMsg{inv: inv, peer: p}
 }
 
 // DonePeer informs the blockmanager that a peer has disconnected.
@@ -586,6 +585,7 @@ func (b *blockManager) DonePeer(p *peer) {
 	if atomic.LoadInt32(&b.shutdown) != 0 {
 		return
 	}
+
 	b.msgChan <- &donePeerMsg{peer: p}
 }
 

@@ -135,8 +135,8 @@ func isDust(txOut *btcwire.TxOut) bool {
 	// a pay-to-pubkey script with a compressed pubkey, which is not very
 	// common.
 	//
-	// The most common scripts are pay-to-script-hash, and as per the above
-	// breakdown, the minimum size of a p2sh input script is 148 bytes.  So
+	// The most common scripts are pay-to-pubkey-hash, and as per the above
+	// breakdown, the minimum size of a p2pkh input script is 148 bytes.  So
 	// that figure is used.
 	totalSize := txOutSize + 148
 
@@ -145,7 +145,7 @@ func isDust(txOut *btcwire.TxOut) bool {
 	// minTxRelayFee is in Satoshi/KB (kilobyte, not kibibyte), so
 	// multiply by 1000 to convert bytes.
 	//
-	// Using the typical values for a pay-to-script-hash transaction from
+	// Using the typical values for a pay-to-pubkey-hash transaction from
 	// the breakdown above and the default minimum transaction relay fee of
 	// 10000, this equates to values less than 5460 satoshi being considered
 	// dust.
