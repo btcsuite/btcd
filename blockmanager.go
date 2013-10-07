@@ -189,9 +189,7 @@ func (b *blockManager) handleNewPeerMsg(peers *list.List, p *peer) {
 // is invoked from the syncHandler goroutine.
 func (b *blockManager) handleDonePeerMsg(peers *list.List, p *peer) {
 	// Remove the peer from the list of candidate peers.
-	var enext *list.Element
-	for e := peers.Front(); e != nil; e = enext {
-		enext = e.Next()
+	for e := peers.Front(); e != nil; e = e.Next() {
 		if e.Value == p {
 			peers.Remove(e)
 			break
