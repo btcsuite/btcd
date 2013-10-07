@@ -6,7 +6,7 @@ package main
 
 import (
 	"fmt"
-	"opensource.conformal.com/go/go-flags"
+	"github.com/conformal/go-flags"
 	"os"
 	"path/filepath"
 )
