@@ -116,7 +116,9 @@ func (s *server) handleAddPeerMsg(peers *list.List, banned map[string]time.Time,
 // handleDonePeerMsg deals with peers that have signalled they are done.  It is
 // invoked from the peerHandler goroutine.
 func (s *server) handleDonePeerMsg(peers *list.List, p *peer) bool {
-	for e := peers.Front(); e != nil; e = e.Next() {
+	var enext *list.Element
+	for e := peers.Front(); e != nil; e = enext {
+		enext = e.Next()
 		if e.Value == p {
 			// Issue an asynchronous reconnect if the peer was a
 			// persistent outbound connection.

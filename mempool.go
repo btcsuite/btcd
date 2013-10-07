@@ -292,7 +292,9 @@ func (mp *txMemPool) removeOrphan(txHash *btcwire.ShaHash) {
 	for _, txIn := range tx.TxIn {
 		originTxHash := txIn.PreviousOutpoint.Hash
 		if orphans, exists := mp.orphansByPrev[originTxHash]; exists {
-			for e := orphans.Front(); e != nil; e = e.Next() {
+			var enext *list.Element
+			for e := orphans.Front(); e != nil; e = enext {
+				enext = e.Next()
 				if e.Value.(*btcwire.MsgTx) == tx {
 					orphans.Remove(e)
 					break

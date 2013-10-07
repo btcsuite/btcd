@@ -95,7 +95,9 @@ func (b *blockManager) startSync(peers *list.List) {
 	}
 
 	var bestPeer *peer
-	for e := peers.Front(); e != nil; e = e.Next() {
+	var enext *list.Element
+	for e := peers.Front(); e != nil; e = enext {
+		enext = e.Next()
 		p := e.Value.(*peer)
 
 		// Remove sync candidate peers that are no longer candidates due
@@ -187,7 +189,9 @@ func (b *blockManager) handleNewPeerMsg(peers *list.List, p *peer) {
 // is invoked from the syncHandler goroutine.
 func (b *blockManager) handleDonePeerMsg(peers *list.List, p *peer) {
 	// Remove the peer from the list of candidate peers.
-	for e := peers.Front(); e != nil; e = e.Next() {
+	var enext *list.Element
+	for e := peers.Front(); e != nil; e = enext {
+		enext = e.Next()
 		if e.Value == p {
 			peers.Remove(e)
 			break
