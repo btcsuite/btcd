@@ -129,6 +129,19 @@ func TestParseOpcode(t *testing.T) {
 	if err == nil {
 		t.Errorf("no error with dodgy opcode map!")
 	}
+
+	// Missing entry.
+	fakemap = make(map[byte]*opcode)
+	for k, v := range opcodemap {
+		fakemap[k] = v
+	}
+	delete(fakemap, OP_PUSHDATA4)
+	// this script would be fine if -8 was a valid length.
+	_, err = parseScriptTemplate([]byte{OP_PUSHDATA4, 0x1, 0x00, 0x00,
+		0x00, 0x00, 0x00, 0x00, 0x00}, fakemap)
+	if err == nil {
+		t.Errorf("no error with dodgy opcode map (missing entry)!")
+	}
 }
 
 type popTest struct {

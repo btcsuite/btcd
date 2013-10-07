@@ -223,6 +223,73 @@ const (
 	OP_NOP8                     = 183
 	OP_NOP9                     = 184
 	OP_NOP10                    = 185
+	OP_UNKNOWN186               = 186
+	OP_UNKNOWN187               = 187
+	OP_UNKNOWN188               = 188
+	OP_UNKNOWN189               = 189
+	OP_UNKNOWN190               = 190
+	OP_UNKNOWN191               = 191
+	OP_UNKNOWN192               = 192
+	OP_UNKNOWN193               = 193
+	OP_UNKNOWN194               = 194
+	OP_UNKNOWN195               = 195
+	OP_UNKNOWN196               = 196
+	OP_UNKNOWN197               = 197
+	OP_UNKNOWN198               = 198
+	OP_UNKNOWN199               = 199
+	OP_UNKNOWN200               = 200
+	OP_UNKNOWN201               = 201
+	OP_UNKNOWN202               = 202
+	OP_UNKNOWN203               = 203
+	OP_UNKNOWN204               = 204
+	OP_UNKNOWN205               = 205
+	OP_UNKNOWN206               = 206
+	OP_UNKNOWN207               = 207
+	OP_UNKNOWN208               = 208
+	OP_UNKNOWN209               = 209
+	OP_UNKNOWN210               = 210
+	OP_UNKNOWN211               = 211
+	OP_UNKNOWN212               = 212
+	OP_UNKNOWN213               = 213
+	OP_UNKNOWN214               = 214
+	OP_UNKNOWN215               = 215
+	OP_UNKNOWN216               = 216
+	OP_UNKNOWN217               = 217
+	OP_UNKNOWN218               = 218
+	OP_UNKNOWN219               = 219
+	OP_UNKNOWN220               = 220
+	OP_UNKNOWN221               = 221
+	OP_UNKNOWN222               = 222
+	OP_UNKNOWN223               = 223
+	OP_UNKNOWN224               = 224
+	OP_UNKNOWN225               = 225
+	OP_UNKNOWN226               = 226
+	OP_UNKNOWN227               = 227
+	OP_UNKNOWN228               = 228
+	OP_UNKNOWN229               = 229
+	OP_UNKNOWN230               = 230
+	OP_UNKNOWN231               = 231
+	OP_UNKNOWN232               = 232
+	OP_UNKNOWN233               = 233
+	OP_UNKNOWN234               = 234
+	OP_UNKNOWN235               = 235
+	OP_UNKNOWN236               = 236
+	OP_UNKNOWN237               = 237
+	OP_UNKNOWN238               = 238
+	OP_UNKNOWN239               = 239
+	OP_UNKNOWN240               = 240
+	OP_UNKNOWN241               = 241
+	OP_UNKNOWN242               = 242
+	OP_UNKNOWN243               = 243
+	OP_UNKNOWN244               = 244
+	OP_UNKNOWN245               = 245
+	OP_UNKNOWN246               = 246
+	OP_UNKNOWN247               = 247
+	OP_UNKNOWN248               = 248
+	OP_UNKNOWN249               = 249
+	OP_UNKNOWN250               = 250
+	OP_UNKNOWN251               = 251
+	OP_UNKNOWN252               = 252
 	OP_PUBKEYHASH               = 253 // bitcoind internal, for completeness
 	OP_PUBKEY                   = 254 // bitcoind internal, for completeness
 	OP_INVALIDOPCODE            = 255 // bitcoind internal, for completeness
@@ -622,6 +689,140 @@ var opcodemapPreinit = map[byte]*opcode{
 		opfunc: opcodeNop},
 	OP_NOP10: {value: OP_NOP10, name: "OP_NOP10", length: 1,
 		opfunc: opcodeNop},
+	OP_UNKNOWN186: {value: OP_UNKNOWN186, name: "OP_UNKNOWN186", length: 1,
+		opfunc: opcodeInvalid},
+	OP_UNKNOWN187: {value: OP_UNKNOWN187, name: "OP_UNKNOWN187", length: 1,
+		opfunc: opcodeInvalid},
+	OP_UNKNOWN188: {value: OP_UNKNOWN188, name: "OP_UNKNOWN188", length: 1,
+		opfunc: opcodeInvalid},
+	OP_UNKNOWN189: {value: OP_UNKNOWN189, name: "OP_UNKNOWN189", length: 1,
+		opfunc: opcodeInvalid},
+	OP_UNKNOWN190: {value: OP_UNKNOWN190, name: "OP_UNKNOWN190", length: 1,
+		opfunc: opcodeInvalid},
+	OP_UNKNOWN191: {value: OP_UNKNOWN191, name: "OP_UNKNOWN191", length: 1,
+		opfunc: opcodeInvalid},
+	OP_UNKNOWN192: {value: OP_UNKNOWN192, name: "OP_UNKNOWN192", length: 1,
+		opfunc: opcodeInvalid},
+	OP_UNKNOWN193: {value: OP_UNKNOWN193, name: "OP_UNKNOWN193", length: 1,
+		opfunc: opcodeInvalid},
+	OP_UNKNOWN194: {value: OP_UNKNOWN194, name: "OP_UNKNOWN194", length: 1,
+		opfunc: opcodeInvalid},
+	OP_UNKNOWN195: {value: OP_UNKNOWN195, name: "OP_UNKNOWN195", length: 1,
+		opfunc: opcodeInvalid},
+	OP_UNKNOWN196: {value: OP_UNKNOWN196, name: "OP_UNKNOWN196", length: 1,
+		opfunc: opcodeInvalid},
+	OP_UNKNOWN197: {value: OP_UNKNOWN197, name: "OP_UNKNOWN197", length: 1,
+		opfunc: opcodeInvalid},
+	OP_UNKNOWN198: {value: OP_UNKNOWN198, name: "OP_UNKNOWN198", length: 1,
+		opfunc: opcodeInvalid},
+	OP_UNKNOWN199: {value: OP_UNKNOWN199, name: "OP_UNKNOWN199", length: 1,
+		opfunc: opcodeInvalid},
+	OP_UNKNOWN200: {value: OP_UNKNOWN200, name: "OP_UNKNOWN200", length: 1,
+		opfunc: opcodeInvalid},
+	OP_UNKNOWN201: {value: OP_UNKNOWN201, name: "OP_UNKNOWN201", length: 1,
+		opfunc: opcodeInvalid},
+	OP_UNKNOWN202: {value: OP_UNKNOWN202, name: "OP_UNKNOWN202", length: 1,
+		opfunc: opcodeInvalid},
+	OP_UNKNOWN203: {value: OP_UNKNOWN203, name: "OP_UNKNOWN203", length: 1,
+		opfunc: opcodeInvalid},
+	OP_UNKNOWN204: {value: OP_UNKNOWN204, name: "OP_UNKNOWN204", length: 1,
+		opfunc: opcodeInvalid},
+	OP_UNKNOWN205: {value: OP_UNKNOWN205, name: "OP_UNKNOWN205", length: 1,
+		opfunc: opcodeInvalid},
+	OP_UNKNOWN206: {value: OP_UNKNOWN206, name: "OP_UNKNOWN206", length: 1,
+		opfunc: opcodeInvalid},
+	OP_UNKNOWN207: {value: OP_UNKNOWN207, name: "OP_UNKNOWN207", length: 1,
+		opfunc: opcodeInvalid},
+	OP_UNKNOWN208: {value: OP_UNKNOWN208, name: "OP_UNKNOWN208", length: 1,
+		opfunc: opcodeInvalid},
+	OP_UNKNOWN209: {value: OP_UNKNOWN209, name: "OP_UNKNOWN209", length: 1,
+		opfunc: opcodeInvalid},
+	OP_UNKNOWN210: {value: OP_UNKNOWN210, name: "OP_UNKNOWN210", length: 1,
+		opfunc: opcodeInvalid},
+	OP_UNKNOWN211: {value: OP_UNKNOWN211, name: "OP_UNKNOWN211", length: 1,
+		opfunc: opcodeInvalid},
+	OP_UNKNOWN212: {value: OP_UNKNOWN212, name: "OP_UNKNOWN212", length: 1,
+		opfunc: opcodeInvalid},
+	OP_UNKNOWN213: {value: OP_UNKNOWN213, name: "OP_UNKNOWN213", length: 1,
+		opfunc: opcodeInvalid},
+	OP_UNKNOWN214: {value: OP_UNKNOWN214, name: "OP_UNKNOWN214", length: 1,
+		opfunc: opcodeInvalid},
+	OP_UNKNOWN215: {value: OP_UNKNOWN215, name: "OP_UNKNOWN215", length: 1,
+		opfunc: opcodeInvalid},
+	OP_UNKNOWN216: {value: OP_UNKNOWN216, name: "OP_UNKNOWN216", length: 1,
+		opfunc: opcodeInvalid},
+	OP_UNKNOWN217: {value: OP_UNKNOWN217, name: "OP_UNKNOWN217", length: 1,
+		opfunc: opcodeInvalid},
+	OP_UNKNOWN218: {value: OP_UNKNOWN218, name: "OP_UNKNOWN218", length: 1,
+		opfunc: opcodeInvalid},
+	OP_UNKNOWN219: {value: OP_UNKNOWN219, name: "OP_UNKNOWN219", length: 1,
+		opfunc: opcodeInvalid},
+	OP_UNKNOWN220: {value: OP_UNKNOWN220, name: "OP_UNKNOWN220", length: 1,
+		opfunc: opcodeInvalid},
+	OP_UNKNOWN221: {value: OP_UNKNOWN221, name: "OP_UNKNOWN221", length: 1,
+		opfunc: opcodeInvalid},
+	OP_UNKNOWN222: {value: OP_UNKNOWN222, name: "OP_UNKNOWN222", length: 1,
+		opfunc: opcodeInvalid},
+	OP_UNKNOWN223: {value: OP_UNKNOWN223, name: "OP_UNKNOWN223", length: 1,
+		opfunc: opcodeInvalid},
+	OP_UNKNOWN224: {value: OP_UNKNOWN224, name: "OP_UNKNOWN224", length: 1,
+		opfunc: opcodeInvalid},
+	OP_UNKNOWN225: {value: OP_UNKNOWN225, name: "OP_UNKNOWN225", length: 1,
+		opfunc: opcodeInvalid},
+	OP_UNKNOWN226: {value: OP_UNKNOWN226, name: "OP_UNKNOWN226", length: 1,
+		opfunc: opcodeInvalid},
+	OP_UNKNOWN227: {value: OP_UNKNOWN227, name: "OP_UNKNOWN227", length: 1,
+		opfunc: opcodeInvalid},
+	OP_UNKNOWN228: {value: OP_UNKNOWN228, name: "OP_UNKNOWN228", length: 1,
+		opfunc: opcodeInvalid},
+	OP_UNKNOWN229: {value: OP_UNKNOWN229, name: "OP_UNKNOWN229", length: 1,
+		opfunc: opcodeInvalid},
+	OP_UNKNOWN230: {value: OP_UNKNOWN230, name: "OP_UNKNOWN230", length: 1,
+		opfunc: opcodeInvalid},
+	OP_UNKNOWN231: {value: OP_UNKNOWN231, name: "OP_UNKNOWN231", length: 1,
+		opfunc: opcodeInvalid},
+	OP_UNKNOWN232: {value: OP_UNKNOWN232, name: "OP_UNKNOWN232", length: 1,
+		opfunc: opcodeInvalid},
+	OP_UNKNOWN233: {value: OP_UNKNOWN233, name: "OP_UNKNOWN233", length: 1,
+		opfunc: opcodeInvalid},
+	OP_UNKNOWN234: {value: OP_UNKNOWN234, name: "OP_UNKNOWN234", length: 1,
+		opfunc: opcodeInvalid},
+	OP_UNKNOWN235: {value: OP_UNKNOWN235, name: "OP_UNKNOWN235", length: 1,
+		opfunc: opcodeInvalid},
+	OP_UNKNOWN236: {value: OP_UNKNOWN236, name: "OP_UNKNOWN236", length: 1,
+		opfunc: opcodeInvalid},
+	OP_UNKNOWN237: {value: OP_UNKNOWN237, name: "OP_UNKNOWN237", length: 1,
+		opfunc: opcodeInvalid},
+	OP_UNKNOWN238: {value: OP_UNKNOWN238, name: "OP_UNKNOWN238", length: 1,
+		opfunc: opcodeInvalid},
+	OP_UNKNOWN239: {value: OP_UNKNOWN239, name: "OP_UNKNOWN239", length: 1,
+		opfunc: opcodeInvalid},
+	OP_UNKNOWN240: {value: OP_UNKNOWN240, name: "OP_UNKNOWN240", length: 1,
+		opfunc: opcodeInvalid},
+	OP_UNKNOWN241: {value: OP_UNKNOWN241, name: "OP_UNKNOWN241", length: 1,
+		opfunc: opcodeInvalid},
+	OP_UNKNOWN242: {value: OP_UNKNOWN242, name: "OP_UNKNOWN242", length: 1,
+		opfunc: opcodeInvalid},
+	OP_UNKNOWN243: {value: OP_UNKNOWN243, name: "OP_UNKNOWN243", length: 1,
+		opfunc: opcodeInvalid},
+	OP_UNKNOWN244: {value: OP_UNKNOWN244, name: "OP_UNKNOWN244", length: 1,
+		opfunc: opcodeInvalid},
+	OP_UNKNOWN245: {value: OP_UNKNOWN245, name: "OP_UNKNOWN245", length: 1,
+		opfunc: opcodeInvalid},
+	OP_UNKNOWN246: {value: OP_UNKNOWN246, name: "OP_UNKNOWN246", length: 1,
+		opfunc: opcodeInvalid},
+	OP_UNKNOWN247: {value: OP_UNKNOWN247, name: "OP_UNKNOWN247", length: 1,
+		opfunc: opcodeInvalid},
+	OP_UNKNOWN248: {value: OP_UNKNOWN248, name: "OP_UNKNOWN248", length: 1,
+		opfunc: opcodeInvalid},
+	OP_UNKNOWN249: {value: OP_UNKNOWN249, name: "OP_UNKNOWN249", length: 1,
+		opfunc: opcodeInvalid},
+	OP_UNKNOWN250: {value: OP_UNKNOWN250, name: "OP_UNKNOWN250", length: 1,
+		opfunc: opcodeInvalid},
+	OP_UNKNOWN251: {value: OP_UNKNOWN251, name: "OP_UNKNOWN251", length: 1,
+		opfunc: opcodeInvalid},
+	OP_UNKNOWN252: {value: OP_UNKNOWN252, name: "OP_UNKNOWN252", length: 1,
+		opfunc: opcodeInvalid},
 	OP_PUBKEYHASH: {value: OP_PUBKEYHASH, name: "OP_PUBKEYHASH", length: 1,
 		opfunc: opcodeInvalid},
 	OP_PUBKEY: {value: OP_PUBKEY, name: "OP_PUBKEY", length: 1,

@@ -1355,9 +1355,9 @@ var removeOpcodeTests = []removeOpcodeTest{
 	},
 	removeOpcodeTest{
 		name:   "invalid opcode",
-		before: []byte{186},
+		before: []byte{btcscript.OP_UNKNOWN186},
 		remove: btcscript.OP_CODESEPARATOR,
-		err:    btcscript.StackErrInvalidOpcode,
+		after:  []byte{btcscript.OP_UNKNOWN186},
 	},
 	removeOpcodeTest{
 		name:   "invalid length (insruction)",
@@ -1463,9 +1463,9 @@ var removeOpcodeByDataTests = []removeOpcodeByDataTest{
 	},
 	removeOpcodeByDataTest{
 		name:   "invalid opcode ",
-		before: []byte{187},
+		before: []byte{btcscript.OP_UNKNOWN187},
 		remove: []byte{1, 2, 3, 4},
-		err:    btcscript.StackErrInvalidOpcode,
+		after:  []byte{btcscript.OP_UNKNOWN187},
 	},
 	removeOpcodeByDataTest{
 		name:   "invalid length (instruction)",
