@@ -211,6 +211,47 @@ func (s *server) listenHandler(listener net.Listener) {
 	log.Tracef("[SRVR] Listener handler done for %s", listener.Addr())
 }
 
+// seedFromDNS uses DNS seeding to populate the address manager with peers.
+func (s *server) seedFromDNS() {
+	// Nothing to do if DNS seeding is disabled.
+	if cfg.DisableDNSSeed {
+		return
+	}
+
+	proxy := ""
+	if cfg.Proxy != "" && cfg.UseTor {
+		proxy = cfg.Proxy
+	}
+	for _, seeder := range activeNetParams.dnsSeeds {
+		seedpeers := dnsDiscover(seeder, proxy)
+		if len(seedpeers) == 0 {
+			continue
+		}
+		addresses := make([]*btcwire.NetAddress, len(seedpeers))
+		// if this errors then we have *real* problems
+		intPort, _ := strconv.Atoi(activeNetParams.peerPort)
+		for i, peer := range seedpeers {
+			addresses[i] = new(btcwire.NetAddress)
+			addresses[i].SetAddress(peer, uint16(intPort))
+			// bitcoind seeds with addresses from
+			// a time randomly selected between 3
+			// and 7 days ago.
+			addresses[i].Timestamp = time.Now().Add(-1 *
+				time.Second * time.Duration(secondsIn3Days+
+				s.addrManager.rand.Int31n(secondsIn4Days)))
+		}
+
+		// Bitcoind uses a lookup of the dns seeder here. This
+		// is rather strange since the values looked up by the
+		// DNS seed lookups will vary quite a lot.
+		// to replicate this behaviour we put all addresses as
+		// having come from the first one.
+		s.addrManager.AddAddresses(addresses, addresses[0])
+	}
+	// XXX if this is empty do we want to use hardcoded
+	// XXX peers like bitcoind does?
+}
+
 // peerHandler is used to handle peer operations such as adding and removing
 // peers to and from the server, banning peers, and broadcasting messages to
 // peers.  It must be run a a goroutine.
@@ -232,41 +273,8 @@ func (s *server) peerHandler() {
 		maxOutbound = cfg.MaxPeers
 	}
 
-	// Do initial DNS seeding to populate address manager.
-	if !cfg.DisableDNSSeed {
-		proxy := ""
-		if cfg.Proxy != "" && cfg.UseTor {
-			proxy = cfg.Proxy
-		}
-		for _, seeder := range activeNetParams.dnsSeeds {
-			seedpeers := dnsDiscover(seeder, proxy)
-			if len(seedpeers) == 0 {
-				continue
-			}
-			addresses := make([]*btcwire.NetAddress, len(seedpeers))
-			// if this errors then we have *real* problems
-			intPort, _ := strconv.Atoi(activeNetParams.peerPort)
-			for i, peer := range seedpeers {
-				addresses[i] = new(btcwire.NetAddress)
-				addresses[i].SetAddress(peer, uint16(intPort))
-				// bitcoind seeds with addresses from
-				// a time randomly selected between 3
-				// and 7 days ago.
-				addresses[i].Timestamp = time.Now().Add(-1 *
-					time.Second * time.Duration(secondsIn3Days+
-					s.addrManager.rand.Int31n(secondsIn4Days)))
-			}
-
-			// Bitcoind uses a lookup of the dns seeder here. This
-			// is rather strange since the values looked up by the
-			// DNS seed lookups will vary quite a lot.
-			// to replicate this behaviour we put all addresses as
-			// having come from the first one.
-			s.addrManager.AddAddresses(addresses, addresses[0])
-		}
-		// XXX if this is empty do we want to use hardcoded
-		// XXX peers like bitcoind does?
-	}
+	// Add peers discovered through DNS to the address manager.
+	s.seedFromDNS()
 
 	// Start up persistent peers.
 	permanentPeers := cfg.ConnectPeers
