@@ -11,10 +11,9 @@ import (
 	"github.com/conformal/btcwire"
 )
 
-// ErrAddrUnknownNet describes an error where the address identifier
-// byte is not recognized as belonging to neither the Bitcoin MainNet nor
-// TestNet.
-var ErrAddrUnknownNet = errors.New("unrecognized network identifier byte")
+// ErrUnknownNet describes an error where the Bitcoin network is
+// not recognized.
+var ErrUnknownNet = errors.New("unrecognized bitcoin network")
 
 // ErrMalformedAddress describes an error where an address is improperly
 // formatted, either due to an incorrect length of the hashed pubkey or
@@ -31,30 +30,40 @@ const (
 	TestNetAddr = 0x6f
 )
 
-// EncodeAddress takes a 20-byte raw payment address (hash160 of the
-// uncompressed pubkey) and a network identifying byte and encodes the
-// payment address in a human readable string.
-func EncodeAddress(addrHash []byte, netID byte) (encoded string, err error) {
+// EncodeAddress takes a 20-byte raw payment address (hash160 of a pubkey)
+// and the Bitcoin network to create a human-readable payment address string.
+func EncodeAddress(addrHash []byte, net btcwire.BitcoinNet) (encoded string, err error) {
 	if len(addrHash) != ripemd160.Size {
 		return "", ErrMalformedAddress
 	}
-	if netID != MainNetAddr && netID != TestNetAddr {
-		return "", ErrAddrUnknownNet
+
+	var netID byte
+	switch net {
+	case btcwire.MainNet:
+		netID = MainNetAddr
+	case btcwire.TestNet3:
+		netID = TestNetAddr
+	default:
+		return "", ErrUnknownNet
 	}
 
 	tosum := append([]byte{netID}, addrHash...)
 	cksum := btcwire.DoubleSha256(tosum)
 
-	a := append([]byte{netID}, addrHash...)
-	a = append(a, cksum[:4]...)
+	// Address before base58 encoding is 1 byte for netID, 20 bytes for
+	// hash, plus 4 bytes of checksum.
+	a := make([]byte, 25, 25)
+	a[0] = netID
+	copy(a[1:], addrHash)
+	copy(a[21:], cksum[:4])
 
 	return Base58Encode(a), nil
 }
 
-// DecodeAddress decodes a human readable payment address string
-// returning the 20-byte decoded address, along with the network
-// identifying byte.
-func DecodeAddress(addr string) (addrHash []byte, netID byte, err error) {
+// DecodeAddress decodes a human-readable payment address string
+// returning the 20-byte decoded address, along with the Bitcoin
+// network for the address.
+func DecodeAddress(addr string) (addrHash []byte, net btcwire.BitcoinNet, err error) {
 	decoded := Base58Decode(addr)
 
 	// Length of decoded address must be 20 bytes + 1 byte for a network
@@ -63,20 +72,26 @@ func DecodeAddress(addr string) (addrHash []byte, netID byte, err error) {
 		return nil, 0x00, ErrMalformedAddress
 	}
 
-	netID = decoded[0]
-	if netID != MainNetAddr && netID != TestNetAddr {
-		return nil, 0x00, ErrAddrUnknownNet
+	switch decoded[0] {
+	case MainNetAddr:
+		net = btcwire.MainNet
+	case TestNetAddr:
+		net = btcwire.TestNet3
+	default:
+		return nil, 0, ErrUnknownNet
 	}
-	addrHash = decoded[1:21]
 
 	// Checksum is first four bytes of double SHA256 of the network byte
 	// and addrHash.  Verify this matches the final 4 bytes of the decoded
 	// address.
-	tosum := append([]byte{netID}, addrHash...)
+	tosum := decoded[:ripemd160.Size+1]
 	cksum := btcwire.DoubleSha256(tosum)[:4]
 	if !bytes.Equal(cksum, decoded[len(decoded)-4:]) {
-		return nil, 0x00, ErrMalformedAddress
+		return nil, net, ErrMalformedAddress
 	}
 
-	return addrHash, netID, nil
+	addrHash = make([]byte, ripemd160.Size, ripemd160.Size)
+	copy(addrHash, decoded[1:ripemd160.Size+1])
+
+	return addrHash, net, nil
 }
