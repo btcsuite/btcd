@@ -5,7 +5,7 @@
 package btcscript
 
 // ScriptType is an enum type that represents the type of a script. It is
-// returned from ScriptToAddress as part of the metadata about the script.
+// returned from ScriptToAddrHash as part of the metadata about the script.
 // It implements the Stringer interface for nice printing.
 type ScriptType int
 
@@ -31,7 +31,7 @@ var scriptTypeToName = []string{
 	ScriptAddr:       "Addr",
 	ScriptPubKey:     "Pubkey",
 	ScriptStrange:    "Strange",
-	ScriptGeneration: "Generation", // ScriptToAddress does not recieve enough information to identify Generation scripts.
+	ScriptGeneration: "Generation", // ScriptToAddrHash does not recieve enough information to identify Generation scripts.
 }
 
 type pkformat struct {

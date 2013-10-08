@@ -74,7 +74,7 @@ var StackErrTooManyOperations = errors.New("Too many operations in script")
 // the stack is over MaxScriptElementSize.
 var StackErrElementTooBig = errors.New("Element in script too large")
 
-// StackErrUnknownAddress is returned when ScriptToAddress does not recognise
+// StackErrUnknownAddress is returned when ScriptToAddrHash does not recognise
 // the pattern of the script and thus can not find the address for payment.
 var StackErrUnknownAddress = errors.New("non-recognised address")
 
@@ -97,11 +97,11 @@ var StackErrEmptyStack = errors.New("Stack empty at end of execution")
 var StackErrP2SHNonPushOnly = errors.New("pay to script hash with non " +
 	"pushonly input")
 
-// StackErrInvalidParseType is an internal error returned from ScriptToAddress
+// StackErrInvalidParseType is an internal error returned from ScriptToAddrHash
 // ony if the internal data tables are wrong.
 var StackErrInvalidParseType = errors.New("internal error: invalid parsetype found")
 
-// StackErrInvalidAddrOffset is an internal error returned from ScriptToAddress
+// StackErrInvalidAddrOffset is an internal error returned from ScriptToAddrHash
 // ony if the internal data tables are wrong.
 var StackErrInvalidAddrOffset = errors.New("internal error: invalid offset found")
 
