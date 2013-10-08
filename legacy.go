@@ -8,7 +8,7 @@ package btcwire
 // guidelines and are only provided for backwards compatibility.  Use the
 // InvType* constants instead.
 const (
-	InvVect_Error InvType = InvTypeError
-	InvVect_Tx    InvType = InvTypeTx
-	InvVect_Block InvType = InvTypeBlock
+	InvVect_Error InvType = InvTypeError // DEPRECATED
+	InvVect_Tx    InvType = InvTypeTx    // DEPRECATED
+	InvVect_Block InvType = InvTypeBlock // DEPRECATED
 )
