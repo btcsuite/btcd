@@ -665,14 +665,56 @@ func removeRegressionDB(dbPath string) error {
 	return nil
 }
 
-// loadBlockDB opens the block database and returns a handle to it.
-func loadBlockDB() (btcdb.Db, error) {
+// dbPath returns the path to the block database given a database type.
+func blockDbPath(dbType string) string {
 	// The database name is based on the database type.
-	dbName := blockDbNamePrefix + "_" + cfg.DbType
-	if cfg.DbType == "sqlite" {
+	dbName := blockDbNamePrefix + "_" + dbType
+	if dbType == "sqlite" {
 		dbName = dbName + ".db"
 	}
 	dbPath := filepath.Join(cfg.DataDir, dbName)
+	return dbPath
+}
+
+// warnMultipeDBs shows a warning if multiple block database types are detected.
+// This is not a situation most users want.  It is handy for development however
+// to support multiple side-by-side databases.
+func warnMultipeDBs() {
+	// This is intentionally not using the known db types which depend
+	// on the database types compiled into the binary since we want to
+	// detect legacy db types as well.
+	dbTypes := []string{"leveldb", "sqlite"}
+	duplicateDbPaths := make([]string, 0, len(dbTypes)-1)
+	for _, dbType := range dbTypes {
+		if dbType == cfg.DbType {
+			continue
+		}
+
+		// Store db path as a duplicate db if it exists.
+		dbPath := blockDbPath(dbType)
+		if fileExists(dbPath) {
+			duplicateDbPaths = append(duplicateDbPaths, dbPath)
+		}
+	}
+
+	// Warn if there are extra databases.
+	if len(duplicateDbPaths) > 0 {
+		selectedDbPath := blockDbPath(cfg.DbType)
+		log.Warnf("WARNING: There are multiple block chain databases "+
+			"using different database types.\nYou probably don't "+
+			"want to waste disk space by having more than one.\n"+
+			"Your current database is located at [%v].\nThe "+
+			"additional database is located at %v", selectedDbPath,
+			duplicateDbPaths)
+	}
+}
+
+// loadBlockDB opens the block database and returns a handle to it.
+func loadBlockDB() (btcdb.Db, error) {
+	warnMultipeDBs()
+
+	// The database name is based on the database type.
+	dbPath := blockDbPath(cfg.DbType)
 
 	// The regression test is special in that it needs a clean database for
 	// each run, so remove it now if it already exists.

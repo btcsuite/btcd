@@ -26,7 +26,7 @@ const (
 	defaultMaxPeers       = 8
 	defaultBanDuration    = time.Hour * 24
 	defaultVerifyEnabled  = false
-	defaultDbType         = "sqlite"
+	defaultDbType         = "leveldb"
 )
 
 var (
