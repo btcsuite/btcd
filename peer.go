@@ -118,6 +118,7 @@ type peer struct {
 	knownAddresses     map[string]bool
 	knownInventory     *MruInventoryMap
 	knownInvMutex      sync.Mutex
+	requestedTxns      map[btcwire.ShaHash]bool // owned by blockmanager.
 	requestedBlocks    map[btcwire.ShaHash]bool // owned by blockmanager.
 	lastBlock          int32
 	retrycount         int64
@@ -129,6 +130,7 @@ type peer struct {
 	continueHash       *btcwire.ShaHash
 	outputQueue        chan btcwire.Message
 	outputInvChan      chan *btcwire.InvVect
+	txProcessed        chan bool
 	blockProcessed     chan bool
 	quit               chan bool
 }
@@ -437,20 +439,13 @@ func (p *peer) handleTxMsg(msg *btcwire.MsgTx) {
 	iv := btcwire.NewInvVect(btcwire.InvTypeTx, &hash)
 	p.addKnownInventory(iv)
 
-	// Process the transaction.
-	err = p.server.txMemPool.ProcessTransaction(msg)
-	if err != nil {
-		// When the error is a rule error, it means the transaction was
-		// simply rejected as opposed to something actually going wrong,
-		// so log it as such.  Otherwise, something really did go wrong,
-		// so log it as an actual error.
-		if _, ok := err.(TxRuleError); ok {
-			log.Debugf("Rejected transaction %v: %v", hash, err)
-		} else {
-			log.Errorf("Failed to process transaction %v: %v", hash, err)
-		}
-		return
-	}
+	// Queue the transaction up to be handled by the block manager and
+	// intentionally block further receives until the transaction is fully
+	// processed and known good or bad.  This helps prevent a malicious peer
+	// from queueing up a bunch of bad transactions before disconnecting (or
+	// being disconnected) and wasting memory.
+	p.server.blockManager.QueueTx(msg, p)
+	<-p.txProcessed
 }
 
 // handleBlockMsg is invoked when a peer receives a block bitcoin message.  It
@@ -1129,11 +1124,13 @@ func newPeerBase(s *server, inbound bool) *peer {
 		inbound:         inbound,
 		knownAddresses:  make(map[string]bool),
 		knownInventory:  NewMruInventoryMap(maxKnownInventory),
+		requestedTxns:   make(map[btcwire.ShaHash]bool),
 		requestedBlocks: make(map[btcwire.ShaHash]bool),
 		requestQueue:    list.New(),
 		invSendQueue:    list.New(),
 		outputQueue:     make(chan btcwire.Message, outputBufferSize),
 		outputInvChan:   make(chan *btcwire.InvVect, outputBufferSize),
+		txProcessed:     make(chan bool, 1),
 		blockProcessed:  make(chan bool, 1),
 		quit:            make(chan bool),
 	}

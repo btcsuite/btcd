@@ -407,9 +407,9 @@ func (mp *txMemPool) maybeAddOrphan(tx *btcwire.MsgTx, txHash *btcwire.ShaHash) 
 	return nil
 }
 
-// isTransactionInPool returns whether or not the passed transaction already
+// IsTransactionInPool returns whether or not the passed transaction already
 // exists in the memory pool.
-func (mp *txMemPool) isTransactionInPool(hash *btcwire.ShaHash) bool {
+func (mp *txMemPool) IsTransactionInPool(hash *btcwire.ShaHash) bool {
 	mp.lock.RLock()
 	defer mp.lock.RUnlock()
 
@@ -529,7 +529,7 @@ func (mp *txMemPool) maybeAcceptTransaction(tx *btcwire.MsgTx, isOrphan *bool) e
 	// be a quick check to weed out duplicates.  It is more expensive to
 	// detect a duplicate transaction in the main chain, so that is done
 	// later.
-	if mp.isTransactionInPool(&txHash) {
+	if mp.IsTransactionInPool(&txHash) {
 		str := fmt.Sprintf("already have transaction %v", txHash)
 		return TxRuleError(str)
 	}
