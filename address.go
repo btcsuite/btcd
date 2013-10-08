@@ -4,11 +4,6 @@
 
 package btcscript
 
-import (
-	"github.com/conformal/btcutil"
-	"github.com/conformal/btcwire"
-)
-
 // ScriptType is an enum type that represents the type of a script. It is
 // returned from ScriptToAddress as part of the metadata about the script.
 // It implements the Stringer interface for nice printing.
@@ -62,8 +57,8 @@ const (
 	scrNoAddr
 )
 
-// ScriptToAddress extracts a payment address and the type out of a PkScript
-func ScriptToAddress(script []byte) (ScriptType, string, error) {
+// ScriptToAddrHash extracts a 20-byte public key hash and the type out of a PkScript
+func ScriptToAddrHash(script []byte) (ScriptType, []byte, error) {
 	// Currently this only understands one form of PkScript
 	validformats := []pkformat{
 		{ScriptAddr, scrPayAddr, 25, []pkbytes{{0, OP_DUP}, {1, OP_HASH160}, {2, OP_DATA_20}, {23, OP_EQUALVERIFY}, {24, OP_CHECKSIG}}, true},
@@ -91,10 +86,10 @@ func ScriptToAddress(script []byte) (ScriptType, string, error) {
 		{ScriptStrange, scrNoAddr, 33, []pkbytes{{0, OP_DATA_32}}, false},
 		{ScriptStrange, scrNoAddr, 33, []pkbytes{{0, OP_HASH160}, {1, OP_DATA_20}, {22, OP_EQUAL}}, false},
 	}
-	return scriptToAddressTemplate(script, validformats)
+	return scriptToAddrHashTemplate(script, validformats)
 }
 
-func scriptToAddressTemplate(script []byte, validformats []pkformat) (ScriptType, string, error) {
+func scriptToAddrHashTemplate(script []byte, validformats []pkformat) (ScriptType, []byte, error) {
 	var format pkformat
 	var success bool
 	for _, format = range validformats {
@@ -109,7 +104,7 @@ func scriptToAddressTemplate(script []byte, validformats []pkformat) (ScriptType
 		success = true
 		for _, pkbyte := range format.databytes {
 			if pkbyte.off >= len(script) {
-				return ScriptUnknown, "Unknown",
+				return ScriptUnknown, nil,
 					StackErrInvalidAddrOffset
 			}
 			if script[pkbyte.off] != pkbyte.val {
@@ -129,64 +124,50 @@ func scriptToAddressTemplate(script []byte, validformats []pkformat) (ScriptType
 		if len(script) > 1 {
 			// check for a few special case
 			if script[len(script)-1] == OP_CHECK_MULTISIG {
-				return ScriptStrange, "Unknown", nil
+				return ScriptStrange, nil, nil
 			}
 			if script[0] == OP_0 && (len(script) <= 75 && byte(len(script)) == script[1]+2) {
-				return ScriptStrange, "Unknown", nil
+				return ScriptStrange, nil, nil
 			}
 			if script[0] == OP_HASH160 && len(script) == 23 && script[22] == OP_EQUAL {
-				return ScriptStrange, "Unknown", nil
+				return ScriptStrange, nil, nil
 			}
 			if script[0] == OP_DATA_36 && len(script) == 37 {
 				// Multisig ScriptSig
-				return ScriptStrange, "Unknown", nil
+				return ScriptStrange, nil, nil
 			}
 		}
 
-		return ScriptUnknown, "Unknown", StackErrUnknownAddress
+		return ScriptUnknown, nil, StackErrUnknownAddress
 	}
 
-	var atype byte
-	var abuf []byte
-	var addr string
+	var addrhash []byte
 	switch format.parsetype {
 	case scrPayAddr:
-		atype = 0x00
-		abuf = script[3:23]
+		addrhash = script[3:23]
 	case scrCollectAddr:
 		// script is replaced with the md160 of the pubkey
 		slen := len(script)
 		pubkey := script[slen-65:]
-		abuf = calcHash160(pubkey)
+		addrhash = calcHash160(pubkey)
 	case scrCollectAddrComp:
 		// script is replaced with the md160 of the pubkey
 		slen := len(script)
 		pubkey := script[slen-33:]
-		abuf = calcHash160(pubkey)
+		addrhash = calcHash160(pubkey)
 	case scrGeneratePubkeyAddr:
-		atype = 0x00
-		addr = "Unknown"
+		// unable to determine address hash from script
 	case scrNoAddr:
-		addr = "Unknown"
+		// unable to determine address hash from script
 	case scrPubkeyAddr:
-		atype = 0x00
 		pubkey := script[1:66]
-		abuf = calcHash160(pubkey)
+		addrhash = calcHash160(pubkey)
 	case scrPubkeyAddrComp:
-		atype = 0x00
 		pubkey := script[1:34]
-		abuf = calcHash160(pubkey)
+		addrhash = calcHash160(pubkey)
 	default:
-		return ScriptUnknown, "Unknown", StackErrInvalidParseType
+		return ScriptUnknown, nil, StackErrInvalidParseType
 	}
 
-	if abuf != nil {
-		addrbytes := append([]byte{atype}, abuf[:]...)
-
-		cksum := btcwire.DoubleSha256(addrbytes)
-		addrbytes = append(addrbytes, cksum[:4]...)
-		addr = btcutil.Base58Encode(addrbytes)
-	}
-
-	return format.addrtype, addr, nil
+	return format.addrtype, addrhash, nil
 }

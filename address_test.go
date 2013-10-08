@@ -4,13 +4,14 @@
 package btcscript_test
 
 import (
+	"bytes"
 	"github.com/conformal/btcscript"
 	"testing"
 )
 
 type addressTest struct {
 	script     []byte
-	address    string
+	addrhash   []byte
 	shouldFail error
 	class      btcscript.ScriptType
 }
@@ -26,8 +27,10 @@ var addressTests = []addressTest{
 		0xfa, 0x9b, 0x8b, 0x64, 0xf9, 0xd4, 0xc0, 0x3f,
 		0x99, 0x9b, 0x86, 0x43, 0xf6, 0x56, 0xb4, 0x12,
 		0xa3, btcscript.OP_CHECKSIG},
-		address: "12cbQLTFMXRnSzktFkuoG3eHoMeFtpTu3S",
-		class:   btcscript.ScriptPubKey,
+		addrhash: []byte{0x11, 0xb3, 0x66, 0xed, 0xfc, 0x0a,
+			0x8b, 0x66, 0xfe, 0xeb, 0xae, 0x5c, 0x2e,
+			0x25, 0xa7, 0xb6, 0xa5, 0xd1, 0xcf, 0x31},
+		class: btcscript.ScriptPubKey,
 	},
 	{script: []byte{btcscript.OP_DATA_65,
 		0x04, 0x11, 0xdb, 0x93, 0xe1, 0xdc, 0xdb, 0x8a,
@@ -51,8 +54,8 @@ var addressTests = []addressTest{
 		0xa4, 0xac, 0xdd, 0x12, 0x90, 0x9d, 0x83, 0x1c,
 		0xc5, 0x6c, 0xbb, 0xac, 0x46, 0x22, 0x08, 0x22,
 		0x21, 0xa8, 0x76, 0x8d, 0x1d, 0x09, 0x01},
-		address: "Unknown",
-		class:   btcscript.ScriptPubKey,
+		addrhash: nil,
+		class:    btcscript.ScriptPubKey,
 	},
 	{script: []byte{btcscript.OP_DUP, btcscript.OP_HASH160,
 		btcscript.OP_DATA_20,
@@ -61,8 +64,10 @@ var addressTests = []addressTest{
 		0x09, 0xa3, 0x05, 0x64,
 		btcscript.OP_EQUALVERIFY, btcscript.OP_CHECKSIG,
 	},
-		address: "1Gmt8AzabtngttF3PcZzLR1p7uCMaHNuGY",
-		class:   btcscript.ScriptAddr,
+		addrhash: []byte{0xad, 0x06, 0xdd, 0x6d, 0xde, 0xe5,
+			0x5c, 0xbc, 0xa9, 0xa9, 0xe3, 0x71, 0x3b,
+			0xd7, 0x58, 0x75, 0x09, 0xa3, 0x05, 0x64},
+		class: btcscript.ScriptAddr,
 	},
 	{script: []byte{btcscript.OP_DATA_73,
 		0x30, 0x46, 0x02, 0x21, 0x00, 0xdd, 0xc6, 0x97,
@@ -85,8 +90,10 @@ var addressTests = []addressTest{
 		0x93, 0x7d, 0x58, 0xe5, 0xa7, 0x5a, 0x71, 0x04,
 		0x2d, 0x40, 0x38, 0x8a, 0x4d, 0x30, 0x7f, 0x88,
 		0x7d},
-		address: "16tRBxwU7t5hEHaPLqiE35gS3jaGBppraH",
-		class:   btcscript.ScriptAddr,
+		addrhash: []byte{0x40, 0x92, 0x08, 0xf3, 0x87, 0xf4,
+			0x7f, 0xd2, 0x3a, 0x9f, 0x44, 0x5e, 0x14,
+			0xdc, 0x1f, 0x99, 0xbb, 0xb8, 0x0d, 0xaa},
+		class: btcscript.ScriptAddr,
 	},
 	{script: []byte{btcscript.OP_DATA_73,
 		0x30, 0x46, 0x02, 0x21, 0x00, 0xac, 0x7e, 0x4e,
@@ -106,8 +113,10 @@ var addressTests = []addressTest{
 		0x72, 0x3d, 0x5a, 0xd4, 0x06, 0x8d, 0xdd, 0x30,
 		0x36,
 	},
-		address: "1272555ceTPn2WepjzVgFESWdfNQjqdjgp",
-		class:   btcscript.ScriptAddr,
+		addrhash: []byte{0x0c, 0x1b, 0x83, 0xd0, 0x1d, 0x0f,
+			0xfb, 0x2b, 0xcc, 0xae, 0x60, 0x69, 0x63,
+			0x37, 0x6c, 0xca, 0x38, 0x63, 0xa7, 0xce},
+		class: btcscript.ScriptAddr,
 	},
 	{script: []byte{btcscript.OP_DATA_32,
 		0x30, 0x46, 0x02, 0x21, 0x00, 0xac, 0x7e, 0x4e,
@@ -115,8 +124,8 @@ var addressTests = []addressTest{
 		0x87, 0x2a, 0xb9, 0xd3, 0x2c, 0xdc, 0x08, 0x33,
 		0x80, 0x73, 0x3e, 0x3e, 0x98, 0x47, 0xff, 0x77,
 	},
-		address: "Unknown",
-		class:   btcscript.ScriptStrange,
+		addrhash: nil,
+		class:    btcscript.ScriptStrange,
 	},
 	{script: []byte{btcscript.OP_DATA_33,
 		0x02, 0x40, 0x05, 0xc9, 0x45, 0xd8, 0x6a, 0xc6,
@@ -126,8 +135,10 @@ var addressTests = []addressTest{
 		0x36,
 		btcscript.OP_CHECKSIG,
 	},
-		address: "1272555ceTPn2WepjzVgFESWdfNQjqdjgp",
-		class:   btcscript.ScriptPubKey,
+		addrhash: []byte{0x0c, 0x1b, 0x83, 0xd0, 0x1d, 0x0f,
+			0xfb, 0x2b, 0xcc, 0xae, 0x60, 0x69, 0x63,
+			0x37, 0x6c, 0xca, 0x38, 0x63, 0xa7, 0xce},
+		class: btcscript.ScriptPubKey,
 	},
 	{script: []byte{btcscript.OP_DATA_33,
 		0x02, 0x40, 0x05, 0xc9, 0x45, 0xd8, 0x6a, 0xc6,
@@ -137,8 +148,8 @@ var addressTests = []addressTest{
 		0x36,
 		btcscript.OP_CHECK_MULTISIG, // note this isn't a real tx
 	},
-		address: "Unknown",
-		class:   btcscript.ScriptStrange,
+		addrhash: nil,
+		class:    btcscript.ScriptStrange,
 	},
 	{script: []byte{btcscript.OP_0, btcscript.OP_DATA_33,
 		0x02, 0x40, 0x05, 0xc9, 0x45, 0xd8, 0x6a, 0xc6,
@@ -147,8 +158,8 @@ var addressTests = []addressTest{
 		0x72, 0x3d, 0x5a, 0xd4, 0x06, 0x8d, 0xdd, 0x30,
 		0x36, // note this isn't a real tx
 	},
-		address: "Unknown",
-		class:   btcscript.ScriptStrange,
+		addrhash: nil,
+		class:    btcscript.ScriptStrange,
 	},
 	{script: []byte{btcscript.OP_HASH160, btcscript.OP_DATA_20,
 		0x02, 0x40, 0x05, 0xc9, 0x45, 0xd8, 0x6a, 0xc6,
@@ -156,8 +167,8 @@ var addressTests = []addressTest{
 		0xa7, 0xa8, 0x45, 0xbd,
 		btcscript.OP_EQUAL, // note this isn't a real tx
 	},
-		address: "Unknown",
-		class:   btcscript.ScriptStrange,
+		addrhash: nil,
+		class:    btcscript.ScriptStrange,
 	},
 	{script: []byte{btcscript.OP_DATA_36,
 		0x02, 0x40, 0x05, 0xc9, 0x45, 0xd8, 0x6a, 0xc6,
@@ -167,8 +178,8 @@ var addressTests = []addressTest{
 		0xa7, 0xa8, 0x45, 0xbd,
 		// note this isn't a real tx
 	},
-		address: "Unknown",
-		class:   btcscript.ScriptStrange,
+		addrhash: nil,
+		class:    btcscript.ScriptStrange,
 	},
 	{script: []byte{},
 		shouldFail: btcscript.StackErrUnknownAddress,
@@ -177,7 +188,7 @@ var addressTests = []addressTest{
 
 func TestAddresses(t *testing.T) {
 	for i, s := range addressTests {
-		class, address, err := btcscript.ScriptToAddress(s.script)
+		class, addrhash, err := btcscript.ScriptToAddrHash(s.script)
 		if s.shouldFail != nil {
 			if err != s.shouldFail {
 				t.Errorf("Address test %v failed is err [%v] should be [%v]", i, err, s.shouldFail)
@@ -186,8 +197,8 @@ func TestAddresses(t *testing.T) {
 			if err != nil {
 				t.Errorf("Address test %v failed err %v", i, err)
 			} else {
-				if s.address != address {
-					t.Errorf("Address test %v mismatch is [%v] want [%v]", i, address, s.address)
+				if !bytes.Equal(s.addrhash, addrhash) {
+					t.Errorf("Address test %v mismatch is [%v] want [%v]", i, addrhash, s.addrhash)
 				}
 				if s.class != class {
 					t.Errorf("Address test %v class mismatch is [%v] want [%v]", i, class, s.class)

@@ -49,8 +49,8 @@ func TstSignatureScriptCustomReader(reader io.Reader, tx *btcwire.MsgTx, idx int
 		hashType, privkey, compress)
 }
 
-// Tests for internal error cases in ScriptToAddress.
-// We pass bad format definitions to  ScriptToAddrss to make sure the internal
+// Tests for internal error cases in ScriptToAddrHash.
+// We pass bad format definitions to ScriptToAddrHash to make sure the internal
 // checks work correctly. This is located in internal_test.go and not address.go
 // because of the ridiculous amount of internal types/constants that would
 // otherwise need to be exported here.
@@ -94,7 +94,7 @@ var TstPkFormats = []pkformatTest{
 
 func TestBadPkFormat(t *testing.T) {
 	for _, test := range TstPkFormats {
-		ty, addr, err := scriptToAddressTemplate(test.script,
+		ty, addr, err := scriptToAddrHashTemplate(test.script,
 			[]pkformat{test.format})
 		if err != nil {
 			if err != test.err {
