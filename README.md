@@ -43,6 +43,17 @@ https://github.com/conformal/btcd/releases
   depending on your configuration.  If you did not already add to your system
   path during the installation, we recommend you do so now.
 
+## Updating
+
+#### Windows
+
+Install a newer MSI
+
+#### Linux/BSD/POSIX - Build from Source
+
+- Run the following command to update btcd, all dependencies, and install it:
+  ```$ go get -u -v github.com/conformal/btcd/...```
+
 ## Getting Started
 
 btcd has several configuration options avilable to tweak how it runs, but all
