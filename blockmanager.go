@@ -329,7 +329,7 @@ func (b *blockManager) handleInvMsg(imsg *invMsg) {
 	lastBlock := -1
 	invVects := imsg.inv.InvList
 	for i := len(invVects) - 1; i >= 0; i-- {
-		if invVects[i].Type == btcwire.InvVect_Block {
+		if invVects[i].Type == btcwire.InvTypeBlock {
 			lastBlock = i
 			break
 		}
@@ -342,7 +342,7 @@ func (b *blockManager) handleInvMsg(imsg *invMsg) {
 	chain := b.blockChain
 	for i, iv := range invVects {
 		// Ignore unsupported inventory types.
-		if iv.Type != btcwire.InvVect_Block && iv.Type != btcwire.InvVect_Tx {
+		if iv.Type != btcwire.InvTypeBlock && iv.Type != btcwire.InvTypeTx {
 			continue
 		}
 
@@ -357,7 +357,7 @@ func (b *blockManager) handleInvMsg(imsg *invMsg) {
 			continue
 		}
 
-		if iv.Type == btcwire.InvVect_Block {
+		if iv.Type == btcwire.InvTypeBlock {
 			// The block is an orphan block that we already have.
 			// When the existing orphan was processed, it requested
 			// the missing parent blocks.  When this scenario
@@ -505,7 +505,7 @@ func (b *blockManager) handleNotifyMsg(notification *btcchain.Notification) {
 		hash, _ := block.Sha()
 
 		// Generate the inventory vector and relay it.
-		iv := btcwire.NewInvVect(btcwire.InvVect_Block, hash)
+		iv := btcwire.NewInvVect(btcwire.InvTypeBlock, hash)
 		b.server.RelayInventory(iv)
 
 	// A block has been connected to the main block chain.

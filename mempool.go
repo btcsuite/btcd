@@ -670,7 +670,7 @@ func (mp *txMemPool) maybeAcceptTransaction(tx *btcwire.MsgTx, isOrphan *bool) e
 	// TODO(davec): Notifications
 
 	// Generate the inventory vector and relay it.
-	iv := btcwire.NewInvVect(btcwire.InvVect_Tx, &txHash)
+	iv := btcwire.NewInvVect(btcwire.InvTypeTx, &txHash)
 	mp.server.RelayInventory(iv)
 
 	return nil

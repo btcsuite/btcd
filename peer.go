@@ -350,7 +350,7 @@ func (p *peer) pushBlockMsg(sha btcwire.ShaHash) error {
 		hash, _, err := p.server.db.NewestSha()
 		if err == nil {
 			invMsg := btcwire.NewMsgInv()
-			iv := btcwire.NewInvVect(btcwire.InvVect_Block, hash)
+			iv := btcwire.NewInvVect(btcwire.InvTypeBlock, hash)
 			invMsg.AddInvVect(iv)
 			p.QueueMessage(invMsg)
 			p.continueHash = nil
@@ -410,7 +410,7 @@ func (p *peer) handleMemPoolMsg(msg *btcwire.MsgMemPool) {
 	invMsg := btcwire.NewMsgInv()
 	hashes := p.server.txMemPool.TxShas()
 	for i, hash := range hashes {
-		iv := btcwire.NewInvVect(btcwire.InvVect_Tx, hash)
+		iv := btcwire.NewInvVect(btcwire.InvTypeTx, hash)
 		invMsg.AddInvVect(iv)
 		if i+1 >= btcwire.MaxInvPerMsg {
 			break
@@ -434,7 +434,7 @@ func (p *peer) handleTxMsg(msg *btcwire.MsgTx) {
 		log.Errorf("Unable to get transaction hash: %v", err)
 		return
 	}
-	iv := btcwire.NewInvVect(btcwire.InvVect_Tx, &hash)
+	iv := btcwire.NewInvVect(btcwire.InvTypeTx, &hash)
 	p.addKnownInventory(iv)
 
 	// Process the transaction.
@@ -467,7 +467,7 @@ func (p *peer) handleBlockMsg(msg *btcwire.MsgBlock, buf []byte) {
 		log.Errorf("Unable to get block hash: %v", err)
 		return
 	}
-	iv := btcwire.NewInvVect(btcwire.InvVect_Block, hash)
+	iv := btcwire.NewInvVect(btcwire.InvTypeBlock, hash)
 	p.addKnownInventory(iv)
 
 	// Queue the block up to be handled by the block
@@ -502,9 +502,9 @@ out:
 	for _, iv := range msg.InvList {
 		var err error
 		switch iv.Type {
-		case btcwire.InvVect_Tx:
+		case btcwire.InvTypeTx:
 			err = p.pushTxMsg(iv.Hash)
-		case btcwire.InvVect_Block:
+		case btcwire.InvTypeBlock:
 			err = p.pushBlockMsg(iv.Hash)
 		default:
 			log.Warnf("[PEER] Unknown type in inventory request %d",
@@ -579,7 +579,7 @@ func (p *peer) handleGetBlocksMsg(msg *btcwire.MsgGetBlocks) {
 		// Add block inventory to the message.
 		for _, hash := range hashList {
 			hashCopy := hash
-			iv := btcwire.NewInvVect(btcwire.InvVect_Block, &hashCopy)
+			iv := btcwire.NewInvVect(btcwire.InvTypeBlock, &hashCopy)
 			invMsg.AddInvVect(iv)
 		}
 		start += int64(len(hashList))
