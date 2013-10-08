@@ -113,8 +113,7 @@ func btcdMain() error {
 	}
 
 	// Perform upgrades to btcd as new versions require it.
-	err = doUpgrades()
-	if err != nil {
+	if err := doUpgrades(); err != nil {
 		log.Errorf("%v", err)
 		return err
 	}
@@ -151,14 +150,12 @@ func main() {
 	runtime.GOMAXPROCS(runtime.NumCPU())
 
 	// Up some limits.
-	err := setLimits()
-	if err != nil {
+	if err := setLimits(); err != nil {
 		os.Exit(1)
 	}
 
 	// Work around defer not working after os.Exit()
-	err = btcdMain()
-	if err != nil {
+	if err := btcdMain(); err != nil {
 		os.Exit(1)
 	}
 }

@@ -162,9 +162,6 @@ func (s *server) handleBanPeerMsg(banned map[string]time.Time, p *peer) {
 // handleRelayInvMsg deals with relaying inventory to peers that are not already
 // known to have it.  It is invoked from the peerHandler goroutine.
 func (s *server) handleRelayInvMsg(peers *list.List, iv *btcwire.InvVect) {
-	// TODO(davec): Don't relay inventory during the initial block chain
-	// download.  Move the check out of the block manager.
-
 	// Loop through all connected peers and relay the inventory to those
 	// which are not already known to have it.
 	for e := peers.Front(); e != nil; e = e.Next() {

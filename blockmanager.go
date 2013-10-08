@@ -490,9 +490,6 @@ func (b *blockManager) handleNotifyMsg(notification *btcchain.Notification) {
 	case btcchain.NTBlockAccepted:
 		// Don't relay if we are not current. Other peers that are
 		// current should already know about it.
-		// TODO(davec): This should really be over in RelayInventory
-		// in server to stop all relays, but chain is not concurrent
-		// safe at this time, so call it here to single thread access.
 		if !b.blockChain.IsCurrent() {
 			return
 		}
