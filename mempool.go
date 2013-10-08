@@ -771,6 +771,23 @@ func (mp *txMemPool) ProcessTransaction(tx *btcwire.MsgTx) error {
 	return nil
 }
 
+// TxShas returns a slice containing the hashes of all transactions in the
+// memory pool.
+func (mp *txMemPool) TxShas() []*btcwire.ShaHash {
+	mp.lock.Lock()
+	defer mp.lock.Unlock()
+
+	hashes := make([]*btcwire.ShaHash, len(mp.pool))
+	i := 0
+	for hash := range mp.pool {
+		hashCopy := hash
+		hashes[i] = &hashCopy
+		i++
+	}
+
+	return hashes
+}
+
 // newTxMemPool returns a new memory pool for validating and storing standalone
 // transactions until they are mined into a block.
 func newTxMemPool(server *server) *txMemPool {

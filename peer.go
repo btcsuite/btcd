@@ -400,6 +400,29 @@ func (p *peer) PushGetBlocksMsg(locator btcchain.BlockLocator, stopHash *btcwire
 	return nil
 }
 
+// handleMemPoolMsg is invoked when a peer receives a mempool bitcoin message.
+// It creates and sends an inventory message with the contents of the memory
+// pool up to the maximum inventory allowed per message.
+func (p *peer) handleMemPoolMsg(msg *btcwire.MsgMemPool) {
+	// Generate inventory message with the available transactions in the
+	// transaction memory pool.  Limit it to the max allowed inventory
+	// per message.
+	invMsg := btcwire.NewMsgInv()
+	hashes := p.server.txMemPool.TxShas()
+	for i, hash := range hashes {
+		iv := btcwire.NewInvVect(btcwire.InvVect_Tx, hash)
+		invMsg.AddInvVect(iv)
+		if i+1 >= btcwire.MaxInvPerMsg {
+			break
+		}
+	}
+
+	// Send the inventory message if there is anything to send.
+	if len(invMsg.InvList) > 0 {
+		p.QueueMessage(invMsg)
+	}
+}
+
 // handleTxMsg is invoked when a peer receives a tx bitcoin message.  It blocks
 // until the bitcoin transaction has been fully processed.  Unlock the block
 // handler this does not serialize all transactions through a single thread
@@ -911,6 +934,9 @@ out:
 
 		case *btcwire.MsgAlert:
 			p.server.BroadcastMessage(msg, p)
+
+		case *btcwire.MsgMemPool:
+			p.handleMemPoolMsg(msg)
 
 		case *btcwire.MsgTx:
 			p.handleTxMsg(msg)
