@@ -67,7 +67,7 @@ func main() {
 	if len(datadir) == 0 {
 		datadir = filepath.Join(btcdHomeDir(), "data")
 	}
-	datadir = filepath.Join(datadir, "mainnet")
+	datadir = filepath.Join(datadir, "testnet")
 
 	blockDbNamePrefix := "blocks"
 	dbName := blockDbNamePrefix + "_" + dbType

@@ -24,7 +24,7 @@ var (
 // loadBlockDB opens the block database and returns a handle to it.
 func loadBlockDB() (btcdb.Db, error) {
 	// The database name is based on the database type.
-	dbType := "leveldb"
+	dbType := cfg.DbType
 	dbName := blockDbNamePrefix + "_" + dbType
 	if dbType == "sqlite" {
 		dbName = dbName + ".db"
@@ -52,7 +52,7 @@ func findCandidates(db btcdb.Db, latestHash *btcwire.ShaHash) ([]*btcchain.Check
 
 	// Setup chain and get the latest checkpoint.  Ignore notifications
 	// since they aren't needed for this util.
-	chain := btcchain.New(db, btcwire.MainNet, nil)
+	chain := btcchain.New(db, activeNetwork, nil)
 	latestCheckpoint := chain.LatestCheckpoint()
 	if latestCheckpoint == nil {
 		return nil, fmt.Errorf("unable to retrieve latest checkpoint")

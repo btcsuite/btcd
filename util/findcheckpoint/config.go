@@ -6,6 +6,10 @@ package main
 
 import (
 	"fmt"
+	"github.com/conformal/btcdb"
+	_ "github.com/conformal/btcdb/ldb"
+	_ "github.com/conformal/btcdb/sqlite3"
+	"github.com/conformal/btcwire"
 	"github.com/conformal/go-flags"
 	"os"
 	"path/filepath"
@@ -15,10 +19,13 @@ const (
 	minCandidates        = 1
 	maxCandidates        = 20
 	defaultNumCandidates = 5
+	defaultDbType        = "sqlite"
 )
 
 var (
 	defaultDataDir = filepath.Join(btcdHomeDir(), "data")
+	knownDbTypes   = btcdb.SupportedDBs()
+	activeNetwork  = btcwire.MainNet
 )
 
 // config defines the configuration options for findcheckpoint.
@@ -26,6 +33,8 @@ var (
 // See loadConfig for details on the configuration load process.
 type config struct {
 	DataDir       string `short:"b" long:"datadir" description:"Location of the btcd data directory"`
+	DbType        string `long:"dbtype" description:"Database backend to use for the Block Chain"`
+	TestNet3      bool   `long:"testnet" description:"Use the test network"`
 	NumCandidates int    `short:"n" long:"numcandidates" description:"Max num of checkpoint candidates to show {1-20}"`
 	UseGoOutput   bool   `short:"g" long:"gooutput" description:"Display the candidates using Go syntax that is ready to insert into the btcchain checkpoint list"`
 }
@@ -48,21 +57,31 @@ func btcdHomeDir() string {
 	return "."
 }
 
+// validDbType returns whether or not dbType is a supported database type.
+func validDbType(dbType string) bool {
+	for _, knownType := range knownDbTypes {
+		if dbType == knownType {
+			return true
+		}
+	}
+
+	return false
+}
+
+func netName(btcnet btcwire.BitcoinNet) string {
+	net := "mainnet"
+	if btcnet == btcwire.TestNet3 {
+		net = "testnet"
+	}
+	return net
+}
+
 // loadConfig initializes and parses the config using command line options.
-//
-// The configuration proceeds as follows:
-// 	1) Start with a default config with sane settings
-// 	2) Pre-parse the command line to check for an alternative config file
-// 	3) Load configuration file overwriting defaults with any specified options
-// 	4) Parse CLI options and overwrite/add any specified options
-//
-// The above results in btcd functioning properly without any config settings
-// while still allowing the user to override settings with config files and
-// command line options.  Command line options always take precedence.
 func loadConfig() (*config, []string, error) {
 	// Default config.
 	cfg := config{
 		DataDir:       defaultDataDir,
+		DbType:        defaultDbType,
 		NumCandidates: defaultNumCandidates,
 	}
 
@@ -76,11 +95,16 @@ func loadConfig() (*config, []string, error) {
 		return nil, nil, err
 	}
 
-	// Validate the number of candidates.
-	if cfg.NumCandidates < minCandidates || cfg.NumCandidates > maxCandidates {
-		str := "%s: The specified number of candidates is out of " +
-			"range -- parsed [%v]"
-		err = fmt.Errorf(str, "loadConfig", cfg.NumCandidates)
+	// Choose the active network based on the flags.
+	if cfg.TestNet3 {
+		activeNetwork = btcwire.TestNet3
+	}
+
+	// Validate database type.
+	if !validDbType(cfg.DbType) {
+		str := "%s: The specified database type [%v] is invalid -- " +
+			"supported types %v"
+		err := fmt.Errorf(str, "loadConfig", cfg.DbType, knownDbTypes)
 		fmt.Fprintln(os.Stderr, err)
 		parser.WriteHelp(os.Stderr)
 		return nil, nil, err
@@ -92,8 +116,17 @@ func loadConfig() (*config, []string, error) {
 	// All data is specific to a network, so namespacing the data directory
 	// means each individual piece of serialized data does not have to
 	// worry about changing names per network and such.
-	//cfg.DataDir = cleanAndExpandPath(cfg.DataDir)
-	cfg.DataDir = filepath.Join(cfg.DataDir, "mainnet")
+	cfg.DataDir = filepath.Join(cfg.DataDir, netName(activeNetwork))
+
+	// Validate the number of candidates.
+	if cfg.NumCandidates < minCandidates || cfg.NumCandidates > maxCandidates {
+		str := "%s: The specified number of candidates is out of " +
+			"range -- parsed [%v]"
+		err = fmt.Errorf(str, "loadConfig", cfg.NumCandidates)
+		fmt.Fprintln(os.Stderr, err)
+		parser.WriteHelp(os.Stderr)
+		return nil, nil, err
+	}
 
 	return &cfg, remainingArgs, nil
 }
