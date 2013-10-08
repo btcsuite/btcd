@@ -831,7 +831,7 @@ func (p *peer) writeMessage(msg btcwire.Message) {
 	// Use closures to log expensive operations so they are only run when the
 	// logging level requires it.
 	log.Tracef("%v", newLogClosure(func() string {
-		return "[PEER] msg" + spew.Sdump(msg)
+		return "[PEER] " + spew.Sdump(msg)
 	}))
 	log.Tracef("%v", newLogClosure(func() string {
 		var buf bytes.Buffer
