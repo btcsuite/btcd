@@ -7,8 +7,8 @@ package btcscript_test
 import (
 	"bytes"
 	"errors"
-	"github.com/conformal/btcscript"
 	"fmt"
+	"github.com/conformal/btcscript"
 	"math/big"
 	"testing"
 )
@@ -254,7 +254,7 @@ var stackTests = []stackTest{
 	},
 	{
 		"popInt -1 leading 0",
-		[][]byte{{0x01,0x00, 0x00, 0x80}},
+		[][]byte{{0x01, 0x00, 0x00, 0x80}},
 		func(stack *btcscript.Stack) error {
 			v, err := stack.PopInt()
 			if err != nil {
@@ -290,7 +290,7 @@ var stackTests = []stackTest{
 	// Confirm that the asInt code doesn't modify the base data.
 	{
 		"peekint nomodify -1",
-		[][]byte{{0x01,0x00, 0x00, 0x80}},
+		[][]byte{{0x01, 0x00, 0x00, 0x80}},
 		func(stack *btcscript.Stack) error {
 			v, err := stack.PeekInt(0)
 			if err != nil {
@@ -303,7 +303,7 @@ var stackTests = []stackTest{
 			return nil
 		},
 		nil,
-		[][]byte{{0x01,0x00, 0x00, 0x80}},
+		[][]byte{{0x01, 0x00, 0x00, 0x80}},
 	},
 	{
 		"PushInt 0",

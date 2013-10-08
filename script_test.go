@@ -15,15 +15,17 @@ import (
 )
 
 type txTest struct {
-	name       string
-	tx         *btcwire.MsgTx
-	pkScript   []byte // output script of previous tx
-	idx        int    // tx idx to be run.
-	bip16      bool   // is bip16 active?
-	parseErr   error  // failure of NewScript
-	err        error  // Failure of Executre
-	shouldFail bool   // Execute should fail with nonspecified error.
-	nSigOps    int    // result of GetPreciseSigOpsCount
+	name          string
+	tx            *btcwire.MsgTx
+	pkScript      []byte               // output script of previous tx
+	idx           int                  // tx idx to be run.
+	bip16         bool                 // is bip16 active?
+	parseErr      error                // failure of NewScript
+	err           error                // Failure of Executre
+	shouldFail    bool                 // Execute should fail with nonspecified error.
+	nSigOps       int                  // result of GetPreciseSigOpsCount
+	scriptInfo    btcscript.ScriptInfo // result of ScriptInfo
+	scriptInfoErr error                // error return of ScriptInfo
 }
 
 var txTests = []txTest{
@@ -127,6 +129,12 @@ var txTests = []txTest{
 		},
 		idx:     0,
 		nSigOps: 1,
+		scriptInfo: btcscript.ScriptInfo{
+			PkScriptClass:  btcscript.PubKeyTy,
+			NumInputs:      1,
+			ExpectedInputs: 1,
+			SigOps:         1,
+		},
 	},
 	// Previous test with the value of one output changed.
 	txTest{
@@ -228,6 +236,12 @@ var txTests = []txTest{
 		idx:     0,
 		err:     btcscript.StackErrScriptFailed,
 		nSigOps: 1,
+		scriptInfo: btcscript.ScriptInfo{
+			PkScriptClass:  btcscript.PubKeyTy,
+			NumInputs:      1,
+			ExpectedInputs: 1,
+			SigOps:         1,
+		},
 	},
 	txTest{
 		name: "CheckSig invalid signature",
@@ -330,6 +344,12 @@ var txTests = []txTest{
 		idx:        0,
 		shouldFail: true,
 		nSigOps:    1,
+		scriptInfo: btcscript.ScriptInfo{
+			PkScriptClass:  btcscript.PubKeyTy,
+			NumInputs:      1,
+			ExpectedInputs: 1,
+			SigOps:         1,
+		},
 	},
 	txTest{
 		name: "CheckSig invalid pubkey",
@@ -431,6 +451,12 @@ var txTests = []txTest{
 		idx:        0,
 		shouldFail: true,
 		nSigOps:    1,
+		scriptInfo: btcscript.ScriptInfo{
+			PkScriptClass:  btcscript.PubKeyTy,
+			NumInputs:      1,
+			ExpectedInputs: 1,
+			SigOps:         1,
+		},
 	},
 	// tx 599e47a8114fe098103663029548811d2651991b62397e057f0c863c2bc9f9ea
 	// uses checksig with SigHashNone.
@@ -533,6 +559,12 @@ var txTests = []txTest{
 		idx:     0,
 		bip16:   true, // after threshold
 		nSigOps: 1,
+		scriptInfo: btcscript.ScriptInfo{
+			PkScriptClass:  btcscript.PubKeyHashTy,
+			NumInputs:      2,
+			ExpectedInputs: 2,
+			SigOps:         1,
+		},
 	},
 	// tx 51bf528ecf3c161e7c021224197dbe84f9a8564212f6207baa014c01a1668e1e
 	// first instance of an AnyoneCanPay signature in the blockchain
@@ -657,6 +689,12 @@ var txTests = []txTest{
 		idx:     0,
 		bip16:   true, // after threshold
 		nSigOps: 1,
+		scriptInfo: btcscript.ScriptInfo{
+			PkScriptClass:  btcscript.PubKeyHashTy,
+			NumInputs:      2,
+			ExpectedInputs: 2,
+			SigOps:         1,
+		},
 	},
 	// tx 6d36bc17e947ce00bb6f12f8e7a56a1585c5a36188ffa2b05e10b4743273a74b
 	// Uses OP_CODESEPARATOR and OP_CHECKMULTISIG
@@ -777,9 +815,10 @@ var txTests = []txTest{
 			0x4f, 0x13,
 			btcscript.OP_NOP2, btcscript.OP_DROP,
 		},
-		idx:     1,
-		bip16:   false,
-		nSigOps: 0, // multisig is in the pkScript!
+		idx:           1,
+		bip16:         false,
+		nSigOps:       0, // multisig is in the pkScript!
+		scriptInfoErr: btcscript.StackErrNonPushOnly,
 	},
 	// same as previous but with one byte changed to make signature fail
 	txTest{
@@ -899,10 +938,11 @@ var txTests = []txTest{
 			0x4f, 0x13,
 			btcscript.OP_NOP2, btcscript.OP_DROP,
 		},
-		idx:     1,
-		bip16:   false,
-		err:     btcscript.StackErrScriptFailed,
-		nSigOps: 0, // multisig is in the pkScript!
+		idx:           1,
+		bip16:         false,
+		err:           btcscript.StackErrScriptFailed,
+		nSigOps:       0, // multisig is in the pkScript!
+		scriptInfoErr: btcscript.StackErrNonPushOnly,
 	},
 	// tx e5779b9e78f9650debc2893fd9636d827b26b4ddfa6a8172fe8708c924f5c39d
 	// First P2SH transaction in the blockchain
@@ -962,6 +1002,12 @@ var txTests = []txTest{
 		idx:     0,
 		bip16:   true,
 		nSigOps: 0, // no signature ops in the pushed script.
+		scriptInfo: btcscript.ScriptInfo{
+			PkScriptClass:  btcscript.ScriptHashTy,
+			NumInputs:      1,
+			ExpectedInputs: -1, // p2sh script is non standard
+			SigOps:         0,
+		},
 	},
 	// next few tests are modified versions of previous to hit p2sh error
 	// cases.
@@ -1023,6 +1069,12 @@ var txTests = []txTest{
 		err:     btcscript.StackErrScriptFailed,
 		bip16:   true,
 		nSigOps: 0, // no signature ops in the pushed script.
+		scriptInfo: btcscript.ScriptInfo{
+			PkScriptClass:  btcscript.ScriptHashTy,
+			NumInputs:      1,
+			ExpectedInputs: -1, // p2sh script is non standard
+			SigOps:         0,
+		},
 	},
 	txTest{
 		// sigscript changed so that pkscript hash will not match.
@@ -1078,9 +1130,10 @@ var txTests = []txTest{
 			0xba, 0x67,
 			btcscript.OP_EQUAL,
 		},
-		idx:   0,
-		err:   btcscript.StackErrShortScript,
-		bip16: true,
+		idx:           0,
+		err:           btcscript.StackErrShortScript,
+		bip16:         true,
+		scriptInfoErr: btcscript.StackErrShortScript,
 	},
 	txTest{
 		// sigscript changed so to be non pushonly.
@@ -1140,10 +1193,11 @@ var txTests = []txTest{
 			0xae, 0x88,
 			btcscript.OP_EQUAL,
 		},
-		idx:      0,
-		parseErr: btcscript.StackErrP2SHNonPushOnly,
-		bip16:    true,
-		nSigOps:  0, // no signature ops in the pushed script.
+		idx:           0,
+		parseErr:      btcscript.StackErrP2SHNonPushOnly,
+		bip16:         true,
+		nSigOps:       0, // no signature ops in the pushed script.
+		scriptInfoErr: btcscript.StackErrNonPushOnly,
 	},
 	txTest{
 		// sigscript changed so to be non pushonly.
@@ -1195,6 +1249,12 @@ var txTests = []txTest{
 		idx:      0,
 		bip16:    true,
 		nSigOps:  0, // no signature ops in the pushed script.
+		scriptInfo: btcscript.ScriptInfo{
+			PkScriptClass:  btcscript.NonStandardTy,
+			NumInputs:      1,
+			ExpectedInputs: -1,
+			SigOps:         0,
+		},
 	},
 }
 
@@ -1317,6 +1377,195 @@ func TestGetPreciseSignOps(t *testing.T) {
 
 		}
 	}
+}
+
+type scriptInfoTest struct {
+	name          string
+	sigScript     []byte
+	pkScript      []byte
+	bip16         bool
+	scriptInfo    btcscript.ScriptInfo
+	scriptInfoErr error
+}
+
+func TestScriptInfo(t *testing.T) {
+	for _, test := range txTests {
+		si, err := btcscript.CalcScriptInfo(
+			test.tx.TxIn[test.idx].SignatureScript,
+			test.pkScript, test.bip16)
+		if err != nil {
+			if err != test.scriptInfoErr {
+				t.Errorf("scriptinfo test \"%s\": got \"%v\""+
+					"expected \"%v\"", test.name, err,
+					test.scriptInfoErr)
+			}
+			continue
+		}
+		if test.scriptInfoErr != nil {
+			t.Errorf("%s: succeeded when expecting \"%v\"",
+				test.name, test.scriptInfoErr)
+			continue
+		}
+		if *si != test.scriptInfo {
+			t.Errorf("%s: scriptinfo doesn't match expected. "+
+				"got: \"%v\" expected \"%v\"", test.name,
+				*si, test.scriptInfo)
+			continue
+		}
+	}
+
+	extraTests := []scriptInfoTest{
+		{
+			// Invented scripts, the hashes do not match
+			name: "pkscript doesn't parse",
+			sigScript: []byte{btcscript.OP_TRUE,
+				btcscript.OP_DATA_1, 81,
+				btcscript.OP_DATA_8,
+				btcscript.OP_2DUP, btcscript.OP_EQUAL,
+				btcscript.OP_NOT, btcscript.OP_VERIFY,
+				btcscript.OP_ABS, btcscript.OP_SWAP,
+				btcscript.OP_ABS, btcscript.OP_EQUAL,
+			},
+			// truncated version of test below:
+			pkScript: []byte{btcscript.OP_HASH160,
+				btcscript.OP_DATA_20,
+				0xfe, 0x44, 0x10, 0x65, 0xb6, 0x53, 0x22, 0x31,
+				0xde, 0x2f, 0xac, 0x56, 0x31, 0x52, 0x20, 0x5e,
+				0xc4, 0xf5, 0x9c,
+			},
+			bip16:         true,
+			scriptInfoErr: btcscript.StackErrShortScript,
+		},
+		{
+			name: "sigScript doesn't parse",
+			// Truncated version of p2sh script below.
+			sigScript: []byte{btcscript.OP_TRUE,
+				btcscript.OP_DATA_1, 81,
+				btcscript.OP_DATA_8,
+				btcscript.OP_2DUP, btcscript.OP_EQUAL,
+				btcscript.OP_NOT, btcscript.OP_VERIFY,
+				btcscript.OP_ABS, btcscript.OP_SWAP,
+				btcscript.OP_ABS,
+			},
+			pkScript: []byte{btcscript.OP_HASH160,
+				btcscript.OP_DATA_20,
+				0xfe, 0x44, 0x10, 0x65, 0xb6, 0x53, 0x22, 0x31,
+				0xde, 0x2f, 0xac, 0x56, 0x31, 0x52, 0x20, 0x5e,
+				0xc4, 0xf5, 0x9c, 0x74, btcscript.OP_EQUAL,
+			},
+			bip16:         true,
+			scriptInfoErr: btcscript.StackErrShortScript,
+		},
+		{
+			// Invented scripts, the hashes do not match
+			name: "p2sh standard script",
+			sigScript: []byte{btcscript.OP_TRUE,
+				btcscript.OP_DATA_1, 81,
+				btcscript.OP_DATA_25,
+				btcscript.OP_DUP, btcscript.OP_HASH160,
+				btcscript.OP_DATA_20, 0x1, 0x2, 0x3, 0x4, 0x5,
+				0x6, 0x7, 0x8, 0x9, 0xa, 0xb, 0xc, 0xd, 0xe,
+				0xf, 0x10, 0x11, 0x12, 0x13, 0x14,
+				btcscript.OP_EQUALVERIFY, btcscript.OP_CHECKSIG,
+			},
+			pkScript: []byte{btcscript.OP_HASH160,
+				btcscript.OP_DATA_20,
+				0xfe, 0x44, 0x10, 0x65, 0xb6, 0x53, 0x22, 0x31,
+				0xde, 0x2f, 0xac, 0x56, 0x31, 0x52, 0x20, 0x5e,
+				0xc4, 0xf5, 0x9c, 0x74, btcscript.OP_EQUAL,
+			},
+			bip16: true,
+			scriptInfo: btcscript.ScriptInfo{
+				PkScriptClass:  btcscript.ScriptHashTy,
+				NumInputs:      3,
+				ExpectedInputs: 3, // nonstandard p2sh.
+				SigOps:         1,
+			},
+		},
+		{
+			// from 567a53d1ce19ce3d07711885168484439965501536d0d0294c5d46d46c10e53b
+			// from the blockchain.
+			name: "p2sh nonstandard script",
+			sigScript: []byte{btcscript.OP_TRUE,
+				btcscript.OP_DATA_1, 81,
+				btcscript.OP_DATA_8,
+				btcscript.OP_2DUP, btcscript.OP_EQUAL,
+				btcscript.OP_NOT, btcscript.OP_VERIFY,
+				btcscript.OP_ABS, btcscript.OP_SWAP,
+				btcscript.OP_ABS, btcscript.OP_EQUAL,
+			},
+			pkScript: []byte{btcscript.OP_HASH160,
+				btcscript.OP_DATA_20,
+				0xfe, 0x44, 0x10, 0x65, 0xb6, 0x53, 0x22, 0x31,
+				0xde, 0x2f, 0xac, 0x56, 0x31, 0x52, 0x20, 0x5e,
+				0xc4, 0xf5, 0x9c, 0x74, btcscript.OP_EQUAL,
+			},
+			bip16: true,
+			scriptInfo: btcscript.ScriptInfo{
+				PkScriptClass:  btcscript.ScriptHashTy,
+				NumInputs:      3,
+				ExpectedInputs: -1, // nonstandard p2sh.
+				SigOps:         0,
+			},
+		},
+		{
+			// Script is invented, numbers all fake.
+			name: "multisig script",
+			sigScript: []byte{btcscript.OP_TRUE,
+				btcscript.OP_TRUE, btcscript.OP_TRUE,
+			},
+			pkScript: []byte{
+				btcscript.OP_3, btcscript.OP_DATA_33,
+				0x1, 0x2, 0x3, 0x4, 0x5, 0x6, 0x7, 0x8, 0x9,
+				0xa, 0xb, 0xc, 0xd, 0xe, 0xf, 0x10, 0x11, 0x12,
+				0x13, 0x14, 0x15, 0x16, 0x17, 0x18, 0x19, 0x1a,
+				0x1b, 0x1c, 0x1d, 0x1e, 0x1f, 0x20, 0x21,
+				btcscript.OP_DATA_33,
+				0x1, 0x2, 0x3, 0x4, 0x5, 0x6, 0x7, 0x8, 0x9,
+				0xa, 0xb, 0xc, 0xd, 0xe, 0xf, 0x10, 0x11, 0x12,
+				0x13, 0x14, 0x15, 0x16, 0x17, 0x18, 0x19, 0x1a,
+				0x1b, 0x1c, 0x1d, 0x1e, 0x1f, 0x20, 0x21,
+				btcscript.OP_DATA_33,
+				0x1, 0x2, 0x3, 0x4, 0x5, 0x6, 0x7, 0x8, 0x9,
+				0xa, 0xb, 0xc, 0xd, 0xe, 0xf, 0x10, 0x11, 0x12,
+				0x13, 0x14, 0x15, 0x16, 0x17, 0x18, 0x19, 0x1a,
+				0x1b, 0x1c, 0x1d, 0x1e, 0x1f, 0x20, 0x21,
+				btcscript.OP_3, btcscript.OP_CHECK_MULTISIG,
+			},
+			bip16: true,
+			scriptInfo: btcscript.ScriptInfo{
+				PkScriptClass:  btcscript.MultiSigTy,
+				NumInputs:      3,
+				ExpectedInputs: 3,
+				SigOps:         3,
+			},
+		},
+	}
+
+	for _, test := range extraTests {
+		si, err := btcscript.CalcScriptInfo(test.sigScript,
+			test.pkScript, test.bip16)
+		if err != nil {
+			if err != test.scriptInfoErr {
+				t.Errorf("scriptinfo test \"%s\": got \"%v\""+
+					"expected \"%v\"", test.name, err,
+					test.scriptInfoErr)
+			}
+			continue
+		}
+		if test.scriptInfoErr != nil {
+			t.Errorf("%s: succeeded when expecting \"%v\"",
+				test.name, test.scriptInfoErr)
+			continue
+		}
+		if *si != test.scriptInfo {
+			t.Errorf("%s: scriptinfo doesn't match expected. "+
+				"got: \"%v\" expected \"%v\"", test.name,
+				*si, test.scriptInfo)
+			continue
+		}
+	}
+
 }
 
 type removeOpcodeTest struct {

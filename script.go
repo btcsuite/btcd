@@ -109,6 +109,10 @@ var StackErrInvalidAddrOffset = errors.New("internal error: invalid offset found
 // a function.
 var StackErrInvalidIndex = errors.New("Invalid script index")
 
+// StackErrNonPushOnly is returned when ScriptInfo is called with a pkScript
+// that peforms operations other that pushing data to the stack.
+var StackErrNonPushOnly = errors.New("SigScript is non pushonly")
+
 // Bip16Activation is the timestamp where BIP0016 is valid to use in the
 // blockchain.  To be used to determine if BIP0016 should be called for or not.
 // This timestamp corresponds to Sun Apr 1 00:00:00 UTC 2012.
@@ -974,4 +978,101 @@ func sigDER(r, s *big.Int) []byte {
 	b[offset+1] = byte(len(s.Bytes()))
 	copy(b[offset+2:], s.Bytes())
 	return b
+}
+
+// expectedInputs returns the number of arguments required by a script.
+// If the script is of unnown type such that the number can not be determined
+// then -1 is returned. We are an interanl function and thus assume that class
+// is the real class of pops (and we can thus assume things that were
+// determined while finding out the type).
+func expectedInputs(pops []parsedOpcode, class ScriptClass) int {
+	// count needed inputs.
+	switch class {
+	case PubKeyTy:
+		return 1
+	case PubKeyHashTy:
+		return 2
+	case ScriptHashTy:
+		// Not including script, handled below.
+		return 1
+	case MultiSigTy:
+		// Standard multisig has a push a small number for the number
+		// of sigs and number of keys.
+		// Check the first push instrution to see how many arguments are
+		// expected. typoeOfScript already checked this so that we know
+		// it'll be one of OP_1 - OP_16.
+		return int(pops[0].opcode.value - (OP_1 - 1))
+	default:
+		return -1
+	}
+
+}
+
+type ScriptInfo struct {
+	// The class of the sigscript, equivalent to calling GetScriptClass
+	// on the sigScript.
+	PkScriptClass ScriptClass
+	// the number of inputs provided by the pkScript
+	NumInputs int
+	// the number of outputs required by sigScript and any
+	// pay-to-script-hash scripts. The number will be -1 if unknown.
+	ExpectedInputs int
+	// The nubmer of signature operations in the scriptpair.
+	SigOps int
+}
+
+// CalcScriptInfo returns a structure providing data about the scriptpair that
+// are provided as arguments. It will error if the pair is in someway invalid
+// such taht they can not be analysed, i.e. if they do not parse or the
+// pkScript is not a push-only script
+func CalcScriptInfo(sigscript, pkscript []byte, bip16 bool) (*ScriptInfo, error) {
+	si := new(ScriptInfo)
+	// parse both scripts.
+	sigPops, err := parseScript(sigscript)
+	if err != nil {
+		return nil, err
+	}
+
+	pkPops, err := parseScript(pkscript)
+	if err != nil {
+		return nil, err
+	}
+
+	// push only sigScript makes little sense.
+	si.PkScriptClass = typeOfScript(pkPops)
+
+	// Can't have a pkScript that doesn't just push data.
+	if !isPushOnly(sigPops) {
+		return nil, StackErrNonPushOnly
+	}
+
+	si.ExpectedInputs = expectedInputs(pkPops, si.PkScriptClass)
+	// all entries push to stack (or are OP_RESERVED and exec will fail).
+	si.NumInputs = len(sigPops)
+
+	if si.PkScriptClass == ScriptHashTy && bip16 {
+		// grab the last push instruction in the script and pull out the
+		// data.
+		script := sigPops[len(sigPops)-1].data
+		// check for existance and error else.
+		shPops, err := parseScript(script)
+		if err != nil {
+			return nil, err
+		}
+
+		shClass := typeOfScript(shPops)
+
+		shInputs := expectedInputs(shPops, shClass)
+		if shInputs == -1 {
+			// We have no fucking clue, then.
+			si.ExpectedInputs = -1
+		} else {
+			si.ExpectedInputs += shInputs
+		}
+		si.SigOps = getSigOpCount(shPops, true)
+	} else {
+		si.SigOps = getSigOpCount(pkPops, true)
+	}
+
+	return si, nil
 }
