@@ -771,8 +771,8 @@ func (mp *txMemPool) ProcessTransaction(tx *btcwire.MsgTx) error {
 	return nil
 }
 
-// TxShas returns a slice containing the hashes of all transactions in the
-// memory pool.
+// TxShas returns a slice of hashes for all of the transactions in the memory
+// pool.
 func (mp *txMemPool) TxShas() []*btcwire.ShaHash {
 	mp.lock.Lock()
 	defer mp.lock.Unlock()

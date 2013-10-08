@@ -359,7 +359,7 @@ func (p *peer) pushBlockMsg(sha btcwire.ShaHash) error {
 	return nil
 }
 
-// pushGetBlocksMsg sends a getblocks message for the provided block locator
+// PushGetBlocksMsg sends a getblocks message for the provided block locator
 // and stop hash.  It will ignore back-to-back duplicate requests.
 func (p *peer) PushGetBlocksMsg(locator btcchain.BlockLocator, stopHash *btcwire.ShaHash) error {
 	p.prevGetBlockMutex.Lock()

@@ -68,6 +68,7 @@ func validDbType(dbType string) bool {
 	return false
 }
 
+// netName returns a human-readable name for the passed bitcoin network.
 func netName(btcnet btcwire.BitcoinNet) string {
 	net := "mainnet"
 	if btcnet == btcwire.TestNet3 {
