@@ -37,7 +37,7 @@ func TestNotFound(t *testing.T) {
 
 	// Ensure inventory vectors are added properly.
 	hash := btcwire.ShaHash{}
-	iv := btcwire.NewInvVect(btcwire.InvVect_Block, &hash)
+	iv := btcwire.NewInvVect(btcwire.InvTypeBlock, &hash)
 	err := msg.AddInvVect(iv)
 	if err != nil {
 		t.Errorf("AddInvVect: %v", err)
@@ -77,8 +77,8 @@ func TestNotFoundWire(t *testing.T) {
 		t.Errorf("NewShaHashFromStr: %v", err)
 	}
 
-	iv := btcwire.NewInvVect(btcwire.InvVect_Block, blockHash)
-	iv2 := btcwire.NewInvVect(btcwire.InvVect_Tx, txHash)
+	iv := btcwire.NewInvVect(btcwire.InvTypeBlock, blockHash)
+	iv2 := btcwire.NewInvVect(btcwire.InvTypeTx, txHash)
 
 	// Empty notfound message.
 	NoInv := btcwire.NewMsgNotFound()
@@ -92,12 +92,12 @@ func TestNotFoundWire(t *testing.T) {
 	MultiInv.AddInvVect(iv2)
 	MultiInvEncoded := []byte{
 		0x02,                   // Varint for number of inv vectors
-		0x02, 0x00, 0x00, 0x00, // InvVect_Block
+		0x02, 0x00, 0x00, 0x00, // InvTypeBlock
 		0xdc, 0xe9, 0x69, 0x10, 0x94, 0xda, 0x23, 0xc7,
 		0xe7, 0x67, 0x13, 0xd0, 0x75, 0xd4, 0xa1, 0x0b,
 		0x79, 0x40, 0x08, 0xa6, 0x36, 0xac, 0xc2, 0x4b,
 		0x26, 0x03, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // Block 203707 hash
-		0x01, 0x00, 0x00, 0x00, // InvVect_Tx
+		0x01, 0x00, 0x00, 0x00, // InvTypeTx
 		0xf0, 0xfa, 0xcc, 0x7a, 0x48, 0x1b, 0xe7, 0xcf,
 		0x42, 0xbd, 0x7f, 0xe5, 0x4f, 0x2c, 0x2a, 0xf8,
 		0xef, 0x81, 0x9a, 0xdd, 0x93, 0xee, 0x55, 0x98,
@@ -235,14 +235,14 @@ func TestNotFoundWireErrors(t *testing.T) {
 		t.Errorf("NewShaHashFromStr: %v", err)
 	}
 
-	iv := btcwire.NewInvVect(btcwire.InvVect_Block, blockHash)
+	iv := btcwire.NewInvVect(btcwire.InvTypeBlock, blockHash)
 
 	// Base message used to induce errors.
 	baseNotFound := btcwire.NewMsgNotFound()
 	baseNotFound.AddInvVect(iv)
 	baseNotFoundEncoded := []byte{
 		0x02,                   // Varint for number of inv vectors
-		0x02, 0x00, 0x00, 0x00, // InvVect_Block
+		0x02, 0x00, 0x00, 0x00, // InvTypeBlock
 		0xdc, 0xe9, 0x69, 0x10, 0x94, 0xda, 0x23, 0xc7,
 		0xe7, 0x67, 0x13, 0xd0, 0x75, 0xd4, 0xa1, 0x0b,
 		0x79, 0x40, 0x08, 0xa6, 0x36, 0xac, 0xc2, 0x4b,

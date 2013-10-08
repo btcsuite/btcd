@@ -23,16 +23,16 @@ type InvType uint32
 
 // These constants define the various supported inventory vector types.
 const (
-	InvVect_Error InvType = 0
-	InvVect_Tx    InvType = 1
-	InvVect_Block InvType = 2
+	InvTypeError InvType = 0
+	InvTypeTx    InvType = 1
+	InvTypeBlock InvType = 2
 )
 
 // Map of service flags back to their constant names for pretty printing.
 var ivStrings = map[InvType]string{
-	InvVect_Error: "ERROR",
-	InvVect_Tx:    "MSG_TX",
-	InvVect_Block: "MSG_BLOCK",
+	InvTypeError: "ERROR",
+	InvTypeTx:    "MSG_TX",
+	InvTypeBlock: "MSG_BLOCK",
 }
 
 // String returns the InvType in human-readable form.

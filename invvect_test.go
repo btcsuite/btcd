@@ -18,9 +18,9 @@ func TestInvTypeStringer(t *testing.T) {
 		in   btcwire.InvType
 		want string
 	}{
-		{btcwire.InvVect_Error, "ERROR"},
-		{btcwire.InvVect_Tx, "MSG_TX"},
-		{btcwire.InvVect_Block, "MSG_BLOCK"},
+		{btcwire.InvTypeError, "ERROR"},
+		{btcwire.InvTypeTx, "MSG_TX"},
+		{btcwire.InvTypeBlock, "MSG_BLOCK"},
 		{0xffffffff, "Unknown InvType (4294967295)"},
 	}
 
@@ -38,7 +38,7 @@ func TestInvTypeStringer(t *testing.T) {
 
 // TestInvVect tests the InvVect API.
 func TestInvVect(t *testing.T) {
-	ivType := btcwire.InvVect_Block
+	ivType := btcwire.InvTypeBlock
 	hash := btcwire.ShaHash{}
 
 	// Ensure we get the same payload and signature back out.
@@ -66,13 +66,13 @@ func TestInvVectWire(t *testing.T) {
 
 	// errInvVect is an inventory vector with an error.
 	errInvVect := btcwire.InvVect{
-		Type: btcwire.InvVect_Error,
+		Type: btcwire.InvTypeError,
 		Hash: btcwire.ShaHash{},
 	}
 
 	// errInvVectEncoded is the wire encoded bytes of errInvVect.
 	errInvVectEncoded := []byte{
-		0x00, 0x00, 0x00, 0x00, // InvVect_Error
+		0x00, 0x00, 0x00, 0x00, // InvTypeError
 		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
@@ -81,13 +81,13 @@ func TestInvVectWire(t *testing.T) {
 
 	// txInvVect is an inventory vector representing a transaction.
 	txInvVect := btcwire.InvVect{
-		Type: btcwire.InvVect_Tx,
+		Type: btcwire.InvTypeTx,
 		Hash: *baseHash,
 	}
 
 	// txInvVectEncoded is the wire encoded bytes of txInvVect.
 	txInvVectEncoded := []byte{
-		0x01, 0x00, 0x00, 0x00, // InvVect_Tx
+		0x01, 0x00, 0x00, 0x00, // InvTypeTx
 		0xdc, 0xe9, 0x69, 0x10, 0x94, 0xda, 0x23, 0xc7,
 		0xe7, 0x67, 0x13, 0xd0, 0x75, 0xd4, 0xa1, 0x0b,
 		0x79, 0x40, 0x08, 0xa6, 0x36, 0xac, 0xc2, 0x4b,
@@ -96,13 +96,13 @@ func TestInvVectWire(t *testing.T) {
 
 	// blockInvVect is an inventory vector representing a block.
 	blockInvVect := btcwire.InvVect{
-		Type: btcwire.InvVect_Block,
+		Type: btcwire.InvTypeBlock,
 		Hash: *baseHash,
 	}
 
 	// blockInvVectEncoded is the wire encoded bytes of blockInvVect.
 	blockInvVectEncoded := []byte{
-		0x02, 0x00, 0x00, 0x00, // InvVect_Block
+		0x02, 0x00, 0x00, 0x00, // InvTypeBlock
 		0xdc, 0xe9, 0x69, 0x10, 0x94, 0xda, 0x23, 0xc7,
 		0xe7, 0x67, 0x13, 0xd0, 0x75, 0xd4, 0xa1, 0x0b,
 		0x79, 0x40, 0x08, 0xa6, 0x36, 0xac, 0xc2, 0x4b,
