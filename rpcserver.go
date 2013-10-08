@@ -11,6 +11,7 @@ import (
 	"github.com/conformal/btcchain"
 	"github.com/conformal/btcjson"
 	"github.com/conformal/btcscript"
+	"github.com/conformal/btcutil"
 	"github.com/conformal/btcwire"
 	"github.com/davecgh/go-spew/spew"
 	"math/big"
@@ -370,7 +371,7 @@ func jsonRPCRead(w http.ResponseWriter, r *http.Request, s *rpcServer) {
 		} else {
 			txSha, _ := btcwire.NewShaHashFromStr(tx)
 			var txS *btcwire.MsgTx
-			txList, err  := s.server.db.FetchTxBySha(txSha)
+			txList, err := s.server.db.FetchTxBySha(txSha)
 			if err != nil {
 				log.Errorf("[RPCS] Error fetching tx: %v", err)
 				jsonError := btcjson.Error{
@@ -428,10 +429,11 @@ func jsonRPCRead(w http.ResponseWriter, r *http.Request, s *rpcServer) {
 				isbuf, _ := btcscript.DisasmString(v.PkScript)
 				voutList[i].ScriptPubKey.Asm = isbuf
 				voutList[i].ScriptPubKey.ReqSig = strings.Count(isbuf, "OP_CHECKSIG")
-				_, addr, err := btcscript.ScriptToAddress(v.PkScript)
+				_, addrhash, err := btcscript.ScriptToAddrHash(v.PkScript)
 				if err != nil {
-					log.Errorf("[RPCS] Error getting address for %v: %v", txSha, err)
-				} else {
+					log.Errorf("[RPCS] Error getting address hash for %v: %v", txSha, err)
+				}
+				if addr, err := btcutil.EncodeAddress(addrhash, s.server.btcnet); err != nil {
 					addrList := make([]string, 1)
 					addrList[0] = addr
 					voutList[i].ScriptPubKey.Addresses = addrList
