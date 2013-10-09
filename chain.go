@@ -173,7 +173,7 @@ func (b *BlockChain) DisableVerify(disable bool) {
 //
 // This function is NOT safe for concurrent access.
 func (b *BlockChain) HaveBlock(hash *btcwire.ShaHash) bool {
-	return b.IsKnownOrphan(hash) && b.blockExists(hash)
+	return b.IsKnownOrphan(hash) || b.blockExists(hash)
 }
 
 // IsKnownOrphan returns whether the passed hash is currently a known orphan.
