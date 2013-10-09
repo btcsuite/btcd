@@ -8,8 +8,6 @@ import (
 	"compress/bzip2"
 	"encoding/binary"
 	"github.com/conformal/btcchain"
-	"github.com/conformal/btcdb"
-	_ "github.com/conformal/btcdb/sqlite3"
 	"github.com/conformal/btcutil"
 	"github.com/conformal/btcwire"
 	"io"
@@ -26,7 +24,7 @@ import (
 func TestReorganization(t *testing.T) {
 	// Intentionally load the side chain blocks out of order to ensure
 	// orphans are handled properly along with chain reorganization.
-	testFiles := [...]string{
+	testFiles := []string{
 		"blk_0_to_4.dat.bz2",
 		"blk_4A.dat.bz2",
 		"blk_5A.dat.bz2",
@@ -46,36 +44,26 @@ func TestReorganization(t *testing.T) {
 
 	t.Logf("Number of blocks: %v\n", len(blocks))
 
-	dbname := "chaintest"
-	_ = os.Remove(dbname)
-	db, err := btcdb.CreateDB("sqlite", dbname)
+	// Create a new database and chain instance to run tests against.
+	chain, teardownFunc, err := chainSetup("reorg")
 	if err != nil {
-		t.Errorf("Error creating db: %v\n", err)
+		t.Errorf("Failed to setup chain instance: %v", err)
+		return
 	}
-	// Clean up
-	defer os.Remove(dbname)
-	defer db.Close()
-
-	// Insert the main network genesis block.
-	genesis := btcutil.NewBlock(&btcwire.GenesisBlock)
-	if _, err := db.InsertBlock(genesis); err != nil {
-		t.Errorf("Failed to insert genesis block: %v", err)
-	}
+	defer teardownFunc()
 
 	// Since we're not dealing with the real block chain, disable
 	// checkpoints and set the coinbase maturity to 1.
-	blockChain := btcchain.New(db, btcwire.MainNet, nil)
-	blockChain.DisableCheckpoints(true)
+	chain.DisableCheckpoints(true)
 	btcchain.TstSetCoinbaseMaturity(1)
 
 	for i := 1; i < len(blocks); i++ {
-		err = blockChain.ProcessBlock(blocks[i])
+		err = chain.ProcessBlock(blocks[i])
 		if err != nil {
 			t.Errorf("ProcessBlock fail on block %v: %v\n", i, err)
 			return
 		}
 	}
-	db.Sync()
 
 	return
 }
