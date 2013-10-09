@@ -15,15 +15,15 @@ func asInt(v []byte) *big.Int {
 		return big.NewInt(0)
 	}
 	negative := false
+	origlen := len(v)
 	msb := v[len(v)-1]
 	if msb&0x80 == 0x80 {
 		negative = true
 		// remove sign bit
 		msb &= 0x7f
 	}
-	start := 0
 	// trim leading 0 bytes
-	for ; msb == 0; msb, start = v[len(v)-1], start+1 {
+	for ; msb == 0; msb = v[len(v)-1] {
 		v = v[:len(v)-1]
 		if len(v) == 0 {
 			break
@@ -32,12 +32,12 @@ func asInt(v []byte) *big.Int {
 	// reverse bytes with a copy since stack is immutable.
 	intArray := make([]byte, len(v))
 	for i := range v {
-		// Mask off the sign bit without changing original array.
-		if i == len(v) -1 && start == 0 && negative {
-			intArray[len(v)-i -1] = v[i] & 0x7f
-		} else {
-			intArray[len(v)-i-1] = v[i]
-		}
+		intArray[len(v)-i-1] = v[i]
+	}
+	// IFF the value is negative and no 0 bytes were trimmed,
+	// the leading byte needs to be sign corrected
+	if negative && len(intArray) == origlen {
+		intArray[0] &= 0x7f
 	}
 
 	num := new(big.Int).SetBytes(intArray)
