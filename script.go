@@ -332,7 +332,7 @@ func parseScriptTemplate(script []byte, opcodemap map[byte]*opcode) ([]parsedOpc
 			off = i + 1 - op.length // beginning of data
 			// Disallow entries that do not fit script or were
 			// sign extended.
-			if int(l) >= len(script[off:]) || int(l) < 0 {
+			if int(l) > len(script[off:]) || int(l) < 0 {
 				return retScript, StackErrShortScript
 			}
 			pop.data = script[off : off+int(l)]
