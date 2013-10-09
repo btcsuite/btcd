@@ -6,7 +6,6 @@ package btcjson
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
 )
 
@@ -158,7 +157,15 @@ type ListUnSpentResult struct {
 type Error struct {
 	Code    int    `json:"code,omitempty"`
 	Message string `json:"message,omitempty"`
-	Error   error  `json:"-"`
+}
+
+// Guarantee Error satisifies the builtin error interface
+var _, _ error = Error{}, &Error{}
+
+// Error returns a string describing the btcjson error.  This
+// satisifies the builtin error interface.
+func (e Error) Error() string {
+	return fmt.Sprintf("%d: %s", e.Code, e.Message)
 }
 
 // jsonWithArgs takes a command, an id,  and an interface which contains an
@@ -723,7 +730,6 @@ func ReadResultCmd(cmd string, message []byte) (Reply, error) {
 	var jsonErr Error
 	var id interface{}
 	err = json.Unmarshal(objmap["error"], &jsonErr)
-	jsonErr.Error = errors.New(string(jsonErr.Code) + ": " + jsonErr.Message)
 	if err != nil {
 		err = fmt.Errorf("Error unmarshalling json reply: %v", err)
 		return result, err

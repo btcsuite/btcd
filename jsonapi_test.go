@@ -7,6 +7,7 @@ package btcjson_test
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"github.com/conformal/btcjson"
 	"io"
 	"io/ioutil"
@@ -380,4 +381,52 @@ func TestReadResultCmd(t *testing.T) {
 	}
 
 	return
+}
+
+// TestErrorInterface tests that the Error type satisifies the builtin
+// error interface and tests that the error string is created in the form
+// "code: message".
+func TestErrorInterface(t *testing.T) {
+	codes := []int{
+		-1,
+		0,
+		1,
+	}
+	messages := []string{
+		"parse error",
+		"error getting field",
+		"method not found",
+	}
+
+	// Create an Error and check that both Error and *Error can be used
+	// as an error.
+	var jsonError btcjson.Error
+	var iface interface{} = jsonError
+	var ifacep interface{} = &jsonError
+	if _, ok := iface.(error); !ok {
+		t.Error("cannot type assert Error as error")
+		return
+	}
+	if _, ok := ifacep.(error); !ok {
+		t.Error("cannot type assert *Error as error")
+		return
+	}
+
+	// Verify jsonError is converted to the expected string using a few
+	// combinations of codes and messages.
+	for _, code := range codes {
+		for _, message := range messages {
+			// Create Error
+			jsonError := btcjson.Error{
+				Code:    code,
+				Message: message,
+			}
+
+			exp := fmt.Sprintf("%d: %s", jsonError.Code, jsonError.Message)
+			res := fmt.Sprintf("%v", jsonError)
+			if exp != res {
+				t.Errorf("error string '%s' differs from expected '%v'", res, exp)
+			}
+		}
+	}
 }
