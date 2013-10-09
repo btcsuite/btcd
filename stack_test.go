@@ -237,6 +237,22 @@ var stackTests = []stackTest{
 		[][]byte{},
 	},
 	{
+		"popInt -1",
+		[][]byte{{0x81}},
+		func(stack *btcscript.Stack) error {
+			v, err := stack.PopInt()
+			if err != nil {
+				return err
+			}
+			if v.Cmp(big.NewInt(-1)) != 0 {
+				return errors.New("1 != 1 on popInt")
+			}
+			return nil
+		},
+		nil,
+		[][]byte{},
+	},
+	{
 		"popInt -1 leading 0",
 		[][]byte{{0x01,0x00, 0x00, 0x80}},
 		func(stack *btcscript.Stack) error {
@@ -247,6 +263,24 @@ var stackTests = []stackTest{
 			if v.Cmp(big.NewInt(-1)) != 0 {
 				fmt.Printf("%v != %v\n", v, big.NewInt(-1))
 				return errors.New("-1 != -1 on popInt")
+			}
+			return nil
+		},
+		nil,
+		[][]byte{},
+	},
+	// Triggers the multibyte case in asInt
+	{
+		"popInt -513",
+		[][]byte{{0x1, 0x82}},
+		func(stack *btcscript.Stack) error {
+			v, err := stack.PopInt()
+			if err != nil {
+				return err
+			}
+			if v.Cmp(big.NewInt(-513)) != 0 {
+				fmt.Printf("%v != %v\n", v, big.NewInt(-513))
+				return errors.New("1 != 1 on popInt")
 			}
 			return nil
 		},
