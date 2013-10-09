@@ -19,7 +19,7 @@ const (
 	minCandidates        = 1
 	maxCandidates        = 20
 	defaultNumCandidates = 5
-	defaultDbType        = "sqlite"
+	defaultDbType        = "leveldb"
 )
 
 var (
