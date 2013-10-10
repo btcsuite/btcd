@@ -210,7 +210,7 @@ func (p *peer) pushVersionMsg() error {
 func (p *peer) handleVersionMsg(msg *btcwire.MsgVersion) {
 	// Detect self connections.
 	if msg.Nonce == p.server.nonce {
-		log.Debugf("[PEER] Disconnecting peer connected to self %s",
+		log.Debugf("PEER: Disconnecting peer connected to self %s",
 			p.addr)
 		p.Disconnect()
 		return
@@ -218,7 +218,7 @@ func (p *peer) handleVersionMsg(msg *btcwire.MsgVersion) {
 
 	// Limit to one version message per peer.
 	if p.versionKnown {
-		p.logError("[PEER] Only one version message per peer is allowed %s.",
+		p.logError("PEER: Only one version message per peer is allowed %s.",
 			p.addr)
 		p.Disconnect()
 		return
@@ -227,7 +227,7 @@ func (p *peer) handleVersionMsg(msg *btcwire.MsgVersion) {
 	// Negotiate the protocol version.
 	p.protocolVersion = minUint32(p.protocolVersion, uint32(msg.ProtocolVersion))
 	p.versionKnown = true
-	log.Debugf("[PEER] Negotiated protocol version %d for peer %s",
+	log.Debugf("PEER: Negotiated protocol version %d for peer %s",
 		p.protocolVersion, p.addr)
 	p.lastBlock = msg.LastBlock
 
@@ -240,7 +240,7 @@ func (p *peer) handleVersionMsg(msg *btcwire.MsgVersion) {
 		// Send version.
 		err := p.pushVersionMsg()
 		if err != nil {
-			p.logError("[PEER] Can't send version message: %v", err)
+			p.logError("PEER: Can't send version message: %v", err)
 			p.Disconnect()
 			return
 		}
@@ -249,7 +249,7 @@ func (p *peer) handleVersionMsg(msg *btcwire.MsgVersion) {
 	// Set up a NetAddress for the peer to be used with AddrManager.
 	na, err := newNetAddress(p.conn.RemoteAddr(), p.services)
 	if err != nil {
-		p.logError("[PEER] Can't get remote address: %v", err)
+		p.logError("PEER: Can't get remote address: %v", err)
 		p.Disconnect()
 		return
 	}
@@ -266,7 +266,7 @@ func (p *peer) handleVersionMsg(msg *btcwire.MsgVersion) {
 			// Advertise the local address.
 			na, err := newNetAddress(p.conn.LocalAddr(), p.services)
 			if err != nil {
-				p.logError("[PEER] Can't advertise local "+
+				p.logError("PEER: Can't advertise local "+
 					"address: %v", err)
 				p.Disconnect()
 				return
@@ -328,7 +328,7 @@ func (p *peer) pushBlockMsg(sha btcwire.ShaHash) error {
 
 	blk, err := p.server.db.FetchBlockBySha(&sha)
 	if err != nil {
-		log.Tracef("[PEER] Unable to fetch requested block sha %v: %v",
+		log.Tracef("PEER: Unable to fetch requested block sha %v: %v",
 			&sha, err)
 		return err
 	}
@@ -371,7 +371,7 @@ func (p *peer) PushGetBlocksMsg(locator btcchain.BlockLocator, stopHash *btcwire
 		beginHash != nil && stopHash.IsEqual(p.prevGetBlocksStop) &&
 		beginHash.IsEqual(p.prevGetBlocksBegin) {
 
-		log.Tracef("[PEER] Filtering duplicate [getblocks] with begin "+
+		log.Tracef("PEER: Filtering duplicate [getblocks] with begin "+
 			"hash %v, stop hash %v", beginHash, stopHash)
 		return nil
 	}
@@ -493,7 +493,7 @@ out:
 		case btcwire.InvTypeBlock:
 			err = p.pushBlockMsg(iv.Hash)
 		default:
-			log.Warnf("[PEER] Unknown type in inventory request %d",
+			log.Warnf("PEER: Unknown type in inventory request %d",
 				iv.Type)
 			break out
 		}
@@ -552,7 +552,7 @@ func (p *peer) handleGetBlocksMsg(msg *btcwire.MsgGetBlocks) {
 		// Fetch the inventory from the block database.
 		hashList, err := p.server.db.FetchHeightRange(start, endIdx)
 		if err != nil {
-			log.Warnf("[PEER] Block lookup failed: %v", err)
+			log.Warnf("PEER: Block lookup failed: %v", err)
 			return
 		}
 
@@ -646,7 +646,7 @@ func (p *peer) handleGetHeadersMsg(msg *btcwire.MsgGetHeaders) {
 		// Fetch the inventory from the block database.
 		hashList, err := p.server.db.FetchHeightRange(start, endIdx)
 		if err != nil {
-			log.Warnf("[PEER] Header lookup failed: %v", err)
+			log.Warnf("PEER: Header lookup failed: %v", err)
 			return
 		}
 
@@ -660,7 +660,7 @@ func (p *peer) handleGetHeadersMsg(msg *btcwire.MsgGetHeaders) {
 		for _, hash := range hashList {
 			block, err := p.server.db.FetchBlockBySha(&hash)
 			if err != nil {
-				log.Warnf("[PEER] Lookup of known block hash "+
+				log.Warnf("PEER: Lookup of known block hash "+
 					"failed: %v", err)
 				continue
 			}
@@ -686,7 +686,7 @@ func (p *peer) handleGetAddrMsg(msg *btcwire.MsgGetAddr) {
 	// Push the addresses.
 	err := p.pushAddrMsg(addrCache)
 	if err != nil {
-		p.logError("[PEER] Can't push address message: %v", err)
+		p.logError("PEER: Can't push address message: %v", err)
 		p.Disconnect()
 		return
 	}
@@ -739,7 +739,7 @@ func (p *peer) handleAddrMsg(msg *btcwire.MsgAddr) {
 
 	// A message that has no addresses is invalid.
 	if len(msg.AddrList) == 0 {
-		p.logError("[PEER] Command [%s] from %s does not contain any addresses",
+		p.logError("PEER: Command [%s] from %s does not contain any addresses",
 			msg.Command(), p.addr)
 		p.Disconnect()
 		return
@@ -789,16 +789,23 @@ func (p *peer) readMessage() (msg btcwire.Message, buf []byte, err error) {
 	if err != nil {
 		return
 	}
-	log.Debugf("[PEER] Received command [%v] from %s", msg.Command(),
-		p.addr)
 
 	// Use closures to log expensive operations so they are only run when
 	// the logging level requires it.
-	log.Tracef("%v", newLogClosure(func() string {
-		return "[PEER] " + spew.Sdump(msg)
+	log.Debugf("%v", newLogClosure(func() string {
+		// Debug summary of message.
+		summary := messageSummary(msg)
+		if len(summary) > 0 {
+			summary = " (" + summary + ")"
+		}
+		return fmt.Sprintf("PEER: Received %v%s from %s",
+			msg.Command(), summary, p.addr)
 	}))
 	log.Tracef("%v", newLogClosure(func() string {
-		return "[PEER] " + spew.Sdump(buf)
+		return "PEER: " + spew.Sdump(msg)
+	}))
+	log.Tracef("%v", newLogClosure(func() string {
+		return "PEER: " + spew.Sdump(buf)
 	}))
 
 	return
@@ -811,13 +818,19 @@ func (p *peer) writeMessage(msg btcwire.Message) {
 		return
 	}
 
-	log.Debugf("[PEER] Sending command [%v] to %s", msg.Command(),
-		p.addr)
-
-	// Use closures to log expensive operations so they are only run when the
-	// logging level requires it.
+	// Use closures to log expensive operations so they are only run when
+	// the logging level requires it.
+	log.Debugf("%v", newLogClosure(func() string {
+		// Debug summary of message.
+		summary := messageSummary(msg)
+		if len(summary) > 0 {
+			summary = " (" + summary + ")"
+		}
+		return fmt.Sprintf("PEER: Sending %v%s to %s", msg.Command(),
+			summary, p.addr)
+	}))
 	log.Tracef("%v", newLogClosure(func() string {
-		return "[PEER] " + spew.Sdump(msg)
+		return "PEER: " + spew.Sdump(msg)
 	}))
 	log.Tracef("%v", newLogClosure(func() string {
 		var buf bytes.Buffer
@@ -825,14 +838,14 @@ func (p *peer) writeMessage(msg btcwire.Message) {
 		if err != nil {
 			return err.Error()
 		}
-		return "[PEER] " + spew.Sdump(buf.Bytes())
+		return "PEER: " + spew.Sdump(buf.Bytes())
 	}))
 
 	// Write the message to the peer.
 	err := btcwire.WriteMessage(p.conn, msg, p.protocolVersion, p.btcnet)
 	if err != nil {
 		p.Disconnect()
-		p.logError("[PEER] Can't send message: %v", err)
+		p.logError("PEER: Can't send message: %v", err)
 		return
 	}
 }
@@ -875,21 +888,21 @@ out:
 			// regression test mode and the error is one of the
 			// allowed errors.
 			if cfg.RegressionTest && p.isAllowedByRegression(err) {
-				log.Errorf("[PEER] Allowed regression test "+
+				log.Errorf("PEER: Allowed regression test "+
 					"error: %v", err)
 				continue
 			}
 
 			// Only log the error if we're not forcibly disconnecting.
 			if atomic.LoadInt32(&p.disconnect) == 0 {
-				p.logError("[PEER] Can't read message: %v", err)
+				p.logError("PEER: Can't read message: %v", err)
 			}
 			break out
 		}
 
 		// Ensure version message comes first.
 		if _, ok := rmsg.(*btcwire.MsgVersion); !ok && !p.versionKnown {
-			p.logError("[PEER] A version message must precede all others")
+			p.logError("PEER: A version message must precede all others")
 			break out
 		}
 
@@ -945,7 +958,7 @@ out:
 			p.handleGetHeadersMsg(msg)
 
 		default:
-			log.Debugf("[PEER] Received unhandled message of type %v: Fix Me",
+			log.Debugf("PEER: Received unhandled message of type %v: Fix Me",
 				rmsg.Command())
 		}
 
@@ -970,7 +983,7 @@ out:
 		p.server.blockManager.DonePeer(p)
 	}
 
-	log.Tracef("[PEER] Peer input handler done for %s", p.addr)
+	log.Tracef("PEER: Peer input handler done for %s", p.addr)
 }
 
 // outHandler handles all outgoing messages for the peer.  It must be run as a
@@ -1025,7 +1038,7 @@ out:
 			break out
 		}
 	}
-	log.Tracef("[PEER] Peer output handler done for %s", p.addr)
+	log.Tracef("PEER: Peer output handler done for %s", p.addr)
 }
 
 // QueueMessage adds the passed bitcoin message to the peer send queue.  It
@@ -1076,13 +1089,13 @@ func (p *peer) Start() error {
 		return nil
 	}
 
-	log.Tracef("[PEER] Starting peer %s", p.addr)
+	log.Tracef("PEER: Starting peer %s", p.addr)
 
 	// Send an initial version message if this is an outbound connection.
 	if !p.inbound {
 		err := p.pushVersionMsg()
 		if err != nil {
-			p.logError("[PEER] Can't send outbound version "+
+			p.logError("PEER: Can't send outbound version "+
 				"message %v", err)
 			p.Disconnect()
 			return err
@@ -1098,7 +1111,7 @@ func (p *peer) Start() error {
 
 // Shutdown gracefully shuts down the peer by disconnecting it.
 func (p *peer) Shutdown() {
-	log.Tracef("[PEER] Shutdown peer %s", p.addr)
+	log.Tracef("PEER: Shutdown peer %s", p.addr)
 	p.Disconnect()
 }
 
@@ -1189,11 +1202,11 @@ func newOutboundPeer(s *server, addr string, persistent bool) *peer {
 		// this is a persistent connection, retry after the retry
 		// interval.
 		for atomic.LoadInt32(&p.disconnect) == 0 {
-			log.Debugf("[SRVR] Attempting to connect to %s", faddr)
+			log.Debugf("SRVR: Attempting to connect to %s", faddr)
 			conn, err := dial("tcp", addr)
 			if err != nil {
 				p.retrycount += 1
-				log.Debugf("[SRVR] Failed to connect to %s: %v",
+				log.Debugf("SRVR: Failed to connect to %s: %v",
 					faddr, err)
 				if !persistent {
 					p.server.donePeers <- p
@@ -1201,7 +1214,7 @@ func newOutboundPeer(s *server, addr string, persistent bool) *peer {
 				}
 				scaledInterval := connectionRetryInterval.Nanoseconds() * p.retrycount / 2
 				scaledDuration := time.Duration(scaledInterval)
-				log.Debugf("[SRVR] Retrying connection to %s "+
+				log.Debugf("SRVR: Retrying connection to %s "+
 					"in %s", faddr, scaledDuration)
 				time.Sleep(scaledDuration)
 				continue
@@ -1214,7 +1227,7 @@ func newOutboundPeer(s *server, addr string, persistent bool) *peer {
 				p.server.addrManager.Attempt(p.na)
 
 				// Connection was successful so log it and start peer.
-				log.Debugf("[SRVR] Connected to %s",
+				log.Debugf("SRVR: Connected to %s",
 					conn.RemoteAddr())
 				p.conn = conn
 				atomic.AddInt32(&p.connected, 1)

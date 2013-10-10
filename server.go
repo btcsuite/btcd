@@ -76,7 +76,7 @@ func (s *server) handleAddPeerMsg(peers *list.List, banned map[string]time.Time,
 
 	// Ignore new peers if we're shutting down.
 	if atomic.LoadInt32(&s.shutdown) != 0 {
-		log.Infof("[SRVR] New peer %s ignored - server is shutting "+
+		log.Infof("SRVR: New peer %s ignored - server is shutting "+
 			"down", p)
 		p.Shutdown()
 		return false
@@ -85,19 +85,19 @@ func (s *server) handleAddPeerMsg(peers *list.List, banned map[string]time.Time,
 	// Disconnect banned peers.
 	host, _, err := net.SplitHostPort(p.addr)
 	if err != nil {
-		log.Debugf("[SRVR] can't split hostport %v", err)
+		log.Debugf("SRVR: can't split hostport %v", err)
 		p.Shutdown()
 		return false
 	}
 	if banEnd, ok := banned[host]; ok {
 		if time.Now().Before(banEnd) {
-			log.Debugf("[SRVR] Peer %s is banned for another %v - "+
+			log.Debugf("SRVR: Peer %s is banned for another %v - "+
 				"disconnecting", host, banEnd.Sub(time.Now()))
 			p.Shutdown()
 			return false
 		}
 
-		log.Infof("[SRVR] Peer %s is no longer banned", host)
+		log.Infof("SRVR: Peer %s is no longer banned", host)
 		delete(banned, host)
 	}
 
@@ -105,7 +105,7 @@ func (s *server) handleAddPeerMsg(peers *list.List, banned map[string]time.Time,
 
 	// Limit max number of total peers.
 	if peers.Len() >= cfg.MaxPeers {
-		log.Infof("[SRVR] Max peers reached [%d] - disconnecting "+
+		log.Infof("SRVR: Max peers reached [%d] - disconnecting "+
 			"peer %s", cfg.MaxPeers, p)
 		p.Shutdown()
 		// TODO(oga) how to handle permanent peers here?
@@ -114,7 +114,7 @@ func (s *server) handleAddPeerMsg(peers *list.List, banned map[string]time.Time,
 	}
 
 	// Add the new peer and start it.
-	log.Debugf("[SRVR] New peer %s", p)
+	log.Debugf("SRVR: New peer %s", p)
 	peers.PushBack(p)
 	if p.inbound {
 		p.Start()
@@ -136,11 +136,11 @@ func (s *server) handleDonePeerMsg(peers *list.List, p *peer) bool {
 				return false
 			}
 			peers.Remove(e)
-			log.Debugf("[SRVR] Removed peer %s", p)
+			log.Debugf("SRVR: Removed peer %s", p)
 			return true
 		}
 	}
-	log.Warnf("[SRVR] Lost peer %v that we never had!", p)
+	log.Warnf("SRVR: Lost peer %v that we never had!", p)
 	return false
 }
 
@@ -149,11 +149,11 @@ func (s *server) handleDonePeerMsg(peers *list.List, p *peer) bool {
 func (s *server) handleBanPeerMsg(banned map[string]time.Time, p *peer) {
 	host, _, err := net.SplitHostPort(p.addr)
 	if err != nil {
-		log.Debugf("[SRVR] can't split ban peer %s %v", p.addr, err)
+		log.Debugf("SRVR: can't split ban peer %s %v", p.addr, err)
 		return
 	}
 	direction := directionString(p.inbound)
-	log.Infof("[SRVR] Banned peer %s (%s) for %v", host, direction,
+	log.Infof("SRVR: Banned peer %s (%s) for %v", host, direction,
 		cfg.BanDuration)
 	banned[host] = time.Now().Add(cfg.BanDuration)
 
@@ -201,13 +201,13 @@ func (s *server) handleBroadcastMsg(peers *list.List, bmsg *broadcastMsg) {
 // listenHandler is the main listener which accepts incoming connections for the
 // server.  It must be run as a goroutine.
 func (s *server) listenHandler(listener net.Listener) {
-	log.Infof("[SRVR] Server listening on %s", listener.Addr())
+	log.Infof("SRVR: Server listening on %s", listener.Addr())
 	for atomic.LoadInt32(&s.shutdown) == 0 {
 		conn, err := listener.Accept()
 		if err != nil {
 			// Only log the error if we're not forcibly shutting down.
 			if atomic.LoadInt32(&s.shutdown) == 0 {
-				log.Errorf("[SRVR] can't accept connection: %v",
+				log.Errorf("SRVR: can't accept connection: %v",
 					err)
 			}
 			continue
@@ -215,7 +215,7 @@ func (s *server) listenHandler(listener net.Listener) {
 		s.AddPeer(newInboundPeer(s, conn))
 	}
 	s.wg.Done()
-	log.Tracef("[SRVR] Listener handler done for %s", listener.Addr())
+	log.Tracef("SRVR: Listener handler done for %s", listener.Addr())
 }
 
 // seedFromDNS uses DNS seeding to populate the address manager with peers.
@@ -271,7 +271,7 @@ func (s *server) peerHandler() {
 	s.addrManager.Start()
 	s.blockManager.Start()
 
-	log.Tracef("[SRVR] Starting peer handler")
+	log.Tracef("SRVR: Starting peer handler")
 	peers := list.New()
 	bannedPeers := make(map[string]time.Time)
 	outboundPeers := 0
@@ -428,7 +428,7 @@ out:
 	s.blockManager.Stop()
 	s.addrManager.Stop()
 	s.wg.Done()
-	log.Tracef("[SRVR] Peer handler done")
+	log.Tracef("SRVR: Peer handler done")
 }
 
 // AddPeer adds a new peer that has already been connected to the server.
@@ -463,7 +463,7 @@ func (s *server) Start() {
 		return
 	}
 
-	log.Trace("[SRVR] Starting server")
+	log.Trace("SRVR: Starting server")
 
 	// Start all the listeners.  There will not be any if listening is
 	// disabled.
@@ -488,11 +488,11 @@ func (s *server) Start() {
 func (s *server) Stop() error {
 	// Make sure this only happens once.
 	if atomic.AddInt32(&s.shutdown, 1) != 1 {
-		log.Infof("[SRVR] Server is already in the process of shutting down")
+		log.Infof("SRVR: Server is already in the process of shutting down")
 		return nil
 	}
 
-	log.Warnf("[SRVR] Server shutting down")
+	log.Warnf("SRVR: Server shutting down")
 
 	// Stop all the listeners.  There will not be any listeners if
 	// listening is disabled.
@@ -516,7 +516,7 @@ func (s *server) Stop() error {
 // WaitForShutdown blocks until the main listener and peer handlers are stopped.
 func (s *server) WaitForShutdown() {
 	s.wg.Wait()
-	log.Infof("[SRVR] Server shutdown complete")
+	log.Infof("SRVR: Server shutdown complete")
 }
 
 // ScheduleShutdown schedules a server shutdown after the specified duration.
@@ -527,7 +527,7 @@ func (s *server) ScheduleShutdown(duration time.Duration) {
 	if atomic.AddInt32(&s.shutdownSched, 1) != 1 {
 		return
 	}
-	log.Warnf("[SRVR] Server shutdown in %v", duration)
+	log.Warnf("SRVR: Server shutdown in %v", duration)
 	go func() {
 		remaining := duration
 		tickDuration := dynamicTickDuration(remaining)
@@ -553,7 +553,7 @@ func (s *server) ScheduleShutdown(duration time.Duration) {
 					ticker.Stop()
 					ticker = time.NewTicker(tickDuration)
 				}
-				log.Warnf("[SRVR] Server shutdown in %v", remaining)
+				log.Warnf("SRVR: Server shutdown in %v", remaining)
 			}
 		}
 	}()

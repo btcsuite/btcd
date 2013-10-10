@@ -42,7 +42,7 @@ func (s *rpcServer) Start() {
 		return
 	}
 
-	log.Trace("[RPCS] Starting RPC server")
+	log.Trace("RPCS: Starting RPC server")
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		login := s.username + ":" + s.password
 		auth := "Basic " + base64.StdEncoding.EncodeToString([]byte(login))
@@ -50,7 +50,7 @@ func (s *rpcServer) Start() {
 		if len(authhdr) > 0 && authhdr[0] == auth {
 			jsonRPCRead(w, r, s)
 		} else {
-			log.Warnf("[RPCS] Auth failure.")
+			log.Warnf("RPCS: Auth failure.")
 			jsonAuthFail(w, r, s)
 		}
 	})
@@ -58,9 +58,9 @@ func (s *rpcServer) Start() {
 	for _, listener := range s.listeners {
 		s.wg.Add(1)
 		go func(listener net.Listener) {
-			log.Infof("[RPCS] RPC server listening on %s", listener.Addr())
+			log.Infof("RPCS: RPC server listening on %s", listener.Addr())
 			httpServer.Serve(listener)
-			log.Tracef("[RPCS] RPC listener done for %s", listener.Addr())
+			log.Tracef("RPCS: RPC listener done for %s", listener.Addr())
 			s.wg.Done()
 		}(listener)
 	}
@@ -69,18 +69,18 @@ func (s *rpcServer) Start() {
 // Stop is used by server.go to stop the rpc listener.
 func (s *rpcServer) Stop() error {
 	if atomic.AddInt32(&s.shutdown, 1) != 1 {
-		log.Infof("[RPCS] RPC server is already in the process of shutting down")
+		log.Infof("RPCS: RPC server is already in the process of shutting down")
 		return nil
 	}
-	log.Warnf("[RPCS] RPC server shutting down")
+	log.Warnf("RPCS: RPC server shutting down")
 	for _, listener := range s.listeners {
 		err := listener.Close()
 		if err != nil {
-			log.Errorf("[RPCS] Problem shutting down rpc: %v", err)
+			log.Errorf("RPCS: Problem shutting down rpc: %v", err)
 			return err
 		}
 	}
-	log.Infof("[RPCS] RPC server shutdown complete")
+	log.Infof("RPCS: RPC server shutdown complete")
 	s.wg.Wait()
 	return nil
 }
@@ -100,7 +100,7 @@ func newRPCServer(s *server) (*rpcServer, error) {
 	listenAddr4 := net.JoinHostPort("127.0.0.1", rpc.rpcport)
 	listener4, err := net.Listen("tcp4", listenAddr4)
 	if err != nil {
-		log.Errorf("[RPCS] Couldn't create listener: %v", err)
+		log.Errorf("RPCS: Couldn't create listener: %v", err)
 		return nil, err
 	}
 	listeners = append(listeners, listener4)
@@ -109,7 +109,7 @@ func newRPCServer(s *server) (*rpcServer, error) {
 	listenAddr6 := net.JoinHostPort("::1", rpc.rpcport)
 	listener6, err := net.Listen("tcp6", listenAddr6)
 	if err != nil {
-		log.Errorf("[RPCS] Couldn't create listener: %v", err)
+		log.Errorf("RPCS: Couldn't create listener: %v", err)
 		return nil, err
 	}
 	listeners = append(listeners, listener6)
@@ -134,13 +134,13 @@ func jsonRPCRead(w http.ResponseWriter, r *http.Request, s *rpcServer) {
 	var rawReply btcjson.Reply
 	body, err := btcjson.GetRaw(r.Body)
 	if err != nil {
-		log.Errorf("[RPCS] Error getting json message: %v", err)
+		log.Errorf("RPCS: Error getting json message: %v", err)
 		return
 	}
 	var message btcjson.Message
 	err = json.Unmarshal(body, &message)
 	if err != nil {
-		log.Errorf("[RPCS] Error unmarshalling json message: %v", err)
+		log.Errorf("RPCS: Error unmarshalling json message: %v", err)
 		jsonError := btcjson.Error{
 			Code:    -32700,
 			Message: "Parse error",
@@ -151,7 +151,7 @@ func jsonRPCRead(w http.ResponseWriter, r *http.Request, s *rpcServer) {
 			Error:  &jsonError,
 			Id:     nil,
 		}
-		log.Tracef("[RPCS] reply: %v", rawReply)
+		log.Tracef("RPCS: reply: %v", rawReply)
 		msg, err := btcjson.MarshallAndSend(rawReply, w)
 		if err != nil {
 			log.Errorf(msg)
@@ -161,7 +161,7 @@ func jsonRPCRead(w http.ResponseWriter, r *http.Request, s *rpcServer) {
 		return
 
 	}
-	log.Tracef("[RPCS] received: %v", message)
+	log.Tracef("RPCS: received: %v", message)
 
 	// Deal with commands
 	switch message.Method {
@@ -225,7 +225,7 @@ func jsonRPCRead(w http.ResponseWriter, r *http.Request, s *rpcServer) {
 				Error:  &jsonError,
 				Id:     &message.Id,
 			}
-			log.Tracef("[RPCS] reply: %v", rawReply)
+			log.Tracef("RPCS: reply: %v", rawReply)
 			break
 
 		}
@@ -251,7 +251,7 @@ func jsonRPCRead(w http.ResponseWriter, r *http.Request, s *rpcServer) {
 		}
 		sha, err := btcwire.NewShaHashFromStr(hash)
 		if err != nil {
-			log.Errorf("[RPCS] Error generating sha: %v", err)
+			log.Errorf("RPCS: Error generating sha: %v", err)
 			jsonError := btcjson.Error{
 				Code:    -5,
 				Message: "Block not found",
@@ -262,12 +262,12 @@ func jsonRPCRead(w http.ResponseWriter, r *http.Request, s *rpcServer) {
 				Error:  &jsonError,
 				Id:     &message.Id,
 			}
-			log.Tracef("[RPCS] reply: %v", rawReply)
+			log.Tracef("RPCS: reply: %v", rawReply)
 			break
 		}
 		blk, err := s.server.db.FetchBlockBySha(sha)
 		if err != nil {
-			log.Errorf("[RPCS] Error fetching sha: %v", err)
+			log.Errorf("RPCS: Error fetching sha: %v", err)
 			jsonError := btcjson.Error{
 				Code:    -5,
 				Message: "Block not found",
@@ -278,13 +278,13 @@ func jsonRPCRead(w http.ResponseWriter, r *http.Request, s *rpcServer) {
 				Error:  &jsonError,
 				Id:     &message.Id,
 			}
-			log.Tracef("[RPCS] reply: %v", rawReply)
+			log.Tracef("RPCS: reply: %v", rawReply)
 			break
 		}
 		idx := blk.Height()
 		buf, err := blk.Bytes()
 		if err != nil {
-			log.Errorf("[RPCS] Error fetching block: %v", err)
+			log.Errorf("RPCS: Error fetching block: %v", err)
 			jsonError := btcjson.Error{
 				Code:    -5,
 				Message: "Block not found",
@@ -295,7 +295,7 @@ func jsonRPCRead(w http.ResponseWriter, r *http.Request, s *rpcServer) {
 				Error:  &jsonError,
 				Id:     &message.Id,
 			}
-			log.Tracef("[RPCS] reply: %v", rawReply)
+			log.Tracef("RPCS: reply: %v", rawReply)
 			break
 		}
 
@@ -308,7 +308,7 @@ func jsonRPCRead(w http.ResponseWriter, r *http.Request, s *rpcServer) {
 
 		_, maxidx, err := s.server.db.NewestSha()
 		if err != nil {
-			log.Errorf("[RPCS] Cannot get newest sha: %v", err)
+			log.Errorf("RPCS: Cannot get newest sha: %v", err)
 			return
 		}
 
@@ -332,7 +332,7 @@ func jsonRPCRead(w http.ResponseWriter, r *http.Request, s *rpcServer) {
 		if idx < maxidx {
 			shaNext, err := s.server.db.FetchBlockShaByHeight(int64(idx + 1))
 			if err != nil {
-				log.Errorf("[RPCS] No next block: %v", err)
+				log.Errorf("RPCS: No next block: %v", err)
 			} else {
 				blockReply.NextHash = shaNext.String()
 			}
@@ -373,7 +373,7 @@ func jsonRPCRead(w http.ResponseWriter, r *http.Request, s *rpcServer) {
 			var txS *btcwire.MsgTx
 			txList, err := s.server.db.FetchTxBySha(txSha)
 			if err != nil {
-				log.Errorf("[RPCS] Error fetching tx: %v", err)
+				log.Errorf("RPCS: Error fetching tx: %v", err)
 				jsonError := btcjson.Error{
 					Code:    -5,
 					Message: "No information available about transaction",
@@ -384,7 +384,7 @@ func jsonRPCRead(w http.ResponseWriter, r *http.Request, s *rpcServer) {
 					Error:  &jsonError,
 					Id:     &message.Id,
 				}
-				log.Tracef("[RPCS] reply: %v", rawReply)
+				log.Tracef("RPCS: reply: %v", rawReply)
 				break
 			}
 
@@ -393,7 +393,7 @@ func jsonRPCRead(w http.ResponseWriter, r *http.Request, s *rpcServer) {
 			blksha := txList[lastTx].BlkSha
 			blk, err := s.server.db.FetchBlockBySha(blksha)
 			if err != nil {
-				log.Errorf("[RPCS] Error fetching sha: %v", err)
+				log.Errorf("RPCS: Error fetching sha: %v", err)
 				jsonError := btcjson.Error{
 					Code:    -5,
 					Message: "Block not found",
@@ -404,7 +404,7 @@ func jsonRPCRead(w http.ResponseWriter, r *http.Request, s *rpcServer) {
 					Error:  &jsonError,
 					Id:     &message.Id,
 				}
-				log.Tracef("[RPCS] reply: %v", rawReply)
+				log.Tracef("RPCS: reply: %v", rawReply)
 				break
 			}
 			idx := blk.Height()
@@ -431,7 +431,7 @@ func jsonRPCRead(w http.ResponseWriter, r *http.Request, s *rpcServer) {
 				voutList[i].ScriptPubKey.ReqSig = strings.Count(isbuf, "OP_CHECKSIG")
 				_, addrhash, err := btcscript.ScriptToAddrHash(v.PkScript)
 				if err != nil {
-					log.Errorf("[RPCS] Error getting address hash for %v: %v", txSha, err)
+					log.Errorf("RPCS: Error getting address hash for %v: %v", txSha, err)
 				}
 				if addr, err := btcutil.EncodeAddress(addrhash, s.server.btcnet); err != nil {
 					addrList := make([]string, 1)
@@ -442,7 +442,7 @@ func jsonRPCRead(w http.ResponseWriter, r *http.Request, s *rpcServer) {
 
 			_, maxidx, err := s.server.db.NewestSha()
 			if err != nil {
-				log.Errorf("[RPCS] Cannot get newest sha: %v", err)
+				log.Errorf("RPCS: Cannot get newest sha: %v", err)
 				return
 			}
 			confirmations := uint64(1 + maxidx - idx)
@@ -523,7 +523,7 @@ func getDifficultyRatio(bits uint32) float64 {
 	outString := difficulty.FloatString(2)
 	diff, err := strconv.ParseFloat(outString, 64)
 	if err != nil {
-		log.Errorf("[RPCS] Cannot get difficulty: %v", err)
+		log.Errorf("RPCS: Cannot get difficulty: %v", err)
 		return 0
 	}
 	return diff

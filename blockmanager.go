@@ -91,7 +91,7 @@ func (b *blockManager) startSync(peers *list.List) {
 	// Find the height of the current known best block.
 	_, height, err := b.server.db.NewestSha()
 	if err != nil {
-		log.Errorf("[BMGR] %v", err)
+		log.Errorf("BMGR: %v", err)
 		return
 	}
 
@@ -121,17 +121,17 @@ func (b *blockManager) startSync(peers *list.List) {
 	if bestPeer != nil {
 		locator, err := b.blockChain.LatestBlockLocator()
 		if err != nil {
-			log.Errorf("[BMGR] Failed to get block locator for the "+
+			log.Errorf("BMGR: Failed to get block locator for the "+
 				"latest block: %v", err)
 			return
 		}
 
-		log.Infof("[BMGR] Syncing to block height %d from peer %v",
+		log.Infof("BMGR: Syncing to block height %d from peer %v",
 			bestPeer.lastBlock, bestPeer.addr)
 		bestPeer.PushGetBlocksMsg(locator, &zeroHash)
 		b.syncPeer = bestPeer
 	} else {
-		log.Warnf("[BMGR] No sync peer candidates available")
+		log.Warnf("BMGR: No sync peer candidates available")
 	}
 }
 
@@ -172,7 +172,7 @@ func (b *blockManager) handleNewPeerMsg(peers *list.List, p *peer) {
 		return
 	}
 
-	log.Infof("[BMGR] New valid peer %s", p)
+	log.Infof("BMGR: New valid peer %s", p)
 
 	// Ignore the peer if it's not a sync candidate.
 	if !b.isSyncCandidate(p) {
@@ -199,7 +199,7 @@ func (b *blockManager) handleDonePeerMsg(peers *list.List, p *peer) {
 		}
 	}
 
-	log.Infof("[BMGR] Lost peer %s", p)
+	log.Infof("BMGR: Lost peer %s", p)
 
 	// Remove requested transactions from the global map so that they will
 	// be fetched from elsewhere next time we get an inv.
@@ -236,6 +236,10 @@ func (b *blockManager) logBlockHeight(numTx, height int64) {
 		return
 	}
 
+	// Truncated the duration to 10s of milliseconds.
+	durationMillis := int64(duration / time.Millisecond)
+	tDuration := 10 * time.Millisecond * time.Duration(durationMillis/10)
+
 	// Log information about new block height.
 	blockStr := "blocks"
 	if b.receivedLogBlocks == 1 {
@@ -245,9 +249,9 @@ func (b *blockManager) logBlockHeight(numTx, height int64) {
 	if b.receivedLogTx == 1 {
 		txStr = "transaction"
 	}
-	log.Infof("[BMGR] Processed %d %s (%d %s) in the last %s - Block "+
+	log.Infof("BMGR: Processed %d %s (%d %s) in the last %s - Block "+
 		"height %d", b.receivedLogBlocks, blockStr, b.receivedLogTx,
-		txStr, duration, height)
+		txStr, tDuration, height)
 
 	b.receivedLogBlocks = 0
 	b.receivedLogTx = 0
@@ -261,7 +265,7 @@ func (b *blockManager) handleTxMsg(tmsg *txMsg) {
 
 	// If we didn't ask for this block then the peer is misbehaving.
 	if _, ok := tmsg.peer.requestedTxns[txHash]; !ok {
-		log.Warnf("[BMGR] Got unrequested transaction %v from %s -- "+
+		log.Warnf("BMGR: Got unrequested transaction %v from %s -- "+
 			"disconnecting", &txHash, tmsg.peer.addr)
 		tmsg.peer.Disconnect()
 		return
@@ -306,7 +310,7 @@ func (b *blockManager) handleBlockMsg(bmsg *blockMsg) {
 		// mode in this case so the chain code is actually fed the
 		// duplicate blocks.
 		if !cfg.RegressionTest {
-			log.Warnf("[BMGR] Got unrequested block %v from %s -- "+
+			log.Warnf("BMGR: Got unrequested block %v from %s -- "+
 				"disconnecting", blockSha, bmsg.peer.addr)
 			bmsg.peer.Disconnect()
 			return
@@ -332,9 +336,9 @@ func (b *blockManager) handleBlockMsg(bmsg *blockMsg) {
 		// it as such.  Otherwise, something really did go wrong, so log
 		// it as an actual error.
 		if _, ok := err.(btcchain.RuleError); ok {
-			log.Infof("[BMGR] Rejected block %v: %v", blockSha, err)
+			log.Infof("BMGR: Rejected block %v: %v", blockSha, err)
 		} else {
-			log.Errorf("[BMGR] Failed to process block %v: %v", blockSha, err)
+			log.Errorf("BMGR: Failed to process block %v: %v", blockSha, err)
 		}
 		return
 	}
@@ -348,7 +352,7 @@ func (b *blockManager) handleBlockMsg(bmsg *blockMsg) {
 	// Log info about the new block height.
 	_, height, err := b.server.db.NewestSha()
 	if err != nil {
-		log.Warnf("[BMGR] Failed to obtain latest sha - %v", err)
+		log.Warnf("BMGR: Failed to obtain latest sha - %v", err)
 		return
 	}
 	b.logBlockHeight(int64(len(bmsg.block.MsgBlock().Transactions)), height)
@@ -449,7 +453,7 @@ func (b *blockManager) handleInvMsg(imsg *invMsg) {
 				orphanRoot := chain.GetOrphanRoot(&iv.Hash)
 				locator, err := chain.LatestBlockLocator()
 				if err != nil {
-					log.Errorf("[PEER] Failed to get block "+
+					log.Errorf("PEER: Failed to get block "+
 						"locator for the latest block: "+
 						"%v", err)
 					continue
@@ -551,7 +555,7 @@ out:
 		}
 	}
 	b.wg.Done()
-	log.Trace("[BMGR] Block handler done")
+	log.Trace("BMGR: Block handler done")
 }
 
 // handleNotifyMsg handles notifications from btcchain.  It does things such
@@ -566,7 +570,7 @@ func (b *blockManager) handleNotifyMsg(notification *btcchain.Notification) {
 			orphanRoot := b.blockChain.GetOrphanRoot(orphanHash)
 			locator, err := b.blockChain.LatestBlockLocator()
 			if err != nil {
-				log.Errorf("[BMGR] Failed to get block locator "+
+				log.Errorf("BMGR: Failed to get block locator "+
 					"for the latest block: %v", err)
 				break
 			}
@@ -588,7 +592,7 @@ func (b *blockManager) handleNotifyMsg(notification *btcchain.Notification) {
 
 		block, ok := notification.Data.(*btcutil.Block)
 		if !ok {
-			log.Warnf("[BMGR] Chain accepted notification is not a block.")
+			log.Warnf("BMGR: Chain accepted notification is not a block.")
 			break
 		}
 
@@ -604,7 +608,7 @@ func (b *blockManager) handleNotifyMsg(notification *btcchain.Notification) {
 	case btcchain.NTBlockConnected:
 		block, ok := notification.Data.(*btcutil.Block)
 		if !ok {
-			log.Warnf("[BMGR] Chain connected notification is not a block.")
+			log.Warnf("BMGR: Chain connected notification is not a block.")
 			break
 		}
 
@@ -618,7 +622,7 @@ func (b *blockManager) handleNotifyMsg(notification *btcchain.Notification) {
 	case btcchain.NTBlockDisconnected:
 		block, ok := notification.Data.(*btcutil.Block)
 		if !ok {
-			log.Warnf("[BMGR] Chain disconnected notification is not a block.")
+			log.Warnf("BMGR: Chain disconnected notification is not a block.")
 			break
 		}
 
@@ -697,7 +701,7 @@ func (b *blockManager) Start() {
 		return
 	}
 
-	log.Trace("[BMGR] Starting block manager")
+	log.Trace("BMGR: Starting block manager")
 	b.wg.Add(1)
 	go b.blockHandler()
 }
@@ -706,12 +710,12 @@ func (b *blockManager) Start() {
 // handlers and waiting for them to finish.
 func (b *blockManager) Stop() error {
 	if atomic.AddInt32(&b.shutdown, 1) != 1 {
-		log.Warnf("[BMGR] Block manager is already in the process of " +
+		log.Warnf("BMGR: Block manager is already in the process of " +
 			"shutting down")
 		return nil
 	}
 
-	log.Infof("[BMGR] Block manager shutting down")
+	log.Infof("BMGR: Block manager shutting down")
 	close(b.quit)
 	b.wg.Wait()
 	return nil
@@ -732,16 +736,16 @@ func newBlockManager(s *server) (*blockManager, error) {
 	bm.blockChain = btcchain.New(s.db, s.btcnet, bm.handleNotifyMsg)
 	bm.blockChain.DisableCheckpoints(cfg.DisableCheckpoints)
 	if cfg.DisableCheckpoints {
-		log.Info("[BMGR] Checkpoints are disabled")
+		log.Info("BMGR: Checkpoints are disabled")
 	}
 
-	log.Infof("[BMGR] Generating initial block node index.  This may " +
+	log.Infof("BMGR: Generating initial block node index.  This may " +
 		"take a while...")
 	err := bm.blockChain.GenerateInitialIndex()
 	if err != nil {
 		return nil, err
 	}
-	log.Infof("[BMGR] Block index generation complete")
+	log.Infof("BMGR: Block index generation complete")
 
 	return &bm, nil
 }
@@ -757,7 +761,7 @@ func removeRegressionDB(dbPath string) error {
 	// Remove the old regression test database if it already exists.
 	fi, err := os.Stat(dbPath)
 	if err == nil {
-		log.Infof("[BMGR] Removing regression test database from '%s'", dbPath)
+		log.Infof("BMGR: Removing regression test database from '%s'", dbPath)
 		if fi.IsDir() {
 			err := os.RemoveAll(dbPath)
 			if err != nil {
@@ -829,7 +833,7 @@ func loadBlockDB() (btcdb.Db, error) {
 	// each run, so remove it now if it already exists.
 	removeRegressionDB(dbPath)
 
-	log.Infof("[BMGR] Loading block database from '%s'", dbPath)
+	log.Infof("BMGR: Loading block database from '%s'", dbPath)
 	db, err := btcdb.OpenDB(cfg.DbType, dbPath)
 	if err != nil {
 		// Return the error if it's not because the database doesn't
@@ -865,11 +869,11 @@ func loadBlockDB() (btcdb.Db, error) {
 			db.Close()
 			return nil, err
 		}
-		log.Infof("[BMGR] Inserted genesis block %v",
+		log.Infof("BMGR: Inserted genesis block %v",
 			activeNetParams.genesisHash)
 		height = 0
 	}
 
-	log.Infof("[BMGR] Block database loaded with block height %d", height)
+	log.Infof("BMGR: Block database loaded with block height %d", height)
 	return db, nil
 }

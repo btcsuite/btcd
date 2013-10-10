@@ -372,7 +372,7 @@ func (mp *txMemPool) addOrphan(tx *btcwire.MsgTx, txHash *btcwire.ShaHash) {
 		mp.orphansByPrev[originTxHash].PushBack(tx)
 	}
 
-	log.Debugf("[TXMP] Stored orphan transaction %v (total: %d)", txHash,
+	log.Debugf("TXMP: Stored orphan transaction %v (total: %d)", txHash,
 		len(mp.orphans))
 }
 
@@ -663,7 +663,7 @@ func (mp *txMemPool) maybeAcceptTransaction(tx *btcwire.MsgTx, isOrphan *bool) e
 	mp.addTransaction(tx, &txHash)
 
 	mp.lock.RLock()
-	log.Debugf("[TXMP] Accepted transaction %v (pool size: %v)", txHash,
+	log.Debugf("TXMP: Accepted transaction %v (pool size: %v)", txHash,
 		len(mp.pool))
 	mp.lock.RUnlock()
 
@@ -742,7 +742,7 @@ func (mp *txMemPool) ProcessTransaction(tx *btcwire.MsgTx) error {
 	if err != nil {
 		return err
 	}
-	log.Tracef("[TXMP] Processing transaction %v", txHash)
+	log.Tracef("TXMP: Processing transaction %v", txHash)
 
 	// Potentially accept the transaction to the memory pool.
 	var isOrphan bool
