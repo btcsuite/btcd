@@ -29,7 +29,7 @@ type config struct {
 	TestNet3   bool   `long:"testnet" description:"Use the test network"`
 	OutFile    string `short:"o" description:"outfile"`
 	Progress   bool   `short:"p" description:"show progress"`
-	ShaString  string `short:"s" description:"Block SHA to process"`
+	ShaString  string `short:"s" description:"Block SHA to process" required:"true"`
 	EShaString string `short:"e" description:"End Block SHA to process"`
 	RawBlock   bool   `short:"r" description:"Raw Block"`
 	FmtBlock   bool   `short:"f" description:"Format Block"`
@@ -46,7 +46,10 @@ const (
 func main() {
 	end := int64(-1)
 
-	cfg := config{DbType: "leveldb"}
+	cfg := config{
+		DbType:  "leveldb",
+		DataDir: filepath.Join(btcdHomeDir(), "data"),
+	}
 	parser := flags.NewParser(&cfg, flags.Default)
 	_, err := parser.Parse()
 	if err != nil {
@@ -65,9 +68,6 @@ func main() {
 	defer log.Flush()
 	btcdb.UseLogger(log)
 
-	if len(cfg.DataDir) == 0 {
-		cfg.DataDir = filepath.Join(btcdHomeDir(), "data")
-	}
 	var testnet string
 	if cfg.TestNet3 {
 		testnet = "testnet"
