@@ -730,6 +730,10 @@ func newBlockManager(s *server) (*blockManager, error) {
 		quit:             make(chan bool),
 	}
 	bm.blockChain = btcchain.New(s.db, s.btcnet, bm.handleNotifyMsg)
+	bm.blockChain.DisableCheckpoints(cfg.DisableCheckpoints)
+	if cfg.DisableCheckpoints {
+		log.Info("[BMGR] Checkpoints are disabled")
+	}
 
 	log.Infof("[BMGR] Generating initial block node index.  This may " +
 		"take a while...")
