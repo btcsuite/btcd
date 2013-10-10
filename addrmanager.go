@@ -495,8 +495,8 @@ func (a *AddrManager) loadPeers() {
 		a.reset()
 		return
 	}
-	log.Infof("[AMGR] Successfuly loaded %d addresses from %s",
-		a.nNew+a.nTried, filePath)
+	log.Infof("[AMGR] Loaded %d addresses from '%s'", a.nNew+a.nTried,
+		filePath)
 }
 
 func (a *AddrManager) deserialisePeers(filePath string) error {
