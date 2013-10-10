@@ -6,6 +6,7 @@ package main
 
 import (
 	"container/list"
+	"fmt"
 	"github.com/conformal/btcchain"
 	"github.com/conformal/btcdb"
 	"github.com/conformal/btcutil"
@@ -226,7 +227,7 @@ func (b *blockManager) handleDonePeerMsg(peers *list.List, p *peer) {
 // logBlockHeight logs a new block height as an information message to show
 // progress to the user.  In order to prevent spam, it limits logging to one
 // message every 10 seconds with duration and totals included.
-func (b *blockManager) logBlockHeight(numTx, height int64) {
+func (b *blockManager) logBlockHeight(numTx, height int64, latestHash *btcwire.ShaHash) {
 	b.receivedLogBlocks++
 	b.receivedLogTx += numTx
 
@@ -240,6 +241,13 @@ func (b *blockManager) logBlockHeight(numTx, height int64) {
 	durationMillis := int64(duration / time.Millisecond)
 	tDuration := 10 * time.Millisecond * time.Duration(durationMillis/10)
 
+	// Attempt to get the timestamp of the latest block.
+	blockTimeStr := ""
+	block, err := b.server.db.FetchBlockBySha(latestHash)
+	if err == nil {
+		blockTimeStr = fmt.Sprintf(", %s", block.MsgBlock().Header.Timestamp)
+	}
+
 	// Log information about new block height.
 	blockStr := "blocks"
 	if b.receivedLogBlocks == 1 {
@@ -249,9 +257,9 @@ func (b *blockManager) logBlockHeight(numTx, height int64) {
 	if b.receivedLogTx == 1 {
 		txStr = "transaction"
 	}
-	log.Infof("BMGR: Processed %d %s (%d %s) in the last %s - Block "+
-		"height %d", b.receivedLogBlocks, blockStr, b.receivedLogTx,
-		txStr, tDuration, height)
+	log.Infof("BMGR: Processed %d %s in the last %s (%d %s, height %d%s)",
+		b.receivedLogBlocks, blockStr, tDuration, b.receivedLogTx,
+		txStr, height, blockTimeStr)
 
 	b.receivedLogBlocks = 0
 	b.receivedLogTx = 0
@@ -350,12 +358,13 @@ func (b *blockManager) handleBlockMsg(bmsg *blockMsg) {
 	}
 
 	// Log info about the new block height.
-	_, height, err := b.server.db.NewestSha()
+	latestHash, height, err := b.server.db.NewestSha()
 	if err != nil {
 		log.Warnf("BMGR: Failed to obtain latest sha - %v", err)
 		return
 	}
-	b.logBlockHeight(int64(len(bmsg.block.MsgBlock().Transactions)), height)
+	b.logBlockHeight(int64(len(bmsg.block.MsgBlock().Transactions)), height,
+		latestHash)
 
 	// Sync the db to disk.
 	b.server.db.Sync()
