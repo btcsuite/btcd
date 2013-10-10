@@ -555,7 +555,11 @@ func (b *BlockChain) checkBIP0030(node *blockNode, block *btcutil.Block) error {
 	if err != nil {
 		return nil
 	}
-	txResults, err := b.fetchTxList(node, fetchList)
+	fetchSet := make(map[btcwire.ShaHash]bool)
+	for _, txHash := range fetchList {
+		fetchSet[*txHash] = true
+	}
+	txResults, err := b.fetchTxStore(node, fetchSet)
 	if err != nil {
 		return err
 	}

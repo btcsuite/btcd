@@ -16,7 +16,6 @@ func TestHaveBlock(t *testing.T) {
 	// Load up blocks such that there is a side chain.
 	// (genesis block) -> 1 -> 2 -> 3 -> 4
 	//                          \-> 3a
-	// orphans are handled properly along with chain reorganization.
 	testFiles := []string{
 		"blk_0_to_4.dat.bz2",
 		"blk_3A.dat.bz2",
