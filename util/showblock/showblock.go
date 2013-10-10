@@ -7,12 +7,12 @@ package main
 import (
 	"encoding/binary"
 	"errors"
-	"flag"
 	"fmt"
 	"github.com/conformal/btcdb"
 	_ "github.com/conformal/btcdb/ldb"
 	_ "github.com/conformal/btcdb/sqlite3"
 	"github.com/conformal/btcwire"
+	"github.com/conformal/go-flags"
 	"github.com/conformal/seelog"
 	"github.com/davecgh/go-spew/spew"
 	"io"
@@ -23,6 +23,19 @@ import (
 
 type ShaHash btcwire.ShaHash
 
+type config struct {
+	DataDir    string `short:"b" long:"datadir" description:"Directory to store data"`
+	DbType     string `long:"dbtype" description:"Database backend"`
+	TestNet3   bool   `long:"testnet" description:"Use the test network"`
+	OutFile    string `short:"o" description:"outfile"`
+	Progress   bool   `short:"p" description:"show progress"`
+	ShaString  string `short:"s" description:"Block SHA to process"`
+	EShaString string `short:"e" description:"End Block SHA to process"`
+	RawBlock   bool   `short:"r" description:"Raw Block"`
+	FmtBlock   bool   `short:"f" description:"Format Block"`
+	ShowTx     bool   `short:"t" description:"Show transaction"`
+}
+
 var log seelog.LoggerInterface
 
 const (
@@ -31,26 +44,17 @@ const (
 )
 
 func main() {
-	var err error
-	var dbType string
-	var datadir string
-	var shastring, eshastring, outfile string
-	var rflag, fflag, tflag, testnetflag bool
-	var progress int
 	end := int64(-1)
-	flag.StringVar(&dbType, "dbtype", "", "Database backend to use for the Block Chain")
-	flag.StringVar(&datadir, "datadir", ".", "Directory to store data")
 
-	flag.StringVar(&shastring, "s", "", "Block sha to process")
-	flag.StringVar(&eshastring, "e", "", "Block sha to process")
-	flag.StringVar(&outfile, "o", "", "outfile")
-	flag.BoolVar(&rflag, "r", false, "raw block")
-	flag.BoolVar(&fflag, "f", false, "fmt block")
-	flag.BoolVar(&tflag, "t", false, "show transactions")
-	flag.BoolVar(&testnetflag, "testnet", false, "use testnet db")
-	flag.IntVar(&progress, "p", 0, "show progress")
-
-	flag.Parse()
+	cfg := config{DbType: "leveldb"}
+	parser := flags.NewParser(&cfg, flags.Default)
+	_, err := parser.Parse()
+	if err != nil {
+		if e, ok := err.(*flags.Error); !ok || e.Type != flags.ErrHelp {
+			parser.WriteHelp(os.Stderr)
+		}
+		return
+	}
 
 	log, err = seelog.LoggerFromWriterWithMinLevel(os.Stdout,
 		seelog.InfoLvl)
@@ -61,28 +65,27 @@ func main() {
 	defer log.Flush()
 	btcdb.UseLogger(log)
 
-	if len(dbType) == 0 {
-		dbType = "sqlite"
+	if len(cfg.DataDir) == 0 {
+		cfg.DataDir = filepath.Join(btcdHomeDir(), "data")
+	}
+	var testnet string
+	if cfg.TestNet3 {
+		testnet = "testnet"
+	} else {
+		testnet = "mainnet"
 	}
 
-	if len(datadir) == 0 {
-		datadir = filepath.Join(btcdHomeDir(), "data")
-	}
-	if testnetflag {
-		datadir = filepath.Join(datadir, "testnet")
-	} else {
-		datadir = filepath.Join(datadir, "mainnet")
-	}
+	cfg.DataDir = filepath.Join(cfg.DataDir, testnet)
 
 	blockDbNamePrefix := "blocks"
-	dbName := blockDbNamePrefix + "_" + dbType
-	if dbType == "sqlite" {
+	dbName := blockDbNamePrefix + "_" + cfg.DbType
+	if cfg.DbType == "sqlite" {
 		dbName = dbName + ".db"
 	}
-	dbPath := filepath.Join(datadir, dbName)
+	dbPath := filepath.Join(cfg.DataDir, dbName)
 
-	log.Infof("loading db %v", dbType)
-	db, err := btcdb.OpenDB(dbType, dbPath)
+	log.Infof("loading db %v", cfg.DbType)
+	db, err := btcdb.OpenDB(cfg.DbType, dbPath)
 	if err != nil {
 		log.Warnf("db open failed: %v", err)
 		return
@@ -90,15 +93,15 @@ func main() {
 	defer db.Close()
 	log.Infof("db load complete")
 
-	height, err := getHeight(db, shastring)
+	height, err := getHeight(db, cfg.ShaString)
 	if err != nil {
-		log.Infof("Invalid block %v", shastring)
+		log.Infof("Invalid block %v", cfg.ShaString)
 		return
 	}
-	if eshastring != "" {
-		end, err = getHeight(db, eshastring)
+	if cfg.EShaString != "" {
+		end, err = getHeight(db, cfg.EShaString)
 		if err != nil {
-			log.Infof("Invalid end block %v", eshastring)
+			log.Infof("Invalid end block %v", cfg.EShaString)
 			return
 		}
 	} else {
@@ -108,28 +111,28 @@ func main() {
 	log.Infof("height %v end %v", height, end)
 
 	var fo io.WriteCloser
-	if outfile != "" {
-		fo, err = os.Create(outfile)
+	if cfg.OutFile != "" {
+		fo, err = os.Create(cfg.OutFile)
 		if err != nil {
-			log.Warnf("failed to open file %v, err %v", outfile, err)
+			log.Warnf("failed to open file %v, err %v", cfg.OutFile, err)
 		}
 		defer func() {
 			if err := fo.Close(); err != nil {
-				log.Warn("failed to close file %v %v", outfile, err)
+				log.Warn("failed to close file %v %v", cfg.OutFile, err)
 			}
 		}()
 	}
 
 	for ; height < end; height++ {
-		if progress != 0 && height%int64(progress) == 0 {
+		if cfg.Progress && height%int64(1) == 0 {
 			log.Infof("Processing block %v", height)
 		}
-		err = DumpBlock(db, height, fo, rflag, fflag, tflag)
+		err = DumpBlock(db, height, fo, cfg.RawBlock, cfg.FmtBlock, cfg.ShowTx)
 		if err != nil {
 			break
 		}
 	}
-	if progress != 0 {
+	if cfg.Progress {
 		height--
 		log.Infof("Processing block %v", height)
 	}
