@@ -42,15 +42,6 @@ var userAgent = fmt.Sprintf("/btcd:%d.%d.%d/", appMajor, appMinor, appPatch)
 // zeroHash is the zero value hash (all zeros).  It is defined as a convenience.
 var zeroHash btcwire.ShaHash
 
-// directionString is a helper function that returns a string that represents
-// the direction of a connection (inbound or outbound).
-func directionString(inbound bool) string {
-	if inbound {
-		return "inbound"
-	}
-	return "outbound"
-}
-
 // minUint32 is a helper function to return the minimum of two uint32s.
 // This avoids a math import and the need to cast to floats.
 func minUint32(a, b uint32) uint32 {

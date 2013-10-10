@@ -5,11 +5,6 @@
 package main
 
 import (
-	"fmt"
-	"github.com/conformal/btcchain"
-	"github.com/conformal/btcdb"
-	"github.com/conformal/btcscript"
-	"github.com/conformal/seelog"
 	"net"
 	"net/http"
 	_ "net/http/pprof"
@@ -18,66 +13,8 @@ import (
 )
 
 var (
-	log = seelog.Disabled
 	cfg *config
 )
-
-// newLogger creates a new seelog logger using the provided logging level and
-// log message prefix.
-func newLogger(level string, prefix string) seelog.LoggerInterface {
-	fmtstring := `
-	<seelog type="adaptive" mininterval="2000000" maxinterval="100000000"
-		critmsgcount="500" minlevel="%s">
-		<outputs formatid="all">
-			<console/>
-		</outputs>
-		<formats>
-			<format id="all" format="[%%Time %%Date] [%%LEV] [%s] %%Msg%%n" />
-		</formats>
-	</seelog>`
-	config := fmt.Sprintf(fmtstring, level, prefix)
-
-	logger, err := seelog.LoggerFromConfigAsString(config)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "failed to create logger: %v", err)
-		os.Exit(1)
-	}
-
-	return logger
-}
-
-// useLogger sets the btcd logger to the passed logger.
-func useLogger(logger seelog.LoggerInterface) {
-	log = logger
-}
-
-// setLogLevel sets the log level for the logging system.  It initialises a
-// logger for each subsystem at the provided level.
-func setLogLevel(logLevel string) []seelog.LoggerInterface {
-	var loggers []seelog.LoggerInterface
-
-	// Define sub-systems.
-	subSystems := []struct {
-		level     string
-		prefix    string
-		useLogger func(seelog.LoggerInterface)
-	}{
-		{logLevel, "BTCD", useLogger},
-		{logLevel, "BCDB", btcdb.UseLogger},
-		{logLevel, "CHAN", btcchain.UseLogger},
-		{logLevel, "SCRP", btcscript.UseLogger},
-	}
-
-	// Configure all sub-systems with new loggers while keeping track of
-	// the created loggers to return so they can be flushed.
-	for _, s := range subSystems {
-		newLog := newLogger(s.level, s.prefix)
-		loggers = append(loggers, newLog)
-		s.useLogger(newLog)
-	}
-
-	return loggers
-}
 
 // btcdMain is the real main function for btcd.  It is necessary to work around
 // the fact that deferred functions do not run when os.Exit() is called.
