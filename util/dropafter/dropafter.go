@@ -6,11 +6,11 @@ package main
 
 import (
 	"errors"
-	"flag"
 	"fmt"
 	"github.com/conformal/btcdb"
 	_ "github.com/conformal/btcdb/ldb"
 	"github.com/conformal/btcwire"
+	"github.com/conformal/go-flags"
 	"github.com/conformal/seelog"
 	"os"
 	"path/filepath"
@@ -18,6 +18,13 @@ import (
 )
 
 type ShaHash btcwire.ShaHash
+
+type config struct {
+	DataDir   string `short:"b" long:"datadir" description:"Directory to store data"`
+	DbType    string `long:"dbtype" description:"Database backend"`
+	TestNet3  bool   `long:"testnet" description:"Use the test network"`
+	ShaString string `short:"s" description:"Block SHA to process" required:"true"`
+}
 
 var log seelog.LoggerInterface
 
@@ -27,15 +34,18 @@ const (
 )
 
 func main() {
-	var err error
-	var dbType string
-	var datadir string
-	var shastring string
-	flag.StringVar(&dbType, "dbtype", "", "Database backend to use for the Block Chain")
-	flag.StringVar(&datadir, "datadir", "", "Directory to store data")
-	flag.StringVar(&shastring, "s", "", "Block sha to process")
-
-	flag.Parse()
+	cfg := config{
+		DbType:  "leveldb",
+		DataDir: filepath.Join(btcdHomeDir(), "data"),
+	}
+	parser := flags.NewParser(&cfg, flags.Default)
+	_, err := parser.Parse()
+	if err != nil {
+		if e, ok := err.(*flags.Error); !ok || e.Type != flags.ErrHelp {
+			parser.WriteHelp(os.Stderr)
+		}
+		return
+	}
 
 	log, err = seelog.LoggerFromWriterWithMinLevel(os.Stdout,
 		seelog.TraceLvl)
@@ -46,24 +56,24 @@ func main() {
 	defer log.Flush()
 	btcdb.UseLogger(log)
 
-	if len(dbType) == 0 {
-		dbType = "sqlite"
+	var testnet string
+	if cfg.TestNet3 {
+		testnet = "testnet"
+	} else {
+		testnet = "mainnet"
 	}
 
-	if len(datadir) == 0 {
-		datadir = filepath.Join(btcdHomeDir(), "data")
-	}
-	datadir = filepath.Join(datadir, "mainnet")
+	cfg.DataDir = filepath.Join(cfg.DataDir, testnet)
 
 	blockDbNamePrefix := "blocks"
-	dbName := blockDbNamePrefix + "_" + dbType
-	if dbType == "sqlite" {
+	dbName := blockDbNamePrefix + "_" + cfg.DbType
+	if cfg.DbType == "sqlite" {
 		dbName = dbName + ".db"
 	}
-	dbPath := filepath.Join(datadir, dbName)
+	dbPath := filepath.Join(cfg.DataDir, dbName)
 
 	log.Infof("loading db")
-	db, err := btcdb.OpenDB(dbType, dbPath)
+	db, err := btcdb.OpenDB(cfg.DbType, dbPath)
 	if err != nil {
 		log.Warnf("db open failed: %v", err)
 		return
@@ -74,9 +84,9 @@ func main() {
 	_, height, err := db.NewestSha()
 	log.Infof("loaded block height %v", height)
 
-	sha, err := getSha(db, shastring)
+	sha, err := getSha(db, cfg.ShaString)
 	if err != nil {
-		log.Infof("Invalid block %v", shastring)
+		log.Infof("Invalid block hash %v", cfg.ShaString)
 		return
 	}
 
