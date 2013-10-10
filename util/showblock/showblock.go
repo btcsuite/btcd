@@ -35,7 +35,7 @@ func main() {
 	var dbType string
 	var datadir string
 	var shastring, eshastring, outfile string
-	var rflag, fflag, tflag bool
+	var rflag, fflag, tflag, testnetflag bool
 	var progress int
 	end := int64(-1)
 	flag.StringVar(&dbType, "dbtype", "", "Database backend to use for the Block Chain")
@@ -47,6 +47,7 @@ func main() {
 	flag.BoolVar(&rflag, "r", false, "raw block")
 	flag.BoolVar(&fflag, "f", false, "fmt block")
 	flag.BoolVar(&tflag, "t", false, "show transactions")
+	flag.BoolVar(&testnetflag, "testnet", false, "use testnet db")
 	flag.IntVar(&progress, "p", 0, "show progress")
 
 	flag.Parse()
@@ -67,7 +68,11 @@ func main() {
 	if len(datadir) == 0 {
 		datadir = filepath.Join(btcdHomeDir(), "data")
 	}
-	datadir = filepath.Join(datadir, "testnet")
+	if testnetflag {
+		datadir = filepath.Join(datadir, "testnet")
+	} else {
+		datadir = filepath.Join(datadir, "mainnet")
+	}
 
 	blockDbNamePrefix := "blocks"
 	dbName := blockDbNamePrefix + "_" + dbType
