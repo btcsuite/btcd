@@ -169,6 +169,7 @@ func openDB(dbpath string, flag opt.OptionsFlag) (pbdb btcdb.Db, err error) {
 	} else {
 		if flag&opt.OFCreateIfMissing != 0 {
 			needVersionFile = true
+			dbversion = CurrentDBVersion
 		}
 	}
 
@@ -204,7 +205,6 @@ func openDB(dbpath string, flag opt.OptionsFlag) (pbdb btcdb.Db, err error) {
 			return
 		}
 		defer fo.Close()
-		dbversion = CurrentDBVersion
 		err = binary.Write(fo, binary.LittleEndian, dbversion)
 		if err != nil {
 			return
