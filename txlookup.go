@@ -102,11 +102,16 @@ func disconnectTransactions(txStore TxStore, block *btcutil.Block) error {
 // fetchTxStoreMain fetches transaction data about the provided set of
 // transactions from the point of view of the end of the main chain.
 func fetchTxStoreMain(db btcdb.Db, txSet map[btcwire.ShaHash]bool) TxStore {
+	// Just return an empty store now if there are no requested hashes.
+	txStore := make(TxStore)
+	if len(txSet) == 0 {
+		return txStore
+	}
+
 	// The transaction store map needs to have an entry for every requested
 	// transaction.  By default, all the transactions are marked as missing.
 	// Each entry will be filled in with the appropriate data below.
 	txList := make([]*btcwire.ShaHash, 0, len(txSet))
-	txStore := make(TxStore)
 	for hash := range txSet {
 		hashCopy := hash
 		txStore[hash] = &TxData{Hash: &hashCopy, Err: btcdb.TxShaMissing}
