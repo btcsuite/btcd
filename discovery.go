@@ -158,7 +158,7 @@ func dnsDiscover(seeder string, proxy string) []net.IP {
 			seederPlusProxy = fmt.Sprintf("%s (proxy %s)",
 				seeder, proxy)
 		}
-		log.Warnf("DISC: Failed to fetch dns seeds "+
+		log.Debugf("DISC: Unable to fetch dns seeds "+
 			"from %s: %v", seederPlusProxy, err)
 		return []net.IP{}
 	}

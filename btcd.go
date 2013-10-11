@@ -44,7 +44,7 @@ func btcdMain() error {
 	if cfg.Profile != "" {
 		go func() {
 			listenAddr := net.JoinHostPort("", cfg.Profile)
-			log.Infof("BTCD: Profile server listening on %s", listenAddr)
+			log.Infof("Profile server listening on %s", listenAddr)
 			log.Errorf("%v", http.ListenAndServe(listenAddr, nil))
 		}()
 	}
