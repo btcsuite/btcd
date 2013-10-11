@@ -201,7 +201,7 @@ func CreateMessageWithId(message string, id interface{}, args ...interface{}) ([
 		"getdifficulty", "getgenerate", "gethashespersec", "getinfo",
 		"getmininginfo", "getpeerinfo", "getrawmempool",
 		"keypoolrefill", "listaddressgroupings", "listlockunspent",
-		"stop", "walletlock":
+		"stop", "walletlock", "getbestblockhash":
 		if len(args) > 0 {
 			err = fmt.Errorf("Too many arguments for %s", message)
 			return finalMessage, err
@@ -246,7 +246,8 @@ func CreateMessageWithId(message string, id interface{}, args ...interface{}) ([
 		}
 		finalMessage, err = jsonWithArgs(message, id, args)
 	// One optional string
-	case "getmemorypool", "getnewaddress", "getwork", "help":
+	case "getmemorypool", "getnewaddress", "getwork", "help",
+		"getrawchangeaddress":
 		if len(args) > 1 {
 			err = fmt.Errorf("Too many arguments for %s", message)
 			return finalMessage, err
@@ -798,7 +799,7 @@ func ReadResultCmd(cmd string, message []byte) (Reply, error) {
 		"getconnetioncount", "getdifficulty", "gethashespersec",
 		"setgenerate", "stop", "settxfee", "getaccount",
 		"getnewaddress", "sendtoaddress", "createrawtransaction",
-		"sendrawtransaction":
+		"sendrawtransaction", "getbestblockhash", "getrawchangeaddress":
 		err = json.Unmarshal(message, &result)
 	// For anything else put it in an interface.  All the data is still
 	// there, just a little less convenient to deal with.

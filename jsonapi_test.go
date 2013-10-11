@@ -170,6 +170,11 @@ var cmdtests = []struct {
 	{"walletpassphrase", []interface{}{"test", 1}, true},
 	{"walletpassphrase", []interface{}{"test"}, false},
 	{"walletpassphrase", []interface{}{"test", "test"}, false},
+	{"getrawchangeaddress", []interface{}{}, true},
+	{"getrawchangeaddress", []interface{}{"something"}, true},
+	{"getrawchangeaddress", []interface{}{"something", "test"}, false},
+	{"getbestblockhash", []interface{}{}, true},
+	{"getbestblockhash", []interface{}{"something"}, false},
 	{"fakecommand", nil, false},
 }
 
