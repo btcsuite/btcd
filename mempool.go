@@ -264,7 +264,7 @@ func checkTransactionStandard(tx *btcwire.MsgTx, height int64) error {
 	return nil
 }
 
-// checkInputsStandard performs a series of checks on a transactions inputs
+// checkInputsStandard performs a series of checks on a transaction's inputs
 // to ensure they are "standard".  A standard transaction input is one that
 // that consumes the same number of outputs from the stack as the output script
 // pushes.  This help prevent resource exhaustion attacks by "creative" use of
@@ -408,7 +408,7 @@ func (mp *txMemPool) maybeAddOrphan(tx *btcwire.MsgTx, txHash *btcwire.ShaHash) 
 }
 
 // IsTransactionInPool returns whether or not the passed transaction already
-// exists in the memory pool.
+// exists in the main pool.
 func (mp *txMemPool) IsTransactionInPool(hash *btcwire.ShaHash) bool {
 	mp.lock.RLock()
 	defer mp.lock.RUnlock()
@@ -417,11 +417,26 @@ func (mp *txMemPool) IsTransactionInPool(hash *btcwire.ShaHash) bool {
 		return true
 	}
 
-	if _, exists := mp.orphans[*hash]; exists {
+	return false
+}
+
+// IsOrphanInPool returns whether or not the passed transaction already exists
+// in the orphan pool.
+func (mp *txMemPool) IsOrphanInPool(hash *btcwire.ShaHash) bool {
+	mp.lock.RLock()
+	defer mp.lock.RUnlock()
+
+	if _, exists := mp.pool[*hash]; exists {
 		return true
 	}
 
 	return false
+}
+
+// HaveTransaction returns whether or not the passed transaction already exists
+// in the main pool or in the orphan pool.
+func (mp *txMemPool) HaveTransaction(hash *btcwire.ShaHash) bool {
+	return mp.IsTransactionInPool(hash) || mp.IsOrphanInPool(hash)
 }
 
 // removeTransaction removes the passed transaction from the memory pool.
@@ -513,6 +528,20 @@ func (mp *txMemPool) fetchInputTransactions(tx *btcwire.MsgTx) (btcchain.TxStore
 	return txStore, nil
 }
 
+// FetchTransaction returns the requested transaction from the transaction pool.
+// This only fetches from the main transaction pool and does not include
+// orphans.
+func (mp *txMemPool) FetchTransaction(txHash *btcwire.ShaHash) (*btcwire.MsgTx, error) {
+	mp.lock.RLock()
+	defer mp.lock.RUnlock()
+
+	if tx, exists := mp.pool[*txHash]; exists {
+		return tx, nil
+	}
+
+	return nil, fmt.Errorf("transaction is not in the pool")
+}
+
 // maybeAcceptTransaction is the main workhorse for handling insertion of new
 // free-standing transactions into a memory pool.  It includes functionality
 // such as rejecting duplicate transactions, ensuring transactions follow all
@@ -526,10 +555,8 @@ func (mp *txMemPool) maybeAcceptTransaction(tx *btcwire.MsgTx, isOrphan *bool) e
 
 	// Don't accept the transaction if it already exists in the pool.  This
 	// applies to orphan transactions as well.  This check is intended to
-	// be a quick check to weed out duplicates.  It is more expensive to
-	// detect a duplicate transaction in the main chain, so that is done
-	// later.
-	if mp.IsTransactionInPool(&txHash) {
+	// be a quick check to weed out duplicates.
+	if mp.HaveTransaction(&txHash) {
 		str := fmt.Sprintf("already have transaction %v", txHash)
 		return TxRuleError(str)
 	}

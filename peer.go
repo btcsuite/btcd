@@ -7,7 +7,6 @@ package main
 import (
 	"bytes"
 	"container/list"
-	"errors"
 	"fmt"
 	"github.com/conformal/btcchain"
 	"github.com/conformal/btcdb"
@@ -303,15 +302,25 @@ func (p *peer) handleVersionMsg(msg *btcwire.MsgVersion) {
 }
 
 // pushTxMsg sends a tx message for the provided transaction hash to the
-// connected peer.  An error is returned if the transaction sha is not known.
-func (p *peer) pushTxMsg(sha btcwire.ShaHash) error {
-	// We dont deal with these for now.
-	return errors.New("Tx fetching not implemented")
+// connected peer.  An error is returned if the transaction hash is not known.
+func (p *peer) pushTxMsg(sha *btcwire.ShaHash) error {
+	// Attempt to fetch the requested transaction from the pool.  A
+	// call could be made to check for existence first, but simply trying
+	// to fetch a missing transaction results in the same behavior.
+	tx, err := p.server.txMemPool.FetchTransaction(sha)
+	if err != nil {
+		log.Tracef("PEER: Unable to fetch tx %v from transaction "+
+			"pool: %v", sha, err)
+		return err
+	}
+	p.QueueMessage(tx)
+
+	return nil
 }
 
 // pushBlockMsg sends a block message for the provided block hash to the
 // connected peer.  An error is returned if the block hash is not known.
-func (p *peer) pushBlockMsg(sha btcwire.ShaHash) error {
+func (p *peer) pushBlockMsg(sha *btcwire.ShaHash) error {
 	// What should this function do about the rate limiting the
 	// number of blocks queued for this peer?
 	// Current thought is have a counting mutex in the peer
@@ -326,10 +335,10 @@ func (p *peer) pushBlockMsg(sha btcwire.ShaHash) error {
 	// outstanding objects.
 	// Should the tx complete api be a mutex or channel?
 
-	blk, err := p.server.db.FetchBlockBySha(&sha)
+	blk, err := p.server.db.FetchBlockBySha(sha)
 	if err != nil {
 		log.Tracef("PEER: Unable to fetch requested block sha %v: %v",
-			&sha, err)
+			sha, err)
 		return err
 	}
 	p.QueueMessage(blk.MsgBlock())
@@ -339,7 +348,7 @@ func (p *peer) pushBlockMsg(sha btcwire.ShaHash) error {
 	// would fit into a single message, send it a new inventory message
 	// to trigger it to issue another getblocks message for the next
 	// batch of inventory.
-	if p.continueHash != nil && p.continueHash.IsEqual(&sha) {
+	if p.continueHash != nil && p.continueHash.IsEqual(sha) {
 		hash, _, err := p.server.db.NewestSha()
 		if err == nil {
 			invMsg := btcwire.NewMsgInv()
@@ -489,9 +498,9 @@ out:
 		var err error
 		switch iv.Type {
 		case btcwire.InvTypeTx:
-			err = p.pushTxMsg(iv.Hash)
+			err = p.pushTxMsg(&iv.Hash)
 		case btcwire.InvTypeBlock:
-			err = p.pushBlockMsg(iv.Hash)
+			err = p.pushBlockMsg(&iv.Hash)
 		default:
 			log.Warnf("PEER: Unknown type in inventory request %d",
 				iv.Type)

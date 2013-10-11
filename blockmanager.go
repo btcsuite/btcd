@@ -385,7 +385,7 @@ func (b *blockManager) haveInventory(invVect *btcwire.InvVect) bool {
 	case btcwire.InvVect_Tx:
 		// Ask the transaction memory pool if the transaction is known
 		// to it in any form (main pool or orphan).
-		if b.server.txMemPool.IsTransactionInPool(&invVect.Hash) {
+		if b.server.txMemPool.HaveTransaction(&invVect.Hash) {
 			return true
 		}
 
