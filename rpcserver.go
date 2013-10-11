@@ -173,9 +173,83 @@ func jsonRPCRead(w http.ResponseWriter, r *http.Request, s *rpcServer) {
 		}
 		s.server.Stop()
 	case "getblockcount":
-		_, maxidx, _ := s.server.db.NewestSha()
+		_, maxidx, err := s.server.db.NewestSha()
+		if err != nil {
+			log.Errorf("RPCS: Error getting newest sha: %v", err)
+			jsonError := btcjson.Error{
+				Code:    -5,
+				Message: "Error getting block count",
+			}
+			rawReply = btcjson.Reply{
+				Result: nil,
+				Error:  &jsonError,
+				Id:     &message.Id,
+			}
+			log.Tracef("RPCS: reply: %v", rawReply)
+			break
+		}
 		rawReply = btcjson.Reply{
 			Result: maxidx,
+			Error:  nil,
+			Id:     &message.Id,
+		}
+	case "getbestblockhash":
+		sha, _, err := s.server.db.NewestSha()
+		if err != nil {
+			log.Errorf("RPCS: Error getting newest sha: %v", err)
+			jsonError := btcjson.Error{
+				Code:    -5,
+				Message: "Error getting best block hash",
+			}
+			rawReply = btcjson.Reply{
+				Result: nil,
+				Error:  &jsonError,
+				Id:     &message.Id,
+			}
+			log.Tracef("RPCS: reply: %v", rawReply)
+			break
+		}
+		rawReply = btcjson.Reply{
+			Result: sha,
+			Error:  nil,
+			Id:     &message.Id,
+		}
+	case "getdifficulty":
+		sha, _, err := s.server.db.NewestSha()
+		if err != nil {
+			log.Errorf("RPCS: Error getting sha: %v", err)
+			jsonError := btcjson.Error{
+				Code:    -5,
+				Message: "Error Getting difficulty",
+			}
+
+			rawReply = btcjson.Reply{
+				Result: nil,
+				Error:  &jsonError,
+				Id:     &message.Id,
+			}
+			log.Tracef("RPCS: reply: %v", rawReply)
+			break
+		}
+		blk, err := s.server.db.FetchBlockBySha(sha)
+		if err != nil {
+			log.Errorf("RPCS: Error getting block: %v", err)
+			jsonError := btcjson.Error{
+				Code:    -5,
+				Message: "Error Getting difficulty",
+			}
+
+			rawReply = btcjson.Reply{
+				Result: nil,
+				Error:  &jsonError,
+				Id:     &message.Id,
+			}
+			log.Tracef("RPCS: reply: %v", rawReply)
+			break
+		}
+		blockHeader := &blk.MsgBlock().Header
+		rawReply = btcjson.Reply{
+			Result: getDifficultyRatio(blockHeader.Bits),
 			Error:  nil,
 			Id:     &message.Id,
 		}
