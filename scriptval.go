@@ -124,11 +124,41 @@ func ValidateTransactionScripts(tx *btcwire.MsgTx, txHash *btcwire.ShaHash, time
 // the passed block.
 func checkBlockScripts(block *btcutil.Block, txStore TxStore) error {
 	timestamp := block.MsgBlock().Header.Timestamp
-	for i, tx := range block.MsgBlock().Transactions {
-		txHash, _ := block.TxSha(i)
+
+	txList := block.MsgBlock().Transactions
+	c := make(chan txValidate)
+	resultErrors := make([]error, len(txList))
+
+	var currentItem int
+	var completedItems int
+	processFunc := func(txIdx int) {
+		tx := txList[txIdx]
+		txHash, _ := block.TxSha(txIdx)
+
 		err := ValidateTransactionScripts(tx, txHash, timestamp, txStore)
-		if err != nil {
-			return err
+		r := txValidate{txIdx, err}
+		c <- r
+	}
+	for currentItem = 0; currentItem < len(txList) && currentItem < 8; currentItem++ {
+		go processFunc(currentItem)
+	}
+	for completedItems < len(txList) {
+		select {
+		case result := <-c:
+			completedItems++
+			resultErrors[result.txIndex] = result.err
+			// would be nice to determine if we could stop
+			// on early errors here instead of running more.
+
+			if currentItem < len(txList) {
+				go processFunc(currentItem)
+				currentItem++
+			}
+		}
+	}
+	for i := 0; i < len(txList); i++ {
+		if resultErrors[i] != nil {
+			return resultErrors[i]
 		}
 	}
 
