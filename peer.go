@@ -199,7 +199,7 @@ func (p *peer) pushVersionMsg() error {
 	// Advertise that we're a full node.
 	msg.Services = btcwire.SFNodeNetwork
 
-	p.outputQueue <- msg
+	p.QueueMessage(msg)
 	return nil
 }
 
@@ -255,7 +255,7 @@ func (p *peer) handleVersionMsg(msg *btcwire.MsgVersion) {
 	p.na = na
 
 	// Send verack.
-	p.outputQueue <- btcwire.NewMsgVerAck()
+	p.QueueMessage(btcwire.NewMsgVerAck())
 
 	// Outbound connections.
 	if !p.inbound {
@@ -279,7 +279,7 @@ func (p *peer) handleVersionMsg(msg *btcwire.MsgVersion) {
 		// include a timestamp with addresses.
 		hasTimestamp := p.protocolVersion >= btcwire.NetAddressTimeVersion
 		if p.server.addrManager.NeedMoreAddresses() && hasTimestamp {
-			p.outputQueue <- btcwire.NewMsgGetAddr()
+			p.QueueMessage(btcwire.NewMsgGetAddr())
 		}
 
 		// Mark the address as a known good address.
@@ -483,7 +483,7 @@ func (p *peer) handleBlockMsg(msg *btcwire.MsgBlock, buf []byte) {
 // handleInvMsg is invoked when a peer receives an inv bitcoin message and is
 // used to examine the inventory being advertised by the remote peer and react
 // accordingly. We pass the message down to blockmanager which will call
-// PushMessage with any appropriate responses.
+// QueueMessage with any appropriate responses.
 func (p *peer) handleInvMsg(msg *btcwire.MsgInv) {
 	p.server.blockManager.QueueInv(msg, p)
 }
@@ -726,14 +726,14 @@ func (p *peer) pushAddrMsg(addresses []*btcwire.NetAddress) error {
 
 		// Split into multiple messages as needed.
 		if numAdded > 0 && numAdded%btcwire.MaxAddrPerMsg == 0 {
-			p.outputQueue <- msg
+			p.QueueMessage(msg)
 			msg.ClearAddresses()
 		}
 	}
 
 	// Send message with remaining addresses if needed.
 	if numAdded%btcwire.MaxAddrPerMsg != 0 {
-		p.outputQueue <- msg
+		p.QueueMessage(msg)
 	}
 	return nil
 }
@@ -788,7 +788,7 @@ func (p *peer) handlePingMsg(msg *btcwire.MsgPing) {
 	// Only Reply with pong is message comes from a new enough client.
 	if p.protocolVersion > btcwire.BIP0031Version {
 		// Include nonce from ping so pong can be identified.
-		p.outputQueue <- btcwire.NewMsgPong(msg.Nonce)
+		p.QueueMessage(btcwire.NewMsgPong(msg.Nonce))
 	}
 }
 
