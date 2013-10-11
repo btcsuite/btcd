@@ -38,8 +38,8 @@ func (b *BlockChain) BlockLocatorFromHash(hash *btcwire.ShaHash) BlockLocator {
 	}
 
 	// Attempt to find the height of the block that corresponds to the
-	// passed hash, and if it's on a side chain, find the height at which
-	// it forks from the main chain.
+	// passed hash, and if it's on a side chain, also find the height at
+	// which it forks from the main chain.
 	blockHeight := int64(-1)
 	forkHeight := int64(-1)
 	node, exists := b.index[*hash]

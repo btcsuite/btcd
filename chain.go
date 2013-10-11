@@ -758,8 +758,8 @@ func (b *BlockChain) disconnectBlock(node *blockNode, block *btcutil.Block) erro
 	// This node's parent is now the end of the best chain.
 	b.bestChain = node.parent
 
-	// Notify the caller that the block was disconnect from the main chain.
-	// The caller would typically want to react with actions such as
+	// Notify the caller that the block was disconnected from the main
+	// chain.  The caller would typically want to react with actions such as
 	// updating wallets.
 	b.sendNotification(NTBlockDisconnected, block)
 
@@ -789,7 +789,7 @@ func (b *BlockChain) reorganizeChain(detachNodes, attachNodes *list.List) error 
 	//
 	// NOTE: bitcoind does these checks directly when it connects a block.
 	// The downside to that approach is that if any of these checks fail
-	// after disconneting some blocks or attaching others, all of the
+	// after disconnecting some blocks or attaching others, all of the
 	// operations have to be rolled back to get the chain back into the
 	// state it was before the rule violation (or other failure).  There are
 	// at least a couple of ways accomplish that rollback, but both involve

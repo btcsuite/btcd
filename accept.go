@@ -23,7 +23,8 @@ func (b *BlockChain) maybeAcceptBlock(block *btcutil.Block) error {
 		return err
 	}
 
-	// The height of this block one more than the referenced previous block.
+	// The height of this block is one more than the referenced previous
+	// block.
 	blockHeight := int64(0)
 	if prevNode != nil {
 		blockHeight = prevNode.height + 1

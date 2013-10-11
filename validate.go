@@ -790,7 +790,7 @@ func (b *BlockChain) checkConnectBlock(node *blockNode, block *btcutil.Block) er
 		}
 
 		// Check for overflow or going over the limits.  We have to do
-		// this on every loop to avoid overflow.
+		// this on every loop iteration to avoid overflow.
 		lastSigops := totalSigOps
 		totalSigOps += numsigOps
 		if totalSigOps < lastSigops || totalSigOps > maxSigOpsPerBlock {
