@@ -426,7 +426,7 @@ func (mp *txMemPool) IsOrphanInPool(hash *btcwire.ShaHash) bool {
 	mp.lock.RLock()
 	defer mp.lock.RUnlock()
 
-	if _, exists := mp.pool[*hash]; exists {
+	if _, exists := mp.orphans[*hash]; exists {
 		return true
 	}
 
