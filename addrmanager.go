@@ -466,6 +466,7 @@ func (a *AddrManager) savePeers() {
 	w, err := os.Create(filePath)
 	if err != nil {
 		log.Error("Error opening file: ", filePath, err)
+		return
 	}
 	enc := json.NewEncoder(w)
 	defer w.Close()
