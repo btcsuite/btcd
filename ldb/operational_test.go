@@ -65,7 +65,7 @@ func testOperationalMode(t *testing.T, mode int) {
 		db.SetDBInsertMode(btcdb.InsertValidatedInput)
 	}
 
-	testdatafile := filepath.Join("testdata", "blocks1-256.bz2")
+	testdatafile := filepath.Join("..", "testdata", "blocks1-256.bz2")
 	blocks, err := loadBlocks(t, testdatafile)
 	if err != nil {
 		t.Errorf("Unable to load blocks from test data for mode %v: %v",
@@ -185,7 +185,7 @@ func testBackout(t *testing.T, mode int) {
 
 	}
 
-	testdatafile := filepath.Join("testdata", "blocks1-256.bz2")
+	testdatafile := filepath.Join("..", "testdata", "blocks1-256.bz2")
 	blocks, err := loadBlocks(t, testdatafile)
 	if len(blocks) < 120 {
 		t.Errorf("test data too small")
@@ -274,7 +274,7 @@ func loadBlocks(t *testing.T, file string) (blocks []*btcutil.Block, err error) 
 		blocks = savedblocks
 		return
 	}
-	testdatafile := filepath.Join("testdata", "blocks1-256.bz2")
+	testdatafile := filepath.Join("..", "testdata", "blocks1-256.bz2")
 	var dr io.Reader
 	var fi io.ReadCloser
 	fi, err = os.Open(testdatafile)

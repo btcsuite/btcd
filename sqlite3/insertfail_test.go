@@ -58,7 +58,7 @@ func failtestOperationalMode(t *testing.T, mode int) {
 	sqlite3.SetBlockCacheSize(db, 2)
 	sqlite3.SetTxCacheSize(db, 3)
 
-	testdatafile := filepath.Join("testdata", "blocks1-256.bz2")
+	testdatafile := filepath.Join("..", "testdata", "blocks1-256.bz2")
 	blocks, err := loadBlocks(t, testdatafile)
 	if err != nil {
 		t.Errorf("Unable to load blocks from test data for mode %v: %v",

@@ -21,7 +21,7 @@ func loadblocks(t *testing.T) []*btcutil.Block {
 		return tstBlocks
 	}
 
-	testdatafile := filepath.Join("testdata", "blocks1-256.bz2")
+	testdatafile := filepath.Join("..", "testdata", "blocks1-256.bz2")
 	blocks, err := loadBlocks(t, testdatafile)
 	if err != nil {
 		t.Errorf("Unable to load blocks from test data: %v", err)
