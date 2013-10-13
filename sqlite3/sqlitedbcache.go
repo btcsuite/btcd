@@ -131,6 +131,13 @@ func (db *SqliteDb) insertBlockCache(sha *btcwire.ShaHash, blk *btcutil.Block) {
 	bc.blockMap[blkObj.sha] = &blkObj
 }
 
+// FetchTxByShaList returns the most recent tx of the name fully spent or not
+func (db *SqliteDb) FetchTxByShaList(txShaList []*btcwire.ShaHash) []*btcdb.TxListReply {
+	// until the fully spent separation of tx is complete this is identical
+	// to FetchUnSpentTxByShaList
+	return db.FetchUnSpentTxByShaList(txShaList)
+}
+
 // FetchUnSpentTxByShaList given a array of ShaHash, look up the transactions
 // and return them in a TxListReply array.
 func (db *SqliteDb) FetchUnSpentTxByShaList(txShaList []*btcwire.ShaHash) []*btcdb.TxListReply {

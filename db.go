@@ -79,7 +79,15 @@ type Db interface {
 
 	// FetchTxByShaList returns a TxListReply given an array of transaction
 	// hashes.  The implementation may cache the underlying data if desired.
-	FetchUnSpentTxByShaList(txShaList []*btcwire.ShaHash) ([]*TxListReply)
+	// This differs from FetchUnSpentTxByShaList in that it will return
+	// the most recent known Tx, if it is fully spent or not.
+	FetchTxByShaList(txShaList []*btcwire.ShaHash) []*TxListReply
+
+	// FetchUnSpentTxByShaList returns a TxListReply given an array of
+	// transaction hashes.  The implementation may cache the underlying
+	// data if desired. Fully spent transactions will not normally not
+	// be returned in this operation.
+	FetchUnSpentTxByShaList(txShaList []*btcwire.ShaHash) []*TxListReply
 
 	// InsertBlock inserts raw block and transaction data from a block
 	// into the database.  The first block inserted into the database
@@ -145,7 +153,7 @@ type DriverDB struct {
 type TxListReply struct {
 	Sha     *btcwire.ShaHash
 	Tx      *btcwire.MsgTx
-	BlkSha	*btcwire.ShaHash
+	BlkSha  *btcwire.ShaHash
 	Height  int64
 	TxSpent []bool
 	Err     error

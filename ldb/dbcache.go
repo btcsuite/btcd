@@ -36,6 +36,13 @@ func (db *LevelDb) fetchBlockBySha(sha *btcwire.ShaHash) (blk *btcutil.Block, er
 	return
 }
 
+// FetchTxByShaList returns the most recent tx of the name fully spent or not
+func (db *LevelDb) FetchTxByShaList(txShaList []*btcwire.ShaHash) []*btcdb.TxListReply {
+	// until the fully spent separation of tx is complete this is identical
+	// to FetchUnSpentTxByShaList
+	return db.FetchUnSpentTxByShaList(txShaList)
+}
+
 // FetchUnSpentTxByShaList given a array of ShaHash, look up the transactions
 // and return them in a TxListReply array.
 func (db *LevelDb) FetchUnSpentTxByShaList(txShaList []*btcwire.ShaHash) []*btcdb.TxListReply {
