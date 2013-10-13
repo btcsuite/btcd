@@ -15,6 +15,14 @@ import (
 // hashes are added, then the step is doubled each loop iteration to
 // exponentially decrease the number of hashes as a function of the distance
 // from the block being located.
+//
+// For example, assume you have a block chain with a side chain as depicted
+// below:
+// 	genesis -> 1 -> 2 -> ... -> 15 -> 16  -> 17  -> 18
+// 	                              \-> 16a -> 17a
+//
+// The block locator for block 17a would be the hashes of blocks:
+// [17a 16a 15 14 13 12 11 10 9 8 6 2 genesis]
 type BlockLocator []*btcwire.ShaHash
 
 // BlockLocatorFromHash returns a block locator for the passed block hash.
