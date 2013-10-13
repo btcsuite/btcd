@@ -82,7 +82,7 @@ func (db *LevelDb) fetchTxDataBySha(txsha *btcwire.ShaHash) (rtx *btcwire.MsgTx,
 	//log.Trace("transaction %v is at block %v %v txoff %v, txlen %v\n",
 	//	txsha, blksha, blkHeight, txOff, txLen)
 
-	rbuf := bytes.NewBuffer(blkbuf[txOff:txOff+txLen])
+	rbuf := bytes.NewBuffer(blkbuf[txOff : txOff+txLen])
 
 	var tx btcwire.MsgTx
 	err = tx.Deserialize(rbuf)
@@ -102,7 +102,7 @@ func (db *LevelDb) FetchTxBySha(txsha *btcwire.ShaHash) ([]*btcdb.TxListReply, e
 		return []*btcdb.TxListReply{}, err
 	}
 
-	replies := make ([]*btcdb.TxListReply, 1)
+	replies := make([]*btcdb.TxListReply, 1)
 
 	btxspent := make([]bool, len(tx.TxOut), len(tx.TxOut))
 	for idx := range tx.TxOut {

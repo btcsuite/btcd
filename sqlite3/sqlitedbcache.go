@@ -242,7 +242,7 @@ func (db *SqliteDb) FetchTxBySha(txsha *btcwire.ShaHash) ([]*btcdb.TxListReply, 
 
 	// Check Tx cache
 	if txc, ok := db.fetchTxCache(txsha); ok {
-		replies := make ([]*btcdb.TxListReply, 1)
+		replies := make([]*btcdb.TxListReply, 1)
 
 		tx := txc.tx
 		btxspent := make([]bool, len(tx.TxOut), len(tx.TxOut))
@@ -308,7 +308,6 @@ func (db *SqliteDb) FetchTxBySha(txsha *btcwire.ShaHash) ([]*btcdb.TxListReply, 
 	txc.blksha = *blksha
 	db.insertTxCache(&txc)
 
-
 	btxspent := make([]bool, len(tx.TxOut), len(tx.TxOut))
 	for idx := range tx.TxOut {
 		byteidx := idx / 8
@@ -316,7 +315,7 @@ func (db *SqliteDb) FetchTxBySha(txsha *btcwire.ShaHash) ([]*btcdb.TxListReply, 
 		btxspent[idx] = (txspent[byteidx] & (byte(1) << byteoff)) != 0
 	}
 
-	replies := make ([]*btcdb.TxListReply, 1)
+	replies := make([]*btcdb.TxListReply, 1)
 	txlre := btcdb.TxListReply{Sha: txsha, Tx: &tx, BlkSha: blksha, Height: height, TxSpent: btxspent, Err: err}
 	replies[0] = &txlre
 	return replies, nil
