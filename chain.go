@@ -347,19 +347,42 @@ func (b *BlockChain) GenerateInitialIndex() error {
 
 	// Loop forwards through each block loading the node into the index for
 	// the block.
-	for i := startHeight; i <= endHeight; i++ {
-		hash, err := b.db.FetchBlockShaByHeight(i)
+	//
+	// Due to a bug in the SQLite btcdb driver, the FetchBlockBySha call is
+	// limited to a maximum number of hashes per invocation.  Since SQLite
+	// is going to be nuked eventually, the bug isn't being fixed in the
+	// driver.  In the mean time, work around the issue by calling
+	// FetchBlockBySha multiple times with the appropriate indices as needed.
+	for start := startHeight; start < endHeight; {
+		hashList, err := b.db.FetchHeightRange(start, endHeight+1)
 		if err != nil {
 			return err
 		}
 
-		node, err := b.loadBlockNode(hash)
-		if err != nil {
-			return err
+		// The database did not return any further hashes.  Break out of
+		// the loop now.
+		if len(hashList) == 0 {
+			break
 		}
 
-		// This node is now the end of the best chain.
-		b.bestChain = node
+		// Loop forwards through each block loading the node into the
+		// index for the block.
+		for _, hash := range hashList {
+			// Make a copy of the hash to make sure there are no references
+			// into the list so it can be freed.
+			hashCopy := hash
+			node, err := b.loadBlockNode(&hashCopy)
+			if err != nil {
+				return err
+			}
+
+			// This node is now the end of the best chain.
+			b.bestChain = node
+		}
+
+		// Start at the next block after the latest one on the next loop
+		// iteration.
+		start += int64(len(hashList))
 	}
 
 	return nil
