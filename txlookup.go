@@ -100,8 +100,10 @@ func disconnectTransactions(txStore TxStore, block *btcutil.Block) error {
 }
 
 // fetchTxStoreMain fetches transaction data about the provided set of
-// transactions from the point of view of the end of the main chain.
-func fetchTxStoreMain(db btcdb.Db, txSet map[btcwire.ShaHash]bool) TxStore {
+// transactions from the point of view of the end of the main chain.  It takes
+// a flag which specifies whether or not fully spent transaction should be
+// included in the results.
+func fetchTxStoreMain(db btcdb.Db, txSet map[btcwire.ShaHash]bool, includeSpent bool) TxStore {
 	// Just return an empty store now if there are no requested hashes.
 	txStore := make(TxStore)
 	if len(txSet) == 0 {
@@ -120,8 +122,13 @@ func fetchTxStoreMain(db btcdb.Db, txSet map[btcwire.ShaHash]bool) TxStore {
 
 	// Ask the database (main chain) for the list of transactions.  This
 	// will return the information from the point of view of the end of the
-	// main chain.
-	txReplyList := db.FetchUnSpentTxByShaList(txList)
+	// main chain.  Choose whether or not to include fully spent
+	// transactions depending on the passed flag.
+	fetchFunc := db.FetchUnSpentTxByShaList
+	if includeSpent {
+		fetchFunc = db.FetchTxByShaList
+	}
+	txReplyList := fetchFunc(txList)
 	for _, txReply := range txReplyList {
 		// Lookup the existing results entry to modify.  Skip
 		// this reply if there is no corresponding entry in
@@ -166,16 +173,21 @@ func (b *BlockChain) fetchTxStore(node *blockNode, txSet map[btcwire.ShaHash]boo
 		return nil, err
 	}
 
-	// Fetch the requested set from the point of view of the end of the
-	// main (best) chain.
-	txStore := fetchTxStoreMain(b.db, txSet)
-
 	// If we haven't selected a best chain yet or we are extending the main
-	// (best) chain with a new block, everything is accurate, so return the
-	// results now.
+	// (best) chain with a new block, fetch the requested set from the point
+	// of view of the end of the main (best) chain without including fully
+	// spent transactions in the results.  This is a little more efficient
+	// since it means less transaction lookups are needed.
 	if b.bestChain == nil || (prevNode != nil && prevNode.hash.IsEqual(b.bestChain.hash)) {
+		txStore := fetchTxStoreMain(b.db, txSet, false)
 		return txStore, nil
 	}
+
+	// Fetch the requested set from the point of view of the end of the
+	// main (best) chain including fully spent transactions.  The fully
+	// spent transactions are needed because the following code unspends
+	// them to get the correct point of view.
+	txStore := fetchTxStoreMain(b.db, txSet, true)
 
 	// The requested node is either on a side chain or is a node on the main
 	// chain before the end of it.  In either case, we need to undo the
@@ -310,7 +322,9 @@ func (b *BlockChain) FetchTransactionStore(tx *btcwire.MsgTx) (TxStore, error) {
 	}
 
 	// Request the input transactions from the point of view of the end of
-	// the main chain.
-	txStore := fetchTxStoreMain(b.db, txNeededSet)
+	// the main chain without including fully spent trasactions in the
+	// results.  Fully spent transactions are only needed for chain
+	// reorganization which does not apply here.
+	txStore := fetchTxStoreMain(b.db, txNeededSet, false)
 	return txStore, nil
 }
