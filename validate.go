@@ -347,18 +347,20 @@ func countP2SHSigOps(msgTx *btcwire.MsgTx, isCoinBaseTx bool, txStore TxStore) (
 		txInHash := &txIn.PreviousOutpoint.Hash
 		originTx, exists := txStore[*txInHash]
 		if !exists || originTx.Err != nil || originTx.Tx == nil {
-			return 0, fmt.Errorf("unable to find input transaction "+
+			str := fmt.Sprintf("unable to find input transaction "+
 				"%v referenced from transaction %v", txInHash,
 				txHash)
+			return 0, RuleError(str)
 		}
 
 		// Ensure the output index in the referenced transaction is
 		// available.
 		originTxIndex := txIn.PreviousOutpoint.Index
 		if originTxIndex >= uint32(len(originTx.Tx.TxOut)) {
-			return 0, fmt.Errorf("out of bounds input index %d in "+
+			str := fmt.Sprintf("out of bounds input index %d in "+
 				"transaction %v referenced from transaction %v",
 				originTxIndex, txInHash, txHash)
+			return 0, RuleError(str)
 		}
 
 		// We're only interested in pay-to-script-hash types, so skip
@@ -379,10 +381,11 @@ func countP2SHSigOps(msgTx *btcwire.MsgTx, isCoinBaseTx bool, txStore TxStore) (
 		lastSigOps := totalSigOps
 		totalSigOps += numSigOps
 		if totalSigOps < lastSigOps {
-			return 0, fmt.Errorf("the public key script from "+
+			str := fmt.Sprintf("the public key script from "+
 				"output index %d in transaction %v contains "+
 				"too many signature operations - overflow",
 				originTxIndex, txInHash)
+			return 0, RuleError(str)
 		}
 	}
 
