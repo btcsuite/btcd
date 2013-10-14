@@ -5,6 +5,8 @@
 package btcdb_test
 
 import (
+	"github.com/davecgh/go-spew/spew"
+	"reflect"
 	"testing"
 )
 
@@ -43,6 +45,50 @@ func testInterface(t *testing.T, dbType string) {
 				newHeight, height)
 			return
 		}
+
+		// Ensure the block now exists in the database.
+		expectedHash, err := block.Sha()
+		if err != nil {
+			t.Errorf("block.Sha: %v", err)
+			return
+		}
+		if exists := db.ExistsSha(expectedHash); !exists {
+			t.Errorf("ExistsSha: block %v does not exist",
+				expectedHash)
+			return
+		}
+
+		// Ensure loading the block back from the database gives back
+		// the same MsgBlock and raw bytes.
+		blockFromDb, err := db.FetchBlockBySha(expectedHash)
+		if err != nil {
+			t.Errorf("FetchBlockBySha: %v", err)
+		}
+		if !reflect.DeepEqual(block.MsgBlock(), blockFromDb.MsgBlock()) {
+			t.Errorf("Block from database does not match stored "+
+				"block\ngot: %v\nwant: %v",
+				spew.Sdump(blockFromDb.MsgBlock()),
+				spew.Sdump(block.MsgBlock()))
+			return
+		}
+		blockBytes, err := block.Bytes()
+		if err != nil {
+			t.Errorf("block.Bytes: %v", err)
+			return
+		}
+		blockFromDbBytes, err := blockFromDb.Bytes()
+		if err != nil {
+			t.Errorf("blockFromDb.Bytes: %v", err)
+			return
+		}
+		if !reflect.DeepEqual(blockBytes, blockFromDbBytes) {
+			t.Errorf("Block bytes from database do not match "+
+				"stored block bytes\ngot: %v\nwant: %v",
+				spew.Sdump(blockFromDbBytes),
+				spew.Sdump(blockBytes))
+			return
+		}
+
 	}
 
 	// TODO(davec): Need to figure out how to handle the special checks
@@ -53,8 +99,8 @@ func testInterface(t *testing.T, dbType string) {
 	/*
 	   Close()
 	   DropAfterBlockBySha(*btcwire.ShaHash) (err error)
-	   ExistsSha(sha *btcwire.ShaHash) (exists bool)
-	   FetchBlockBySha(sha *btcwire.ShaHash) (blk *btcutil.Block, err error)
+	   - ExistsSha(sha *btcwire.ShaHash) (exists bool)
+	   - FetchBlockBySha(sha *btcwire.ShaHash) (blk *btcutil.Block, err error)
 	   FetchBlockShaByHeight(height int64) (sha *btcwire.ShaHash, err error)
 	   FetchHeightRange(startHeight, endHeight int64) (rshalist []btcwire.ShaHash, err error)
 	   ExistsTxSha(sha *btcwire.ShaHash) (exists bool)
