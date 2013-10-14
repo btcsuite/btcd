@@ -282,6 +282,99 @@ func testFetchTxByShaList(tc *testContext) bool {
 	return true
 }
 
+// testFetchUnSpentTxByShaList ensures FetchUnSpentTxByShaList conforms to the
+// interface contract.
+func testFetchUnSpentTxByShaList(tc *testContext) bool {
+	txHashes, err := tc.block.TxShas()
+	if err != nil {
+		tc.t.Errorf("block.TxShas: %v", err)
+		return false
+	}
+
+	txReplyList := tc.db.FetchUnSpentTxByShaList(txHashes)
+	if len(txReplyList) != len(txHashes) {
+		tc.t.Errorf("FetchUnSpentTxByShaList (%s): tx reply list for "+
+			"block #%d (%v) does not match expected length "+
+			"- got: %v, want: %v", tc.dbType, tc.blockHeight,
+			tc.blockHash, len(txReplyList), len(txHashes))
+		return false
+	}
+	for i, tx := range tc.block.MsgBlock().Transactions {
+		txHash := txHashes[i]
+		txD := txReplyList[i]
+
+		// The transaction hash in the reply must be the expected value.
+		if !txD.Sha.IsEqual(txHash) {
+			tc.t.Errorf("FetchUnSpentTxByShaList (%s): tx #%d hash "+
+				"does not match expected - got %v, "+
+				"want %v", tc.dbType, i, txD.Sha, txHashes[i])
+			return false
+		}
+
+		// The reply must not indicate any errors.
+		if txD.Err != nil {
+			tc.t.Errorf("FetchUnSpentTxByShaList (%s): tx #%d (%v) "+
+				"returned unexpected error - got %v, "+
+				"want nil", tc.dbType, i, txD.Sha, txD.Err)
+			return false
+		}
+
+		// The transaction in the reply fetched from the database must
+		// be the same MsgTx that was stored.
+		if !reflect.DeepEqual(tx, txD.Tx) {
+			tc.t.Errorf("FetchUnSpentTxByShaList (%s): tx #%d (%v) "+
+				"from database does not match stored tx\n"+
+				"got: %v\nwant: %v", tc.dbType, i, txHash,
+				spew.Sdump(txD.Tx), spew.Sdump(tx))
+			return false
+		}
+
+		// The block hash in the reply from the database must be the
+		// expected value.
+		if txD.BlkSha == nil {
+			tc.t.Errorf("FetchUnSpentTxByShaList (%s): tx #%d (%v) "+
+				"returned nil block hash", tc.dbType, i, txD.Sha)
+			return false
+		}
+		if !txD.BlkSha.IsEqual(tc.blockHash) {
+			tc.t.Errorf("FetchUnSpentTxByShaList (%s): tx #%d (%v) "+
+				"returned unexpected block hash - got %v, "+
+				"want %v", tc.dbType, i, txD.Sha, txD.BlkSha,
+				tc.blockHash)
+			return false
+		}
+
+		// The block height in the reply from the database must be the
+		// expected value.
+		if txD.Height != tc.blockHeight {
+			tc.t.Errorf("FetchUnSpentTxByShaList (%s): tx #%d (%v) "+
+				"returned unexpected block height - got %v, "+
+				"want %v", tc.dbType, i, txD.Sha, txD.Height,
+				tc.blockHeight)
+			return false
+		}
+
+		// The spend data in the reply from the database must not
+		// indicate any of the transactions that were just inserted are
+		// spent.
+		if txD.TxSpent == nil {
+			tc.t.Errorf("FetchUnSpentTxByShaList (%s): tx #%d (%v) "+
+				"returned nil spend data", tc.dbType, i, txD.Sha)
+			return false
+		}
+		noSpends := make([]bool, len(tx.TxOut))
+		if !reflect.DeepEqual(txD.TxSpent, noSpends) {
+			tc.t.Errorf("FetchUnSpentTxByShaList (%s): tx #%d (%v) "+
+				"returned unexpected spend data - got %v, "+
+				"want %v", tc.dbType, i, txD.Sha, txD.TxSpent,
+				noSpends)
+			return false
+		}
+	}
+
+	return true
+}
+
 // testInterface tests performs tests for the various interfaces of btcdb which
 // require state in the database for the given database type.
 func testInterface(t *testing.T, dbType string) {
@@ -358,6 +451,13 @@ func testInterface(t *testing.T, dbType string) {
 		if !testFetchTxByShaList(&context) {
 			return
 		}
+
+		// All of the transactions in the block must be fetchable via
+		// FetchUnSpentTxByShaList and all of the list replies must have
+		// the expected values.
+		if !testFetchUnSpentTxByShaList(&context) {
+			return
+		}
 	}
 
 	// TODO(davec): Need to figure out how to handle the special checks
@@ -375,7 +475,7 @@ func testInterface(t *testing.T, dbType string) {
 	   - ExistsTxSha(sha *btcwire.ShaHash) (exists bool)
 	   - FetchTxBySha(txsha *btcwire.ShaHash) ([]*TxListReply, error)
 	   - FetchTxByShaList(txShaList []*btcwire.ShaHash) []*TxListReply
-	   FetchUnSpentTxByShaList(txShaList []*btcwire.ShaHash) []*TxListReply
+	   - FetchUnSpentTxByShaList(txShaList []*btcwire.ShaHash) []*TxListReply
 	   - InsertBlock(block *btcutil.Block) (height int64, err error)
 	   InvalidateBlockCache()
 	   InvalidateCache()
