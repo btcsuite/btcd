@@ -5,6 +5,7 @@
 package btcdb_test
 
 import (
+	"fmt"
 	"github.com/conformal/btcdb"
 	"testing"
 )
@@ -51,4 +52,44 @@ func TestEmptyDB(t *testing.T) {
 		// Clean up the old db.
 		teardown()
 	}
+}
+
+// TestAddDuplicateDriver ensures that adding a duplicate driver does not
+// overwrite an existing one.
+func TestAddDuplicateDriver(t *testing.T) {
+	supportedDBs := btcdb.SupportedDBs()
+	if len(supportedDBs) == 0 {
+		t.Errorf("TestAddDuplicateDriver: No backends to test")
+		return
+	}
+	dbType := supportedDBs[0]
+
+	// bogusCreateDB is a function which acts as a bogus create and open
+	// driver function and intentionally returns a failure that can be
+	// detected if the interface allows a duplicate driver to overwrite an
+	// existing one.
+	bogusCreateDB := func(string) (btcdb.Db, error) {
+		return nil, fmt.Errorf("duplicate driver allowed for database "+
+			"type [%v]", dbType)
+	}
+
+	// Create a driver that tries to replace an existing one.  Set its
+	// create and open functions to a function that causes a test failure if
+	// they are invoked.
+	driver := btcdb.DriverDB{
+		DbType: dbType,
+		Create: bogusCreateDB,
+		Open:   bogusCreateDB,
+	}
+	btcdb.AddDBDriver(driver)
+
+	// Ensure creating a database of the type that we tried to replace
+	// doesn't fail (if it does, it indicates the driver was erroneously
+	// replaced).
+	_, teardown, err := createDB(dbType, "dupdrivertest", true)
+	if err != nil {
+		t.Errorf("TestAddDuplicateDriver: %v", err)
+		return
+	}
+	teardown()
 }
