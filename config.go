@@ -23,7 +23,7 @@ const (
 	defaultConfigFilename = "btcd.conf"
 	defaultLogLevel       = "info"
 	defaultBtcnet         = btcwire.MainNet
-	defaultMaxPeers       = 8
+	defaultMaxPeers       = 125
 	defaultBanDuration    = time.Hour * 24
 	defaultVerifyEnabled  = false
 	defaultDbType         = "leveldb"
