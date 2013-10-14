@@ -1240,7 +1240,7 @@ func (s *rpcServer) newBlockNotifyCheckTxOut(db btcdb.Db, block *btcutil.Block, 
 	for i, txout := range tx.Tx.TxOut {
 		_, txaddrhash, err := btcscript.ScriptToAddrHash(txout.PkScript)
 		if err != nil {
-			log.Error("Error getting payment address from tx; dropping any Tx notifications.")
+			log.Debug("Error getting payment address from tx; dropping any Tx notifications.")
 			break
 		}
 		s.ws.txRequests.RLock()
