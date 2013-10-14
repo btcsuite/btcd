@@ -93,3 +93,45 @@ func TestAddDuplicateDriver(t *testing.T) {
 	}
 	teardown()
 }
+
+// TestCreateOpenFail ensures that errors which occur while opening or closing
+// a database are handled properly.
+func TestCreateOpenFail(t *testing.T) {
+	// bogusCreateDB is a function which acts as a bogus create and open
+	// driver function that intentionally returns a failure which can be
+	// detected.
+	dbType := "createopenfail"
+	openError := fmt.Errorf("failed to create or open database for "+
+		"database type [%v]", dbType)
+	bogusCreateDB := func(string) (btcdb.Db, error) {
+		return nil, openError
+	}
+
+	// Create and add driver that intentionally fails when created or opened
+	// to ensure errors on database open and create are handled properly.
+	driver := btcdb.DriverDB{
+		DbType: dbType,
+		Create: bogusCreateDB,
+		Open:   bogusCreateDB,
+	}
+	btcdb.AddDBDriver(driver)
+
+	// Ensure creating a database with the new type fails with the expected
+	// error.
+	_, err := btcdb.CreateDB(dbType, "createfailtest")
+	if err != openError {
+		t.Errorf("TestCreateOpenFail: expected error not received - "+
+			"got: %v, want %v", err, openError)
+		return
+	}
+
+	// Ensure opening a database with the new type fails with the expected
+	// error.
+	_, err = btcdb.OpenDB(dbType, "openfailtest")
+	if err != openError {
+		t.Errorf("TestCreateOpenFail: expected error not received - "+
+			"got: %v, want %v", err, openError)
+		return
+	}
+
+}
