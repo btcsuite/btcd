@@ -116,6 +116,10 @@ func testFetchBlockShaByHeight(tc *testContext) bool {
 		return false
 	}
 
+	return true
+}
+
+func testFetchBlockShaByHeightErrors(tc *testContext) bool {
 	// Invalid heights must error and return a nil hash.
 	tests := []int64{-1, tc.blockHeight + 1, tc.blockHeight + 2}
 	for i, wantHeight := range tests {
@@ -393,6 +397,55 @@ func testFetchUnSpentTxByShaList(tc *testContext) bool {
 	return true
 }
 
+// testIntegrity performs a series of tests against the interface functions
+// which fetch and check for data existence.
+func testIntegrity(tc *testContext) bool {
+	// The block must now exist in the database.
+	if !testExistsSha(tc) {
+		return false
+	}
+
+	// Loading the block back from the database must give back
+	// the same MsgBlock and raw bytes that were stored.
+	if !testFetchBlockBySha(tc) {
+		return false
+	}
+
+	// The hash returned for the block by its height must be the
+	// expected value.
+	if !testFetchBlockShaByHeight(tc) {
+		return false
+	}
+
+	// All of the transactions in the block must now exist in the
+	// database.
+	if !testExistsTxSha(tc) {
+		return false
+	}
+
+	// Loading all of the transactions in the block back from the
+	// database must give back the same MsgTx that was stored.
+	if !testFetchTxBySha(tc) {
+		return false
+	}
+
+	// All of the transactions in the block must be fetchable via
+	// FetchTxByShaList and all of the list replies must have the
+	// expected values.
+	if !testFetchTxByShaList(tc) {
+		return false
+	}
+
+	// All of the transactions in the block must be fetchable via
+	// FetchUnSpentTxByShaList and all of the list replies must have
+	// the expected values.
+	if !testFetchUnSpentTxByShaList(tc) {
+		return false
+	}
+
+	return true
+}
+
 // testInterface tests performs tests for the various interfaces of btcdb which
 // require state in the database for the given database type.
 func testInterface(t *testing.T, dbType string) {
@@ -434,46 +487,15 @@ func testInterface(t *testing.T, dbType string) {
 			return
 		}
 
-		// The block must now exist in the database.
-		if !testExistsSha(&context) {
+		// The block must pass all data integrity tests which involve
+		// invoking all and testing the result of all interface
+		// functions which deal with fetch and checking for data
+		// existence.
+		if !testIntegrity(&context) {
 			return
 		}
 
-		// Loading the block back from the database must give back
-		// the same MsgBlock and raw bytes that were stored.
-		if !testFetchBlockBySha(&context) {
-			return
-		}
-
-		// The hash returned for the block by its height must be the
-		// expected value.
-		if !testFetchBlockShaByHeight(&context) {
-			return
-		}
-
-		// All of the transactions in the block must now exist in the
-		// database.
-		if !testExistsTxSha(&context) {
-			return
-		}
-
-		// Loading all of the transactions in the block back from the
-		// database must give back the same MsgTx that was stored.
-		if !testFetchTxBySha(&context) {
-			return
-		}
-
-		// All of the transactions in the block must be fetchable via
-		// FetchTxByShaList and all of the list replies must have the
-		// expected values.
-		if !testFetchTxByShaList(&context) {
-			return
-		}
-
-		// All of the transactions in the block must be fetchable via
-		// FetchUnSpentTxByShaList and all of the list replies must have
-		// the expected values.
-		if !testFetchUnSpentTxByShaList(&context) {
+		if !testFetchBlockShaByHeightErrors(&context) {
 			return
 		}
 	}
