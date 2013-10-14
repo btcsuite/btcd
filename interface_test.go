@@ -6,32 +6,187 @@ package btcdb_test
 
 import (
 	"github.com/conformal/btcdb"
+	"github.com/conformal/btcutil"
+	"github.com/conformal/btcwire"
 	"github.com/davecgh/go-spew/spew"
 	"reflect"
 	"testing"
 )
 
-// testFetchBlockShaByHeightErrors ensures FetchBlockShaByHeight handles invalid
-// heights correctly.
-func testFetchBlockShaByHeightErrors(t *testing.T, dbType string, db btcdb.Db, numBlocks int64) bool {
-	tests := []int64{-1, numBlocks, numBlocks + 1}
+// testContext is used to store context information about a running test which
+// is passed into helper functions.
+type testContext struct {
+	t           *testing.T
+	dbType      string
+	db          btcdb.Db
+	blockHeight int64
+	blockHash   *btcwire.ShaHash
+	block       *btcutil.Block
+}
+
+// testInsertBlock ensures InsertBlock conforms to the interface contract.
+func testInsertBlock(tc *testContext) bool {
+	// The block must insert without any errors.
+	newHeight, err := tc.db.InsertBlock(tc.block)
+	if err != nil {
+		tc.t.Errorf("InsertBlock (%s): failed to insert block %v "+
+			"err %v", tc.dbType, tc.blockHeight, err)
+		return false
+	}
+
+	// The returned height must be the expected value.
+	if newHeight != tc.blockHeight {
+		tc.t.Errorf("InsertBlock (%s): height mismatch got: %v, "+
+			"want: %v", tc.dbType, newHeight, tc.blockHeight)
+		return false
+	}
+
+	return true
+}
+
+// testExistsSha ensures ExistsSha conforms to the interface contract.
+func testExistsSha(tc *testContext) bool {
+	// The block must exist in the database.
+	if exists := tc.db.ExistsSha(tc.blockHash); !exists {
+		tc.t.Errorf("ExistsSha (%s): block %v does not exist",
+			tc.dbType, tc.blockHash)
+		return false
+	}
+
+	return true
+}
+
+// testFetchBlockBySha ensures FetchBlockBySha conforms to the interface
+// contract.
+func testFetchBlockBySha(tc *testContext) bool {
+	// The block must be fetchable by its hash without any errors.
+	blockFromDb, err := tc.db.FetchBlockBySha(tc.blockHash)
+	if err != nil {
+		tc.t.Errorf("FetchBlockBySha (%s): %v", tc.dbType, err)
+		return false
+	}
+
+	// The block fetched from the database must give back the same MsgBlock
+	// and raw bytes that were stored.
+	if !reflect.DeepEqual(tc.block.MsgBlock(), blockFromDb.MsgBlock()) {
+		tc.t.Errorf("FetchBlockBySha (%s): block from database "+
+			"does not match stored block\ngot: %v\n"+
+			"want: %v", tc.dbType,
+			spew.Sdump(blockFromDb.MsgBlock()),
+			spew.Sdump(tc.block.MsgBlock()))
+		return false
+	}
+	blockBytes, err := tc.block.Bytes()
+	if err != nil {
+		tc.t.Errorf("block.Bytes: %v", err)
+		return false
+	}
+	blockFromDbBytes, err := blockFromDb.Bytes()
+	if err != nil {
+		tc.t.Errorf("blockFromDb.Bytes: %v", err)
+		return false
+	}
+	if !reflect.DeepEqual(blockBytes, blockFromDbBytes) {
+		tc.t.Errorf("FetchBlockBySha (%s): block bytes from "+
+			"database do not match stored block bytes\n"+
+			"got: %v\nwant: %v", tc.dbType,
+			spew.Sdump(blockFromDbBytes), spew.Sdump(blockBytes))
+		return false
+	}
+
+	return true
+}
+
+// testFetchBlockShaByHeight ensures FetchBlockShaByHeight conforms to the
+// interface contract.
+func testFetchBlockShaByHeight(tc *testContext) bool {
+	// The hash returned for the block by its height must be the expected
+	// value.
+	hashFromDb, err := tc.db.FetchBlockShaByHeight(tc.blockHeight)
+	if err != nil {
+		tc.t.Errorf("FetchBlockShaByHeight (%s): %v", tc.dbType, err)
+		return false
+	}
+	if !hashFromDb.IsEqual(tc.blockHash) {
+		tc.t.Errorf("FetchBlockShaByHeight (%s): returned hash "+
+			"does  not match expected value - got: %v, "+
+			"want: %v", tc.dbType, hashFromDb, tc.blockHash)
+		return false
+	}
+
+	// Invalid heights must error and return a nil hash.
+	tests := []int64{-1, tc.blockHeight + 1, tc.blockHeight + 2}
 	for i, wantHeight := range tests {
-		hashFromDb, err := db.FetchBlockShaByHeight(wantHeight)
+		hashFromDb, err := tc.db.FetchBlockShaByHeight(wantHeight)
 		if err == nil {
-			t.Errorf("FetchBlockShaByHeight #%d (%s): did not "+
+			tc.t.Errorf("FetchBlockShaByHeight #%d (%s): did not "+
 				"return error on invalid index: %d - got: %v, "+
-				"want: non-nil", i, dbType, wantHeight, err)
+				"want: non-nil", i, tc.dbType, wantHeight, err)
 			return false
 		}
 		if hashFromDb != nil {
-			t.Errorf("FetchBlockShaByHeight #%d (%s): returned "+
+			tc.t.Errorf("FetchBlockShaByHeight #%d (%s): returned "+
 				"hash is not nil on invalid index: %d - got: "+
-				"%v, want: nil", i, dbType, wantHeight, err)
+				"%v, want: nil", i, tc.dbType, wantHeight, err)
 			return false
 		}
 	}
 
-	return false
+	return true
+}
+
+// testExistsTxSha ensures ExistsTxSha conforms to the interface contract.
+func testExistsTxSha(tc *testContext) bool {
+	txHashes, err := tc.block.TxShas()
+	if err != nil {
+		tc.t.Errorf("block.TxShas: %v", err)
+		return false
+	}
+
+	for i := range txHashes {
+		// The transaction must exist in the database.
+		txHash := txHashes[i]
+		if exists := tc.db.ExistsTxSha(txHash); !exists {
+			tc.t.Errorf("ExistsTxSha (%s): tx %v does not exist",
+				tc.dbType, txHash)
+			return false
+		}
+	}
+
+	return true
+}
+
+// testFetchTxBySha ensures FetchTxBySha conforms to the interface contract.
+func testFetchTxBySha(tc *testContext) bool {
+	txHashes, err := tc.block.TxShas()
+	if err != nil {
+		tc.t.Errorf("block.TxShas: %v", err)
+		return false
+	}
+
+	for i, tx := range tc.block.MsgBlock().Transactions {
+		txHash := txHashes[i]
+		txReplyList, err := tc.db.FetchTxBySha(txHash)
+		if err != nil {
+			tc.t.Errorf("FetchTxBySha (%s): %v", tc.dbType, err)
+			return false
+		}
+		if len(txReplyList) == 0 {
+			tc.t.Errorf("FetchTxBySha (%s): tx %v did not "+
+				"return reply data", tc.dbType, txHash)
+			return false
+		}
+		txFromDb := txReplyList[len(txReplyList)-1].Tx
+		if !reflect.DeepEqual(tx, txFromDb) {
+			tc.t.Errorf("FetchTxBySha (%s): tx %v from "+
+				"database does not match stored tx\n"+
+				"got: %v\nwant: %v", tc.dbType, txHash,
+				spew.Sdump(txFromDb), spew.Sdump(tx))
+			return false
+		}
+	}
+
+	return true
 }
 
 // testInterface tests performs tests for the various interfaces of btcdb which
@@ -52,126 +207,57 @@ func testInterface(t *testing.T, dbType string) {
 		return
 	}
 
+	// Create a test context to pass around.
+	context := testContext{t: t, dbType: dbType, db: db}
+
 	t.Logf("Loaded %d blocks", len(blocks))
 	for height := int64(1); height < int64(len(blocks)); height++ {
+		// Get the appropriate block and hash and update the test
+		// context accordingly.
 		block := blocks[height]
-
-		// Ensure there are no errors inserting each block into the
-		// database.
-		newHeight, err := db.InsertBlock(block)
-		if err != nil {
-			t.Errorf("InsertBlock (%s): failed to insert block %v "+
-				"err %v", dbType, height, err)
-			return
-		}
-		if newHeight != height {
-			t.Errorf("InsertBlock (%s): height mismatch got: %v, "+
-				"want: %v", dbType, newHeight, height)
-			return
-		}
-
-		// Ensure the block now exists in the database.
-		expectedHash, err := block.Sha()
+		blockHash, err := block.Sha()
 		if err != nil {
 			t.Errorf("block.Sha: %v", err)
 			return
 		}
-		if exists := db.ExistsSha(expectedHash); !exists {
-			t.Errorf("ExistsSha (%s): block %v does not exist",
-				dbType, expectedHash)
+		context.blockHeight = height
+		context.blockHash = blockHash
+		context.block = block
+
+		// The block must insert without any errors and return the
+		// expected height.
+		if !testInsertBlock(&context) {
 			return
 		}
 
-		// Ensure loading the block back from the database gives back
-		// the same MsgBlock and raw bytes.
-		blockFromDb, err := db.FetchBlockBySha(expectedHash)
-		if err != nil {
-			t.Errorf("FetchBlockBySha (%s): %v", dbType, err)
-			return
-		}
-		if !reflect.DeepEqual(block.MsgBlock(), blockFromDb.MsgBlock()) {
-			t.Errorf("FetchBlockBySha (%s): block from database "+
-				"does not match stored block\ngot: %v\n"+
-				"want: %v", dbType,
-				spew.Sdump(blockFromDb.MsgBlock()),
-				spew.Sdump(block.MsgBlock()))
-			return
-		}
-		blockBytes, err := block.Bytes()
-		if err != nil {
-			t.Errorf("block.Bytes: %v", err)
-			return
-		}
-		blockFromDbBytes, err := blockFromDb.Bytes()
-		if err != nil {
-			t.Errorf("blockFromDb.Bytes: %v", err)
-			return
-		}
-		if !reflect.DeepEqual(blockBytes, blockFromDbBytes) {
-			t.Errorf("FetchBlockBySha (%s): block bytes from "+
-				"database do not match stored block bytes\n"+
-				"got: %v\nwant: %v", dbType,
-				spew.Sdump(blockFromDbBytes),
-				spew.Sdump(blockBytes))
+		// The block must now exist in the database.
+		if !testExistsSha(&context) {
 			return
 		}
 
-		// Ensure the hash returned for the block by its height is the
+		// Loading the block back from the database must give back
+		// the same MsgBlock and raw bytes that were stored.
+		if !testFetchBlockBySha(&context) {
+			return
+		}
+
+		// The hash returned for the block by its height must be the
 		// expected value.
-		hashFromDb, err := db.FetchBlockShaByHeight(height)
-		if err != nil {
-			t.Errorf("FetchBlockShaByHeight (%s): %v", dbType, err)
-			return
-		}
-		if !hashFromDb.IsEqual(expectedHash) {
-			t.Errorf("FetchBlockShaByHeight (%s): returned hash "+
-				"does  not match expected value - got: %v, "+
-				"want: %v", dbType, hashFromDb, expectedHash)
+		if !testFetchBlockShaByHeight(&context) {
 			return
 		}
 
-		// The following set of tests examine all of the transactions in
-		// the block.
-		txHashes, err := block.TxShas()
-		if err != nil {
-			t.Errorf("block.TxShas: %v", err)
+		// All of the transactions in the block must now exist in the
+		// database.
+		if !testExistsTxSha(&context) {
 			return
 		}
-		for i, tx := range block.MsgBlock().Transactions {
-			// Ensure the transaction exists.
-			txHash := txHashes[i]
-			if exists := db.ExistsTxSha(txHash); !exists {
-				t.Errorf("ExistsTxSha (%s): tx %v does not exist",
-					dbType, txHash)
-				return
-			}
 
-			// Ensure loading the transaction back from the database
-			// gives back the same MsgTx.
-			txReplyList, err := db.FetchTxBySha(txHash)
-			if err != nil {
-				t.Errorf("FetchTxBySha (%s): %v", dbType, err)
-				return
-			}
-			if len(txReplyList) == 0 {
-				t.Errorf("FetchTxBySha (%s): tx %v did not "+
-					"return reply data", dbType, txHash)
-				return
-			}
-			txFromDb := txReplyList[len(txReplyList)-1].Tx
-			if !reflect.DeepEqual(tx, txFromDb) {
-				t.Errorf("FetchTxBySha (%s): tx %v from "+
-					"database does not match stored tx\n"+
-					"got: %v\nwant: %v", dbType, txHash,
-					spew.Sdump(txFromDb), spew.Sdump(tx))
-				return
-			}
+		// Loading all of the transactions in the block back from the
+		// database must give back the same MsgTx that was stored.
+		if !testFetchTxBySha(&context) {
+			return
 		}
-	}
-
-	// Ensure FetchBlockShaByHeight handles invalid heights properly.
-	if !testFetchBlockShaByHeightErrors(t, dbType, db, int64(len(blocks))) {
-		return
 	}
 
 	// TODO(davec): Need to figure out how to handle the special checks
