@@ -176,6 +176,5 @@ func DoubleSha256(b []byte) []byte {
 	sum := hasher.Sum(nil)
 	hasher.Reset()
 	hasher.Write(sum)
-	sum = hasher.Sum(nil)
-	return sum
+	return hasher.Sum(nil)
 }
