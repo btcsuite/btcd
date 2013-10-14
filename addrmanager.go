@@ -261,9 +261,9 @@ func (a *AddrManager) expireNew(bucket int) {
 		if bad(v) {
 			log.Tracef("AMGR: expiring bad address %v", k)
 			delete(a.addrNew[bucket], k)
-			a.nNew--
 			v.refs--
 			if v.refs == 0 {
+				a.nNew--
 				delete(a.addrIndex, k)
 			}
 			return
@@ -280,9 +280,9 @@ func (a *AddrManager) expireNew(bucket int) {
 		log.Tracef("AMGR: expiring oldest address %v", key)
 
 		delete(a.addrNew[bucket], key)
-		a.nNew--
 		oldest.refs--
 		if oldest.refs == 0 {
+			a.nNew--
 			delete(a.addrIndex, key)
 		}
 	}
