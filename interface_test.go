@@ -65,8 +65,8 @@ func testInterface(t *testing.T, dbType string) {
 			t.Errorf("FetchBlockBySha: %v", err)
 		}
 		if !reflect.DeepEqual(block.MsgBlock(), blockFromDb.MsgBlock()) {
-			t.Errorf("Block from database does not match stored "+
-				"block\ngot: %v\nwant: %v",
+			t.Errorf("FetchBlockBySha: block from database does "+
+				"not match stored block\ngot: %v\nwant: %v",
 				spew.Sdump(blockFromDb.MsgBlock()),
 				spew.Sdump(block.MsgBlock()))
 			return
@@ -82,9 +82,9 @@ func testInterface(t *testing.T, dbType string) {
 			return
 		}
 		if !reflect.DeepEqual(blockBytes, blockFromDbBytes) {
-			t.Errorf("Block bytes from database do not match "+
-				"stored block bytes\ngot: %v\nwant: %v",
-				spew.Sdump(blockFromDbBytes),
+			t.Errorf("FetchBlockBySha: block bytes from database "+
+				"do not match stored block bytes\ngot: %v\n"+
+				"want: %v", spew.Sdump(blockFromDbBytes),
 				spew.Sdump(blockBytes))
 			return
 		}
