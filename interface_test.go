@@ -15,7 +15,7 @@ import (
 func testInterface(t *testing.T, dbType string) {
 	db, teardown, err := setupDB(dbType, "interface")
 	if err != nil {
-		t.Errorf("Failed to create test database %v", err)
+		t.Errorf("Failed to create test database (%s) %v", dbType, err)
 		return
 	}
 	defer teardown()
@@ -36,13 +36,13 @@ func testInterface(t *testing.T, dbType string) {
 		// database.
 		newHeight, err := db.InsertBlock(block)
 		if err != nil {
-			t.Errorf("InsertBlock: failed to insert block %v err %v",
-				height, err)
+			t.Errorf("InsertBlock (%s): failed to insert block %v "+
+				"err %v", dbType, height, err)
 			return
 		}
 		if newHeight != height {
-			t.Errorf("InsertBlock: height mismatch got: %v, want: %v",
-				newHeight, height)
+			t.Errorf("InsertBlock (%s): height mismatch got: %v, "+
+				"want: %v", dbType, newHeight, height)
 			return
 		}
 
@@ -53,8 +53,8 @@ func testInterface(t *testing.T, dbType string) {
 			return
 		}
 		if exists := db.ExistsSha(expectedHash); !exists {
-			t.Errorf("ExistsSha: block %v does not exist",
-				expectedHash)
+			t.Errorf("ExistsSha (%s): block %v does not exist",
+				dbType, expectedHash)
 			return
 		}
 
@@ -62,11 +62,13 @@ func testInterface(t *testing.T, dbType string) {
 		// the same MsgBlock and raw bytes.
 		blockFromDb, err := db.FetchBlockBySha(expectedHash)
 		if err != nil {
-			t.Errorf("FetchBlockBySha: %v", err)
+			t.Errorf("FetchBlockBySha (%s): %v", dbType, err)
+			return
 		}
 		if !reflect.DeepEqual(block.MsgBlock(), blockFromDb.MsgBlock()) {
-			t.Errorf("FetchBlockBySha: block from database does "+
-				"not match stored block\ngot: %v\nwant: %v",
+			t.Errorf("FetchBlockBySha (%s): block from database "+
+				"does not match stored block\ngot: %v\n"+
+				"want: %v", dbType,
 				spew.Sdump(blockFromDb.MsgBlock()),
 				spew.Sdump(block.MsgBlock()))
 			return
@@ -82,9 +84,10 @@ func testInterface(t *testing.T, dbType string) {
 			return
 		}
 		if !reflect.DeepEqual(blockBytes, blockFromDbBytes) {
-			t.Errorf("FetchBlockBySha: block bytes from database "+
-				"do not match stored block bytes\ngot: %v\n"+
-				"want: %v", spew.Sdump(blockFromDbBytes),
+			t.Errorf("FetchBlockBySha (%s): block bytes from "+
+				"database do not match stored block bytes\n"+
+				"got: %v\nwant: %v", dbType,
+				spew.Sdump(blockFromDbBytes),
 				spew.Sdump(blockBytes))
 			return
 		}
@@ -93,13 +96,13 @@ func testInterface(t *testing.T, dbType string) {
 		// expected value.
 		hashFromDb, err := db.FetchBlockShaByHeight(height)
 		if err != nil {
-			t.Errorf("FetchBlockShaByHeight: %v", err)
+			t.Errorf("FetchBlockShaByHeight (%s): %v", dbType, err)
 			return
 		}
 		if !hashFromDb.IsEqual(expectedHash) {
-			t.Errorf("FetchBlockShaByHeight: returned hash does "+
-				"not match expected value - got: %v, want: %v",
-				hashFromDb, expectedHash)
+			t.Errorf("FetchBlockShaByHeight (%s): returned hash "+
+				"does  not match expected value - got: %v, "+
+				"want: %v", dbType, hashFromDb, expectedHash)
 			return
 		}
 	}
