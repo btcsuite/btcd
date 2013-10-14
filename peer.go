@@ -826,6 +826,16 @@ func (p *peer) writeMessage(msg btcwire.Message) {
 	if atomic.LoadInt32(&p.disconnect) != 0 {
 		return
 	}
+	if !p.versionKnown {
+		switch msg.(type) {
+		case *btcwire.MsgVersion:
+			// This is OK.
+		default:
+			// We drop all messages other than version if we
+			// haven't done the handshake already.
+			return
+		}
+	}
 
 	// Use closures to log expensive operations so they are only run when
 	// the logging level requires it.
@@ -1007,13 +1017,17 @@ out:
 			p.writeMessage(msg)
 
 		case iv := <-p.outputInvChan:
-			p.invSendQueue.PushBack(iv)
+			// No handshake? They'll find out soon enough.
+			if p.versionKnown {
+				p.invSendQueue.PushBack(iv)
+			}
 
 		case <-trickleTicker.C:
 			// Don't send anything if we're disconnecting or there
 			// is no queued inventory.
 			if atomic.LoadInt32(&p.disconnect) != 0 ||
-				p.invSendQueue.Len() == 0 {
+				p.invSendQueue.Len() == 0 ||
+				!p.versionKnown {
 				continue
 			}
 
