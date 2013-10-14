@@ -5,14 +5,33 @@
 package btcdb_test
 
 import (
+	"compress/bzip2"
+	"encoding/binary"
 	"fmt"
 	"github.com/conformal/btcdb"
 	_ "github.com/conformal/btcdb/ldb"
 	_ "github.com/conformal/btcdb/sqlite3"
 	"github.com/conformal/btcutil"
 	"github.com/conformal/btcwire"
+	"io"
 	"os"
 	"path/filepath"
+	"strings"
+	"testing"
+)
+
+var (
+	// network is the expected bitcoin network in the test block data.
+	network = btcwire.MainNet
+
+	// savedBlocks is used to store blocks loaded from the blockDataFile
+	// so multiple invocations to loadBlocks from the various test functions
+	// do not have to reload them from disk.
+	savedBlocks []*btcutil.Block
+
+	// blockDataFile is the path to a file containing the first 256 blocks
+	// of the block chain.
+	blockDataFile = filepath.Join("testdata", "blocks1-256.bz2")
 )
 
 var zeroHash = btcwire.ShaHash{}
@@ -128,4 +147,73 @@ func setupDB(dbType, dbName string) (btcdb.Db, func(), error) {
 	}
 
 	return db, teardown, nil
+}
+
+// loadBlocks loads the blocks contained in the testdata directory and returns
+// a slice of them.
+func loadBlocks(t *testing.T) ([]*btcutil.Block, error) {
+	if len(savedBlocks) != 0 {
+		return savedBlocks, nil
+	}
+
+	var dr io.Reader
+	fi, err := os.Open(blockDataFile)
+	if err != nil {
+		t.Errorf("failed to open file %v, err %v", blockDataFile, err)
+		return nil, err
+	}
+	if strings.HasSuffix(blockDataFile, ".bz2") {
+		z := bzip2.NewReader(fi)
+		dr = z
+	} else {
+		dr = fi
+	}
+
+	defer func() {
+		if err := fi.Close(); err != nil {
+			t.Errorf("failed to close file %v %v", blockDataFile, err)
+		}
+	}()
+
+	// Set the first block as the genesis block.
+	blocks := make([]*btcutil.Block, 0, 256)
+	genesis := btcutil.NewBlock(&btcwire.GenesisBlock)
+	blocks = append(blocks, genesis)
+
+	for height := int64(1); err == nil; height++ {
+		var rintbuf uint32
+		err := binary.Read(dr, binary.LittleEndian, &rintbuf)
+		if err == io.EOF {
+			// hit end of file at expected offset: no warning
+			height--
+			err = nil
+			break
+		}
+		if err != nil {
+			t.Errorf("failed to load network type, err %v", err)
+			break
+		}
+		if rintbuf != uint32(network) {
+			t.Errorf("Block doesn't match network: %v expects %v",
+				rintbuf, network)
+			break
+		}
+		err = binary.Read(dr, binary.LittleEndian, &rintbuf)
+		blocklen := rintbuf
+
+		rbytes := make([]byte, blocklen)
+
+		// read block
+		dr.Read(rbytes)
+
+		block, err := btcutil.NewBlockFromBytes(rbytes)
+		if err != nil {
+			t.Errorf("failed to parse block %v", height)
+			return nil, err
+		}
+		blocks = append(blocks, block)
+	}
+
+	savedBlocks = blocks
+	return blocks, nil
 }
