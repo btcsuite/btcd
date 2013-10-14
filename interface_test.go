@@ -145,6 +145,27 @@ func testInterface(t *testing.T, dbType string) {
 					dbType, txHash)
 				return
 			}
+
+			// Ensure loading the transaction back from the database
+			// gives back the same MsgTx.
+			txReplyList, err := db.FetchTxBySha(txHash)
+			if err != nil {
+				t.Errorf("FetchTxBySha (%s): %v", dbType, err)
+				return
+			}
+			if len(txReplyList) == 0 {
+				t.Errorf("FetchTxBySha (%s): tx %v did not "+
+					"return reply data", dbType, txHash)
+				return
+			}
+			txFromDb := txReplyList[len(txReplyList)-1].Tx
+			if !reflect.DeepEqual(tx, txFromDb) {
+				t.Errorf("FetchTxBySha (%s): tx %v from "+
+					"database does not match stored tx\n"+
+					"got: %v\nwant: %v", dbType, txHash,
+					spew.Sdump(txFromDb), spew.Sdump(tx))
+				return
+			}
 		}
 	}
 
@@ -166,7 +187,7 @@ func testInterface(t *testing.T, dbType string) {
 	   - FetchBlockShaByHeight(height int64) (sha *btcwire.ShaHash, err error)
 	   FetchHeightRange(startHeight, endHeight int64) (rshalist []btcwire.ShaHash, err error)
 	   - ExistsTxSha(sha *btcwire.ShaHash) (exists bool)
-	   FetchTxBySha(txsha *btcwire.ShaHash) ([]*TxListReply, error)
+	   - FetchTxBySha(txsha *btcwire.ShaHash) ([]*TxListReply, error)
 	   FetchTxByShaList(txShaList []*btcwire.ShaHash) []*TxListReply
 	   FetchUnSpentTxByShaList(txShaList []*btcwire.ShaHash) []*TxListReply
 	   - InsertBlock(block *btcutil.Block) (height int64, err error)
