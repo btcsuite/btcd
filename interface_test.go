@@ -129,6 +129,23 @@ func testInterface(t *testing.T, dbType string) {
 				"want: %v", dbType, hashFromDb, expectedHash)
 			return
 		}
+
+		// The following set of tests examine all of the transactions in
+		// the block.
+		txHashes, err := block.TxShas()
+		if err != nil {
+			t.Errorf("block.TxShas: %v", err)
+			return
+		}
+		for i, tx := range block.MsgBlock().Transactions {
+			// Ensure the transaction exists.
+			txHash := txHashes[i]
+			if exists := db.ExistsTxSha(txHash); !exists {
+				t.Errorf("ExistsTxSha (%s): tx %v does not exist",
+					dbType, txHash)
+				return
+			}
+		}
 	}
 
 	// Ensure FetchBlockShaByHeight handles invalid heights properly.
@@ -148,7 +165,7 @@ func testInterface(t *testing.T, dbType string) {
 	   - FetchBlockBySha(sha *btcwire.ShaHash) (blk *btcutil.Block, err error)
 	   - FetchBlockShaByHeight(height int64) (sha *btcwire.ShaHash, err error)
 	   FetchHeightRange(startHeight, endHeight int64) (rshalist []btcwire.ShaHash, err error)
-	   ExistsTxSha(sha *btcwire.ShaHash) (exists bool)
+	   - ExistsTxSha(sha *btcwire.ShaHash) (exists bool)
 	   FetchTxBySha(txsha *btcwire.ShaHash) ([]*TxListReply, error)
 	   FetchTxByShaList(txShaList []*btcwire.ShaHash) []*TxListReply
 	   FetchUnSpentTxByShaList(txShaList []*btcwire.ShaHash) []*TxListReply
