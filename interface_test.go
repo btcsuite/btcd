@@ -133,5 +133,27 @@ func TestCreateOpenFail(t *testing.T) {
 			"got: %v, want %v", err, openError)
 		return
 	}
+}
 
+// TestCreateOpenUnsupported ensures that attempting to create or open an
+// unsupported database type is handled properly.
+func TestCreateOpenUnsupported(t *testing.T) {
+	// Ensure creating a database with an unsupported type fails with the
+	// expected error.
+	dbType := "unsupported"
+	_, err := btcdb.CreateDB(dbType, "unsupportedcreatetest")
+	if err != btcdb.DbUnknownType {
+		t.Errorf("TestCreateOpenUnsupported: expected error not "+
+			"received - got: %v, want %v", err, btcdb.DbUnknownType)
+		return
+	}
+
+	// Ensure opening a database with the new type fails with the expected
+	// error.
+	_, err = btcdb.OpenDB(dbType, "unsupportedopentest")
+	if err != btcdb.DbUnknownType {
+		t.Errorf("TestCreateOpenUnsupported: expected error not "+
+			"received - got: %v, want %v", err, btcdb.DbUnknownType)
+		return
+	}
 }
