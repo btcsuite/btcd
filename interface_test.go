@@ -396,7 +396,7 @@ func testInterface(t *testing.T, dbType string) {
 	// Create a test context to pass around.
 	context := testContext{t: t, dbType: dbType, db: db}
 
-	t.Logf("Loaded %d blocks", len(blocks))
+	t.Logf("Loaded %d blocks for testing %s", len(blocks), dbType)
 	for height := int64(1); height < int64(len(blocks)); height++ {
 		// Get the appropriate block and hash and update the test
 		// context accordingly.
