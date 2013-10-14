@@ -89,6 +89,19 @@ func testInterface(t *testing.T, dbType string) {
 			return
 		}
 
+		// Ensure the hash returned for the block by its height is the
+		// expected value.
+		hashFromDb, err := db.FetchBlockShaByHeight(height)
+		if err != nil {
+			t.Errorf("FetchBlockShaByHeight: %v", err)
+			return
+		}
+		if !hashFromDb.IsEqual(expectedHash) {
+			t.Errorf("FetchBlockShaByHeight: returned hash does "+
+				"not match expected value - got: %v, want: %v",
+				hashFromDb, expectedHash)
+			return
+		}
 	}
 
 	// TODO(davec): Need to figure out how to handle the special checks
