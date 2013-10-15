@@ -201,21 +201,26 @@ func testFetchTxBySha(tc *testContext) bool {
 	return true
 }
 
-// testFetchTxByShaList ensures FetchTxByShaList conforms to the interface
-// contract.
-func testFetchTxByShaList(tc *testContext) bool {
+func testFetchTxByShaListCommon(tc *testContext, includeSpent bool) bool {
+	fetchFunc := tc.db.FetchUnSpentTxByShaList
+	funcName := "FetchUnSpentTxByShaList"
+	if includeSpent {
+		fetchFunc = tc.db.FetchTxByShaList
+		funcName = "FetchTxByShaList"
+	}
+
 	txHashes, err := tc.block.TxShas()
 	if err != nil {
 		tc.t.Errorf("block.TxShas: %v", err)
 		return false
 	}
 
-	txReplyList := tc.db.FetchTxByShaList(txHashes)
+	txReplyList := fetchFunc(txHashes)
 	if len(txReplyList) != len(txHashes) {
-		tc.t.Errorf("FetchTxByShaList (%s): block #%d (%s) "+
-			"tx reply list does not match expected length "+
-			"- got: %v, want: %v", tc.dbType, tc.blockHeight,
-			tc.blockHash, len(txReplyList), len(txHashes))
+		tc.t.Errorf("%s (%s): block #%d (%s) tx reply list does not "+
+			" match expected length - got: %v, want: %v", funcName,
+			tc.dbType, tc.blockHeight, tc.blockHash,
+			len(txReplyList), len(txHashes))
 		return false
 	}
 	for i, tx := range tc.block.MsgBlock().Transactions {
@@ -224,18 +229,18 @@ func testFetchTxByShaList(tc *testContext) bool {
 
 		// The transaction hash in the reply must be the expected value.
 		if !txD.Sha.IsEqual(txHash) {
-			tc.t.Errorf("FetchTxByShaList (%s): block #%d (%s) "+
-				"tx #%d (%s) hash does not match expected "+
-				"value - got %v", tc.dbType, tc.blockHeight,
+			tc.t.Errorf("%s (%s): block #%d (%s) tx #%d (%s) "+
+				"hash does not match expected value - got %v",
+				funcName, tc.dbType, tc.blockHeight,
 				tc.blockHash, i, txHash, txD.Sha)
 			return false
 		}
 
 		// The reply must not indicate any errors.
 		if txD.Err != nil {
-			tc.t.Errorf("FetchTxByShaList (%s): block #%d (%s) "+
-				"tx #%d (%s) returned unexpected error - "+
-				"got %v, want nil", tc.dbType, tc.blockHeight,
+			tc.t.Errorf("%s (%s): block #%d (%s) tx #%d (%s) "+
+				"returned unexpected error - got %v, want nil",
+				funcName, tc.dbType, tc.blockHeight,
 				tc.blockHash, i, txHash, txD.Err)
 			return false
 		}
@@ -243,9 +248,9 @@ func testFetchTxByShaList(tc *testContext) bool {
 		// The transaction in the reply fetched from the database must
 		// be the same MsgTx that was stored.
 		if !reflect.DeepEqual(tx, txD.Tx) {
-			tc.t.Errorf("FetchTxByShaList (%s): block #%d (%s) "+
-				"tx #%d (%s) does not match stored tx\n"+
-				"got: %v\nwant: %v", tc.dbType, tc.blockHeight,
+			tc.t.Errorf("%s (%s): block #%d (%s) tx #%d (%s) does "+
+				"not match stored tx\ngot: %v\nwant: %v",
+				funcName, tc.dbType, tc.blockHeight,
 				tc.blockHash, i, txHash, spew.Sdump(txD.Tx),
 				spew.Sdump(tx))
 			return false
@@ -254,15 +259,15 @@ func testFetchTxByShaList(tc *testContext) bool {
 		// The block hash in the reply from the database must be the
 		// expected value.
 		if txD.BlkSha == nil {
-			tc.t.Errorf("FetchTxByShaList (%s): block #%d (%s) "+
-				"tx #%d (%s) returned nil block hash", tc.dbType,
+			tc.t.Errorf("%s (%s): block #%d (%s) tx #%d (%s) "+
+				"returned nil block hash", funcName, tc.dbType,
 				tc.blockHeight, tc.blockHash, i, txHash)
 			return false
 		}
 		if !txD.BlkSha.IsEqual(tc.blockHash) {
-			tc.t.Errorf("FetchTxByShaList (%s): block #%d (%s) "+
-				"tx #%d (%s) returned unexpected block hash - "+
-				"got %v", tc.dbType, tc.blockHeight,
+			tc.t.Errorf("%s (%s): block #%d (%s) tx #%d (%s)"+
+				"returned unexpected block hash - got %v",
+				funcName, tc.dbType, tc.blockHeight,
 				tc.blockHash, i, txHash, txD.BlkSha)
 			return false
 		}
@@ -270,9 +275,9 @@ func testFetchTxByShaList(tc *testContext) bool {
 		// The block height in the reply from the database must be the
 		// expected value.
 		if txD.Height != tc.blockHeight {
-			tc.t.Errorf("FetchTxByShaList (%s): block #%d (%s) "+
-				"tx #%d (%s) returned unexpected block height "+
-				"- got %v", tc.dbType, tc.blockHeight,
+			tc.t.Errorf("%s (%s): block #%d (%s) tx #%d (%s) "+
+				"returned unexpected block height - got %v",
+				funcName, tc.dbType, tc.blockHeight,
 				tc.blockHash, i, txHash, txD.Height)
 			return false
 		}
@@ -281,16 +286,16 @@ func testFetchTxByShaList(tc *testContext) bool {
 		// indicate any of the transactions that were just inserted are
 		// spent.
 		if txD.TxSpent == nil {
-			tc.t.Errorf("FetchTxByShaList (%s): block #%d (%s) "+
-				"tx #%d (%s) returned nil spend data", tc.dbType,
+			tc.t.Errorf("%s (%s): block #%d (%s) tx #%d (%s) "+
+				"returned nil spend data", funcName, tc.dbType,
 				tc.blockHeight, tc.blockHash, i, txHash)
 			return false
 		}
 		noSpends := make([]bool, len(tx.TxOut))
 		if !reflect.DeepEqual(txD.TxSpent, noSpends) {
-			tc.t.Errorf("FetchTxByShaList (%s): block #%d (%s) "+
-				"tx #%d (%s) returned unexpected spend data - "+
-				"got %v, want %v", tc.dbType, tc.blockHeight,
+			tc.t.Errorf("%s (%s): block #%d (%s) tx #%d (%s) "+
+				"returned unexpected spend data - got %v, "+
+				"want %v", funcName, tc.dbType, tc.blockHeight,
 				tc.blockHash, i, txHash, txD.TxSpent, noSpends)
 			return false
 		}
@@ -299,102 +304,16 @@ func testFetchTxByShaList(tc *testContext) bool {
 	return true
 }
 
+// testFetchTxByShaList ensures FetchTxByShaList conforms to the interface
+// contract.
+func testFetchTxByShaList(tc *testContext) bool {
+	return testFetchTxByShaListCommon(tc, true)
+}
+
 // testFetchUnSpentTxByShaList ensures FetchUnSpentTxByShaList conforms to the
 // interface contract.
 func testFetchUnSpentTxByShaList(tc *testContext) bool {
-	txHashes, err := tc.block.TxShas()
-	if err != nil {
-		tc.t.Errorf("block.TxShas: %v", err)
-		return false
-	}
-
-	txReplyList := tc.db.FetchUnSpentTxByShaList(txHashes)
-	if len(txReplyList) != len(txHashes) {
-		tc.t.Errorf("FetchUnSpentTxByShaList (%s): block #%d (%s) "+
-			"tx reply list does not match expected length "+
-			"- got: %v, want: %v", tc.dbType, tc.blockHeight,
-			tc.blockHash, len(txReplyList), len(txHashes))
-		return false
-	}
-	for i, tx := range tc.block.MsgBlock().Transactions {
-		txHash := txHashes[i]
-		txD := txReplyList[i]
-
-		// The transaction hash in the reply must be the expected value.
-		if !txD.Sha.IsEqual(txHash) {
-			tc.t.Errorf("FetchUnSpentTxByShaList (%s): block #%d (%s) "+
-				"tx #%d (%s) hash does not match expected "+
-				"value - got %v", tc.dbType, tc.blockHeight,
-				tc.blockHash, i, txHash, txD.Sha)
-			return false
-		}
-
-		// The reply must not indicate any errors.
-		if txD.Err != nil {
-			tc.t.Errorf("FetchUnSpentTxByShaList (%s): block #%d (%s) "+
-				"tx #%d (%s) returned unexpected error - "+
-				"got %v, want nil", tc.dbType, tc.blockHeight,
-				tc.blockHash, i, txHash, txD.Err)
-			return false
-		}
-
-		// The transaction in the reply fetched from the database must
-		// be the same MsgTx that was stored.
-		if !reflect.DeepEqual(tx, txD.Tx) {
-			tc.t.Errorf("FetchUnSpentTxByShaList (%s): block #%d (%s) "+
-				"tx #%d (%s) does not match stored tx\n"+
-				"got: %v\nwant: %v", tc.dbType, tc.blockHeight,
-				tc.blockHash, i, txHash, spew.Sdump(txD.Tx),
-				spew.Sdump(tx))
-			return false
-		}
-
-		// The block hash in the reply from the database must be the
-		// expected value.
-		if txD.BlkSha == nil {
-			tc.t.Errorf("FetchUnSpentTxByShaList (%s): block #%d (%s) "+
-				"tx #%d (%s) returned nil block hash", tc.dbType,
-				tc.blockHeight, tc.blockHash, i, txHash)
-			return false
-		}
-		if !txD.BlkSha.IsEqual(tc.blockHash) {
-			tc.t.Errorf("FetchUnSpentTxByShaList (%s): block #%d (%s) "+
-				"tx #%d (%s) returned unexpected block hash - "+
-				"got %v", tc.dbType, tc.blockHeight,
-				tc.blockHash, i, txHash, txD.BlkSha)
-			return false
-		}
-
-		// The block height in the reply from the database must be the
-		// expected value.
-		if txD.Height != tc.blockHeight {
-			tc.t.Errorf("FetchUnSpentTxByShaList (%s): block #%d (%s) "+
-				"tx #%d (%s) returned unexpected block height "+
-				"- got %v", tc.dbType, tc.blockHeight,
-				tc.blockHash, i, txHash, txD.Height)
-			return false
-		}
-
-		// The spend data in the reply from the database must not
-		// indicate any of the transactions that were just inserted are
-		// spent.
-		if txD.TxSpent == nil {
-			tc.t.Errorf("FetchUnSpentTxByShaList (%s): block #%d (%s) "+
-				"tx #%d (%s) returned nil spend data", tc.dbType,
-				tc.blockHeight, tc.blockHash, i, txHash)
-			return false
-		}
-		noSpends := make([]bool, len(tx.TxOut))
-		if !reflect.DeepEqual(txD.TxSpent, noSpends) {
-			tc.t.Errorf("FetchUnSpentTxByShaList (%s): block #%d (%s) "+
-				"tx #%d (%s) returned unexpected spend data - "+
-				"got %v, want %v", tc.dbType, tc.blockHeight,
-				tc.blockHash, i, txHash, txD.TxSpent, noSpends)
-			return false
-		}
-	}
-
-	return true
+	return testFetchTxByShaListCommon(tc, false)
 }
 
 // testIntegrity performs a series of tests against the interface functions
