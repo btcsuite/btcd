@@ -14,7 +14,13 @@ import (
 )
 
 // testContext is used to store context information about a running test which
-// is passed into helper functions.
+// is passed into helper functions.  The useSpends field indicates whether or
+// not the spend data should be empty or figure it out based on the specific
+// test blocks provided.  This is needed because the first loop where the blocks
+// are inserted, the tests are running against the latest block and therefore
+// none of the outputs can be spent yet.  However, on subsequent runs, all
+// blocks have been inserted and therefore some of the transaction outputs are
+// spent.
 type testContext struct {
 	t           *testing.T
 	dbType      string
@@ -22,6 +28,7 @@ type testContext struct {
 	blockHeight int64
 	blockHash   *btcwire.ShaHash
 	block       *btcutil.Block
+	useSpends   bool
 }
 
 // testInsertBlock ensures InsertBlock conforms to the interface contract.
@@ -201,6 +208,46 @@ func testFetchTxBySha(tc *testContext) bool {
 	return true
 }
 
+// expectedSpentBuf returns the expected transaction spend information depending
+// on the block height and and transaction number.  NOTE: These figures are
+// only valid for the specific set of test data provided at the time these tests
+// were written.  In particular, this means the first 256 blocks of the mainnet
+// block chain.
+//
+// The first run through while the blocks are still being inserted, the tests
+// are running against the latest block and therefore none of the outputs can
+// be spent yet.  However, on subsequent runs, all blocks have been inserted and
+// therefore some of the transaction outputs are spent.
+func expectedSpentBuf(tc *testContext, txNum int) []bool {
+	numTxOut := len(tc.block.MsgBlock().Transactions[txNum].TxOut)
+	spentBuf := make([]bool, numTxOut)
+	if tc.useSpends {
+		if tc.blockHeight == 9 && txNum == 0 {
+			spentBuf[0] = true
+		}
+
+		if tc.blockHeight == 170 && txNum == 1 {
+			spentBuf[1] = true
+		}
+
+		if tc.blockHeight == 181 && txNum == 1 {
+			spentBuf[1] = true
+		}
+
+		if tc.blockHeight == 182 && txNum == 1 {
+			spentBuf[0] = true
+			spentBuf[1] = true
+		}
+
+		if tc.blockHeight == 183 && txNum == 1 {
+			spentBuf[0] = true
+			spentBuf[1] = true
+		}
+	}
+
+	return spentBuf
+}
+
 func testFetchTxByShaListCommon(tc *testContext, includeSpent bool) bool {
 	fetchFunc := tc.db.FetchUnSpentTxByShaList
 	funcName := "FetchUnSpentTxByShaList"
@@ -291,12 +338,12 @@ func testFetchTxByShaListCommon(tc *testContext, includeSpent bool) bool {
 				tc.blockHeight, tc.blockHash, i, txHash)
 			return false
 		}
-		noSpends := make([]bool, len(tx.TxOut))
-		if !reflect.DeepEqual(txD.TxSpent, noSpends) {
+		spentBuf := expectedSpentBuf(tc, i)
+		if !reflect.DeepEqual(txD.TxSpent, spentBuf) {
 			tc.t.Errorf("%s (%s): block #%d (%s) tx #%d (%s) "+
 				"returned unexpected spend data - got %v, "+
 				"want %v", funcName, tc.dbType, tc.blockHeight,
-				tc.blockHash, i, txHash, txD.TxSpent, noSpends)
+				tc.blockHash, i, txHash, txD.TxSpent, spentBuf)
 			return false
 		}
 	}
@@ -416,6 +463,37 @@ func testInterface(t *testing.T, dbType string) {
 
 		if !testFetchBlockShaByHeightErrors(&context) {
 			return
+		}
+	}
+
+	// The data integrity tests must still pass after calling each of the
+	// invalidate cache functions.  This intentionally uses a map since
+	// map iteration is not the same order every run.  This helps catch
+	// issues that could be caused by calling one version before another.
+	context.useSpends = true
+	invalidateCacheFuncs := map[string]func(){
+		"InvalidateBlockCache": db.InvalidateBlockCache,
+		"InvalidateTxCache":    db.InvalidateTxCache,
+		"InvalidateCache":      db.InvalidateCache,
+	}
+	for funcName, invalidateCacheFunc := range invalidateCacheFuncs {
+		t.Logf("Running integrity tests after calling %s", funcName)
+		invalidateCacheFunc()
+
+		for height := int64(0); height < int64(len(blocks)); height++ {
+			// Get the appropriate block and hash and update the
+			// test context accordingly.
+			block := blocks[height]
+			blockHash, err := block.Sha()
+			if err != nil {
+				t.Errorf("block.Sha: %v", err)
+				return
+			}
+			context.blockHeight = height
+			context.blockHash = blockHash
+			context.block = block
+
+			testIntegrity(&context)
 		}
 	}
 
