@@ -1,5 +1,8 @@
-btcd 0.3.0 Alpha - Dependency Commits
--------------------------------------
+Dependency Commits
+==================
+
+btcd 0.3.0 Alpha
+----------------
 btcchain	4151416b16a7b76e54eeec5ae4da7a99f91ad2b9
 btcdb		e4d3f259912ab65f1ee64635bab536ded54b6ef9
 btcec		e748650cc8303352d91afb12270ec0c2d6769064
@@ -10,4 +13,18 @@ btcwire		5f971e10e626cdb48d2ef0dd834d943408274280
 go-flags	b7c08f54e16afa16e5f2194895d25f31fefeb99b
 go-socks	92ce162c38f029f7fa66c4336b8b5168f2c75d78
 goleveldb	88ef664c9e3f806fd3dcd79f2dcb70292f8cf91d
+seelog		6b91ad56123bb473755caa213db2bde5422177bf
+
+btcd 0.3.1 Alpha
+----------------
+btcchain	b7b9823f6cb9e790157ccdb2938f823b400c8a30
+btcdb		3b56ccaff7748219a695a12570c34f57badd253b
+btcec		e748650cc8303352d91afb12270ec0c2d6769064
+btcjson		31489c15b3a178562aa4245a83e353414ddeb044
+btcscript	003a41f66f5840674faa94022bc3cbd8892bb32e
+btcutil		f72ab9cfcef8df68fb81ed820c3bc9f4a378b0f8
+btcwire		fa1d343430ecff479bee0652a7a000aed61f3f6f
+go-flags	91d04d6c04078a9a1b665530c08b758ec2fbef85
+go-socks	92ce162c38f029f7fa66c4336b8b5168f2c75d78
+goleveldb	1d0f0aa639f784f38fa998bdf50911ae8ccbcff3
 seelog		6b91ad56123bb473755caa213db2bde5422177bf
