@@ -72,8 +72,7 @@ func btcdMain() error {
 	listenAddr := net.JoinHostPort("", cfg.Port)
 	server, err := newServer(listenAddr, db, activeNetParams.btcnet)
 	if err != nil {
-		log.Errorf("Unable to start server on %v", listenAddr)
-		log.Errorf("%v", err)
+		log.Errorf("Unable to start server on %v: %v", listenAddr, err)
 		return err
 	}
 	server.Start()
