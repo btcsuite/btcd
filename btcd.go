@@ -40,6 +40,9 @@ func btcdMain() error {
 		loggers = setLogLevel(cfg.DebugLevel)
 	}
 
+	// Show version at startup.
+	log.Infof("Version %s", version())
+
 	// See if we want to enable profiling.
 	if cfg.Profile != "" {
 		go func() {
