@@ -51,6 +51,36 @@ func testInsertBlock(tc *testContext) bool {
 	return true
 }
 
+// testNewestSha ensures the NewestSha returns the values expected by the
+// interface contract.
+func testNewestSha(tc *testContext) bool {
+	// The news block hash and height must be returned without any errors.
+	sha, height, err := tc.db.NewestSha()
+	if err != nil {
+		tc.t.Errorf("NewestSha (%s): block #%d (%s) error %v",
+			tc.dbType, tc.blockHeight, tc.blockHash, err)
+		return false
+	}
+
+	// The returned hash must be the expected value.
+	if !sha.IsEqual(tc.blockHash) {
+		tc.t.Errorf("NewestSha (%s): block #%d (%s) wrong hash got: %s",
+			tc.dbType, tc.blockHeight, tc.blockHash, sha)
+		return false
+
+	}
+
+	// The returned height must be the expected value.
+	if height != tc.blockHeight {
+		tc.t.Errorf("NewestSha (%s): block #%d (%s) wrong height "+
+			"got: %d", tc.dbType, tc.blockHeight, tc.blockHash,
+			height)
+		return false
+	}
+
+	return true
+}
+
 // testExistsSha ensures ExistsSha conforms to the interface contract.
 func testExistsSha(tc *testContext) bool {
 	// The block must exist in the database.
@@ -450,6 +480,12 @@ func testInterface(t *testing.T, dbType string) {
 		// The block must insert without any errors and return the
 		// expected height.
 		if !testInsertBlock(&context) {
+			return
+		}
+
+		// The NewestSha function must return the correct information
+		// about the block that was just inserted.
+		if !testNewestSha(&context) {
 			return
 		}
 
