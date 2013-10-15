@@ -69,6 +69,12 @@ Launch btcd from your Start menu.
 ```bash
 $ ./btcd
 ````
+## Mailing lists
+
+- btcd: discussion of btcd and its packages.
+- btcd-commits: readonly mail-out of source code changes.
+
+To subscribe to a given list, send email to list+subscribe@opensource.conformal.com
 
 ## TODO
 
