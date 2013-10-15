@@ -966,6 +966,12 @@ out:
 			p.handleInvMsg(msg)
 			markConnected = true
 
+		case *btcwire.MsgNotFound:
+			// TODO(davec): Ignore this for now, but ultimately
+			// it should probably be used to detect when something
+			// we requested needs to be re-requested from another
+			// peer.
+
 		case *btcwire.MsgGetData:
 			p.handleGetDataMsg(msg)
 			markConnected = true
