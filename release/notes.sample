@@ -1,0 +1,6 @@
+- Each release note is preceded by a dash
+- Each release note must not exceed 74 characters per line
+- Release notes that require a longer explanation than will fit on a
+  single line should be wrapped with the text indented as in this line
+- No periods at the end of each release note
+- Other minor cleanup and bug fixes
