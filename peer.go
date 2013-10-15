@@ -117,9 +117,8 @@ type peer struct {
 	requestedBlocks    map[btcwire.ShaHash]bool // owned by blockmanager.
 	lastBlock          int32
 	retrycount         int64
-	prevGetBlocksBegin *btcwire.ShaHash
-	prevGetBlocksStop  *btcwire.ShaHash
-	prevGetBlockMutex  sync.Mutex
+	prevGetBlocksBegin *btcwire.ShaHash // owned by blockmanager.
+	prevGetBlocksStop  *btcwire.ShaHash // owned by blockmaanger.
 	requestQueue       *list.List
 	invSendQueue       *list.List
 	continueHash       *btcwire.ShaHash
@@ -369,9 +368,6 @@ func (p *peer) pushBlockMsg(sha *btcwire.ShaHash) error {
 // PushGetBlocksMsg sends a getblocks message for the provided block locator
 // and stop hash.  It will ignore back-to-back duplicate requests.
 func (p *peer) PushGetBlocksMsg(locator btcchain.BlockLocator, stopHash *btcwire.ShaHash) error {
-	p.prevGetBlockMutex.Lock()
-	defer p.prevGetBlockMutex.Unlock()
-
 	// Extract the begin hash from the block locator, if one was specified,
 	// to use for filtering duplicate getblocks requests.
 	// request.
