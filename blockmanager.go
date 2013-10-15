@@ -426,9 +426,6 @@ func (b *blockManager) haveInventory(invVect *btcwire.InvVect) bool {
 
 // handleInvMsg handles inv messages from all peers.
 // We examine the inventory advertised by the remote peer and act accordingly.
-//
-// NOTE: This will need to have tx handling added as well when they are
-// supported.
 func (b *blockManager) handleInvMsg(imsg *invMsg) {
 	// Ignore invs from peers that aren't the sync if we are not current.
 	// Helps prevent fetching a mass of orphans.
