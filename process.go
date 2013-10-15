@@ -53,13 +53,25 @@ func (b *BlockChain) processOrphans(hash *btcwire.ShaHash) error {
 		// accepted.  This will typically only be one, but it could
 		// be multiple if multiple blocks are mined and broadcast
 		// around the same time.  The one with the most proof of work
-		// will eventually win out.
-		for _, orphan := range b.prevOrphans[*processHash] {
+		// will eventually win out.  An indexing for loop is
+		// intentionally used over a range here as range does not
+		// reevaluate the slice on each iteration nor does it adjust the
+		// index for the modified slice.
+		for i := 0; i < len(b.prevOrphans[*processHash]); i++ {
+			orphan := b.prevOrphans[*processHash][i]
+			if orphan == nil {
+				log.Warnf("Found a nil entry at index %d in the "+
+					"orphan dependency list for block %v", i,
+					processHash)
+				continue
+			}
+
 			// Remove the orphan from the orphan pool.
 			// It's safe to ignore the error on Sha since the hash
 			// is already cached.
 			orphanHash, _ := orphan.block.Sha()
 			b.removeOrphanBlock(orphan)
+			i--
 
 			// Potentially accept the block into the block chain.
 			err := b.maybeAcceptBlock(orphan.block)
