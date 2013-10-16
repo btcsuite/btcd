@@ -30,7 +30,11 @@ type params struct {
 }
 
 // mainNetParams contains parameters specific to the main network
-// (btcwire.MainNet).
+// (btcwire.MainNet).  NOTE: The RPC port is intentionally different than the
+// reference implementation because btcd does not handle wallet requests.  The
+// separate wallet process listens on the well-known port and forwards requests
+// it does not handle on to btcd.  This approach allows the wallet process
+// to emulate the full reference implementation RPC API.
 var mainNetParams = params{
 	netName:      "mainnet",
 	btcnet:       btcwire.MainNet,
@@ -40,7 +44,7 @@ var mainNetParams = params{
 	powLimitBits: btcchain.ChainParams(btcwire.MainNet).PowLimitBits,
 	listenPort:   btcwire.MainPort,
 	peerPort:     btcwire.MainPort,
-	rpcPort:      "8332",
+	rpcPort:      "8334",
 	dnsSeeds: []string{
 		"seed.bitcoin.sipa.be",
 		"dnsseed.bluematt.me",
@@ -50,7 +54,8 @@ var mainNetParams = params{
 }
 
 // regressionParams contains parameters specific to the regression test network
-// (btcwire.TestNet).
+// (btcwire.TestNet).  NOTE: The RPC port is intentionally different than the
+// reference implementation - see the mainNetParams comment for details.
 var regressionParams = params{
 	netName:      "regtest",
 	btcnet:       btcwire.TestNet,
@@ -60,12 +65,13 @@ var regressionParams = params{
 	powLimitBits: btcchain.ChainParams(btcwire.TestNet).PowLimitBits,
 	listenPort:   btcwire.RegressionTestPort,
 	peerPort:     btcwire.TestNetPort,
-	rpcPort:      "18332",
+	rpcPort:      "18334",
 	dnsSeeds:     []string{},
 }
 
 // testNet3Params contains parameters specific to the test network (version 3)
-// (btcwire.TestNet3).
+// (btcwire.TestNet3).  NOTE: The RPC port is intentionally different than the
+// reference implementation - see the mainNetParams comment for details.
 var testNet3Params = params{
 	netName:      "testnet",
 	btcnet:       btcwire.TestNet3,
@@ -75,7 +81,7 @@ var testNet3Params = params{
 	powLimitBits: btcchain.ChainParams(btcwire.TestNet3).PowLimitBits,
 	listenPort:   btcwire.TestNetPort,
 	peerPort:     btcwire.TestNetPort,
-	rpcPort:      "18332",
+	rpcPort:      "18334",
 	dnsSeeds: []string{
 		"testnet-seed.bitcoin.petertodd.org",
 		"testnet-seed.bluematt.me",

@@ -12,7 +12,7 @@ import (
 const (
 	User     = "rpcuser"
 	Password = "rpcpass"
-	Server   = "127.0.0.1:8332"
+	Server   = "127.0.0.1:8334"
 )
 
 var (
