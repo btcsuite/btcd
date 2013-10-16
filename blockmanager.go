@@ -543,7 +543,7 @@ func (b *blockManager) handleInvMsg(imsg *invMsg) {
 		}
 	}
 	if len(gdmsg.InvList) > 0 {
-		imsg.peer.QueueMessage(gdmsg)
+		imsg.peer.QueueMessage(gdmsg, nil)
 	}
 }
 

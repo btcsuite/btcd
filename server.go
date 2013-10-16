@@ -193,7 +193,7 @@ func (s *server) handleBroadcastMsg(peers *list.List, bmsg *broadcastMsg) {
 			excluded = true
 		}
 		if !excluded {
-			p.QueueMessage(bmsg.message)
+			p.QueueMessage(bmsg.message, nil)
 		}
 	}
 }
