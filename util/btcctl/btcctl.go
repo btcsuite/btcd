@@ -2,38 +2,50 @@ package main
 
 import (
 	"errors"
-	"flag"
 	"fmt"
 	"github.com/conformal/btcjson"
+	"github.com/conformal/go-flags"
 	"github.com/davecgh/go-spew/spew"
+	"os"
 	"strconv"
 )
 
-const (
-	User     = "rpcuser"
-	Password = "rpcpass"
-	Server   = "127.0.0.1:8334"
-)
+type config struct {
+	Help        bool   `short:"h" long:"help" description:"Help"`
+	RpcUser     string `short:"u" description:"RPC username"`
+	RpcPassword string `short:"P" long:"rpcpass" description:"RPC password"`
+	RpcServer   string `short:"s" long:"rpcserver" description:"RPC server to connect to"`
+}
 
 var (
 	ErrNoData = errors.New("No data returned.")
 )
 
 func main() {
-	flag.Parse()
+	cfg := config{
+		RpcServer: "127.0.0.1:8334",
+	}
+	parser := flags.NewParser(&cfg, flags.None)
 
-	args := flag.Args()
-	if len(args) < 1 {
-		usage()
+	args, err := parser.Parse()
+	if err != nil {
+		if e, ok := err.(*flags.Error); !ok || e.Type != flags.ErrHelp {
+			usage(parser)
+		}
+		return
+	}
+
+	if len(args) < 1 || cfg.Help {
+		usage(parser)
 		return
 	}
 
 	switch args[0] {
 	default:
-		usage()
+		usage(parser)
 	case "getblock":
 		if len(args) != 2 {
-			usage()
+			usage(parser)
 			break
 		}
 		msg, err := btcjson.CreateMessage("getblock", args[1])
@@ -41,7 +53,7 @@ func main() {
 			fmt.Printf("CreateMessage: %v\n", err)
 			break
 		}
-		reply, err := send(msg)
+		reply, err := send(&cfg, msg)
 		if err != nil {
 			fmt.Printf("RpcCommand: %v\n", err)
 			break
@@ -53,7 +65,7 @@ func main() {
 			fmt.Printf("CreateMessage: %v\n", err)
 			break
 		}
-		reply, err := send(msg)
+		reply, err := send(&cfg, msg)
 		if err != nil {
 			fmt.Printf("RpcCommand: %v\n", err)
 			break
@@ -61,7 +73,7 @@ func main() {
 		fmt.Printf("%d\n", int(reply.(float64)))
 	case "getblockhash":
 		if len(args) != 2 {
-			usage()
+			usage(parser)
 			break
 		}
 		idx, err := strconv.Atoi(args[1])
@@ -74,7 +86,7 @@ func main() {
 			fmt.Printf("CreateMessage: %v\n", err)
 			break
 		}
-		reply, err := send(msg)
+		reply, err := send(&cfg, msg)
 		if err != nil {
 			fmt.Printf("RpcCommand: %v\n", err)
 			break
@@ -86,7 +98,7 @@ func main() {
 			fmt.Printf("CreateMessage: %v\n", err)
 			break
 		}
-		reply, err := send(msg)
+		reply, err := send(&cfg, msg)
 		if err != nil {
 			fmt.Printf("RpcCommand: %v\n", err)
 			break
@@ -94,7 +106,7 @@ func main() {
 		fmt.Printf("%v\n", reply.(bool))
 	case "getrawtransaction":
 		if len(args) != 2 {
-			usage()
+			usage(parser)
 			break
 		}
 		msg, err := btcjson.CreateMessage("getrawtransaction", args[1], 1)
@@ -102,7 +114,7 @@ func main() {
 			fmt.Printf("CreateMessage: %v\n", err)
 			break
 		}
-		reply, err := send(msg)
+		reply, err := send(&cfg, msg)
 		if err != nil {
 			fmt.Printf("RpcCommand: %v\n", err)
 			break
@@ -114,7 +126,7 @@ func main() {
 			fmt.Printf("CreateMessage: %v\n", err)
 			break
 		}
-		reply, err := send(msg)
+		reply, err := send(&cfg, msg)
 		if err != nil {
 			fmt.Printf("RpcCommand: %v\n", err)
 			break
@@ -123,8 +135,8 @@ func main() {
 	}
 }
 
-func send(msg []byte) (interface{}, error) {
-	reply, err := btcjson.RpcCommand(User, Password, Server, msg)
+func send(cfg *config, msg []byte) (interface{}, error) {
+	reply, err := btcjson.RpcCommand(cfg.RpcUser, cfg.RpcPassword, cfg.RpcServer, msg)
 	if err != nil {
 		return 0, err
 	}
@@ -135,13 +147,14 @@ func send(msg []byte) (interface{}, error) {
 	return reply.Result, nil
 }
 
-func usage() {
-	fmt.Printf(
-		"usage:\n" +
-			"\tgetblock <blockhash>\n" +
-			"\tgetblockcount\n" +
-			"\tgetblockhash <blocknumber>\n" +
-			"\tgetgenerate\n" +
-			"\tgetrawtransaction <txhash>\n" +
+func usage(parser *flags.Parser) {
+	parser.WriteHelp(os.Stderr)
+	fmt.Fprintf(os.Stderr,
+		"\nCommands:\n"+
+			"\tgetblock <blockhash>\n"+
+			"\tgetblockcount\n"+
+			"\tgetblockhash <blocknumber>\n"+
+			"\tgetgenerate\n"+
+			"\tgetrawtransaction <txhash>\n"+
 			"\tstop\n")
 }
