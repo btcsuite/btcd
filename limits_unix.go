@@ -2,7 +2,7 @@
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
-// +build !windows
+// +build !windows,!plan9
 
 package main
 
