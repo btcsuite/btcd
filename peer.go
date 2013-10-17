@@ -938,7 +938,7 @@ func (p *peer) inHandler() {
 		// matter.
 		if p.versionKnown {
 			log.Warnf("Peer %s no answer for %d minutes, "+
-				"disconnecting", idleTimeoutMinutes, p)
+				"disconnecting", p, idleTimeoutMinutes)
 		}
 		p.Disconnect()
 	})
