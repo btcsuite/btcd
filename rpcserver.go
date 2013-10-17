@@ -539,8 +539,12 @@ func jsonRead(body []byte, s *rpcServer) (reply btcjson.Reply, err error) {
 
 	case "getrawmempool":
 		hashes := s.server.txMemPool.TxShas()
+		hashStrings := make([]string, len(hashes))
+		for i := 0; i < len(hashes); i++ {
+			hashStrings[i] = hashes[i].String()
+		}
 		reply = btcjson.Reply{
-			Result: hashes,
+			Result: hashStrings,
 			Id:     &message.Id,
 		}
 
