@@ -537,6 +537,13 @@ func jsonRead(body []byte, s *rpcServer) (reply btcjson.Reply, err error) {
 			Id:     &message.Id,
 		}
 
+	case "getrawmempool":
+		hashes := s.server.txMemPool.TxShas()
+		reply = btcjson.Reply{
+			Result: hashes,
+			Id:     &message.Id,
+		}
+
 	case "getrawtransaction":
 		// TODO: Perform smarter paramter parsing.
 		var f interface{}
