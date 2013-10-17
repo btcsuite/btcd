@@ -43,6 +43,34 @@ func main() {
 	switch args[0] {
 	default:
 		usage(parser)
+	case "decoderawtransaction":
+		if len(args) != 2 {
+			usage(parser)
+			break
+		}
+		msg, err := btcjson.CreateMessage("decoderawtransaction", args[1])
+		if err != nil {
+			fmt.Printf("CreateMessage: %v\n", err)
+			break
+		}
+		reply, err := send(&cfg, msg)
+		if err != nil {
+			fmt.Printf("RpcCommand: %v\n", err)
+			break
+		}
+		spew.Dump(reply)
+	case "getbestblockhash":
+		msg, err := btcjson.CreateMessage("getbestblockhash")
+		if err != nil {
+			fmt.Printf("CreateMessage: %v\n", err)
+			break
+		}
+		reply, err := send(&cfg, msg)
+		if err != nil {
+			fmt.Printf("RpcCommand: %v\n", err)
+			break
+		}
+		fmt.Printf("%s\n", reply.(string))
 	case "getblock":
 		if len(args) != 2 {
 			usage(parser)
@@ -92,6 +120,18 @@ func main() {
 			break
 		}
 		fmt.Printf("%v\n", reply)
+	case "getdifficulty":
+		msg, err := btcjson.CreateMessage("getdifficulty")
+		if err != nil {
+			fmt.Printf("CreateMessage: %v\n", err)
+			break
+		}
+		reply, err := send(&cfg, msg)
+		if err != nil {
+			fmt.Printf("RpcCommand: %v\n", err)
+			break
+		}
+		fmt.Printf("%f\n", reply.(float64))
 	case "getgenerate":
 		msg, err := btcjson.CreateMessage("getgenerate")
 		if err != nil {
@@ -104,6 +144,18 @@ func main() {
 			break
 		}
 		fmt.Printf("%v\n", reply.(bool))
+	case "getrawmempool":
+		msg, err := btcjson.CreateMessage("getrawmempool")
+		if err != nil {
+			fmt.Printf("CreateMessage: %v\n", err)
+			break
+		}
+		reply, err := send(&cfg, msg)
+		if err != nil {
+			fmt.Printf("RpcCommand: %v\n", err)
+			break
+		}
+		spew.Dump(reply)
 	case "getrawtransaction":
 		if len(args) != 2 {
 			usage(parser)
@@ -151,10 +203,14 @@ func usage(parser *flags.Parser) {
 	parser.WriteHelp(os.Stderr)
 	fmt.Fprintf(os.Stderr,
 		"\nCommands:\n"+
+			"\tdecoderawtransaction <txhash>\n"+
+			"\tgetbestblockhash\n"+
 			"\tgetblock <blockhash>\n"+
 			"\tgetblockcount\n"+
 			"\tgetblockhash <blocknumber>\n"+
+			"\tgetdifficulty\n"+
 			"\tgetgenerate\n"+
+			"\tgetrawmempool\n"+
 			"\tgetrawtransaction <txhash>\n"+
 			"\tstop\n")
 }
