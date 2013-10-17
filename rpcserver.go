@@ -357,7 +357,7 @@ func jsonRead(body []byte, s *rpcServer) (reply btcjson.Reply, err error) {
 			return
 		}
 		reply = btcjson.Reply{
-			Result: sha,
+			Result: sha.String(),
 			Id:     &message.Id,
 		}
 
