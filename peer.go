@@ -1262,7 +1262,6 @@ func newPeerBase(s *server, inbound bool) *peer {
 		protocolVersion: btcwire.ProtocolVersion,
 		btcnet:          s.btcnet,
 		services:        btcwire.SFNodeNetwork,
-		timeConnected:   time.Now(),
 		inbound:         inbound,
 		knownAddresses:  make(map[string]bool),
 		knownInventory:  NewMruInventoryMap(maxKnownInventory),
@@ -1285,6 +1284,7 @@ func newInboundPeer(s *server, conn net.Conn) *peer {
 	p := newPeerBase(s, true)
 	p.conn = conn
 	p.addr = conn.RemoteAddr().String()
+	p.timeConnected = time.Now()
 	atomic.AddInt32(&p.connected, 1)
 	return p
 }
@@ -1362,6 +1362,7 @@ func newOutboundPeer(s *server, addr string, persistent bool) *peer {
 			// may have scheduled a shutdown.  In that case ditch
 			// the peer immediately.
 			if atomic.LoadInt32(&p.disconnect) == 0 {
+				p.timeConnected = time.Now()
 				p.server.addrManager.Attempt(p.na)
 
 				// Connection was successful so log it and start peer.
