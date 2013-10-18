@@ -113,6 +113,8 @@ type peer struct {
 	addr               string
 	na                 *btcwire.NetAddress
 	timeConnected      time.Time
+	lastSend	   time.Time
+	lastRecv	   time.Time
 	inbound            bool
 	connected          int32
 	disconnect         int32 // only to be used atomically
@@ -962,6 +964,7 @@ out:
 			}
 			break out
 		}
+		p.lastRecv = time.Now()
 
 		// Ensure version message comes first.
 		if _, ok := rmsg.(*btcwire.MsgVersion); !ok && !p.versionKnown {
@@ -1111,6 +1114,7 @@ out:
 				pingTimer.Reset(pingTimeoutMinutes * time.Minute)
 			}
 			p.writeMessage(msg.msg)
+			p.lastSend = time.Now()
 			if msg.doneChan != nil {
 				msg.doneChan <- true
 			}
