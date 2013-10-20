@@ -207,6 +207,7 @@ func (s *rpcServer) Stop() error {
 func newRPCServer(s *server) (*rpcServer, error) {
 	rpc := rpcServer{
 		server: s,
+		quit:   make(chan int),
 	}
 	// Get values from config
 	rpc.rpcport = cfg.RPCPort
