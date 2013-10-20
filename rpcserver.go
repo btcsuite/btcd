@@ -859,15 +859,18 @@ func jsonWSRead(walletNotification chan []byte, replychan chan *btcjson.Reply, b
 					return err
 				}
 				txList := s.server.db.FetchTxByShaList(txShaList)
-				for j := range txList {
-					for _, txout := range txList[j].Tx.TxOut {
+				for _, txReply := range txList {
+					if txReply.Err != nil || txReply.Tx == nil {
+						continue
+					}
+					for _, txout := range txReply.Tx.TxOut {
 						_, txaddrhash, err := btcscript.ScriptToAddrHash(txout.PkScript)
 						if err != nil {
 							return err
 						}
 						if !bytes.Equal(addrhash, txaddrhash) {
 							reply := btcjson.Reply{
-								Result: txList[j].Sha,
+								Result: txReply.Sha,
 								Error:  nil,
 								Id:     &message.Id,
 							}
@@ -1253,9 +1256,11 @@ func (s *rpcServer) NotifyNewTxListeners(db btcdb.Db, block *btcutil.Block) {
 		return
 	}
 	txList := db.FetchTxByShaList(txShaList)
-	for _, tx := range txList {
-		go s.newBlockNotifyCheckTxIn(tx.Tx.TxIn)
-		go s.newBlockNotifyCheckTxOut(db, block, tx)
+	for _, txReply := range txList {
+		if txReply.Err == nil && txReply.Tx != nil {
+			go s.newBlockNotifyCheckTxIn(txReply.Tx.TxIn)
+			go s.newBlockNotifyCheckTxOut(db, block, txReply)
+		}
 	}
 }
 
