@@ -120,6 +120,18 @@ func main() {
 			break
 		}
 		fmt.Printf("%v\n", reply)
+	case "getconnectioncount":
+		msg, err := btcjson.CreateMessage("getconnectioncount")
+		if err != nil {
+			fmt.Printf("CreateMessage: %v\n", err)
+			break
+		}
+		reply, err := send(&cfg, msg)
+		if err != nil {
+			fmt.Printf("RpcCommand: %v\n", err)
+			break
+		}
+		fmt.Printf("%d\n", int(reply.(float64)))
 	case "getdifficulty":
 		msg, err := btcjson.CreateMessage("getdifficulty")
 		if err != nil {
@@ -190,11 +202,14 @@ func main() {
 func send(cfg *config, msg []byte) (interface{}, error) {
 	reply, err := btcjson.RpcCommand(cfg.RpcUser, cfg.RpcPassword, cfg.RpcServer, msg)
 	if err != nil {
-		return 0, err
+		return nil, err
+	}
+	if reply.Error != nil {
+		return nil, reply.Error
 	}
 	if reply.Result == nil {
 		err := ErrNoData
-		return 0, err
+		return nil, err
 	}
 	return reply.Result, nil
 }
@@ -208,6 +223,7 @@ func usage(parser *flags.Parser) {
 			"\tgetblock <blockhash>\n"+
 			"\tgetblockcount\n"+
 			"\tgetblockhash <blocknumber>\n"+
+			"\tgetconnectioncount\n"+
 			"\tgetdifficulty\n"+
 			"\tgetgenerate\n"+
 			"\tgetrawmempool\n"+
