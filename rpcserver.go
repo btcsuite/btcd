@@ -362,6 +362,14 @@ func jsonRead(body []byte, s *rpcServer) (reply btcjson.Reply, err error) {
 			Id:     &message.Id,
 		}
 
+	case "getconnectioncount":
+		var count int
+
+		reply = btcjson.Reply{
+			Result: count,
+			Id:     &message.Id,
+		}
+
 	case "getdifficulty":
 		var sha *btcwire.ShaHash
 		sha, _, err = s.server.db.NewestSha()
