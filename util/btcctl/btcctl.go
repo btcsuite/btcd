@@ -43,6 +43,22 @@ func main() {
 	switch args[0] {
 	default:
 		usage(parser)
+	case "addnode":
+		if len(args) != 3 {
+			usage(parser)
+			break
+		}
+		msg, err := btcjson.CreateMessage("addnode", args[1], args[2])
+		if err != nil {
+			fmt.Printf("CreateMessage: %v\n", err)
+			break
+		}
+		reply, err := send(&cfg, msg)
+		if err != nil {
+			fmt.Printf("RpcCommand: %v\n", err)
+			break
+		}
+		spew.Dump(reply)
 	case "decoderawtransaction":
 		if len(args) != 2 {
 			usage(parser)
@@ -230,6 +246,7 @@ func usage(parser *flags.Parser) {
 	parser.WriteHelp(os.Stderr)
 	fmt.Fprintf(os.Stderr,
 		"\nCommands:\n"+
+			"\taddnode <ip> <add/remove/onetry>\n"+
 			"\tdecoderawtransaction <txhash>\n"+
 			"\tgetbestblockhash\n"+
 			"\tgetblock <blockhash>\n"+
