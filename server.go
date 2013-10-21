@@ -60,6 +60,7 @@ type server struct {
 	donePeers     chan *peer
 	banPeers      chan *peer
 	wakeup        chan bool
+	query         chan interface{}
 	relayInv      chan *btcwire.InvVect
 	broadcast     chan broadcastMsg
 	wg            sync.WaitGroup
@@ -198,6 +199,75 @@ func (s *server) handleBroadcastMsg(peers *list.List, bmsg *broadcastMsg) {
 	}
 }
 
+type PeerInfo struct {
+	Addr           string
+	Services       btcwire.ServiceFlag
+	LastSend       time.Time
+	LastRecv       time.Time
+	BytesSent      int
+	BytesRecv      int
+	ConnTime       time.Time
+	Version        uint32
+	SubVer         string
+	Inbound        bool
+	StartingHeight int32
+	BanScore       int
+	SyncNode       bool
+}
+
+type getConnCountMsg struct {
+	reply chan int
+}
+
+type getPeerInfoMsg struct {
+	reply chan []*PeerInfo
+}
+
+
+func (s *server) handleQuery(querymsg interface{}, peers *list.List, bannedPeers map[string]time.Time) {
+	switch msg := querymsg.(type) {
+	case getConnCountMsg:
+		nconnected := 0
+		for e := peers.Front(); e != nil; e = e.Next() {
+			peer := e.Value.(*peer)
+			if peer.Connected() {
+				nconnected++
+			}
+		}
+
+		msg.reply <- nconnected
+	case getPeerInfoMsg:
+		infos := make([]*PeerInfo, 0, peers.Len())
+		for e := peers.Front(); e != nil; e = e.Next() {
+			peer := e.Value.(*peer)
+			if !peer.Connected() {
+				continue
+			}
+			// A lot of this will make the race detector go mad,
+			// however it is statistics for purely informational purposes
+			// and we don't really care if they are raced to get the new
+			// version.
+			info := &PeerInfo{
+				Addr:           peer.addr,
+				Services:       peer.services,
+				LastSend:       peer.lastSend,
+				LastRecv:       peer.lastRecv,
+				BytesSent:      0, // TODO(oga) we need this from wire.
+				BytesRecv:      0, // TODO(oga) we need this from wire.
+				ConnTime:       peer.timeConnected,
+				Version:        peer.protocolVersion,
+				SubVer:         "unknown",
+				Inbound:        peer.inbound,
+				StartingHeight: peer.lastBlock,
+				BanScore:       0,
+				SyncNode:       false, // TODO(oga) for now. bm knows this.
+			}
+			infos = append(infos, info)
+		}
+		msg.reply <- infos
+	}
+}
+
 // listenHandler is the main listener which accepts incoming connections for the
 // server.  It must be run as a goroutine.
 func (s *server) listenHandler(listener net.Listener) {
@@ -332,6 +402,9 @@ out:
 		case <-s.wakeup:
 			// this page left intentionally blank
 
+		case qmsg := <-s.query:
+			s.handleQuery(qmsg, peers, bannedPeers)
+
 		// Shutdown the peer handler.
 		case <-s.quit:
 			// Shutdown peers.
@@ -454,6 +527,22 @@ func (s *server) BroadcastMessage(msg btcwire.Message, exclPeers ...*peer) {
 	// broadcast and refrain from broadcasting again.
 	bmsg := broadcastMsg{message: msg, excludePeers: exclPeers}
 	s.broadcast <- bmsg
+}
+
+func (s *server) ConnectedCount() int {
+	replyChan := make(chan int)
+
+	s.query <- getConnCountMsg{reply: replyChan}
+
+	return <-replyChan
+}
+
+func (s *server) PeerInfo() []*PeerInfo {
+	replyChan := make(chan []*PeerInfo)
+
+	s.query <- getPeerInfoMsg{reply: replyChan}
+
+	return <-replyChan
 }
 
 // Start begins accepting connections from peers.
@@ -594,6 +683,7 @@ func newServer(addr string, db btcdb.Db, btcnet btcwire.BitcoinNet) (*server, er
 		donePeers:   make(chan *peer, cfg.MaxPeers),
 		banPeers:    make(chan *peer, cfg.MaxPeers),
 		wakeup:      make(chan bool),
+		query:       make(chan interface{}),
 		relayInv:    make(chan *btcwire.InvVect, cfg.MaxPeers),
 		broadcast:   make(chan broadcastMsg, cfg.MaxPeers),
 		quit:        make(chan bool),

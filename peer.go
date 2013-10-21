@@ -113,8 +113,8 @@ type peer struct {
 	addr               string
 	na                 *btcwire.NetAddress
 	timeConnected      time.Time
-	lastSend	   time.Time
-	lastRecv	   time.Time
+	lastSend           time.Time
+	lastRecv           time.Time
 	inbound            bool
 	connected          int32
 	disconnect         int32 // only to be used atomically

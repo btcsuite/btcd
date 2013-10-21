@@ -320,6 +320,7 @@ var handlers = map[string]commandHandler{
 	"getdifficulty":        handleGetDifficulty,
 	"getgenerate":          handleGetGenerate,
 	"gethashespersec":      handleGetHashesPerSec,
+	"getpeerinfo":          handleGetPeerInfo,
 	"getrawmempool":        handleGetRawMempool,
 	"getrawtransaction":    handleGetRawTransaction,
 	"sendrawtransaction":   handleSendRawTransaction,
@@ -434,8 +435,7 @@ func handleGetBlockHash(s *rpcServer, cmd btcjson.Cmd, walletNotification chan [
 
 // handleGetConnectionCount implements the getconnectioncount command.
 func handleGetConnectionCount(s *rpcServer, cmd btcjson.Cmd, walletNotification chan []byte) (interface{}, error) {
-	// TODO fillmein.
-	return 0, nil
+	return s.server.ConnectedCount(), nil
 }
 
 // handleGetDifficulty implements the getdifficulty command.
@@ -465,6 +465,11 @@ func handleGetGenerate(s *rpcServer, cmd btcjson.Cmd, walletNotification chan []
 func handleGetHashesPerSec(s *rpcServer, cmd btcjson.Cmd, walletNotification chan []byte) (interface{}, error) {
 	// btcd does not do mining so we can hardcode replies here.
 	return 0, nil
+}
+
+// handleGetPeerInfo implements the getpeerinfo command.
+func handleGetPeerInfo(s *rpcServer, cmd btcjson.Cmd, walletNotification chan []byte) (interface{}, error) {
+	return	s.server.PeerInfo(), nil
 }
 
 // handleGetRawMempool implements the getrawmempool command.
