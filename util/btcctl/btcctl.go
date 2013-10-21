@@ -156,6 +156,18 @@ func main() {
 			break
 		}
 		fmt.Printf("%v\n", reply.(bool))
+	case "getpeerinfo":
+		msg, err := btcjson.CreateMessage("getpeerinfo")
+		if err != nil {
+			fmt.Printf("CreateMessage: %v\n", err)
+			break
+		}
+		reply, err := send(&cfg, msg)
+		if err != nil {
+			fmt.Printf("RpcCommand: %v\n", err)
+			break
+		}
+		spew.Dump(reply)
 	case "getrawmempool":
 		msg, err := btcjson.CreateMessage("getrawmempool")
 		if err != nil {
@@ -226,6 +238,7 @@ func usage(parser *flags.Parser) {
 			"\tgetconnectioncount\n"+
 			"\tgetdifficulty\n"+
 			"\tgetgenerate\n"+
+			"\tgetpeerinfo\n"+
 			"\tgetrawmempool\n"+
 			"\tgetrawtransaction <txhash>\n"+
 			"\tstop\n")
