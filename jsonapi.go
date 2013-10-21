@@ -283,7 +283,7 @@ func CreateMessageWithId(message string, id interface{}, args ...interface{}) ([
 		}
 		finalMessage, err = jsonWithArgs(message, id, args)
 	// Two required strings
-	case "setaccount", "signmessage", "walletpassphrasechange":
+	case "setaccount", "signmessage", "walletpassphrasechange", "addnode":
 		if len(args) != 2 {
 			err = fmt.Errorf("Missing arguments for %s", message)
 			return finalMessage, err
@@ -374,7 +374,7 @@ func CreateMessageWithId(message string, id interface{}, args ...interface{}) ([
 		}
 		finalMessage, err = jsonWithArgs(message, id, args)
 	// One required string, one optional int
-	case "addnode", "getrawtransaction", "getreceivedbyaddress":
+	case "getrawtransaction", "getreceivedbyaddress":
 		if len(args) > 2 || len(args) == 0 {
 			err = fmt.Errorf("Wrong number of argument for %s", message)
 			return finalMessage, err
