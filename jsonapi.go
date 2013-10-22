@@ -388,6 +388,25 @@ func CreateMessageWithId(message string, id interface{}, args ...interface{}) ([
 			return finalMessage, err
 		}
 		finalMessage, err = jsonWithArgs(message, id, args)
+	// One required string, one optional string
+	// Strictly, the optional arg for submit block is an object, but
+	// bitcoind ignores it for now, so best to just allow string until
+	// support for it is complete.
+	case "submitblock":
+		if len(args) > 2 || len(args) == 0 {
+			err = fmt.Errorf("Wrong number of argument for %s", message)
+			return finalMessage, err
+		}
+		_, ok1 := args[0].(string)
+		ok2 := true
+		if len(args) == 2 {
+			_, ok2 = args[1].(string)
+		}
+		if !ok1 || !ok2 {
+			err = fmt.Errorf("Arguments must be string and optionally string for %s", message)
+			return finalMessage, err
+		}
+		finalMessage, err = jsonWithArgs(message, id, args)
 	// One optional int, one optional bool
 	case "listreceivedbyaccount", "listreceivedbyaddress":
 		if len(args) > 2 {
