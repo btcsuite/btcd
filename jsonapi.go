@@ -191,11 +191,10 @@ func CreateMessage(message string, args ...interface{}) ([]byte, error) {
 	return finalMessage, err
 }
 
-// CreateMessage takes a string, an id,  and the optional arguments for it.
-// Then, if it is a recognized bitcoin json message, generates the json message
-//  ready to send off to the daemon or server.
-// It is capable of handeling all of the commands from the standard client,
-// described at:
+// CreateMessageWithId takes a string, an id, and the optional arguments for
+// it. Then, if it is a recognized bitcoin json message, generates the json
+// message ready to send off to the daemon or server. It is capable of handling
+// all of the commands from the standard client, described at:
 // https://en.bitcoin.it/wiki/Original_Bitcoin_client/API_Calls_list
 func CreateMessageWithId(message string, id interface{}, args ...interface{}) ([]byte, error) {
 	var finalMessage []byte
