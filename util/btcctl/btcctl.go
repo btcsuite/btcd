@@ -225,7 +225,7 @@ func main() {
 		}
 		os.Exit(1)
 	}
-	if cfg.Help {
+	if len(args) < 1 || cfg.Help {
 		usage(parser)
 		return
 	}
