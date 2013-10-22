@@ -282,10 +282,7 @@ func jsonRPCRead(w http.ResponseWriter, r *http.Request, s *rpcServer) {
 func jsonRead(body []byte, s *rpcServer) (reply btcjson.Reply, err error) {
 	var message btcjson.Message
 	if err := json.Unmarshal(body, &message); err != nil {
-		jsonError := btcjson.Error{
-			Code:    -32700,
-			Message: "Parse error",
-		}
+		jsonError := btcjson.ErrParse
 
 		reply = btcjson.Reply{
 			Result: nil,
@@ -309,6 +306,9 @@ func jsonRead(body []byte, s *rpcServer) (reply btcjson.Reply, err error) {
 				}
 				err = errors.New(jsonErr.Message)
 			} else {
+				// In the case where we did not have a btcjson
+				// error to begin with, make a new one to send,
+				// but this really should not happen.
 				rawJSONError := btcjson.Error{
 					Code:    -32603,
 					Message: err.Error(),
@@ -335,10 +335,7 @@ func jsonRead(body []byte, s *rpcServer) (reply btcjson.Reply, err error) {
 		_, maxidx, err = s.server.db.NewestSha()
 		if err != nil {
 			log.Errorf("RPCS: Error getting newest sha: %v", err)
-			err = btcjson.Error{
-				Code:    -5,
-				Message: "Error getting block count",
-			}
+			err = btcjson.ErrBlockCount
 			return
 		}
 		reply = btcjson.Reply{
@@ -351,10 +348,7 @@ func jsonRead(body []byte, s *rpcServer) (reply btcjson.Reply, err error) {
 		sha, _, err = s.server.db.NewestSha()
 		if err != nil {
 			log.Errorf("RPCS: Error getting newest sha: %v", err)
-			err = btcjson.Error{
-				Code:    -5,
-				Message: "Error getting best block hash",
-			}
+			err = btcjson.ErrBestBlockHash
 			return
 		}
 		reply = btcjson.Reply{
@@ -375,20 +369,14 @@ func jsonRead(body []byte, s *rpcServer) (reply btcjson.Reply, err error) {
 		sha, _, err = s.server.db.NewestSha()
 		if err != nil {
 			log.Errorf("RPCS: Error getting sha: %v", err)
-			err = btcjson.Error{
-				Code:    -5,
-				Message: "Error Getting difficulty",
-			}
+			err = btcjson.ErrDifficulty
 			return
 		}
 		var blk *btcutil.Block
 		blk, err = s.server.db.FetchBlockBySha(sha)
 		if err != nil {
 			log.Errorf("RPCS: Error getting block: %v", err)
-			err = btcjson.Error{
-				Code:    -5,
-				Message: "Error Getting difficulty",
-			}
+			err = btcjson.ErrDifficulty
 			return
 		}
 		blockHeader := &blk.MsgBlock().Header
@@ -434,10 +422,7 @@ func jsonRead(body []byte, s *rpcServer) (reply btcjson.Reply, err error) {
 		sha, err = s.server.db.FetchBlockShaByHeight(int64(idx))
 		if err != nil {
 			log.Errorf("[RCPS] Error getting block: %v", err)
-			err = btcjson.Error{
-				Code:    -1,
-				Message: "Block number out of range.",
-			}
+			err = btcjson.ErrOutOfRange
 			return
 		}
 		reply = btcjson.Reply{
@@ -463,31 +448,21 @@ func jsonRead(body []byte, s *rpcServer) (reply btcjson.Reply, err error) {
 		sha, err = btcwire.NewShaHashFromStr(hash)
 		if err != nil {
 			log.Errorf("RPCS: Error generating sha: %v", err)
-			err = btcjson.Error{
-				Code:    -5,
-				Message: "Block not found",
-			}
+			err = btcjson.ErrBlockNotFound
 			return
 		}
 		var blk *btcutil.Block
 		blk, err = s.server.db.FetchBlockBySha(sha)
 		if err != nil {
 			log.Errorf("RPCS: Error fetching sha: %v", err)
-			err = btcjson.Error{
-				Code:    -5,
-				Message: "Block not found",
-			}
-			return
+			err = btcjson.ErrBlockNotFound
 		}
 		idx := blk.Height()
 		var buf []byte
 		buf, err = blk.Bytes()
 		if err != nil {
 			log.Errorf("RPCS: Error fetching block: %v", err)
-			err = btcjson.Error{
-				Code:    -5,
-				Message: "Block not found",
-			}
+			err = btcjson.ErrBlockNotFound
 			return
 		}
 
@@ -502,10 +477,7 @@ func jsonRead(body []byte, s *rpcServer) (reply btcjson.Reply, err error) {
 		_, maxidx, err = s.server.db.NewestSha()
 		if err != nil {
 			log.Errorf("RPCS: Cannot get newest sha: %v", err)
-			err = btcjson.Error{
-				Code:    -5,
-				Message: "Block not found",
-			}
+			err = btcjson.ErrBlockNotFound
 			return
 		}
 
@@ -531,10 +503,7 @@ func jsonRead(body []byte, s *rpcServer) (reply btcjson.Reply, err error) {
 			shaNext, err = s.server.db.FetchBlockShaByHeight(int64(idx + 1))
 			if err != nil {
 				log.Errorf("RPCS: No next block: %v", err)
-				err = btcjson.Error{
-					Code:    -5,
-					Message: "Block not found",
-				}
+				err = btcjson.ErrBlockNotFound
 				return
 			}
 			blockReply.NextHash = shaNext.String()
@@ -589,10 +558,7 @@ func jsonRead(body []byte, s *rpcServer) (reply btcjson.Reply, err error) {
 			txList, err = s.server.db.FetchTxBySha(txSha)
 			if err != nil {
 				log.Errorf("RPCS: Error fetching tx: %v", err)
-				err = btcjson.Error{
-					Code:    -5,
-					Message: "No information available about transaction",
-				}
+				err = btcjson.ErrNoTxInfo
 				return
 			}
 
@@ -603,10 +569,7 @@ func jsonRead(body []byte, s *rpcServer) (reply btcjson.Reply, err error) {
 			blk, err = s.server.db.FetchBlockBySha(blksha)
 			if err != nil {
 				log.Errorf("RPCS: Error fetching sha: %v", err)
-				err = btcjson.Error{
-					Code:    -5,
-					Message: "Block not found",
-				}
+				err = btcjson.ErrBlockNotFound
 				return
 			}
 			idx := blk.Height()
@@ -648,10 +611,7 @@ func jsonRead(body []byte, s *rpcServer) (reply btcjson.Reply, err error) {
 			_, maxidx, err = s.server.db.NewestSha()
 			if err != nil {
 				log.Errorf("RPCS: Cannot get newest sha: %v", err)
-				err = btcjson.Error{
-					Code:    -5,
-					Message: "No information about newest block",
-				}
+				err = btcjson.ErrNoNewestBlockInfo
 				return
 			}
 			confirmations := uint64(1 + maxidx - idx)
@@ -707,18 +667,12 @@ func jsonRead(body []byte, s *rpcServer) (reply btcjson.Reply, err error) {
 	case "sendrawtransaction":
 		params, ok := message.Params.([]interface{})
 		if !ok || len(params) != 1 {
-			err = btcjson.Error{
-				Code:    -32602,
-				Message: "Invalid parameters",
-			}
+			err = btcjson.ErrInvalidParams
 			return
 		}
 		serializedtxhex, ok := params[0].(string)
 		if !ok {
-			err = btcjson.Error{
-				Code:    -32602,
-				Message: "Raw tx is not a string",
-			}
+			err = btcjson.ErrRawTxString
 			return
 		}
 
@@ -726,10 +680,7 @@ func jsonRead(body []byte, s *rpcServer) (reply btcjson.Reply, err error) {
 		var serializedTx []byte
 		serializedTx, err = hex.DecodeString(serializedtxhex)
 		if err != nil {
-			err = btcjson.Error{
-				Code:    -22,
-				Message: "Unable to decode hex string",
-			}
+			err = btcjson.ErrDecodeHexString
 			return
 		}
 		msgtx := btcwire.NewMsgTx()
