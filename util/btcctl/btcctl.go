@@ -59,8 +59,8 @@ var commandHandlers = map[string]*handlerData{
 	"stop":                 &handlerData{0, 0, displayGeneric, nil},
 }
 
-// toInt attempt to convert the passed string to an integer.  It returns the
-// integer packed into interface so it can be used in the calls which expect
+// toInt attempts to convert the passed string to an integer.  It returns the
+// integer packed into an interface so it can be used in the calls which expect
 // interfaces.  An error will be returned if the string can't be converted to an
 // integer.
 func toInt(val string) (interface{}, error) {
@@ -146,6 +146,11 @@ func commandHandler(cfg *config, command string, data *handlerData, args []strin
 		return ErrUsage
 	}
 
+	// Ensure there is a display handler.
+	if data.displayHandler == nil {
+		return ErrNoDisplayHandler
+	}
+
 	// Ensure the number of conversion handlers is valid if any are
 	// specified.
 	convHandlers := data.conversionHandlers
@@ -177,11 +182,8 @@ func commandHandler(cfg *config, command string, data *handlerData, args []strin
 		return err
 	}
 
-	// Ensure there is a valid display handler and use it to display the
-	// results of the JSON-RPC command.
-	if data.displayHandler == nil {
-		return ErrNoDisplayHandler
-	}
+	// Display the results of the JSON-RPC command using the provided
+	// display handler.
 	err = data.displayHandler(reply)
 	if err != nil {
 		return err
