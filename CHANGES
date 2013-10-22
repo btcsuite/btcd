@@ -3,6 +3,28 @@ User visible changes for btcd
   A full-node bitcoin implementation written in Go
 ============================================================================
 
+Changes in 0.3.2 (Tue Oct 22 2013)
+  - Fix an issue that could cause the download of the block chain to stall
+    (https://github.com/conformal/btcd/issues/12)
+  - Remove deprecated sqlite as an available database backend
+  - Close sqlite compile issue as sqlite has now been removed
+    (https://github.com/conformal/btcd/issues/11)
+  - Change default RPC ports to 8334 (mainnet) and 18334 (testnet)
+  - Continue cleanup and work on implementing RPC API calls
+  - Add support for the following RPC calls: getrawmempool,
+    getbestblockhash, decoderawtransaction, getdifficulty,
+    getconnectioncount, getpeerinfo, and addnode
+  - Improve the btcctl utility that is used to issue JSON-RPC commands
+  - Fix an issue preventing btcd from cleanly shutting down with the RPC
+    stop command
+  - Add a number of database interface tests to ensure backends implement
+    the expected interface
+  - Expose some additional information from btcscript to be used for
+    identifying "standard"" transactions
+  - Add support for plan9 - thanks @mischief
+    (https://github.com/conformal/btcd/pull/19)
+  - Other minor bug fixes and general code cleanup
+
 Changes in 0.3.1-alpha (Tue Oct 15 2013)
   - Change default database to leveldb
     NOTE: This does mean you will have to redownload the block chain.  Since we
