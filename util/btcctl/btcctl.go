@@ -159,13 +159,15 @@ func commandHandler(cfg *config, command string, data *handlerData, args []strin
 		iargs[i] = arg
 	}
 	for i := range iargs {
-		converter := convHandlers[i]
-		if converter != nil {
-			convertedArg, err := converter(args[i])
-			if err != nil {
-				return err
+		if convHandlers != nil {
+			converter := convHandlers[i]
+			if converter != nil {
+				convertedArg, err := converter(args[i])
+				if err != nil {
+					return err
+				}
+				iargs[i] = convertedArg
 			}
-			iargs[i] = convertedArg
 		}
 	}
 
