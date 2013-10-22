@@ -7,6 +7,7 @@ import (
 	"github.com/conformal/go-flags"
 	"github.com/davecgh/go-spew/spew"
 	"os"
+	"sort"
 	"strconv"
 )
 
@@ -33,6 +34,7 @@ type handlerData struct {
 	optionalArgs       int
 	displayHandler     displayHandler
 	conversionHandlers []conversionHandler
+	usage              string
 }
 
 var (
@@ -41,22 +43,22 @@ var (
 	ErrUsage            = errors.New("btcctl usage") // Real usage is shown.
 )
 
-// commandHandlers is a map of commands and associate handler data
-// that is used to validate correctness and perform the command.
+// commandHandlers is a map of commands and associated handler data that is used
+// to validate correctness and perform the command.
 var commandHandlers = map[string]*handlerData{
-	"addnode":              &handlerData{2, 0, displaySpewDump, nil},
-	"decoderawtransaction": &handlerData{1, 0, displaySpewDump, nil},
-	"getbestblockhash":     &handlerData{0, 0, displayGeneric, nil},
-	"getblock":             &handlerData{1, 0, displaySpewDump, nil},
-	"getblockcount":        &handlerData{0, 0, displayFloat64, nil},
-	"getblockhash":         &handlerData{1, 0, displayGeneric, []conversionHandler{toInt}},
-	"getconnectioncount":   &handlerData{0, 0, displayFloat64, nil},
-	"getdifficulty":        &handlerData{0, 0, displayFloat64, nil},
-	"getgenerate":          &handlerData{0, 0, displayGeneric, nil},
-	"getpeerinfo":          &handlerData{0, 0, displaySpewDump, nil},
-	"getrawmempool":        &handlerData{0, 0, displaySpewDump, nil},
-	"getrawtransaction":    &handlerData{1, 1, displaySpewDump, []conversionHandler{nil, toInt}},
-	"stop":                 &handlerData{0, 0, displayGeneric, nil},
+	"addnode":              &handlerData{2, 0, displaySpewDump, nil, "<ip> <add/remove/onetry>"},
+	"decoderawtransaction": &handlerData{1, 0, displaySpewDump, nil, "<txhash>"},
+	"getbestblockhash":     &handlerData{0, 0, displayGeneric, nil, ""},
+	"getblock":             &handlerData{1, 0, displaySpewDump, nil, "<blockhash>"},
+	"getblockcount":        &handlerData{0, 0, displayFloat64, nil, ""},
+	"getblockhash":         &handlerData{1, 0, displayGeneric, []conversionHandler{toInt}, "<blocknumber>"},
+	"getconnectioncount":   &handlerData{0, 0, displayFloat64, nil, ""},
+	"getdifficulty":        &handlerData{0, 0, displayFloat64, nil, ""},
+	"getgenerate":          &handlerData{0, 0, displayGeneric, nil, ""},
+	"getpeerinfo":          &handlerData{0, 0, displaySpewDump, nil, ""},
+	"getrawmempool":        &handlerData{0, 0, displaySpewDump, nil, ""},
+	"getrawtransaction":    &handlerData{1, 1, displaySpewDump, []conversionHandler{nil, toInt}, "<txhash> [verbose=0]"},
+	"stop":                 &handlerData{0, 0, displayGeneric, nil, ""},
 }
 
 // toInt attempts to convert the passed string to an integer.  It returns the
@@ -195,21 +197,22 @@ func commandHandler(cfg *config, command string, data *handlerData, args []strin
 // usage displays the command usage.
 func usage(parser *flags.Parser) {
 	parser.WriteHelp(os.Stderr)
-	fmt.Fprintf(os.Stderr,
-		"\nCommands:\n"+
-			"\taddnode <ip> <add/remove/onetry>\n"+
-			"\tdecoderawtransaction <txhash>\n"+
-			"\tgetbestblockhash\n"+
-			"\tgetblock <blockhash>\n"+
-			"\tgetblockcount\n"+
-			"\tgetblockhash <blocknumber>\n"+
-			"\tgetconnectioncount\n"+
-			"\tgetdifficulty\n"+
-			"\tgetgenerate\n"+
-			"\tgetpeerinfo\n"+
-			"\tgetrawmempool\n"+
-			"\tgetrawtransaction <txhash> [verbose=0]\n"+
-			"\tstop\n")
+
+	// Extract usage information for each command from the command handler
+	// data and sort by command name.
+	fmt.Fprintf(os.Stderr, "\nCommands:\n")
+	usageStrings := make([]string, 0, len(commandHandlers))
+	for command, data := range commandHandlers {
+		usage := command
+		if len(data.usage) > 0 {
+			usage += " " + data.usage
+		}
+		usageStrings = append(usageStrings, usage)
+	}
+	sort.Sort(sort.StringSlice(usageStrings))
+	for _, usage := range usageStrings {
+		fmt.Fprintf(os.Stderr, "\t%s\n", usage)
+	}
 }
 
 func main() {
