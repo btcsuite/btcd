@@ -210,7 +210,6 @@ func usage(parser *flags.Parser) {
 			"\tgetrawmempool\n"+
 			"\tgetrawtransaction <txhash> [verbose=0]\n"+
 			"\tstop\n")
-	os.Exit(1)
 }
 
 func main() {
@@ -224,7 +223,7 @@ func main() {
 		if e, ok := err.(*flags.Error); !ok || e.Type != flags.ErrHelp {
 			usage(parser)
 		}
-		return
+		os.Exit(1)
 	}
 	if cfg.Help {
 		usage(parser)
@@ -236,7 +235,7 @@ func main() {
 	if !exists {
 		fmt.Fprintf(os.Stderr, "Unrecognized command: %s\n", args[0])
 		usage(parser)
-		return
+		os.Exit(1)
 	}
 
 	// Execute the command.
@@ -244,9 +243,10 @@ func main() {
 	if err != nil {
 		if err == ErrUsage {
 			usage(parser)
-			return
+			os.Exit(1)
 		}
 
 		fmt.Fprintf(os.Stderr, "%v\n", err)
+		os.Exit(1)
 	}
 }
