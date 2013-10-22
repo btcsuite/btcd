@@ -87,7 +87,6 @@ are currently under heavy development:
 - Add remaining missing RPC calls
 - Add option to allow btcd run as a daemon/service
 - Complete several TODO items in the code
-- Offer 32-bit MSI as well as the 64-bit one
 - Offer cross-compiled binaries for popular OSes (Fedora, Ubuntu, FreeBSD, OpenBSD)
 
 ## GPG Verification Key
