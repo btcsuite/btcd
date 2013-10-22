@@ -9,8 +9,7 @@ As of May 2013, there are over 235,000 blocks in the Bitcoin block chain and
 and over 17 million transactions (which turns out to be over 11GB of data).
 btcdb provides a database layer to store and retrieve this data in a fairly
 simple and efficient manner.  The use of this should not require specific
-knowledge of the database backend used although currently only db_sqlite is
-provided.
+knowledge of the database backend.
 
 Basic Design
 
@@ -20,8 +19,7 @@ increases monotonically.  Each transaction belongs to a single block
 although a block can have a variable number of transactions.  Along
 with these two items, several convenience functions for dealing with
 the database are provided as well as functions to query specific items
-that may be present in a block or tx (although many of these are in
-the sqlite3 subpackage).
+that may be present in a block or tx.
 
 Usage
 
@@ -34,14 +32,14 @@ referenced parent block to already exist.  In a more concrete example:
 	// Import packages.
 	import (
 		"github.com/conformal/btcdb"
-		_ "github.com/conformal/btcdb/sqlite3"
+		_ "github.com/conformal/btcdb/ldb"
 		"github.com/conformal/btcutil"
 		"github.com/conformal/btcwire"
 	)
 
 	// Create a database and schedule it to be closed on exit.
 	dbName := "example.db"
-	db, err := btcdb.CreateDB("sqlite", dbName)
+	db, err := btcdb.CreateDB("leveldb", dbName)
 	if err != nil {
 		// Log and handle the error
 	}
