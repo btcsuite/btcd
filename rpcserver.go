@@ -156,7 +156,9 @@ func (s *rpcServer) Start() {
 	}
 
 	log.Trace("RPCS: Starting RPC server")
-	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+	rpcServeMux := http.NewServeMux()
+	httpServer := &http.Server{Handler: rpcServeMux}
+	rpcServeMux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		login := s.username + ":" + s.password
 		auth := "Basic " + base64.StdEncoding.EncodeToString([]byte(login))
 		authhdr := r.Header["Authorization"]
@@ -168,10 +170,9 @@ func (s *rpcServer) Start() {
 		}
 	})
 	go s.walletListenerDuplicator()
-	http.Handle("/wallet", websocket.Handler(func(ws *websocket.Conn) {
+	rpcServeMux.Handle("/wallet", websocket.Handler(func(ws *websocket.Conn) {
 		s.walletReqsNotifications(ws)
 	}))
-	httpServer := &http.Server{}
 	for _, listener := range s.listeners {
 		s.wg.Add(1)
 		go func(listener net.Listener) {
