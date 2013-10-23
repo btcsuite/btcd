@@ -653,7 +653,7 @@ func (b *blockManager) handleNotifyMsg(notification *btcchain.Notification) {
 		// Notify frontends
 		if r := b.server.rpcServer; r != nil {
 			go r.NotifyBlockConnected(block)
-			go r.NotifyNewTxListeners(b.server.db, block)
+			go r.NotifyBlockTXs(b.server.db, block)
 		}
 
 	// A block has been disconnected from the main block chain.
