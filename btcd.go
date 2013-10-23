@@ -48,9 +48,6 @@ func btcdMain() error {
 		go func() {
 			listenAddr := net.JoinHostPort("", cfg.Profile)
 			log.Infof("Profile server listening on %s", listenAddr)
-			profileRedirect := http.RedirectHandler("/debug/pprof",
-				http.StatusSeeOther)
-			http.Handle("/", profileRedirect)
 			log.Errorf("%v", http.ListenAndServe(listenAddr, nil))
 		}()
 	}
