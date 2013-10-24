@@ -11,15 +11,19 @@ import (
 	"math/big"
 )
 
+// Errors returned by canonicalPadding.
+var (
+	errNegativeValue          = errors.New("value may be interpreted as negative")
+	errExcessivelyPaddedValue = errors.New("value is excessively padded")
+)
+
 // Signature is a type representing an ecdsa signature.
 type Signature struct {
 	R *big.Int
 	S *big.Int
 }
 
-// ParseSignature parses a signature in DER format for the curve type `curve'
-// into a Signature type, perfoming some basic sanity checks.
-func ParseSignature(sigStr []byte, curve elliptic.Curve) (*Signature, error) {
+func parseSig(sigStr []byte, curve elliptic.Curve, der bool) (*Signature, error) {
 	// Originally this code used encoding/asn1 in order to parse the
 	// signature, but a number of problems were found with this approach.
 	// Despite the fact that signatures are stored as DER, the difference
@@ -69,7 +73,16 @@ func ParseSignature(sigStr []byte, curve elliptic.Curve) (*Signature, error) {
 	}
 
 	// Then R itself.
-	signature.R = new(big.Int).SetBytes(sigStr[index : index+rLen])
+	rBytes := sigStr[index : index+rLen]
+	if der {
+		switch err := canonicalPadding(rBytes); err {
+		case errNegativeValue:
+			return nil, errors.New("signature R is negative")
+		case errExcessivelyPaddedValue:
+			return nil, errors.New("signature R is excessively padded")
+		}
+	}
+	signature.R = new(big.Int).SetBytes(rBytes)
 	index += rLen
 	// 0x02. length already checked in previous if.
 	if sigStr[index] != 0x02 {
@@ -86,7 +99,16 @@ func ParseSignature(sigStr []byte, curve elliptic.Curve) (*Signature, error) {
 	}
 
 	// Then S itself.
-	signature.S = new(big.Int).SetBytes(sigStr[index : index+sLen])
+	sBytes := sigStr[index : index+sLen]
+	if der {
+		switch err := canonicalPadding(sBytes); err {
+		case errNegativeValue:
+			return nil, errors.New("signature S is negative")
+		case errExcessivelyPaddedValue:
+			return nil, errors.New("signature S is excessively padded")
+		}
+	}
+	signature.S = new(big.Int).SetBytes(sBytes)
 	index += sLen
 
 	// sanity check length parsing
@@ -113,4 +135,33 @@ func ParseSignature(sigStr []byte, curve elliptic.Curve) (*Signature, error) {
 	}
 
 	return signature, nil
+}
+
+// ParseSignature parses a signature in BER format for the curve type `curve'
+// into a Signature type, perfoming some basic sanity checks.  If parsing
+// according to the more strict DER format is needed, use ParseDERSignature.
+func ParseSignature(sigStr []byte, curve elliptic.Curve) (*Signature, error) {
+	return parseSig(sigStr, curve, false)
+}
+
+// ParseDERSignature parses a signature in DER format for the curve type
+// `curve` into a Signature type.  If parsing according to the less strict
+// BER format is needed, use ParseSignature.
+func ParseDERSignature(sigStr []byte, curve elliptic.Curve) (*Signature, error) {
+	return parseSig(sigStr, curve, true)
+}
+
+// canonicalPadding checks whether a big-endian encoded integer could
+// possibly be misinterpreted as a negative number (even though OpenSSL
+// treats all numbers as unsigned), or if there is any unnecessary
+// leading zero padding.
+func canonicalPadding(b []byte) error {
+	switch {
+	case b[0]&0x80 == 0x80:
+		return errNegativeValue
+	case len(b) > 1 && b[0] == 0x00 && b[1]&0x80 != 0x80:
+		return errExcessivelyPaddedValue
+	default:
+		return nil
+	}
 }
