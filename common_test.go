@@ -193,6 +193,29 @@ func TestVarStringWire(t *testing.T) {
 			continue
 		}
 	}
+
+	invtests := []struct {
+		buf  []byte // Wire encoding
+		pver uint32 // Protocol version for wire encoding
+	}{
+		{append([]byte{0x02}, []byte("")...), pver},
+		//{append([]byte{0xfe, 0x00, 0x00, 0x00, 0x80}, []byte("")...), pver},
+		{append([]byte{0xff, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01}, []byte("")...), pver},
+		//{append([]byte{0xff, 0x00, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00}, []byte("")...), pver},
+	}
+	t.Logf("Running %d invalid tests", len(invtests))
+	for i, test := range invtests {
+		// Decode from wire format.
+		rbuf := bytes.NewBuffer(test.buf)
+		val, err := btcwire.TstReadVarString(rbuf, test.pver)
+		if err != nil {
+			t.Logf("readVarString #%d error %v (error expected)", i, err)
+			continue
+		}
+		t.Errorf("readVarString #%d\n got: %d want error != nil: %d", i,
+			val)
+		continue
+	}
 }
 
 // TestVarStringWireErrors performs negative tests against wire encode and
