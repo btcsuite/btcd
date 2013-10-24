@@ -1682,7 +1682,12 @@ func opcodeCheckSig(op *parsedOpcode, s *Script) error {
 		return err
 	}
 
-	signature, err := btcec.ParseSignature(sigStr, btcec.S256())
+	var signature *btcec.Signature
+	if s.der {
+		signature, err = btcec.ParseDERSignature(sigStr, btcec.S256())
+	} else {
+		signature, err = btcec.ParseSignature(sigStr, btcec.S256())
+	}
 	if err != nil {
 		log.Warnf("can't parse signature from string: %v", err)
 		return err
@@ -1761,10 +1766,17 @@ func opcodeCheckMultiSig(op *parsedOpcode, s *Script) error {
 			return err
 		}
 		// skip off the last byte for hashtype
-		signatures[i], err =
-			btcec.ParseSignature(
-				sigStrings[i][:len(sigStrings[i])-1],
-				btcec.S256())
+		if s.der {
+			signatures[i], err =
+				btcec.ParseDERSignature(
+					sigStrings[i][:len(sigStrings[i])-1],
+					btcec.S256())
+		} else {
+			signatures[i], err =
+				btcec.ParseSignature(
+					sigStrings[i][:len(sigStrings[i])-1],
+					btcec.S256())
+		}
 		if err != nil {
 			return err
 		}

@@ -19,6 +19,7 @@ import (
 // All run on a fake tx with a single in, single out.
 type opcodeTest struct {
 	script     []byte
+	canonical  bool
 	shouldPass bool
 	shouldFail error
 }
@@ -384,6 +385,18 @@ var opcodeTests = []opcodeTest{
 		0x8a, 0x06, 0x26, 0xf1, 0xba, 0xde, 0xd5, 0xc7, 0x2a, 0x70,
 		0x4f, 0x7e, 0x6c, 0xd8, 0x4c,
 		btcscript.OP_1, btcscript.OP_CHECK_MULTISIG},
+		canonical:  false,
+		shouldPass: false},
+	{script: []byte{btcscript.OP_1, btcscript.OP_1, btcscript.OP_DATA_65,
+		0x04, 0xae, 0x1a, 0x62, 0xfe, 0x09, 0xc5, 0xf5, 0x1b, 0x13,
+		0x90, 0x5f, 0x07, 0xf0, 0x6b, 0x99, 0xa2, 0xf7, 0x15, 0x9b,
+		0x22, 0x25, 0xf3, 0x74, 0xcd, 0x37, 0x8d, 0x71, 0x30, 0x2f,
+		0xa2, 0x84, 0x14, 0xe7, 0xaa, 0xb3, 0x73, 0x97, 0xf5, 0x54,
+		0xa7, 0xdf, 0x5f, 0x14, 0x2c, 0x21, 0xc1, 0xb7, 0x30, 0x3b,
+		0x8a, 0x06, 0x26, 0xf1, 0xba, 0xde, 0xd5, 0xc7, 0x2a, 0x70,
+		0x4f, 0x7e, 0x6c, 0xd8, 0x4c,
+		btcscript.OP_1, btcscript.OP_CHECK_MULTISIG},
+		canonical:  true,
 		shouldPass: false},
 	/* up here because no defined error case. */
 	{script: []byte{btcscript.OP_1, btcscript.OP_1, btcscript.OP_DATA_65,
@@ -468,7 +481,7 @@ var opcodeTests = []opcodeTest{
 	{script: []byte{252}, shouldPass: false},
 }
 
-func testScript(t *testing.T, script []byte) (err error) {
+func testScript(t *testing.T, script []byte, canonical bool) (err error) {
 	// mock up fake tx.
 	tx := &btcwire.MsgTx{
 		Version: 1,
@@ -493,8 +506,13 @@ func testScript(t *testing.T, script []byte) (err error) {
 
 	tx.TxOut[0].PkScript = script
 
+	var flags btcscript.ScriptFlags
+	if canonical {
+		flags = btcscript.ScriptCanonicalSignatures
+	}
+
 	engine, err := btcscript.NewScript(tx.TxIn[0].SignatureScript,
-		tx.TxOut[0].PkScript, 0, tx, false)
+		tx.TxOut[0].PkScript, 0, tx, flags)
 	if err != nil {
 		return err
 	}
@@ -514,7 +532,7 @@ func TestScripts(t *testing.T) {
 	for i := range opcodeTests {
 		shouldPass := opcodeTests[i].shouldPass
 		shouldFail := opcodeTests[i].shouldFail
-		err := testScript(t, opcodeTests[i].script)
+		err := testScript(t, opcodeTests[i].script, opcodeTests[i].canonical)
 		if shouldFail != nil {
 			if err == nil {
 				t.Errorf("test %d passed should fail with %v", i, err)
@@ -4279,7 +4297,7 @@ func testOpcode(t *testing.T, test *detailedTest) {
 	tx.TxOut[0].PkScript = test.script
 
 	engine, err := btcscript.NewScript(tx.TxIn[0].SignatureScript,
-		tx.TxOut[0].PkScript, 0, tx, false)
+		tx.TxOut[0].PkScript, 0, tx, 0)
 	if err != nil {
 		if err != test.expectedReturn {
 			t.Errorf("Error return not expected %s: %v %v",

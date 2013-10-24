@@ -159,6 +159,7 @@ type Script struct {
 	condStack       []int
 	numOps          int
 	bip16           bool     // treat execution as pay-to-script-hash
+	der             bool     // enforce DER encoding
 	savedFirstStack [][]byte // stack from first script for bip16 scripts
 }
 
@@ -361,11 +362,35 @@ func unparseScript(pops []parsedOpcode) ([]byte, error) {
 	return script, nil
 }
 
+// ScriptFlags is a bitmask defining additional operations or
+// tests that will be done when executing a Script.
+type ScriptFlags uint32
+
+const (
+	// ScriptBip16 defines whether the bip16 threshhold has passed and thus
+	// pay-to-script hash transactions will be fully validated.
+	ScriptBip16 ScriptFlags = 1 << iota
+
+	// ScriptCanonicalSignatures defines whether additional canonical
+	// signature checks are performed when parsing a signature.
+	//
+	// Canonical (DER) signatures are not required in the tx rules for
+	// block acceptance, but are checked in recent versions of bitcoind
+	// when accepting transactions to the mempool.  Non-canonical (valid
+	// BER but not valid DER) transactions can potentially be changed
+	// before mined into a block, either by adding extra padding or
+	// flipping the sign of the R or S value in the signature, creating a
+	// transaction that still validates and spends the inputs, but is not
+	// recognized by creator of the transaction.  Performing a canonical
+	// check enforces script signatures use a unique DER format.
+	ScriptCanonicalSignatures
+)
+
 // NewScript returns a new script engine for the provided tx and input idx with
 // a signature script scriptSig and a pubkeyscript scriptPubKey. If bip16 is
 // true then it will be treated as if the bip16 threshhold has passed and thus
 // pay-to-script hash transactions will be fully validated.
-func NewScript(scriptSig []byte, scriptPubKey []byte, txidx int, tx *btcwire.MsgTx, bip16 bool) (*Script, error) {
+func NewScript(scriptSig []byte, scriptPubKey []byte, txidx int, tx *btcwire.MsgTx, flags ScriptFlags) (*Script, error) {
 	var m Script
 	scripts := [][]byte{scriptSig, scriptPubKey}
 	m.scripts = make([][]parsedOpcode, len(scripts))
@@ -385,6 +410,8 @@ func NewScript(scriptSig []byte, scriptPubKey []byte, txidx int, tx *btcwire.Msg
 		}
 	}
 
+	// Parse flags.
+	bip16 := flags&ScriptBip16 == ScriptBip16
 	if bip16 && isScriptHash(m.scripts[1]) {
 		// if we are pay to scripthash then we only accept input
 		// scripts that push data
@@ -392,6 +419,9 @@ func NewScript(scriptSig []byte, scriptPubKey []byte, txidx int, tx *btcwire.Msg
 			return nil, StackErrP2SHNonPushOnly
 		}
 		m.bip16 = true
+	}
+	if flags&ScriptCanonicalSignatures == ScriptCanonicalSignatures {
+		m.der = true
 	}
 
 	m.tx = *tx
@@ -964,19 +994,39 @@ func signatureScriptCustomReader(reader io.Reader, tx *btcwire.MsgTx, idx int,
 //
 //  0x30 <length> 0x02 <length r> r 0x02 <length s> s
 func sigDER(r, s *big.Int) []byte {
+	// In DER format, a leading 0x00 octet must be prepended to
+	// the byte slice so it cannot be interpreted as a negative
+	// big-endian number.  This is only done if the sign bit on
+	// the first byte is set.
+	var rb, sb []byte
+	if r.Bytes()[0]&0x80 != 0 {
+		paddedBytes := make([]byte, len(r.Bytes())+1)
+		copy(paddedBytes[1:], r.Bytes())
+		rb = paddedBytes
+	} else {
+		rb = r.Bytes()
+	}
+	if s.Bytes()[0]&0x80 != 0 {
+		paddedBytes := make([]byte, len(s.Bytes())+1)
+		copy(paddedBytes[1:], s.Bytes())
+		sb = paddedBytes
+	} else {
+		sb = s.Bytes()
+	}
+
 	// total length of returned signature is 1 byte for each magic and
 	// length (6 total), plus lengths of r and s
-	length := 6 + len(r.Bytes()) + len(s.Bytes())
+	length := 6 + len(rb) + len(sb)
 	b := make([]byte, length, length)
 
 	b[0] = 0x30
 	b[1] = byte(length - 2)
 	b[2] = 0x02
-	b[3] = byte(len(r.Bytes()))
-	offset := copy(b[4:], r.Bytes()) + 4
+	b[3] = byte(len(rb))
+	offset := copy(b[4:], rb) + 4
 	b[offset] = 0x02
-	b[offset+1] = byte(len(s.Bytes()))
-	copy(b[offset+2:], s.Bytes())
+	b[offset+1] = byte(len(sb))
+	copy(b[offset+2:], sb)
 	return b
 }
 
