@@ -1198,7 +1198,7 @@ func (cmd *GetAccountAddressCmd) MarshalJSON() ([]byte, error) {
 	// Fill and marshal a RawCmd.
 	return json.Marshal(RawCmd{
 		Jsonrpc: "1.0",
-		Method:  "accountaddress",
+		Method:  "getaccountaddress",
 		Id:      cmd.id,
 		Params: []interface{}{
 			cmd.Account,

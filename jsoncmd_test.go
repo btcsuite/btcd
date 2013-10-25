@@ -136,6 +136,61 @@ var jsoncmdtests = []struct {
 		},
 	},
 	{
+		name: "basic dumpprivkey",
+		f: func() (Cmd, error) {
+			return NewDumpPrivKeyCmd(float64(1),
+				"address")
+		},
+		result: &DumpPrivKeyCmd{
+			id: float64(1),
+			Address: "address",
+		},
+	},
+	{
+		name: "basic dumpwallet",
+		f: func() (Cmd, error) {
+			return NewDumpWalletCmd(float64(1),
+				"filename")
+		},
+		result: &DumpWalletCmd{
+			id: float64(1),
+			Filename: "filename",
+		},
+	},
+	{
+		name: "basic encryptwallet",
+		f: func() (Cmd, error) {
+			return NewEncryptWalletCmd(float64(1),
+				"passphrase")
+		},
+		result: &EncryptWalletCmd{
+			id: float64(1),
+			Passphrase: "passphrase",
+		},
+	},
+	{
+		name: "basic getaccount",
+		f: func() (Cmd, error) {
+			return NewGetAccountCmd(float64(1),
+				"address")
+		},
+		result: &GetAccountCmd{
+			id: float64(1),
+			Address: "address",
+		},
+	},
+	{
+		name: "basic getaccountaddress",
+		f: func() (Cmd, error) {
+			return NewGetAccountAddressCmd(float64(1),
+				"account")
+		},
+		result: &GetAccountAddressCmd{
+			id: float64(1),
+			Account: "account",
+		},
+	},
+	{
 		name: "basic ping",
 		f: func() (Cmd, error) {
 			return NewPingCmd(float64(1))
