@@ -381,6 +381,74 @@ func TestBlockSerializeErrors(t *testing.T) {
 	}
 }
 
+// TestBlockOverflowErrors  performs tests to ensure deserializing blocks which
+// are intentionally crafted to use large values for the number of transactions
+// are handled properly.  This could otherwise potentially be used as an attack
+// vector.
+func TestBlockOverflowErrors(t *testing.T) {
+	// Use protocol version 70001 specifically here instead of the latest
+	// protocol version because the test data is using bytes encoded with
+	// that version.
+	pver := uint32(70001)
+
+	tests := []struct {
+		buf  []byte // Wire encoding
+		pver uint32 // Protocol version for wire encoding
+		err  error  // Expected error
+	}{
+		// Block that claims to have ~uint64(0) transactions.
+		{
+			[]byte{
+				0x01, 0x00, 0x00, 0x00, // Version 1
+				0x6f, 0xe2, 0x8c, 0x0a, 0xb6, 0xf1, 0xb3, 0x72,
+				0xc1, 0xa6, 0xa2, 0x46, 0xae, 0x63, 0xf7, 0x4f,
+				0x93, 0x1e, 0x83, 0x65, 0xe1, 0x5a, 0x08, 0x9c,
+				0x68, 0xd6, 0x19, 0x00, 0x00, 0x00, 0x00, 0x00, // PrevBlock
+				0x98, 0x20, 0x51, 0xfd, 0x1e, 0x4b, 0xa7, 0x44,
+				0xbb, 0xbe, 0x68, 0x0e, 0x1f, 0xee, 0x14, 0x67,
+				0x7b, 0xa1, 0xa3, 0xc3, 0x54, 0x0b, 0xf7, 0xb1,
+				0xcd, 0xb6, 0x06, 0xe8, 0x57, 0x23, 0x3e, 0x0e, // MerkleRoot
+				0x61, 0xbc, 0x66, 0x49, // Timestamp
+				0xff, 0xff, 0x00, 0x1d, // Bits
+				0x01, 0xe3, 0x62, 0x99, // Nonce
+				0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+				0xff, // TxnCount
+			}, pver, &btcwire.MessageError{},
+		},
+	}
+
+	t.Logf("Running %d tests", len(tests))
+	for i, test := range tests {
+		// Decode from wire format.
+		var msg btcwire.MsgBlock
+		r := bytes.NewBuffer(test.buf)
+		err := msg.BtcDecode(r, test.pver)
+		if reflect.TypeOf(err) != reflect.TypeOf(test.err) {
+			t.Errorf("BtcDecode #%d wrong error got: %v, want: %v",
+				i, err, reflect.TypeOf(test.err))
+			continue
+		}
+
+		// Deserialize from wire format.
+		r = bytes.NewBuffer(test.buf)
+		err = msg.Deserialize(r)
+		if reflect.TypeOf(err) != reflect.TypeOf(test.err) {
+			t.Errorf("Deserialize #%d wrong error got: %v, want: %v",
+				i, err, reflect.TypeOf(test.err))
+			continue
+		}
+
+		// Deserialize with transaction location info from wire format.
+		r = bytes.NewBuffer(test.buf)
+		_, err = msg.DeserializeTxLoc(r)
+		if reflect.TypeOf(err) != reflect.TypeOf(test.err) {
+			t.Errorf("DeserializeTxLoc #%d wrong error got: %v, "+
+				"want: %v", i, err, reflect.TypeOf(test.err))
+			continue
+		}
+	}
+}
+
 var blockOne = btcwire.MsgBlock{
 	Header: btcwire.BlockHeader{
 		Version: 1,

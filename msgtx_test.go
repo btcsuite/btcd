@@ -491,6 +491,102 @@ func TestTxSerializeErrors(t *testing.T) {
 	}
 }
 
+// TestTxOverflowErrors performs tests to ensure deserializing transactions
+// which are intentionally crafted to use large values for the variable number
+// of inputs and outputs are handled properly.  This could otherwise potentially
+// be used as an attack vector.
+func TestTxOverflowErrors(t *testing.T) {
+	// Use protocol version 70001 and transaction version 1 specifically
+	// here instead of the latest values because the test data is using
+	// bytes encoded with those versions.
+	pver := uint32(70001)
+	txVer := uint32(1)
+
+	tests := []struct {
+		buf     []byte // Wire encoding
+		pver    uint32 // Protocol version for wire encoding
+		version uint32 // Transaction version
+		err     error  // Expected error
+	}{
+		// Transaction that claims to have ~uint64(0) inputs.
+		{
+			[]byte{
+				0x00, 0x00, 0x00, 0x01, // Version
+				0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+				0xff, // Varint for number of input transactions
+			}, pver, txVer, &btcwire.MessageError{},
+		},
+
+		// Transaction that claims to have ~uint64(0) outputs.
+		{
+			[]byte{
+				0x00, 0x00, 0x00, 0x01, // Version
+				0x00, // Varint for number of input transactions
+				0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+				0xff, // Varint for number of output transactions
+			}, pver, txVer, &btcwire.MessageError{},
+		},
+
+		// Transaction that has an input with a signature script that
+		// claims to have ~uint64(0) length.
+		{
+			[]byte{
+				0x00, 0x00, 0x00, 0x01, // Version
+				0x01, // Varint for number of input transactions
+				0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+				0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+				0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+				0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // Previous output hash
+				0xff, 0xff, 0xff, 0xff, // Prevous output index
+				0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+				0xff, // Varint for length of signature script
+			}, pver, txVer, &btcwire.MessageError{},
+		},
+
+		// Transaction that has an output with a public key script
+		// that claims to have ~uint64(0) length.
+		{
+			[]byte{
+				0x00, 0x00, 0x00, 0x01, // Version
+				0x01, // Varint for number of input transactions
+				0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+				0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+				0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+				0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // Previous output hash
+				0xff, 0xff, 0xff, 0xff, // Prevous output index
+				0x00,                   // Varint for length of signature script
+				0xff, 0xff, 0xff, 0xff, // Sequence
+				0x01,                                           // Varint for number of output transactions
+				0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // Transaction amount
+				0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+				0xff, // Varint for length of public key script
+			}, pver, txVer, &btcwire.MessageError{},
+		},
+	}
+
+	t.Logf("Running %d tests", len(tests))
+	for i, test := range tests {
+		// Decode from wire format.
+		var msg btcwire.MsgTx
+		r := bytes.NewBuffer(test.buf)
+		err := msg.BtcDecode(r, test.pver)
+		if reflect.TypeOf(err) != reflect.TypeOf(test.err) {
+			t.Errorf("BtcDecode #%d wrong error got: %v, want: %v",
+				i, err, reflect.TypeOf(test.err))
+			continue
+		}
+
+		// Decode from wire format.
+		r = bytes.NewBuffer(test.buf)
+		err = msg.Deserialize(r)
+		if reflect.TypeOf(err) != reflect.TypeOf(test.err) {
+			t.Errorf("Deserialize #%d wrong error got: %v, want: %v",
+				i, err, reflect.TypeOf(test.err))
+			continue
+		}
+	}
+}
+
 // multiTx is a MsgTx with an input and output and used in various tests.
 var multiTx = &btcwire.MsgTx{
 	Version: 1,
