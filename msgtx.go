@@ -6,8 +6,16 @@ package btcwire
 
 import (
 	"bytes"
+	"fmt"
 	"io"
 )
+
+// TxVersion is the current latest supported transaction version.
+const TxVersion = 1
+
+// MaxTxInSequenceNum is the maximum sequence number the sequence field
+// of a transaction input can be.
+const MaxTxInSequenceNum uint32 = 0xffffffff
 
 // defaultTxInOutAlloc is the default size used for the backing array for
 // transaction inputs and outputs.  The array will dynamically grow as needed,
@@ -16,12 +24,33 @@ import (
 // backing array multiple times.
 const defaultTxInOutAlloc = 15
 
-// TxVersion is the current latest supported transaction version.
-const TxVersion = 1
+const (
+	// minTxInPayload is the minimum payload size for a transaction input.
+	// PreviousOutpoint.Hash + PreviousOutpoint.Index 4 bytes + Varint for
+	// SignatureScript length 1 byte + Sequence 4 bytes.
+	minTxInPayload = 9 + HashSize
 
-// MaxTxInSequenceNum is the maximum sequence number the sequence field
-// of a transaction input can be.
-const MaxTxInSequenceNum uint32 = 0xffffffff
+	// maxTxInPerMessage is the maximum number of transactions inputs that
+	// a transaction which fits into a message could possibly have.
+	maxTxInPerMessage = (maxMessagePayload / minTxInPayload) + 1
+
+	// minTxOutPayload is the minimum payload size for a transaction output.
+	// Value 8 bytes + Varint for PkScript length 1 byte.
+	minTxOutPayload = 9
+
+	// maxTxOutPerMessage is the maximum number of transactions outputs that
+	// a transaction which fits into a message could possibly have.
+	maxTxOutPerMessage = (maxMessagePayload / minTxOutPayload) + 1
+
+	// minTxPayload is the minimum payload size for a transaction.  Note
+	// that any realistically usable transaction must have at least one
+	// input or output, but that is a rule enforced at a higher layer, so
+	// it is intentionally not included here.
+	// Version 4 bytes + Varint number of transaction inputs 1 byte + Varint
+	// number of transaction outputs 1 byte + LockTime 4 bytes + min input
+	// payload + min output payload.
+	minTxPayload = 10
+)
 
 // OutPoint defines a bitcoin data type that is used to track previous
 // transaction outputs.
@@ -191,6 +220,16 @@ func (msg *MsgTx) BtcDecode(r io.Reader, pver uint32) error {
 		return err
 	}
 
+	// Prevent more input transactions than could possibly fit into a
+	// message.  It would be possible to cause memory exhaustion and panics
+	// without a sane upper bound on this count.
+	if count > uint64(maxTxInPerMessage) {
+		str := fmt.Sprintf("too many input transactions to fit into "+
+			"max message size [count %d, max %d]", count,
+			maxTxInPerMessage)
+		return messageError("MsgTx.BtcDecode", str)
+	}
+
 	msg.TxIn = make([]*TxIn, 0, count)
 	for i := uint64(0); i < count; i++ {
 		ti := TxIn{}
@@ -204,6 +243,16 @@ func (msg *MsgTx) BtcDecode(r io.Reader, pver uint32) error {
 	count, err = readVarInt(r, pver)
 	if err != nil {
 		return err
+	}
+
+	// Prevent more output transactions than could possibly fit into a
+	// message.  It would be possible to cause memory exhaustion and panics
+	// without a sane upper bound on this count.
+	if count > uint64(maxTxOutPerMessage) {
+		str := fmt.Sprintf("too many output transactions to fit into "+
+			"max message size [count %d, max %d]", count,
+			maxTxOutPerMessage)
+		return messageError("MsgTx.BtcDecode", str)
 	}
 
 	msg.TxOut = make([]*TxOut, 0, count)
@@ -362,6 +411,16 @@ func readTxIn(r io.Reader, pver uint32, version uint32, ti *TxIn) error {
 		return err
 	}
 
+	// Prevent signature script larger than the max message size.  It would
+	// be possible to cause memory exhaustion and panics without a sane
+	// upper bound on this count.
+	if count > uint64(maxMessagePayload) {
+		str := fmt.Sprintf("transaction input signature script is "+
+			"larger than max message size [count %d, max %d]",
+			count, maxMessagePayload)
+		return messageError("MsgTx.BtcDecode", str)
+	}
+
 	b := make([]byte, count)
 	err = readElement(r, b)
 	if err != nil {
@@ -413,12 +472,22 @@ func readTxOut(r io.Reader, pver uint32, version uint32, to *TxOut) error {
 		return err
 	}
 
-	slen, err := readVarInt(r, pver)
+	count, err := readVarInt(r, pver)
 	if err != nil {
 		return err
 	}
 
-	b := make([]byte, slen)
+	// Prevent public key script larger than the max message size.  It would
+	// be possible to cause memory exhaustion and panics without a sane
+	// upper bound on this count.
+	if count > uint64(maxMessagePayload) {
+		str := fmt.Sprintf("transaction output public key script is "+
+			"larger than max message size [count %d, max %d]",
+			count, maxMessagePayload)
+		return messageError("MsgTx.BtcDecode", str)
+	}
+
+	b := make([]byte, count)
 	err = readElement(r, b)
 	if err != nil {
 		return err

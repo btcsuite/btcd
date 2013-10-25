@@ -6,6 +6,7 @@ package btcwire
 
 import (
 	"bytes"
+	"fmt"
 	"io"
 )
 
@@ -21,6 +22,10 @@ const MaxBlocksPerMsg = 500
 
 // MaxBlockPayload is the maximum bytes a block message can be in bytes.
 const MaxBlockPayload = 1000000 // Not actually 1MB which would be 1024 * 1024
+
+// maxTxPerBlock is the maximum number of transactions that could
+// possibly fit into a block.
+const maxTxPerBlock = (MaxBlockPayload / minTxPayload) + 1
 
 // TxLoc holds locator data for the offset and length of where a transaction is
 // located within a MsgBlock data buffer.
@@ -72,8 +77,18 @@ func (msg *MsgBlock) BtcDecode(r io.Reader, pver uint32) error {
 		return err
 	}
 
-	msg.Transactions = make([]*MsgTx, 0, msg.Header.TxnCount)
-	for i := uint64(0); i < msg.Header.TxnCount; i++ {
+	// Prevent more transactions than could possibly fit into a block.
+	// It would be possible to cause memory exhaustion and panics without
+	// a sane upper bound on this count.
+	txCount := msg.Header.TxnCount
+	if txCount > maxTxPerBlock {
+		str := fmt.Sprintf("too many transactions to fit into a block "+
+			"[count %d, max %d]", txCount, maxTxPerBlock)
+		return messageError("MsgBlock.BtcDecode", str)
+	}
+
+	msg.Transactions = make([]*MsgTx, 0, txCount)
+	for i := uint64(0); i < txCount; i++ {
 		tx := MsgTx{}
 		err := tx.BtcDecode(r, pver)
 		if err != nil {
@@ -115,9 +130,18 @@ func (msg *MsgBlock) DeserializeTxLoc(r *bytes.Buffer) ([]TxLoc, error) {
 		return nil, err
 	}
 
+	// Prevent more transactions than could possibly fit into a block.
+	// It would be possible to cause memory exhaustion and panics without
+	// a sane upper bound on this count.
+	txCount := msg.Header.TxnCount
+	if txCount > maxTxPerBlock {
+		str := fmt.Sprintf("too many transactions to fit into a block "+
+			"[count %d, max %d]", txCount, maxTxPerBlock)
+		return nil, messageError("MsgBlock.DeserializeTxLoc", str)
+	}
+
 	// Deserialize each transaction while keeping track of its location
 	// within the byte stream.
-	txCount := msg.Header.TxnCount
 	msg.Transactions = make([]*MsgTx, 0, txCount)
 	txLocs := make([]TxLoc, txCount)
 	for i := uint64(0); i < txCount; i++ {

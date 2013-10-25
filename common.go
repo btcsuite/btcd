@@ -8,6 +8,7 @@ import (
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/binary"
+	"fmt"
 	"io"
 	"math"
 )
@@ -121,13 +122,27 @@ func writeVarInt(w io.Writer, pver uint32, val uint64) error {
 
 // readVarString reads a variable length string from r and returns it as a Go
 // string.  A varString is encoded as a varInt containing the length of the
-// string, and the bytes that represent the string itself.
+// string, and the bytes that represent the string itself.  An error is returned
+// if the length is greater than the maximum block payload size, since it would
+// not be possible to put a varString of that size into a block anyways and it
+// also helps protect against memory exhuastion attacks and forced panics
+// through malformed messages.
 func readVarString(r io.Reader, pver uint32) (string, error) {
-	slen, err := readVarInt(r, pver)
+	count, err := readVarInt(r, pver)
 	if err != nil {
 		return "", err
 	}
-	buf := make([]byte, slen)
+
+	// Prevent variable length strings that are larger than the maximum
+	// message size.  It would be possible to cause memory exhaustion and
+	// panics without a sane upper bound on this count.
+	if count > maxMessagePayload {
+		str := fmt.Sprintf("variable length string is too long "+
+			"[count %d, max %d]", count, maxMessagePayload)
+		return "", messageError("readVarString", str)
+	}
+
+	buf := make([]byte, count)
 	err = readElement(r, buf)
 	if err != nil {
 		return "", err
