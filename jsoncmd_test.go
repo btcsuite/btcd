@@ -276,20 +276,11 @@ var jsoncmdtests = []struct {
 		},
 	},
 	{
-		name: "basic ping",
+		name: "basic getbestblockhash",
 		f: func() (Cmd, error) {
-			return NewPingCmd(float64(1))
+			return NewGetBestBlockHashCmd(float64(1))
 		},
-		result: &PingCmd{
-			id: float64(1),
-		},
-	},
-	{
-		name: "basic getblockcount",
-		f: func() (Cmd, error) {
-			return NewGetBlockCountCmd(float64(1))
-		},
-		result: &GetBlockCountCmd{
+		result: &GetBestBlockHashCmd{
 			id: float64(1),
 		},
 	},
@@ -302,6 +293,24 @@ var jsoncmdtests = []struct {
 		result: &GetBlockCmd{
 			id:   float64(1),
 			Hash: "somehash",
+		},
+	},
+	{
+		name: "basic getblockcount",
+		f: func() (Cmd, error) {
+			return NewGetBlockCountCmd(float64(1))
+		},
+		result: &GetBlockCountCmd{
+			id: float64(1),
+		},
+	},
+	{
+		name: "basic ping",
+		f: func() (Cmd, error) {
+			return NewPingCmd(float64(1))
+		},
+		result: &PingCmd{
+			id: float64(1),
 		},
 	},
 }
