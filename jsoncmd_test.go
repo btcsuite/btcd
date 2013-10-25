@@ -125,6 +125,17 @@ var jsoncmdtests = []struct {
 		},
 	},
 	{
+		name: "basic decoderawtransaction",
+		f: func() (Cmd, error) {
+			return NewDecodeRawTransactionCmd(float64(1),
+				"thisisahexidecimaltransaction")
+		},
+		result: &DecodeRawTransactionCmd{
+			id: float64(1),
+			HexTx: "thisisahexidecimaltransaction",
+		},
+	},
+	{
 		name: "basic ping",
 		f: func() (Cmd, error) {
 			return NewPingCmd(float64(1))
