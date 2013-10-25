@@ -50,8 +50,7 @@ func TestHeaders(t *testing.T) {
 	for i := 0; i < btcwire.MaxBlockHeadersPerMsg+1; i++ {
 		err = msg.AddBlockHeader(bh)
 	}
-	// TODO(davec): Check for actual error.
-	if err == nil {
+	if reflect.TypeOf(err) != reflect.TypeOf(&btcwire.MessageError{}) {
 		t.Errorf("AddBlockHeader: expected error on too many headers " +
 			"not received")
 	}
