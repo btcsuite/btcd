@@ -10,6 +10,7 @@ import (
 	"github.com/conformal/btcwire"
 	"github.com/davecgh/go-spew/spew"
 	"io"
+	"reflect"
 	"strings"
 	"testing"
 )
@@ -193,29 +194,6 @@ func TestVarStringWire(t *testing.T) {
 			continue
 		}
 	}
-
-	invtests := []struct {
-		buf  []byte // Wire encoding
-		pver uint32 // Protocol version for wire encoding
-	}{
-		{append([]byte{0x02}, []byte("")...), pver},
-		//{append([]byte{0xfe, 0x00, 0x00, 0x00, 0x80}, []byte("")...), pver},
-		{append([]byte{0xff, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01}, []byte("")...), pver},
-		//{append([]byte{0xff, 0x00, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00}, []byte("")...), pver},
-	}
-	t.Logf("Running %d invalid tests", len(invtests))
-	for i, test := range invtests {
-		// Decode from wire format.
-		rbuf := bytes.NewBuffer(test.buf)
-		val, err := btcwire.TstReadVarString(rbuf, test.pver)
-		if err != nil {
-			t.Logf("readVarString #%d error %v (error expected)", i, err)
-			continue
-		}
-		t.Errorf("readVarString #%d\n got: %d want error != nil: %d", i,
-			val)
-		continue
-	}
 }
 
 // TestVarStringWireErrors performs negative tests against wire encode and
@@ -263,6 +241,38 @@ func TestVarStringWireErrors(t *testing.T) {
 			continue
 		}
 	}
+}
+
+// TestVarStringOverflowErrors performs tests to ensure deserializing variable
+// length strings intentionally crafted to use large values for the string
+// length are handled properly.  This could otherwise potentially be used as an
+// attack vector.
+func TestVarStringOverflowErrors(t *testing.T) {
+	pver := btcwire.ProtocolVersion
+
+	tests := []struct {
+		buf  []byte // Wire encoding
+		pver uint32 // Protocol version for wire encoding
+		err  error  // Expected error
+	}{
+		{[]byte{0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff},
+			pver, &btcwire.MessageError{}},
+		{[]byte{0xff, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01},
+			pver, &btcwire.MessageError{}},
+	}
+
+	t.Logf("Running %d tests", len(tests))
+	for i, test := range tests {
+		// Decode from wire format.
+		rbuf := bytes.NewBuffer(test.buf)
+		_, err := btcwire.TstReadVarString(rbuf, test.pver)
+		if reflect.TypeOf(err) != reflect.TypeOf(test.err) {
+			t.Errorf("readVarString #%d wrong error got: %v, "+
+				"want: %v", i, err, reflect.TypeOf(test.err))
+			continue
+		}
+	}
+
 }
 
 // TestRandomUint64 exercises the randomness of the random number generator on
