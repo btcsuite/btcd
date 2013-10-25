@@ -223,6 +223,59 @@ var jsoncmdtests = []struct {
 		},
 	},
 	{
+		name: "basic getaddressesbyaccount",
+		f: func() (Cmd, error) {
+			return NewGetAddressesByAccountCmd(float64(1),
+				"account")
+		},
+		result: &GetAddressesByAccountCmd{
+			id:      float64(1),
+			Account: "account",
+		},
+	},
+	{
+		name: "basic getbalance",
+		f: func() (Cmd, error) {
+			return NewGetBalanceCmd(float64(1))
+		},
+		result: &GetBalanceCmd{
+			id:      float64(1),
+			Minconf: 1, // the default
+		},
+	},
+	{
+		name: "basic getbalance + account",
+		f: func() (Cmd, error) {
+			return NewGetBalanceCmd(float64(1), "account")
+		},
+		result: &GetBalanceCmd{
+			id:      float64(1),
+			Account: "account",
+			Minconf: 1, // the default
+		},
+	},
+	{
+		name: "basic getbalance + minconf",
+		f: func() (Cmd, error) {
+			return NewGetBalanceCmd(float64(1), "", 2)
+		},
+		result: &GetBalanceCmd{
+			id:      float64(1),
+			Minconf: 2,
+		},
+	},
+	{
+		name: "basic getbalance + account + minconf",
+		f: func() (Cmd, error) {
+			return NewGetBalanceCmd(float64(1), "account", 2)
+		},
+		result: &GetBalanceCmd{
+			id:      float64(1),
+			Account: "account",
+			Minconf: 2,
+		},
+	},
+	{
 		name: "basic ping",
 		f: func() (Cmd, error) {
 			return NewPingCmd(float64(1))

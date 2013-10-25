@@ -1453,9 +1453,7 @@ func (cmd *GetBalanceCmd) MarshalJSON() ([]byte, error) {
 		Jsonrpc: "1.0",
 		Method:  "getbalance",
 		Id:      cmd.id,
-		Params: []interface{}{
-			cmd.Account,
-		},
+		Params:  []interface{}{},
 	}
 
 	if cmd.Account != "" || cmd.Minconf != 1 {
@@ -1493,7 +1491,7 @@ func (cmd *GetBalanceCmd) UnmarshalJSON(b []byte) error {
 	if len(r.Params) > 1 {
 		minconf, ok := r.Params[1].(float64)
 		if !ok {
-			return errors.New("first optional parameter minconf must be a number")
+			return errors.New("second optional parameter minconf must be a number")
 		}
 		optArgs = append(optArgs, int(minconf))
 	}
