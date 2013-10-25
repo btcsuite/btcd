@@ -57,7 +57,7 @@ var jsoncmdtests = []struct {
 		},
 	},
 	{
-		name: "basic addnode remoe",
+		name: "basic addnode remove",
 		f: func() (Cmd, error) {
 			return NewAddNodeCmd(float64(1), "address",
 				"remove")
@@ -367,6 +367,55 @@ var jsoncmdtests = []struct {
 		},
 		result: &PingCmd{
 			id: float64(1),
+		},
+	},
+	{
+		name: "basic verifymessage",
+		f: func() (Cmd, error) {
+			return NewVerifyMessageCmd(float64(1),
+				"someaddress",
+				"somesig",
+				"a message")
+		},
+		result: &VerifyMessageCmd{
+			id:        float64(1),
+			Address:   "someaddress",
+			Signature: "somesig",
+			Message:   "a message",
+		},
+	},
+	{
+		name: "basic walletlock",
+		f: func() (Cmd, error) {
+			return NewWalletLockCmd(float64(1))
+		},
+		result: &WalletLockCmd{
+			id: float64(1),
+		},
+	},
+	{
+		name: "basic walletpassphrase",
+		f: func() (Cmd, error) {
+			return NewWalletPassphraseCmd(float64(1),
+				"phrase1",
+				10)
+		},
+		result: &WalletPassphraseCmd{
+			id:         float64(1),
+			Passphrase: "phrase1",
+			Timeout:    10,
+		},
+	},
+	{
+		name: "basic walletpassphrasechange",
+		f: func() (Cmd, error) {
+			return NewWalletPassphraseChangeCmd(float64(1),
+				"phrase1", "phrase2")
+		},
+		result: &WalletPassphraseChangeCmd{
+			id:            float64(1),
+			OldPassphrase: "phrase1",
+			NewPassphrase: "phrase2",
 		},
 	},
 }
