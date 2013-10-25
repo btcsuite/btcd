@@ -1464,7 +1464,7 @@ func (cmd *GetAddressesByAccountCmd) UnmarshalJSON(b []byte) error {
 type GetBalanceCmd struct {
 	id      interface{}
 	Account string
-	Minconf int
+	MinConf int
 }
 
 // Enforce that GetBalanceCmd satisifies the Cmd interface.
@@ -1498,7 +1498,7 @@ func NewGetBalanceCmd(id interface{}, optArgs ...interface{}) (*GetBalanceCmd, e
 	return &GetBalanceCmd{
 		id:      id,
 		Account: account,
-		Minconf: minconf,
+		MinConf: minconf,
 	}, nil
 }
 
@@ -1521,11 +1521,11 @@ func (cmd *GetBalanceCmd) MarshalJSON() ([]byte, error) {
 		Params:  []interface{}{},
 	}
 
-	if cmd.Account != "" || cmd.Minconf != 1 {
+	if cmd.Account != "" || cmd.MinConf != 1 {
 		raw.Params = append(raw.Params, cmd.Account)
 	}
-	if cmd.Minconf != 1 {
-		raw.Params = append(raw.Params, cmd.Minconf)
+	if cmd.MinConf != 1 {
+		raw.Params = append(raw.Params, cmd.MinConf)
 	}
 
 	// Fill and marshal a RawCmd.
@@ -2858,7 +2858,7 @@ func (cmd *GetRawTransactionCmd) UnmarshalJSON(b []byte) error {
 type GetReceivedByAccountCmd struct {
 	id      interface{}
 	Account string
-	Minconf int
+	MinConf int
 }
 
 // Enforce that GetReceivedByAccountCmd satisifies the Cmd interface.
@@ -2890,7 +2890,7 @@ func NewGetReceivedByAccountCmd(id interface{}, optArgs ...interface{}) (*GetRec
 	return &GetReceivedByAccountCmd{
 		id:      id,
 		Account: account,
-		Minconf: minconf,
+		MinConf: minconf,
 	}, nil
 }
 
@@ -2914,12 +2914,12 @@ func (cmd *GetReceivedByAccountCmd) MarshalJSON() ([]byte, error) {
 		Params:  []interface{}{},
 	}
 
-	if cmd.Account != "" || cmd.Minconf != 1 {
+	if cmd.Account != "" || cmd.MinConf != 1 {
 		raw.Params = append(raw.Params, cmd.Account)
 	}
 
-	if cmd.Minconf != 1 {
-		raw.Params = append(raw.Params, cmd.Minconf)
+	if cmd.MinConf != 1 {
+		raw.Params = append(raw.Params, cmd.MinConf)
 	}
 	return json.Marshal(raw)
 }
@@ -2970,7 +2970,7 @@ func (cmd *GetReceivedByAccountCmd) UnmarshalJSON(b []byte) error {
 type GetReceivedByAddressCmd struct {
 	id      interface{}
 	Address string
-	Minconf int
+	MinConf int
 }
 
 // Enforce that GetReceivedByAddressCmd satisifies the Cmd interface.
@@ -3002,7 +3002,7 @@ func NewGetReceivedByAddressCmd(id interface{}, optArgs ...interface{}) (*GetRec
 	return &GetReceivedByAddressCmd{
 		id:      id,
 		Address: address,
-		Minconf: minconf,
+		MinConf: minconf,
 	}, nil
 }
 
@@ -3026,12 +3026,12 @@ func (cmd *GetReceivedByAddressCmd) MarshalJSON() ([]byte, error) {
 		Params:  []interface{}{},
 	}
 
-	if cmd.Address != "" || cmd.Minconf != 1 {
+	if cmd.Address != "" || cmd.MinConf != 1 {
 		raw.Params = append(raw.Params, cmd.Address)
 	}
 
-	if cmd.Minconf != 1 {
-		raw.Params = append(raw.Params, cmd.Minconf)
+	if cmd.MinConf != 1 {
+		raw.Params = append(raw.Params, cmd.MinConf)
 	}
 	return json.Marshal(raw)
 }
@@ -5329,17 +5329,16 @@ func (cmd *SendToAddressCmd) UnmarshalJSON(b []byte) error {
 	if err != nil {
 		return err
 	}
-
 	optArgs := make([]interface{}, 0, 2)
-	if len(r.Params) > 3 {
-		comment, ok := r.Params[3].(string)
+	if len(r.Params) > 2 {
+		comment, ok := r.Params[2].(string)
 		if !ok {
 			return errors.New("third optional parameter comment must be a string")
 		}
 		optArgs = append(optArgs, comment)
 	}
-	if len(r.Params) > 4 {
-		commentto, ok := r.Params[4].(string)
+	if len(r.Params) > 3 {
+		commentto, ok := r.Params[3].(string)
 		if !ok {
 			return errors.New("sixth optional parameter commentto must be a string")
 		}
@@ -5686,6 +5685,7 @@ type RawTxInput struct {
 	Txid         string `json:"txid"`
 	Vout         int    `json:"vout"`
 	ScriptPubKey string `json:"scriptPubKey"`
+	RedeemScript string `json:"redeemScript"`
 }
 
 // SignRawTransactionCmd is a type handling custom marshaling and
@@ -5727,12 +5727,12 @@ func NewSignRawTransactionCmd(id interface{}, rawTx string, optArgs ...interface
 		privkeys = pk
 	}
 	if len(optArgs) > 2 {
-		pk, ok := optArgs[2].([]string)
+		fl, ok := optArgs[2].(string)
 		if !ok {
 			return nil, errors.New("third optional parameter flags should be a string")
 		}
 
-		privkeys = pk
+		flags = fl
 	}
 	return &SignRawTransactionCmd{
 		id:       id,
@@ -5835,6 +5835,16 @@ func (cmd *SignRawTransactionCmd) UnmarshalJSON(b []byte) error {
 			inputs[i].ScriptPubKey, ok = scriptpubkey.(string)
 			if !ok {
 				return errors.New("scriptpubkey not a string in input object")
+			}
+
+			redeemScript, ok := mip["redeemScript"]
+			if !ok {
+				return errors.New("redeemScript missing in input object")
+			}
+
+			inputs[i].RedeemScript, ok = redeemScript.(string)
+			if !ok {
+				return errors.New("redeemScript not a string in input object")
 			}
 
 		}

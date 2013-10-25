@@ -240,7 +240,7 @@ var jsoncmdtests = []struct {
 		},
 		result: &GetBalanceCmd{
 			id:      float64(1),
-			Minconf: 1, // the default
+			MinConf: 1, // the default
 		},
 	},
 	{
@@ -251,7 +251,7 @@ var jsoncmdtests = []struct {
 		result: &GetBalanceCmd{
 			id:      float64(1),
 			Account: "account",
-			Minconf: 1, // the default
+			MinConf: 1, // the default
 		},
 	},
 	{
@@ -261,7 +261,7 @@ var jsoncmdtests = []struct {
 		},
 		result: &GetBalanceCmd{
 			id:      float64(1),
-			Minconf: 2,
+			MinConf: 2,
 		},
 	},
 	{
@@ -272,7 +272,7 @@ var jsoncmdtests = []struct {
 		result: &GetBalanceCmd{
 			id:      float64(1),
 			Account: "account",
-			Minconf: 2,
+			MinConf: 2,
 		},
 	},
 	{
@@ -491,6 +491,214 @@ var jsoncmdtests = []struct {
 		},
 		result: &PingCmd{
 			id: float64(1),
+		},
+	},
+	{
+		name: "basic sendfrom",
+		f: func() (Cmd, error) {
+			return NewSendFromCmd(float64(1),
+				"account",
+				"address",
+				12,
+				1)
+		},
+		result: &SendFromCmd{
+			id:          float64(1),
+			FromAccount: "account",
+			ToAddress:   "address",
+			Amount:      12,
+			MinConf:     1, // the default
+		},
+	},
+	{
+		name: "basic sendrawtransaction",
+		f: func() (Cmd, error) {
+			return NewSendRawTransactionCmd(float64(1),
+				"hexstringofatx")
+		},
+		result: &SendRawTransactionCmd{
+			id:    float64(1),
+			HexTx: "hexstringofatx",
+		},
+	},
+	{
+		name: "basic sendtoaddress",
+		f: func() (Cmd, error) {
+			return NewSendToAddressCmd(float64(1),
+				"somebtcaddress",
+				1)
+		},
+		result: &SendToAddressCmd{
+			id:      float64(1),
+			Address: "somebtcaddress",
+			Amount:  1,
+		},
+	},
+	{
+		name: "basic sendtoaddress plus optional",
+		f: func() (Cmd, error) {
+			return NewSendToAddressCmd(float64(1),
+				"somebtcaddress",
+				1,
+				"a comment",
+				"comment to")
+		},
+		result: &SendToAddressCmd{
+			id:        float64(1),
+			Address:   "somebtcaddress",
+			Amount:    1,
+			Comment:   "a comment",
+			CommentTo: "comment to",
+		},
+	},
+	{
+		name: "basic setaccount",
+		f: func() (Cmd, error) {
+			return NewSetAccountCmd(float64(1),
+				"somebtcaddress",
+				"account name")
+		},
+		result: &SetAccountCmd{
+			id:      float64(1),
+			Address: "somebtcaddress",
+			Account: "account name",
+		},
+	},
+	{
+		name: "basic setgenerate",
+		f: func() (Cmd, error) {
+			return NewSetGenerateCmd(float64(1), true)
+		},
+		result: &SetGenerateCmd{
+			id:       float64(1),
+			Generate: true,
+		},
+	},
+	{
+		name: "basic setgenerate + optional",
+		f: func() (Cmd, error) {
+			return NewSetGenerateCmd(float64(1), true, 10)
+		},
+		result: &SetGenerateCmd{
+			id:           float64(1),
+			Generate:     true,
+			GenProcLimit: 10,
+		},
+	},
+	/*	{
+		name: "basic settxfee",
+		f: func() (Cmd, error) {
+			return NewSetTxFeeCmd(float64(1), 10)
+		},
+		result: &SetTxFeeCmd{
+			id:     float64(1),
+			Amount: 100000000,
+		},
+	},*/
+	{
+		name: "basic signrawtransaction",
+		f: func() (Cmd, error) {
+			return NewSignRawTransactionCmd(float64(1),
+				"sometxstring")
+		},
+		result: &SignRawTransactionCmd{
+			id:    float64(1),
+			RawTx: "sometxstring",
+		},
+	},
+	/*	{
+		name: "basic signrawtransaction with optional",
+		f: func() (Cmd, error) {
+			return NewSignRawTransactionCmd(float64(1),
+				"sometxstring",
+				[]RawTxInput{
+					RawTxInput{
+						Txid:         "test",
+						Vout:         1,
+						ScriptPubKey: "test",
+						RedeemScript: "test",
+					},
+				},
+				[]string{"aprivatekey", "privkey2"},
+				"flags")
+		},
+		result: &SignRawTransactionCmd{
+			id:    float64(1),
+			RawTx: "sometxstring",
+			Inputs: []RawTxInput{
+				RawTxInput{
+					Txid:         "test",
+					Vout:         1,
+					ScriptPubKey: "test",
+					RedeemScript: "test",
+				},
+			},
+			PrivKeys: []string{"aprivatekey", "privkey2"},
+			Flags:    "flags",
+		},
+	},*/
+	{
+		name: "basic stop",
+		f: func() (Cmd, error) {
+			return NewStopCmd(float64(1))
+		},
+		result: &StopCmd{
+			id: float64(1),
+		},
+	},
+	{
+		name: "basic submitblock",
+		f: func() (Cmd, error) {
+			return NewSubmitBlockCmd(float64(1),
+				"lotsofhex")
+		},
+		result: &SubmitBlockCmd{
+			id:       float64(1),
+			HexBlock: "lotsofhex",
+		},
+	},
+	//	{
+	//		name: "submitblock with optional object",
+	//		f: func() (Cmd, error) {
+	//			return NewSubmitBlockCmd(float64(1),
+	//				"lotsofhex", "otherstuff")
+	//		},
+	//		result: &SubmitBlockCmd{
+	//			id:       float64(1),
+	//			HexBlock: "lotsofhex",
+	//		},
+	//	},
+	{
+		name: "basic validateaddress",
+		f: func() (Cmd, error) {
+			return NewValidateAddressCmd(float64(1),
+				"somebtcaddress")
+		},
+		result: &ValidateAddressCmd{
+			id:      float64(1),
+			Address: "somebtcaddress",
+		},
+	},
+	{
+		name: "basic verifychain",
+		f: func() (Cmd, error) {
+			return NewVerifyChainCmd(float64(1))
+		},
+		result: &VerifyChainCmd{
+			id:         float64(1),
+			CheckLevel: 3,
+			CheckDepth: 288,
+		},
+	},
+	{
+		name: "basic verifychain + optional",
+		f: func() (Cmd, error) {
+			return NewVerifyChainCmd(float64(1), 4, 1)
+		},
+		result: &VerifyChainCmd{
+			id:         float64(1),
+			CheckLevel: 4,
+			CheckDepth: 1,
 		},
 	},
 	{
