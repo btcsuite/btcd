@@ -375,7 +375,7 @@ func (cmd *AddMultisigAddressCmd) UnmarshalJSON(b []byte) error {
 		return errors.New("second parameter keys must be an array")
 	}
 	keys := make([]string, len(ikeys))
-	for i, val := range(ikeys) {
+	for i, val := range ikeys {
 		keys[i], ok = val.(string)
 		if !ok {
 			return errors.New("second parameter keys must be an array of strings")
@@ -618,7 +618,7 @@ func (cmd *CreateMultisigCmd) UnmarshalJSON(b []byte) error {
 		return errors.New("second parameter keys must be an array")
 	}
 	keys := make([]string, len(ikeys))
-	for i, val := range(ikeys) {
+	for i, val := range ikeys {
 		keys[i], ok = val.(string)
 		if !ok {
 			return errors.New("second parameter keys must be an array of strings")
@@ -712,7 +712,7 @@ func (cmd *CreateRawTransactionCmd) UnmarshalJSON(b []byte) error {
 		if !ok {
 			return errors.New("first parameter inputs must be an array of objects")
 		}
-		
+
 		if len(v) != 2 {
 			return errors.New("input with wrong number of members")
 		}
@@ -1275,7 +1275,7 @@ func (cmd *GetAddedNodeInfoCmd) Method() string {
 // MarshalJSON returns the JSON encoding of cmd.  Part of the Cmd interface.
 func (cmd *GetAddedNodeInfoCmd) MarshalJSON() ([]byte, error) {
 	// Fill and marshal a RawCmd.
-	
+
 	raw := RawCmd{
 		Jsonrpc: "1.0",
 		Method:  "getaddednodeinfo",

@@ -131,7 +131,7 @@ var jsoncmdtests = []struct {
 				"thisisahexidecimaltransaction")
 		},
 		result: &DecodeRawTransactionCmd{
-			id: float64(1),
+			id:    float64(1),
 			HexTx: "thisisahexidecimaltransaction",
 		},
 	},
@@ -142,7 +142,7 @@ var jsoncmdtests = []struct {
 				"address")
 		},
 		result: &DumpPrivKeyCmd{
-			id: float64(1),
+			id:      float64(1),
 			Address: "address",
 		},
 	},
@@ -153,7 +153,7 @@ var jsoncmdtests = []struct {
 				"filename")
 		},
 		result: &DumpWalletCmd{
-			id: float64(1),
+			id:       float64(1),
 			Filename: "filename",
 		},
 	},
@@ -164,7 +164,7 @@ var jsoncmdtests = []struct {
 				"passphrase")
 		},
 		result: &EncryptWalletCmd{
-			id: float64(1),
+			id:         float64(1),
 			Passphrase: "passphrase",
 		},
 	},
@@ -175,7 +175,7 @@ var jsoncmdtests = []struct {
 				"address")
 		},
 		result: &GetAccountCmd{
-			id: float64(1),
+			id:      float64(1),
 			Address: "address",
 		},
 	},
@@ -186,7 +186,7 @@ var jsoncmdtests = []struct {
 				"account")
 		},
 		result: &GetAccountAddressCmd{
-			id: float64(1),
+			id:      float64(1),
 			Account: "account",
 		},
 	},
@@ -196,7 +196,7 @@ var jsoncmdtests = []struct {
 			return NewGetAddedNodeInfoCmd(float64(1), true)
 		},
 		result: &GetAddedNodeInfoCmd{
-			id: float64(1),
+			id:  float64(1),
 			Dns: true,
 		},
 	},
@@ -206,7 +206,7 @@ var jsoncmdtests = []struct {
 			return NewGetAddedNodeInfoCmd(float64(1), false)
 		},
 		result: &GetAddedNodeInfoCmd{
-			id: float64(1),
+			id:  float64(1),
 			Dns: false,
 		},
 	},
@@ -217,8 +217,8 @@ var jsoncmdtests = []struct {
 				"thisisanode")
 		},
 		result: &GetAddedNodeInfoCmd{
-			id: float64(1),
-			Dns: true,
+			id:   float64(1),
+			Dns:  true,
 			Node: "thisisanode",
 		},
 	},
