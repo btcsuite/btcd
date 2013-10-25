@@ -10,7 +10,6 @@ import (
 	"github.com/conformal/btcutil"
 	"github.com/conformal/btcwire"
 	"math"
-	"time"
 )
 
 // txValidate is used to track results of validating scripts for each
@@ -29,7 +28,7 @@ type txProcessList struct {
 // validateTxIn validates a the script pair for the passed spending transaction
 // (along with the specific input index) and origin transaction (with the
 // specific output index).
-func validateTxIn(txInIdx int, txin *btcwire.TxIn, txSha *btcwire.ShaHash, tx *btcwire.MsgTx, timestamp time.Time, originTx *btcwire.MsgTx) error {
+func validateTxIn(txInIdx int, txin *btcwire.TxIn, txSha *btcwire.ShaHash, tx *btcwire.MsgTx, originTx *btcwire.MsgTx, flags btcscript.ScriptFlags) error {
 	// If the input transaction has no previous input, there is nothing
 	// to check.
 	originTxIdx := txin.PreviousOutpoint.Index
@@ -39,14 +38,15 @@ func validateTxIn(txInIdx int, txin *btcwire.TxIn, txSha *btcwire.ShaHash, tx *b
 
 	if originTxIdx >= uint32(len(originTx.TxOut)) {
 		originTxSha := &txin.PreviousOutpoint.Hash
-		log.Warnf("unable to locate source tx %v spending tx %v", originTxSha, &txSha)
+		log.Warnf("unable to locate source tx %v spending tx %v",
+			originTxSha, &txSha)
 		return fmt.Errorf("invalid index %x", originTxIdx)
 	}
 
 	sigScript := txin.SignatureScript
 	pkScript := originTx.TxOut[originTxIdx].PkScript
 	engine, err := btcscript.NewScript(sigScript, pkScript, txInIdx, tx,
-		timestamp.After(btcscript.Bip16Activation))
+		flags)
 	if err != nil {
 		return err
 	}
@@ -62,7 +62,7 @@ func validateTxIn(txInIdx int, txin *btcwire.TxIn, txSha *btcwire.ShaHash, tx *b
 
 // ValidateTransactionScripts validates the scripts for the passed transaction
 // using multiple goroutines.
-func ValidateTransactionScripts(tx *btcwire.MsgTx, txHash *btcwire.ShaHash, timestamp time.Time, txStore TxStore) (err error) {
+func ValidateTransactionScripts(tx *btcwire.MsgTx, txHash *btcwire.ShaHash, txStore TxStore, flags btcscript.ScriptFlags) (err error) {
 	c := make(chan txValidate)
 	job := tx.TxIn
 	resultErrors := make([]error, len(job))
@@ -87,8 +87,8 @@ func ValidateTransactionScripts(tx *btcwire.MsgTx, txHash *btcwire.ShaHash, time
 			}
 			originTx = txInfo.Tx
 		}
-		err := validateTxIn(txInIdx, job[txInIdx], txHash, tx, timestamp,
-			originTx)
+		err := validateTxIn(txInIdx, job[txInIdx], txHash, tx, originTx,
+			flags)
 		r := txValidate{txInIdx, err}
 		c <- r
 	}
@@ -123,7 +123,12 @@ func ValidateTransactionScripts(tx *btcwire.MsgTx, txHash *btcwire.ShaHash, time
 // checkBlockScripts executes and validates the scripts for all transactions in
 // the passed block.
 func checkBlockScripts(block *btcutil.Block, txStore TxStore) error {
-	timestamp := block.MsgBlock().Header.Timestamp
+	// Setup the script validation flags.  Blocks created after the BIP0016
+	// activation time need to have the pay-to-script-hash checks enabled.
+	var flags btcscript.ScriptFlags
+	if block.MsgBlock().Header.Timestamp.After(btcscript.Bip16Activation) {
+		flags |= btcscript.ScriptBip16
+	}
 
 	txList := block.MsgBlock().Transactions
 	c := make(chan txValidate)
@@ -135,7 +140,7 @@ func checkBlockScripts(block *btcutil.Block, txStore TxStore) error {
 		tx := txList[txIdx]
 		txHash, _ := block.TxSha(txIdx)
 
-		err := ValidateTransactionScripts(tx, txHash, timestamp, txStore)
+		err := ValidateTransactionScripts(tx, txHash, txStore, flags)
 		r := txValidate{txIdx, err}
 		c <- r
 	}
