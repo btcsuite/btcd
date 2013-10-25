@@ -415,6 +415,15 @@ var jsoncmdtests = []struct {
 		},
 	},
 	{
+		name: "basic getmininginfo",
+		f: func() (Cmd, error) {
+			return NewGetMiningInfoCmd(float64(1))
+		},
+		result: &GetMiningInfoCmd{
+			id: float64(1),
+		},
+	},
+	{
 		name: "basic getnettotals",
 		f: func() (Cmd, error) {
 			return NewGetNetTotalsCmd(float64(1))
@@ -457,11 +466,21 @@ var jsoncmdtests = []struct {
 		},
 	},
 	{
-		name: "basic getmininginfo",
+		name: "basic getnewaddress",
 		f: func() (Cmd, error) {
-			return NewGetMiningInfoCmd(float64(1))
+			return NewGetNewAddressCmd(float64(1), "address")
 		},
-		result: &GetMiningInfoCmd{
+		result: &GetNewAddressCmd{
+			id: float64(1),
+			Address: "address",
+		},
+	},
+	{
+		name: "basic getpeerinfo",
+		f: func() (Cmd, error) {
+			return NewGetPeerInfoCmd(float64(1)) 
+		},
+		result: &GetPeerInfoCmd{
 			id: float64(1),
 		},
 	},
