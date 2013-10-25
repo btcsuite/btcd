@@ -361,6 +361,69 @@ var jsoncmdtests = []struct {
 		},
 	},
 	{
+		name: "basic getconectioncount",
+		f: func() (Cmd, error) {
+			return NewGetConnectionCountCmd(float64(1))
+		},
+		result: &GetConnectionCountCmd{
+			id: float64(1),
+		},
+	},
+	{
+		name: "basic getdifficulty",
+		f: func() (Cmd, error) {
+			return NewGetDifficultyCmd(float64(1))
+		},
+		result: &GetDifficultyCmd{
+			id: float64(1),
+		},
+	},
+	{
+		name: "basic getgeneratecmd",
+		f: func() (Cmd, error) {
+			return NewGetGenerateCmd(float64(1))
+		},
+		result: &GetGenerateCmd{
+			id: float64(1),
+		},
+	},
+	{
+		name: "basic gethashespersec",
+		f: func() (Cmd, error) {
+			return NewGetHashesPerSecCmd(float64(1))
+		},
+		result: &GetHashesPerSecCmd{
+			id: float64(1),
+		},
+	},
+	{
+		name: "basic getinfo",
+		f: func() (Cmd, error) {
+			return NewGetInfoCmd(float64(1))
+		},
+		result: &GetInfoCmd{
+			id: float64(1),
+		},
+	},
+	{
+		name: "basic getinfo",
+		f: func() (Cmd, error) {
+			return NewGetInfoCmd(float64(1))
+		},
+		result: &GetInfoCmd{
+			id: float64(1),
+		},
+	},
+	{
+		name: "basic getnettotals",
+		f: func() (Cmd, error) {
+			return NewGetNetTotalsCmd(float64(1))
+		},
+		result: &GetNetTotalsCmd{
+			id: float64(1),
+		},
+	},
+	{
 		name: "basic ping",
 		f: func() (Cmd, error) {
 			return NewPingCmd(float64(1))
