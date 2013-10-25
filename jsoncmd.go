@@ -134,6 +134,9 @@ func ParseMarshaledCmd(b []byte) (Cmd, error) {
 	case "getinfo":
 		cmd = new(GetInfoCmd)
 
+	case "getmininginfo":
+		cmd = new(GetMiningInfoCmd)
+
 	case "getnettotals":
 		cmd = new(GetNetTotalsCmd)
 
@@ -2181,6 +2184,66 @@ func (cmd *GetInfoCmd) UnmarshalJSON(b []byte) error {
 	return nil
 }
 
+// GetMiningInfoCmd is a type handling custom marshaling and
+// unmarshaling of getmininginfo JSON RPC commands.
+type GetMiningInfoCmd struct {
+	id interface{}
+}
+
+// Enforce that GetMiningInfoCmd satisifies the Cmd interface.
+var _ Cmd = &GetMiningInfoCmd{}
+
+// NewGetMiningInfoCmd creates a new GetMiningInfoCmd.
+func NewGetMiningInfoCmd(id interface{}) (*GetMiningInfoCmd, error) {
+	return &GetMiningInfoCmd{
+		id: id,
+	}, nil
+}
+
+// Id satisfies the Cmd interface by returning the id of the command.
+func (cmd *GetMiningInfoCmd) Id() interface{} {
+	return cmd.id
+}
+
+// Method satisfies the Cmd interface by returning the json method.
+func (cmd *GetMiningInfoCmd) Method() string {
+	return "getmininginfo"
+}
+
+// MarshalJSON returns the JSON encoding of cmd.  Part of the Cmd interface.
+func (cmd *GetMiningInfoCmd) MarshalJSON() ([]byte, error) {
+
+	// Fill and marshal a RawCmd.
+	return json.Marshal(RawCmd{
+		Jsonrpc: "1.0",
+		Method:  "getmininginfo",
+		Id:      cmd.id,
+		Params:  []interface{}{},
+	})
+}
+
+// UnmarshalJSON unmarshals the JSON encoding of cmd into cmd.  Part of
+// the Cmd interface.
+func (cmd *GetMiningInfoCmd) UnmarshalJSON(b []byte) error {
+	// Unmashal into a RawCmd
+	var r RawCmd
+	if err := json.Unmarshal(b, &r); err != nil {
+		return err
+	}
+
+	if len(r.Params) != 0 {
+		return ErrWrongNumberOfParams
+	}
+
+	newCmd, err := NewGetMiningInfoCmd(r.Id)
+	if err != nil {
+		return err
+	}
+
+	*cmd = *newCmd
+	return nil
+}
+
 // GetNetTotalsCmd is a type handling custom marshaling and
 // unmarshaling of getnettotals JSON RPC commands.
 type GetNetTotalsCmd struct {
@@ -2339,66 +2402,6 @@ func (cmd *GetNetworkHashPSCmd) UnmarshalJSON(b []byte) error {
 		optArgs = append(optArgs, int(height))
 	}
 	newCmd, err := NewGetNetworkHashPSCmd(r.Id, optArgs...)
-	if err != nil {
-		return err
-	}
-
-	*cmd = *newCmd
-	return nil
-}
-
-// GetMiningInfoCmd is a type handling custom marshaling and
-// unmarshaling of getmininginfo JSON RPC commands.
-type GetMiningInfoCmd struct {
-	id interface{}
-}
-
-// Enforce that GetMiningInfoCmd satisifies the Cmd interface.
-var _ Cmd = &GetMiningInfoCmd{}
-
-// NewGetMiningInfoCmd creates a new GetMiningInfoCmd.
-func NewGetMiningInfoCmd(id interface{}) (*GetMiningInfoCmd, error) {
-	return &GetMiningInfoCmd{
-		id: id,
-	}, nil
-}
-
-// Id satisfies the Cmd interface by returning the id of the command.
-func (cmd *GetMiningInfoCmd) Id() interface{} {
-	return cmd.id
-}
-
-// Method satisfies the Cmd interface by returning the json method.
-func (cmd *GetMiningInfoCmd) Method() string {
-	return "getmininginfo"
-}
-
-// MarshalJSON returns the JSON encoding of cmd.  Part of the Cmd interface.
-func (cmd *GetMiningInfoCmd) MarshalJSON() ([]byte, error) {
-
-	// Fill and marshal a RawCmd.
-	return json.Marshal(RawCmd{
-		Jsonrpc: "1.0",
-		Method:  "getmininginfo",
-		Id:      cmd.id,
-		Params:  []interface{}{},
-	})
-}
-
-// UnmarshalJSON unmarshals the JSON encoding of cmd into cmd.  Part of
-// the Cmd interface.
-func (cmd *GetMiningInfoCmd) UnmarshalJSON(b []byte) error {
-	// Unmashal into a RawCmd
-	var r RawCmd
-	if err := json.Unmarshal(b, &r); err != nil {
-		return err
-	}
-
-	if len(r.Params) != 0 {
-		return ErrWrongNumberOfParams
-	}
-
-	newCmd, err := NewGetMiningInfoCmd(r.Id)
 	if err != nil {
 		return err
 	}

@@ -310,7 +310,7 @@ var jsoncmdtests = []struct {
 			return NewGetBlockHashCmd(float64(1), 1234)
 		},
 		result: &GetBlockHashCmd{
-			id: float64(1),
+			id:    float64(1),
 			Index: 1234,
 		},
 	},
@@ -327,13 +327,13 @@ var jsoncmdtests = []struct {
 		name: "basic getblocktemplate + request",
 		f: func() (Cmd, error) {
 			return NewGetBlockTemplateCmd(float64(1),
-				&TemplateRequest{Mode:"mode",
-				Capabilities: []string{"one", "two", "three"}})
+				&TemplateRequest{Mode: "mode",
+					Capabilities: []string{"one", "two", "three"}})
 		},
 		result: &GetBlockTemplateCmd{
 			id: float64(1),
-			Request:	&TemplateRequest{
-				Mode:"mode",
+			Request: &TemplateRequest{
+				Mode: "mode",
 				Capabilities: []string{
 					"one",
 					"two",
@@ -347,11 +347,11 @@ var jsoncmdtests = []struct {
 		f: func() (Cmd, error) {
 			return NewGetBlockTemplateCmd(float64(1),
 				&TemplateRequest{
-				Capabilities: []string{"one", "two", "three"}})
+					Capabilities: []string{"one", "two", "three"}})
 		},
 		result: &GetBlockTemplateCmd{
 			id: float64(1),
-			Request:	&TemplateRequest{
+			Request: &TemplateRequest{
 				Capabilities: []string{
 					"one",
 					"two",
@@ -420,6 +420,48 @@ var jsoncmdtests = []struct {
 			return NewGetNetTotalsCmd(float64(1))
 		},
 		result: &GetNetTotalsCmd{
+			id: float64(1),
+		},
+	},
+	{
+		name: "basic getnetworkhashps",
+		f: func() (Cmd, error) {
+			return NewGetNetworkHashPSCmd(float64(1))
+		},
+		result: &GetNetworkHashPSCmd{
+			id:     float64(1),
+			Blocks: 120,
+			Height: -1,
+		},
+	},
+	{
+		name: "basic getnetworkhashps + blocks",
+		f: func() (Cmd, error) {
+			return NewGetNetworkHashPSCmd(float64(1), 5000)
+		},
+		result: &GetNetworkHashPSCmd{
+			id:     float64(1),
+			Blocks: 5000,
+			Height: -1,
+		},
+	},
+	{
+		name: "basic getnetworkhashps + blocks + height",
+		f: func() (Cmd, error) {
+			return NewGetNetworkHashPSCmd(float64(1), 5000, 1000)
+		},
+		result: &GetNetworkHashPSCmd{
+			id:     float64(1),
+			Blocks: 5000,
+			Height: 1000,
+		},
+	},
+	{
+		name: "basic getmininginfo",
+		f: func() (Cmd, error) {
+			return NewGetMiningInfoCmd(float64(1))
+		},
+		result: &GetMiningInfoCmd{
 			id: float64(1),
 		},
 	},
