@@ -1853,11 +1853,20 @@ func (cmd *GetBlockTemplateCmd) UnmarshalJSON(b []byte) error {
 
 		capabilities, ok := rmap["capabilities"]
 		if ok {
-			scap, ok := capabilities.([]string)
+			icap, ok := capabilities.([]interface{})
 			if !ok {
-				return errors.New("TemplateRequest mode must be a string array")
+				return errors.New("TemplateRequest mode must be an array")
 			}
-			trequest.Capabilities = scap
+
+			cap := make([]string, len(icap))
+			for i, val := range icap {
+				cap[i], ok = val.(string)
+				if !ok {
+					return errors.New("TemplateRequest mode must be an aray of strings")
+				}
+			}
+
+			trequest.Capabilities = cap
 		}
 
 		optArgs = append(optArgs, trequest)

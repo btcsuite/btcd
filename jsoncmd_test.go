@@ -305,6 +305,62 @@ var jsoncmdtests = []struct {
 		},
 	},
 	{
+		name: "basic getblockhash",
+		f: func() (Cmd, error) {
+			return NewGetBlockHashCmd(float64(1), 1234)
+		},
+		result: &GetBlockHashCmd{
+			id: float64(1),
+			Index: 1234,
+		},
+	},
+	{
+		name: "basic getblocktemplate",
+		f: func() (Cmd, error) {
+			return NewGetBlockTemplateCmd(float64(1))
+		},
+		result: &GetBlockTemplateCmd{
+			id: float64(1),
+		},
+	},
+	{
+		name: "basic getblocktemplate + request",
+		f: func() (Cmd, error) {
+			return NewGetBlockTemplateCmd(float64(1),
+				&TemplateRequest{Mode:"mode",
+				Capabilities: []string{"one", "two", "three"}})
+		},
+		result: &GetBlockTemplateCmd{
+			id: float64(1),
+			Request:	&TemplateRequest{
+				Mode:"mode",
+				Capabilities: []string{
+					"one",
+					"two",
+					"three",
+				},
+			},
+		},
+	},
+	{
+		name: "basic getblocktemplate + request no mode",
+		f: func() (Cmd, error) {
+			return NewGetBlockTemplateCmd(float64(1),
+				&TemplateRequest{
+				Capabilities: []string{"one", "two", "three"}})
+		},
+		result: &GetBlockTemplateCmd{
+			id: float64(1),
+			Request:	&TemplateRequest{
+				Capabilities: []string{
+					"one",
+					"two",
+					"three",
+				},
+			},
+		},
+	},
+	{
 		name: "basic ping",
 		f: func() (Cmd, error) {
 			return NewPingCmd(float64(1))
