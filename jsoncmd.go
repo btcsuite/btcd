@@ -1253,7 +1253,7 @@ func NewGetAddedNodeInfoCmd(id interface{}, dns bool, optArgs ...string) (*GetAd
 		if len(optArgs) > 1 {
 			return nil, ErrTooManyOptArgs
 		}
-		node = optArgs[1]
+		node = optArgs[0]
 	}
 	return &GetAddedNodeInfoCmd{
 		id:   id,
@@ -1275,26 +1275,18 @@ func (cmd *GetAddedNodeInfoCmd) Method() string {
 // MarshalJSON returns the JSON encoding of cmd.  Part of the Cmd interface.
 func (cmd *GetAddedNodeInfoCmd) MarshalJSON() ([]byte, error) {
 	// Fill and marshal a RawCmd.
-	var raw RawCmd
-	if cmd.Node == "" {
-		raw = RawCmd{
-			Jsonrpc: "1.0",
-			Method:  "getaddednodeinfo",
-			Id:      cmd.id,
-			Params: []interface{}{
-				cmd.Dns,
-			},
-		}
-	} else {
-		raw = RawCmd{
-			Jsonrpc: "1.0",
-			Method:  "getaddednodeinfo",
-			Id:      cmd.id,
-			Params: []interface{}{
-				cmd.Dns,
-				cmd.Node,
-			},
-		}
+	
+	raw := RawCmd{
+		Jsonrpc: "1.0",
+		Method:  "getaddednodeinfo",
+		Id:      cmd.id,
+		Params: []interface{}{
+			cmd.Dns,
+		},
+	}
+
+	if cmd.Node != "" {
+		raw.Params = append(raw.Params, cmd.Node)
 	}
 
 	return json.Marshal(raw)

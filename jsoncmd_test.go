@@ -191,6 +191,38 @@ var jsoncmdtests = []struct {
 		},
 	},
 	{
+		name: "basic getaddednodeinfo true",
+		f: func() (Cmd, error) {
+			return NewGetAddedNodeInfoCmd(float64(1), true)
+		},
+		result: &GetAddedNodeInfoCmd{
+			id: float64(1),
+			Dns: true,
+		},
+	},
+	{
+		name: "basic getaddednodeinfo false",
+		f: func() (Cmd, error) {
+			return NewGetAddedNodeInfoCmd(float64(1), false)
+		},
+		result: &GetAddedNodeInfoCmd{
+			id: float64(1),
+			Dns: false,
+		},
+	},
+	{
+		name: "basic getaddednodeinfo withnode",
+		f: func() (Cmd, error) {
+			return NewGetAddedNodeInfoCmd(float64(1), true,
+				"thisisanode")
+		},
+		result: &GetAddedNodeInfoCmd{
+			id: float64(1),
+			Dns: true,
+			Node: "thisisanode",
+		},
+	},
+	{
 		name: "basic ping",
 		f: func() (Cmd, error) {
 			return NewPingCmd(float64(1))
