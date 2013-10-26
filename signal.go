@@ -27,10 +27,13 @@ func mainInterruptHandler() {
 	for {
 		select {
 		case <-interruptChannel:
+			log.Infof("Received SIGINT (Ctrl+C).  Shutting down...")
 			for _, callback := range interruptCallbacks {
 				callback()
 			}
-			os.Exit(0)
+
+			// Signal the main goroutine to shutdown.
+			shutdownChannel <- true
 
 		case handler := <-addHandlerChannel:
 			interruptCallbacks = append(interruptCallbacks, handler)

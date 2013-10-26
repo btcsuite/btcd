@@ -13,7 +13,8 @@ import (
 )
 
 var (
-	cfg *config
+	cfg             *config
+	shutdownChannel = make(chan bool)
 )
 
 // btcdMain is the real main function for btcd.  It is necessary to work around
@@ -71,6 +72,7 @@ func btcdMain() error {
 
 	// Ensure the database is sync'd and closed on Ctrl+C.
 	addInterruptHandler(func() {
+		log.Infof("Gracefully shutting down the database...")
 		db.RollbackClose()
 	})
 
@@ -83,7 +85,21 @@ func btcdMain() error {
 	}
 	server.Start()
 
-	server.WaitForShutdown()
+	// Monitor for graceful server shutdown and signal the main goroutine
+	// when done.  This is done in a separate goroutine rather than waiting
+	// directly so the main goroutine can be signaled for shutdown by either
+	// a graceful shutdown or from the main interrupt handler.  This is
+	// necessary since the main goroutine must be kept running long enough
+	// for the interrupt handler goroutine to finish.
+	go func() {
+		server.WaitForShutdown()
+		shutdownChannel <- true
+	}()
+
+	// Wait for shutdown signal from either a graceful server stop or from
+	// the interrupt handler.
+	<-shutdownChannel
+	log.Info("Shutdown complete")
 	return nil
 }
 
