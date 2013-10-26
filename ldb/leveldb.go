@@ -289,11 +289,11 @@ func (db *LevelDb) DropAfterBlockBySha(sha *btcwire.ShaHash) (rerr error) {
 			}
 		}
 		// rather than iterate the list of tx backward, do it twice.
-		for _, tx := range blk.MsgBlock().Transactions {
-			txSha, _ := tx.TxSha()
+		txShas, _ := blk.TxShas()
+		for _, txSha := range txShas {
 			var txUo txUpdateObj
 			txUo.delete = true
-			db.txUpdateMap[txSha] = &txUo
+			db.txUpdateMap[*txSha] = &txUo
 		}
 		db.lBatch().Delete(shaBlkToKey(blksha))
 		db.lBatch().Delete(int64ToKey(height))
@@ -347,8 +347,7 @@ func (db *LevelDb) InsertBlock(block *btcutil.Block) (height int64, rerr error) 
 	// miners, the sha of the transaction exists in a previous block,
 	// detect this condition and 'accept' the block.
 	for txidx, tx := range mblock.Transactions {
-		var txsha btcwire.ShaHash
-		txsha, err = tx.TxSha()
+		txsha, err := block.TxSha(txidx)
 		if err != nil {
 			log.Warnf("failed to compute tx name block %v idx %v err %v", blocksha, txidx, err)
 			return 0, err
@@ -362,7 +361,7 @@ func (db *LevelDb) InsertBlock(block *btcutil.Block) (height int64, rerr error) 
 			if err != nil {
 				panic("invalid sha string in source")
 			}
-			if txsha == *dupsha {
+			if txsha.IsEqual(dupsha) {
 				//log.Tracef("skipping sha %v %v", dupsha, newheight)
 				continue
 			}
@@ -372,7 +371,7 @@ func (db *LevelDb) InsertBlock(block *btcutil.Block) (height int64, rerr error) 
 			if err != nil {
 				panic("invalid sha string in source")
 			}
-			if txsha == *dupsha {
+			if txsha.IsEqual(dupsha) {
 				//log.Tracef("skipping sha %v %v", dupsha, newheight)
 				continue
 			}
@@ -385,15 +384,15 @@ func (db *LevelDb) InsertBlock(block *btcutil.Block) (height int64, rerr error) 
 			}
 		}
 
-		err = db.insertTx(&txsha, newheight, txloc[txidx].TxStart, txloc[txidx].TxLen, spentbuf)
+		err = db.insertTx(txsha, newheight, txloc[txidx].TxStart, txloc[txidx].TxLen, spentbuf)
 		if err != nil {
-			log.Warnf("block %v idx %v failed to insert tx %v %v err %v", blocksha, newheight, &txsha, txidx, err)
+			log.Warnf("block %v idx %v failed to insert tx %v %v err %v", blocksha, newheight, txsha, txidx, err)
 
 			return
 		}
 		err = db.doSpend(tx)
 		if err != nil {
-			log.Warnf("block %v idx %v failed to spend tx %v %v err %v", blocksha, newheight, &txsha, txidx, err)
+			log.Warnf("block %v idx %v failed to spend tx %v %v err %v", blocksha, newheight, txsha, txidx, err)
 
 			return
 		}
