@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"github.com/conformal/btcdb"
 	_ "github.com/conformal/btcdb/ldb"
-	_ "github.com/conformal/btcdb/memdb"
 	"github.com/conformal/btcwire"
 	"github.com/conformal/go-flags"
 	"net"
