@@ -15,7 +15,6 @@ import (
 	"github.com/conformal/goleveldb/leveldb/opt"
 	"github.com/conformal/seelog"
 	"os"
-	"runtime"
 	"sync"
 )
 
@@ -548,7 +547,6 @@ func (db *LevelDb) processBatches() error {
 		}
 		db.lbatch.Reset()
 		db.txUpdateMap = map[btcwire.ShaHash]*txUpdateObj{}
-		runtime.GC()
 	}
 
 	return nil
