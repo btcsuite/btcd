@@ -10,6 +10,7 @@ import (
 	_ "net/http/pprof"
 	"os"
 	"runtime"
+	"runtime/pprof"
 )
 
 var (
@@ -44,7 +45,7 @@ func btcdMain() error {
 	// Show version at startup.
 	log.Infof("Version %s", version())
 
-	// See if we want to enable profiling.
+	// Enable http profiling server if requested.
 	if cfg.Profile != "" {
 		go func() {
 			listenAddr := net.JoinHostPort("", cfg.Profile)
@@ -54,6 +55,17 @@ func btcdMain() error {
 			http.Handle("/", profileRedirect)
 			log.Errorf("%v", http.ListenAndServe(listenAddr, nil))
 		}()
+	}
+
+	// Write cpu profile if requested.
+	if cfg.CpuProfile != "" {
+		f, err := os.Create(cfg.CpuProfile)
+		if err != nil {
+			log.Errorf("Unable to create cpu profile: %v", err)
+			return err
+		}
+		pprof.StartCPUProfile(f)
+		defer pprof.StopCPUProfile()
 	}
 
 	// Perform upgrades to btcd as new versions require it.
