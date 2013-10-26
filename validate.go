@@ -230,14 +230,12 @@ func CheckTransactionSanity(tx *btcwire.MsgTx) error {
 	}
 
 	// Check for duplicate transaction inputs.
-	existingTxOut := make(map[string]bool)
+	existingTxOut := make(map[btcwire.OutPoint]bool)
 	for _, txIn := range tx.TxIn {
-		prevOut := &txIn.PreviousOutpoint
-		key := fmt.Sprintf("%v%v", prevOut.Hash, prevOut.Index)
-		if _, exists := existingTxOut[key]; exists {
+		if _, exists := existingTxOut[txIn.PreviousOutpoint]; exists {
 			return RuleError("transaction contains duplicate outpoint")
 		}
-		existingTxOut[key] = true
+		existingTxOut[txIn.PreviousOutpoint] = true
 	}
 
 	// Coinbase script length must be between min and max length.
