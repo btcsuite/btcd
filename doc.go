@@ -44,8 +44,12 @@ engine to validate a transaction.
 	func ValidateTx(tx *btcwire.MsgTx, txIdx int, txIn *btcwire.MsgTx, txInIdx int, timestamp time.Time) {
 		pkScript := txIn.TxOut[txInIdx].PkScript
 		sigScript := tx.txIn[TxIdx]
+		var flags btcscript.ScriptFlags
+		if timestamp.After(btcscript.Bip16Activation) {
+			flags |= btcscript.ScriptBip16
+		}
 		engine, err := btcscript.NewScript(sigScript, pkScript, txInIdx,
-			tx, timestamp.After(btcscript.Bip16Activation))
+			tx, flags)
 		return engine.Execute()
 	}
 
