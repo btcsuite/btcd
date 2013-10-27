@@ -975,8 +975,24 @@ func warnMultipeDBs() {
 	}
 }
 
-// loadBlockDB opens the block database and returns a handle to it.
-func loadBlockDB() (btcdb.Db, error) {
+// setupBlockDB loads (or creates when needed) the block database taking into
+// account the selected database backend.  It also contains additional logic
+// such warning the user if there are multiple databases which consume space on
+// the file system and ensuring the regression test database is clean when in
+// regression test mode.
+func setupBlockDB() (btcdb.Db, error) {
+	// The memdb backend does not have a file path associated with it, so
+	// handle it uniquely.  We also don't want to worry about the multiple
+	// database type warnings when running with the memory database.
+	if cfg.DbType == "memdb" {
+		btcdLog.Infof("Creating block database in memory.")
+		db, err := btcdb.CreateDB(cfg.DbType)
+		if err != nil {
+			return nil, err
+		}
+		return db, nil
+	}
+
 	warnMultipeDBs()
 
 	// The database name is based on the database type.
@@ -989,8 +1005,8 @@ func loadBlockDB() (btcdb.Db, error) {
 	btcdLog.Infof("Loading block database from '%s'", dbPath)
 	db, err := btcdb.OpenDB(cfg.DbType, dbPath)
 	if err != nil {
-		// Return the error if it's not because the database doesn't
-		// exist.
+		// Return the error if it's not because the database
+		// doesn't exist.
 		if err != btcdb.DbDoesNotExist {
 			return nil, err
 		}
@@ -1004,6 +1020,16 @@ func loadBlockDB() (btcdb.Db, error) {
 		if err != nil {
 			return nil, err
 		}
+	}
+
+	return db, nil
+}
+
+// loadBlockDB opens the block database and returns a handle to it.
+func loadBlockDB() (btcdb.Db, error) {
+	db, err := setupBlockDB()
+	if err != nil {
+		return nil, err
 	}
 
 	// Get the latest block height from the database.
