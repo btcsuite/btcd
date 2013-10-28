@@ -35,6 +35,8 @@ type Block struct {
 	blockHeight     int64              // Height in the main block chain
 	txShas          []*btcwire.ShaHash // Cached transaction hashes
 	txShasGenerated bool               // ALL transaction hashes generated
+	transactions    []*Tx              // Transactions
+	txnsGenerated   bool               // ALL wrapped transactions generated
 }
 
 // MsgBlock returns the underlying btcwire.MsgBlock for the Block.
@@ -83,12 +85,13 @@ func (b *Block) Sha() (*btcwire.ShaHash, error) {
 	return &sha, nil
 }
 
-// TxSha returns the hash for the requested transaction number in the Block.
-// The supplied index is 0 based.  That is to say, the first transaction is the
-// block is txNum 0.  This is equivalent to calling TxSha on the underlying
-// btcwire.MsgTx, however it caches the result so subsequent calls are more
-// efficient.
-func (b *Block) TxSha(txNum int) (*btcwire.ShaHash, error) {
+// Tx returns a wrapped transaction (btcutil.Tx) for the transaction at the
+// specified index in the Block.  The supplied index is 0 based.  That is to
+// say, the first transaction in the block is txNum 0.  This is nearly
+// equivalent to accessing the raw transaction (btcwire.MsgTx) from the
+// underlying btcwire.MsgBlock, however the wrapped transaction has some helpful
+// properties such as caching the hash so subsequent calls are more efficient.
+func (b *Block) Tx(txNum int) (*Tx, error) {
 	// Ensure the requested transaction is in range.
 	numTx := b.msgBlock.Header.TxnCount
 	if txNum < 0 || uint64(txNum) > numTx {
@@ -97,28 +100,80 @@ func (b *Block) TxSha(txNum int) (*btcwire.ShaHash, error) {
 		return nil, OutOfRangeError(str)
 	}
 
-	// Generate slice to hold all of the transaction hashes if needed.
-	if len(b.txShas) == 0 {
-		b.txShas = make([]*btcwire.ShaHash, numTx)
+	// Generate slice to hold all of the wrapped transactions if needed.
+	if len(b.transactions) == 0 {
+		b.transactions = make([]*Tx, numTx)
 	}
 
-	// Return the cached hash if it has already been generated.
-	if b.txShas[txNum] != nil {
-		return b.txShas[txNum], nil
+	// Return the wrapped transaction if it has already been generated.
+	if b.transactions[txNum] != nil {
+		return b.transactions[txNum], nil
 	}
 
-	// Generate the hash for the transaction.  Ignore the error since TxSha
-	// can't currently fail.
-	sha, _ := b.msgBlock.Transactions[txNum].TxSha()
+	// Generate and cache the wrapped transaction and return it.
+	newTx := NewTx(b.msgBlock.Transactions[txNum])
+	newTx.SetIndex(txNum)
+	b.transactions[txNum] = newTx
+	return newTx, nil
+}
 
-	// Cache the transaction hash and return it.
-	b.txShas[txNum] = &sha
-	return &sha, nil
+// Transactions returns a slice of wrapped transactions (btcutil.Tx) for all
+// transactions in the Block.  This is nearly equivalent to accessing the raw
+// transactions (btcwire.MsgTx) in the underlying btcwire.MsgBlock, however it
+// instead provides easy access to wrapped versions (btcutil.Tx) of them.
+func (b *Block) Transactions() []*Tx {
+	// Return transactions if they have ALL already been generated.  This
+	// flag is necessary because the wrapped transactions are lazily
+	// generated in a sparse fashion.
+	if b.txnsGenerated {
+		return b.transactions
+	}
+
+	// Generate slice to hold all of the wrapped transactions if needed.
+	if len(b.transactions) == 0 {
+		b.transactions = make([]*Tx, b.msgBlock.Header.TxnCount)
+	}
+
+	// Generate and cache the wrapped transactions for all that haven't
+	// already been done.
+	for i, tx := range b.transactions {
+		if tx == nil {
+			newTx := NewTx(b.msgBlock.Transactions[i])
+			newTx.SetIndex(i)
+			b.transactions[i] = newTx
+		}
+	}
+
+	b.txnsGenerated = true
+	return b.transactions
+}
+
+// TxSha returns the hash for the requested transaction number in the Block.
+// The supplied index is 0 based.  That is to say, the first transaction in the
+// block is txNum 0.  This is equivalent to calling TxSha on the underlying
+// btcwire.MsgTx, however it caches the result so subsequent calls are more
+// efficient.
+func (b *Block) TxSha(txNum int) (*btcwire.ShaHash, error) {
+	// Attempt to get a wrapped transaction for the specified index.  It
+	// will be created lazily if needed or simply return the cached version
+	// if it has already been generated.
+	tx, err := b.Tx(txNum)
+	if err != nil {
+		return nil, err
+	}
+
+	// Defer to the wrapped transaction which will return the cached hash if
+	// it has already been generated.
+	return tx.Sha(), nil
 }
 
 // TxShas returns a slice of hashes for all transactions in the Block.  This is
 // equivalent to calling TxSha on each underlying btcwire.MsgTx, however it
 // caches the result so subsequent calls are more efficient.
+//
+// DEPRECATED - This function will be removed in the next version and
+// should not be used.  Instead, use Transactions() and .Sha() on each
+// transaction.
 func (b *Block) TxShas() ([]*btcwire.ShaHash, error) {
 	// Return cached hashes if they have ALL already been generated.  This
 	// flag is necessary because the transaction hashes are lazily generated
@@ -136,9 +191,11 @@ func (b *Block) TxShas() ([]*btcwire.ShaHash, error) {
 	// been done.
 	for i, hash := range b.txShas {
 		if hash == nil {
-			// Ignore the error since TxSha can't currently fail.
-			sha, _ := b.msgBlock.Transactions[i].TxSha()
-			b.txShas[i] = &sha
+			// Ignore the errors since the only way these can fail
+			// is if the index is out of range which is not possible
+			// here due to the range.
+			tx, _ := b.Tx(i)
+			b.txShas[i] = tx.Sha()
 		}
 	}
 
