@@ -66,8 +66,9 @@ func TestCheckSerializedHeight(t *testing.T) {
 
 	t.Logf("Running %d tests", len(tests))
 	for i, test := range tests {
-		tx := coinbaseTx.Copy()
-		tx.TxIn[0].SignatureScript = test.sigScript
+		msgTx := coinbaseTx.Copy()
+		msgTx.TxIn[0].SignatureScript = test.sigScript
+		tx := btcutil.NewTx(msgTx)
 
 		err := btcchain.TstCheckSerializedHeight(tx, test.wantHeight)
 		if reflect.TypeOf(err) != reflect.TypeOf(test.err) {

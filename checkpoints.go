@@ -154,11 +154,11 @@ func (b *BlockChain) findLatestKnownCheckpoint() (*btcutil.Block, error) {
 
 // isNonstandardTransaction determines whether a transaction contains any
 // scripts which are not one of the standard types.
-func isNonstandardTransaction(tx *btcwire.MsgTx) bool {
+func isNonstandardTransaction(tx *btcutil.Tx) bool {
 	// TODO(davec): Should there be checks for the input signature scripts?
 
 	// Check all of the output public key scripts for non-standard scripts.
-	for _, txOut := range tx.TxOut {
+	for _, txOut := range tx.MsgTx().TxOut {
 		scriptClass := btcscript.GetScriptClass(txOut.PkScript)
 		if scriptClass == btcscript.NonStandardTy {
 			return true
@@ -235,7 +235,7 @@ func (b *BlockChain) IsCheckpointCandidate(block *btcutil.Block) (bool, error) {
 
 	// A checkpoint must have transactions that only contain standard
 	// scripts.
-	for _, tx := range block.MsgBlock().Transactions {
+	for _, tx := range block.Transactions() {
 		if isNonstandardTransaction(tx) {
 			return false, nil
 		}

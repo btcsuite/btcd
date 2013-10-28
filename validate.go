@@ -94,7 +94,9 @@ func isNullOutpoint(outpoint *btcwire.OutPoint) bool {
 // represented in the block chain by a transaction with a single input that has
 // a previous output transaction index set to the maximum value along with a
 // zero hash.
-func IsCoinBase(msgTx *btcwire.MsgTx) bool {
+func IsCoinBase(tx *btcutil.Tx) bool {
+	msgTx := tx.MsgTx()
+
 	// A coin base must only have one transaction input.
 	if len(msgTx.TxIn) != 1 {
 		return false
@@ -111,7 +113,9 @@ func IsCoinBase(msgTx *btcwire.MsgTx) bool {
 }
 
 // IsFinalizedTransaction determines whether or not a transaction is finalized.
-func IsFinalizedTransaction(msgTx *btcwire.MsgTx, blockHeight int64, blockTime time.Time) bool {
+func IsFinalizedTransaction(tx *btcutil.Tx, blockHeight int64, blockTime time.Time) bool {
+	msgTx := tx.MsgTx()
+
 	// Lock time of zero means the transaction is finalized.
 	lockTime := msgTx.LockTime
 	if lockTime == 0 {
@@ -175,14 +179,15 @@ func calcBlockSubsidy(height int64) int64 {
 
 // CheckTransactionSanity performs some preliminary checks on a transaction to
 // ensure it is sane.  These checks are context free.
-func CheckTransactionSanity(tx *btcwire.MsgTx) error {
+func CheckTransactionSanity(tx *btcutil.Tx) error {
 	// A transaction must have at least one input.
-	if len(tx.TxIn) == 0 {
+	msgTx := tx.MsgTx()
+	if len(msgTx.TxIn) == 0 {
 		return RuleError("transaction has no inputs")
 	}
 
 	// A transaction must have at least one output.
-	if len(tx.TxOut) == 0 {
+	if len(msgTx.TxOut) == 0 {
 		return RuleError("transaction has no outputs")
 	}
 
@@ -198,7 +203,7 @@ func CheckTransactionSanity(tx *btcwire.MsgTx) error {
 	// as a satoshi.  One bitcoin is a quantity of satoshi as defined by the
 	// satoshiPerBitcoin constant.
 	var totalSatoshi int64
-	for _, txOut := range tx.TxOut {
+	for _, txOut := range msgTx.TxOut {
 		satoshi := txOut.Value
 		if satoshi < 0 {
 			str := fmt.Sprintf("transaction output has negative "+
@@ -231,7 +236,7 @@ func CheckTransactionSanity(tx *btcwire.MsgTx) error {
 
 	// Check for duplicate transaction inputs.
 	existingTxOut := make(map[btcwire.OutPoint]bool)
-	for _, txIn := range tx.TxIn {
+	for _, txIn := range msgTx.TxIn {
 		if _, exists := existingTxOut[txIn.PreviousOutpoint]; exists {
 			return RuleError("transaction contains duplicate outpoint")
 		}
@@ -240,7 +245,7 @@ func CheckTransactionSanity(tx *btcwire.MsgTx) error {
 
 	// Coinbase script length must be between min and max length.
 	if IsCoinBase(tx) {
-		slen := len(tx.TxIn[0].SignatureScript)
+		slen := len(msgTx.TxIn[0].SignatureScript)
 		if slen < minCoinbaseScriptLen || slen > maxCoinbaseScriptLen {
 			str := fmt.Sprintf("coinbase transaction script length "+
 				"of %d is out of range (min: %d, max: %d)",
@@ -250,7 +255,7 @@ func CheckTransactionSanity(tx *btcwire.MsgTx) error {
 	} else {
 		// Previous transaction outputs referenced by the inputs to this
 		// transaction must not be null.
-		for _, txIn := range tx.TxIn {
+		for _, txIn := range msgTx.TxIn {
 			prevOut := &txIn.PreviousOutpoint
 			if isNullOutpoint(prevOut) {
 				return RuleError("transaction input refers to " +
@@ -302,7 +307,9 @@ func (b *BlockChain) checkProofOfWork(block *btcutil.Block) error {
 // input and output scripts in the provided transaction.  This uses the
 // quicker, but imprecise, signature operation counting mechanism from
 // btcscript.
-func countSigOps(msgTx *btcwire.MsgTx) int {
+func countSigOps(tx *btcutil.Tx) int {
+	msgTx := tx.MsgTx()
+
 	// Accumulate the number of signature operations in all transaction
 	// inputs.
 	totalSigOps := 0
@@ -325,20 +332,15 @@ func countSigOps(msgTx *btcwire.MsgTx) int {
 // transactions which are of the pay-to-script-hash type.  This uses the
 // precise, signature operation counting mechanism from btcscript which requires
 // access to the input transaction scripts.
-func countP2SHSigOps(msgTx *btcwire.MsgTx, isCoinBaseTx bool, txStore TxStore) (int, error) {
+func countP2SHSigOps(tx *btcutil.Tx, isCoinBaseTx bool, txStore TxStore) (int, error) {
 	// Coinbase transactions have no interesting inputs.
 	if isCoinBaseTx {
 		return 0, nil
 	}
 
-	// TODO(davec): Need to pass the cached version in.
-	txHash, err := msgTx.TxSha()
-	if err != nil {
-		return 0, err
-	}
-
 	// Accumulate the number of signature operations in all transaction
 	// inputs.
+	msgTx := tx.MsgTx()
 	totalSigOps := 0
 	for _, txIn := range msgTx.TxIn {
 		// Ensure the referenced input transaction is available.
@@ -347,23 +349,24 @@ func countP2SHSigOps(msgTx *btcwire.MsgTx, isCoinBaseTx bool, txStore TxStore) (
 		if !exists || originTx.Err != nil || originTx.Tx == nil {
 			str := fmt.Sprintf("unable to find input transaction "+
 				"%v referenced from transaction %v", txInHash,
-				txHash)
+				tx.Sha())
 			return 0, RuleError(str)
 		}
+		originMsgTx := originTx.Tx.MsgTx()
 
 		// Ensure the output index in the referenced transaction is
 		// available.
 		originTxIndex := txIn.PreviousOutpoint.Index
-		if originTxIndex >= uint32(len(originTx.Tx.TxOut)) {
+		if originTxIndex >= uint32(len(originMsgTx.TxOut)) {
 			str := fmt.Sprintf("out of bounds input index %d in "+
 				"transaction %v referenced from transaction %v",
-				originTxIndex, txInHash, txHash)
+				originTxIndex, txInHash, tx.Sha())
 			return 0, RuleError(str)
 		}
 
 		// We're only interested in pay-to-script-hash types, so skip
 		// this input if it's not one.
-		pkScript := originTx.Tx.TxOut[originTxIndex].PkScript
+		pkScript := originMsgTx.TxOut[originTxIndex].PkScript
 		if !btcscript.IsPayToScriptHash(pkScript) {
 			continue
 		}
@@ -407,8 +410,7 @@ func (b *BlockChain) checkBlockSanity(block *btcutil.Block) error {
 	}
 
 	// Ensure the block time is not more than 2 hours in the future.
-	msgBlock := block.MsgBlock()
-	header := &msgBlock.Header
+	header := &block.MsgBlock().Header
 	if header.Timestamp.After(time.Now().Add(time.Hour * 2)) {
 		str := fmt.Sprintf("block timestamp of %v is too far in the "+
 			"future", header.Timestamp)
@@ -416,7 +418,7 @@ func (b *BlockChain) checkBlockSanity(block *btcutil.Block) error {
 	}
 
 	// A block must have at least one transaction.
-	transactions := msgBlock.Transactions
+	transactions := block.Transactions()
 	if len(transactions) == 0 {
 		return RuleError("block does not contain any transactions")
 	}
@@ -463,11 +465,8 @@ func (b *BlockChain) checkBlockSanity(block *btcutil.Block) error {
 	// since the transaction hashes are already cached due to building the
 	// merkle tree above.
 	existingTxHashes := make(map[btcwire.ShaHash]bool)
-	txShas, err := block.TxShas()
-	if err != nil {
-		return err
-	}
-	for _, hash := range txShas {
+	for _, tx := range transactions {
+		hash := tx.Sha()
 		if _, exists := existingTxHashes[*hash]; exists {
 			str := fmt.Sprintf("block contains duplicate "+
 				"transaction %v", hash)
@@ -497,8 +496,8 @@ func (b *BlockChain) checkBlockSanity(block *btcutil.Block) error {
 
 // checkSerializedHeight checks if the signature script in the passed
 // transaction starts with the serialized block height of wantHeight.
-func checkSerializedHeight(coinbaseTx *btcwire.MsgTx, wantHeight int64) error {
-	sigScript := coinbaseTx.TxIn[0].SignatureScript
+func checkSerializedHeight(coinbaseTx *btcutil.Tx, wantHeight int64) error {
+	sigScript := coinbaseTx.MsgTx().TxIn[0].SignatureScript
 	if len(sigScript) < 1 {
 		str := "the coinbase signature script for blocks of " +
 			"version %d or greater must start with the " +
@@ -601,20 +600,15 @@ func (b *BlockChain) checkBIP0030(node *blockNode, block *btcutil.Block) error {
 // amount, and verifying the signatures to prove the spender was the owner of
 // the bitcoins and therefore allowed to spend them.  As it checks the inputs,
 // it also calculates the total fees for the transaction and returns that value.
-func CheckTransactionInputs(tx *btcwire.MsgTx, txHeight int64, txStore TxStore) (int64, error) {
+func CheckTransactionInputs(tx *btcutil.Tx, txHeight int64, txStore TxStore) (int64, error) {
 	// Coinbase transactions have no inputs.
 	if IsCoinBase(tx) {
 		return 0, nil
 	}
 
-	// TODO(davec): Need to pass the cached version in.
-	txHash, err := tx.TxSha()
-	if err != nil {
-		return 0, err
-	}
-
+	txHash := tx.Sha()
 	var totalSatoshiIn int64
-	for _, txIn := range tx.TxIn {
+	for _, txIn := range tx.MsgTx().TxIn {
 		// Ensure the input is available.
 		txInHash := &txIn.PreviousOutpoint.Hash
 		originTx, exists := txStore[*txInHash]
@@ -659,7 +653,7 @@ func CheckTransactionInputs(tx *btcwire.MsgTx, txHeight int64, txStore TxStore) 
 		// a transaction are in a unit value known as a satoshi.  One
 		// bitcoin is a quantity of satoshi as defined by the
 		// satoshiPerBitcoin constant.
-		originTxSatoshi := originTx.Tx.TxOut[originTxIndex].Value
+		originTxSatoshi := originTx.Tx.MsgTx().TxOut[originTxIndex].Value
 		if originTxSatoshi < 0 {
 			str := fmt.Sprintf("transaction output has negative "+
 				"value of %v", originTxSatoshi)
@@ -693,7 +687,7 @@ func CheckTransactionInputs(tx *btcwire.MsgTx, txHeight int64, txStore TxStore) 
 	// to ignore overflow and out of range errors here because those error
 	// conditions would have already been caught by checkTransactionSanity.
 	var totalSatoshiOut int64
-	for _, txOut := range tx.TxOut {
+	for _, txOut := range tx.MsgTx().TxOut {
 		totalSatoshiOut += txOut.Value
 	}
 
@@ -771,7 +765,7 @@ func (b *BlockChain) checkConnectBlock(node *blockNode, block *btcutil.Block) er
 	// expands the count to include a precise count of pay-to-script-hash
 	// signature operations in each of the input transaction public key
 	// scripts.
-	transactions := block.MsgBlock().Transactions
+	transactions := block.Transactions()
 	totalSigOps := 0
 	for i, tx := range transactions {
 		numsigOps := countSigOps(tx)
@@ -832,7 +826,7 @@ func (b *BlockChain) checkConnectBlock(node *blockNode, block *btcutil.Block) er
 	// errors here because those error conditions would have already been
 	// caught by checkTransactionSanity.
 	var totalSatoshiOut int64
-	for _, txOut := range transactions[0].TxOut {
+	for _, txOut := range transactions[0].MsgTx().TxOut {
 		totalSatoshiOut += txOut.Value
 	}
 	expectedSatoshiOut := calcBlockSubsidy(node.height) + totalFees

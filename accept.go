@@ -60,16 +60,10 @@ func (b *BlockChain) maybeAcceptBlock(block *btcutil.Block) error {
 	}
 
 	// Ensure all transactions in the block are finalized.
-	for i, tx := range block.MsgBlock().Transactions {
+	for _, tx := range block.Transactions() {
 		if !IsFinalizedTransaction(tx, blockHeight, blockHeader.Timestamp) {
-			// Use the TxSha function from the block rather
-			// than the transaction itself since the block version
-			// is cached.  Also, it's safe to ignore the error here
-			// since the only reason TxSha can fail is if the index
-			// is out of range which is impossible here.
-			txSha, _ := block.TxSha(i)
 			str := fmt.Sprintf("block contains unfinalized "+
-				"transaction %v", txSha)
+				"transaction %v", tx.Sha())
 			return RuleError(str)
 		}
 	}
@@ -129,7 +123,7 @@ func (b *BlockChain) maybeAcceptBlock(block *btcutil.Block) error {
 			if prevNode != nil {
 				expectedHeight = prevNode.height + 1
 			}
-			coinbaseTx := block.MsgBlock().Transactions[0]
+			coinbaseTx := block.Transactions()[0]
 			err := checkSerializedHeight(coinbaseTx, expectedHeight)
 			if err != nil {
 				return err

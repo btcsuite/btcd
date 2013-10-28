@@ -69,21 +69,15 @@ func hashMerkleBranches(left *btcwire.ShaHash, right *btcwire.ShaHash) *btcwire.
 // Since this function uses nodes that are pointers to the hashes, empty nodes
 // will be nil.
 func BuildMerkleTreeStore(block *btcutil.Block) []*btcwire.ShaHash {
-	numTransactions := len(block.MsgBlock().Transactions)
-
 	// Calculate how many entries are required to hold the binary merkle
 	// tree as a linear array and create an array of that size.
-	nextPoT := nextPowerOfTwo(numTransactions)
+	nextPoT := nextPowerOfTwo(len(block.Transactions()))
 	arraySize := nextPoT*2 - 1
 	merkles := make([]*btcwire.ShaHash, arraySize)
 
 	// Create the base transaction shas and populate the array with them.
-	for i := 0; i < numTransactions; i++ {
-		// Ignore the error since the only reason TxSha can fail is
-		// if the index is out of range which is impossible here due
-		// to using a loop over the existing transactions.
-		sha, _ := block.TxSha(i)
-		merkles[i] = sha
+	for i, tx := range block.Transactions() {
+		merkles[i] = tx.Sha()
 	}
 
 	// Start the array offset after the last transaction and adjusted to the

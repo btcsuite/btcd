@@ -19,16 +19,10 @@ type txValidate struct {
 	err     error
 }
 
-// txProcessList
-type txProcessList struct {
-	txsha btcwire.ShaHash
-	tx    *btcwire.MsgTx
-}
-
 // validateTxIn validates a the script pair for the passed spending transaction
 // (along with the specific input index) and origin transaction (with the
 // specific output index).
-func validateTxIn(txInIdx int, txin *btcwire.TxIn, txSha *btcwire.ShaHash, tx *btcwire.MsgTx, originTx *btcwire.MsgTx, flags btcscript.ScriptFlags) error {
+func validateTxIn(txInIdx int, txin *btcwire.TxIn, tx *btcutil.Tx, originTx *btcutil.Tx, flags btcscript.ScriptFlags) error {
 	// If the input transaction has no previous input, there is nothing
 	// to check.
 	originTxIdx := txin.PreviousOutpoint.Index
@@ -36,17 +30,17 @@ func validateTxIn(txInIdx int, txin *btcwire.TxIn, txSha *btcwire.ShaHash, tx *b
 		return nil
 	}
 
-	if originTxIdx >= uint32(len(originTx.TxOut)) {
+	if originTxIdx >= uint32(len(originTx.MsgTx().TxOut)) {
 		originTxSha := &txin.PreviousOutpoint.Hash
 		log.Warnf("unable to locate source tx %v spending tx %v",
-			originTxSha, &txSha)
+			originTxSha, tx.Sha())
 		return fmt.Errorf("invalid index %x", originTxIdx)
 	}
 
 	sigScript := txin.SignatureScript
-	pkScript := originTx.TxOut[originTxIdx].PkScript
-	engine, err := btcscript.NewScript(sigScript, pkScript, txInIdx, tx,
-		flags)
+	pkScript := originTx.MsgTx().TxOut[originTxIdx].PkScript
+	engine, err := btcscript.NewScript(sigScript, pkScript, txInIdx,
+		tx.MsgTx(), flags)
 	if err != nil {
 		return err
 	}
@@ -62,9 +56,9 @@ func validateTxIn(txInIdx int, txin *btcwire.TxIn, txSha *btcwire.ShaHash, tx *b
 
 // ValidateTransactionScripts validates the scripts for the passed transaction
 // using multiple goroutines.
-func ValidateTransactionScripts(tx *btcwire.MsgTx, txHash *btcwire.ShaHash, txStore TxStore, flags btcscript.ScriptFlags) (err error) {
+func ValidateTransactionScripts(tx *btcutil.Tx, txStore TxStore, flags btcscript.ScriptFlags) (err error) {
 	c := make(chan txValidate)
-	job := tx.TxIn
+	job := tx.MsgTx().TxIn
 	resultErrors := make([]error, len(job))
 
 	var currentItem int
@@ -72,12 +66,12 @@ func ValidateTransactionScripts(tx *btcwire.MsgTx, txHash *btcwire.ShaHash, txSt
 
 	processFunc := func(txInIdx int) {
 		log.Tracef("validating tx %v input %v len %v",
-			txHash, currentItem, len(job))
+			tx.Sha(), currentItem, len(job))
 		txin := job[txInIdx]
 		originTxSha := &txin.PreviousOutpoint.Hash
 		origintxidx := txin.PreviousOutpoint.Index
 
-		var originTx *btcwire.MsgTx
+		var originTx *btcutil.Tx
 		if origintxidx != math.MaxUint32 {
 			txInfo, ok := txStore[*originTxSha]
 			if !ok {
@@ -87,8 +81,7 @@ func ValidateTransactionScripts(tx *btcwire.MsgTx, txHash *btcwire.ShaHash, txSt
 			}
 			originTx = txInfo.Tx
 		}
-		err := validateTxIn(txInIdx, job[txInIdx], txHash, tx, originTx,
-			flags)
+		err := validateTxIn(txInIdx, txin, tx, originTx, flags)
 		r := txValidate{txInIdx, err}
 		c <- r
 	}
@@ -114,7 +107,8 @@ func ValidateTransactionScripts(tx *btcwire.MsgTx, txHash *btcwire.ShaHash, txSt
 	}
 	for i := 0; i < len(job); i++ {
 		if resultErrors[i] != nil {
-			log.Warnf("tx %v failed input %v, err %v", txHash, i, resultErrors[i])
+			log.Warnf("tx %v failed input %v, err %v", tx.Sha(), i,
+				resultErrors[i])
 		}
 	}
 	return
@@ -130,17 +124,14 @@ func checkBlockScripts(block *btcutil.Block, txStore TxStore) error {
 		flags |= btcscript.ScriptBip16
 	}
 
-	txList := block.MsgBlock().Transactions
+	txList := block.Transactions()
 	c := make(chan txValidate)
 	resultErrors := make([]error, len(txList))
 
 	var currentItem int
 	var completedItems int
 	processFunc := func(txIdx int) {
-		tx := txList[txIdx]
-		txHash, _ := block.TxSha(txIdx)
-
-		err := ValidateTransactionScripts(tx, txHash, txStore, flags)
+		err := ValidateTransactionScripts(txList[txIdx], txStore, flags)
 		r := txValidate{txIdx, err}
 		c <- r
 	}

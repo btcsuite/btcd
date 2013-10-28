@@ -13,7 +13,6 @@ package btcchain
 
 import (
 	"github.com/conformal/btcutil"
-	"github.com/conformal/btcwire"
 	"time"
 )
 
@@ -37,6 +36,6 @@ func TstTimeSorter(times []time.Time) timeSorter {
 
 // TstCheckSerializedHeight makes the internal checkSerializedHeight function
 // available to the test package.
-func TstCheckSerializedHeight(coinbaseTx *btcwire.MsgTx, wantHeight int64) error {
+func TstCheckSerializedHeight(coinbaseTx *btcutil.Tx, wantHeight int64) error {
 	return checkSerializedHeight(coinbaseTx, wantHeight)
 }
