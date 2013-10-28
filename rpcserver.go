@@ -489,6 +489,7 @@ func jsonRead(body []byte, s *rpcServer, walletNotification chan []byte) (reply 
 		if err != nil {
 			log.Errorf("RPCS: Error fetching sha: %v", err)
 			err = btcjson.ErrBlockNotFound
+			return
 		}
 		idx := blk.Height()
 		var buf []byte
