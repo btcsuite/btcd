@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"github.com/conformal/btcjson"
@@ -34,6 +35,7 @@ type handlerData struct {
 	optionalArgs       int
 	displayHandler     displayHandler
 	conversionHandlers []conversionHandler
+	makeCmd            func([]interface{}) (btcjson.Cmd, error)
 	usage              string
 }
 
@@ -46,19 +48,20 @@ var (
 // commandHandlers is a map of commands and associated handler data that is used
 // to validate correctness and perform the command.
 var commandHandlers = map[string]*handlerData{
-	"addnode":              &handlerData{2, 0, displaySpewDump, nil, "<ip> <add/remove/onetry>"},
-	"decoderawtransaction": &handlerData{1, 0, displaySpewDump, nil, "<txhash>"},
-	"getbestblockhash":     &handlerData{0, 0, displayGeneric, nil, ""},
-	"getblock":             &handlerData{1, 0, displaySpewDump, nil, "<blockhash>"},
-	"getblockcount":        &handlerData{0, 0, displayFloat64, nil, ""},
-	"getblockhash":         &handlerData{1, 0, displayGeneric, []conversionHandler{toInt}, "<blocknumber>"},
-	"getconnectioncount":   &handlerData{0, 0, displayFloat64, nil, ""},
-	"getdifficulty":        &handlerData{0, 0, displayFloat64, nil, ""},
-	"getgenerate":          &handlerData{0, 0, displayGeneric, nil, ""},
-	"getpeerinfo":          &handlerData{0, 0, displaySpewDump, nil, ""},
-	"getrawmempool":        &handlerData{0, 0, displaySpewDump, nil, ""},
-	"getrawtransaction":    &handlerData{1, 1, displaySpewDump, []conversionHandler{nil, toInt}, "<txhash> [verbose=0]"},
-	"stop":                 &handlerData{0, 0, displayGeneric, nil, ""},
+	"addnode":              &handlerData{2, 0, displaySpewDump, nil, makeAddNode, "<ip> <add/remove/onetry>"},
+	"decoderawtransaction": &handlerData{1, 0, displaySpewDump, nil, makeDecodeRawTransaction, "<txhash>"},
+	"getbestblockhash":     &handlerData{0, 0, displayGeneric, nil, makeGetBestBlockHash, ""},
+	"getblock": &handlerData{1, 0, displaySpewDump, nil, makeGetBlock,
+		"<blockhash>"},
+	"getblockcount":      &handlerData{0, 0, displayFloat64, nil, makeGetBlockCount, ""},
+	"getblockhash":       &handlerData{1, 0, displayGeneric, []conversionHandler{toInt}, makeGetBlockHash, "<blocknumber>"},
+	"getconnectioncount": &handlerData{0, 0, displayFloat64, nil, makeGetConnectionCount, ""},
+	"getdifficulty":      &handlerData{0, 0, displayFloat64, nil, makeGetDifficulty, ""},
+	"getgenerate":        &handlerData{0, 0, displayGeneric, nil, makeGetGenerate, ""},
+	"getpeerinfo":        &handlerData{0, 0, displaySpewDump, nil, makeGetPeerInfo, ""},
+	"getrawmempool":      &handlerData{0, 0, displaySpewDump, nil, makeGetRawMempool, ""},
+	"getrawtransaction":  &handlerData{1, 1, displaySpewDump, []conversionHandler{nil, toInt}, makeGetRawTransaction, "<txhash> [verbose=0]"},
+	"stop":               &handlerData{0, 0, displayGeneric, nil, makeStop, ""},
 }
 
 // toInt attempts to convert the passed string to an integer.  It returns the
@@ -100,6 +103,83 @@ func displaySpewDump(reply interface{}) error {
 	return nil
 }
 
+// makeAddNode generates the cmd structure for addnode comands.
+func makeAddNode(args []interface{}) (btcjson.Cmd, error) {
+	return btcjson.NewAddNodeCmd("btcctl", args[0].(string),
+		args[1].(string))
+}
+
+// makeDecodeRawTransaction generates the cmd structure for
+// decoderawtransaction comands.
+func makeDecodeRawTransaction(args []interface{}) (btcjson.Cmd, error) {
+	return btcjson.NewDecodeRawTransactionCmd("btcctl", args[0].(string))
+}
+
+// makeGetBestBlockHash generates the cmd structure for
+// makebestblockhash comands.
+func makeGetBestBlockHash(args []interface{}) (btcjson.Cmd, error) {
+	return btcjson.NewGetBestBlockHashCmd("btcctl")
+}
+
+// makeGetBlock generates the cmd structure for getblock comands.
+func makeGetBlock(args []interface{}) (btcjson.Cmd, error) {
+	return btcjson.NewGetBlockCmd("btcctl", args[0].(string))
+}
+
+// makeGetBlockCount generates the cmd structure for getblockcount comands.
+func makeGetBlockCount(args []interface{}) (btcjson.Cmd, error) {
+	return btcjson.NewGetBlockCountCmd("btcctl")
+}
+
+// makeGetBlockHash generates the cmd structure for getblockhash comands.
+func makeGetBlockHash(args []interface{}) (btcjson.Cmd, error) {
+	return btcjson.NewGetBlockHashCmd("btcctl", args[0].(int64))
+}
+
+// makeGetConnectionCount generates the cmd structure for
+// getconnectioncount comands.
+func makeGetConnectionCount(args []interface{}) (btcjson.Cmd, error) {
+	return btcjson.NewGetConnectionCountCmd("btcctl")
+}
+
+// makeGetDifficulty generates the cmd structure for
+// getdifficulty comands.
+func makeGetDifficulty(args []interface{}) (btcjson.Cmd, error) {
+	return btcjson.NewGetDifficultyCmd("btcctl")
+}
+
+// makeGetGenerate generates the cmd structure for
+// getgenerate comands.
+func makeGetGenerate(args []interface{}) (btcjson.Cmd, error) {
+	return btcjson.NewGetGenerateCmd("btcctl")
+}
+
+// makePeerInfo generates the cmd structure for
+// getpeerinfo comands.
+func makeGetPeerInfo(args []interface{}) (btcjson.Cmd, error) {
+	return btcjson.NewGetPeerInfoCmd("btcctl")
+}
+
+// makeRawMempool generates the cmd structure for
+// getrawmempool comands.
+func makeGetRawMempool(args []interface{}) (btcjson.Cmd, error) {
+	return btcjson.NewGetRawMempoolCmd("btcctl")
+}
+
+// makeRawTransaction generates the cmd structure for
+// getrawtransaction comands.
+func makeGetRawTransaction(args []interface{}) (btcjson.Cmd, error) {
+	i := args[1].(int)
+
+	bi := i != 0
+	return btcjson.NewGetRawTransactionCmd("btcctl", args[0].(string), bi)
+}
+
+// makeStop generates the cmd structure for stop comands.
+func makeStop(args []interface{}) (btcjson.Cmd, error) {
+	return btcjson.NewStopCmd("btcctl")
+}
+
 // send sends a JSON-RPC command to the specified RPC server and examines the
 // results for various error conditions.  It either returns a valid result or
 // an appropriate error.
@@ -123,8 +203,8 @@ func send(cfg *config, msg []byte) (interface{}, error) {
 // sendCommand creates a JSON-RPC command using the passed command and arguments
 // and then sends it.  A prefix is added to any errors that occur indicating
 // what step failed.
-func sendCommand(cfg *config, command string, args ...interface{}) (interface{}, error) {
-	msg, err := btcjson.CreateMessage(command, args...)
+func sendCommand(cfg *config, command btcjson.Cmd) (interface{}, error) {
+	msg, err := json.Marshal(command)
 	if err != nil {
 		return nil, fmt.Errorf("CreateMessage: %v", err.Error())
 	}
@@ -177,9 +257,13 @@ func commandHandler(cfg *config, command string, data *handlerData, args []strin
 			}
 		}
 	}
+	cmd, err := data.makeCmd(iargs)
+	if err != nil {
+		return err
+	}
 
 	// Create and send the appropriate JSON-RPC command.
-	reply, err := sendCommand(cfg, command, iargs...)
+	reply, err := sendCommand(cfg, cmd)
 	if err != nil {
 		return err
 	}
