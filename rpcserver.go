@@ -725,7 +725,8 @@ func jsonRead(body []byte, s *rpcServer, walletNotification chan []byte) (reply 
 			}
 			return
 		}
-		err = s.server.txMemPool.ProcessTransaction(msgtx)
+		tx := btcutil.NewTx(msgtx)
+		err = s.server.txMemPool.ProcessTransaction(tx)
 		if err != nil {
 			log.Errorf("RPCS: Failed to process transaction: %v", err)
 			err = btcjson.Error{
@@ -736,15 +737,13 @@ func jsonRead(body []byte, s *rpcServer, walletNotification chan []byte) (reply 
 		}
 
 		var result interface{}
-		txsha, err := msgtx.TxSha()
-		if err == nil {
-			result = txsha.String()
-		}
+		txsha := tx.Sha()
+		result = txsha.String()
 
 		// If called from websocket code, add a mined tx hashes
 		// request.
 		if walletNotification != nil {
-			s.ws.requests.AddMinedTxRequest(walletNotification, &txsha)
+			s.ws.requests.AddMinedTxRequest(walletNotification, txsha)
 		}
 
 		reply = btcjson.Reply{

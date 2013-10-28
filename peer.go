@@ -325,7 +325,7 @@ func (p *peer) pushTxMsg(sha *btcwire.ShaHash, doneChan chan bool) error {
 			"pool: %v", sha, err)
 		return err
 	}
-	p.QueueMessage(tx, doneChan)
+	p.QueueMessage(tx.MsgTx(), doneChan)
 
 	return nil
 }
@@ -453,12 +453,10 @@ func (p *peer) handleMemPoolMsg(msg *btcwire.MsgMemPool) {
 // transactions don't rely on the previous one in a linear fashion like blocks.
 func (p *peer) handleTxMsg(msg *btcwire.MsgTx) {
 	// Add the transaction to the known inventory for the peer.
-	hash, err := msg.TxSha()
-	if err != nil {
-		log.Errorf("Unable to get transaction hash: %v", err)
-		return
-	}
-	iv := btcwire.NewInvVect(btcwire.InvTypeTx, &hash)
+	// Convert the raw MsgTx to a btcutil.Tx which provides some convenience
+	// methods and things such as hash caching.
+	tx := btcutil.NewTx(msg)
+	iv := btcwire.NewInvVect(btcwire.InvTypeTx, tx.Sha())
 	p.addKnownInventory(iv)
 
 	// Queue the transaction up to be handled by the block manager and
@@ -466,16 +464,15 @@ func (p *peer) handleTxMsg(msg *btcwire.MsgTx) {
 	// processed and known good or bad.  This helps prevent a malicious peer
 	// from queueing up a bunch of bad transactions before disconnecting (or
 	// being disconnected) and wasting memory.
-	p.server.blockManager.QueueTx(msg, p)
+	p.server.blockManager.QueueTx(tx, p)
 	<-p.txProcessed
 }
 
 // handleBlockMsg is invoked when a peer receives a block bitcoin message.  It
 // blocks until the bitcoin block has been fully processed.
 func (p *peer) handleBlockMsg(msg *btcwire.MsgBlock, buf []byte) {
-	// Convert the raw MsgBlock to a btcutil.Block which
-	// provides some convience methods and things such as
-	// hash caching.
+	// Convert the raw MsgBlock to a btcutil.Block which provides some
+	// convenience methods and things such as hash caching.
 	block := btcutil.NewBlockFromBlockAndBytes(msg, buf)
 
 	// Add the block to the known inventory for the peer.
