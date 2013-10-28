@@ -313,8 +313,8 @@ func jsonRPCRead(w http.ResponseWriter, r *http.Request, s *rpcServer) {
 // wallet notification channel can be used to automatically register
 // various notifications for the wallet.
 func jsonRead(body []byte, s *rpcServer, walletNotification chan []byte) (reply btcjson.Reply, err error) {
-	var message btcjson.Message
-	if err := json.Unmarshal(body, &message); err != nil {
+	cmd, err := btcjson.ParseMarshaledCmd(body)
+	if err != nil {
 		jsonError := btcjson.ErrParse
 
 		reply = btcjson.Reply{
@@ -327,15 +327,16 @@ func jsonRead(body []byte, s *rpcServer, walletNotification chan []byte) (reply 
 
 		return reply, jsonError
 	}
-	log.Tracef("RPCS: received: %v", message)
+	log.Tracef("RPCS: received: %v", cmd)
 
 	// Set final reply based on error if non-nil.
 	defer func() {
 		if err != nil {
+			id := cmd.Id()
 			if jsonErr, ok := err.(btcjson.Error); ok {
 				reply = btcjson.Reply{
 					Error: &jsonErr,
-					Id:    &message.Id,
+					Id:    &id,
 				}
 				err = errors.New(jsonErr.Message)
 			} else {
@@ -348,22 +349,24 @@ func jsonRead(body []byte, s *rpcServer, walletNotification chan []byte) (reply 
 				}
 				reply = btcjson.Reply{
 					Error: &rawJSONError,
-					Id:    &message.Id,
+					Id:    &id,
 				}
 			}
 		}
 	}()
 
+	id := cmd.Id()
+
 	// Deal with commands
-	switch message.Method {
-	case "stop":
+	switch c := cmd.(type) {
+	case *btcjson.StopCmd:
 		reply = btcjson.Reply{
 			Result: "btcd stopping.",
-			Id:     &message.Id,
+			Id:     &id,
 		}
 		s.server.Stop()
 
-	case "getblockcount":
+	case *btcjson.GetBlockCountCmd:
 		var maxidx int64
 		_, maxidx, err = s.server.db.NewestSha()
 		if err != nil {
@@ -373,10 +376,10 @@ func jsonRead(body []byte, s *rpcServer, walletNotification chan []byte) (reply 
 		}
 		reply = btcjson.Reply{
 			Result: maxidx,
-			Id:     &message.Id,
+			Id:     &id,
 		}
 
-	case "getbestblockhash":
+	case *btcjson.GetBestBlockHashCmd:
 		var sha *btcwire.ShaHash
 		sha, _, err = s.server.db.NewestSha()
 		if err != nil {
@@ -386,18 +389,18 @@ func jsonRead(body []byte, s *rpcServer, walletNotification chan []byte) (reply 
 		}
 		reply = btcjson.Reply{
 			Result: sha.String(),
-			Id:     &message.Id,
+			Id:     &id,
 		}
 
-	case "getconnectioncount":
+	case *btcjson.GetConnectionCountCmd:
 		var count int
 
 		reply = btcjson.Reply{
 			Result: count,
-			Id:     &message.Id,
+			Id:     &id,
 		}
 
-	case "getdifficulty":
+	case *btcjson.GetDifficultyCmd:
 		var sha *btcwire.ShaHash
 		sha, _, err = s.server.db.NewestSha()
 		if err != nil {
@@ -415,44 +418,31 @@ func jsonRead(body []byte, s *rpcServer, walletNotification chan []byte) (reply 
 		blockHeader := &blk.MsgBlock().Header
 		reply = btcjson.Reply{
 			Result: getDifficultyRatio(blockHeader.Bits),
-			Id:     &message.Id,
+			Id:     &id,
 		}
 
 	// btcd does not do mining so we can hardcode replies here.
-	case "getgenerate":
+	case *btcjson.GetGenerateCmd:
 		reply = btcjson.Reply{
 			Result: false,
-			Id:     &message.Id,
+			Id:     &id,
 		}
 
-	case "setgenerate":
+	case *btcjson.SetGenerateCmd:
 		reply = btcjson.Reply{
 			Result: nil,
-			Id:     &message.Id,
+			Id:     &id,
 		}
 
-	case "gethashespersec":
+	case *btcjson.GetHashesPerSecCmd:
 		reply = btcjson.Reply{
 			Result: 0,
-			Id:     &message.Id,
+			Id:     &id,
 		}
 
-	case "getblockhash":
-		var f interface{}
-		err = json.Unmarshal(body, &f)
-		m := f.(map[string]interface{})
-		var idx float64
-		for _, v := range m {
-			switch vv := v.(type) {
-			case []interface{}:
-				for _, u := range vv {
-					idx, _ = u.(float64)
-				}
-			default:
-			}
-		}
+	case *btcjson.GetBlockHashCmd:
 		var sha *btcwire.ShaHash
-		sha, err = s.server.db.FetchBlockShaByHeight(int64(idx))
+		sha, err = s.server.db.FetchBlockShaByHeight(c.Index)
 		if err != nil {
 			log.Errorf("[RCPS] Error getting block: %v", err)
 			err = btcjson.ErrOutOfRange
@@ -460,25 +450,12 @@ func jsonRead(body []byte, s *rpcServer, walletNotification chan []byte) (reply 
 		}
 		reply = btcjson.Reply{
 			Result: sha.String(),
-			Id:     &message.Id,
+			Id:     &id,
 		}
 
-	case "getblock":
-		var f interface{}
-		err = json.Unmarshal(body, &f)
-		m := f.(map[string]interface{})
-		var hash string
-		for _, v := range m {
-			switch vv := v.(type) {
-			case []interface{}:
-				for _, u := range vv {
-					hash, _ = u.(string)
-				}
-			default:
-			}
-		}
+	case *btcjson.GetBlockCmd:
 		var sha *btcwire.ShaHash
-		sha, err = btcwire.NewShaHashFromStr(hash)
+		sha, err = btcwire.NewShaHashFromStr(c.Hash)
 		if err != nil {
 			log.Errorf("RPCS: Error generating sha: %v", err)
 			err = btcjson.ErrBlockNotFound
@@ -517,7 +494,7 @@ func jsonRead(body []byte, s *rpcServer, walletNotification chan []byte) (reply 
 
 		blockHeader := &blk.MsgBlock().Header
 		blockReply := btcjson.BlockResult{
-			Hash:          hash,
+			Hash:          c.Hash,
 			Version:       blockHeader.Version,
 			MerkleRoot:    blockHeader.MerkleRoot.String(),
 			PreviousHash:  blockHeader.PrevBlock.String(),
@@ -546,10 +523,10 @@ func jsonRead(body []byte, s *rpcServer, walletNotification chan []byte) (reply 
 		reply = btcjson.Reply{
 			Result: blockReply,
 			Error:  nil,
-			Id:     &message.Id,
+			Id:     &id,
 		}
 
-	case "getrawmempool":
+	case *btcjson.GetRawMempoolCmd:
 		hashes := s.server.txMemPool.TxShas()
 		hashStrings := make([]string, len(hashes))
 		for i := 0; i < len(hashes); i++ {
@@ -557,36 +534,14 @@ func jsonRead(body []byte, s *rpcServer, walletNotification chan []byte) (reply 
 		}
 		reply = btcjson.Reply{
 			Result: hashStrings,
-			Id:     &message.Id,
+			Id:     &id,
 		}
 
-	case "getrawtransaction":
-		// TODO: Perform smarter paramter parsing.
-		var f interface{}
-		err = json.Unmarshal(body, &f)
-		m := f.(map[string]interface{})
-		var tx string
-		var verbose float64
-		for _, v := range m {
-			switch vv := v.(type) {
-			case []interface{}:
-				for _, u := range vv {
-					switch uu := u.(type) {
-					case string:
-						tx = uu
-					case float64:
-						verbose = uu
-					default:
-					}
-				}
-			default:
-			}
-		}
-
-		if int(verbose) != 0 {
+	case *btcjson.GetRawTransactionCmd:
+		if c.Verbose {
 			// TODO: check error code. tx is not checked before
 			// this point.
-			txSha, _ := btcwire.NewShaHashFromStr(tx)
+			txSha, _ := btcwire.NewShaHashFromStr(c.Txid)
 			var txS *btcwire.MsgTx
 			var txList []*btcdb.TxListReply
 			txList, err = s.server.db.FetchTxBySha(txSha)
@@ -652,7 +607,7 @@ func jsonRead(body []byte, s *rpcServer, walletNotification chan []byte) (reply 
 
 			blockHeader := &blk.MsgBlock().Header
 			txReply := btcjson.TxRawResult{
-				Txid:     tx,
+				Txid:     c.Txid,
 				Vout:     voutList,
 				Vin:      vinList,
 				Version:  txS.Version,
@@ -667,52 +622,27 @@ func jsonRead(body []byte, s *rpcServer, walletNotification chan []byte) (reply 
 			reply = btcjson.Reply{
 				Result: txReply,
 				Error:  nil,
-				Id:     &message.Id,
+				Id:     &id,
 			}
 		} else {
 			// Don't return details
 			// not used yet
 		}
 
-	case "decoderawtransaction":
-		// TODO: Perform smarter paramter parsing.
-		var f interface{}
-		err = json.Unmarshal(body, &f)
-		m := f.(map[string]interface{})
-		var hash string
-		for _, v := range m {
-			switch vv := v.(type) {
-			case []interface{}:
-				for _, u := range vv {
-					hash, _ = u.(string)
-				}
-			default:
-			}
-		}
-		// TODO: use hash and fill result with info.
-		_ = hash
+	case *btcjson.DecodeRawTransactionCmd:
+		// TODO: use c.HexTx and fill result with info.
 		txReply := btcjson.TxRawDecodeResult{}
 		reply = btcjson.Reply{
 			Result: txReply,
 			Error:  nil,
-			Id:     &message.Id,
+			Id:     &id,
 		}
 
-	case "sendrawtransaction":
-		params, ok := message.Params.([]interface{})
-		if !ok || len(params) != 1 {
-			err = btcjson.ErrInvalidParams
-			return
-		}
-		serializedtxhex, ok := params[0].(string)
-		if !ok {
-			err = btcjson.ErrRawTxString
-			return
-		}
+	case *btcjson.SendRawTransactionCmd:
 
 		// Deserialize and send off to tx relay
 		var serializedTx []byte
-		serializedTx, err = hex.DecodeString(serializedtxhex)
+		serializedTx, err = hex.DecodeString(c.HexTx)
 		if err != nil {
 			err = btcjson.ErrDecodeHexString
 			return
@@ -750,7 +680,7 @@ func jsonRead(body []byte, s *rpcServer, walletNotification chan []byte) (reply 
 		reply = btcjson.Reply{
 			Result: result,
 			Error:  nil,
-			Id:     &message.Id,
+			Id:     &id,
 		}
 
 	default:
@@ -761,7 +691,7 @@ func jsonRead(body []byte, s *rpcServer, walletNotification chan []byte) (reply 
 		reply = btcjson.Reply{
 			Result: nil,
 			Error:  &jsonError,
-			Id:     &message.Id,
+			Id:     &id,
 		}
 		err = ErrMethodNotImplemented
 	}
