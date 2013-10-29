@@ -1169,26 +1169,43 @@ func (s *rpcServer) NotifyBlockDisconnected(block *btcutil.Block) {
 // of new transactions (with both spent and unspent outputs) for a watched
 // address.
 func (s *rpcServer) NotifyBlockTXs(db btcdb.Db, block *btcutil.Block) {
-	txShaList, err := block.TxShas()
-	if err != nil {
-		log.Error("Bad block; All notifications for block dropped.")
-		return
+	// Build a map of in-flight transactions to see if any of the inputs in
+	// this block are referencing other transactions earlier in this block.
+	txInFlight := map[btcwire.ShaHash]int{}
+	transactions := block.Transactions()
+	spent := make([][]bool, len(transactions))
+	for i, tx := range transactions {
+		spent[i] = make([]bool, len(tx.MsgTx().TxOut))
+		txInFlight[*tx.Sha()] = i
 	}
-	txList := db.FetchTxByShaList(txShaList)
-	for _, txReply := range txList {
-		if txReply.Err == nil && txReply.Tx != nil {
-			go s.newBlockNotifyCheckTxIn(txReply.Tx.TxIn)
-			go s.newBlockNotifyCheckTxOut(db, block, txReply)
+
+	// The newBlockNotifyCheckTxOut current needs spent data.  This can
+	// this can ultimately be optimized out by making sure the notifications
+	// are in order.  For now, just create the spent data.
+	for i, tx := range transactions[1:] {
+		for _, txIn := range tx.MsgTx().TxIn {
+			originHash := &txIn.PreviousOutpoint.Hash
+			if inFlightIndex, ok := txInFlight[*originHash]; ok &&
+				i >= inFlightIndex {
+
+				prevIndex := txIn.PreviousOutpoint.Index
+				spent[inFlightIndex][prevIndex] = true
+			}
 		}
+	}
+
+	for i, tx := range transactions {
+		go s.newBlockNotifyCheckTxIn(tx)
+		go s.newBlockNotifyCheckTxOut(block, tx, spent[i])
 	}
 }
 
 // newBlockNotifyCheckTxIn is a helper function to iterate through
 // each transaction input of a new block and perform any checks and
 // notify listening frontends when necessary.
-func (s *rpcServer) newBlockNotifyCheckTxIn(txins []*btcwire.TxIn) {
+func (s *rpcServer) newBlockNotifyCheckTxIn(tx *btcutil.Tx) {
 	for wltNtfn, cxt := range s.ws.requests.m {
-		for _, txin := range txins {
+		for _, txin := range tx.MsgTx().TxIn {
 			for op, id := range cxt.spentRequests {
 				if txin.PreviousOutpoint != op {
 					continue
@@ -1220,9 +1237,9 @@ func (s *rpcServer) newBlockNotifyCheckTxIn(txins []*btcwire.TxIn) {
 // newBlockNotifyCheckTxOut is a helper function to iterate through
 // each transaction output of a new block and perform any checks and
 // notify listening frontends when necessary.
-func (s *rpcServer) newBlockNotifyCheckTxOut(db btcdb.Db, block *btcutil.Block, tx *btcdb.TxListReply) {
+func (s *rpcServer) newBlockNotifyCheckTxOut(block *btcutil.Block, tx *btcutil.Tx, spent []bool) {
 	for wltNtfn, cxt := range s.ws.requests.m {
-		for i, txout := range tx.Tx.TxOut {
+		for i, txout := range tx.MsgTx().TxOut {
 			_, txaddrhash, err := btcscript.ScriptToAddrHash(txout.PkScript)
 			if err != nil {
 				log.Debug("Error getting payment address from tx; dropping any Tx notifications.")
@@ -1258,11 +1275,11 @@ func (s *rpcServer) newBlockNotifyCheckTxOut(db btcdb.Db, block *btcutil.Block, 
 						Receiver:  txaddr,
 						BlockHash: blkhash.String(),
 						Height:    block.Height(),
-						TxHash:    tx.Sha.String(),
+						TxHash:    tx.Sha().String(),
 						Index:     uint32(i),
 						Amount:    txout.Value,
 						PkScript:  btcutil.Base58Encode(txout.PkScript),
-						Spent:     tx.TxSpent[i],
+						Spent:     spent[i],
 					},
 					Error: nil,
 					Id:    &id,
