@@ -311,6 +311,7 @@ func jsonRPCRead(w http.ResponseWriter, r *http.Request, s *rpcServer) {
 type commandHandler func(*rpcServer, btcjson.Cmd, chan []byte) (interface{}, error)
 
 var handlers = map[string]commandHandler{
+	"addnode":              handleAddNode,
 	"decoderawtransaction": handleDecodeRawTransaction,
 	"getbestblockhash":     handleGetBestBlockHash,
 	"getblock":             handleGetBlock,
@@ -326,6 +327,28 @@ var handlers = map[string]commandHandler{
 	"sendrawtransaction":   handleSendRawTransaction,
 	"setgenerate":          handleSetGenerate,
 	"stop":                 handleStop,
+}
+
+// handleDecodeRawTransaction handles decoderawtransaction commands.
+func handleAddNode(s *rpcServer, cmd btcjson.Cmd,
+	walletNotification chan []byte) (interface{}, error) {
+	c := cmd.(*btcjson.AddNodeCmd)
+
+	addr := normalizePeerAddress(c.Addr)
+	var err error
+	switch c.SubCmd {
+	case "add":
+		err = s.server.AddAddr(addr, true)
+	case "remove":
+		err = s.server.RemoveAddr(addr)
+	case "onetry":
+		err = s.server.AddAddr(addr, false)
+	default:
+		err = errors.New("Invalid subcommand for addnode")
+	}
+
+	// no data returned unless an error.
+	return nil, err
 }
 
 // handleDecodeRawTransaction handles decoderawtransaction commands.
@@ -469,7 +492,7 @@ func handleGetHashesPerSec(s *rpcServer, cmd btcjson.Cmd, walletNotification cha
 
 // handleGetPeerInfo implements the getpeerinfo command.
 func handleGetPeerInfo(s *rpcServer, cmd btcjson.Cmd, walletNotification chan []byte) (interface{}, error) {
-	return	s.server.PeerInfo(), nil
+	return s.server.PeerInfo(), nil
 }
 
 // handleGetRawMempool implements the getrawmempool command.

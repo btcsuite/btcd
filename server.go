@@ -6,6 +6,7 @@ package main
 
 import (
 	"container/list"
+	"errors"
 	"fmt"
 	"github.com/conformal/btcdb"
 	"github.com/conformal/btcwire"
@@ -223,6 +224,16 @@ type getPeerInfoMsg struct {
 	reply chan []*PeerInfo
 }
 
+type addNodeMsg struct {
+	addr      string
+	permanent bool
+	reply     chan error
+}
+
+type delNodeMsg struct {
+	addr  string
+	reply chan error
+}
 
 func (s *server) handleQuery(querymsg interface{}, peers *list.List, bannedPeers map[string]time.Time) {
 	switch msg := querymsg.(type) {
@@ -265,6 +276,41 @@ func (s *server) handleQuery(querymsg interface{}, peers *list.List, bannedPeers
 			infos = append(infos, info)
 		}
 		msg.reply <- infos
+	case addNodeMsg:
+		// TODO(oga) really these checks only apply to permanent peers.
+		for e := peers.Front(); e != nil; e = e.Next() {
+			peer := e.Value.(*peer)
+			if peer.addr == msg.addr {
+				msg.reply <- errors.New("peer already connected")
+				return
+			}
+		}
+		// TODO(oga) if too many, nuke a non-perm peer.
+		if s.handleAddPeerMsg(peers, bannedPeers,
+			newOutboundPeer(s, msg.addr, msg.permanent)) {
+			msg.reply <- nil
+		} else {
+			msg.reply <- errors.New("failed to add peer")
+		}
+
+	case delNodeMsg:
+		found := false
+		// TODO(oga) really these checks only apply to permanent peers.
+		for e := peers.Front(); e != nil; e = e.Next() {
+			peer := e.Value.(*peer)
+			if peer.addr == msg.addr {
+				peer.persistent = false // XXX hack!
+				peer.Disconnect()
+				found = true
+				break
+			}
+		}
+
+		if found {
+			msg.reply <- nil
+		} else {
+			msg.reply <- errors.New("peer not found")
+		}
 	}
 }
 
@@ -541,6 +587,22 @@ func (s *server) PeerInfo() []*PeerInfo {
 	replyChan := make(chan []*PeerInfo)
 
 	s.query <- getPeerInfoMsg{reply: replyChan}
+
+	return <-replyChan
+}
+
+func (s *server) AddAddr(addr string, permanent bool) error {
+	replyChan := make(chan error)
+
+	s.query <- addNodeMsg{addr: addr, permanent: permanent, reply: replyChan}
+
+	return <-replyChan
+}
+
+func (s *server) RemoveAddr(addr string) error {
+	replyChan := make(chan error)
+
+	s.query <- delNodeMsg{addr: addr, reply: replyChan}
 
 	return <-replyChan
 }
