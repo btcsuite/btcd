@@ -200,6 +200,7 @@ func (s *server) handleBroadcastMsg(peers *list.List, bmsg *broadcastMsg) {
 	}
 }
 
+// Peerinfo represents the information requested by the getpeerinfo rpc command.
 type PeerInfo struct {
 	Addr           string
 	Services       btcwire.ServiceFlag
@@ -235,6 +236,8 @@ type delNodeMsg struct {
 	reply chan error
 }
 
+// handleQuery is the central handler for all queries and commands from other
+// goroutines related to peer state.
 func (s *server) handleQuery(querymsg interface{}, peers *list.List, bannedPeers map[string]time.Time) {
 	switch msg := querymsg.(type) {
 	case getConnCountMsg:
@@ -575,6 +578,7 @@ func (s *server) BroadcastMessage(msg btcwire.Message, exclPeers ...*peer) {
 	s.broadcast <- bmsg
 }
 
+// ConnectedCount returns the number of currently connected peers.
 func (s *server) ConnectedCount() int {
 	replyChan := make(chan int)
 
@@ -583,6 +587,8 @@ func (s *server) ConnectedCount() int {
 	return <-replyChan
 }
 
+// PeerInfo returns an array of PeerInfo structures describing all connected
+// peers.
 func (s *server) PeerInfo() []*PeerInfo {
 	replyChan := make(chan []*PeerInfo)
 
@@ -591,6 +597,9 @@ func (s *server) PeerInfo() []*PeerInfo {
 	return <-replyChan
 }
 
+// AddAddr adds `addr' as a new outbound peer. If permanent is true then the
+// peer will be persistent and reconnect if the connection is lost.
+// It is an error to call this with an already existing peer.
 func (s *server) AddAddr(addr string, permanent bool) error {
 	replyChan := make(chan error)
 
@@ -599,6 +608,8 @@ func (s *server) AddAddr(addr string, permanent bool) error {
 	return <-replyChan
 }
 
+// RemoveAddr removes `addr' from the list of persistent peers if present.
+// An error will be returned if the peer was not found.
 func (s *server) RemoveAddr(addr string) error {
 	replyChan := make(chan error)
 
