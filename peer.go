@@ -137,6 +137,7 @@ type peer struct {
 	txProcessed        chan bool
 	blockProcessed     chan bool
 	quit               chan bool
+	userAgent          string
 }
 
 // String returns the peer's address and directionality as a human-readable
@@ -247,6 +248,9 @@ func (p *peer) handleVersionMsg(msg *btcwire.MsgVersion) {
 	// Set the supported services for the peer to what the remote peer
 	// advertised.
 	p.services = msg.Services
+
+	// Set the remote peer's user agent.
+	p.userAgent = msg.UserAgent
 
 	// Inbound connections.
 	if p.inbound {
