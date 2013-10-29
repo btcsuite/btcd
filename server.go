@@ -270,7 +270,7 @@ func (s *server) handleQuery(querymsg interface{}, peers *list.List, bannedPeers
 				BytesRecv:      0, // TODO(oga) we need this from wire.
 				ConnTime:       peer.timeConnected,
 				Version:        peer.protocolVersion,
-				SubVer:         "unknown",
+				SubVer:         peer.userAgent,
 				Inbound:        peer.inbound,
 				StartingHeight: peer.lastBlock,
 				BanScore:       0,
