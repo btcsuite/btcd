@@ -184,9 +184,12 @@ func testExistsTxSha(tc *testContext) bool {
 		// The transaction must exist in the database.
 		txHash := tx.Sha()
 		if exists := tc.db.ExistsTxSha(txHash); !exists {
-			tc.t.Errorf("ExistsTxSha (%s): block #%d (%s) "+
-				"tx #%d (%s) does not exist", tc.dbType,
-				tc.blockHeight, tc.blockHash, i, txHash)
+			_, err := tc.db.FetchTxBySha(txHash)
+			if err != nil {
+				tc.t.Errorf("ExistsTxSha (%s): block #%d (%s) "+
+					"tx #%d (%s) does not exist", tc.dbType,
+					tc.blockHeight, tc.blockHash, i, txHash)
+			}
 			return false
 		}
 	}
