@@ -16,15 +16,6 @@ import (
 )
 
 const (
-	// SatoshiPerBitcent is the number of satoshi in one bitcoin cent.
-	SatoshiPerBitcent int64 = 1e6
-
-	// SatoshiPerBitcoin is the number of satoshi in one bitcoin (1 BTC).
-	SatoshiPerBitcoin int64 = 1e8
-
-	// MaxSatoshi is the maximum transaction amount allowed in satoshi.
-	MaxSatoshi int64 = 21e6 * SatoshiPerBitcoin
-
 	// maxSigOpsPerBlock is the maximum number of signature operations
 	// allowed for a block.  It is a fraction of the max block payload size.
 	maxSigOpsPerBlock = btcwire.MaxBlockPayload / 50
@@ -52,7 +43,7 @@ const (
 
 	// baseSubsidy is the starting subsidy amount for mined blocks.  This
 	// value is halved every subsidyHalvingInterval blocks.
-	baseSubsidy = 50 * SatoshiPerBitcoin
+	baseSubsidy = 50 * btcutil.SatoshiPerBitcoin
 
 	// subsidyHalvingInterval is the interval of blocks at which the
 	// baseSubsidy is continually halved.  See calcBlockSubsidy for more
@@ -213,10 +204,10 @@ func CheckTransactionSanity(tx *btcutil.Tx) error {
 				"value of %v", satoshi)
 			return RuleError(str)
 		}
-		if satoshi > MaxSatoshi {
+		if satoshi > btcutil.MaxSatoshi {
 			str := fmt.Sprintf("transaction output value of %v is "+
 				"higher than max allowed value of %v", satoshi,
-				MaxSatoshi)
+				btcutil.MaxSatoshi)
 			return RuleError(str)
 		}
 
@@ -229,10 +220,11 @@ func CheckTransactionSanity(tx *btcutil.Tx) error {
 				"outputs has negative value of %v", totalSatoshi)
 			return RuleError(str)
 		}
-		if totalSatoshi > MaxSatoshi {
+		if totalSatoshi > btcutil.MaxSatoshi {
 			str := fmt.Sprintf("total value of all transaction "+
 				"outputs is %v which is higher than max "+
-				"allowed value of %v", totalSatoshi, MaxSatoshi)
+				"allowed value of %v", totalSatoshi,
+				btcutil.MaxSatoshi)
 			return RuleError(str)
 		}
 	}
@@ -662,10 +654,10 @@ func CheckTransactionInputs(tx *btcutil.Tx, txHeight int64, txStore TxStore) (in
 				"value of %v", originTxSatoshi)
 			return 0, RuleError(str)
 		}
-		if originTxSatoshi > MaxSatoshi {
+		if originTxSatoshi > btcutil.MaxSatoshi {
 			str := fmt.Sprintf("transaction output value of %v is "+
 				"higher than max allowed value of %v",
-				originTxSatoshi, MaxSatoshi)
+				originTxSatoshi, btcutil.MaxSatoshi)
 			return 0, RuleError(str)
 		}
 
@@ -674,11 +666,12 @@ func CheckTransactionInputs(tx *btcutil.Tx, txHeight int64, txStore TxStore) (in
 		// the accumulator so check for overflow.
 		lastSatoshiIn := totalSatoshiIn
 		totalSatoshiIn += originTxSatoshi
-		if totalSatoshiIn < lastSatoshiIn || totalSatoshiIn > MaxSatoshi {
+		if totalSatoshiIn < lastSatoshiIn ||
+			totalSatoshiIn > btcutil.MaxSatoshi {
 			str := fmt.Sprintf("total value of all transaction "+
 				"inputs is %v which is higher than max "+
 				"allowed value of %v", totalSatoshiIn,
-				MaxSatoshi)
+				btcutil.MaxSatoshi)
 			return 0, RuleError(str)
 		}
 
