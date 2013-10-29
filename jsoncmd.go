@@ -281,7 +281,7 @@ func ParseMarshaledCmd(b []byte) (Cmd, error) {
 	}
 
 	if cmd == nil {
-		return nil, errors.New("unimplemented")
+		return nil, ErrMethodNotFound
 	}
 
 	// If we get here we have a cmd that can unmarshal itself.
