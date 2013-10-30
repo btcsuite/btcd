@@ -602,7 +602,7 @@ func handleSendRawTransaction(s *rpcServer, cmd btcjson.Cmd, walletNotification 
 	err = msgtx.Deserialize(bytes.NewBuffer(serializedTx))
 	if err != nil {
 		err := btcjson.Error{
-			Code:    -22,
+			Code:    btcjson.ErrDeserialization.Code,
 			Message: "Unable to deserialize raw tx",
 		}
 		return nil, err
@@ -612,7 +612,7 @@ func handleSendRawTransaction(s *rpcServer, cmd btcjson.Cmd, walletNotification 
 	if err != nil {
 		log.Errorf("RPCS: Failed to process transaction: %v", err)
 		err = btcjson.Error{
-			Code:    -22,
+			Code:    btcjson.ErrDeserialization.Code,
 			Message: "Failed to process transaction",
 		}
 		return nil, err
@@ -666,13 +666,9 @@ func jsonRead(body []byte, s *rpcServer, walletNotification chan []byte) (reply 
 
 	handler, ok := handlers[cmd.Method()]
 	if !ok {
-		jsonError := btcjson.Error{
-			Code:    -32601,
-			Message: "Method not found",
-		}
 		reply = btcjson.Reply{
 			Result: nil,
-			Error:  &jsonError,
+			Error:  &btcjson.ErrMethodNotFound,
 			Id:     &id,
 		}
 		return reply, ErrMethodNotImplemented
@@ -691,7 +687,7 @@ func jsonRead(body []byte, s *rpcServer, walletNotification chan []byte) (reply 
 			// error to begin with, make a new one to send,
 			// but this really should not happen.
 			rawJSONError := btcjson.Error{
-				Code:    -32603,
+				Code:    btcjson.ErrInternal.Code,
 				Message: err.Error(),
 			}
 			reply = btcjson.Reply{
@@ -713,14 +709,9 @@ func jsonWSRead(walletNotification chan []byte, replychan chan *btcjson.Reply, b
 	var message btcjson.Message
 	err := json.Unmarshal(body, &message)
 	if err != nil {
-		jsonError := btcjson.Error{
-			Code:    -32700,
-			Message: "Parse error",
-		}
-
 		reply := btcjson.Reply{
 			Result: nil,
-			Error:  &jsonError,
+			Error:  &btcjson.ErrParse,
 			Id:     nil,
 		}
 
@@ -835,26 +826,18 @@ func jsonWSRead(walletNotification chan []byte, replychan chan *btcjson.Reply, b
 	case "notifynewtxs":
 		params, ok := message.Params.([]interface{})
 		if !ok || len(params) != 1 {
-			jsonError := btcjson.Error{
-				Code:    -32602,
-				Message: "Invalid parameters",
-			}
 			rawReply = btcjson.Reply{
 				Result: nil,
-				Error:  &jsonError,
+				Error:  &btcjson.ErrInvalidParams,
 				Id:     &message.Id,
 			}
 			return ErrBadParamsField
 		}
 		addr, ok := params[0].(string)
 		if !ok {
-			jsonError := btcjson.Error{
-				Code:    -32602,
-				Message: "Invalid parameters",
-			}
 			rawReply = btcjson.Reply{
 				Result: nil,
-				Error:  &jsonError,
+				Error:  &btcjson.ErrInvalidParams,
 				Id:     &message.Id,
 			}
 			return ErrBadParamsField
@@ -862,7 +845,7 @@ func jsonWSRead(walletNotification chan []byte, replychan chan *btcjson.Reply, b
 		addrhash, _, err := btcutil.DecodeAddress(addr)
 		if err != nil {
 			jsonError := btcjson.Error{
-				Code:    -32602,
+				Code:    btcjson.ErrInvalidParams.Code,
 				Message: "Cannot decode address",
 			}
 			rawReply = btcjson.Reply{
@@ -885,13 +868,9 @@ func jsonWSRead(walletNotification chan []byte, replychan chan *btcjson.Reply, b
 	case "notifyspent":
 		params, ok := message.Params.([]interface{})
 		if !ok || len(params) != 2 {
-			jsonError := btcjson.Error{
-				Code:    -32602,
-				Message: "Invalid parameters",
-			}
 			rawReply = btcjson.Reply{
 				Result: nil,
-				Error:  &jsonError,
+				Error:  &btcjson.ErrInvalidParams,
 				Id:     &message.Id,
 			}
 			return ErrBadParamsField
@@ -899,13 +878,9 @@ func jsonWSRead(walletNotification chan []byte, replychan chan *btcjson.Reply, b
 		hashBE, ok1 := params[0].(string)
 		index, ok2 := params[1].(float64)
 		if !ok1 || !ok2 {
-			jsonError := btcjson.Error{
-				Code:    -32602,
-				Message: "Invalid parameters",
-			}
 			rawReply = btcjson.Reply{
 				Result: nil,
-				Error:  &jsonError,
+				Error:  &btcjson.ErrInvalidParams,
 				Id:     &message.Id,
 			}
 			return ErrBadParamsField
@@ -913,7 +888,7 @@ func jsonWSRead(walletNotification chan []byte, replychan chan *btcjson.Reply, b
 		hash, err := btcwire.NewShaHashFromStr(hashBE)
 		if err != nil {
 			jsonError := btcjson.Error{
-				Code:    -32602,
+				Code:    btcjson.ErrInvalidParams.Code,
 				Message: "Hash string cannot be parsed.",
 			}
 			rawReply = btcjson.Reply{
@@ -933,13 +908,9 @@ func jsonWSRead(walletNotification chan []byte, replychan chan *btcjson.Reply, b
 		}
 
 	default:
-		jsonError := btcjson.Error{
-			Code:    -32601,
-			Message: "Method not found",
-		}
 		rawReply = btcjson.Reply{
 			Result: nil,
-			Error:  &jsonError,
+			Error:  &btcjson.ErrMethodNotFound,
 			Id:     &message.Id,
 		}
 	}
