@@ -50,6 +50,13 @@ func RegisterCustomCmd(method string, parser RawCmdParser) {
 // ParseMarshaledCmd parses a raw command and unmarshals as a Cmd.
 // Code that reads and handles commands should switch on the type and
 // type assert as the particular commands supported by the program.
+//
+// In all cases where b is a valid JSON-RPC message, and unmarshalling
+// succeeds, a non-nil Cmd will always be returned.  This even
+// includes error cases where parsing the message into a concrete Cmd
+// type fails.  This behavior allows RPC server code to reply back with
+// a detailed error using the Id and Method functions of the Cmd
+// interface.
 func ParseMarshaledCmd(b []byte) (Cmd, error) {
 	var r RawCmd
 	if err := json.Unmarshal(b, &r); err != nil {
@@ -281,15 +288,70 @@ func ParseMarshaledCmd(b []byte) (Cmd, error) {
 	}
 
 	if cmd == nil {
-		return nil, ErrMethodNotFound
+		cmd = newUnparsableCmd(r.Id, r.Method)
+		return cmd, ErrMethodNotFound
 	}
 
 	// If we get here we have a cmd that can unmarshal itself.
 	if err := cmd.UnmarshalJSON(b); err != nil {
-		return nil, err
-	} else {
-		return cmd, nil
+		cmd = newUnparsableCmd(r.Id, r.Method)
+		return cmd, err
 	}
+	return cmd, nil
+}
+
+// unparsableCmd is a type representing a valid unmarshalled JSON-RPC
+// request, but is used for cases where parsing the RPC request into a
+// concrete Cmd type failed, either due to an unknown method, or trying
+// to parse incorrect arguments for a known method.
+type unparsableCmd struct {
+	id     interface{}
+	method string
+}
+
+// Enforce that unparsableCmd satisifies the Cmd interface.
+var _ Cmd = &unparsableCmd{}
+
+func newUnparsableCmd(id interface{}, method string) *unparsableCmd {
+	return &unparsableCmd{
+		id:     id,
+		method: method,
+	}
+}
+
+// Id satisifies the Cmd interface by returning the id of the command.
+func (cmd *unparsableCmd) Id() interface{} {
+	return cmd.id
+}
+
+// Method satisfies the Cmd interface by returning the json method.
+func (cmd *unparsableCmd) Method() string {
+	return cmd.method
+}
+
+// MarshalJSON returns the JSON encoding of cmd.  Part of the Cmd interface.
+func (cmd *unparsableCmd) MarshalJSON() ([]byte, error) {
+	// Fill and marshal a RawCmd.
+	raw := RawCmd{
+		Jsonrpc: "1.0",
+		Method:  cmd.method,
+		Id:      cmd.id,
+	}
+	return json.Marshal(raw)
+}
+
+// UnmarshalJSON unmarshals the JSON encoding of cmd into cmd.  Part of
+// the Cmd interface.
+func (cmd *unparsableCmd) UnmarshalJSON(b []byte) error {
+	// Unmashal into a RawCmd
+	var r RawCmd
+	if err := json.Unmarshal(b, &r); err != nil {
+		return err
+	}
+
+	cmd.id = r.Id
+	cmd.method = r.Method
+	return nil
 }
 
 // AddMultisigAddressCmd is a type handling custom marshaling and

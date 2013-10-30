@@ -471,14 +471,14 @@ var jsoncmdtests = []struct {
 			return NewGetNewAddressCmd(float64(1), "address")
 		},
 		result: &GetNewAddressCmd{
-			id: float64(1),
+			id:      float64(1),
 			Address: "address",
 		},
 	},
 	{
 		name: "basic getpeerinfo",
 		f: func() (Cmd, error) {
-			return NewGetPeerInfoCmd(float64(1)) 
+			return NewGetPeerInfoCmd(float64(1))
 		},
 		result: &GetPeerInfoCmd{
 			id: float64(1),
