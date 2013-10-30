@@ -616,7 +616,8 @@ func (mp *txMemPool) maybeAcceptTransaction(tx *btcutil.Tx, isOrphan *bool) erro
 	}
 
 	// Get the current height of the main chain.  A standalone transaction
-	// will be mined into the next block at best, so
+	// will be mined into the next block at best, so it's height is at least
+	// one more than the current height.
 	_, curHeight, err := mp.server.db.NewestSha()
 	if err != nil {
 		return err
@@ -795,8 +796,7 @@ func (mp *txMemPool) ProcessTransaction(tx *btcutil.Tx) error {
 	mp.Lock()
 	defer mp.Unlock()
 
-	txHash := tx.Sha()
-	log.Tracef("TXMP: Processing transaction %v", txHash)
+	log.Tracef("TXMP: Processing transaction %v", tx.Sha())
 
 	// Potentially accept the transaction to the memory pool.
 	var isOrphan bool
@@ -809,7 +809,7 @@ func (mp *txMemPool) ProcessTransaction(tx *btcutil.Tx) error {
 		// Accept any orphan transactions that depend on this
 		// transaction (they are no longer orphans) and repeat for those
 		// accepted transactions until there are no more.
-		err := mp.processOrphans(txHash)
+		err := mp.processOrphans(tx.Sha())
 		if err != nil {
 			return err
 		}

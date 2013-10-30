@@ -271,7 +271,7 @@ func (b *blockManager) handleTxMsg(tmsg *txMsg) {
 	// Keep track of which peer the tx was sent from.
 	txHash := tmsg.tx.Sha()
 
-	// If we didn't ask for this block then the peer is misbehaving.
+	// If we didn't ask for this transaction then the peer is misbehaving.
 	if _, ok := tmsg.peer.requestedTxns[*txHash]; !ok {
 		log.Warnf("BMGR: Got unrequested transaction %v from %s -- "+
 			"disconnecting", txHash, tmsg.peer.addr)
