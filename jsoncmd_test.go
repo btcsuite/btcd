@@ -485,6 +485,193 @@ var jsoncmdtests = []struct {
 		},
 	},
 	{
+		name: "basic gettxout",
+		f: func() (Cmd, error) {
+			return NewGetTxOutCmd(float64(1),
+				"sometx",
+				10)
+		},
+		result: &GetTxOutCmd{
+			id:     float64(1),
+			Txid:   "sometx",
+			Output: 10,
+		},
+	},
+	{
+		name: "basic gettxout + optional",
+		f: func() (Cmd, error) {
+			return NewGetTxOutCmd(float64(1),
+				"sometx",
+				10,
+				false)
+		},
+		result: &GetTxOutCmd{
+			id:             float64(1),
+			Txid:           "sometx",
+			Output:         10,
+			IncludeMempool: false,
+		},
+	},
+	{
+		name: "basic gettxsetoutinfo",
+		f: func() (Cmd, error) {
+			return NewGetTxOutSetInfoCmd(float64(1))
+		},
+		result: &GetTxOutSetInfoCmd{
+			id: float64(1),
+		},
+	},
+	{
+		name: "basic getwork",
+		f: func() (Cmd, error) {
+			return NewGetWorkCmd(float64(1),
+				WorkRequest{
+					Data:      "some data",
+					Target:    "our target",
+					Algorithm: "algo",
+				})
+		},
+		result: &GetWorkCmd{
+			id: float64(1),
+			Request: WorkRequest{
+				Data:      "some data",
+				Target:    "our target",
+				Algorithm: "algo",
+			},
+		},
+	},
+	{
+		name: "basic help",
+		f: func() (Cmd, error) {
+			return NewHelpCmd(float64(1))
+		},
+		result: &HelpCmd{
+			id: float64(1),
+		},
+	},
+	{
+		name: "basic help + optional cmd",
+		f: func() (Cmd, error) {
+			return NewHelpCmd(float64(1),
+				"getinfo")
+		},
+		result: &HelpCmd{
+			id:      float64(1),
+			Command: "getinfo",
+		},
+	},
+	{
+		name: "basic importprivkey",
+		f: func() (Cmd, error) {
+			return NewImportPrivKeyCmd(float64(1),
+				"somereallongprivatekey")
+		},
+		result: &ImportPrivKeyCmd{
+			id:      float64(1),
+			PrivKey: "somereallongprivatekey",
+		},
+	},
+	{
+		name: "basic importprivkey + opts",
+		f: func() (Cmd, error) {
+			return NewImportPrivKeyCmd(float64(1),
+				"somereallongprivatekey",
+				"some text",
+				false)
+		},
+		result: &ImportPrivKeyCmd{
+			id:      float64(1),
+			PrivKey: "somereallongprivatekey",
+			Label:   "some text",
+			ReScan:  false,
+		},
+	},
+	{
+		name: "basic importwallet",
+		f: func() (Cmd, error) {
+			return NewImportWalletCmd(float64(1),
+				"walletfilename.dat")
+		},
+		result: &ImportWalletCmd{
+			id:       float64(1),
+			Filename: "walletfilename.dat",
+		},
+	},
+	{
+		name: "basic keypoolrefill",
+		f: func() (Cmd, error) {
+			return NewKeyPoolRefillCmd(float64(1))
+		},
+		result: &KeyPoolRefillCmd{
+			id: float64(1),
+		},
+	},
+	{
+		name: "basic listaccounts",
+		f: func() (Cmd, error) {
+			return NewListAccountsCmd(float64(1), 1)
+		},
+		result: &ListAccountsCmd{
+			id:      float64(1),
+			MinConf: 1,
+		},
+	},
+	{
+		name: "basic listaddressgroupings",
+		f: func() (Cmd, error) {
+			return NewListAddressGroupingsCmd(float64(1))
+		},
+		result: &ListAddressGroupingsCmd{
+			id: float64(1),
+		},
+	},
+	{
+		name: "basic lockunspent",
+		f: func() (Cmd, error) {
+			return NewLockUnspentCmd(float64(1), true)
+		},
+		result: &LockUnspentCmd{
+			id:     float64(1),
+			Unlock: true,
+		},
+	},
+	{
+		name: "basic move",
+		f: func() (Cmd, error) {
+			return NewMoveCmd(float64(1),
+				"account1",
+				"account2",
+				12,
+				1)
+		},
+		result: &MoveCmd{
+			id:          float64(1),
+			FromAccount: "account1",
+			ToAccount:   "account2",
+			Amount:      12,
+			MinConf:     1, // the default
+		},
+	},
+	{
+		name: "basic move + optionals",
+		f: func() (Cmd, error) {
+			return NewMoveCmd(float64(1),
+				"account1",
+				"account2",
+				12,
+				1,
+				"some comment")
+		},
+		result: &MoveCmd{
+			id:          float64(1),
+			FromAccount: "account1",
+			ToAccount:   "account2",
+			Amount:      12,
+			MinConf:     1, // the default
+			Comment:     "some comment",
+		},
+	},
+	{
 		name: "basic ping",
 		f: func() (Cmd, error) {
 			return NewPingCmd(float64(1))
@@ -508,6 +695,27 @@ var jsoncmdtests = []struct {
 			ToAddress:   "address",
 			Amount:      12,
 			MinConf:     1, // the default
+		},
+	},
+	{
+		name: "basic sendfrom + options",
+		f: func() (Cmd, error) {
+			return NewSendFromCmd(float64(1),
+				"account",
+				"address",
+				12,
+				1,
+				"a comment",
+				"comment to")
+		},
+		result: &SendFromCmd{
+			id:          float64(1),
+			FromAccount: "account",
+			ToAddress:   "address",
+			Amount:      12,
+			MinConf:     1, // the default
+			Comment:     "a comment",
+			CommentTo:   "comment to",
 		},
 	},
 	{
@@ -585,16 +793,16 @@ var jsoncmdtests = []struct {
 			GenProcLimit: 10,
 		},
 	},
-	/*	{
+	{
 		name: "basic settxfee",
 		f: func() (Cmd, error) {
 			return NewSetTxFeeCmd(float64(1), 10)
 		},
 		result: &SetTxFeeCmd{
 			id:     float64(1),
-			Amount: 100000000,
+			Amount: 10,
 		},
-	},*/
+	},
 	{
 		name: "basic signrawtransaction",
 		f: func() (Cmd, error) {

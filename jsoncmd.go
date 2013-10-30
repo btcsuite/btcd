@@ -3226,11 +3226,10 @@ func (cmd *GetTxOutCmd) UnmarshalJSON(b []byte) error {
 
 	output, ok := r.Params[1].(float64)
 	if !ok {
-		return errors.New("first parameter output must be a number")
+		return errors.New("second parameter output must be a number")
 	}
-
 	optArgs := make([]bool, 0, 1)
-	if len(r.Params) == 2 {
+	if len(r.Params) == 3 {
 		mempool, ok := r.Params[2].(bool)
 		if !ok {
 			return errors.New("third optional parameter includemempool must be a bool")
@@ -4673,7 +4672,7 @@ func NewMoveCmd(id interface{}, fromaccount string, toaccount string, amount int
 		minconf = m
 	}
 	if len(optArgs) > 1 {
-		c, ok := optArgs[0].(string)
+		c, ok := optArgs[1].(string)
 		if !ok {
 			return nil, errors.New("second optional parameter comment is not a string")
 		}
@@ -4709,7 +4708,7 @@ func (cmd *MoveCmd) MarshalJSON() ([]byte, error) {
 		Params: []interface{}{
 			cmd.FromAccount,
 			cmd.ToAccount,
-			cmd.Amount,
+			float64(cmd.Amount) / 1e8, //convert to BTC
 		},
 	}
 
@@ -5564,7 +5563,7 @@ func (cmd *SetTxFeeCmd) MarshalJSON() ([]byte, error) {
 		Method:  "settxfee",
 		Id:      cmd.id,
 		Params: []interface{}{
-			cmd.Amount,
+			float64(cmd.Amount) / 1e8, //convert to BTC
 		},
 	}
 
