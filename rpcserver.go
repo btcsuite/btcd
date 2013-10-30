@@ -611,9 +611,11 @@ func handleSendRawTransaction(s *rpcServer, cmd btcjson.Cmd, walletNotification 
 		// so log it as such.  Otherwise, something really did go wrong,
 		// so log it as an actual error.
 		if _, ok := err.(TxRuleError); ok {
-			log.Debugf("RPCS: Rejected transaction %v: %v", txHash, err)
+			log.Debugf("RPCS: Rejected transaction %v: %v", tx.Sha(),
+				err)
 		} else {
-			log.Errorf("RPCS: Failed to process transaction %v: %v", txHash, err)
+			log.Errorf("RPCS: Failed to process transaction %v: %v",
+				tx.Sha(), err)
 		}
 		err = btcjson.Error{
 			Code:    btcjson.ErrDeserialization.Code,
