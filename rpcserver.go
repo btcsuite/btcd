@@ -33,10 +33,6 @@ var (
 	// ErrBadParamsField describes an error where the parameters JSON
 	// field cannot be properly parsed.
 	ErrBadParamsField = errors.New("bad params field")
-
-	// ErrMethodNotImplemented describes an error where the RPC or
-	// websocket JSON method is not implemented.
-	ErrMethodNotImplemented = errors.New("method not implemented")
 )
 
 // rpcServer holds the items the rpc server may need to access (config,
@@ -648,17 +644,30 @@ func handleStop(s *rpcServer, cmd btcjson.Cmd, walletNotification chan []byte) (
 func jsonRead(body []byte, s *rpcServer, walletNotification chan []byte) (reply btcjson.Reply, err error) {
 	cmd, err := btcjson.ParseMarshaledCmd(body)
 	if err != nil {
-		jsonError := btcjson.ErrParse
+		var id interface{}
+		if cmd != nil {
+			// Unmarshaling a valid JSON-RPC message succeeded.  Use
+			// the provided id for errors.
+			id = cmd.Id()
+		}
 
-		reply = btcjson.Reply{
-			Result: nil,
-			Error:  &jsonError,
-			Id:     nil,
+		if jsonErr, ok := err.(btcjson.Error); ok {
+			reply = btcjson.Reply{
+				Result: nil,
+				Error:  &jsonErr,
+				Id:     &id,
+			}
+		} else {
+			reply = btcjson.Reply{
+				Result: nil,
+				Error:  &jsonErr,
+				Id:     &id,
+			}
 		}
 
 		log.Tracef("RPCS: reply: %v", reply)
 
-		return reply, jsonError
+		return reply, err
 	}
 	log.Tracef("RPCS: received: %v", cmd)
 
@@ -671,7 +680,7 @@ func jsonRead(body []byte, s *rpcServer, walletNotification chan []byte) (reply 
 			Error:  &btcjson.ErrMethodNotFound,
 			Id:     &id,
 		}
-		return reply, ErrMethodNotImplemented
+		return reply, btcjson.ErrMethodNotFound
 	}
 
 	result, err := handler(s, cmd, walletNotification)
@@ -914,7 +923,7 @@ func jsonWSRead(walletNotification chan []byte, replychan chan *btcjson.Reply, b
 			Id:     &message.Id,
 		}
 	}
-	return ErrMethodNotImplemented
+	return btcjson.ErrMethodNotFound
 }
 
 // getDifficultyRatio returns the proof-of-work difficulty as a multiple of the
@@ -1035,7 +1044,7 @@ func (s *rpcServer) websocketJSONHandler(walletNotification chan []byte, msg []b
 	reply, err := jsonRead(msg, s, walletNotification)
 	s.wg.Done()
 
-	if err != ErrMethodNotImplemented {
+	if err != btcjson.ErrMethodNotFound {
 		replyBytes, err := json.Marshal(reply)
 		if err != nil {
 			log.Errorf("RPCS: Error marshalling reply: %v", err)
@@ -1070,16 +1079,9 @@ func (s *rpcServer) websocketJSONHandler(walletNotification chan []byte, msg []b
 			}
 		}
 	}()
-
-	if err == ErrMethodNotImplemented {
-		// Try websocket extensions
-		s.wg.Add(1)
-		err = jsonWSRead(walletNotification, replychan, msg, s)
-		s.wg.Done()
-	}
-	if err != nil && err != ErrMethodNotImplemented {
-		log.Error(err)
-	}
+	s.wg.Add(1)
+	err = jsonWSRead(walletNotification, replychan, msg, s)
+	s.wg.Done()
 }
 
 // NotifyBlockConnected creates and marshalls a JSON message to notify
