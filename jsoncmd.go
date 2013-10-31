@@ -2966,7 +2966,7 @@ func (cmd *GetReceivedByAccountCmd) UnmarshalJSON(b []byte) error {
 }
 
 // GetReceivedByAddressCmd is a type handling custom marshaling and
-// unmarshaling of getrecievedbyaddress JSON RPC commands.
+// unmarshaling of getreceivedbyaddress JSON RPC commands.
 type GetReceivedByAddressCmd struct {
 	id      interface{}
 	Address string
@@ -3013,7 +3013,7 @@ func (cmd *GetReceivedByAddressCmd) Id() interface{} {
 
 // Method satisfies the Cmd interface by returning the json method.
 func (cmd *GetReceivedByAddressCmd) Method() string {
-	return "getrecievedbyaddress"
+	return "getrecivedbyaddress"
 }
 
 // MarshalJSON returns the JSON encoding of cmd.  Part of the Cmd interface.
@@ -3021,7 +3021,7 @@ func (cmd *GetReceivedByAddressCmd) MarshalJSON() ([]byte, error) {
 
 	raw := RawCmd{
 		Jsonrpc: "1.0",
-		Method:  "getrecievedbyaddress",
+		Method:  "getreceivedbyaddress",
 		Id:      cmd.id,
 		Params:  []interface{}{},
 	}

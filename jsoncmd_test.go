@@ -485,6 +485,96 @@ var jsoncmdtests = []struct {
 		},
 	},
 	{
+		name: "basic getrawmchangeaddress",
+		f: func() (Cmd, error) {
+			return NewGetRawChangeAddressCmd(float64(1))
+		},
+		result: &GetRawChangeAddressCmd{
+			id: float64(1),
+		},
+	},
+	{
+		name: "basic getrawmchangeaddress + account",
+		f: func() (Cmd, error) {
+			return NewGetRawChangeAddressCmd(float64(1),
+				"accountname")
+		},
+		result: &GetRawChangeAddressCmd{
+			id:      float64(1),
+			Account: "accountname",
+		},
+	},
+	{
+		name: "basic getrawmempool",
+		f: func() (Cmd, error) {
+			return NewGetRawMempoolCmd(float64(1))
+		},
+		result: &GetRawMempoolCmd{
+			id: float64(1),
+		},
+	},
+	{
+		name: "basic getrawtransaction",
+		f: func() (Cmd, error) {
+			return NewGetRawTransactionCmd(float64(1),
+				"sometxid")
+		},
+		result: &GetRawTransactionCmd{
+			id:   float64(1),
+			Txid: "sometxid",
+		},
+	},
+	{
+		name: "basic getrawtransaction + verbose",
+		f: func() (Cmd, error) {
+			return NewGetRawTransactionCmd(float64(1),
+				"sometxid",
+				true)
+		},
+		result: &GetRawTransactionCmd{
+			id:      float64(1),
+			Txid:    "sometxid",
+			Verbose: true,
+		},
+	},
+	{
+		name: "basic getreceivedbyaccount",
+		f: func() (Cmd, error) {
+			return NewGetReceivedByAccountCmd(float64(1),
+				"abtcaccount",
+				1)
+		},
+		result: &GetReceivedByAccountCmd{
+			id:      float64(1),
+			Account: "abtcaccount",
+			MinConf: 1,
+		},
+	},
+	{
+		name: "basic getreceivedbyaddress",
+		f: func() (Cmd, error) {
+			return NewGetReceivedByAddressCmd(float64(1),
+				"abtcaddress",
+				1)
+		},
+		result: &GetReceivedByAddressCmd{
+			id:      float64(1),
+			Address: "abtcaddress",
+			MinConf: 1,
+		},
+	},
+	{
+		name: "basic gettransaction",
+		f: func() (Cmd, error) {
+			return NewGetTransactionCmd(float64(1),
+				"atxid")
+		},
+		result: &GetTransactionCmd{
+			id:   float64(1),
+			Txid: "atxid",
+		},
+	},
+	{
 		name: "basic gettxout",
 		f: func() (Cmd, error) {
 			return NewGetTxOutCmd(float64(1),
