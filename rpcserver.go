@@ -760,31 +760,99 @@ func jsonWSRead(walletNotification chan []byte, replychan chan *btcjson.Reply, b
 			Id:     &message.Id,
 		}
 
-	case "rescan":
-		var addr string
-		minblock, maxblock := int64(0), btcdb.AllShas
-		params, ok := message.Params.([]interface{})
-		if !ok {
-			return ErrBadParamsField
-		}
-		for i, v := range params {
-			switch v.(type) {
-			case string:
-				if i == 0 {
-					addr = v.(string)
-				}
-			case float64:
-				if i == 1 {
-					minblock = int64(v.(float64))
-				} else if i == 2 {
-					maxblock = int64(v.(float64))
-				}
-			}
-		}
-		addrhash, _, err := btcutil.DecodeAddress(addr)
+	case "getbestblock":
+		// All other "get block" commands give either the height, the
+		// hash, or both but require the block SHA.  This gets both for
+		// the best block.
+		sha, height, err := s.server.db.NewestSha()
 		if err != nil {
+			log.Errorf("RPCS: Error getting newest block: %v", err)
+			rawReply = btcjson.Reply{
+				Result: nil,
+				Error:  &btcjson.ErrBestBlockHash,
+				Id:     &message.Id,
+			}
 			return err
 		}
+		rawReply = btcjson.Reply{
+			Result: map[string]interface{}{
+				"hash":   sha.String(),
+				"height": height,
+			},
+			Id: &message.Id,
+		}
+
+	case "rescan":
+		minblock, maxblock := int64(0), btcdb.AllShas
+		params, ok := message.Params.([]interface{})
+		if !ok || len(params) < 2 {
+			rawReply = btcjson.Reply{
+				Result: nil,
+				Error:  &btcjson.ErrInvalidParams,
+				Id:     &message.Id,
+			}
+			return ErrBadParamsField
+		}
+		fminblock, ok := params[0].(float64)
+		if !ok {
+			rawReply = btcjson.Reply{
+				Result: nil,
+				Error:  &btcjson.ErrInvalidParams,
+				Id:     &message.Id,
+			}
+			return ErrBadParamsField
+		}
+		minblock = int64(fminblock)
+		iaddrs, ok := params[1].([]interface{})
+		if !ok {
+			rawReply = btcjson.Reply{
+				Result: nil,
+				Error:  &btcjson.ErrInvalidParams,
+				Id:     &message.Id,
+			}
+			return ErrBadParamsField
+		}
+
+		// addrHashes holds a set of string-ified address hashes.
+		addrHashes := make(map[string]bool, len(iaddrs))
+		for i := range iaddrs {
+			addr, ok := iaddrs[i].(string)
+			if !ok {
+				rawReply = btcjson.Reply{
+					Result: nil,
+					Error:  &btcjson.ErrInvalidParams,
+					Id:     &message.Id,
+				}
+				return ErrBadParamsField
+			}
+
+			addrhash, _, err := btcutil.DecodeAddress(addr)
+			if err != nil {
+				rawReply = btcjson.Reply{
+					Result: nil,
+					Error:  &btcjson.ErrInvalidParams,
+					Id:     &message.Id,
+				}
+				return ErrBadParamsField
+			}
+
+			addrHashes[string(addrhash)] = true
+		}
+
+		if len(params) > 2 {
+			fmaxblock, ok := params[2].(float64)
+			if !ok {
+				rawReply = btcjson.Reply{
+					Result: nil,
+					Error:  &btcjson.ErrInvalidParams,
+					Id:     &message.Id,
+				}
+				return ErrBadParamsField
+			}
+			maxblock = int64(fmaxblock)
+		}
+
+		log.Debugf("RPCS: Begining rescan")
 
 		// FetchHeightRange may not return a complete list of block shas for
 		// the given range, so fetch range as many times as necessary.
@@ -811,16 +879,41 @@ func jsonWSRead(walletNotification chan []byte, replychan chan *btcjson.Reply, b
 					if txReply.Err != nil || txReply.Tx == nil {
 						continue
 					}
-					for _, txout := range txReply.Tx.TxOut {
-						_, txaddrhash, err := btcscript.ScriptToAddrHash(txout.PkScript)
+					for txOutIdx, txout := range txReply.Tx.TxOut {
+						st, txaddrhash, err := btcscript.ScriptToAddrHash(txout.PkScript)
+						if st != btcscript.ScriptAddr || err != nil {
+							continue
+						}
+						txaddr, err := btcutil.EncodeAddress(txaddrhash, s.server.btcnet)
 						if err != nil {
+							log.Errorf("Error encoding address: %v", err)
 							return err
 						}
-						if !bytes.Equal(addrhash, txaddrhash) {
+						if ok := addrHashes[string(txaddrhash)]; ok {
 							reply := btcjson.Reply{
-								Result: txReply.Sha,
-								Error:  nil,
-								Id:     &message.Id,
+								Result: struct {
+									Sender    string `json:"sender"`
+									Receiver  string `json:"receiver"`
+									BlockHash string `json:"blockhash"`
+									Height    int64  `json:"height"`
+									TxHash    string `json:"txhash"`
+									Index     uint32 `json:"index"`
+									Amount    int64  `json:"amount"`
+									PkScript  string `json:"pkscript"`
+									Spent     bool   `json:"spent"`
+								}{
+									Sender:    "Unknown", // TODO(jrick)
+									Receiver:  txaddr,
+									BlockHash: blkshalist[i].String(),
+									Height:    blk.Height(),
+									TxHash:    txReply.Sha.String(),
+									Index:     uint32(txOutIdx),
+									Amount:    txout.Value,
+									PkScript:  btcutil.Base58Encode(txout.PkScript),
+									Spent:     txReply.TxSpent[txOutIdx],
+								},
+								Error: nil,
+								Id:    &message.Id,
 							}
 							replychan <- &reply
 						}
@@ -840,6 +933,8 @@ func jsonWSRead(walletNotification chan []byte, replychan chan *btcjson.Reply, b
 			Error:  nil,
 			Id:     &message.Id,
 		}
+
+		log.Debug("RPCS: Finished rescan")
 
 	case "notifynewtxs":
 		params, ok := message.Params.([]interface{})
