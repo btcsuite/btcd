@@ -136,6 +136,17 @@ var jsoncmdtests = []struct {
 		},
 	},
 	{
+		name: "basic decodescript",
+		f: func() (Cmd, error) {
+			return NewDecodeScriptCmd(float64(1),
+				"a bunch of hex")
+		},
+		result: &DecodeScriptCmd{
+			id:        float64(1),
+			HexScript: "a bunch of hex",
+		},
+	},
+	{
 		name: "basic dumpprivkey",
 		f: func() (Cmd, error) {
 			return NewDumpPrivKeyCmd(float64(1),
@@ -955,17 +966,19 @@ var jsoncmdtests = []struct {
 			HexBlock: "lotsofhex",
 		},
 	},
-	//	{
-	//		name: "submitblock with optional object",
-	//		f: func() (Cmd, error) {
-	//			return NewSubmitBlockCmd(float64(1),
-	//				"lotsofhex", "otherstuff")
-	//		},
-	//		result: &SubmitBlockCmd{
-	//			id:       float64(1),
-	//			HexBlock: "lotsofhex",
-	//		},
-	//	},
+	{
+		name: "submitblock with optional object",
+		f: func() (Cmd, error) {
+			return NewSubmitBlockCmd(float64(1),
+				"lotsofhex",
+				&SubmitBlockOptions{WorkId: "otherstuff"})
+		},
+		result: &SubmitBlockCmd{
+			id:       float64(1),
+			HexBlock: "lotsofhex",
+			Options:  &SubmitBlockOptions{WorkId: "otherstuff"},
+		},
+	},
 	{
 		name: "basic validateaddress",
 		f: func() (Cmd, error) {
