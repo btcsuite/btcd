@@ -65,10 +65,17 @@ const (
 	// considered standard.
 	maxStandardMultiSigs = 3
 
-	// minTxRelayFee is the minimum fee in satoshi that is required for
-	// a transaction to be treated as free for relay purposes.  It is also
-	// used to help determine if a transation is considered dust.
+	// minTxRelayFee is the minimum fee in satoshi that is required for a
+	// transaction to be treated as free for relay purposes.  It is also
+	// used to help determine if a transaction is considered dust and as a
+	// base for calculating minimum required fees for larger transactions.
+	// This value is in Satoshi/KB (kilobyte, not kibibyte).
 	minTxRelayFee = 10000
+
+	// blockPrioritySize is the number of bytes reserved in a block for
+	// high-priority transactions.  It is mainly used to help determine the
+	// minimum required fee for a transaction.
+	blockPrioritySize = 27000
 )
 
 // txMemPool is used as a source of transactions that need to be mined into
@@ -133,14 +140,14 @@ func isDust(txOut *btcwire.TxOut) bool {
 	totalSize := txOut.SerializeSize() + 148
 
 	// The output is considered dust if the cost to the network to spend the
-	// coins is more than 1/3 of the minimum transaction relay fee.
-	// minTxRelayFee is in Satoshi/KB (kilobyte, not kibibyte), so
+	// coins is more than 1/3 of the minimum free transaction relay fee.
+	// minFreeTxRelayFee is in Satoshi/KB (kilobyte, not kibibyte), so
 	// multiply by 1000 to convert bytes.
 	//
 	// Using the typical values for a pay-to-pubkey-hash transaction from
-	// the breakdown above and the default minimum transaction relay fee of
-	// 10000, this equates to values less than 5460 satoshi being considered
-	// dust.
+	// the breakdown above and the default minimum free transaction relay
+	// fee of 10000, this equates to values less than 5460 satoshi being
+	// considered dust.
 	//
 	// The following is equivalent to (value/totalSize) * (1/3) * 1000
 	// without needing to do floating point math.
@@ -262,6 +269,40 @@ func checkTransactionStandard(tx *btcutil.Tx, height int64) error {
 func checkInputsStandard(tx *btcutil.Tx) error {
 	// TODO(davec): Implement
 	return nil
+}
+
+// calcMinRelayFee retuns the minimum transaction fee required for the passed
+// transaction to be accepted into the memory pool and relayed.
+func calcMinRelayFee(tx *btcutil.Tx) int64 {
+	// Most miners allow a free transaction area in blocks they mine to go
+	// alongside the area used for high-priority transactions as well as
+	// transactions with fees.  A transaction size of up to 1000 bytes is
+	// considered safe to go into this section.  Further, the minimum fee
+	// calculated below on its own would encourage several small
+	// transactions to avoid fees rather than one single larger transaction
+	// which is more desirable.  Therefore, as long as the size of the
+	// transaction does not exceeed 1000 less than the reserved space for
+	// high-priority transactions, don't require a fee for it.
+	serializedLen := int64(tx.MsgTx().SerializeSize())
+	if serializedLen < (blockPrioritySize - 1000) {
+		return 0
+	}
+
+	// Calculate the minimum fee for a transaction to be allowed into the
+	// mempool and relayed by scaling the base fee (which is the minimum
+	// free transaction relay fee).  minTxRelayFee is in Satoshi/KB
+	// (kilobyte, not kibibyte), so divide the transaction size by 1000 to
+	// convert to kilobytes.  Also, integer division is used so fees only
+	// increase on full kilobyte boundaries.
+	minFee := (1 + serializedLen/1000) * minTxRelayFee
+
+	// Set the minimum fee to the maximum possible value if the calculated
+	// fee is not in the valid range for monetary amounts.
+	if minFee < 0 || minFee > btcutil.MaxSatoshi {
+		minFee = btcutil.MaxSatoshi
+	}
+
+	return minFee
 }
 
 // removeOrphan removes the passed orphan transaction from the orphan pool and
@@ -677,13 +718,22 @@ func (mp *txMemPool) maybeAcceptTransaction(tx *btcutil.Tx, isOrphan *bool) erro
 		}
 	}
 
-	// Note: if you modify this code to accept non-standard transactions,
+	// NOTE: if you modify this code to accept non-standard transactions,
 	// you should add code here to check that the transaction does a
 	// reasonable number of ECDSA signature verifications.
 
-	// TODO(davec): Don't allow the transaction if the transation fee
-	// would be too low to get into an empty block.
-	_ = txFee
+	// Don't allow transactions with fees too low to get into a mined block.
+	minRequiredFee := calcMinRelayFee(tx)
+	if txFee < minRequiredFee {
+		str := fmt.Sprintf("transaction %v has %d fees which is under "+
+			"the required amount of %d", txHash, txFee,
+			minRequiredFee)
+		return TxRuleError(str)
+	}
+
+	// TODO(davec): Rate-limit 'free' transactions.  That is to say
+	// transactions which are less than the minimum relay fee and are there
+	// considered free.
 
 	// Verify crypto signatures for each input and reject the transaction if
 	// any don't verify.
@@ -692,8 +742,6 @@ func (mp *txMemPool) maybeAcceptTransaction(tx *btcutil.Tx, isOrphan *bool) erro
 	if err != nil {
 		return err
 	}
-
-	// TODO(davec): Rate-limit free transactions
 
 	// Add to transaction pool.
 	mp.addTransaction(tx)
