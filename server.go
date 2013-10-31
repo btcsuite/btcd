@@ -74,6 +74,7 @@ type peerState struct {
 	outboundPeers    *list.List
 	persistentPeers  *list.List
 	banned           map[string]time.Time
+	outboundGroups    map[string]int
 	maxOutboundPeers int
 }
 
@@ -138,12 +139,13 @@ func (s *server) handleAddPeerMsg(state *peerState, p *peer) bool {
 
 	// Add the new peer and start it.
 	log.Debugf("SRVR: New peer %s", p)
-	if p.persistent {
-		state.persistentPeers.PushBack(p)
+	if p.inbound {
+		state.peers.PushBack(p)
+		p.Start()
 	} else {
-		if p.inbound {
-			state.peers.PushBack(p)
-			p.Start()
+		state.outboundGroups[GroupKey(p.na)]++
+		if p.persistent {
+			state.persistentPeers.PushBack(p)
 		} else {
 			state.outboundPeers.PushBack(p)
 		}
@@ -171,6 +173,9 @@ func (s *server) handleDonePeerMsg(state *peerState, p *peer) {
 				atomic.LoadInt32(&s.shutdown) == 0 {
 				e.Value = newOutboundPeer(s, p.addr, true)
 				return
+			}
+			if !p.inbound {
+				state.outboundGroups[GroupKey(p.na)]--
 			}
 			list.Remove(e)
 			log.Debugf("SRVR: Removed peer %s", p)
@@ -353,6 +358,9 @@ func (s *server) handleQuery(querymsg interface{}, state *peerState) {
 		for e := state.persistentPeers.Front(); e != nil; e = e.Next() {
 			peer := e.Value.(*peer)
 			if peer.addr == msg.addr {
+				// Keep group counts ok since we remove from
+				// the list now.
+				state.outboundGroups[GroupKey(peer.na)]--
 				// This is ok because we are not continuing
 				// to iterate so won't corrupt the loop.
 				state.persistentPeers.Remove(e)
@@ -450,6 +458,7 @@ func (s *server) peerHandler() {
 		outboundPeers:    list.New(),
 		banned:           make(map[string]time.Time),
 		maxOutboundPeers: defaultMaxOutbound,
+		outboundGroups:   make(map[string]int),
 	}
 	if cfg.MaxPeers < state.maxOutboundPeers {
 		state.maxOutboundPeers = cfg.MaxPeers
@@ -515,11 +524,6 @@ out:
 			atomic.LoadInt32(&s.shutdown) != 0 {
 			continue
 		}
-		groups := make(map[string]int)
-		forAllOutboundPeers(state, func(p *peer) {
-			groups[GroupKey(p.na)]++
-		})
-
 		tries := 0
 		for state.NeedMoreOutbound() &&
 			atomic.LoadInt32(&s.shutdown) == 0 {
@@ -543,7 +547,7 @@ out:
 			// to the same network segment at the expense of
 			// others. bitcoind breaks out of the loop here, but
 			// we continue to try other addresses.
-			if groups[key] != 0 {
+			if state.outboundGroups[key] != 0 {
 				continue
 			}
 
@@ -576,7 +580,6 @@ out:
 			// already checked that we have room for more peers.
 			if s.handleAddPeerMsg(state,
 				newOutboundPeer(s, addrStr, false)) {
-				groups[key]++
 			}
 		}
 
