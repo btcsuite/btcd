@@ -96,28 +96,19 @@ func readVarInt(r io.Reader, pver uint32) (uint64, error) {
 // writeVarInt serializes val to w using a variable number of bytes depending
 // on its value.
 func writeVarInt(w io.Writer, pver uint32, val uint64) error {
-	if val > math.MaxUint32 {
-		err := writeElements(w, []byte{0xff}, uint64(val))
-		if err != nil {
-			return err
-		}
-		return nil
+	if val < 0xfd {
+		return writeElement(w, uint8(val))
 	}
-	if val > math.MaxUint16 {
-		err := writeElements(w, []byte{0xfe}, uint32(val))
-		if err != nil {
-			return err
-		}
-		return nil
+
+	if val <= math.MaxUint16 {
+		return writeElements(w, []byte{0xfd}, uint16(val))
 	}
-	if val >= 0xfd {
-		err := writeElements(w, []byte{0xfd}, uint16(val))
-		if err != nil {
-			return err
-		}
-		return nil
+
+	if val <= math.MaxUint32 {
+		return writeElements(w, []byte{0xfe}, uint32(val))
 	}
-	return writeElement(w, uint8(val))
+
+	return writeElements(w, []byte{0xff}, uint64(val))
 }
 
 // readVarString reads a variable length string from r and returns it as a Go
