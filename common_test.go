@@ -144,6 +144,41 @@ func TestVarIntWireErrors(t *testing.T) {
 	}
 }
 
+// TestVarIntWire tests the serialize size for variable length integers.
+func TestVarIntSerializeSize(t *testing.T) {
+	tests := []struct {
+		val  uint64 // Value to get the serialized size for
+		size int    // Expected serialized size
+	}{
+		// Single byte
+		{0, 1},
+		// Max single byte
+		{0xfc, 1},
+		// Min 2-byte
+		{0xfd, 3},
+		// Max 2-byte
+		{0xffff, 3},
+		// Min 4-byte
+		{0x10000, 5},
+		// Max 4-byte
+		{0xffffffff, 5},
+		// Min 8-byte
+		{0x100000000, 9},
+		// Max 8-byte
+		{0xffffffffffffffff, 9},
+	}
+
+	t.Logf("Running %d tests", len(tests))
+	for i, test := range tests {
+		serializedSize := btcwire.TstVarIntSerializeSize(test.val)
+		if serializedSize != test.size {
+			t.Errorf("varIntSerializeSize #%d got: %d, want: %d", i,
+				serializedSize, test.size)
+			continue
+		}
+	}
+}
+
 // TestVarStringWire tests wire encode and decode for variable length strings.
 func TestVarStringWire(t *testing.T) {
 	pver := btcwire.ProtocolVersion

@@ -587,6 +587,35 @@ func TestTxOverflowErrors(t *testing.T) {
 	}
 }
 
+// TestTxSerializeSize performs tests to ensure the serialize size for various
+// transactions is accurate.
+func TestTxSerializeSize(t *testing.T) {
+	// Empty tx message.
+	noTx := btcwire.NewMsgTx()
+	noTx.Version = 1
+
+	tests := []struct {
+		in   *btcwire.MsgTx // Tx to encode
+		size int            // Expected serialized size
+	}{
+		// No inputs or outpus.
+		{noTx, 10},
+
+		// Transcaction with an input and an output.
+		{multiTx, 134},
+	}
+
+	t.Logf("Running %d tests", len(tests))
+	for i, test := range tests {
+		serializedSize := test.in.SerializeSize()
+		if serializedSize != test.size {
+			t.Errorf("MsgTx.SerializeSize: #%d got: %d, want: %d", i,
+				serializedSize, test.size)
+			continue
+		}
+	}
+}
+
 // multiTx is a MsgTx with an input and output and used in various tests.
 var multiTx = &btcwire.MsgTx{
 	Version: 1,

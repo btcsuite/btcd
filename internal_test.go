@@ -37,6 +37,12 @@ func TstWriteVarInt(w io.Writer, pver uint32, val uint64) error {
 	return writeVarInt(w, pver, val)
 }
 
+// TstVarIntSerializeSize makes the internal varIntSerializeSize function
+// available to the test package.
+func TstVarIntSerializeSize(val uint64) int {
+	return varIntSerializeSize(val)
+}
+
 // TstReadVarString makes the internal readVarString function available to the
 // test package.
 func TstReadVarString(r io.Reader, pver uint32) (string, error) {
