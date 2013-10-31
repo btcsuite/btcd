@@ -75,6 +75,16 @@ type TxIn struct {
 	Sequence         uint32
 }
 
+// SerializeSize returns the number of bytes it would take to serialize the
+// the transaction input.
+func (t *TxIn) SerializeSize() int {
+	// Outpoint Hash 32 bytes + Outpoint Index 4 bytes + Sequence 4 bytes +
+	// serialized varint size for the length of SignatureScript +
+	// SignatureScript bytes.
+	return 40 + varIntSerializeSize(uint64(len(t.SignatureScript))) +
+		len(t.SignatureScript)
+}
+
 // NewTxIn returns a new bitcoin transaction input with the provided
 // previous outpoint point and signature script with a default sequence of
 // MaxTxInSequenceNum.
@@ -90,6 +100,14 @@ func NewTxIn(prevOut *OutPoint, signatureScript []byte) *TxIn {
 type TxOut struct {
 	Value    int64
 	PkScript []byte
+}
+
+// SerializeSize returns the number of bytes it would take to serialize the
+// the transaction output.
+func (t *TxOut) SerializeSize() int {
+	// Value 8 bytes + serialized varint size for the length of PkScript +
+	// PkScript bytes.
+	return 8 + varIntSerializeSize(uint64(len(t.PkScript))) + len(t.PkScript)
 }
 
 // NewTxOut returns a new bitcoin transaction output with the provided
@@ -350,6 +368,25 @@ func (msg *MsgTx) Serialize(w io.Writer) error {
 	// a result, make use of BtcEncode.
 	return msg.BtcEncode(w, 0)
 
+}
+
+// SerializeSize returns the number of bytes it would take to serialize the
+// the transaction.
+func (msg *MsgTx) SerializeSize() int {
+	// Version 4 bytes + LockTime 4 bytes + Serialized varint size for the
+	// number of transaction inputs and outputs.
+	n := 8 + varIntSerializeSize(uint64(len(msg.TxIn))) +
+		varIntSerializeSize(uint64(len(msg.TxOut)))
+
+	for _, txIn := range msg.TxIn {
+		n += txIn.SerializeSize()
+	}
+
+	for _, txOut := range msg.TxOut {
+		n += txOut.SerializeSize()
+	}
+
+	return n
 }
 
 // Command returns the protocol command string for the message.  This is part
