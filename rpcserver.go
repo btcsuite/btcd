@@ -603,6 +603,7 @@ func handleSendRawTransaction(s *rpcServer, cmd btcjson.Cmd, walletNotification 
 		}
 		return nil, err
 	}
+
 	tx := btcutil.NewTx(msgtx)
 	err = s.server.txMemPool.ProcessTransaction(tx)
 	if err != nil {
@@ -624,15 +625,13 @@ func handleSendRawTransaction(s *rpcServer, cmd btcjson.Cmd, walletNotification 
 		return nil, err
 	}
 
-	txsha := tx.Sha()
-
 	// If called from websocket code, add a mined tx hashes
 	// request.
 	if walletNotification != nil {
-		s.ws.requests.AddMinedTxRequest(walletNotification, txsha)
+		s.ws.requests.AddMinedTxRequest(walletNotification, tx.Sha())
 	}
 
-	return txsha.String(), nil
+	return tx.Sha().String(), nil
 }
 
 // handleSetGenerate implements the setgenerate command.

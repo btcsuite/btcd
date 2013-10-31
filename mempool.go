@@ -5,7 +5,6 @@
 package main
 
 import (
-	"bytes"
 	"container/list"
 	"crypto/rand"
 	"fmt"
@@ -89,14 +88,6 @@ type txMemPool struct {
 // relay fee.  In particular, if the cost to the network to spend coins is more
 // than 1/3 of the minimum transaction relay fee, it is considered dust.
 func isDust(txOut *btcwire.TxOut) bool {
-	// Get the serialized size of the transaction output.
-	//
-	// TODO(davec): The serialized size should come from btcwire, but it
-	// currently doesn't provide a way to do so for transaction outputs, so
-	// calculate it here based on the current format.
-	// 8 bytes for value + 1 byte for script length + script length
-	txOutSize := 9 + len(txOut.PkScript)
-
 	// The total serialized size consists of the output and the associated
 	// input script to redeem it.  Since there is no input script
 	// to redeem it yet, use the minimum size of a typical input script.
@@ -139,7 +130,7 @@ func isDust(txOut *btcwire.TxOut) bool {
 	// The most common scripts are pay-to-pubkey-hash, and as per the above
 	// breakdown, the minimum size of a p2pkh input script is 148 bytes.  So
 	// that figure is used.
-	totalSize := txOutSize + 148
+	totalSize := txOut.SerializeSize() + 148
 
 	// The output is considered dust if the cost to the network to spend the
 	// coins is more than 1/3 of the minimum transaction relay fee.
@@ -214,12 +205,7 @@ func checkTransactionStandard(tx *btcutil.Tx, height int64) error {
 	// almost as much to process as the sender fees, limit the maximum
 	// size of a transaction.  This also helps mitigate CPU exhaustion
 	// attacks.
-	var serializedTxBuf bytes.Buffer
-	err := msgTx.Serialize(&serializedTxBuf)
-	if err != nil {
-		return err
-	}
-	serializedLen := serializedTxBuf.Len()
+	serializedLen := msgTx.SerializeSize()
 	if serializedLen > maxStandardTxSize {
 		str := fmt.Sprintf("transaction size of %v is larger than max "+
 			"allowed size of %v", serializedLen, maxStandardTxSize)
@@ -384,12 +370,7 @@ func (mp *txMemPool) maybeAddOrphan(tx *btcutil.Tx) error {
 	// also limited, so this equates to a maximum memory used of
 	// maxOrphanTxSize * maxOrphanTransactions (which is 500MB as of the
 	// time this comment was written).
-	var serializedTxBuf bytes.Buffer
-	err := tx.MsgTx().Serialize(&serializedTxBuf)
-	if err != nil {
-		return err
-	}
-	serializedLen := serializedTxBuf.Len()
+	serializedLen := tx.MsgTx().SerializeSize()
 	if serializedLen > maxOrphanTxSize {
 		str := fmt.Sprintf("orphan transaction size of %d bytes is "+
 			"larger than max allowed size of %d bytes",
