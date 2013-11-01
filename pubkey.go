@@ -98,8 +98,8 @@ type PublicKey ecdsa.PublicKey
 func (p *PublicKey) SerializeUncompressed() []byte {
 	b := make([]byte, 65)
 	b[0] = pubkeyUncompressed
-	copy(b[1:33], p.X.Bytes())
-	copy(b[33:], p.Y.Bytes())
+	copy(b[1:33], pad(32, p.X.Bytes()))
+	copy(b[33:], pad(32, p.Y.Bytes()))
 	return b
 }
 
@@ -111,7 +111,7 @@ func (p *PublicKey) SerializeCompressed() []byte {
 		format |= 0x1
 	}
 	b[0] = format
-	copy(b[1:33], p.X.Bytes())
+	copy(b[1:33], pad(32, p.X.Bytes()))
 	return b
 }
 
@@ -123,7 +123,18 @@ func (p *PublicKey) SerializeHybrid() []byte {
 		format |= 0x1
 	}
 	b[0] = format
-	copy(b[1:33], p.X.Bytes())
-	copy(b[33:], p.Y.Bytes())
+	copy(b[1:33], pad(32, p.X.Bytes()))
+	copy(b[33:], pad(32, p.Y.Bytes()))
 	return b
+}
+
+func pad(size int, b []byte) []byte {
+	// Prevent a possible panic if the input exceeds the expected size.
+	if len(b) > size {
+		size = len(b)
+	}
+
+	p := make([]byte, size)
+	copy(p[size-len(b):], b)
+	return p
 }
