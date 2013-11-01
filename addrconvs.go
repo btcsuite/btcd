@@ -95,3 +95,46 @@ func DecodeAddress(addr string) (addrHash []byte, net btcwire.BitcoinNet, err er
 
 	return addrHash, net, nil
 }
+
+// EncodePrivateKey takes a 32-byte raw private key address and encodes
+// it into the Wallet Import Format (WIF)
+func EncodePrivateKey(privKey []byte) (string, error) {
+	if len(privKey) != 32 {
+		return "", ErrMalformedAddress
+	}
+
+	tosum := append([]byte{0x80}, privKey...)
+	cksum := btcwire.DoubleSha256(tosum)
+
+	// Address before base58 encoding is 1 byte for 0x80 (5), 32 bytes for
+	// privKey, plus 4 bytes of checksum.
+	a := make([]byte, 37, 37)
+	a[0] = 0x80
+	copy(a[1:], privKey)
+	copy(a[32+1:], cksum[:4])
+
+	return Base58Encode(a), nil
+}
+
+// DecodePrivateKey takes a Wallet Import Format (WIF) string and
+// decodes into a 32-byte private key.
+func DecodePrivateKey(wif string) ([]byte, error) {
+	decoded := Base58Decode(wif)
+
+	// Length of decoded privkey must be 32 bytes + 1 byte for 0x80
+	// + 4 bytes of checksum
+	if len(decoded) != 32+5 {
+		return nil, ErrMalformedAddress
+	}
+
+	tosum := decoded[:32+1]
+	cksum := btcwire.DoubleSha256(tosum)[:4]
+	if !bytes.Equal(cksum, decoded[len(decoded)-4:]) {
+		return nil, ErrMalformedAddress
+	}
+
+	privKey := make([]byte, 32, 32)
+	copy(privKey[:], decoded[1:32+1])
+
+	return privKey, nil
+}

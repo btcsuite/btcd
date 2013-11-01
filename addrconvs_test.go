@@ -11,6 +11,18 @@ import (
 	"testing"
 )
 
+var encodePrivateKeyTests = []struct {
+	in  []byte
+	out string
+}{
+	{[]byte{
+		0x0c, 0x28, 0xfc, 0xa3, 0x86, 0xc7, 0xa2, 0x27,
+		0x60, 0x0b, 0x2f, 0xe5, 0x0b, 0x7c, 0xae, 0x11,
+		0xec, 0x86, 0xd3, 0xbf, 0x1f, 0xbe, 0x47, 0x1b,
+		0xe8, 0x98, 0x27, 0xe1, 0x9d, 0x72, 0xaa, 0x1d,
+	}, "5HueCGU8rMjxEXxiPuD5BDku4MkFqeZyd4dZ1jvhTVqvbTLvyTJ"},
+}
+
 var encodeTests = []struct {
 	raw []byte
 	net btcwire.BitcoinNet
@@ -89,5 +101,31 @@ func TestDecodeAddresses(t *testing.T) {
 			t.Errorf("Networks differ: Expected '%v', returned '%v'",
 				decodeTests[i].net, net)
 		}
+	}
+}
+
+func TestEncodeDecodePrivateKey(t *testing.T) {
+	for _, test := range encodePrivateKeyTests {
+		wif, err := btcutil.EncodePrivateKey(test.in)
+		if err != nil {
+			t.Error(err)
+			continue
+		}
+		if wif != test.out {
+			t.Errorf("TestEncodeDecodePrivateKey failed: want '%s', got '%s'",
+				test.out, wif)
+			continue
+		}
+
+		key, err := btcutil.DecodePrivateKey(test.out)
+		if err != nil {
+			t.Error(err)
+			continue
+		}
+		if !bytes.Equal(key, test.in) {
+			t.Errorf("TestEncodeDecodePrivateKey failed: want '%x', got '%x'",
+				test.out, key)
+		}
+
 	}
 }
