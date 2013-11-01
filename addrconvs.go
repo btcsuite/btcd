@@ -20,6 +20,11 @@ var ErrUnknownNet = errors.New("unrecognized bitcoin network")
 // a non-matching checksum.
 var ErrMalformedAddress = errors.New("malformed address")
 
+// ErrMalformedPrivateKey describes an error where an address is improperly
+// formatted, either due to an incorrect length of the private key or
+// a non-matching checksum.
+var ErrMalformedPrivateKey = errors.New("malformed private key")
+
 // Constants used to specify which network a payment address belongs
 // to.  Mainnet address cannot be used on the Testnet, and vice versa.
 const (
@@ -28,6 +33,12 @@ const (
 
 	// TestNetAddr is the address identifier for TestNet
 	TestNetAddr = 0x6f
+
+	// MainNetKey is the key identifier for MainNet
+	MainNetKey = 0x80
+
+	// TestNetKey is the key identifier for TestNet
+	TestNetKey = 0xef
 )
 
 // EncodeAddress takes a 20-byte raw payment address (hash160 of a pubkey)
@@ -96,20 +107,30 @@ func DecodeAddress(addr string) (addrHash []byte, net btcwire.BitcoinNet, err er
 	return addrHash, net, nil
 }
 
-// EncodePrivateKey takes a 32-byte raw private key address and encodes
-// it into the Wallet Import Format (WIF)
-func EncodePrivateKey(privKey []byte) (string, error) {
+// EncodePrivateKey takes a 32-byte private key and encodes it into the
+// Wallet Import Format (WIF).
+func EncodePrivateKey(privKey []byte, net btcwire.BitcoinNet) (string, error) {
 	if len(privKey) != 32 {
-		return "", ErrMalformedAddress
+		return "", ErrMalformedPrivateKey
 	}
 
-	tosum := append([]byte{0x80}, privKey...)
+	var netID byte
+	switch net {
+	case btcwire.MainNet:
+		netID = MainNetKey
+	case btcwire.TestNet3:
+		netID = TestNetKey
+	default:
+		return "", ErrUnknownNet
+	}
+
+	tosum := append([]byte{netID}, privKey...)
 	cksum := btcwire.DoubleSha256(tosum)
 
-	// Address before base58 encoding is 1 byte for 0x80 (5), 32 bytes for
+	// Private key before base58 encoding is 1 byte for netID, 32 bytes for
 	// privKey, plus 4 bytes of checksum.
 	a := make([]byte, 37, 37)
-	a[0] = 0x80
+	a[0] = netID
 	copy(a[1:], privKey)
 	copy(a[32+1:], cksum[:4])
 
@@ -118,23 +139,36 @@ func EncodePrivateKey(privKey []byte) (string, error) {
 
 // DecodePrivateKey takes a Wallet Import Format (WIF) string and
 // decodes into a 32-byte private key.
-func DecodePrivateKey(wif string) ([]byte, error) {
+func DecodePrivateKey(wif string) ([]byte, btcwire.BitcoinNet, error) {
 	decoded := Base58Decode(wif)
 
 	// Length of decoded privkey must be 32 bytes + 1 byte for 0x80
 	// + 4 bytes of checksum
 	if len(decoded) != 32+5 {
-		return nil, ErrMalformedAddress
+		return nil, 0, ErrMalformedPrivateKey
 	}
 
+	var net btcwire.BitcoinNet
+	switch decoded[0] {
+	case MainNetKey:
+		net = btcwire.MainNet
+	case TestNetKey:
+		net = btcwire.TestNet3
+	default:
+		return nil, 0, ErrUnknownNet
+	}
+
+	// Checksum is first four bytes of double SHA256 of the identifier byte
+	// and privKey.  Verify this matches the final 4 bytes of the decoded
+	// private key.
 	tosum := decoded[:32+1]
 	cksum := btcwire.DoubleSha256(tosum)[:4]
 	if !bytes.Equal(cksum, decoded[len(decoded)-4:]) {
-		return nil, ErrMalformedAddress
+		return nil, 0, ErrMalformedPrivateKey
 	}
 
 	privKey := make([]byte, 32, 32)
 	copy(privKey[:], decoded[1:32+1])
 
-	return privKey, nil
+	return privKey, net, nil
 }

@@ -13,6 +13,7 @@ import (
 
 var encodePrivateKeyTests = []struct {
 	in  []byte
+	net btcwire.BitcoinNet
 	out string
 }{
 	{[]byte{
@@ -20,7 +21,7 @@ var encodePrivateKeyTests = []struct {
 		0x60, 0x0b, 0x2f, 0xe5, 0x0b, 0x7c, 0xae, 0x11,
 		0xec, 0x86, 0xd3, 0xbf, 0x1f, 0xbe, 0x47, 0x1b,
 		0xe8, 0x98, 0x27, 0xe1, 0x9d, 0x72, 0xaa, 0x1d,
-	}, "5HueCGU8rMjxEXxiPuD5BDku4MkFqeZyd4dZ1jvhTVqvbTLvyTJ"},
+	}, btcwire.MainNet, "5HueCGU8rMjxEXxiPuD5BDku4MkFqeZyd4dZ1jvhTVqvbTLvyTJ"},
 }
 
 var encodeTests = []struct {
@@ -106,7 +107,7 @@ func TestDecodeAddresses(t *testing.T) {
 
 func TestEncodeDecodePrivateKey(t *testing.T) {
 	for _, test := range encodePrivateKeyTests {
-		wif, err := btcutil.EncodePrivateKey(test.in)
+		wif, err := btcutil.EncodePrivateKey(test.in, test.net)
 		if err != nil {
 			t.Error(err)
 			continue
@@ -117,7 +118,7 @@ func TestEncodeDecodePrivateKey(t *testing.T) {
 			continue
 		}
 
-		key, err := btcutil.DecodePrivateKey(test.out)
+		key, _, err := btcutil.DecodePrivateKey(test.out)
 		if err != nil {
 			t.Error(err)
 			continue
