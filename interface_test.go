@@ -244,24 +244,40 @@ func expectedSpentBuf(tc *testContext, txNum int) []bool {
 	spentBuf := make([]bool, numTxOut)
 	if tc.useSpends {
 		if tc.blockHeight == 9 && txNum == 0 {
+			// Spent by block 170, tx 1, input 0.
+			// tx f4184fc596403b9d638783cf57adfe4c75c605f6356fbc91338530e9831e9e16
 			spentBuf[0] = true
 		}
 
 		if tc.blockHeight == 170 && txNum == 1 {
+			// Spent by block 181, tx 1, input 0.
+			// tx a16f3ce4dd5deb92d98ef5cf8afeaf0775ebca408f708b2146c4fb42b41e14be
 			spentBuf[1] = true
 		}
 
 		if tc.blockHeight == 181 && txNum == 1 {
+			// Spent by block 182, tx 1, input 0.
+			// tx 591e91f809d716912ca1d4a9295e70c3e78bab077683f79350f101da64588073
 			spentBuf[1] = true
 		}
 
 		if tc.blockHeight == 182 && txNum == 1 {
+			// Spent by block 221, tx 1, input 0.
+			// tx 298ca2045d174f8a158961806ffc4ef96fad02d71a6b84d9fa0491813a776160
 			spentBuf[0] = true
+
+			// Spent by block 183, tx 1, input 0.
+			// tx 12b5633bad1f9c167d523ad1aa1947b2732a865bf5414eab2f9e5ae5d5c191ba
 			spentBuf[1] = true
 		}
 
 		if tc.blockHeight == 183 && txNum == 1 {
+			// Spent by block 187, tx 1, input 0.
+			// tx 4385fcf8b14497d0659adccfe06ae7e38e0b5dc95ff8a13d7c62035994a0cd79
 			spentBuf[0] = true
+
+			// Spent by block 248, tx 1, input 0.
+			// tx 828ef3b079f9c23829c56fe86e85b4a69d9e06e5b54ea597eef5fb3ffef509fe
 			spentBuf[1] = true
 		}
 	}
@@ -528,6 +544,15 @@ func testInterface(t *testing.T, dbType string) {
 	// required for the duplicate transactions allowed by blocks 91842 and
 	// 91880 on the main network due to the old miner + Satoshi client bug.
 
+	// TODO(davec): Add tests for error conditions:
+	// * Don't allow duplicate blocks
+	// * Don't allow insertion of block that contains a transaction that
+	//   already exists unless the previous one is fully spent
+	// * Don't allow block that has a duplicate transaction in itself
+	// * Don't allow block which contains a tx that references a missing tx
+	// * Don't allow block which contains a tx that references another tx
+	//   that comes after it in the same block
+
 	// TODO(davec): Add tests for the following functions:
 	/*
 	   Close()
@@ -541,9 +566,9 @@ func testInterface(t *testing.T, dbType string) {
 	   - FetchTxByShaList(txShaList []*btcwire.ShaHash) []*TxListReply
 	   - FetchUnSpentTxByShaList(txShaList []*btcwire.ShaHash) []*TxListReply
 	   - InsertBlock(block *btcutil.Block) (height int64, err error)
-	   InvalidateBlockCache()
-	   InvalidateCache()
-	   InvalidateTxCache()
+	   - InvalidateBlockCache()
+	   - InvalidateCache()
+	   - InvalidateTxCache()
 	   NewIterateBlocks() (pbi BlockIterator, err error)
 	   NewestSha() (sha *btcwire.ShaHash, height int64, err error)
 	   RollbackClose()
