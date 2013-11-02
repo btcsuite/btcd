@@ -180,15 +180,9 @@ func testFetchBlockShaByHeightErrors(tc *testContext) bool {
 
 // testExistsTxSha ensures ExistsTxSha conforms to the interface contract.
 func testExistsTxSha(tc *testContext) bool {
-	txHashes, err := tc.block.TxShas()
-	if err != nil {
-		tc.t.Errorf("block.TxShas: %v", err)
-		return false
-	}
-
-	for i := range txHashes {
+	for i, tx := range tc.block.Transactions() {
 		// The transaction must exist in the database.
-		txHash := txHashes[i]
+		txHash := tx.Sha()
 		if exists := tc.db.ExistsTxSha(txHash); !exists {
 			tc.t.Errorf("ExistsTxSha (%s): block #%d (%s) "+
 				"tx #%d (%s) does not exist", tc.dbType,
@@ -202,14 +196,8 @@ func testExistsTxSha(tc *testContext) bool {
 
 // testFetchTxBySha ensures FetchTxBySha conforms to the interface contract.
 func testFetchTxBySha(tc *testContext) bool {
-	txHashes, err := tc.block.TxShas()
-	if err != nil {
-		tc.t.Errorf("block.TxShas: %v", err)
-		return false
-	}
-
-	for i, tx := range tc.block.MsgBlock().Transactions {
-		txHash := txHashes[i]
+	for i, tx := range tc.block.Transactions() {
+		txHash := tx.Sha()
 		txReplyList, err := tc.db.FetchTxBySha(txHash)
 		if err != nil {
 			tc.t.Errorf("FetchTxBySha (%s): block #%d (%s) "+
@@ -225,12 +213,12 @@ func testFetchTxBySha(tc *testContext) bool {
 			return false
 		}
 		txFromDb := txReplyList[len(txReplyList)-1].Tx
-		if !reflect.DeepEqual(tx, txFromDb) {
+		if !reflect.DeepEqual(tx.MsgTx(), txFromDb) {
 			tc.t.Errorf("FetchTxBySha (%s): block #%d (%s) "+
 				"tx #%d (%s) does not match stored tx\n"+
 				"got: %v\nwant: %v", tc.dbType, tc.blockHeight,
 				tc.blockHash, i, txHash, spew.Sdump(txFromDb),
-				spew.Sdump(tx))
+				spew.Sdump(tx.MsgTx()))
 			return false
 		}
 	}
@@ -286,10 +274,10 @@ func testFetchTxByShaListCommon(tc *testContext, includeSpent bool) bool {
 		funcName = "FetchTxByShaList"
 	}
 
-	txHashes, err := tc.block.TxShas()
-	if err != nil {
-		tc.t.Errorf("block.TxShas: %v", err)
-		return false
+	transactions := tc.block.Transactions()
+	txHashes := make([]*btcwire.ShaHash, len(transactions))
+	for i, tx := range transactions {
+		txHashes[i] = tx.Sha()
 	}
 
 	txReplyList := fetchFunc(txHashes)
@@ -300,8 +288,8 @@ func testFetchTxByShaListCommon(tc *testContext, includeSpent bool) bool {
 			len(txReplyList), len(txHashes))
 		return false
 	}
-	for i, tx := range tc.block.MsgBlock().Transactions {
-		txHash := txHashes[i]
+	for i, tx := range transactions {
+		txHash := tx.Sha()
 		txD := txReplyList[i]
 
 		// The transaction hash in the reply must be the expected value.
@@ -324,12 +312,12 @@ func testFetchTxByShaListCommon(tc *testContext, includeSpent bool) bool {
 
 		// The transaction in the reply fetched from the database must
 		// be the same MsgTx that was stored.
-		if !reflect.DeepEqual(tx, txD.Tx) {
+		if !reflect.DeepEqual(tx.MsgTx(), txD.Tx) {
 			tc.t.Errorf("%s (%s): block #%d (%s) tx #%d (%s) does "+
 				"not match stored tx\ngot: %v\nwant: %v",
 				funcName, tc.dbType, tc.blockHeight,
 				tc.blockHash, i, txHash, spew.Sdump(txD.Tx),
-				spew.Sdump(tx))
+				spew.Sdump(tx.MsgTx()))
 			return false
 		}
 

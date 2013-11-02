@@ -288,11 +288,10 @@ func (db *LevelDb) DropAfterBlockBySha(sha *btcwire.ShaHash) (rerr error) {
 			}
 		}
 		// rather than iterate the list of tx backward, do it twice.
-		txShas, _ := blk.TxShas()
-		for _, txSha := range txShas {
+		for _, tx := range blk.Transactions() {
 			var txUo txUpdateObj
 			txUo.delete = true
-			db.txUpdateMap[*txSha] = &txUo
+			db.txUpdateMap[*tx.Sha()] = &txUo
 		}
 		db.lBatch().Delete(shaBlkToKey(blksha))
 		db.lBatch().Delete(int64ToKey(height))
