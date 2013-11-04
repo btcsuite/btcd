@@ -6,7 +6,6 @@ package main
 
 import (
 	"bytes"
-	"code.google.com/p/go.crypto/ripemd160"
 	"code.google.com/p/go.net/websocket"
 	"encoding/base64"
 	"encoding/hex"
@@ -83,7 +82,9 @@ func (r *wsRequests) getOrCreateContexts(walletNotification chan []byte) *reques
 	rc, ok := r.m[walletNotification]
 	if !ok {
 		rc = &requestContexts{
-			txRequests:      make(map[addressHash]interface{}),
+			// The key is a stringified addressHash.
+			txRequests:      make(map[string]interface{}),
+
 			spentRequests:   make(map[btcwire.OutPoint]interface{}),
 			minedTxRequests: make(map[btcwire.ShaHash]bool),
 		}
@@ -93,12 +94,12 @@ func (r *wsRequests) getOrCreateContexts(walletNotification chan []byte) *reques
 }
 
 // AddTxRequest adds the request context for new transaction notifications.
-func (r *wsRequests) AddTxRequest(walletNotification chan []byte, addr addressHash, id interface{}) {
+func (r *wsRequests) AddTxRequest(walletNotification chan []byte, addrhash string, id interface{}) {
 	r.Lock()
 	defer r.Unlock()
 
 	rc := r.getOrCreateContexts(walletNotification)
-	rc.txRequests[addr] = id
+	rc.txRequests[addrhash] = id
 }
 
 // AddSpentRequest adds a request context for notifications of a spent
@@ -152,14 +153,13 @@ func (r *wsRequests) CloseListeners(walletNotification chan []byte) {
 	close(walletNotification)
 }
 
-type addressHash [ripemd160.Size]byte
-
 // requestContexts holds all requests for a single wallet connection.
 type requestContexts struct {
 	// txRequests maps between a 160-byte pubkey hash and the JSON
 	// id of the requester so replies can be correctly routed back
-	// to the correct btcwallet callback.
-	txRequests map[addressHash]interface{}
+	// to the correct btcwallet callback.  The key must be a stringified
+	// address hash.
+	txRequests map[string]interface{}
 
 	// spentRequests maps between an Outpoint of an unspent
 	// transaction output and the JSON id of the requester so
@@ -968,9 +968,7 @@ func jsonWSRead(walletNotification chan []byte, replychan chan *btcjson.Reply, b
 			}
 			return ErrBadParamsField
 		}
-		var hash addressHash
-		copy(hash[:], addrhash)
-		s.ws.requests.AddTxRequest(walletNotification, hash, message.Id)
+		s.ws.requests.AddTxRequest(walletNotification, string(addrhash), message.Id)
 
 		rawReply = btcjson.Reply{
 			Result: nil,
@@ -1349,10 +1347,7 @@ func (s *rpcServer) newBlockNotifyCheckTxOut(block *btcutil.Block, tx *btcutil.T
 				log.Debug("Error getting payment address from tx; dropping any Tx notifications.")
 				break
 			}
-			for addr, id := range cxt.txRequests {
-				if !bytes.Equal(addr[:], txaddrhash) {
-					continue
-				}
+			if id, ok := cxt.txRequests[string(txaddrhash)]; ok {
 				blkhash, err := block.Sha()
 				if err != nil {
 					log.Error("Error getting block sha; dropping Tx notification.")
