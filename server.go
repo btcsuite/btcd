@@ -200,21 +200,21 @@ func (s *server) handleBroadcastMsg(peers *list.List, bmsg *broadcastMsg) {
 	}
 }
 
-// Peerinfo represents the information requested by the getpeerinfo rpc command.
+// PeerInfo represents the information requested by the getpeerinfo rpc command.
 type PeerInfo struct {
-	Addr           string
-	Services       btcwire.ServiceFlag
-	LastSend       time.Time
-	LastRecv       time.Time
-	BytesSent      int
-	BytesRecv      int
-	ConnTime       time.Time
-	Version        uint32
-	SubVer         string
-	Inbound        bool
-	StartingHeight int32
-	BanScore       int
-	SyncNode       bool
+	Addr           string              `json:"addr,omitempty"`
+	Services       btcwire.ServiceFlag `json:"services,omitempty"`
+	LastSend       int64               `json:"lastsend,omitempty"`
+	LastRecv       int64               `json:"lastrecv,omitempty"`
+	BytesSent      int                 `json:"bytessent,omitempty"`
+	BytesRecv      int                 `json:"bytesrecv,omitempty"`
+	ConnTime       int64               `json:"conntime,omitempty"`
+	Version        uint32              `json:"version,omitempty"`
+	SubVer         string              `json:"subver,omitempty"`
+	Inbound        bool                `json:"inbound,omitempty"`
+	StartingHeight int32               `json:"startingheight,omitempty"`
+	BanScore       int                 `json:"banscore,omitempty"`
+	SyncNode       bool                `json:"syncnode,omitempty"`
 }
 
 type getConnCountMsg struct {
@@ -264,11 +264,11 @@ func (s *server) handleQuery(querymsg interface{}, peers *list.List, bannedPeers
 			info := &PeerInfo{
 				Addr:           peer.addr,
 				Services:       peer.services,
-				LastSend:       peer.lastSend,
-				LastRecv:       peer.lastRecv,
+				LastSend:       peer.lastSend.Unix(),
+				LastRecv:       peer.lastRecv.Unix(),
 				BytesSent:      0, // TODO(oga) we need this from wire.
 				BytesRecv:      0, // TODO(oga) we need this from wire.
-				ConnTime:       peer.timeConnected,
+				ConnTime:       peer.timeConnected.Unix(),
 				Version:        peer.protocolVersion,
 				SubVer:         peer.userAgent,
 				Inbound:        peer.inbound,

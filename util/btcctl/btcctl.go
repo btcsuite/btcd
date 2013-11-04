@@ -14,7 +14,7 @@ import (
 
 type config struct {
 	Help        bool   `short:"h" long:"help" description:"Help"`
-	RpcUser     string `short:"u" description:"RPC username"`
+	RpcUser     string `short:"u" long:"rpcuser" description:"RPC username"`
 	RpcPassword string `short:"P" long:"rpcpass" description:"RPC password"`
 	RpcServer   string `short:"s" long:"rpcserver" description:"RPC server to connect to"`
 }
