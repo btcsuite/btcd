@@ -83,7 +83,7 @@ func (r *wsRequests) getOrCreateContexts(walletNotification chan []byte) *reques
 	if !ok {
 		rc = &requestContexts{
 			// The key is a stringified addressHash.
-			txRequests:      make(map[string]interface{}),
+			txRequests: make(map[string]interface{}),
 
 			spentRequests:   make(map[btcwire.OutPoint]interface{}),
 			minedTxRequests: make(map[btcwire.ShaHash]bool),
@@ -305,6 +305,7 @@ func jsonRPCRead(w http.ResponseWriter, r *http.Request, s *rpcServer) {
 }
 
 type commandHandler func(*rpcServer, btcjson.Cmd, chan []byte) (interface{}, error)
+type wsCommandHandler func(*rpcServer, *btcjson.Message, chan []byte, chan *btcjson.Reply) error
 
 var handlers = map[string]commandHandler{
 	"addnode":              handleAddNode,
@@ -323,6 +324,14 @@ var handlers = map[string]commandHandler{
 	"sendrawtransaction":   handleSendRawTransaction,
 	"setgenerate":          handleSetGenerate,
 	"stop":                 handleStop,
+}
+
+var wsHandlers = map[string]wsCommandHandler{
+	"getcurrentnet": handleGetCurrentNet,
+	"getbestblock":  handleGetBestBlock,
+	"rescan":        handleRescan,
+	"notifynewtxs":  handleNotifyNewTxs,
+	"notifyspent":   handleNotifySpent,
 }
 
 // handleDecodeRawTransaction handles decoderawtransaction commands.
@@ -723,6 +732,325 @@ func jsonRead(body []byte, s *rpcServer, walletNotification chan []byte) (reply 
 	return reply, err
 }
 
+// handleGetCurrentNet implements the getcurrentnet command extension
+// for websocket connections.
+func handleGetCurrentNet(s *rpcServer, message *btcjson.Message,
+	walletNotification chan []byte, replychan chan *btcjson.Reply) error {
+
+	var net btcwire.BitcoinNet
+	if cfg.TestNet3 {
+		net = btcwire.TestNet3
+	} else {
+		net = btcwire.MainNet
+	}
+
+	rawReply := &btcjson.Reply{
+		Result: float64(net),
+		Id:     &message.Id,
+	}
+	replychan <- rawReply
+	return nil
+}
+
+// handleGetBestBlock implements the getbestblock command extension
+// for websocket connections.
+func handleGetBestBlock(s *rpcServer, message *btcjson.Message,
+	walletNotification chan []byte, replychan chan *btcjson.Reply) error {
+
+	// All other "get block" commands give either the height, the
+	// hash, or both but require the block SHA.  This gets both for
+	// the best block.
+	sha, height, err := s.server.db.NewestSha()
+	if err != nil {
+		log.Errorf("RPCS: Error getting newest block: %v", err)
+		rawReply := &btcjson.Reply{
+			Result: nil,
+			Error:  &btcjson.ErrBestBlockHash,
+			Id:     &message.Id,
+		}
+		replychan <- rawReply
+		return err
+	}
+	rawReply := &btcjson.Reply{
+		Result: map[string]interface{}{
+			"hash":   sha.String(),
+			"height": height,
+		},
+		Id: &message.Id,
+	}
+	replychan <- rawReply
+	return nil
+}
+
+// handleRescan implements the rescan command extension for websocket
+// connections.
+func handleRescan(s *rpcServer, message *btcjson.Message,
+	walletNotification chan []byte, replychan chan *btcjson.Reply) error {
+
+	minblock, maxblock := int64(0), btcdb.AllShas
+	params, ok := message.Params.([]interface{})
+	if !ok || len(params) < 2 {
+		rawReply := &btcjson.Reply{
+			Result: nil,
+			Error:  &btcjson.ErrInvalidParams,
+			Id:     &message.Id,
+		}
+		replychan <- rawReply
+		return ErrBadParamsField
+	}
+	fminblock, ok := params[0].(float64)
+	if !ok {
+		rawReply := &btcjson.Reply{
+			Result: nil,
+			Error:  &btcjson.ErrInvalidParams,
+			Id:     &message.Id,
+		}
+		replychan <- rawReply
+		return ErrBadParamsField
+	}
+	minblock = int64(fminblock)
+	iaddrs, ok := params[1].([]interface{})
+	if !ok {
+		rawReply := &btcjson.Reply{
+			Result: nil,
+			Error:  &btcjson.ErrInvalidParams,
+			Id:     &message.Id,
+		}
+		replychan <- rawReply
+		return ErrBadParamsField
+	}
+
+	// addrHashes holds a set of string-ified address hashes.
+	addrHashes := make(map[string]bool, len(iaddrs))
+	for i := range iaddrs {
+		addr, ok := iaddrs[i].(string)
+		if !ok {
+			rawReply := &btcjson.Reply{
+				Result: nil,
+				Error:  &btcjson.ErrInvalidParams,
+				Id:     &message.Id,
+			}
+			replychan <- rawReply
+			return ErrBadParamsField
+		}
+
+		addrhash, _, err := btcutil.DecodeAddress(addr)
+		if err != nil {
+			rawReply := &btcjson.Reply{
+				Result: nil,
+				Error:  &btcjson.ErrInvalidParams,
+				Id:     &message.Id,
+			}
+			replychan <- rawReply
+			return ErrBadParamsField
+		}
+
+		addrHashes[string(addrhash)] = true
+	}
+
+	if len(params) > 2 {
+		fmaxblock, ok := params[2].(float64)
+		if !ok {
+			rawReply := &btcjson.Reply{
+				Result: nil,
+				Error:  &btcjson.ErrInvalidParams,
+				Id:     &message.Id,
+			}
+			replychan <- rawReply
+			return ErrBadParamsField
+		}
+		maxblock = int64(fmaxblock)
+	}
+
+	log.Debugf("RPCS: Begining rescan")
+
+	// FetchHeightRange may not return a complete list of block shas for
+	// the given range, so fetch range as many times as necessary.
+	for {
+		blkshalist, err := s.server.db.FetchHeightRange(minblock, maxblock)
+		if err != nil {
+			return err
+		}
+		if len(blkshalist) == 0 {
+			break
+		}
+
+		for i := range blkshalist {
+			blk, err := s.server.db.FetchBlockBySha(&blkshalist[i])
+			if err != nil {
+				return err
+			}
+			txShaList, err := blk.TxShas()
+			if err != nil {
+				return err
+			}
+			txList := s.server.db.FetchTxByShaList(txShaList)
+			for _, txReply := range txList {
+				if txReply.Err != nil || txReply.Tx == nil {
+					continue
+				}
+				for txOutIdx, txout := range txReply.Tx.TxOut {
+					st, txaddrhash, err := btcscript.ScriptToAddrHash(txout.PkScript)
+					if st != btcscript.ScriptAddr || err != nil {
+						continue
+					}
+					txaddr, err := btcutil.EncodeAddress(txaddrhash, s.server.btcnet)
+					if err != nil {
+						log.Errorf("Error encoding address: %v", err)
+						return err
+					}
+					if ok := addrHashes[string(txaddrhash)]; ok {
+						reply := &btcjson.Reply{
+							Result: struct {
+								Sender    string `json:"sender"`
+								Receiver  string `json:"receiver"`
+								BlockHash string `json:"blockhash"`
+								Height    int64  `json:"height"`
+								TxHash    string `json:"txhash"`
+								Index     uint32 `json:"index"`
+								Amount    int64  `json:"amount"`
+								PkScript  string `json:"pkscript"`
+								Spent     bool   `json:"spent"`
+							}{
+								Sender:    "Unknown", // TODO(jrick)
+								Receiver:  txaddr,
+								BlockHash: blkshalist[i].String(),
+								Height:    blk.Height(),
+								TxHash:    txReply.Sha.String(),
+								Index:     uint32(txOutIdx),
+								Amount:    txout.Value,
+								PkScript:  btcutil.Base58Encode(txout.PkScript),
+								Spent:     txReply.TxSpent[txOutIdx],
+							},
+							Error: nil,
+							Id:    &message.Id,
+						}
+						replychan <- reply
+					}
+				}
+			}
+		}
+
+		if maxblock-minblock > int64(len(blkshalist)) {
+			minblock += int64(len(blkshalist))
+		} else {
+			break
+		}
+	}
+
+	rawReply := &btcjson.Reply{
+		Result: nil,
+		Error:  nil,
+		Id:     &message.Id,
+	}
+	replychan <- rawReply
+
+	log.Debug("RPCS: Finished rescan")
+	return nil
+}
+
+// handleNotifyNewTxs implements the notifynewtxs command extension for
+// websocket connections.
+func handleNotifyNewTxs(s *rpcServer, message *btcjson.Message,
+	walletNotification chan []byte, replychan chan *btcjson.Reply) error {
+
+	params, ok := message.Params.([]interface{})
+	if !ok || len(params) != 1 {
+		rawReply := &btcjson.Reply{
+			Result: nil,
+			Error:  &btcjson.ErrInvalidParams,
+			Id:     &message.Id,
+		}
+		replychan <- rawReply
+		return ErrBadParamsField
+	}
+	addr, ok := params[0].(string)
+	if !ok {
+		rawReply := &btcjson.Reply{
+			Result: nil,
+			Error:  &btcjson.ErrInvalidParams,
+			Id:     &message.Id,
+		}
+		replychan <- rawReply
+		return ErrBadParamsField
+	}
+	addrhash, _, err := btcutil.DecodeAddress(addr)
+	if err != nil {
+		jsonError := btcjson.Error{
+			Code:    btcjson.ErrInvalidParams.Code,
+			Message: "Cannot decode address",
+		}
+		rawReply := &btcjson.Reply{
+			Result: nil,
+			Error:  &jsonError,
+			Id:     &message.Id,
+		}
+		replychan <- rawReply
+		return ErrBadParamsField
+	}
+	s.ws.requests.AddTxRequest(walletNotification, string(addrhash), message.Id)
+
+	rawReply := &btcjson.Reply{
+		Result: nil,
+		Error:  nil,
+		Id:     &message.Id,
+	}
+	replychan <- rawReply
+	return nil
+}
+
+// handleNotifySpent implements the notifyspent command extension for
+// websocket connections.
+func handleNotifySpent(s *rpcServer, message *btcjson.Message,
+	walletNotification chan []byte, replychan chan *btcjson.Reply) error {
+
+	params, ok := message.Params.([]interface{})
+	if !ok || len(params) != 2 {
+		rawReply := &btcjson.Reply{
+			Result: nil,
+			Error:  &btcjson.ErrInvalidParams,
+			Id:     &message.Id,
+		}
+		replychan <- rawReply
+		return ErrBadParamsField
+	}
+	hashBE, ok1 := params[0].(string)
+	index, ok2 := params[1].(float64)
+	if !ok1 || !ok2 {
+		rawReply := &btcjson.Reply{
+			Result: nil,
+			Error:  &btcjson.ErrInvalidParams,
+			Id:     &message.Id,
+		}
+		replychan <- rawReply
+		return ErrBadParamsField
+	}
+	hash, err := btcwire.NewShaHashFromStr(hashBE)
+	if err != nil {
+		jsonError := btcjson.Error{
+			Code:    btcjson.ErrInvalidParams.Code,
+			Message: "Hash string cannot be parsed.",
+		}
+		rawReply := &btcjson.Reply{
+			Result: nil,
+			Error:  &jsonError,
+			Id:     &message.Id,
+		}
+		replychan <- rawReply
+		return ErrBadParamsField
+	}
+	op := btcwire.NewOutPoint(hash, uint32(index))
+	s.ws.requests.AddSpentRequest(walletNotification, op, message.Id)
+
+	rawReply := &btcjson.Reply{
+		Result: nil,
+		Error:  nil,
+		Id:     &message.Id,
+	}
+	replychan <- rawReply
+	return nil
+}
+
 func jsonWSRead(walletNotification chan []byte, replychan chan *btcjson.Reply, body []byte, s *rpcServer) error {
 	var message btcjson.Message
 	err := json.Unmarshal(body, &message)
@@ -740,292 +1068,45 @@ func jsonWSRead(walletNotification chan []byte, replychan chan *btcjson.Reply, b
 	}
 	log.Tracef("RPCS: received: %v", message)
 
-	var rawReply btcjson.Reply
 	defer func() {
-		replychan <- &rawReply
 		close(replychan)
 	}()
 
-	// Deal with commands
-	switch message.Method {
-	case "getcurrentnet":
-		var net btcwire.BitcoinNet
-		if cfg.TestNet3 {
-			net = btcwire.TestNet3
-		} else {
-			net = btcwire.MainNet
-		}
-		rawReply = btcjson.Reply{
-			Result: float64(net),
-			Id:     &message.Id,
-		}
-
-	case "getbestblock":
-		// All other "get block" commands give either the height, the
-		// hash, or both but require the block SHA.  This gets both for
-		// the best block.
-		sha, height, err := s.server.db.NewestSha()
-		if err != nil {
-			log.Errorf("RPCS: Error getting newest block: %v", err)
-			rawReply = btcjson.Reply{
-				Result: nil,
-				Error:  &btcjson.ErrBestBlockHash,
-				Id:     &message.Id,
-			}
-			return err
-		}
-		rawReply = btcjson.Reply{
-			Result: map[string]interface{}{
-				"hash":   sha.String(),
-				"height": height,
-			},
-			Id: &message.Id,
-		}
-
-	case "rescan":
-		minblock, maxblock := int64(0), btcdb.AllShas
-		params, ok := message.Params.([]interface{})
-		if !ok || len(params) < 2 {
-			rawReply = btcjson.Reply{
-				Result: nil,
-				Error:  &btcjson.ErrInvalidParams,
-				Id:     &message.Id,
-			}
-			return ErrBadParamsField
-		}
-		fminblock, ok := params[0].(float64)
-		if !ok {
-			rawReply = btcjson.Reply{
-				Result: nil,
-				Error:  &btcjson.ErrInvalidParams,
-				Id:     &message.Id,
-			}
-			return ErrBadParamsField
-		}
-		minblock = int64(fminblock)
-		iaddrs, ok := params[1].([]interface{})
-		if !ok {
-			rawReply = btcjson.Reply{
-				Result: nil,
-				Error:  &btcjson.ErrInvalidParams,
-				Id:     &message.Id,
-			}
-			return ErrBadParamsField
-		}
-
-		// addrHashes holds a set of string-ified address hashes.
-		addrHashes := make(map[string]bool, len(iaddrs))
-		for i := range iaddrs {
-			addr, ok := iaddrs[i].(string)
-			if !ok {
-				rawReply = btcjson.Reply{
-					Result: nil,
-					Error:  &btcjson.ErrInvalidParams,
-					Id:     &message.Id,
-				}
-				return ErrBadParamsField
-			}
-
-			addrhash, _, err := btcutil.DecodeAddress(addr)
-			if err != nil {
-				rawReply = btcjson.Reply{
-					Result: nil,
-					Error:  &btcjson.ErrInvalidParams,
-					Id:     &message.Id,
-				}
-				return ErrBadParamsField
-			}
-
-			addrHashes[string(addrhash)] = true
-		}
-
-		if len(params) > 2 {
-			fmaxblock, ok := params[2].(float64)
-			if !ok {
-				rawReply = btcjson.Reply{
-					Result: nil,
-					Error:  &btcjson.ErrInvalidParams,
-					Id:     &message.Id,
-				}
-				return ErrBadParamsField
-			}
-			maxblock = int64(fmaxblock)
-		}
-
-		log.Debugf("RPCS: Begining rescan")
-
-		// FetchHeightRange may not return a complete list of block shas for
-		// the given range, so fetch range as many times as necessary.
-		for {
-			blkshalist, err := s.server.db.FetchHeightRange(minblock, maxblock)
-			if err != nil {
-				return err
-			}
-			if len(blkshalist) == 0 {
-				break
-			}
-
-			for i := range blkshalist {
-				blk, err := s.server.db.FetchBlockBySha(&blkshalist[i])
-				if err != nil {
-					return err
-				}
-				txShaList, err := blk.TxShas()
-				if err != nil {
-					return err
-				}
-				txList := s.server.db.FetchTxByShaList(txShaList)
-				for _, txReply := range txList {
-					if txReply.Err != nil || txReply.Tx == nil {
-						continue
-					}
-					for txOutIdx, txout := range txReply.Tx.TxOut {
-						st, txaddrhash, err := btcscript.ScriptToAddrHash(txout.PkScript)
-						if st != btcscript.ScriptAddr || err != nil {
-							continue
-						}
-						txaddr, err := btcutil.EncodeAddress(txaddrhash, s.server.btcnet)
-						if err != nil {
-							log.Errorf("Error encoding address: %v", err)
-							return err
-						}
-						if ok := addrHashes[string(txaddrhash)]; ok {
-							reply := btcjson.Reply{
-								Result: struct {
-									Sender    string `json:"sender"`
-									Receiver  string `json:"receiver"`
-									BlockHash string `json:"blockhash"`
-									Height    int64  `json:"height"`
-									TxHash    string `json:"txhash"`
-									Index     uint32 `json:"index"`
-									Amount    int64  `json:"amount"`
-									PkScript  string `json:"pkscript"`
-									Spent     bool   `json:"spent"`
-								}{
-									Sender:    "Unknown", // TODO(jrick)
-									Receiver:  txaddr,
-									BlockHash: blkshalist[i].String(),
-									Height:    blk.Height(),
-									TxHash:    txReply.Sha.String(),
-									Index:     uint32(txOutIdx),
-									Amount:    txout.Value,
-									PkScript:  btcutil.Base58Encode(txout.PkScript),
-									Spent:     txReply.TxSpent[txOutIdx],
-								},
-								Error: nil,
-								Id:    &message.Id,
-							}
-							replychan <- &reply
-						}
-					}
-				}
-			}
-
-			if maxblock-minblock > int64(len(blkshalist)) {
-				minblock += int64(len(blkshalist))
-			} else {
-				break
-			}
-		}
-
-		rawReply = btcjson.Reply{
-			Result: nil,
-			Error:  nil,
-			Id:     &message.Id,
-		}
-
-		log.Debug("RPCS: Finished rescan")
-
-	case "notifynewtxs":
-		params, ok := message.Params.([]interface{})
-		if !ok || len(params) != 1 {
-			rawReply = btcjson.Reply{
-				Result: nil,
-				Error:  &btcjson.ErrInvalidParams,
-				Id:     &message.Id,
-			}
-			return ErrBadParamsField
-		}
-		addr, ok := params[0].(string)
-		if !ok {
-			rawReply = btcjson.Reply{
-				Result: nil,
-				Error:  &btcjson.ErrInvalidParams,
-				Id:     &message.Id,
-			}
-			return ErrBadParamsField
-		}
-		addrhash, _, err := btcutil.DecodeAddress(addr)
-		if err != nil {
-			jsonError := btcjson.Error{
-				Code:    btcjson.ErrInvalidParams.Code,
-				Message: "Cannot decode address",
-			}
-			rawReply = btcjson.Reply{
-				Result: nil,
-				Error:  &jsonError,
-				Id:     &message.Id,
-			}
-			return ErrBadParamsField
-		}
-		s.ws.requests.AddTxRequest(walletNotification, string(addrhash), message.Id)
-
-		rawReply = btcjson.Reply{
-			Result: nil,
-			Error:  nil,
-			Id:     &message.Id,
-		}
-
-	case "notifyspent":
-		params, ok := message.Params.([]interface{})
-		if !ok || len(params) != 2 {
-			rawReply = btcjson.Reply{
-				Result: nil,
-				Error:  &btcjson.ErrInvalidParams,
-				Id:     &message.Id,
-			}
-			return ErrBadParamsField
-		}
-		hashBE, ok1 := params[0].(string)
-		index, ok2 := params[1].(float64)
-		if !ok1 || !ok2 {
-			rawReply = btcjson.Reply{
-				Result: nil,
-				Error:  &btcjson.ErrInvalidParams,
-				Id:     &message.Id,
-			}
-			return ErrBadParamsField
-		}
-		hash, err := btcwire.NewShaHashFromStr(hashBE)
-		if err != nil {
-			jsonError := btcjson.Error{
-				Code:    btcjson.ErrInvalidParams.Code,
-				Message: "Hash string cannot be parsed.",
-			}
-			rawReply = btcjson.Reply{
-				Result: nil,
-				Error:  &jsonError,
-				Id:     &message.Id,
-			}
-			return ErrBadParamsField
-		}
-		op := btcwire.NewOutPoint(hash, uint32(index))
-		s.ws.requests.AddSpentRequest(walletNotification, op, message.Id)
-
-		rawReply = btcjson.Reply{
-			Result: nil,
-			Error:  nil,
-			Id:     &message.Id,
-		}
-
-	default:
-		rawReply = btcjson.Reply{
+	wsHandler, ok := wsHandlers[message.Method]
+	if !ok {
+		rawReply := &btcjson.Reply{
 			Result: nil,
 			Error:  &btcjson.ErrMethodNotFound,
 			Id:     &message.Id,
 		}
+		replychan <- rawReply
+		return btcjson.ErrMethodNotFound
 	}
-	return btcjson.ErrMethodNotFound
+
+	if err := wsHandler(s, &message, walletNotification, replychan); err != nil {
+		if jsonErr, ok := err.(btcjson.Error); ok {
+			rawReply := &btcjson.Reply{
+				Error: &jsonErr,
+				Id:    &message.Id,
+			}
+			replychan <- rawReply
+			err = errors.New(jsonErr.Message)
+		} else {
+			// In the case where we did not have a btcjson
+			// error to begin with, make a new one to send,
+			// but this really should not happen.
+			rawJSONError := btcjson.Error{
+				Code:    btcjson.ErrInternal.Code,
+				Message: err.Error(),
+			}
+			rawReply := &btcjson.Reply{
+				Error: &rawJSONError,
+				Id:    &message.Id,
+			}
+			replychan <- rawReply
+		}
+	}
+	return err
 }
 
 // getDifficultyRatio returns the proof-of-work difficulty as a multiple of the
