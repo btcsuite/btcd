@@ -6,16 +6,34 @@ package btcec_test
 
 import (
 	"bytes"
+	"crypto/ecdsa"
 	"github.com/conformal/btcec"
 	"github.com/davecgh/go-spew/spew"
 	"testing"
 )
+
+type privKeyTest struct {
+	name string
+	key  []byte
+}
 
 type pubKeyTest struct {
 	name    string
 	key     []byte
 	format  byte
 	isValid bool
+}
+
+var privKeyTests = []privKeyTest{
+	privKeyTest{
+		name: "check curve",
+		key: []byte{
+			0xea, 0xf0, 0x2c, 0xa3, 0x48, 0xc5, 0x24, 0xe6,
+			0x39, 0x26, 0x55, 0xba, 0x4d, 0x29, 0x60, 0x3c,
+			0xd1, 0xa7, 0x34, 0x7d, 0x9d, 0x65, 0xcf, 0xe9,
+			0x3c, 0xe1, 0xeb, 0xff, 0xdc, 0xa2, 0x26, 0x94,
+		},
+	},
 }
 
 var pubKeyTests = []pubKeyTest{
@@ -198,6 +216,22 @@ var pubKeyTests = []pubKeyTest{
 		},
 		isValid: false,
 	},
+}
+
+func TestPrivKeys(t *testing.T) {
+	for _, test := range privKeyTests {
+		x, y := btcec.S256().ScalarBaseMult(test.key)
+		pub := (*btcec.PublicKey)(&ecdsa.PublicKey{
+			Curve: btcec.S256(),
+			X:     x,
+			Y:     y,
+		})
+		_, err := btcec.ParsePubKey(pub.SerializeUncompressed(), btcec.S256())
+		if err != nil {
+			t.Errorf("%s privkey: %v", test.name, err)
+			continue
+		}
+	}
 }
 
 func TestPubKeys(t *testing.T) {
