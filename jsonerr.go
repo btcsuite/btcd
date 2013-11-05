@@ -145,3 +145,15 @@ var (
 		Message: "Unable to decode hex string",
 	}
 )
+
+// Errors that are specific to btcd.
+var (
+	ErrNoWallet = Error{
+		Code:    -1,
+		Message: "This implementation does not implement wallet commands",
+	}
+	ErrUnimplemented = Error{
+		Code:    -1,
+		Message: "Command unimplemented",
+	}
+)
