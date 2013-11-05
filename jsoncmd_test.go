@@ -905,6 +905,19 @@ var jsoncmdtests = []struct {
 		},
 	},
 	{
+		name: "basic signmessage",
+		f: func() (Cmd, error) {
+			return NewSignMessageCmd(float64(1),
+				"btcaddress",
+				"a message")
+		},
+		result: &SignMessageCmd{
+			id:      float64(1),
+			Address: "btcaddress",
+			Message: "a message",
+		},
+	},
+	{
 		name: "basic signrawtransaction",
 		f: func() (Cmd, error) {
 			return NewSignRawTransactionCmd(float64(1),
