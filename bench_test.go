@@ -201,3 +201,13 @@ func BenchmarkWriteTxIn(b *testing.B) {
 		btcwire.TstWriteTxIn(ioutil.Discard, 0, 0, txIn)
 	}
 }
+
+// BenchmarkSerializeTx performs a benchmark on how long it takes to serialize
+// a transaction.
+func BenchmarkSerializeTx(b *testing.B) {
+	tx := blockOne.Transactions[0]
+	for i := 0; i < b.N; i++ {
+		tx.BtcEncode(ioutil.Discard, 0)
+
+	}
+}
