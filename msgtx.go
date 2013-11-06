@@ -451,7 +451,7 @@ func writeOutPoint(w io.Writer, pver uint32, version uint32, op *OutPoint) error
 // readTxIn reads the next sequence of bytes from r as a transaction input
 // (TxIn).
 func readTxIn(r io.Reader, pver uint32, version uint32, ti *TxIn) error {
-	op := OutPoint{}
+	var op OutPoint
 	err := readOutPoint(r, pver, version, &op)
 	if err != nil {
 		return err
@@ -474,16 +474,18 @@ func readTxIn(r io.Reader, pver uint32, version uint32, ti *TxIn) error {
 	}
 
 	b := make([]byte, count)
-	err = readElement(r, b)
+	_, err = io.ReadFull(r, b)
 	if err != nil {
 		return err
 	}
 	ti.SignatureScript = b
 
-	err = readElement(r, &ti.Sequence)
+	b = make([]byte, 4)
+	_, err = io.ReadFull(r, b)
 	if err != nil {
 		return err
 	}
+	ti.Sequence = binary.LittleEndian.Uint32(b)
 
 	return nil
 }
@@ -521,10 +523,10 @@ func writeTxIn(w io.Writer, pver uint32, version uint32, ti *TxIn) error {
 func readTxOut(r io.Reader, pver uint32, version uint32, to *TxOut) error {
 	buf := make([]byte, 8)
 	_, err := io.ReadFull(r, buf)
-	to.Value = int64(binary.LittleEndian.Uint64(buf))
 	if err != nil {
 		return err
 	}
+	to.Value = int64(binary.LittleEndian.Uint64(buf))
 
 	count, err := readVarInt(r, pver)
 	if err != nil {
