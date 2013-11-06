@@ -167,7 +167,7 @@ func readVarString(r io.Reader, pver uint32) (string, error) {
 	}
 
 	buf := make([]byte, count)
-	err = readElement(r, buf)
+	_, err = io.ReadFull(r, buf)
 	if err != nil {
 		return "", err
 	}
