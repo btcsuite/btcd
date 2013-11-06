@@ -6,6 +6,7 @@ package btcwire
 
 import (
 	"bytes"
+	"encoding/binary"
 	"fmt"
 	"io"
 )
@@ -426,7 +427,14 @@ func readOutPoint(r io.Reader, pver uint32, version uint32, op *OutPoint) error 
 // writeOutPoint encodes op to the bitcoin protocol encoding for an OutPoint
 // to w.
 func writeOutPoint(w io.Writer, pver uint32, version uint32, op *OutPoint) error {
-	err := writeElements(w, op.Hash, op.Index)
+	_, err := w.Write(op.Hash[:])
+	if err != nil {
+		return err
+	}
+
+	buf := make([]byte, 4)
+	binary.LittleEndian.PutUint32(buf, op.Index)
+	_, err = w.Write(buf)
 	if err != nil {
 		return err
 	}
