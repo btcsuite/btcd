@@ -112,3 +112,15 @@ func BenchmarkWriteVarStr10(b *testing.B) {
 		btcwire.TstWriteVarString(ioutil.Discard, 0, "test012345")
 	}
 }
+
+// BenchmarkWriteOutPoint performs a benchmark on how long it takes to write a
+// transaction output point.
+func BenchmarkWriteOutPoint(b *testing.B) {
+	op := &btcwire.OutPoint{
+		Hash:  btcwire.ShaHash{},
+		Index: 0,
+	}
+	for i := 0; i < b.N; i++ {
+		btcwire.TstWriteOutPoint(ioutil.Discard, 0, 0, op)
+	}
+}

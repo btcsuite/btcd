@@ -102,3 +102,9 @@ func TstWriteBlockHeader(w io.Writer, pver uint32, bh *BlockHeader) error {
 func TstReadMessageHeader(r io.Reader) (*messageHeader, error) {
 	return readMessageHeader(r)
 }
+
+// TstWriteOutPoint makes the internal writeOutPoint function available to the
+// test package.
+func TstWriteOutPoint(w io.Writer, pver uint32, version uint32, op *OutPoint) error {
+	return writeOutPoint(w, pver, version, op)
+}
