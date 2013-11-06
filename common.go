@@ -97,18 +97,31 @@ func readVarInt(r io.Reader, pver uint32) (uint64, error) {
 // on its value.
 func writeVarInt(w io.Writer, pver uint32, val uint64) error {
 	if val < 0xfd {
-		return writeElement(w, uint8(val))
+		_, err := w.Write([]byte{uint8(val)})
+		return err
 	}
 
 	if val <= math.MaxUint16 {
-		return writeElements(w, []byte{0xfd}, uint16(val))
+		buf := make([]byte, 3)
+		buf[0] = 0xfd
+		binary.LittleEndian.PutUint16(buf[1:], uint16(val))
+		_, err := w.Write(buf)
+		return err
 	}
 
 	if val <= math.MaxUint32 {
-		return writeElements(w, []byte{0xfe}, uint32(val))
+		buf := make([]byte, 5)
+		buf[0] = 0xfe
+		binary.LittleEndian.PutUint32(buf[1:], uint32(val))
+		_, err := w.Write(buf)
+		return err
 	}
 
-	return writeElements(w, []byte{0xff}, uint64(val))
+	buf := make([]byte, 9)
+	buf[0] = 0xff
+	binary.LittleEndian.PutUint64(buf[1:], val)
+	_, err := w.Write(buf)
+	return err
 }
 
 // varIntSerializeSize returns the number of bytes it would take to serialize
