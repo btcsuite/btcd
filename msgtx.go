@@ -417,10 +417,17 @@ func NewMsgTx() *MsgTx {
 
 // readOutPoint reads the next sequence of bytes from r as an OutPoint.
 func readOutPoint(r io.Reader, pver uint32, version uint32, op *OutPoint) error {
-	err := readElements(r, &op.Hash, &op.Index)
+	_, err := io.ReadFull(r, op.Hash[:])
 	if err != nil {
 		return err
 	}
+
+	buf := make([]byte, 4)
+	_, err = io.ReadFull(r, buf)
+	if err != nil {
+		return err
+	}
+	op.Index = binary.LittleEndian.Uint32(buf)
 	return nil
 }
 
