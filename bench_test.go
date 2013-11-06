@@ -96,3 +96,19 @@ func BenchmarkReadVarStr10(b *testing.B) {
 		btcwire.TstReadVarString(bytes.NewBuffer(buf), 0)
 	}
 }
+
+// BenchmarkWriteVarStr4 performs a benchmark on how long it takes to write a
+// four byte variable length string.
+func BenchmarkWriteVarStr4(b *testing.B) {
+	for i := 0; i < b.N; i++ {
+		btcwire.TstWriteVarString(ioutil.Discard, 0, "test")
+	}
+}
+
+// BenchmarkWriteVarStr10 performs a benchmark on how long it takes to write a
+// four byte variable length string.
+func BenchmarkWriteVarStr10(b *testing.B) {
+	for i := 0; i < b.N; i++ {
+		btcwire.TstWriteVarString(ioutil.Discard, 0, "test012345")
+	}
+}
