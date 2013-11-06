@@ -103,6 +103,12 @@ func TstReadMessageHeader(r io.Reader) (*messageHeader, error) {
 	return readMessageHeader(r)
 }
 
+// TstReadOutPoint makes the internal readOutPoint function available to the
+// test package.
+func TstReadOutPoint(r io.Reader, pver uint32, version uint32, op *OutPoint) error {
+	return readOutPoint(r, pver, version, op)
+}
+
 // TstWriteOutPoint makes the internal writeOutPoint function available to the
 // test package.
 func TstWriteOutPoint(w io.Writer, pver uint32, version uint32, op *OutPoint) error {

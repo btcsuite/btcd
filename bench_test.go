@@ -106,10 +106,26 @@ func BenchmarkWriteVarStr4(b *testing.B) {
 }
 
 // BenchmarkWriteVarStr10 performs a benchmark on how long it takes to write a
-// four byte variable length string.
+// ten byte variable length string.
 func BenchmarkWriteVarStr10(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		btcwire.TstWriteVarString(ioutil.Discard, 0, "test012345")
+	}
+}
+
+// BenchmarkReadOutPoint performs a benchmark on how long it takes to read a
+// transaction output point.
+func BenchmarkReadOutPoint(b *testing.B) {
+	buf := []byte{
+		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // Previous output hash
+		0xff, 0xff, 0xff, 0xff, // Previous output index
+	}
+	var op btcwire.OutPoint
+	for i := 0; i < b.N; i++ {
+		btcwire.TstReadOutPoint(bytes.NewBuffer(buf), 0, 0, &op)
 	}
 }
 
