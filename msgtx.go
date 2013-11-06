@@ -552,7 +552,9 @@ func readTxOut(r io.Reader, pver uint32, version uint32, to *TxOut) error {
 // writeTxOut encodes to into the bitcoin protocol encoding for a transaction
 // output (TxOut) to w.
 func writeTxOut(w io.Writer, pver uint32, version uint32, to *TxOut) error {
-	err := writeElement(w, to.Value)
+	buf := make([]byte, 8)
+	binary.LittleEndian.PutUint64(buf, uint64(to.Value))
+	_, err := w.Write(buf)
 	if err != nil {
 		return err
 	}
@@ -563,7 +565,7 @@ func writeTxOut(w io.Writer, pver uint32, version uint32, to *TxOut) error {
 		return err
 	}
 
-	err = writeElement(w, to.PkScript)
+	_, err = w.Write(to.PkScript)
 	if err != nil {
 		return err
 	}
