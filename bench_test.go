@@ -192,3 +192,12 @@ func BenchmarkReadTxIn(b *testing.B) {
 		btcwire.TstReadTxIn(bytes.NewBuffer(buf), 0, 0, &txIn)
 	}
 }
+
+// BenchmarkWriteTxIn performs a benchmark on how long it takes to write
+// a transaction input.
+func BenchmarkWriteTxIn(b *testing.B) {
+	txIn := blockOne.Transactions[0].TxIn[0]
+	for i := 0; i < b.N; i++ {
+		btcwire.TstWriteTxIn(ioutil.Discard, 0, 0, txIn)
+	}
+}
