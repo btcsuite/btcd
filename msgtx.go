@@ -314,7 +314,9 @@ func (msg *MsgTx) Deserialize(r io.Reader) error {
 // See Serialize for encoding transactions to be stored to disk, such as in a
 // database, as opposed to encoding transactions for the wire.
 func (msg *MsgTx) BtcEncode(w io.Writer, pver uint32) error {
-	err := writeElement(w, msg.Version)
+	buf := make([]byte, 4)
+	binary.LittleEndian.PutUint32(buf, msg.Version)
+	_, err := w.Write(buf)
 	if err != nil {
 		return err
 	}
@@ -345,7 +347,8 @@ func (msg *MsgTx) BtcEncode(w io.Writer, pver uint32) error {
 		}
 	}
 
-	err = writeElement(w, msg.LockTime)
+	binary.LittleEndian.PutUint32(buf, msg.LockTime)
+	_, err = w.Write(buf)
 	if err != nil {
 		return err
 	}
