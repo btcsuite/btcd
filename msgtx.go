@@ -504,13 +504,14 @@ func writeTxIn(w io.Writer, pver uint32, version uint32, ti *TxIn) error {
 		return err
 	}
 
-	b := []byte(ti.SignatureScript)
-	_, err = w.Write(b)
+	_, err = w.Write(ti.SignatureScript)
 	if err != nil {
 		return err
 	}
 
-	err = writeElement(w, &ti.Sequence)
+	buf := make([]byte, 4)
+	binary.LittleEndian.PutUint32(buf, ti.Sequence)
+	_, err = w.Write(buf)
 	if err != nil {
 		return err
 	}
