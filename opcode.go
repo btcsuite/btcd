@@ -9,11 +9,11 @@ import (
 	"code.google.com/p/go.crypto/ripemd160"
 	"crypto/ecdsa"
 	"crypto/sha1"
-	"crypto/sha256"
 	"encoding/binary"
 	"fmt"
 	"github.com/conformal/btcec"
 	"github.com/conformal/btcwire"
+	"github.com/conformal/fastsha256"
 	"github.com/davecgh/go-spew/spew"
 	"hash"
 	"math/big"
@@ -1591,7 +1591,7 @@ func calcHash(buf []byte, hasher hash.Hash) []byte {
 
 // calculate hash160 which is ripemd160(sha256(data))
 func calcHash160(buf []byte) []byte {
-	return calcHash(calcHash(buf, sha256.New()), ripemd160.New())
+	return calcHash(calcHash(buf, fastsha256.New()), ripemd160.New())
 }
 
 func opcodeRipemd160(op *parsedOpcode, s *Script) error {
@@ -1620,7 +1620,7 @@ func opcodeSha256(op *parsedOpcode, s *Script) error {
 		return err
 	}
 
-	s.dstack.PushByteArray(calcHash(buf, sha256.New()))
+	s.dstack.PushByteArray(calcHash(buf, fastsha256.New()))
 	return nil
 }
 
