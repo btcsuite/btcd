@@ -78,3 +78,21 @@ func BenchmarkReadVarInt9(b *testing.B) {
 		btcwire.TstReadVarInt(bytes.NewBuffer(buf), 0)
 	}
 }
+
+// BenchmarkReadVarStr4 performs a benchmark on how long it takes to read a
+// four byte variable length string.
+func BenchmarkReadVarStr4(b *testing.B) {
+	buf := []byte{0x04, 't', 'e', 's', 't'}
+	for i := 0; i < b.N; i++ {
+		btcwire.TstReadVarString(bytes.NewBuffer(buf), 0)
+	}
+}
+
+// BenchmarkReadVarStr10 performs a benchmark on how long it takes to read a
+// ten byte variable length string.
+func BenchmarkReadVarStr10(b *testing.B) {
+	buf := []byte{0x0a, 't', 'e', 's', 't', '0', '1', '2', '3', '4', '5'}
+	for i := 0; i < b.N; i++ {
+		btcwire.TstReadVarString(bytes.NewBuffer(buf), 0)
+	}
+}
