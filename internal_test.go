@@ -126,3 +126,9 @@ func TstReadTxOut(r io.Reader, pver uint32, version uint32, to *TxOut) error {
 func TstWriteTxOut(w io.Writer, pver uint32, version uint32, to *TxOut) error {
 	return writeTxOut(w, pver, version, to)
 }
+
+// TstReadTxIn makes the internal readTxIn function available to the test
+// package.
+func TstReadTxIn(r io.Reader, pver uint32, version uint32, ti *TxIn) error {
+	return readTxIn(r, pver, version, ti)
+}

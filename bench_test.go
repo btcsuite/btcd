@@ -161,10 +161,7 @@ func BenchmarkReadTxOut(b *testing.B) {
 	}
 	var txOut btcwire.TxOut
 	for i := 0; i < b.N; i++ {
-		err := btcwire.TstReadTxOut(bytes.NewBuffer(buf), 0, 0, &txOut)
-		if err != nil {
-			b.Log(err)
-		}
+		btcwire.TstReadTxOut(bytes.NewBuffer(buf), 0, 0, &txOut)
 	}
 }
 
@@ -174,5 +171,24 @@ func BenchmarkWriteTxOut(b *testing.B) {
 	txOut := blockOne.Transactions[0].TxOut[0]
 	for i := 0; i < b.N; i++ {
 		btcwire.TstWriteTxOut(ioutil.Discard, 0, 0, txOut)
+	}
+}
+
+// BenchmarkReadTxIn performs a benchmark on how long it takes to read a
+// transaction input.
+func BenchmarkReadTxIn(b *testing.B) {
+	buf := []byte{
+		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // Previous output hash
+		0xff, 0xff, 0xff, 0xff, // Previous output index
+		0x07,                                     // Varint for length of signature script
+		0x04, 0xff, 0xff, 0x00, 0x1d, 0x01, 0x04, // Signature script
+		0xff, 0xff, 0xff, 0xff, // Sequence
+	}
+	var txIn btcwire.TxIn
+	for i := 0; i < b.N; i++ {
+		btcwire.TstReadTxIn(bytes.NewBuffer(buf), 0, 0, &txIn)
 	}
 }
