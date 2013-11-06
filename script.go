@@ -146,6 +146,24 @@ const (
 	NonStandardTy                    // None of the above.
 )
 
+var scriptClassToName = []string{
+	PubKeyTy: "pubkey",
+	PubKeyHashTy: "pubkeyhash",
+	ScriptHashTy: "scripthash",
+	MultiSigTy: "multisig",
+	NonStandardTy: "nonstandard",
+}
+
+// String implements the Stringer interface by returning the name of
+// the enum script class. If the enum is invalid then "Invalid" will be
+// returned.
+func (t ScriptClass) String() string {
+	if int(t) > len(scriptClassToName) || int(t) < 0 {
+		return "Invalid"
+	}
+	return scriptClassToName[t]
+}
+
 // Script is the virtual machine that executes btcscripts.
 type Script struct {
 	scripts         [][]parsedOpcode

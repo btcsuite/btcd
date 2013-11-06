@@ -2664,3 +2664,50 @@ nexttest:
 		}
 	}
 }
+
+var classStringifyTests = []struct{
+	name string
+	scriptclass btcscript.ScriptClass
+	stringed string
+}{
+	{
+		name: "pubkey",
+		scriptclass: btcscript.PubKeyTy,
+		stringed: "pubkey",
+	},
+	{
+		name: "pubkeyhash",
+		scriptclass: btcscript.PubKeyHashTy,
+		stringed: "pubkeyhash",
+	},
+	{
+		name: "scripthash",
+		scriptclass: btcscript.ScriptHashTy,
+		stringed: "scripthash",
+	},
+	{
+		name: "multisigty",
+		scriptclass: btcscript.MultiSigTy,
+		stringed: "multisig",
+	},
+	{
+		name: "nonstandard",
+		scriptclass: btcscript.NonStandardTy,
+		stringed: "nonstandard",
+	},
+	{
+		name: "broken",
+		scriptclass: btcscript.ScriptClass(255),
+		stringed: "Invalid",
+	},
+}
+
+func TestStringifyClass(t *testing.T) {
+	for _, test := range classStringifyTests {
+		typeString := test.scriptclass.String()
+		if typeString != test.stringed {
+			t.Errorf("%s: got \"%s\" expected \"%s\"", test.name,
+				typeString, test.stringed)
+		}
+	}
+}
