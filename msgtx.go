@@ -519,7 +519,9 @@ func writeTxIn(w io.Writer, pver uint32, version uint32, ti *TxIn) error {
 // readTxOut reads the next sequence of bytes from r as a transaction output
 // (TxOut).
 func readTxOut(r io.Reader, pver uint32, version uint32, to *TxOut) error {
-	err := readElement(r, &to.Value)
+	buf := make([]byte, 8)
+	_, err := io.ReadFull(r, buf)
+	to.Value = int64(binary.LittleEndian.Uint64(buf))
 	if err != nil {
 		return err
 	}
@@ -540,7 +542,7 @@ func readTxOut(r io.Reader, pver uint32, version uint32, to *TxOut) error {
 	}
 
 	b := make([]byte, count)
-	err = readElement(r, b)
+	_, err = io.ReadFull(r, b)
 	if err != nil {
 		return err
 	}
