@@ -43,7 +43,7 @@ func BenchmarkWriteVarInt9(b *testing.B) {
 	}
 }
 
-// BenchmarkReadVarInt1 performs a benchmark on how long it takes to write
+// BenchmarkReadVarInt1 performs a benchmark on how long it takes to read
 // a single byte variable length integer.
 func BenchmarkReadVarInt1(b *testing.B) {
 	buf := []byte{0x01}
@@ -52,7 +52,7 @@ func BenchmarkReadVarInt1(b *testing.B) {
 	}
 }
 
-// BenchmarkReadVarInt3 performs a benchmark on how long it takes to write
+// BenchmarkReadVarInt3 performs a benchmark on how long it takes to read
 // a three byte variable length integer.
 func BenchmarkReadVarInt3(b *testing.B) {
 	buf := []byte{0x0fd, 0xff, 0xff}
@@ -61,7 +61,7 @@ func BenchmarkReadVarInt3(b *testing.B) {
 	}
 }
 
-// BenchmarkReadVarInt5 performs a benchmark on how long it takes to write
+// BenchmarkReadVarInt5 performs a benchmark on how long it takes to read
 // a five byte variable length integer.
 func BenchmarkReadVarInt5(b *testing.B) {
 	buf := []byte{0xfe, 0xff, 0xff, 0xff, 0xff}
@@ -70,7 +70,7 @@ func BenchmarkReadVarInt5(b *testing.B) {
 	}
 }
 
-// BenchmarkReadVarInt9 performs a benchmark on how long it takes to write
+// BenchmarkReadVarInt9 performs a benchmark on how long it takes to read
 // a nine byte variable length integer.
 func BenchmarkReadVarInt9(b *testing.B) {
 	buf := []byte{0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff}
