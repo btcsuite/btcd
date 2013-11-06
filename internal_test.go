@@ -114,3 +114,9 @@ func TstReadOutPoint(r io.Reader, pver uint32, version uint32, op *OutPoint) err
 func TstWriteOutPoint(w io.Writer, pver uint32, version uint32, op *OutPoint) error {
 	return writeOutPoint(w, pver, version, op)
 }
+
+// TstWriteTxOut makes the internal writeTxOut function available to the test
+// package.
+func TstWriteTxOut(w io.Writer, pver uint32, version uint32, to *TxOut) error {
+	return writeTxOut(w, pver, version, to)
+}

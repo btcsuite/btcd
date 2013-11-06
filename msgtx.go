@@ -339,7 +339,7 @@ func (msg *MsgTx) BtcEncode(w io.Writer, pver uint32) error {
 	}
 
 	for _, to := range msg.TxOut {
-		err = writeTxOut(w, pver, to)
+		err = writeTxOut(w, pver, msg.Version, to)
 		if err != nil {
 			return err
 		}
@@ -551,7 +551,7 @@ func readTxOut(r io.Reader, pver uint32, version uint32, to *TxOut) error {
 
 // writeTxOut encodes to into the bitcoin protocol encoding for a transaction
 // output (TxOut) to w.
-func writeTxOut(w io.Writer, pver uint32, to *TxOut) error {
+func writeTxOut(w io.Writer, pver uint32, version uint32, to *TxOut) error {
 	err := writeElement(w, to.Value)
 	if err != nil {
 		return err
