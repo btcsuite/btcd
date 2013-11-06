@@ -181,7 +181,7 @@ func writeVarString(w io.Writer, pver uint32, str string) error {
 	if err != nil {
 		return err
 	}
-	err = writeElement(w, []byte(str))
+	_, err = w.Write([]byte(str))
 	if err != nil {
 		return err
 	}
