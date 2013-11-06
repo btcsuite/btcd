@@ -6,9 +6,9 @@ package btcwire
 
 import (
 	"crypto/rand"
-	"crypto/sha256"
 	"encoding/binary"
 	"fmt"
+	"github.com/conformal/fastsha256"
 	"io"
 	"math"
 )
@@ -414,7 +414,7 @@ func RandomUint64() (uint64, error) {
 
 // DoubleSha256 calculates sha256(sha256(b)) and returns the resulting bytes.
 func DoubleSha256(b []byte) []byte {
-	hasher := sha256.New()
+	hasher := fastsha256.New()
 	hasher.Write(b)
 	sum := hasher.Sum(nil)
 	hasher.Reset()
