@@ -53,8 +53,8 @@ func writeElements(w io.Writer, elements ...interface{}) error {
 
 // readVarInt reads a variable length integer from r and returns it as a uint64.
 func readVarInt(r io.Reader, pver uint32) (uint64, error) {
-	b := make([]byte, 1)
-	_, err := io.ReadFull(r, b)
+	b := make([]byte, 8)
+	_, err := io.ReadFull(r, b[0:1])
 	if err != nil {
 		return 0, err
 	}
@@ -63,28 +63,25 @@ func readVarInt(r io.Reader, pver uint32) (uint64, error) {
 	discriminant := uint8(b[0])
 	switch discriminant {
 	case 0xff:
-		var u uint64
-		err = binary.Read(r, binary.LittleEndian, &u)
+		_, err := io.ReadFull(r, b)
 		if err != nil {
 			return 0, err
 		}
-		rv = u
+		rv = binary.LittleEndian.Uint64(b)
 
 	case 0xfe:
-		var u uint32
-		err = binary.Read(r, binary.LittleEndian, &u)
+		_, err := io.ReadFull(r, b[0:4])
 		if err != nil {
 			return 0, err
 		}
-		rv = uint64(u)
+		rv = uint64(binary.LittleEndian.Uint32(b))
 
 	case 0xfd:
-		var u uint16
-		err = binary.Read(r, binary.LittleEndian, &u)
+		_, err := io.ReadFull(r, b[0:2])
 		if err != nil {
 			return 0, err
 		}
-		rv = uint64(u)
+		rv = uint64(binary.LittleEndian.Uint16(b))
 
 	default:
 		rv = uint64(discriminant)
