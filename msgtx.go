@@ -229,10 +229,12 @@ func (tx *MsgTx) Copy() *MsgTx {
 // See Deserialize for decoding transactions stored to disk, such as in a
 // database, as opposed to decoding transactions from the wire.
 func (msg *MsgTx) BtcDecode(r io.Reader, pver uint32) error {
-	err := readElement(r, &msg.Version)
+	buf := make([]byte, 4)
+	_, err := io.ReadFull(r, buf)
 	if err != nil {
 		return err
 	}
+	msg.Version = binary.LittleEndian.Uint32(buf)
 
 	count, err := readVarInt(r, pver)
 	if err != nil {
@@ -249,14 +251,14 @@ func (msg *MsgTx) BtcDecode(r io.Reader, pver uint32) error {
 		return messageError("MsgTx.BtcDecode", str)
 	}
 
-	msg.TxIn = make([]*TxIn, 0, count)
+	msg.TxIn = make([]*TxIn, count)
 	for i := uint64(0); i < count; i++ {
 		ti := TxIn{}
 		err = readTxIn(r, pver, msg.Version, &ti)
 		if err != nil {
 			return err
 		}
-		msg.TxIn = append(msg.TxIn, &ti)
+		msg.TxIn[i] = &ti
 	}
 
 	count, err = readVarInt(r, pver)
@@ -274,20 +276,21 @@ func (msg *MsgTx) BtcDecode(r io.Reader, pver uint32) error {
 		return messageError("MsgTx.BtcDecode", str)
 	}
 
-	msg.TxOut = make([]*TxOut, 0, count)
+	msg.TxOut = make([]*TxOut, count)
 	for i := uint64(0); i < count; i++ {
 		to := TxOut{}
 		err = readTxOut(r, pver, msg.Version, &to)
 		if err != nil {
 			return err
 		}
-		msg.TxOut = append(msg.TxOut, &to)
+		msg.TxOut[i] = &to
 	}
 
-	err = readElement(r, &msg.LockTime)
+	_, err = io.ReadFull(r, buf)
 	if err != nil {
 		return err
 	}
+	msg.LockTime = binary.LittleEndian.Uint32(buf)
 
 	return nil
 }
