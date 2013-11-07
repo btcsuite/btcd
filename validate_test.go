@@ -24,7 +24,7 @@ func TestCheckBlockSanity(t *testing.T) {
 	defer teardownFunc()
 
 	block := btcutil.NewBlock(&Block100000)
-	err = chain.TstCheckBlockSanity(block)
+	err = chain.CheckBlockSanity(block)
 	if err != nil {
 		t.Errorf("CheckBlockSanity: %v", err)
 	}

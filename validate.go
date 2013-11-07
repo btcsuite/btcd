@@ -388,9 +388,9 @@ func countP2SHSigOps(tx *btcutil.Tx, isCoinBaseTx bool, txStore TxStore) (int, e
 	return totalSigOps, nil
 }
 
-// checkBlockSanity performs some preliminary checks on a block to ensure it is
+// CheckBlockSanity performs some preliminary checks on a block to ensure it is
 // sane before continuing with block processing.  These checks are context free.
-func (b *BlockChain) checkBlockSanity(block *btcutil.Block) error {
+func (b *BlockChain) CheckBlockSanity(block *btcutil.Block) error {
 	// NOTE: bitcoind does size limits checking here, but the size limits
 	// have already been checked by btcwire for incoming blocks.  Also,
 	// btcwire checks the size limits on send too, so there is no need
