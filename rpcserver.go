@@ -360,11 +360,20 @@ func jsonRPCRead(w http.ResponseWriter, r *http.Request, s *rpcServer) {
 		return
 	}
 
-	// Error is intentionally ignored here.  It's used in in the
-	// websocket handler to tell when a method is not supported by
-	// the standard RPC API, and is not needed here.  Error logging
-	// is done inside jsonRead, so no need to log the error here.
-	reply, _ := jsonRead(body, s, nil)
+	var reply btcjson.Reply
+	cmd, jsonErr := parseCmd(body)
+	if cmd != nil {
+		// Unmarshaling at least a valid JSON-RPC message succeeded.
+		// Use the provided id for errors.
+		id := cmd.Id()
+		reply.Id = &id
+	}
+	if jsonErr != nil {
+		reply.Error = jsonErr
+	} else {
+		reply = standardCmdReply(cmd, s, nil)
+	}
+
 	log.Tracef("[RPCS] reply: %v", reply)
 
 	msg, err := btcjson.MarshallAndSend(reply, w)
@@ -798,81 +807,100 @@ func handleStop(s *rpcServer, cmd btcjson.Cmd, walletNotification chan []byte) (
 	return "btcd stopping.", nil
 }
 
-// jsonRead abstracts the JSON unmarshalling and reply handling used
-// by both RPC and websockets.  If called from websocket code, a non-nil
-// wallet notification channel can be used to automatically register
-// various notifications for the wallet.
-func jsonRead(body []byte, s *rpcServer, walletNotification chan []byte) (reply btcjson.Reply, err error) {
-	cmd, err := btcjson.ParseMarshaledCmd(body)
+// parseCmd parses a marshaled known command, returning any errors as a
+// btcjson.Error that can be used in replies.  The returned cmd may still
+// be non-nil if b is at least a valid marshaled JSON-RPC message.
+func parseCmd(b []byte) (btcjson.Cmd, *btcjson.Error) {
+	cmd, err := btcjson.ParseMarshaledCmd(b)
 	if err != nil {
-		var id interface{}
-		if cmd != nil {
-			// Unmarshaling a valid JSON-RPC message succeeded.  Use
-			// the provided id for errors.
-			id = cmd.Id()
-		}
-
-		if jsonErr, ok := err.(btcjson.Error); ok {
-			reply = btcjson.Reply{
-				Result: nil,
-				Error:  &jsonErr,
-				Id:     &id,
-			}
-		} else {
-			reply = btcjson.Reply{
-				Result: nil,
-				Error:  &jsonErr,
-				Id:     &id,
+		jsonErr, ok := err.(btcjson.Error)
+		if !ok {
+			jsonErr = btcjson.Error{
+				Code:    btcjson.ErrParse.Code,
+				Message: err.Error(),
 			}
 		}
-
-		log.Tracef("RPCS: reply: %v", reply)
-
-		return reply, err
+		return cmd, &jsonErr
 	}
-	log.Tracef("RPCS: received: %v", cmd)
+	return cmd, nil
+}
+
+// standardCmdReply checks that a parsed command is a standard
+// Bitcoin JSON-RPC command and runs the proper handler to reply to the
+// command.
+func standardCmdReply(cmd btcjson.Cmd, s *rpcServer,
+	walletNotification chan []byte) (reply btcjson.Reply) {
 
 	id := cmd.Id()
+	reply.Id = &id
 
 	handler, ok := handlers[cmd.Method()]
 	if !ok {
-		reply = btcjson.Reply{
-			Result: nil,
-			Error:  &btcjson.ErrMethodNotFound,
-			Id:     &id,
-		}
-		return reply, btcjson.ErrMethodNotFound
+		reply.Error = &btcjson.ErrMethodNotFound
+		return reply
 	}
 
 	result, err := handler(s, cmd, walletNotification)
 	if err != nil {
-		if jsonErr, ok := err.(btcjson.Error); ok {
-			reply = btcjson.Reply{
-				Error: &jsonErr,
-				Id:    &id,
-			}
-			err = errors.New(jsonErr.Message)
-		} else {
+		jsonErr, ok := err.(btcjson.Error)
+		if !ok {
 			// In the case where we did not have a btcjson
 			// error to begin with, make a new one to send,
 			// but this really should not happen.
-			rawJSONError := btcjson.Error{
+			jsonErr = btcjson.Error{
 				Code:    btcjson.ErrInternal.Code,
 				Message: err.Error(),
 			}
-			reply = btcjson.Reply{
-				Error: &rawJSONError,
-				Id:    &id,
-			}
 		}
+		reply.Error = &jsonErr
 	} else {
-		reply = btcjson.Reply{
-			Result: result,
-			Id:     &id,
-		}
+		reply.Result = result
+	}
+	return reply
+}
+
+// respondToAnyCmd checks that a parsed command is a standard or
+// extension JSON-RPC command and runs the proper handler to reply to
+// the command.  Any and all responses are sent to the wallet from
+// this function.
+func respondToAnyCmd(cmd btcjson.Cmd, s *rpcServer,
+	walletNotification chan []byte, rc *requestContexts) {
+
+	reply := standardCmdReply(cmd, s, walletNotification)
+	if reply.Error != &btcjson.ErrMethodNotFound {
+		mreply, _ := json.Marshal(reply)
+		walletNotification <- mreply
+		return
 	}
 
-	return reply, err
+	wsHandler, ok := wsHandlers[cmd.Method()]
+	if !ok {
+		reply.Error = &btcjson.ErrMethodNotFound
+		mreply, _ := json.Marshal(reply)
+		walletNotification <- mreply
+		return
+	}
+
+	if err := wsHandler(s, cmd, walletNotification, rc); err != nil {
+		jsonErr, ok := err.(btcjson.Error)
+		if ok {
+			reply.Error = &jsonErr
+			mreply, _ := json.Marshal(reply)
+			walletNotification <- mreply
+			return
+		}
+
+		// In the case where we did not have a btcjson
+		// error to begin with, make a new one to send,
+		// but this really should not happen.
+		jsonErr = btcjson.Error{
+			Code:    btcjson.ErrInternal.Code,
+			Message: err.Error(),
+		}
+		reply.Error = &jsonErr
+		mreply, _ := json.Marshal(reply)
+		walletNotification <- mreply
+	}
 }
 
 // handleGetCurrentNet implements the getcurrentnet command extension
@@ -1066,68 +1094,6 @@ func handleNotifySpent(s *rpcServer, cmd btcjson.Cmd,
 	return nil
 }
 
-func jsonWSRead(body []byte, s *rpcServer, walletNotification chan []byte,
-	rc *requestContexts) error {
-
-	var reply btcjson.Reply
-
-	cmd, err := btcjson.ParseMarshaledCmd(body)
-	if err != nil {
-		if cmd != nil {
-			// Unmarshaling a valid JSON-RPC message succeeded.  Use
-			// the provided id for errors.
-			id := cmd.Id()
-			reply.Id = &id
-		}
-
-		jsonErr, ok := err.(btcjson.Error)
-		if !ok {
-			jsonErr = btcjson.Error{
-				Code:    btcjson.ErrMisc.Code,
-				Message: err.Error(),
-			}
-		}
-		reply.Error = &jsonErr
-		mreply, _ := json.Marshal(reply)
-		walletNotification <- mreply
-		return err
-	}
-
-	id := cmd.Id()
-	reply.Id = &id
-
-	wsHandler, ok := wsHandlers[cmd.Method()]
-	if !ok {
-		reply.Error = &btcjson.ErrMethodNotFound
-		mreply, _ := json.Marshal(reply)
-		walletNotification <- mreply
-		return btcjson.ErrMethodNotFound
-	}
-
-	if err := wsHandler(s, cmd, walletNotification, rc); err != nil {
-		jsonErr, ok := err.(btcjson.Error)
-		if ok {
-			reply.Error = &jsonErr
-			mreply, _ := json.Marshal(reply)
-			walletNotification <- mreply
-			return errors.New(jsonErr.Message)
-		}
-
-		// In the case where we did not have a btcjson
-		// error to begin with, make a new one to send,
-		// but this really should not happen.
-		jsonErr = btcjson.Error{
-			Code:    btcjson.ErrInternal.Code,
-			Message: err.Error(),
-		}
-		reply.Error = &jsonErr
-		mreply, _ := json.Marshal(reply)
-		walletNotification <- mreply
-		return err
-	}
-	return nil
-}
-
 // getDifficultyRatio returns the proof-of-work difficulty as a multiple of the
 // minimum difficulty using the passed bits field from the header of a block.
 func getDifficultyRatio(bits uint32) float64 {
@@ -1261,24 +1227,28 @@ func (s *rpcServer) walletReqsNotifications(ws *websocket.Conn) {
 
 // websocketJSONHandler parses and handles a marshalled json message,
 // sending the marshalled reply to a wallet notification channel.
-func (s *rpcServer) websocketJSONHandler(walletNotification chan []byte, rc *requestContexts, msg []byte) {
-	s.wg.Add(1)
-	reply, err := jsonRead(msg, s, walletNotification)
-	s.wg.Done()
+func (s *rpcServer) websocketJSONHandler(walletNotification chan []byte,
+	rc *requestContexts, msg []byte) {
 
-	if err != btcjson.ErrMethodNotFound {
-		replyBytes, err := json.Marshal(reply)
-		if err != nil {
-			log.Errorf("RPCS: Error marshalling reply: %v", err)
+	s.wg.Add(1)
+	defer s.wg.Done()
+
+	cmd, jsonErr := parseCmd(msg)
+	if jsonErr != nil {
+		var reply btcjson.Reply
+		if cmd != nil {
+			// Unmarshaling at least a valid JSON-RPC message succeeded.
+			// Use the provided id for errors.
+			id := cmd.Id()
+			reply.Id = &id
 		}
-		walletNotification <- replyBytes
+		reply.Error = jsonErr
+		mreply, _ := json.Marshal(reply)
+		walletNotification <- mreply
 		return
 	}
 
-	// Try websocket extensions
-	s.wg.Add(1)
-	err = jsonWSRead(msg, s, walletNotification, rc)
-	s.wg.Done()
+	respondToAnyCmd(cmd, s, walletNotification, rc)
 }
 
 // NotifyBlockConnected creates and marshalls a JSON message to notify
