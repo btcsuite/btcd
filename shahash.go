@@ -18,7 +18,7 @@ const MaxHashStringSize = HashSize * 2
 
 // ErrHashStrSize describes an error that indicates the caller specified a hash
 // string that has too many characters.
-var ErrHashStrSize = fmt.Errorf("Max hash length is %v chars", MaxHashStringSize)
+var ErrHashStrSize = fmt.Errorf("max hash length is %v chars", MaxHashStringSize)
 
 // ShaHash is used in several of the bitcoin messages and common structures.  It
 // typically represents the double sha256 of data.

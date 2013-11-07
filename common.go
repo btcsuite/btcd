@@ -140,7 +140,7 @@ func readElements(r io.Reader, elements ...interface{}) error {
 func writeElement(w io.Writer, element interface{}) error {
 	var scratch [8]byte
 
-	// Attempt to read the element based on the concrete type via fast
+	// Attempt to write the element based on the concrete type via fast
 	// type assertions first.
 	switch e := element.(type) {
 	case int32:
@@ -238,6 +238,8 @@ func writeElement(w io.Writer, element interface{}) error {
 		return nil
 	}
 
+	// Fall back to the slower binary.Write if a fast path was not available
+	// above.
 	return binary.Write(w, binary.LittleEndian, element)
 }
 

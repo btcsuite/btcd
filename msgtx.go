@@ -144,7 +144,7 @@ func (msg *MsgTx) AddTxOut(to *TxOut) {
 }
 
 // TxSha generates the ShaHash name for the transaction.
-func (tx *MsgTx) TxSha() (ShaHash, error) {
+func (msg *MsgTx) TxSha() (ShaHash, error) {
 	// Encode the transaction and calculate double sha256 on the result.
 	// Ignore the error returns since the only way the encode could fail
 	// is being out of memory or due to nil pointers, both of which would
@@ -153,7 +153,7 @@ func (tx *MsgTx) TxSha() (ShaHash, error) {
 	// regardless of input.
 	var buf bytes.Buffer
 	var sha ShaHash
-	_ = tx.Serialize(&buf)
+	_ = msg.Serialize(&buf)
 	_ = sha.SetBytes(DoubleSha256(buf.Bytes()))
 
 	// Even though this function can't currently fail, it still returns
@@ -164,18 +164,18 @@ func (tx *MsgTx) TxSha() (ShaHash, error) {
 
 // Copy creates a deep copy of a transaction so that the original does not get
 // modified when the copy is manipulated.
-func (tx *MsgTx) Copy() *MsgTx {
+func (msg *MsgTx) Copy() *MsgTx {
 	// Create new tx and start by copying primitive values and making space
 	// for the transaction inputs and outputs.
 	newTx := MsgTx{
-		Version:  tx.Version,
-		TxIn:     make([]*TxIn, 0, len(tx.TxIn)),
-		TxOut:    make([]*TxOut, 0, len(tx.TxOut)),
-		LockTime: tx.LockTime,
+		Version:  msg.Version,
+		TxIn:     make([]*TxIn, 0, len(msg.TxIn)),
+		TxOut:    make([]*TxOut, 0, len(msg.TxOut)),
+		LockTime: msg.LockTime,
 	}
 
 	// Deep copy the old TxIn data.
-	for _, oldTxIn := range tx.TxIn {
+	for _, oldTxIn := range msg.TxIn {
 		// Deep copy the old previous outpoint.
 		oldOutPoint := oldTxIn.PreviousOutpoint
 		newOutPoint := OutPoint{}
@@ -202,7 +202,7 @@ func (tx *MsgTx) Copy() *MsgTx {
 	}
 
 	// Deep copy the old TxOut data.
-	for _, oldTxOut := range tx.TxOut {
+	for _, oldTxOut := range msg.TxOut {
 		// Deep copy the old PkScript
 		var newScript []byte
 		oldScript := oldTxOut.PkScript
