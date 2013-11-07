@@ -112,7 +112,7 @@ func (b *BlockChain) ProcessBlock(block *btcutil.Block) error {
 	}
 
 	// Perform preliminary sanity checks on the block and its transactions.
-	err = b.CheckBlockSanity(block)
+	err = CheckBlockSanity(block, b.chainParams().PowLimit)
 	if err != nil {
 		return err
 	}

@@ -15,16 +15,9 @@ import (
 )
 
 func TestCheckBlockSanity(t *testing.T) {
-	// Create a new database and chain instance to run tests against.
-	chain, teardownFunc, err := chainSetup("cbsanity")
-	if err != nil {
-		t.Errorf("Failed to setup chain instance: %v", err)
-		return
-	}
-	defer teardownFunc()
-
+	powLimit := btcchain.ChainParams(btcwire.MainNet).PowLimit
 	block := btcutil.NewBlock(&Block100000)
-	err = chain.CheckBlockSanity(block)
+	err := btcchain.CheckBlockSanity(block, powLimit)
 	if err != nil {
 		t.Errorf("CheckBlockSanity: %v", err)
 	}
