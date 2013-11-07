@@ -74,7 +74,7 @@ type peerState struct {
 	outboundPeers    *list.List
 	persistentPeers  *list.List
 	banned           map[string]time.Time
-	outboundGroups    map[string]int
+	outboundGroups   map[string]int
 	maxOutboundPeers int
 }
 

@@ -751,7 +751,7 @@ func handleSendRawTransaction(s *rpcServer, cmd btcjson.Cmd, walletNotification 
 	if err != nil {
 		err := btcjson.Error{
 			Code:    btcjson.ErrDeserialization.Code,
-			Message: "Unable to deserialize raw tx",
+			Message: "TX decode failed",
 		}
 		return nil, err
 	}
@@ -769,12 +769,12 @@ func handleSendRawTransaction(s *rpcServer, cmd btcjson.Cmd, walletNotification 
 		} else {
 			log.Errorf("RPCS: Failed to process transaction %v: %v",
 				tx.Sha(), err)
+			err = btcjson.Error{
+				Code:    btcjson.ErrDeserialization.Code,
+				Message: "TX rejected",
+			}
+			return nil, err
 		}
-		err = btcjson.Error{
-			Code:    btcjson.ErrDeserialization.Code,
-			Message: "Failed to process transaction",
-		}
-		return nil, err
 	}
 
 	// If called from websocket code, add a mined tx hashes
