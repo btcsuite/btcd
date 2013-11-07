@@ -108,7 +108,7 @@ func (msg *MsgGetHeaders) BtcEncode(w io.Writer, pver uint32) error {
 		}
 	}
 
-	err = writeElement(w, msg.HashStop)
+	err = writeElement(w, &msg.HashStop)
 	if err != nil {
 		return err
 	}
