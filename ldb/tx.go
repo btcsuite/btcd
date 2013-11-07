@@ -372,7 +372,6 @@ func (db *LevelDb) FetchTxBySha(txsha *btcwire.ShaHash) ([]*btcdb.TxListReply, e
 		if txerr != btcdb.TxShaMissing {
 			return []*btcdb.TxListReply{}, txerr
 		}
-		replylen++
 	}
 
 	sTxList, fSerr := db.getTxFullySpent(txsha)
