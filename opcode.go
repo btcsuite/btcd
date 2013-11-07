@@ -11,7 +11,6 @@ import (
 	"crypto/sha1"
 	"crypto/sha256"
 	"encoding/binary"
-	"errors"
 	"fmt"
 	"github.com/conformal/btcec"
 	"github.com/conformal/btcwire"
@@ -1667,7 +1666,8 @@ func opcodeCheckSig(op *parsedOpcode, s *Script) error {
 	// at least  1 byte for the below. btcec will check full length upon
 	// parsing the signature.
 	if len(sigStr) < 1 {
-		return errors.New("Short signature")
+		s.dstack.PushBool(false)
+		return nil
 	}
 
 	// Trim off hashtype from the signature string.
