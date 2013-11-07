@@ -54,6 +54,8 @@ type config struct {
 	RPCUser            string        `short:"u" long:"rpcuser" description:"Username for RPC connections"`
 	RPCPass            string        `short:"P" long:"rpcpass" default-mask:"-" description:"Password for RPC connections"`
 	RPCListeners       []string      `long:"rpclisten" description:"Listen for RPC connections on this interface/port (default no listening.  default port: 8334, testnet: 18334)"`
+	RPCCert            string        `long:"rpccert" description:"File containing the certificate file."`
+	RPCKey             string        `long:"rpckey" description:"File containing the certificate key."`
 	DisableRPC         bool          `long:"norpc" description:"Disable built-in RPC server -- NOTE: The RPC server is disabled by default if no rpcuser/rpcpass is specified"`
 	DisableDNSSeed     bool          `long:"nodnsseed" description:"Disable DNS seeding for peers"`
 	Proxy              string        `long:"proxy" description:"Connect via SOCKS5 proxy (eg. 127.0.0.1:9050)"`
@@ -338,6 +340,13 @@ func loadConfig() (*config, []string, error) {
 		cfg.RPCListeners = []string{
 			net.JoinHostPort("", activeNetParams.rpcPort),
 		}
+	}
+
+	if cfg.RPCKey == "" {
+		cfg.RPCKey = filepath.Join(cfg.DataDir, "rpc.key")
+	}
+	if cfg.RPCCert == "" {
+		cfg.RPCCert = filepath.Join(cfg.DataDir, "rpc.cert")
 	}
 
 	// Add default port to all listener addresses if needed and remove

@@ -7,6 +7,7 @@ import (
 	"github.com/conformal/btcjson"
 	"github.com/conformal/go-flags"
 	"github.com/davecgh/go-spew/spew"
+	"io/ioutil"
 	"os"
 	"sort"
 	"strconv"
@@ -17,6 +18,8 @@ type config struct {
 	RpcUser     string `short:"u" long:"rpcuser" description:"RPC username"`
 	RpcPassword string `short:"P" long:"rpcpass" description:"RPC password"`
 	RpcServer   string `short:"s" long:"rpcserver" description:"RPC server to connect to"`
+	RpcCert     string `short:"c" long:"rpccert" description:"RPC server certificate chain for validation"`
+	TlsSkipVerify bool `long:"skipverify" description:"Do not verify tls certificates (not recommended!)"`
 }
 
 // conversionHandler is a handler that is used to convert parameters from the
@@ -233,7 +236,23 @@ func makeVerifyChain(args []interface{}) (btcjson.Cmd, error) {
 // results for various error conditions.  It either returns a valid result or
 // an appropriate error.
 func send(cfg *config, msg []byte) (interface{}, error) {
-	reply, err := btcjson.RpcCommand(cfg.RpcUser, cfg.RpcPassword, cfg.RpcServer, msg)
+	var reply btcjson.Reply
+	var err error
+	if cfg.RpcCert != "" || cfg.TlsSkipVerify {
+		var pem []byte
+		if cfg.RpcCert != "" {
+			pem, err = ioutil.ReadFile(cfg.RpcCert)
+			if err != nil {
+				return nil, err
+			}
+		}
+		reply, err = btcjson.TlsRpcCommand(cfg.RpcUser,
+			cfg.RpcPassword, cfg.RpcServer, msg, pem,
+			cfg.TlsSkipVerify)
+	} else {
+		reply, err = btcjson.RpcCommand(cfg.RpcUser, cfg.RpcPassword,
+			cfg.RpcServer, msg)
+	}
 	if err != nil {
 		return nil, err
 	}
