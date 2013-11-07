@@ -727,6 +727,47 @@ var jsoncmdtests = []struct {
 		},
 	},
 	{
+		name: "basic listlockunspent",
+		f: func() (Cmd, error) {
+			return NewListLockUnspentCmd(float64(1))
+		},
+		result: &ListLockUnspentCmd{
+			id: float64(1),
+		},
+	},
+	{
+		name: "basic listreceivedbyaccount",
+		f: func() (Cmd, error) {
+			return NewListReceivedByAccountCmd(float64(1))
+		},
+		result: &ListReceivedByAccountCmd{
+			id:      float64(1),
+			MinConf: 1,
+		},
+	},
+	{
+		name: "basic listunspent",
+		f: func() (Cmd, error) {
+			return NewListUnspentCmd(float64(1))
+		},
+		result: &ListUnspentCmd{
+			id:      float64(1),
+			MinConf: 1,
+			MaxConf: 999999,
+		},
+	},
+	{
+		name: "basic listunspent + opts",
+		f: func() (Cmd, error) {
+			return NewListUnspentCmd(float64(1), 0, 6)
+		},
+		result: &ListUnspentCmd{
+			id:      float64(1),
+			MinConf: 0,
+			MaxConf: 6,
+		},
+	},
+	{
 		name: "basic lockunspent",
 		f: func() (Cmd, error) {
 			return NewLockUnspentCmd(float64(1), true)

@@ -4595,7 +4595,7 @@ func (cmd *LockUnspentCmd) UnmarshalJSON(b []byte) error {
 
 	unlock, ok := r.Params[0].(bool)
 	if !ok {
-		return errors.New("first parameter unlock must be a number")
+		return errors.New("first parameter unlock must be a bool")
 	}
 
 	optArgs := make([][]TransactionInput, 0, 1)
