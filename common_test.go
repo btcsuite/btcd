@@ -147,6 +147,73 @@ func TestElementWire(t *testing.T) {
 	}
 }
 
+// TestElementWireErrors performs negative tests against wire encode and decode
+// of various element types to confirm error paths work correctly.
+func TestElementWireErrors(t *testing.T) {
+	tests := []struct {
+		in       interface{} // Value to encode
+		max      int         // Max size of fixed buffer to induce errors
+		writeErr error       // Expected write error
+		readErr  error       // Expected read error
+	}{
+		{int32(1), 0, io.ErrShortWrite, io.EOF},
+		{uint32(256), 0, io.ErrShortWrite, io.EOF},
+		{int64(65536), 0, io.ErrShortWrite, io.EOF},
+		{[4]byte{0x01, 0x02, 0x03, 0x04}, 0, io.ErrShortWrite, io.EOF},
+		{
+			[btcwire.CommandSize]byte{
+				0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08,
+				0x09, 0x0a, 0x0b, 0x0c,
+			},
+			0, io.ErrShortWrite, io.EOF,
+		},
+		{
+			[16]byte{
+				0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08,
+				0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f, 0x10,
+			},
+			0, io.ErrShortWrite, io.EOF,
+		},
+		{
+			(*btcwire.ShaHash)(&[btcwire.HashSize]byte{ // Make go vet happy.
+				0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08,
+				0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f, 0x10,
+				0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17, 0x18,
+				0x19, 0x1a, 0x1b, 0x1c, 0x1d, 0x1e, 0x1f, 0x20,
+			}),
+			0, io.ErrShortWrite, io.EOF,
+		},
+		{btcwire.ServiceFlag(btcwire.SFNodeNetwork), 0, io.ErrShortWrite, io.EOF},
+		{btcwire.InvType(btcwire.InvTypeTx), 0, io.ErrShortWrite, io.EOF},
+		{btcwire.BitcoinNet(btcwire.MainNet), 0, io.ErrShortWrite, io.EOF},
+	}
+
+	t.Logf("Running %d tests", len(tests))
+	for i, test := range tests {
+		// Encode to wire format.
+		w := newFixedWriter(test.max)
+		err := btcwire.TstWriteElement(w, test.in)
+		if err != test.writeErr {
+			t.Errorf("writeElement #%d wrong error got: %v, want: %v",
+				i, err, test.writeErr)
+			continue
+		}
+
+		// Decode from wire format.
+		r := newFixedReader(test.max, nil)
+		val := test.in
+		if reflect.ValueOf(test.in).Kind() != reflect.Ptr {
+			val = reflect.New(reflect.TypeOf(test.in)).Interface()
+		}
+		err = btcwire.TstReadElement(r, val)
+		if err != test.readErr {
+			t.Errorf("readElement #%d wrong error got: %v, want: %v",
+				i, err, test.readErr)
+			continue
+		}
+	}
+}
+
 // TestVarIntWire tests wire encode and decode for variable length integers.
 func TestVarIntWire(t *testing.T) {
 	pver := btcwire.ProtocolVersion
