@@ -51,17 +51,16 @@ var commandHandlers = map[string]*handlerData{
 	"addnode":              &handlerData{2, 0, displaySpewDump, nil, makeAddNode, "<ip> <add/remove/onetry>"},
 	"decoderawtransaction": &handlerData{1, 0, displaySpewDump, nil, makeDecodeRawTransaction, "<txhash>"},
 	"getbestblockhash":     &handlerData{0, 0, displayGeneric, nil, makeGetBestBlockHash, ""},
-	"getblock": &handlerData{1, 0, displaySpewDump, nil, makeGetBlock,
-		"<blockhash>"},
-	"getblockcount":      &handlerData{0, 0, displayFloat64, nil, makeGetBlockCount, ""},
-	"getblockhash":       &handlerData{1, 0, displayGeneric, []conversionHandler{toInt}, makeGetBlockHash, "<blocknumber>"},
-	"getconnectioncount": &handlerData{0, 0, displayFloat64, nil, makeGetConnectionCount, ""},
-	"getdifficulty":      &handlerData{0, 0, displayFloat64, nil, makeGetDifficulty, ""},
-	"getgenerate":        &handlerData{0, 0, displayGeneric, nil, makeGetGenerate, ""},
-	"getpeerinfo":        &handlerData{0, 0, displaySpewDump, nil, makeGetPeerInfo, ""},
-	"getrawmempool":      &handlerData{0, 0, displaySpewDump, nil, makeGetRawMempool, ""},
-	"getrawtransaction":  &handlerData{1, 1, displaySpewDump, []conversionHandler{nil, toInt}, makeGetRawTransaction, "<txhash> [verbose=0]"},
-	"stop":               &handlerData{0, 0, displayGeneric, nil, makeStop, ""},
+	"getblock":             &handlerData{1, 0, displaySpewDump, nil, makeGetBlock, "<blockhash>"},
+	"getblockcount":        &handlerData{0, 0, displayFloat64, nil, makeGetBlockCount, ""},
+	"getblockhash":         &handlerData{1, 0, displayGeneric, []conversionHandler{toInt64}, makeGetBlockHash, "<blocknumber>"},
+	"getconnectioncount":   &handlerData{0, 0, displayFloat64, nil, makeGetConnectionCount, ""},
+	"getdifficulty":        &handlerData{0, 0, displayFloat64, nil, makeGetDifficulty, ""},
+	"getgenerate":          &handlerData{0, 0, displayGeneric, nil, makeGetGenerate, ""},
+	"getpeerinfo":          &handlerData{0, 0, displaySpewDump, nil, makeGetPeerInfo, ""},
+	"getrawmempool":        &handlerData{0, 0, displaySpewDump, nil, makeGetRawMempool, ""},
+	"getrawtransaction":    &handlerData{1, 1, displaySpewDump, []conversionHandler{nil, toInt}, makeGetRawTransaction, "<txhash> [verbose=0]"},
+	"stop":                 &handlerData{0, 0, displayGeneric, nil, makeStop, ""},
 }
 
 // toInt attempts to convert the passed string to an integer.  It returns the
@@ -70,6 +69,19 @@ var commandHandlers = map[string]*handlerData{
 // integer.
 func toInt(val string) (interface{}, error) {
 	idx, err := strconv.Atoi(val)
+	if err != nil {
+		return nil, err
+	}
+
+	return idx, nil
+}
+
+// toInt64 attempts to convert the passed string to an int64.  It returns the
+// integer packed into an interface so it can be used in the calls which expect
+// interfaces.  An error will be returned if the string can't be converted to an
+// integer.
+func toInt64(val string) (interface{}, error) {
+	idx, err := strconv.ParseInt(val, 10, 64)
 	if err != nil {
 		return nil, err
 	}
