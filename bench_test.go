@@ -272,3 +272,12 @@ func BenchmarkReadBlockHeader(b *testing.B) {
 		btcwire.TstReadBlockHeader(bytes.NewBuffer(buf), 0, &header)
 	}
 }
+
+// BenchmarkWriteBlockHeader performs a benchmark on how long it takes to
+// serialize a block header.
+func BenchmarkWriteBlockHeader(b *testing.B) {
+	header := blockOne.Header
+	for i := 0; i < b.N; i++ {
+		btcwire.TstWriteBlockHeader(ioutil.Discard, 0, &header)
+	}
+}
