@@ -19,10 +19,26 @@ import (
 // the test package.
 const MaxMessagePayload uint32 = maxMessagePayload
 
+// CommandSize makes the internal commandSize constant available to the test
+// package.
+const CommandSize = commandSize
+
 // TstRandomUint64 makes the internal randomUint64 function available to the
 // test package.
 func TstRandomUint64(r io.Reader) (uint64, error) {
 	return randomUint64(r)
+}
+
+// TstReadElement makes the internal readElement function available to the
+// test package.
+func TstReadElement(r io.Reader, element interface{}) error {
+	return readElement(r, element)
+}
+
+// TstWriteElement makes the internal writeElement function available to the
+// test package.
+func TstWriteElement(w io.Writer, element interface{}) error {
+	return writeElement(w, element)
 }
 
 // TstReadVarInt makes the internal readVarInt function available to the

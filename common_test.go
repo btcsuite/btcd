@@ -32,6 +32,121 @@ func (r *fakeRandReader) Read(p []byte) (int, error) {
 	return n, r.err
 }
 
+// TestElementWire tests wire encode and decode for various element types.  This
+// is mainly to test the "fast" paths in readElement and writeElement which use
+// type assertions to avoid reflection when possible.
+func TestElementWire(t *testing.T) {
+	type writeElementReflect int32
+
+	tests := []struct {
+		in  interface{} // Value to encode
+		buf []byte      // Wire encoding
+	}{
+		{int32(1), []byte{0x01, 0x00, 0x00, 0x00}},
+		{uint32(256), []byte{0x00, 0x01, 0x00, 0x00}},
+		{
+			int64(65536),
+			[]byte{0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00},
+		},
+		{
+			uint64(4294967296),
+			[]byte{0x00, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00},
+		},
+		{
+			[4]byte{0x01, 0x02, 0x03, 0x04},
+			[]byte{0x01, 0x02, 0x03, 0x04},
+		},
+		{
+			[btcwire.CommandSize]byte{
+				0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08,
+				0x09, 0x0a, 0x0b, 0x0c,
+			},
+			[]byte{
+				0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08,
+				0x09, 0x0a, 0x0b, 0x0c,
+			},
+		},
+		{
+			[16]byte{
+				0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08,
+				0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f, 0x10,
+			},
+			[]byte{
+				0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08,
+				0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f, 0x10,
+			},
+		},
+		{
+			(*btcwire.ShaHash)(&[btcwire.HashSize]byte{ // Make go vet happy.
+				0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08,
+				0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f, 0x10,
+				0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17, 0x18,
+				0x19, 0x1a, 0x1b, 0x1c, 0x1d, 0x1e, 0x1f, 0x20,
+			}),
+			[]byte{
+				0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08,
+				0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f, 0x10,
+				0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17, 0x18,
+				0x19, 0x1a, 0x1b, 0x1c, 0x1d, 0x1e, 0x1f, 0x20,
+			},
+		},
+		{
+			btcwire.ServiceFlag(btcwire.SFNodeNetwork),
+			[]byte{0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00},
+		},
+		{
+			btcwire.InvType(btcwire.InvTypeTx),
+			[]byte{0x01, 0x00, 0x00, 0x00},
+		},
+		{
+			btcwire.BitcoinNet(btcwire.MainNet),
+			[]byte{0xf9, 0xbe, 0xb4, 0xd9},
+		},
+		// Type not supported by the "fast" path and requires reflection.
+		{
+			writeElementReflect(1),
+			[]byte{0x01, 0x00, 0x00, 0x00},
+		},
+	}
+
+	t.Logf("Running %d tests", len(tests))
+	for i, test := range tests {
+		// Write to wire format.
+		var buf bytes.Buffer
+		err := btcwire.TstWriteElement(&buf, test.in)
+		if err != nil {
+			t.Errorf("writeElement #%d error %v", i, err)
+			continue
+		}
+		if !bytes.Equal(buf.Bytes(), test.buf) {
+			t.Errorf("writeElement #%d\n got: %s want: %s", i,
+				spew.Sdump(buf.Bytes()), spew.Sdump(test.buf))
+			continue
+		}
+
+		// Read from wire format.
+		rbuf := bytes.NewBuffer(test.buf)
+		val := test.in
+		if reflect.ValueOf(test.in).Kind() != reflect.Ptr {
+			val = reflect.New(reflect.TypeOf(test.in)).Interface()
+		}
+		err = btcwire.TstReadElement(rbuf, val)
+		if err != nil {
+			t.Errorf("readElement #%d error %v", i, err)
+			continue
+		}
+		ival := val
+		if reflect.ValueOf(test.in).Kind() != reflect.Ptr {
+			ival = reflect.Indirect(reflect.ValueOf(val)).Interface()
+		}
+		if !reflect.DeepEqual(ival, test.in) {
+			t.Errorf("readElement #%d\n got: %s want: %s", i,
+				spew.Sdump(ival), spew.Sdump(test.in))
+			continue
+		}
+	}
+}
+
 // TestVarIntWire tests wire encode and decode for variable length integers.
 func TestVarIntWire(t *testing.T) {
 	pver := btcwire.ProtocolVersion
