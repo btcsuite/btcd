@@ -1662,6 +1662,13 @@ func opcodeCheckSig(op *parsedOpcode, s *Script) error {
 		return err
 	}
 
+	// Signature actually needs needs to be longer than this, but we need
+	// at least  1 byte for the below. btcec will check full length upon
+	// parsing the signature.
+	if len(sigStr) < 1 {
+		return errors.New("Short signature")
+	}
+
 	// Trim off hashtype from the signature string.
 	hashType := sigStr[len(sigStr)-1]
 	sigStr = sigStr[:len(sigStr)-1]
