@@ -11,6 +11,7 @@ import (
 	"crypto/sha1"
 	"crypto/sha256"
 	"encoding/binary"
+	"errors"
 	"fmt"
 	"github.com/conformal/btcec"
 	"github.com/conformal/btcwire"
