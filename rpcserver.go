@@ -670,7 +670,7 @@ func handleGetRawTransaction(s *rpcServer, cmd btcjson.Cmd, walletNotification c
 		// this point.
 		txSha, _ := btcwire.NewShaHashFromStr(c.Txid)
 		txList, err := s.server.db.FetchTxBySha(txSha)
-		if err != nil {
+		if err != nil || len(txList) == 0 {
 			log.Errorf("RPCS: Error fetching tx: %v", err)
 			return nil, btcjson.ErrNoTxInfo
 		}
