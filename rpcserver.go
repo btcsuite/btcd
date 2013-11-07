@@ -515,7 +515,7 @@ func handleGetBestBlockHash(s *rpcServer, cmd btcjson.Cmd, walletNotification ch
 		return nil, btcjson.ErrBestBlockHash
 	}
 
-	return sha.String, nil
+	return sha.String(), nil
 }
 
 // handleGetBlock implements the getblock command.
