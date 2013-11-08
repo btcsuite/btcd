@@ -24,14 +24,14 @@ var (
 const (
 	// BlockConnectedNtfnId is the id of the btcd blockconnected
 	// notification.
-	BlockConnectedNtfnId    = "btcd:blockconnected"
+	BlockConnectedNtfnId = "btcd:blockconnected"
 
 	// BlockDisconnectedNtfnId is the id of the btcd blockdisconnected
 	// notification.
 	BlockDisconnectedNtfnId = "btcd:blockdisconnected"
 
 	//TxMinedNtfnId is the id of the btcd txmined notification.
-	TxMinedNtfnId           = "btcd:txmined"
+	TxMinedNtfnId = "btcd:txmined"
 )
 
 type newNtfnFn func() Notification
