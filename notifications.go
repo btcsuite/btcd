@@ -94,7 +94,7 @@ func NewBlockConnectedNtfn(hash string, height int32) *BlockConnectedNtfn {
 	}
 }
 
-// satisifies the Notification interface by returning the id of the
+// Id satisifies the Notification interface by returning the id of the
 // notification.
 func (n *BlockConnectedNtfn) Id() interface{} {
 	return BlockConnectedNtfnId
