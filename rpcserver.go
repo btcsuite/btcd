@@ -1262,38 +1262,20 @@ func (s *rpcServer) NotifyBlockConnected(block *btcutil.Block) {
 		return
 	}
 
-	var id interface{} = "btcd:blockconnected"
-	ntfn := btcjson.Reply{
-		Result: struct {
-			Hash     string   `json:"hash"`
-			Height   int64    `json:"height"`
-			MinedTXs []string `json:"minedtxs"`
-		}{
-			Hash:   hash.String(),
-			Height: block.Height(),
-		},
-		Id: &id,
-	}
-	m, _ := json.Marshal(ntfn)
-	s.ws.walletNotificationMaster <- m
+	// TODO: remove int32 type conversion.
+	ntfn := btcws.NewBlockConnectedNtfn(hash.String(),
+		int32(block.Height()))
+	mntfn, _ := json.Marshal(ntfn)
+	s.ws.walletNotificationMaster <- mntfn
 
 	// Inform any interested parties about txs mined in this block.
 	for _, tx := range block.Transactions() {
 		if clist, ok := s.ws.minedTxNotifications[*tx.Sha()]; ok {
 			for e := clist.Front(); e != nil; e = e.Next() {
 				ctx := e.Value.(*notificationCtx)
-
-				var id interface{} = "btcd:txmined"
-				reply := btcjson.Reply{
-					Result: tx.Sha().String(),
-					Id:     &id,
-				}
-				replyBytes, err := json.Marshal(reply)
-				if err != nil {
-					log.Errorf("RPCS: Unable to marshal mined tx notification: %v", err)
-					continue
-				}
-				ctx.connection <- replyBytes
+				ntfn := btcws.NewTxMinedNtfn(tx.Sha().String())
+				mntfn, _ := json.Marshal(ntfn)
+				ctx.connection <- mntfn
 				s.ws.RemoveMinedTxRequest(ctx.connection, ctx.rc,
 					tx.Sha())
 			}
@@ -1306,24 +1288,17 @@ func (s *rpcServer) NotifyBlockConnected(block *btcutil.Block) {
 // of a new block disconnected from the main chain.  The notification is sent
 // to each connected wallet.
 func (s *rpcServer) NotifyBlockDisconnected(block *btcutil.Block) {
-	var id interface{} = "btcd:blockdisconnected"
 	hash, err := block.Sha()
 	if err != nil {
 		log.Error("Bad block; connected block notification dropped.")
 		return
 	}
-	ntfn := btcjson.Reply{
-		Result: struct {
-			Hash   string `json:"hash"`
-			Height int64  `json:"height"`
-		}{
-			Hash:   hash.String(),
-			Height: block.Height(),
-		},
-		Id: &id,
-	}
-	m, _ := json.Marshal(ntfn)
-	s.ws.walletNotificationMaster <- m
+
+	// TODO: remove int32 type conversion.
+	ntfn := btcws.NewBlockDisconnectedNtfn(hash.String(),
+		int32(block.Height()))
+	mntfn, _ := json.Marshal(ntfn)
+	s.ws.walletNotificationMaster <- mntfn
 }
 
 // NotifyBlockTXs creates and marshals a JSON message to notify wallets
