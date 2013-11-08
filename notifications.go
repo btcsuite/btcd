@@ -217,7 +217,7 @@ func (n *TxMinedNtfn) Id() interface{} {
 func (n *TxMinedNtfn) MarshalJSON() ([]byte, error) {
 	id := n.Id()
 	reply := btcjson.Reply{
-		Result: n.Hash,
+		Result: *n,
 		Id:     &id,
 	}
 	return json.Marshal(reply)
