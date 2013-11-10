@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"github.com/conformal/btcdb"
 	_ "github.com/conformal/btcdb/ldb"
+	"github.com/conformal/btcutil"
 	"github.com/conformal/btcwire"
 	"github.com/conformal/go-flags"
 	"net"
@@ -20,6 +21,7 @@ import (
 
 const (
 	defaultConfigFilename = "btcd.conf"
+	defaultDataDirname    = "data"
 	defaultLogLevel       = "info"
 	defaultBtcnet         = btcwire.MainNet
 	defaultMaxPeers       = 125
@@ -29,8 +31,9 @@ const (
 )
 
 var (
-	defaultConfigFile = filepath.Join(btcdHomeDir(), defaultConfigFilename)
-	defaultDataDir    = filepath.Join(btcdHomeDir(), "data")
+	btcdHomeDir       = btcutil.AppDataDir("btcd", false)
+	defaultConfigFile = filepath.Join(btcdHomeDir, defaultConfigFilename)
+	defaultDataDir    = filepath.Join(btcdHomeDir, defaultDataDirname)
 	knownDbTypes      = btcdb.SupportedDBs()
 )
 
@@ -65,30 +68,12 @@ type config struct {
 	DebugLevel         string        `short:"d" long:"debuglevel" description:"Logging level {trace, debug, info, warn, error, critical}"`
 }
 
-// btcdHomeDir returns an OS appropriate home directory for btcd.
-func btcdHomeDir() string {
-	// Search for Windows APPDATA first.  This won't exist on POSIX OSes.
-	appData := os.Getenv("APPDATA")
-	if appData != "" {
-		return filepath.Join(appData, "btcd")
-	}
-
-	// Fall back to standard HOME directory that works for most POSIX OSes.
-	home := os.Getenv("HOME")
-	if home != "" {
-		return filepath.Join(home, ".btcd")
-	}
-
-	// In the worst case, use the current directory.
-	return "."
-}
-
 // cleanAndExpandPath expands environement variables and leading ~ in the
 // passed path, cleans the result, and returns it.
 func cleanAndExpandPath(path string) string {
 	// Expand initial ~ to OS specific home directory.
 	if strings.HasPrefix(path, "~") {
-		homeDir := filepath.Dir(btcdHomeDir())
+		homeDir := filepath.Dir(btcdHomeDir)
 		path = strings.Replace(path, "~", homeDir, 1)
 	}
 

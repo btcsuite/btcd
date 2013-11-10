@@ -5,9 +5,45 @@
 package main
 
 import (
+	"io"
 	"os"
 	"path/filepath"
 )
+
+// dirEmpty returns whether or not the specified directory path is empty.
+func dirEmpty(dirPath string) (bool, error) {
+	f, err := os.Open(dirPath)
+	defer f.Close()
+
+	// Read the names of a max of one entry from the directory.  When the
+	// directory is empty, an io.EOF error will be returned, so allow it.
+	names, err := f.Readdirnames(1)
+	if err != nil && err != io.EOF {
+		return false, err
+	}
+
+	return len(names) == 0, nil
+}
+
+// oldBtcdHomeDir returns the OS specific home directory btcd used prior to
+// version 0.3.3.  This has since been replaced with btcutil.AppDataDir, but
+// this function is still provided for the automatic upgrade path.
+func oldBtcdHomeDir() string {
+	// Search for Windows APPDATA first.  This won't exist on POSIX OSes.
+	appData := os.Getenv("APPDATA")
+	if appData != "" {
+		return filepath.Join(appData, "btcd")
+	}
+
+	// Fall back to standard HOME directory that works for most POSIX OSes.
+	home := os.Getenv("HOME")
+	if home != "" {
+		return filepath.Join(home, ".btcd")
+	}
+
+	// In the worst case, use the current directory.
+	return "."
+}
 
 // upgradeDBPathNet moves the database for a specific network from its
 // location prior to btcd version 0.2.0 and uses heuristics to ascertain the old
@@ -56,7 +92,7 @@ func upgradeDBPaths() error {
 	// their names were suffixed by "testnet" and "regtest" for their
 	// respective networks.  Check for the old database and update it to the
 	// new path introduced with version 0.2.0 accodingly.
-	oldDbRoot := filepath.Join(btcdHomeDir(), "db")
+	oldDbRoot := filepath.Join(oldBtcdHomeDir(), "db")
 	upgradeDBPathNet(filepath.Join(oldDbRoot, "btcd.db"), "mainnet")
 	upgradeDBPathNet(filepath.Join(oldDbRoot, "btcd_testnet.db"), "testnet")
 	upgradeDBPathNet(filepath.Join(oldDbRoot, "btcd_regtest.db"), "regtest")
@@ -70,7 +106,72 @@ func upgradeDBPaths() error {
 	return nil
 }
 
+// upgradeDataPaths moves the application data from its location prior to btcd
+// version 0.3.3 to its new location.
+func upgradeDataPaths() error {
+	// No need to migrate if the old and new home paths are the same.
+	oldHomePath := oldBtcdHomeDir()
+	newHomePath := btcdHomeDir
+	if oldHomePath == newHomePath {
+		return nil
+	}
+
+	// Only migrate if the old path exists and the new one doesn't.
+	if fileExists(oldHomePath) && !fileExists(newHomePath) {
+		// Create the new path.
+		log.Infof("Migrating application home path from '%s' to '%s'",
+			oldHomePath, newHomePath)
+		err := os.MkdirAll(newHomePath, 0700)
+		if err != nil {
+			return err
+		}
+
+		// Move old btcd.conf into new location if needed.
+		oldConfPath := filepath.Join(oldHomePath, defaultConfigFilename)
+		newConfPath := filepath.Join(newHomePath, defaultConfigFilename)
+		if fileExists(oldConfPath) && !fileExists(newConfPath) {
+			err := os.Rename(oldConfPath, newConfPath)
+			if err != nil {
+				return err
+			}
+		}
+
+		// Move old data directory into new location if needed.
+		oldDataPath := filepath.Join(oldHomePath, defaultDataDirname)
+		newDataPath := filepath.Join(newHomePath, defaultDataDirname)
+		if fileExists(oldDataPath) && !fileExists(newDataPath) {
+			err := os.Rename(oldDataPath, newDataPath)
+			if err != nil {
+				return err
+			}
+		}
+
+		// Remove the old home if it is empty or show a warning if not.
+		ohpEmpty, err := dirEmpty(oldHomePath)
+		if err != nil {
+			return err
+		}
+		if ohpEmpty {
+			err := os.Remove(oldHomePath)
+			if err != nil {
+				return err
+			}
+		} else {
+			log.Warnf("Not removing '%s' since it contains files "+
+				"not created by this application.  You may "+
+				"want to manually move them or delete them.",
+				oldHomePath)
+		}
+	}
+
+	return nil
+}
+
 // doUpgrades performs upgrades to btcd as new versions require it.
 func doUpgrades() error {
-	return upgradeDBPaths()
+	err := upgradeDBPaths()
+	if err != nil {
+		return err
+	}
+	return upgradeDataPaths()
 }
