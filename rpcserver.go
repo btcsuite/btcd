@@ -1256,6 +1256,7 @@ func (s *rpcServer) websocketJSONHandler(walletNotification chan []byte,
 // to each connected wallet.
 func (s *rpcServer) NotifyBlockConnected(block *btcutil.Block) {
 	s.ws.RLock()
+	defer s.ws.RUnlock()
 	hash, err := block.Sha()
 	if err != nil {
 		log.Error("Bad block; connected block notification dropped.")
@@ -1281,7 +1282,6 @@ func (s *rpcServer) NotifyBlockConnected(block *btcutil.Block) {
 			}
 		}
 	}
-	s.ws.RUnlock()
 }
 
 // NotifyBlockDisconnected creates and marshals a JSON message to notify
@@ -1366,7 +1366,8 @@ func (s *rpcServer) newBlockNotifyCheckTxIn(tx *btcutil.Tx) {
 // newBlockNotifyCheckTxOut is a helper function to iterate through
 // each transaction output of a new block and perform any checks and
 // notify listening frontends when necessary.
-func (s *rpcServer) newBlockNotifyCheckTxOut(block *btcutil.Block, tx *btcutil.Tx) {
+func (s *rpcServer) newBlockNotifyCheckTxOut(block *btcutil.Block,
+	tx *btcutil.Tx) {
 
 	for i, txout := range tx.MsgTx().TxOut {
 		_, txaddrhash, err := btcscript.ScriptToAddrHash(txout.PkScript)
