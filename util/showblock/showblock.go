@@ -36,7 +36,11 @@ type config struct {
 	ShowTx     bool   `short:"t" description:"Show transaction"`
 }
 
-var log seelog.LoggerInterface
+var (
+	btcdHomeDir    = btcutil.AppDataDir("btcd", false)
+	defaultDataDir = filepath.Join(btcdHomeDir, "data")
+	log            seelog.LoggerInterface
+)
 
 const (
 	ArgSha = iota
@@ -48,7 +52,7 @@ func main() {
 
 	cfg := config{
 		DbType:  "leveldb",
-		DataDir: filepath.Join(btcdHomeDir(), "data"),
+		DataDir: defaultDataDir,
 	}
 	parser := flags.NewParser(&cfg, flags.Default)
 	_, err := parser.Parse()

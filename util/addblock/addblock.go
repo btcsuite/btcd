@@ -31,11 +31,15 @@ type config struct {
 	InFile   string `short:"i" long:"infile" description:"File containing the block(s)" required:"true"`
 }
 
-var log seelog.LoggerInterface
-
 const (
 	ArgSha = iota
 	ArgHeight
+)
+
+var (
+	btcdHomeDir    = btcutil.AppDataDir("btcd", false)
+	defaultDataDir = filepath.Join(btcdHomeDir, "data")
+	log            seelog.LoggerInterface
 )
 
 type bufQueue struct {
@@ -52,7 +56,7 @@ type blkQueue struct {
 func main() {
 	cfg := config{
 		DbType:  "leveldb",
-		DataDir: filepath.Join(btcdHomeDir(), "data"),
+		DataDir: defaultDataDir,
 	}
 	parser := flags.NewParser(&cfg, flags.Default)
 	_, err := parser.Parse()
@@ -245,22 +249,4 @@ func newLogger(level string, prefix string) seelog.LoggerInterface {
 	}
 
 	return logger
-}
-
-// btcdHomeDir returns an OS appropriate home directory for btcd.
-func btcdHomeDir() string {
-	// Search for Windows APPDATA first.  This won't exist on POSIX OSes.
-	appData := os.Getenv("APPDATA")
-	if appData != "" {
-		return filepath.Join(appData, "btcd")
-	}
-
-	// Fall back to standard HOME directory that works for most POSIX OSes.
-	home := os.Getenv("HOME")
-	if home != "" {
-		return filepath.Join(home, ".btcd")
-	}
-
-	// In the worst case, use the current directory.
-	return "."
 }

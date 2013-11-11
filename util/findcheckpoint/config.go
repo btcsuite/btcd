@@ -23,7 +23,8 @@ const (
 )
 
 var (
-	defaultDataDir = filepath.Join(btcdHomeDir(), "data")
+	btcdHomeDir    = btcutil.AppDataDir("btcd", false)
+	defaultDataDir = filepath.Join(btcdHomeDir, "data")
 	knownDbTypes   = btcdb.SupportedDBs()
 	activeNetwork  = btcwire.MainNet
 )
@@ -37,24 +38,6 @@ type config struct {
 	TestNet3      bool   `long:"testnet" description:"Use the test network"`
 	NumCandidates int    `short:"n" long:"numcandidates" description:"Max num of checkpoint candidates to show {1-20}"`
 	UseGoOutput   bool   `short:"g" long:"gooutput" description:"Display the candidates using Go syntax that is ready to insert into the btcchain checkpoint list"`
-}
-
-// btcdHomeDir returns an OS appropriate home directory for btcd.
-func btcdHomeDir() string {
-	// Search for Windows APPDATA first.  This won't exist on POSIX OSes.
-	appData := os.Getenv("APPDATA")
-	if appData != "" {
-		return filepath.Join(appData, "btcd")
-	}
-
-	// Fall back to standard HOME directory that works for most POSIX OSes.
-	home := os.Getenv("HOME")
-	if home != "" {
-		return filepath.Join(home, ".btcd")
-	}
-
-	// In the worst case, use the current directory.
-	return "."
 }
 
 // validDbType returns whether or not dbType is a supported database type.
