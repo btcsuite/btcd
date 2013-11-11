@@ -207,6 +207,12 @@ func (r *wsContext) RemoveMinedTxRequest(walletNotification chan []byte, rc *req
 	r.Lock()
 	defer r.Unlock()
 
+	r.removeMinedTxRequest(walletNotification, rc, txID)
+}
+
+// removeMinedTxRequest removes request contexts for notifications of a
+// mined transaction without grabbing any locks.
+func (r *wsContext) removeMinedTxRequest(walletNotification chan []byte, rc *requestContexts, txID *btcwire.ShaHash) {
 	r.removeGlobalMinedTxRequest(walletNotification, txID)
 	delete(rc.minedTxRequests, *txID)
 }
@@ -1255,8 +1261,6 @@ func (s *rpcServer) websocketJSONHandler(walletNotification chan []byte,
 // of a new block connected to the main chain.  The notification is sent
 // to each connected wallet.
 func (s *rpcServer) NotifyBlockConnected(block *btcutil.Block) {
-	s.ws.RLock()
-	defer s.ws.RUnlock()
 	hash, err := block.Sha()
 	if err != nil {
 		log.Error("Bad block; connected block notification dropped.")
@@ -1270,6 +1274,7 @@ func (s *rpcServer) NotifyBlockConnected(block *btcutil.Block) {
 	s.ws.walletNotificationMaster <- mntfn
 
 	// Inform any interested parties about txs mined in this block.
+	s.ws.Lock()
 	for _, tx := range block.Transactions() {
 		if clist, ok := s.ws.minedTxNotifications[*tx.Sha()]; ok {
 			for e := clist.Front(); e != nil; e = e.Next() {
@@ -1277,11 +1282,12 @@ func (s *rpcServer) NotifyBlockConnected(block *btcutil.Block) {
 				ntfn := btcws.NewTxMinedNtfn(tx.Sha().String())
 				mntfn, _ := json.Marshal(ntfn)
 				ctx.connection <- mntfn
-				s.ws.RemoveMinedTxRequest(ctx.connection, ctx.rc,
+				s.ws.removeMinedTxRequest(ctx.connection, ctx.rc,
 					tx.Sha())
 			}
 		}
 	}
+	s.ws.Unlock()
 }
 
 // NotifyBlockDisconnected creates and marshals a JSON message to notify
