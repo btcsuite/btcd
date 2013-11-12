@@ -45,6 +45,10 @@ const (
 	// bloom filtering related messages and extended the version message
 	// with a relay flag (pver >= BIP0037Version).
 	BIP0037Version uint32 = 70001
+
+	// RejectVersion is the protocol version which added a new reject
+	// message.
+	RejectVersion uint32 = 70002
 )
 
 // ServiceFlag identifies services supported by a bitcoin peer.

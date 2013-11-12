@@ -139,6 +139,15 @@ func readElement(r io.Reader, element interface{}) error {
 		}
 		*e = BloomUpdateType(b[0])
 		return nil
+
+	case *RejectCode:
+		b := scratch[0:1]
+		_, err := io.ReadFull(r, b)
+		if err != nil {
+			return err
+		}
+		*e = RejectCode(b[0])
+		return nil
 	}
 
 	// Fall back to the slower binary.Read if a fast path was not available
@@ -273,6 +282,15 @@ func writeElement(w io.Writer, element interface{}) error {
 		return nil
 
 	case BloomUpdateType:
+		b := scratch[0:1]
+		b[0] = uint8(e)
+		_, err := w.Write(b)
+		if err != nil {
+			return err
+		}
+		return nil
+
+	case RejectCode:
 		b := scratch[0:1]
 		b[0] = uint8(e)
 		_, err := w.Write(b)
