@@ -107,7 +107,9 @@ func (r *wsContext) AddTxRequest(walletNotification chan []byte, rc *requestCont
 
 func (r *wsContext) removeGlobalTxRequest(walletNotification chan []byte, addrhash string) {
 	clist := r.txNotifications[addrhash]
-	for e := clist.Front(); e != nil; e = e.Next() {
+	var enext *list.Element
+	for e := clist.Front(); e != nil; e = enext {
+		enext = e.Next()
 		ctx := e.Value.(*notificationCtx)
 		if ctx.connection == walletNotification {
 			clist.Remove(e)
@@ -142,7 +144,9 @@ func (r *wsContext) AddSpentRequest(walletNotification chan []byte, rc *requestC
 
 func (r *wsContext) removeGlobalSpentRequest(walletNotification chan []byte, op *btcwire.OutPoint) {
 	clist := r.spentNotifications[*op]
-	for e := clist.Front(); e != nil; e = e.Next() {
+	var enext *list.Element
+	for e := clist.Front(); e != nil; e = enext {
+		enext = e.Next()
 		ctx := e.Value.(*notificationCtx)
 		if ctx.connection == walletNotification {
 			clist.Remove(e)
@@ -188,7 +192,9 @@ func (r *wsContext) AddMinedTxRequest(walletNotification chan []byte, txID *btcw
 
 func (r *wsContext) removeGlobalMinedTxRequest(walletNotification chan []byte, txID *btcwire.ShaHash) {
 	clist := r.minedTxNotifications[*txID]
-	for e := clist.Front(); e != nil; e = e.Next() {
+	var enext *list.Element
+	for e := clist.Front(); e != nil; e = enext {
+		enext = e.Next()
 		ctx := e.Value.(*notificationCtx)
 		if ctx.connection == walletNotification {
 			clist.Remove(e)
@@ -1277,7 +1283,9 @@ func (s *rpcServer) NotifyBlockConnected(block *btcutil.Block) {
 	s.ws.Lock()
 	for _, tx := range block.Transactions() {
 		if clist, ok := s.ws.minedTxNotifications[*tx.Sha()]; ok {
-			for e := clist.Front(); e != nil; e = e.Next() {
+			var enext *list.Element
+			for e := clist.Front(); e != nil; e = enext {
+				enext = e.Next()
 				ctx := e.Value.(*notificationCtx)
 				ntfn := btcws.NewTxMinedNtfn(tx.Sha().String())
 				mntfn, _ := json.Marshal(ntfn)
@@ -1358,7 +1366,9 @@ func notifySpentData(ctx *notificationCtx, txhash *btcwire.ShaHash, index uint32
 func (s *rpcServer) newBlockNotifyCheckTxIn(tx *btcutil.Tx) {
 	for _, txin := range tx.MsgTx().TxIn {
 		if clist, ok := s.ws.spentNotifications[txin.PreviousOutpoint]; ok {
-			for e := clist.Front(); e != nil; e = e.Next() {
+			var enext *list.Element
+			for e := clist.Front(); e != nil; e = enext {
+				enext = e.Next()
 				ctx := e.Value.(*notificationCtx)
 				notifySpentData(ctx, &txin.PreviousOutpoint.Hash,
 					uint32(txin.PreviousOutpoint.Index), tx)
