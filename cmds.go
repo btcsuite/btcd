@@ -18,6 +18,9 @@ func init() {
 	btcjson.RegisterCustomCmd("rescan", parseRescanCmd)
 	btcjson.RegisterCustomCmd("notifynewtxs", parseNotifyNewTXsCmd)
 	btcjson.RegisterCustomCmd("notifyspent", parseNotifySpentCmd)
+	btcjson.RegisterCustomCmd("createencryptedwallet", parseCreateEncryptedWalletCmd)
+	btcjson.RegisterCustomCmd("getbalances", parseGetBalancesCmd)
+	btcjson.RegisterCustomCmd("walletislocked", parseWalletIsLockedCmd)
 }
 
 // GetCurrentNetCmd is a type handling custom marshaling and
@@ -460,6 +463,279 @@ func (cmd *NotifySpentCmd) UnmarshalJSON(b []byte) error {
 	}
 
 	concreteCmd, ok := newCmd.(*NotifySpentCmd)
+	if !ok {
+		return btcjson.ErrInternal
+	}
+	*cmd = *concreteCmd
+	return nil
+}
+
+// CreateEncryptedWalletCmd is a type handling custom
+// marshaling and unmarshaling of createencryptedwallet
+// JSON websocket extension commands.
+type CreateEncryptedWalletCmd struct {
+	id          interface{}
+	Account     string
+	Description string
+	Passphrase  string
+}
+
+// Enforce that CreateEncryptedWalletCmd satisifies the btcjson.Cmd
+// interface.
+var _ btcjson.Cmd = &CreateEncryptedWalletCmd{}
+
+// NewCreateEncryptedWalletCmd creates a new CreateEncryptedWalletCmd.
+func NewCreateEncryptedWalletCmd(id interface{},
+	account, description, passphrase string) *CreateEncryptedWalletCmd {
+
+	return &CreateEncryptedWalletCmd{
+		id:          id,
+		Account:     account,
+		Description: description,
+		Passphrase:  passphrase,
+	}
+}
+
+// parseCreateEncryptedWalletCmd parses a CreateEncryptedWalletCmd
+// into a concrete type satisifying the btcjson.Cmd interface.
+// This is used when registering the custom command with the btcjson
+// parser.
+func parseCreateEncryptedWalletCmd(r *btcjson.RawCmd) (btcjson.Cmd, error) {
+	if len(r.Params) != 3 {
+		return nil, btcjson.ErrWrongNumberOfParams
+	}
+
+	account, ok := r.Params[0].(string)
+	if !ok {
+		return nil, errors.New("first parameter must be a string")
+	}
+	description, ok := r.Params[1].(string)
+	if !ok {
+		return nil, errors.New("second parameter is not a string")
+	}
+	passphrase, ok := r.Params[2].(string)
+	if !ok {
+		return nil, errors.New("third parameter is not a string")
+	}
+
+	cmd := NewCreateEncryptedWalletCmd(r.Id, account, description,
+		passphrase)
+	return cmd, nil
+}
+
+// Id satisifies the Cmd interface by returning the ID of the command.
+func (cmd *CreateEncryptedWalletCmd) Id() interface{} {
+	return cmd.id
+}
+
+// Method satisfies the Cmd interface by returning the RPC method.
+func (cmd *CreateEncryptedWalletCmd) Method() string {
+	return "createencryptedwallet"
+}
+
+// MarshalJSON returns the JSON encoding of cmd.  Part of the Cmd interface.
+func (cmd *CreateEncryptedWalletCmd) MarshalJSON() ([]byte, error) {
+	// Fill a RawCmd and marshal.
+	raw := btcjson.RawCmd{
+		Jsonrpc: "1.0",
+		Method:  "createencryptedwallet",
+		Id:      cmd.id,
+		Params: []interface{}{
+			cmd.Account,
+			cmd.Description,
+			cmd.Passphrase,
+		},
+	}
+
+	return json.Marshal(raw)
+}
+
+// UnmarshalJSON unmarshals the JSON encoding of cmd into cmd.  Part of
+// the Cmd interface.
+func (cmd *CreateEncryptedWalletCmd) UnmarshalJSON(b []byte) error {
+	// Unmarshal into a RawCmd.
+	var r btcjson.RawCmd
+	if err := json.Unmarshal(b, &r); err != nil {
+		return err
+	}
+
+	newCmd, err := parseCreateEncryptedWalletCmd(&r)
+	if err != nil {
+		return err
+	}
+
+	concreteCmd, ok := newCmd.(*CreateEncryptedWalletCmd)
+	if !ok {
+		return btcjson.ErrInternal
+	}
+	*cmd = *concreteCmd
+	return nil
+}
+
+// GetBalancesCmd is a type handling custom marshaling and
+// unmarshaling of getbalances JSON websocket extension commands.
+type GetBalancesCmd struct {
+	id interface{}
+}
+
+// Enforce that GetBalancesCmd satisifies the btcjson.Cmd
+// interface.
+var _ btcjson.Cmd = &GetBalancesCmd{}
+
+// NewGetBalancesCmd creates a new GetBalancesCmd.
+func NewGetBalancesCmd(id interface{}) *GetBalancesCmd {
+	return &GetBalancesCmd{id: id}
+}
+
+// parseGetBalancesCmd parses a GetBalancesCmd into a concrete
+// type satisifying the btcjson.Cmd interface.  This is used when
+// registering the custom command with the btcjson parser.
+func parseGetBalancesCmd(r *btcjson.RawCmd) (btcjson.Cmd, error) {
+	if len(r.Params) != 0 {
+		return nil, btcjson.ErrWrongNumberOfParams
+	}
+
+	return NewGetBalancesCmd(r.Id), nil
+}
+
+// Id satisifies the Cmd interface by returning the ID of the command.
+func (cmd *GetBalancesCmd) Id() interface{} {
+	return cmd.id
+}
+
+// Method satisfies the Cmd interface by returning the RPC method.
+func (cmd *GetBalancesCmd) Method() string {
+	return "getbalances"
+}
+
+// MarshalJSON returns the JSON encoding of cmd.  Part of the Cmd interface.
+func (cmd *GetBalancesCmd) MarshalJSON() ([]byte, error) {
+	// Fill a RawCmd and marshal.
+	raw := btcjson.RawCmd{
+		Jsonrpc: "1.0",
+		Method:  "getbalances",
+		Id:      cmd.id,
+		Params:  []interface{}{},
+	}
+
+	return json.Marshal(raw)
+}
+
+// UnmarshalJSON unmarshals the JSON encoding of cmd into cmd.  Part of
+// the Cmd interface.
+func (cmd *GetBalancesCmd) UnmarshalJSON(b []byte) error {
+	// Unmarshal into a RawCmd.
+	var r btcjson.RawCmd
+	if err := json.Unmarshal(b, &r); err != nil {
+		return err
+	}
+
+	newCmd, err := parseGetBalancesCmd(&r)
+	if err != nil {
+		return err
+	}
+
+	concreteCmd, ok := newCmd.(*GetBalancesCmd)
+	if !ok {
+		return btcjson.ErrInternal
+	}
+	*cmd = *concreteCmd
+	return nil
+}
+
+// WalletIsLockedCmd is a type handling custom marshaling and
+// unmarshaling of walletislocked JSON websocket extension commands.
+type WalletIsLockedCmd struct {
+	id      interface{}
+	Account string
+}
+
+// Enforce that WalletIsLockedCmd satisifies the btcjson.Cmd
+// interface.
+var _ btcjson.Cmd = &WalletIsLockedCmd{}
+
+// NewWalletIsLockedCmd creates a new WalletIsLockedCmd.
+func NewWalletIsLockedCmd(id interface{},
+	optArgs ...string) (*WalletIsLockedCmd, error) {
+
+	// Optional arguments set to their default values.
+	account := ""
+
+	if len(optArgs) > 1 {
+		return nil, btcjson.ErrInvalidParams
+	}
+
+	if len(optArgs) == 1 {
+		account = optArgs[0]
+	}
+
+	return &WalletIsLockedCmd{
+		id:      id,
+		Account: account,
+	}, nil
+}
+
+// parseWalletIsLockedCmd parses a WalletIsLockedCmd into a concrete
+// type satisifying the btcjson.Cmd interface.  This is used when
+// registering the custom command with the btcjson parser.
+func parseWalletIsLockedCmd(r *btcjson.RawCmd) (btcjson.Cmd, error) {
+	if len(r.Params) > 1 {
+		return nil, btcjson.ErrInvalidParams
+	}
+
+	if len(r.Params) == 0 {
+		return NewWalletIsLockedCmd(r.Id)
+	}
+
+	account, ok := r.Params[0].(string)
+	if !ok {
+		return nil, errors.New("account must be a string")
+	}
+	return NewWalletIsLockedCmd(r.Id, account)
+}
+
+// Id satisifies the Cmd interface by returning the ID of the command.
+func (cmd *WalletIsLockedCmd) Id() interface{} {
+	return cmd.id
+}
+
+// Method satisfies the Cmd interface by returning the RPC method.
+func (cmd *WalletIsLockedCmd) Method() string {
+	return "walletislocked"
+}
+
+// MarshalJSON returns the JSON encoding of cmd.  Part of the Cmd interface.
+func (cmd *WalletIsLockedCmd) MarshalJSON() ([]byte, error) {
+	// Fill a RawCmd and marshal.
+	raw := btcjson.RawCmd{
+		Jsonrpc: "1.0",
+		Method:  "walletislocked",
+		Id:      cmd.id,
+		Params:  []interface{}{},
+	}
+
+	if cmd.Account != "" {
+		raw.Params = append(raw.Params, cmd.Account)
+	}
+
+	return json.Marshal(raw)
+}
+
+// UnmarshalJSON unmarshals the JSON encoding of cmd into cmd.  Part of
+// the Cmd interface.
+func (cmd *WalletIsLockedCmd) UnmarshalJSON(b []byte) error {
+	// Unmarshal into a RawCmd.
+	var r btcjson.RawCmd
+	if err := json.Unmarshal(b, &r); err != nil {
+		return err
+	}
+
+	newCmd, err := parseWalletIsLockedCmd(&r)
+	if err != nil {
+		return err
+	}
+
+	concreteCmd, ok := newCmd.(*WalletIsLockedCmd)
 	if !ok {
 		return btcjson.ErrInternal
 	}
