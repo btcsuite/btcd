@@ -2476,7 +2476,7 @@ func (cmd *GetNetworkHashPSCmd) UnmarshalJSON(b []byte) error {
 // unmarshaling of getnewaddress JSON RPC commands.
 type GetNewAddressCmd struct {
 	id      interface{}
-	Address string
+	Account string
 }
 
 // Enforce that GetNewAddressCmd satisifies the Cmd interface.
@@ -2484,17 +2484,17 @@ var _ Cmd = &GetNewAddressCmd{}
 
 // NewGetNewAddressCmd creates a new GetNewAddressCmd.
 func NewGetNewAddressCmd(id interface{}, optArgs ...string) (*GetNewAddressCmd, error) {
-	var address string
+	var account string
 	if len(optArgs) > 0 {
 		if len(optArgs) > 1 {
 			return nil, ErrTooManyOptArgs
 		}
-		address = optArgs[0]
+		account = optArgs[0]
 
 	}
 	return &GetNewAddressCmd{
 		id:      id,
-		Address: address,
+		Account: account,
 	}, nil
 }
 
@@ -2518,8 +2518,8 @@ func (cmd *GetNewAddressCmd) MarshalJSON() ([]byte, error) {
 		Params:  []interface{}{},
 	}
 
-	if cmd.Address != "" {
-		raw.Params = append(raw.Params, cmd.Address)
+	if cmd.Account != "" {
+		raw.Params = append(raw.Params, cmd.Account)
 	}
 	return json.Marshal(raw)
 }
