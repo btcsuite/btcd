@@ -466,7 +466,7 @@ var handlers = map[string]commandHandler{
 	"stop":                   handleStop,
 	"submitblock":            handleUnimplemented,
 	"validateaddress":        handleAskWallet,
-	"verifychain":            handleUnimplemented,
+	"verifychain":            handleVerifyChain,
 	"verifymessage":          handleAskWallet,
 	"walletlock":             handleAskWallet,
 	"walletpassphrase":       handleAskWallet,
@@ -817,6 +817,61 @@ func handleSetGenerate(s *rpcServer, cmd btcjson.Cmd, walletNotification chan []
 func handleStop(s *rpcServer, cmd btcjson.Cmd, walletNotification chan []byte) (interface{}, error) {
 	s.server.Stop()
 	return "btcd stopping.", nil
+}
+
+func verifyChain(db btcdb.Db, level, depth int32) error {
+	_, curheight64, err := db.NewestSha()
+	if err != nil {
+		log.Errorf("RPCS: verify is unable to fetch current block "+
+			"height: %v", err)
+	}
+
+	curheight := int32(curheight64)
+
+	if depth > curheight {
+		depth = curheight
+	}
+
+	for height := curheight; height > (curheight - depth); height-- {
+		// Level 0 just looks up the block.
+		sha, err := db.FetchBlockShaByHeight(int64(height))
+		if err != nil {
+			log.Errorf("RPCS: verify is unable to fetch block at "+
+				"height %d: %v", height, err)
+			return err
+		}
+
+		block, err := db.FetchBlockBySha(sha)
+		if err != nil {
+			log.Errorf("RPCS: verify is unable to fetch block at "+
+				"sha %v height %d: %v", sha, height, err)
+			return err
+		}
+
+		// Level 1 does basic chain sanity checks.
+		if level > 0 {
+			err := btcchain.CheckBlockSanity(block,
+				activeNetParams.powLimit)
+			if err != nil {
+				log.Errorf("RPCS: verify is unable to "+
+					"validate block at sha %v height "+
+					"%s: %v", sha, height, err)
+				return err
+			}
+		}
+	}
+	log.Infof("RPCS: Chain verify completed successfully")
+
+	return nil
+}
+
+func handleVerifyChain(s *rpcServer, cmd btcjson.Cmd, walletNotification chan []byte) (interface{}, error) {
+	c := cmd.(*btcjson.VerifyChainCmd)
+
+	err := verifyChain(s.server.db, c.CheckLevel, c.CheckDepth)
+	if err != nil {
+	}
+	return "", nil
 }
 
 // parseCmd parses a marshaled known command, returning any errors as a

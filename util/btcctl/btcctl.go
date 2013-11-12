@@ -60,6 +60,7 @@ var commandHandlers = map[string]*handlerData{
 	"getpeerinfo":          &handlerData{0, 0, displaySpewDump, nil, makeGetPeerInfo, ""},
 	"getrawmempool":        &handlerData{0, 0, displaySpewDump, nil, makeGetRawMempool, ""},
 	"getrawtransaction":    &handlerData{1, 1, displaySpewDump, []conversionHandler{nil, toInt}, makeGetRawTransaction, "<txhash> [verbose=0]"},
+	"verifychain":  	&handlerData{0, 2, displaySpewDump, []conversionHandler{toInt, toInt}, makeVerifyChain, "[level] [depth]"},
 	"stop":                 &handlerData{0, 0, displayGeneric, nil, makeStop, ""},
 }
 
@@ -190,6 +191,14 @@ func makeGetRawTransaction(args []interface{}) (btcjson.Cmd, error) {
 // makeStop generates the cmd structure for stop comands.
 func makeStop(args []interface{}) (btcjson.Cmd, error) {
 	return btcjson.NewStopCmd("btcctl")
+}
+
+func makeVerifyChain(args []interface{}) (btcjson.Cmd, error) {
+	iargs := make([]int32, 0, 2)
+	for _, i := range args {
+		iargs = append(iargs, int32(i.(int)))
+	}
+	return btcjson.NewVerifyChainCmd("btcctl", iargs...)
 }
 
 // send sends a JSON-RPC command to the specified RPC server and examines the
