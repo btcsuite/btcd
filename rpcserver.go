@@ -681,26 +681,28 @@ func handleGetRawTransaction(s *rpcServer, cmd btcjson.Cmd, walletNotification c
 		// TODO: check error code. tx is not checked before
 		// this point.
 		txSha, _ := btcwire.NewShaHashFromStr(c.Txid)
-		txList, err := s.server.db.FetchTxBySha(txSha)
-		if err != nil || len(txList) == 0 {
-			log.Errorf("RPCS: Error fetching tx: %v", err)
-			return nil, btcjson.ErrNoTxInfo
-		}
-
-		lastTx := len(txList) - 1
-		txS := txList[lastTx].Tx
-		blksha := txList[lastTx].BlkSha
-		blk, err := s.server.db.FetchBlockBySha(blksha)
+		var mtx *btcwire.MsgTx
+		var blksha *btcwire.ShaHash
+		tx, err := s.server.txMemPool.FetchTransaction(txSha)
 		if err != nil {
-			log.Errorf("RPCS: Error fetching sha: %v", err)
-			return nil, btcjson.ErrBlockNotFound
-		}
-		idx := blk.Height()
+			txList, err := s.server.db.FetchTxBySha(txSha)
+			if err != nil || len(txList) == 0 {
+				log.Errorf("RPCS: Error fetching tx: %v", err)
+				return nil, btcjson.ErrNoTxInfo
+			}
 
-		txOutList := txS.TxOut
+			lastTx := len(txList) - 1
+			mtx = txList[lastTx].Tx
+
+			blksha = txList[lastTx].BlkSha
+		} else {
+			mtx = tx.MsgTx()
+		}
+
+		txOutList := mtx.TxOut
 		voutList := make([]btcjson.Vout, len(txOutList))
 
-		txInList := txS.TxIn
+		txInList := mtx.TxIn
 		vinList := make([]btcjson.Vin, len(txInList))
 
 		for i, v := range txInList {
@@ -730,26 +732,34 @@ func handleGetRawTransaction(s *rpcServer, cmd btcjson.Cmd, walletNotification c
 			}
 		}
 
-		_, maxidx, err := s.server.db.NewestSha()
-		if err != nil {
-			log.Errorf("RPCS: Cannot get newest sha: %v", err)
-			return nil, btcjson.ErrNoNewestBlockInfo
-		}
-		confirmations := uint64(1 + maxidx - idx)
-
-		blockHeader := &blk.MsgBlock().Header
 		txReply := btcjson.TxRawResult{
 			Txid:     c.Txid,
 			Vout:     voutList,
 			Vin:      vinList,
-			Version:  txS.Version,
-			LockTime: txS.LockTime,
+			Version:  mtx.Version,
+			LockTime: mtx.LockTime,
+		}
+		if blksha != nil {
+			blk, err := s.server.db.FetchBlockBySha(blksha)
+			if err != nil {
+				log.Errorf("RPCS: Error fetching sha: %v", err)
+				return nil, btcjson.ErrBlockNotFound
+			}
+			idx := blk.Height()
+
+			_, maxidx, err := s.server.db.NewestSha()
+			if err != nil {
+				log.Errorf("RPCS: Cannot get newest sha: %v", err)
+				return nil, btcjson.ErrNoNewestBlockInfo
+			}
+
+			blockHeader := &blk.MsgBlock().Header
 			// This is not a typo, they are identical in
 			// bitcoind as well.
-			Time:          blockHeader.Timestamp.Unix(),
-			Blocktime:     blockHeader.Timestamp.Unix(),
-			BlockHash:     blksha.String(),
-			Confirmations: confirmations,
+			txReply.Time = blockHeader.Timestamp.Unix()
+			txReply.Blocktime = blockHeader.Timestamp.Unix()
+			txReply.BlockHash = blksha.String()
+			txReply.Confirmations = uint64(1 + maxidx - idx)
 		}
 		return txReply, nil
 	} else {
