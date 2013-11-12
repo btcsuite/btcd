@@ -6128,8 +6128,8 @@ func (cmd *ValidateAddressCmd) UnmarshalJSON(b []byte) error {
 // unmarshaling of verifychain JSON RPC commands.
 type VerifyChainCmd struct {
 	id         interface{}
-	CheckLevel int
-	CheckDepth int
+	CheckLevel int32
+	CheckDepth int32
 }
 
 // Enforce that VerifyChainCmd satisifies the Cmd interface.
@@ -6137,10 +6137,10 @@ var _ Cmd = &VerifyChainCmd{}
 
 // NewVerifyChainCmd creates a new VerifyChainCmd. Optionally a
 // pointer to a TemplateRequest may be provided.
-func NewVerifyChainCmd(id interface{}, optArgs ...int) (*VerifyChainCmd, error) {
+func NewVerifyChainCmd(id interface{}, optArgs ...int32) (*VerifyChainCmd, error) {
 	// bitcoind default, but they do vary it based on cli args.
-	var checklevel = 3
-	var checkdepth = 288
+	var checklevel int32 = 3
+	var checkdepth int32 = 288
 
 	if len(optArgs) > 0 {
 		if len(optArgs) > 2 {
@@ -6204,14 +6204,14 @@ func (cmd *VerifyChainCmd) UnmarshalJSON(b []byte) error {
 		return ErrWrongNumberOfParams
 	}
 
-	optArgs := make([]int, 0, 2)
+	optArgs := make([]int32, 0, 2)
 	if len(r.Params) > 0 {
 		checklevel, ok := r.Params[0].(float64)
 		if !ok {
 			return errors.New("first optional parameter checklevel must be a number")
 		}
 
-		optArgs = append(optArgs, int(checklevel))
+		optArgs = append(optArgs, int32(checklevel))
 	}
 
 	if len(r.Params) > 1 {
@@ -6220,7 +6220,7 @@ func (cmd *VerifyChainCmd) UnmarshalJSON(b []byte) error {
 			return errors.New("second optional parameter checkdepth must be a number")
 		}
 
-		optArgs = append(optArgs, int(checkdepth))
+		optArgs = append(optArgs, int32(checkdepth))
 	}
 
 	newCmd, err := NewVerifyChainCmd(r.Id, optArgs...)
