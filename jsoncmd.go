@@ -5101,7 +5101,7 @@ func (cmd *SendManyCmd) UnmarshalJSON(b []byte) error {
 		return err
 	}
 
-	if len(r.Params) > 6 || len(r.Params) < 3 {
+	if len(r.Params) > 4 || len(r.Params) < 2 {
 		return ErrWrongNumberOfParams
 	}
 
@@ -5110,15 +5110,19 @@ func (cmd *SendManyCmd) UnmarshalJSON(b []byte) error {
 		return errors.New("first parameter fromaccount must be a string")
 	}
 
-	famounts, ok := r.Params[1].(map[string]float64)
+	iamounts, ok := r.Params[1].(map[string]interface{})
 	if !ok {
-		return errors.New("second parameter toaccount must be a string to number map")
+		return errors.New("second parameter toaccount must be a JSON object")
 	}
 
 	amounts := make(map[string]int64)
-	for k, v := range famounts {
+	for k, v := range iamounts {
+		famount, ok := v.(float64)
+		if !ok {
+			return errors.New("second parameter toaccount must be a string to number map")
+		}
 		var err error
-		amounts[k], err = JSONToAmount(v)
+		amounts[k], err = JSONToAmount(famount)
 		if err != nil {
 			return err
 		}
