@@ -60,10 +60,10 @@ const (
 	// prosperity.  3*80 + 3*65 + 65 = 500
 	maxStandardSigScriptSize = 500
 
-	// maxStandardMultiSigs is the maximum number of signatures
-	// allowed in a multi-signature transaction output script for it to be
+	// maxStandardMultiSigKeys is the maximum number of public keys allowed
+	// in a multi-signature transaction output script for it to be
 	// considered standard.
-	maxStandardMultiSigs = 3
+	maxStandardMultiSigKeys = 3
 
 	// minTxRelayFee is the minimum fee in satoshi that is required for a
 	// transaction to be treated as free for relay purposes.  It is also
@@ -157,22 +157,42 @@ func isDust(txOut *btcwire.TxOut) bool {
 // checkPkScriptStandard performs a series of checks on a transaction ouput
 // script (public key script) to ensure it is a "standard" public key script.
 // A standard public key script is one that is a recognized form, and for
-// multi-signature scripts, only contains from 1 to 3 signatures.
-func checkPkScriptStandard(pkScript []byte) error {
-	scriptClass := btcscript.GetScriptClass(pkScript)
+// multi-signature scripts, only contains from 1 to maxStandardMultiSigKeys
+// public keys.
+func checkPkScriptStandard(pkScript []byte, scriptClass btcscript.ScriptClass) error {
 	switch scriptClass {
 	case btcscript.MultiSigTy:
-		// TODO(davec): Need to get the actual number of signatures.
-		numSigs := 1
+		numPubKeys, numSigs, err := btcscript.CalcMultiSigStats(pkScript)
+		if err != nil {
+			return err
+		}
+
+		// A standard multi-signature public key script must contain
+		// from 1 to maxStandardMultiSigKeys public keys.
+		if numPubKeys < 1 {
+			str := fmt.Sprintf("multi-signature script with no " +
+				"pubkeys")
+			return TxRuleError(str)
+		}
+		if numPubKeys > maxStandardMultiSigKeys {
+			str := fmt.Sprintf("multi-signature script with %d "+
+				"public keys which is more than the allowed "+
+				"max of %d", numPubKeys, maxStandardMultiSigKeys)
+			return TxRuleError(str)
+		}
+
+		// A standard multi-signature public key script must have at
+		// least 1 signature and no more signatures than available
+		// public keys.
 		if numSigs < 1 {
 			str := fmt.Sprintf("multi-signature script with no " +
 				"signatures")
 			return TxRuleError(str)
 		}
-		if numSigs > maxStandardMultiSigs {
+		if numSigs > numPubKeys {
 			str := fmt.Sprintf("multi-signature script with %d "+
-				"signatures which is more than the allowed max "+
-				"of %d", numSigs, maxStandardMultiSigs)
+				"signatures which is more than the available "+
+				"%d public keys", numSigs, numPubKeys)
 			return TxRuleError(str)
 		}
 
@@ -243,11 +263,18 @@ func checkTransactionStandard(tx *btcutil.Tx, height int64) error {
 
 	// None of the output public key scripts can be a non-standard script or
 	// be "dust".
+	numNullDataOutputs := 0
 	for i, txOut := range msgTx.TxOut {
-		err := checkPkScriptStandard(txOut.PkScript)
+		scriptClass := btcscript.GetScriptClass(txOut.PkScript)
+		err := checkPkScriptStandard(txOut.PkScript, scriptClass)
 		if err != nil {
 			str := fmt.Sprintf("transaction output %d: %v", i, err)
 			return TxRuleError(str)
+		}
+
+		// Accumulate the number of outputs which only carry data.
+		if scriptClass == btcscript.NullDataTy {
+			numNullDataOutputs++
 		}
 
 		if isDust(txOut) {
@@ -257,17 +284,62 @@ func checkTransactionStandard(tx *btcutil.Tx, height int64) error {
 		}
 	}
 
+	// A standard transaction must not have more than one output script that
+	// only carries data.
+	if numNullDataOutputs > 1 {
+		return TxRuleError("more than one transaction output is a " +
+			"nulldata script")
+	}
+
 	return nil
 }
 
 // checkInputsStandard performs a series of checks on a transaction's inputs
 // to ensure they are "standard".  A standard transaction input is one that
-// that consumes the same number of outputs from the stack as the output script
-// pushes.  This help prevent resource exhaustion attacks by "creative" use of
-// scripts that are super expensive to process like OP_DUP OP_CHECKSIG OP_DROP
-// repeated a large number of times followed by a final OP_TRUE.
-func checkInputsStandard(tx *btcutil.Tx) error {
-	// TODO(davec): Implement
+// that consumes the expected number of elements from the stack and that number
+// is the same as the output script pushes.  This help prevent resource
+// exhaustion attacks by "creative" use of scripts that are super expensive to
+// process like OP_DUP OP_CHECKSIG OP_DROP repeated a large number of times
+// followed by a final OP_TRUE.
+func checkInputsStandard(tx *btcutil.Tx, txStore btcchain.TxStore) error {
+	// NOTE: The reference implementation also does a coinbase check here,
+	// but coinbases have already been rejected prior to calling this
+	// function so no need to recheck.
+
+	for i, txIn := range tx.MsgTx().TxIn {
+		// It is safe to elide existence and index checks here since
+		// they have already been checked prior to calling this
+		// function.
+		prevOut := txIn.PreviousOutpoint
+		originTx := txStore[prevOut.Hash].Tx.MsgTx()
+		originPkScript := originTx.TxOut[prevOut.Index].PkScript
+
+		// Calculate stats for the script pair.
+		scriptInfo, err := btcscript.CalcScriptInfo(txIn.SignatureScript,
+			originPkScript, true)
+		if err != nil {
+			return err
+		}
+
+		// A negative value for expected inputs indicates the script is
+		// non-standard in some way.
+		if scriptInfo.ExpectedInputs < 0 {
+			str := fmt.Sprintf("transaction input #%d expects %d "+
+				"inputs", i, scriptInfo.ExpectedInputs)
+			return TxRuleError(str)
+		}
+
+		// The script pair is non-standard if the number of available
+		// inputs does not match the number of expected inputs.
+		if scriptInfo.NumInputs != scriptInfo.ExpectedInputs {
+			str := fmt.Sprintf("transaction input #%d expects %d "+
+				"inputs, but referenced output script only "+
+				"provides %d", i, scriptInfo.ExpectedInputs,
+				scriptInfo.NumInputs)
+			return TxRuleError(str)
+		}
+	}
+
 	return nil
 }
 
@@ -710,7 +782,7 @@ func (mp *txMemPool) maybeAcceptTransaction(tx *btcutil.Tx, isOrphan *bool) erro
 	// Don't allow transactions with non-standard inputs on the main
 	// network.
 	if activeNetParams.btcnet == btcwire.MainNet {
-		err := checkInputsStandard(tx)
+		err := checkInputsStandard(tx, txStore)
 		if err != nil {
 			str := fmt.Sprintf("transaction %v has a non-standard "+
 				"input: %v", txHash, err)
@@ -732,8 +804,8 @@ func (mp *txMemPool) maybeAcceptTransaction(tx *btcutil.Tx, isOrphan *bool) erro
 	}
 
 	// TODO(davec): Rate-limit 'free' transactions.  That is to say
-	// transactions which are less than the minimum relay fee and are there
-	// considered free.
+	// transactions which are less than the minimum relay fee and are
+	// therefore considered free.
 
 	// Verify crypto signatures for each input and reject the transaction if
 	// any don't verify.
