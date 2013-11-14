@@ -815,12 +815,14 @@ func newServer(listenAddrs []string, db btcdb.Db, btcnet btcwire.BitcoinNet) (*s
 		return nil, err
 	}
 
-	ipv4Addrs, ipv6Addrs, err := parseListeners(listenAddrs)
-	if err != nil {
-		return nil, err
-	}
-	listeners := make([]net.Listener, 0, len(ipv4Addrs)+len(ipv6Addrs))
+	var listeners []net.Listener
 	if !cfg.DisableListen {
+		ipv4Addrs, ipv6Addrs, err := parseListeners(listenAddrs)
+		if err != nil {
+			return nil, err
+		}
+		listeners = make([]net.Listener, 0, len(ipv4Addrs)+len(ipv6Addrs))
+
 		for _, addr := range ipv4Addrs {
 			listener, err := net.Listen("tcp4", addr)
 			if err != nil {
@@ -840,6 +842,7 @@ func newServer(listenAddrs []string, db btcdb.Db, btcnet btcwire.BitcoinNet) (*s
 			}
 			listeners = append(listeners, listener)
 		}
+
 		if len(listeners) == 0 {
 			return nil, errors.New("No valid listen address")
 		}
