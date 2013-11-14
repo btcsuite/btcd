@@ -44,7 +44,6 @@ type rpcServer struct {
 	server    *server
 	ws        wsContext
 	wg        sync.WaitGroup
-	rpcport   string
 	username  string
 	password  string
 	listeners []net.Listener
@@ -313,13 +312,12 @@ func (s *rpcServer) Stop() error {
 }
 
 // newRPCServer returns a new instance of the rpcServer struct.
-func newRPCServer(s *server) (*rpcServer, error) {
+func newRPCServer(listenAddrs []string, s *server) (*rpcServer, error) {
 	rpc := rpcServer{
 		server: s,
 		quit:   make(chan int),
 	}
 	// Get values from config
-	rpc.rpcport = cfg.RPCPort
 	rpc.username = cfg.RPCUser
 	rpc.password = cfg.RPCPass
 
@@ -330,24 +328,33 @@ func newRPCServer(s *server) (*rpcServer, error) {
 	rpc.ws.spentNotifications = make(map[btcwire.OutPoint]*list.List)
 	rpc.ws.minedTxNotifications = make(map[btcwire.ShaHash]*list.List)
 
-	// IPv4 listener.
-	var listeners []net.Listener
-	listenAddr4 := net.JoinHostPort("127.0.0.1", rpc.rpcport)
-	listener4, err := net.Listen("tcp4", listenAddr4)
-	if err != nil {
-		log.Errorf("RPCS: Couldn't create listener: %v", err)
-		return nil, err
+	// TODO(oga) this code is identical to that in server, should be
+	// factored into something shared.
+	ipv4ListenAddrs, ipv6ListenAddrs, err := parseListeners(listenAddrs)
+	listeners := make([]net.Listener, 0,
+		len(ipv6ListenAddrs)+len(ipv4ListenAddrs))
+	for _, addr := range ipv4ListenAddrs {
+		listener, err := net.Listen("tcp4", addr)
+		if err != nil {
+			log.Warnf("RPCS: Can't listen on %s: %v", addr,
+				err)
+			continue
+		}
+		listeners = append(listeners, listener)
 	}
-	listeners = append(listeners, listener4)
 
-	// IPv6 listener.
-	listenAddr6 := net.JoinHostPort("::1", rpc.rpcport)
-	listener6, err := net.Listen("tcp6", listenAddr6)
-	if err != nil {
-		log.Errorf("RPCS: Couldn't create listener: %v", err)
-		return nil, err
+	for _, addr := range ipv6ListenAddrs {
+		listener, err := net.Listen("tcp6", addr)
+		if err != nil {
+			log.Warnf("RPCS: Can't listen on %s: %v", addr,
+				err)
+			continue
+		}
+		listeners = append(listeners, listener)
 	}
-	listeners = append(listeners, listener6)
+	if len(listeners) == 0 {
+		return nil, errors.New("RPCS: No valid listen address")
+	}
 
 	rpc.listeners = listeners
 

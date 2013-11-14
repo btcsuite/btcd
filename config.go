@@ -53,7 +53,7 @@ type config struct {
 	BanDuration        time.Duration `long:"banduration" description:"How long to ban misbehaving peers.  Valid time units are {s, m, h}.  Minimum 1 second"`
 	RPCUser            string        `short:"u" long:"rpcuser" description:"Username for RPC connections"`
 	RPCPass            string        `short:"P" long:"rpcpass" default-mask:"-" description:"Password for RPC connections"`
-	RPCPort            string        `short:"r" long:"rpcport" description:"Listen for JSON/RPC messages on this port"`
+	RPCListeners       []string      `long:"rpclisten" description:"Listen for RPC connections on this interface/port (default no listening.  default port: 8334, testnet: 18334)"`
 	DisableRPC         bool          `long:"norpc" description:"Disable built-in RPC server -- NOTE: The RPC server is disabled by default if no rpcuser/rpcpass is specified"`
 	DisableDNSSeed     bool          `long:"nodnsseed" description:"Disable DNS seeding for peers"`
 	Proxy              string        `long:"proxy" description:"Connect via SOCKS5 proxy (eg. 127.0.0.1:9050)"`
@@ -147,33 +147,6 @@ func normalizeAddresses(addrs []string, defaultPort string) []string {
 	return removeDuplicateAddresses(addrs)
 }
 
-// cleanListenAddresses returns a new slice with all the passed peer addresses
-// normalized and duplicates removed.
-func cleanListenAddresses(addrs []string) []string {
-	return normalizeAddresses(addrs, activeNetParams.listenPort)
-}
-
-// cleanPeerAddresses returns a new slice with all the passed peer addresses
-// normalized and duplicates removed.
-func cleanPeerAddresses(addrs []string) []string {
-	return normalizeAddresses(addrs, activeNetParams.peerPort)
-}
-
-// updateConfigWithActiveParams update the passed config with parameters
-// from the active net params if the relevant options in the passed config
-// object are the default so options specified by the user on the command line
-// are not overridden.
-func updateConfigWithActiveParams(cfg *config) {
-	// Even though there should only be one default, a duplicate might
-	// have been specified via the config file or CLI options.  So, make
-	// sure to update all default entries rather than only the first one
-	// found.  Duplicates are removed later.
-
-	if cfg.RPCPort == netParams(defaultBtcnet).rpcPort {
-		cfg.RPCPort = activeNetParams.rpcPort
-	}
-}
-
 // filesExists reports whether the named file or directory exists.
 func fileExists(name string) bool {
 	if _, err := os.Stat(name); err != nil {
@@ -200,7 +173,6 @@ func loadConfig() (*config, []string, error) {
 	// Default config.
 	cfg := config{
 		DebugLevel:  defaultLogLevel,
-		RPCPort:     netParams(defaultBtcnet).rpcPort,
 		MaxPeers:    defaultMaxPeers,
 		BanDuration: defaultBanDuration,
 		ConfigFile:  defaultConfigFile,
@@ -268,7 +240,6 @@ func loadConfig() (*config, []string, error) {
 	} else if cfg.RegressionTest {
 		activeNetParams = netParams(btcwire.TestNet)
 	}
-	updateConfigWithActiveParams(&cfg)
 
 	// Validate debug log level.
 	if !validLogLevel(cfg.DebugLevel) {
@@ -363,14 +334,28 @@ func loadConfig() (*config, []string, error) {
 		cfg.DisableRPC = true
 	}
 
-	// Add default port to all listner addresses if needed and remove
+	if len(cfg.RPCListeners) == 0 {
+		cfg.RPCListeners = []string{
+			net.JoinHostPort("", activeNetParams.rpcPort),
+		}
+	}
+
+	// Add default port to all listener addresses if needed and remove
 	// duplicate addresses.
-	cfg.Listeners = cleanListenAddresses(cfg.Listeners)
+	cfg.Listeners = normalizeAddresses(cfg.Listeners,
+		activeNetParams.listenPort)
+
+	// Add default port to all rpc listener addresses if needed and remove
+	// duplicate addresses.
+	cfg.RPCListeners = normalizeAddresses(cfg.RPCListeners,
+		activeNetParams.rpcPort)
 
 	// Add default port to all added peer addresses if needed and remove
 	// duplicate addresses.
-	cfg.AddPeers = cleanPeerAddresses(cfg.AddPeers)
-	cfg.ConnectPeers = cleanPeerAddresses(cfg.ConnectPeers)
+	cfg.AddPeers = normalizeAddresses(cfg.AddPeers,
+		activeNetParams.peerPort)
+	cfg.ConnectPeers = normalizeAddresses(cfg.ConnectPeers,
+		activeNetParams.peerPort)
 
 	return &cfg, remainingArgs, nil
 }

@@ -871,7 +871,7 @@ func newServer(listenAddrs []string, db btcdb.Db, btcnet btcwire.BitcoinNet) (*s
 	s.txMemPool = newTxMemPool(&s)
 
 	if !cfg.DisableRPC {
-		s.rpcServer, err = newRPCServer(&s)
+		s.rpcServer, err = newRPCServer(cfg.RPCListeners, &s)
 		if err != nil {
 			return nil, err
 		}
