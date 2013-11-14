@@ -2671,6 +2671,11 @@ var classStringifyTests = []struct {
 	stringed    string
 }{
 	{
+		name:        "nonstandardty",
+		scriptclass: btcscript.NonStandardTy
+		stringed:    "nonstandard",
+	},
+	{
 		name:        "pubkey",
 		scriptclass: btcscript.PubKeyTy,
 		stringed:    "pubkey",
