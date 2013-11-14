@@ -139,19 +139,21 @@ type ScriptClass byte
 
 // Classes of script payment known about in the blockchain.
 const (
-	PubKeyTy      ScriptClass = iota // Pay pubkey.
+	NonStandardTy ScriptClass = iota // None of the recognized forms.
+	PubKeyTy                         // Pay pubkey.
 	PubKeyHashTy                     // Pay pubkey hash.
 	ScriptHashTy                     // Pay to script hash.
 	MultiSigTy                       // Multi signature.
-	NonStandardTy                    // None of the above.
+	NullDataTy                       // Empty data-only (provably prunable).
 )
 
 var scriptClassToName = []string{
+	NonStandardTy: "nonstandard",
 	PubKeyTy:      "pubkey",
 	PubKeyHashTy:  "pubkeyhash",
 	ScriptHashTy:  "scripthash",
 	MultiSigTy:    "multisig",
-	NonStandardTy: "nonstandard",
+	NullDataTy:    "nulldata",
 }
 
 // String implements the Stringer interface by returning the name of
@@ -251,6 +253,22 @@ func isMultiSig(pops []parsedOpcode) bool {
 	return true
 }
 
+// isNullData returns true if the passed script is a null data transaction,
+// false otherwise.
+func isNullData(pops []parsedOpcode) bool {
+	// A nulldata transaction is either a single OP_RETURN or an
+	// OP_RETURN SMALLDATA (where SMALLDATA is a push data up to 80 bytes).
+	l := len(pops)
+	if l == 1 && pops[0].opcode.value == OP_RETURN {
+		return true
+	}
+
+	return l == 2 &&
+		pops[0].opcode.value == OP_RETURN &&
+		pops[1].opcode.value <= OP_PUSHDATA4 &&
+		len(pops[1].data) <= 80
+}
+
 // isPushOnly returns true if the script only pushes data, false otherwise.
 func isPushOnly(pops []parsedOpcode) bool {
 	// technically we cheat here, we don't look at opcodes
@@ -297,6 +315,8 @@ func typeOfScript(pops []parsedOpcode) ScriptClass {
 		return ScriptHashTy
 	} else if isMultiSig(pops) {
 		return MultiSigTy
+	} else if isNullData(pops) {
+		return NullDataTy
 	}
 	return NonStandardTy
 
@@ -1070,10 +1090,11 @@ func expectedInputs(pops []parsedOpcode, class ScriptClass) int {
 		// expected. typoeOfScript already checked this so that we know
 		// it'll be one of OP_1 - OP_16.
 		return int(pops[0].opcode.value - (OP_1 - 1))
+	case NullDataTy:
+		fallthrough
 	default:
 		return -1
 	}
-
 }
 
 type ScriptInfo struct {
