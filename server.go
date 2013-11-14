@@ -772,9 +772,9 @@ func (s *server) ScheduleShutdown(duration time.Duration) {
 // detects addresses which apply to "all interfaces" and adds the address to
 // both slices.
 func parseListeners(addrs []string) ([]string, []string, error) {
-	ipv4ListenAddrs := make([]string, 0, len(cfg.Listeners)*2)
-	ipv6ListenAddrs := make([]string, 0, len(cfg.Listeners)*2)
-	for _, addr := range cfg.Listeners {
+	ipv4ListenAddrs := make([]string, 0, len(addrs)*2)
+	ipv6ListenAddrs := make([]string, 0, len(addrs)*2)
+	for _, addr := range addrs {
 		host, _, err := net.SplitHostPort(addr)
 		if err != nil {
 			// Shouldn't happen due to already being normalized.
@@ -791,7 +791,8 @@ func parseListeners(addrs []string) ([]string, []string, error) {
 		// Parse the IP.
 		ip := net.ParseIP(host)
 		if ip == nil {
-			return nil, nil, err
+			return nil, nil, fmt.Errorf("'%s' is not a valid IP "+
+				"address", host)
 		}
 
 		// To4 returns nil when the IP is not an IPv4 address, so use
@@ -815,6 +816,9 @@ func newServer(listenAddrs []string, db btcdb.Db, btcnet btcwire.BitcoinNet) (*s
 	}
 
 	ipv4ListenAddrs, ipv6ListenAddrs, err := parseListeners(listenAddrs)
+	if err != nil {
+		return nil, err
+	}
 	listeners := make([]net.Listener, 0,
 		len(ipv6ListenAddrs)+len(ipv4ListenAddrs))
 	if !cfg.DisableListen {
@@ -838,7 +842,7 @@ func newServer(listenAddrs []string, db btcdb.Db, btcnet btcwire.BitcoinNet) (*s
 			listeners = append(listeners, listener)
 		}
 		if len(listeners) == 0 {
-			return nil, errors.New("SRVR: No valid listen address")
+			return nil, errors.New("No valid listen address")
 		}
 	}
 
