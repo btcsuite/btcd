@@ -147,10 +147,10 @@ const (
 )
 
 var scriptClassToName = []string{
-	PubKeyTy: "pubkey",
-	PubKeyHashTy: "pubkeyhash",
-	ScriptHashTy: "scripthash",
-	MultiSigTy: "multisig",
+	PubKeyTy:      "pubkey",
+	PubKeyHashTy:  "pubkeyhash",
+	ScriptHashTy:  "scripthash",
+	MultiSigTy:    "multisig",
 	NonStandardTy: "nonstandard",
 }
 
