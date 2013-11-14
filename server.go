@@ -768,7 +768,7 @@ func (s *server) ScheduleShutdown(duration time.Duration) {
 
 // parseListeners splits the list of listen addresses passed in addrs into
 // IPv4 and IPv6 slices and returns them.  This allows easy creation of the
-// listeners on the correct interface "tcp4" and "tcp6".  It also, properly
+// listeners on the correct interface "tcp4" and "tcp6".  It also properly
 // detects addresses which apply to "all interfaces" and adds the address to
 // both slices.
 func parseListeners(addrs []string) ([]string, []string, error) {
@@ -815,14 +815,13 @@ func newServer(listenAddrs []string, db btcdb.Db, btcnet btcwire.BitcoinNet) (*s
 		return nil, err
 	}
 
-	ipv4ListenAddrs, ipv6ListenAddrs, err := parseListeners(listenAddrs)
+	ipv4Addrs, ipv6Addrs, err := parseListeners(listenAddrs)
 	if err != nil {
 		return nil, err
 	}
-	listeners := make([]net.Listener, 0,
-		len(ipv6ListenAddrs)+len(ipv4ListenAddrs))
+	listeners := make([]net.Listener, 0, len(ipv4Addrs)+len(ipv6Addrs))
 	if !cfg.DisableListen {
-		for _, addr := range ipv4ListenAddrs {
+		for _, addr := range ipv4Addrs {
 			listener, err := net.Listen("tcp4", addr)
 			if err != nil {
 				log.Warnf("SRVR: Can't listen on %s: %v", addr,
@@ -832,7 +831,7 @@ func newServer(listenAddrs []string, db btcdb.Db, btcnet btcwire.BitcoinNet) (*s
 			listeners = append(listeners, listener)
 		}
 
-		for _, addr := range ipv6ListenAddrs {
+		for _, addr := range ipv6Addrs {
 			listener, err := net.Listen("tcp6", addr)
 			if err != nil {
 				log.Warnf("SRVR: Can't listen on %s: %v", addr,
