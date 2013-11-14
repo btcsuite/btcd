@@ -2672,7 +2672,7 @@ var classStringifyTests = []struct {
 }{
 	{
 		name:        "nonstandardty",
-		scriptclass: btcscript.NonStandardTy
+		scriptclass: btcscript.NonStandardTy,
 		stringed:    "nonstandard",
 	},
 	{
