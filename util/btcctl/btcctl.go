@@ -60,7 +60,7 @@ var commandHandlers = map[string]*handlerData{
 	"getpeerinfo":          &handlerData{0, 0, displaySpewDump, nil, makeGetPeerInfo, ""},
 	"getrawmempool":        &handlerData{0, 0, displaySpewDump, nil, makeGetRawMempool, ""},
 	"getrawtransaction":    &handlerData{1, 1, displaySpewDump, []conversionHandler{nil, toInt}, makeGetRawTransaction, "<txhash> [verbose=0]"},
-	"verifychain":  	&handlerData{0, 2, displaySpewDump, []conversionHandler{toInt, toInt}, makeVerifyChain, "[level] [depth]"},
+	"verifychain":          &handlerData{0, 2, displaySpewDump, []conversionHandler{toInt, toInt}, makeVerifyChain, "[level] [depth]"},
 	"stop":                 &handlerData{0, 0, displayGeneric, nil, makeStop, ""},
 }
 
@@ -182,7 +182,10 @@ func makeGetRawMempool(args []interface{}) (btcjson.Cmd, error) {
 // makeRawTransaction generates the cmd structure for
 // getrawtransaction comands.
 func makeGetRawTransaction(args []interface{}) (btcjson.Cmd, error) {
-	i := args[1].(int)
+	i := 0
+	if len(args) > 1 {
+		i = args[1].(int)
+	}
 
 	bi := i != 0
 	return btcjson.NewGetRawTransactionCmd("btcctl", args[0].(string), bi)
