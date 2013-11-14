@@ -1144,3 +1144,28 @@ func CalcScriptInfo(sigscript, pkscript []byte, bip16 bool) (*ScriptInfo, error)
 
 	return si, nil
 }
+
+// CalcMultiSigStats returns the number of public keys and signatures from
+// a multi-signature transaction script.  The passed script MUST already be
+// known to be a multi-signature script.
+func CalcMultiSigStats(script []byte) (int, int, error) {
+	pops, err := parseScript(script)
+	if err != nil {
+		return 0, 0, err
+	}
+
+	// A multi-signature script is of the pattern:
+	//  NUM_SIGS PUBKEY PUBKEY PUBKEY... NUM_PUBKEYS OP_CHECKMULTISIG
+	// Therefore the number of signatures is the oldest item on the stack
+	// and the number of pubkeys is the 2nd to last.  Also, the absolute
+	// minimum for a multi-signature script is 1 pubkey, so at least 4
+	// items must be on the stack per:
+	//  OP_1 PUBKEY OP_1 OP_CHECKMULTISIG
+	if len(pops) < 4 {
+		return 0, 0, StackErrUnderflow
+	}
+
+	numSigs := int(pops[0].opcode.value - (OP_1 - 1))
+	numPubKeys := int(pops[len(pops)-2].opcode.value - (OP_1 - 1))
+	return numPubKeys, numSigs, nil
+}
