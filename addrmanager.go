@@ -1063,17 +1063,22 @@ func RFC6145(na *btcwire.NetAddress) bool {
 	return rfc6145.Contains(na.IP)
 }
 
+var onioncatrange = net.IPNet{IP: net.ParseIP("FD87:d87e:eb43"),
+	Mask: net.CIDRMask(48, 128)}
+
 func Tor(na *btcwire.NetAddress) bool {
 	// bitcoind encodes a .onion address as a 16 byte number by decoding the
 	// address prior to the .onion (i.e. the key hash) base32 into a ten
 	// byte number. it then stores the first 6 bytes of the address as
 	// 0xfD, 0x87, 0xD8, 0x7e, 0xeb, 0x43
-	// making the format
+	// this is the same range used by onioncat, part of the
+	// RFC4193 Unique local IPv6 range.
+	// In summary the format is:
 	// { magic 6 bytes, 10 bytes base32 decode of key hash }
-	// Since we use btcwire.NetAddress to represent and address we may
-	// well have to emulate this.
-	// XXX fillmein
-	return false
+	// TODO(oga) note that when handling tor addresses we need to detect
+	// this and // connect correctly. We may want to print tor addresses
+	// specially too.
+	return onioncatrange.Contains(na.IP)
 }
 
 var zero4 = net.IPNet{IP: net.ParseIP("0.0.0.0"),
@@ -1101,7 +1106,7 @@ func Valid(na *btcwire.NetAddress) bool {
 // ranges.
 func Routable(na *btcwire.NetAddress) bool {
 	return Valid(na) && !(RFC1918(na) || RFC3927(na) || RFC4862(na) ||
-		RFC4193(na) || Tor(na) || RFC4843(na) || Local(na))
+		(RFC4193(na) && !Tor(na)) || RFC4843(na) || Local(na))
 }
 
 // GroupKey returns a string representing the network group an address
@@ -1140,9 +1145,9 @@ func GroupKey(na *btcwire.NetAddress) string {
 		}
 		return (&net.IPNet{IP: ip, Mask: net.CIDRMask(16, 32)}).String()
 	}
-	// XXX tor?
 	if Tor(na) {
-		panic("oga should have implemented me")
+		// group is keyed off the first 4 bits of the actual onion key.
+		return fmt.Sprintf("tor:%d", na.IP[6]&((1<<4)-1))
 	}
 
 	// OK, so now we know ourselves to be a IPv6 address.
