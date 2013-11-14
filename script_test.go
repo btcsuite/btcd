@@ -2665,40 +2665,35 @@ nexttest:
 	}
 }
 
-var classStringifyTests = []struct{
-	name string
+var classStringifyTests = []struct {
+	name        string
 	scriptclass btcscript.ScriptClass
-	stringed string
+	stringed    string
 }{
 	{
-		name: "pubkey",
+		name:        "pubkey",
 		scriptclass: btcscript.PubKeyTy,
-		stringed: "pubkey",
+		stringed:    "pubkey",
 	},
 	{
-		name: "pubkeyhash",
+		name:        "pubkeyhash",
 		scriptclass: btcscript.PubKeyHashTy,
-		stringed: "pubkeyhash",
+		stringed:    "pubkeyhash",
 	},
 	{
-		name: "scripthash",
+		name:        "scripthash",
 		scriptclass: btcscript.ScriptHashTy,
-		stringed: "scripthash",
+		stringed:    "scripthash",
 	},
 	{
-		name: "multisigty",
+		name:        "multisigty",
 		scriptclass: btcscript.MultiSigTy,
-		stringed: "multisig",
+		stringed:    "multisig",
 	},
 	{
-		name: "nonstandard",
-		scriptclass: btcscript.NonStandardTy,
-		stringed: "nonstandard",
-	},
-	{
-		name: "broken",
+		name:        "broken",
 		scriptclass: btcscript.ScriptClass(255),
-		stringed: "Invalid",
+		stringed:    "Invalid",
 	},
 }
 
