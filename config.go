@@ -52,13 +52,13 @@ type config struct {
 	MaxPeers           int           `long:"maxpeers" description:"Max number of inbound and outbound peers"`
 	BanDuration        time.Duration `long:"banduration" description:"How long to ban misbehaving peers.  Valid time units are {s, m, h}.  Minimum 1 second"`
 	RPCUser            string        `short:"u" long:"rpcuser" description:"Username for RPC connections"`
-	RPCPass            string        `short:"P" long:"rpcpass" description:"Password for RPC connections"`
+	RPCPass            string        `short:"P" long:"rpcpass" default-mask:"-" description:"Password for RPC connections"`
 	RPCPort            string        `short:"r" long:"rpcport" description:"Listen for JSON/RPC messages on this port"`
 	DisableRPC         bool          `long:"norpc" description:"Disable built-in RPC server -- NOTE: The RPC server is disabled by default if no rpcuser/rpcpass is specified"`
 	DisableDNSSeed     bool          `long:"nodnsseed" description:"Disable DNS seeding for peers"`
 	Proxy              string        `long:"proxy" description:"Connect via SOCKS5 proxy (eg. 127.0.0.1:9050)"`
 	ProxyUser          string        `long:"proxyuser" description:"Username for proxy server"`
-	ProxyPass          string        `long:"proxypass" description:"Password for proxy server"`
+	ProxyPass          string        `long:"proxypass" default-mask:"-" description:"Password for proxy server"`
 	UseTor             bool          `long:"tor" description:"Specifies the proxy server used is a Tor node"`
 	TestNet3           bool          `long:"testnet" description:"Use the test network"`
 	RegressionTest     bool          `long:"regtest" description:"Use the regression test network"`
@@ -209,16 +209,11 @@ func loadConfig() (*config, []string, error) {
 	}
 
 	// Pre-parse the command line options to see if an alternative config
-	// file or the version flag was specified.
+	// file or the version flag was specified.  Any errors can be ignored
+	// here since they will be caught be the final parse below.
 	preCfg := cfg
-	preParser := flags.NewParser(&preCfg, flags.Default)
-	_, err := preParser.Parse()
-	if err != nil {
-		if e, ok := err.(*flags.Error); !ok || e.Type != flags.ErrHelp {
-			preParser.WriteHelp(os.Stderr)
-		}
-		return nil, nil, err
-	}
+	preParser := flags.NewParser(&preCfg, flags.None)
+	preParser.Parse()
 
 	// Show the version and exit if the version flag was specified.
 	if preCfg.ShowVersion {
@@ -230,7 +225,7 @@ func loadConfig() (*config, []string, error) {
 
 	// Load additional config from file.
 	parser := flags.NewParser(&cfg, flags.Default)
-	err = parser.ParseIniFile(preCfg.ConfigFile)
+	err := parser.ParseIniFile(preCfg.ConfigFile)
 	if err != nil {
 		if _, ok := err.(*os.PathError); !ok {
 			fmt.Fprintln(os.Stderr, err)
