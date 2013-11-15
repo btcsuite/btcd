@@ -779,6 +779,9 @@ func (mp *txMemPool) maybeAcceptTransaction(tx *btcutil.Tx, isOrphan *bool) erro
 	// used later.
 	txFee, err := btcchain.CheckTransactionInputs(tx, nextBlockHeight, txStore)
 	if err != nil {
+		if _, ok := err.(btcchain.RuleError); ok {
+			return TxRuleError(err.Error())
+		}
 		return err
 	}
 
