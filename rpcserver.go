@@ -724,7 +724,7 @@ func handleGetRawTransaction(s *rpcServer, cmd btcjson.Cmd, walletNotification c
 				// TODO: set and return error?
 				log.Errorf("RPCS: Error getting address hash for %v: %v", txSha, err)
 			}
-			if addr, err := btcutil.EncodeAddress(addrhash, s.server.btcnet); err != nil {
+			if addr, err := btcutil.EncodeAddress(addrhash, s.server.btcnet); err == nil {
 				// TODO: set and return error?
 				addrList := make([]string, 1)
 				addrList[0] = addr
