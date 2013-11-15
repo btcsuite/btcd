@@ -663,14 +663,15 @@ func (mp *txMemPool) FetchTransaction(txHash *btcwire.ShaHash) (*btcutil.Tx, err
 	return nil, fmt.Errorf("transaction is not in the pool")
 }
 
-// maybeAcceptTransaction is the main workhorse for handling insertion of new
-// free-standing transactions into a memory pool.  It includes functionality
-// such as rejecting duplicate transactions, ensuring transactions follow all
-// rules, orphan transaction handling, and insertion into the memory pool.
+// maybeAcceptTransaction is the internal function which implements the public
+// MaybeAcceptTransaction.  See the comment for MaybeAcceptTransaction for
+// more details.
 //
 // This function MUST be called with the mempool lock held (for writes).
 func (mp *txMemPool) maybeAcceptTransaction(tx *btcutil.Tx, isOrphan *bool) error {
-	*isOrphan = false
+	if isOrphan != nil {
+		*isOrphan = false
+	}
 	txHash := tx.Sha()
 
 	// Don't accept the transaction if it already exists in the pool.  This
@@ -765,7 +766,9 @@ func (mp *txMemPool) maybeAcceptTransaction(tx *btcutil.Tx, isOrphan *bool) erro
 	// Transaction is an orphan if any of the inputs don't exist.
 	for _, txD := range txStore {
 		if txD.Err == btcdb.TxShaMissing {
-			*isOrphan = true
+			if isOrphan != nil {
+				*isOrphan = true
+			}
 			return nil
 		}
 	}
@@ -823,11 +826,23 @@ func (mp *txMemPool) maybeAcceptTransaction(tx *btcutil.Tx, isOrphan *bool) erro
 
 	// TODO(davec): Notifications
 
-	// Generate the inventory vector and relay it.
-	iv := btcwire.NewInvVect(btcwire.InvTypeTx, txHash)
-	mp.server.RelayInventory(iv)
-
 	return nil
+}
+
+// MaybeAcceptTransaction is the main workhorse for handling insertion of new
+// free-standing transactions into a memory pool.  It includes functionality
+// such as rejecting duplicate transactions, ensuring transactions follow all
+// rules, orphan transaction handling, and insertion into the memory pool.  The
+// isOrphan parameter can be nil if the caller does not need to know whether
+// or not the transaction is an orphan.
+//
+// This function is safe for concurrent access.
+func (mp *txMemPool) MaybeAcceptTransaction(tx *btcutil.Tx, isOrphan *bool) error {
+	// Protect concurrent access.
+	mp.Lock()
+	defer mp.Unlock()
+
+	return mp.maybeAcceptTransaction(tx, isOrphan)
 }
 
 // processOrphans determines if there are any orphans which depend on the passed
@@ -872,7 +887,11 @@ func (mp *txMemPool) processOrphans(hash *btcwire.ShaHash) error {
 				return err
 			}
 
-			if isOrphan {
+			if !isOrphan {
+				// Generate the inventory vector and relay it.
+				iv := btcwire.NewInvVect(btcwire.InvTypeTx, tx.Sha())
+				mp.server.RelayInventory(iv)
+			} else {
 				mp.removeOrphan(orphanHash)
 			}
 
@@ -907,6 +926,10 @@ func (mp *txMemPool) ProcessTransaction(tx *btcutil.Tx) error {
 	}
 
 	if !isOrphan {
+		// Generate the inventory vector and relay it.
+		iv := btcwire.NewInvVect(btcwire.InvTypeTx, tx.Sha())
+		mp.server.RelayInventory(iv)
+
 		// Accept any orphan transactions that depend on this
 		// transaction (they are no longer orphans) and repeat for those
 		// accepted transactions until there are no more.
