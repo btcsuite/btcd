@@ -225,14 +225,16 @@ func loadConfig() (*config, []string, error) {
 
 	// Load additional config from file.
 	parser := flags.NewParser(&cfg, flags.Default)
-	err := parser.ParseIniFile(preCfg.ConfigFile)
-	if err != nil {
-		if _, ok := err.(*os.PathError); !ok {
-			fmt.Fprintln(os.Stderr, err)
-			parser.WriteHelp(os.Stderr)
-			return nil, nil, err
+	if !preCfg.RegressionTest || preCfg.ConfigFile != defaultConfigFile {
+		err := parser.ParseIniFile(preCfg.ConfigFile)
+		if err != nil {
+			if _, ok := err.(*os.PathError); !ok {
+				fmt.Fprintln(os.Stderr, err)
+				parser.WriteHelp(os.Stderr)
+				return nil, nil, err
+			}
+			log.Warnf("%v", err)
 		}
-		log.Warnf("%v", err)
 	}
 
 	// Don't add peers from the config file when in regression test mode.
