@@ -440,6 +440,12 @@ func (p *peer) handleMemPoolMsg(msg *btcwire.MsgMemPool) {
 	invMsg := btcwire.NewMsgInv()
 	hashes := p.server.txMemPool.TxShas()
 	for i, hash := range hashes {
+		// Another thread might have removed the transaction from the
+		// pool since the initial query.
+		if !p.server.txMemPool.IsTransactionInPool(hash) {
+			continue
+		}
+
 		iv := btcwire.NewInvVect(btcwire.InvTypeTx, hash)
 		invMsg.AddInvVect(iv)
 		if i+1 >= btcwire.MaxInvPerMsg {

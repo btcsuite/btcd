@@ -645,9 +645,14 @@ func (b *blockManager) handleNotifyMsg(notification *btcchain.Notification) {
 		}
 
 		// Remove all of the transactions (except the coinbase) in the
-		// connected block from the transaction pool.
+		// connected block from the transaction pool.  Also, remove any
+		// transactions which are now double spends as a result of these
+		// new transactions.  Note that removing a transaction from
+		// pool also removes any transactions which depend on it,
+		// recursively.
 		for _, tx := range block.Transactions()[1:] {
-			b.server.txMemPool.removeTransaction(tx)
+			b.server.txMemPool.RemoveTransaction(tx)
+			b.server.txMemPool.RemoveDoubleSpends(tx)
 		}
 
 		// Notify frontends
@@ -674,7 +679,7 @@ func (b *blockManager) handleNotifyMsg(notification *btcchain.Notification) {
 				// Remove the transaction and all transactions
 				// that depend on it if it wasn't accepted into
 				// the transaction pool.
-				b.server.txMemPool.removeTransaction(tx)
+				b.server.txMemPool.RemoveTransaction(tx)
 			}
 		}
 

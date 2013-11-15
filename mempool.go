@@ -565,7 +565,8 @@ func (mp *txMemPool) HaveTransaction(hash *btcwire.ShaHash) bool {
 	return mp.haveTransaction(hash)
 }
 
-// removeTransaction removes the passed transaction from the memory pool.
+// removeTransaction is the internal function which implements the public
+// RemoveTransaction.  See the comment for RemoveTransaction for more details.
 //
 // This function MUST be called with the mempool lock held (for writes).
 func (mp *txMemPool) removeTransaction(tx *btcutil.Tx) {
@@ -585,6 +586,39 @@ func (mp *txMemPool) removeTransaction(tx *btcutil.Tx) {
 			delete(mp.outpoints, txIn.PreviousOutpoint)
 		}
 		delete(mp.pool, *txHash)
+	}
+}
+
+// RemoveTransaction removes the passed transaction and any transactions which
+// depend on it from the memory pool.
+//
+// This function is safe for concurrent access.
+func (mp *txMemPool) RemoveTransaction(tx *btcutil.Tx) {
+	// Protect concurrent access.
+	mp.Lock()
+	defer mp.Unlock()
+
+	mp.removeTransaction(tx)
+}
+
+// RemoveDoubleSpends removes all transactions which spend outputs spent by the
+// passed transaction from the memory pool.  Removing those transactions then
+// leads to removing all transactions which rely on them, recursively.  This is
+// necessary when a block is connected to the main chain because the block may
+// contain transactions which were previously unknown to the memory pool
+//
+// This function is safe for concurrent access.
+func (mp *txMemPool) RemoveDoubleSpends(tx *btcutil.Tx) {
+	// Protect concurrent access.
+	mp.Lock()
+	defer mp.Unlock()
+
+	for _, txIn := range tx.MsgTx().TxIn {
+		if txRedeemer, ok := mp.outpoints[txIn.PreviousOutpoint]; ok {
+			if !txRedeemer.Sha().IsEqual(tx.Sha()) {
+				mp.removeTransaction(txRedeemer)
+			}
+		}
 	}
 }
 
