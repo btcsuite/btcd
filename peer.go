@@ -431,6 +431,43 @@ func (p *peer) PushGetBlocksMsg(locator btcchain.BlockLocator, stopHash *btcwire
 	return nil
 }
 
+// PushGetHeadersMsg sends a getblocks message for the provided block locator
+// and stop hash.  It will ignore back-to-back duplicate requests.
+func (p *peer) PushGetHeadersMsg(locator btcchain.BlockLocator) error {
+	// Extract the begin hash from the block locator, if one was specified,
+	// to use for filtering duplicate getblocks requests.
+	// request.
+	var beginHash *btcwire.ShaHash
+	if len(locator) > 0 {
+		beginHash = locator[0]
+	}
+
+	// Filter duplicate getblocks requests.
+	if p.prevGetBlocksBegin != nil &&
+		beginHash != nil &&
+		beginHash.IsEqual(p.prevGetBlocksBegin) {
+
+		peerLog.Tracef("PEER: Filtering duplicate [getblocks] with begin "+
+			"hash %v", beginHash)
+		return nil
+	}
+
+	// Construct the getheaders request and queue it to be sent.
+	msg := btcwire.NewMsgGetHeaders()
+	for _, hash := range locator {
+		err := msg.AddBlockLocatorHash(hash)
+		if err != nil {
+			return err
+		}
+	}
+	p.QueueMessage(msg, nil)
+
+	// Update the previous getblocks request information for filtering
+	// duplicates.
+	p.prevGetBlocksBegin = beginHash
+	return nil
+}
+
 // handleMemPoolMsg is invoked when a peer receives a mempool bitcoin message.
 // It creates and sends an inventory message with the contents of the memory
 // pool up to the maximum inventory allowed per message.
@@ -518,6 +555,14 @@ func (p *peer) handleBlockMsg(msg *btcwire.MsgBlock, buf []byte) {
 // QueueMessage with any appropriate responses.
 func (p *peer) handleInvMsg(msg *btcwire.MsgInv) {
 	p.server.blockManager.QueueInv(msg, p)
+}
+
+// handleHeadersMsg is invoked when a peer receives an inv bitcoin message and
+// is used to examine the inventory being advertised by the remote peer and
+// react accordingly. We pass the message down to blockmanager which will call
+// QueueMessage with any appropriate responses.
+func (p *peer) handleHeadersMsg(msg *btcwire.MsgHeaders) {
+	p.server.blockManager.QueueHeaders(msg, p)
 }
 
 // handleGetData is invoked when a peer receives a getdata bitcoin message and
@@ -1043,6 +1088,9 @@ out:
 
 		case *btcwire.MsgGetHeaders:
 			p.handleGetHeadersMsg(msg)
+
+		case *btcwire.MsgHeaders:
+			p.handleHeadersMsg(msg)
 
 		default:
 			peerLog.Debugf("Received unhandled message of type %v: Fix Me",
