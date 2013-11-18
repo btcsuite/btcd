@@ -60,6 +60,7 @@ var commandHandlers = map[string]*handlerData{
 	"getpeerinfo":          &handlerData{0, 0, displaySpewDump, nil, makeGetPeerInfo, ""},
 	"getrawmempool":        &handlerData{0, 0, displaySpewDump, nil, makeGetRawMempool, ""},
 	"getrawtransaction":    &handlerData{1, 1, displaySpewDump, []conversionHandler{nil, toInt}, makeGetRawTransaction, "<txhash> [verbose=0]"},
+	"importprivkey":        &handlerData{1, 2, displayGeneric, []conversionHandler{nil, nil, toBool}, makeImportPrivKey, "<wifprivkey> [label] [rescan=true]"},
 	"verifychain":          &handlerData{0, 2, displaySpewDump, []conversionHandler{toInt, toInt}, makeVerifyChain, "[level] [depth]"},
 	"stop":                 &handlerData{0, 0, displayGeneric, nil, makeStop, ""},
 }
@@ -88,6 +89,14 @@ func toInt64(val string) (interface{}, error) {
 	}
 
 	return idx, nil
+}
+
+// toBool attempts to convert the passed string to a bool.  It returns the
+// bool packed into the empty interface so it can be used in the calls which
+// accept interfaces.  An error will be returned if the string can't be
+// converted to a bool.
+func toBool(val string) (interface{}, error) {
+	return strconv.ParseBool(val)
 }
 
 // displayGeneric is a displayHandler that simply displays the passed interface
@@ -189,6 +198,22 @@ func makeGetRawTransaction(args []interface{}) (btcjson.Cmd, error) {
 
 	bi := i != 0
 	return btcjson.NewGetRawTransactionCmd("btcctl", args[0].(string), bi)
+}
+
+// makeImportPrivKey generates the cmd structure for
+// importprivkey commands.
+func makeImportPrivKey(args []interface{}) (btcjson.Cmd, error) {
+	var label string
+	var rescan bool
+	if len(args) > 1 {
+		label = args[1].(string)
+	}
+	if len(args) > 2 {
+		rescan = args[2].(bool)
+	}
+
+	return btcjson.NewImportPrivKeyCmd("btcctl", args[0].(string), label,
+		rescan)
 }
 
 // makeStop generates the cmd structure for stop comands.
