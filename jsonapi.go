@@ -7,6 +7,7 @@ package btcjson
 import (
 	"encoding/json"
 	"fmt"
+	"strings"
 )
 
 // Message contains a message to be sent to the bitcoin client.
@@ -741,7 +742,11 @@ func ReadResultCmd(cmd string, message []byte) (Reply, error) {
 	var objmap map[string]json.RawMessage
 	err = json.Unmarshal(message, &objmap)
 	if err != nil {
-		err = fmt.Errorf("Error unmarshalling json reply: %v", err)
+		if strings.Contains(string(message), "401 Unauthorized.") {
+			err = fmt.Errorf("Authentication error.")
+		} else {
+			err = fmt.Errorf("Error unmarshalling json reply: %v", err)
+		}
 		return result, err
 	}
 	// Take care of the parts that are the same for all replies.
