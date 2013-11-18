@@ -684,7 +684,7 @@ var jsoncmdtests = []struct {
 			id:      float64(1),
 			PrivKey: "somereallongprivatekey",
 			Label:   "some text",
-			ReScan:  false,
+			Rescan:  false,
 		},
 	},
 	{

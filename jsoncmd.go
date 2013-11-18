@@ -3510,7 +3510,7 @@ type ImportPrivKeyCmd struct {
 	id      interface{}
 	PrivKey string
 	Label   string
-	ReScan  bool
+	Rescan  bool
 }
 
 // Enforce that ImportPrivKeyCmd satisifies the Cmd interface.
@@ -3542,7 +3542,7 @@ func NewImportPrivKeyCmd(id interface{}, privkey string, optArgs ...interface{})
 		id:      id,
 		PrivKey: privkey,
 		Label:   label,
-		ReScan:  rescan,
+		Rescan:  rescan,
 	}, nil
 }
 
@@ -3567,12 +3567,12 @@ func (cmd *ImportPrivKeyCmd) MarshalJSON() ([]byte, error) {
 		},
 	}
 
-	if cmd.Label != "" || cmd.ReScan {
+	if cmd.Label != "" || cmd.Rescan {
 		raw.Params = append(raw.Params, cmd.Label)
 	}
 
-	if cmd.ReScan {
-		raw.Params = append(raw.Params, cmd.ReScan)
+	if cmd.Rescan {
+		raw.Params = append(raw.Params, cmd.Rescan)
 	}
 	return json.Marshal(raw)
 }
