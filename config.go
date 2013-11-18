@@ -47,7 +47,7 @@ type config struct {
 	DataDir            string        `short:"b" long:"datadir" description:"Directory to store data"`
 	AddPeers           []string      `short:"a" long:"addpeer" description:"Add a peer to connect with at startup"`
 	ConnectPeers       []string      `long:"connect" description:"Connect only to the specified peers at startup"`
-	DisableListen      bool          `long:"nolisten" description:"Disable listening for incoming connections -- NOTE: Listening is automatically disabled if the --connect option is used or if the --proxy option is used without the --tor option"`
+	DisableListen      bool          `long:"nolisten" description:"Disable listening for incoming connections -- NOTE: Listening is automatically disabled if the --connect or --proxy options are used without also specifying listen interfaces via --listen"`
 	Listeners          []string      `long:"listen" description:"Listen for connections on this interface/port (default all interfaces port: 8333, testnet: 18333)"`
 	MaxPeers           int           `long:"maxpeers" description:"Max number of inbound and outbound peers"`
 	BanDuration        time.Duration `long:"banduration" description:"How long to ban misbehaving peers.  Valid time units are {s, m, h}.  Minimum 1 second"`

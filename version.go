@@ -33,7 +33,7 @@ var appBuild string
 // version returns the application version as a properly formed string per the
 // semantic versioning 2.0.0 spec (http://semver.org/).
 func version() string {
-	// Start with the major, minor, and path versions.
+	// Start with the major, minor, and patch versions.
 	version := fmt.Sprintf("%d.%d.%d", appMajor, appMinor, appPatch)
 
 	// Append pre-release version if there is one.  The hyphen called for

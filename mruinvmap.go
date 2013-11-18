@@ -85,7 +85,7 @@ func (m *MruInventoryMap) Delete(iv *btcwire.InvVect) {
 // NewMruInventoryMap returns a new inventory map that is limited to the number
 // of entries specified by limit.  When the number of entries exceeds the limit,
 // the oldest (least recently used) entry will be removed to make room for the
-// new entry..
+// new entry.
 func NewMruInventoryMap(limit uint) *MruInventoryMap {
 	m := MruInventoryMap{
 		invMap:  make(map[btcwire.InvVect]*list.Element),
