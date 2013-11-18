@@ -14,7 +14,11 @@ import (
 // It performs several validation checks which depend on its position within
 // the block chain before adding it.  The block is expected to have already gone
 // through ProcessBlock before calling this function with it.
-func (b *BlockChain) maybeAcceptBlock(block *btcutil.Block) error {
+// The fastAdd argument modifies the behavior of the function by avoiding the
+// somewhat expensive operation: BIP34 validation, it also passes the argument
+// down to connectBestChain()
+
+func (b *BlockChain) maybeAcceptBlock(block *btcutil.Block, fastAdd bool) error {
 	// Get a block node for the block previous to this one.  Will be nil
 	// if this is the genesis block.
 	prevNode, err := b.getPrevNodeFromBlock(block)
@@ -31,43 +35,49 @@ func (b *BlockChain) maybeAcceptBlock(block *btcutil.Block) error {
 	}
 	block.SetHeight(blockHeight)
 
-	// Ensure the difficulty specified in the block header matches the
-	// calculated difficulty based on the previous block and difficulty
-	// retarget rules.
 	blockHeader := block.MsgBlock().Header
-	expectedDifficulty, err := b.calcNextRequiredDifficulty(prevNode, block)
-	if err != nil {
-		return err
-	}
-	blockDifficulty := blockHeader.Bits
-	if blockDifficulty != expectedDifficulty {
-		str := "block difficulty of %d is not the expected value of %d"
-		str = fmt.Sprintf(str, blockDifficulty, expectedDifficulty)
-		return RuleError(str)
-	}
 
-	// Ensure the timestamp for the block header is after the median time of
-	// the last several blocks (medianTimeBlocks).
-	medianTime, err := b.calcPastMedianTime(prevNode)
-	if err != nil {
-		log.Errorf("calcPastMedianTime: %v", err)
-		return err
-	}
-	if !blockHeader.Timestamp.After(medianTime) {
-		str := "block timestamp of %v is not after expected %v"
-		str = fmt.Sprintf(str, blockHeader.Timestamp, medianTime)
-		return RuleError(str)
-	}
-
-	// Ensure all transactions in the block are finalized.
-	for _, tx := range block.Transactions() {
-		if !IsFinalizedTransaction(tx, blockHeight, blockHeader.Timestamp) {
-			str := fmt.Sprintf("block contains unfinalized "+
-				"transaction %v", tx.Sha())
+	if !fastAdd {
+		// Ensure the difficulty specified in the block header matches
+		// the calculated difficulty based on the previous block and
+		// difficulty
+		// retarget rules.
+		expectedDifficulty, err := b.calcNextRequiredDifficulty(prevNode, block)
+		if err != nil {
+			return err
+		}
+		blockDifficulty := blockHeader.Bits
+		if blockDifficulty != expectedDifficulty {
+			str := "block difficulty of %d is not the expected value of %d"
+			str = fmt.Sprintf(str, blockDifficulty, expectedDifficulty)
 			return RuleError(str)
 		}
-	}
 
+		// Ensure the timestamp for the block header is after the
+		// median time of the last several blocks (medianTimeBlocks).
+		medianTime, err := b.calcPastMedianTime(prevNode)
+		if err != nil {
+			log.Errorf("calcPastMedianTime: %v", err)
+			return err
+		}
+		if !blockHeader.Timestamp.After(medianTime) {
+			str := "block timestamp of %v is not after expected %v"
+			str = fmt.Sprintf(str, blockHeader.Timestamp,
+				medianTime)
+			return RuleError(str)
+		}
+
+		// Ensure all transactions in the block are finalized.
+		for _, tx := range block.Transactions() {
+			if !IsFinalizedTransaction(tx, blockHeight,
+				blockHeader.Timestamp) {
+				str := fmt.Sprintf("block contains "+
+					"unfinalized transaction %v", tx.Sha())
+				return RuleError(str)
+			}
+		}
+
+	}
 	// Ensure chain matches up to predetermined checkpoints.
 	// It's safe to ignore the error on Sha since it's already cached.
 	blockHash, _ := block.Sha()
@@ -83,59 +93,66 @@ func (b *BlockChain) maybeAcceptBlock(block *btcutil.Block) error {
 		return RuleError(str)
 	}
 
-	// Reject version 1 blocks once a majority of the network has upgraded.
-	// Rules:
-	//  95% (950 / 1000) for main network
-	//  75% (75 / 100) for the test network
-	// This is part of BIP_0034.
-	if blockHeader.Version == 1 {
-		minRequired := uint64(950)
-		numToCheck := uint64(1000)
-		if b.btcnet == btcwire.TestNet3 || b.btcnet == btcwire.TestNet {
-			minRequired = 75
-			numToCheck = 100
-		}
-		if b.isMajorityVersion(2, prevNode, minRequired, numToCheck) {
-			str := "new blocks with version %d are no longer valid"
-			str = fmt.Sprintf(str, blockHeader.Version)
-			return RuleError(str)
-		}
-	}
-
-	// Ensure coinbase starts with serialized block heights for blocks
-	// whose version is the serializedHeightVersion or newer once a majority
-	// of the network has upgraded.
-	// Rules:
-	//  75% (750 / 1000) for main network
-	//  51% (51 / 100) for the test network
-	// This is part of BIP_0034.
-	if blockHeader.Version >= serializedHeightVersion {
-		minRequired := uint64(750)
-		numToCheck := uint64(1000)
-		if b.btcnet == btcwire.TestNet3 || b.btcnet == btcwire.TestNet {
-			minRequired = 51
-			numToCheck = 100
-		}
-		if b.isMajorityVersion(serializedHeightVersion, prevNode,
-			minRequired, numToCheck) {
-
-			expectedHeight := int64(0)
-			if prevNode != nil {
-				expectedHeight = prevNode.height + 1
+	if !fastAdd {
+		// Reject version 1 blocks once a majority of the network has
+		// upgraded.
+		// Rules:
+		//  95% (950 / 1000) for main network
+		//  75% (75 / 100) for the test network
+		// This is part of BIP_0034.
+		if blockHeader.Version == 1 {
+			minRequired := uint64(950)
+			numToCheck := uint64(1000)
+			if b.btcnet == btcwire.TestNet3 || b.btcnet ==
+				btcwire.TestNet {
+				minRequired = 75
+				numToCheck = 100
 			}
-			coinbaseTx := block.Transactions()[0]
-			err := checkSerializedHeight(coinbaseTx, expectedHeight)
-			if err != nil {
-				return err
+			if b.isMajorityVersion(2, prevNode, minRequired,
+				numToCheck) {
+				str := "new blocks with version %d are no longer valid"
+				str = fmt.Sprintf(str, blockHeader.Version)
+				return RuleError(str)
 			}
 		}
-	}
 
-	// Prune block nodes which are no longer needed before creating a new
-	// node.
-	err = b.pruneBlockNodes()
-	if err != nil {
-		return err
+		// Ensure coinbase starts with serialized block heights for
+		// blocks whose version is the serializedHeightVersion or
+		// newer once a majority of the network has upgraded.
+		// Rules:
+		//  75% (750 / 1000) for main network
+		//  51% (51 / 100) for the test network
+		// This is part of BIP_0034.
+		if blockHeader.Version >= serializedHeightVersion {
+			minRequired := uint64(750)
+			numToCheck := uint64(1000)
+			if b.btcnet == btcwire.TestNet3 || b.btcnet ==
+				btcwire.TestNet {
+				minRequired = 51
+				numToCheck = 100
+			}
+			if b.isMajorityVersion(serializedHeightVersion,
+				prevNode, minRequired, numToCheck) {
+
+				expectedHeight := int64(0)
+				if prevNode != nil {
+					expectedHeight = prevNode.height + 1
+				}
+				coinbaseTx := block.Transactions()[0]
+				err := checkSerializedHeight(coinbaseTx,
+					expectedHeight)
+				if err != nil {
+					return err
+				}
+			}
+		}
+
+		// Prune block nodes which are no longer needed before creating
+		// a new node.
+		err = b.pruneBlockNodes()
+		if err != nil {
+			return err
+		}
 	}
 
 	// Create a new block node for the block and add it to the in-memory
@@ -150,7 +167,7 @@ func (b *BlockChain) maybeAcceptBlock(block *btcutil.Block) error {
 	// Connect the passed block to the chain while respecting proper chain
 	// selection according to the chain with the most proof of work.  This
 	// also handles validation of the transaction scripts.
-	err = b.connectBestChain(newNode, block)
+	err = b.connectBestChain(newNode, block, fastAdd)
 	if err != nil {
 		return err
 	}

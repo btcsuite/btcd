@@ -58,7 +58,7 @@ func TestReorganization(t *testing.T) {
 	btcchain.TstSetCoinbaseMaturity(1)
 
 	for i := 1; i < len(blocks); i++ {
-		err = chain.ProcessBlock(blocks[i])
+		err = chain.ProcessBlock(blocks[i], false)
 		if err != nil {
 			t.Errorf("ProcessBlock fail on block %v: %v\n", i, err)
 			return

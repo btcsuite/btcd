@@ -74,7 +74,7 @@ func (b *BlockChain) processOrphans(hash *btcwire.ShaHash) error {
 			i--
 
 			// Potentially accept the block into the block chain.
-			err := b.maybeAcceptBlock(orphan.block)
+			err := b.maybeAcceptBlock(orphan.block, false)
 			if err != nil {
 				return err
 			}
@@ -92,7 +92,7 @@ func (b *BlockChain) processOrphans(hash *btcwire.ShaHash) error {
 // the block chain.  It includes functionality such as rejecting duplicate
 // blocks, ensuring blocks follow all rules, orphan handling, and insertion into
 // the block chain along with best chain selection and reorganization.
-func (b *BlockChain) ProcessBlock(block *btcutil.Block) error {
+func (b *BlockChain) ProcessBlock(block *btcutil.Block, fastAdd bool) error {
 	blockHash, err := block.Sha()
 	if err != nil {
 		return err
@@ -138,22 +138,23 @@ func (b *BlockChain) ProcessBlock(block *btcutil.Block) error {
 				blockHeader.Timestamp, checkpointTime)
 			return RuleError(str)
 		}
-
-		// Even though the checks prior to now have already ensured the
-		// proof of work exceeds the claimed amount, the claimed amount
-		// is a field in the block header which could be forged.  This
-		// check ensures the proof of work is at least the minimum
-		// expected based on elapsed time since the last checkpoint and
-		// maximum adjustment allowed by the retarget rules.
-		duration := blockHeader.Timestamp.Sub(checkpointTime)
-		requiredTarget := CompactToBig(b.calcEasiestDifficulty(
-			checkpointHeader.Bits, duration))
-		currentTarget := CompactToBig(blockHeader.Bits)
-		if currentTarget.Cmp(requiredTarget) > 0 {
-			str := fmt.Sprintf("block target difficulty of %064x "+
-				"is too low when compared to the previous "+
-				"checkpoint", currentTarget)
-			return RuleError(str)
+		if !fastAdd {
+			// Even though the checks prior to now have already ensured the
+			// proof of work exceeds the claimed amount, the claimed amount
+			// is a field in the block header which could be forged.  This
+			// check ensures the proof of work is at least the minimum
+			// expected based on elapsed time since the last checkpoint and
+			// maximum adjustment allowed by the retarget rules.
+			duration := blockHeader.Timestamp.Sub(checkpointTime)
+			requiredTarget := CompactToBig(b.calcEasiestDifficulty(
+				checkpointHeader.Bits, duration))
+			currentTarget := CompactToBig(blockHeader.Bits)
+			if currentTarget.Cmp(requiredTarget) > 0 {
+				str := fmt.Sprintf("block target difficulty of %064x "+
+					"is too low when compared to the previous "+
+					"checkpoint", currentTarget)
+				return RuleError(str)
+			}
 		}
 	}
 
@@ -172,7 +173,7 @@ func (b *BlockChain) ProcessBlock(block *btcutil.Block) error {
 
 	// The block has passed all context independent checks and appears sane
 	// enough to potentially accept it into the block chain.
-	err = b.maybeAcceptBlock(block)
+	err = b.maybeAcceptBlock(block, fastAdd)
 	if err != nil {
 		return err
 	}

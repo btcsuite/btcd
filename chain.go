@@ -874,7 +874,10 @@ func (b *BlockChain) reorganizeChain(detachNodes, attachNodes *list.List) error 
 // chain.  However, it may also be extending (or creating) a side chain (fork)
 // which may or may not end up becoming the main chain depending on which fork
 // cumulatively has the most proof of work.
-func (b *BlockChain) connectBestChain(node *blockNode, block *btcutil.Block) error {
+// The fastAdd argument avoids the call to checkConnectBlock which does
+// several expensive transaction validation operations.
+
+func (b *BlockChain) connectBestChain(node *blockNode, block *btcutil.Block, fastAdd bool) error {
 	// We haven't selected a best chain yet or we are extending the main
 	// (best) chain with a new block.  This is the most common case.
 	if b.bestChain == nil || node.parent.hash.IsEqual(b.bestChain.hash) {
@@ -883,13 +886,15 @@ func (b *BlockChain) connectBestChain(node *blockNode, block *btcutil.Block) err
 		// be necessary to get this node to the main chain) without
 		// violating any rules and without actually connecting the
 		// block.
-		err := b.checkConnectBlock(node, block)
-		if err != nil {
-			return err
+		if !fastAdd {
+			err := b.checkConnectBlock(node, block)
+			if err != nil {
+				return err
+			}
 		}
 
 		// Connect the block to the main chain.
-		err = b.connectBlock(node, block)
+		err := b.connectBlock(node, block)
 		if err != nil {
 			return err
 		}
@@ -900,6 +905,10 @@ func (b *BlockChain) connectBestChain(node *blockNode, block *btcutil.Block) err
 		}
 
 		return nil
+	}
+	if fastAdd {
+		bsha, _ := block.Sha()
+		log.Warnf("fastAdd set in the side chain case? %v\n", bsha)
 	}
 
 	// We're extending (or creating) a side chain which may or may not
