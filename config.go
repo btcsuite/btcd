@@ -190,7 +190,7 @@ func loadConfig() (*config, []string, error) {
 	err := os.MkdirAll(btcdHomeDir, 0700)
 	if err != nil {
 		log.Errorf("%v", err)
-		os.Exit(-1)
+		return nil, nil, err
 	}
 
 	// Pre-parse the command line options to see if an alternative config
