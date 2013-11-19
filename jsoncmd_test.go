@@ -670,6 +670,7 @@ var jsoncmdtests = []struct {
 		result: &ImportPrivKeyCmd{
 			id:      float64(1),
 			PrivKey: "somereallongprivatekey",
+			Rescan:  true,
 		},
 	},
 	{

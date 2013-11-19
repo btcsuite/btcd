@@ -3520,7 +3520,7 @@ var _ Cmd = &ImportPrivKeyCmd{}
 // pointer to a TemplateRequest may be provided.
 func NewImportPrivKeyCmd(id interface{}, privkey string, optArgs ...interface{}) (*ImportPrivKeyCmd, error) {
 	var label string
-	var rescan bool
+	rescan := true
 	var ok bool
 
 	if len(optArgs) > 2 {
@@ -3567,11 +3567,11 @@ func (cmd *ImportPrivKeyCmd) MarshalJSON() ([]byte, error) {
 		},
 	}
 
-	if cmd.Label != "" || cmd.Rescan {
+	if cmd.Label != "" || !cmd.Rescan {
 		raw.Params = append(raw.Params, cmd.Label)
 	}
 
-	if cmd.Rescan {
+	if !cmd.Rescan {
 		raw.Params = append(raw.Params, cmd.Rescan)
 	}
 	return json.Marshal(raw)
