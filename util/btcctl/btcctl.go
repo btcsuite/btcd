@@ -13,14 +13,6 @@ import (
 	"strconv"
 )
 
-type config struct {
-	RpcUser       string `short:"u" long:"rpcuser" description:"RPC username"`
-	RpcPassword   string `short:"P" long:"rpcpass" description:"RPC password"`
-	RpcServer     string `short:"s" long:"rpcserver" description:"RPC server to connect to"`
-	RpcCert       string `short:"c" long:"rpccert" description:"RPC server certificate chain for validation"`
-	TlsSkipVerify bool   `long:"skipverify" description:"Do not verify tls certificates (not recommended!)"`
-}
-
 // conversionHandler is a handler that is used to convert parameters from the
 // command line to a specific type.  This is needed since the btcjson API
 // expects certain types for various parameters.
@@ -367,12 +359,7 @@ func usage(parser *flags.Parser) {
 }
 
 func main() {
-	// Parse command line and show usage if needed.
-	cfg := config{
-		RpcServer: "127.0.0.1:8334",
-	}
-	parser := flags.NewParser(&cfg, flags.PassDoubleDash|flags.HelpFlag)
-	args, err := parser.Parse()
+	parser, cfg, args, err := loadConfig()
 	if err != nil {
 		usage(parser)
 		os.Exit(1)
@@ -391,7 +378,7 @@ func main() {
 	}
 
 	// Execute the command.
-	err = commandHandler(&cfg, args[0], data, args[1:])
+	err = commandHandler(cfg, args[0], data, args[1:])
 	if err != nil {
 		if err == ErrUsage {
 			usage(parser)
