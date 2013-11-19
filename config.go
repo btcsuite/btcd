@@ -347,10 +347,18 @@ func loadConfig() (*config, []string, error) {
 		cfg.DisableRPC = true
 	}
 
-	if len(cfg.RPCListeners) == 0 {
-		cfg.RPCListeners = []string{
-			net.JoinHostPort("", activeNetParams.rpcPort),
+	// Default RPC to listen on localhost only.
+	if !cfg.DisableRPC && len(cfg.RPCListeners) == 0 {
+		addrs, err := net.LookupHost("localhost")
+		if err != nil {
+			return nil, nil, err
 		}
+		cfg.RPCListeners = make([]string, 0, len(addrs))
+		for _, addr := range addrs {
+			addr = net.JoinHostPort(addr, activeNetParams.rpcPort)
+			cfg.RPCListeners = append(cfg.RPCListeners, addr)
+		}
+
 	}
 
 	// Add default port to all listener addresses if needed and remove
