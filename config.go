@@ -31,11 +31,13 @@ const (
 )
 
 var (
-	btcdHomeDir       = btcutil.AppDataDir("btcd", false)
-	defaultConfigFile = filepath.Join(btcdHomeDir, defaultConfigFilename)
-	defaultDataDir    = filepath.Join(btcdHomeDir, defaultDataDirname)
-	defaultListener   = net.JoinHostPort("", netParams(defaultBtcnet).listenPort)
-	knownDbTypes      = btcdb.SupportedDBs()
+	btcdHomeDir        = btcutil.AppDataDir("btcd", false)
+	defaultConfigFile  = filepath.Join(btcdHomeDir, defaultConfigFilename)
+	defaultDataDir     = filepath.Join(btcdHomeDir, defaultDataDirname)
+	defaultListener    = net.JoinHostPort("", netParams(defaultBtcnet).listenPort)
+	knownDbTypes       = btcdb.SupportedDBs()
+	defaultRPCKeyFile  = filepath.Join(btcdHomeDir, "rpc.key")
+	defaultRPCCertFile = filepath.Join(btcdHomeDir, "rpc.cert")
 )
 
 // config defines the configuration options for btcd.
@@ -180,6 +182,8 @@ func loadConfig() (*config, []string, error) {
 		ConfigFile:  defaultConfigFile,
 		DataDir:     defaultDataDir,
 		DbType:      defaultDbType,
+		RPCKey:      defaultRPCKeyFile,
+		RPCCert:     defaultRPCCertFile,
 	}
 
 	// Pre-parse the command line options to see if an alternative config
@@ -340,13 +344,6 @@ func loadConfig() (*config, []string, error) {
 		cfg.RPCListeners = []string{
 			net.JoinHostPort("", activeNetParams.rpcPort),
 		}
-	}
-
-	if cfg.RPCKey == "" {
-		cfg.RPCKey = filepath.Join(cfg.DataDir, "rpc.key")
-	}
-	if cfg.RPCCert == "" {
-		cfg.RPCCert = filepath.Join(cfg.DataDir, "rpc.cert")
 	}
 
 	// Add default port to all listener addresses if needed and remove
