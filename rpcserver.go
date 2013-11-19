@@ -390,7 +390,7 @@ func genKey(key, cert string) error {
 		os.Remove(cert)
 		return err
 	}
-	keybytes, err := x509.MarshalECPrivateKey(priv)
+	keybytes, err := MarshalECPrivateKey(priv)
 	if err != nil {
 		os.Remove(key)
 		os.Remove(cert)
