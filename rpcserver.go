@@ -359,6 +359,7 @@ func genKey(key, cert string) error {
 	}
 	template.DNSNames = append(template.DNSNames, host, "localhost")
 
+	needLocalhost := true
 	addrs, err := net.InterfaceAddrs()
 	if err != nil {
 		return err
@@ -366,8 +367,15 @@ func genKey(key, cert string) error {
 	for _, a := range addrs {
 		ip, _, err := net.ParseCIDR(a.String())
 		if err == nil {
+			if ip.String() == "127.0.0.1" {
+				needLocalhost = false
+			}
 			template.IPAddresses = append(template.IPAddresses, ip)
 		}
+	}
+	if needLocalhost {
+		localHost := net.ParseIP("127.0.0.1")
+		template.IPAddresses = append(template.IPAddresses, localHost)
 	}
 
 	derBytes, err := x509.CreateCertificate(rand.Reader, &template,
