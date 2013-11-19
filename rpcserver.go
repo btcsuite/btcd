@@ -357,7 +357,7 @@ func genKey(key, cert string) error {
 	if err != nil {
 		return err
 	}
-	template.DNSNames = append(template.DNSNames, host)
+	template.DNSNames = append(template.DNSNames, host, "localhost")
 
 	addrs, err := net.InterfaceAddrs()
 	if err != nil {
