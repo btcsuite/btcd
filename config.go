@@ -48,14 +48,14 @@ type config struct {
 	AddPeers           []string      `short:"a" long:"addpeer" description:"Add a peer to connect with at startup"`
 	ConnectPeers       []string      `long:"connect" description:"Connect only to the specified peers at startup"`
 	DisableListen      bool          `long:"nolisten" description:"Disable listening for incoming connections -- NOTE: Listening is automatically disabled if the --connect or --proxy options are used without also specifying listen interfaces via --listen"`
-	Listeners          []string      `long:"listen" description:"Listen for connections on this interface/port (default all interfaces port: 8333, testnet: 18333)"`
+	Listeners          []string      `long:"listen" description:"Add an interface/port to listen for connections (default all interfaces port: 8333, testnet: 18333)"`
 	MaxPeers           int           `long:"maxpeers" description:"Max number of inbound and outbound peers"`
 	BanDuration        time.Duration `long:"banduration" description:"How long to ban misbehaving peers.  Valid time units are {s, m, h}.  Minimum 1 second"`
 	RPCUser            string        `short:"u" long:"rpcuser" description:"Username for RPC connections"`
 	RPCPass            string        `short:"P" long:"rpcpass" default-mask:"-" description:"Password for RPC connections"`
-	RPCListeners       []string      `long:"rpclisten" description:"Listen for RPC connections on this interface/port (default no listening.  default port: 8334, testnet: 18334)"`
-	RPCCert            string        `long:"rpccert" description:"File containing the certificate file."`
-	RPCKey             string        `long:"rpckey" description:"File containing the certificate key."`
+	RPCListeners       []string      `long:"rpclisten" description:"Add an interface/port to listen for RPC connections (default port: 8334, testnet: 18334)"`
+	RPCCert            string        `long:"rpccert" description:"File containing the certificate file"`
+	RPCKey             string        `long:"rpckey" description:"File containing the certificate key"`
 	DisableRPC         bool          `long:"norpc" description:"Disable built-in RPC server -- NOTE: The RPC server is disabled by default if no rpcuser/rpcpass is specified"`
 	DisableDNSSeed     bool          `long:"nodnsseed" description:"Disable DNS seeding for peers"`
 	Proxy              string        `long:"proxy" description:"Connect via SOCKS5 proxy (eg. 127.0.0.1:9050)"`
