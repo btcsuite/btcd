@@ -287,9 +287,21 @@ func (s *rpcServer) Start() {
 		}
 	})
 	go s.walletListenerDuplicator()
-	rpcServeMux.Handle("/wallet", websocket.Handler(func(ws *websocket.Conn) {
-		s.walletReqsNotifications(ws)
-	}))
+	wsServer := websocket.Server{
+		Handler: websocket.Handler(func(ws *websocket.Conn) {
+			s.walletReqsNotifications(ws)
+		}),
+		Handshake: func(_ *websocket.Config, r *http.Request) error {
+			login := s.username + ":" + s.password
+			auth := "Basic " + base64.StdEncoding.EncodeToString([]byte(login))
+			authhdr := r.Header["Authorization"]
+			if len(authhdr) <= 0 || authhdr[0] != auth {
+				return errors.New("auth failure")
+			}
+			return nil
+		},
+	}
+	rpcServeMux.Handle("/wallet", wsServer)
 	for _, listener := range s.listeners {
 		s.wg.Add(1)
 		go func(listener net.Listener) {
