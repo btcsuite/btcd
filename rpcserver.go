@@ -324,7 +324,7 @@ func (s *rpcServer) Stop() error {
 // genkey generates a key/cert pair to the paths provided.
 // TODO(oga) wrap errors with fmt.Errorf for more context?
 func genKey(key, cert string) error {
-	log.Infof("Generating tls certificates...")
+	log.Infof("RPCS: Generating TLS certificates...")
 	priv, err := ecdsa.GenerateKey(elliptic.P521(), rand.Reader)
 	if err != nil {
 		return err
@@ -399,7 +399,7 @@ func genKey(key, cert string) error {
 	pem.Encode(keyOut, &pem.Block{Type: "EC PRIVATE KEY", Bytes: keybytes})
 	keyOut.Close()
 
-	log.Infof("Done generating tls certificates")
+	log.Infof("RPCS: Done generating tls certificates")
 
 	return nil
 }
