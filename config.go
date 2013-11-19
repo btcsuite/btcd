@@ -186,6 +186,13 @@ func loadConfig() (*config, []string, error) {
 		RPCCert:     defaultRPCCertFile,
 	}
 
+	// Create the home directory if it doesn't already exist.
+	err := os.MkdirAll(btcdHomeDir, 0700)
+	if err != nil {
+		log.Errorf("%v", err)
+		os.Exit(-1)
+	}
+
 	// Pre-parse the command line options to see if an alternative config
 	// file or the version flag was specified.  Any errors can be ignored
 	// here since they will be caught be the final parse below.
