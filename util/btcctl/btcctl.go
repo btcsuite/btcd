@@ -14,12 +14,11 @@ import (
 )
 
 type config struct {
-	Help        bool   `short:"h" long:"help" description:"Help"`
-	RpcUser     string `short:"u" long:"rpcuser" description:"RPC username"`
-	RpcPassword string `short:"P" long:"rpcpass" description:"RPC password"`
-	RpcServer   string `short:"s" long:"rpcserver" description:"RPC server to connect to"`
-	RpcCert     string `short:"c" long:"rpccert" description:"RPC server certificate chain for validation"`
-	TlsSkipVerify bool `long:"skipverify" description:"Do not verify tls certificates (not recommended!)"`
+	RpcUser       string `short:"u" long:"rpcuser" description:"RPC username"`
+	RpcPassword   string `short:"P" long:"rpcpass" description:"RPC password"`
+	RpcServer     string `short:"s" long:"rpcserver" description:"RPC server to connect to"`
+	RpcCert       string `short:"c" long:"rpccert" description:"RPC server certificate chain for validation"`
+	TlsSkipVerify bool   `long:"skipverify" description:"Do not verify tls certificates (not recommended!)"`
 }
 
 // conversionHandler is a handler that is used to convert parameters from the
@@ -372,15 +371,13 @@ func main() {
 	cfg := config{
 		RpcServer: "127.0.0.1:8334",
 	}
-	parser := flags.NewParser(&cfg, flags.PassDoubleDash)
+	parser := flags.NewParser(&cfg, flags.PassDoubleDash|flags.HelpFlag)
 	args, err := parser.Parse()
 	if err != nil {
-		if e, ok := err.(*flags.Error); !ok || e.Type != flags.ErrHelp {
-			usage(parser)
-		}
+		usage(parser)
 		os.Exit(1)
 	}
-	if len(args) < 1 || cfg.Help {
+	if len(args) < 1 {
 		usage(parser)
 		return
 	}
