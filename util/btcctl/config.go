@@ -21,7 +21,7 @@ var (
 type config struct {
 	ConfigFile    string `short:"C" long:"configfile" description:"Path to configuration file"`
 	RpcUser       string `short:"u" long:"rpcuser" description:"RPC username"`
-	RpcPassword   string `short:"P" long:"rpcpass" description:"RPC password"`
+	RpcPassword   string `short:"P" long:"rpcpass" default-mask:"-" description:"RPC password"`
 	RpcServer     string `short:"s" long:"rpcserver" description:"RPC server to connect to"`
 	RpcCert       string `short:"c" long:"rpccert" description:"RPC server certificate chain for validation"`
 	TlsSkipVerify bool   `long:"skipverify" description:"Do not verify tls certificates (not recommended!)"`
