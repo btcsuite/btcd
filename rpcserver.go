@@ -399,7 +399,7 @@ func genKey(key, cert string) error {
 	pem.Encode(keyOut, &pem.Block{Type: "EC PRIVATE KEY", Bytes: keybytes})
 	keyOut.Close()
 
-	log.Infof("RPCS: Done generating tls certificates")
+	log.Infof("RPCS: Done generating TLS certificates")
 
 	return nil
 }
