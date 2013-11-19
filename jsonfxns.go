@@ -6,6 +6,9 @@ package btcjson
 
 import (
 	"bytes"
+	_ "crypto/sha512"
+	"crypto/tls"
+	"crypto/x509"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -32,9 +35,24 @@ func MarshallAndSend(rawReply Reply, w io.Writer) (string, error) {
 // and ip/port and then send the supplied message.  This uses net/http rather
 // than net/rpc/jsonrpc since that one doesn't support http connections and is
 // therefore useless.
-func jsonRpcSend(user string, password string, server string, message []byte) (*http.Response, error) {
+func jsonRpcSend(user string, password string, server string, message []byte,
+	https bool, certificates []byte, skipverify bool) (*http.Response, error) {
+	client := &http.Client{}
+	protocol := "http"
+	if https {
+		pool := x509.NewCertPool()
+		pool.AppendCertsFromPEM(certificates)
+
+		config := &tls.Config{
+			InsecureSkipVerify: skipverify,
+			RootCAs:            pool,
+		}
+		transport := &http.Transport{TLSClientConfig: config}
+		client.Transport = transport
+		protocol = "https"
+	}
 	credentials := user + ":" + password
-	resp, err := http.Post("http://"+credentials+"@"+server,
+	resp, err := client.Post(protocol+"://"+credentials+"@"+server,
 		"application/json", bytes.NewBuffer(message))
 	if err != nil {
 		// We do not want to log the username/password in the errors.

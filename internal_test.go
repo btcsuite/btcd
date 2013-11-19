@@ -51,7 +51,7 @@ func TestJsonRpcSend(t *testing.T) {
 	password := "something"
 	server := "invalid"
 	var message []byte
-	_, err := jsonRpcSend(user, password, server, message)
+	_, err := jsonRpcSend(user, password, server, message, false, nil, false)
 	if err == nil {
 		t.Errorf("Should fail when it cannot connect.")
 	}

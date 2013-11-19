@@ -872,16 +872,32 @@ func JSONGetMethod(message []byte) (string, error) {
 	return method, err
 }
 
+// TlsRpcCommand takes a message generated from one of the routines above
+// along with the login/server information and any relavent PEM encoded
+// certificates chains. It sends the command via https and returns a go struct
+// with the result.
+func TlsRpcCommand(user string, password string, server string, message []byte,
+	certificates []byte, skipverify bool) (Reply, error) {
+	return rpcCommand(user, password, server, message, true, certificates,
+		skipverify)
+}
+
 // RpcCommand takes a message generated from one of the routines above
 // along with the login/server info, sends it, and gets a reply, returning
 // a go struct with the result.
 func RpcCommand(user string, password string, server string, message []byte) (Reply, error) {
+	return rpcCommand(user, password, server, message, false, nil, false)
+}
+
+func rpcCommand(user string, password string, server string, message []byte,
+	https bool, certificates []byte, skipverify bool) (Reply, error) {
 	var result Reply
 	method, err := JSONGetMethod(message)
 	if err != nil {
 		return result, err
 	}
-	body, err := RpcRawCommand(user, password, server, message)
+	body, err := rpcRawCommand(user, password, server, message, https,
+		certificates, skipverify)
 	if err != nil {
 		err := fmt.Errorf("Error getting json reply: %v", err)
 		return result, err
@@ -894,10 +910,26 @@ func RpcCommand(user string, password string, server string, message []byte) (Re
 	return result, err
 }
 
+// TlsRpcRawCommand takes a message generated from one of the routines above
+// along with the login,server info and PEM encoded certificate chains for the
+// server  sends it, and gets a reply, returning
+// the raw []byte response for use with ReadResultCmd.
+func TlsRpcRawCommand(user string, password string, server string,
+	message []byte, certificates []byte, skipverify bool) ([]byte, error) {
+	return rpcRawCommand(user, password, server, message, true,
+		certificates, skipverify)
+}
+
 // RpcRawCommand takes a message generated from one of the routines above
 // along with the login/server info, sends it, and gets a reply, returning
 // the raw []byte response for use with ReadResultCmd.
 func RpcRawCommand(user string, password string, server string, message []byte) ([]byte, error) {
+	return rpcRawCommand(user, password, server, message, false, nil, false)
+}
+
+// rpcRawCommand is a helper function for the above two functions.
+func rpcRawCommand(user string, password string, server string,
+	message []byte, https bool, certificates []byte, skipverify bool) ([]byte, error) {
 	var result []byte
 	var msg interface{}
 	err := json.Unmarshal(message, &msg)
@@ -905,7 +937,8 @@ func RpcRawCommand(user string, password string, server string, message []byte) 
 		err := fmt.Errorf("Error, message does not appear to be valid json: %v", err)
 		return result, err
 	}
-	resp, err := jsonRpcSend(user, password, server, message)
+	resp, err := jsonRpcSend(user, password, server, message, https,
+		certificates, skipverify)
 	if err != nil {
 		err := fmt.Errorf("Error sending json message: " + err.Error())
 		return result, err
