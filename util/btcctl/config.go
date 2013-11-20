@@ -6,6 +6,7 @@ import (
 	"github.com/conformal/go-flags"
 	"os"
 	"path/filepath"
+	"strings"
 )
 
 var (
@@ -19,6 +20,7 @@ var (
 //
 // See loadConfig for details on the configuration load process.
 type config struct {
+	ShowVersion   bool   `short:"V" long:"version" description:"Display version information and exit"`
 	ConfigFile    string `short:"C" long:"configfile" description:"Path to configuration file"`
 	RpcUser       string `short:"u" long:"rpcuser" description:"RPC username"`
 	RpcPassword   string `short:"P" long:"rpcpass" default-mask:"-" description:"RPC password"`
@@ -48,11 +50,19 @@ func loadConfig() (*flags.Parser, *config, []string, error) {
 	}
 
 	// Pre-parse the command line options to see if an alternative config
-	// file was specified.  Any errors can be ignored here since they will
-	// be caught be the final parse below.
+	// file or the version flag was specified.  Any errors can be ignored
+	// here since they will be caught be the final parse below.
 	preCfg := cfg
 	preParser := flags.NewParser(&preCfg, flags.None)
 	preParser.Parse()
+
+	// Show the version and exit if the version flag was specified.
+	if preCfg.ShowVersion {
+		appName := filepath.Base(os.Args[0])
+		appName = strings.TrimSuffix(appName, filepath.Ext(appName))
+		fmt.Println(appName, "version", version())
+		os.Exit(0)
+	}
 
 	// Load additional config from file.
 	parser := flags.NewParser(&cfg, flags.PassDoubleDash|flags.HelpFlag)

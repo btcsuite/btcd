@@ -26,6 +26,7 @@ PROJECT=btcd
 PROJECT_UC=$(echo $PROJECT | tr '[:lower:]' '[:upper:]')
 SCRIPT=$(basename $0)
 VERFILE=../version.go
+VERFILES="$VERFILE ../util/btcctl/version.go"
 PROJ_CHANGES=../CHANGES
 
 # verify params
@@ -37,11 +38,13 @@ fi
 CUR_DIR=$(pwd)
 cd "$(dirname $0)"
 
-# verify version file exists
-if [ ! -f "$VERFILE" ]; then
-	echo "$SCRIPT: error: $VERFILE does not exist" 1>&2
-	exit 1
-fi
+# verify version files exist
+for verfile in $VERFILES; do
+	if [ ! -f "$verfile" ]; then
+		echo "$SCRIPT: error: $verfile does not exist" 1>&2
+		exit 1
+	fi
+done
 
 # verify changes file exists
 if [ ! -f "$PROJ_CHANGES" ]; then
@@ -172,17 +175,21 @@ awk '
 second_line==1 { print $0 }
 ' <"$PROJ_CHANGES" >>"${PROJ_CHANGES}.tmp"
 
-# update version file with new version
-sed -E "
-    s/${PAT_PREFIX}Major${PAT_SUFFIX}/\1${MAJOR}/;
-    s/${PAT_PREFIX}Minor${PAT_SUFFIX}/\1${MINOR}/;
-    s/${PAT_PREFIX}Patch${PAT_SUFFIX}/\1${PATCH}/;
-" <"$VERFILE" >"${VERFILE}.tmp"
+# update version filef with new version
+for verfile in $VERFILES; do
+	sed -E "
+	    s/${PAT_PREFIX}Major${PAT_SUFFIX}/\1${MAJOR}/;
+	    s/${PAT_PREFIX}Minor${PAT_SUFFIX}/\1${MINOR}/;
+	    s/${PAT_PREFIX}Patch${PAT_SUFFIX}/\1${PATCH}/;
+	" <"$verfile" >"${verfile}.tmp"
+done
 
 
 # Apply changes
 mv "${PROJ_CHANGES}.tmp" "$PROJ_CHANGES"
-mv "${VERFILE}.tmp" "$VERFILE"
+for verfile in $VERFILES; do
+	mv "${verfile}.tmp" "$verfile"
+done
 
 echo "All files have been prepared for release."
 echo "Use the following commands to review the changes for accuracy:"
