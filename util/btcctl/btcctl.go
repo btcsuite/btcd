@@ -205,17 +205,15 @@ func makeGetRawTransaction(args []interface{}) (btcjson.Cmd, error) {
 // makeImportPrivKey generates the cmd structure for
 // importprivkey commands.
 func makeImportPrivKey(args []interface{}) (btcjson.Cmd, error) {
-	var label string
-	var rescan bool
+	var optargs = make([]interface{}, 0, 2)
 	if len(args) > 1 {
-		label = args[1].(string)
+		optargs = append(optargs, args[1].(string))
 	}
 	if len(args) > 2 {
-		rescan = args[2].(bool)
+		optargs = append(optargs, args[2].(bool))
 	}
 
-	return btcjson.NewImportPrivKeyCmd("btcctl", args[0].(string), label,
-		rescan)
+	return btcjson.NewImportPrivKeyCmd("btcctl", args[0].(string), optargs...)
 }
 
 // makeStop generates the cmd structure for stop comands.
