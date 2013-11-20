@@ -3586,7 +3586,7 @@ func (cmd *ImportPrivKeyCmd) UnmarshalJSON(b []byte) error {
 		return err
 	}
 
-	if len(r.Params) > 3 {
+	if len(r.Params) == 0 || len(r.Params) > 3 {
 		return ErrWrongNumberOfParams
 	}
 

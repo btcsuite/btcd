@@ -674,7 +674,21 @@ var jsoncmdtests = []struct {
 		},
 	},
 	{
-		name: "basic importprivkey + opts",
+		name: "basic importprivkey + 1 opt",
+		f: func() (Cmd, error) {
+			return NewImportPrivKeyCmd(float64(1),
+				"somereallongprivatekey",
+				"some text")
+		},
+		result: &ImportPrivKeyCmd{
+			id:      float64(1),
+			PrivKey: "somereallongprivatekey",
+			Label:   "some text",
+			Rescan:  true,
+		},
+	},
+	{
+		name: "basic importprivkey + 2 opts",
 		f: func() (Cmd, error) {
 			return NewImportPrivKeyCmd(float64(1),
 				"somereallongprivatekey",
