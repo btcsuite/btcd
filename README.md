@@ -87,7 +87,6 @@ are currently under heavy development:
 - Documentation
 - Code cleanup
 - Add remaining missing RPC calls
-- Add option to allow btcd run as a daemon/service
 - Complete several TODO items in the code
 - Offer cross-compiled binaries for popular OSes (Fedora, Ubuntu, FreeBSD, OpenBSD)
 

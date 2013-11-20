@@ -5,6 +5,7 @@
 package main
 
 import (
+	"fmt"
 	"net"
 	"net/http"
 	_ "net/http/pprof"
@@ -19,8 +20,11 @@ var (
 )
 
 // btcdMain is the real main function for btcd.  It is necessary to work around
-// the fact that deferred functions do not run when os.Exit() is called.
-func btcdMain() error {
+// the fact that deferred functions do not run when os.Exit() is called.  The
+// optional serverChan parameter is mainly used by the service code to be
+// notified with the server once it is setup so it can gracefully stop it when
+// requested from the service control manager.
+func btcdMain(serverChan chan<- *server) error {
 	// Initialize logging at the default logging level.
 	setLogLevels(defaultLogLevel)
 	defer backendLog.Flush()
@@ -87,6 +91,9 @@ func btcdMain() error {
 		return err
 	}
 	server.Start()
+	if serverChan != nil {
+		serverChan <- server
+	}
 
 	// Monitor for graceful server shutdown and signal the main goroutine
 	// when done.  This is done in a separate goroutine rather than waiting
@@ -115,8 +122,22 @@ func main() {
 		os.Exit(1)
 	}
 
+	// Call serviceMain on Windows to handle running as a service.  When
+	// the return isService flag is true, exit now since we ran as a
+	// service.  Otherwise, just fall through to normal operation.
+	if runtime.GOOS == "windows" {
+		isService, err := serviceMain()
+		if err != nil {
+			fmt.Println(err)
+			os.Exit(1)
+		}
+		if isService {
+			os.Exit(0)
+		}
+	}
+
 	// Work around defer not working after os.Exit()
-	if err := btcdMain(); err != nil {
+	if err := btcdMain(nil); err != nil {
 		os.Exit(1)
 	}
 }

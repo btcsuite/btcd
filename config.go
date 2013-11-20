@@ -14,6 +14,7 @@ import (
 	"net"
 	"os"
 	"path/filepath"
+	"runtime"
 	"sort"
 	"strconv"
 	"strings"
@@ -73,6 +74,12 @@ type config struct {
 	Profile            string        `long:"profile" description:"Enable HTTP profiling on given port -- NOTE port must be between 1024 and 65536"`
 	CpuProfile         string        `long:"cpuprofile" description:"Write CPU profile to the specified file"`
 	DebugLevel         string        `short:"d" long:"debuglevel" description:"Logging level for all subsystems {trace, debug, info, warn, error, critical} -- You may also specify <subsystem>=<level>,<subsystem2>=<level>,... to set the log level for individual subsystems -- Use show to list available subsystems"`
+}
+
+// serviceOptions defines the configuration options for btcd as a service on
+// Windows.
+type serviceOptions struct {
+	ServiceCommand string `short:"s" long:"service" description:"Service command {install, remove, start, stop}"`
 }
 
 // cleanAndExpandPath expands environement variables and leading ~ in the
@@ -228,6 +235,15 @@ func fileExists(name string) bool {
 	return true
 }
 
+// newConfigParser returns a new command line flags parser.
+func newConfigParser(cfg *config, so *serviceOptions, options flags.Options) *flags.Parser {
+	parser := flags.NewParser(cfg, options)
+	if runtime.GOOS == "windows" {
+		parser.AddGroup("Service Options", "Service Options", so)
+	}
+	return parser
+}
+
 // loadConfig initializes and parses the config using a config file and command
 // line options.
 //
@@ -253,6 +269,13 @@ func loadConfig() (*config, []string, error) {
 		RPCCert:     defaultRPCCertFile,
 	}
 
+	// Service options which are only added on Windows.
+	serviceOpts := serviceOptions{}
+	var runServiceCommand func(string) error
+	if runtime.GOOS == "windows" {
+		runServiceCommand = performServiceCommand
+	}
+
 	// Create the home directory if it doesn't already exist.
 	err := os.MkdirAll(btcdHomeDir, 0700)
 	if err != nil {
@@ -264,7 +287,7 @@ func loadConfig() (*config, []string, error) {
 	// file or the version flag was specified.  Any errors can be ignored
 	// here since they will be caught be the final parse below.
 	preCfg := cfg
-	preParser := flags.NewParser(&preCfg, flags.None)
+	preParser := newConfigParser(&preCfg, &serviceOpts, flags.None)
 	preParser.Parse()
 
 	// Show the version and exit if the version flag was specified.
@@ -275,9 +298,20 @@ func loadConfig() (*config, []string, error) {
 		os.Exit(0)
 	}
 
+	// Perform service command and exit if specified.  Invalid service
+	// commands show an appropriate error.  Only runs on Windows since
+	// the runServiceCommand function will be nil when not on Windows.
+	if serviceOpts.ServiceCommand != "" && runServiceCommand != nil {
+		err := runServiceCommand(serviceOpts.ServiceCommand)
+		if err != nil {
+			fmt.Fprintln(os.Stderr, err)
+		}
+		os.Exit(0)
+	}
+
 	// Load additional config from file.
 	var configFileError error
-	parser := flags.NewParser(&cfg, flags.Default)
+	parser := newConfigParser(&cfg, &serviceOpts, flags.Default)
 	if !preCfg.RegressionTest || preCfg.ConfigFile != defaultConfigFile {
 		err := flags.NewIniParser(parser).ParseFile(preCfg.ConfigFile)
 		if err != nil {
@@ -303,14 +337,6 @@ func loadConfig() (*config, []string, error) {
 		}
 		return nil, nil, err
 	}
-
-	// Warn about missing config file after the final command line parse
-	// succeeds.  This prevents the warning on help messages and invalid
-	// options.
-	if configFileError != nil {
-		btcdLog.Warnf("%v", configFileError)
-	}
-
 
 	// The two test networks can't be selected simultaneously.
 	if cfg.TestNet3 && cfg.RegressionTest {
@@ -458,6 +484,13 @@ func loadConfig() (*config, []string, error) {
 		activeNetParams.peerPort)
 	cfg.ConnectPeers = normalizeAddresses(cfg.ConnectPeers,
 		activeNetParams.peerPort)
+
+	// Warn about missing config file after the final command line parse
+	// succeeds.  This prevents the warning on help messages and invalid
+	// options.
+	if configFileError != nil {
+		btcdLog.Warnf("%v", configFileError)
+	}
 
 	return &cfg, remainingArgs, nil
 }
