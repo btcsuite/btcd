@@ -33,6 +33,7 @@ type handlerData struct {
 	usage              string
 }
 
+// Errors used in the various handlers.
 var (
 	ErrNoData           = errors.New("No data returned.")
 	ErrNoDisplayHandler = errors.New("No display handler specified.")
@@ -229,20 +230,20 @@ func makeVerifyChain(args []interface{}) (btcjson.Cmd, error) {
 func send(cfg *config, msg []byte) (interface{}, error) {
 	var reply btcjson.Reply
 	var err error
-	if cfg.RpcCert != "" || cfg.TlsSkipVerify {
+	if cfg.RPCCert != "" || cfg.TlsSkipVerify {
 		var pem []byte
-		if cfg.RpcCert != "" {
-			pem, err = ioutil.ReadFile(cfg.RpcCert)
+		if cfg.RPCCert != "" {
+			pem, err = ioutil.ReadFile(cfg.RPCCert)
 			if err != nil {
 				return nil, err
 			}
 		}
-		reply, err = btcjson.TlsRpcCommand(cfg.RpcUser,
-			cfg.RpcPassword, cfg.RpcServer, msg, pem,
+		reply, err = btcjson.TlsRpcCommand(cfg.RPCUser,
+			cfg.RPCPassword, cfg.RPCServer, msg, pem,
 			cfg.TlsSkipVerify)
 	} else {
-		reply, err = btcjson.RpcCommand(cfg.RpcUser, cfg.RpcPassword,
-			cfg.RpcServer, msg)
+		reply, err = btcjson.RpcCommand(cfg.RPCUser, cfg.RPCPassword,
+			cfg.RPCServer, msg)
 	}
 	if err != nil {
 		return nil, err

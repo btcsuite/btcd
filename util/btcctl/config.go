@@ -22,10 +22,10 @@ var (
 type config struct {
 	ShowVersion   bool   `short:"V" long:"version" description:"Display version information and exit"`
 	ConfigFile    string `short:"C" long:"configfile" description:"Path to configuration file"`
-	RpcUser       string `short:"u" long:"rpcuser" description:"RPC username"`
-	RpcPassword   string `short:"P" long:"rpcpass" default-mask:"-" description:"RPC password"`
-	RpcServer     string `short:"s" long:"rpcserver" description:"RPC server to connect to"`
-	RpcCert       string `short:"c" long:"rpccert" description:"RPC server certificate chain for validation"`
+	RPCUser       string `short:"u" long:"rpcuser" description:"RPC username"`
+	RPCPassword   string `short:"P" long:"rpcpass" default-mask:"-" description:"RPC password"`
+	RPCServer     string `short:"s" long:"rpcserver" description:"RPC server to connect to"`
+	RPCCert       string `short:"c" long:"rpccert" description:"RPC server certificate chain for validation"`
 	TlsSkipVerify bool   `long:"skipverify" description:"Do not verify tls certificates (not recommended!)"`
 }
 
@@ -45,8 +45,8 @@ func loadConfig() (*flags.Parser, *config, []string, error) {
 	// Default config.
 	cfg := config{
 		ConfigFile: defaultConfigFile,
-		RpcServer:  "localhost:8334",
-		RpcCert:    defaultRPCCertFile,
+		RPCServer:  "localhost:8334",
+		RPCCert:    defaultRPCCertFile,
 	}
 
 	// Pre-parse the command line options to see if an alternative config
