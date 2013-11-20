@@ -441,7 +441,7 @@ func newRPCServer(listenAddrs []string, s *server) (*rpcServer, error) {
 	rpc.ws.spentNotifications = make(map[btcwire.OutPoint]*list.List)
 	rpc.ws.minedTxNotifications = make(map[btcwire.ShaHash]*list.List)
 
-	// check for existance of cert file and key file
+	// check for existence of cert file and key file
 	if !fileExists(cfg.RPCKey) && !fileExists(cfg.RPCCert) {
 		// if both files do not exist, we generate them.
 		err := genKey(cfg.RPCKey, cfg.RPCCert)
