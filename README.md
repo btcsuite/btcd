@@ -35,6 +35,8 @@ https://github.com/conformal/btcd/releases
 
 - Install Go according to the installation instructions here:
   http://golang.org/doc/install
+  btcd requires features only available in go1.2 or later.  At
+  present, that means you must install go1.2rc5 or later.
 
 - Run the following command to obtain btcd, all dependencies, and install it:
   ```$ go get github.com/conformal/btcd```
