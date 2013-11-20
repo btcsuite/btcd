@@ -28,17 +28,20 @@ The flags are:
   -a, --addpeer=       Add a peer to connect with at startup
       --connect=       Connect only to the specified peers at startup
       --nolisten       Disable listening for incoming connections -- NOTE:
-                       Listening is automatically disabled if the --connect
-                       option is used or if the --proxy option is used without
-                       the --tor option
-  -p, --port=          Listen for connections on this port (default: 8333,
-                       testnet: 18333)
+                       Listening is automatically disabled if the --connect or
+                       --proxy options are used without also specifying listen
+                       interfaces via --listen
+      --listen=        Add an interface/port to listen for connections (default
+                       all interfaces port: 8333, testnet: 18333)
       --maxpeers=      Max number of inbound and outbound peers
       --banduration=   How long to ban misbehaving peers.  Valid time units are
                        {s, m, h}.  Minimum 1 second
   -u, --rpcuser=       Username for RPC connections
   -P, --rpcpass=       Password for RPC connections
-  -r, --rpcport=       Listen for JSON/RPC messages on this port
+      --rpclisten=     Add an interface/port to listen for RPC connections
+                       (default localhost port: 8334, testnet: 18334)
+      --rpccert=       File containing the certificate file
+      --rpckey=        File containing the certificate key
       --norpc          Disable built-in RPC server -- NOTE: The RPC server is
                        disabled by default if no rpcuser/rpcpass is specified
       --nodnsseed      Disable DNS seeding for peers
@@ -49,10 +52,11 @@ The flags are:
       --testnet        Use the test network
       --regtest        Use the regression test network
       --nocheckpoints  Disable built-in checkpoints.  Don't do this unless you
-                       know what you're doing
+                       know what you're doing.
       --dbtype=        Database backend to use for the Block Chain
       --profile=       Enable HTTP profiling on given port -- NOTE port must be
                        between 1024 and 65536
+      --cpuprofile=    Write CPU profile to the specified file
   -d, --debuglevel=    Logging level {trace, debug, info, warn, error,
                        critical}
 
