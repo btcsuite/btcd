@@ -45,6 +45,7 @@ var (
 var commandHandlers = map[string]*handlerData{
 	"addnode":              &handlerData{2, 0, displaySpewDump, nil, makeAddNode, "<ip> <add/remove/onetry>"},
 	"decoderawtransaction": &handlerData{1, 0, displaySpewDump, nil, makeDecodeRawTransaction, "<txhash>"},
+	"dumpprivkey":          &handlerData{1, 0, displayGeneric, nil, makeDumpPrivKey, "<bitcoinaddress>"},
 	"getbestblockhash":     &handlerData{0, 0, displayGeneric, nil, makeGetBestBlockHash, ""},
 	"getblock":             &handlerData{1, 0, displaySpewDump, nil, makeGetBlock, "<blockhash>"},
 	"getblockcount":        &handlerData{0, 0, displayFloat64, nil, makeGetBlockCount, ""},
@@ -130,6 +131,12 @@ func makeAddNode(args []interface{}) (btcjson.Cmd, error) {
 // decoderawtransaction comands.
 func makeDecodeRawTransaction(args []interface{}) (btcjson.Cmd, error) {
 	return btcjson.NewDecodeRawTransactionCmd("btcctl", args[0].(string))
+}
+
+// makeDumpPrivKey generates the cmd structure for
+// dumpprivkey commands.
+func makeDumpPrivKey(args []interface{}) (btcjson.Cmd, error) {
+	return btcjson.NewDumpPrivKeyCmd("btcctl", args[0].(string))
 }
 
 // makeGetBestBlockHash generates the cmd structure for
