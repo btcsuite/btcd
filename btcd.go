@@ -32,11 +32,6 @@ func btcdMain() error {
 	}
 	cfg = tcfg
 
-	// Change the logging level if needed.
-	if cfg.DebugLevel != defaultLogLevel {
-		setLogLevels(cfg.DebugLevel)
-	}
-
 	// Show version at startup.
 	btcdLog.Infof("Version %s", version())
 

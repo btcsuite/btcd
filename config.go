@@ -14,6 +14,7 @@ import (
 	"net"
 	"os"
 	"path/filepath"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -70,7 +71,7 @@ type config struct {
 	DbType             string        `long:"dbtype" description:"Database backend to use for the Block Chain"`
 	Profile            string        `long:"profile" description:"Enable HTTP profiling on given port -- NOTE port must be between 1024 and 65536"`
 	CpuProfile         string        `long:"cpuprofile" description:"Write CPU profile to the specified file"`
-	DebugLevel         string        `short:"d" long:"debuglevel" description:"Logging level {trace, debug, info, warn, error, critical}"`
+	DebugLevel         string        `short:"d" long:"debuglevel" description:"Logging level for all subsystems {trace, debug, info, warn, error, critical} -- You may also specify <subsystem>=<level>,<subsystem2>=<level>,... to set the log level for individual subsystems -- Use show to list available subsystems"`
 }
 
 // cleanAndExpandPath expands environement variables and leading ~ in the
@@ -104,6 +105,77 @@ func validLogLevel(logLevel string) bool {
 		return true
 	}
 	return false
+}
+
+// supportedSubsystems returns a sorted slice of the supported subsystems for
+// logging purposes.
+func supportedSubsystems() []string {
+	// Convert the subsystemLoggers map keys to a slice.
+	subsystems := make([]string, 0, len(subsystemLoggers))
+	for subsysID := range subsystemLoggers {
+		subsystems = append(subsystems, subsysID)
+	}
+
+	// Sort the subsytems for stable display.
+	sort.Strings(subsystems)
+	return subsystems
+}
+
+// parseDebugLevel attempt to parse the specified debug level and set the levels
+// accordingly.  An appropriate error is returned if anything is invalid.
+func parseDebugLevel(debugLevel string) error {
+	// Special show command to list supported subsystems.
+	if debugLevel == "show" {
+		fmt.Println("Supported subsystems", supportedSubsystems())
+		os.Exit(0)
+	}
+
+	// When the specified string doesn't have any delimters, treat it as
+	// the log level for all subsystems.
+	if !strings.Contains(debugLevel, ",") && !strings.Contains(debugLevel, "=") {
+		// Validate debug log level.
+		if !validLogLevel(debugLevel) {
+			str := "The specified debug level [%v] is invalid"
+			return fmt.Errorf(str, debugLevel)
+		}
+
+		// Change the logging level for all subsystems if needed.
+		if debugLevel != defaultLogLevel {
+			setLogLevels(debugLevel)
+		}
+
+		return nil
+	}
+
+	// Split the specified string into subsystem/level pairs while detecting
+	// issues and update the log levels accordingly.
+	for _, logLevelPair := range strings.Split(debugLevel, ",") {
+		if !strings.Contains(logLevelPair, "=") {
+			str := "The specified debug level contains an invalid " +
+				"subsystem/level pair [%v]"
+			return fmt.Errorf(str, logLevelPair)
+		}
+
+		// Extract the specified subsystem and log level.
+		fields := strings.Split(logLevelPair, "=")
+		subsysID, logLevel := fields[0], fields[1]
+
+		// Validate subsystem.
+		if _, exists := subsystemLoggers[subsysID]; !exists {
+			str := "The specified subsystem [%v] is invalid"
+			return fmt.Errorf(str, subsysID)
+		}
+
+		// Validate log level.
+		if !validLogLevel(logLevel) {
+			str := "The specified debug level [%v] is invalid"
+			return fmt.Errorf(str, logLevel)
+		}
+
+		setLogLevel(subsysID, logLevel)
+	}
+
+	return nil
 }
 
 // validDbType returns whether or not dbType is a supported database type.
@@ -254,10 +326,9 @@ func loadConfig() (*config, []string, error) {
 		activeNetParams = netParams(btcwire.TestNet)
 	}
 
-	// Validate debug log level.
-	if !validLogLevel(cfg.DebugLevel) {
-		str := "%s: The specified debug level [%v] is invalid"
-		err := fmt.Errorf(str, "loadConfig", cfg.DebugLevel)
+	// Parse, validate, and set debug log level(s).
+	if err := parseDebugLevel(cfg.DebugLevel); err != nil {
+		err := fmt.Errorf("%s: %v", "loadConfig", err.Error())
 		fmt.Fprintln(os.Stderr, err)
 		parser.WriteHelp(os.Stderr)
 		return nil, nil, err
