@@ -8,12 +8,12 @@ import (
 	"encoding/binary"
 	"fmt"
 	"github.com/conformal/btcdb"
+	"github.com/conformal/btclog"
 	"github.com/conformal/btcutil"
 	"github.com/conformal/btcwire"
 	"github.com/conformal/goleveldb/leveldb"
 	"github.com/conformal/goleveldb/leveldb/cache"
 	"github.com/conformal/goleveldb/leveldb/opt"
-	"github.com/conformal/seelog"
 	"os"
 	"sync"
 )
@@ -24,7 +24,7 @@ const (
 	dbMaxTransMem     = 64 * 1024 * 1024 // 64 MB
 )
 
-var log seelog.LoggerInterface = seelog.Disabled
+var log = btclog.Disabled
 
 type tTxInsertData struct {
 	txsha   *btcwire.ShaHash

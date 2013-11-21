@@ -8,9 +8,9 @@ import (
 	"database/sql"
 	"fmt"
 	"github.com/conformal/btcdb"
+	"github.com/conformal/btclog"
 	"github.com/conformal/btcutil"
 	"github.com/conformal/btcwire"
-	"github.com/conformal/seelog"
 	_ "github.com/mattn/go-sqlite3"
 	"os"
 	"sync"
@@ -88,7 +88,7 @@ var txqueries []string = []string{
 	txtmpExistsShaStmt: "SELECT blockid FROM txtmp WHERE key = ?;",
 }
 
-var log seelog.LoggerInterface = seelog.Disabled
+var log = btclog.Disabled
 
 type tBlockInsertData struct {
 	sha  btcwire.ShaHash

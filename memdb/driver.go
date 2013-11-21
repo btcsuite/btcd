@@ -6,10 +6,10 @@ package memdb
 
 import (
 	"github.com/conformal/btcdb"
-	"github.com/conformal/seelog"
+	"github.com/conformal/btclog"
 )
 
-var log = seelog.Disabled
+var log = btclog.Disabled
 
 func init() {
 	driver := btcdb.DriverDB{DbType: "memdb", Create: CreateDB, Open: OpenDB}
