@@ -150,7 +150,7 @@ func torLookupIP(host, proxy string) ([]net.IP, error) {
 // any hosts in the list. Therefore if all hosts failed an empty slice of
 // strings will be returned.
 func dnsDiscover(seeder string, proxy string) []net.IP {
-	log.Debugf("DISC: Fetching list of seeds from %v", seeder)
+	discLog.Debugf("Fetching list of seeds from %v", seeder)
 	peers, err := doDNSLookup(seeder, proxy)
 	if err != nil {
 		seederPlusProxy := seeder
@@ -158,8 +158,8 @@ func dnsDiscover(seeder string, proxy string) []net.IP {
 			seederPlusProxy = fmt.Sprintf("%s (proxy %s)",
 				seeder, proxy)
 		}
-		log.Debugf("DISC: Unable to fetch dns seeds "+
-			"from %s: %v", seederPlusProxy, err)
+		discLog.Debugf("Unable to fetch dns seeds from %s: %v",
+			seederPlusProxy, err)
 		return []net.IP{}
 	}
 

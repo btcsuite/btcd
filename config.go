@@ -189,7 +189,7 @@ func loadConfig() (*config, []string, error) {
 	// Create the home directory if it doesn't already exist.
 	err := os.MkdirAll(btcdHomeDir, 0700)
 	if err != nil {
-		log.Errorf("%v", err)
+		btcdLog.Errorf("%v", err)
 		return nil, nil, err
 	}
 
@@ -218,7 +218,7 @@ func loadConfig() (*config, []string, error) {
 				parser.WriteHelp(os.Stderr)
 				return nil, nil, err
 			}
-			log.Warnf("%v", err)
+			btcdLog.Warnf("%v", err)
 		}
 	}
 

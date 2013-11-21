@@ -465,7 +465,7 @@ func (mp *txMemPool) addOrphan(tx *btcutil.Tx) {
 		mp.orphansByPrev[originTxHash].PushBack(tx)
 	}
 
-	log.Debugf("TXMP: Stored orphan transaction %v (total: %d)", tx.Sha(),
+	txmpLog.Debugf("Stored orphan transaction %v (total: %d)", tx.Sha(),
 		len(mp.orphans))
 }
 
@@ -858,7 +858,7 @@ func (mp *txMemPool) maybeAcceptTransaction(tx *btcutil.Tx, isOrphan *bool) erro
 	// Add to transaction pool.
 	mp.addTransaction(tx)
 
-	log.Debugf("TXMP: Accepted transaction %v (pool size: %v)", txHash,
+	txmpLog.Debugf("Accepted transaction %v (pool size: %v)", txHash,
 		len(mp.pool))
 
 	// TODO(davec): Notifications
@@ -953,7 +953,7 @@ func (mp *txMemPool) ProcessTransaction(tx *btcutil.Tx) error {
 	mp.Lock()
 	defer mp.Unlock()
 
-	log.Tracef("TXMP: Processing transaction %v", tx.Sha())
+	txmpLog.Tracef("Processing transaction %v", tx.Sha())
 
 	// Potentially accept the transaction to the memory pool.
 	var isOrphan bool

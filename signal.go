@@ -27,7 +27,7 @@ func mainInterruptHandler() {
 	for {
 		select {
 		case <-interruptChannel:
-			log.Infof("Received SIGINT (Ctrl+C).  Shutting down...")
+			btcdLog.Infof("Received SIGINT (Ctrl+C).  Shutting down...")
 			for _, callback := range interruptCallbacks {
 				callback()
 			}

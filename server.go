@@ -101,7 +101,7 @@ func (s *server) handleAddPeerMsg(state *peerState, p *peer) bool {
 
 	// Ignore new peers if we're shutting down.
 	if atomic.LoadInt32(&s.shutdown) != 0 {
-		log.Infof("SRVR: New peer %s ignored - server is shutting "+
+		srvrLog.Infof("New peer %s ignored - server is shutting "+
 			"down", p)
 		p.Shutdown()
 		return false
@@ -110,19 +110,19 @@ func (s *server) handleAddPeerMsg(state *peerState, p *peer) bool {
 	// Disconnect banned peers.
 	host, _, err := net.SplitHostPort(p.addr)
 	if err != nil {
-		log.Debugf("SRVR: can't split hostport %v", err)
+		srvrLog.Debugf("can't split hostport %v", err)
 		p.Shutdown()
 		return false
 	}
 	if banEnd, ok := state.banned[host]; ok {
 		if time.Now().Before(banEnd) {
-			log.Debugf("SRVR: Peer %s is banned for another %v - "+
+			srvrLog.Debugf("Peer %s is banned for another %v - "+
 				"disconnecting", host, banEnd.Sub(time.Now()))
 			p.Shutdown()
 			return false
 		}
 
-		log.Infof("SRVR: Peer %s is no longer banned", host)
+		srvrLog.Infof("Peer %s is no longer banned", host)
 		delete(state.banned, host)
 	}
 
@@ -130,7 +130,7 @@ func (s *server) handleAddPeerMsg(state *peerState, p *peer) bool {
 
 	// Limit max number of total peers.
 	if state.Count() >= cfg.MaxPeers {
-		log.Infof("SRVR: Max peers reached [%d] - disconnecting "+
+		srvrLog.Infof("Max peers reached [%d] - disconnecting "+
 			"peer %s", cfg.MaxPeers, p)
 		p.Shutdown()
 		// TODO(oga) how to handle permanent peers here?
@@ -139,7 +139,7 @@ func (s *server) handleAddPeerMsg(state *peerState, p *peer) bool {
 	}
 
 	// Add the new peer and start it.
-	log.Debugf("SRVR: New peer %s", p)
+	srvrLog.Debugf("New peer %s", p)
 	if p.inbound {
 		state.peers.PushBack(p)
 		p.Start()
@@ -179,7 +179,7 @@ func (s *server) handleDonePeerMsg(state *peerState, p *peer) {
 				state.outboundGroups[GroupKey(p.na)]--
 			}
 			list.Remove(e)
-			log.Debugf("SRVR: Removed peer %s", p)
+			srvrLog.Debugf("Removed peer %s", p)
 			return
 		}
 	}
@@ -192,11 +192,11 @@ func (s *server) handleDonePeerMsg(state *peerState, p *peer) {
 func (s *server) handleBanPeerMsg(state *peerState, p *peer) {
 	host, _, err := net.SplitHostPort(p.addr)
 	if err != nil {
-		log.Debugf("SRVR: can't split ban peer %s %v", p.addr, err)
+		srvrLog.Debugf("can't split ban peer %s %v", p.addr, err)
 		return
 	}
 	direction := directionString(p.inbound)
-	log.Infof("SRVR: Banned peer %s (%s) for %v", host, direction,
+	srvrLog.Infof("Banned peer %s (%s) for %v", host, direction,
 		cfg.BanDuration)
 	state.banned[host] = time.Now().Add(cfg.BanDuration)
 
@@ -382,13 +382,13 @@ func (s *server) handleQuery(querymsg interface{}, state *peerState) {
 // listenHandler is the main listener which accepts incoming connections for the
 // server.  It must be run as a goroutine.
 func (s *server) listenHandler(listener net.Listener) {
-	log.Infof("SRVR: Server listening on %s", listener.Addr())
+	srvrLog.Infof("Server listening on %s", listener.Addr())
 	for atomic.LoadInt32(&s.shutdown) == 0 {
 		conn, err := listener.Accept()
 		if err != nil {
 			// Only log the error if we're not forcibly shutting down.
 			if atomic.LoadInt32(&s.shutdown) == 0 {
-				log.Errorf("SRVR: can't accept connection: %v",
+				srvrLog.Errorf("can't accept connection: %v",
 					err)
 			}
 			continue
@@ -396,7 +396,7 @@ func (s *server) listenHandler(listener net.Listener) {
 		s.AddPeer(newInboundPeer(s, conn))
 	}
 	s.wg.Done()
-	log.Tracef("SRVR: Listener handler done for %s", listener.Addr())
+	srvrLog.Tracef("Listener handler done for %s", listener.Addr())
 }
 
 // seedFromDNS uses DNS seeding to populate the address manager with peers.
@@ -452,7 +452,7 @@ func (s *server) peerHandler() {
 	s.addrManager.Start()
 	s.blockManager.Start()
 
-	log.Tracef("SRVR: Starting peer handler")
+	srvrLog.Tracef("Starting peer handler")
 	state := &peerState{
 		peers:            list.New(),
 		persistentPeers:  list.New(),
@@ -595,7 +595,7 @@ out:
 	s.blockManager.Stop()
 	s.addrManager.Stop()
 	s.wg.Done()
-	log.Tracef("SRVR: Peer handler done")
+	srvrLog.Tracef("Peer handler done")
 }
 
 // AddPeer adds a new peer that has already been connected to the server.
@@ -670,7 +670,7 @@ func (s *server) Start() {
 		return
 	}
 
-	log.Trace("SRVR: Starting server")
+	srvrLog.Trace("Starting server")
 
 	// Start all the listeners.  There will not be any if listening is
 	// disabled.
@@ -695,11 +695,11 @@ func (s *server) Start() {
 func (s *server) Stop() error {
 	// Make sure this only happens once.
 	if atomic.AddInt32(&s.shutdown, 1) != 1 {
-		log.Infof("SRVR: Server is already in the process of shutting down")
+		srvrLog.Infof("Server is already in the process of shutting down")
 		return nil
 	}
 
-	log.Warnf("SRVR: Server shutting down")
+	srvrLog.Warnf("Server shutting down")
 
 	// Stop all the listeners.  There will not be any listeners if
 	// listening is disabled.
@@ -723,7 +723,7 @@ func (s *server) Stop() error {
 // WaitForShutdown blocks until the main listener and peer handlers are stopped.
 func (s *server) WaitForShutdown() {
 	s.wg.Wait()
-	log.Infof("SRVR: Server shutdown complete")
+	srvrLog.Infof("Server shutdown complete")
 }
 
 // ScheduleShutdown schedules a server shutdown after the specified duration.
@@ -734,7 +734,7 @@ func (s *server) ScheduleShutdown(duration time.Duration) {
 	if atomic.AddInt32(&s.shutdownSched, 1) != 1 {
 		return
 	}
-	log.Warnf("SRVR: Server shutdown in %v", duration)
+	srvrLog.Warnf("Server shutdown in %v", duration)
 	go func() {
 		remaining := duration
 		tickDuration := dynamicTickDuration(remaining)
@@ -760,7 +760,7 @@ func (s *server) ScheduleShutdown(duration time.Duration) {
 					ticker.Stop()
 					ticker = time.NewTicker(tickDuration)
 				}
-				log.Warnf("SRVR: Server shutdown in %v", remaining)
+				srvrLog.Warnf("Server shutdown in %v", remaining)
 			}
 		}
 	}()
@@ -826,7 +826,7 @@ func newServer(listenAddrs []string, db btcdb.Db, btcnet btcwire.BitcoinNet) (*s
 		for _, addr := range ipv4Addrs {
 			listener, err := net.Listen("tcp4", addr)
 			if err != nil {
-				log.Warnf("SRVR: Can't listen on %s: %v", addr,
+				srvrLog.Warnf("Can't listen on %s: %v", addr,
 					err)
 				continue
 			}
@@ -836,7 +836,7 @@ func newServer(listenAddrs []string, db btcdb.Db, btcnet btcwire.BitcoinNet) (*s
 		for _, addr := range ipv6Addrs {
 			listener, err := net.Listen("tcp6", addr)
 			if err != nil {
-				log.Warnf("SRVR: Can't listen on %s: %v", addr,
+				srvrLog.Warnf("Can't listen on %s: %v", addr,
 					err)
 				continue
 			}

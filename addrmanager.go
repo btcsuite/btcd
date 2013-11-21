@@ -153,7 +153,7 @@ func (a *AddrManager) updateAddress(netAddr, srcAddr *btcwire.NetAddress) {
 
 	// Enforce max addresses.
 	if len(a.addrNew[bucket]) > newBucketSize {
-		log.Tracef("AMGR: new bucket is full, expiring old ")
+		amgrLog.Tracef("new bucket is full, expiring old ")
 		a.expireNew(bucket)
 	}
 
@@ -161,7 +161,7 @@ func (a *AddrManager) updateAddress(netAddr, srcAddr *btcwire.NetAddress) {
 	ka.refs++
 	a.addrNew[bucket][addr] = ka
 
-	log.Tracef("AMGR: Added new address %s for a total of %d addresses",
+	amgrLog.Tracef("Added new address %s for a total of %d addresses",
 		addr, a.nTried+a.nNew)
 }
 
@@ -259,7 +259,7 @@ func (a *AddrManager) expireNew(bucket int) {
 	var oldest *knownAddress
 	for k, v := range a.addrNew[bucket] {
 		if bad(v) {
-			log.Tracef("AMGR: expiring bad address %v", k)
+			amgrLog.Tracef("expiring bad address %v", k)
 			delete(a.addrNew[bucket], k)
 			v.refs--
 			if v.refs == 0 {
@@ -277,7 +277,7 @@ func (a *AddrManager) expireNew(bucket int) {
 
 	if oldest != nil {
 		key := NetAddressKey(oldest.na)
-		log.Tracef("AMGR: expiring oldest address %v", key)
+		amgrLog.Tracef("expiring oldest address %v", key)
 
 		delete(a.addrNew[bucket], key)
 		oldest.refs--
@@ -393,7 +393,7 @@ out:
 	dumpAddressTicker.Stop()
 	a.savePeers()
 	a.wg.Done()
-	log.Trace("AMGR: Address handler done")
+	amgrLog.Trace("Address handler done")
 }
 
 type serialisedKnownAddress struct {
@@ -465,7 +465,7 @@ func (a *AddrManager) savePeers() {
 
 	w, err := os.Create(filePath)
 	if err != nil {
-		log.Error("Error opening file: ", filePath, err)
+		amgrLog.Error("Error opening file: ", filePath, err)
 		return
 	}
 	enc := json.NewEncoder(w)
@@ -485,19 +485,17 @@ func (a *AddrManager) loadPeers() {
 
 	err := a.deserialisePeers(filePath)
 	if err != nil {
-		log.Errorf("AMGR: Failed to parse %s: %v", filePath,
-			err)
+		amgrLog.Errorf("Failed to parse %s: %v", filePath, err)
 		// if it is invalid we nuke the old one unconditionally.
 		err = os.Remove(filePath)
 		if err != nil {
-			log.Warn("Failed to remove corrupt peers "+
+			amgrLog.Warn("Failed to remove corrupt peers "+
 				"file: ", err)
 		}
 		a.reset()
 		return
 	}
-	log.Infof("AMGR: Loaded %d addresses from '%s'", a.nNew+a.nTried,
-		filePath)
+	amgrLog.Infof("Loaded %d addresses from '%s'", a.nNew+a.nTried, filePath)
 }
 
 func (a *AddrManager) deserialisePeers(filePath string) error {
@@ -611,7 +609,7 @@ func (a *AddrManager) Start() {
 		return
 	}
 
-	log.Trace("AMGR: Starting address manager")
+	amgrLog.Trace("Starting address manager")
 
 	a.wg.Add(1)
 
@@ -625,12 +623,12 @@ func (a *AddrManager) Start() {
 // Stop gracefully shuts down the address manager by stopping the main handler.
 func (a *AddrManager) Stop() error {
 	if atomic.AddInt32(&a.shutdown, 1) != 1 {
-		log.Warnf("AMGR: Address manager is already in the process of " +
+		amgrLog.Warnf("Address manager is already in the process of " +
 			"shutting down")
 		return nil
 	}
 
-	log.Infof("AMGR: Address manager shutting down")
+	amgrLog.Infof("Address manager shutting down")
 	close(a.quit)
 	a.wg.Wait()
 	return nil
@@ -660,7 +658,7 @@ func (a *AddrManager) AddAddressByIP(addrIP string) {
 	// Split IP and port
 	addr, portStr, err := net.SplitHostPort(addrIP)
 	if err != nil {
-		log.Warnf("AMGR: AddADddressByIP given bullshit adddress"+
+		amgrLog.Warnf("AddADddressByIP given bullshit adddress"+
 			"(%s): %v", err)
 		return
 	}
@@ -669,12 +667,12 @@ func (a *AddrManager) AddAddressByIP(addrIP string) {
 	na.Timestamp = time.Now()
 	na.IP = net.ParseIP(addr)
 	if na.IP == nil {
-		log.Error("AMGR: Invalid ip address:", addr)
+		amgrLog.Error("Invalid ip address:", addr)
 		return
 	}
 	port, err := strconv.ParseUint(portStr, 10, 0)
 	if err != nil {
-		log.Error("AMGR: Invalid port: ", portStr, err)
+		amgrLog.Error("Invalid port: ", portStr, err)
 		return
 	}
 	na.Port = uint16(port)
@@ -809,8 +807,8 @@ func (a *AddrManager) GetAddress(class string, newBias int) *knownAddress {
 			ka := e.Value.(*knownAddress)
 			randval := a.rand.Intn(large)
 			if float64(randval) < (factor * chance(ka) * float64(large)) {
-				log.Tracef("AMGR: Selected %v from tried "+
-					"bucket", NetAddressKey(ka.na))
+				amgrLog.Tracef("Selected %v from tried bucket",
+					NetAddressKey(ka.na))
 				return ka
 			}
 			factor *= 1.2
@@ -837,7 +835,7 @@ func (a *AddrManager) GetAddress(class string, newBias int) *knownAddress {
 			}
 			randval := a.rand.Intn(large)
 			if float64(randval) < (factor * chance(ka) * float64(large)) {
-				log.Tracef("AMGR: Selected %v from new bucket",
+				amgrLog.Tracef("Selected %v from new bucket",
 					NetAddressKey(ka.na))
 				return ka
 			}
@@ -972,7 +970,7 @@ func (a *AddrManager) Good(addr *btcwire.NetAddress) {
 	a.nNew++
 
 	rmkey := NetAddressKey(rmka.na)
-	log.Tracef("AMGR: replacing %s with %s in tried", rmkey, addrKey)
+	amgrLog.Tracef("Replacing %s with %s in tried", rmkey, addrKey)
 
 	// We made sure there is space here just above.
 	a.addrNew[newBucket][rmkey] = rmka

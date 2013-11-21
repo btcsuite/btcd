@@ -21,14 +21,9 @@ var (
 // btcdMain is the real main function for btcd.  It is necessary to work around
 // the fact that deferred functions do not run when os.Exit() is called.
 func btcdMain() error {
-	// Initialize logging and setup deferred flushing to ensure all
-	// outstanding messages are written on shutdown.
-	loggers := setLogLevel(defaultLogLevel)
-	defer func() {
-		for _, logger := range loggers {
-			logger.Flush()
-		}
-	}()
+	// Initialize logging at the default logging level.
+	setLogLevels(defaultLogLevel)
+	defer backendLog.Flush()
 
 	// Load configuration and parse command line.
 	tcfg, _, err := loadConfig()
@@ -39,21 +34,21 @@ func btcdMain() error {
 
 	// Change the logging level if needed.
 	if cfg.DebugLevel != defaultLogLevel {
-		loggers = setLogLevel(cfg.DebugLevel)
+		setLogLevels(cfg.DebugLevel)
 	}
 
 	// Show version at startup.
-	log.Infof("Version %s", version())
+	btcdLog.Infof("Version %s", version())
 
 	// Enable http profiling server if requested.
 	if cfg.Profile != "" {
 		go func() {
 			listenAddr := net.JoinHostPort("", cfg.Profile)
-			log.Infof("Profile server listening on %s", listenAddr)
+			btcdLog.Infof("Profile server listening on %s", listenAddr)
 			profileRedirect := http.RedirectHandler("/debug/pprof",
 				http.StatusSeeOther)
 			http.Handle("/", profileRedirect)
-			log.Errorf("%v", http.ListenAndServe(listenAddr, nil))
+			btcdLog.Errorf("%v", http.ListenAndServe(listenAddr, nil))
 		}()
 	}
 
@@ -61,7 +56,7 @@ func btcdMain() error {
 	if cfg.CpuProfile != "" {
 		f, err := os.Create(cfg.CpuProfile)
 		if err != nil {
-			log.Errorf("Unable to create cpu profile: %v", err)
+			btcdLog.Errorf("Unable to create cpu profile: %v", err)
 			return err
 		}
 		pprof.StartCPUProfile(f)
@@ -70,21 +65,21 @@ func btcdMain() error {
 
 	// Perform upgrades to btcd as new versions require it.
 	if err := doUpgrades(); err != nil {
-		log.Errorf("%v", err)
+		btcdLog.Errorf("%v", err)
 		return err
 	}
 
 	// Load the block database.
 	db, err := loadBlockDB()
 	if err != nil {
-		log.Errorf("%v", err)
+		btcdLog.Errorf("%v", err)
 		return err
 	}
 	defer db.Close()
 
 	// Ensure the database is sync'd and closed on Ctrl+C.
 	addInterruptHandler(func() {
-		log.Infof("Gracefully shutting down the database...")
+		btcdLog.Infof("Gracefully shutting down the database...")
 		db.RollbackClose()
 	})
 
@@ -92,7 +87,7 @@ func btcdMain() error {
 	server, err := newServer(cfg.Listeners, db, activeNetParams.btcnet)
 	if err != nil {
 		// TODO(oga) this logging could do with some beautifying.
-		log.Errorf("Unable to start server on %v: %v",
+		btcdLog.Errorf("Unable to start server on %v: %v",
 			cfg.Listeners, err)
 		return err
 	}
@@ -112,7 +107,7 @@ func btcdMain() error {
 	// Wait for shutdown signal from either a graceful server stop or from
 	// the interrupt handler.
 	<-shutdownChannel
-	log.Info("Shutdown complete")
+	btcdLog.Info("Shutdown complete")
 	return nil
 }
 

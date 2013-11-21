@@ -272,7 +272,7 @@ func (s *rpcServer) Start() {
 		return
 	}
 
-	log.Trace("RPCS: Starting RPC server")
+	rpcsLog.Trace("Starting RPC server")
 	rpcServeMux := http.NewServeMux()
 	httpServer := &http.Server{Handler: rpcServeMux}
 	rpcServeMux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
@@ -282,7 +282,7 @@ func (s *rpcServer) Start() {
 		if len(authhdr) > 0 && authhdr[0] == auth {
 			jsonRPCRead(w, r, s)
 		} else {
-			log.Warnf("RPCS: Auth failure.")
+			rpcsLog.Warnf("Auth failure.")
 			jsonAuthFail(w, r, s)
 		}
 	})
@@ -305,9 +305,9 @@ func (s *rpcServer) Start() {
 	for _, listener := range s.listeners {
 		s.wg.Add(1)
 		go func(listener net.Listener) {
-			log.Infof("RPCS: RPC server listening on %s", listener.Addr())
+			rpcsLog.Infof("RPC server listening on %s", listener.Addr())
 			httpServer.Serve(listener)
-			log.Tracef("RPCS: RPC listener done for %s", listener.Addr())
+			rpcsLog.Tracef("RPC listener done for %s", listener.Addr())
 			s.wg.Done()
 		}(listener)
 	}
@@ -316,18 +316,18 @@ func (s *rpcServer) Start() {
 // Stop is used by server.go to stop the rpc listener.
 func (s *rpcServer) Stop() error {
 	if atomic.AddInt32(&s.shutdown, 1) != 1 {
-		log.Infof("RPCS: RPC server is already in the process of shutting down")
+		rpcsLog.Infof("RPC server is already in the process of shutting down")
 		return nil
 	}
-	log.Warnf("RPCS: RPC server shutting down")
+	rpcsLog.Warnf("RPC server shutting down")
 	for _, listener := range s.listeners {
 		err := listener.Close()
 		if err != nil {
-			log.Errorf("RPCS: Problem shutting down rpc: %v", err)
+			rpcsLog.Errorf("Problem shutting down rpc: %v", err)
 			return err
 		}
 	}
-	log.Infof("RPCS: RPC server shutdown complete")
+	rpcsLog.Infof("RPC server shutdown complete")
 	s.wg.Wait()
 	close(s.quit)
 	return nil
@@ -336,7 +336,7 @@ func (s *rpcServer) Stop() error {
 // genkey generates a key/cert pair to the paths provided.
 // TODO(oga) wrap errors with fmt.Errorf for more context?
 func genKey(key, cert string) error {
-	log.Infof("RPCS: Generating TLS certificates...")
+	rpcsLog.Infof("Generating TLS certificates...")
 	priv, err := ecdsa.GenerateKey(elliptic.P521(), rand.Reader)
 	if err != nil {
 		return err
@@ -419,7 +419,7 @@ func genKey(key, cert string) error {
 	pem.Encode(keyOut, &pem.Block{Type: "EC PRIVATE KEY", Bytes: keybytes})
 	keyOut.Close()
 
-	log.Infof("RPCS: Done generating TLS certificates")
+	rpcsLog.Infof("Done generating TLS certificates")
 
 	return nil
 }
@@ -470,7 +470,7 @@ func newRPCServer(listenAddrs []string, s *server) (*rpcServer, error) {
 		var listener net.Listener
 		listener, err = tls.Listen("tcp4", addr, &tlsConfig)
 		if err != nil {
-			log.Warnf("RPCS: Can't listen on %s: %v", addr,
+			rpcsLog.Warnf("Can't listen on %s: %v", addr,
 				err)
 			continue
 		}
@@ -481,7 +481,7 @@ func newRPCServer(listenAddrs []string, s *server) (*rpcServer, error) {
 		var listener net.Listener
 		listener, err = tls.Listen("tcp6", addr, &tlsConfig)
 		if err != nil {
-			log.Warnf("RPCS: Can't listen on %s: %v", addr,
+			rpcsLog.Warnf("Can't listen on %s: %v", addr,
 				err)
 			continue
 		}
@@ -510,7 +510,7 @@ func jsonRPCRead(w http.ResponseWriter, r *http.Request, s *rpcServer) {
 	}
 	body, err := btcjson.GetRaw(r.Body)
 	if err != nil {
-		log.Errorf("RPCS: Error getting json message: %v", err)
+		rpcsLog.Errorf("Error getting json message: %v", err)
 		return
 	}
 
@@ -528,14 +528,14 @@ func jsonRPCRead(w http.ResponseWriter, r *http.Request, s *rpcServer) {
 		reply = standardCmdReply(cmd, s, nil)
 	}
 
-	log.Tracef("[RPCS] reply: %v", reply)
+	rpcsLog.Tracef("reply: %v", reply)
 
 	msg, err := btcjson.MarshallAndSend(reply, w)
 	if err != nil {
-		log.Errorf(msg)
+		rpcsLog.Errorf(msg)
 		return
 	}
-	log.Debugf(msg)
+	rpcsLog.Debugf(msg)
 }
 
 // TODO(jrick): Remove the wallet notification chan.
@@ -674,7 +674,7 @@ func handleGetBestBlockHash(s *rpcServer, cmd btcjson.Cmd, walletNotification ch
 	var sha *btcwire.ShaHash
 	sha, _, err := s.server.db.NewestSha()
 	if err != nil {
-		log.Errorf("RPCS: Error getting newest sha: %v", err)
+		rpcsLog.Errorf("Error getting newest sha: %v", err)
 		return nil, btcjson.ErrBestBlockHash
 	}
 
@@ -686,18 +686,18 @@ func handleGetBlock(s *rpcServer, cmd btcjson.Cmd, walletNotification chan []byt
 	c := cmd.(*btcjson.GetBlockCmd)
 	sha, err := btcwire.NewShaHashFromStr(c.Hash)
 	if err != nil {
-		log.Errorf("RPCS: Error generating sha: %v", err)
+		rpcsLog.Errorf("Error generating sha: %v", err)
 		return nil, btcjson.ErrBlockNotFound
 	}
 	blk, err := s.server.db.FetchBlockBySha(sha)
 	if err != nil {
-		log.Errorf("RPCS: Error fetching sha: %v", err)
+		rpcsLog.Errorf("Error fetching sha: %v", err)
 		return nil, btcjson.ErrBlockNotFound
 	}
 	idx := blk.Height()
 	buf, err := blk.Bytes()
 	if err != nil {
-		log.Errorf("RPCS: Error fetching block: %v", err)
+		rpcsLog.Errorf("Error fetching block: %v", err)
 		return nil, btcjson.ErrBlockNotFound
 	}
 
@@ -710,7 +710,7 @@ func handleGetBlock(s *rpcServer, cmd btcjson.Cmd, walletNotification chan []byt
 
 	_, maxidx, err := s.server.db.NewestSha()
 	if err != nil {
-		log.Errorf("RPCS: Cannot get newest sha: %v", err)
+		rpcsLog.Errorf("Cannot get newest sha: %v", err)
 		return nil, btcjson.ErrBlockNotFound
 	}
 
@@ -735,7 +735,7 @@ func handleGetBlock(s *rpcServer, cmd btcjson.Cmd, walletNotification chan []byt
 		var shaNext *btcwire.ShaHash
 		shaNext, err = s.server.db.FetchBlockShaByHeight(int64(idx + 1))
 		if err != nil {
-			log.Errorf("RPCS: No next block: %v", err)
+			rpcsLog.Errorf("No next block: %v", err)
 			return nil, btcjson.ErrBlockNotFound
 		}
 		blockReply.NextHash = shaNext.String()
@@ -748,7 +748,7 @@ func handleGetBlock(s *rpcServer, cmd btcjson.Cmd, walletNotification chan []byt
 func handleGetBlockCount(s *rpcServer, cmd btcjson.Cmd, walletNotification chan []byte) (interface{}, error) {
 	_, maxidx, err := s.server.db.NewestSha()
 	if err != nil {
-		log.Errorf("RPCS: Error getting newest sha: %v", err)
+		rpcsLog.Errorf("Error getting newest sha: %v", err)
 		return nil, btcjson.ErrBlockCount
 	}
 
@@ -760,7 +760,7 @@ func handleGetBlockHash(s *rpcServer, cmd btcjson.Cmd, walletNotification chan [
 	c := cmd.(*btcjson.GetBlockHashCmd)
 	sha, err := s.server.db.FetchBlockShaByHeight(c.Index)
 	if err != nil {
-		log.Errorf("[RCPS] Error getting block: %v", err)
+		rpcsLog.Errorf("Error getting block: %v", err)
 		return nil, btcjson.ErrOutOfRange
 	}
 
@@ -776,12 +776,12 @@ func handleGetConnectionCount(s *rpcServer, cmd btcjson.Cmd, walletNotification 
 func handleGetDifficulty(s *rpcServer, cmd btcjson.Cmd, walletNotification chan []byte) (interface{}, error) {
 	sha, _, err := s.server.db.NewestSha()
 	if err != nil {
-		log.Errorf("RPCS: Error getting sha: %v", err)
+		rpcsLog.Errorf("Error getting sha: %v", err)
 		return nil, btcjson.ErrDifficulty
 	}
 	blk, err := s.server.db.FetchBlockBySha(sha)
 	if err != nil {
-		log.Errorf("RPCS: Error getting block: %v", err)
+		rpcsLog.Errorf("Error getting block: %v", err)
 		return nil, btcjson.ErrDifficulty
 	}
 	blockHeader := &blk.MsgBlock().Header
@@ -829,7 +829,7 @@ func handleGetRawTransaction(s *rpcServer, cmd btcjson.Cmd, walletNotification c
 		if err != nil {
 			txList, err := s.server.db.FetchTxBySha(txSha)
 			if err != nil || len(txList) == 0 {
-				log.Errorf("RPCS: Error fetching tx: %v", err)
+				rpcsLog.Errorf("Error fetching tx: %v", err)
 				return nil, btcjson.ErrNoTxInfo
 			}
 
@@ -852,7 +852,7 @@ func handleGetRawTransaction(s *rpcServer, cmd btcjson.Cmd, walletNotification c
 			disbuf, _ := btcscript.DisasmString(v.SignatureScript)
 			vinList[i].ScriptSig.Asm = strings.Replace(disbuf, " ", "", -1)
 			vinList[i].Vout = i + 1
-			log.Debugf(disbuf)
+			rpcsLog.Debugf(disbuf)
 		}
 
 		for i, v := range txOutList {
@@ -864,7 +864,7 @@ func handleGetRawTransaction(s *rpcServer, cmd btcjson.Cmd, walletNotification c
 			_, addrhash, err := btcscript.ScriptToAddrHash(v.PkScript)
 			if err != nil {
 				// TODO: set and return error?
-				log.Errorf("RPCS: Error getting address hash for %v: %v", txSha, err)
+				rpcsLog.Errorf("Error getting address hash for %v: %v", txSha, err)
 			}
 			if addr, err := btcutil.EncodeAddress(addrhash, s.server.btcnet); err == nil {
 				// TODO: set and return error?
@@ -884,14 +884,14 @@ func handleGetRawTransaction(s *rpcServer, cmd btcjson.Cmd, walletNotification c
 		if blksha != nil {
 			blk, err := s.server.db.FetchBlockBySha(blksha)
 			if err != nil {
-				log.Errorf("RPCS: Error fetching sha: %v", err)
+				rpcsLog.Errorf("Error fetching sha: %v", err)
 				return nil, btcjson.ErrBlockNotFound
 			}
 			idx := blk.Height()
 
 			_, maxidx, err := s.server.db.NewestSha()
 			if err != nil {
-				log.Errorf("RPCS: Cannot get newest sha: %v", err)
+				rpcsLog.Errorf("Cannot get newest sha: %v", err)
 				return nil, btcjson.ErrNoNewestBlockInfo
 			}
 
@@ -937,10 +937,10 @@ func handleSendRawTransaction(s *rpcServer, cmd btcjson.Cmd, walletNotification 
 		// so log it as such.  Otherwise, something really did go wrong,
 		// so log it as an actual error.
 		if _, ok := err.(TxRuleError); ok {
-			log.Debugf("RPCS: Rejected transaction %v: %v", tx.Sha(),
+			rpcsLog.Debugf("Rejected transaction %v: %v", tx.Sha(),
 				err)
 		} else {
-			log.Errorf("RPCS: Failed to process transaction %v: %v",
+			rpcsLog.Errorf("Failed to process transaction %v: %v",
 				tx.Sha(), err)
 			err = btcjson.Error{
 				Code:    btcjson.ErrDeserialization.Code,
@@ -974,7 +974,7 @@ func handleStop(s *rpcServer, cmd btcjson.Cmd, walletNotification chan []byte) (
 func verifyChain(db btcdb.Db, level, depth int32) error {
 	_, curheight64, err := db.NewestSha()
 	if err != nil {
-		log.Errorf("RPCS: verify is unable to fetch current block "+
+		rpcsLog.Errorf("Verify is unable to fetch current block "+
 			"height: %v", err)
 	}
 
@@ -988,14 +988,14 @@ func verifyChain(db btcdb.Db, level, depth int32) error {
 		// Level 0 just looks up the block.
 		sha, err := db.FetchBlockShaByHeight(int64(height))
 		if err != nil {
-			log.Errorf("RPCS: verify is unable to fetch block at "+
+			rpcsLog.Errorf("Verify is unable to fetch block at "+
 				"height %d: %v", height, err)
 			return err
 		}
 
 		block, err := db.FetchBlockBySha(sha)
 		if err != nil {
-			log.Errorf("RPCS: verify is unable to fetch block at "+
+			rpcsLog.Errorf("Verify is unable to fetch block at "+
 				"sha %v height %d: %v", sha, height, err)
 			return err
 		}
@@ -1005,14 +1005,14 @@ func verifyChain(db btcdb.Db, level, depth int32) error {
 			err := btcchain.CheckBlockSanity(block,
 				activeNetParams.powLimit)
 			if err != nil {
-				log.Errorf("RPCS: verify is unable to "+
+				rpcsLog.Errorf("Verify is unable to "+
 					"validate block at sha %v height "+
 					"%s: %v", sha, height, err)
 				return err
 			}
 		}
 	}
-	log.Infof("RPCS: Chain verify completed successfully")
+	rpcsLog.Infof("Chain verify completed successfully")
 
 	return nil
 }
@@ -1181,7 +1181,7 @@ func handleRescan(s *rpcServer, cmd btcjson.Cmd,
 		return btcjson.ErrInternal
 	}
 
-	log.Debugf("RPCS: Begining rescan")
+	rpcsLog.Debugf("Begining rescan")
 
 	minblock := int64(rescanCmd.BeginBlock)
 	maxblock := int64(rescanCmd.EndBlock)
@@ -1219,7 +1219,7 @@ func handleRescan(s *rpcServer, cmd btcjson.Cmd,
 					}
 					txaddr, err := btcutil.EncodeAddress(txaddrhash, s.server.btcnet)
 					if err != nil {
-						log.Errorf("Error encoding address: %v", err)
+						rpcsLog.Errorf("Error encoding address: %v", err)
 						return err
 					}
 					if _, ok := rescanCmd.Addresses[txaddr]; ok {
@@ -1261,7 +1261,7 @@ func handleRescan(s *rpcServer, cmd btcjson.Cmd,
 	mreply, _ := json.Marshal(reply)
 	walletNotification <- mreply
 
-	log.Debug("RPCS: Finished rescan")
+	rpcsLog.Debug("Finished rescan")
 	return nil
 }
 
@@ -1327,7 +1327,7 @@ func getDifficultyRatio(bits uint32) float64 {
 	outString := difficulty.FloatString(2)
 	diff, err := strconv.ParseFloat(outString, 64)
 	if err != nil {
-		log.Errorf("RPCS: Cannot get difficulty: %v", err)
+		rpcsLog.Errorf("Cannot get difficulty: %v", err)
 		return 0
 	}
 	return diff
@@ -1476,7 +1476,7 @@ func (s *rpcServer) websocketJSONHandler(walletNotification chan []byte,
 func (s *rpcServer) NotifyBlockConnected(block *btcutil.Block) {
 	hash, err := block.Sha()
 	if err != nil {
-		log.Error("Bad block; connected block notification dropped.")
+		rpcsLog.Error("Bad block; connected block notification dropped.")
 		return
 	}
 
@@ -1511,7 +1511,7 @@ func (s *rpcServer) NotifyBlockConnected(block *btcutil.Block) {
 func (s *rpcServer) NotifyBlockDisconnected(block *btcutil.Block) {
 	hash, err := block.Sha()
 	if err != nil {
-		log.Error("Bad block; connected block notification dropped.")
+		rpcsLog.Error("Bad block; connected block notification dropped.")
 		return
 	}
 
@@ -1540,7 +1540,7 @@ func notifySpentData(ctx *notificationCtx, txhash *btcwire.ShaHash, index uint32
 		err := spender.MsgTx().Serialize(&buf)
 		if err != nil {
 			// This really shouldn't ever happen...
-			log.Warnf("RPCS: Can't serialize tx: %v", err)
+			rpcsLog.Warnf("Can't serialize tx: %v", err)
 			return
 		}
 		txStr = string(buf.Bytes())
@@ -1561,7 +1561,7 @@ func notifySpentData(ctx *notificationCtx, txhash *btcwire.ShaHash, index uint32
 	}
 	replyBytes, err := json.Marshal(reply)
 	if err != nil {
-		log.Errorf("RPCS: Unable to marshal spent notification: %v", err)
+		rpcsLog.Errorf("Unable to marshal spent notification: %v", err)
 		return
 	}
 	ctx.connection <- replyBytes
@@ -1595,7 +1595,7 @@ func (s *rpcServer) newBlockNotifyCheckTxOut(block *btcutil.Block,
 	for i, txout := range tx.MsgTx().TxOut {
 		_, txaddrhash, err := btcscript.ScriptToAddrHash(txout.PkScript)
 		if err != nil {
-			log.Debug("Error getting payment address from tx; dropping any Tx notifications.")
+			rpcsLog.Debug("Error getting payment address from tx; dropping any Tx notifications.")
 			break
 		}
 		if idlist, ok := s.ws.txNotifications[string(txaddrhash)]; ok {
@@ -1604,12 +1604,12 @@ func (s *rpcServer) newBlockNotifyCheckTxOut(block *btcutil.Block,
 
 				blkhash, err := block.Sha()
 				if err != nil {
-					log.Error("Error getting block sha; dropping Tx notification.")
+					rpcsLog.Error("Error getting block sha; dropping Tx notification.")
 					break
 				}
 				txaddr, err := btcutil.EncodeAddress(txaddrhash, s.server.btcnet)
 				if err != nil {
-					log.Error("Error encoding address; dropping Tx notification.")
+					rpcsLog.Error("Error encoding address; dropping Tx notification.")
 					break
 				}
 				reply := &btcjson.Reply{
@@ -1637,7 +1637,7 @@ func (s *rpcServer) newBlockNotifyCheckTxOut(block *btcutil.Block,
 				}
 				replyBytes, err := json.Marshal(reply)
 				if err != nil {
-					log.Errorf("RPCS: Unable to marshal tx notification: %v", err)
+					rpcsLog.Errorf("Unable to marshal tx notification: %v", err)
 					continue
 				}
 				ctx.connection <- replyBytes
