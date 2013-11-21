@@ -51,7 +51,7 @@ type LevelDb struct {
 	lastBlkSha       btcwire.ShaHash
 	lastBlkIdx       int64
 
-	txUpdateMap map[btcwire.ShaHash]*txUpdateObj
+	txUpdateMap      map[btcwire.ShaHash]*txUpdateObj
 	txSpentUpdateMap map[btcwire.ShaHash]*spentTxUpdate
 }
 
@@ -379,10 +379,10 @@ func (db *LevelDb) InsertBlock(block *btcutil.Block) (height int64, rerr error) 
 			}
 			if txsha.IsEqual(dupsha) {
 				// marking TxOut[0] as spent
-				po :=  btcwire.NewOutPoint(dupsha, 0)
+				po := btcwire.NewOutPoint(dupsha, 0)
 				txI := btcwire.NewTxIn(po, []byte("garbage"))
 
-				var spendtx btcwire.MsgTx 
+				var spendtx btcwire.MsgTx
 				spendtx.AddTxIn(txI)
 				err = db.doSpend(&spendtx)
 				if err != nil {
@@ -397,10 +397,10 @@ func (db *LevelDb) InsertBlock(block *btcutil.Block) (height int64, rerr error) 
 			}
 			if txsha.IsEqual(dupsha) {
 				// marking TxOut[0] as spent
-				po :=  btcwire.NewOutPoint(dupsha, 0)
+				po := btcwire.NewOutPoint(dupsha, 0)
 				txI := btcwire.NewTxIn(po, []byte("garbage"))
 
-				var spendtx btcwire.MsgTx 
+				var spendtx btcwire.MsgTx
 				spendtx.AddTxIn(txI)
 				err = db.doSpend(&spendtx)
 				if err != nil {
@@ -501,20 +501,20 @@ func (db *LevelDb) setclearSpentData(txsha *btcwire.ShaHash, idx uint32, set boo
 			}
 
 			// need to reslice the list to exclude the most recent.
-			sTx := spentTxList [len(spentTxList) -1]
-			spentTxList [len(spentTxList) -1] = nil
-			if len (spentTxList) == 1 {
+			sTx := spentTxList[len(spentTxList)-1]
+			spentTxList[len(spentTxList)-1] = nil
+			if len(spentTxList) == 1 {
 				// write entry to delete tx from spent pool
 				// XXX
 			} else {
-				spentTxList = spentTxList [:len(spentTxList)-1]
+				spentTxList = spentTxList[:len(spentTxList)-1]
 				// XXX format sTxList and set update Table
 			}
 
 			// Create 'new' Tx update data.
 			blkHeight = sTx.blkHeight
 			txOff = sTx.txoff
-			txLen = sTx.txlen 
+			txLen = sTx.txlen
 			spentbuflen := (sTx.numTxO + 7) / 8
 			spentData = make([]byte, spentbuflen, spentbuflen)
 			for i := range spentData {
@@ -542,7 +542,7 @@ func (db *LevelDb) setclearSpentData(txsha *btcwire.ShaHash, idx uint32, set boo
 
 	// check for fully spent Tx
 	fullySpent := true
-	for _, val := range txUo.spentData { 
+	for _, val := range txUo.spentData {
 		if val != ^byte(0) {
 			fullySpent = false
 			break
@@ -551,11 +551,11 @@ func (db *LevelDb) setclearSpentData(txsha *btcwire.ShaHash, idx uint32, set boo
 	if fullySpent {
 		var txSu *spentTxUpdate
 		// Look up Tx in fully spent table
-		if txSuOld, ok := db.txSpentUpdateMap[*txsha] ; ok {
+		if txSuOld, ok := db.txSpentUpdateMap[*txsha]; ok {
 			txSu = txSuOld
 		} else {
 			var txSuStore spentTxUpdate
-			txSu = &txSuStore 
+			txSu = &txSuStore
 
 			txSuOld, err := db.getTxFullySpent(txsha)
 			if err == nil {
@@ -568,8 +568,8 @@ func (db *LevelDb) setclearSpentData(txsha *btcwire.ShaHash, idx uint32, set boo
 		sTx.blkHeight = txUo.blkHeight
 		sTx.txoff = txUo.txoff
 		sTx.txlen = txUo.txlen
-		// XXX -- there is no way to comput the real TxOut 
-		// from the spent array. 
+		// XXX -- there is no way to comput the real TxOut
+		// from the spent array.
 		sTx.numTxO = 8 * len(txUo.spentData)
 
 		// append this txdata to fully spent txlist

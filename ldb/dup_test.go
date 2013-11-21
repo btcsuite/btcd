@@ -23,7 +23,7 @@ func Test_dupTx(t *testing.T) {
 	_ = os.RemoveAll(dbnamever)
 	db, err := btcdb.CreateDB("leveldb", dbname)
 	if err != nil {
-	t.Errorf("Failed to open test database %v", err)
+		t.Errorf("Failed to open test database %v", err)
 		return
 	}
 	defer os.RemoveAll(dbname)
@@ -75,7 +75,6 @@ out:
 			}
 		}
 
-
 		newheight, err := db.InsertBlock(block)
 		if err != nil {
 			t.Errorf("failed to insert block %v err %v", height, err)
@@ -116,7 +115,7 @@ out:
 
 	hash, _ := btcwire.NewShaHashFromStr("df2b060fa2e5e9c8ed5eaf6a45c13753ec8c63282b2688322eba40cd98ea067a")
 
-	po :=  btcwire.NewOutPoint(hash, 0)
+	po := btcwire.NewOutPoint(hash, 0)
 	txI := btcwire.NewTxIn(po, []byte("garbage"))
 	txO := btcwire.NewTxOut(50000000, []byte("garbageout"))
 
@@ -133,7 +132,7 @@ out:
 	for _, lr := range listReply {
 		if lr.Err != nil {
 			t.Errorf("sha %v spent %v err %v\n", lr.Sha,
-			    lr.TxSpent, lr.Err)
+				lr.TxSpent, lr.Err)
 		}
 	}
 
@@ -148,7 +147,7 @@ out:
 	for _, lr := range listReply {
 		if lr.Err != btcdb.TxShaMissing {
 			t.Errorf("sha %v spent %v err %v\n", lr.Sha,
-			    lr.TxSpent, lr.Err)
+				lr.TxSpent, lr.Err)
 		}
 	}
 
@@ -160,8 +159,8 @@ out:
 		} else {
 			for _, lr := range txReply {
 				if lr.Err != nil {
-				fmt.Errorf("stx %v spent %v err %v\n", lr.Sha,
-				    lr.TxSpent, lr.Err)
+					fmt.Errorf("stx %v spent %v err %v\n", lr.Sha,
+						lr.TxSpent, lr.Err)
 				}
 			}
 		}

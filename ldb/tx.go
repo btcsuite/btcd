@@ -9,8 +9,8 @@ import (
 	"encoding/binary"
 	"fmt"
 	"github.com/conformal/btcdb"
-	"github.com/conformal/goleveldb/leveldb"
 	"github.com/conformal/btcwire"
+	"github.com/conformal/goleveldb/leveldb"
 )
 
 type txUpdateObj struct {
@@ -31,7 +31,7 @@ type spentTx struct {
 	delete    bool
 }
 type spentTxUpdate struct {
-	txl []*spentTx
+	txl    []*spentTx
 	delete bool
 }
 
@@ -154,7 +154,7 @@ func (db *LevelDb) getTxFullySpent(txsha *btcwire.ShaHash) ([]*spentTx, error) {
 
 	for i := range spentTxList {
 		var sTx spentTx
-		var  blkHeight int64
+		var blkHeight int64
 		var txOff, txLen, numTxO int32
 
 		err := binary.Read(txR, binary.LittleEndian, &blkHeight)
@@ -275,7 +275,7 @@ func (db *LevelDb) FetchTxByShaList(txShaList []*btcwire.ShaHash) []*btcdb.TxLis
 				stx := sTxList[idx]
 
 				tx, blockSha, _, _, err = db.fetchTxDataByLoc(
-				    stx.blkHeight, stx.txoff, stx.txlen, []byte{})
+					stx.blkHeight, stx.txoff, stx.txlen, []byte{})
 				if err == nil {
 					btxspent = make([]bool, len(tx.TxOut))
 					for i := range btxspent {
@@ -384,13 +384,12 @@ func (db *LevelDb) FetchTxBySha(txsha *btcwire.ShaHash) ([]*btcdb.TxListReply, e
 		replylen += len(sTxList)
 	}
 
-	replies := make ([]*btcdb.TxListReply, replylen)
-
+	replies := make([]*btcdb.TxListReply, replylen)
 
 	if fSerr == nil {
 		for _, stx := range sTxList {
 			tx, blksha, _, _, err := db.fetchTxDataByLoc(
-			    stx.blkHeight, stx.txoff, stx.txlen, []byte{})
+				stx.blkHeight, stx.txoff, stx.txlen, []byte{})
 			if err != nil {
 				if err != leveldb.ErrNotFound {
 					return []*btcdb.TxListReply{}, err
@@ -419,4 +418,3 @@ func (db *LevelDb) FetchTxBySha(txsha *btcwire.ShaHash) ([]*btcdb.TxListReply, e
 	}
 	return replies, nil
 }
-
