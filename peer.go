@@ -261,16 +261,18 @@ func (p *peer) handleVersionMsg(msg *btcwire.MsgVersion) {
 			p.Disconnect()
 			return
 		}
-	}
 
-	// Set up a NetAddress for the peer to be used with AddrManager.
-	na, err := newNetAddress(p.conn.RemoteAddr(), p.services)
-	if err != nil {
-		p.logError("PEER: Can't get remote address: %v", err)
-		p.Disconnect()
-		return
+		// Set up a NetAddress for the peer to be used with AddrManager.
+		// We only do this inbound because outbound set this up
+		// at connection time and no point recomputing.
+		na, err := newNetAddress(p.conn.RemoteAddr(), p.services)
+		if err != nil {
+			p.logError("PEER: Can't get remote address: %v", err)
+			p.Disconnect()
+			return
+		}
+		p.na = na
 	}
-	p.na = na
 
 	// Send verack.
 	p.QueueMessage(btcwire.NewMsgVerAck(), nil)
