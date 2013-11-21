@@ -66,7 +66,7 @@ func ValidateTransactionScripts(tx *btcutil.Tx, txStore TxStore, flags btcscript
 
 	processFunc := func(txInIdx int) {
 		log.Tracef("validating tx %v input %v len %v",
-			tx.Sha(), currentItem, len(job))
+			tx.Sha(), txInIdx, len(job))
 		txin := job[txInIdx]
 		originTxSha := &txin.PreviousOutpoint.Hash
 		origintxidx := txin.PreviousOutpoint.Index
