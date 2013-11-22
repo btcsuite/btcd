@@ -134,10 +134,8 @@ func parseAndSetDebugLevels(debugLevel string) error {
 			return fmt.Errorf(str, debugLevel)
 		}
 
-		// Change the logging level for all subsystems if needed.
-		if debugLevel != defaultLogLevel {
-			setLogLevels(debugLevel)
-		}
+		// Change the logging level for all subsystems.
+		setLogLevels(debugLevel)
 
 		return nil
 	}
