@@ -1095,7 +1095,7 @@ func Valid(na *btcwire.NetAddress) bool {
 	// invalid protocol addresses from earlier versions of bitcoind (before
 	// 0.2.9), however, since protocol versions before 70001 are
 	// disconnected by the bitcoin network now we have elided it.
-	return !(na.IP.IsUnspecified() || RFC3849(na) ||
+	return na.IP != nil && !(na.IP.IsUnspecified() || RFC3849(na) ||
 		na.IP.Equal(net.IPv4bcast))
 }
 
