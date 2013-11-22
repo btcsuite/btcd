@@ -58,6 +58,7 @@ var commandHandlers = map[string]*handlerData{
 	"getrawmempool":        &handlerData{0, 0, displaySpewDump, nil, makeGetRawMempool, ""},
 	"getrawtransaction":    &handlerData{1, 1, displaySpewDump, []conversionHandler{nil, toInt}, makeGetRawTransaction, "<txhash> [verbose=0]"},
 	"importprivkey":        &handlerData{1, 2, displayGeneric, []conversionHandler{nil, nil, toBool}, makeImportPrivKey, "<wifprivkey> [label] [rescan=true]"},
+	"listtransactions":     &handlerData{0, 3, displayGeneric, []conversionHandler{nil, toInt, toInt}, makeListTransactions, "<listtransactions> [account] [count=10] [from=0]"},
 	"verifychain":          &handlerData{0, 2, displaySpewDump, []conversionHandler{toInt, toInt}, makeVerifyChain, "[level] [depth]"},
 	"stop":                 &handlerData{0, 0, displayGeneric, nil, makeStop, ""},
 }
@@ -220,6 +221,23 @@ func makeImportPrivKey(args []interface{}) (btcjson.Cmd, error) {
 	}
 
 	return btcjson.NewImportPrivKeyCmd("btcctl", args[0].(string), optargs...)
+}
+
+// makeListTransactions generates the cmd structure for
+// listtransactions commands.
+func makeListTransactions(args []interface{}) (btcjson.Cmd, error) {
+	var optargs = make([]interface{}, 0, 3)
+	if len(args) > 1 {
+		optargs = append(optargs, args[0].(string))
+	}
+	if len(args) > 2 {
+		optargs = append(optargs, args[1].(int))
+	}
+	if len(args) > 3 {
+		optargs = append(optargs, args[2].(int))
+	}
+
+	return btcjson.NewListTransactionsCmd("btcctl", optargs...)
 }
 
 // makeStop generates the cmd structure for stop comands.
