@@ -860,7 +860,7 @@ func handleGetRawTransaction(s *rpcServer, cmd btcjson.Cmd, walletNotification c
 			voutList[i].Value = float64(v.Value) / 100000000
 			isbuf, _ := btcscript.DisasmString(v.PkScript)
 			voutList[i].ScriptPubKey.Asm = isbuf
-			voutList[i].ScriptPubKey.ReqSig = strings.Count(isbuf, "OP_CHECKSIG")
+			voutList[i].ScriptPubKey.ReqSigs = strings.Count(isbuf, "OP_CHECKSIG")
 			_, addrhash, err := btcscript.ScriptToAddrHash(v.PkScript)
 			if err != nil {
 				// TODO: set and return error?
