@@ -125,6 +125,16 @@ var jsoncmdtests = []struct {
 		},
 	},
 	{
+		name: "basic debuglevel",
+		f: func() (Cmd, error) {
+			return NewDebugLevelCmd(float64(1), "debug")
+		},
+		result: &DebugLevelCmd{
+			id:        float64(1),
+			LevelSpec: "debug",
+		},
+	},
+	{
 		name: "basic decoderawtransaction",
 		f: func() (Cmd, error) {
 			return NewDecodeRawTransactionCmd(float64(1),

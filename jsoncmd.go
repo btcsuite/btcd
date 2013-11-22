@@ -81,6 +81,9 @@ func ParseMarshaledCmd(b []byte) (Cmd, error) {
 	case "createrawtransaction":
 		cmd = new(CreateRawTransactionCmd)
 
+	case "debuglevel":
+		cmd = new(DebugLevelCmd)
+
 	case "decoderawtransaction":
 		cmd = new(DecodeRawTransactionCmd)
 
@@ -820,6 +823,75 @@ func (cmd *CreateRawTransactionCmd) UnmarshalJSON(b []byte) error {
 	}
 
 	newCmd, err := NewCreateRawTransactionCmd(r.Id, inputs, amounts)
+	if err != nil {
+		return err
+	}
+
+	*cmd = *newCmd
+	return nil
+}
+
+// DebugLevelCmd is a type handling custom marshaling and unmarshaling of
+// debuglevel JSON RPC commands.  This command is not a standard Bitcoin
+// command.  It is an extension for btcd.
+type DebugLevelCmd struct {
+	id        interface{}
+	LevelSpec string
+}
+
+// Enforce that DebugLevelCmd satisifies the Cmd interface.
+var _ Cmd = &DebugLevelCmd{}
+
+// NewDebugLevelCmd creates a new DebugLevelCmd.  This command is not a standard
+// Bitcoin command.  It is an extension for btcd.
+func NewDebugLevelCmd(id interface{}, levelSpec string) (*DebugLevelCmd, error) {
+	return &DebugLevelCmd{
+		id:        id,
+		LevelSpec: levelSpec,
+	}, nil
+}
+
+// Id satisfies the Cmd interface by returning the id of the command.
+func (cmd *DebugLevelCmd) Id() interface{} {
+	return cmd.id
+}
+
+// Method satisfies the Cmd interface by returning the json method.
+func (cmd *DebugLevelCmd) Method() string {
+	return "debuglevel"
+}
+
+// MarshalJSON returns the JSON encoding of cmd.  Part of the Cmd interface.
+func (cmd *DebugLevelCmd) MarshalJSON() ([]byte, error) {
+	// Fill and marshal a RawCmd.
+	return json.Marshal(RawCmd{
+		Jsonrpc: "1.0",
+		Method:  cmd.Method(),
+		Id:      cmd.id,
+		Params: []interface{}{
+			cmd.LevelSpec,
+		},
+	})
+}
+
+// UnmarshalJSON unmarshals the JSON encoding of cmd into cmd.  Part of
+// the Cmd interface.
+func (cmd *DebugLevelCmd) UnmarshalJSON(b []byte) error {
+	// Unmashal into a RawCmd
+	var r RawCmd
+	if err := json.Unmarshal(b, &r); err != nil {
+		return err
+	}
+
+	if len(r.Params) != 1 {
+		return ErrWrongNumberOfParams
+	}
+	levelSpec, ok := r.Params[0].(string)
+	if !ok {
+		return errors.New("first parameter levelspec must be a string")
+	}
+
+	newCmd, err := NewDebugLevelCmd(r.Id, levelSpec)
 	if err != nil {
 		return err
 	}
