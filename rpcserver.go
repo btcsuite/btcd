@@ -547,6 +547,7 @@ var handlers = map[string]commandHandler{
 	"backupwallet":           handleAskWallet,
 	"createmultisig":         handleAskWallet,
 	"createrawtransaction":   handleUnimplemented,
+	"debuglevel":             handleDebugLevel,
 	"decoderawtransaction":   handleDecodeRawTransaction,
 	"decodescript":           handleUnimplemented,
 	"dumpprivkey":            handleAskWallet,
@@ -660,6 +661,29 @@ func handleAddNode(s *rpcServer, cmd btcjson.Cmd,
 
 	// no data returned unless an error.
 	return nil, err
+}
+
+// handleDebugLevel handles debuglevel commands.
+func handleDebugLevel(s *rpcServer, cmd btcjson.Cmd,
+	walletNotification chan []byte) (interface{}, error) {
+	c := cmd.(*btcjson.DebugLevelCmd)
+
+	// Special show command to list supported subsystems.
+	if c.LevelSpec == "show" {
+		return fmt.Sprintf("Supported subsystems %v",
+			supportedSubsystems()), nil
+	}
+
+	err := parseAndSetDebugLevels(c.LevelSpec)
+	if err != nil {
+		jsonErr := btcjson.Error{
+			Code:    btcjson.ErrInvalidParams.Code,
+			Message: err.Error(),
+		}
+		return nil, jsonErr
+	}
+
+	return "Done.", nil
 }
 
 // handleDecodeRawTransaction handles decoderawtransaction commands.

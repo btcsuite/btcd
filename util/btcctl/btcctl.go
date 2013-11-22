@@ -44,6 +44,7 @@ var (
 // to validate correctness and perform the command.
 var commandHandlers = map[string]*handlerData{
 	"addnode":              &handlerData{2, 0, displaySpewDump, nil, makeAddNode, "<ip> <add/remove/onetry>"},
+	"debuglevel":           &handlerData{1, 0, displayGeneric, nil, makeDebugLevel, "<levelspec>"},
 	"decoderawtransaction": &handlerData{1, 0, displaySpewDump, nil, makeDecodeRawTransaction, "<txhash>"},
 	"dumpprivkey":          &handlerData{1, 0, displayGeneric, nil, makeDumpPrivKey, "<bitcoinaddress>"},
 	"getbestblockhash":     &handlerData{0, 0, displayGeneric, nil, makeGetBestBlockHash, ""},
@@ -125,6 +126,11 @@ func displaySpewDump(reply interface{}) error {
 func makeAddNode(args []interface{}) (btcjson.Cmd, error) {
 	return btcjson.NewAddNodeCmd("btcctl", args[0].(string),
 		args[1].(string))
+}
+
+// makeDebugLevel generates the cmd structure for debuglevel commands.
+func makeDebugLevel(args []interface{}) (btcjson.Cmd, error) {
+	return btcjson.NewDebugLevelCmd("btcctl", args[0].(string))
 }
 
 // makeDecodeRawTransaction generates the cmd structure for

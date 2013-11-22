@@ -121,15 +121,10 @@ func supportedSubsystems() []string {
 	return subsystems
 }
 
-// parseDebugLevel attempt to parse the specified debug level and set the levels
-// accordingly.  An appropriate error is returned if anything is invalid.
-func parseDebugLevel(debugLevel string) error {
-	// Special show command to list supported subsystems.
-	if debugLevel == "show" {
-		fmt.Println("Supported subsystems", supportedSubsystems())
-		os.Exit(0)
-	}
-
+// parseAndSetDebugLevels attempts to parse the specified debug level and set
+// the levels accordingly.  An appropriate error is returned if anything is
+// invalid.
+func parseAndSetDebugLevels(debugLevel string) error {
 	// When the specified string doesn't have any delimters, treat it as
 	// the log level for all subsystems.
 	if !strings.Contains(debugLevel, ",") && !strings.Contains(debugLevel, "=") {
@@ -162,8 +157,9 @@ func parseDebugLevel(debugLevel string) error {
 
 		// Validate subsystem.
 		if _, exists := subsystemLoggers[subsysID]; !exists {
-			str := "The specified subsystem [%v] is invalid"
-			return fmt.Errorf(str, subsysID)
+			str := "The specified subsystem [%v] is invalid -- " +
+				"supported subsytems %v"
+			return fmt.Errorf(str, subsysID, supportedSubsystems())
 		}
 
 		// Validate log level.
@@ -326,8 +322,14 @@ func loadConfig() (*config, []string, error) {
 		activeNetParams = netParams(btcwire.TestNet)
 	}
 
+	// Special show command to list supported subsystems and exit.
+	if cfg.DebugLevel == "show" {
+		fmt.Println("Supported subsystems", supportedSubsystems())
+		os.Exit(0)
+	}
+
 	// Parse, validate, and set debug log level(s).
-	if err := parseDebugLevel(cfg.DebugLevel); err != nil {
+	if err := parseAndSetDebugLevels(cfg.DebugLevel); err != nil {
 		err := fmt.Errorf("%s: %v", "loadConfig", err.Error())
 		fmt.Fprintln(os.Stderr, err)
 		parser.WriteHelp(os.Stderr)
