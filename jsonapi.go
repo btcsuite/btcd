@@ -106,7 +106,7 @@ type Vout struct {
 	ScriptPubKey struct {
 		Asm       string   `json:"asm"`
 		Hex       string   `json:"hex"`
-		ReqSig    int      `json:"reqSig"`
+		ReqSigs   int      `json:"reqSigs"`
 		Type      string   `json:"type"`
 		Addresses []string `json:"addresses"`
 	} `json:"scriptPubKey"`
