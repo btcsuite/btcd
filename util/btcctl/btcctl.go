@@ -58,7 +58,7 @@ var commandHandlers = map[string]*handlerData{
 	"getrawmempool":        &handlerData{0, 0, displaySpewDump, nil, makeGetRawMempool, ""},
 	"getrawtransaction":    &handlerData{1, 1, displaySpewDump, []conversionHandler{nil, toInt}, makeGetRawTransaction, "<txhash> [verbose=0]"},
 	"importprivkey":        &handlerData{1, 2, displayGeneric, []conversionHandler{nil, nil, toBool}, makeImportPrivKey, "<wifprivkey> [label] [rescan=true]"},
-	"listtransactions":     &handlerData{0, 3, displayGeneric, []conversionHandler{nil, toInt, toInt}, makeListTransactions, "<listtransactions> [account] [count=10] [from=0]"},
+	"listtransactions":     &handlerData{0, 3, displaySpewDump, []conversionHandler{nil, toInt, toInt}, makeListTransactions, "<listtransactions> [account] [count=10] [from=0]"},
 	"verifychain":          &handlerData{0, 2, displaySpewDump, []conversionHandler{toInt, toInt}, makeVerifyChain, "[level] [depth]"},
 	"stop":                 &handlerData{0, 0, displayGeneric, nil, makeStop, ""},
 }
