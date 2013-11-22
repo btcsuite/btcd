@@ -1169,7 +1169,7 @@ func (cmd *DumpWalletCmd) UnmarshalJSON(b []byte) error {
 }
 
 // EncryptWalletCmd is a type handling custom marshaling and
-// unmarshaling of ecryptwallet JSON RPC commands.
+// unmarshaling of encryptwallet JSON RPC commands.
 type EncryptWalletCmd struct {
 	id         interface{}
 	Passphrase string
