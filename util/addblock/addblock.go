@@ -10,10 +10,10 @@ import (
 	"github.com/conformal/btcdb"
 	_ "github.com/conformal/btcdb/ldb"
 	_ "github.com/conformal/btcdb/sqlite3"
+	"github.com/conformal/btclog"
 	"github.com/conformal/btcutil"
 	"github.com/conformal/btcwire"
 	"github.com/conformal/go-flags"
-	"github.com/conformal/seelog"
 	"io"
 	"os"
 	"path/filepath"
@@ -39,7 +39,7 @@ const (
 var (
 	btcdHomeDir    = btcutil.AppDataDir("btcd", false)
 	defaultDataDir = filepath.Join(btcdHomeDir, "data")
-	log            seelog.LoggerInterface
+	log            btclog.Logger
 )
 
 type bufQueue struct {
@@ -69,13 +69,9 @@ func main() {
 
 	runtime.GOMAXPROCS(runtime.NumCPU())
 
-	log, err = seelog.LoggerFromWriterWithMinLevel(os.Stdout,
-		seelog.InfoLvl)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "failed to create logger: %v", err)
-		return
-	}
-	defer log.Flush()
+	backendLogger := btclog.NewDefaultBackendLogger()
+	defer backendLogger.Flush()
+	log = btclog.NewSubsystemLogger(backendLogger, "")
 	btcdb.UseLogger(log)
 
 	var testnet string
@@ -225,28 +221,4 @@ func readBlocks(fi io.Reader, bufqueue chan *bufQueue) {
 		bufqueue <- &bufM
 		height++
 	}
-}
-
-// newLogger creates a new seelog logger using the provided logging level and
-// log message prefix.
-func newLogger(level string, prefix string) seelog.LoggerInterface {
-	fmtstring := `
-        <seelog type="adaptive" mininterval="2000000" maxinterval="100000000"
-                critmsgcount="500" minlevel="%s">
-                <outputs formatid="all">
-                        <console/>
-                </outputs>
-                <formats>
-                        <format id="all" format="[%%Time %%Date] [%%LEV] [%s] %%Msg%%n" />
-                </formats>
-        </seelog>`
-	config := fmt.Sprintf(fmtstring, level, prefix)
-
-	logger, err := seelog.LoggerFromConfigAsString(config)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "failed to create logger: %v", err)
-		os.Exit(1)
-	}
-
-	return logger
 }

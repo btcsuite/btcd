@@ -7,14 +7,13 @@ package main
 import (
 	"encoding/binary"
 	"errors"
-	"fmt"
 	"github.com/conformal/btcdb"
 	_ "github.com/conformal/btcdb/ldb"
 	_ "github.com/conformal/btcdb/sqlite3"
+	"github.com/conformal/btclog"
 	"github.com/conformal/btcutil"
 	"github.com/conformal/btcwire"
 	"github.com/conformal/go-flags"
-	"github.com/conformal/seelog"
 	"github.com/davecgh/go-spew/spew"
 	"io"
 	"os"
@@ -40,7 +39,7 @@ type config struct {
 var (
 	btcdHomeDir    = btcutil.AppDataDir("btcd", false)
 	defaultDataDir = filepath.Join(btcdHomeDir, "data")
-	log            seelog.LoggerInterface
+	log            btclog.Logger
 )
 
 const (
@@ -64,13 +63,9 @@ func main() {
 		return
 	}
 
-	log, err = seelog.LoggerFromWriterWithMinLevel(os.Stdout,
-		seelog.InfoLvl)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "failed to create logger: %v", err)
-		return
-	}
-	defer log.Flush()
+	backendLogger := btclog.NewDefaultBackendLogger()
+	defer backendLogger.Flush()
+	log = btclog.NewSubsystemLogger(backendLogger, "")
 	btcdb.UseLogger(log)
 
 	var testnet string
