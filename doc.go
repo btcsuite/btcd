@@ -57,8 +57,11 @@ The flags are:
       --profile=       Enable HTTP profiling on given port -- NOTE port must be
                        between 1024 and 65536
       --cpuprofile=    Write CPU profile to the specified file
-  -d, --debuglevel=    Logging level {trace, debug, info, warn, error,
-                       critical}
+  -d, --debuglevel:    Logging level for all subsystems {trace, debug, info,
+                       warn, error, critical} -- You may also specify
+                       <subsystem>=<level>,<subsystem2>=<level>,... to set the
+                       log level for individual subsystems -- Use show to list
+                       available subsystems
 
 */
 package main
