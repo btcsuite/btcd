@@ -275,16 +275,17 @@ func loadConfig() (*config, []string, error) {
 	}
 
 	// Load additional config from file.
+	var configFileError error
 	parser := flags.NewParser(&cfg, flags.Default)
 	if !preCfg.RegressionTest || preCfg.ConfigFile != defaultConfigFile {
-		err := parser.ParseIniFile(preCfg.ConfigFile)
+		err := flags.NewIniParser(parser).ParseFile(preCfg.ConfigFile)
 		if err != nil {
 			if _, ok := err.(*os.PathError); !ok {
 				fmt.Fprintln(os.Stderr, err)
 				parser.WriteHelp(os.Stderr)
 				return nil, nil, err
 			}
-			btcdLog.Warnf("%v", err)
+			configFileError = err
 		}
 	}
 
@@ -301,6 +302,14 @@ func loadConfig() (*config, []string, error) {
 		}
 		return nil, nil, err
 	}
+
+	// Warn about missing config file after the final command line parse
+	// succeeds.  This prevents the warning on help messages and invalid
+	// options.
+	if configFileError != nil {
+		btcdLog.Warnf("%v", configFileError)
+	}
+
 
 	// The two test networks can't be selected simultaneously.
 	if cfg.TestNet3 && cfg.RegressionTest {

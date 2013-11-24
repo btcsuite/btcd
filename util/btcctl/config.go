@@ -73,7 +73,7 @@ func loadConfig() (*flags.Parser, *config, []string, error) {
 
 	// Load additional config from file.
 	parser := flags.NewParser(&cfg, flags.PassDoubleDash|flags.HelpFlag)
-	err = parser.ParseIniFile(preCfg.ConfigFile)
+	err = flags.NewIniParser(parser).ParseFile(preCfg.ConfigFile)
 	if err != nil {
 		if _, ok := err.(*os.PathError); !ok {
 			fmt.Fprintln(os.Stderr, err)
