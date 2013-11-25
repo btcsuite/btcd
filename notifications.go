@@ -193,7 +193,11 @@ func (n *BlockDisconnectedNtfn) UnmarshalJSON(b []byte) error {
 // TxMinedNtfn is a type handling custom marshaling and
 // unmarshaling of txmined JSON websocket notifications.
 type TxMinedNtfn struct {
-	Hash string `json:"hash"`
+	TxID        string `json:"txid"`
+	BlockHash   string `json:"blockhash"`
+	BlockHeight int32  `json:"blockheight"`
+	BlockTime   int64  `json:"blocktime"`
+	Index       int    `json:"index"`
 }
 
 type txMinedResult TxMinedNtfn
@@ -202,8 +206,16 @@ type txMinedResult TxMinedNtfn
 var _ Notification = &TxMinedNtfn{}
 
 // NewTxMinedNtfn creates a new TxMinedNtfn.
-func NewTxMinedNtfn(hash string) *TxMinedNtfn {
-	return &TxMinedNtfn{Hash: hash}
+func NewTxMinedNtfn(txid, blockhash string, blockheight int32,
+	blocktime int64, index int) *TxMinedNtfn {
+
+	return &TxMinedNtfn{
+		TxID:        txid,
+		BlockHash:   blockhash,
+		BlockHeight: blockheight,
+		BlockTime:   blocktime,
+		Index:       index,
+	}
 }
 
 // Id satisifies the Notification interface by returning the id of the
