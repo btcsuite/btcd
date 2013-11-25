@@ -130,12 +130,14 @@ func newSeelogLogger() seelog.LoggerInterface {
 	<seelog type="adaptive" mininterval="2000000" maxinterval="100000000"
 		critmsgcount="500" minlevel="trace">
 		<outputs formatid="all">
-			<console/>
+			<console />
+			<rollingfile type="size" filename="%s" maxsize="10485760" maxrolls="3" />
 		</outputs>
 		<formats>
-			<format id="all" format="%Time %Date [%LEV] %Msg%n" />
+			<format id="all" format="%%Time %%Date [%%LEV] %%Msg%%n" />
 		</formats>
 	</seelog>`
+	config = fmt.Sprintf(config, defaultLogFile)
 
 	logger, err := seelog.LoggerFromConfigAsString(config)
 	if err != nil {

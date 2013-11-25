@@ -39,6 +39,7 @@ var (
 	knownDbTypes       = btcdb.SupportedDBs()
 	defaultRPCKeyFile  = filepath.Join(btcdHomeDir, "rpc.key")
 	defaultRPCCertFile = filepath.Join(btcdHomeDir, "rpc.cert")
+	defaultLogFile     = filepath.Join(btcdHomeDir, "logs", "btcd.log")
 )
 
 // config defines the configuration options for btcd.
