@@ -1518,7 +1518,12 @@ func (s *rpcServer) NotifyBlockConnected(block *btcutil.Block) {
 			for e := clist.Front(); e != nil; e = enext {
 				enext = e.Next()
 				ctx := e.Value.(*notificationCtx)
-				ntfn := btcws.NewTxMinedNtfn(tx.Sha().String())
+				// TODO: remove int32 type conversion after
+				// the int64 -> int32 switch is made.
+				ntfn := btcws.NewTxMinedNtfn(tx.Sha().String(),
+					hash.String(), int32(block.Height()),
+					block.MsgBlock().Header.Timestamp.Unix(),
+					tx.Index())
 				mntfn, _ := json.Marshal(ntfn)
 				ctx.connection <- mntfn
 				s.ws.removeMinedTxRequest(ctx.connection, ctx.rc,
