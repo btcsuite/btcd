@@ -1225,18 +1225,13 @@ func handleRescan(s *rpcServer, cmd btcjson.Cmd,
 		for i := range blkshalist {
 			blk, err := s.server.db.FetchBlockBySha(&blkshalist[i])
 			if err != nil {
+				rpcsLog.Errorf("Error looking up block sha: %v", err)
 				return err
 			}
-			txShaList, err := blk.TxShas()
-			if err != nil {
-				return err
-			}
-			txList := s.server.db.FetchTxByShaList(txShaList)
-			for _, txReply := range txList {
-				if txReply.Err != nil || txReply.Tx == nil {
-					continue
-				}
-				for txOutIdx, txout := range txReply.Tx.TxOut {
+			txs := blk.Transactions()
+			for _, tx := range txs {
+				var txReply *btcdb.TxListReply
+				for txOutIdx, txout := range tx.MsgTx().TxOut {
 					st, txaddrhash, err := btcscript.ScriptToAddrHash(txout.PkScript)
 					if st != btcscript.ScriptAddr || err != nil {
 						continue
@@ -1246,27 +1241,48 @@ func handleRescan(s *rpcServer, cmd btcjson.Cmd,
 						rpcsLog.Errorf("Error encoding address: %v", err)
 						return err
 					}
+
 					if _, ok := rescanCmd.Addresses[txaddr]; ok {
+						// TODO(jrick): This lookup is expensive and can be avoided
+						// if the wallet is sent the previous outpoints for all inputs
+						// of the tx, so any can removed from the utxo set (since
+						// they are, as of this tx, now spent).
+						if txReply == nil {
+							txReplyList, err := s.server.db.FetchTxBySha(tx.Sha())
+							if err != nil {
+								rpcsLog.Errorf("Tx Sha %v not found by db.", tx.Sha())
+								return err
+							}
+							for i := range txReplyList {
+								if txReplyList[i].Height == blk.Height() {
+									txReply = txReplyList[i]
+									break
+								}
+							}
+						}
+
 						reply.Result = struct {
-							Sender    string `json:"sender"`
-							Receiver  string `json:"receiver"`
-							BlockHash string `json:"blockhash"`
-							Height    int64  `json:"height"`
-							TxHash    string `json:"txhash"`
-							Index     uint32 `json:"index"`
-							Amount    int64  `json:"amount"`
-							PkScript  string `json:"pkscript"`
-							Spent     bool   `json:"spent"`
+							Receiver   string `json:"receiver"`
+							Height     int64  `json:"height"`
+							BlockHash  string `json:"blockhash"`
+							BlockIndex int    `json:"blockindex"`
+							BlockTime  int64  `json:"blocktime"`
+							TxID       string `json:"txid"`
+							TxOutIndex uint32 `json:"txoutindex"`
+							Amount     int64  `json:"amount"`
+							PkScript   string `json:"pkscript"`
+							Spent      bool   `json:"spent"`
 						}{
-							Sender:    "Unknown", // TODO(jrick)
-							Receiver:  txaddr,
-							BlockHash: blkshalist[i].String(),
-							Height:    blk.Height(),
-							TxHash:    txReply.Sha.String(),
-							Index:     uint32(txOutIdx),
-							Amount:    txout.Value,
-							PkScript:  btcutil.Base58Encode(txout.PkScript),
-							Spent:     txReply.TxSpent[txOutIdx],
+							Receiver:   txaddr,
+							Height:     blk.Height(),
+							BlockHash:  blkshalist[i].String(),
+							BlockIndex: tx.Index(),
+							BlockTime:  blk.MsgBlock().Header.Timestamp.Unix(),
+							TxID:       tx.Sha().String(),
+							TxOutIndex: uint32(txOutIdx),
+							Amount:     txout.Value,
+							PkScript:   btcutil.Base58Encode(txout.PkScript),
+							Spent:      txReply.TxSpent[txOutIdx],
 						}
 						mreply, _ := json.Marshal(reply)
 						walletNotification <- mreply
@@ -1643,23 +1659,25 @@ func (s *rpcServer) newBlockNotifyCheckTxOut(block *btcutil.Block,
 				}
 				reply := &btcjson.Reply{
 					Result: struct {
-						Sender    string `json:"sender"`
-						Receiver  string `json:"receiver"`
-						BlockHash string `json:"blockhash"`
-						Height    int64  `json:"height"`
-						TxHash    string `json:"txhash"`
-						Index     uint32 `json:"index"`
-						Amount    int64  `json:"amount"`
-						PkScript  string `json:"pkscript"`
+						Receiver   string `json:"receiver"`
+						Height     int64  `json:"height"`
+						BlockHash  string `json:"blockhash"`
+						BlockIndex int    `json:"blockindex"`
+						BlockTime  int64  `json:"blocktime"`
+						TxID       string `json:"txid"`
+						TxOutIndex uint32 `json:"txoutindex"`
+						Amount     int64  `json:"amount"`
+						PkScript   string `json:"pkscript"`
 					}{
-						Sender:    "Unknown", // TODO(jrick)
-						Receiver:  txaddr,
-						BlockHash: blkhash.String(),
-						Height:    block.Height(),
-						TxHash:    tx.Sha().String(),
-						Index:     uint32(i),
-						Amount:    txout.Value,
-						PkScript:  btcutil.Base58Encode(txout.PkScript),
+						Receiver:   txaddr,
+						Height:     block.Height(),
+						BlockHash:  blkhash.String(),
+						BlockIndex: tx.Index(),
+						BlockTime:  block.MsgBlock().Header.Timestamp.Unix(),
+						TxID:       tx.Sha().String(),
+						TxOutIndex: uint32(i),
+						Amount:     txout.Value,
+						PkScript:   btcutil.Base58Encode(txout.PkScript),
 					},
 					Error: nil,
 					Id:    &ctx.id,
