@@ -771,28 +771,31 @@ func (s *server) ScheduleShutdown(duration time.Duration) {
 // listeners on the correct interface "tcp4" and "tcp6".  It also properly
 // detects addresses which apply to "all interfaces" and adds the address to
 // both slices.
-func parseListeners(addrs []string) ([]string, []string, error) {
+func parseListeners(addrs []string) ([]string, []string, bool, error) {
 	ipv4ListenAddrs := make([]string, 0, len(addrs)*2)
 	ipv6ListenAddrs := make([]string, 0, len(addrs)*2)
+	haveWildcard := false
+
 	for _, addr := range addrs {
 		host, _, err := net.SplitHostPort(addr)
 		if err != nil {
 			// Shouldn't happen due to already being normalized.
-			return nil, nil, err
+			return nil, nil, false, err
 		}
 
 		// Empty host or host of * on plan9 is both IPv4 and IPv6.
 		if host == "" || (host == "*" && runtime.GOOS == "plan9") {
 			ipv4ListenAddrs = append(ipv4ListenAddrs, addr)
 			ipv6ListenAddrs = append(ipv6ListenAddrs, addr)
+			haveWildcard = true
 			continue
 		}
 
 		// Parse the IP.
 		ip := net.ParseIP(host)
 		if ip == nil {
-			return nil, nil, fmt.Errorf("'%s' is not a valid IP "+
-				"address", host)
+			return nil, nil, false, fmt.Errorf("'%s' is not a "+
+				"valid IP address", host)
 		}
 
 		// To4 returns nil when the IP is not an IPv4 address, so use
@@ -803,7 +806,7 @@ func parseListeners(addrs []string) ([]string, []string, error) {
 			ipv4ListenAddrs = append(ipv4ListenAddrs, addr)
 		}
 	}
-	return ipv4ListenAddrs, ipv6ListenAddrs, nil
+	return ipv4ListenAddrs, ipv6ListenAddrs, haveWildcard, nil
 }
 
 // newServer returns a new btcd server configured to listen on addr for the
@@ -815,13 +818,38 @@ func newServer(listenAddrs []string, db btcdb.Db, btcnet btcwire.BitcoinNet) (*s
 		return nil, err
 	}
 
+	amgr := NewAddrManager()
+
 	var listeners []net.Listener
 	if !cfg.DisableListen {
-		ipv4Addrs, ipv6Addrs, err := parseListeners(listenAddrs)
+		ipv4Addrs, ipv6Addrs, wildcard, err :=
+			parseListeners(listenAddrs)
 		if err != nil {
 			return nil, err
 		}
 		listeners = make([]net.Listener, 0, len(ipv4Addrs)+len(ipv6Addrs))
+
+		// TODO(oga) nonstandard port...
+		if wildcard {
+			port, err :=
+				strconv.ParseUint(activeNetParams.listenPort,
+					10, 16)
+			if err != nil {
+				// I can't think of a cleaner way to do this...
+				goto nowc
+			}
+			addrs, err := net.InterfaceAddrs()
+			for _, a := range addrs {
+				ip, _, err := net.ParseCIDR(a.String())
+				if err != nil {
+					continue
+				}
+				na := btcwire.NewNetAddressIPPort(ip,
+					uint16(port), btcwire.SFNodeNetwork)
+				amgr.addLocalAddress(na, InterfacePrio)
+			}
+		}
+	nowc:
 
 		for _, addr := range ipv4Addrs {
 			listener, err := net.Listen("tcp4", addr)
@@ -831,6 +859,10 @@ func newServer(listenAddrs []string, db btcdb.Db, btcnet btcwire.BitcoinNet) (*s
 				continue
 			}
 			listeners = append(listeners, listener)
+
+			if na, err := deserialiseNetAddress(addr); err == nil {
+				amgr.addLocalAddress(na, BoundPrio)
+			}
 		}
 
 		for _, addr := range ipv6Addrs {
@@ -841,6 +873,9 @@ func newServer(listenAddrs []string, db btcdb.Db, btcnet btcwire.BitcoinNet) (*s
 				continue
 			}
 			listeners = append(listeners, listener)
+			if na, err := deserialiseNetAddress(addr); err == nil {
+				amgr.addLocalAddress(na, BoundPrio)
+			}
 		}
 
 		if len(listeners) == 0 {
@@ -852,7 +887,7 @@ func newServer(listenAddrs []string, db btcdb.Db, btcnet btcwire.BitcoinNet) (*s
 		nonce:       nonce,
 		listeners:   listeners,
 		btcnet:      btcnet,
-		addrManager: NewAddrManager(),
+		addrManager: amgr,
 		newPeers:    make(chan *peer, cfg.MaxPeers),
 		donePeers:   make(chan *peer, cfg.MaxPeers),
 		banPeers:    make(chan *peer, cfg.MaxPeers),

@@ -472,7 +472,7 @@ func newRPCServer(listenAddrs []string, s *server) (*rpcServer, error) {
 
 	// TODO(oga) this code is similar to that in server, should be
 	// factored into something shared.
-	ipv4ListenAddrs, ipv6ListenAddrs, err := parseListeners(listenAddrs)
+	ipv4ListenAddrs, ipv6ListenAddrs, _, err := parseListeners(listenAddrs)
 	if err != nil {
 		return nil, err
 	}

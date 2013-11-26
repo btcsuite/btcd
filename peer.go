@@ -281,17 +281,13 @@ func (p *peer) handleVersionMsg(msg *btcwire.MsgVersion) {
 	if !p.inbound {
 		// TODO(davec): Only do this if not doing the initial block
 		// download and the local address is routable.
-		if !cfg.DisableListen {
-			// Advertise the local address.
-			na, err := newNetAddress(p.conn.LocalAddr(), p.services)
-			if err != nil {
-				p.logError("Can't advertise local "+
-					"address: %v", err)
-				p.Disconnect()
-				return
+		if !cfg.DisableListen /* && isCurrent? */ {
+			// get address that best matches. p.na
+			lna := p.server.addrManager.getBestLocalAddress(p.na)
+			if Routable(lna) {
+				addresses := []*btcwire.NetAddress{lna}
+				p.pushAddrMsg(addresses)
 			}
-			addresses := []*btcwire.NetAddress{na}
-			p.pushAddrMsg(addresses)
 		}
 
 		// Request known addresses if the server address manager needs
