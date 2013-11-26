@@ -314,6 +314,8 @@ func (db *LevelDb) InsertBlock(block *btcutil.Block) (height int64, rerr error) 
 	defer func() {
 		if rerr == nil {
 			rerr = db.processBatches()
+		} else {
+			db.lBatch().Reset()
 		}
 	}()
 
@@ -363,8 +365,7 @@ func (db *LevelDb) InsertBlock(block *btcutil.Block) (height int64, rerr error) 
 		err = db.insertTx(txsha, newheight, txloc[txidx].TxStart, txloc[txidx].TxLen, spentbuf)
 		if err != nil {
 			log.Warnf("block %v idx %v failed to insert tx %v %v err %v", blocksha, newheight, &txsha, txidx, err)
-
-			return
+			return 0, err
 		}
 
 		// Some old blocks contain duplicate transactions
@@ -412,8 +413,7 @@ func (db *LevelDb) InsertBlock(block *btcutil.Block) (height int64, rerr error) 
 		err = db.doSpend(tx)
 		if err != nil {
 			log.Warnf("block %v idx %v failed to spend tx %v %v err %v", blocksha, newheight, txsha, txidx, err)
-
-			return
+			return 0, err
 		}
 	}
 	return newheight, nil
@@ -626,6 +626,8 @@ func (db *LevelDb) processBatches() error {
 			db.lbatch = new(leveldb.Batch)
 		}
 
+		defer db.lbatch.Reset()
+
 		for txSha, txU := range db.txUpdateMap {
 			key := shaTxToKey(&txSha)
 			if txU.delete {
@@ -660,7 +662,6 @@ func (db *LevelDb) processBatches() error {
 			log.Tracef("batch failed %v\n", err)
 			return err
 		}
-		db.lbatch.Reset()
 		db.txUpdateMap = map[btcwire.ShaHash]*txUpdateObj{}
 		db.txSpentUpdateMap = make(map[btcwire.ShaHash]*spentTxUpdate)
 	}
