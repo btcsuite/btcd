@@ -771,6 +771,54 @@ var jsoncmdtests = []struct {
 		},
 	},
 	{
+		name: "basic listtransactions",
+		f: func() (Cmd, error) {
+			return NewListTransactionsCmd(float64(1))
+		},
+		result: &ListTransactionsCmd{
+			id:      float64(1),
+			Account: "",
+			Count:   10,
+			From:    0,
+		},
+	},
+	{
+		name: "listtransactions 1 optarg",
+		f: func() (Cmd, error) {
+			return NewListTransactionsCmd(float64(1), "abcde")
+		},
+		result: &ListTransactionsCmd{
+			id:      float64(1),
+			Account: "abcde",
+			Count:   10,
+			From:    0,
+		},
+	},
+	{
+		name: "listtransactions 2 optargs",
+		f: func() (Cmd, error) {
+			return NewListTransactionsCmd(float64(1), "abcde", 123)
+		},
+		result: &ListTransactionsCmd{
+			id:      float64(1),
+			Account: "abcde",
+			Count:   123,
+			From:    0,
+		},
+	},
+	{
+		name: "listtransactions 3 optargs",
+		f: func() (Cmd, error) {
+			return NewListTransactionsCmd(float64(1), "abcde", 123, 456)
+		},
+		result: &ListTransactionsCmd{
+			id:      float64(1),
+			Account: "abcde",
+			Count:   123,
+			From:    456,
+		},
+	},
+	{
 		name: "basic listunspent",
 		f: func() (Cmd, error) {
 			return NewListUnspentCmd(float64(1))

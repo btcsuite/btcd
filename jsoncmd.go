@@ -4391,7 +4391,7 @@ func NewListTransactionsCmd(id interface{}, optArgs ...interface{}) (*ListTransa
 		account = ac
 	}
 	if len(optArgs) > 1 {
-		cnt, ok := optArgs[0].(int)
+		cnt, ok := optArgs[1].(int)
 		if !ok {
 			return nil, errors.New("second optional argument count is not an int")
 		}
@@ -4399,7 +4399,7 @@ func NewListTransactionsCmd(id interface{}, optArgs ...interface{}) (*ListTransa
 		count = cnt
 	}
 	if len(optArgs) > 2 {
-		frm, ok := optArgs[0].(int)
+		frm, ok := optArgs[2].(int)
 		if !ok {
 			return nil, errors.New("third optional argument from is not an int")
 		}
