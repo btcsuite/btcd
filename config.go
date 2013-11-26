@@ -43,6 +43,10 @@ var (
 	defaultLogFile     = filepath.Join(btcdHomeDir, "logs", "btcd.log")
 )
 
+// runServiceCommand is only set to a real function on Windows.  It is used
+// to parse and execute service commands specified via the -s flag.
+var runServiceCommand func(string) error
+
 // config defines the configuration options for btcd.
 //
 // See loadConfig for details on the configuration load process.
@@ -271,10 +275,6 @@ func loadConfig() (*config, []string, error) {
 
 	// Service options which are only added on Windows.
 	serviceOpts := serviceOptions{}
-	var runServiceCommand func(string) error
-	if runtime.GOOS == "windows" {
-		runServiceCommand = performServiceCommand
-	}
 
 	// Create the home directory if it doesn't already exist.
 	err := os.MkdirAll(btcdHomeDir, 0700)

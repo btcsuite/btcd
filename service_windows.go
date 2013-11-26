@@ -318,3 +318,9 @@ func serviceMain() (bool, error) {
 
 	return true, nil
 }
+
+// Set windows specific functions to real functions.
+func init() {
+	runServiceCommand = performServiceCommand
+	winServiceMain = serviceMain
+}

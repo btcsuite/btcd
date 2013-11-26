@@ -19,6 +19,10 @@ var (
 	shutdownChannel = make(chan bool)
 )
 
+// winServiceMain is only invoked on Windows.  It detect when btcd is running as
+// a service and reacts accordingly.
+var winServiceMain func() (bool, error)
+
 // btcdMain is the real main function for btcd.  It is necessary to work around
 // the fact that deferred functions do not run when os.Exit() is called.  The
 // optional serverChan parameter is mainly used by the service code to be
@@ -126,7 +130,7 @@ func main() {
 	// the return isService flag is true, exit now since we ran as a
 	// service.  Otherwise, just fall through to normal operation.
 	if runtime.GOOS == "windows" {
-		isService, err := serviceMain()
+		isService, err := winServiceMain()
 		if err != nil {
 			fmt.Println(err)
 			os.Exit(1)
