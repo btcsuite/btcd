@@ -227,13 +227,13 @@ func makeImportPrivKey(args []interface{}) (btcjson.Cmd, error) {
 // listtransactions commands.
 func makeListTransactions(args []interface{}) (btcjson.Cmd, error) {
 	var optargs = make([]interface{}, 0, 3)
-	if len(args) > 1 {
+	if len(args) > 0 {
 		optargs = append(optargs, args[0].(string))
 	}
-	if len(args) > 2 {
+	if len(args) > 1 {
 		optargs = append(optargs, args[1].(int))
 	}
-	if len(args) > 3 {
+	if len(args) > 2 {
 		optargs = append(optargs, args[2].(int))
 	}
 
