@@ -259,7 +259,8 @@ func (db *LevelDb) DropAfterBlockBySha(sha *btcwire.ShaHash) (rerr error) {
 	defer func() {
 		if rerr == nil {
 			rerr = db.processBatches()
-
+		} else {
+			db.lBatch().Reset()
 		}
 	}()
 
