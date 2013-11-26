@@ -828,6 +828,28 @@ func newServer(listenAddrs []string, db btcdb.Db, btcnet btcwire.BitcoinNet) (*s
 			return nil, err
 		}
 		listeners = make([]net.Listener, 0, len(ipv4Addrs)+len(ipv6Addrs))
+		discover := true
+		if len(cfg.ExternalIPs) != 0 {
+			discover = false
+			port, err :=
+				strconv.ParseUint(activeNetParams.listenPort,
+					10, 16)
+			if err != nil {
+				srvrLog.Warnf("doubleewteeeff?")
+			}
+
+			for _, sip := range cfg.ExternalIPs {
+				na, err := hostToNetAddress(sip, uint16(port),
+					btcwire.SFNodeNetwork)
+				if err != nil {
+					srvrLog.Warnf("Not adding %s as ip: %v",
+						sip, err)
+					continue
+				}
+
+				amgr.addLocalAddress(na, ManualPrio)
+			}
+		}
 
 		// TODO(oga) nonstandard port...
 		if wildcard {
@@ -846,7 +868,9 @@ func newServer(listenAddrs []string, db btcdb.Db, btcnet btcwire.BitcoinNet) (*s
 				}
 				na := btcwire.NewNetAddressIPPort(ip,
 					uint16(port), btcwire.SFNodeNetwork)
-				amgr.addLocalAddress(na, InterfacePrio)
+				if discover {
+					amgr.addLocalAddress(na, InterfacePrio)
+				}
 			}
 		}
 	nowc:
@@ -860,8 +884,10 @@ func newServer(listenAddrs []string, db btcdb.Db, btcnet btcwire.BitcoinNet) (*s
 			}
 			listeners = append(listeners, listener)
 
-			if na, err := deserialiseNetAddress(addr); err == nil {
-				amgr.addLocalAddress(na, BoundPrio)
+			if discover {
+				if na, err := deserialiseNetAddress(addr); err == nil {
+					amgr.addLocalAddress(na, BoundPrio)
+				}
 			}
 		}
 
@@ -873,8 +899,10 @@ func newServer(listenAddrs []string, db btcdb.Db, btcnet btcwire.BitcoinNet) (*s
 				continue
 			}
 			listeners = append(listeners, listener)
-			if na, err := deserialiseNetAddress(addr); err == nil {
-				amgr.addLocalAddress(na, BoundPrio)
+			if discover {
+				if na, err := deserialiseNetAddress(addr); err == nil {
+					amgr.addLocalAddress(na, BoundPrio)
+				}
 			}
 		}
 
