@@ -274,7 +274,10 @@ func makeVerifyChain(args []interface{}) (btcjson.Cmd, error) {
 func send(cfg *config, msg []byte) (interface{}, error) {
 	var reply btcjson.Reply
 	var err error
-	if cfg.RPCCert != "" || cfg.TlsSkipVerify {
+	if cfg.NoTls || (cfg.RPCCert == "" && !cfg.TlsSkipVerify) {
+		reply, err = btcjson.RpcCommand(cfg.RPCUser, cfg.RPCPassword,
+			cfg.RPCServer, msg)
+	} else {
 		var pem []byte
 		if cfg.RPCCert != "" {
 			pem, err = ioutil.ReadFile(cfg.RPCCert)
@@ -285,9 +288,6 @@ func send(cfg *config, msg []byte) (interface{}, error) {
 		reply, err = btcjson.TlsRpcCommand(cfg.RPCUser,
 			cfg.RPCPassword, cfg.RPCServer, msg, pem,
 			cfg.TlsSkipVerify)
-	} else {
-		reply, err = btcjson.RpcCommand(cfg.RPCUser, cfg.RPCPassword,
-			cfg.RPCServer, msg)
 	}
 	if err != nil {
 		return nil, err

@@ -26,6 +26,7 @@ type config struct {
 	RPCPassword   string `short:"P" long:"rpcpass" default-mask:"-" description:"RPC password"`
 	RPCServer     string `short:"s" long:"rpcserver" description:"RPC server to connect to"`
 	RPCCert       string `short:"c" long:"rpccert" description:"RPC server certificate chain for validation"`
+	NoTls         bool   `long:"notls" description:"Disable TLS"`
 	TlsSkipVerify bool   `long:"skipverify" description:"Do not verify tls certificates (not recommended!)"`
 }
 
