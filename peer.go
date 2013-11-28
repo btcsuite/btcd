@@ -175,23 +175,26 @@ func (p *peer) pushVersionMsg() error {
 		return err
 	}
 
-	// Create a NetAddress for the local IP.  Don't assume any services
-	// until we know otherwise.
-	naMe, err := newNetAddress(p.conn.LocalAddr(), 0)
-	if err != nil {
-		return err
-	}
+	theirNa := p.na
 
-	// Create a NetAddress for the remote IP.  Don't assume any services
-	// until we know otherwise.
-	naYou, err := newNetAddress(p.conn.RemoteAddr(), 0)
-	if err != nil {
-		return err
+	// If we are behind a proxy and the connection comes from the proxy then
+	// we return an unroutable address as their address. This is to prevent
+	// leaking the tor proxy address.
+	if cfg.Proxy != "" {
+		proxyaddress, _, err := net.SplitHostPort(cfg.Proxy)
+		// invalid proxy means poorly configured, be on the safe side.
+		if err != nil || p.na.IP.String() == proxyaddress {
+			theirNa = &btcwire.NetAddress{
+				Timestamp: time.Now(),
+				IP:        net.IP([]byte{0, 0, 0, 0}),
+			}
+		}
 	}
 
 	// Version message.
-	msg := btcwire.NewMsgVersion(naMe, naYou, p.server.nonce, userAgent,
-		int32(blockNum))
+	msg := btcwire.NewMsgVersion(
+		p.server.addrManager.getBestLocalAddress(p.na), theirNa, p.server.nonce,
+		userAgent, int32(blockNum))
 
 	// XXX: bitcoind appears to always enable the full node services flag
 	// of the remote peer netaddress field in the version message regardless
