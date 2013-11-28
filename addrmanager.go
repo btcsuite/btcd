@@ -595,14 +595,12 @@ func deserialiseNetAddress(addr string) (*btcwire.NetAddress, error) {
 	if err != nil {
 		return nil, err
 	}
-	ip := net.ParseIP(host)
 	port, err := strconv.ParseUint(portStr, 10, 16)
 	if err != nil {
 		return nil, err
 	}
-	na := btcwire.NewNetAddressIPPort(ip, uint16(port),
-		btcwire.SFNodeNetwork)
-	return na, nil
+
+	return hostToNetAddress(host, uint16(port), btcwire.SFNodeNetwork)
 }
 
 // Start begins the core address handler which manages a pool of known
