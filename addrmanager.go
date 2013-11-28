@@ -1061,7 +1061,7 @@ func RFC6145(na *btcwire.NetAddress) bool {
 	return rfc6145.Contains(na.IP)
 }
 
-var onioncatrange = net.IPNet{IP: net.ParseIP("FD87:d87e:eb43"),
+var onioncatrange = net.IPNet{IP: net.ParseIP("FD87:d87e:eb43::"),
 	Mask: net.CIDRMask(48, 128)}
 
 func Tor(na *btcwire.NetAddress) bool {
@@ -1073,9 +1073,6 @@ func Tor(na *btcwire.NetAddress) bool {
 	// RFC4193 Unique local IPv6 range.
 	// In summary the format is:
 	// { magic 6 bytes, 10 bytes base32 decode of key hash }
-	// TODO(oga) note that when handling tor addresses we need to detect
-	// this and // connect correctly. We may want to print tor addresses
-	// specially too.
 	return onioncatrange.Contains(na.IP)
 }
 
