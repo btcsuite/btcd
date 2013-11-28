@@ -8,6 +8,7 @@ import (
 	"bytes"
 	"container/list"
 	crand "crypto/rand" // for seeding
+	"encoding/base32"
 	"encoding/binary"
 	"encoding/json"
 	"fmt"
@@ -19,6 +20,7 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -753,11 +755,61 @@ func NewAddrManager() *AddrManager {
 	return &am
 }
 
+// hostToNetAddress returns a netaddress given a host address. If the address is
+// a tor .onion address this will be taken care of. else if the host is not an
+// IP address it will be resolved (via tor if required).
+func hostToNetAddress(host string, port uint16, services btcwire.ServiceFlag) (*btcwire.NetAddress, error) {
+	// tor address is 16 char base32 + ".onion"
+	var ip net.IP
+	if len(host) == 22 && host[16:] == ".onion" {
+		// go base32 encoding uses capitals (as does the rfc
+		// but tor and bitcoind tend to user lowercase, so we switch
+		// case here.
+		data, err := base32.StdEncoding.DecodeString(
+			strings.ToUpper(host[:16]))
+		if err != nil {
+			return nil, err
+		}
+		prefix := []byte{0xfd, 0x87, 0xd8, 0x7e, 0xeb, 0x43}
+		ip = net.IP(append(prefix, data...))
+	} else if ip = net.ParseIP(host); ip == nil {
+		var err error
+		var ips []net.IP
+		if cfg.Proxy != "" {
+			ips, err = torLookupIP(host, cfg.Proxy)
+		} else {
+			ips, err = net.LookupIP(host)
+		}
+		if err != nil {
+			return nil, err
+		}
+		if len(ips) == 0 {
+			return nil, fmt.Errorf("No addresses found for %s", host)
+		}
+		ip = ips[0]
+	}
+
+	return btcwire.NewNetAddressIPPort(ip, port, services), nil
+}
+
+// ipString returns a string for the ip from the provided NetAddress. If the
+// ip is in the range used for tor addresses then it will be transformed into
+// the relavent .onion address.
+func ipString(na *btcwire.NetAddress) string {
+	if Tor(na) {
+		// We know now that na.IP is long enogh.
+		base32 := base32.StdEncoding.EncodeToString(na.IP[6:])
+		return strings.ToLower(base32) + ".onion"
+	} else {
+		return na.IP.String()
+	}
+}
+
 // NetAddressKey returns a string key in the form of ip:port for IPv4 addresses
 // or [ip]:port for IPv6 addresses.
 func NetAddressKey(na *btcwire.NetAddress) string {
 	port := strconv.FormatUint(uint64(na.Port), 10)
-	addr := net.JoinHostPort(na.IP.String(), port)
+	addr := net.JoinHostPort(ipString(na), port)
 	return addr
 }
 

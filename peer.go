@@ -1325,7 +1325,7 @@ func newOutboundPeer(s *server, addr string, persistent bool) *peer {
 	// which case we return nil to be handled by the caller.  This must be
 	// done before we fork off the goroutine because as soon as this
 	// function returns the peer must have a valid netaddress.
-	ip, portStr, err := net.SplitHostPort(addr)
+	host, portStr, err := net.SplitHostPort(addr)
 	if err != nil {
 		p.logError("Tried to create a new outbound peer with invalid "+
 			"address %s: %v", addr, err)
@@ -1338,7 +1338,13 @@ func newOutboundPeer(s *server, addr string, persistent bool) *peer {
 			"port %s: %v", portStr, err)
 		return nil
 	}
-	p.na = btcwire.NewNetAddressIPPort(net.ParseIP(ip), uint16(port), 0)
+
+	p.na, err = hostToNetAddress(host, uint16(port), 0)
+	if err != nil {
+		p.logError("Can not turn host %s into netaddress: %v",
+			host, err)
+		return nil
+	}
 
 	go func() {
 		// Select which dial method to call depending on whether or
