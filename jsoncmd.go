@@ -5110,7 +5110,7 @@ func NewSendManyCmd(id interface{}, fromaccount string, amounts map[string]int64
 		minconf = m
 	}
 	if len(optArgs) > 1 {
-		c, ok := optArgs[0].(string)
+		c, ok := optArgs[1].(string)
 		if !ok {
 			return nil, errors.New("second optional parameter comment is not a string")
 		}

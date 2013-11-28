@@ -934,6 +934,55 @@ var jsoncmdtests = []struct {
 		},
 	},
 	{
+		name: "basic sendmany",
+		f: func() (Cmd, error) {
+			pairs := map[string]int64{
+				"address A": 1000,
+				"address B": 2000,
+				"address C": 3000,
+			}
+			return NewSendManyCmd(float64(1),
+				"account",
+				pairs)
+		},
+		result: &SendManyCmd{
+			id:          float64(1),
+			FromAccount: "account",
+			Amounts: map[string]int64{
+				"address A": 1000,
+				"address B": 2000,
+				"address C": 3000,
+			},
+			MinConf: 1, // the default
+		},
+	},
+	{
+		name: "sendmany + options",
+		f: func() (Cmd, error) {
+			pairs := map[string]int64{
+				"address A": 1000,
+				"address B": 2000,
+				"address C": 3000,
+			}
+			return NewSendManyCmd(float64(1),
+				"account",
+				pairs,
+				10,
+				"comment")
+		},
+		result: &SendManyCmd{
+			id:          float64(1),
+			FromAccount: "account",
+			Amounts: map[string]int64{
+				"address A": 1000,
+				"address B": 2000,
+				"address C": 3000,
+			},
+			MinConf: 10,
+			Comment: "comment",
+		},
+	},
+	{
 		name: "basic sendrawtransaction",
 		f: func() (Cmd, error) {
 			return NewSendRawTransactionCmd(float64(1),
