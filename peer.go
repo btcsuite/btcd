@@ -254,14 +254,6 @@ func (p *peer) handleVersionMsg(msg *btcwire.MsgVersion) {
 
 	// Inbound connections.
 	if p.inbound {
-		// Send version.
-		err := p.pushVersionMsg()
-		if err != nil {
-			p.logError("Can't send version message: %v", err)
-			p.Disconnect()
-			return
-		}
-
 		// Set up a NetAddress for the peer to be used with AddrManager.
 		// We only do this inbound because outbound set this up
 		// at connection time and no point recomputing.
@@ -272,6 +264,14 @@ func (p *peer) handleVersionMsg(msg *btcwire.MsgVersion) {
 			return
 		}
 		p.na = na
+
+		// Send version.
+		err = p.pushVersionMsg()
+		if err != nil {
+			p.logError("Can't send version message: %v", err)
+			p.Disconnect()
+			return
+		}
 	}
 
 	// Send verack.
