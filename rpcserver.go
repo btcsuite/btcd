@@ -1298,6 +1298,7 @@ func handleRescan(s *rpcServer, cmd btcjson.Cmd,
 		}
 	}
 
+	reply.Result = nil
 	mreply, _ := json.Marshal(reply)
 	walletNotification <- mreply
 
