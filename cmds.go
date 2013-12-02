@@ -745,7 +745,7 @@ func (cmd *WalletIsLockedCmd) UnmarshalJSON(b []byte) error {
 }
 
 // ListAllTransactionsCmd is a type handling custom marshaling and
-// unmarshaling of walletislocked JSON websocket extension commands.
+// unmarshaling of listalltransactions JSON websocket extension commands.
 type ListAllTransactionsCmd struct {
 	id      interface{}
 	Account string
