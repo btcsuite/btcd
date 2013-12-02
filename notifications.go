@@ -267,7 +267,7 @@ func (n *TxMinedNtfn) UnmarshalJSON(b []byte) error {
 // TxNtfn is a type handling custom marshaling and
 // unmarshaling of newtx JSON websocket notifications.
 type TxNtfn struct {
-	Account string `json:"account"`
+	Account string                 `json:"account"`
 	Details map[string]interface{} `json:"details"`
 }
 
