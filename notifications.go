@@ -30,8 +30,11 @@ const (
 	// notification.
 	BlockDisconnectedNtfnId = "btcd:blockdisconnected"
 
-	//TxMinedNtfnId is the id of the btcd txmined notification.
+	// TxMinedNtfnId is the id of the btcd txmined notification.
 	TxMinedNtfnId = "btcd:txmined"
+
+	// TxNtfnId is the id of the btcwallet newtx notification.
+	TxNtfnId = "btcwallet:newtx"
 )
 
 type newNtfnFn func() Notification
@@ -48,10 +51,15 @@ func newTxMinedNtfn() Notification {
 	return &TxMinedNtfn{}
 }
 
+func newTxNtfn() Notification {
+	return &TxNtfn{}
+}
+
 var newNtfnFns = map[string]newNtfnFn{
 	BlockConnectedNtfnId:    newBlockConnectedNtfn,
 	BlockDisconnectedNtfnId: newBlockDisconnectedNtfn,
 	TxMinedNtfnId:           newTxMinedNtfn,
+	TxNtfnId:                newTxNtfn,
 }
 
 // ParseMarshaledNtfn attempts to unmarshal a marshaled notification
@@ -253,5 +261,63 @@ func (n *TxMinedNtfn) UnmarshalJSON(b []byte) error {
 	}
 
 	*n = TxMinedNtfn(ntfn.Result)
+	return nil
+}
+
+// TxNtfn is a type handling custom marshaling and
+// unmarshaling of newtx JSON websocket notifications.
+type TxNtfn struct {
+	Account string `json:"account"`
+	Details map[string]interface{} `json:"details"`
+}
+
+type txNtfnResult TxNtfn
+
+// Enforce that TxNtfn satisfies the Notification interface.
+var _ Notification = &TxNtfn{}
+
+// NewTxNtfn creates a new TxNtfn.
+func NewTxNtfn(account string, details map[string]interface{}) *TxNtfn {
+	return &TxNtfn{
+		Account: account,
+		Details: details,
+	}
+}
+
+// Id satisifies the Notification interface by returning the id of the
+// notification.
+func (n *TxNtfn) Id() interface{} {
+	return TxNtfnId
+}
+
+// MarshalJSON returns the JSON encoding of n.  Part of the Notification
+// interface.
+func (n *TxNtfn) MarshalJSON() ([]byte, error) {
+	id := n.Id()
+	reply := btcjson.Reply{
+		Result: *n,
+		Id:     &id,
+	}
+	return json.Marshal(reply)
+}
+
+// UnmarshalJSON unmarshals the JSON encoding of n into n.  Part of
+// the Notification interface.
+func (n *TxNtfn) UnmarshalJSON(b []byte) error {
+	var ntfn struct {
+		Result txNtfnResult   `json:"result"`
+		Error  *btcjson.Error `json:"error"`
+		Id     interface{}    `json:"id"`
+	}
+	if err := json.Unmarshal(b, &ntfn); err != nil {
+		return err
+	}
+
+	// Notification IDs must match expected.
+	if n.Id() != ntfn.Id {
+		return ErrNtfnUnexpected
+	}
+
+	*n = TxNtfn(ntfn.Result)
 	return nil
 }
