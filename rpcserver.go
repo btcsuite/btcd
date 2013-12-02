@@ -1639,10 +1639,10 @@ func (s *rpcServer) newBlockNotifyCheckTxOut(block *btcutil.Block,
 	tx *btcutil.Tx) {
 
 	for i, txout := range tx.MsgTx().TxOut {
-		_, txaddrhash, err := btcscript.ScriptToAddrHash(txout.PkScript)
-		if err != nil {
-			rpcsLog.Debug("Error getting payment address from tx; dropping any Tx notifications.")
-			break
+		stype, txaddrhash, err := btcscript.ScriptToAddrHash(txout.PkScript)
+		if stype != btcscript.ScriptAddr || err != nil {
+			// Only support pay-to-pubkey-hash right now.
+			continue
 		}
 		if idlist, ok := s.ws.txNotifications[string(txaddrhash)]; ok {
 			for e := idlist.Front(); e != nil; e = e.Next() {
