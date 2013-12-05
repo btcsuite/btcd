@@ -11,7 +11,9 @@ import (
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rand"
+	"crypto/sha256"
 	_ "crypto/sha512" // for cert generation
+	"crypto/subtle"
 	"crypto/tls"
 	"crypto/x509"
 	"crypto/x509/pkix"
@@ -52,10 +54,9 @@ type rpcServer struct {
 	started   int32
 	shutdown  int32
 	server    *server
+	authsha   [sha256.Size]byte
 	ws        wsContext
 	wg        sync.WaitGroup
-	username  string
-	password  string
 	listeners []net.Listener
 	quit      chan int
 }
@@ -276,32 +277,21 @@ func (s *rpcServer) Start() {
 	rpcServeMux := http.NewServeMux()
 	httpServer := &http.Server{Handler: rpcServeMux}
 	rpcServeMux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		login := s.username + ":" + s.password
-		auth := "Basic " + base64.StdEncoding.EncodeToString([]byte(login))
-		authhdr := r.Header["Authorization"]
-		if len(authhdr) > 0 && authhdr[0] == auth {
-			jsonRPCRead(w, r, s)
-		} else {
-			rpcsLog.Warnf("Auth failure.")
+		if err := s.checkAuth(r); err != nil {
 			jsonAuthFail(w, r, s)
+			return
 		}
+		jsonRPCRead(w, r, s)
 	})
 	go s.walletListenerDuplicator()
-	wsServer := websocket.Server{
-		Handler: websocket.Handler(func(ws *websocket.Conn) {
-			s.walletReqsNotifications(ws)
-		}),
-		Handshake: func(_ *websocket.Config, r *http.Request) error {
-			login := s.username + ":" + s.password
-			auth := "Basic " + base64.StdEncoding.EncodeToString([]byte(login))
-			authhdr := r.Header["Authorization"]
-			if len(authhdr) <= 0 || authhdr[0] != auth {
-				return errors.New("auth failure")
-			}
-			return nil
-		},
-	}
-	rpcServeMux.Handle("/wallet", wsServer)
+	rpcServeMux.HandleFunc("/wallet", func(w http.ResponseWriter, r *http.Request) {
+		if err := s.checkAuth(r); err != nil {
+			http.Error(w, "401 Unauthorized.", http.StatusUnauthorized)
+			return
+		}
+		websocket.Handler(s.walletReqsNotifications).ServeHTTP(w, r)
+	})
+
 	for _, listener := range s.listeners {
 		s.wg.Add(1)
 		go func(listener net.Listener) {
@@ -311,6 +301,28 @@ func (s *rpcServer) Start() {
 			s.wg.Done()
 		}(listener)
 	}
+}
+
+// checkAuth checks the HTTP Basic authentication supplied by a wallet
+// or RPC client in the HTTP request r.  If the supplied authentication
+// does not match the username and password expected, a non-nil error is
+// returned.
+//
+// This check is time-constant.
+func (s *rpcServer) checkAuth(r *http.Request) error {
+	authhdr := r.Header["Authorization"]
+	if len(authhdr) <= 0 {
+		rpcsLog.Warnf("Auth failure.")
+		return errors.New("auth failure")
+	}
+
+	authsha := sha256.Sum256([]byte(authhdr[0]))
+	cmp := subtle.ConstantTimeCompare(authsha[:], s.authsha[:])
+	if cmp != 1 {
+		rpcsLog.Warnf("Auth failure.")
+		return errors.New("auth failure")
+	}
+	return nil
 }
 
 // Stop is used by server.go to stop the rpc listener.
@@ -426,13 +438,13 @@ func genKey(key, cert string) error {
 
 // newRPCServer returns a new instance of the rpcServer struct.
 func newRPCServer(listenAddrs []string, s *server) (*rpcServer, error) {
+	login := cfg.RPCUser + ":" + cfg.RPCPass
+	auth := "Basic " + base64.StdEncoding.EncodeToString([]byte(login))
 	rpc := rpcServer{
-		server: s,
-		quit:   make(chan int),
+		authsha: sha256.Sum256([]byte(auth)),
+		server:  s,
+		quit:    make(chan int),
 	}
-	// Get values from config
-	rpc.username = cfg.RPCUser
-	rpc.password = cfg.RPCPass
 
 	// initialize memory for websocket connections
 	rpc.ws.connections = make(map[chan []byte]*requestContexts)
