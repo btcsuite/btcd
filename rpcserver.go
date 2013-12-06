@@ -887,7 +887,7 @@ func handleGetRawTransaction(s *rpcServer, cmd btcjson.Cmd, walletNotification c
 			vinList[i].Sequence = float64(v.Sequence)
 			disbuf, _ := btcscript.DisasmString(v.SignatureScript)
 			vinList[i].ScriptSig.Asm = strings.Replace(disbuf, " ", "", -1)
-			vinList[i].Vout = i + 1
+			vinList[i].Vout = int(v.PreviousOutpoint.Index)
 			rpcsLog.Debugf(disbuf)
 		}
 
