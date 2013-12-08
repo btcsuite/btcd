@@ -966,7 +966,7 @@ func createTxRawResult(net btcwire.BitcoinNet, txSha string, mtx *btcwire.MsgTx,
 
 	for i, v := range txOutList {
 		voutList[i].N = i
-		voutList[i].Value = float64(v.Value) / 100000000
+		voutList[i].Value = float64(v.Value) / btcutil.SatoshiPerBitcoin
 
 		_, addrhash, err := btcscript.ScriptToAddrHash(v.PkScript)
 		if err != nil {
