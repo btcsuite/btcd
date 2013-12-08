@@ -737,17 +737,20 @@ func handleGetBlock(s *rpcServer, cmd btcjson.Cmd, walletNotification chan []byt
 		return nil, btcjson.ErrBlockNotFound
 	}
 
-	txList, _ := blk.TxShas()
-
-	txNames := make([]string, len(txList))
-	for i, v := range txList {
-		txNames[i] = v.String()
-	}
-
 	_, maxidx, err := s.server.db.NewestSha()
 	if err != nil {
 		rpcsLog.Errorf("Cannot get newest sha: %v", err)
 		return nil, btcjson.ErrBlockNotFound
+	}
+
+	if !c.Verbose {
+		var wireBuf bytes.Buffer
+		err := blk.MsgBlock().BtcEncode(&wireBuf, btcwire.ProtocolVersion)
+		if err != nil {
+			return nil, btcjson.Error{Code: btcjson.ErrInternal.Code, Message: err.Error()}
+		}
+		blkHex := hex.EncodeToString(wireBuf.Bytes())
+		return btcjson.BlockResult{Hex: blkHex}, nil
 	}
 
 	blockHeader := &blk.MsgBlock().Header
@@ -760,10 +763,35 @@ func handleGetBlock(s *rpcServer, cmd btcjson.Cmd, walletNotification chan []byt
 		Time:          blockHeader.Timestamp.Unix(),
 		Confirmations: uint64(1 + maxidx - idx),
 		Height:        idx,
-		Tx:            txNames,
 		Size:          len(buf),
 		Bits:          strconv.FormatInt(int64(blockHeader.Bits), 16),
 		Difficulty:    getDifficultyRatio(blockHeader.Bits),
+	}
+
+	if !c.VerboseTx {
+		txList, _ := blk.TxShas()
+
+		txNames := make([]string, len(txList))
+		for i, v := range txList {
+			txNames[i] = v.String()
+		}
+
+		blockReply.Tx = txNames
+	} else {
+		txns := blk.Transactions()
+		rawTxns := make([]btcjson.TxRawResult, len(txns))
+		for i, tx := range txns {
+			txSha := tx.Sha().String()
+			mtx := tx.MsgTx()
+
+			rawTxn, err := createTxRawResult(s.server.btcnet, txSha, mtx, blk, maxidx, sha, true)
+			if err != nil {
+				rpcsLog.Errorf("Cannot create TxRawResult for txSha=%s: %v", txSha, err)
+				return nil, err
+			}
+			rawTxns[i] = *rawTxn
+		}
+		blockReply.RawTx = rawTxns
 	}
 
 	// Get next block unless we are already at the top.
@@ -855,96 +883,132 @@ func handleGetRawMempool(s *rpcServer, cmd btcjson.Cmd, walletNotification chan 
 // handleGetRawTransaction implements the getrawtransaction command.
 func handleGetRawTransaction(s *rpcServer, cmd btcjson.Cmd, walletNotification chan []byte) (interface{}, error) {
 	c := cmd.(*btcjson.GetRawTransactionCmd)
-	if c.Verbose {
-		// TODO: check error code. tx is not checked before
-		// this point.
-		txSha, _ := btcwire.NewShaHashFromStr(c.Txid)
-		var mtx *btcwire.MsgTx
-		var blksha *btcwire.ShaHash
-		tx, err := s.server.txMemPool.FetchTransaction(txSha)
-		if err != nil {
-			txList, err := s.server.db.FetchTxBySha(txSha)
-			if err != nil || len(txList) == 0 {
-				rpcsLog.Errorf("Error fetching tx: %v", err)
-				return nil, btcjson.ErrNoTxInfo
-			}
 
-			lastTx := len(txList) - 1
-			mtx = txList[lastTx].Tx
-
-			blksha = txList[lastTx].BlkSha
-		} else {
-			mtx = tx.MsgTx()
+	// TODO: check error code. tx is not checked before
+	// this point.
+	txSha, _ := btcwire.NewShaHashFromStr(c.Txid)
+	var mtx *btcwire.MsgTx
+	var blksha *btcwire.ShaHash
+	tx, err := s.server.txMemPool.FetchTransaction(txSha)
+	if err != nil {
+		txList, err := s.server.db.FetchTxBySha(txSha)
+		if err != nil || len(txList) == 0 {
+			rpcsLog.Errorf("Error fetching tx: %v", err)
+			return nil, btcjson.ErrNoTxInfo
 		}
 
-		txOutList := mtx.TxOut
-		voutList := make([]btcjson.Vout, len(txOutList))
+		lastTx := len(txList) - 1
+		mtx = txList[lastTx].Tx
 
-		txInList := mtx.TxIn
-		vinList := make([]btcjson.Vin, len(txInList))
-
-		for i, v := range txInList {
-			vinList[i].Sequence = float64(v.Sequence)
-			disbuf, _ := btcscript.DisasmString(v.SignatureScript)
-			vinList[i].ScriptSig.Asm = strings.Replace(disbuf, " ", "", -1)
-			vinList[i].Vout = int(v.PreviousOutpoint.Index)
-			rpcsLog.Debugf(disbuf)
-		}
-
-		for i, v := range txOutList {
-			voutList[i].N = i
-			voutList[i].Value = float64(v.Value) / 100000000
-			isbuf, _ := btcscript.DisasmString(v.PkScript)
-			voutList[i].ScriptPubKey.Asm = isbuf
-			voutList[i].ScriptPubKey.ReqSigs = strings.Count(isbuf, "OP_CHECKSIG")
-			_, addrhash, err := btcscript.ScriptToAddrHash(v.PkScript)
-			if err != nil {
-				// TODO: set and return error?
-				rpcsLog.Errorf("Error getting address hash for %v: %v", txSha, err)
-			}
-			if addr, err := btcutil.EncodeAddress(addrhash, s.server.btcnet); err == nil {
-				// TODO: set and return error?
-				addrList := make([]string, 1)
-				addrList[0] = addr
-				voutList[i].ScriptPubKey.Addresses = addrList
-			}
-		}
-
-		txReply := btcjson.TxRawResult{
-			Txid:     c.Txid,
-			Vout:     voutList,
-			Vin:      vinList,
-			Version:  mtx.Version,
-			LockTime: mtx.LockTime,
-		}
-		if blksha != nil {
-			blk, err := s.server.db.FetchBlockBySha(blksha)
-			if err != nil {
-				rpcsLog.Errorf("Error fetching sha: %v", err)
-				return nil, btcjson.ErrBlockNotFound
-			}
-			idx := blk.Height()
-
-			_, maxidx, err := s.server.db.NewestSha()
-			if err != nil {
-				rpcsLog.Errorf("Cannot get newest sha: %v", err)
-				return nil, btcjson.ErrNoNewestBlockInfo
-			}
-
-			blockHeader := &blk.MsgBlock().Header
-			// This is not a typo, they are identical in
-			// bitcoind as well.
-			txReply.Time = blockHeader.Timestamp.Unix()
-			txReply.Blocktime = blockHeader.Timestamp.Unix()
-			txReply.BlockHash = blksha.String()
-			txReply.Confirmations = uint64(1 + maxidx - idx)
-		}
-		return txReply, nil
+		blksha = txList[lastTx].BlkSha
 	} else {
-		// Don't return details
-		// not used yet
-		return nil, nil
+		mtx = tx.MsgTx()
 	}
+
+	var blk *btcutil.Block
+	var maxidx int64
+
+	if blksha != nil {
+		blk, err = s.server.db.FetchBlockBySha(blksha)
+		if err != nil {
+			rpcsLog.Errorf("Error fetching sha: %v", err)
+			return nil, btcjson.ErrBlockNotFound
+		}
+
+		_, maxidx, err = s.server.db.NewestSha()
+		if err != nil {
+			rpcsLog.Errorf("Cannot get newest sha: %v", err)
+			return nil, btcjson.ErrNoNewestBlockInfo
+		}
+	}
+
+	rawTxn, jsonErr := createTxRawResult(s.server.btcnet, c.Txid, mtx, blk, maxidx, blksha, c.Verbose)
+	if err != nil {
+		rpcsLog.Errorf("Cannot create TxRawResult for txSha=%s: %v", txSha, err)
+		return nil, *jsonErr
+	}
+	return *rawTxn, nil
+}
+
+func createTxRawResult(net btcwire.BitcoinNet, txSha string, mtx *btcwire.MsgTx, blk *btcutil.Block, maxidx int64, blksha *btcwire.ShaHash, verbose bool) (*btcjson.TxRawResult, *btcjson.Error) {
+	tx := btcutil.NewTx(mtx)
+
+	var buf bytes.Buffer
+	err := mtx.BtcEncode(&buf, btcwire.ProtocolVersion)
+	if err != nil {
+		return nil, &btcjson.Error{Code: btcjson.ErrInternal.Code, Message: err.Error()}
+	}
+	mtxHex := hex.EncodeToString(buf.Bytes())
+
+	if !verbose {
+		return &btcjson.TxRawResult{Hex: mtxHex}, nil
+	}
+
+	txOutList := mtx.TxOut
+	voutList := make([]btcjson.Vout, len(txOutList))
+
+	txInList := mtx.TxIn
+	vinList := make([]btcjson.Vin, len(txInList))
+
+	for i, v := range txInList {
+		if btcchain.IsCoinBase(tx) {
+			vinList[i].Coinbase = hex.EncodeToString(v.SignatureScript)
+		} else {
+			vinList[i].Txid = v.PreviousOutpoint.Hash.String()
+			vinList[i].Vout = int(uint32(v.PreviousOutpoint.Index))
+
+			disbuf, _ := btcscript.DisasmString(v.SignatureScript)
+			vinList[i].ScriptSig.Asm = disbuf
+			vinList[i].ScriptSig.Hex = hex.EncodeToString(v.SignatureScript)
+		}
+		vinList[i].Sequence = float64(v.Sequence)
+	}
+
+	for i, v := range txOutList {
+		voutList[i].N = i
+		voutList[i].Value = float64(v.Value) / btcutil.SatoshiPerBitcoin
+
+		_, addrhash, err := btcscript.ScriptToAddrHash(v.PkScript)
+		if err != nil {
+			// TODO: set and return error?
+			rpcsLog.Errorf("Error getting address hash for %v: %v", txSha, err)
+		}
+		if addr, err := btcutil.EncodeAddress(addrhash, net); err == nil {
+			// TODO: set and return error?
+			addrList := make([]string, 1)
+			addrList[0] = addr
+			voutList[i].ScriptPubKey.Addresses = addrList
+		}
+
+		disbuf, _ := btcscript.DisasmString(v.PkScript)
+		voutList[i].ScriptPubKey.Asm = disbuf
+		voutList[i].ScriptPubKey.Hex = hex.EncodeToString(v.PkScript)
+		voutList[i].ScriptPubKey.ReqSigs = strings.Count(disbuf, "OP_CHECKSIG")
+		voutList[i].ScriptPubKey.Type = btcscript.GetScriptClass(v.PkScript).String()
+	}
+
+	txReply := &btcjson.TxRawResult{
+		Hex:      mtxHex,
+		Txid:     txSha,
+		Vout:     voutList,
+		Vin:      vinList,
+		Version:  mtx.Version,
+		LockTime: mtx.LockTime,
+	}
+
+	if blk != nil {
+		blockHeader := &blk.MsgBlock().Header
+		idx := blk.Height()
+
+		// This is not a typo, they are identical in
+		// bitcoind as well.
+		txReply.Time = blockHeader.Timestamp.Unix()
+		txReply.Blocktime = blockHeader.Timestamp.Unix()
+		txReply.BlockHash = blksha.String()
+		txReply.Confirmations = uint64(1 + maxidx - idx)
+	}
+
+	return txReply, nil
 }
 
 // handleSendRawTransaction implements the sendrawtransaction command.
