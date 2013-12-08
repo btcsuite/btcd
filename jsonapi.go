@@ -47,19 +47,21 @@ type InfoResult struct {
 
 // BlockResult models the data from the getblock command.
 type BlockResult struct {
-	Hash          string   `json:"hash"`
-	Confirmations uint64   `json:"confirmations"`
-	Size          int      `json:"size"`
-	Height        int64    `json:"height"`
-	Version       uint32   `json:"version"`
-	MerkleRoot    string   `json:"merkleroot"`
-	Tx            []string `json:"tx"`
-	Time          int64    `json:"time"`
-	Nonce         uint32   `json:"nonce"`
-	Bits          string   `json:"bits"`
-	Difficulty    float64  `json:"difficulty"`
-	PreviousHash  string   `json:"previousblockhash"`
-	NextHash      string   `json:"nextblockhash"`
+	Hex           string        `json:"hex,omitempty"`
+	Hash          string        `json:"hash"`
+	Confirmations uint64        `json:"confirmations"`
+	Size          int           `json:"size"`
+	Height        int64         `json:"height"`
+	Version       uint32        `json:"version"`
+	MerkleRoot    string        `json:"merkleroot"`
+	Tx            []string      `json:"tx,omitempty"`
+	RawTx         []TxRawResult `json:"rawtx,omitempty"`
+	Time          int64         `json:"time"`
+	Nonce         uint32        `json:"nonce"`
+	Bits          string        `json:"bits"`
+	Difficulty    float64       `json:"difficulty"`
+	PreviousHash  string        `json:"previousblockhash"`
+	NextHash      string        `json:"nextblockhash"`
 }
 
 // TxRawResult models the data from the getrawtransaction command.
@@ -70,10 +72,10 @@ type TxRawResult struct {
 	LockTime      uint32 `json:"locktime"`
 	Vin           []Vin  `json:"vin"`
 	Vout          []Vout `json:"vout"`
-	BlockHash     string `json:"blockhash"`
-	Confirmations uint64 `json:"confirmations"`
-	Time          int64  `json:"time"`
-	Blocktime     int64  `json:"blocktime"`
+	BlockHash     string `json:"blockhash,omitempty"`
+	Confirmations uint64 `json:"confirmations,omitempty"`
+	Time          int64  `json:"time,omitempty"`
+	Blocktime     int64  `json:"blocktime,omitempty"`
 }
 
 // TxRawDecodeResult models the data from the decoderawtransaction command.
@@ -89,11 +91,11 @@ type TxRawDecodeResult struct {
 // getrawtransaction and decoderawtransaction use the same structure.
 type Vin struct {
 	Coinbase  string `json:"coinbase,omitempty"`
+	Txid      string `json:"txid,omitempty"`
 	Vout      int    `json:"vout,omitempty"`
 	ScriptSig struct {
-		Txid string `json:"txid"`
-		Asm  string `json:"asm"`
-		Hex  string `json:"hex"`
+		Asm string `json:"asm"`
+		Hex string `json:"hex"`
 	} `json:"scriptSig,omitempty"`
 	Sequence float64 `json:"sequence"`
 }

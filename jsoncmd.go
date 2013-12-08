@@ -1705,18 +1705,40 @@ func (cmd *GetBestBlockHashCmd) UnmarshalJSON(b []byte) error {
 // GetBlockCmd is a type handling custom marshaling and
 // unmarshaling of getblock JSON RPC commands.
 type GetBlockCmd struct {
-	id   interface{}
-	Hash string
+	id        interface{}
+	Hash      string
+	Verbose   bool
+	VerboseTx bool
 }
 
 // Enforce that GetBlockCmd satisifies the Cmd interface.
 var _ Cmd = &GetBlockCmd{}
 
 // NewGetBlockCmd creates a new GetBlockCmd.
-func NewGetBlockCmd(id interface{}, hash string) (*GetBlockCmd, error) {
+func NewGetBlockCmd(id interface{}, hash string, optArgs ...bool) (*GetBlockCmd, error) {
+	// default verbose is set to true to match old behavior
+	verbose, verboseTx := true, false
+
+	optArgsLen := len(optArgs)
+	if optArgsLen > 0 {
+		if optArgsLen > 2 {
+			return nil, ErrTooManyOptArgs
+		}
+		verbose = optArgs[0]
+		if optArgsLen > 1 {
+			verboseTx = optArgs[1]
+
+			if !verbose && verboseTx {
+				return nil, ErrInvalidParams
+			}
+		}
+	}
+
 	return &GetBlockCmd{
-		id:   id,
-		Hash: hash,
+		id:        id,
+		Hash:      hash,
+		Verbose:   verbose,
+		VerboseTx: verboseTx,
 	}, nil
 }
 
@@ -1734,14 +1756,28 @@ func (cmd *GetBlockCmd) Method() string {
 func (cmd *GetBlockCmd) MarshalJSON() ([]byte, error) {
 
 	// Fill and marshal a RawCmd.
-	return json.Marshal(RawCmd{
+	raw := RawCmd{
 		Jsonrpc: "1.0",
 		Method:  "getblock",
 		Id:      cmd.id,
 		Params: []interface{}{
 			cmd.Hash,
 		},
-	})
+	}
+
+	if !cmd.Verbose {
+		// set optional verbose argument to false
+		raw.Params = append(raw.Params, false)
+	} else {
+		if cmd.VerboseTx {
+			// set optional verbose argument to true
+			raw.Params = append(raw.Params, true)
+			// set optional verboseTx argument to true
+			raw.Params = append(raw.Params, true)
+		}
+	}
+
+	return json.Marshal(raw)
 }
 
 // UnmarshalJSON unmarshals the JSON encoding of cmd into cmd.  Part of
@@ -1753,15 +1789,34 @@ func (cmd *GetBlockCmd) UnmarshalJSON(b []byte) error {
 		return err
 	}
 
-	if len(r.Params) != 1 {
+	if len(r.Params) > 3 || len(r.Params) < 1 {
 		return ErrWrongNumberOfParams
 	}
+
 	hash, ok := r.Params[0].(string)
 	if !ok {
 		return errors.New("first parameter hash must be a string")
 	}
 
-	newCmd, err := NewGetBlockCmd(r.Id, hash)
+	optArgs := make([]bool, 0, 1)
+	if len(r.Params) > 1 {
+		verbose, ok := r.Params[1].(bool)
+		if !ok {
+			return errors.New("second optional parameter verbose must be a bool")
+		}
+
+		optArgs = append(optArgs, verbose)
+	}
+	if len(r.Params) == 3 {
+		verboseTx, ok := r.Params[2].(bool)
+		if !ok {
+			return errors.New("third optional parameter verboseTx must be a bool")
+		}
+
+		optArgs = append(optArgs, verboseTx)
+	}
+
+	newCmd, err := NewGetBlockCmd(r.Id, hash, optArgs...)
 	if err != nil {
 		return err
 	}
