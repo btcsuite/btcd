@@ -747,7 +747,7 @@ func handleGetBlock(s *rpcServer, cmd btcjson.Cmd, walletNotification chan []byt
 		var wireBuf bytes.Buffer
 		err := blk.MsgBlock().BtcEncode(&wireBuf, btcwire.ProtocolVersion)
 		if err != nil {
-			return nil, err
+			return nil, btcjson.Error{Code: btcjson.ErrInternal.Code, Message: err.Error()}
 		}
 		blkHex := hex.EncodeToString(wireBuf.Bytes())
 		return btcjson.BlockResult{Hex: blkHex}, nil
@@ -922,21 +922,21 @@ func handleGetRawTransaction(s *rpcServer, cmd btcjson.Cmd, walletNotification c
 		}
 	}
 
-	rawTxn, err := createTxRawResult(s.server.btcnet, c.Txid, mtx, blk, maxidx, blksha, c.Verbose)
+	rawTxn, jsonErr := createTxRawResult(s.server.btcnet, c.Txid, mtx, blk, maxidx, blksha, c.Verbose)
 	if err != nil {
 		rpcsLog.Errorf("Cannot create TxRawResult for txSha=%s: %v", txSha, err)
-		return nil, err
+		return nil, *jsonErr
 	}
 	return *rawTxn, nil
 }
 
-func createTxRawResult(net btcwire.BitcoinNet, txSha string, mtx *btcwire.MsgTx, blk *btcutil.Block, maxidx int64, blksha *btcwire.ShaHash, verbose bool) (*btcjson.TxRawResult, error) {
+func createTxRawResult(net btcwire.BitcoinNet, txSha string, mtx *btcwire.MsgTx, blk *btcutil.Block, maxidx int64, blksha *btcwire.ShaHash, verbose bool) (*btcjson.TxRawResult, *btcjson.Error) {
 	tx := btcutil.NewTx(mtx)
 
 	var buf bytes.Buffer
 	err := mtx.BtcEncode(&buf, btcwire.ProtocolVersion)
 	if err != nil {
-		return nil, err
+		return nil, &btcjson.Error{Code: btcjson.ErrInternal.Code, Message: err.Error()}
 	}
 	mtxHex := hex.EncodeToString(buf.Bytes())
 
