@@ -1,6 +1,9 @@
 btcd
 ====
 
+[![Build Status](https://travis-ci.org/conformal/btcd.png?branch=master)]
+(https://travis-ci.org/conformal/btcd)
+
 btcd is an alternative full node bitcoin implementation written in Go (golang).
 
 This project is currently under active development and is in an Alpha state.
