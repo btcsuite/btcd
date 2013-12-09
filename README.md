@@ -1,6 +1,9 @@
 btcchain
 ========
 
+[![Build Status](https://travis-ci.org/conformal/btcchain.png?branch=master)]
+(https://travis-ci.org/conformal/btcchain)
+
 Package btcchain implements bitcoin block handling and chain selection rules.
 The test coverage is currently only around 60%, but will be increasing over
 time. See `test_coverage.txt` for the gocov coverage report.  Alternatively, if
