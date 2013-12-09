@@ -1,6 +1,9 @@
 btcwire
 =======
 
+[![Build Status](https://travis-ci.org/conformal/btcwire.png?branch=master)]
+(https://travis-ci.org/conformal/btcwire)
+
 Package btcwire implements the bitcoin wire protocol.  A comprehensive suite of
 tests with 100% test coverage is provided to ensure proper functionality.  See
 `test_coverage.txt` for the gocov coverage report.  Alternatively, if you are
