@@ -773,7 +773,11 @@ func (p *peer) pushAddrMsg(addresses []*btcwire.NetAddress) error {
 		// Split into multiple messages as needed.
 		if numAdded > 0 && numAdded%btcwire.MaxAddrPerMsg == 0 {
 			p.QueueMessage(msg, nil)
-			msg.ClearAddresses()
+
+			// NOTE: This needs to be a new address message and not
+			// simply call ClearAddresses since the message is a
+			// pointer and queueing it does not make a copy.
+			msg = btcwire.NewMsgAddr()
 		}
 	}
 
