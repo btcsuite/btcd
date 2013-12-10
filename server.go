@@ -728,7 +728,6 @@ func (s *server) Stop() error {
 // WaitForShutdown blocks until the main listener and peer handlers are stopped.
 func (s *server) WaitForShutdown() {
 	s.wg.Wait()
-	srvrLog.Infof("Server shutdown complete")
 }
 
 // ScheduleShutdown schedules a server shutdown after the specified duration.

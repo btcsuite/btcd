@@ -94,6 +94,11 @@ func btcdMain(serverChan chan<- *server) error {
 			cfg.Listeners, err)
 		return err
 	}
+	addInterruptHandler(func() {
+		btcdLog.Infof("Gracefully shutting down the server...")
+		server.Stop()
+		server.WaitForShutdown()
+	})
 	server.Start()
 	if serverChan != nil {
 		serverChan <- server
@@ -107,6 +112,7 @@ func btcdMain(serverChan chan<- *server) error {
 	// for the interrupt handler goroutine to finish.
 	go func() {
 		server.WaitForShutdown()
+		srvrLog.Infof("Server shutdown complete")
 		shutdownChannel <- true
 	}()
 
