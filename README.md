@@ -1,6 +1,9 @@
 btcjson
 =======
 
+[![Build Status](https://travis-ci.org/conformal/btcjson.png?branch=master)]
+(https://travis-ci.org/conformal/btcjson)
+
 Package btcjson implements the bitcoin JSON-RPC API.  There is a test
 suite which is aiming to reach 100% code coverage.  See
 `test_coverage.txt` for the current coverage (using gocov).  On a
