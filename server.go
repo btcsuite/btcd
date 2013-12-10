@@ -67,6 +67,7 @@ type server struct {
 	broadcast     chan broadcastMsg
 	wg            sync.WaitGroup
 	quit          chan bool
+	nat           NAT
 	db            btcdb.Db
 }
 
@@ -683,6 +684,10 @@ func (s *server) Start() {
 	// managers.
 	s.wg.Add(1)
 	go s.peerHandler()
+	if s.nat != nil {
+		s.wg.Add(1)
+		go s.upnpUpdateThread()
+	}
 
 	// Start the RPC server if it's not disabled.
 	if !cfg.DisableRPC {
@@ -809,6 +814,57 @@ func parseListeners(addrs []string) ([]string, []string, bool, error) {
 	return ipv4ListenAddrs, ipv6ListenAddrs, haveWildcard, nil
 }
 
+func (s *server) upnpUpdateThread() {
+	// Go off immediately to prevent code duplication, thereafter we renew
+	// lease every 15 minutes.
+	timer := time.NewTimer(0 * time.Second)
+	lport, _ := strconv.ParseInt(activeNetParams.listenPort, 10, 16)
+	first := true
+out:
+	for {
+		select {
+		case <-timer.C:
+			// TODO(oga) pick external port  more cleverly
+			// TODO(oga) know which ports we are listening to on an external net.
+			// TODO(oga) if specific listen port doesn't work then ask for wildcard
+			// listen port?
+			// XXX this assumes timeout is in seconds.
+			listenPort, err := s.nat.AddPortMapping("tcp", int(lport), int(lport),
+				"btcd listen port", 20*60)
+			if err != nil {
+				srvrLog.Warnf("can't add UPnP port mapping: %v", err)
+			}
+			if first && err == nil {
+				// TODO(oga): look this up periodically to see if upnp domain changed
+				// and so did ip.
+				externalip, err := s.nat.GetExternalAddress()
+				if err != nil {
+					srvrLog.Warnf("UPnP can't get external address: %v", err)
+					continue out
+				}
+				na := btcwire.NewNetAddressIPPort(externalip, uint16(listenPort),
+					btcwire.SFNodeNetwork)
+				s.addrManager.addLocalAddress(na, UpnpPrio)
+				srvrLog.Warnf("Successfully bound via UPnP to %s", NetAddressKey(na))
+				first = false
+			}
+			timer.Reset(time.Minute * 15)
+		case <-s.quit:
+			break out
+		}
+	}
+
+	timer.Stop()
+
+	if err := s.nat.DeletePortMapping("tcp", int(lport), int(lport)); err != nil {
+		srvrLog.Warnf("unable to remove UPnP port mapping: %v", err)
+	} else {
+		srvrLog.Debugf("succesfully disestablished UPnP port mapping")
+	}
+
+	s.wg.Done()
+}
+
 // newServer returns a new btcd server configured to listen on addr for the
 // bitcoin network type specified in btcnet.  Use start to begin accepting
 // connections from peers.
@@ -821,6 +877,7 @@ func newServer(listenAddrs []string, db btcdb.Db, btcnet btcwire.BitcoinNet) (*s
 	amgr := NewAddrManager()
 
 	var listeners []net.Listener
+	var nat NAT
 	if !cfg.DisableListen {
 		ipv4Addrs, ipv6Addrs, wildcard, err :=
 			parseListeners(listenAddrs)
@@ -849,6 +906,12 @@ func newServer(listenAddrs []string, db btcdb.Db, btcnet btcwire.BitcoinNet) (*s
 
 				amgr.addLocalAddress(na, ManualPrio)
 			}
+		} else if discover && cfg.Upnp {
+			nat, err = Discover()
+			if err != nil {
+				srvrLog.Warnf("Can't discover upnp: %v", err)
+			}
+			// nil nat here is fine, just means no upnp on network.
 		}
 
 		// TODO(oga) nonstandard port...
@@ -924,6 +987,7 @@ func newServer(listenAddrs []string, db btcdb.Db, btcnet btcwire.BitcoinNet) (*s
 		relayInv:    make(chan *btcwire.InvVect, cfg.MaxPeers),
 		broadcast:   make(chan broadcastMsg, cfg.MaxPeers),
 		quit:        make(chan bool),
+		nat:         nat,
 		db:          db,
 	}
 	bm, err := newBlockManager(&s)

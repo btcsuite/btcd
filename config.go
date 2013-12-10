@@ -80,6 +80,7 @@ type config struct {
 	Profile            string `long:"profile" description:"Enable HTTP profiling on given port -- NOTE port must be between 1024 and 65536"`
 	CpuProfile         string `long:"cpuprofile" description:"Write CPU profile to the specified file"`
 	DebugLevel         string `short:"d" long:"debuglevel" description:"Logging level for all subsystems {trace, debug, info, warn, error, critical} -- You may also specify <subsystem>=<level>,<subsystem2>=<level>,... to set the log level for individual subsystems -- Use show to list available subsystems"`
+	Upnp               bool   `long:"upnp" description:"Use UPnP to map our listening port outside of NAT"`
 }
 
 // serviceOptions defines the configuration options for btcd as a service on
