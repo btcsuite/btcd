@@ -312,8 +312,9 @@ var jsoncmdtests = []struct {
 				"somehash")
 		},
 		result: &GetBlockCmd{
-			id:   float64(1),
-			Hash: "somehash",
+			id:      float64(1),
+			Hash:    "somehash",
+			Verbose: true,
 		},
 	},
 	{
