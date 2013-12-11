@@ -78,13 +78,22 @@ const (
 	blockPrioritySize = 27000
 )
 
+// TxDesc is a descriptor containing a transaction in the mempool and the
+// metadata we store about it.
+type TxDesc struct {
+	Tx     *btcutil.Tx // Transaction.
+	Added  time.Time // Time when added to pool.
+	Height int64     // Blockheight when added to pool.
+	Fee    int64     // Transaction fees.
+}
+
 // txMemPool is used as a source of transactions that need to be mined into
 // blocks and relayed to other peers.  It is safe for concurrent access from
 // multiple peers.
 type txMemPool struct {
 	sync.RWMutex
 	server        *server
-	pool          map[btcwire.ShaHash]*btcutil.Tx
+	pool          map[btcwire.ShaHash]*TxDesc
 	orphans       map[btcwire.ShaHash]*btcutil.Tx
 	orphansByPrev map[btcwire.ShaHash]*list.List
 	outpoints     map[btcwire.OutPoint]*btcutil.Tx
@@ -581,8 +590,8 @@ func (mp *txMemPool) removeTransaction(tx *btcutil.Tx) {
 
 	// Remove the transaction and mark the referenced outpoints as unspent
 	// by the pool.
-	if tx, exists := mp.pool[*txHash]; exists {
-		for _, txIn := range tx.MsgTx().TxIn {
+	if txDesc, exists := mp.pool[*txHash]; exists {
+		for _, txIn := range txDesc.Tx.MsgTx().TxIn {
 			delete(mp.outpoints, txIn.PreviousOutpoint)
 		}
 		delete(mp.pool, *txHash)
@@ -627,10 +636,15 @@ func (mp *txMemPool) RemoveDoubleSpends(tx *btcutil.Tx) {
 // helper for maybeAcceptTransaction.
 //
 // This function MUST be called with the mempool lock held (for writes).
-func (mp *txMemPool) addTransaction(tx *btcutil.Tx) {
+func (mp *txMemPool) addTransaction(tx *btcutil.Tx, height, fee int64) {
 	// Add the transaction to the pool and mark the referenced outpoints
 	// as spent by the pool.
-	mp.pool[*tx.Sha()] = tx
+	mp.pool[*tx.Sha()] = &TxDesc{
+		Tx: tx,
+		Added: time.Now(),
+		Height: height,
+		Fee: fee,
+	}
 	for _, txIn := range tx.MsgTx().TxIn {
 		mp.outpoints[txIn.PreviousOutpoint] = tx
 	}
@@ -668,7 +682,8 @@ func (mp *txMemPool) fetchInputTransactions(tx *btcutil.Tx) (btcchain.TxStore, e
 	// Attempt to populate any missing inputs from the transaction pool.
 	for _, txD := range txStore {
 		if txD.Err == btcdb.TxShaMissing || txD.Tx == nil {
-			if poolTx, exists := mp.pool[*txD.Hash]; exists {
+			if poolTxDesc, exists := mp.pool[*txD.Hash]; exists {
+				poolTx := poolTxDesc.Tx
 				txD.Tx = poolTx
 				txD.BlockHeight = mempoolHeight
 				txD.Spent = make([]bool, len(poolTx.MsgTx().TxOut))
@@ -690,8 +705,8 @@ func (mp *txMemPool) FetchTransaction(txHash *btcwire.ShaHash) (*btcutil.Tx, err
 	mp.RLock()
 	defer mp.RUnlock()
 
-	if tx, exists := mp.pool[*txHash]; exists {
-		return tx, nil
+	if txDesc, exists := mp.pool[*txHash]; exists {
+		return txDesc.Tx, nil
 	}
 
 	return nil, fmt.Errorf("transaction is not in the pool")
@@ -856,7 +871,7 @@ func (mp *txMemPool) maybeAcceptTransaction(tx *btcutil.Tx, isOrphan *bool) erro
 	}
 
 	// Add to transaction pool.
-	mp.addTransaction(tx)
+	mp.addTransaction(tx, nextBlockHeight-1, txFee)
 
 	txmpLog.Debugf("Accepted transaction %v (pool size: %v)", txHash,
 		len(mp.pool))
@@ -1005,12 +1020,30 @@ func (mp *txMemPool) TxShas() []*btcwire.ShaHash {
 	return hashes
 }
 
+// TxDescs returns a slice of descriptors for all the transactions in the pool.
+// The descriptors are to be treated as read only.
+//
+// This function is safe for concurrent access.
+func (mp *txMemPool) TxDescs() []*TxDesc {
+	mp.RLock()
+	defer mp.RUnlock()
+
+	descs := make([]*TxDesc, len(mp.pool))
+	i := 0
+	for _, desc := range mp.pool {
+		descs[i] = desc
+		i++
+	}
+
+	return descs
+}
+
 // newTxMemPool returns a new memory pool for validating and storing standalone
 // transactions until they are mined into a block.
 func newTxMemPool(server *server) *txMemPool {
 	return &txMemPool{
 		server:        server,
-		pool:          make(map[btcwire.ShaHash]*btcutil.Tx),
+		pool:          make(map[btcwire.ShaHash]*TxDesc),
 		orphans:       make(map[btcwire.ShaHash]*btcutil.Tx),
 		orphansByPrev: make(map[btcwire.ShaHash]*list.List),
 		outpoints:     make(map[btcwire.OutPoint]*btcutil.Tx),

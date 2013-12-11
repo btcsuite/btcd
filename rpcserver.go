@@ -870,13 +870,52 @@ func handleGetPeerInfo(s *rpcServer, cmd btcjson.Cmd, walletNotification chan []
 	return s.server.PeerInfo(), nil
 }
 
+type mempoolDescriptor struct {
+	Size	int	`json:"size"`
+	Fee int64		`json:"fee"`
+	Time int64	`json:"time"`
+	Height int64	`json:"height"`
+	StartingPriority int `json:"startingpriority"`
+	CurrentPriority	int `json:"currentpriority"`
+	Depends		[]string `json:"depends"`
+
+}
+
 // handleGetRawMempool implements the getrawmempool command.
 func handleGetRawMempool(s *rpcServer, cmd btcjson.Cmd, walletNotification chan []byte) (interface{}, error) {
-	hashes := s.server.txMemPool.TxShas()
-	hashStrings := make([]string, len(hashes))
-	for i := 0; i < len(hashes); i++ {
-		hashStrings[i] = hashes[i].String()
+	c := cmd.(*btcjson.GetRawMempoolCmd)
+	descs := s.server.txMemPool.TxDescs()
+
+	if c.Verbose {
+		result := make(map[string]*mempoolDescriptor, len(descs))
+		for _, desc := range descs {
+			mpd := &mempoolDescriptor{
+				Size: desc.Tx.MsgTx().SerializeSize(),
+				Fee:  desc.Fee,
+				Time: desc.Added.Unix(),
+				Height: desc.Height,
+				StartingPriority: 0, // We don't mine.
+				CurrentPriority: 0, // We don't mine.
+			}
+			for _, txIn := range desc.Tx.MsgTx().TxIn {
+				hash := &txIn.PreviousOutpoint.Hash
+				if s.server.txMemPool.HaveTransaction(hash) {
+					mpd.Depends = append(mpd.Depends,
+						hash.String())
+				}
+			}
+
+			result[desc.Tx.Sha().String()] = mpd
+		}
+
+		return  result, nil
 	}
+	hashStrings := make([]string, len(descs))
+	for i := range(hashStrings) {
+		hashStrings[i] = descs[i].Tx.Sha().String()
+	}
+
+
 	return hashStrings, nil
 }
 
