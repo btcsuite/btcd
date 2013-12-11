@@ -6,12 +6,9 @@ package btcscript_test
 
 import (
 	"bytes"
-	"fmt"
 	"github.com/conformal/btcscript"
 	"github.com/conformal/btcwire"
-	"github.com/conformal/seelog"
 	"github.com/davecgh/go-spew/spew"
-	"os"
 	"testing"
 )
 
@@ -520,14 +517,6 @@ func testScript(t *testing.T, script []byte, canonical bool) (err error) {
 }
 
 func TestScripts(t *testing.T) {
-	log, err := seelog.LoggerFromWriterWithMinLevel(os.Stdout,
-		seelog.InfoLvl)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "failed to create logger: %v", err)
-		return
-	}
-	defer log.Flush()
-	btcscript.UseLogger(log)
 	// for each entry in the list
 	for i := range opcodeTests {
 		shouldPass := opcodeTests[i].shouldPass
