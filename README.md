@@ -1,6 +1,9 @@
 btcutil
 =======
 
+[![Build Status](https://travis-ci.org/conformal/btcutil.png?branch=master)]
+(https://travis-ci.org/conformal/btcutil)
+
 Package btcutil provides bitcoin-specific convenience functions and types.
 A comprehensive suite of tests is provided to ensure proper functionality.  See
 `test_coverage.txt` for the gocov coverage report.  Alternatively, if you are
