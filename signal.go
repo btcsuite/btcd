@@ -29,8 +29,8 @@ func mainInterruptHandler() {
 		case <-interruptChannel:
 			btcdLog.Infof("Received SIGINT (Ctrl+C).  Shutting down...")
 			// run handlers in LIFO order.
-			for i  := range interruptCallbacks {
-				idx := len(interruptCallbacks) -1 -i
+			for i := range interruptCallbacks {
+				idx := len(interruptCallbacks) - 1 - i
 				callback := interruptCallbacks[idx]
 				callback()
 			}
