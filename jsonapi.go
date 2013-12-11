@@ -13,7 +13,7 @@ import (
 // Message contains a message to be sent to the bitcoin client.
 type Message struct {
 	Jsonrpc string      `json:"jsonrpc"`
-	Id      interface{} `json:"id"`
+	Id      interface{} `json:"id,omitempty"`
 	Method  string      `json:"method"`
 	Params  interface{} `json:"params"`
 }
