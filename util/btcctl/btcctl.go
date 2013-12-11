@@ -57,7 +57,7 @@ var commandHandlers = map[string]*handlerData{
 	"getgenerate":          &handlerData{0, 0, displayGeneric, nil, makeGetGenerate, ""},
 	"getpeerinfo":          &handlerData{0, 0, displaySpewDump, nil, makeGetPeerInfo, ""},
 	"getrawmempool":        &handlerData{0, 1, displaySpewDump, []conversionHandler{toBool}, makeGetRawMempool, "[verbose=false]"},
-	"getrawtransaction":    &handlerData{1, 1, displaySpewDump, []conversionHandler{nil, toInt}, makeGetRawTransaction, "<txhash> [verbose=0]"},
+	"getrawtransaction":    &handlerData{1, 1, displaySpewDump, []conversionHandler{nil, toBool}, makeGetRawTransaction, "<txhash> [verbose=false]"},
 	"importprivkey":        &handlerData{1, 2, displayGeneric, []conversionHandler{nil, nil, toBool}, makeImportPrivKey, "<wifprivkey> [label] [rescan=true]"},
 	"listtransactions":     &handlerData{0, 3, displaySpewDump, []conversionHandler{nil, toInt, toInt}, makeListTransactions, "[account] [count=10] [from=0]"},
 	"verifychain":          &handlerData{0, 2, displaySpewDump, []conversionHandler{toInt, toInt}, makeVerifyChain, "[level] [depth]"},
@@ -219,13 +219,12 @@ func makeGetRawMempool(args []interface{}) (btcjson.Cmd, error) {
 // makeRawTransaction generates the cmd structure for
 // getrawtransaction comands.
 func makeGetRawTransaction(args []interface{}) (btcjson.Cmd, error) {
-	i := 0
+	opt := make([]bool, 0, 1)
 	if len(args) > 1 {
-		i = args[1].(int)
+		opt = append(opt, args[1].(bool))
 	}
 
-	bi := i != 0
-	return btcjson.NewGetRawTransactionCmd("btcctl", args[0].(string), bi)
+	return btcjson.NewGetRawTransactionCmd("btcctl", args[0].(string), opt...)
 }
 
 // makeImportPrivKey generates the cmd structure for
