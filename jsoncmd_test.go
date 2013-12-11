@@ -536,6 +536,25 @@ var jsoncmdtests = []struct {
 		},
 	},
 	{
+		name: "basic getrawmempool noverbose",
+		f: func() (Cmd, error) {
+			return NewGetRawMempoolCmd(float64(1), false)
+		},
+		result: &GetRawMempoolCmd{
+			id: float64(1),
+		},
+	},
+	{
+		name: "basic getrawmempool verbose",
+		f: func() (Cmd, error) {
+			return NewGetRawMempoolCmd(float64(1), true)
+		},
+		result: &GetRawMempoolCmd{
+			id: float64(1),
+			Verbose: true,
+		},
+	},
+	{
 		name: "basic getrawtransaction",
 		f: func() (Cmd, error) {
 			return NewGetRawTransactionCmd(float64(1),

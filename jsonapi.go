@@ -793,7 +793,7 @@ func ReadResultCmd(cmd string, message []byte) (Reply, error) {
 		if err == nil {
 			result.Result = res
 		}
-	case "getaddressesbyaccount", "getrawmempool":
+	case "getaddressesbyaccount":
 		var res []string
 		err = json.Unmarshal(objmap["result"], &res)
 		if err == nil {

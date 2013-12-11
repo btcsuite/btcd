@@ -2831,15 +2831,24 @@ func (cmd *GetRawChangeAddressCmd) UnmarshalJSON(b []byte) error {
 // unmarshaling of getrawmempool JSON RPC commands.
 type GetRawMempoolCmd struct {
 	id interface{}
+	Verbose bool
 }
 
 // Enforce that GetRawMempoolCmd satisifies the Cmd interface.
 var _ Cmd = &GetRawMempoolCmd{}
 
 // NewGetRawMempoolCmd creates a new GetRawMempoolCmd.
-func NewGetRawMempoolCmd(id interface{}) (*GetRawMempoolCmd, error) {
+func NewGetRawMempoolCmd(id interface{}, optArgs ...bool) (*GetRawMempoolCmd, error) {
+	verbose := false
+	if len(optArgs) > 0 {
+		if len(optArgs) > 1 {
+			return nil, ErrTooManyOptArgs
+		}
+		verbose = optArgs[0]
+	}
 	return &GetRawMempoolCmd{
 		id: id,
+		Verbose: verbose,
 	}, nil
 }
 
@@ -2855,14 +2864,18 @@ func (cmd *GetRawMempoolCmd) Method() string {
 
 // MarshalJSON returns the JSON encoding of cmd.  Part of the Cmd interface.
 func (cmd *GetRawMempoolCmd) MarshalJSON() ([]byte, error) {
-
-	// Fill and marshal a RawCmd.
-	return json.Marshal(RawCmd{
+	raw := RawCmd{
 		Jsonrpc: "1.0",
 		Method:  "getrawmempool",
 		Id:      cmd.id,
 		Params:  []interface{}{},
-	})
+	}
+
+	if cmd.Verbose {
+		raw.Params = append(raw.Params, cmd.Verbose)
+	}
+
+	return json.Marshal(raw)
 }
 
 // UnmarshalJSON unmarshals the JSON encoding of cmd into cmd.  Part of
@@ -2874,11 +2887,21 @@ func (cmd *GetRawMempoolCmd) UnmarshalJSON(b []byte) error {
 		return err
 	}
 
-	if len(r.Params) != 0 {
+	if len(r.Params) > 1 {
 		return ErrWrongNumberOfParams
 	}
 
-	newCmd, err := NewGetRawMempoolCmd(r.Id)
+	optArgs := make([]bool, 0, 1)
+	if len(r.Params)  == 1 {
+		verbose, ok := r.Params[0].(bool)
+		if !ok {
+			return errors.New("first optional parameter verbose must be a bool")
+		}
+
+		optArgs = append(optArgs, verbose)
+	}
+
+	newCmd, err := NewGetRawMempoolCmd(r.Id, optArgs...)
 	if err != nil {
 		return err
 	}
