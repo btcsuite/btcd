@@ -3,6 +3,84 @@ User visible changes for btcd
   A full-node bitcoin implementation written in Go
 ============================================================================
 
+Changes in 0.4.0 (Thu Dec 12 2013)
+  - Allow listen interfaces to be specified via --listen instead of only the
+    port (https://github.com/conformal/btcd/issues/33)
+  - Allow listen interfaces for the RPC server to be specified via
+    --rpclisten instead of only the port
+    (https://github.com/conformal/btcd/issues/34)
+  - Only disable listening when --connect or --proxy are used when no
+    --listen interface are specified
+    (https://github.com/conformal/btcd/issues/10)
+  - Add several new standard transaction checks to transaction memory pool:
+    - Support nulldata scripts as standard
+    - Only allow a max of one nulldata output per transaction
+    - Enforce a maximum of 3 public keys in multi-signature transactions
+    - The number of signatures in multi-signature transactions must not
+      exceed the number of public keys
+    - The number of inputs to a signature script must match the expected
+      number of inputs for the script type
+    - The number of inputs pushed onto the stack by a redeeming signature
+      script must match the number of inputs consumed by the referenced
+      public key script
+  - When a block is connected, remove any transactions from the memory pool
+    which are now double spends as a result of the newly connected
+    transactions
+  - Don't relay transactions resurrected during a chain switch since
+    other peers will also be switching chains and therefore already know
+    about them
+  - Cleanup a few cases where rejected transactions showed as an error
+    rather than as a rejected transaction
+  - Ignore the default configuration file when --regtest (regression test
+    mode) is specified
+  - Implement TLS support for RPC including automatic certificate generation
+  - Support HTTP authentication headers for web sockets
+  - Update address manager to recognize and properly work with Tor
+    addresses (https://github.com/conformal/btcd/issues/36) and
+    (https://github.com/conformal/btcd/issues/37)
+  - Improve btcctl utility in the following ways:
+    - Add the ability to specify a configuration file
+    - Add a default entry for the RPC cert to point to the location
+      it will likely be in the btcd home directory
+    - Implement --version flag
+    - Provide a --notls option to support non-TLS configurations
+  - Fix a couple of minor races found by the Go race detector
+  - Improve logging
+    - Allow logging level to be specified on a per subsystem basis
+      (https://github.com/conformal/btcd/issues/48)
+    - Allow logging levels to be dynamically changed via RPC
+      (https://github.com/conformal/btcd/issues/15)
+    - Implement a rolling log file with a max of 10MB per file and a
+      rotation size of 3 which results in a max logging size of 30 MB
+  - Correct a minor issue with the rescanning websocket call
+    (https://github.com/conformal/btcd/issues/54)
+  - Fix a race with pushing address messages that could lead to a panic
+    (https://github.com/conformal/btcd/issues/58)
+  - Improve which external IP address is reported to peers based on which
+    interface they are connected through
+    (https://github.com/conformal/btcd/issues/35)
+  - Add --externalip option to allow an external IP address to be specified
+    for cases such as tor hidden services or advanced network configurations
+    (https://github.com/conformal/btcd/issues/38)
+  - Add --upnp option to support automatic port mapping via UPnP
+    (https://github.com/conformal/btcd/issues/51)
+  - Update Ctrl+C interrupt handler to properly sync address manager and
+    remove the UPnP port mapping (if needed)
+  - Continue cleanup and work on implementing RPC API calls
+    - Add importprivkey (import private key) command to btcctl
+    - Update getrawtransaction to provide addresses properly, support
+      new verbose param, and match the reference implementation with the
+      exception of MULTISIG (thanks @flammit)
+    - Update getblock with new verbose flag (thanks @flammit)
+    - Add listtransactions command to btcctl
+    - Add getbalance command to btcctl
+  - Add basic support for btcd to run as a native Windows service
+    (https://github.com/conformal/btcd/issues/42)
+  - Package addblock utility with Windows MSIs
+  - Add support for TravisCI (continuous build integration)
+  - Cleanup some documentation and usage
+  - Several other minor bug fixes and general code cleanup
+
 Changes in 0.3.3 (Wed Nov 13 2013)
   - Significantly improve initial block chain download speed
     (https://github.com/conformal/btcd/issues/20)
