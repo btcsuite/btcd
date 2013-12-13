@@ -11,88 +11,161 @@ import (
 )
 
 var (
-	// ErrNtfnUnexpected describes an error where an unexpected
-	// notification is received when unmarshaling into a concrete
-	// Notification variable.
-	ErrNtfnUnexpected = errors.New("notification unexpected")
-
-	// ErrNtfnNotFound describes an error where a parser does not
-	// handle unmarshaling a notification.
-	ErrNtfnNotFound = errors.New("notification not found")
+	// ErrNotANtfn describes an error where a JSON-RPC Request
+	// object cannot be successfully parsed as a notification
+	// due to having an ID.
+	ErrNotANtfn = errors.New("notifications may not have IDs")
 )
 
 const (
-	// BlockConnectedNtfnId is the id of the btcd blockconnected
+	// AccountBalanceNtfnMethod is the method of the btcwallet
+	// accountbalance notification.
+	AccountBalanceNtfnMethod = "accountbalance"
+
+	// BlockConnectedNtfnMethod is the method of the btcd
+	// blockconnected notification.
+	BlockConnectedNtfnMethod = "blockconnected"
+
+	// BlockDisconnectedNtfnMethod is the method of the btcd
+	// blockdisconnected notification.
+	BlockDisconnectedNtfnMethod = "blockdisconnected"
+
+	// BtcdConnectedNtfnMethod is the method of the btcwallet
+	// btcdconnected notification.
+	BtcdConnectedNtfnMethod = "btcdconnected"
+
+	// TxMinedNtfnMethod is the method of the btcd txmined
 	// notification.
-	BlockConnectedNtfnId = "btcd:blockconnected"
+	TxMinedNtfnMethod = "txmined"
 
-	// BlockDisconnectedNtfnId is the id of the btcd blockdisconnected
+	// TxNtfnMethod is the method of the btcwallet newtx
 	// notification.
-	BlockDisconnectedNtfnId = "btcd:blockdisconnected"
+	TxNtfnMethod = "newtx"
 
-	// TxMinedNtfnId is the id of the btcd txmined notification.
-	TxMinedNtfnId = "btcd:txmined"
-
-	// TxNtfnId is the id of the btcwallet newtx notification.
-	TxNtfnId = "btcwallet:newtx"
+	// WalletLockStateNtfnMethod is the method of the btcwallet
+	// walletlockstate notification.
+	WalletLockStateNtfnMethod = "walletlockstate"
 )
 
-type newNtfnFn func() Notification
-
-func newBlockConnectedNtfn() Notification {
-	return &BlockConnectedNtfn{}
+// Register notifications with btcjson.
+func init() {
+	btcjson.RegisterCustomCmd(AccountBalanceNtfnMethod, parseAccountBalanceNtfn)
+	btcjson.RegisterCustomCmd(BlockConnectedNtfnMethod, parseBlockConnectedNtfn)
+	btcjson.RegisterCustomCmd(BlockDisconnectedNtfnMethod, parseBlockDisconnectedNtfn)
+	btcjson.RegisterCustomCmd(BtcdConnectedNtfnMethod, parseBtcdConnectedNtfn)
+	btcjson.RegisterCustomCmd(TxMinedNtfnMethod, parseTxMinedNtfn)
+	btcjson.RegisterCustomCmd(TxNtfnMethod, parseTxNtfn)
+	btcjson.RegisterCustomCmd(WalletLockStateNtfnMethod, parseWalletLockStateNtfn)
 }
 
-func newBlockDisconnectedNtfn() Notification {
-	return &BlockDisconnectedNtfn{}
+// AccountBalanceNtfn is a type handling custom marshaling and
+// unmarshaling of accountbalance JSON websocket notifications.
+type AccountBalanceNtfn struct {
+	Account   string
+	Balance   float64
+	Confirmed bool // Whether Balance is confirmed or unconfirmed.
 }
 
-func newTxMinedNtfn() Notification {
-	return &TxMinedNtfn{}
-}
+// Enforce that AccountBalanceNtfn satisifes the btcjson.Cmd interface.
+var _ btcjson.Cmd = &AccountBalanceNtfn{}
 
-func newTxNtfn() Notification {
-	return &TxNtfn{}
-}
+// NewAccountBalanceNtfn creates a new AccountBalanceNtfn.
+func NewAccountBalanceNtfn(account string, balance float64,
+	confirmed bool) *AccountBalanceNtfn {
 
-var newNtfnFns = map[string]newNtfnFn{
-	BlockConnectedNtfnId:    newBlockConnectedNtfn,
-	BlockDisconnectedNtfnId: newBlockDisconnectedNtfn,
-	TxMinedNtfnId:           newTxMinedNtfn,
-	TxNtfnId:                newTxNtfn,
-}
-
-// ParseMarshaledNtfn attempts to unmarshal a marshaled notification
-// into the notification described by id.
-func ParseMarshaledNtfn(id string, b []byte) (Notification, error) {
-	if newFn, ok := newNtfnFns[id]; ok {
-		n := newFn()
-		if err := n.UnmarshalJSON(b); err != nil {
-			return nil, err
-		}
-		return n, nil
+	return &AccountBalanceNtfn{
+		Account:   account,
+		Balance:   balance,
+		Confirmed: confirmed,
 	}
-	return nil, ErrNtfnNotFound
 }
 
-// Notification is an interface implemented by all notification types.
-type Notification interface {
-	json.Marshaler
-	json.Unmarshaler
-	Id() interface{}
+// parseAccountBalanceNtfn parses a RawCmd into a concrete type satisifying
+// the btcjson.Cmd interface.  This is used when registering the notification
+// with the btcjson parser.
+func parseAccountBalanceNtfn(r *btcjson.RawCmd) (btcjson.Cmd, error) {
+	if r.Id != nil {
+		return nil, ErrNotANtfn
+	}
+
+	if len(r.Params) != 3 {
+		return nil, btcjson.ErrWrongNumberOfParams
+	}
+
+	account, ok := r.Params[0].(string)
+	if !ok {
+		return nil, errors.New("first parameter account must be a string")
+	}
+	balance, ok := r.Params[1].(float64)
+	if !ok {
+		return nil, errors.New("second parameter balance must be a number")
+	}
+	confirmed, ok := r.Params[2].(bool)
+	if !ok {
+		return nil, errors.New("third parameter confirmed must be a boolean")
+	}
+
+	return NewAccountBalanceNtfn(account, balance, confirmed), nil
+}
+
+// Id satisifies the btcjson.Cmd interface by returning nil for a
+// notification ID.
+func (n *AccountBalanceNtfn) Id() interface{} {
+	return nil
+}
+
+// Method satisifies the btcjson.Cmd interface by returning the method
+// of the notification.
+func (n *AccountBalanceNtfn) Method() string {
+	return AccountBalanceNtfnMethod
+}
+
+// MarshalJSON returns the JSON encoding of n.  Part of the btcjson.Cmd
+// interface.
+func (n *AccountBalanceNtfn) MarshalJSON() ([]byte, error) {
+	ntfn := btcjson.Message{
+		Jsonrpc: "1.0",
+		Method:  n.Method(),
+		Params: []interface{}{
+			n.Account,
+			n.Balance,
+			n.Confirmed,
+		},
+	}
+	return json.Marshal(ntfn)
+}
+
+// UnmarshalJSON unmarshals the JSON encoding of n into n.  Part of
+// the btcjson.Cmd interface.
+func (n *AccountBalanceNtfn) UnmarshalJSON(b []byte) error {
+	// Unmarshal into a RawCmd.
+	var r btcjson.RawCmd
+	if err := json.Unmarshal(b, &r); err != nil {
+		return err
+	}
+
+	newNtfn, err := parseAccountBalanceNtfn(&r)
+	if err != nil {
+		return err
+	}
+
+	concreteNtfn, ok := newNtfn.(*AccountBalanceNtfn)
+	if !ok {
+		return btcjson.ErrInternal
+	}
+	*n = *concreteNtfn
+	return nil
 }
 
 // BlockConnectedNtfn is a type handling custom marshaling and
 // unmarshaling of blockconnected JSON websocket notifications.
 type BlockConnectedNtfn struct {
-	Hash   string `json:"hash"`
-	Height int32  `json:"height"`
+	Hash   string
+	Height int32
 }
 
-type blockConnectedResult BlockConnectedNtfn
-
-// Enforce that BlockConnectedNtfn satisfies the Notification interface.
-var _ Notification = &BlockConnectedNtfn{}
+// Enforce that BlockConnectedNtfn satisfies the btcjson.Cmd interface.
+var _ btcjson.Cmd = &BlockConnectedNtfn{}
 
 // NewBlockConnectedNtfn creates a new BlockConnectedNtfn.
 func NewBlockConnectedNtfn(hash string, height int32) *BlockConnectedNtfn {
@@ -102,57 +175,89 @@ func NewBlockConnectedNtfn(hash string, height int32) *BlockConnectedNtfn {
 	}
 }
 
-// Id satisifies the Notification interface by returning the id of the
-// notification.
-func (n *BlockConnectedNtfn) Id() interface{} {
-	return BlockConnectedNtfnId
+// parseBlockConnectedNtfn parses a RawCmd into a concrete type satisifying
+// the btcjson.Cmd interface.  This is used when registering the notification
+// with the btcjson parser.
+func parseBlockConnectedNtfn(r *btcjson.RawCmd) (btcjson.Cmd, error) {
+	if r.Id != nil {
+		return nil, ErrNotANtfn
+	}
+
+	if len(r.Params) != 2 {
+		return nil, btcjson.ErrWrongNumberOfParams
+	}
+
+	hash, ok := r.Params[0].(string)
+	if !ok {
+		return nil, errors.New("first parameter hash must be a string")
+	}
+	fheight, ok := r.Params[1].(float64)
+	if !ok {
+		return nil, errors.New("second parameter height must be a number")
+	}
+
+	return NewBlockConnectedNtfn(hash, int32(fheight)), nil
 }
 
-// MarshalJSON returns the JSON encoding of n.  Part of the Notification
+// Id satisifies the btcjson.Cmd interface by returning nil for a
+// notification ID.
+func (n *BlockConnectedNtfn) Id() interface{} {
+	return nil
+}
+
+// Method satisifies the btcjson.Cmd interface by returning the method
+// of the notification.
+func (n *BlockConnectedNtfn) Method() string {
+	return BlockConnectedNtfnMethod
+}
+
+// MarshalJSON returns the JSON encoding of n.  Part of the btcjson.Cmd
 // interface.
 func (n *BlockConnectedNtfn) MarshalJSON() ([]byte, error) {
-	id := n.Id()
-	reply := btcjson.Reply{
-		Result: *n,
-		Id:     &id,
+	ntfn := btcjson.Message{
+		Jsonrpc: "1.0",
+		Method:  n.Method(),
+		Params: []interface{}{
+			n.Hash,
+			n.Height,
+		},
 	}
-	return json.Marshal(reply)
+	return json.Marshal(ntfn)
 }
 
 // UnmarshalJSON unmarshals the JSON encoding of n into n.  Part of
-// the Notification interface.
+// the btcjson.Cmd interface.
 func (n *BlockConnectedNtfn) UnmarshalJSON(b []byte) error {
-	var ntfn struct {
-		Result blockConnectedResult `json:"result"`
-		Error  *btcjson.Error       `json:"error"`
-		Id     interface{}          `json:"id"`
-	}
-	if err := json.Unmarshal(b, &ntfn); err != nil {
+	// Unmarshal into a RawCmd.
+	var r btcjson.RawCmd
+	if err := json.Unmarshal(b, &r); err != nil {
 		return err
 	}
 
-	// Notification IDs must match expected.
-	if n.Id() != ntfn.Id {
-		return ErrNtfnUnexpected
+	newNtfn, err := parseBlockConnectedNtfn(&r)
+	if err != nil {
+		return err
 	}
 
-	*n = BlockConnectedNtfn(ntfn.Result)
+	concreteNtfn, ok := newNtfn.(*BlockConnectedNtfn)
+	if !ok {
+		return btcjson.ErrInternal
+	}
+	*n = *concreteNtfn
 	return nil
 }
 
 // BlockDisconnectedNtfn is a type handling custom marshaling and
 // unmarshaling of blockdisconnected JSON websocket notifications.
 type BlockDisconnectedNtfn struct {
-	Hash   string `json:"hash"`
-	Height int32  `json:"height"`
+	Hash   string
+	Height int32
 }
 
-type blockDisconnectedResult BlockDisconnectedNtfn
+// Enforce that BlockDisconnectedNtfn satisfies the btcjson.Cmd interface.
+var _ btcjson.Cmd = &BlockDisconnectedNtfn{}
 
-// Enforce that BlockDisconnectedNtfn satisfies the Notification interface.
-var _ Notification = &BlockDisconnectedNtfn{}
-
-// NewBlockDisconnectedNtfn creates a new BlockConnectedNtfn.
+// NewBlockDisconnectedNtfn creates a new BlockDisconnectedNtfn.
 func NewBlockDisconnectedNtfn(hash string, height int32) *BlockDisconnectedNtfn {
 	return &BlockDisconnectedNtfn{
 		Hash:   hash,
@@ -160,58 +265,172 @@ func NewBlockDisconnectedNtfn(hash string, height int32) *BlockDisconnectedNtfn 
 	}
 }
 
-// Id satisifies the Notification interface by returning the id of the
-// notification.
-func (n *BlockDisconnectedNtfn) Id() interface{} {
-	return BlockDisconnectedNtfnId
+// parseBlockDisconnectedNtfn parses a RawCmd into a concrete type satisifying
+// the btcjson.Cmd interface.  This is used when registering the notification
+// with the btcjson parser.
+func parseBlockDisconnectedNtfn(r *btcjson.RawCmd) (btcjson.Cmd, error) {
+	if r.Id != nil {
+		return nil, ErrNotANtfn
+	}
+
+	if len(r.Params) != 2 {
+		return nil, btcjson.ErrWrongNumberOfParams
+	}
+
+	hash, ok := r.Params[0].(string)
+	if !ok {
+		return nil, errors.New("first parameter hash must be a string")
+	}
+	fheight, ok := r.Params[1].(float64)
+	if !ok {
+		return nil, errors.New("second parameter height must be a number")
+	}
+
+	return NewBlockDisconnectedNtfn(hash, int32(fheight)), nil
 }
 
-// MarshalJSON returns the JSON encoding of n.  Part of the Notification
+// Id satisifies the btcjson.Cmd interface by returning nil for a
+// notification ID.
+func (n *BlockDisconnectedNtfn) Id() interface{} {
+	return nil
+}
+
+// Method satisifies the btcjson.Cmd interface by returning the method
+// of the notification.
+func (n *BlockDisconnectedNtfn) Method() string {
+	return BlockDisconnectedNtfnMethod
+}
+
+// MarshalJSON returns the JSON encoding of n.  Part of the btcjson.Cmd
 // interface.
 func (n *BlockDisconnectedNtfn) MarshalJSON() ([]byte, error) {
-	id := n.Id()
-	reply := btcjson.Reply{
-		Result: *n,
-		Id:     &id,
+	ntfn := btcjson.Message{
+		Jsonrpc: "1.0",
+		Method:  n.Method(),
+		Params: []interface{}{
+			n.Hash,
+			n.Height,
+		},
 	}
-	return json.Marshal(reply)
+	return json.Marshal(ntfn)
 }
 
 // UnmarshalJSON unmarshals the JSON encoding of n into n.  Part of
-// the Notification interface.
+// the btcjson.Cmd interface.
 func (n *BlockDisconnectedNtfn) UnmarshalJSON(b []byte) error {
-	var ntfn struct {
-		Result blockDisconnectedResult `json:"result"`
-		Error  *btcjson.Error          `json:"error"`
-		Id     interface{}             `json:"id"`
-	}
-	if err := json.Unmarshal(b, &ntfn); err != nil {
+	// Unmarshal into a RawCmd.
+	var r btcjson.RawCmd
+	if err := json.Unmarshal(b, &r); err != nil {
 		return err
 	}
 
-	// Notification IDs must match expected.
-	if n.Id() != ntfn.Id {
-		return ErrNtfnUnexpected
+	newNtfn, err := parseBlockDisconnectedNtfn(&r)
+	if err != nil {
+		return err
 	}
 
-	*n = BlockDisconnectedNtfn(ntfn.Result)
+	concreteNtfn, ok := newNtfn.(*BlockDisconnectedNtfn)
+	if !ok {
+		return btcjson.ErrInternal
+	}
+	*n = *concreteNtfn
+	return nil
+}
+
+// BtcdConnectedNtfn is a type handling custom marshaling and
+// unmarshaling of btcdconnected JSON websocket notifications.
+type BtcdConnectedNtfn struct {
+	Connected bool
+}
+
+// Enforce that BtcdConnectedNtfn satisifies the btcjson.Cmd
+// interface.
+var _ btcjson.Cmd = &BtcdConnectedNtfn{}
+
+// NewBtcdConnectedNtfn creates a new BtcdConnectedNtfn.
+func NewBtcdConnectedNtfn(connected bool) *BtcdConnectedNtfn {
+	return &BtcdConnectedNtfn{connected}
+}
+
+// parseBtcdConnectedNtfn parses a RawCmd into a concrete type satisifying
+// the btcjson.Cmd interface.  This is used when registering the notification
+// with the btcjson parser.
+func parseBtcdConnectedNtfn(r *btcjson.RawCmd) (btcjson.Cmd, error) {
+	if r.Id != nil {
+		return nil, ErrNotANtfn
+	}
+
+	if len(r.Params) != 1 {
+		return nil, btcjson.ErrWrongNumberOfParams
+	}
+
+	connected, ok := r.Params[0].(bool)
+	if !ok {
+		return nil, errors.New("first parameter connected is not a boolean")
+	}
+
+	return NewBtcdConnectedNtfn(connected), nil
+}
+
+// Id satisifies the btcjson.Cmd interface by returning nil for a
+// notification ID.
+func (n *BtcdConnectedNtfn) Id() interface{} {
+	return nil
+}
+
+// Method satisifies the btcjson.Cmd interface by returning the method
+// of the notification.
+func (n *BtcdConnectedNtfn) Method() string {
+	return BtcdConnectedNtfnMethod
+}
+
+// MarshalJSON returns the JSON encoding of n.  Part of the btcjson.Cmd
+// interface.
+func (n *BtcdConnectedNtfn) MarshalJSON() ([]byte, error) {
+	ntfn := btcjson.Message{
+		Jsonrpc: "1.0",
+		Method:  n.Method(),
+		Params: []interface{}{
+			n.Connected,
+		},
+	}
+	return json.Marshal(ntfn)
+}
+
+// UnmarshalJSON unmarshals the JSON encoding of n into n.  Part of
+// the btcjson.Cmd interface.
+func (n *BtcdConnectedNtfn) UnmarshalJSON(b []byte) error {
+	// Unmarshal into a RawCmd.
+	var r btcjson.RawCmd
+	if err := json.Unmarshal(b, &r); err != nil {
+		return err
+	}
+
+	newNtfn, err := parseTxMinedNtfn(&r)
+	if err != nil {
+		return err
+	}
+
+	concreteNtfn, ok := newNtfn.(*BtcdConnectedNtfn)
+	if !ok {
+		return btcjson.ErrInternal
+	}
+	*n = *concreteNtfn
 	return nil
 }
 
 // TxMinedNtfn is a type handling custom marshaling and
 // unmarshaling of txmined JSON websocket notifications.
 type TxMinedNtfn struct {
-	TxID        string `json:"txid"`
-	BlockHash   string `json:"blockhash"`
-	BlockHeight int32  `json:"blockheight"`
-	BlockTime   int64  `json:"blocktime"`
-	Index       int    `json:"index"`
+	TxID        string
+	BlockHash   string
+	BlockHeight int32
+	BlockTime   int64
+	Index       int
 }
 
-type txMinedResult TxMinedNtfn
-
-// Enforce that TxMinedNtfn satisfies the Notification interface.
-var _ Notification = &TxMinedNtfn{}
+// Enforce that TxMinedNtfn satisifies the btcjson.Cmd interface.
+var _ btcjson.Cmd = &TxMinedNtfn{}
 
 // NewTxMinedNtfn creates a new TxMinedNtfn.
 func NewTxMinedNtfn(txid, blockhash string, blockheight int32,
@@ -226,55 +445,103 @@ func NewTxMinedNtfn(txid, blockhash string, blockheight int32,
 	}
 }
 
-// Id satisifies the Notification interface by returning the id of the
-// notification.
-func (n *TxMinedNtfn) Id() interface{} {
-	return TxMinedNtfnId
+// parseTxMinedNtfn parses a RawCmd into a concrete type satisifying
+// the btcjson.Cmd interface.  This is used when registering the notification
+// with the btcjson parser.
+func parseTxMinedNtfn(r *btcjson.RawCmd) (btcjson.Cmd, error) {
+	if r.Id != nil {
+		return nil, ErrNotANtfn
+	}
+
+	if len(r.Params) != 5 {
+		return nil, btcjson.ErrWrongNumberOfParams
+	}
+
+	txid, ok := r.Params[0].(string)
+	if !ok {
+		return nil, errors.New("first parameter txid must be a string")
+	}
+	blockhash, ok := r.Params[1].(string)
+	if !ok {
+		return nil, errors.New("second parameter blockhash must be a string")
+	}
+	fblockheight, ok := r.Params[2].(float64)
+	if !ok {
+		return nil, errors.New("third parameter blockheight must be a number")
+	}
+	fblocktime, ok := r.Params[3].(float64)
+	if !ok {
+		return nil, errors.New("fourth parameter blocktime must be a number")
+	}
+	findex, ok := r.Params[4].(float64)
+	if !ok {
+		return nil, errors.New("fifth parameter index must be a number")
+	}
+
+	return NewTxMinedNtfn(txid, blockhash, int32(fblockheight),
+		int64(fblocktime), int(findex)), nil
 }
 
-// MarshalJSON returns the JSON encoding of n.  Part of the Notification
+// Id satisifies the btcjson.Cmd interface by returning nil for a
+// notification ID.
+func (n *TxMinedNtfn) Id() interface{} {
+	return nil
+}
+
+// Method satisifies the btcjson.Cmd interface by returning the method
+// of the notification.
+func (n *TxMinedNtfn) Method() string {
+	return TxMinedNtfnMethod
+}
+
+// MarshalJSON returns the JSON encoding of n.  Part of the btcjson.Cmd
 // interface.
 func (n *TxMinedNtfn) MarshalJSON() ([]byte, error) {
-	id := n.Id()
-	reply := btcjson.Reply{
-		Result: *n,
-		Id:     &id,
+	ntfn := btcjson.Message{
+		Jsonrpc: "1.0",
+		Method:  n.Method(),
+		Params: []interface{}{
+			n.TxID,
+			n.BlockHash,
+			n.BlockHeight,
+			n.BlockTime,
+			n.Index,
+		},
 	}
-	return json.Marshal(reply)
+	return json.Marshal(ntfn)
 }
 
 // UnmarshalJSON unmarshals the JSON encoding of n into n.  Part of
-// the Notification interface.
+// the btcjson.Cmd interface.
 func (n *TxMinedNtfn) UnmarshalJSON(b []byte) error {
-	var ntfn struct {
-		Result txMinedResult  `json:"result"`
-		Error  *btcjson.Error `json:"error"`
-		Id     interface{}    `json:"id"`
-	}
-	if err := json.Unmarshal(b, &ntfn); err != nil {
+	// Unmarshal into a RawCmd.
+	var r btcjson.RawCmd
+	if err := json.Unmarshal(b, &r); err != nil {
 		return err
 	}
 
-	// Notification IDs must match expected.
-	if n.Id() != ntfn.Id {
-		return ErrNtfnUnexpected
+	newNtfn, err := parseTxMinedNtfn(&r)
+	if err != nil {
+		return err
 	}
 
-	*n = TxMinedNtfn(ntfn.Result)
+	concreteNtfn, ok := newNtfn.(*TxMinedNtfn)
+	if !ok {
+		return btcjson.ErrInternal
+	}
+	*n = *concreteNtfn
 	return nil
 }
 
 // TxNtfn is a type handling custom marshaling and
 // unmarshaling of newtx JSON websocket notifications.
 type TxNtfn struct {
-	Account string                 `json:"account"`
-	Details map[string]interface{} `json:"details"`
+	Account string
+	Details map[string]interface{}
 }
 
-type txNtfnResult TxNtfn
-
-// Enforce that TxNtfn satisfies the Notification interface.
-var _ Notification = &TxNtfn{}
+// Enforce that TxNtfn satisifies the btcjson.Cmd interface.
+var _ btcjson.Cmd = &TxNtfn{}
 
 // NewTxNtfn creates a new TxNtfn.
 func NewTxNtfn(account string, details map[string]interface{}) *TxNtfn {
@@ -284,40 +551,167 @@ func NewTxNtfn(account string, details map[string]interface{}) *TxNtfn {
 	}
 }
 
-// Id satisifies the Notification interface by returning the id of the
-// notification.
-func (n *TxNtfn) Id() interface{} {
-	return TxNtfnId
+// parseTxNtfn parses a RawCmd into a concrete type satisifying
+// the btcjson.Cmd interface.  This is used when registering the notification
+// with the btcjson parser.
+func parseTxNtfn(r *btcjson.RawCmd) (btcjson.Cmd, error) {
+	if r.Id != nil {
+		return nil, ErrNotANtfn
+	}
+
+	if len(r.Params) != 2 {
+		return nil, btcjson.ErrWrongNumberOfParams
+	}
+
+	account, ok := r.Params[0].(string)
+	if !ok {
+		return nil, errors.New("first parameter account must be a string")
+	}
+	details, ok := r.Params[1].(map[string]interface{})
+	if !ok {
+		return nil, errors.New("second parameter details must be a JSON object")
+	}
+
+	return NewTxNtfn(account, details), nil
 }
 
-// MarshalJSON returns the JSON encoding of n.  Part of the Notification
+// Id satisifies the btcjson.Cmd interface by returning nil for a
+// notification ID.
+func (n *TxNtfn) Id() interface{} {
+	return nil
+}
+
+// Method satisifies the btcjson.Cmd interface by returning the method
+// of the notification.
+func (n *TxNtfn) Method() string {
+	return TxNtfnMethod
+}
+
+// MarshalJSON returns the JSON encoding of n.  Part of the btcjson.Cmd
 // interface.
 func (n *TxNtfn) MarshalJSON() ([]byte, error) {
-	id := n.Id()
-	reply := btcjson.Reply{
-		Result: *n,
-		Id:     &id,
+	ntfn := btcjson.Message{
+		Jsonrpc: "1.0",
+		Method:  n.Method(),
+		Params: []interface{}{
+			n.Account,
+			n.Details,
+		},
 	}
-	return json.Marshal(reply)
+	return json.Marshal(ntfn)
 }
 
 // UnmarshalJSON unmarshals the JSON encoding of n into n.  Part of
-// the Notification interface.
+// the btcjson.Cmd interface.
 func (n *TxNtfn) UnmarshalJSON(b []byte) error {
-	var ntfn struct {
-		Result txNtfnResult   `json:"result"`
-		Error  *btcjson.Error `json:"error"`
-		Id     interface{}    `json:"id"`
-	}
-	if err := json.Unmarshal(b, &ntfn); err != nil {
+	// Unmarshal into a RawCmd.
+	var r btcjson.RawCmd
+	if err := json.Unmarshal(b, &r); err != nil {
 		return err
 	}
 
-	// Notification IDs must match expected.
-	if n.Id() != ntfn.Id {
-		return ErrNtfnUnexpected
+	newNtfn, err := parseTxNtfn(&r)
+	if err != nil {
+		return err
 	}
 
-	*n = TxNtfn(ntfn.Result)
+	concreteNtfn, ok := newNtfn.(*TxNtfn)
+	if !ok {
+		return btcjson.ErrInternal
+	}
+	*n = *concreteNtfn
+	return nil
+}
+
+// WalletLockStateNtfn is a type handling custom marshaling and
+// unmarshaling of walletlockstate JSON websocket notifications.
+type WalletLockStateNtfn struct {
+	Account string
+	Locked  bool
+}
+
+// Enforce that WalletLockStateNtfnMethod satisifies the btcjson.Cmd
+// interface.
+var _ btcjson.Cmd = &WalletLockStateNtfn{}
+
+// NewWalletLockStateNtfn creates a new WalletLockStateNtfn.
+func NewWalletLockStateNtfn(account string,
+	locked bool) *WalletLockStateNtfn {
+
+	return &WalletLockStateNtfn{
+		Account: account,
+		Locked:  locked,
+	}
+}
+
+// parseWalletLockStateNtfn parses a RawCmd into a concrete type
+// satisifying the btcjson.Cmd interface.  This is used when registering
+// the notification with the btcjson parser.
+func parseWalletLockStateNtfn(r *btcjson.RawCmd) (btcjson.Cmd, error) {
+	if r.Id != nil {
+		return nil, ErrNotANtfn
+	}
+
+	if len(r.Params) != 2 {
+		return nil, btcjson.ErrWrongNumberOfParams
+	}
+
+	account, ok := r.Params[0].(string)
+	if !ok {
+		return nil, errors.New("first parameter account must be a string")
+	}
+	locked, ok := r.Params[1].(bool)
+	if !ok {
+		return nil, errors.New("second parameter locked must be a boolean")
+	}
+
+	return NewWalletLockStateNtfn(account, locked), nil
+}
+
+// Id satisifies the btcjson.Cmd interface by returning nil for a
+// notification ID.
+func (n *WalletLockStateNtfn) Id() interface{} {
+	return nil
+}
+
+// Method satisifies the btcjson.Cmd interface by returning the method
+// of the notification.
+func (n *WalletLockStateNtfn) Method() string {
+	return WalletLockStateNtfnMethod
+}
+
+// MarshalJSON returns the JSON encoding of n.  Part of the btcjson.Cmd
+// interface.
+func (n *WalletLockStateNtfn) MarshalJSON() ([]byte, error) {
+	ntfn := btcjson.Message{
+		Jsonrpc: "1.0",
+		Method:  n.Method(),
+		Params: []interface{}{
+			n.Account,
+			n.Locked,
+		},
+	}
+	return json.Marshal(ntfn)
+}
+
+// UnmarshalJSON unmarshals the JSON encoding of n into n.  Part of
+// the btcjson.Cmd interface.
+func (n *WalletLockStateNtfn) UnmarshalJSON(b []byte) error {
+	// Unmarshal into a RawCmd.
+	var r btcjson.RawCmd
+	if err := json.Unmarshal(b, &r); err != nil {
+		return err
+	}
+
+	newNtfn, err := parseWalletLockStateNtfn(&r)
+	if err != nil {
+		return err
+	}
+
+	concreteNtfn, ok := newNtfn.(*WalletLockStateNtfn)
+	if !ok {
+		return btcjson.ErrInternal
+	}
+	*n = *concreteNtfn
 	return nil
 }
