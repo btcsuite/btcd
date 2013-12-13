@@ -152,11 +152,12 @@ func (b *blockManager) startSync(peers *list.List) {
 		bmgrLog.Infof("Syncing to block height %d from peer %v",
 			bestPeer.lastBlock, bestPeer.addr)
 
-		// if starting from the beginning fetch headers and
-		// download blocks based on that, otherwise compute
-		// the block download via inv messages.
-
-		if height == 0 {
+		// if starting from the beginning fetch headers and download
+		// blocks based on that, otherwise compute the block download
+		// via inv messages.  Regression test mode does not support the
+		// headers-first approach so do normal block downloads when in
+		// regression test mode.
+		if height == 0 && !cfg.RegressionTest {
 			bestPeer.PushGetHeadersMsg(locator)
 			b.fetchingHeaders = true
 		} else {
