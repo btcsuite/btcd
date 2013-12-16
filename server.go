@@ -887,19 +887,33 @@ func newServer(listenAddrs []string, db btcdb.Db, btcnet btcwire.BitcoinNet) (*s
 		discover := true
 		if len(cfg.ExternalIPs) != 0 {
 			discover = false
-			port, err :=
-				strconv.ParseUint(activeNetParams.listenPort,
-					10, 16)
-			if err != nil {
-				srvrLog.Warnf("doubleewteeeff?")
-			}
+			// if this fails we have real issues.
+			port, _ := strconv.ParseUint(
+				activeNetParams.listenPort, 10, 16)
 
 			for _, sip := range cfg.ExternalIPs {
-				na, err := hostToNetAddress(sip, uint16(port),
+				eport := uint16(port)
+				host, portstr, err := net.SplitHostPort(sip)
+				if err != nil {
+					// no port, use default.
+					host = sip
+				} else {
+					port, err := strconv.ParseUint(
+						portstr, 10, 16)
+					if err != nil {
+						srvrLog.Warnf("Can not parse "+
+							"port from %s for "+
+							"externalip: %v", sip,
+							err)
+						continue
+					}
+					eport = uint16(port)
+				}
+				na, err := hostToNetAddress(host, eport,
 					btcwire.SFNodeNetwork)
 				if err != nil {
-					srvrLog.Warnf("Not adding %s as ip: %v",
-						sip, err)
+					srvrLog.Warnf("Not adding %s as "+
+						"externalip: %v", sip, err)
 					continue
 				}
 
