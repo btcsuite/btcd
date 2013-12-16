@@ -1281,7 +1281,12 @@ func handleRescan(s *rpcServer, cmd btcjson.Cmd,
 		return btcjson.ErrInternal
 	}
 
-	rpcsLog.Debugf("Begining rescan")
+	if len(rescanCmd.Addresses) == 1 {
+		rpcsLog.Info("Begining rescan for 1 address.")
+	} else {
+		rpcsLog.Infof("Begining rescan for %v addresses.",
+			len(rescanCmd.Addresses))
+	}
 
 	minblock := int64(rescanCmd.BeginBlock)
 	maxblock := int64(rescanCmd.EndBlock)
@@ -1378,7 +1383,7 @@ func handleRescan(s *rpcServer, cmd btcjson.Cmd,
 	mreply, _ := json.Marshal(reply)
 	walletNotification <- mreply
 
-	rpcsLog.Debug("Finished rescan")
+	rpcsLog.Info("Finished rescan")
 	return nil
 }
 
