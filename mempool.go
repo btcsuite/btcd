@@ -82,9 +82,9 @@ const (
 // metadata we store about it.
 type TxDesc struct {
 	Tx     *btcutil.Tx // Transaction.
-	Added  time.Time // Time when added to pool.
-	Height int64     // Blockheight when added to pool.
-	Fee    int64     // Transaction fees.
+	Added  time.Time   // Time when added to pool.
+	Height int64       // Blockheight when added to pool.
+	Fee    int64       // Transaction fees.
 }
 
 // txMemPool is used as a source of transactions that need to be mined into
@@ -640,10 +640,10 @@ func (mp *txMemPool) addTransaction(tx *btcutil.Tx, height, fee int64) {
 	// Add the transaction to the pool and mark the referenced outpoints
 	// as spent by the pool.
 	mp.pool[*tx.Sha()] = &TxDesc{
-		Tx: tx,
-		Added: time.Now(),
+		Tx:     tx,
+		Added:  time.Now(),
 		Height: height,
-		Fee: fee,
+		Fee:    fee,
 	}
 	for _, txIn := range tx.MsgTx().TxIn {
 		mp.outpoints[txIn.PreviousOutpoint] = tx

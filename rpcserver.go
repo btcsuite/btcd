@@ -871,14 +871,13 @@ func handleGetPeerInfo(s *rpcServer, cmd btcjson.Cmd, walletNotification chan []
 }
 
 type mempoolDescriptor struct {
-	Size	int	`json:"size"`
-	Fee int64		`json:"fee"`
-	Time int64	`json:"time"`
-	Height int64	`json:"height"`
-	StartingPriority int `json:"startingpriority"`
-	CurrentPriority	int `json:"currentpriority"`
-	Depends		[]string `json:"depends"`
-
+	Size             int      `json:"size"`
+	Fee              int64    `json:"fee"`
+	Time             int64    `json:"time"`
+	Height           int64    `json:"height"`
+	StartingPriority int      `json:"startingpriority"`
+	CurrentPriority  int      `json:"currentpriority"`
+	Depends          []string `json:"depends"`
 }
 
 // handleGetRawMempool implements the getrawmempool command.
@@ -890,12 +889,12 @@ func handleGetRawMempool(s *rpcServer, cmd btcjson.Cmd, walletNotification chan 
 		result := make(map[string]*mempoolDescriptor, len(descs))
 		for _, desc := range descs {
 			mpd := &mempoolDescriptor{
-				Size: desc.Tx.MsgTx().SerializeSize(),
-				Fee:  desc.Fee,
-				Time: desc.Added.Unix(),
-				Height: desc.Height,
+				Size:             desc.Tx.MsgTx().SerializeSize(),
+				Fee:              desc.Fee,
+				Time:             desc.Added.Unix(),
+				Height:           desc.Height,
 				StartingPriority: 0, // We don't mine.
-				CurrentPriority: 0, // We don't mine.
+				CurrentPriority:  0, // We don't mine.
 			}
 			for _, txIn := range desc.Tx.MsgTx().TxIn {
 				hash := &txIn.PreviousOutpoint.Hash
@@ -908,13 +907,12 @@ func handleGetRawMempool(s *rpcServer, cmd btcjson.Cmd, walletNotification chan 
 			result[desc.Tx.Sha().String()] = mpd
 		}
 
-		return  result, nil
+		return result, nil
 	}
 	hashStrings := make([]string, len(descs))
-	for i := range(hashStrings) {
+	for i := range hashStrings {
 		hashStrings[i] = descs[i].Tx.Sha().String()
 	}
-
 
 	return hashStrings, nil
 }
