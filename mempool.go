@@ -876,7 +876,10 @@ func (mp *txMemPool) maybeAcceptTransaction(tx *btcutil.Tx, isOrphan *bool) erro
 	txmpLog.Debugf("Accepted transaction %v (pool size: %v)", txHash,
 		len(mp.pool))
 
-	// TODO(davec): Notifications
+	// Notify wallets of mempool transactions to wallet addresses.
+	if mp.server.rpcServer != nil {
+		mp.server.rpcServer.NotifyForTxOuts(tx, nil)
+	}
 
 	return nil
 }

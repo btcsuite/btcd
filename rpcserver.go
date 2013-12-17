@@ -1728,7 +1728,7 @@ func (s *rpcServer) NotifyBlockDisconnected(block *btcutil.Block) {
 func (s *rpcServer) NotifyBlockTXs(db btcdb.Db, block *btcutil.Block) {
 	for _, tx := range block.Transactions() {
 		s.newBlockNotifyCheckTxIn(tx)
-		s.newBlockNotifyCheckTxOut(block, tx)
+		s.NotifyForTxOuts(tx, block)
 	}
 }
 
@@ -1786,12 +1786,10 @@ func (s *rpcServer) newBlockNotifyCheckTxIn(tx *btcutil.Tx) {
 	}
 }
 
-// newBlockNotifyCheckTxOut is a helper function to iterate through
-// each transaction output of a new block and perform any checks and
-// notify listening frontends when necessary.
-func (s *rpcServer) newBlockNotifyCheckTxOut(block *btcutil.Block,
-	tx *btcutil.Tx) {
-
+// NotifyForTxOuts iterates through all outputs of a tx, performing any
+// necessary notifications for wallets.  If a non-nil block is passed,
+// additional block information is passed with the notifications.
+func (s *rpcServer) NotifyForTxOuts(tx *btcutil.Tx, block *btcutil.Block) {
 	for i, txout := range tx.MsgTx().TxOut {
 		stype, txaddrhash, err := btcscript.ScriptToAddrHash(txout.PkScript)
 		if stype != btcscript.ScriptAddr || err != nil {
@@ -1802,47 +1800,57 @@ func (s *rpcServer) newBlockNotifyCheckTxOut(block *btcutil.Block,
 			for e := idlist.Front(); e != nil; e = e.Next() {
 				ctx := e.Value.(*notificationCtx)
 
-				blkhash, err := block.Sha()
-				if err != nil {
-					rpcsLog.Error("Error getting block sha; dropping Tx notification.")
-					break
-				}
 				txaddr, err := btcutil.EncodeAddress(txaddrhash, s.server.btcnet)
 				if err != nil {
 					rpcsLog.Error("Error encoding address; dropping Tx notification.")
 					break
 				}
-				reply := &btcjson.Reply{
-					Result: struct {
-						Receiver   string `json:"receiver"`
-						Height     int64  `json:"height"`
-						BlockHash  string `json:"blockhash"`
-						BlockIndex int    `json:"blockindex"`
-						BlockTime  int64  `json:"blocktime"`
-						TxID       string `json:"txid"`
-						TxOutIndex uint32 `json:"txoutindex"`
-						Amount     int64  `json:"amount"`
-						PkScript   string `json:"pkscript"`
-					}{
-						Receiver:   txaddr,
-						Height:     block.Height(),
-						BlockHash:  blkhash.String(),
-						BlockIndex: tx.Index(),
-						BlockTime:  block.MsgBlock().Header.Timestamp.Unix(),
-						TxID:       tx.Sha().String(),
-						TxOutIndex: uint32(i),
-						Amount:     txout.Value,
-						PkScript:   btcutil.Base58Encode(txout.PkScript),
-					},
-					Error: nil,
-					Id:    &ctx.id,
+
+				// TODO(jrick): shove this in btcws
+				result := struct {
+					Receiver   string `json:"receiver"`
+					Height     int64  `json:"height"`
+					BlockHash  string `json:"blockhash"`
+					BlockIndex int    `json:"blockindex"`
+					BlockTime  int64  `json:"blocktime"`
+					TxID       string `json:"txid"`
+					TxOutIndex uint32 `json:"txoutindex"`
+					Amount     int64  `json:"amount"`
+					PkScript   string `json:"pkscript"`
+				}{
+					Receiver:   txaddr,
+					TxID:       tx.Sha().String(),
+					TxOutIndex: uint32(i),
+					Amount:     txout.Value,
+					PkScript:   btcutil.Base58Encode(txout.PkScript),
 				}
-				replyBytes, err := json.Marshal(reply)
+
+				if block != nil {
+					blkhash, err := block.Sha()
+					if err != nil {
+						rpcsLog.Error("Error getting block sha; dropping Tx notification.")
+						break
+					}
+					result.Height = block.Height()
+					result.BlockHash = blkhash.String()
+					result.BlockIndex = tx.Index()
+					result.BlockTime = block.MsgBlock().Header.Timestamp.Unix()
+				} else {
+					result.Height = -1
+					result.BlockIndex = -1
+				}
+
+				reply := &btcjson.Reply{
+					Result: result,
+					Error:  nil,
+					Id:     &ctx.id,
+				}
+				mreply, err := json.Marshal(reply)
 				if err != nil {
 					rpcsLog.Errorf("Unable to marshal tx notification: %v", err)
 					continue
 				}
-				ctx.connection <- replyBytes
+				ctx.connection <- mreply
 			}
 		}
 	}
