@@ -7,7 +7,6 @@ package main
 import (
 	"encoding/binary"
 	"errors"
-	"fmt"
 	"net"
 )
 
@@ -41,29 +40,9 @@ var (
 	}
 )
 
-// try individual DNS server return list of strings for responses.
-func doDNSLookup(host, proxy string) ([]net.IP, error) {
-	var err error
-	var addrs []net.IP
-
-	if proxy != "" {
-		addrs, err = torLookupIP(host, proxy)
-	} else {
-		addrs, err = net.LookupIP(host)
-	}
-	if err != nil {
-		return nil, err
-	}
-
-	return addrs, nil
-}
-
-// Use Tor to resolve DNS.
-/*
- TODO:
- * this function must be documented internally
- * this function does not handle IPv6
-*/
+// torLookupIP uses Tor to resolve DNS via the SOCKS extension they provide for
+// resolution over the Tor network. Tor itself doesnt support ipv6 so this
+// doesn't either.
 func torLookupIP(host, proxy string) ([]net.IP, error) {
 	conn, err := net.Dial("tcp", proxy)
 	if err != nil {
@@ -149,17 +128,12 @@ func torLookupIP(host, proxy string) ([]net.IP, error) {
 // resolution. If any errors occur then the seeder that errored will not have
 // any hosts in the list. Therefore if all hosts failed an empty slice of
 // strings will be returned.
-func dnsDiscover(seeder string, proxy string) []net.IP {
+func dnsDiscover(seeder string) []net.IP {
 	discLog.Debugf("Fetching list of seeds from %v", seeder)
-	peers, err := doDNSLookup(seeder, proxy)
+	peers, err := BtcdLookup(seeder)
 	if err != nil {
-		seederPlusProxy := seeder
-		if proxy != "" {
-			seederPlusProxy = fmt.Sprintf("%s (proxy %s)",
-				seeder, proxy)
-		}
 		discLog.Debugf("Unable to fetch dns seeds from %s: %v",
-			seederPlusProxy, err)
+			seeder, err)
 		return []net.IP{}
 	}
 

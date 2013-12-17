@@ -1544,31 +1544,16 @@ func newOutboundPeer(s *server, addr string, persistent bool) *peer {
 	}
 
 	go func() {
-		// Select which dial method to call depending on whether or
-		// not a proxy is configured.  Also, add proxy information to
-		// logged address if needed.
-		dial := net.Dial
-		faddr := addr
-		if cfg.Proxy != "" {
-			proxy := &socks.Proxy{
-				Addr:     cfg.Proxy,
-				Username: cfg.ProxyUser,
-				Password: cfg.ProxyPass,
-			}
-			dial = proxy.Dial
-			faddr = fmt.Sprintf("%s via proxy %s", addr, cfg.Proxy)
-		}
-
 		// Attempt to connect to the peer.  If the connection fails and
 		// this is a persistent connection, retry after the retry
 		// interval.
 		for atomic.LoadInt32(&p.disconnect) == 0 {
-			srvrLog.Debugf("Attempting to connect to %s", faddr)
-			conn, err := dial("tcp", addr)
+			srvrLog.Debugf("Attempting to connect to %s", addr)
+			conn, err := BtcdDial("tcp", addr)
 			if err != nil {
 				p.retryCount += 1
 				srvrLog.Debugf("Failed to connect to %s: %v",
-					faddr, err)
+					addr, err)
 				if !persistent {
 					p.server.donePeers <- p
 					return
@@ -1576,7 +1561,7 @@ func newOutboundPeer(s *server, addr string, persistent bool) *peer {
 				scaledInterval := connectionRetryInterval.Nanoseconds() * p.retryCount / 2
 				scaledDuration := time.Duration(scaledInterval)
 				srvrLog.Debugf("Retrying connection to %s in "+
-					"%s", faddr, scaledDuration)
+					"%s", addr, scaledDuration)
 				time.Sleep(scaledDuration)
 				continue
 			}

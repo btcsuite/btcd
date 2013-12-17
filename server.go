@@ -407,12 +407,8 @@ func (s *server) seedFromDNS() {
 		return
 	}
 
-	proxy := ""
-	if cfg.Proxy != "" && cfg.UseTor {
-		proxy = cfg.Proxy
-	}
 	for _, seeder := range activeNetParams.dnsSeeds {
-		seedpeers := dnsDiscover(seeder, proxy)
+		seedpeers := dnsDiscover(seeder)
 		if len(seedpeers) == 0 {
 			continue
 		}

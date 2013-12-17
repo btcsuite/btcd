@@ -5,12 +5,14 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"github.com/conformal/btcdb"
 	_ "github.com/conformal/btcdb/ldb"
 	"github.com/conformal/btcutil"
 	"github.com/conformal/btcwire"
 	"github.com/conformal/go-flags"
+	"github.com/conformal/go-socks"
 	"net"
 	"os"
 	"path/filepath"
@@ -71,7 +73,10 @@ type config struct {
 	Proxy              string        `long:"proxy" description:"Connect via SOCKS5 proxy (eg. 127.0.0.1:9050)"`
 	ProxyUser          string        `long:"proxyuser" description:"Username for proxy server"`
 	ProxyPass          string        `long:"proxypass" default-mask:"-" description:"Password for proxy server"`
-	UseTor             bool          `long:"tor" description:"Specifies the proxy server used is a Tor node"`
+	OnionProxy         string        `long:"onion" description:"Connect to tor hidden services via SOCKS5 proxy (eg. 127.0.0.1:9050)"`
+	OnionProxyUser     string        `long:"onionuser" description:"Username for onion proxy server"`
+	OnionProxyPass     string        `long:"onionpass" default-mask:"-" description:"Password for onion proxy server"`
+	NoOnion            bool          `long:"noonion" description:"Disable connecting to tor hidden services"`
 	TestNet3           bool          `long:"testnet" description:"Use the test network"`
 	RegressionTest     bool          `long:"regtest" description:"Use the regression test network"`
 	DisableCheckpoints bool          `long:"nocheckpoints" description:"Disable built-in checkpoints.  Don't do this unless you know what you're doing."`
@@ -80,6 +85,10 @@ type config struct {
 	CpuProfile         string        `long:"cpuprofile" description:"Write CPU profile to the specified file"`
 	DebugLevel         string        `short:"d" long:"debuglevel" description:"Logging level for all subsystems {trace, debug, info, warn, error, critical} -- You may also specify <subsystem>=<level>,<subsystem2>=<level>,... to set the log level for individual subsystems -- Use show to list available subsystems"`
 	Upnp               bool          `long:"upnp" description:"Use UPnP to map our listening port outside of NAT"`
+	onionlookup        func(string) ([]net.IP, error)
+	lookup             func(string) ([]net.IP, error)
+	oniondial          func(string, string) (net.Conn, error)
+	dial               func(string, string) (net.Conn, error)
 }
 
 // serviceOptions defines the configuration options for btcd as a service on
@@ -422,15 +431,6 @@ func loadConfig() (*config, []string, error) {
 		return nil, nil, err
 	}
 
-	// --tor requires --proxy to be set.
-	if cfg.UseTor && cfg.Proxy == "" {
-		str := "%s: the --tor option requires --proxy to be set"
-		err := fmt.Errorf(str, "loadConfig")
-		fmt.Fprintln(os.Stderr, err)
-		parser.WriteHelp(os.Stderr)
-		return nil, nil, err
-	}
-
 	// --proxy or --connect without --listen disables listening.
 	if (cfg.Proxy != "" || len(cfg.ConnectPeers) > 0) &&
 		len(cfg.Listeners) == 0 {
@@ -494,5 +494,60 @@ func loadConfig() (*config, []string, error) {
 		btcdLog.Warnf("%v", configFileError)
 	}
 
+	cfg.dial = net.Dial
+	cfg.lookup = net.LookupIP
+	if cfg.Proxy != "" {
+		proxy := &socks.Proxy{
+			Addr:     cfg.Proxy,
+			Username: cfg.ProxyUser,
+			Password: cfg.ProxyPass,
+		}
+		cfg.dial = proxy.Dial
+		if !cfg.NoOnion {
+			cfg.lookup = func(host string) ([]net.IP, error) {
+				return torLookupIP(host, cfg.Proxy)
+			}
+		}
+	}
+	if cfg.OnionProxy != "" {
+		cfg.oniondial = func(a, b string) (net.Conn, error) {
+			proxy := &socks.Proxy{
+				Addr:     cfg.OnionProxy,
+				Username: cfg.OnionProxyUser,
+				Password: cfg.OnionProxyPass,
+			}
+			return proxy.Dial(a, b)
+		}
+		cfg.onionlookup = func(host string) ([]net.IP, error) {
+			return torLookupIP(host, cfg.OnionProxy)
+		}
+	} else {
+		cfg.oniondial = cfg.dial
+		cfg.onionlookup = cfg.lookup
+	}
+
+	if cfg.NoOnion {
+		cfg.oniondial = func(a, b string) (net.Conn, error) {
+			return nil, errors.New("tor has been disabled")
+		}
+		cfg.onionlookup = func(a string) ([]net.IP, error) {
+			return nil, errors.New("tor has been disabled")
+		}
+	}
+
 	return &cfg, remainingArgs, nil
+}
+
+func BtcdDial(network, address string) (net.Conn, error) {
+	if strings.HasSuffix(address, ".onion") {
+		return cfg.oniondial(network, address)
+	}
+	return cfg.dial(network, address)
+}
+
+func BtcdLookup(host string) ([]net.IP, error) {
+	if strings.HasSuffix(host, ".onion") {
+		return cfg.onionlookup(host)
+	}
+	return cfg.lookup(host)
 }

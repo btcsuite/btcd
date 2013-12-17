@@ -774,13 +774,7 @@ func hostToNetAddress(host string, port uint16, services btcwire.ServiceFlag) (*
 		prefix := []byte{0xfd, 0x87, 0xd8, 0x7e, 0xeb, 0x43}
 		ip = net.IP(append(prefix, data...))
 	} else if ip = net.ParseIP(host); ip == nil {
-		var err error
-		var ips []net.IP
-		if cfg.Proxy != "" {
-			ips, err = torLookupIP(host, cfg.Proxy)
-		} else {
-			ips, err = net.LookupIP(host)
-		}
+		ips, err := BtcdLookup(host)
 		if err != nil {
 			return nil, err
 		}
