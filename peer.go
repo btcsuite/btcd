@@ -1239,6 +1239,8 @@ cleanup:
 			if msg.doneChan != nil {
 				msg.doneChan <- false
 			}
+		case <-p.outputInvChan:
+			// Just drain channel
 		default:
 			break cleanup
 		}
