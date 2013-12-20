@@ -90,6 +90,43 @@ var cmdtests = []struct {
 		},
 	},
 	{
+		name: "listaddresstransactions no optargs",
+		f: func() (btcjson.Cmd, error) {
+			addrs := []string{
+				"17XhEvq9Nahdj7Xe1nv6oRe1tEmaHUuynH",
+			}
+			return NewListAddressTransactionsCmd(
+				float64(1),
+				addrs)
+		},
+		result: &ListAddressTransactionsCmd{
+			id:      float64(1),
+			Account: "",
+			Addresses: []string{
+				"17XhEvq9Nahdj7Xe1nv6oRe1tEmaHUuynH",
+			},
+		},
+	},
+	{
+		name: "listaddresstransactions one optarg",
+		f: func() (btcjson.Cmd, error) {
+			addrs := []string{
+				"17XhEvq9Nahdj7Xe1nv6oRe1tEmaHUuynH",
+			}
+			return NewListAddressTransactionsCmd(
+				float64(1),
+				addrs,
+				"abcde")
+		},
+		result: &ListAddressTransactionsCmd{
+			id:      float64(1),
+			Account: "abcde",
+			Addresses: []string{
+				"17XhEvq9Nahdj7Xe1nv6oRe1tEmaHUuynH",
+			},
+		},
+	},
+	{
 		name: "listalltransactions no optargs",
 		f: func() (btcjson.Cmd, error) {
 			return NewListAllTransactionsCmd(float64(1))

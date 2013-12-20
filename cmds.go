@@ -18,6 +18,7 @@ func init() {
 	btcjson.RegisterCustomCmd("getbalances", parseGetBalancesCmd)
 	btcjson.RegisterCustomCmd("getbestblock", parseGetBestBlockCmd)
 	btcjson.RegisterCustomCmd("getcurrentnet", parseGetCurrentNetCmd)
+	btcjson.RegisterCustomCmd("listaddresstransactions", parseListAddressTransactionsCmd)
 	btcjson.RegisterCustomCmd("listalltransactions", parseListAllTransactionsCmd)
 	btcjson.RegisterCustomCmd("notifynewtxs", parseNotifyNewTXsCmd)
 	btcjson.RegisterCustomCmd("notifyspent", parseNotifySpentCmd)
@@ -738,6 +739,123 @@ func (cmd *WalletIsLockedCmd) UnmarshalJSON(b []byte) error {
 	}
 
 	concreteCmd, ok := newCmd.(*WalletIsLockedCmd)
+	if !ok {
+		return btcjson.ErrInternal
+	}
+	*cmd = *concreteCmd
+	return nil
+}
+
+type ListAddressTransactionsCmd struct {
+	id        interface{}
+	Account   string
+	Addresses []string
+}
+
+// Enforce that ListAddressTransactionsCmd satisifies the btcjson.Cmd
+// interface.
+var _ btcjson.Cmd = &ListAddressTransactionsCmd{}
+
+// NewListAddressTransactionsCmd creates a new ListAddressTransactionsCmd.
+func NewListAddressTransactionsCmd(id interface{}, addresses []string,
+	optArgs ...string) (*ListAddressTransactionsCmd, error) {
+
+	if len(optArgs) > 1 {
+		return nil, btcjson.ErrTooManyOptArgs
+	}
+
+	// Optional arguments set to their default values.
+	account := ""
+
+	if len(optArgs) == 1 {
+		account = optArgs[0]
+	}
+
+	return &ListAddressTransactionsCmd{
+		id:        id,
+		Account:   account,
+		Addresses: addresses,
+	}, nil
+}
+
+// parseListAddressTransactionsCmd parses a ListAddressTransactionsCmd into
+// a concrete type satisifying the btcjson.Cmd interface.  This is used
+// when registering the custom command with the btcjson parser.
+func parseListAddressTransactionsCmd(r *btcjson.RawCmd) (btcjson.Cmd, error) {
+	if len(r.Params) == 0 || len(r.Params) > 2 {
+		return nil, btcjson.ErrInvalidParams
+	}
+
+	iaddrs, ok := r.Params[0].([]interface{})
+	if !ok {
+		return nil, errors.New("first parameter must be a JSON array")
+	}
+	addresses := make([]string, len(iaddrs))
+	for i := range iaddrs {
+		addr, ok := iaddrs[i].(string)
+		if !ok {
+			return nil, errors.New("first parameter must be an " +
+				"array of strings")
+		}
+		addresses[i] = addr
+	}
+
+	if len(r.Params) == 1 {
+		// No optional parameters.
+		return NewListAddressTransactionsCmd(r.Id, addresses)
+	}
+
+	account, ok := r.Params[1].(string)
+	if !ok {
+		return nil, errors.New("second parameter must be a string")
+	}
+	return NewListAddressTransactionsCmd(r.Id, addresses, account)
+}
+
+// Id satisifies the Cmd interface by returning the ID of the command.
+func (cmd *ListAddressTransactionsCmd) Id() interface{} {
+	return cmd.id
+}
+
+// Method satisfies the Cmd interface by returning the RPC method.
+func (cmd *ListAddressTransactionsCmd) Method() string {
+	return "listaddresstransactions"
+}
+
+// MarshalJSON returns the JSON encoding of cmd.  Part of the Cmd interface.
+func (cmd *ListAddressTransactionsCmd) MarshalJSON() ([]byte, error) {
+	// Fill a RawCmd and marshal.
+	raw := btcjson.RawCmd{
+		Jsonrpc: "1.0",
+		Method:  cmd.Method(),
+		Id:      cmd.id,
+		Params: []interface{}{
+			cmd.Addresses,
+		},
+	}
+
+	if cmd.Account != "" {
+		raw.Params = append(raw.Params, cmd.Account)
+	}
+
+	return json.Marshal(raw)
+}
+
+// UnmarshalJSON unmarshals the JSON encoding of cmd into cmd.  Part of
+// the Cmd interface.
+func (cmd *ListAddressTransactionsCmd) UnmarshalJSON(b []byte) error {
+	// Unmarshal into a RawCmd.
+	var r btcjson.RawCmd
+	if err := json.Unmarshal(b, &r); err != nil {
+		return err
+	}
+
+	newCmd, err := parseListAddressTransactionsCmd(&r)
+	if err != nil {
+		return err
+	}
+
+	concreteCmd, ok := newCmd.(*ListAddressTransactionsCmd)
 	if !ok {
 		return btcjson.ErrInternal
 	}
