@@ -157,7 +157,7 @@ func (b *blockManager) startSync(peers *list.List) {
 		// via inv messages.  Regression test mode does not support the
 		// headers-first approach so do normal block downloads when in
 		// regression test mode.
-		if height == 0 && !cfg.RegressionTest {
+		if height == 0 && !cfg.RegressionTest && !cfg.DisableCheckpoints {
 			bestPeer.PushGetHeadersMsg(locator)
 			b.fetchingHeaders = true
 		} else {
