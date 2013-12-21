@@ -1261,10 +1261,3 @@ func (f *fieldVal) Inverse() *fieldVal {
 	f.Square().Square().Square().Square().Square() // f = a^(2^256 - 4294968320)
 	return f.Mul(&a45)                             // f = a^(2^256 - 4294968275) = a^(p-2)
 }
-
-// NewFieldVal returns a new field value set to 0.  Callers of this package
-// don't need to work with field values directly.  This is provided for testing
-// purposes.
-func NewFieldVal() *fieldVal {
-	return new(fieldVal)
-}

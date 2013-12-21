@@ -63,3 +63,9 @@ func (curve *KoblitzCurve) TstAddJacobian(x1, y1, z1, x2, y2, z2, x3, y3, z3 *fi
 func (curve *KoblitzCurve) TstDoubleJacobian(x1, y1, z1, x3, y3, z3 *fieldVal) {
 	curve.doubleJacobian(x1, y1, z1, x3, y3, z3)
 }
+
+// NewFieldVal returns a new field value set to 0.  This is only available to
+// the test package.
+func NewFieldVal() *fieldVal {
+	return new(fieldVal)
+}
