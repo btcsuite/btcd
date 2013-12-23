@@ -1,6 +1,9 @@
 btcec
 =====
 
+[![Build Status](https://travis-ci.org/conformal/btcec.png?branch=master)]
+(https://travis-ci.org/conformal/btcec)
+
 Package btcec implements elliptic curve cryptography using koblitz curves
 (secp256k1 only for now). It is designed so that it may be used with the
 standard crypto/ecdsa packages provided with go.  There is a test suite
