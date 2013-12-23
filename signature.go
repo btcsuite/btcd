@@ -23,6 +23,35 @@ type Signature struct {
 	S *big.Int
 }
 
+// Serialize returns the ECDSA signature in the more strict DER format.  Note
+// that the serialized bytes returned do not include the appended hash type
+// used in Bitcoin signature scripts.
+//
+// encoding/asn1 is broken so we hand roll this output:
+//
+// 0x30 <length> 0x02 <length r> r 0x02 <length s> s
+func (sig *Signature) Serialize() []byte {
+	// Ensure the encoded bytes for the r and s values are canonical and
+	// thus suitable for DER encoding.
+	rb := canonicalizeInt(sig.R)
+	sb := canonicalizeInt(sig.S)
+
+	// total length of returned signature is 1 byte for each magic and
+	// length (6 total), plus lengths of r and s
+	length := 6 + len(rb) + len(sb)
+	b := make([]byte, length, length)
+
+	b[0] = 0x30
+	b[1] = byte(length - 2)
+	b[2] = 0x02
+	b[3] = byte(len(rb))
+	offset := copy(b[4:], rb) + 4
+	b[offset] = 0x02
+	b[offset+1] = byte(len(sb))
+	copy(b[offset+2:], sb)
+	return b
+}
+
 func parseSig(sigStr []byte, curve elliptic.Curve, der bool) (*Signature, error) {
 	// Originally this code used encoding/asn1 in order to parse the
 	// signature, but a number of problems were found with this approach.
@@ -149,6 +178,25 @@ func ParseSignature(sigStr []byte, curve elliptic.Curve) (*Signature, error) {
 // BER format is needed, use ParseSignature.
 func ParseDERSignature(sigStr []byte, curve elliptic.Curve) (*Signature, error) {
 	return parseSig(sigStr, curve, true)
+}
+
+// canonicalizeInt returns the bytes for the passed big integer adjusted as
+// necessary to ensure that a big-endian encoded integer can't possibly be
+// misinterpreted as a negative number.  This can happen when the most
+// significant bit is set, so it is padded by a leading zero byte in this case.
+// Also, the returned bytes will have at least a single byte when the passed
+// value is 0.  This is required for DER encoding.
+func canonicalizeInt(val *big.Int) []byte {
+	b := val.Bytes()
+	if len(b) == 0 {
+		b = []byte{0x00}
+	}
+	if b[0]&0x80 != 0 {
+		paddedBytes := make([]byte, len(b)+1)
+		copy(paddedBytes[1:], b)
+		b = paddedBytes
+	}
+	return b
 }
 
 // canonicalPadding checks whether a big-endian encoded integer could
