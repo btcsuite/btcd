@@ -15,7 +15,6 @@ import (
 	"github.com/conformal/btcwire"
 	"github.com/davecgh/go-spew/spew"
 	"io"
-	"math/big"
 	"time"
 )
 
@@ -1000,7 +999,8 @@ func signatureScriptCustomReader(reader io.Reader, tx *btcwire.MsgTx, idx int,
 	if err != nil {
 		return nil, fmt.Errorf("cannot sign tx input: %s", err)
 	}
-	sig := append(sigDER(r, s), hashType)
+	ecSig := btcec.Signature{R: r, S: s}
+	sig := append(ecSig.Serialize(), hashType)
 
 	pk := (*btcec.PublicKey)(&privkey.PublicKey)
 	var pubkeyOpcode *parsedOpcode
@@ -1023,49 +1023,6 @@ func signatureScriptCustomReader(reader io.Reader, tx *btcwire.MsgTx, idx int,
 		*pubkeyOpcode,
 	}
 	return unparseScript(pops)
-}
-
-// sigDER returns the ECDSA signature r, s in the DER format used by
-// signature scripts.  The signature does not include the appended hashtype.
-//
-// encoding/asn1 is broken so we hand roll this output:
-//
-//  0x30 <length> 0x02 <length r> r 0x02 <length s> s
-func sigDER(r, s *big.Int) []byte {
-	// In DER format, a leading 0x00 octet must be prepended to
-	// the byte slice so it cannot be interpreted as a negative
-	// big-endian number.  This is only done if the sign bit on
-	// the first byte is set.
-	var rb, sb []byte
-	if r.Bytes()[0]&0x80 != 0 {
-		paddedBytes := make([]byte, len(r.Bytes())+1)
-		copy(paddedBytes[1:], r.Bytes())
-		rb = paddedBytes
-	} else {
-		rb = r.Bytes()
-	}
-	if s.Bytes()[0]&0x80 != 0 {
-		paddedBytes := make([]byte, len(s.Bytes())+1)
-		copy(paddedBytes[1:], s.Bytes())
-		sb = paddedBytes
-	} else {
-		sb = s.Bytes()
-	}
-
-	// total length of returned signature is 1 byte for each magic and
-	// length (6 total), plus lengths of r and s
-	length := 6 + len(rb) + len(sb)
-	b := make([]byte, length, length)
-
-	b[0] = 0x30
-	b[1] = byte(length - 2)
-	b[2] = 0x02
-	b[3] = byte(len(rb))
-	offset := copy(b[4:], rb) + 4
-	b[offset] = 0x02
-	b[offset+1] = byte(len(sb))
-	copy(b[offset+2:], sb)
-	return b
 }
 
 // expectedInputs returns the number of arguments required by a script.
