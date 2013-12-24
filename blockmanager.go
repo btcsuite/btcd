@@ -528,7 +528,7 @@ func (b *blockManager) handleInvMsg(imsg *invMsg) {
 
 		// Add the inventory to the cache of known inventory
 		// for the peer.
-		imsg.peer.addKnownInventory(iv)
+		imsg.peer.AddKnownInventory(iv)
 
 		if b.fetchingHeaders {
 			// if we are fetching headers and already know
