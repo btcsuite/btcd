@@ -110,7 +110,7 @@ func displayGeneric(reply interface{}) error {
 // is returned if a float64 is not passed.
 func displayFloat64(reply interface{}) error {
 	if val, ok := reply.(float64); ok {
-		fmt.Println(val)
+		fmt.Printf("%f", val)
 		return nil
 	}
 
