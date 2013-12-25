@@ -871,7 +871,7 @@ func (mp *txMemPool) maybeAcceptTransaction(tx *btcutil.Tx, isOrphan *bool) erro
 	}
 
 	// Add to transaction pool.
-	mp.addTransaction(tx, nextBlockHeight-1, txFee)
+	mp.addTransaction(tx, curHeight, txFee)
 
 	txmpLog.Debugf("Accepted transaction %v (pool size: %v)", txHash,
 		len(mp.pool))
