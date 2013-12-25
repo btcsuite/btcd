@@ -870,9 +870,12 @@ func handleGetPeerInfo(s *rpcServer, cmd btcjson.Cmd, walletNotification chan []
 	return s.server.PeerInfo(), nil
 }
 
+// mempoolDescriptor describes a JSON object which is returned for each
+// transaction in the memory pool in response to a getrawmempool command with
+// the verbose flag set.
 type mempoolDescriptor struct {
 	Size             int      `json:"size"`
-	Fee              int64    `json:"fee"`
+	Fee              float64  `json:"fee"`
 	Time             int64    `json:"time"`
 	Height           int64    `json:"height"`
 	StartingPriority int      `json:"startingpriority"`
@@ -889,8 +892,9 @@ func handleGetRawMempool(s *rpcServer, cmd btcjson.Cmd, walletNotification chan 
 		result := make(map[string]*mempoolDescriptor, len(descs))
 		for _, desc := range descs {
 			mpd := &mempoolDescriptor{
-				Size:             desc.Tx.MsgTx().SerializeSize(),
-				Fee:              desc.Fee,
+				Size: desc.Tx.MsgTx().SerializeSize(),
+				Fee: float64(desc.Fee) /
+					float64(btcutil.SatoshiPerBitcoin),
 				Time:             desc.Added.Unix(),
 				Height:           desc.Height,
 				StartingPriority: 0, // We don't mine.
@@ -909,6 +913,9 @@ func handleGetRawMempool(s *rpcServer, cmd btcjson.Cmd, walletNotification chan 
 
 		return result, nil
 	}
+
+	// The response is simply an array of the transaction hashes if the
+	// verbose flag is not set.
 	hashStrings := make([]string, len(descs))
 	for i := range hashStrings {
 		hashStrings[i] = descs[i].Tx.Sha().String()

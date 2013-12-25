@@ -958,7 +958,7 @@ func (mp *txMemPool) processOrphans(hash *btcwire.ShaHash) error {
 }
 
 // ProcessTransaction is the main workhorse for handling insertion of new
-// free-standing transactions into a memory pool.  It includes functionality
+// free-standing transactions into the memory pool.  It includes functionality
 // such as rejecting duplicate transactions, ensuring transactions follow all
 // rules, orphan transaction handling, and insertion into the memory pool.
 //
