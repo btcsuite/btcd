@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -43,25 +44,25 @@ var (
 // commandHandlers is a map of commands and associated handler data that is used
 // to validate correctness and perform the command.
 var commandHandlers = map[string]*handlerData{
-	"addnode":              &handlerData{2, 0, displaySpewDump, nil, makeAddNode, "<ip> <add/remove/onetry>"},
+	"addnode":              &handlerData{2, 0, displayJSONDump, nil, makeAddNode, "<ip> <add/remove/onetry>"},
 	"debuglevel":           &handlerData{1, 0, displayGeneric, nil, makeDebugLevel, "<levelspec>"},
-	"decoderawtransaction": &handlerData{1, 0, displaySpewDump, nil, makeDecodeRawTransaction, "<txhash>"},
+	"decoderawtransaction": &handlerData{1, 0, displayJSONDump, nil, makeDecodeRawTransaction, "<txhash>"},
 	"dumpprivkey":          &handlerData{1, 0, displayGeneric, nil, makeDumpPrivKey, "<bitcoinaddress>"},
 	"getbalance":           &handlerData{0, 2, displayGeneric, []conversionHandler{nil, toInt}, makeGetBalance, "[account] [minconf=1]"},
 	"getbestblockhash":     &handlerData{0, 0, displayGeneric, nil, makeGetBestBlockHash, ""},
-	"getblock":             &handlerData{1, 0, displaySpewDump, nil, makeGetBlock, "<blockhash>"},
+	"getblock":             &handlerData{1, 0, displayJSONDump, nil, makeGetBlock, "<blockhash>"},
 	"getblockcount":        &handlerData{0, 0, displayFloat64, nil, makeGetBlockCount, ""},
 	"getblockhash":         &handlerData{1, 0, displayGeneric, []conversionHandler{toInt64}, makeGetBlockHash, "<blocknumber>"},
 	"getconnectioncount":   &handlerData{0, 0, displayFloat64, nil, makeGetConnectionCount, ""},
 	"getdifficulty":        &handlerData{0, 0, displayFloat64, nil, makeGetDifficulty, ""},
 	"getgenerate":          &handlerData{0, 0, displayGeneric, nil, makeGetGenerate, ""},
 	"gethashespersec":      &handlerData{0, 0, displayGeneric, nil, makeGetHashesPerSec, ""},
-	"getpeerinfo":          &handlerData{0, 0, displaySpewDump, nil, makeGetPeerInfo, ""},
-	"getrawmempool":        &handlerData{0, 1, displaySpewDump, []conversionHandler{toBool}, makeGetRawMempool, "[verbose=false]"},
-	"getrawtransaction":    &handlerData{1, 1, displaySpewDump, []conversionHandler{nil, toBool}, makeGetRawTransaction, "<txhash> [verbose=false]"},
+	"getpeerinfo":          &handlerData{0, 0, displayJSONDump, nil, makeGetPeerInfo, ""},
+	"getrawmempool":        &handlerData{0, 1, displayJSONDump, []conversionHandler{toBool}, makeGetRawMempool, "[verbose=false]"},
+	"getrawtransaction":    &handlerData{1, 1, displayJSONDump, []conversionHandler{nil, toBool}, makeGetRawTransaction, "<txhash> [verbose=false]"},
 	"importprivkey":        &handlerData{1, 2, displayGeneric, []conversionHandler{nil, nil, toBool}, makeImportPrivKey, "<wifprivkey> [label] [rescan=true]"},
-	"listtransactions":     &handlerData{0, 3, displaySpewDump, []conversionHandler{nil, toInt, toInt}, makeListTransactions, "[account] [count=10] [from=0]"},
-	"verifychain":          &handlerData{0, 2, displaySpewDump, []conversionHandler{toInt, toInt}, makeVerifyChain, "[level] [depth]"},
+	"listtransactions":     &handlerData{0, 3, displayJSONDump, []conversionHandler{nil, toInt, toInt}, makeListTransactions, "[account] [count=10] [from=0]"},
+	"verifychain":          &handlerData{0, 2, displayJSONDump, []conversionHandler{toInt, toInt}, makeVerifyChain, "[level] [depth]"},
 	"stop":                 &handlerData{0, 0, displayGeneric, nil, makeStop, ""},
 }
 
@@ -122,6 +123,23 @@ func displayFloat64(reply interface{}) error {
 // passed interface.
 func displaySpewDump(reply interface{}) error {
 	spew.Dump(reply)
+	return nil
+}
+
+// displayJSONDump is a displayHandler that uses json.Indent to display the
+// passed interface.
+func displayJSONDump(reply interface{}) error {
+	marshaledBytes, err := json.Marshal(reply)
+	if err != nil {
+		return err
+	}
+
+	var buf bytes.Buffer
+	err = json.Indent(&buf, marshaledBytes, "", "\t")
+	if err != nil {
+		return err
+	}
+	fmt.Println(buf.String())
 	return nil
 }
 
