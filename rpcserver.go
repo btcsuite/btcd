@@ -730,27 +730,37 @@ func handleGetBlock(s *rpcServer, cmd btcjson.Cmd, walletNotification chan []byt
 		rpcsLog.Errorf("Error fetching sha: %v", err)
 		return nil, btcjson.ErrBlockNotFound
 	}
-	idx := blk.Height()
+
+	// When the verbose flag isn't set, simply return the network-serialized
+	// block as a hex-encoded string.
+	if !c.Verbose {
+		var wireBuf bytes.Buffer
+		err := blk.MsgBlock().BtcEncode(&wireBuf, btcwire.ProtocolVersion)
+		if err != nil {
+			return nil, btcjson.Error{
+				Code:    btcjson.ErrInternal.Code,
+				Message: err.Error(),
+			}
+		}
+		blkHex := hex.EncodeToString(wireBuf.Bytes())
+		return blkHex, nil
+	}
+
+	// The verbose flag is set, so generate the JSON object and return it.
 	buf, err := blk.Bytes()
 	if err != nil {
 		rpcsLog.Errorf("Error fetching block: %v", err)
-		return nil, btcjson.ErrBlockNotFound
+		return nil, btcjson.Error{
+			Code:    btcjson.ErrInternal.Code,
+			Message: err.Error(),
+		}
 	}
+	idx := blk.Height()
 
 	_, maxidx, err := s.server.db.NewestSha()
 	if err != nil {
 		rpcsLog.Errorf("Cannot get newest sha: %v", err)
 		return nil, btcjson.ErrBlockNotFound
-	}
-
-	if !c.Verbose {
-		var wireBuf bytes.Buffer
-		err := blk.MsgBlock().BtcEncode(&wireBuf, btcwire.ProtocolVersion)
-		if err != nil {
-			return nil, btcjson.Error{Code: btcjson.ErrInternal.Code, Message: err.Error()}
-		}
-		blkHex := hex.EncodeToString(wireBuf.Bytes())
-		return btcjson.BlockResult{Hex: blkHex}, nil
 	}
 
 	blockHeader := &blk.MsgBlock().Header
