@@ -756,7 +756,6 @@ func handleGetBlock(s *rpcServer, cmd btcjson.Cmd, walletNotification chan []byt
 		}
 	}
 	idx := blk.Height()
-
 	_, maxidx, err := s.server.db.NewestSha()
 	if err != nil {
 		rpcsLog.Errorf("Cannot get newest sha: %v", err)

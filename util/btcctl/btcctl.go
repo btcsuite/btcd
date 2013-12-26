@@ -50,7 +50,7 @@ var commandHandlers = map[string]*handlerData{
 	"dumpprivkey":          &handlerData{1, 0, displayGeneric, nil, makeDumpPrivKey, "<bitcoinaddress>"},
 	"getbalance":           &handlerData{0, 2, displayGeneric, []conversionHandler{nil, toInt}, makeGetBalance, "[account] [minconf=1]"},
 	"getbestblockhash":     &handlerData{0, 0, displayGeneric, nil, makeGetBestBlockHash, ""},
-	"getblock":             &handlerData{1, 0, displayJSONDump, nil, makeGetBlock, "<blockhash>"},
+	"getblock":             &handlerData{1, 2, displayJSONDump, []conversionHandler{nil, toBool, toBool}, makeGetBlock, "<blockhash>"},
 	"getblockcount":        &handlerData{0, 0, displayFloat64, nil, makeGetBlockCount, ""},
 	"getblockhash":         &handlerData{1, 0, displayGeneric, []conversionHandler{toInt64}, makeGetBlockHash, "<blocknumber>"},
 	"getconnectioncount":   &handlerData{0, 0, displayFloat64, nil, makeGetConnectionCount, ""},
@@ -188,7 +188,22 @@ func makeGetBestBlockHash(args []interface{}) (btcjson.Cmd, error) {
 
 // makeGetBlock generates the cmd structure for getblock comands.
 func makeGetBlock(args []interface{}) (btcjson.Cmd, error) {
-	return btcjson.NewGetBlockCmd("btcctl", args[0].(string))
+	// Create the getblock command with defaults for the optional
+	// parameters.
+	getBlockCmd, err := btcjson.NewGetBlockCmd("btcctl", args[0].(string))
+	if err != nil {
+		return nil, err
+	}
+
+	// Override the optional parameters if they were specified.
+	if len(args) > 1 {
+		getBlockCmd.Verbose = args[1].(bool)
+	}
+	if len(args) > 2 {
+		getBlockCmd.VerboseTx = args[2].(bool)
+	}
+
+	return getBlockCmd, nil
 }
 
 // makeGetBlockCount generates the cmd structure for getblockcount comands.
