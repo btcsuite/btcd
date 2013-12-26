@@ -55,6 +55,7 @@ var commandHandlers = map[string]*handlerData{
 	"getconnectioncount":   &handlerData{0, 0, displayFloat64, nil, makeGetConnectionCount, ""},
 	"getdifficulty":        &handlerData{0, 0, displayFloat64, nil, makeGetDifficulty, ""},
 	"getgenerate":          &handlerData{0, 0, displayGeneric, nil, makeGetGenerate, ""},
+	"gethashespersec":      &handlerData{0, 0, displayGeneric, nil, makeGetHashesPerSec, ""},
 	"getpeerinfo":          &handlerData{0, 0, displaySpewDump, nil, makeGetPeerInfo, ""},
 	"getrawmempool":        &handlerData{0, 1, displaySpewDump, []conversionHandler{toBool}, makeGetRawMempool, "[verbose=false]"},
 	"getrawtransaction":    &handlerData{1, 1, displaySpewDump, []conversionHandler{nil, toBool}, makeGetRawTransaction, "<txhash> [verbose=false]"},
@@ -198,6 +199,11 @@ func makeGetDifficulty(args []interface{}) (btcjson.Cmd, error) {
 // getgenerate comands.
 func makeGetGenerate(args []interface{}) (btcjson.Cmd, error) {
 	return btcjson.NewGetGenerateCmd("btcctl")
+}
+
+// makeGetHashesPerSec generates the cmd structure for gethashespersec comands.
+func makeGetHashesPerSec(args []interface{}) (btcjson.Cmd, error) {
+	return btcjson.NewGetHashesPerSecCmd("btcctl")
 }
 
 // makePeerInfo generates the cmd structure for
