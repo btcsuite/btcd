@@ -45,9 +45,10 @@ type InfoResult struct {
 	Errors          string  `json:"errors,omitempty"`
 }
 
-// BlockResult models the data from the getblock command.
+// BlockResult models the data from the getblock command when the verbose flag
+// is set.  When the verbose flag is not set, getblock return a hex-encoded
+// string.
 type BlockResult struct {
-	Hex           string        `json:"hex,omitempty"`
 	Hash          string        `json:"hash"`
 	Confirmations uint64        `json:"confirmations"`
 	Size          int           `json:"size"`
@@ -776,10 +777,21 @@ func ReadResultCmd(cmd string, message []byte) (Reply, error) {
 			result.Result = res
 		}
 	case "getblock":
-		var res BlockResult
-		err = json.Unmarshal(objmap["result"], &res)
-		if err == nil {
-			result.Result = res
+		// getblock can either return a JSON object or a hex-encoded
+		// string depending on the verbose flag.  Choose the right form
+		// accordingly.
+		if strings.Contains(string(objmap["result"]), "{") {
+			var res BlockResult
+			err = json.Unmarshal(objmap["result"], &res)
+			if err == nil {
+				result.Result = res
+			}
+		} else {
+			var res string
+			err = json.Unmarshal(objmap["result"], &res)
+			if err == nil {
+				result.Result = res
+			}
 		}
 	case "getrawtransaction":
 		var res TxRawResult
