@@ -27,7 +27,7 @@ import (
 //      https://bitcointalk.org/index.php?topic=155054.0;all
 
 var (
-	// fieldOne is simple the integer 1 in field representation.  It is
+	// fieldOne is simply the integer 1 in field representation.  It is
 	// used to avoid needing to create it multiple times during the internal
 	// arithmetic.
 	fieldOne = new(fieldVal).SetInt(1)
