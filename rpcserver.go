@@ -1034,7 +1034,7 @@ func createTxRawResult(net btcwire.BitcoinNet, txSha string, mtx *btcwire.MsgTx,
 			vinList[i].ScriptSig.Asm = disbuf
 			vinList[i].ScriptSig.Hex = hex.EncodeToString(v.SignatureScript)
 		}
-		vinList[i].Sequence = uint32(v.Sequence)
+		vinList[i].Sequence = v.Sequence
 	}
 
 	voutList := make([]btcjson.Vout, len(mtx.TxOut))
