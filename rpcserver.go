@@ -717,6 +717,20 @@ func handleGetBestBlockHash(s *rpcServer, cmd btcjson.Cmd, walletNotification ch
 	return sha.String(), nil
 }
 
+// messageToHex serializes a message to the wire protocol encoding using the
+// latest protocol version and returns a hex-encoded string of the result.
+func messageToHex(msg btcwire.Message) (string, *btcjson.Error) {
+	var buf bytes.Buffer
+	err := msg.BtcEncode(&buf, btcwire.ProtocolVersion)
+	if err != nil {
+		return "", &btcjson.Error{
+			Code:    btcjson.ErrInternal.Code,
+			Message: err.Error(),
+		}
+	}
+	return hex.EncodeToString(buf.Bytes()), nil
+}
+
 // handleGetBlock implements the getblock command.
 func handleGetBlock(s *rpcServer, cmd btcjson.Cmd, walletNotification chan []byte) (interface{}, error) {
 	c := cmd.(*btcjson.GetBlockCmd)
@@ -734,15 +748,10 @@ func handleGetBlock(s *rpcServer, cmd btcjson.Cmd, walletNotification chan []byt
 	// When the verbose flag isn't set, simply return the network-serialized
 	// block as a hex-encoded string.
 	if !c.Verbose {
-		var wireBuf bytes.Buffer
-		err := blk.MsgBlock().BtcEncode(&wireBuf, btcwire.ProtocolVersion)
+		blkHex, err := messageToHex(blk.MsgBlock())
 		if err != nil {
-			return nil, btcjson.Error{
-				Code:    btcjson.ErrInternal.Code,
-				Message: err.Error(),
-			}
+			return nil, err
 		}
-		blkHex := hex.EncodeToString(wireBuf.Bytes())
 		return blkHex, nil
 	}
 
@@ -983,15 +992,14 @@ func handleGetRawTransaction(s *rpcServer, cmd btcjson.Cmd, walletNotification c
 	return *rawTxn, nil
 }
 
+// createTxRawResult
 func createTxRawResult(net btcwire.BitcoinNet, txSha string, mtx *btcwire.MsgTx, blk *btcutil.Block, maxidx int64, blksha *btcwire.ShaHash, verbose bool) (*btcjson.TxRawResult, *btcjson.Error) {
 	tx := btcutil.NewTx(mtx)
 
-	var buf bytes.Buffer
-	err := mtx.BtcEncode(&buf, btcwire.ProtocolVersion)
+	mtxHex, err := messageToHex(mtx)
 	if err != nil {
-		return nil, &btcjson.Error{Code: btcjson.ErrInternal.Code, Message: err.Error()}
+		return nil, err
 	}
-	mtxHex := hex.EncodeToString(buf.Bytes())
 
 	if !verbose {
 		return &btcjson.TxRawResult{Hex: mtxHex}, nil
@@ -999,7 +1007,6 @@ func createTxRawResult(net btcwire.BitcoinNet, txSha string, mtx *btcwire.MsgTx,
 
 	txOutList := mtx.TxOut
 	voutList := make([]btcjson.Vout, len(txOutList))
-
 	txInList := mtx.TxIn
 	vinList := make([]btcjson.Vin, len(txInList))
 
