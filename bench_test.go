@@ -10,6 +10,23 @@ import (
 	"testing"
 )
 
+// BenchmarkAddJacobian benchmarks the secp256k1 curve addJacobian function.
+func BenchmarkAddJacobian(b *testing.B) {
+	b.StopTimer()
+	x1 := btcec.NewFieldVal().SetHex("34f9460f0e4f08393d192b3c5133a6ba099aa0ad9fd54ebccfacdfa239ff49c6")
+	y1 := btcec.NewFieldVal().SetHex("0b71ea9bd730fd8923f6d25a7a91e7dd7728a960686cb5a901bb419e0f2ca232")
+	z1 := btcec.NewFieldVal().SetHex("1")
+	x2 := btcec.NewFieldVal().SetHex("34f9460f0e4f08393d192b3c5133a6ba099aa0ad9fd54ebccfacdfa239ff49c6")
+	y2 := btcec.NewFieldVal().SetHex("0b71ea9bd730fd8923f6d25a7a91e7dd7728a960686cb5a901bb419e0f2ca232")
+	z2 := btcec.NewFieldVal().SetHex("1")
+	x3, y3, z3 := btcec.NewFieldVal(), btcec.NewFieldVal(), btcec.NewFieldVal()
+	curve := btcec.S256()
+	b.StartTimer()
+	for i := 0; i < b.N; i++ {
+		curve.TstAddJacobian(x1, y1, z1, x2, y2, z2, x3, y3, z3)
+	}
+}
+
 // BechmarkScalarBaseMult benchmarks the secp256k1 curve ScalarBaseMult
 // function.
 func BechmarkScalarBaseMult(b *testing.B) {
