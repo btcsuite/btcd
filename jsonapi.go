@@ -794,10 +794,21 @@ func ReadResultCmd(cmd string, message []byte) (Reply, error) {
 			}
 		}
 	case "getrawtransaction":
-		var res TxRawResult
-		err = json.Unmarshal(objmap["result"], &res)
-		if err == nil {
-			result.Result = res
+		// getrawtransaction can either return a JSON object or a
+		// hex-encoded string depending on the verbose flag.  Choose the
+		// right form accordingly.
+		if strings.Contains(string(objmap["result"]), "{") {
+			var res TxRawResult
+			err = json.Unmarshal(objmap["result"], &res)
+			if err == nil {
+				result.Result = res
+			}
+		} else {
+			var res string
+			err = json.Unmarshal(objmap["result"], &res)
+			if err == nil {
+				result.Result = res
+			}
 		}
 	case "decoderawtransaction":
 		var res TxRawDecodeResult
