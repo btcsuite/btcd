@@ -94,7 +94,7 @@ type Vin struct {
 	Coinbase  string `json:"coinbase,omitempty"`
 	Txid      string `json:"txid,omitempty"`
 	Vout      int    `json:"vout,omitempty"`
-	ScriptSig struct {
+	ScriptSig *struct {
 		Asm string `json:"asm"`
 		Hex string `json:"hex"`
 	} `json:"scriptSig,omitempty"`
