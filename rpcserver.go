@@ -1030,6 +1030,7 @@ func createTxRawResult(net btcwire.BitcoinNet, txSha string, mtx *btcwire.MsgTx,
 			vinList[i].Vout = int(uint32(v.PreviousOutpoint.Index))
 
 			disbuf, _ := btcscript.DisasmString(v.SignatureScript)
+			vinList[i].ScriptSig = new(btcjson.ScriptSig)
 			vinList[i].ScriptSig.Asm = disbuf
 			vinList[i].ScriptSig.Hex = hex.EncodeToString(v.SignatureScript)
 		}
