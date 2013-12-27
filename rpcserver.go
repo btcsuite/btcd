@@ -802,9 +802,11 @@ func handleGetBlock(s *rpcServer, cmd btcjson.Cmd, walletNotification chan []byt
 			txSha := tx.Sha().String()
 			mtx := tx.MsgTx()
 
-			rawTxn, err := createTxRawResult(s.server.btcnet, txSha, mtx, blk, maxidx, sha, true)
+			rawTxn, err := createTxRawResult(s.server.btcnet, txSha,
+				mtx, blk, maxidx, sha)
 			if err != nil {
-				rpcsLog.Errorf("Cannot create TxRawResult for txSha=%s: %v", txSha, err)
+				rpcsLog.Errorf("Cannot create TxRawResult for "+
+					"transaction %s: %v", txSha, err)
 				return nil, err
 			}
 			rawTxns[i] = *rawTxn
@@ -946,9 +948,18 @@ func handleGetRawMempool(s *rpcServer, cmd btcjson.Cmd, walletNotification chan 
 func handleGetRawTransaction(s *rpcServer, cmd btcjson.Cmd, walletNotification chan []byte) (interface{}, error) {
 	c := cmd.(*btcjson.GetRawTransactionCmd)
 
-	// TODO: check error code. tx is not checked before
-	// this point.
-	txSha, _ := btcwire.NewShaHashFromStr(c.Txid)
+	// Convert the provided transaction hash hex to a ShaHash.
+	txSha, err := btcwire.NewShaHashFromStr(c.Txid)
+	if err != nil {
+		rpcsLog.Errorf("Error generating sha: %v", err)
+		return nil, btcjson.Error{
+			Code:    btcjson.ErrBlockNotFound.Code,
+			Message: "Parameter 1 must be a hexaecimal string",
+		}
+	}
+
+	// Try to fetch the transaction from the memory pool and if that fails,
+	// try the block database.
 	var mtx *btcwire.MsgTx
 	var blksha *btcwire.ShaHash
 	tx, err := s.server.txMemPool.FetchTransaction(txSha)
@@ -967,9 +978,18 @@ func handleGetRawTransaction(s *rpcServer, cmd btcjson.Cmd, walletNotification c
 		mtx = tx.MsgTx()
 	}
 
+	// When the verbose flag isn't set, simply return the network-serialized
+	// transaction as a hex-encoded string.
+	if !c.Verbose {
+		mtxHex, err := messageToHex(mtx)
+		if err != nil {
+			return nil, err
+		}
+		return mtxHex, nil
+	}
+
 	var blk *btcutil.Block
 	var maxidx int64
-
 	if blksha != nil {
 		blk, err = s.server.db.FetchBlockBySha(blksha)
 		if err != nil {
@@ -984,7 +1004,7 @@ func handleGetRawTransaction(s *rpcServer, cmd btcjson.Cmd, walletNotification c
 		}
 	}
 
-	rawTxn, jsonErr := createTxRawResult(s.server.btcnet, c.Txid, mtx, blk, maxidx, blksha, c.Verbose)
+	rawTxn, jsonErr := createTxRawResult(s.server.btcnet, c.Txid, mtx, blk, maxidx, blksha)
 	if err != nil {
 		rpcsLog.Errorf("Cannot create TxRawResult for txSha=%s: %v", txSha, err)
 		return nil, *jsonErr
@@ -992,25 +1012,17 @@ func handleGetRawTransaction(s *rpcServer, cmd btcjson.Cmd, walletNotification c
 	return *rawTxn, nil
 }
 
-// createTxRawResult
-func createTxRawResult(net btcwire.BitcoinNet, txSha string, mtx *btcwire.MsgTx, blk *btcutil.Block, maxidx int64, blksha *btcwire.ShaHash, verbose bool) (*btcjson.TxRawResult, *btcjson.Error) {
+// createTxRawResult converts the passed transaction and associated parameters
+// to a raw transaction JSON object.
+func createTxRawResult(net btcwire.BitcoinNet, txSha string, mtx *btcwire.MsgTx, blk *btcutil.Block, maxidx int64, blksha *btcwire.ShaHash) (*btcjson.TxRawResult, *btcjson.Error) {
 	tx := btcutil.NewTx(mtx)
-
 	mtxHex, err := messageToHex(mtx)
 	if err != nil {
 		return nil, err
 	}
 
-	if !verbose {
-		return &btcjson.TxRawResult{Hex: mtxHex}, nil
-	}
-
-	txOutList := mtx.TxOut
-	voutList := make([]btcjson.Vout, len(txOutList))
-	txInList := mtx.TxIn
-	vinList := make([]btcjson.Vin, len(txInList))
-
-	for i, v := range txInList {
+	vinList := make([]btcjson.Vin, len(mtx.TxIn))
+	for i, v := range mtx.TxIn {
 		if btcchain.IsCoinBase(tx) {
 			vinList[i].Coinbase = hex.EncodeToString(v.SignatureScript)
 		} else {
@@ -1024,7 +1036,8 @@ func createTxRawResult(net btcwire.BitcoinNet, txSha string, mtx *btcwire.MsgTx,
 		vinList[i].Sequence = float64(v.Sequence)
 	}
 
-	for i, v := range txOutList {
+	voutList := make([]btcjson.Vout, len(mtx.TxOut))
+	for i, v := range mtx.TxOut {
 		voutList[i].N = i
 		voutList[i].Value = float64(v.Value) / float64(btcutil.SatoshiPerBitcoin)
 
@@ -1060,8 +1073,7 @@ func createTxRawResult(net btcwire.BitcoinNet, txSha string, mtx *btcwire.MsgTx,
 		blockHeader := &blk.MsgBlock().Header
 		idx := blk.Height()
 
-		// This is not a typo, they are identical in
-		// bitcoind as well.
+		// This is not a typo, they are identical in bitcoind as well.
 		txReply.Time = blockHeader.Timestamp.Unix()
 		txReply.Blocktime = blockHeader.Timestamp.Unix()
 		txReply.BlockHash = blksha.String()
