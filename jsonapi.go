@@ -88,17 +88,22 @@ type TxRawDecodeResult struct {
 	Vout     []Vout `json:"vout"`
 }
 
+// ScriptSig models a signature script.  It is defined seperately since it only
+// applies to non-coinbase.  Therefore the field in the Vin structure needs
+// to be a pointer.
+type ScriptSig struct {
+	Asm string `json:"asm"`
+	Hex string `json:"hex"`
+}
+
 // Vin models parts of the tx data.  It is defined seperately since both
 // getrawtransaction and decoderawtransaction use the same structure.
 type Vin struct {
-	Coinbase  string `json:"coinbase,omitempty"`
-	Txid      string `json:"txid,omitempty"`
-	Vout      int    `json:"vout,omitempty"`
-	ScriptSig *struct {
-		Asm string `json:"asm"`
-		Hex string `json:"hex"`
-	} `json:"scriptSig,omitempty"`
-	Sequence float64 `json:"sequence"`
+	Coinbase  string     `json:"coinbase,omitempty"`
+	Txid      string     `json:"txid,omitempty"`
+	Vout      int        `json:"vout,omitempty"`
+	ScriptSig *ScriptSig `json:"scriptSig,omitempty"`
+	Sequence  float64    `json:"sequence"`
 }
 
 // Vout models parts of the tx data.  It is defined seperately since both
