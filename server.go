@@ -260,19 +260,19 @@ func (s *server) handleBroadcastMsg(state *peerState, bmsg *broadcastMsg) {
 
 // PeerInfo represents the information requested by the getpeerinfo rpc command.
 type PeerInfo struct {
-	Addr           string              `json:"addr,omitempty"`
-	Services       btcwire.ServiceFlag `json:"services,omitempty"`
-	LastSend       int64               `json:"lastsend,omitempty"`
-	LastRecv       int64               `json:"lastrecv,omitempty"`
-	BytesSent      int                 `json:"bytessent,omitempty"`
-	BytesRecv      int                 `json:"bytesrecv,omitempty"`
-	ConnTime       int64               `json:"conntime,omitempty"`
-	Version        uint32              `json:"version,omitempty"`
-	SubVer         string              `json:"subver,omitempty"`
-	Inbound        bool                `json:"inbound,omitempty"`
-	StartingHeight int32               `json:"startingheight,omitempty"`
-	BanScore       int                 `json:"banscore,omitempty"`
-	SyncNode       bool                `json:"syncnode,omitempty"`
+	Addr           string `json:"addr,omitempty"`
+	Services       string `json:"services,omitempty"`
+	LastSend       int64  `json:"lastsend,omitempty"`
+	LastRecv       int64  `json:"lastrecv,omitempty"`
+	BytesSent      int    `json:"bytessent,omitempty"`
+	BytesRecv      int    `json:"bytesrecv,omitempty"`
+	ConnTime       int64  `json:"conntime,omitempty"`
+	Version        uint32 `json:"version,omitempty"`
+	SubVer         string `json:"subver,omitempty"`
+	Inbound        bool   `json:"inbound,omitempty"`
+	StartingHeight int32  `json:"startingheight,omitempty"`
+	BanScore       int    `json:"banscore,omitempty"`
+	SyncNode       bool   `json:"syncnode,omitempty"`
 }
 
 type getConnCountMsg struct {
@@ -320,7 +320,7 @@ func (s *server) handleQuery(querymsg interface{}, state *peerState) {
 			// version.
 			info := &PeerInfo{
 				Addr:           p.addr,
-				Services:       p.services,
+				Services:       fmt.Sprintf("%08d", p.services),
 				LastSend:       p.lastSend.Unix(),
 				LastRecv:       p.lastRecv.Unix(),
 				BytesSent:      0, // TODO(oga) we need this from wire.
