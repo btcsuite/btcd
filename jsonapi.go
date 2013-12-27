@@ -103,7 +103,7 @@ type Vin struct {
 	Txid      string     `json:"txid,omitempty"`
 	Vout      int        `json:"vout,omitempty"`
 	ScriptSig *ScriptSig `json:"scriptSig,omitempty"`
-	Sequence  float64    `json:"sequence"`
+	Sequence  uint32     `json:"sequence"`
 }
 
 // Vout models parts of the tx data.  It is defined seperately since both
