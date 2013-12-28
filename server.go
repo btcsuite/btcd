@@ -260,17 +260,17 @@ func (s *server) handleBroadcastMsg(state *peerState, bmsg *broadcastMsg) {
 
 // PeerInfo represents the information requested by the getpeerinfo rpc command.
 type PeerInfo struct {
-	Addr           string `json:"addr,omitempty"`
-	Services       string `json:"services,omitempty"`
-	LastSend       int64  `json:"lastsend,omitempty"`
-	LastRecv       int64  `json:"lastrecv,omitempty"`
-	BytesSent      int    `json:"bytessent,omitempty"`
-	BytesRecv      int    `json:"bytesrecv,omitempty"`
-	ConnTime       int64  `json:"conntime,omitempty"`
-	Version        uint32 `json:"version,omitempty"`
-	SubVer         string `json:"subver,omitempty"`
-	Inbound        bool   `json:"inbound,omitempty"`
-	StartingHeight int32  `json:"startingheight,omitempty"`
+	Addr           string `json:"addr"`
+	Services       string `json:"services"`
+	LastSend       int64  `json:"lastsend"`
+	LastRecv       int64  `json:"lastrecv"`
+	BytesSent      int    `json:"bytessent"`
+	BytesRecv      int    `json:"bytesrecv"`
+	ConnTime       int64  `json:"conntime"`
+	Version        uint32 `json:"version"`
+	SubVer         string `json:"subver"`
+	Inbound        bool   `json:"inbound"`
+	StartingHeight int32  `json:"startingheight"`
 	BanScore       int    `json:"banscore,omitempty"`
 	SyncNode       bool   `json:"syncnode,omitempty"`
 }
