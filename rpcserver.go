@@ -1194,9 +1194,7 @@ func handleVerifyChain(s *rpcServer, cmd btcjson.Cmd, walletNotification chan []
 	c := cmd.(*btcjson.VerifyChainCmd)
 
 	err := verifyChain(s.server.db, c.CheckLevel, c.CheckDepth)
-	if err != nil {
-	}
-	return "", nil
+	return err == nil, nil
 }
 
 // parseCmd parses a marshaled known command, returning any errors as a
