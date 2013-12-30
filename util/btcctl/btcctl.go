@@ -168,7 +168,7 @@ func makeDumpPrivKey(args []interface{}) (btcjson.Cmd, error) {
 }
 
 // makeGetAccount generates the cmd structure for
-// getaddress commands.
+// getaccount commands.
 func makeGetAccount(args []interface{}) (btcjson.Cmd, error) {
 	return btcjson.NewGetAccountCmd("btcctl", args[0].(string))
 }
