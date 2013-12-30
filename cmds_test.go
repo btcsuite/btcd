@@ -90,6 +90,27 @@ var cmdtests = []struct {
 		},
 	},
 	{
+		name: "getunconfirmedbalance no optargs",
+		f: func() (btcjson.Cmd, error) {
+			return NewGetUnconfirmedBalanceCmd(float64(1))
+		},
+		result: &GetUnconfirmedBalanceCmd{
+			id:      float64(1),
+			Account: "",
+		},
+	},
+	{
+		name: "getunconfirmedbalance one optarg",
+		f: func() (btcjson.Cmd, error) {
+			return NewGetUnconfirmedBalanceCmd(float64(1),
+				"abcde")
+		},
+		result: &GetUnconfirmedBalanceCmd{
+			id:      float64(1),
+			Account: "abcde",
+		},
+	},
+	{
 		name: "listaddresstransactions no optargs",
 		f: func() (btcjson.Cmd, error) {
 			addrs := []string{

@@ -18,6 +18,7 @@ func init() {
 	btcjson.RegisterCustomCmd("getbalances", parseGetBalancesCmd)
 	btcjson.RegisterCustomCmd("getbestblock", parseGetBestBlockCmd)
 	btcjson.RegisterCustomCmd("getcurrentnet", parseGetCurrentNetCmd)
+	btcjson.RegisterCustomCmd("getunconfirmedbalance", parseGetUnconfirmedBalanceCmd)
 	btcjson.RegisterCustomCmd("listaddresstransactions", parseListAddressTransactionsCmd)
 	btcjson.RegisterCustomCmd("listalltransactions", parseListAllTransactionsCmd)
 	btcjson.RegisterCustomCmd("notifynewtxs", parseNotifyNewTXsCmd)
@@ -88,6 +89,108 @@ func (cmd *GetCurrentNetCmd) UnmarshalJSON(b []byte) error {
 	}
 
 	concreteCmd, ok := newCmd.(*GetCurrentNetCmd)
+	if !ok {
+		return btcjson.ErrInternal
+	}
+	*cmd = *concreteCmd
+	return nil
+}
+
+// GetUnconfirmedBalanceCmd is a type handling custom marshaling and
+// unmarshaling of getunconfirmedbalance JSON websocket extension
+// commands.
+type GetUnconfirmedBalanceCmd struct {
+	id      interface{}
+	Account string
+}
+
+// Enforce that GetUnconfirmedBalanceCmd satisifies the btcjson.Cmd
+// interface.
+var _ btcjson.Cmd = &GetUnconfirmedBalanceCmd{}
+
+// NewGetUnconfirmedBalanceCmd creates a new GetUnconfirmedBalanceCmd.
+func NewGetUnconfirmedBalanceCmd(id interface{},
+	optArgs ...string) (*GetUnconfirmedBalanceCmd, error) {
+
+	if len(optArgs) > 1 {
+		return nil, btcjson.ErrTooManyOptArgs
+	}
+
+	// Optional parameters set to their defaults.
+	account := ""
+
+	if len(optArgs) == 1 {
+		account = optArgs[0]
+	}
+
+	return &GetUnconfirmedBalanceCmd{
+		id:      id,
+		Account: account,
+	}, nil
+}
+
+// parseGetUnconfirmedBalanceCmd parses a RawCmd into a concrete type
+// satisifying the btcjson.Cmd interface.  This is used when registering
+// the custom command with the btcjson parser.
+func parseGetUnconfirmedBalanceCmd(r *btcjson.RawCmd) (btcjson.Cmd, error) {
+	if len(r.Params) > 1 {
+		return nil, btcjson.ErrWrongNumberOfParams
+	}
+
+	if len(r.Params) == 0 {
+		// No optional args.
+		return NewGetUnconfirmedBalanceCmd(r.Id)
+	}
+
+	// One optional parameter for account.
+	account, ok := r.Params[0].(string)
+	if !ok {
+		return nil, errors.New("first parameter account must be a string")
+	}
+	return NewGetUnconfirmedBalanceCmd(r.Id, account)
+}
+
+// Id satisifies the Cmd interface by returning the ID of the command.
+func (cmd *GetUnconfirmedBalanceCmd) Id() interface{} {
+	return cmd.id
+}
+
+// Method satisifies the Cmd interface by returning the RPC method.
+func (cmd *GetUnconfirmedBalanceCmd) Method() string {
+	return "getunconfirmedbalance"
+}
+
+// MarshalJSON returns the JSON encoding of cmd.  Part of the Cmd interface.
+func (cmd *GetUnconfirmedBalanceCmd) MarshalJSON() ([]byte, error) {
+	// Fill a RawCmd and marshal.
+	raw := btcjson.RawCmd{
+		Jsonrpc: "1.0",
+		Method:  "getunconfirmedbalance",
+		Id:      cmd.id,
+	}
+
+	if cmd.Account != "" {
+		raw.Params = append(raw.Params, cmd.Account)
+	}
+
+	return json.Marshal(raw)
+}
+
+// UnmarshalJSON unmarshals the JSON encoding of cmd into cmd.  Part of
+// the Cmd interface.
+func (cmd *GetUnconfirmedBalanceCmd) UnmarshalJSON(b []byte) error {
+	// Unmarshal into a RawCmd.
+	var r btcjson.RawCmd
+	if err := json.Unmarshal(b, &r); err != nil {
+		return err
+	}
+
+	newCmd, err := parseGetUnconfirmedBalanceCmd(&r)
+	if err != nil {
+		return err
+	}
+
+	concreteCmd, ok := newCmd.(*GetUnconfirmedBalanceCmd)
 	if !ok {
 		return btcjson.ErrInternal
 	}
