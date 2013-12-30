@@ -62,7 +62,7 @@ var commandHandlers = map[string]*handlerData{
 	"getrawtransaction":    &handlerData{1, 1, displayJSONDump, []conversionHandler{nil, toBool}, makeGetRawTransaction, "<txhash> [verbose=false]"},
 	"importprivkey":        &handlerData{1, 2, displayGeneric, []conversionHandler{nil, nil, toBool}, makeImportPrivKey, "<wifprivkey> [label] [rescan=true]"},
 	"listtransactions":     &handlerData{0, 3, displayJSONDump, []conversionHandler{nil, toInt, toInt}, makeListTransactions, "[account] [count=10] [from=0]"},
-	"verifychain":          &handlerData{0, 2, displayJSONDump, []conversionHandler{toInt, toInt}, makeVerifyChain, "[level] [depth]"},
+	"verifychain":          &handlerData{0, 2, displayJSONDump, []conversionHandler{toInt, toInt}, makeVerifyChain, "[level] [numblocks]"},
 	"stop":                 &handlerData{0, 0, displayGeneric, nil, makeStop, ""},
 }
 
@@ -302,6 +302,7 @@ func makeStop(args []interface{}) (btcjson.Cmd, error) {
 	return btcjson.NewStopCmd("btcctl")
 }
 
+// makeVerifyChain generates the cmd structure for verifychain comands.
 func makeVerifyChain(args []interface{}) (btcjson.Cmd, error) {
 	iargs := make([]int32, 0, 2)
 	for _, i := range args {
