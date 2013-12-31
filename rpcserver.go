@@ -35,7 +35,6 @@ import (
 	"net/http"
 	"os"
 	"strconv"
-	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -700,7 +699,7 @@ func handleDebugLevel(s *rpcServer, cmd btcjson.Cmd,
 
 // createVinList returns a slice of JSON objects for the inputs of the passed
 // transaction.
-func createVinList(mtx *btcwire.MsgTx) []btcjson.Vin {
+func createVinList(mtx *btcwire.MsgTx) ([]btcjson.Vin, *btcjson.Error) {
 	tx := btcutil.NewTx(mtx)
 	vinList := make([]btcjson.Vin, len(mtx.TxIn))
 	for i, v := range mtx.TxIn {
@@ -710,7 +709,13 @@ func createVinList(mtx *btcwire.MsgTx) []btcjson.Vin {
 			vinList[i].Txid = v.PreviousOutpoint.Hash.String()
 			vinList[i].Vout = int(v.PreviousOutpoint.Index)
 
-			disbuf, _ := btcscript.DisasmString(v.SignatureScript)
+			disbuf, err := btcscript.DisasmString(v.SignatureScript)
+			if err != nil {
+				return nil, &btcjson.Error{
+					Code:    btcjson.ErrInternal.Code,
+					Message: err.Error(),
+				}
+			}
 			vinList[i].ScriptSig = new(btcjson.ScriptSig)
 			vinList[i].ScriptSig.Asm = disbuf
 			vinList[i].ScriptSig.Hex = hex.EncodeToString(v.SignatureScript)
@@ -718,39 +723,51 @@ func createVinList(mtx *btcwire.MsgTx) []btcjson.Vin {
 		vinList[i].Sequence = v.Sequence
 	}
 
-	return vinList
+	return vinList, nil
 }
 
 // createVoutList returns a slice of JSON objects for the outputs of the passed
 // transaction.
-func createVoutList(mtx *btcwire.MsgTx, net btcwire.BitcoinNet) []btcjson.Vout {
+func createVoutList(mtx *btcwire.MsgTx, net btcwire.BitcoinNet) ([]btcjson.Vout, *btcjson.Error) {
 	voutList := make([]btcjson.Vout, len(mtx.TxOut))
 	for i, v := range mtx.TxOut {
 		voutList[i].N = i
 		voutList[i].Value = float64(v.Value) / float64(btcutil.SatoshiPerBitcoin)
 
+		disbuf, err := btcscript.DisasmString(v.PkScript)
+		if err != nil {
+			return nil, &btcjson.Error{
+				Code:    btcjson.ErrInternal.Code,
+				Message: err.Error(),
+			}
+		}
+		voutList[i].ScriptPubKey.Asm = disbuf
+		voutList[i].ScriptPubKey.Hex = hex.EncodeToString(v.PkScript)
+		voutList[i].ScriptPubKey.Type = btcscript.NonStandardTy.String()
+
+		scriptType := btcscript.GetScriptClass(v.PkScript)
+		if scriptType == btcscript.NonStandardTy || scriptType == btcscript.NullDataTy {
+			continue
+		}
 		_, addrhash, err := btcscript.ScriptToAddrHash(v.PkScript)
 		if err != nil {
 			txSha, _ := mtx.TxSha()
 			// TODO: set and return error?
-			rpcsLog.Errorf("Error getting address hash for %v: %v",
-				txSha, err)
+			rpcsLog.Errorf("Error getting address hash for %v: %v", txSha, err)
+			continue
 		}
 		if addr, err := btcutil.EncodeAddress(addrhash, net); err == nil {
 			// TODO: set and return error?
 			addrList := make([]string, 1)
 			addrList[0] = addr
+			voutList[i].ScriptPubKey.Type = scriptType.String()
 			voutList[i].ScriptPubKey.Addresses = addrList
+			// TODO: replace with proper multisig handling
+			voutList[i].ScriptPubKey.ReqSigs = 1
 		}
-
-		disbuf, _ := btcscript.DisasmString(v.PkScript)
-		voutList[i].ScriptPubKey.Asm = disbuf
-		voutList[i].ScriptPubKey.Hex = hex.EncodeToString(v.PkScript)
-		voutList[i].ScriptPubKey.ReqSigs = strings.Count(disbuf, "OP_CHECKSIG")
-		voutList[i].ScriptPubKey.Type = btcscript.GetScriptClass(v.PkScript).String()
 	}
 
-	return voutList
+	return voutList, nil
 }
 
 // handleDecodeRawTransaction handles decoderawtransaction commands.
@@ -781,13 +798,22 @@ func handleDecodeRawTransaction(s *rpcServer, cmd btcjson.Cmd,
 	}
 	txSha, _ := mtx.TxSha()
 
+	vin, err := createVinList(&mtx)
+	if err != nil {
+		return nil, err
+	}
+	vout, err := createVoutList(&mtx, s.server.btcnet)
+	if err != nil {
+		return nil, err
+	}
+
 	// Create and return the result.
 	txReply := btcjson.TxRawDecodeResult{
 		Txid:     txSha.String(),
 		Version:  mtx.Version,
 		Locktime: mtx.LockTime,
-		Vin:      createVinList(&mtx),
-		Vout:     createVoutList(&mtx, s.server.btcnet),
+		Vin:      vin,
+		Vout:     vout,
 	}
 	return txReply, nil
 }
@@ -1107,11 +1133,20 @@ func createTxRawResult(net btcwire.BitcoinNet, txSha string, mtx *btcwire.MsgTx,
 		return nil, err
 	}
 
+	vin, err := createVinList(mtx)
+	if err != nil {
+		return nil, err
+	}
+	vout, err := createVoutList(mtx, net)
+	if err != nil {
+		return nil, err
+	}
+
 	txReply := &btcjson.TxRawResult{
 		Hex:      mtxHex,
 		Txid:     txSha,
-		Vout:     createVoutList(mtx, net),
-		Vin:      createVinList(mtx),
+		Vout:     vout,
+		Vin:      vin,
 		Version:  mtx.Version,
 		LockTime: mtx.LockTime,
 	}
