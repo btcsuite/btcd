@@ -328,7 +328,7 @@ func jsonRPCRead(w http.ResponseWriter, r *http.Request, s *rpcServer) {
 	if jsonErr != nil {
 		reply.Error = jsonErr
 	} else {
-		reply = standardCmdReply(cmd, s, nil)
+		reply = standardCmdReply(cmd, s)
 	}
 
 	rpcsLog.Tracef("reply: %v", reply)
@@ -341,9 +341,9 @@ func jsonRPCRead(w http.ResponseWriter, r *http.Request, s *rpcServer) {
 	rpcsLog.Debugf(msg)
 }
 
-// TODO(jrick): Remove the wallet notification chan.
-type commandHandler func(*rpcServer, btcjson.Cmd, chan []byte) (interface{}, error)
+type commandHandler func(*rpcServer, btcjson.Cmd) (interface{}, error)
 
+// handlers maps RPC command strings to appropriate handler functions.
 var handlers = map[string]commandHandler{
 	"addmultisigaddress":     handleAskWallet,
 	"addnode":                handleAddNode,
@@ -421,22 +421,19 @@ var handlers = map[string]commandHandler{
 
 // handleUnimplemented is a temporary handler for commands that we should
 // support but do not.
-func handleUnimplemented(s *rpcServer, cmd btcjson.Cmd,
-	walletNotification chan []byte) (interface{}, error) {
+func handleUnimplemented(s *rpcServer, cmd btcjson.Cmd) (interface{}, error) {
 	return nil, btcjson.ErrUnimplemented
 }
 
 // handleAskWallet is the handler for commands that we do recognise as valid
 // but that we can not answer correctly since it involves wallet state.
 // These commands will be implemented in btcwallet.
-func handleAskWallet(s *rpcServer, cmd btcjson.Cmd,
-	walletNotification chan []byte) (interface{}, error) {
+func handleAskWallet(s *rpcServer, cmd btcjson.Cmd) (interface{}, error) {
 	return nil, btcjson.ErrNoWallet
 }
 
 // handleAddNode handles addnode commands.
-func handleAddNode(s *rpcServer, cmd btcjson.Cmd,
-	walletNotification chan []byte) (interface{}, error) {
+func handleAddNode(s *rpcServer, cmd btcjson.Cmd) (interface{}, error) {
 	c := cmd.(*btcjson.AddNodeCmd)
 
 	addr := normalizeAddress(c.Addr, activeNetParams.peerPort)
@@ -464,8 +461,7 @@ func handleAddNode(s *rpcServer, cmd btcjson.Cmd,
 }
 
 // handleDebugLevel handles debuglevel commands.
-func handleDebugLevel(s *rpcServer, cmd btcjson.Cmd,
-	walletNotification chan []byte) (interface{}, error) {
+func handleDebugLevel(s *rpcServer, cmd btcjson.Cmd) (interface{}, error) {
 	c := cmd.(*btcjson.DebugLevelCmd)
 
 	// Special show command to list supported subsystems.
@@ -559,8 +555,7 @@ func createVoutList(mtx *btcwire.MsgTx, net btcwire.BitcoinNet) ([]btcjson.Vout,
 }
 
 // handleDecodeRawTransaction handles decoderawtransaction commands.
-func handleDecodeRawTransaction(s *rpcServer, cmd btcjson.Cmd,
-	walletNotification chan []byte) (interface{}, error) {
+func handleDecodeRawTransaction(s *rpcServer, cmd btcjson.Cmd) (interface{}, error) {
 	c := cmd.(*btcjson.DecodeRawTransactionCmd)
 
 	// Deserialize the transaction.
@@ -607,9 +602,7 @@ func handleDecodeRawTransaction(s *rpcServer, cmd btcjson.Cmd,
 }
 
 // handleGetBestBlockHash implements the getbestblockhash command.
-func handleGetBestBlockHash(s *rpcServer, cmd btcjson.Cmd,
-	walletNotification chan []byte) (interface{}, error) {
-	var sha *btcwire.ShaHash
+func handleGetBestBlockHash(s *rpcServer, cmd btcjson.Cmd) (interface{}, error) {
 	sha, _, err := s.server.db.NewestSha()
 	if err != nil {
 		rpcsLog.Errorf("Error getting newest sha: %v", err)
@@ -634,8 +627,7 @@ func messageToHex(msg btcwire.Message) (string, error) {
 }
 
 // handleGetBlock implements the getblock command.
-func handleGetBlock(s *rpcServer, cmd btcjson.Cmd,
-	walletNotification chan []byte) (interface{}, error) {
+func handleGetBlock(s *rpcServer, cmd btcjson.Cmd) (interface{}, error) {
 	c := cmd.(*btcjson.GetBlockCmd)
 	sha, err := btcwire.NewShaHashFromStr(c.Hash)
 	if err != nil {
@@ -732,8 +724,7 @@ func handleGetBlock(s *rpcServer, cmd btcjson.Cmd,
 }
 
 // handleGetBlockCount implements the getblockcount command.
-func handleGetBlockCount(s *rpcServer, cmd btcjson.Cmd,
-	walletNotification chan []byte) (interface{}, error) {
+func handleGetBlockCount(s *rpcServer, cmd btcjson.Cmd) (interface{}, error) {
 	_, maxidx, err := s.server.db.NewestSha()
 	if err != nil {
 		rpcsLog.Errorf("Error getting newest sha: %v", err)
@@ -744,8 +735,7 @@ func handleGetBlockCount(s *rpcServer, cmd btcjson.Cmd,
 }
 
 // handleGetBlockHash implements the getblockhash command.
-func handleGetBlockHash(s *rpcServer, cmd btcjson.Cmd,
-	walletNotification chan []byte) (interface{}, error) {
+func handleGetBlockHash(s *rpcServer, cmd btcjson.Cmd) (interface{}, error) {
 	c := cmd.(*btcjson.GetBlockHashCmd)
 	sha, err := s.server.db.FetchBlockShaByHeight(c.Index)
 	if err != nil {
@@ -757,14 +747,12 @@ func handleGetBlockHash(s *rpcServer, cmd btcjson.Cmd,
 }
 
 // handleGetConnectionCount implements the getconnectioncount command.
-func handleGetConnectionCount(s *rpcServer, cmd btcjson.Cmd,
-	walletNotification chan []byte) (interface{}, error) {
+func handleGetConnectionCount(s *rpcServer, cmd btcjson.Cmd) (interface{}, error) {
 	return s.server.ConnectedCount(), nil
 }
 
 // handleGetDifficulty implements the getdifficulty command.
-func handleGetDifficulty(s *rpcServer, cmd btcjson.Cmd,
-	walletNotification chan []byte) (interface{}, error) {
+func handleGetDifficulty(s *rpcServer, cmd btcjson.Cmd) (interface{}, error) {
 	sha, _, err := s.server.db.NewestSha()
 	if err != nil {
 		rpcsLog.Errorf("Error getting sha: %v", err)
@@ -781,21 +769,19 @@ func handleGetDifficulty(s *rpcServer, cmd btcjson.Cmd,
 }
 
 // handleGetGenerate implements the getgenerate command.
-func handleGetGenerate(s *rpcServer, cmd btcjson.Cmd,
-	walletNotification chan []byte) (interface{}, error) {
+func handleGetGenerate(s *rpcServer, cmd btcjson.Cmd) (interface{}, error) {
 	// btcd does not do mining so we can hardcode replies here.
 	return false, nil
 }
 
 // handleGetHashesPerSec implements the gethashespersec command.
-func handleGetHashesPerSec(s *rpcServer, cmd btcjson.Cmd,
-	walletNotification chan []byte) (interface{}, error) {
+func handleGetHashesPerSec(s *rpcServer, cmd btcjson.Cmd) (interface{}, error) {
 	// btcd does not do mining so we can hardcode replies here.
 	return 0, nil
 }
 
 // handleGetPeerInfo implements the getpeerinfo command.
-func handleGetPeerInfo(s *rpcServer, cmd btcjson.Cmd, walletNotification chan []byte) (interface{}, error) {
+func handleGetPeerInfo(s *rpcServer, cmd btcjson.Cmd) (interface{}, error) {
 	return s.server.PeerInfo(), nil
 }
 
@@ -813,7 +799,7 @@ type mempoolDescriptor struct {
 }
 
 // handleGetRawMempool implements the getrawmempool command.
-func handleGetRawMempool(s *rpcServer, cmd btcjson.Cmd, walletNotification chan []byte) (interface{}, error) {
+func handleGetRawMempool(s *rpcServer, cmd btcjson.Cmd) (interface{}, error) {
 	c := cmd.(*btcjson.GetRawMempoolCmd)
 	descs := s.server.txMemPool.TxDescs()
 
@@ -854,7 +840,7 @@ func handleGetRawMempool(s *rpcServer, cmd btcjson.Cmd, walletNotification chan 
 }
 
 // handleGetRawTransaction implements the getrawtransaction command.
-func handleGetRawTransaction(s *rpcServer, cmd btcjson.Cmd, walletNotification chan []byte) (interface{}, error) {
+func handleGetRawTransaction(s *rpcServer, cmd btcjson.Cmd) (interface{}, error) {
 	c := cmd.(*btcjson.GetRawTransactionCmd)
 
 	// Convert the provided transaction hash hex to a ShaHash.
@@ -962,7 +948,7 @@ func createTxRawResult(net btcwire.BitcoinNet, txSha string, mtx *btcwire.MsgTx,
 }
 
 // handleSendRawTransaction implements the sendrawtransaction command.
-func handleSendRawTransaction(s *rpcServer, cmd btcjson.Cmd, walletNotification chan []byte) (interface{}, error) {
+func handleSendRawTransaction(s *rpcServer, cmd btcjson.Cmd) (interface{}, error) {
 	c := cmd.(*btcjson.SendRawTransactionCmd)
 	// Deserialize and send off to tx relay
 	serializedTx, err := hex.DecodeString(c.HexTx)
@@ -1000,23 +986,17 @@ func handleSendRawTransaction(s *rpcServer, cmd btcjson.Cmd, walletNotification 
 		}
 	}
 
-	// If called from websocket code, add a mined tx hashes
-	// request.
-	if walletNotification != nil {
-		s.ws.AddMinedTxRequest(walletNotification, tx.Sha())
-	}
-
 	return tx.Sha().String(), nil
 }
 
 // handleSetGenerate implements the setgenerate command.
-func handleSetGenerate(s *rpcServer, cmd btcjson.Cmd, walletNotification chan []byte) (interface{}, error) {
+func handleSetGenerate(s *rpcServer, cmd btcjson.Cmd) (interface{}, error) {
 	// btcd does not do mining so we can hardcode replies here.
 	return nil, nil
 }
 
 // handleStop implements the stop command.
-func handleStop(s *rpcServer, cmd btcjson.Cmd, walletNotification chan []byte) (interface{}, error) {
+func handleStop(s *rpcServer, cmd btcjson.Cmd) (interface{}, error) {
 	s.server.Stop()
 	return "btcd stopping.", nil
 }
@@ -1067,7 +1047,7 @@ func verifyChain(db btcdb.Db, level, depth int32) error {
 	return nil
 }
 
-func handleVerifyChain(s *rpcServer, cmd btcjson.Cmd, walletNotification chan []byte) (interface{}, error) {
+func handleVerifyChain(s *rpcServer, cmd btcjson.Cmd) (interface{}, error) {
 	c := cmd.(*btcjson.VerifyChainCmd)
 
 	err := verifyChain(s.server.db, c.CheckLevel, c.CheckDepth)
@@ -1095,9 +1075,7 @@ func parseCmd(b []byte) (btcjson.Cmd, *btcjson.Error) {
 // standardCmdReply checks that a parsed command is a standard
 // Bitcoin JSON-RPC command and runs the proper handler to reply to the
 // command.
-func standardCmdReply(cmd btcjson.Cmd, s *rpcServer,
-	walletNotification chan []byte) (reply btcjson.Reply) {
-
+func standardCmdReply(cmd btcjson.Cmd, s *rpcServer) (reply btcjson.Reply) {
 	id := cmd.Id()
 	reply.Id = &id
 
@@ -1107,7 +1085,7 @@ func standardCmdReply(cmd btcjson.Cmd, s *rpcServer,
 		return reply
 	}
 
-	result, err := handler(s, cmd, walletNotification)
+	result, err := handler(s, cmd)
 	if err != nil {
 		jsonErr, ok := err.(btcjson.Error)
 		if !ok {

@@ -228,11 +228,12 @@ type requestContexts struct {
 type wsCommandHandler func(*rpcServer, btcjson.Cmd, chan []byte, *requestContexts) error
 
 var wsHandlers = map[string]wsCommandHandler{
-	"getcurrentnet": handleGetCurrentNet,
-	"getbestblock":  handleGetBestBlock,
-	"rescan":        handleRescan,
-	"notifynewtxs":  handleNotifyNewTXs,
-	"notifyspent":   handleNotifySpent,
+	"getcurrentnet":       handleGetCurrentNet,
+	"getbestblock":        handleGetBestBlock,
+	"notifynewtxs":        handleNotifyNewTXs,
+	"notifyspent":         handleNotifySpent,
+	"rescan":              handleRescan,
+	"sendrawtransaction:": handleWalletSendRawTransaction,
 }
 
 // respondToAnyCmd checks that a parsed command is a standard or
@@ -242,22 +243,20 @@ var wsHandlers = map[string]wsCommandHandler{
 func respondToAnyCmd(cmd btcjson.Cmd, s *rpcServer,
 	walletNotification chan []byte, rc *requestContexts) {
 
-	reply := standardCmdReply(cmd, s, walletNotification)
-	if reply.Error != &btcjson.ErrMethodNotFound {
-		mreply, _ := json.Marshal(reply)
-		walletNotification <- mreply
-		return
-	}
-
+	// Lookup the websocket extension for the command and if it doesn't
+	// exist fallback to handling the command as a standard command.
 	wsHandler, ok := wsHandlers[cmd.Method()]
 	if !ok {
-		reply.Error = &btcjson.ErrMethodNotFound
+		reply := standardCmdReply(cmd, s)
 		mreply, _ := json.Marshal(reply)
 		walletNotification <- mreply
 		return
 	}
 
+	// Call the appropriate handler which responds unless there was an
+	// error in which case the error is marshalled and sent here.
 	if err := wsHandler(s, cmd, walletNotification, rc); err != nil {
+		var reply btcjson.Reply
 		jsonErr, ok := err.(btcjson.Error)
 		if ok {
 			reply.Error = &jsonErr
@@ -320,6 +319,54 @@ func handleGetBestBlock(s *rpcServer, cmd btcjson.Cmd,
 		"hash":   sha.String(),
 		"height": height,
 	}
+	mreply, _ := json.Marshal(reply)
+	walletNotification <- mreply
+	return nil
+}
+
+// handleNotifyNewTXs implements the notifynewtxs command extension for
+// websocket connections.
+func handleNotifyNewTXs(s *rpcServer, cmd btcjson.Cmd,
+	walletNotification chan []byte, rc *requestContexts) error {
+
+	id := cmd.Id()
+	reply := &btcjson.Reply{Id: &id}
+
+	notifyCmd, ok := cmd.(*btcws.NotifyNewTXsCmd)
+	if !ok {
+		return btcjson.ErrInternal
+	}
+
+	for _, addr := range notifyCmd.Addresses {
+		hash, _, err := btcutil.DecodeAddress(addr)
+		if err != nil {
+			return fmt.Errorf("cannot decode address: %v", err)
+		}
+		s.ws.AddTxRequest(walletNotification, rc, string(hash),
+			cmd.Id())
+	}
+
+	mreply, _ := json.Marshal(reply)
+	walletNotification <- mreply
+	return nil
+}
+
+// handleNotifySpent implements the notifyspent command extension for
+// websocket connections.
+func handleNotifySpent(s *rpcServer, cmd btcjson.Cmd,
+	walletNotification chan []byte, rc *requestContexts) error {
+
+	id := cmd.Id()
+	reply := &btcjson.Reply{Id: &id}
+
+	notifyCmd, ok := cmd.(*btcws.NotifySpentCmd)
+	if !ok {
+		return btcjson.ErrInternal
+	}
+
+	s.ws.AddSpentRequest(walletNotification, rc, notifyCmd.OutPoint,
+		cmd.Id())
+
 	mreply, _ := json.Marshal(reply)
 	walletNotification <- mreply
 	return nil
@@ -444,51 +491,22 @@ func handleRescan(s *rpcServer, cmd btcjson.Cmd,
 	return nil
 }
 
-// handleNotifyNewTXs implements the notifynewtxs command extension for
-// websocket connections.
-func handleNotifyNewTXs(s *rpcServer, cmd btcjson.Cmd,
+// handleWalletSendRawTransaction implements the websocket extended version of
+// the sendrawtransaction command.
+func handleWalletSendRawTransaction(s *rpcServer, cmd btcjson.Cmd,
 	walletNotification chan []byte, rc *requestContexts) error {
 
-	id := cmd.Id()
-	reply := &btcjson.Reply{Id: &id}
-
-	notifyCmd, ok := cmd.(*btcws.NotifyNewTXsCmd)
-	if !ok {
-		return btcjson.ErrInternal
+	result, err := handleSendRawTransaction(s, cmd)
+	if err != nil {
+		return err
 	}
 
-	for _, addr := range notifyCmd.Addresses {
-		hash, _, err := btcutil.DecodeAddress(addr)
-		if err != nil {
-			return fmt.Errorf("cannot decode address: %v", err)
-		}
-		s.ws.AddTxRequest(walletNotification, rc, string(hash),
-			cmd.Id())
-	}
+	// The result is already guaranteed to be a valid hash string if no
+	// error was returned above, so it's safe to ignore the error here.
+	txSha, _ := btcwire.NewShaHashFromStr(result.(string))
 
-	mreply, _ := json.Marshal(reply)
-	walletNotification <- mreply
-	return nil
-}
-
-// handleNotifySpent implements the notifyspent command extension for
-// websocket connections.
-func handleNotifySpent(s *rpcServer, cmd btcjson.Cmd,
-	walletNotification chan []byte, rc *requestContexts) error {
-
-	id := cmd.Id()
-	reply := &btcjson.Reply{Id: &id}
-
-	notifyCmd, ok := cmd.(*btcws.NotifySpentCmd)
-	if !ok {
-		return btcjson.ErrInternal
-	}
-
-	s.ws.AddSpentRequest(walletNotification, rc, notifyCmd.OutPoint,
-		cmd.Id())
-
-	mreply, _ := json.Marshal(reply)
-	walletNotification <- mreply
+	// Request to be notified when the transaction is mined.
+	s.ws.AddMinedTxRequest(walletNotification, txSha)
 	return nil
 }
 
