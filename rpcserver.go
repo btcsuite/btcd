@@ -48,7 +48,7 @@ var (
 type commandHandler func(*rpcServer, btcjson.Cmd) (interface{}, error)
 
 // handlers maps RPC command strings to appropriate handler functions.
-var handlers = map[string]commandHandler{
+var rpcHandlers = map[string]commandHandler{
 	"addmultisigaddress":     handleAskWallet,
 	"addnode":                handleAddNode,
 	"backupwallet":           handleAskWallet,
@@ -382,8 +382,8 @@ func jsonAuthFail(w http.ResponseWriter, r *http.Request, s *rpcServer) {
 	fmt.Fprint(w, "401 Unauthorized.\n")
 }
 
-// jsonRPCRead is the RPC wrapper around the jsonRead function to handles
-// reading and responding to RPC messages.
+// jsonRPCRead is the RPC wrapper around the jsonRead function to handle reading
+// and responding to RPC messages.
 func jsonRPCRead(w http.ResponseWriter, r *http.Request, s *rpcServer) {
 	r.Close = true
 	if atomic.LoadInt32(&s.shutdown) != 0 {
@@ -1079,7 +1079,7 @@ func standardCmdReply(cmd btcjson.Cmd, s *rpcServer) (reply btcjson.Reply) {
 	id := cmd.Id()
 	reply.Id = &id
 
-	handler, ok := handlers[cmd.Method()]
+	handler, ok := rpcHandlers[cmd.Method()]
 	if !ok {
 		reply.Error = &btcjson.ErrMethodNotFound
 		return reply
