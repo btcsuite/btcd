@@ -83,7 +83,7 @@ type TxRawResult struct {
 type TxRawDecodeResult struct {
 	Txid     string `json:"txid"`
 	Version  uint32 `json:"version"`
-	Locktime int    `json:"locktime"`
+	Locktime uint32 `json:"locktime"`
 	Vin      []Vin  `json:"vin"`
 	Vout     []Vout `json:"vout"`
 }
