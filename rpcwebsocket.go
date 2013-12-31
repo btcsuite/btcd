@@ -19,6 +19,19 @@ import (
 	"sync"
 )
 
+type wsCommandHandler func(*rpcServer, btcjson.Cmd, chan []byte, *requestContexts) error
+
+// wsHandlers maps RPC command strings to appropriate websocket handler
+// functions.
+var wsHandlers = map[string]wsCommandHandler{
+	"getcurrentnet":       handleGetCurrentNet,
+	"getbestblock":        handleGetBestBlock,
+	"notifynewtxs":        handleNotifyNewTXs,
+	"notifyspent":         handleNotifySpent,
+	"rescan":              handleRescan,
+	"sendrawtransaction:": handleWalletSendRawTransaction,
+}
+
 // wsContext holds the items the RPC server needs to handle websocket
 // connections for wallets.
 type wsContext struct {
@@ -223,17 +236,6 @@ type requestContexts struct {
 	// block, wallet may remove the raw transaction from its unmined tx
 	// pool.
 	minedTxRequests map[btcwire.ShaHash]bool
-}
-
-type wsCommandHandler func(*rpcServer, btcjson.Cmd, chan []byte, *requestContexts) error
-
-var wsHandlers = map[string]wsCommandHandler{
-	"getcurrentnet":       handleGetCurrentNet,
-	"getbestblock":        handleGetBestBlock,
-	"notifynewtxs":        handleNotifyNewTXs,
-	"notifyspent":         handleNotifySpent,
-	"rescan":              handleRescan,
-	"sendrawtransaction:": handleWalletSendRawTransaction,
 }
 
 // respondToAnyCmd checks that a parsed command is a standard or
