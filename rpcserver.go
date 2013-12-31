@@ -699,7 +699,7 @@ func handleDebugLevel(s *rpcServer, cmd btcjson.Cmd,
 
 // createVinList returns a slice of JSON objects for the inputs of the passed
 // transaction.
-func createVinList(mtx *btcwire.MsgTx) ([]btcjson.Vin, *btcjson.Error) {
+func createVinList(mtx *btcwire.MsgTx) ([]btcjson.Vin, error) {
 	tx := btcutil.NewTx(mtx)
 	vinList := make([]btcjson.Vin, len(mtx.TxIn))
 	for i, v := range mtx.TxIn {
@@ -711,7 +711,7 @@ func createVinList(mtx *btcwire.MsgTx) ([]btcjson.Vin, *btcjson.Error) {
 
 			disbuf, err := btcscript.DisasmString(v.SignatureScript)
 			if err != nil {
-				return nil, &btcjson.Error{
+				return nil, btcjson.Error{
 					Code:    btcjson.ErrInternal.Code,
 					Message: err.Error(),
 				}
@@ -728,7 +728,7 @@ func createVinList(mtx *btcwire.MsgTx) ([]btcjson.Vin, *btcjson.Error) {
 
 // createVoutList returns a slice of JSON objects for the outputs of the passed
 // transaction.
-func createVoutList(mtx *btcwire.MsgTx, net btcwire.BitcoinNet) ([]btcjson.Vout, *btcjson.Error) {
+func createVoutList(mtx *btcwire.MsgTx, net btcwire.BitcoinNet) ([]btcjson.Vout, error) {
 	voutList := make([]btcjson.Vout, len(mtx.TxOut))
 	for i, v := range mtx.TxOut {
 		voutList[i].N = i
@@ -736,7 +736,7 @@ func createVoutList(mtx *btcwire.MsgTx, net btcwire.BitcoinNet) ([]btcjson.Vout,
 
 		disbuf, err := btcscript.DisasmString(v.PkScript)
 		if err != nil {
-			return nil, &btcjson.Error{
+			return nil, btcjson.Error{
 				Code:    btcjson.ErrInternal.Code,
 				Message: err.Error(),
 			}
@@ -832,11 +832,11 @@ func handleGetBestBlockHash(s *rpcServer, cmd btcjson.Cmd, walletNotification ch
 
 // messageToHex serializes a message to the wire protocol encoding using the
 // latest protocol version and returns a hex-encoded string of the result.
-func messageToHex(msg btcwire.Message) (string, *btcjson.Error) {
+func messageToHex(msg btcwire.Message) (string, error) {
 	var buf bytes.Buffer
 	err := msg.BtcEncode(&buf, btcwire.ProtocolVersion)
 	if err != nil {
-		return "", &btcjson.Error{
+		return "", btcjson.Error{
 			Code:    btcjson.ErrInternal.Code,
 			Message: err.Error(),
 		}
@@ -1120,14 +1120,14 @@ func handleGetRawTransaction(s *rpcServer, cmd btcjson.Cmd, walletNotification c
 	rawTxn, jsonErr := createTxRawResult(s.server.btcnet, c.Txid, mtx, blk, maxidx, blksha)
 	if err != nil {
 		rpcsLog.Errorf("Cannot create TxRawResult for txSha=%s: %v", txSha, err)
-		return nil, *jsonErr
+		return nil, jsonErr
 	}
 	return *rawTxn, nil
 }
 
 // createTxRawResult converts the passed transaction and associated parameters
 // to a raw transaction JSON object.
-func createTxRawResult(net btcwire.BitcoinNet, txSha string, mtx *btcwire.MsgTx, blk *btcutil.Block, maxidx int64, blksha *btcwire.ShaHash) (*btcjson.TxRawResult, *btcjson.Error) {
+func createTxRawResult(net btcwire.BitcoinNet, txSha string, mtx *btcwire.MsgTx, blk *btcutil.Block, maxidx int64, blksha *btcwire.ShaHash) (*btcjson.TxRawResult, error) {
 	mtxHex, err := messageToHex(mtx)
 	if err != nil {
 		return nil, err
