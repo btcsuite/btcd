@@ -49,6 +49,7 @@ var commandHandlers = map[string]*handlerData{
 	"decoderawtransaction": &handlerData{1, 0, displayJSONDump, nil, makeDecodeRawTransaction, "<txhash>"},
 	"dumpprivkey":          &handlerData{1, 0, displayGeneric, nil, makeDumpPrivKey, "<bitcoinaddress>"},
 	"getaccount":           &handlerData{1, 0, displayGeneric, nil, makeGetAccount, "<address>"},
+	"getaccountaddress":    &handlerData{1, 0, displayGeneric, nil, makeGetAccountAddress, "<account>"},
 	"getbalance":           &handlerData{0, 2, displayGeneric, []conversionHandler{nil, toInt}, makeGetBalance, "[account] [minconf=1]"},
 	"getbestblockhash":     &handlerData{0, 0, displayGeneric, nil, makeGetBestBlockHash, ""},
 	"getblock":             &handlerData{1, 2, displayJSONDump, []conversionHandler{nil, toBool, toBool}, makeGetBlock, "<blockhash>"},
@@ -171,6 +172,12 @@ func makeDumpPrivKey(args []interface{}) (btcjson.Cmd, error) {
 // getaccount commands.
 func makeGetAccount(args []interface{}) (btcjson.Cmd, error) {
 	return btcjson.NewGetAccountCmd("btcctl", args[0].(string))
+}
+
+// makeGetAccountAddress generates the cmd structure for
+// getaccountaddress commands.
+func makeGetAccountAddress(args []interface{}) (btcjson.Cmd, error) {
+	return btcjson.NewGetAccountAddressCmd("btcctl", args[0].(string))
 }
 
 // makeGetBalance generates the cmd structure for
