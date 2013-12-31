@@ -99,11 +99,41 @@ type ScriptSig struct {
 // Vin models parts of the tx data.  It is defined seperately since both
 // getrawtransaction and decoderawtransaction use the same structure.
 type Vin struct {
-	Coinbase  string     `json:"coinbase,omitempty"`
-	Txid      string     `json:"txid,omitempty"`
-	Vout      int        `json:"vout,omitempty"`
-	ScriptSig *ScriptSig `json:"scriptSig,omitempty"`
+	Coinbase  string     `json:"coinbase"`
+	Txid      string     `json:"txid"`
+	Vout      int        `json:"vout"`
+	ScriptSig *ScriptSig `json:"scriptSig"`
 	Sequence  uint32     `json:"sequence"`
+}
+
+func (v *Vin) IsCoinBase() bool {
+	return len(v.Coinbase) > 0
+}
+
+func (v *Vin) MarshalJSON() ([]byte, error) {
+	if v.IsCoinBase() {
+		coinbaseStruct := struct {
+			Coinbase string `json:"coinbase"`
+			Sequence uint32 `json:"sequence"`
+		}{
+			Coinbase: v.Coinbase,
+			Sequence: v.Sequence,
+		}
+		return json.Marshal(coinbaseStruct)
+	}
+
+	txStruct := struct {
+		Txid      string     `json:"txid"`
+		Vout      int        `json:"vout"`
+		ScriptSig *ScriptSig `json:"scriptSig"`
+		Sequence  uint32     `json:"sequence"`
+	}{
+		Txid:      v.Txid,
+		Vout:      v.Vout,
+		ScriptSig: v.ScriptSig,
+		Sequence:  v.Sequence,
+	}
+	return json.Marshal(txStruct)
 }
 
 // Vout models parts of the tx data.  It is defined seperately since both
@@ -114,9 +144,9 @@ type Vout struct {
 	ScriptPubKey struct {
 		Asm       string   `json:"asm"`
 		Hex       string   `json:"hex"`
-		ReqSigs   int      `json:"reqSigs"`
+		ReqSigs   int      `json:"reqSigs,omitempty"`
 		Type      string   `json:"type"`
-		Addresses []string `json:"addresses"`
+		Addresses []string `json:"addresses,omitempty"`
 	} `json:"scriptPubKey"`
 }
 
