@@ -653,7 +653,7 @@ func handleAskWallet(s *rpcServer, cmd btcjson.Cmd,
 	return nil, btcjson.ErrNoWallet
 }
 
-// handleDecodeRawTransaction handles decoderawtransaction commands.
+// handleAddNode handles addnode commands.
 func handleAddNode(s *rpcServer, cmd btcjson.Cmd,
 	walletNotification chan []byte) (interface{}, error) {
 	c := cmd.(*btcjson.AddNodeCmd)
@@ -698,11 +698,98 @@ func handleDebugLevel(s *rpcServer, cmd btcjson.Cmd,
 	return "Done.", nil
 }
 
+// createVinList returns a slice of JSON objects for the inputs of the passed
+// transaction.
+func createVinList(mtx *btcwire.MsgTx) []btcjson.Vin {
+	tx := btcutil.NewTx(mtx)
+	vinList := make([]btcjson.Vin, len(mtx.TxIn))
+	for i, v := range mtx.TxIn {
+		if btcchain.IsCoinBase(tx) {
+			vinList[i].Coinbase = hex.EncodeToString(v.SignatureScript)
+		} else {
+			vinList[i].Txid = v.PreviousOutpoint.Hash.String()
+			vinList[i].Vout = int(v.PreviousOutpoint.Index)
+
+			disbuf, _ := btcscript.DisasmString(v.SignatureScript)
+			vinList[i].ScriptSig = new(btcjson.ScriptSig)
+			vinList[i].ScriptSig.Asm = disbuf
+			vinList[i].ScriptSig.Hex = hex.EncodeToString(v.SignatureScript)
+		}
+		vinList[i].Sequence = v.Sequence
+	}
+
+	return vinList
+}
+
+// createVoutList returns a slice of JSON objects for the outputs of the passed
+// transaction.
+func createVoutList(mtx *btcwire.MsgTx, net btcwire.BitcoinNet) []btcjson.Vout {
+	voutList := make([]btcjson.Vout, len(mtx.TxOut))
+	for i, v := range mtx.TxOut {
+		voutList[i].N = i
+		voutList[i].Value = float64(v.Value) / float64(btcutil.SatoshiPerBitcoin)
+
+		_, addrhash, err := btcscript.ScriptToAddrHash(v.PkScript)
+		if err != nil {
+			txSha, _ := mtx.TxSha()
+			// TODO: set and return error?
+			rpcsLog.Errorf("Error getting address hash for %v: %v",
+				txSha, err)
+		}
+		if addr, err := btcutil.EncodeAddress(addrhash, net); err == nil {
+			// TODO: set and return error?
+			addrList := make([]string, 1)
+			addrList[0] = addr
+			voutList[i].ScriptPubKey.Addresses = addrList
+		}
+
+		disbuf, _ := btcscript.DisasmString(v.PkScript)
+		voutList[i].ScriptPubKey.Asm = disbuf
+		voutList[i].ScriptPubKey.Hex = hex.EncodeToString(v.PkScript)
+		voutList[i].ScriptPubKey.ReqSigs = strings.Count(disbuf, "OP_CHECKSIG")
+		voutList[i].ScriptPubKey.Type = btcscript.GetScriptClass(v.PkScript).String()
+	}
+
+	return voutList
+}
+
 // handleDecodeRawTransaction handles decoderawtransaction commands.
 func handleDecodeRawTransaction(s *rpcServer, cmd btcjson.Cmd,
 	walletNotification chan []byte) (interface{}, error) {
-	// TODO: use c.HexTx and fill result with info.
-	return btcjson.TxRawDecodeResult{}, nil
+	c := cmd.(*btcjson.DecodeRawTransactionCmd)
+
+	// Deserialize the transaction.
+	hexStr := c.HexTx
+	if len(hexStr)%2 != 0 {
+		hexStr = "0" + hexStr
+	}
+	serializedTx, err := hex.DecodeString(hexStr)
+	if err != nil {
+		return nil, btcjson.Error{
+			Code: btcjson.ErrInvalidParameter.Code,
+			Message: fmt.Sprintf("argument must be hexadecimal "+
+				"string (not %q)", hexStr),
+		}
+	}
+	var mtx btcwire.MsgTx
+	err = mtx.Deserialize(bytes.NewBuffer(serializedTx))
+	if err != nil {
+		return nil, btcjson.Error{
+			Code:    btcjson.ErrDeserialization.Code,
+			Message: "TX decode failed",
+		}
+	}
+	txSha, _ := mtx.TxSha()
+
+	// Create and return the result.
+	txReply := btcjson.TxRawDecodeResult{
+		Txid:     txSha.String(),
+		Version:  mtx.Version,
+		Locktime: mtx.LockTime,
+		Vin:      createVinList(&mtx),
+		Vout:     createVoutList(&mtx, s.server.btcnet),
+	}
+	return txReply, nil
 }
 
 // handleGetBestBlockHash implements the getbestblockhash command.
@@ -1015,57 +1102,16 @@ func handleGetRawTransaction(s *rpcServer, cmd btcjson.Cmd, walletNotification c
 // createTxRawResult converts the passed transaction and associated parameters
 // to a raw transaction JSON object.
 func createTxRawResult(net btcwire.BitcoinNet, txSha string, mtx *btcwire.MsgTx, blk *btcutil.Block, maxidx int64, blksha *btcwire.ShaHash) (*btcjson.TxRawResult, *btcjson.Error) {
-	tx := btcutil.NewTx(mtx)
 	mtxHex, err := messageToHex(mtx)
 	if err != nil {
 		return nil, err
 	}
 
-	vinList := make([]btcjson.Vin, len(mtx.TxIn))
-	for i, v := range mtx.TxIn {
-		if btcchain.IsCoinBase(tx) {
-			vinList[i].Coinbase = hex.EncodeToString(v.SignatureScript)
-		} else {
-			vinList[i].Txid = v.PreviousOutpoint.Hash.String()
-			vinList[i].Vout = int(uint32(v.PreviousOutpoint.Index))
-
-			disbuf, _ := btcscript.DisasmString(v.SignatureScript)
-			vinList[i].ScriptSig = new(btcjson.ScriptSig)
-			vinList[i].ScriptSig.Asm = disbuf
-			vinList[i].ScriptSig.Hex = hex.EncodeToString(v.SignatureScript)
-		}
-		vinList[i].Sequence = v.Sequence
-	}
-
-	voutList := make([]btcjson.Vout, len(mtx.TxOut))
-	for i, v := range mtx.TxOut {
-		voutList[i].N = i
-		voutList[i].Value = float64(v.Value) / float64(btcutil.SatoshiPerBitcoin)
-
-		_, addrhash, err := btcscript.ScriptToAddrHash(v.PkScript)
-		if err != nil {
-			// TODO: set and return error?
-			rpcsLog.Errorf("Error getting address hash for %v: %v", txSha, err)
-		}
-		if addr, err := btcutil.EncodeAddress(addrhash, net); err == nil {
-			// TODO: set and return error?
-			addrList := make([]string, 1)
-			addrList[0] = addr
-			voutList[i].ScriptPubKey.Addresses = addrList
-		}
-
-		disbuf, _ := btcscript.DisasmString(v.PkScript)
-		voutList[i].ScriptPubKey.Asm = disbuf
-		voutList[i].ScriptPubKey.Hex = hex.EncodeToString(v.PkScript)
-		voutList[i].ScriptPubKey.ReqSigs = strings.Count(disbuf, "OP_CHECKSIG")
-		voutList[i].ScriptPubKey.Type = btcscript.GetScriptClass(v.PkScript).String()
-	}
-
 	txReply := &btcjson.TxRawResult{
 		Hex:      mtxHex,
 		Txid:     txSha,
-		Vout:     voutList,
-		Vin:      vinList,
+		Vout:     createVoutList(mtx, net),
+		Vin:      createVinList(mtx),
 		Version:  mtx.Version,
 		LockTime: mtx.LockTime,
 	}
