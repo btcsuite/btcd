@@ -53,7 +53,7 @@ var rpcHandlers = map[string]commandHandler{
 	"addnode":                handleAddNode,
 	"backupwallet":           handleAskWallet,
 	"createmultisig":         handleAskWallet,
-	"createrawtransaction":   handleUnimplemented,
+	"createrawtransaction":   handleCreateRawTransaction,
 	"debuglevel":             handleDebugLevel,
 	"decoderawtransaction":   handleDecodeRawTransaction,
 	"decodescript":           handleUnimplemented,
@@ -460,6 +460,108 @@ func handleAddNode(s *rpcServer, cmd btcjson.Cmd) (interface{}, error) {
 	return nil, nil
 }
 
+// messageToHex serializes a message to the wire protocol encoding using the
+// latest protocol version and returns a hex-encoded string of the result.
+func messageToHex(msg btcwire.Message) (string, error) {
+	var buf bytes.Buffer
+	err := msg.BtcEncode(&buf, btcwire.ProtocolVersion)
+	if err != nil {
+		return "", btcjson.Error{
+			Code:    btcjson.ErrInternal.Code,
+			Message: err.Error(),
+		}
+	}
+	return hex.EncodeToString(buf.Bytes()), nil
+}
+
+// handleCreateRawTransaction handles createrawtransaction commands.
+func handleCreateRawTransaction(s *rpcServer, cmd btcjson.Cmd) (interface{}, error) {
+	c := cmd.(*btcjson.CreateRawTransactionCmd)
+
+	// Add all transaction inputs to a new transaction after performing
+	// some validty checks.
+	mtx := btcwire.NewMsgTx()
+	for _, input := range c.Inputs {
+		txHash, err := btcwire.NewShaHashFromStr(input.Txid)
+		if err != nil {
+			return nil, btcjson.ErrDecodeHexString
+		}
+
+		if input.Vout < 0 {
+			return nil, btcjson.Error{
+				Code:    btcjson.ErrInvalidParameter.Code,
+				Message: "Invalid parameter, vout must be positive",
+			}
+		}
+
+		prevOut := btcwire.NewOutPoint(txHash, uint32(input.Vout))
+		txIn := btcwire.NewTxIn(prevOut, []byte{})
+		mtx.AddTxIn(txIn)
+	}
+
+	// Add all transaction outputs to the transaction after performing
+	// some validty checks.
+	for encodedAddr, amount := range c.Amounts {
+		// Ensure amount is in the valid range for monetary amounts.
+		if amount <= 0 || amount > btcutil.MaxSatoshi {
+			return nil, btcjson.Error{
+				Code:    btcjson.ErrType.Code,
+				Message: "Invalid amount",
+			}
+		}
+
+		// Decode the provided address.
+		addr, err := btcutil.DecodeAddr(encodedAddr)
+		if err != nil {
+			return nil, btcjson.Error{
+				Code: btcjson.ErrInvalidAddressOrKey.Code,
+				Message: btcjson.ErrInvalidAddressOrKey.Message +
+					": " + err.Error(),
+			}
+		}
+
+		// Ensure the address is one of the supported types and that
+		// the network encoded with the address matches the network the
+		// server is currently on.
+		net := s.server.btcnet
+		switch addr := addr.(type) {
+		case *btcutil.AddressPubKeyHash:
+			net = addr.Net()
+		case *btcutil.AddressScriptHash:
+			net = addr.Net()
+		default:
+			return nil, btcjson.ErrInvalidAddressOrKey
+		}
+		if net != s.server.btcnet {
+			return nil, btcjson.Error{
+				Code: btcjson.ErrInvalidAddressOrKey.Code,
+				Message: fmt.Sprintf("%s: %q",
+					btcjson.ErrInvalidAddressOrKey.Message,
+					encodedAddr),
+			}
+		}
+
+		// Create a new script which pays to the provided address.
+		pkScript, err := btcscript.PayToAddrScript(addr)
+		if err != nil {
+			return nil, btcjson.Error{
+				Code:    btcjson.ErrInternal.Code,
+				Message: err.Error(),
+			}
+		}
+
+		txOut := btcwire.NewTxOut(amount, pkScript)
+		mtx.AddTxOut(txOut)
+	}
+
+	// Return the serialized and hex-encoded transaction.
+	mtxHex, err := messageToHex(mtx)
+	if err != nil {
+		return nil, err
+	}
+	return mtxHex, nil
+}
+
 // handleDebugLevel handles debuglevel commands.
 func handleDebugLevel(s *rpcServer, cmd btcjson.Cmd) (interface{}, error) {
 	c := cmd.(*btcjson.DebugLevelCmd)
@@ -612,20 +714,6 @@ func handleGetBestBlockHash(s *rpcServer, cmd btcjson.Cmd) (interface{}, error) 
 	}
 
 	return sha.String(), nil
-}
-
-// messageToHex serializes a message to the wire protocol encoding using the
-// latest protocol version and returns a hex-encoded string of the result.
-func messageToHex(msg btcwire.Message) (string, error) {
-	var buf bytes.Buffer
-	err := msg.BtcEncode(&buf, btcwire.ProtocolVersion)
-	if err != nil {
-		return "", btcjson.Error{
-			Code:    btcjson.ErrInternal.Code,
-			Message: err.Error(),
-		}
-	}
-	return hex.EncodeToString(buf.Bytes()), nil
 }
 
 // handleGetBlock implements the getblock command.
