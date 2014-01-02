@@ -1165,7 +1165,7 @@ func CalcPkScriptAddrHashes(script []byte) (ScriptClass, int, [][]byte) {
 		return c, 1, [][]byte{addrHash}
 
 	case MultiSigTy:
-		_, reqSigs, addrHashes, err := ScriptToMultiSigAddresses(script)
+		_, reqSigs, addrHashes, err := ScriptToAddrHashes(script)
 		if err != nil {
 			return NonStandardTy, 0, nil
 		}

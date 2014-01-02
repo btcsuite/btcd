@@ -176,11 +176,12 @@ func scriptToAddrHashTemplate(script []byte, validformats []pkformat) (ScriptTyp
 	return format.addrtype, addrhash, nil
 }
 
-// ScriptToAddrHashes extracts multiply 20-byte public key hash and the type out of a PkScript
-func ScriptToMultiSigAddresses(script []byte) (ScriptType, int, [][]byte, error) {
+// ScriptToAddrHashes extracts multiple 20-byte public key hashes
+// from a MultiSig script.
+func ScriptToAddrHashes(script []byte) (ScriptType, int, [][]byte, error) {
 	pops, err := parseScript(script)
 	if err != nil {
-		return ScriptUnknown, 0, nil, err
+		return ScriptUnknown, 0, nil, StackErrUnknownAddress
 	}
 
 	if !isMultiSig(pops) {
