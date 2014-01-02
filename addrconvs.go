@@ -39,6 +39,12 @@ const (
 
 	// TestNetKey is the key identifier for TestNet
 	TestNetKey = 0xef
+
+	// MainNetScriptHash is the address identifier for MainNet
+	MainNetScriptHash = 0x05
+
+	// TestNetScriptHash is the address identifier for TestNet
+	TestNetScriptHash = 0xC4
 )
 
 // EncodeAddress takes a 20-byte raw payment address (hash160 of a pubkey)
@@ -58,6 +64,30 @@ func EncodeAddress(addrHash []byte, net btcwire.BitcoinNet) (encoded string, err
 		return "", ErrUnknownNet
 	}
 
+	return encodeHashWithNetId(netID, addrHash)
+}
+
+// EncodeScriptHash takes a 20-byte raw script hash (hash160 of a pubkey)
+// and the Bitcoin network to create a human-readable payment address string.
+func EncodeScriptHash(addrHash []byte, net btcwire.BitcoinNet) (encoded string, err error) {
+	if len(addrHash) != ripemd160.Size {
+		return "", ErrMalformedAddress
+	}
+
+	var netID byte
+	switch net {
+	case btcwire.MainNet:
+		netID = MainNetScriptHash
+	case btcwire.TestNet3:
+		netID = TestNetScriptHash
+	default:
+		return "", ErrUnknownNet
+	}
+
+	return encodeHashWithNetId(netID, addrHash)
+}
+
+func encodeHashWithNetId(netID byte, addrHash []byte) (encoded string, err error) {
 	tosum := append([]byte{netID}, addrHash...)
 	cksum := btcwire.DoubleSha256(tosum)
 
