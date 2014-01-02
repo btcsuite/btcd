@@ -45,6 +45,7 @@ var (
 // to validate correctness and perform the command.
 var commandHandlers = map[string]*handlerData{
 	"addnode":              &handlerData{2, 0, displayJSONDump, nil, makeAddNode, "<ip> <add/remove/onetry>"},
+	"createrawtransaction": &handlerData{2, 0, displayGeneric, nil, makeCreateRawTransaction, "\"[{\"txid\":\"id\",\"vout\":n},...]\" \"{\"address\":amount,...}\""},
 	"debuglevel":           &handlerData{1, 0, displayGeneric, nil, makeDebugLevel, "<levelspec>"},
 	"decoderawtransaction": &handlerData{1, 0, displayJSONDump, nil, makeDecodeRawTransaction, "<txhash>"},
 	"dumpprivkey":          &handlerData{1, 0, displayGeneric, nil, makeDumpPrivKey, "<bitcoinaddress>"},
@@ -149,6 +150,30 @@ func displayJSONDump(reply interface{}) error {
 func makeAddNode(args []interface{}) (btcjson.Cmd, error) {
 	return btcjson.NewAddNodeCmd("btcctl", args[0].(string),
 		args[1].(string))
+}
+
+// makeCreateRawTransaction generates the cmd structure for createrawtransaction
+// comands.
+func makeCreateRawTransaction(args []interface{}) (btcjson.Cmd, error) {
+	// First unmarshal the JSON provided by the parameters into interfaces.
+	var iinputs, iamounts interface{}
+	err := json.Unmarshal([]byte(args[0].(string)), &iinputs)
+	if err != nil {
+		return nil, err
+	}
+	err = json.Unmarshal([]byte(args[1].(string)), &iamounts)
+	if err != nil {
+		return nil, err
+	}
+
+	// Validate and convert the interfaces to concrete types.
+	inputs, amounts, err := btcjson.ConvertCreateRawTxParams(iinputs,
+		iamounts)
+	if err != nil {
+		return nil, err
+	}
+
+	return btcjson.NewCreateRawTransactionCmd("btcctl", inputs, amounts)
 }
 
 // makeDebugLevel generates the cmd structure for debuglevel commands.
