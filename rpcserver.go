@@ -743,28 +743,32 @@ func createVoutList(mtx *btcwire.MsgTx, net btcwire.BitcoinNet) ([]btcjson.Vout,
 		}
 		voutList[i].ScriptPubKey.Asm = disbuf
 		voutList[i].ScriptPubKey.Hex = hex.EncodeToString(v.PkScript)
-		voutList[i].ScriptPubKey.Type = btcscript.NonStandardTy.String()
 
-		scriptType := btcscript.GetScriptClass(v.PkScript)
-		if scriptType == btcscript.NonStandardTy || scriptType == btcscript.NullDataTy {
-			continue
+		scriptType, reqSigs, addrHashes := btcscript.CalcPkScriptAddrHashes(v.PkScript)
+		voutList[i].ScriptPubKey.Type = scriptType.String()
+		voutList[i].ScriptPubKey.ReqSigs = reqSigs
+
+		if addrHashes == nil {
+			voutList[i].ScriptPubKey.Addresses = nil
+		} else {
+			voutList[i].ScriptPubKey.Addresses = make([]string, len(addrHashes))
+			for j := 0; j < len(addrHashes); j++ {
+				var addr string
+				if scriptType == btcscript.ScriptHashTy {
+					addr, err = btcutil.EncodeScriptHash(addrHashes[j], net)
+					if err != nil {
+						continue
+					}
+				} else {
+					addr, err = btcutil.EncodeAddress(addrHashes[j], net)
+					if err != nil {
+						continue
+					}
+				}
+				voutList[i].ScriptPubKey.Addresses[j] = addr
+			}
 		}
-		_, addrhash, err := btcscript.ScriptToAddrHash(v.PkScript)
-		if err != nil {
-			txSha, _ := mtx.TxSha()
-			// TODO: set and return error?
-			rpcsLog.Errorf("Error getting address hash for %v: %v", txSha, err)
-			continue
-		}
-		if addr, err := btcutil.EncodeAddress(addrhash, net); err == nil {
-			// TODO: set and return error?
-			addrList := make([]string, 1)
-			addrList[0] = addr
-			voutList[i].ScriptPubKey.Type = scriptType.String()
-			voutList[i].ScriptPubKey.Addresses = addrList
-			// TODO: replace with proper multisig handling
-			voutList[i].ScriptPubKey.ReqSigs = 1
-		}
+
 	}
 
 	return voutList, nil
