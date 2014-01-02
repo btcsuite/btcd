@@ -22,16 +22,20 @@ const (
 	ScriptUnknown ScriptType = iota
 	ScriptAddr
 	ScriptPubKey
+	ScriptPayToScriptHash
+	ScriptMultiSig
 	ScriptStrange
 	ScriptGeneration
 )
 
 var scriptTypeToName = []string{
-	ScriptUnknown:    "Unknown",
-	ScriptAddr:       "Addr",
-	ScriptPubKey:     "Pubkey",
-	ScriptStrange:    "Strange",
-	ScriptGeneration: "Generation", // ScriptToAddrHash does not recieve enough information to identify Generation scripts.
+	ScriptUnknown:         "Unknown",
+	ScriptAddr:            "Addr",
+	ScriptPubKey:          "Pubkey",
+	ScriptPayToScriptHash: "PayToScriptHash",
+	ScriptMultiSig:        "MultiSig",
+	ScriptStrange:         "Strange",
+	ScriptGeneration:      "Generation", // ScriptToAddrHash does not recieve enough information to identify Generation scripts.
 }
 
 type pkformat struct {
@@ -54,6 +58,7 @@ const (
 	scrGeneratePubkeyAddr
 	scrPubkeyAddr
 	scrPubkeyAddrComp
+	scrPayToScriptHash
 	scrNoAddr
 )
 
@@ -83,8 +88,8 @@ func ScriptToAddrHash(script []byte) (ScriptType, []byte, error) {
 		{ScriptPubKey, scrGeneratePubkeyAddr, 70, []pkbytes{{0, OP_DATA_69}}, false},
 		{ScriptPubKey, scrPubkeyAddr, 67, []pkbytes{{0, OP_DATA_65}, {66, OP_CHECKSIG}}, true},
 		{ScriptPubKey, scrPubkeyAddrComp, 35, []pkbytes{{0, OP_DATA_33}, {34, OP_CHECKSIG}}, true},
+		{ScriptPayToScriptHash, scrPayToScriptHash, 23, []pkbytes{{0, OP_HASH160}, {1, OP_DATA_20}, {22, OP_EQUAL}}, false},
 		{ScriptStrange, scrNoAddr, 33, []pkbytes{{0, OP_DATA_32}}, false},
-		{ScriptStrange, scrNoAddr, 33, []pkbytes{{0, OP_HASH160}, {1, OP_DATA_20}, {22, OP_EQUAL}}, false},
 	}
 	return scriptToAddrHashTemplate(script, validformats)
 }
@@ -129,9 +134,6 @@ func scriptToAddrHashTemplate(script []byte, validformats []pkformat) (ScriptTyp
 			if script[0] == OP_0 && (len(script) <= 75 && byte(len(script)) == script[1]+2) {
 				return ScriptStrange, nil, nil
 			}
-			if script[0] == OP_HASH160 && len(script) == 23 && script[22] == OP_EQUAL {
-				return ScriptStrange, nil, nil
-			}
 			if script[0] == OP_DATA_36 && len(script) == 37 {
 				// Multisig ScriptSig
 				return ScriptStrange, nil, nil
@@ -165,9 +167,33 @@ func scriptToAddrHashTemplate(script []byte, validformats []pkformat) (ScriptTyp
 	case scrPubkeyAddrComp:
 		pubkey := script[1:34]
 		addrhash = calcHash160(pubkey)
+	case scrPayToScriptHash:
+		addrhash = script[2:22]
 	default:
 		return ScriptUnknown, nil, StackErrInvalidParseType
 	}
 
 	return format.addrtype, addrhash, nil
+}
+
+// ScriptToAddrHashes extracts multiply 20-byte public key hash and the type out of a PkScript
+func ScriptToMultiSigAddresses(script []byte) (ScriptType, int, [][]byte, error) {
+	pops, err := parseScript(script)
+	if err != nil {
+		return ScriptUnknown, 0, nil, err
+	}
+
+	if !isMultiSig(pops) {
+		return ScriptUnknown, 0, nil, StackErrUnknownAddress
+	}
+
+	l := len(pops)
+	addrHashes := make([][]byte, l-3)
+	for i, pop := range pops[1 : l-2] {
+		addrHashes[i] = calcHash160(pop.data)
+	}
+
+	reqSigs := int(pops[0].opcode.value - (OP_1 - 1))
+
+	return ScriptMultiSig, reqSigs, addrHashes, nil
 }
