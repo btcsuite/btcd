@@ -49,6 +49,8 @@ const (
 
 // EncodeAddress takes a 20-byte raw payment address (hash160 of a pubkey)
 // and the Bitcoin network to create a human-readable payment address string.
+//
+// DEPRECATED - Use the EncodeAddress functions of the Address interface.
 func EncodeAddress(addrHash []byte, net btcwire.BitcoinNet) (encoded string, err error) {
 	if len(addrHash) != ripemd160.Size {
 		return "", ErrMalformedAddress
@@ -69,6 +71,8 @@ func EncodeAddress(addrHash []byte, net btcwire.BitcoinNet) (encoded string, err
 
 // EncodeScriptHash takes a 20-byte raw script hash (hash160 of the SHA256 of the redeeming script)
 // and the Bitcoin network to create a human-readable payment address string.
+//
+// DEPRECATED - Use the EncodeAddress functions of the Address interface.
 func EncodeScriptHash(addrHash []byte, net btcwire.BitcoinNet) (encoded string, err error) {
 	if len(addrHash) != ripemd160.Size {
 		return "", ErrMalformedAddress
@@ -104,6 +108,9 @@ func encodeHashWithNetId(netID byte, addrHash []byte) (encoded string, err error
 // DecodeAddress decodes a human-readable payment address string
 // returning the 20-byte decoded address, along with the Bitcoin
 // network for the address.
+//
+// DEPRECATED - Use DecodeAddr to decode a string encoded address to
+// the Address interface.
 func DecodeAddress(addr string) (addrHash []byte, net btcwire.BitcoinNet, err error) {
 	decoded := Base58Decode(addr)
 
