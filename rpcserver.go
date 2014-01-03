@@ -528,31 +528,29 @@ func createVoutList(mtx *btcwire.MsgTx, net btcwire.BitcoinNet) ([]btcjson.Vout,
 		voutList[i].ScriptPubKey.Asm = disbuf
 		voutList[i].ScriptPubKey.Hex = hex.EncodeToString(v.PkScript)
 
-		scriptType, reqSigs, addrHashes := btcscript.CalcPkScriptAddrHashes(v.PkScript)
+		scriptType, reqSigs, hashes := btcscript.CalcPkScriptAddrHashes(v.PkScript)
 		voutList[i].ScriptPubKey.Type = scriptType.String()
 		voutList[i].ScriptPubKey.ReqSigs = reqSigs
 
-		if addrHashes == nil {
+		if hashes == nil {
 			voutList[i].ScriptPubKey.Addresses = nil
 		} else {
-			voutList[i].ScriptPubKey.Addresses = make([]string, len(addrHashes))
-			for j := 0; j < len(addrHashes); j++ {
-				var addr string
+			voutList[i].ScriptPubKey.Addresses = make([]string, len(hashes))
+			for j := 0; j < len(hashes); j++ {
+				var addr btcutil.Address
 				if scriptType == btcscript.ScriptHashTy {
-					addr, err = btcutil.EncodeScriptHash(addrHashes[j], net)
-					if err != nil {
-						continue
-					}
+					addr, err = btcutil.NewAddressScriptHash(hashes[j], net)
 				} else {
-					addr, err = btcutil.EncodeAddress(addrHashes[j], net)
-					if err != nil {
-						continue
-					}
+					addr, err = btcutil.NewAddressPubKeyHash(hashes[j], net)
 				}
-				voutList[i].ScriptPubKey.Addresses[j] = addr
+				if err != nil {
+					// hash will always be 20 bytes, so the only
+					// possible error is from an invalid network.
+					return nil, errors.New("Cannot create address with invalid network.")
+				}
+				voutList[i].ScriptPubKey.Addresses[j] = addr.EncodeAddress()
 			}
 		}
-
 	}
 
 	return voutList, nil

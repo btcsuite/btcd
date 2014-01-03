@@ -340,12 +340,19 @@ func handleNotifyNewTXs(s *rpcServer, cmd btcjson.Cmd,
 	}
 
 	for _, addr := range notifyCmd.Addresses {
-		hash, _, err := btcutil.DecodeAddress(addr)
+		addr, err := btcutil.DecodeAddr(addr)
 		if err != nil {
 			return fmt.Errorf("cannot decode address: %v", err)
 		}
-		s.ws.AddTxRequest(walletNotification, rc, string(hash),
-			cmd.Id())
+
+		// TODO(jrick) Notifing for non-P2PKH addresses is currently
+		// unsuported.
+		if _, ok := addr.(*btcutil.AddressPubKeyHash); !ok {
+			return fmt.Errorf("address is not P2PKH: %v", addr.EncodeAddress())
+		}
+
+		s.ws.AddTxRequest(walletNotification, rc,
+			string(addr.ScriptAddress()), cmd.Id())
 	}
 
 	mreply, _ := json.Marshal(reply)
@@ -423,13 +430,13 @@ func handleRescan(s *rpcServer, cmd btcjson.Cmd,
 					if st != btcscript.ScriptAddr || err != nil {
 						continue
 					}
-					txaddr, err := btcutil.EncodeAddress(txaddrhash, s.server.btcnet)
+					txaddr, err := btcutil.NewAddressPubKeyHash(txaddrhash, s.server.btcnet)
 					if err != nil {
-						rpcsLog.Errorf("Error encoding address: %v", err)
+						rpcsLog.Errorf("Error creating address: %v", err)
 						return err
 					}
 
-					if _, ok := rescanCmd.Addresses[txaddr]; ok {
+					if _, ok := rescanCmd.Addresses[txaddr.EncodeAddress()]; ok {
 						// TODO(jrick): This lookup is expensive and can be avoided
 						// if the wallet is sent the previous outpoints for all inputs
 						// of the tx, so any can removed from the utxo set (since
@@ -460,7 +467,7 @@ func handleRescan(s *rpcServer, cmd btcjson.Cmd,
 							PkScript   string `json:"pkscript"`
 							Spent      bool   `json:"spent"`
 						}{
-							Receiver:   txaddr,
+							Receiver:   txaddr.EncodeAddress(),
 							Height:     blk.Height(),
 							BlockHash:  blkshalist[i].String(),
 							BlockIndex: tx.Index(),
@@ -784,9 +791,9 @@ func (s *rpcServer) NotifyForTxOuts(tx *btcutil.Tx, block *btcutil.Block) {
 			for e := idlist.Front(); e != nil; e = e.Next() {
 				ctx := e.Value.(*notificationCtx)
 
-				txaddr, err := btcutil.EncodeAddress(txaddrhash, s.server.btcnet)
+				txaddr, err := btcutil.NewAddressPubKeyHash(txaddrhash, s.server.btcnet)
 				if err != nil {
-					rpcsLog.Error("Error encoding address; dropping Tx notification.")
+					rpcsLog.Debugf("Error creating address; dropping Tx notification.")
 					break
 				}
 
@@ -802,7 +809,7 @@ func (s *rpcServer) NotifyForTxOuts(tx *btcutil.Tx, block *btcutil.Block) {
 					Amount     int64  `json:"amount"`
 					PkScript   string `json:"pkscript"`
 				}{
-					Receiver:   txaddr,
+					Receiver:   txaddr.EncodeAddress(),
 					TxID:       tx.Sha().String(),
 					TxOutIndex: uint32(i),
 					Amount:     txout.Value,
