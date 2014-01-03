@@ -709,6 +709,65 @@ type TransactionInput struct {
 	Vout int    `json:"vout"`
 }
 
+// ConvertCreateRawTxParams validates and converts the passed parameters from
+// raw interfaces into concrete structs.  This is a separate function since
+// the createrawtransaction command parameters are caller-crafted JSON as
+// opposed to machine generated JSON as is the case for most commands.
+func ConvertCreateRawTxParams(inputs, amounts interface{}) ([]TransactionInput, map[string]int64, error) {
+	iinputs, ok := inputs.([]interface{})
+	if !ok {
+		return nil, nil, errors.New("first parameter inputs must be an array")
+	}
+	rinputs := make([]TransactionInput, len(iinputs))
+	for i, iv := range iinputs {
+		v, ok := iv.(map[string]interface{})
+		if !ok {
+			return nil, nil, errors.New("first parameter inputs must be an array of objects")
+		}
+
+		if len(v) != 2 {
+			return nil, nil, errors.New("input with wrong number of members")
+		}
+		txid, ok := v["txid"]
+		if !ok {
+			return nil, nil, errors.New("input without txid")
+		}
+		rinputs[i].Txid, ok = txid.(string)
+		if !ok {
+			return nil, nil, errors.New("input txid isn't a string")
+		}
+
+		vout, ok := v["vout"]
+		if !ok {
+			return nil, nil, errors.New("input without vout")
+		}
+		fvout, ok := vout.(float64)
+		if !ok {
+			return nil, nil, errors.New("input vout not a number")
+		}
+		rinputs[i].Vout = int(fvout)
+	}
+	famounts, ok := amounts.(map[string]interface{})
+	if !ok {
+		return nil, nil, errors.New("second parameter keys must be a map")
+	}
+
+	ramounts := make(map[string]int64)
+	for k, v := range famounts {
+		fv, ok := v.(float64)
+		if !ok {
+			return nil, nil, errors.New("second parameter keys must be a number map")
+		}
+		var err error
+		ramounts[k], err = JSONToAmount(fv)
+		if err != nil {
+			return nil, nil, err
+		}
+	}
+
+	return rinputs, ramounts, nil
+}
+
 // CreateRawTransactionCmd is a type handling custom marshaling and
 // unmarshaling of createrawtransaction JSON RPC commands.
 type CreateRawTransactionCmd struct {
@@ -770,56 +829,11 @@ func (cmd *CreateRawTransactionCmd) UnmarshalJSON(b []byte) error {
 	if len(r.Params) != 2 {
 		return ErrWrongNumberOfParams
 	}
-	iinputs, ok := r.Params[0].([]interface{})
-	if !ok {
-		return errors.New("first parameter inputs must be an array")
-	}
-	inputs := make([]TransactionInput, len(iinputs))
-	for i, iv := range iinputs {
-		v, ok := iv.(map[string]interface{})
-		if !ok {
-			return errors.New("first parameter inputs must be an array of objects")
-		}
 
-		if len(v) != 2 {
-			return errors.New("input with wrong number of members")
-		}
-		txid, ok := v["txid"]
-		if !ok {
-			return errors.New("input without txid")
-		}
-		inputs[i].Txid, ok = txid.(string)
-		if !ok {
-			return errors.New("input txid isn't a string")
-		}
-
-		vout, ok := v["vout"]
-		if !ok {
-			return errors.New("input without vout")
-		}
-		fvout, ok := vout.(float64)
-		if !ok {
-			return errors.New("input vout not a number")
-		}
-		inputs[i].Vout = int(fvout)
-	}
-	cmd.Inputs = inputs
-	famounts, ok := r.Params[1].(map[string]interface{})
-	if !ok {
-		return errors.New("second parameter keys must be a map")
-	}
-
-	amounts := make(map[string]int64)
-	for k, v := range famounts {
-		fv, ok := v.(float64)
-		if !ok {
-			return errors.New("second parameter keys must  be a number map")
-		}
-		var err error
-		amounts[k], err = JSONToAmount(fv)
-		if err != nil {
-			return err
-		}
+	inputs, amounts, err := ConvertCreateRawTxParams(r.Params[0],
+		r.Params[1])
+	if err != nil {
+		return err
 	}
 
 	newCmd, err := NewCreateRawTransactionCmd(r.Id, inputs, amounts)
