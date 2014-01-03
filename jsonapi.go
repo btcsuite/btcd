@@ -65,6 +65,14 @@ type BlockResult struct {
 	NextHash      string        `json:"nextblockhash"`
 }
 
+// DecodeScriptResult models the data returned from the decodescript command.
+type DecodeScriptResult struct {
+	Asm       string   `json:"asm"`
+	ReqSigs   int      `json:"reqSigs,omitempty"`
+	Type      string   `json:"type"`
+	Addresses []string `json:"addresses,omitempty"`
+}
+
 // TxRawResult models the data from the getrawtransaction command.
 type TxRawResult struct {
 	Hex           string `json:"hex"`
