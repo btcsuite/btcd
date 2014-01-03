@@ -12,6 +12,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/conformal/btcec"
+	"github.com/conformal/btcutil"
 	"github.com/conformal/btcwire"
 	"github.com/davecgh/go-spew/spew"
 	"io"
@@ -111,6 +112,10 @@ var StackErrInvalidIndex = errors.New("Invalid script index")
 // StackErrNonPushOnly is returned when ScriptInfo is called with a pkScript
 // that peforms operations other that pushing data to the stack.
 var StackErrNonPushOnly = errors.New("SigScript is non pushonly")
+
+// ErrUnsupportedAddress is returned when a concrete type that implements
+// a btcutil.Address is not a supported type.
+var ErrUnsupportedAddress = errors.New("unsupported address type")
 
 // Bip16Activation is the timestamp where BIP0016 is valid to use in the
 // blockchain.  To be used to determine if BIP0016 should be called for or not.
@@ -967,6 +972,45 @@ func PayToPubKeyHashScript(pubKeyHash []byte) (pkScript []byte, err error) {
 		},
 	}
 	return unparseScript(pops)
+}
+
+// PayToScriptHashScript creates a new script to pay a transaction output to a
+// script hash.
+func PayToScriptHashScript(scriptHash []byte) (pkScript []byte, err error) {
+	pops := []parsedOpcode{
+		parsedOpcode{
+			opcode: opcodemap[OP_HASH160],
+		},
+		parsedOpcode{
+			opcode: opcodemap[OP_DATA_20],
+			data:   scriptHash,
+		},
+		parsedOpcode{
+			opcode: opcodemap[OP_EQUAL],
+		},
+	}
+	return unparseScript(pops)
+}
+
+// PayToAddrScript creates a new script to pay a transaction output to a the
+// specified address.  Currently the only supported address types are
+// btcutil.AddressPubKeyHash and btcutil.AddressScriptHash.
+func PayToAddrScript(addr btcutil.Address) ([]byte, error) {
+	switch addr := addr.(type) {
+	case *btcutil.AddressPubKeyHash:
+		if addr == nil {
+			return nil, ErrUnsupportedAddress
+		}
+		return PayToPubKeyHashScript(addr.ScriptAddress())
+
+	case *btcutil.AddressScriptHash:
+		if addr == nil {
+			return nil, ErrUnsupportedAddress
+		}
+		return PayToScriptHashScript(addr.ScriptAddress())
+	}
+
+	return nil, ErrUnsupportedAddress
 }
 
 // SignatureScript creates an input signature script for tx to spend
