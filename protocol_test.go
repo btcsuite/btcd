@@ -30,3 +30,26 @@ func TestServiceFlagStringer(t *testing.T) {
 		}
 	}
 }
+
+// TestBitcoinNetStringer tests the stringized output for bitcoin net types.
+func TestBitcoinNetStringer(t *testing.T) {
+	tests := []struct {
+		in   btcwire.BitcoinNet
+		want string
+	}{
+		{btcwire.MainNet, "MainNet"},
+		{btcwire.TestNet, "TestNet"},
+		{btcwire.TestNet3, "TestNet3"},
+		{0xffffffff, "Unknown BitcoinNet (4294967295)"},
+	}
+
+	t.Logf("Running %d tests", len(tests))
+	for i, test := range tests {
+		result := test.in.String()
+		if result != test.want {
+			t.Errorf("String #%d\n got: %s want: %s", i, result,
+				test.want)
+			continue
+		}
+	}
+}
