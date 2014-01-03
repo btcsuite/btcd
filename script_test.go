@@ -9,6 +9,7 @@ import (
 	"crypto/ecdsa"
 	"github.com/conformal/btcec"
 	"github.com/conformal/btcscript"
+	"github.com/conformal/btcutil"
 	"github.com/conformal/btcwire"
 	"math/big"
 	"testing"
@@ -2783,6 +2784,96 @@ func TestStringifyClass(t *testing.T) {
 		if typeString != test.stringed {
 			t.Errorf("%s: got \"%s\" expected \"%s\"", test.name,
 				typeString, test.stringed)
+		}
+	}
+}
+
+// bogusAddress implements the btcutil.Address interface so the tests can ensure
+// unsupported address types are handled properly.
+type bogusAddress struct{}
+
+// EncodeAddress simply returns an empty string.  It exists to satsify the
+// btcutil.Address interface.
+func (b *bogusAddress) EncodeAddress() string {
+	return ""
+}
+
+// ScriptAddress simply returns an empty byte slice.  It exists to satsify the
+// btcutil.Address interface.
+func (b *bogusAddress) ScriptAddress() []byte {
+	return []byte{}
+}
+
+func TestPayToAddrScript(t *testing.T) {
+	// 1MirQ9bwyQcGVJPwKUgapu5ouK2E2Ey4gX
+	p2pkhMain, err := btcutil.NewAddressPubKeyHash([]byte{
+		0xe3, 0x4c, 0xce, 0x70, 0xc8, 0x63, 0x73, 0x27, 0x3e, 0xfc,
+		0xc5, 0x4c, 0xe7, 0xd2, 0xa4, 0x91, 0xbb, 0x4a, 0x0e, 0x84,
+	}, btcwire.MainNet)
+	if err != nil {
+		t.Errorf("Unable to create public key hash address: %v", err)
+		return
+	}
+
+	// Taken from transaction:
+	// b0539a45de13b3e0403909b8bd1a555b8cbe45fd4e3f3fda76f3a5f52835c29d
+	p2shMain, _ := btcutil.NewAddressScriptHashFromHash([]byte{
+		0xe8, 0xc3, 0x00, 0xc8, 0x79, 0x86, 0xef, 0xa8, 0x4c, 0x37,
+		0xc0, 0x51, 0x99, 0x29, 0x01, 0x9e, 0xf8, 0x6e, 0xb5, 0xb4,
+	}, btcwire.MainNet)
+	if err != nil {
+		t.Errorf("Unable to create script hash address: %v", err)
+		return
+	}
+
+	tests := []struct {
+		in       btcutil.Address
+		expected []byte
+		err      error
+	}{
+		// pay-to-pubkey-hash address on mainnet
+		{
+			p2pkhMain,
+			[]byte{
+				0x76, 0xa9, 0x14, 0xe3, 0x4c, 0xce, 0x70, 0xc8,
+				0x63, 0x73, 0x27, 0x3e, 0xfc, 0xc5, 0x4c, 0xe7,
+				0xd2, 0xa4, 0x91, 0xbb, 0x4a, 0x0e, 0x84, 0x88,
+				0xac,
+			},
+			nil,
+		},
+		// pay-to-script-hash address on mainnet
+		{
+			p2shMain,
+			[]byte{
+				0xa9, 0x14, 0xe8, 0xc3, 0x00, 0xc8, 0x79, 0x86,
+				0xef, 0xa8, 0x4c, 0x37, 0xc0, 0x51, 0x99, 0x29,
+				0x01, 0x9e, 0xf8, 0x6e, 0xb5, 0xb4, 0x87,
+			},
+			nil,
+		},
+
+		// Supported address types with nil pointers.
+		{(*btcutil.AddressPubKeyHash)(nil), []byte{}, btcscript.ErrUnsupportedAddress},
+		{(*btcutil.AddressScriptHash)(nil), []byte{}, btcscript.ErrUnsupportedAddress},
+
+		// Unsupported address type.
+		{&bogusAddress{}, []byte{}, btcscript.ErrUnsupportedAddress},
+	}
+
+	t.Logf("Running %d tests", len(tests))
+	for i, test := range tests {
+		pkScript, err := btcscript.PayToAddrScript(test.in)
+		if err != test.err {
+			t.Errorf("PayToAddrScript #%d unexpected error - "+
+				"got %v, want %v", i, err, test.err)
+			continue
+		}
+
+		if !bytes.Equal(pkScript, test.expected) {
+			t.Errorf("PayToAddrScript #%d got: %x\nwant: %x",
+				i, pkScript, test.expected)
+			continue
 		}
 	}
 }
