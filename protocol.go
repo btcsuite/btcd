@@ -5,6 +5,7 @@
 package btcwire
 
 import (
+	"fmt"
 	"strconv"
 	"strings"
 )
@@ -101,3 +102,20 @@ const (
 	// TestNet3 represents the test network (version 3).
 	TestNet3 BitcoinNet = 0x0709110b
 )
+
+// bnStrings is a map of bitcoin networks back to their constant names for
+// pretty printing.
+var bnStrings = map[BitcoinNet]string{
+	MainNet:  "MainNet",
+	TestNet:  "TestNet",
+	TestNet3: "TestNet3",
+}
+
+// String returns the BitcoinNet in human-readable form.
+func (n BitcoinNet) String() string {
+	if s, ok := bnStrings[n]; ok {
+		return s
+	}
+
+	return fmt.Sprintf("Unknown BitcoinNet (%d)", uint32(n))
+}
