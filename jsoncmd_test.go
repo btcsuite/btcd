@@ -550,7 +550,7 @@ var jsoncmdtests = []struct {
 			return NewGetRawMempoolCmd(float64(1), true)
 		},
 		result: &GetRawMempoolCmd{
-			id: float64(1),
+			id:      float64(1),
 			Verbose: true,
 		},
 	},

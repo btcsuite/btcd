@@ -2830,7 +2830,7 @@ func (cmd *GetRawChangeAddressCmd) UnmarshalJSON(b []byte) error {
 // GetRawMempoolCmd is a type handling custom marshaling and
 // unmarshaling of getrawmempool JSON RPC commands.
 type GetRawMempoolCmd struct {
-	id interface{}
+	id      interface{}
 	Verbose bool
 }
 
@@ -2847,7 +2847,7 @@ func NewGetRawMempoolCmd(id interface{}, optArgs ...bool) (*GetRawMempoolCmd, er
 		verbose = optArgs[0]
 	}
 	return &GetRawMempoolCmd{
-		id: id,
+		id:      id,
 		Verbose: verbose,
 	}, nil
 }
@@ -2892,7 +2892,7 @@ func (cmd *GetRawMempoolCmd) UnmarshalJSON(b []byte) error {
 	}
 
 	optArgs := make([]bool, 0, 1)
-	if len(r.Params)  == 1 {
+	if len(r.Params) == 1 {
 		verbose, ok := r.Params[0].(bool)
 		if !ok {
 			return errors.New("first optional parameter verbose must be a bool")
