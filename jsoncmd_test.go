@@ -12,6 +12,8 @@ import (
 	"testing"
 )
 
+var testId = float64(1)
+
 var jsoncmdtests = []struct {
 	name   string
 	f      func() (Cmd, error)
@@ -20,11 +22,11 @@ var jsoncmdtests = []struct {
 	{
 		name: "basic addmultisigaddress",
 		f: func() (Cmd, error) {
-			return NewAddMultisigAddressCmd(float64(1), 1,
+			return NewAddMultisigAddressCmd(testId, 1,
 				[]string{"foo", "bar"})
 		},
 		result: &AddMultisigAddressCmd{
-			id:        float64(1),
+			id:        testId,
 			NRequired: 1,
 			Keys:      []string{"foo", "bar"},
 			Account:   "",
@@ -33,11 +35,11 @@ var jsoncmdtests = []struct {
 	{
 		name: "addmultisigaddress + optional",
 		f: func() (Cmd, error) {
-			return NewAddMultisigAddressCmd(float64(1), 1,
+			return NewAddMultisigAddressCmd(testId, 1,
 				[]string{"foo", "bar"}, "address")
 		},
 		result: &AddMultisigAddressCmd{
-			id:        float64(1),
+			id:        testId,
 			NRequired: 1,
 			Keys:      []string{"foo", "bar"},
 			Account:   "address",
@@ -47,11 +49,11 @@ var jsoncmdtests = []struct {
 	{
 		name: "basic addnode add",
 		f: func() (Cmd, error) {
-			return NewAddNodeCmd(float64(1), "address",
+			return NewAddNodeCmd(testId, "address",
 				"add")
 		},
 		result: &AddNodeCmd{
-			id:     float64(1),
+			id:     testId,
 			Addr:   "address",
 			SubCmd: "add",
 		},
@@ -59,11 +61,11 @@ var jsoncmdtests = []struct {
 	{
 		name: "basic addnode remove",
 		f: func() (Cmd, error) {
-			return NewAddNodeCmd(float64(1), "address",
+			return NewAddNodeCmd(testId, "address",
 				"remove")
 		},
 		result: &AddNodeCmd{
-			id:     float64(1),
+			id:     testId,
 			Addr:   "address",
 			SubCmd: "remove",
 		},
@@ -71,11 +73,11 @@ var jsoncmdtests = []struct {
 	{
 		name: "basic addnode onetry",
 		f: func() (Cmd, error) {
-			return NewAddNodeCmd(float64(1), "address",
+			return NewAddNodeCmd(testId, "address",
 				"onetry")
 		},
 		result: &AddNodeCmd{
-			id:     float64(1),
+			id:     testId,
 			Addr:   "address",
 			SubCmd: "onetry",
 		},
@@ -84,21 +86,21 @@ var jsoncmdtests = []struct {
 	{
 		name: "basic backupwallet",
 		f: func() (Cmd, error) {
-			return NewBackupWalletCmd(float64(1), "destination")
+			return NewBackupWalletCmd(testId, "destination")
 		},
 		result: &BackupWalletCmd{
-			id:          float64(1),
+			id:          testId,
 			Destination: "destination",
 		},
 	},
 	{
 		name: "basic createmultisig",
 		f: func() (Cmd, error) {
-			return NewCreateMultisigCmd(float64(1), 1,
+			return NewCreateMultisigCmd(testId, 1,
 				[]string{"key1", "key2", "key3"})
 		},
 		result: &CreateMultisigCmd{
-			id:        float64(1),
+			id:        testId,
 			NRequired: 1,
 			Keys:      []string{"key1", "key2", "key3"},
 		},
@@ -106,14 +108,14 @@ var jsoncmdtests = []struct {
 	{
 		name: "basic createrawtransaction",
 		f: func() (Cmd, error) {
-			return NewCreateRawTransactionCmd(float64(1),
+			return NewCreateRawTransactionCmd(testId,
 				[]TransactionInput{
 					TransactionInput{Txid: "tx1", Vout: 1},
 					TransactionInput{Txid: "tx2", Vout: 3}},
 				map[string]int64{"bob": 1, "bill": 2})
 		},
 		result: &CreateRawTransactionCmd{
-			id: float64(1),
+			id: testId,
 			Inputs: []TransactionInput{
 				TransactionInput{Txid: "tx1", Vout: 1},
 				TransactionInput{Txid: "tx2", Vout: 3},
@@ -127,118 +129,118 @@ var jsoncmdtests = []struct {
 	{
 		name: "basic debuglevel",
 		f: func() (Cmd, error) {
-			return NewDebugLevelCmd(float64(1), "debug")
+			return NewDebugLevelCmd(testId, "debug")
 		},
 		result: &DebugLevelCmd{
-			id:        float64(1),
+			id:        testId,
 			LevelSpec: "debug",
 		},
 	},
 	{
 		name: "basic decoderawtransaction",
 		f: func() (Cmd, error) {
-			return NewDecodeRawTransactionCmd(float64(1),
+			return NewDecodeRawTransactionCmd(testId,
 				"thisisahexidecimaltransaction")
 		},
 		result: &DecodeRawTransactionCmd{
-			id:    float64(1),
+			id:    testId,
 			HexTx: "thisisahexidecimaltransaction",
 		},
 	},
 	{
 		name: "basic decodescript",
 		f: func() (Cmd, error) {
-			return NewDecodeScriptCmd(float64(1),
+			return NewDecodeScriptCmd(testId,
 				"a bunch of hex")
 		},
 		result: &DecodeScriptCmd{
-			id:        float64(1),
+			id:        testId,
 			HexScript: "a bunch of hex",
 		},
 	},
 	{
 		name: "basic dumpprivkey",
 		f: func() (Cmd, error) {
-			return NewDumpPrivKeyCmd(float64(1),
+			return NewDumpPrivKeyCmd(testId,
 				"address")
 		},
 		result: &DumpPrivKeyCmd{
-			id:      float64(1),
+			id:      testId,
 			Address: "address",
 		},
 	},
 	{
 		name: "basic dumpwallet",
 		f: func() (Cmd, error) {
-			return NewDumpWalletCmd(float64(1),
+			return NewDumpWalletCmd(testId,
 				"filename")
 		},
 		result: &DumpWalletCmd{
-			id:       float64(1),
+			id:       testId,
 			Filename: "filename",
 		},
 	},
 	{
 		name: "basic encryptwallet",
 		f: func() (Cmd, error) {
-			return NewEncryptWalletCmd(float64(1),
+			return NewEncryptWalletCmd(testId,
 				"passphrase")
 		},
 		result: &EncryptWalletCmd{
-			id:         float64(1),
+			id:         testId,
 			Passphrase: "passphrase",
 		},
 	},
 	{
 		name: "basic getaccount",
 		f: func() (Cmd, error) {
-			return NewGetAccountCmd(float64(1),
+			return NewGetAccountCmd(testId,
 				"address")
 		},
 		result: &GetAccountCmd{
-			id:      float64(1),
+			id:      testId,
 			Address: "address",
 		},
 	},
 	{
 		name: "basic getaccountaddress",
 		f: func() (Cmd, error) {
-			return NewGetAccountAddressCmd(float64(1),
+			return NewGetAccountAddressCmd(testId,
 				"account")
 		},
 		result: &GetAccountAddressCmd{
-			id:      float64(1),
+			id:      testId,
 			Account: "account",
 		},
 	},
 	{
 		name: "basic getaddednodeinfo true",
 		f: func() (Cmd, error) {
-			return NewGetAddedNodeInfoCmd(float64(1), true)
+			return NewGetAddedNodeInfoCmd(testId, true)
 		},
 		result: &GetAddedNodeInfoCmd{
-			id:  float64(1),
+			id:  testId,
 			Dns: true,
 		},
 	},
 	{
 		name: "basic getaddednodeinfo false",
 		f: func() (Cmd, error) {
-			return NewGetAddedNodeInfoCmd(float64(1), false)
+			return NewGetAddedNodeInfoCmd(testId, false)
 		},
 		result: &GetAddedNodeInfoCmd{
-			id:  float64(1),
+			id:  testId,
 			Dns: false,
 		},
 	},
 	{
 		name: "basic getaddednodeinfo withnode",
 		f: func() (Cmd, error) {
-			return NewGetAddedNodeInfoCmd(float64(1), true,
+			return NewGetAddedNodeInfoCmd(testId, true,
 				"thisisanode")
 		},
 		result: &GetAddedNodeInfoCmd{
-			id:   float64(1),
+			id:   testId,
 			Dns:  true,
 			Node: "thisisanode",
 		},
@@ -246,31 +248,31 @@ var jsoncmdtests = []struct {
 	{
 		name: "basic getaddressesbyaccount",
 		f: func() (Cmd, error) {
-			return NewGetAddressesByAccountCmd(float64(1),
+			return NewGetAddressesByAccountCmd(testId,
 				"account")
 		},
 		result: &GetAddressesByAccountCmd{
-			id:      float64(1),
+			id:      testId,
 			Account: "account",
 		},
 	},
 	{
 		name: "basic getbalance",
 		f: func() (Cmd, error) {
-			return NewGetBalanceCmd(float64(1))
+			return NewGetBalanceCmd(testId)
 		},
 		result: &GetBalanceCmd{
-			id:      float64(1),
+			id:      testId,
 			MinConf: 1, // the default
 		},
 	},
 	{
 		name: "basic getbalance + account",
 		f: func() (Cmd, error) {
-			return NewGetBalanceCmd(float64(1), "account")
+			return NewGetBalanceCmd(testId, "account")
 		},
 		result: &GetBalanceCmd{
-			id:      float64(1),
+			id:      testId,
 			Account: "account",
 			MinConf: 1, // the default
 		},
@@ -278,20 +280,20 @@ var jsoncmdtests = []struct {
 	{
 		name: "basic getbalance + minconf",
 		f: func() (Cmd, error) {
-			return NewGetBalanceCmd(float64(1), "", 2)
+			return NewGetBalanceCmd(testId, "", 2)
 		},
 		result: &GetBalanceCmd{
-			id:      float64(1),
+			id:      testId,
 			MinConf: 2,
 		},
 	},
 	{
 		name: "basic getbalance + account + minconf",
 		f: func() (Cmd, error) {
-			return NewGetBalanceCmd(float64(1), "account", 2)
+			return NewGetBalanceCmd(testId, "account", 2)
 		},
 		result: &GetBalanceCmd{
-			id:      float64(1),
+			id:      testId,
 			Account: "account",
 			MinConf: 2,
 		},
@@ -299,20 +301,20 @@ var jsoncmdtests = []struct {
 	{
 		name: "basic getbestblockhash",
 		f: func() (Cmd, error) {
-			return NewGetBestBlockHashCmd(float64(1))
+			return NewGetBestBlockHashCmd(testId)
 		},
 		result: &GetBestBlockHashCmd{
-			id: float64(1),
+			id: testId,
 		},
 	},
 	{
 		name: "basic getblock",
 		f: func() (Cmd, error) {
-			return NewGetBlockCmd(float64(1),
+			return NewGetBlockCmd(testId,
 				"somehash")
 		},
 		result: &GetBlockCmd{
-			id:      float64(1),
+			id:      testId,
 			Hash:    "somehash",
 			Verbose: true,
 		},
@@ -320,40 +322,40 @@ var jsoncmdtests = []struct {
 	{
 		name: "basic getblockcount",
 		f: func() (Cmd, error) {
-			return NewGetBlockCountCmd(float64(1))
+			return NewGetBlockCountCmd(testId)
 		},
 		result: &GetBlockCountCmd{
-			id: float64(1),
+			id: testId,
 		},
 	},
 	{
 		name: "basic getblockhash",
 		f: func() (Cmd, error) {
-			return NewGetBlockHashCmd(float64(1), 1234)
+			return NewGetBlockHashCmd(testId, 1234)
 		},
 		result: &GetBlockHashCmd{
-			id:    float64(1),
+			id:    testId,
 			Index: 1234,
 		},
 	},
 	{
 		name: "basic getblocktemplate",
 		f: func() (Cmd, error) {
-			return NewGetBlockTemplateCmd(float64(1))
+			return NewGetBlockTemplateCmd(testId)
 		},
 		result: &GetBlockTemplateCmd{
-			id: float64(1),
+			id: testId,
 		},
 	},
 	{
 		name: "basic getblocktemplate + request",
 		f: func() (Cmd, error) {
-			return NewGetBlockTemplateCmd(float64(1),
+			return NewGetBlockTemplateCmd(testId,
 				&TemplateRequest{Mode: "mode",
 					Capabilities: []string{"one", "two", "three"}})
 		},
 		result: &GetBlockTemplateCmd{
-			id: float64(1),
+			id: testId,
 			Request: &TemplateRequest{
 				Mode: "mode",
 				Capabilities: []string{
@@ -367,12 +369,12 @@ var jsoncmdtests = []struct {
 	{
 		name: "basic getblocktemplate + request no mode",
 		f: func() (Cmd, error) {
-			return NewGetBlockTemplateCmd(float64(1),
+			return NewGetBlockTemplateCmd(testId,
 				&TemplateRequest{
 					Capabilities: []string{"one", "two", "three"}})
 		},
 		result: &GetBlockTemplateCmd{
-			id: float64(1),
+			id: testId,
 			Request: &TemplateRequest{
 				Capabilities: []string{
 					"one",
@@ -385,82 +387,82 @@ var jsoncmdtests = []struct {
 	{
 		name: "basic getconectioncount",
 		f: func() (Cmd, error) {
-			return NewGetConnectionCountCmd(float64(1))
+			return NewGetConnectionCountCmd(testId)
 		},
 		result: &GetConnectionCountCmd{
-			id: float64(1),
+			id: testId,
 		},
 	},
 	{
 		name: "basic getdifficulty",
 		f: func() (Cmd, error) {
-			return NewGetDifficultyCmd(float64(1))
+			return NewGetDifficultyCmd(testId)
 		},
 		result: &GetDifficultyCmd{
-			id: float64(1),
+			id: testId,
 		},
 	},
 	{
 		name: "basic getgeneratecmd",
 		f: func() (Cmd, error) {
-			return NewGetGenerateCmd(float64(1))
+			return NewGetGenerateCmd(testId)
 		},
 		result: &GetGenerateCmd{
-			id: float64(1),
+			id: testId,
 		},
 	},
 	{
 		name: "basic gethashespersec",
 		f: func() (Cmd, error) {
-			return NewGetHashesPerSecCmd(float64(1))
+			return NewGetHashesPerSecCmd(testId)
 		},
 		result: &GetHashesPerSecCmd{
-			id: float64(1),
+			id: testId,
 		},
 	},
 	{
 		name: "basic getinfo",
 		f: func() (Cmd, error) {
-			return NewGetInfoCmd(float64(1))
+			return NewGetInfoCmd(testId)
 		},
 		result: &GetInfoCmd{
-			id: float64(1),
+			id: testId,
 		},
 	},
 	{
 		name: "basic getinfo",
 		f: func() (Cmd, error) {
-			return NewGetInfoCmd(float64(1))
+			return NewGetInfoCmd(testId)
 		},
 		result: &GetInfoCmd{
-			id: float64(1),
+			id: testId,
 		},
 	},
 	{
 		name: "basic getmininginfo",
 		f: func() (Cmd, error) {
-			return NewGetMiningInfoCmd(float64(1))
+			return NewGetMiningInfoCmd(testId)
 		},
 		result: &GetMiningInfoCmd{
-			id: float64(1),
+			id: testId,
 		},
 	},
 	{
 		name: "basic getnettotals",
 		f: func() (Cmd, error) {
-			return NewGetNetTotalsCmd(float64(1))
+			return NewGetNetTotalsCmd(testId)
 		},
 		result: &GetNetTotalsCmd{
-			id: float64(1),
+			id: testId,
 		},
 	},
 	{
 		name: "basic getnetworkhashps",
 		f: func() (Cmd, error) {
-			return NewGetNetworkHashPSCmd(float64(1))
+			return NewGetNetworkHashPSCmd(testId)
 		},
 		result: &GetNetworkHashPSCmd{
-			id:     float64(1),
+			id:     testId,
 			Blocks: 120,
 			Height: -1,
 		},
@@ -468,10 +470,10 @@ var jsoncmdtests = []struct {
 	{
 		name: "basic getnetworkhashps + blocks",
 		f: func() (Cmd, error) {
-			return NewGetNetworkHashPSCmd(float64(1), 5000)
+			return NewGetNetworkHashPSCmd(testId, 5000)
 		},
 		result: &GetNetworkHashPSCmd{
-			id:     float64(1),
+			id:     testId,
 			Blocks: 5000,
 			Height: -1,
 		},
@@ -479,10 +481,10 @@ var jsoncmdtests = []struct {
 	{
 		name: "basic getnetworkhashps + blocks + height",
 		f: func() (Cmd, error) {
-			return NewGetNetworkHashPSCmd(float64(1), 5000, 1000)
+			return NewGetNetworkHashPSCmd(testId, 5000, 1000)
 		},
 		result: &GetNetworkHashPSCmd{
-			id:     float64(1),
+			id:     testId,
 			Blocks: 5000,
 			Height: 1000,
 		},
@@ -490,90 +492,90 @@ var jsoncmdtests = []struct {
 	{
 		name: "basic getnewaddress",
 		f: func() (Cmd, error) {
-			return NewGetNewAddressCmd(float64(1), "account")
+			return NewGetNewAddressCmd(testId, "account")
 		},
 		result: &GetNewAddressCmd{
-			id:      float64(1),
+			id:      testId,
 			Account: "account",
 		},
 	},
 	{
 		name: "basic getpeerinfo",
 		f: func() (Cmd, error) {
-			return NewGetPeerInfoCmd(float64(1))
+			return NewGetPeerInfoCmd(testId)
 		},
 		result: &GetPeerInfoCmd{
-			id: float64(1),
+			id: testId,
 		},
 	},
 	{
 		name: "basic getrawmchangeaddress",
 		f: func() (Cmd, error) {
-			return NewGetRawChangeAddressCmd(float64(1))
+			return NewGetRawChangeAddressCmd(testId)
 		},
 		result: &GetRawChangeAddressCmd{
-			id: float64(1),
+			id: testId,
 		},
 	},
 	{
 		name: "basic getrawmchangeaddress + account",
 		f: func() (Cmd, error) {
-			return NewGetRawChangeAddressCmd(float64(1),
+			return NewGetRawChangeAddressCmd(testId,
 				"accountname")
 		},
 		result: &GetRawChangeAddressCmd{
-			id:      float64(1),
+			id:      testId,
 			Account: "accountname",
 		},
 	},
 	{
 		name: "basic getrawmempool",
 		f: func() (Cmd, error) {
-			return NewGetRawMempoolCmd(float64(1))
+			return NewGetRawMempoolCmd(testId)
 		},
 		result: &GetRawMempoolCmd{
-			id: float64(1),
+			id: testId,
 		},
 	},
 	{
 		name: "basic getrawmempool noverbose",
 		f: func() (Cmd, error) {
-			return NewGetRawMempoolCmd(float64(1), false)
+			return NewGetRawMempoolCmd(testId, false)
 		},
 		result: &GetRawMempoolCmd{
-			id: float64(1),
+			id: testId,
 		},
 	},
 	{
 		name: "basic getrawmempool verbose",
 		f: func() (Cmd, error) {
-			return NewGetRawMempoolCmd(float64(1), true)
+			return NewGetRawMempoolCmd(testId, true)
 		},
 		result: &GetRawMempoolCmd{
-			id:      float64(1),
+			id:      testId,
 			Verbose: true,
 		},
 	},
 	{
 		name: "basic getrawtransaction",
 		f: func() (Cmd, error) {
-			return NewGetRawTransactionCmd(float64(1),
+			return NewGetRawTransactionCmd(testId,
 				"sometxid")
 		},
 		result: &GetRawTransactionCmd{
-			id:   float64(1),
+			id:   testId,
 			Txid: "sometxid",
 		},
 	},
 	{
 		name: "basic getrawtransaction + verbose",
 		f: func() (Cmd, error) {
-			return NewGetRawTransactionCmd(float64(1),
+			return NewGetRawTransactionCmd(testId,
 				"sometxid",
 				true)
 		},
 		result: &GetRawTransactionCmd{
-			id:      float64(1),
+			id:      testId,
 			Txid:    "sometxid",
 			Verbose: true,
 		},
@@ -581,12 +583,12 @@ var jsoncmdtests = []struct {
 	{
 		name: "basic getreceivedbyaccount",
 		f: func() (Cmd, error) {
-			return NewGetReceivedByAccountCmd(float64(1),
+			return NewGetReceivedByAccountCmd(testId,
 				"abtcaccount",
 				1)
 		},
 		result: &GetReceivedByAccountCmd{
-			id:      float64(1),
+			id:      testId,
 			Account: "abtcaccount",
 			MinConf: 1,
 		},
@@ -594,12 +596,12 @@ var jsoncmdtests = []struct {
 	{
 		name: "basic getreceivedbyaddress",
 		f: func() (Cmd, error) {
-			return NewGetReceivedByAddressCmd(float64(1),
+			return NewGetReceivedByAddressCmd(testId,
 				"abtcaddress",
 				1)
 		},
 		result: &GetReceivedByAddressCmd{
-			id:      float64(1),
+			id:      testId,
 			Address: "abtcaddress",
 			MinConf: 1,
 		},
@@ -607,23 +609,23 @@ var jsoncmdtests = []struct {
 	{
 		name: "basic gettransaction",
 		f: func() (Cmd, error) {
-			return NewGetTransactionCmd(float64(1),
+			return NewGetTransactionCmd(testId,
 				"atxid")
 		},
 		result: &GetTransactionCmd{
-			id:   float64(1),
+			id:   testId,
 			Txid: "atxid",
 		},
 	},
 	{
 		name: "basic gettxout",
 		f: func() (Cmd, error) {
-			return NewGetTxOutCmd(float64(1),
+			return NewGetTxOutCmd(testId,
 				"sometx",
 				10)
 		},
 		result: &GetTxOutCmd{
-			id:     float64(1),
+			id:     testId,
 			Txid:   "sometx",
 			Output: 10,
 		},
@@ -631,13 +633,13 @@ var jsoncmdtests = []struct {
 	{
 		name: "basic gettxout + optional",
 		f: func() (Cmd, error) {
-			return NewGetTxOutCmd(float64(1),
+			return NewGetTxOutCmd(testId,
 				"sometx",
 				10,
 				false)
 		},
 		result: &GetTxOutCmd{
-			id:             float64(1),
+			id:             testId,
 			Txid:           "sometx",
 			Output:         10,
 			IncludeMempool: false,
@@ -646,16 +648,16 @@ var jsoncmdtests = []struct {
 	{
 		name: "basic gettxsetoutinfo",
 		f: func() (Cmd, error) {
-			return NewGetTxOutSetInfoCmd(float64(1))
+			return NewGetTxOutSetInfoCmd(testId)
 		},
 		result: &GetTxOutSetInfoCmd{
-			id: float64(1),
+			id: testId,
 		},
 	},
 	{
 		name: "basic getwork",
 		f: func() (Cmd, error) {
-			return NewGetWorkCmd(float64(1),
+			return NewGetWorkCmd(testId,
 				WorkRequest{
 					Data:      "some data",
 					Target:    "our target",
@@ -663,7 +665,7 @@ var jsoncmdtests = []struct {
 				})
 		},
 		result: &GetWorkCmd{
-			id: float64(1),
+			id: testId,
 			Request: WorkRequest{
 				Data:      "some data",
 				Target:    "our target",
@@ -674,31 +676,31 @@ var jsoncmdtests = []struct {
 	{
 		name: "basic help",
 		f: func() (Cmd, error) {
-			return NewHelpCmd(float64(1))
+			return NewHelpCmd(testId)
 		},
 		result: &HelpCmd{
-			id: float64(1),
+			id: testId,
 		},
 	},
 	{
 		name: "basic help + optional cmd",
 		f: func() (Cmd, error) {
-			return NewHelpCmd(float64(1),
+			return NewHelpCmd(testId,
 				"getinfo")
 		},
 		result: &HelpCmd{
-			id:      float64(1),
+			id:      testId,
 			Command: "getinfo",
 		},
 	},
 	{
 		name: "basic importprivkey",
 		f: func() (Cmd, error) {
-			return NewImportPrivKeyCmd(float64(1),
+			return NewImportPrivKeyCmd(testId,
 				"somereallongprivatekey")
 		},
 		result: &ImportPrivKeyCmd{
-			id:      float64(1),
+			id:      testId,
 			PrivKey: "somereallongprivatekey",
 			Rescan:  true,
 		},
@@ -706,12 +708,12 @@ var jsoncmdtests = []struct {
 	{
 		name: "basic importprivkey + 1 opt",
 		f: func() (Cmd, error) {
-			return NewImportPrivKeyCmd(float64(1),
+			return NewImportPrivKeyCmd(testId,
 				"somereallongprivatekey",
 				"some text")
 		},
 		result: &ImportPrivKeyCmd{
-			id:      float64(1),
+			id:      testId,
 			PrivKey: "somereallongprivatekey",
 			Label:   "some text",
 			Rescan:  true,
@@ -720,13 +722,13 @@ var jsoncmdtests = []struct {
 	{
 		name: "basic importprivkey + 2 opts",
 		f: func() (Cmd, error) {
-			return NewImportPrivKeyCmd(float64(1),
+			return NewImportPrivKeyCmd(testId,
 				"somereallongprivatekey",
 				"some text",
 				false)
 		},
 		result: &ImportPrivKeyCmd{
-			id:      float64(1),
+			id:      testId,
 			PrivKey: "somereallongprivatekey",
 			Label:   "some text",
 			Rescan:  false,
@@ -735,68 +737,68 @@ var jsoncmdtests = []struct {
 	{
 		name: "basic importwallet",
 		f: func() (Cmd, error) {
-			return NewImportWalletCmd(float64(1),
+			return NewImportWalletCmd(testId,
 				"walletfilename.dat")
 		},
 		result: &ImportWalletCmd{
-			id:       float64(1),
+			id:       testId,
 			Filename: "walletfilename.dat",
 		},
 	},
 	{
 		name: "basic keypoolrefill",
 		f: func() (Cmd, error) {
-			return NewKeyPoolRefillCmd(float64(1))
+			return NewKeyPoolRefillCmd(testId)
 		},
 		result: &KeyPoolRefillCmd{
-			id: float64(1),
+			id: testId,
 		},
 	},
 	{
 		name: "basic listaccounts",
 		f: func() (Cmd, error) {
-			return NewListAccountsCmd(float64(1), 1)
+			return NewListAccountsCmd(testId, 1)
 		},
 		result: &ListAccountsCmd{
-			id:      float64(1),
+			id:      testId,
 			MinConf: 1,
 		},
 	},
 	{
 		name: "basic listaddressgroupings",
 		f: func() (Cmd, error) {
-			return NewListAddressGroupingsCmd(float64(1))
+			return NewListAddressGroupingsCmd(testId)
 		},
 		result: &ListAddressGroupingsCmd{
-			id: float64(1),
+			id: testId,
 		},
 	},
 	{
 		name: "basic listlockunspent",
 		f: func() (Cmd, error) {
-			return NewListLockUnspentCmd(float64(1))
+			return NewListLockUnspentCmd(testId)
 		},
 		result: &ListLockUnspentCmd{
-			id: float64(1),
+			id: testId,
 		},
 	},
 	{
 		name: "basic listreceivedbyaccount",
 		f: func() (Cmd, error) {
-			return NewListReceivedByAccountCmd(float64(1))
+			return NewListReceivedByAccountCmd(testId)
 		},
 		result: &ListReceivedByAccountCmd{
-			id:      float64(1),
+			id:      testId,
 			MinConf: 1,
 		},
 	},
 	{
 		name: "basic listtransactions",
 		f: func() (Cmd, error) {
-			return NewListTransactionsCmd(float64(1))
+			return NewListTransactionsCmd(testId)
 		},
 		result: &ListTransactionsCmd{
-			id:      float64(1),
+			id:      testId,
 			Account: "",
 			Count:   10,
 			From:    0,
@@ -805,10 +807,10 @@ var jsoncmdtests = []struct {
 	{
 		name: "listtransactions 1 optarg",
 		f: func() (Cmd, error) {
-			return NewListTransactionsCmd(float64(1), "abcde")
+			return NewListTransactionsCmd(testId, "abcde")
 		},
 		result: &ListTransactionsCmd{
-			id:      float64(1),
+			id:      testId,
 			Account: "abcde",
 			Count:   10,
 			From:    0,
@@ -817,10 +819,10 @@ var jsoncmdtests = []struct {
 	{
 		name: "listtransactions 2 optargs",
 		f: func() (Cmd, error) {
-			return NewListTransactionsCmd(float64(1), "abcde", 123)
+			return NewListTransactionsCmd(testId, "abcde", 123)
 		},
 		result: &ListTransactionsCmd{
-			id:      float64(1),
+			id:      testId,
 			Account: "abcde",
 			Count:   123,
 			From:    0,
@@ -829,10 +831,10 @@ var jsoncmdtests = []struct {
 	{
 		name: "listtransactions 3 optargs",
 		f: func() (Cmd, error) {
-			return NewListTransactionsCmd(float64(1), "abcde", 123, 456)
+			return NewListTransactionsCmd(testId, "abcde", 123, 456)
 		},
 		result: &ListTransactionsCmd{
-			id:      float64(1),
+			id:      testId,
 			Account: "abcde",
 			Count:   123,
 			From:    456,
@@ -841,10 +843,10 @@ var jsoncmdtests = []struct {
 	{
 		name: "basic listunspent",
 		f: func() (Cmd, error) {
-			return NewListUnspentCmd(float64(1))
+			return NewListUnspentCmd(testId)
 		},
 		result: &ListUnspentCmd{
-			id:      float64(1),
+			id:      testId,
 			MinConf: 1,
 			MaxConf: 999999,
 		},
@@ -852,10 +854,10 @@ var jsoncmdtests = []struct {
 	{
 		name: "basic listunspent + opts",
 		f: func() (Cmd, error) {
-			return NewListUnspentCmd(float64(1), 0, 6)
+			return NewListUnspentCmd(testId, 0, 6)
 		},
 		result: &ListUnspentCmd{
-			id:      float64(1),
+			id:      testId,
 			MinConf: 0,
 			MaxConf: 6,
 		},
@@ -863,24 +865,24 @@ var jsoncmdtests = []struct {
 	{
 		name: "basic lockunspent",
 		f: func() (Cmd, error) {
-			return NewLockUnspentCmd(float64(1), true)
+			return NewLockUnspentCmd(testId, true)
 		},
 		result: &LockUnspentCmd{
-			id:     float64(1),
+			id:     testId,
 			Unlock: true,
 		},
 	},
 	{
 		name: "basic move",
 		f: func() (Cmd, error) {
-			return NewMoveCmd(float64(1),
+			return NewMoveCmd(testId,
 				"account1",
 				"account2",
 				12,
 				1)
 		},
 		result: &MoveCmd{
-			id:          float64(1),
+			id:          testId,
 			FromAccount: "account1",
 			ToAccount:   "account2",
 			Amount:      12,
@@ -890,7 +892,7 @@ var jsoncmdtests = []struct {
 	{
 		name: "basic move + optionals",
 		f: func() (Cmd, error) {
-			return NewMoveCmd(float64(1),
+			return NewMoveCmd(testId,
 				"account1",
 				"account2",
 				12,
@@ -898,7 +900,7 @@ var jsoncmdtests = []struct {
 				"some comment")
 		},
 		result: &MoveCmd{
-			id:          float64(1),
+			id:          testId,
 			FromAccount: "account1",
 			ToAccount:   "account2",
 			Amount:      12,
@@ -909,23 +911,23 @@ var jsoncmdtests = []struct {
 	{
 		name: "basic ping",
 		f: func() (Cmd, error) {
-			return NewPingCmd(float64(1))
+			return NewPingCmd(testId)
 		},
 		result: &PingCmd{
-			id: float64(1),
+			id: testId,
 		},
 	},
 	{
 		name: "basic sendfrom",
 		f: func() (Cmd, error) {
-			return NewSendFromCmd(float64(1),
+			return NewSendFromCmd(testId,
 				"account",
 				"address",
 				12,
 				1)
 		},
 		result: &SendFromCmd{
-			id:          float64(1),
+			id:          testId,
 			FromAccount: "account",
 			ToAddress:   "address",
 			Amount:      12,
@@ -935,7 +937,7 @@ var jsoncmdtests = []struct {
 	{
 		name: "basic sendfrom + options",
 		f: func() (Cmd, error) {
-			return NewSendFromCmd(float64(1),
+			return NewSendFromCmd(testId,
 				"account",
 				"address",
 				12,
@@ -944,7 +946,7 @@ var jsoncmdtests = []struct {
 				"comment to")
 		},
 		result: &SendFromCmd{
-			id:          float64(1),
+			id:          testId,
 			FromAccount: "account",
 			ToAddress:   "address",
 			Amount:      12,
@@ -961,12 +963,12 @@ var jsoncmdtests = []struct {
 				"address B": 2000,
 				"address C": 3000,
 			}
-			return NewSendManyCmd(float64(1),
+			return NewSendManyCmd(testId,
 				"account",
 				pairs)
 		},
 		result: &SendManyCmd{
-			id:          float64(1),
+			id:          testId,
 			FromAccount: "account",
 			Amounts: map[string]int64{
 				"address A": 1000,
@@ -984,14 +986,14 @@ var jsoncmdtests = []struct {
 				"address B": 2000,
 				"address C": 3000,
 			}
-			return NewSendManyCmd(float64(1),
+			return NewSendManyCmd(testId,
 				"account",
 				pairs,
 				10,
 				"comment")
 		},
 		result: &SendManyCmd{
-			id:          float64(1),
+			id:          testId,
 			FromAccount: "account",
 			Amounts: map[string]int64{
 				"address A": 1000,
@@ -1005,23 +1007,23 @@ var jsoncmdtests = []struct {
 	{
 		name: "basic sendrawtransaction",
 		f: func() (Cmd, error) {
-			return NewSendRawTransactionCmd(float64(1),
+			return NewSendRawTransactionCmd(testId,
 				"hexstringofatx")
 		},
 		result: &SendRawTransactionCmd{
-			id:    float64(1),
+			id:    testId,
 			HexTx: "hexstringofatx",
 		},
 	},
 	{
 		name: "basic sendtoaddress",
 		f: func() (Cmd, error) {
-			return NewSendToAddressCmd(float64(1),
+			return NewSendToAddressCmd(testId,
 				"somebtcaddress",
 				1)
 		},
 		result: &SendToAddressCmd{
-			id:      float64(1),
+			id:      testId,
 			Address: "somebtcaddress",
 			Amount:  1,
 		},
@@ -1029,14 +1031,14 @@ var jsoncmdtests = []struct {
 	{
 		name: "basic sendtoaddress plus optional",
 		f: func() (Cmd, error) {
-			return NewSendToAddressCmd(float64(1),
+			return NewSendToAddressCmd(testId,
 				"somebtcaddress",
 				1,
 				"a comment",
 				"comment to")
 		},
 		result: &SendToAddressCmd{
-			id:        float64(1),
+			id:        testId,
 			Address:   "somebtcaddress",
 			Amount:    1,
 			Comment:   "a comment",
@@ -1046,12 +1048,12 @@ var jsoncmdtests = []struct {
 	{
 		name: "basic setaccount",
 		f: func() (Cmd, error) {
-			return NewSetAccountCmd(float64(1),
+			return NewSetAccountCmd(testId,
 				"somebtcaddress",
 				"account name")
 		},
 		result: &SetAccountCmd{
-			id:      float64(1),
+			id:      testId,
 			Address: "somebtcaddress",
 			Account: "account name",
 		},
@@ -1059,20 +1061,20 @@ var jsoncmdtests = []struct {
 	{
 		name: "basic setgenerate",
 		f: func() (Cmd, error) {
-			return NewSetGenerateCmd(float64(1), true)
+			return NewSetGenerateCmd(testId, true)
 		},
 		result: &SetGenerateCmd{
-			id:       float64(1),
+			id:       testId,
 			Generate: true,
 		},
 	},
 	{
 		name: "basic setgenerate + optional",
 		f: func() (Cmd, error) {
-			return NewSetGenerateCmd(float64(1), true, 10)
+			return NewSetGenerateCmd(testId, true, 10)
 		},
 		result: &SetGenerateCmd{
-			id:           float64(1),
+			id:           testId,
 			Generate:     true,
 			GenProcLimit: 10,
 		},
@@ -1080,22 +1082,22 @@ var jsoncmdtests = []struct {
 	{
 		name: "basic settxfee",
 		f: func() (Cmd, error) {
-			return NewSetTxFeeCmd(float64(1), 10)
+			return NewSetTxFeeCmd(testId, 10)
 		},
 		result: &SetTxFeeCmd{
-			id:     float64(1),
+			id:     testId,
 			Amount: 10,
 		},
 	},
 	{
 		name: "basic signmessage",
 		f: func() (Cmd, error) {
-			return NewSignMessageCmd(float64(1),
+			return NewSignMessageCmd(testId,
 				"btcaddress",
 				"a message")
 		},
 		result: &SignMessageCmd{
-			id:      float64(1),
+			id:      testId,
 			Address: "btcaddress",
 			Message: "a message",
 		},
@@ -1103,18 +1105,18 @@ var jsoncmdtests = []struct {
 	{
 		name: "basic signrawtransaction",
 		f: func() (Cmd, error) {
-			return NewSignRawTransactionCmd(float64(1),
+			return NewSignRawTransactionCmd(testId,
 				"sometxstring")
 		},
 		result: &SignRawTransactionCmd{
-			id:    float64(1),
+			id:    testId,
 			RawTx: "sometxstring",
 		},
 	},
 	/*	{
 		name: "basic signrawtransaction with optional",
 		f: func() (Cmd, error) {
-			return NewSignRawTransactionCmd(float64(1),
+			return NewSignRawTransactionCmd(testId,
 				"sometxstring",
 				[]RawTxInput{
 					RawTxInput{
@@ -1128,7 +1130,7 @@ var jsoncmdtests = []struct {
 				"flags")
 		},
 		result: &SignRawTransactionCmd{
-			id:    float64(1),
+			id:    testId,
 			RawTx: "sometxstring",
 			Inputs: []RawTxInput{
 				RawTxInput{
@@ -1145,32 +1147,32 @@ var jsoncmdtests = []struct {
 	{
 		name: "basic stop",
 		f: func() (Cmd, error) {
-			return NewStopCmd(float64(1))
+			return NewStopCmd(testId)
 		},
 		result: &StopCmd{
-			id: float64(1),
+			id: testId,
 		},
 	},
 	{
 		name: "basic submitblock",
 		f: func() (Cmd, error) {
-			return NewSubmitBlockCmd(float64(1),
+			return NewSubmitBlockCmd(testId,
 				"lotsofhex")
 		},
 		result: &SubmitBlockCmd{
-			id:       float64(1),
+			id:       testId,
 			HexBlock: "lotsofhex",
 		},
 	},
 	{
 		name: "submitblock with optional object",
 		f: func() (Cmd, error) {
-			return NewSubmitBlockCmd(float64(1),
+			return NewSubmitBlockCmd(testId,
 				"lotsofhex",
 				&SubmitBlockOptions{WorkId: "otherstuff"})
 		},
 		result: &SubmitBlockCmd{
-			id:       float64(1),
+			id:       testId,
 			HexBlock: "lotsofhex",
 			Options:  &SubmitBlockOptions{WorkId: "otherstuff"},
 		},
@@ -1178,21 +1180,21 @@ var jsoncmdtests = []struct {
 	{
 		name: "basic validateaddress",
 		f: func() (Cmd, error) {
-			return NewValidateAddressCmd(float64(1),
+			return NewValidateAddressCmd(testId,
 				"somebtcaddress")
 		},
 		result: &ValidateAddressCmd{
-			id:      float64(1),
+			id:      testId,
 			Address: "somebtcaddress",
 		},
 	},
 	{
 		name: "basic verifychain",
 		f: func() (Cmd, error) {
-			return NewVerifyChainCmd(float64(1))
+			return NewVerifyChainCmd(testId)
 		},
 		result: &VerifyChainCmd{
-			id:         float64(1),
+			id:         testId,
 			CheckLevel: 3,
 			CheckDepth: 288,
 		},
@@ -1200,10 +1202,10 @@ var jsoncmdtests = []struct {
 	{
 		name: "basic verifychain + optional",
 		f: func() (Cmd, error) {
-			return NewVerifyChainCmd(float64(1), 4, 1)
+			return NewVerifyChainCmd(testId, 4, 1)
 		},
 		result: &VerifyChainCmd{
-			id:         float64(1),
+			id:         testId,
 			CheckLevel: 4,
 			CheckDepth: 1,
 		},
@@ -1211,13 +1213,13 @@ var jsoncmdtests = []struct {
 	{
 		name: "basic verifymessage",
 		f: func() (Cmd, error) {
-			return NewVerifyMessageCmd(float64(1),
+			return NewVerifyMessageCmd(testId,
 				"someaddress",
 				"somesig",
 				"a message")
 		},
 		result: &VerifyMessageCmd{
-			id:        float64(1),
+			id:        testId,
 			Address:   "someaddress",
 			Signature: "somesig",
 			Message:   "a message",
@@ -1226,21 +1228,21 @@ var jsoncmdtests = []struct {
 	{
 		name: "basic walletlock",
 		f: func() (Cmd, error) {
-			return NewWalletLockCmd(float64(1))
+			return NewWalletLockCmd(testId)
 		},
 		result: &WalletLockCmd{
-			id: float64(1),
+			id: testId,
 		},
 	},
 	{
 		name: "basic walletpassphrase",
 		f: func() (Cmd, error) {
-			return NewWalletPassphraseCmd(float64(1),
+			return NewWalletPassphraseCmd(testId,
 				"phrase1",
 				10)
 		},
 		result: &WalletPassphraseCmd{
-			id:         float64(1),
+			id:         testId,
 			Passphrase: "phrase1",
 			Timeout:    10,
 		},
@@ -1248,11 +1250,11 @@ var jsoncmdtests = []struct {
 	{
 		name: "basic walletpassphrasechange",
 		f: func() (Cmd, error) {
-			return NewWalletPassphraseChangeCmd(float64(1),
+			return NewWalletPassphraseChangeCmd(testId,
 				"phrase1", "phrase2")
 		},
 		result: &WalletPassphraseChangeCmd{
-			id:            float64(1),
+			id:            testId,
 			OldPassphrase: "phrase1",
 			NewPassphrase: "phrase2",
 		},
@@ -1280,6 +1282,11 @@ func TestCmds(t *testing.T) {
 			t.Errorf("%s: failed to ummarshal cmd: %v",
 				test.name, err)
 			continue
+		}
+
+		id, ok := (c.Id()).(float64)
+		if !ok || id != testId {
+			t.Errorf("%s: id not returned properly", test.name)
 		}
 
 		if !reflect.DeepEqual(test.result, c2) {
