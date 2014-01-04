@@ -211,7 +211,7 @@ const (
 	OP_CODESEPARATOR            = 171
 	OP_CHECKSIG                 = 172
 	OP_CHECKSIGVERIFY           = 173
-	OP_CHECK_MULTISIG           = 174
+	OP_CHECKMULTISIG            = 174
 	OP_CHECKMULTISIGVERIFY      = 175
 	OP_NOP1                     = 176
 	OP_NOP2                     = 177
@@ -664,7 +664,7 @@ var opcodemapPreinit = map[byte]*opcode{
 		opfunc: opcodeCheckSig},
 	OP_CHECKSIGVERIFY: {value: OP_CHECKSIGVERIFY, name: "OP_CHECKSIGVERIFY", length: 1,
 		opfunc: opcodeCheckSigVerify},
-	OP_CHECK_MULTISIG: {value: OP_CHECK_MULTISIG, name: "OP_CHECK_MULTISIG", length: 1,
+	OP_CHECKMULTISIG: {value: OP_CHECKMULTISIG, name: "OP_CHECKMULTISIG", length: 1,
 		opfunc: opcodeCheckMultiSig},
 	OP_CHECKMULTISIGVERIFY: {value: OP_CHECKMULTISIGVERIFY, name: "OP_CHECKMULTISIGVERIFY", length: 1,
 

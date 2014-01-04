@@ -128,7 +128,7 @@ func scriptToAddrHashTemplate(script []byte, validformats []pkformat) (ScriptTyp
 	if success == false {
 		if len(script) > 1 {
 			// check for a few special case
-			if script[len(script)-1] == OP_CHECK_MULTISIG {
+			if script[len(script)-1] == OP_CHECKMULTISIG {
 				return ScriptStrange, nil, nil
 			}
 			if script[0] == OP_0 && (len(script) <= 75 && byte(len(script)) == script[1]+2) {

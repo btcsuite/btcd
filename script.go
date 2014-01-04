@@ -237,7 +237,7 @@ func IsPayToScriptHash(script []byte) bool {
 func isMultiSig(pops []parsedOpcode) bool {
 	l := len(pops)
 	// absolute minimum is 1 pubkey so
-	// OP_1-16, pubkey, OP_1, OP_CHECK_MULTISIG
+	// OP_1-16, pubkey, OP_1, OP_CHECKMULTISIG
 	if l < 4 {
 		return false
 	}
@@ -249,7 +249,7 @@ func isMultiSig(pops []parsedOpcode) bool {
 		pops[l-2].opcode.value > OP_16 {
 		return false
 	}
-	if pops[l-1].opcode.value != OP_CHECK_MULTISIG {
+	if pops[l-1].opcode.value != OP_CHECKMULTISIG {
 		return false
 	}
 	for _, pop := range pops[1 : l-2] {
@@ -936,7 +936,7 @@ func getSigOpCount(pops []parsedOpcode, precise bool) int {
 			fallthrough
 		case OP_CHECKSIGVERIFY:
 			nSigs++
-		case OP_CHECK_MULTISIG:
+		case OP_CHECKMULTISIG:
 			fallthrough
 		case OP_CHECKMULTISIGVERIFY:
 			// If we are being precise then look for familiar

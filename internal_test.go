@@ -3544,17 +3544,17 @@ var popTests = []popTest{
 		expectedErr: StackErrInvalidOpcode,
 	},
 	popTest{
-		name: "OP_CHECK_MULTISIG",
+		name: "OP_CHECKMULTISIG",
 		pop: &parsedOpcode{
-			opcode: opcodemapPreinit[OP_CHECK_MULTISIG],
+			opcode: opcodemapPreinit[OP_CHECKMULTISIG],
 			data:   nil,
 		},
 		expectedErr: nil,
 	},
 	popTest{
-		name: "OP_CHECK_MULTISIG long",
+		name: "OP_CHECKMULTISIG long",
 		pop: &parsedOpcode{
-			opcode: opcodemapPreinit[OP_CHECK_MULTISIG],
+			opcode: opcodemapPreinit[OP_CHECKMULTISIG],
 			data:   make([]byte, 1),
 		},
 		expectedErr: StackErrInvalidOpcode,
