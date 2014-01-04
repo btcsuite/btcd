@@ -7,7 +7,9 @@ package btcutil
 import (
 	"bytes"
 	"code.google.com/p/go.crypto/ripemd160"
+	"encoding/hex"
 	"errors"
+	"github.com/conformal/btcec"
 	"github.com/conformal/btcwire"
 )
 
@@ -21,7 +23,7 @@ var (
 	ErrUnknownIdentifier = errors.New("unknown identifier byte")
 )
 
-// checkBitcoinNet returns an error is the bitcoin network is not supported.
+// checkBitcoinNet returns an error if the bitcoin network is not supported.
 func checkBitcoinNet(net btcwire.BitcoinNet) error {
 	// Check for a valid bitcoin network.
 	if !(net == btcwire.MainNet || net == btcwire.TestNet3) {
@@ -116,13 +118,6 @@ func DecodeAddr(addr string) (Address, error) {
 		}
 		return NewAddressPubKeyHash(decoded[1:ripemd160.Size+1],
 			net)
-
-	case 33: // Compressed pubkey
-		fallthrough
-
-	case 65: // Uncompressed pubkey
-		// TODO(jrick)
-		return nil, errors.New("pay-to-pubkey unimplemented")
 
 	default:
 		return nil, errors.New("decoded address is of unknown size")
@@ -252,4 +247,143 @@ func (a *AddressScriptHash) Net() btcwire.BitcoinNet {
 // be used as a fmt.Stringer.
 func (a *AddressScriptHash) String() string {
 	return a.EncodeAddress()
+}
+
+// PubKeyFormat describes what format to use for a pay-to-pubkey address.
+type PubKeyFormat int
+
+const (
+	// PKFUncompressed indicates the pay-to-pubkey address format is an
+	// uncompressed public key.
+	PKFUncompressed PubKeyFormat = iota
+
+	// PKFCompressed indicates the pay-to-pubkey address format is a
+	// compressed public key.
+	PKFCompressed
+
+	// PKFHybrid indicates the pay-to-pubkey address format is a hybrid
+	// public key.
+	PKFHybrid
+)
+
+// AddressPubKey is an Address for a pay-to-pubkey transaction.
+type AddressPubKey struct {
+	pubKeyFormat PubKeyFormat
+	pubKey       *btcec.PublicKey
+	net          btcwire.BitcoinNet
+}
+
+// NewAddressPubKey returns a new AddressPubKey which represents a pay-to-pubkey
+// address.  The serializedPubKey parameter must be a valid pubkey and can be
+// uncompressed, compressed, or hybrid.  The net parameter must be
+// btcwire.MainNet or btcwire.TestNet3.
+func NewAddressPubKey(serializedPubKey []byte, net btcwire.BitcoinNet) (*AddressPubKey, error) {
+	pubKey, err := btcec.ParsePubKey(serializedPubKey, btcec.S256())
+	if err != nil {
+		return nil, err
+	}
+
+	// Set the format of the pubkey.  This probably should be returned
+	// from btcec, but do it here to avoid API churn.  We already know the
+	// pubkey is valid since it parsed above, so it's safe to simply examine
+	// the leading byte to get the format.
+	pkFormat := PKFUncompressed
+	switch serializedPubKey[0] {
+	case 0x02:
+		fallthrough
+	case 0x03:
+		pkFormat = PKFCompressed
+
+	case 0x06:
+		fallthrough
+	case 0x07:
+		pkFormat = PKFHybrid
+	}
+
+	ecPubKey := (*btcec.PublicKey)(pubKey)
+	addr := &AddressPubKey{pubKeyFormat: pkFormat, pubKey: ecPubKey, net: net}
+	return addr, nil
+}
+
+// serialize returns the serialization of the public key according to the
+// format associated with the address.
+func (a *AddressPubKey) serialize() []byte {
+	var serializedPubKey []byte
+	switch a.pubKeyFormat {
+	default:
+		fallthrough
+	case PKFUncompressed:
+		serializedPubKey = a.pubKey.SerializeUncompressed()
+
+	case PKFCompressed:
+		serializedPubKey = a.pubKey.SerializeCompressed()
+
+	case PKFHybrid:
+		serializedPubKey = a.pubKey.SerializeHybrid()
+	}
+
+	return serializedPubKey
+}
+
+// EncodeAddress returns the string encoding of the public key as a
+// pay-to-pubkey-hash.  Note that the public key format (uncompressed,
+// compressed, etc) will change the resulting address.  This is expected since
+// pay-to-pubkey-hash is a hash of the serialized public key which obviously
+// differs with the format.  At the time of this writing, most Bitcoin addresses
+// are pay-to-pubkey-hash constructed from the uncompressed public key.
+//
+// Part of the Address interface.
+func (a *AddressPubKey) EncodeAddress() string {
+	var netID byte
+	switch a.net {
+	case btcwire.MainNet:
+		netID = MainNetAddr
+	case btcwire.TestNet3:
+		netID = TestNetAddr
+	}
+
+	return encodeAddress(Hash160(a.serialize()), netID)
+}
+
+// ScriptAddress returns the bytes to be included in a txout script to pay
+// to a public key.  Setting the public key format will affect the output of
+// this function accordingly.  Part of the Address interface.
+func (a *AddressPubKey) ScriptAddress() []byte {
+	return a.serialize()
+}
+
+// Net returns the bitcoin network associated with the pay-to-pubkey address.
+func (a *AddressPubKey) Net() btcwire.BitcoinNet {
+	return a.net
+}
+
+// String returns the hex-encoded human-readable string for the pay-to-pubkey
+// address.  This is not the same as calling EncodeAddress.
+func (a *AddressPubKey) String() string {
+	return hex.EncodeToString(a.serialize())
+}
+
+// PubKeyFormat returns the format (uncompressed, compressed, etc) of the
+// pay-to-pubkey address.
+func (a *AddressPubKey) Format() PubKeyFormat {
+	return a.pubKeyFormat
+}
+
+// SetFormat sets the format (uncompressed, compressed, etc) of the
+// pay-to-pubkey address.
+func (a *AddressPubKey) SetFormat(pkFormat PubKeyFormat) {
+	a.pubKeyFormat = pkFormat
+}
+
+// AddressPubKeyHash returns the pay-to-pubkey address converted to a
+// pay-to-pubkey-hash address.  Note that the public key format (uncompressed,
+// compressed, etc) will change the resulting address.  This is expected since
+// pay-to-pubkey-hash is a hash of the serialized public key which obviously
+// differs with the format.  At the time of this writing, most Bitcoin addresses
+// are pay-to-pubkey-hash constructed from the uncompressed public key.
+func (a *AddressPubKey) AddressPubKeyHash() *AddressPubKeyHash {
+	// All potential error conditions are already checked, so it's safe to
+	// ignore the error here.
+	addr, _ := NewAddressPubKeyHash(Hash160(a.serialize()), a.net)
+	return addr
 }
