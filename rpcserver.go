@@ -741,13 +741,22 @@ func handleDecodeScript(s *rpcServer, cmd btcjson.Cmd) (interface{}, error) {
 		}
 	}
 
+	// Convert the script itself to a pay-to-script-hash address.
+	p2sh, err := btcutil.NewAddressScriptHash(script, net)
+	if err != nil {
+		return nil, btcjson.Error{
+			Code:    btcjson.ErrInternal.Code,
+			Message: err.Error(),
+		}
+	}
+
 	// Generate and return the reply.
 	reply := btcjson.DecodeScriptResult{
 		Asm:       disbuf,
 		ReqSigs:   reqSigs,
 		Type:      scriptType.String(),
 		Addresses: addresses,
-		P2sh:      hex.EncodeToString(btcutil.Hash160(script)),
+		P2sh:      p2sh.EncodeAddress(),
 	}
 	return reply, nil
 }
