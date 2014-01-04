@@ -693,20 +693,24 @@ func removeOpcodeByData(pkscript []parsedOpcode, data []byte) []parsedOpcode {
 
 }
 
-// DisasmString formats a disassembled script for one line printing.
+// DisasmString formats a disassembled script for one line printing.  When the
+// script fails to parse, the returned string will contain the disassembled
+// script up to the point the failure occurred along with the string '[error]'
+// appended.  In addition, the reason the script failed to parse is returned
+// if the caller wants more information about the failure.
 func DisasmString(buf []byte) (string, error) {
 	disbuf := ""
 	opcodes, err := parseScript(buf)
-	if err != nil {
-		return "", err
-	}
 	for _, pop := range opcodes {
 		disbuf += pop.print(true) + " "
 	}
 	if disbuf != "" {
 		disbuf = disbuf[:len(disbuf)-1]
 	}
-	return disbuf, nil
+	if err != nil {
+		disbuf += "[error]"
+	}
+	return disbuf, err
 }
 
 // calcScriptHash will, given the a script and hashtype for the current
