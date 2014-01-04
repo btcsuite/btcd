@@ -48,6 +48,7 @@ var commandHandlers = map[string]*handlerData{
 	"createrawtransaction": &handlerData{2, 0, displayGeneric, nil, makeCreateRawTransaction, "\"[{\"txid\":\"id\",\"vout\":n},...]\" \"{\"address\":amount,...}\""},
 	"debuglevel":           &handlerData{1, 0, displayGeneric, nil, makeDebugLevel, "<levelspec>"},
 	"decoderawtransaction": &handlerData{1, 0, displayJSONDump, nil, makeDecodeRawTransaction, "<txhash>"},
+	"decodescript":         &handlerData{1, 0, displayJSONDump, nil, makeDecodeScript, "<hex>"},
 	"dumpprivkey":          &handlerData{1, 0, displayGeneric, nil, makeDumpPrivKey, "<bitcoinaddress>"},
 	"getaccount":           &handlerData{1, 0, displayGeneric, nil, makeGetAccount, "<address>"},
 	"getaccountaddress":    &handlerData{1, 0, displayGeneric, nil, makeGetAccountAddress, "<account>"},
@@ -185,6 +186,11 @@ func makeDebugLevel(args []interface{}) (btcjson.Cmd, error) {
 // decoderawtransaction comands.
 func makeDecodeRawTransaction(args []interface{}) (btcjson.Cmd, error) {
 	return btcjson.NewDecodeRawTransactionCmd("btcctl", args[0].(string))
+}
+
+// makeDecodeScript generates the cmd structure for decodescript comands.
+func makeDecodeScript(args []interface{}) (btcjson.Cmd, error) {
+	return btcjson.NewDecodeScriptCmd("btcctl", args[0].(string))
 }
 
 // makeDumpPrivKey generates the cmd structure for
