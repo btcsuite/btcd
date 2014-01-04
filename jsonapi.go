@@ -71,6 +71,7 @@ type DecodeScriptResult struct {
 	ReqSigs   int      `json:"reqSigs,omitempty"`
 	Type      string   `json:"type"`
 	Addresses []string `json:"addresses,omitempty"`
+	P2sh      string   `json:"p2sh"`
 }
 
 // TxRawResult models the data from the getrawtransaction command.
