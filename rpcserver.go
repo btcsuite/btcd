@@ -747,6 +747,7 @@ func handleDecodeScript(s *rpcServer, cmd btcjson.Cmd) (interface{}, error) {
 		ReqSigs:   reqSigs,
 		Type:      scriptType.String(),
 		Addresses: addresses,
+		P2sh:      hex.EncodeToString(btcutil.Hash160(script)),
 	}
 	return reply, nil
 }
