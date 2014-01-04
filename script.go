@@ -19,99 +19,104 @@ import (
 	"time"
 )
 
-// StackErrShortScript is returned if the script has an opcode that is too long
-// for the length of the script.
-var StackErrShortScript = errors.New("execute past end of script")
+var (
+	// StackErrShortScript is returned if the script has an opcode that is
+	// too long for the length of the script.
+	StackErrShortScript = errors.New("execute past end of script")
 
-// StackErrUnderflow is returned if an opcode requires more items on the stack
-// than is present.
-var StackErrUnderflow = errors.New("stack underflow")
+	// StackErrUnderflow is returned if an opcode requires more items on the
+	// stack than is present.
+	StackErrUnderflow = errors.New("stack underflow")
 
-// StackErrInvalidArgs is returned if the argument for an opcode is out of
-// acceptable range.
-var StackErrInvalidArgs = errors.New("invalid argument")
+	// StackErrInvalidArgs is returned if the argument for an opcode is out
+	// of acceptable range.
+	StackErrInvalidArgs = errors.New("invalid argument")
 
-// StackErrOpDisabled is returned when a disabled opcode is encountered in the
-// script.
-var StackErrOpDisabled = errors.New("Disabled Opcode")
+	// StackErrOpDisabled is returned when a disabled opcode is encountered
+	// in the script.
+	StackErrOpDisabled = errors.New("Disabled Opcode")
 
-// StackErrVerifyFailed is returned when one of the OP_VERIFY or OP_*VERIFY
-// instructions is executed and the conditions fails.
-var StackErrVerifyFailed = errors.New("Verify failed")
+	// StackErrVerifyFailed is returned when one of the OP_VERIFY or
+	// OP_*VERIFY instructions is executed and the conditions fails.
+	StackErrVerifyFailed = errors.New("Verify failed")
 
-// StackErrNumberTooBig is returned when the argument for an opcode that should
-// be an offset is obviously far too large.
-var StackErrNumberTooBig = errors.New("number too big")
+	// StackErrNumberTooBig is returned when the argument for an opcode that
+	// should be an offset is obviously far too large.
+	StackErrNumberTooBig = errors.New("number too big")
 
-// StackErrInvalidOpcode is returned when an opcode marked as invalid or a
-// completely undefined opcode is encountered.
-var StackErrInvalidOpcode = errors.New("Invalid Opcode")
+	// StackErrInvalidOpcode is returned when an opcode marked as invalid or
+	// a completely undefined opcode is encountered.
+	StackErrInvalidOpcode = errors.New("Invalid Opcode")
 
-// StackErrReservedOpcode is returned when an opcode marked as reserved is
-// encountered.
-var StackErrReservedOpcode = errors.New("Reserved Opcode")
+	// StackErrReservedOpcode is returned when an opcode marked as reserved
+	// is encountered.
+	StackErrReservedOpcode = errors.New("Reserved Opcode")
 
-// StackErrEarlyReturn is returned when OP_RETURN is executed in the script.
-var StackErrEarlyReturn = errors.New("Script returned early")
+	// StackErrEarlyReturn is returned when OP_RETURN is executed in the
+	// script.
+	StackErrEarlyReturn = errors.New("Script returned early")
 
-// StackErrNoIf is returned if an OP_ELSE or OP_ENDIF is encountered without
-// first having an OP_IF or OP_NOTIF in the script.
-var StackErrNoIf = errors.New("OP_ELSE or OP_ENDIF with no matching OP_IF")
+	// StackErrNoIf is returned if an OP_ELSE or OP_ENDIF is encountered
+	// without first having an OP_IF or OP_NOTIF in the script.
+	StackErrNoIf = errors.New("OP_ELSE or OP_ENDIF with no matching OP_IF")
 
-// StackErrMissingEndif is returned if the end of a script is reached without
-// and OP_ENDIF to correspond to a conditional expression.
-var StackErrMissingEndif = fmt.Errorf("execute fail, in conditional execution")
+	// StackErrMissingEndif is returned if the end of a script is reached
+	// without and OP_ENDIF to correspond to a conditional expression.
+	StackErrMissingEndif = fmt.Errorf("execute fail, in conditional execution")
 
-// StackErrTooManyPubkeys is returned if an OP_CHECKMULTISIG is encountered
-// with more than MaxPubKeysPerMultiSig pubkeys present.
-var StackErrTooManyPubkeys = errors.New("Invalid pubkey count in OP_CHECKMULTISIG")
+	// StackErrTooManyPubkeys is returned if an OP_CHECKMULTISIG is
+	// encountered with more than MaxPubKeysPerMultiSig pubkeys present.
+	StackErrTooManyPubkeys = errors.New("Invalid pubkey count in OP_CHECKMULTISIG")
 
-// StackErrTooManyOperations is returned if a script has more then
-// MaxOpsPerScript opcodes that do not push data.
-var StackErrTooManyOperations = errors.New("Too many operations in script")
+	// StackErrTooManyOperations is returned if a script has more than
+	// MaxOpsPerScript opcodes that do not push data.
+	StackErrTooManyOperations = errors.New("Too many operations in script")
 
-// StackErrElementTooBig is returned if the size of an element to be pushed to
-// the stack is over MaxScriptElementSize.
-var StackErrElementTooBig = errors.New("Element in script too large")
+	// StackErrElementTooBig is returned if the size of an element to be
+	// pushed to the stack is over MaxScriptElementSize.
+	StackErrElementTooBig = errors.New("Element in script too large")
 
-// StackErrUnknownAddress is returned when ScriptToAddrHash does not recognise
-// the pattern of the script and thus can not find the address for payment.
-var StackErrUnknownAddress = errors.New("non-recognised address")
+	// StackErrUnknownAddress is returned when ScriptToAddrHash does not
+	// recognise the pattern of the script and thus can not find the address
+	// for payment.
+	StackErrUnknownAddress = errors.New("non-recognised address")
 
-// StackErrScriptFailed is returned when at the end of a script the boolean
-// on top of the stack is false signifying that the script has failed.
-var StackErrScriptFailed = errors.New("execute fail, fail on stack")
+	// StackErrScriptFailed is returned when at the end of a script the
+	// boolean on top of the stack is false signifying that the script has
+	// failed.
+	StackErrScriptFailed = errors.New("execute fail, fail on stack")
 
-// StackErrScriptUnfinished is returned when CheckErrorCondition is called
-// on a script that has not finished executing.
-var StackErrScriptUnfinished = errors.New("Error check when script unfinished")
+	// StackErrScriptUnfinished is returned when CheckErrorCondition is
+	// called on a script that has not finished executing.
+	StackErrScriptUnfinished = errors.New("Error check when script unfinished")
 
-// StackErrEmpyStack is returned when the stack is empty at the end of
-// execution. Normal operation requires that a boolean is on top of the stack
-// when the scripts have finished executing.
-var StackErrEmptyStack = errors.New("Stack empty at end of execution")
+	// StackErrEmpyStack is returned when the stack is empty at the end of
+	// execution. Normal operation requires that a boolean is on top of the
+	// stack when the scripts have finished executing.
+	StackErrEmptyStack = errors.New("Stack empty at end of execution")
 
-// StackErrP2SHNonPushOnly is returned when a Pay-to-Script-Hash transaction
-// is encountered and the ScriptSig does operations other than push data (in
-// violation of bip16).
-var StackErrP2SHNonPushOnly = errors.New("pay to script hash with non " +
-	"pushonly input")
+	// StackErrP2SHNonPushOnly is returned when a Pay-to-Script-Hash
+	// transaction is encountered and the ScriptSig does operations other
+	// than push data (in violation of bip16).
+	StackErrP2SHNonPushOnly = errors.New("pay to script hash with non " +
+		"pushonly input")
 
-// StackErrInvalidParseType is an internal error returned from ScriptToAddrHash
-// ony if the internal data tables are wrong.
-var StackErrInvalidParseType = errors.New("internal error: invalid parsetype found")
+	// StackErrInvalidParseType is an internal error returned from
+	// ScriptToAddrHash ony if the internal data tables are wrong.
+	StackErrInvalidParseType = errors.New("internal error: invalid parsetype found")
 
-// StackErrInvalidAddrOffset is an internal error returned from ScriptToAddrHash
-// ony if the internal data tables are wrong.
-var StackErrInvalidAddrOffset = errors.New("internal error: invalid offset found")
+	// StackErrInvalidAddrOffset is an internal error returned from
+	// ScriptToAddrHash ony if the internal data tables are wrong.
+	StackErrInvalidAddrOffset = errors.New("internal error: invalid offset found")
 
-// StackErrInvalidIndex is returned when an out-of-bounds index was passed to
-// a function.
-var StackErrInvalidIndex = errors.New("Invalid script index")
+	// StackErrInvalidIndex is returned when an out-of-bounds index was
+	// passed to a function.
+	StackErrInvalidIndex = errors.New("Invalid script index")
 
-// StackErrNonPushOnly is returned when ScriptInfo is called with a pkScript
-// that peforms operations other that pushing data to the stack.
-var StackErrNonPushOnly = errors.New("SigScript is non pushonly")
+	// StackErrNonPushOnly is returned when ScriptInfo is called with a
+	// pkScript that peforms operations other that pushing data to the stack.
+	StackErrNonPushOnly = errors.New("SigScript is non pushonly")
+)
 
 // ErrUnsupportedAddress is returned when a concrete type that implements
 // a btcutil.Address is not a supported type.
