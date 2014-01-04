@@ -56,7 +56,7 @@ var rpcHandlers = map[string]commandHandler{
 	"createrawtransaction":   handleCreateRawTransaction,
 	"debuglevel":             handleDebugLevel,
 	"decoderawtransaction":   handleDecodeRawTransaction,
-	"decodescript":           handleUnimplemented,
+	"decodescript":           handleDecodeScript,
 	"dumpprivkey":            handleAskWallet,
 	"dumpwallet":             handleAskWallet,
 	"encryptwallet":          handleAskWallet,
@@ -703,6 +703,52 @@ func handleDecodeRawTransaction(s *rpcServer, cmd btcjson.Cmd) (interface{}, err
 		Vout:     vout,
 	}
 	return txReply, nil
+}
+
+// handleDecodeScript handles decodescript commands.
+func handleDecodeScript(s *rpcServer, cmd btcjson.Cmd) (interface{}, error) {
+	c := cmd.(*btcjson.DecodeScriptCmd)
+
+	// Convert the hex script to bytes.
+	script, err := hex.DecodeString(c.HexScript)
+	if err != nil {
+		return nil, btcjson.Error{
+			Code: btcjson.ErrInvalidParameter.Code,
+			Message: fmt.Sprintf("argument must be hexadecimal "+
+				"string (not %q)", c.HexScript),
+		}
+	}
+
+	// The disassembled string will contain [error] inline if the script
+	// doesn't fully parse, so ignore the error here.
+	disbuf, _ := btcscript.DisasmString(script)
+
+	// Get information about the script.
+	// TODO(davec): The btcscript CalcPkScriptAddrHashes function should
+	// be changed to return btcutil.Address.
+	net := s.server.btcnet
+	scriptType, reqSigs, hashes := btcscript.CalcPkScriptAddrHashes(script)
+	addresses := make([]string, len(hashes))
+	for i, hash := range hashes {
+		var addr btcutil.Address
+		if scriptType == btcscript.ScriptHashTy {
+			addr, err = btcutil.NewAddressScriptHash(hash, net)
+		} else {
+			addr, err = btcutil.NewAddressPubKeyHash(hash, net)
+		}
+		if err == nil {
+			addresses[i] = addr.EncodeAddress()
+		}
+	}
+
+	// Generate and return the reply.
+	reply := btcjson.DecodeScriptResult{
+		Asm:       disbuf,
+		ReqSigs:   reqSigs,
+		Type:      scriptType.String(),
+		Addresses: addresses,
+	}
+	return reply, nil
 }
 
 // handleGetBestBlockHash implements the getbestblockhash command.
