@@ -21,6 +21,37 @@ var (
 	ErrUnknownIdentifier = errors.New("unknown identifier byte")
 )
 
+// checkBitcoinNet returns an error is the bitcoin network is not supported.
+func checkBitcoinNet(net btcwire.BitcoinNet) error {
+	// Check for a valid bitcoin network.
+	if !(net == btcwire.MainNet || net == btcwire.TestNet3) {
+		return ErrUnknownNet
+	}
+
+	return nil
+}
+
+// encodeAddress returns a human-readable payment address given a ripemd160 hash
+// and netid which encodes the bitcoin network and address type.  It is used
+// in both pay-to-pubkey-hash (P2PKH) and pay-to-script-hash (P2SH) address
+// encoding.
+func encodeAddress(hash160 []byte, netID byte) string {
+	tosum := make([]byte, ripemd160.Size+1)
+	tosum[0] = netID
+	copy(tosum[1:], hash160)
+	cksum := btcwire.DoubleSha256(tosum)
+
+	// Address before base58 encoding is 1 byte for netID, ripemd160 hash
+	// size, plus 4 bytes of checksum (total 25).
+	b := make([]byte, ripemd160.Size+5, ripemd160.Size+5)
+	b[0] = netID
+	copy(b[1:], hash160)
+	copy(b[ripemd160.Size+1:], cksum[:4])
+
+	return Base58Encode(b)
+
+}
+
 // Address is an interface type for any type of destination a transaction
 // output may spend to.  This includes pay-to-pubkey (P2PK), pay-to-pubkey-hash
 // (P2PKH), and pay-to-script-hash (P2SH).  Address is designed to be generic
@@ -114,8 +145,8 @@ func NewAddressPubKeyHash(pkHash []byte, net btcwire.BitcoinNet) (*AddressPubKey
 	}
 
 	// Check for a valid bitcoin network.
-	if !(net == btcwire.MainNet || net == btcwire.TestNet3) {
-		return nil, ErrUnknownNet
+	if err := checkBitcoinNet(net); err != nil {
+		return nil, err
 	}
 
 	addr := &AddressPubKeyHash{net: net}
@@ -134,17 +165,7 @@ func (a *AddressPubKeyHash) EncodeAddress() string {
 		netID = TestNetAddr
 	}
 
-	tosum := append([]byte{netID}, a.hash[:]...)
-	cksum := btcwire.DoubleSha256(tosum)
-
-	// Address before base58 encoding is 1 byte for netID, 20 bytes for
-	// hash, plus 4 bytes of checksum (total 25).
-	b := make([]byte, 25, 25)
-	b[0] = netID
-	copy(b[1:], a.hash[:])
-	copy(b[21:], cksum[:4])
-
-	return Base58Encode(b)
+	return encodeAddress(a.hash[:], netID)
 }
 
 // ScriptAddress returns the bytes to be included in a txout script to pay
@@ -178,15 +199,14 @@ func NewAddressScriptHash(serializedScript []byte, net btcwire.BitcoinNet) (*Add
 // NewAddressScriptHashFromHash returns a new AddressScriptHash.  scriptHash
 // must be 20 bytes and net must be btcwire.MainNet or btcwire.TestNet3.
 func NewAddressScriptHashFromHash(scriptHash []byte, net btcwire.BitcoinNet) (*AddressScriptHash, error) {
-
 	// Check for a valid script hash length.
 	if len(scriptHash) != ripemd160.Size {
 		return nil, errors.New("scriptHash must be 20 bytes")
 	}
 
 	// Check for a valid bitcoin network.
-	if !(net == btcwire.MainNet || net == btcwire.TestNet3) {
-		return nil, ErrUnknownNet
+	if err := checkBitcoinNet(net); err != nil {
+		return nil, err
 	}
 
 	addr := &AddressScriptHash{net: net}
@@ -205,17 +225,7 @@ func (a *AddressScriptHash) EncodeAddress() string {
 		netID = TestNetScriptHash
 	}
 
-	tosum := append([]byte{netID}, a.hash[:]...)
-	cksum := btcwire.DoubleSha256(tosum)
-
-	// P2SH address before base58 encoding is 1 byte for netID, 20 bytes
-	// for hash, plus 4 bytes of checksum (total 25).
-	b := make([]byte, 25, 25)
-	b[0] = netID
-	copy(b[1:], a.hash[:])
-	copy(b[21:], cksum[:4])
-
-	return Base58Encode(b)
+	return encodeAddress(a.hash[:], netID)
 }
 
 // ScriptAddress returns the bytes to be included in a txout script to pay
