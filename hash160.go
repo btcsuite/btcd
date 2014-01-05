@@ -6,7 +6,7 @@ package btcutil
 
 import (
 	"code.google.com/p/go.crypto/ripemd160"
-	"crypto/sha256"
+	"github.com/conformal/fastsha256"
 	"hash"
 )
 
@@ -18,5 +18,5 @@ func calcHash(buf []byte, hasher hash.Hash) []byte {
 
 // Hash160 calculates the hash ripemd160(sha256(b)).
 func Hash160(buf []byte) []byte {
-	return calcHash(calcHash(buf, sha256.New()), ripemd160.New())
+	return calcHash(calcHash(buf, fastsha256.New()), ripemd160.New())
 }
