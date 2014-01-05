@@ -180,6 +180,13 @@ func (a *AddressPubKeyHash) Net() btcwire.BitcoinNet {
 	return a.net
 }
 
+// String returns a human-readable string for the pay-to-pubkey-hash address.
+// This is equivalent to calling EncodeAddress, but is provided so the type can
+// be used as a fmt.Stringer.
+func (a *AddressPubKeyHash) String() string {
+	return a.EncodeAddress()
+}
+
 // AddressScriptHash is an Address for a pay-to-script-hash (P2SH)
 // transaction.
 type AddressScriptHash struct {
@@ -238,4 +245,11 @@ func (a *AddressScriptHash) ScriptAddress() []byte {
 // address.
 func (a *AddressScriptHash) Net() btcwire.BitcoinNet {
 	return a.net
+}
+
+// String returns a human-readable string for the pay-to-script-hash address.
+// This is equivalent to calling EncodeAddress, but is provided so the type can
+// be used as a fmt.Stringer.
+func (a *AddressScriptHash) String() string {
+	return a.EncodeAddress()
 }
