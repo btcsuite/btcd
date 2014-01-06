@@ -67,6 +67,7 @@ var commandHandlers = map[string]*handlerData{
 	"importprivkey":        &handlerData{1, 2, displayGeneric, []conversionHandler{nil, nil, toBool}, makeImportPrivKey, "<wifprivkey> [label] [rescan=true]"},
 	"listtransactions":     &handlerData{0, 3, displayJSONDump, []conversionHandler{nil, toInt, toInt}, makeListTransactions, "[account] [count=10] [from=0]"},
 	"verifychain":          &handlerData{0, 2, displayJSONDump, []conversionHandler{toInt, toInt}, makeVerifyChain, "[level] [numblocks]"},
+	"sendrawtransaction":   &handlerData{1, 0, displayGeneric, nil, makeSendRawTransaction, "<hextx>"},
 	"stop":                 &handlerData{0, 0, displayGeneric, nil, makeStop, ""},
 }
 
@@ -340,6 +341,12 @@ func makeListTransactions(args []interface{}) (btcjson.Cmd, error) {
 	}
 
 	return btcjson.NewListTransactionsCmd("btcctl", optargs...)
+}
+
+// makeSendRawTransaction generates the cmd structure for sendrawtransaction
+// commands.
+func makeSendRawTransaction(args []interface{}) (btcjson.Cmd, error) {
+	return btcjson.NewSendRawTransactionCmd("btcctl", args[0].(string))
 }
 
 // makeStop generates the cmd structure for stop comands.
