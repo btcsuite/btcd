@@ -65,7 +65,7 @@ func init() {
 func OpenDB(dbpath string) (btcdb.Db, error) {
 	log = btcdb.GetLog()
 
-	db, err := openDB(dbpath, 0)
+	db, err := openDB(dbpath, false)
 	if err != nil {
 		return nil, err
 	}
@@ -127,7 +127,7 @@ blocknarrow:
 
 var CurrentDBVersion int32 = 1
 
-func openDB(dbpath string, flag opt.OptionsFlag) (pbdb btcdb.Db, err error) {
+func openDB(dbpath string, create bool) (pbdb btcdb.Db, err error) {
 	var db LevelDb
 	var tlDb *leveldb.DB
 	var dbversion int32
@@ -143,7 +143,7 @@ func openDB(dbpath string, flag opt.OptionsFlag) (pbdb btcdb.Db, err error) {
 		}
 	}()
 
-	if flag&opt.OFCreateIfMissing == opt.OFCreateIfMissing {
+	if create == true {
 		err = os.Mkdir(dbpath, 0750)
 		if err != nil {
 			log.Errorf("mkdir failed %v %v", dbpath, err)
@@ -168,22 +168,22 @@ func openDB(dbpath string, flag opt.OptionsFlag) (pbdb btcdb.Db, err error) {
 			dbversion = ^0
 		}
 	} else {
-		if flag&opt.OFCreateIfMissing != 0 {
+		if create == true {
 			needVersionFile = true
 			dbversion = CurrentDBVersion
 		}
 	}
 
 	myCache := cache.NewEmptyCache()
-	opts := &opt.Options{Flag: flag,
-		BlockCache:      myCache,
-		MaxOpenFiles:    256,
-		CompressionType: opt.NoCompression,
+	opts := &opt.Options{
+		BlockCache:   myCache,
+		MaxOpenFiles: 256,
+		Compression:  opt.NoCompression,
 	}
 
 	switch dbversion {
 	case 0:
-		opts = &opt.Options{Flag: flag}
+		opts = &opt.Options{}
 	case 1:
 		// uses defaults from above
 	default:
@@ -220,7 +220,7 @@ func CreateDB(dbpath string) (btcdb.Db, error) {
 	log = btcdb.GetLog()
 
 	// No special setup needed, just OpenBB
-	db, err := openDB(dbpath, opt.OFCreateIfMissing)
+	db, err := openDB(dbpath, true)
 	if err == nil {
 		ldb := db.(*LevelDb)
 		ldb.lastBlkIdx = -1
