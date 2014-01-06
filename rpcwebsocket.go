@@ -395,9 +395,9 @@ func handleRescan(s *rpcServer, cmd btcjson.Cmd,
 	}
 
 	if len(rescanCmd.Addresses) == 1 {
-		rpcsLog.Info("Begining rescan for 1 address.")
+		rpcsLog.Info("Beginning rescan for 1 address.")
 	} else {
-		rpcsLog.Infof("Begining rescan for %v addresses.",
+		rpcsLog.Infof("Beginning rescan for %v addresses.",
 			len(rescanCmd.Addresses))
 	}
 
