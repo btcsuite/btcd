@@ -854,6 +854,41 @@ var jsoncmdtests = []struct {
 	},
 	{
 		name: "basic",
+		cmd:  "listsinceblock",
+		f: func() (Cmd, error) {
+			return NewListSinceBlockCmd(testId)
+		},
+		result: &ListSinceBlockCmd{
+			id:                  testId,
+			TargetConfirmations: 1,
+		},
+	},
+	{
+		name: "basic + 1 ops",
+		cmd:  "listsinceblock",
+		f: func() (Cmd, error) {
+			return NewListSinceBlockCmd(testId, "someblockhash")
+		},
+		result: &ListSinceBlockCmd{
+			id:                  testId,
+			BlockHash:           "someblockhash",
+			TargetConfirmations: 1,
+		},
+	},
+	{
+		name: "basic + 2 ops",
+		cmd:  "listsinceblock",
+		f: func() (Cmd, error) {
+			return NewListSinceBlockCmd(testId, "someblockhash", 3)
+		},
+		result: &ListSinceBlockCmd{
+			id:                  testId,
+			BlockHash:           "someblockhash",
+			TargetConfirmations: 3,
+		},
+	},
+	{
+		name: "basic",
 		cmd:  "listtransactions",
 		f: func() (Cmd, error) {
 			return NewListTransactionsCmd(testId)

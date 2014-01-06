@@ -4371,7 +4371,7 @@ func NewListSinceBlockCmd(id interface{}, optArgs ...interface{}) (*ListSinceBlo
 		blockhash = bh
 	}
 	if len(optArgs) > 1 {
-		tc, ok := optArgs[0].(int)
+		tc, ok := optArgs[1].(int)
 		if !ok {
 			return nil, errors.New("second optional argument targetconfirmations is not an int")
 		}
