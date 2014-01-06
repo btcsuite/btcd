@@ -3177,7 +3177,7 @@ func (cmd *GetReceivedByAddressCmd) Id() interface{} {
 
 // Method satisfies the Cmd interface by returning the json method.
 func (cmd *GetReceivedByAddressCmd) Method() string {
-	return "getrecivedbyaddress"
+	return "getreceivedbyaddress"
 }
 
 // MarshalJSON returns the JSON encoding of cmd.  Part of the Cmd interface.
