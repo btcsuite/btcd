@@ -206,7 +206,7 @@ func (b *blockManager) handleNewPeerMsg(peers *list.List, p *peer) {
 		return
 	}
 
-	bmgrLog.Infof("New valid peer %s", p)
+	bmgrLog.Infof("New valid peer %s (%s)", p, p.userAgent)
 
 	// Ignore the peer if it's not a sync candidate.
 	if !b.isSyncCandidate(p) {
