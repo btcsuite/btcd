@@ -831,6 +831,31 @@ var opcodemapPreinit = map[byte]*opcode{
 		opfunc: opcodeInvalid},
 }
 
+// opcodeOnelineRepls defines opcode names which are replaced when doing a
+// one-line disassembly.  This is done to match the output of the reference
+// implementation while not changing the opcode names in the nicer full
+// disassembly.
+var opcodeOnelineRepls = map[string]string{
+	"OP_1NEGATE": "-1",
+	"OP_0":       "0",
+	"OP_1":       "1",
+	"OP_2":       "2",
+	"OP_3":       "3",
+	"OP_4":       "4",
+	"OP_5":       "5",
+	"OP_6":       "6",
+	"OP_7":       "7",
+	"OP_8":       "8",
+	"OP_9":       "9",
+	"OP_10":      "10",
+	"OP_11":      "11",
+	"OP_12":      "12",
+	"OP_13":      "13",
+	"OP_14":      "14",
+	"OP_15":      "15",
+	"OP_16":      "16",
+}
+
 type parsedOpcode struct {
 	opcode *opcode
 	data   []byte
@@ -868,7 +893,19 @@ func (pop *parsedOpcode) exec(s *Script) error {
 }
 
 func (pop *parsedOpcode) print(oneline bool) string {
-	retString := pop.opcode.name
+	// The reference implementation one-line disassembly replaces opcodes
+	// which represent values (e.g. OP_0 through OP_16 and OP_1NEGATE)
+	// with the raw value.  However, when not doing a one-line dissassembly,
+	// we prefer to show the actual opcode names.  Thus, only replace the
+	// opcodes in question when the oneline flag is set.
+	opcodeName := pop.opcode.name
+	if oneline {
+		if replName, ok := opcodeOnelineRepls[opcodeName]; ok {
+			opcodeName = replName
+		}
+	}
+
+	retString := opcodeName
 	if pop.opcode.length == 1 {
 		return retString
 	}
