@@ -7,6 +7,7 @@ package main
 import (
 	"encoding/binary"
 	"fmt"
+	"github.com/conformal/btcd/limits"
 	"github.com/conformal/btcdb"
 	_ "github.com/conformal/btcdb/ldb"
 	"github.com/conformal/btclog"
@@ -66,7 +67,13 @@ func main() {
 		return
 	}
 
+	// Use all processor cores.
 	runtime.GOMAXPROCS(runtime.NumCPU())
+
+	// Up some limits.
+	if err := limits.SetLimits(); err != nil {
+		os.Exit(1)
+	}
 
 	backendLogger := btclog.NewDefaultBackendLogger()
 	defer backendLogger.Flush()

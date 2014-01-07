@@ -4,7 +4,7 @@
 
 // +build !windows,!plan9
 
-package main
+package limits
 
 import (
 	"fmt"
@@ -16,7 +16,7 @@ const (
 	fileLimitMin  = 1024
 )
 
-func setLimits() error {
+func SetLimits() error {
 	var rLimit syscall.Rlimit
 
 	err := syscall.Getrlimit(syscall.RLIMIT_NOFILE, &rLimit)

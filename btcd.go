@@ -5,6 +5,7 @@
 package main
 
 import (
+	"github.com/conformal/btcd/limits"
 	"fmt"
 	"net"
 	"net/http"
@@ -128,7 +129,7 @@ func main() {
 	runtime.GOMAXPROCS(runtime.NumCPU())
 
 	// Up some limits.
-	if err := setLimits(); err != nil {
+	if err := limits.SetLimits(); err != nil {
 		os.Exit(1)
 	}
 
