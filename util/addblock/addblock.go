@@ -18,7 +18,6 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
-	"runtime/pprof"
 )
 
 type ShaHash btcwire.ShaHash
@@ -146,25 +145,18 @@ func main() {
 					blkP.complete <- true
 					db.InsertBlock(blkP.blk)
 
-					if cfg.Progress && eheight%int64(1) == 0 {
+					if cfg.Progress && eheight%int64(10000) == 0 {
 						log.Infof("Processing block %v", eheight)
 					}
 					eheight++
-
-					if eheight%2000 == 0 {
-						f, err := os.Create(fmt.Sprintf("profile.%d", eheight))
-						if err == nil {
-							pprof.WriteHeapProfile(f)
-							f.Close()
-						} else {
-							log.Warnf("profile failed %v", err)
-						}
-					}
 				} else {
 					break
 				}
 			}
 		}
+	}
+	if cfg.Progress {
+		log.Infof("Processing block %v", eheight)
 	}
 }
 
