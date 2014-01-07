@@ -49,69 +49,6 @@ func TstSignatureScriptCustomReader(reader io.Reader, tx *btcwire.MsgTx, idx int
 		hashType, privkey, compress)
 }
 
-// Tests for internal error cases in ScriptToAddrHash.
-// We pass bad format definitions to ScriptToAddrHash to make sure the internal
-// checks work correctly. This is located in internal_test.go and not address.go
-// because of the ridiculous amount of internal types/constants that would
-// otherwise need to be exported here.
-
-type pkformatTest struct {
-	name   string
-	format pkformat
-	script []byte
-	ty     ScriptType
-	err    error
-}
-
-var TstPkFormats = []pkformatTest{
-	pkformatTest{
-		name: "bad offset",
-		format: pkformat{
-			addrtype:  ScriptAddr,
-			parsetype: scrNoAddr,
-			length:    4,
-			databytes: []pkbytes{{0, OP_1}, {1, OP_2}, {2,
-				OP_3}, /* wrong - too long */ {9, OP_4}},
-			allowmore: true,
-		},
-		script: []byte{OP_1, OP_2, OP_3, OP_4},
-		err:    StackErrInvalidAddrOffset,
-	},
-	pkformatTest{
-		name: "Bad parsetype",
-		format: pkformat{
-			addrtype:  ScriptAddr,
-			parsetype: 8, // invalid type
-			length:    4,
-			databytes: []pkbytes{{0, OP_1}, {1, OP_2}, {2,
-				OP_3}, /* wrong - too long */ {3, OP_4}},
-			allowmore: true,
-		},
-		script: []byte{OP_1, OP_2, OP_3, OP_4},
-		err:    StackErrInvalidParseType,
-	},
-}
-
-func TestBadPkFormat(t *testing.T) {
-	for _, test := range TstPkFormats {
-		ty, addr, err := scriptToAddrHashTemplate(test.script,
-			[]pkformat{test.format})
-		if err != nil {
-			if err != test.err {
-				t.Errorf("%s got error \"%v\". Was expecrting "+
-					"\"%v\"", test.name, err, test.err)
-			}
-			continue
-		}
-		if ty != test.ty {
-			t.Errorf("%s: unexpected type \"%s\". Wanted \"%s\" (addr %v)",
-				test.name, ty, test.ty, addr)
-			continue
-		}
-	}
-
-}
-
 // Internal tests for opcodde parsing with bad data templates.
 func TestParseOpcode(t *testing.T) {
 	fakemap := make(map[byte]*opcode)

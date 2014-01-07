@@ -1200,35 +1200,3 @@ func CalcMultiSigStats(script []byte) (int, int, error) {
 	numPubKeys := int(pops[len(pops)-2].opcode.value - (OP_1 - 1))
 	return numPubKeys, numSigs, nil
 }
-
-// CalcPkScriptAddrHashes returns the type of script as well as the required
-// number of signatures and the hashes of the addresses.
-func CalcPkScriptAddrHashes(script []byte) (ScriptClass, int, [][]byte) {
-	c := GetScriptClass(script)
-	switch c {
-	case ScriptHashTy:
-		fallthrough
-	case PubKeyTy:
-		fallthrough
-	case PubKeyHashTy:
-		_, addrHash, err := ScriptToAddrHash(script)
-		if err != nil {
-			return NonStandardTy, 0, nil
-		}
-		return c, 1, [][]byte{addrHash}
-
-	case MultiSigTy:
-		_, reqSigs, addrHashes, err := ScriptToAddrHashes(script)
-		if err != nil {
-			return NonStandardTy, 0, nil
-		}
-
-		return c, reqSigs, addrHashes
-	case NonStandardTy:
-		fallthrough
-	case NullDataTy:
-		fallthrough
-	default:
-		return NonStandardTy, 0, nil
-	}
-}
