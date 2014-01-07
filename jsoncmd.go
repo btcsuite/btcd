@@ -4324,7 +4324,7 @@ func (cmd *ListReceivedByAddressCmd) UnmarshalJSON(b []byte) error {
 		if !ok {
 			return errors.New("first optional parameter minconf must be a number")
 		}
-		optArgs = append(optArgs, minconf)
+		optArgs = append(optArgs, int(minconf))
 	}
 	if len(r.Params) > 1 {
 		includeempty, ok := r.Params[1].(bool)

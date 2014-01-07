@@ -854,6 +854,40 @@ var jsoncmdtests = []struct {
 	},
 	{
 		name: "basic",
+		cmd:  "listreceivedbyaddress",
+		f: func() (Cmd, error) {
+			return NewListReceivedByAddressCmd(testId)
+		},
+		result: &ListReceivedByAddressCmd{
+			id:      testId,
+			MinConf: 1,
+		},
+	},
+	{
+		name: "basic + 1 opt",
+		cmd:  "listreceivedbyaddress",
+		f: func() (Cmd, error) {
+			return NewListReceivedByAddressCmd(testId, 2)
+		},
+		result: &ListReceivedByAddressCmd{
+			id:      testId,
+			MinConf: 2,
+		},
+	},
+	{
+		name: "basic + 2 opt",
+		cmd:  "listreceivedbyaddress",
+		f: func() (Cmd, error) {
+			return NewListReceivedByAddressCmd(testId, 2, true)
+		},
+		result: &ListReceivedByAddressCmd{
+			id:           testId,
+			MinConf:      2,
+			IncludeEmpty: true,
+		},
+	},
+	{
+		name: "basic",
 		cmd:  "listsinceblock",
 		f: func() (Cmd, error) {
 			return NewListSinceBlockCmd(testId)
