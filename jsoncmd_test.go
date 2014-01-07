@@ -853,6 +853,29 @@ var jsoncmdtests = []struct {
 		},
 	},
 	{
+		name: "basic + 1 opt",
+		cmd:  "listreceivedbyaccount",
+		f: func() (Cmd, error) {
+			return NewListReceivedByAccountCmd(testId, 2)
+		},
+		result: &ListReceivedByAccountCmd{
+			id:      testId,
+			MinConf: 2,
+		},
+	},
+	{
+		name: "basic + 2 opt",
+		cmd:  "listreceivedbyaccount",
+		f: func() (Cmd, error) {
+			return NewListReceivedByAccountCmd(testId, 2, true)
+		},
+		result: &ListReceivedByAccountCmd{
+			id:           testId,
+			MinConf:      2,
+			IncludeEmpty: true,
+		},
+	},
+	{
 		name: "basic",
 		cmd:  "listreceivedbyaddress",
 		f: func() (Cmd, error) {
