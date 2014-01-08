@@ -57,6 +57,15 @@ func TestInv(t *testing.T) {
 			"vectors not received")
 	}
 
+	// Ensure creating the message with a size hint larger than the max
+	// works as expected.
+	msg = btcwire.NewMsgInvSizeHint(btcwire.MaxInvPerMsg + 1)
+	wantCap := btcwire.MaxInvPerMsg
+	if cap(msg.InvList) != wantCap {
+		t.Errorf("NewMsgInvSizeHint: wrong cap for size hint - "+
+			"got %v, want %v", cap(msg.InvList), wantCap)
+	}
+
 	return
 }
 
