@@ -114,6 +114,10 @@ func (n *AccountBalanceNtfn) Id() interface{} {
 	return nil
 }
 
+// SetId is implemented to satisify the btcjson.Cmd interface.  The
+// notification id is not modified.
+func (n *AccountBalanceNtfn) SetId(id interface{}) {}
+
 // Method satisifies the btcjson.Cmd interface by returning the method
 // of the notification.
 func (n *AccountBalanceNtfn) Method() string {
@@ -205,6 +209,10 @@ func (n *BlockConnectedNtfn) Id() interface{} {
 	return nil
 }
 
+// SetId is implemented to satisify the btcjson.Cmd interface.  The
+// notification id is not modified.
+func (n *BlockConnectedNtfn) SetId(id interface{}) {}
+
 // Method satisifies the btcjson.Cmd interface by returning the method
 // of the notification.
 func (n *BlockConnectedNtfn) Method() string {
@@ -295,6 +303,10 @@ func (n *BlockDisconnectedNtfn) Id() interface{} {
 	return nil
 }
 
+// SetId is implemented to satisify the btcjson.Cmd interface.  The
+// notification id is not modified.
+func (n *BlockDisconnectedNtfn) SetId(id interface{}) {}
+
 // Method satisifies the btcjson.Cmd interface by returning the method
 // of the notification.
 func (n *BlockDisconnectedNtfn) Method() string {
@@ -377,6 +389,10 @@ func parseBtcdConnectedNtfn(r *btcjson.RawCmd) (btcjson.Cmd, error) {
 func (n *BtcdConnectedNtfn) Id() interface{} {
 	return nil
 }
+
+// SetId is implemented to satisify the btcjson.Cmd interface.  The
+// notification id is not modified.
+func (n *BtcdConnectedNtfn) SetId(id interface{}) {}
 
 // Method satisifies the btcjson.Cmd interface by returning the method
 // of the notification.
@@ -488,6 +504,10 @@ func (n *TxMinedNtfn) Id() interface{} {
 	return nil
 }
 
+// SetId is implemented to satisify the btcjson.Cmd interface.  The
+// notification id is not modified.
+func (n *TxMinedNtfn) SetId(id interface{}) {}
+
 // Method satisifies the btcjson.Cmd interface by returning the method
 // of the notification.
 func (n *TxMinedNtfn) Method() string {
@@ -581,6 +601,10 @@ func (n *TxNtfn) Id() interface{} {
 	return nil
 }
 
+// SetId is implemented to satisify the btcjson.Cmd interface.  The
+// notification id is not modified.
+func (n *TxNtfn) SetId(id interface{}) {}
+
 // Method satisifies the btcjson.Cmd interface by returning the method
 // of the notification.
 func (n *TxNtfn) Method() string {
@@ -673,6 +697,10 @@ func parseWalletLockStateNtfn(r *btcjson.RawCmd) (btcjson.Cmd, error) {
 func (n *WalletLockStateNtfn) Id() interface{} {
 	return nil
 }
+
+// SetId is implemented to satisify the btcjson.Cmd interface.  The
+// notification id is not modified.
+func (n *WalletLockStateNtfn) SetId(id interface{}) {}
 
 // Method satisifies the btcjson.Cmd interface by returning the method
 // of the notification.

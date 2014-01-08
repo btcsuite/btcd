@@ -58,6 +58,11 @@ func (cmd *GetCurrentNetCmd) Id() interface{} {
 	return cmd.id
 }
 
+// SetId satisifies the Cmd interface by setting the ID of the command.
+func (cmd *GetCurrentNetCmd) SetId(id interface{}) {
+	cmd.id = id
+}
+
 // Method satisfies the Cmd interface by returning the RPC method.
 func (cmd *GetCurrentNetCmd) Method() string {
 	return "getcurrentnet"
@@ -155,6 +160,11 @@ func (cmd *GetUnconfirmedBalanceCmd) Id() interface{} {
 	return cmd.id
 }
 
+// SetId satisifies the Cmd interface by setting the ID of the command.
+func (cmd *GetUnconfirmedBalanceCmd) SetId(id interface{}) {
+	cmd.id = id
+}
+
 // Method satisifies the Cmd interface by returning the RPC method.
 func (cmd *GetUnconfirmedBalanceCmd) Method() string {
 	return "getunconfirmedbalance"
@@ -227,6 +237,11 @@ func parseGetBestBlockCmd(r *btcjson.RawCmd) (btcjson.Cmd, error) {
 // Id satisifies the Cmd interface by returning the ID of the command.
 func (cmd *GetBestBlockCmd) Id() interface{} {
 	return cmd.id
+}
+
+// SetId satisifies the Cmd interface by setting the ID of the command.
+func (cmd *GetBestBlockCmd) SetId(id interface{}) {
+	cmd.id = id
 }
 
 // Method satisfies the Cmd interface by returning the RPC method.
@@ -342,6 +357,11 @@ func (cmd *RescanCmd) Id() interface{} {
 	return cmd.id
 }
 
+// SetId satisifies the Cmd interface by setting the ID of the command.
+func (cmd *RescanCmd) SetId(id interface{}) {
+	cmd.id = id
+}
+
 // Method satisfies the Cmd interface by returning the RPC method.
 func (cmd *RescanCmd) Method() string {
 	return "rescan"
@@ -438,6 +458,11 @@ func (cmd *NotifyNewTXsCmd) Id() interface{} {
 	return cmd.id
 }
 
+// SetId satisifies the Cmd interface by setting the ID of the command.
+func (cmd *NotifyNewTXsCmd) SetId(id interface{}) {
+	cmd.id = id
+}
+
 // Method satisfies the Cmd interface by returning the RPC method.
 func (cmd *NotifyNewTXsCmd) Method() string {
 	return "notifynewtxs"
@@ -531,6 +556,11 @@ func parseNotifySpentCmd(r *btcjson.RawCmd) (btcjson.Cmd, error) {
 // Id satisifies the Cmd interface by returning the ID of the command.
 func (cmd *NotifySpentCmd) Id() interface{} {
 	return cmd.id
+}
+
+// SetId satisifies the Cmd interface by setting the ID of the command.
+func (cmd *NotifySpentCmd) SetId(id interface{}) {
+	cmd.id = id
 }
 
 // Method satisfies the Cmd interface by returning the RPC method.
@@ -634,6 +664,11 @@ func (cmd *CreateEncryptedWalletCmd) Id() interface{} {
 	return cmd.id
 }
 
+// SetId satisifies the Cmd interface by setting the ID of the command.
+func (cmd *CreateEncryptedWalletCmd) SetId(id interface{}) {
+	cmd.id = id
+}
+
 // Method satisfies the Cmd interface by returning the RPC method.
 func (cmd *CreateEncryptedWalletCmd) Method() string {
 	return "createencryptedwallet"
@@ -707,6 +742,11 @@ func parseGetBalancesCmd(r *btcjson.RawCmd) (btcjson.Cmd, error) {
 // Id satisifies the Cmd interface by returning the ID of the command.
 func (cmd *GetBalancesCmd) Id() interface{} {
 	return cmd.id
+}
+
+// SetId satisifies the Cmd interface by setting the ID of the command.
+func (cmd *GetBalancesCmd) SetId(id interface{}) {
+	cmd.id = id
 }
 
 // Method satisfies the Cmd interface by returning the RPC method.
@@ -803,6 +843,11 @@ func parseWalletIsLockedCmd(r *btcjson.RawCmd) (btcjson.Cmd, error) {
 // Id satisifies the Cmd interface by returning the ID of the command.
 func (cmd *WalletIsLockedCmd) Id() interface{} {
 	return cmd.id
+}
+
+// SetId satisifies the Cmd interface by setting the ID of the command.
+func (cmd *WalletIsLockedCmd) SetId(id interface{}) {
+	cmd.id = id
 }
 
 // Method satisfies the Cmd interface by returning the RPC method.
@@ -920,6 +965,11 @@ func (cmd *ListAddressTransactionsCmd) Id() interface{} {
 	return cmd.id
 }
 
+// SetId satisifies the Cmd interface by setting the ID of the command.
+func (cmd *ListAddressTransactionsCmd) SetId(id interface{}) {
+	cmd.id = id
+}
+
 // Method satisfies the Cmd interface by returning the RPC method.
 func (cmd *ListAddressTransactionsCmd) Method() string {
 	return "listaddresstransactions"
@@ -1020,6 +1070,11 @@ func parseListAllTransactionsCmd(r *btcjson.RawCmd) (btcjson.Cmd, error) {
 // Id satisifies the Cmd interface by returning the ID of the command.
 func (cmd *ListAllTransactionsCmd) Id() interface{} {
 	return cmd.id
+}
+
+// SetId satisifies the Cmd interface by setting the ID of the command.
+func (cmd *ListAllTransactionsCmd) SetId(id interface{}) {
+	cmd.id = id
 }
 
 // Method satisfies the Cmd interface by returning the RPC method.
@@ -1132,6 +1187,11 @@ func NewGetAddressBalanceCmd(id interface{}, address string,
 // Id satisifies the Cmd interface by returning the ID of the command.
 func (cmd *GetAddressBalanceCmd) Id() interface{} {
 	return cmd.id
+}
+
+// SetId satisifies the Cmd interface by setting the ID of the command.
+func (cmd *GetAddressBalanceCmd) SetId(id interface{}) {
+	cmd.id = id
 }
 
 // Method satisfies the Cmd interface by returning the RPC method.
