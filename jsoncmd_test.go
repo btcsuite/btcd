@@ -637,6 +637,20 @@ var jsoncmdtests = []struct {
 		},
 	},
 	{
+		name: "basic + opt",
+		cmd:  "getreceivedbyaccount",
+		f: func() (Cmd, error) {
+			return NewGetReceivedByAccountCmd(testId,
+				"abtcaccount",
+				2)
+		},
+		result: &GetReceivedByAccountCmd{
+			id:      testId,
+			Account: "abtcaccount",
+			MinConf: 2,
+		},
+	},
+	{
 		name: "basic",
 		cmd:  "getreceivedbyaddress",
 		f: func() (Cmd, error) {
@@ -648,6 +662,20 @@ var jsoncmdtests = []struct {
 			id:      testId,
 			Address: "abtcaddress",
 			MinConf: 1,
+		},
+	},
+	{
+		name: "basic + opt",
+		cmd:  "getreceivedbyaddress",
+		f: func() (Cmd, error) {
+			return NewGetReceivedByAddressCmd(testId,
+				"abtcaddress",
+				2)
+		},
+		result: &GetReceivedByAddressCmd{
+			id:      testId,
+			Address: "abtcaddress",
+			MinConf: 2,
 		},
 	},
 	{
@@ -819,6 +847,17 @@ var jsoncmdtests = []struct {
 		result: &ListAccountsCmd{
 			id:      testId,
 			MinConf: 1,
+		},
+	},
+	{
+		name: "basic + opt",
+		cmd:  "listaccounts",
+		f: func() (Cmd, error) {
+			return NewListAccountsCmd(testId, 2)
+		},
+		result: &ListAccountsCmd{
+			id:      testId,
+			MinConf: 2,
 		},
 	},
 	{
