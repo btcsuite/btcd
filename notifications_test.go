@@ -62,9 +62,9 @@ var ntfntests = []struct {
 		},
 	},
 	{
-		name: "rescanresult",
+		name: "processedtx",
 		f: func() btcjson.Cmd {
-			cmd := &btcws.RescanResultNtfn{
+			cmd := &btcws.ProcessedTxNtfn{
 				Receiver:    "miFxiuApPo3KBqtMnPUjasZmHoVnoH3Eoc",
 				Amount:      200000000,
 				TxID:        "851f5c0652e785c5ed80aafaf2d918e5cbe5c307dbba3680808ada1d01f36886",
@@ -78,7 +78,7 @@ var ntfntests = []struct {
 			}
 			return cmd
 		},
-		result: &btcws.RescanResultNtfn{
+		result: &btcws.ProcessedTxNtfn{
 			Receiver:    "miFxiuApPo3KBqtMnPUjasZmHoVnoH3Eoc",
 			Amount:      200000000,
 			TxID:        "851f5c0652e785c5ed80aafaf2d918e5cbe5c307dbba3680808ada1d01f36886",

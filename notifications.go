@@ -34,9 +34,9 @@ const (
 	// btcdconnected notification.
 	BtcdConnectedNtfnMethod = "btcdconnected"
 
-	// RescanResultNtfnMethod is the method of the btcd
-	// rescanresult notification.
-	RescanResultNtfnMethod = "rescanresult"
+	// ProcessedTxNtfnMethod is the method of the btcd
+	// processedtx notification.
+	ProcessedTxNtfnMethod = "processedx"
 
 	// TxMinedNtfnMethod is the method of the btcd txmined
 	// notification.
@@ -57,7 +57,7 @@ func init() {
 	btcjson.RegisterCustomCmd(BlockConnectedNtfnMethod, parseBlockConnectedNtfn)
 	btcjson.RegisterCustomCmd(BlockDisconnectedNtfnMethod, parseBlockDisconnectedNtfn)
 	btcjson.RegisterCustomCmd(BtcdConnectedNtfnMethod, parseBtcdConnectedNtfn)
-	btcjson.RegisterCustomCmd(RescanResultNtfnMethod, parseRescanResultNtfn)
+	btcjson.RegisterCustomCmd(ProcessedTxNtfnMethod, parseProcessedTxNtfn)
 	btcjson.RegisterCustomCmd(TxMinedNtfnMethod, parseTxMinedNtfn)
 	btcjson.RegisterCustomCmd(TxNtfnMethod, parseTxNtfn)
 	btcjson.RegisterCustomCmd(WalletLockStateNtfnMethod, parseWalletLockStateNtfn)
@@ -440,9 +440,9 @@ func (n *BtcdConnectedNtfn) UnmarshalJSON(b []byte) error {
 	return nil
 }
 
-// RescanResultNtfn is a type handling custom marshaling and unmarshaling
-// of rescanresult JSON websocket notifications.
-type RescanResultNtfn struct {
+// ProcessedTxNtfn is a type handling custom marshaling and unmarshaling
+// of processedtx JSON websocket notifications.
+type ProcessedTxNtfn struct {
 	Receiver    string
 	Amount      int64
 	TxID        string
@@ -455,13 +455,13 @@ type RescanResultNtfn struct {
 	Spent       bool
 }
 
-// Enforce that RescanResultNtfn satisifies the btcjson.Cmd interface.
-var _ btcjson.Cmd = &RescanResultNtfn{}
+// Enforce that ProcessedTxNtfn satisifies the btcjson.Cmd interface.
+var _ btcjson.Cmd = &ProcessedTxNtfn{}
 
-// parseRescanResultNtfn parses a RawCmd into a concrete type satisifying
+// parseProcessedTxNtfn parses a RawCmd into a concrete type satisifying
 // the btcjson.Cmd interface.  This is used when registering the notification
 // with the btcjson parser.
-func parseRescanResultNtfn(r *btcjson.RawCmd) (btcjson.Cmd, error) {
+func parseProcessedTxNtfn(r *btcjson.RawCmd) (btcjson.Cmd, error) {
 	if r.Id != nil {
 		return nil, ErrNotANtfn
 	}
@@ -516,7 +516,7 @@ func parseRescanResultNtfn(r *btcjson.RawCmd) (btcjson.Cmd, error) {
 		return nil, errors.New("tenth parameter spent must be a bool")
 	}
 
-	cmd := &RescanResultNtfn{
+	cmd := &ProcessedTxNtfn{
 		Receiver:    receiver,
 		Amount:      amount,
 		TxID:        txid,
@@ -533,23 +533,23 @@ func parseRescanResultNtfn(r *btcjson.RawCmd) (btcjson.Cmd, error) {
 
 // Id satisifies the btcjson.Cmd interface by returning nil for a
 // notification ID.
-func (n *RescanResultNtfn) Id() interface{} {
+func (n *ProcessedTxNtfn) Id() interface{} {
 	return nil
 }
 
 // SetId is implemented to satisify the btcjson.Cmd interface.  The
 // notification id is not modified.
-func (n *RescanResultNtfn) SetId(id interface{}) {}
+func (n *ProcessedTxNtfn) SetId(id interface{}) {}
 
 // Method satisifies the btcjson.Cmd interface by returning the method
 // of the notification.
-func (n *RescanResultNtfn) Method() string {
-	return RescanResultNtfnMethod
+func (n *ProcessedTxNtfn) Method() string {
+	return ProcessedTxNtfnMethod
 }
 
 // MarshalJSON returns the JSON encoding of n.  Part of the btcjson.Cmd
 // interface.
-func (n *RescanResultNtfn) MarshalJSON() ([]byte, error) {
+func (n *ProcessedTxNtfn) MarshalJSON() ([]byte, error) {
 	ntfn := btcjson.Message{
 		Jsonrpc: "1.0",
 		Method:  n.Method(),
@@ -571,19 +571,19 @@ func (n *RescanResultNtfn) MarshalJSON() ([]byte, error) {
 
 // UnmarshalJSON unmarshals the JSON encoding of n into n.  Part of
 // the btcjson.Cmd interface.
-func (n *RescanResultNtfn) UnmarshalJSON(b []byte) error {
+func (n *ProcessedTxNtfn) UnmarshalJSON(b []byte) error {
 	// Unmarshal into a RawCmd.
 	var r btcjson.RawCmd
 	if err := json.Unmarshal(b, &r); err != nil {
 		return err
 	}
 
-	newNtfn, err := parseRescanResultNtfn(&r)
+	newNtfn, err := parseProcessedTxNtfn(&r)
 	if err != nil {
 		return err
 	}
 
-	concreteNtfn, ok := newNtfn.(*RescanResultNtfn)
+	concreteNtfn, ok := newNtfn.(*ProcessedTxNtfn)
 	if !ok {
 		return btcjson.ErrInternal
 	}
