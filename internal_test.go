@@ -13,6 +13,7 @@ package btcutil
 
 import (
 	"code.google.com/p/go.crypto/ripemd160"
+	"github.com/conformal/btcec"
 	"github.com/conformal/btcwire"
 )
 
@@ -48,6 +49,19 @@ func TstAddressScriptHash(hash [ripemd160.Size]byte,
 	return &AddressScriptHash{
 		hash: hash,
 		net:  net,
+	}
+}
+
+// TstAddressPubKey makes an AddressPubKey, setting the unexported fields with
+// the parameters.
+func TstAddressPubKey(serializedPubKey []byte, pubKeyFormat PubKeyFormat,
+	net btcwire.BitcoinNet) *AddressPubKey {
+
+	pubKey, _ := btcec.ParsePubKey(serializedPubKey, btcec.S256())
+	return &AddressPubKey{
+		pubKeyFormat: pubKeyFormat,
+		pubKey:       (*btcec.PublicKey)(pubKey),
+		net:          net,
 	}
 }
 
