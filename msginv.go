@@ -115,3 +115,24 @@ func NewMsgInv() *MsgInv {
 		InvList: make([]*InvVect, 0, defaultInvListAlloc),
 	}
 }
+
+// NewMsgInvSizeHint returns a new bitcoin inv message that conforms to the
+// Message interface.  See MsgInv for details.  This function differs from
+// NewMsgInv in that it allows a default allocation size for the backing array
+// which houses the inventory vector list.  This allows callers who know in
+// advance how large the inventory list will grow to avoid the overhead of
+// growing the internal backing array several times when appending large amounts
+// of inventory vectors with AddInvVect.  Note that the specified hint is just
+// that - a hint that is used for the default allocation size.  Adding more
+// (or less) inventory vectors will still work properly.  The size hint is
+// limited to MaxInvPerMsg.
+func NewMsgInvSizeHint(sizeHint uint) *MsgInv {
+	// Limit the specified hint to the maximum allow per message.
+	if sizeHint > MaxInvPerMsg {
+		sizeHint = MaxInvPerMsg
+	}
+
+	return &MsgInv{
+		InvList: make([]*InvVect, 0, sizeHint),
+	}
+}
