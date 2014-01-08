@@ -34,6 +34,10 @@ const (
 	// btcdconnected notification.
 	BtcdConnectedNtfnMethod = "btcdconnected"
 
+	// RescanResultNtfnMethod is the method of the btcd
+	// rescanresult notification.
+	RescanResultNtfnMethod = "rescanresult"
+
 	// TxMinedNtfnMethod is the method of the btcd txmined
 	// notification.
 	TxMinedNtfnMethod = "txmined"
@@ -53,6 +57,7 @@ func init() {
 	btcjson.RegisterCustomCmd(BlockConnectedNtfnMethod, parseBlockConnectedNtfn)
 	btcjson.RegisterCustomCmd(BlockDisconnectedNtfnMethod, parseBlockDisconnectedNtfn)
 	btcjson.RegisterCustomCmd(BtcdConnectedNtfnMethod, parseBtcdConnectedNtfn)
+	btcjson.RegisterCustomCmd(RescanResultNtfnMethod, parseRescanResultNtfn)
 	btcjson.RegisterCustomCmd(TxMinedNtfnMethod, parseTxMinedNtfn)
 	btcjson.RegisterCustomCmd(TxNtfnMethod, parseTxNtfn)
 	btcjson.RegisterCustomCmd(WalletLockStateNtfnMethod, parseWalletLockStateNtfn)
@@ -428,6 +433,157 @@ func (n *BtcdConnectedNtfn) UnmarshalJSON(b []byte) error {
 	}
 
 	concreteNtfn, ok := newNtfn.(*BtcdConnectedNtfn)
+	if !ok {
+		return btcjson.ErrInternal
+	}
+	*n = *concreteNtfn
+	return nil
+}
+
+// RescanResultNtfn is a type handling custom marshaling and unmarshaling
+// of rescanresult JSON websocket notifications.
+type RescanResultNtfn struct {
+	Receiver    string
+	Amount      int64
+	TxID        string
+	TxOutIndex  uint32
+	PkScript    string
+	BlockHash   string
+	BlockHeight int32
+	BlockIndex  int
+	BlockTime   int64
+	Spent       bool
+}
+
+// Enforce that RescanResultNtfn satisifies the btcjson.Cmd interface.
+var _ btcjson.Cmd = &RescanResultNtfn{}
+
+// parseRescanResultNtfn parses a RawCmd into a concrete type satisifying
+// the btcjson.Cmd interface.  This is used when registering the notification
+// with the btcjson parser.
+func parseRescanResultNtfn(r *btcjson.RawCmd) (btcjson.Cmd, error) {
+	if r.Id != nil {
+		return nil, ErrNotANtfn
+	}
+
+	if len(r.Params) != 10 {
+		return nil, btcjson.ErrWrongNumberOfParams
+	}
+
+	receiver, ok := r.Params[0].(string)
+	if !ok {
+		return nil, errors.New("first parameter receiver must be a string")
+	}
+	famount, ok := r.Params[1].(float64)
+	if !ok {
+		return nil, errors.New("second parameter amount must be a number")
+	}
+	amount := int64(famount)
+	txid, ok := r.Params[2].(string)
+	if !ok {
+		return nil, errors.New("third parameter txid must be a string")
+	}
+	fTxOutIdx, ok := r.Params[3].(float64)
+	if !ok {
+		return nil, errors.New("fourth parameter txoutidx must be a number")
+	}
+	txOutIdx := uint32(fTxOutIdx)
+	pkScript, ok := r.Params[4].(string)
+	if !ok {
+		return nil, errors.New("fifth parameter pkScript must be a string")
+	}
+	blockHash := r.Params[5].(string)
+	if !ok {
+		return nil, errors.New("sixth parameter blockHash must be a string")
+	}
+	fBlockHeight, ok := r.Params[6].(float64)
+	if !ok {
+		return nil, errors.New("seventh parameter blockHeight must be a number")
+	}
+	blockHeight := int32(fBlockHeight)
+	fBlockIndex, ok := r.Params[7].(float64)
+	if !ok {
+		return nil, errors.New("eighth parameter blockIndex must be a number")
+	}
+	blockIndex := int(fBlockIndex)
+	fBlockTime, ok := r.Params[8].(float64)
+	if !ok {
+		return nil, errors.New("ninth parameter blockTime must be a number")
+	}
+	blockTime := int64(fBlockTime)
+	spent, ok := r.Params[9].(bool)
+	if !ok {
+		return nil, errors.New("tenth parameter spent must be a bool")
+	}
+
+	cmd := &RescanResultNtfn{
+		Receiver:    receiver,
+		Amount:      amount,
+		TxID:        txid,
+		TxOutIndex:  txOutIdx,
+		PkScript:    pkScript,
+		BlockHash:   blockHash,
+		BlockHeight: blockHeight,
+		BlockIndex:  blockIndex,
+		BlockTime:   blockTime,
+		Spent:       spent,
+	}
+	return cmd, nil
+}
+
+// Id satisifies the btcjson.Cmd interface by returning nil for a
+// notification ID.
+func (n *RescanResultNtfn) Id() interface{} {
+	return nil
+}
+
+// SetId is implemented to satisify the btcjson.Cmd interface.  The
+// notification id is not modified.
+func (n *RescanResultNtfn) SetId(id interface{}) {}
+
+// Method satisifies the btcjson.Cmd interface by returning the method
+// of the notification.
+func (n *RescanResultNtfn) Method() string {
+	return RescanResultNtfnMethod
+}
+
+// MarshalJSON returns the JSON encoding of n.  Part of the btcjson.Cmd
+// interface.
+func (n *RescanResultNtfn) MarshalJSON() ([]byte, error) {
+	ntfn := btcjson.Message{
+		Jsonrpc: "1.0",
+		Method:  n.Method(),
+		Params: []interface{}{
+			n.Receiver,
+			n.Amount,
+			n.TxID,
+			n.TxOutIndex,
+			n.PkScript,
+			n.BlockHash,
+			n.BlockHeight,
+			n.BlockIndex,
+			n.BlockTime,
+			n.Spent,
+		},
+	}
+	return json.Marshal(ntfn)
+}
+
+// UnmarshalJSON unmarshals the JSON encoding of n into n.  Part of
+// the btcjson.Cmd interface.
+func (n *RescanResultNtfn) UnmarshalJSON(b []byte) error {
+	// Unmarshal into a RawCmd.
+	var r btcjson.RawCmd
+	if err := json.Unmarshal(b, &r); err != nil {
+		return err
+	}
+
+	newNtfn, err := parseRescanResultNtfn(&r)
+	if err != nil {
+		return err
+	}
+
+	concreteNtfn, ok := newNtfn.(*RescanResultNtfn)
 	if !ok {
 		return btcjson.ErrInternal
 	}

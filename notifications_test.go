@@ -62,6 +62,36 @@ var ntfntests = []struct {
 		},
 	},
 	{
+		name: "rescanresult",
+		f: func() btcjson.Cmd {
+			cmd := &btcws.RescanResultNtfn{
+				Receiver:    "miFxiuApPo3KBqtMnPUjasZmHoVnoH3Eoc",
+				Amount:      200000000,
+				TxID:        "851f5c0652e785c5ed80aafaf2d918e5cbe5c307dbba3680808ada1d01f36886",
+				TxOutIndex:  1,
+				PkScript:    "76a9141e127eda7cd71b9724085f588840a3e9d697ae9888ac",
+				BlockHash:   "000000004811dda1c320ad5d0ea184a20a53acd92292c5f1cb926c3ee82abf70",
+				BlockHeight: 153469,
+				BlockIndex:  1,
+				BlockTime:   1386944019,
+				Spent:       true,
+			}
+			return cmd
+		},
+		result: &btcws.RescanResultNtfn{
+			Receiver:    "miFxiuApPo3KBqtMnPUjasZmHoVnoH3Eoc",
+			Amount:      200000000,
+			TxID:        "851f5c0652e785c5ed80aafaf2d918e5cbe5c307dbba3680808ada1d01f36886",
+			TxOutIndex:  1,
+			PkScript:    "76a9141e127eda7cd71b9724085f588840a3e9d697ae9888ac",
+			BlockHash:   "000000004811dda1c320ad5d0ea184a20a53acd92292c5f1cb926c3ee82abf70",
+			BlockHeight: 153469,
+			BlockIndex:  1,
+			BlockTime:   1386944019,
+			Spent:       true,
+		},
+	},
+	{
 		name: "txmined",
 		f: func() btcjson.Cmd {
 			return btcws.NewTxMinedNtfn(
