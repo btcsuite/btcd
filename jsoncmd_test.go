@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"github.com/davecgh/go-spew/spew"
 	"reflect"
+	"strings"
 	"testing"
 )
 
@@ -1537,5 +1538,97 @@ func TestCmds(t *testing.T) {
 			t.Errorf("%s: id not returned properly after change.", name)
 		}
 
+	}
+}
+
+func TestHelps(t *testing.T) {
+	helpTests := []string{
+		"addmultisigaddress",
+		"addnode",
+		"backupwallet",
+		"createmultisig",
+		"createrawtransaction",
+		"debuglevel",
+		"decoderawtransaction",
+		"decodescript",
+		"dumpprivkey",
+		"dumpwallet",
+		"encryptwallet",
+		"getaccount",
+		"getaccountaddress",
+		"getaddednodeinfo",
+		"getaddressesbyaccount",
+		"getbalance",
+		"getbestblockhash",
+		"getblock",
+		"getblockcount",
+		"getblockhash",
+		"getblocktemplate",
+		"getconnectioncount",
+		"getdifficulty",
+		"getgenerate",
+		"gethashespersec",
+		"getinfo",
+		"getmininginfo",
+		"getnettotals",
+		"getnetworkhashps",
+		"getnewaddress",
+		"getpeerinfo",
+		"getrawchangeaddress",
+		"getrawmempool",
+		"getrawtransaction",
+		"getreceivedbyaccount",
+		"getreceivedbyaddress",
+		"gettransaction",
+		"gettxout",
+		"gettxoutsetinfo",
+		"getwork",
+		"help",
+		"importprivkey",
+		"importwallet",
+		"keypoolrefill",
+		"listaccounts",
+		"listaddressgroupings",
+		"listlockunspent",
+		"listreceivedbyaccount",
+		"listreceivedbyaddress",
+		"listsinceblock",
+		"listtransactions",
+		"listunspent",
+		"lockunspent",
+		"move",
+		"ping",
+		"sendfrom",
+		"sendmany",
+		"sendrawtransaction",
+		"sendtoaddress",
+		"setaccount",
+		"setgenerate",
+		"settxfee",
+		"signmessage",
+		"signrawtransaction",
+		"stop",
+		"submitblock",
+		"validateaddress",
+		"verifychain",
+		"verifymessage",
+		"walletlock",
+		"walletpassphrase",
+		"walletpassphrasechange",
+	}
+
+	for _, test := range helpTests {
+		helpStr, err := GetHelpString(test)
+		if err != nil {
+			t.Errorf("%s: failed to get help string: %v",
+				test, err)
+			continue
+		}
+
+		if !strings.HasPrefix(helpStr, test) {
+			t.Errorf("%s: help string doesn't begin with command "+
+				"name: \"%s\"", test, helpStr)
+			continue
+		}
 	}
 }

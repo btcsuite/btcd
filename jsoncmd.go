@@ -40,12 +40,17 @@ type RawCmd struct {
 // ParseRawCmd is a function to create a custom Cmd from a RawCmd.
 type RawCmdParser func(*RawCmd) (Cmd, error)
 
-var customCmds = make(map[string]RawCmdParser)
+type cmd struct {
+	parser     RawCmdParser
+	helpString string
+}
+
+var customCmds = make(map[string]cmd)
 
 // RegisterCustomCmd registers a custom RawCmd parsing func for a
 // non-standard Bitcoin command.
-func RegisterCustomCmd(method string, parser RawCmdParser) {
-	customCmds[method] = parser
+func RegisterCustomCmd(method string, parser RawCmdParser, helpString string) {
+	customCmds[method] = cmd{parser: parser, helpString: helpString}
 }
 
 // ParseMarshaledCmd parses a raw command and unmarshals as a Cmd.
@@ -286,8 +291,8 @@ func ParseMarshaledCmd(b []byte) (Cmd, error) {
 	default:
 		// None of the standard Bitcoin RPC methods matched.  Try
 		// registered custom commands.
-		if f, ok := customCmds[r.Method]; ok {
-			return f(&r)
+		if c, ok := customCmds[r.Method]; ok {
+			return c.parser(&r)
 		}
 	}
 
