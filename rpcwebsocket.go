@@ -65,7 +65,7 @@ type notificationCtx struct {
 }
 
 // AddTxRequest adds the request context for new transaction notifications.
-func (r *wsContext) AddTxRequest(walletNotification chan []byte, rc *requestContexts, addrhash string, id interface{}) {
+func (r *wsContext) AddTxRequest(walletNotification chan []byte, rc *requestContexts, addr string, id interface{}) {
 	r.Lock()
 	defer r.Unlock()
 
@@ -75,19 +75,19 @@ func (r *wsContext) AddTxRequest(walletNotification chan []byte, rc *requestCont
 		rc:         rc,
 	}
 
-	clist, ok := r.txNotifications[addrhash]
+	clist, ok := r.txNotifications[addr]
 	if !ok {
 		clist = list.New()
-		r.txNotifications[addrhash] = clist
+		r.txNotifications[addr] = clist
 	}
 
 	clist.PushBack(nc)
 
-	rc.txRequests[addrhash] = id
+	rc.txRequests[addr] = id
 }
 
-func (r *wsContext) removeGlobalTxRequest(walletNotification chan []byte, addrhash string) {
-	clist := r.txNotifications[addrhash]
+func (r *wsContext) removeGlobalTxRequest(walletNotification chan []byte, addr string) {
+	clist := r.txNotifications[addr]
 	var enext *list.Element
 	for e := clist.Front(); e != nil; e = enext {
 		enext = e.Next()
@@ -99,7 +99,7 @@ func (r *wsContext) removeGlobalTxRequest(walletNotification chan []byte, addrha
 	}
 
 	if clist.Len() == 0 {
-		delete(r.txNotifications, addrhash)
+		delete(r.txNotifications, addr)
 	}
 }
 
@@ -351,8 +351,8 @@ func handleNotifyNewTXs(s *rpcServer, cmd btcjson.Cmd,
 			return fmt.Errorf("address is not P2PKH: %v", addr.EncodeAddress())
 		}
 
-		s.ws.AddTxRequest(walletNotification, rc,
-			string(addr.ScriptAddress()), cmd.Id())
+		s.ws.AddTxRequest(walletNotification, rc, addr.EncodeAddress(),
+			cmd.Id())
 	}
 
 	mreply, _ := json.Marshal(reply)
@@ -419,67 +419,66 @@ func handleRescan(s *rpcServer, cmd btcjson.Cmd,
 		for i := range blkshalist {
 			blk, err := s.server.db.FetchBlockBySha(&blkshalist[i])
 			if err != nil {
-				rpcsLog.Errorf("Error looking up block sha: %v", err)
+				rpcsLog.Errorf("Error looking up block sha: %v",
+					err)
 				return err
 			}
-			txs := blk.Transactions()
-			for _, tx := range txs {
+			for _, tx := range blk.Transactions() {
 				var txReply *btcdb.TxListReply
 				for txOutIdx, txout := range tx.MsgTx().TxOut {
-					st, txaddrhash, err := btcscript.ScriptToAddrHash(txout.PkScript)
-					if st != btcscript.ScriptAddr || err != nil {
+					_, addrs, _, err := btcscript.ExtractPkScriptAddrs(
+						txout.PkScript, s.server.btcnet)
+					if err != nil {
 						continue
 					}
-					txaddr, err := btcutil.NewAddressPubKeyHash(txaddrhash, s.server.btcnet)
-					if err != nil {
-						rpcsLog.Errorf("Error creating address: %v", err)
-						return err
-					}
 
-					if _, ok := rescanCmd.Addresses[txaddr.EncodeAddress()]; ok {
-						// TODO(jrick): This lookup is expensive and can be avoided
-						// if the wallet is sent the previous outpoints for all inputs
-						// of the tx, so any can removed from the utxo set (since
-						// they are, as of this tx, now spent).
-						if txReply == nil {
-							txReplyList, err := s.server.db.FetchTxBySha(tx.Sha())
-							if err != nil {
-								rpcsLog.Errorf("Tx Sha %v not found by db.", tx.Sha())
-								return err
-							}
-							for i := range txReplyList {
-								if txReplyList[i].Height == blk.Height() {
-									txReply = txReplyList[i]
-									break
+					for i, addr := range addrs {
+						encodedAddr := addr.EncodeAddress()
+						if _, ok := rescanCmd.Addresses[encodedAddr]; ok {
+							// TODO(jrick): This lookup is expensive and can be avoided
+							// if the wallet is sent the previous outpoints for all inputs
+							// of the tx, so any can removed from the utxo set (since
+							// they are, as of this tx, now spent).
+							if txReply == nil {
+								txReplyList, err := s.server.db.FetchTxBySha(tx.Sha())
+								if err != nil {
+									rpcsLog.Errorf("Tx Sha %v not found by db.", tx.Sha())
+									return err
+								}
+								for i := range txReplyList {
+									if txReplyList[i].Height == blk.Height() {
+										txReply = txReplyList[i]
+										break
+									}
 								}
 							}
-						}
 
-						reply.Result = struct {
-							Receiver   string `json:"receiver"`
-							Height     int64  `json:"height"`
-							BlockHash  string `json:"blockhash"`
-							BlockIndex int    `json:"blockindex"`
-							BlockTime  int64  `json:"blocktime"`
-							TxID       string `json:"txid"`
-							TxOutIndex uint32 `json:"txoutindex"`
-							Amount     int64  `json:"amount"`
-							PkScript   string `json:"pkscript"`
-							Spent      bool   `json:"spent"`
-						}{
-							Receiver:   txaddr.EncodeAddress(),
-							Height:     blk.Height(),
-							BlockHash:  blkshalist[i].String(),
-							BlockIndex: tx.Index(),
-							BlockTime:  blk.MsgBlock().Header.Timestamp.Unix(),
-							TxID:       tx.Sha().String(),
-							TxOutIndex: uint32(txOutIdx),
-							Amount:     txout.Value,
-							PkScript:   btcutil.Base58Encode(txout.PkScript),
-							Spent:      txReply.TxSpent[txOutIdx],
+							reply.Result = struct {
+								Receiver   string `json:"receiver"`
+								Height     int64  `json:"height"`
+								BlockHash  string `json:"blockhash"`
+								BlockIndex int    `json:"blockindex"`
+								BlockTime  int64  `json:"blocktime"`
+								TxID       string `json:"txid"`
+								TxOutIndex uint32 `json:"txoutindex"`
+								Amount     int64  `json:"amount"`
+								PkScript   string `json:"pkscript"`
+								Spent      bool   `json:"spent"`
+							}{
+								Receiver:   encodedAddr,
+								Height:     blk.Height(),
+								BlockHash:  blkshalist[i].String(),
+								BlockIndex: tx.Index(),
+								BlockTime:  blk.MsgBlock().Header.Timestamp.Unix(),
+								TxID:       tx.Sha().String(),
+								TxOutIndex: uint32(txOutIdx),
+								Amount:     txout.Value,
+								PkScript:   btcutil.Base58Encode(txout.PkScript),
+								Spent:      txReply.TxSpent[txOutIdx],
+							}
+							mreply, _ := json.Marshal(reply)
+							walletNotification <- mreply
 						}
-						mreply, _ := json.Marshal(reply)
-						walletNotification <- mreply
 					}
 				}
 			}
@@ -782,66 +781,69 @@ func (s *rpcServer) newBlockNotifyCheckTxIn(tx *btcutil.Tx) {
 // additional block information is passed with the notifications.
 func (s *rpcServer) NotifyForTxOuts(tx *btcutil.Tx, block *btcutil.Block) {
 	for i, txout := range tx.MsgTx().TxOut {
-		stype, txaddrhash, err := btcscript.ScriptToAddrHash(txout.PkScript)
-		if stype != btcscript.ScriptAddr || err != nil {
-			// Only support pay-to-pubkey-hash right now.
+		_, addrs, _, err := btcscript.ExtractPkScriptAddrs(
+			txout.PkScript, s.server.btcnet)
+		if err != nil {
 			continue
 		}
-		if idlist, ok := s.ws.txNotifications[string(txaddrhash)]; ok {
-			for e := idlist.Front(); e != nil; e = e.Next() {
-				ctx := e.Value.(*notificationCtx)
 
-				txaddr, err := btcutil.NewAddressPubKeyHash(txaddrhash, s.server.btcnet)
-				if err != nil {
-					rpcsLog.Debugf("Error creating address; dropping Tx notification.")
-					break
-				}
+		for _, addr := range addrs {
+			// Only support pay-to-pubkey-hash right now.
+			if _, ok := addr.(*btcutil.AddressPubKeyHash); !ok {
+				continue
+			}
 
-				// TODO(jrick): shove this in btcws
-				result := struct {
-					Receiver   string `json:"receiver"`
-					Height     int64  `json:"height"`
-					BlockHash  string `json:"blockhash"`
-					BlockIndex int    `json:"blockindex"`
-					BlockTime  int64  `json:"blocktime"`
-					TxID       string `json:"txid"`
-					TxOutIndex uint32 `json:"txoutindex"`
-					Amount     int64  `json:"amount"`
-					PkScript   string `json:"pkscript"`
-				}{
-					Receiver:   txaddr.EncodeAddress(),
-					TxID:       tx.Sha().String(),
-					TxOutIndex: uint32(i),
-					Amount:     txout.Value,
-					PkScript:   btcutil.Base58Encode(txout.PkScript),
-				}
+			encodedAddr := addr.EncodeAddress()
+			if idlist, ok := s.ws.txNotifications[encodedAddr]; ok {
+				for e := idlist.Front(); e != nil; e = e.Next() {
+					ctx := e.Value.(*notificationCtx)
 
-				if block != nil {
-					blkhash, err := block.Sha()
-					if err != nil {
-						rpcsLog.Error("Error getting block sha; dropping Tx notification.")
-						break
+					// TODO(jrick): shove this in btcws
+					result := struct {
+						Receiver   string `json:"receiver"`
+						Height     int64  `json:"height"`
+						BlockHash  string `json:"blockhash"`
+						BlockIndex int    `json:"blockindex"`
+						BlockTime  int64  `json:"blocktime"`
+						TxID       string `json:"txid"`
+						TxOutIndex uint32 `json:"txoutindex"`
+						Amount     int64  `json:"amount"`
+						PkScript   string `json:"pkscript"`
+					}{
+						Receiver:   encodedAddr,
+						TxID:       tx.Sha().String(),
+						TxOutIndex: uint32(i),
+						Amount:     txout.Value,
+						PkScript:   btcutil.Base58Encode(txout.PkScript),
 					}
-					result.Height = block.Height()
-					result.BlockHash = blkhash.String()
-					result.BlockIndex = tx.Index()
-					result.BlockTime = block.MsgBlock().Header.Timestamp.Unix()
-				} else {
-					result.Height = -1
-					result.BlockIndex = -1
-				}
 
-				reply := &btcjson.Reply{
-					Result: result,
-					Error:  nil,
-					Id:     &ctx.id,
+					if block != nil {
+						blkhash, err := block.Sha()
+						if err != nil {
+							rpcsLog.Error("Error getting block sha; dropping Tx notification.")
+							break
+						}
+						result.Height = block.Height()
+						result.BlockHash = blkhash.String()
+						result.BlockIndex = tx.Index()
+						result.BlockTime = block.MsgBlock().Header.Timestamp.Unix()
+					} else {
+						result.Height = -1
+						result.BlockIndex = -1
+					}
+
+					reply := &btcjson.Reply{
+						Result: result,
+						Error:  nil,
+						Id:     &ctx.id,
+					}
+					mreply, err := json.Marshal(reply)
+					if err != nil {
+						rpcsLog.Errorf("Unable to marshal tx notification: %v", err)
+						continue
+					}
+					ctx.connection <- mreply
 				}
-				mreply, err := json.Marshal(reply)
-				if err != nil {
-					rpcsLog.Errorf("Unable to marshal tx notification: %v", err)
-					continue
-				}
-				ctx.connection <- mreply
 			}
 		}
 	}

@@ -630,26 +630,18 @@ func createVoutList(mtx *btcwire.MsgTx, net btcwire.BitcoinNet) ([]btcjson.Vout,
 		voutList[i].ScriptPubKey.Asm = disbuf
 		voutList[i].ScriptPubKey.Hex = hex.EncodeToString(v.PkScript)
 
-		scriptType, reqSigs, hashes := btcscript.CalcPkScriptAddrHashes(v.PkScript)
-		voutList[i].ScriptPubKey.Type = scriptType.String()
+		// Ignore the error here since an error means the script
+		// couldn't parse and there is no additional information about
+		// it anyways.
+		scriptClass, addrs, reqSigs, _ := btcscript.ExtractPkScriptAddrs(v.PkScript, net)
+		voutList[i].ScriptPubKey.Type = scriptClass.String()
 		voutList[i].ScriptPubKey.ReqSigs = reqSigs
 
-		if hashes == nil {
+		if addrs == nil {
 			voutList[i].ScriptPubKey.Addresses = nil
 		} else {
-			voutList[i].ScriptPubKey.Addresses = make([]string, len(hashes))
-			for j := 0; j < len(hashes); j++ {
-				var addr btcutil.Address
-				if scriptType == btcscript.ScriptHashTy {
-					addr, err = btcutil.NewAddressScriptHash(hashes[j], net)
-				} else {
-					addr, err = btcutil.NewAddressPubKeyHash(hashes[j], net)
-				}
-				if err != nil {
-					// hash will always be 20 bytes, so the only
-					// possible error is from an invalid network.
-					return nil, errors.New("Cannot create address with invalid network.")
-				}
+			voutList[i].ScriptPubKey.Addresses = make([]string, len(addrs))
+			for j, addr := range addrs {
 				voutList[i].ScriptPubKey.Addresses[j] = addr.EncodeAddress()
 			}
 		}
@@ -724,21 +716,13 @@ func handleDecodeScript(s *rpcServer, cmd btcjson.Cmd) (interface{}, error) {
 	disbuf, _ := btcscript.DisasmString(script)
 
 	// Get information about the script.
-	// TODO(davec): The btcscript CalcPkScriptAddrHashes function should
-	// be changed to return btcutil.Address.
+	// Ignore the error here since an error means the script couldn't parse
+	// and there is no additinal information about it anyways.
 	net := s.server.btcnet
-	scriptType, reqSigs, hashes := btcscript.CalcPkScriptAddrHashes(script)
-	addresses := make([]string, len(hashes))
-	for i, hash := range hashes {
-		var addr btcutil.Address
-		if scriptType == btcscript.ScriptHashTy {
-			addr, err = btcutil.NewAddressScriptHash(hash, net)
-		} else {
-			addr, err = btcutil.NewAddressPubKeyHash(hash, net)
-		}
-		if err == nil {
-			addresses[i] = addr.EncodeAddress()
-		}
+	scriptClass, addrs, reqSigs, _ := btcscript.ExtractPkScriptAddrs(script, net)
+	addresses := make([]string, len(addrs))
+	for i, addr := range addrs {
+		addresses[i] = addr.EncodeAddress()
 	}
 
 	// Convert the script itself to a pay-to-script-hash address.
@@ -754,7 +738,7 @@ func handleDecodeScript(s *rpcServer, cmd btcjson.Cmd) (interface{}, error) {
 	reply := btcjson.DecodeScriptResult{
 		Asm:       disbuf,
 		ReqSigs:   reqSigs,
-		Type:      scriptType.String(),
+		Type:      scriptClass.String(),
 		Addresses: addresses,
 		P2sh:      p2sh.EncodeAddress(),
 	}
