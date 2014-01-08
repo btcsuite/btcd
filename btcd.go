@@ -5,8 +5,8 @@
 package main
 
 import (
-	"github.com/conformal/btcd/limits"
 	"fmt"
+	"github.com/conformal/btcd/limits"
 	"net"
 	"net/http"
 	_ "net/http/pprof"

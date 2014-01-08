@@ -316,7 +316,7 @@ func newRPCServer(listenAddrs []string, s *server) (*rpcServer, error) {
 	}
 
 	// initialize memory for websocket connections
-	rpc.ws.connections = make(map[chan []byte]*requestContexts)
+	rpc.ws.connections = make(map[walletChan]*requestContexts)
 	rpc.ws.walletNotificationMaster = make(chan []byte)
 	rpc.ws.txNotifications = make(map[string]*list.List)
 	rpc.ws.spentNotifications = make(map[btcwire.OutPoint]*list.List)
