@@ -490,9 +490,11 @@ func (p *peer) PushGetHeadersMsg(locator btcchain.BlockLocator) error {
 func (p *peer) handleMemPoolMsg(msg *btcwire.MsgMemPool) {
 	// Generate inventory message with the available transactions in the
 	// transaction memory pool.  Limit it to the max allowed inventory
-	// per message.
-	invMsg := btcwire.NewMsgInv()
+	// per message.  The the NewMsgInvSizeHint function automatically limits
+	// the passed hint to the maximum allowed, so it's safe to pass it
+	// without double checking it here.
 	hashes := p.server.txMemPool.TxShas()
+	invMsg := btcwire.NewMsgInvSizeHint(uint(len(hashes)))
 	for i, hash := range hashes {
 		// Another thread might have removed the transaction from the
 		// pool since the initial query.

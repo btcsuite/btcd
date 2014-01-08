@@ -1092,7 +1092,7 @@ func (b *blockManager) handleHeadersMsg(bmsg *headersMsg) {
 // fetchHeaderBlocks is creates and sends a request to the syncPeer for
 // the next list of blocks to downloaded.
 func (b *blockManager) fetchHeaderBlocks() {
-	gdmsg := btcwire.NewMsgGetData()
+	gdmsg := btcwire.NewMsgGetDataSizeHint(btcwire.MaxInvPerMsg)
 	numRequested := 0
 	startBlock := b.startBlock
 	for {
