@@ -252,6 +252,14 @@ func (b *blockManager) handleDonePeerMsg(peers *list.List, p *peer) {
 	// Attempt to find a new peer to sync from if the quitting peer is the
 	// sync peer.
 	if b.syncPeer != nil && b.syncPeer == p {
+		if b.fetchingHeaders  {
+			b.fetchingHeaders = false
+			b.startBlock = nil
+			b.fetchBlock = nil
+			b.lastBlock = nil
+			b.headerPool = make(map[btcwire.ShaHash]*headerstr)
+			b.headerOrphan = make(map[btcwire.ShaHash]*headerstr)
+		}
 		b.syncPeer = nil
 		b.startSync(peers)
 	}
