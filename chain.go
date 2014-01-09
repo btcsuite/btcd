@@ -876,7 +876,6 @@ func (b *BlockChain) reorganizeChain(detachNodes, attachNodes *list.List) error 
 // cumulatively has the most proof of work.
 // The fastAdd argument avoids the call to checkConnectBlock which does
 // several expensive transaction validation operations.
-
 func (b *BlockChain) connectBestChain(node *blockNode, block *btcutil.Block, fastAdd bool) error {
 	// We haven't selected a best chain yet or we are extending the main
 	// (best) chain with a new block.  This is the most common case.

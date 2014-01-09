@@ -17,7 +17,6 @@ import (
 // The fastAdd argument modifies the behavior of the function by avoiding the
 // somewhat expensive operation: BIP34 validation, it also passes the argument
 // down to connectBestChain()
-
 func (b *BlockChain) maybeAcceptBlock(block *btcutil.Block, fastAdd bool) error {
 	// Get a block node for the block previous to this one.  Will be nil
 	// if this is the genesis block.
@@ -40,8 +39,7 @@ func (b *BlockChain) maybeAcceptBlock(block *btcutil.Block, fastAdd bool) error 
 	if !fastAdd {
 		// Ensure the difficulty specified in the block header matches
 		// the calculated difficulty based on the previous block and
-		// difficulty
-		// retarget rules.
+		// difficulty retarget rules.
 		expectedDifficulty, err := b.calcNextRequiredDifficulty(prevNode, block)
 		if err != nil {
 			return err
@@ -78,6 +76,7 @@ func (b *BlockChain) maybeAcceptBlock(block *btcutil.Block, fastAdd bool) error 
 		}
 
 	}
+
 	// Ensure chain matches up to predetermined checkpoints.
 	// It's safe to ignore the error on Sha since it's already cached.
 	blockHash, _ := block.Sha()
