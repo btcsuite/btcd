@@ -63,15 +63,6 @@ var cmdtests = []struct {
 		},
 	},
 	{
-		name: "getbalances",
-		f: func() (btcjson.Cmd, error) {
-			return NewGetBalancesCmd(float64(1)), nil
-		},
-		result: &GetBalancesCmd{
-			id: float64(1),
-		},
-	},
-	{
 		name: "getbestblock",
 		f: func() (btcjson.Cmd, error) {
 			return NewGetBestBlockCmd(float64(1)), nil

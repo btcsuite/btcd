@@ -15,7 +15,6 @@ import (
 func init() {
 	btcjson.RegisterCustomCmd("createencryptedwallet", parseCreateEncryptedWalletCmd)
 	btcjson.RegisterCustomCmd("getaddressbalance", parseGetAddressBalanceCmd)
-	btcjson.RegisterCustomCmd("getbalances", parseGetBalancesCmd)
 	btcjson.RegisterCustomCmd("getbestblock", parseGetBestBlockCmd)
 	btcjson.RegisterCustomCmd("getcurrentnet", parseGetCurrentNetCmd)
 	btcjson.RegisterCustomCmd("getunconfirmedbalance", parseGetUnconfirmedBalanceCmd)
@@ -706,82 +705,6 @@ func (cmd *CreateEncryptedWalletCmd) UnmarshalJSON(b []byte) error {
 	}
 
 	concreteCmd, ok := newCmd.(*CreateEncryptedWalletCmd)
-	if !ok {
-		return btcjson.ErrInternal
-	}
-	*cmd = *concreteCmd
-	return nil
-}
-
-// GetBalancesCmd is a type handling custom marshaling and
-// unmarshaling of getbalances JSON websocket extension commands.
-type GetBalancesCmd struct {
-	id interface{}
-}
-
-// Enforce that GetBalancesCmd satisifies the btcjson.Cmd
-// interface.
-var _ btcjson.Cmd = &GetBalancesCmd{}
-
-// NewGetBalancesCmd creates a new GetBalancesCmd.
-func NewGetBalancesCmd(id interface{}) *GetBalancesCmd {
-	return &GetBalancesCmd{id: id}
-}
-
-// parseGetBalancesCmd parses a GetBalancesCmd into a concrete
-// type satisifying the btcjson.Cmd interface.  This is used when
-// registering the custom command with the btcjson parser.
-func parseGetBalancesCmd(r *btcjson.RawCmd) (btcjson.Cmd, error) {
-	if len(r.Params) != 0 {
-		return nil, btcjson.ErrWrongNumberOfParams
-	}
-
-	return NewGetBalancesCmd(r.Id), nil
-}
-
-// Id satisifies the Cmd interface by returning the ID of the command.
-func (cmd *GetBalancesCmd) Id() interface{} {
-	return cmd.id
-}
-
-// SetId satisifies the Cmd interface by setting the ID of the command.
-func (cmd *GetBalancesCmd) SetId(id interface{}) {
-	cmd.id = id
-}
-
-// Method satisfies the Cmd interface by returning the RPC method.
-func (cmd *GetBalancesCmd) Method() string {
-	return "getbalances"
-}
-
-// MarshalJSON returns the JSON encoding of cmd.  Part of the Cmd interface.
-func (cmd *GetBalancesCmd) MarshalJSON() ([]byte, error) {
-	// Fill a RawCmd and marshal.
-	raw := btcjson.RawCmd{
-		Jsonrpc: "1.0",
-		Method:  "getbalances",
-		Id:      cmd.id,
-		Params:  []interface{}{},
-	}
-
-	return json.Marshal(raw)
-}
-
-// UnmarshalJSON unmarshals the JSON encoding of cmd into cmd.  Part of
-// the Cmd interface.
-func (cmd *GetBalancesCmd) UnmarshalJSON(b []byte) error {
-	// Unmarshal into a RawCmd.
-	var r btcjson.RawCmd
-	if err := json.Unmarshal(b, &r); err != nil {
-		return err
-	}
-
-	newCmd, err := parseGetBalancesCmd(&r)
-	if err != nil {
-		return err
-	}
-
-	concreteCmd, ok := newCmd.(*GetBalancesCmd)
 	if !ok {
 		return btcjson.ErrInternal
 	}
