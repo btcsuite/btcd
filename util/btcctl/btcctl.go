@@ -55,7 +55,7 @@ var commandHandlers = map[string]*handlerData{
 	"getbalance":           &handlerData{0, 2, displayGeneric, []conversionHandler{nil, toInt}, makeGetBalance, "[account] [minconf=1]"},
 	"getbestblockhash":     &handlerData{0, 0, displayGeneric, nil, makeGetBestBlockHash, ""},
 	"getblock":             &handlerData{1, 2, displayJSONDump, []conversionHandler{nil, toBool, toBool}, makeGetBlock, "<blockhash>"},
-	"getblockcount":        &handlerData{0, 0, displayFloat64, nil, makeGetBlockCount, ""},
+	"getblockcount":        &handlerData{0, 0, displayGeneric, nil, makeGetBlockCount, ""},
 	"getblockhash":         &handlerData{1, 0, displayGeneric, []conversionHandler{toInt64}, makeGetBlockHash, "<blocknumber>"},
 	"getconnectioncount":   &handlerData{0, 0, displayFloat64, nil, makeGetConnectionCount, ""},
 	"getdifficulty":        &handlerData{0, 0, displayFloat64, nil, makeGetDifficulty, ""},
