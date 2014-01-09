@@ -36,7 +36,7 @@ const (
 
 	// ProcessedTxNtfnMethod is the method of the btcd
 	// processedtx notification.
-	ProcessedTxNtfnMethod = "processedx"
+	ProcessedTxNtfnMethod = "processedtx"
 
 	// TxMinedNtfnMethod is the method of the btcd txmined
 	// notification.
