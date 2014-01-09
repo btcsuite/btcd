@@ -9,7 +9,6 @@ import (
 	"github.com/conformal/btcchain"
 	"github.com/conformal/btcdb"
 	_ "github.com/conformal/btcdb/ldb"
-	_ "github.com/conformal/btcdb/sqlite3"
 	"github.com/conformal/btcwire"
 	"os"
 	"path/filepath"
