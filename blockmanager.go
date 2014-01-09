@@ -1030,7 +1030,7 @@ func (b *blockManager) handleHeadersMsg(bmsg *headersMsg) {
 
 	nheaders := len(msg.Headers)
 	if nheaders == 0 {
-		bmgrLog.Infof("Received %v0 block headers: Fetching blocks",
+		bmgrLog.Infof("Received %v block headers: Fetching blocks",
 			len(b.headerPool))
 		b.fetchHeaderBlocks()
 		return
