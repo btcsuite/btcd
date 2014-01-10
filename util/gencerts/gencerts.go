@@ -41,7 +41,7 @@ func main() {
 		var err error
 		cfg.Directory, err = os.Getwd()
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "No directory specified and Cannot get working directory\n")
+			fmt.Fprintf(os.Stderr, "no directory specified and cannot get working directory\n")
 			os.Exit(1)
 		}
 	}
