@@ -487,13 +487,6 @@ func loadConfig() (*config, []string, error) {
 	cfg.ConnectPeers = normalizeAddresses(cfg.ConnectPeers,
 		activeNetParams.peerPort)
 
-	// Warn about missing config file after the final command line parse
-	// succeeds.  This prevents the warning on help messages and invalid
-	// options.
-	if configFileError != nil {
-		btcdLog.Warnf("%v", configFileError)
-	}
-
 	cfg.dial = net.Dial
 	cfg.lookup = net.LookupIP
 	if cfg.Proxy != "" {
@@ -533,6 +526,13 @@ func loadConfig() (*config, []string, error) {
 		cfg.onionlookup = func(a string) ([]net.IP, error) {
 			return nil, errors.New("tor has been disabled")
 		}
+	}
+
+	// Warn about missing config file only after all other configuration is
+	// done.  This prevents the warning on help messages and invalid
+	// options.  Note this should go directly before the return.
+	if configFileError != nil {
+		btcdLog.Warnf("%v", configFileError)
 	}
 
 	return &cfg, remainingArgs, nil
