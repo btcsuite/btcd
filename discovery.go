@@ -130,7 +130,7 @@ func torLookupIP(host, proxy string) ([]net.IP, error) {
 // strings will be returned.
 func dnsDiscover(seeder string) []net.IP {
 	discLog.Debugf("Fetching list of seeds from %v", seeder)
-	peers, err := BtcdLookup(seeder)
+	peers, err := btcdLookup(seeder)
 	if err != nil {
 		discLog.Debugf("Unable to fetch dns seeds from %s: %v",
 			seeder, err)

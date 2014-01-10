@@ -1551,7 +1551,7 @@ func newOutboundPeer(s *server, addr string, persistent bool) *peer {
 		// interval.
 		for atomic.LoadInt32(&p.disconnect) == 0 {
 			srvrLog.Debugf("Attempting to connect to %s", addr)
-			conn, err := BtcdDial("tcp", addr)
+			conn, err := btcdDial("tcp", addr)
 			if err != nil {
 				p.retryCount += 1
 				srvrLog.Debugf("Failed to connect to %s: %v",
