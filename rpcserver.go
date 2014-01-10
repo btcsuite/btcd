@@ -150,6 +150,7 @@ func (s *rpcServer) Start() {
 			jsonAuthFail(w, r, s)
 			return
 		}
+		w.Header().Set("Connection", "close")
 		jsonRPCRead(w, r, s)
 	})
 	go s.walletListenerDuplicator()
