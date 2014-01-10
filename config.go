@@ -487,6 +487,12 @@ func loadConfig() (*config, []string, error) {
 	cfg.ConnectPeers = normalizeAddresses(cfg.ConnectPeers,
 		activeNetParams.peerPort)
 
+	// Setup dial and DNS resolution (lookup) functions depending on the
+	// specified options.  The default is to use the standard net.Dial
+	// function as well as the system DNS resolver.  When a proxy is
+	// specified, the dial function is set to the proxy specific dial
+	// function and the lookup is set to use tor (unless --noonion is
+	// specified in which case the system DNS resolver is used).
 	cfg.dial = net.Dial
 	cfg.lookup = net.LookupIP
 	if cfg.Proxy != "" {
@@ -502,6 +508,15 @@ func loadConfig() (*config, []string, error) {
 			}
 		}
 	}
+
+	// Setup onion address dial and DNS resolution (lookup) functions
+	// depending on the specified options.  The default is to use the
+	// same dial and lookup functions selected above.  However, when an
+	// onion-specific proxy is specified, the onion address dial and
+	// lookup functions are set to use the onion-specific proxy while
+	// leaving the normal dial and lookup functions as selected above.
+	// This allows .onion address traffic to be routed through a different
+	// proxy than normal traffic.
 	if cfg.OnionProxy != "" {
 		cfg.oniondial = func(a, b string) (net.Conn, error) {
 			proxy := &socks.Proxy{
@@ -519,6 +534,8 @@ func loadConfig() (*config, []string, error) {
 		cfg.onionlookup = cfg.lookup
 	}
 
+	// Specifying --noonion means the onion address dial and DNS resolution
+	// (lookup) functions result in an error.
 	if cfg.NoOnion {
 		cfg.oniondial = func(a, b string) (net.Conn, error) {
 			return nil, errors.New("tor has been disabled")
