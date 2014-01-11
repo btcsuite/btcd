@@ -20,8 +20,8 @@ var (
 	shutdownChannel = make(chan bool)
 )
 
-// winServiceMain is only invoked on Windows.  It detect when btcd is running as
-// a service and reacts accordingly.
+// winServiceMain is only invoked on Windows.  It detects when btcd is running
+// as a service and reacts accordingly.
 var winServiceMain func() (bool, error)
 
 // btcdMain is the real main function for btcd.  It is necessary to work around

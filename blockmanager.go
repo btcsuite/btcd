@@ -478,7 +478,7 @@ func (b *blockManager) handleBlockMsg(bmsg *blockMsg) {
 // inventory vector is known.  This includes checking all of the various places
 // inventory can be when it is in different states such as blocks that are part
 // of the main chain, on a side chain, in the orphan pool, and transactions that
-// in the memory pool (either the main pool or orphan pool).
+// are in the memory pool (either the main pool or orphan pool).
 func (b *blockManager) haveInventory(invVect *btcwire.InvVect) bool {
 	switch invVect.Type {
 	case btcwire.InvVect_Block:
