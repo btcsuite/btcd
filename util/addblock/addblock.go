@@ -1,222 +1,134 @@
-// Copyright (c) 2013 Conformal Systems LLC.
+// Copyright (c) 2013-2014 Conformal Systems LLC.
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
 package main
 
 import (
-	"encoding/binary"
-	"fmt"
+	"github.com/conformal/btcchain"
 	"github.com/conformal/btcd/limits"
 	"github.com/conformal/btcdb"
 	_ "github.com/conformal/btcdb/ldb"
 	"github.com/conformal/btclog"
-	"github.com/conformal/btcutil"
-	"github.com/conformal/btcwire"
-	"github.com/conformal/go-flags"
-	"io"
 	"os"
 	"path/filepath"
 	"runtime"
 )
 
-type ShaHash btcwire.ShaHash
-
-type config struct {
-	DataDir  string `short:"b" long:"datadir" description:"Directory to store data"`
-	DbType   string `long:"dbtype" description:"Database backend"`
-	TestNet3 bool   `long:"testnet" description:"Use the test network"`
-	Progress bool   `short:"p" description:"show progress"`
-	InFile   string `short:"i" long:"infile" description:"File containing the block(s)" required:"true"`
-}
-
 const (
-	ArgSha = iota
-	ArgHeight
+	// blockDbNamePrefix is the prefix for the btcd block database.
+	blockDbNamePrefix = "blocks"
 )
 
 var (
-	btcdHomeDir    = btcutil.AppDataDir("btcd", false)
-	defaultDataDir = filepath.Join(btcdHomeDir, "data")
-	log            btclog.Logger
+	cfg *config
+	log btclog.Logger
 )
 
-type bufQueue struct {
-	height int64
-	blkbuf []byte
-}
-
-type blkQueue struct {
-	complete chan bool
-	height   int64
-	blk      *btcutil.Block
-}
-
-func main() {
-	cfg := config{
-		DbType:  "leveldb",
-		DataDir: defaultDataDir,
-	}
-	parser := flags.NewParser(&cfg, flags.Default)
-	_, err := parser.Parse()
-	if err != nil {
-		if e, ok := err.(*flags.Error); !ok || e.Type != flags.ErrHelp {
-			parser.WriteHelp(os.Stderr)
-		}
-		return
-	}
-
-	// Use all processor cores.
-	runtime.GOMAXPROCS(runtime.NumCPU())
-
-	// Up some limits.
-	if err := limits.SetLimits(); err != nil {
-		os.Exit(1)
-	}
-
-	backendLogger := btclog.NewDefaultBackendLogger()
-	defer backendLogger.Flush()
-	log = btclog.NewSubsystemLogger(backendLogger, "")
-	btcdb.UseLogger(log)
-
-	var testnet string
-	if cfg.TestNet3 {
-		testnet = "testnet"
-	} else {
-		testnet = "mainnet"
-	}
-
-	cfg.DataDir = filepath.Join(cfg.DataDir, testnet)
-
-	err = os.MkdirAll(cfg.DataDir, 0700)
-	if err != nil {
-		fmt.Printf("unable to create db repo area %v, %v", cfg.DataDir, err)
-	}
-
-	blockDbNamePrefix := "blocks"
+// loadBlockDB opens the block database and returns a handle to it.
+func loadBlockDB() (btcdb.Db, error) {
+	// The database name is based on the database type.
 	dbName := blockDbNamePrefix + "_" + cfg.DbType
 	if cfg.DbType == "sqlite" {
 		dbName = dbName + ".db"
 	}
 	dbPath := filepath.Join(cfg.DataDir, dbName)
 
-	log.Infof("loading db")
-	db, err := btcdb.CreateDB(cfg.DbType, dbPath)
+	log.Infof("Loading block database from '%s'", dbPath)
+	db, err := btcdb.OpenDB(cfg.DbType, dbPath)
 	if err != nil {
-		log.Warnf("db open failed: %v", err)
-		return
+		// Return the error if it's not because the database doesn't
+		// exist.
+		if err != btcdb.DbDoesNotExist {
+			return nil, err
+		}
+
+		// Create the db if it does not exist.
+		err = os.MkdirAll(cfg.DataDir, 0700)
+		if err != nil {
+			return nil, err
+		}
+		db, err = btcdb.CreateDB(cfg.DbType, dbPath)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	// Get the latest block height from the database.
+	_, height, err := db.NewestSha()
+	if err != nil {
+		db.Close()
+		return nil, err
+	}
+
+	log.Infof("Block database loaded with block height %d", height)
+	return db, nil
+}
+
+// realMain is the real main function for the utility.  It is necessary to work
+// around the fact that deferred functions do not run when os.Exit() is called.
+func realMain() error {
+	// Load configuration and parse command line.
+	tcfg, _, err := loadConfig()
+	if err != nil {
+		return err
+	}
+	cfg = tcfg
+
+	// Setup logging.
+	backendLogger := btclog.NewDefaultBackendLogger()
+	defer backendLogger.Flush()
+	log = btclog.NewSubsystemLogger(backendLogger, "")
+	btcdb.UseLogger(btclog.NewSubsystemLogger(backendLogger, "BCDB: "))
+	btcchain.UseLogger(btclog.NewSubsystemLogger(backendLogger, "CHAN: "))
+
+	// Load the block database.
+	db, err := loadBlockDB()
+	if err != nil {
+		log.Errorf("Failed to load database: %v", err)
+		return err
 	}
 	defer db.Close()
-	log.Infof("db created")
 
-	var fi io.ReadCloser
-
-	fi, err = os.Open(cfg.InFile)
+	fi, err := os.Open(cfg.InFile)
 	if err != nil {
-		log.Warnf("failed to open file %v, err %v", cfg.InFile, err)
+		log.Errorf("Failed to open file %v: %v", cfg.InFile, err)
+		return err
 	}
-	defer func() {
-		if err := fi.Close(); err != nil {
-			log.Warn("failed to close file %v %v", cfg.InFile, err)
-		}
-	}()
+	defer fi.Close()
 
-	bufqueue := make(chan *bufQueue, 2)
-	blkqueue := make(chan *blkQueue, 2)
+	// Create a block importer for the database and input file and start it.
+	// The done channel returned from start will contain an error if
+	// anything went wrong.
+	importer := newBlockImporter(db, fi)
 
-	for i := 0; i < runtime.NumCPU(); i++ {
-		go processBuf(i, bufqueue, blkqueue)
+	// Perform the import asynchronously.  This allows blocks to be
+	// processed and read in parallel.  The results channel returned from
+	// Import contains the statistics about the import including an error
+	// if something went wrong.
+	log.Info("Starting import")
+	resultsChan := importer.Import()
+	results := <-resultsChan
+	if results.err != nil {
+		log.Errorf("%v", results.err)
+		return results.err
 	}
-	go processBuf(0, bufqueue, blkqueue)
 
-	go readBlocks(fi, bufqueue)
-
-	var eheight int64
-	doneMap := map[int64]*blkQueue{}
-	for {
-
-		select {
-		case blkM := <-blkqueue:
-			doneMap[blkM.height] = blkM
-
-			for {
-				if blkP, ok := doneMap[eheight]; ok {
-					delete(doneMap, eheight)
-					blkP.complete <- true
-					db.InsertBlock(blkP.blk)
-
-					if cfg.Progress && eheight%int64(10000) == 0 {
-						log.Infof("Processing block %v", eheight)
-					}
-					eheight++
-				} else {
-					break
-				}
-			}
-		}
-	}
-	if cfg.Progress {
-		log.Infof("Processing block %v", eheight)
-	}
+	log.Infof("Processed a total of %d blocks (%d imported, %d already "+
+		"known)", results.blocksProcessed, results.blocksImported,
+		results.blocksProcessed-results.blocksImported)
+	return nil
 }
 
-func processBuf(idx int, bufqueue chan *bufQueue, blkqueue chan *blkQueue) {
-	complete := make(chan bool)
-	for {
-		select {
-		case bq := <-bufqueue:
-			var blkmsg blkQueue
-
-			blkmsg.height = bq.height
-
-			if len(bq.blkbuf) == 0 {
-				// we are done
-				blkqueue <- &blkmsg
-			}
-
-			blk, err := btcutil.NewBlockFromBytes(bq.blkbuf)
-			if err != nil {
-				fmt.Printf("failed to parse block %v", bq.height)
-				return
-			}
-			blkmsg.blk = blk
-			blkmsg.complete = complete
-			blkqueue <- &blkmsg
-			select {
-			case <-complete:
-			}
-		}
+func main() {
+	// Use all processor cores and up some limits.
+	runtime.GOMAXPROCS(runtime.NumCPU())
+	if err := limits.SetLimits(); err != nil {
+		os.Exit(1)
 	}
-}
 
-func readBlocks(fi io.Reader, bufqueue chan *bufQueue) {
-	var height int64
-	for {
-		var net, blen uint32
-
-		var bufM bufQueue
-		bufM.height = height
-
-		// generate and write header values
-		err := binary.Read(fi, binary.LittleEndian, &net)
-		if err != nil {
-			break
-			bufqueue <- &bufM
-		}
-		if net != uint32(btcwire.MainNet) {
-			fmt.Printf("network mismatch %v %v",
-				net, uint32(btcwire.MainNet))
-
-			bufqueue <- &bufM
-		}
-		err = binary.Read(fi, binary.LittleEndian, &blen)
-		if err != nil {
-			bufqueue <- &bufM
-		}
-		blkbuf := make([]byte, blen)
-		err = binary.Read(fi, binary.LittleEndian, blkbuf)
-		bufM.blkbuf = blkbuf
-		bufqueue <- &bufM
-		height++
+	// Work around defer not working after os.Exit()
+	if err := realMain(); err != nil {
+		os.Exit(1)
 	}
 }
