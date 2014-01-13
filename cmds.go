@@ -419,7 +419,7 @@ type NotifyNewTXsCmd struct {
 // Enforce that NotifyNewTXsCmd satisifies the btcjson.Cmd interface.
 var _ btcjson.Cmd = &NotifyNewTXsCmd{}
 
-// NewNotifyNewTXsCmd creates a new RescanCmd.
+// NewNotifyNewTXsCmd creates a new NotifyNewTXsCmd.
 func NewNotifyNewTXsCmd(id interface{}, addresses []string) *NotifyNewTXsCmd {
 	return &NotifyNewTXsCmd{
 		id:        id,
@@ -515,7 +515,7 @@ type NotifySpentCmd struct {
 // Enforce that NotifySpentCmd satisifies the btcjson.Cmd interface.
 var _ btcjson.Cmd = &NotifySpentCmd{}
 
-// NewNotifySpentCmd creates a new RescanCmd.
+// NewNotifySpentCmd creates a new NotifySpentCmd.
 func NewNotifySpentCmd(id interface{}, op *btcwire.OutPoint) *NotifySpentCmd {
 	return &NotifySpentCmd{
 		id:       id,
