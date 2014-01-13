@@ -3,6 +3,53 @@ User visible changes for btcd
   A full-node bitcoin implementation written in Go
 ============================================================================
 
+Changes in 0.5.0 (Mon Jan 13 2014)
+  - Optimize initial block download by introducing a new mode which
+    downloads the block headers first (up to the final checkpoint)
+  - Improve peer handling to remove the potential for slow peers to cause
+    sluggishness amongst all peers
+    (https://github.com/conformal/btcd/issues/63)
+  - Fix an issue where the initial block sync could stall when the sync peer
+    disconnects (https://github.com/conformal/btcd/issues/62)
+  - Correct an issue where --externalip was doing a DNS lookup on the full
+    host:port instead of just the host portion
+    (https://github.com/conformal/btcd/issues/38)
+  - Fix an issue which could lead to a panic on chain switches
+    (https://github.com/conformal/btcd/issues/70)
+  - Improve btcctl utility in the following ways:
+    - Show getdifficulty output as floating point to 6 digits of precision
+    - Show all JSON object replies formatted as standard JSON
+    - Allow btcctl getblock to accept optional params
+    - Add getaccount command (wallet-specific)
+    - Add getaccountaddress command (wallet-specific)
+    - Add sendrawtransaction command
+  - Continue cleanup and work on implementing RPC API calls
+    - Update getrawmempool to support new optional verbose flag
+    - Update getrawtransaction to match the reference client
+    - Update getblock to support new optional verbose flag
+    - Update raw transactions to fully match the reference client including
+      support for all transaction types and address types
+    - Correct getrawmempool fee field to return BTC instead of Satoshi
+    - Correct getpeerinfo service flag to return 8 digit string so it
+      matches the reference client
+    - Correct verifychain to return a boolean
+    - Implement decoderawtransaction command
+    - Implement createrawtransaction command
+    - Implement decodescript command
+    - Implement gethashespersec command
+    - Allow RPC handler overrides when invoked via a websocket versus
+      legacy connection
+  - Add new DNS seed for peer discovery
+  - Display user agent on new valid peer log message
+    (https://github.com/conformal/btcd/issues/64)
+  - Notify wallet when new transactions that pay to registered addresses
+    show up in the mempool before being mined into a block
+  - Support a tor-specific proxy in addition to a normal proxy
+    (https://github.com/conformal/btcd/issues/47)
+  - Remove deprecated sqlite3 imports from utilities
+  - Remove leftover profile write from addblock utility
+  - Quite a bit of code cleanup and refactoring to improve maintainability
+
 Changes in 0.4.0 (Thu Dec 12 2013)
   - Allow listen interfaces to be specified via --listen instead of only the
     port (https://github.com/conformal/btcd/issues/33)
