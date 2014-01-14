@@ -38,7 +38,7 @@ https://github.com/conformal/btcd/releases
 
 - Install Go according to the installation instructions here:
   http://golang.org/doc/install
-  btcd requires features only available in go1.2 or later.
+  **NOTE: btcd requires features only available in Go version 1.2 or later.**
 
 - Run the following command to obtain btcd, all dependencies, and install it:
   ```$ go get github.com/conformal/btcd```
@@ -54,6 +54,8 @@ https://github.com/conformal/btcd/releases
 Install a newer MSI
 
 #### Linux/BSD/POSIX - Build from Source
+
+**NOTE: btcd requires features only available in Go version 1.2 or later.**
 
 - Run the following command to update btcd, all dependencies, and install it:
   ```$ go get -u -v github.com/conformal/btcd/...```
