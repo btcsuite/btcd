@@ -335,9 +335,9 @@ func handleRescan(s *rpcServer, icmd btcjson.Cmd, c handlerChans) (interface{}, 
 	}
 
 	if len(cmd.Addresses) == 1 {
-		rpcsLog.Info("Beginning rescan for 1 address.")
+		rpcsLog.Info("Beginning rescan for 1 address")
 	} else {
-		rpcsLog.Infof("Beginning rescan for %v addresses.",
+		rpcsLog.Infof("Beginning rescan for %v addresses",
 			len(cmd.Addresses))
 	}
 
@@ -412,7 +412,7 @@ func rescanBlock(s *rpcServer, cmd *btcws.RescanCmd, c handlerChans, blk *btcuti
 				if txReply == nil {
 					txReplyList, err := s.server.db.FetchTxBySha(tx.Sha())
 					if err != nil {
-						rpcsLog.Errorf("Tx Sha %v not found by db.", tx.Sha())
+						rpcsLog.Errorf("Tx Sha %v not found by db", tx.Sha())
 						continue txouts
 					}
 					for i := range txReplyList {
@@ -671,7 +671,7 @@ func (s *rpcServer) websocketJSONHandler(r chan *btcjson.Reply, c handlerChans, 
 func (s *rpcServer) NotifyBlockConnected(block *btcutil.Block) {
 	hash, err := block.Sha()
 	if err != nil {
-		rpcsLog.Error("Bad block; connected block notification dropped.")
+		rpcsLog.Error("Bad block; connected block notification dropped")
 		return
 	}
 
@@ -707,7 +707,7 @@ func (s *rpcServer) NotifyBlockConnected(block *btcutil.Block) {
 func (s *rpcServer) NotifyBlockDisconnected(block *btcutil.Block) {
 	hash, err := block.Sha()
 	if err != nil {
-		rpcsLog.Error("Bad block; connected block notification dropped.")
+		rpcsLog.Error("Bad block; connected block notification dropped")
 		return
 	}
 
@@ -794,7 +794,7 @@ func (s *rpcServer) NotifyForTxOuts(tx *btcutil.Tx, block *btcutil.Block) {
 					if block != nil {
 						blkhash, err := block.Sha()
 						if err != nil {
-							rpcsLog.Error("Error getting block sha; dropping Tx notification.")
+							rpcsLog.Error("Error getting block sha; dropping Tx notification")
 							break
 						}
 						ntfn.BlockHeight = int32(block.Height())
