@@ -567,7 +567,14 @@ func (s *rpcServer) walletReqsNotifications(ws *websocket.Conn) {
 			default:
 				var m []byte
 				if err := websocket.Message.Receive(ws, &m); err != nil {
-					close(disconnected)
+					// Only close disconnected if not closed yet.
+					select {
+					case <-disconnected:
+						// nothing
+
+					default:
+						close(disconnected)
+					}
 					return
 				}
 				msgs <- m
@@ -607,8 +614,14 @@ func (s *rpcServer) walletReqsNotifications(ws *websocket.Conn) {
 				continue
 			}
 			if err := websocket.Message.Send(ws, mresp); err != nil {
-				// Wallet disconnected.
-				close(disconnected)
+				// Only close disconnected if not closed yet.
+				select {
+				case <-disconnected:
+					// nothing
+
+				default:
+					close(disconnected)
+				}
 				return
 			}
 
@@ -620,8 +633,14 @@ func (s *rpcServer) walletReqsNotifications(ws *websocket.Conn) {
 				continue
 			}
 			if err := websocket.Message.Send(ws, mntfn); err != nil {
-				// Wallet disconnected.
-				close(disconnected)
+				// Only close disconnected if not closed yet.
+				select {
+				case <-disconnected:
+					// nothing
+
+				default:
+					close(disconnected)
+				}
 				return
 			}
 		}
