@@ -147,7 +147,10 @@ func (s *rpcServer) Start() {
 		w.Header().Set("Connection", "close")
 		jsonRPCRead(w, r, s)
 	})
+
+	s.wg.Add(1)
 	go s.walletListenerDuplicator()
+
 	rpcServeMux.HandleFunc("/wallet", func(w http.ResponseWriter, r *http.Request) {
 		if err := s.checkAuth(r); err != nil {
 			http.Error(w, "401 Unauthorized.", http.StatusUnauthorized)
@@ -203,9 +206,9 @@ func (s *rpcServer) Stop() error {
 			return err
 		}
 	}
-	rpcsLog.Infof("RPC server shutdown complete")
-	s.wg.Wait()
 	close(s.quit)
+	s.wg.Wait()
+	rpcsLog.Infof("RPC server shutdown complete")
 	return nil
 }
 

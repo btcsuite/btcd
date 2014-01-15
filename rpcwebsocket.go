@@ -367,7 +367,7 @@ func handleRescan(s *rpcServer, icmd btcjson.Cmd, c handlerChans) (interface{}, 
 			// client requesting the rescan has disconnected.
 			select {
 			case <-c.disconnected:
-				rpcsLog.Infof("Stopping rescan at height %v for disconnected client",
+				rpcsLog.Debugf("Stopping rescan at height %v for disconnected client",
 					blk.Height())
 				return nil, nil
 
@@ -518,6 +518,7 @@ func (s *rpcServer) RemoveWalletListener(n ntfnChan) {
 func (s *rpcServer) walletListenerDuplicator() {
 	// Duplicate all messages sent across walletNotificationMaster to each
 	// listening wallet.
+out:
 	for {
 		select {
 		case ntfn := <-s.ws.walletNotificationMaster:
@@ -528,9 +529,11 @@ func (s *rpcServer) walletListenerDuplicator() {
 			s.ws.RUnlock()
 
 		case <-s.quit:
-			return
+			break out
 		}
 	}
+
+	s.wg.Done()
 }
 
 // walletReqsNotifications is the handler function for websocket
@@ -587,7 +590,13 @@ func (s *rpcServer) walletReqsNotifications(ws *websocket.Conn) {
 		case <-s.quit:
 			// Server closed.  Closing disconnected signals handlers to stop
 			// and flushes all channels handlers may write to.
-			close(disconnected)
+			select {
+			case <-disconnected:
+				// nothing
+
+			default:
+				close(disconnected)
+			}
 
 		case <-disconnected:
 			for {
