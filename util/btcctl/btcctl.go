@@ -69,6 +69,7 @@ var commandHandlers = map[string]*handlerData{
 	"verifychain":          &handlerData{0, 2, displayJSONDump, []conversionHandler{toInt, toInt}, makeVerifyChain, "[level] [numblocks]"},
 	"sendrawtransaction":   &handlerData{1, 0, displayGeneric, nil, makeSendRawTransaction, "<hextx>"},
 	"stop":                 &handlerData{0, 0, displayGeneric, nil, makeStop, ""},
+	"submitblock":          &handlerData{1, 1, displayGeneric, nil, makeSubmitBlock, "<hexdata> [jsonparametersobject]"},
 }
 
 // toInt attempts to convert the passed string to an integer.  It returns the
@@ -352,6 +353,16 @@ func makeSendRawTransaction(args []interface{}) (btcjson.Cmd, error) {
 // makeStop generates the cmd structure for stop comands.
 func makeStop(args []interface{}) (btcjson.Cmd, error) {
 	return btcjson.NewStopCmd("btcctl")
+}
+
+// makeSubmitBlock generates the cmd structure for submitblock commands.
+func makeSubmitBlock(args []interface{}) (btcjson.Cmd, error) {
+	opts := &btcjson.SubmitBlockOptions{}
+	if len(args) == 2 {
+		opts.WorkId = args[1].(string)
+	}
+
+	return btcjson.NewSubmitBlockCmd("btcctl", args[0].(string), opts)
 }
 
 // makeVerifyChain generates the cmd structure for verifychain comands.

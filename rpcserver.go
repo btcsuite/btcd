@@ -108,7 +108,7 @@ var rpcHandlers = map[string]commandHandler{
 	"signmessage":            handleAskWallet,
 	"signrawtransaction":     handleAskWallet,
 	"stop":                   handleStop,
-	"submitblock":            handleUnimplemented,
+	"submitblock":            handleSubmitBlock,
 	"validateaddress":        handleAskWallet,
 	"verifychain":            handleVerifyChain,
 	"verifymessage":          handleAskWallet,
@@ -1060,6 +1060,36 @@ func handleSetGenerate(s *rpcServer, cmd btcjson.Cmd) (interface{}, error) {
 func handleStop(s *rpcServer, cmd btcjson.Cmd) (interface{}, error) {
 	s.server.Stop()
 	return "btcd stopping.", nil
+}
+
+// handleSubmitBlock implements the submitblock command.
+func handleSubmitBlock(s *rpcServer, cmd btcjson.Cmd) (interface{}, error) {
+	c := cmd.(*btcjson.SubmitBlockCmd)
+	// Deserialize and send off to block processor.
+	serializedBlock, err := hex.DecodeString(c.HexBlock)
+	if err != nil {
+		err := btcjson.Error{
+			Code:    btcjson.ErrDeserialization.Code,
+			Message: "Block decode failed",
+		}
+		return nil, err
+	}
+
+	block, err := btcutil.NewBlockFromBytes(serializedBlock)
+	if err != nil {
+		err := btcjson.Error{
+			Code:    btcjson.ErrDeserialization.Code,
+			Message: "Block decode failed",
+		}
+		return nil, err
+	}
+
+	err = s.server.blockManager.blockChain.ProcessBlock(block, false)
+	if err != nil {
+		return fmt.Sprintf("rejected: %s", err.Error()), nil
+	}
+
+	return nil, nil
 }
 
 func verifyChain(db btcdb.Db, level, depth int32) error {
