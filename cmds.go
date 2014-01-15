@@ -13,19 +13,32 @@ import (
 )
 
 func init() {
-	btcjson.RegisterCustomCmd("createencryptedwallet", parseCreateEncryptedWalletCmd)
-	btcjson.RegisterCustomCmd("exportwatchingwallet", parseExportWatchingWalletCmd)
-	btcjson.RegisterCustomCmd("getaddressbalance", parseGetAddressBalanceCmd)
-	btcjson.RegisterCustomCmd("getbestblock", parseGetBestBlockCmd)
-	btcjson.RegisterCustomCmd("getcurrentnet", parseGetCurrentNetCmd)
-	btcjson.RegisterCustomCmd("getunconfirmedbalance", parseGetUnconfirmedBalanceCmd)
-	btcjson.RegisterCustomCmd("listaddresstransactions", parseListAddressTransactionsCmd)
-	btcjson.RegisterCustomCmd("listalltransactions", parseListAllTransactionsCmd)
-	btcjson.RegisterCustomCmd("notifyblocks", parseNotifyBlocksCmd)
-	btcjson.RegisterCustomCmd("notifynewtxs", parseNotifyNewTXsCmd)
-	btcjson.RegisterCustomCmd("notifyspent", parseNotifySpentCmd)
-	btcjson.RegisterCustomCmd("rescan", parseRescanCmd)
-	btcjson.RegisterCustomCmd("walletislocked", parseWalletIsLockedCmd)
+	btcjson.RegisterCustomCmd("createencryptedwallet",
+		parseCreateEncryptedWalletCmd, `TODO(jrick) fillmein`)
+	btcjson.RegisterCustomCmd("exportwatchingwallet",
+		parseExportWatchingWalletCmd, `TODO(jrick) fillmein`)
+	btcjson.RegisterCustomCmd("getaddressbalance",
+		parseGetAddressBalanceCmd, `TODO(jrick) fillmein`)
+	btcjson.RegisterCustomCmd("getbestblock", parseGetBestBlockCmd,
+		`TODO(jrick) fillmein`)
+	btcjson.RegisterCustomCmd("getcurrentnet", parseGetCurrentNetCmd,
+		`TODO(jrick) fillmein`)
+	btcjson.RegisterCustomCmd("getunconfirmedbalance",
+		parseGetUnconfirmedBalanceCmd, `TODO(jrick) fillmein`)
+	btcjson.RegisterCustomCmd("listaddresstransactions",
+		parseListAddressTransactionsCmd, `TODO(jrick) fillmein`)
+	btcjson.RegisterCustomCmd("listalltransactions",
+		parseListAllTransactionsCmd, `TODO(jrick) fillmein`)
+	btcjson.RegisterCustomCmd("notifyblocks", parseNotifyBlocksCmd,
+		`TODO(jrick) fillmein`)
+	btcjson.RegisterCustomCmd("notifynewtxs", parseNotifyNewTXsCmd,
+		`TODO(jrick) fillmein`)
+	btcjson.RegisterCustomCmd("notifyspent", parseNotifySpentCmd,
+		`TODO(jrick) fillmein`)
+	btcjson.RegisterCustomCmd("rescan", parseRescanCmd,
+		`TODO(jrick) fillmein`)
+	btcjson.RegisterCustomCmd("walletislocked", parseWalletIsLockedCmd,
+		`TODO(jrick) fillmein`)
 }
 
 // GetCurrentNetCmd is a type handling custom marshaling and

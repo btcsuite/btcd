@@ -57,15 +57,24 @@ const (
 
 // Register notifications with btcjson.
 func init() {
-	btcjson.RegisterCustomCmd(AccountBalanceNtfnMethod, parseAccountBalanceNtfn)
-	btcjson.RegisterCustomCmd(BlockConnectedNtfnMethod, parseBlockConnectedNtfn)
-	btcjson.RegisterCustomCmd(BlockDisconnectedNtfnMethod, parseBlockDisconnectedNtfn)
-	btcjson.RegisterCustomCmd(BtcdConnectedNtfnMethod, parseBtcdConnectedNtfn)
-	btcjson.RegisterCustomCmd(ProcessedTxNtfnMethod, parseProcessedTxNtfn)
-	btcjson.RegisterCustomCmd(TxMinedNtfnMethod, parseTxMinedNtfn)
-	btcjson.RegisterCustomCmd(TxSpentNtfnMethod, parseTxSpentNtfn)
-	btcjson.RegisterCustomCmd(TxNtfnMethod, parseTxNtfn)
-	btcjson.RegisterCustomCmd(WalletLockStateNtfnMethod, parseWalletLockStateNtfn)
+	btcjson.RegisterCustomCmd(AccountBalanceNtfnMethod,
+		parseAccountBalanceNtfn, `TODO(jrick) fillmein`)
+	btcjson.RegisterCustomCmd(BlockConnectedNtfnMethod,
+		parseBlockConnectedNtfn, `TODO(jrick) fillmein`)
+	btcjson.RegisterCustomCmd(BlockDisconnectedNtfnMethod,
+		parseBlockDisconnectedNtfn, `TODO(jrick) fillmein`)
+	btcjson.RegisterCustomCmd(BtcdConnectedNtfnMethod,
+		parseBtcdConnectedNtfn, `TODO(jrick) fillmein`)
+	btcjson.RegisterCustomCmd(ProcessedTxNtfnMethod,
+		parseProcessedTxNtfn, `TODO(jrick) fillmein`)
+	btcjson.RegisterCustomCmd(TxMinedNtfnMethod, parseTxMinedNtfn,
+		`TODO(jrick) fillmein`)
+	btcjson.RegisterCustomCmd(TxSpentNtfnMethod, parseTxSpentNtfn,
+		`TODO(jrick) fillmein`)
+	btcjson.RegisterCustomCmd(TxNtfnMethod, parseTxNtfn,
+		`TODO(jrick) fillmein`)
+	btcjson.RegisterCustomCmd(WalletLockStateNtfnMethod,
+		parseWalletLockStateNtfn, `TODO(jrick) fillmein`)
 }
 
 // AccountBalanceNtfn is a type handling custom marshaling and
