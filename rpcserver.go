@@ -45,79 +45,96 @@ var (
 type commandHandler func(*rpcServer, btcjson.Cmd) (interface{}, error)
 
 // handlers maps RPC command strings to appropriate handler functions.
-var rpcHandlers = map[string]commandHandler{
-	"addmultisigaddress":     handleAskWallet,
+// this is copied by init because help references rpcHandlers and thus causes
+// a dependancy loop.
+var rpcHandlers map[string]commandHandler
+var rpcHandlersBeforeInit = map[string]commandHandler{
 	"addnode":                handleAddNode,
-	"backupwallet":           handleAskWallet,
-	"createmultisig":         handleAskWallet,
 	"createrawtransaction":   handleCreateRawTransaction,
 	"debuglevel":             handleDebugLevel,
 	"decoderawtransaction":   handleDecodeRawTransaction,
 	"decodescript":           handleDecodeScript,
-	"dumpprivkey":            handleAskWallet,
-	"dumpwallet":             handleAskWallet,
-	"encryptwallet":          handleAskWallet,
-	"getaccount":             handleAskWallet,
-	"getaccountaddress":      handleAskWallet,
-	"getaddednodeinfo":       handleUnimplemented,
-	"getaddressesbyaccount":  handleAskWallet,
-	"getbalance":             handleAskWallet,
 	"getbestblockhash":       handleGetBestBlockHash,
 	"getblock":               handleGetBlock,
 	"getblockcount":          handleGetBlockCount,
 	"getblockhash":           handleGetBlockHash,
-	"getblocktemplate":       handleUnimplemented,
 	"getconnectioncount":     handleGetConnectionCount,
 	"getdifficulty":          handleGetDifficulty,
 	"getgenerate":            handleGetGenerate,
 	"gethashespersec":        handleGetHashesPerSec,
-	"getinfo":                handleUnimplemented,
-	"getmininginfo":          handleUnimplemented,
-	"getnettotals":           handleUnimplemented,
-	"getnetworkhashps":       handleUnimplemented,
-	"getnewaddress":          handleUnimplemented,
 	"getpeerinfo":            handleGetPeerInfo,
-	"getrawchangeaddress":    handleAskWallet,
 	"getrawmempool":          handleGetRawMempool,
 	"getrawtransaction":      handleGetRawTransaction,
-	"getreceivedbyaccount":   handleAskWallet,
-	"getreceivedbyaddress":   handleAskWallet,
-	"gettransaction":         handleAskWallet,
-	"gettxout":               handleAskWallet,
-	"gettxoutsetinfo":        handleAskWallet,
-	"getwork":                handleUnimplemented,
-	"help":                   handleUnimplemented,
-	"importprivkey":          handleAskWallet,
-	"importwallet":           handleAskWallet,
-	"keypoolrefill":          handleAskWallet,
-	"listaccounts":           handleAskWallet,
-	"listaddressgroupings":   handleAskWallet,
-	"listlockunspent":        handleAskWallet,
-	"listreceivedbyaccount":  handleAskWallet,
-	"listreceivedbyaddress":  handleAskWallet,
-	"listsinceblock":         handleAskWallet,
-	"listtransactions":       handleAskWallet,
-	"listunspent":            handleAskWallet,
-	"lockunspent":            handleAskWallet,
-	"move":                   handleAskWallet,
-	"ping":                   handleUnimplemented,
-	"sendfrom":               handleAskWallet,
-	"sendmany":               handleAskWallet,
+	"help":                   handleHelp,
 	"sendrawtransaction":     handleSendRawTransaction,
-	"sendtoaddress":          handleAskWallet,
-	"setaccount":             handleAskWallet,
 	"setgenerate":            handleSetGenerate,
-	"settxfee":               handleAskWallet,
-	"signmessage":            handleAskWallet,
-	"signrawtransaction":     handleAskWallet,
 	"stop":                   handleStop,
 	"submitblock":            handleSubmitBlock,
-	"validateaddress":        handleAskWallet,
 	"verifychain":            handleVerifyChain,
-	"verifymessage":          handleAskWallet,
-	"walletlock":             handleAskWallet,
-	"walletpassphrase":       handleAskWallet,
-	"walletpassphrasechange": handleAskWallet,
+}
+
+func init() {
+	rpcHandlers = rpcHandlersBeforeInit
+}
+
+// list of commands that we recognise, but for which btcd has no support because
+// it lacks support for wallet functionality. For these commands the user
+// should ask a connected instance of btcwallet.
+var rpcAskWallet = map[string]bool{
+	"addmultisigaddress":     true,
+	"backupwallet":           true,
+	"createmultisig":         true,
+	"dumpprivkey":            true,
+	"dumpwallet":             true,
+	"encryptwallet":          true,
+	"getaccount":             true,
+	"getaccountaddress":      true,
+	"getaddressesbyaccount":  true,
+	"getbalance":             true,
+	"getrawchangeaddress":    true,
+	"getreceivedbyaccount":   true,
+	"getreceivedbyaddress":   true,
+	"gettransaction":         true,
+	"gettxout":               true,
+	"gettxoutsetinfo":        true,
+	"importprivkey":          true,
+	"importwallet":           true,
+	"keypoolrefill":          true,
+	"listaccounts":           true,
+	"listaddressgroupings":   true,
+	"listlockunspent":        true,
+	"listreceivedbyaccount":  true,
+	"listreceivedbyaddress":  true,
+	"listsinceblock":         true,
+	"listtransactions":       true,
+	"listunspent":            true,
+	"lockunspent":            true,
+	"move":                   true,
+	"sendfrom":               true,
+	"sendmany":               true,
+	"sendtoaddress":          true,
+	"setaccount":             true,
+	"settxfee":               true,
+	"signmessage":            true,
+	"signrawtransaction":     true,
+	"validateaddress":        true,
+	"verifymessage":          true,
+	"walletlock":             true,
+	"walletpassphrase":       true,
+	"walletpassphrasechange": true,
+}
+
+// Commands that are temporarily unimplemented.
+var rpcUnimplemented = map[string]bool{
+	"getaddednodeinfo":       true,
+	"getblocktemplate":       true,
+	"getinfo":                true,
+	"getmininginfo":          true,
+	"getnettotals":           true,
+	"getnetworkhashps":       true,
+	"getnewaddress":          true,
+	"getwork":                true,
+	"ping":                   true,
 }
 
 // rpcServer holds the items the rpc server may need to access (config,
@@ -1011,6 +1028,70 @@ func createTxRawResult(net btcwire.BitcoinNet, txSha string, mtx *btcwire.MsgTx,
 	return txReply, nil
 }
 
+var helpAddenda = map[string]string{
+	"getgenerate": `
+NOTE: btcd does not mine so this will always return false. The call is provided
+for compatibility only.`,
+	"gethashespersec": `
+NOTE: btcd does not mine so this will always return false. The call is provided
+for compatibility only.`,
+	"getpeerinfo": `
+NOTE: btcd does not currently implement all fields. the "bytessent",
+"bytesrecv", "pingtime", "pingwait" and "syncnode" fields are not yet
+implemented.`,
+	"sendrawtransaction": `
+NOTE: btcd does not currently support the "allowhighfees" parameter.`,
+	"setgenerate": `
+NOTE: btcd does not mine so command has no effect. The call is provided
+for compatibility only.`,
+}
+
+// getHelp text retreives help text from btcjson for the command in question.
+// If there is any extra btcd specific information related to the given command
+// then this is appended to the string.
+func getHelpText(cmdName string) (string, error) {
+	help, err := btcjson.GetHelpString(cmdName)
+	if err != nil {
+		return "", err
+	}
+	if helpAddendum, ok := helpAddenda[cmdName]; ok {
+		help += helpAddendum
+	}
+
+	return help, nil
+}
+
+// handleHelp implements the help command.
+func handleHelp(s *rpcServer, cmd btcjson.Cmd) (interface{}, error) {
+	help := cmd.(*btcjson.HelpCmd)
+
+	// if no args we give a list of all known commands
+	if help.Command == "" {
+		commands := ""
+		first := true
+		// TODO(oga) this should have one liner usage for each command
+		// really, but for now just a list of commands is sufficient.
+		for k := range rpcHandlers {
+			if !first {
+				commands += "\n"
+			}
+			commands += k
+			first = false
+		}
+		return commands, nil
+	}
+
+	// Check that we actually support the command asked for. We only
+	// search the main list of hanlders since we do not wish to provide help
+	// for commands that are unimplemented or relate to wallet
+	// functionality.
+	if _, ok :=  rpcHandlers[help.Command]; !ok {
+		return "", fmt.Errorf("help: unknown command: %s", help.Command)
+	}
+
+	return getHelpText(help.Command)
+}
+
 // handleSendRawTransaction implements the sendrawtransaction command.
 func handleSendRawTransaction(s *rpcServer, cmd btcjson.Cmd) (interface{}, error) {
 	c := cmd.(*btcjson.SendRawTransactionCmd)
@@ -1174,10 +1255,22 @@ func standardCmdReply(cmd btcjson.Cmd, s *rpcServer) (reply btcjson.Reply) {
 	reply.Id = &id
 
 	handler, ok := rpcHandlers[cmd.Method()]
-	if !ok {
-		reply.Error = &btcjson.ErrMethodNotFound
-		return reply
+	if ok {
+		goto handled
 	}
+	_, ok = rpcAskWallet[cmd.Method()]
+	if ok {
+		handler = handleAskWallet
+		goto handled
+	}
+	_, ok = rpcUnimplemented[cmd.Method()]
+	if ok {
+		handler = handleUnimplemented
+		goto handled
+	}
+	reply.Error = &btcjson.ErrMethodNotFound
+	return reply
+handled:
 
 	result, err := handler(s, cmd)
 	if err != nil {

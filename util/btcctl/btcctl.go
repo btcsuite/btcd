@@ -64,6 +64,7 @@ var commandHandlers = map[string]*handlerData{
 	"getpeerinfo":          &handlerData{0, 0, displayJSONDump, nil, makeGetPeerInfo, ""},
 	"getrawmempool":        &handlerData{0, 1, displayJSONDump, []conversionHandler{toBool}, makeGetRawMempool, "[verbose=false]"},
 	"getrawtransaction":    &handlerData{1, 1, displayJSONDump, []conversionHandler{nil, toBool}, makeGetRawTransaction, "<txhash> [verbose=false]"},
+	"help":			&handlerData{0, 1, displayGeneric, nil, makeHelp, "[commandName]"},
 	"importprivkey":        &handlerData{1, 2, displayGeneric, []conversionHandler{nil, nil, toBool}, makeImportPrivKey, "<wifprivkey> [label] [rescan=true]"},
 	"listtransactions":     &handlerData{0, 3, displayJSONDump, []conversionHandler{nil, toInt, toInt}, makeListTransactions, "[account] [count=10] [from=0]"},
 	"verifychain":          &handlerData{0, 2, displayJSONDump, []conversionHandler{toInt, toInt}, makeVerifyChain, "[level] [numblocks]"},
@@ -300,6 +301,14 @@ func makeGetRawMempool(args []interface{}) (btcjson.Cmd, error) {
 		opt = append(opt, args[0].(bool))
 	}
 	return btcjson.NewGetRawMempoolCmd("btcctl", opt...)
+}
+
+func makeHelp(args []interface{}) (btcjson.Cmd, error) {
+	opt := make([]string, 0, 1)
+	if len(args) > 0 {
+		opt = append(opt, args[0].(string))
+	}
+	return btcjson.NewHelpCmd("btcctl", opt...)
 }
 
 // makeRawTransaction generates the cmd structure for
