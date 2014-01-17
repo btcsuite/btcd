@@ -7,7 +7,6 @@ package main
 import (
 	"bytes"
 	"code.google.com/p/go.net/websocket"
-	"container/list"
 	"crypto/sha256"
 	"crypto/subtle"
 	"crypto/tls"
@@ -124,7 +123,7 @@ type rpcServer struct {
 	shutdown  int32
 	server    *server
 	authsha   [sha256.Size]byte
-	ws        wsContext
+	ws        *wsContext
 	wg        sync.WaitGroup
 	listeners []net.Listener
 	quit      chan int
@@ -240,14 +239,9 @@ func newRPCServer(listenAddrs []string, s *server) (*rpcServer, error) {
 	rpc := rpcServer{
 		authsha: sha256.Sum256([]byte(auth)),
 		server:  s,
+		ws:      newWebsocketContext(),
 		quit:    make(chan int),
 	}
-
-	// initialize memory for websocket connections
-	rpc.ws.connections = make(map[ntfnChan]*requestContexts)
-	rpc.ws.txNotifications = make(map[string]*list.List)
-	rpc.ws.spentNotifications = make(map[btcwire.OutPoint]*list.List)
-	rpc.ws.minedTxNotifications = make(map[btcwire.ShaHash]*list.List)
 
 	// check for existence of cert file and key file
 	if !fileExists(cfg.RPCKey) && !fileExists(cfg.RPCCert) {

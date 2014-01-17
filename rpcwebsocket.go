@@ -214,6 +214,18 @@ func (r *wsContext) CloseListeners(n ntfnChan) {
 	close(n)
 }
 
+// newWebsocketContext returns a new websocket context that is used
+// for handling websocket requests and notifications.
+func newWebsocketContext() *wsContext {
+	return &wsContext{
+		connections:              make(map[ntfnChan]*requestContexts),
+		walletNotificationMaster: make(ntfnChan),
+		txNotifications:          make(map[string]*list.List),
+		spentNotifications:       make(map[btcwire.OutPoint]*list.List),
+		minedTxNotifications:     make(map[btcwire.ShaHash]*list.List),
+	}
+}
+
 // requestContexts holds all requests for a single wallet connection.
 type requestContexts struct {
 	// blockUpdates specifies whether a client has requested notifications
