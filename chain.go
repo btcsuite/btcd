@@ -142,20 +142,22 @@ func removeChildNode(children []*blockNode, node *blockNode) []*blockNode {
 // follow all rules, orphan handling, checkpoint handling, and best chain
 // selection with reorganization.
 type BlockChain struct {
-	db            btcdb.Db
-	btcnet        btcwire.BitcoinNet
-	notifications NotificationCallback
-	root          *blockNode
-	bestChain     *blockNode
-	index         map[btcwire.ShaHash]*blockNode
-	depNodes      map[btcwire.ShaHash][]*blockNode
-	orphans       map[btcwire.ShaHash]*orphanBlock
-	prevOrphans   map[btcwire.ShaHash][]*orphanBlock
-	oldestOrphan  *orphanBlock
-	orphanLock    sync.RWMutex
-	blockCache    map[btcwire.ShaHash]*btcutil.Block
-	noVerify      bool
-	noCheckpoints bool
+	db              btcdb.Db
+	btcnet          btcwire.BitcoinNet
+	notifications   NotificationCallback
+	root            *blockNode
+	bestChain       *blockNode
+	index           map[btcwire.ShaHash]*blockNode
+	depNodes        map[btcwire.ShaHash][]*blockNode
+	orphans         map[btcwire.ShaHash]*orphanBlock
+	prevOrphans     map[btcwire.ShaHash][]*orphanBlock
+	oldestOrphan    *orphanBlock
+	orphanLock      sync.RWMutex
+	blockCache      map[btcwire.ShaHash]*btcutil.Block
+	noVerify        bool
+	noCheckpoints   bool
+	nextCheckpoint  *Checkpoint
+	checkpointBlock *btcutil.Block
 }
 
 // DisableVerify provides a mechanism to disable transaction script validation

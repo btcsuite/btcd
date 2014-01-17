@@ -125,10 +125,16 @@ func (b *BlockChain) verifyCheckpoint(height int64, hash *btcwire.ShaHash) bool 
 		return true
 	}
 
-	return checkpoint.Hash.IsEqual(hash)
+	if !checkpoint.Hash.IsEqual(hash) {
+		return false
+	}
+
+	log.Infof("Verfied checkpoint at height %d/block %s", checkpoint.Height,
+		checkpoint.Hash)
+	return true
 }
 
-// findClosestKnownCheckpoint finds the most recent checkpoint that is already
+// findLatestKnownCheckpoint finds the most recent checkpoint that is already
 // available in the downloaded portion of the block chain and returns the
 // associated block.  It returns nil if a checkpoint can't be found (this should
 // really only happen for blocks before the first checkpoint).
@@ -137,20 +143,96 @@ func (b *BlockChain) findLatestKnownCheckpoint() (*btcutil.Block, error) {
 		return nil, nil
 	}
 
-	// Loop backwards through the available checkpoints to find one that
-	// we already have.
+	// No checkpoints.
 	checkpoints := b.checkpointData().checkpoints
-	clen := len(checkpoints)
-	for i := clen - 1; i >= 0; i-- {
-		if b.db.ExistsSha(checkpoints[i].Hash) {
-			block, err := b.db.FetchBlockBySha(checkpoints[i].Hash)
-			if err != nil {
-				return nil, err
+	numCheckpoints := len(checkpoints)
+	if numCheckpoints == 0 {
+		return nil, nil
+	}
+
+	// Perform the initial search to find and cache the latest known
+	// checkpoint if the best chain is not known yet or we haven't already
+	// previously searched.
+	if b.bestChain == nil || (b.checkpointBlock == nil && b.nextCheckpoint == nil) {
+		// Loop backwards through the available checkpoints to find one
+		// that we already have.
+		checkpointIndex := -1
+		for i := numCheckpoints - 1; i >= 0; i-- {
+			if b.db.ExistsSha(checkpoints[i].Hash) {
+				checkpointIndex = i
+				break
 			}
-			return block, nil
+		}
+
+		// No known latest checkpoint.  This will only happen on blocks
+		// before the first known checkpoint.  So, set the next expected
+		// checkpoint to the first checkpoint and return the fact there
+		// is no latest known checkpoint block.
+		if checkpointIndex == -1 {
+			b.nextCheckpoint = &checkpoints[0]
+			return nil, nil
+		}
+
+		// Cache the latest known checkpoint block for future lookups.
+		checkpoint := checkpoints[checkpointIndex]
+		block, err := b.db.FetchBlockBySha(checkpoint.Hash)
+		if err != nil {
+			return nil, err
+		}
+		b.checkpointBlock = block
+
+		// Set the next expected checkpoint block accordingly.
+		b.nextCheckpoint = nil
+		if checkpointIndex < numCheckpoints-1 {
+			b.nextCheckpoint = &checkpoints[checkpointIndex+1]
+		}
+
+		return block, nil
+	}
+
+	// At this point we've already searched for the latest known checkpoint,
+	// so when there is no next checkpoint, the current checkpoint lockin
+	// will always be the latest known checkpoint.
+	if b.nextCheckpoint == nil {
+		return b.checkpointBlock, nil
+	}
+
+	// When there is a next checkpoint and the height of the current best
+	// chain does not exceed it, the current checkpoint lockin is still
+	// the latest known checkpoint.
+	if b.bestChain.height < b.nextCheckpoint.Height {
+		return b.checkpointBlock, nil
+	}
+
+	// We've reached or exceeded the next checkpoint height.  Note that
+	// once a checkpoint lockin has been reached, forks are prevented from
+	// any blocks before the checkpoint, so we don't have to worry about the
+	// checkpoint going away out from under us due to a chain reorganize.
+
+	// Cache the latest known checkpoint block for future lookups.  Note
+	// that if this lookup fails something is very wrong since the chain
+	// has already passed the checkpoint which was verified as accurate
+	// before inserting it.
+	block, err := b.db.FetchBlockBySha(b.nextCheckpoint.Hash)
+	if err != nil {
+		return nil, err
+	}
+	b.checkpointBlock = block
+
+	// Set the next expected checkpoint.
+	checkpointIndex := -1
+	for i := numCheckpoints - 1; i >= 0; i-- {
+		if checkpoints[i].Hash.IsEqual(b.nextCheckpoint.Hash) {
+			checkpointIndex = i
+			break
 		}
 	}
-	return nil, nil
+	b.nextCheckpoint = nil
+	if checkpointIndex != -1 && checkpointIndex < numCheckpoints-1 {
+		b.nextCheckpoint = &checkpoints[checkpointIndex+1]
+	}
+
+	return b.checkpointBlock, nil
 }
 
 // isNonstandardTransaction determines whether a transaction contains any
