@@ -1061,6 +1061,21 @@ var jsoncmdtests = []struct {
 		},
 	},
 	{
+		name: "basic + opts + addresses",
+		cmd:  "listunspent",
+		f: func() (Cmd, error) {
+			return NewListUnspentCmd(testId, 0, 6, []string{
+				"a", "b", "c",
+			})
+		},
+		result: &ListUnspentCmd{
+			id:        testId,
+			MinConf:   0,
+			MaxConf:   6,
+			Addresses: []string{"a", "b", "c"},
+		},
+	},
+	{
 		name: "basic",
 		cmd:  "lockunspent",
 		f: func() (Cmd, error) {

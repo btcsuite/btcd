@@ -4853,9 +4853,10 @@ func (cmd *ListTransactionsCmd) UnmarshalJSON(b []byte) error {
 // ListUnspentCmd is a type handling custom marshaling and
 // unmarshaling of listunspent JSON RPC commands.
 type ListUnspentCmd struct {
-	id      interface{}
-	MinConf int
-	MaxConf int
+	id        interface{}
+	MinConf   int
+	MaxConf   int
+	Addresses []string
 }
 
 // Enforce that ListUnspentCmd satisifies the Cmd interface.
@@ -4863,23 +4864,40 @@ var _ Cmd = &ListUnspentCmd{}
 
 // NewListUnspentCmd creates a new ListUnspentCmd. Optionally a
 // pointer to a TemplateRequest may be provided.
-func NewListUnspentCmd(id interface{}, optArgs ...int) (*ListUnspentCmd, error) {
+func NewListUnspentCmd(id interface{}, optArgs ...interface{}) (*ListUnspentCmd, error) {
 	minconf := 1
 	maxconf := 999999
+	var addresses []string
 
-	if len(optArgs) > 2 {
+	if len(optArgs) > 3 {
 		return nil, ErrWrongNumberOfParams
 	}
 	if len(optArgs) > 0 {
-		minconf = optArgs[0]
+		m, ok := optArgs[0].(int)
+		if !ok {
+			return nil, errors.New("first optional argument minconf is not an int")
+		}
+		minconf = m
 	}
 	if len(optArgs) > 1 {
-		maxconf = optArgs[1]
+		m, ok := optArgs[1].(int)
+		if !ok {
+			return nil, errors.New("second optional argument maxconf is not an int")
+		}
+		maxconf = m
+	}
+	if len(optArgs) > 2 {
+		a, ok := optArgs[2].([]string)
+		if !ok {
+			return nil, errors.New("third optional argument addresses is not an array of strings")
+		}
+		addresses = a
 	}
 	return &ListUnspentCmd{
-		id:      id,
-		MinConf: minconf,
-		MaxConf: maxconf,
+		id:        id,
+		MinConf:   minconf,
+		MaxConf:   maxconf,
+		Addresses: addresses,
 	}, nil
 }
 
@@ -4907,12 +4925,16 @@ func (cmd *ListUnspentCmd) MarshalJSON() ([]byte, error) {
 		Params:  []interface{}{},
 	}
 
-	if cmd.MinConf != 1 || cmd.MaxConf != 99999 {
+	if cmd.MinConf != 1 || cmd.MaxConf != 99999 || len(cmd.Addresses) != 0 {
 		raw.Params = append(raw.Params, cmd.MinConf)
 	}
 
-	if cmd.MaxConf != 99999 {
+	if cmd.MaxConf != 99999 || len(cmd.Addresses) != 0 {
 		raw.Params = append(raw.Params, cmd.MaxConf)
+	}
+
+	if len(cmd.Addresses) != 0 {
+		raw.Params = append(raw.Params, cmd.Addresses)
 	}
 
 	return json.Marshal(raw)
@@ -4927,11 +4949,11 @@ func (cmd *ListUnspentCmd) UnmarshalJSON(b []byte) error {
 		return err
 	}
 
-	if len(r.Params) > 2 {
+	if len(r.Params) > 3 {
 		return ErrWrongNumberOfParams
 	}
 
-	optArgs := make([]int, 0, 2)
+	optArgs := make([]interface{}, 0, 3)
 	if len(r.Params) > 0 {
 		minconf, ok := r.Params[0].(float64)
 		if !ok {
@@ -4945,6 +4967,22 @@ func (cmd *ListUnspentCmd) UnmarshalJSON(b []byte) error {
 			return errors.New("second optional parameter maxconf must be a number")
 		}
 		optArgs = append(optArgs, int(maxconf))
+	}
+	if len(r.Params) > 2 {
+		iaddr, ok := r.Params[2].([]interface{})
+		if !ok {
+			return errors.New("third  optional parameter addresses must be an array")
+		}
+
+		addr := make([]string, len(iaddr))
+		for i, val := range iaddr {
+			addr[i], ok = val.(string)
+			if !ok {
+				return errors.New("optional parameter addreses must be an array of strings")
+			}
+		}
+
+		optArgs = append(optArgs, addr)
 	}
 
 	newCmd, err := NewListUnspentCmd(r.Id, optArgs...)
