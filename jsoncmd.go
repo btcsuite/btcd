@@ -5655,8 +5655,9 @@ func (cmd *SendManyCmd) UnmarshalJSON(b []byte) error {
 // SendRawTransactionCmd is a type handling custom marshaling and
 // unmarshaling of sendrawtransaction JSON RPC commands.
 type SendRawTransactionCmd struct {
-	id    interface{}
-	HexTx string
+	id            interface{}
+	HexTx         string
+	AllowHighFees bool
 }
 
 // Enforce that SendRawTransactionCmd satisifies the Cmd interface.
@@ -5664,11 +5665,19 @@ var _ Cmd = &SendRawTransactionCmd{}
 
 // NewSendRawTransactionCmd creates a new SendRawTransactionCmd. Optionally a
 // pointer to a TemplateRequest may be provided.
-func NewSendRawTransactionCmd(id interface{}, hextx string) (*SendRawTransactionCmd, error) {
+func NewSendRawTransactionCmd(id interface{}, hextx string, optArgs ...bool) (*SendRawTransactionCmd, error) {
+	allowHighFees := false
+	if len(optArgs) > 1 {
+		return nil, ErrTooManyOptArgs
+	}
+	if len(optArgs) == 1 {
+		allowHighFees = optArgs[0]
+	}
 
 	return &SendRawTransactionCmd{
-		id:    id,
-		HexTx: hextx,
+		id:            id,
+		HexTx:         hextx,
+		AllowHighFees: allowHighFees,
 	}, nil
 }
 
@@ -5698,6 +5707,10 @@ func (cmd *SendRawTransactionCmd) MarshalJSON() ([]byte, error) {
 		},
 	}
 
+	if cmd.AllowHighFees {
+		raw.Params = append(raw.Params, cmd.AllowHighFees)
+	}
+
 	return json.Marshal(raw)
 }
 
@@ -5710,7 +5723,7 @@ func (cmd *SendRawTransactionCmd) UnmarshalJSON(b []byte) error {
 		return err
 	}
 
-	if len(r.Params) != 1 {
+	if len(r.Params) > 2 || len(r.Params) < 1 {
 		return ErrWrongNumberOfParams
 	}
 
@@ -5719,7 +5732,16 @@ func (cmd *SendRawTransactionCmd) UnmarshalJSON(b []byte) error {
 		return errors.New("first parameter hextx must be a string")
 	}
 
-	newCmd, err := NewSendRawTransactionCmd(r.Id, hextx)
+	optArgs := make([]bool, 0, 1)
+	if len(r.Params) > 1 {
+		allowHighFees, ok := r.Params[1].(bool)
+		if !ok {
+			return errors.New("second optional parameter allowhighfees must be a bool")
+		}
+		optArgs = append(optArgs, allowHighFees)
+	}
+
+	newCmd, err := NewSendRawTransactionCmd(r.Id, hextx, optArgs...)
 	if err != nil {
 		return err
 	}

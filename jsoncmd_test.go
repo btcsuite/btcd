@@ -1238,6 +1238,31 @@ var jsoncmdtests = []struct {
 		},
 	},
 	{
+		name: "allowhighfees: false",
+		cmd:  "sendrawtransaction",
+		f: func() (Cmd, error) {
+			return NewSendRawTransactionCmd(testId,
+				"hexstringofatx", false)
+		},
+		result: &SendRawTransactionCmd{
+			id:    testId,
+			HexTx: "hexstringofatx",
+		},
+	},
+	{
+		name: "allowhighfees: true",
+		cmd:  "sendrawtransaction",
+		f: func() (Cmd, error) {
+			return NewSendRawTransactionCmd(testId,
+				"hexstringofatx", true)
+		},
+		result: &SendRawTransactionCmd{
+			id:            testId,
+			HexTx:         "hexstringofatx",
+			AllowHighFees: true,
+		},
+	},
+	{
 		name: "basic",
 		cmd:  "sendtoaddress",
 		f: func() (Cmd, error) {
