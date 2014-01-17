@@ -218,11 +218,10 @@ func (r *wsContext) CloseListeners(n ntfnChan) {
 // for handling websocket requests and notifications.
 func newWebsocketContext() *wsContext {
 	return &wsContext{
-		connections:              make(map[ntfnChan]*requestContexts),
-		walletNotificationMaster: make(ntfnChan),
-		txNotifications:          make(map[string]*list.List),
-		spentNotifications:       make(map[btcwire.OutPoint]*list.List),
-		minedTxNotifications:     make(map[btcwire.ShaHash]*list.List),
+		connections:          make(map[ntfnChan]*requestContexts),
+		txNotifications:      make(map[string]*list.List),
+		spentNotifications:   make(map[btcwire.OutPoint]*list.List),
+		minedTxNotifications: make(map[btcwire.ShaHash]*list.List),
 	}
 }
 
