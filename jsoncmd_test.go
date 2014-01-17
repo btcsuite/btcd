@@ -840,6 +840,17 @@ var jsoncmdtests = []struct {
 		},
 	},
 	{
+		name: "newsize",
+		cmd:  "keypoolrefill",
+		f: func() (Cmd, error) {
+			return NewKeyPoolRefillCmd(testId, 1000000)
+		},
+		result: &KeyPoolRefillCmd{
+			id:      testId,
+			NewSize: 1000000,
+		},
+	},
+	{
 		name: "basic",
 		cmd:  "listaccounts",
 		f: func() (Cmd, error) {

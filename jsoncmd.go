@@ -4086,7 +4086,8 @@ func (cmd *ImportWalletCmd) UnmarshalJSON(b []byte) error {
 // KeyPoolRefillCmd is a type handling custom marshaling and
 // unmarshaling of keypoolrefill JSON RPC commands.
 type KeyPoolRefillCmd struct {
-	id interface{}
+	id      interface{}
+	NewSize uint
 }
 
 // Enforce that KeyPoolRefillCmd satisifies the Cmd interface.
@@ -4094,9 +4095,19 @@ var _ Cmd = &KeyPoolRefillCmd{}
 
 // NewKeyPoolRefillCmd creates a new KeyPoolRefillCmd. Optionally a
 // pointer to a TemplateRequest may be provided.
-func NewKeyPoolRefillCmd(id interface{}) (*KeyPoolRefillCmd, error) {
+func NewKeyPoolRefillCmd(id interface{}, optArgs ...uint) (*KeyPoolRefillCmd, error) {
+	newSize := uint(0)
+
+	if len(optArgs) > 0 {
+		if len(optArgs) > 1 {
+			return nil, ErrTooManyOptArgs
+		}
+		newSize = optArgs[0]
+	}
+
 	return &KeyPoolRefillCmd{
-		id: id,
+		id:      id,
+		NewSize: newSize,
 	}, nil
 }
 
@@ -4124,6 +4135,10 @@ func (cmd *KeyPoolRefillCmd) MarshalJSON() ([]byte, error) {
 		Params:  []interface{}{},
 	}
 
+	if cmd.NewSize != 0 {
+		raw.Params = append(raw.Params, cmd.NewSize)
+	}
+
 	return json.Marshal(raw)
 }
 
@@ -4136,11 +4151,20 @@ func (cmd *KeyPoolRefillCmd) UnmarshalJSON(b []byte) error {
 		return err
 	}
 
-	if len(r.Params) > 0 {
+	if len(r.Params) > 1 {
 		return ErrWrongNumberOfParams
 	}
 
-	newCmd, err := NewKeyPoolRefillCmd(r.Id)
+	optArgs := make([]uint, 0, 1)
+	if len(r.Params) > 0 {
+		newsize, ok := r.Params[0].(float64)
+		if !ok {
+			return errors.New("first optional parameter newsize must be a number")
+		}
+		optArgs = append(optArgs, uint(newsize))
+	}
+
+	newCmd, err := NewKeyPoolRefillCmd(r.Id, optArgs...)
 	if err != nil {
 		return err
 	}
