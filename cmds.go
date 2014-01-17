@@ -20,7 +20,7 @@ func init() {
 	btcjson.RegisterCustomCmd("getunconfirmedbalance", parseGetUnconfirmedBalanceCmd)
 	btcjson.RegisterCustomCmd("listaddresstransactions", parseListAddressTransactionsCmd)
 	btcjson.RegisterCustomCmd("listalltransactions", parseListAllTransactionsCmd)
-	btcjson.RegisterCustomCmd("notifyblocks", parseNotifyBlocks)
+	btcjson.RegisterCustomCmd("notifyblocks", parseNotifyBlocksCmd)
 	btcjson.RegisterCustomCmd("notifynewtxs", parseNotifyNewTXsCmd)
 	btcjson.RegisterCustomCmd("notifyspent", parseNotifySpentCmd)
 	btcjson.RegisterCustomCmd("rescan", parseRescanCmd)
@@ -426,10 +426,10 @@ func NewNotifyBlocksCmd(id interface{}) *NotifyBlocksCmd {
 	}
 }
 
-// parseNotifyBlocks parses a NotifyBlocksCmd into a concrete type 
+// parseNotifyBlocksCmd parses a NotifyBlocksCmd into a concrete type 
 // satisifying the btcjson.Cmd interface.  This is used when registering
 // the custom command with the btcjson parser.
-func parseNotifyBlocks(r *btcjson.RawCmd) (btcjson.Cmd, error) {
+func parseNotifyBlocksCmd(r *btcjson.RawCmd) (btcjson.Cmd, error) {
         if len(r.Params) != 0 {
                 return nil, btcjson.ErrWrongNumberOfParams
         }
@@ -472,7 +472,7 @@ func (cmd *NotifyBlocksCmd) UnmarshalJSON(b []byte) error {
 		return err
 	}
 
-	newCmd, err := parseNotifyNewTXsCmd(&r)
+	newCmd, err := parseNotifyBlocksCmd(&r)
 	if err != nil {
 		return err
 	}
