@@ -804,6 +804,11 @@ func (s *rpcServer) newBlockNotifyCheckTxIn(tx *btcutil.Tx) {
 // necessary notifications for wallets.  If a non-nil block is passed,
 // additional block information is passed with the notifications.
 func (s *rpcServer) NotifyForTxOuts(tx *btcutil.Tx, block *btcutil.Block) {
+	// Nothing to do if nobody is listening for transaction notifications.
+	if len(s.ws.txNotifications) == 0 {
+		return
+	}
+
 	for i, txout := range tx.MsgTx().TxOut {
 		_, addrs, _, err := btcscript.ExtractPkScriptAddrs(
 			txout.PkScript, s.server.btcnet)
