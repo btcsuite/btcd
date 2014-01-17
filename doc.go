@@ -72,7 +72,7 @@ intentionally causes an error by attempting to process a duplicate block.
 		"fmt"
 		"github.com/conformal/btcchain"
 		"github.com/conformal/btcdb"
-		_ "github.com/conformal/btcdb/sqlite3"
+		_ "github.com/conformal/btcdb/ldb"
 		"github.com/conformal/btcutil"
 		"github.com/conformal/btcwire"
 		"os"
@@ -87,7 +87,7 @@ intentionally causes an error by attempting to process a duplicate block.
 		// database.
 		dbName := "example.db"
 		_ = os.Remove(dbName)
-		db, err := btcdb.CreateDB("sqlite", dbName)
+		db, err := btcdb.CreateDB("leveldb", dbName)
 		if err != nil {
 			fmt.Printf("Failed to create database: %v\n", err)
 			return
