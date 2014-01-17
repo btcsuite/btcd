@@ -563,7 +563,7 @@ func (s *rpcServer) walletReqsNotifications(ws *websocket.Conn) {
 	}
 
 	// msgs is a channel for all messages received over the websocket.
-	msgs := make(chan []byte)
+	msgs := make(chan string)
 
 	// Receive messages from websocket and send across reqs until the
 	// connection is lost.
@@ -574,7 +574,7 @@ func (s *rpcServer) walletReqsNotifications(ws *websocket.Conn) {
 				return
 
 			default:
-				var m []byte
+				var m string
 				if err := websocket.Message.Receive(ws, &m); err != nil {
 					// Only close disconnected if not closed yet.
 					select {
@@ -628,7 +628,7 @@ func (s *rpcServer) walletReqsNotifications(ws *websocket.Conn) {
 				rpcsLog.Errorf("Error unmarshaling response: %v", err)
 				continue
 			}
-			if err := websocket.Message.Send(ws, mresp); err != nil {
+			if err := websocket.Message.Send(ws, string(mresp)); err != nil {
 				// Only close disconnected if not closed yet.
 				select {
 				case <-disconnected:
@@ -647,7 +647,7 @@ func (s *rpcServer) walletReqsNotifications(ws *websocket.Conn) {
 				rpcsLog.Errorf("Error unmarshaling notification: %v", err)
 				continue
 			}
-			if err := websocket.Message.Send(ws, mntfn); err != nil {
+			if err := websocket.Message.Send(ws, string(mntfn)); err != nil {
 				// Only close disconnected if not closed yet.
 				select {
 				case <-disconnected:
@@ -664,13 +664,13 @@ func (s *rpcServer) walletReqsNotifications(ws *websocket.Conn) {
 
 // websocketJSONHandler parses and handles a marshalled json message,
 // sending the marshalled reply to a wallet notification channel.
-func (s *rpcServer) websocketJSONHandler(r chan *btcjson.Reply, c handlerChans, msg []byte) {
+func (s *rpcServer) websocketJSONHandler(r chan *btcjson.Reply, c handlerChans, msg string) {
 	s.wg.Add(1)
 	defer s.wg.Done()
 
 	var resp *btcjson.Reply
 
-	cmd, jsonErr := parseCmd(msg)
+	cmd, jsonErr := parseCmd([]byte(msg))
 	if jsonErr != nil {
 		resp = &btcjson.Reply{}
 		if cmd != nil {
