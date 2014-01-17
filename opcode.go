@@ -1723,7 +1723,6 @@ func opcodeCheckSig(op *parsedOpcode, s *Script) error {
 
 	pubKey, err := btcec.ParsePubKey(pkStr, btcec.S256())
 	if err != nil {
-		log.Warnf("can't parse public key from string: %v", err)
 		return err
 	}
 
@@ -1734,7 +1733,6 @@ func opcodeCheckSig(op *parsedOpcode, s *Script) error {
 		signature, err = btcec.ParseSignature(sigStr, btcec.S256())
 	}
 	if err != nil {
-		log.Warnf("can't parse signature from string: %v", err)
 		return err
 	}
 
@@ -1745,10 +1743,6 @@ func opcodeCheckSig(op *parsedOpcode, s *Script) error {
 			signature.R, signature.S, spew.Sdump(hash))
 	}))
 	ok := ecdsa.Verify(pubKey, hash, signature.R, signature.S)
-	if !ok {
-		log.Warnf("ecdsa.Verify valid:  %v", ok)
-	}
-
 	s.dstack.PushBool(ok)
 	return nil
 }
