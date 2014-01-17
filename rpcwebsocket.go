@@ -34,6 +34,7 @@ type wsCommandHandler func(*rpcServer, btcjson.Cmd, handlerChans) (interface{}, 
 var wsHandlers = map[string]wsCommandHandler{
 	"getcurrentnet":       handleGetCurrentNet,
 	"getbestblock":        handleGetBestBlock,
+	"notifyblocks":        handleNotifyBlocks,
 	"notifynewtxs":        handleNotifyNewTXs,
 	"notifyspent":         handleNotifySpent,
 	"rescan":              handleRescan,
@@ -49,10 +50,6 @@ type wsContext struct {
 	// wallet channel as the key.
 	connections map[ntfnChan]*requestContexts
 
-	// Any chain notifications meant to be received by every connected
-	// wallet are sent across this channel.
-	walletNotificationMaster ntfnChan
-
 	// Map of address hash to list of notificationCtx. This is the global
 	// list we actually use for notifications, we also keep a list in the
 	// requestContexts to make removal from this list on connection close
@@ -64,6 +61,16 @@ type wsContext struct {
 
 	// Map of shas to list of notificationCtx.
 	minedTxNotifications map[btcwire.ShaHash]*list.List
+}
+
+// AddBlockUpdateRequest adds the request context to mark a wallet as
+// having requested updates for connected and disconnected blocks.
+func (r *wsContext) AddBlockUpdateRequest(n ntfnChan) {
+	r.Lock()
+	defer r.Unlock()
+
+	rc := r.connections[n]
+	rc.blockUpdates = true
 }
 
 // AddTxRequest adds the request context for new transaction notifications.
@@ -209,6 +216,11 @@ func (r *wsContext) CloseListeners(n ntfnChan) {
 
 // requestContexts holds all requests for a single wallet connection.
 type requestContexts struct {
+	// blockUpdates specifies whether a client has requested notifications
+	// for whenever blocks are connected or disconnected from the main
+	// chain.
+	blockUpdates bool
+
 	// txRequests is a set of addresses a wallet has requested transactions
 	// updates for.  It is maintained here so all requests can be removed
 	// when a wallet disconnects.
@@ -277,6 +289,13 @@ func handleGetBestBlock(s *rpcServer, icmd btcjson.Cmd, c handlerChans) (interfa
 		"height": height,
 	}
 	return result, nil
+}
+
+// handleNotifyBlocks implements the notifyblocks command extension for
+// websocket connections.
+func handleNotifyBlocks(s *rpcServer, icmd btcjson.Cmd, c handlerChans) (interface{}, *btcjson.Error) {
+	s.ws.AddBlockUpdateRequest(c.n)
+	return nil, nil
 }
 
 // handleNotifyNewTXs implements the notifynewtxs command extension for
@@ -512,30 +531,6 @@ func (s *rpcServer) RemoveWalletListener(n ntfnChan) {
 	s.ws.Unlock()
 }
 
-// walletListenerDuplicator listens for new wallet listener channels
-// and duplicates messages sent to walletNotificationMaster to all
-// connected listeners.
-func (s *rpcServer) walletListenerDuplicator() {
-	// Duplicate all messages sent across walletNotificationMaster to each
-	// listening wallet.
-out:
-	for {
-		select {
-		case ntfn := <-s.ws.walletNotificationMaster:
-			s.ws.RLock()
-			for c := range s.ws.connections {
-				c <- ntfn
-			}
-			s.ws.RUnlock()
-
-		case <-s.quit:
-			break out
-		}
-	}
-
-	s.wg.Done()
-}
-
 // walletReqsNotifications is the handler function for websocket
 // connections from a btcwallet instance.  It reads messages from wallet and
 // sends back replies, as well as notififying wallets of chain updates.
@@ -705,7 +700,11 @@ func (s *rpcServer) NotifyBlockConnected(block *btcutil.Block) {
 
 	// TODO: remove int32 type conversion.
 	ntfn := btcws.NewBlockConnectedNtfn(hash.String(), int32(block.Height()))
-	s.ws.walletNotificationMaster <- ntfn
+	for ntfnChan, rc := range s.ws.connections {
+		if rc.blockUpdates {
+			ntfnChan <- ntfn
+		}
+	}
 
 	// Inform any interested parties about txs mined in this block.
 	s.ws.Lock()
@@ -742,7 +741,11 @@ func (s *rpcServer) NotifyBlockDisconnected(block *btcutil.Block) {
 	// TODO: remove int32 type conversion.
 	ntfn := btcws.NewBlockDisconnectedNtfn(hash.String(),
 		int32(block.Height()))
-	s.ws.walletNotificationMaster <- ntfn
+	for ntfnChan, rc := range s.ws.connections {
+		if rc.blockUpdates {
+			ntfnChan <- ntfn
+		}
+	}
 }
 
 // NotifyBlockTXs creates and marshals a JSON message to notify wallets

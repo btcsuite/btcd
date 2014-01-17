@@ -148,9 +148,6 @@ func (s *rpcServer) Start() {
 		jsonRPCRead(w, r, s)
 	})
 
-	s.wg.Add(1)
-	go s.walletListenerDuplicator()
-
 	rpcServeMux.HandleFunc("/wallet", func(w http.ResponseWriter, r *http.Request) {
 		if err := s.checkAuth(r); err != nil {
 			http.Error(w, "401 Unauthorized.", http.StatusUnauthorized)
@@ -248,7 +245,6 @@ func newRPCServer(listenAddrs []string, s *server) (*rpcServer, error) {
 
 	// initialize memory for websocket connections
 	rpc.ws.connections = make(map[ntfnChan]*requestContexts)
-	rpc.ws.walletNotificationMaster = make(ntfnChan)
 	rpc.ws.txNotifications = make(map[string]*list.List)
 	rpc.ws.spentNotifications = make(map[btcwire.OutPoint]*list.List)
 	rpc.ws.minedTxNotifications = make(map[btcwire.ShaHash]*list.List)
