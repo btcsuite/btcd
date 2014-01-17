@@ -152,7 +152,10 @@ func (s *rpcServer) Start() {
 			http.Error(w, "401 Unauthorized.", http.StatusUnauthorized)
 			return
 		}
-		websocket.Handler(s.walletReqsNotifications).ServeHTTP(w, r)
+		wsServer := websocket.Server{
+			Handler: websocket.Handler(s.walletReqsNotifications),
+		}
+		wsServer.ServeHTTP(w, r)
 	})
 
 	for _, listener := range s.listeners {
