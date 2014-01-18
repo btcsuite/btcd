@@ -33,6 +33,11 @@ const (
 	// inventory cache.
 	maxKnownInventory = 20000
 
+	// negotiateTimeoutSeconds is the number of seconds of inactivity before
+	// we timeout a peer that hasn't completed the initial version
+	// negotiation.
+	negotiateTimeoutSeconds = 30
+
 	// idleTimeoutMinutes is the number of minutes of inactivity before
 	// we time out a peer.
 	idleTimeoutMinutes = 5
@@ -1019,7 +1024,10 @@ func (p *peer) isAllowedByRegression(err error) bool {
 // inHandler handles all incoming messages for the peer.  It must be run as a
 // goroutine.
 func (p *peer) inHandler() {
-	idleTimer := time.AfterFunc(idleTimeoutMinutes*time.Minute, func() {
+	// Peers must complete the initial version negotiation within a shorter
+	// timeframe than a general idle timeout.  The timer is then reset below
+	// to idleTimeoutMinutes for all future messages.
+	idleTimer := time.AfterFunc(negotiateTimeoutSeconds*time.Second, func() {
 		// XXX technically very very very slightly racy, doesn't really
 		// matter.
 		if p.versionKnown {
