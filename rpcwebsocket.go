@@ -18,7 +18,10 @@ import (
 	"github.com/conformal/btcwire"
 	"github.com/conformal/btcws"
 	"sync"
+	"time"
 )
+
+var timeZeroVal time.Time
 
 type ntfnChan chan btcjson.Cmd
 
@@ -546,6 +549,10 @@ func (s *rpcServer) RemoveWalletListener(n ntfnChan) {
 // connections from a btcwallet instance.  It reads messages from wallet and
 // sends back replies, as well as notififying wallets of chain updates.
 func (s *rpcServer) walletReqsNotifications(ws *websocket.Conn) {
+	// Clear the read deadline that was set before the websocket hijacked
+	// the connection.
+	ws.SetReadDeadline(timeZeroVal)
+
 	// Add wallet notification channel so this handler receives btcd chain
 	// notifications.
 	n := make(ntfnChan)

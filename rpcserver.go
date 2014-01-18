@@ -31,6 +31,10 @@ import (
 	"time"
 )
 
+// rpcAuthTimeoutSeconds is the number of seconds a connection to the RPC server
+// is allowed to stay open without authenticating before it is closed.
+const rpcAuthTimeoutSeconds = 10
+
 // Errors
 var (
 	// ErrBadParamsField describes an error where the parameters JSON
@@ -137,7 +141,13 @@ func (s *rpcServer) Start() {
 
 	rpcsLog.Trace("Starting RPC server")
 	rpcServeMux := http.NewServeMux()
-	httpServer := &http.Server{Handler: rpcServeMux}
+	httpServer := &http.Server{
+		Handler: rpcServeMux,
+
+		// Timeout connections which don't complete the initial
+		// handshake within the allowed timeframe.
+		ReadTimeout: time.Second * rpcAuthTimeoutSeconds,
+	}
 	rpcServeMux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		if err := s.checkAuth(r); err != nil {
 			jsonAuthFail(w, r, s)
