@@ -32,7 +32,7 @@ func makeHeader(btcnet btcwire.BitcoinNet, command string,
 	return buf
 }
 
-// TestMessage tests the Read/WriteMessage API.
+// TestMessage tests the Read/WriteMessage and Read/WriteMessageN API.
 func TestMessage(t *testing.T) {
 	pver := btcwire.ProtocolVersion
 
@@ -74,25 +74,65 @@ func TestMessage(t *testing.T) {
 		out    btcwire.Message    // Expected decoded value
 		pver   uint32             // Protocol version for wire encoding
 		btcnet btcwire.BitcoinNet // Network to use for wire encoding
+		bytes  int                // Expected num bytes read/written
 	}{
-		{msgVersion, msgVersion, pver, btcwire.MainNet},
-		{msgVerack, msgVerack, pver, btcwire.MainNet},
-		{msgGetAddr, msgGetAddr, pver, btcwire.MainNet},
-		{msgAddr, msgAddr, pver, btcwire.MainNet},
-		{msgGetBlocks, msgGetBlocks, pver, btcwire.MainNet},
-		{msgBlock, msgBlock, pver, btcwire.MainNet},
-		{msgInv, msgInv, pver, btcwire.MainNet},
-		{msgGetData, msgGetData, pver, btcwire.MainNet},
-		{msgNotFound, msgNotFound, pver, btcwire.MainNet},
-		{msgTx, msgTx, pver, btcwire.MainNet},
-		{msgPing, msgPing, pver, btcwire.MainNet},
-		{msgPong, msgPong, pver, btcwire.MainNet},
-		{msgGetHeaders, msgGetHeaders, pver, btcwire.MainNet},
-		{msgHeaders, msgHeaders, pver, btcwire.MainNet},
-		{msgAlert, msgAlert, pver, btcwire.MainNet},
-		{msgMemPool, msgMemPool, pver, btcwire.MainNet},
+		{msgVersion, msgVersion, pver, btcwire.MainNet, 121},
+		{msgVerack, msgVerack, pver, btcwire.MainNet, 24},
+		{msgGetAddr, msgGetAddr, pver, btcwire.MainNet, 24},
+		{msgAddr, msgAddr, pver, btcwire.MainNet, 25},
+		{msgGetBlocks, msgGetBlocks, pver, btcwire.MainNet, 61},
+		{msgBlock, msgBlock, pver, btcwire.MainNet, 239},
+		{msgInv, msgInv, pver, btcwire.MainNet, 25},
+		{msgGetData, msgGetData, pver, btcwire.MainNet, 25},
+		{msgNotFound, msgNotFound, pver, btcwire.MainNet, 25},
+		{msgTx, msgTx, pver, btcwire.MainNet, 34},
+		{msgPing, msgPing, pver, btcwire.MainNet, 32},
+		{msgPong, msgPong, pver, btcwire.MainNet, 32},
+		{msgGetHeaders, msgGetHeaders, pver, btcwire.MainNet, 61},
+		{msgHeaders, msgHeaders, pver, btcwire.MainNet, 25},
+		{msgAlert, msgAlert, pver, btcwire.MainNet, 42},
+		{msgMemPool, msgMemPool, pver, btcwire.MainNet, 24},
 	}
 
+	t.Logf("Running %d tests", len(tests))
+	for i, test := range tests {
+		// Encode to wire format.
+		var buf bytes.Buffer
+		nw, err := btcwire.WriteMessageN(&buf, test.in, test.pver, test.btcnet)
+		if err != nil {
+			t.Errorf("WriteMessage #%d error %v", i, err)
+			continue
+		}
+
+		// Ensure the number of bytes written match the expected value.
+		if nw != test.bytes {
+			t.Errorf("WriteMessage #%d unexpected num bytes "+
+				"written - got %d, want %d", i, nw, test.bytes)
+		}
+
+		// Decode from wire format.
+		rbuf := bytes.NewBuffer(buf.Bytes())
+		nr, msg, _, err := btcwire.ReadMessageN(rbuf, test.pver, test.btcnet)
+		if err != nil {
+			t.Errorf("ReadMessage #%d error %v, msg %v", i, err,
+				spew.Sdump(msg))
+			continue
+		}
+		if !reflect.DeepEqual(msg, test.out) {
+			t.Errorf("ReadMessage #%d\n got: %v want: %v", i,
+				spew.Sdump(msg), spew.Sdump(test.out))
+			continue
+		}
+
+		// Ensure the number of bytes read match the expected value.
+		if nr != test.bytes {
+			t.Errorf("ReadMessage #%d unexpected num bytes read - "+
+				"got %d, want %d", i, nr, test.bytes)
+		}
+	}
+
+	// Do the same thing for Read/WriteMessage, but ignore the bytes since
+	// they don't return them.
 	t.Logf("Running %d tests", len(tests))
 	for i, test := range tests {
 		// Encode to wire format.
@@ -186,6 +226,7 @@ func TestReadMessageWireErrors(t *testing.T) {
 		btcnet  btcwire.BitcoinNet // Bitcoin network for wire encoding
 		max     int                // Max size of fixed buffer to induce errors
 		readErr error              // Expected read error
+		bytes   int                // Expected num bytes read
 	}{
 		// Latest protocol version with intentional read errors.
 
@@ -196,6 +237,7 @@ func TestReadMessageWireErrors(t *testing.T) {
 			btcnet,
 			0,
 			io.EOF,
+			0,
 		},
 
 		// Wrong network.  Want MainNet, but giving TestNet3.
@@ -205,6 +247,7 @@ func TestReadMessageWireErrors(t *testing.T) {
 			btcnet,
 			len(testNet3Bytes),
 			&btcwire.MessageError{},
+			24,
 		},
 
 		// Exceed max overall message payload length.
@@ -214,6 +257,7 @@ func TestReadMessageWireErrors(t *testing.T) {
 			btcnet,
 			len(exceedMaxPayloadBytes),
 			&btcwire.MessageError{},
+			24,
 		},
 
 		// Invalid UTF-8 command.
@@ -223,6 +267,7 @@ func TestReadMessageWireErrors(t *testing.T) {
 			btcnet,
 			len(badCommandBytes),
 			&btcwire.MessageError{},
+			24,
 		},
 
 		// Valid, but unsupported command.
@@ -232,6 +277,7 @@ func TestReadMessageWireErrors(t *testing.T) {
 			btcnet,
 			len(unsupportedCommandBytes),
 			&btcwire.MessageError{},
+			24,
 		},
 
 		// Exceed max allowed payload for a message of a specific type.
@@ -241,6 +287,7 @@ func TestReadMessageWireErrors(t *testing.T) {
 			btcnet,
 			len(exceedTypePayloadBytes),
 			&btcwire.MessageError{},
+			24,
 		},
 
 		// Message with a payload shorter than the header indicates.
@@ -250,6 +297,7 @@ func TestReadMessageWireErrors(t *testing.T) {
 			btcnet,
 			len(shortPayloadBytes),
 			io.EOF,
+			24,
 		},
 
 		// Message with a bad checksum.
@@ -259,6 +307,7 @@ func TestReadMessageWireErrors(t *testing.T) {
 			btcnet,
 			len(badChecksumBytes),
 			&btcwire.MessageError{},
+			26,
 		},
 
 		// Message with a valid header, but wrong format.
@@ -268,6 +317,7 @@ func TestReadMessageWireErrors(t *testing.T) {
 			btcnet,
 			len(badMessageBytes),
 			io.EOF,
+			25,
 		},
 
 		// 15k bytes of data to discard.
@@ -277,6 +327,7 @@ func TestReadMessageWireErrors(t *testing.T) {
 			btcnet,
 			len(discardBytes),
 			&btcwire.MessageError{},
+			24,
 		},
 	}
 
@@ -284,11 +335,17 @@ func TestReadMessageWireErrors(t *testing.T) {
 	for i, test := range tests {
 		// Decode from wire format.
 		r := newFixedReader(test.max, test.buf)
-		_, _, err := btcwire.ReadMessage(r, test.pver, test.btcnet)
+		nr, _, _, err := btcwire.ReadMessageN(r, test.pver, test.btcnet)
 		if reflect.TypeOf(err) != reflect.TypeOf(test.readErr) {
 			t.Errorf("ReadMessage #%d wrong error got: %v <%T>, "+
 				"want: %T", i, err, err, test.readErr)
 			continue
+		}
+
+		// Ensure the number of bytes written match the expected value.
+		if nr != test.bytes {
+			t.Errorf("ReadMessage #%d unexpected num bytes read - "+
+				"got %d, want %d", i, nr, test.bytes)
 		}
 
 		// For errors which are not of type btcwire.MessageError, check
@@ -336,30 +393,37 @@ func TestWriteMessageWireErrors(t *testing.T) {
 		btcnet btcwire.BitcoinNet // Bitcoin network for wire encoding
 		max    int                // Max size of fixed buffer to induce errors
 		err    error              // Expected error
+		bytes  int                // Expected num bytes written
 	}{
 		// Command too long.
-		{badCommandMsg, pver, btcnet, 0, btcwireErr},
+		{badCommandMsg, pver, btcnet, 0, btcwireErr, 0},
 		// Force error in payload encode.
-		{encodeErrMsg, pver, btcnet, 0, btcwireErr},
+		{encodeErrMsg, pver, btcnet, 0, btcwireErr, 0},
 		// Force error due to exceeding max overall message payload size.
-		{exceedOverallPayloadErrMsg, pver, btcnet, 0, btcwireErr},
+		{exceedOverallPayloadErrMsg, pver, btcnet, 0, btcwireErr, 0},
 		// Force error due to exceeding max payload for message type.
-		{exceedPayloadErrMsg, pver, btcnet, 0, btcwireErr},
+		{exceedPayloadErrMsg, pver, btcnet, 0, btcwireErr, 0},
 		// Force error in header write.
-		{bogusMsg, pver, btcnet, 0, io.ErrShortWrite},
+		{bogusMsg, pver, btcnet, 0, io.ErrShortWrite, 0},
 		// Force error in payload write.
-		{bogusMsg, pver, btcnet, 24, io.ErrShortWrite},
+		{bogusMsg, pver, btcnet, 24, io.ErrShortWrite, 24},
 	}
 
 	t.Logf("Running %d tests", len(tests))
 	for i, test := range tests {
 		// Encode wire format.
 		w := newFixedWriter(test.max)
-		err := btcwire.WriteMessage(w, test.msg, test.pver, test.btcnet)
+		nw, err := btcwire.WriteMessageN(w, test.msg, test.pver, test.btcnet)
 		if reflect.TypeOf(err) != reflect.TypeOf(test.err) {
 			t.Errorf("WriteMessage #%d wrong error got: %v <%T>, "+
 				"want: %T", i, err, err, test.err)
 			continue
+		}
+
+		// Ensure the number of bytes written match the expected value.
+		if nw != test.bytes {
+			t.Errorf("WriteMessage #%d unexpected num bytes "+
+				"written - got %d, want %d", i, nw, test.bytes)
 		}
 
 		// For errors which are not of type btcwire.MessageError, check
