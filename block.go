@@ -93,7 +93,7 @@ func (b *Block) Sha() (*btcwire.ShaHash, error) {
 // properties such as caching the hash so subsequent calls are more efficient.
 func (b *Block) Tx(txNum int) (*Tx, error) {
 	// Ensure the requested transaction is in range.
-	numTx := b.msgBlock.Header.TxnCount
+	numTx := uint64(len(b.msgBlock.Transactions))
 	if txNum < 0 || uint64(txNum) > numTx {
 		str := fmt.Sprintf("transaction index %d is out of range - max %d",
 			txNum, numTx-1)
@@ -131,7 +131,7 @@ func (b *Block) Transactions() []*Tx {
 
 	// Generate slice to hold all of the wrapped transactions if needed.
 	if len(b.transactions) == 0 {
-		b.transactions = make([]*Tx, b.msgBlock.Header.TxnCount)
+		b.transactions = make([]*Tx, len(b.msgBlock.Transactions))
 	}
 
 	// Generate and cache the wrapped transactions for all that haven't
@@ -184,7 +184,7 @@ func (b *Block) TxShas() ([]*btcwire.ShaHash, error) {
 
 	// Generate slice to hold all of the transaction hashes if needed.
 	if len(b.txShas) == 0 {
-		b.txShas = make([]*btcwire.ShaHash, b.msgBlock.Header.TxnCount)
+		b.txShas = make([]*btcwire.ShaHash, len(b.msgBlock.Transactions))
 	}
 
 	// Generate and cache the transaction hashes for all that haven't already
