@@ -135,6 +135,54 @@ func testFetchBlockBySha(tc *testContext) bool {
 	return true
 }
 
+// testFetchBlockHeightBySha ensures FetchBlockHeightBySha conforms to the
+// interface contract.
+func testFetchBlockHeightBySha(tc *testContext) bool {
+	// The block height must be fetchable by its hash without any errors.
+	blockHeight, err := tc.db.FetchBlockHeightBySha(tc.blockHash)
+	if err != nil {
+		tc.t.Errorf("FetchBlockHeightBySha (%s): block #%d (%s) err: %v",
+			tc.dbType, tc.blockHeight, tc.blockHash, err)
+		return false
+	}
+
+	// The block height fetched from the database must match the expected
+	// height.
+	if blockHeight != tc.blockHeight {
+		tc.t.Errorf("FetchBlockHeightBySha (%s): block #%d (%s) height "+
+			"does not match expected value - got: %v", tc.dbType,
+			tc.blockHeight, tc.blockHash, blockHeight)
+		return false
+	}
+
+	return true
+}
+
+// testFetchBlockHeaderBySha ensures FetchBlockHeaderBySha conforms to the
+// interface contract.
+func testFetchBlockHeaderBySha(tc *testContext) bool {
+	// The block header must be fetchable by its hash without any errors.
+	blockHeader, err := tc.db.FetchBlockHeaderBySha(tc.blockHash)
+	if err != nil {
+		tc.t.Errorf("FetchBlockHeaderBySha (%s): block #%d (%s) err: %v",
+			tc.dbType, tc.blockHeight, tc.blockHash, err)
+		return false
+	}
+
+	// The block header fetched from the database must give back the same
+	// BlockHeader that was stored.
+	if !reflect.DeepEqual(&tc.block.MsgBlock().Header, blockHeader) {
+		tc.t.Errorf("FetchBlockHeaderBySha (%s): block header #%d (%s) "+
+			" does not match stored block\ngot: %v\nwant: %v",
+			tc.dbType, tc.blockHeight, tc.blockHash,
+			spew.Sdump(blockHeader),
+			spew.Sdump(&tc.block.MsgBlock().Header))
+		return false
+	}
+
+	return true
+}
+
 // testFetchBlockShaByHeight ensures FetchBlockShaByHeight conforms to the
 // interface contract.
 func testFetchBlockShaByHeight(tc *testContext) bool {
@@ -411,6 +459,18 @@ func testIntegrity(tc *testContext) bool {
 	// Loading the block back from the database must give back
 	// the same MsgBlock and raw bytes that were stored.
 	if !testFetchBlockBySha(tc) {
+		return false
+	}
+
+	// The height returned for the block given its hash must be the
+	// expected value
+	if !testFetchBlockHeightBySha(tc) {
+		return false
+	}
+
+	// Loading the header back from the database must give back
+	// the same BlockHeader that was stored.
+	if !testFetchBlockHeaderBySha(tc) {
 		return false
 	}
 
