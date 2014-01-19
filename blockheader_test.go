@@ -156,3 +156,79 @@ func TestBlockHeaderWire(t *testing.T) {
 		}
 	}
 }
+
+// TestBlockHeaderSerialize tests BlockHeader serialize and deserialize.
+func TestBlockHeaderSerialize(t *testing.T) {
+	nonce := uint32(123123) // 0x1e0f3
+
+	// baseBlockHdr is used in the various tests as a baseline BlockHeader.
+	hash := btcwire.GenesisHash
+	merkleHash := btcwire.GenesisMerkleRoot
+	bits := uint32(0x1d00ffff)
+	baseBlockHdr := &btcwire.BlockHeader{
+		Version:    1,
+		PrevBlock:  hash,
+		MerkleRoot: merkleHash,
+		Timestamp:  time.Unix(0x495fab29, 0), // 2009-01-03 12:15:05 -0600 CST
+		Bits:       bits,
+		Nonce:      nonce,
+	}
+
+	// baseBlockHdrEncoded is the wire encoded bytes of baseBlockHdr.
+	baseBlockHdrEncoded := []byte{
+		0x01, 0x00, 0x00, 0x00, // Version 1
+		0x6f, 0xe2, 0x8c, 0x0a, 0xb6, 0xf1, 0xb3, 0x72,
+		0xc1, 0xa6, 0xa2, 0x46, 0xae, 0x63, 0xf7, 0x4f,
+		0x93, 0x1e, 0x83, 0x65, 0xe1, 0x5a, 0x08, 0x9c,
+		0x68, 0xd6, 0x19, 0x00, 0x00, 0x00, 0x00, 0x00, // PrevBlock
+		0x3b, 0xa3, 0xed, 0xfd, 0x7a, 0x7b, 0x12, 0xb2,
+		0x7a, 0xc7, 0x2c, 0x3e, 0x67, 0x76, 0x8f, 0x61,
+		0x7f, 0xc8, 0x1b, 0xc3, 0x88, 0x8a, 0x51, 0x32,
+		0x3a, 0x9f, 0xb8, 0xaa, 0x4b, 0x1e, 0x5e, 0x4a, // MerkleRoot
+		0x29, 0xab, 0x5f, 0x49, // Timestamp
+		0xff, 0xff, 0x00, 0x1d, // Bits
+		0xf3, 0xe0, 0x01, 0x00, // Nonce
+	}
+
+	tests := []struct {
+		in  *btcwire.BlockHeader // Data to encode
+		out *btcwire.BlockHeader // Expected decoded data
+		buf []byte               // Serialized data
+	}{
+		{
+			baseBlockHdr,
+			baseBlockHdr,
+			baseBlockHdrEncoded,
+		},
+	}
+
+	t.Logf("Running %d tests", len(tests))
+	for i, test := range tests {
+		// Serialize the block header.
+		var buf bytes.Buffer
+		err := test.in.Serialize(&buf)
+		if err != nil {
+			t.Errorf("Serialize #%d error %v", i, err)
+			continue
+		}
+		if !bytes.Equal(buf.Bytes(), test.buf) {
+			t.Errorf("Serialize #%d\n got: %s want: %s", i,
+				spew.Sdump(buf.Bytes()), spew.Sdump(test.buf))
+			continue
+		}
+
+		// Deserialize the block header.
+		var bh btcwire.BlockHeader
+		rbuf := bytes.NewBuffer(test.buf)
+		err = bh.Deserialize(rbuf)
+		if err != nil {
+			t.Errorf("Deserialize #%d error %v", i, err)
+			continue
+		}
+		if !reflect.DeepEqual(&bh, test.out) {
+			t.Errorf("Deserialize #%d\n got: %s want: %s", i,
+				spew.Sdump(&bh), spew.Sdump(test.out))
+			continue
+		}
+	}
+}
