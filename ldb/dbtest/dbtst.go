@@ -25,8 +25,9 @@ func main() {
 
 	ro := &opt.ReadOptions{}
 	wo := &opt.WriteOptions{}
+	opts := &opt.Options{}
 
-	ldb, err := leveldb.OpenFile("dbfile", &opt.Options{Flag: opt.OFCreateIfMissing})
+	ldb, err := leveldb.OpenFile("dbfile", opts)
 	if err != nil {
 		fmt.Printf("db open failed %v\n", err)
 		return
