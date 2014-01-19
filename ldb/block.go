@@ -308,8 +308,3 @@ func (db *LevelDb) NewestSha() (rsha *btcwire.ShaHash, rblkid int64, err error) 
 
 	return &sha, db.lastBlkIdx, nil
 }
-
-func (db *LevelDb) NewIterateBlocks() (rbogus btcdb.BlockIterator, err error) {
-	err = fmt.Errorf("Not implemented")
-	return
-}

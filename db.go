@@ -23,20 +23,6 @@ var (
 // a range of shas by height to request them all.
 const AllShas = int64(^uint64(0) >> 1)
 
-// InsertMode represents a hint to the database about how much data the
-// application is expecting to send to the database in a short period of time.
-// This in turn provides the database with the opportunity to work in optimized
-// modes when it will be very busy such as during the initial block chain
-// download.
-type InsertMode int
-
-// Constants used to indicate the database insert mode hint.  See InsertMode.
-const (
-	InsertNormal InsertMode = iota
-	InsertFast
-	InsertValidatedInput
-)
-
 // Db defines a generic interface that is used to request and insert data into
 // the bitcoin block chain.  This interface is intended to be agnostic to actual
 // mechanism used for backend data storage.  The AddDBDriver function can be
@@ -102,18 +88,6 @@ type Db interface {
 	// requires the referenced parent block to already exist.
 	InsertBlock(block *btcutil.Block) (height int64, err error)
 
-	// InvalidateBlockCache releases all cached blocks.
-	InvalidateBlockCache()
-
-	// InvalidateCache releases all cached blocks and transactions.
-	InvalidateCache()
-
-	// InvalidateTxCache releases all cached transactions.
-	InvalidateTxCache()
-
-	// NewIterateBlocks returns an iterator for all blocks in database.
-	NewIterateBlocks() (pbi BlockIterator, err error)
-
 	// NewestSha returns the hash and block height of the most recent (end)
 	// block of the block chain.  It will return the zero hash, -1 for
 	// the block height, and no error (nil) if there are not any blocks in
@@ -124,27 +98,9 @@ type Db interface {
 	// saved data at last Sync and closes the database.
 	RollbackClose()
 
-	// SetDBInsertMode provides hints to the database about how the
-	// application is running.  This allows the database to work in
-	// optimized modes when the database may be very busy.
-	SetDBInsertMode(InsertMode)
-
 	// Sync verifies that the database is coherent on disk and no
 	// outstanding transactions are in flight.
 	Sync()
-}
-
-// BlockIterator defines a generic interface for an iterator through the block
-// chain.
-type BlockIterator interface {
-	// Close shuts down the iterator when done walking blocks in the database.
-	Close()
-
-	// NextRow iterates thru all blocks in database.
-	NextRow() bool
-
-	// Row returns row data for block iterator.
-	Row() (key *btcwire.ShaHash, pver uint32, buf []byte, err error)
 }
 
 // DriverDB defines a structure for backend drivers to use when they registered

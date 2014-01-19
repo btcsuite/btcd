@@ -33,9 +33,7 @@ func loadblocks(t *testing.T) []*btcutil.Block {
 }
 
 func TestUnspentInsert(t *testing.T) {
-	testUnspentInsert(t, dbTmDefault)
-	//testUnspentInsert(t, dbTmNormal)
-	//testUnspentInsert(t, dbTmFast)
+	testUnspentInsert(t)
 }
 
 // insert every block in the test chain
@@ -43,9 +41,9 @@ func TestUnspentInsert(t *testing.T) {
 // block and verify that the the tx is spent/unspent
 // new tx should be fully unspent, referenced tx should have
 // the associated txout set to spent.
-func testUnspentInsert(t *testing.T, mode int) {
+func testUnspentInsert(t *testing.T) {
 	// Ignore db remove errors since it means we didn't have an old one.
-	dbname := fmt.Sprintf("tstdbuspnt1.%d", mode)
+	dbname := fmt.Sprintf("tstdbuspnt1")
 	dbnamever := dbname + ".ver"
 	_ = os.RemoveAll(dbname)
 	_ = os.RemoveAll(dbnamever)
@@ -57,19 +55,6 @@ func testUnspentInsert(t *testing.T, mode int) {
 	defer os.RemoveAll(dbname)
 	defer os.RemoveAll(dbnamever)
 	defer db.Close()
-
-	switch mode {
-	case dbTmDefault: // default
-		// no setup
-	case dbTmNormal: // explicit normal
-		db.SetDBInsertMode(btcdb.InsertNormal)
-	case dbTmFast: // fast mode
-
-	case dbTmNoVerify: // validated block
-		t.Errorf("UnspentInsert test is not valid in NoVerify mode")
-	}
-
-	// Since we are dealing with small dataset, reduce cache size
 
 	blocks := loadblocks(t)
 endtest:

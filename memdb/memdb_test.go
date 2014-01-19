@@ -100,13 +100,6 @@ func TestClosed(t *testing.T) {
 	// The following calls don't return errors from the interface to be able
 	// to detect a closed database, so just call them to ensure there are no
 	// panics.
-	db.InvalidateBlockCache()
-	db.InvalidateCache()
-	db.InvalidateTxCache()
-	db.NewIterateBlocks()
-	db.SetDBInsertMode(btcdb.InsertNormal)
-	db.SetDBInsertMode(btcdb.InsertFast)
-	db.SetDBInsertMode(btcdb.InsertValidatedInput)
 	db.Sync()
 	db.RollbackClose()
 }

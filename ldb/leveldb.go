@@ -420,14 +420,6 @@ func (db *LevelDb) InsertBlock(block *btcutil.Block) (height int64, rerr error) 
 	return newheight, nil
 }
 
-// SetDBInsertMode provides hints to the database to how the application
-// is running this allows the database to work in optimized modes when the
-// database may be very busy.
-func (db *LevelDb) SetDBInsertMode(newmode btcdb.InsertMode) {
-
-	// special modes are not supported
-}
-
 // doSpend iterates all TxIn in a bitcoin transaction marking each associated
 // TxOut as spent.
 func (db *LevelDb) doSpend(tx *btcwire.MsgTx) error {

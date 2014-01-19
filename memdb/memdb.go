@@ -703,15 +703,6 @@ func (db *MemDb) InvalidateTxCache() {
 	}
 }
 
-// NewIterateBlocks returns an iterator for all blocks in database.  This is
-// part of the btcdb.Db interface implementation.
-//
-// This implmentation does not implement an iterator, so an error is returned
-// if this function is called.
-func (db *MemDb) NewIterateBlocks() (btcdb.BlockIterator, error) {
-	return nil, fmt.Errorf("Not implemented")
-}
-
 // NewestSha returns the hash and block height of the most recent (end) block of
 // the block chain.  It will return the zero hash, -1 for the block height, and
 // no error (nil) if there are not any blocks in the database yet.  This is part
@@ -750,18 +741,6 @@ func (db *MemDb) RollbackClose() {
 	// Rollback doesn't apply to a memory database, so just call Close.
 	// Close handles the mutex locks.
 	db.Close()
-}
-
-// SetDBInsertMode provides hints to the database about how the application is
-// running.  This allows the database to work in optimized modes when the
-// database may be very busy.  This is part of the btcdb.Db interface
-// implementation.
-//
-// No special mode handling is performed for this implementation.
-func (db *MemDb) SetDBInsertMode(newmode btcdb.InsertMode) {
-	if db.closed {
-		log.Warnf("SetDBInsertMode called after db close.")
-	}
 }
 
 // Sync verifies that the database is coherent on disk and no outstanding

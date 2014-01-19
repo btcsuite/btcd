@@ -569,35 +569,23 @@ func testInterface(t *testing.T, dbType string) {
 		}
 	}
 
-	// The data integrity tests must still pass after calling each of the
-	// invalidate cache functions.  This intentionally uses a map since
-	// map iteration is not the same order every run.  This helps catch
-	// issues that could be caused by calling one version before another.
+	// Run the data integrity tests again after all blocks have been
+	// inserted to ensure the spend tracking  is working properly.
 	context.useSpends = true
-	invalidateCacheFuncs := map[string]func(){
-		"InvalidateBlockCache": db.InvalidateBlockCache,
-		"InvalidateTxCache":    db.InvalidateTxCache,
-		"InvalidateCache":      db.InvalidateCache,
-	}
-	for funcName, invalidateCacheFunc := range invalidateCacheFuncs {
-		t.Logf("Running integrity tests after calling %s", funcName)
-		invalidateCacheFunc()
-
-		for height := int64(0); height < int64(len(blocks)); height++ {
-			// Get the appropriate block and hash and update the
-			// test context accordingly.
-			block := blocks[height]
-			blockHash, err := block.Sha()
-			if err != nil {
-				t.Errorf("block.Sha: %v", err)
-				return
-			}
-			context.blockHeight = height
-			context.blockHash = blockHash
-			context.block = block
-
-			testIntegrity(&context)
+	for height := int64(0); height < int64(len(blocks)); height++ {
+		// Get the appropriate block and hash and update the
+		// test context accordingly.
+		block := blocks[height]
+		blockHash, err := block.Sha()
+		if err != nil {
+			t.Errorf("block.Sha: %v", err)
+			return
 		}
+		context.blockHeight = height
+		context.blockHash = blockHash
+		context.block = block
+
+		testIntegrity(&context)
 	}
 
 	// TODO(davec): Need to figure out how to handle the special checks
@@ -605,34 +593,31 @@ func testInterface(t *testing.T, dbType string) {
 	// 91880 on the main network due to the old miner + Satoshi client bug.
 
 	// TODO(davec): Add tests for error conditions:
-	// * Don't allow duplicate blocks
-	// * Don't allow insertion of block that contains a transaction that
-	//   already exists unless the previous one is fully spent
-	// * Don't allow block that has a duplicate transaction in itself
-	// * Don't allow block which contains a tx that references a missing tx
-	// * Don't allow block which contains a tx that references another tx
-	//   that comes after it in the same block
+	/*
+	   - Don't allow duplicate blocks
+	   - Don't allow insertion of block that contains a transaction that
+	     already exists unless the previous one is fully spent
+	   - Don't allow block that has a duplicate transaction in itself
+	   - Don't allow block which contains a tx that references a missing tx
+	   - Don't allow block which contains a tx that references another tx
+	     that comes after it in the same block
+	*/
 
 	// TODO(davec): Add tests for the following functions:
 	/*
-	   Close()
-	   DropAfterBlockBySha(*btcwire.ShaHash) (err error)
-	   - ExistsSha(sha *btcwire.ShaHash) (exists bool)
-	   - FetchBlockBySha(sha *btcwire.ShaHash) (blk *btcutil.Block, err error)
-	   - FetchBlockShaByHeight(height int64) (sha *btcwire.ShaHash, err error)
-	   FetchHeightRange(startHeight, endHeight int64) (rshalist []btcwire.ShaHash, err error)
-	   - ExistsTxSha(sha *btcwire.ShaHash) (exists bool)
-	   - FetchTxBySha(txsha *btcwire.ShaHash) ([]*TxListReply, error)
-	   - FetchTxByShaList(txShaList []*btcwire.ShaHash) []*TxListReply
-	   - FetchUnSpentTxByShaList(txShaList []*btcwire.ShaHash) []*TxListReply
-	   - InsertBlock(block *btcutil.Block) (height int64, err error)
-	   - InvalidateBlockCache()
-	   - InvalidateCache()
-	   - InvalidateTxCache()
-	   NewIterateBlocks() (pbi BlockIterator, err error)
-	   NewestSha() (sha *btcwire.ShaHash, height int64, err error)
-	   RollbackClose()
-	   SetDBInsertMode(InsertMode)
-	   Sync()
+	   - Close()
+	   - DropAfterBlockBySha(*btcwire.ShaHash) (err error)
+	   x ExistsSha(sha *btcwire.ShaHash) (exists bool)
+	   x FetchBlockBySha(sha *btcwire.ShaHash) (blk *btcutil.Block, err error)
+	   x FetchBlockShaByHeight(height int64) (sha *btcwire.ShaHash, err error)
+	   - FetchHeightRange(startHeight, endHeight int64) (rshalist []btcwire.ShaHash, err error)
+	   x ExistsTxSha(sha *btcwire.ShaHash) (exists bool)
+	   x FetchTxBySha(txsha *btcwire.ShaHash) ([]*TxListReply, error)
+	   x FetchTxByShaList(txShaList []*btcwire.ShaHash) []*TxListReply
+	   x FetchUnSpentTxByShaList(txShaList []*btcwire.ShaHash) []*TxListReply
+	   x InsertBlock(block *btcutil.Block) (height int64, err error)
+	   x NewestSha() (sha *btcwire.ShaHash, height int64, err error)
+	   - RollbackClose()
+	   - Sync()
 	*/
 }

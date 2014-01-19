@@ -20,28 +20,18 @@ import (
 
 var network = btcwire.MainNet
 
-const (
-	dbTmDefault = iota
-	dbTmNormal
-	dbTmFast
-	dbTmNoVerify
-)
-
 func TestOperational(t *testing.T) {
-	testOperationalMode(t, dbTmDefault)
-	//testOperationalMode(t, dbTmNormal)
-	//testOperationalMode(t, dbTmFast)
-	//testOperationalMode(t, dbTmNoVerify)
+	testOperationalMode(t)
 }
 
-func testOperationalMode(t *testing.T, mode int) {
+func testOperationalMode(t *testing.T) {
 	// simplified basic operation is:
 	// 1) fetch block from remote server
 	// 2) look up all txin (except coinbase in db)
 	// 3) insert block
 
 	// Ignore db remove errors since it means we didn't have an old one.
-	dbname := fmt.Sprintf("tstdbop1.%d", mode)
+	dbname := fmt.Sprintf("tstdbop1")
 	dbnamever := dbname + ".ver"
 	_ = os.RemoveAll(dbname)
 	_ = os.RemoveAll(dbnamever)
@@ -54,22 +44,10 @@ func testOperationalMode(t *testing.T, mode int) {
 	defer os.RemoveAll(dbnamever)
 	defer db.Close()
 
-	switch mode {
-	case dbTmDefault: // default
-		// no setup
-	case dbTmNormal: // explicit normal
-		db.SetDBInsertMode(btcdb.InsertNormal)
-	case dbTmFast: // fast mode
-
-	case dbTmNoVerify: // validated block
-		db.SetDBInsertMode(btcdb.InsertValidatedInput)
-	}
-
 	testdatafile := filepath.Join("..", "testdata", "blocks1-256.bz2")
 	blocks, err := loadBlocks(t, testdatafile)
 	if err != nil {
-		t.Errorf("Unable to load blocks from test data for mode %v: %v",
-			mode, err)
+		t.Errorf("Unable to load blocks from test data: %v", err)
 		return
 	}
 
@@ -77,36 +55,31 @@ func testOperationalMode(t *testing.T, mode int) {
 out:
 	for height := int64(0); height < int64(len(blocks)); height++ {
 		block := blocks[height]
-		if mode != dbTmNoVerify {
-			// except for NoVerify which does not allow lookups check inputs
-			mblock := block.MsgBlock()
-			var txneededList []*btcwire.ShaHash
-			for _, tx := range mblock.Transactions {
-				for _, txin := range tx.TxIn {
-					if txin.PreviousOutpoint.Index == uint32(4294967295) {
-						continue
-					}
-					origintxsha := &txin.PreviousOutpoint.Hash
-					txneededList = append(txneededList, origintxsha)
+		mblock := block.MsgBlock()
+		var txneededList []*btcwire.ShaHash
+		for _, tx := range mblock.Transactions {
+			for _, txin := range tx.TxIn {
+				if txin.PreviousOutpoint.Index == uint32(4294967295) {
+					continue
+				}
+				origintxsha := &txin.PreviousOutpoint.Hash
+				txneededList = append(txneededList, origintxsha)
 
-					if !db.ExistsTxSha(origintxsha) {
-						t.Errorf("referenced tx not found %v ", origintxsha)
-					}
-
-					_, err = db.FetchTxBySha(origintxsha)
-					if err != nil {
-						t.Errorf("referenced tx not found %v err %v ", origintxsha, err)
-					}
+				if !db.ExistsTxSha(origintxsha) {
+					t.Errorf("referenced tx not found %v ", origintxsha)
+				}
+				_, err = db.FetchTxBySha(origintxsha)
+				if err != nil {
+					t.Errorf("referenced tx not found %v err %v ", origintxsha, err)
 				}
 			}
-			txlist := db.FetchUnSpentTxByShaList(txneededList)
-			for _, txe := range txlist {
-				if txe.Err != nil {
-					t.Errorf("tx list fetch failed %v err %v ", txe.Sha, txe.Err)
-					break out
-				}
+		}
+		txlist := db.FetchUnSpentTxByShaList(txneededList)
+		for _, txe := range txlist {
+			if txe.Err != nil {
+				t.Errorf("tx list fetch failed %v err %v ", txe.Sha, txe.Err)
+				break out
 			}
-
 		}
 
 		newheight, err := db.InsertBlock(block)
@@ -136,34 +109,20 @@ out:
 
 	// now that db is populated, do some additional test
 	testFetchRangeHeight(t, db, blocks)
-
-	switch mode {
-	case dbTmDefault: // default
-		// no cleanup
-	case dbTmNormal: // explicit normal
-		// no cleanup
-	case dbTmFast: // fast mode
-		db.SetDBInsertMode(btcdb.InsertNormal)
-	case dbTmNoVerify: // validated block
-		db.SetDBInsertMode(btcdb.InsertNormal)
-	}
 }
 
 func TestBackout(t *testing.T) {
-	testBackout(t, dbTmDefault)
-	//testBackout(t, dbTmNormal)
-	//testBackout(t, dbTmFast)
+	testBackout(t)
 }
 
-func testBackout(t *testing.T, mode int) {
+func testBackout(t *testing.T) {
 	// simplified basic operation is:
 	// 1) fetch block from remote server
 	// 2) look up all txin (except coinbase in db)
 	// 3) insert block
 
-	t.Logf("mode %v", mode)
 	// Ignore db remove errors since it means we didn't have an old one.
-	dbname := fmt.Sprintf("tstdbop2.%d", mode)
+	dbname := fmt.Sprintf("tstdbop2")
 	dbnamever := dbname + ".ver"
 	_ = os.RemoveAll(dbname)
 	_ = os.RemoveAll(dbnamever)
@@ -175,15 +134,6 @@ func testBackout(t *testing.T, mode int) {
 	defer os.RemoveAll(dbname)
 	defer os.RemoveAll(dbnamever)
 	defer db.Close()
-
-	switch mode {
-	case dbTmDefault: // default
-		// no setup
-	case dbTmNormal: // explicit normal
-		db.SetDBInsertMode(btcdb.InsertNormal)
-	case dbTmFast: // fast mode
-
-	}
 
 	testdatafile := filepath.Join("..", "testdata", "blocks1-256.bz2")
 	blocks, err := loadBlocks(t, testdatafile)
