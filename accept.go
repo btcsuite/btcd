@@ -34,8 +34,7 @@ func (b *BlockChain) maybeAcceptBlock(block *btcutil.Block, fastAdd bool) error 
 	}
 	block.SetHeight(blockHeight)
 
-	blockHeader := block.MsgBlock().Header
-
+	blockHeader := &block.MsgBlock().Header
 	if !fastAdd {
 		// Ensure the difficulty specified in the block header matches
 		// the calculated difficulty based on the previous block and

@@ -123,14 +123,14 @@ func (b *BlockChain) ProcessBlock(block *btcutil.Block, fastAdd bool) error {
 	// easy to mine, but otherwise bogus, blocks that could be used to eat
 	// memory, and ensuring expected (versus claimed) proof of work
 	// requirements since the last checkpoint are met.
-	blockHeader := block.MsgBlock().Header
+	blockHeader := &block.MsgBlock().Header
 	checkpointBlock, err := b.findLatestKnownCheckpoint()
 	if err != nil {
 		return err
 	}
 	if checkpointBlock != nil {
 		// Ensure the block timestamp is after the checkpoint timestamp.
-		checkpointHeader := checkpointBlock.MsgBlock().Header
+		checkpointHeader := &checkpointBlock.MsgBlock().Header
 		checkpointTime := checkpointHeader.Timestamp
 		if blockHeader.Timestamp.Before(checkpointTime) {
 			str := fmt.Sprintf("block %v has timestamp %v before "+

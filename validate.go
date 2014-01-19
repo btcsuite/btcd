@@ -268,8 +268,7 @@ func CheckTransactionSanity(tx *btcutil.Tx) error {
 // target difficulty as claimed.
 func checkProofOfWork(block *btcutil.Block, powLimit *big.Int) error {
 	// The target difficulty must be larger than zero.
-	header := block.MsgBlock().Header
-	target := CompactToBig(header.Bits)
+	target := CompactToBig(block.MsgBlock().Header.Bits)
 	if target.Sign() <= 0 {
 		str := fmt.Sprintf("block target difficulty of %064x is too low",
 			target)
