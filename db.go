@@ -59,6 +59,13 @@ type Db interface {
 	// cache the underlying data if desired.
 	FetchBlockBySha(sha *btcwire.ShaHash) (blk *btcutil.Block, err error)
 
+	// FetchBlockHeightBySha returns the block height for the given hash.
+	FetchBlockHeightBySha(sha *btcwire.ShaHash) (height int64, err error)
+
+	// FetchBlockHeaderBySha returns a btcwire.BlockHeader for the given
+	// sha.  The implementation may cache the underlying data if desired.
+	FetchBlockHeaderBySha(sha *btcwire.ShaHash) (bh *btcwire.BlockHeader, err error)
+
 	// FetchBlockShaByHeight returns a block hash based on its height in the
 	// block chain.
 	FetchBlockShaByHeight(height int64) (sha *btcwire.ShaHash, err error)

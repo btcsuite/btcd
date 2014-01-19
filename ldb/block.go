@@ -38,6 +38,38 @@ func (db *LevelDb) fetchBlockBySha(sha *btcwire.ShaHash) (blk *btcutil.Block, er
 	return
 }
 
+// FetchBlockHeightBySha returns the block height for the given hash.  This is
+// part of the btcdb.Db interface implementation.
+func (db *LevelDb) FetchBlockHeightBySha(sha *btcwire.ShaHash) (int64, error) {
+	db.dbLock.Lock()
+	defer db.dbLock.Unlock()
+
+	return db.getBlkLoc(sha)
+}
+
+// FetchBlockHeaderBySha - return a btcwire ShaHash
+func (db *LevelDb) FetchBlockHeaderBySha(sha *btcwire.ShaHash) (bh *btcwire.BlockHeader, err error) {
+	db.dbLock.Lock()
+	defer db.dbLock.Unlock()
+
+	// Read the raw block from the database.
+	buf, _, err := db.fetchSha(sha)
+	if err != nil {
+		return nil, err
+	}
+
+	// Only deserialize the header portion and ensure the transaction count
+	// is zero since this is a standalone header.
+	var blockHeader btcwire.BlockHeader
+	err = blockHeader.Deserialize(bytes.NewBuffer(buf))
+	if err != nil {
+		return nil, err
+	}
+	bh = &blockHeader
+
+	return bh, err
+}
+
 func (db *LevelDb) getBlkLoc(sha *btcwire.ShaHash) (int64, error) {
 	var blkHeight int64
 
