@@ -740,7 +740,6 @@ func (p *peer) handleGetHeadersMsg(msg *btcwire.MsgGetHeaders) {
 		// Send the requested block header.
 		headersMsg := btcwire.NewMsgHeaders()
 		hdr := block.MsgBlock().Header // copy
-		hdr.TxnCount = 0
 		headersMsg.AddBlockHeader(&hdr)
 		p.QueueMessage(headersMsg, nil)
 		return
@@ -796,7 +795,6 @@ func (p *peer) handleGetHeadersMsg(msg *btcwire.MsgGetHeaders) {
 				continue
 			}
 			hdr := block.MsgBlock().Header // copy
-			hdr.TxnCount = 0
 			headersMsg.AddBlockHeader(&hdr)
 		}
 

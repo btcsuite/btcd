@@ -286,7 +286,7 @@ func messageSummary(msg btcwire.Message) string {
 		header := &msg.Header
 		hash, _ := msg.BlockSha()
 		return fmt.Sprintf("hash %s, ver %d, %d tx, %s", hash,
-			header.Version, header.TxnCount, header.Timestamp)
+			header.Version, len(msg.Transactions), header.Timestamp)
 
 	case *btcwire.MsgInv:
 		return invSummary(msg.InvList)

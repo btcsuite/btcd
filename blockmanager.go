@@ -481,12 +481,12 @@ func (b *blockManager) handleBlockMsg(bmsg *blockMsg) {
 // are in the memory pool (either the main pool or orphan pool).
 func (b *blockManager) haveInventory(invVect *btcwire.InvVect) bool {
 	switch invVect.Type {
-	case btcwire.InvVect_Block:
+	case btcwire.InvTypeBlock:
 		// Ask chain if the block is known to it in any form (main
 		// chain, side chain, or orphan).
 		return b.blockChain.HaveBlock(&invVect.Hash)
 
-	case btcwire.InvVect_Tx:
+	case btcwire.InvTypeTx:
 		// Ask the transaction memory pool if the transaction is known
 		// to it in any form (main pool or orphan).
 		if b.server.txMemPool.HaveTransaction(&invVect.Hash) {
@@ -604,7 +604,7 @@ func (b *blockManager) handleInvMsg(imsg *invMsg) {
 		imsg.peer.requestQueue.Remove(e)
 
 		switch iv.Type {
-		case btcwire.InvVect_Block:
+		case btcwire.InvTypeBlock:
 			// Request the block if there is not already a pending
 			// request.
 			if _, exists := b.requestedBlocks[iv.Hash]; !exists {
@@ -614,7 +614,7 @@ func (b *blockManager) handleInvMsg(imsg *invMsg) {
 				numRequested++
 			}
 
-		case btcwire.InvVect_Tx:
+		case btcwire.InvTypeTx:
 			// Request the transaction if there is not already a
 			// pending request.
 			if _, exists := b.requestedTxns[iv.Hash]; !exists {
