@@ -61,7 +61,6 @@ func TestBlockHeaderWire(t *testing.T) {
 		Timestamp:  time.Unix(0x495fab29, 0), // 2009-01-03 12:15:05 -0600 CST
 		Bits:       bits,
 		Nonce:      nonce,
-		TxnCount:   0,
 	}
 
 	// baseBlockHdrEncoded is the wire encoded bytes of baseBlockHdr.
@@ -78,7 +77,6 @@ func TestBlockHeaderWire(t *testing.T) {
 		0x29, 0xab, 0x5f, 0x49, // Timestamp
 		0xff, 0xff, 0x00, 0x1d, // Bits
 		0xf3, 0xe0, 0x01, 0x00, // Nonce
-		0x00, // TxnCount Varint
 	}
 
 	tests := []struct {

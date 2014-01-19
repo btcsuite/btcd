@@ -14,8 +14,8 @@ import (
 const BlockVersion uint32 = 2
 
 // Version 4 bytes + Timestamp 4 bytes + Bits 4 bytes + Nonce 4 bytes +
-// TxnCount (varInt) + PrevBlock and MerkleRoot hashes.
-const maxBlockHeaderPayload = 16 + maxVarIntPayload + (HashSize * 2)
+// PrevBlock and MerkleRoot hashes.
+const maxBlockHeaderPayload = 16 + (HashSize * 2)
 
 // BlockHeader defines information about a block and is used in the bitcoin
 // block (MsgBlock) and headers (MsgHeaders) messages.
@@ -38,11 +38,6 @@ type BlockHeader struct {
 
 	// Nonce used to generate the block.
 	Nonce uint32
-
-	// Number of transactions in the block.  For the bitcoin headers
-	// (MsgHeaders) message, this must be 0.  This is encoded as a variable
-	// length integer on the wire.
-	TxnCount uint64
 }
 
 // blockHashLen is a constant that represents how much of the block header is
@@ -81,7 +76,6 @@ func NewBlockHeader(prevHash *ShaHash, merkleRootHash *ShaHash, bits uint32,
 		Timestamp:  time.Now(),
 		Bits:       bits,
 		Nonce:      nonce,
-		TxnCount:   0,
 	}
 }
 
@@ -95,12 +89,6 @@ func readBlockHeader(r io.Reader, pver uint32, bh *BlockHeader) error {
 	}
 	bh.Timestamp = time.Unix(int64(sec), 0)
 
-	count, err := readVarInt(r, pver)
-	if err != nil {
-		return err
-	}
-	bh.TxnCount = count
-
 	return nil
 }
 
@@ -109,11 +97,6 @@ func writeBlockHeader(w io.Writer, pver uint32, bh *BlockHeader) error {
 	sec := uint32(bh.Timestamp.Unix())
 	err := writeElements(w, bh.Version, &bh.PrevBlock, &bh.MerkleRoot,
 		sec, bh.Bits, bh.Nonce)
-	if err != nil {
-		return err
-	}
-
-	err = writeVarInt(w, pver, bh.TxnCount)
 	if err != nil {
 		return err
 	}

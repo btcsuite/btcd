@@ -49,22 +49,18 @@ type MsgBlock struct {
 	Transactions []*MsgTx
 }
 
-// AddTransaction adds a transaction to the message and updates Header.TxnCount
-// accordingly.
+// AddTransaction adds a transaction to the message.
 func (msg *MsgBlock) AddTransaction(tx *MsgTx) error {
 	// TODO: Return error if adding the transaction would make the message
 	// too large.
 	msg.Transactions = append(msg.Transactions, tx)
-	msg.Header.TxnCount = uint64(len(msg.Transactions))
 	return nil
 
 }
 
-// ClearTransactions removes all transactions from the message and updates
-// Header.TxnCount accordingly.
+// ClearTransactions removes all transactions from the message.
 func (msg *MsgBlock) ClearTransactions() {
 	msg.Transactions = make([]*MsgTx, 0, defaultTransactionAlloc)
-	msg.Header.TxnCount = 0
 }
 
 // BtcDecode decodes r using the bitcoin protocol encoding into the receiver.
@@ -77,10 +73,14 @@ func (msg *MsgBlock) BtcDecode(r io.Reader, pver uint32) error {
 		return err
 	}
 
+	txCount, err := readVarInt(r, pver)
+	if err != nil {
+		return err
+	}
+
 	// Prevent more transactions than could possibly fit into a block.
 	// It would be possible to cause memory exhaustion and panics without
 	// a sane upper bound on this count.
-	txCount := msg.Header.TxnCount
 	if txCount > maxTxPerBlock {
 		str := fmt.Sprintf("too many transactions to fit into a block "+
 			"[count %d, max %d]", txCount, maxTxPerBlock)
@@ -130,10 +130,14 @@ func (msg *MsgBlock) DeserializeTxLoc(r *bytes.Buffer) ([]TxLoc, error) {
 		return nil, err
 	}
 
+	txCount, err := readVarInt(r, 0)
+	if err != nil {
+		return nil, err
+	}
+
 	// Prevent more transactions than could possibly fit into a block.
 	// It would be possible to cause memory exhaustion and panics without
 	// a sane upper bound on this count.
-	txCount := msg.Header.TxnCount
 	if txCount > maxTxPerBlock {
 		str := fmt.Sprintf("too many transactions to fit into a block "+
 			"[count %d, max %d]", txCount, maxTxPerBlock)
@@ -163,9 +167,12 @@ func (msg *MsgBlock) DeserializeTxLoc(r *bytes.Buffer) ([]TxLoc, error) {
 // See Serialize for encoding blocks to be stored to disk, such as in a
 // database, as opposed to encoding blocks for the wire.
 func (msg *MsgBlock) BtcEncode(w io.Writer, pver uint32) error {
-	msg.Header.TxnCount = uint64(len(msg.Transactions))
-
 	err := writeBlockHeader(w, pver, &msg.Header)
+	if err != nil {
+		return err
+	}
+
+	err = writeVarInt(w, pver, uint64(len(msg.Transactions)))
 	if err != nil {
 		return err
 	}
@@ -205,8 +212,9 @@ func (msg *MsgBlock) Command() string {
 // MaxPayloadLength returns the maximum length the payload can be for the
 // receiver.  This is part of the Message interface implementation.
 func (msg *MsgBlock) MaxPayloadLength(pver uint32) uint32 {
-	// Block header at 81 bytes + max transactions which can vary up to the
-	// maxBlockPayload (including the block header).
+	// Block header at 80 bytes + transaction count + max transactions
+	// which can vary up to the MaxBlockPayload (including the block header
+	// and transaction count).
 	return MaxBlockPayload
 }
 

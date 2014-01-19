@@ -57,10 +57,15 @@ func (msg *MsgHeaders) BtcDecode(r io.Reader, pver uint32) error {
 			return err
 		}
 
+		txCount, err := readVarInt(r, pver)
+		if err != nil {
+			return err
+		}
+
 		// Ensure the transaction count is zero for headers.
-		if bh.TxnCount > 0 {
+		if txCount > 0 {
 			str := fmt.Sprintf("block headers may not contain "+
-				"transactions [count %v]", bh.TxnCount)
+				"transactions [count %v]", txCount)
 			return messageError("MsgHeaders.BtcDecode", str)
 		}
 		msg.AddBlockHeader(&bh)
@@ -86,17 +91,20 @@ func (msg *MsgHeaders) BtcEncode(w io.Writer, pver uint32) error {
 	}
 
 	for _, bh := range msg.Headers {
-		// Ensure block headers do not contain a transaction count.
-		if bh.TxnCount > 0 {
-			str := fmt.Sprintf("block headers may not contain "+
-				"transactions [count %v]", bh.TxnCount)
-			return messageError("MsgHeaders.BtcEncode", str)
-		}
-
 		err := writeBlockHeader(w, pver, bh)
 		if err != nil {
 			return err
 		}
+
+		// The wire protocol encoding always includes a 0 for the number
+		// of transactions on header messages.  This is really just an
+		// artifact of the way the original implementation serializes
+		// block headers, but it is required.
+		err = writeVarInt(w, pver, 0)
+		if err != nil {
+			return err
+		}
+
 	}
 
 	return nil
@@ -111,8 +119,10 @@ func (msg *MsgHeaders) Command() string {
 // MaxPayloadLength returns the maximum length the payload can be for the
 // receiver.  This is part of the Message interface implementation.
 func (msg *MsgHeaders) MaxPayloadLength(pver uint32) uint32 {
-	// Num headers (varInt) + max allowed headers.
-	return maxVarIntPayload + (maxBlockHeaderPayload * MaxBlockHeadersPerMsg)
+	// Num headers (varInt) + max allowed headers (header length + 1 byte
+	// for the number of transactions which is always 0).
+	return maxVarIntPayload + ((maxBlockHeaderPayload + 1) *
+		MaxBlockHeadersPerMsg)
 }
 
 // NewMsgHeaders returns a new bitcoin headers message that conforms to the

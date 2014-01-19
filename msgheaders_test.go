@@ -26,8 +26,9 @@ func TestHeaders(t *testing.T) {
 	}
 
 	// Ensure max payload is expected value for latest protocol version.
-	// Num headers (varInt) + max allowed headers.
-	wantPayload := uint32(178009)
+	// Num headers (varInt) + max allowed headers (header length + 1 byte
+	// for the number of transactions which is always 0).
+	wantPayload := uint32(162009)
 	maxPayload := msg.MaxPayloadLength(pver)
 	if maxPayload != wantPayload {
 		t.Errorf("MaxPayloadLength: wrong max payload length for "+
@@ -262,7 +263,6 @@ func TestHeadersWireErrors(t *testing.T) {
 	bhTrans := btcwire.NewBlockHeader(&hash, &merkleHash, bits, nonce)
 	bhTrans.Version = blockOne.Header.Version
 	bhTrans.Timestamp = blockOne.Header.Timestamp
-	bhTrans.TxnCount = 1
 
 	transHeader := btcwire.NewMsgHeaders()
 	transHeader.AddBlockHeader(bhTrans)
@@ -298,8 +298,10 @@ func TestHeadersWireErrors(t *testing.T) {
 		{oneHeader, oneHeaderEncoded, pver, 5, io.ErrShortWrite, io.EOF},
 		// Force error with greater than max headers.
 		{maxHeaders, maxHeadersEncoded, pver, 3, btcwireErr, btcwireErr},
+		// Force error with number of transactions.
+		{transHeader, transHeaderEncoded, pver, 81, io.ErrShortWrite, io.EOF},
 		// Force error with included transactions.
-		{transHeader, transHeaderEncoded, pver, len(transHeaderEncoded), btcwireErr, btcwireErr},
+		{transHeader, transHeaderEncoded, pver, len(transHeaderEncoded), nil, btcwireErr},
 	}
 
 	t.Logf("Running %d tests", len(tests))

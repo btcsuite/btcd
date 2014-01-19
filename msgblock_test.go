@@ -468,7 +468,6 @@ var blockOne = btcwire.MsgBlock{
 		Timestamp: time.Unix(0x4966bc61, 0), // 2009-01-08 20:54:25 -0600 CST
 		Bits:      0x1d00ffff,               // 486604799
 		Nonce:     0x9962e301,               // 2573394689
-		TxnCount:  1,
 	},
 	Transactions: []*btcwire.MsgTx{
 		&btcwire.MsgTx{
