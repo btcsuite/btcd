@@ -73,22 +73,16 @@ type blockNode struct {
 	timestamp time.Time
 }
 
-// newBlockNode returns a new block node for the given block.  It is completely
-// disconnected from the chain and the workSum value is just the work for the
-// passed block.  The work sum is updated accordingly when the node is inserted
-// into a chain.
-func newBlockNode(block *btcutil.Block) *blockNode {
-	// Get the block sha.  It's ok to ignore the error here since
-	// sha has already been called and an error there would have caused
-	// an exit before this function is called.
-	blockSha, _ := block.Sha()
-
-	blockHeader := block.MsgBlock().Header
+// newBlockNode returns a new block node for the given block header.  It is
+// completely disconnected from the chain and the workSum value is just the work
+// for the passed block.  The work sum is updated accordingly when the node is
+// inserted into a chain.
+func newBlockNode(blockHeader *btcwire.BlockHeader, blockSha *btcwire.ShaHash, height int64) *blockNode {
 	node := blockNode{
 		hash:       blockSha,
 		parentHash: &blockHeader.PrevBlock,
 		workSum:    calcWork(blockHeader.Bits),
-		height:     block.Height(),
+		height:     height,
 		version:    blockHeader.Version,
 		bits:       blockHeader.Bits,
 		timestamp:  blockHeader.Timestamp,
@@ -395,14 +389,18 @@ func (b *BlockChain) GenerateInitialIndex() error {
 // It is used mainly to dynamically load previous blocks from database as they
 // are needed to avoid needing to put the entire block chain in memory.
 func (b *BlockChain) loadBlockNode(hash *btcwire.ShaHash) (*blockNode, error) {
-	// Load the block from the db.
-	block, err := b.db.FetchBlockBySha(hash)
+	// Load the block header and height from the db.
+	blockHeader, err := b.db.FetchBlockHeaderBySha(hash)
+	if err != nil {
+		return nil, err
+	}
+	blockHeight, err := b.db.FetchBlockHeightBySha(hash)
 	if err != nil {
 		return nil, err
 	}
 
 	// Create the new block node for the block and set the work.
-	node := newBlockNode(block)
+	node := newBlockNode(blockHeader, hash, blockHeight)
 	node.inMainChain = true
 
 	// Add the node to the chain.
@@ -414,7 +412,7 @@ func (b *BlockChain) loadBlockNode(hash *btcwire.ShaHash) (*blockNode, error) {
 	//     therefore is an error to insert into the chain
 	//  4) Neither 1 or 2 is true, but this is the first node being added
 	//     to the tree, so it's the root.
-	prevHash := &block.MsgBlock().Header.PrevBlock
+	prevHash := &blockHeader.PrevBlock
 	if parentNode, ok := b.index[*prevHash]; ok {
 		// Case 1 -- This node is a child of an existing block node.
 		// Update the node's work sum with the sum of the parent node's
