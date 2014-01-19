@@ -1,17 +1,10 @@
 #!/bin/sh
 
-# This script uses gocov to generate a test coverage report.
-# The gocov tool my be obtained with the following command:
-#   go get github.com/axw/gocov/gocov
-#
-# It will be installed to $GOPATH/bin, so ensure that location is in your $PATH.
-
-# Check for gocov.
-type gocov >/dev/null 2>&1
-if [ $? -ne 0 ]; then
-	echo >&2 "This script requires the gocov tool."
-	echo >&2 "You may obtain it with the following command:"
-	echo >&2 "go get github.com/axw/gocov/gocov"
-	exit 1
-fi
-(cd sqlite3 && gocov test | gocov report)
+# This script uses go tool cover to generate a test coverage report.
+go test -coverprofile=cov.out && go tool cover -func=cov.out && rm -f cov.out
+echo "============================================================"
+(cd ldb && go test -coverprofile=cov.out && go tool cover -func=cov.out && \
+  rm -f cov.out)
+echo "============================================================"
+(cd memdb && go test -coverprofile=cov.out && go tool cover -func=cov.out && \
+  rm -f cov.out)
