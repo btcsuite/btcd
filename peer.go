@@ -722,9 +722,9 @@ func (p *peer) handleGetBlocksMsg(msg *btcwire.MsgGetBlocks) {
 func (p *peer) handleGetHeadersMsg(msg *btcwire.MsgGetHeaders) {
 	// Attempt to look up the height of the provided stop hash.
 	endIdx := btcdb.AllShas
-	block, err := p.server.db.FetchBlockBySha(&msg.HashStop)
+	height, err := p.server.db.FetchBlockHeightBySha(&msg.HashStop)
 	if err == nil {
-		endIdx = block.Height() + 1
+		endIdx = height + 1
 	}
 
 	// There are no block locators so a specific header is being requested
@@ -737,10 +737,16 @@ func (p *peer) handleGetHeadersMsg(msg *btcwire.MsgGetHeaders) {
 			return
 		}
 
-		// Send the requested block header.
+		// Fetch and send the requested block header.
+		header, err := p.server.db.FetchBlockHeaderBySha(&msg.HashStop)
+		if err != nil {
+			peerLog.Warnf("Lookup of known block hash failed: %v",
+				err)
+			return
+		}
+
 		headersMsg := btcwire.NewMsgHeaders()
-		hdr := block.MsgBlock().Header // copy
-		headersMsg.AddBlockHeader(&hdr)
+		headersMsg.AddBlockHeader(header)
 		p.QueueMessage(headersMsg, nil)
 		return
 	}
@@ -752,10 +758,10 @@ func (p *peer) handleGetHeadersMsg(msg *btcwire.MsgGetHeaders) {
 	// This mirrors the behavior in the reference implementation.
 	startIdx := int64(1)
 	for _, hash := range msg.BlockLocatorHashes {
-		block, err := p.server.db.FetchBlockBySha(hash)
+		height, err := p.server.db.FetchBlockHeightBySha(hash)
 		if err == nil {
 			// Start with the next hash since we know this one.
-			startIdx = block.Height() + 1
+			startIdx = height + 1
 			break
 		}
 	}
@@ -767,7 +773,7 @@ func (p *peer) handleGetHeadersMsg(msg *btcwire.MsgGetHeaders) {
 
 	// Generate headers message and send it.
 	//
-	// The FetchBlockBySha call is limited to a maximum number of hashes
+	// The FetchHeightRange call is limited to a maximum number of hashes
 	// per invocation.  Since the maximum number of headers per message
 	// might be larger, call it multiple times with the appropriate indices
 	// as needed.
@@ -788,14 +794,13 @@ func (p *peer) handleGetHeadersMsg(msg *btcwire.MsgGetHeaders) {
 
 		// Add headers to the message.
 		for _, hash := range hashList {
-			block, err := p.server.db.FetchBlockBySha(&hash)
+			header, err := p.server.db.FetchBlockHeaderBySha(&hash)
 			if err != nil {
 				peerLog.Warnf("Lookup of known block hash "+
 					"failed: %v", err)
 				continue
 			}
-			hdr := block.MsgBlock().Header // copy
-			headersMsg.AddBlockHeader(&hdr)
+			headersMsg.AddBlockHeader(header)
 		}
 
 		// Start at the next block header after the latest one on the
