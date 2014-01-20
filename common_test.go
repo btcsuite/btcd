@@ -58,7 +58,7 @@ func chainSetup(dbName string) (*btcchain.BlockChain, func(), error) {
 	var db btcdb.Db
 	var teardown func()
 	if testDbType == "memdb" {
-		ndb, err := btcdb.CreateDB(testDbType, "")
+		ndb, err := btcdb.CreateDB(testDbType)
 		if err != nil {
 			return nil, nil, fmt.Errorf("error creating db: %v", err)
 		}
