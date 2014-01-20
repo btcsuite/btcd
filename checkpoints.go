@@ -58,6 +58,7 @@ var checkpointDataMainNet = checkpointData{
 		{225430, newShaHashFromStr("00000000000001c108384350f74090433e7fcf79a606b8e797f065b130575932")},
 		{250000, newShaHashFromStr("000000000000003887df1f29024b06fc2200b55f8af8f35453d7be294df2d214")},
 		{267300, newShaHashFromStr("000000000000000a83fbd660e918f218bf37edd92b748ad940483c7c116179ac")},
+		{279000, newShaHashFromStr("0000000000000001ae8c72a0b0c301f67e3afca10e819efa9041e458e9bd7e40")},
 	},
 	checkpointsByHeight: nil, // Automatically generated in init.
 }
