@@ -35,13 +35,13 @@ type wsCommandHandler func(*rpcServer, btcjson.Cmd, handlerChans) (interface{}, 
 // wsHandlers maps RPC command strings to appropriate websocket handler
 // functions.
 var wsHandlers = map[string]wsCommandHandler{
-	"getcurrentnet":       handleGetCurrentNet,
-	"getbestblock":        handleGetBestBlock,
-	"notifyblocks":        handleNotifyBlocks,
-	"notifynewtxs":        handleNotifyNewTXs,
-	"notifyspent":         handleNotifySpent,
-	"rescan":              handleRescan,
-	"sendrawtransaction:": handleWalletSendRawTransaction,
+	"getcurrentnet":      handleGetCurrentNet,
+	"getbestblock":       handleGetBestBlock,
+	"notifyblocks":       handleNotifyBlocks,
+	"notifynewtxs":       handleNotifyNewTXs,
+	"notifyspent":        handleNotifySpent,
+	"rescan":             handleRescan,
+	"sendrawtransaction": handleWalletSendRawTransaction,
 }
 
 // wsContext holds the items the RPC server needs to handle websocket
@@ -492,15 +492,14 @@ func handleWalletSendRawTransaction(s *rpcServer, icmd btcjson.Cmd, c handlerCha
 	// TODO: the standard handlers really should be changed to
 	// return btcjson.Errors which get used directly in the
 	// response.  Wouldn't need this crap here then.
-	var jsonErr *btcjson.Error
-	if jsonErr, ok := err.(*btcjson.Error); ok {
-		return result, jsonErr
-	}
-	jsonErr = &btcjson.Error{
-		Code:    btcjson.ErrMisc.Code,
-		Message: err.Error(),
-	}
 	if err != nil {
+		if jsonErr, ok := err.(*btcjson.Error); ok {
+			return result, jsonErr
+		}
+		jsonErr := &btcjson.Error{
+			Code:    btcjson.ErrMisc.Code,
+			Message: err.Error(),
+		}
 		return result, jsonErr
 	}
 
