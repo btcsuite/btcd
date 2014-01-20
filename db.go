@@ -106,9 +106,9 @@ type Db interface {
 // DriverDB defines a structure for backend drivers to use when they registered
 // themselves as a backend which implements the Db interface.
 type DriverDB struct {
-	DbType string
-	Create func(argstr string) (pbdb Db, err error)
-	Open   func(filepath string) (pbdb Db, err error)
+	DbType   string
+	CreateDB func(args ...interface{}) (pbdb Db, err error)
+	OpenDB   func(args ...interface{}) (pbdb Db, err error)
 }
 
 // TxListReply is used to return individual transaction information when
@@ -138,20 +138,20 @@ func AddDBDriver(instance DriverDB) {
 }
 
 // CreateDB intializes and opens a database.
-func CreateDB(dbtype string, argstr string) (pbdb Db, err error) {
+func CreateDB(dbtype string, args ...interface{}) (pbdb Db, err error) {
 	for _, drv := range driverList {
 		if drv.DbType == dbtype {
-			return drv.Create(argstr)
+			return drv.CreateDB(args...)
 		}
 	}
 	return nil, DbUnknownType
 }
 
 // OpenDB opens an existing database.
-func OpenDB(dbtype string, argstr string) (pbdb Db, err error) {
+func OpenDB(dbtype string, args ...interface{}) (pbdb Db, err error) {
 	for _, drv := range driverList {
 		if drv.DbType == dbtype {
-			return drv.Open(argstr)
+			return drv.OpenDB(args...)
 		}
 	}
 	return nil, DbUnknownType

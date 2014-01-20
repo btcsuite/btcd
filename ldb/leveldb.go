@@ -55,14 +55,33 @@ type LevelDb struct {
 	txSpentUpdateMap map[btcwire.ShaHash]*spentTxUpdate
 }
 
-var self = btcdb.DriverDB{DbType: "leveldb", Create: CreateDB, Open: OpenDB}
+var self = btcdb.DriverDB{DbType: "leveldb", CreateDB: CreateDB, OpenDB: OpenDB}
 
 func init() {
 	btcdb.AddDBDriver(self)
 }
 
+// parseArgs parses the arguments from the btcdb Open/Create methods.
+func parseArgs(funcName string, args ...interface{}) (string, error) {
+	if len(args) != 1 {
+		return "", fmt.Errorf("Invalid arguments to ldb.%s -- "+
+			"expected database path string", funcName)
+	}
+	dbPath, ok := args[0].(string)
+	if !ok {
+		return "", fmt.Errorf("First argument to ldb.%s is invalid -- "+
+			"expected database path string", funcName)
+	}
+	return dbPath, nil
+}
+
 // OpenDB opens an existing database for use.
-func OpenDB(dbpath string) (btcdb.Db, error) {
+func OpenDB(args ...interface{}) (btcdb.Db, error) {
+	dbpath, err := parseArgs("OpenDB", args...)
+	if err != nil {
+		return nil, err
+	}
+
 	log = btcdb.GetLog()
 
 	db, err := openDB(dbpath, false)
@@ -216,7 +235,12 @@ func openDB(dbpath string, create bool) (pbdb btcdb.Db, err error) {
 }
 
 // CreateDB creates, initializes and opens a database for use.
-func CreateDB(dbpath string) (btcdb.Db, error) {
+func CreateDB(args ...interface{}) (btcdb.Db, error) {
+	dbpath, err := parseArgs("Create", args...)
+	if err != nil {
+		return nil, err
+	}
+
 	log = btcdb.GetLog()
 
 	// No special setup needed, just OpenBB

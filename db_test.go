@@ -76,7 +76,7 @@ func TestAddDuplicateDriver(t *testing.T) {
 	// driver function and intentionally returns a failure that can be
 	// detected if the interface allows a duplicate driver to overwrite an
 	// existing one.
-	bogusCreateDB := func(string) (btcdb.Db, error) {
+	bogusCreateDB := func(args ...interface{}) (btcdb.Db, error) {
 		return nil, fmt.Errorf("duplicate driver allowed for database "+
 			"type [%v]", dbType)
 	}
@@ -85,9 +85,9 @@ func TestAddDuplicateDriver(t *testing.T) {
 	// create and open functions to a function that causes a test failure if
 	// they are invoked.
 	driver := btcdb.DriverDB{
-		DbType: dbType,
-		Create: bogusCreateDB,
-		Open:   bogusCreateDB,
+		DbType:   dbType,
+		CreateDB: bogusCreateDB,
+		OpenDB:   bogusCreateDB,
 	}
 	btcdb.AddDBDriver(driver)
 
@@ -111,16 +111,16 @@ func TestCreateOpenFail(t *testing.T) {
 	dbType := "createopenfail"
 	openError := fmt.Errorf("failed to create or open database for "+
 		"database type [%v]", dbType)
-	bogusCreateDB := func(string) (btcdb.Db, error) {
+	bogusCreateDB := func(args ...interface{}) (btcdb.Db, error) {
 		return nil, openError
 	}
 
 	// Create and add driver that intentionally fails when created or opened
 	// to ensure errors on database open and create are handled properly.
 	driver := btcdb.DriverDB{
-		DbType: dbType,
-		Create: bogusCreateDB,
-		Open:   bogusCreateDB,
+		DbType:   dbType,
+		CreateDB: bogusCreateDB,
+		OpenDB:   bogusCreateDB,
 	}
 	btcdb.AddDBDriver(driver)
 

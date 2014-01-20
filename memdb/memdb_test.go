@@ -18,7 +18,7 @@ import (
 // and does not panic or otherwise misbehave for functions which do not return
 // errors.
 func TestClosed(t *testing.T) {
-	db, err := btcdb.CreateDB("memdb", "")
+	db, err := btcdb.CreateDB("memdb")
 	if err != nil {
 		t.Errorf("Failed to open test database %v", err)
 		return

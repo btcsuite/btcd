@@ -54,7 +54,7 @@ func fileExists(name string) bool {
 func openDB(dbType, dbName string) (btcdb.Db, error) {
 	// Handle memdb specially since it has no files on disk.
 	if dbType == "memdb" {
-		db, err := btcdb.OpenDB(dbType, "")
+		db, err := btcdb.OpenDB(dbType)
 		if err != nil {
 			return nil, fmt.Errorf("error opening db: %v", err)
 		}
@@ -78,7 +78,7 @@ func createDB(dbType, dbName string, close bool) (btcdb.Db, func(), error) {
 	// Handle memory database specially since it doesn't need the disk
 	// specific handling.
 	if dbType == "memdb" {
-		db, err := btcdb.CreateDB(dbType, "")
+		db, err := btcdb.CreateDB(dbType)
 		if err != nil {
 			return nil, nil, fmt.Errorf("error creating db: %v", err)
 		}
