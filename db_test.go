@@ -30,7 +30,7 @@ func testNewestShaEmpty(t *testing.T, db btcdb.Db) {
 
 	}
 	if height != -1 {
-		t.Errorf("NewestSha wrong height got: %s, want %s", height, -1)
+		t.Errorf("NewestSha wrong height got: %d, want %d", height, -1)
 	}
 }
 
