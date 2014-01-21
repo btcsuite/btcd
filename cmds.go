@@ -156,7 +156,7 @@ func parseExportWatchingWalletCmd(r *btcjson.RawCmd) (btcjson.Cmd, error) {
 
 // Id satisifies the Cmd interface by returning the ID of the command.
 func (cmd *ExportWatchingWalletCmd) Id() interface{} {
-	return cmd.Id
+	return cmd.id
 }
 
 // SetId satisifies the Cmd interface by setting the ID of the command.
