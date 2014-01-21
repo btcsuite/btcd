@@ -266,6 +266,8 @@ type PeerInfo struct {
 	LastRecv       int64  `json:"lastrecv"`
 	BytesSent      int    `json:"bytessent"`
 	BytesRecv      int    `json:"bytesrecv"`
+	PingTime       int64  `json:"pingtime"`
+	PingWait       int64  `json:"pingwait,omitempty"`
 	ConnTime       int64  `json:"conntime"`
 	Version        uint32 `json:"version"`
 	SubVer         string `json:"subver"`
@@ -333,6 +335,14 @@ func (s *server) handleQuery(querymsg interface{}, state *peerState) {
 				BanScore:       0,
 				SyncNode:       false, // TODO(oga) for now. bm knows this.
 			}
+			p.pingStatsMtx.Lock()
+			info.PingTime = p.lastPingMicros
+			if p.lastPingNonce != 0 {
+				wait := time.Now().Sub(p.lastPingTime).Nanoseconds()
+				// We actually want microseconds.
+				info.PingWait = wait / 1000
+			}
+			p.pingStatsMtx.Unlock()
 			infos = append(infos, info)
 		})
 		msg.reply <- infos

@@ -49,28 +49,29 @@ type commandHandler func(*rpcServer, btcjson.Cmd) (interface{}, error)
 // a dependancy loop.
 var rpcHandlers map[string]commandHandler
 var rpcHandlersBeforeInit = map[string]commandHandler{
-	"addnode":                handleAddNode,
-	"createrawtransaction":   handleCreateRawTransaction,
-	"debuglevel":             handleDebugLevel,
-	"decoderawtransaction":   handleDecodeRawTransaction,
-	"decodescript":           handleDecodeScript,
-	"getbestblockhash":       handleGetBestBlockHash,
-	"getblock":               handleGetBlock,
-	"getblockcount":          handleGetBlockCount,
-	"getblockhash":           handleGetBlockHash,
-	"getconnectioncount":     handleGetConnectionCount,
-	"getdifficulty":          handleGetDifficulty,
-	"getgenerate":            handleGetGenerate,
-	"gethashespersec":        handleGetHashesPerSec,
-	"getpeerinfo":            handleGetPeerInfo,
-	"getrawmempool":          handleGetRawMempool,
-	"getrawtransaction":      handleGetRawTransaction,
-	"help":                   handleHelp,
-	"sendrawtransaction":     handleSendRawTransaction,
-	"setgenerate":            handleSetGenerate,
-	"stop":                   handleStop,
-	"submitblock":            handleSubmitBlock,
-	"verifychain":            handleVerifyChain,
+	"addnode":              handleAddNode,
+	"createrawtransaction": handleCreateRawTransaction,
+	"debuglevel":           handleDebugLevel,
+	"decoderawtransaction": handleDecodeRawTransaction,
+	"decodescript":         handleDecodeScript,
+	"getbestblockhash":     handleGetBestBlockHash,
+	"getblock":             handleGetBlock,
+	"getblockcount":        handleGetBlockCount,
+	"getblockhash":         handleGetBlockHash,
+	"getconnectioncount":   handleGetConnectionCount,
+	"getdifficulty":        handleGetDifficulty,
+	"getgenerate":          handleGetGenerate,
+	"gethashespersec":      handleGetHashesPerSec,
+	"getpeerinfo":          handleGetPeerInfo,
+	"getrawmempool":        handleGetRawMempool,
+	"getrawtransaction":    handleGetRawTransaction,
+	"help":                 handleHelp,
+	"ping":                 handlePing,
+	"sendrawtransaction":   handleSendRawTransaction,
+	"setgenerate":          handleSetGenerate,
+	"stop":                 handleStop,
+	"submitblock":          handleSubmitBlock,
+	"verifychain":          handleVerifyChain,
 }
 
 func init() {
@@ -126,15 +127,14 @@ var rpcAskWallet = map[string]bool{
 
 // Commands that are temporarily unimplemented.
 var rpcUnimplemented = map[string]bool{
-	"getaddednodeinfo":       true,
-	"getblocktemplate":       true,
-	"getinfo":                true,
-	"getmininginfo":          true,
-	"getnettotals":           true,
-	"getnetworkhashps":       true,
-	"getnewaddress":          true,
-	"getwork":                true,
-	"ping":                   true,
+	"getaddednodeinfo": true,
+	"getblocktemplate": true,
+	"getinfo":          true,
+	"getmininginfo":    true,
+	"getnettotals":     true,
+	"getnetworkhashps": true,
+	"getnewaddress":    true,
+	"getwork":          true,
 }
 
 // rpcServer holds the items the rpc server may need to access (config,
@@ -1037,7 +1037,7 @@ NOTE: btcd does not mine so this will always return false. The call is provided
 for compatibility only.`,
 	"getpeerinfo": `
 NOTE: btcd does not currently implement all fields. the "bytessent",
-"bytesrecv", "pingtime", "pingwait" and "syncnode" fields are not yet
+"bytesrecv" and "syncnode" fields are not yet
 implemented.`,
 	"sendrawtransaction": `
 NOTE: btcd does not currently support the "allowhighfees" parameter.`,
@@ -1085,11 +1085,24 @@ func handleHelp(s *rpcServer, cmd btcjson.Cmd) (interface{}, error) {
 	// search the main list of hanlders since we do not wish to provide help
 	// for commands that are unimplemented or relate to wallet
 	// functionality.
-	if _, ok :=  rpcHandlers[help.Command]; !ok {
+	if _, ok := rpcHandlers[help.Command]; !ok {
 		return "", fmt.Errorf("help: unknown command: %s", help.Command)
 	}
 
 	return getHelpText(help.Command)
+}
+
+// handlePing implements the ping command.
+func handlePing(s *rpcServer, cmd btcjson.Cmd) (interface{}, error) {
+	// Ask server to ping \o_
+	nonce, err := btcwire.RandomUint64()
+	if err != nil {
+		return nil, fmt.Errorf("Not sending ping - can not generate "+
+			"nonce: %v", err)
+	}
+	s.server.BroadcastMessage(btcwire.NewMsgPing(nonce))
+
+	return nil, nil
 }
 
 // handleSendRawTransaction implements the sendrawtransaction command.

@@ -162,6 +162,10 @@ type peer struct {
 	blockProcessed     chan bool
 	quit               chan bool
 	userAgent          string
+	pingStatsMtx       sync.Mutex // protects lastPing*
+	lastPingNonce      uint64     // Set to nonce if we have a pending ping.
+	lastPingTime       time.Time  // Time we sent last ping.
+	lastPingMicros     int64      // Time for last ping to return.
 }
 
 // String returns the peer's address and directionality as a human-readable
@@ -921,6 +925,30 @@ func (p *peer) handlePingMsg(msg *btcwire.MsgPing) {
 	}
 }
 
+// handlePongMsg is invoked when a peer recieved a pong bitcoin message.
+// recent clients (protocol version > BIP0031Version), and if we had send a ping
+// previosuly we update our ping time statistics. If the client is too old or
+// we had not send a ping we ignore it.
+func (p *peer) handlePongMsg(msg *btcwire.MsgPong) {
+	p.pingStatsMtx.Lock()
+	defer p.pingStatsMtx.Unlock()
+
+	// Arguably we could use a buffered channel here sending data
+	// in a fifo manner whenever we send a ping, or a list keeping track of
+	// the times of each ping. For now we just make a best effort and
+	// only record stats if it was for the last ping sent. Any preceding
+	// and overlapping pings will be ignored. It is unlikely to occur
+	// without large usage of the ping rpc call since we ping
+	// infrequently enough that if they overlap we would have timed out
+	// the peer.
+	if p.protocolVersion > btcwire.BIP0031Version &&
+		p.lastPingNonce != 0 && msg.Nonce == p.lastPingNonce {
+		p.lastPingMicros = time.Now().Sub(p.lastPingTime).Nanoseconds()
+		p.lastPingMicros /= 1000 // convert to usec.
+		p.lastPingNonce = 0
+	}
+}
+
 // readMessage reads the next bitcoin message from the peer with logging.
 func (p *peer) readMessage() (msg btcwire.Message, buf []byte, err error) {
 	msg, buf, err = btcwire.ReadMessage(p.conn, p.protocolVersion, p.btcnet)
@@ -1092,8 +1120,7 @@ out:
 			markConnected = true
 
 		case *btcwire.MsgPong:
-			// Don't do anything, but could try to work out network
-			// timing or similar.
+			p.handlePongMsg(msg)
 
 		case *btcwire.MsgAlert:
 			p.server.BroadcastMessage(msg, p)
@@ -1324,13 +1351,20 @@ out:
 			// specially.
 			peerLog.Tracef("%s: recieved from queuehandler", p)
 			reset := true
-			switch msg.msg.(type) {
+			switch m := msg.msg.(type) {
 			case *btcwire.MsgVersion:
 				// should get an ack
 			case *btcwire.MsgGetAddr:
 				// should get addresses
 			case *btcwire.MsgPing:
 				// expects pong
+				// Also set up statistics.
+				p.pingStatsMtx.Lock()
+				if p.protocolVersion > btcwire.BIP0031Version {
+					p.lastPingNonce = m.Nonce
+					p.lastPingTime = time.Now()
+				}
+				p.pingStatsMtx.Unlock()
 			case *btcwire.MsgMemPool:
 				// Should return an inv.
 			case *btcwire.MsgGetData:

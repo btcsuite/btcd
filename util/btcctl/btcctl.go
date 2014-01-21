@@ -64,9 +64,10 @@ var commandHandlers = map[string]*handlerData{
 	"getpeerinfo":          &handlerData{0, 0, displayJSONDump, nil, makeGetPeerInfo, ""},
 	"getrawmempool":        &handlerData{0, 1, displayJSONDump, []conversionHandler{toBool}, makeGetRawMempool, "[verbose=false]"},
 	"getrawtransaction":    &handlerData{1, 1, displayJSONDump, []conversionHandler{nil, toBool}, makeGetRawTransaction, "<txhash> [verbose=false]"},
-	"help":			&handlerData{0, 1, displayGeneric, nil, makeHelp, "[commandName]"},
+	"help":                 &handlerData{0, 1, displayGeneric, nil, makeHelp, "[commandName]"},
 	"importprivkey":        &handlerData{1, 2, displayGeneric, []conversionHandler{nil, nil, toBool}, makeImportPrivKey, "<wifprivkey> [label] [rescan=true]"},
 	"listtransactions":     &handlerData{0, 3, displayJSONDump, []conversionHandler{nil, toInt, toInt}, makeListTransactions, "[account] [count=10] [from=0]"},
+	"ping":                 &handlerData{0, 0, displayGeneric, nil, makePing, ""},
 	"verifychain":          &handlerData{0, 2, displayJSONDump, []conversionHandler{toInt, toInt}, makeVerifyChain, "[level] [numblocks]"},
 	"sendrawtransaction":   &handlerData{1, 0, displayGeneric, nil, makeSendRawTransaction, "<hextx>"},
 	"stop":                 &handlerData{0, 0, displayGeneric, nil, makeStop, ""},
@@ -351,6 +352,11 @@ func makeListTransactions(args []interface{}) (btcjson.Cmd, error) {
 	}
 
 	return btcjson.NewListTransactionsCmd("btcctl", optargs...)
+}
+
+// makePing generates the cmd structure for ping commands.
+func makePing(args []interface{}) (btcjson.Cmd, error) {
+	return btcjson.NewPingCmd("btcctl")
 }
 
 // makeSendRawTransaction generates the cmd structure for sendrawtransaction
