@@ -14,6 +14,7 @@ import (
 
 func init() {
 	btcjson.RegisterCustomCmd("createencryptedwallet", parseCreateEncryptedWalletCmd)
+	btcjson.RegisterCustomCmd("exportwatchingwallet", parseExportWatchingWalletCmd)
 	btcjson.RegisterCustomCmd("getaddressbalance", parseGetAddressBalanceCmd)
 	btcjson.RegisterCustomCmd("getbestblock", parseGetBestBlockCmd)
 	btcjson.RegisterCustomCmd("getcurrentnet", parseGetCurrentNetCmd)
@@ -94,6 +95,114 @@ func (cmd *GetCurrentNetCmd) UnmarshalJSON(b []byte) error {
 	}
 
 	concreteCmd, ok := newCmd.(*GetCurrentNetCmd)
+	if !ok {
+		return btcjson.ErrInternal
+	}
+	*cmd = *concreteCmd
+	return nil
+}
+
+// ExportWatchingWalletCmd is a type handling custom marshaling and
+// unmarshaling of exportwatchingwallet JSON websocket extension
+// commands.
+type ExportWatchingWalletCmd struct {
+	id      interface{}
+	Account string
+	Zip     bool
+}
+
+// Enforce that ExportWatchingWalletCmd satisifies the btcjson.Cmd
+// interface.
+var _ btcjson.Cmd = &ExportWatchingWalletCmd{}
+
+// NewExportWatchingWalletCmd creates a new ExportWatchingWalletCmd.
+func NewExportWatchingWalletCmd(id interface{}, optArgs ...interface{}) (*ExportWatchingWalletCmd, error) {
+	if len(optArgs) > 2 {
+		return nil, btcjson.ErrTooManyOptArgs
+	}
+
+	// Optional parameters set to their defaults.
+	account := ""
+	zip := false
+
+	if len(optArgs) > 0 {
+		a, ok := optArgs[0].(string)
+		if !ok {
+			return nil, errors.New("first optarg account must be a string")
+		}
+		account = a
+	}
+	if len(optArgs) > 1 {
+		z, ok := optArgs[0].(bool)
+		if !ok {
+			return nil, errors.New("second optarg zip must be a boolean")
+		}
+		zip = z
+	}
+
+	return &ExportWatchingWalletCmd{
+		id:      id,
+		Account: account,
+		Zip:     zip,
+	}, nil
+}
+
+// parseExportWatchingWalletCmd parses a RawCmd into a concrete type
+// satisifying the btcjson.Cmd interface.  This is used when registering
+// the custom command with the btcjson parser.
+func parseExportWatchingWalletCmd(r *btcjson.RawCmd) (btcjson.Cmd, error) {
+	return NewExportWatchingWalletCmd(r.Id, r.Params...)
+}
+
+// Id satisifies the Cmd interface by returning the ID of the command.
+func (cmd *ExportWatchingWalletCmd) Id() interface{} {
+	return cmd.Id
+}
+
+// SetId satisifies the Cmd interface by setting the ID of the command.
+func (cmd *ExportWatchingWalletCmd) SetId(id interface{}) {
+	cmd.id = id
+}
+
+// Method satisifies the Cmd interface by returning the RPC method.
+func (cmd *ExportWatchingWalletCmd) Method() string {
+	return "exportwatchingwallet"
+}
+
+// MarshalJSON returns the JSON encoding of cmd.  Part of the Cmd interface.
+func (cmd *ExportWatchingWalletCmd) MarshalJSON() ([]byte, error) {
+	// Fill a RawCmd and marshal.
+	raw := btcjson.RawCmd{
+		Jsonrpc: "1.0",
+		Method:  "exportwatchingwallet",
+		Id:      cmd.id,
+	}
+
+	if cmd.Account != "" || cmd.Zip {
+		raw.Params = append(raw.Params, cmd.Account)
+	}
+	if cmd.Zip {
+		raw.Params = append(raw.Params, cmd.Zip)
+	}
+
+	return json.Marshal(raw)
+}
+
+// UnmarshalJSON unmarshals the JSON encoding of cmd into cmd.  Part of
+// the Cmd interface.
+func (cmd *ExportWatchingWalletCmd) UnmarshalJSON(b []byte) error {
+	// Unmarshal into a RawCmd.
+	var r btcjson.RawCmd
+	if err := json.Unmarshal(b, &r); err != nil {
+		return err
+	}
+
+	newCmd, err := parseExportWatchingWalletCmd(&r)
+	if err != nil {
+		return err
+	}
+
+	concreteCmd, ok := newCmd.(*ExportWatchingWalletCmd)
 	if !ok {
 		return btcjson.ErrInternal
 	}
@@ -413,7 +522,7 @@ func (cmd *RescanCmd) UnmarshalJSON(b []byte) error {
 // unmarshaling of notifyblocks JSON websocket extension
 // commands.
 type NotifyBlocksCmd struct {
-        id        interface{}
+	id interface{}
 }
 
 // Enforce that NotifyBlocksCmd satisifies the btcjson.Cmd interface.
@@ -422,18 +531,18 @@ var _ btcjson.Cmd = &NotifyBlocksCmd{}
 // NewNotifyBlocksCmd creates a new NotifyBlocksCmd.
 func NewNotifyBlocksCmd(id interface{}) *NotifyBlocksCmd {
 	return &NotifyBlocksCmd{
-		id:        id,
+		id: id,
 	}
 }
 
-// parseNotifyBlocksCmd parses a NotifyBlocksCmd into a concrete type 
+// parseNotifyBlocksCmd parses a NotifyBlocksCmd into a concrete type
 // satisifying the btcjson.Cmd interface.  This is used when registering
 // the custom command with the btcjson parser.
 func parseNotifyBlocksCmd(r *btcjson.RawCmd) (btcjson.Cmd, error) {
-        if len(r.Params) != 0 {
-                return nil, btcjson.ErrWrongNumberOfParams
-        }
-        return NewNotifyBlocksCmd(r.Id), nil
+	if len(r.Params) != 0 {
+		return nil, btcjson.ErrWrongNumberOfParams
+	}
+	return NewNotifyBlocksCmd(r.Id), nil
 }
 
 // Id satisifies the Cmd interface by returning the ID of the command.
