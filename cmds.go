@@ -106,9 +106,9 @@ func (cmd *GetCurrentNetCmd) UnmarshalJSON(b []byte) error {
 // unmarshaling of exportwatchingwallet JSON websocket extension
 // commands.
 type ExportWatchingWalletCmd struct {
-	id      interface{}
-	Account string
-	Zip     bool
+	id       interface{}
+	Account  string
+	Download bool
 }
 
 // Enforce that ExportWatchingWalletCmd satisifies the btcjson.Cmd
@@ -123,7 +123,7 @@ func NewExportWatchingWalletCmd(id interface{}, optArgs ...interface{}) (*Export
 
 	// Optional parameters set to their defaults.
 	account := ""
-	zip := false
+	dl := false
 
 	if len(optArgs) > 0 {
 		a, ok := optArgs[0].(string)
@@ -133,17 +133,17 @@ func NewExportWatchingWalletCmd(id interface{}, optArgs ...interface{}) (*Export
 		account = a
 	}
 	if len(optArgs) > 1 {
-		z, ok := optArgs[0].(bool)
+		b, ok := optArgs[0].(bool)
 		if !ok {
 			return nil, errors.New("second optarg zip must be a boolean")
 		}
-		zip = z
+		dl = b
 	}
 
 	return &ExportWatchingWalletCmd{
-		id:      id,
-		Account: account,
-		Zip:     zip,
+		id:       id,
+		Account:  account,
+		Download: dl,
 	}, nil
 }
 
@@ -178,11 +178,11 @@ func (cmd *ExportWatchingWalletCmd) MarshalJSON() ([]byte, error) {
 		Id:      cmd.id,
 	}
 
-	if cmd.Account != "" || cmd.Zip {
+	if cmd.Account != "" || cmd.Download {
 		raw.Params = append(raw.Params, cmd.Account)
 	}
-	if cmd.Zip {
-		raw.Params = append(raw.Params, cmd.Zip)
+	if cmd.Download {
+		raw.Params = append(raw.Params, cmd.Download)
 	}
 
 	return json.Marshal(raw)
