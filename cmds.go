@@ -13,6 +13,11 @@ import (
 )
 
 func init() {
+	btcjson.RegisterCustomCmd("authenticate", parseAuthenticateCmd,
+		`authenticate "username" "passphrase"
+Authenticate the websocket with the RPC server.  This is only required if the
+credentials were not already supplied via HTTP auth headers.  It must be the
+first command sent or you will be disconnected.`)
 	btcjson.RegisterCustomCmd("createencryptedwallet",
 		parseCreateEncryptedWalletCmd, `TODO(jrick) fillmein`)
 	btcjson.RegisterCustomCmd("exportwatchingwallet",
@@ -39,6 +44,100 @@ func init() {
 		`TODO(jrick) fillmein`)
 	btcjson.RegisterCustomCmd("walletislocked", parseWalletIsLockedCmd,
 		`TODO(jrick) fillmein`)
+}
+
+// AuthenticateCmd is a type handling custom marshaling and
+// unmarshaling of authenticate JSON websocket extension
+// commands.
+type AuthenticateCmd struct {
+	id         interface{}
+	Username   string
+	Passphrase string
+}
+
+// Enforce that AuthenticateCmd satisifies the btcjson.Cmd interface.
+var _ btcjson.Cmd = &AuthenticateCmd{}
+
+// NewAuthenticateCmd creates a new GetCurrentNetCmd.
+func NewAuthenticateCmd(id interface{}, username, passphrase string) *AuthenticateCmd {
+	return &AuthenticateCmd{
+		id:         id,
+		Username:   username,
+		Passphrase: passphrase,
+	}
+}
+
+// parseAuthenticateCmd parses a RawCmd into a concrete type satisifying
+// the btcjson.Cmd interface.  This is used when registering the custom
+// command with the btcjson parser.
+func parseAuthenticateCmd(r *btcjson.RawCmd) (btcjson.Cmd, error) {
+	if len(r.Params) != 2 {
+		return nil, btcjson.ErrWrongNumberOfParams
+	}
+
+	username, ok := r.Params[0].(string)
+	if !ok {
+		return nil, errors.New("first parameter username must be a string")
+	}
+
+	passphrase, ok := r.Params[1].(string)
+	if !ok {
+		return nil, errors.New("second parameter passphrase must be a string")
+	}
+
+	return NewAuthenticateCmd(r.Id, username, passphrase), nil
+}
+
+// Id satisifies the Cmd interface by returning the ID of the command.
+func (cmd *AuthenticateCmd) Id() interface{} {
+	return cmd.id
+}
+
+// SetId satisifies the Cmd interface by setting the ID of the command.
+func (cmd *AuthenticateCmd) SetId(id interface{}) {
+	cmd.id = id
+}
+
+// Method satisfies the Cmd interface by returning the RPC method.
+func (cmd *AuthenticateCmd) Method() string {
+	return "authenticate"
+}
+
+// MarshalJSON returns the JSON encoding of cmd.  Part of the Cmd interface.
+func (cmd *AuthenticateCmd) MarshalJSON() ([]byte, error) {
+	// Fill a RawCmd and marshal.
+	raw := btcjson.RawCmd{
+		Jsonrpc: "1.0",
+		Method:  cmd.Method(),
+		Id:      cmd.id,
+		Params: []interface{}{
+			cmd.Username,
+			cmd.Passphrase,
+		},
+	}
+	return json.Marshal(raw)
+}
+
+// UnmarshalJSON unmarshals the JSON encoding of cmd into cmd.  Part of
+// the Cmd interface.
+func (cmd *AuthenticateCmd) UnmarshalJSON(b []byte) error {
+	// Unmarshal into a RawCmd.
+	var r btcjson.RawCmd
+	if err := json.Unmarshal(b, &r); err != nil {
+		return err
+	}
+
+	newCmd, err := parseAuthenticateCmd(&r)
+	if err != nil {
+		return err
+	}
+
+	concreteCmd, ok := newCmd.(*AuthenticateCmd)
+	if !ok {
+		return btcjson.ErrInternal
+	}
+	*cmd = *concreteCmd
+	return nil
 }
 
 // GetCurrentNetCmd is a type handling custom marshaling and
