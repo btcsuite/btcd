@@ -130,7 +130,7 @@ func (b *BlockChain) verifyCheckpoint(height int64, hash *btcwire.ShaHash) bool 
 		return false
 	}
 
-	log.Infof("Verfied checkpoint at height %d/block %s", checkpoint.Height,
+	log.Infof("Verified checkpoint at height %d/block %s", checkpoint.Height,
 		checkpoint.Hash)
 	return true
 }
