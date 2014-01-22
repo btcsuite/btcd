@@ -166,7 +166,7 @@ func (s *rpcServer) Start() {
 		ReadTimeout: time.Second * rpcAuthTimeoutSeconds,
 	}
 	rpcServeMux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		if err := s.checkAuth(r); err != nil {
+		if _, err := s.checkAuth(r, true); err != nil {
 			jsonAuthFail(w, r, s)
 			return
 		}
@@ -175,12 +175,15 @@ func (s *rpcServer) Start() {
 	})
 
 	rpcServeMux.HandleFunc("/wallet", func(w http.ResponseWriter, r *http.Request) {
-		if err := s.checkAuth(r); err != nil {
+		authenticated, err := s.checkAuth(r, false)
+		if err != nil {
 			http.Error(w, "401 Unauthorized.", http.StatusUnauthorized)
 			return
 		}
 		wsServer := websocket.Server{
-			Handler: websocket.Handler(s.walletReqsNotifications),
+			Handler: websocket.Handler(func(ws *websocket.Conn) {
+				s.walletReqsNotifications(ws, authenticated)
+			}),
 		}
 		wsServer.ServeHTTP(w, r)
 	})
@@ -202,20 +205,24 @@ func (s *rpcServer) Start() {
 // returned.
 //
 // This check is time-constant.
-func (s *rpcServer) checkAuth(r *http.Request) error {
+func (s *rpcServer) checkAuth(r *http.Request, require bool) (bool, error) {
 	authhdr := r.Header["Authorization"]
 	if len(authhdr) <= 0 {
-		rpcsLog.Warnf("Auth failure.")
-		return errors.New("auth failure")
+		if require {
+			rpcsLog.Warnf("Auth failure.")
+			return false, errors.New("auth failure")
+		}
+
+		return false, nil
 	}
 
 	authsha := sha256.Sum256([]byte(authhdr[0]))
 	cmp := subtle.ConstantTimeCompare(authsha[:], s.authsha[:])
 	if cmp != 1 {
 		rpcsLog.Warnf("Auth failure.")
-		return errors.New("auth failure")
+		return false, errors.New("auth failure")
 	}
-	return nil
+	return true, nil
 }
 
 // Stop is used by server.go to stop the rpc listener.
