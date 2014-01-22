@@ -133,7 +133,7 @@ func NewExportWatchingWalletCmd(id interface{}, optArgs ...interface{}) (*Export
 		account = a
 	}
 	if len(optArgs) > 1 {
-		b, ok := optArgs[0].(bool)
+		b, ok := optArgs[1].(bool)
 		if !ok {
 			return nil, errors.New("second optarg zip must be a boolean")
 		}
