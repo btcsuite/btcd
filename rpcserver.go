@@ -337,7 +337,8 @@ func newRPCServer(listenAddrs []string, s *server) (*rpcServer, error) {
 
 // jsonAuthFail sends a message back to the client if the http auth is rejected.
 func jsonAuthFail(w http.ResponseWriter, r *http.Request, s *rpcServer) {
-	fmt.Fprint(w, "401 Unauthorized.\n")
+	w.Header().Add("WWW-Authenticate", `Basic realm="btcd RPC"`)
+	http.Error(w, "401 Unauthorized.", http.StatusUnauthorized)
 }
 
 // jsonRPCRead is the RPC wrapper around the jsonRead function to handle reading
