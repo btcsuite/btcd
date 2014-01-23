@@ -57,6 +57,7 @@ var commandHandlers = map[string]*handlerData{
 	"getblock":             &handlerData{1, 2, displayJSONDump, []conversionHandler{nil, toBool, toBool}, makeGetBlock, "<blockhash>"},
 	"getblockcount":        &handlerData{0, 0, displayGeneric, nil, makeGetBlockCount, ""},
 	"getblockhash":         &handlerData{1, 0, displayGeneric, []conversionHandler{toInt64}, makeGetBlockHash, "<blocknumber>"},
+	"getblocktemplate":     &handlerData{0, 1, displayJSONDump, nil, makeGetBlockTemplate, "[jsonrequestobject]"},
 	"getconnectioncount":   &handlerData{0, 0, displayGeneric, nil, makeGetConnectionCount, ""},
 	"getdifficulty":        &handlerData{0, 0, displayFloat64, nil, makeGetDifficulty, ""},
 	"getgenerate":          &handlerData{0, 0, displayGeneric, nil, makeGetGenerate, ""},
@@ -263,6 +264,21 @@ func makeGetBlockCount(args []interface{}) (btcjson.Cmd, error) {
 // makeGetBlockHash generates the cmd structure for getblockhash comands.
 func makeGetBlockHash(args []interface{}) (btcjson.Cmd, error) {
 	return btcjson.NewGetBlockHashCmd("btcctl", args[0].(int64))
+}
+
+// makeGetBlockTemplate generates the cmd structure for getblocktemplate commands.
+func makeGetBlockTemplate(args []interface{}) (btcjson.Cmd, error) {
+	cmd, err := btcjson.NewGetBlockTemplateCmd("btcctl")
+	if err != nil {
+		return nil, err
+	}
+	if len(args) == 1 {
+		err = cmd.UnmarshalJSON([]byte(args[0].(string)))
+		if err != nil {
+			return nil, err
+		}
+	}
+	return cmd, nil
 }
 
 // makeGetConnectionCount generates the cmd structure for
