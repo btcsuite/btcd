@@ -40,6 +40,8 @@ first command sent or you will be disconnected.`)
 		`TODO(jrick) fillmein`)
 	btcjson.RegisterCustomCmd("notifyspent", parseNotifySpentCmd,
 		`TODO(jrick) fillmein`)
+	btcjson.RegisterCustomCmd("recoveraddresses", parseRecoverAddressesCmd,
+		`TODO(jrick) fillmein`)
 	btcjson.RegisterCustomCmd("rescan", parseRescanCmd,
 		`TODO(jrick) fillmein`)
 	btcjson.RegisterCustomCmd("walletislocked", parseWalletIsLockedCmd,
@@ -496,6 +498,99 @@ func (cmd *GetBestBlockCmd) UnmarshalJSON(b []byte) error {
 	}
 
 	concreteCmd, ok := newCmd.(*GetBestBlockCmd)
+	if !ok {
+		return btcjson.ErrInternal
+	}
+	*cmd = *concreteCmd
+	return nil
+}
+
+// RecoverAddressesCmd is a type handling custom marshaling and
+// unmarshaling of recoveraddresses JSON websocket extension
+// commands.
+type RecoverAddressesCmd struct {
+	id      interface{}
+	Account string
+	N       int
+}
+
+// Enforce that RecoverAddressesCmd satisifies the btcjson.Cmd interface.
+var _ btcjson.Cmd = &RecoverAddressesCmd{}
+
+// NewRecoverAddressesCmd creates a new RecoverAddressesCmd.
+func NewRecoverAddressesCmd(id interface{}, account string, n int) *RecoverAddressesCmd {
+	return &RecoverAddressesCmd{
+		id:      id,
+		Account: account,
+		N:       n,
+	}
+}
+
+// parseRecoverAddressesCmd parses a RawCmd into a concrete type satisifying
+// the btcjson.Cmd interface.  This is used when registering the custom
+// command with the btcjson parser.
+func parseRecoverAddressesCmd(r *btcjson.RawCmd) (btcjson.Cmd, error) {
+	if len(r.Params) != 2 {
+		return nil, btcjson.ErrWrongNumberOfParams
+	}
+
+	account, ok := r.Params[0].(string)
+	if !ok {
+		return nil, errors.New("first parameter account must be a string")
+	}
+	n, ok := r.Params[1].(float64)
+	if !ok {
+		return nil, errors.New("second parameter n must be a number")
+	}
+	return NewRecoverAddressesCmd(r.Id, account, int(n)), nil
+}
+
+// Id satisifies the Cmd interface by returning the ID of the command.
+func (cmd *RecoverAddressesCmd) Id() interface{} {
+	return cmd.id
+}
+
+// SetId satisifies the Cmd interface by setting the ID of the command.
+func (cmd *RecoverAddressesCmd) SetId(id interface{}) {
+	cmd.id = id
+}
+
+// Method satisfies the Cmd interface by returning the RPC method.
+func (cmd *RecoverAddressesCmd) Method() string {
+	return "recoveraddresses"
+}
+
+// MarshalJSON returns the JSON encoding of cmd.  Part of the Cmd interface.
+func (cmd *RecoverAddressesCmd) MarshalJSON() ([]byte, error) {
+	// Fill a RawCmd and marshal.
+	raw := btcjson.RawCmd{
+		Jsonrpc: "1.0",
+		Method:  "recoveraddresses",
+		Id:      cmd.id,
+		Params: []interface{}{
+			cmd.Account,
+			cmd.N,
+		},
+	}
+
+	return json.Marshal(raw)
+}
+
+// UnmarshalJSON unmarshals the JSON encoding of cmd into cmd.  Part of
+// the Cmd interface.
+func (cmd *RecoverAddressesCmd) UnmarshalJSON(b []byte) error {
+	// Unmarshal into a RawCmd.
+	var r btcjson.RawCmd
+	if err := json.Unmarshal(b, &r); err != nil {
+		return err
+	}
+
+	newCmd, err := parseRecoverAddressesCmd(&r)
+	if err != nil {
+		return err
+	}
+
+	concreteCmd, ok := newCmd.(*RecoverAddressesCmd)
 	if !ok {
 		return btcjson.ErrInternal
 	}
