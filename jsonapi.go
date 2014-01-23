@@ -173,6 +173,14 @@ type GetMiningInfoResult struct {
 	HashesPerSec     float64 `json:"hashespersec"`
 }
 
+// GetWorkResult models the data from the getwork command.
+type GetWorkResult struct {
+	Data     string `json:"data"`
+	Hash1    string `json:"hash1"`
+	Midstate string `json:"midstate"`
+	Target   string `json:"target"`
+}
+
 // ValidateAddressResult models the data from the validateaddress command.
 type ValidateAddressResult struct {
 	IsValid      bool   `json:"isvalid"`
@@ -868,6 +876,12 @@ func ReadResultCmd(cmd string, message []byte) (Reply, error) {
 		}
 	case "getmininginfo":
 		var res GetMiningInfoResult
+		err = json.Unmarshal(objmap["result"], &res)
+		if err == nil {
+			result.Result = res
+		}
+	case "getwork":
+		var res GetWorkResult
 		err = json.Unmarshal(objmap["result"], &res)
 		if err == nil {
 			result.Result = res

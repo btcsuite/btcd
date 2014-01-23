@@ -3751,49 +3751,48 @@ func (cmd *GetWorkCmd) UnmarshalJSON(b []byte) error {
 	if err := json.Unmarshal(b, &r); err != nil {
 		return err
 	}
-
-	if len(r.Params) != 1 {
+	if len(r.Params) > 1 {
 		return ErrWrongNumberOfParams
 	}
-
-	rmap, ok := r.Params[0].(map[string]interface{})
-	if !ok {
-		return errors.New("first optional parameter template request must be an object")
-	}
-
 	wrequest := new(WorkRequest)
-	// data is required
-	data, ok := rmap["data"]
-	if !ok {
-		return errors.New("WorkRequest data must be present")
-	}
-	sdata, ok := data.(string)
-	if !ok {
-		return errors.New("WorkRequest data must be a string")
-	}
-	wrequest.Data = sdata
-
-	// target is required
-	target, ok := rmap["target"]
-	if !ok {
-		return errors.New("WorkRequest target must be present")
-	}
-	starget, ok := target.(string)
-	if !ok {
-		return errors.New("WorkRequest target must be a string")
-	}
-	wrequest.Target = starget
-
-	// algorithm is optional
-	algo, ok := rmap["algorithm"]
-	if ok {
-		salgo, ok := algo.(string)
+	if len(r.Params) == 1 {
+		rmap, ok := r.Params[0].(map[string]interface{})
 		if !ok {
-			return errors.New("WorkRequest algorithm must be a string")
+			return errors.New("first optional parameter template request must be an object")
 		}
-		wrequest.Algorithm = salgo
-	}
 
+		// data is required
+		data, ok := rmap["data"]
+		if !ok {
+			return errors.New("WorkRequest data must be present")
+		}
+		sdata, ok := data.(string)
+		if !ok {
+			return errors.New("WorkRequest data must be a string")
+		}
+		wrequest.Data = sdata
+
+		// target is required
+		target, ok := rmap["target"]
+		if !ok {
+			return errors.New("WorkRequest target must be present")
+		}
+		starget, ok := target.(string)
+		if !ok {
+			return errors.New("WorkRequest target must be a string")
+		}
+		wrequest.Target = starget
+
+		// algorithm is optional
+		algo, ok := rmap["algorithm"]
+		if ok {
+			salgo, ok := algo.(string)
+			if !ok {
+				return errors.New("WorkRequest algorithm must be a string")
+			}
+			wrequest.Algorithm = salgo
+		}
+	}
 	newCmd, err := NewGetWorkCmd(r.Id, wrequest)
 	if err != nil {
 		return err
