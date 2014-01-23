@@ -736,7 +736,7 @@ var jsoncmdtests = []struct {
 		cmd:  "getwork",
 		f: func() (Cmd, error) {
 			return NewGetWorkCmd(testId,
-				WorkRequest{
+				&WorkRequest{
 					Data:      "some data",
 					Target:    "our target",
 					Algorithm: "algo",
@@ -744,7 +744,7 @@ var jsoncmdtests = []struct {
 		},
 		result: &GetWorkCmd{
 			id: testId,
-			Request: WorkRequest{
+			Request: &WorkRequest{
 				Data:      "some data",
 				Target:    "our target",
 				Algorithm: "algo",

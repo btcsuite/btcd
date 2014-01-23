@@ -3691,7 +3691,7 @@ type WorkRequest struct {
 // unmarshaling of getwork JSON RPC commands.
 type GetWorkCmd struct {
 	id      interface{}
-	Request WorkRequest
+	Request *WorkRequest
 }
 
 // Enforce that GetWorkCmd satisifies the Cmd interface.
@@ -3699,7 +3699,14 @@ var _ Cmd = &GetWorkCmd{}
 
 // NewGetWorkCmd creates a new GetWorkCmd. Optionally a
 // pointer to a TemplateRequest may be provided.
-func NewGetWorkCmd(id interface{}, request WorkRequest) (*GetWorkCmd, error) {
+func NewGetWorkCmd(id interface{}, optArgs ...*WorkRequest) (*GetWorkCmd, error) {
+	var request *WorkRequest
+	if len(optArgs) > 0 {
+		if len(optArgs) > 1 {
+			return nil, ErrTooManyOptArgs
+		}
+		request = optArgs[0]
+	}
 	return &GetWorkCmd{
 		id:      id,
 		Request: request,
@@ -3727,9 +3734,10 @@ func (cmd *GetWorkCmd) MarshalJSON() ([]byte, error) {
 		Jsonrpc: "1.0",
 		Method:  "getwork",
 		Id:      cmd.id,
-		Params: []interface{}{
-			cmd.Request,
-		},
+		Params:  []interface{}{},
+	}
+	if cmd.Request != nil {
+		raw.Params = append(raw.Params, cmd.Request)
 	}
 
 	return json.Marshal(raw)
@@ -3786,7 +3794,7 @@ func (cmd *GetWorkCmd) UnmarshalJSON(b []byte) error {
 		wrequest.Algorithm = salgo
 	}
 
-	newCmd, err := NewGetWorkCmd(r.Id, *wrequest)
+	newCmd, err := NewGetWorkCmd(r.Id, wrequest)
 	if err != nil {
 		return err
 	}
