@@ -69,10 +69,10 @@ var commandHandlers = map[string]*handlerData{
 	"importprivkey":        &handlerData{1, 2, displayGeneric, []conversionHandler{nil, nil, toBool}, makeImportPrivKey, "<wifprivkey> [label] [rescan=true]"},
 	"listtransactions":     &handlerData{0, 3, displayJSONDump, []conversionHandler{nil, toInt, toInt}, makeListTransactions, "[account] [count=10] [from=0]"},
 	"ping":                 &handlerData{0, 0, displayGeneric, nil, makePing, ""},
-	"verifychain":          &handlerData{0, 2, displayJSONDump, []conversionHandler{toInt, toInt}, makeVerifyChain, "[level] [numblocks]"},
 	"sendrawtransaction":   &handlerData{1, 0, displayGeneric, nil, makeSendRawTransaction, "<hextx>"},
 	"stop":                 &handlerData{0, 0, displayGeneric, nil, makeStop, ""},
 	"submitblock":          &handlerData{1, 1, displayGeneric, nil, makeSubmitBlock, "<hexdata> [jsonparametersobject]"},
+	"verifychain":          &handlerData{0, 2, displayJSONDump, []conversionHandler{toInt, toInt}, makeVerifyChain, "[level] [numblocks]"},
 }
 
 // toInt attempts to convert the passed string to an integer.  It returns the
@@ -152,14 +152,14 @@ func displayJSONDump(reply interface{}) error {
 	return nil
 }
 
-// makeAddNode generates the cmd structure for addnode comands.
+// makeAddNode generates the cmd structure for addnode commands.
 func makeAddNode(args []interface{}) (btcjson.Cmd, error) {
 	return btcjson.NewAddNodeCmd("btcctl", args[0].(string),
 		args[1].(string))
 }
 
 // makeCreateRawTransaction generates the cmd structure for createrawtransaction
-// comands.
+// commands.
 func makeCreateRawTransaction(args []interface{}) (btcjson.Cmd, error) {
 	// First unmarshal the JSON provided by the parameters into interfaces.
 	var iinputs, iamounts interface{}
@@ -188,12 +188,12 @@ func makeDebugLevel(args []interface{}) (btcjson.Cmd, error) {
 }
 
 // makeDecodeRawTransaction generates the cmd structure for
-// decoderawtransaction comands.
+// decoderawtransaction commands.
 func makeDecodeRawTransaction(args []interface{}) (btcjson.Cmd, error) {
 	return btcjson.NewDecodeRawTransactionCmd("btcctl", args[0].(string))
 }
 
-// makeDecodeScript generates the cmd structure for decodescript comands.
+// makeDecodeScript generates the cmd structure for decodescript commands.
 func makeDecodeScript(args []interface{}) (btcjson.Cmd, error) {
 	return btcjson.NewDecodeScriptCmd("btcctl", args[0].(string))
 }
@@ -231,12 +231,12 @@ func makeGetBalance(args []interface{}) (btcjson.Cmd, error) {
 }
 
 // makeGetBestBlockHash generates the cmd structure for
-// makebestblockhash comands.
+// makebestblockhash commands.
 func makeGetBestBlockHash(args []interface{}) (btcjson.Cmd, error) {
 	return btcjson.NewGetBestBlockHashCmd("btcctl")
 }
 
-// makeGetBlock generates the cmd structure for getblock comands.
+// makeGetBlock generates the cmd structure for getblock commands.
 func makeGetBlock(args []interface{}) (btcjson.Cmd, error) {
 	// Create the getblock command with defaults for the optional
 	// parameters.
@@ -256,12 +256,12 @@ func makeGetBlock(args []interface{}) (btcjson.Cmd, error) {
 	return getBlockCmd, nil
 }
 
-// makeGetBlockCount generates the cmd structure for getblockcount comands.
+// makeGetBlockCount generates the cmd structure for getblockcount commands.
 func makeGetBlockCount(args []interface{}) (btcjson.Cmd, error) {
 	return btcjson.NewGetBlockCountCmd("btcctl")
 }
 
-// makeGetBlockHash generates the cmd structure for getblockhash comands.
+// makeGetBlockHash generates the cmd structure for getblockhash commands.
 func makeGetBlockHash(args []interface{}) (btcjson.Cmd, error) {
 	return btcjson.NewGetBlockHashCmd("btcctl", args[0].(int64))
 }
@@ -282,36 +282,36 @@ func makeGetBlockTemplate(args []interface{}) (btcjson.Cmd, error) {
 }
 
 // makeGetConnectionCount generates the cmd structure for
-// getconnectioncount comands.
+// getconnectioncount commands.
 func makeGetConnectionCount(args []interface{}) (btcjson.Cmd, error) {
 	return btcjson.NewGetConnectionCountCmd("btcctl")
 }
 
 // makeGetDifficulty generates the cmd structure for
-// getdifficulty comands.
+// getdifficulty commands.
 func makeGetDifficulty(args []interface{}) (btcjson.Cmd, error) {
 	return btcjson.NewGetDifficultyCmd("btcctl")
 }
 
 // makeGetGenerate generates the cmd structure for
-// getgenerate comands.
+// getgenerate commands.
 func makeGetGenerate(args []interface{}) (btcjson.Cmd, error) {
 	return btcjson.NewGetGenerateCmd("btcctl")
 }
 
-// makeGetHashesPerSec generates the cmd structure for gethashespersec comands.
+// makeGetHashesPerSec generates the cmd structure for gethashespersec commands.
 func makeGetHashesPerSec(args []interface{}) (btcjson.Cmd, error) {
 	return btcjson.NewGetHashesPerSecCmd("btcctl")
 }
 
 // makePeerInfo generates the cmd structure for
-// getpeerinfo comands.
+// getpeerinfo commands.
 func makeGetPeerInfo(args []interface{}) (btcjson.Cmd, error) {
 	return btcjson.NewGetPeerInfoCmd("btcctl")
 }
 
 // makeRawMempool generates the cmd structure for
-// getrawmempool comands.
+// getrawmempool commands.
 func makeGetRawMempool(args []interface{}) (btcjson.Cmd, error) {
 	opt := make([]bool, 0, 1)
 	if len(args) > 0 {
@@ -329,7 +329,7 @@ func makeHelp(args []interface{}) (btcjson.Cmd, error) {
 }
 
 // makeRawTransaction generates the cmd structure for
-// getrawtransaction comands.
+// getrawtransaction commands.
 func makeGetRawTransaction(args []interface{}) (btcjson.Cmd, error) {
 	opt := make([]bool, 0, 1)
 	if len(args) > 1 {
@@ -381,7 +381,7 @@ func makeSendRawTransaction(args []interface{}) (btcjson.Cmd, error) {
 	return btcjson.NewSendRawTransactionCmd("btcctl", args[0].(string))
 }
 
-// makeStop generates the cmd structure for stop comands.
+// makeStop generates the cmd structure for stop commands.
 func makeStop(args []interface{}) (btcjson.Cmd, error) {
 	return btcjson.NewStopCmd("btcctl")
 }
@@ -396,7 +396,7 @@ func makeSubmitBlock(args []interface{}) (btcjson.Cmd, error) {
 	return btcjson.NewSubmitBlockCmd("btcctl", args[0].(string), opts)
 }
 
-// makeVerifyChain generates the cmd structure for verifychain comands.
+// makeVerifyChain generates the cmd structure for verifychain commands.
 func makeVerifyChain(args []interface{}) (btcjson.Cmd, error) {
 	iargs := make([]int32, 0, 2)
 	for _, i := range args {
