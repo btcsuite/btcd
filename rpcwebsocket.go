@@ -747,7 +747,7 @@ func (s *rpcServer) websocketJSONHandler(r chan *btcjson.Reply, c handlerChans, 
 		// connection is not already authenticated.
 		s.ws.Lock()
 		rc := s.ws.connections[c.n]
-		if _, ok := cmd.(*btcws.AuthenticateMsg); ok {
+		if _, ok := cmd.(*btcws.AuthenticateCmd); ok {
 			// Validate the provided credentials.
 			err := websocketAuthenticate(cmd, rc, s.authsha[:])
 			if err != nil {
