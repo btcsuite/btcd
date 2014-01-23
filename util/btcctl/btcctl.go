@@ -65,6 +65,7 @@ var commandHandlers = map[string]*handlerData{
 	"getpeerinfo":          &handlerData{0, 0, displayJSONDump, nil, makeGetPeerInfo, ""},
 	"getrawmempool":        &handlerData{0, 1, displayJSONDump, []conversionHandler{toBool}, makeGetRawMempool, "[verbose=false]"},
 	"getrawtransaction":    &handlerData{1, 1, displayJSONDump, []conversionHandler{nil, toBool}, makeGetRawTransaction, "<txhash> [verbose=false]"},
+	"getwork":              &handlerData{0, 1, displayJSONDump, nil, makeGetWork, "[jsonrequestobject]"},
 	"help":                 &handlerData{0, 1, displayGeneric, nil, makeHelp, "[commandName]"},
 	"importprivkey":        &handlerData{1, 2, displayGeneric, []conversionHandler{nil, nil, toBool}, makeImportPrivKey, "<wifprivkey> [label] [rescan=true]"},
 	"listtransactions":     &handlerData{0, 3, displayJSONDump, []conversionHandler{nil, toInt, toInt}, makeListTransactions, "[account] [count=10] [from=0]"},
@@ -318,6 +319,20 @@ func makeGetRawMempool(args []interface{}) (btcjson.Cmd, error) {
 		opt = append(opt, args[0].(bool))
 	}
 	return btcjson.NewGetRawMempoolCmd("btcctl", opt...)
+}
+
+func makeGetWork(args []interface{}) (btcjson.Cmd, error) {
+	cmd, err := btcjson.NewGetWorkCmd("btcctl")
+	if err != nil {
+		return nil, err
+	}
+	if len(args) == 1 {
+		err = cmd.UnmarshalJSON([]byte(args[0].(string)))
+		if err != nil {
+			return nil, err
+		}
+	}
+	return cmd, nil
 }
 
 func makeHelp(args []interface{}) (btcjson.Cmd, error) {
