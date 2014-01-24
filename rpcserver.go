@@ -54,6 +54,7 @@ var rpcHandlersBeforeInit = map[string]commandHandler{
 	"debuglevel":           handleDebugLevel,
 	"decoderawtransaction": handleDecodeRawTransaction,
 	"decodescript":         handleDecodeScript,
+	"getaddednodeinfo":     handleGetAddedNodeInfo,
 	"getbestblockhash":     handleGetBestBlockHash,
 	"getblock":             handleGetBlock,
 	"getblockcount":        handleGetBlockCount,
@@ -127,7 +128,6 @@ var rpcAskWallet = map[string]bool{
 
 // Commands that are temporarily unimplemented.
 var rpcUnimplemented = map[string]bool{
-	"getaddednodeinfo": true,
 	"getblocktemplate": true,
 	"getinfo":          true,
 	"getmininginfo":    true,
@@ -702,6 +702,89 @@ func handleDecodeScript(s *rpcServer, cmd btcjson.Cmd) (interface{}, error) {
 		P2sh:      p2sh.EncodeAddress(),
 	}
 	return reply, nil
+}
+
+// handleGetAddedNodeInfo handles getaddednodeinfo commands.
+func handleGetAddedNodeInfo(s *rpcServer, cmd btcjson.Cmd) (interface{}, error) {
+	c := cmd.(*btcjson.GetAddedNodeInfoCmd)
+
+	// Retrieve a list of persistent (added) peers from the bitcoin server
+	// and filter the list of peer per the specified address (if any).
+	peers := s.server.AddedNodeInfo()
+	if c.Node != "" {
+		found := false
+		for i, peer := range peers {
+			if peer.addr == c.Node {
+				peers = peers[i : i+1]
+				found = true
+			}
+		}
+		if !found {
+			return nil, btcjson.Error{
+				Code:    -24,
+				Message: "Node has not been added.",
+			}
+		}
+	}
+
+	// Without the dns flag, the result is just a slice of the adddresses
+	// as strings.
+	if !c.Dns {
+		results := make([]string, 0, len(peers))
+		for _, peer := range peers {
+			results = append(results, peer.addr)
+		}
+		return results, nil
+	}
+
+	// With the dns flag, the result is an array of JSON objects which
+	// include the result of DNS lookups for each peer.
+	results := make([]*btcjson.GetAddedNodeInfoResult, 0, len(peers))
+	for _, peer := range peers {
+		// Set the "address" of the peer which could be an ip address
+		// or a domain name.
+		var result btcjson.GetAddedNodeInfoResult
+		result.AddedNode = peer.addr
+		isConnected := peer.Connected()
+		result.Connected = &isConnected
+
+		// Split the address into host and port portions so we can do
+		// a DNS lookup against the host.  When no port is specified in
+		// the address, just use the address as the host.
+		host, _, err := net.SplitHostPort(peer.addr)
+		if err != nil {
+			host = peer.addr
+		}
+
+		// Do a DNS lookup for the address.  If the lookup fails, just
+		// use the host.
+		var ipList []string
+		ips, err := btcdLookup(host)
+		if err == nil {
+			ipList = make([]string, 0, len(ips))
+			for _, ip := range ips {
+				ipList = append(ipList, ip.String())
+			}
+		} else {
+			ipList = make([]string, 1)
+			ipList[0] = host
+		}
+
+		// Add the addresses and connection info to the result.
+		addrs := make([]btcjson.GetAddedNodeInfoResultAddr, 0, len(ipList))
+		for _, ip := range ipList {
+			var addr btcjson.GetAddedNodeInfoResultAddr
+			addr.Address = ip
+			addr.Connected = "false"
+			if ip == host && peer.Connected() {
+				addr.Connected = directionString(peer.inbound)
+			}
+			addrs = append(addrs, addr)
+		}
+		result.Addresses = &addrs
+		results = append(results, &result)
+	}
+	return results, nil
 }
 
 // handleGetBestBlockHash implements the getbestblockhash command.

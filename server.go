@@ -215,7 +215,7 @@ func forAllOutboundPeers(state *peerState, closure func(p *peer)) {
 }
 
 // forAllPeers is a helper function that runs closure on all peers known to
-// peerSTate.
+// peerState.
 func forAllPeers(state *peerState, closure func(p *peer)) {
 	for e := state.peers.Front(); e != nil; e = e.Next() {
 		closure(e.Value.(*peer))
@@ -296,20 +296,23 @@ type delNodeMsg struct {
 	reply chan error
 }
 
+type getAddedNodesMsg struct {
+	reply chan []*peer
+}
+
 // handleQuery is the central handler for all queries and commands from other
 // goroutines related to peer state.
 func (s *server) handleQuery(querymsg interface{}, state *peerState) {
 	switch msg := querymsg.(type) {
 	case getConnCountMsg:
 		nconnected := 0
-
 		forAllPeers(state, func(p *peer) {
 			if p.Connected() {
 				nconnected++
 			}
 		})
-
 		msg.reply <- nconnected
+
 	case getPeerInfoMsg:
 		infos := make([]*PeerInfo, 0, state.peers.Len())
 		forAllPeers(state, func(p *peer) {
@@ -346,6 +349,7 @@ func (s *server) handleQuery(querymsg interface{}, state *peerState) {
 			infos = append(infos, info)
 		})
 		msg.reply <- infos
+
 	case addNodeMsg:
 		// XXX(oga) duplicate oneshots?
 		if msg.permanent {
@@ -387,6 +391,16 @@ func (s *server) handleQuery(querymsg interface{}, state *peerState) {
 		} else {
 			msg.reply <- errors.New("peer not found")
 		}
+
+	// Request a list of the persistent (added) peers.
+	case getAddedNodesMsg:
+		// Respond with a slice of the relavent peers.
+		peers := make([]*peer, 0, state.persistentPeers.Len())
+		for e := state.persistentPeers.Front(); e != nil; e = e.Next() {
+			peer := e.Value.(*peer)
+			peers = append(peers, peer)
+		}
+		msg.reply <- peers
 	}
 }
 
@@ -636,6 +650,14 @@ func (s *server) ConnectedCount() int {
 
 	s.query <- getConnCountMsg{reply: replyChan}
 
+	return <-replyChan
+}
+
+// AddedNodeInfo returns an array of btcjson.GetAddedNodeInfoResult structures
+// describing the persistent (added) nodes.
+func (s *server) AddedNodeInfo() []*peer {
+	replyChan := make(chan []*peer)
+	s.query <- getAddedNodesMsg{reply: replyChan}
 	return <-replyChan
 }
 
