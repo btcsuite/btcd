@@ -207,6 +207,20 @@ type ListUnSpentResult struct {
 	Confirmations float64 `json:"confirmations"`
 }
 
+// GetAddedNodeInfoResultAddr models the data of the addresses portion of the
+// getaddednodeinfo command.
+type GetAddedNodeInfoResultAddr struct {
+	Address   string `json:"address"`
+	Connected string `json:"connected"`
+}
+
+// GetAddedNodeInfoResult models the data from the getaddednodeinfo command.
+type GetAddedNodeInfoResult struct {
+	AddedNode string                        `json:"addednode"`
+	Connected *bool                         `json:"connected,omitempty"`
+	Addresses *[]GetAddedNodeInfoResultAddr `json:"addresses,omitempty"`
+}
+
 // Error models the error field of the json returned by a bitcoin client.  When
 // there is no error, this should be a nil pointer to produce the null in the
 // json that bitcoind produces.
@@ -822,6 +836,12 @@ func ReadResultCmd(cmd string, message []byte) (Reply, error) {
 	// generate put the results in the proper structure.
 	// We handle the error condition after the switch statement.
 	switch cmd {
+	case "getaddednodeinfo":
+		var res []GetAddedNodeInfoResult
+		err = json.Unmarshal(objmap["result"], &res)
+		if err == nil {
+			result.Result = res
+		}
 	case "getinfo":
 		var res InfoResult
 		err = json.Unmarshal(objmap["result"], &res)
