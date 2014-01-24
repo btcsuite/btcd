@@ -1007,10 +1007,8 @@ func (cmd *NotifySpentCmd) UnmarshalJSON(b []byte) error {
 // marshaling and unmarshaling of createencryptedwallet
 // JSON websocket extension commands.
 type CreateEncryptedWalletCmd struct {
-	id          interface{}
-	Account     string
-	Description string
-	Passphrase  string
+	id         interface{}
+	Passphrase string
 }
 
 // Enforce that CreateEncryptedWalletCmd satisifies the btcjson.Cmd
@@ -1018,14 +1016,10 @@ type CreateEncryptedWalletCmd struct {
 var _ btcjson.Cmd = &CreateEncryptedWalletCmd{}
 
 // NewCreateEncryptedWalletCmd creates a new CreateEncryptedWalletCmd.
-func NewCreateEncryptedWalletCmd(id interface{},
-	account, description, passphrase string) *CreateEncryptedWalletCmd {
-
+func NewCreateEncryptedWalletCmd(id interface{}, passphrase string) *CreateEncryptedWalletCmd {
 	return &CreateEncryptedWalletCmd{
-		id:          id,
-		Account:     account,
-		Description: description,
-		Passphrase:  passphrase,
+		id:         id,
+		Passphrase: passphrase,
 	}
 }
 
@@ -1034,26 +1028,16 @@ func NewCreateEncryptedWalletCmd(id interface{},
 // This is used when registering the custom command with the btcjson
 // parser.
 func parseCreateEncryptedWalletCmd(r *btcjson.RawCmd) (btcjson.Cmd, error) {
-	if len(r.Params) != 3 {
+	if len(r.Params) != 1 {
 		return nil, btcjson.ErrWrongNumberOfParams
 	}
 
-	account, ok := r.Params[0].(string)
+	passphrase, ok := r.Params[0].(string)
 	if !ok {
-		return nil, errors.New("first parameter must be a string")
-	}
-	description, ok := r.Params[1].(string)
-	if !ok {
-		return nil, errors.New("second parameter is not a string")
-	}
-	passphrase, ok := r.Params[2].(string)
-	if !ok {
-		return nil, errors.New("third parameter is not a string")
+		return nil, errors.New("first parameter is not a string")
 	}
 
-	cmd := NewCreateEncryptedWalletCmd(r.Id, account, description,
-		passphrase)
-	return cmd, nil
+	return NewCreateEncryptedWalletCmd(r.Id, passphrase), nil
 }
 
 // Id satisifies the Cmd interface by returning the ID of the command.
@@ -1078,11 +1062,7 @@ func (cmd *CreateEncryptedWalletCmd) MarshalJSON() ([]byte, error) {
 		Jsonrpc: "1.0",
 		Method:  "createencryptedwallet",
 		Id:      cmd.id,
-		Params: []interface{}{
-			cmd.Account,
-			cmd.Description,
-			cmd.Passphrase,
-		},
+		Params:  []interface{}{cmd.Passphrase},
 	}
 
 	return json.Marshal(raw)

@@ -24,15 +24,11 @@ var cmdtests = []struct {
 		f: func() (btcjson.Cmd, error) {
 			return NewCreateEncryptedWalletCmd(
 				float64(1),
-				"abcde",
-				"description",
 				"banana"), nil
 		},
 		result: &CreateEncryptedWalletCmd{
-			id:          float64(1),
-			Account:     "abcde",
-			Description: "description",
-			Passphrase:  "banana",
+			id:         float64(1),
+			Passphrase: "banana",
 		},
 	},
 	{
