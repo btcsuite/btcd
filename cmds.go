@@ -12,12 +12,17 @@ import (
 	"github.com/conformal/btcwire"
 )
 
-func init() {
-	btcjson.RegisterCustomCmd("authenticate", parseAuthenticateCmd,
-		`authenticate "username" "passphrase"
+// Help texts
+const (
+	authenticateHelp = `authenticate "username" "passphrase"
 Authenticate the websocket with the RPC server.  This is only required if the
 credentials were not already supplied via HTTP auth headers.  It must be the
-first command sent or you will be disconnected.`)
+first command sent or you will be disconnected.`
+)
+
+func init() {
+	btcjson.RegisterCustomCmd("authenticate", parseAuthenticateCmd,
+		authenticateHelp)
 	btcjson.RegisterCustomCmd("createencryptedwallet",
 		parseCreateEncryptedWalletCmd, `TODO(jrick) fillmein`)
 	btcjson.RegisterCustomCmd("exportwatchingwallet",
