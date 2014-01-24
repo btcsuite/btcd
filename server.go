@@ -93,6 +93,26 @@ func (p *peerState) NeedMoreOutbound() bool {
 		p.Count() < cfg.MaxPeers
 }
 
+// forAllOutboundPeers is a helper function that runs closure on all outbound
+// peers known to peerState.
+func (p *peerState) forAllOutboundPeers(closure func(p *peer)) {
+	for e := p.outboundPeers.Front(); e != nil; e = e.Next() {
+		closure(e.Value.(*peer))
+	}
+	for e := p.persistentPeers.Front(); e != nil; e = e.Next() {
+		closure(e.Value.(*peer))
+	}
+}
+
+// forAllPeers is a helper function that runs closure on all peers known to
+// peerState.
+func (p *peerState) forAllPeers(closure func(p *peer)) {
+	for e := p.peers.Front(); e != nil; e = e.Next() {
+		closure(e.Value.(*peer))
+	}
+	p.forAllOutboundPeers(closure)
+}
+
 // handleAddPeerMsg deals with adding new peers.  It is invoked from the
 // peerHandler goroutine.
 func (s *server) handleAddPeerMsg(state *peerState, p *peer) bool {
@@ -203,30 +223,10 @@ func (s *server) handleBanPeerMsg(state *peerState, p *peer) {
 
 }
 
-// forAllOutboundPeers is a helper function that runs closure on all outbound
-// peers known to peerState.
-func forAllOutboundPeers(state *peerState, closure func(p *peer)) {
-	for e := state.outboundPeers.Front(); e != nil; e = e.Next() {
-		closure(e.Value.(*peer))
-	}
-	for e := state.persistentPeers.Front(); e != nil; e = e.Next() {
-		closure(e.Value.(*peer))
-	}
-}
-
-// forAllPeers is a helper function that runs closure on all peers known to
-// peerState.
-func forAllPeers(state *peerState, closure func(p *peer)) {
-	for e := state.peers.Front(); e != nil; e = e.Next() {
-		closure(e.Value.(*peer))
-	}
-	forAllOutboundPeers(state, closure)
-}
-
 // handleRelayInvMsg deals with relaying inventory to peers that are not already
 // known to have it.  It is invoked from the peerHandler goroutine.
 func (s *server) handleRelayInvMsg(state *peerState, iv *btcwire.InvVect) {
-	forAllPeers(state, func(p *peer) {
+	state.forAllPeers(func(p *peer) {
 		if !p.Connected() {
 			return
 		}
@@ -241,7 +241,7 @@ func (s *server) handleRelayInvMsg(state *peerState, iv *btcwire.InvVect) {
 // handleBroadcastMsg deals with broadcasting messages to peers.  It is invoked
 // from the peerHandler goroutine.
 func (s *server) handleBroadcastMsg(state *peerState, bmsg *broadcastMsg) {
-	forAllPeers(state, func(p *peer) {
+	state.forAllPeers(func(p *peer) {
 		excluded := false
 		for _, ep := range bmsg.excludePeers {
 			if p == ep {
@@ -306,7 +306,7 @@ func (s *server) handleQuery(querymsg interface{}, state *peerState) {
 	switch msg := querymsg.(type) {
 	case getConnCountMsg:
 		nconnected := 0
-		forAllPeers(state, func(p *peer) {
+		state.forAllPeers(func(p *peer) {
 			if p.Connected() {
 				nconnected++
 			}
@@ -315,7 +315,7 @@ func (s *server) handleQuery(querymsg interface{}, state *peerState) {
 
 	case getPeerInfoMsg:
 		infos := make([]*PeerInfo, 0, state.peers.Len())
-		forAllPeers(state, func(p *peer) {
+		state.forAllPeers(func(p *peer) {
 			if !p.Connected() {
 				return
 			}
@@ -535,7 +535,7 @@ out:
 		// Shutdown the peer handler.
 		case <-s.quit:
 			// Shutdown peers.
-			forAllPeers(state, func(p *peer) {
+			state.forAllPeers(func(p *peer) {
 				p.Shutdown()
 			})
 			break out
