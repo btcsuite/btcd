@@ -52,6 +52,7 @@ var commandHandlers = map[string]*handlerData{
 	"dumpprivkey":          &handlerData{1, 0, displayGeneric, nil, makeDumpPrivKey, "<bitcoinaddress>"},
 	"getaccount":           &handlerData{1, 0, displayGeneric, nil, makeGetAccount, "<address>"},
 	"getaccountaddress":    &handlerData{1, 0, displayGeneric, nil, makeGetAccountAddress, "<account>"},
+	"getaddednodeinfo":     &handlerData{1, 1, displayJSONDump, []conversionHandler{toBool, nil}, makeGetAddedNodeInfo, "<dns> [node]"},
 	"getbalance":           &handlerData{0, 2, displayGeneric, []conversionHandler{nil, toInt}, makeGetBalance, "[account] [minconf=1]"},
 	"getbestblockhash":     &handlerData{0, 0, displayGeneric, nil, makeGetBestBlockHash, ""},
 	"getblock":             &handlerData{1, 2, displayJSONDump, []conversionHandler{nil, toBool, toBool}, makeGetBlock, "<blockhash>"},
@@ -215,6 +216,24 @@ func makeGetAccount(args []interface{}) (btcjson.Cmd, error) {
 // getaccountaddress commands.
 func makeGetAccountAddress(args []interface{}) (btcjson.Cmd, error) {
 	return btcjson.NewGetAccountAddressCmd("btcctl", args[0].(string))
+}
+
+// makeGetAddedNodeInfo generates the cmd structure for
+// getaccountaddress commands.
+func makeGetAddedNodeInfo(args []interface{}) (btcjson.Cmd, error) {
+	// Create the getaddednodeinfo command with defaults for the optional
+	// parameters.
+	cmd, err := btcjson.NewGetAddedNodeInfoCmd("btcctl", args[0].(bool))
+	if err != nil {
+		return nil, err
+	}
+
+	// Override the optional parameter if it was specified.
+	if len(args) > 1 {
+		cmd.Node = args[1].(string)
+	}
+
+	return cmd, nil
 }
 
 // makeGetBalance generates the cmd structure for
