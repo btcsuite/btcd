@@ -837,7 +837,15 @@ func ReadResultCmd(cmd string, message []byte) (Reply, error) {
 	// We handle the error condition after the switch statement.
 	switch cmd {
 	case "getaddednodeinfo":
-		var res []GetAddedNodeInfoResult
+		// getaddednodeinfo can either return a JSON object or a
+		// slice of strings depending on the verbose flag.  Choose the
+		// right form accordingly.
+		var res interface{}
+		if strings.Contains(string(objmap["result"]), "{") {
+			res = []GetAddedNodeInfoResult{}
+		} else {
+			res = []string{}
+		}
 		err = json.Unmarshal(objmap["result"], &res)
 		if err == nil {
 			result.Result = res
