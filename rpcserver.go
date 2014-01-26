@@ -93,12 +93,14 @@ var rpcAskWallet = map[string]bool{
 	"getaccountaddress":      true,
 	"getaddressesbyaccount":  true,
 	"getbalance":             true,
+	"getblocktemplate":       true,
 	"getrawchangeaddress":    true,
 	"getreceivedbyaccount":   true,
 	"getreceivedbyaddress":   true,
 	"gettransaction":         true,
 	"gettxout":               true,
 	"gettxoutsetinfo":        true,
+	"getwork":                true,
 	"importprivkey":          true,
 	"importwallet":           true,
 	"keypoolrefill":          true,
@@ -128,13 +130,11 @@ var rpcAskWallet = map[string]bool{
 
 // Commands that are temporarily unimplemented.
 var rpcUnimplemented = map[string]bool{
-	"getblocktemplate": true,
 	"getinfo":          true,
 	"getmininginfo":    true,
 	"getnettotals":     true,
 	"getnetworkhashps": true,
 	"getnewaddress":    true,
-	"getwork":          true,
 }
 
 // rpcServer holds the items the rpc server may need to access (config,
