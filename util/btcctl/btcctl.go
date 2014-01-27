@@ -76,6 +76,7 @@ var commandHandlers = map[string]*handlerData{
 	"stop":                 &handlerData{0, 0, displayGeneric, nil, makeStop, ""},
 	"submitblock":          &handlerData{1, 1, displayGeneric, nil, makeSubmitBlock, "<hexdata> [jsonparametersobject]"},
 	"verifychain":          &handlerData{0, 2, displayJSONDump, []conversionHandler{toInt, toInt}, makeVerifyChain, "[level] [numblocks]"},
+	"walletpassphrase":     &handlerData{1, 1, displayGeneric, []conversionHandler{nil, toInt64}, makeWalletPassphrase, "<passphrase> [timeout]"},
 }
 
 // toInt attempts to convert the passed string to an integer.  It returns the
@@ -447,6 +448,15 @@ func makeVerifyChain(args []interface{}) (btcjson.Cmd, error) {
 		iargs = append(iargs, int32(i.(int)))
 	}
 	return btcjson.NewVerifyChainCmd("btcctl", iargs...)
+}
+
+// makeWalletPassphrase generates the cmd structure for walletpassphrase commands.
+func makeWalletPassphrase(args []interface{}) (btcjson.Cmd, error) {
+	timeout := int64(60)
+	if len(args) > 1 {
+		timeout = args[1].(int64)
+	}
+	return btcjson.NewWalletPassphraseCmd("btcctl", args[0].(string), timeout)
 }
 
 // send sends a JSON-RPC command to the specified RPC server and examines the
