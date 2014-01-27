@@ -63,6 +63,7 @@ var commandHandlers = map[string]*handlerData{
 	"getdifficulty":        &handlerData{0, 0, displayFloat64, nil, makeGetDifficulty, ""},
 	"getgenerate":          &handlerData{0, 0, displayGeneric, nil, makeGetGenerate, ""},
 	"gethashespersec":      &handlerData{0, 0, displayGeneric, nil, makeGetHashesPerSec, ""},
+	"getnewaddress":        &handlerData{0, 1, displayGeneric, nil, makeGetNewAddress, "[account]"},
 	"getpeerinfo":          &handlerData{0, 0, displayJSONDump, nil, makeGetPeerInfo, ""},
 	"getrawmempool":        &handlerData{0, 1, displayJSONDump, []conversionHandler{toBool}, makeGetRawMempool, "[verbose=false]"},
 	"getrawtransaction":    &handlerData{1, 1, displayJSONDump, []conversionHandler{nil, toBool}, makeGetRawTransaction, "<txhash> [verbose=false]"},
@@ -322,6 +323,15 @@ func makeGetGenerate(args []interface{}) (btcjson.Cmd, error) {
 // makeGetHashesPerSec generates the cmd structure for gethashespersec commands.
 func makeGetHashesPerSec(args []interface{}) (btcjson.Cmd, error) {
 	return btcjson.NewGetHashesPerSecCmd("btcctl")
+}
+
+// makeGetNewAddress generates the cmd structure for getnewaddress commands.
+func makeGetNewAddress(args []interface{}) (btcjson.Cmd, error) {
+	var account string
+	if len(args) > 0 {
+		account = args[0].(string)
+	}
+	return btcjson.NewGetNewAddressCmd("btcctl", account)
 }
 
 // makePeerInfo generates the cmd structure for
