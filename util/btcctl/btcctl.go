@@ -77,6 +77,7 @@ var commandHandlers = map[string]*handlerData{
 	"stop":                   &handlerData{0, 0, displayGeneric, nil, makeStop, ""},
 	"submitblock":            &handlerData{1, 1, displayGeneric, nil, makeSubmitBlock, "<hexdata> [jsonparametersobject]"},
 	"verifychain":            &handlerData{0, 2, displayJSONDump, []conversionHandler{toInt, toInt}, makeVerifyChain, "[level] [numblocks]"},
+	"walletlock":             &handlerData{0, 0, displayGeneric, nil, makeWalletLock, ""},
 	"walletpassphrase":       &handlerData{1, 1, displayGeneric, []conversionHandler{nil, toInt64}, makeWalletPassphrase, "<passphrase> [timeout]"},
 	"walletpassphrasechange": &handlerData{2, 0, displayGeneric, nil, makeWalletPassphraseChange, "<oldpassphrase> <newpassphrase>"},
 }
@@ -456,6 +457,11 @@ func makeVerifyChain(args []interface{}) (btcjson.Cmd, error) {
 		iargs = append(iargs, int32(i.(int)))
 	}
 	return btcjson.NewVerifyChainCmd("btcctl", iargs...)
+}
+
+// makeWalletLock generates the cmd structure for walletlock commands.
+func makeWalletLock(args []interface{}) (btcjson.Cmd, error) {
+	return btcjson.NewWalletLockCmd("btcctl")
 }
 
 // makeWalletPassphrase generates the cmd structure for walletpassphrase commands.
