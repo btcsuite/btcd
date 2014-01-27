@@ -94,6 +94,7 @@ var rpcAskWallet = map[string]bool{
 	"getaddressesbyaccount":  true,
 	"getbalance":             true,
 	"getblocktemplate":       true,
+	"getnewaddress":          true,
 	"getrawchangeaddress":    true,
 	"getreceivedbyaccount":   true,
 	"getreceivedbyaddress":   true,
@@ -134,7 +135,6 @@ var rpcUnimplemented = map[string]bool{
 	"getmininginfo":    true,
 	"getnettotals":     true,
 	"getnetworkhashps": true,
-	"getnewaddress":    true,
 }
 
 // rpcServer holds the items the rpc server may need to access (config,
