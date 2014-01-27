@@ -72,6 +72,7 @@ var commandHandlers = map[string]*handlerData{
 	"getwork":               &handlerData{0, 1, displayJSONDump, nil, makeGetWork, "[jsonrequestobject]"},
 	"help":                  &handlerData{0, 1, displayGeneric, nil, makeHelp, "[commandName]"},
 	"importprivkey":         &handlerData{1, 2, displayGeneric, []conversionHandler{nil, nil, toBool}, makeImportPrivKey, "<wifprivkey> [label] [rescan=true]"},
+	"listsinceblock":        &handlerData{0, 2, displayJSONDump, []conversionHandler{nil, toInt}, makeListSinceBlock, "[blockhash] [minconf=10]"},
 	"listtransactions":      &handlerData{0, 3, displayJSONDump, []conversionHandler{nil, toInt, toInt}, makeListTransactions, "[account] [count=10] [from=0]"},
 	"ping":                  &handlerData{0, 0, displayGeneric, nil, makePing, ""},
 	"sendfrom": &handlerData{3, 3, displayGeneric, []conversionHandler{nil, nil, toSatoshi, toInt, nil, nil},
@@ -422,6 +423,20 @@ func makeImportPrivKey(args []interface{}) (btcjson.Cmd, error) {
 	}
 
 	return btcjson.NewImportPrivKeyCmd("btcctl", args[0].(string), optargs...)
+}
+
+// makeListSinceBlock generates the cmd structure for
+// listsinceblock commands.
+func makeListSinceBlock(args []interface{}) (btcjson.Cmd, error) {
+	var optargs = make([]interface{}, 0, 2)
+	if len(args) > 0 {
+		optargs = append(optargs, args[0].(string))
+	}
+	if len(args) > 1 {
+		optargs = append(optargs, args[1].(int))
+	}
+
+	return btcjson.NewListSinceBlockCmd("btcctl", optargs...)
 }
 
 // makeListTransactions generates the cmd structure for
