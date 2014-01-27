@@ -94,6 +94,7 @@ var rpcAskWallet = map[string]bool{
 	"getaddressesbyaccount":  true,
 	"getbalance":             true,
 	"getblocktemplate":       true,
+	"getinfo":                true,
 	"getnewaddress":          true,
 	"getrawchangeaddress":    true,
 	"getreceivedbyaccount":   true,
@@ -131,7 +132,6 @@ var rpcAskWallet = map[string]bool{
 
 // Commands that are temporarily unimplemented.
 var rpcUnimplemented = map[string]bool{
-	"getinfo":          true,
 	"getmininginfo":    true,
 	"getnettotals":     true,
 	"getnetworkhashps": true,
