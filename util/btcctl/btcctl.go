@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/conformal/btcjson"
+	"github.com/conformal/btcutil"
 	"github.com/conformal/go-flags"
 	"github.com/davecgh/go-spew/spew"
 	"io/ioutil"
@@ -44,35 +45,37 @@ var (
 // commandHandlers is a map of commands and associated handler data that is used
 // to validate correctness and perform the command.
 var commandHandlers = map[string]*handlerData{
-	"addnode":                &handlerData{2, 0, displayJSONDump, nil, makeAddNode, "<ip> <add/remove/onetry>"},
-	"createrawtransaction":   &handlerData{2, 0, displayGeneric, nil, makeCreateRawTransaction, "\"[{\"txid\":\"id\",\"vout\":n},...]\" \"{\"address\":amount,...}\""},
-	"debuglevel":             &handlerData{1, 0, displayGeneric, nil, makeDebugLevel, "<levelspec>"},
-	"decoderawtransaction":   &handlerData{1, 0, displayJSONDump, nil, makeDecodeRawTransaction, "<txhash>"},
-	"decodescript":           &handlerData{1, 0, displayJSONDump, nil, makeDecodeScript, "<hex>"},
-	"dumpprivkey":            &handlerData{1, 0, displayGeneric, nil, makeDumpPrivKey, "<bitcoinaddress>"},
-	"getaccount":             &handlerData{1, 0, displayGeneric, nil, makeGetAccount, "<address>"},
-	"getaccountaddress":      &handlerData{1, 0, displayGeneric, nil, makeGetAccountAddress, "<account>"},
-	"getaddednodeinfo":       &handlerData{1, 1, displayJSONDump, []conversionHandler{toBool, nil}, makeGetAddedNodeInfo, "<dns> [node]"},
-	"getaddressesbyaccount":  &handlerData{1, 0, displayJSONDump, nil, makeGetAddressesByAccount, "[account]"},
-	"getbalance":             &handlerData{0, 2, displayGeneric, []conversionHandler{nil, toInt}, makeGetBalance, "[account] [minconf=1]"},
-	"getbestblockhash":       &handlerData{0, 0, displayGeneric, nil, makeGetBestBlockHash, ""},
-	"getblock":               &handlerData{1, 2, displayJSONDump, []conversionHandler{nil, toBool, toBool}, makeGetBlock, "<blockhash>"},
-	"getblockcount":          &handlerData{0, 0, displayGeneric, nil, makeGetBlockCount, ""},
-	"getblockhash":           &handlerData{1, 0, displayGeneric, []conversionHandler{toInt64}, makeGetBlockHash, "<blocknumber>"},
-	"getblocktemplate":       &handlerData{0, 1, displayJSONDump, nil, makeGetBlockTemplate, "[jsonrequestobject]"},
-	"getconnectioncount":     &handlerData{0, 0, displayGeneric, nil, makeGetConnectionCount, ""},
-	"getdifficulty":          &handlerData{0, 0, displayFloat64, nil, makeGetDifficulty, ""},
-	"getgenerate":            &handlerData{0, 0, displayGeneric, nil, makeGetGenerate, ""},
-	"gethashespersec":        &handlerData{0, 0, displayGeneric, nil, makeGetHashesPerSec, ""},
-	"getnewaddress":          &handlerData{0, 1, displayGeneric, nil, makeGetNewAddress, "[account]"},
-	"getpeerinfo":            &handlerData{0, 0, displayJSONDump, nil, makeGetPeerInfo, ""},
-	"getrawmempool":          &handlerData{0, 1, displayJSONDump, []conversionHandler{toBool}, makeGetRawMempool, "[verbose=false]"},
-	"getrawtransaction":      &handlerData{1, 1, displayJSONDump, []conversionHandler{nil, toBool}, makeGetRawTransaction, "<txhash> [verbose=false]"},
-	"getwork":                &handlerData{0, 1, displayJSONDump, nil, makeGetWork, "[jsonrequestobject]"},
-	"help":                   &handlerData{0, 1, displayGeneric, nil, makeHelp, "[commandName]"},
-	"importprivkey":          &handlerData{1, 2, displayGeneric, []conversionHandler{nil, nil, toBool}, makeImportPrivKey, "<wifprivkey> [label] [rescan=true]"},
-	"listtransactions":       &handlerData{0, 3, displayJSONDump, []conversionHandler{nil, toInt, toInt}, makeListTransactions, "[account] [count=10] [from=0]"},
-	"ping":                   &handlerData{0, 0, displayGeneric, nil, makePing, ""},
+	"addnode":               &handlerData{2, 0, displayJSONDump, nil, makeAddNode, "<ip> <add/remove/onetry>"},
+	"createrawtransaction":  &handlerData{2, 0, displayGeneric, nil, makeCreateRawTransaction, "\"[{\"txid\":\"id\",\"vout\":n},...]\" \"{\"address\":amount,...}\""},
+	"debuglevel":            &handlerData{1, 0, displayGeneric, nil, makeDebugLevel, "<levelspec>"},
+	"decoderawtransaction":  &handlerData{1, 0, displayJSONDump, nil, makeDecodeRawTransaction, "<txhash>"},
+	"decodescript":          &handlerData{1, 0, displayJSONDump, nil, makeDecodeScript, "<hex>"},
+	"dumpprivkey":           &handlerData{1, 0, displayGeneric, nil, makeDumpPrivKey, "<bitcoinaddress>"},
+	"getaccount":            &handlerData{1, 0, displayGeneric, nil, makeGetAccount, "<address>"},
+	"getaccountaddress":     &handlerData{1, 0, displayGeneric, nil, makeGetAccountAddress, "<account>"},
+	"getaddednodeinfo":      &handlerData{1, 1, displayJSONDump, []conversionHandler{toBool, nil}, makeGetAddedNodeInfo, "<dns> [node]"},
+	"getaddressesbyaccount": &handlerData{1, 0, displayJSONDump, nil, makeGetAddressesByAccount, "[account]"},
+	"getbalance":            &handlerData{0, 2, displayGeneric, []conversionHandler{nil, toInt}, makeGetBalance, "[account] [minconf=1]"},
+	"getbestblockhash":      &handlerData{0, 0, displayGeneric, nil, makeGetBestBlockHash, ""},
+	"getblock":              &handlerData{1, 2, displayJSONDump, []conversionHandler{nil, toBool, toBool}, makeGetBlock, "<blockhash>"},
+	"getblockcount":         &handlerData{0, 0, displayGeneric, nil, makeGetBlockCount, ""},
+	"getblockhash":          &handlerData{1, 0, displayGeneric, []conversionHandler{toInt64}, makeGetBlockHash, "<blocknumber>"},
+	"getblocktemplate":      &handlerData{0, 1, displayJSONDump, nil, makeGetBlockTemplate, "[jsonrequestobject]"},
+	"getconnectioncount":    &handlerData{0, 0, displayGeneric, nil, makeGetConnectionCount, ""},
+	"getdifficulty":         &handlerData{0, 0, displayFloat64, nil, makeGetDifficulty, ""},
+	"getgenerate":           &handlerData{0, 0, displayGeneric, nil, makeGetGenerate, ""},
+	"gethashespersec":       &handlerData{0, 0, displayGeneric, nil, makeGetHashesPerSec, ""},
+	"getnewaddress":         &handlerData{0, 1, displayGeneric, nil, makeGetNewAddress, "[account]"},
+	"getpeerinfo":           &handlerData{0, 0, displayJSONDump, nil, makeGetPeerInfo, ""},
+	"getrawmempool":         &handlerData{0, 1, displayJSONDump, []conversionHandler{toBool}, makeGetRawMempool, "[verbose=false]"},
+	"getrawtransaction":     &handlerData{1, 1, displayJSONDump, []conversionHandler{nil, toBool}, makeGetRawTransaction, "<txhash> [verbose=false]"},
+	"getwork":               &handlerData{0, 1, displayJSONDump, nil, makeGetWork, "[jsonrequestobject]"},
+	"help":                  &handlerData{0, 1, displayGeneric, nil, makeHelp, "[commandName]"},
+	"importprivkey":         &handlerData{1, 2, displayGeneric, []conversionHandler{nil, nil, toBool}, makeImportPrivKey, "<wifprivkey> [label] [rescan=true]"},
+	"listtransactions":      &handlerData{0, 3, displayJSONDump, []conversionHandler{nil, toInt, toInt}, makeListTransactions, "[account] [count=10] [from=0]"},
+	"ping":                  &handlerData{0, 0, displayGeneric, nil, makePing, ""},
+	"sendfrom": &handlerData{3, 3, displayGeneric, []conversionHandler{nil, nil, toSatoshi, toInt, nil, nil},
+		makeSendFrom, "<account> <address> <amount> [minconf=1] [comment] [comment-to]"},
 	"sendrawtransaction":     &handlerData{1, 0, displayGeneric, nil, makeSendRawTransaction, "<hextx>"},
 	"stop":                   &handlerData{0, 0, displayGeneric, nil, makeStop, ""},
 	"submitblock":            &handlerData{1, 1, displayGeneric, nil, makeSubmitBlock, "<hexdata> [jsonparametersobject]"},
@@ -80,6 +83,18 @@ var commandHandlers = map[string]*handlerData{
 	"walletlock":             &handlerData{0, 0, displayGeneric, nil, makeWalletLock, ""},
 	"walletpassphrase":       &handlerData{1, 1, displayGeneric, []conversionHandler{nil, toInt64}, makeWalletPassphrase, "<passphrase> [timeout]"},
 	"walletpassphrasechange": &handlerData{2, 0, displayGeneric, nil, makeWalletPassphraseChange, "<oldpassphrase> <newpassphrase>"},
+}
+
+// toSatoshi attempts to convert the passed string to a satoshi amount returned
+// as an int64.  It returns the int64 packed into an interface so it can be used
+// in the calls which expect interfaces.  An error will be returned if the string
+// can't be converted first to a float64.
+func toSatoshi(val string) (interface{}, error) {
+	idx, err := strconv.ParseFloat(val, 64)
+	if err != nil {
+		return nil, err
+	}
+	return int64(float64(btcutil.SatoshiPerBitcoin) * idx), nil
 }
 
 // toInt attempts to convert the passed string to an integer.  It returns the
@@ -427,6 +442,25 @@ func makeListTransactions(args []interface{}) (btcjson.Cmd, error) {
 // makePing generates the cmd structure for ping commands.
 func makePing(args []interface{}) (btcjson.Cmd, error) {
 	return btcjson.NewPingCmd("btcctl")
+}
+
+// makeSendFrom generates the cmd structure for sendfrom commands.
+func makeSendFrom(args []interface{}) (btcjson.Cmd, error) {
+	minconf := 1
+	comment := ""
+	commentTo := ""
+
+	if len(args) > 3 {
+		minconf = args[3].(int)
+	}
+	if len(args) > 4 {
+		comment = args[4].(string)
+	}
+	if len(args) > 5 {
+		commentTo = args[5].(string)
+	}
+	return btcjson.NewSendFromCmd("btcctl", args[0].(string), args[1].(string),
+		args[2].(int64), minconf, comment, commentTo)
 }
 
 // makeSendRawTransaction generates the cmd structure for sendrawtransaction
