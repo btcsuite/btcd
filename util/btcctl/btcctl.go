@@ -76,6 +76,7 @@ var commandHandlers = map[string]*handlerData{
 	"ping":                  &handlerData{0, 0, displayGeneric, nil, makePing, ""},
 	"sendfrom": &handlerData{3, 3, displayGeneric, []conversionHandler{nil, nil, toSatoshi, toInt, nil, nil},
 		makeSendFrom, "<account> <address> <amount> [minconf=1] [comment] [comment-to]"},
+	"sendmany":               &handlerData{2, 2, displayGeneric, []conversionHandler{nil, nil, toInt, nil}, makeSendMany, "<account> <{\"address\":amount,...}> [minconf=1] [comment]"},
 	"sendrawtransaction":     &handlerData{1, 0, displayGeneric, nil, makeSendRawTransaction, "<hextx>"},
 	"stop":                   &handlerData{0, 0, displayGeneric, nil, makeStop, ""},
 	"submitblock":            &handlerData{1, 1, displayGeneric, nil, makeSubmitBlock, "<hexdata> [jsonparametersobject]"},
@@ -461,6 +462,30 @@ func makeSendFrom(args []interface{}) (btcjson.Cmd, error) {
 	}
 	return btcjson.NewSendFromCmd("btcctl", args[0].(string), args[1].(string),
 		args[2].(int64), minconf, comment, commentTo)
+}
+
+// makeSendMany generates the cmd structure for sendmany commands.
+func makeSendMany(args []interface{}) (btcjson.Cmd, error) {
+	minconf := 1
+	comment := ""
+
+	origPairs := make(map[string]float64)
+	err := json.Unmarshal([]byte(args[1].(string)), &origPairs)
+	if err != nil {
+		return nil, err
+	}
+	pairs := make(map[string]int64)
+	for addr, value := range origPairs {
+		pairs[addr] = int64(float64(btcutil.SatoshiPerBitcoin) * value)
+	}
+
+	if len(args) > 2 {
+		minconf = args[2].(int)
+	}
+	if len(args) > 3 {
+		comment = args[3].(string)
+	}
+	return btcjson.NewSendManyCmd("btcctl", args[0].(string), pairs, minconf, comment)
 }
 
 // makeSendRawTransaction generates the cmd structure for sendrawtransaction
