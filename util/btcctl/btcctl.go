@@ -484,28 +484,22 @@ func makePing(args []interface{}) (btcjson.Cmd, error) {
 
 // makeSendFrom generates the cmd structure for sendfrom commands.
 func makeSendFrom(args []interface{}) (btcjson.Cmd, error) {
-	minconf := 1
-	comment := ""
-	commentTo := ""
-
+	var optargs = make([]interface{}, 0, 3)
 	if len(args) > 3 {
-		minconf = args[3].(int)
+		optargs = append(optargs, args[3].(int))
 	}
 	if len(args) > 4 {
-		comment = args[4].(string)
+		optargs = append(optargs, args[4].(string))
 	}
 	if len(args) > 5 {
-		commentTo = args[5].(string)
+		optargs = append(optargs, args[5].(string))
 	}
-	return btcjson.NewSendFromCmd("btcctl", args[0].(string), args[1].(string),
-		args[2].(int64), minconf, comment, commentTo)
+	return btcjson.NewSendFromCmd("btcctl", args[0].(string),
+		args[1].(string), args[2].(int64), optargs...)
 }
 
 // makeSendMany generates the cmd structure for sendmany commands.
 func makeSendMany(args []interface{}) (btcjson.Cmd, error) {
-	minconf := 1
-	comment := ""
-
 	origPairs := make(map[string]float64)
 	err := json.Unmarshal([]byte(args[1].(string)), &origPairs)
 	if err != nil {
@@ -516,13 +510,14 @@ func makeSendMany(args []interface{}) (btcjson.Cmd, error) {
 		pairs[addr] = int64(float64(btcutil.SatoshiPerBitcoin) * value)
 	}
 
+	var optargs = make([]interface{}, 0, 2)
 	if len(args) > 2 {
-		minconf = args[2].(int)
+		optargs = append(optargs, args[2].(int))
 	}
 	if len(args) > 3 {
-		comment = args[3].(string)
+		optargs = append(optargs, args[3].(string))
 	}
-	return btcjson.NewSendManyCmd("btcctl", args[0].(string), pairs, minconf, comment)
+	return btcjson.NewSendManyCmd("btcctl", args[0].(string), pairs, optargs...)
 }
 
 // makeSendRawTransaction generates the cmd structure for sendrawtransaction
