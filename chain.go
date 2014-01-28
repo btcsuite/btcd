@@ -825,7 +825,6 @@ func (b *BlockChain) reorganizeChain(detachNodes, attachNodes *list.List) error 
 		if err != nil {
 			return err
 		}
-
 	}
 
 	// Disconnect blocks from the main chain.
@@ -918,13 +917,13 @@ func (b *BlockChain) connectBestChain(node *blockNode, block *btcutil.Block, fas
 	b.blockCache[*node.hash] = block
 	b.index[*node.hash] = node
 
+	// Connect the parent node to this node.
+	node.inMainChain = false
+	node.parent.children = append(node.parent.children, node)
+
 	// We're extending (or creating) a side chain, but the cumulative
 	// work for this new side chain is not enough to make it the new chain.
 	if node.workSum.Cmp(b.bestChain.workSum) <= 0 {
-		// Connect the parent node to this node.
-		node.inMainChain = false
-		node.parent.children = append(node.parent.children, node)
-
 		// Find the fork point.
 		fork := node
 		for ; fork.parent != nil; fork = fork.parent {
