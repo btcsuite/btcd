@@ -72,6 +72,7 @@ var commandHandlers = map[string]*handlerData{
 	"getwork":               &handlerData{0, 1, displayJSONDump, nil, makeGetWork, "[jsonrequestobject]"},
 	"help":                  &handlerData{0, 1, displayGeneric, nil, makeHelp, "[commandName]"},
 	"importprivkey":         &handlerData{1, 2, displayGeneric, []conversionHandler{nil, nil, toBool}, makeImportPrivKey, "<wifprivkey> [label] [rescan=true]"},
+	"keypoolrefill":         &handlerData{0, 1, displayGeneric, []conversionHandler{toInt}, makeKeyPoolRefill, "[newsize]"},
 	"listaccounts":          &handlerData{0, 1, displayJSONDump, []conversionHandler{toInt}, makeListAccounts, "[minconf=1]"},
 	"listsinceblock":        &handlerData{0, 2, displayJSONDump, []conversionHandler{nil, toInt}, makeListSinceBlock, "[blockhash] [minconf=10]"},
 	"listtransactions":      &handlerData{0, 3, displayJSONDump, []conversionHandler{nil, toInt, toInt}, makeListTransactions, "[account] [count=10] [from=0]"},
@@ -424,6 +425,16 @@ func makeImportPrivKey(args []interface{}) (btcjson.Cmd, error) {
 	}
 
 	return btcjson.NewImportPrivKeyCmd("btcctl", args[0].(string), optargs...)
+}
+
+// makeKeyPoolRefill generates the cmd structure for keypoolrefill commands.
+func makeKeyPoolRefill(args []interface{}) (btcjson.Cmd, error) {
+	var optargs = make([]uint, 0, 1)
+	if len(args) > 0 {
+		optargs = append(optargs, uint(args[0].(int)))
+	}
+
+	return btcjson.NewKeyPoolRefillCmd("btcctl", optargs...)
 }
 
 // makeListAccounts generates the cmd structure for listaccounts commands.
