@@ -144,13 +144,13 @@ func (b *BlockChain) maybeAcceptBlock(block *btcutil.Block, fastAdd bool) error 
 				}
 			}
 		}
+	}
 
-		// Prune block nodes which are no longer needed before creating
-		// a new node.
-		err = b.pruneBlockNodes()
-		if err != nil {
-			return err
-		}
+	// Prune block nodes which are no longer needed before creating
+	// a new node.
+	err = b.pruneBlockNodes()
+	if err != nil {
+		return err
 	}
 
 	// Create a new block node for the block and add it to the in-memory
