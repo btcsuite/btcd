@@ -930,13 +930,11 @@ func handleGetDifficulty(s *rpcServer, cmd btcjson.Cmd) (interface{}, error) {
 		rpcsLog.Errorf("Error getting sha: %v", err)
 		return nil, btcjson.ErrDifficulty
 	}
-	blk, err := s.server.db.FetchBlockBySha(sha)
+	blockHeader, err := s.server.db.FetchBlockHeaderBySha(sha)
 	if err != nil {
 		rpcsLog.Errorf("Error getting block: %v", err)
 		return nil, btcjson.ErrDifficulty
 	}
-	blockHeader := &blk.MsgBlock().Header
-
 	return getDifficultyRatio(blockHeader.Bits), nil
 }
 
