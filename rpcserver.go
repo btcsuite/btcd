@@ -63,6 +63,7 @@ var rpcHandlersBeforeInit = map[string]commandHandler{
 	"getdifficulty":        handleGetDifficulty,
 	"getgenerate":          handleGetGenerate,
 	"gethashespersec":      handleGetHashesPerSec,
+	"getinfo":              handleGetInfo,
 	"getpeerinfo":          handleGetPeerInfo,
 	"getrawmempool":        handleGetRawMempool,
 	"getrawtransaction":    handleGetRawTransaction,
@@ -94,7 +95,6 @@ var rpcAskWallet = map[string]bool{
 	"getaddressesbyaccount":  true,
 	"getbalance":             true,
 	"getblocktemplate":       true,
-	"getinfo":                true,
 	"getnewaddress":          true,
 	"getrawchangeaddress":    true,
 	"getreceivedbyaccount":   true,
@@ -948,6 +948,34 @@ func handleGetGenerate(s *rpcServer, cmd btcjson.Cmd) (interface{}, error) {
 func handleGetHashesPerSec(s *rpcServer, cmd btcjson.Cmd) (interface{}, error) {
 	// btcd does not do mining so we can hardcode replies here.
 	return 0, nil
+}
+
+// handleGetInfo implements the getinfo command. We only return the fields
+// that are not related to wallet functionality.
+func handleGetInfo(s *rpcServer, cmd btcjson.Cmd) (interface{}, error) {
+	// We require the current block height and sha.
+	sha, height, err := s.server.db.NewestSha()
+	if err != nil {
+		rpcsLog.Errorf("Error getting sha: %v", err)
+		return nil, btcjson.ErrBlockCount
+	}
+	blkHeader, err := s.server.db.FetchBlockHeaderBySha(sha)
+	if err != nil {
+		rpcsLog.Errorf("Error getting block: %v", err)
+		return nil, btcjson.ErrDifficulty
+	}
+
+	ret := map[string]interface{}{
+		"version":         1000000*appMajor + 10000*appMinor + 100*appPatch,
+		"protocolversion": btcwire.ProtocolVersion,
+		"blocks":          height,
+		"timeoffset":      0,
+		"proxy":           cfg.Proxy,
+		"difficulty":      getDifficultyRatio(blkHeader.Bits),
+		"testnet":         cfg.TestNet3,
+	}
+
+	return ret, nil
 }
 
 // handleGetPeerInfo implements the getpeerinfo command.
