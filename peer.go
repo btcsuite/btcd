@@ -645,9 +645,9 @@ func (p *peer) handleGetBlocksMsg(msg *btcwire.MsgGetBlocks) {
 	// Attempt to find the ending index of the stop hash if specified.
 	endIdx := btcdb.AllShas
 	if !msg.HashStop.IsEqual(&zeroHash) {
-		block, err := p.server.db.FetchBlockBySha(&msg.HashStop)
+		height, err := p.server.db.FetchBlockHeightBySha(&msg.HashStop)
 		if err == nil {
-			endIdx = block.Height() + 1
+			endIdx = height + 1
 		}
 	}
 
@@ -658,10 +658,10 @@ func (p *peer) handleGetBlocksMsg(msg *btcwire.MsgGetBlocks) {
 	// This mirrors the behavior in the reference implementation.
 	startIdx := int64(1)
 	for _, hash := range msg.BlockLocatorHashes {
-		block, err := p.server.db.FetchBlockBySha(hash)
+		height, err := p.server.db.FetchBlockHeightBySha(hash)
 		if err == nil {
 			// Start with the next hash since we know this one.
-			startIdx = block.Height() + 1
+			startIdx = height + 1
 			break
 		}
 	}

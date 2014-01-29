@@ -284,9 +284,9 @@ func (b *blockManager) logBlockHeight(numTx, height int64, latestHash *btcwire.S
 
 	// Attempt to get the timestamp of the latest block.
 	blockTimeStr := ""
-	block, err := b.server.db.FetchBlockBySha(latestHash)
+	header, err := b.server.db.FetchBlockHeaderBySha(latestHash)
 	if err == nil {
-		blockTimeStr = fmt.Sprintf(", %s", block.MsgBlock().Header.Timestamp)
+		blockTimeStr = fmt.Sprintf(", %s", header.Timestamp)
 	}
 
 	// Log information about new block height.
