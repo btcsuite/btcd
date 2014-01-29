@@ -42,17 +42,23 @@ func NewTLSCertPair(organization string, validUntil time.Time, extraHosts []stri
 		validUntil = endOfTime
 	}
 
+	serialNumberLimit := new(big.Int).Lsh(big.NewInt(1), 128)
+	serialNumber, err := rand.Int(rand.Reader, serialNumberLimit)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to generate serial number: %s", err)
+	}
+
 	template := x509.Certificate{
-		SerialNumber: new(big.Int).SetInt64(0),
+		SerialNumber: serialNumber,
 		Subject: pkix.Name{
 			Organization: []string{organization},
 		},
-		NotBefore: now,
+		NotBefore: now.Add(-time.Hour * 24),
 		NotAfter:  validUntil,
 
-		KeyUsage:    x509.KeyUsageKeyEncipherment | x509.KeyUsageCertSign,
-		ExtKeyUsage: []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
-		IsCA:        true, // so can sign self.
+		KeyUsage: x509.KeyUsageKeyEncipherment | x509.KeyUsageDigitalSignature |
+			x509.KeyUsageCertSign,
+		IsCA: true, // so can sign self.
 		BasicConstraintsValid: true,
 	}
 
