@@ -460,20 +460,19 @@ func (p *peer) PushGetBlocksMsg(locator btcchain.BlockLocator, stopHash *btcwire
 // and stop hash.  It will ignore back-to-back duplicate requests.
 func (p *peer) PushGetHeadersMsg(locator btcchain.BlockLocator) error {
 	// Extract the begin hash from the block locator, if one was specified,
-	// to use for filtering duplicate getblocks requests.
-	// request.
+	// to use for filtering duplicate getheaders requests.
 	var beginHash *btcwire.ShaHash
 	if len(locator) > 0 {
 		beginHash = locator[0]
 	}
 
-	// Filter duplicate getblocks requests.
+	// Filter duplicate getheaders requests.
 	if p.prevGetBlocksBegin != nil &&
 		beginHash != nil &&
 		beginHash.IsEqual(p.prevGetBlocksBegin) {
 
-		peerLog.Tracef("PEER: Filtering duplicate [getblocks] with begin "+
-			"hash %v", beginHash)
+		peerLog.Tracef("PEER: Filtering duplicate [getheaders] with "+
+			"begin hash %v", beginHash)
 		return nil
 	}
 
@@ -487,7 +486,7 @@ func (p *peer) PushGetHeadersMsg(locator btcchain.BlockLocator) error {
 	}
 	p.QueueMessage(msg, nil)
 
-	// Update the previous getblocks request information for filtering
+	// Update the previous getheaders request information for filtering
 	// duplicates.
 	p.prevGetBlocksBegin = beginHash
 	return nil
@@ -578,16 +577,14 @@ func (p *peer) handleBlockMsg(msg *btcwire.MsgBlock, buf []byte) {
 
 // handleInvMsg is invoked when a peer receives an inv bitcoin message and is
 // used to examine the inventory being advertised by the remote peer and react
-// accordingly. We pass the message down to blockmanager which will call
+// accordingly.  We pass the message down to blockmanager which will call
 // QueueMessage with any appropriate responses.
 func (p *peer) handleInvMsg(msg *btcwire.MsgInv) {
 	p.server.blockManager.QueueInv(msg, p)
 }
 
-// handleHeadersMsg is invoked when a peer receives an inv bitcoin message and
-// is used to examine the inventory being advertised by the remote peer and
-// react accordingly. We pass the message down to blockmanager which will call
-// QueueMessage with any appropriate responses.
+// handleHeadersMsg is invoked when a peer receives a headers bitcoin message.
+// The message is passed down to the block manager.
 func (p *peer) handleHeadersMsg(msg *btcwire.MsgHeaders) {
 	p.server.blockManager.QueueHeaders(msg, p)
 }
@@ -1138,6 +1135,9 @@ out:
 			p.handleInvMsg(msg)
 			markConnected = true
 
+		case *btcwire.MsgHeaders:
+			p.handleHeadersMsg(msg)
+
 		case *btcwire.MsgNotFound:
 			// TODO(davec): Ignore this for now, but ultimately
 			// it should probably be used to detect when something
@@ -1153,9 +1153,6 @@ out:
 
 		case *btcwire.MsgGetHeaders:
 			p.handleGetHeadersMsg(msg)
-
-		case *btcwire.MsgHeaders:
-			p.handleHeadersMsg(msg)
 
 		default:
 			peerLog.Debugf("Received unhandled message of type %v: Fix Me",

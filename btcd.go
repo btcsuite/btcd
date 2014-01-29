@@ -64,6 +64,7 @@ func btcdMain(serverChan chan<- *server) error {
 			return err
 		}
 		pprof.StartCPUProfile(f)
+		defer f.Close()
 		defer pprof.StopCPUProfile()
 	}
 
