@@ -6,7 +6,6 @@ package main
 
 import (
 	"container/list"
-	"fmt"
 	"github.com/conformal/btcchain"
 	"github.com/conformal/btcdb"
 	"github.com/conformal/btcutil"
@@ -268,9 +267,9 @@ func (b *blockManager) handleDonePeerMsg(peers *list.List, p *peer) {
 // logBlockHeight logs a new block height as an information message to show
 // progress to the user.  In order to prevent spam, it limits logging to one
 // message every 10 seconds with duration and totals included.
-func (b *blockManager) logBlockHeight(numTx, height int64, latestHash *btcwire.ShaHash) {
+func (b *blockManager) logBlockHeight(block *btcutil.Block) {
 	b.receivedLogBlocks++
-	b.receivedLogTx += numTx
+	b.receivedLogTx += int64(len(block.MsgBlock().Transactions))
 
 	now := time.Now()
 	duration := now.Sub(b.lastBlockLogTime)
@@ -282,13 +281,6 @@ func (b *blockManager) logBlockHeight(numTx, height int64, latestHash *btcwire.S
 	durationMillis := int64(duration / time.Millisecond)
 	tDuration := 10 * time.Millisecond * time.Duration(durationMillis/10)
 
-	// Attempt to get the timestamp of the latest block.
-	blockTimeStr := ""
-	header, err := b.server.db.FetchBlockHeaderBySha(latestHash)
-	if err == nil {
-		blockTimeStr = fmt.Sprintf(", %s", header.Timestamp)
-	}
-
 	// Log information about new block height.
 	blockStr := "blocks"
 	if b.receivedLogBlocks == 1 {
@@ -298,9 +290,9 @@ func (b *blockManager) logBlockHeight(numTx, height int64, latestHash *btcwire.S
 	if b.receivedLogTx == 1 {
 		txStr = "transaction"
 	}
-	bmgrLog.Infof("Processed %d %s in the last %s (%d %s, height %d%s)",
+	bmgrLog.Infof("Processed %d %s in the last %s (%d %s, height %d, %s)",
 		b.receivedLogBlocks, blockStr, tDuration, b.receivedLogTx,
-		txStr, height, blockTimeStr)
+		txStr, block.Height(), block.MsgBlock().Header.Timestamp)
 
 	b.receivedLogBlocks = 0
 	b.receivedLogTx = 0
@@ -455,20 +447,12 @@ func (b *blockManager) handleBlockMsg(bmsg *blockMsg) {
 		return
 	}
 
-	// Don't keep track of the peer that sent the block any longer if it's
-	// not an orphan.
+	// When the block is not an orphan, don't keep track of the peer that
+	// sent it any longer and log information about it.
 	if !b.blockChain.IsKnownOrphan(blockSha) {
 		delete(b.blockPeer, *blockSha)
+		b.logBlockHeight(bmsg.block)
 	}
-
-	// Log info about the new block height.
-	latestHash, height, err := b.server.db.NewestSha()
-	if err != nil {
-		bmgrLog.Warnf("Failed to obtain latest sha - %v", err)
-		return
-	}
-	b.logBlockHeight(int64(len(bmsg.block.MsgBlock().Transactions)), height,
-		latestHash)
 
 	// Sync the db to disk.
 	b.server.db.Sync()
