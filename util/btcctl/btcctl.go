@@ -80,6 +80,8 @@ var commandHandlers = map[string]*handlerData{
 	"keypoolrefill":         &handlerData{0, 1, displayGeneric, []conversionHandler{toInt}, makeKeyPoolRefill, "[newsize]"},
 	"listaccounts":          &handlerData{0, 1, displayJSONDump, []conversionHandler{toInt}, makeListAccounts, "[minconf=1]"},
 	"listaddressgroupings":  &handlerData{0, 0, displayJSONDump, nil, makeListAddressGroupings, ""},
+	"listreceivedbyaccount": &handlerData{0, 2, displayJSONDump, []conversionHandler{toInt, toBool}, makeListReceivedByAccount, "[minconf] [includeempty]"},
+	"listreceivedbyaddress": &handlerData{0, 2, displayJSONDump, []conversionHandler{toInt, toBool}, makeListReceivedByAddress, "[minconf] [includeempty]"},
 	"listlockunspent":       &handlerData{0, 0, displayJSONDump, nil, makeListLockUnspent, ""},
 	"listsinceblock":        &handlerData{0, 2, displayJSONDump, []conversionHandler{nil, toInt}, makeListSinceBlock, "[blockhash] [minconf=10]"},
 	"listtransactions":      &handlerData{0, 3, displayJSONDump, []conversionHandler{nil, toInt, toInt}, makeListTransactions, "[account] [count=10] [from=0]"},
@@ -492,6 +494,30 @@ func makeListAccounts(args []interface{}) (btcjson.Cmd, error) {
 // makeListAddressGroupings generates the cmd structure for listaddressgroupings commands.
 func makeListAddressGroupings(args []interface{}) (btcjson.Cmd, error) {
 	return btcjson.NewListAddressGroupingsCmd("btcctl")
+}
+
+// makeListReceivedByAccount generates the cmd structure for listreceivedbyaccount commands.
+func makeListReceivedByAccount(args []interface{}) (btcjson.Cmd, error) {
+	var optargs = make([]interface{}, 0, 2)
+	if len(args) > 0 {
+		optargs = append(optargs, args[0].(int))
+	}
+	if len(args) > 1 {
+		optargs = append(optargs, args[1].(bool))
+	}
+	return btcjson.NewListReceivedByAccountCmd("btcctl", optargs...)
+}
+
+// makeListReceivedByAddress generates the cmd structure for listreceivedbyaddress commands.
+func makeListReceivedByAddress(args []interface{}) (btcjson.Cmd, error) {
+	var optargs = make([]interface{}, 0, 2)
+	if len(args) > 0 {
+		optargs = append(optargs, args[0].(int))
+	}
+	if len(args) > 1 {
+		optargs = append(optargs, args[1].(bool))
+	}
+	return btcjson.NewListReceivedByAddressCmd("btcctl", optargs...)
 }
 
 // makeListLockUnspent generates the cmd structure for listlockunspent commands.
