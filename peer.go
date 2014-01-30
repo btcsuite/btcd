@@ -151,6 +151,8 @@ type peer struct {
 	retryCount         int64
 	prevGetBlocksBegin *btcwire.ShaHash // owned by blockmanager
 	prevGetBlocksStop  *btcwire.ShaHash // owned by blockmanager
+	prevGetHdrsBegin   *btcwire.ShaHash // owned by blockmanager
+	prevGetHdrsStop    *btcwire.ShaHash // owned by blockmanager
 	requestQueue       *list.List
 	continueHash       *btcwire.ShaHash
 	outputQueue        chan outMsg
@@ -458,7 +460,7 @@ func (p *peer) PushGetBlocksMsg(locator btcchain.BlockLocator, stopHash *btcwire
 
 // PushGetHeadersMsg sends a getblocks message for the provided block locator
 // and stop hash.  It will ignore back-to-back duplicate requests.
-func (p *peer) PushGetHeadersMsg(locator btcchain.BlockLocator) error {
+func (p *peer) PushGetHeadersMsg(locator btcchain.BlockLocator, stopHash *btcwire.ShaHash) error {
 	// Extract the begin hash from the block locator, if one was specified,
 	// to use for filtering duplicate getheaders requests.
 	var beginHash *btcwire.ShaHash
@@ -467,9 +469,9 @@ func (p *peer) PushGetHeadersMsg(locator btcchain.BlockLocator) error {
 	}
 
 	// Filter duplicate getheaders requests.
-	if p.prevGetBlocksBegin != nil &&
-		beginHash != nil &&
-		beginHash.IsEqual(p.prevGetBlocksBegin) {
+	if p.prevGetHdrsStop != nil && p.prevGetHdrsBegin != nil &&
+		beginHash != nil && stopHash.IsEqual(p.prevGetHdrsStop) &&
+		beginHash.IsEqual(p.prevGetHdrsBegin) {
 
 		peerLog.Tracef("PEER: Filtering duplicate [getheaders] with "+
 			"begin hash %v", beginHash)
@@ -478,6 +480,7 @@ func (p *peer) PushGetHeadersMsg(locator btcchain.BlockLocator) error {
 
 	// Construct the getheaders request and queue it to be sent.
 	msg := btcwire.NewMsgGetHeaders()
+	msg.HashStop = *stopHash
 	for _, hash := range locator {
 		err := msg.AddBlockLocatorHash(hash)
 		if err != nil {
@@ -488,7 +491,8 @@ func (p *peer) PushGetHeadersMsg(locator btcchain.BlockLocator) error {
 
 	// Update the previous getheaders request information for filtering
 	// duplicates.
-	p.prevGetBlocksBegin = beginHash
+	p.prevGetHdrsBegin = beginHash
+	p.prevGetHdrsStop = stopHash
 	return nil
 }
 
