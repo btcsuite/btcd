@@ -94,6 +94,7 @@ var commandHandlers = map[string]*handlerData{
 	"settxfee":               &handlerData{1, 0, displayGeneric, []conversionHandler{toSatoshi}, makeSetTxFee, "<amount>"},
 	"stop":                   &handlerData{0, 0, displayGeneric, nil, makeStop, ""},
 	"submitblock":            &handlerData{1, 1, displayGeneric, nil, makeSubmitBlock, "<hexdata> [jsonparametersobject]"},
+	"validateaddress":        &handlerData{1, 0, displayJSONDump, nil, makeValidateAddress, "<address>"},
 	"verifychain":            &handlerData{0, 2, displayJSONDump, []conversionHandler{toInt, toInt}, makeVerifyChain, "[level] [numblocks]"},
 	"walletlock":             &handlerData{0, 0, displayGeneric, nil, makeWalletLock, ""},
 	"walletpassphrase":       &handlerData{1, 1, displayGeneric, []conversionHandler{nil, toInt64}, makeWalletPassphrase, "<passphrase> [timeout]"},
@@ -643,6 +644,11 @@ func makeSubmitBlock(args []interface{}) (btcjson.Cmd, error) {
 	}
 
 	return btcjson.NewSubmitBlockCmd("btcctl", args[0].(string), opts)
+}
+
+// makeValidateAddress generates the cmd structure for validateaddress commands.
+func makeValidateAddress(args []interface{}) (btcjson.Cmd, error) {
+	return btcjson.NewValidateAddressCmd("btcctl", args[0].(string))
 }
 
 // makeVerifyChain generates the cmd structure for verifychain commands.
