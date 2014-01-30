@@ -80,6 +80,7 @@ var commandHandlers = map[string]*handlerData{
 	"keypoolrefill":         &handlerData{0, 1, displayGeneric, []conversionHandler{toInt}, makeKeyPoolRefill, "[newsize]"},
 	"listaccounts":          &handlerData{0, 1, displayJSONDump, []conversionHandler{toInt}, makeListAccounts, "[minconf=1]"},
 	"listaddressgroupings":  &handlerData{0, 0, displayJSONDump, nil, makeListAddressGroupings, ""},
+	"listlockunspent":       &handlerData{0, 0, displayJSONDump, nil, makeListLockUnspent, ""},
 	"listsinceblock":        &handlerData{0, 2, displayJSONDump, []conversionHandler{nil, toInt}, makeListSinceBlock, "[blockhash] [minconf=10]"},
 	"listtransactions":      &handlerData{0, 3, displayJSONDump, []conversionHandler{nil, toInt, toInt}, makeListTransactions, "[account] [count=10] [from=0]"},
 	"ping":                  &handlerData{0, 0, displayGeneric, nil, makePing, ""},
@@ -490,6 +491,11 @@ func makeListAccounts(args []interface{}) (btcjson.Cmd, error) {
 // makeListAddressGroupings generates the cmd structure for listaddressgroupings commands.
 func makeListAddressGroupings(args []interface{}) (btcjson.Cmd, error) {
 	return btcjson.NewListAddressGroupingsCmd("btcctl")
+}
+
+// makeListLockUnspent generates the cmd structure for listlockunspent commands.
+func makeListLockUnspent(args []interface{}) (btcjson.Cmd, error) {
+	return btcjson.NewListLockUnspentCmd("btcctl")
 }
 
 // makeListSinceBlock generates the cmd structure for
