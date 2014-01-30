@@ -1073,7 +1073,7 @@ func handleGetRawTransaction(s *rpcServer, cmd btcjson.Cmd) (interface{}, error)
 
 	// When the verbose flag isn't set, simply return the network-serialized
 	// transaction as a hex-encoded string.
-	if !c.Verbose {
+	if c.Verbose == 0 {
 		mtxHex, err := messageToHex(mtx)
 		if err != nil {
 			return nil, err
