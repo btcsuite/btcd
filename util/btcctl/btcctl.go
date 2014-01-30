@@ -83,6 +83,7 @@ var commandHandlers = map[string]*handlerData{
 	"listlockunspent":       &handlerData{0, 0, displayJSONDump, nil, makeListLockUnspent, ""},
 	"listsinceblock":        &handlerData{0, 2, displayJSONDump, []conversionHandler{nil, toInt}, makeListSinceBlock, "[blockhash] [minconf=10]"},
 	"listtransactions":      &handlerData{0, 3, displayJSONDump, []conversionHandler{nil, toInt, toInt}, makeListTransactions, "[account] [count=10] [from=0]"},
+	"listunspent":           &handlerData{0, 3, displayJSONDump, []conversionHandler{toInt, toInt, nil}, makeListUnspent, "[minconf=1] [maxconf=9999999] [jsonaddressarray]"},
 	"ping":                  &handlerData{0, 0, displayGeneric, nil, makePing, ""},
 	"sendfrom": &handlerData{3, 3, displayGeneric, []conversionHandler{nil, nil, toSatoshi, toInt, nil, nil},
 		makeSendFrom, "<account> <address> <amount> [minconf=1] [comment] [comment-to]"},
@@ -527,6 +528,26 @@ func makeListTransactions(args []interface{}) (btcjson.Cmd, error) {
 	}
 
 	return btcjson.NewListTransactionsCmd("btcctl", optargs...)
+}
+
+// makeListUnspent generates the cmd structure for listunspent commands.
+func makeListUnspent(args []interface{}) (btcjson.Cmd, error) {
+	var optargs = make([]interface{}, 0, 3)
+	if len(args) > 0 {
+		optargs = append(optargs, args[0].(int))
+	}
+	if len(args) > 1 {
+		optargs = append(optargs, args[1].(int))
+	}
+	if len(args) > 2 {
+		var addrs []string
+		err := json.Unmarshal([]byte(args[2].(string)), &addrs)
+		if err != nil {
+			return nil, err
+		}
+		optargs = append(optargs, addrs)
+	}
+	return btcjson.NewListUnspentCmd("btcctl", optargs...)
 }
 
 // makePing generates the cmd structure for ping commands.
