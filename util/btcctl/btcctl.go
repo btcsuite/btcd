@@ -68,6 +68,7 @@ var commandHandlers = map[string]*handlerData{
 	"getinfo":               &handlerData{0, 0, displayJSONDump, nil, makeGetInfo, ""},
 	"getnewaddress":         &handlerData{0, 1, displayGeneric, nil, makeGetNewAddress, "[account]"},
 	"getpeerinfo":           &handlerData{0, 0, displayJSONDump, nil, makeGetPeerInfo, ""},
+	"getrawchangeaddress":   &handlerData{0, 0, displayGeneric, nil, makeGetRawChangeAddress, ""},
 	"getrawmempool":         &handlerData{0, 1, displayJSONDump, []conversionHandler{toBool}, makeGetRawMempool, "[verbose=false]"},
 	"getrawtransaction":     &handlerData{1, 1, displayJSONDump, []conversionHandler{nil, toInt}, makeGetRawTransaction, "<txhash> [verbose=0]"},
 	"getreceivedbyaccount":  &handlerData{1, 1, displayGeneric, []conversionHandler{nil, toInt}, makeGetReceivedByAccount, "<account> [minconf=1]"},
@@ -376,6 +377,11 @@ func makeGetNewAddress(args []interface{}) (btcjson.Cmd, error) {
 // getpeerinfo commands.
 func makeGetPeerInfo(args []interface{}) (btcjson.Cmd, error) {
 	return btcjson.NewGetPeerInfoCmd("btcctl")
+}
+
+// makeGetRawChangeAddress generates the cmd structure for getrawchangeaddress commands.
+func makeGetRawChangeAddress(args []interface{}) (btcjson.Cmd, error) {
+	return btcjson.NewGetRawChangeAddressCmd("btcctl")
 }
 
 // makeRawMempool generates the cmd structure for
