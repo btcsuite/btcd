@@ -1012,6 +1012,7 @@ func handleGetRawMempool(s *rpcServer, cmd btcjson.Cmd) (interface{}, error) {
 				Height:           desc.Height,
 				StartingPriority: 0, // We don't mine.
 				CurrentPriority:  0, // We don't mine.
+				Depends:          make([]string, 0),
 			}
 			for _, txIn := range desc.Tx.MsgTx().TxIn {
 				hash := &txIn.PreviousOutpoint.Hash
