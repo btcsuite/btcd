@@ -96,6 +96,7 @@ var commandHandlers = map[string]*handlerData{
 	"submitblock":            &handlerData{1, 1, displayGeneric, nil, makeSubmitBlock, "<hexdata> [jsonparametersobject]"},
 	"validateaddress":        &handlerData{1, 0, displayJSONDump, nil, makeValidateAddress, "<address>"},
 	"verifychain":            &handlerData{0, 2, displayJSONDump, []conversionHandler{toInt, toInt}, makeVerifyChain, "[level] [numblocks]"},
+	"verifymessage":          &handlerData{3, 0, displayGeneric, nil, makeVerifyMessage, "<address> <signature> <message>"},
 	"walletlock":             &handlerData{0, 0, displayGeneric, nil, makeWalletLock, ""},
 	"walletpassphrase":       &handlerData{1, 1, displayGeneric, []conversionHandler{nil, toInt64}, makeWalletPassphrase, "<passphrase> [timeout]"},
 	"walletpassphrasechange": &handlerData{2, 0, displayGeneric, nil, makeWalletPassphraseChange, "<oldpassphrase> <newpassphrase>"},
@@ -658,6 +659,11 @@ func makeVerifyChain(args []interface{}) (btcjson.Cmd, error) {
 		iargs = append(iargs, int32(i.(int)))
 	}
 	return btcjson.NewVerifyChainCmd("btcctl", iargs...)
+}
+
+func makeVerifyMessage(args []interface{}) (btcjson.Cmd, error) {
+	return btcjson.NewVerifyMessageCmd("btcctl", args[0].(string),
+		args[1].(string), args[2].(string))
 }
 
 // makeWalletLock generates the cmd structure for walletlock commands.
