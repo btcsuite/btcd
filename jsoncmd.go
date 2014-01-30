@@ -3210,27 +3210,13 @@ type GetReceivedByAccountCmd struct {
 var _ Cmd = &GetReceivedByAccountCmd{}
 
 // NewGetReceivedByAccountCmd creates a new GetReceivedByAccountCmd.
-func NewGetReceivedByAccountCmd(id interface{}, optArgs ...interface{}) (*GetReceivedByAccountCmd, error) {
-	if len(optArgs) > 2 {
+func NewGetReceivedByAccountCmd(id interface{}, account string, optArgs ...int) (*GetReceivedByAccountCmd, error) {
+	if len(optArgs) > 1 {
 		return nil, ErrTooManyOptArgs
 	}
-	var account string
-	if len(optArgs) > 0 {
-		a, ok := optArgs[0].(string)
-		if !ok {
-			return nil, errors.New("first optional argument account is not a string")
-		}
-
-		account = a
-	}
 	var minconf int = 1
-	if len(optArgs) > 1 {
-		m, ok := optArgs[1].(int)
-		if !ok {
-			return nil, errors.New("second optional argument minconf is not a int")
-		}
-		minconf = m
-
+	if len(optArgs) > 0 {
+		minconf = optArgs[0]
 	}
 	return &GetReceivedByAccountCmd{
 		id:      id,
@@ -3261,11 +3247,9 @@ func (cmd *GetReceivedByAccountCmd) MarshalJSON() ([]byte, error) {
 		Jsonrpc: "1.0",
 		Method:  "getreceivedbyaccount",
 		Id:      cmd.id,
-		Params:  []interface{}{},
-	}
-
-	if cmd.Account != "" || cmd.MinConf != 1 {
-		raw.Params = append(raw.Params, cmd.Account)
+		Params: []interface{}{
+			cmd.Account,
+		},
 	}
 
 	if cmd.MinConf != 1 {
@@ -3287,16 +3271,12 @@ func (cmd *GetReceivedByAccountCmd) UnmarshalJSON(b []byte) error {
 		return ErrWrongNumberOfParams
 	}
 
-	optArgs := make([]interface{}, 0, 2)
-	if len(r.Params) > 0 {
-		account, ok := r.Params[0].(string)
-		if !ok {
-			return errors.New("first optional parameter account must be a string")
-		}
-
-		optArgs = append(optArgs, account)
+	account, ok := r.Params[0].(string)
+	if !ok {
+		return errors.New("first parameter account must be a string")
 	}
 
+	optArgs := make([]int, 0, 1)
 	if len(r.Params) > 1 {
 		minconf, ok := r.Params[1].(float64)
 		if !ok {
@@ -3306,7 +3286,7 @@ func (cmd *GetReceivedByAccountCmd) UnmarshalJSON(b []byte) error {
 		optArgs = append(optArgs, int(minconf))
 	}
 
-	newCmd, err := NewGetReceivedByAccountCmd(r.Id, optArgs...)
+	newCmd, err := NewGetReceivedByAccountCmd(r.Id, account, optArgs...)
 	if err != nil {
 		return err
 	}
@@ -3327,27 +3307,13 @@ type GetReceivedByAddressCmd struct {
 var _ Cmd = &GetReceivedByAddressCmd{}
 
 // NewGetReceivedByAddressCmd creates a new GetReceivedByAddressCmd.
-func NewGetReceivedByAddressCmd(id interface{}, optArgs ...interface{}) (*GetReceivedByAddressCmd, error) {
-	if len(optArgs) > 2 {
+func NewGetReceivedByAddressCmd(id interface{}, address string, optArgs ...int) (*GetReceivedByAddressCmd, error) {
+	if len(optArgs) > 1 {
 		return nil, ErrTooManyOptArgs
 	}
-	var address string
-	if len(optArgs) > 0 {
-		a, ok := optArgs[0].(string)
-		if !ok {
-			return nil, errors.New("first optional argument address is not a string")
-		}
-
-		address = a
-	}
 	var minconf int = 1
-	if len(optArgs) > 1 {
-		m, ok := optArgs[1].(int)
-		if !ok {
-			return nil, errors.New("second optional argument minconf is not a int")
-		}
-		minconf = m
-
+	if len(optArgs) > 0 {
+		minconf = optArgs[0]
 	}
 	return &GetReceivedByAddressCmd{
 		id:      id,
@@ -3378,11 +3344,9 @@ func (cmd *GetReceivedByAddressCmd) MarshalJSON() ([]byte, error) {
 		Jsonrpc: "1.0",
 		Method:  "getreceivedbyaddress",
 		Id:      cmd.id,
-		Params:  []interface{}{},
-	}
-
-	if cmd.Address != "" || cmd.MinConf != 1 {
-		raw.Params = append(raw.Params, cmd.Address)
+		Params: []interface{}{
+			cmd.Address,
+		},
 	}
 
 	if cmd.MinConf != 1 {
@@ -3404,16 +3368,12 @@ func (cmd *GetReceivedByAddressCmd) UnmarshalJSON(b []byte) error {
 		return ErrWrongNumberOfParams
 	}
 
-	optArgs := make([]interface{}, 0, 2)
-	if len(r.Params) > 0 {
-		address, ok := r.Params[0].(string)
-		if !ok {
-			return errors.New("first optional parameter address must be a string")
-		}
-
-		optArgs = append(optArgs, address)
+	address, ok := r.Params[0].(string)
+	if !ok {
+		return errors.New("first parameter address must be a string")
 	}
 
+	optArgs := make([]int, 0, 1)
 	if len(r.Params) > 1 {
 		minconf, ok := r.Params[1].(float64)
 		if !ok {
@@ -3423,7 +3383,7 @@ func (cmd *GetReceivedByAddressCmd) UnmarshalJSON(b []byte) error {
 		optArgs = append(optArgs, int(minconf))
 	}
 
-	newCmd, err := NewGetReceivedByAddressCmd(r.Id, optArgs...)
+	newCmd, err := NewGetReceivedByAddressCmd(r.Id, address, optArgs...)
 	if err != nil {
 		return err
 	}
