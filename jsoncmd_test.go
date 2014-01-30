@@ -615,12 +615,12 @@ var jsoncmdtests = []struct {
 		f: func() (Cmd, error) {
 			return NewGetRawTransactionCmd(testId,
 				"sometxid",
-				true)
+				1)
 		},
 		result: &GetRawTransactionCmd{
 			id:      testId,
 			Txid:    "sometxid",
-			Verbose: true,
+			Verbose: 1,
 		},
 	},
 	{

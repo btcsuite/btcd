@@ -3105,15 +3105,15 @@ func (cmd *GetRawMempoolCmd) UnmarshalJSON(b []byte) error {
 type GetRawTransactionCmd struct {
 	id      interface{}
 	Txid    string
-	Verbose bool
+	Verbose int
 }
 
 // Enforce that GetRawTransactionCmd satisifies the Cmd interface.
 var _ Cmd = &GetRawTransactionCmd{}
 
 // NewGetRawTransactionCmd creates a new GetRawTransactionCmd.
-func NewGetRawTransactionCmd(id interface{}, txid string, optArgs ...bool) (*GetRawTransactionCmd, error) {
-	var verbose bool
+func NewGetRawTransactionCmd(id interface{}, txid string, optArgs ...int) (*GetRawTransactionCmd, error) {
+	var verbose int
 	if len(optArgs) > 0 {
 		if len(optArgs) > 1 {
 			return nil, ErrTooManyOptArgs
@@ -3155,7 +3155,7 @@ func (cmd *GetRawTransactionCmd) MarshalJSON() ([]byte, error) {
 		},
 	}
 
-	if cmd.Verbose {
+	if cmd.Verbose != 0 {
 		raw.Params = append(raw.Params, cmd.Verbose)
 	}
 	return json.Marshal(raw)
@@ -3179,14 +3179,14 @@ func (cmd *GetRawTransactionCmd) UnmarshalJSON(b []byte) error {
 		return errors.New("first parameter txid must be a string")
 	}
 
-	optArgs := make([]bool, 0, 1)
+	optArgs := make([]int, 0, 1)
 	if len(r.Params) == 2 {
-		verbose, ok := r.Params[1].(bool)
+		verbose, ok := r.Params[1].(float64)
 		if !ok {
-			return errors.New("second optional parameter verbose must be a bool")
+			return errors.New("second optional parameter verbose must be a number")
 		}
 
-		optArgs = append(optArgs, verbose)
+		optArgs = append(optArgs, int(verbose))
 	}
 
 	newCmd, err := NewGetRawTransactionCmd(r.Id, txid, optArgs...)
