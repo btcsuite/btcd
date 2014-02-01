@@ -100,6 +100,17 @@ func (b *BlockChain) checkpointData() *checkpointData {
 	return nil
 }
 
+// Checkpoints returns a slice of checkpoints (regardless of whether they are
+// already known).  When checkpoints are disabled or there are no checkpoints
+// for the active network, it will return nil.
+func (b *BlockChain) Checkpoints() []Checkpoint {
+	if b.noCheckpoints || b.checkpointData() == nil {
+		return nil
+	}
+
+	return b.checkpointData().checkpoints
+}
+
 // LatestCheckpoint returns the most recent checkpoint (regardless of whether it
 // is already known).  When checkpoints are disabled or there are no checkpoints
 // for the active network, it will return nil.
