@@ -174,7 +174,7 @@ func (s *rpcServer) Start() {
 		jsonRPCRead(w, r, s)
 	})
 
-	rpcServeMux.HandleFunc("/wallet", func(w http.ResponseWriter, r *http.Request) {
+	rpcServeMux.HandleFunc("/ws", func(w http.ResponseWriter, r *http.Request) {
 		authenticated, err := s.checkAuth(r, false)
 		if err != nil {
 			http.Error(w, "401 Unauthorized.", http.StatusUnauthorized)
