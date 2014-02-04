@@ -27,6 +27,7 @@ import (
 
 var timeZeroVal time.Time
 
+// ErrBadAuth describes an error that was the result of invalid credentials.
 var ErrBadAuth = errors.New("invalid credentials")
 
 type ntfnChan chan btcjson.Cmd
