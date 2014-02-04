@@ -66,6 +66,7 @@ var commandHandlers = map[string]*handlerData{
 	"getgenerate":           &handlerData{0, 0, displayGeneric, nil, makeGetGenerate, ""},
 	"gethashespersec":       &handlerData{0, 0, displayGeneric, nil, makeGetHashesPerSec, ""},
 	"getinfo":               &handlerData{0, 0, displayJSONDump, nil, makeGetInfo, ""},
+	"getnettotals":          &handlerData{0, 0, displayGeneric, nil, makeGetNetTotals, ""},
 	"getnewaddress":         &handlerData{0, 1, displayGeneric, nil, makeGetNewAddress, "[account]"},
 	"getpeerinfo":           &handlerData{0, 0, displayJSONDump, nil, makeGetPeerInfo, ""},
 	"getrawchangeaddress":   &handlerData{0, 0, displayGeneric, nil, makeGetRawChangeAddress, ""},
@@ -370,6 +371,11 @@ func makeGetHashesPerSec(args []interface{}) (btcjson.Cmd, error) {
 // makeGetInfo generates the cmd structure for getinfo commands.
 func makeGetInfo(args []interface{}) (btcjson.Cmd, error) {
 	return btcjson.NewGetInfoCmd("btcctl")
+}
+
+// makeGetNetTotals generates the cmd structure for getnettotals commands.
+func makeGetNetTotals(args []interface{}) (btcjson.Cmd, error) {
+	return btcjson.NewGetNetTotalsCmd("btcctl")
 }
 
 // makeGetNewAddress generates the cmd structure for getnewaddress commands.
