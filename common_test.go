@@ -406,7 +406,7 @@ func TestVarStringWire(t *testing.T) {
 			continue
 		}
 		if val != test.out {
-			t.Errorf("readVarString #%d\n got: %d want: %d", i,
+			t.Errorf("readVarString #%d\n got: %s want: %s", i,
 				val, test.out)
 			continue
 		}
