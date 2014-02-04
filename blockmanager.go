@@ -906,7 +906,8 @@ out:
 				b.handleDonePeerMsg(candidatePeers, msg.peer)
 
 			default:
-				// bitch and whine.
+				bmgrLog.Warnf("Invalid message type in block "+
+					"handler: %T", msg)
 			}
 
 		// Queries used for atomically retrieving internal state.
