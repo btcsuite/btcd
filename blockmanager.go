@@ -542,7 +542,7 @@ func (b *blockManager) handleBlockMsg(bmsg *blockMsg) {
 	prevHash := b.nextCheckpoint.Hash
 	b.nextCheckpoint = b.findNextHeaderCheckpoint(prevHeight)
 	if b.nextCheckpoint != nil {
-		locator := btcchain.BlockLocator{prevHash}
+		locator := btcchain.BlockLocator([]*btcwire.ShaHash{prevHash})
 		err := bmsg.peer.PushGetHeadersMsg(locator, b.nextCheckpoint.Hash)
 		if err != nil {
 			bmgrLog.Warnf("Failed to send getheaders message to "+
@@ -561,7 +561,7 @@ func (b *blockManager) handleBlockMsg(bmsg *blockMsg) {
 	b.headersFirstMode = false
 	b.headerList.Init()
 	bmgrLog.Infof("Reached the final checkpoint -- switching to normal mode")
-	locator := btcchain.BlockLocator{blockSha}
+	locator := btcchain.BlockLocator([]*btcwire.ShaHash{blockSha})
 	err = bmsg.peer.PushGetBlocksMsg(locator, &zeroHash)
 	if err != nil {
 		bmgrLog.Warnf("Failed to send getblocks message to peer %s: %v",
@@ -706,7 +706,7 @@ func (b *blockManager) handleHeadersMsg(hmsg *headersMsg) {
 	// This header is not a checkpoint, so request the next batch of
 	// headers starting from the latest known header and ending with the
 	// next checkpoint.
-	locator := btcchain.BlockLocator{finalHash}
+	locator := btcchain.BlockLocator([]*btcwire.ShaHash{finalHash})
 	err := hmsg.peer.PushGetHeadersMsg(locator, b.nextCheckpoint.Hash)
 	if err != nil {
 		bmgrLog.Warnf("Failed to send getheaders message to "+
