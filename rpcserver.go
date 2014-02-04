@@ -1343,7 +1343,7 @@ func verifyChain(db btcdb.Db, level, depth int32) error {
 			if err != nil {
 				rpcsLog.Errorf("Verify is unable to "+
 					"validate block at sha %v height "+
-					"%s: %v", sha, height, err)
+					"%d: %v", sha, height, err)
 				return err
 			}
 		}
