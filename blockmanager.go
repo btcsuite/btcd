@@ -70,6 +70,12 @@ type txMsg struct {
 	peer *peer
 }
 
+// getSyncPeerMsg is a message type to be sent across the query channel for
+// retrieving the current sync peer.
+type getSyncPeerMsg struct {
+	reply chan *peer
+}
+
 // headerNode is used as a node in a list of headers that are linked together
 // between checkpoints.
 type headerNode struct {
@@ -93,8 +99,7 @@ type blockManager struct {
 	processingReqs    bool
 	syncPeer          *peer
 	msgChan           chan interface{}
-	syncPeerRequest   chan bool
-	syncPeerResult    chan *peer
+	query             chan interface{}
 	wg                sync.WaitGroup
 	quit              chan bool
 
@@ -904,9 +909,16 @@ out:
 				// bitch and whine.
 			}
 
-		// Return the current sync peer.
-		case <-b.syncPeerRequest:
-			b.syncPeerResult <- b.syncPeer
+		// Queries used for atomically retrieving internal state.
+		case qmsg := <-b.query:
+			switch msg := qmsg.(type) {
+			case getSyncPeerMsg:
+				msg.reply <- b.syncPeer
+
+			default:
+				bmgrLog.Warnf("Invalid query type in block "+
+					"handler query: %T", msg)
+			}
 
 		case <-b.quit:
 			break out
@@ -1112,8 +1124,9 @@ func (b *blockManager) Stop() error {
 
 // SyncPeer returns the current sync peer.
 func (b *blockManager) SyncPeer() *peer {
-	b.syncPeerRequest <- true
-	return <-b.syncPeerResult
+	reply := make(chan *peer)
+	b.query <- getSyncPeerMsg{reply: reply}
+	return <-reply
 }
 
 // newBlockManager returns a new bitcoin block manager.
@@ -1131,8 +1144,7 @@ func newBlockManager(s *server) (*blockManager, error) {
 		requestedBlocks:  make(map[btcwire.ShaHash]bool),
 		lastBlockLogTime: time.Now(),
 		msgChan:          make(chan interface{}, cfg.MaxPeers*3),
-		syncPeerRequest:  make(chan bool, 1),
-		syncPeerResult:   make(chan *peer, 1),
+		query:            make(chan interface{}),
 		headerList:       list.New(),
 		quit:             make(chan bool),
 	}
