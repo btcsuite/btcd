@@ -747,7 +747,7 @@ func (b *BlockChain) checkConnectBlock(node *blockNode, block *btcutil.Block) er
 
 	// BIP0016 describes a pay-to-script-hash type that is considered a
 	// "standard" type.  The rules for this BIP only apply to transactions
-	// after the timestmap defined by btcscript.Bip16Activation. See
+	// after the timestamp defined by btcscript.Bip16Activation.  See
 	// https://en.bitcoin.it/wiki/BIP_0016 for more details.
 	enforceBIP0016 := false
 	if node.timestamp.After(btcscript.Bip16Activation) {
