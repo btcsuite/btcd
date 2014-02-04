@@ -137,6 +137,8 @@ type peer struct {
 	timeConnected      time.Time
 	lastSend           time.Time
 	lastRecv           time.Time
+	bytesRead          uint64
+	bytesWritten       uint64
 	inbound            bool
 	connected          int32
 	disconnect         int32 // only to be used atomically
@@ -951,11 +953,13 @@ func (p *peer) handlePongMsg(msg *btcwire.MsgPong) {
 }
 
 // readMessage reads the next bitcoin message from the peer with logging.
-func (p *peer) readMessage() (msg btcwire.Message, buf []byte, err error) {
-	msg, buf, err = btcwire.ReadMessage(p.conn, p.protocolVersion, p.btcnet)
+func (p *peer) readMessage() (btcwire.Message, []byte, error) {
+	n, msg, buf, err := btcwire.ReadMessageN(p.conn, p.protocolVersion, p.btcnet)
 	if err != nil {
-		return
+		p.bytesRead += uint64(n)
+		return nil, nil, err
 	}
+	p.bytesRead += uint64(n)
 
 	// Use closures to log expensive operations so they are only run when
 	// the logging level requires it.
@@ -975,7 +979,7 @@ func (p *peer) readMessage() (msg btcwire.Message, buf []byte, err error) {
 		return spew.Sdump(buf)
 	}))
 
-	return
+	return msg, buf, nil
 }
 
 // writeMessage sends a bitcoin Message to the peer with logging.
@@ -1019,12 +1023,14 @@ func (p *peer) writeMessage(msg btcwire.Message) {
 	}))
 
 	// Write the message to the peer.
-	err := btcwire.WriteMessage(p.conn, msg, p.protocolVersion, p.btcnet)
+	n, err := btcwire.WriteMessageN(p.conn, msg, p.protocolVersion, p.btcnet)
 	if err != nil {
+		p.bytesWritten += uint64(n)
 		p.Disconnect()
 		p.logError("Can't send message: %v", err)
 		return
 	}
+	p.bytesWritten += uint64(n)
 }
 
 // isAllowedByRegression returns whether or not the passed error is allowed by

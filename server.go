@@ -264,8 +264,8 @@ type PeerInfo struct {
 	Services       string `json:"services"`
 	LastSend       int64  `json:"lastsend"`
 	LastRecv       int64  `json:"lastrecv"`
-	BytesSent      int    `json:"bytessent"`
-	BytesRecv      int    `json:"bytesrecv"`
+	BytesSent      uint64 `json:"bytessent"`
+	BytesRecv      uint64 `json:"bytesrecv"`
 	PingTime       int64  `json:"pingtime"`
 	PingWait       int64  `json:"pingwait,omitempty"`
 	ConnTime       int64  `json:"conntime"`
@@ -328,8 +328,8 @@ func (s *server) handleQuery(querymsg interface{}, state *peerState) {
 				Services:       fmt.Sprintf("%08d", p.services),
 				LastSend:       p.lastSend.Unix(),
 				LastRecv:       p.lastRecv.Unix(),
-				BytesSent:      0, // TODO(oga) we need this from wire.
-				BytesRecv:      0, // TODO(oga) we need this from wire.
+				BytesSent:      p.bytesWritten,
+				BytesRecv:      p.bytesRead,
 				ConnTime:       p.timeConnected.Unix(),
 				Version:        p.protocolVersion,
 				SubVer:         p.userAgent,
