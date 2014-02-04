@@ -64,6 +64,7 @@ var rpcHandlersBeforeInit = map[string]commandHandler{
 	"getgenerate":          handleGetGenerate,
 	"gethashespersec":      handleGetHashesPerSec,
 	"getinfo":              handleGetInfo,
+	"getnettotals":         handleGetNetTotals,
 	"getpeerinfo":          handleGetPeerInfo,
 	"getrawmempool":        handleGetRawMempool,
 	"getrawtransaction":    handleGetRawTransaction,
@@ -133,7 +134,6 @@ var rpcAskWallet = map[string]bool{
 // Commands that are temporarily unimplemented.
 var rpcUnimplemented = map[string]bool{
 	"getmininginfo":    true,
-	"getnettotals":     true,
 	"getnetworkhashps": true,
 }
 
@@ -727,8 +727,8 @@ func handleGetAddedNodeInfo(s *rpcServer, cmd btcjson.Cmd) (interface{}, error) 
 		}
 	}
 
-	// Without the dns flag, the result is just a slice of the adddresses
-	// as strings.
+	// Without the dns flag, the result is just a slice of the addresses as
+	// strings.
 	if !c.Dns {
 		results := make([]string, 0, len(peers))
 		for _, peer := range peers {
@@ -976,6 +976,17 @@ func handleGetInfo(s *rpcServer, cmd btcjson.Cmd) (interface{}, error) {
 	}
 
 	return ret, nil
+}
+
+// handleGetNetTotals implements the getnettotals command.
+func handleGetNetTotals(s *rpcServer, cmd btcjson.Cmd) (interface{}, error) {
+	netTotals := s.server.NetTotals()
+	reply := &btcjson.GetNetTotalsResult{
+		TotalBytesRecv: netTotals.TotalBytesRecv,
+		TotalBytesSent: netTotals.TotalBytesSent,
+		TimeMillis:     time.Now().UnixNano() / 1000,
+	}
+	return reply, nil
 }
 
 // handleGetPeerInfo implements the getpeerinfo command.

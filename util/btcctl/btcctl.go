@@ -66,7 +66,7 @@ var commandHandlers = map[string]*handlerData{
 	"getgenerate":           {0, 0, displayGeneric, nil, makeGetGenerate, ""},
 	"gethashespersec":       {0, 0, displayGeneric, nil, makeGetHashesPerSec, ""},
 	"getinfo":               {0, 0, displayJSONDump, nil, makeGetInfo, ""},
-	"getnettotals":          {0, 0, displayGeneric, nil, makeGetNetTotals, ""},
+	"getnettotals":          {0, 0, displayJSONDump, nil, makeGetNetTotals, ""},
 	"getnewaddress":         {0, 1, displayGeneric, nil, makeGetNewAddress, "[account]"},
 	"getpeerinfo":           {0, 0, displayJSONDump, nil, makeGetPeerInfo, ""},
 	"getrawchangeaddress":   {0, 0, displayGeneric, nil, makeGetRawChangeAddress, ""},
