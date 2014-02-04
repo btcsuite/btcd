@@ -1723,7 +1723,8 @@ func opcodeCheckSig(op *parsedOpcode, s *Script) error {
 
 	pubKey, err := btcec.ParsePubKey(pkStr, btcec.S256())
 	if err != nil {
-		return err
+		s.dstack.PushBool(false)
+		return nil
 	}
 
 	var signature *btcec.Signature
@@ -1733,7 +1734,8 @@ func opcodeCheckSig(op *parsedOpcode, s *Script) error {
 		signature, err = btcec.ParseSignature(sigStr, btcec.S256())
 	}
 	if err != nil {
-		return err
+		s.dstack.PushBool(false)
+		return nil
 	}
 
 	log.Tracef("%v", newLogClosure(func() string {
@@ -1798,32 +1800,38 @@ func opcodeCheckMultiSig(op *parsedOpcode, s *Script) error {
 	nsig := int(numSignatures.Int64())
 
 	sigStrings := make([][]byte, nsig)
-	signatures := make([]*btcec.Signature, nsig)
-	for i := range signatures {
+	signatures := make([]*btcec.Signature, 0, nsig)
+	for i := range sigStrings {
 		sigStrings[i], err = s.dstack.PopByteArray()
 		if err != nil {
 			return err
 		}
+		var sig *btcec.Signature
 		// skip off the last byte for hashtype
 		if s.der {
-			signatures[i], err =
+			sig, err = 
 				btcec.ParseDERSignature(
 					sigStrings[i][:len(sigStrings[i])-1],
 					btcec.S256())
 		} else {
-			signatures[i], err =
+			sig, err = 
 				btcec.ParseSignature(
 					sigStrings[i][:len(sigStrings[i])-1],
 					btcec.S256())
 		}
-		if err != nil {
-			return err
+		if err == nil {
+			signatures = append(signatures, sig)
 		}
 	}
 
 	// bug in bitcoind mean we pop one more stack value than should be used.
 	_, err = s.dstack.PopByteArray()
 	if err != nil {
+		return err
+	}
+
+	if len(signatures) == 0 {
+		s.dstack.PushBool(false)
 		return nil
 	}
 
