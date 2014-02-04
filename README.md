@@ -86,8 +86,12 @@ To subscribe to a given list, send email to list+subscribe@opensource.conformal.
 
 ## Issue Tracker
 
-The [integrated github issues tracker](https://github.com/conformal/btcd/issues)
+The [integrated github issue tracker](https://github.com/conformal/btcd/issues)
 is used for this project.
+
+## Documentation
+
+The documentation is a work-in-progress.  It uses the [github wiki](https://github.com/conformal/btcd/wiki) facility.
 
 ## GPG Verification Key
 
