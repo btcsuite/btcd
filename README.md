@@ -25,8 +25,10 @@ One key difference between btcd and bitcoind is that btcd does *NOT* include
 wallet functionality and this was a very intentional design decision. See the
 blog entry [here](https://blog.conformal.com/btcd-not-your-moms-bitcoin-daemon)
 for more details.  This means you can't actually make or receive payments
-directly with btcd.  That functionality will be provided by the forthcoming
-btcwallet and btcgui.
+directly with btcd.  That functionality is provided by the
+[btcwallet](https://github.com/conformal/btcwallet) and
+[btcgui](https://github.com/conformal/btcgui) projects which are both under
+active development.
 
 ## Installation
 
@@ -82,17 +84,10 @@ $ ./btcd
 
 To subscribe to a given list, send email to list+subscribe@opensource.conformal.com
 
-## TODO
+## Issue Tracker
 
-The following is a brief overview of the next things we have planned to work on
-for btcd.  Note this does not include the separate btcwallet and btcgui which
-are currently under heavy development:
-
-- Documentation
-- Code cleanup
-- Add remaining missing RPC calls
-- Complete several TODO items in the code
-- Offer cross-compiled binaries for popular OSes (Fedora, Ubuntu, FreeBSD, OpenBSD)
+The [integrated github issues tracker](https://github.com/conformal/btcd/issues)
+is used for this project.
 
 ## GPG Verification Key
 
