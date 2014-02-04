@@ -206,10 +206,10 @@ func TestBlock(t *testing.T) {
 
 	// Transaction offsets and length for the transaction in Block100000.
 	wantTxLocs := []btcwire.TxLoc{
-		btcwire.TxLoc{TxStart: 81, TxLen: 135},
-		btcwire.TxLoc{TxStart: 216, TxLen: 259},
-		btcwire.TxLoc{TxStart: 475, TxLen: 257},
-		btcwire.TxLoc{TxStart: 732, TxLen: 225},
+		{TxStart: 81, TxLen: 135},
+		{TxStart: 216, TxLen: 259},
+		{TxStart: 475, TxLen: 257},
+		{TxStart: 732, TxLen: 225},
 	}
 
 	// Ensure the transaction location information is accurate.
@@ -382,10 +382,10 @@ var Block100000 = btcwire.MsgBlock{
 		Nonce:     0x10572b0f,               // 274148111
 	},
 	Transactions: []*btcwire.MsgTx{
-		&btcwire.MsgTx{
+		{
 			Version: 1,
 			TxIn: []*btcwire.TxIn{
-				&btcwire.TxIn{
+				{
 					PreviousOutpoint: btcwire.OutPoint{
 						Hash:  btcwire.ShaHash{},
 						Index: 0xffffffff,
@@ -397,7 +397,7 @@ var Block100000 = btcwire.MsgBlock{
 				},
 			},
 			TxOut: []*btcwire.TxOut{
-				&btcwire.TxOut{
+				{
 					Value: 0x12a05f200, // 5000000000
 					PkScript: []byte{
 						0x41, // OP_DATA_65
@@ -416,10 +416,10 @@ var Block100000 = btcwire.MsgBlock{
 			},
 			LockTime: 0,
 		},
-		&btcwire.MsgTx{
+		{
 			Version: 1,
 			TxIn: []*btcwire.TxIn{
-				&btcwire.TxIn{
+				{
 					PreviousOutpoint: btcwire.OutPoint{
 						Hash: btcwire.ShaHash([32]byte{ // Make go vet happy.
 							0x03, 0x2e, 0x38, 0xe9, 0xc0, 0xa8, 0x4c, 0x60,
@@ -456,7 +456,7 @@ var Block100000 = btcwire.MsgBlock{
 				},
 			},
 			TxOut: []*btcwire.TxOut{
-				&btcwire.TxOut{
+				{
 					Value: 0x2123e300, // 556000000
 					PkScript: []byte{
 						0x76, // OP_DUP
@@ -469,7 +469,7 @@ var Block100000 = btcwire.MsgBlock{
 						0xac, // OP_CHECKSIG
 					},
 				},
-				&btcwire.TxOut{
+				{
 					Value: 0x108e20f00, // 4444000000
 					PkScript: []byte{
 						0x76, // OP_DUP
@@ -485,10 +485,10 @@ var Block100000 = btcwire.MsgBlock{
 			},
 			LockTime: 0,
 		},
-		&btcwire.MsgTx{
+		{
 			Version: 1,
 			TxIn: []*btcwire.TxIn{
-				&btcwire.TxIn{
+				{
 					PreviousOutpoint: btcwire.OutPoint{
 						Hash: btcwire.ShaHash([32]byte{ // Make go vet happy.
 							0xc3, 0x3e, 0xbf, 0xf2, 0xa7, 0x09, 0xf1, 0x3d,
@@ -524,7 +524,7 @@ var Block100000 = btcwire.MsgBlock{
 				},
 			},
 			TxOut: []*btcwire.TxOut{
-				&btcwire.TxOut{
+				{
 					Value: 0xf4240, // 1000000
 					PkScript: []byte{
 						0x76, // OP_DUP
@@ -537,7 +537,7 @@ var Block100000 = btcwire.MsgBlock{
 						0xac, // OP_CHECKSIG
 					},
 				},
-				&btcwire.TxOut{
+				{
 					Value: 0x11d260c0, // 299000000
 					PkScript: []byte{
 						0x76, // OP_DUP
@@ -553,10 +553,10 @@ var Block100000 = btcwire.MsgBlock{
 			},
 			LockTime: 0,
 		},
-		&btcwire.MsgTx{
+		{
 			Version: 1,
 			TxIn: []*btcwire.TxIn{
-				&btcwire.TxIn{
+				{
 					PreviousOutpoint: btcwire.OutPoint{
 						Hash: btcwire.ShaHash([32]byte{ // Make go vet happy.
 							0x0b, 0x60, 0x72, 0xb3, 0x86, 0xd4, 0xa7, 0x73,
@@ -593,7 +593,7 @@ var Block100000 = btcwire.MsgBlock{
 				},
 			},
 			TxOut: []*btcwire.TxOut{
-				&btcwire.TxOut{
+				{
 					Value: 0xf4240, // 1000000
 					PkScript: []byte{
 						0x76, // OP_DUP
