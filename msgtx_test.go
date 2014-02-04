@@ -620,7 +620,7 @@ func TestTxSerializeSize(t *testing.T) {
 var multiTx = &btcwire.MsgTx{
 	Version: 1,
 	TxIn: []*btcwire.TxIn{
-		&btcwire.TxIn{
+		{
 			PreviousOutpoint: btcwire.OutPoint{
 				Hash:  btcwire.ShaHash{},
 				Index: 0xffffffff,
@@ -632,7 +632,7 @@ var multiTx = &btcwire.MsgTx{
 		},
 	},
 	TxOut: []*btcwire.TxOut{
-		&btcwire.TxOut{
+		{
 			Value: 0x12a05f200,
 			PkScript: []byte{
 				0x41, // OP_DATA_65

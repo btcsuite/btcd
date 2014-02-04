@@ -470,10 +470,10 @@ var blockOne = btcwire.MsgBlock{
 		Nonce:     0x9962e301,               // 2573394689
 	},
 	Transactions: []*btcwire.MsgTx{
-		&btcwire.MsgTx{
+		{
 			Version: 1,
 			TxIn: []*btcwire.TxIn{
-				&btcwire.TxIn{
+				{
 					PreviousOutpoint: btcwire.OutPoint{
 						Hash:  btcwire.ShaHash{},
 						Index: 0xffffffff,
@@ -485,7 +485,7 @@ var blockOne = btcwire.MsgBlock{
 				},
 			},
 			TxOut: []*btcwire.TxOut{
-				&btcwire.TxOut{
+				{
 					Value: 0x12a05f200,
 					PkScript: []byte{
 						0x41, // OP_DATA_65
@@ -551,5 +551,5 @@ var blockOneBytes = []byte{
 
 // Transaction location information for block one transactions.
 var blockOneTxLocs = []btcwire.TxLoc{
-	btcwire.TxLoc{TxStart: 81, TxLen: 134},
+	{TxStart: 81, TxLen: 134},
 }

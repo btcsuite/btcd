@@ -13,7 +13,7 @@ import (
 var genesisCoinbaseTx = MsgTx{
 	Version: 1,
 	TxIn: []*TxIn{
-		&TxIn{
+		{
 			PreviousOutpoint: OutPoint{
 				Hash:  ShaHash{},
 				Index: 0xffffffff,
@@ -34,7 +34,7 @@ var genesisCoinbaseTx = MsgTx{
 		},
 	},
 	TxOut: []*TxOut{
-		&TxOut{
+		{
 			Value: 0x12a05f200,
 			PkScript: []byte{
 				0x41, 0x04, 0x67, 0x8a, 0xfd, 0xb0, 0xfe, 0x55, /* |A.g....U| */
