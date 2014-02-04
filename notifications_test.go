@@ -163,7 +163,7 @@ func TestNtfns(t *testing.T) {
 
 		// verify that id is nil.
 		if n.Id() != nil {
-			t.Error("%s: notification should not have non-nil id %v",
+			t.Errorf("%s: notification should not have non-nil id %v",
 				test.name, n.Id())
 			continue
 		}
