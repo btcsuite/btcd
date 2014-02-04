@@ -963,20 +963,20 @@ func getSigOpCount(pops []parsedOpcode, precise bool) int {
 // output to a 20-byte pubkey hash.
 func PayToPubKeyHashScript(pubKeyHash []byte) (pkScript []byte, err error) {
 	pops := []parsedOpcode{
-		parsedOpcode{
+		{
 			opcode: opcodemap[OP_DUP],
 		},
-		parsedOpcode{
+		{
 			opcode: opcodemap[OP_HASH160],
 		},
-		parsedOpcode{
+		{
 			opcode: opcodemap[OP_DATA_20],
 			data:   pubKeyHash,
 		},
-		parsedOpcode{
+		{
 			opcode: opcodemap[OP_EQUALVERIFY],
 		},
-		parsedOpcode{
+		{
 			opcode: opcodemap[OP_CHECKSIG],
 		},
 	}
@@ -987,14 +987,14 @@ func PayToPubKeyHashScript(pubKeyHash []byte) (pkScript []byte, err error) {
 // script hash.
 func PayToScriptHashScript(scriptHash []byte) (pkScript []byte, err error) {
 	pops := []parsedOpcode{
-		parsedOpcode{
+		{
 			opcode: opcodemap[OP_HASH160],
 		},
-		parsedOpcode{
+		{
 			opcode: opcodemap[OP_DATA_20],
 			data:   scriptHash,
 		},
-		parsedOpcode{
+		{
 			opcode: opcodemap[OP_EQUAL],
 		},
 	}
@@ -1069,7 +1069,7 @@ func signatureScriptCustomReader(reader io.Reader, tx *btcwire.MsgTx, idx int,
 		}
 	}
 	pops := []parsedOpcode{
-		parsedOpcode{
+		{
 			opcode: opcodemap[byte(len(sig))],
 			data:   sig,
 		},

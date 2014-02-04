@@ -483,7 +483,7 @@ func testScript(t *testing.T, script []byte, canonical bool) (err error) {
 	tx := &btcwire.MsgTx{
 		Version: 1,
 		TxIn: []*btcwire.TxIn{
-			&btcwire.TxIn{
+			{
 				PreviousOutpoint: btcwire.OutPoint{
 					Hash:  btcwire.ShaHash{},
 					Index: 0xffffffff,
@@ -493,7 +493,7 @@ func testScript(t *testing.T, script []byte, canonical bool) (err error) {
 			},
 		},
 		TxOut: []*btcwire.TxOut{
-			&btcwire.TxOut{
+			{
 				Value:    0x12a05f200,
 				PkScript: []byte{},
 			},
@@ -4265,7 +4265,7 @@ func testOpcode(t *testing.T, test *detailedTest) {
 	tx := &btcwire.MsgTx{
 		Version: 1,
 		TxIn: []*btcwire.TxIn{
-			&btcwire.TxIn{
+			{
 				PreviousOutpoint: btcwire.OutPoint{
 					Hash:  btcwire.ShaHash{},
 					Index: 0xffffffff,
@@ -4275,7 +4275,7 @@ func testOpcode(t *testing.T, test *detailedTest) {
 			},
 		},
 		TxOut: []*btcwire.TxOut{
-			&btcwire.TxOut{
+			{
 				Value:    0x12a05f200,
 				PkScript: []byte{},
 			},

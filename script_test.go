@@ -33,12 +33,12 @@ type txTest struct {
 var txTests = []txTest{
 	// tx 0437cd7f8525ceed2324359c2d0ba26006d92d85. the first tx in the
 	// blockchain that verifies signatures.
-	txTest{
+	{
 		name: "CheckSig",
 		tx: &btcwire.MsgTx{
 			Version: 1,
 			TxIn: []*btcwire.TxIn{
-				&btcwire.TxIn{
+				{
 					PreviousOutpoint: btcwire.OutPoint{
 						Hash: btcwire.ShaHash([32]byte{
 							0xc9, 0x97, 0xa5, 0xe5,
@@ -75,7 +75,7 @@ var txTests = []txTest{
 				},
 			},
 			TxOut: []*btcwire.TxOut{
-				&btcwire.TxOut{
+				{
 					Value: 1000000000,
 					PkScript: []byte{
 						btcscript.OP_DATA_65,
@@ -95,7 +95,7 @@ var txTests = []txTest{
 						btcscript.OP_CHECKSIG,
 					},
 				},
-				&btcwire.TxOut{
+				{
 					Value: 4000000000,
 					PkScript: []byte{
 						btcscript.OP_DATA_65,
@@ -139,12 +139,12 @@ var txTests = []txTest{
 		},
 	},
 	// Previous test with the value of one output changed.
-	txTest{
+	{
 		name: "CheckSig Failure",
 		tx: &btcwire.MsgTx{
 			Version: 1,
 			TxIn: []*btcwire.TxIn{
-				&btcwire.TxIn{
+				{
 					PreviousOutpoint: btcwire.OutPoint{
 						Hash: btcwire.ShaHash([32]byte{
 							0xc9, 0x97, 0xa5, 0xe5,
@@ -181,7 +181,7 @@ var txTests = []txTest{
 				},
 			},
 			TxOut: []*btcwire.TxOut{
-				&btcwire.TxOut{
+				{
 					Value: 1000000000,
 					PkScript: []byte{
 						btcscript.OP_DATA_65,
@@ -201,7 +201,7 @@ var txTests = []txTest{
 						btcscript.OP_CHECKSIG,
 					},
 				},
-				&btcwire.TxOut{
+				{
 					Value: 5000000000,
 					PkScript: []byte{
 						btcscript.OP_DATA_65,
@@ -245,12 +245,12 @@ var txTests = []txTest{
 			SigOps:         1,
 		},
 	},
-	txTest{
+	{
 		name: "CheckSig invalid signature",
 		tx: &btcwire.MsgTx{
 			Version: 1,
 			TxIn: []*btcwire.TxIn{
-				&btcwire.TxIn{
+				{
 					PreviousOutpoint: btcwire.OutPoint{
 						Hash: btcwire.ShaHash([32]byte{
 							0xc9, 0x97, 0xa5, 0xe5,
@@ -289,7 +289,7 @@ var txTests = []txTest{
 				},
 			},
 			TxOut: []*btcwire.TxOut{
-				&btcwire.TxOut{
+				{
 					Value: 1000000000,
 					PkScript: []byte{
 						btcscript.OP_DATA_65,
@@ -309,7 +309,7 @@ var txTests = []txTest{
 						btcscript.OP_CHECKSIG,
 					},
 				},
-				&btcwire.TxOut{
+				{
 					Value: 4000000000,
 					PkScript: []byte{
 						btcscript.OP_DATA_65,
@@ -353,12 +353,12 @@ var txTests = []txTest{
 			SigOps:         1,
 		},
 	},
-	txTest{
+	{
 		name: "CheckSig invalid pubkey",
 		tx: &btcwire.MsgTx{
 			Version: 1,
 			TxIn: []*btcwire.TxIn{
-				&btcwire.TxIn{
+				{
 					PreviousOutpoint: btcwire.OutPoint{
 						Hash: btcwire.ShaHash([32]byte{
 							0xc9, 0x97, 0xa5, 0xe5,
@@ -395,7 +395,7 @@ var txTests = []txTest{
 				},
 			},
 			TxOut: []*btcwire.TxOut{
-				&btcwire.TxOut{
+				{
 					Value: 1000000000,
 					PkScript: []byte{
 						btcscript.OP_DATA_65,
@@ -415,7 +415,7 @@ var txTests = []txTest{
 						btcscript.OP_CHECKSIG,
 					},
 				},
-				&btcwire.TxOut{
+				{
 					Value: 4000000000,
 					PkScript: []byte{
 						btcscript.OP_DATA_65,
@@ -462,12 +462,12 @@ var txTests = []txTest{
 	},
 	// tx 599e47a8114fe098103663029548811d2651991b62397e057f0c863c2bc9f9ea
 	// uses checksig with SigHashNone.
-	txTest{
+	{
 		name: "CheckSigHashNone",
 		tx: &btcwire.MsgTx{
 			Version: 1,
 			TxIn: []*btcwire.TxIn{
-				&btcwire.TxIn{
+				{
 					PreviousOutpoint: btcwire.OutPoint{
 						Hash: btcwire.ShaHash([32]byte{
 							0x5f, 0x38, 0x6c, 0x8a,
@@ -517,7 +517,7 @@ var txTests = []txTest{
 				},
 			},
 			TxOut: []*btcwire.TxOut{
-				&btcwire.TxOut{
+				{
 					Value: 1000000,
 					PkScript: []byte{
 						btcscript.OP_DUP,
@@ -531,7 +531,7 @@ var txTests = []txTest{
 						btcscript.OP_CHECKSIG,
 					},
 				},
-				&btcwire.TxOut{
+				{
 					Value: 29913632,
 					PkScript: []byte{
 						btcscript.OP_DUP,
@@ -568,12 +568,12 @@ var txTests = []txTest{
 			SigOps:         1,
 		},
 	},
-	txTest{
+	{
 		name: "Non-canonical signature: R value negative",
 		tx: &btcwire.MsgTx{
 			Version: 1,
 			TxIn: []*btcwire.TxIn{
-				&btcwire.TxIn{
+				{
 					PreviousOutpoint: btcwire.OutPoint{
 						Hash: btcwire.ShaHash([32]byte{
 							0xfe, 0x15, 0x62, 0xc4,
@@ -621,7 +621,7 @@ var txTests = []txTest{
 					},
 					Sequence: 4294967295,
 				},
-				&btcwire.TxIn{
+				{
 					PreviousOutpoint: btcwire.OutPoint{
 						Hash: btcwire.ShaHash([32]byte{
 							0x2a, 0xc7, 0xee, 0xf8,
@@ -671,7 +671,7 @@ var txTests = []txTest{
 				},
 			},
 			TxOut: []*btcwire.TxOut{
-				&btcwire.TxOut{
+				{
 					Value: 630320000,
 					PkScript: []byte{
 						btcscript.OP_DUP,
@@ -685,7 +685,7 @@ var txTests = []txTest{
 						btcscript.OP_CHECKSIG,
 					},
 				},
-				&btcwire.TxOut{
+				{
 					Value: 100000181,
 					PkScript: []byte{
 						btcscript.OP_DUP,
@@ -699,7 +699,7 @@ var txTests = []txTest{
 						btcscript.OP_CHECKSIG,
 					},
 				},
-				&btcwire.TxOut{
+				{
 					Value: 596516343,
 					PkScript: []byte{
 						btcscript.OP_DUP,
@@ -742,12 +742,12 @@ var txTests = []txTest{
 
 	// tx 51bf528ecf3c161e7c021224197dbe84f9a8564212f6207baa014c01a1668e1e
 	// first instance of an AnyoneCanPay signature in the blockchain
-	txTest{
+	{
 		name: "CheckSigHashAnyoneCanPay",
 		tx: &btcwire.MsgTx{
 			Version: 1,
 			TxIn: []*btcwire.TxIn{
-				&btcwire.TxIn{
+				{
 					PreviousOutpoint: btcwire.OutPoint{
 						Hash: btcwire.ShaHash([32]byte{
 							0xf6, 0x04, 0x4c, 0x0a,
@@ -789,7 +789,7 @@ var txTests = []txTest{
 					},
 					Sequence: 4294967295,
 				},
-				&btcwire.TxIn{
+				{
 					PreviousOutpoint: btcwire.OutPoint{
 						Hash: btcwire.ShaHash([32]byte{
 							0x9c, 0x6a, 0xf0, 0xdf,
@@ -833,7 +833,7 @@ var txTests = []txTest{
 				},
 			},
 			TxOut: []*btcwire.TxOut{
-				&btcwire.TxOut{
+				{
 					Value: 300000,
 					PkScript: []byte{
 						btcscript.OP_DUP,
@@ -872,12 +872,12 @@ var txTests = []txTest{
 	},
 	// tx 6d36bc17e947ce00bb6f12f8e7a56a1585c5a36188ffa2b05e10b4743273a74b
 	// Uses OP_CODESEPARATOR and OP_CHECKMULTISIG
-	txTest{
+	{
 		name: "CheckMultiSig",
 		tx: &btcwire.MsgTx{
 			Version: 1,
 			TxIn: []*btcwire.TxIn{
-				&btcwire.TxIn{
+				{
 					PreviousOutpoint: btcwire.OutPoint{
 						Hash: btcwire.ShaHash([32]byte{
 							0x37, 0xb1, 0x7d, 0x76,
@@ -915,7 +915,7 @@ var txTests = []txTest{
 					},
 					Sequence: 4294967295,
 				},
-				&btcwire.TxIn{
+				{
 					PreviousOutpoint: btcwire.OutPoint{
 						Hash: btcwire.ShaHash([32]byte{
 							0x37, 0xb1, 0x7d, 0x76,
@@ -964,7 +964,7 @@ var txTests = []txTest{
 				},
 			},
 			TxOut: []*btcwire.TxOut{
-				&btcwire.TxOut{
+				{
 					Value: 4800000,
 					PkScript: []byte{
 						btcscript.OP_DUP,
@@ -995,12 +995,12 @@ var txTests = []txTest{
 		scriptInfoErr: btcscript.StackErrNonPushOnly,
 	},
 	// same as previous but with one byte changed to make signature fail
-	txTest{
+	{
 		name: "CheckMultiSig fail",
 		tx: &btcwire.MsgTx{
 			Version: 1,
 			TxIn: []*btcwire.TxIn{
-				&btcwire.TxIn{
+				{
 					PreviousOutpoint: btcwire.OutPoint{
 						Hash: btcwire.ShaHash([32]byte{
 							0x37, 0xb1, 0x7d, 0x76,
@@ -1038,7 +1038,7 @@ var txTests = []txTest{
 					},
 					Sequence: 4294967295,
 				},
-				&btcwire.TxIn{
+				{
 					PreviousOutpoint: btcwire.OutPoint{
 						Hash: btcwire.ShaHash([32]byte{
 							0x37, 0xb1, 0x7d, 0x76,
@@ -1087,7 +1087,7 @@ var txTests = []txTest{
 				},
 			},
 			TxOut: []*btcwire.TxOut{
-				&btcwire.TxOut{
+				{
 					Value: 5800000,
 					PkScript: []byte{
 						btcscript.OP_DUP,
@@ -1120,12 +1120,12 @@ var txTests = []txTest{
 	},
 	// tx e5779b9e78f9650debc2893fd9636d827b26b4ddfa6a8172fe8708c924f5c39d
 	// First P2SH transaction in the blockchain
-	txTest{
+	{
 		name: "P2SH",
 		tx: &btcwire.MsgTx{
 			Version: 1,
 			TxIn: []*btcwire.TxIn{
-				&btcwire.TxIn{
+				{
 					PreviousOutpoint: btcwire.OutPoint{
 						Hash: btcwire.ShaHash([32]byte{
 							0x6d, 0x58, 0xf8, 0xa3,
@@ -1148,7 +1148,7 @@ var txTests = []txTest{
 				},
 			},
 			TxOut: []*btcwire.TxOut{
-				&btcwire.TxOut{
+				{
 					Value: 1000000,
 					PkScript: []byte{
 						btcscript.OP_DUP,
@@ -1185,13 +1185,13 @@ var txTests = []txTest{
 	},
 	// next few tests are modified versions of previous to hit p2sh error
 	// cases.
-	txTest{
+	{
 		// sigscript changed so that pkscript hash will not match.
 		name: "P2SH - bad hash",
 		tx: &btcwire.MsgTx{
 			Version: 1,
 			TxIn: []*btcwire.TxIn{
-				&btcwire.TxIn{
+				{
 					PreviousOutpoint: btcwire.OutPoint{
 						Hash: btcwire.ShaHash([32]byte{
 							0x6d, 0x58, 0xf8, 0xa3,
@@ -1214,7 +1214,7 @@ var txTests = []txTest{
 				},
 			},
 			TxOut: []*btcwire.TxOut{
-				&btcwire.TxOut{
+				{
 					Value: 1000000,
 					PkScript: []byte{
 						btcscript.OP_DUP,
@@ -1250,13 +1250,13 @@ var txTests = []txTest{
 			SigOps:         0,
 		},
 	},
-	txTest{
+	{
 		// sigscript changed so that pkscript hash will not match.
 		name: "P2SH - doesn't parse",
 		tx: &btcwire.MsgTx{
 			Version: 1,
 			TxIn: []*btcwire.TxIn{
-				&btcwire.TxIn{
+				{
 					PreviousOutpoint: btcwire.OutPoint{
 						Hash: btcwire.ShaHash([32]byte{
 							0x6d, 0x58, 0xf8, 0xa3,
@@ -1279,7 +1279,7 @@ var txTests = []txTest{
 				},
 			},
 			TxOut: []*btcwire.TxOut{
-				&btcwire.TxOut{
+				{
 					Value: 1000000,
 					PkScript: []byte{
 						btcscript.OP_DUP,
@@ -1309,13 +1309,13 @@ var txTests = []txTest{
 		bip16:         true,
 		scriptInfoErr: btcscript.StackErrShortScript,
 	},
-	txTest{
+	{
 		// sigscript changed so to be non pushonly.
 		name: "P2SH - non pushonly",
 		tx: &btcwire.MsgTx{
 			Version: 1,
 			TxIn: []*btcwire.TxIn{
-				&btcwire.TxIn{
+				{
 					PreviousOutpoint: btcwire.OutPoint{
 						Hash: btcwire.ShaHash([32]byte{
 							0x6d, 0x58, 0xf8, 0xa3,
@@ -1342,7 +1342,7 @@ var txTests = []txTest{
 				},
 			},
 			TxOut: []*btcwire.TxOut{
-				&btcwire.TxOut{
+				{
 					Value: 1000000,
 					PkScript: []byte{
 						btcscript.OP_DUP,
@@ -1373,13 +1373,13 @@ var txTests = []txTest{
 		nSigOps:       0, // no signature ops in the pushed script.
 		scriptInfoErr: btcscript.StackErrNonPushOnly,
 	},
-	txTest{
+	{
 		// sigscript changed so to be non pushonly.
 		name: "empty pkScript",
 		tx: &btcwire.MsgTx{
 			Version: 1,
 			TxIn: []*btcwire.TxIn{
-				&btcwire.TxIn{
+				{
 					PreviousOutpoint: btcwire.OutPoint{
 						Hash: btcwire.ShaHash([32]byte{
 							0x6d, 0x58, 0xf8, 0xa3,
@@ -1402,7 +1402,7 @@ var txTests = []txTest{
 				},
 			},
 			TxOut: []*btcwire.TxOut{
-				&btcwire.TxOut{
+				{
 					Value: 1000000,
 					PkScript: []byte{
 						btcscript.OP_DUP,
@@ -1509,29 +1509,29 @@ func TestGetPreciseSignOps(t *testing.T) {
 		err       error
 	}
 	psocTests := []psocTest{
-		psocTest{
+		{
 			name:      "scriptSig doesn't parse",
 			scriptSig: []byte{btcscript.OP_PUSHDATA1, 2},
 			err:       btcscript.StackErrShortScript,
 		},
-		psocTest{
+		{
 			name:      "scriptSig isn't push only",
 			scriptSig: []byte{btcscript.OP_1, btcscript.OP_DUP},
 			nSigOps:   0,
 		},
-		psocTest{
+		{
 			name:      "scriptSig length 0",
 			scriptSig: []byte{},
 			nSigOps:   0,
 		},
-		psocTest{
+		{
 			name: "No script at the end",
 			// No script at end but still push only.
 			scriptSig: []byte{btcscript.OP_1, btcscript.OP_1},
 			nSigOps:   0,
 		},
 		// pushed script doesn't parse.
-		psocTest{
+		{
 			name: "pushed script doesn't parse",
 			scriptSig: []byte{btcscript.OP_DATA_2,
 				btcscript.OP_PUSHDATA1, 2},
@@ -1759,14 +1759,14 @@ type removeOpcodeTest struct {
 
 var removeOpcodeTests = []removeOpcodeTest{
 	// Nothing to remove.
-	removeOpcodeTest{
+	{
 		name:   "nothing to remove",
 		before: []byte{btcscript.OP_NOP},
 		remove: btcscript.OP_CODESEPARATOR,
 		after:  []byte{btcscript.OP_NOP},
 	},
 	// Test basic opcode removal
-	removeOpcodeTest{
+	{
 		name: "codeseparator 1",
 		before: []byte{btcscript.OP_NOP, btcscript.OP_CODESEPARATOR,
 			btcscript.OP_TRUE},
@@ -1775,7 +1775,7 @@ var removeOpcodeTests = []removeOpcodeTest{
 	},
 	// The opcode in question is actually part of the data in a previous
 	// opcode
-	removeOpcodeTest{
+	{
 		name: "codeseparator by coincidence",
 		before: []byte{btcscript.OP_NOP, btcscript.OP_DATA_1, btcscript.OP_CODESEPARATOR,
 			btcscript.OP_TRUE},
@@ -1783,19 +1783,19 @@ var removeOpcodeTests = []removeOpcodeTest{
 		after: []byte{btcscript.OP_NOP, btcscript.OP_DATA_1, btcscript.OP_CODESEPARATOR,
 			btcscript.OP_TRUE},
 	},
-	removeOpcodeTest{
+	{
 		name:   "invalid opcode",
 		before: []byte{btcscript.OP_UNKNOWN186},
 		remove: btcscript.OP_CODESEPARATOR,
 		after:  []byte{btcscript.OP_UNKNOWN186},
 	},
-	removeOpcodeTest{
+	{
 		name:   "invalid length (insruction)",
 		before: []byte{btcscript.OP_PUSHDATA1},
 		remove: btcscript.OP_CODESEPARATOR,
 		err:    btcscript.StackErrShortScript,
 	},
-	removeOpcodeTest{
+	{
 		name:   "invalid length (data)",
 		before: []byte{btcscript.OP_PUSHDATA1, 255, 254},
 		remove: btcscript.OP_CODESEPARATOR,
@@ -1837,73 +1837,73 @@ type removeOpcodeByDataTest struct {
 }
 
 var removeOpcodeByDataTests = []removeOpcodeByDataTest{
-	removeOpcodeByDataTest{
+	{
 		name:   "nothing to do",
 		before: []byte{btcscript.OP_NOP},
 		remove: []byte{1, 2, 3, 4},
 		after:  []byte{btcscript.OP_NOP},
 	},
-	removeOpcodeByDataTest{
+	{
 		name:   "simple case",
 		before: []byte{btcscript.OP_DATA_4, 1, 2, 3, 4},
 		remove: []byte{1, 2, 3, 4},
 		after:  []byte{},
 	},
-	removeOpcodeByDataTest{
+	{
 		name:   "simple case (miss)",
 		before: []byte{btcscript.OP_DATA_4, 1, 2, 3, 4},
 		remove: []byte{1, 2, 3, 5},
 		after:  []byte{btcscript.OP_DATA_4, 1, 2, 3, 4},
 	},
-	removeOpcodeByDataTest{
+	{
 		name:   "simple case (pushdata1)",
 		before: []byte{btcscript.OP_PUSHDATA1, 4, 1, 2, 3, 4},
 		remove: []byte{1, 2, 3, 4},
 		after:  []byte{},
 	},
-	removeOpcodeByDataTest{
+	{
 		name:   "simple case (pushdata1 miss)",
 		before: []byte{btcscript.OP_PUSHDATA1, 4, 1, 2, 3, 4},
 		remove: []byte{1, 2, 3, 5},
 		after:  []byte{btcscript.OP_PUSHDATA1, 4, 1, 2, 3, 4},
 	},
-	removeOpcodeByDataTest{
+	{
 		name:   "simple case (pushdata2)",
 		before: []byte{btcscript.OP_PUSHDATA2, 4, 0, 1, 2, 3, 4},
 		remove: []byte{1, 2, 3, 4},
 		after:  []byte{},
 	},
-	removeOpcodeByDataTest{
+	{
 		name:   "simple case (pushdata2 miss)",
 		before: []byte{btcscript.OP_PUSHDATA2, 4, 0, 1, 2, 3, 4},
 		remove: []byte{1, 2, 3, 5},
 		after:  []byte{btcscript.OP_PUSHDATA2, 4, 0, 1, 2, 3, 4},
 	},
-	removeOpcodeByDataTest{
+	{
 		name:   "simple case (pushdata4)",
 		before: []byte{btcscript.OP_PUSHDATA4, 4, 0, 0, 0, 1, 2, 3, 4},
 		remove: []byte{1, 2, 3, 4},
 		after:  []byte{},
 	},
-	removeOpcodeByDataTest{
+	{
 		name:   "simple case (pushdata4 miss)",
 		before: []byte{btcscript.OP_PUSHDATA4, 4, 0, 0, 0, 1, 2, 3, 4},
 		remove: []byte{1, 2, 3, 4, 5},
 		after:  []byte{btcscript.OP_PUSHDATA4, 4, 0, 0, 0, 1, 2, 3, 4},
 	},
-	removeOpcodeByDataTest{
+	{
 		name:   "invalid opcode ",
 		before: []byte{btcscript.OP_UNKNOWN187},
 		remove: []byte{1, 2, 3, 4},
 		after:  []byte{btcscript.OP_UNKNOWN187},
 	},
-	removeOpcodeByDataTest{
+	{
 		name:   "invalid length (instruction)",
 		before: []byte{btcscript.OP_PUSHDATA1},
 		remove: []byte{1, 2, 3, 4},
 		err:    btcscript.StackErrShortScript,
 	},
-	removeOpcodeByDataTest{
+	{
 		name:   "invalid length (data)",
 		before: []byte{btcscript.OP_PUSHDATA1, 255, 254},
 		remove: []byte{1, 2, 3, 4},
@@ -1946,7 +1946,7 @@ type scriptTypeTest struct {
 
 var scriptTypeTests = []scriptTypeTest{
 	// tx 0437cd7f8525ceed2324359c2d0ba26006d92d85.
-	scriptTypeTest{
+	{
 		name: "Pay Pubkey",
 		script: []byte{
 			btcscript.OP_DATA_65,
@@ -1963,7 +1963,7 @@ var scriptTypeTests = []scriptTypeTest{
 		scripttype: btcscript.PubKeyTy,
 	},
 	// tx 599e47a8114fe098103663029548811d2651991b62397e057f0c863c2bc9f9ea
-	scriptTypeTest{
+	{
 		name: "Pay PubkeyHash",
 		script: []byte{
 			btcscript.OP_DUP,
@@ -1980,7 +1980,7 @@ var scriptTypeTests = []scriptTypeTest{
 	// part of tx 6d36bc17e947ce00bb6f12f8e7a56a1585c5a36188ffa2b05e10b4743273a74b
 	// codeseparator parts have been elided. (bitcoind's checks for multisig
 	// type doesn't have codesep etc either.
-	scriptTypeTest{
+	{
 		name: "multisig",
 		script: []byte{
 			btcscript.OP_TRUE,
@@ -1996,7 +1996,7 @@ var scriptTypeTests = []scriptTypeTest{
 	},
 	// tx e5779b9e78f9650debc2893fd9636d827b26b4ddfa6a8172fe8708c924f5c39d
 	// P2SH
-	scriptTypeTest{
+	{
 		name: "P2SH",
 		script: []byte{
 			btcscript.OP_HASH160,
@@ -2009,7 +2009,7 @@ var scriptTypeTests = []scriptTypeTest{
 		scripttype: btcscript.ScriptHashTy,
 	},
 	// Nulldata with no data at all.
-	scriptTypeTest{
+	{
 		name: "nulldata",
 		script: []byte{
 			btcscript.OP_RETURN,
@@ -2017,7 +2017,7 @@ var scriptTypeTests = []scriptTypeTest{
 		scripttype: btcscript.NullDataTy,
 	},
 	// Nulldata with small data.
-	scriptTypeTest{
+	{
 		name: "nulldata2",
 		script: []byte{
 			btcscript.OP_RETURN,
@@ -2027,7 +2027,7 @@ var scriptTypeTests = []scriptTypeTest{
 		scripttype: btcscript.NullDataTy,
 	},
 	// Nulldata with max allowed data.
-	scriptTypeTest{
+	{
 		name: "nulldata3",
 		script: []byte{
 			btcscript.OP_RETURN,
@@ -2047,7 +2047,7 @@ var scriptTypeTests = []scriptTypeTest{
 		scripttype: btcscript.NullDataTy,
 	},
 	// Nulldata with more than max allowed data (so therefore nonstandard)
-	scriptTypeTest{
+	{
 		name: "nulldata4",
 		script: []byte{
 			btcscript.OP_RETURN,
@@ -2069,7 +2069,7 @@ var scriptTypeTests = []scriptTypeTest{
 	},
 	// Almost nulldata, but add an additional opcode after the data to make
 	// it nonstandard.
-	scriptTypeTest{
+	{
 		name: "nulldata5",
 		script: []byte{
 			btcscript.OP_RETURN,
@@ -2080,7 +2080,7 @@ var scriptTypeTests = []scriptTypeTest{
 		scripttype: btcscript.NonStandardTy,
 	}, // The next few are almost multisig (it is the more complex script type)
 	// but with various changes to make it fail.
-	scriptTypeTest{
+	{
 		// multisig but funny nsigs..
 		name: "strange 1",
 		script: []byte{
@@ -2095,7 +2095,7 @@ var scriptTypeTests = []scriptTypeTest{
 		},
 		scripttype: btcscript.NonStandardTy,
 	},
-	scriptTypeTest{
+	{
 		name: "strange 2",
 		// multisig but funny pubkey.
 		script: []byte{
@@ -2106,7 +2106,7 @@ var scriptTypeTests = []scriptTypeTest{
 		},
 		scripttype: btcscript.NonStandardTy,
 	},
-	scriptTypeTest{
+	{
 		name: "strange 3",
 		// multisig but no matching npubkeys opcode.
 		script: []byte{
@@ -2126,7 +2126,7 @@ var scriptTypeTests = []scriptTypeTest{
 		},
 		scripttype: btcscript.NonStandardTy,
 	},
-	scriptTypeTest{
+	{
 		name: "strange 4",
 		// multisig but with multisigverify
 		script: []byte{
@@ -2141,7 +2141,7 @@ var scriptTypeTests = []scriptTypeTest{
 		},
 		scripttype: btcscript.NonStandardTy,
 	},
-	scriptTypeTest{
+	{
 		name: "strange 5",
 		// multisig but wrong length.
 		script: []byte{
@@ -2150,7 +2150,7 @@ var scriptTypeTests = []scriptTypeTest{
 		},
 		scripttype: btcscript.NonStandardTy,
 	},
-	scriptTypeTest{
+	{
 		name: "doesn't parse",
 		script: []byte{
 			btcscript.OP_DATA_5, 0x1, 0x2, 0x3, 0x4,
@@ -2191,11 +2191,11 @@ func TestBadPC(t *testing.T) {
 		script, off int
 	}
 	pcTests := []pcTest{
-		pcTest{
+		{
 			script: 2,
 			off:    0,
 		},
-		pcTest{
+		{
 			script: 0,
 			off:    2,
 		},
@@ -2204,7 +2204,7 @@ func TestBadPC(t *testing.T) {
 	tx := &btcwire.MsgTx{
 		Version: 1,
 		TxIn: []*btcwire.TxIn{
-			&btcwire.TxIn{
+			{
 				PreviousOutpoint: btcwire.OutPoint{
 					Hash: btcwire.ShaHash([32]byte{
 						0xc9, 0x97, 0xa5, 0xe5,
@@ -2223,7 +2223,7 @@ func TestBadPC(t *testing.T) {
 			},
 		},
 		TxOut: []*btcwire.TxOut{
-			&btcwire.TxOut{
+			{
 				Value:    1000000000,
 				PkScript: []byte{},
 			},
@@ -2263,7 +2263,7 @@ func TestCheckErrorCondition(t *testing.T) {
 	tx := &btcwire.MsgTx{
 		Version: 1,
 		TxIn: []*btcwire.TxIn{
-			&btcwire.TxIn{
+			{
 				PreviousOutpoint: btcwire.OutPoint{
 					Hash: btcwire.ShaHash([32]byte{
 						0xc9, 0x97, 0xa5, 0xe5,
@@ -2282,7 +2282,7 @@ func TestCheckErrorCondition(t *testing.T) {
 			},
 		},
 		TxOut: []*btcwire.TxOut{
-			&btcwire.TxOut{
+			{
 				Value:    1000000000,
 				PkScript: []byte{},
 			},
@@ -2423,10 +2423,10 @@ const coinbaseVal = 2500000000
 const fee = 5000000
 
 var SigScriptTests = []TstSigScript{
-	TstSigScript{
+	{
 		name: "one input uncompressed",
 		inputs: []TstInput{
-			TstInput{
+			{
 				txout:              btcwire.NewTxOut(coinbaseVal, uncompressedPkScript),
 				sigscriptGenerates: true,
 				inputValidates:     true,
@@ -2437,16 +2437,16 @@ var SigScriptTests = []TstSigScript{
 		compress:           false,
 		scriptAtWrongIndex: false,
 	},
-	TstSigScript{
+	{
 		name: "two inputs uncompressed",
 		inputs: []TstInput{
-			TstInput{
+			{
 				txout:              btcwire.NewTxOut(coinbaseVal, uncompressedPkScript),
 				sigscriptGenerates: true,
 				inputValidates:     true,
 				indexOutOfRange:    false,
 			},
-			TstInput{
+			{
 				txout:              btcwire.NewTxOut(coinbaseVal+fee, uncompressedPkScript),
 				sigscriptGenerates: true,
 				inputValidates:     true,
@@ -2457,10 +2457,10 @@ var SigScriptTests = []TstSigScript{
 		compress:           false,
 		scriptAtWrongIndex: false,
 	},
-	TstSigScript{
+	{
 		name: "one input compressed",
 		inputs: []TstInput{
-			TstInput{
+			{
 				txout:              btcwire.NewTxOut(coinbaseVal, compressedPkScript),
 				sigscriptGenerates: true,
 				inputValidates:     true,
@@ -2471,16 +2471,16 @@ var SigScriptTests = []TstSigScript{
 		compress:           true,
 		scriptAtWrongIndex: false,
 	},
-	TstSigScript{
+	{
 		name: "two inputs compressed",
 		inputs: []TstInput{
-			TstInput{
+			{
 				txout:              btcwire.NewTxOut(coinbaseVal, compressedPkScript),
 				sigscriptGenerates: true,
 				inputValidates:     true,
 				indexOutOfRange:    false,
 			},
-			TstInput{
+			{
 				txout:              btcwire.NewTxOut(coinbaseVal+fee, compressedPkScript),
 				sigscriptGenerates: true,
 				inputValidates:     true,
@@ -2491,10 +2491,10 @@ var SigScriptTests = []TstSigScript{
 		compress:           true,
 		scriptAtWrongIndex: false,
 	},
-	TstSigScript{
+	{
 		name: "hashtype SigHashNone",
 		inputs: []TstInput{
-			TstInput{
+			{
 				txout:              btcwire.NewTxOut(coinbaseVal, uncompressedPkScript),
 				sigscriptGenerates: true,
 				inputValidates:     true,
@@ -2505,10 +2505,10 @@ var SigScriptTests = []TstSigScript{
 		compress:           false,
 		scriptAtWrongIndex: false,
 	},
-	TstSigScript{
+	{
 		name: "hashtype SigHashSingle",
 		inputs: []TstInput{
-			TstInput{
+			{
 				txout:              btcwire.NewTxOut(coinbaseVal, uncompressedPkScript),
 				sigscriptGenerates: true,
 				inputValidates:     true,
@@ -2519,10 +2519,10 @@ var SigScriptTests = []TstSigScript{
 		compress:           false,
 		scriptAtWrongIndex: false,
 	},
-	TstSigScript{
+	{
 		name: "hashtype SigHashAnyoneCanPay",
 		inputs: []TstInput{
-			TstInput{
+			{
 				txout:              btcwire.NewTxOut(coinbaseVal, uncompressedPkScript),
 				sigscriptGenerates: true,
 				inputValidates:     true,
@@ -2533,10 +2533,10 @@ var SigScriptTests = []TstSigScript{
 		compress:           false,
 		scriptAtWrongIndex: false,
 	},
-	TstSigScript{
+	{
 		name: "hashtype non-standard",
 		inputs: []TstInput{
-			TstInput{
+			{
 				txout:              btcwire.NewTxOut(coinbaseVal, uncompressedPkScript),
 				sigscriptGenerates: true,
 				inputValidates:     true,
@@ -2547,10 +2547,10 @@ var SigScriptTests = []TstSigScript{
 		compress:           false,
 		scriptAtWrongIndex: false,
 	},
-	TstSigScript{
+	{
 		name: "invalid compression",
 		inputs: []TstInput{
-			TstInput{
+			{
 				txout:              btcwire.NewTxOut(coinbaseVal, uncompressedPkScript),
 				sigscriptGenerates: true,
 				inputValidates:     false,
@@ -2561,10 +2561,10 @@ var SigScriptTests = []TstSigScript{
 		compress:           true,
 		scriptAtWrongIndex: false,
 	},
-	TstSigScript{
+	{
 		name: "short PkScript",
 		inputs: []TstInput{
-			TstInput{
+			{
 				txout:              btcwire.NewTxOut(coinbaseVal, shortPkScript),
 				sigscriptGenerates: false,
 				indexOutOfRange:    false,
@@ -2574,16 +2574,16 @@ var SigScriptTests = []TstSigScript{
 		compress:           false,
 		scriptAtWrongIndex: false,
 	},
-	TstSigScript{
+	{
 		name: "valid script at wrong index",
 		inputs: []TstInput{
-			TstInput{
+			{
 				txout:              btcwire.NewTxOut(coinbaseVal, uncompressedPkScript),
 				sigscriptGenerates: true,
 				inputValidates:     true,
 				indexOutOfRange:    false,
 			},
-			TstInput{
+			{
 				txout:              btcwire.NewTxOut(coinbaseVal+fee, uncompressedPkScript),
 				sigscriptGenerates: true,
 				inputValidates:     true,
@@ -2594,16 +2594,16 @@ var SigScriptTests = []TstSigScript{
 		compress:           false,
 		scriptAtWrongIndex: true,
 	},
-	TstSigScript{
+	{
 		name: "index out of range",
 		inputs: []TstInput{
-			TstInput{
+			{
 				txout:              btcwire.NewTxOut(coinbaseVal, uncompressedPkScript),
 				sigscriptGenerates: true,
 				inputValidates:     true,
 				indexOutOfRange:    false,
 			},
-			TstInput{
+			{
 				txout:              btcwire.NewTxOut(coinbaseVal+fee, uncompressedPkScript),
 				sigscriptGenerates: true,
 				inputValidates:     true,
@@ -2614,10 +2614,10 @@ var SigScriptTests = []TstSigScript{
 		compress:           false,
 		scriptAtWrongIndex: true,
 	},
-	TstSigScript{
+	{
 		name: "invalid reader",
 		inputs: []TstInput{
-			TstInput{
+			{
 				txout:              btcwire.NewTxOut(coinbaseVal, uncompressedPkScript),
 				invalidReader:      true,
 				sigscriptGenerates: false,

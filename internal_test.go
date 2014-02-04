@@ -88,7 +88,7 @@ type popTest struct {
 }
 
 var popTests = []popTest{
-	popTest{
+	{
 		name: "OP_FALSE",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_FALSE],
@@ -96,7 +96,7 @@ var popTests = []popTest{
 		},
 		expectedErr: nil,
 	},
-	popTest{
+	{
 		name: "OP_FALSE long",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_FALSE],
@@ -104,7 +104,7 @@ var popTests = []popTest{
 		},
 		expectedErr: StackErrInvalidOpcode,
 	},
-	popTest{
+	{
 		name: "OP_DATA_1 short",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_DATA_1],
@@ -112,7 +112,7 @@ var popTests = []popTest{
 		},
 		expectedErr: StackErrInvalidOpcode,
 	},
-	popTest{
+	{
 		name: "OP_DATA_1",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_DATA_1],
@@ -120,7 +120,7 @@ var popTests = []popTest{
 		},
 		expectedErr: nil,
 	},
-	popTest{
+	{
 		name: "OP_DATA_1 long",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_DATA_1],
@@ -128,7 +128,7 @@ var popTests = []popTest{
 		},
 		expectedErr: StackErrInvalidOpcode,
 	},
-	popTest{
+	{
 		name: "OP_DATA_2 short",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_DATA_2],
@@ -136,7 +136,7 @@ var popTests = []popTest{
 		},
 		expectedErr: StackErrInvalidOpcode,
 	},
-	popTest{
+	{
 		name: "OP_DATA_2",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_DATA_2],
@@ -144,7 +144,7 @@ var popTests = []popTest{
 		},
 		expectedErr: nil,
 	},
-	popTest{
+	{
 		name: "OP_DATA_2 long",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_DATA_2],
@@ -152,7 +152,7 @@ var popTests = []popTest{
 		},
 		expectedErr: StackErrInvalidOpcode,
 	},
-	popTest{
+	{
 		name: "OP_DATA_3 short",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_DATA_3],
@@ -160,7 +160,7 @@ var popTests = []popTest{
 		},
 		expectedErr: StackErrInvalidOpcode,
 	},
-	popTest{
+	{
 		name: "OP_DATA_3",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_DATA_3],
@@ -168,7 +168,7 @@ var popTests = []popTest{
 		},
 		expectedErr: nil,
 	},
-	popTest{
+	{
 		name: "OP_DATA_3 long",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_DATA_3],
@@ -176,7 +176,7 @@ var popTests = []popTest{
 		},
 		expectedErr: StackErrInvalidOpcode,
 	},
-	popTest{
+	{
 		name: "OP_DATA_4 short",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_DATA_4],
@@ -184,7 +184,7 @@ var popTests = []popTest{
 		},
 		expectedErr: StackErrInvalidOpcode,
 	},
-	popTest{
+	{
 		name: "OP_DATA_4",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_DATA_4],
@@ -192,7 +192,7 @@ var popTests = []popTest{
 		},
 		expectedErr: nil,
 	},
-	popTest{
+	{
 		name: "OP_DATA_4 long",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_DATA_4],
@@ -200,7 +200,7 @@ var popTests = []popTest{
 		},
 		expectedErr: StackErrInvalidOpcode,
 	},
-	popTest{
+	{
 		name: "OP_DATA_5 short",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_DATA_5],
@@ -208,7 +208,7 @@ var popTests = []popTest{
 		},
 		expectedErr: StackErrInvalidOpcode,
 	},
-	popTest{
+	{
 		name: "OP_DATA_5",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_DATA_5],
@@ -216,7 +216,7 @@ var popTests = []popTest{
 		},
 		expectedErr: nil,
 	},
-	popTest{
+	{
 		name: "OP_DATA_5 long",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_DATA_5],
@@ -224,7 +224,7 @@ var popTests = []popTest{
 		},
 		expectedErr: StackErrInvalidOpcode,
 	},
-	popTest{
+	{
 		name: "OP_DATA_6 short",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_DATA_6],
@@ -232,7 +232,7 @@ var popTests = []popTest{
 		},
 		expectedErr: StackErrInvalidOpcode,
 	},
-	popTest{
+	{
 		name: "OP_DATA_6",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_DATA_6],
@@ -240,7 +240,7 @@ var popTests = []popTest{
 		},
 		expectedErr: nil,
 	},
-	popTest{
+	{
 		name: "OP_DATA_6 long",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_DATA_6],
@@ -248,7 +248,7 @@ var popTests = []popTest{
 		},
 		expectedErr: StackErrInvalidOpcode,
 	},
-	popTest{
+	{
 		name: "OP_DATA_7 short",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_DATA_7],
@@ -256,7 +256,7 @@ var popTests = []popTest{
 		},
 		expectedErr: StackErrInvalidOpcode,
 	},
-	popTest{
+	{
 		name: "OP_DATA_7",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_DATA_7],
@@ -264,7 +264,7 @@ var popTests = []popTest{
 		},
 		expectedErr: nil,
 	},
-	popTest{
+	{
 		name: "OP_DATA_7 long",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_DATA_7],
@@ -272,7 +272,7 @@ var popTests = []popTest{
 		},
 		expectedErr: StackErrInvalidOpcode,
 	},
-	popTest{
+	{
 		name: "OP_DATA_8 short",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_DATA_8],
@@ -280,7 +280,7 @@ var popTests = []popTest{
 		},
 		expectedErr: StackErrInvalidOpcode,
 	},
-	popTest{
+	{
 		name: "OP_DATA_8",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_DATA_8],
@@ -288,7 +288,7 @@ var popTests = []popTest{
 		},
 		expectedErr: nil,
 	},
-	popTest{
+	{
 		name: "OP_DATA_8 long",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_DATA_8],
@@ -296,7 +296,7 @@ var popTests = []popTest{
 		},
 		expectedErr: StackErrInvalidOpcode,
 	},
-	popTest{
+	{
 		name: "OP_DATA_9 short",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_DATA_9],
@@ -304,7 +304,7 @@ var popTests = []popTest{
 		},
 		expectedErr: StackErrInvalidOpcode,
 	},
-	popTest{
+	{
 		name: "OP_DATA_9",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_DATA_9],
@@ -312,7 +312,7 @@ var popTests = []popTest{
 		},
 		expectedErr: nil,
 	},
-	popTest{
+	{
 		name: "OP_DATA_9 long",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_DATA_9],
@@ -320,7 +320,7 @@ var popTests = []popTest{
 		},
 		expectedErr: StackErrInvalidOpcode,
 	},
-	popTest{
+	{
 		name: "OP_DATA_10 short",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_DATA_10],
@@ -328,7 +328,7 @@ var popTests = []popTest{
 		},
 		expectedErr: StackErrInvalidOpcode,
 	},
-	popTest{
+	{
 		name: "OP_DATA_10",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_DATA_10],
@@ -336,7 +336,7 @@ var popTests = []popTest{
 		},
 		expectedErr: nil,
 	},
-	popTest{
+	{
 		name: "OP_DATA_10 long",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_DATA_10],
@@ -344,7 +344,7 @@ var popTests = []popTest{
 		},
 		expectedErr: StackErrInvalidOpcode,
 	},
-	popTest{
+	{
 		name: "OP_DATA_11 short",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_DATA_11],
@@ -352,7 +352,7 @@ var popTests = []popTest{
 		},
 		expectedErr: StackErrInvalidOpcode,
 	},
-	popTest{
+	{
 		name: "OP_DATA_11",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_DATA_11],
@@ -360,7 +360,7 @@ var popTests = []popTest{
 		},
 		expectedErr: nil,
 	},
-	popTest{
+	{
 		name: "OP_DATA_11 long",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_DATA_11],
@@ -368,7 +368,7 @@ var popTests = []popTest{
 		},
 		expectedErr: StackErrInvalidOpcode,
 	},
-	popTest{
+	{
 		name: "OP_DATA_12 short",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_DATA_12],
@@ -376,7 +376,7 @@ var popTests = []popTest{
 		},
 		expectedErr: StackErrInvalidOpcode,
 	},
-	popTest{
+	{
 		name: "OP_DATA_12",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_DATA_12],
@@ -384,7 +384,7 @@ var popTests = []popTest{
 		},
 		expectedErr: nil,
 	},
-	popTest{
+	{
 		name: "OP_DATA_12 long",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_DATA_12],
@@ -392,7 +392,7 @@ var popTests = []popTest{
 		},
 		expectedErr: StackErrInvalidOpcode,
 	},
-	popTest{
+	{
 		name: "OP_DATA_13 short",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_DATA_13],
@@ -400,7 +400,7 @@ var popTests = []popTest{
 		},
 		expectedErr: StackErrInvalidOpcode,
 	},
-	popTest{
+	{
 		name: "OP_DATA_13",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_DATA_13],
@@ -408,7 +408,7 @@ var popTests = []popTest{
 		},
 		expectedErr: nil,
 	},
-	popTest{
+	{
 		name: "OP_DATA_13 long",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_DATA_13],
@@ -416,7 +416,7 @@ var popTests = []popTest{
 		},
 		expectedErr: StackErrInvalidOpcode,
 	},
-	popTest{
+	{
 		name: "OP_DATA_14 short",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_DATA_14],
@@ -424,7 +424,7 @@ var popTests = []popTest{
 		},
 		expectedErr: StackErrInvalidOpcode,
 	},
-	popTest{
+	{
 		name: "OP_DATA_14",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_DATA_14],
@@ -432,7 +432,7 @@ var popTests = []popTest{
 		},
 		expectedErr: nil,
 	},
-	popTest{
+	{
 		name: "OP_DATA_14 long",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_DATA_14],
@@ -440,7 +440,7 @@ var popTests = []popTest{
 		},
 		expectedErr: StackErrInvalidOpcode,
 	},
-	popTest{
+	{
 		name: "OP_DATA_15 short",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_DATA_15],
@@ -448,7 +448,7 @@ var popTests = []popTest{
 		},
 		expectedErr: StackErrInvalidOpcode,
 	},
-	popTest{
+	{
 		name: "OP_DATA_15",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_DATA_15],
@@ -456,7 +456,7 @@ var popTests = []popTest{
 		},
 		expectedErr: nil,
 	},
-	popTest{
+	{
 		name: "OP_DATA_15 long",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_DATA_15],
@@ -464,7 +464,7 @@ var popTests = []popTest{
 		},
 		expectedErr: StackErrInvalidOpcode,
 	},
-	popTest{
+	{
 		name: "OP_DATA_16 short",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_DATA_16],
@@ -472,7 +472,7 @@ var popTests = []popTest{
 		},
 		expectedErr: StackErrInvalidOpcode,
 	},
-	popTest{
+	{
 		name: "OP_DATA_16",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_DATA_16],
@@ -480,7 +480,7 @@ var popTests = []popTest{
 		},
 		expectedErr: nil,
 	},
-	popTest{
+	{
 		name: "OP_DATA_16 long",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_DATA_16],
@@ -488,7 +488,7 @@ var popTests = []popTest{
 		},
 		expectedErr: StackErrInvalidOpcode,
 	},
-	popTest{
+	{
 		name: "OP_DATA_17 short",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_DATA_17],
@@ -496,7 +496,7 @@ var popTests = []popTest{
 		},
 		expectedErr: StackErrInvalidOpcode,
 	},
-	popTest{
+	{
 		name: "OP_DATA_17",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_DATA_17],
@@ -504,7 +504,7 @@ var popTests = []popTest{
 		},
 		expectedErr: nil,
 	},
-	popTest{
+	{
 		name: "OP_DATA_17 long",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_DATA_17],
@@ -512,7 +512,7 @@ var popTests = []popTest{
 		},
 		expectedErr: StackErrInvalidOpcode,
 	},
-	popTest{
+	{
 		name: "OP_DATA_18 short",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_DATA_18],
@@ -520,7 +520,7 @@ var popTests = []popTest{
 		},
 		expectedErr: StackErrInvalidOpcode,
 	},
-	popTest{
+	{
 		name: "OP_DATA_18",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_DATA_18],
@@ -528,7 +528,7 @@ var popTests = []popTest{
 		},
 		expectedErr: nil,
 	},
-	popTest{
+	{
 		name: "OP_DATA_18 long",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_DATA_18],
@@ -536,7 +536,7 @@ var popTests = []popTest{
 		},
 		expectedErr: StackErrInvalidOpcode,
 	},
-	popTest{
+	{
 		name: "OP_DATA_19 short",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_DATA_19],
@@ -544,7 +544,7 @@ var popTests = []popTest{
 		},
 		expectedErr: StackErrInvalidOpcode,
 	},
-	popTest{
+	{
 		name: "OP_DATA_19",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_DATA_19],
@@ -552,7 +552,7 @@ var popTests = []popTest{
 		},
 		expectedErr: nil,
 	},
-	popTest{
+	{
 		name: "OP_DATA_19 long",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_DATA_19],
@@ -560,7 +560,7 @@ var popTests = []popTest{
 		},
 		expectedErr: StackErrInvalidOpcode,
 	},
-	popTest{
+	{
 		name: "OP_DATA_20 short",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_DATA_20],
@@ -568,7 +568,7 @@ var popTests = []popTest{
 		},
 		expectedErr: StackErrInvalidOpcode,
 	},
-	popTest{
+	{
 		name: "OP_DATA_20",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_DATA_20],
@@ -576,7 +576,7 @@ var popTests = []popTest{
 		},
 		expectedErr: nil,
 	},
-	popTest{
+	{
 		name: "OP_DATA_20 long",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_DATA_20],
@@ -584,7 +584,7 @@ var popTests = []popTest{
 		},
 		expectedErr: StackErrInvalidOpcode,
 	},
-	popTest{
+	{
 		name: "OP_DATA_21 short",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_DATA_21],
@@ -592,7 +592,7 @@ var popTests = []popTest{
 		},
 		expectedErr: StackErrInvalidOpcode,
 	},
-	popTest{
+	{
 		name: "OP_DATA_21",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_DATA_21],
@@ -600,7 +600,7 @@ var popTests = []popTest{
 		},
 		expectedErr: nil,
 	},
-	popTest{
+	{
 		name: "OP_DATA_21 long",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_DATA_21],
@@ -608,7 +608,7 @@ var popTests = []popTest{
 		},
 		expectedErr: StackErrInvalidOpcode,
 	},
-	popTest{
+	{
 		name: "OP_DATA_22 short",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_DATA_22],
@@ -616,7 +616,7 @@ var popTests = []popTest{
 		},
 		expectedErr: StackErrInvalidOpcode,
 	},
-	popTest{
+	{
 		name: "OP_DATA_22",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_DATA_22],
@@ -624,7 +624,7 @@ var popTests = []popTest{
 		},
 		expectedErr: nil,
 	},
-	popTest{
+	{
 		name: "OP_DATA_22 long",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_DATA_22],
@@ -632,7 +632,7 @@ var popTests = []popTest{
 		},
 		expectedErr: StackErrInvalidOpcode,
 	},
-	popTest{
+	{
 		name: "OP_DATA_23 short",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_DATA_23],
@@ -640,7 +640,7 @@ var popTests = []popTest{
 		},
 		expectedErr: StackErrInvalidOpcode,
 	},
-	popTest{
+	{
 		name: "OP_DATA_23",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_DATA_23],
@@ -648,7 +648,7 @@ var popTests = []popTest{
 		},
 		expectedErr: nil,
 	},
-	popTest{
+	{
 		name: "OP_DATA_23 long",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_DATA_23],
@@ -656,7 +656,7 @@ var popTests = []popTest{
 		},
 		expectedErr: StackErrInvalidOpcode,
 	},
-	popTest{
+	{
 		name: "OP_DATA_24 short",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_DATA_24],
@@ -664,7 +664,7 @@ var popTests = []popTest{
 		},
 		expectedErr: StackErrInvalidOpcode,
 	},
-	popTest{
+	{
 		name: "OP_DATA_24",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_DATA_24],
@@ -672,7 +672,7 @@ var popTests = []popTest{
 		},
 		expectedErr: nil,
 	},
-	popTest{
+	{
 		name: "OP_DATA_24 long",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_DATA_24],
@@ -680,7 +680,7 @@ var popTests = []popTest{
 		},
 		expectedErr: StackErrInvalidOpcode,
 	},
-	popTest{
+	{
 		name: "OP_DATA_25 short",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_DATA_25],
@@ -688,7 +688,7 @@ var popTests = []popTest{
 		},
 		expectedErr: StackErrInvalidOpcode,
 	},
-	popTest{
+	{
 		name: "OP_DATA_25",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_DATA_25],
@@ -696,7 +696,7 @@ var popTests = []popTest{
 		},
 		expectedErr: nil,
 	},
-	popTest{
+	{
 		name: "OP_DATA_25 long",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_DATA_25],
@@ -704,7 +704,7 @@ var popTests = []popTest{
 		},
 		expectedErr: StackErrInvalidOpcode,
 	},
-	popTest{
+	{
 		name: "OP_DATA_26 short",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_DATA_26],
@@ -712,7 +712,7 @@ var popTests = []popTest{
 		},
 		expectedErr: StackErrInvalidOpcode,
 	},
-	popTest{
+	{
 		name: "OP_DATA_26",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_DATA_26],
@@ -720,7 +720,7 @@ var popTests = []popTest{
 		},
 		expectedErr: nil,
 	},
-	popTest{
+	{
 		name: "OP_DATA_26 long",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_DATA_26],
@@ -728,7 +728,7 @@ var popTests = []popTest{
 		},
 		expectedErr: StackErrInvalidOpcode,
 	},
-	popTest{
+	{
 		name: "OP_DATA_27 short",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_DATA_27],
@@ -736,7 +736,7 @@ var popTests = []popTest{
 		},
 		expectedErr: StackErrInvalidOpcode,
 	},
-	popTest{
+	{
 		name: "OP_DATA_27",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_DATA_27],
@@ -744,7 +744,7 @@ var popTests = []popTest{
 		},
 		expectedErr: nil,
 	},
-	popTest{
+	{
 		name: "OP_DATA_27 long",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_DATA_27],
@@ -752,7 +752,7 @@ var popTests = []popTest{
 		},
 		expectedErr: StackErrInvalidOpcode,
 	},
-	popTest{
+	{
 		name: "OP_DATA_28 short",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_DATA_28],
@@ -760,7 +760,7 @@ var popTests = []popTest{
 		},
 		expectedErr: StackErrInvalidOpcode,
 	},
-	popTest{
+	{
 		name: "OP_DATA_28",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_DATA_28],
@@ -768,7 +768,7 @@ var popTests = []popTest{
 		},
 		expectedErr: nil,
 	},
-	popTest{
+	{
 		name: "OP_DATA_28 long",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_DATA_28],
@@ -776,7 +776,7 @@ var popTests = []popTest{
 		},
 		expectedErr: StackErrInvalidOpcode,
 	},
-	popTest{
+	{
 		name: "OP_DATA_29 short",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_DATA_29],
@@ -784,7 +784,7 @@ var popTests = []popTest{
 		},
 		expectedErr: StackErrInvalidOpcode,
 	},
-	popTest{
+	{
 		name: "OP_DATA_29",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_DATA_29],
@@ -792,7 +792,7 @@ var popTests = []popTest{
 		},
 		expectedErr: nil,
 	},
-	popTest{
+	{
 		name: "OP_DATA_29 long",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_DATA_29],
@@ -800,7 +800,7 @@ var popTests = []popTest{
 		},
 		expectedErr: StackErrInvalidOpcode,
 	},
-	popTest{
+	{
 		name: "OP_DATA_30 short",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_DATA_30],
@@ -808,7 +808,7 @@ var popTests = []popTest{
 		},
 		expectedErr: StackErrInvalidOpcode,
 	},
-	popTest{
+	{
 		name: "OP_DATA_30",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_DATA_30],
@@ -816,7 +816,7 @@ var popTests = []popTest{
 		},
 		expectedErr: nil,
 	},
-	popTest{
+	{
 		name: "OP_DATA_30 long",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_DATA_30],
@@ -824,7 +824,7 @@ var popTests = []popTest{
 		},
 		expectedErr: StackErrInvalidOpcode,
 	},
-	popTest{
+	{
 		name: "OP_DATA_31 short",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_DATA_31],
@@ -832,7 +832,7 @@ var popTests = []popTest{
 		},
 		expectedErr: StackErrInvalidOpcode,
 	},
-	popTest{
+	{
 		name: "OP_DATA_31",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_DATA_31],
@@ -840,7 +840,7 @@ var popTests = []popTest{
 		},
 		expectedErr: nil,
 	},
-	popTest{
+	{
 		name: "OP_DATA_31 long",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_DATA_31],
@@ -848,7 +848,7 @@ var popTests = []popTest{
 		},
 		expectedErr: StackErrInvalidOpcode,
 	},
-	popTest{
+	{
 		name: "OP_DATA_32 short",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_DATA_32],
@@ -856,7 +856,7 @@ var popTests = []popTest{
 		},
 		expectedErr: StackErrInvalidOpcode,
 	},
-	popTest{
+	{
 		name: "OP_DATA_32",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_DATA_32],
@@ -864,7 +864,7 @@ var popTests = []popTest{
 		},
 		expectedErr: nil,
 	},
-	popTest{
+	{
 		name: "OP_DATA_32 long",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_DATA_32],
@@ -872,7 +872,7 @@ var popTests = []popTest{
 		},
 		expectedErr: StackErrInvalidOpcode,
 	},
-	popTest{
+	{
 		name: "OP_DATA_33 short",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_DATA_33],
@@ -880,7 +880,7 @@ var popTests = []popTest{
 		},
 		expectedErr: StackErrInvalidOpcode,
 	},
-	popTest{
+	{
 		name: "OP_DATA_33",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_DATA_33],
@@ -888,7 +888,7 @@ var popTests = []popTest{
 		},
 		expectedErr: nil,
 	},
-	popTest{
+	{
 		name: "OP_DATA_33 long",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_DATA_33],
@@ -896,7 +896,7 @@ var popTests = []popTest{
 		},
 		expectedErr: StackErrInvalidOpcode,
 	},
-	popTest{
+	{
 		name: "OP_DATA_34 short",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_DATA_34],
@@ -904,7 +904,7 @@ var popTests = []popTest{
 		},
 		expectedErr: StackErrInvalidOpcode,
 	},
-	popTest{
+	{
 		name: "OP_DATA_34",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_DATA_34],
@@ -912,7 +912,7 @@ var popTests = []popTest{
 		},
 		expectedErr: nil,
 	},
-	popTest{
+	{
 		name: "OP_DATA_34 long",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_DATA_34],
@@ -920,7 +920,7 @@ var popTests = []popTest{
 		},
 		expectedErr: StackErrInvalidOpcode,
 	},
-	popTest{
+	{
 		name: "OP_DATA_35 short",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_DATA_35],
@@ -928,7 +928,7 @@ var popTests = []popTest{
 		},
 		expectedErr: StackErrInvalidOpcode,
 	},
-	popTest{
+	{
 		name: "OP_DATA_35",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_DATA_35],
@@ -936,7 +936,7 @@ var popTests = []popTest{
 		},
 		expectedErr: nil,
 	},
-	popTest{
+	{
 		name: "OP_DATA_35 long",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_DATA_35],
@@ -944,7 +944,7 @@ var popTests = []popTest{
 		},
 		expectedErr: StackErrInvalidOpcode,
 	},
-	popTest{
+	{
 		name: "OP_DATA_36 short",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_DATA_36],
@@ -952,7 +952,7 @@ var popTests = []popTest{
 		},
 		expectedErr: StackErrInvalidOpcode,
 	},
-	popTest{
+	{
 		name: "OP_DATA_36",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_DATA_36],
@@ -960,7 +960,7 @@ var popTests = []popTest{
 		},
 		expectedErr: nil,
 	},
-	popTest{
+	{
 		name: "OP_DATA_36 long",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_DATA_36],
@@ -968,7 +968,7 @@ var popTests = []popTest{
 		},
 		expectedErr: StackErrInvalidOpcode,
 	},
-	popTest{
+	{
 		name: "OP_DATA_37 short",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_DATA_37],
@@ -976,7 +976,7 @@ var popTests = []popTest{
 		},
 		expectedErr: StackErrInvalidOpcode,
 	},
-	popTest{
+	{
 		name: "OP_DATA_37",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_DATA_37],
@@ -984,7 +984,7 @@ var popTests = []popTest{
 		},
 		expectedErr: nil,
 	},
-	popTest{
+	{
 		name: "OP_DATA_37 long",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_DATA_37],
@@ -992,7 +992,7 @@ var popTests = []popTest{
 		},
 		expectedErr: StackErrInvalidOpcode,
 	},
-	popTest{
+	{
 		name: "OP_DATA_38 short",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_DATA_38],
@@ -1000,7 +1000,7 @@ var popTests = []popTest{
 		},
 		expectedErr: StackErrInvalidOpcode,
 	},
-	popTest{
+	{
 		name: "OP_DATA_38",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_DATA_38],
@@ -1008,7 +1008,7 @@ var popTests = []popTest{
 		},
 		expectedErr: nil,
 	},
-	popTest{
+	{
 		name: "OP_DATA_38 long",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_DATA_38],
@@ -1016,7 +1016,7 @@ var popTests = []popTest{
 		},
 		expectedErr: StackErrInvalidOpcode,
 	},
-	popTest{
+	{
 		name: "OP_DATA_39 short",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_DATA_39],
@@ -1024,7 +1024,7 @@ var popTests = []popTest{
 		},
 		expectedErr: StackErrInvalidOpcode,
 	},
-	popTest{
+	{
 		name: "OP_DATA_39",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_DATA_39],
@@ -1032,7 +1032,7 @@ var popTests = []popTest{
 		},
 		expectedErr: nil,
 	},
-	popTest{
+	{
 		name: "OP_DATA_39 long",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_DATA_39],
@@ -1040,7 +1040,7 @@ var popTests = []popTest{
 		},
 		expectedErr: StackErrInvalidOpcode,
 	},
-	popTest{
+	{
 		name: "OP_DATA_40 short",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_DATA_40],
@@ -1048,7 +1048,7 @@ var popTests = []popTest{
 		},
 		expectedErr: StackErrInvalidOpcode,
 	},
-	popTest{
+	{
 		name: "OP_DATA_40",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_DATA_40],
@@ -1056,7 +1056,7 @@ var popTests = []popTest{
 		},
 		expectedErr: nil,
 	},
-	popTest{
+	{
 		name: "OP_DATA_40 long",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_DATA_40],
@@ -1064,7 +1064,7 @@ var popTests = []popTest{
 		},
 		expectedErr: StackErrInvalidOpcode,
 	},
-	popTest{
+	{
 		name: "OP_DATA_41 short",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_DATA_41],
@@ -1072,7 +1072,7 @@ var popTests = []popTest{
 		},
 		expectedErr: StackErrInvalidOpcode,
 	},
-	popTest{
+	{
 		name: "OP_DATA_41",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_DATA_41],
@@ -1080,7 +1080,7 @@ var popTests = []popTest{
 		},
 		expectedErr: nil,
 	},
-	popTest{
+	{
 		name: "OP_DATA_41 long",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_DATA_41],
@@ -1088,7 +1088,7 @@ var popTests = []popTest{
 		},
 		expectedErr: StackErrInvalidOpcode,
 	},
-	popTest{
+	{
 		name: "OP_DATA_42 short",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_DATA_42],
@@ -1096,7 +1096,7 @@ var popTests = []popTest{
 		},
 		expectedErr: StackErrInvalidOpcode,
 	},
-	popTest{
+	{
 		name: "OP_DATA_42",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_DATA_42],
@@ -1104,7 +1104,7 @@ var popTests = []popTest{
 		},
 		expectedErr: nil,
 	},
-	popTest{
+	{
 		name: "OP_DATA_42 long",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_DATA_42],
@@ -1112,7 +1112,7 @@ var popTests = []popTest{
 		},
 		expectedErr: StackErrInvalidOpcode,
 	},
-	popTest{
+	{
 		name: "OP_DATA_43 short",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_DATA_43],
@@ -1120,7 +1120,7 @@ var popTests = []popTest{
 		},
 		expectedErr: StackErrInvalidOpcode,
 	},
-	popTest{
+	{
 		name: "OP_DATA_43",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_DATA_43],
@@ -1128,7 +1128,7 @@ var popTests = []popTest{
 		},
 		expectedErr: nil,
 	},
-	popTest{
+	{
 		name: "OP_DATA_43 long",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_DATA_43],
@@ -1136,7 +1136,7 @@ var popTests = []popTest{
 		},
 		expectedErr: StackErrInvalidOpcode,
 	},
-	popTest{
+	{
 		name: "OP_DATA_44 short",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_DATA_44],
@@ -1144,7 +1144,7 @@ var popTests = []popTest{
 		},
 		expectedErr: StackErrInvalidOpcode,
 	},
-	popTest{
+	{
 		name: "OP_DATA_44",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_DATA_44],
@@ -1152,7 +1152,7 @@ var popTests = []popTest{
 		},
 		expectedErr: nil,
 	},
-	popTest{
+	{
 		name: "OP_DATA_44 long",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_DATA_44],
@@ -1160,7 +1160,7 @@ var popTests = []popTest{
 		},
 		expectedErr: StackErrInvalidOpcode,
 	},
-	popTest{
+	{
 		name: "OP_DATA_45 short",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_DATA_45],
@@ -1168,7 +1168,7 @@ var popTests = []popTest{
 		},
 		expectedErr: StackErrInvalidOpcode,
 	},
-	popTest{
+	{
 		name: "OP_DATA_45",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_DATA_45],
@@ -1176,7 +1176,7 @@ var popTests = []popTest{
 		},
 		expectedErr: nil,
 	},
-	popTest{
+	{
 		name: "OP_DATA_45 long",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_DATA_45],
@@ -1184,7 +1184,7 @@ var popTests = []popTest{
 		},
 		expectedErr: StackErrInvalidOpcode,
 	},
-	popTest{
+	{
 		name: "OP_DATA_46 short",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_DATA_46],
@@ -1192,7 +1192,7 @@ var popTests = []popTest{
 		},
 		expectedErr: StackErrInvalidOpcode,
 	},
-	popTest{
+	{
 		name: "OP_DATA_46",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_DATA_46],
@@ -1200,7 +1200,7 @@ var popTests = []popTest{
 		},
 		expectedErr: nil,
 	},
-	popTest{
+	{
 		name: "OP_DATA_46 long",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_DATA_46],
@@ -1208,7 +1208,7 @@ var popTests = []popTest{
 		},
 		expectedErr: StackErrInvalidOpcode,
 	},
-	popTest{
+	{
 		name: "OP_DATA_47 short",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_DATA_47],
@@ -1216,7 +1216,7 @@ var popTests = []popTest{
 		},
 		expectedErr: StackErrInvalidOpcode,
 	},
-	popTest{
+	{
 		name: "OP_DATA_47",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_DATA_47],
@@ -1224,7 +1224,7 @@ var popTests = []popTest{
 		},
 		expectedErr: nil,
 	},
-	popTest{
+	{
 		name: "OP_DATA_47 long",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_DATA_47],
@@ -1232,7 +1232,7 @@ var popTests = []popTest{
 		},
 		expectedErr: StackErrInvalidOpcode,
 	},
-	popTest{
+	{
 		name: "OP_DATA_48 short",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_DATA_48],
@@ -1240,7 +1240,7 @@ var popTests = []popTest{
 		},
 		expectedErr: StackErrInvalidOpcode,
 	},
-	popTest{
+	{
 		name: "OP_DATA_48",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_DATA_48],
@@ -1248,7 +1248,7 @@ var popTests = []popTest{
 		},
 		expectedErr: nil,
 	},
-	popTest{
+	{
 		name: "OP_DATA_48 long",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_DATA_48],
@@ -1256,7 +1256,7 @@ var popTests = []popTest{
 		},
 		expectedErr: StackErrInvalidOpcode,
 	},
-	popTest{
+	{
 		name: "OP_DATA_49 short",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_DATA_49],
@@ -1264,7 +1264,7 @@ var popTests = []popTest{
 		},
 		expectedErr: StackErrInvalidOpcode,
 	},
-	popTest{
+	{
 		name: "OP_DATA_49",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_DATA_49],
@@ -1272,7 +1272,7 @@ var popTests = []popTest{
 		},
 		expectedErr: nil,
 	},
-	popTest{
+	{
 		name: "OP_DATA_49 long",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_DATA_49],
@@ -1280,7 +1280,7 @@ var popTests = []popTest{
 		},
 		expectedErr: StackErrInvalidOpcode,
 	},
-	popTest{
+	{
 		name: "OP_DATA_50 short",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_DATA_50],
@@ -1288,7 +1288,7 @@ var popTests = []popTest{
 		},
 		expectedErr: StackErrInvalidOpcode,
 	},
-	popTest{
+	{
 		name: "OP_DATA_50",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_DATA_50],
@@ -1296,7 +1296,7 @@ var popTests = []popTest{
 		},
 		expectedErr: nil,
 	},
-	popTest{
+	{
 		name: "OP_DATA_50 long",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_DATA_50],
@@ -1304,7 +1304,7 @@ var popTests = []popTest{
 		},
 		expectedErr: StackErrInvalidOpcode,
 	},
-	popTest{
+	{
 		name: "OP_DATA_51 short",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_DATA_51],
@@ -1312,7 +1312,7 @@ var popTests = []popTest{
 		},
 		expectedErr: StackErrInvalidOpcode,
 	},
-	popTest{
+	{
 		name: "OP_DATA_51",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_DATA_51],
@@ -1320,7 +1320,7 @@ var popTests = []popTest{
 		},
 		expectedErr: nil,
 	},
-	popTest{
+	{
 		name: "OP_DATA_51 long",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_DATA_51],
@@ -1328,7 +1328,7 @@ var popTests = []popTest{
 		},
 		expectedErr: StackErrInvalidOpcode,
 	},
-	popTest{
+	{
 		name: "OP_DATA_52 short",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_DATA_52],
@@ -1336,7 +1336,7 @@ var popTests = []popTest{
 		},
 		expectedErr: StackErrInvalidOpcode,
 	},
-	popTest{
+	{
 		name: "OP_DATA_52",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_DATA_52],
@@ -1344,7 +1344,7 @@ var popTests = []popTest{
 		},
 		expectedErr: nil,
 	},
-	popTest{
+	{
 		name: "OP_DATA_52 long",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_DATA_52],
@@ -1352,7 +1352,7 @@ var popTests = []popTest{
 		},
 		expectedErr: StackErrInvalidOpcode,
 	},
-	popTest{
+	{
 		name: "OP_DATA_53 short",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_DATA_53],
@@ -1360,7 +1360,7 @@ var popTests = []popTest{
 		},
 		expectedErr: StackErrInvalidOpcode,
 	},
-	popTest{
+	{
 		name: "OP_DATA_53",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_DATA_53],
@@ -1368,7 +1368,7 @@ var popTests = []popTest{
 		},
 		expectedErr: nil,
 	},
-	popTest{
+	{
 		name: "OP_DATA_53 long",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_DATA_53],
@@ -1376,7 +1376,7 @@ var popTests = []popTest{
 		},
 		expectedErr: StackErrInvalidOpcode,
 	},
-	popTest{
+	{
 		name: "OP_DATA_54 short",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_DATA_54],
@@ -1384,7 +1384,7 @@ var popTests = []popTest{
 		},
 		expectedErr: StackErrInvalidOpcode,
 	},
-	popTest{
+	{
 		name: "OP_DATA_54",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_DATA_54],
@@ -1392,7 +1392,7 @@ var popTests = []popTest{
 		},
 		expectedErr: nil,
 	},
-	popTest{
+	{
 		name: "OP_DATA_54 long",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_DATA_54],
@@ -1400,7 +1400,7 @@ var popTests = []popTest{
 		},
 		expectedErr: StackErrInvalidOpcode,
 	},
-	popTest{
+	{
 		name: "OP_DATA_55 short",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_DATA_55],
@@ -1408,7 +1408,7 @@ var popTests = []popTest{
 		},
 		expectedErr: StackErrInvalidOpcode,
 	},
-	popTest{
+	{
 		name: "OP_DATA_55",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_DATA_55],
@@ -1416,7 +1416,7 @@ var popTests = []popTest{
 		},
 		expectedErr: nil,
 	},
-	popTest{
+	{
 		name: "OP_DATA_55 long",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_DATA_55],
@@ -1424,7 +1424,7 @@ var popTests = []popTest{
 		},
 		expectedErr: StackErrInvalidOpcode,
 	},
-	popTest{
+	{
 		name: "OP_DATA_56 short",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_DATA_56],
@@ -1432,7 +1432,7 @@ var popTests = []popTest{
 		},
 		expectedErr: StackErrInvalidOpcode,
 	},
-	popTest{
+	{
 		name: "OP_DATA_56",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_DATA_56],
@@ -1440,7 +1440,7 @@ var popTests = []popTest{
 		},
 		expectedErr: nil,
 	},
-	popTest{
+	{
 		name: "OP_DATA_56 long",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_DATA_56],
@@ -1448,7 +1448,7 @@ var popTests = []popTest{
 		},
 		expectedErr: StackErrInvalidOpcode,
 	},
-	popTest{
+	{
 		name: "OP_DATA_57 short",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_DATA_57],
@@ -1456,7 +1456,7 @@ var popTests = []popTest{
 		},
 		expectedErr: StackErrInvalidOpcode,
 	},
-	popTest{
+	{
 		name: "OP_DATA_57",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_DATA_57],
@@ -1464,7 +1464,7 @@ var popTests = []popTest{
 		},
 		expectedErr: nil,
 	},
-	popTest{
+	{
 		name: "OP_DATA_57 long",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_DATA_57],
@@ -1472,7 +1472,7 @@ var popTests = []popTest{
 		},
 		expectedErr: StackErrInvalidOpcode,
 	},
-	popTest{
+	{
 		name: "OP_DATA_58 short",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_DATA_58],
@@ -1480,7 +1480,7 @@ var popTests = []popTest{
 		},
 		expectedErr: StackErrInvalidOpcode,
 	},
-	popTest{
+	{
 		name: "OP_DATA_58",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_DATA_58],
@@ -1488,7 +1488,7 @@ var popTests = []popTest{
 		},
 		expectedErr: nil,
 	},
-	popTest{
+	{
 		name: "OP_DATA_58 long",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_DATA_58],
@@ -1496,7 +1496,7 @@ var popTests = []popTest{
 		},
 		expectedErr: StackErrInvalidOpcode,
 	},
-	popTest{
+	{
 		name: "OP_DATA_59 short",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_DATA_59],
@@ -1504,7 +1504,7 @@ var popTests = []popTest{
 		},
 		expectedErr: StackErrInvalidOpcode,
 	},
-	popTest{
+	{
 		name: "OP_DATA_59",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_DATA_59],
@@ -1512,7 +1512,7 @@ var popTests = []popTest{
 		},
 		expectedErr: nil,
 	},
-	popTest{
+	{
 		name: "OP_DATA_59 long",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_DATA_59],
@@ -1520,7 +1520,7 @@ var popTests = []popTest{
 		},
 		expectedErr: StackErrInvalidOpcode,
 	},
-	popTest{
+	{
 		name: "OP_DATA_60 short",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_DATA_60],
@@ -1528,7 +1528,7 @@ var popTests = []popTest{
 		},
 		expectedErr: StackErrInvalidOpcode,
 	},
-	popTest{
+	{
 		name: "OP_DATA_60",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_DATA_60],
@@ -1536,7 +1536,7 @@ var popTests = []popTest{
 		},
 		expectedErr: nil,
 	},
-	popTest{
+	{
 		name: "OP_DATA_60 long",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_DATA_60],
@@ -1544,7 +1544,7 @@ var popTests = []popTest{
 		},
 		expectedErr: StackErrInvalidOpcode,
 	},
-	popTest{
+	{
 		name: "OP_DATA_61 short",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_DATA_61],
@@ -1552,7 +1552,7 @@ var popTests = []popTest{
 		},
 		expectedErr: StackErrInvalidOpcode,
 	},
-	popTest{
+	{
 		name: "OP_DATA_61",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_DATA_61],
@@ -1560,7 +1560,7 @@ var popTests = []popTest{
 		},
 		expectedErr: nil,
 	},
-	popTest{
+	{
 		name: "OP_DATA_61 long",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_DATA_61],
@@ -1568,7 +1568,7 @@ var popTests = []popTest{
 		},
 		expectedErr: StackErrInvalidOpcode,
 	},
-	popTest{
+	{
 		name: "OP_DATA_62 short",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_DATA_62],
@@ -1576,7 +1576,7 @@ var popTests = []popTest{
 		},
 		expectedErr: StackErrInvalidOpcode,
 	},
-	popTest{
+	{
 		name: "OP_DATA_62",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_DATA_62],
@@ -1584,7 +1584,7 @@ var popTests = []popTest{
 		},
 		expectedErr: nil,
 	},
-	popTest{
+	{
 		name: "OP_DATA_62 long",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_DATA_62],
@@ -1592,7 +1592,7 @@ var popTests = []popTest{
 		},
 		expectedErr: StackErrInvalidOpcode,
 	},
-	popTest{
+	{
 		name: "OP_DATA_63 short",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_DATA_63],
@@ -1600,7 +1600,7 @@ var popTests = []popTest{
 		},
 		expectedErr: StackErrInvalidOpcode,
 	},
-	popTest{
+	{
 		name: "OP_DATA_63",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_DATA_63],
@@ -1608,7 +1608,7 @@ var popTests = []popTest{
 		},
 		expectedErr: nil,
 	},
-	popTest{
+	{
 		name: "OP_DATA_63 long",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_DATA_63],
@@ -1616,7 +1616,7 @@ var popTests = []popTest{
 		},
 		expectedErr: StackErrInvalidOpcode,
 	},
-	popTest{
+	{
 		name: "OP_DATA_64 short",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_DATA_64],
@@ -1624,7 +1624,7 @@ var popTests = []popTest{
 		},
 		expectedErr: StackErrInvalidOpcode,
 	},
-	popTest{
+	{
 		name: "OP_DATA_64",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_DATA_64],
@@ -1632,7 +1632,7 @@ var popTests = []popTest{
 		},
 		expectedErr: nil,
 	},
-	popTest{
+	{
 		name: "OP_DATA_64 long",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_DATA_64],
@@ -1640,7 +1640,7 @@ var popTests = []popTest{
 		},
 		expectedErr: StackErrInvalidOpcode,
 	},
-	popTest{
+	{
 		name: "OP_DATA_65 short",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_DATA_65],
@@ -1648,7 +1648,7 @@ var popTests = []popTest{
 		},
 		expectedErr: StackErrInvalidOpcode,
 	},
-	popTest{
+	{
 		name: "OP_DATA_65",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_DATA_65],
@@ -1656,7 +1656,7 @@ var popTests = []popTest{
 		},
 		expectedErr: nil,
 	},
-	popTest{
+	{
 		name: "OP_DATA_65 long",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_DATA_65],
@@ -1664,7 +1664,7 @@ var popTests = []popTest{
 		},
 		expectedErr: StackErrInvalidOpcode,
 	},
-	popTest{
+	{
 		name: "OP_DATA_66 short",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_DATA_66],
@@ -1672,7 +1672,7 @@ var popTests = []popTest{
 		},
 		expectedErr: StackErrInvalidOpcode,
 	},
-	popTest{
+	{
 		name: "OP_DATA_66",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_DATA_66],
@@ -1680,7 +1680,7 @@ var popTests = []popTest{
 		},
 		expectedErr: nil,
 	},
-	popTest{
+	{
 		name: "OP_DATA_66 long",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_DATA_66],
@@ -1688,7 +1688,7 @@ var popTests = []popTest{
 		},
 		expectedErr: StackErrInvalidOpcode,
 	},
-	popTest{
+	{
 		name: "OP_DATA_67 short",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_DATA_67],
@@ -1696,7 +1696,7 @@ var popTests = []popTest{
 		},
 		expectedErr: StackErrInvalidOpcode,
 	},
-	popTest{
+	{
 		name: "OP_DATA_67",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_DATA_67],
@@ -1704,7 +1704,7 @@ var popTests = []popTest{
 		},
 		expectedErr: nil,
 	},
-	popTest{
+	{
 		name: "OP_DATA_67 long",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_DATA_67],
@@ -1712,7 +1712,7 @@ var popTests = []popTest{
 		},
 		expectedErr: StackErrInvalidOpcode,
 	},
-	popTest{
+	{
 		name: "OP_DATA_68 short",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_DATA_68],
@@ -1720,7 +1720,7 @@ var popTests = []popTest{
 		},
 		expectedErr: StackErrInvalidOpcode,
 	},
-	popTest{
+	{
 		name: "OP_DATA_68",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_DATA_68],
@@ -1728,7 +1728,7 @@ var popTests = []popTest{
 		},
 		expectedErr: nil,
 	},
-	popTest{
+	{
 		name: "OP_DATA_68 long",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_DATA_68],
@@ -1736,7 +1736,7 @@ var popTests = []popTest{
 		},
 		expectedErr: StackErrInvalidOpcode,
 	},
-	popTest{
+	{
 		name: "OP_DATA_69 short",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_DATA_69],
@@ -1744,7 +1744,7 @@ var popTests = []popTest{
 		},
 		expectedErr: StackErrInvalidOpcode,
 	},
-	popTest{
+	{
 		name: "OP_DATA_69",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_DATA_69],
@@ -1752,7 +1752,7 @@ var popTests = []popTest{
 		},
 		expectedErr: nil,
 	},
-	popTest{
+	{
 		name: "OP_DATA_69 long",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_DATA_69],
@@ -1760,7 +1760,7 @@ var popTests = []popTest{
 		},
 		expectedErr: StackErrInvalidOpcode,
 	},
-	popTest{
+	{
 		name: "OP_DATA_70 short",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_DATA_70],
@@ -1768,7 +1768,7 @@ var popTests = []popTest{
 		},
 		expectedErr: StackErrInvalidOpcode,
 	},
-	popTest{
+	{
 		name: "OP_DATA_70",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_DATA_70],
@@ -1776,7 +1776,7 @@ var popTests = []popTest{
 		},
 		expectedErr: nil,
 	},
-	popTest{
+	{
 		name: "OP_DATA_70 long",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_DATA_70],
@@ -1784,7 +1784,7 @@ var popTests = []popTest{
 		},
 		expectedErr: StackErrInvalidOpcode,
 	},
-	popTest{
+	{
 		name: "OP_DATA_71 short",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_DATA_71],
@@ -1792,7 +1792,7 @@ var popTests = []popTest{
 		},
 		expectedErr: StackErrInvalidOpcode,
 	},
-	popTest{
+	{
 		name: "OP_DATA_71",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_DATA_71],
@@ -1800,7 +1800,7 @@ var popTests = []popTest{
 		},
 		expectedErr: nil,
 	},
-	popTest{
+	{
 		name: "OP_DATA_71 long",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_DATA_71],
@@ -1808,7 +1808,7 @@ var popTests = []popTest{
 		},
 		expectedErr: StackErrInvalidOpcode,
 	},
-	popTest{
+	{
 		name: "OP_DATA_72 short",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_DATA_72],
@@ -1816,7 +1816,7 @@ var popTests = []popTest{
 		},
 		expectedErr: StackErrInvalidOpcode,
 	},
-	popTest{
+	{
 		name: "OP_DATA_72",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_DATA_72],
@@ -1824,7 +1824,7 @@ var popTests = []popTest{
 		},
 		expectedErr: nil,
 	},
-	popTest{
+	{
 		name: "OP_DATA_72 long",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_DATA_72],
@@ -1832,7 +1832,7 @@ var popTests = []popTest{
 		},
 		expectedErr: StackErrInvalidOpcode,
 	},
-	popTest{
+	{
 		name: "OP_DATA_73 short",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_DATA_73],
@@ -1840,7 +1840,7 @@ var popTests = []popTest{
 		},
 		expectedErr: StackErrInvalidOpcode,
 	},
-	popTest{
+	{
 		name: "OP_DATA_73",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_DATA_73],
@@ -1848,7 +1848,7 @@ var popTests = []popTest{
 		},
 		expectedErr: nil,
 	},
-	popTest{
+	{
 		name: "OP_DATA_73 long",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_DATA_73],
@@ -1856,7 +1856,7 @@ var popTests = []popTest{
 		},
 		expectedErr: StackErrInvalidOpcode,
 	},
-	popTest{
+	{
 		name: "OP_DATA_74 short",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_DATA_74],
@@ -1864,7 +1864,7 @@ var popTests = []popTest{
 		},
 		expectedErr: StackErrInvalidOpcode,
 	},
-	popTest{
+	{
 		name: "OP_DATA_74",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_DATA_74],
@@ -1872,7 +1872,7 @@ var popTests = []popTest{
 		},
 		expectedErr: nil,
 	},
-	popTest{
+	{
 		name: "OP_DATA_74 long",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_DATA_74],
@@ -1880,7 +1880,7 @@ var popTests = []popTest{
 		},
 		expectedErr: StackErrInvalidOpcode,
 	},
-	popTest{
+	{
 		name: "OP_DATA_75 short",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_DATA_75],
@@ -1888,7 +1888,7 @@ var popTests = []popTest{
 		},
 		expectedErr: StackErrInvalidOpcode,
 	},
-	popTest{
+	{
 		name: "OP_DATA_75",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_DATA_75],
@@ -1896,7 +1896,7 @@ var popTests = []popTest{
 		},
 		expectedErr: nil,
 	},
-	popTest{
+	{
 		name: "OP_DATA_75 long",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_DATA_75],
@@ -1904,7 +1904,7 @@ var popTests = []popTest{
 		},
 		expectedErr: StackErrInvalidOpcode,
 	},
-	popTest{
+	{
 		name: "OP_PUSHDATA1",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_PUSHDATA1],
@@ -1912,7 +1912,7 @@ var popTests = []popTest{
 		},
 		expectedErr: nil,
 	},
-	popTest{
+	{
 		name: "OP_PUSHDATA2",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_PUSHDATA2],
@@ -1920,7 +1920,7 @@ var popTests = []popTest{
 		},
 		expectedErr: nil,
 	},
-	popTest{
+	{
 		name: "OP_PUSHDATA4",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_PUSHDATA1],
@@ -1928,7 +1928,7 @@ var popTests = []popTest{
 		},
 		expectedErr: nil,
 	},
-	popTest{
+	{
 		name: "OP_1NEGATE",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_1NEGATE],
@@ -1936,7 +1936,7 @@ var popTests = []popTest{
 		},
 		expectedErr: nil,
 	},
-	popTest{
+	{
 		name: "OP_1NEGATE long",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_1NEGATE],
@@ -1944,7 +1944,7 @@ var popTests = []popTest{
 		},
 		expectedErr: StackErrInvalidOpcode,
 	},
-	popTest{
+	{
 		name: "OP_RESERVED",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_RESERVED],
@@ -1952,7 +1952,7 @@ var popTests = []popTest{
 		},
 		expectedErr: nil,
 	},
-	popTest{
+	{
 		name: "OP_RESERVED long",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_RESERVED],
@@ -1960,7 +1960,7 @@ var popTests = []popTest{
 		},
 		expectedErr: StackErrInvalidOpcode,
 	},
-	popTest{
+	{
 		name: "OP_TRUE",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_TRUE],
@@ -1968,7 +1968,7 @@ var popTests = []popTest{
 		},
 		expectedErr: nil,
 	},
-	popTest{
+	{
 		name: "OP_TRUE long",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_TRUE],
@@ -1976,7 +1976,7 @@ var popTests = []popTest{
 		},
 		expectedErr: StackErrInvalidOpcode,
 	},
-	popTest{
+	{
 		name: "OP_2",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_2],
@@ -1984,7 +1984,7 @@ var popTests = []popTest{
 		},
 		expectedErr: nil,
 	},
-	popTest{
+	{
 		name: "OP_2 long",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_2],
@@ -1992,7 +1992,7 @@ var popTests = []popTest{
 		},
 		expectedErr: StackErrInvalidOpcode,
 	},
-	popTest{
+	{
 		name: "OP_2",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_2],
@@ -2000,7 +2000,7 @@ var popTests = []popTest{
 		},
 		expectedErr: nil,
 	},
-	popTest{
+	{
 		name: "OP_2 long",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_2],
@@ -2008,7 +2008,7 @@ var popTests = []popTest{
 		},
 		expectedErr: StackErrInvalidOpcode,
 	},
-	popTest{
+	{
 		name: "OP_3",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_3],
@@ -2016,7 +2016,7 @@ var popTests = []popTest{
 		},
 		expectedErr: nil,
 	},
-	popTest{
+	{
 		name: "OP_3 long",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_3],
@@ -2024,7 +2024,7 @@ var popTests = []popTest{
 		},
 		expectedErr: StackErrInvalidOpcode,
 	},
-	popTest{
+	{
 		name: "OP_4",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_4],
@@ -2032,7 +2032,7 @@ var popTests = []popTest{
 		},
 		expectedErr: nil,
 	},
-	popTest{
+	{
 		name: "OP_4 long",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_4],
@@ -2040,7 +2040,7 @@ var popTests = []popTest{
 		},
 		expectedErr: StackErrInvalidOpcode,
 	},
-	popTest{
+	{
 		name: "OP_5",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_5],
@@ -2048,7 +2048,7 @@ var popTests = []popTest{
 		},
 		expectedErr: nil,
 	},
-	popTest{
+	{
 		name: "OP_5 long",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_5],
@@ -2056,7 +2056,7 @@ var popTests = []popTest{
 		},
 		expectedErr: StackErrInvalidOpcode,
 	},
-	popTest{
+	{
 		name: "OP_6",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_6],
@@ -2064,7 +2064,7 @@ var popTests = []popTest{
 		},
 		expectedErr: nil,
 	},
-	popTest{
+	{
 		name: "OP_6 long",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_6],
@@ -2072,7 +2072,7 @@ var popTests = []popTest{
 		},
 		expectedErr: StackErrInvalidOpcode,
 	},
-	popTest{
+	{
 		name: "OP_7",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_7],
@@ -2080,7 +2080,7 @@ var popTests = []popTest{
 		},
 		expectedErr: nil,
 	},
-	popTest{
+	{
 		name: "OP_7 long",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_7],
@@ -2088,7 +2088,7 @@ var popTests = []popTest{
 		},
 		expectedErr: StackErrInvalidOpcode,
 	},
-	popTest{
+	{
 		name: "OP_8",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_8],
@@ -2096,7 +2096,7 @@ var popTests = []popTest{
 		},
 		expectedErr: nil,
 	},
-	popTest{
+	{
 		name: "OP_8 long",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_8],
@@ -2104,7 +2104,7 @@ var popTests = []popTest{
 		},
 		expectedErr: StackErrInvalidOpcode,
 	},
-	popTest{
+	{
 		name: "OP_9",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_9],
@@ -2112,7 +2112,7 @@ var popTests = []popTest{
 		},
 		expectedErr: nil,
 	},
-	popTest{
+	{
 		name: "OP_9 long",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_9],
@@ -2120,7 +2120,7 @@ var popTests = []popTest{
 		},
 		expectedErr: StackErrInvalidOpcode,
 	},
-	popTest{
+	{
 		name: "OP_10",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_10],
@@ -2128,7 +2128,7 @@ var popTests = []popTest{
 		},
 		expectedErr: nil,
 	},
-	popTest{
+	{
 		name: "OP_10 long",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_10],
@@ -2136,7 +2136,7 @@ var popTests = []popTest{
 		},
 		expectedErr: StackErrInvalidOpcode,
 	},
-	popTest{
+	{
 		name: "OP_11",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_11],
@@ -2144,7 +2144,7 @@ var popTests = []popTest{
 		},
 		expectedErr: nil,
 	},
-	popTest{
+	{
 		name: "OP_11 long",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_11],
@@ -2152,7 +2152,7 @@ var popTests = []popTest{
 		},
 		expectedErr: StackErrInvalidOpcode,
 	},
-	popTest{
+	{
 		name: "OP_12",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_12],
@@ -2160,7 +2160,7 @@ var popTests = []popTest{
 		},
 		expectedErr: nil,
 	},
-	popTest{
+	{
 		name: "OP_12 long",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_12],
@@ -2168,7 +2168,7 @@ var popTests = []popTest{
 		},
 		expectedErr: StackErrInvalidOpcode,
 	},
-	popTest{
+	{
 		name: "OP_13",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_13],
@@ -2176,7 +2176,7 @@ var popTests = []popTest{
 		},
 		expectedErr: nil,
 	},
-	popTest{
+	{
 		name: "OP_13 long",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_13],
@@ -2184,7 +2184,7 @@ var popTests = []popTest{
 		},
 		expectedErr: StackErrInvalidOpcode,
 	},
-	popTest{
+	{
 		name: "OP_14",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_14],
@@ -2192,7 +2192,7 @@ var popTests = []popTest{
 		},
 		expectedErr: nil,
 	},
-	popTest{
+	{
 		name: "OP_14 long",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_14],
@@ -2200,7 +2200,7 @@ var popTests = []popTest{
 		},
 		expectedErr: StackErrInvalidOpcode,
 	},
-	popTest{
+	{
 		name: "OP_15",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_15],
@@ -2208,7 +2208,7 @@ var popTests = []popTest{
 		},
 		expectedErr: nil,
 	},
-	popTest{
+	{
 		name: "OP_15 long",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_15],
@@ -2216,7 +2216,7 @@ var popTests = []popTest{
 		},
 		expectedErr: StackErrInvalidOpcode,
 	},
-	popTest{
+	{
 		name: "OP_16",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_16],
@@ -2224,7 +2224,7 @@ var popTests = []popTest{
 		},
 		expectedErr: nil,
 	},
-	popTest{
+	{
 		name: "OP_16 long",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_16],
@@ -2232,7 +2232,7 @@ var popTests = []popTest{
 		},
 		expectedErr: StackErrInvalidOpcode,
 	},
-	popTest{
+	{
 		name: "OP_NOP",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_NOP],
@@ -2240,7 +2240,7 @@ var popTests = []popTest{
 		},
 		expectedErr: nil,
 	},
-	popTest{
+	{
 		name: "OP_NOP long",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_NOP],
@@ -2248,7 +2248,7 @@ var popTests = []popTest{
 		},
 		expectedErr: StackErrInvalidOpcode,
 	},
-	popTest{
+	{
 		name: "OP_VER",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_VER],
@@ -2256,7 +2256,7 @@ var popTests = []popTest{
 		},
 		expectedErr: nil,
 	},
-	popTest{
+	{
 		name: "OP_VER long",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_VER],
@@ -2264,7 +2264,7 @@ var popTests = []popTest{
 		},
 		expectedErr: StackErrInvalidOpcode,
 	},
-	popTest{
+	{
 		name: "OP_IF",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_IF],
@@ -2272,7 +2272,7 @@ var popTests = []popTest{
 		},
 		expectedErr: nil,
 	},
-	popTest{
+	{
 		name: "OP_IF long",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_IF],
@@ -2280,7 +2280,7 @@ var popTests = []popTest{
 		},
 		expectedErr: StackErrInvalidOpcode,
 	},
-	popTest{
+	{
 		name: "OP_NOTIF",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_NOTIF],
@@ -2288,7 +2288,7 @@ var popTests = []popTest{
 		},
 		expectedErr: nil,
 	},
-	popTest{
+	{
 		name: "OP_NOTIF long",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_NOTIF],
@@ -2296,7 +2296,7 @@ var popTests = []popTest{
 		},
 		expectedErr: StackErrInvalidOpcode,
 	},
-	popTest{
+	{
 		name: "OP_VERIF",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_VERIF],
@@ -2304,7 +2304,7 @@ var popTests = []popTest{
 		},
 		expectedErr: nil,
 	},
-	popTest{
+	{
 		name: "OP_VERIF long",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_VERIF],
@@ -2312,7 +2312,7 @@ var popTests = []popTest{
 		},
 		expectedErr: StackErrInvalidOpcode,
 	},
-	popTest{
+	{
 		name: "OP_VERNOTIF",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_VERNOTIF],
@@ -2320,7 +2320,7 @@ var popTests = []popTest{
 		},
 		expectedErr: nil,
 	},
-	popTest{
+	{
 		name: "OP_VERNOTIF long",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_VERNOTIF],
@@ -2328,7 +2328,7 @@ var popTests = []popTest{
 		},
 		expectedErr: StackErrInvalidOpcode,
 	},
-	popTest{
+	{
 		name: "OP_ELSE",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_ELSE],
@@ -2336,7 +2336,7 @@ var popTests = []popTest{
 		},
 		expectedErr: nil,
 	},
-	popTest{
+	{
 		name: "OP_ELSE long",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_ELSE],
@@ -2344,7 +2344,7 @@ var popTests = []popTest{
 		},
 		expectedErr: StackErrInvalidOpcode,
 	},
-	popTest{
+	{
 		name: "OP_ENDIF",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_ENDIF],
@@ -2352,7 +2352,7 @@ var popTests = []popTest{
 		},
 		expectedErr: nil,
 	},
-	popTest{
+	{
 		name: "OP_ENDIF long",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_ENDIF],
@@ -2360,7 +2360,7 @@ var popTests = []popTest{
 		},
 		expectedErr: StackErrInvalidOpcode,
 	},
-	popTest{
+	{
 		name: "OP_VERIFY",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_VERIFY],
@@ -2368,7 +2368,7 @@ var popTests = []popTest{
 		},
 		expectedErr: nil,
 	},
-	popTest{
+	{
 		name: "OP_VERIFY long",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_VERIFY],
@@ -2376,7 +2376,7 @@ var popTests = []popTest{
 		},
 		expectedErr: StackErrInvalidOpcode,
 	},
-	popTest{
+	{
 		name: "OP_RETURN",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_RETURN],
@@ -2384,7 +2384,7 @@ var popTests = []popTest{
 		},
 		expectedErr: nil,
 	},
-	popTest{
+	{
 		name: "OP_RETURN long",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_RETURN],
@@ -2392,7 +2392,7 @@ var popTests = []popTest{
 		},
 		expectedErr: StackErrInvalidOpcode,
 	},
-	popTest{
+	{
 		name: "OP_TOALTSTACK",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_TOALTSTACK],
@@ -2400,7 +2400,7 @@ var popTests = []popTest{
 		},
 		expectedErr: nil,
 	},
-	popTest{
+	{
 		name: "OP_TOALTSTACK long",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_TOALTSTACK],
@@ -2408,7 +2408,7 @@ var popTests = []popTest{
 		},
 		expectedErr: StackErrInvalidOpcode,
 	},
-	popTest{
+	{
 		name: "OP_FROMALTSTACK",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_FROMALTSTACK],
@@ -2416,7 +2416,7 @@ var popTests = []popTest{
 		},
 		expectedErr: nil,
 	},
-	popTest{
+	{
 		name: "OP_FROMALTSTACK long",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_FROMALTSTACK],
@@ -2424,7 +2424,7 @@ var popTests = []popTest{
 		},
 		expectedErr: StackErrInvalidOpcode,
 	},
-	popTest{
+	{
 		name: "OP_2DROP",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_2DROP],
@@ -2432,7 +2432,7 @@ var popTests = []popTest{
 		},
 		expectedErr: nil,
 	},
-	popTest{
+	{
 		name: "OP_2DROP long",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_2DROP],
@@ -2440,7 +2440,7 @@ var popTests = []popTest{
 		},
 		expectedErr: StackErrInvalidOpcode,
 	},
-	popTest{
+	{
 		name: "OP_2DUP",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_2DUP],
@@ -2448,7 +2448,7 @@ var popTests = []popTest{
 		},
 		expectedErr: nil,
 	},
-	popTest{
+	{
 		name: "OP_2DUP long",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_2DUP],
@@ -2456,7 +2456,7 @@ var popTests = []popTest{
 		},
 		expectedErr: StackErrInvalidOpcode,
 	},
-	popTest{
+	{
 		name: "OP_3DUP",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_3DUP],
@@ -2464,7 +2464,7 @@ var popTests = []popTest{
 		},
 		expectedErr: nil,
 	},
-	popTest{
+	{
 		name: "OP_3DUP long",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_3DUP],
@@ -2472,7 +2472,7 @@ var popTests = []popTest{
 		},
 		expectedErr: StackErrInvalidOpcode,
 	},
-	popTest{
+	{
 		name: "OP_2OVER",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_2OVER],
@@ -2480,7 +2480,7 @@ var popTests = []popTest{
 		},
 		expectedErr: nil,
 	},
-	popTest{
+	{
 		name: "OP_2OVER long",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_2OVER],
@@ -2488,7 +2488,7 @@ var popTests = []popTest{
 		},
 		expectedErr: StackErrInvalidOpcode,
 	},
-	popTest{
+	{
 		name: "OP_2ROT",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_2ROT],
@@ -2496,7 +2496,7 @@ var popTests = []popTest{
 		},
 		expectedErr: nil,
 	},
-	popTest{
+	{
 		name: "OP_2ROT long",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_2ROT],
@@ -2504,7 +2504,7 @@ var popTests = []popTest{
 		},
 		expectedErr: StackErrInvalidOpcode,
 	},
-	popTest{
+	{
 		name: "OP_2SWAP",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_2SWAP],
@@ -2512,7 +2512,7 @@ var popTests = []popTest{
 		},
 		expectedErr: nil,
 	},
-	popTest{
+	{
 		name: "OP_2SWAP long",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_2SWAP],
@@ -2520,7 +2520,7 @@ var popTests = []popTest{
 		},
 		expectedErr: StackErrInvalidOpcode,
 	},
-	popTest{
+	{
 		name: "OP_IFDUP",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_IFDUP],
@@ -2528,7 +2528,7 @@ var popTests = []popTest{
 		},
 		expectedErr: nil,
 	},
-	popTest{
+	{
 		name: "OP_IFDUP long",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_IFDUP],
@@ -2536,7 +2536,7 @@ var popTests = []popTest{
 		},
 		expectedErr: StackErrInvalidOpcode,
 	},
-	popTest{
+	{
 		name: "OP_DEPTH",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_DEPTH],
@@ -2544,7 +2544,7 @@ var popTests = []popTest{
 		},
 		expectedErr: nil,
 	},
-	popTest{
+	{
 		name: "OP_DEPTH long",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_DEPTH],
@@ -2552,7 +2552,7 @@ var popTests = []popTest{
 		},
 		expectedErr: StackErrInvalidOpcode,
 	},
-	popTest{
+	{
 		name: "OP_DROP",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_DROP],
@@ -2560,7 +2560,7 @@ var popTests = []popTest{
 		},
 		expectedErr: nil,
 	},
-	popTest{
+	{
 		name: "OP_DROP long",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_DROP],
@@ -2568,7 +2568,7 @@ var popTests = []popTest{
 		},
 		expectedErr: StackErrInvalidOpcode,
 	},
-	popTest{
+	{
 		name: "OP_DUP",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_DUP],
@@ -2576,7 +2576,7 @@ var popTests = []popTest{
 		},
 		expectedErr: nil,
 	},
-	popTest{
+	{
 		name: "OP_DUP long",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_DUP],
@@ -2584,7 +2584,7 @@ var popTests = []popTest{
 		},
 		expectedErr: StackErrInvalidOpcode,
 	},
-	popTest{
+	{
 		name: "OP_NIP",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_NIP],
@@ -2592,7 +2592,7 @@ var popTests = []popTest{
 		},
 		expectedErr: nil,
 	},
-	popTest{
+	{
 		name: "OP_NIP long",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_NIP],
@@ -2600,7 +2600,7 @@ var popTests = []popTest{
 		},
 		expectedErr: StackErrInvalidOpcode,
 	},
-	popTest{
+	{
 		name: "OP_OVER",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_OVER],
@@ -2608,7 +2608,7 @@ var popTests = []popTest{
 		},
 		expectedErr: nil,
 	},
-	popTest{
+	{
 		name: "OP_OVER long",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_OVER],
@@ -2616,7 +2616,7 @@ var popTests = []popTest{
 		},
 		expectedErr: StackErrInvalidOpcode,
 	},
-	popTest{
+	{
 		name: "OP_PICK",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_PICK],
@@ -2624,7 +2624,7 @@ var popTests = []popTest{
 		},
 		expectedErr: nil,
 	},
-	popTest{
+	{
 		name: "OP_PICK long",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_PICK],
@@ -2632,7 +2632,7 @@ var popTests = []popTest{
 		},
 		expectedErr: StackErrInvalidOpcode,
 	},
-	popTest{
+	{
 		name: "OP_ROLL",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_ROLL],
@@ -2640,7 +2640,7 @@ var popTests = []popTest{
 		},
 		expectedErr: nil,
 	},
-	popTest{
+	{
 		name: "OP_ROLL long",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_ROLL],
@@ -2648,7 +2648,7 @@ var popTests = []popTest{
 		},
 		expectedErr: StackErrInvalidOpcode,
 	},
-	popTest{
+	{
 		name: "OP_ROT",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_ROT],
@@ -2656,7 +2656,7 @@ var popTests = []popTest{
 		},
 		expectedErr: nil,
 	},
-	popTest{
+	{
 		name: "OP_ROT long",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_ROT],
@@ -2664,7 +2664,7 @@ var popTests = []popTest{
 		},
 		expectedErr: StackErrInvalidOpcode,
 	},
-	popTest{
+	{
 		name: "OP_SWAP",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_SWAP],
@@ -2672,7 +2672,7 @@ var popTests = []popTest{
 		},
 		expectedErr: nil,
 	},
-	popTest{
+	{
 		name: "OP_SWAP long",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_SWAP],
@@ -2680,7 +2680,7 @@ var popTests = []popTest{
 		},
 		expectedErr: StackErrInvalidOpcode,
 	},
-	popTest{
+	{
 		name: "OP_TUCK",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_TUCK],
@@ -2688,7 +2688,7 @@ var popTests = []popTest{
 		},
 		expectedErr: nil,
 	},
-	popTest{
+	{
 		name: "OP_TUCK long",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_TUCK],
@@ -2696,7 +2696,7 @@ var popTests = []popTest{
 		},
 		expectedErr: StackErrInvalidOpcode,
 	},
-	popTest{
+	{
 		name: "OP_CAT",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_CAT],
@@ -2704,7 +2704,7 @@ var popTests = []popTest{
 		},
 		expectedErr: nil,
 	},
-	popTest{
+	{
 		name: "OP_CAT long",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_CAT],
@@ -2712,7 +2712,7 @@ var popTests = []popTest{
 		},
 		expectedErr: StackErrInvalidOpcode,
 	},
-	popTest{
+	{
 		name: "OP_SUBSTR",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_SUBSTR],
@@ -2720,7 +2720,7 @@ var popTests = []popTest{
 		},
 		expectedErr: nil,
 	},
-	popTest{
+	{
 		name: "OP_SUBSTR long",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_SUBSTR],
@@ -2728,7 +2728,7 @@ var popTests = []popTest{
 		},
 		expectedErr: StackErrInvalidOpcode,
 	},
-	popTest{
+	{
 		name: "OP_LEFT",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_LEFT],
@@ -2736,7 +2736,7 @@ var popTests = []popTest{
 		},
 		expectedErr: nil,
 	},
-	popTest{
+	{
 		name: "OP_LEFT long",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_LEFT],
@@ -2744,7 +2744,7 @@ var popTests = []popTest{
 		},
 		expectedErr: StackErrInvalidOpcode,
 	},
-	popTest{
+	{
 		name: "OP_LEFT",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_LEFT],
@@ -2752,7 +2752,7 @@ var popTests = []popTest{
 		},
 		expectedErr: nil,
 	},
-	popTest{
+	{
 		name: "OP_LEFT long",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_LEFT],
@@ -2760,7 +2760,7 @@ var popTests = []popTest{
 		},
 		expectedErr: StackErrInvalidOpcode,
 	},
-	popTest{
+	{
 		name: "OP_RIGHT",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_RIGHT],
@@ -2768,7 +2768,7 @@ var popTests = []popTest{
 		},
 		expectedErr: nil,
 	},
-	popTest{
+	{
 		name: "OP_RIGHT long",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_RIGHT],
@@ -2776,7 +2776,7 @@ var popTests = []popTest{
 		},
 		expectedErr: StackErrInvalidOpcode,
 	},
-	popTest{
+	{
 		name: "OP_SIZE",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_SIZE],
@@ -2784,7 +2784,7 @@ var popTests = []popTest{
 		},
 		expectedErr: nil,
 	},
-	popTest{
+	{
 		name: "OP_SIZE long",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_SIZE],
@@ -2792,7 +2792,7 @@ var popTests = []popTest{
 		},
 		expectedErr: StackErrInvalidOpcode,
 	},
-	popTest{
+	{
 		name: "OP_INVERT",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_INVERT],
@@ -2800,7 +2800,7 @@ var popTests = []popTest{
 		},
 		expectedErr: nil,
 	},
-	popTest{
+	{
 		name: "OP_INVERT long",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_INVERT],
@@ -2808,7 +2808,7 @@ var popTests = []popTest{
 		},
 		expectedErr: StackErrInvalidOpcode,
 	},
-	popTest{
+	{
 		name: "OP_AND",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_AND],
@@ -2816,7 +2816,7 @@ var popTests = []popTest{
 		},
 		expectedErr: nil,
 	},
-	popTest{
+	{
 		name: "OP_AND long",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_AND],
@@ -2824,7 +2824,7 @@ var popTests = []popTest{
 		},
 		expectedErr: StackErrInvalidOpcode,
 	},
-	popTest{
+	{
 		name: "OP_OR",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_OR],
@@ -2832,7 +2832,7 @@ var popTests = []popTest{
 		},
 		expectedErr: nil,
 	},
-	popTest{
+	{
 		name: "OP_OR long",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_OR],
@@ -2840,7 +2840,7 @@ var popTests = []popTest{
 		},
 		expectedErr: StackErrInvalidOpcode,
 	},
-	popTest{
+	{
 		name: "OP_XOR",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_XOR],
@@ -2848,7 +2848,7 @@ var popTests = []popTest{
 		},
 		expectedErr: nil,
 	},
-	popTest{
+	{
 		name: "OP_XOR long",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_XOR],
@@ -2856,7 +2856,7 @@ var popTests = []popTest{
 		},
 		expectedErr: StackErrInvalidOpcode,
 	},
-	popTest{
+	{
 		name: "OP_EQUAL",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_EQUAL],
@@ -2864,7 +2864,7 @@ var popTests = []popTest{
 		},
 		expectedErr: nil,
 	},
-	popTest{
+	{
 		name: "OP_EQUAL long",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_EQUAL],
@@ -2872,7 +2872,7 @@ var popTests = []popTest{
 		},
 		expectedErr: StackErrInvalidOpcode,
 	},
-	popTest{
+	{
 		name: "OP_EQUALVERIFY",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_EQUALVERIFY],
@@ -2880,7 +2880,7 @@ var popTests = []popTest{
 		},
 		expectedErr: nil,
 	},
-	popTest{
+	{
 		name: "OP_EQUALVERIFY long",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_EQUALVERIFY],
@@ -2888,7 +2888,7 @@ var popTests = []popTest{
 		},
 		expectedErr: StackErrInvalidOpcode,
 	},
-	popTest{
+	{
 		name: "OP_RESERVED1",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_RESERVED1],
@@ -2896,7 +2896,7 @@ var popTests = []popTest{
 		},
 		expectedErr: nil,
 	},
-	popTest{
+	{
 		name: "OP_RESERVED1 long",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_RESERVED1],
@@ -2904,7 +2904,7 @@ var popTests = []popTest{
 		},
 		expectedErr: StackErrInvalidOpcode,
 	},
-	popTest{
+	{
 		name: "OP_RESERVED2",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_RESERVED2],
@@ -2912,7 +2912,7 @@ var popTests = []popTest{
 		},
 		expectedErr: nil,
 	},
-	popTest{
+	{
 		name: "OP_RESERVED2 long",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_RESERVED2],
@@ -2920,7 +2920,7 @@ var popTests = []popTest{
 		},
 		expectedErr: StackErrInvalidOpcode,
 	},
-	popTest{
+	{
 		name: "OP_1ADD",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_1ADD],
@@ -2928,7 +2928,7 @@ var popTests = []popTest{
 		},
 		expectedErr: nil,
 	},
-	popTest{
+	{
 		name: "OP_1ADD long",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_1ADD],
@@ -2936,7 +2936,7 @@ var popTests = []popTest{
 		},
 		expectedErr: StackErrInvalidOpcode,
 	},
-	popTest{
+	{
 		name: "OP_1SUB",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_1SUB],
@@ -2944,7 +2944,7 @@ var popTests = []popTest{
 		},
 		expectedErr: nil,
 	},
-	popTest{
+	{
 		name: "OP_1SUB long",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_1SUB],
@@ -2952,7 +2952,7 @@ var popTests = []popTest{
 		},
 		expectedErr: StackErrInvalidOpcode,
 	},
-	popTest{
+	{
 		name: "OP_2MUL",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_2MUL],
@@ -2960,7 +2960,7 @@ var popTests = []popTest{
 		},
 		expectedErr: nil,
 	},
-	popTest{
+	{
 		name: "OP_2MUL long",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_2MUL],
@@ -2968,7 +2968,7 @@ var popTests = []popTest{
 		},
 		expectedErr: StackErrInvalidOpcode,
 	},
-	popTest{
+	{
 		name: "OP_2DIV",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_2DIV],
@@ -2976,7 +2976,7 @@ var popTests = []popTest{
 		},
 		expectedErr: nil,
 	},
-	popTest{
+	{
 		name: "OP_2DIV long",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_2DIV],
@@ -2984,7 +2984,7 @@ var popTests = []popTest{
 		},
 		expectedErr: StackErrInvalidOpcode,
 	},
-	popTest{
+	{
 		name: "OP_NEGATE",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_NEGATE],
@@ -2992,7 +2992,7 @@ var popTests = []popTest{
 		},
 		expectedErr: nil,
 	},
-	popTest{
+	{
 		name: "OP_NEGATE long",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_NEGATE],
@@ -3000,7 +3000,7 @@ var popTests = []popTest{
 		},
 		expectedErr: StackErrInvalidOpcode,
 	},
-	popTest{
+	{
 		name: "OP_ABS",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_ABS],
@@ -3008,7 +3008,7 @@ var popTests = []popTest{
 		},
 		expectedErr: nil,
 	},
-	popTest{
+	{
 		name: "OP_ABS long",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_ABS],
@@ -3016,7 +3016,7 @@ var popTests = []popTest{
 		},
 		expectedErr: StackErrInvalidOpcode,
 	},
-	popTest{
+	{
 		name: "OP_NOT",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_NOT],
@@ -3024,7 +3024,7 @@ var popTests = []popTest{
 		},
 		expectedErr: nil,
 	},
-	popTest{
+	{
 		name: "OP_NOT long",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_NOT],
@@ -3032,7 +3032,7 @@ var popTests = []popTest{
 		},
 		expectedErr: StackErrInvalidOpcode,
 	},
-	popTest{
+	{
 		name: "OP_0NOTEQUAL",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_0NOTEQUAL],
@@ -3040,7 +3040,7 @@ var popTests = []popTest{
 		},
 		expectedErr: nil,
 	},
-	popTest{
+	{
 		name: "OP_0NOTEQUAL long",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_0NOTEQUAL],
@@ -3048,7 +3048,7 @@ var popTests = []popTest{
 		},
 		expectedErr: StackErrInvalidOpcode,
 	},
-	popTest{
+	{
 		name: "OP_ADD",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_ADD],
@@ -3056,7 +3056,7 @@ var popTests = []popTest{
 		},
 		expectedErr: nil,
 	},
-	popTest{
+	{
 		name: "OP_ADD long",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_ADD],
@@ -3064,7 +3064,7 @@ var popTests = []popTest{
 		},
 		expectedErr: StackErrInvalidOpcode,
 	},
-	popTest{
+	{
 		name: "OP_SUB",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_SUB],
@@ -3072,7 +3072,7 @@ var popTests = []popTest{
 		},
 		expectedErr: nil,
 	},
-	popTest{
+	{
 		name: "OP_SUB long",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_SUB],
@@ -3080,7 +3080,7 @@ var popTests = []popTest{
 		},
 		expectedErr: StackErrInvalidOpcode,
 	},
-	popTest{
+	{
 		name: "OP_MUL",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_MUL],
@@ -3088,7 +3088,7 @@ var popTests = []popTest{
 		},
 		expectedErr: nil,
 	},
-	popTest{
+	{
 		name: "OP_MUL long",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_MUL],
@@ -3096,7 +3096,7 @@ var popTests = []popTest{
 		},
 		expectedErr: StackErrInvalidOpcode,
 	},
-	popTest{
+	{
 		name: "OP_DIV",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_DIV],
@@ -3104,7 +3104,7 @@ var popTests = []popTest{
 		},
 		expectedErr: nil,
 	},
-	popTest{
+	{
 		name: "OP_DIV long",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_DIV],
@@ -3112,7 +3112,7 @@ var popTests = []popTest{
 		},
 		expectedErr: StackErrInvalidOpcode,
 	},
-	popTest{
+	{
 		name: "OP_MOD",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_MOD],
@@ -3120,7 +3120,7 @@ var popTests = []popTest{
 		},
 		expectedErr: nil,
 	},
-	popTest{
+	{
 		name: "OP_MOD long",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_MOD],
@@ -3128,7 +3128,7 @@ var popTests = []popTest{
 		},
 		expectedErr: StackErrInvalidOpcode,
 	},
-	popTest{
+	{
 		name: "OP_LSHIFT",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_LSHIFT],
@@ -3136,7 +3136,7 @@ var popTests = []popTest{
 		},
 		expectedErr: nil,
 	},
-	popTest{
+	{
 		name: "OP_LSHIFT long",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_LSHIFT],
@@ -3144,7 +3144,7 @@ var popTests = []popTest{
 		},
 		expectedErr: StackErrInvalidOpcode,
 	},
-	popTest{
+	{
 		name: "OP_RSHIFT",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_RSHIFT],
@@ -3152,7 +3152,7 @@ var popTests = []popTest{
 		},
 		expectedErr: nil,
 	},
-	popTest{
+	{
 		name: "OP_RSHIFT long",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_RSHIFT],
@@ -3160,7 +3160,7 @@ var popTests = []popTest{
 		},
 		expectedErr: StackErrInvalidOpcode,
 	},
-	popTest{
+	{
 		name: "OP_BOOLAND",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_BOOLAND],
@@ -3168,7 +3168,7 @@ var popTests = []popTest{
 		},
 		expectedErr: nil,
 	},
-	popTest{
+	{
 		name: "OP_BOOLAND long",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_BOOLAND],
@@ -3176,7 +3176,7 @@ var popTests = []popTest{
 		},
 		expectedErr: StackErrInvalidOpcode,
 	},
-	popTest{
+	{
 		name: "OP_BOOLOR",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_BOOLOR],
@@ -3184,7 +3184,7 @@ var popTests = []popTest{
 		},
 		expectedErr: nil,
 	},
-	popTest{
+	{
 		name: "OP_BOOLOR long",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_BOOLOR],
@@ -3192,7 +3192,7 @@ var popTests = []popTest{
 		},
 		expectedErr: StackErrInvalidOpcode,
 	},
-	popTest{
+	{
 		name: "OP_NUMEQUAL",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_NUMEQUAL],
@@ -3200,7 +3200,7 @@ var popTests = []popTest{
 		},
 		expectedErr: nil,
 	},
-	popTest{
+	{
 		name: "OP_NUMEQUAL long",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_NUMEQUAL],
@@ -3208,7 +3208,7 @@ var popTests = []popTest{
 		},
 		expectedErr: StackErrInvalidOpcode,
 	},
-	popTest{
+	{
 		name: "OP_NUMEQUALVERIFY",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_NUMEQUALVERIFY],
@@ -3216,7 +3216,7 @@ var popTests = []popTest{
 		},
 		expectedErr: nil,
 	},
-	popTest{
+	{
 		name: "OP_NUMEQUALVERIFY long",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_NUMEQUALVERIFY],
@@ -3224,7 +3224,7 @@ var popTests = []popTest{
 		},
 		expectedErr: StackErrInvalidOpcode,
 	},
-	popTest{
+	{
 		name: "OP_NUMNOTEQUAL",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_NUMNOTEQUAL],
@@ -3232,7 +3232,7 @@ var popTests = []popTest{
 		},
 		expectedErr: nil,
 	},
-	popTest{
+	{
 		name: "OP_NUMNOTEQUAL long",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_NUMNOTEQUAL],
@@ -3240,7 +3240,7 @@ var popTests = []popTest{
 		},
 		expectedErr: StackErrInvalidOpcode,
 	},
-	popTest{
+	{
 		name: "OP_LESSTHAN",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_LESSTHAN],
@@ -3248,7 +3248,7 @@ var popTests = []popTest{
 		},
 		expectedErr: nil,
 	},
-	popTest{
+	{
 		name: "OP_LESSTHAN long",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_LESSTHAN],
@@ -3256,7 +3256,7 @@ var popTests = []popTest{
 		},
 		expectedErr: StackErrInvalidOpcode,
 	},
-	popTest{
+	{
 		name: "OP_GREATERTHAN",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_GREATERTHAN],
@@ -3264,7 +3264,7 @@ var popTests = []popTest{
 		},
 		expectedErr: nil,
 	},
-	popTest{
+	{
 		name: "OP_GREATERTHAN long",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_GREATERTHAN],
@@ -3272,7 +3272,7 @@ var popTests = []popTest{
 		},
 		expectedErr: StackErrInvalidOpcode,
 	},
-	popTest{
+	{
 		name: "OP_LESSTHANOREQUAL",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_LESSTHANOREQUAL],
@@ -3280,7 +3280,7 @@ var popTests = []popTest{
 		},
 		expectedErr: nil,
 	},
-	popTest{
+	{
 		name: "OP_LESSTHANOREQUAL long",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_LESSTHANOREQUAL],
@@ -3288,7 +3288,7 @@ var popTests = []popTest{
 		},
 		expectedErr: StackErrInvalidOpcode,
 	},
-	popTest{
+	{
 		name: "OP_GREATERTHANOREQUAL",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_GREATERTHANOREQUAL],
@@ -3296,7 +3296,7 @@ var popTests = []popTest{
 		},
 		expectedErr: nil,
 	},
-	popTest{
+	{
 		name: "OP_GREATERTHANOREQUAL long",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_GREATERTHANOREQUAL],
@@ -3304,7 +3304,7 @@ var popTests = []popTest{
 		},
 		expectedErr: StackErrInvalidOpcode,
 	},
-	popTest{
+	{
 		name: "OP_MIN",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_MIN],
@@ -3312,7 +3312,7 @@ var popTests = []popTest{
 		},
 		expectedErr: nil,
 	},
-	popTest{
+	{
 		name: "OP_MIN long",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_MIN],
@@ -3320,7 +3320,7 @@ var popTests = []popTest{
 		},
 		expectedErr: StackErrInvalidOpcode,
 	},
-	popTest{
+	{
 		name: "OP_MAX",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_MAX],
@@ -3328,7 +3328,7 @@ var popTests = []popTest{
 		},
 		expectedErr: nil,
 	},
-	popTest{
+	{
 		name: "OP_MAX long",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_MAX],
@@ -3336,7 +3336,7 @@ var popTests = []popTest{
 		},
 		expectedErr: StackErrInvalidOpcode,
 	},
-	popTest{
+	{
 		name: "OP_WITHIN",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_WITHIN],
@@ -3344,7 +3344,7 @@ var popTests = []popTest{
 		},
 		expectedErr: nil,
 	},
-	popTest{
+	{
 		name: "OP_WITHIN long",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_WITHIN],
@@ -3352,7 +3352,7 @@ var popTests = []popTest{
 		},
 		expectedErr: StackErrInvalidOpcode,
 	},
-	popTest{
+	{
 		name: "OP_RIPEMD160",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_RIPEMD160],
@@ -3360,7 +3360,7 @@ var popTests = []popTest{
 		},
 		expectedErr: nil,
 	},
-	popTest{
+	{
 		name: "OP_RIPEMD160 long",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_RIPEMD160],
@@ -3368,7 +3368,7 @@ var popTests = []popTest{
 		},
 		expectedErr: StackErrInvalidOpcode,
 	},
-	popTest{
+	{
 		name: "OP_SHA1",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_SHA1],
@@ -3376,7 +3376,7 @@ var popTests = []popTest{
 		},
 		expectedErr: nil,
 	},
-	popTest{
+	{
 		name: "OP_SHA1 long",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_SHA1],
@@ -3384,7 +3384,7 @@ var popTests = []popTest{
 		},
 		expectedErr: StackErrInvalidOpcode,
 	},
-	popTest{
+	{
 		name: "OP_SHA256",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_SHA256],
@@ -3392,7 +3392,7 @@ var popTests = []popTest{
 		},
 		expectedErr: nil,
 	},
-	popTest{
+	{
 		name: "OP_SHA256 long",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_SHA256],
@@ -3400,7 +3400,7 @@ var popTests = []popTest{
 		},
 		expectedErr: StackErrInvalidOpcode,
 	},
-	popTest{
+	{
 		name: "OP_HASH160",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_HASH160],
@@ -3408,7 +3408,7 @@ var popTests = []popTest{
 		},
 		expectedErr: nil,
 	},
-	popTest{
+	{
 		name: "OP_HASH160 long",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_HASH160],
@@ -3416,7 +3416,7 @@ var popTests = []popTest{
 		},
 		expectedErr: StackErrInvalidOpcode,
 	},
-	popTest{
+	{
 		name: "OP_HASH256",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_HASH256],
@@ -3424,7 +3424,7 @@ var popTests = []popTest{
 		},
 		expectedErr: nil,
 	},
-	popTest{
+	{
 		name: "OP_HASH256 long",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_HASH256],
@@ -3432,7 +3432,7 @@ var popTests = []popTest{
 		},
 		expectedErr: StackErrInvalidOpcode,
 	},
-	popTest{
+	{
 		name: "OP_CODESAPERATOR",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_CODESEPARATOR],
@@ -3440,7 +3440,7 @@ var popTests = []popTest{
 		},
 		expectedErr: nil,
 	},
-	popTest{
+	{
 		name: "OP_CODESEPARATOR long",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_CODESEPARATOR],
@@ -3448,7 +3448,7 @@ var popTests = []popTest{
 		},
 		expectedErr: StackErrInvalidOpcode,
 	},
-	popTest{
+	{
 		name: "OP_CHECKSIG",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_CHECKSIG],
@@ -3456,7 +3456,7 @@ var popTests = []popTest{
 		},
 		expectedErr: nil,
 	},
-	popTest{
+	{
 		name: "OP_CHECKSIG long",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_CHECKSIG],
@@ -3464,7 +3464,7 @@ var popTests = []popTest{
 		},
 		expectedErr: StackErrInvalidOpcode,
 	},
-	popTest{
+	{
 		name: "OP_CHECKSIGVERIFY",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_CHECKSIGVERIFY],
@@ -3472,7 +3472,7 @@ var popTests = []popTest{
 		},
 		expectedErr: nil,
 	},
-	popTest{
+	{
 		name: "OP_CHECKSIGVERIFY long",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_CHECKSIGVERIFY],
@@ -3480,7 +3480,7 @@ var popTests = []popTest{
 		},
 		expectedErr: StackErrInvalidOpcode,
 	},
-	popTest{
+	{
 		name: "OP_CHECKMULTISIG",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_CHECKMULTISIG],
@@ -3488,7 +3488,7 @@ var popTests = []popTest{
 		},
 		expectedErr: nil,
 	},
-	popTest{
+	{
 		name: "OP_CHECKMULTISIG long",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_CHECKMULTISIG],
@@ -3496,7 +3496,7 @@ var popTests = []popTest{
 		},
 		expectedErr: StackErrInvalidOpcode,
 	},
-	popTest{
+	{
 		name: "OP_CHECKMULTISIGVERIFY",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_CHECKMULTISIGVERIFY],
@@ -3504,7 +3504,7 @@ var popTests = []popTest{
 		},
 		expectedErr: nil,
 	},
-	popTest{
+	{
 		name: "OP_CHECKMULTISIGVERIFY long",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_CHECKMULTISIGVERIFY],
@@ -3512,7 +3512,7 @@ var popTests = []popTest{
 		},
 		expectedErr: StackErrInvalidOpcode,
 	},
-	popTest{
+	{
 		name: "OP_NOP1",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_NOP1],
@@ -3520,7 +3520,7 @@ var popTests = []popTest{
 		},
 		expectedErr: nil,
 	},
-	popTest{
+	{
 		name: "OP_NOP1 long",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_NOP1],
@@ -3528,7 +3528,7 @@ var popTests = []popTest{
 		},
 		expectedErr: StackErrInvalidOpcode,
 	},
-	popTest{
+	{
 		name: "OP_NOP2",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_NOP2],
@@ -3536,7 +3536,7 @@ var popTests = []popTest{
 		},
 		expectedErr: nil,
 	},
-	popTest{
+	{
 		name: "OP_NOP2 long",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_NOP2],
@@ -3544,7 +3544,7 @@ var popTests = []popTest{
 		},
 		expectedErr: StackErrInvalidOpcode,
 	},
-	popTest{
+	{
 		name: "OP_NOP3",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_NOP3],
@@ -3552,7 +3552,7 @@ var popTests = []popTest{
 		},
 		expectedErr: nil,
 	},
-	popTest{
+	{
 		name: "OP_NOP3 long",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_NOP3],
@@ -3560,7 +3560,7 @@ var popTests = []popTest{
 		},
 		expectedErr: StackErrInvalidOpcode,
 	},
-	popTest{
+	{
 		name: "OP_NOP4",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_NOP4],
@@ -3568,7 +3568,7 @@ var popTests = []popTest{
 		},
 		expectedErr: nil,
 	},
-	popTest{
+	{
 		name: "OP_NOP4 long",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_NOP4],
@@ -3576,7 +3576,7 @@ var popTests = []popTest{
 		},
 		expectedErr: StackErrInvalidOpcode,
 	},
-	popTest{
+	{
 		name: "OP_NOP5",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_NOP5],
@@ -3584,7 +3584,7 @@ var popTests = []popTest{
 		},
 		expectedErr: nil,
 	},
-	popTest{
+	{
 		name: "OP_NOP5 long",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_NOP5],
@@ -3592,7 +3592,7 @@ var popTests = []popTest{
 		},
 		expectedErr: StackErrInvalidOpcode,
 	},
-	popTest{
+	{
 		name: "OP_NOP6",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_NOP6],
@@ -3600,7 +3600,7 @@ var popTests = []popTest{
 		},
 		expectedErr: nil,
 	},
-	popTest{
+	{
 		name: "OP_NOP6 long",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_NOP6],
@@ -3608,7 +3608,7 @@ var popTests = []popTest{
 		},
 		expectedErr: StackErrInvalidOpcode,
 	},
-	popTest{
+	{
 		name: "OP_NOP7",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_NOP7],
@@ -3616,7 +3616,7 @@ var popTests = []popTest{
 		},
 		expectedErr: nil,
 	},
-	popTest{
+	{
 		name: "OP_NOP7 long",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_NOP7],
@@ -3624,7 +3624,7 @@ var popTests = []popTest{
 		},
 		expectedErr: StackErrInvalidOpcode,
 	},
-	popTest{
+	{
 		name: "OP_NOP8",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_NOP8],
@@ -3632,7 +3632,7 @@ var popTests = []popTest{
 		},
 		expectedErr: nil,
 	},
-	popTest{
+	{
 		name: "OP_NOP8 long",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_NOP8],
@@ -3640,7 +3640,7 @@ var popTests = []popTest{
 		},
 		expectedErr: StackErrInvalidOpcode,
 	},
-	popTest{
+	{
 		name: "OP_NOP9",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_NOP9],
@@ -3648,7 +3648,7 @@ var popTests = []popTest{
 		},
 		expectedErr: nil,
 	},
-	popTest{
+	{
 		name: "OP_NOP9 long",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_NOP9],
@@ -3656,7 +3656,7 @@ var popTests = []popTest{
 		},
 		expectedErr: StackErrInvalidOpcode,
 	},
-	popTest{
+	{
 		name: "OP_NOP10",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_NOP10],
@@ -3664,7 +3664,7 @@ var popTests = []popTest{
 		},
 		expectedErr: nil,
 	},
-	popTest{
+	{
 		name: "OP_NOP10 long",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_NOP10],
@@ -3672,7 +3672,7 @@ var popTests = []popTest{
 		},
 		expectedErr: StackErrInvalidOpcode,
 	},
-	popTest{
+	{
 		name: "OP_PUBKEYHASH",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_PUBKEYHASH],
@@ -3680,7 +3680,7 @@ var popTests = []popTest{
 		},
 		expectedErr: nil,
 	},
-	popTest{
+	{
 		name: "OP_PUBKEYHASH long",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_PUBKEYHASH],
@@ -3688,7 +3688,7 @@ var popTests = []popTest{
 		},
 		expectedErr: StackErrInvalidOpcode,
 	},
-	popTest{
+	{
 		name: "OP_PUBKEY",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_PUBKEY],
@@ -3696,7 +3696,7 @@ var popTests = []popTest{
 		},
 		expectedErr: nil,
 	},
-	popTest{
+	{
 		name: "OP_PUBKEY long",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_PUBKEY],
@@ -3704,7 +3704,7 @@ var popTests = []popTest{
 		},
 		expectedErr: StackErrInvalidOpcode,
 	},
-	popTest{
+	{
 		name: "OP_INVALIDOPCODE",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_INVALIDOPCODE],
@@ -3712,7 +3712,7 @@ var popTests = []popTest{
 		},
 		expectedErr: nil,
 	},
-	popTest{
+	{
 		name: "OP_INVALIDOPCODE long",
 		pop: &parsedOpcode{
 			opcode: opcodemapPreinit[OP_INVALIDOPCODE],
