@@ -74,6 +74,7 @@ var commandHandlers = map[string]*handlerData{
 	"getrawtransaction":     {1, 1, displayJSONDump, []conversionHandler{nil, toInt}, makeGetRawTransaction, "<txhash> [verbose=0]"},
 	"getreceivedbyaccount":  {1, 1, displayGeneric, []conversionHandler{nil, toInt}, makeGetReceivedByAccount, "<account> [minconf=1]"},
 	"getreceivedbyaddress":  {1, 1, displayGeneric, []conversionHandler{nil, toInt}, makeGetReceivedByAddress, "<address> [minconf=1]"},
+	"gettransaction":        {1, 1, displayJSONDump, nil, makeGetTransaction, "txid"},
 	"gettxoutsetinfo":       {0, 0, displayJSONDump, nil, makeGetTxOutSetInfo, ""},
 	"getwork":               {0, 1, displayJSONDump, nil, makeGetWork, "[jsonrequestobject]"},
 	"help":                  {0, 1, displayGeneric, nil, makeHelp, "[commandName]"},
@@ -427,6 +428,11 @@ func makeGetReceivedByAddress(args []interface{}) (btcjson.Cmd, error) {
 		opt = append(opt, args[1].(int))
 	}
 	return btcjson.NewGetReceivedByAddressCmd("btcctl", args[0].(string), opt...)
+}
+
+// makeGetTransaction generates the cmd structure for gettransaction commands.
+func makeGetTransaction(args []interface{}) (btcjson.Cmd, error) {
+	return btcjson.NewGetTransactionCmd("btcctl", args[0].(string))
 }
 
 // makeGetTxOutSetInfo generates the cmd structure for gettxoutsetinfo commands.
