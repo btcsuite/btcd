@@ -115,10 +115,12 @@ type Vin struct {
 	Sequence  uint32     `json:"sequence"`
 }
 
+// IsCoinBase returns a bool to show if a Vin is a Coinbase one or not.
 func (v *Vin) IsCoinBase() bool {
 	return len(v.Coinbase) > 0
 }
 
+// MarshalJSON provides a custom Marshal method for Vin.
 func (v *Vin) MarshalJSON() ([]byte, error) {
 	if v.IsCoinBase() {
 		coinbaseStruct := struct {
@@ -192,11 +194,14 @@ type ValidateAddressResult struct {
 	Account      string `json:"account,omitempty"`
 }
 
+// SignRawTransactionResult models the data from the signrawtransaction
+// command.
 type SignRawTransactionResult struct {
 	Hex      string `json:"hex"`
 	Complete bool   `json:"complete"`
 }
 
+// ListUnSpentResult models the data from the ListUnSpentResult command.
 type ListUnSpentResult struct {
 	TxId          string  `json:"txid"`
 	Vout          float64 `json:"vout"`

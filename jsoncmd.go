@@ -37,7 +37,7 @@ type RawCmd struct {
 	Params  []interface{} `json:"params"`
 }
 
-// ParseRawCmd is a function to create a custom Cmd from a RawCmd.
+// RawCmdParser is a function to create a custom Cmd from a RawCmd.
 type RawCmdParser func(*RawCmd) (Cmd, error)
 
 type cmd struct {
@@ -70,7 +70,7 @@ func ParseMarshaledCmd(b []byte) (Cmd, error) {
 	}
 
 	// Return a custom command type for recognized
-	var cmd Cmd = nil
+	var cmd Cmd
 	switch r.Method {
 	case "addmultisigaddress":
 		cmd = new(AddMultisigAddressCmd)
@@ -6225,6 +6225,7 @@ func (cmd *SignMessageCmd) UnmarshalJSON(b []byte) error {
 	return nil
 }
 
+// RawTxInput models the data needed for a raw tx input.
 type RawTxInput struct {
 	Txid         string `json:"txid"`
 	Vout         int    `json:"vout"`
