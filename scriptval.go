@@ -90,8 +90,10 @@ out:
 			// Execute the script pair.
 			if err := engine.Execute(); err != nil {
 				err := fmt.Errorf("validate of input "+
-					"%d from transaction %s failed: %v",
-					txVI.txInIndex, txInHash, err)
+					"%d from transaction %s failed: %v "+
+					"(input script bytes %x, prev output "+
+					"script bytes %x)", txVI.txInIndex,
+					txInHash, err, sigScript, pkScript)
 				v.sendResult(err)
 				break out
 			}
