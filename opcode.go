@@ -1809,12 +1809,12 @@ func opcodeCheckMultiSig(op *parsedOpcode, s *Script) error {
 		var sig *btcec.Signature
 		// skip off the last byte for hashtype
 		if s.der {
-			sig, err = 
+			sig, err =
 				btcec.ParseDERSignature(
 					sigStrings[i][:len(sigStrings[i])-1],
 					btcec.S256())
 		} else {
-			sig, err = 
+			sig, err =
 				btcec.ParseSignature(
 					sigStrings[i][:len(sigStrings[i])-1],
 					btcec.S256())
