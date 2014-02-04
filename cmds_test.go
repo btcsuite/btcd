@@ -200,7 +200,7 @@ var cmdtests = []struct {
 		name: "rescan no optargs",
 		f: func() (btcjson.Cmd, error) {
 			addrs := map[string]struct{}{
-				"17XhEvq9Nahdj7Xe1nv6oRe1tEmaHUuynH": struct{}{},
+				"17XhEvq9Nahdj7Xe1nv6oRe1tEmaHUuynH": {},
 			}
 			return NewRescanCmd(
 				float64(1),
@@ -211,7 +211,7 @@ var cmdtests = []struct {
 			id:         float64(1),
 			BeginBlock: 270000,
 			Addresses: map[string]struct{}{
-				"17XhEvq9Nahdj7Xe1nv6oRe1tEmaHUuynH": struct{}{},
+				"17XhEvq9Nahdj7Xe1nv6oRe1tEmaHUuynH": {},
 			},
 			EndBlock: btcdb.AllShas,
 		},
@@ -220,7 +220,7 @@ var cmdtests = []struct {
 		name: "rescan one optarg",
 		f: func() (btcjson.Cmd, error) {
 			addrs := map[string]struct{}{
-				"17XhEvq9Nahdj7Xe1nv6oRe1tEmaHUuynH": struct{}{},
+				"17XhEvq9Nahdj7Xe1nv6oRe1tEmaHUuynH": {},
 			}
 			return NewRescanCmd(
 				float64(1),
@@ -232,7 +232,7 @@ var cmdtests = []struct {
 			id:         float64(1),
 			BeginBlock: 270000,
 			Addresses: map[string]struct{}{
-				"17XhEvq9Nahdj7Xe1nv6oRe1tEmaHUuynH": struct{}{},
+				"17XhEvq9Nahdj7Xe1nv6oRe1tEmaHUuynH": {},
 			},
 			EndBlock: 280000,
 		},
