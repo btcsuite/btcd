@@ -120,15 +120,15 @@ var jsoncmdtests = []struct {
 		f: func() (Cmd, error) {
 			return NewCreateRawTransactionCmd(testId,
 				[]TransactionInput{
-					TransactionInput{Txid: "tx1", Vout: 1},
-					TransactionInput{Txid: "tx2", Vout: 3}},
+					{Txid: "tx1", Vout: 1},
+					{Txid: "tx2", Vout: 3}},
 				map[string]int64{"bob": 1, "bill": 2})
 		},
 		result: &CreateRawTransactionCmd{
 			id: testId,
 			Inputs: []TransactionInput{
-				TransactionInput{Txid: "tx1", Vout: 1},
-				TransactionInput{Txid: "tx2", Vout: 3},
+				{Txid: "tx1", Vout: 1},
+				{Txid: "tx2", Vout: 3},
 			},
 			Amounts: map[string]int64{
 				"bob":  1,
