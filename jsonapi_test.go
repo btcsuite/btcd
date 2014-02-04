@@ -371,7 +371,7 @@ func TestReadResultCmd(t *testing.T) {
 				if err != nil {
 					t.Errorf("Should unmarshal result: %d %v", i, err)
 				}
-				if bytes.Compare(tt.msg, msg2) != 0 {
+				if !bytes.Equal(tt.msg, msg2) {
 					t.Errorf("json byte arrays differ. %d %v %v", i, tt.msg, msg2)
 				}
 			}
