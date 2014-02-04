@@ -92,6 +92,7 @@ var commandHandlers = map[string]*handlerData{
 		makeSendFrom, "<account> <address> <amount> [minconf=1] [comment] [comment-to]"},
 	"sendmany":               &handlerData{2, 2, displayGeneric, []conversionHandler{nil, nil, toInt, nil}, makeSendMany, "<account> <{\"address\":amount,...}> [minconf=1] [comment]"},
 	"sendrawtransaction":     &handlerData{1, 0, displayGeneric, nil, makeSendRawTransaction, "<hextx>"},
+	"sendtoaddress":          &handlerData{2, 2, displayGeneric, []conversionHandler{nil, toSatoshi, nil, nil}, makeSendToAddress, "<address> <amount> [comment] [comment-to]"},
 	"settxfee":               &handlerData{1, 0, displayGeneric, []conversionHandler{toSatoshi}, makeSetTxFee, "<amount>"},
 	"stop":                   &handlerData{0, 0, displayGeneric, nil, makeStop, ""},
 	"submitblock":            &handlerData{1, 1, displayGeneric, nil, makeSubmitBlock, "<hexdata> [jsonparametersobject]"},
@@ -631,6 +632,11 @@ func makeSendMany(args []interface{}) (btcjson.Cmd, error) {
 // commands.
 func makeSendRawTransaction(args []interface{}) (btcjson.Cmd, error) {
 	return btcjson.NewSendRawTransactionCmd("btcctl", args[0].(string))
+}
+
+// makeSendToAddress generates the cmd struture for sendtoaddress commands.
+func makeSendToAddress(args []interface{}) (btcjson.Cmd, error) {
+	return btcjson.NewSendToAddressCmd("btcctl", args[0].(string), args[1].(int64), args[2:]...)
 }
 
 // makeSetTxFee generates the cmd structure for settxfee commands.
