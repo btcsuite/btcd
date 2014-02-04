@@ -314,11 +314,13 @@ func (s *server) handleQuery(querymsg interface{}, state *peerState) {
 		msg.reply <- nconnected
 
 	case getPeerInfoMsg:
+		syncPeer := s.blockManager.SyncPeer()
 		infos := make([]*PeerInfo, 0, state.peers.Len())
 		state.forAllPeers(func(p *peer) {
 			if !p.Connected() {
 				return
 			}
+
 			// A lot of this will make the race detector go mad,
 			// however it is statistics for purely informational purposes
 			// and we don't really care if they are raced to get the new
@@ -336,7 +338,7 @@ func (s *server) handleQuery(querymsg interface{}, state *peerState) {
 				Inbound:        p.inbound,
 				StartingHeight: p.lastBlock,
 				BanScore:       0,
-				SyncNode:       false, // TODO(oga) for now. bm knows this.
+				SyncNode:       p == syncPeer,
 			}
 			p.pingStatsMtx.Lock()
 			info.PingTime = p.lastPingMicros

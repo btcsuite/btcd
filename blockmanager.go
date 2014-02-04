@@ -93,6 +93,8 @@ type blockManager struct {
 	processingReqs    bool
 	syncPeer          *peer
 	msgChan           chan interface{}
+	syncPeerRequest   chan bool
+	syncPeerResult    chan *peer
 	wg                sync.WaitGroup
 	quit              chan bool
 
@@ -902,6 +904,10 @@ out:
 				// bitch and whine.
 			}
 
+		// Return the current sync peer.
+		case <-b.syncPeerRequest:
+			b.syncPeerResult <- b.syncPeer
+
 		case <-b.quit:
 			break out
 		}
@@ -1104,6 +1110,12 @@ func (b *blockManager) Stop() error {
 	return nil
 }
 
+// SyncPeer returns the current sync peer.
+func (b *blockManager) SyncPeer() *peer {
+	b.syncPeerRequest <- true
+	return <-b.syncPeerResult
+}
+
 // newBlockManager returns a new bitcoin block manager.
 // Use Start to begin processing asynchronous block and inv updates.
 func newBlockManager(s *server) (*blockManager, error) {
@@ -1119,6 +1131,8 @@ func newBlockManager(s *server) (*blockManager, error) {
 		requestedBlocks:  make(map[btcwire.ShaHash]bool),
 		lastBlockLogTime: time.Now(),
 		msgChan:          make(chan interface{}, cfg.MaxPeers*3),
+		syncPeerRequest:  make(chan bool, 1),
+		syncPeerResult:   make(chan *peer, 1),
 		headerList:       list.New(),
 		quit:             make(chan bool),
 	}
