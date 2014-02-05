@@ -137,8 +137,8 @@ type peer struct {
 	timeConnected      time.Time
 	lastSend           time.Time
 	lastRecv           time.Time
-	bytesRead          uint64
-	bytesWritten       uint64
+	bytesReceived      uint64
+	bytesSent          uint64
 	inbound            bool
 	connected          int32
 	disconnect         int32 // only to be used atomically
@@ -956,10 +956,10 @@ func (p *peer) handlePongMsg(msg *btcwire.MsgPong) {
 func (p *peer) readMessage() (btcwire.Message, []byte, error) {
 	n, msg, buf, err := btcwire.ReadMessageN(p.conn, p.protocolVersion, p.btcnet)
 	if err != nil {
-		p.bytesRead += uint64(n)
+		p.bytesReceived += uint64(n)
 		return nil, nil, err
 	}
-	p.bytesRead += uint64(n)
+	p.bytesReceived += uint64(n)
 
 	// Use closures to log expensive operations so they are only run when
 	// the logging level requires it.
@@ -1025,12 +1025,12 @@ func (p *peer) writeMessage(msg btcwire.Message) {
 	// Write the message to the peer.
 	n, err := btcwire.WriteMessageN(p.conn, msg, p.protocolVersion, p.btcnet)
 	if err != nil {
-		p.bytesWritten += uint64(n)
+		p.bytesSent += uint64(n)
 		p.Disconnect()
 		p.logError("Can't send message: %v", err)
 		return
 	}
-	p.bytesWritten += uint64(n)
+	p.bytesSent += uint64(n)
 }
 
 // isAllowedByRegression returns whether or not the passed error is allowed by
