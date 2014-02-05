@@ -984,7 +984,7 @@ func handleGetNetTotals(s *rpcServer, cmd btcjson.Cmd) (interface{}, error) {
 	reply := &btcjson.GetNetTotalsResult{
 		TotalBytesRecv: netTotals.TotalBytesRecv,
 		TotalBytesSent: netTotals.TotalBytesSent,
-		TimeMillis:     time.Now().UnixNano() / 1000,
+		TimeMillis:     time.Now().UTC().UnixNano() / 1000,
 	}
 	return reply, nil
 }
