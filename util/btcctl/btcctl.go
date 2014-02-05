@@ -66,6 +66,7 @@ var commandHandlers = map[string]*handlerData{
 	"getgenerate":           {0, 0, displayGeneric, nil, makeGetGenerate, ""},
 	"gethashespersec":       {0, 0, displayGeneric, nil, makeGetHashesPerSec, ""},
 	"getinfo":               {0, 0, displayJSONDump, nil, makeGetInfo, ""},
+	"getnetworkhashps":      {0, 2, displayGeneric, []conversionHandler{toInt, toInt}, makeGetNetworkHashPS, "[blocks height]"},
 	"getnettotals":          {0, 0, displayJSONDump, nil, makeGetNetTotals, ""},
 	"getnewaddress":         {0, 1, displayGeneric, nil, makeGetNewAddress, "[account]"},
 	"getpeerinfo":           {0, 0, displayJSONDump, nil, makeGetPeerInfo, ""},
@@ -373,6 +374,29 @@ func makeGetHashesPerSec(args []interface{}) (btcjson.Cmd, error) {
 // makeGetInfo generates the cmd structure for getinfo commands.
 func makeGetInfo(args []interface{}) (btcjson.Cmd, error) {
 	return btcjson.NewGetInfoCmd("btcctl")
+}
+
+// makeGetNetworkHashPS generates the cmd structure for getnetworkhashps
+// commands.
+func makeGetNetworkHashPS(args []interface{}) (btcjson.Cmd, error) {
+	// Create the getnetworkhashps command with defaults for the optional
+	// parameters.
+	cmd, err := btcjson.NewGetNetworkHashPSCmd("btcctl")
+	if err != nil {
+		return nil, err
+	}
+
+	// Override the optional blocks if specified.
+	if len(args) > 0 {
+		cmd.Blocks = args[0].(int)
+	}
+
+	// Override the optional height if specified.
+	if len(args) > 1 {
+		cmd.Height = args[1].(int)
+	}
+
+	return cmd, nil
 }
 
 // makeGetNetTotals generates the cmd structure for getnettotals commands.
