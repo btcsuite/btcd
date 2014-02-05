@@ -51,9 +51,11 @@ type server struct {
 	nonce         uint64
 	listeners     []net.Listener
 	btcnet        btcwire.BitcoinNet
-	started       int32 // atomic
-	shutdown      int32 // atomic
-	shutdownSched int32 // atomic
+	started       int32  // atomic
+	shutdown      int32  // atomic
+	shutdownSched int32  // atomic
+	bytesReceived uint64 // Total bytes received from all peers since start.
+	bytesSent     uint64 // Total bytes sent by all peers since start.
 	addrManager   *AddrManager
 	rpcServer     *rpcServer
 	blockManager  *blockManager
@@ -300,19 +302,6 @@ type getAddedNodesMsg struct {
 	reply chan []*peer
 }
 
-// NetTotals contains information about the total bytes received and sent across
-// the network.
-type NetTotals struct {
-	TotalBytesRecv uint64
-	TotalBytesSent uint64
-}
-
-// getNetTotals is a message type to be sent across the query channel for
-// retrieving the current total bytes sent and received from all peers.
-type getNetTotals struct {
-	reply chan *NetTotals
-}
-
 // handleQuery is the central handler for all queries and commands from other
 // goroutines related to peer state.
 func (s *server) handleQuery(querymsg interface{}, state *peerState) {
@@ -416,18 +405,6 @@ func (s *server) handleQuery(querymsg interface{}, state *peerState) {
 			peers = append(peers, peer)
 		}
 		msg.reply <- peers
-
-	// Request the total bytes sent and received.
-	case getNetTotals:
-		// Respond with a ....
-		netTotals := NetTotals{}
-		state.forAllPeers(func(p *peer) {
-			if p.Connected() {
-				netTotals.TotalBytesRecv += p.bytesReceived
-				netTotals.TotalBytesSent += p.bytesSent
-			}
-		})
-		msg.reply <- &netTotals
 	}
 }
 
@@ -721,10 +698,10 @@ func (s *server) RemoveAddr(addr string) error {
 
 // NetTotals returns the sum of all bytes received and sent across the network
 // for all peers.
-func (s *server) NetTotals() *NetTotals {
-	reply := make(chan *NetTotals)
-	s.query <- getNetTotals{reply: reply}
-	return <-reply
+func (s *server) NetTotals() (uint64, uint64) {
+	totalBytesReceived := atomic.LoadUint64(&s.bytesReceived)
+	totalBytesSent := atomic.LoadUint64(&s.bytesSent)
+	return totalBytesReceived, totalBytesSent
 }
 
 // Start begins accepting connections from peers.

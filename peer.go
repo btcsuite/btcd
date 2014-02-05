@@ -957,9 +957,13 @@ func (p *peer) readMessage() (btcwire.Message, []byte, error) {
 	n, msg, buf, err := btcwire.ReadMessageN(p.conn, p.protocolVersion, p.btcnet)
 	if err != nil {
 		p.bytesReceived += uint64(n)
+		p.server.bytesReceived = atomic.AddUint64(&p.server.bytesReceived,
+			uint64(n))
 		return nil, nil, err
 	}
 	p.bytesReceived += uint64(n)
+	p.server.bytesReceived = atomic.AddUint64(&p.server.bytesReceived,
+		uint64(n))
 
 	// Use closures to log expensive operations so they are only run when
 	// the logging level requires it.
@@ -1026,11 +1030,14 @@ func (p *peer) writeMessage(msg btcwire.Message) {
 	n, err := btcwire.WriteMessageN(p.conn, msg, p.protocolVersion, p.btcnet)
 	if err != nil {
 		p.bytesSent += uint64(n)
+		p.server.bytesSent = atomic.AddUint64(&p.server.bytesSent,
+			uint64(n))
 		p.Disconnect()
 		p.logError("Can't send message: %v", err)
 		return
 	}
 	p.bytesSent += uint64(n)
+	p.server.bytesSent = atomic.AddUint64(&p.server.bytesSent, uint64(n))
 }
 
 // isAllowedByRegression returns whether or not the passed error is allowed by

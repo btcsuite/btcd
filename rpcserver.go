@@ -980,10 +980,10 @@ func handleGetInfo(s *rpcServer, cmd btcjson.Cmd) (interface{}, error) {
 
 // handleGetNetTotals implements the getnettotals command.
 func handleGetNetTotals(s *rpcServer, cmd btcjson.Cmd) (interface{}, error) {
-	netTotals := s.server.NetTotals()
+	totalBytesRecv, totalBytesSent := s.server.NetTotals()
 	reply := &btcjson.GetNetTotalsResult{
-		TotalBytesRecv: netTotals.TotalBytesRecv,
-		TotalBytesSent: netTotals.TotalBytesSent,
+		TotalBytesRecv: totalBytesRecv,
+		TotalBytesSent: totalBytesSent,
 		TimeMillis:     time.Now().UTC().UnixNano() / 1000,
 	}
 	return reply, nil
