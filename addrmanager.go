@@ -140,7 +140,11 @@ func (a *AddrManager) updateAddress(netAddr, srcAddr *btcwire.NetAddress) {
 			return
 		}
 	} else {
-		ka = &knownAddress{na: netAddr, srcAddr: srcAddr}
+		// Make a copy of the net address to avoid races since it is
+		// updated elsewhere in the addrmanager code and would otherwise
+		// change the actual netaddress on the peer.
+		netAddrCopy := *netAddr
+		ka = &knownAddress{na: &netAddrCopy, srcAddr: srcAddr}
 		a.addrIndex[addr] = ka
 		a.nNew++
 		// XXX time penalty?
