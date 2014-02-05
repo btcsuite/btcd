@@ -295,11 +295,11 @@ Returns a JSON object containing information related to mining:
 }`,
 
 	"getnettotals": `getnettotals
-Returns JSON object containinng network traffic statistics:
+Returns JSON object containing network traffic statistics:
 {
 	"totalbytesrecv":n,	# Numeric total bytes received.
 	"totalbytessent":n,	# Numeric total bytes sent.
-	"timemilis",t,		# Total numeric cpu time.
+	"timemilis",t,		# Total numeric of milliseconds since epoch.
 }`,
 
 	"getnetworkhashps": `getnetworkhashps ( blocks=120 height=-1 )
