@@ -97,6 +97,13 @@ type TxRawDecodeResult struct {
 	Vout     []Vout `json:"vout"`
 }
 
+// GetNetTotalsResult models the data returned from the getnettotals command.
+type GetNetTotalsResult struct {
+	TotalBytesRecv uint64 `json:"totalbytesrecv"`
+	TotalBytesSent uint64 `json:"totalbytessent"`
+	TimeMillis     int64  `json:"timemillis"`
+}
+
 // ScriptSig models a signature script.  It is defined seperately since it only
 // applies to non-coinbase.  Therefore the field in the Vin structure needs
 // to be a pointer.
@@ -877,6 +884,12 @@ func ReadResultCmd(cmd string, message []byte) (Reply, error) {
 			if err == nil {
 				result.Result = res
 			}
+		}
+	case "getnettotals":
+		var res GetNetTotalsResult
+		err = json.Unmarshal(objmap["result"], &res)
+		if err == nil {
+			result.Result = res
 		}
 	case "getrawtransaction":
 		// getrawtransaction can either return a JSON object or a
