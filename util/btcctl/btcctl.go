@@ -160,7 +160,7 @@ func displayGeneric(reply interface{}) error {
 }
 
 // displayFloat64 is a displayHandler that ensures the concrete type of the
-// passed interface is a float64 and displays it using fmt.Println.  An error
+// passed interface is a float64 and displays it using fmt.Printf.  An error
 // is returned if a float64 is not passed.
 func displayFloat64(reply interface{}) error {
 	if val, ok := reply.(float64); ok {

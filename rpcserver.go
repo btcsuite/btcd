@@ -65,6 +65,7 @@ var rpcHandlersBeforeInit = map[string]commandHandler{
 	"gethashespersec":      handleGetHashesPerSec,
 	"getinfo":              handleGetInfo,
 	"getnettotals":         handleGetNetTotals,
+	"getnetworkhashps":     handleGetNetworkHashPS,
 	"getpeerinfo":          handleGetPeerInfo,
 	"getrawmempool":        handleGetRawMempool,
 	"getrawtransaction":    handleGetRawTransaction,
@@ -133,8 +134,7 @@ var rpcAskWallet = map[string]bool{
 
 // Commands that are temporarily unimplemented.
 var rpcUnimplemented = map[string]bool{
-	"getmininginfo":    true,
-	"getnetworkhashps": true,
+	"getmininginfo": true,
 }
 
 // rpcServer holds the items the rpc server may need to access (config,
@@ -987,6 +987,94 @@ func handleGetNetTotals(s *rpcServer, cmd btcjson.Cmd) (interface{}, error) {
 		TimeMillis:     time.Now().UTC().UnixNano() / int64(time.Millisecond),
 	}
 	return reply, nil
+}
+
+// handleGetNetworkHashPS implements the getnetworkhashps command.
+func handleGetNetworkHashPS(s *rpcServer, cmd btcjson.Cmd) (interface{}, error) {
+	c := cmd.(*btcjson.GetNetworkHashPSCmd)
+
+	_, newestHeight, err := s.server.db.NewestSha()
+	if err != nil {
+		return nil, btcjson.Error{
+			Code:    btcjson.ErrInternal.Code,
+			Message: err.Error(),
+		}
+	}
+
+	// When the passed height is too high or zero, just return 0 now
+	// since we can't reasonably calculate the number of network hashes
+	// per second from invalid values.  When it's negative, use the current
+	// best block height.
+	endHeight := int64(c.Height)
+	if endHeight > newestHeight || endHeight == 0 {
+		return 0, nil
+	}
+	if endHeight < 0 {
+		endHeight = newestHeight
+	}
+
+	// Calculate the starting block height based on the passed number of
+	// blocks.  When the passed value is negative, use the last block the
+	// difficulty changed as the starting height.  Also make sure the
+	// starting height is not before the beginning of the chain.
+	var startHeight int64
+	if c.Blocks <= 0 {
+		startHeight = endHeight - ((endHeight % btcchain.BlocksPerRetarget) + 1)
+	} else {
+		startHeight = endHeight - int64(c.Blocks)
+	}
+	if startHeight < 0 {
+		startHeight = 0
+	}
+	rpcsLog.Debugf("Calculating network hashes per second from %d to %d",
+		startHeight, endHeight)
+
+	// Find the min and max block timestamps as well as calculate the total
+	// amount of work that happened between the start and end blocks.
+	var minTimestamp, maxTimestamp time.Time
+	totalWork := big.NewInt(0)
+	for curHeight := startHeight; curHeight <= endHeight; curHeight++ {
+		hash, err := s.server.db.FetchBlockShaByHeight(curHeight)
+		if err != nil {
+			return nil, btcjson.Error{
+				Code:    btcjson.ErrInternal.Code,
+				Message: err.Error(),
+			}
+		}
+
+		header, err := s.server.db.FetchBlockHeaderBySha(hash)
+		if err != nil {
+			return nil, btcjson.Error{
+				Code:    btcjson.ErrInternal.Code,
+				Message: err.Error(),
+			}
+		}
+
+		if curHeight == startHeight {
+			minTimestamp = header.Timestamp
+			maxTimestamp = minTimestamp
+		} else {
+			totalWork.Add(totalWork, btcchain.CalcWork(header.Bits))
+
+			if minTimestamp.After(header.Timestamp) {
+				minTimestamp = header.Timestamp
+			}
+			if maxTimestamp.Before(header.Timestamp) {
+				maxTimestamp = header.Timestamp
+			}
+		}
+	}
+
+	// Calculate the difference in seconds between the min and max block
+	// timestamps and avoid division by zero in the case where there is no
+	// time difference.
+	timeDiff := int64(maxTimestamp.Sub(minTimestamp) / time.Second)
+	if timeDiff == 0 {
+		return 0, nil
+	}
+
+	hashesPerSec := new(big.Int).Div(totalWork, big.NewInt(timeDiff))
+	return hashesPerSec.Int64(), nil
 }
 
 // handleGetPeerInfo implements the getpeerinfo command.
