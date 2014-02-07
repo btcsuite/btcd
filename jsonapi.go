@@ -891,6 +891,12 @@ func ReadResultCmd(cmd string, message []byte) (Reply, error) {
 		if err == nil {
 			result.Result = res
 		}
+	case "getnetworkhashps":
+		var res int64
+		err = json.Unmarshal(objmap["result"], &res)
+		if err == nil {
+			result.Result = res
+		}
 	case "getrawtransaction":
 		// getrawtransaction can either return a JSON object or a
 		// hex-encoded string depending on the verbose flag.  Choose the
