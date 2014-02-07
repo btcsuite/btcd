@@ -22,10 +22,10 @@ const (
 	// targetSpacing is the desired amount of time to generate each block.
 	targetSpacing = time.Minute * 10
 
-	// blocksPerRetarget is the number of blocks between each difficulty
+	// BlocksPerRetarget is the number of blocks between each difficulty
 	// retarget.  It is calculated based on the desired block generation
 	// rate.
-	blocksPerRetarget = int64(targetTimespan / targetSpacing)
+	BlocksPerRetarget = int64(targetTimespan / targetSpacing)
 
 	// retargetAdjustmentFactor is the adjustment factor used to limit
 	// the minimum and maximum amount of adjustment that can occur between
@@ -161,7 +161,7 @@ func BigToCompact(n *big.Int) uint32 {
 	return compact
 }
 
-// calcWork calculates a work value from difficulty bits.  Bitcoin increases
+// CalcWork calculates a work value from difficulty bits.  Bitcoin increases
 // the difficulty for generating a block by decreasing the value which the
 // generated hash must be less than.  This difficulty target is stored in each
 // block header using a compact representation as described in the documenation
@@ -169,9 +169,9 @@ func BigToCompact(n *big.Int) uint32 {
 // the most proof of work (highest difficulty).  Since a lower target difficulty
 // value equates to higher actual difficulty, the work value which will be
 // accumulated must be the inverse of the difficulty.  Also, in order to avoid
-// potential division by zero and really small floating point numbers, add 1 to
-// the denominator and multiply the numerator by 2^256.
-func calcWork(bits uint32) *big.Int {
+// potential division by zero and really small floating point numbers, the
+// result adds 1 to the denominator and multiplies the numerator by 2^256.
+func CalcWork(bits uint32) *big.Int {
 	// Return a work value of zero if the passed difficulty bits represent
 	// a negative number. Note this should not happen in practice with valid
 	// blocks, but an invalid block could trigger it.
@@ -235,7 +235,7 @@ func (b *BlockChain) findPrevTestNetDifficulty(startNode *blockNode) (uint32, er
 	// the special rule applied.
 	powLimitBits := b.chainParams().PowLimitBits
 	iterNode := startNode
-	for iterNode != nil && iterNode.height%blocksPerRetarget != 0 && iterNode.bits == powLimitBits {
+	for iterNode != nil && iterNode.height%BlocksPerRetarget != 0 && iterNode.bits == powLimitBits {
 		// Get the previous block node.  This function is used over
 		// simply accessing iterNode.parent directly as it will
 		// dynamically create previous block nodes as needed.  This
@@ -272,7 +272,7 @@ func (b *BlockChain) calcNextRequiredDifficulty(lastNode *blockNode, block *btcu
 
 	// Return the previous block's difficulty requirements if this block
 	// is not at a difficulty retarget interval.
-	if (lastNode.height+1)%blocksPerRetarget != 0 {
+	if (lastNode.height+1)%BlocksPerRetarget != 0 {
 		// The difficulty rules differ between networks.
 		switch b.btcnet {
 		// The test network rules allow minimum difficulty blocks after
@@ -312,7 +312,7 @@ func (b *BlockChain) calcNextRequiredDifficulty(lastNode *blockNode, block *btcu
 	// Get the block node at the previous retarget (targetTimespan days
 	// worth of blocks).
 	firstNode := lastNode
-	for i := int64(0); i < blocksPerRetarget-1 && firstNode != nil; i++ {
+	for i := int64(0); i < BlocksPerRetarget-1 && firstNode != nil; i++ {
 		// Get the previous block node.  This function is used over
 		// simply accessing firstNode.parent directly as it will
 		// dynamically create previous block nodes as needed.  This

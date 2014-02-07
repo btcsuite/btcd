@@ -26,7 +26,7 @@ const (
 	// in memory in order to perform all necessary validation.  It is used
 	// to determine when it's safe to prune nodes from memory without
 	// causing constant dynamic reloading.
-	minMemoryNodes = blocksPerRetarget
+	minMemoryNodes = BlocksPerRetarget
 )
 
 // ErrIndexAlreadyInitialized describes an error that indicates the block index
@@ -81,7 +81,7 @@ func newBlockNode(blockHeader *btcwire.BlockHeader, blockSha *btcwire.ShaHash, h
 	node := blockNode{
 		hash:       blockSha,
 		parentHash: &blockHeader.PrevBlock,
-		workSum:    calcWork(blockHeader.Bits),
+		workSum:    CalcWork(blockHeader.Bits),
 		height:     height,
 		version:    blockHeader.Version,
 		bits:       blockHeader.Bits,
