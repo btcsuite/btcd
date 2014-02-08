@@ -53,6 +53,14 @@ func RegisterCustomCmd(method string, parser RawCmdParser, helpString string) {
 	customCmds[method] = cmd{parser: parser, helpString: helpString}
 }
 
+type CmdGenerator func() Cmd
+
+var customCmdGenerators = make(map[string]CmdGenerator)
+
+func RegisterCustomCmdGenerator(method string, generator CmdGenerator) {
+	customCmdGenerators[method] = generator
+}
+
 // ParseMarshaledCmd parses a raw command and unmarshals as a Cmd.
 // Code that reads and handles commands should switch on the type and
 // type assert as the particular commands supported by the program.
@@ -293,6 +301,10 @@ func ParseMarshaledCmd(b []byte) (Cmd, error) {
 		// registered custom commands.
 		if c, ok := customCmds[r.Method]; ok {
 			return c.parser(&r)
+		}
+
+		if g, ok := customCmdGenerators[r.Method]; ok {
+			cmd = g()
 		}
 	}
 
