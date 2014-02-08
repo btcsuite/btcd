@@ -38,6 +38,14 @@ const (
 	// processedtx notification.
 	ProcessedTxNtfnMethod = "processedtx"
 
+	// AllTxNtfnMethod is the method of the btcd alltx
+	// notification
+	AllTxNtfnMethod = "alltx"
+
+	// AllVerboseTxNtfnMethod is the method of the btcd
+	// allverbosetx notifications.
+	AllVerboseTxNtfnMethod = "allverbosetx"
+
 	// TxMinedNtfnMethod is the method of the btcd txmined
 	// notification.
 	TxMinedNtfnMethod = "txmined"
@@ -75,6 +83,10 @@ func init() {
 		`TODO(jrick) fillmein`)
 	btcjson.RegisterCustomCmd(WalletLockStateNtfnMethod,
 		parseWalletLockStateNtfn, `TODO(jrick) fillmein`)
+	btcjson.RegisterCustomCmd(AllTxNtfnMethod,
+		parseAllTxNtfn, `TODO(flam) fillmein`)
+	btcjson.RegisterCustomCmdGenerator(AllVerboseTxNtfnMethod,
+		generateAllVerboseTxNtfn)
 }
 
 // AccountBalanceNtfn is a type handling custom marshaling and
@@ -1013,5 +1025,177 @@ func (n *WalletLockStateNtfn) UnmarshalJSON(b []byte) error {
 		return btcjson.ErrInternal
 	}
 	*n = *concreteNtfn
+	return nil
+}
+
+// AllTxNtfn is a type handling custom marshaling and
+// unmarshaling of txmined JSON websocket notifications.
+type AllTxNtfn struct {
+	TxID   string
+	Amount int64
+}
+
+// Enforce that AllTxNtfn satisifies the btcjson.Cmd interface.
+var _ btcjson.Cmd = &AllTxNtfn{}
+
+// NewAllTxNtfn creates a new AllTxNtfn.
+func NewAllTxNtfn(txid string, amount int64) *AllTxNtfn {
+	return &AllTxNtfn{
+		TxID:   txid,
+		Amount: amount,
+	}
+}
+
+// parseAllTxNtfn parses a RawCmd into a concrete type satisifying
+// the btcjson.Cmd interface.  This is used when registering the notification
+// with the btcjson parser.
+func parseAllTxNtfn(r *btcjson.RawCmd) (btcjson.Cmd, error) {
+	if r.Id != nil {
+		return nil, ErrNotANtfn
+	}
+
+	if len(r.Params) != 2 {
+		return nil, btcjson.ErrWrongNumberOfParams
+	}
+
+	txid, ok := r.Params[0].(string)
+	if !ok {
+		return nil, errors.New("first parameter txid must be a string")
+	}
+	famount, ok := r.Params[1].(float64)
+	if !ok {
+		return nil, errors.New("second parameter amount must be a number")
+	}
+
+	return NewAllTxNtfn(txid, int64(famount)), nil
+}
+
+// Id satisifies the btcjson.Cmd interface by returning nil for a
+// notification ID.
+func (n *AllTxNtfn) Id() interface{} {
+	return nil
+}
+
+// SetId is implemented to satisify the btcjson.Cmd interface.  The
+// notification id is not modified.
+func (n *AllTxNtfn) SetId(id interface{}) {}
+
+// Method satisifies the btcjson.Cmd interface by returning the method
+// of the notification.
+func (n *AllTxNtfn) Method() string {
+	return AllTxNtfnMethod
+}
+
+// MarshalJSON returns the JSON encoding of n.  Part of the btcjson.Cmd
+// interface.
+func (n *AllTxNtfn) MarshalJSON() ([]byte, error) {
+	ntfn := btcjson.Message{
+		Jsonrpc: "1.0",
+		Method:  n.Method(),
+		Params: []interface{}{
+			n.TxID,
+			n.Amount,
+		},
+	}
+	return json.Marshal(ntfn)
+}
+
+// UnmarshalJSON unmarshals the JSON encoding of n into n.  Part of
+// the btcjson.Cmd interface.
+func (n *AllTxNtfn) UnmarshalJSON(b []byte) error {
+	// Unmarshal into a RawCmd.
+	var r btcjson.RawCmd
+	if err := json.Unmarshal(b, &r); err != nil {
+		return err
+	}
+
+	newNtfn, err := parseAllTxNtfn(&r)
+	if err != nil {
+		return err
+	}
+
+	concreteNtfn, ok := newNtfn.(*AllTxNtfn)
+	if !ok {
+		return btcjson.ErrInternal
+	}
+	*n = *concreteNtfn
+	return nil
+}
+
+// AllVerboseTxNtfn is a type handling custom marshaling and
+// unmarshaling of txmined JSON websocket notifications.
+type AllVerboseTxNtfn struct {
+	RawTx *btcjson.TxRawResult
+}
+
+// Enforce that AllTxNtfn satisifies the btcjson.Cmd interface.
+var _ btcjson.Cmd = &AllVerboseTxNtfn{}
+
+// NewAllVerboseTxNtfn creates a new AllVerboseTxNtfn.
+func NewAllVerboseTxNtfn(rawTx *btcjson.TxRawResult) *AllVerboseTxNtfn {
+	return &AllVerboseTxNtfn{
+		RawTx: rawTx,
+	}
+}
+
+// Id satisifies the btcjson.Cmd interface by returning nil for a
+// notification ID.
+func (n *AllVerboseTxNtfn) Id() interface{} {
+	return nil
+}
+
+// SetId is implemented to satisify the btcjson.Cmd interface.  The
+// notification id is not modified.
+func (n *AllVerboseTxNtfn) SetId(id interface{}) {}
+
+// Method satisifies the btcjson.Cmd interface by returning the method
+// of the notification.
+func (n *AllVerboseTxNtfn) Method() string {
+	return AllVerboseTxNtfnMethod
+}
+
+// MarshalJSON returns the JSON encoding of n.  Part of the btcjson.Cmd
+// interface.
+func (n *AllVerboseTxNtfn) MarshalJSON() ([]byte, error) {
+	ntfn := btcjson.Message{
+		Jsonrpc: "1.0",
+		Method:  n.Method(),
+		Params: []interface{}{
+			n.RawTx,
+		},
+	}
+	return json.Marshal(ntfn)
+}
+
+func generateAllVerboseTxNtfn() btcjson.Cmd {
+	return new(AllVerboseTxNtfn)
+}
+
+type rawParamsCmd struct {
+	Jsonrpc string             `json:"jsonrpc"`
+	Id      interface{}        `json:"id"`
+	Method  string             `json:"method"`
+	Params  []*json.RawMessage `json:"params"`
+}
+
+// UnmarshalJSON unmarshals the JSON encoding of n into n.  Part of
+// the btcjson.Cmd interface.
+func (n *AllVerboseTxNtfn) UnmarshalJSON(b []byte) error {
+	// Unmarshal into a custom rawParamsCmd
+	var r rawParamsCmd
+	if err := json.Unmarshal(b, &r); err != nil {
+		return err
+	}
+
+	if len(r.Params) != 1 {
+		return btcjson.ErrWrongNumberOfParams
+	}
+
+	var rawTx *btcjson.TxRawResult
+	if err := json.Unmarshal(*r.Params[0], &rawTx); err != nil {
+		return err
+	}
+
+	*n = *NewAllVerboseTxNtfn(rawTx)
 	return nil
 }

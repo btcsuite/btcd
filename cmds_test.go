@@ -174,6 +174,18 @@ var cmdtests = []struct {
 		},
 	},
 	{
+		name: "notifyallnewtxs",
+		f: func() (btcjson.Cmd, error) {
+			return NewNotifyAllNewTXsCmd(
+				float64(1),
+				true), nil
+		},
+		result: &NotifyAllNewTXsCmd{
+			id:      float64(1),
+			Verbose: true,
+		},
+	},
+	{
 		name: "notifyspent",
 		f: func() (btcjson.Cmd, error) {
 			op := &btcwire.OutPoint{

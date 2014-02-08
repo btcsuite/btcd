@@ -43,6 +43,8 @@ func init() {
 		`TODO(jrick) fillmein`)
 	btcjson.RegisterCustomCmd("notifynewtxs", parseNotifyNewTXsCmd,
 		`TODO(jrick) fillmein`)
+	btcjson.RegisterCustomCmd("notifyallnewtxs", parseNotifyAllNewTXsCmd,
+		`TODO(flam) fillmein`)
 	btcjson.RegisterCustomCmd("notifyspent", parseNotifySpentCmd,
 		`TODO(jrick) fillmein`)
 	btcjson.RegisterCustomCmd("recoveraddresses", parseRecoverAddressesCmd,
@@ -895,6 +897,90 @@ func (cmd *NotifyNewTXsCmd) UnmarshalJSON(b []byte) error {
 	}
 
 	concreteCmd, ok := newCmd.(*NotifyNewTXsCmd)
+	if !ok {
+		return btcjson.ErrInternal
+	}
+	*cmd = *concreteCmd
+	return nil
+}
+
+// NotifyAllNewTXsCmd is a type handling custom marshaling and
+// unmarshaling of notifynewtxs JSON websocket extension
+// commands.
+type NotifyAllNewTXsCmd struct {
+	id      interface{}
+	Verbose bool
+}
+
+// Enforce that NotifyAllNewTXsCmd satisifies the btcjson.Cmd interface.
+var _ btcjson.Cmd = &NotifyAllNewTXsCmd{}
+
+// NewNotifyAllNewTXsCmd creates a new NotifyAllNewTXsCmd.
+func NewNotifyAllNewTXsCmd(id interface{}, verbose bool) *NotifyAllNewTXsCmd {
+	return &NotifyAllNewTXsCmd{
+		id:      id,
+		Verbose: verbose,
+	}
+}
+
+// parseNotifyAllNewTXsCmd parses a NotifyAllNewTXsCmd into a concrete type
+// satisifying the btcjson.Cmd interface.  This is used when registering
+// the custom command with the btcjson parser.
+func parseNotifyAllNewTXsCmd(r *btcjson.RawCmd) (btcjson.Cmd, error) {
+	if len(r.Params) != 1 {
+		return nil, btcjson.ErrWrongNumberOfParams
+	}
+
+	verbose := r.Params[0].(bool)
+
+	return NewNotifyAllNewTXsCmd(r.Id, verbose), nil
+}
+
+// Id satisifies the Cmd interface by returning the ID of the command.
+func (cmd *NotifyAllNewTXsCmd) Id() interface{} {
+	return cmd.id
+}
+
+// SetId satisifies the Cmd interface by setting the ID of the command.
+func (cmd *NotifyAllNewTXsCmd) SetId(id interface{}) {
+	cmd.id = id
+}
+
+// Method satisfies the Cmd interface by returning the RPC method.
+func (cmd *NotifyAllNewTXsCmd) Method() string {
+	return "notifyallnewtxs"
+}
+
+// MarshalJSON returns the JSON encoding of cmd.  Part of the Cmd interface.
+func (cmd *NotifyAllNewTXsCmd) MarshalJSON() ([]byte, error) {
+	// Fill a RawCmd and marshal.
+	raw := btcjson.RawCmd{
+		Jsonrpc: "1.0",
+		Method:  "notifyallnewtxs",
+		Id:      cmd.id,
+		Params: []interface{}{
+			cmd.Verbose,
+		},
+	}
+
+	return json.Marshal(raw)
+}
+
+// UnmarshalJSON unmarshals the JSON encoding of cmd into cmd.  Part of
+// the Cmd interface.
+func (cmd *NotifyAllNewTXsCmd) UnmarshalJSON(b []byte) error {
+	// Unmarshal into a RawCmd.
+	var r btcjson.RawCmd
+	if err := json.Unmarshal(b, &r); err != nil {
+		return err
+	}
+
+	newCmd, err := parseNotifyAllNewTXsCmd(&r)
+	if err != nil {
+		return err
+	}
+
+	concreteCmd, ok := newCmd.(*NotifyAllNewTXsCmd)
 	if !ok {
 		return btcjson.ErrInternal
 	}
