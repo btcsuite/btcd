@@ -915,25 +915,40 @@ type NotifyAllNewTXsCmd struct {
 // Enforce that NotifyAllNewTXsCmd satisifies the btcjson.Cmd interface.
 var _ btcjson.Cmd = &NotifyAllNewTXsCmd{}
 
-// NewNotifyAllNewTXsCmd creates a new NotifyAllNewTXsCmd.
-func NewNotifyAllNewTXsCmd(id interface{}, verbose bool) *NotifyAllNewTXsCmd {
+// NewNotifyAllNewTXsCmd creates a new NotifyAllNewTXsCmd that optionally
+// takes a single verbose parameter that defaults to false.
+func NewNotifyAllNewTXsCmd(id interface{}, optArgs ...bool) (*NotifyAllNewTXsCmd, error) {
+	verbose := false
+
+	optArgsLen := len(optArgs)
+	if optArgsLen > 0 {
+		if optArgsLen > 1 {
+			return nil, btcjson.ErrTooManyOptArgs
+		}
+		verbose = optArgs[0]
+	}
+
 	return &NotifyAllNewTXsCmd{
 		id:      id,
 		Verbose: verbose,
-	}
+	}, nil
 }
 
 // parseNotifyAllNewTXsCmd parses a NotifyAllNewTXsCmd into a concrete type
 // satisifying the btcjson.Cmd interface.  This is used when registering
 // the custom command with the btcjson parser.
 func parseNotifyAllNewTXsCmd(r *btcjson.RawCmd) (btcjson.Cmd, error) {
-	if len(r.Params) != 1 {
-		return nil, btcjson.ErrWrongNumberOfParams
+	verbose := false
+	numParams := len(r.Params)
+
+	if numParams > 0 {
+		if numParams > 1 {
+			return nil, btcjson.ErrWrongNumberOfParams
+		}
+		verbose = r.Params[0].(bool)
 	}
 
-	verbose := r.Params[0].(bool)
-
-	return NewNotifyAllNewTXsCmd(r.Id, verbose), nil
+	return NewNotifyAllNewTXsCmd(r.Id, verbose)
 }
 
 // Id satisifies the Cmd interface by returning the ID of the command.
