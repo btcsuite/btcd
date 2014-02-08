@@ -53,10 +53,14 @@ func RegisterCustomCmd(method string, parser RawCmdParser, helpString string) {
 	customCmds[method] = cmd{parser: parser, helpString: helpString}
 }
 
+// CmdGenerator is a function that returns a new concerete Cmd of
+// the appropriate type for a non-standard Bitcoin command.
 type CmdGenerator func() Cmd
 
 var customCmdGenerators = make(map[string]CmdGenerator)
 
+// RegisterCustomCmdGenerator registers a custom CmdGenerator func for
+// a non-standard Bitcoin command.
 func RegisterCustomCmdGenerator(method string, generator CmdGenerator) {
 	customCmdGenerators[method] = generator
 }
