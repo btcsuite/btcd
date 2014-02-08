@@ -717,7 +717,7 @@ func (mp *txMemPool) FetchTransaction(txHash *btcwire.ShaHash) (*btcutil.Tx, err
 // more details.
 //
 // This function MUST be called with the mempool lock held (for writes).
-func (mp *txMemPool) maybeAcceptTransaction(tx *btcutil.Tx, isOrphan *bool) error {
+func (mp *txMemPool) maybeAcceptTransaction(tx *btcutil.Tx, isOrphan *bool, isNew bool) error {
 	if isOrphan != nil {
 		*isOrphan = false
 	}
@@ -879,6 +879,10 @@ func (mp *txMemPool) maybeAcceptTransaction(tx *btcutil.Tx, isOrphan *bool) erro
 	// Notify wallets of mempool transactions to wallet addresses.
 	if mp.server.rpcServer != nil {
 		mp.server.rpcServer.NotifyForTxOuts(tx, nil)
+
+		if isNew {
+			mp.server.rpcServer.NotifyForNewTx(tx)
+		}
 	}
 
 	return nil
@@ -892,12 +896,12 @@ func (mp *txMemPool) maybeAcceptTransaction(tx *btcutil.Tx, isOrphan *bool) erro
 // or not the transaction is an orphan.
 //
 // This function is safe for concurrent access.
-func (mp *txMemPool) MaybeAcceptTransaction(tx *btcutil.Tx, isOrphan *bool) error {
+func (mp *txMemPool) MaybeAcceptTransaction(tx *btcutil.Tx, isOrphan *bool, isNew bool) error {
 	// Protect concurrent access.
 	mp.Lock()
 	defer mp.Unlock()
 
-	return mp.maybeAcceptTransaction(tx, isOrphan)
+	return mp.maybeAcceptTransaction(tx, isOrphan, isNew)
 }
 
 // processOrphans determines if there are any orphans which depend on the passed
@@ -937,7 +941,7 @@ func (mp *txMemPool) processOrphans(hash *btcwire.ShaHash) error {
 			// Potentially accept the transaction into the
 			// transaction pool.
 			var isOrphan bool
-			err := mp.maybeAcceptTransaction(tx, &isOrphan)
+			err := mp.maybeAcceptTransaction(tx, &isOrphan, true)
 			if err != nil {
 				return err
 			}
@@ -975,7 +979,7 @@ func (mp *txMemPool) ProcessTransaction(tx *btcutil.Tx) error {
 
 	// Potentially accept the transaction to the memory pool.
 	var isOrphan bool
-	err := mp.maybeAcceptTransaction(tx, &isOrphan)
+	err := mp.maybeAcceptTransaction(tx, &isOrphan, true)
 	if err != nil {
 		return err
 	}
