@@ -84,6 +84,8 @@ func (r *wsContext) AddBlockUpdateRequest(n ntfnChan) {
 	rc.blockUpdates = true
 }
 
+// AddAllNewTxRequest adds the request context to mark a wallet as
+// having requested updates for all new transactions.
 func (r *wsContext) AddAllNewTxRequest(n ntfnChan, verbose bool) {
 	r.Lock()
 	defer r.Unlock()
