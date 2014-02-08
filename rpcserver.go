@@ -166,11 +166,11 @@ func (s *rpcServer) Start() {
 		ReadTimeout: time.Second * rpcAuthTimeoutSeconds,
 	}
 	rpcServeMux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Connection", "close")
 		if _, err := s.checkAuth(r, true); err != nil {
 			jsonAuthFail(w, r, s)
 			return
 		}
-		w.Header().Set("Connection", "close")
 		jsonRPCRead(w, r, s)
 	})
 
