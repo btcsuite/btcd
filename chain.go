@@ -78,9 +78,13 @@ type blockNode struct {
 // for the passed block.  The work sum is updated accordingly when the node is
 // inserted into a chain.
 func newBlockNode(blockHeader *btcwire.BlockHeader, blockSha *btcwire.ShaHash, height int64) *blockNode {
+	// Make a copy of the hash so the node doesn't keep a reference to part
+	// of the full block/block header preventing it from being garbage
+	// collected.
+	prevHash := blockHeader.PrevBlock
 	node := blockNode{
 		hash:       blockSha,
-		parentHash: &blockHeader.PrevBlock,
+		parentHash: &prevHash,
 		workSum:    CalcWork(blockHeader.Bits),
 		height:     height,
 		version:    blockHeader.Version,
