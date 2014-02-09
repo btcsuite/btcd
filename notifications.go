@@ -1031,8 +1031,8 @@ func (n *WalletLockStateNtfn) UnmarshalJSON(b []byte) error {
 // AllTxNtfn is a type handling custom marshaling and
 // unmarshaling of txmined JSON websocket notifications.
 type AllTxNtfn struct {
-	TxID   string
-	Amount int64
+	TxID   string `json:"txid"`
+	Amount int64  `json:"amount"`
 }
 
 // Enforce that AllTxNtfn satisifies the btcjson.Cmd interface.
@@ -1125,7 +1125,7 @@ func (n *AllTxNtfn) UnmarshalJSON(b []byte) error {
 // AllVerboseTxNtfn is a type handling custom marshaling and
 // unmarshaling of txmined JSON websocket notifications.
 type AllVerboseTxNtfn struct {
-	RawTx *btcjson.TxRawResult
+	RawTx *btcjson.TxRawResult `json:"rawtx"`
 }
 
 // Enforce that AllTxNtfn satisifies the btcjson.Cmd interface.
@@ -1185,6 +1185,10 @@ func (n *AllVerboseTxNtfn) UnmarshalJSON(b []byte) error {
 	var r rawParamsCmd
 	if err := json.Unmarshal(b, &r); err != nil {
 		return err
+	}
+
+	if r.Id != nil {
+		return ErrNotANtfn
 	}
 
 	if len(r.Params) != 1 {
