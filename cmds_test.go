@@ -178,7 +178,7 @@ var cmdtests = []struct {
 		f: func() (btcjson.Cmd, error) {
 			return NewNotifyAllNewTXsCmd(
 				float64(1),
-				true), nil
+				true)
 		},
 		result: &NotifyAllNewTXsCmd{
 			id:      float64(1),
