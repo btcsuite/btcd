@@ -827,6 +827,9 @@ func (s *rpcServer) websocketJSONHandler(r chan *btcjson.Reply, c handlerChans, 
 // of a new block connected to the main chain.  The notification is sent
 // to each connected wallet.
 func (s *rpcServer) NotifyBlockConnected(block *btcutil.Block) {
+	s.ws.Lock()
+	defer s.ws.Unlock()
+
 	hash, err := block.Sha()
 	if err != nil {
 		rpcsLog.Error("Bad block; connected block notification dropped")
@@ -842,7 +845,6 @@ func (s *rpcServer) NotifyBlockConnected(block *btcutil.Block) {
 	}
 
 	// Inform any interested parties about txs mined in this block.
-	s.ws.Lock()
 	for _, tx := range block.Transactions() {
 		if clist, ok := s.ws.minedTxNotifications[*tx.Sha()]; ok {
 			var enext *list.Element
@@ -860,13 +862,15 @@ func (s *rpcServer) NotifyBlockConnected(block *btcutil.Block) {
 			}
 		}
 	}
-	s.ws.Unlock()
 }
 
 // NotifyBlockDisconnected creates and marshals a JSON message to notify
 // of a new block disconnected from the main chain.  The notification is sent
 // to each connected wallet.
 func (s *rpcServer) NotifyBlockDisconnected(block *btcutil.Block) {
+	s.ws.Lock()
+	defer s.ws.Unlock()
+
 	hash, err := block.Sha()
 	if err != nil {
 		rpcsLog.Error("Bad block; connected block notification dropped")
@@ -910,6 +914,9 @@ func notifySpentData(n ntfnChan, txhash *btcwire.ShaHash, index uint32,
 // each transaction input of a new block and perform any checks and
 // notify listening frontends when necessary.
 func (s *rpcServer) newBlockNotifyCheckTxIn(tx *btcutil.Tx) {
+	s.ws.Lock()
+	defer s.ws.Unlock()
+
 	for _, txin := range tx.MsgTx().TxIn {
 		if clist, ok := s.ws.spentNotifications[txin.PreviousOutpoint]; ok {
 			var enext *list.Element
@@ -928,6 +935,9 @@ func (s *rpcServer) newBlockNotifyCheckTxIn(tx *btcutil.Tx) {
 // necessary notifications for wallets.  If a non-nil block is passed,
 // additional block information is passed with the notifications.
 func (s *rpcServer) NotifyForTxOuts(tx *btcutil.Tx, block *btcutil.Block) {
+	s.ws.Lock()
+	defer s.ws.Unlock()
+
 	// Nothing to do if nobody is listening for transaction notifications.
 	if len(s.ws.txNotifications) == 0 {
 		return
@@ -987,6 +997,9 @@ func (s *rpcServer) NotifyForTxOuts(tx *btcutil.Tx, block *btcutil.Block) {
 // NotifyForNewTx sends delivers the new tx to any client that has
 // registered for all new TX.
 func (s *rpcServer) NotifyForNewTx(tx *btcutil.Tx) {
+	s.ws.Lock()
+	defer s.ws.Unlock()
+
 	txId := tx.Sha().String()
 	mtx := tx.MsgTx()
 
