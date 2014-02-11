@@ -77,7 +77,7 @@ var commandHandlers = map[string]*handlerData{
 	"getreceivedbyaddress":  {1, 1, displayGeneric, []conversionHandler{nil, toInt}, makeGetReceivedByAddress, "<address> [minconf=1]"},
 	"gettransaction":        {1, 1, displayJSONDump, nil, makeGetTransaction, "txid"},
 	"gettxoutsetinfo":       {0, 0, displayJSONDump, nil, makeGetTxOutSetInfo, ""},
-	"getwork":               {0, 1, displayJSONDump, nil, makeGetWork, "[jsonrequestobject]"},
+	"getwork":               {0, 1, displayJSONDump, nil, makeGetWork, "[data]"},
 	"help":                  {0, 1, displayGeneric, nil, makeHelp, "[commandName]"},
 	"importprivkey":         {1, 2, displayGeneric, []conversionHandler{nil, nil, toBool}, makeImportPrivKey, "<wifprivkey> [label] [rescan=true]"},
 	"keypoolrefill":         {0, 1, displayGeneric, []conversionHandler{toInt}, makeKeyPoolRefill, "[newsize]"},
@@ -470,10 +470,7 @@ func makeGetWork(args []interface{}) (btcjson.Cmd, error) {
 		return nil, err
 	}
 	if len(args) == 1 {
-		err = cmd.UnmarshalJSON([]byte(args[0].(string)))
-		if err != nil {
-			return nil, err
-		}
+		cmd.Data = args[0].(string)
 	}
 	return cmd, nil
 }
