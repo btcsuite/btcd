@@ -3654,20 +3654,11 @@ func (cmd *GetTxOutSetInfoCmd) UnmarshalJSON(b []byte) error {
 	return nil
 }
 
-// WorkRequest is a request object as defined in
-// https://en.bitcoin.it/wiki/Getwork, it is provided as a
-// pointer argument to GetWorkCmd.
-type WorkRequest struct {
-	Data      string `json:"data"`
-	Target    string `json:"target"`
-	Algorithm string `json:"algorithm,omitempty"`
-}
-
 // GetWorkCmd is a type handling custom marshaling and
 // unmarshaling of getwork JSON RPC commands.
 type GetWorkCmd struct {
-	id      interface{}
-	Request *WorkRequest
+	id   interface{}
+	Data string `json:"data,omitempty"`
 }
 
 // Enforce that GetWorkCmd satisifies the Cmd interface.
@@ -3675,17 +3666,17 @@ var _ Cmd = &GetWorkCmd{}
 
 // NewGetWorkCmd creates a new GetWorkCmd. Optionally a
 // pointer to a TemplateRequest may be provided.
-func NewGetWorkCmd(id interface{}, optArgs ...*WorkRequest) (*GetWorkCmd, error) {
-	var request *WorkRequest
+func NewGetWorkCmd(id interface{}, optArgs ...string) (*GetWorkCmd, error) {
+	var data string
 	if len(optArgs) > 0 {
 		if len(optArgs) > 1 {
 			return nil, ErrTooManyOptArgs
 		}
-		request = optArgs[0]
+		data = optArgs[0]
 	}
 	return &GetWorkCmd{
-		id:      id,
-		Request: request,
+		id:   id,
+		Data: data,
 	}, nil
 }
 
@@ -3712,8 +3703,8 @@ func (cmd *GetWorkCmd) MarshalJSON() ([]byte, error) {
 		Id:      cmd.id,
 		Params:  []interface{}{},
 	}
-	if cmd.Request != nil {
-		raw.Params = append(raw.Params, cmd.Request)
+	if cmd.Data != "" {
+		raw.Params = append(raw.Params, cmd.Data)
 	}
 
 	return json.Marshal(raw)
@@ -3730,46 +3721,15 @@ func (cmd *GetWorkCmd) UnmarshalJSON(b []byte) error {
 	if len(r.Params) > 1 {
 		return ErrWrongNumberOfParams
 	}
-	wrequest := new(WorkRequest)
+	var data string
 	if len(r.Params) == 1 {
-		rmap, ok := r.Params[0].(map[string]interface{})
+		sdata, ok := r.Params[0].(string)
 		if !ok {
-			return errors.New("first optional parameter template request must be an object")
+			return errors.New("data must be a string")
 		}
-
-		// data is required
-		data, ok := rmap["data"]
-		if !ok {
-			return errors.New("WorkRequest data must be present")
-		}
-		sdata, ok := data.(string)
-		if !ok {
-			return errors.New("WorkRequest data must be a string")
-		}
-		wrequest.Data = sdata
-
-		// target is required
-		target, ok := rmap["target"]
-		if !ok {
-			return errors.New("WorkRequest target must be present")
-		}
-		starget, ok := target.(string)
-		if !ok {
-			return errors.New("WorkRequest target must be a string")
-		}
-		wrequest.Target = starget
-
-		// algorithm is optional
-		algo, ok := rmap["algorithm"]
-		if ok {
-			salgo, ok := algo.(string)
-			if !ok {
-				return errors.New("WorkRequest algorithm must be a string")
-			}
-			wrequest.Algorithm = salgo
-		}
+		data = sdata
 	}
-	newCmd, err := NewGetWorkCmd(r.Id, wrequest)
+	newCmd, err := NewGetWorkCmd(r.Id, data)
 	if err != nil {
 		return err
 	}
