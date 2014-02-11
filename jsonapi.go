@@ -933,10 +933,21 @@ func ReadResultCmd(cmd string, message []byte) (Reply, error) {
 			result.Result = res
 		}
 	case "getwork":
-		var res GetWorkResult
-		err = json.Unmarshal(objmap["result"], &res)
-		if err == nil {
-			result.Result = res
+		// getwork can either return a JSON object or a boolean
+		// depending on whether or not data was provided.  Choose the
+		// right form accordingly.
+		if strings.Contains(string(objmap["result"]), "{") {
+			var res GetWorkResult
+			err = json.Unmarshal(objmap["result"], &res)
+			if err == nil {
+				result.Result = res
+			}
+		} else {
+			var res bool
+			err = json.Unmarshal(objmap["result"], &res)
+			if err == nil {
+				result.Result = res
+			}
 		}
 	case "validateaddress":
 		var res ValidateAddressResult
