@@ -14,6 +14,32 @@ func isOdd(a *big.Int) bool {
 	return a.Bit(0) == 1
 }
 
+// decompressPoint decompresses a point on the given curve given the X point and
+// the solution to use.
+func decompressPoint(curve *KoblitzCurve, x *big.Int, ybit bool) (*big.Int, error) {
+	// TODO(oga) This will probably only work for secp256k1 due to
+	// optimisations.
+
+	// Y = +-sqrt(x^3 + B)
+	x3 := new(big.Int).Mul(x, x)
+	x3.Mul(x3, x)
+	x3.Add(x3, curve.Params().B)
+
+	// now calculate sqrt mod p of x2 + B
+	// This code used to do a full sqrt based on tonelli/shanks,
+	// but this was replaced by the algorithms referenced in
+	// https://bitcointalk.org/index.php?topic=162805.msg1712294#msg1712294
+	y := new(big.Int).Exp(x3, curve.QPlus1Div4(), curve.Params().P)
+
+	if ybit != isOdd(y) {
+		y.Sub(curve.Params().P, y)
+	}
+	if ybit != isOdd(y) {
+		return nil, fmt.Errorf("ybit doesn't match oddness")
+	}
+	return y, nil
+}
+
 const (
 	pubkeyCompressed   byte = 0x2 // y_bit + x coord
 	pubkeyUncompressed byte = 0x4 // x coord + y coord
@@ -53,25 +79,10 @@ func ParsePubKey(pubKeyStr []byte, curve *KoblitzCurve) (key *ecdsa.PublicKey, e
 				"pubkey string: %d", pubKeyStr[0])
 		}
 		pubkey.X = new(big.Int).SetBytes(pubKeyStr[1:33])
-		// Y = +-sqrt(x^3 + B)
-		x3 := new(big.Int).Mul(pubkey.X, pubkey.X)
-		x3.Mul(x3, pubkey.X)
-		x3.Add(x3, pubkey.Curve.Params().B)
-
-		// now calculate sqrt mod p of x2 + B
-		// This code used to do a full sqrt based on tonelli/shanks,
-		// but this was replaced by the algorithms referenced in
-		// https://bitcointalk.org/index.php?topic=162805.msg1712294#msg1712294
-		y := new(big.Int).Exp(x3, curve.QPlus1Div4(), pubkey.Curve.Params().P)
-
-		if ybit != isOdd(y) {
-			y.Sub(pubkey.Curve.Params().P, y)
+		pubkey.Y, err = decompressPoint(curve, pubkey.X, ybit)
+		if err != nil {
+			return nil, err
 		}
-		if ybit != isOdd(y) {
-			return nil, fmt.Errorf("ybit doesn't match oddness")
-		}
-
-		pubkey.Y = y
 	default: // wrong!
 		return nil, fmt.Errorf("invalid pub key length %d",
 			len(pubKeyStr))

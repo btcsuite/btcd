@@ -5,7 +5,9 @@
 package btcec
 
 import (
+	"crypto/ecdsa"
 	"crypto/elliptic"
+	"crypto/rand"
 	"errors"
 	"fmt"
 	"math/big"
@@ -212,4 +214,170 @@ func canonicalPadding(b []byte) error {
 	default:
 		return nil
 	}
+}
+
+// hashToInt converts a hash value to an integer. There is some disagreement
+// about how this is done. [NSA] suggests that this is done in the obvious
+// manner, but [SECG] truncates the hash to the bit-length of the curve order
+// first. We follow [SECG] because that's what OpenSSL does. Additionally,
+// OpenSSL right shifts excess bits from the number if the hash is too large
+// and we mirror that too.
+// This is borrowed from crypto/ecdsa.
+func hashToInt(hash []byte, c elliptic.Curve) *big.Int {
+	orderBits := c.Params().N.BitLen()
+	orderBytes := (orderBits + 7) / 8
+	if len(hash) > orderBytes {
+		hash = hash[:orderBytes]
+	}
+
+	ret := new(big.Int).SetBytes(hash)
+	excess := len(hash)*8 - orderBits
+	if excess > 0 {
+		ret.Rsh(ret, uint(excess))
+	}
+	return ret
+}
+
+// recoverKeyFromSignature recoves a public key from the signature "sig" on the
+// given message hash "msg". Based on the algorithm found in section 5.1.5 of
+// SEC 1 Ver 2.0, page 47-48 (53 and 54 in the pdf). This performs the details
+// in the inner loop in Step 1. The counter provided is actually the j parameter
+// of the loop * 2 - on the first iteration of j we do the R case, else the -R
+// case in step 1.6. This counter is used in the bitcoin compressed signature
+// format and thus we match bitcoind's behaviour here.
+func recoverKeyFromSignature(curve *KoblitzCurve, sig *Signature, msg []byte,
+	iter int, doChecks bool) (*ecdsa.PublicKey, error) {
+	// 1.1 x = (n * i) + r
+	Rx := new(big.Int).Mul(curve.Params().N,
+		new(big.Int).SetInt64(int64(iter/2)))
+	Rx.Add(Rx, sig.R)
+	if Rx.Cmp(curve.Params().P) != -1 {
+		return nil, errors.New("calculated Rx is larger than curve P")
+	}
+
+	// convert 02<Rx> to point R. (step 1.2 and 1.3). If we are on an odd
+	// iteration then 1.6 will be done with -R, so we calculate the other
+	// term when uncompressing the point.
+	Ry, err := decompressPoint(curve, Rx, iter%2 == 1)
+	if err != nil {
+		return nil, err
+	}
+
+	// 1.4 Check n*R is point at infinity
+	if doChecks {
+		nRx, nRy := curve.ScalarMult(Rx, Ry, curve.Params().N.Bytes())
+		if nRx.Sign() != 0 || nRy.Sign() != 0 {
+			return nil, errors.New("R*n does not equal the point at infinity")
+		}
+	}
+
+	// 1.5 calculate e from message using the same algorithm as ecdsa
+	// signature calculation.
+	e := hashToInt(msg, curve)
+
+	// Step 1.6.1:
+	// We calculate the two terms sR and eG separately multiplied by the
+	// inverse of r (from the signature). We then add them to calculate
+	// Q = r^-1(sR-eG)
+	invr := new(big.Int).ModInverse(sig.R, curve.Params().N)
+
+	// first term.
+	invrS := new(big.Int).Mul(invr, sig.S)
+	invrS.Mod(invrS, curve.Params().N)
+	sRx, sRy := curve.ScalarMult(Rx, Ry, invrS.Bytes())
+
+	// second term.
+	e.Neg(e)
+	e.Mod(e, curve.Params().N)
+	e.Mul(e, invr)
+	e.Mod(e, curve.Params().N)
+	minuseGx, minuseGy := curve.ScalarBaseMult(e.Bytes())
+
+	// TODO(oga) this would be faster if we did a mult and add in one
+	// step to prevent the jacobian conversion back and forth.
+	Qx, Qy := curve.Add(sRx, sRy, minuseGx, minuseGy)
+
+	return &ecdsa.PublicKey{
+		Curve: curve,
+		X:     Qx,
+		Y:     Qy,
+	}, nil
+}
+
+// SignCompact produces a compact signature of the data in hash with the given
+// private key on the given koblitz curve. The isCompressed  parameter should
+// be used to detail if the given signature should reference a compressed
+// public key or not. If successful the bytes of the compact signature will be
+// returned in the format:
+// <(byte of 27+public key solution)+4 if compressed >< padded bytes for signature R><padded bytes for signature S>
+// where the R and S parameters are padde up to the bitlengh of the curve.
+func SignCompact(curve *KoblitzCurve, key *ecdsa.PrivateKey,
+	hash []byte, isCompressedKey bool) ([]byte, error) {
+	r, s, err := ecdsa.Sign(rand.Reader, key, hash)
+	if err != nil {
+		return nil, err
+	}
+
+	sig := &Signature{R: r, S: s}
+	// bitcoind checks the bit length of R and S here. The ecdsa signature
+	// algorithm returns R and S mod N therefore they will be the bitsize of
+	// the curve, and thus correctly sized.
+	for i := 0; i < (curve.H+1)*2; i++ {
+		pk, err := recoverKeyFromSignature(curve, sig, hash, i, true)
+		if err == nil && pk.X.Cmp(key.X) == 0 && pk.Y.Cmp(key.Y) == 0 {
+			result := make([]byte, 1, 2*(curve.BitSize/8)+1)
+			result[0] = 27 + byte(i)
+			if isCompressedKey {
+				result[0] += 4
+			}
+			// Not sure this needs rounding but safer to do so.
+			curvelen := (curve.BitSize + 7) / 8
+
+			// Pad R and S to curvelen if needed.
+			bytelen := (sig.R.BitLen() + 7) / 8
+			if bytelen < curvelen {
+				result = append(result,
+					make([]byte, curvelen-bytelen)...)
+			}
+			result = append(result, sig.R.Bytes()...)
+
+			bytelen = (sig.S.BitLen() + 7) / 8
+			if bytelen < curvelen {
+				result = append(result,
+					make([]byte, curvelen-bytelen)...)
+			}
+			result = append(result, sig.S.Bytes()...)
+
+			return result, nil
+		}
+	}
+
+	return nil, errors.New("no valid solution for pubkey found")
+}
+
+// RecoverCompact verifies the compact signature "signature" of "hash" for the
+// Koblitz curve in "curve". If the signature matches then the recovered public
+// key will be returned as well as a boolen if the original key was compressed
+// or not, else an error will be returned.
+func RecoverCompact(curve *KoblitzCurve, signature,
+	hash []byte) (*ecdsa.PublicKey, bool, error) {
+	bitlen := (curve.BitSize + 7) / 8
+	if len(signature) != 1+bitlen*2 {
+		return nil, false, errors.New("invalid compact signature size")
+	}
+
+	iteration := int((signature[0] - 27) & ^byte(4))
+
+	// format is <header byte><bitlen R><bitlen S>
+	sig := &Signature{
+		R: new(big.Int).SetBytes(signature[1 : bitlen+1]),
+		S: new(big.Int).SetBytes(signature[bitlen+1:]),
+	}
+	// The iteration used here was encoded
+	key, err := recoverKeyFromSignature(curve, sig, hash, iteration, false)
+	if err != nil {
+		return nil, false, err
+	}
+
+	return key, ((signature[0] - 27) & 4) == 4, nil
 }

@@ -6,6 +6,9 @@ package btcec_test
 
 import (
 	"bytes"
+	"crypto/ecdsa"
+	"crypto/rand"
+	"fmt"
 	"github.com/conformal/btcec"
 	"math/big"
 	"testing"
@@ -418,5 +421,72 @@ func TestSignatureSerialize(t *testing.T) {
 				"got:  %x\nwant: %x", i, test.name, result,
 				test.expected)
 		}
+	}
+}
+
+func testSignCompact(t *testing.T, tag string, curve *btcec.KoblitzCurve,
+	data []byte, isCompressed bool) {
+	priv, _ := ecdsa.GenerateKey(curve, rand.Reader)
+
+	hashed := []byte("testing")
+	sig, err := btcec.SignCompact(curve, priv, hashed, isCompressed)
+	if err != nil {
+		t.Errorf("%s: error signing: %s", tag, err)
+		return
+	}
+
+	pk, wasCompressed, err := btcec.RecoverCompact(curve, sig, hashed)
+	if err != nil {
+		t.Errorf("%s: error recovering: %s", tag,  err)
+		return
+	}
+	if pk.X.Cmp(priv.X) != 0 || pk.Y.Cmp(priv.Y) != 0 {
+		t.Errorf("%s: recovered pubkey doesn't match original "+
+			"(%v,%v) vs (%v,%v) ", tag, pk.X, pk.Y, priv.X, priv.Y)
+		return
+	}
+	if wasCompressed != isCompressed {
+		t.Errorf("%s: recovered pubkey doesn't match compressed state "+
+			"(%v vs %v)", tag, isCompressed, wasCompressed)
+		return
+	}
+
+	// If we change the compressed bit we should get the same key back,
+	// but the compressed flag should be reversed.
+	if isCompressed {
+		sig[0] -= 4
+	} else {
+		sig[0] += 4
+	}
+
+	pk, wasCompressed, err = btcec.RecoverCompact(curve, sig, hashed)
+	if err != nil {
+		t.Errorf("%s: error recovering (2): %s", tag, err)
+		return
+	}
+	if pk.X.Cmp(priv.X) != 0 || pk.Y.Cmp(priv.Y) != 0 {
+		t.Errorf("%s: recovered pubkey (2) doesn't match original "+
+			"(%v,%v) vs (%v,%v) ", tag, pk.X, pk.Y, priv.X, priv.Y)
+		return
+	}
+	if wasCompressed == isCompressed {
+		t.Errorf("%s: recovered pubkey doesn't match reversed "+
+			"compressed state (%v vs %v)", tag, isCompressed,
+			wasCompressed)
+		return
+	}
+}
+
+func TestSignCompact(t *testing.T) {
+	for i := 0; i < 256; i++ {
+		name := fmt.Sprintf("test %d", i)
+		data := make([]byte, 32)
+		_, err := rand.Read(data)
+		if err != nil {
+			t.Errorf("failed to read random data for %s", name)
+			continue
+		}
+		compressed := i%2 != 0
+		testSignCompact(t, name, btcec.S256(), data, compressed)
 	}
 }
