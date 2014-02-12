@@ -28,6 +28,8 @@ const (
 	defaultConfigFilename = "btcd.conf"
 	defaultDataDirname    = "data"
 	defaultLogLevel       = "info"
+	defaultLogDirname     = "logs"
+	defaultLogFilename    = "btcd.log"
 	defaultBtcnet         = btcwire.MainNet
 	defaultMaxPeers       = 125
 	defaultBanDuration    = time.Hour * 24
@@ -43,7 +45,7 @@ var (
 	knownDbTypes       = btcdb.SupportedDBs()
 	defaultRPCKeyFile  = filepath.Join(btcdHomeDir, "rpc.key")
 	defaultRPCCertFile = filepath.Join(btcdHomeDir, "rpc.cert")
-	defaultLogFile     = filepath.Join(btcdHomeDir, "logs", "btcd.log")
+	defaultLogDir      = filepath.Join(btcdHomeDir, defaultLogDirname)
 )
 
 // runServiceCommand is only set to a real function on Windows.  It is used
@@ -57,6 +59,7 @@ type config struct {
 	ShowVersion        bool          `short:"V" long:"version" description:"Display version information and exit"`
 	ConfigFile         string        `short:"C" long:"configfile" description:"Path to configuration file"`
 	DataDir            string        `short:"b" long:"datadir" description:"Directory to store data"`
+	LogDir             string        `long:"logdir" description:"Directory to log output."`
 	AddPeers           []string      `short:"a" long:"addpeer" description:"Add a peer to connect with at startup"`
 	ConnectPeers       []string      `long:"connect" description:"Connect only to the specified peers at startup"`
 	DisableListen      bool          `long:"nolisten" description:"Disable listening for incoming connections -- NOTE: Listening is automatically disabled if the --connect or --proxy options are used without also specifying listen interfaces via --listen"`
@@ -280,6 +283,7 @@ func loadConfig() (*config, []string, error) {
 		BanDuration: defaultBanDuration,
 		ConfigFile:  defaultConfigFile,
 		DataDir:     defaultDataDir,
+		LogDir:      defaultLogDir,
 		DbType:      defaultDbType,
 		RPCKey:      defaultRPCKeyFile,
 		RPCCert:     defaultRPCCertFile,
@@ -368,11 +372,29 @@ func loadConfig() (*config, []string, error) {
 		activeNetParams = netParams(btcwire.TestNet)
 	}
 
+	// Append the network type to the data directory so it is "namespaced"
+	// per network.  In addition to the block database, there are other
+	// pieces of data that are saved to disk such as address manager state.
+	// All data is specific to a network, so namespacing the data directory
+	// means each individual piece of serialized data does not have to
+	// worry about changing names per network and such.
+	cfg.DataDir = cleanAndExpandPath(cfg.DataDir)
+	cfg.DataDir = filepath.Join(cfg.DataDir, activeNetParams.netName)
+
+	// Append the network type to the log directory so it is "namespaced"
+	// per network in the same fashion as the data directory.
+	cfg.LogDir = cleanAndExpandPath(cfg.LogDir)
+	cfg.LogDir = filepath.Join(cfg.LogDir, activeNetParams.netName)
+
 	// Special show command to list supported subsystems and exit.
 	if cfg.DebugLevel == "show" {
 		fmt.Println("Supported subsystems", supportedSubsystems())
 		os.Exit(0)
 	}
+
+	// Initialize logging at the default logging level.
+	initSeelogLogger(filepath.Join(cfg.LogDir, defaultLogFilename))
+	setLogLevels(defaultLogLevel)
 
 	// Parse, validate, and set debug log level(s).
 	if err := parseAndSetDebugLevels(cfg.DebugLevel); err != nil {
@@ -403,15 +425,6 @@ func loadConfig() (*config, []string, error) {
 			return nil, nil, err
 		}
 	}
-
-	// Append the network type to the data directory so it is "namespaced"
-	// per network.  In addition to the block database, there are other
-	// pieces of data that are saved to disk such as address manager state.
-	// All data is specific to a network, so namespacing the data directory
-	// means each individual piece of serialized data does not have to
-	// worry about changing names per network and such.
-	cfg.DataDir = cleanAndExpandPath(cfg.DataDir)
-	cfg.DataDir = filepath.Join(cfg.DataDir, activeNetParams.netName)
 
 	// Don't allow ban durations that are too short.
 	if cfg.BanDuration < time.Duration(time.Second) {

@@ -122,10 +122,9 @@ func useLogger(subsystemID string, logger btclog.Logger) {
 	}
 }
 
-// newSeelogLogger creates a new seelog logger.
-func newSeelogLogger() seelog.LoggerInterface {
-	// <seelog type="sync" minlevel="trace">
-
+// initSeelogLogger initializes a new seelog logger that is used as the backend
+// for all logging subsytems.
+func initSeelogLogger(logFile string) {
 	config := `
 	<seelog type="adaptive" mininterval="2000000" maxinterval="100000000"
 		critmsgcount="500" minlevel="trace">
@@ -137,7 +136,7 @@ func newSeelogLogger() seelog.LoggerInterface {
 			<format id="all" format="%%Time %%Date [%%LEV] %%Msg%%n" />
 		</formats>
 	</seelog>`
-	config = fmt.Sprintf(config, defaultLogFile)
+	config = fmt.Sprintf(config, logFile)
 
 	logger, err := seelog.LoggerFromConfigAsString(config)
 	if err != nil {
@@ -145,18 +144,13 @@ func newSeelogLogger() seelog.LoggerInterface {
 		os.Exit(1)
 	}
 
-	return logger
+	backendLog = logger
 }
 
 // setLogLevel sets the logging level for provided subsystem.  Invalid
 // subsystems are ignored.  Uninitialized subsystems are dynamically created as
 // needed.
 func setLogLevel(subsystemID string, logLevel string) {
-	// Create the backend seelog logger if needed.
-	if backendLog == seelog.Disabled {
-		backendLog = newSeelogLogger()
-	}
-
 	// Ignore invalid subsystems.
 	logger, ok := subsystemLoggers[subsystemID]
 	if !ok {
