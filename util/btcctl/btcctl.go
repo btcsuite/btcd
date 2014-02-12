@@ -96,6 +96,7 @@ var commandHandlers = map[string]*handlerData{
 	"sendrawtransaction":     {1, 0, displayGeneric, nil, makeSendRawTransaction, "<hextx>"},
 	"sendtoaddress":          {2, 2, displayGeneric, []conversionHandler{nil, toSatoshi, nil, nil}, makeSendToAddress, "<address> <amount> [comment] [comment-to]"},
 	"settxfee":               {1, 0, displayGeneric, []conversionHandler{toSatoshi}, makeSetTxFee, "<amount>"},
+	"signmessage":            {2, 2, displayGeneric, nil, makeSignMessage, "<address> <message>"},
 	"stop":                   {0, 0, displayGeneric, nil, makeStop, ""},
 	"submitblock":            {1, 1, displayGeneric, nil, makeSubmitBlock, "<hexdata> [jsonparametersobject]"},
 	"validateaddress":        {1, 0, displayJSONDump, nil, makeValidateAddress, "<address>"},
@@ -669,6 +670,12 @@ func makeSendToAddress(args []interface{}) (btcjson.Cmd, error) {
 // makeSetTxFee generates the cmd structure for settxfee commands.
 func makeSetTxFee(args []interface{}) (btcjson.Cmd, error) {
 	return btcjson.NewSetTxFeeCmd("btcctl", args[0].(int64))
+}
+
+// makeSignMessage generates the cmd structure for signmessage commands.
+func makeSignMessage(args []interface{}) (btcjson.Cmd, error) {
+	return btcjson.NewSignMessageCmd("btcctl", args[0].(string),
+		args[1].(string))
 }
 
 // makeStop generates the cmd structure for stop commands.
