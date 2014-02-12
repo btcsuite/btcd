@@ -714,7 +714,8 @@ func (a *AddrManager) AddressCache() []*btcwire.NetAddress {
 	i := 0
 	// Iteration order is undefined here, but we randomise it anyway.
 	for _, v := range a.addrIndex {
-		allAddr[i] = v.na
+		copyNa := *v.na
+		allAddr[i] = &copyNa
 		i++
 	}
 	// Fisher-Yates shuffle the array
