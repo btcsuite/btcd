@@ -1252,10 +1252,6 @@ for compatibility only.`,
 	"gethashespersec": `
 NOTE: btcd does not mine so this will always return false. The call is provided
 for compatibility only.`,
-	"getpeerinfo": `
-NOTE: btcd does not currently implement all fields. the "bytessent",
-"bytesrecv" and "syncnode" fields are not yet
-implemented.`,
 	"sendrawtransaction": `
 NOTE: btcd does not currently support the "allowhighfees" parameter.`,
 	"setgenerate": `
