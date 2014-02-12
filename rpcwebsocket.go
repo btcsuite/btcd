@@ -80,7 +80,10 @@ func (r *wsContext) AddBlockUpdateRequest(n ntfnChan) {
 	r.Lock()
 	defer r.Unlock()
 
-	rc := r.connections[n]
+	rc, ok := r.connections[n]
+	if !ok {
+		return
+	}
 	rc.blockUpdates = true
 }
 
@@ -90,7 +93,10 @@ func (r *wsContext) AddAllNewTxRequest(n ntfnChan, verbose bool) {
 	r.Lock()
 	defer r.Unlock()
 
-	rc := r.connections[n]
+	rc, ok := r.connections[n]
+	if !ok {
+		return
+	}
 	rc.allTxUpdates = true
 	rc.verboseTxUpdates = verbose
 }
@@ -100,6 +106,12 @@ func (r *wsContext) AddTxRequest(n ntfnChan, addr string) {
 	r.Lock()
 	defer r.Unlock()
 
+	rc, ok := r.connections[n]
+	if !ok {
+		return
+	}
+	rc.txRequests[addr] = struct{}{}
+
 	clist, ok := r.txNotifications[addr]
 	if !ok {
 		clist = list.New()
@@ -107,9 +119,6 @@ func (r *wsContext) AddTxRequest(n ntfnChan, addr string) {
 	}
 
 	clist.PushBack(n)
-
-	rc := r.connections[n]
-	rc.txRequests[addr] = struct{}{}
 }
 
 func (r *wsContext) removeGlobalTxRequest(n ntfnChan, addr string) {
@@ -135,15 +144,18 @@ func (r *wsContext) AddSpentRequest(n ntfnChan, op *btcwire.OutPoint) {
 	r.Lock()
 	defer r.Unlock()
 
+	rc, ok := r.connections[n]
+	if !ok {
+		return
+	}
+	rc.spentRequests[*op] = struct{}{}
+
 	clist, ok := r.spentNotifications[*op]
 	if !ok {
 		clist = list.New()
 		r.spentNotifications[*op] = clist
 	}
 	clist.PushBack(n)
-
-	rc := r.connections[n]
-	rc.spentRequests[*op] = struct{}{}
 }
 
 func (r *wsContext) removeGlobalSpentRequest(n ntfnChan, op *btcwire.OutPoint) {
@@ -170,7 +182,10 @@ func (r *wsContext) RemoveSpentRequest(n ntfnChan, op *btcwire.OutPoint) {
 	defer r.Unlock()
 
 	r.removeGlobalSpentRequest(n, op)
-	rc := r.connections[n]
+	rc, ok := r.connections[n]
+	if !ok {
+		return
+	}
 	delete(rc.spentRequests, *op)
 }
 
@@ -180,15 +195,18 @@ func (r *wsContext) AddMinedTxRequest(n ntfnChan, txID *btcwire.ShaHash) {
 	r.Lock()
 	defer r.Unlock()
 
+	rc, ok := r.connections[n]
+	if !ok {
+		return
+	}
+	rc.minedTxRequests[*txID] = struct{}{}
+
 	clist, ok := r.minedTxNotifications[*txID]
 	if !ok {
 		clist = list.New()
 		r.minedTxNotifications[*txID] = clist
 	}
 	clist.PushBack(n)
-
-	rc := r.connections[n]
-	rc.minedTxRequests[*txID] = struct{}{}
 }
 
 func (r *wsContext) removeGlobalMinedTxRequest(n ntfnChan, txID *btcwire.ShaHash) {
@@ -221,7 +239,10 @@ func (r *wsContext) RemoveMinedTxRequest(n ntfnChan, txID *btcwire.ShaHash) {
 // mined transaction without grabbing any locks.
 func (r *wsContext) removeMinedTxRequest(n ntfnChan, txID *btcwire.ShaHash) {
 	r.removeGlobalMinedTxRequest(n, txID)
-	rc := r.connections[n]
+	rc, ok := r.connections[n]
+	if !ok {
+		return
+	}
 	delete(rc.minedTxRequests, *txID)
 }
 
@@ -780,6 +801,10 @@ func (s *rpcServer) websocketJSONHandler(r chan *btcjson.Reply, c handlerChans, 
 		// connection is not already authenticated.
 		s.ws.Lock()
 		rc := s.ws.connections[c.n]
+		// Note: c.n is guaranteed to be in the s.ws.connections map since it is
+		// called from the main walletReqNotifications for loop.  Any calls
+		// from that goroutine will always have valid connections since they
+		// are not removed till after that exits.
 		if _, ok := cmd.(*btcws.AuthenticateCmd); ok {
 			// Validate the provided credentials.
 			err := websocketAuthenticate(cmd, rc, s.authsha[:])
