@@ -98,7 +98,7 @@ func (curve *KoblitzCurve) IsOnCurve(x, y *big.Int) bool {
 // (x1, y1, 1) + (x2, y2, 1) = (x3, y3, z3).  It performs faster addition than
 // the generic add routine since less arithmetic is needed due to the ability to
 // avoid the z value multiplications.
-func (curve *KoblitzCurve) addZ1AndZ2EqualsOne(x1, y1, x2, y2, x3, y3, z3 *fieldVal) {
+func (curve *KoblitzCurve) addZ1AndZ2EqualsOne(x1, y1, z1, x2, y2, x3, y3, z3 *fieldVal) {
 	// To compute the point addition efficiently, this implementation splits
 	// the equation into intermediate elements which are used to minimize
 	// the number of field multiplications using the method shown at:
@@ -124,7 +124,7 @@ func (curve *KoblitzCurve) addZ1AndZ2EqualsOne(x1, y1, x2, y2, x3, y3, z3 *field
 			// Since x1 == x2 and y1 == y2, point doubling must be
 			// done, otherwise the addition would end up dividing
 			// by zero.
-			curve.doubleJacobian(x1, y1, fieldOne, x3, y3, z3)
+			curve.doubleJacobian(x1, y1, z1, x3, y3, z3)
 			return
 		}
 
@@ -409,7 +409,7 @@ func (curve *KoblitzCurve) addJacobian(x1, y1, z1, x2, y2, z2, x3, y3, z3 *field
 	isZ2One := z2.Equals(fieldOne)
 	switch {
 	case isZ1One && isZ2One:
-		curve.addZ1AndZ2EqualsOne(x1, y1, x2, y2, x3, y3, z3)
+		curve.addZ1AndZ2EqualsOne(x1, y1, z1, x2, y2, x3, y3, z3)
 		return
 	case z1.Equals(z2):
 		curve.addZ1EqualsZ2(x1, y1, z1, x2, y2, x3, y3, z3)
@@ -441,7 +441,8 @@ func (curve *KoblitzCurve) Add(x1, y1, x2, y2 *big.Int) (*big.Int, *big.Int) {
 	fx1, fy1 := curve.bigAffineToField(x1, y1)
 	fx2, fy2 := curve.bigAffineToField(x2, y2)
 	fx3, fy3, fz3 := new(fieldVal), new(fieldVal), new(fieldVal)
-	curve.addJacobian(fx1, fy1, fieldOne, fx2, fy2, fieldOne, fx3, fy3, fz3)
+	fOne := new(fieldVal).SetInt(1)
+	curve.addJacobian(fx1, fy1, fOne, fx2, fy2, fOne, fx3, fy3, fz3)
 
 	// Convert the Jacobian coordinate field values back to affine big
 	// integers.
@@ -583,7 +584,8 @@ func (curve *KoblitzCurve) Double(x1, y1 *big.Int) (*big.Int, *big.Int) {
 	// and do the point doubling in Jacobian projective space.
 	fx1, fy1 := curve.bigAffineToField(x1, y1)
 	fx3, fy3, fz3 := new(fieldVal), new(fieldVal), new(fieldVal)
-	curve.doubleJacobian(fx1, fy1, fieldOne, fx3, fy3, fz3)
+	fOne := new(fieldVal).SetInt(1)
+	curve.doubleJacobian(fx1, fy1, fOne, fx3, fy3, fz3)
 
 	// Convert the Jacobian coordinate field values back to affine big
 	// integers.
@@ -600,7 +602,7 @@ func (curve *KoblitzCurve) ScalarMult(Bx, By *big.Int, k []byte) (*big.Int, *big
 
 	// Point P = the point to multiply the scalar with.
 	px, py := curve.bigAffineToField(Bx, By)
-	pz := fieldOne
+	pz := new(fieldVal).SetInt(1)
 
 	// Double and add as necessary depending on the bits set in the scalar.
 	for _, byteVal := range k {
