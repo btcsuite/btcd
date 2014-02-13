@@ -956,7 +956,7 @@ func (p *peer) handlePongMsg(msg *btcwire.MsgPong) {
 func (p *peer) readMessage() (btcwire.Message, []byte, error) {
 	n, msg, buf, err := btcwire.ReadMessageN(p.conn, p.protocolVersion, p.btcnet)
 	p.bytesReceived += uint64(n)
-	atomic.AddUint64(&p.server.bytesReceived, uint64(n))
+	p.server.AddBytesReceived(uint64(n))
 	if err != nil {
 		return nil, nil, err
 	}
@@ -1025,7 +1025,7 @@ func (p *peer) writeMessage(msg btcwire.Message) {
 	// Write the message to the peer.
 	n, err := btcwire.WriteMessageN(p.conn, msg, p.protocolVersion, p.btcnet)
 	p.bytesSent += uint64(n)
-	atomic.AddUint64(&p.server.bytesSent, uint64(n))
+	p.server.AddBytesSent(uint64(n))
 	if err != nil {
 		p.Disconnect()
 		p.logError("Can't send message: %v", err)

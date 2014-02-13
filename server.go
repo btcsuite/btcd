@@ -51,11 +51,12 @@ type server struct {
 	nonce         uint64
 	listeners     []net.Listener
 	btcnet        btcwire.BitcoinNet
-	started       int32  // atomic
-	shutdown      int32  // atomic
-	shutdownSched int32  // atomic
-	bytesReceived uint64 // Total bytes received from all peers since start.
-	bytesSent     uint64 // Total bytes sent by all peers since start.
+	started       int32      // atomic
+	shutdown      int32      // atomic
+	shutdownSched int32      // atomic
+	bytesMutex    sync.Mutex // For the following two fields.
+	bytesReceived uint64     // Total bytes received from all peers since start.
+	bytesSent     uint64     // Total bytes sent by all peers since start.
 	addrManager   *AddrManager
 	rpcServer     *rpcServer
 	blockManager  *blockManager
@@ -696,12 +697,31 @@ func (s *server) RemoveAddr(addr string) error {
 	return <-replyChan
 }
 
+// AddBytesSent adds the passed number of bytes to the total bytes sent counter
+// for the server.  It is safe for concurrent access.
+func (s *server) AddBytesSent(bytesSent uint64) {
+	s.bytesMutex.Lock()
+	defer s.bytesMutex.Unlock()
+
+	s.bytesSent += bytesSent
+}
+
+// AddBytesReceived adds the passed number of bytes to the total bytes received
+// counter for the server.  It is safe for concurrent access.
+func (s *server) AddBytesReceived(bytesReceived uint64) {
+	s.bytesMutex.Lock()
+	defer s.bytesMutex.Unlock()
+
+	s.bytesReceived += bytesReceived
+}
+
 // NetTotals returns the sum of all bytes received and sent across the network
-// for all peers.
+// for all peers.  It is safe for concurrent access.
 func (s *server) NetTotals() (uint64, uint64) {
-	totalBytesReceived := atomic.LoadUint64(&s.bytesReceived)
-	totalBytesSent := atomic.LoadUint64(&s.bytesSent)
-	return totalBytesReceived, totalBytesSent
+	s.bytesMutex.Lock()
+	defer s.bytesMutex.Unlock()
+
+	return s.bytesReceived, s.bytesSent
 }
 
 // Start begins accepting connections from peers.
