@@ -175,12 +175,9 @@ func (r *wsContext) removeGlobalSpentRequest(n ntfnChan, op *btcwire.OutPoint) {
 	}
 }
 
-// RemoveSpentRequest removes a request context for notifications of a
-// spent Outpoint.
-func (r *wsContext) RemoveSpentRequest(n ntfnChan, op *btcwire.OutPoint) {
-	r.Lock()
-	defer r.Unlock()
-
+// removeSpentRequest removes a request context for notifications of a
+// spent Outpoint without grabbing any locks.
+func (r *wsContext) removeSpentRequest(n ntfnChan, op *btcwire.OutPoint) {
 	r.removeGlobalSpentRequest(n, op)
 	rc, ok := r.connections[n]
 	if !ok {
@@ -917,7 +914,7 @@ func (s *rpcServer) NotifyBlockDisconnected(block *btcutil.Block) {
 // address.
 func (s *rpcServer) NotifyBlockTXs(db btcdb.Db, block *btcutil.Block) {
 	for _, tx := range block.Transactions() {
-		s.newBlockNotifyCheckTxIn(tx)
+		s.NewBlockNotifyCheckTxIn(tx)
 		s.NotifyForTxOuts(tx, block)
 	}
 }
@@ -935,10 +932,10 @@ func notifySpentData(n ntfnChan, txhash *btcwire.ShaHash, index uint32,
 	n <- ntfn
 }
 
-// newBlockNotifyCheckTxIn is a helper function to iterate through
+// NewBlockNotifyCheckTxIn is a helper function to iterate through
 // each transaction input of a new block and perform any checks and
 // notify listening frontends when necessary.
-func (s *rpcServer) newBlockNotifyCheckTxIn(tx *btcutil.Tx) {
+func (s *rpcServer) NewBlockNotifyCheckTxIn(tx *btcutil.Tx) {
 	s.ws.Lock()
 	defer s.ws.Unlock()
 
@@ -950,7 +947,7 @@ func (s *rpcServer) newBlockNotifyCheckTxIn(tx *btcutil.Tx) {
 				n := e.Value.(ntfnChan)
 				notifySpentData(n, &txin.PreviousOutpoint.Hash,
 					txin.PreviousOutpoint.Index, tx)
-				s.ws.RemoveSpentRequest(n, &txin.PreviousOutpoint)
+				s.ws.removeSpentRequest(n, &txin.PreviousOutpoint)
 			}
 		}
 	}
