@@ -30,6 +30,10 @@ directly with btcd.  That functionality is provided by the
 [btcgui](https://github.com/conformal/btcgui) projects which are both under
 active development.
 
+## Requirements
+
+[Go](http://golang.org) 1.2 or newer.
+
 ## Installation
 
 #### Windows - MSI Available
@@ -40,7 +44,6 @@ https://github.com/conformal/btcd/releases
 
 - Install Go according to the installation instructions here:
   http://golang.org/doc/install
-  **NOTE: btcd requires features only available in Go version 1.2 or later.**
 
 - Run the following command to obtain btcd, all dependencies, and install it:
   ```$ go get github.com/conformal/btcd```
@@ -56,8 +59,6 @@ https://github.com/conformal/btcd/releases
 Install a newer MSI
 
 #### Linux/BSD/POSIX - Build from Source
-
-**NOTE: btcd requires features only available in Go version 1.2 or later.**
 
 - Run the following command to update btcd, all dependencies, and install it:
   ```$ go get -u -v github.com/conformal/btcd/...```
