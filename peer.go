@@ -267,7 +267,7 @@ func (p *peer) handleVersionMsg(msg *btcwire.MsgVersion) {
 
 	// Limit to one version message per peer.
 	if p.versionKnown {
-		p.logError("PEER: Only one version message per peer is allowed %s.",
+		p.logError("Only one version message per peer is allowed %s.",
 			p.addr)
 		p.Disconnect()
 		return
@@ -475,8 +475,8 @@ func (p *peer) PushGetHeadersMsg(locator btcchain.BlockLocator, stopHash *btcwir
 		beginHash != nil && stopHash.IsEqual(p.prevGetHdrsStop) &&
 		beginHash.IsEqual(p.prevGetHdrsBegin) {
 
-		peerLog.Tracef("PEER: Filtering duplicate [getheaders] with "+
-			"begin hash %v", beginHash)
+		peerLog.Tracef("Filtering duplicate [getheaders] with begin "+
+			"hash %v", beginHash)
 		return nil
 	}
 
@@ -1093,7 +1093,7 @@ out:
 
 			// Only log the error if we're not forcibly disconnecting.
 			if atomic.LoadInt32(&p.disconnect) == 0 {
-				p.logError("PEER: Can't read message: %v", err)
+				p.logError("Can't read message: %v", err)
 			}
 			break out
 		}
@@ -1101,7 +1101,7 @@ out:
 
 		// Ensure version message comes first.
 		if _, ok := rmsg.(*btcwire.MsgVersion); !ok && !p.versionKnown {
-			p.logError("PEER: A version message must precede all others")
+			p.logError("A version message must precede all others")
 			break out
 		}
 
@@ -1499,8 +1499,7 @@ func (p *peer) Start() error {
 	if !p.inbound {
 		err := p.pushVersionMsg()
 		if err != nil {
-			p.logError("PEER: Can't send outbound version "+
-				"message %v", err)
+			p.logError("Can't send outbound version message %v", err)
 			p.Disconnect()
 			return err
 		}
