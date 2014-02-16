@@ -277,7 +277,7 @@ type PeerInfo struct {
 	Inbound        bool   `json:"inbound"`
 	StartingHeight int32  `json:"startingheight"`
 	BanScore       int    `json:"banscore,omitempty"`
-	SyncNode       bool   `json:"syncnode,omitempty"`
+	SyncNode       bool   `json:"syncnode"`
 }
 
 type getConnCountMsg struct {
