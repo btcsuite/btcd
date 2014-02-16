@@ -74,6 +74,25 @@ type DecodeScriptResult struct {
 	P2sh      string   `json:"p2sh"`
 }
 
+// GetPeerInfoResult models the data returned from the getpeerinfo command.
+type GetPeerInfoResult struct {
+	Addr           string `json:"addr"`
+	Services       string `json:"services"`
+	LastSend       int64  `json:"lastsend"`
+	LastRecv       int64  `json:"lastrecv"`
+	BytesSent      uint64 `json:"bytessent"`
+	BytesRecv      uint64 `json:"bytesrecv"`
+	PingTime       int64  `json:"pingtime"`
+	PingWait       int64  `json:"pingwait,omitempty"`
+	ConnTime       int64  `json:"conntime"`
+	Version        uint32 `json:"version"`
+	SubVer         string `json:"subver"`
+	Inbound        bool   `json:"inbound"`
+	StartingHeight int32  `json:"startingheight"`
+	BanScore       int    `json:"banscore,omitempty"`
+	SyncNode       bool   `json:"syncnode"`
+}
+
 // TxRawResult models the data from the getrawtransaction command.
 type TxRawResult struct {
 	Hex           string `json:"hex"`
@@ -893,6 +912,12 @@ func ReadResultCmd(cmd string, message []byte) (Reply, error) {
 		}
 	case "getnetworkhashps":
 		var res int64
+		err = json.Unmarshal(objmap["result"], &res)
+		if err == nil {
+			result.Result = res
+		}
+	case "getpeerinfo":
+		var res []GetPeerInfoResult
 		err = json.Unmarshal(objmap["result"], &res)
 		if err == nil {
 			result.Result = res
