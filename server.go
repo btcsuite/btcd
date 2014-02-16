@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/conformal/btcdb"
+	"github.com/conformal/btcjson"
 	"github.com/conformal/btcwire"
 	"net"
 	"runtime"
@@ -261,31 +262,12 @@ func (s *server) handleBroadcastMsg(state *peerState, bmsg *broadcastMsg) {
 	})
 }
 
-// PeerInfo represents the information requested by the getpeerinfo rpc command.
-type PeerInfo struct {
-	Addr           string `json:"addr"`
-	Services       string `json:"services"`
-	LastSend       int64  `json:"lastsend"`
-	LastRecv       int64  `json:"lastrecv"`
-	BytesSent      uint64 `json:"bytessent"`
-	BytesRecv      uint64 `json:"bytesrecv"`
-	PingTime       int64  `json:"pingtime"`
-	PingWait       int64  `json:"pingwait,omitempty"`
-	ConnTime       int64  `json:"conntime"`
-	Version        uint32 `json:"version"`
-	SubVer         string `json:"subver"`
-	Inbound        bool   `json:"inbound"`
-	StartingHeight int32  `json:"startingheight"`
-	BanScore       int    `json:"banscore,omitempty"`
-	SyncNode       bool   `json:"syncnode"`
-}
-
 type getConnCountMsg struct {
 	reply chan int
 }
 
 type getPeerInfoMsg struct {
-	reply chan []*PeerInfo
+	reply chan []*btcjson.GetPeerInfoResult
 }
 
 type addNodeMsg struct {
@@ -318,7 +300,7 @@ func (s *server) handleQuery(querymsg interface{}, state *peerState) {
 
 	case getPeerInfoMsg:
 		syncPeer := s.blockManager.SyncPeer()
-		infos := make([]*PeerInfo, 0, state.peers.Len())
+		infos := make([]*btcjson.GetPeerInfoResult, 0, state.peers.Len())
 		state.forAllPeers(func(p *peer) {
 			if !p.Connected() {
 				return
@@ -328,7 +310,7 @@ func (s *server) handleQuery(querymsg interface{}, state *peerState) {
 			// however it is statistics for purely informational purposes
 			// and we don't really care if they are raced to get the new
 			// version.
-			info := &PeerInfo{
+			info := &btcjson.GetPeerInfoResult{
 				Addr:           p.addr,
 				Services:       fmt.Sprintf("%08d", p.services),
 				LastSend:       p.lastSend.Unix(),
@@ -668,8 +650,8 @@ func (s *server) AddedNodeInfo() []*peer {
 
 // PeerInfo returns an array of PeerInfo structures describing all connected
 // peers.
-func (s *server) PeerInfo() []*PeerInfo {
-	replyChan := make(chan []*PeerInfo)
+func (s *server) PeerInfo() []*btcjson.GetPeerInfoResult {
+	replyChan := make(chan []*btcjson.GetPeerInfoResult)
 
 	s.query <- getPeerInfoMsg{reply: replyChan}
 
