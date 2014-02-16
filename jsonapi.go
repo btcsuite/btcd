@@ -93,6 +93,17 @@ type GetPeerInfoResult struct {
 	SyncNode       bool   `json:"syncnode"`
 }
 
+// GetRawMempoolResult models the data returned from the getrawmempool command.
+type GetRawMempoolResult struct {
+	Size             int      `json:"size"`
+	Fee              float64  `json:"fee"`
+	Time             int64    `json:"time"`
+	Height           int64    `json:"height"`
+	StartingPriority int      `json:"startingpriority"`
+	CurrentPriority  int      `json:"currentpriority"`
+	Depends          []string `json:"depends"`
+}
+
 // TxRawResult models the data from the getrawtransaction command.
 type TxRawResult struct {
 	Hex           string `json:"hex"`
@@ -956,6 +967,23 @@ func ReadResultCmd(cmd string, message []byte) (Reply, error) {
 		err = json.Unmarshal(objmap["result"], &res)
 		if err == nil {
 			result.Result = res
+		}
+	case "getrawmempool":
+		// getrawmempool can either return a map of JSON objects or
+		// an array of strings depending on the verbose flag.  Choose
+		// the right form accordingly.
+		if strings.Contains(string(objmap["result"]), "{") {
+			var res map[string]GetRawMempoolResult
+			err = json.Unmarshal(objmap["result"], &res)
+			if err == nil {
+				result.Result = res
+			}
+		} else {
+			var res []string
+			err = json.Unmarshal(objmap["result"], &res)
+			if err == nil {
+				result.Result = res
+			}
 		}
 	case "getwork":
 		// getwork can either return a JSON object or a boolean
