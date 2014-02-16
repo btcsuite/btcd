@@ -1082,28 +1082,15 @@ func handleGetPeerInfo(s *rpcServer, cmd btcjson.Cmd) (interface{}, error) {
 	return s.server.PeerInfo(), nil
 }
 
-// mempoolDescriptor describes a JSON object which is returned for each
-// transaction in the memory pool in response to a getrawmempool command with
-// the verbose flag set.
-type mempoolDescriptor struct {
-	Size             int      `json:"size"`
-	Fee              float64  `json:"fee"`
-	Time             int64    `json:"time"`
-	Height           int64    `json:"height"`
-	StartingPriority int      `json:"startingpriority"`
-	CurrentPriority  int      `json:"currentpriority"`
-	Depends          []string `json:"depends"`
-}
-
 // handleGetRawMempool implements the getrawmempool command.
 func handleGetRawMempool(s *rpcServer, cmd btcjson.Cmd) (interface{}, error) {
 	c := cmd.(*btcjson.GetRawMempoolCmd)
 	descs := s.server.txMemPool.TxDescs()
 
 	if c.Verbose {
-		result := make(map[string]*mempoolDescriptor, len(descs))
+		result := make(map[string]*btcjson.GetRawMempoolResult, len(descs))
 		for _, desc := range descs {
-			mpd := &mempoolDescriptor{
+			mpd := &btcjson.GetRawMempoolResult{
 				Size: desc.Tx.MsgTx().SerializeSize(),
 				Fee: float64(desc.Fee) /
 					float64(btcutil.SatoshiPerBitcoin),
