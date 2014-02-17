@@ -22,6 +22,14 @@ const (
 	// accountbalance notification.
 	AccountBalanceNtfnMethod = "accountbalance"
 
+	// AllTxNtfnMethod is the method of the btcd alltx
+	// notification
+	AllTxNtfnMethod = "alltx"
+
+	// AllVerboseTxNtfnMethod is the method of the btcd
+	// allverbosetx notifications.
+	AllVerboseTxNtfnMethod = "allverbosetx"
+
 	// BlockConnectedNtfnMethod is the method of the btcd
 	// blockconnected notification.
 	BlockConnectedNtfnMethod = "blockconnected"
@@ -34,29 +42,16 @@ const (
 	// btcdconnected notification.
 	BtcdConnectedNtfnMethod = "btcdconnected"
 
-	// ProcessedTxNtfnMethod is the method of the btcd
-	// processedtx notification.
-	ProcessedTxNtfnMethod = "processedtx"
-
-	// AllTxNtfnMethod is the method of the btcd alltx
-	// notification
-	AllTxNtfnMethod = "alltx"
-
-	// AllVerboseTxNtfnMethod is the method of the btcd
-	// allverbosetx notifications.
-	AllVerboseTxNtfnMethod = "allverbosetx"
-
-	// TxMinedNtfnMethod is the method of the btcd txmined
-	// notification.
-	TxMinedNtfnMethod = "txmined"
+	// RecvTxNtfnMethod is the method of the btcd recvtx notification.
+	RecvTxNtfnMethod = "recvtx"
 
 	// TxNtfnMethod is the method of the btcwallet newtx
 	// notification.
 	TxNtfnMethod = "newtx"
 
-	// TxSpentNtfnMethod is the method of the btcd txspent
+	// RedeemingTxNtfnMethod is the method of the btcd redeemingtx
 	// notification.
-	TxSpentNtfnMethod = "txspent"
+	RedeemingTxNtfnMethod = "redeemingtx"
 
 	// WalletLockStateNtfnMethod is the method of the btcwallet
 	// walletlockstate notification.
@@ -73,11 +68,9 @@ func init() {
 		parseBlockDisconnectedNtfn, `TODO(jrick) fillmein`)
 	btcjson.RegisterCustomCmd(BtcdConnectedNtfnMethod,
 		parseBtcdConnectedNtfn, `TODO(jrick) fillmein`)
-	btcjson.RegisterCustomCmd(ProcessedTxNtfnMethod,
-		parseProcessedTxNtfn, `TODO(jrick) fillmein`)
-	btcjson.RegisterCustomCmd(TxMinedNtfnMethod, parseTxMinedNtfn,
-		`TODO(jrick) fillmein`)
-	btcjson.RegisterCustomCmd(TxSpentNtfnMethod, parseTxSpentNtfn,
+	btcjson.RegisterCustomCmd(RecvTxNtfnMethod,
+		parseRecvTxNtfn, `TODO(jrick) fillmein`)
+	btcjson.RegisterCustomCmd(RedeemingTxNtfnMethod, parseRedeemingTxNtfn,
 		`TODO(jrick) fillmein`)
 	btcjson.RegisterCustomCmd(TxNtfnMethod, parseTxNtfn,
 		`TODO(jrick) fillmein`)
@@ -87,6 +80,14 @@ func init() {
 		parseAllTxNtfn, `TODO(flam) fillmein`)
 	btcjson.RegisterCustomCmdGenerator(AllVerboseTxNtfnMethod,
 		generateAllVerboseTxNtfn)
+}
+
+// BlockDetails describes details of a tx in a block.
+type BlockDetails struct {
+	Height int32
+	Hash   string
+	Index  int
+	Time   int64
 }
 
 // AccountBalanceNtfn is a type handling custom marshaling and
@@ -453,7 +454,7 @@ func (n *BtcdConnectedNtfn) UnmarshalJSON(b []byte) error {
 		return err
 	}
 
-	newNtfn, err := parseTxMinedNtfn(&r)
+	newNtfn, err := parseBtcdConnectedNtfn(&r)
 	if err != nil {
 		return err
 	}
@@ -466,150 +467,136 @@ func (n *BtcdConnectedNtfn) UnmarshalJSON(b []byte) error {
 	return nil
 }
 
-// ProcessedTxNtfn is a type handling custom marshaling and unmarshaling
-// of processedtx JSON websocket notifications.
-type ProcessedTxNtfn struct {
-	Receiver    string
-	Amount      int64
-	TxID        string
-	TxOutIndex  uint32
-	PkScript    string
-	BlockHash   string
-	BlockHeight int32
-	BlockIndex  int
-	BlockTime   int64
-	Spent       bool
+// RecvTxNtfn is a type handling custom marshaling and unmarshaling
+// of recvtx JSON websocket notifications.
+type RecvTxNtfn struct {
+	HexTx string
+	Block *BlockDetails
 }
 
-// Enforce that ProcessedTxNtfn satisifies the btcjson.Cmd interface.
-var _ btcjson.Cmd = &ProcessedTxNtfn{}
+// Enforce that RecvTxNtfn satisifies the btcjson.Cmd interface.
+var _ btcjson.Cmd = &RecvTxNtfn{}
 
-// parseProcessedTxNtfn parses a RawCmd into a concrete type satisifying
-// the btcjson.Cmd interface.  This is used when registering the notification
-// with the btcjson parser.
-func parseProcessedTxNtfn(r *btcjson.RawCmd) (btcjson.Cmd, error) {
+// NewRecvTxNtfn creates a new RecvTxNtfn.
+func NewRecvTxNtfn(hextx string, block *BlockDetails) *RecvTxNtfn {
+	return &RecvTxNtfn{
+		HexTx: hextx,
+		Block: block,
+	}
+}
+
+// parsRecvTxNtfn parses a RawCmd into a concrete type satisifying the
+// btcjson.Cmd interface.  This is used when registering the notification with
+// the btcjson parser.
+func parseRecvTxNtfn(r *btcjson.RawCmd) (btcjson.Cmd, error) {
 	if r.Id != nil {
 		return nil, ErrNotANtfn
 	}
 
-	if len(r.Params) != 10 {
+	// Must have one or two parameters.
+	if len(r.Params) == 0 || len(r.Params) > 2 {
 		return nil, btcjson.ErrWrongNumberOfParams
 	}
 
-	receiver, ok := r.Params[0].(string)
+	hextx, ok := r.Params[0].(string)
 	if !ok {
-		return nil, errors.New("first parameter receiver must be a string")
-	}
-	famount, ok := r.Params[1].(float64)
-	if !ok {
-		return nil, errors.New("second parameter amount must be a number")
-	}
-	amount := int64(famount)
-	txid, ok := r.Params[2].(string)
-	if !ok {
-		return nil, errors.New("third parameter txid must be a string")
-	}
-	fTxOutIdx, ok := r.Params[3].(float64)
-	if !ok {
-		return nil, errors.New("fourth parameter txoutidx must be a number")
-	}
-	txOutIdx := uint32(fTxOutIdx)
-	pkScript, ok := r.Params[4].(string)
-	if !ok {
-		return nil, errors.New("fifth parameter pkScript must be a string")
-	}
-	blockHash := r.Params[5].(string)
-	if !ok {
-		return nil, errors.New("sixth parameter blockHash must be a string")
-	}
-	fBlockHeight, ok := r.Params[6].(float64)
-	if !ok {
-		return nil, errors.New("seventh parameter blockHeight must be a number")
-	}
-	blockHeight := int32(fBlockHeight)
-	fBlockIndex, ok := r.Params[7].(float64)
-	if !ok {
-		return nil, errors.New("eighth parameter blockIndex must be a number")
-	}
-	blockIndex := int(fBlockIndex)
-	fBlockTime, ok := r.Params[8].(float64)
-	if !ok {
-		return nil, errors.New("ninth parameter blockTime must be a number")
-	}
-	blockTime := int64(fBlockTime)
-	spent, ok := r.Params[9].(bool)
-	if !ok {
-		return nil, errors.New("tenth parameter spent must be a bool")
+		return nil, errors.New("first parameter hextx must be a string")
 	}
 
-	cmd := &ProcessedTxNtfn{
-		Receiver:    receiver,
-		Amount:      amount,
-		TxID:        txid,
-		TxOutIndex:  txOutIdx,
-		PkScript:    pkScript,
-		BlockHash:   blockHash,
-		BlockHeight: blockHeight,
-		BlockIndex:  blockIndex,
-		BlockTime:   blockTime,
-		Spent:       spent,
+	ntfn := &RecvTxNtfn{HexTx: hextx}
+
+	if len(r.Params) > 1 {
+		details, ok := r.Params[1].(map[string]interface{})
+		if !ok {
+			return nil, errors.New("second parameter must be a JSON object")
+		}
+
+		height, ok := details["height"].(float64)
+		if !ok {
+			return nil, errors.New("unspecified block height")
+		}
+
+		hash, ok := details["hash"].(string)
+		if !ok {
+			return nil, errors.New("unspecified block hash")
+		}
+
+		index, ok := details["index"].(float64)
+		if !ok {
+			return nil, errors.New("unspecified block index")
+		}
+
+		time, ok := details["time"].(float64)
+		if !ok {
+			return nil, errors.New("unspecified block time")
+		}
+
+		ntfn.Block = &BlockDetails{
+			Height: int32(height),
+			Hash:   hash,
+			Index:  int(index),
+			Time:   int64(time),
+		}
 	}
-	return cmd, nil
+
+	return ntfn, nil
 }
 
 // Id satisifies the btcjson.Cmd interface by returning nil for a
 // notification ID.
-func (n *ProcessedTxNtfn) Id() interface{} {
+func (n *RecvTxNtfn) Id() interface{} {
 	return nil
 }
 
 // SetId is implemented to satisify the btcjson.Cmd interface.  The
 // notification id is not modified.
-func (n *ProcessedTxNtfn) SetId(id interface{}) {}
+func (n *RecvTxNtfn) SetId(id interface{}) {}
 
 // Method satisifies the btcjson.Cmd interface by returning the method
 // of the notification.
-func (n *ProcessedTxNtfn) Method() string {
-	return ProcessedTxNtfnMethod
+func (n *RecvTxNtfn) Method() string {
+	return RecvTxNtfnMethod
 }
 
 // MarshalJSON returns the JSON encoding of n.  Part of the btcjson.Cmd
 // interface.
-func (n *ProcessedTxNtfn) MarshalJSON() ([]byte, error) {
+func (n *RecvTxNtfn) MarshalJSON() ([]byte, error) {
+	params := []interface{}{n.HexTx}
+
+	if n.Block != nil {
+		details := map[string]interface{}{
+			"height": float64(n.Block.Height),
+			"hash":   n.Block.Hash,
+			"index":  float64(n.Block.Index),
+			"time":   float64(n.Block.Time),
+		}
+		params = append(params, details)
+	}
+
 	ntfn := btcjson.Message{
 		Jsonrpc: "1.0",
 		Method:  n.Method(),
-		Params: []interface{}{
-			n.Receiver,
-			n.Amount,
-			n.TxID,
-			n.TxOutIndex,
-			n.PkScript,
-			n.BlockHash,
-			n.BlockHeight,
-			n.BlockIndex,
-			n.BlockTime,
-			n.Spent,
-		},
+		Params:  params,
 	}
+
 	return json.Marshal(ntfn)
 }
 
 // UnmarshalJSON unmarshals the JSON encoding of n into n.  Part of
 // the btcjson.Cmd interface.
-func (n *ProcessedTxNtfn) UnmarshalJSON(b []byte) error {
+func (n *RecvTxNtfn) UnmarshalJSON(b []byte) error {
 	// Unmarshal into a RawCmd.
 	var r btcjson.RawCmd
 	if err := json.Unmarshal(b, &r); err != nil {
 		return err
 	}
 
-	newNtfn, err := parseProcessedTxNtfn(&r)
+	newNtfn, err := parseRecvTxNtfn(&r)
 	if err != nil {
 		return err
 	}
 
-	concreteNtfn, ok := newNtfn.(*ProcessedTxNtfn)
+	concreteNtfn, ok := newNtfn.(*RecvTxNtfn)
 	if !ok {
 		return btcjson.ErrInternal
 	}
@@ -617,117 +604,136 @@ func (n *ProcessedTxNtfn) UnmarshalJSON(b []byte) error {
 	return nil
 }
 
-// TxMinedNtfn is a type handling custom marshaling and
-// unmarshaling of txmined JSON websocket notifications.
-type TxMinedNtfn struct {
-	TxID        string
-	BlockHash   string
-	BlockHeight int32
-	BlockTime   int64
-	Index       int
+// RedeemingTxNtfn is a type handling custom marshaling and unmarshaling
+// of redeemingtx JSON websocket notifications.
+type RedeemingTxNtfn struct {
+	HexTx string
+	Block *BlockDetails
 }
 
-// Enforce that TxMinedNtfn satisifies the btcjson.Cmd interface.
-var _ btcjson.Cmd = &TxMinedNtfn{}
+// Enforce that RedeemingTxNtfn satisifies the btcjson.Cmd interface.
+var _ btcjson.Cmd = &RedeemingTxNtfn{}
 
-// NewTxMinedNtfn creates a new TxMinedNtfn.
-func NewTxMinedNtfn(txid, blockhash string, blockheight int32,
-	blocktime int64, index int) *TxMinedNtfn {
-
-	return &TxMinedNtfn{
-		TxID:        txid,
-		BlockHash:   blockhash,
-		BlockHeight: blockheight,
-		BlockTime:   blocktime,
-		Index:       index,
+// NewRedeemingTxNtfn creates a new RedeemingTxNtfn.
+func NewRedeemingTxNtfn(hextx string, block *BlockDetails) *RedeemingTxNtfn {
+	return &RedeemingTxNtfn{
+		HexTx: hextx,
+		Block: block,
 	}
 }
 
-// parseTxMinedNtfn parses a RawCmd into a concrete type satisifying
-// the btcjson.Cmd interface.  This is used when registering the notification
-// with the btcjson parser.
-func parseTxMinedNtfn(r *btcjson.RawCmd) (btcjson.Cmd, error) {
+// parseRedeemingTxNtfn parses a RawCmd into a concrete type satisifying the
+// btcjson.Cmd interface.  This is used when registering the notification with
+// the btcjson parser.
+func parseRedeemingTxNtfn(r *btcjson.RawCmd) (btcjson.Cmd, error) {
 	if r.Id != nil {
 		return nil, ErrNotANtfn
 	}
 
-	if len(r.Params) != 5 {
+	// Must have one or two parameters.
+	if len(r.Params) == 0 || len(r.Params) > 2 {
 		return nil, btcjson.ErrWrongNumberOfParams
 	}
 
-	txid, ok := r.Params[0].(string)
+	hextx, ok := r.Params[0].(string)
 	if !ok {
-		return nil, errors.New("first parameter txid must be a string")
-	}
-	blockhash, ok := r.Params[1].(string)
-	if !ok {
-		return nil, errors.New("second parameter blockhash must be a string")
-	}
-	fblockheight, ok := r.Params[2].(float64)
-	if !ok {
-		return nil, errors.New("third parameter blockheight must be a number")
-	}
-	fblocktime, ok := r.Params[3].(float64)
-	if !ok {
-		return nil, errors.New("fourth parameter blocktime must be a number")
-	}
-	findex, ok := r.Params[4].(float64)
-	if !ok {
-		return nil, errors.New("fifth parameter index must be a number")
+		return nil, errors.New("first parameter hextx must be a string")
 	}
 
-	return NewTxMinedNtfn(txid, blockhash, int32(fblockheight),
-		int64(fblocktime), int(findex)), nil
+	ntfn := &RedeemingTxNtfn{HexTx: hextx}
+
+	if len(r.Params) > 1 {
+		details, ok := r.Params[1].(map[string]interface{})
+		if !ok {
+			return nil, errors.New("second parameter must be a JSON object")
+		}
+
+		height, ok := details["height"].(float64)
+		if !ok {
+			return nil, errors.New("unspecified block height")
+		}
+
+		hash, ok := details["hash"].(string)
+		if !ok {
+			return nil, errors.New("unspecified block hash")
+		}
+
+		index, ok := details["index"].(float64)
+		if !ok {
+			return nil, errors.New("unspecified block index")
+		}
+
+		time, ok := details["time"].(float64)
+		if !ok {
+			return nil, errors.New("unspecified block time")
+		}
+
+		ntfn.Block = &BlockDetails{
+			Height: int32(height),
+			Hash:   hash,
+			Index:  int(index),
+			Time:   int64(time),
+		}
+	}
+
+	return ntfn, nil
 }
 
 // Id satisifies the btcjson.Cmd interface by returning nil for a
 // notification ID.
-func (n *TxMinedNtfn) Id() interface{} {
+func (n *RedeemingTxNtfn) Id() interface{} {
 	return nil
 }
 
 // SetId is implemented to satisify the btcjson.Cmd interface.  The
 // notification id is not modified.
-func (n *TxMinedNtfn) SetId(id interface{}) {}
+func (n *RedeemingTxNtfn) SetId(id interface{}) {}
 
 // Method satisifies the btcjson.Cmd interface by returning the method
 // of the notification.
-func (n *TxMinedNtfn) Method() string {
-	return TxMinedNtfnMethod
+func (n *RedeemingTxNtfn) Method() string {
+	return RedeemingTxNtfnMethod
 }
 
 // MarshalJSON returns the JSON encoding of n.  Part of the btcjson.Cmd
 // interface.
-func (n *TxMinedNtfn) MarshalJSON() ([]byte, error) {
+func (n *RedeemingTxNtfn) MarshalJSON() ([]byte, error) {
+	params := []interface{}{n.HexTx}
+
+	if n.Block != nil {
+		details := map[string]interface{}{
+			"height": float64(n.Block.Height),
+			"hash":   n.Block.Hash,
+			"index":  float64(n.Block.Index),
+			"time":   float64(n.Block.Time),
+		}
+		params = append(params, details)
+	}
+
 	ntfn := btcjson.Message{
 		Jsonrpc: "1.0",
 		Method:  n.Method(),
-		Params: []interface{}{
-			n.TxID,
-			n.BlockHash,
-			n.BlockHeight,
-			n.BlockTime,
-			n.Index,
-		},
+		Params:  params,
 	}
+
 	return json.Marshal(ntfn)
 }
 
 // UnmarshalJSON unmarshals the JSON encoding of n into n.  Part of
 // the btcjson.Cmd interface.
-func (n *TxMinedNtfn) UnmarshalJSON(b []byte) error {
+func (n *RedeemingTxNtfn) UnmarshalJSON(b []byte) error {
 	// Unmarshal into a RawCmd.
 	var r btcjson.RawCmd
 	if err := json.Unmarshal(b, &r); err != nil {
 		return err
 	}
 
-	newNtfn, err := parseTxMinedNtfn(&r)
+	newNtfn, err := parseRedeemingTxNtfn(&r)
 	if err != nil {
 		return err
 	}
 
-	concreteNtfn, ok := newNtfn.(*TxMinedNtfn)
+	concreteNtfn, ok := newNtfn.(*RedeemingTxNtfn)
 	if !ok {
 		return btcjson.ErrInternal
 	}
@@ -740,108 +746,6 @@ func (n *TxMinedNtfn) UnmarshalJSON(b []byte) error {
 type TxNtfn struct {
 	Account string
 	Details map[string]interface{}
-}
-
-// TxSpentNtfn is a type handling custom marshaling and
-// unmarshaling of txspent JSON websocket notifications.
-type TxSpentNtfn struct {
-	SpentTxId       string
-	SpentTxOutIndex int
-	SpendingTx      string
-}
-
-// Enforce that TxSpentNtfn satisifies the btcjson.Cmd interface.
-var _ btcjson.Cmd = &TxSpentNtfn{}
-
-// NewTxSpentNtfn creates a new TxSpentNtfn.
-func NewTxSpentNtfn(txid string, txOutIndex int, spendingTx string) *TxSpentNtfn {
-	return &TxSpentNtfn{
-		SpentTxId:       txid,
-		SpentTxOutIndex: txOutIndex,
-		SpendingTx:      spendingTx,
-	}
-}
-
-// parseTxSpentNtfn parses a RawCmd into a concrete type satisifying
-// the btcjson.Cmd interface.  This is used when registering the notification
-// with the btcjson parser.
-func parseTxSpentNtfn(r *btcjson.RawCmd) (btcjson.Cmd, error) {
-	if r.Id != nil {
-		return nil, ErrNotANtfn
-	}
-
-	if len(r.Params) != 3 {
-		return nil, btcjson.ErrWrongNumberOfParams
-	}
-
-	txid, ok := r.Params[0].(string)
-	if !ok {
-		return nil, errors.New("first parameter txid must be a string")
-	}
-	findex, ok := r.Params[1].(float64)
-	if !ok {
-		return nil, errors.New("second parameter index must be a number")
-	}
-	index := int(findex)
-	spendingTx, ok := r.Params[2].(string)
-	if !ok {
-		return nil, errors.New("third parameter spendingTx must be a string")
-	}
-
-	return NewTxSpentNtfn(txid, index, spendingTx), nil
-}
-
-// Id satisifies the btcjson.Cmd interface by returning nil for a
-// notification ID.
-func (n *TxSpentNtfn) Id() interface{} {
-	return nil
-}
-
-// SetId is implemented to satisify the btcjson.Cmd interface.  The
-// notification id is not modified.
-func (n *TxSpentNtfn) SetId(id interface{}) {}
-
-// Method satisifies the btcjson.Cmd interface by returning the method
-// of the notification.
-func (n *TxSpentNtfn) Method() string {
-	return TxSpentNtfnMethod
-}
-
-// MarshalJSON returns the JSON encoding of n.  Part of the btcjson.Cmd
-// interface.
-func (n *TxSpentNtfn) MarshalJSON() ([]byte, error) {
-	ntfn := btcjson.Message{
-		Jsonrpc: "1.0",
-		Method:  n.Method(),
-		Params: []interface{}{
-			n.SpentTxId,
-			n.SpentTxOutIndex,
-			n.SpendingTx,
-		},
-	}
-	return json.Marshal(ntfn)
-}
-
-// UnmarshalJSON unmarshals the JSON encoding of n into n.  Part of
-// the btcjson.Cmd interface.
-func (n *TxSpentNtfn) UnmarshalJSON(b []byte) error {
-	// Unmarshal into a RawCmd.
-	var r btcjson.RawCmd
-	if err := json.Unmarshal(b, &r); err != nil {
-		return err
-	}
-
-	newNtfn, err := parseTxSpentNtfn(&r)
-	if err != nil {
-		return err
-	}
-
-	concreteNtfn, ok := newNtfn.(*TxSpentNtfn)
-	if !ok {
-		return btcjson.ErrInternal
-	}
-	*n = *concreteNtfn
-	return nil
 }
 
 // Enforce that TxNtfn satisifies the btcjson.Cmd interface.
