@@ -144,7 +144,7 @@ type rpcServer struct {
 	shutdown        int32
 	server          *server
 	authsha         [sha256.Size]byte
-	ws              *wsContext
+	ntfnMgr         *wsNotificationManager
 	numClients      int
 	numClientsMutex sync.Mutex
 	wg              sync.WaitGroup
@@ -184,9 +184,9 @@ func (s *rpcServer) Start() {
 			return
 		}
 		jsonRPCRead(w, r, s)
-
 	})
 
+	// Websocket endpoint.
 	rpcServeMux.HandleFunc("/ws", func(w http.ResponseWriter, r *http.Request) {
 		authenticated, err := s.checkAuth(r, false)
 		if err != nil {
@@ -195,7 +195,7 @@ func (s *rpcServer) Start() {
 		}
 		wsServer := websocket.Server{
 			Handler: websocket.Handler(func(ws *websocket.Conn) {
-				s.walletReqsNotifications(ws, authenticated)
+				s.WebsocketHandler(ws, r.RemoteAddr, authenticated)
 			}),
 		}
 		wsServer.ServeHTTP(w, r)
@@ -296,6 +296,7 @@ func (s *rpcServer) Stop() error {
 			return err
 		}
 	}
+	s.ntfnMgr.Shutdown()
 	close(s.quit)
 	s.wg.Wait()
 	rpcsLog.Infof("RPC server shutdown complete")
@@ -333,9 +334,9 @@ func newRPCServer(listenAddrs []string, s *server) (*rpcServer, error) {
 	rpc := rpcServer{
 		authsha: sha256.Sum256([]byte(auth)),
 		server:  s,
-		ws:      newWebsocketContext(),
 		quit:    make(chan int),
 	}
+	rpc.ntfnMgr = newWsNotificationManager(&rpc)
 
 	// check for existence of cert file and key file
 	if !fileExists(cfg.RPCKey) && !fileExists(cfg.RPCCert) {

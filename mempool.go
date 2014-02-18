@@ -876,13 +876,15 @@ func (mp *txMemPool) maybeAcceptTransaction(tx *btcutil.Tx, isOrphan *bool, isNe
 	txmpLog.Debugf("Accepted transaction %v (pool size: %v)", txHash,
 		len(mp.pool))
 
-	// Notify wallets of mempool transactions to wallet addresses.
+	// Notify websocket clients about mempool transactions.
 	if mp.server.rpcServer != nil {
-		mp.server.rpcServer.NotifyForTxOuts(tx, nil)
+		go func() {
+			mp.server.rpcServer.ntfnMgr.NotifyForTxOuts(tx, nil)
 
-		if isNew {
-			mp.server.rpcServer.NotifyForNewTx(tx)
-		}
+			if isNew {
+				mp.server.rpcServer.ntfnMgr.NotifyForNewTx(tx)
+			}
+		}()
 	}
 
 	return nil

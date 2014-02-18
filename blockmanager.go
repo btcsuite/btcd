@@ -998,8 +998,8 @@ func (b *blockManager) handleNotifyMsg(notification *btcchain.Notification) {
 		// Notify frontends
 		if r := b.server.rpcServer; r != nil {
 			go func() {
-				r.NotifyBlockTXs(b.server.db, block)
-				r.NotifyBlockConnected(block)
+				r.ntfnMgr.NotifyBlockTXs(block)
+				r.ntfnMgr.NotifyBlockConnected(block)
 			}()
 		}
 
@@ -1025,7 +1025,7 @@ func (b *blockManager) handleNotifyMsg(notification *btcchain.Notification) {
 
 		// Notify frontends
 		if r := b.server.rpcServer; r != nil {
-			go r.NotifyBlockDisconnected(block)
+			go r.ntfnMgr.NotifyBlockDisconnected(block)
 		}
 	}
 }
