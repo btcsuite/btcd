@@ -1231,16 +1231,6 @@ func handleNotifyNewTXs(wsc *wsClient, icmd btcjson.Cmd) (interface{}, *btcjson.
 			return nil, &e
 		}
 
-		// TODO(jrick) Notifying for non-P2PKH addresses is currently
-		// unsuported.
-		if _, ok := addr.(*btcutil.AddressPubKeyHash); !ok {
-			e := btcjson.Error{
-				Code:    btcjson.ErrInvalidAddressOrKey.Code,
-				Message: fmt.Sprintf("Invalid address or key: %v", addr.EncodeAddress()),
-			}
-			return nil, &e
-		}
-
 		wsc.server.ntfnMgr.AddAddrRequest(wsc, addr.EncodeAddress())
 	}
 
