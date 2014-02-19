@@ -1831,7 +1831,7 @@ func opcodeCheckMultiSig(op *parsedOpcode, s *Script) error {
 	}
 
 	if len(signatures) == 0 {
-		s.dstack.PushBool(false)
+		s.dstack.PushBool(nsig == 0)
 		return nil
 	}
 
