@@ -192,6 +192,15 @@ type Script struct {
 	savedFirstStack [][]byte // stack from first script for bip16 scripts
 }
 
+// isSmallInt returns whether or not the opcode is considered a small integer,
+// which is an OP_0, or OP_1 through OP_16.
+func isSmallInt(op *opcode) bool {
+	if op.value == OP_0 || (op.value >= OP_1 && op.value <= OP_16) {
+		return true
+	}
+	return false
+}
+
 // isPubkey returns true if the script passed is a pubkey transaction, false
 // otherwise.
 func isPubkey(pops []parsedOpcode) bool {
@@ -237,16 +246,14 @@ func IsPayToScriptHash(script []byte) bool {
 func isMultiSig(pops []parsedOpcode) bool {
 	l := len(pops)
 	// absolute minimum is 1 pubkey so
-	// OP_1-16, pubkey, OP_1, OP_CHECKMULTISIG
+	// OP_0/OP_1-16, pubkey, OP_1, OP_CHECKMULTISIG
 	if l < 4 {
 		return false
 	}
-	if pops[0].opcode.value < OP_1 ||
-		pops[0].opcode.value > OP_16 {
+	if !isSmallInt(pops[0].opcode) {
 		return false
 	}
-	if pops[l-2].opcode.value < OP_1 ||
-		pops[l-2].opcode.value > OP_16 {
+	if !isSmallInt(pops[l-2].opcode) {
 		return false
 	}
 	if pops[l-1].opcode.value != OP_CHECKMULTISIG {
@@ -1096,10 +1103,10 @@ func expectedInputs(pops []parsedOpcode, class ScriptClass) int {
 	case MultiSigTy:
 		// Standard multisig has a push a small number for the number
 		// of sigs and number of keys.
-		// Check the first push instrution to see how many arguments are
-		// expected. typoeOfScript already checked this so that we know
-		// it'll be one of OP_1 - OP_16.
-		return int(pops[0].opcode.value - (OP_1 - 1))
+		// Check the first push instruction to see how many arguments
+		// are expected. typeOfScript already checked this so we know
+		// it'll be a small int.
+		return asSmallInt(pops[0].opcode)
 	case NullDataTy:
 		fallthrough
 	default:
@@ -1176,6 +1183,16 @@ func CalcScriptInfo(sigscript, pkscript []byte, bip16 bool) (*ScriptInfo, error)
 	return si, nil
 }
 
+// asSmallInt returns the passed opcode, which must be true according to
+// isSmallInt(), as an integer.
+func asSmallInt(op *opcode) int {
+	if op.value == OP_0 {
+		return 0
+	}
+
+	return int(op.value - (OP_1 - 1))
+}
+
 // CalcMultiSigStats returns the number of public keys and signatures from
 // a multi-signature transaction script.  The passed script MUST already be
 // known to be a multi-signature script.
@@ -1196,7 +1213,7 @@ func CalcMultiSigStats(script []byte) (int, int, error) {
 		return 0, 0, StackErrUnderflow
 	}
 
-	numSigs := int(pops[0].opcode.value - (OP_1 - 1))
-	numPubKeys := int(pops[len(pops)-2].opcode.value - (OP_1 - 1))
+	numSigs := asSmallInt(pops[0].opcode)
+	numPubKeys := asSmallInt(pops[len(pops)-2].opcode)
 	return numPubKeys, numSigs, nil
 }

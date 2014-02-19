@@ -65,8 +65,8 @@ func ExtractPkScriptAddrs(pkScript []byte, net btcwire.BitcoinNet) (ScriptClass,
 		// Therefore the number of required signatures is the 1st item
 		// on the stack and the number of public keys is the 2nd to last
 		// item on the stack.
-		requiredSigs = int(pops[0].opcode.value - (OP_1 - 1))
-		numPubKeys := int(pops[len(pops)-2].opcode.value - (OP_1 - 1))
+		requiredSigs = asSmallInt(pops[0].opcode)
+		numPubKeys := asSmallInt(pops[len(pops)-2].opcode)
 
 		// Extract the public keys while skipping any that are invalid.
 		addrs = make([]btcutil.Address, 0, numPubKeys)
