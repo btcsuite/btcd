@@ -1118,6 +1118,67 @@ var txTests = []txTest{
 		nSigOps:       0, // multisig is in the pkScript!
 		scriptInfoErr: btcscript.StackErrNonPushOnly,
 	},
+	// taken from tx b2d93dfd0b2c1a380e55e76a8d9cb3075dec9f4474e9485be008c337fd62c1f7
+	// on testnet
+	// multisig with zero required signatures
+	{
+		name: "CheckMultiSig zero required signatures",
+		tx: &btcwire.MsgTx{
+			Version: 1,
+			TxIn: []*btcwire.TxIn{
+				{
+					PreviousOutpoint: btcwire.OutPoint{
+						Hash: btcwire.ShaHash([32]byte{
+							0x37, 0xb1, 0x7d, 0x76,
+							0x38, 0x51, 0xcd, 0x1a,
+							0xb0, 0x4a, 0x42, 0x44,
+							0x63, 0xd4, 0x13, 0xc4,
+							0xee, 0x5c, 0xf6, 0x13,
+							0x04, 0xc7, 0xfd, 0x76,
+							0x97, 0x7b, 0xea, 0x7f,
+							0xce, 0x07, 0x57, 0x05,
+						}),
+						Index: 0,
+					},
+					SignatureScript: []byte{
+						btcscript.OP_0,
+						btcscript.OP_DATA_37,
+						btcscript.OP_0,
+						btcscript.OP_DATA_33,
+						0x02, 0x4a, 0xb3, 0x3c, 0x3a,
+						0x54, 0x7a, 0x37, 0x29, 0x3e,
+						0xb8, 0x75, 0xb4, 0xbb, 0xdb,
+						0xd4, 0x73, 0xe9, 0xd4, 0xba,
+						0xfd, 0xf3, 0x56, 0x87, 0xe7,
+						0x97, 0x44, 0xdc, 0xd7, 0x0f,
+						0x6e, 0x4d, 0xe2,
+						btcscript.OP_1,
+						btcscript.OP_CHECKMULTISIG,
+					},
+					Sequence: 4294967295,
+				},
+			},
+			TxOut:    []*btcwire.TxOut{},
+			LockTime: 0,
+		},
+		pkScript: []byte{
+			btcscript.OP_HASH160,
+			btcscript.OP_DATA_20,
+			0x2c, 0x6b, 0x10, 0x7f, 0xdf, 0x10, 0x6f, 0x22, 0x6f,
+			0x3f, 0xa3, 0x27, 0xba, 0x36, 0xd6, 0xe3, 0xca, 0xc7,
+			0x3d, 0xf0,
+			btcscript.OP_EQUAL,
+		},
+		idx:     0,
+		bip16:   true,
+		nSigOps: 1,
+		scriptInfo: btcscript.ScriptInfo{
+			PkScriptClass:  btcscript.ScriptHashTy,
+			NumInputs:      2,
+			ExpectedInputs: 1,
+			SigOps:         1,
+		},
+	},
 	// tx e5779b9e78f9650debc2893fd9636d827b26b4ddfa6a8172fe8708c924f5c39d
 	// First P2SH transaction in the blockchain
 	{
