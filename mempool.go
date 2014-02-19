@@ -97,6 +97,9 @@ type txMemPool struct {
 	orphans       map[btcwire.ShaHash]*btcutil.Tx
 	orphansByPrev map[btcwire.ShaHash]*list.List
 	outpoints     map[btcwire.OutPoint]*btcutil.Tx
+	pennyTotal    float64 // exponentially decaying total for penny spends.
+	lastPennyUnix int64   // unix time of last ``penny spend''
+
 }
 
 // isDust returns whether or not the passed transaction output amount is
@@ -858,9 +861,29 @@ func (mp *txMemPool) maybeAcceptTransaction(tx *btcutil.Tx, isOrphan *bool, isNe
 		return TxRuleError(str)
 	}
 
-	// TODO(davec): Rate-limit 'free' transactions.  That is to say
-	// transactions which are less than the minimum relay fee and are
-	// therefore considered free.
+	// Free-to-relay transactions are rate limited here to prevent
+	// penny-flooding with tiny transactions as a form of attack.
+	if minRequiredFee == 0 {
+		nowUnix := time.Now().Unix()
+		// we decay passed data with an exponentially decaying ~10
+		// minutes window - matches bitcoind handling.
+		mp.pennyTotal *= math.Pow(1.0-1.0/600.0,
+			float64(nowUnix-mp.lastPennyUnix))
+		mp.lastPennyUnix = nowUnix
+
+		// Are we still over the limit?
+		if mp.pennyTotal >= cfg.FreeTxRelayLimit*10*1000 {
+			str := fmt.Sprintf("transaction %v has 0 fees and has "+
+				"been rejected by the rate limiter", txHash)
+			return TxRuleError(str)
+		}
+		oldTotal := mp.pennyTotal
+
+		mp.pennyTotal += float64(tx.MsgTx().SerializeSize())
+		txmpLog.Debugf("rate limit: curTotal %v, nextTotal: %v, "+
+			"limit %v", oldTotal, mp.pennyTotal,
+			cfg.FreeTxRelayLimit*10*1000)
+	}
 
 	// Verify crypto signatures for each input and reject the transaction if
 	// any don't verify.

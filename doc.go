@@ -74,6 +74,9 @@ Application Options:
                            the log level for individual subsystems -- Use show
                            to list available subsystems (info)
       --upnp               Use UPnP to map our listening port outside of NAT
+      --limitfreerelay=    Limit relay of transactions with no transaction fee
+                           to the given amount in thousands of bytes per minute
+                           (15)
 
 Help Options:
   -h, --help           Show this help message
