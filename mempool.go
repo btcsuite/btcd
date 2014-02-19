@@ -49,7 +49,7 @@ const (
 	// maxStandardTxSize is the maximum size allowed for transactions that
 	// are considered standard and will therefore be relayed and considered
 	// for mining.
-	maxStandardTxSize = btcwire.MaxBlockPayload / 10
+	maxStandardTxSize = 100000
 
 	// maxStandardSigScriptSize is the maximum size allowed for a
 	// transaction input signature script to be considered standard.  This
@@ -75,7 +75,7 @@ const (
 	// blockPrioritySize is the number of bytes reserved in a block for
 	// high-priority transactions.  It is mainly used to help determine the
 	// minimum required fee for a transaction.
-	blockPrioritySize = 27000
+	blockPrioritySize = 50000
 )
 
 // TxDesc is a descriptor containing a transaction in the mempool and the
