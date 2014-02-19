@@ -140,14 +140,16 @@ var rpcUnimplemented = map[string]bool{
 // rpcServer holds the items the rpc server may need to access (config,
 // shutdown, main server, etc.)
 type rpcServer struct {
-	started   int32
-	shutdown  int32
-	server    *server
-	authsha   [sha256.Size]byte
-	ws        *wsContext
-	wg        sync.WaitGroup
-	listeners []net.Listener
-	quit      chan int
+	started         int32
+	shutdown        int32
+	server          *server
+	authsha         [sha256.Size]byte
+	ws              *wsContext
+	numClients      int
+	numClientsMutex sync.Mutex
+	wg              sync.WaitGroup
+	listeners       []net.Listener
+	quit            chan int
 }
 
 // Start is used by server.go to start the rpc listener.
@@ -167,11 +169,22 @@ func (s *rpcServer) Start() {
 	}
 	rpcServeMux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Connection", "close")
+		r.Close = true
+
+		// Limit the number of connections to max allowed.
+		if s.limitConnections(w, r.RemoteAddr) {
+			return
+		}
+
+		// Keep track of the number of connected clients.
+		s.incrementClients()
+		defer s.decrementClients()
 		if _, err := s.checkAuth(r, true); err != nil {
 			jsonAuthFail(w, r, s)
 			return
 		}
 		jsonRPCRead(w, r, s)
+
 	})
 
 	rpcServeMux.HandleFunc("/ws", func(w http.ResponseWriter, r *http.Request) {
@@ -197,6 +210,49 @@ func (s *rpcServer) Start() {
 			s.wg.Done()
 		}(listener)
 	}
+}
+
+// limitConnections responds with a 503 service unavailable and returns true if
+// adding another client would exceed the maximum allow RPC clients.
+//
+// This function is safe for concurrent access.
+func (s *rpcServer) limitConnections(w http.ResponseWriter, remoteAddr string) bool {
+	s.numClientsMutex.Lock()
+	defer s.numClientsMutex.Unlock()
+
+	if s.numClients+1 > cfg.RPCMaxClients {
+		rpcsLog.Infof("Max RPC clients exceeded [%d] - "+
+			"disconnecting client %s", cfg.RPCMaxClients,
+			remoteAddr)
+		http.Error(w, "503 Too busy.  Try again later.",
+			http.StatusServiceUnavailable)
+		return true
+	}
+	return false
+}
+
+// incrementClients adds one to the number of connected RPC clients.  Note
+// this only applies to standard clients.  Websocket clients have their own
+// limits and are tracked separately.
+//
+// This function is safe for concurrent access.
+func (s *rpcServer) incrementClients() {
+	s.numClientsMutex.Lock()
+	defer s.numClientsMutex.Unlock()
+
+	s.numClients++
+}
+
+// decrementClients subtracts one from the number of connected RPC clients.
+// Note this only applies to standard clients.  Websocket clients have their own
+// limits and are tracked separately.
+//
+// This function is safe for concurrent access.
+func (s *rpcServer) decrementClients() {
+	s.numClientsMutex.Lock()
+	defer s.numClientsMutex.Unlock()
+
+	s.numClients--
 }
 
 // checkAuth checks the HTTP Basic authentication supplied by a wallet
@@ -344,7 +400,6 @@ func jsonAuthFail(w http.ResponseWriter, r *http.Request, s *rpcServer) {
 // jsonRPCRead is the RPC wrapper around the jsonRead function to handle reading
 // and responding to RPC messages.
 func jsonRPCRead(w http.ResponseWriter, r *http.Request, s *rpcServer) {
-	r.Close = true
 	if atomic.LoadInt32(&s.shutdown) != 0 {
 		return
 	}

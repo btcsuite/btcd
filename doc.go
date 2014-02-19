@@ -41,6 +41,7 @@ Application Options:
                        (default port: 8334, testnet: 18334)
       --rpccert=       File containing the certificate file
       --rpckey=        File containing the certificate key
+      --rpcmaxclients= Max number of RPC clients for standard connections (10)
       --norpc          Disable built-in RPC server -- NOTE: The RPC server is
                        disabled by default if no rpcuser/rpcpass is specified
       --nodnsseed      Disable DNS seeding for peers
