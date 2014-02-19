@@ -341,6 +341,10 @@ func (m *wsNotificationManager) AddSpentRequest(wsc *wsClient, op *btcwire.OutPo
 //
 // This function MUST be called with the notification manager lock held.
 func (m *wsNotificationManager) removeSpentRequest(wsc *wsClient, op *btcwire.OutPoint) {
+	// Remove the request tracking from the client.
+	delete(wsc.spentRequests, *op)
+
+	// Remove the client from the list to notify.
 	notifyMap, ok := m.spentNotifications[*op]
 	if !ok {
 		rpcsLog.Warnf("Attempt to remove nonexistent spent request "+
@@ -533,13 +537,16 @@ func (m *wsNotificationManager) AddAddrRequest(wsc *wsClient, addr string) {
 //
 // This function MUST be called with the notification manager lock held.
 func (m *wsNotificationManager) removeAddrRequest(wsc *wsClient, addr string) {
+	// Remove the request tracking from the client.
+	delete(wsc.addrRequests, addr)
+
+	// Remove the client from the list to notify.
 	notifyMap, ok := m.addrNotifications[addr]
 	if !ok {
 		rpcsLog.Warnf("Attempt to remove nonexistent addr request "+
 			"<%s> for websocket client %s", addr, wsc.addr)
 		return
 	}
-
 	delete(notifyMap, wsc.quit)
 
 	// Remove the map entry altogether if there are no more clients
