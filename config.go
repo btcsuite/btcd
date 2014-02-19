@@ -25,17 +25,18 @@ import (
 )
 
 const (
-	defaultConfigFilename = "btcd.conf"
-	defaultDataDirname    = "data"
-	defaultLogLevel       = "info"
-	defaultLogDirname     = "logs"
-	defaultLogFilename    = "btcd.log"
-	defaultBtcnet         = btcwire.MainNet
-	defaultMaxPeers       = 125
-	defaultBanDuration    = time.Hour * 24
-	defaultMaxRPCClients  = 10
-	defaultVerifyEnabled  = false
-	defaultDbType         = "leveldb"
+	defaultConfigFilename   = "btcd.conf"
+	defaultDataDirname      = "data"
+	defaultLogLevel         = "info"
+	defaultLogDirname       = "logs"
+	defaultLogFilename      = "btcd.log"
+	defaultBtcnet           = btcwire.MainNet
+	defaultMaxPeers         = 125
+	defaultBanDuration      = time.Hour * 24
+	defaultMaxRPCClients    = 10
+	defaultMaxRPCWebsockets = 25
+	defaultVerifyEnabled    = false
+	defaultDbType           = "leveldb"
 )
 
 var (
@@ -73,6 +74,7 @@ type config struct {
 	RPCCert            string        `long:"rpccert" description:"File containing the certificate file"`
 	RPCKey             string        `long:"rpckey" description:"File containing the certificate key"`
 	RPCMaxClients      int           `long:"rpcmaxclients" description:"Max number of RPC clients for standard connections"`
+	RPCMaxWebsockets   int           `long:"rpcmaxwebsockets" description:"Max number of RPC websocket connections"`
 	DisableRPC         bool          `long:"norpc" description:"Disable built-in RPC server -- NOTE: The RPC server is disabled by default if no rpcuser/rpcpass is specified"`
 	DisableDNSSeed     bool          `long:"nodnsseed" description:"Disable DNS seeding for peers"`
 	ExternalIPs        []string      `long:"externalip" description:"Add an ip to the list of local addresses we claim to listen on to peers"`
@@ -280,16 +282,17 @@ func newConfigParser(cfg *config, so *serviceOptions, options flags.Options) *fl
 func loadConfig() (*config, []string, error) {
 	// Default config.
 	cfg := config{
-		ConfigFile:    defaultConfigFile,
-		DebugLevel:    defaultLogLevel,
-		MaxPeers:      defaultMaxPeers,
-		BanDuration:   defaultBanDuration,
-		RPCMaxClients: defaultMaxRPCClients,
-		DataDir:       defaultDataDir,
-		LogDir:        defaultLogDir,
-		DbType:        defaultDbType,
-		RPCKey:        defaultRPCKeyFile,
-		RPCCert:       defaultRPCCertFile,
+		ConfigFile:       defaultConfigFile,
+		DebugLevel:       defaultLogLevel,
+		MaxPeers:         defaultMaxPeers,
+		BanDuration:      defaultBanDuration,
+		RPCMaxClients:    defaultMaxRPCClients,
+		RPCMaxWebsockets: defaultMaxRPCWebsockets,
+		DataDir:          defaultDataDir,
+		LogDir:           defaultLogDir,
+		DbType:           defaultDbType,
+		RPCKey:           defaultRPCKeyFile,
+		RPCCert:          defaultRPCCertFile,
 	}
 
 	// Service options which are only added on Windows.

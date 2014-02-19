@@ -43,6 +43,8 @@ Application Options:
       --rpckey=            File containing the certificate key
       --rpcmaxclients=     Max number of RPC clients for standard connections
                            (10)
+      --rpcmaxwebsockets=  Max number of RPC clients for standard connections
+                           (25)
       --norpc              Disable built-in RPC server -- NOTE: The RPC server
                            is disabled by default if no rpcuser/rpcpass is
                            specified

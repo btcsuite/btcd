@@ -26,9 +26,6 @@ import (
 )
 
 const (
-	// TODO(davec): This should be a config option.
-	maxWebsocketClients = 10
-
 	// websocketSendBufferSize is the number of elements the send channel
 	// can queue before blocking.  Note that this only applies to requests
 	// handled directly in the websocket client input handler or the async
@@ -79,9 +76,9 @@ func (s *rpcServer) WebsocketHandler(conn *websocket.Conn, remoteAddr string,
 
 	// Limit max number of websocket clients.
 	rpcsLog.Infof("New websocket client %s", remoteAddr)
-	if s.ntfnMgr.NumClients()+1 > maxWebsocketClients {
+	if s.ntfnMgr.NumClients()+1 > cfg.RPCMaxWebsockets {
 		rpcsLog.Infof("Max websocket clients exceeded [%d] - "+
-			"disconnecting client %s", maxWebsocketClients,
+			"disconnecting client %s", cfg.RPCMaxWebsockets,
 			remoteAddr)
 		conn.Close()
 		return
