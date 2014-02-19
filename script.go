@@ -528,12 +528,12 @@ func (s *Script) CheckErrorCondition() (err error) {
 	v, err := s.dstack.PopBool()
 	if err == nil && v == false {
 		// log interesting data.
-		log.Tracef("%v", func() string {
+		log.Tracef("%v", newLogClosure(func() string {
 			dis0, _ := s.DisasmScript(0)
 			dis1, _ := s.DisasmScript(1)
 			return fmt.Sprintf("scripts failed: script0: %s\n"+
 				"script1: %s", dis0, dis1)
-		})
+		}))
 		err = StackErrScriptFailed
 	}
 	if err == nil && len(s.condStack) != 1 {
