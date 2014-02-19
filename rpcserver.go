@@ -265,7 +265,8 @@ func (s *rpcServer) checkAuth(r *http.Request, require bool) (bool, error) {
 	authhdr := r.Header["Authorization"]
 	if len(authhdr) <= 0 {
 		if require {
-			rpcsLog.Warnf("Auth failure.")
+			rpcsLog.Warnf("RPC authentication failure from %s",
+				r.RemoteAddr)
 			return false, errors.New("auth failure")
 		}
 
@@ -275,7 +276,7 @@ func (s *rpcServer) checkAuth(r *http.Request, require bool) (bool, error) {
 	authsha := sha256.Sum256([]byte(authhdr[0]))
 	cmp := subtle.ConstantTimeCompare(authsha[:], s.authsha[:])
 	if cmp != 1 {
-		rpcsLog.Warnf("Auth failure.")
+		rpcsLog.Warnf("RPC authentication failure from %s", r.RemoteAddr)
 		return false, errors.New("auth failure")
 	}
 	return true, nil
