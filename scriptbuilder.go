@@ -88,6 +88,10 @@ func (b *ScriptBuilder) PushData(data []byte) *ScriptBuilder {
 // PushInt64 pushes the passed integer to the end of the script.
 func (b *ScriptBuilder) PushInt64(val int64) *ScriptBuilder {
 	// Fast path for small integers and OP_1NEGATE.
+	if val == 0 {
+		b.script = append(b.script, OP_0)
+		return b
+	}
 	if val == -1 || (val >= 1 && val <= 16) {
 		b.script = append(b.script, byte((OP_1-1)+val))
 		return b
