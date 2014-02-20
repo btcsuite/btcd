@@ -1171,7 +1171,7 @@ func IsValidIdType(id interface{}) bool {
 
 // JSONToAmount Safely converts a floating point value to an int.
 // Clearly not all floating point numbers can be converted to ints (there
-// is no one-to-one mapping, but bitcoin's json api returns most numbers as
+// is no one-to-one mapping), but bitcoin's json api returns most numbers as
 // floats which are not safe to use when handling money.  Since bitcoins can
 // only be divided in a limited way, this methods works for the amounts returned
 // by the json api.  It is not for general use.
