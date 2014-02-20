@@ -2429,33 +2429,6 @@ func TestCheckErrorCondition(t *testing.T) {
 	}
 }
 
-func TestPayToPubKeyHashScript(t *testing.T) {
-	validaddr := []byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15,
-		16, 17, 18, 19, 20}
-	invalidaddr := validaddr[:len(validaddr)-2]
-
-	expected := []byte{btcscript.OP_DUP, btcscript.OP_HASH160,
-		btcscript.OP_DATA_20, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12,
-		13, 14, 15, 16, 17, 18, 19, 20, btcscript.OP_EQUALVERIFY,
-		btcscript.OP_CHECKSIG}
-
-	script, err := btcscript.PayToPubKeyHashScript(validaddr)
-	if err != nil {
-		t.Error(err)
-		return
-	}
-	if !bytes.Equal(script, expected) {
-		t.Error("Unexpected script result.")
-		return
-	}
-
-	_, err = btcscript.PayToPubKeyHashScript(invalidaddr)
-	if err == nil {
-		t.Error("Erroneously created script for invalid address.")
-		return
-	}
-}
-
 type TstSigScript struct {
 	name               string
 	inputs             []TstInput

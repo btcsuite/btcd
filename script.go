@@ -1001,46 +1001,20 @@ func getSigOpCount(pops []parsedOpcode, precise bool) int {
 	return nSigs
 }
 
-// PayToPubKeyHashScript creates a new script to pay a transaction
-// output to a 20-byte pubkey hash.
-func PayToPubKeyHashScript(pubKeyHash []byte) (pkScript []byte, err error) {
-	pops := []parsedOpcode{
-		{
-			opcode: opcodemap[OP_DUP],
-		},
-		{
-			opcode: opcodemap[OP_HASH160],
-		},
-		{
-			opcode: opcodemap[OP_DATA_20],
-			data:   pubKeyHash,
-		},
-		{
-			opcode: opcodemap[OP_EQUALVERIFY],
-		},
-		{
-			opcode: opcodemap[OP_CHECKSIG],
-		},
-	}
-	return unparseScript(pops)
+// payToPubKeyHashScript creates a new script to pay a transaction
+// output to a 20-byte pubkey hash. It is expected that the input is a valid
+// hash.
+func payToPubKeyHashScript(pubKeyHash []byte) []byte {
+	return NewScriptBuilder().PushOp(OP_DUP).PushOp(OP_HASH160).
+		PushData(pubKeyHash).PushOp(OP_EQUALVERIFY).PushOp(OP_CHECKSIG).
+		Script()
 }
 
-// PayToScriptHashScript creates a new script to pay a transaction output to a
-// script hash.
-func PayToScriptHashScript(scriptHash []byte) (pkScript []byte, err error) {
-	pops := []parsedOpcode{
-		{
-			opcode: opcodemap[OP_HASH160],
-		},
-		{
-			opcode: opcodemap[OP_DATA_20],
-			data:   scriptHash,
-		},
-		{
-			opcode: opcodemap[OP_EQUAL],
-		},
-	}
-	return unparseScript(pops)
+// payToScriptHashScript creates a new script to pay a transaction output to a
+// script hash. It is expected that the input is a valid hash.
+func payToScriptHashScript(scriptHash []byte) []byte {
+	return NewScriptBuilder().PushOp(OP_HASH160).PushData(scriptHash).
+		PushOp(OP_EQUAL).Script() 
 }
 
 // PayToAddrScript creates a new script to pay a transaction output to a the
@@ -1052,13 +1026,13 @@ func PayToAddrScript(addr btcutil.Address) ([]byte, error) {
 		if addr == nil {
 			return nil, ErrUnsupportedAddress
 		}
-		return PayToPubKeyHashScript(addr.ScriptAddress())
+		return payToPubKeyHashScript(addr.ScriptAddress()), nil
 
 	case *btcutil.AddressScriptHash:
 		if addr == nil {
 			return nil, ErrUnsupportedAddress
 		}
-		return PayToScriptHashScript(addr.ScriptAddress())
+		return payToScriptHashScript(addr.ScriptAddress()), nil
 	}
 
 	return nil, ErrUnsupportedAddress
@@ -1074,7 +1048,6 @@ func PayToAddrScript(addr btcutil.Address) ([]byte, error) {
 // compress.  This format must match the same format used to generate
 // the payment address, or the script validation will fail.
 func SignatureScript(tx *btcwire.MsgTx, idx int, subscript []byte, hashType byte, privkey *ecdsa.PrivateKey, compress bool) ([]byte, error) {
-
 	return signatureScriptCustomReader(rand.Reader, tx, idx, subscript,
 		hashType, privkey, compress)
 }
@@ -1098,26 +1071,14 @@ func signatureScriptCustomReader(reader io.Reader, tx *btcwire.MsgTx, idx int,
 	sig := append(ecSig.Serialize(), hashType)
 
 	pk := (*btcec.PublicKey)(&privkey.PublicKey)
-	var pubkeyOpcode *parsedOpcode
+	var pkData []byte
 	if compress {
-		pubkeyOpcode = &parsedOpcode{
-			opcode: opcodemap[OP_DATA_33],
-			data:   pk.SerializeCompressed(),
-		}
+		pkData = pk.SerializeCompressed()
 	} else {
-		pubkeyOpcode = &parsedOpcode{
-			opcode: opcodemap[OP_DATA_65],
-			data:   pk.SerializeUncompressed(),
-		}
+		pkData = pk.SerializeUncompressed()
 	}
-	pops := []parsedOpcode{
-		{
-			opcode: opcodemap[byte(len(sig))],
-			data:   sig,
-		},
-		*pubkeyOpcode,
-	}
-	return unparseScript(pops)
+
+	return NewScriptBuilder().PushData(sig).PushData(pkData).Script(), nil
 }
 
 // expectedInputs returns the number of arguments required by a script.
