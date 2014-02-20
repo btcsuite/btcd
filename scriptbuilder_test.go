@@ -10,9 +10,9 @@ import (
 	"testing"
 )
 
-// TestScriptBuilderPushOp tests that pushing opcodes to a script via the
+// TestScriptBuilderAddOp tests that pushing opcodes to a script via the
 // ScriptBuilder API works as expected.
-func TestScriptBuilderPushOp(t *testing.T) {
+func TestScriptBuilderAddOp(t *testing.T) {
 	tests := []struct {
 		name     string
 		opcodes  []byte
@@ -40,11 +40,11 @@ func TestScriptBuilderPushOp(t *testing.T) {
 	for i, test := range tests {
 		builder.Reset()
 		for _, opcode := range test.opcodes {
-			builder.PushOp(opcode)
+			builder.AddOp(opcode)
 		}
 		result := builder.Script()
 		if !bytes.Equal(result, test.expected) {
-			t.Errorf("ScriptBuilder.PushOp #%d (%s) wrong result\n"+
+			t.Errorf("ScriptBuilder.AddOp #%d (%s) wrong result\n"+
 				"got: %x\nwant: %x", i, test.name, result,
 				test.expected)
 			continue
@@ -52,9 +52,9 @@ func TestScriptBuilderPushOp(t *testing.T) {
 	}
 }
 
-// TestScriptBuilderPushInt64 tests that pushing signed integers to a script via
+// TestScriptBuilderAddInt64 tests that pushing signed integers to a script via
 // the ScriptBuilder API works as expected.
-func TestScriptBuilderPushInt64(t *testing.T) {
+func TestScriptBuilderAddInt64(t *testing.T) {
 	tests := []struct {
 		name     string
 		val      int64
@@ -103,10 +103,10 @@ func TestScriptBuilderPushInt64(t *testing.T) {
 	builder := btcscript.NewScriptBuilder()
 	t.Logf("Running %d tests", len(tests))
 	for i, test := range tests {
-		builder.Reset().PushInt64(test.val)
+		builder.Reset().AddInt64(test.val)
 		result := builder.Script()
 		if !bytes.Equal(result, test.expected) {
-			t.Errorf("ScriptBuilder.PushInt64 #%d (%s) wrong result\n"+
+			t.Errorf("ScriptBuilder.AddInt64 #%d (%s) wrong result\n"+
 				"got: %x\nwant: %x", i, test.name, result,
 				test.expected)
 			continue
@@ -114,9 +114,9 @@ func TestScriptBuilderPushInt64(t *testing.T) {
 	}
 }
 
-// TestScriptBuilderPushUint64 tests that pushing unsigned integers to a script
+// TestScriptBuilderAddUint64 tests that pushing unsigned integers to a script
 // via the ScriptBuilder API works as expected.
-func TestScriptBuilderPushUint64(t *testing.T) {
+func TestScriptBuilderAddUint64(t *testing.T) {
 	tests := []struct {
 		name     string
 		val      uint64
@@ -152,10 +152,10 @@ func TestScriptBuilderPushUint64(t *testing.T) {
 	builder := btcscript.NewScriptBuilder()
 	t.Logf("Running %d tests", len(tests))
 	for i, test := range tests {
-		builder.Reset().PushUint64(test.val)
+		builder.Reset().AddUint64(test.val)
 		result := builder.Script()
 		if !bytes.Equal(result, test.expected) {
-			t.Errorf("ScriptBuilder.PushUint64 #%d (%s) wrong result\n"+
+			t.Errorf("ScriptBuilder.AddUint64 #%d (%s) wrong result\n"+
 				"got: %x\nwant: %x", i, test.name, result,
 				test.expected)
 			continue
@@ -163,9 +163,9 @@ func TestScriptBuilderPushUint64(t *testing.T) {
 	}
 }
 
-// TestScriptBuilderPushData tests that pushing data to a script via the
+// TestScriptBuilderAddData tests that pushing data to a script via the
 // ScriptBuilder API works as expected.
-func TestScriptBuilderPushData(t *testing.T) {
+func TestScriptBuilderAddData(t *testing.T) {
 	tests := []struct {
 		name     string
 		data     []byte
@@ -237,10 +237,10 @@ func TestScriptBuilderPushData(t *testing.T) {
 	builder := btcscript.NewScriptBuilder()
 	t.Logf("Running %d tests", len(tests))
 	for i, test := range tests {
-		builder.Reset().PushData(test.data)
+		builder.Reset().AddData(test.data)
 		result := builder.Script()
 		if !bytes.Equal(result, test.expected) {
-			t.Errorf("ScriptBuilder.PushData #%d (%s) wrong result\n"+
+			t.Errorf("ScriptBuilder.AddData #%d (%s) wrong result\n"+
 				"got: %x\nwant: %x", i, test.name, result,
 				test.expected)
 			continue

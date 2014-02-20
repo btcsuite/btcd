@@ -1005,16 +1005,16 @@ func getSigOpCount(pops []parsedOpcode, precise bool) int {
 // output to a 20-byte pubkey hash. It is expected that the input is a valid
 // hash.
 func payToPubKeyHashScript(pubKeyHash []byte) []byte {
-	return NewScriptBuilder().PushOp(OP_DUP).PushOp(OP_HASH160).
-		PushData(pubKeyHash).PushOp(OP_EQUALVERIFY).PushOp(OP_CHECKSIG).
+	return NewScriptBuilder().AddOp(OP_DUP).AddOp(OP_HASH160).
+		AddData(pubKeyHash).AddOp(OP_EQUALVERIFY).AddOp(OP_CHECKSIG).
 		Script()
 }
 
 // payToScriptHashScript creates a new script to pay a transaction output to a
 // script hash. It is expected that the input is a valid hash.
 func payToScriptHashScript(scriptHash []byte) []byte {
-	return NewScriptBuilder().PushOp(OP_HASH160).PushData(scriptHash).
-		PushOp(OP_EQUAL).Script() 
+	return NewScriptBuilder().AddOp(OP_HASH160).AddData(scriptHash).
+		AddOp(OP_EQUAL).Script() 
 }
 
 // PayToAddrScript creates a new script to pay a transaction output to a the
@@ -1078,7 +1078,7 @@ func signatureScriptCustomReader(reader io.Reader, tx *btcwire.MsgTx, idx int,
 		pkData = pk.SerializeUncompressed()
 	}
 
-	return NewScriptBuilder().PushData(sig).PushData(pkData).Script(), nil
+	return NewScriptBuilder().AddData(sig).AddData(pkData).Script(), nil
 }
 
 // expectedInputs returns the number of arguments required by a script.

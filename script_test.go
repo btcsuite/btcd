@@ -18,7 +18,7 @@ import (
 func TestStandardPushes(t *testing.T) {
 	for i := 0; i < 1000; i++ {
 		builder := btcscript.NewScriptBuilder()
-		builder.PushInt64(int64(i))
+		builder.AddInt64(int64(i))
 		if result := btcscript.IsPushOnlyScript(builder.Script()); !result {
 			t.Errorf("StandardPushesTests IsPushOnlyScript test #%d failed: %x\n", i, builder.Script())
 		}
@@ -29,7 +29,7 @@ func TestStandardPushes(t *testing.T) {
 	}
 	for i := 0; i < 1000; i++ {
 		builder := btcscript.NewScriptBuilder()
-		builder.PushData(bytes.Repeat([]byte{0x49}, i))
+		builder.AddData(bytes.Repeat([]byte{0x49}, i))
 		if result := btcscript.IsPushOnlyScript(builder.Script()); !result {
 			t.Errorf("StandardPushesTests IsPushOnlyScript test #%d failed: %x\n", i, builder.Script())
 		}

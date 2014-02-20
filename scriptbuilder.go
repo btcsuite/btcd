@@ -25,23 +25,23 @@ const (
 // For example, the following would build a 2-of-3 multisig script for usage in
 // a pay-to-script-hash:
 // 	builder := btcscript.NewScriptBuilder()
-// 	builder.PushOp(btcscript.OP_2).PushData(pubKey1).PushData(pubKey2)
-// 	builder.PushData(pubKey3).PushOp(btcscript.OP_3)
-// 	builder.PushOp(btcscript.OP_CHECKMULTISIG)
+// 	builder.AddOp(btcscript.OP_2).AddData(pubKey1).AddData(pubKey2)
+// 	builder.AddData(pubKey3).AddOp(btcscript.OP_3)
+// 	builder.AddOp(btcscript.OP_CHECKMULTISIG)
 // 	fmt.Printf("Final multi-sig script: %x\n", builder.Script())
 type ScriptBuilder struct {
 	script []byte
 }
 
-// PushOp pushes the passed opcode to the end of the script.
-func (b *ScriptBuilder) PushOp(opcode byte) *ScriptBuilder {
+// AddOp pushes the passed opcode to the end of the script.
+func (b *ScriptBuilder) AddOp(opcode byte) *ScriptBuilder {
 	b.script = append(b.script, opcode)
 	return b
 }
 
-// PushData pushes the passed data to the end of the script.  It automatically
+// AddData pushes the passed data to the end of the script.  It automatically
 // chooses canonical opcodes depending on the length of the data.
-func (b *ScriptBuilder) PushData(data []byte) *ScriptBuilder {
+func (b *ScriptBuilder) AddData(data []byte) *ScriptBuilder {
 	// Don't modify the script at all if no data was passed.
 	dataLen := len(data)
 	if dataLen == 0 {
@@ -85,8 +85,8 @@ func (b *ScriptBuilder) PushData(data []byte) *ScriptBuilder {
 	return b
 }
 
-// PushInt64 pushes the passed integer to the end of the script.
-func (b *ScriptBuilder) PushInt64(val int64) *ScriptBuilder {
+// AddInt64 pushes the passed integer to the end of the script.
+func (b *ScriptBuilder) AddInt64(val int64) *ScriptBuilder {
 	// Fast path for small integers and OP_1NEGATE.
 	if val == 0 {
 		b.script = append(b.script, OP_0)
@@ -97,11 +97,11 @@ func (b *ScriptBuilder) PushInt64(val int64) *ScriptBuilder {
 		return b
 	}
 
-	return b.PushData(fromInt(new(big.Int).SetInt64(val)))
+	return b.AddData(fromInt(new(big.Int).SetInt64(val)))
 }
 
-// PushUint64 pushes the passed integer to the end of the script.
-func (b *ScriptBuilder) PushUint64(val uint64) *ScriptBuilder {
+// AddUint64 pushes the passed integer to the end of the script.
+func (b *ScriptBuilder) AddUint64(val uint64) *ScriptBuilder {
 	// Fast path for small integers.
 	if val == 0 {
 		b.script = append(b.script, OP_0)
@@ -112,7 +112,7 @@ func (b *ScriptBuilder) PushUint64(val uint64) *ScriptBuilder {
 		return b
 	}
 
-	return b.PushData(fromInt(new(big.Int).SetUint64(val)))
+	return b.AddData(fromInt(new(big.Int).SetUint64(val)))
 }
 
 // Reset resets the script so it has no content.
