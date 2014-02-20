@@ -15,6 +15,31 @@ import (
 	"testing"
 )
 
+func TestStandardPushes(t *testing.T) {
+	for i := 0; i < 1000; i++ {
+		builder := btcscript.NewScriptBuilder()
+		builder.PushInt64(int64(i))
+		if result := btcscript.IsPushOnlyScript(builder.Script()); !result {
+			t.Errorf("StandardPushesTests IsPushOnlyScript test #%d failed: %x\n", i, builder.Script())
+		}
+		if result := btcscript.HasCanonicalPushes(builder.Script()); !result {
+			t.Errorf("StandardPushesTests HasCanonicalPushes test #%d failed: %x\n", i, builder.Script())
+			continue
+		}
+	}
+	for i := 0; i < 1000; i++ {
+		builder := btcscript.NewScriptBuilder()
+		builder.PushData(bytes.Repeat([]byte{0x49}, i))
+		if result := btcscript.IsPushOnlyScript(builder.Script()); !result {
+			t.Errorf("StandardPushesTests IsPushOnlyScript test #%d failed: %x\n", i, builder.Script())
+		}
+		if result := btcscript.HasCanonicalPushes(builder.Script()); !result {
+			t.Errorf("StandardPushesTests HasCanonicalPushes test #%d failed: %x\n", i, builder.Script())
+			continue
+		}
+	}
+}
+
 type txTest struct {
 	name          string
 	tx            *btcwire.MsgTx

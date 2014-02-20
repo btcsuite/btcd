@@ -308,6 +308,41 @@ func IsPushOnlyScript(script []byte) bool {
 	return isPushOnly(pops)
 }
 
+// HasCanonicalPushes returns whether or not the passed script only contains
+// canonical data pushes.  A canonical data push one where the fewest number of
+// bytes possible to encode the size of the data being pushed is used.  This
+// includes using the small integer opcodes for single byte data that can be
+// represented directly.
+func HasCanonicalPushes(script []byte) bool {
+	pops, err := parseScript(script)
+	if err != nil {
+		return false
+	}
+
+	for _, pop := range pops {
+		opcode := pop.opcode.value
+		data := pop.data
+		dataLen := len(pop.data)
+		if opcode > OP_16 {
+			continue
+		}
+		if opcode < OP_PUSHDATA1 && opcode > OP_0 && (dataLen == 1 && data[0] <= 16) {
+			return false
+		}
+		if opcode == OP_PUSHDATA1 && dataLen < OP_PUSHDATA1 {
+			return false
+		}
+		if opcode == OP_PUSHDATA2 && dataLen <= 0xff {
+			return false
+		}
+		if opcode == OP_PUSHDATA4 && dataLen <= 0xffff {
+			return false
+		}
+	}
+
+	return true
+}
+
 // GetScriptClass returns the class of the script passed. If the script does not
 // parse then NonStandardTy will be returned.
 func GetScriptClass(script []byte) ScriptClass {
