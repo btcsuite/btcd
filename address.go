@@ -40,7 +40,7 @@ func ExtractPkScriptAddrs(pkScript []byte, net btcwire.BitcoinNet) (ScriptClass,
 	case PubKeyTy:
 		// A pay-to-pubkey script is of the form:
 		//  <pubkey> OP_CHECKSIG
-		// Therefore the pubkey is the item on the stack.
+		// Therefore the pubkey is the first item on the stack.
 		// Skip the pubkey if it's invalid for some reason.
 		requiredSigs = 1
 		addr, err := btcutil.NewAddressPubKey(pops[0].data, net)

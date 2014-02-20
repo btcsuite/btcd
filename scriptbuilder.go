@@ -19,7 +19,7 @@ const (
 )
 
 // ScriptBuilder provides a facility for building custom scripts.  It allows
-// you to push opcodes, ints, and, data while respecting canonical encoding.  It
+// you to push opcodes, ints, and data while respecting canonical encoding.  It
 // does not ensure the script will execute correctly.
 //
 // For example, the following would build a 2-of-3 multisig script for usage in

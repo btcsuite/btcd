@@ -1122,7 +1122,7 @@ func signatureScriptCustomReader(reader io.Reader, tx *btcwire.MsgTx, idx int,
 
 // expectedInputs returns the number of arguments required by a script.
 // If the script is of unnown type such that the number can not be determined
-// then -1 is returned. We are an interanl function and thus assume that class
+// then -1 is returned. We are an internal function and thus assume that class
 // is the real class of pops (and we can thus assume things that were
 // determined while finding out the type).
 func expectedInputs(pops []parsedOpcode, class ScriptClass) int {
