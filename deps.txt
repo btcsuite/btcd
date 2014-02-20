@@ -111,3 +111,21 @@ go-socks       92ce162c38f029f7fa66c4336b8b5168f2c75d78
 goleveldb      3ce16077443eab51c7bc8371fef66fddee0b5870
 seelog         6b91ad56123bb473755caa213db2bde5422177bf
 winsvc         2a5f78f6f2059b884aad8f6907fb029afda48c43
+
+btcd 0.7.0 Alpha
+----------------
+btcchain       149d8176b0ff0b1fc848bca46ab8bca2079b7ab8
+btcdb          0a86df4a162ddd8311194d44231f69e94abd1d23
+btcec          ff3fac426d4d037505ea8208b79e93c2852451e0
+btcjson        21b974e2715f48e36dbcb759314dfe96cdfb094d
+btclog         1cd4812f9be0b0c88dd43510d6ce98adfd083b75
+btcscript      2b0b512a83acb2bdfa9766b7dc44b6f81cb89c02
+btcutil        ca515e278dbc106e15a597e8ac5dc39239672f09
+btcwire        f6b03bf8a8308837a5663e537be297956279dd67
+btcws          5c666417351a31c54a7569553198d0763a2337e9
+fastsha256     a3150791c7d7ccb8050fc0d13528b873fd67e8c3
+go-flags       a53ab6481be8dd78e060df308a9f577859dfeab5
+go-socks       92ce162c38f029f7fa66c4336b8b5168f2c75d78
+goleveldb      3ce16077443eab51c7bc8371fef66fddee0b5870
+seelog         6b91ad56123bb473755caa213db2bde5422177bf
+winsvc         2a5f78f6f2059b884aad8f6907fb029afda48c43
