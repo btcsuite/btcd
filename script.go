@@ -1017,9 +1017,15 @@ func payToScriptHashScript(scriptHash []byte) []byte {
 		AddOp(OP_EQUAL).Script() 
 }
 
+// payToPubkeyScript creates a new script to pay a transaction output to a
+// public key. It is expected that the input is a valid pubkey.
+func payToPubKeyScript(serializedPubKey []byte) []byte {
+	return NewScriptBuilder().AddData(serializedPubKey).
+		AddOp(OP_CHECKSIG).Script() 
+}
+
 // PayToAddrScript creates a new script to pay a transaction output to a the
-// specified address.  Currently the only supported address types are
-// btcutil.AddressPubKeyHash and btcutil.AddressScriptHash.
+// specified address.
 func PayToAddrScript(addr btcutil.Address) ([]byte, error) {
 	switch addr := addr.(type) {
 	case *btcutil.AddressPubKeyHash:
@@ -1033,6 +1039,12 @@ func PayToAddrScript(addr btcutil.Address) ([]byte, error) {
 			return nil, ErrUnsupportedAddress
 		}
 		return payToScriptHashScript(addr.ScriptAddress()), nil
+
+	case *btcutil.AddressPubKey:
+		if addr == nil {
+			return nil, ErrUnsupportedAddress
+		}
+		return payToPubKeyScript(addr.ScriptAddress()), nil
 	}
 
 	return nil, ErrUnsupportedAddress
