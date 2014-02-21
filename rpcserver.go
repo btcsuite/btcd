@@ -1386,19 +1386,21 @@ func handleSendRawTransaction(s *rpcServer, cmd btcjson.Cmd) (interface{}, error
 		// When the error is a rule error, it means the transaction was
 		// simply rejected as opposed to something actually going wrong,
 		// so log it as such.  Otherwise, something really did go wrong,
-		// so log it as an actual error.
+		// so log it as an actual error.  In both cases, a JSON-RPC
+		// error is returned to the client with the deserialization
+		// error code (to match bitcoind behavior).
 		if _, ok := err.(TxRuleError); ok {
 			rpcsLog.Debugf("Rejected transaction %v: %v", tx.Sha(),
 				err)
 		} else {
 			rpcsLog.Errorf("Failed to process transaction %v: %v",
 				tx.Sha(), err)
-			err = btcjson.Error{
-				Code:    btcjson.ErrDeserialization.Code,
-				Message: "TX rejected",
-			}
-			return nil, err
 		}
+		err = btcjson.Error{
+			Code:    btcjson.ErrDeserialization.Code,
+			Message: "TX rejected",
+		}
+		return nil, err
 	}
 
 	return tx.Sha().String(), nil
