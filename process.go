@@ -117,14 +117,14 @@ func (b *BlockChain) ProcessBlock(block *btcutil.Block, fastAdd bool) error {
 		return err
 	}
 
-	// Find the latest known checkpoint and perform some additional checks
-	// based on the checkpoint.  This provides a few nice properties such as
+	// Find the previous checkpoint and perform some additional checks based
+	// on the checkpoint.  This provides a few nice properties such as
 	// preventing old side chain blocks before the last checkpoint,
 	// rejecting easy to mine, but otherwise bogus, blocks that could be
 	// used to eat memory, and ensuring expected (versus claimed) proof of
-	// work requirements since the last checkpoint are met.
+	// work requirements since the previous checkpoint are met.
 	blockHeader := &block.MsgBlock().Header
-	checkpointBlock, err := b.findLatestKnownCheckpoint()
+	checkpointBlock, err := b.findPreviousCheckpoint()
 	if err != nil {
 		return err
 	}

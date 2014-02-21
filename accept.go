@@ -91,12 +91,11 @@ func (b *BlockChain) maybeAcceptBlock(block *btcutil.Block, fastAdd bool) error 
 		return RuleError(str)
 	}
 
-	// Find the latest known good checkpoint and prevent blocks which fork
-	// the main chain before it.  This prevents storage of new, otherwise
-	// valid, blocks which build off of old blocks that are likely at a
-	// much easier difficulty and therefore could be used to waste cache and
-	// disk space.
-	checkpointBlock, err := b.findLatestKnownCheckpoint()
+	// Find the previous checkpoint and prevent blocks which fork the main
+	// chain before it.  This prevents storage of new, otherwise valid,
+	// blocks which build off of old blocks that are likely at a much easier
+	// difficulty and therefore could be used to waste cache and disk space.
+	checkpointBlock, err := b.findPreviousCheckpoint()
 	if err != nil {
 		return err
 	}

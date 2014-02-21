@@ -146,11 +146,11 @@ func (b *BlockChain) verifyCheckpoint(height int64, hash *btcwire.ShaHash) bool 
 	return true
 }
 
-// findLatestKnownCheckpoint finds the most recent checkpoint that is already
+// findPreviousCheckpoint finds the most recent checkpoint that is already
 // available in the downloaded portion of the block chain and returns the
 // associated block.  It returns nil if a checkpoint can't be found (this should
 // really only happen for blocks before the first checkpoint).
-func (b *BlockChain) findLatestKnownCheckpoint() (*btcutil.Block, error) {
+func (b *BlockChain) findPreviousCheckpoint() (*btcutil.Block, error) {
 	if b.noCheckpoints || b.checkpointData() == nil {
 		return nil, nil
 	}
