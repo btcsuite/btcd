@@ -91,6 +91,22 @@ func (b *BlockChain) maybeAcceptBlock(block *btcutil.Block, fastAdd bool) error 
 		return RuleError(str)
 	}
 
+	// Find the latest known good checkpoint and prevent blocks which fork
+	// the main chain before it.  This prevents storage of new, otherwise
+	// valid, blocks which build off of old blocks that are likely at a
+	// much easier difficulty and therefore could be used to waste cache and
+	// disk space.
+	checkpointBlock, err := b.findLatestKnownCheckpoint()
+	if err != nil {
+		return err
+	}
+	if checkpointBlock != nil && blockHeight < checkpointBlock.Height() {
+		str := fmt.Sprintf("block at height %d forks the main chain "+
+			"before the previous checkpoint at height %d",
+			blockHeight, checkpointBlock.Height())
+		return RuleError(str)
+	}
+
 	if !fastAdd {
 		// Reject version 1 blocks once a majority of the network has
 		// upgraded.
