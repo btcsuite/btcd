@@ -1014,14 +1014,14 @@ func payToPubKeyHashScript(pubKeyHash []byte) []byte {
 // script hash. It is expected that the input is a valid hash.
 func payToScriptHashScript(scriptHash []byte) []byte {
 	return NewScriptBuilder().AddOp(OP_HASH160).AddData(scriptHash).
-		AddOp(OP_EQUAL).Script() 
+		AddOp(OP_EQUAL).Script()
 }
 
 // payToPubkeyScript creates a new script to pay a transaction output to a
 // public key. It is expected that the input is a valid pubkey.
 func payToPubKeyScript(serializedPubKey []byte) []byte {
 	return NewScriptBuilder().AddData(serializedPubKey).
-		AddOp(OP_CHECKSIG).Script() 
+		AddOp(OP_CHECKSIG).Script()
 }
 
 // PayToAddrScript creates a new script to pay a transaction output to a the
@@ -1052,7 +1052,7 @@ func PayToAddrScript(addr btcutil.Address) ([]byte, error) {
 
 // ErrBadNumRequired is returned from MultiSigScript when nrequired is larger
 // than the number of provided public keys.
-var ErrBadNumRequired = errors.New("more signatures required than keys present") 
+var ErrBadNumRequired = errors.New("more signatures required than keys present")
 
 // MultiSigScript returns a valid script for a multisignature redemption where
 // nrequired of the keys in pubkeys are required to have signed the transaction
@@ -1064,7 +1064,7 @@ func MultiSigScript(pubkeys []*btcutil.AddressPubKey, nrequired int) ([]byte, er
 	}
 
 	builder := NewScriptBuilder().AddInt64(int64(nrequired))
-	for _, key := range  pubkeys {
+	for _, key := range pubkeys {
 		builder.AddData(key.ScriptAddress())
 	}
 	builder.AddInt64(int64(len(pubkeys)))
