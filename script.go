@@ -1050,6 +1050,29 @@ func PayToAddrScript(addr btcutil.Address) ([]byte, error) {
 	return nil, ErrUnsupportedAddress
 }
 
+// ErrBadNumRequired is returned from MultiSigScript when nrequired is larger
+// than the number of provided public keys.
+var ErrBadNumRequired = errors.New("more signatures required than keys present") 
+
+// MultiSigScript returns a valid script for a multisignature redemption where
+// nrequired of the keys in pubkeys are required to have signed the transaction
+// for success. An ErrBadNumRequired will be returned if nrequired is larger than
+// the number of keys provided.
+func MultiSigScript(pubkeys []*btcutil.AddressPubKey, nrequired int) ([]byte, error) {
+	if len(pubkeys) < nrequired {
+		return nil, ErrBadNumRequired
+	}
+
+	builder := NewScriptBuilder().AddInt64(int64(nrequired))
+	for _, key := range  pubkeys {
+		builder.AddData(key.ScriptAddress())
+	}
+	builder.AddInt64(int64(len(pubkeys)))
+	builder.AddOp(OP_CHECKMULTISIG)
+
+	return builder.Script(), nil
+}
+
 // SignatureScript creates an input signature script for tx to spend
 // BTC sent from a previous output to the owner of privkey.  tx must
 // include all transaction inputs and outputs, however txin scripts are

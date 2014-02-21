@@ -23,7 +23,8 @@ const (
 // does not ensure the script will execute correctly.
 //
 // For example, the following would build a 2-of-3 multisig script for usage in
-// a pay-to-script-hash:
+// a pay-to-script-hash (although in this situation MultiSigScript() would be a
+// better choice to generate the script):
 // 	builder := btcscript.NewScriptBuilder()
 // 	builder.AddOp(btcscript.OP_2).AddData(pubKey1).AddData(pubKey2)
 // 	builder.AddData(pubKey3).AddOp(btcscript.OP_3)
