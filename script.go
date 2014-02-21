@@ -204,9 +204,9 @@ func isSmallInt(op *opcode) bool {
 // isPubkey returns true if the script passed is a pubkey transaction, false
 // otherwise.
 func isPubkey(pops []parsedOpcode) bool {
+	// valid pubkeys are either 33 or 65 bytes
 	return len(pops) == 2 &&
-		pops[0].opcode.value > OP_FALSE &&
-		pops[0].opcode.value <= OP_DATA_75 &&
+		(len(pops[0].data) == 33 || len(pops[0].data) == 65) &&
 		pops[1].opcode.value == OP_CHECKSIG
 }
 
