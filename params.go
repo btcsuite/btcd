@@ -26,6 +26,11 @@ type Params struct {
 	// have represented in compact form.  See CompactToBig for more details
 	// on compact form.
 	PowLimitBits uint32
+
+	// SubsidyHalvingInterval is the interval of blocks at which the
+	// baseSubsidy is continually halved.  Mathematically this is:
+	// baseSubsidy / 2^(height/SubsidyHalvingInterval)
+	SubsidyHalvingInterval int64
 }
 
 // mainPowLimit is the highest proof of work value a bitcoin block can have for
@@ -35,10 +40,11 @@ var mainPowLimit = new(big.Int).Sub(new(big.Int).Lsh(bigOne, 224), bigOne)
 // mainNetParams contains parameters specific to the main network
 // (btcwire.MainNet).
 var mainNetParams = Params{
-	GenesisBlock: &btcwire.GenesisBlock,
-	GenesisHash:  &btcwire.GenesisHash,
-	PowLimit:     mainPowLimit,
-	PowLimitBits: BigToCompact(mainPowLimit),
+	GenesisBlock:           &btcwire.GenesisBlock,
+	GenesisHash:            &btcwire.GenesisHash,
+	PowLimit:               mainPowLimit,
+	PowLimitBits:           BigToCompact(mainPowLimit),
+	SubsidyHalvingInterval: 210000,
 }
 
 // regressionPowLimit is the highest proof of work value a bitcoin block can
@@ -48,10 +54,11 @@ var regressionPowLimit = new(big.Int).Sub(new(big.Int).Lsh(bigOne, 255), bigOne)
 // regressionParams contains parameters specific to the regression test network
 // (btcwire.TestNet).
 var regressionParams = Params{
-	GenesisBlock: &btcwire.TestNetGenesisBlock,
-	GenesisHash:  &btcwire.TestNetGenesisHash,
-	PowLimit:     regressionPowLimit,
-	PowLimitBits: BigToCompact(regressionPowLimit),
+	GenesisBlock:           &btcwire.TestNetGenesisBlock,
+	GenesisHash:            &btcwire.TestNetGenesisHash,
+	PowLimit:               regressionPowLimit,
+	PowLimitBits:           BigToCompact(regressionPowLimit),
+	SubsidyHalvingInterval: 150,
 }
 
 // testNetPowLimit is the highest proof of work value a bitcoin block can have
@@ -61,10 +68,11 @@ var testNetPowLimit = new(big.Int).Sub(new(big.Int).Lsh(bigOne, 224), bigOne)
 // testNet3Params contains parameters specific to the test network (version 3)
 // (btcwire.TestNet3).
 var testNet3Params = Params{
-	GenesisBlock: &btcwire.TestNet3GenesisBlock,
-	GenesisHash:  &btcwire.TestNet3GenesisHash,
-	PowLimit:     testNetPowLimit,
-	PowLimitBits: BigToCompact(testNetPowLimit),
+	GenesisBlock:           &btcwire.TestNet3GenesisBlock,
+	GenesisHash:            &btcwire.TestNet3GenesisHash,
+	PowLimit:               testNetPowLimit,
+	PowLimitBits:           BigToCompact(testNetPowLimit),
+	SubsidyHalvingInterval: 210000,
 }
 
 // chainParams returns chain parameters specific to the bitcoin network
