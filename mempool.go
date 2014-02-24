@@ -912,7 +912,7 @@ func (mp *txMemPool) maybeAcceptTransaction(tx *btcutil.Tx, isOrphan *bool, isNe
 	// Notify websocket clients about mempool transactions.
 	if mp.server.rpcServer != nil {
 		go func() {
-			mp.server.rpcServer.ntfnMgr.NotifyForTxOuts(tx, nil)
+			mp.server.rpcServer.ntfnMgr.NotifyForTx(tx, nil)
 
 			if isNew {
 				mp.server.rpcServer.ntfnMgr.NotifyForNewTx(tx)
