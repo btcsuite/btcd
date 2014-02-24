@@ -89,11 +89,13 @@ func (h *BlockHeader) Serialize(w io.Writer) error {
 func NewBlockHeader(prevHash *ShaHash, merkleRootHash *ShaHash, bits uint32,
 	nonce uint32) *BlockHeader {
 
+	// Limit the timestamp to one second precision since the protocol
+	// doesn't support better.
 	return &BlockHeader{
 		Version:    BlockVersion,
 		PrevBlock:  *prevHash,
 		MerkleRoot: *merkleRootHash,
-		Timestamp:  time.Now(),
+		Timestamp:  time.Unix(time.Now().Unix(), 0),
 		Bits:       bits,
 		Nonce:      nonce,
 	}

@@ -75,8 +75,10 @@ func (na *NetAddress) SetAddress(ip net.IP, port uint16) {
 // NewNetAddressIPPort returns a new NetAddress using the provided IP, port, and
 // supported services with defaults for the remaining fields.
 func NewNetAddressIPPort(ip net.IP, port uint16, services ServiceFlag) *NetAddress {
+	// Limit the timestamp to one second precision since the protocol
+	// doesn't support better.
 	na := NetAddress{
-		Timestamp: time.Now(),
+		Timestamp: time.Unix(time.Now().Unix(), 0),
 		Services:  services,
 		IP:        ip,
 		Port:      port,

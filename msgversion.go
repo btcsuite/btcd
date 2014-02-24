@@ -176,7 +176,7 @@ func (msg *MsgVersion) MaxPayloadLength(pver uint32) uint32 {
 func NewMsgVersion(me *NetAddress, you *NetAddress, nonce uint64,
 	userAgent string, lastBlock int32) *MsgVersion {
 
-	// Limit the Timestamp to millisecond precision since the protocol
+	// Limit the timestamp to one second precision since the protocol
 	// doesn't support better.
 	return &MsgVersion{
 		ProtocolVersion: int32(ProtocolVersion),
