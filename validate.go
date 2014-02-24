@@ -398,8 +398,19 @@ func CheckBlockSanity(block *btcutil.Block, powLimit *big.Int) error {
 		return err
 	}
 
-	// Ensure the block time is not more than 2 hours in the future.
+	// A block timestamp must not have a greater precision than one second.
+	// This check is necessary because Go time.Time values support
+	// nanosecond precision whereas the consensus rules only apply to
+	// seconds and it's much nicer to deal with standard Go time values
+	// instead of converting to seconds everywhere.
 	header := &block.MsgBlock().Header
+	if !header.Timestamp.Equal(time.Unix(header.Timestamp.Unix(), 0)) {
+		str := fmt.Sprintf("block timestamp of %v has a higher "+
+			"precision than one second", header.Timestamp)
+		return RuleError(str)
+	}
+
+	// Ensure the block time is not more than 2 hours in the future.
 	if header.Timestamp.After(time.Now().Add(time.Hour * 2)) {
 		str := fmt.Sprintf("block timestamp of %v is too far in the "+
 			"future", header.Timestamp)
