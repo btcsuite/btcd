@@ -11,12 +11,18 @@ import (
 	"io"
 )
 
-// TxVersion is the current latest supported transaction version.
-const TxVersion = 1
+const (
+	// TxVersion is the current latest supported transaction version.
+	TxVersion = 1
 
-// MaxTxInSequenceNum is the maximum sequence number the sequence field
-// of a transaction input can be.
-const MaxTxInSequenceNum uint32 = 0xffffffff
+	// MaxTxInSequenceNum is the maximum sequence number the sequence field
+	// of a transaction input can be.
+	MaxTxInSequenceNum uint32 = 0xffffffff
+
+	// MaxPrevOutIndex is the maximum index the index field of a previous
+	// outpoint can be.
+	MaxPrevOutIndex uint32 = 0xffffffff
+)
 
 // defaultTxInOutAlloc is the default size used for the backing array for
 // transaction inputs and outputs.  The array will dynamically grow as needed,
