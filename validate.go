@@ -152,19 +152,20 @@ func isBIP0030Node(node *blockNode) bool {
 	return false
 }
 
-// calcBlockSubsidy returns the subsidy amount a block at the provided height
+// CalcBlockSubsidy returns the subsidy amount a block at the provided height
 // should have. This is mainly used for determining how much the coinbase for
 // newly generated blocks awards as well as validating the coinbase for blocks
 // has the expected value.
 //
 // The subsidy is halved every SubsidyHalvingInterval blocks.  Mathematically
-// this is: baseSubsidy / 2^(height/SubsidyHalvingInterval)
+// this is: baseSubsidy / 2^(height/subsidyHalvingInterval)
 //
-// At the target block generation rate this is approximately every 4
-// years.
-func (b *BlockChain) calcBlockSubsidy(height int64) int64 {
+// At the target block generation rate for the main network, this is
+// approximately every 4 years.
+func CalcBlockSubsidy(height int64, btcnet btcwire.BitcoinNet) int64 {
 	// Equivalent to: baseSubsidy / 2^(height/subsidyHalvingInterval)
-	return baseSubsidy >> uint(height/b.chainParams().SubsidyHalvingInterval)
+	return baseSubsidy >>
+		uint(height/ChainParams(btcnet).SubsidyHalvingInterval)
 }
 
 // CheckTransactionSanity performs some preliminary checks on a transaction to
@@ -830,7 +831,7 @@ func (b *BlockChain) checkConnectBlock(node *blockNode, block *btcutil.Block) er
 	for _, txOut := range transactions[0].MsgTx().TxOut {
 		totalSatoshiOut += txOut.Value
 	}
-	expectedSatoshiOut := b.calcBlockSubsidy(node.height) + totalFees
+	expectedSatoshiOut := CalcBlockSubsidy(node.height, b.btcnet) + totalFees
 	if totalSatoshiOut > expectedSatoshiOut {
 		str := fmt.Sprintf("coinbase transaction for block pays %v "+
 			"which is more than expected value of %v",
