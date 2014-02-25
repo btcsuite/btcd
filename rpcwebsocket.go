@@ -692,11 +692,17 @@ func createMarshalledReply(id, result interface{}, replyErr error) ([]byte, erro
 // ensure sending notifications from other subsystems can't block.  Ultimately,
 // all messages are sent via the outHandler.
 type wsClient struct {
+	sync.Mutex
+
 	// server is the RPC server that is servicing the client.
 	server *rpcServer
 
 	// conn is the underlying websocket connection.
 	conn *websocket.Conn
+
+	// disconnected indicated whether or not the websocket client is
+	// disconnected.
+	disconnected bool
 
 	// addr is the remote address of the client.
 	addr string
@@ -1096,14 +1102,12 @@ cleanup:
 // the number of outstanding requests a client can make without preventing or
 // blocking on async notifications.
 func (c *wsClient) SendMessage(marshalledJSON []byte, doneChan chan bool) {
-	// Don't queue the message if in the process of shutting down.
-	select {
-	case <-c.quit:
+	// Don't send the message if disconnected.
+	if c.Disconnected() {
 		if doneChan != nil {
 			doneChan <- false
 		}
 		return
-	default:
 	}
 
 	c.sendChan <- wsResponse{msg: marshalledJSON, doneChan: doneChan}
@@ -1123,29 +1127,37 @@ var ErrClientQuit = errors.New("client quit")
 // ErrClientQuit.  This is intended to be checked by long-running notification
 // handlers to stop processing if there is no more work needed to be done.
 func (c *wsClient) QueueNotification(marshalledJSON []byte) error {
-	// Don't queue the message if in the process of shutting down.
-	select {
-	case <-c.quit:
+	// Don't queue the message if disconnected.
+	if c.Disconnected() {
 		return ErrClientQuit
-	default:
 	}
 
 	c.ntfnChan <- marshalledJSON
 	return nil
 }
 
+// Disconnected returns whether or not the websocket client is disconnected.
+func (c *wsClient) Disconnected() bool {
+	c.Lock()
+	defer c.Unlock()
+
+	return c.disconnected
+}
+
 // Disconnect disconnects the websocket client.
 func (c *wsClient) Disconnect() {
-	// Don't try to disconnect again if in the process of shutting down.
-	select {
-	case <-c.quit:
+	c.Lock()
+	defer c.Unlock()
+
+	// Nothing to do if already disconnected.
+	if c.disconnected {
 		return
-	default:
 	}
 
 	rpcsLog.Tracef("Disconnecting websocket client %s", c.addr)
 	close(c.quit)
 	c.conn.Close()
+	c.disconnected = true
 }
 
 // Start begins processing input and output messages.
