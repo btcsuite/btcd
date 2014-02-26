@@ -26,7 +26,15 @@ var (
 // checkBitcoinNet returns an error if the bitcoin network is not supported.
 func checkBitcoinNet(net btcwire.BitcoinNet) error {
 	// Check for a valid bitcoin network.
-	if !(net == btcwire.MainNet || net == btcwire.TestNet3) {
+	switch net {
+	case btcwire.MainNet:
+		fallthrough
+	case btcwire.TestNet:
+		fallthrough
+	case btcwire.TestNet3:
+		return nil
+
+	default:
 		return ErrUnknownNet
 	}
 
@@ -66,6 +74,10 @@ type Address interface {
 	// ScriptAddress returns the raw bytes of the address to be used
 	// when inserting the address into a txout's script.
 	ScriptAddress() []byte
+
+	// IsForNet returns whether or not the address is associated with the
+	// passed bitcoin network.
+	IsForNet(btcwire.BitcoinNet) bool
 }
 
 // DecodeAddr decodes the string encoding of an address and returns
@@ -127,8 +139,8 @@ func DecodeAddr(addr string) (Address, error) {
 // AddressPubKeyHash is an Address for a pay-to-pubkey-hash (P2PKH)
 // transaction.
 type AddressPubKeyHash struct {
-	hash [ripemd160.Size]byte
-	net  btcwire.BitcoinNet
+	hash  [ripemd160.Size]byte
+	netID byte
 }
 
 // NewAddressPubKeyHash returns a new AddressPubKeyHash.  pkHash must
@@ -144,7 +156,20 @@ func NewAddressPubKeyHash(pkHash []byte, net btcwire.BitcoinNet) (*AddressPubKey
 		return nil, err
 	}
 
-	addr := &AddressPubKeyHash{net: net}
+	// Choose the appropriate network ID for the address based on the
+	// network.
+	var netID byte
+	switch net {
+	case btcwire.MainNet:
+		netID = MainNetAddr
+
+	case btcwire.TestNet:
+		fallthrough
+	case btcwire.TestNet3:
+		netID = TestNetAddr
+	}
+
+	addr := &AddressPubKeyHash{netID: netID}
 	copy(addr.hash[:], pkHash)
 	return addr, nil
 }
@@ -152,15 +177,7 @@ func NewAddressPubKeyHash(pkHash []byte, net btcwire.BitcoinNet) (*AddressPubKey
 // EncodeAddress returns the string encoding of a pay-to-pubkey-hash
 // address.  Part of the Address interface.
 func (a *AddressPubKeyHash) EncodeAddress() string {
-	var netID byte
-	switch a.net {
-	case btcwire.MainNet:
-		netID = MainNetAddr
-	case btcwire.TestNet3:
-		netID = TestNetAddr
-	}
-
-	return encodeAddress(a.hash[:], netID)
+	return encodeAddress(a.hash[:], a.netID)
 }
 
 // ScriptAddress returns the bytes to be included in a txout script to pay
@@ -169,10 +186,20 @@ func (a *AddressPubKeyHash) ScriptAddress() []byte {
 	return a.hash[:]
 }
 
-// Net returns the bitcoin network associated with the pay-to-pubkey-hash
-// address.
-func (a *AddressPubKeyHash) Net() btcwire.BitcoinNet {
-	return a.net
+// IsForNet returns whether or not the pay-to-pubkey-hash address is associated
+// with the passed bitcoin network.
+func (a *AddressPubKeyHash) IsForNet(net btcwire.BitcoinNet) bool {
+	switch net {
+	case btcwire.MainNet:
+		return a.netID == MainNetAddr
+
+	case btcwire.TestNet:
+		fallthrough
+	case btcwire.TestNet3:
+		return a.netID == TestNetAddr
+	}
+
+	return false
 }
 
 // String returns a human-readable string for the pay-to-pubkey-hash address.
@@ -185,8 +212,8 @@ func (a *AddressPubKeyHash) String() string {
 // AddressScriptHash is an Address for a pay-to-script-hash (P2SH)
 // transaction.
 type AddressScriptHash struct {
-	hash [ripemd160.Size]byte
-	net  btcwire.BitcoinNet
+	hash  [ripemd160.Size]byte
+	netID byte
 }
 
 // NewAddressScriptHash returns a new AddressScriptHash.  net must be
@@ -211,7 +238,20 @@ func NewAddressScriptHashFromHash(scriptHash []byte, net btcwire.BitcoinNet) (*A
 		return nil, err
 	}
 
-	addr := &AddressScriptHash{net: net}
+	// Choose the appropriate network ID for the address based on the
+	// network.
+	var netID byte
+	switch net {
+	case btcwire.MainNet:
+		netID = MainNetScriptHash
+
+	case btcwire.TestNet:
+		fallthrough
+	case btcwire.TestNet3:
+		netID = TestNetScriptHash
+	}
+
+	addr := &AddressScriptHash{netID: netID}
 	copy(addr.hash[:], scriptHash)
 	return addr, nil
 }
@@ -219,15 +259,7 @@ func NewAddressScriptHashFromHash(scriptHash []byte, net btcwire.BitcoinNet) (*A
 // EncodeAddress returns the string encoding of a pay-to-script-hash
 // address.  Part of the Address interface.
 func (a *AddressScriptHash) EncodeAddress() string {
-	var netID byte
-	switch a.net {
-	case btcwire.MainNet:
-		netID = MainNetScriptHash
-	case btcwire.TestNet3:
-		netID = TestNetScriptHash
-	}
-
-	return encodeAddress(a.hash[:], netID)
+	return encodeAddress(a.hash[:], a.netID)
 }
 
 // ScriptAddress returns the bytes to be included in a txout script to pay
@@ -236,10 +268,19 @@ func (a *AddressScriptHash) ScriptAddress() []byte {
 	return a.hash[:]
 }
 
-// Net returns the bitcoin network associated with the pay-to-script-hash
-// address.
-func (a *AddressScriptHash) Net() btcwire.BitcoinNet {
-	return a.net
+// IsForNet returns whether or not the pay-to-script-hash address is associated
+// with the passed bitcoin network.
+func (a *AddressScriptHash) IsForNet(net btcwire.BitcoinNet) bool {
+	switch net {
+	case btcwire.MainNet:
+		return a.netID == MainNetScriptHash
+	case btcwire.TestNet:
+		fallthrough
+	case btcwire.TestNet3:
+		return a.netID == TestNetScriptHash
+	}
+
+	return false
 }
 
 // String returns a human-readable string for the pay-to-script-hash address.
@@ -270,7 +311,7 @@ const (
 type AddressPubKey struct {
 	pubKeyFormat PubKeyFormat
 	pubKey       *btcec.PublicKey
-	net          btcwire.BitcoinNet
+	netID        byte
 }
 
 // NewAddressPubKey returns a new AddressPubKey which represents a pay-to-pubkey
@@ -300,9 +341,30 @@ func NewAddressPubKey(serializedPubKey []byte, net btcwire.BitcoinNet) (*Address
 		pkFormat = PKFHybrid
 	}
 
+	// Check for a valid bitcoin network.
+	if err := checkBitcoinNet(net); err != nil {
+		return nil, err
+	}
+
+	// Choose the appropriate network ID for the address based on the
+	// network.
+	var netID byte
+	switch net {
+	case btcwire.MainNet:
+		netID = MainNetAddr
+
+	case btcwire.TestNet:
+		fallthrough
+	case btcwire.TestNet3:
+		netID = TestNetAddr
+	}
+
 	ecPubKey := (*btcec.PublicKey)(pubKey)
-	addr := &AddressPubKey{pubKeyFormat: pkFormat, pubKey: ecPubKey, net: net}
-	return addr, nil
+	return &AddressPubKey{
+		pubKeyFormat: pkFormat,
+		pubKey:       ecPubKey,
+		netID:        netID,
+	}, nil
 }
 
 // serialize returns the serialization of the public key according to the
@@ -334,15 +396,7 @@ func (a *AddressPubKey) serialize() []byte {
 //
 // Part of the Address interface.
 func (a *AddressPubKey) EncodeAddress() string {
-	var netID byte
-	switch a.net {
-	case btcwire.MainNet:
-		netID = MainNetAddr
-	case btcwire.TestNet3:
-		netID = TestNetAddr
-	}
-
-	return encodeAddress(Hash160(a.serialize()), netID)
+	return encodeAddress(Hash160(a.serialize()), a.netID)
 }
 
 // ScriptAddress returns the bytes to be included in a txout script to pay
@@ -352,9 +406,20 @@ func (a *AddressPubKey) ScriptAddress() []byte {
 	return a.serialize()
 }
 
-// Net returns the bitcoin network associated with the pay-to-pubkey address.
-func (a *AddressPubKey) Net() btcwire.BitcoinNet {
-	return a.net
+// IsForNet returns whether or not the pay-to-pubkey address is associated
+// with the passed bitcoin network.
+func (a *AddressPubKey) IsForNet(net btcwire.BitcoinNet) bool {
+	switch net {
+	case btcwire.MainNet:
+		return a.netID == MainNetAddr
+
+	case btcwire.TestNet:
+		fallthrough
+	case btcwire.TestNet3:
+		return a.netID == TestNetAddr
+	}
+
+	return false
 }
 
 // String returns the hex-encoded human-readable string for the pay-to-pubkey
@@ -382,8 +447,8 @@ func (a *AddressPubKey) SetFormat(pkFormat PubKeyFormat) {
 // differs with the format.  At the time of this writing, most Bitcoin addresses
 // are pay-to-pubkey-hash constructed from the uncompressed public key.
 func (a *AddressPubKey) AddressPubKeyHash() *AddressPubKeyHash {
-	// All potential error conditions are already checked, so it's safe to
-	// ignore the error here.
-	addr, _ := NewAddressPubKeyHash(Hash160(a.serialize()), a.net)
+	addr := &AddressPubKeyHash{netID: a.netID}
+	copy(addr.hash[:], Hash160(a.serialize()))
 	return addr
+
 }

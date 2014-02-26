@@ -14,7 +14,6 @@ package btcutil
 import (
 	"code.google.com/p/go.crypto/ripemd160"
 	"github.com/conformal/btcec"
-	"github.com/conformal/btcwire"
 )
 
 // SetBlockBytes sets the internal serialized block byte buffer to the passed
@@ -31,37 +30,37 @@ func TstAppDataDir(goos, appName string, roaming bool) string {
 }
 
 // TstAddressPubKeyHash makes an AddressPubKeyHash, setting the
-// unexported fields with the parameters hash and net.
+// unexported fields with the parameters hash and netID.
 func TstAddressPubKeyHash(hash [ripemd160.Size]byte,
-	net btcwire.BitcoinNet) *AddressPubKeyHash {
+	netID byte) *AddressPubKeyHash {
 
 	return &AddressPubKeyHash{
-		hash: hash,
-		net:  net,
+		hash:  hash,
+		netID: netID,
 	}
 }
 
 // TstAddressScriptHash makes an AddressScriptHash, setting the
-// unexported fields with the parameters hash and net.
+// unexported fields with the parameters hash and netID.
 func TstAddressScriptHash(hash [ripemd160.Size]byte,
-	net btcwire.BitcoinNet) *AddressScriptHash {
+	netID byte) *AddressScriptHash {
 
 	return &AddressScriptHash{
-		hash: hash,
-		net:  net,
+		hash:  hash,
+		netID: netID,
 	}
 }
 
 // TstAddressPubKey makes an AddressPubKey, setting the unexported fields with
 // the parameters.
 func TstAddressPubKey(serializedPubKey []byte, pubKeyFormat PubKeyFormat,
-	net btcwire.BitcoinNet) *AddressPubKey {
+	netID byte) *AddressPubKey {
 
 	pubKey, _ := btcec.ParsePubKey(serializedPubKey, btcec.S256())
 	return &AddressPubKey{
 		pubKeyFormat: pubKeyFormat,
 		pubKey:       (*btcec.PublicKey)(pubKey),
-		net:          net,
+		netID:        netID,
 	}
 }
 
