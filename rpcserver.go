@@ -539,16 +539,13 @@ func handleCreateRawTransaction(s *rpcServer, cmd btcjson.Cmd) (interface{}, err
 		// Ensure the address is one of the supported types and that
 		// the network encoded with the address matches the network the
 		// server is currently on.
-		net := s.server.btcnet
-		switch addr := addr.(type) {
+		switch addr.(type) {
 		case *btcutil.AddressPubKeyHash:
-			net = addr.Net()
 		case *btcutil.AddressScriptHash:
-			net = addr.Net()
 		default:
 			return nil, btcjson.ErrInvalidAddressOrKey
 		}
-		if net != s.server.btcnet {
+		if !addr.IsForNet(s.server.btcnet) {
 			return nil, btcjson.Error{
 				Code: btcjson.ErrInvalidAddressOrKey.Code,
 				Message: fmt.Sprintf("%s: %q",
