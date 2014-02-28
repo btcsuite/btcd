@@ -293,11 +293,11 @@ func checkProofOfWork(block *btcutil.Block, powLimit *big.Int) error {
 	return nil
 }
 
-// countSigOps returns the number of signature operations for all transaction
+// CountSigOps returns the number of signature operations for all transaction
 // input and output scripts in the provided transaction.  This uses the
 // quicker, but imprecise, signature operation counting mechanism from
 // btcscript.
-func countSigOps(tx *btcutil.Tx) int {
+func CountSigOps(tx *btcutil.Tx) int {
 	msgTx := tx.MsgTx()
 
 	// Accumulate the number of signature operations in all transaction
@@ -483,7 +483,7 @@ func CheckBlockSanity(block *btcutil.Block, powLimit *big.Int) error {
 		// We could potentially overflow the accumulator so check for
 		// overflow.
 		lastSigOps := totalSigOps
-		totalSigOps += countSigOps(tx)
+		totalSigOps += CountSigOps(tx)
 		if totalSigOps < lastSigOps || totalSigOps > maxSigOpsPerBlock {
 			str := fmt.Sprintf("block contains too many signature "+
 				"operations - got %v, max %v", totalSigOps,
@@ -770,7 +770,7 @@ func (b *BlockChain) checkConnectBlock(node *blockNode, block *btcutil.Block) er
 	transactions := block.Transactions()
 	totalSigOps := 0
 	for i, tx := range transactions {
-		numsigOps := countSigOps(tx)
+		numsigOps := CountSigOps(tx)
 		if enforceBIP0016 {
 			// Since the first (and only the first) transaction has
 			// already been verified to be a coinbase transaction,
