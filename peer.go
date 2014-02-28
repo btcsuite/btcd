@@ -303,7 +303,8 @@ func (p *peer) handleVersionMsg(msg *btcwire.MsgVersion) {
 		// Send version.
 		err = p.pushVersionMsg()
 		if err != nil {
-			p.logError("Can't send version message: %v", err)
+			p.logError("Can't send version message to %s: %v",
+				p.addr, err)
 			p.Disconnect()
 			return
 		}
@@ -827,7 +828,7 @@ func (p *peer) handleGetAddrMsg(msg *btcwire.MsgGetAddr) {
 	// Push the addresses.
 	err := p.pushAddrMsg(addrCache)
 	if err != nil {
-		p.logError("Can't push address message: %v", err)
+		p.logError("Can't push address message to %s: %v", p.addr, err)
 		p.Disconnect()
 		return
 	}
@@ -1028,7 +1029,7 @@ func (p *peer) writeMessage(msg btcwire.Message) {
 	p.server.AddBytesSent(uint64(n))
 	if err != nil {
 		p.Disconnect()
-		p.logError("Can't send message: %v", err)
+		p.logError("Can't send message to %s: %v", p.addr, err)
 		return
 	}
 }
