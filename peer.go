@@ -1086,7 +1086,7 @@ out:
 			// allowed errors.
 			if cfg.RegressionTest && p.isAllowedByRegression(err) {
 				peerLog.Errorf("Allowed regression test "+
-					"error from %s: %v", err, p.addr)
+					"error from %s: %v", p.addr, err)
 				idleTimer.Reset(idleTimeoutMinutes * time.Minute)
 				continue
 			}
