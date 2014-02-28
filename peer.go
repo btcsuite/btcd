@@ -1086,14 +1086,15 @@ out:
 			// allowed errors.
 			if cfg.RegressionTest && p.isAllowedByRegression(err) {
 				peerLog.Errorf("Allowed regression test "+
-					"error: %v", err)
+					"error from %s: %v", err, p.addr)
 				idleTimer.Reset(idleTimeoutMinutes * time.Minute)
 				continue
 			}
 
 			// Only log the error if we're not forcibly disconnecting.
 			if atomic.LoadInt32(&p.disconnect) == 0 {
-				p.logError("Can't read message: %v", err)
+				p.logError("Can't read message from %s: %v",
+					p.addr, err)
 			}
 			break out
 		}
