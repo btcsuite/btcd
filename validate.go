@@ -17,9 +17,9 @@ import (
 )
 
 const (
-	// maxSigOpsPerBlock is the maximum number of signature operations
+	// MaxSigOpsPerBlock is the maximum number of signature operations
 	// allowed for a block.  It is a fraction of the max block payload size.
-	maxSigOpsPerBlock = btcwire.MaxBlockPayload / 50
+	MaxSigOpsPerBlock = btcwire.MaxBlockPayload / 50
 
 	// lockTimeThreshold is the number below which a lock time is
 	// interpreted to be a block number.  Since an average of one block
@@ -484,10 +484,10 @@ func CheckBlockSanity(block *btcutil.Block, powLimit *big.Int) error {
 		// overflow.
 		lastSigOps := totalSigOps
 		totalSigOps += CountSigOps(tx)
-		if totalSigOps < lastSigOps || totalSigOps > maxSigOpsPerBlock {
+		if totalSigOps < lastSigOps || totalSigOps > MaxSigOpsPerBlock {
 			str := fmt.Sprintf("block contains too many signature "+
 				"operations - got %v, max %v", totalSigOps,
-				maxSigOpsPerBlock)
+				MaxSigOpsPerBlock)
 			return RuleError(str)
 		}
 	}
@@ -790,10 +790,10 @@ func (b *BlockChain) checkConnectBlock(node *blockNode, block *btcutil.Block) er
 		// this on every loop iteration to avoid overflow.
 		lastSigops := totalSigOps
 		totalSigOps += numsigOps
-		if totalSigOps < lastSigops || totalSigOps > maxSigOpsPerBlock {
+		if totalSigOps < lastSigops || totalSigOps > MaxSigOpsPerBlock {
 			str := fmt.Sprintf("block contains too many "+
 				"signature operations - got %v, max %v",
-				totalSigOps, maxSigOpsPerBlock)
+				totalSigOps, MaxSigOpsPerBlock)
 			return RuleError(str)
 		}
 	}
