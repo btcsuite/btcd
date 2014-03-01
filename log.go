@@ -37,6 +37,7 @@ var (
 	btcdLog    = btclog.Disabled
 	chanLog    = btclog.Disabled
 	discLog    = btclog.Disabled
+	minrLog    = btclog.Disabled
 	peerLog    = btclog.Disabled
 	rpcsLog    = btclog.Disabled
 	scrpLog    = btclog.Disabled
@@ -52,6 +53,7 @@ var subsystemLoggers = map[string]btclog.Logger{
 	"BTCD": btcdLog,
 	"CHAN": chanLog,
 	"DISC": discLog,
+	"MINR": minrLog,
 	"PEER": peerLog,
 	"RPCS": rpcsLog,
 	"SCRP": scrpLog,
@@ -103,6 +105,9 @@ func useLogger(subsystemID string, logger btclog.Logger) {
 
 	case "DISC":
 		discLog = logger
+
+	case "MINR":
+		minrLog = logger
 
 	case "PEER":
 		peerLog = logger
