@@ -31,30 +31,30 @@ const (
 // function.
 var (
 	backendLog = seelog.Disabled
-	btcdLog    = btclog.Disabled
-	bcdbLog    = btclog.Disabled
-	chanLog    = btclog.Disabled
-	scrpLog    = btclog.Disabled
 	amgrLog    = btclog.Disabled
+	bcdbLog    = btclog.Disabled
 	bmgrLog    = btclog.Disabled
+	btcdLog    = btclog.Disabled
+	chanLog    = btclog.Disabled
 	discLog    = btclog.Disabled
 	peerLog    = btclog.Disabled
 	rpcsLog    = btclog.Disabled
+	scrpLog    = btclog.Disabled
 	srvrLog    = btclog.Disabled
 	txmpLog    = btclog.Disabled
 )
 
 // subsystemLoggers maps each subsystem identifier to its associated logger.
 var subsystemLoggers = map[string]btclog.Logger{
-	"BTCD": btcdLog,
-	"BCDB": bcdbLog,
-	"CHAN": chanLog,
-	"SCRP": scrpLog,
 	"AMGR": amgrLog,
+	"BCDB": bcdbLog,
 	"BMGR": bmgrLog,
+	"BTCD": btcdLog,
+	"CHAN": chanLog,
 	"DISC": discLog,
 	"PEER": peerLog,
 	"RPCS": rpcsLog,
+	"SCRP": scrpLog,
 	"SRVR": srvrLog,
 	"TXMP": txmpLog,
 }
@@ -84,26 +84,22 @@ func useLogger(subsystemID string, logger btclog.Logger) {
 	subsystemLoggers[subsystemID] = logger
 
 	switch subsystemID {
-	case "BTCD":
-		btcdLog = logger
+	case "AMGR":
+		amgrLog = logger
 
 	case "BCDB":
 		bcdbLog = logger
 		btcdb.UseLogger(logger)
 
+	case "BMGR":
+		bmgrLog = logger
+
+	case "BTCD":
+		btcdLog = logger
+
 	case "CHAN":
 		chanLog = logger
 		btcchain.UseLogger(logger)
-
-	case "SCRP":
-		scrpLog = logger
-		btcscript.UseLogger(logger)
-
-	case "AMGR":
-		amgrLog = logger
-
-	case "BMGR":
-		bmgrLog = logger
 
 	case "DISC":
 		discLog = logger
@@ -113,6 +109,10 @@ func useLogger(subsystemID string, logger btclog.Logger) {
 
 	case "RPCS":
 		rpcsLog = logger
+
+	case "SCRP":
+		scrpLog = logger
+		btcscript.UseLogger(logger)
 
 	case "SRVR":
 		srvrLog = logger
