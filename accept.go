@@ -39,7 +39,8 @@ func (b *BlockChain) maybeAcceptBlock(block *btcutil.Block, fastAdd bool) error 
 		// Ensure the difficulty specified in the block header matches
 		// the calculated difficulty based on the previous block and
 		// difficulty retarget rules.
-		expectedDifficulty, err := b.calcNextRequiredDifficulty(prevNode, block)
+		expectedDifficulty, err := b.calcNextRequiredDifficulty(prevNode,
+			block.MsgBlock().Header.Timestamp)
 		if err != nil {
 			return err
 		}

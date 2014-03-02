@@ -6,7 +6,6 @@ package btcchain
 
 import (
 	"fmt"
-	"github.com/conformal/btcutil"
 	"github.com/conformal/btcwire"
 	"math/big"
 	"time"
@@ -260,7 +259,10 @@ func (b *BlockChain) findPrevTestNetDifficulty(startNode *blockNode) (uint32, er
 
 // calcNextRequiredDifficulty calculates the required difficulty for the block
 // after the passed previous block node based on the difficulty retarget rules.
-func (b *BlockChain) calcNextRequiredDifficulty(lastNode *blockNode, block *btcutil.Block) (uint32, error) {
+// This function differs from the exported CalcNextRequiredDifficulty in that
+// the exported version uses the current best chain as the previous block node
+// while this function accepts any block node.
+func (b *BlockChain) calcNextRequiredDifficulty(lastNode *blockNode, newBlockTime time.Time) (uint32, error) {
 	// Choose the correct proof of work limit for the active network.
 	powLimit := b.chainParams().PowLimit
 	powLimitBits := b.chainParams().PowLimitBits
@@ -284,7 +286,6 @@ func (b *BlockChain) calcNextRequiredDifficulty(lastNode *blockNode, block *btcu
 			// Return minimum difficulty when more than twice the
 			// desired amount of time needed to generate a block has
 			// elapsed.
-			newBlockTime := block.MsgBlock().Header.Timestamp
 			allowMinTime := lastNode.timestamp.Add(targetSpacing * 2)
 			if newBlockTime.After(allowMinTime) {
 				return powLimitBits, nil
@@ -366,4 +367,13 @@ func (b *BlockChain) calcNextRequiredDifficulty(lastNode *blockNode, block *btcu
 		targetTimespan)
 
 	return newTargetBits, nil
+}
+
+// CalcNextRequiredDifficulty calculates the required difficulty for the block
+// after the end of the current best chain based on the difficulty retarget
+// rules.
+//
+// This function is NOT safe for concurrent access.
+func (b *BlockChain) CalcNextRequiredDifficulty(timestamp time.Time) (uint32, error) {
+	return b.calcNextRequiredDifficulty(b.bestChain, timestamp)
 }
