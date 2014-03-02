@@ -929,7 +929,7 @@ func (p *peer) handlePingMsg(msg *btcwire.MsgPing) {
 	}
 }
 
-// handlePongMsg is invoked when a peer recieved a pong bitcoin message.
+// handlePongMsg is invoked when a peer received a pong bitcoin message.
 // recent clients (protocol version > BIP0031Version), and if we had send a ping
 // previosuly we update our ping time statistics. If the client is too old or
 // we had not send a ping we ignore it.
@@ -1352,13 +1352,13 @@ out:
 		case msg := <-p.sendQueue:
 			// If the message is one we should get a reply for
 			// then reset the timer, we only want to send pings
-			// when otherwise we would not recieve a reply from
+			// when otherwise we would not receive a reply from
 			// the peer. We specifically do not count block or inv
 			// messages here since they are not sure of a reply if
 			// the inv is of no interest explicitly solicited invs
 			// should elicit a reply but we don't track them
 			// specially.
-			peerLog.Tracef("%s: recieved from queuehandler", p)
+			peerLog.Tracef("%s: received from queuehandler", p)
 			reset := true
 			switch m := msg.msg.(type) {
 			case *btcwire.MsgVersion:
