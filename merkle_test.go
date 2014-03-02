@@ -13,7 +13,7 @@ import (
 // TestMerkle tests the BuildMerkleTreeStore API.
 func TestMerkle(t *testing.T) {
 	block := btcutil.NewBlock(&Block100000)
-	merkles := btcchain.BuildMerkleTreeStore(block)
+	merkles := btcchain.BuildMerkleTreeStore(block.Transactions())
 	calculatedMerkleRoot := merkles[len(merkles)-1]
 	wantMerkle := &Block100000.Header.MerkleRoot
 	if !wantMerkle.IsEqual(calculatedMerkleRoot) {

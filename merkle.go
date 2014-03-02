@@ -40,11 +40,11 @@ func hashMerkleBranches(left *btcwire.ShaHash, right *btcwire.ShaHash) *btcwire.
 	return newSha
 }
 
-// BuildMerkleTreeStore creates a merkle tree from block, stores it using a
-// linear array, and returns a slice of the backing array.  A linear array was
-// chosen as opposed to an actual tree structure since it uses about half as
-// much memory.  The following describes a merkle tree and how it is stored in
-// a linear array.
+// BuildMerkleTreeStore creates a merkle tree from a slice of transactions,
+// stores it using a linear array, and returns a slice of the backing array.  A
+// linear array was chosen as opposed to an actual tree structure since it uses
+// about half as much memory.  The following describes a merkle tree and how it
+// is stored in a linear array.
 //
 // A merkle tree is a tree in which every non-leaf node is the hash of its
 // children nodes.  A diagram depicting how this works for bitcoin transactions
@@ -68,15 +68,15 @@ func hashMerkleBranches(left *btcwire.ShaHash, right *btcwire.ShaHash) *btcwire.
 // are calculated by concatenating the left node with itself before hashing.
 // Since this function uses nodes that are pointers to the hashes, empty nodes
 // will be nil.
-func BuildMerkleTreeStore(block *btcutil.Block) []*btcwire.ShaHash {
+func BuildMerkleTreeStore(transactions []*btcutil.Tx) []*btcwire.ShaHash {
 	// Calculate how many entries are required to hold the binary merkle
 	// tree as a linear array and create an array of that size.
-	nextPoT := nextPowerOfTwo(len(block.Transactions()))
+	nextPoT := nextPowerOfTwo(len(transactions))
 	arraySize := nextPoT*2 - 1
 	merkles := make([]*btcwire.ShaHash, arraySize)
 
 	// Create the base transaction shas and populate the array with them.
-	for i, tx := range block.Transactions() {
+	for i, tx := range transactions {
 		merkles[i] = tx.Sha()
 	}
 
