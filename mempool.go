@@ -71,11 +71,6 @@ const (
 	// base for calculating minimum required fees for larger transactions.
 	// This value is in Satoshi/KB (kilobyte, not kibibyte).
 	minTxRelayFee = 1000
-
-	// blockPrioritySize is the number of bytes reserved in a block for
-	// high-priority transactions.  It is mainly used to help determine the
-	// minimum required fee for a transaction.
-	blockPrioritySize = 50000
 )
 
 // TxDesc is a descriptor containing a transaction in the mempool and the
@@ -378,7 +373,7 @@ func calcMinRelayFee(tx *btcutil.Tx) int64 {
 	// transaction does not exceeed 1000 less than the reserved space for
 	// high-priority transactions, don't require a fee for it.
 	serializedLen := int64(tx.MsgTx().SerializeSize())
-	if serializedLen < (blockPrioritySize - 1000) {
+	if serializedLen < (defaultBlockPrioritySize - 1000) {
 		return 0
 	}
 

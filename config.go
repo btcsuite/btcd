@@ -25,19 +25,24 @@ import (
 )
 
 const (
-	defaultConfigFilename   = "btcd.conf"
-	defaultDataDirname      = "data"
-	defaultLogLevel         = "info"
-	defaultLogDirname       = "logs"
-	defaultLogFilename      = "btcd.log"
-	defaultBtcnet           = btcwire.MainNet
-	defaultMaxPeers         = 125
-	defaultBanDuration      = time.Hour * 24
-	defaultMaxRPCClients    = 10
-	defaultMaxRPCWebsockets = 25
-	defaultVerifyEnabled    = false
-	defaultDbType           = "leveldb"
-	defaultFreeTxRelayLimit = 15.0
+	defaultConfigFilename    = "btcd.conf"
+	defaultDataDirname       = "data"
+	defaultLogLevel          = "info"
+	defaultLogDirname        = "logs"
+	defaultLogFilename       = "btcd.log"
+	defaultBtcnet            = btcwire.MainNet
+	defaultMaxPeers          = 125
+	defaultBanDuration       = time.Hour * 24
+	defaultMaxRPCClients     = 10
+	defaultMaxRPCWebsockets  = 25
+	defaultVerifyEnabled     = false
+	defaultDbType            = "leveldb"
+	defaultFreeTxRelayLimit  = 15.0
+	defaultBlockMinSize      = 0
+	defaultBlockMaxSize      = 750000
+	blockMaxSizeMin          = 1000
+	blockMaxSizeMax          = btcwire.MaxBlockPayload - 1000
+	defaultBlockPrioritySize = 50000
 )
 
 var (
@@ -95,6 +100,9 @@ type config struct {
 	DebugLevel         string        `short:"d" long:"debuglevel" description:"Logging level for all subsystems {trace, debug, info, warn, error, critical} -- You may also specify <subsystem>=<level>,<subsystem2>=<level>,... to set the log level for individual subsystems -- Use show to list available subsystems"`
 	Upnp               bool          `long:"upnp" description:"Use UPnP to map our listening port outside of NAT"`
 	FreeTxRelayLimit   float64       `long:"limitfreerelay" description:"Limit relay of transactions with no transaction fee to the given amount in thousands of bytes per minute"`
+	BlockMinSize       uint32        `long:"blockminsize" description:"Mininum block size in bytes to be used when creating a block"`
+	BlockMaxSize       uint32        `long:"blockmaxsize" description:"Maximum block size in bytes to be used when creating a block"`
+	BlockPrioritySize  uint32        `long:"blockprioritysize" description:"Size in bytes for high-priority/low-fee transactions when creating a block"`
 	onionlookup        func(string) ([]net.IP, error)
 	lookup             func(string) ([]net.IP, error)
 	oniondial          func(string, string) (net.Conn, error)
@@ -284,18 +292,21 @@ func newConfigParser(cfg *config, so *serviceOptions, options flags.Options) *fl
 func loadConfig() (*config, []string, error) {
 	// Default config.
 	cfg := config{
-		ConfigFile:       defaultConfigFile,
-		DebugLevel:       defaultLogLevel,
-		MaxPeers:         defaultMaxPeers,
-		BanDuration:      defaultBanDuration,
-		RPCMaxClients:    defaultMaxRPCClients,
-		RPCMaxWebsockets: defaultMaxRPCWebsockets,
-		DataDir:          defaultDataDir,
-		LogDir:           defaultLogDir,
-		DbType:           defaultDbType,
-		RPCKey:           defaultRPCKeyFile,
-		RPCCert:          defaultRPCCertFile,
-		FreeTxRelayLimit: defaultFreeTxRelayLimit,
+		ConfigFile:        defaultConfigFile,
+		DebugLevel:        defaultLogLevel,
+		MaxPeers:          defaultMaxPeers,
+		BanDuration:       defaultBanDuration,
+		RPCMaxClients:     defaultMaxRPCClients,
+		RPCMaxWebsockets:  defaultMaxRPCWebsockets,
+		DataDir:           defaultDataDir,
+		LogDir:            defaultLogDir,
+		DbType:            defaultDbType,
+		RPCKey:            defaultRPCKeyFile,
+		RPCCert:           defaultRPCCertFile,
+		FreeTxRelayLimit:  defaultFreeTxRelayLimit,
+		BlockMinSize:      defaultBlockMinSize,
+		BlockMaxSize:      defaultBlockMaxSize,
+		BlockPrioritySize: defaultBlockPrioritySize,
 	}
 
 	// Service options which are only added on Windows.
@@ -492,6 +503,23 @@ func loadConfig() (*config, []string, error) {
 		}
 
 	}
+
+	// Limit the max block size to a sane value.
+	if cfg.BlockMaxSize < blockMaxSizeMin || cfg.BlockMaxSize >
+		blockMaxSizeMax {
+
+		str := "%s: The blockmaxsize option must be in between %d " +
+			"and %d -- parsed [%d]"
+		err := fmt.Errorf(str, "loadConfig", blockMaxSizeMin,
+			blockMaxSizeMax, cfg.BlockMaxSize)
+		fmt.Fprintln(os.Stderr, err)
+		parser.WriteHelp(os.Stderr)
+		return nil, nil, err
+	}
+
+	// Limit the block priority and minimum block sizes to max block size.
+	cfg.BlockPrioritySize = minUint32(cfg.BlockPrioritySize, cfg.BlockMaxSize)
+	cfg.BlockMinSize = minUint32(cfg.BlockMinSize, cfg.BlockMaxSize)
 
 	// Add default port to all listener addresses if needed and remove
 	// duplicate addresses.
