@@ -325,9 +325,9 @@ func writeVarInt(w io.Writer, pver uint32, val uint64) error {
 	return err
 }
 
-// varIntSerializeSize returns the number of bytes it would take to serialize
+// VarIntSerializeSize returns the number of bytes it would take to serialize
 // val as a variable length integer.
-func varIntSerializeSize(val uint64) int {
+func VarIntSerializeSize(val uint64) int {
 	// The value is small enough to be represented by itself, so it's
 	// just 1 byte.
 	if val < 0xfd {

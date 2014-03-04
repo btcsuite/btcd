@@ -352,9 +352,9 @@ func TestVarIntSerializeSize(t *testing.T) {
 
 	t.Logf("Running %d tests", len(tests))
 	for i, test := range tests {
-		serializedSize := btcwire.TstVarIntSerializeSize(test.val)
+		serializedSize := btcwire.VarIntSerializeSize(test.val)
 		if serializedSize != test.size {
-			t.Errorf("varIntSerializeSize #%d got: %d, want: %d", i,
+			t.Errorf("VarIntSerializeSize #%d got: %d, want: %d", i,
 				serializedSize, test.size)
 			continue
 		}

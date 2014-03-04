@@ -88,7 +88,7 @@ func (t *TxIn) SerializeSize() int {
 	// Outpoint Hash 32 bytes + Outpoint Index 4 bytes + Sequence 4 bytes +
 	// serialized varint size for the length of SignatureScript +
 	// SignatureScript bytes.
-	return 40 + varIntSerializeSize(uint64(len(t.SignatureScript))) +
+	return 40 + VarIntSerializeSize(uint64(len(t.SignatureScript))) +
 		len(t.SignatureScript)
 }
 
@@ -114,7 +114,7 @@ type TxOut struct {
 func (t *TxOut) SerializeSize() int {
 	// Value 8 bytes + serialized varint size for the length of PkScript +
 	// PkScript bytes.
-	return 8 + varIntSerializeSize(uint64(len(t.PkScript))) + len(t.PkScript)
+	return 8 + VarIntSerializeSize(uint64(len(t.PkScript))) + len(t.PkScript)
 }
 
 // NewTxOut returns a new bitcoin transaction output with the provided
@@ -388,8 +388,8 @@ func (msg *MsgTx) Serialize(w io.Writer) error {
 func (msg *MsgTx) SerializeSize() int {
 	// Version 4 bytes + LockTime 4 bytes + Serialized varint size for the
 	// number of transaction inputs and outputs.
-	n := 8 + varIntSerializeSize(uint64(len(msg.TxIn))) +
-		varIntSerializeSize(uint64(len(msg.TxOut)))
+	n := 8 + VarIntSerializeSize(uint64(len(msg.TxIn))) +
+		VarIntSerializeSize(uint64(len(msg.TxOut)))
 
 	for _, txIn := range msg.TxIn {
 		n += txIn.SerializeSize()
