@@ -70,7 +70,7 @@ const (
 	// used to help determine if a transaction is considered dust and as a
 	// base for calculating minimum required fees for larger transactions.
 	// This value is in Satoshi/KB (kilobyte, not kibibyte).
-	minTxRelayFee = 10000
+	minTxRelayFee = 1000
 
 	// blockPrioritySize is the number of bytes reserved in a block for
 	// high-priority transactions.  It is mainly used to help determine the
@@ -158,7 +158,7 @@ func isDust(txOut *btcwire.TxOut) bool {
 	//
 	// Using the typical values for a pay-to-pubkey-hash transaction from
 	// the breakdown above and the default minimum free transaction relay
-	// fee of 10000, this equates to values less than 5460 satoshi being
+	// fee of 1000, this equates to values less than 546 satoshi being
 	// considered dust.
 	//
 	// The following is equivalent to (value/totalSize) * (1/3) * 1000
