@@ -741,7 +741,10 @@ func (m *wsNotificationManager) AddClient(wsc *wsClient) {
 // RemoveClient removes the passed websocket client and all notifications
 // registered for it.
 func (m *wsNotificationManager) RemoveClient(wsc *wsClient) {
-	m.queueNotification <- (*notificationUnregisterClient)(wsc)
+	select {
+	case m.queueNotification <- (*notificationUnregisterClient)(wsc):
+	case <-m.quit:
+	}
 }
 
 // Start starts the goroutines required for the manager to queue and process
