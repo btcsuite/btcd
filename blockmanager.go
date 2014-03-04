@@ -995,12 +995,9 @@ func (b *blockManager) handleNotifyMsg(notification *btcchain.Notification) {
 			b.server.txMemPool.RemoveDoubleSpends(tx)
 		}
 
-		// Notify frontends
+		// Notify registered websocket clients
 		if r := b.server.rpcServer; r != nil {
-			go func() {
-				r.ntfnMgr.NotifyBlockTXs(block)
-				r.ntfnMgr.NotifyBlockConnected(block)
-			}()
+			r.ntfnMgr.NotifyBlockConnected(block)
 		}
 
 	// A block has been disconnected from the main block chain.
@@ -1023,9 +1020,9 @@ func (b *blockManager) handleNotifyMsg(notification *btcchain.Notification) {
 			}
 		}
 
-		// Notify frontends
+		// Notify registered websocket clients
 		if r := b.server.rpcServer; r != nil {
-			go r.ntfnMgr.NotifyBlockDisconnected(block)
+			r.ntfnMgr.NotifyBlockDisconnected(block)
 		}
 	}
 }

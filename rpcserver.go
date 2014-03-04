@@ -210,6 +210,8 @@ func (s *rpcServer) Start() {
 			s.wg.Done()
 		}(listener)
 	}
+
+	s.ntfnMgr.Start()
 }
 
 // limitConnections responds with a 503 service unavailable and returns true if
@@ -297,6 +299,7 @@ func (s *rpcServer) Stop() error {
 		}
 	}
 	s.ntfnMgr.Shutdown()
+	s.ntfnMgr.WaitForShutdown()
 	close(s.quit)
 	s.wg.Wait()
 	rpcsLog.Infof("RPC server shutdown complete")
