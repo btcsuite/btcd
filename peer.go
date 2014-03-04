@@ -259,8 +259,7 @@ func (p *peer) pushVersionMsg() error {
 func (p *peer) handleVersionMsg(msg *btcwire.MsgVersion) {
 	// Detect self connections.
 	if msg.Nonce == p.server.nonce {
-		peerLog.Debugf("Disconnecting peer connected to self %s",
-			p.addr)
+		peerLog.Debugf("Disconnecting peer connected to self %s", p)
 		p.Disconnect()
 		return
 	}
@@ -268,7 +267,7 @@ func (p *peer) handleVersionMsg(msg *btcwire.MsgVersion) {
 	// Limit to one version message per peer.
 	if p.versionKnown {
 		p.logError("Only one version message per peer is allowed %s.",
-			p.addr)
+			p)
 		p.Disconnect()
 		return
 	}
@@ -277,7 +276,7 @@ func (p *peer) handleVersionMsg(msg *btcwire.MsgVersion) {
 	p.protocolVersion = minUint32(p.protocolVersion, uint32(msg.ProtocolVersion))
 	p.versionKnown = true
 	peerLog.Debugf("Negotiated protocol version %d for peer %s",
-		p.protocolVersion, p.addr)
+		p.protocolVersion, p)
 	p.lastBlock = msg.LastBlock
 
 	// Set the supported services for the peer to what the remote peer
@@ -304,7 +303,7 @@ func (p *peer) handleVersionMsg(msg *btcwire.MsgVersion) {
 		err = p.pushVersionMsg()
 		if err != nil {
 			p.logError("Can't send version message to %s: %v",
-				p.addr, err)
+				p, err)
 			p.Disconnect()
 			return
 		}
@@ -828,7 +827,7 @@ func (p *peer) handleGetAddrMsg(msg *btcwire.MsgGetAddr) {
 	// Push the addresses.
 	err := p.pushAddrMsg(addrCache)
 	if err != nil {
-		p.logError("Can't push address message to %s: %v", p.addr, err)
+		p.logError("Can't push address message to %s: %v", p, err)
 		p.Disconnect()
 		return
 	}
@@ -886,7 +885,7 @@ func (p *peer) handleAddrMsg(msg *btcwire.MsgAddr) {
 	// A message that has no addresses is invalid.
 	if len(msg.AddrList) == 0 {
 		p.logError("Command [%s] from %s does not contain any addresses",
-			msg.Command(), p.addr)
+			msg.Command(), p)
 		p.Disconnect()
 		return
 	}
@@ -971,7 +970,7 @@ func (p *peer) readMessage() (btcwire.Message, []byte, error) {
 			summary = " (" + summary + ")"
 		}
 		return fmt.Sprintf("Received %v%s from %s",
-			msg.Command(), summary, p.addr)
+			msg.Command(), summary, p)
 	}))
 	peerLog.Tracef("%v", newLogClosure(func() string {
 		return spew.Sdump(msg)
@@ -1009,7 +1008,7 @@ func (p *peer) writeMessage(msg btcwire.Message) {
 			summary = " (" + summary + ")"
 		}
 		return fmt.Sprintf("Sending %v%s to %s", msg.Command(),
-			summary, p.addr)
+			summary, p)
 	}))
 	peerLog.Tracef("%v", newLogClosure(func() string {
 		return spew.Sdump(msg)
@@ -1029,7 +1028,7 @@ func (p *peer) writeMessage(msg btcwire.Message) {
 	p.server.AddBytesSent(uint64(n))
 	if err != nil {
 		p.Disconnect()
-		p.logError("Can't send message to %s: %v", p.addr, err)
+		p.logError("Can't send message to %s: %v", p, err)
 		return
 	}
 }
@@ -1087,7 +1086,7 @@ out:
 			// allowed errors.
 			if cfg.RegressionTest && p.isAllowedByRegression(err) {
 				peerLog.Errorf("Allowed regression test "+
-					"error from %s: %v", p.addr, err)
+					"error from %s: %v", p, err)
 				idleTimer.Reset(idleTimeoutMinutes * time.Minute)
 				continue
 			}
@@ -1095,7 +1094,7 @@ out:
 			// Only log the error if we're not forcibly disconnecting.
 			if atomic.LoadInt32(&p.disconnect) == 0 {
 				p.logError("Can't read message from %s: %v",
-					p.addr, err)
+					p, err)
 			}
 			break out
 		}
@@ -1198,7 +1197,7 @@ out:
 		p.server.blockManager.DonePeer(p)
 	}
 
-	peerLog.Tracef("Peer input handler done for %s", p.addr)
+	peerLog.Tracef("Peer input handler done for %s", p)
 }
 
 // queueHandler handles the queueing of outgoing data for the peer. This runs
@@ -1330,7 +1329,7 @@ cleanup:
 		}
 	}
 	p.queueWg.Done()
-	peerLog.Tracef("Peer queue handler done for %s", p.addr)
+	peerLog.Tracef("Peer queue handler done for %s", p)
 }
 
 // outHandler handles all outgoing messages for the peer.  It must be run as a
@@ -1424,7 +1423,7 @@ cleanup:
 			break cleanup
 		}
 	}
-	peerLog.Tracef("Peer output handler done for %s", p.addr)
+	peerLog.Tracef("Peer output handler done for %s", p)
 }
 
 // QueueMessage adds the passed bitcoin message to the peer send queue.  It
@@ -1480,7 +1479,7 @@ func (p *peer) Disconnect() {
 	if atomic.AddInt32(&p.disconnect, 1) != 1 {
 		return
 	}
-	peerLog.Tracef("disconnecting %s", p.addr)
+	peerLog.Tracef("disconnecting %s", p)
 	close(p.quit)
 	if atomic.LoadInt32(&p.connected) != 0 {
 		p.conn.Close()
@@ -1495,7 +1494,7 @@ func (p *peer) Start() error {
 		return nil
 	}
 
-	peerLog.Tracef("Starting peer %s", p.addr)
+	peerLog.Tracef("Starting peer %s", p)
 
 	// Send an initial version message if this is an outbound connection.
 	if !p.inbound {
@@ -1520,7 +1519,7 @@ func (p *peer) Start() error {
 
 // Shutdown gracefully shuts down the peer by disconnecting it.
 func (p *peer) Shutdown() {
-	peerLog.Tracef("Shutdown peer %s", p.addr)
+	peerLog.Tracef("Shutdown peer %s", p)
 	p.Disconnect()
 }
 
