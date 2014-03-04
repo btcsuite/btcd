@@ -81,7 +81,7 @@ $ ./btcd
 
 ## IRC server
 
-- [irc.conformal.com:6697](irc://irc.conformal.com:+6697)
+- irc.conformal.com:6697
 - ssl required
 - channel #btcd
 
