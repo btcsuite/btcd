@@ -78,6 +78,13 @@ Launch btcd from your Start menu.
 ```bash
 $ ./btcd
 ````
+
+## IRC server
+
+- [irc.conformal.com:6697](irc://irc.conformal.com:+6697)
+- ssl required
+- channel #btcd
+
 ## Mailing lists
 
 - btcd: discussion of btcd and its packages.
