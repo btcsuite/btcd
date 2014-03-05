@@ -291,6 +291,10 @@ out:
 				wsc := (*wsClient)(n)
 				blockNotifications[wsc.quit] = wsc
 
+			case *notificationUnregisterBlocks:
+				wsc := (*wsClient)(n)
+				delete(blockNotifications, wsc.quit)
+
 			case *notificationRegisterClient:
 				wsc := (*wsClient)(n)
 				clients[wsc.quit] = wsc
@@ -321,6 +325,14 @@ out:
 
 			case *notificationUnregisterAddr:
 				m.removeAddrRequest(watchedAddrs, n.wsc, n.addr)
+
+			case *notificationRegisterNewMempoolTxs:
+				wsc := (*wsClient)(n)
+				txNotifications[wsc.quit] = wsc
+
+			case *notificationUnregisterNewMempoolTxs:
+				wsc := (*wsClient)(n)
+				delete(txNotifications, wsc.quit)
 
 			default:
 				rpcsLog.Warn("Unhandled notification type")
