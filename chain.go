@@ -297,7 +297,7 @@ func (b *BlockChain) addOrphanBlock(block *btcutil.Block) {
 	// of near the top since removeOrphanBlock does its own locking and
 	// the range iterator is not invalidated by removing map entries.
 	b.orphanLock.Lock()
-	b.orphanLock.Unlock()
+	defer b.orphanLock.Unlock()
 
 	// Insert the block into the orphan map with an expiration time
 	// 1 hour from now.
