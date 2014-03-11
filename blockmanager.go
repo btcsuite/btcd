@@ -76,6 +76,28 @@ type getSyncPeerMsg struct {
 	reply chan *peer
 }
 
+// checkConnectBlockMsg is a message type to be sent across the query channel
+// for requesting chain to check if a block connects to the end of the current
+// main chain.
+type checkConnectBlockMsg struct {
+	block *btcutil.Block
+	reply chan error
+}
+
+// calcNextReqDifficultyResponse is a response sent to the reply channel of a
+// calcNextReqDifficultyMsg query.
+type calcNextReqDifficultyResponse struct {
+	difficulty uint32
+	err        error
+}
+
+// calcNextReqDifficultyMsg is a message type to be sent across the query
+// channel for requesting the required difficulty of the next block.
+type calcNextReqDifficultyMsg struct {
+	timestamp time.Time
+	reply     chan calcNextReqDifficultyResponse
+}
+
 // headerNode is used as a node in a list of headers that are linked together
 // between checkpoints.
 type headerNode struct {
@@ -949,6 +971,18 @@ out:
 			case getSyncPeerMsg:
 				msg.reply <- b.syncPeer
 
+			case checkConnectBlockMsg:
+				err := b.blockChain.CheckConnectBlock(msg.block)
+				msg.reply <- err
+
+			case calcNextReqDifficultyMsg:
+				difficulty, err :=
+					b.blockChain.CalcNextRequiredDifficulty(
+						msg.timestamp)
+				msg.reply <- calcNextReqDifficultyResponse{
+					difficulty: difficulty,
+					err:        err,
+				}
 			default:
 				bmgrLog.Warnf("Invalid message type in block "+
 					"handler: %T", msg)
@@ -1158,6 +1192,28 @@ func (b *blockManager) SyncPeer() *peer {
 	reply := make(chan *peer)
 	b.msgChan <- getSyncPeerMsg{reply: reply}
 	return <-reply
+}
+
+// CheckConnectBlock performs several checks to confirm connecting the passed
+// block to the main chain does not violate any rules.  This function makes use
+// of CheckConnectBlock on an internal instance of a block chain.  It is funneled
+// through the block manager since btcchain is not safe for concurrent access.
+func (b *blockManager) CheckConnectBlock(block *btcutil.Block) error {
+	reply := make(chan error)
+	b.query <- checkConnectBlockMsg{block: block, reply: reply}
+	return <-reply
+}
+
+// CalcNextRequiredDifficulty calculates the required difficulty for the next
+// block after the current main chain.  This function makes use of
+// CalcNextRequiredDifficulty on an internal instance of a block chain.  It is
+// funneled through the block manager since btcchain is not safe for concurrent
+// access.
+func (b *blockManager) CalcNextRequiredDifficulty(timestamp time.Time) (uint32, error) {
+	reply := make(chan calcNextReqDifficultyResponse)
+	b.query <- calcNextReqDifficultyMsg{timestamp: timestamp, reply: reply}
+	response := <-reply
+	return response.difficulty, response.err
 }
 
 // newBlockManager returns a new bitcoin block manager.

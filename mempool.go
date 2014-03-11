@@ -66,10 +66,10 @@ const (
 	maxStandardMultiSigKeys = 3
 
 	// minTxRelayFee is the minimum fee in satoshi that is required for a
-	// transaction to be treated as free for relay purposes.  It is also
-	// used to help determine if a transaction is considered dust and as a
-	// base for calculating minimum required fees for larger transactions.
-	// This value is in Satoshi/KB (kilobyte, not kibibyte).
+	// transaction to be treated as free for relay and mining purposes.  It
+	// is also used to help determine if a transaction is considered dust
+	// and as a base for calculating minimum required fees for larger
+	// transactions.  This value is in Satoshi/KB (kilobyte, not kibibyte).
 	minTxRelayFee = 1000
 )
 
@@ -94,7 +94,6 @@ type txMemPool struct {
 	outpoints     map[btcwire.OutPoint]*btcutil.Tx
 	pennyTotal    float64 // exponentially decaying total for penny spends.
 	lastPennyUnix int64   // unix time of last ``penny spend''
-
 }
 
 // isDust returns whether or not the passed transaction output amount is
