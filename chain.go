@@ -340,7 +340,7 @@ func (b *BlockChain) GenerateInitialIndex() error {
 
 	// Calculate the starting height based on the minimum number of nodes
 	// needed in memory.
-	startHeight := endHeight - (minMemoryNodes + 1)
+	startHeight := endHeight - minMemoryNodes
 	if startHeight < 0 {
 		startHeight = 0
 	}
@@ -353,7 +353,7 @@ func (b *BlockChain) GenerateInitialIndex() error {
 	// is going to be nuked eventually, the bug isn't being fixed in the
 	// driver.  In the mean time, work around the issue by calling
 	// FetchBlockBySha multiple times with the appropriate indices as needed.
-	for start := startHeight; start < endHeight; {
+	for start := startHeight; start <= endHeight; {
 		hashList, err := b.db.FetchHeightRange(start, endHeight+1)
 		if err != nil {
 			return err
@@ -368,8 +368,8 @@ func (b *BlockChain) GenerateInitialIndex() error {
 		// Loop forwards through each block loading the node into the
 		// index for the block.
 		for _, hash := range hashList {
-			// Make a copy of the hash to make sure there are no references
-			// into the list so it can be freed.
+			// Make a copy of the hash to make sure there are no
+			// references into the list so it can be freed.
 			hashCopy := hash
 			node, err := b.loadBlockNode(&hashCopy)
 			if err != nil {

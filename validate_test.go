@@ -14,6 +14,30 @@ import (
 	"time"
 )
 
+// TestCheckConnectBlock tests the CheckConnectBlock function to ensure it
+// fails
+func TestCheckConnectBlock(t *testing.T) {
+	// Create a new database and chain instance to run tests against.
+	chain, teardownFunc, err := chainSetup("checkconnectblock")
+	if err != nil {
+		t.Errorf("Failed to setup chain instance: %v", err)
+		return
+	}
+	defer teardownFunc()
+
+	err = chain.GenerateInitialIndex()
+	if err != nil {
+		t.Errorf("GenerateInitialIndex: %v", err)
+	}
+
+	// The genesis block should fail to connect since it's already
+	// inserted.
+	err = chain.CheckConnectBlock(btcutil.NewBlock(&btcwire.GenesisBlock))
+	if err == nil {
+		t.Errorf("CheckConnectBlock: Did not received expected error")
+	}
+}
+
 func TestCheckBlockSanity(t *testing.T) {
 	powLimit := btcchain.ChainParams(btcwire.MainNet).PowLimit
 	block := btcutil.NewBlock(&Block100000)

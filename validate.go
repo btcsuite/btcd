@@ -711,6 +711,15 @@ func CheckTransactionInputs(tx *btcutil.Tx, txHeight int64, txStore TxStore) (in
 // checkConnectBlock performs several checks to confirm connecting the passed
 // block to the main chain (including whatever reorganization might be necessary
 // to get this node to the main chain) does not violate any rules.
+//
+// The CheckConnectBlock function makes use of this function to perform the
+// bulk of its work.  The only difference is this function accepts a node which
+// may or may not require reorganization to connect it to the main chain whereas
+// CheckConnectBlock creates a new node which specifically connects to the end
+// of the current main chain and then calls this function with that node.
+//
+// See the comments for CheckConnectBlock for some examples of the type of
+// checks performed by this function.
 func (b *BlockChain) checkConnectBlock(node *blockNode, block *btcutil.Block) error {
 	// If the side chain blocks end up in the database, a call to
 	// checkBlockSanity should be done here in case a previous version
@@ -718,12 +727,9 @@ func (b *BlockChain) checkConnectBlock(node *blockNode, block *btcutil.Block) er
 	// implementation only currently uses memory for the side chain blocks,
 	// it isn't currently necessary.
 
-	// TODO(davec): Keep a flag if this has already been done to avoid
-	// multiple runs.
-
 	// The coinbase for the Genesis block is not spendable, so just return
 	// now.
-	if node.hash.IsEqual(b.chainParams().GenesisHash) {
+	if node.hash.IsEqual(b.chainParams().GenesisHash) && b.bestChain == nil {
 		return nil
 	}
 
@@ -863,4 +869,25 @@ func (b *BlockChain) checkConnectBlock(node *blockNode, block *btcutil.Block) er
 	}
 
 	return nil
+}
+
+// CheckConnectBlock performs several checks to confirm connecting the passed
+// block to the main chain does not violate any rules.  An example of some of
+// the checks performed are ensuring connecting the block would not cause any
+// duplicate transaction hashes for old transactions that aren't already fully
+// spent, double spends, exceeding the maximum allowed signature operations
+// per block, invalid values in relation to the expected block subisidy, or
+// fail transaction script validation.
+//
+// This function is NOT safe for concurrent access.
+func (b *BlockChain) CheckConnectBlock(block *btcutil.Block) error {
+	prevNode := b.bestChain
+	blockSha, _ := block.Sha()
+	newNode := newBlockNode(&block.MsgBlock().Header, blockSha, block.Height())
+	if prevNode != nil {
+		newNode.parent = prevNode
+		newNode.workSum.Add(prevNode.workSum, newNode.workSum)
+	}
+
+	return b.checkConnectBlock(newNode, block)
 }
