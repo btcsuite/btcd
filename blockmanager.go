@@ -76,7 +76,7 @@ type getSyncPeerMsg struct {
 	reply chan *peer
 }
 
-// checkConnectBlockMsg is a message type to be sent across the query channel
+// checkConnectBlockMsg is a message type to be sent across the message channel
 // for requesting chain to check if a block connects to the end of the current
 // main chain.
 type checkConnectBlockMsg struct {
@@ -91,7 +91,7 @@ type calcNextReqDifficultyResponse struct {
 	err        error
 }
 
-// calcNextReqDifficultyMsg is a message type to be sent across the query
+// calcNextReqDifficultyMsg is a message type to be sent across the message
 // channel for requesting the required difficulty of the next block.
 type calcNextReqDifficultyMsg struct {
 	timestamp time.Time
@@ -1200,7 +1200,7 @@ func (b *blockManager) SyncPeer() *peer {
 // through the block manager since btcchain is not safe for concurrent access.
 func (b *blockManager) CheckConnectBlock(block *btcutil.Block) error {
 	reply := make(chan error)
-	b.query <- checkConnectBlockMsg{block: block, reply: reply}
+	b.msgChan <- checkConnectBlockMsg{block: block, reply: reply}
 	return <-reply
 }
 
@@ -1211,7 +1211,7 @@ func (b *blockManager) CheckConnectBlock(block *btcutil.Block) error {
 // access.
 func (b *blockManager) CalcNextRequiredDifficulty(timestamp time.Time) (uint32, error) {
 	reply := make(chan calcNextReqDifficultyResponse)
-	b.query <- calcNextReqDifficultyMsg{timestamp: timestamp, reply: reply}
+	b.msgChan <- calcNextReqDifficultyMsg{timestamp: timestamp, reply: reply}
 	response := <-reply
 	return response.difficulty, response.err
 }
