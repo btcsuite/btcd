@@ -69,7 +69,7 @@ const (
 	// transaction to be treated as free for relay and mining purposes.  It
 	// is also used to help determine if a transaction is considered dust
 	// and as a base for calculating minimum required fees for larger
-	// transactions.  This value is in Satoshi/KB (kilobyte, not kibibyte).
+	// transactions.  This value is in Satoshi/1000 bytes.
 	minTxRelayFee = 1000
 )
 
@@ -147,8 +147,8 @@ func isDust(txOut *btcwire.TxOut) bool {
 
 	// The output is considered dust if the cost to the network to spend the
 	// coins is more than 1/3 of the minimum free transaction relay fee.
-	// minFreeTxRelayFee is in Satoshi/KB (kilobyte, not kibibyte), so
-	// multiply by 1000 to convert bytes.
+	// minFreeTxRelayFee is in Satoshi/KB, so multiply by 1000 to
+	// convert to bytes.
 	//
 	// Using the typical values for a pay-to-pubkey-hash transaction from
 	// the breakdown above and the default minimum free transaction relay
@@ -378,10 +378,10 @@ func calcMinRelayFee(tx *btcutil.Tx) int64 {
 
 	// Calculate the minimum fee for a transaction to be allowed into the
 	// mempool and relayed by scaling the base fee (which is the minimum
-	// free transaction relay fee).  minTxRelayFee is in Satoshi/KB
-	// (kilobyte, not kibibyte), so divide the transaction size by 1000 to
-	// convert to kilobytes.  Also, integer division is used so fees only
-	// increase on full kilobyte boundaries.
+	// free transaction relay fee).  minTxRelayFee is in Satoshi/KB, so
+	// divide the transaction size by 1000 to convert to kilobytes.  Also,
+	// integer division is used so fees only increase on full kilobyte
+	// boundaries.
 	minFee := (1 + serializedLen/1000) * minTxRelayFee
 
 	// Set the minimum fee to the maximum possible value if the calculated

@@ -505,7 +505,7 @@ mempoolLoop:
 		txSize := tx.MsgTx().SerializeSize()
 		prioItem.priority = calcPriority(tx, txSize, inputPriority)
 
-		// Calculate the fee in Satoshi/KB (kilobyte, not kibibyte).
+		// Calculate the fee in Satoshi/KB.
 		// NOTE: This is a more precise value than the one calculated
 		// during calcMinRelayFee which rounds up to the nearest full
 		// kilobyte boundary.  This is beneficial since it provides an
