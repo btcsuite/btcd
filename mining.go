@@ -245,19 +245,17 @@ func calcPriority(tx *btcutil.Tx, serializedTxSize int, inputPriority float64) f
 	// <33 byte compresed pubkey> + OP_CHECKSIG}]
 	//
 	// Thus 1 + 73 + 1 + 1 + 33 + 1 = 110
-	adjustedTxSize := serializedTxSize
+	overhead := 0
 	for _, txIn := range tx.MsgTx().TxIn {
-		overhead := 41 + minInt(110, len(txIn.SignatureScript))
-		if adjustedTxSize > overhead {
-			adjustedTxSize -= overhead
-		}
+		// Max inputs + size can't possibly overflow here.
+		overhead += 41 + minInt(110, len(txIn.SignatureScript))
 	}
 
-	if adjustedTxSize == 0 {
+	if overhead >= serializedTxSize {
 		return 0.0
 	}
 
-	return inputPriority / float64(adjustedTxSize)
+	return inputPriority / float64(serializedTxSize-overhead)
 }
 
 // spendTransaction updates the passed transaction store by marking the inputs
