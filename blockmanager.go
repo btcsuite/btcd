@@ -70,7 +70,7 @@ type txMsg struct {
 	peer *peer
 }
 
-// getSyncPeerMsg is a message type to be sent across the query channel for
+// getSyncPeerMsg is a message type to be sent across the message channel for
 // retrieving the current sync peer.
 type getSyncPeerMsg struct {
 	reply chan *peer
@@ -99,7 +99,6 @@ type blockManager struct {
 	processingReqs    bool
 	syncPeer          *peer
 	msgChan           chan interface{}
-	query             chan interface{}
 	wg                sync.WaitGroup
 	quit              chan bool
 
@@ -905,20 +904,12 @@ out:
 			case *donePeerMsg:
 				b.handleDonePeerMsg(candidatePeers, msg.peer)
 
-			default:
-				bmgrLog.Warnf("Invalid message type in block "+
-					"handler: %T", msg)
-			}
-
-		// Queries used for atomically retrieving internal state.
-		case qmsg := <-b.query:
-			switch msg := qmsg.(type) {
 			case getSyncPeerMsg:
 				msg.reply <- b.syncPeer
 
 			default:
-				bmgrLog.Warnf("Invalid query type in block "+
-					"handler query: %T", msg)
+				bmgrLog.Warnf("Invalid message type in block "+
+					"handler: %T", msg)
 			}
 
 		case <-b.quit:
@@ -1123,7 +1114,7 @@ func (b *blockManager) Stop() error {
 // SyncPeer returns the current sync peer.
 func (b *blockManager) SyncPeer() *peer {
 	reply := make(chan *peer)
-	b.query <- getSyncPeerMsg{reply: reply}
+	b.msgChan <- getSyncPeerMsg{reply: reply}
 	return <-reply
 }
 
@@ -1142,7 +1133,6 @@ func newBlockManager(s *server) (*blockManager, error) {
 		requestedBlocks:  make(map[btcwire.ShaHash]bool),
 		lastBlockLogTime: time.Now(),
 		msgChan:          make(chan interface{}, cfg.MaxPeers*3),
-		query:            make(chan interface{}),
 		headerList:       list.New(),
 		quit:             make(chan bool),
 	}
