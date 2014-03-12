@@ -14,7 +14,7 @@ import (
 )
 
 // Maximum payload size for a variable length integer.
-const maxVarIntPayload = 9
+const MaxVarIntPayload = 9
 
 // readElement reads the next sequence of bytes from r using little endian
 // depending on the concrete type of element pointed to.

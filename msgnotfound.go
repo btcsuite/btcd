@@ -95,7 +95,7 @@ func (msg *MsgNotFound) Command() string {
 func (msg *MsgNotFound) MaxPayloadLength(pver uint32) uint32 {
 	// Max var int 9 bytes + max InvVects at 36 bytes each.
 	// Num inventory vectors (varInt) + max allowed inventory vectors.
-	return maxVarIntPayload + (MaxInvPerMsg * maxInvVectPayload)
+	return MaxVarIntPayload + (MaxInvPerMsg * maxInvVectPayload)
 }
 
 // NewMsgNotFound returns a new bitcoin notfound message that conforms to the

@@ -129,7 +129,7 @@ func (msg *MsgGetBlocks) Command() string {
 func (msg *MsgGetBlocks) MaxPayloadLength(pver uint32) uint32 {
 	// Protocol version 4 bytes + num hashes (varInt) + max block locator
 	// hashes + hash stop.
-	return 4 + maxVarIntPayload + (MaxBlockLocatorsPerMsg * HashSize) + HashSize
+	return 4 + MaxVarIntPayload + (MaxBlockLocatorsPerMsg * HashSize) + HashSize
 }
 
 // NewMsgGetBlocks returns a new bitcoin getblocks message that conforms to the
