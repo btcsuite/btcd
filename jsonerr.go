@@ -64,6 +64,18 @@ var (
 	}
 )
 
+// Peer-to-peer client errors
+var (
+	ErrClientNotConnected = Error{
+		Code:    -9,
+		Message: "Bitcoin is not connected",
+	}
+	ErrClientInInitialDownload = Error{
+		Code:    -10,
+		Message: "Bitcoin is downloading blocks...",
+	}
+)
+
 // Wallet JSON errors
 var (
 	ErrWallet = Error{
