@@ -15,7 +15,7 @@ const BlockVersion uint32 = 2
 
 // Version 4 bytes + Timestamp 4 bytes + Bits 4 bytes + Nonce 4 bytes +
 // PrevBlock and MerkleRoot hashes.
-const maxBlockHeaderPayload = 16 + (HashSize * 2)
+const MaxBlockHeaderPayload = 16 + (HashSize * 2)
 
 // BlockHeader defines information about a block and is used in the bitcoin
 // block (MsgBlock) and headers (MsgHeaders) messages.

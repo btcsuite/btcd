@@ -121,7 +121,7 @@ func (msg *MsgHeaders) Command() string {
 func (msg *MsgHeaders) MaxPayloadLength(pver uint32) uint32 {
 	// Num headers (varInt) + max allowed headers (header length + 1 byte
 	// for the number of transactions which is always 0).
-	return MaxVarIntPayload + ((maxBlockHeaderPayload + 1) *
+	return MaxVarIntPayload + ((MaxBlockHeaderPayload + 1) *
 		MaxBlockHeadersPerMsg)
 }
 
