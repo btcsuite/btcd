@@ -572,7 +572,7 @@ func (b *blockManager) handleBlockMsg(bmsg *blockMsg) {
 // fetchHeaderBlocks creates and sends a request to the syncPeer for the next
 // list of blocks to be downloaded based on the current list of headers.
 func (b *blockManager) fetchHeaderBlocks() {
-	// Nothing to do if there is not start header.
+	// Nothing to do if there is no start header.
 	if b.startHeader == nil {
 		bmgrLog.Warnf("fetchHeaderBlocks called with no start header")
 		return

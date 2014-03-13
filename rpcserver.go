@@ -498,7 +498,7 @@ func handleCreateRawTransaction(s *rpcServer, cmd btcjson.Cmd) (interface{}, err
 	c := cmd.(*btcjson.CreateRawTransactionCmd)
 
 	// Add all transaction inputs to a new transaction after performing
-	// some validty checks.
+	// some validity checks.
 	mtx := btcwire.NewMsgTx()
 	for _, input := range c.Inputs {
 		txHash, err := btcwire.NewShaHashFromStr(input.Txid)
@@ -519,7 +519,7 @@ func handleCreateRawTransaction(s *rpcServer, cmd btcjson.Cmd) (interface{}, err
 	}
 
 	// Add all transaction outputs to the transaction after performing
-	// some validty checks.
+	// some validity checks.
 	for encodedAddr, amount := range c.Amounts {
 		// Ensure amount is in the valid range for monetary amounts.
 		if amount <= 0 || amount > btcutil.MaxSatoshi {
