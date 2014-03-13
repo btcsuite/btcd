@@ -2863,6 +2863,11 @@ func (b *bogusAddress) ScriptAddress() []byte {
 	return []byte{}
 }
 
+// IsForNet lies blatantly to satisfy the btcutil.Address interface.
+func (b *bogusAddress) IsForNet(btcwire.BitcoinNet) bool {
+	return true // why not?
+}
+
 func TestPayToAddrScript(t *testing.T) {
 	// 1MirQ9bwyQcGVJPwKUgapu5ouK2E2Ey4gX
 	p2pkhMain, err := btcutil.NewAddressPubKeyHash([]byte{
