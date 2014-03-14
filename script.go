@@ -421,26 +421,32 @@ func parseScriptTemplate(script []byte, opcodemap map[byte]*opcode) ([]parsedOpc
 			pop.data = script[i+1 : i+op.length]
 			i += op.length
 		case op.length < 0:
-			var err error
 			var l uint
 			off := i + 1
+
+			if len(script[off:]) < -op.length {
+				return retScript, StackErrShortScript
+			}
+
+			// Next -length bytes are little endian length of data.
 			switch op.length {
 			case -1:
-				l, err = scriptUInt8(script[off:])
+				l = uint(script[off])
 			case -2:
-				l, err = scriptUInt16(script[off:])
+				l = ((uint(script[off+1]) << 8) |
+					uint(script[off]))
 			case -4:
-				l, err = scriptUInt32(script[off:])
+				l = ((uint(script[off+3]) << 24) |
+					(uint(script[off+2]) << 16) |
+					(uint(script[off+1]) << 8) |
+					uint(script[off]))
 			default:
 				return retScript,
 					fmt.Errorf("invalid opcode length %d",
 						op.length)
 			}
 
-			if err != nil {
-				return nil, err
-			}
-			off = i + 1 - op.length // beginning of data
+			off += -op.length // beginning of data
 			// Disallow entries that do not fit script or were
 			// sign extended.
 			if int(l) > len(script[off:]) || int(l) < 0 {
@@ -619,7 +625,7 @@ func (m *Script) Step() (done bool, err error) {
 		return true, err
 	}
 
-	if m.dstack.Depth() + m.astack.Depth() > maxStackSize {
+	if m.dstack.Depth()+m.astack.Depth() > maxStackSize {
 		return false, StackErrOverflow
 	}
 
@@ -860,33 +866,6 @@ func calcScriptHash(script []parsedOpcode, hashType byte, tx *btcwire.MsgTx, idx
 	binary.Write(&wbuf, binary.LittleEndian, uint32(hashType))
 
 	return btcwire.DoubleSha256(wbuf.Bytes())
-}
-
-// scriptUInt8 return the number stored in the first byte of a slice.
-func scriptUInt8(script []byte) (uint, error) {
-	if len(script) < 1 {
-		return 0, StackErrShortScript
-	}
-	return uint(script[0]), nil
-}
-
-// scriptUInt16 returns the number stored in the next 2 bytes of a slice.
-func scriptUInt16(script []byte) (uint, error) {
-	if len(script) < 2 {
-		return 0, StackErrShortScript
-	}
-	// Yes this is little endian
-	return ((uint(script[1]) << 8) | uint(script[0])), nil
-}
-
-// scriptUInt32 returns the number stored in the first 4 bytes of a slice.
-func scriptUInt32(script []byte) (uint, error) {
-	if len(script) < 4 {
-		return 0, StackErrShortScript
-	}
-	// Yes this is little endian
-	return ((uint(script[3]) << 24) | (uint(script[2]) << 16) |
-		(uint(script[1]) << 8) | uint(script[0])), nil
 }
 
 // getStack returns the contents of stack as a byte array bottom up
