@@ -943,7 +943,7 @@ func (pop *parsedOpcode) exec(s *Script) error {
 
 	// Always-illegal opcodes are ``fail on program counter''.
 	if pop.alwaysIllegal() {
-		return StackErrAlwaysIllegal
+		return StackErrReservedOpcode
 	}
 
 	// Note that this includes OP_RESERVED which counts as a push operation.
