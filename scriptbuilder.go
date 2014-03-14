@@ -41,18 +41,15 @@ func (b *ScriptBuilder) AddOp(opcode byte) *ScriptBuilder {
 }
 
 // AddData pushes the passed data to the end of the script.  It automatically
-// chooses canonical opcodes depending on the length of the data.
+// chooses canonical opcodes depending on the length of the data. A zero length
+// buffer will lead to a push of empty data onto the stack.
 func (b *ScriptBuilder) AddData(data []byte) *ScriptBuilder {
-	// Don't modify the script at all if no data was passed.
 	dataLen := len(data)
-	if dataLen == 0 {
-		return b
-	}
 
 	// When the data consists of a single number that can be represented
 	// by one of the "small integer" opcodes, use that opcode instead of
 	// a data push opcode followed by the number.
-	if dataLen == 1 && data[0] == 0 {
+	if dataLen == 0 || dataLen == 1 && data[0] == 0 {
 		b.script = append(b.script, OP_0)
 		return b
 	} else if dataLen == 1 && data[0] <= 16 {
