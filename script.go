@@ -24,6 +24,10 @@ var (
 	// too long for the length of the script.
 	StackErrShortScript = errors.New("execute past end of script")
 
+	// StackErrLongScript is returned if the script has an opcode that is
+	// too long for the length of the script.
+	StackErrLongScript = errors.New("script is longer than maximum allowed")
+
 	// StackErrUnderflow is returned if an opcode requires more items on the
 	// stack than is present.
 	StackErrUnderflow = errors.New("stack underflow")
@@ -122,9 +126,14 @@ var (
 	StackErrOverflow = errors.New("Stacks overflowed")
 )
 
-// maxStackSize is the maximum combined height of stack and alt stack during
-// execution.
-const maxStackSize = 1000
+const (
+	// maxStackSize is the maximum combined height of stack and alt stack
+	// during execution.
+	maxStackSize = 1000
+
+	// maxScriptSize is the maximum allowed length of a raw script.
+	maxScriptSize = 10000
+)
 
 // ErrUnsupportedAddress is returned when a concrete type that implements
 // a btcutil.Address is not a supported type.
@@ -492,6 +501,9 @@ func NewScript(scriptSig []byte, scriptPubKey []byte, txidx int, tx *btcwire.Msg
 	scripts := [][]byte{scriptSig, scriptPubKey}
 	m.scripts = make([][]parsedOpcode, len(scripts))
 	for i, scr := range scripts {
+		if len(scr) > maxScriptSize {
+			return nil, StackErrLongScript
+		}
 		var err error
 		m.scripts[i], err = parseScript(scr)
 		if err != nil {
