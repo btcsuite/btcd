@@ -864,7 +864,7 @@ func calcScriptHash(script []parsedOpcode, hashType byte, tx *btcwire.MsgTx, idx
 
 // scriptUInt8 return the number stored in the first byte of a slice.
 func scriptUInt8(script []byte) (uint, error) {
-	if len(script) <= 1 {
+	if len(script) < 1 {
 		return 0, StackErrShortScript
 	}
 	return uint(script[0]), nil
@@ -872,7 +872,7 @@ func scriptUInt8(script []byte) (uint, error) {
 
 // scriptUInt16 returns the number stored in the next 2 bytes of a slice.
 func scriptUInt16(script []byte) (uint, error) {
-	if len(script) <= 2 {
+	if len(script) < 2 {
 		return 0, StackErrShortScript
 	}
 	// Yes this is little endian
@@ -881,7 +881,7 @@ func scriptUInt16(script []byte) (uint, error) {
 
 // scriptUInt32 returns the number stored in the first 4 bytes of a slice.
 func scriptUInt32(script []byte) (uint, error) {
-	if len(script) <= 4 {
+	if len(script) < 4 {
 		return 0, StackErrShortScript
 	}
 	// Yes this is little endian
