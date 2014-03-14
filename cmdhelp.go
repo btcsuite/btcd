@@ -428,7 +428,7 @@ transaction "txid". The object follows the following format:
 		{
 			"account":"name",	# The acount name involvedi n the transaction. "" means the default.
 			"address":"address",	# The address involved in the transaction as a string.
-			"category":"send|recieve",	# Category - either send or recieve.
+			"category":"send|receive",	# Category - either send or receive.
 			"amount":n,		# numeric amount in BTC.
 		}
 		...
