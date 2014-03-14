@@ -628,6 +628,9 @@ func (m *Script) Step() (done bool, err error) {
 			return false, StackErrMissingEndif
 		}
 
+		// alt stack doesn't persist.
+		_ = m.astack.DropN(m.astack.Depth())
+
 		m.numOps = 0 // number of ops is per script.
 		m.scriptoff = 0
 		if m.scriptidx == 0 && m.bip16 {
