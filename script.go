@@ -583,10 +583,6 @@ func (s *Script) CheckErrorCondition() (err error) {
 		}))
 		err = StackErrScriptFailed
 	}
-	if err == nil && len(s.condStack) != 1 {
-		// conditional execution stack context left active
-		err = StackErrMissingEndif
-	}
 	return err
 }
 
@@ -625,6 +621,11 @@ func (m *Script) Step() (done bool, err error) {
 	// prepare for next instruction
 	m.scriptoff++
 	if m.scriptoff >= len(m.scripts[m.scriptidx]) {
+		// Illegal to have an `if' that straddles two scripts.
+		if err == nil && len(m.condStack) != 1 {
+			return false, StackErrMissingEndif
+		}
+
 		m.numOps = 0 // number of ops is per script.
 		m.scriptoff = 0
 		if m.scriptidx == 0 && m.bip16 {
