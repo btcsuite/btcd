@@ -932,17 +932,35 @@ func (pop *parsedOpcode) conditional() bool {
 	}
 }
 
+// exec peforms execution on the opcode. It takes into account whether or not
+// it is hidden by conditionals, but some rules still must be tested in this
+// case.
 func (pop *parsedOpcode) exec(s *Script) error {
-	// *sigh* bitcoind pretty much mandates that we violate layering here.
-	// Any opcode that isn't just adding data to the stack counts here
-	// as an operation. Note that OP_RESERVED is less than OP_16 and thus
-	// is counted as a push opcode here.
+	// Disabled opcodes are ``fail on program counter''.
+	if pop.disabled() {
+		return StackErrOpDisabled
+	}
+
+	// Always-illegal opcodes are ``fail on program counter''.
+	if pop.alwaysIllegal() {
+		return StackErrAlwaysIllegal
+	}
+
+	// Note that this includes OP_RESERVED which counts as a push operation.
 	if pop.opcode.value > OP_16 {
 		s.numOps++
 		if s.numOps > MaxOpsPerScript {
 			return StackErrTooManyOperations
 		}
 
+	} else if len(pop.data) > MaxScriptElementSize {
+		return StackErrElementTooBig
+	}
+
+	// If we are not a conditional opcode and we aren't executing, then
+	// we are done now.
+	if s.condStack[0] != OpCondTrue && !pop.conditional() {
+		return nil
 	}
 	return pop.opcode.opfunc(pop, s)
 }
@@ -1050,11 +1068,6 @@ func opcodeFalse(op *parsedOpcode, s *Script) error {
 }
 
 func opcodePushData(op *parsedOpcode, s *Script) error {
-	// This max script element test must occur at execution time instead
-	// of parse time to match bitcoind behaviour.
-	if len(op.data) > MaxScriptElementSize {
-		return StackErrElementTooBig
-	}
 	s.dstack.PushByteArray(op.data)
 	return nil
 }

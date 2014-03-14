@@ -595,29 +595,13 @@ func (m *Script) Step() (done bool, err error) {
 	// verify that it is pointing to a valid script address
 	err = m.validPC()
 	if err != nil {
-		return
+		return true, err
 	}
 	opcode := m.scripts[m.scriptidx][m.scriptoff]
 
-	executeInstr := true
-	if m.condStack[0] != OpCondTrue {
-		// some opcodes still 'activate' if on the non-executing side
-		// of conditional execution
-		if opcode.disabled() {
-			return true, StackErrOpDisabled
-		} else if opcode.alwaysIllegal() {
-			return true, StackErrAlwaysIllegal
-		} else if opcode.conditional() {
-			executeInstr = true
-		} else {
-			executeInstr = false
-		}
-	}
-	if executeInstr {
-		err = opcode.exec(m)
-		if err != nil {
-			return
-		}
+	err = opcode.exec(m)
+	if err != nil {
+		return true, err
 	}
 
 	// prepare for next instruction
@@ -664,10 +648,10 @@ func (m *Script) Step() (done bool, err error) {
 		}
 		m.lastcodesep = 0
 		if m.scriptidx >= len(m.scripts) {
-			done = true
+			return true, nil
 		}
 	}
-	return
+	return false, nil
 }
 
 // curPC returns either the current script and offset, or an error if the
