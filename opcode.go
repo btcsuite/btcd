@@ -862,6 +862,45 @@ type parsedOpcode struct {
 	opfunc func(op parsedOpcode, s Script) error
 }
 
+// The following opcodes are disabled and are thus always bad to see in the
+// instruction stream (even if turned off by a conditional).
+func (pop *parsedOpcode) disabled() bool {
+	switch pop.opcode.value {
+	case OP_CAT:
+		return true
+	case OP_SUBSTR:
+		return true
+	case OP_LEFT:
+		return true
+	case OP_RIGHT:
+		return true
+	case OP_INVERT:
+		return true
+	case OP_AND:
+		return true
+	case OP_OR:
+		return true
+	case OP_XOR:
+		return true
+	case OP_2MUL:
+		return true
+	case OP_2DIV:
+		return true
+	case OP_MUL:
+		return true
+	case OP_DIV:
+		return true
+	case OP_MOD:
+		return true
+	case OP_LSHIFT:
+		return true
+	case OP_RSHIFT:
+		return true
+	default:
+		return false
+	}
+}
+
 // The following opcodes are always illegal when passed over by the program
 // counter even if in a non-executed branch. (it isn't a coincidence that they
 // are conditionals).

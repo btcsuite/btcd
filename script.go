@@ -603,7 +603,9 @@ func (m *Script) Step() (done bool, err error) {
 	if m.condStack[0] != OpCondTrue {
 		// some opcodes still 'activate' if on the non-executing side
 		// of conditional execution
-		if opcode.alwaysIllegal() {
+		if opcode.disabled() {
+			return true, StackErrOpDisabled
+		} else if opcode.alwaysIllegal() {
 			return true, StackErrAlwaysIllegal
 		} else if opcode.conditional() {
 			executeInstr = true
