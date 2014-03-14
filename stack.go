@@ -10,9 +10,13 @@ import (
 
 // asInt converts a byte array to a bignum by treating it as a little endian
 // number with sign bit.
-func asInt(v []byte) *big.Int {
+func asInt(v []byte) (*big.Int, error) {
+	// Only 32bit numbers allowed.
+	if len(v) > 4 {
+		return nil, StackErrNumberTooBig
+	}
 	if len(v) == 0 {
-		return big.NewInt(0)
+		return big.NewInt(0), nil
 	}
 	negative := false
 	origlen := len(v)
@@ -44,7 +48,7 @@ func asInt(v []byte) *big.Int {
 	if negative {
 		num = num.Neg(num)
 	}
-	return num
+	return num, nil
 }
 
 // fromInt provies a Big.Int in little endian format with the high bit of the
@@ -127,7 +131,7 @@ func (s *Stack) PopInt() (*big.Int, error) {
 	if err != nil {
 		return nil, err
 	}
-	return asInt(so), nil
+	return asInt(so)
 }
 
 // PopBool pops the value off the top of the stack, converts it into a bool and
@@ -155,7 +159,7 @@ func (s *Stack) PeekInt(idx int) (i *big.Int, err error) {
 	if err != nil {
 		return nil, err
 	}
-	return asInt(so), nil
+	return asInt(so)
 }
 
 // PeekBool returns the nth item on the stack as a bool without removing it.

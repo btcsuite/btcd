@@ -872,12 +872,13 @@ var detailedTests = []detailedTest{
 		disassembly:    "OP_IFDUP",
 	},
 	{
-		name:        "toaltastack",
+		// alt stack is purged at the end of execution
+		name:        "toaltstack",
 		before:      [][]byte{{1}},
 		altbefore:   [][]byte{},
 		script:      []byte{btcscript.OP_TOALTSTACK},
 		after:       [][]byte{},
-		altafter:    [][]byte{{1}},
+		altafter:    [][]byte{},
 		disassembly: "OP_TOALTSTACK",
 	},
 	{

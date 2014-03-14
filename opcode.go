@@ -1258,10 +1258,7 @@ func opcodePick(op *parsedOpcode, s *Script) error {
 		return err
 	}
 
-	if pidx.BitLen() > 32 {
-		return StackErrNumberTooBig
-	}
-
+	// PopInt promises that the int returned is 32 bit.
 	val := int(pidx.Int64())
 
 	return s.dstack.PickN(val)
@@ -1275,10 +1272,7 @@ func opcodeRoll(op *parsedOpcode, s *Script) error {
 		return err
 	}
 
-	if ridx.BitLen() > 32 {
-		return StackErrNumberTooBig
-	}
-
+	// PopInt promises that the int returned is 32 bit.
 	val := int(ridx.Int64())
 
 	return s.dstack.RollN(val)
@@ -1823,10 +1817,7 @@ func opcodeCheckMultiSig(op *parsedOpcode, s *Script) error {
 	// XXX arbitrary limits
 	// nore more than 20 pubkeyhs, or 201 operations
 
-	if numPubkeys.BitLen() > 32 {
-		return StackErrNumberTooBig
-	}
-
+	// PopInt promises that the int returned is 32 bit.
 	npk := int(numPubkeys.Int64())
 	if npk < 0 || npk > MaxPubKeysPerMultiSig {
 		return StackErrTooManyPubkeys
@@ -1848,10 +1839,8 @@ func opcodeCheckMultiSig(op *parsedOpcode, s *Script) error {
 	if err != nil {
 		return err
 	}
-	if numSignatures.BitLen() > 32 {
-		return StackErrNumberTooBig
-	}
 
+	// PopInt promises that the int returned is 32 bit.
 	nsig := int(numSignatures.Int64())
 
 	sigStrings := make([][]byte, nsig)
