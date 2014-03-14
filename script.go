@@ -116,7 +116,15 @@ var (
 	// StackErrNonPushOnly is returned when ScriptInfo is called with a
 	// pkScript that peforms operations other that pushing data to the stack.
 	StackErrNonPushOnly = errors.New("SigScript is non pushonly")
+
+	// StackErrOverflow is returned when stack and altstack combined depth
+	// is over the limit.
+	StackErrOverflow = errors.New("Stacks overflowed")
 )
+
+// maxStackSize is the maximum combined height of stack and alt stack during
+// execution.
+const maxStackSize = 1000
 
 // ErrUnsupportedAddress is returned when a concrete type that implements
 // a btcutil.Address is not a supported type.
@@ -597,6 +605,10 @@ func (m *Script) Step() (done bool, err error) {
 	err = opcode.exec(m)
 	if err != nil {
 		return true, err
+	}
+
+	if m.dstack.Depth() + m.astack.Depth() > maxStackSize {
+		return false, StackErrOverflow
 	}
 
 	// prepare for next instruction
