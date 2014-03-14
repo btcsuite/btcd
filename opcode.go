@@ -862,6 +862,22 @@ type parsedOpcode struct {
 	opfunc func(op parsedOpcode, s Script) error
 }
 
+// The following opcodes are always illegal when passed over by the program
+// counter even if in a non-executed branch. (it isn't a coincidence that they
+// are conditionals).
+func (pop *parsedOpcode) alwaysIllegal() bool {
+	switch pop.opcode.value {
+	case OP_VERIF:
+		return true
+	case OP_VERNOTIF:
+		return true
+	default:
+		return false
+	}
+}
+
+// The following opcode are conditional and thus change the conditional
+// execution stack state when passed.
 func (pop *parsedOpcode) conditional() bool {
 	switch pop.opcode.value {
 	case OP_IF:

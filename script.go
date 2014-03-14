@@ -52,6 +52,11 @@ var (
 	// is encountered.
 	StackErrReservedOpcode = errors.New("Reserved Opcode")
 
+	// StackErrAlwaysIllegal is returned when an opcode marked as always
+	// illegal is encountered. Currently this is just OP_VERIF and
+	// OP_VERNOTIF.
+	StackErrAlwaysIllegal = errors.New("Always Illlegal instruction encountered")
+
 	// StackErrEarlyReturn is returned when OP_RETURN is executed in the
 	// script.
 	StackErrEarlyReturn = errors.New("Script returned early")
@@ -602,7 +607,9 @@ func (m *Script) Step() (done bool, err error) {
 	if m.condStack[0] != OpCondTrue {
 		// some opcodes still 'activate' if on the non-executing side
 		// of conditional execution
-		if opcode.conditional() {
+		if opcode.alwaysIllegal() {
+			return true, StackErrAlwaysIllegal
+		} else if opcode.conditional() {
 			executeInstr = true
 		} else {
 			executeInstr = false
