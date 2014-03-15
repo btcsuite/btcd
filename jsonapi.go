@@ -35,6 +35,7 @@ type InfoResult struct {
 	WalletVersion   int     `json:"walletversion,omitempty"`
 	Balance         float64 `json:"balance,omitempty"`
 	Blocks          int     `json:"blocks,omitempty"`
+	TimeOffset      int64   `json:"timeoffset,omitempty"`
 	Connections     int     `json:"connections,omitempty"`
 	Proxy           string  `json:"proxy,omitempty"`
 	Difficulty      float64 `json:"difficulty,omitempty"`
@@ -42,6 +43,7 @@ type InfoResult struct {
 	KeypoolOldest   int64   `json:"keypoololdest,omitempty"`
 	KeypoolSize     int     `json:"keypoolsize,omitempty"`
 	PaytxFee        float64 `json:"paytxfee,omitempty"`
+	RelayFee        float64 `json:"relayfee,omitempty"`
 	Errors          string  `json:"errors,omitempty"`
 }
 
