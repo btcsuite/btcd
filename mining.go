@@ -308,7 +308,7 @@ func logSkippedDeps(tx *btcutil.Tx, deps *list.List) {
 //
 // Transactions which only spend outputs from other transactions already in the
 // block chain are immediately added to a priority queue which either
-// prioritizes based on the priority (then fee per kilobye) or the fee per
+// prioritizes based on the priority (then fee per kilobyte) or the fee per
 // kilobyte (then priority) depending on whether or not the BlockPrioritySize
 // configuration option allots space for high-priority transactions.
 // Transactions which spend outputs from other transactions in the memory pool
