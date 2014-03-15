@@ -28,11 +28,11 @@ const (
 	// the lock time is a uint32, the max is sometime around 2106.
 	lockTimeThreshold uint32 = 5e8 // Tue Nov 5 00:53:20 1985 UTC
 
-	// minCoinbaseScriptLen is the minimum length a coinbase script can be.
-	minCoinbaseScriptLen = 2
+	// MinCoinbaseScriptLen is the minimum length a coinbase script can be.
+	MinCoinbaseScriptLen = 2
 
-	// maxCoinbaseScriptLen is the maximum length a coinbase script can be.
-	maxCoinbaseScriptLen = 100
+	// MaxCoinbaseScriptLen is the maximum length a coinbase script can be.
+	MaxCoinbaseScriptLen = 100
 
 	// medianTimeBlocks is the number of previous blocks which should be
 	// used to calculate the median time used to validate block timestamps.
@@ -238,10 +238,10 @@ func CheckTransactionSanity(tx *btcutil.Tx) error {
 	// Coinbase script length must be between min and max length.
 	if IsCoinBase(tx) {
 		slen := len(msgTx.TxIn[0].SignatureScript)
-		if slen < minCoinbaseScriptLen || slen > maxCoinbaseScriptLen {
+		if slen < MinCoinbaseScriptLen || slen > MaxCoinbaseScriptLen {
 			str := fmt.Sprintf("coinbase transaction script length "+
 				"of %d is out of range (min: %d, max: %d)",
-				slen, minCoinbaseScriptLen, maxCoinbaseScriptLen)
+				slen, MinCoinbaseScriptLen, MaxCoinbaseScriptLen)
 			return RuleError(str)
 		}
 	} else {
