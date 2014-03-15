@@ -1022,14 +1022,15 @@ func handleGetInfo(s *rpcServer, cmd btcjson.Cmd) (interface{}, error) {
 		return nil, btcjson.ErrDifficulty
 	}
 
-	ret := map[string]interface{}{
-		"version":         1000000*appMajor + 10000*appMinor + 100*appPatch,
-		"protocolversion": btcwire.ProtocolVersion,
-		"blocks":          height,
-		"timeoffset":      0,
-		"proxy":           cfg.Proxy,
-		"difficulty":      getDifficultyRatio(blkHeader.Bits),
-		"testnet":         cfg.TestNet3,
+	ret := &btcjson.InfoResult{
+		Version:         int(1000000*appMajor + 10000*appMinor + 100*appPatch),
+		ProtocolVersion: int(btcwire.ProtocolVersion),
+		Blocks:          int(height),
+		TimeOffset:      0,
+		Proxy:           cfg.Proxy,
+		Difficulty:      getDifficultyRatio(blkHeader.Bits),
+		TestNet:         cfg.TestNet3,
+		RelayFee:        float64(minTxRelayFee) / float64(btcutil.SatoshiPerBitcoin),
 	}
 
 	return ret, nil
