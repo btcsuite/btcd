@@ -46,11 +46,12 @@ https://github.com/conformal/btcd/releases
   http://golang.org/doc/install
 
 - Run the following command to obtain btcd, all dependencies, and install it:
-  ```$ go get github.com/conformal/btcd```
+  ```$ go get github.com/conformal/btcd/...```
 
-- btcd will now be installed in either ```$GOROOT/bin``` or ```$GOPATH/bin```
-  depending on your configuration.  If you did not already add to your system
-  path during the installation, we recommend you do so now.
+- btcd (and utilities) will now be installed in either ```$GOROOT/bin``` or
+  ```$GOPATH/bin``` depending on your configuration.  If you did not already
+  add the bin directory to your system path during Go installation, we
+  recommend you do so now.
 
 ## Updating
 
