@@ -1819,6 +1819,11 @@ func opcodeCheckSigVerify(op *parsedOpcode, s *Script) error {
 	return err
 }
 
+type sig struct {
+	s  *btcec.Signature
+	ht byte
+}
+
 // stack; sigs <numsigs> pubkeys <numpubkeys>
 func opcodeCheckMultiSig(op *parsedOpcode, s *Script) error {
 
@@ -1857,21 +1862,25 @@ func opcodeCheckMultiSig(op *parsedOpcode, s *Script) error {
 	nsig := int(numSignatures.Int64())
 
 	sigStrings := make([][]byte, nsig)
-	signatures := make([]*btcec.Signature, 0, nsig)
+	signatures := make([]sig, 0, nsig)
 	for i := range sigStrings {
 		sigStrings[i], err = s.dstack.PopByteArray()
 		if err != nil {
 			return err
 		}
-		var sig *btcec.Signature
+		if len(sigStrings[i]) == 0 {
+			continue
+		}
+		sig := sig{}
+		sig.ht = sigStrings[i][len(sigStrings[i])-1]
 		// skip off the last byte for hashtype
 		if s.der {
-			sig, err =
+			sig.s, err =
 				btcec.ParseDERSignature(
 					sigStrings[i][:len(sigStrings[i])-1],
 					btcec.S256())
 		} else {
-			sig, err =
+			sig.s, err =
 				btcec.ParseSignature(
 					sigStrings[i][:len(sigStrings[i])-1],
 					btcec.S256())
@@ -1906,10 +1915,8 @@ func opcodeCheckMultiSig(op *parsedOpcode, s *Script) error {
 	for i := range signatures {
 		// check signatures.
 		success := false
-		// get hashtype from original byte string
-		hashType := sigStrings[i][len(sigStrings[i])-1]
 
-		hash := calcScriptHash(script, hashType, &s.tx, s.txidx)
+		hash := calcScriptHash(script, signatures[i].ht, &s.tx, s.txidx)
 	inner:
 		// Find first pubkey that successfully validates signature.
 		// we start off the search from the key that was successful
@@ -1924,7 +1931,7 @@ func opcodeCheckMultiSig(op *parsedOpcode, s *Script) error {
 				}
 			}
 			success = ecdsa.Verify(pubKeys[curPk], hash,
-				signatures[i].R, signatures[i].S)
+				signatures[i].s.R, signatures[i].s.S)
 			if success {
 				break inner
 			}
