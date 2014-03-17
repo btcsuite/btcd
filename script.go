@@ -754,7 +754,7 @@ func removeOpcode(pkscript []parsedOpcode, opcode byte) []parsedOpcode {
 func removeOpcodeByData(pkscript []parsedOpcode, data []byte) []parsedOpcode {
 	retScript := make([]parsedOpcode, 0, len(pkscript))
 	for _, pop := range pkscript {
-		if !bytes.Equal(pop.data, data) {
+		if !bytes.Contains(pop.data, data) {
 			retScript = append(retScript, pop)
 		}
 	}
