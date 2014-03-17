@@ -1200,7 +1200,7 @@ var txTests = []txTest{
 		scriptInfo: btcscript.ScriptInfo{
 			PkScriptClass:  btcscript.ScriptHashTy,
 			NumInputs:      2,
-			ExpectedInputs: 1,
+			ExpectedInputs: 2,
 			SigOps:         1,
 		},
 	},
@@ -1780,6 +1780,7 @@ func TestScriptInfo(t *testing.T) {
 			name: "multisig script",
 			sigScript: []byte{btcscript.OP_TRUE,
 				btcscript.OP_TRUE, btcscript.OP_TRUE,
+				btcscript.OP_0, // Extra arg for OP_CHECKMULTISIG bug
 			},
 			pkScript: []byte{
 				btcscript.OP_3, btcscript.OP_DATA_33,
@@ -1802,8 +1803,8 @@ func TestScriptInfo(t *testing.T) {
 			bip16: true,
 			scriptInfo: btcscript.ScriptInfo{
 				PkScriptClass:  btcscript.MultiSigTy,
-				NumInputs:      3,
-				ExpectedInputs: 3,
+				NumInputs:      4,
+				ExpectedInputs: 4,
 				SigOps:         3,
 			},
 		},

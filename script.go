@@ -1128,11 +1128,13 @@ func expectedInputs(pops []parsedOpcode, class ScriptClass) int {
 		return 1
 	case MultiSigTy:
 		// Standard multisig has a push a small number for the number
-		// of sigs and number of keys.
-		// Check the first push instruction to see how many arguments
-		// are expected. typeOfScript already checked this so we know
-		// it'll be a small int.
-		return asSmallInt(pops[0].opcode)
+		// of sigs and number of keys.  Check the first push instruction
+		// to see how many arguments are expected. typeOfScript already
+		// checked this so we know it'll be a small int.  Also, due to
+		// the original bitcoind bug where OP_CHECKMULTISIG pops an
+		// additional item from the stack, add an extra expected input
+		// for the extra push that is required to compensate.
+		return asSmallInt(pops[0].opcode) + 1
 	case NullDataTy:
 		fallthrough
 	default:
