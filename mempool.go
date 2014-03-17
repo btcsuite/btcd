@@ -890,7 +890,7 @@ func (mp *txMemPool) maybeAcceptTransaction(tx *btcutil.Tx, isOrphan *bool, isNe
 		oldTotal := mp.pennyTotal
 
 		mp.pennyTotal += float64(tx.MsgTx().SerializeSize())
-		txmpLog.Debugf("rate limit: curTotal %v, nextTotal: %v, "+
+		txmpLog.Tracef("rate limit: curTotal %v, nextTotal: %v, "+
 			"limit %v", oldTotal, mp.pennyTotal,
 			cfg.FreeTxRelayLimit*10*1000)
 	}
