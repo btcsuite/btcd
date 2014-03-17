@@ -19,14 +19,14 @@ change.
 	// Import packages.
 	import (
 		"github.com/conformal/btcdb"
-		_ "github.com/conformal/btcdb/sqlite3"
+		_ "github.com/conformal/btcdb/ldb"
 		"github.com/conformal/btcutil"
 		"github.com/conformal/btcwire"
 	)
 
 	// Create a database and schedule it to be closed on exit.
-	dbName := "example.db"
-	db, err := btcdb.CreateDB("sqlite", dbName)
+	dbName := "example"
+	db, err := btcdb.CreateDB("leveldb", dbName)
 	if err != nil {
 		// Log and handle the error
 	}
