@@ -355,8 +355,8 @@ func checkInputsStandard(tx *btcutil.Tx, txStore btcchain.TxStore) error {
 		// inputs does not match the number of expected inputs.
 		if scriptInfo.NumInputs != scriptInfo.ExpectedInputs {
 			str := fmt.Sprintf("transaction input #%d expects %d "+
-				"inputs, but referenced output script only "+
-				"provides %d", i, scriptInfo.ExpectedInputs,
+				"inputs, but referenced output script provides "+
+				"%d", i, scriptInfo.ExpectedInputs,
 				scriptInfo.NumInputs)
 			return TxRuleError(str)
 		}
