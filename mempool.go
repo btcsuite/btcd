@@ -999,7 +999,7 @@ func (mp *txMemPool) processOrphans(hash *btcwire.ShaHash) error {
 // rules, orphan transaction handling, and insertion into the memory pool.
 //
 // This function is safe for concurrent access.
-func (mp *txMemPool) ProcessTransaction(tx *btcutil.Tx) error {
+func (mp *txMemPool) ProcessTransaction(tx *btcutil.Tx, allowOrphan bool) error {
 	// Protect concurrent access.
 	mp.Lock()
 	defer mp.Unlock()
@@ -1026,8 +1026,13 @@ func (mp *txMemPool) ProcessTransaction(tx *btcutil.Tx) error {
 			return err
 		}
 	} else {
-		// When the transaction is an orphan (has inputs missing),
-		// potentially add it to the orphan pool.
+		// The transaction is an orphan (has inputs missing).  Reject
+		// it if the flag to allow orphans is not set.
+		if !allowOrphan {
+			return TxRuleError("transaction spends unknown inputs")
+		}
+
+		// Potentially add the orphan transaction to the orphan pool.
 		err := mp.maybeAddOrphan(tx)
 		if err != nil {
 			return err
