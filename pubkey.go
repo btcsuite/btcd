@@ -6,6 +6,7 @@ package btcec
 
 import (
 	"crypto/ecdsa"
+	"errors"
 	"fmt"
 	"math/big"
 )
@@ -52,6 +53,10 @@ const (
 func ParsePubKey(pubKeyStr []byte, curve *KoblitzCurve) (key *ecdsa.PublicKey, err error) {
 	pubkey := ecdsa.PublicKey{}
 	pubkey.Curve = curve
+
+	if len(pubKeyStr) == 0 {
+		return nil, errors.New("pubkey string is empty")
+	}
 
 	format := pubKeyStr[0]
 	ybit := (format & 0x1) == 0x1
