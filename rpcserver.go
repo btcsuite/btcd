@@ -1399,7 +1399,7 @@ func handleSendRawTransaction(s *rpcServer, cmd btcjson.Cmd) (interface{}, error
 		}
 		err = btcjson.Error{
 			Code:    btcjson.ErrDeserialization.Code,
-			Message: "TX rejected",
+			Message: fmt.Sprintf("TX rejected: %v", err),
 		}
 		return nil, err
 	}
