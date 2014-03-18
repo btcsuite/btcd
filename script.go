@@ -325,6 +325,32 @@ func IsPushOnlyScript(script []byte) bool {
 	return isPushOnly(pops)
 }
 
+// canonicalPush returns true if the object is either not a push instruction
+// or the push instruction contained wherein is matches the canonical form
+// or using the smallest instruction to do the job. False otherwise.
+func canonicalPush(pop parsedOpcode) bool {
+	opcode := pop.opcode.value
+	data := pop.data
+	dataLen := len(pop.data)
+	if opcode > OP_16 {
+		return true
+	}
+
+	if opcode < OP_PUSHDATA1 && opcode > OP_0 && (dataLen == 1 && data[0] <= 16) {
+		return false
+	}
+	if opcode == OP_PUSHDATA1 && dataLen < OP_PUSHDATA1 {
+		return false
+	}
+	if opcode == OP_PUSHDATA2 && dataLen <= 0xff {
+		return false
+	}
+	if opcode == OP_PUSHDATA4 && dataLen <= 0xffff {
+		return false
+	}
+	return true
+}
+
 // HasCanonicalPushes returns whether or not the passed script only contains
 // canonical data pushes.  A canonical data push one where the fewest number of
 // bytes possible to encode the size of the data being pushed is used.  This
@@ -337,22 +363,7 @@ func HasCanonicalPushes(script []byte) bool {
 	}
 
 	for _, pop := range pops {
-		opcode := pop.opcode.value
-		data := pop.data
-		dataLen := len(pop.data)
-		if opcode > OP_16 {
-			continue
-		}
-		if opcode < OP_PUSHDATA1 && opcode > OP_0 && (dataLen == 1 && data[0] <= 16) {
-			return false
-		}
-		if opcode == OP_PUSHDATA1 && dataLen < OP_PUSHDATA1 {
-			return false
-		}
-		if opcode == OP_PUSHDATA2 && dataLen <= 0xff {
-			return false
-		}
-		if opcode == OP_PUSHDATA4 && dataLen <= 0xffff {
+		if !canonicalPush(pop) {
 			return false
 		}
 	}
@@ -754,7 +765,7 @@ func removeOpcode(pkscript []parsedOpcode, opcode byte) []parsedOpcode {
 func removeOpcodeByData(pkscript []parsedOpcode, data []byte) []parsedOpcode {
 	retScript := make([]parsedOpcode, 0, len(pkscript))
 	for _, pop := range pkscript {
-		if !bytes.Contains(pop.data, data) {
+		if !canonicalPush(pop) || !bytes.Contains(pop.data, data) {
 			retScript = append(retScript, pop)
 		}
 	}
