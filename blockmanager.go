@@ -986,8 +986,17 @@ func (b *blockManager) handleNotifyMsg(notification *btcchain.Notification) {
 			b.server.txMemPool.RemoveDoubleSpends(tx)
 		}
 
-		// Notify registered websocket clients
+		// If the RPC server is enabled:
 		if r := b.server.rpcServer; r != nil {
+			// Remove also InvVects belonging to txs submitted to the RPC server
+			// using sendrawtransactions that are in the InvVect map of tx and
+			// must be periodically resent throughout the network until they are
+			// included in a block (see server.go in /btcd)
+			for _, tx := range block.Transactions()[1:] {
+				b.server.RemRebroadcastInventory(btcwire.NewInvVect(btcwire.InvTypeTx, tx.Sha()))
+			}
+
+			// Notify registered websocket clients of incoming block
 			r.ntfnMgr.NotifyBlockConnected(block)
 		}
 
