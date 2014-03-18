@@ -389,7 +389,7 @@ func (b *blockManager) handleTxMsg(tmsg *txMsg) {
 
 	// Process the transaction to include validation, insertion in the
 	// memory pool, orphan handling, etc.
-	err := tmsg.peer.server.txMemPool.ProcessTransaction(tmsg.tx)
+	err := tmsg.peer.server.txMemPool.ProcessTransaction(tmsg.tx, true)
 
 	// Remove transaction from request maps. Either the mempool/chain
 	// already knows about it and as such we shouldn't have any more
@@ -986,17 +986,18 @@ func (b *blockManager) handleNotifyMsg(notification *btcchain.Notification) {
 			b.server.txMemPool.RemoveDoubleSpends(tx)
 		}
 
-		// If the RPC server is enabled:
 		if r := b.server.rpcServer; r != nil {
 			// Remove also InvVects belonging to txs submitted to the RPC server
-			// using sendrawtransactions that are in the InvVect map of tx and
+			// using sendrawtransaction that are in the InvVect map of tx and
 			// must be periodically resent throughout the network until they are
-			// included in a block (see server.go in /btcd)
+			// included in a block (see server.go in /btcd). We start at 1 ([1:])
+			// in the loop so that we do not bother trying to remove a coinbase
+			// tx.
 			for _, tx := range block.Transactions()[1:] {
 				b.server.RemRebroadcastInventory(btcwire.NewInvVect(btcwire.InvTypeTx, tx.Sha()))
 			}
 
-			// Notify registered websocket clients of incoming block
+			// Notify registered websocket clients of incoming block.
 			r.ntfnMgr.NotifyBlockConnected(block)
 		}
 
@@ -1020,7 +1021,7 @@ func (b *blockManager) handleNotifyMsg(notification *btcchain.Notification) {
 			}
 		}
 
-		// Notify registered websocket clients
+		// Notify registered websocket clients.
 		if r := b.server.rpcServer; r != nil {
 			r.ntfnMgr.NotifyBlockDisconnected(block)
 		}

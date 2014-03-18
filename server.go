@@ -24,8 +24,9 @@ import (
 // These constants are used by the DNS seed code to pick a random last seen
 // time.
 const (
-	secondsIn3Days int32 = 24 * 60 * 60 * 3
-	secondsIn4Days int32 = 24 * 60 * 60 * 4
+	secondsIn3Days    int32  = 24 * 60 * 60 * 3
+	secondsIn4Days    int32  = 24 * 60 * 60 * 4
+	rand16BitsTo0To29 uint16 = 2185 // ceil(2^16 / 30)
 )
 
 const (
@@ -65,7 +66,7 @@ type server struct {
 	blockManager      *blockManager
 	txMemPool         *txMemPool
 	addRebroadcastInv chan *btcwire.InvVect
-	remRebroadcastInv chan *btcwire.InvVect
+	delRebroadcastInv chan *btcwire.InvVect
 	newPeers          chan *peer
 	donePeers         chan *peer
 	banPeers          chan *peer
@@ -90,12 +91,12 @@ type peerState struct {
 
 // Add an InvVect (corresponding to an RPC-submitted tx) to a map of them
 func (s *server) AddRebroadcastInventory(iv *btcwire.InvVect) {
-	s.addRebroadcastInv <- iv // Send to rebroadcastHandler for removal
+	s.addRebroadcastInv <- iv
 }
 
 // Remove an InvVect (corresponding to an RPC-submitted tx) to a map of them
 func (s *server) RemRebroadcastInventory(iv *btcwire.InvVect) {
-	s.remRebroadcastInv <- iv // Send to rebroadcastHandler for removal
+	s.delRebroadcastInv <- iv
 }
 
 func (p *peerState) Count() int {
@@ -729,48 +730,44 @@ func (s *server) NetTotals() (uint64, uint64) {
 // submitted tx eventually enter a block, we need to retransmit them
 // periodically until we see them actually enter a block.
 func (s *server) rebroadcastHandler() {
-	timer := time.NewTimer(0 * time.Second) // Immediately broadcast local tx list
+	timer := time.NewTimer(5 * time.Minute) // Wait 5 min before first tx rebroadcast.
 	pendingInvs := make(map[btcwire.InvVect]struct{})
 
 out:
 	for {
 		select {
-		// Incoming InvVects are added to our hashmap of RPC txs; called by
-		// handleSendRawTransaction in rpcserver.go (/btcd).
+		// Incoming InvVects are added to our hashmap of RPC txs.
 		case iv := <-s.addRebroadcastInv:
-			srvrLog.Infof("I'm adding iv %s in my iv channel", iv.Hash)
 			pendingInvs[*iv] = struct{}{}
 
-		// When an InvVect has been added to a block, we can now remove it; called
-		// by handleNotifyMsg in blockmanager.go (/btcd); note that we need to
-		// check if the iv is actually found in the map before we try to delete it,
-		// as when handleNotifyMsg finds a new block it cycles through the txs and
-		// sends them all indescriminately to this function. The if loop is cheap,
-		// so this should not be an issue.
-		case iv := <-s.remRebroadcastInv:
+		// When an InvVect has been added to a block, we can now remove it; note
+		// that we need to check if the iv is actually found in the map before we
+		// try to delete it, as when handleNotifyMsg finds a new block it cycles
+		// through the txs and sends them all indescriminately to this function.
+		// The if loop is cheap, so this should not be an issue.
+		case iv := <-s.delRebroadcastInv:
 			if _, ok := pendingInvs[*iv]; ok {
-				srvrLog.Infof("I found iv %s in my iv channel, deleting it", iv.Hash)
 				delete(pendingInvs, *iv)
 			}
 
-		// When the timer goes over, scan through all the InvVects of RPC-submitted
+		// When the timer triggers, scan through all the InvVects of RPC-submitted
 		// tx and cause the server to resubmit them to peers, as they have not
 		// been added to incoming blocks.
 		case <-timer.C:
 			for iv := range pendingInvs {
-				srvrLog.Infof("Re-relaying RPC transactions not included in a block", iv.Hash)
-				s.RelayInventory(&iv)
+				ivCopy := iv
+				s.RelayInventory(&ivCopy)
 			}
 
-			// Generate a random number from 0 --> 2^16
+			// Generate a random number from 0 --> 2^16.
 			var randomNumber uint16
 			binary.Read(rand.Reader, binary.LittleEndian, &randomNumber)
 
 			// We want resubmission every 1,...,30 minutes at random intervals,
 			// similar to bitcoind's ResendWalletTransactions, so what we do is
-			// add 1 and divide our random number by 2185, giving us a timing of
-			// 1, ... , 30
-			timer.Reset(time.Minute * time.Duration(((randomNumber + 1) / 2185)))
+			// divide our random number by rand16BitsTo0To29, mul by time.Minute
+			// and add a time.Minute to get a random time from 1 min ... 30 min.
+			timer.Reset((time.Minute * time.Duration(((randomNumber) / rand16BitsTo0To29))) + time.Minute)
 
 		case <-s.quit:
 			break out
@@ -778,11 +775,6 @@ out:
 	}
 
 	timer.Stop()
-
-	// We are done with our channels and may close them; if they're still being
-	// accessed afterwards something has gone horribly wrong
-	close(s.addRebroadcastInv)
-	close(s.remRebroadcastInv)
 
 	s.wg.Done()
 }
@@ -1129,7 +1121,7 @@ func newServer(listenAddrs []string, db btcdb.Db, btcnet btcwire.BitcoinNet) (*s
 		broadcast:         make(chan broadcastMsg, cfg.MaxPeers),
 		quit:              make(chan bool),
 		addRebroadcastInv: make(chan *btcwire.InvVect),
-		remRebroadcastInv: make(chan *btcwire.InvVect),
+		delRebroadcastInv: make(chan *btcwire.InvVect),
 		nat:               nat,
 		db:                db,
 	}

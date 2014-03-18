@@ -1382,7 +1382,7 @@ func handleSendRawTransaction(s *rpcServer, cmd btcjson.Cmd) (interface{}, error
 	}
 
 	tx := btcutil.NewTx(msgtx)
-	err = s.server.txMemPool.ProcessTransaction(tx)
+	err = s.server.txMemPool.ProcessTransaction(tx, false)
 	if err != nil {
 		// When the error is a rule error, it means the transaction was
 		// simply rejected as opposed to something actually going wrong,
@@ -1404,9 +1404,10 @@ func handleSendRawTransaction(s *rpcServer, cmd btcjson.Cmd) (interface{}, error
 		return nil, err
 	}
 
-	// We keep track of all the RPC calls to this function because it's possible
-	// that they may need to be periodically rebroadcast, for instance if the
-	// client was offline when they were generated.  Refer to server.go in /btcd.
+	// We keep track of all the sendrawtransaction request txs because we need to
+	// rebroadcast them if they fail to get broadcast or entered into a block; for
+	// instance if the client was offline when they were generated.  Refer to
+	// server.go in /btcd.
 	s.server.AddRebroadcastInventory(btcwire.NewInvVect(btcwire.InvTypeTx, tx.Sha()))
 
 	return tx.Sha().String(), nil
