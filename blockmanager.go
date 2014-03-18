@@ -404,7 +404,8 @@ func (b *blockManager) handleTxMsg(tmsg *txMsg) {
 		// so log it as such.  Otherwise, something really did go wrong,
 		// so log it as an actual error.
 		if _, ok := err.(TxRuleError); ok {
-			bmgrLog.Debugf("Rejected transaction %v: %v", txHash, err)
+			bmgrLog.Debugf("Rejected transaction %v from %s: %v", txHash,
+				tmsg.peer, err)
 		} else {
 			bmgrLog.Errorf("Failed to process transaction %v: %v", txHash, err)
 		}
@@ -500,7 +501,8 @@ func (b *blockManager) handleBlockMsg(bmsg *blockMsg) {
 		// it as such.  Otherwise, something really did go wrong, so log
 		// it as an actual error.
 		if _, ok := err.(btcchain.RuleError); ok {
-			bmgrLog.Infof("Rejected block %v: %v", blockSha, err)
+			bmgrLog.Infof("Rejected block %v from %s: %v", blockSha,
+				bmsg.peer, err)
 		} else {
 			bmgrLog.Errorf("Failed to process block %v: %v", blockSha, err)
 		}
