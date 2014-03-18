@@ -99,6 +99,7 @@ type txMemPool struct {
 	outpoints     map[btcwire.OutPoint]*btcutil.Tx
 	pennyTotal    float64 // exponentially decaying total for penny spends.
 	lastPennyUnix int64   // unix time of last ``penny spend''
+
 }
 
 // isDust returns whether or not the passed transaction output amount is
@@ -911,7 +912,6 @@ func (mp *txMemPool) maybeAcceptTransaction(tx *btcutil.Tx, isOrphan *bool, isNe
 	// Notify websocket clients about mempool transactions.
 	if mp.server.rpcServer != nil {
 		mp.server.rpcServer.ntfnMgr.NotifyMempoolTx(tx, isNew)
-
 	}
 
 	return nil
