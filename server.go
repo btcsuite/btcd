@@ -6,6 +6,8 @@ package main
 
 import (
 	"container/list"
+	"crypto/rand"
+	"encoding/binary"
 	"errors"
 	"fmt"
 	"github.com/conformal/btcdb"
@@ -49,30 +51,32 @@ type broadcastMsg struct {
 // server provides a bitcoin server for handling communications to and from
 // bitcoin peers.
 type server struct {
-	nonce         uint64
-	listeners     []net.Listener
-	btcnet        btcwire.BitcoinNet
-	started       int32      // atomic
-	shutdown      int32      // atomic
-	shutdownSched int32      // atomic
-	bytesMutex    sync.Mutex // For the following two fields.
-	bytesReceived uint64     // Total bytes received from all peers since start.
-	bytesSent     uint64     // Total bytes sent by all peers since start.
-	addrManager   *AddrManager
-	rpcServer     *rpcServer
-	blockManager  *blockManager
-	txMemPool     *txMemPool
-	newPeers      chan *peer
-	donePeers     chan *peer
-	banPeers      chan *peer
-	wakeup        chan bool
-	query         chan interface{}
-	relayInv      chan *btcwire.InvVect
-	broadcast     chan broadcastMsg
-	wg            sync.WaitGroup
-	quit          chan bool
-	nat           NAT
-	db            btcdb.Db
+	nonce             uint64
+	listeners         []net.Listener
+	btcnet            btcwire.BitcoinNet
+	started           int32      // atomic
+	shutdown          int32      // atomic
+	shutdownSched     int32      // atomic
+	bytesMutex        sync.Mutex // For the following two fields.
+	bytesReceived     uint64     // Total bytes received from all peers since start.
+	bytesSent         uint64     // Total bytes sent by all peers since start.
+	addrManager       *AddrManager
+	rpcServer         *rpcServer
+	blockManager      *blockManager
+	txMemPool         *txMemPool
+	addRebroadcastInv chan *btcwire.InvVect
+	remRebroadcastInv chan *btcwire.InvVect
+	newPeers          chan *peer
+	donePeers         chan *peer
+	banPeers          chan *peer
+	wakeup            chan bool
+	query             chan interface{}
+	relayInv          chan *btcwire.InvVect
+	broadcast         chan broadcastMsg
+	wg                sync.WaitGroup
+	quit              chan bool
+	nat               NAT
+	db                btcdb.Db
 }
 
 type peerState struct {
@@ -82,6 +86,16 @@ type peerState struct {
 	banned           map[string]time.Time
 	outboundGroups   map[string]int
 	maxOutboundPeers int
+}
+
+// Add an InvVect (corresponding to an RPC-submitted tx) to a map of them
+func (s *server) AddRebroadcastInventory(iv *btcwire.InvVect) {
+	s.addRebroadcastInv <- iv // Send to rebroadcastHandler for removal
+}
+
+// Remove an InvVect (corresponding to an RPC-submitted tx) to a map of them
+func (s *server) RemRebroadcastInventory(iv *btcwire.InvVect) {
+	s.remRebroadcastInv <- iv // Send to rebroadcastHandler for removal
 }
 
 func (p *peerState) Count() int {
@@ -706,6 +720,73 @@ func (s *server) NetTotals() (uint64, uint64) {
 	return s.bytesReceived, s.bytesSent
 }
 
+// rebroadcastHandler is a listener that uses a couple of channels to maintain
+// a list of transactions that need to be rebroadcast.  The list of tx is stored
+// in their abstracted P2P form (InvVect) in a map (pendingInvs).
+// Why we need this:
+// We handle user submitted tx, e.g. from a wallet, via the RPC submission
+// function sendrawtransactions.  Because we need to ensure that user-
+// submitted tx eventually enter a block, we need to retransmit them
+// periodically until we see them actually enter a block.
+func (s *server) rebroadcastHandler() {
+	timer := time.NewTimer(0 * time.Second) // Immediately broadcast local tx list
+	pendingInvs := make(map[btcwire.InvVect]struct{})
+
+out:
+	for {
+		select {
+		// Incoming InvVects are added to our hashmap of RPC txs; called by
+		// handleSendRawTransaction in rpcserver.go (/btcd).
+		case iv := <-s.addRebroadcastInv:
+			srvrLog.Infof("I'm adding iv %s in my iv channel", iv.Hash)
+			pendingInvs[*iv] = struct{}{}
+
+		// When an InvVect has been added to a block, we can now remove it; called
+		// by handleNotifyMsg in blockmanager.go (/btcd); note that we need to
+		// check if the iv is actually found in the map before we try to delete it,
+		// as when handleNotifyMsg finds a new block it cycles through the txs and
+		// sends them all indescriminately to this function. The if loop is cheap,
+		// so this should not be an issue.
+		case iv := <-s.remRebroadcastInv:
+			if _, ok := pendingInvs[*iv]; ok {
+				srvrLog.Infof("I found iv %s in my iv channel, deleting it", iv.Hash)
+				delete(pendingInvs, *iv)
+			}
+
+		// When the timer goes over, scan through all the InvVects of RPC-submitted
+		// tx and cause the server to resubmit them to peers, as they have not
+		// been added to incoming blocks.
+		case <-timer.C:
+			for iv := range pendingInvs {
+				srvrLog.Infof("Re-relaying RPC transactions not included in a block", iv.Hash)
+				s.RelayInventory(&iv)
+			}
+
+			// Generate a random number from 0 --> 2^16
+			var randomNumber uint16
+			binary.Read(rand.Reader, binary.LittleEndian, &randomNumber)
+
+			// We want resubmission every 1,...,30 minutes at random intervals,
+			// similar to bitcoind's ResendWalletTransactions, so what we do is
+			// add 1 and divide our random number by 2185, giving us a timing of
+			// 1, ... , 30
+			timer.Reset(time.Minute * time.Duration(((randomNumber + 1) / 2185)))
+
+		case <-s.quit:
+			break out
+		}
+	}
+
+	timer.Stop()
+
+	// We are done with our channels and may close them; if they're still being
+	// accessed afterwards something has gone horribly wrong
+	close(s.addRebroadcastInv)
+	close(s.remRebroadcastInv)
+
+	s.wg.Done()
+}
+
 // Start begins accepting connections from peers.
 func (s *server) Start() {
 	// Already started?
@@ -726,13 +807,18 @@ func (s *server) Start() {
 	// managers.
 	s.wg.Add(1)
 	go s.peerHandler()
+
 	if s.nat != nil {
 		s.wg.Add(1)
 		go s.upnpUpdateThread()
 	}
 
-	// Start the RPC server if it's not disabled.
+	// Start the rebroadcastHandler, which ensures user tx received by
+	// the RPC server are rebroadcast until being included in a block.
+	// Then, start the RPC server if it's enabled.
 	if !cfg.DisableRPC {
+		s.wg.Add(1)
+		go s.rebroadcastHandler()
 		s.rpcServer.Start()
 	}
 }
@@ -1030,20 +1116,22 @@ func newServer(listenAddrs []string, db btcdb.Db, btcnet btcwire.BitcoinNet) (*s
 	}
 
 	s := server{
-		nonce:       nonce,
-		listeners:   listeners,
-		btcnet:      btcnet,
-		addrManager: amgr,
-		newPeers:    make(chan *peer, cfg.MaxPeers),
-		donePeers:   make(chan *peer, cfg.MaxPeers),
-		banPeers:    make(chan *peer, cfg.MaxPeers),
-		wakeup:      make(chan bool),
-		query:       make(chan interface{}),
-		relayInv:    make(chan *btcwire.InvVect, cfg.MaxPeers),
-		broadcast:   make(chan broadcastMsg, cfg.MaxPeers),
-		quit:        make(chan bool),
-		nat:         nat,
-		db:          db,
+		nonce:             nonce,
+		listeners:         listeners,
+		btcnet:            btcnet,
+		addrManager:       amgr,
+		newPeers:          make(chan *peer, cfg.MaxPeers),
+		donePeers:         make(chan *peer, cfg.MaxPeers),
+		banPeers:          make(chan *peer, cfg.MaxPeers),
+		wakeup:            make(chan bool),
+		query:             make(chan interface{}),
+		relayInv:          make(chan *btcwire.InvVect, cfg.MaxPeers),
+		broadcast:         make(chan broadcastMsg, cfg.MaxPeers),
+		quit:              make(chan bool),
+		addRebroadcastInv: make(chan *btcwire.InvVect),
+		remRebroadcastInv: make(chan *btcwire.InvVect),
+		nat:               nat,
+		db:                db,
 	}
 	bm, err := newBlockManager(&s)
 	if err != nil {
