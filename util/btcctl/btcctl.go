@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"github.com/conformal/btcjson"
 	"github.com/conformal/btcutil"
+	"github.com/conformal/btcws"
 	"github.com/conformal/go-flags"
 	"github.com/davecgh/go-spew/spew"
 	"io/ioutil"
@@ -46,6 +47,7 @@ var (
 // to validate correctness and perform the command.
 var commandHandlers = map[string]*handlerData{
 	"addnode":               {2, 0, displayJSONDump, nil, makeAddNode, "<ip> <add/remove/onetry>"},
+	"createencryptedwallet": {1, 0, displayGeneric, nil, makeCreateEncryptedWallet, "<passphrase>"},
 	"createrawtransaction":  {2, 0, displayGeneric, nil, makeCreateRawTransaction, "\"[{\"txid\":\"id\",\"vout\":n},...]\" \"{\"address\":amount,...}\""},
 	"debuglevel":            {1, 0, displayGeneric, nil, makeDebugLevel, "<levelspec>"},
 	"decoderawtransaction":  {1, 0, displayJSONDump, nil, makeDecodeRawTransaction, "<txhash>"},
@@ -200,6 +202,12 @@ func displayJSONDump(reply interface{}) error {
 func makeAddNode(args []interface{}) (btcjson.Cmd, error) {
 	return btcjson.NewAddNodeCmd("btcctl", args[0].(string),
 		args[1].(string))
+}
+
+// makeCreateEncryptedWallet generates the cmd structure for
+// createencryptedwallet commands.
+func makeCreateEncryptedWallet(args []interface{}) (btcjson.Cmd, error) {
+	return btcws.NewCreateEncryptedWalletCmd("btcctl", args[0].(string)), nil
 }
 
 // makeCreateRawTransaction generates the cmd structure for createrawtransaction
