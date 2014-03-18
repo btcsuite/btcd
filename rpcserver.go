@@ -88,6 +88,7 @@ func init() {
 var rpcAskWallet = map[string]bool{
 	"addmultisigaddress":     true,
 	"backupwallet":           true,
+	"createencryptedwallet":  true,
 	"createmultisig":         true,
 	"dumpprivkey":            true,
 	"dumpwallet":             true,
