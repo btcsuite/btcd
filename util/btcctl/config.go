@@ -30,6 +30,20 @@ type config struct {
 	TlsSkipVerify bool   `long:"skipverify" description:"Do not verify tls certificates (not recommended!)"`
 }
 
+// cleanAndExpandPath expands environement variables and leading ~ in the
+// passed path, cleans the result, and returns it.
+func cleanAndExpandPath(path string) string {
+	// Expand initial ~ to OS specific home directory.
+	if strings.HasPrefix(path, "~") {
+		homeDir := filepath.Dir(btcctlHomeDir)
+		path = strings.Replace(path, "~", homeDir, 1)
+	}
+
+	// NOTE: The os.ExpandEnv doesn't work with Windows-style %VARIABLE%,
+	// but they variables can still be expanded via POSIX-style $VARIABLE.
+	return filepath.Clean(os.ExpandEnv(path))
+}
+
 // loadConfig initializes and parses the config using a config file and command
 // line options.
 //
@@ -87,6 +101,9 @@ func loadConfig() (*flags.Parser, *config, []string, error) {
 	if err != nil {
 		return parser, nil, nil, err
 	}
+
+	// Handle environment variable expansion in the RPC certificate path.
+	cfg.RPCCert = cleanAndExpandPath(cfg.RPCCert)
 
 	return parser, &cfg, remainingArgs, nil
 }
