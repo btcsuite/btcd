@@ -18,7 +18,7 @@ import (
 const (
 	defaultDbType   = "leveldb"
 	defaultDataFile = "bootstrap.dat"
-	defaultProgress = 10000
+	defaultProgress = 10
 )
 
 var (
@@ -36,7 +36,7 @@ type config struct {
 	DbType   string `long:"dbtype" description:"Database backend to use for the Block Chain"`
 	TestNet3 bool   `long:"testnet" description:"Use the test network"`
 	InFile   string `short:"i" long:"infile" description:"File containing the block(s)"`
-	Progress int    `short:"p" long:"progress" description:"Show a progress message every time this number of blocks is processed -- Use 0 to disable progress announcements"`
+	Progress int    `short:"p" long:"progress" description:"Show a progress message each time this number of seconds have passed -- Use 0 to disable progress announcements"`
 }
 
 // filesExists reports whether the named file or directory exists.
