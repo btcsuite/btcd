@@ -14,6 +14,7 @@ import (
 	"github.com/conformal/btcwire"
 	"io"
 	"sync"
+	"time"
 )
 
 var zeroHash = btcwire.ShaHash{}
@@ -38,6 +39,10 @@ type blockImporter struct {
 	wg              sync.WaitGroup
 	blocksProcessed int64
 	blocksImported  int64
+	txProcessed     int64
+	lastHeight      int64
+	lastBlockTime   time.Time
+	lastLogTime     time.Time
 }
 
 // readBlock reads the next block from the input file.
@@ -87,6 +92,7 @@ func (bi *blockImporter) readBlock() ([]byte, error) {
 func (bi *blockImporter) processBlock(serializedBlock []byte) (bool, error) {
 	// Deserialize the block which includes checks for malformed blocks.
 	block, err := btcutil.NewBlockFromBytes(serializedBlock)
+
 	if err != nil {
 		return false, err
 	}
@@ -95,6 +101,10 @@ func (bi *blockImporter) processBlock(serializedBlock []byte) (bool, error) {
 	if err != nil {
 		return false, err
 	}
+
+	// update block statistics
+	bi.txProcessed += int64(len(block.MsgBlock().Transactions))
+	bi.lastBlockTime = block.MsgBlock().Header.Timestamp
 
 	// Skip blocks that already exist.
 	if bi.db.ExistsSha(blockSha) {
@@ -165,6 +175,7 @@ out:
 			}
 
 			bi.blocksProcessed++
+			bi.lastHeight++
 			imported, err := bi.processBlock(serializedBlock)
 			if err != nil {
 				bi.errChan <- err
@@ -175,9 +186,28 @@ out:
 				bi.blocksImported++
 			}
 
-			if cfg.Progress != 0 && bi.blocksProcessed > 0 &&
-				bi.blocksProcessed%int64(cfg.Progress) == 0 {
-				log.Infof("Processed %d blocks", bi.blocksProcessed)
+			// report every cfg.Progress seconds
+			now := time.Now()
+			duration := now.Sub(bi.lastLogTime)
+
+			if  cfg.Progress != 0 && bi.blocksProcessed > 0 &&
+				duration > time.Second * time.Duration(cfg.Progress) {
+				durationMillis := int64(duration / time.Millisecond)
+				tDuration := 10 * time.Millisecond * time.Duration(durationMillis/10)
+				blockStr := "blocks"
+				if bi.blocksProcessed == 1 {
+					blockStr = "block"
+				}
+				txStr := "transactions"
+				if bi.txProcessed == 1 {
+					txStr = "transaction"
+				}
+
+				log.Infof("Processed %d %s in the last %s (%d %s, height %d, %s)",
+					bi.blocksProcessed, blockStr, tDuration, bi.txProcessed,
+					txStr, bi.lastHeight, bi.lastBlockTime)
+
+				bi.lastLogTime = now
 			}
 
 		case <-bi.quit:
@@ -247,5 +277,6 @@ func newBlockImporter(db btcdb.Db, r io.ReadSeeker) *blockImporter {
 		errChan:      make(chan error),
 		quit:         make(chan bool),
 		chain:        btcchain.New(db, activeNetwork, nil),
+		lastLogTime:  time.Now(),
 	}
 }
