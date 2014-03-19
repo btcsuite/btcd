@@ -147,6 +147,7 @@ type peer struct {
 	knownAddresses     map[string]bool
 	knownInventory     *MruInventoryMap
 	knownInvMutex      sync.Mutex
+	versionMutex       sync.Mutex
 	requestedTxns      map[btcwire.ShaHash]bool // owned by blockmanager
 	requestedBlocks    map[btcwire.ShaHash]bool // owned by blockmanager
 	lastBlock          int32
@@ -197,6 +198,26 @@ func (p *peer) AddKnownInventory(invVect *btcwire.InvVect) {
 	defer p.knownInvMutex.Unlock()
 
 	p.knownInventory.Add(invVect)
+}
+
+// isVersionKnown returns the value of versionKnown held in p, which indicates
+// whether or not we know the version of the peer's software.  It is safe for
+// concurrent access.
+func (p *peer) isVersionKnown() bool {
+	p.versionMutex.Lock()
+	defer p.versionMutex.Unlock()
+
+	return p.versionKnown
+}
+
+// setVersionKnown sets the versionKnown flag held in p, which indicates whether or
+// not we know the version of the peer's software.  It is safe for concurrent
+// access.
+func (p *peer) setVersionKnown(flagInput bool) {
+	p.versionMutex.Lock()
+	defer p.versionMutex.Unlock()
+
+	p.versionKnown = flagInput
 }
 
 // pushVersionMsg sends a version message to the connected peer using the
@@ -265,7 +286,7 @@ func (p *peer) handleVersionMsg(msg *btcwire.MsgVersion) {
 	}
 
 	// Limit to one version message per peer.
-	if p.versionKnown {
+	if p.isVersionKnown() {
 		p.logError("Only one version message per peer is allowed %s.",
 			p)
 		p.Disconnect()
@@ -274,7 +295,7 @@ func (p *peer) handleVersionMsg(msg *btcwire.MsgVersion) {
 
 	// Negotiate the protocol version.
 	p.protocolVersion = minUint32(p.protocolVersion, uint32(msg.ProtocolVersion))
-	p.versionKnown = true
+	p.setVersionKnown(true)
 	peerLog.Debugf("Negotiated protocol version %d for peer %s",
 		p.protocolVersion, p)
 	p.lastBlock = msg.LastBlock
@@ -988,7 +1009,7 @@ func (p *peer) writeMessage(msg btcwire.Message) {
 	if atomic.LoadInt32(&p.disconnect) != 0 {
 		return
 	}
-	if !p.versionKnown {
+	if !p.isVersionKnown() {
 		switch msg.(type) {
 		case *btcwire.MsgVersion:
 			// This is OK.
@@ -1068,7 +1089,7 @@ func (p *peer) inHandler() {
 	idleTimer := time.AfterFunc(negotiateTimeoutSeconds*time.Second, func() {
 		// XXX technically very very very slightly racy, doesn't really
 		// matter.
-		if p.versionKnown {
+		if p.isVersionKnown() {
 			peerLog.Warnf("Peer %s no answer for %d minutes, "+
 				"disconnecting", p, idleTimeoutMinutes)
 		}
@@ -1101,7 +1122,7 @@ out:
 		p.lastRecv = time.Now()
 
 		// Ensure version message comes first.
-		if _, ok := rmsg.(*btcwire.MsgVersion); !ok && !p.versionKnown {
+		if _, ok := rmsg.(*btcwire.MsgVersion); !ok && !p.isVersionKnown() {
 			p.logError("A version message must precede all others")
 			break out
 		}
@@ -1193,7 +1214,7 @@ out:
 	p.server.donePeers <- p
 
 	// Only tell block manager we are gone if we ever told it we existed.
-	if p.versionKnown {
+	if p.isVersionKnown() {
 		p.server.blockManager.DonePeer(p)
 	}
 
@@ -1258,7 +1279,7 @@ out:
 
 		case iv := <-p.outputInvChan:
 			// No handshake?  They'll find out soon enough.
-			if p.versionKnown {
+			if p.isVersionKnown() {
 				invSendQueue.PushBack(iv)
 			}
 
