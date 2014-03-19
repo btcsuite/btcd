@@ -489,7 +489,7 @@ func TestAddresses(t *testing.T) {
 		var err error
 		if test.canDecode {
 			// Decode addr and compare error against valid.
-			decoded, err = btcutil.DecodeAddr(test.addr)
+			decoded, err = btcutil.DecodeAddress(test.addr)
 			if (err == nil) != test.valid {
 				t.Errorf("%v: decoding test failed", test.name)
 				return

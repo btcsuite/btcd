@@ -116,14 +116,9 @@ type Address interface {
 	IsForNet(btcwire.BitcoinNet) bool
 }
 
-// DecodeAddr decodes the string encoding of an address and returns
+// DecodeAddress decodes the string encoding of an address and returns
 // the Address if addr is a valid encoding for a known address type.
-//
-// This is named DecodeAddr and not DecodeAddress due to DecodeAddress
-// already being defined for an old api.  When the old api is eventually
-// removed, a proper DecodeAddress function will be added, and DecodeAddr
-// will become deprecated.
-func DecodeAddr(addr string) (Address, error) {
+func DecodeAddress(addr string) (Address, error) {
 	decoded := Base58Decode(addr)
 
 	// Switch on decoded length to determine the type.
