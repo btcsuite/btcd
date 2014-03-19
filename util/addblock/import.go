@@ -29,20 +29,21 @@ type importResults struct {
 // blockImporter houses information about an ongoing import from a block data
 // file to the block database.
 type blockImporter struct {
-	db              btcdb.Db
-	chain           *btcchain.BlockChain
-	r               io.ReadSeeker
-	processQueue    chan []byte
-	doneChan        chan bool
-	errChan         chan error
-	quit            chan bool
-	wg              sync.WaitGroup
-	blocksProcessed int64
-	blocksImported  int64
-	txProcessed     int64
-	lastHeight      int64
-	lastBlockTime   time.Time
-	lastLogTime     time.Time
+	db                btcdb.Db
+	chain             *btcchain.BlockChain
+	r                 io.ReadSeeker
+	processQueue      chan []byte
+	doneChan          chan bool
+	errChan           chan error
+	quit              chan bool
+	wg                sync.WaitGroup
+	blocksProcessed   int64
+	blocksImported    int64
+	receivedLogBlocks int64
+	receivedLogTx     int64
+	lastHeight        int64
+	lastBlockTime     time.Time
+	lastLogTime       time.Time
 }
 
 // readBlock reads the next block from the input file.
@@ -101,9 +102,9 @@ func (bi *blockImporter) processBlock(serializedBlock []byte) (bool, error) {
 		return false, err
 	}
 
-	// update block statistics
-	bi.txProcessed += int64(len(block.MsgBlock().Transactions))
+	// update progress statistics
 	bi.lastBlockTime = block.MsgBlock().Header.Timestamp
+	bi.receivedLogTx += int64(len(block.MsgBlock().Transactions))
 
 	// Skip blocks that already exist.
 	if bi.db.ExistsSha(blockSha) {
@@ -160,6 +161,40 @@ out:
 	bi.wg.Done()
 }
 
+// logProgress logs block progress as an information message.  In order to
+// prevent spam, it limits logging to one message every cfg.Progress seconds
+// with duration and totals included.
+func (bi *blockImporter) logProgress() {
+	bi.receivedLogBlocks++
+
+	now := time.Now()
+	duration := now.Sub(bi.lastLogTime)
+	if duration < time.Second*time.Duration(cfg.Progress) {
+		return
+	}
+
+	// Truncate the duration to 10s of milliseconds.
+	durationMillis := int64(duration / time.Millisecond)
+	tDuration := 10 * time.Millisecond * time.Duration(durationMillis/10)
+
+	// Log information about new block height.
+	blockStr := "blocks"
+	if bi.receivedLogBlocks == 1 {
+		blockStr = "block"
+	}
+	txStr := "transactions"
+	if bi.receivedLogTx == 1 {
+		txStr = "transaction"
+	}
+	log.Infof("Processed %d %s in the last %s (%d %s, height %d, %s)",
+		bi.receivedLogBlocks, blockStr, tDuration, bi.receivedLogTx,
+		txStr, bi.lastHeight, bi.lastBlockTime)
+
+	bi.receivedLogBlocks = 0
+	bi.receivedLogTx = 0
+	bi.lastLogTime = now
+}
+
 // processHandler is the main handler for processing blocks.  This allows block
 // processing to take place in parallel with block reads from the import file.
 // It must be run as a goroutine.
@@ -185,29 +220,7 @@ out:
 				bi.blocksImported++
 			}
 
-			// report every cfg.Progress seconds
-			now := time.Now()
-			duration := now.Sub(bi.lastLogTime)
-
-			if cfg.Progress != 0 && bi.blocksProcessed > 0 &&
-				duration > time.Second*time.Duration(cfg.Progress) {
-				durationMillis := int64(duration / time.Millisecond)
-				tDuration := 10 * time.Millisecond * time.Duration(durationMillis/10)
-				blockStr := "blocks"
-				if bi.blocksProcessed == 1 {
-					blockStr = "block"
-				}
-				txStr := "transactions"
-				if bi.txProcessed == 1 {
-					txStr = "transaction"
-				}
-
-				log.Infof("Processed %d %s in the last %s (%d %s, height %d, %s)",
-					bi.blocksProcessed, blockStr, tDuration, bi.txProcessed,
-					txStr, bi.lastHeight, bi.lastBlockTime)
-
-				bi.lastLogTime = now
-			}
+			bi.logProgress()
 
 		case <-bi.quit:
 			break out
