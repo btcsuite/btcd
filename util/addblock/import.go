@@ -92,7 +92,6 @@ func (bi *blockImporter) readBlock() ([]byte, error) {
 func (bi *blockImporter) processBlock(serializedBlock []byte) (bool, error) {
 	// Deserialize the block which includes checks for malformed blocks.
 	block, err := btcutil.NewBlockFromBytes(serializedBlock)
-
 	if err != nil {
 		return false, err
 	}
@@ -190,8 +189,8 @@ out:
 			now := time.Now()
 			duration := now.Sub(bi.lastLogTime)
 
-			if  cfg.Progress != 0 && bi.blocksProcessed > 0 &&
-				duration > time.Second * time.Duration(cfg.Progress) {
+			if cfg.Progress != 0 && bi.blocksProcessed > 0 &&
+				duration > time.Second*time.Duration(cfg.Progress) {
 				durationMillis := int64(duration / time.Millisecond)
 				tDuration := 10 * time.Millisecond * time.Duration(durationMillis/10)
 				blockStr := "blocks"
