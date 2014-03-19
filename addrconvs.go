@@ -6,7 +6,6 @@ package btcutil
 
 import (
 	"bytes"
-	"code.google.com/p/go.crypto/ripemd160"
 	"errors"
 	"github.com/conformal/btcwire"
 )
@@ -46,103 +45,6 @@ const (
 	// TestNetScriptHash is the script hash identifier for TestNet
 	TestNetScriptHash = 0xc4
 )
-
-// EncodeAddress takes a 20-byte raw payment address (hash160 of a pubkey)
-// and the Bitcoin network to create a human-readable payment address string.
-//
-// DEPRECATED - Use the EncodeAddress functions of the Address interface.
-func EncodeAddress(addrHash []byte, net btcwire.BitcoinNet) (encoded string, err error) {
-	if len(addrHash) != ripemd160.Size {
-		return "", ErrMalformedAddress
-	}
-
-	var netID byte
-	switch net {
-	case btcwire.MainNet:
-		netID = MainNetAddr
-	case btcwire.TestNet3:
-		netID = TestNetAddr
-	default:
-		return "", ErrUnknownNet
-	}
-
-	return encodeHashWithNetId(netID, addrHash)
-}
-
-// EncodeScriptHash takes a 20-byte raw script hash (hash160 of the SHA256 of the redeeming script)
-// and the Bitcoin network to create a human-readable payment address string.
-//
-// DEPRECATED - Use the EncodeAddress functions of the Address interface.
-func EncodeScriptHash(addrHash []byte, net btcwire.BitcoinNet) (encoded string, err error) {
-	if len(addrHash) != ripemd160.Size {
-		return "", ErrMalformedAddress
-	}
-
-	var netID byte
-	switch net {
-	case btcwire.MainNet:
-		netID = MainNetScriptHash
-	case btcwire.TestNet3:
-		netID = TestNetScriptHash
-	default:
-		return "", ErrUnknownNet
-	}
-
-	return encodeHashWithNetId(netID, addrHash)
-}
-
-func encodeHashWithNetId(netID byte, addrHash []byte) (encoded string, err error) {
-	tosum := append([]byte{netID}, addrHash...)
-	cksum := btcwire.DoubleSha256(tosum)
-
-	// Address before base58 encoding is 1 byte for netID, 20 bytes for
-	// hash, plus 4 bytes of checksum.
-	a := make([]byte, 25, 25)
-	a[0] = netID
-	copy(a[1:], addrHash)
-	copy(a[21:], cksum[:4])
-
-	return Base58Encode(a), nil
-}
-
-// DecodeAddress decodes a human-readable payment address string
-// returning the 20-byte decoded address, along with the Bitcoin
-// network for the address.
-//
-// DEPRECATED - Use DecodeAddr to decode a string encoded address to
-// the Address interface.
-func DecodeAddress(addr string) (addrHash []byte, net btcwire.BitcoinNet, err error) {
-	decoded := Base58Decode(addr)
-
-	// Length of decoded address must be 20 bytes + 1 byte for a network
-	// identifier byte + 4 bytes of checksum.
-	if len(decoded) != ripemd160.Size+5 {
-		return nil, 0x00, ErrMalformedAddress
-	}
-
-	switch decoded[0] {
-	case MainNetAddr:
-		net = btcwire.MainNet
-	case TestNetAddr:
-		net = btcwire.TestNet3
-	default:
-		return nil, 0, ErrUnknownNet
-	}
-
-	// Checksum is first four bytes of double SHA256 of the network byte
-	// and addrHash.  Verify this matches the final 4 bytes of the decoded
-	// address.
-	tosum := decoded[:ripemd160.Size+1]
-	cksum := btcwire.DoubleSha256(tosum)[:4]
-	if !bytes.Equal(cksum, decoded[len(decoded)-4:]) {
-		return nil, net, ErrMalformedAddress
-	}
-
-	addrHash = make([]byte, ripemd160.Size, ripemd160.Size)
-	copy(addrHash, decoded[1:ripemd160.Size+1])
-
-	return addrHash, net, nil
-}
 
 // EncodePrivateKey takes a 32-byte private key and encodes it into the
 // Wallet Import Format (WIF).
