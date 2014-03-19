@@ -531,7 +531,8 @@ func handleCreateRawTransaction(s *rpcServer, cmd btcjson.Cmd) (interface{}, err
 		}
 
 		// Decode the provided address.
-		addr, err := btcutil.DecodeAddr(encodedAddr)
+		addr, err := btcutil.DecodeAddress(encodedAddr,
+			activeNetParams.btcnet)
 		if err != nil {
 			return nil, btcjson.Error{
 				Code: btcjson.ErrInvalidAddressOrKey.Code,
