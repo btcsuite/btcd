@@ -8,6 +8,7 @@ import (
 	"bytes"
 	"code.google.com/p/go.crypto/ripemd160"
 	"encoding/hex"
+	"fmt"
 	"github.com/conformal/btcutil"
 	"github.com/conformal/btcwire"
 	"reflect"
@@ -19,20 +20,20 @@ const invalidNet = btcwire.BitcoinNet(0xffffffff)
 
 func TestAddresses(t *testing.T) {
 	tests := []struct {
-		name      string
-		addr      string
-		valid     bool
-		canDecode bool
-		result    btcutil.Address
-		f         func() (btcutil.Address, error)
-		net       btcwire.BitcoinNet
+		name    string
+		addr    string
+		encoded string
+		valid   bool
+		result  btcutil.Address
+		f       func() (btcutil.Address, error)
+		net     btcwire.BitcoinNet
 	}{
 		// Positive P2PKH tests.
 		{
-			name:      "mainnet p2pkh",
-			addr:      "1MirQ9bwyQcGVJPwKUgapu5ouK2E2Ey4gX",
-			valid:     true,
-			canDecode: true,
+			name:    "mainnet p2pkh",
+			addr:    "1MirQ9bwyQcGVJPwKUgapu5ouK2E2Ey4gX",
+			encoded: "1MirQ9bwyQcGVJPwKUgapu5ouK2E2Ey4gX",
+			valid:   true,
 			result: btcutil.TstAddressPubKeyHash(
 				[ripemd160.Size]byte{
 					0xe3, 0x4c, 0xce, 0x70, 0xc8, 0x63, 0x73, 0x27, 0x3e, 0xfc,
@@ -47,10 +48,10 @@ func TestAddresses(t *testing.T) {
 			net: btcwire.MainNet,
 		},
 		{
-			name:      "mainnet p2pkh 2",
-			addr:      "12MzCDwodF9G1e7jfwLXfR164RNtx4BRVG",
-			valid:     true,
-			canDecode: true,
+			name:    "mainnet p2pkh 2",
+			addr:    "12MzCDwodF9G1e7jfwLXfR164RNtx4BRVG",
+			encoded: "12MzCDwodF9G1e7jfwLXfR164RNtx4BRVG",
+			valid:   true,
 			result: btcutil.TstAddressPubKeyHash(
 				[ripemd160.Size]byte{
 					0x0e, 0xf0, 0x30, 0x10, 0x7f, 0xd2, 0x6e, 0x0b, 0x6b, 0xf4,
@@ -65,10 +66,10 @@ func TestAddresses(t *testing.T) {
 			net: btcwire.MainNet,
 		},
 		{
-			name:      "testnet p2pkh",
-			addr:      "mrX9vMRYLfVy1BnZbc5gZjuyaqH3ZW2ZHz",
-			valid:     true,
-			canDecode: true,
+			name:    "testnet p2pkh",
+			addr:    "mrX9vMRYLfVy1BnZbc5gZjuyaqH3ZW2ZHz",
+			encoded: "mrX9vMRYLfVy1BnZbc5gZjuyaqH3ZW2ZHz",
+			valid:   true,
 			result: btcutil.TstAddressPubKeyHash(
 				[ripemd160.Size]byte{
 					0x78, 0xb3, 0x16, 0xa0, 0x86, 0x47, 0xd5, 0xb7, 0x72, 0x83,
@@ -85,10 +86,10 @@ func TestAddresses(t *testing.T) {
 
 		// Negative P2PKH tests.
 		{
-			name:      "p2pkh wrong byte identifier/net",
-			addr:      "MrX9vMRYLfVy1BnZbc5gZjuyaqH3ZW2ZHz",
-			valid:     false,
-			canDecode: true,
+			name:    "p2pkh wrong byte identifier/net",
+			addr:    "MrX9vMRYLfVy1BnZbc5gZjuyaqH3ZW2ZHz",
+			encoded: "MrX9vMRYLfVy1BnZbc5gZjuyaqH3ZW2ZHz",
+			valid:   false,
 			f: func() (btcutil.Address, error) {
 				pkHash := []byte{
 					0x78, 0xb3, 0x16, 0xa0, 0x86, 0x47, 0xd5, 0xb7, 0x72, 0x83,
@@ -97,10 +98,9 @@ func TestAddresses(t *testing.T) {
 			},
 		},
 		{
-			name:      "p2pkh wrong hash length",
-			addr:      "",
-			valid:     false,
-			canDecode: true,
+			name:  "p2pkh wrong hash length",
+			addr:  "",
+			valid: false,
 			f: func() (btcutil.Address, error) {
 				pkHash := []byte{
 					0x00, 0x0e, 0xf0, 0x30, 0x10, 0x7f, 0xd2, 0x6e, 0x0b, 0x6b,
@@ -110,10 +110,9 @@ func TestAddresses(t *testing.T) {
 			},
 		},
 		{
-			name:      "p2pkh bad checksum",
-			addr:      "1MirQ9bwyQcGVJPwKUgapu5ouK2E2Ey4gY",
-			valid:     false,
-			canDecode: true,
+			name:  "p2pkh bad checksum",
+			addr:  "1MirQ9bwyQcGVJPwKUgapu5ouK2E2Ey4gY",
+			valid: false,
 		},
 
 		// Positive P2SH tests.
@@ -121,10 +120,10 @@ func TestAddresses(t *testing.T) {
 			// Taken from transactions:
 			// output: 3c9018e8d5615c306d72397f8f5eef44308c98fb576a88e030c25456b4f3a7ac
 			// input:  837dea37ddc8b1e3ce646f1a656e79bbd8cc7f558ac56a169626d649ebe2a3ba.
-			name:      "mainnet p2sh",
-			addr:      "3QJmV3qfvL9SuYo34YihAf3sRCW3qSinyC",
-			valid:     true,
-			canDecode: true,
+			name:    "mainnet p2sh",
+			addr:    "3QJmV3qfvL9SuYo34YihAf3sRCW3qSinyC",
+			encoded: "3QJmV3qfvL9SuYo34YihAf3sRCW3qSinyC",
+			valid:   true,
 			result: btcutil.TstAddressScriptHash(
 				[ripemd160.Size]byte{
 					0xf8, 0x15, 0xb0, 0x36, 0xd9, 0xbb, 0xbc, 0xe5, 0xe9, 0xf2,
@@ -161,10 +160,10 @@ func TestAddresses(t *testing.T) {
 			// Taken from transactions:
 			// output: b0539a45de13b3e0403909b8bd1a555b8cbe45fd4e3f3fda76f3a5f52835c29d
 			// input: (not yet redeemed at time test was written)
-			name:      "mainnet p2sh 2",
-			addr:      "3NukJ6fYZJ5Kk8bPjycAnruZkE5Q7UW7i8",
-			valid:     true,
-			canDecode: true,
+			name:    "mainnet p2sh 2",
+			addr:    "3NukJ6fYZJ5Kk8bPjycAnruZkE5Q7UW7i8",
+			encoded: "3NukJ6fYZJ5Kk8bPjycAnruZkE5Q7UW7i8",
+			valid:   true,
 			result: btcutil.TstAddressScriptHash(
 				[ripemd160.Size]byte{
 					0xe8, 0xc3, 0x00, 0xc8, 0x79, 0x86, 0xef, 0xa8, 0x4c, 0x37,
@@ -180,10 +179,10 @@ func TestAddresses(t *testing.T) {
 		},
 		{
 			// Taken from bitcoind base58_keys_valid.
-			name:      "testnet p2sh",
-			addr:      "2NBFNJTktNa7GZusGbDbGKRZTxdK9VVez3n",
-			valid:     true,
-			canDecode: true,
+			name:    "testnet p2sh",
+			addr:    "2NBFNJTktNa7GZusGbDbGKRZTxdK9VVez3n",
+			encoded: "2NBFNJTktNa7GZusGbDbGKRZTxdK9VVez3n",
+			valid:   true,
 			result: btcutil.TstAddressScriptHash(
 				[ripemd160.Size]byte{
 					0xc5, 0x79, 0x34, 0x2c, 0x2c, 0x4c, 0x92, 0x20, 0x20, 0x5e,
@@ -200,10 +199,9 @@ func TestAddresses(t *testing.T) {
 
 		// Negative P2SH tests.
 		{
-			name:      "p2sh wrong hash length",
-			addr:      "",
-			valid:     false,
-			canDecode: true,
+			name:  "p2sh wrong hash length",
+			addr:  "",
+			valid: false,
 			f: func() (btcutil.Address, error) {
 				hash := []byte{
 					0x00, 0xf8, 0x15, 0xb0, 0x36, 0xd9, 0xbb, 0xbc, 0xe5, 0xe9,
@@ -213,10 +211,9 @@ func TestAddresses(t *testing.T) {
 			},
 		},
 		{
-			name:      "p2sh wrong byte identifier/net",
-			addr:      "0NBFNJTktNa7GZusGbDbGKRZTxdK9VVez3n",
-			valid:     false,
-			canDecode: true,
+			name:  "p2sh wrong byte identifier/net",
+			addr:  "0NBFNJTktNa7GZusGbDbGKRZTxdK9VVez3n",
+			valid: false,
 			f: func() (btcutil.Address, error) {
 				hash := []byte{
 					0xc5, 0x79, 0x34, 0x2c, 0x2c, 0x4c, 0x92, 0x20, 0x20, 0x5e,
@@ -227,10 +224,10 @@ func TestAddresses(t *testing.T) {
 
 		// Positive P2PK tests.
 		{
-			name:      "mainnet p2pk compressed (0x02)",
-			addr:      "13CG6SJ3yHUXo4Cr2RY4THLLJrNFuG3gUg",
-			valid:     true,
-			canDecode: false,
+			name:    "mainnet p2pk compressed (0x02)",
+			addr:    "02192d74d0cb94344c9569c2e77901573d8d7903c3ebec3a957724895dca52c6b4",
+			encoded: "13CG6SJ3yHUXo4Cr2RY4THLLJrNFuG3gUg",
+			valid:   true,
 			result: btcutil.TstAddressPubKey(
 				[]byte{
 					0x02, 0x19, 0x2d, 0x74, 0xd0, 0xcb, 0x94, 0x34, 0x4c, 0x95,
@@ -249,10 +246,10 @@ func TestAddresses(t *testing.T) {
 			net: btcwire.MainNet,
 		},
 		{
-			name:      "mainnet p2pk compressed (0x03)",
-			addr:      "15sHANNUBSh6nDp8XkDPmQcW6n3EFwmvE6",
-			valid:     true,
-			canDecode: false,
+			name:    "mainnet p2pk compressed (0x03)",
+			addr:    "03b0bd634234abbb1ba1e986e884185c61cf43e001f9137f23c2c409273eb16e65",
+			encoded: "15sHANNUBSh6nDp8XkDPmQcW6n3EFwmvE6",
+			valid:   true,
 			result: btcutil.TstAddressPubKey(
 				[]byte{
 					0x03, 0xb0, 0xbd, 0x63, 0x42, 0x34, 0xab, 0xbb, 0x1b, 0xa1,
@@ -271,10 +268,11 @@ func TestAddresses(t *testing.T) {
 			net: btcwire.MainNet,
 		},
 		{
-			name:      "mainnet p2pk uncompressed (0x04)",
-			addr:      "12cbQLTFMXRnSzktFkuoG3eHoMeFtpTu3S",
-			valid:     true,
-			canDecode: false,
+			name: "mainnet p2pk uncompressed (0x04)",
+			addr: "0411db93e1dcdb8a016b49840f8c53bc1eb68a382e97b1482ecad7b148a6909a5cb2" +
+				"e0eaddfb84ccf9744464f82e160bfa9b8b64f9d4c03f999b8643f656b412a3",
+			encoded: "12cbQLTFMXRnSzktFkuoG3eHoMeFtpTu3S",
+			valid:   true,
 			result: btcutil.TstAddressPubKey(
 				[]byte{
 					0x04, 0x11, 0xdb, 0x93, 0xe1, 0xdc, 0xdb, 0x8a, 0x01, 0x6b,
@@ -299,10 +297,11 @@ func TestAddresses(t *testing.T) {
 			net: btcwire.MainNet,
 		},
 		{
-			name:      "mainnet p2pk hybrid (0x06)",
-			addr:      "1Ja5rs7XBZnK88EuLVcFqYGMEbBitzchmX",
-			valid:     true,
-			canDecode: false,
+			name: "mainnet p2pk hybrid (0x06)",
+			addr: "06192d74d0cb94344c9569c2e77901573d8d7903c3ebec3a957724895dca52c6b4" +
+				"0d45264838c0bd96852662ce6a847b197376830160c6d2eb5e6a4c44d33f453e",
+			encoded: "1Ja5rs7XBZnK88EuLVcFqYGMEbBitzchmX",
+			valid:   true,
 			result: btcutil.TstAddressPubKey(
 				[]byte{
 					0x06, 0x19, 0x2d, 0x74, 0xd0, 0xcb, 0x94, 0x34, 0x4c, 0x95,
@@ -327,10 +326,11 @@ func TestAddresses(t *testing.T) {
 			net: btcwire.MainNet,
 		},
 		{
-			name:      "mainnet p2pk hybrid (0x07)",
-			addr:      "1ExqMmf6yMxcBMzHjbj41wbqYuqoX6uBLG",
-			valid:     true,
-			canDecode: false,
+			name: "mainnet p2pk hybrid (0x07)",
+			addr: "07b0bd634234abbb1ba1e986e884185c61cf43e001f9137f23c2c409273eb16e65" +
+				"37a576782eba668a7ef8bd3b3cfb1edb7117ab65129b8a2e681f3c1e0908ef7b",
+			encoded: "1ExqMmf6yMxcBMzHjbj41wbqYuqoX6uBLG",
+			valid:   true,
 			result: btcutil.TstAddressPubKey(
 				[]byte{
 					0x07, 0xb0, 0xbd, 0x63, 0x42, 0x34, 0xab, 0xbb, 0x1b, 0xa1,
@@ -355,10 +355,10 @@ func TestAddresses(t *testing.T) {
 			net: btcwire.MainNet,
 		},
 		{
-			name:      "testnet p2pk compressed (0x02)",
-			addr:      "mhiDPVP2nJunaAgTjzWSHCYfAqxxrxzjmo",
-			valid:     true,
-			canDecode: false,
+			name:    "testnet p2pk compressed (0x02)",
+			addr:    "02192d74d0cb94344c9569c2e77901573d8d7903c3ebec3a957724895dca52c6b4",
+			encoded: "mhiDPVP2nJunaAgTjzWSHCYfAqxxrxzjmo",
+			valid:   true,
 			result: btcutil.TstAddressPubKey(
 				[]byte{
 					0x02, 0x19, 0x2d, 0x74, 0xd0, 0xcb, 0x94, 0x34, 0x4c, 0x95,
@@ -377,10 +377,10 @@ func TestAddresses(t *testing.T) {
 			net: btcwire.TestNet3,
 		},
 		{
-			name:      "testnet p2pk compressed (0x03)",
-			addr:      "mkPETRTSzU8MZLHkFKBmbKppxmdw9qT42t",
-			valid:     true,
-			canDecode: false,
+			name:    "testnet p2pk compressed (0x03)",
+			addr:    "03b0bd634234abbb1ba1e986e884185c61cf43e001f9137f23c2c409273eb16e65",
+			encoded: "mkPETRTSzU8MZLHkFKBmbKppxmdw9qT42t",
+			valid:   true,
 			result: btcutil.TstAddressPubKey(
 				[]byte{
 					0x03, 0xb0, 0xbd, 0x63, 0x42, 0x34, 0xab, 0xbb, 0x1b, 0xa1,
@@ -399,10 +399,11 @@ func TestAddresses(t *testing.T) {
 			net: btcwire.TestNet3,
 		},
 		{
-			name:      "testnet p2pk uncompressed (0x04)",
-			addr:      "mh8YhPYEAYs3E7EVyKtB5xrcfMExkkdEMF",
-			valid:     true,
-			canDecode: false,
+			name: "testnet p2pk uncompressed (0x04)",
+			addr: "0411db93e1dcdb8a016b49840f8c53bc1eb68a382e97b1482ecad7b148a6909a5" +
+				"cb2e0eaddfb84ccf9744464f82e160bfa9b8b64f9d4c03f999b8643f656b412a3",
+			encoded: "mh8YhPYEAYs3E7EVyKtB5xrcfMExkkdEMF",
+			valid:   true,
 			result: btcutil.TstAddressPubKey(
 				[]byte{
 					0x04, 0x11, 0xdb, 0x93, 0xe1, 0xdc, 0xdb, 0x8a, 0x01, 0x6b,
@@ -427,10 +428,11 @@ func TestAddresses(t *testing.T) {
 			net: btcwire.TestNet3,
 		},
 		{
-			name:      "testnet p2pk hybrid (0x06)",
-			addr:      "my639vCVzbDZuEiX44adfTUg6anRomZLEP",
-			valid:     true,
-			canDecode: false,
+			name: "testnet p2pk hybrid (0x06)",
+			addr: "06192d74d0cb94344c9569c2e77901573d8d7903c3ebec3a957724895dca52c6b" +
+				"40d45264838c0bd96852662ce6a847b197376830160c6d2eb5e6a4c44d33f453e",
+			encoded: "my639vCVzbDZuEiX44adfTUg6anRomZLEP",
+			valid:   true,
 			result: btcutil.TstAddressPubKey(
 				[]byte{
 					0x06, 0x19, 0x2d, 0x74, 0xd0, 0xcb, 0x94, 0x34, 0x4c, 0x95,
@@ -455,10 +457,11 @@ func TestAddresses(t *testing.T) {
 			net: btcwire.TestNet3,
 		},
 		{
-			name:      "testnet p2pk hybrid (0x07)",
-			addr:      "muUnepk5nPPrxUTuTAhRqrpAQuSWS5fVii",
-			valid:     true,
-			canDecode: false,
+			name: "testnet p2pk hybrid (0x07)",
+			addr: "07b0bd634234abbb1ba1e986e884185c61cf43e001f9137f23c2c409273eb16e6" +
+				"537a576782eba668a7ef8bd3b3cfb1edb7117ab65129b8a2e681f3c1e0908ef7b",
+			encoded: "muUnepk5nPPrxUTuTAhRqrpAQuSWS5fVii",
+			valid:   true,
 			result: btcutil.TstAddressPubKey(
 				[]byte{
 					0x07, 0xb0, 0xbd, 0x63, 0x42, 0x34, 0xab, 0xbb, 0x1b, 0xa1,
@@ -485,33 +488,29 @@ func TestAddresses(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		var decoded btcutil.Address
-		var err error
-		if test.canDecode {
-			// Decode addr and compare error against valid.
-			decoded, err = btcutil.DecodeAddress(test.addr)
-			if (err == nil) != test.valid {
-				t.Errorf("%v: decoding test failed", test.name)
-				return
-			}
-		} else {
-			// The address can't be decoded directly, so instead
-			// call the creation function.
-			decoded, err = test.f()
-			if (err == nil) != test.valid {
-				t.Errorf("%v: creation test failed", test.name)
-				return
-			}
+		// Decode addr and compare error against valid.
+		decoded, err := btcutil.DecodeAddress(test.addr, test.net)
+		if (err == nil) != test.valid {
+			t.Errorf("%v: decoding test failed: %v", test.name, err)
+			return
 		}
 
-		// If decoding succeeded, encode again and compare against the original.
 		if err == nil {
-			encoded := decoded.EncodeAddress()
+			// Ensure the stringer returns the same address as the
+			// original.
+			if decodedStringer, ok := decoded.(fmt.Stringer); ok {
+				if test.addr != decodedStringer.String() {
+					t.Errorf("%v: String on decoded value does not match expected value: %v != %v",
+						test.name, test.addr, decodedStringer.String())
+					return
+				}
+			}
 
-			// Compare encoded addr against the original encoding.
-			if test.addr != encoded {
+			// Encode again and compare against the original.
+			encoded := decoded.EncodeAddress()
+			if test.encoded != encoded {
 				t.Errorf("%v: decoding and encoding produced different addressess: %v != %v",
-					test.name, test.addr, encoded)
+					test.name, test.encoded, encoded)
 				return
 			}
 
@@ -537,8 +536,7 @@ func TestAddresses(t *testing.T) {
 				return
 			}
 
-			// Check networks.  This check always succeeds for non-P2PKH and
-			// non-P2SH addresses as both nets will be Go's default zero value.
+			// Ensure the address is for the expected network.
 			if !decoded.IsForNet(test.net) {
 				t.Errorf("%v: calculated network does not match expected",
 					test.name)

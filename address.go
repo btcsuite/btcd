@@ -118,10 +118,23 @@ type Address interface {
 
 // DecodeAddress decodes the string encoding of an address and returns
 // the Address if addr is a valid encoding for a known address type.
-func DecodeAddress(addr string) (Address, error) {
-	decoded := Base58Decode(addr)
+//
+// The bitcoin network the address is associated with is extracted if possible.
+// When the address does not encode the network, such as in the case of a raw
+// public key, the address will be associated with the passed defaultNet.
+func DecodeAddress(addr string, defaultNet btcwire.BitcoinNet) (Address, error) {
+	// Serialized public keys are either 65 bytes (130 hex chars) if
+	// uncompressed/hybrid or 33 bytes (66 hex chars) if compressed.
+	if len(addr) == 130 || len(addr) == 66 {
+		serializedPubKey, err := hex.DecodeString(addr)
+		if err != nil {
+			return nil, err
+		}
+		return NewAddressPubKey(serializedPubKey, defaultNet)
+	}
 
 	// Switch on decoded length to determine the type.
+	decoded := Base58Decode(addr)
 	switch len(decoded) {
 	case 1 + ripemd160.Size + 4: // P2PKH or P2SH
 		// Parse the network and hash type (pubkey hash vs script
