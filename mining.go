@@ -295,6 +295,30 @@ func logSkippedDeps(tx *btcutil.Tx, deps *list.List) {
 	}
 }
 
+// medianAdjustedTime returns the current time adjusted to ensure it is at least
+// one second after the median timestamp of the last several blocks per the
+// chain consensus rules.
+func medianAdjustedTime(chainState *chainState) (time.Time, error) {
+	chainState.Lock()
+	defer chainState.Unlock()
+	if chainState.pastMedianTimeErr != nil {
+		return time.Time{}, chainState.pastMedianTimeErr
+	}
+
+	// The timestamp for the block must not be before the median timestamp
+	// of the last several blocks.  Thus, choose the maximum between the
+	// current time and one second after the past median time.  The current
+	// timestamp is truncated to seconds before comparisons since a block
+	// timestamp does not supported a precision greater than one second.
+	newTimestamp := time.Unix(time.Now().Unix(), 0)
+	minTimestamp := chainState.pastMedianTime.Add(time.Second)
+	if newTimestamp.Before(minTimestamp) {
+		newTimestamp = minTimestamp
+	}
+
+	return newTimestamp, nil
+}
+
 // NewBlockTemplate returns a new block template using the transactions from the
 // passed transaction memory pool with a coinbase that pays to the passed
 // address and is ready to be solved.  The transactions selected and included
@@ -351,12 +375,16 @@ func logSkippedDeps(tx *btcutil.Tx, deps *list.List) {
 //  |  <= cfg.BlockMinSize)             |   |
 //   -----------------------------------  --
 func NewBlockTemplate(payToAddress btcutil.Address, mempool *txMemPool) (*BlockTemplate, error) {
+	// Convenience vars.
 	blockManager := mempool.server.blockManager
+	chainState := &blockManager.chainState
 	chain := blockManager.blockChain
 
 	// Extend the most recently known best block.
-	prevHash, prevHeight, _ := mempool.server.db.NewestSha()
-	nextBlockHeight := prevHeight + 1
+	chainState.Lock()
+	prevHash := chainState.newestHash
+	nextBlockHeight := chainState.newestHeight + 1
+	chainState.Unlock()
 
 	// Create a standard coinbase transaction paying to the provided
 	// address.  NOTE: The coinbase value will be updated to include the
@@ -694,10 +722,13 @@ mempoolLoop:
 	txFees[0] = -totalFees
 
 	// Calculate the required difficulty for the block.  The timestamp
-	// is truncated to seconds since a block timestamp does not supported
-	// a precision greater than one second.
-	now := time.Unix(time.Now().Unix(), 0)
-	requiredDifficulty, err := blockManager.CalcNextRequiredDifficulty(now)
+	// is potentially adjusted to ensure it comes after the median time of
+	// the last several blocks per the chain consensus rules.
+	ts, err := medianAdjustedTime(chainState)
+	if err != nil {
+		return nil, err
+	}
+	requiredDifficulty, err := blockManager.CalcNextRequiredDifficulty(ts)
 	if err != nil {
 		return nil, err
 	}
@@ -709,7 +740,7 @@ mempoolLoop:
 		Version:    generatedBlockVersion,
 		PrevBlock:  *prevHash,
 		MerkleRoot: *merkles[len(merkles)-1],
-		Timestamp:  now,
+		Timestamp:  ts,
 		Bits:       requiredDifficulty,
 	}
 	for _, tx := range blockTxns {
