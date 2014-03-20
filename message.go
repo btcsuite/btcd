@@ -218,8 +218,8 @@ func WriteMessageN(w io.Writer, msg Message, pver uint32, btcnet BitcoinNet) (in
 	// Encode the header for the message.  This is done to a buffer
 	// rather than directly to the writer since writeElements doesn't
 	// return the number of bytes written.
-	var hw bytes.Buffer
-	writeElements(&hw, hdr.magic, command, hdr.length, hdr.checksum)
+	hw := bytes.NewBuffer(make([]byte, 0, MessageHeaderSize))
+	writeElements(hw, hdr.magic, command, hdr.length, hdr.checksum)
 
 	// Write header.
 	n, err := w.Write(hw.Bytes())

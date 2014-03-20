@@ -157,9 +157,9 @@ func (msg *MsgTx) TxSha() (ShaHash, error) {
 	// cause a run-time panic.  Also, SetBytes can't fail here due to the
 	// fact DoubleSha256 always returns a []byte of the right size
 	// regardless of input.
-	var buf bytes.Buffer
+	buf := bytes.NewBuffer(make([]byte, 0, msg.SerializeSize()))
+	_ = msg.Serialize(buf)
 	var sha ShaHash
-	_ = msg.Serialize(&buf)
 	_ = sha.SetBytes(DoubleSha256(buf.Bytes()))
 
 	// Even though this function can't currently fail, it still returns
