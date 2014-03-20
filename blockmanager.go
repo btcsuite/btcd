@@ -989,16 +989,12 @@ func (b *blockManager) handleNotifyMsg(notification *btcchain.Notification) {
 		}
 
 		if r := b.server.rpcServer; r != nil {
-			// Remove also InvVects belonging to txs submitted to the RPC server
-			// using sendrawtransaction that are in the InvVect map of tx and
-			// must be periodically resent throughout the network until they are
-			// included in a block (see server.go in /btcd). We start at 1 ([1:])
-			// in the loop so that we do not bother trying to remove a coinbase
-			// tx.
+			// Now this block is in the blockchain we can mark all the transactions
+			// (except the coinbase) as no longer needing rebroadcasting.
 			for _, tx := range block.Transactions()[1:] {
 				b.server.ModifyRebroadcastInventory(
 					btcwire.NewInvVect(btcwire.InvTypeTx, tx.Sha()),
-					DelRebroadcastIV)
+					RIVTDel)
 			}
 
 			// Notify registered websocket clients of incoming block.

@@ -24,9 +24,9 @@ import (
 // These constants are used by the DNS seed code to pick a random last seen
 // time.
 const (
-	secondsIn3Days    int32  = 24 * 60 * 60 * 3
-	secondsIn4Days    int32  = 24 * 60 * 60 * 4
-	rand16BitsTo0To29 uint16 = 2185 // ceil(2^16 / 30)
+	secondsIn3Days         int32  = 24 * 60 * 60 * 3
+	secondsIn4Days         int32  = 24 * 60 * 60 * 4
+	rand16BitsToMax1820sec uint16 = 36 // 2^16 / 1800
 )
 
 const (
@@ -49,14 +49,14 @@ type broadcastMsg struct {
 	excludePeers []*peer
 }
 
-// RebroastcastIVType represents the allowed types of rebroadcastHandler operations
+// RebroadtcastIVType represents the allowed types of rebroadcastHandler operations
 // to the rebroadcastHandler InvVect map
-type RebroastcastIVType uint8
+type RebroadtcastIVType uint8
 
 // These constants define the various supported rebroadcastHandler operation types
 const (
-	AddRebroadcastIV RebroastcastIVType = 0
-	DelRebroadcastIV RebroastcastIVType = 1
+	RIVTAdd RebroadtcastIVType = iota
+	RIVTDel
 )
 
 // A structure which we use to pass our iv to our channel, which then safely
@@ -64,7 +64,7 @@ const (
 // access races
 type rebroadcastIV struct {
 	iv *btcwire.InvVect
-	op RebroastcastIVType //Operation to execute on iv
+	op RebroadtcastIVType //Operation to execute on iv
 }
 
 // server provides a bitcoin server for handling communications to and from
@@ -106,14 +106,10 @@ type peerState struct {
 	maxOutboundPeers int
 }
 
-// ModifyRebroadcastInventory creates a message to the channel in rebroadcast-
-// Handler and dispatches it; the message is of type rebroadcastIV, which includes
-// an InvVect itself (iv) and an operation to commit to (dothis)
-func (s *server) ModifyRebroadcastInventory(iv *btcwire.InvVect, dothis RebroastcastIVType) {
-	var message rebroadcastIV
-	message.iv = iv
-	message.op = dothis
-	s.modifyRebroadcastInv <- message
+// ModifyRebroadcastInventory modifies the set of inventory that is rebroadcast
+// until it show up into a block according to the passed operation.
+func (s *server) ModifyRebroadcastInventory(iv *btcwire.InvVect, op RebroadtcastIVType) {
+	s.modifyRebroadcastInv <- rebroadcastIV{iv: iv, op: op}
 }
 
 func (p *peerState) Count() int {
@@ -755,8 +751,9 @@ out:
 		select {
 		case miv := <-s.modifyRebroadcastInv:
 			switch miv.op {
-			// Incoming InvVects are added to our hashmap of RPC txs.
-			case AddRebroadcastIV:
+			// Incoming InvVects are added to our map of RPC txs.
+			case RIVTAdd:
+				srvrLog.Infof("Added iv %s to our map of rpc tx", miv.iv)
 				pendingInvs[*miv.iv] = struct{}{}
 
 			// When an InvVect has been added to a block, we can now remove it;
@@ -765,8 +762,9 @@ out:
 			// new block it cycles through the txs and sends them all
 			// indescriminately to this function.  The if loop is cheap, so
 			// this should not be an issue.
-			case DelRebroadcastIV:
+			case RIVTDel:
 				if _, ok := pendingInvs[*miv.iv]; ok {
+					srvrLog.Infof("Removed iv %s from our map of rpc tx", miv.iv)
 					delete(pendingInvs, *miv.iv)
 				}
 			}
@@ -777,6 +775,7 @@ out:
 		case <-timer.C:
 			for iv := range pendingInvs {
 				ivCopy := iv
+				srvrLog.Infof("Relaying iv %s from our map of rpc tx", ivCopy)
 				s.RelayInventory(&ivCopy)
 			}
 
@@ -784,11 +783,13 @@ out:
 			var randomNumber uint16
 			binary.Read(rand.Reader, binary.LittleEndian, &randomNumber)
 
-			// We want resubmission every 1,...,30 minutes at random intervals,
+			// We want resubmission every 0,...,30 minutes at random intervals,
 			// similar to bitcoind's ResendWalletTransactions, so what we do is
-			// divide our random number by rand16BitsTo0To29, mul by time.Minute
-			// and add a time.Minute to get a random time from 1 min ... 30 min.
-			timer.Reset((time.Minute * time.Duration(((randomNumber) / rand16BitsTo0To29))) + time.Minute)
+			// divide our random number by rand16BitsToMax1820sec and mul by
+			// time.Second to give a random time from 0 sec to 1820 sec.
+			// Note that 1820 sec is 30:20 min:sec, not precisely 30 min.
+			timer.Reset(time.Second * time.Duration(((randomNumber) /
+				rand16BitsToMax1820sec)))
 
 		case <-s.quit:
 			break out

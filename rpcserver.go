@@ -1412,7 +1412,7 @@ func handleSendRawTransaction(s *rpcServer, cmd btcjson.Cmd) (interface{}, error
 	// server.go in /btcd.
 	s.server.ModifyRebroadcastInventory(
 		btcwire.NewInvVect(btcwire.InvTypeTx, tx.Sha()),
-		AddRebroadcastIV)
+		RIVTAdd)
 
 	return tx.Sha().String(), nil
 }
