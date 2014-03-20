@@ -15,6 +15,7 @@ var (
 	btcctlHomeDir         = btcutil.AppDataDir("btcctl", false)
 	btcwalletHomeDir      = btcutil.AppDataDir("btcwallet", false)
 	defaultConfigFile     = filepath.Join(btcctlHomeDir, "btcctl.conf")
+	defaultRPCServer      = "localhost"
 	defaultRPCCertFile    = filepath.Join(btcdHomeDir, "rpc.cert")
 	defaultWalletCertFile = filepath.Join(btcwalletHomeDir, "rpc.cert")
 )
@@ -90,6 +91,8 @@ func loadConfig() (*flags.Parser, *config, []string, error) {
 	// Default config.
 	cfg := config{
 		ConfigFile: defaultConfigFile,
+		RPCServer:  defaultRPCServer,
+		RPCCert:    defaultRPCCertFile,
 	}
 
 	// Create the home directory if it doesn't already exist.
@@ -130,24 +133,17 @@ func loadConfig() (*flags.Parser, *config, []string, error) {
 		return parser, nil, nil, err
 	}
 
-	// Choose a default RPC certificate file if the user did not
-	// specify one.
-	if cfg.RPCCert == "" {
-		if cfg.Wallet {
-			cfg.RPCCert = defaultWalletCertFile
-		} else {
-			cfg.RPCCert = defaultRPCCertFile
-		}
+	// Override the RPC certificate if the --wallet flag was specified and
+	// the user did not specify one.
+	if cfg.Wallet && cfg.RPCCert == defaultRPCCertFile {
+		cfg.RPCCert = defaultWalletCertFile
 	}
 
 	// Handle environment variable expansion in the RPC certificate path.
 	cfg.RPCCert = cleanAndExpandPath(cfg.RPCCert)
 
-	// Connect to localhost if the user did not specify a server.
-	if cfg.RPCServer == "" {
-		cfg.RPCServer = "localhost"
-	}
-
+	// Add default port to RPC server based on --testnet and --wallet flags
+	// if needed.
 	cfg.RPCServer = normalizeAddress(cfg.RPCServer, cfg.TestNet3, cfg.Wallet)
 
 	return parser, &cfg, remainingArgs, nil
