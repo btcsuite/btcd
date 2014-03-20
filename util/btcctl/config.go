@@ -4,16 +4,19 @@ import (
 	"fmt"
 	"github.com/conformal/btcutil"
 	"github.com/conformal/go-flags"
+	"net"
 	"os"
 	"path/filepath"
 	"strings"
 )
 
 var (
-	btcdHomeDir        = btcutil.AppDataDir("btcd", false)
-	btcctlHomeDir      = btcutil.AppDataDir("btcctl", false)
-	defaultConfigFile  = filepath.Join(btcctlHomeDir, "btcctl.conf")
-	defaultRPCCertFile = filepath.Join(btcdHomeDir, "rpc.cert")
+	btcdHomeDir           = btcutil.AppDataDir("btcd", false)
+	btcctlHomeDir         = btcutil.AppDataDir("btcctl", false)
+	btcwalletHomeDir      = btcutil.AppDataDir("btcwallet", false)
+	defaultConfigFile     = filepath.Join(btcctlHomeDir, "btcctl.conf")
+	defaultRPCCertFile    = filepath.Join(btcdHomeDir, "rpc.cert")
+	defaultWalletCertFile = filepath.Join(btcwalletHomeDir, "rpc.cert")
 )
 
 // config defines the configuration options for btcctl.
@@ -27,7 +30,34 @@ type config struct {
 	RPCServer     string `short:"s" long:"rpcserver" description:"RPC server to connect to"`
 	RPCCert       string `short:"c" long:"rpccert" description:"RPC server certificate chain for validation"`
 	NoTls         bool   `long:"notls" description:"Disable TLS"`
+	TestNet3      bool   `long:"testnet" description:"Connect to testnet"`
 	TlsSkipVerify bool   `long:"skipverify" description:"Do not verify tls certificates (not recommended!)"`
+	Wallet        bool   `long:"wallet" description:"Connect to wallet"`
+}
+
+// normalizeAddress returns addr with the passed default port appended if
+// there is not already a port specified.
+func normalizeAddress(addr string, useTestNet3, useWallet bool) string {
+	_, _, err := net.SplitHostPort(addr)
+	if err != nil {
+		var defaultPort string
+		if useTestNet3 {
+			if useWallet {
+				defaultPort = "18332"
+			} else {
+				defaultPort = "18334"
+			}
+		} else {
+			if useWallet {
+				defaultPort = "8332"
+			} else {
+				defaultPort = "8334"
+			}
+		}
+
+		return net.JoinHostPort(addr, defaultPort)
+	}
+	return addr
 }
 
 // cleanAndExpandPath expands environement variables and leading ~ in the
@@ -60,8 +90,6 @@ func loadConfig() (*flags.Parser, *config, []string, error) {
 	// Default config.
 	cfg := config{
 		ConfigFile: defaultConfigFile,
-		RPCServer:  "localhost:8334",
-		RPCCert:    defaultRPCCertFile,
 	}
 
 	// Create the home directory if it doesn't already exist.
@@ -102,8 +130,25 @@ func loadConfig() (*flags.Parser, *config, []string, error) {
 		return parser, nil, nil, err
 	}
 
+	// Choose a default RPC certificate file if the user did not
+	// specify one.
+	if cfg.RPCCert == "" {
+		if cfg.Wallet {
+			cfg.RPCCert = defaultWalletCertFile
+		} else {
+			cfg.RPCCert = defaultRPCCertFile
+		}
+	}
+
 	// Handle environment variable expansion in the RPC certificate path.
 	cfg.RPCCert = cleanAndExpandPath(cfg.RPCCert)
+
+	// Connect to localhost if the user did not specify a server.
+	if cfg.RPCServer == "" {
+		cfg.RPCServer = "localhost"
+	}
+
+	cfg.RPCServer = normalizeAddress(cfg.RPCServer, cfg.TestNet3, cfg.Wallet)
 
 	return parser, &cfg, remainingArgs, nil
 }
