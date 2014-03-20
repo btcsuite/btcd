@@ -281,3 +281,12 @@ func BenchmarkWriteBlockHeader(b *testing.B) {
 		btcwire.TstWriteBlockHeader(ioutil.Discard, 0, &header)
 	}
 }
+
+// BenchmarkTxSha performs a benchmark on how long it takes to hash a
+// transaction.
+func BenchmarkTxSha(b *testing.B) {
+	tx := btcwire.GenesisBlock.Transactions[0]
+	for i := 0; i < b.N; i++ {
+		tx.TxSha()
+	}
+}
