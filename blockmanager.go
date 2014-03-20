@@ -98,6 +98,30 @@ type calcNextReqDifficultyMsg struct {
 	reply     chan calcNextReqDifficultyResponse
 }
 
+// processBlockResponse is a response sent to the reply channel of a
+// processBlockMsg.
+type processBlockResponse struct {
+	isOrphan bool
+	err      error
+}
+
+// processBlockMsg is a message type to be sent across the message channel
+// for requested a block is processed.  Note this call differs from blockMsg
+// above in that blockMsg is intended for blocks that can from peers and have
+// extra handling whereas this message essentially is just a concurrent safe
+// way to call ProcessBlock on the internal block chain instance.
+type processBlockMsg struct {
+	block *btcutil.Block
+	reply chan processBlockResponse
+}
+
+// isCurrentMsg is a message type to be sent across the message channel for
+// requesting whether or not the block manager believes it is synced with
+// the currently connected peers.
+type isCurrentMsg struct {
+	reply chan bool
+}
+
 // headerNode is used as a node in a list of headers that are linked together
 // between checkpoints.
 type headerNode struct {
@@ -117,6 +141,17 @@ type chainState struct {
 	newestHeight      int64
 	pastMedianTime    time.Time
 	pastMedianTimeErr error
+}
+
+// Best returns the block hash and height known for the tip of the best known
+// chain.
+//
+// This function is safe for concurrent access.
+func (c *chainState) Best() (*btcwire.ShaHash, int64) {
+	c.Lock()
+	defer c.Unlock()
+
+	return c.newestHash, c.newestHeight
 }
 
 // blockManager provides a concurrency safe block manager for handling all
@@ -983,6 +1018,26 @@ out:
 					difficulty: difficulty,
 					err:        err,
 				}
+
+			case processBlockMsg:
+				err := b.blockChain.ProcessBlock(msg.block, false)
+				if err != nil {
+					msg.reply <- processBlockResponse{
+						isOrphan: false,
+						err:      err,
+					}
+				}
+
+				blockSha, _ := msg.block.Sha()
+				msg.reply <- processBlockResponse{
+					isOrphan: b.blockChain.IsKnownOrphan(
+						blockSha),
+					err: nil,
+				}
+
+			case isCurrentMsg:
+				msg.reply <- b.current()
+
 			default:
 				bmgrLog.Warnf("Invalid message type in block "+
 					"handler: %T", msg)
@@ -1222,6 +1277,24 @@ func (b *blockManager) CalcNextRequiredDifficulty(timestamp time.Time) (uint32, 
 	b.msgChan <- calcNextReqDifficultyMsg{timestamp: timestamp, reply: reply}
 	response := <-reply
 	return response.difficulty, response.err
+}
+
+// ProcessBlock makes use of ProcessBlock on an internal instance of a block
+// chain.  It is funneled through the block manager since btcchain is not safe
+// for concurrent access.
+func (b *blockManager) ProcessBlock(block *btcutil.Block) (bool, error) {
+	reply := make(chan processBlockResponse)
+	b.msgChan <- processBlockMsg{block: block, reply: reply}
+	response := <-reply
+	return response.isOrphan, response.err
+}
+
+// IsCurrent returns whether or not the block manager believes it is synced with
+// the connected peers.
+func (b *blockManager) IsCurrent() bool {
+	reply := make(chan bool)
+	b.msgChan <- isCurrentMsg{reply: reply}
+	return <-reply
 }
 
 // newBlockManager returns a new bitcoin block manager.

@@ -92,8 +92,9 @@ type txMemPool struct {
 	orphans       map[btcwire.ShaHash]*btcutil.Tx
 	orphansByPrev map[btcwire.ShaHash]*list.List
 	outpoints     map[btcwire.OutPoint]*btcutil.Tx
-	pennyTotal    float64 // exponentially decaying total for penny spends.
-	lastPennyUnix int64   // unix time of last ``penny spend''
+	lastUpdated   time.Time // last time pool was updated
+	pennyTotal    float64   // exponentially decaying total for penny spends.
+	lastPennyUnix int64     // unix time of last ``penny spend''
 }
 
 // isDust returns whether or not the passed transaction output amount is
@@ -602,6 +603,7 @@ func (mp *txMemPool) removeTransaction(tx *btcutil.Tx) {
 			delete(mp.outpoints, txIn.PreviousOutpoint)
 		}
 		delete(mp.pool, *txHash)
+		mp.lastUpdated = time.Now()
 	}
 }
 
@@ -655,6 +657,7 @@ func (mp *txMemPool) addTransaction(tx *btcutil.Tx, height, fee int64) {
 	for _, txIn := range tx.MsgTx().TxIn {
 		mp.outpoints[txIn.PreviousOutpoint] = tx
 	}
+	mp.lastUpdated = time.Now()
 }
 
 // checkPoolDoubleSpend checks whether or not the passed transaction is
@@ -1071,6 +1074,17 @@ func (mp *txMemPool) TxDescs() []*TxDesc {
 	}
 
 	return descs
+}
+
+// LastUpdated returns the last time a transaction was added to or removed from
+// the main pool.  It does not include the orphan pool.
+//
+// This function is safe for concurrent access.
+func (mp *txMemPool) LastUpdated() time.Time {
+	mp.RLock()
+	defer mp.RUnlock()
+
+	return mp.lastUpdated
 }
 
 // newTxMemPool returns a new memory pool for validating and storing standalone
