@@ -271,8 +271,8 @@ func (bi *blockImporter) Import() chan *importResults {
 		bi.doneChan <- true
 	}()
 
-	// Start the status handler and return the result the channel that it
-	// will send the results on when the import is done.
+	// Start the status handler and return the result channel that it will
+	// send the results on when the import is done.
 	resultChan := make(chan *importResults)
 	go bi.statusHandler(resultChan)
 	return resultChan
