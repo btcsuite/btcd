@@ -83,6 +83,20 @@ type headerNode struct {
 	sha    *btcwire.ShaHash
 }
 
+// chainState tracks the state of the best chain as blocks are inserted.  This
+// is done because btcchain is currently not safe for concurrent access and the
+// block manager is typically quite busy processing block and inventory.
+// Therefore, requesting this information from chain through the block manager
+// would not be anywhere near as efficient as simply updating it as each block
+// is inserted and protecting it with a mutex.
+type chainState struct {
+	sync.Mutex
+	newestHash        *btcwire.ShaHash
+	newestHeight      int64
+	pastMedianTime    time.Time
+	pastMedianTimeErr error
+}
+
 // blockManager provides a concurrency safe block manager for handling all
 // incoming blocks.
 type blockManager struct {
@@ -99,6 +113,7 @@ type blockManager struct {
 	processingReqs    bool
 	syncPeer          *peer
 	msgChan           chan interface{}
+	chainState        chainState
 	wg                sync.WaitGroup
 	quit              chan bool
 
@@ -122,6 +137,24 @@ func (b *blockManager) resetHeaderState(newestHash *btcwire.ShaHash, newestHeigh
 	if b.nextCheckpoint != nil {
 		node := headerNode{height: newestHeight, sha: newestHash}
 		b.headerList.PushBack(&node)
+	}
+}
+
+// updateChainState updates the chain state associated with the block manager.
+// This allows fast access to chain information since btcchain is currently not
+// safe for concurrent access and the block manager is typically quite busy
+// processing block and inventory.
+func (b *blockManager) updateChainState(newestHash *btcwire.ShaHash, newestHeight int64) {
+	b.chainState.Lock()
+	defer b.chainState.Unlock()
+
+	b.chainState.newestHash = newestHash
+	b.chainState.newestHeight = newestHeight
+	medianTime, err := b.blockChain.CalcPastMedianTime()
+	if err != nil {
+		b.chainState.pastMedianTimeErr = err
+	} else {
+		b.chainState.pastMedianTime = medianTime
 	}
 }
 
@@ -510,10 +543,12 @@ func (b *blockManager) handleBlockMsg(bmsg *blockMsg) {
 	}
 
 	// When the block is not an orphan, don't keep track of the peer that
-	// sent it any longer and log information about it.
+	// sent it any longer, log information about it, and update the chain
+	// state.
 	if !b.blockChain.IsKnownOrphan(blockSha) {
 		delete(b.blockPeer, *blockSha)
 		b.logBlockHeight(bmsg.block)
+		b.updateChainState(blockSha, bmsg.block.Height())
 	}
 
 	// Sync the db to disk.
@@ -1157,6 +1192,10 @@ func newBlockManager(s *server) (*blockManager, error) {
 		return nil, err
 	}
 	bmgrLog.Infof("Block index generation complete")
+
+	// Initialize the chain state now that the intial block node index has
+	// been generated.
+	bm.updateChainState(newestHash, height)
 
 	return &bm, nil
 }
