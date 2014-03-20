@@ -753,7 +753,6 @@ out:
 			switch miv.op {
 			// Incoming InvVects are added to our map of RPC txs.
 			case RIVTAdd:
-				srvrLog.Infof("Added iv %s to our map of rpc tx", miv.iv)
 				pendingInvs[*miv.iv] = struct{}{}
 
 			// When an InvVect has been added to a block, we can now remove it;
@@ -764,7 +763,6 @@ out:
 			// this should not be an issue.
 			case RIVTDel:
 				if _, ok := pendingInvs[*miv.iv]; ok {
-					srvrLog.Infof("Removed iv %s from our map of rpc tx", miv.iv)
 					delete(pendingInvs, *miv.iv)
 				}
 			}
@@ -775,7 +773,6 @@ out:
 		case <-timer.C:
 			for iv := range pendingInvs {
 				ivCopy := iv
-				srvrLog.Infof("Relaying iv %s from our map of rpc tx", ivCopy)
 				s.RelayInventory(&ivCopy)
 			}
 
