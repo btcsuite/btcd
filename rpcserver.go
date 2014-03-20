@@ -1410,7 +1410,9 @@ func handleSendRawTransaction(s *rpcServer, cmd btcjson.Cmd) (interface{}, error
 	// rebroadcast them if they fail to get broadcast or entered into a block; for
 	// instance if the client was offline when they were generated.  Refer to
 	// server.go in /btcd.
-	s.server.AddRebroadcastInventory(btcwire.NewInvVect(btcwire.InvTypeTx, tx.Sha()))
+	s.server.ModifyRebroadcastInventory(
+		btcwire.NewInvVect(btcwire.InvTypeTx, tx.Sha()),
+		AddRebroadcastIV)
 
 	return tx.Sha().String(), nil
 }

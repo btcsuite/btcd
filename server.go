@@ -49,35 +49,52 @@ type broadcastMsg struct {
 	excludePeers []*peer
 }
 
+// RebroastcastIVType represents the allowed types of rebroadcastHandler operations
+// to the rebroadcastHandler InvVect map
+type RebroastcastIVType uint8
+
+// These constants define the various supported rebroadcastHandler operation types
+const (
+	AddRebroadcastIV RebroastcastIVType = 0
+	DelRebroadcastIV RebroastcastIVType = 1
+)
+
+// A structure which we use to pass our iv to our channel, which then safely
+// modifies the map of InvVects so that we don't need to worry about concurrent
+// access races
+type rebroadcastIV struct {
+	iv *btcwire.InvVect
+	op RebroastcastIVType //Operation to execute on iv
+}
+
 // server provides a bitcoin server for handling communications to and from
 // bitcoin peers.
 type server struct {
-	nonce             uint64
-	listeners         []net.Listener
-	btcnet            btcwire.BitcoinNet
-	started           int32      // atomic
-	shutdown          int32      // atomic
-	shutdownSched     int32      // atomic
-	bytesMutex        sync.Mutex // For the following two fields.
-	bytesReceived     uint64     // Total bytes received from all peers since start.
-	bytesSent         uint64     // Total bytes sent by all peers since start.
-	addrManager       *AddrManager
-	rpcServer         *rpcServer
-	blockManager      *blockManager
-	txMemPool         *txMemPool
-	addRebroadcastInv chan *btcwire.InvVect
-	delRebroadcastInv chan *btcwire.InvVect
-	newPeers          chan *peer
-	donePeers         chan *peer
-	banPeers          chan *peer
-	wakeup            chan bool
-	query             chan interface{}
-	relayInv          chan *btcwire.InvVect
-	broadcast         chan broadcastMsg
-	wg                sync.WaitGroup
-	quit              chan bool
-	nat               NAT
-	db                btcdb.Db
+	nonce                uint64
+	listeners            []net.Listener
+	btcnet               btcwire.BitcoinNet
+	started              int32      // atomic
+	shutdown             int32      // atomic
+	shutdownSched        int32      // atomic
+	bytesMutex           sync.Mutex // For the following two fields.
+	bytesReceived        uint64     // Total bytes received from all peers since start.
+	bytesSent            uint64     // Total bytes sent by all peers since start.
+	addrManager          *AddrManager
+	rpcServer            *rpcServer
+	blockManager         *blockManager
+	txMemPool            *txMemPool
+	modifyRebroadcastInv chan rebroadcastIV
+	newPeers             chan *peer
+	donePeers            chan *peer
+	banPeers             chan *peer
+	wakeup               chan bool
+	query                chan interface{}
+	relayInv             chan *btcwire.InvVect
+	broadcast            chan broadcastMsg
+	wg                   sync.WaitGroup
+	quit                 chan bool
+	nat                  NAT
+	db                   btcdb.Db
 }
 
 type peerState struct {
@@ -89,14 +106,14 @@ type peerState struct {
 	maxOutboundPeers int
 }
 
-// Add an InvVect (corresponding to an RPC-submitted tx) to a map of them
-func (s *server) AddRebroadcastInventory(iv *btcwire.InvVect) {
-	s.addRebroadcastInv <- iv
-}
-
-// Remove an InvVect (corresponding to an RPC-submitted tx) to a map of them
-func (s *server) RemRebroadcastInventory(iv *btcwire.InvVect) {
-	s.delRebroadcastInv <- iv
+// ModifyRebroadcastInventory creates a message to the channel in rebroadcast-
+// Handler and dispatches it; the message is of type rebroadcastIV, which includes
+// an InvVect itself (iv) and an operation to commit to (dothis)
+func (s *server) ModifyRebroadcastInventory(iv *btcwire.InvVect, dothis RebroastcastIVType) {
+	var message rebroadcastIV
+	message.iv = iv
+	message.op = dothis
+	s.modifyRebroadcastInv <- message
 }
 
 func (p *peerState) Count() int {
@@ -736,18 +753,22 @@ func (s *server) rebroadcastHandler() {
 out:
 	for {
 		select {
-		// Incoming InvVects are added to our hashmap of RPC txs.
-		case iv := <-s.addRebroadcastInv:
-			pendingInvs[*iv] = struct{}{}
+		case miv := <-s.modifyRebroadcastInv:
+			switch miv.op {
+			// Incoming InvVects are added to our hashmap of RPC txs.
+			case AddRebroadcastIV:
+				pendingInvs[*miv.iv] = struct{}{}
 
-		// When an InvVect has been added to a block, we can now remove it; note
-		// that we need to check if the iv is actually found in the map before we
-		// try to delete it, as when handleNotifyMsg finds a new block it cycles
-		// through the txs and sends them all indescriminately to this function.
-		// The if loop is cheap, so this should not be an issue.
-		case iv := <-s.delRebroadcastInv:
-			if _, ok := pendingInvs[*iv]; ok {
-				delete(pendingInvs, *iv)
+			// When an InvVect has been added to a block, we can now remove it;
+			// note that we need to check if the iv is actually found in the
+			// map before we try to delete it, as when handleNotifyMsg finds a
+			// new block it cycles through the txs and sends them all
+			// indescriminately to this function.  The if loop is cheap, so
+			// this should not be an issue.
+			case DelRebroadcastIV:
+				if _, ok := pendingInvs[*miv.iv]; ok {
+					delete(pendingInvs, *miv.iv)
+				}
 			}
 
 		// When the timer triggers, scan through all the InvVects of RPC-submitted
@@ -1108,22 +1129,21 @@ func newServer(listenAddrs []string, db btcdb.Db, btcnet btcwire.BitcoinNet) (*s
 	}
 
 	s := server{
-		nonce:             nonce,
-		listeners:         listeners,
-		btcnet:            btcnet,
-		addrManager:       amgr,
-		newPeers:          make(chan *peer, cfg.MaxPeers),
-		donePeers:         make(chan *peer, cfg.MaxPeers),
-		banPeers:          make(chan *peer, cfg.MaxPeers),
-		wakeup:            make(chan bool),
-		query:             make(chan interface{}),
-		relayInv:          make(chan *btcwire.InvVect, cfg.MaxPeers),
-		broadcast:         make(chan broadcastMsg, cfg.MaxPeers),
-		quit:              make(chan bool),
-		addRebroadcastInv: make(chan *btcwire.InvVect),
-		delRebroadcastInv: make(chan *btcwire.InvVect),
-		nat:               nat,
-		db:                db,
+		nonce:                nonce,
+		listeners:            listeners,
+		btcnet:               btcnet,
+		addrManager:          amgr,
+		newPeers:             make(chan *peer, cfg.MaxPeers),
+		donePeers:            make(chan *peer, cfg.MaxPeers),
+		banPeers:             make(chan *peer, cfg.MaxPeers),
+		wakeup:               make(chan bool),
+		query:                make(chan interface{}),
+		relayInv:             make(chan *btcwire.InvVect, cfg.MaxPeers),
+		broadcast:            make(chan broadcastMsg, cfg.MaxPeers),
+		quit:                 make(chan bool),
+		modifyRebroadcastInv: make(chan rebroadcastIV),
+		nat:                  nat,
+		db:                   db,
 	}
 	bm, err := newBlockManager(&s)
 	if err != nil {
