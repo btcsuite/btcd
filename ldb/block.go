@@ -247,13 +247,18 @@ func (db *LevelDb) FetchBlockShaByHeight(height int64) (sha *btcwire.ShaHash, er
 // fetchBlockShaByHeight returns a block hash based on its height in the
 // block chain.
 func (db *LevelDb) fetchBlockShaByHeight(height int64) (rsha *btcwire.ShaHash, err error) {
-	var sha *btcwire.ShaHash
-	sha, _, err = db.getBlkByHeight(height)
+	key := int64ToKey(height)
+
+	blkVal, err := db.lDb.Get(key, db.ro)
 	if err != nil {
-		return
+		log.Tracef("failed to find height %v", height)
+		return // exists ???
 	}
 
-	return sha, nil
+	var sha btcwire.ShaHash
+	sha.SetBytes(blkVal[0:32])
+
+	return &sha, nil
 }
 
 // FetchHeightRange looks up a range of blocks by the start and ending
@@ -271,7 +276,7 @@ func (db *LevelDb) FetchHeightRange(startHeight, endHeight int64) (rshalist []bt
 		endidx = endHeight
 	}
 
-	var shalist []btcwire.ShaHash
+	shalist := make([]btcwire.ShaHash, 0, endidx-startHeight)
 	for height := startHeight; height < endidx; height++ {
 		// TODO(drahn) fix blkFile from height
 

@@ -101,7 +101,7 @@ func OpenDB(args ...interface{}) (btcdb.Db, error) {
 blockforward:
 	for {
 
-		sha, _, err := ldb.getBlkByHeight(testblock)
+		sha, err := ldb.fetchBlockShaByHeight(testblock)
 		if err == nil {
 			// block is found
 			lastSha = sha
@@ -125,7 +125,7 @@ blockforward:
 blocknarrow:
 	for lastknownblock != -1 {
 		testblock = (lastknownblock + nextunknownblock) / 2
-		sha, _, err := ldb.getBlkByHeight(testblock)
+		sha, err := ldb.fetchBlockShaByHeight(testblock)
 		if err == nil {
 			lastknownblock = testblock
 			lastSha = sha
