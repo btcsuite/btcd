@@ -368,8 +368,7 @@ func newRPCServer(listenAddrs []string, s *server) (*rpcServer, error) {
 	listeners := make([]net.Listener, 0,
 		len(ipv6ListenAddrs)+len(ipv4ListenAddrs))
 	for _, addr := range ipv4ListenAddrs {
-		var listener net.Listener
-		listener, err = tls.Listen("tcp4", addr, &tlsConfig)
+		listener, err := tls.Listen("tcp4", addr, &tlsConfig)
 		if err != nil {
 			rpcsLog.Warnf("Can't listen on %s: %v", addr,
 				err)
@@ -379,8 +378,7 @@ func newRPCServer(listenAddrs []string, s *server) (*rpcServer, error) {
 	}
 
 	for _, addr := range ipv6ListenAddrs {
-		var listener net.Listener
-		listener, err = tls.Listen("tcp6", addr, &tlsConfig)
+		listener, err := tls.Listen("tcp6", addr, &tlsConfig)
 		if err != nil {
 			rpcsLog.Warnf("Can't listen on %s: %v", addr,
 				err)
@@ -394,7 +392,7 @@ func newRPCServer(listenAddrs []string, s *server) (*rpcServer, error) {
 
 	rpc.listeners = listeners
 
-	return &rpc, err
+	return &rpc, nil
 }
 
 // jsonAuthFail sends a message back to the client if the http auth is rejected.
