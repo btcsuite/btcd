@@ -611,7 +611,8 @@ func (cmd *RecoverAddressesCmd) UnmarshalJSON(b []byte) error {
 type RescanCmd struct {
 	id         interface{}
 	BeginBlock int32
-	Addresses  map[string]struct{}
+	Addresses  []string
+	OutPoints  []*btcwire.OutPoint
 	EndBlock   int64 // TODO: switch this and btcdb.AllShas to int32
 }
 
@@ -621,8 +622,8 @@ var _ btcjson.Cmd = &RescanCmd{}
 // NewRescanCmd creates a new RescanCmd, parsing the optional
 // arguments optArgs which may either be empty or a single upper
 // block height.
-func NewRescanCmd(id interface{}, begin int32, addresses map[string]struct{},
-	optArgs ...int64) (*RescanCmd, error) {
+func NewRescanCmd(id interface{}, begin int32, addresses []string,
+	outpoints []*btcwire.OutPoint, optArgs ...int64) (*RescanCmd, error) {
 
 	// Optional parameters set to their defaults.
 	end := btcdb.AllShas
@@ -638,6 +639,7 @@ func NewRescanCmd(id interface{}, begin int32, addresses map[string]struct{},
 		id:         id,
 		BeginBlock: begin,
 		Addresses:  addresses,
+		OutPoints:  outpoints,
 		EndBlock:   end,
 	}, nil
 }
@@ -646,7 +648,7 @@ func NewRescanCmd(id interface{}, begin int32, addresses map[string]struct{},
 // the btcjson.Cmd interface.  This is used when registering the custom
 // command with the btcjson parser.
 func parseRescanCmd(r *btcjson.RawCmd) (btcjson.Cmd, error) {
-	if len(r.Params) < 2 {
+	if len(r.Params) < 3 {
 		return nil, btcjson.ErrWrongNumberOfParams
 	}
 
@@ -654,16 +656,47 @@ func parseRescanCmd(r *btcjson.RawCmd) (btcjson.Cmd, error) {
 	if !ok {
 		return nil, errors.New("first parameter must be a number")
 	}
-	iaddrs, ok := r.Params[1].(map[string]interface{})
+
+	iaddrs, ok := r.Params[1].([]interface{})
 	if !ok {
-		return nil, errors.New("second parameter must be a JSON object")
+		return nil, errors.New("second parameter must be a JSON array")
 	}
-	addresses := make(map[string]struct{}, len(iaddrs))
-	for addr := range iaddrs {
-		addresses[addr] = struct{}{}
+	addresses := make([]string, 0, len(iaddrs))
+	for _, addr := range iaddrs {
+		addrStr, ok := addr.(string)
+		if !ok {
+			return nil, errors.New("address is not a string")
+		}
+		addresses = append(addresses, addrStr)
 	}
-	params := make([]int64, len(r.Params[2:]))
-	for i, val := range r.Params[2:] {
+
+	ops, ok := r.Params[2].([]interface{})
+	if !ok {
+		return nil, errors.New("third parameter must be a JSON array")
+	}
+	outpoints := make([]*btcwire.OutPoint, 0, len(ops))
+	for i := range ops {
+		op, ok := ops[i].(map[string]interface{})
+		if !ok {
+			return nil, errors.New("outpoint is not a JSON object")
+		}
+		txHashHexStr, ok := op["hash"].(string)
+		if !ok {
+			return nil, errors.New("outpoint hash is not a string")
+		}
+		txHash, err := btcwire.NewShaHashFromStr(txHashHexStr)
+		if err != nil {
+			return nil, errors.New("outpoint hash is not a valid hex string")
+		}
+		index, ok := op["index"].(float64)
+		if !ok {
+			return nil, errors.New("outpoint index is not a number")
+		}
+		outpoints = append(outpoints, btcwire.NewOutPoint(txHash, uint32(index)))
+	}
+
+	params := make([]int64, len(r.Params[3:]))
+	for i, val := range r.Params[3:] {
 		fval, ok := val.(float64)
 		if !ok {
 			return nil, errors.New("optional parameters must " +
@@ -672,7 +705,7 @@ func parseRescanCmd(r *btcjson.RawCmd) (btcjson.Cmd, error) {
 		params[i] = int64(fval)
 	}
 
-	return NewRescanCmd(r.Id, int32(begin), addresses, params...)
+	return NewRescanCmd(r.Id, int32(begin), addresses, outpoints, params...)
 }
 
 // Id satisifies the Cmd interface by returning the ID of the command.
@@ -692,6 +725,14 @@ func (cmd *RescanCmd) Method() string {
 
 // MarshalJSON returns the JSON encoding of cmd.  Part of the Cmd interface.
 func (cmd *RescanCmd) MarshalJSON() ([]byte, error) {
+	ops := make([]interface{}, 0, len(cmd.OutPoints))
+	for _, op := range cmd.OutPoints {
+		ops = append(ops, map[string]interface{}{
+			"hash":  op.Hash.String(),
+			"index": float64(op.Index),
+		})
+	}
+
 	// Fill a RawCmd and marshal.
 	raw := btcjson.RawCmd{
 		Jsonrpc: "1.0",
@@ -700,6 +741,7 @@ func (cmd *RescanCmd) MarshalJSON() ([]byte, error) {
 		Params: []interface{}{
 			cmd.BeginBlock,
 			cmd.Addresses,
+			ops,
 		},
 	}
 

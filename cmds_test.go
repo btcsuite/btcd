@@ -211,19 +211,34 @@ var cmdtests = []struct {
 	{
 		name: "rescan no optargs",
 		f: func() (btcjson.Cmd, error) {
-			addrs := map[string]struct{}{
-				"17XhEvq9Nahdj7Xe1nv6oRe1tEmaHUuynH": {},
+			addrs := []string{"17XhEvq9Nahdj7Xe1nv6oRe1tEmaHUuynH"}
+			ops := []*btcwire.OutPoint{
+				&btcwire.OutPoint{
+					Hash: [...]byte{0, 1, 2, 3, 4, 5, 6, 7, 8, 9,
+						10, 11, 12, 13, 14, 15, 16, 17, 18, 19,
+						20, 21, 22, 23, 24, 25, 26, 27, 28, 29,
+						30, 31},
+					Index: 1,
+				},
 			}
 			return NewRescanCmd(
 				float64(1),
 				270000,
-				addrs)
+				addrs,
+				ops)
 		},
 		result: &RescanCmd{
 			id:         float64(1),
 			BeginBlock: 270000,
-			Addresses: map[string]struct{}{
-				"17XhEvq9Nahdj7Xe1nv6oRe1tEmaHUuynH": {},
+			Addresses:  []string{"17XhEvq9Nahdj7Xe1nv6oRe1tEmaHUuynH"},
+			OutPoints: []*btcwire.OutPoint{
+				&btcwire.OutPoint{
+					Hash: [...]byte{0, 1, 2, 3, 4, 5, 6, 7, 8, 9,
+						10, 11, 12, 13, 14, 15, 16, 17, 18, 19,
+						20, 21, 22, 23, 24, 25, 26, 27, 28, 29,
+						30, 31},
+					Index: 1,
+				},
 			},
 			EndBlock: btcdb.AllShas,
 		},
@@ -231,20 +246,35 @@ var cmdtests = []struct {
 	{
 		name: "rescan one optarg",
 		f: func() (btcjson.Cmd, error) {
-			addrs := map[string]struct{}{
-				"17XhEvq9Nahdj7Xe1nv6oRe1tEmaHUuynH": {},
+			addrs := []string{"17XhEvq9Nahdj7Xe1nv6oRe1tEmaHUuynH"}
+			ops := []*btcwire.OutPoint{
+				&btcwire.OutPoint{
+					Hash: [...]byte{0, 1, 2, 3, 4, 5, 6, 7, 8, 9,
+						10, 11, 12, 13, 14, 15, 16, 17, 18, 19,
+						20, 21, 22, 23, 24, 25, 26, 27, 28, 29,
+						30, 31},
+					Index: 1,
+				},
 			}
 			return NewRescanCmd(
 				float64(1),
 				270000,
 				addrs,
+				ops,
 				280000)
 		},
 		result: &RescanCmd{
 			id:         float64(1),
 			BeginBlock: 270000,
-			Addresses: map[string]struct{}{
-				"17XhEvq9Nahdj7Xe1nv6oRe1tEmaHUuynH": {},
+			Addresses:  []string{"17XhEvq9Nahdj7Xe1nv6oRe1tEmaHUuynH"},
+			OutPoints: []*btcwire.OutPoint{
+				&btcwire.OutPoint{
+					Hash: [...]byte{0, 1, 2, 3, 4, 5, 6, 7, 8, 9,
+						10, 11, 12, 13, 14, 15, 16, 17, 18, 19,
+						20, 21, 22, 23, 24, 25, 26, 27, 28, 29,
+						30, 31},
+					Index: 1,
+				},
 			},
 			EndBlock: 280000,
 		},
