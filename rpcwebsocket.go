@@ -1597,7 +1597,7 @@ func handleRescan(wsc *wsClient, icmd btcjson.Cmd) (interface{}, *btcjson.Error)
 	var ripemd160Hash [ripemd160.Size]byte
 	var compressedPubkey [33]byte
 	var uncompressedPubkey [65]byte
-	for addrStr := range cmd.Addresses {
+	for _, addrStr := range cmd.Addresses {
 		addr, err := btcutil.DecodeAddress(addrStr, activeNetParams.btcnet)
 		if err != nil {
 			jsonErr := btcjson.Error{
@@ -1640,6 +1640,9 @@ func handleRescan(wsc *wsClient, icmd btcjson.Cmd) (interface{}, *btcjson.Error)
 			// is added.
 			lookups.fallbacks[addrStr] = struct{}{}
 		}
+	}
+	for _, outpoint := range cmd.OutPoints {
+		lookups.unspent[*outpoint] = struct{}{}
 	}
 
 	minBlock := int64(cmd.BeginBlock)
