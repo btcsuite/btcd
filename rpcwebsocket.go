@@ -181,13 +181,27 @@ func (m *wsNotificationManager) queueHandler() {
 // to the notification manager for block and transaction notification
 // processing.
 func (m *wsNotificationManager) NotifyBlockConnected(block *btcutil.Block) {
-	m.queueNotification <- (*notificationBlockConnected)(block)
+	// As NotifyBlockConnected will be called by the block manager
+	// and the RPC server may no longer be running, use a select
+	// statement to unblock enqueueing the notification once the RPC
+	// server has begun shutting down.
+	select {
+	case m.queueNotification <- (*notificationBlockConnected)(block):
+	case <-m.quit:
+	}
 }
 
 // NotifyBlockDisconnected passes a block disconnected from the best chain
 // to the notification manager for block notification processing.
 func (m *wsNotificationManager) NotifyBlockDisconnected(block *btcutil.Block) {
-	m.queueNotification <- (*notificationBlockDisconnected)(block)
+	// As NotifyBlockDisconnected will be called by the block manager
+	// and the RPC server may no longer be running, use a select
+	// statement to unblock enqueueing the notification once the RPC
+	// server has begun shutting down.
+	select {
+	case m.queueNotification <- (*notificationBlockDisconnected)(block):
+	case <-m.quit:
+	}
 }
 
 // NotifyMempoolTx passes a transaction accepted by mempool to the
@@ -195,9 +209,18 @@ func (m *wsNotificationManager) NotifyBlockDisconnected(block *btcutil.Block) {
 // isNew is true, the tx is is a new transaction, rather than one
 // added to the mempool during a reorg.
 func (m *wsNotificationManager) NotifyMempoolTx(tx *btcutil.Tx, isNew bool) {
-	m.queueNotification <- &notificationTxAcceptedByMempool{
+	n := &notificationTxAcceptedByMempool{
 		isNew: isNew,
 		tx:    tx,
+	}
+
+	// As NotifyMempoolTx will be called by mempool and the RPC server
+	// may no longer be running, use a select statement to unblock
+	// enqueueing the notification once the RPC server has begun
+	// shutting down.
+	select {
+	case m.queueNotification <- n:
+	case <-m.quit:
 	}
 }
 
@@ -354,8 +377,12 @@ out:
 }
 
 // NumClients returns the number of clients actively being served.
-func (m *wsNotificationManager) NumClients() int {
-	return <-m.numClients
+func (m *wsNotificationManager) NumClients() (n int) {
+	select {
+	case n = <-m.numClients:
+	case <-m.quit: // Use default n (0) if server has shut down.
+	}
+	return
 }
 
 // RegisterBlockUpdates requests block update notifications to the passed
