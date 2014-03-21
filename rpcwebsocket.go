@@ -6,6 +6,7 @@ package main
 
 import (
 	"bytes"
+	"code.google.com/p/go.crypto/ripemd160"
 	"code.google.com/p/go.net/websocket"
 	"container/list"
 	"crypto/sha256"
@@ -1431,10 +1432,24 @@ func handleNotifyNewTXs(wsc *wsClient, icmd btcjson.Cmd) (interface{}, *btcjson.
 	return nil, nil
 }
 
+type rescanKeys struct {
+	fallbacks           map[string]struct{}
+	pubKeyHashes        map[[ripemd160.Size]byte]struct{}
+	scriptHashes        map[[ripemd160.Size]byte]struct{}
+	compressedPubkeys   map[[33]byte]struct{}
+	uncompressedPubkeys map[[65]byte]struct{}
+	unspent             map[btcwire.OutPoint]struct{}
+}
+
 // rescanBlock rescans all transactions in a single block.  This is a helper
 // function for handleRescan.
-func rescanBlock(wsc *wsClient, cmd *btcws.RescanCmd, blk *btcutil.Block,
-	unspent map[btcwire.OutPoint]struct{}) {
+func rescanBlock(wsc *wsClient, lookups *rescanKeys, blk *btcutil.Block) {
+	// Vars used for map keys.  The item being checked is copied into
+	// these and then used as the lookup key.  Saves on GC.
+	var ripemd160Hash [ripemd160.Size]byte
+	var compressedPubkey [33]byte
+	var uncompressedPubkey [65]byte
+	var outpoint btcwire.OutPoint
 
 	for _, tx := range blk.Transactions() {
 		// Hexadecimal representation of this tx.  Only created if
@@ -1449,8 +1464,8 @@ func rescanBlock(wsc *wsClient, cmd *btcws.RescanCmd, blk *btcutil.Block,
 		recvNotified := false
 
 		for _, txin := range tx.MsgTx().TxIn {
-			if _, ok := unspent[txin.PreviousOutpoint]; ok {
-				delete(unspent, txin.PreviousOutpoint)
+			if _, ok := lookups.unspent[txin.PreviousOutpoint]; ok {
+				delete(lookups.unspent, txin.PreviousOutpoint)
 
 				if spentNotified {
 					continue
@@ -1480,12 +1495,53 @@ func rescanBlock(wsc *wsClient, cmd *btcws.RescanCmd, blk *btcutil.Block,
 				txout.PkScript, wsc.server.server.btcnet)
 
 			for _, addr := range addrs {
-				encodedAddr := addr.EncodeAddress()
-				if _, ok := cmd.Addresses[encodedAddr]; !ok {
-					continue
+				switch a := addr.(type) {
+				case *btcutil.AddressPubKeyHash:
+					copy(ripemd160Hash[:], a.ScriptAddress())
+					if _, ok := lookups.pubKeyHashes[ripemd160Hash]; !ok {
+						continue
+					}
+
+				case *btcutil.AddressScriptHash:
+					copy(ripemd160Hash[:], a.ScriptAddress())
+					if _, ok := lookups.scriptHashes[ripemd160Hash]; !ok {
+						continue
+					}
+
+				case *btcutil.AddressPubKey:
+					pubkeyBytes := a.ScriptAddress()
+					switch len(pubkeyBytes) {
+					case 33: // Compressed
+						copy(compressedPubkey[:], pubkeyBytes)
+						_, ok := lookups.compressedPubkeys[compressedPubkey]
+						if !ok {
+							continue
+						}
+
+					case 65: // Uncompressed
+						copy(uncompressedPubkey[:], pubkeyBytes)
+						_, ok := lookups.uncompressedPubkeys[uncompressedPubkey]
+						if !ok {
+							continue
+						}
+
+					default: // wtf
+						continue
+					}
+
+				default:
+					// A new address type must have been added.  Encode as a
+					// payment address string and check the fallback map.
+					addrStr := addr.EncodeAddress()
+					_, ok := lookups.fallbacks[addrStr]
+					if !ok {
+						continue
+					}
 				}
 
-				unspent[*btcwire.NewOutPoint(tx.Sha(), uint32(txOutIdx))] = struct{}{}
+				copy(outpoint.Hash[:], tx.Sha()[:])
+				outpoint.Index = uint32(txOutIdx)
+				lookups.unspent[outpoint] = struct{}{}
 
 				if recvNotified {
 					continue
@@ -1529,9 +1585,65 @@ func handleRescan(wsc *wsClient, icmd btcjson.Cmd) (interface{}, *btcjson.Error)
 		rpcsLog.Infof("Beginning rescan for %d addresses", numAddrs)
 	}
 
+	// Build lookup maps.
+	lookups := rescanKeys{
+		fallbacks:           map[string]struct{}{},
+		pubKeyHashes:        map[[ripemd160.Size]byte]struct{}{},
+		scriptHashes:        map[[ripemd160.Size]byte]struct{}{},
+		compressedPubkeys:   map[[33]byte]struct{}{},
+		uncompressedPubkeys: map[[65]byte]struct{}{},
+		unspent:             map[btcwire.OutPoint]struct{}{},
+	}
+	var ripemd160Hash [ripemd160.Size]byte
+	var compressedPubkey [33]byte
+	var uncompressedPubkey [65]byte
+	for addrStr := range cmd.Addresses {
+		addr, err := btcutil.DecodeAddress(addrStr, activeNetParams.btcnet)
+		if err != nil {
+			jsonErr := btcjson.Error{
+				Code:    btcjson.ErrInvalidAddressOrKey.Code,
+				Message: "Rescan address " + addrStr + ": " + err.Error(),
+			}
+			return nil, &jsonErr
+		}
+		switch a := addr.(type) {
+		case *btcutil.AddressPubKeyHash:
+			copy(ripemd160Hash[:], a.ScriptAddress())
+			lookups.pubKeyHashes[ripemd160Hash] = struct{}{}
+
+		case *btcutil.AddressScriptHash:
+			copy(ripemd160Hash[:], a.ScriptAddress())
+			lookups.scriptHashes[ripemd160Hash] = struct{}{}
+
+		case *btcutil.AddressPubKey:
+			pubkeyBytes := a.ScriptAddress()
+			switch len(pubkeyBytes) {
+			case 33: // Compressed
+				copy(compressedPubkey[:], pubkeyBytes)
+				lookups.compressedPubkeys[compressedPubkey] = struct{}{}
+
+			case 65: // Uncompressed
+				copy(uncompressedPubkey[:], pubkeyBytes)
+				lookups.uncompressedPubkeys[uncompressedPubkey] = struct{}{}
+
+			default:
+				jsonErr := btcjson.Error{
+					Code:    btcjson.ErrInvalidAddressOrKey.Code,
+					Message: "Pubkey " + addrStr + " is of unknown length",
+				}
+				return nil, &jsonErr
+			}
+
+		default:
+			// A new address type must have been added.  Use encoded
+			// payment address string as a fallback until a fast path
+			// is added.
+			lookups.fallbacks[addrStr] = struct{}{}
+		}
+	}
+
 	minBlock := int64(cmd.BeginBlock)
 	maxBlock := int64(cmd.EndBlock)
-	unspent := make(map[btcwire.OutPoint]struct{})
 
 	// FetchHeightRange may not return a complete list of block shas for
 	// the given range, so fetch range as many times as necessary.
@@ -1561,7 +1673,7 @@ func handleRescan(wsc *wsClient, icmd btcjson.Cmd) (interface{}, *btcjson.Error)
 					blk.Height())
 				return nil, nil
 			default:
-				rescanBlock(wsc, cmd, blk, unspent)
+				rescanBlock(wsc, &lookups, blk)
 			}
 		}
 
