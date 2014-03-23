@@ -7,7 +7,6 @@ package main
 import (
 	"bytes"
 	"code.google.com/p/go.net/websocket"
-	"crypto/sha256"
 	"crypto/subtle"
 	"crypto/tls"
 	"encoding/base64"
@@ -20,6 +19,7 @@ import (
 	"github.com/conformal/btcscript"
 	"github.com/conformal/btcutil"
 	"github.com/conformal/btcwire"
+	"github.com/conformal/fastsha256"
 	"io/ioutil"
 	"math/big"
 	"net"
@@ -144,7 +144,7 @@ type rpcServer struct {
 	started         int32
 	shutdown        int32
 	server          *server
-	authsha         [sha256.Size]byte
+	authsha         [fastsha256.Size]byte
 	ntfnMgr         *wsNotificationManager
 	numClients      int
 	numClientsMutex sync.Mutex
@@ -276,7 +276,7 @@ func (s *rpcServer) checkAuth(r *http.Request, require bool) (bool, error) {
 		return false, nil
 	}
 
-	authsha := sha256.Sum256([]byte(authhdr[0]))
+	authsha := fastsha256.Sum256([]byte(authhdr[0]))
 	cmp := subtle.ConstantTimeCompare(authsha[:], s.authsha[:])
 	if cmp != 1 {
 		rpcsLog.Warnf("RPC authentication failure from %s", r.RemoteAddr)
@@ -336,7 +336,7 @@ func newRPCServer(listenAddrs []string, s *server) (*rpcServer, error) {
 	login := cfg.RPCUser + ":" + cfg.RPCPass
 	auth := "Basic " + base64.StdEncoding.EncodeToString([]byte(login))
 	rpc := rpcServer{
-		authsha: sha256.Sum256([]byte(auth)),
+		authsha: fastsha256.Sum256([]byte(auth)),
 		server:  s,
 		quit:    make(chan int),
 	}
