@@ -911,11 +911,10 @@ func handleGetBlock(s *rpcServer, cmd btcjson.Cmd) (interface{}, error) {
 	}
 
 	if !c.VerboseTx {
-		txList, _ := blk.TxShas()
-
-		txNames := make([]string, len(txList))
-		for i, v := range txList {
-			txNames[i] = v.String()
+		transactions := blk.Transactions()
+		txNames := make([]string, len(transactions))
+		for i, tx := range transactions {
+			txNames[i] = tx.Sha().String()
 		}
 
 		blockReply.Tx = txNames
