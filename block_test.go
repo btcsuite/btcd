@@ -61,29 +61,6 @@ func TestBlock(t *testing.T) {
 		"e9a66845e05d5abc0ad04ec80f774a7e585c6e8db975962d069a522137b80c1d",
 	}
 
-	// Request sha for all transactions one at a time via TxSha.
-	for i, txSha := range wantTxShas {
-		wantSha, err := btcwire.NewShaHashFromStr(txSha)
-		if err != nil {
-			t.Errorf("NewShaHashFromStr: %v", err)
-		}
-
-		// Request the sha multiple times to test generation and caching.
-		for j := 0; j < 2; j++ {
-			sha, err := b.TxSha(i)
-			if err != nil {
-				t.Errorf("TxSha: %v", err)
-				continue
-			}
-
-			if !sha.IsEqual(wantSha) {
-				t.Errorf("TxSha #%d mismatched sha - got %v, "+
-					"want %v", j, sha, wantSha)
-				continue
-			}
-		}
-	}
-
 	// Create a new block to nuke all cached data.
 	b = btcutil.NewBlock(&Block100000)
 
@@ -106,43 +83,6 @@ func TestBlock(t *testing.T) {
 			if !sha.IsEqual(wantSha) {
 				t.Errorf("Sha #%d mismatched sha - got %v, "+
 					"want %v", j, sha, wantSha)
-				continue
-			}
-		}
-	}
-
-	// Create a new block to nuke all cached data.
-	b = btcutil.NewBlock(&Block100000)
-
-	// Request slice of all transaction shas multiple times to test
-	// generation and caching.
-	for i := 0; i < 2; i++ {
-		txShas, err := b.TxShas()
-		if err != nil {
-			t.Errorf("TxShas: %v", err)
-			continue
-		}
-
-		// Ensure we get the expected number of transaction shas.
-		if len(txShas) != len(wantTxShas) {
-			t.Errorf("TxShas #%d mismatched number of shas -"+
-				"got %d, want %d", i, len(txShas),
-				len(wantTxShas))
-			continue
-		}
-
-		// Ensure all of the shas match.
-		for j, txSha := range wantTxShas {
-			wantSha, err := btcwire.NewShaHashFromStr(txSha)
-			if err != nil {
-				t.Errorf("NewShaHashFromStr: %v", err)
-			}
-
-			if !txShas[j].IsEqual(wantSha) {
-				t.Errorf("TxShas #%d mismatched shas - "+
-					"got %v, want %v", j,
-					spew.Sdump(txShas),
-					spew.Sdump(wantTxShas))
 				continue
 			}
 		}

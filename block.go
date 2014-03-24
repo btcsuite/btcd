@@ -29,14 +29,12 @@ func (e OutOfRangeError) Error() string {
 // transactions on their first access so subsequent accesses don't have to
 // repeat the relatively expensive hashing operations.
 type Block struct {
-	msgBlock        *btcwire.MsgBlock  // Underlying MsgBlock
-	serializedBlock []byte             // Serialized bytes for the block
-	blockSha        *btcwire.ShaHash   // Cached block hash
-	blockHeight     int64              // Height in the main block chain
-	txShas          []*btcwire.ShaHash // Cached transaction hashes
-	txShasGenerated bool               // ALL transaction hashes generated
-	transactions    []*Tx              // Transactions
-	txnsGenerated   bool               // ALL wrapped transactions generated
+	msgBlock        *btcwire.MsgBlock // Underlying MsgBlock
+	serializedBlock []byte            // Serialized bytes for the block
+	blockSha        *btcwire.ShaHash  // Cached block hash
+	blockHeight     int64             // Height in the main block chain
+	transactions    []*Tx             // Transactions
+	txnsGenerated   bool              // ALL wrapped transactions generated
 }
 
 // MsgBlock returns the underlying btcwire.MsgBlock for the Block.
@@ -165,42 +163,6 @@ func (b *Block) TxSha(txNum int) (*btcwire.ShaHash, error) {
 	// Defer to the wrapped transaction which will return the cached hash if
 	// it has already been generated.
 	return tx.Sha(), nil
-}
-
-// TxShas returns a slice of hashes for all transactions in the Block.  This is
-// equivalent to calling TxSha on each underlying btcwire.MsgTx, however it
-// caches the result so subsequent calls are more efficient.
-//
-// DEPRECATED - This function will be removed in the next version and
-// should not be used.  Instead, use Transactions() and .Sha() on each
-// transaction.
-func (b *Block) TxShas() ([]*btcwire.ShaHash, error) {
-	// Return cached hashes if they have ALL already been generated.  This
-	// flag is necessary because the transaction hashes are lazily generated
-	// in a sparse fashion.
-	if b.txShasGenerated {
-		return b.txShas, nil
-	}
-
-	// Generate slice to hold all of the transaction hashes if needed.
-	if len(b.txShas) == 0 {
-		b.txShas = make([]*btcwire.ShaHash, len(b.msgBlock.Transactions))
-	}
-
-	// Generate and cache the transaction hashes for all that haven't already
-	// been done.
-	for i, hash := range b.txShas {
-		if hash == nil {
-			// Ignore the errors since the only way these can fail
-			// is if the index is out of range which is not possible
-			// here due to the range.
-			tx, _ := b.Tx(i)
-			b.txShas[i] = tx.Sha()
-		}
-	}
-
-	b.txShasGenerated = true
-	return b.txShas, nil
 }
 
 // TxLoc returns the offsets and lengths of each transaction in a raw block.
