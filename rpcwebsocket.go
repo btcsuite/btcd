@@ -1675,10 +1675,15 @@ func handleRescan(wsc *wsClient, icmd btcjson.Cmd) (interface{}, *btcjson.Error)
 	minBlock := int64(cmd.BeginBlock)
 	maxBlock := int64(cmd.EndBlock)
 
+	// A ticker is created to wait at least 10 seconds before notifying the
+	// websocket client of the current progress completed by the rescan.
+	ticker := time.NewTicker(10 * time.Second)
+	defer ticker.Stop()
+
 	// FetchHeightRange may not return a complete list of block shas for
 	// the given range, so fetch range as many times as necessary.
 	db := wsc.server.server.db
-	for {
+	for minBlock < maxBlock {
 		hashList, err := db.FetchHeightRange(minBlock, maxBlock)
 		if err != nil {
 			rpcsLog.Errorf("Error looking up block range: %v", err)
@@ -1699,19 +1704,39 @@ func handleRescan(wsc *wsClient, icmd btcjson.Cmd) (interface{}, *btcjson.Error)
 			// client requesting the rescan has disconnected.
 			select {
 			case <-wsc.quit:
-				rpcsLog.Debugf("Stopped rescan at height %v for disconnected client",
-					blk.Height())
+				rpcsLog.Debugf("Stopped rescan at height %v "+
+					"for disconnected client", blk.Height())
 				return nil, nil
 			default:
 				rescanBlock(wsc, &lookups, blk)
 			}
+
+			// Periodically notify the client of the progress
+			// completed.  Continue with next block if no progress
+			// notification is needed yet.
+			select {
+			case <-ticker.C: // fallthrough
+			default:
+				continue
+			}
+
+			n := btcws.NewRescanProgressNtfn(int32(blk.Height()))
+			mn, err := n.MarshalJSON()
+			if err != nil {
+				rpcsLog.Errorf("Failed to marshal rescan "+
+					"progress notification: %v", err)
+				continue
+			}
+
+			if err = wsc.QueueNotification(mn); err == ErrClientQuit {
+				// Finished if the client disconnected.
+				rpcsLog.Debugf("Stopped rescan at height %v "+
+					"for disconnected client", blk.Height())
+				return nil, nil
+			}
 		}
 
-		if maxBlock-minBlock > int64(len(hashList)) {
-			minBlock += int64(len(hashList))
-		} else {
-			break
-		}
+		minBlock += int64(len(hashList))
 	}
 
 	rpcsLog.Info("Finished rescan")
