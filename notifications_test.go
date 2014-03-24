@@ -124,6 +124,15 @@ var ntfntests = []struct {
 		},
 	},
 	{
+		name: "rescanprogress",
+		f: func() btcjson.Cmd {
+			return btcws.NewRescanProgressNtfn(12345)
+		},
+		result: &btcws.RescanProgressNtfn{
+			LastProcessed: 12345,
+		},
+	},
+	{
 		name: "newtx",
 		f: func() btcjson.Cmd {
 			details := map[string]interface{}{
@@ -226,7 +235,10 @@ func TestNtfns(t *testing.T) {
 
 		// Read marshaled notification back into n.  Should still
 		// match result.
-		n.UnmarshalJSON(mn)
+		if err := n.UnmarshalJSON(mn); err != nil {
+			t.Errorf("%s: unmarshal failed: %v", test.name, err)
+			continue
+		}
 		if !reflect.DeepEqual(test.result, n) {
 			t.Errorf("%s: unmarshal not as expected. "+
 				"got %v wanted %v", test.name, spew.Sdump(n),

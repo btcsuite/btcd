@@ -53,6 +53,10 @@ const (
 	// notification.
 	RedeemingTxNtfnMethod = "redeemingtx"
 
+	// RescanProgressNtfnMethod is the method of the btcd rescanprogress
+	// notification.
+	RescanProgressNtfnMethod = "rescanprogress"
+
 	// WalletLockStateNtfnMethod is the method of the btcwallet
 	// walletlockstate notification.
 	WalletLockStateNtfnMethod = "walletlockstate"
@@ -70,6 +74,9 @@ func init() {
 		parseBtcdConnectedNtfn, `TODO(jrick) fillmein`)
 	btcjson.RegisterCustomCmd(RecvTxNtfnMethod,
 		parseRecvTxNtfn, `TODO(jrick) fillmein`)
+	btcjson.RegisterCustomCmd(RescanProgressNtfnMethod,
+		parseRescanProgressNtfn, `TODO(jrick) fillmein`)
+
 	btcjson.RegisterCustomCmd(RedeemingTxNtfnMethod, parseRedeemingTxNtfn,
 		`TODO(jrick) fillmein`)
 	btcjson.RegisterCustomCmd(TxNtfnMethod, parseTxNtfn,
@@ -734,6 +741,89 @@ func (n *RedeemingTxNtfn) UnmarshalJSON(b []byte) error {
 	}
 
 	concreteNtfn, ok := newNtfn.(*RedeemingTxNtfn)
+	if !ok {
+		return btcjson.ErrInternal
+	}
+	*n = *concreteNtfn
+	return nil
+}
+
+// RescanProgressNtfn is type handling custom marshaling and
+// unmarshaling of rescanprogress JSON websocket notifications.
+type RescanProgressNtfn struct {
+	LastProcessed int32
+}
+
+// Enforce that RescanProgressNtfn satisifies the btcjson.Cmd interface.
+var _ btcjson.Cmd = &RescanProgressNtfn{}
+
+// NewRescanProgressNtfn creates a new RescanProgressNtfn.
+func NewRescanProgressNtfn(last int32) *RescanProgressNtfn {
+	return &RescanProgressNtfn{last}
+}
+
+// parseRescanProgressNtfn parses a RawCmd into a concrete type satisifying
+// the btcjson.Cmd interface.  This is used when registering the notification
+// with the btcjson parser.
+func parseRescanProgressNtfn(r *btcjson.RawCmd) (btcjson.Cmd, error) {
+	if r.Id != nil {
+		return nil, ErrNotANtfn
+	}
+
+	if len(r.Params) != 1 {
+		return nil, btcjson.ErrWrongNumberOfParams
+	}
+
+	last, ok := r.Params[0].(float64)
+	if !ok {
+		return nil, errors.New("first parameter must be a number")
+	}
+
+	return NewRescanProgressNtfn(int32(last)), nil
+}
+
+// Id satisifies the btcjson.Cmd interface by returning nil for a
+// notification ID.
+func (n *RescanProgressNtfn) Id() interface{} {
+	return nil
+}
+
+// SetId is implemented to satisify the btcjson.Cmd interface.  The
+// notification ID is not modified.
+func (n *RescanProgressNtfn) SetId(id interface{}) {}
+
+// Method satisifies the btcjson.Cmd interface by returning the method
+// of the notification.
+func (n *RescanProgressNtfn) Method() string {
+	return RescanProgressNtfnMethod
+}
+
+// MarshalJSON returns the JSON encoding of n.  Part of the btcjson.Cmd
+// interface.
+func (n *RescanProgressNtfn) MarshalJSON() ([]byte, error) {
+	ntfn := btcjson.Message{
+		Jsonrpc: "1.0",
+		Method:  n.Method(),
+		Params:  []interface{}{n.LastProcessed},
+	}
+	return json.Marshal(ntfn)
+}
+
+// UnmarshalJSON unmarshals the JSON encoding of n into n.  Part of
+// the btcjson.Cmd interface.
+func (n *RescanProgressNtfn) UnmarshalJSON(b []byte) error {
+	// Unmarshal into a RawCmd.
+	var r btcjson.RawCmd
+	if err := json.Unmarshal(b, &r); err != nil {
+		return err
+	}
+
+	newNtfn, err := parseRescanProgressNtfn(&r)
+	if err != nil {
+		return err
+	}
+
+	concreteNtfn, ok := newNtfn.(*RescanProgressNtfn)
 	if !ok {
 		return btcjson.ErrInternal
 	}
