@@ -552,13 +552,9 @@ func isTransactionSpent(txD *TxData) bool {
 func (b *BlockChain) checkBIP0030(node *blockNode, block *btcutil.Block) error {
 	// Attempt to fetch duplicate transactions for all of the transactions
 	// in this block from the point of view of the parent node.
-	fetchList, err := block.TxShas()
-	if err != nil {
-		return nil
-	}
 	fetchSet := make(map[btcwire.ShaHash]bool)
-	for _, txHash := range fetchList {
-		fetchSet[*txHash] = true
+	for _, tx := range block.Transactions() {
+		fetchSet[*tx.Sha()] = true
 	}
 	txResults, err := b.fetchTxStore(node, fetchSet)
 	if err != nil {
