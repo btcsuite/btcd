@@ -82,6 +82,7 @@ var commandHandlers = map[string]*handlerData{
 	"getwork":               {0, 1, displayJSONDump, nil, makeGetWork, "[data]"},
 	"help":                  {0, 1, displayGeneric, nil, makeHelp, "[commandName]"},
 	"importprivkey":         {1, 2, displayGeneric, []conversionHandler{nil, nil, toBool}, makeImportPrivKey, "<wifprivkey> [label] [rescan=true]"},
+	"importwallet":          {1, 0, displayGeneric, nil, makeImportWallet, "<filename>"},
 	"keypoolrefill":         {0, 1, displayGeneric, []conversionHandler{toInt}, makeKeyPoolRefill, "[newsize]"},
 	"listaccounts":          {0, 1, displayJSONDump, []conversionHandler{toInt}, makeListAccounts, "[minconf=1]"},
 	"listaddressgroupings":  {0, 0, displayJSONDump, nil, makeListAddressGroupings, ""},
@@ -515,6 +516,12 @@ func makeImportPrivKey(args []interface{}) (btcjson.Cmd, error) {
 	}
 
 	return btcjson.NewImportPrivKeyCmd("btcctl", args[0].(string), optargs...)
+}
+
+// makeImportWallet generates the cmd structure for
+// importwallet commands.
+func makeImportWallet(args []interface{}) (btcjson.Cmd, error) {
+	return btcjson.NewImportWalletCmd("btcctl", args[0].(string))
 }
 
 // makeKeyPoolRefill generates the cmd structure for keypoolrefill commands.
