@@ -6,7 +6,6 @@ package btcec_test
 
 import (
 	"bytes"
-	"crypto/ecdsa"
 	"github.com/conformal/btcec"
 	"github.com/davecgh/go-spew/spew"
 	"testing"
@@ -220,13 +219,10 @@ var pubKeyTests = []pubKeyTest{
 
 func TestPrivKeys(t *testing.T) {
 	for _, test := range privKeyTests {
-		x, y := btcec.S256().ScalarBaseMult(test.key)
-		pub := (*btcec.PublicKey)(&ecdsa.PublicKey{
-			Curve: btcec.S256(),
-			X:     x,
-			Y:     y,
-		})
-		_, err := btcec.ParsePubKey(pub.SerializeUncompressed(), btcec.S256())
+		_, pub := btcec.PrivKeyFromBytes(btcec.S256(), test.key)
+
+		_, err := btcec.ParsePubKey(
+			pub.SerializeUncompressed(), btcec.S256())
 		if err != nil {
 			t.Errorf("%s privkey: %v", test.name, err)
 			continue

@@ -437,7 +437,7 @@ func testSignCompact(t *testing.T, tag string, curve *btcec.KoblitzCurve,
 
 	pk, wasCompressed, err := btcec.RecoverCompact(curve, sig, hashed)
 	if err != nil {
-		t.Errorf("%s: error recovering: %s", tag,  err)
+		t.Errorf("%s: error recovering: %s", tag, err)
 		return
 	}
 	if pk.X.Cmp(priv.X) != 0 || pk.Y.Cmp(priv.Y) != 0 {
