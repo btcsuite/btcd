@@ -216,7 +216,7 @@ type MaxValueAgeCoinSelector struct {
 }
 
 // CoinSelect will attempt to select coins using the algorithm described
-// in the MaxValueAgeSelector struct.
+// in the MaxValueAgeCoinSelector struct.
 func (s MaxValueAgeCoinSelector) CoinSelect(targetValue int64, coins []Coin) (Coins, error) {
 	sortedCoins := make([]Coin, 0, len(coins))
 	sortedCoins = append(sortedCoins, coins...)
