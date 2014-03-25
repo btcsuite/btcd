@@ -1,7 +1,7 @@
 coinset
 =======
 
-Package coinset provides bitcoin-specific convenience functions for selecting 
+Package coinset provides bitcoin-specific convenience functions for selecting
 from and managing sets of unspent transaction outpoints (UTXOs).
 
 A comprehensive suite of tests is provided to ensure proper functionality.  See
@@ -27,7 +27,7 @@ $ go get github.com/conformal/btcutil/coinset
 
 ## Usage
 
-Each unspent transaction outpoint is represented by the Coin interface.  An 
+Each unspent transaction outpoint is represented by the Coin interface.  An
 example of a concrete type that implements Coin is coinset.SimpleCoin.
 
 The typical use case for this library is for creating raw bitcoin transactions
@@ -37,8 +37,8 @@ given a set of Coins that may be spent by the user, for example as below:
 var unspentCoins = []coinset.Coin{ ... }
 ```
 
-When the user needs to spend a certain amount, they will need to select a 
-subset of these coins which contain at least that value.  CoinSelector is 
+When the user needs to spend a certain amount, they will need to select a
+subset of these coins which contain at least that value.  CoinSelector is
 an interface that represents types that implement coin selection algos,
 subject to various criteria.  There are a few examples of CoinSelector's:
 
@@ -50,13 +50,13 @@ subject to various criteria.  There are a few examples of CoinSelector's:
 
 - MinPriorityCoinSelector
 
-For example, if the user wishes to maximize the probability that their 
+For example, if the user wishes to maximize the probability that their
 transaction is mined quickly, they could use the MaxValueAgeCoinSelector to
 select high priority coins, then also attach a relatively high fee.
 
 ```Go
 selector := &coinset.MaxValueAgeCoinSelector{
-    MaxInputs: 10, 
+    MaxInputs: 10,
     MinAmountChange: 10000,
 }
 selectedCoins, err := selector.CoinSelect(targetAmount + bigFee, unspentCoins)
@@ -68,7 +68,7 @@ msgTx := coinset.NewMsgTxWithInputCoins(selectedCoins)
 
 ```
 
-The user can then create the msgTx.TxOut's as required, then sign the 
+The user can then create the msgTx.TxOut's as required, then sign the
 transaction and transmit it to the network.
 
 ## License
