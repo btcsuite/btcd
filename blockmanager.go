@@ -993,9 +993,8 @@ func (b *blockManager) handleNotifyMsg(notification *btcchain.Notification) {
 			// transactions (except the coinbase) as no longer needing
 			// rebroadcasting.
 			for _, tx := range block.Transactions()[1:] {
-				riv := BroadcastInventoryDel(btcwire.NewInvVect(btcwire.InvTypeTx,
-					tx.Sha()))
-				b.server.ModifyRebroadcastInventory(riv)
+				iv := btcwire.NewInvVect(btcwire.InvTypeTx, tx.Sha())
+				b.server.RemoveRebroadcastInventory(iv)
 			}
 
 			// Notify registered websocket clients of incoming block.
