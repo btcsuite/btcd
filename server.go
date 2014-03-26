@@ -13,6 +13,7 @@ import (
 	"github.com/conformal/btcdb"
 	"github.com/conformal/btcjson"
 	"github.com/conformal/btcwire"
+	"math"
 	"net"
 	"runtime"
 	"strconv"
@@ -21,16 +22,11 @@ import (
 	"time"
 )
 
-
 const (
 	// These constants are used by the DNS seed code to pick a random last seen
 	// time.
-	secondsIn3Days int32  = 24 * 60 * 60 * 3
-	secondsIn4Days int32  = 24 * 60 * 60 * 4
-
-	// This is the maximum possible value of unint16; used for random number
-	// generation.
-	maxValueUint16 uint16 = 65535
+	secondsIn3Days int32 = 24 * 60 * 60 * 3
+	secondsIn4Days int32 = 24 * 60 * 60 * 4
 )
 
 const (
@@ -55,11 +51,11 @@ type broadcastMsg struct {
 
 // BroadcastInventoryAdd is a type used to declare that the InvVect it contains
 // needs to be added to the rebroadcast map
-type BroadcastInventoryAdd *btcwire.InvVect
+type broadcastInventoryAdd *btcwire.InvVect
 
 // BroadcastInventoryDel is a type used to declare that the InvVect it contains
 // needs to be removed from the rebroadcast map
-type BroadcastInventoryDel *btcwire.InvVect
+type broadcastInventoryDel *btcwire.InvVect
 
 // server provides a bitcoin server for handling communications to and from
 // bitcoin peers.
@@ -102,12 +98,12 @@ type peerState struct {
 
 // randomUint16Number returns a random uint16 in a specified input range.  Note
 // that the range is in zeroth ordering; if you pass it 1800, you will get values
-// from 0 to 1800.  In order to avoid modulo bias and ensure every possible 
-// outcome in [0, max) has equal probability, the random number must be sampled 
+// from 0 to 1800.  In order to avoid modulo bias and ensure every possible
+// outcome in [0, max) has equal probability, the random number must be sampled
 // from a random source that has a range limited to a multiple of the modulus.
 func randomUint16Number(max uint16) uint16 {
 	var randomNumber uint16
-	var limitRange = (maxValueUint16 / max) * max
+	var limitRange = (math.MaxUint16 / max) * max
 	for {
 		binary.Read(rand.Reader, binary.LittleEndian, &randomNumber)
 		if randomNumber < limitRange {
@@ -116,10 +112,16 @@ func randomUint16Number(max uint16) uint16 {
 	}
 }
 
-// ModifyRebroadcastInventory dispatches a message to the rebroadcastHandler
-// specifying to add or remove items in the rebroadcast map of InvVects
-func (s *server) ModifyRebroadcastInventory(riv interface{}) {
-	s.modifyRebroadcastInv <- riv
+// AddRebroadcastInventory dispatches a message to the rebroadcastHandler
+// specifying to add an item to the rebroadcast map of InvVects
+func (s *server) AddRebroadcastInventory(iv *btcwire.InvVect) {
+	s.modifyRebroadcastInv <- broadcastInventoryAdd(iv)
+}
+
+// RemoveRebroadcastInventory dispatches a message to the rebroadcastHandler
+// specifying to remove an item from the rebroadcast map of InvVects
+func (s *server) RemoveRebroadcastInventory(iv *btcwire.InvVect) {
+	s.modifyRebroadcastInv <- broadcastInventoryDel(iv)
 }
 
 func (p *peerState) Count() int {
@@ -762,7 +764,7 @@ out:
 		case riv := <-s.modifyRebroadcastInv:
 			switch msg := riv.(type) {
 			// Incoming InvVects are added to our map of RPC txs.
-			case BroadcastInventoryAdd:
+			case broadcastInventoryAdd:
 				pendingInvs[*msg] = struct{}{}
 
 			// When an InvVect has been added to a block, we can now remove it;
@@ -771,7 +773,7 @@ out:
 			// new block it cycles through the txs and sends them all
 			// indescriminately to this function.  The if loop is cheap, so
 			// this should not be an issue.
-			case BroadcastInventoryDel:
+			case broadcastInventoryDel:
 				if _, ok := pendingInvs[*msg]; ok {
 					delete(pendingInvs, *msg)
 				}
@@ -786,11 +788,8 @@ out:
 				s.RelayInventory(&ivCopy)
 			}
 
-			// Generate a random number from 0 --> 1800 (30:00 min max).
-			nRand0To1800 := randomUint16Number(1801)
-
-			// Set the timer to go off in another nRand0To1800 seconds.
-			timer.Reset(time.Second * time.Duration(nRand0To1800))
+			// Set the timer to go off at a random time between 0 and 1799 seconds
+			timer.Reset(time.Second * time.Duration(randomUint16Number(1800)))
 
 		case <-s.quit:
 			break out
@@ -830,12 +829,11 @@ func (s *server) Start() {
 
 	if !cfg.DisableRPC {
 		s.wg.Add(1)
-		
+
 		// Start the rebroadcastHandler, which ensures user tx received by
 		// the RPC server are rebroadcast until being included in a block.
 		go s.rebroadcastHandler()
-		
-		// Start the RPC server.
+
 		s.rpcServer.Start()
 	}
 }
