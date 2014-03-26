@@ -1062,8 +1062,16 @@ func (b *blockManager) handleNotifyMsg(notification *btcchain.Notification) {
 			b.server.txMemPool.RemoveDoubleSpends(tx)
 		}
 
-		// Notify registered websocket clients
 		if r := b.server.rpcServer; r != nil {
+			// Now that this block is in the blockchain we can mark all the
+			// transactions (except the coinbase) as no longer needing
+			// rebroadcasting.
+			for _, tx := range block.Transactions()[1:] {
+				iv := btcwire.NewInvVect(btcwire.InvTypeTx, tx.Sha())
+				b.server.RemoveRebroadcastInventory(iv)
+			}
+
+			// Notify registered websocket clients of incoming block.
 			r.ntfnMgr.NotifyBlockConnected(block)
 		}
 
@@ -1087,7 +1095,7 @@ func (b *blockManager) handleNotifyMsg(notification *btcchain.Notification) {
 			}
 		}
 
-		// Notify registered websocket clients
+		// Notify registered websocket clients.
 		if r := b.server.rpcServer; r != nil {
 			r.ntfnMgr.NotifyBlockDisconnected(block)
 		}
