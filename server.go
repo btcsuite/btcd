@@ -21,11 +21,15 @@ import (
 	"time"
 )
 
-// These constants are used by the DNS seed code to pick a random last seen
-// time.
+
 const (
+	// These constants are used by the DNS seed code to pick a random last seen
+	// time.
 	secondsIn3Days int32  = 24 * 60 * 60 * 3
 	secondsIn4Days int32  = 24 * 60 * 60 * 4
+
+	// This is the maximum possible value of unint16; used for random number
+	// generation.
 	maxValueUint16 uint16 = 65535
 )
 
@@ -822,12 +826,14 @@ func (s *server) Start() {
 		go s.upnpUpdateThread()
 	}
 
-	// Start the rebroadcastHandler, which ensures user tx received by
-	// the RPC server are rebroadcast until being included in a block.
-	// Then, start the RPC server if it's enabled.
 	if !cfg.DisableRPC {
 		s.wg.Add(1)
+		
+		// Start the rebroadcastHandler, which ensures user tx received by
+		// the RPC server are rebroadcast until being included in a block.
 		go s.rebroadcastHandler()
+		
+		// Start the RPC server.
 		s.rpcServer.Start()
 	}
 }
