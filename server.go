@@ -787,7 +787,7 @@ out:
 			// Generate a random number from 0 --> 1800.
 			nRand0To1800 := randomUint16Number(1801)
 
-			// Set the timer to go off in another nRand0To1800 seconds
+			// Set the timer to go off in another nRand0To1800 seconds.
 			timer.Reset(time.Second * time.Duration(nRand0To1800))
 
 		case <-s.quit:
