@@ -24,9 +24,9 @@ import (
 // These constants are used by the DNS seed code to pick a random last seen
 // time.
 const (
-	secondsIn3Days         int32  = 24 * 60 * 60 * 3
-	secondsIn4Days         int32  = 24 * 60 * 60 * 4
-	rand16BitsToMax1820sec uint16 = 36 // 2^16 / 1800
+	secondsIn3Days int32  = 24 * 60 * 60 * 3
+	secondsIn4Days int32  = 24 * 60 * 60 * 4
+	maxValueUint16 uint16 = 65535
 )
 
 const (
@@ -49,23 +49,13 @@ type broadcastMsg struct {
 	excludePeers []*peer
 }
 
-// RebroadtcastIVType represents the allowed types of rebroadcastHandler operations
-// to the rebroadcastHandler InvVect map
-type RebroadtcastIVType uint8
+// BroadcastInventoryAdd is a type used to declare that the InvVect it contains
+// needs to be added to the rebroadcast map
+type BroadcastInventoryAdd *btcwire.InvVect
 
-// These constants define the various supported rebroadcastHandler operation types
-const (
-	RIVTAdd RebroadtcastIVType = iota
-	RIVTDel
-)
-
-// A structure which we use to pass our iv to our channel, which then safely
-// modifies the map of InvVects so that we don't need to worry about concurrent
-// access races
-type rebroadcastIV struct {
-	iv *btcwire.InvVect
-	op RebroadtcastIVType //Operation to execute on iv
-}
+// BroadcastInventoryDel is a type used to declare that the InvVect it contains
+// needs to be removed from the rebroadcast map
+type BroadcastInventoryDel *btcwire.InvVect
 
 // server provides a bitcoin server for handling communications to and from
 // bitcoin peers.
@@ -83,7 +73,7 @@ type server struct {
 	rpcServer            *rpcServer
 	blockManager         *blockManager
 	txMemPool            *txMemPool
-	modifyRebroadcastInv chan rebroadcastIV
+	modifyRebroadcastInv chan interface{}
 	newPeers             chan *peer
 	donePeers            chan *peer
 	banPeers             chan *peer
@@ -106,10 +96,24 @@ type peerState struct {
 	maxOutboundPeers int
 }
 
-// ModifyRebroadcastInventory modifies the set of inventory that is rebroadcast
-// until it show up into a block according to the passed operation.
-func (s *server) ModifyRebroadcastInventory(iv *btcwire.InvVect, op RebroadtcastIVType) {
-	s.modifyRebroadcastInv <- rebroadcastIV{iv: iv, op: op}
+// randomUint16Number returns a random uint16 in a specified input range.  Note
+// that the range is in zeroth ordering; if you pass it 1800, you will get values
+// from 0 to 1800.
+func randomUint16Number(max uint16) uint16 {
+	var randomNumber uint16
+	var limitrange = (maxValueUint16 / max) * max
+	for {
+		binary.Read(rand.Reader, binary.LittleEndian, &randomNumber)
+		if randomNumber < limitrange {
+			return (randomNumber % max)
+		}
+	}
+}
+
+// ModifyRebroadcastInventory dispatches a message to the rebroadcastHandler
+// specifying to add or remove items in the rebroadcast map of InvVects
+func (s *server) ModifyRebroadcastInventory(riv interface{}) {
+	s.modifyRebroadcastInv <- riv
 }
 
 func (p *peerState) Count() int {
@@ -749,11 +753,11 @@ func (s *server) rebroadcastHandler() {
 out:
 	for {
 		select {
-		case miv := <-s.modifyRebroadcastInv:
-			switch miv.op {
+		case riv := <-s.modifyRebroadcastInv:
+			switch msg := riv.(type) {
 			// Incoming InvVects are added to our map of RPC txs.
-			case RIVTAdd:
-				pendingInvs[*miv.iv] = struct{}{}
+			case BroadcastInventoryAdd:
+				pendingInvs[*msg] = struct{}{}
 
 			// When an InvVect has been added to a block, we can now remove it;
 			// note that we need to check if the iv is actually found in the
@@ -761,9 +765,9 @@ out:
 			// new block it cycles through the txs and sends them all
 			// indescriminately to this function.  The if loop is cheap, so
 			// this should not be an issue.
-			case RIVTDel:
-				if _, ok := pendingInvs[*miv.iv]; ok {
-					delete(pendingInvs, *miv.iv)
+			case BroadcastInventoryDel:
+				if _, ok := pendingInvs[*msg]; ok {
+					delete(pendingInvs, *msg)
 				}
 			}
 
@@ -776,17 +780,11 @@ out:
 				s.RelayInventory(&ivCopy)
 			}
 
-			// Generate a random number from 0 --> 2^16.
-			var randomNumber uint16
-			binary.Read(rand.Reader, binary.LittleEndian, &randomNumber)
+			// Generate a random number from 0 --> 1800.
+			nRand0To1800 := randomUint16Number(1801)
 
-			// We want resubmission every 0,...,30 minutes at random intervals,
-			// similar to bitcoind's ResendWalletTransactions, so what we do is
-			// divide our random number by rand16BitsToMax1820sec and mul by
-			// time.Second to give a random time from 0 sec to 1820 sec.
-			// Note that 1820 sec is 30:20 min:sec, not precisely 30 min.
-			timer.Reset(time.Second * time.Duration(((randomNumber) /
-				rand16BitsToMax1820sec)))
+			// Set the timer to go off in another nRand0To1800 seconds
+			timer.Reset(time.Second * time.Duration(nRand0To1800))
 
 		case <-s.quit:
 			break out
@@ -1139,7 +1137,7 @@ func newServer(listenAddrs []string, db btcdb.Db, btcnet btcwire.BitcoinNet) (*s
 		relayInv:             make(chan *btcwire.InvVect, cfg.MaxPeers),
 		broadcast:            make(chan broadcastMsg, cfg.MaxPeers),
 		quit:                 make(chan bool),
-		modifyRebroadcastInv: make(chan rebroadcastIV),
+		modifyRebroadcastInv: make(chan interface{}),
 		nat:                  nat,
 		db:                   db,
 	}

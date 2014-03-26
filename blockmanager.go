@@ -989,12 +989,13 @@ func (b *blockManager) handleNotifyMsg(notification *btcchain.Notification) {
 		}
 
 		if r := b.server.rpcServer; r != nil {
-			// Now this block is in the blockchain we can mark all the transactions
-			// (except the coinbase) as no longer needing rebroadcasting.
+			// Now that this block is in the blockchain we can mark all the
+			// transactions (except the coinbase) as no longer needing
+			// rebroadcasting.
 			for _, tx := range block.Transactions()[1:] {
-				b.server.ModifyRebroadcastInventory(
-					btcwire.NewInvVect(btcwire.InvTypeTx, tx.Sha()),
-					RIVTDel)
+				riv := BroadcastInventoryDel(btcwire.NewInvVect(btcwire.InvTypeTx,
+					tx.Sha()))
+				b.server.ModifyRebroadcastInventory(riv)
 			}
 
 			// Notify registered websocket clients of incoming block.
