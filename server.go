@@ -102,13 +102,15 @@ type peerState struct {
 
 // randomUint16Number returns a random uint16 in a specified input range.  Note
 // that the range is in zeroth ordering; if you pass it 1800, you will get values
-// from 0 to 1800.
+// from 0 to 1800.  In order to avoid modulo bias and ensure every possible 
+// outcome in [0, max) has equal probability, the random number must be sampled 
+// from a random source that has a range limited to a multiple of the modulus.
 func randomUint16Number(max uint16) uint16 {
 	var randomNumber uint16
-	var limitrange = (maxValueUint16 / max) * max
+	var limitRange = (maxValueUint16 / max) * max
 	for {
 		binary.Read(rand.Reader, binary.LittleEndian, &randomNumber)
-		if randomNumber < limitrange {
+		if randomNumber < limitRange {
 			return (randomNumber % max)
 		}
 	}
@@ -784,7 +786,7 @@ out:
 				s.RelayInventory(&ivCopy)
 			}
 
-			// Generate a random number from 0 --> 1800.
+			// Generate a random number from 0 --> 1800 (30:00 min max).
 			nRand0To1800 := randomUint16Number(1801)
 
 			// Set the timer to go off in another nRand0To1800 seconds.
