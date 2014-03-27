@@ -64,6 +64,10 @@ func TestVersion(t *testing.T) {
 		t.Errorf("NewMsgVersion: wrong last block - got %v, want %v",
 			msg.LastBlock, lastBlock)
 	}
+	if msg.RelayTx != true {
+		t.Errorf("NewMsgVersion: relaytx is not true by default: - got %v, want %v",
+			msg.RelayTx, true)
+	}
 
 	// Version message should not have any services set by default.
 	if msg.Services != 0 {
@@ -85,8 +89,8 @@ func TestVersion(t *testing.T) {
 	// Ensure max payload is expected value.
 	// Protocol version 4 bytes + services 8 bytes + timestamp 8 bytes +
 	// remote and local net addresses + nonce 8 bytes + length of user agent
-	// (varInt) + max allowed user agent length + last block 4 bytes.
-	wantPayload := uint32(2101)
+	// (varInt) + max allowed user agent length + last block 4 bytes + relay tx 1 byte.
+	wantPayload := uint32(2102)
 	maxPayload := msg.MaxPayloadLength(pver)
 	if maxPayload != wantPayload {
 		t.Errorf("MaxPayloadLength: wrong max payload length for "+
@@ -157,9 +161,9 @@ func TestVersionWire(t *testing.T) {
 	}{
 		// Latest protocol version.
 		{
-			baseVersion,
-			baseVersion,
-			baseVersionEncoded,
+			baseVersion70001,
+			baseVersion70001,
+			baseVersion70001Encoded,
 			btcwire.ProtocolVersion,
 		},
 
@@ -177,6 +181,14 @@ func TestVersionWire(t *testing.T) {
 			baseVersion,
 			baseVersionEncoded,
 			btcwire.BIP0031Version,
+		},
+
+		// Protocol version BIP0037Version.
+		{
+			baseVersion70001,
+			baseVersion70001,
+			baseVersion70001Encoded,
+			btcwire.BIP0037Version,
 		},
 
 		// Protocol version NetAddressTimeVersion.
@@ -293,8 +305,10 @@ func TestVersionWireErrors(t *testing.T) {
 		// Force error in user agent.
 		{baseVersion, baseVersionEncoded, pver, 82, io.ErrShortWrite, io.ErrUnexpectedEOF},
 		// Force error in last block.
-		{baseVersion, baseVersionEncoded, pver, 98, io.ErrShortWrite, io.ErrUnexpectedEOF},
-		// Force error due to user agent too big.
+		{baseVersion, baseVersionEncoded, pver, 97, io.ErrShortWrite, io.EOF},
+		// Force error in relay tx.
+		{baseVersion70001, baseVersion70001Encoded, uint32(70001), 101, io.ErrShortWrite, io.EOF},
+		// Force error due to user agent too big
 		{exceedUAVer, exceedUAVerEncoded, pver, newLen, btcwireErr, btcwireErr},
 	}
 
@@ -442,6 +456,77 @@ func TestVersionOptionalFields(t *testing.T) {
 	}
 }
 
+// TestVersionRelayTx tests the MsgVersion RelayTx API
+func TestVersionRelayTx(t *testing.T) {
+	// Create version message data.
+	userAgent := "/btcdtest:0.0.1/"
+	lastBlock := int32(234234)
+	tcpAddrMe := &net.TCPAddr{IP: net.ParseIP("127.0.0.1"), Port: 8333}
+	me, err := btcwire.NewNetAddress(tcpAddrMe, btcwire.SFNodeNetwork)
+	if err != nil {
+		t.Errorf("NewNetAddress: %v", err)
+	}
+	tcpAddrYou := &net.TCPAddr{IP: net.ParseIP("192.168.0.1"), Port: 8333}
+	you, err := btcwire.NewNetAddress(tcpAddrYou, btcwire.SFNodeNetwork)
+	if err != nil {
+		t.Errorf("NewNetAddress: %v", err)
+	}
+	nonce, err := btcwire.RandomUint64()
+	if err != nil {
+		t.Errorf("RandomUint64: error generating nonce: %v", err)
+	}
+
+	// Ensure we get the correct data back out.
+	msg := btcwire.NewMsgVersion(me, you, nonce, userAgent, lastBlock)
+
+	// Explictly set RelayTx to false since true by default.
+	msg.RelayTx = false
+
+	// Encode the message to wire format.
+	var buf bytes.Buffer
+	err = msg.BtcEncode(&buf, btcwire.BIP0037Version)
+	if err != nil {
+		t.Errorf("BtcEncode error %v", err)
+	}
+	b := buf.Bytes()
+	if len(b) != 102 || b[101] != 0x00 {
+		t.Errorf("Relay Tx is not false")
+	}
+
+	wantBuf := []byte{
+		0x71, 0x11, 0x01, 0x00, // Protocol version 70001
+		0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // SFNodeNetwork
+		0x29, 0xab, 0x5f, 0x49, 0x00, 0x00, 0x00, 0x00, // 64-bit Timestamp
+		// AddrYou -- No timestamp for NetAddress in version message
+		0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // SFNodeNetwork
+		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+		0x00, 0x00, 0xff, 0xff, 0xc0, 0xa8, 0x00, 0x01, // IP 192.168.0.1
+		0x20, 0x8d, // Port 8333 in big-endian
+		// AddrMe -- No timestamp for NetAddress in version message
+		0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // SFNodeNetwork
+		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+		0x00, 0x00, 0xff, 0xff, 0x7f, 0x00, 0x00, 0x01, // IP 127.0.0.1
+		0x20, 0x8d, // Port 8333 in big-endian
+		0xf3, 0xe0, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, // Nonce
+		0x10, // Varint for user agent length
+		0x2f, 0x62, 0x74, 0x63, 0x64, 0x74, 0x65, 0x73,
+		0x74, 0x3a, 0x30, 0x2e, 0x30, 0x2e, 0x31, 0x2f, // User agent
+		0xfa, 0x92, 0x03, 0x00, // Last block
+		0x00, // Relay tx (false)
+	}
+
+	// Decode the message from wire format.
+	msg = &btcwire.MsgVersion{}
+	rbuf := bytes.NewBuffer(wantBuf)
+	err = msg.BtcDecode(rbuf, btcwire.BIP0037Version)
+	if err != nil {
+		t.Errorf("BtcDecode error %v", err)
+	}
+	if msg.RelayTx != false {
+		t.Errorf("Relay Tx is not false")
+	}
+}
+
 // baseVersion is used in the various tests as a baseline MsgVersion.
 var baseVersion = &btcwire.MsgVersion{
 	ProtocolVersion: 60002,
@@ -485,4 +570,51 @@ var baseVersionEncoded = []byte{
 	0x2f, 0x62, 0x74, 0x63, 0x64, 0x74, 0x65, 0x73,
 	0x74, 0x3a, 0x30, 0x2e, 0x30, 0x2e, 0x31, 0x2f, // User agent
 	0xfa, 0x92, 0x03, 0x00, // Last block
+}
+
+// baseVersion70001 is used in the various tests as a baseline MsgVersion.
+var baseVersion70001 = &btcwire.MsgVersion{
+	ProtocolVersion: 70001,
+	Services:        btcwire.SFNodeNetwork,
+	Timestamp:       time.Unix(0x495fab29, 0), // 2009-01-03 12:15:05 -0600 CST)
+	AddrYou: btcwire.NetAddress{
+		Timestamp: time.Time{}, // Zero value -- no timestamp in version
+		Services:  btcwire.SFNodeNetwork,
+		IP:        net.ParseIP("192.168.0.1"),
+		Port:      8333,
+	},
+	AddrMe: btcwire.NetAddress{
+		Timestamp: time.Time{}, // Zero value -- no timestamp in version
+		Services:  btcwire.SFNodeNetwork,
+		IP:        net.ParseIP("127.0.0.1"),
+		Port:      8333,
+	},
+	Nonce:     123123, // 0x1e0f3
+	UserAgent: "/btcdtest:0.0.1/",
+	LastBlock: 234234, // 0x392fa
+	RelayTx:   true,
+}
+
+// baseVersion70001Encoded is the wire encoded bytes for baseVersion using protocol
+// version 70001 and is used in the various tests.
+var baseVersion70001Encoded = []byte{
+	0x71, 0x11, 0x01, 0x00, // Protocol version 70001
+	0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // SFNodeNetwork
+	0x29, 0xab, 0x5f, 0x49, 0x00, 0x00, 0x00, 0x00, // 64-bit Timestamp
+	// AddrYou -- No timestamp for NetAddress in version message
+	0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // SFNodeNetwork
+	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+	0x00, 0x00, 0xff, 0xff, 0xc0, 0xa8, 0x00, 0x01, // IP 192.168.0.1
+	0x20, 0x8d, // Port 8333 in big-endian
+	// AddrMe -- No timestamp for NetAddress in version message
+	0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // SFNodeNetwork
+	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+	0x00, 0x00, 0xff, 0xff, 0x7f, 0x00, 0x00, 0x01, // IP 127.0.0.1
+	0x20, 0x8d, // Port 8333 in big-endian
+	0xf3, 0xe0, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, // Nonce
+	0x10, // Varint for user agent length
+	0x2f, 0x62, 0x74, 0x63, 0x64, 0x74, 0x65, 0x73,
+	0x74, 0x3a, 0x30, 0x2e, 0x30, 0x2e, 0x31, 0x2f, // User agent
+	0xfa, 0x92, 0x03, 0x00, // Last block
+	0x01, // Relay tx
 }

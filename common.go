@@ -60,6 +60,19 @@ func readElement(r io.Reader, element interface{}) error {
 		*e = binary.LittleEndian.Uint64(b)
 		return nil
 
+	case *bool:
+		b := scratch[0:1]
+		_, err := io.ReadFull(r, b)
+		if err != nil {
+			return err
+		}
+		if b[0] == 0x00 {
+			*e = false
+		} else {
+			*e = true
+		}
+		return nil
+
 	// Message header checksum.
 	case *[4]byte:
 		_, err := io.ReadFull(r, e[:])
@@ -173,6 +186,19 @@ func writeElement(w io.Writer, element interface{}) error {
 	case uint64:
 		b := scratch[0:8]
 		binary.LittleEndian.PutUint64(b, e)
+		_, err := w.Write(b)
+		if err != nil {
+			return err
+		}
+		return nil
+
+	case bool:
+		b := scratch[0:1]
+		if e == true {
+			b[0] = 0x01
+		} else {
+			b[0] = 0x00
+		}
 		_, err := w.Write(b)
 		if err != nil {
 			return err
