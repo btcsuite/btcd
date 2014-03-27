@@ -97,11 +97,13 @@ type peerState struct {
 }
 
 // randomUint16Number returns a random uint16 in a specified input range.  Note
-// that the range is in zeroth ordering; if you pass it 1800, you will get values
-// from 0 to 1800.  In order to avoid modulo bias and ensure every possible
-// outcome in [0, max) has equal probability, the random number must be sampled
-// from a random source that has a range limited to a multiple of the modulus.
+// that the range is in zeroth ordering; if you pass it 1800, you will get
+// values from 0 to 1800.
 func randomUint16Number(max uint16) uint16 {
+	// In order to avoid modulo bias and ensure every possible outcome in
+	// [0, max) has equal probability, the random number must be sampled
+	// from a random source that has a range limited to a multiple of the
+	// modulus.
 	var randomNumber uint16
 	var limitRange = (math.MaxUint16 / max) * max
 	for {
@@ -112,14 +114,14 @@ func randomUint16Number(max uint16) uint16 {
 	}
 }
 
-// AddRebroadcastInventory dispatches a message to the rebroadcastHandler
-// specifying to add an item to the rebroadcast map of InvVects
+// AddRebroadcastInventory adds 'iv' to the list of inventories to be
+// rebroadcasted at random intervals until they show up in a block.
 func (s *server) AddRebroadcastInventory(iv *btcwire.InvVect) {
 	s.modifyRebroadcastInv <- broadcastInventoryAdd(iv)
 }
 
-// RemoveRebroadcastInventory dispatches a message to the rebroadcastHandler
-// specifying to remove an item from the rebroadcast map of InvVects
+// RemoveRebroadcastInventory removes 'iv' from the list of items to be
+// rebroadcasted if present.
 func (s *server) RemoveRebroadcastInventory(iv *btcwire.InvVect) {
 	s.modifyRebroadcastInv <- broadcastInventoryDel(iv)
 }
