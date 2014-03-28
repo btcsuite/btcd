@@ -748,16 +748,12 @@ func (s *server) NetTotals() (uint64, uint64) {
 	return s.bytesReceived, s.bytesSent
 }
 
-// rebroadcastHandler is a listener that uses a couple of channels to maintain
-// a list of transactions that need to be rebroadcast.  The list of tx is stored
-// in their abstracted P2P form (InvVect) in a map (pendingInvs).
-// Why we need this:
-// We handle user submitted tx, e.g. from a wallet, via the RPC submission
-// function sendrawtransactions.  Because we need to ensure that user-
-// submitted tx eventually enter a block, we need to retransmit them
-// periodically until we see them actually enter a block.
+// rebroadcastHandler keeps track of user submitted inventories that we have
+// sent out but have not yet made it into a block. We periodically rebroadcast
+// them in case our peers restarted or otherwise lost track of them.
 func (s *server) rebroadcastHandler() {
-	timer := time.NewTimer(5 * time.Minute) // Wait 5 min before first tx rebroadcast.
+	 // Wait 5 min before first tx rebroadcast.
+	timer := time.NewTimer(5 * time.Minute)
 	pendingInvs := make(map[btcwire.InvVect]struct{})
 
 out:
@@ -769,29 +765,26 @@ out:
 			case broadcastInventoryAdd:
 				pendingInvs[*msg] = struct{}{}
 
-			// When an InvVect has been added to a block, we can now remove it;
-			// note that we need to check if the iv is actually found in the
-			// map before we try to delete it, as when handleNotifyMsg finds a
-			// new block it cycles through the txs and sends them all
-			// indescriminately to this function.  The if loop is cheap, so
-			// this should not be an issue.
+			// When an InvVect has been added to a block, we can
+			// now remove it, if it was present.
 			case broadcastInventoryDel:
 				if _, ok := pendingInvs[*msg]; ok {
 					delete(pendingInvs, *msg)
 				}
 			}
 
-		// When the timer triggers, scan through all the InvVects of RPC-submitted
-		// tx and cause the server to resubmit them to peers, as they have not
-		// been added to incoming blocks.
 		case <-timer.C:
+			// Any inventory we have has not made it into a block
+			// yet. We periodically resubmit them until they have.
 			for iv := range pendingInvs {
 				ivCopy := iv
 				s.RelayInventory(&ivCopy)
 			}
 
-			// Set the timer to go off at a random time between 0 and 1799 seconds
-			timer.Reset(time.Second * time.Duration(randomUint16Number(1800)))
+			// Process at a random time up to 30mins (in seconds)
+			// in the future.
+			timer.Reset(time.Second *
+				time.Duration(randomUint16Number(1800)))
 
 		case <-s.quit:
 			break out
