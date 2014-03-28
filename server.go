@@ -752,7 +752,7 @@ func (s *server) NetTotals() (uint64, uint64) {
 // sent out but have not yet made it into a block. We periodically rebroadcast
 // them in case our peers restarted or otherwise lost track of them.
 func (s *server) rebroadcastHandler() {
-	 // Wait 5 min before first tx rebroadcast.
+	// Wait 5 min before first tx rebroadcast.
 	timer := time.NewTimer(5 * time.Minute)
 	pendingInvs := make(map[btcwire.InvVect]struct{})
 

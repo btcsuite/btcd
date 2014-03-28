@@ -1403,7 +1403,7 @@ func handleSendRawTransaction(s *rpcServer, cmd btcjson.Cmd) (interface{}, error
 		return nil, err
 	}
 
-	// We keep track of all the sendrawtransaction request txs so that we 
+	// We keep track of all the sendrawtransaction request txs so that we
 	// can rebroadcast them if they don't make their way into a block.
 	iv := btcwire.NewInvVect(btcwire.InvTypeTx, tx.Sha())
 	s.server.AddRebroadcastInventory(iv)
