@@ -22,6 +22,9 @@ import (
 )
 
 const (
+	// maxProtocolVersion is the max protocol version the peer supports.
+	maxProtocolVersion = 70001
+
 	// outputBufferSize is the number of elements the output channels use.
 	outputBufferSize = 50
 
@@ -258,6 +261,9 @@ func (p *peer) pushVersionMsg() error {
 
 	// Advertise that we're a full node.
 	msg.Services = btcwire.SFNodeNetwork
+
+	// Advertise our max supported protocol version.
+	msg.ProtocolVersion = maxProtocolVersion
 
 	p.QueueMessage(msg, nil)
 	return nil
@@ -1540,7 +1546,7 @@ func (p *peer) Shutdown() {
 func newPeerBase(s *server, inbound bool) *peer {
 	p := peer{
 		server:          s,
-		protocolVersion: btcwire.ProtocolVersion,
+		protocolVersion: maxProtocolVersion,
 		btcnet:          s.btcnet,
 		services:        btcwire.SFNodeNetwork,
 		inbound:         inbound,
