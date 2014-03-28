@@ -624,7 +624,7 @@ func CheckTransactionInputs(tx *btcutil.Tx, txHeight int64, txStore TxStore) (in
 				str := fmt.Sprintf("tried to spend coinbase "+
 					"transaction %v from height %v at "+
 					"height %v before required maturity "+
-					"of %v blocks", txHash, originHeight,
+					"of %v blocks", txInHash, originHeight,
 					txHeight, coinbaseMaturity)
 				return 0, RuleError(str)
 			}
