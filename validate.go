@@ -259,10 +259,10 @@ func CheckTransactionSanity(tx *btcutil.Tx) error {
 	return nil
 }
 
-// checkProofOfWork ensures the block header bits which indicate the target
+// CheckProofOfWork ensures the block header bits which indicate the target
 // difficulty is in min/max range and that the block hash is less than the
 // target difficulty as claimed.
-func checkProofOfWork(block *btcutil.Block, powLimit *big.Int) error {
+func CheckProofOfWork(block *btcutil.Block, powLimit *big.Int) error {
 	// The target difficulty must be larger than zero.
 	target := CompactToBig(block.MsgBlock().Header.Bits)
 	if target.Sign() <= 0 {
@@ -394,7 +394,7 @@ func CheckBlockSanity(block *btcutil.Block, powLimit *big.Int) error {
 	// Ensure the proof of work bits in the block header is in min/max range
 	// and the block hash is less than the target value described by the
 	// bits.
-	err := checkProofOfWork(block, powLimit)
+	err := CheckProofOfWork(block, powLimit)
 	if err != nil {
 		return err
 	}
