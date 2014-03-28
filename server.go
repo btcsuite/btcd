@@ -49,11 +49,11 @@ type broadcastMsg struct {
 	excludePeers []*peer
 }
 
-// BroadcastInventoryAdd is a type used to declare that the InvVect it contains
+// broadcastInventoryAdd is a type used to declare that the InvVect it contains
 // needs to be added to the rebroadcast map
 type broadcastInventoryAdd *btcwire.InvVect
 
-// BroadcastInventoryDel is a type used to declare that the InvVect it contains
+// broadcastInventoryDel is a type used to declare that the InvVect it contains
 // needs to be removed from the rebroadcast map
 type broadcastInventoryDel *btcwire.InvVect
 
