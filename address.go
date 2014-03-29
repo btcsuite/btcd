@@ -188,7 +188,7 @@ type AddressPubKeyHash struct {
 }
 
 // NewAddressPubKeyHash returns a new AddressPubKeyHash.  pkHash must
-// be 20 bytes and net must be btcwire.MainNet or btcwire.TestNet3.
+// be 20 bytes.
 func NewAddressPubKeyHash(pkHash []byte, net btcwire.BitcoinNet) (*AddressPubKeyHash, error) {
 	// Check for a valid pubkey hash length.
 	if len(pkHash) != ripemd160.Size {
@@ -270,7 +270,7 @@ func NewAddressScriptHash(serializedScript []byte, net btcwire.BitcoinNet) (*Add
 }
 
 // NewAddressScriptHashFromHash returns a new AddressScriptHash.  scriptHash
-// must be 20 bytes and net must be btcwire.MainNet or btcwire.TestNet3.
+// must be 20 bytes.
 func NewAddressScriptHashFromHash(scriptHash []byte, net btcwire.BitcoinNet) (*AddressScriptHash, error) {
 	// Check for a valid script hash length.
 	if len(scriptHash) != ripemd160.Size {
@@ -360,8 +360,7 @@ type AddressPubKey struct {
 
 // NewAddressPubKey returns a new AddressPubKey which represents a pay-to-pubkey
 // address.  The serializedPubKey parameter must be a valid pubkey and can be
-// uncompressed, compressed, or hybrid.  The net parameter must be
-// btcwire.MainNet or btcwire.TestNet3.
+// uncompressed, compressed, or hybrid.
 func NewAddressPubKey(serializedPubKey []byte, net btcwire.BitcoinNet) (*AddressPubKey, error) {
 	pubKey, err := btcec.ParsePubKey(serializedPubKey, btcec.S256())
 	if err != nil {
