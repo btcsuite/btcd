@@ -50,8 +50,8 @@ type MsgVersion struct {
 	// Last block seen by the generator of the version message.
 	LastBlock int32
 
-	// Announce transactions to peer.
-	RelayTx bool
+	// Don't announce transactions to peer.
+	DisableRelayTx bool
 }
 
 // HasService returns whether the specified service is supported by the peer
@@ -132,12 +132,18 @@ func (msg *MsgVersion) BtcDecode(r io.Reader, pver uint32) error {
 		}
 	}
 
-	if pver >= BIP0037Version {
-		err = readElement(r, &msg.RelayTx)
-		if err != nil {
-			// Optional
-			msg.RelayTx = true
-		}
+	// There was no relay transactions field before BIP0037Version, but
+	// the default behavior prior to the addition of the field was to always
+	// relay transactions.
+	if buf.Len() > 0 {
+		// It's safe to ignore the error here since the buffer has at
+		// least one byte and that byte will result in a boolean value
+		// regardless of its value.  Also, the wire encoding for the
+		// field is true when transactions should be relayed, so reverse
+		// it for the DisableRelayTx field.
+		var relayTx bool
+		readElement(r, &relayTx)
+		msg.DisableRelayTx = !relayTx
 	}
 
 	return nil
@@ -183,8 +189,11 @@ func (msg *MsgVersion) BtcEncode(w io.Writer, pver uint32) error {
 		return err
 	}
 
+	// There was no relay transactions field before BIP0037Version.  Also,
+	// the wire encoding for the field is true when transactions should be
+	// relayed, so reverse it from the DisableRelayTx field.
 	if pver >= BIP0037Version {
-		err = writeElement(w, msg.RelayTx)
+		err = writeElement(w, !msg.DisableRelayTx)
 		if err != nil {
 			return err
 		}
@@ -202,12 +211,13 @@ func (msg *MsgVersion) Command() string {
 // receiver.  This is part of the Message interface implementation.
 func (msg *MsgVersion) MaxPayloadLength(pver uint32) uint32 {
 	// XXX: <= 106 different
-	// XXX: >= 70001 different
 
-	// Protocol version 4 bytes + services 8 bytes + timestamp 8 bytes + remote
-	// and local net addresses + nonce 8 bytes + length of user agent (varInt) +
-	// max allowed useragent length + last block 4 bytes + relay tx 1 byte.
-	return 32 + (maxNetAddressPayload(pver) * 2) + MaxVarIntPayload + MaxUserAgentLen + 1
+	// Protocol version 4 bytes + services 8 bytes + timestamp 8 bytes +
+	// remote and local net addresses + nonce 8 bytes + length of user
+	// agent (varInt) + max allowed useragent length + last block 4 bytes +
+	// relay transactions flag 1 byte.
+	return 33 + (maxNetAddressPayload(pver) * 2) + MaxVarIntPayload +
+		MaxUserAgentLen
 }
 
 // NewMsgVersion returns a new bitcoin version message that conforms to the
@@ -227,7 +237,7 @@ func NewMsgVersion(me *NetAddress, you *NetAddress, nonce uint64,
 		Nonce:           nonce,
 		UserAgent:       userAgent,
 		LastBlock:       lastBlock,
-		RelayTx:         true,
+		DisableRelayTx:  false,
 	}
 }
 

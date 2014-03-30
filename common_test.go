@@ -53,6 +53,14 @@ func TestElementWire(t *testing.T) {
 			[]byte{0x00, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00},
 		},
 		{
+			true,
+			[]byte{0x01},
+		},
+		{
+			false,
+			[]byte{0x00},
+		},
+		{
 			[4]byte{0x01, 0x02, 0x03, 0x04},
 			[]byte{0x01, 0x02, 0x03, 0x04},
 		},
@@ -159,6 +167,7 @@ func TestElementWireErrors(t *testing.T) {
 		{int32(1), 0, io.ErrShortWrite, io.EOF},
 		{uint32(256), 0, io.ErrShortWrite, io.EOF},
 		{int64(65536), 0, io.ErrShortWrite, io.EOF},
+		{true, 0, io.ErrShortWrite, io.EOF},
 		{[4]byte{0x01, 0x02, 0x03, 0x04}, 0, io.ErrShortWrite, io.EOF},
 		{
 			[btcwire.CommandSize]byte{
