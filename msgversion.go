@@ -5,6 +5,7 @@
 package btcwire
 
 import (
+	"bytes"
 	"fmt"
 	"io"
 	"net"
@@ -66,44 +67,66 @@ func (msg *MsgVersion) AddService(service ServiceFlag) {
 }
 
 // BtcDecode decodes r using the bitcoin protocol encoding into the receiver.
+// The version message is special in that the protocol version hasn't been
+// negotiated yet.  As a result, the pver field is ignored and any fields which
+// are added in new versions are optional.  This also mean that r must be a
+// *bytes.Buffer so the number of remaining bytes can be ascertained.
+//
 // This is part of the Message interface implementation.
 func (msg *MsgVersion) BtcDecode(r io.Reader, pver uint32) error {
+	buf, ok := r.(*bytes.Buffer)
+	if !ok {
+		return fmt.Errorf("MsgVersion.BtcDecode reader is not a " +
+			"*bytes.Buffer")
+	}
+
 	var sec int64
-	err := readElements(r, &msg.ProtocolVersion, &msg.Services, &sec)
+	err := readElements(buf, &msg.ProtocolVersion, &msg.Services, &sec)
 	if err != nil {
 		return err
 	}
 	msg.Timestamp = time.Unix(sec, 0)
 
-	err = readNetAddress(r, pver, &msg.AddrYou, false)
+	err = readNetAddress(buf, pver, &msg.AddrYou, false)
 	if err != nil {
 		return err
 	}
 
-	err = readNetAddress(r, pver, &msg.AddrMe, false)
-	if err != nil {
-		return err
+	// Protocol versions >= 106 added a from address, nonce, and user agent
+	// field and they are only considered present if there are bytes
+	// remaining in the message.
+	if buf.Len() > 0 {
+		err = readNetAddress(buf, pver, &msg.AddrMe, false)
+		if err != nil {
+			return err
+		}
+	}
+	if buf.Len() > 0 {
+		err = readElement(buf, &msg.Nonce)
+		if err != nil {
+			return err
+		}
+	}
+	if buf.Len() > 0 {
+		userAgent, err := readVarString(buf, pver)
+		if err != nil {
+			return err
+		}
+		if len(userAgent) > MaxUserAgentLen {
+			str := fmt.Sprintf("user agent too long [len %v, max %v]",
+				len(userAgent), MaxUserAgentLen)
+			return messageError("MsgVersion.BtcDecode", str)
+		}
+		msg.UserAgent = userAgent
 	}
 
-	err = readElement(r, &msg.Nonce)
-	if err != nil {
-		return err
-	}
-
-	userAgent, err := readVarString(r, pver)
-	if err != nil {
-		return err
-	}
-	if len(userAgent) > MaxUserAgentLen {
-		str := fmt.Sprintf("user agent too long [len %v, max %v]",
-			len(userAgent), MaxUserAgentLen)
-		return messageError("MsgVersion.BtcDecode", str)
-	}
-	msg.UserAgent = userAgent
-
-	err = readElement(r, &msg.LastBlock)
-	if err != nil {
-		return err
+	// Protocol versions >= 209 added a last known block field.  It is only
+	// considered present if there are bytes remaining in the message.
+	if buf.Len() > 0 {
+		err = readElement(buf, &msg.LastBlock)
+		if err != nil {
+			return err
+		}
 	}
 
 	return nil

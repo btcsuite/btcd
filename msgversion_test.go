@@ -236,6 +236,14 @@ func TestVersionWireErrors(t *testing.T) {
 	pver := uint32(60002)
 	btcwireErr := &btcwire.MessageError{}
 
+	// Ensure calling MsgVersion.BtcDecode with a non *bytes.Buffer returns
+	// error.
+	fr := newFixedReader(0, []byte{})
+	if err := baseVersion.BtcDecode(fr, pver); err == nil {
+		t.Errorf("Did not received error when calling " +
+			"MsgVersion.BtcDecode with non *bytes.Buffer")
+	}
+
 	// Copy the base version and change the user agent to exceed max limits.
 	bvc := *baseVersion
 	exceedUAVer := &bvc
@@ -277,15 +285,15 @@ func TestVersionWireErrors(t *testing.T) {
 		// Force error in remote address.
 		{baseVersion, baseVersionEncoded, pver, 20, io.ErrShortWrite, io.EOF},
 		// Force error in local address.
-		{baseVersion, baseVersionEncoded, pver, 46, io.ErrShortWrite, io.EOF},
+		{baseVersion, baseVersionEncoded, pver, 47, io.ErrShortWrite, io.ErrUnexpectedEOF},
 		// Force error in nonce.
-		{baseVersion, baseVersionEncoded, pver, 72, io.ErrShortWrite, io.EOF},
+		{baseVersion, baseVersionEncoded, pver, 73, io.ErrShortWrite, io.ErrUnexpectedEOF},
 		// Force error in user agent length.
-		{baseVersion, baseVersionEncoded, pver, 80, io.ErrShortWrite, io.EOF},
-		// Force error in user agent.
 		{baseVersion, baseVersionEncoded, pver, 81, io.ErrShortWrite, io.EOF},
+		// Force error in user agent.
+		{baseVersion, baseVersionEncoded, pver, 82, io.ErrShortWrite, io.ErrUnexpectedEOF},
 		// Force error in last block.
-		{baseVersion, baseVersionEncoded, pver, 97, io.ErrShortWrite, io.EOF},
+		{baseVersion, baseVersionEncoded, pver, 98, io.ErrShortWrite, io.ErrUnexpectedEOF},
 		// Force error due to user agent too big.
 		{exceedUAVer, exceedUAVerEncoded, pver, newLen, btcwireErr, btcwireErr},
 	}
@@ -313,8 +321,8 @@ func TestVersionWireErrors(t *testing.T) {
 
 		// Decode from wire format.
 		var msg btcwire.MsgVersion
-		r := newFixedReader(test.max, test.buf)
-		err = msg.BtcDecode(r, test.pver)
+		buf := bytes.NewBuffer(test.buf[0:test.max])
+		err = msg.BtcDecode(buf, test.pver)
 		if reflect.TypeOf(err) != reflect.TypeOf(test.readErr) {
 			t.Errorf("BtcDecode #%d wrong error got: %v, want: %v",
 				i, err, test.readErr)
