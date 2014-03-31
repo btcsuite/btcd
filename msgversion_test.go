@@ -341,6 +341,107 @@ func TestVersionWireErrors(t *testing.T) {
 	}
 }
 
+// TestVersionOptionalFields performs tests to ensure that an encoded version
+// messages that omit optional fields are handled correctly.
+func TestVersionOptionalFields(t *testing.T) {
+	// onlyRequiredVersion is a version message that only contains the
+	// required versions and all other values set to their default values.
+	onlyRequiredVersion := btcwire.MsgVersion{
+		ProtocolVersion: 60002,
+		Services:        btcwire.SFNodeNetwork,
+		Timestamp:       time.Unix(0x495fab29, 0), // 2009-01-03 12:15:05 -0600 CST)
+		AddrYou: btcwire.NetAddress{
+			Timestamp: time.Time{}, // Zero value -- no timestamp in version
+			Services:  btcwire.SFNodeNetwork,
+			IP:        net.ParseIP("192.168.0.1"),
+			Port:      8333,
+		},
+	}
+	onlyRequiredVersionEncoded := make([]byte, len(baseVersionEncoded)-55)
+	copy(onlyRequiredVersionEncoded, baseVersionEncoded)
+
+	// addrMeVersion is a version message that contains all fields through
+	// the AddrMe field.
+	addrMeVersion := onlyRequiredVersion
+	addrMeVersion.AddrMe = btcwire.NetAddress{
+		Timestamp: time.Time{}, // Zero value -- no timestamp in version
+		Services:  btcwire.SFNodeNetwork,
+		IP:        net.ParseIP("127.0.0.1"),
+		Port:      8333,
+	}
+	addrMeVersionEncoded := make([]byte, len(baseVersionEncoded)-29)
+	copy(addrMeVersionEncoded, baseVersionEncoded)
+
+	// nonceVersion is a version message that contains all fields through
+	// the Nonce field.
+	nonceVersion := addrMeVersion
+	nonceVersion.Nonce = 123123 // 0x1e0f3
+	nonceVersionEncoded := make([]byte, len(baseVersionEncoded)-21)
+	copy(nonceVersionEncoded, baseVersionEncoded)
+
+	// uaVersion is a version message that contains all fields through
+	// the UserAgent field.
+	uaVersion := nonceVersion
+	uaVersion.UserAgent = "/btcdtest:0.0.1/"
+	uaVersionEncoded := make([]byte, len(baseVersionEncoded)-4)
+	copy(uaVersionEncoded, baseVersionEncoded)
+
+	// lastBlockVersion is a version message that contains all fields
+	// through the LastBlock field.
+	lastBlockVersion := uaVersion
+	lastBlockVersion.LastBlock = 234234 // 0x392fa
+	lastBlockVersionEncoded := make([]byte, len(baseVersionEncoded))
+	copy(lastBlockVersionEncoded, baseVersionEncoded)
+
+	tests := []struct {
+		msg  *btcwire.MsgVersion // Expected message
+		buf  []byte              // Wire encoding
+		pver uint32              // Protocol version for wire encoding
+	}{
+		{
+			&onlyRequiredVersion,
+			onlyRequiredVersionEncoded,
+			btcwire.ProtocolVersion,
+		},
+		{
+			&addrMeVersion,
+			addrMeVersionEncoded,
+			btcwire.ProtocolVersion,
+		},
+		{
+			&nonceVersion,
+			nonceVersionEncoded,
+			btcwire.ProtocolVersion,
+		},
+		{
+			&uaVersion,
+			uaVersionEncoded,
+			btcwire.ProtocolVersion,
+		},
+		{
+			&lastBlockVersion,
+			lastBlockVersionEncoded,
+			btcwire.ProtocolVersion,
+		},
+	}
+
+	for i, test := range tests {
+		// Decode the message from wire format.
+		var msg btcwire.MsgVersion
+		rbuf := bytes.NewBuffer(test.buf)
+		err := msg.BtcDecode(rbuf, test.pver)
+		if err != nil {
+			t.Errorf("BtcDecode #%d error %v", i, err)
+			continue
+		}
+		if !reflect.DeepEqual(&msg, test.msg) {
+			t.Errorf("BtcDecode #%d\n got: %s want: %s", i,
+				spew.Sdump(msg), spew.Sdump(test.msg))
+			continue
+		}
+	}
+}
+
 // baseVersion is used in the various tests as a baseline MsgVersion.
 var baseVersion = &btcwire.MsgVersion{
 	ProtocolVersion: 60002,
