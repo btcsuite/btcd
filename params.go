@@ -50,6 +50,7 @@ var mainNetParams = params{
 		"dnsseed.bluematt.me",
 		"dnsseed.bitcoin.dashjr.org",
 		"seed.bitcoinstats.com",
+		"seed.bitnodes.io",
 		"bitseed.xf2.org",
 	},
 }
