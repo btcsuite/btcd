@@ -224,13 +224,17 @@ type GetWorkResult struct {
 
 // ValidateAddressResult models the data from the validateaddress command.
 type ValidateAddressResult struct {
-	IsValid      bool   `json:"isvalid"`
-	Address      string `json:"address,omitempty"`
-	IsMine       bool   `json:"ismine,omitempty"`
-	IsScript     bool   `json:"isscript,omitempty"`
-	PubKey       string `json:"pubkey,omitempty"`
-	IsCompressed bool   `json:"iscompressed,omitempty"`
-	Account      string `json:"account,omitempty"`
+	IsValid      bool     `json:"isvalid"`
+	Address      string   `json:"address,omitempty"`
+	IsMine       bool     `json:"ismine,omitempty"`
+	IsScript     bool     `json:"isscript,omitempty"`
+	PubKey       string   `json:"pubkey,omitempty"`
+	IsCompressed bool     `json:"iscompressed,omitempty"`
+	Account      string   `json:"account,omitempty"`
+	Addresses    []string `json:"addresses,omitempty"`
+	Hex          string   `json:"hex,omitempty"`
+	Script       string   `json:"script,omitempty"`
+	SigsRequired int      `json:"sigsrequired,omitempty"`
 }
 
 // SignRawTransactionResult models the data from the signrawtransaction
