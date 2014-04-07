@@ -46,6 +46,7 @@ var (
 // commandHandlers is a map of commands and associated handler data that is used
 // to validate correctness and perform the command.
 var commandHandlers = map[string]*handlerData{
+	"addmultisigaddress":    {2, 1, displayGeneric, []conversionHandler{toInt, nil, nil}, makeAddMultiSigAddress, "<numrequired> <[\"pubkey\",...]> [account]"},
 	"addnode":               {2, 0, displayJSONDump, nil, makeAddNode, "<ip> <add/remove/onetry>"},
 	"createencryptedwallet": {1, 0, displayGeneric, nil, makeCreateEncryptedWallet, "<passphrase>"},
 	"createrawtransaction":  {2, 0, displayGeneric, nil, makeCreateRawTransaction, "\"[{\"txid\":\"id\",\"vout\":n},...]\" \"{\"address\":amount,...}\""},
@@ -197,6 +198,20 @@ func displayJSONDump(reply interface{}) error {
 	}
 	fmt.Println(buf.String())
 	return nil
+}
+
+// makeAddMultiSigAddress generates the cmd structure for addmultisigaddress commands.
+func makeAddMultiSigAddress(args []interface{}) (btcjson.Cmd, error) {
+	var pubkeys []string
+	err := json.Unmarshal([]byte(args[1].(string)), &pubkeys)
+	if err != nil {
+		return nil, err
+	}
+	var opt string
+	if len(args) > 2 {
+		opt = args[2].(string)
+	}
+	return btcjson.NewAddMultisigAddressCmd("btcctl", args[0].(int), pubkeys, opt)
 }
 
 // makeAddNode generates the cmd structure for addnode commands.
