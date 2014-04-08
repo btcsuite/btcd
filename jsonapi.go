@@ -888,15 +888,18 @@ func ReadResultCmd(cmd string, message []byte) (Reply, error) {
 		// getaddednodeinfo can either return a JSON object or a
 		// slice of strings depending on the verbose flag.  Choose the
 		// right form accordingly.
-		var res interface{}
 		if strings.Contains(string(objmap["result"]), "{") {
-			res = []GetAddedNodeInfoResult{}
+			var res []GetAddedNodeInfoResult
+			err = json.Unmarshal(objmap["result"], &res)
+			if err == nil {
+				result.Result = res
+			}
 		} else {
-			res = []string{}
-		}
-		err = json.Unmarshal(objmap["result"], &res)
-		if err == nil {
-			result.Result = res
+			var res []string
+			err = json.Unmarshal(objmap["result"], &res)
+			if err == nil {
+				result.Result = res
+			}
 		}
 	case "getinfo":
 		var res InfoResult
