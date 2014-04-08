@@ -235,12 +235,12 @@ func (msg *MsgTx) Copy() *MsgTx {
 // See Deserialize for decoding transactions stored to disk, such as in a
 // database, as opposed to decoding transactions from the wire.
 func (msg *MsgTx) BtcDecode(r io.Reader, pver uint32) error {
-	buf := make([]byte, 4)
-	_, err := io.ReadFull(r, buf)
+	var buf [4]byte
+	_, err := io.ReadFull(r, buf[:])
 	if err != nil {
 		return err
 	}
-	msg.Version = binary.LittleEndian.Uint32(buf)
+	msg.Version = binary.LittleEndian.Uint32(buf[:])
 
 	count, err := readVarInt(r, pver)
 	if err != nil {
@@ -292,11 +292,11 @@ func (msg *MsgTx) BtcDecode(r io.Reader, pver uint32) error {
 		msg.TxOut[i] = &to
 	}
 
-	_, err = io.ReadFull(r, buf)
+	_, err = io.ReadFull(r, buf[:])
 	if err != nil {
 		return err
 	}
-	msg.LockTime = binary.LittleEndian.Uint32(buf)
+	msg.LockTime = binary.LittleEndian.Uint32(buf[:])
 
 	return nil
 }
@@ -323,9 +323,9 @@ func (msg *MsgTx) Deserialize(r io.Reader) error {
 // See Serialize for encoding transactions to be stored to disk, such as in a
 // database, as opposed to encoding transactions for the wire.
 func (msg *MsgTx) BtcEncode(w io.Writer, pver uint32) error {
-	buf := make([]byte, 4)
-	binary.LittleEndian.PutUint32(buf, msg.Version)
-	_, err := w.Write(buf)
+	var buf [4]byte
+	binary.LittleEndian.PutUint32(buf[:], msg.Version)
+	_, err := w.Write(buf[:])
 	if err != nil {
 		return err
 	}
@@ -356,8 +356,8 @@ func (msg *MsgTx) BtcEncode(w io.Writer, pver uint32) error {
 		}
 	}
 
-	binary.LittleEndian.PutUint32(buf, msg.LockTime)
-	_, err = w.Write(buf)
+	binary.LittleEndian.PutUint32(buf[:], msg.LockTime)
+	_, err = w.Write(buf[:])
 	if err != nil {
 		return err
 	}
@@ -434,12 +434,12 @@ func readOutPoint(r io.Reader, pver uint32, version uint32, op *OutPoint) error 
 		return err
 	}
 
-	buf := make([]byte, 4)
-	_, err = io.ReadFull(r, buf)
+	var buf [4]byte
+	_, err = io.ReadFull(r, buf[:])
 	if err != nil {
 		return err
 	}
-	op.Index = binary.LittleEndian.Uint32(buf)
+	op.Index = binary.LittleEndian.Uint32(buf[:])
 	return nil
 }
 
@@ -451,9 +451,9 @@ func writeOutPoint(w io.Writer, pver uint32, version uint32, op *OutPoint) error
 		return err
 	}
 
-	buf := make([]byte, 4)
-	binary.LittleEndian.PutUint32(buf, op.Index)
-	_, err = w.Write(buf)
+	var buf [4]byte
+	binary.LittleEndian.PutUint32(buf[:], op.Index)
+	_, err = w.Write(buf[:])
 	if err != nil {
 		return err
 	}
@@ -492,12 +492,12 @@ func readTxIn(r io.Reader, pver uint32, version uint32, ti *TxIn) error {
 	}
 	ti.SignatureScript = b
 
-	b = make([]byte, 4)
-	_, err = io.ReadFull(r, b)
+	var buf [4]byte
+	_, err = io.ReadFull(r, buf[:])
 	if err != nil {
 		return err
 	}
-	ti.Sequence = binary.LittleEndian.Uint32(b)
+	ti.Sequence = binary.LittleEndian.Uint32(buf[:])
 
 	return nil
 }
@@ -521,9 +521,9 @@ func writeTxIn(w io.Writer, pver uint32, version uint32, ti *TxIn) error {
 		return err
 	}
 
-	buf := make([]byte, 4)
-	binary.LittleEndian.PutUint32(buf, ti.Sequence)
-	_, err = w.Write(buf)
+	var buf [4]byte
+	binary.LittleEndian.PutUint32(buf[:], ti.Sequence)
+	_, err = w.Write(buf[:])
 	if err != nil {
 		return err
 	}
@@ -534,12 +534,12 @@ func writeTxIn(w io.Writer, pver uint32, version uint32, ti *TxIn) error {
 // readTxOut reads the next sequence of bytes from r as a transaction output
 // (TxOut).
 func readTxOut(r io.Reader, pver uint32, version uint32, to *TxOut) error {
-	buf := make([]byte, 8)
-	_, err := io.ReadFull(r, buf)
+	var buf [8]byte
+	_, err := io.ReadFull(r, buf[:])
 	if err != nil {
 		return err
 	}
-	to.Value = int64(binary.LittleEndian.Uint64(buf))
+	to.Value = int64(binary.LittleEndian.Uint64(buf[:]))
 
 	count, err := readVarInt(r, pver)
 	if err != nil {
@@ -569,9 +569,9 @@ func readTxOut(r io.Reader, pver uint32, version uint32, to *TxOut) error {
 // writeTxOut encodes to into the bitcoin protocol encoding for a transaction
 // output (TxOut) to w.
 func writeTxOut(w io.Writer, pver uint32, version uint32, to *TxOut) error {
-	buf := make([]byte, 8)
-	binary.LittleEndian.PutUint64(buf, uint64(to.Value))
-	_, err := w.Write(buf)
+	var buf [8]byte
+	binary.LittleEndian.PutUint64(buf[:], uint64(to.Value))
+	_, err := w.Write(buf[:])
 	if err != nil {
 		return err
 	}

@@ -128,12 +128,12 @@ func readMessageHeader(r io.Reader) (int, *messageHeader, error) {
 	// to read the entire header into a buffer first in case there is a
 	// short read so the proper amount of read bytes are known.  This works
 	// since the header is a fixed size.
-	headerBytes := make([]byte, MessageHeaderSize)
-	n, err := io.ReadFull(r, headerBytes)
+	var headerBytes [MessageHeaderSize]byte
+	n, err := io.ReadFull(r, headerBytes[:])
 	if err != nil {
 		return n, nil, err
 	}
-	hr := bytes.NewBuffer(headerBytes)
+	hr := bytes.NewBuffer(headerBytes[:])
 
 	// Create and populate a messageHeader struct from the raw header bytes.
 	hdr := messageHeader{}

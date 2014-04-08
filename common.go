@@ -283,7 +283,7 @@ func writeElements(w io.Writer, elements ...interface{}) error {
 
 // readVarInt reads a variable length integer from r and returns it as a uint64.
 func readVarInt(r io.Reader, pver uint32) (uint64, error) {
-	b := make([]byte, 8)
+	var b [8]byte
 	_, err := io.ReadFull(r, b[0:1])
 	if err != nil {
 		return 0, err
@@ -293,25 +293,25 @@ func readVarInt(r io.Reader, pver uint32) (uint64, error) {
 	discriminant := uint8(b[0])
 	switch discriminant {
 	case 0xff:
-		_, err := io.ReadFull(r, b)
+		_, err := io.ReadFull(r, b[:])
 		if err != nil {
 			return 0, err
 		}
-		rv = binary.LittleEndian.Uint64(b)
+		rv = binary.LittleEndian.Uint64(b[:])
 
 	case 0xfe:
 		_, err := io.ReadFull(r, b[0:4])
 		if err != nil {
 			return 0, err
 		}
-		rv = uint64(binary.LittleEndian.Uint32(b))
+		rv = uint64(binary.LittleEndian.Uint32(b[:]))
 
 	case 0xfd:
 		_, err := io.ReadFull(r, b[0:2])
 		if err != nil {
 			return 0, err
 		}
-		rv = uint64(binary.LittleEndian.Uint16(b))
+		rv = uint64(binary.LittleEndian.Uint16(b[:]))
 
 	default:
 		rv = uint64(discriminant)
@@ -329,25 +329,25 @@ func writeVarInt(w io.Writer, pver uint32, val uint64) error {
 	}
 
 	if val <= math.MaxUint16 {
-		buf := make([]byte, 3)
+		var buf [3]byte
 		buf[0] = 0xfd
 		binary.LittleEndian.PutUint16(buf[1:], uint16(val))
-		_, err := w.Write(buf)
+		_, err := w.Write(buf[:])
 		return err
 	}
 
 	if val <= math.MaxUint32 {
-		buf := make([]byte, 5)
+		var buf [5]byte
 		buf[0] = 0xfe
 		binary.LittleEndian.PutUint32(buf[1:], uint32(val))
-		_, err := w.Write(buf)
+		_, err := w.Write(buf[:])
 		return err
 	}
 
-	buf := make([]byte, 9)
+	var buf [9]byte
 	buf[0] = 0xff
 	binary.LittleEndian.PutUint64(buf[1:], val)
-	_, err := w.Write(buf)
+	_, err := w.Write(buf[:])
 	return err
 }
 
@@ -422,15 +422,15 @@ func writeVarString(w io.Writer, pver uint32, str string) error {
 // unexported version takes a reader primarily to ensure the error paths
 // can be properly tested by passing a fake reader in the tests.
 func randomUint64(r io.Reader) (uint64, error) {
-	b := make([]byte, 8)
-	n, err := r.Read(b)
+	var b [8]byte
+	n, err := r.Read(b[:])
 	if n != len(b) {
 		return 0, io.ErrShortBuffer
 	}
 	if err != nil {
 		return 0, err
 	}
-	return binary.BigEndian.Uint64(b), nil
+	return binary.BigEndian.Uint64(b[:]), nil
 }
 
 // RandomUint64 returns a cryptographically random uint64 value.
