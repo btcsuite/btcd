@@ -786,14 +786,14 @@ func (n *RescanProgressNtfn) UnmarshalJSON(b []byte) error {
 // unmarshaling of newtx JSON websocket notifications.
 type TxNtfn struct {
 	Account string
-	Details map[string]interface{}
+	Details *btcjson.ListTransactionsResult
 }
 
 // Enforce that TxNtfn satisifies the btcjson.Cmd interface.
 var _ btcjson.Cmd = &TxNtfn{}
 
 // NewTxNtfn creates a new TxNtfn.
-func NewTxNtfn(account string, details map[string]interface{}) *TxNtfn {
+func NewTxNtfn(account string, details *btcjson.ListTransactionsResult) *TxNtfn {
 	return &TxNtfn{
 		Account: account,
 		Details: details,
@@ -818,14 +818,13 @@ func parseTxNtfn(r *btcjson.RawCmd) (btcjson.Cmd, error) {
 			"string: " + err.Error())
 	}
 
-	// TODO(davec): Object
-	var details map[string]interface{}
+	var details btcjson.ListTransactionsResult
 	if err := json.Unmarshal(r.Params[1], &details); err != nil {
 		return nil, errors.New("second parameter 'details' must be a " +
 			"JSON object of transaction details: " + err.Error())
 	}
 
-	return NewTxNtfn(account, details), nil
+	return NewTxNtfn(account, &details), nil
 }
 
 // Id satisifies the btcjson.Cmd interface by returning nil for a
