@@ -402,7 +402,7 @@ func NewAddressPubKey(serializedPubKey []byte, net btcwire.BitcoinNet) (*Address
 		netID = TestNetAddr
 	}
 
-	ecPubKey := (*btcec.PublicKey)(pubKey)
+	ecPubKey := pubKey
 	return &AddressPubKey{
 		pubKeyFormat: pkFormat,
 		pubKey:       ecPubKey,
