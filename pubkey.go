@@ -50,8 +50,8 @@ const (
 // ParsePubKey parses a public key for a koblitz curve from a bytestring into a
 // ecdsa.Publickey, verifying that it is valid. It supports compressed,
 // uncompressed and hybrid signature formats.
-func ParsePubKey(pubKeyStr []byte, curve *KoblitzCurve) (key *ecdsa.PublicKey, err error) {
-	pubkey := ecdsa.PublicKey{}
+func ParsePubKey(pubKeyStr []byte, curve *KoblitzCurve) (key *PublicKey, err error) {
+	pubkey := PublicKey{}
 	pubkey.Curve = curve
 
 	if len(pubKeyStr) == 0 {
@@ -108,6 +108,11 @@ func ParsePubKey(pubKeyStr []byte, curve *KoblitzCurve) (key *ecdsa.PublicKey, e
 // PublicKey is an ecdsa.PublicKey with additional functions to
 // serialize in uncompressed, compressed, and hybrid formats.
 type PublicKey ecdsa.PublicKey
+
+// ToECDSA returns the public key as a *ecdsa.PublicKey.
+func (p *PublicKey) ToECDSA() *ecdsa.PublicKey {
+	return (*ecdsa.PublicKey)(p)
+}
 
 // SerializeUncompressed serializes a public key in a 65-byte uncompressed
 // format.
