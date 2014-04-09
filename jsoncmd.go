@@ -7,6 +7,7 @@ package btcjson
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 )
 
 // ErrTooManyOptArgs describes an error where too many optional
@@ -31,10 +32,32 @@ type Cmd interface {
 // custom command type is set.  Other packages may register their
 // own RawCmd to Cmd converters by calling RegisterCustomCmd.
 type RawCmd struct {
-	Jsonrpc string        `json:"jsonrpc"`
-	Id      interface{}   `json:"id"`
-	Method  string        `json:"method"`
-	Params  []interface{} `json:"params"`
+	Jsonrpc string            `json:"jsonrpc"`
+	Id      interface{}       `json:"id"`
+	Method  string            `json:"method"`
+	Params  []json.RawMessage `json:"params"`
+}
+
+// NewRawCmd returns a new raw command given the provided id, method, and
+// parameters.  The parameters are marshalled into a json.RawMessage for the
+// Params field of the returned raw command.
+func NewRawCmd(id interface{}, method string, params []interface{}) (*RawCmd, error) {
+	rawParams := make([]json.RawMessage, 0, len(params))
+	for _, param := range params {
+		marshalledParam, err := json.Marshal(param)
+		if err != nil {
+			return nil, err
+		}
+		rawMessage := json.RawMessage(marshalledParam)
+		rawParams = append(rawParams, rawMessage)
+	}
+
+	return &RawCmd{
+		Jsonrpc: "1.0",
+		Id:      id,
+		Method:  method,
+		Params:  rawParams,
+	}, nil
 }
 
 // RawCmdParser is a function to create a custom Cmd from a RawCmd.
@@ -362,10 +385,9 @@ func (cmd *unparsableCmd) Method() string {
 // MarshalJSON returns the JSON encoding of cmd.  Part of the Cmd interface.
 func (cmd *unparsableCmd) MarshalJSON() ([]byte, error) {
 	// Fill and marshal a RawCmd.
-	raw := RawCmd{
-		Jsonrpc: "1.0",
-		Method:  cmd.method,
-		Id:      cmd.id,
+	raw, err := NewRawCmd(cmd.id, cmd.method, nil)
+	if err != nil {
+		return nil, err
 	}
 	return json.Marshal(raw)
 }
@@ -436,21 +458,18 @@ func (cmd *AddMultisigAddressCmd) Method() string {
 
 // MarshalJSON returns the JSON encoding of cmd.  Part of the Cmd interface.
 func (cmd *AddMultisigAddressCmd) MarshalJSON() ([]byte, error) {
-	// Fill and marshal a RawCmd.
-	raw := RawCmd{
-		Jsonrpc: "1.0",
-		Method:  "addmultisigaddress",
-		Id:      cmd.id,
-		Params: []interface{}{
-			cmd.NRequired,
-			cmd.Keys,
-		},
-	}
-
+	params := make([]interface{}, 2, 3)
+	params[0] = cmd.NRequired
+	params[1] = cmd.Keys
 	if cmd.Account != "" {
-		raw.Params = append(raw.Params, cmd.Account)
+		params = append(params, cmd.Account)
 	}
 
+	// Fill and marshal a RawCmd.
+	raw, err := NewRawCmd(cmd.id, cmd.Method(), params)
+	if err != nil {
+		return nil, err
+	}
 	return json.Marshal(raw)
 }
 
@@ -466,30 +485,24 @@ func (cmd *AddMultisigAddressCmd) UnmarshalJSON(b []byte) error {
 	if len(r.Params) < 2 || len(r.Params) > 3 {
 		return ErrWrongNumberOfParams
 	}
-	nRequired, ok := r.Params[0].(float64)
-	if !ok {
-		return errors.New("first parameter nrequired must be a number")
+
+	var nRequired int
+	if err := json.Unmarshal(r.Params[0], &nRequired); err != nil {
+		return fmt.Errorf("first parameter 'nrequired' must be an integer: %v", err)
 	}
-	ikeys, ok := r.Params[1].([]interface{})
-	if !ok {
-		return errors.New("second parameter keys must be an array")
+
+	var keys []string
+	if err := json.Unmarshal(r.Params[1], &keys); err != nil {
+		return fmt.Errorf("second parameter 'keys' must be an array of strings: %v", err)
 	}
-	keys := make([]string, len(ikeys))
-	for i, val := range ikeys {
-		keys[i], ok = val.(string)
-		if !ok {
-			return errors.New("second parameter keys must be an array of strings")
-		}
-	}
+
 	var account string
 	if len(r.Params) > 2 {
-		account, ok = r.Params[2].(string)
-		if !ok {
-			return errors.New("third (optional) parameter account must be a string")
+		if err := json.Unmarshal(r.Params[2], &account); err != nil {
+			return fmt.Errorf("third optional parameter 'account' must be a string: %v", err)
 		}
 	}
-	newCmd, err := NewAddMultisigAddressCmd(r.Id, int(nRequired), keys,
-		account)
+	newCmd, err := NewAddMultisigAddressCmd(r.Id, nRequired, keys, account)
 	if err != nil {
 		return err
 	}
@@ -548,16 +561,17 @@ func (cmd *AddNodeCmd) Method() string {
 
 // MarshalJSON returns the JSON encoding of cmd.  Part of the Cmd interface.
 func (cmd *AddNodeCmd) MarshalJSON() ([]byte, error) {
+	params := []interface{}{
+		cmd.Addr,
+		cmd.SubCmd,
+	}
+
 	// Fill and marshal a RawCmd.
-	return json.Marshal(RawCmd{
-		Jsonrpc: "1.0",
-		Method:  "addnode",
-		Id:      cmd.id,
-		Params: []interface{}{
-			cmd.Addr,
-			cmd.SubCmd,
-		},
-	})
+	raw, err := NewRawCmd(cmd.id, cmd.Method(), params)
+	if err != nil {
+		return nil, err
+	}
+	return json.Marshal(raw)
 }
 
 // UnmarshalJSON unmarshals the JSON encoding of cmd into cmd.  Part of
@@ -572,14 +586,17 @@ func (cmd *AddNodeCmd) UnmarshalJSON(b []byte) error {
 	if len(r.Params) != 2 {
 		return ErrWrongNumberOfParams
 	}
-	addr, ok := r.Params[0].(string)
-	if !ok {
-		return errors.New("first parameter addr must be a string")
+
+	var addr string
+	if err := json.Unmarshal(r.Params[0], &addr); err != nil {
+		return fmt.Errorf("first parameter 'addr' must be a string: %v", err)
 	}
-	subcmd, ok := r.Params[1].(string)
-	if !ok {
-		return errors.New("second parameter subcmd must be a string")
+
+	var subcmd string
+	if err := json.Unmarshal(r.Params[1], &subcmd); err != nil {
+		return fmt.Errorf("second parameter 'subcmd' must be a string: %v", err)
 	}
+
 	newCmd, err := NewAddNodeCmd(r.Id, addr, subcmd)
 	if err != nil {
 		return err
@@ -625,15 +642,16 @@ func (cmd *BackupWalletCmd) Method() string {
 
 // MarshalJSON returns the JSON encoding of cmd.  Part of the Cmd interface.
 func (cmd *BackupWalletCmd) MarshalJSON() ([]byte, error) {
+	params := []interface{}{
+		cmd.Destination,
+	}
+
 	// Fill and marshal a RawCmd.
-	return json.Marshal(RawCmd{
-		Jsonrpc: "1.0",
-		Method:  "backupwallet",
-		Id:      cmd.id,
-		Params: []interface{}{
-			cmd.Destination,
-		},
-	})
+	raw, err := NewRawCmd(cmd.id, cmd.Method(), params)
+	if err != nil {
+		return nil, err
+	}
+	return json.Marshal(raw)
 }
 
 // UnmarshalJSON unmarshals the JSON encoding of cmd into cmd.  Part of
@@ -648,10 +666,12 @@ func (cmd *BackupWalletCmd) UnmarshalJSON(b []byte) error {
 	if len(r.Params) != 1 {
 		return ErrWrongNumberOfParams
 	}
-	destination, ok := r.Params[0].(string)
-	if !ok {
-		return errors.New("first parameter desitnation must be a string")
+
+	var destination string
+	if err := json.Unmarshal(r.Params[0], &destination); err != nil {
+		return fmt.Errorf("first parameter 'destination' must be a string: %v", err)
 	}
+
 	newCmd, err := NewBackupWalletCmd(r.Id, destination)
 	if err != nil {
 		return err
@@ -699,16 +719,17 @@ func (cmd *CreateMultisigCmd) Method() string {
 
 // MarshalJSON returns the JSON encoding of cmd.  Part of the Cmd interface.
 func (cmd *CreateMultisigCmd) MarshalJSON() ([]byte, error) {
+	params := []interface{}{
+		cmd.NRequired,
+		cmd.Keys,
+	}
+
 	// Fill and marshal a RawCmd.
-	return json.Marshal(RawCmd{
-		Jsonrpc: "1.0",
-		Method:  "createmultisig",
-		Id:      cmd.id,
-		Params: []interface{}{
-			cmd.NRequired,
-			cmd.Keys,
-		},
-	})
+	raw, err := NewRawCmd(cmd.id, cmd.Method(), params)
+	if err != nil {
+		return nil, err
+	}
+	return json.Marshal(raw)
 }
 
 // UnmarshalJSON unmarshals the JSON encoding of cmd into cmd.  Part of
@@ -723,24 +744,18 @@ func (cmd *CreateMultisigCmd) UnmarshalJSON(b []byte) error {
 	if len(r.Params) != 2 {
 		return ErrWrongNumberOfParams
 	}
-	nRequired, ok := r.Params[0].(float64)
-	if !ok {
-		return errors.New("first parameter nrequired must be a number")
+
+	var nRequired int
+	if err := json.Unmarshal(r.Params[0], &nRequired); err != nil {
+		return fmt.Errorf("first parameter 'nrequired' must be an integer: %v", err)
 	}
 
-	ikeys, ok := r.Params[1].([]interface{})
-	if !ok {
-		return errors.New("second parameter keys must be an array")
-	}
-	keys := make([]string, len(ikeys))
-	for i, val := range ikeys {
-		keys[i], ok = val.(string)
-		if !ok {
-			return errors.New("second parameter keys must be an array of strings")
-		}
+	var keys []string
+	if err := json.Unmarshal(r.Params[1], &keys); err != nil {
+		return fmt.Errorf("second parameter 'keys' must be an array of strings: %v", err)
 	}
 
-	newCmd, err := NewCreateMultisigCmd(r.Id, int(nRequired), keys)
+	newCmd, err := NewCreateMultisigCmd(r.Id, nRequired, keys)
 	if err != nil {
 		return err
 	}
@@ -754,65 +769,6 @@ func (cmd *CreateMultisigCmd) UnmarshalJSON(b []byte) error {
 type TransactionInput struct {
 	Txid string `json:"txid"`
 	Vout int    `json:"vout"`
-}
-
-// ConvertCreateRawTxParams validates and converts the passed parameters from
-// raw interfaces into concrete structs.  This is a separate function since
-// the createrawtransaction command parameters are caller-crafted JSON as
-// opposed to machine generated JSON as is the case for most commands.
-func ConvertCreateRawTxParams(inputs, amounts interface{}) ([]TransactionInput, map[string]int64, error) {
-	iinputs, ok := inputs.([]interface{})
-	if !ok {
-		return nil, nil, errors.New("first parameter inputs must be an array")
-	}
-	rinputs := make([]TransactionInput, len(iinputs))
-	for i, iv := range iinputs {
-		v, ok := iv.(map[string]interface{})
-		if !ok {
-			return nil, nil, errors.New("first parameter inputs must be an array of objects")
-		}
-
-		if len(v) != 2 {
-			return nil, nil, errors.New("input with wrong number of members")
-		}
-		txid, ok := v["txid"]
-		if !ok {
-			return nil, nil, errors.New("input without txid")
-		}
-		rinputs[i].Txid, ok = txid.(string)
-		if !ok {
-			return nil, nil, errors.New("input txid isn't a string")
-		}
-
-		vout, ok := v["vout"]
-		if !ok {
-			return nil, nil, errors.New("input without vout")
-		}
-		fvout, ok := vout.(float64)
-		if !ok {
-			return nil, nil, errors.New("input vout not a number")
-		}
-		rinputs[i].Vout = int(fvout)
-	}
-	famounts, ok := amounts.(map[string]interface{})
-	if !ok {
-		return nil, nil, errors.New("second parameter keys must be a map")
-	}
-
-	ramounts := make(map[string]int64)
-	for k, v := range famounts {
-		fv, ok := v.(float64)
-		if !ok {
-			return nil, nil, errors.New("second parameter keys must be a number map")
-		}
-		var err error
-		ramounts[k], err = JSONToAmount(fv)
-		if err != nil {
-			return nil, nil, err
-		}
-	}
-
-	return rinputs, ramounts, nil
 }
 
 // CreateRawTransactionCmd is a type handling custom marshaling and
@@ -852,21 +808,22 @@ func (cmd *CreateRawTransactionCmd) Method() string {
 
 // MarshalJSON returns the JSON encoding of cmd.  Part of the Cmd interface.
 func (cmd *CreateRawTransactionCmd) MarshalJSON() ([]byte, error) {
-	floatAmount := make(map[string]float64)
-
+	floatAmounts := make(map[string]float64)
 	for k, v := range cmd.Amounts {
-		floatAmount[k] = float64(v) / 1e8
+		floatAmounts[k] = float64(v) / 1e8
 	}
+
+	params := []interface{}{
+		cmd.Inputs,
+		floatAmounts,
+	}
+
 	// Fill and marshal a RawCmd.
-	return json.Marshal(RawCmd{
-		Jsonrpc: "1.0",
-		Method:  "createrawtransaction",
-		Id:      cmd.id,
-		Params: []interface{}{
-			cmd.Inputs,
-			floatAmount,
-		},
-	})
+	raw, err := NewRawCmd(cmd.id, cmd.Method(), params)
+	if err != nil {
+		return nil, err
+	}
+	return json.Marshal(raw)
 }
 
 // UnmarshalJSON unmarshals the JSON encoding of cmd into cmd.  Part of
@@ -882,13 +839,27 @@ func (cmd *CreateRawTransactionCmd) UnmarshalJSON(b []byte) error {
 		return ErrWrongNumberOfParams
 	}
 
-	inputs, amounts, err := ConvertCreateRawTxParams(r.Params[0],
-		r.Params[1])
-	if err != nil {
-		return err
+	var inputs []TransactionInput
+	if err := json.Unmarshal(r.Params[0], &inputs); err != nil {
+		return fmt.Errorf("first parameter 'inputs' must be a JSON array "+
+			"of transaction input JSON objects: %v", err)
 	}
 
-	newCmd, err := NewCreateRawTransactionCmd(r.Id, inputs, amounts)
+	var amounts map[string]float64
+	if err := json.Unmarshal(r.Params[1], &amounts); err != nil {
+		return fmt.Errorf("second parameter 'amounts' must be a JSON object: %v", err)
+	}
+
+	intAmounts := make(map[string]int64, len(amounts))
+	for k, v := range amounts {
+		amount, err := JSONToAmount(v)
+		if err != nil {
+			return err
+		}
+		intAmounts[k] = amount
+	}
+
+	newCmd, err := NewCreateRawTransactionCmd(r.Id, inputs, intAmounts)
 	if err != nil {
 		return err
 	}
@@ -934,15 +905,16 @@ func (cmd *DebugLevelCmd) Method() string {
 
 // MarshalJSON returns the JSON encoding of cmd.  Part of the Cmd interface.
 func (cmd *DebugLevelCmd) MarshalJSON() ([]byte, error) {
+	params := []interface{}{
+		cmd.LevelSpec,
+	}
+
 	// Fill and marshal a RawCmd.
-	return json.Marshal(RawCmd{
-		Jsonrpc: "1.0",
-		Method:  cmd.Method(),
-		Id:      cmd.id,
-		Params: []interface{}{
-			cmd.LevelSpec,
-		},
-	})
+	raw, err := NewRawCmd(cmd.id, cmd.Method(), params)
+	if err != nil {
+		return nil, err
+	}
+	return json.Marshal(raw)
 }
 
 // UnmarshalJSON unmarshals the JSON encoding of cmd into cmd.  Part of
@@ -957,9 +929,10 @@ func (cmd *DebugLevelCmd) UnmarshalJSON(b []byte) error {
 	if len(r.Params) != 1 {
 		return ErrWrongNumberOfParams
 	}
-	levelSpec, ok := r.Params[0].(string)
-	if !ok {
-		return errors.New("first parameter levelspec must be a string")
+
+	var levelSpec string
+	if err := json.Unmarshal(r.Params[0], &levelSpec); err != nil {
+		return fmt.Errorf("first parameter 'levelspec' must be a string: %v", err)
 	}
 
 	newCmd, err := NewDebugLevelCmd(r.Id, levelSpec)
@@ -1006,15 +979,16 @@ func (cmd *DecodeRawTransactionCmd) Method() string {
 
 // MarshalJSON returns the JSON encoding of cmd.  Part of the Cmd interface.
 func (cmd *DecodeRawTransactionCmd) MarshalJSON() ([]byte, error) {
+	params := []interface{}{
+		cmd.HexTx,
+	}
+
 	// Fill and marshal a RawCmd.
-	return json.Marshal(RawCmd{
-		Jsonrpc: "1.0",
-		Method:  "decoderawtransaction",
-		Id:      cmd.id,
-		Params: []interface{}{
-			cmd.HexTx,
-		},
-	})
+	raw, err := NewRawCmd(cmd.id, cmd.Method(), params)
+	if err != nil {
+		return nil, err
+	}
+	return json.Marshal(raw)
 }
 
 // UnmarshalJSON unmarshals the JSON encoding of cmd into cmd.  Part of
@@ -1029,9 +1003,10 @@ func (cmd *DecodeRawTransactionCmd) UnmarshalJSON(b []byte) error {
 	if len(r.Params) != 1 {
 		return ErrWrongNumberOfParams
 	}
-	hextx, ok := r.Params[0].(string)
-	if !ok {
-		return errors.New("first parameter hextx must be an array of objects")
+
+	var hextx string
+	if err := json.Unmarshal(r.Params[0], &hextx); err != nil {
+		return fmt.Errorf("first parameter 'hextx' must be a string: %v", err)
 	}
 
 	newCmd, err := NewDecodeRawTransactionCmd(r.Id, hextx)
@@ -1078,15 +1053,16 @@ func (cmd *DecodeScriptCmd) Method() string {
 
 // MarshalJSON returns the JSON encoding of cmd.  Part of the Cmd interface.
 func (cmd *DecodeScriptCmd) MarshalJSON() ([]byte, error) {
+	params := []interface{}{
+		cmd.HexScript,
+	}
+
 	// Fill and marshal a RawCmd.
-	return json.Marshal(RawCmd{
-		Jsonrpc: "1.0",
-		Method:  "decodescript",
-		Id:      cmd.id,
-		Params: []interface{}{
-			cmd.HexScript,
-		},
-	})
+	raw, err := NewRawCmd(cmd.id, cmd.Method(), params)
+	if err != nil {
+		return nil, err
+	}
+	return json.Marshal(raw)
 }
 
 // UnmarshalJSON unmarshals the JSON encoding of cmd into cmd.  Part of
@@ -1101,9 +1077,10 @@ func (cmd *DecodeScriptCmd) UnmarshalJSON(b []byte) error {
 	if len(r.Params) != 1 {
 		return ErrWrongNumberOfParams
 	}
-	hexscript, ok := r.Params[0].(string)
-	if !ok {
-		return errors.New("first parameter hexscript must be an array of objects")
+
+	var hexscript string
+	if err := json.Unmarshal(r.Params[0], &hexscript); err != nil {
+		return fmt.Errorf("first parameter 'hexscript' must be a string: %v", err)
 	}
 
 	newCmd, err := NewDecodeScriptCmd(r.Id, hexscript)
@@ -1150,15 +1127,16 @@ func (cmd *DumpPrivKeyCmd) Method() string {
 
 // MarshalJSON returns the JSON encoding of cmd.  Part of the Cmd interface.
 func (cmd *DumpPrivKeyCmd) MarshalJSON() ([]byte, error) {
+	params := []interface{}{
+		cmd.Address,
+	}
+
 	// Fill and marshal a RawCmd.
-	return json.Marshal(RawCmd{
-		Jsonrpc: "1.0",
-		Method:  "dumpprivkey",
-		Id:      cmd.id,
-		Params: []interface{}{
-			cmd.Address,
-		},
-	})
+	raw, err := NewRawCmd(cmd.id, cmd.Method(), params)
+	if err != nil {
+		return nil, err
+	}
+	return json.Marshal(raw)
 }
 
 // UnmarshalJSON unmarshals the JSON encoding of cmd into cmd.  Part of
@@ -1173,9 +1151,10 @@ func (cmd *DumpPrivKeyCmd) UnmarshalJSON(b []byte) error {
 	if len(r.Params) != 1 {
 		return ErrWrongNumberOfParams
 	}
-	address, ok := r.Params[0].(string)
-	if !ok {
-		return errors.New("first parameter address must be an array of objects")
+
+	var address string
+	if err := json.Unmarshal(r.Params[0], &address); err != nil {
+		return fmt.Errorf("first parameter 'address' must be a string: %v", err)
 	}
 
 	newCmd, err := NewDumpPrivKeyCmd(r.Id, address)
@@ -1222,15 +1201,16 @@ func (cmd *DumpWalletCmd) Method() string {
 
 // MarshalJSON returns the JSON encoding of cmd.  Part of the Cmd interface.
 func (cmd *DumpWalletCmd) MarshalJSON() ([]byte, error) {
+	params := []interface{}{
+		cmd.Filename,
+	}
+
 	// Fill and marshal a RawCmd.
-	return json.Marshal(RawCmd{
-		Jsonrpc: "1.0",
-		Method:  "dumpwallet",
-		Id:      cmd.id,
-		Params: []interface{}{
-			cmd.Filename,
-		},
-	})
+	raw, err := NewRawCmd(cmd.id, cmd.Method(), params)
+	if err != nil {
+		return nil, err
+	}
+	return json.Marshal(raw)
 }
 
 // UnmarshalJSON unmarshals the JSON encoding of cmd into cmd.  Part of
@@ -1245,9 +1225,10 @@ func (cmd *DumpWalletCmd) UnmarshalJSON(b []byte) error {
 	if len(r.Params) != 1 {
 		return ErrWrongNumberOfParams
 	}
-	filename, ok := r.Params[0].(string)
-	if !ok {
-		return errors.New("first parameter filename must be an array of objects")
+
+	var filename string
+	if err := json.Unmarshal(r.Params[0], &filename); err != nil {
+		return fmt.Errorf("first parameter 'filename' must be a string: %v", err)
 	}
 
 	newCmd, err := NewDumpWalletCmd(r.Id, filename)
@@ -1294,15 +1275,16 @@ func (cmd *EncryptWalletCmd) Method() string {
 
 // MarshalJSON returns the JSON encoding of cmd.  Part of the Cmd interface.
 func (cmd *EncryptWalletCmd) MarshalJSON() ([]byte, error) {
+	params := []interface{}{
+		cmd.Passphrase,
+	}
+
 	// Fill and marshal a RawCmd.
-	return json.Marshal(RawCmd{
-		Jsonrpc: "1.0",
-		Method:  "encryptwallet",
-		Id:      cmd.id,
-		Params: []interface{}{
-			cmd.Passphrase,
-		},
-	})
+	raw, err := NewRawCmd(cmd.id, cmd.Method(), params)
+	if err != nil {
+		return nil, err
+	}
+	return json.Marshal(raw)
 }
 
 // UnmarshalJSON unmarshals the JSON encoding of cmd into cmd.  Part of
@@ -1317,9 +1299,10 @@ func (cmd *EncryptWalletCmd) UnmarshalJSON(b []byte) error {
 	if len(r.Params) != 1 {
 		return ErrWrongNumberOfParams
 	}
-	passphrase, ok := r.Params[0].(string)
-	if !ok {
-		return errors.New("first parameter passphrase must be a string")
+
+	var passphrase string
+	if err := json.Unmarshal(r.Params[0], &passphrase); err != nil {
+		return fmt.Errorf("first parameter 'passphrase' must be a string: %v", err)
 	}
 
 	newCmd, err := NewEncryptWalletCmd(r.Id, passphrase)
@@ -1366,15 +1349,16 @@ func (cmd *GetAccountCmd) Method() string {
 
 // MarshalJSON returns the JSON encoding of cmd.  Part of the Cmd interface.
 func (cmd *GetAccountCmd) MarshalJSON() ([]byte, error) {
+	params := []interface{}{
+		cmd.Address,
+	}
+
 	// Fill and marshal a RawCmd.
-	return json.Marshal(RawCmd{
-		Jsonrpc: "1.0",
-		Method:  "getaccount",
-		Id:      cmd.id,
-		Params: []interface{}{
-			cmd.Address,
-		},
-	})
+	raw, err := NewRawCmd(cmd.id, cmd.Method(), params)
+	if err != nil {
+		return nil, err
+	}
+	return json.Marshal(raw)
 }
 
 // UnmarshalJSON unmarshals the JSON encoding of cmd into cmd.  Part of
@@ -1389,9 +1373,10 @@ func (cmd *GetAccountCmd) UnmarshalJSON(b []byte) error {
 	if len(r.Params) != 1 {
 		return ErrWrongNumberOfParams
 	}
-	address, ok := r.Params[0].(string)
-	if !ok {
-		return errors.New("first parameter address must be a string")
+
+	var address string
+	if err := json.Unmarshal(r.Params[0], &address); err != nil {
+		return fmt.Errorf("first parameter 'address' must be a string: %v", err)
 	}
 
 	newCmd, err := NewGetAccountCmd(r.Id, address)
@@ -1438,15 +1423,16 @@ func (cmd *GetAccountAddressCmd) Method() string {
 
 // MarshalJSON returns the JSON encoding of cmd.  Part of the Cmd interface.
 func (cmd *GetAccountAddressCmd) MarshalJSON() ([]byte, error) {
+	params := []interface{}{
+		cmd.Account,
+	}
+
 	// Fill and marshal a RawCmd.
-	return json.Marshal(RawCmd{
-		Jsonrpc: "1.0",
-		Method:  "getaccountaddress",
-		Id:      cmd.id,
-		Params: []interface{}{
-			cmd.Account,
-		},
-	})
+	raw, err := NewRawCmd(cmd.id, cmd.Method(), params)
+	if err != nil {
+		return nil, err
+	}
+	return json.Marshal(raw)
 }
 
 // UnmarshalJSON unmarshals the JSON encoding of cmd into cmd.  Part of
@@ -1461,9 +1447,9 @@ func (cmd *GetAccountAddressCmd) UnmarshalJSON(b []byte) error {
 	if len(r.Params) != 1 {
 		return ErrWrongNumberOfParams
 	}
-	account, ok := r.Params[0].(string)
-	if !ok {
-		return errors.New("first parameter account must be a string")
+	var account string
+	if err := json.Unmarshal(r.Params[0], &account); err != nil {
+		return fmt.Errorf("first parameter 'account' must be a string: %v", err)
 	}
 
 	newCmd, err := NewGetAccountAddressCmd(r.Id, account)
@@ -1522,21 +1508,19 @@ func (cmd *GetAddedNodeInfoCmd) Method() string {
 
 // MarshalJSON returns the JSON encoding of cmd.  Part of the Cmd interface.
 func (cmd *GetAddedNodeInfoCmd) MarshalJSON() ([]byte, error) {
-	// Fill and marshal a RawCmd.
-
-	raw := RawCmd{
-		Jsonrpc: "1.0",
-		Method:  "getaddednodeinfo",
-		Id:      cmd.id,
-		Params: []interface{}{
-			cmd.Dns,
-		},
+	params := []interface{}{
+		cmd.Dns,
 	}
 
 	if cmd.Node != "" {
-		raw.Params = append(raw.Params, cmd.Node)
+		params = append(params, cmd.Node)
 	}
 
+	// Fill and marshal a RawCmd.
+	raw, err := NewRawCmd(cmd.id, cmd.Method(), params)
+	if err != nil {
+		return nil, err
+	}
 	return json.Marshal(raw)
 }
 
@@ -1552,18 +1536,17 @@ func (cmd *GetAddedNodeInfoCmd) UnmarshalJSON(b []byte) error {
 	if len(r.Params) < 1 || len(r.Params) > 2 {
 		return ErrWrongNumberOfParams
 	}
-	dns, ok := r.Params[0].(bool)
-	if !ok {
-		return errors.New("first parameter dns must be a bool")
+
+	var dns bool
+	if err := json.Unmarshal(r.Params[0], &dns); err != nil {
+		return fmt.Errorf("first parameter 'dns' must be a bool: %v", err)
 	}
 
 	var node string
-	if len(r.Params) == 2 {
-		node, ok = r.Params[1].(string)
-		if !ok {
-			return errors.New("second parameter node must be a string")
+	if len(r.Params) > 1 {
+		if err := json.Unmarshal(r.Params[1], &node); err != nil {
+			return fmt.Errorf("second optional parameter 'node' must be a string: %v", err)
 		}
-
 	}
 
 	newCmd, err := NewGetAddedNodeInfoCmd(r.Id, dns, node)
@@ -1610,15 +1593,16 @@ func (cmd *GetAddressesByAccountCmd) Method() string {
 
 // MarshalJSON returns the JSON encoding of cmd.  Part of the Cmd interface.
 func (cmd *GetAddressesByAccountCmd) MarshalJSON() ([]byte, error) {
+	params := []interface{}{
+		cmd.Account,
+	}
+
 	// Fill and marshal a RawCmd.
-	return json.Marshal(RawCmd{
-		Jsonrpc: "1.0",
-		Method:  "getaddressesbyaccount",
-		Id:      cmd.id,
-		Params: []interface{}{
-			cmd.Account,
-		},
-	})
+	raw, err := NewRawCmd(cmd.id, cmd.Method(), params)
+	if err != nil {
+		return nil, err
+	}
+	return json.Marshal(raw)
 }
 
 // UnmarshalJSON unmarshals the JSON encoding of cmd into cmd.  Part of
@@ -1633,9 +1617,10 @@ func (cmd *GetAddressesByAccountCmd) UnmarshalJSON(b []byte) error {
 	if len(r.Params) != 1 {
 		return ErrWrongNumberOfParams
 	}
-	account, ok := r.Params[0].(string)
-	if !ok {
-		return errors.New("first parameter account must be a string")
+
+	var account string
+	if err := json.Unmarshal(r.Params[0], &account); err != nil {
+		return fmt.Errorf("first parameter 'account' must be a string: %v", err)
 	}
 
 	newCmd, err := NewGetAddressesByAccountCmd(r.Id, account)
@@ -1707,21 +1692,19 @@ func (cmd *GetBalanceCmd) Method() string {
 
 // MarshalJSON returns the JSON encoding of cmd.  Part of the Cmd interface.
 func (cmd *GetBalanceCmd) MarshalJSON() ([]byte, error) {
-	raw := RawCmd{
-		Jsonrpc: "1.0",
-		Method:  "getbalance",
-		Id:      cmd.id,
-		Params:  []interface{}{},
-	}
-
+	params := make([]interface{}, 0, 2)
 	if cmd.Account != "" || cmd.MinConf != 1 {
-		raw.Params = append(raw.Params, cmd.Account)
+		params = append(params, cmd.Account)
 	}
 	if cmd.MinConf != 1 {
-		raw.Params = append(raw.Params, cmd.MinConf)
+		params = append(params, cmd.MinConf)
 	}
 
 	// Fill and marshal a RawCmd.
+	raw, err := NewRawCmd(cmd.id, cmd.Method(), params)
+	if err != nil {
+		return nil, err
+	}
 	return json.Marshal(raw)
 }
 
@@ -1737,21 +1720,22 @@ func (cmd *GetBalanceCmd) UnmarshalJSON(b []byte) error {
 	if len(r.Params) > 2 {
 		return ErrWrongNumberOfParams
 	}
+
 	optArgs := make([]interface{}, 0, 2)
 	if len(r.Params) > 0 {
-		account, ok := r.Params[0].(string)
-		if !ok {
-			return errors.New("first parameter account must be a string")
+		var account string
+		if err := json.Unmarshal(r.Params[0], &account); err != nil {
+			return fmt.Errorf("first optional parameter 'account' must be a string: %v", err)
 		}
 		optArgs = append(optArgs, account)
 	}
 
 	if len(r.Params) > 1 {
-		minconf, ok := r.Params[1].(float64)
-		if !ok {
-			return errors.New("second optional parameter minconf must be a number")
+		var minconf int
+		if err := json.Unmarshal(r.Params[1], &minconf); err != nil {
+			return fmt.Errorf("second optional parameter 'minconf' must be an integer: %v", err)
 		}
-		optArgs = append(optArgs, int(minconf))
+		optArgs = append(optArgs, minconf)
 	}
 
 	newCmd, err := NewGetBalanceCmd(r.Id, optArgs...)
@@ -1796,14 +1780,12 @@ func (cmd *GetBestBlockHashCmd) Method() string {
 
 // MarshalJSON returns the JSON encoding of cmd.  Part of the Cmd interface.
 func (cmd *GetBestBlockHashCmd) MarshalJSON() ([]byte, error) {
-
 	// Fill and marshal a RawCmd.
-	return json.Marshal(RawCmd{
-		Jsonrpc: "1.0",
-		Method:  "getbestblockhash",
-		Id:      cmd.id,
-		Params:  []interface{}{},
-	})
+	raw, err := NewRawCmd(cmd.id, cmd.Method(), []interface{}{})
+	if err != nil {
+		return nil, err
+	}
+	return json.Marshal(raw)
 }
 
 // UnmarshalJSON unmarshals the JSON encoding of cmd into cmd.  Part of
@@ -1885,29 +1867,23 @@ func (cmd *GetBlockCmd) Method() string {
 
 // MarshalJSON returns the JSON encoding of cmd.  Part of the Cmd interface.
 func (cmd *GetBlockCmd) MarshalJSON() ([]byte, error) {
-
-	// Fill and marshal a RawCmd.
-	raw := RawCmd{
-		Jsonrpc: "1.0",
-		Method:  "getblock",
-		Id:      cmd.id,
-		Params: []interface{}{
-			cmd.Hash,
-		},
-	}
-
+	params := make([]interface{}, 1, 3)
+	params[0] = cmd.Hash
 	if !cmd.Verbose {
 		// set optional verbose argument to false
-		raw.Params = append(raw.Params, false)
-	} else {
-		if cmd.VerboseTx {
-			// set optional verbose argument to true
-			raw.Params = append(raw.Params, true)
-			// set optional verboseTx argument to true
-			raw.Params = append(raw.Params, true)
-		}
+		params = append(params, false)
+	} else if cmd.VerboseTx {
+		// set optional verbose argument to true
+		params = append(params, true)
+		// set optional verboseTx argument to true
+		params = append(params, true)
 	}
 
+	// Fill and marshal a RawCmd.
+	raw, err := NewRawCmd(cmd.id, cmd.Method(), params)
+	if err != nil {
+		return nil, err
+	}
 	return json.Marshal(raw)
 }
 
@@ -1924,26 +1900,24 @@ func (cmd *GetBlockCmd) UnmarshalJSON(b []byte) error {
 		return ErrWrongNumberOfParams
 	}
 
-	hash, ok := r.Params[0].(string)
-	if !ok {
-		return errors.New("first parameter hash must be a string")
+	var hash string
+	if err := json.Unmarshal(r.Params[0], &hash); err != nil {
+		return fmt.Errorf("first parameter 'hash' must be a string: %v", err)
 	}
 
-	optArgs := make([]bool, 0, 1)
+	optArgs := make([]bool, 0, 2)
 	if len(r.Params) > 1 {
-		verbose, ok := r.Params[1].(bool)
-		if !ok {
-			return errors.New("second optional parameter verbose must be a bool")
+		var verbose bool
+		if err := json.Unmarshal(r.Params[1], &verbose); err != nil {
+			return fmt.Errorf("second optional parameter 'verbose' must be a bool: %v", err)
 		}
-
 		optArgs = append(optArgs, verbose)
 	}
-	if len(r.Params) == 3 {
-		verboseTx, ok := r.Params[2].(bool)
-		if !ok {
-			return errors.New("third optional parameter verboseTx must be a bool")
+	if len(r.Params) > 2 {
+		var verboseTx bool
+		if err := json.Unmarshal(r.Params[2], &verboseTx); err != nil {
+			return fmt.Errorf("third optional parameter 'verboseTx' must be a bool: %v", err)
 		}
-
 		optArgs = append(optArgs, verboseTx)
 	}
 
@@ -1989,14 +1963,12 @@ func (cmd *GetBlockCountCmd) Method() string {
 
 // MarshalJSON returns the JSON encoding of cmd.  Part of the Cmd interface.
 func (cmd *GetBlockCountCmd) MarshalJSON() ([]byte, error) {
-
 	// Fill and marshal a RawCmd.
-	return json.Marshal(RawCmd{
-		Jsonrpc: "1.0",
-		Method:  "getblockcount",
-		Id:      cmd.id,
-		Params:  []interface{}{},
-	})
+	raw, err := NewRawCmd(cmd.id, cmd.Method(), []interface{}{})
+	if err != nil {
+		return nil, err
+	}
+	return json.Marshal(raw)
 }
 
 // UnmarshalJSON unmarshals the JSON encoding of cmd into cmd.  Part of
@@ -2056,16 +2028,16 @@ func (cmd *GetBlockHashCmd) Method() string {
 
 // MarshalJSON returns the JSON encoding of cmd.  Part of the Cmd interface.
 func (cmd *GetBlockHashCmd) MarshalJSON() ([]byte, error) {
+	params := []interface{}{
+		cmd.Index,
+	}
 
 	// Fill and marshal a RawCmd.
-	return json.Marshal(RawCmd{
-		Jsonrpc: "1.0",
-		Method:  "getblockhash",
-		Id:      cmd.id,
-		Params: []interface{}{
-			cmd.Index,
-		},
-	})
+	raw, err := NewRawCmd(cmd.id, cmd.Method(), params)
+	if err != nil {
+		return nil, err
+	}
+	return json.Marshal(raw)
 }
 
 // UnmarshalJSON unmarshals the JSON encoding of cmd into cmd.  Part of
@@ -2080,12 +2052,13 @@ func (cmd *GetBlockHashCmd) UnmarshalJSON(b []byte) error {
 	if len(r.Params) != 1 {
 		return ErrWrongNumberOfParams
 	}
-	hash, ok := r.Params[0].(float64)
-	if !ok {
-		return errors.New("first parameter hash must be a number")
+
+	var index int64
+	if err := json.Unmarshal(r.Params[0], &index); err != nil {
+		return fmt.Errorf("first parameter 'index' must be an integer: %v", err)
 	}
 
-	newCmd, err := NewGetBlockHashCmd(r.Id, int64(hash))
+	newCmd, err := NewGetBlockHashCmd(r.Id, index)
 	if err != nil {
 		return err
 	}
@@ -2099,7 +2072,7 @@ func (cmd *GetBlockHashCmd) UnmarshalJSON(b []byte) error {
 // pointer argument to GetBlockTemplateCmd.
 type TemplateRequest struct {
 	Mode         string   `json:"mode,omitempty"`
-	Capabilities []string `json:"capabilities"`
+	Capabilities []string `json:"capabilities,omitempty"`
 }
 
 // GetBlockTemplateCmd is a type handling custom marshaling and
@@ -2145,17 +2118,16 @@ func (cmd *GetBlockTemplateCmd) Method() string {
 
 // MarshalJSON returns the JSON encoding of cmd.  Part of the Cmd interface.
 func (cmd *GetBlockTemplateCmd) MarshalJSON() ([]byte, error) {
-	raw := RawCmd{
-		Jsonrpc: "1.0",
-		Method:  "getblocktemplate",
-		Id:      cmd.id,
-		Params:  []interface{}{},
-	}
-
+	params := make([]interface{}, 0, 1)
 	if cmd.Request != nil {
-		raw.Params = append(raw.Params, cmd.Request)
+		params = append(params, cmd.Request)
 	}
 
+	// Fill and marshal a RawCmd.
+	raw, err := NewRawCmd(cmd.id, cmd.Method(), params)
+	if err != nil {
+		return nil, err
+	}
 	return json.Marshal(raw)
 }
 
@@ -2171,43 +2143,14 @@ func (cmd *GetBlockTemplateCmd) UnmarshalJSON(b []byte) error {
 	if len(r.Params) > 1 {
 		return ErrWrongNumberOfParams
 	}
+
 	optArgs := make([]*TemplateRequest, 0, 1)
 	if len(r.Params) > 0 {
-		rmap, ok := r.Params[0].(map[string]interface{})
-		if !ok {
-			return errors.New("first optional parameter template request must be an object")
+		var template TemplateRequest
+		if err := json.Unmarshal(r.Params[0], &template); err != nil {
+			return fmt.Errorf("first optional parameter 'template' must be a template request JSON object: %v", err)
 		}
-
-		trequest := new(TemplateRequest)
-		// optional mode string.
-		mode, ok := rmap["mode"]
-		if ok {
-			smode, ok := mode.(string)
-			if !ok {
-				return errors.New("TemplateRequest mode must be a string")
-			}
-			trequest.Mode = smode
-		}
-
-		capabilities, ok := rmap["capabilities"]
-		if ok {
-			icap, ok := capabilities.([]interface{})
-			if !ok {
-				return errors.New("TemplateRequest mode must be an array")
-			}
-
-			cap := make([]string, len(icap))
-			for i, val := range icap {
-				cap[i], ok = val.(string)
-				if !ok {
-					return errors.New("TemplateRequest mode must be an aray of strings")
-				}
-			}
-
-			trequest.Capabilities = cap
-		}
-
-		optArgs = append(optArgs, trequest)
+		optArgs = append(optArgs, &template)
 	}
 
 	newCmd, err := NewGetBlockTemplateCmd(r.Id, optArgs...)
@@ -2252,14 +2195,12 @@ func (cmd *GetConnectionCountCmd) Method() string {
 
 // MarshalJSON returns the JSON encoding of cmd.  Part of the Cmd interface.
 func (cmd *GetConnectionCountCmd) MarshalJSON() ([]byte, error) {
-
 	// Fill and marshal a RawCmd.
-	return json.Marshal(RawCmd{
-		Jsonrpc: "1.0",
-		Method:  "getconnectioncount",
-		Id:      cmd.id,
-		Params:  []interface{}{},
-	})
+	raw, err := NewRawCmd(cmd.id, cmd.Method(), []interface{}{})
+	if err != nil {
+		return nil, err
+	}
+	return json.Marshal(raw)
 }
 
 // UnmarshalJSON unmarshals the JSON encoding of cmd into cmd.  Part of
@@ -2317,14 +2258,12 @@ func (cmd *GetDifficultyCmd) Method() string {
 
 // MarshalJSON returns the JSON encoding of cmd.  Part of the Cmd interface.
 func (cmd *GetDifficultyCmd) MarshalJSON() ([]byte, error) {
-
 	// Fill and marshal a RawCmd.
-	return json.Marshal(RawCmd{
-		Jsonrpc: "1.0",
-		Method:  "getdifficulty",
-		Id:      cmd.id,
-		Params:  []interface{}{},
-	})
+	raw, err := NewRawCmd(cmd.id, cmd.Method(), []interface{}{})
+	if err != nil {
+		return nil, err
+	}
+	return json.Marshal(raw)
 }
 
 // UnmarshalJSON unmarshals the JSON encoding of cmd into cmd.  Part of
@@ -2382,14 +2321,12 @@ func (cmd *GetGenerateCmd) Method() string {
 
 // MarshalJSON returns the JSON encoding of cmd.  Part of the Cmd interface.
 func (cmd *GetGenerateCmd) MarshalJSON() ([]byte, error) {
-
 	// Fill and marshal a RawCmd.
-	return json.Marshal(RawCmd{
-		Jsonrpc: "1.0",
-		Method:  "getgenerate",
-		Id:      cmd.id,
-		Params:  []interface{}{},
-	})
+	raw, err := NewRawCmd(cmd.id, cmd.Method(), []interface{}{})
+	if err != nil {
+		return nil, err
+	}
+	return json.Marshal(raw)
 }
 
 // UnmarshalJSON unmarshals the JSON encoding of cmd into cmd.  Part of
@@ -2447,14 +2384,12 @@ func (cmd *GetHashesPerSecCmd) Method() string {
 
 // MarshalJSON returns the JSON encoding of cmd.  Part of the Cmd interface.
 func (cmd *GetHashesPerSecCmd) MarshalJSON() ([]byte, error) {
-
 	// Fill and marshal a RawCmd.
-	return json.Marshal(RawCmd{
-		Jsonrpc: "1.0",
-		Method:  "gethashespersec",
-		Id:      cmd.id,
-		Params:  []interface{}{},
-	})
+	raw, err := NewRawCmd(cmd.id, cmd.Method(), []interface{}{})
+	if err != nil {
+		return nil, err
+	}
+	return json.Marshal(raw)
 }
 
 // UnmarshalJSON unmarshals the JSON encoding of cmd into cmd.  Part of
@@ -2512,14 +2447,12 @@ func (cmd *GetInfoCmd) Method() string {
 
 // MarshalJSON returns the JSON encoding of cmd.  Part of the Cmd interface.
 func (cmd *GetInfoCmd) MarshalJSON() ([]byte, error) {
-
 	// Fill and marshal a RawCmd.
-	return json.Marshal(RawCmd{
-		Jsonrpc: "1.0",
-		Method:  "getinfo",
-		Id:      cmd.id,
-		Params:  []interface{}{},
-	})
+	raw, err := NewRawCmd(cmd.id, cmd.Method(), []interface{}{})
+	if err != nil {
+		return nil, err
+	}
+	return json.Marshal(raw)
 }
 
 // UnmarshalJSON unmarshals the JSON encoding of cmd into cmd.  Part of
@@ -2577,14 +2510,12 @@ func (cmd *GetMiningInfoCmd) Method() string {
 
 // MarshalJSON returns the JSON encoding of cmd.  Part of the Cmd interface.
 func (cmd *GetMiningInfoCmd) MarshalJSON() ([]byte, error) {
-
 	// Fill and marshal a RawCmd.
-	return json.Marshal(RawCmd{
-		Jsonrpc: "1.0",
-		Method:  "getmininginfo",
-		Id:      cmd.id,
-		Params:  []interface{}{},
-	})
+	raw, err := NewRawCmd(cmd.id, cmd.Method(), []interface{}{})
+	if err != nil {
+		return nil, err
+	}
+	return json.Marshal(raw)
 }
 
 // UnmarshalJSON unmarshals the JSON encoding of cmd into cmd.  Part of
@@ -2642,14 +2573,12 @@ func (cmd *GetNetTotalsCmd) Method() string {
 
 // MarshalJSON returns the JSON encoding of cmd.  Part of the Cmd interface.
 func (cmd *GetNetTotalsCmd) MarshalJSON() ([]byte, error) {
-
 	// Fill and marshal a RawCmd.
-	return json.Marshal(RawCmd{
-		Jsonrpc: "1.0",
-		Method:  "getnettotals",
-		Id:      cmd.id,
-		Params:  []interface{}{},
-	})
+	raw, err := NewRawCmd(cmd.id, cmd.Method(), []interface{}{})
+	if err != nil {
+		return nil, err
+	}
+	return json.Marshal(raw)
 }
 
 // UnmarshalJSON unmarshals the JSON encoding of cmd into cmd.  Part of
@@ -2725,23 +2654,19 @@ func (cmd *GetNetworkHashPSCmd) Method() string {
 
 // MarshalJSON returns the JSON encoding of cmd.  Part of the Cmd interface.
 func (cmd *GetNetworkHashPSCmd) MarshalJSON() ([]byte, error) {
+	params := make([]interface{}, 0, 2)
+	if cmd.Blocks != 120 || cmd.Height != -1 {
+		params = append(params, cmd.Blocks)
+	}
+	if cmd.Height != -1 {
+		params = append(params, cmd.Height)
+	}
 
 	// Fill and marshal a RawCmd.
-	raw := RawCmd{
-		Jsonrpc: "1.0",
-		Method:  "getnetworkhashps",
-		Id:      cmd.id,
-		Params:  []interface{}{},
+	raw, err := NewRawCmd(cmd.id, cmd.Method(), params)
+	if err != nil {
+		return nil, err
 	}
-
-	if cmd.Blocks != 120 || cmd.Height != -1 {
-		raw.Params = append(raw.Params, cmd.Blocks)
-	}
-
-	if cmd.Height != -1 {
-		raw.Params = append(raw.Params, cmd.Height)
-	}
-
 	return json.Marshal(raw)
 }
 
@@ -2760,21 +2685,19 @@ func (cmd *GetNetworkHashPSCmd) UnmarshalJSON(b []byte) error {
 
 	optArgs := make([]int, 0, 2)
 	if len(r.Params) > 0 {
-		blocks, ok := r.Params[0].(float64)
-		if !ok {
-			return errors.New("first optional parameter blocks must be a number")
+		var blocks int
+		if err := json.Unmarshal(r.Params[0], &blocks); err != nil {
+			return fmt.Errorf("first optional parameter 'blocks' must be an integer: %v", err)
 		}
-
-		optArgs = append(optArgs, int(blocks))
+		optArgs = append(optArgs, blocks)
 	}
 
 	if len(r.Params) > 1 {
-		height, ok := r.Params[1].(float64)
-		if !ok {
-			return errors.New("second optional parameter height must be a number")
+		var height int
+		if err := json.Unmarshal(r.Params[1], &height); err != nil {
+			return fmt.Errorf("second optional parameter 'height' must be an integer: %v", err)
 		}
-
-		optArgs = append(optArgs, int(height))
+		optArgs = append(optArgs, height)
 	}
 	newCmd, err := NewGetNetworkHashPSCmd(r.Id, optArgs...)
 	if err != nil {
@@ -2828,16 +2751,15 @@ func (cmd *GetNewAddressCmd) Method() string {
 
 // MarshalJSON returns the JSON encoding of cmd.  Part of the Cmd interface.
 func (cmd *GetNewAddressCmd) MarshalJSON() ([]byte, error) {
-
-	raw := RawCmd{
-		Jsonrpc: "1.0",
-		Method:  "getnewaddress",
-		Id:      cmd.id,
-		Params:  []interface{}{},
+	params := make([]interface{}, 0, 1)
+	if cmd.Account != "" {
+		params = append(params, cmd.Account)
 	}
 
-	if cmd.Account != "" {
-		raw.Params = append(raw.Params, cmd.Account)
+	// Fill and marshal a RawCmd.
+	raw, err := NewRawCmd(cmd.id, cmd.Method(), params)
+	if err != nil {
+		return nil, err
 	}
 	return json.Marshal(raw)
 }
@@ -2857,12 +2779,11 @@ func (cmd *GetNewAddressCmd) UnmarshalJSON(b []byte) error {
 
 	optArgs := make([]string, 0, 1)
 	if len(r.Params) > 0 {
-		addr, ok := r.Params[0].(string)
-		if !ok {
-			return errors.New("first optional parameter address must be a string")
+		var account string
+		if err := json.Unmarshal(r.Params[0], &account); err != nil {
+			return fmt.Errorf("first optional parameter 'account' must be a string: %v", err)
 		}
-
-		optArgs = append(optArgs, addr)
+		optArgs = append(optArgs, account)
 	}
 
 	newCmd, err := NewGetNewAddressCmd(r.Id, optArgs...)
@@ -2907,14 +2828,12 @@ func (cmd *GetPeerInfoCmd) Method() string {
 
 // MarshalJSON returns the JSON encoding of cmd.  Part of the Cmd interface.
 func (cmd *GetPeerInfoCmd) MarshalJSON() ([]byte, error) {
-
 	// Fill and marshal a RawCmd.
-	return json.Marshal(RawCmd{
-		Jsonrpc: "1.0",
-		Method:  "getpeerinfo",
-		Id:      cmd.id,
-		Params:  []interface{}{},
-	})
+	raw, err := NewRawCmd(cmd.id, cmd.Method(), []interface{}{})
+	if err != nil {
+		return nil, err
+	}
+	return json.Marshal(raw)
 }
 
 // UnmarshalJSON unmarshals the JSON encoding of cmd into cmd.  Part of
@@ -2982,16 +2901,15 @@ func (cmd *GetRawChangeAddressCmd) Method() string {
 
 // MarshalJSON returns the JSON encoding of cmd.  Part of the Cmd interface.
 func (cmd *GetRawChangeAddressCmd) MarshalJSON() ([]byte, error) {
-
-	raw := RawCmd{
-		Jsonrpc: "1.0",
-		Method:  "getrawchangeaddress",
-		Id:      cmd.id,
-		Params:  []interface{}{},
+	params := make([]interface{}, 0, 1)
+	if cmd.Account != "" {
+		params = append(params, cmd.Account)
 	}
 
-	if cmd.Account != "" {
-		raw.Params = append(raw.Params, cmd.Account)
+	// Fill and marshal a RawCmd.
+	raw, err := NewRawCmd(cmd.id, cmd.Method(), params)
+	if err != nil {
+		return nil, err
 	}
 	return json.Marshal(raw)
 }
@@ -3011,11 +2929,10 @@ func (cmd *GetRawChangeAddressCmd) UnmarshalJSON(b []byte) error {
 
 	optArgs := make([]string, 0, 1)
 	if len(r.Params) > 0 {
-		account, ok := r.Params[0].(string)
-		if !ok {
-			return errors.New("first optional parameter account must be a string")
+		var account string
+		if err := json.Unmarshal(r.Params[0], &account); err != nil {
+			return fmt.Errorf("first optional parameter 'account' must be a string: %v", err)
 		}
-
 		optArgs = append(optArgs, account)
 	}
 
@@ -3070,17 +2987,16 @@ func (cmd *GetRawMempoolCmd) Method() string {
 
 // MarshalJSON returns the JSON encoding of cmd.  Part of the Cmd interface.
 func (cmd *GetRawMempoolCmd) MarshalJSON() ([]byte, error) {
-	raw := RawCmd{
-		Jsonrpc: "1.0",
-		Method:  "getrawmempool",
-		Id:      cmd.id,
-		Params:  []interface{}{},
-	}
-
+	params := make([]interface{}, 0, 1)
 	if cmd.Verbose {
-		raw.Params = append(raw.Params, cmd.Verbose)
+		params = append(params, cmd.Verbose)
 	}
 
+	// Fill and marshal a RawCmd.
+	raw, err := NewRawCmd(cmd.id, cmd.Method(), params)
+	if err != nil {
+		return nil, err
+	}
 	return json.Marshal(raw)
 }
 
@@ -3098,12 +3014,11 @@ func (cmd *GetRawMempoolCmd) UnmarshalJSON(b []byte) error {
 	}
 
 	optArgs := make([]bool, 0, 1)
-	if len(r.Params) == 1 {
-		verbose, ok := r.Params[0].(bool)
-		if !ok {
-			return errors.New("first optional parameter verbose must be a bool")
+	if len(r.Params) > 0 {
+		var verbose bool
+		if err := json.Unmarshal(r.Params[0], &verbose); err != nil {
+			return fmt.Errorf("first optional parameter 'verbose' must be a bool: %v", err)
 		}
-
 		optArgs = append(optArgs, verbose)
 	}
 
@@ -3161,18 +3076,16 @@ func (cmd *GetRawTransactionCmd) Method() string {
 
 // MarshalJSON returns the JSON encoding of cmd.  Part of the Cmd interface.
 func (cmd *GetRawTransactionCmd) MarshalJSON() ([]byte, error) {
-
-	raw := RawCmd{
-		Jsonrpc: "1.0",
-		Method:  "getrawtransaction",
-		Id:      cmd.id,
-		Params: []interface{}{
-			cmd.Txid,
-		},
+	params := make([]interface{}, 1, 2)
+	params[0] = cmd.Txid
+	if cmd.Verbose != 0 {
+		params = append(params, cmd.Verbose)
 	}
 
-	if cmd.Verbose != 0 {
-		raw.Params = append(raw.Params, cmd.Verbose)
+	// Fill and marshal a RawCmd.
+	raw, err := NewRawCmd(cmd.id, cmd.Method(), params)
+	if err != nil {
+		return nil, err
 	}
 	return json.Marshal(raw)
 }
@@ -3190,19 +3103,18 @@ func (cmd *GetRawTransactionCmd) UnmarshalJSON(b []byte) error {
 		return ErrWrongNumberOfParams
 	}
 
-	txid, ok := r.Params[0].(string)
-	if !ok {
-		return errors.New("first parameter txid must be a string")
+	var txid string
+	if err := json.Unmarshal(r.Params[0], &txid); err != nil {
+		return fmt.Errorf("first parameter 'txid' must be a string: %v", err)
 	}
 
 	optArgs := make([]int, 0, 1)
-	if len(r.Params) == 2 {
-		verbose, ok := r.Params[1].(float64)
-		if !ok {
-			return errors.New("second optional parameter verbose must be a number")
+	if len(r.Params) > 1 {
+		var verbose int
+		if err := json.Unmarshal(r.Params[1], &verbose); err != nil {
+			return fmt.Errorf("second optional parameter 'verbose' must be an integer: %v", err)
 		}
-
-		optArgs = append(optArgs, int(verbose))
+		optArgs = append(optArgs, verbose)
 	}
 
 	newCmd, err := NewGetRawTransactionCmd(r.Id, txid, optArgs...)
@@ -3258,18 +3170,16 @@ func (cmd *GetReceivedByAccountCmd) Method() string {
 
 // MarshalJSON returns the JSON encoding of cmd.  Part of the Cmd interface.
 func (cmd *GetReceivedByAccountCmd) MarshalJSON() ([]byte, error) {
-
-	raw := RawCmd{
-		Jsonrpc: "1.0",
-		Method:  "getreceivedbyaccount",
-		Id:      cmd.id,
-		Params: []interface{}{
-			cmd.Account,
-		},
+	params := make([]interface{}, 1, 2)
+	params[0] = cmd.Account
+	if cmd.MinConf != 1 {
+		params = append(params, cmd.MinConf)
 	}
 
-	if cmd.MinConf != 1 {
-		raw.Params = append(raw.Params, cmd.MinConf)
+	// Fill and marshal a RawCmd.
+	raw, err := NewRawCmd(cmd.id, cmd.Method(), params)
+	if err != nil {
+		return nil, err
 	}
 	return json.Marshal(raw)
 }
@@ -3287,19 +3197,18 @@ func (cmd *GetReceivedByAccountCmd) UnmarshalJSON(b []byte) error {
 		return ErrWrongNumberOfParams
 	}
 
-	account, ok := r.Params[0].(string)
-	if !ok {
-		return errors.New("first parameter account must be a string")
+	var account string
+	if err := json.Unmarshal(r.Params[0], &account); err != nil {
+		return fmt.Errorf("first parameter 'account' must be a string: %v", err)
 	}
 
 	optArgs := make([]int, 0, 1)
 	if len(r.Params) > 1 {
-		minconf, ok := r.Params[1].(float64)
-		if !ok {
-			return errors.New("second optional parameter verbose must be a number")
+		var minconf int
+		if err := json.Unmarshal(r.Params[1], &minconf); err != nil {
+			return fmt.Errorf("second optional parameter 'minconf' must be an integer: %v", err)
 		}
-
-		optArgs = append(optArgs, int(minconf))
+		optArgs = append(optArgs, minconf)
 	}
 
 	newCmd, err := NewGetReceivedByAccountCmd(r.Id, account, optArgs...)
@@ -3355,18 +3264,16 @@ func (cmd *GetReceivedByAddressCmd) Method() string {
 
 // MarshalJSON returns the JSON encoding of cmd.  Part of the Cmd interface.
 func (cmd *GetReceivedByAddressCmd) MarshalJSON() ([]byte, error) {
-
-	raw := RawCmd{
-		Jsonrpc: "1.0",
-		Method:  "getreceivedbyaddress",
-		Id:      cmd.id,
-		Params: []interface{}{
-			cmd.Address,
-		},
+	params := make([]interface{}, 1, 2)
+	params[0] = cmd.Address
+	if cmd.MinConf != 1 {
+		params = append(params, cmd.MinConf)
 	}
 
-	if cmd.MinConf != 1 {
-		raw.Params = append(raw.Params, cmd.MinConf)
+	// Fill and marshal a RawCmd.
+	raw, err := NewRawCmd(cmd.id, cmd.Method(), params)
+	if err != nil {
+		return nil, err
 	}
 	return json.Marshal(raw)
 }
@@ -3384,19 +3291,18 @@ func (cmd *GetReceivedByAddressCmd) UnmarshalJSON(b []byte) error {
 		return ErrWrongNumberOfParams
 	}
 
-	address, ok := r.Params[0].(string)
-	if !ok {
-		return errors.New("first parameter address must be a string")
+	var address string
+	if err := json.Unmarshal(r.Params[0], &address); err != nil {
+		return fmt.Errorf("first parameter 'address' must be a string: %v", err)
 	}
 
 	optArgs := make([]int, 0, 1)
 	if len(r.Params) > 1 {
-		minconf, ok := r.Params[1].(float64)
-		if !ok {
-			return errors.New("second optional parameter verbose must be a number")
+		var minconf int
+		if err := json.Unmarshal(r.Params[1], &minconf); err != nil {
+			return fmt.Errorf("second optional parameter 'minconf' must be an integer: %v", err)
 		}
-
-		optArgs = append(optArgs, int(minconf))
+		optArgs = append(optArgs, minconf)
 	}
 
 	newCmd, err := NewGetReceivedByAddressCmd(r.Id, address, optArgs...)
@@ -3443,16 +3349,15 @@ func (cmd *GetTransactionCmd) Method() string {
 
 // MarshalJSON returns the JSON encoding of cmd.  Part of the Cmd interface.
 func (cmd *GetTransactionCmd) MarshalJSON() ([]byte, error) {
-
-	raw := RawCmd{
-		Jsonrpc: "1.0",
-		Method:  "gettransaction",
-		Id:      cmd.id,
-		Params: []interface{}{
-			cmd.Txid,
-		},
+	params := []interface{}{
+		cmd.Txid,
 	}
 
+	// Fill and marshal a RawCmd.
+	raw, err := NewRawCmd(cmd.id, cmd.Method(), params)
+	if err != nil {
+		return nil, err
+	}
 	return json.Marshal(raw)
 }
 
@@ -3469,9 +3374,9 @@ func (cmd *GetTransactionCmd) UnmarshalJSON(b []byte) error {
 		return ErrWrongNumberOfParams
 	}
 
-	txid, ok := r.Params[0].(string)
-	if !ok {
-		return errors.New("first parameter txid must be a string")
+	var txid string
+	if err := json.Unmarshal(r.Params[0], &txid); err != nil {
+		return fmt.Errorf("first parameter 'txid' must be a string: %v", err)
 	}
 
 	newCmd, err := NewGetTransactionCmd(r.Id, txid)
@@ -3529,21 +3434,18 @@ func (cmd *GetTxOutCmd) Method() string {
 
 // MarshalJSON returns the JSON encoding of cmd.  Part of the Cmd interface.
 func (cmd *GetTxOutCmd) MarshalJSON() ([]byte, error) {
-
-	raw := RawCmd{
-		Jsonrpc: "1.0",
-		Method:  "gettxout",
-		Id:      cmd.id,
-		Params: []interface{}{
-			cmd.Txid,
-			cmd.Output,
-		},
-	}
-
+	params := make([]interface{}, 2, 3)
+	params[0] = cmd.Txid
+	params[1] = cmd.Output
 	if cmd.IncludeMempool != false {
-		raw.Params = append(raw.Params, cmd.IncludeMempool)
+		params = append(params, cmd.IncludeMempool)
 	}
 
+	// Fill and marshal a RawCmd.
+	raw, err := NewRawCmd(cmd.id, cmd.Method(), params)
+	if err != nil {
+		return nil, err
+	}
 	return json.Marshal(raw)
 }
 
@@ -3560,22 +3462,22 @@ func (cmd *GetTxOutCmd) UnmarshalJSON(b []byte) error {
 		return ErrWrongNumberOfParams
 	}
 
-	txid, ok := r.Params[0].(string)
-	if !ok {
-		return errors.New("first parameter txid must be a string")
+	var txid string
+	if err := json.Unmarshal(r.Params[0], &txid); err != nil {
+		return fmt.Errorf("first parameter 'txid' must be a string: %v", err)
 	}
 
-	output, ok := r.Params[1].(float64)
-	if !ok {
-		return errors.New("second parameter output must be a number")
+	var output int
+	if err := json.Unmarshal(r.Params[1], &output); err != nil {
+		return fmt.Errorf("second parameter 'output' must be an integer: %v", err)
 	}
+
 	optArgs := make([]bool, 0, 1)
-	if len(r.Params) == 3 {
-		mempool, ok := r.Params[2].(bool)
-		if !ok {
-			return errors.New("third optional parameter includemempool must be a bool")
+	if len(r.Params) > 2 {
+		var mempool bool
+		if err := json.Unmarshal(r.Params[2], &mempool); err != nil {
+			return fmt.Errorf("third optional parameter 'includemempool' must be a bool: %v", err)
 		}
-
 		optArgs = append(optArgs, mempool)
 	}
 
@@ -3621,14 +3523,11 @@ func (cmd *GetTxOutSetInfoCmd) Method() string {
 
 // MarshalJSON returns the JSON encoding of cmd.  Part of the Cmd interface.
 func (cmd *GetTxOutSetInfoCmd) MarshalJSON() ([]byte, error) {
-
-	raw := RawCmd{
-		Jsonrpc: "1.0",
-		Method:  "gettxoutsetinfo",
-		Id:      cmd.id,
-		Params:  []interface{}{},
+	// Fill and marshal a RawCmd.
+	raw, err := NewRawCmd(cmd.id, cmd.Method(), []interface{}{})
+	if err != nil {
+		return nil, err
 	}
-
 	return json.Marshal(raw)
 }
 
@@ -3697,16 +3596,16 @@ func (cmd *GetWorkCmd) Method() string {
 
 // MarshalJSON returns the JSON encoding of cmd.  Part of the Cmd interface.
 func (cmd *GetWorkCmd) MarshalJSON() ([]byte, error) {
-	raw := RawCmd{
-		Jsonrpc: "1.0",
-		Method:  "getwork",
-		Id:      cmd.id,
-		Params:  []interface{}{},
-	}
+	params := make([]interface{}, 0, 1)
 	if cmd.Data != "" {
-		raw.Params = append(raw.Params, cmd.Data)
+		params = append(params, cmd.Data)
 	}
 
+	// Fill and marshal a RawCmd.
+	raw, err := NewRawCmd(cmd.id, cmd.Method(), params)
+	if err != nil {
+		return nil, err
+	}
 	return json.Marshal(raw)
 }
 
@@ -3721,14 +3620,14 @@ func (cmd *GetWorkCmd) UnmarshalJSON(b []byte) error {
 	if len(r.Params) > 1 {
 		return ErrWrongNumberOfParams
 	}
+
 	var data string
-	if len(r.Params) == 1 {
-		sdata, ok := r.Params[0].(string)
-		if !ok {
-			return errors.New("data must be a string")
+	if len(r.Params) > 0 {
+		if err := json.Unmarshal(r.Params[0], &data); err != nil {
+			return fmt.Errorf("first optional parameter 'data' must be a string: %v", err)
 		}
-		data = sdata
 	}
+
 	newCmd, err := NewGetWorkCmd(r.Id, data)
 	if err != nil {
 		return err
@@ -3782,15 +3681,15 @@ func (cmd *HelpCmd) Method() string {
 
 // MarshalJSON returns the JSON encoding of cmd.  Part of the Cmd interface.
 func (cmd *HelpCmd) MarshalJSON() ([]byte, error) {
-	raw := RawCmd{
-		Jsonrpc: "1.0",
-		Method:  "help",
-		Id:      cmd.id,
-		Params:  []interface{}{},
+	params := make([]interface{}, 0, 1)
+	if cmd.Command != "" {
+		params = append(params, cmd.Command)
 	}
 
-	if cmd.Command != "" {
-		raw.Params = append(raw.Params, cmd.Command)
+	// Fill and marshal a RawCmd.
+	raw, err := NewRawCmd(cmd.id, cmd.Method(), params)
+	if err != nil {
+		return nil, err
 	}
 	return json.Marshal(raw)
 }
@@ -3809,12 +3708,11 @@ func (cmd *HelpCmd) UnmarshalJSON(b []byte) error {
 	}
 
 	optArgs := make([]string, 0, 1)
-	if len(r.Params) == 1 {
-		command, ok := r.Params[0].(string)
-		if !ok {
-			return errors.New("first optional parameter command must be a string")
+	if len(r.Params) > 0 {
+		var command string
+		if err := json.Unmarshal(r.Params[0], &command); err != nil {
+			return fmt.Errorf("first optional parameter 'command' must be a string: %v", err)
 		}
-
 		optArgs = append(optArgs, command)
 	}
 
@@ -3886,21 +3784,19 @@ func (cmd *ImportPrivKeyCmd) Method() string {
 
 // MarshalJSON returns the JSON encoding of cmd.  Part of the Cmd interface.
 func (cmd *ImportPrivKeyCmd) MarshalJSON() ([]byte, error) {
-	raw := RawCmd{
-		Jsonrpc: "1.0",
-		Method:  "importprivkey",
-		Id:      cmd.id,
-		Params: []interface{}{
-			cmd.PrivKey,
-		},
-	}
-
+	params := make([]interface{}, 1, 3)
+	params[0] = cmd.PrivKey
 	if cmd.Label != "" || !cmd.Rescan {
-		raw.Params = append(raw.Params, cmd.Label)
+		params = append(params, cmd.Label)
+	}
+	if !cmd.Rescan {
+		params = append(params, cmd.Rescan)
 	}
 
-	if !cmd.Rescan {
-		raw.Params = append(raw.Params, cmd.Rescan)
+	// Fill and marshal a RawCmd.
+	raw, err := NewRawCmd(cmd.id, cmd.Method(), params)
+	if err != nil {
+		return nil, err
 	}
 	return json.Marshal(raw)
 }
@@ -3918,27 +3814,25 @@ func (cmd *ImportPrivKeyCmd) UnmarshalJSON(b []byte) error {
 		return ErrWrongNumberOfParams
 	}
 
-	privkey, ok := r.Params[0].(string)
-	if !ok {
-		return errors.New("first parameter privkey must be a string")
+	var privkey string
+	if err := json.Unmarshal(r.Params[0], &privkey); err != nil {
+		return fmt.Errorf("first parameter 'privkey' must be a string: %v", err)
 	}
 
 	optArgs := make([]interface{}, 0, 2)
 	if len(r.Params) > 1 {
-		label, ok := r.Params[1].(string)
-		if !ok {
-			return errors.New("second optional parameter label must be a string")
+		var label string
+		if err := json.Unmarshal(r.Params[1], &label); err != nil {
+			return fmt.Errorf("second optional parameter 'label' must be a string: %v", err)
 		}
-
 		optArgs = append(optArgs, label)
 	}
 
 	if len(r.Params) > 2 {
-		rescan, ok := r.Params[2].(bool)
-		if !ok {
-			return errors.New("third optional parameter rescan must be a bool")
+		var rescan bool
+		if err := json.Unmarshal(r.Params[2], &rescan); err != nil {
+			return fmt.Errorf("third optional parameter 'rescan' must be a bool: %v", err)
 		}
-
 		optArgs = append(optArgs, rescan)
 	}
 
@@ -3987,15 +3881,15 @@ func (cmd *ImportWalletCmd) Method() string {
 
 // MarshalJSON returns the JSON encoding of cmd.  Part of the Cmd interface.
 func (cmd *ImportWalletCmd) MarshalJSON() ([]byte, error) {
-	raw := RawCmd{
-		Jsonrpc: "1.0",
-		Method:  "importwallet",
-		Id:      cmd.id,
-		Params: []interface{}{
-			cmd.Filename,
-		},
+	params := []interface{}{
+		cmd.Filename,
 	}
 
+	// Fill and marshal a RawCmd.
+	raw, err := NewRawCmd(cmd.id, cmd.Method(), params)
+	if err != nil {
+		return nil, err
+	}
 	return json.Marshal(raw)
 }
 
@@ -4012,9 +3906,9 @@ func (cmd *ImportWalletCmd) UnmarshalJSON(b []byte) error {
 		return ErrWrongNumberOfParams
 	}
 
-	filename, ok := r.Params[0].(string)
-	if !ok {
-		return errors.New("first parameter filename must be a string")
+	var filename string
+	if err := json.Unmarshal(r.Params[0], &filename); err != nil {
+		return fmt.Errorf("first parameter 'filename' must be a string: %v", err)
 	}
 
 	newCmd, err := NewImportWalletCmd(r.Id, filename)
@@ -4071,17 +3965,16 @@ func (cmd *KeyPoolRefillCmd) Method() string {
 
 // MarshalJSON returns the JSON encoding of cmd.  Part of the Cmd interface.
 func (cmd *KeyPoolRefillCmd) MarshalJSON() ([]byte, error) {
-	raw := RawCmd{
-		Jsonrpc: "1.0",
-		Method:  "keypoolrefill",
-		Id:      cmd.id,
-		Params:  []interface{}{},
-	}
-
+	params := make([]interface{}, 0, 1)
 	if cmd.NewSize != 0 {
-		raw.Params = append(raw.Params, cmd.NewSize)
+		params = append(params, cmd.NewSize)
 	}
 
+	// Fill and marshal a RawCmd.
+	raw, err := NewRawCmd(cmd.id, cmd.Method(), params)
+	if err != nil {
+		return nil, err
+	}
 	return json.Marshal(raw)
 }
 
@@ -4100,11 +3993,11 @@ func (cmd *KeyPoolRefillCmd) UnmarshalJSON(b []byte) error {
 
 	optArgs := make([]uint, 0, 1)
 	if len(r.Params) > 0 {
-		newsize, ok := r.Params[0].(float64)
-		if !ok {
-			return errors.New("first optional parameter newsize must be a number")
+		var newsize uint
+		if err := json.Unmarshal(r.Params[0], &newsize); err != nil {
+			return fmt.Errorf("first optional parameter 'newsize' must be an unsigned integer: %v", err)
 		}
-		optArgs = append(optArgs, uint(newsize))
+		optArgs = append(optArgs, newsize)
 	}
 
 	newCmd, err := NewKeyPoolRefillCmd(r.Id, optArgs...)
@@ -4159,17 +4052,16 @@ func (cmd *ListAccountsCmd) Method() string {
 
 // MarshalJSON returns the JSON encoding of cmd.  Part of the Cmd interface.
 func (cmd *ListAccountsCmd) MarshalJSON() ([]byte, error) {
-	raw := RawCmd{
-		Jsonrpc: "1.0",
-		Method:  "listaccounts",
-		Id:      cmd.id,
-		Params:  []interface{}{},
-	}
-
+	params := make([]interface{}, 0, 1)
 	if cmd.MinConf != 1 {
-		raw.Params = append(raw.Params, cmd.MinConf)
+		params = append(params, cmd.MinConf)
 	}
 
+	// Fill and marshal a RawCmd.
+	raw, err := NewRawCmd(cmd.id, cmd.Method(), params)
+	if err != nil {
+		return nil, err
+	}
 	return json.Marshal(raw)
 }
 
@@ -4188,11 +4080,11 @@ func (cmd *ListAccountsCmd) UnmarshalJSON(b []byte) error {
 
 	optArgs := make([]int, 0, 1)
 	if len(r.Params) == 1 {
-		minconf, ok := r.Params[0].(float64)
-		if !ok {
-			return errors.New("first parameter minconf must be a number")
+		var minconf int
+		if err := json.Unmarshal(r.Params[0], &minconf); err != nil {
+			return fmt.Errorf("first optional parameter 'minconf' must be an integer: %v", err)
 		}
-		optArgs = append(optArgs, int(minconf))
+		optArgs = append(optArgs, minconf)
 	}
 
 	newCmd, err := NewListAccountsCmd(r.Id, optArgs...)
@@ -4238,13 +4130,11 @@ func (cmd *ListAddressGroupingsCmd) Method() string {
 
 // MarshalJSON returns the JSON encoding of cmd.  Part of the Cmd interface.
 func (cmd *ListAddressGroupingsCmd) MarshalJSON() ([]byte, error) {
-	raw := RawCmd{
-		Jsonrpc: "1.0",
-		Method:  "listaddressgroupings",
-		Id:      cmd.id,
-		Params:  []interface{}{},
+	// Fill and marshal a RawCmd.
+	raw, err := NewRawCmd(cmd.id, cmd.Method(), []interface{}{})
+	if err != nil {
+		return nil, err
 	}
-
 	return json.Marshal(raw)
 }
 
@@ -4304,13 +4194,11 @@ func (cmd *ListLockUnspentCmd) Method() string {
 
 // MarshalJSON returns the JSON encoding of cmd.  Part of the Cmd interface.
 func (cmd *ListLockUnspentCmd) MarshalJSON() ([]byte, error) {
-	raw := RawCmd{
-		Jsonrpc: "1.0",
-		Method:  "listlockunspent",
-		Id:      cmd.id,
-		Params:  []interface{}{},
+	// Fill and marshal a RawCmd.
+	raw, err := NewRawCmd(cmd.id, cmd.Method(), []interface{}{})
+	if err != nil {
+		return nil, err
 	}
-
 	return json.Marshal(raw)
 }
 
@@ -4395,21 +4283,19 @@ func (cmd *ListReceivedByAccountCmd) Method() string {
 
 // MarshalJSON returns the JSON encoding of cmd.  Part of the Cmd interface.
 func (cmd *ListReceivedByAccountCmd) MarshalJSON() ([]byte, error) {
-	raw := RawCmd{
-		Jsonrpc: "1.0",
-		Method:  "listreceivedbyaccount",
-		Id:      cmd.id,
-		Params:  []interface{}{},
-	}
-
+	params := make([]interface{}, 0, 2)
 	if cmd.MinConf != 1 || cmd.IncludeEmpty != false {
-		raw.Params = append(raw.Params, cmd.MinConf)
+		params = append(params, cmd.MinConf)
 	}
-
 	if cmd.IncludeEmpty != false {
-		raw.Params = append(raw.Params, cmd.IncludeEmpty)
+		params = append(params, cmd.IncludeEmpty)
 	}
 
+	// Fill and marshal a RawCmd.
+	raw, err := NewRawCmd(cmd.id, cmd.Method(), params)
+	if err != nil {
+		return nil, err
+	}
 	return json.Marshal(raw)
 }
 
@@ -4428,16 +4314,16 @@ func (cmd *ListReceivedByAccountCmd) UnmarshalJSON(b []byte) error {
 
 	optArgs := make([]interface{}, 0, 2)
 	if len(r.Params) > 0 {
-		minconf, ok := r.Params[0].(float64)
-		if !ok {
-			return errors.New("first optional parameter minconf must be a number")
+		var minconf int
+		if err := json.Unmarshal(r.Params[0], &minconf); err != nil {
+			return fmt.Errorf("first optional parameter 'minconf' must be an integer: %v", err)
 		}
-		optArgs = append(optArgs, int(minconf))
+		optArgs = append(optArgs, minconf)
 	}
 	if len(r.Params) > 1 {
-		includeempty, ok := r.Params[1].(bool)
-		if !ok {
-			return errors.New("second optional parameter includeempt must be a bool")
+		var includeempty bool
+		if err := json.Unmarshal(r.Params[1], &includeempty); err != nil {
+			return fmt.Errorf("second optional parameter 'includeempty' must be a bool: %v", err)
 		}
 		optArgs = append(optArgs, includeempty)
 	}
@@ -4510,21 +4396,19 @@ func (cmd *ListReceivedByAddressCmd) Method() string {
 
 // MarshalJSON returns the JSON encoding of cmd.  Part of the Cmd interface.
 func (cmd *ListReceivedByAddressCmd) MarshalJSON() ([]byte, error) {
-	raw := RawCmd{
-		Jsonrpc: "1.0",
-		Method:  "listreceivedbyaddress",
-		Id:      cmd.id,
-		Params:  []interface{}{},
-	}
-
+	params := make([]interface{}, 0, 2)
 	if cmd.MinConf != 1 || cmd.IncludeEmpty != false {
-		raw.Params = append(raw.Params, cmd.MinConf)
+		params = append(params, cmd.MinConf)
 	}
-
 	if cmd.IncludeEmpty != false {
-		raw.Params = append(raw.Params, cmd.IncludeEmpty)
+		params = append(params, cmd.IncludeEmpty)
 	}
 
+	// Fill and marshal a RawCmd.
+	raw, err := NewRawCmd(cmd.id, cmd.Method(), params)
+	if err != nil {
+		return nil, err
+	}
 	return json.Marshal(raw)
 }
 
@@ -4543,16 +4427,16 @@ func (cmd *ListReceivedByAddressCmd) UnmarshalJSON(b []byte) error {
 
 	optArgs := make([]interface{}, 0, 2)
 	if len(r.Params) > 0 {
-		minconf, ok := r.Params[0].(float64)
-		if !ok {
-			return errors.New("first optional parameter minconf must be a number")
+		var minconf int
+		if err := json.Unmarshal(r.Params[0], &minconf); err != nil {
+			return fmt.Errorf("first optional parameter 'minconf' must be an integer: %v", err)
 		}
-		optArgs = append(optArgs, int(minconf))
+		optArgs = append(optArgs, minconf)
 	}
 	if len(r.Params) > 1 {
-		includeempty, ok := r.Params[1].(bool)
-		if !ok {
-			return errors.New("second optional parameter includeempt must be a bool")
+		var includeempty bool
+		if err := json.Unmarshal(r.Params[1], &includeempty); err != nil {
+			return fmt.Errorf("second optional parameter 'includeempty' must be a bool: %v", err)
 		}
 		optArgs = append(optArgs, includeempty)
 	}
@@ -4625,21 +4509,19 @@ func (cmd *ListSinceBlockCmd) Method() string {
 
 // MarshalJSON returns the JSON encoding of cmd.  Part of the Cmd interface.
 func (cmd *ListSinceBlockCmd) MarshalJSON() ([]byte, error) {
-	raw := RawCmd{
-		Jsonrpc: "1.0",
-		Method:  "listsinceblock",
-		Id:      cmd.id,
-		Params:  []interface{}{},
-	}
-
+	params := make([]interface{}, 0, 2)
 	if cmd.BlockHash != "" || cmd.TargetConfirmations != 1 {
-		raw.Params = append(raw.Params, cmd.BlockHash)
+		params = append(params, cmd.BlockHash)
 	}
-
 	if cmd.TargetConfirmations != 1 {
-		raw.Params = append(raw.Params, cmd.TargetConfirmations)
+		params = append(params, cmd.TargetConfirmations)
 	}
 
+	// Fill and marshal a RawCmd.
+	raw, err := NewRawCmd(cmd.id, cmd.Method(), params)
+	if err != nil {
+		return nil, err
+	}
 	return json.Marshal(raw)
 }
 
@@ -4658,18 +4540,18 @@ func (cmd *ListSinceBlockCmd) UnmarshalJSON(b []byte) error {
 
 	optArgs := make([]interface{}, 0, 2)
 	if len(r.Params) > 0 {
-		blockhash, ok := r.Params[0].(string)
-		if !ok {
-			return errors.New("first optional parameter blockhash must be a string")
+		var blockhash string
+		if err := json.Unmarshal(r.Params[0], &blockhash); err != nil {
+			return fmt.Errorf("first optional parameter 'blockhash' must be a string: %v", err)
 		}
 		optArgs = append(optArgs, blockhash)
 	}
 	if len(r.Params) > 1 {
-		targetconfirmations, ok := r.Params[1].(float64)
-		if !ok {
-			return errors.New("second optional parameter targetconfirmations must be a number")
+		var targetconfirmations int
+		if err := json.Unmarshal(r.Params[1], &targetconfirmations); err != nil {
+			return fmt.Errorf("second optional parameter 'targetconfirmations' must be an integer: %v", err)
 		}
-		optArgs = append(optArgs, int(targetconfirmations))
+		optArgs = append(optArgs, targetconfirmations)
 	}
 
 	newCmd, err := NewListSinceBlockCmd(r.Id, optArgs...)
@@ -4751,24 +4633,22 @@ func (cmd *ListTransactionsCmd) Method() string {
 
 // MarshalJSON returns the JSON encoding of cmd.  Part of the Cmd interface.
 func (cmd *ListTransactionsCmd) MarshalJSON() ([]byte, error) {
-	raw := RawCmd{
-		Jsonrpc: "1.0",
-		Method:  "listtransactions",
-		Id:      cmd.id,
-		Params:  []interface{}{},
-	}
-
+	params := make([]interface{}, 0, 3)
 	if cmd.Account != "" || cmd.Count != 10 || cmd.From != 0 {
-		raw.Params = append(raw.Params, cmd.Account)
+		params = append(params, cmd.Account)
 	}
-
 	if cmd.Count != 10 || cmd.From != 0 {
-		raw.Params = append(raw.Params, cmd.Count)
+		params = append(params, cmd.Count)
 	}
 	if cmd.From != 0 {
-		raw.Params = append(raw.Params, cmd.From)
+		params = append(params, cmd.From)
 	}
 
+	// Fill and marshal a RawCmd.
+	raw, err := NewRawCmd(cmd.id, cmd.Method(), params)
+	if err != nil {
+		return nil, err
+	}
 	return json.Marshal(raw)
 }
 
@@ -4787,25 +4667,25 @@ func (cmd *ListTransactionsCmd) UnmarshalJSON(b []byte) error {
 
 	optArgs := make([]interface{}, 0, 3)
 	if len(r.Params) > 0 {
-		account, ok := r.Params[0].(string)
-		if !ok {
-			return errors.New("first optional parameter account must be a string")
+		var account string
+		if err := json.Unmarshal(r.Params[0], &account); err != nil {
+			return fmt.Errorf("first optional parameter 'account' must be a string: %v", err)
 		}
 		optArgs = append(optArgs, account)
 	}
 	if len(r.Params) > 1 {
-		count, ok := r.Params[1].(float64)
-		if !ok {
-			return errors.New("second optional parameter count must be a number")
+		var count int
+		if err := json.Unmarshal(r.Params[1], &count); err != nil {
+			return fmt.Errorf("second optional parameter 'count' must be an integer: %v", err)
 		}
-		optArgs = append(optArgs, int(count))
+		optArgs = append(optArgs, count)
 	}
 	if len(r.Params) > 2 {
-		from, ok := r.Params[2].(float64)
-		if !ok {
-			return errors.New("third optional parameter from must be a number")
+		var from int
+		if err := json.Unmarshal(r.Params[2], &from); err != nil {
+			return fmt.Errorf("third optional parameter 'from' must be an integer: %v", err)
 		}
-		optArgs = append(optArgs, int(from))
+		optArgs = append(optArgs, from)
 	}
 
 	newCmd, err := NewListTransactionsCmd(r.Id, optArgs...)
@@ -4885,25 +4765,22 @@ func (cmd *ListUnspentCmd) Method() string {
 
 // MarshalJSON returns the JSON encoding of cmd.  Part of the Cmd interface.
 func (cmd *ListUnspentCmd) MarshalJSON() ([]byte, error) {
-	raw := RawCmd{
-		Jsonrpc: "1.0",
-		Method:  "listunspent",
-		Id:      cmd.id,
-		Params:  []interface{}{},
-	}
-
+	params := make([]interface{}, 0, 3)
 	if cmd.MinConf != 1 || cmd.MaxConf != 99999 || len(cmd.Addresses) != 0 {
-		raw.Params = append(raw.Params, cmd.MinConf)
+		params = append(params, cmd.MinConf)
 	}
-
 	if cmd.MaxConf != 99999 || len(cmd.Addresses) != 0 {
-		raw.Params = append(raw.Params, cmd.MaxConf)
+		params = append(params, cmd.MaxConf)
 	}
-
 	if len(cmd.Addresses) != 0 {
-		raw.Params = append(raw.Params, cmd.Addresses)
+		params = append(params, cmd.Addresses)
 	}
 
+	// Fill and marshal a RawCmd.
+	raw, err := NewRawCmd(cmd.id, cmd.Method(), params)
+	if err != nil {
+		return nil, err
+	}
 	return json.Marshal(raw)
 }
 
@@ -4922,34 +4799,25 @@ func (cmd *ListUnspentCmd) UnmarshalJSON(b []byte) error {
 
 	optArgs := make([]interface{}, 0, 3)
 	if len(r.Params) > 0 {
-		minconf, ok := r.Params[0].(float64)
-		if !ok {
-			return errors.New("first optional parameter minconf must be a number")
+		var minconf int
+		if err := json.Unmarshal(r.Params[0], &minconf); err != nil {
+			return fmt.Errorf("first optional parameter 'minconf' must be an integer: %v", err)
 		}
-		optArgs = append(optArgs, int(minconf))
+		optArgs = append(optArgs, minconf)
 	}
 	if len(r.Params) > 1 {
-		maxconf, ok := r.Params[1].(float64)
-		if !ok {
-			return errors.New("second optional parameter maxconf must be a number")
+		var maxconf int
+		if err := json.Unmarshal(r.Params[1], &maxconf); err != nil {
+			return fmt.Errorf("second optional parameter 'maxconf' must be an integer: %v", err)
 		}
-		optArgs = append(optArgs, int(maxconf))
+		optArgs = append(optArgs, maxconf)
 	}
 	if len(r.Params) > 2 {
-		iaddr, ok := r.Params[2].([]interface{})
-		if !ok {
-			return errors.New("third  optional parameter addresses must be an array")
+		var addrs []string
+		if err := json.Unmarshal(r.Params[2], &addrs); err != nil {
+			return fmt.Errorf("third optional parameter 'addresses' must be an array of strings: %v", err)
 		}
-
-		addr := make([]string, len(iaddr))
-		for i, val := range iaddr {
-			addr[i], ok = val.(string)
-			if !ok {
-				return errors.New("optional parameter addreses must be an array of strings")
-			}
-		}
-
-		optArgs = append(optArgs, addr)
+		optArgs = append(optArgs, addrs)
 	}
 
 	newCmd, err := NewListUnspentCmd(r.Id, optArgs...)
@@ -5009,19 +4877,17 @@ func (cmd *LockUnspentCmd) Method() string {
 
 // MarshalJSON returns the JSON encoding of cmd.  Part of the Cmd interface.
 func (cmd *LockUnspentCmd) MarshalJSON() ([]byte, error) {
-	raw := RawCmd{
-		Jsonrpc: "1.0",
-		Method:  "lockunspent",
-		Id:      cmd.id,
-		Params: []interface{}{
-			cmd.Unlock,
-		},
-	}
-
+	params := make([]interface{}, 1, 2)
+	params[0] = cmd.Unlock
 	if len(cmd.Transactions) > 0 {
-		raw.Params = append(raw.Params, cmd.Transactions)
+		params = append(params, cmd.Transactions)
 	}
 
+	// Fill and marshal a RawCmd.
+	raw, err := NewRawCmd(cmd.id, cmd.Method(), params)
+	if err != nil {
+		return nil, err
+	}
 	return json.Marshal(raw)
 }
 
@@ -5038,42 +4904,19 @@ func (cmd *LockUnspentCmd) UnmarshalJSON(b []byte) error {
 		return ErrWrongNumberOfParams
 	}
 
-	unlock, ok := r.Params[0].(bool)
-	if !ok {
-		return errors.New("first parameter unlock must be a bool")
+	var unlock bool
+	if err := json.Unmarshal(r.Params[0], &unlock); err != nil {
+		return fmt.Errorf("first parameter 'unlock' must be a bool: %v", err)
 	}
 
 	optArgs := make([][]TransactionInput, 0, 1)
 	if len(r.Params) > 1 {
-		iinputs, ok := r.Params[1].([]map[string]interface{})
-		if !ok {
-			return errors.New("second optional parameter transactions must be an array of objects")
+		var transactions []TransactionInput
+		if err := json.Unmarshal(r.Params[0], &transactions); err != nil {
+			return fmt.Errorf("second optional parameter 'transactions' "+
+				"must be a JSON array of transaction input JSON objects: %v", err)
 		}
-		inputs := make([]TransactionInput, len(iinputs))
-		for i, v := range iinputs {
-			if len(v) != 2 {
-				return errors.New("input with wrong number of members")
-			}
-			txid, ok := v["txid"]
-			if !ok {
-				return errors.New("input without txid")
-			}
-			inputs[i].Txid, ok = txid.(string)
-			if !ok {
-				return errors.New("input txid isn't a string")
-			}
-
-			vout, ok := v["vout"]
-			if !ok {
-				return errors.New("input without vout")
-			}
-			fvout, ok := vout.(float64)
-			if !ok {
-				return errors.New("input vout not a number")
-			}
-			inputs[i].Vout = int(fvout)
-		}
-		optArgs = append(optArgs, inputs)
+		optArgs = append(optArgs, transactions)
 	}
 
 	newCmd, err := NewLockUnspentCmd(r.Id, unlock, optArgs...)
@@ -5151,25 +4994,22 @@ func (cmd *MoveCmd) Method() string {
 
 // MarshalJSON returns the JSON encoding of cmd.  Part of the Cmd interface.
 func (cmd *MoveCmd) MarshalJSON() ([]byte, error) {
-	raw := RawCmd{
-		Jsonrpc: "1.0",
-		Method:  "move",
-		Id:      cmd.id,
-		Params: []interface{}{
-			cmd.FromAccount,
-			cmd.ToAccount,
-			float64(cmd.Amount) / 1e8, //convert to BTC
-		},
-	}
-
+	params := make([]interface{}, 3, 5)
+	params[0] = cmd.FromAccount
+	params[1] = cmd.ToAccount
+	params[2] = float64(cmd.Amount) / 1e8 //convert to BTC
 	if cmd.MinConf != 1 || cmd.Comment != "" {
-		raw.Params = append(raw.Params, cmd.MinConf)
+		params = append(params, cmd.MinConf)
 	}
-
 	if cmd.Comment != "" {
-		raw.Params = append(raw.Params, cmd.Comment)
+		params = append(params, cmd.Comment)
 	}
 
+	// Fill and marshal a RawCmd.
+	raw, err := NewRawCmd(cmd.id, cmd.Method(), params)
+	if err != nil {
+		return nil, err
+	}
 	return json.Marshal(raw)
 }
 
@@ -5186,42 +5026,42 @@ func (cmd *MoveCmd) UnmarshalJSON(b []byte) error {
 		return ErrWrongNumberOfParams
 	}
 
-	fromaccount, ok := r.Params[0].(string)
-	if !ok {
-		return errors.New("first parameter fromaccount must be a string")
+	var fromaccount string
+	if err := json.Unmarshal(r.Params[0], &fromaccount); err != nil {
+		return fmt.Errorf("first parameter 'fromaccount' must be a string: %v", err)
 	}
 
-	toaccount, ok := r.Params[1].(string)
-	if !ok {
-		return errors.New("second parameter toaccount must be a string")
+	var toaccount string
+	if err := json.Unmarshal(r.Params[1], &toaccount); err != nil {
+		return fmt.Errorf("second parameter 'toaccount' must be a string: %v", err)
 	}
 
-	amount, ok := r.Params[2].(float64)
-	if !ok {
-		return errors.New("third parameter toaccount must be a number")
+	var famount float64
+	if err := json.Unmarshal(r.Params[2], &famount); err != nil {
+		return fmt.Errorf("third parameter 'amount' must be a number: %v", err)
 	}
-
-	samount, err := JSONToAmount(amount)
+	amount, err := JSONToAmount(famount)
 	if err != nil {
 		return err
 	}
+
 	optArgs := make([]interface{}, 0, 2)
 	if len(r.Params) > 3 {
-		minconf, ok := r.Params[3].(float64)
-		if !ok {
-			return errors.New("fourth optional parameter minconf must be a number")
+		var minconf int
+		if err := json.Unmarshal(r.Params[3], &minconf); err != nil {
+			return fmt.Errorf("fourth optional parameter 'minconf' must be an integer: %v", err)
 		}
-		optArgs = append(optArgs, int(minconf))
+		optArgs = append(optArgs, minconf)
 	}
 	if len(r.Params) > 4 {
-		comment, ok := r.Params[4].(string)
-		if !ok {
-			return errors.New("fifth optional parameter comment must be a string")
+		var comment string
+		if err := json.Unmarshal(r.Params[4], &comment); err != nil {
+			return fmt.Errorf("fifth optional parameter 'comment' must be a string: %v", err)
 		}
 		optArgs = append(optArgs, comment)
 	}
 
-	newCmd, err := NewMoveCmd(r.Id, fromaccount, toaccount, samount,
+	newCmd, err := NewMoveCmd(r.Id, fromaccount, toaccount, amount,
 		optArgs...)
 	if err != nil {
 		return err
@@ -5265,13 +5105,11 @@ func (cmd *PingCmd) Method() string {
 
 // MarshalJSON returns the JSON encoding of cmd.  Part of the Cmd interface.
 func (cmd *PingCmd) MarshalJSON() ([]byte, error) {
-	raw := RawCmd{
-		Jsonrpc: "1.0",
-		Method:  "ping",
-		Id:      cmd.id,
-		Params:  []interface{}{},
+	// Fill and marshal a RawCmd.
+	raw, err := NewRawCmd(cmd.id, cmd.Method(), []interface{}{})
+	if err != nil {
+		return nil, err
 	}
-
 	return json.Marshal(raw)
 }
 
@@ -5374,29 +5212,25 @@ func (cmd *SendFromCmd) Method() string {
 
 // MarshalJSON returns the JSON encoding of cmd.  Part of the Cmd interface.
 func (cmd *SendFromCmd) MarshalJSON() ([]byte, error) {
-	raw := RawCmd{
-		Jsonrpc: "1.0",
-		Method:  "sendfrom",
-		Id:      cmd.id,
-		Params: []interface{}{
-			cmd.FromAccount,
-			cmd.ToAddress,
-			float64(cmd.Amount) / 1e8, //convert to BTC
-		},
-	}
-
+	params := make([]interface{}, 3, 6)
+	params[0] = cmd.FromAccount
+	params[1] = cmd.ToAddress
+	params[2] = float64(cmd.Amount) / 1e8 //convert to BTC
 	if cmd.MinConf != 1 || cmd.Comment != "" || cmd.CommentTo != "" {
-		raw.Params = append(raw.Params, cmd.MinConf)
+		params = append(params, cmd.MinConf)
 	}
-
 	if cmd.Comment != "" || cmd.CommentTo != "" {
-		raw.Params = append(raw.Params, cmd.Comment)
+		params = append(params, cmd.Comment)
 	}
-
 	if cmd.CommentTo != "" {
-		raw.Params = append(raw.Params, cmd.CommentTo)
+		params = append(params, cmd.CommentTo)
 	}
 
+	// Fill and marshal a RawCmd.
+	raw, err := NewRawCmd(cmd.id, cmd.Method(), params)
+	if err != nil {
+		return nil, err
+	}
 	return json.Marshal(raw)
 }
 
@@ -5413,51 +5247,49 @@ func (cmd *SendFromCmd) UnmarshalJSON(b []byte) error {
 		return ErrWrongNumberOfParams
 	}
 
-	fromaccount, ok := r.Params[0].(string)
-	if !ok {
-		return errors.New("first parameter fromaccount must be a string")
+	var fromaccount string
+	if err := json.Unmarshal(r.Params[0], &fromaccount); err != nil {
+		return fmt.Errorf("first parameter 'fromaccount' must be a string: %v", err)
 	}
 
-	toaccount, ok := r.Params[1].(string)
-	if !ok {
-		return errors.New("second parameter toaccount must be a string")
+	var toaddress string
+	if err := json.Unmarshal(r.Params[1], &toaddress); err != nil {
+		return fmt.Errorf("second parameter 'toaddress' must be a string: %v", err)
 	}
 
-	amount, ok := r.Params[2].(float64)
-	if !ok {
-		return errors.New("third parameter toaccount must be a number")
+	var famount float64
+	if err := json.Unmarshal(r.Params[2], &famount); err != nil {
+		return fmt.Errorf("third parameter 'amount' must be a number: %v", err)
 	}
-
-	samount, err := JSONToAmount(amount)
+	amount, err := JSONToAmount(famount)
 	if err != nil {
 		return err
 	}
 
 	optArgs := make([]interface{}, 0, 3)
 	if len(r.Params) > 3 {
-		minconf, ok := r.Params[3].(float64)
-		if !ok {
-			return errors.New("fourth optional parameter minconf must be a number")
+		var minconf int
+		if err := json.Unmarshal(r.Params[3], &minconf); err != nil {
+			return fmt.Errorf("fourth optional parameter 'minconf' must be an integer: %v", err)
 		}
-
-		optArgs = append(optArgs, int(minconf))
+		optArgs = append(optArgs, minconf)
 	}
 	if len(r.Params) > 4 {
-		comment, ok := r.Params[4].(string)
-		if !ok {
-			return errors.New("fifth optional parameter comment must be a string")
+		var comment string
+		if err := json.Unmarshal(r.Params[4], &comment); err != nil {
+			return fmt.Errorf("fifth optional parameter 'comment' must be a string: %v", err)
 		}
 		optArgs = append(optArgs, comment)
 	}
 	if len(r.Params) > 5 {
-		commentto, ok := r.Params[5].(string)
-		if !ok {
-			return errors.New("sixth optional parameter commentto must be a string")
+		var commentto string
+		if err := json.Unmarshal(r.Params[5], &commentto); err != nil {
+			return fmt.Errorf("sixth optional parameter 'commentto' must be a string: %v", err)
 		}
 		optArgs = append(optArgs, commentto)
 	}
 
-	newCmd, err := NewSendFromCmd(r.Id, fromaccount, toaccount, samount,
+	newCmd, err := NewSendFromCmd(r.Id, fromaccount, toaddress, amount,
 		optArgs...)
 	if err != nil {
 		return err
@@ -5531,29 +5363,26 @@ func (cmd *SendManyCmd) Method() string {
 
 // MarshalJSON returns the JSON encoding of cmd.  Part of the Cmd interface.
 func (cmd *SendManyCmd) MarshalJSON() ([]byte, error) {
-	floatAmount := make(map[string]float64)
-
+	floatAmounts := make(map[string]float64, len(cmd.Amounts))
 	for k, v := range cmd.Amounts {
-		floatAmount[k] = float64(v) / 1e8
-	}
-	raw := RawCmd{
-		Jsonrpc: "1.0",
-		Method:  "sendmany",
-		Id:      cmd.id,
-		Params: []interface{}{
-			cmd.FromAccount,
-			floatAmount,
-		},
+		floatAmounts[k] = float64(v) / 1e8
 	}
 
+	params := make([]interface{}, 2, 4)
+	params[0] = cmd.FromAccount
+	params[1] = floatAmounts
 	if cmd.MinConf != 1 || cmd.Comment != "" {
-		raw.Params = append(raw.Params, cmd.MinConf)
+		params = append(params, cmd.MinConf)
 	}
-
 	if cmd.Comment != "" {
-		raw.Params = append(raw.Params, cmd.Comment)
+		params = append(params, cmd.Comment)
 	}
 
+	// Fill and marshal a RawCmd.
+	raw, err := NewRawCmd(cmd.id, cmd.Method(), params)
+	if err != nil {
+		return nil, err
+	}
 	return json.Marshal(raw)
 }
 
@@ -5570,42 +5399,36 @@ func (cmd *SendManyCmd) UnmarshalJSON(b []byte) error {
 		return ErrWrongNumberOfParams
 	}
 
-	fromaccount, ok := r.Params[0].(string)
-	if !ok {
-		return errors.New("first parameter fromaccount must be a string")
+	var fromaccount string
+	if err := json.Unmarshal(r.Params[0], &fromaccount); err != nil {
+		return fmt.Errorf("first parameter 'fromaccount' must be a string: %v", err)
 	}
 
-	iamounts, ok := r.Params[1].(map[string]interface{})
-	if !ok {
-		return errors.New("second parameter toaccount must be a JSON object")
+	var famounts map[string]float64
+	if err := json.Unmarshal(r.Params[1], &famounts); err != nil {
+		return fmt.Errorf("second parameter 'amounts' must be a JSON object of address to amount mappings: %v", err)
 	}
-
-	amounts := make(map[string]int64)
-	for k, v := range iamounts {
-		famount, ok := v.(float64)
-		if !ok {
-			return errors.New("second parameter toaccount must be a string to number map")
-		}
-		var err error
-		amounts[k], err = JSONToAmount(famount)
+	amounts := make(map[string]int64, len(famounts))
+	for k, v := range famounts {
+		amount, err := JSONToAmount(v)
 		if err != nil {
 			return err
 		}
+		amounts[k] = amount
 	}
 
 	optArgs := make([]interface{}, 0, 2)
 	if len(r.Params) > 2 {
-		minconf, ok := r.Params[2].(float64)
-		if !ok {
-			return errors.New("third optional parameter minconf must be a number")
+		var minconf int
+		if err := json.Unmarshal(r.Params[2], &minconf); err != nil {
+			return fmt.Errorf("third optional parameter 'minconf' must be an integer: %v", err)
 		}
-
-		optArgs = append(optArgs, int(minconf))
+		optArgs = append(optArgs, minconf)
 	}
 	if len(r.Params) > 3 {
-		comment, ok := r.Params[3].(string)
-		if !ok {
-			return errors.New("fourth optional parameter comment must be a string")
+		var comment string
+		if err := json.Unmarshal(r.Params[3], &comment); err != nil {
+			return fmt.Errorf("fourth optional parameter 'comment' must be a string: %v", err)
 		}
 		optArgs = append(optArgs, comment)
 	}
@@ -5665,19 +5488,17 @@ func (cmd *SendRawTransactionCmd) Method() string {
 
 // MarshalJSON returns the JSON encoding of cmd.  Part of the Cmd interface.
 func (cmd *SendRawTransactionCmd) MarshalJSON() ([]byte, error) {
-	raw := RawCmd{
-		Jsonrpc: "1.0",
-		Method:  "sendrawtransaction",
-		Id:      cmd.id,
-		Params: []interface{}{
-			cmd.HexTx,
-		},
-	}
-
+	params := make([]interface{}, 1, 2)
+	params[0] = cmd.HexTx
 	if cmd.AllowHighFees {
-		raw.Params = append(raw.Params, cmd.AllowHighFees)
+		params = append(params, cmd.AllowHighFees)
 	}
 
+	// Fill and marshal a RawCmd.
+	raw, err := NewRawCmd(cmd.id, cmd.Method(), params)
+	if err != nil {
+		return nil, err
+	}
 	return json.Marshal(raw)
 }
 
@@ -5694,16 +5515,16 @@ func (cmd *SendRawTransactionCmd) UnmarshalJSON(b []byte) error {
 		return ErrWrongNumberOfParams
 	}
 
-	hextx, ok := r.Params[0].(string)
-	if !ok {
-		return errors.New("first parameter hextx must be a string")
+	var hextx string
+	if err := json.Unmarshal(r.Params[0], &hextx); err != nil {
+		return fmt.Errorf("first parameter 'hextx' must be a string: %v", err)
 	}
 
 	optArgs := make([]bool, 0, 1)
 	if len(r.Params) > 1 {
-		allowHighFees, ok := r.Params[1].(bool)
-		if !ok {
-			return errors.New("second optional parameter allowhighfees must be a bool")
+		var allowHighFees bool
+		if err := json.Unmarshal(r.Params[1], &allowHighFees); err != nil {
+			return fmt.Errorf("second optional parameter 'allowhighfees' must be a bool: %v", err)
 		}
 		optArgs = append(optArgs, allowHighFees)
 	}
@@ -5781,24 +5602,21 @@ func (cmd *SendToAddressCmd) Method() string {
 
 // MarshalJSON returns the JSON encoding of cmd.  Part of the Cmd interface.
 func (cmd *SendToAddressCmd) MarshalJSON() ([]byte, error) {
-	raw := RawCmd{
-		Jsonrpc: "1.0",
-		Method:  "sendtoaddress",
-		Id:      cmd.id,
-		Params: []interface{}{
-			cmd.Address,
-			float64(cmd.Amount) / 1e8, //convert to BTC
-		},
-	}
-
+	params := make([]interface{}, 2, 4)
+	params[0] = cmd.Address
+	params[1] = float64(cmd.Amount) / 1e8 //convert to BTC
 	if cmd.Comment != "" || cmd.CommentTo != "" {
-		raw.Params = append(raw.Params, cmd.Comment)
+		params = append(params, cmd.Comment)
 	}
-
 	if cmd.CommentTo != "" {
-		raw.Params = append(raw.Params, cmd.CommentTo)
+		params = append(params, cmd.CommentTo)
 	}
 
+	// Fill and marshal a RawCmd.
+	raw, err := NewRawCmd(cmd.id, cmd.Method(), params)
+	if err != nil {
+		return nil, err
+	}
 	return json.Marshal(raw)
 }
 
@@ -5815,38 +5633,37 @@ func (cmd *SendToAddressCmd) UnmarshalJSON(b []byte) error {
 		return ErrWrongNumberOfParams
 	}
 
-	toaccount, ok := r.Params[0].(string)
-	if !ok {
-		return errors.New("first parameter toaccount must be a string")
+	var address string
+	if err := json.Unmarshal(r.Params[0], &address); err != nil {
+		return fmt.Errorf("first parameter 'address' must be a string: %v", err)
 	}
 
-	amount, ok := r.Params[1].(float64)
-	if !ok {
-		return errors.New("second parameter amount must be a number")
+	var famount float64
+	if err := json.Unmarshal(r.Params[1], &famount); err != nil {
+		return fmt.Errorf("second parameter 'amount' must be a number: %v", err)
 	}
-
-	samount, err := JSONToAmount(amount)
+	amount, err := JSONToAmount(famount)
 	if err != nil {
 		return err
 	}
+
 	optArgs := make([]interface{}, 0, 2)
 	if len(r.Params) > 2 {
-		comment, ok := r.Params[2].(string)
-		if !ok {
-			return errors.New("third optional parameter comment must be a string")
+		var comment string
+		if err := json.Unmarshal(r.Params[2], &comment); err != nil {
+			return fmt.Errorf("third optional parameter 'comment' must be a string: %v", err)
 		}
 		optArgs = append(optArgs, comment)
 	}
 	if len(r.Params) > 3 {
-		commentto, ok := r.Params[3].(string)
-		if !ok {
-			return errors.New("sixth optional parameter commentto must be a string")
+		var commentto string
+		if err := json.Unmarshal(r.Params[3], &commentto); err != nil {
+			return fmt.Errorf("fourth optional parameter 'commentto' must be a string: %v", err)
 		}
 		optArgs = append(optArgs, commentto)
 	}
 
-	newCmd, err := NewSendToAddressCmd(r.Id, toaccount, samount,
-		optArgs...)
+	newCmd, err := NewSendToAddressCmd(r.Id, address, amount, optArgs...)
 	if err != nil {
 		return err
 	}
@@ -5894,16 +5711,16 @@ func (cmd *SetAccountCmd) Method() string {
 
 // MarshalJSON returns the JSON encoding of cmd.  Part of the Cmd interface.
 func (cmd *SetAccountCmd) MarshalJSON() ([]byte, error) {
-	raw := RawCmd{
-		Jsonrpc: "1.0",
-		Method:  "setaccount",
-		Id:      cmd.id,
-		Params: []interface{}{
-			cmd.Address,
-			cmd.Account,
-		},
+	params := []interface{}{
+		cmd.Address,
+		cmd.Account,
 	}
 
+	// Fill and marshal a RawCmd.
+	raw, err := NewRawCmd(cmd.id, cmd.Method(), params)
+	if err != nil {
+		return nil, err
+	}
 	return json.Marshal(raw)
 }
 
@@ -5920,14 +5737,14 @@ func (cmd *SetAccountCmd) UnmarshalJSON(b []byte) error {
 		return ErrWrongNumberOfParams
 	}
 
-	address, ok := r.Params[0].(string)
-	if !ok {
-		return errors.New("first parameter address must be a string")
+	var address string
+	if err := json.Unmarshal(r.Params[0], &address); err != nil {
+		return fmt.Errorf("first parameter 'address' must be a string: %v", err)
 	}
 
-	account, ok := r.Params[1].(string)
-	if !ok {
-		return errors.New("second parameter account must be a string")
+	var account string
+	if err := json.Unmarshal(r.Params[1], &account); err != nil {
+		return fmt.Errorf("second parameter 'account' must be a string: %v", err)
 	}
 
 	newCmd, err := NewSetAccountCmd(r.Id, address, account)
@@ -5986,19 +5803,17 @@ func (cmd *SetGenerateCmd) Method() string {
 
 // MarshalJSON returns the JSON encoding of cmd.  Part of the Cmd interface.
 func (cmd *SetGenerateCmd) MarshalJSON() ([]byte, error) {
-	raw := RawCmd{
-		Jsonrpc: "1.0",
-		Method:  "setgenerate",
-		Id:      cmd.id,
-		Params: []interface{}{
-			cmd.Generate,
-		},
-	}
-
+	params := make([]interface{}, 1, 2)
+	params[0] = cmd.Generate
 	if cmd.GenProcLimit != 0 {
-		raw.Params = append(raw.Params, cmd.GenProcLimit)
+		params = append(params, cmd.GenProcLimit)
 	}
 
+	// Fill and marshal a RawCmd.
+	raw, err := NewRawCmd(cmd.id, cmd.Method(), params)
+	if err != nil {
+		return nil, err
+	}
 	return json.Marshal(raw)
 }
 
@@ -6015,18 +5830,18 @@ func (cmd *SetGenerateCmd) UnmarshalJSON(b []byte) error {
 		return ErrWrongNumberOfParams
 	}
 
-	generate, ok := r.Params[0].(bool)
-	if !ok {
-		return errors.New("first parameter generate must be a bool")
+	var generate bool
+	if err := json.Unmarshal(r.Params[0], &generate); err != nil {
+		return fmt.Errorf("first parameter 'generate' must be a bool: %v", err)
 	}
 
 	optArgs := make([]int, 0, 1)
 	if len(r.Params) > 1 {
-		genproclimit, ok := r.Params[1].(float64)
-		if !ok {
-			return errors.New("second parameter genproclimit must be a number")
+		var genproclimit int
+		if err := json.Unmarshal(r.Params[1], &genproclimit); err != nil {
+			return fmt.Errorf("second optional parameter 'genproclimit' must be an integer: %v", err)
 		}
-		optArgs = append(optArgs, int(genproclimit))
+		optArgs = append(optArgs, genproclimit)
 	}
 
 	newCmd, err := NewSetGenerateCmd(r.Id, generate, optArgs...)
@@ -6074,15 +5889,15 @@ func (cmd *SetTxFeeCmd) Method() string {
 
 // MarshalJSON returns the JSON encoding of cmd.  Part of the Cmd interface.
 func (cmd *SetTxFeeCmd) MarshalJSON() ([]byte, error) {
-	raw := RawCmd{
-		Jsonrpc: "1.0",
-		Method:  "settxfee",
-		Id:      cmd.id,
-		Params: []interface{}{
-			float64(cmd.Amount) / 1e8, //convert to BTC
-		},
+	params := []interface{}{
+		float64(cmd.Amount) / 1e8, //convert to BTC
 	}
 
+	// Fill and marshal a RawCmd.
+	raw, err := NewRawCmd(cmd.id, cmd.Method(), params)
+	if err != nil {
+		return nil, err
+	}
 	return json.Marshal(raw)
 }
 
@@ -6099,17 +5914,16 @@ func (cmd *SetTxFeeCmd) UnmarshalJSON(b []byte) error {
 		return ErrWrongNumberOfParams
 	}
 
-	amount, ok := r.Params[0].(float64)
-	if !ok {
-		return errors.New("first parameter amount must be a number")
+	var famount float64
+	if err := json.Unmarshal(r.Params[0], &famount); err != nil {
+		return fmt.Errorf("first parameter 'amount' must be a number: %v", err)
 	}
-
-	samount, err := JSONToAmount(amount)
+	amount, err := JSONToAmount(famount)
 	if err != nil {
 		return err
 	}
 
-	newCmd, err := NewSetTxFeeCmd(r.Id, samount)
+	newCmd, err := NewSetTxFeeCmd(r.Id, amount)
 	if err != nil {
 		return err
 	}
@@ -6156,16 +5970,16 @@ func (cmd *SignMessageCmd) Method() string {
 
 // MarshalJSON returns the JSON encoding of cmd.  Part of the Cmd interface.
 func (cmd *SignMessageCmd) MarshalJSON() ([]byte, error) {
-	raw := RawCmd{
-		Jsonrpc: "1.0",
-		Method:  "signmessage",
-		Id:      cmd.id,
-		Params: []interface{}{
-			cmd.Address,
-			cmd.Message,
-		},
+	params := []interface{}{
+		cmd.Address,
+		cmd.Message,
 	}
 
+	// Fill and marshal a RawCmd.
+	raw, err := NewRawCmd(cmd.id, cmd.Method(), params)
+	if err != nil {
+		return nil, err
+	}
 	return json.Marshal(raw)
 }
 
@@ -6182,14 +5996,14 @@ func (cmd *SignMessageCmd) UnmarshalJSON(b []byte) error {
 		return ErrWrongNumberOfParams
 	}
 
-	address, ok := r.Params[0].(string)
-	if !ok {
-		return errors.New("first parameter address must be a string")
+	var address string
+	if err := json.Unmarshal(r.Params[0], &address); err != nil {
+		return fmt.Errorf("first parameter 'address' must be a string: %v", err)
 	}
 
-	message, ok := r.Params[1].(string)
-	if !ok {
-		return errors.New("second parameter message must be a string")
+	var message string
+	if err := json.Unmarshal(r.Params[1], &message); err != nil {
+		return fmt.Errorf("second parameter 'message' must be a string: %v", err)
 	}
 
 	newCmd, err := NewSignMessageCmd(r.Id, address, message)
@@ -6281,25 +6095,23 @@ func (cmd *SignRawTransactionCmd) Method() string {
 
 // MarshalJSON returns the JSON encoding of cmd.  Part of the Cmd interface.
 func (cmd *SignRawTransactionCmd) MarshalJSON() ([]byte, error) {
-	raw := RawCmd{
-		Jsonrpc: "1.0",
-		Method:  "signrawtransaction",
-		Id:      cmd.id,
-		Params: []interface{}{
-			cmd.RawTx,
-		},
-	}
-
+	params := make([]interface{}, 1, 4)
+	params[0] = cmd.RawTx
 	if len(cmd.Inputs) > 0 || len(cmd.PrivKeys) > 0 || cmd.Flags != "" {
-		raw.Params = append(raw.Params, cmd.Inputs)
+		params = append(params, cmd.Inputs)
 	}
 	if len(cmd.PrivKeys) > 0 || cmd.Flags != "" {
-		raw.Params = append(raw.Params, cmd.PrivKeys)
+		params = append(params, cmd.PrivKeys)
 	}
 	if cmd.Flags != "" {
-		raw.Params = append(raw.Params, cmd.Flags)
+		params = append(params, cmd.Flags)
 	}
 
+	// Fill and marshal a RawCmd.
+	raw, err := NewRawCmd(cmd.id, cmd.Method(), params)
+	if err != nil {
+		return nil, err
+	}
 	return json.Marshal(raw)
 }
 
@@ -6316,81 +6128,33 @@ func (cmd *SignRawTransactionCmd) UnmarshalJSON(b []byte) error {
 		return ErrWrongNumberOfParams
 	}
 
-	rawtx, ok := r.Params[0].(string)
-	if !ok {
-		return errors.New("first parameter rawtx must be a string")
+	var rawtx string
+	if err := json.Unmarshal(r.Params[0], &rawtx); err != nil {
+		return fmt.Errorf("first parameter 'rawtx' must be a string: %v", err)
 	}
 
 	optArgs := make([]interface{}, 0, 3)
 	if len(r.Params) > 1 {
-		ip, ok := r.Params[1].([]interface{})
-		if !ok {
-			return errors.New("second optional parameter inputs must be an array")
-		}
-		inputs := make([]RawTxInput, len(ip))
-		for i, val := range ip {
-			mip, ok := val.(map[string]interface{})
-			if !ok {
-				return errors.New("second optional parameter inputs must be an array of objects")
-			}
-			txid, ok := mip["txid"]
-			if !ok {
-				return errors.New("txid missing in input object")
-			}
-
-			inputs[i].Txid, ok = txid.(string)
-			if !ok {
-				return errors.New("txid not a string in input object")
-			}
-
-			vout, ok := mip["vout"]
-			if !ok {
-				return errors.New("vout missing in input object")
-			}
-			fvout, ok := vout.(float64)
-			if !ok {
-				return errors.New("vout not a number in input object")
-			}
-			inputs[i].Vout = int(fvout)
-
-			scriptpubkey, ok := mip["scriptpubkey"]
-			if !ok {
-				return errors.New("scriptpubkey missing in input object")
-			}
-
-			inputs[i].ScriptPubKey, ok = scriptpubkey.(string)
-			if !ok {
-				return errors.New("scriptpubkey not a string in input object")
-			}
-
-			redeemScript, ok := mip["redeemScript"]
-			if !ok {
-				return errors.New("redeemScript missing in input object")
-			}
-
-			inputs[i].RedeemScript, ok = redeemScript.(string)
-			if !ok {
-				return errors.New("redeemScript not a string in input object")
-			}
-
+		var inputs []RawTxInput
+		if err := json.Unmarshal(r.Params[1], &inputs); err != nil {
+			return fmt.Errorf("second optional parameter 'inputs' "+
+				"must be a JSON array of raw transaction input JSON objects: %v", err)
 		}
 		optArgs = append(optArgs, inputs)
 	}
 
 	if len(r.Params) > 2 {
-		privkeys, ok := r.Params[2].([]string)
-		if !ok {
-			return errors.New("third optional parameter privkeys is not an array of strings")
+		var privkeys []string
+		if err := json.Unmarshal(r.Params[2], &privkeys); err != nil {
+			return fmt.Errorf("third optional parameter 'privkeys' must be an array of strings: %v", err)
 		}
-
 		optArgs = append(optArgs, privkeys)
 	}
 	if len(r.Params) > 3 {
-		flags, ok := r.Params[3].([]string)
-		if !ok {
-			return errors.New("fourth optional parameter flags is not a string")
+		var flags string
+		if err := json.Unmarshal(r.Params[3], &flags); err != nil {
+			return fmt.Errorf("fourth optional parameter 'flags' must be a string: %v", err)
 		}
-
 		optArgs = append(optArgs, flags)
 	}
 
@@ -6438,13 +6202,11 @@ func (cmd *StopCmd) Method() string {
 
 // MarshalJSON returns the JSON encoding of cmd.  Part of the Cmd interface.
 func (cmd *StopCmd) MarshalJSON() ([]byte, error) {
-	raw := RawCmd{
-		Jsonrpc: "1.0",
-		Method:  "stop",
-		Id:      cmd.id,
-		Params:  []interface{}{},
+	// Fill and marshal a RawCmd.
+	raw, err := NewRawCmd(cmd.id, cmd.Method(), []interface{}{})
+	if err != nil {
+		return nil, err
 	}
-
 	return json.Marshal(raw)
 }
 
@@ -6523,19 +6285,17 @@ func (cmd *SubmitBlockCmd) Method() string {
 
 // MarshalJSON returns the JSON encoding of cmd.  Part of the Cmd interface.
 func (cmd *SubmitBlockCmd) MarshalJSON() ([]byte, error) {
-	raw := RawCmd{
-		Jsonrpc: "1.0",
-		Method:  "submitblock",
-		Id:      cmd.id,
-		Params: []interface{}{
-			cmd.HexBlock,
-		},
-	}
-
+	params := make([]interface{}, 1, 2)
+	params[0] = cmd.HexBlock
 	if cmd.Options != nil {
-		raw.Params = append(raw.Params, cmd.Options)
+		params = append(params, cmd.Options)
 	}
 
+	// Fill and marshal a RawCmd.
+	raw, err := NewRawCmd(cmd.id, cmd.Method(), params)
+	if err != nil {
+		return nil, err
+	}
 	return json.Marshal(raw)
 }
 
@@ -6552,29 +6312,19 @@ func (cmd *SubmitBlockCmd) UnmarshalJSON(b []byte) error {
 		return ErrWrongNumberOfParams
 	}
 
-	hexblock, ok := r.Params[0].(string)
-	if !ok {
-		return errors.New("first parameter hexblock must be a string")
+	var hexblock string
+	if err := json.Unmarshal(r.Params[0], &hexblock); err != nil {
+		return fmt.Errorf("first parameter 'hexblock' must be a string: %v", err)
 	}
 
 	optArgs := make([]*SubmitBlockOptions, 0, 1)
 	if len(r.Params) == 2 {
-		obj, ok := r.Params[1].(map[string]interface{})
-		if !ok {
-			return errors.New("second optioanl parameter options must be an object")
+		var options SubmitBlockOptions
+		if err := json.Unmarshal(r.Params[1], &options); err != nil {
+			return fmt.Errorf("second optional parameter 'options' must "+
+				"be a JSON object of submit block options: %v", err)
 		}
-		options := new(SubmitBlockOptions)
-
-		// workid is optional
-		iworkid, ok := obj["workid"]
-		if ok {
-			workid, ok := iworkid.(string)
-			if !ok {
-				return errors.New("object member workid must be a string")
-			}
-			options.WorkId = workid
-		}
-		optArgs = append(optArgs, options)
+		optArgs = append(optArgs, &options)
 	}
 
 	newCmd, err := NewSubmitBlockCmd(r.Id, hexblock, optArgs...)
@@ -6623,15 +6373,15 @@ func (cmd *ValidateAddressCmd) Method() string {
 
 // MarshalJSON returns the JSON encoding of cmd.  Part of the Cmd interface.
 func (cmd *ValidateAddressCmd) MarshalJSON() ([]byte, error) {
-	raw := RawCmd{
-		Jsonrpc: "1.0",
-		Method:  "validateaddress",
-		Id:      cmd.id,
-		Params: []interface{}{
-			cmd.Address,
-		},
+	params := []interface{}{
+		cmd.Address,
 	}
 
+	// Fill and marshal a RawCmd.
+	raw, err := NewRawCmd(cmd.id, cmd.Method(), params)
+	if err != nil {
+		return nil, err
+	}
 	return json.Marshal(raw)
 }
 
@@ -6648,9 +6398,9 @@ func (cmd *ValidateAddressCmd) UnmarshalJSON(b []byte) error {
 		return ErrWrongNumberOfParams
 	}
 
-	address, ok := r.Params[0].(string)
-	if !ok {
-		return errors.New("first parameter address must be a string")
+	var address string
+	if err := json.Unmarshal(r.Params[0], &address); err != nil {
+		return fmt.Errorf("first parameter 'address' must be a string: %v", err)
 	}
 
 	newCmd, err := NewValidateAddressCmd(r.Id, address)
@@ -6715,22 +6465,20 @@ func (cmd *VerifyChainCmd) Method() string {
 
 // MarshalJSON returns the JSON encoding of cmd.  Part of the Cmd interface.
 func (cmd *VerifyChainCmd) MarshalJSON() ([]byte, error) {
-	raw := RawCmd{
-		Jsonrpc: "1.0",
-		Method:  "verifychain",
-		Id:      cmd.id,
-		Params:  []interface{}{},
-	}
-
 	// XXX(oga) magic numbers
+	params := make([]interface{}, 0, 2)
 	if cmd.CheckLevel != 3 || cmd.CheckDepth != 288 {
-		raw.Params = append(raw.Params, cmd.CheckLevel)
+		params = append(params, cmd.CheckLevel)
 	}
-
 	if cmd.CheckDepth != 288 {
-		raw.Params = append(raw.Params, cmd.CheckDepth)
+		params = append(params, cmd.CheckDepth)
 	}
 
+	// Fill and marshal a RawCmd.
+	raw, err := NewRawCmd(cmd.id, cmd.Method(), params)
+	if err != nil {
+		return nil, err
+	}
 	return json.Marshal(raw)
 }
 
@@ -6749,21 +6497,19 @@ func (cmd *VerifyChainCmd) UnmarshalJSON(b []byte) error {
 
 	optArgs := make([]int32, 0, 2)
 	if len(r.Params) > 0 {
-		checklevel, ok := r.Params[0].(float64)
-		if !ok {
-			return errors.New("first optional parameter checklevel must be a number")
+		var checklevel int32
+		if err := json.Unmarshal(r.Params[0], &checklevel); err != nil {
+			return fmt.Errorf("first optional parameter 'checklevel' must be a 32-bit integer: %v", err)
 		}
-
-		optArgs = append(optArgs, int32(checklevel))
+		optArgs = append(optArgs, checklevel)
 	}
 
 	if len(r.Params) > 1 {
-		checkdepth, ok := r.Params[1].(float64)
-		if !ok {
-			return errors.New("second optional parameter checkdepth must be a number")
+		var checkdepth int32
+		if err := json.Unmarshal(r.Params[1], &checkdepth); err != nil {
+			return fmt.Errorf("second optional parameter 'checkdepth' must be a 32-bit integer: %v", err)
 		}
-
-		optArgs = append(optArgs, int32(checkdepth))
+		optArgs = append(optArgs, checkdepth)
 	}
 
 	newCmd, err := NewVerifyChainCmd(r.Id, optArgs...)
@@ -6817,17 +6563,17 @@ func (cmd *VerifyMessageCmd) Method() string {
 
 // MarshalJSON returns the JSON encoding of cmd.  Part of the Cmd interface.
 func (cmd *VerifyMessageCmd) MarshalJSON() ([]byte, error) {
-	raw := RawCmd{
-		Jsonrpc: "1.0",
-		Method:  "verifymessage",
-		Id:      cmd.id,
-		Params: []interface{}{
-			cmd.Address,
-			cmd.Signature,
-			cmd.Message,
-		},
+	params := []interface{}{
+		cmd.Address,
+		cmd.Signature,
+		cmd.Message,
 	}
 
+	// Fill and marshal a RawCmd.
+	raw, err := NewRawCmd(cmd.id, cmd.Method(), params)
+	if err != nil {
+		return nil, err
+	}
 	return json.Marshal(raw)
 }
 
@@ -6844,19 +6590,19 @@ func (cmd *VerifyMessageCmd) UnmarshalJSON(b []byte) error {
 		return ErrWrongNumberOfParams
 	}
 
-	address, ok := r.Params[0].(string)
-	if !ok {
-		return errors.New("first parameter address must be a string")
+	var address string
+	if err := json.Unmarshal(r.Params[0], &address); err != nil {
+		return fmt.Errorf("first parameter 'address' must be a string: %v", err)
 	}
 
-	signature, ok := r.Params[1].(string)
-	if !ok {
-		return errors.New("second parameter signature must be a string")
+	var signature string
+	if err := json.Unmarshal(r.Params[1], &signature); err != nil {
+		return fmt.Errorf("second parameter 'signature' must be a string: %v", err)
 	}
 
-	message, ok := r.Params[2].(string)
-	if !ok {
-		return errors.New("third parameter message must be a string")
+	var message string
+	if err := json.Unmarshal(r.Params[2], &message); err != nil {
+		return fmt.Errorf("third parameter 'message' must be a string: %v", err)
 	}
 
 	newCmd, err := NewVerifyMessageCmd(r.Id, address, signature, message)
@@ -6903,13 +6649,11 @@ func (cmd *WalletLockCmd) Method() string {
 
 // MarshalJSON returns the JSON encoding of cmd.  Part of the Cmd interface.
 func (cmd *WalletLockCmd) MarshalJSON() ([]byte, error) {
-	raw := RawCmd{
-		Jsonrpc: "1.0",
-		Method:  "walletlock",
-		Id:      cmd.id,
-		Params:  []interface{}{},
+	// Fill and marshal a RawCmd.
+	raw, err := NewRawCmd(cmd.id, cmd.Method(), []interface{}{})
+	if err != nil {
+		return nil, err
 	}
-
 	return json.Marshal(raw)
 }
 
@@ -6974,16 +6718,16 @@ func (cmd *WalletPassphraseCmd) Method() string {
 
 // MarshalJSON returns the JSON encoding of cmd.  Part of the Cmd interface.
 func (cmd *WalletPassphraseCmd) MarshalJSON() ([]byte, error) {
-	raw := RawCmd{
-		Jsonrpc: "1.0",
-		Method:  "walletpassphrase",
-		Id:      cmd.id,
-		Params: []interface{}{
-			cmd.Passphrase,
-			cmd.Timeout,
-		},
+	params := []interface{}{
+		cmd.Passphrase,
+		cmd.Timeout,
 	}
 
+	// Fill and marshal a RawCmd.
+	raw, err := NewRawCmd(cmd.id, cmd.Method(), params)
+	if err != nil {
+		return nil, err
+	}
 	return json.Marshal(raw)
 }
 
@@ -7000,17 +6744,17 @@ func (cmd *WalletPassphraseCmd) UnmarshalJSON(b []byte) error {
 		return ErrWrongNumberOfParams
 	}
 
-	passphrase, ok := r.Params[0].(string)
-	if !ok {
-		return errors.New("first parameter passphrase must be a string")
+	var passphrase string
+	if err := json.Unmarshal(r.Params[0], &passphrase); err != nil {
+		return fmt.Errorf("first parameter 'passphrase' must be a string: %v", err)
 	}
 
-	timeout, ok := r.Params[1].(float64)
-	if !ok {
-		return errors.New("second parameter timeout must be a number")
+	var timeout int64
+	if err := json.Unmarshal(r.Params[1], &timeout); err != nil {
+		return fmt.Errorf("second parameter 'timeout' must be an integer: %v", err)
 	}
 
-	newCmd, err := NewWalletPassphraseCmd(r.Id, passphrase, int64(timeout))
+	newCmd, err := NewWalletPassphraseCmd(r.Id, passphrase, timeout)
 	if err != nil {
 		return err
 	}
@@ -7058,16 +6802,16 @@ func (cmd *WalletPassphraseChangeCmd) Method() string {
 
 // MarshalJSON returns the JSON encoding of cmd.  Part of the Cmd interface.
 func (cmd *WalletPassphraseChangeCmd) MarshalJSON() ([]byte, error) {
-	raw := RawCmd{
-		Jsonrpc: "1.0",
-		Method:  "walletpassphrasechange",
-		Id:      cmd.id,
-		Params: []interface{}{
-			cmd.OldPassphrase,
-			cmd.NewPassphrase,
-		},
+	params := []interface{}{
+		cmd.OldPassphrase,
+		cmd.NewPassphrase,
 	}
 
+	// Fill and marshal a RawCmd.
+	raw, err := NewRawCmd(cmd.id, cmd.Method(), params)
+	if err != nil {
+		return nil, err
+	}
 	return json.Marshal(raw)
 }
 
@@ -7084,14 +6828,14 @@ func (cmd *WalletPassphraseChangeCmd) UnmarshalJSON(b []byte) error {
 		return ErrWrongNumberOfParams
 	}
 
-	oldpassphrase, ok := r.Params[0].(string)
-	if !ok {
-		return errors.New("first parameter oldpassphrase must be a string")
+	var oldpassphrase string
+	if err := json.Unmarshal(r.Params[0], &oldpassphrase); err != nil {
+		return fmt.Errorf("first parameter 'oldpassphrase' must be a string: %v", err)
 	}
 
-	newpassphrase, ok := r.Params[1].(string)
-	if !ok {
-		return errors.New("second parameter newpassphrase must be a string")
+	var newpassphrase string
+	if err := json.Unmarshal(r.Params[1], &newpassphrase); err != nil {
+		return fmt.Errorf("second parameter 'newpassphrase' must be a string: %v", err)
 	}
 
 	newCmd, err := NewWalletPassphraseChangeCmd(r.Id, oldpassphrase, newpassphrase)
