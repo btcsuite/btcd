@@ -1806,7 +1806,7 @@ func opcodeCheckSig(op *parsedOpcode, s *Script) error {
 			spew.Sdump(pkStr), pubKey.X, pubKey.Y,
 			signature.R, signature.S, spew.Sdump(hash))
 	}))
-	ok := ecdsa.Verify(pubKey, hash, signature.R, signature.S)
+	ok := ecdsa.Verify(pubKey.ToECDSA(), hash, signature.R, signature.S)
 	s.dstack.PushBool(ok)
 	return nil
 }
@@ -1845,7 +1845,7 @@ func opcodeCheckMultiSig(op *parsedOpcode, s *Script) error {
 		return StackErrTooManyOperations
 	}
 	pubKeyStrings := make([][]byte, npk)
-	pubKeys := make([]*ecdsa.PublicKey, npk)
+	pubKeys := make([]*btcec.PublicKey, npk)
 	for i := range pubKeys {
 		pubKeyStrings[i], err = s.dstack.PopByteArray()
 		if err != nil {
@@ -1930,7 +1930,7 @@ func opcodeCheckMultiSig(op *parsedOpcode, s *Script) error {
 					continue
 				}
 			}
-			success = ecdsa.Verify(pubKeys[curPk], hash,
+			success = ecdsa.Verify(pubKeys[curPk].ToECDSA(), hash,
 				signatures[i].s.R, signatures[i].s.S)
 			if success {
 				break inner
