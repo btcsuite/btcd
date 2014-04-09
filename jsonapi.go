@@ -106,6 +106,26 @@ type GetRawMempoolResult struct {
 	Depends          []string `json:"depends"`
 }
 
+// ListTransactionsResult models the data from the listtransactions command.
+type ListTransactionsResult struct {
+	Account         string   `json:"account"`
+	Address         string   `json:"address,omitempty"`
+	Category        string   `json:"category"`
+	Amount          float64  `json:"amount"`
+	Fee             float64  `json:"fee"`
+	Confirmations   int64    `json:"confirmations"`
+	Generated       bool     `json:"generated"`
+	BlockHash       string   `json:"blockhash,omitempty"`
+	BlockIndex      int64    `json:"blockindex,omitempty"`
+	BlockTime       int64    `json:"blocktime,omitempty"`
+	TxID            string   `json:"amount"`
+	WalletConflicts []string `json:"walletconflicts"`
+	Time            int64    `json:"time"`
+	TimeReceived    int64    `json:"timereceived"`
+	Comment         string   `json:"comment,omitempty"`
+	OtherAccount    float64  `json:"otheraccount"`
+}
+
 // TxRawResult models the data from the getrawtransaction command.
 type TxRawResult struct {
 	Hex           string `json:"hex"`
@@ -1019,6 +1039,12 @@ func ReadResultCmd(cmd string, message []byte) (Reply, error) {
 		}
 	case "signrawtransaction":
 		var res SignRawTransactionResult
+		err = json.Unmarshal(objmap["result"], &res)
+		if err == nil {
+			result.Result = res
+		}
+	case "listtransactions":
+		var res []ListTransactionsResult
 		err = json.Unmarshal(objmap["result"], &res)
 		if err == nil {
 			result.Result = res
