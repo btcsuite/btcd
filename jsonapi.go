@@ -67,6 +67,12 @@ type BlockResult struct {
 	NextHash      string        `json:"nextblockhash"`
 }
 
+// CreateMultiSigResult models the data returned from the createmultisig command.
+type CreateMultiSigResult struct {
+	Address      string `json:"address"`
+	RedeemScript string `json:"redeemScript"`
+}
+
 // DecodeScriptResult models the data returned from the decodescript command.
 type DecodeScriptResult struct {
 	Asm       string   `json:"asm"`
@@ -904,6 +910,12 @@ func ReadResultCmd(cmd string, message []byte) (Reply, error) {
 	// generate put the results in the proper structure.
 	// We handle the error condition after the switch statement.
 	switch cmd {
+	case "createmultisig":
+		var res CreateMultiSigResult
+		err = json.Unmarshal(objmap["result"], &res)
+		if err == nil {
+			result.Result = res
+		}
 	case "getaddednodeinfo":
 		// getaddednodeinfo can either return a JSON object or a
 		// slice of strings depending on the verbose flag.  Choose the
