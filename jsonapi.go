@@ -85,6 +85,7 @@ type DecodeScriptResult struct {
 // GetPeerInfoResult models the data returned from the getpeerinfo command.
 type GetPeerInfoResult struct {
 	Addr           string `json:"addr"`
+	AddrLocal      string `json:"addrlocal,omitempty"`
 	Services       string `json:"services"`
 	LastSend       int64  `json:"lastsend"`
 	LastRecv       int64  `json:"lastrecv"`
