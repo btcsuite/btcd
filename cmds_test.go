@@ -8,7 +8,6 @@ package btcws
 import (
 	"github.com/conformal/btcdb"
 	"github.com/conformal/btcjson"
-	"github.com/conformal/btcwire"
 	"github.com/davecgh/go-spew/spew"
 	"reflect"
 	"testing"
@@ -188,22 +187,20 @@ var cmdtests = []struct {
 	{
 		name: "notifyspent",
 		f: func() (btcjson.Cmd, error) {
-			op := &btcwire.OutPoint{
-				Hash: [...]byte{0, 1, 2, 3, 4, 5, 6, 7, 8, 9,
-					10, 11, 12, 13, 14, 15, 16, 17, 18, 19,
-					20, 21, 22, 23, 24, 25, 26, 27, 28, 29,
-					30, 31},
+			op := &OutPoint{
+				Hash: "000102030405060708091011121314" +
+					"1516171819202122232425262728" +
+					"293031",
 				Index: 1,
 			}
 			return NewNotifySpentCmd(float64(1), op), nil
 		},
 		result: &NotifySpentCmd{
 			id: float64(1),
-			OutPoint: &btcwire.OutPoint{
-				Hash: [...]byte{0, 1, 2, 3, 4, 5, 6, 7, 8, 9,
-					10, 11, 12, 13, 14, 15, 16, 17, 18, 19,
-					20, 21, 22, 23, 24, 25, 26, 27, 28, 29,
-					30, 31},
+			OutPoint: &OutPoint{
+				Hash: "000102030405060708091011121314" +
+					"1516171819202122232425262728" +
+					"293031",
 				Index: 1,
 			},
 		},
@@ -212,12 +209,11 @@ var cmdtests = []struct {
 		name: "rescan no optargs",
 		f: func() (btcjson.Cmd, error) {
 			addrs := []string{"17XhEvq9Nahdj7Xe1nv6oRe1tEmaHUuynH"}
-			ops := []*btcwire.OutPoint{
-				&btcwire.OutPoint{
-					Hash: [...]byte{0, 1, 2, 3, 4, 5, 6, 7, 8, 9,
-						10, 11, 12, 13, 14, 15, 16, 17, 18, 19,
-						20, 21, 22, 23, 24, 25, 26, 27, 28, 29,
-						30, 31},
+			ops := []OutPoint{
+				{
+					Hash: "000102030405060708091011121314" +
+						"1516171819202122232425262728" +
+						"293031",
 					Index: 1,
 				},
 			}
@@ -231,12 +227,11 @@ var cmdtests = []struct {
 			id:         float64(1),
 			BeginBlock: 270000,
 			Addresses:  []string{"17XhEvq9Nahdj7Xe1nv6oRe1tEmaHUuynH"},
-			OutPoints: []*btcwire.OutPoint{
-				&btcwire.OutPoint{
-					Hash: [...]byte{0, 1, 2, 3, 4, 5, 6, 7, 8, 9,
-						10, 11, 12, 13, 14, 15, 16, 17, 18, 19,
-						20, 21, 22, 23, 24, 25, 26, 27, 28, 29,
-						30, 31},
+			OutPoints: []OutPoint{
+				{
+					Hash: "000102030405060708091011121314" +
+						"1516171819202122232425262728" +
+						"293031",
 					Index: 1,
 				},
 			},
@@ -247,12 +242,11 @@ var cmdtests = []struct {
 		name: "rescan one optarg",
 		f: func() (btcjson.Cmd, error) {
 			addrs := []string{"17XhEvq9Nahdj7Xe1nv6oRe1tEmaHUuynH"}
-			ops := []*btcwire.OutPoint{
-				&btcwire.OutPoint{
-					Hash: [...]byte{0, 1, 2, 3, 4, 5, 6, 7, 8, 9,
-						10, 11, 12, 13, 14, 15, 16, 17, 18, 19,
-						20, 21, 22, 23, 24, 25, 26, 27, 28, 29,
-						30, 31},
+			ops := []OutPoint{
+				{
+					Hash: "000102030405060708091011121314" +
+						"1516171819202122232425262728" +
+						"293031",
 					Index: 1,
 				},
 			}
@@ -267,12 +261,11 @@ var cmdtests = []struct {
 			id:         float64(1),
 			BeginBlock: 270000,
 			Addresses:  []string{"17XhEvq9Nahdj7Xe1nv6oRe1tEmaHUuynH"},
-			OutPoints: []*btcwire.OutPoint{
-				&btcwire.OutPoint{
-					Hash: [...]byte{0, 1, 2, 3, 4, 5, 6, 7, 8, 9,
-						10, 11, 12, 13, 14, 15, 16, 17, 18, 19,
-						20, 21, 22, 23, 24, 25, 26, 27, 28, 29,
-						30, 31},
+			OutPoints: []OutPoint{
+				{
+					Hash: "000102030405060708091011121314" +
+						"1516171819202122232425262728" +
+						"293031",
 					Index: 1,
 				},
 			},

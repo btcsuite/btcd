@@ -91,10 +91,10 @@ func init() {
 
 // BlockDetails describes details of a tx in a block.
 type BlockDetails struct {
-	Height int32
-	Hash   string
-	Index  int
-	Time   int64
+	Height int32  `json:"height"`
+	Hash   string `json:"hash"`
+	Index  int    `json:"index"`
+	Time   int64  `json:"time"`
 }
 
 // AccountBalanceNtfn is a type handling custom marshaling and
@@ -131,17 +131,19 @@ func parseAccountBalanceNtfn(r *btcjson.RawCmd) (btcjson.Cmd, error) {
 		return nil, btcjson.ErrWrongNumberOfParams
 	}
 
-	account, ok := r.Params[0].(string)
-	if !ok {
-		return nil, errors.New("first parameter account must be a string")
+	var account string
+	if err := json.Unmarshal(r.Params[0], &account); err != nil {
+		return nil, errors.New("first parameter 'account' must be a string: " + err.Error())
 	}
-	balance, ok := r.Params[1].(float64)
-	if !ok {
-		return nil, errors.New("second parameter balance must be a number")
+
+	var balance float64
+	if err := json.Unmarshal(r.Params[1], &balance); err != nil {
+		return nil, errors.New("second parameter 'balance' must be a number: " + err.Error())
 	}
-	confirmed, ok := r.Params[2].(bool)
-	if !ok {
-		return nil, errors.New("third parameter confirmed must be a boolean")
+
+	var confirmed bool
+	if err := json.Unmarshal(r.Params[2], &confirmed); err != nil {
+		return nil, errors.New("third parameter 'confirmed' must be a bool: " + err.Error())
 	}
 
 	return NewAccountBalanceNtfn(account, balance, confirmed), nil
@@ -166,16 +168,18 @@ func (n *AccountBalanceNtfn) Method() string {
 // MarshalJSON returns the JSON encoding of n.  Part of the btcjson.Cmd
 // interface.
 func (n *AccountBalanceNtfn) MarshalJSON() ([]byte, error) {
-	ntfn := btcjson.Message{
-		Jsonrpc: "1.0",
-		Method:  n.Method(),
-		Params: []interface{}{
-			n.Account,
-			n.Balance,
-			n.Confirmed,
-		},
+	params := []interface{}{
+		n.Account,
+		n.Balance,
+		n.Confirmed,
 	}
-	return json.Marshal(ntfn)
+
+	// No ID for notifications.
+	raw, err := btcjson.NewRawCmd(nil, n.Method(), params)
+	if err != nil {
+		return nil, err
+	}
+	return json.Marshal(raw)
 }
 
 // UnmarshalJSON unmarshals the JSON encoding of n into n.  Part of
@@ -230,16 +234,17 @@ func parseBlockConnectedNtfn(r *btcjson.RawCmd) (btcjson.Cmd, error) {
 		return nil, btcjson.ErrWrongNumberOfParams
 	}
 
-	hash, ok := r.Params[0].(string)
-	if !ok {
-		return nil, errors.New("first parameter hash must be a string")
-	}
-	fheight, ok := r.Params[1].(float64)
-	if !ok {
-		return nil, errors.New("second parameter height must be a number")
+	var hash string
+	if err := json.Unmarshal(r.Params[0], &hash); err != nil {
+		return nil, errors.New("first parameter 'hash' must be a string: " + err.Error())
 	}
 
-	return NewBlockConnectedNtfn(hash, int32(fheight)), nil
+	var height int32
+	if err := json.Unmarshal(r.Params[1], &height); err != nil {
+		return nil, errors.New("second parameter 'height' must be a 32-bit integer: " + err.Error())
+	}
+
+	return NewBlockConnectedNtfn(hash, height), nil
 }
 
 // Id satisifies the btcjson.Cmd interface by returning nil for a
@@ -261,15 +266,17 @@ func (n *BlockConnectedNtfn) Method() string {
 // MarshalJSON returns the JSON encoding of n.  Part of the btcjson.Cmd
 // interface.
 func (n *BlockConnectedNtfn) MarshalJSON() ([]byte, error) {
-	ntfn := btcjson.Message{
-		Jsonrpc: "1.0",
-		Method:  n.Method(),
-		Params: []interface{}{
-			n.Hash,
-			n.Height,
-		},
+	params := []interface{}{
+		n.Hash,
+		n.Height,
 	}
-	return json.Marshal(ntfn)
+
+	// No ID for notifications.
+	raw, err := btcjson.NewRawCmd(nil, n.Method(), params)
+	if err != nil {
+		return nil, err
+	}
+	return json.Marshal(raw)
 }
 
 // UnmarshalJSON unmarshals the JSON encoding of n into n.  Part of
@@ -324,16 +331,17 @@ func parseBlockDisconnectedNtfn(r *btcjson.RawCmd) (btcjson.Cmd, error) {
 		return nil, btcjson.ErrWrongNumberOfParams
 	}
 
-	hash, ok := r.Params[0].(string)
-	if !ok {
-		return nil, errors.New("first parameter hash must be a string")
-	}
-	fheight, ok := r.Params[1].(float64)
-	if !ok {
-		return nil, errors.New("second parameter height must be a number")
+	var hash string
+	if err := json.Unmarshal(r.Params[0], &hash); err != nil {
+		return nil, errors.New("first parameter 'hash' must be a string: " + err.Error())
 	}
 
-	return NewBlockDisconnectedNtfn(hash, int32(fheight)), nil
+	var height int32
+	if err := json.Unmarshal(r.Params[1], &height); err != nil {
+		return nil, errors.New("second parameter 'height' must be a 32-bit integer: " + err.Error())
+	}
+
+	return NewBlockDisconnectedNtfn(hash, height), nil
 }
 
 // Id satisifies the btcjson.Cmd interface by returning nil for a
@@ -355,15 +363,17 @@ func (n *BlockDisconnectedNtfn) Method() string {
 // MarshalJSON returns the JSON encoding of n.  Part of the btcjson.Cmd
 // interface.
 func (n *BlockDisconnectedNtfn) MarshalJSON() ([]byte, error) {
-	ntfn := btcjson.Message{
-		Jsonrpc: "1.0",
-		Method:  n.Method(),
-		Params: []interface{}{
-			n.Hash,
-			n.Height,
-		},
+	params := []interface{}{
+		n.Hash,
+		n.Height,
 	}
-	return json.Marshal(ntfn)
+
+	// No ID for notifications.
+	raw, err := btcjson.NewRawCmd(nil, n.Method(), params)
+	if err != nil {
+		return nil, err
+	}
+	return json.Marshal(raw)
 }
 
 // UnmarshalJSON unmarshals the JSON encoding of n into n.  Part of
@@ -415,9 +425,9 @@ func parseBtcdConnectedNtfn(r *btcjson.RawCmd) (btcjson.Cmd, error) {
 		return nil, btcjson.ErrWrongNumberOfParams
 	}
 
-	connected, ok := r.Params[0].(bool)
-	if !ok {
-		return nil, errors.New("first parameter connected is not a boolean")
+	var connected bool
+	if err := json.Unmarshal(r.Params[0], &connected); err != nil {
+		return nil, errors.New("first parameter 'connected' must be a bool: " + err.Error())
 	}
 
 	return NewBtcdConnectedNtfn(connected), nil
@@ -442,14 +452,16 @@ func (n *BtcdConnectedNtfn) Method() string {
 // MarshalJSON returns the JSON encoding of n.  Part of the btcjson.Cmd
 // interface.
 func (n *BtcdConnectedNtfn) MarshalJSON() ([]byte, error) {
-	ntfn := btcjson.Message{
-		Jsonrpc: "1.0",
-		Method:  n.Method(),
-		Params: []interface{}{
-			n.Connected,
-		},
+	params := []interface{}{
+		n.Connected,
 	}
-	return json.Marshal(ntfn)
+
+	// No ID for notifications.
+	raw, err := btcjson.NewRawCmd(nil, n.Method(), params)
+	if err != nil {
+		return nil, err
+	}
+	return json.Marshal(raw)
 }
 
 // UnmarshalJSON unmarshals the JSON encoding of n into n.  Part of
@@ -505,48 +517,22 @@ func parseRecvTxNtfn(r *btcjson.RawCmd) (btcjson.Cmd, error) {
 		return nil, btcjson.ErrWrongNumberOfParams
 	}
 
-	hextx, ok := r.Params[0].(string)
-	if !ok {
-		return nil, errors.New("first parameter hextx must be a string")
+	var hextx string
+	if err := json.Unmarshal(r.Params[0], &hextx); err != nil {
+		return nil, errors.New("first parameter 'hextx' must be a " +
+			"string: " + err.Error())
 	}
 
-	ntfn := &RecvTxNtfn{HexTx: hextx}
-
+	var blockDetails *BlockDetails
 	if len(r.Params) > 1 {
-		details, ok := r.Params[1].(map[string]interface{})
-		if !ok {
-			return nil, errors.New("second parameter must be a JSON object")
-		}
-
-		height, ok := details["height"].(float64)
-		if !ok {
-			return nil, errors.New("unspecified block height")
-		}
-
-		hash, ok := details["hash"].(string)
-		if !ok {
-			return nil, errors.New("unspecified block hash")
-		}
-
-		index, ok := details["index"].(float64)
-		if !ok {
-			return nil, errors.New("unspecified block index")
-		}
-
-		time, ok := details["time"].(float64)
-		if !ok {
-			return nil, errors.New("unspecified block time")
-		}
-
-		ntfn.Block = &BlockDetails{
-			Height: int32(height),
-			Hash:   hash,
-			Index:  int(index),
-			Time:   int64(time),
+		if err := json.Unmarshal(r.Params[1], &blockDetails); err != nil {
+			return nil, errors.New("second optional parameter " +
+				"'details' must be a JSON oject of block " +
+				"details: " + err.Error())
 		}
 	}
 
-	return ntfn, nil
+	return NewRecvTxNtfn(hextx, blockDetails), nil
 }
 
 // Id satisifies the btcjson.Cmd interface by returning nil for a
@@ -568,25 +554,18 @@ func (n *RecvTxNtfn) Method() string {
 // MarshalJSON returns the JSON encoding of n.  Part of the btcjson.Cmd
 // interface.
 func (n *RecvTxNtfn) MarshalJSON() ([]byte, error) {
-	params := []interface{}{n.HexTx}
-
+	params := make([]interface{}, 1, 2)
+	params[0] = n.HexTx
 	if n.Block != nil {
-		details := map[string]interface{}{
-			"height": float64(n.Block.Height),
-			"hash":   n.Block.Hash,
-			"index":  float64(n.Block.Index),
-			"time":   float64(n.Block.Time),
-		}
-		params = append(params, details)
+		params = append(params, n.Block)
 	}
 
-	ntfn := btcjson.Message{
-		Jsonrpc: "1.0",
-		Method:  n.Method(),
-		Params:  params,
+	// No ID for notifications.
+	raw, err := btcjson.NewRawCmd(nil, n.Method(), params)
+	if err != nil {
+		return nil, err
 	}
-
-	return json.Marshal(ntfn)
+	return json.Marshal(raw)
 }
 
 // UnmarshalJSON unmarshals the JSON encoding of n into n.  Part of
@@ -642,48 +621,22 @@ func parseRedeemingTxNtfn(r *btcjson.RawCmd) (btcjson.Cmd, error) {
 		return nil, btcjson.ErrWrongNumberOfParams
 	}
 
-	hextx, ok := r.Params[0].(string)
-	if !ok {
-		return nil, errors.New("first parameter hextx must be a string")
+	var hextx string
+	if err := json.Unmarshal(r.Params[0], &hextx); err != nil {
+		return nil, errors.New("first parameter 'hextx' must be a " +
+			"string: " + err.Error())
 	}
 
-	ntfn := &RedeemingTxNtfn{HexTx: hextx}
-
+	var blockDetails *BlockDetails
 	if len(r.Params) > 1 {
-		details, ok := r.Params[1].(map[string]interface{})
-		if !ok {
-			return nil, errors.New("second parameter must be a JSON object")
-		}
-
-		height, ok := details["height"].(float64)
-		if !ok {
-			return nil, errors.New("unspecified block height")
-		}
-
-		hash, ok := details["hash"].(string)
-		if !ok {
-			return nil, errors.New("unspecified block hash")
-		}
-
-		index, ok := details["index"].(float64)
-		if !ok {
-			return nil, errors.New("unspecified block index")
-		}
-
-		time, ok := details["time"].(float64)
-		if !ok {
-			return nil, errors.New("unspecified block time")
-		}
-
-		ntfn.Block = &BlockDetails{
-			Height: int32(height),
-			Hash:   hash,
-			Index:  int(index),
-			Time:   int64(time),
+		if err := json.Unmarshal(r.Params[1], &blockDetails); err != nil {
+			return nil, errors.New("second optional parameter " +
+				"'details' must be a JSON oject of block " +
+				"details: " + err.Error())
 		}
 	}
 
-	return ntfn, nil
+	return NewRedeemingTxNtfn(hextx, blockDetails), nil
 }
 
 // Id satisifies the btcjson.Cmd interface by returning nil for a
@@ -705,25 +658,18 @@ func (n *RedeemingTxNtfn) Method() string {
 // MarshalJSON returns the JSON encoding of n.  Part of the btcjson.Cmd
 // interface.
 func (n *RedeemingTxNtfn) MarshalJSON() ([]byte, error) {
-	params := []interface{}{n.HexTx}
-
+	params := make([]interface{}, 1, 2)
+	params[0] = n.HexTx
 	if n.Block != nil {
-		details := map[string]interface{}{
-			"height": float64(n.Block.Height),
-			"hash":   n.Block.Hash,
-			"index":  float64(n.Block.Index),
-			"time":   float64(n.Block.Time),
-		}
-		params = append(params, details)
+		params = append(params, n.Block)
 	}
 
-	ntfn := btcjson.Message{
-		Jsonrpc: "1.0",
-		Method:  n.Method(),
-		Params:  params,
+	// No ID for notifications.
+	raw, err := btcjson.NewRawCmd(nil, n.Method(), params)
+	if err != nil {
+		return nil, err
 	}
-
-	return json.Marshal(ntfn)
+	return json.Marshal(raw)
 }
 
 // UnmarshalJSON unmarshals the JSON encoding of n into n.  Part of
@@ -774,12 +720,13 @@ func parseRescanProgressNtfn(r *btcjson.RawCmd) (btcjson.Cmd, error) {
 		return nil, btcjson.ErrWrongNumberOfParams
 	}
 
-	last, ok := r.Params[0].(float64)
-	if !ok {
-		return nil, errors.New("first parameter must be a number")
+	var last int32
+	if err := json.Unmarshal(r.Params[0], &last); err != nil {
+		return nil, errors.New("first parameter 'last' must be a " +
+			"32-bit integer: " + err.Error())
 	}
 
-	return NewRescanProgressNtfn(int32(last)), nil
+	return NewRescanProgressNtfn(last), nil
 }
 
 // Id satisifies the btcjson.Cmd interface by returning nil for a
@@ -801,12 +748,16 @@ func (n *RescanProgressNtfn) Method() string {
 // MarshalJSON returns the JSON encoding of n.  Part of the btcjson.Cmd
 // interface.
 func (n *RescanProgressNtfn) MarshalJSON() ([]byte, error) {
-	ntfn := btcjson.Message{
-		Jsonrpc: "1.0",
-		Method:  n.Method(),
-		Params:  []interface{}{n.LastProcessed},
+	params := []interface{}{
+		n.LastProcessed,
 	}
-	return json.Marshal(ntfn)
+
+	// No ID for notifications.
+	raw, err := btcjson.NewRawCmd(nil, n.Method(), params)
+	if err != nil {
+		return nil, err
+	}
+	return json.Marshal(raw)
 }
 
 // UnmarshalJSON unmarshals the JSON encoding of n into n.  Part of
@@ -861,13 +812,17 @@ func parseTxNtfn(r *btcjson.RawCmd) (btcjson.Cmd, error) {
 		return nil, btcjson.ErrWrongNumberOfParams
 	}
 
-	account, ok := r.Params[0].(string)
-	if !ok {
-		return nil, errors.New("first parameter account must be a string")
+	var account string
+	if err := json.Unmarshal(r.Params[0], &account); err != nil {
+		return nil, errors.New("first parameter 'account' must be a " +
+			"string: " + err.Error())
 	}
-	details, ok := r.Params[1].(map[string]interface{})
-	if !ok {
-		return nil, errors.New("second parameter details must be a JSON object")
+
+	// TODO(davec): Object
+	var details map[string]interface{}
+	if err := json.Unmarshal(r.Params[1], &details); err != nil {
+		return nil, errors.New("second parameter 'details' must be a " +
+			"JSON object of transaction details: " + err.Error())
 	}
 
 	return NewTxNtfn(account, details), nil
@@ -892,15 +847,17 @@ func (n *TxNtfn) Method() string {
 // MarshalJSON returns the JSON encoding of n.  Part of the btcjson.Cmd
 // interface.
 func (n *TxNtfn) MarshalJSON() ([]byte, error) {
-	ntfn := btcjson.Message{
-		Jsonrpc: "1.0",
-		Method:  n.Method(),
-		Params: []interface{}{
-			n.Account,
-			n.Details,
-		},
+	params := []interface{}{
+		n.Account,
+		n.Details,
 	}
-	return json.Marshal(ntfn)
+
+	// No ID for notifications.
+	raw, err := btcjson.NewRawCmd(nil, n.Method(), params)
+	if err != nil {
+		return nil, err
+	}
+	return json.Marshal(raw)
 }
 
 // UnmarshalJSON unmarshals the JSON encoding of n into n.  Part of
@@ -958,13 +915,16 @@ func parseWalletLockStateNtfn(r *btcjson.RawCmd) (btcjson.Cmd, error) {
 		return nil, btcjson.ErrWrongNumberOfParams
 	}
 
-	account, ok := r.Params[0].(string)
-	if !ok {
-		return nil, errors.New("first parameter account must be a string")
+	var account string
+	if err := json.Unmarshal(r.Params[0], &account); err != nil {
+		return nil, errors.New("first parameter 'account' must be a " +
+			"string: " + err.Error())
 	}
-	locked, ok := r.Params[1].(bool)
-	if !ok {
-		return nil, errors.New("second parameter locked must be a boolean")
+
+	var locked bool
+	if err := json.Unmarshal(r.Params[1], &locked); err != nil {
+		return nil, errors.New("second parameter 'locked' must be a " +
+			"bool: " + err.Error())
 	}
 
 	return NewWalletLockStateNtfn(account, locked), nil
@@ -989,15 +949,17 @@ func (n *WalletLockStateNtfn) Method() string {
 // MarshalJSON returns the JSON encoding of n.  Part of the btcjson.Cmd
 // interface.
 func (n *WalletLockStateNtfn) MarshalJSON() ([]byte, error) {
-	ntfn := btcjson.Message{
-		Jsonrpc: "1.0",
-		Method:  n.Method(),
-		Params: []interface{}{
-			n.Account,
-			n.Locked,
-		},
+	params := []interface{}{
+		n.Account,
+		n.Locked,
 	}
-	return json.Marshal(ntfn)
+
+	// No ID for notifications.
+	raw, err := btcjson.NewRawCmd(nil, n.Method(), params)
+	if err != nil {
+		return nil, err
+	}
+	return json.Marshal(raw)
 }
 
 // UnmarshalJSON unmarshals the JSON encoding of n into n.  Part of
@@ -1052,16 +1014,19 @@ func parseAllTxNtfn(r *btcjson.RawCmd) (btcjson.Cmd, error) {
 		return nil, btcjson.ErrWrongNumberOfParams
 	}
 
-	txid, ok := r.Params[0].(string)
-	if !ok {
-		return nil, errors.New("first parameter txid must be a string")
-	}
-	famount, ok := r.Params[1].(float64)
-	if !ok {
-		return nil, errors.New("second parameter amount must be a number")
+	var txid string
+	if err := json.Unmarshal(r.Params[0], &txid); err != nil {
+		return nil, errors.New("first parameter 'txid' must be a " +
+			"string: " + err.Error())
 	}
 
-	return NewAllTxNtfn(txid, int64(famount)), nil
+	var amount int64
+	if err := json.Unmarshal(r.Params[1], &amount); err != nil {
+		return nil, errors.New("second parameter 'amount' must be an " +
+			"integer: " + err.Error())
+	}
+
+	return NewAllTxNtfn(txid, amount), nil
 }
 
 // Id satisifies the btcjson.Cmd interface by returning nil for a
@@ -1083,15 +1048,17 @@ func (n *AllTxNtfn) Method() string {
 // MarshalJSON returns the JSON encoding of n.  Part of the btcjson.Cmd
 // interface.
 func (n *AllTxNtfn) MarshalJSON() ([]byte, error) {
-	ntfn := btcjson.Message{
-		Jsonrpc: "1.0",
-		Method:  n.Method(),
-		Params: []interface{}{
-			n.TxID,
-			n.Amount,
-		},
+	params := []interface{}{
+		n.TxID,
+		n.Amount,
 	}
-	return json.Marshal(ntfn)
+
+	// No ID for notifications.
+	raw, err := btcjson.NewRawCmd(nil, n.Method(), params)
+	if err != nil {
+		return nil, err
+	}
+	return json.Marshal(raw)
 }
 
 // UnmarshalJSON unmarshals the JSON encoding of n into n.  Part of
@@ -1151,32 +1118,26 @@ func (n *AllVerboseTxNtfn) Method() string {
 // MarshalJSON returns the JSON encoding of n.  Part of the btcjson.Cmd
 // interface.
 func (n *AllVerboseTxNtfn) MarshalJSON() ([]byte, error) {
-	ntfn := btcjson.Message{
-		Jsonrpc: "1.0",
-		Method:  n.Method(),
-		Params: []interface{}{
-			n.RawTx,
-		},
+	params := []interface{}{
+		n.RawTx,
 	}
-	return json.Marshal(ntfn)
+
+	// No ID for notifications.
+	raw, err := btcjson.NewRawCmd(nil, n.Method(), params)
+	if err != nil {
+		return nil, err
+	}
+	return json.Marshal(raw)
 }
 
 func generateAllVerboseTxNtfn() btcjson.Cmd {
 	return new(AllVerboseTxNtfn)
 }
 
-type rawParamsCmd struct {
-	Jsonrpc string             `json:"jsonrpc"`
-	Id      interface{}        `json:"id"`
-	Method  string             `json:"method"`
-	Params  []*json.RawMessage `json:"params"`
-}
-
 // UnmarshalJSON unmarshals the JSON encoding of n into n.  Part of
 // the btcjson.Cmd interface.
 func (n *AllVerboseTxNtfn) UnmarshalJSON(b []byte) error {
-	// Unmarshal into a custom rawParamsCmd
-	var r rawParamsCmd
+	var r btcjson.RawCmd
 	if err := json.Unmarshal(b, &r); err != nil {
 		return err
 	}
@@ -1190,7 +1151,7 @@ func (n *AllVerboseTxNtfn) UnmarshalJSON(b []byte) error {
 	}
 
 	var rawTx *btcjson.TxRawResult
-	if err := json.Unmarshal(*r.Params[0], &rawTx); err != nil {
+	if err := json.Unmarshal(r.Params[0], &rawTx); err != nil {
 		return err
 	}
 

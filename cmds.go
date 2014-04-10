@@ -84,14 +84,16 @@ func parseAuthenticateCmd(r *btcjson.RawCmd) (btcjson.Cmd, error) {
 		return nil, btcjson.ErrWrongNumberOfParams
 	}
 
-	username, ok := r.Params[0].(string)
-	if !ok {
-		return nil, errors.New("first parameter username must be a string")
+	var username string
+	if err := json.Unmarshal(r.Params[0], &username); err != nil {
+		return nil, errors.New("first parameter 'username' must be " +
+			"a string: " + err.Error())
 	}
 
-	passphrase, ok := r.Params[1].(string)
-	if !ok {
-		return nil, errors.New("second parameter passphrase must be a string")
+	var passphrase string
+	if err := json.Unmarshal(r.Params[1], &passphrase); err != nil {
+		return nil, errors.New("second parameter 'passphrase' must " +
+			"be a string: " + err.Error())
 	}
 
 	return NewAuthenticateCmd(r.Id, username, passphrase), nil
@@ -114,15 +116,14 @@ func (cmd *AuthenticateCmd) Method() string {
 
 // MarshalJSON returns the JSON encoding of cmd.  Part of the Cmd interface.
 func (cmd *AuthenticateCmd) MarshalJSON() ([]byte, error) {
-	// Fill a RawCmd and marshal.
-	raw := btcjson.RawCmd{
-		Jsonrpc: "1.0",
-		Method:  cmd.Method(),
-		Id:      cmd.id,
-		Params: []interface{}{
-			cmd.Username,
-			cmd.Passphrase,
-		},
+	params := []interface{}{
+		cmd.Username,
+		cmd.Passphrase,
+	}
+
+	raw, err := btcjson.NewRawCmd(cmd.id, cmd.Method(), params)
+	if err != nil {
+		return nil, err
 	}
 	return json.Marshal(raw)
 }
@@ -192,11 +193,9 @@ func (cmd *GetCurrentNetCmd) Method() string {
 
 // MarshalJSON returns the JSON encoding of cmd.  Part of the Cmd interface.
 func (cmd *GetCurrentNetCmd) MarshalJSON() ([]byte, error) {
-	// Fill a RawCmd and marshal.
-	raw := btcjson.RawCmd{
-		Jsonrpc: "1.0",
-		Method:  "getcurrentnet",
-		Id:      cmd.id,
+	raw, err := btcjson.NewRawCmd(cmd.id, cmd.Method(), []interface{}{})
+	if err != nil {
+		return nil, err
 	}
 	return json.Marshal(raw)
 }
@@ -272,7 +271,30 @@ func NewExportWatchingWalletCmd(id interface{}, optArgs ...interface{}) (*Export
 // satisifying the btcjson.Cmd interface.  This is used when registering
 // the custom command with the btcjson parser.
 func parseExportWatchingWalletCmd(r *btcjson.RawCmd) (btcjson.Cmd, error) {
-	return NewExportWatchingWalletCmd(r.Id, r.Params...)
+	if len(r.Params) > 2 {
+		return nil, btcjson.ErrTooManyOptArgs
+	}
+
+	optArgs := make([]interface{}, 0, 2)
+	if len(r.Params) > 0 {
+		var account string
+		if err := json.Unmarshal(r.Params[0], &account); err != nil {
+			return nil, errors.New("first optional parameter " +
+				" 'account' must be a string: " + err.Error())
+		}
+		optArgs = append(optArgs, account)
+	}
+
+	if len(r.Params) > 1 {
+		var download bool
+		if err := json.Unmarshal(r.Params[1], &download); err != nil {
+			return nil, errors.New("second optional parameter " +
+				" 'download' must be a bool: " + err.Error())
+		}
+		optArgs = append(optArgs, download)
+	}
+
+	return NewExportWatchingWalletCmd(r.Id, optArgs...)
 }
 
 // Id satisifies the Cmd interface by returning the ID of the command.
@@ -292,20 +314,18 @@ func (cmd *ExportWatchingWalletCmd) Method() string {
 
 // MarshalJSON returns the JSON encoding of cmd.  Part of the Cmd interface.
 func (cmd *ExportWatchingWalletCmd) MarshalJSON() ([]byte, error) {
-	// Fill a RawCmd and marshal.
-	raw := btcjson.RawCmd{
-		Jsonrpc: "1.0",
-		Method:  "exportwatchingwallet",
-		Id:      cmd.id,
-	}
-
+	params := make([]interface{}, 0, 2)
 	if cmd.Account != "" || cmd.Download {
-		raw.Params = append(raw.Params, cmd.Account)
+		params = append(params, cmd.Account)
 	}
 	if cmd.Download {
-		raw.Params = append(raw.Params, cmd.Download)
+		params = append(params, cmd.Download)
 	}
 
+	raw, err := btcjson.NewRawCmd(cmd.id, cmd.Method(), params)
+	if err != nil {
+		return nil, err
+	}
 	return json.Marshal(raw)
 }
 
@@ -372,17 +392,17 @@ func parseGetUnconfirmedBalanceCmd(r *btcjson.RawCmd) (btcjson.Cmd, error) {
 		return nil, btcjson.ErrWrongNumberOfParams
 	}
 
-	if len(r.Params) == 0 {
-		// No optional args.
-		return NewGetUnconfirmedBalanceCmd(r.Id)
+	optArgs := make([]string, 0, 1)
+	if len(r.Params) > 0 {
+		var account string
+		if err := json.Unmarshal(r.Params[0], &account); err != nil {
+			return nil, errors.New("first optional parameter " +
+				" 'account' must be a string: " + err.Error())
+		}
+		optArgs = append(optArgs, account)
 	}
 
-	// One optional parameter for account.
-	account, ok := r.Params[0].(string)
-	if !ok {
-		return nil, errors.New("first parameter account must be a string")
-	}
-	return NewGetUnconfirmedBalanceCmd(r.Id, account)
+	return NewGetUnconfirmedBalanceCmd(r.Id, optArgs...)
 }
 
 // Id satisifies the Cmd interface by returning the ID of the command.
@@ -402,17 +422,15 @@ func (cmd *GetUnconfirmedBalanceCmd) Method() string {
 
 // MarshalJSON returns the JSON encoding of cmd.  Part of the Cmd interface.
 func (cmd *GetUnconfirmedBalanceCmd) MarshalJSON() ([]byte, error) {
-	// Fill a RawCmd and marshal.
-	raw := btcjson.RawCmd{
-		Jsonrpc: "1.0",
-		Method:  "getunconfirmedbalance",
-		Id:      cmd.id,
-	}
-
+	params := make([]interface{}, 0, 1)
 	if cmd.Account != "" {
-		raw.Params = append(raw.Params, cmd.Account)
+		params = append(params, cmd.Account)
 	}
 
+	raw, err := btcjson.NewRawCmd(cmd.id, cmd.Method(), params)
+	if err != nil {
+		return nil, err
+	}
 	return json.Marshal(raw)
 }
 
@@ -487,11 +505,9 @@ func (cmd *GetBestBlockCmd) Method() string {
 
 // MarshalJSON returns the JSON encoding of cmd.  Part of the Cmd interface.
 func (cmd *GetBestBlockCmd) MarshalJSON() ([]byte, error) {
-	// Fill a RawCmd and marshal.
-	raw := btcjson.RawCmd{
-		Jsonrpc: "1.0",
-		Method:  "getbestblock",
-		Id:      cmd.id,
+	raw, err := btcjson.NewRawCmd(cmd.id, cmd.Method(), []interface{}{})
+	if err != nil {
+		return nil, err
 	}
 	return json.Marshal(raw)
 }
@@ -547,15 +563,19 @@ func parseRecoverAddressesCmd(r *btcjson.RawCmd) (btcjson.Cmd, error) {
 		return nil, btcjson.ErrWrongNumberOfParams
 	}
 
-	account, ok := r.Params[0].(string)
-	if !ok {
-		return nil, errors.New("first parameter account must be a string")
+	var account string
+	if err := json.Unmarshal(r.Params[0], &account); err != nil {
+		return nil, errors.New("first parameter 'account' must be a " +
+			"string: " + err.Error())
 	}
-	n, ok := r.Params[1].(float64)
-	if !ok {
-		return nil, errors.New("second parameter n must be a number")
+
+	var n int
+	if err := json.Unmarshal(r.Params[1], &n); err != nil {
+		return nil, errors.New("second parameter 'n' must be an " +
+			"integer: " + err.Error())
 	}
-	return NewRecoverAddressesCmd(r.Id, account, int(n)), nil
+
+	return NewRecoverAddressesCmd(r.Id, account, n), nil
 }
 
 // Id satisifies the Cmd interface by returning the ID of the command.
@@ -575,17 +595,15 @@ func (cmd *RecoverAddressesCmd) Method() string {
 
 // MarshalJSON returns the JSON encoding of cmd.  Part of the Cmd interface.
 func (cmd *RecoverAddressesCmd) MarshalJSON() ([]byte, error) {
-	// Fill a RawCmd and marshal.
-	raw := btcjson.RawCmd{
-		Jsonrpc: "1.0",
-		Method:  "recoveraddresses",
-		Id:      cmd.id,
-		Params: []interface{}{
-			cmd.Account,
-			cmd.N,
-		},
+	params := []interface{}{
+		cmd.Account,
+		cmd.N,
 	}
 
+	raw, err := btcjson.NewRawCmd(cmd.id, cmd.Method(), params)
+	if err != nil {
+		return nil, err
+	}
 	return json.Marshal(raw)
 }
 
@@ -611,6 +629,22 @@ func (cmd *RecoverAddressesCmd) UnmarshalJSON(b []byte) error {
 	return nil
 }
 
+// OutPoint describes a transaction outpoint that will be marshalled to and
+// from JSON.
+type OutPoint struct {
+	Hash  string `json:"hash"`
+	Index uint32 `json:"index"`
+}
+
+// NewOutPointFromWire creates a new OutPoint from the OutPoint structure
+// of the btcwire package.
+func NewOutPointFromWire(op *btcwire.OutPoint) *OutPoint {
+	return &OutPoint{
+		Hash:  op.Hash.String(),
+		Index: op.Index,
+	}
+}
+
 // RescanCmd is a type handling custom marshaling and
 // unmarshaling of rescan JSON websocket extension
 // commands.
@@ -618,7 +652,7 @@ type RescanCmd struct {
 	id         interface{}
 	BeginBlock int32
 	Addresses  []string
-	OutPoints  []*btcwire.OutPoint
+	OutPoints  []OutPoint
 	EndBlock   int64 // TODO: switch this and btcdb.AllShas to int32
 }
 
@@ -629,7 +663,7 @@ var _ btcjson.Cmd = &RescanCmd{}
 // arguments optArgs which may either be empty or a single upper
 // block height.
 func NewRescanCmd(id interface{}, begin int32, addresses []string,
-	outpoints []*btcwire.OutPoint, optArgs ...int64) (*RescanCmd, error) {
+	outpoints []OutPoint, optArgs ...int64) (*RescanCmd, error) {
 
 	// Optional parameters set to their defaults.
 	end := btcdb.AllShas
@@ -658,60 +692,36 @@ func parseRescanCmd(r *btcjson.RawCmd) (btcjson.Cmd, error) {
 		return nil, btcjson.ErrWrongNumberOfParams
 	}
 
-	begin, ok := r.Params[0].(float64)
-	if !ok {
-		return nil, errors.New("first parameter must be a number")
+	var begin int32
+	if err := json.Unmarshal(r.Params[0], &begin); err != nil {
+		return nil, errors.New("first parameter 'begin' must be a " +
+			"32-bit integer: " + err.Error())
 	}
 
-	iaddrs, ok := r.Params[1].([]interface{})
-	if !ok {
-		return nil, errors.New("second parameter must be a JSON array")
-	}
-	addresses := make([]string, 0, len(iaddrs))
-	for _, addr := range iaddrs {
-		addrStr, ok := addr.(string)
-		if !ok {
-			return nil, errors.New("address is not a string")
-		}
-		addresses = append(addresses, addrStr)
+	var addresses []string
+	if err := json.Unmarshal(r.Params[1], &addresses); err != nil {
+		return nil, errors.New("second parameter 'addresses' must be " +
+			"an array of strings: " + err.Error())
 	}
 
-	ops, ok := r.Params[2].([]interface{})
-	if !ok {
-		return nil, errors.New("third parameter must be a JSON array")
-	}
-	outpoints := make([]*btcwire.OutPoint, 0, len(ops))
-	for i := range ops {
-		op, ok := ops[i].(map[string]interface{})
-		if !ok {
-			return nil, errors.New("outpoint is not a JSON object")
-		}
-		txHashHexStr, ok := op["hash"].(string)
-		if !ok {
-			return nil, errors.New("outpoint hash is not a string")
-		}
-		txHash, err := btcwire.NewShaHashFromStr(txHashHexStr)
-		if err != nil {
-			return nil, errors.New("outpoint hash is not a valid hex string")
-		}
-		index, ok := op["index"].(float64)
-		if !ok {
-			return nil, errors.New("outpoint index is not a number")
-		}
-		outpoints = append(outpoints, btcwire.NewOutPoint(txHash, uint32(index)))
+	var outpoints []OutPoint
+	if err := json.Unmarshal(r.Params[2], &outpoints); err != nil {
+		return nil, errors.New("third parameter 'outpoints' must be " +
+			"an array of transaction outpoint JSON objects: " +
+			err.Error())
 	}
 
-	params := make([]int64, len(r.Params[3:]))
-	for i, val := range r.Params[3:] {
-		fval, ok := val.(float64)
-		if !ok {
-			return nil, errors.New("optional parameters must " +
-				"be be numbers")
+	optArgs := make([]int64, 0, 1)
+	if len(r.Params) > 3 {
+		var endblock int64
+		if err := json.Unmarshal(r.Params[3], &endblock); err != nil {
+			return nil, errors.New("fourth optional parameter " +
+				" 'endblock' must be an integer: " + err.Error())
 		}
-		params[i] = int64(fval)
+		optArgs = append(optArgs, endblock)
 	}
 
-	return NewRescanCmd(r.Id, int32(begin), addresses, outpoints, params...)
+	return NewRescanCmd(r.Id, begin, addresses, outpoints, optArgs...)
 }
 
 // Id satisifies the Cmd interface by returning the ID of the command.
@@ -731,30 +741,18 @@ func (cmd *RescanCmd) Method() string {
 
 // MarshalJSON returns the JSON encoding of cmd.  Part of the Cmd interface.
 func (cmd *RescanCmd) MarshalJSON() ([]byte, error) {
-	ops := make([]interface{}, 0, len(cmd.OutPoints))
-	for _, op := range cmd.OutPoints {
-		ops = append(ops, map[string]interface{}{
-			"hash":  op.Hash.String(),
-			"index": float64(op.Index),
-		})
-	}
-
-	// Fill a RawCmd and marshal.
-	raw := btcjson.RawCmd{
-		Jsonrpc: "1.0",
-		Method:  "rescan",
-		Id:      cmd.id,
-		Params: []interface{}{
-			cmd.BeginBlock,
-			cmd.Addresses,
-			ops,
-		},
-	}
-
+	params := make([]interface{}, 3, 4)
+	params[0] = cmd.BeginBlock
+	params[1] = cmd.Addresses
+	params[2] = cmd.OutPoints
 	if cmd.EndBlock != btcdb.AllShas {
-		raw.Params = append(raw.Params, cmd.EndBlock)
+		params = append(params, cmd.EndBlock)
 	}
 
+	raw, err := btcjson.NewRawCmd(cmd.id, cmd.Method(), params)
+	if err != nil {
+		return nil, err
+	}
 	return json.Marshal(raw)
 }
 
@@ -824,13 +822,10 @@ func (cmd *NotifyBlocksCmd) Method() string {
 
 // MarshalJSON returns the JSON encoding of cmd.  Part of the Cmd interface.
 func (cmd *NotifyBlocksCmd) MarshalJSON() ([]byte, error) {
-	// Fill a RawCmd and marshal.
-	raw := btcjson.RawCmd{
-		Jsonrpc: "1.0",
-		Method:  "notifyblocks",
-		Id:      cmd.id,
+	raw, err := btcjson.NewRawCmd(cmd.id, cmd.Method(), []interface{}{})
+	if err != nil {
+		return nil, err
 	}
-
 	return json.Marshal(raw)
 }
 
@@ -883,18 +878,10 @@ func parseNotifyNewTXsCmd(r *btcjson.RawCmd) (btcjson.Cmd, error) {
 		return nil, btcjson.ErrWrongNumberOfParams
 	}
 
-	iaddrs, ok := r.Params[0].([]interface{})
-	if !ok {
-		return nil, errors.New("first parameter must be a JSON array")
-	}
-	addresses := make([]string, len(iaddrs))
-	for i := range iaddrs {
-		addr, ok := iaddrs[i].(string)
-		if !ok {
-			return nil, errors.New("first parameter must be an " +
-				"array of strings")
-		}
-		addresses[i] = addr
+	var addresses []string
+	if err := json.Unmarshal(r.Params[0], &addresses); err != nil {
+		return nil, errors.New("first parameter 'addresses' must be " +
+			"an array of strings: " + err.Error())
 	}
 
 	return NewNotifyNewTXsCmd(r.Id, addresses), nil
@@ -917,16 +904,14 @@ func (cmd *NotifyNewTXsCmd) Method() string {
 
 // MarshalJSON returns the JSON encoding of cmd.  Part of the Cmd interface.
 func (cmd *NotifyNewTXsCmd) MarshalJSON() ([]byte, error) {
-	// Fill a RawCmd and marshal.
-	raw := btcjson.RawCmd{
-		Jsonrpc: "1.0",
-		Method:  "notifynewtxs",
-		Id:      cmd.id,
-		Params: []interface{}{
-			cmd.Addresses,
-		},
+	params := []interface{}{
+		cmd.Addresses,
 	}
 
+	raw, err := btcjson.NewRawCmd(cmd.id, cmd.Method(), params)
+	if err != nil {
+		return nil, err
+	}
 	return json.Marshal(raw)
 }
 
@@ -986,17 +971,21 @@ func NewNotifyAllNewTXsCmd(id interface{}, optArgs ...bool) (*NotifyAllNewTXsCmd
 // satisifying the btcjson.Cmd interface.  This is used when registering
 // the custom command with the btcjson parser.
 func parseNotifyAllNewTXsCmd(r *btcjson.RawCmd) (btcjson.Cmd, error) {
-	verbose := false
-	numParams := len(r.Params)
-
-	if numParams > 0 {
-		if numParams > 1 {
-			return nil, btcjson.ErrWrongNumberOfParams
-		}
-		verbose = r.Params[0].(bool)
+	if len(r.Params) > 1 {
+		return nil, btcjson.ErrWrongNumberOfParams
 	}
 
-	return NewNotifyAllNewTXsCmd(r.Id, verbose)
+	optArgs := make([]bool, 0, 1)
+	if len(r.Params) > 0 {
+		var verbose bool
+		if err := json.Unmarshal(r.Params[0], &verbose); err != nil {
+			return nil, errors.New("first optional parameter " +
+				"'verbose' must be a bool: " + err.Error())
+		}
+		optArgs = append(optArgs, verbose)
+	}
+
+	return NewNotifyAllNewTXsCmd(r.Id, optArgs...)
 }
 
 // Id satisifies the Cmd interface by returning the ID of the command.
@@ -1016,16 +1005,14 @@ func (cmd *NotifyAllNewTXsCmd) Method() string {
 
 // MarshalJSON returns the JSON encoding of cmd.  Part of the Cmd interface.
 func (cmd *NotifyAllNewTXsCmd) MarshalJSON() ([]byte, error) {
-	// Fill a RawCmd and marshal.
-	raw := btcjson.RawCmd{
-		Jsonrpc: "1.0",
-		Method:  "notifyallnewtxs",
-		Id:      cmd.id,
-		Params: []interface{}{
-			cmd.Verbose,
-		},
+	params := []interface{}{
+		cmd.Verbose,
 	}
 
+	raw, err := btcjson.NewRawCmd(cmd.id, cmd.Method(), params)
+	if err != nil {
+		return nil, err
+	}
 	return json.Marshal(raw)
 }
 
@@ -1056,14 +1043,14 @@ func (cmd *NotifyAllNewTXsCmd) UnmarshalJSON(b []byte) error {
 // commands.
 type NotifySpentCmd struct {
 	id interface{}
-	*btcwire.OutPoint
+	*OutPoint
 }
 
 // Enforce that NotifySpentCmd satisifies the btcjson.Cmd interface.
 var _ btcjson.Cmd = &NotifySpentCmd{}
 
 // NewNotifySpentCmd creates a new NotifySpentCmd.
-func NewNotifySpentCmd(id interface{}, op *btcwire.OutPoint) *NotifySpentCmd {
+func NewNotifySpentCmd(id interface{}, op *OutPoint) *NotifySpentCmd {
 	return &NotifySpentCmd{
 		id:       id,
 		OutPoint: op,
@@ -1074,29 +1061,17 @@ func NewNotifySpentCmd(id interface{}, op *btcwire.OutPoint) *NotifySpentCmd {
 // satisifying the btcjson.Cmd interface.  This is used when registering
 // the custom command with the btcjson parser.
 func parseNotifySpentCmd(r *btcjson.RawCmd) (btcjson.Cmd, error) {
-	if len(r.Params) != 2 {
+	if len(r.Params) != 1 {
 		return nil, btcjson.ErrWrongNumberOfParams
 	}
 
-	hashStr, ok := r.Params[0].(string)
-	if !ok {
-		return nil, errors.New("first parameter must be a string")
-	}
-	hash, err := btcwire.NewShaHashFromStr(hashStr)
-	if err != nil {
-		return nil, errors.New("first parameter is not a valid " +
-			"hash string")
-	}
-	idx, ok := r.Params[1].(float64)
-	if !ok {
-		return nil, errors.New("second parameter is not a number")
-	}
-	if idx < 0 {
-		return nil, errors.New("second parameter cannot be negative")
+	var outpoint OutPoint
+	if err := json.Unmarshal(r.Params[0], &outpoint); err != nil {
+		return nil, errors.New("first parameter 'outpoint' must be a " +
+			"an outpoint JSON object: " + err.Error())
 	}
 
-	cmd := NewNotifySpentCmd(r.Id, btcwire.NewOutPoint(hash, uint32(idx)))
-	return cmd, nil
+	return NewNotifySpentCmd(r.Id, &outpoint), nil
 }
 
 // Id satisifies the Cmd interface by returning the ID of the command.
@@ -1116,17 +1091,14 @@ func (cmd *NotifySpentCmd) Method() string {
 
 // MarshalJSON returns the JSON encoding of cmd.  Part of the Cmd interface.
 func (cmd *NotifySpentCmd) MarshalJSON() ([]byte, error) {
-	// Fill a RawCmd and marshal.
-	raw := btcjson.RawCmd{
-		Jsonrpc: "1.0",
-		Method:  "notifyspent",
-		Id:      cmd.id,
-		Params: []interface{}{
-			cmd.OutPoint.Hash.String(),
-			cmd.OutPoint.Index,
-		},
+	params := []interface{}{
+		cmd.OutPoint,
 	}
 
+	raw, err := btcjson.NewRawCmd(cmd.id, cmd.Method(), params)
+	if err != nil {
+		return nil, err
+	}
 	return json.Marshal(raw)
 }
 
@@ -1181,9 +1153,10 @@ func parseCreateEncryptedWalletCmd(r *btcjson.RawCmd) (btcjson.Cmd, error) {
 		return nil, btcjson.ErrWrongNumberOfParams
 	}
 
-	passphrase, ok := r.Params[0].(string)
-	if !ok {
-		return nil, errors.New("first parameter is not a string")
+	var passphrase string
+	if err := json.Unmarshal(r.Params[0], &passphrase); err != nil {
+		return nil, errors.New("first parameter 'passphrase' must be " +
+			"a string: " + err.Error())
 	}
 
 	return NewCreateEncryptedWalletCmd(r.Id, passphrase), nil
@@ -1206,14 +1179,14 @@ func (cmd *CreateEncryptedWalletCmd) Method() string {
 
 // MarshalJSON returns the JSON encoding of cmd.  Part of the Cmd interface.
 func (cmd *CreateEncryptedWalletCmd) MarshalJSON() ([]byte, error) {
-	// Fill a RawCmd and marshal.
-	raw := btcjson.RawCmd{
-		Jsonrpc: "1.0",
-		Method:  "createencryptedwallet",
-		Id:      cmd.id,
-		Params:  []interface{}{cmd.Passphrase},
+	params := []interface{}{
+		cmd.Passphrase,
 	}
 
+	raw, err := btcjson.NewRawCmd(cmd.id, cmd.Method(), params)
+	if err != nil {
+		return nil, err
+	}
 	return json.Marshal(raw)
 }
 
@@ -1283,10 +1256,12 @@ func parseWalletIsLockedCmd(r *btcjson.RawCmd) (btcjson.Cmd, error) {
 		return NewWalletIsLockedCmd(r.Id)
 	}
 
-	account, ok := r.Params[0].(string)
-	if !ok {
-		return nil, errors.New("account must be a string")
+	var account string
+	if err := json.Unmarshal(r.Params[0], &account); err != nil {
+		return nil, errors.New("first parameter 'account' must be a " +
+			"string: " + err.Error())
 	}
+
 	return NewWalletIsLockedCmd(r.Id, account)
 }
 
@@ -1307,18 +1282,15 @@ func (cmd *WalletIsLockedCmd) Method() string {
 
 // MarshalJSON returns the JSON encoding of cmd.  Part of the Cmd interface.
 func (cmd *WalletIsLockedCmd) MarshalJSON() ([]byte, error) {
-	// Fill a RawCmd and marshal.
-	raw := btcjson.RawCmd{
-		Jsonrpc: "1.0",
-		Method:  "walletislocked",
-		Id:      cmd.id,
-		Params:  []interface{}{},
-	}
-
+	params := make([]interface{}, 0, 1)
 	if cmd.Account != "" {
-		raw.Params = append(raw.Params, cmd.Account)
+		params = append(params, cmd.Account)
 	}
 
+	raw, err := btcjson.NewRawCmd(cmd.id, cmd.Method(), params)
+	if err != nil {
+		return nil, err
+	}
 	return json.Marshal(raw)
 }
 
@@ -1386,30 +1358,23 @@ func parseListAddressTransactionsCmd(r *btcjson.RawCmd) (btcjson.Cmd, error) {
 		return nil, btcjson.ErrInvalidParams
 	}
 
-	iaddrs, ok := r.Params[0].([]interface{})
-	if !ok {
-		return nil, errors.New("first parameter must be a JSON array")
+	var addresses []string
+	if err := json.Unmarshal(r.Params[0], &addresses); err != nil {
+		return nil, errors.New("first parameter 'addresses' must be " +
+			"an array of strings: " + err.Error())
 	}
-	addresses := make([]string, len(iaddrs))
-	for i := range iaddrs {
-		addr, ok := iaddrs[i].(string)
-		if !ok {
-			return nil, errors.New("first parameter must be an " +
-				"array of strings")
+
+	optArgs := make([]string, 0, 1)
+	if len(r.Params) > 1 {
+		var account string
+		if err := json.Unmarshal(r.Params[1], &account); err != nil {
+			return nil, errors.New("second optional parameter " +
+				"'account' must be a string: " + err.Error())
 		}
-		addresses[i] = addr
+		optArgs = append(optArgs, account)
 	}
 
-	if len(r.Params) == 1 {
-		// No optional parameters.
-		return NewListAddressTransactionsCmd(r.Id, addresses)
-	}
-
-	account, ok := r.Params[1].(string)
-	if !ok {
-		return nil, errors.New("second parameter must be a string")
-	}
-	return NewListAddressTransactionsCmd(r.Id, addresses, account)
+	return NewListAddressTransactionsCmd(r.Id, addresses, optArgs...)
 }
 
 // Id satisifies the Cmd interface by returning the ID of the command.
@@ -1429,20 +1394,16 @@ func (cmd *ListAddressTransactionsCmd) Method() string {
 
 // MarshalJSON returns the JSON encoding of cmd.  Part of the Cmd interface.
 func (cmd *ListAddressTransactionsCmd) MarshalJSON() ([]byte, error) {
-	// Fill a RawCmd and marshal.
-	raw := btcjson.RawCmd{
-		Jsonrpc: "1.0",
-		Method:  cmd.Method(),
-		Id:      cmd.id,
-		Params: []interface{}{
-			cmd.Addresses,
-		},
-	}
-
+	params := make([]interface{}, 1, 2)
+	params[0] = cmd.Addresses
 	if cmd.Account != "" {
-		raw.Params = append(raw.Params, cmd.Account)
+		params = append(params, cmd.Account)
 	}
 
+	raw, err := btcjson.NewRawCmd(cmd.id, cmd.Method(), params)
+	if err != nil {
+		return nil, err
+	}
 	return json.Marshal(raw)
 }
 
@@ -1508,15 +1469,17 @@ func parseListAllTransactionsCmd(r *btcjson.RawCmd) (btcjson.Cmd, error) {
 		return nil, btcjson.ErrInvalidParams
 	}
 
-	if len(r.Params) == 0 {
-		return NewListAllTransactionsCmd(r.Id)
+	optArgs := make([]string, 0, 1)
+	if len(r.Params) > 0 {
+		var account string
+		if err := json.Unmarshal(r.Params[0], &account); err != nil {
+			return nil, errors.New("first optional parameter " +
+				"'account' must be a string: " + err.Error())
+		}
+		optArgs = append(optArgs, account)
 	}
 
-	account, ok := r.Params[0].(string)
-	if !ok {
-		return nil, errors.New("account must be a string")
-	}
-	return NewListAllTransactionsCmd(r.Id, account)
+	return NewListAllTransactionsCmd(r.Id, optArgs...)
 }
 
 // Id satisifies the Cmd interface by returning the ID of the command.
@@ -1536,18 +1499,15 @@ func (cmd *ListAllTransactionsCmd) Method() string {
 
 // MarshalJSON returns the JSON encoding of cmd.  Part of the Cmd interface.
 func (cmd *ListAllTransactionsCmd) MarshalJSON() ([]byte, error) {
-	// Fill a RawCmd and marshal.
-	raw := btcjson.RawCmd{
-		Jsonrpc: "1.0",
-		Method:  "listalltransactions",
-		Id:      cmd.id,
-		Params:  []interface{}{},
-	}
-
+	params := make([]interface{}, 0, 1)
 	if cmd.Account != "" {
-		raw.Params = append(raw.Params, cmd.Account)
+		params = append(params, cmd.Account)
 	}
 
+	raw, err := btcjson.NewRawCmd(cmd.id, cmd.Method(), params)
+	if err != nil {
+		return nil, err
+	}
 	return json.Marshal(raw)
 }
 
@@ -1596,22 +1556,23 @@ func parseGetAddressBalanceCmd(r *btcjson.RawCmd) (btcjson.Cmd, error) {
 		return nil, btcjson.ErrInvalidParams
 	}
 
-	address, ok := r.Params[0].(string)
-	if !ok {
-		return nil, errors.New("address must be a string")
+	var address string
+	if err := json.Unmarshal(r.Params[0], &address); err != nil {
+		return nil, errors.New("first parameter 'address' must be a " +
+			" string: " + err.Error())
 	}
 
-	if len(r.Params) == 1 {
-		// No optional params.
-		return NewGetAddressBalanceCmd(r.Id, address)
+	optArgs := make([]int, 0, 1)
+	if len(r.Params) > 1 {
+		var minConf int
+		if err := json.Unmarshal(r.Params[1], &minConf); err != nil {
+			return nil, errors.New("second optional parameter " +
+				" 'minconf' must be an integer: " + err.Error())
+		}
+		optArgs = append(optArgs, minConf)
 	}
 
-	// 1 optional param for minconf.
-	fminConf, ok := r.Params[1].(float64)
-	if !ok {
-		return nil, errors.New("first optional parameter minconf must be a number")
-	}
-	return NewGetAddressBalanceCmd(r.Id, address, int(fminConf))
+	return NewGetAddressBalanceCmd(r.Id, address, optArgs...)
 }
 
 // NewGetAddressBalanceCmd creates a new GetAddressBalanceCmd.
@@ -1653,20 +1614,16 @@ func (cmd *GetAddressBalanceCmd) Method() string {
 
 // MarshalJSON returns the JSON encoding of cmd.  Part of the Cmd interface.
 func (cmd *GetAddressBalanceCmd) MarshalJSON() ([]byte, error) {
-	// Fill a RawCmd and marshal.
-	raw := btcjson.RawCmd{
-		Jsonrpc: "1.0",
-		Method:  "getaddressbalance",
-		Id:      cmd.id,
-		Params: []interface{}{
-			cmd.Address,
-		},
-	}
-
+	params := make([]interface{}, 1, 2)
+	params[0] = cmd.Address
 	if cmd.Minconf != 1 {
-		raw.Params = append(raw.Params, cmd.Minconf)
+		params = append(params, cmd.Minconf)
 	}
 
+	raw, err := btcjson.NewRawCmd(cmd.id, cmd.Method(), params)
+	if err != nil {
+		return nil, err
+	}
 	return json.Marshal(raw)
 }
 
