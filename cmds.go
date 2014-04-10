@@ -438,6 +438,12 @@ func (cmd *GetUnconfirmedBalanceCmd) UnmarshalJSON(b []byte) error {
 	return nil
 }
 
+// GetBestBlockResult holds the result of a getbestblock response.
+type GetBestBlockResult struct {
+	Hash   string `json:"hash"`
+	Height int32  `json:"height"`
+}
+
 // GetBestBlockCmd is a type handling custom marshaling and
 // unmarshaling of getbestblock JSON websocket extension
 // commands.
