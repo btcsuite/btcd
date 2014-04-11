@@ -107,7 +107,7 @@ type ListTransactionsResult struct {
 	BlockHash       string   `json:"blockhash,omitempty"`
 	BlockIndex      int64    `json:"blockindex,omitempty"`
 	BlockTime       int64    `json:"blocktime,omitempty"`
-	TxID            string   `json:"amount"`
+	TxID            string   `json:"txid"`
 	WalletConflicts []string `json:"walletconflicts"`
 	Time            int64    `json:"time"`
 	TimeReceived    int64    `json:"timereceived"`
