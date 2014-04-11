@@ -24,6 +24,7 @@ type InfoResult struct {
 	TestNet         bool    `json:"testnet,omitempty"`
 	KeypoolOldest   int64   `json:"keypoololdest,omitempty"`
 	KeypoolSize     int     `json:"keypoolsize,omitempty"`
+	UnlockedUntil   int64   `json:"unlocked_until,omitempty"`
 	PaytxFee        float64 `json:"paytxfee,omitempty"`
 	RelayFee        float64 `json:"relayfee,omitempty"`
 	Errors          string  `json:"errors,omitempty"`
