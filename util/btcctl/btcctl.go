@@ -229,20 +229,14 @@ func makeCreateEncryptedWallet(args []interface{}) (btcjson.Cmd, error) {
 // makeCreateRawTransaction generates the cmd structure for createrawtransaction
 // commands.
 func makeCreateRawTransaction(args []interface{}) (btcjson.Cmd, error) {
-	// First unmarshal the JSON provided by the parameters into interfaces.
-	var iinputs, iamounts interface{}
-	err := json.Unmarshal([]byte(args[0].(string)), &iinputs)
-	if err != nil {
-		return nil, err
-	}
-	err = json.Unmarshal([]byte(args[1].(string)), &iamounts)
+	var inputs []btcjson.TransactionInput
+	err := json.Unmarshal([]byte(args[0].(string)), &inputs)
 	if err != nil {
 		return nil, err
 	}
 
-	// Validate and convert the interfaces to concrete types.
-	inputs, amounts, err := btcjson.ConvertCreateRawTxParams(iinputs,
-		iamounts)
+	var amounts map[string]int64
+	err = json.Unmarshal([]byte(args[1].(string)), &amounts)
 	if err != nil {
 		return nil, err
 	}
