@@ -68,6 +68,13 @@ func TestMessage(t *testing.T) {
 	msgHeaders := btcwire.NewMsgHeaders()
 	msgAlert := btcwire.NewMsgAlert([]byte("payload"), []byte("signature"))
 	msgMemPool := btcwire.NewMsgMemPool()
+	msgFilterAdd := btcwire.NewMsgFilterAdd([]byte{0x01})
+	msgFilterClear := btcwire.NewMsgFilterClear()
+	msgFilterLoad := btcwire.NewMsgFilterLoad([]byte{0x01}, 10, 0, btcwire.BloomUpdateNone)
+
+	//
+	bh := btcwire.NewBlockHeader(&btcwire.ShaHash{}, &btcwire.ShaHash{}, 0, 0)
+	msgMerkleBlock := btcwire.NewMsgMerkleBlock(bh)
 
 	tests := []struct {
 		in     btcwire.Message    // Value to encode
@@ -92,6 +99,10 @@ func TestMessage(t *testing.T) {
 		{msgHeaders, msgHeaders, pver, btcwire.MainNet, 25},
 		{msgAlert, msgAlert, pver, btcwire.MainNet, 42},
 		{msgMemPool, msgMemPool, pver, btcwire.MainNet, 24},
+		{msgFilterAdd, msgFilterAdd, pver, btcwire.MainNet, 26},
+		{msgFilterClear, msgFilterClear, pver, btcwire.MainNet, 24},
+		{msgFilterLoad, msgFilterLoad, pver, btcwire.MainNet, 35},
+		{msgMerkleBlock, msgMerkleBlock, pver, btcwire.MainNet, 110},
 	}
 
 	t.Logf("Running %d tests", len(tests))

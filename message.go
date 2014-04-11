@@ -26,22 +26,26 @@ const maxMessagePayload = (1024 * 1024 * 32) // 32MB
 
 // Commands used in bitcoin message headers which describe the type of message.
 const (
-	cmdVersion    = "version"
-	cmdVerAck     = "verack"
-	cmdGetAddr    = "getaddr"
-	cmdAddr       = "addr"
-	cmdGetBlocks  = "getblocks"
-	cmdInv        = "inv"
-	cmdGetData    = "getdata"
-	cmdNotFound   = "notfound"
-	cmdBlock      = "block"
-	cmdTx         = "tx"
-	cmdGetHeaders = "getheaders"
-	cmdHeaders    = "headers"
-	cmdPing       = "ping"
-	cmdPong       = "pong"
-	cmdAlert      = "alert"
-	cmdMemPool    = "mempool"
+	cmdVersion     = "version"
+	cmdVerAck      = "verack"
+	cmdGetAddr     = "getaddr"
+	cmdAddr        = "addr"
+	cmdGetBlocks   = "getblocks"
+	cmdInv         = "inv"
+	cmdGetData     = "getdata"
+	cmdNotFound    = "notfound"
+	cmdBlock       = "block"
+	cmdTx          = "tx"
+	cmdGetHeaders  = "getheaders"
+	cmdHeaders     = "headers"
+	cmdPing        = "ping"
+	cmdPong        = "pong"
+	cmdAlert       = "alert"
+	cmdMemPool     = "mempool"
+	cmdFilterAdd   = "filteradd"
+	cmdFilterClear = "filterclear"
+	cmdFilterLoad  = "filterload"
+	cmdMerkleBlock = "merkleblock"
 )
 
 // Message is an interface that describes a bitcoin message.  A type that
@@ -107,6 +111,18 @@ func makeEmptyMessage(command string) (Message, error) {
 
 	case cmdMemPool:
 		msg = &MsgMemPool{}
+
+	case cmdFilterAdd:
+		msg = &MsgFilterAdd{}
+
+	case cmdFilterClear:
+		msg = &MsgFilterClear{}
+
+	case cmdFilterLoad:
+		msg = &MsgFilterLoad{}
+
+	case cmdMerkleBlock:
+		msg = &MsgMerkleBlock{}
 
 	default:
 		return nil, fmt.Errorf("unhandled command [%s]", command)
