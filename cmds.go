@@ -36,7 +36,8 @@ func init() {
 	btcjson.RegisterCustomCmd("getunconfirmedbalance",
 		parseGetUnconfirmedBalanceCmd, nil, `TODO(jrick) fillmein`)
 	btcjson.RegisterCustomCmd("listaddresstransactions",
-		parseListAddressTransactionsCmd, nil, `TODO(jrick) fillmein`)
+		parseListAddressTransactionsCmd,
+		parseListAddressTransactionsCmdReply, `TODO(jrick) fillmein`)
 	btcjson.RegisterCustomCmd("listalltransactions",
 		parseListAllTransactionsCmd, nil, `TODO(jrick) fillmein`)
 	btcjson.RegisterCustomCmd("notifyblocks", parseNotifyBlocksCmd, nil,
@@ -1375,6 +1376,17 @@ func parseListAddressTransactionsCmd(r *btcjson.RawCmd) (btcjson.Cmd, error) {
 	}
 
 	return NewListAddressTransactionsCmd(r.Id, addresses, optArgs...)
+}
+
+// parseListAddressTransactionsCmdReply parses a the reply to a
+// ListAddressTransactionsCmd into a concrete type and returns it packed into
+// an interface.  This is used when registering the custom command with btcjson.
+func parseListAddressTransactionsCmdReply(message json.RawMessage) (interface{}, error) {
+	var res []btcjson.ListTransactionsResult
+	if err := json.Unmarshal(message, &res); err != nil {
+		return nil, err
+	}
+	return res, nil
 }
 
 // Id satisifies the Cmd interface by returning the ID of the command.
