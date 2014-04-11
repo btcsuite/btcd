@@ -76,18 +76,6 @@ func RegisterCustomCmd(method string, parser RawCmdParser, helpString string) {
 	customCmds[method] = cmd{parser: parser, helpString: helpString}
 }
 
-// CmdGenerator is a function that returns a new concrete Cmd of
-// the appropriate type for a non-standard Bitcoin command.
-type CmdGenerator func() Cmd
-
-var customCmdGenerators = make(map[string]CmdGenerator)
-
-// RegisterCustomCmdGenerator registers a custom CmdGenerator func for
-// a non-standard Bitcoin command.
-func RegisterCustomCmdGenerator(method string, generator CmdGenerator) {
-	customCmdGenerators[method] = generator
-}
-
 // ParseMarshaledCmd parses a raw command and unmarshals as a Cmd.
 // Code that reads and handles commands should switch on the type and
 // type assert as the particular commands supported by the program.
@@ -328,10 +316,6 @@ func ParseMarshaledCmd(b []byte) (Cmd, error) {
 		// registered custom commands.
 		if c, ok := customCmds[r.Method]; ok {
 			return c.parser(&r)
-		}
-
-		if g, ok := customCmdGenerators[r.Method]; ok {
-			cmd = g()
 		}
 	}
 
