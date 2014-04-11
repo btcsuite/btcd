@@ -63,17 +63,26 @@ func NewRawCmd(id interface{}, method string, params []interface{}) (*RawCmd, er
 // RawCmdParser is a function to create a custom Cmd from a RawCmd.
 type RawCmdParser func(*RawCmd) (Cmd, error)
 
+// ReplyParser is a function a custom Cmd can use to unmarshal the results of a
+// reply into a concrete struct.
+type ReplyParser func(json.RawMessage) (interface{}, error)
+
 type cmd struct {
-	parser     RawCmdParser
-	helpString string
+	parser      RawCmdParser
+	replyParser ReplyParser
+	helpString  string
 }
 
 var customCmds = make(map[string]cmd)
 
-// RegisterCustomCmd registers a custom RawCmd parsing func for a
-// non-standard Bitcoin command.
-func RegisterCustomCmd(method string, parser RawCmdParser, helpString string) {
-	customCmds[method] = cmd{parser: parser, helpString: helpString}
+// RegisterCustomCmd registers a custom RawCmd parsing func, reply parsing func,
+// and help text for a non-standard Bitcoin command.
+func RegisterCustomCmd(method string, parser RawCmdParser, replyParser ReplyParser, helpString string) {
+	customCmds[method] = cmd{
+		parser:      parser,
+		replyParser: replyParser,
+		helpString:  helpString,
+	}
 }
 
 // ParseMarshaledCmd parses a raw command and unmarshals as a Cmd.

@@ -509,10 +509,21 @@ func ReadResultCmd(cmd string, message []byte) (Reply, error) {
 		"getnewaddress", "sendtoaddress", "createrawtransaction",
 		"sendrawtransaction", "getbestblockhash", "getrawchangeaddress":
 		err = json.Unmarshal(message, &result)
-	// For anything else put it in an interface.  All the data is still
-	// there, just a little less convenient to deal with.
 	default:
-		err = json.Unmarshal(message, &result)
+		// None of the standard Bitcoin RPC methods matched.  Try
+		// registered custom command reply parsers.
+		if c, ok := customCmds[cmd]; ok && c.replyParser != nil {
+			var res interface{}
+			res, err = c.replyParser(objmap["result"])
+			if err == nil {
+				result.Result = res
+			}
+		} else {
+			// For anything else put it in an interface.  All the
+			// data is still there, just a little less convenient
+			// to deal with.
+			err = json.Unmarshal(message, &result)
+		}
 	}
 	if err != nil {
 		err = fmt.Errorf("Error unmarshalling json reply: %v", err)
