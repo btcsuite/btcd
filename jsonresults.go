@@ -95,6 +95,31 @@ type GetRawMempoolResult struct {
 	Depends          []string `json:"depends"`
 }
 
+// GetTransactionDetailsResult models the details data from the gettransaction command.
+type GetTransactionDetailsResult struct {
+	Account  string  `json:"account"`
+	Address  string  `json:"address,omitempty"`
+	Category string  `json:"category"`
+	Amount   float64 `json:"amount"`
+	Fee      float64 `json:"fee,omitempty"`
+}
+
+// GetTransactionResult models the data from the gettransaction command.
+type GetTransactionResult struct {
+	Amount          float64                       `json:"amount"`
+	Fee             float64                       `json:"fee,omitempty"`
+	Confirmations   int64                         `json:"confirmations"`
+	BlockHash       string                        `json:"blockhash"`
+	BlockIndex      int64                         `json:"blockindex"`
+	BlockTime       int64                         `json:"blocktime"`
+	TxID            string                        `json:"txid"`
+	WalletConflicts []string                      `json:"walletconflicts"`
+	Time            int64                         `json:"time"`
+	TimeReceived    int64                         `json:"timereceived"`
+	Details         []GetTransactionDetailsResult `json:"details"`
+	Hex             string                        `json:"hex"`
+}
+
 // ListTransactionsResult models the data from the listtransactions command.
 type ListTransactionsResult struct {
 	Account         string   `json:"account"`
@@ -427,6 +452,12 @@ func ReadResultCmd(cmd string, message []byte) (Reply, error) {
 			if err == nil {
 				result.Result = res
 			}
+		}
+	case "gettransaction":
+		var res GetTransactionResult
+		err = json.Unmarshal(objmap["result"], &res)
+		if err == nil {
+			result.Result = res
 		}
 	case "getwork":
 		// getwork can either return a JSON object or a boolean
