@@ -1417,7 +1417,16 @@ func handleNotifySpent(wsc *wsClient, icmd btcjson.Cmd) (interface{}, *btcjson.E
 		return nil, &btcjson.ErrInternal
 	}
 
-	wsc.server.ntfnMgr.RegisterSpentRequest(wsc, cmd.OutPoint)
+	blockHash, err := btcwire.NewShaHashFromStr(cmd.OutPoint.Hash)
+	if err != nil {
+		return nil, &btcjson.Error{
+			Code:    btcjson.ErrParse.Code,
+			Message: err.Error(),
+		}
+	}
+
+	outpoint := btcwire.NewOutPoint(blockHash, cmd.Index)
+	wsc.server.ntfnMgr.RegisterSpentRequest(wsc, outpoint)
 	return nil, nil
 }
 
@@ -1604,6 +1613,19 @@ func handleRescan(wsc *wsClient, icmd btcjson.Cmd) (interface{}, *btcjson.Error)
 		return nil, &btcjson.ErrInternal
 	}
 
+	outpoints := make([]*btcwire.OutPoint, 0, len(cmd.OutPoints))
+	for i := range cmd.OutPoints {
+		blockHash, err := btcwire.NewShaHashFromStr(cmd.OutPoints[i].Hash)
+		if err != nil {
+			return nil, &btcjson.Error{
+				Code:    btcjson.ErrParse.Code,
+				Message: err.Error(),
+			}
+		}
+		index := cmd.OutPoints[i].Index
+		outpoints = append(outpoints, btcwire.NewOutPoint(blockHash, index))
+	}
+
 	numAddrs := len(cmd.Addresses)
 	if numAddrs == 1 {
 		rpcsLog.Info("Beginning rescan for 1 address")
@@ -1667,7 +1689,7 @@ func handleRescan(wsc *wsClient, icmd btcjson.Cmd) (interface{}, *btcjson.Error)
 			lookups.fallbacks[addrStr] = struct{}{}
 		}
 	}
-	for _, outpoint := range cmd.OutPoints {
+	for _, outpoint := range outpoints {
 		lookups.unspent[*outpoint] = struct{}{}
 	}
 
