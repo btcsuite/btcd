@@ -128,7 +128,7 @@ type ListTransactionsResult struct {
 	Amount          float64  `json:"amount"`
 	Fee             float64  `json:"fee"`
 	Confirmations   int64    `json:"confirmations"`
-	Generated       bool     `json:"generated"`
+	Generated       bool     `json:"generated,omitempty"`
 	BlockHash       string   `json:"blockhash,omitempty"`
 	BlockIndex      int64    `json:"blockindex,omitempty"`
 	BlockTime       int64    `json:"blocktime,omitempty"`
@@ -137,7 +137,7 @@ type ListTransactionsResult struct {
 	Time            int64    `json:"time"`
 	TimeReceived    int64    `json:"timereceived"`
 	Comment         string   `json:"comment,omitempty"`
-	OtherAccount    float64  `json:"otheraccount"`
+	OtherAccount    string   `json:"otheraccount"`
 }
 
 // TxRawResult models the data from the getrawtransaction command.
