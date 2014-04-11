@@ -85,8 +85,8 @@ func init() {
 		parseWalletLockStateNtfn, `TODO(jrick) fillmein`)
 	btcjson.RegisterCustomCmd(AllTxNtfnMethod,
 		parseAllTxNtfn, `TODO(flam) fillmein`)
-	btcjson.RegisterCustomCmdGenerator(AllVerboseTxNtfnMethod,
-		generateAllVerboseTxNtfn)
+	btcjson.RegisterCustomCmd(AllVerboseTxNtfnMethod,
+		parseAllVerboseTxNtfn, `TODO(flam) fillmein`)
 }
 
 // BlockDetails describes details of a tx in a block.
@@ -1099,6 +1099,26 @@ func NewAllVerboseTxNtfn(rawTx *btcjson.TxRawResult) *AllVerboseTxNtfn {
 	}
 }
 
+// parseAllVerboseTxNtfn parses a RawCmd into a concrete type satisifying
+// the btcjson.Cmd interface.  This is used when registering the notification
+// with the btcjson parser.
+func parseAllVerboseTxNtfn(r *btcjson.RawCmd) (btcjson.Cmd, error) {
+	if r.Id != nil {
+		return nil, ErrNotANtfn
+	}
+
+	if len(r.Params) != 1 {
+		return nil, btcjson.ErrWrongNumberOfParams
+	}
+
+	var rawTx *btcjson.TxRawResult
+	if err := json.Unmarshal(r.Params[0], &rawTx); err != nil {
+		return nil, err
+	}
+
+	return NewAllVerboseTxNtfn(rawTx), nil
+}
+
 // Id satisifies the btcjson.Cmd interface by returning nil for a
 // notification ID.
 func (n *AllVerboseTxNtfn) Id() interface{} {
@@ -1130,10 +1150,6 @@ func (n *AllVerboseTxNtfn) MarshalJSON() ([]byte, error) {
 	return json.Marshal(raw)
 }
 
-func generateAllVerboseTxNtfn() btcjson.Cmd {
-	return new(AllVerboseTxNtfn)
-}
-
 // UnmarshalJSON unmarshals the JSON encoding of n into n.  Part of
 // the btcjson.Cmd interface.
 func (n *AllVerboseTxNtfn) UnmarshalJSON(b []byte) error {
@@ -1142,19 +1158,15 @@ func (n *AllVerboseTxNtfn) UnmarshalJSON(b []byte) error {
 		return err
 	}
 
-	if r.Id != nil {
-		return ErrNotANtfn
-	}
-
-	if len(r.Params) != 1 {
-		return btcjson.ErrWrongNumberOfParams
-	}
-
-	var rawTx *btcjson.TxRawResult
-	if err := json.Unmarshal(r.Params[0], &rawTx); err != nil {
+	newNtfn, err := parseAllVerboseTxNtfn(&r)
+	if err != nil {
 		return err
 	}
 
-	*n = *NewAllVerboseTxNtfn(rawTx)
+	concreteNtfn, ok := newNtfn.(*AllVerboseTxNtfn)
+	if !ok {
+		return btcjson.ErrInternal
+	}
+	*n = *concreteNtfn
 	return nil
 }
