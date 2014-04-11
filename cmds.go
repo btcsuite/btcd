@@ -21,38 +21,38 @@ first command sent or you will be disconnected.`
 )
 
 func init() {
-	btcjson.RegisterCustomCmd("authenticate", parseAuthenticateCmd,
+	btcjson.RegisterCustomCmd("authenticate", parseAuthenticateCmd, nil,
 		authenticateHelp)
 	btcjson.RegisterCustomCmd("createencryptedwallet",
-		parseCreateEncryptedWalletCmd, `TODO(jrick) fillmein`)
+		parseCreateEncryptedWalletCmd, nil, `TODO(jrick) fillmein`)
 	btcjson.RegisterCustomCmd("exportwatchingwallet",
-		parseExportWatchingWalletCmd, `TODO(jrick) fillmein`)
+		parseExportWatchingWalletCmd, nil, `TODO(jrick) fillmein`)
 	btcjson.RegisterCustomCmd("getaddressbalance",
-		parseGetAddressBalanceCmd, `TODO(jrick) fillmein`)
-	btcjson.RegisterCustomCmd("getbestblock", parseGetBestBlockCmd,
+		parseGetAddressBalanceCmd, nil, `TODO(jrick) fillmein`)
+	btcjson.RegisterCustomCmd("getbestblock", parseGetBestBlockCmd, nil,
 		`TODO(jrick) fillmein`)
-	btcjson.RegisterCustomCmd("getcurrentnet", parseGetCurrentNetCmd,
+	btcjson.RegisterCustomCmd("getcurrentnet", parseGetCurrentNetCmd, nil,
 		`TODO(jrick) fillmein`)
 	btcjson.RegisterCustomCmd("getunconfirmedbalance",
-		parseGetUnconfirmedBalanceCmd, `TODO(jrick) fillmein`)
+		parseGetUnconfirmedBalanceCmd, nil, `TODO(jrick) fillmein`)
 	btcjson.RegisterCustomCmd("listaddresstransactions",
-		parseListAddressTransactionsCmd, `TODO(jrick) fillmein`)
+		parseListAddressTransactionsCmd, nil, `TODO(jrick) fillmein`)
 	btcjson.RegisterCustomCmd("listalltransactions",
-		parseListAllTransactionsCmd, `TODO(jrick) fillmein`)
-	btcjson.RegisterCustomCmd("notifyblocks", parseNotifyBlocksCmd,
+		parseListAllTransactionsCmd, nil, `TODO(jrick) fillmein`)
+	btcjson.RegisterCustomCmd("notifyblocks", parseNotifyBlocksCmd, nil,
 		`TODO(jrick) fillmein`)
-	btcjson.RegisterCustomCmd("notifynewtxs", parseNotifyNewTXsCmd,
+	btcjson.RegisterCustomCmd("notifynewtxs", parseNotifyNewTXsCmd, nil,
 		`TODO(jrick) fillmein`)
 	btcjson.RegisterCustomCmd("notifyallnewtxs", parseNotifyAllNewTXsCmd,
-		`TODO(flam) fillmein`)
+		nil, `TODO(flam) fillmein`)
 	btcjson.RegisterCustomCmd("notifyspent", parseNotifySpentCmd,
-		`TODO(jrick) fillmein`)
+		nil, `TODO(jrick) fillmein`)
 	btcjson.RegisterCustomCmd("recoveraddresses", parseRecoverAddressesCmd,
-		`TODO(jrick) fillmein`)
+		nil, `TODO(jrick) fillmein`)
 	btcjson.RegisterCustomCmd("rescan", parseRescanCmd,
-		`TODO(jrick) fillmein`)
+		nil, `TODO(jrick) fillmein`)
 	btcjson.RegisterCustomCmd("walletislocked", parseWalletIsLockedCmd,
-		`TODO(jrick) fillmein`)
+		nil, `TODO(jrick) fillmein`)
 }
 
 // AuthenticateCmd is a type handling custom marshaling and

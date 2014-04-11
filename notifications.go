@@ -65,28 +65,27 @@ const (
 // Register notifications with btcjson.
 func init() {
 	btcjson.RegisterCustomCmd(AccountBalanceNtfnMethod,
-		parseAccountBalanceNtfn, `TODO(jrick) fillmein`)
+		parseAccountBalanceNtfn, nil, `TODO(jrick) fillmein`)
 	btcjson.RegisterCustomCmd(BlockConnectedNtfnMethod,
-		parseBlockConnectedNtfn, `TODO(jrick) fillmein`)
+		parseBlockConnectedNtfn, nil, `TODO(jrick) fillmein`)
 	btcjson.RegisterCustomCmd(BlockDisconnectedNtfnMethod,
-		parseBlockDisconnectedNtfn, `TODO(jrick) fillmein`)
+		parseBlockDisconnectedNtfn, nil, `TODO(jrick) fillmein`)
 	btcjson.RegisterCustomCmd(BtcdConnectedNtfnMethod,
-		parseBtcdConnectedNtfn, `TODO(jrick) fillmein`)
+		parseBtcdConnectedNtfn, nil, `TODO(jrick) fillmein`)
 	btcjson.RegisterCustomCmd(RecvTxNtfnMethod,
-		parseRecvTxNtfn, `TODO(jrick) fillmein`)
+		parseRecvTxNtfn, nil, `TODO(jrick) fillmein`)
 	btcjson.RegisterCustomCmd(RescanProgressNtfnMethod,
-		parseRescanProgressNtfn, `TODO(jrick) fillmein`)
-
+		parseRescanProgressNtfn, nil, `TODO(jrick) fillmein`)
 	btcjson.RegisterCustomCmd(RedeemingTxNtfnMethod, parseRedeemingTxNtfn,
-		`TODO(jrick) fillmein`)
-	btcjson.RegisterCustomCmd(TxNtfnMethod, parseTxNtfn,
+		nil, `TODO(jrick) fillmein`)
+	btcjson.RegisterCustomCmd(TxNtfnMethod, parseTxNtfn, nil,
 		`TODO(jrick) fillmein`)
 	btcjson.RegisterCustomCmd(WalletLockStateNtfnMethod,
-		parseWalletLockStateNtfn, `TODO(jrick) fillmein`)
-	btcjson.RegisterCustomCmd(AllTxNtfnMethod,
-		parseAllTxNtfn, `TODO(flam) fillmein`)
-	btcjson.RegisterCustomCmd(AllVerboseTxNtfnMethod,
-		parseAllVerboseTxNtfn, `TODO(flam) fillmein`)
+		parseWalletLockStateNtfn, nil, `TODO(jrick) fillmein`)
+	btcjson.RegisterCustomCmd(AllTxNtfnMethod, parseAllTxNtfn, nil,
+		`TODO(flam) fillmein`)
+	btcjson.RegisterCustomCmd(AllVerboseTxNtfnMethod, parseAllVerboseTxNtfn,
+		nil, `TODO(flam) fillmein`)
 }
 
 // BlockDetails describes details of a tx in a block.
