@@ -1636,7 +1636,7 @@ func (cmd *GetAddressBalanceCmd) UnmarshalJSON(b []byte) error {
 		return err
 	}
 
-	newCmd, err := parseListAllTransactionsCmd(&r)
+	newCmd, err := parseGetAddressBalanceCmd(&r)
 	if err != nil {
 		return err
 	}

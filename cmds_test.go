@@ -346,7 +346,10 @@ func TestCmds(t *testing.T) {
 
 		// Read marshaled command back into c.  Should still
 		// match result.
-		c.UnmarshalJSON(mc)
+		if err := c.UnmarshalJSON(mc); err != nil {
+			t.Errorf("%s: error while unmarshalling: %v", test.name,
+				err)
+		}
 		if !reflect.DeepEqual(test.result, c) {
 			t.Errorf("%s: unmarshal not as expected. "+
 				"got %v wanted %v", test.name, spew.Sdump(c),
