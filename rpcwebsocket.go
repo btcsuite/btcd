@@ -1389,10 +1389,9 @@ func handleGetBestBlock(wsc *wsClient, icmd btcjson.Cmd) (interface{}, *btcjson.
 		return nil, &btcjson.ErrBestBlockHash
 	}
 
-	// TODO(jrick): need a btcws type for the result.
-	result := map[string]interface{}{
-		"hash":   sha.String(),
-		"height": height,
+	result := &btcws.GetBestBlockResult{
+		Hash:   sha.String(),
+		Height: int32(height),
 	}
 	return result, nil
 }
