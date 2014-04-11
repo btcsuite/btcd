@@ -342,6 +342,8 @@ var resulttests = []struct {
 	{"getinfo", []byte(`{"error":null,"id":1,"result":[{"a":"b"}]}`), false, false},
 	{"getblock", []byte(`{"error":null,"id":1,"result":[{"a":"b"}]}`), false, false},
 	{"getblock", []byte(`{"result":{"hash":"000000","confirmations":16007,"size":325648},"error":null,"id":1}`), false, true},
+	{"gettransaction", []byte(`{"error":null,"id":1,"result":[{"a":"b"}]}`), false, false},
+	{"gettransaction", []byte(`{"error":null,"id":1,"result":{"Amount":0.0}}`), false, true},
 	{"getrawtransaction", []byte(`{"error":null,"id":1,"result":[{"a":"b"}]}`), false, false},
 	{"getrawtransaction", []byte(`{"error":null,"id":1,"result":{"hex":"somejunk","version":1}}`), false, true},
 	{"decoderawtransaction", []byte(`{"error":null,"id":1,"result":[{"a":"b"}]}`), false, false},
