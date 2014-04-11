@@ -14,7 +14,7 @@ https://en.bitcoin.it/wiki/Original_Bitcoin_client/API_Calls_list.
 This package provides data structures and code for marshalling and
 unmarshalling json for communicating with a running instance of btcd
 or bitcoind/bitcoin-qt.  It also provides code for sending those
-message.  It does not provide any code for the client to actually deal
+messages.  It does not provide any code for the client to actually deal
 with the messages.  Although it is meant primarily for btcd, it is
 possible to use this code elsewhere for interacting with a bitcoin
 client programatically.
@@ -30,7 +30,7 @@ different method (or command) being sent.
 
 Replies will vary in form for the different commands.  The basic form is:
 
- {"result":SOMETHING,"error":null,"id":"btcd"}
+ {"result":SOMETHING,"error":null,"id":"SOMEID"}
 
 The result field can be as simple as an int, or a complex structure
 containing many nested fields.  For cases where we have already worked
@@ -51,8 +51,10 @@ RPC Server Authentication
 All RPC calls must be authenticated with a username and password.  The specifics
 on how to configure the RPC server varies depending on the specific bitcoin
 implementation.  For bitcoind, this is accomplished by setting rpcuser and
-rpcpassword in the file ~/.bitcoin/bitcoin.conf.  The default local address
-of bitcoind is 127.0.0.1:8332.
+rpcpassword in the file ~/.bitcoin/bitcoin.conf.  For btcd, this is accomplished
+by setting rpcuser and rpcpass in the file ~/.btcd/btcd.conf.  The default local
+address of bitcoind is 127.0.0.1:8332 and the default local address of btcd is
+127.0.0.1:8334
 
 Usage
 
@@ -64,16 +66,18 @@ For commands where the reply structure is known, such as getinfo, one can
 directly access the fields in the Reply structure by type asserting the
 reply to the appropriate concrete type.
 
-	// Create a getinfo message.
-	msg, err := btcjson.CreateMessage("getinfo")
+	// Create a getinfo command.
+	id := 1
+	cmd, err := btcjson.NewGetInfoCmd(id)
 	if err != nil {
 		// Log and handle error.
 	}
 
 	// Send the message to server using the appropriate username and
 	// password.
-	reply, err := btcjson.RpcCommand(user, password, server, msg)
+	reply, err := btcjson.RpcSend(user, password, server, cmd)
 	if err != nil {
+		fmt.Println(err)
 		// Log and handle error.
 	}
 
@@ -88,22 +92,23 @@ For other commands where this package does not yet provide a concrete
 implementation for the reply, such as getrawmempool, the reply uses a generic
 interface so one can access individual items as follows:
 
-	// Create a getrawmempool message.
-	msg, err := btcjson.CreateMessage("getrawmempool")
+	// Create a getrawmempool command.
+	id := 1
+	cmd, err := btcjson.NewGetRawMempoolCmd(id)
 	if err != nil {
 		// Log and handle error.
 	}
 
 	// Send the message to server using the appropriate username and
 	// password.
-	reply, err := btcjson.RpcCommand(user, password, server, msg)
+	reply, err := btcjson.RpcSend(user, password, server, cmd)
 	if err != nil {
 		// Log and handle error.
 	}
 
-	// Ensure there is a result and type assert it to an interface slice.
+	// Ensure there is a result and type assert it to a string slice.
 	if reply.Result != nil {
-		if mempool, ok := reply.Result.([]interface{}); ok {
+		if mempool, ok := reply.Result.([]string); ok {
 			fmt.Println("num mempool entries =", len(mempool))
 		}
 	}

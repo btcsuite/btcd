@@ -356,6 +356,10 @@ func jsonWithArgs(command string, id interface{}, args interface{}) ([]byte, err
 // It is capable of handeling all of the commands from the standard client,
 // described at:
 // https://en.bitcoin.it/wiki/Original_Bitcoin_client/API_Calls_list
+//
+// WARNING: This method is deprecated and may be removed in a future version.
+// Do NOT use this as it does not work for all commands.  Instead, use one of
+// the New<command>Cmd functions to create a specific command.
 func CreateMessage(message string, args ...interface{}) ([]byte, error) {
 	finalMessage, err := CreateMessageWithId(message, "btcd", args...)
 	return finalMessage, err
@@ -366,6 +370,10 @@ func CreateMessage(message string, args ...interface{}) ([]byte, error) {
 // message ready to send off to the daemon or server. It is capable of handling
 // all of the commands from the standard client, described at:
 // https://en.bitcoin.it/wiki/Original_Bitcoin_client/API_Calls_list
+//
+// WARNING: This method is deprecated and may be removed in a future version.
+// Do NOT use this as it does not work for all commands.  Instead, use one of
+// the New<command>Cmd functions to create a specific command.
 func CreateMessageWithId(message string, id interface{}, args ...interface{}) ([]byte, error) {
 	var finalMessage []byte
 	var err error
