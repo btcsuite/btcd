@@ -1229,6 +1229,33 @@ func rpcRawCommand(user string, password string, server string,
 	return result, err
 }
 
+// RpcSend sends the passed command to the provided server using the provided
+// authentication details, waits for a reply, and returns a Go struct with the
+// result.
+func RpcSend(user string, password string, server string, cmd Cmd) (Reply, error) {
+	msg, err := cmd.MarshalJSON()
+	if err != nil {
+		return Reply{}, err
+	}
+
+	return RpcCommand(user, password, server, msg)
+}
+
+// TlsRpcSend sends the passed command to the provided server using the provided
+// authentication details and PEM encoded certificate chain, waits for a reply,
+// and returns a Go struct with the result.
+func TlsRpcSend(user string, password string, server string, cmd Cmd,
+	certificates []byte, skipVerify bool) (Reply, error) {
+
+	msg, err := cmd.MarshalJSON()
+	if err != nil {
+		return Reply{}, err
+	}
+
+	return TlsRpcCommand(user, password, server, msg, certificates,
+		skipVerify)
+}
+
 // IsValidIdType checks that the Id field (which can go in any of the json
 // messages) is valid.  json rpc 1.0 allows any (json) type, but we still need
 // to prevent values that cannot be marshalled from going in.  json rpc 2.0
