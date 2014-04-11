@@ -1945,18 +1945,18 @@ var removeOpcodeByDataTests = []removeOpcodeByDataTest{
 	{
 		// padded to keep it canonical.
 		name: "simple case (pushdata1)",
-		before: append(append([]byte{btcscript.OP_PUSHDATA1, 76,},
-			bytes.Repeat([]byte{0}, 72)...), []byte{1,2,3,4}...),
+		before: append(append([]byte{btcscript.OP_PUSHDATA1, 76},
+			bytes.Repeat([]byte{0}, 72)...), []byte{1, 2, 3, 4}...),
 		remove: []byte{1, 2, 3, 4},
 		after:  []byte{},
 	},
 	{
 		name: "simple case (pushdata1 miss)",
-		before: append(append([]byte{btcscript.OP_PUSHDATA1, 76,},
-			bytes.Repeat([]byte{0}, 72)...), []byte{1,2,3,4}...),
+		before: append(append([]byte{btcscript.OP_PUSHDATA1, 76},
+			bytes.Repeat([]byte{0}, 72)...), []byte{1, 2, 3, 4}...),
 		remove: []byte{1, 2, 3, 5},
-		after: append(append([]byte{btcscript.OP_PUSHDATA1, 76,},
-			bytes.Repeat([]byte{0}, 72)...), []byte{1,2,3,4}...),
+		after: append(append([]byte{btcscript.OP_PUSHDATA1, 76},
+			bytes.Repeat([]byte{0}, 72)...), []byte{1, 2, 3, 4}...),
 	},
 	{
 		name:   "simple case (pushdata1 miss noncanonical)",
@@ -1967,17 +1967,17 @@ var removeOpcodeByDataTests = []removeOpcodeByDataTest{
 	{
 		name: "simple case (pushdata2)",
 		before: append(append([]byte{btcscript.OP_PUSHDATA2, 0, 1},
-			bytes.Repeat([]byte{0}, 252)...), []byte{1,2,3,4}...),
+			bytes.Repeat([]byte{0}, 252)...), []byte{1, 2, 3, 4}...),
 		remove: []byte{1, 2, 3, 4},
 		after:  []byte{},
 	},
 	{
 		name: "simple case (pushdata2 miss)",
 		before: append(append([]byte{btcscript.OP_PUSHDATA2, 0, 1},
-			bytes.Repeat([]byte{0}, 252)...), []byte{1,2,3,4}...),
+			bytes.Repeat([]byte{0}, 252)...), []byte{1, 2, 3, 4}...),
 		remove: []byte{1, 2, 3, 4, 5},
 		after: append(append([]byte{btcscript.OP_PUSHDATA2, 0, 1},
-			bytes.Repeat([]byte{0}, 252)...), []byte{1,2,3,4}...),
+			bytes.Repeat([]byte{0}, 252)...), []byte{1, 2, 3, 4}...),
 	},
 	{
 		name:   "simple case (pushdata2 miss noncanonical)",
@@ -1989,7 +1989,7 @@ var removeOpcodeByDataTests = []removeOpcodeByDataTest{
 		// This is padded to make the push canonical.
 		name: "simple case (pushdata4)",
 		before: append(append([]byte{btcscript.OP_PUSHDATA4, 0, 0, 1, 0},
-			bytes.Repeat([]byte{0}, 65532)...), []byte{1,2,3,4}...),
+			bytes.Repeat([]byte{0}, 65532)...), []byte{1, 2, 3, 4}...),
 		remove: []byte{1, 2, 3, 4},
 		after:  []byte{},
 	},
@@ -2003,10 +2003,10 @@ var removeOpcodeByDataTests = []removeOpcodeByDataTest{
 		// This is padded to make the push canonical.
 		name: "simple case (pushdata4 miss)",
 		before: append(append([]byte{btcscript.OP_PUSHDATA4, 0, 0, 1, 0},
-			bytes.Repeat([]byte{0}, 65532)...), []byte{1,2,3,4}...),
+			bytes.Repeat([]byte{0}, 65532)...), []byte{1, 2, 3, 4}...),
 		remove: []byte{1, 2, 3, 4, 5},
 		after: append(append([]byte{btcscript.OP_PUSHDATA4, 0, 0, 1, 0},
-			bytes.Repeat([]byte{0}, 65532)...), []byte{1,2,3,4}...),
+			bytes.Repeat([]byte{0}, 65532)...), []byte{1, 2, 3, 4}...),
 	},
 	{
 		name:   "invalid opcode ",
