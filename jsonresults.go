@@ -279,6 +279,12 @@ type SignRawTransactionResult struct {
 	Complete bool   `json:"complete"`
 }
 
+// ListSinceBlockResult models the data from the listsinceblock command.
+type ListSinceBlockResult struct {
+	Transactions []ListTransactionsResult `json:"transactions"`
+	LastBlock    string                   `json:"lastblock"`
+}
+
 // ListUnSpentResult models the data from the ListUnSpentResult command.
 type ListUnSpentResult struct {
 	TxId          string  `json:"txid"`
@@ -487,6 +493,15 @@ func ReadResultCmd(cmd string, message []byte) (Reply, error) {
 		var res SignRawTransactionResult
 		err = json.Unmarshal(objmap["result"], &res)
 		if err == nil {
+			result.Result = res
+		}
+	case "listsinceblock":
+		var res ListSinceBlockResult
+		err = json.Unmarshal(objmap["result"], &res)
+		if err == nil {
+			if res.Transactions == nil {
+				res.Transactions = []ListTransactionsResult{}
+			}
 			result.Result = res
 		}
 	case "listtransactions":

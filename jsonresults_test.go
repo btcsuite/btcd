@@ -43,6 +43,8 @@ var resulttests = []struct {
 	{"getaddressesbyaccount", []byte(`{"error":null,"id":1,"result":["test"]}`), false, true},
 	{"getmininginfo", []byte(`{"error":null,"id":1,"result":[{"a":"b"}]}`), false, false},
 	{"getmininginfo", []byte(`{"error":null,"id":1,"result":{"generate":true}}`), false, true},
+	{"listsinceblock", []byte(`{"error":null,"id":1,"result":[{"a":"b"}]}`), false, false},
+	{"listsinceblock", []byte(`{"error":null,"id":1,"result":{"lastblock":"something"}}`), false, true},
 	{"validateaddress", []byte(`{"error":null,"id":1,"result":{"isvalid":false}}`), false, true},
 	{"validateaddress", []byte(`{"error":null,"id":1,"result":{false}}`), false, false},
 	{"signrawtransaction", []byte(`{"error":null,"id":1,"result":{"hex":"something","complete":false}}`), false, true},
