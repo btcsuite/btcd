@@ -54,19 +54,22 @@ func (u AmountUnit) String() string {
 type Amount int64
 
 // NewAmount creates an Amount from a floating point value representing
-// some value in bitcoin.
+// some value in bitcoin.  NewAmount errors if f is NaN or +-Infinity, but
+// does not check that the amount is within the total amount of bitcoin
+// producable as f may not refer to an amount at a single moment in time.
 func NewAmount(f float64) (Amount, error) {
-	a := f * float64(SatoshiPerBitcoin)
-
-	// The amount is only valid if it does not exceed the total amount
-	// of bitcoin producable, and is not a floating point number that
-	// would otherwise fail that check such as NaN or +-Inf.
-	switch abs := math.Abs(a); {
-	case abs > float64(MaxSatoshi):
+	// The amount is only considered invalid if it cannot be represented
+	// as an integer type.  This may happen if f is NaN or +-Infinity.
+	switch {
+	case math.IsNaN(f):
 		fallthrough
-	case math.IsNaN(abs) || math.IsInf(abs, 1):
+	case math.IsInf(f, 1):
+		fallthrough
+	case math.IsInf(f, -1):
 		return 0, errors.New("invalid bitcoin amount")
 	}
+
+	a := f * float64(SatoshiPerBitcoin)
 
 	// Depending on the sign, add or subtract 0.5 and rely on integer
 	// truncation to correctly round the value up or down.

@@ -25,16 +25,28 @@ func TestAmountCreation(t *testing.T) {
 			expected: 0,
 		},
 		{
-			name:     "max",
+			name:     "max producable",
 			amount:   21e6,
 			valid:    true,
 			expected: Amount(MaxSatoshi),
 		},
 		{
-			name:     "min",
+			name:     "min producable",
 			amount:   -21e6,
 			valid:    true,
 			expected: Amount(-MaxSatoshi),
+		},
+		{
+			name:     "exceeds max producable",
+			amount:   21e6 + 1e-8,
+			valid:    true,
+			expected: Amount(MaxSatoshi + 1),
+		},
+		{
+			name:     "exceeds min producable",
+			amount:   -21e6 - 1e-8,
+			valid:    true,
+			expected: Amount(-MaxSatoshi - 1),
 		},
 		{
 			name:     "one hundred",
@@ -62,16 +74,6 @@ func TestAmountCreation(t *testing.T) {
 		},
 
 		// Negative tests.
-		{
-			name:   "exceeds max",
-			amount: 21e6 + 1,
-			valid:  false,
-		},
-		{
-			name:   "exceeds min",
-			amount: -21e6 - 1,
-			valid:  false,
-		},
 		{
 			name:   "not-a-number",
 			amount: math.NaN(),
