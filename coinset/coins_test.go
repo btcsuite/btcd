@@ -115,8 +115,8 @@ func TestCoinSet(t *testing.T) {
 }
 
 var minIndexSelectors = []coinset.MinIndexCoinSelector{
-	coinset.MinIndexCoinSelector{MaxInputs: 10, MinChangeAmount: 10000},
-	coinset.MinIndexCoinSelector{MaxInputs: 2, MinChangeAmount: 10000},
+	{MaxInputs: 10, MinChangeAmount: 10000},
+	{MaxInputs: 2, MinChangeAmount: 10000},
 }
 
 var minIndexTests = []coinSelectTest{
@@ -136,8 +136,8 @@ func TestMinIndexSelector(t *testing.T) {
 }
 
 var minNumberSelectors = []coinset.MinNumberCoinSelector{
-	coinset.MinNumberCoinSelector{MaxInputs: 10, MinChangeAmount: 10000},
-	coinset.MinNumberCoinSelector{MaxInputs: 2, MinChangeAmount: 10000},
+	{MaxInputs: 10, MinChangeAmount: 10000},
+	{MaxInputs: 2, MinChangeAmount: 10000},
 }
 
 var minNumberTests = []coinSelectTest{
@@ -159,8 +159,8 @@ func TestMinNumberSelector(t *testing.T) {
 }
 
 var maxValueAgeSelectors = []coinset.MaxValueAgeCoinSelector{
-	coinset.MaxValueAgeCoinSelector{MaxInputs: 10, MinChangeAmount: 10000},
-	coinset.MaxValueAgeCoinSelector{MaxInputs: 2, MinChangeAmount: 10000},
+	{MaxInputs: 10, MinChangeAmount: 10000},
+	{MaxInputs: 2, MinChangeAmount: 10000},
 }
 
 var maxValueAgeTests = []coinSelectTest{
@@ -181,13 +181,13 @@ func TestMaxValueAgeSelector(t *testing.T) {
 }
 
 var minPrioritySelectors = []coinset.MinPriorityCoinSelector{
-	coinset.MinPriorityCoinSelector{MaxInputs: 10, MinChangeAmount: 10000, MinAvgValueAgePerInput: 100000000},
-	coinset.MinPriorityCoinSelector{MaxInputs: 02, MinChangeAmount: 10000, MinAvgValueAgePerInput: 200000000},
-	coinset.MinPriorityCoinSelector{MaxInputs: 02, MinChangeAmount: 10000, MinAvgValueAgePerInput: 150000000},
-	coinset.MinPriorityCoinSelector{MaxInputs: 03, MinChangeAmount: 10000, MinAvgValueAgePerInput: 150000000},
-	coinset.MinPriorityCoinSelector{MaxInputs: 10, MinChangeAmount: 10000, MinAvgValueAgePerInput: 1000000000},
-	coinset.MinPriorityCoinSelector{MaxInputs: 10, MinChangeAmount: 10000, MinAvgValueAgePerInput: 175000000},
-	coinset.MinPriorityCoinSelector{MaxInputs: 02, MinChangeAmount: 10000, MinAvgValueAgePerInput: 125000000},
+	{MaxInputs: 10, MinChangeAmount: 10000, MinAvgValueAgePerInput: 100000000},
+	{MaxInputs: 02, MinChangeAmount: 10000, MinAvgValueAgePerInput: 200000000},
+	{MaxInputs: 02, MinChangeAmount: 10000, MinAvgValueAgePerInput: 150000000},
+	{MaxInputs: 03, MinChangeAmount: 10000, MinAvgValueAgePerInput: 150000000},
+	{MaxInputs: 10, MinChangeAmount: 10000, MinAvgValueAgePerInput: 1000000000},
+	{MaxInputs: 10, MinChangeAmount: 10000, MinAvgValueAgePerInput: 175000000},
+	{MaxInputs: 02, MinChangeAmount: 10000, MinAvgValueAgePerInput: 125000000},
 }
 
 var connectedCoins = []coinset.Coin{coins[0], coins[1], coins[3]}
