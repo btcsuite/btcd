@@ -495,6 +495,12 @@ func ReadResultCmd(cmd string, message []byte) (Reply, error) {
 		if err == nil {
 			result.Result = res
 		}
+	case "listaccounts":
+		var res map[string]float64
+		err = json.Unmarshal(objmap["result"], &res)
+		if err == nil {
+			result.Result = res
+		}
 	case "listsinceblock":
 		var res ListSinceBlockResult
 		err = json.Unmarshal(objmap["result"], &res)
