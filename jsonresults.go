@@ -350,6 +350,12 @@ func ReadResultCmd(cmd string, message []byte) (Reply, error) {
 		if err == nil {
 			result.Result = res
 		}
+	case "decodescript":
+		var res DecodeScriptResult
+		err = json.Unmarshal(objmap["result"], &res)
+		if err == nil {
+			result.Result = res
+		}
 	case "getaddednodeinfo":
 		// getaddednodeinfo can either return a JSON object or a
 		// slice of strings depending on the verbose flag.  Choose the

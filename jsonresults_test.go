@@ -28,6 +28,8 @@ var resulttests = []struct {
 	{"anycommand", []byte(`{"error":null,"result":null,"id":"test"}`), false, true},
 	{"createmultisig", []byte(`{"error":null,"id":1,"result":[{"a":"b"}]}`), false, false},
 	{"createmultisig", []byte(`{"error":null,"id":1,"result":{"address":"something","redeemScript":"else"}}`), false, true},
+	{"decodescript", []byte(`{"error":null,"id":1,"result":[{"a":"b"}]}`), false, false},
+	{"decodescript", []byte(`{"error":null,"id":1,"result":{"Asm":"something"}}`), false, true},
 	{"getinfo", []byte(`{"error":null,"result":null,"id":"test"}`), false, true},
 	{"getinfo", []byte(`{"error":null,"result":null}`), false, false},
 	{"getinfo", []byte(`{"error":null,"id":1,"result":[{"a":"b"}]}`), false, false},
