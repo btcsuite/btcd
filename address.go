@@ -69,12 +69,9 @@ func checkBitcoinNet(net btcwire.BitcoinNet) error {
 		fallthrough
 	case btcwire.TestNet3:
 		return nil
-
 	default:
 		return ErrUnknownNet
 	}
-
-	return nil
 }
 
 // encodeAddress returns a human-readable payment address given a ripemd160 hash
