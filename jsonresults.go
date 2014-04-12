@@ -531,11 +531,13 @@ func ReadResultCmd(cmd string, message []byte) (Reply, error) {
 	// For commands that return a single item (or no items), we get it with
 	// the correct concrete type for free (but treat them separately
 	// for clarity).
-	case "getblockcount", "getbalance", "getblocknumber", "getgenerate",
-		"getconnetioncount", "getdifficulty", "gethashespersec",
+	case "getblockcount", "getbalance", "getblockhash", "getgenerate",
+		"getconnectioncount", "getdifficulty", "gethashespersec",
 		"setgenerate", "stop", "settxfee", "getaccount",
 		"getnewaddress", "sendtoaddress", "createrawtransaction",
-		"sendrawtransaction", "getbestblockhash", "getrawchangeaddress":
+		"sendrawtransaction", "getbestblockhash", "getrawchangeaddress",
+		"sendfrom", "sendmany", "addmultisigaddress", "getunconfirmedbalance",
+		"getaccountaddress":
 		err = json.Unmarshal(message, &result)
 	default:
 		// None of the standard Bitcoin RPC methods matched.  Try
