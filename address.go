@@ -468,7 +468,7 @@ func (a *AddressPubKey) String() string {
 	return hex.EncodeToString(a.serialize())
 }
 
-// PubKeyFormat returns the format (uncompressed, compressed, etc) of the
+// Format returns the format (uncompressed, compressed, etc) of the
 // pay-to-pubkey address.
 func (a *AddressPubKey) Format() PubKeyFormat {
 	return a.pubKeyFormat
@@ -520,7 +520,7 @@ func EncodePrivateKey(privKey []byte, net btcwire.BitcoinNet, compressed bool) (
 	// privKey, plus an optional byte (0x01) if copressed, plus 4 bytes of checksum.
 	encodeLen := 37
 	if compressed {
-		encodeLen += 1
+		encodeLen++
 	}
 	a := make([]byte, encodeLen, encodeLen)
 	a[0] = netID
