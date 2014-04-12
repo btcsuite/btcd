@@ -92,3 +92,8 @@ func (a Amount) Format(u AmountUnit) string {
 	units := " " + u.String()
 	return strconv.FormatFloat(a.ToUnit(u), 'f', -int(u+8), 64) + units
 }
+
+// String is the equivalent of calling Format with AmountBitcoin.
+func (a Amount) String() string {
+	return a.Format(AmountBitcoin)
+}

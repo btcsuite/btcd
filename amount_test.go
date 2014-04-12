@@ -102,6 +102,7 @@ func TestAmountCreation(t *testing.T) {
 
 		if a != test.expected {
 			t.Errorf("%v: Created amount %v does not match expected %v", test.name, a, test.expected)
+			continue
 		}
 	}
 }
@@ -178,6 +179,14 @@ func TestAmountUnitConversions(t *testing.T) {
 		s := test.amount.Format(test.unit)
 		if s != test.s {
 			t.Errorf("%v: format '%v' does not match expected '%v'", test.name, s, test.s)
+			continue
+		}
+
+		// Verify that Amount.String works as advertised.
+		s1 := test.amount.Format(AmountBitcoin)
+		s2 := test.amount.String()
+		if s1 != s2 {
+			t.Errorf("%v: String does not match Format(AmountBitcoin): %v != %v", test.name, s1, s2)
 		}
 	}
 }
