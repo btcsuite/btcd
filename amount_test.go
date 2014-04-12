@@ -118,28 +118,28 @@ func TestAmountUnitConversions(t *testing.T) {
 		{
 			name:      "MBTC",
 			amount:    Amount(MaxSatoshi),
-			unit:      AmountMegaBitcoin,
+			unit:      AmountMegaBTC,
 			converted: 21,
 			s:         "21 MBTC",
 		},
 		{
 			name:      "kBTC",
 			amount:    Amount(44433322211100),
-			unit:      AmountKiloBitcoin,
+			unit:      AmountKiloBTC,
 			converted: 444.33322211100,
 			s:         "444.333222111 kBTC",
 		},
 		{
 			name:      "BTC",
 			amount:    Amount(44433322211100),
-			unit:      AmountBitcoin,
+			unit:      AmountBTC,
 			converted: 444333.22211100,
 			s:         "444333.222111 BTC",
 		},
 		{
 			name:      "mBTC",
 			amount:    Amount(44433322211100),
-			unit:      AmountMilliBitcoin,
+			unit:      AmountMilliBTC,
 			converted: 444333222.11100,
 			s:         "444333222.111 mBTC",
 		},
@@ -147,7 +147,7 @@ func TestAmountUnitConversions(t *testing.T) {
 
 			name:      "μBTC",
 			amount:    Amount(44433322211100),
-			unit:      AmountMicroBitcoin,
+			unit:      AmountMicroBTC,
 			converted: 444333222111.00,
 			s:         "444333222111 μBTC",
 		},
@@ -155,7 +155,7 @@ func TestAmountUnitConversions(t *testing.T) {
 
 			name:      "satoshi",
 			amount:    Amount(44433322211100),
-			unit:      AmountBaseBitcoin,
+			unit:      AmountSatoshi,
 			converted: 44433322211100,
 			s:         "44433322211100 Satoshi",
 		},
@@ -183,7 +183,7 @@ func TestAmountUnitConversions(t *testing.T) {
 		}
 
 		// Verify that Amount.String works as advertised.
-		s1 := test.amount.Format(AmountBitcoin)
+		s1 := test.amount.Format(AmountBTC)
 		s2 := test.amount.String()
 		if s1 != s2 {
 			t.Errorf("%v: String does not match Format(AmountBitcoin): %v != %v", test.name, s1, s2)

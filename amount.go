@@ -16,15 +16,15 @@ import (
 // an amount in bitcoin to an amount counted in units.
 type AmountUnit int
 
-// These constants define the various standard units used when describing
-// a bitcoin monetary amount.
+// These constants define various units used when describing a bitcoin
+// monetary amount.
 const (
-	AmountMegaBitcoin  AmountUnit = 6
-	AmountKiloBitcoin  AmountUnit = 3
-	AmountBitcoin      AmountUnit = 0
-	AmountMilliBitcoin AmountUnit = -3
-	AmountMicroBitcoin AmountUnit = -6
-	AmountBaseBitcoin  AmountUnit = -8
+	AmountMegaBTC  AmountUnit = 6
+	AmountKiloBTC  AmountUnit = 3
+	AmountBTC      AmountUnit = 0
+	AmountMilliBTC AmountUnit = -3
+	AmountMicroBTC AmountUnit = -6
+	AmountSatoshi  AmountUnit = -8
 )
 
 // String returns the unit as a string.  For recognized units, the SI
@@ -32,17 +32,17 @@ const (
 // units, "1eN BTC" is returned, where N is the AmountUnit.
 func (u AmountUnit) String() string {
 	switch u {
-	case AmountMegaBitcoin:
+	case AmountMegaBTC:
 		return "MBTC"
-	case AmountKiloBitcoin:
+	case AmountKiloBTC:
 		return "kBTC"
-	case AmountBitcoin:
+	case AmountBTC:
 		return "BTC"
-	case AmountMilliBitcoin:
+	case AmountMilliBTC:
 		return "mBTC"
-	case AmountMicroBitcoin:
+	case AmountMicroBTC:
 		return "μBTC"
-	case AmountBaseBitcoin:
+	case AmountSatoshi:
 		return "Satoshi"
 	default:
 		return "1e" + strconv.FormatInt(int64(u), 10) + " BTC"
@@ -87,13 +87,13 @@ func (a Amount) ToUnit(u AmountUnit) float64 {
 // Format formats a monetary amount counted in bitcoin base units as a
 // string for a given unit.  The conversion will succeed for any unit,
 // however, known units will be formated with an appended label describing
-// the units with SI notation.
+// the units with SI notation, or "Satoshi" for the base unit.
 func (a Amount) Format(u AmountUnit) string {
 	units := " " + u.String()
 	return strconv.FormatFloat(a.ToUnit(u), 'f', -int(u+8), 64) + units
 }
 
-// String is the equivalent of calling Format with AmountBitcoin.
+// String is the equivalent of calling Format with AmountBTC.
 func (a Amount) String() string {
-	return a.Format(AmountBitcoin)
+	return a.Format(AmountBTC)
 }
