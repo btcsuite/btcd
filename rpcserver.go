@@ -434,7 +434,7 @@ func jsonRPCRead(w http.ResponseWriter, r *http.Request, s *rpcServer) {
 		rpcsLog.Errorf(msg)
 		return
 	}
-	rpcsLog.Debugf(msg)
+	rpcsLog.Tracef(msg)
 }
 
 // handleUnimplemented is a temporary handler for commands that we should
