@@ -1454,19 +1454,21 @@ func handleSubmitBlock(s *rpcServer, cmd btcjson.Cmd) (interface{}, error) {
 }
 
 func verifyChain(db btcdb.Db, level, depth int32) error {
-	_, curheight64, err := db.NewestSha()
+	_, curHeight64, err := db.NewestSha()
 	if err != nil {
 		rpcsLog.Errorf("Verify is unable to fetch current block "+
 			"height: %v", err)
 	}
+	curHeight := int32(curHeight64)
 
-	curheight := int32(curheight64)
-
-	if depth > curheight {
-		depth = curheight
+	finishHeight := curHeight - depth
+	if finishHeight < 0 {
+		finishHeight = 0
 	}
+	rpcsLog.Infof("Verifying chain for %d blocks at level %d",
+		curHeight-finishHeight, level)
 
-	for height := curheight; height > (curheight - depth); height-- {
+	for height := curHeight; height > finishHeight; height-- {
 		// Level 0 just looks up the block.
 		sha, err := db.FetchBlockShaByHeight(int64(height))
 		if err != nil {
