@@ -45,14 +45,17 @@ const (
 	// baseSubsidy is the starting subsidy amount for mined blocks.  This
 	// value is halved every SubsidyHalvingInterval blocks.
 	baseSubsidy = 50 * btcutil.SatoshiPerBitcoin
+
+	// CoinbaseMaturity is the number of blocks required before newly
+	// mined bitcoins (coinbase transactions) can be spent.
+	CoinbaseMaturity = 100
 )
 
 var (
-	// coinbaseMaturity is the number of blocks required before newly
-	// mined bitcoins (coinbase transactions) can be spent.  This is a
-	// variable as opposed to a constant because the tests need the ability
-	// to modify it.
-	coinbaseMaturity int64 = 100
+	// coinbaseMaturity is the internal variable used for validating the
+	// spending of coinbase outputs.  A variable rather than the exported
+	// constant is used because the tests need the ability to modify it.
+	coinbaseMaturity int64 = CoinbaseMaturity
 
 	// zeroHash is the zero value for a btcwire.ShaHash and is defined as
 	// a package level variable to avoid the need to create a new instance
