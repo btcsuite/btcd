@@ -251,6 +251,9 @@ func (db *LevelDb) existsTxSha(txSha *btcwire.ShaHash) (exists bool) {
 
 // FetchTxByShaList returns the most recent tx of the name fully spent or not
 func (db *LevelDb) FetchTxByShaList(txShaList []*btcwire.ShaHash) []*btcdb.TxListReply {
+	db.dbLock.Lock()
+	defer db.dbLock.Unlock()
+
 	// until the fully spent separation of tx is complete this is identical
 	// to FetchUnSpentTxByShaList
 	replies := make([]*btcdb.TxListReply, len(txShaList))
