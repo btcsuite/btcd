@@ -156,16 +156,16 @@ var cmdtests = []struct {
 		},
 	},
 	{
-		name: "notifynewtxs",
+		name: "notifyreceived",
 		f: func() (btcjson.Cmd, error) {
 			addrs := []string{
 				"17XhEvq9Nahdj7Xe1nv6oRe1tEmaHUuynH",
 			}
-			return NewNotifyNewTXsCmd(
+			return NewNotifyReceivedCmd(
 				float64(1),
 				addrs), nil
 		},
-		result: &NotifyNewTXsCmd{
+		result: &NotifyReceivedCmd{
 			id: float64(1),
 			Addresses: []string{
 				"17XhEvq9Nahdj7Xe1nv6oRe1tEmaHUuynH",
