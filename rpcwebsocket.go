@@ -50,7 +50,7 @@ var wsHandlers = map[string]wsCommandHandler{
 	"getcurrentnet":   handleGetCurrentNet,
 	"notifyblocks":    handleNotifyBlocks,
 	"notifyallnewtxs": handleNotifyAllNewTXs,
-	"notifynewtxs":    handleNotifyNewTXs,
+	"notifyreceived":  handleNotifyReceived,
 	"notifyspent":     handleNotifySpent,
 	"rescan":          handleRescan,
 }
@@ -1443,10 +1443,10 @@ func handleNotifyAllNewTXs(wsc *wsClient, icmd btcjson.Cmd) (interface{}, *btcjs
 	return nil, nil
 }
 
-// handleNotifyNewTXs implements the notifynewtxs command extension for
+// handleNotifyReceived implements the notifyreceived command extension for
 // websocket connections.
-func handleNotifyNewTXs(wsc *wsClient, icmd btcjson.Cmd) (interface{}, *btcjson.Error) {
-	cmd, ok := icmd.(*btcws.NotifyNewTXsCmd)
+func handleNotifyReceived(wsc *wsClient, icmd btcjson.Cmd) (interface{}, *btcjson.Error) {
+	cmd, ok := icmd.(*btcws.NotifyReceivedCmd)
 	if !ok {
 		return nil, &btcjson.ErrInternal
 	}
