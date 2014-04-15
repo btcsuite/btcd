@@ -151,8 +151,9 @@ out:
 		}
 	}
 
-	txshalist, _ := blk.TxShas()
-	for _, txsha := range txshalist {
+	txlist := blk.Transactions()
+	for _, tx := range txlist {
+		txsha := tx.Sha()
 		txReply, err := db.FetchTxBySha(txsha)
 		if err != nil {
 			t.Errorf("fully spent lookup %v err %v\n", hash, err)
