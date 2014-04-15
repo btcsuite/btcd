@@ -46,13 +46,13 @@ type wsCommandHandler func(*wsClient, btcjson.Cmd) (interface{}, *btcjson.Error)
 // wsHandlers maps RPC command strings to appropriate websocket handler
 // functions.
 var wsHandlers = map[string]wsCommandHandler{
-	"getbestblock":    handleGetBestBlock,
-	"getcurrentnet":   handleGetCurrentNet,
-	"notifyblocks":    handleNotifyBlocks,
-	"notifyallnewtxs": handleNotifyAllNewTXs,
-	"notifyreceived":  handleNotifyReceived,
-	"notifyspent":     handleNotifySpent,
-	"rescan":          handleRescan,
+	"getbestblock":          handleGetBestBlock,
+	"getcurrentnet":         handleGetCurrentNet,
+	"notifyblocks":          handleNotifyBlocks,
+	"notifynewtransactions": handleNotifyNewTransactions,
+	"notifyreceived":        handleNotifyReceived,
+	"notifyspent":           handleNotifySpent,
+	"rescan":                handleRescan,
 }
 
 // wsAsyncHandlers holds the websocket commands which should be run
@@ -475,14 +475,14 @@ func (m *wsNotificationManager) notifyForNewTx(clients map[chan bool]*wsClient, 
 		amount += txOut.Value
 	}
 
-	ntfn := btcws.NewAllTxNtfn(txShaStr, amount)
+	ntfn := btcws.NewTxAcceptedNtfn(txShaStr, amount)
 	marshalledJSON, err := json.Marshal(ntfn)
 	if err != nil {
 		rpcsLog.Errorf("Failed to marshal tx notification: %s", err.Error())
 		return
 	}
 
-	var verboseNtfn *btcws.AllVerboseTxNtfn
+	var verboseNtfn *btcws.TxAcceptedVerboseNtfn
 	var marshalledJSONVerbose []byte
 	for _, wsc := range clients {
 		if wsc.verboseTxUpdates {
@@ -493,7 +493,7 @@ func (m *wsNotificationManager) notifyForNewTx(clients map[chan bool]*wsClient, 
 				if err != nil {
 					return
 				}
-				verboseNtfn = btcws.NewAllVerboseTxNtfn(rawTx)
+				verboseNtfn = btcws.NewTxAcceptedVerboseNtfn(rawTx)
 				marshalledJSONVerbose, err = json.Marshal(verboseNtfn)
 				if err != nil {
 					rpcsLog.Errorf("Failed to marshal verbose tx notification: %s", err.Error())
@@ -1430,10 +1430,10 @@ func handleNotifySpent(wsc *wsClient, icmd btcjson.Cmd) (interface{}, *btcjson.E
 	return nil, nil
 }
 
-// handleNotifyAllNewTXs implements the notifyallnewtxs command extension for
-// websocket connections.
-func handleNotifyAllNewTXs(wsc *wsClient, icmd btcjson.Cmd) (interface{}, *btcjson.Error) {
-	cmd, ok := icmd.(*btcws.NotifyAllNewTXsCmd)
+// handleNotifyNewTransations implements the notifynewtransactions command
+// extension for websocket connections.
+func handleNotifyNewTransactions(wsc *wsClient, icmd btcjson.Cmd) (interface{}, *btcjson.Error) {
+	cmd, ok := icmd.(*btcws.NotifyNewTransactionsCmd)
 	if !ok {
 		return nil, &btcjson.ErrInternal
 	}
