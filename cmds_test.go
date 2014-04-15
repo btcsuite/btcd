@@ -173,13 +173,13 @@ var cmdtests = []struct {
 		},
 	},
 	{
-		name: "notifyallnewtxs",
+		name: "notifynewtransactions",
 		f: func() (btcjson.Cmd, error) {
-			return NewNotifyAllNewTXsCmd(
+			return NewNotifyNewTransactionsCmd(
 				float64(1),
 				true)
 		},
-		result: &NotifyAllNewTXsCmd{
+		result: &NotifyNewTransactionsCmd{
 			id:      float64(1),
 			Verbose: true,
 		},
