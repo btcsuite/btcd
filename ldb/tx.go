@@ -350,6 +350,10 @@ func (db *LevelDb) fetchTxDataByLoc(blkHeight int64, txOff int, txLen int, txspe
 	//log.Trace("transaction %v is at block %v %v txoff %v, txlen %v\n",
 	//	txsha, blksha, blkHeight, txOff, txLen)
 
+	if len(blkbuf) < txOff+txLen {
+		err = btcdb.TxShaMissing
+		return
+	}
 	rbuf := bytes.NewBuffer(blkbuf[txOff : txOff+txLen])
 
 	var tx btcwire.MsgTx
