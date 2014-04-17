@@ -5,14 +5,12 @@
 package btcscript
 
 import (
-	"crypto/ecdsa"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"github.com/conformal/btcutil"
 	"github.com/conformal/btcwire"
-	"io"
 	"io/ioutil"
 	"strconv"
 	"strings"
@@ -45,16 +43,6 @@ func TstRemoveOpcodeByData(pkscript []byte, data []byte) ([]byte, error) {
 func (s *Script) TstSetPC(script, off int) {
 	s.scriptidx = script
 	s.scriptoff = off
-}
-
-// TstSignatureScriptCustomReader allows the test modules to test the internal
-// function signatureScriptCustomReader.
-func TstSignatureScriptCustomReader(reader io.Reader, tx *btcwire.MsgTx, idx int,
-	subscript []byte, hashType byte, privkey *ecdsa.PrivateKey,
-	compress bool) ([]byte, error) {
-
-	return signatureScriptCustomReader(reader, tx, idx, subscript,
-		hashType, privkey, compress)
 }
 
 // Internal tests for opcodde parsing with bad data templates.

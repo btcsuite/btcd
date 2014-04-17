@@ -7,6 +7,9 @@ package btcscript_test
 import (
 	"bytes"
 	"crypto/ecdsa"
+	"crypto/rand"
+	"errors"
+	"fmt"
 	"github.com/conformal/btcec"
 	"github.com/conformal/btcscript"
 	"github.com/conformal/btcutil"
@@ -2463,7 +2466,6 @@ type TstInput struct {
 	sigscriptGenerates bool
 	inputValidates     bool
 	indexOutOfRange    bool
-	invalidReader      bool
 }
 
 var coinbaseOutPoint = &btcwire.OutPoint{
@@ -2694,19 +2696,6 @@ var SigScriptTests = []TstSigScript{
 		compress:           false,
 		scriptAtWrongIndex: true,
 	},
-	{
-		name: "invalid reader",
-		inputs: []TstInput{
-			{
-				txout:              btcwire.NewTxOut(coinbaseVal, uncompressedPkScript),
-				invalidReader:      true,
-				sigscriptGenerates: false,
-			},
-		},
-		hashtype:           btcscript.SigHashAll,
-		compress:           false,
-		scriptAtWrongIndex: true,
-	},
 }
 
 // Test the sigscript generation for valid and invalid inputs, all
@@ -2749,20 +2738,10 @@ nexttest:
 			} else {
 				idx = j
 			}
-			if SigScriptTests[i].inputs[j].invalidReader {
-				script, err = btcscript.TstSignatureScriptCustomReader(
-					new(bytes.Buffer), tx, idx,
-					SigScriptTests[i].inputs[j].txout.PkScript,
-					SigScriptTests[i].hashtype,
-					privkey,
-					SigScriptTests[i].compress)
-			} else {
-				script, err = btcscript.SignatureScript(tx, idx,
-					SigScriptTests[i].inputs[j].txout.PkScript,
-					SigScriptTests[i].hashtype,
-					privkey,
-					SigScriptTests[i].compress)
-			}
+			script, err = btcscript.SignatureScript(tx, idx,
+				SigScriptTests[i].inputs[j].txout.PkScript,
+				SigScriptTests[i].hashtype, privkey,
+				SigScriptTests[i].compress)
 
 			if (err == nil) != SigScriptTests[i].inputs[j].sigscriptGenerates {
 				if err == nil {
@@ -3187,6 +3166,1392 @@ func TestMultiSigScript(t *testing.T) {
 			t.Errorf("MultiSigScript #%d got: %x\nwant: %x",
 				i, script, test.expected)
 			continue
+		}
+	}
+}
+
+func signAndCheck(msg string, tx *btcwire.MsgTx, idx int, pkScript []byte,
+	hashType byte, kdb btcscript.KeyDB, sdb btcscript.ScriptDB,
+	previousScript []byte) error {
+
+	sigScript, err := btcscript.SignTxOutput(
+		btcwire.TestNet3, tx, idx, pkScript, hashType,
+		kdb, sdb, []byte{})
+	if err != nil {
+		return fmt.Errorf("failed to sign output %s: %v", msg, err)
+	}
+
+	return checkScripts(msg, tx, idx, sigScript, pkScript)
+}
+
+func checkScripts(msg string, tx *btcwire.MsgTx, idx int,
+	sigScript, pkScript []byte) error {
+	engine, err := btcscript.NewScript(sigScript, pkScript, idx, tx,
+		btcscript.ScriptBip16|
+			btcscript.ScriptCanonicalSignatures)
+	if err != nil {
+		return fmt.Errorf("failed to make script engine for %s: %v",
+			msg, err)
+	}
+
+	err = engine.Execute()
+	if err != nil {
+		return fmt.Errorf("invalid script signature for %s: %v", msg,
+			err)
+	}
+
+	return nil
+}
+
+type addressToKey struct {
+	key        *ecdsa.PrivateKey
+	compressed bool
+}
+
+func mkGetKey(keys map[string]addressToKey) btcscript.KeyDB {
+	if keys == nil {
+		return btcscript.KeyClosure(func(addr btcutil.Address) (*ecdsa.PrivateKey,
+			bool, error) {
+			return nil, false, errors.New("nope")
+		})
+	}
+	return btcscript.KeyClosure(func(addr btcutil.Address) (*ecdsa.PrivateKey,
+		bool, error) {
+		a2k, ok := keys[addr.EncodeAddress()]
+		if !ok {
+			return nil, false, errors.New("nope")
+		}
+		return a2k.key, a2k.compressed, nil
+	})
+}
+
+func mkGetScript(scripts map[string][]byte) btcscript.ScriptDB {
+	if scripts == nil {
+		return btcscript.ScriptClosure(func(addr btcutil.Address) (
+			[]byte, error) {
+			return nil, errors.New("nope")
+		})
+	}
+	return btcscript.ScriptClosure(func(addr btcutil.Address) ([]byte,
+		error) {
+		script, ok := scripts[addr.EncodeAddress()]
+		if !ok {
+			return nil, errors.New("nope")
+		}
+		return script, nil
+	})
+}
+
+func TestSignTxOutput(t *testing.T) {
+	// make key
+	// make script based on key.
+	// sign with magic pixie dust.
+	hashTypes := []byte{
+		btcscript.SigHashOld, // no longer used but should act like all
+		btcscript.SigHashAll,
+		btcscript.SigHashNone,
+		btcscript.SigHashSingle,
+		btcscript.SigHashAll | btcscript.SigHashAnyOneCanPay,
+		btcscript.SigHashNone | btcscript.SigHashAnyOneCanPay,
+		btcscript.SigHashSingle | btcscript.SigHashAnyOneCanPay,
+	}
+	tx := &btcwire.MsgTx{
+		Version: 1,
+		TxIn: []*btcwire.TxIn{
+			&btcwire.TxIn{
+				PreviousOutpoint: btcwire.OutPoint{
+					Hash:  btcwire.ShaHash{},
+					Index: 0,
+				},
+				Sequence: 4294967295,
+			},
+			&btcwire.TxIn{
+				PreviousOutpoint: btcwire.OutPoint{
+					Hash:  btcwire.ShaHash{},
+					Index: 1,
+				},
+				Sequence: 4294967295,
+			},
+			&btcwire.TxIn{
+				PreviousOutpoint: btcwire.OutPoint{
+					Hash:  btcwire.ShaHash{},
+					Index: 2,
+				},
+				Sequence: 4294967295,
+			},
+		},
+		TxOut: []*btcwire.TxOut{
+			&btcwire.TxOut{
+				Value: 1,
+			},
+			&btcwire.TxOut{
+				Value: 2,
+			},
+			&btcwire.TxOut{
+				Value: 3,
+			},
+		},
+		LockTime: 0,
+	}
+
+	// Pay to Pubkey Hash (uncompressed)
+	for _, hashType := range hashTypes {
+		for i := range tx.TxIn {
+			msg := fmt.Sprintf("%d:%d", hashType, i)
+			key, err := ecdsa.GenerateKey(btcec.S256(),
+				rand.Reader)
+			if err != nil {
+				t.Errorf("failed to make privkey for %s: %v",
+					msg, err)
+				break
+			}
+
+			pk := (*btcec.PublicKey)(&key.PublicKey).
+				SerializeUncompressed()
+			address, err := btcutil.NewAddressPubKeyHash(
+				btcutil.Hash160(pk), btcwire.TestNet3)
+			if err != nil {
+				t.Errorf("failed to make address for %s: %v",
+					msg, err)
+				break
+			}
+
+			pkScript, err := btcscript.PayToAddrScript(address)
+			if err != nil {
+				t.Errorf("failed to make pkscript "+
+					"for %s: %v", msg, err)
+			}
+
+			if err := signAndCheck(msg, tx, i, pkScript, hashType,
+				mkGetKey(map[string]addressToKey{
+					address.EncodeAddress(): {key, false},
+				}), mkGetScript(nil), []byte{}); err != nil {
+				t.Error(err)
+				break
+			}
+		}
+	}
+
+	// Pay to Pubkey Hash (uncompressed) (merging with correct)
+	for _, hashType := range hashTypes {
+		for i := range tx.TxIn {
+			msg := fmt.Sprintf("%d:%d", hashType, i)
+			key, err := ecdsa.GenerateKey(btcec.S256(),
+				rand.Reader)
+			if err != nil {
+				t.Errorf("failed to make privkey for %s: %v",
+					msg, err)
+				break
+			}
+
+			pk := (*btcec.PublicKey)(&key.PublicKey).
+				SerializeUncompressed()
+			address, err := btcutil.NewAddressPubKeyHash(
+				btcutil.Hash160(pk), btcwire.TestNet3)
+			if err != nil {
+				t.Errorf("failed to make address for %s: %v",
+					msg, err)
+				break
+			}
+
+			pkScript, err := btcscript.PayToAddrScript(address)
+			if err != nil {
+				t.Errorf("failed to make pkscript "+
+					"for %s: %v", msg, err)
+			}
+
+			sigScript, err := btcscript.SignTxOutput(
+				btcwire.TestNet3, tx, i, pkScript,
+				hashType, mkGetKey(map[string]addressToKey{
+					address.EncodeAddress(): {key, false},
+				}), mkGetScript(nil), []byte{})
+			if err != nil {
+				t.Errorf("failed to sign output %s: %v", msg,
+					err)
+				break
+			}
+
+			// by the above loop, this should be valid, now sign
+			// again and merge.
+			sigScript, err = btcscript.SignTxOutput(
+				btcwire.TestNet3, tx, i, pkScript,
+				hashType, mkGetKey(map[string]addressToKey{
+					address.EncodeAddress(): {key, false},
+				}), mkGetScript(nil), sigScript)
+			if err != nil {
+				t.Errorf("failed to sign output %s a "+
+					"second time: %v", msg, err)
+				break
+			}
+
+			err = checkScripts(msg, tx, i, sigScript, pkScript)
+			if err != nil {
+				t.Errorf("twice signed script invalid for "+
+					"%s: %v", msg, err)
+				break
+			}
+		}
+	}
+
+	// Pay to Pubkey Hash (compressed)
+	for _, hashType := range hashTypes {
+		for i := range tx.TxIn {
+			msg := fmt.Sprintf("%d:%d", hashType, i)
+
+			key, err := ecdsa.GenerateKey(btcec.S256(),
+				rand.Reader)
+			if err != nil {
+				t.Errorf("failed to make privkey for %s: %v",
+					msg, err)
+				break
+			}
+
+			pk := (*btcec.PublicKey)(&key.PublicKey).
+				SerializeCompressed()
+			address, err := btcutil.NewAddressPubKeyHash(
+				btcutil.Hash160(pk), btcwire.TestNet3)
+			if err != nil {
+				t.Errorf("failed to make address for %s: %v",
+					msg, err)
+				break
+			}
+
+			pkScript, err := btcscript.PayToAddrScript(address)
+			if err != nil {
+				t.Errorf("failed to make pkscript "+
+					"for %s: %v", msg, err)
+			}
+
+			if err := signAndCheck(msg, tx, i, pkScript, hashType,
+				mkGetKey(map[string]addressToKey{
+					address.EncodeAddress(): {key, true},
+				}), mkGetScript(nil), []byte{}); err != nil {
+				t.Error(err)
+				break
+			}
+		}
+	}
+
+	// Pay to Pubkey Hash (compressed) with duplicate merge
+	for _, hashType := range hashTypes {
+		for i := range tx.TxIn {
+			msg := fmt.Sprintf("%d:%d", hashType, i)
+
+			key, err := ecdsa.GenerateKey(btcec.S256(),
+				rand.Reader)
+			if err != nil {
+				t.Errorf("failed to make privkey for %s: %v",
+					msg, err)
+				break
+			}
+
+			pk := (*btcec.PublicKey)(&key.PublicKey).
+				SerializeCompressed()
+			address, err := btcutil.NewAddressPubKeyHash(
+				btcutil.Hash160(pk), btcwire.TestNet3)
+			if err != nil {
+				t.Errorf("failed to make address for %s: %v",
+					msg, err)
+				break
+			}
+
+			pkScript, err := btcscript.PayToAddrScript(address)
+			if err != nil {
+				t.Errorf("failed to make pkscript "+
+					"for %s: %v", msg, err)
+			}
+
+			sigScript, err := btcscript.SignTxOutput(
+				btcwire.TestNet3, tx, i, pkScript,
+				hashType, mkGetKey(map[string]addressToKey{
+					address.EncodeAddress(): {key, true},
+				}), mkGetScript(nil), []byte{})
+			if err != nil {
+				t.Errorf("failed to sign output %s: %v", msg,
+					err)
+				break
+			}
+
+			// by the above loop, this should be valid, now sign
+			// again and merge.
+			sigScript, err = btcscript.SignTxOutput(
+				btcwire.TestNet3, tx, i, pkScript,
+				hashType, mkGetKey(map[string]addressToKey{
+					address.EncodeAddress(): {key, true},
+				}), mkGetScript(nil), sigScript)
+			if err != nil {
+				t.Errorf("failed to sign output %s a "+
+					"second time: %v", msg, err)
+				break
+			}
+
+			err = checkScripts(msg, tx, i, sigScript, pkScript)
+			if err != nil {
+				t.Errorf("twice signed script invalid for "+
+					"%s: %v", msg, err)
+				break
+			}
+		}
+	}
+
+	// Pay to PubKey (uncompressed)
+	for _, hashType := range hashTypes {
+		for i := range tx.TxIn {
+			msg := fmt.Sprintf("%d:%d", hashType, i)
+
+			key, err := ecdsa.GenerateKey(btcec.S256(),
+				rand.Reader)
+			if err != nil {
+				t.Errorf("failed to make privkey for %s: %v",
+					msg, err)
+				break
+			}
+
+			pk := (*btcec.PublicKey)(&key.PublicKey).
+				SerializeUncompressed()
+			address, err := btcutil.NewAddressPubKey(pk,
+				btcwire.TestNet3)
+			if err != nil {
+				t.Errorf("failed to make address for %s: %v",
+					msg, err)
+				break
+			}
+
+			pkScript, err := btcscript.PayToAddrScript(address)
+			if err != nil {
+				t.Errorf("failed to make pkscript "+
+					"for %s: %v", msg, err)
+			}
+
+			if err := signAndCheck(msg, tx, i, pkScript, hashType,
+				mkGetKey(map[string]addressToKey{
+					address.EncodeAddress(): {key, false},
+				}), mkGetScript(nil), []byte{}); err != nil {
+				t.Error(err)
+				break
+			}
+		}
+	}
+
+	// Pay to PubKey (uncompressed)
+	for _, hashType := range hashTypes {
+		for i := range tx.TxIn {
+			msg := fmt.Sprintf("%d:%d", hashType, i)
+
+			key, err := ecdsa.GenerateKey(btcec.S256(),
+				rand.Reader)
+			if err != nil {
+				t.Errorf("failed to make privkey for %s: %v",
+					msg, err)
+				break
+			}
+
+			pk := (*btcec.PublicKey)(&key.PublicKey).
+				SerializeUncompressed()
+			address, err := btcutil.NewAddressPubKey(pk,
+				btcwire.TestNet3)
+			if err != nil {
+				t.Errorf("failed to make address for %s: %v",
+					msg, err)
+				break
+			}
+
+			pkScript, err := btcscript.PayToAddrScript(address)
+			if err != nil {
+				t.Errorf("failed to make pkscript "+
+					"for %s: %v", msg, err)
+			}
+
+			sigScript, err := btcscript.SignTxOutput(
+				btcwire.TestNet3, tx, i, pkScript,
+				hashType, mkGetKey(map[string]addressToKey{
+					address.EncodeAddress(): {key, false},
+				}), mkGetScript(nil), []byte{})
+			if err != nil {
+				t.Errorf("failed to sign output %s: %v", msg,
+					err)
+				break
+			}
+
+			// by the above loop, this should be valid, now sign
+			// again and merge.
+			sigScript, err = btcscript.SignTxOutput(
+				btcwire.TestNet3, tx, i, pkScript,
+				hashType, mkGetKey(map[string]addressToKey{
+					address.EncodeAddress(): {key, false},
+				}), mkGetScript(nil), sigScript)
+			if err != nil {
+				t.Errorf("failed to sign output %s a "+
+					"second time: %v", msg, err)
+				break
+			}
+
+			err = checkScripts(msg, tx, i, sigScript, pkScript)
+			if err != nil {
+				t.Errorf("twice signed script invalid for "+
+					"%s: %v", msg, err)
+				break
+			}
+		}
+	}
+
+	// Pay to PubKey (compressed)
+	for _, hashType := range hashTypes {
+		for i := range tx.TxIn {
+			msg := fmt.Sprintf("%d:%d", hashType, i)
+
+			key, err := ecdsa.GenerateKey(btcec.S256(),
+				rand.Reader)
+			if err != nil {
+				t.Errorf("failed to make privkey for %s: %v",
+					msg, err)
+				break
+			}
+
+			pk := (*btcec.PublicKey)(&key.PublicKey).
+				SerializeCompressed()
+			address, err := btcutil.NewAddressPubKey(pk,
+				btcwire.TestNet3)
+			if err != nil {
+				t.Errorf("failed to make address for %s: %v",
+					msg, err)
+				break
+			}
+
+			pkScript, err := btcscript.PayToAddrScript(address)
+			if err != nil {
+				t.Errorf("failed to make pkscript "+
+					"for %s: %v", msg, err)
+			}
+
+			if err := signAndCheck(msg, tx, i, pkScript, hashType,
+				mkGetKey(map[string]addressToKey{
+					address.EncodeAddress(): {key, true},
+				}), mkGetScript(nil), []byte{}); err != nil {
+				t.Error(err)
+				break
+			}
+		}
+	}
+
+	// Pay to PubKey (compressed) with duplicate merge
+	for _, hashType := range hashTypes {
+		for i := range tx.TxIn {
+			msg := fmt.Sprintf("%d:%d", hashType, i)
+
+			key, err := ecdsa.GenerateKey(btcec.S256(),
+				rand.Reader)
+			if err != nil {
+				t.Errorf("failed to make privkey for %s: %v",
+					msg, err)
+				break
+			}
+
+			pk := (*btcec.PublicKey)(&key.PublicKey).
+				SerializeCompressed()
+			address, err := btcutil.NewAddressPubKey(pk,
+				btcwire.TestNet3)
+			if err != nil {
+				t.Errorf("failed to make address for %s: %v",
+					msg, err)
+				break
+			}
+
+			pkScript, err := btcscript.PayToAddrScript(address)
+			if err != nil {
+				t.Errorf("failed to make pkscript "+
+					"for %s: %v", msg, err)
+			}
+
+			sigScript, err := btcscript.SignTxOutput(
+				btcwire.TestNet3, tx, i, pkScript,
+				hashType, mkGetKey(map[string]addressToKey{
+					address.EncodeAddress(): {key, true},
+				}), mkGetScript(nil), []byte{})
+			if err != nil {
+				t.Errorf("failed to sign output %s: %v", msg,
+					err)
+				break
+			}
+
+			// by the above loop, this should be valid, now sign
+			// again and merge.
+			sigScript, err = btcscript.SignTxOutput(
+				btcwire.TestNet3, tx, i, pkScript,
+				hashType, mkGetKey(map[string]addressToKey{
+					address.EncodeAddress(): {key, true},
+				}), mkGetScript(nil), sigScript)
+			if err != nil {
+				t.Errorf("failed to sign output %s a "+
+					"second time: %v", msg, err)
+				break
+			}
+
+			err = checkScripts(msg, tx, i, sigScript, pkScript)
+			if err != nil {
+				t.Errorf("twice signed script invalid for "+
+					"%s: %v", msg, err)
+				break
+			}
+		}
+	}
+
+	// As before, but with p2sh now.
+	// Pay to Pubkey Hash (uncompressed)
+	for _, hashType := range hashTypes {
+		for i := range tx.TxIn {
+			msg := fmt.Sprintf("%d:%d", hashType, i)
+			key, err := ecdsa.GenerateKey(btcec.S256(),
+				rand.Reader)
+			if err != nil {
+				t.Errorf("failed to make privkey for %s: %v",
+					msg, err)
+				break
+			}
+
+			pk := (*btcec.PublicKey)(&key.PublicKey).
+				SerializeUncompressed()
+			address, err := btcutil.NewAddressPubKeyHash(
+				btcutil.Hash160(pk), btcwire.TestNet3)
+			if err != nil {
+				t.Errorf("failed to make address for %s: %v",
+					msg, err)
+				break
+			}
+
+			pkScript, err := btcscript.PayToAddrScript(address)
+			if err != nil {
+				t.Errorf("failed to make pkscript "+
+					"for %s: %v", msg, err)
+				break
+			}
+
+			scriptAddr, err := btcutil.NewAddressScriptHash(
+				pkScript, btcwire.TestNet3)
+			if err != nil {
+				t.Errorf("failed to make p2sh addr for %s: %v",
+					msg, err)
+				break
+			}
+
+			scriptPkScript, err := btcscript.PayToAddrScript(
+				scriptAddr)
+			if err != nil {
+				t.Errorf("failed to make script pkscript for "+
+					"%s: %v", msg, err)
+				break
+			}
+
+			if err := signAndCheck(msg, tx, i, scriptPkScript,
+				hashType,
+				mkGetKey(map[string]addressToKey{
+					address.EncodeAddress(): {key, false},
+				}), mkGetScript(map[string][]byte{
+					scriptAddr.EncodeAddress(): pkScript,
+				}), []byte{}); err != nil {
+				t.Error(err)
+				break
+			}
+		}
+	}
+
+	// Pay to Pubkey Hash (uncompressed) with duplicate merge
+	for _, hashType := range hashTypes {
+		for i := range tx.TxIn {
+			msg := fmt.Sprintf("%d:%d", hashType, i)
+			key, err := ecdsa.GenerateKey(btcec.S256(),
+				rand.Reader)
+			if err != nil {
+				t.Errorf("failed to make privkey for %s: %v",
+					msg, err)
+				break
+			}
+
+			pk := (*btcec.PublicKey)(&key.PublicKey).
+				SerializeUncompressed()
+			address, err := btcutil.NewAddressPubKeyHash(
+				btcutil.Hash160(pk), btcwire.TestNet3)
+			if err != nil {
+				t.Errorf("failed to make address for %s: %v",
+					msg, err)
+				break
+			}
+
+			pkScript, err := btcscript.PayToAddrScript(address)
+			if err != nil {
+				t.Errorf("failed to make pkscript "+
+					"for %s: %v", msg, err)
+				break
+			}
+
+			scriptAddr, err := btcutil.NewAddressScriptHash(
+				pkScript, btcwire.TestNet3)
+			if err != nil {
+				t.Errorf("failed to make p2sh addr for %s: %v",
+					msg, err)
+				break
+			}
+
+			scriptPkScript, err := btcscript.PayToAddrScript(
+				scriptAddr)
+			if err != nil {
+				t.Errorf("failed to make script pkscript for "+
+					"%s: %v", msg, err)
+				break
+			}
+
+			sigScript, err := btcscript.SignTxOutput(
+				btcwire.TestNet3, tx, i, scriptPkScript,
+				hashType, mkGetKey(map[string]addressToKey{
+					address.EncodeAddress(): {key, false},
+				}), mkGetScript(map[string][]byte{
+					scriptAddr.EncodeAddress(): pkScript,
+				}), []byte{})
+			if err != nil {
+				t.Errorf("failed to sign output %s: %v", msg,
+					err)
+				break
+			}
+
+			// by the above loop, this should be valid, now sign
+			// again and merge.
+			sigScript, err = btcscript.SignTxOutput(
+				btcwire.TestNet3, tx, i, scriptPkScript,
+				hashType, mkGetKey(map[string]addressToKey{
+					address.EncodeAddress(): {key, false},
+				}), mkGetScript(map[string][]byte{
+					scriptAddr.EncodeAddress(): pkScript,
+				}), []byte{})
+			if err != nil {
+				t.Errorf("failed to sign output %s a "+
+					"second time: %v", msg, err)
+				break
+			}
+
+			err = checkScripts(msg, tx, i, sigScript, scriptPkScript)
+			if err != nil {
+				t.Errorf("twice signed script invalid for "+
+					"%s: %v", msg, err)
+				break
+			}
+		}
+	}
+
+	// Pay to Pubkey Hash (compressed)
+	for _, hashType := range hashTypes {
+		for i := range tx.TxIn {
+			msg := fmt.Sprintf("%d:%d", hashType, i)
+
+			key, err := ecdsa.GenerateKey(btcec.S256(),
+				rand.Reader)
+			if err != nil {
+				t.Errorf("failed to make privkey for %s: %v",
+					msg, err)
+				break
+			}
+
+			pk := (*btcec.PublicKey)(&key.PublicKey).
+				SerializeCompressed()
+			address, err := btcutil.NewAddressPubKeyHash(
+				btcutil.Hash160(pk), btcwire.TestNet3)
+			if err != nil {
+				t.Errorf("failed to make address for %s: %v",
+					msg, err)
+				break
+			}
+
+			pkScript, err := btcscript.PayToAddrScript(address)
+			if err != nil {
+				t.Errorf("failed to make pkscript "+
+					"for %s: %v", msg, err)
+			}
+
+			scriptAddr, err := btcutil.NewAddressScriptHash(
+				pkScript, btcwire.TestNet3)
+			if err != nil {
+				t.Errorf("failed to make p2sh addr for %s: %v",
+					msg, err)
+				break
+			}
+
+			scriptPkScript, err := btcscript.PayToAddrScript(
+				scriptAddr)
+			if err != nil {
+				t.Errorf("failed to make script pkscript for "+
+					"%s: %v", msg, err)
+				break
+			}
+
+			if err := signAndCheck(msg, tx, i, scriptPkScript,
+				hashType,
+				mkGetKey(map[string]addressToKey{
+					address.EncodeAddress(): {key, true},
+				}), mkGetScript(map[string][]byte{
+					scriptAddr.EncodeAddress(): pkScript,
+				}), []byte{}); err != nil {
+				t.Error(err)
+				break
+			}
+		}
+	}
+
+	// Pay to Pubkey Hash (compressed) with duplicate merge
+	for _, hashType := range hashTypes {
+		for i := range tx.TxIn {
+			msg := fmt.Sprintf("%d:%d", hashType, i)
+
+			key, err := ecdsa.GenerateKey(btcec.S256(),
+				rand.Reader)
+			if err != nil {
+				t.Errorf("failed to make privkey for %s: %v",
+					msg, err)
+				break
+			}
+
+			pk := (*btcec.PublicKey)(&key.PublicKey).
+				SerializeCompressed()
+			address, err := btcutil.NewAddressPubKeyHash(
+				btcutil.Hash160(pk), btcwire.TestNet3)
+			if err != nil {
+				t.Errorf("failed to make address for %s: %v",
+					msg, err)
+				break
+			}
+
+			pkScript, err := btcscript.PayToAddrScript(address)
+			if err != nil {
+				t.Errorf("failed to make pkscript "+
+					"for %s: %v", msg, err)
+			}
+
+			scriptAddr, err := btcutil.NewAddressScriptHash(
+				pkScript, btcwire.TestNet3)
+			if err != nil {
+				t.Errorf("failed to make p2sh addr for %s: %v",
+					msg, err)
+				break
+			}
+
+			scriptPkScript, err := btcscript.PayToAddrScript(
+				scriptAddr)
+			if err != nil {
+				t.Errorf("failed to make script pkscript for "+
+					"%s: %v", msg, err)
+				break
+			}
+
+			sigScript, err := btcscript.SignTxOutput(
+				btcwire.TestNet3, tx, i, scriptPkScript,
+				hashType, mkGetKey(map[string]addressToKey{
+					address.EncodeAddress(): {key, true},
+				}), mkGetScript(map[string][]byte{
+					scriptAddr.EncodeAddress(): pkScript,
+				}), []byte{})
+			if err != nil {
+				t.Errorf("failed to sign output %s: %v", msg,
+					err)
+				break
+			}
+
+			// by the above loop, this should be valid, now sign
+			// again and merge.
+			sigScript, err = btcscript.SignTxOutput(
+				btcwire.TestNet3, tx, i, scriptPkScript,
+				hashType, mkGetKey(map[string]addressToKey{
+					address.EncodeAddress(): {key, true},
+				}), mkGetScript(map[string][]byte{
+					scriptAddr.EncodeAddress(): pkScript,
+				}), []byte{})
+			if err != nil {
+				t.Errorf("failed to sign output %s a "+
+					"second time: %v", msg, err)
+				break
+			}
+
+			err = checkScripts(msg, tx, i, sigScript, scriptPkScript)
+			if err != nil {
+				t.Errorf("twice signed script invalid for "+
+					"%s: %v", msg, err)
+				break
+			}
+		}
+	}
+
+	// Pay to PubKey (uncompressed)
+	for _, hashType := range hashTypes {
+		for i := range tx.TxIn {
+			msg := fmt.Sprintf("%d:%d", hashType, i)
+
+			key, err := ecdsa.GenerateKey(btcec.S256(),
+				rand.Reader)
+			if err != nil {
+				t.Errorf("failed to make privkey for %s: %v",
+					msg, err)
+				break
+			}
+
+			pk := (*btcec.PublicKey)(&key.PublicKey).
+				SerializeUncompressed()
+			address, err := btcutil.NewAddressPubKey(pk,
+				btcwire.TestNet3)
+			if err != nil {
+				t.Errorf("failed to make address for %s: %v",
+					msg, err)
+				break
+			}
+
+			pkScript, err := btcscript.PayToAddrScript(address)
+			if err != nil {
+				t.Errorf("failed to make pkscript "+
+					"for %s: %v", msg, err)
+			}
+
+			scriptAddr, err := btcutil.NewAddressScriptHash(
+				pkScript, btcwire.TestNet3)
+			if err != nil {
+				t.Errorf("failed to make p2sh addr for %s: %v",
+					msg, err)
+				break
+			}
+
+			scriptPkScript, err := btcscript.PayToAddrScript(
+				scriptAddr)
+			if err != nil {
+				t.Errorf("failed to make script pkscript for "+
+					"%s: %v", msg, err)
+				break
+			}
+
+			if err := signAndCheck(msg, tx, i, scriptPkScript,
+				hashType,
+				mkGetKey(map[string]addressToKey{
+					address.EncodeAddress(): {key, false},
+				}), mkGetScript(map[string][]byte{
+					scriptAddr.EncodeAddress(): pkScript,
+				}), []byte{}); err != nil {
+				t.Error(err)
+				break
+			}
+		}
+	}
+
+	// Pay to PubKey (uncompressed) with duplicate merge
+	for _, hashType := range hashTypes {
+		for i := range tx.TxIn {
+			msg := fmt.Sprintf("%d:%d", hashType, i)
+
+			key, err := ecdsa.GenerateKey(btcec.S256(),
+				rand.Reader)
+			if err != nil {
+				t.Errorf("failed to make privkey for %s: %v",
+					msg, err)
+				break
+			}
+
+			pk := (*btcec.PublicKey)(&key.PublicKey).
+				SerializeUncompressed()
+			address, err := btcutil.NewAddressPubKey(pk,
+				btcwire.TestNet3)
+			if err != nil {
+				t.Errorf("failed to make address for %s: %v",
+					msg, err)
+				break
+			}
+
+			pkScript, err := btcscript.PayToAddrScript(address)
+			if err != nil {
+				t.Errorf("failed to make pkscript "+
+					"for %s: %v", msg, err)
+			}
+
+			scriptAddr, err := btcutil.NewAddressScriptHash(
+				pkScript, btcwire.TestNet3)
+			if err != nil {
+				t.Errorf("failed to make p2sh addr for %s: %v",
+					msg, err)
+				break
+			}
+
+			scriptPkScript, err := btcscript.PayToAddrScript(
+				scriptAddr)
+			if err != nil {
+				t.Errorf("failed to make script pkscript for "+
+					"%s: %v", msg, err)
+				break
+			}
+
+			sigScript, err := btcscript.SignTxOutput(
+				btcwire.TestNet3, tx, i, scriptPkScript,
+				hashType, mkGetKey(map[string]addressToKey{
+					address.EncodeAddress(): {key, false},
+				}), mkGetScript(map[string][]byte{
+					scriptAddr.EncodeAddress(): pkScript,
+				}), []byte{})
+			if err != nil {
+				t.Errorf("failed to sign output %s: %v", msg,
+					err)
+				break
+			}
+
+			// by the above loop, this should be valid, now sign
+			// again and merge.
+			sigScript, err = btcscript.SignTxOutput(
+				btcwire.TestNet3, tx, i, scriptPkScript,
+				hashType, mkGetKey(map[string]addressToKey{
+					address.EncodeAddress(): {key, false},
+				}), mkGetScript(map[string][]byte{
+					scriptAddr.EncodeAddress(): pkScript,
+				}), []byte{})
+			if err != nil {
+				t.Errorf("failed to sign output %s a "+
+					"second time: %v", msg, err)
+				break
+			}
+
+			err = checkScripts(msg, tx, i, sigScript, scriptPkScript)
+			if err != nil {
+				t.Errorf("twice signed script invalid for "+
+					"%s: %v", msg, err)
+				break
+			}
+		}
+	}
+
+	// Pay to PubKey (compressed)
+	for _, hashType := range hashTypes {
+		for i := range tx.TxIn {
+			msg := fmt.Sprintf("%d:%d", hashType, i)
+
+			key, err := ecdsa.GenerateKey(btcec.S256(),
+				rand.Reader)
+			if err != nil {
+				t.Errorf("failed to make privkey for %s: %v",
+					msg, err)
+				break
+			}
+
+			pk := (*btcec.PublicKey)(&key.PublicKey).
+				SerializeCompressed()
+			address, err := btcutil.NewAddressPubKey(pk,
+				btcwire.TestNet3)
+			if err != nil {
+				t.Errorf("failed to make address for %s: %v",
+					msg, err)
+				break
+			}
+
+			pkScript, err := btcscript.PayToAddrScript(address)
+			if err != nil {
+				t.Errorf("failed to make pkscript "+
+					"for %s: %v", msg, err)
+			}
+
+			scriptAddr, err := btcutil.NewAddressScriptHash(
+				pkScript, btcwire.TestNet3)
+			if err != nil {
+				t.Errorf("failed to make p2sh addr for %s: %v",
+					msg, err)
+				break
+			}
+
+			scriptPkScript, err := btcscript.PayToAddrScript(
+				scriptAddr)
+			if err != nil {
+				t.Errorf("failed to make script pkscript for "+
+					"%s: %v", msg, err)
+				break
+			}
+
+			if err := signAndCheck(msg, tx, i, scriptPkScript,
+				hashType,
+				mkGetKey(map[string]addressToKey{
+					address.EncodeAddress(): {key, true},
+				}), mkGetScript(map[string][]byte{
+					scriptAddr.EncodeAddress(): pkScript,
+				}), []byte{}); err != nil {
+				t.Error(err)
+				break
+			}
+		}
+	}
+
+	// Pay to PubKey (compressed)
+	for _, hashType := range hashTypes {
+		for i := range tx.TxIn {
+			msg := fmt.Sprintf("%d:%d", hashType, i)
+
+			key, err := ecdsa.GenerateKey(btcec.S256(),
+				rand.Reader)
+			if err != nil {
+				t.Errorf("failed to make privkey for %s: %v",
+					msg, err)
+				break
+			}
+
+			pk := (*btcec.PublicKey)(&key.PublicKey).
+				SerializeCompressed()
+			address, err := btcutil.NewAddressPubKey(pk,
+				btcwire.TestNet3)
+			if err != nil {
+				t.Errorf("failed to make address for %s: %v",
+					msg, err)
+				break
+			}
+
+			pkScript, err := btcscript.PayToAddrScript(address)
+			if err != nil {
+				t.Errorf("failed to make pkscript "+
+					"for %s: %v", msg, err)
+			}
+
+			scriptAddr, err := btcutil.NewAddressScriptHash(
+				pkScript, btcwire.TestNet3)
+			if err != nil {
+				t.Errorf("failed to make p2sh addr for %s: %v",
+					msg, err)
+				break
+			}
+
+			scriptPkScript, err := btcscript.PayToAddrScript(
+				scriptAddr)
+			if err != nil {
+				t.Errorf("failed to make script pkscript for "+
+					"%s: %v", msg, err)
+				break
+			}
+
+			sigScript, err := btcscript.SignTxOutput(
+				btcwire.TestNet3, tx, i, scriptPkScript,
+				hashType, mkGetKey(map[string]addressToKey{
+					address.EncodeAddress(): {key, true},
+				}), mkGetScript(map[string][]byte{
+					scriptAddr.EncodeAddress(): pkScript,
+				}), []byte{})
+			if err != nil {
+				t.Errorf("failed to sign output %s: %v", msg,
+					err)
+				break
+			}
+
+			// by the above loop, this should be valid, now sign
+			// again and merge.
+			sigScript, err = btcscript.SignTxOutput(
+				btcwire.TestNet3, tx, i, scriptPkScript,
+				hashType, mkGetKey(map[string]addressToKey{
+					address.EncodeAddress(): {key, true},
+				}), mkGetScript(map[string][]byte{
+					scriptAddr.EncodeAddress(): pkScript,
+				}), []byte{})
+			if err != nil {
+				t.Errorf("failed to sign output %s a "+
+					"second time: %v", msg, err)
+				break
+			}
+
+			err = checkScripts(msg, tx, i, sigScript, scriptPkScript)
+			if err != nil {
+				t.Errorf("twice signed script invalid for "+
+					"%s: %v", msg, err)
+				break
+			}
+		}
+	}
+
+	// Basic Multisig
+	for _, hashType := range hashTypes {
+		for i := range tx.TxIn {
+			msg := fmt.Sprintf("%d:%d", hashType, i)
+
+			key1, err := ecdsa.GenerateKey(btcec.S256(),
+				rand.Reader)
+			if err != nil {
+				t.Errorf("failed to make privkey for %s: %v",
+					msg, err)
+				break
+			}
+
+			pk1 := (*btcec.PublicKey)(&key1.PublicKey).
+				SerializeCompressed()
+			address1, err := btcutil.NewAddressPubKey(pk1,
+				btcwire.TestNet3)
+			if err != nil {
+				t.Errorf("failed to make address for %s: %v",
+					msg, err)
+				break
+			}
+
+			key2, err := ecdsa.GenerateKey(btcec.S256(),
+				rand.Reader)
+			if err != nil {
+				t.Errorf("failed to make privkey 2 for %s: %v",
+					msg, err)
+				break
+			}
+
+			pk2 := (*btcec.PublicKey)(&key2.PublicKey).
+				SerializeCompressed()
+			address2, err := btcutil.NewAddressPubKey(pk2,
+				btcwire.TestNet3)
+			if err != nil {
+				t.Errorf("failed to make address 2 for %s: %v",
+					msg, err)
+				break
+			}
+
+			pkScript, err := btcscript.MultiSigScript(
+				[]*btcutil.AddressPubKey{address1, address2},
+				2)
+			if err != nil {
+				t.Errorf("failed to make pkscript "+
+					"for %s: %v", msg, err)
+			}
+
+			scriptAddr, err := btcutil.NewAddressScriptHash(
+				pkScript, btcwire.TestNet3)
+			if err != nil {
+				t.Errorf("failed to make p2sh addr for %s: %v",
+					msg, err)
+				break
+			}
+
+			scriptPkScript, err := btcscript.PayToAddrScript(
+				scriptAddr)
+			if err != nil {
+				t.Errorf("failed to make script pkscript for "+
+					"%s: %v", msg, err)
+				break
+			}
+
+			if err := signAndCheck(msg, tx, i, scriptPkScript,
+				hashType,
+				mkGetKey(map[string]addressToKey{
+					address1.EncodeAddress(): {key1, true},
+					address2.EncodeAddress(): {key2, true},
+				}), mkGetScript(map[string][]byte{
+					scriptAddr.EncodeAddress(): pkScript,
+				}), []byte{}); err != nil {
+				t.Error(err)
+				break
+			}
+		}
+	}
+
+	// Two part multisig, sign with one key then the other.
+	for _, hashType := range hashTypes {
+		for i := range tx.TxIn {
+			msg := fmt.Sprintf("%d:%d", hashType, i)
+
+			key1, err := ecdsa.GenerateKey(btcec.S256(),
+				rand.Reader)
+			if err != nil {
+				t.Errorf("failed to make privkey for %s: %v",
+					msg, err)
+				break
+			}
+
+			pk1 := (*btcec.PublicKey)(&key1.PublicKey).
+				SerializeCompressed()
+			address1, err := btcutil.NewAddressPubKey(pk1,
+				btcwire.TestNet3)
+			if err != nil {
+				t.Errorf("failed to make address for %s: %v",
+					msg, err)
+				break
+			}
+
+			key2, err := ecdsa.GenerateKey(btcec.S256(),
+				rand.Reader)
+			if err != nil {
+				t.Errorf("failed to make privkey 2 for %s: %v",
+					msg, err)
+				break
+			}
+
+			pk2 := (*btcec.PublicKey)(&key2.PublicKey).
+				SerializeCompressed()
+			address2, err := btcutil.NewAddressPubKey(pk2,
+				btcwire.TestNet3)
+			if err != nil {
+				t.Errorf("failed to make address 2 for %s: %v",
+					msg, err)
+				break
+			}
+
+			pkScript, err := btcscript.MultiSigScript(
+				[]*btcutil.AddressPubKey{address1, address2},
+				2)
+			if err != nil {
+				t.Errorf("failed to make pkscript "+
+					"for %s: %v", msg, err)
+			}
+
+			scriptAddr, err := btcutil.NewAddressScriptHash(
+				pkScript, btcwire.TestNet3)
+			if err != nil {
+				t.Errorf("failed to make p2sh addr for %s: %v",
+					msg, err)
+				break
+			}
+
+			scriptPkScript, err := btcscript.PayToAddrScript(
+				scriptAddr)
+			if err != nil {
+				t.Errorf("failed to make script pkscript for "+
+					"%s: %v", msg, err)
+				break
+			}
+
+			sigScript, err := btcscript.SignTxOutput(
+				btcwire.TestNet3, tx, i, scriptPkScript,
+				hashType, mkGetKey(map[string]addressToKey{
+					address1.EncodeAddress(): {key1, true},
+				}), mkGetScript(map[string][]byte{
+					scriptAddr.EncodeAddress(): pkScript,
+				}), []byte{})
+			if err != nil {
+				t.Errorf("failed to sign output %s: %v", msg,
+					err)
+				break
+			}
+
+			// Only 1 out of 2 signed, this *should* fail.
+			if checkScripts(msg, tx, i, sigScript,
+				scriptPkScript) == nil {
+				t.Errorf("part signed script valid for %s", msg)
+				break
+			}
+
+			// Sign with the other key and merge
+			sigScript, err = btcscript.SignTxOutput(
+				btcwire.TestNet3, tx, i, scriptPkScript,
+				hashType, mkGetKey(map[string]addressToKey{
+					address2.EncodeAddress(): {key2, true},
+				}), mkGetScript(map[string][]byte{
+					scriptAddr.EncodeAddress(): pkScript,
+				}), sigScript)
+			if err != nil {
+				t.Errorf("failed to sign output %s: %v", msg, err)
+				break
+			}
+
+			err = checkScripts(msg, tx, i, sigScript,
+				scriptPkScript)
+			if err != nil {
+				t.Errorf("fully signed script invalid for "+
+					"%s: %v", msg, err)
+				break
+			}
+		}
+	}
+
+	// Two part multisig, sign with one key then both, check key dedup
+	// correctly.
+	for _, hashType := range hashTypes {
+		for i := range tx.TxIn {
+			msg := fmt.Sprintf("%d:%d", hashType, i)
+
+			key1, err := ecdsa.GenerateKey(btcec.S256(),
+				rand.Reader)
+			if err != nil {
+				t.Errorf("failed to make privkey for %s: %v",
+					msg, err)
+				break
+			}
+
+			pk1 := (*btcec.PublicKey)(&key1.PublicKey).
+				SerializeCompressed()
+			address1, err := btcutil.NewAddressPubKey(pk1,
+				btcwire.TestNet3)
+			if err != nil {
+				t.Errorf("failed to make address for %s: %v",
+					msg, err)
+				break
+			}
+
+			key2, err := ecdsa.GenerateKey(btcec.S256(),
+				rand.Reader)
+			if err != nil {
+				t.Errorf("failed to make privkey 2 for %s: %v",
+					msg, err)
+				break
+			}
+
+			pk2 := (*btcec.PublicKey)(&key2.PublicKey).
+				SerializeCompressed()
+			address2, err := btcutil.NewAddressPubKey(pk2,
+				btcwire.TestNet3)
+			if err != nil {
+				t.Errorf("failed to make address 2 for %s: %v",
+					msg, err)
+				break
+			}
+
+			pkScript, err := btcscript.MultiSigScript(
+				[]*btcutil.AddressPubKey{address1, address2},
+				2)
+			if err != nil {
+				t.Errorf("failed to make pkscript "+
+					"for %s: %v", msg, err)
+			}
+
+			scriptAddr, err := btcutil.NewAddressScriptHash(
+				pkScript, btcwire.TestNet3)
+			if err != nil {
+				t.Errorf("failed to make p2sh addr for %s: %v",
+					msg, err)
+				break
+			}
+
+			scriptPkScript, err := btcscript.PayToAddrScript(
+				scriptAddr)
+			if err != nil {
+				t.Errorf("failed to make script pkscript for "+
+					"%s: %v", msg, err)
+				break
+			}
+
+			sigScript, err := btcscript.SignTxOutput(
+				btcwire.TestNet3, tx, i, scriptPkScript,
+				hashType, mkGetKey(map[string]addressToKey{
+					address1.EncodeAddress(): {key1, true},
+				}), mkGetScript(map[string][]byte{
+					scriptAddr.EncodeAddress(): pkScript,
+				}), []byte{})
+			if err != nil {
+				t.Errorf("failed to sign output %s: %v", msg,
+					err)
+				break
+			}
+
+			// Only 1 out of 2 signed, this *should* fail.
+			if checkScripts(msg, tx, i, sigScript,
+				scriptPkScript) == nil {
+				t.Errorf("part signed script valid for %s", msg)
+				break
+			}
+
+			// Sign with the other key and merge
+			sigScript, err = btcscript.SignTxOutput(
+				btcwire.TestNet3, tx, i, scriptPkScript,
+				hashType, mkGetKey(map[string]addressToKey{
+					address1.EncodeAddress(): {key1, true},
+					address2.EncodeAddress(): {key2, true},
+				}), mkGetScript(map[string][]byte{
+					scriptAddr.EncodeAddress(): pkScript,
+				}), sigScript)
+			if err != nil {
+				t.Errorf("failed to sign output %s: %v", msg, err)
+				break
+			}
+
+			// Now we should pass.
+			err = checkScripts(msg, tx, i, sigScript,
+				scriptPkScript)
+			if err != nil {
+				t.Errorf("fully signed script invalid for "+
+					"%s: %v", msg, err)
+				break
+			}
 		}
 	}
 }
