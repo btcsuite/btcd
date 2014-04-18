@@ -27,10 +27,6 @@ import (
 )
 
 const (
-	// maxAddresses identifies the maximum number of addresses that the
-	// address manager will track.
-	maxAddresses = 2500
-
 	// needAddressThreshold is the number of addresses under which the
 	// address manager will claim to need more addresses.
 	needAddressThreshold = 1000
@@ -115,13 +111,20 @@ func (a *AddrManager) updateAddress(netAddr, srcAddr *btcwire.NetAddress) {
 	ka := a.find(netAddr)
 	if ka != nil {
 		// TODO(oga) only update adresses periodically.
-		// Update the last seen time.
-		if netAddr.Timestamp.After(ka.na.Timestamp) {
-			ka.na.Timestamp = netAddr.Timestamp
-		}
+		// Update the last seen time and services.
+		// note that to prevent causing excess garbage on getaddr
+		// messages the netaddresses in addrmaanger are *immutable*,
+		// if we need to change them then we replace the pointer with a
+		// new copy so that we don't have to copy every na for getaddr.
+		if netAddr.Timestamp.After(ka.na.Timestamp) ||
+			(ka.na.Services&netAddr.Services) !=
+				netAddr.Services {
 
-		// Update services.
-		ka.na.AddService(netAddr.Services)
+			naCopy := *ka.na
+			naCopy.Timestamp = netAddr.Timestamp
+			naCopy.AddService(netAddr.Services)
+			ka.na = &naCopy
+		}
 
 		// If already in tried, we have nothing to do here.
 		if ka.tried {
@@ -714,8 +717,7 @@ func (a *AddrManager) AddressCache() []*btcwire.NetAddress {
 	i := 0
 	// Iteration order is undefined here, but we randomise it anyway.
 	for _, v := range a.addrIndex {
-		copyNa := *v.na
-		allAddr[i] = &copyNa
+		allAddr[i] = v.na
 		i++
 	}
 	// Fisher-Yates shuffle the array
@@ -937,7 +939,10 @@ func (a *AddrManager) Connected(addr *btcwire.NetAddress) {
 	// so.
 	now := time.Now()
 	if now.After(ka.na.Timestamp.Add(time.Minute * 20)) {
-		ka.na.Timestamp = time.Now()
+		// ka.na is immutable, so replace it.
+		naCopy := *ka.na
+		naCopy.Timestamp = time.Now()
+		ka.na = &naCopy
 	}
 }
 
@@ -955,7 +960,9 @@ func (a *AddrManager) Good(addr *btcwire.NetAddress) {
 	now := time.Now()
 	ka.lastsuccess = now
 	ka.lastattempt = now
-	ka.na.Timestamp = now
+	naCopy := *ka.na
+	naCopy.Timestamp = time.Now()
+	ka.na = &naCopy
 	ka.attempts = 0
 
 	// move to tried set, optionally evicting other addresses if neeed.
