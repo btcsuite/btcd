@@ -91,8 +91,8 @@ type GetRawMempoolResult struct {
 	Fee              float64  `json:"fee"`
 	Time             int64    `json:"time"`
 	Height           int64    `json:"height"`
-	StartingPriority int      `json:"startingpriority"`
-	CurrentPriority  int      `json:"currentpriority"`
+	StartingPriority float64  `json:"startingpriority"`
+	CurrentPriority  float64  `json:"currentpriority"`
 	Depends          []string `json:"depends"`
 }
 
