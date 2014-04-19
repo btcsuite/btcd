@@ -21,6 +21,9 @@ interface with bitcoin peers at the wire protocol level.
 
 ## Documentation
 
+[![GoDoc](https://godoc.org/github.com/conformal/btcwire?status.png)]
+(http://godoc.org/github.com/conformal/btcwire)
+
 Full `go doc` style documentation for the project can be viewed online without
 installing this package by using the GoDoc site here:
 http://godoc.org/github.com/conformal/btcwire
