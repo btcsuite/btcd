@@ -2,8 +2,11 @@ language: go
 go:
   - release
   - tip
-install: go get -d -t -v ./...
-script: go test -v -covermode=count -coverprofile=profile.cov
+install:
+  - go get -d -t -v ./...
+  - go get -v code.google.com/p/go.tools/cmd/cover
+script:
+  - go test -v -covermode=count -coverprofile=profile.cov
 after_success:
   - go get -v github.com/mattn/goveralls
   - export PATH=$PATH:$HOME/gopath/bin
