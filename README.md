@@ -105,7 +105,6 @@ from a remote peer is:
 
 ## TODO
 
-- Implement functions for [BIP 0014](https://en.bitcoin.it/wiki/BIP_0014)
 - Implement alert message decoding/encoding
 - Implement bloom filter messages (filterload, filteradd, filterclear,
   merkleblock) as defined in [BIP 0037](https://en.bitcoin.it/wiki/BIP_0037)

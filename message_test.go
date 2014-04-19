@@ -51,7 +51,7 @@ func TestMessage(t *testing.T) {
 		t.Errorf("NewNetAddress: %v", err)
 	}
 	me.Timestamp = time.Time{} // Version message has zero value timestamp.
-	msgVersion := btcwire.NewMsgVersion(me, you, 123123, "/test:0.0.1/", 0)
+	msgVersion := btcwire.NewMsgVersion(me, you, 123123, 0)
 
 	msgVerack := btcwire.NewMsgVerAck()
 	msgGetAddr := btcwire.NewMsgGetAddr()
@@ -76,7 +76,7 @@ func TestMessage(t *testing.T) {
 		btcnet btcwire.BitcoinNet // Network to use for wire encoding
 		bytes  int                // Expected num bytes read/written
 	}{
-		{msgVersion, msgVersion, pver, btcwire.MainNet, 122},
+		{msgVersion, msgVersion, pver, btcwire.MainNet, 125},
 		{msgVerack, msgVerack, pver, btcwire.MainNet, 24},
 		{msgGetAddr, msgGetAddr, pver, btcwire.MainNet, 24},
 		{msgAddr, msgAddr, pver, btcwire.MainNet, 25},

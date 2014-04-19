@@ -21,7 +21,6 @@ func TestVersion(t *testing.T) {
 	pver := btcwire.ProtocolVersion
 
 	// Create version message data.
-	userAgent := "/btcdtest:0.0.1/"
 	lastBlock := int32(234234)
 	tcpAddrMe := &net.TCPAddr{IP: net.ParseIP("127.0.0.1"), Port: 8333}
 	me, err := btcwire.NewNetAddress(tcpAddrMe, btcwire.SFNodeNetwork)
@@ -39,7 +38,7 @@ func TestVersion(t *testing.T) {
 	}
 
 	// Ensure we get the correct data back out.
-	msg := btcwire.NewMsgVersion(me, you, nonce, userAgent, lastBlock)
+	msg := btcwire.NewMsgVersion(me, you, nonce, lastBlock)
 	if msg.ProtocolVersion != int32(pver) {
 		t.Errorf("NewMsgVersion: wrong protocol version - got %v, want %v",
 			msg.ProtocolVersion, pver)
@@ -56,9 +55,9 @@ func TestVersion(t *testing.T) {
 		t.Errorf("NewMsgVersion: wrong nonce - got %v, want %v",
 			msg.Nonce, nonce)
 	}
-	if msg.UserAgent != userAgent {
+	if msg.UserAgent != btcwire.DefaultUserAgent {
 		t.Errorf("NewMsgVersion: wrong user agent - got %v, want %v",
-			msg.UserAgent, userAgent)
+			msg.UserAgent, btcwire.DefaultUserAgent)
 	}
 	if msg.LastBlock != lastBlock {
 		t.Errorf("NewMsgVersion: wrong last block - got %v, want %v",
@@ -67,6 +66,29 @@ func TestVersion(t *testing.T) {
 	if msg.DisableRelayTx != false {
 		t.Errorf("NewMsgVersion: disable relay tx is not false by "+
 			"default - got %v, want %v", msg.DisableRelayTx, false)
+	}
+
+	msg.AddUserAgent("myclient", "1.2.3", "optional", "comments")
+	customUserAgent := btcwire.DefaultUserAgent + "myclient:1.2.3(optional; comments)/"
+	if msg.UserAgent != customUserAgent {
+		t.Errorf("AddUserAgent: wrong user agent - got %s, want %s",
+			msg.UserAgent, customUserAgent)
+	}
+
+	msg.AddUserAgent("mygui", "3.4.5")
+	customUserAgent += "mygui:3.4.5/"
+	if msg.UserAgent != customUserAgent {
+		t.Errorf("AddUserAgent: wrong user agent - got %s, want %s",
+			msg.UserAgent, customUserAgent)
+	}
+
+	// accounting for ":", "/"
+	err = msg.AddUserAgent(strings.Repeat("t",
+		btcwire.MaxUserAgentLen-len(customUserAgent)-2+1), "")
+	if _, ok := err.(*btcwire.MessageError); !ok {
+		t.Errorf("AddUserAgent: expected error not received "+
+			"- got %v, want %T", err, btcwire.MessageError{})
+
 	}
 
 	// Version message should not have any services set by default.
@@ -111,7 +133,7 @@ func TestVersion(t *testing.T) {
 
 	// Use a fake connection.
 	conn := &fakeConn{localAddr: tcpAddrMe, remoteAddr: tcpAddrYou}
-	msg, err = btcwire.NewMsgVersionFromConn(conn, nonce, userAgent, lastBlock)
+	msg, err = btcwire.NewMsgVersionFromConn(conn, nonce, lastBlock)
 	if err != nil {
 		t.Errorf("NewMsgVersionFromConn: %v", err)
 	}
@@ -131,7 +153,7 @@ func TestVersion(t *testing.T) {
 		localAddr:  &net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 8333},
 		remoteAddr: tcpAddrYou,
 	}
-	msg, err = btcwire.NewMsgVersionFromConn(conn, nonce, userAgent, lastBlock)
+	msg, err = btcwire.NewMsgVersionFromConn(conn, nonce, lastBlock)
 	if err != btcwire.ErrInvalidNetAddr {
 		t.Errorf("NewMsgVersionFromConn: expected error not received "+
 			"- got %v, want %v", err, btcwire.ErrInvalidNetAddr)
@@ -142,7 +164,7 @@ func TestVersion(t *testing.T) {
 		localAddr:  tcpAddrMe,
 		remoteAddr: &net.UDPAddr{IP: net.ParseIP("192.168.0.1"), Port: 8333},
 	}
-	msg, err = btcwire.NewMsgVersionFromConn(conn, nonce, userAgent, lastBlock)
+	msg, err = btcwire.NewMsgVersionFromConn(conn, nonce, lastBlock)
 	if err != btcwire.ErrInvalidNetAddr {
 		t.Errorf("NewMsgVersionFromConn: expected error not received "+
 			"- got %v, want %v", err, btcwire.ErrInvalidNetAddr)

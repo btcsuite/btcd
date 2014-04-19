@@ -9,12 +9,16 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"strings"
 	"time"
 )
 
 // MaxUserAgentLen is the maximum allowed length for the user agent field in a
 // version message (MsgVersion).
 const MaxUserAgentLen = 2000
+
+// DefaultUserAgent for btcwire in the stack
+const DefaultUserAgent = "/btcwire:0.1.4/"
 
 // MsgVersion implements the Message interface and represents a bitcoin version
 // message.  It is used for a peer to advertise itself as soon as an outbound
@@ -115,10 +119,9 @@ func (msg *MsgVersion) BtcDecode(r io.Reader, pver uint32) error {
 		if err != nil {
 			return err
 		}
-		if len(userAgent) > MaxUserAgentLen {
-			str := fmt.Sprintf("user agent too long [len %v, max %v]",
-				len(userAgent), MaxUserAgentLen)
-			return messageError("MsgVersion.BtcDecode", str)
+		err = validateUserAgent(userAgent)
+		if err != nil {
+			return err
 		}
 		msg.UserAgent = userAgent
 	}
@@ -152,13 +155,12 @@ func (msg *MsgVersion) BtcDecode(r io.Reader, pver uint32) error {
 // BtcEncode encodes the receiver to w using the bitcoin protocol encoding.
 // This is part of the Message interface implementation.
 func (msg *MsgVersion) BtcEncode(w io.Writer, pver uint32) error {
-	if len(msg.UserAgent) > MaxUserAgentLen {
-		str := fmt.Sprintf("user agent too long [len %v, max %v]",
-			len(msg.UserAgent), MaxUserAgentLen)
-		return messageError("MsgVersion.BtcEncode", str)
+	err := validateUserAgent(msg.UserAgent)
+	if err != nil {
+		return err
 	}
 
-	err := writeElements(w, msg.ProtocolVersion, msg.Services,
+	err = writeElements(w, msg.ProtocolVersion, msg.Services,
 		msg.Timestamp.Unix())
 	if err != nil {
 		return err
@@ -224,7 +226,7 @@ func (msg *MsgVersion) MaxPayloadLength(pver uint32) uint32 {
 // Message interface using the passed parameters and defaults for the remaining
 // fields.
 func NewMsgVersion(me *NetAddress, you *NetAddress, nonce uint64,
-	userAgent string, lastBlock int32) *MsgVersion {
+	lastBlock int32) *MsgVersion {
 
 	// Limit the timestamp to one second precision since the protocol
 	// doesn't support better.
@@ -235,7 +237,7 @@ func NewMsgVersion(me *NetAddress, you *NetAddress, nonce uint64,
 		AddrYou:         *you,
 		AddrMe:          *me,
 		Nonce:           nonce,
-		UserAgent:       userAgent,
+		UserAgent:       DefaultUserAgent,
 		LastBlock:       lastBlock,
 		DisableRelayTx:  false,
 	}
@@ -244,7 +246,7 @@ func NewMsgVersion(me *NetAddress, you *NetAddress, nonce uint64,
 // NewMsgVersionFromConn is a convenience function that extracts the remote
 // and local address from conn and returns a new bitcoin version message that
 // conforms to the Message interface.  See NewMsgVersion.
-func NewMsgVersionFromConn(conn net.Conn, nonce uint64, userAgent string,
+func NewMsgVersionFromConn(conn net.Conn, nonce uint64,
 	lastBlock int32) (*MsgVersion, error) {
 
 	// Don't assume any services until we know otherwise.
@@ -259,5 +261,33 @@ func NewMsgVersionFromConn(conn net.Conn, nonce uint64, userAgent string,
 		return nil, err
 	}
 
-	return NewMsgVersion(lna, rna, nonce, userAgent, lastBlock), nil
+	return NewMsgVersion(lna, rna, nonce, lastBlock), nil
+}
+
+// validateUserAgent checks userAgent length against MaxUserAgentLen
+func validateUserAgent(userAgent string) error {
+	if len(userAgent) > MaxUserAgentLen {
+		str := fmt.Sprintf("user agent too long [len %v, max %v]",
+			len(userAgent), MaxUserAgentLen)
+		return messageError("MsgVersion", str)
+	}
+	return nil
+}
+
+// AddUserAgent adds a custom user agent
+func (msg *MsgVersion) AddUserAgent(name string, version string,
+	comments ...string) error {
+
+	newUserAgent := fmt.Sprintf("%s:%s", name, version)
+	if len(comments) != 0 {
+		newUserAgent = fmt.Sprintf("%s(%s)", newUserAgent,
+			strings.Join(comments, "; "))
+	}
+	newUserAgent = fmt.Sprintf("%s%s/", msg.UserAgent, newUserAgent)
+	err := validateUserAgent(newUserAgent)
+	if err != nil {
+		return err
+	}
+	msg.UserAgent = newUserAgent
+	return nil
 }
