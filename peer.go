@@ -426,7 +426,7 @@ func (p *peer) pushBlockMsg(sha *btcwire.ShaHash, doneChan, waitChan chan bool) 
 	if p.continueHash != nil && p.continueHash.IsEqual(sha) {
 		hash, _, err := p.server.db.NewestSha()
 		if err == nil {
-			invMsg := btcwire.NewMsgInv()
+			invMsg := btcwire.NewMsgInvSizeHint(1)
 			iv := btcwire.NewInvVect(btcwire.InvTypeBlock, hash)
 			invMsg.AddInvVect(iv)
 			p.QueueMessage(invMsg, doneChan)
