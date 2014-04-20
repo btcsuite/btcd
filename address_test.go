@@ -529,11 +529,27 @@ func TestAddresses(t *testing.T) {
 				saddr, _ = hex.DecodeString(d.String())
 			}
 
-			// Check script address.
+			// Check script address, as well as the Hash160 method for P2PKH and
+			// P2SH addresses.
 			if !bytes.Equal(saddr, decoded.ScriptAddress()) {
 				t.Errorf("%v: script addresses do not match:\n%x != \n%x",
 					test.name, saddr, decoded.ScriptAddress())
 				return
+			}
+			switch a := decoded.(type) {
+			case *btcutil.AddressPubKeyHash:
+				if h := a.Hash160()[:]; !bytes.Equal(saddr, h) {
+					t.Errorf("%v: hashes do not match:\n%x != \n%x",
+						test.name, saddr, h)
+					return
+				}
+
+			case *btcutil.AddressScriptHash:
+				if h := a.Hash160()[:]; !bytes.Equal(saddr, h) {
+					t.Errorf("%v: hashes do not match:\n%x != \n%x",
+						test.name, saddr, h)
+					return
+				}
 			}
 
 			// Ensure the address is for the expected network.

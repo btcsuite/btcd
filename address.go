@@ -250,6 +250,13 @@ func (a *AddressPubKeyHash) String() string {
 	return a.EncodeAddress()
 }
 
+// Hash160 returns the underlying array of the pubkey hash.  This can be useful
+// when an array is more appropiate than a slice (for example, when used as map
+// keys).
+func (a *AddressPubKeyHash) Hash160() *[ripemd160.Size]byte {
+	return &a.hash
+}
+
 // AddressScriptHash is an Address for a pay-to-script-hash (P2SH)
 // transaction.
 type AddressScriptHash struct {
@@ -329,6 +336,13 @@ func (a *AddressScriptHash) IsForNet(net btcwire.BitcoinNet) bool {
 // be used as a fmt.Stringer.
 func (a *AddressScriptHash) String() string {
 	return a.EncodeAddress()
+}
+
+// Hash160 returns the underlying array of the script hash.  This can be useful
+// when an array is more appropiate than a slice (for example, when used as map
+// keys).
+func (a *AddressScriptHash) Hash160() *[ripemd160.Size]byte {
+	return &a.hash
 }
 
 // PubKeyFormat describes what format to use for a pay-to-pubkey address.
