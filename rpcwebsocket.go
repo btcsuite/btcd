@@ -1479,9 +1479,10 @@ type rescanKeys struct {
 // rescanBlock rescans all transactions in a single block.  This is a helper
 // function for handleRescan.
 func rescanBlock(wsc *wsClient, lookups *rescanKeys, blk *btcutil.Block) {
-	// Vars used for map keys.  The item being checked is copied into
-	// these and then used as the lookup key.  Saves on GC.
-	var ripemd160Hash [ripemd160.Size]byte
+	// Vars used for map keys.  If necessary, the byte slice for each
+	// checked item is copied into and then used as the lookup key.
+	// This is quite a bit more efficient than creating an address
+	// string as it saves on GC and performs less copying.
 	var compressedPubkey [33]byte
 	var uncompressedPubkey [65]byte
 	var outpoint btcwire.OutPoint
@@ -1532,14 +1533,12 @@ func rescanBlock(wsc *wsClient, lookups *rescanKeys, blk *btcutil.Block) {
 			for _, addr := range addrs {
 				switch a := addr.(type) {
 				case *btcutil.AddressPubKeyHash:
-					copy(ripemd160Hash[:], a.ScriptAddress())
-					if _, ok := lookups.pubKeyHashes[ripemd160Hash]; !ok {
+					if _, ok := lookups.pubKeyHashes[*a.Hash160()]; !ok {
 						continue
 					}
 
 				case *btcutil.AddressScriptHash:
-					copy(ripemd160Hash[:], a.ScriptAddress())
-					if _, ok := lookups.scriptHashes[ripemd160Hash]; !ok {
+					if _, ok := lookups.scriptHashes[*a.Hash160()]; !ok {
 						continue
 					}
 
@@ -1642,7 +1641,6 @@ func handleRescan(wsc *wsClient, icmd btcjson.Cmd) (interface{}, *btcjson.Error)
 		uncompressedPubkeys: map[[65]byte]struct{}{},
 		unspent:             map[btcwire.OutPoint]struct{}{},
 	}
-	var ripemd160Hash [ripemd160.Size]byte
 	var compressedPubkey [33]byte
 	var uncompressedPubkey [65]byte
 	for _, addrStr := range cmd.Addresses {
@@ -1656,12 +1654,10 @@ func handleRescan(wsc *wsClient, icmd btcjson.Cmd) (interface{}, *btcjson.Error)
 		}
 		switch a := addr.(type) {
 		case *btcutil.AddressPubKeyHash:
-			copy(ripemd160Hash[:], a.ScriptAddress())
-			lookups.pubKeyHashes[ripemd160Hash] = struct{}{}
+			lookups.pubKeyHashes[*a.Hash160()] = struct{}{}
 
 		case *btcutil.AddressScriptHash:
-			copy(ripemd160Hash[:], a.ScriptAddress())
-			lookups.scriptHashes[ripemd160Hash] = struct{}{}
+			lookups.scriptHashes[*a.Hash160()] = struct{}{}
 
 		case *btcutil.AddressPubKey:
 			pubkeyBytes := a.ScriptAddress()
