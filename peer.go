@@ -50,9 +50,15 @@ const (
 	pingTimeoutMinutes = 2
 )
 
-// userAgent is the user agent string used to identify ourselves to other
-// bitcoin peers.
-var userAgent = fmt.Sprintf("/btcd:%d.%d.%d/", appMajor, appMinor, appPatch)
+var (
+	// userAgentName is the user agent name and is used to help identify
+	// ourselves to other bitcoin peers.
+	userAgentName = "btcd"
+
+	// userAgentVersion is the user agent version and is used to help
+	// identify ourselves to other bitcoin peers.
+	userAgentVersion = fmt.Sprintf("%d.%d.%d", appMajor, appMinor, appPatch)
+)
 
 // zeroHash is the zero value hash (all zeros).  It is defined as a convenience.
 var zeroHash btcwire.ShaHash
@@ -238,8 +244,9 @@ func (p *peer) pushVersionMsg() error {
 
 	// Version message.
 	msg := btcwire.NewMsgVersion(
-		p.server.addrManager.getBestLocalAddress(p.na), theirNa, p.server.nonce,
-		userAgent, int32(blockNum))
+		p.server.addrManager.getBestLocalAddress(p.na), theirNa,
+		p.server.nonce, int32(blockNum))
+	msg.AddUserAgent(userAgentName, userAgentVersion)
 
 	// XXX: bitcoind appears to always enable the full node services flag
 	// of the remote peer netaddress field in the version message regardless
