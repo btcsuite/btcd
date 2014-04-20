@@ -274,7 +274,9 @@ func validateUserAgent(userAgent string) error {
 	return nil
 }
 
-// AddUserAgent adds a custom user agent
+// AddUserAgent adds a user agent to the user agent string for the version
+// message.  The version string is not defined to any strict format, although
+// it is recommended to use the form "major.minor.revision" e.g. "2.6.41".
 func (msg *MsgVersion) AddUserAgent(name string, version string,
 	comments ...string) error {
 
