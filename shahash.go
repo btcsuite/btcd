@@ -47,8 +47,8 @@ func (hash *ShaHash) Bytes() []byte {
 func (hash *ShaHash) SetBytes(newHash []byte) error {
 	nhlen := len(newHash)
 	if nhlen != HashSize {
-		return fmt.Errorf("ShaHash: invalid sha length of %v, want %v",
-			nhlen, HashSize)
+		return fmt.Errorf("invalid sha length of %v, want %v", nhlen,
+			HashSize)
 	}
 	copy(hash[:], newHash[0:HashSize])
 
