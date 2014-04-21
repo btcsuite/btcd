@@ -37,13 +37,6 @@ type TxLoc struct {
 // MsgBlock implements the Message interface and represents a bitcoin
 // block message.  It is used to deliver block and transaction information in
 // response to a getdata message (MsgGetData) for a given block hash.
-//
-// NOTE: Unlike the other message types which contain slices, the number of
-// transactions has a specific entry (Header.TxnCount) that must be kept in
-// sync.  The AddTransaction and ClearTransactions functions properly sync the
-// value, but if you are manually modifying the public members, you will need
-// to ensure you update the Header.TxnCount when you add and remove
-// transactions.
 type MsgBlock struct {
 	Header       BlockHeader
 	Transactions []*MsgTx
