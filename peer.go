@@ -624,6 +624,7 @@ func (p *peer) handleHeadersMsg(msg *btcwire.MsgHeaders) {
 // handleGetData is invoked when a peer receives a getdata bitcoin message and
 // is used to deliver block and transaction information.
 func (p *peer) handleGetDataMsg(msg *btcwire.MsgGetData) {
+	numAdded := 0
 	notFound := btcwire.NewMsgNotFound()
 
 	// We wait on the this wait channel periodically to prevent queueing
@@ -632,7 +633,7 @@ func (p *peer) handleGetDataMsg(msg *btcwire.MsgGetData) {
 	// provide a little pipelining.
 	var waitChan chan bool
 	doneChan := make(chan bool)
-out:
+
 	for i, iv := range msg.InvList {
 		var c chan bool
 		// If this will be the last message we send.
@@ -651,11 +652,12 @@ out:
 		default:
 			peerLog.Warnf("Unknown type in inventory request %d",
 				iv.Type)
-			break out
+			continue
 		}
 		if err != nil {
 			notFound.AddInvVect(iv)
 		}
+		numAdded++
 		waitChan = c
 	}
 	if len(notFound.InvList) != 0 {
@@ -667,7 +669,9 @@ out:
 	// We don't process anything else by them in this time so that we
 	// have an idea of when we should hear back from them - else the idle
 	// timeout could fire when we were only half done sending the blocks.
-	<-doneChan
+	if numAdded > 0 {
+		<-doneChan
+	}
 }
 
 // handleGetBlocksMsg is invoked when a peer receives a getdata bitcoin message.
