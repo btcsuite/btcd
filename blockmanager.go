@@ -444,7 +444,7 @@ func (b *blockManager) handleTxMsg(tmsg *txMsg) {
 
 	// Process the transaction to include validation, insertion in the
 	// memory pool, orphan handling, etc.
-	err := tmsg.peer.server.txMemPool.ProcessTransaction(tmsg.tx, true)
+	err := tmsg.peer.server.txMemPool.ProcessTransaction(tmsg.tx, true, true)
 
 	// Remove transaction from request maps. Either the mempool/chain
 	// already knows about it and as such we shouldn't have any more
@@ -1086,7 +1086,7 @@ func (b *blockManager) handleNotifyMsg(notification *btcchain.Notification) {
 		// Reinsert all of the transactions (except the coinbase) into
 		// the transaction pool.
 		for _, tx := range block.Transactions()[1:] {
-			err := b.server.txMemPool.MaybeAcceptTransaction(tx, nil, false)
+			err := b.server.txMemPool.MaybeAcceptTransaction(tx, nil, false, true)
 			if err != nil {
 				// Remove the transaction and all transactions
 				// that depend on it if it wasn't accepted into

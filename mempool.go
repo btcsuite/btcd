@@ -724,7 +724,7 @@ func (mp *txMemPool) FetchTransaction(txHash *btcwire.ShaHash) (*btcutil.Tx, err
 // more details.
 //
 // This function MUST be called with the mempool lock held (for writes).
-func (mp *txMemPool) maybeAcceptTransaction(tx *btcutil.Tx, isOrphan *bool, isNew bool) error {
+func (mp *txMemPool) maybeAcceptTransaction(tx *btcutil.Tx, isOrphan *bool, isNew, rateLimit bool) error {
 	if isOrphan != nil {
 		*isOrphan = false
 	}
@@ -867,7 +867,7 @@ func (mp *txMemPool) maybeAcceptTransaction(tx *btcutil.Tx, isOrphan *bool, isNe
 
 	// Free-to-relay transactions are rate limited here to prevent
 	// penny-flooding with tiny transactions as a form of attack.
-	if minRequiredFee == 0 {
+	if rateLimit && minRequiredFee == 0 {
 		nowUnix := time.Now().Unix()
 		// we decay passed data with an exponentially decaying ~10
 		// minutes window - matches bitcoind handling.
@@ -919,12 +919,12 @@ func (mp *txMemPool) maybeAcceptTransaction(tx *btcutil.Tx, isOrphan *bool, isNe
 // or not the transaction is an orphan.
 //
 // This function is safe for concurrent access.
-func (mp *txMemPool) MaybeAcceptTransaction(tx *btcutil.Tx, isOrphan *bool, isNew bool) error {
+func (mp *txMemPool) MaybeAcceptTransaction(tx *btcutil.Tx, isOrphan *bool, isNew, rateLimit bool) error {
 	// Protect concurrent access.
 	mp.Lock()
 	defer mp.Unlock()
 
-	return mp.maybeAcceptTransaction(tx, isOrphan, isNew)
+	return mp.maybeAcceptTransaction(tx, isOrphan, isNew, rateLimit)
 }
 
 // processOrphans determines if there are any orphans which depend on the passed
@@ -964,7 +964,7 @@ func (mp *txMemPool) processOrphans(hash *btcwire.ShaHash) error {
 			// Potentially accept the transaction into the
 			// transaction pool.
 			var isOrphan bool
-			err := mp.maybeAcceptTransaction(tx, &isOrphan, true)
+			err := mp.maybeAcceptTransaction(tx, &isOrphan, true, true)
 			if err != nil {
 				return err
 			}
@@ -993,7 +993,7 @@ func (mp *txMemPool) processOrphans(hash *btcwire.ShaHash) error {
 // rules, orphan transaction handling, and insertion into the memory pool.
 //
 // This function is safe for concurrent access.
-func (mp *txMemPool) ProcessTransaction(tx *btcutil.Tx, allowOrphan bool) error {
+func (mp *txMemPool) ProcessTransaction(tx *btcutil.Tx, allowOrphan, rateLimit bool) error {
 	// Protect concurrent access.
 	mp.Lock()
 	defer mp.Unlock()
@@ -1002,7 +1002,7 @@ func (mp *txMemPool) ProcessTransaction(tx *btcutil.Tx, allowOrphan bool) error 
 
 	// Potentially accept the transaction to the memory pool.
 	var isOrphan bool
-	err := mp.maybeAcceptTransaction(tx, &isOrphan, true)
+	err := mp.maybeAcceptTransaction(tx, &isOrphan, true, rateLimit)
 	if err != nil {
 		return err
 	}

@@ -1381,7 +1381,7 @@ func handleSendRawTransaction(s *rpcServer, cmd btcjson.Cmd) (interface{}, error
 	}
 
 	tx := btcutil.NewTx(msgtx)
-	err = s.server.txMemPool.ProcessTransaction(tx, false)
+	err = s.server.txMemPool.ProcessTransaction(tx, false, false)
 	if err != nil {
 		// When the error is a rule error, it means the transaction was
 		// simply rejected as opposed to something actually going wrong,
