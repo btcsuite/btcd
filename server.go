@@ -352,6 +352,7 @@ func (s *server) handleQuery(querymsg interface{}, state *peerState) {
 			// however it is statistics for purely informational purposes
 			// and we don't really care if they are raced to get the new
 			// version.
+			p.StatsMtx.Lock()
 			info := &btcjson.GetPeerInfoResult{
 				Addr:           p.addr,
 				Services:       fmt.Sprintf("%08d", p.services),
@@ -367,14 +368,13 @@ func (s *server) handleQuery(querymsg interface{}, state *peerState) {
 				BanScore:       0,
 				SyncNode:       p == syncPeer,
 			}
-			p.pingStatsMtx.Lock()
 			info.PingTime = p.lastPingMicros
 			if p.lastPingNonce != 0 {
 				wait := time.Now().Sub(p.lastPingTime).Nanoseconds()
 				// We actually want microseconds.
 				info.PingWait = wait / 1000
 			}
-			p.pingStatsMtx.Unlock()
+			p.StatsMtx.Unlock()
 			infos = append(infos, info)
 		})
 		msg.reply <- infos
