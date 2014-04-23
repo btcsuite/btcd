@@ -34,7 +34,7 @@ const (
 
 	// maxKnownInventory is the maximum number of items to keep in the known
 	// inventory cache.
-	maxKnownInventory = 20000
+	maxKnownInventory = 1000
 
 	// negotiateTimeoutSeconds is the number of seconds of inactivity before
 	// we timeout a peer that hasn't completed the initial version
