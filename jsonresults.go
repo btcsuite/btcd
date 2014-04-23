@@ -279,6 +279,14 @@ type SignRawTransactionResult struct {
 	Complete bool   `json:"complete"`
 }
 
+// ListReceivedByAccountResult models the data from the listreceivedbyaccount
+// command.
+type ListReceivedByAccountResult struct {
+	Account       string  `json: "account"`
+	Amount        float64 `json:"amount"`
+	Confirmations uint64  `json:"confirmations"`
+}
+
 // ListSinceBlockResult models the data from the listsinceblock command.
 type ListSinceBlockResult struct {
 	Transactions []ListTransactionsResult `json:"transactions"`
@@ -503,6 +511,12 @@ func ReadResultCmd(cmd string, message []byte) (Reply, error) {
 		}
 	case "listaccounts":
 		var res map[string]float64
+		err = json.Unmarshal(objmap["result"], &res)
+		if err == nil {
+			result.Result = res
+		}
+	case "listreceivedbyaccount":
+		var res []ListReceivedByAccountResult
 		err = json.Unmarshal(objmap["result"], &res)
 		if err == nil {
 			result.Result = res
