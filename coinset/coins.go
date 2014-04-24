@@ -12,7 +12,7 @@ import (
 type Coin interface {
 	Hash() *btcwire.ShaHash
 	Index() uint32
-	Value() int64
+	Value() btcutil.Amount
 	PkScript() []byte
 	NumConfs() int64
 	ValueAge() int64
@@ -33,7 +33,7 @@ type Coins interface {
 // the CoinSet, otherwise the cached values will be incorrect.
 type CoinSet struct {
 	coinList      *list.List
-	totalValue    int64
+	totalValue    btcutil.Amount
 	totalValueAge int64
 }
 
@@ -64,7 +64,7 @@ func (cs *CoinSet) Coins() []Coin {
 }
 
 // TotalValue returns the total value of the coins in the set.
-func (cs *CoinSet) TotalValue() (value int64) {
+func (cs *CoinSet) TotalValue() (value btcutil.Amount) {
 	return cs.totalValue
 }
 
@@ -143,7 +143,7 @@ var (
 
 // satisfiesTargetValue checks that the totalValue is either exactly the targetValue
 // or is greater than the targetValue by at least the minChange amount.
-func satisfiesTargetValue(targetValue, minChange, totalValue int64) bool {
+func satisfiesTargetValue(targetValue, minChange, totalValue btcutil.Amount) bool {
 	return (totalValue == targetValue || totalValue >= targetValue+minChange)
 }
 
@@ -159,7 +159,7 @@ func satisfiesTargetValue(targetValue, minChange, totalValue int64) bool {
 // It is important to note that the Coins being used as inputs need to have
 // a constant ValueAge() during the execution of CoinSelect.
 type CoinSelector interface {
-	CoinSelect(targetValue int64, coins []Coin) (Coins, error)
+	CoinSelect(targetValue btcutil.Amount, coins []Coin) (Coins, error)
 }
 
 // MinIndexCoinSelector is a CoinSelector that attempts to construct a
@@ -167,12 +167,12 @@ type CoinSelector interface {
 // any number of lower indexes (as in the ordered array) over higher ones.
 type MinIndexCoinSelector struct {
 	MaxInputs       int
-	MinChangeAmount int64
+	MinChangeAmount btcutil.Amount
 }
 
 // CoinSelect will attempt to select coins using the algorithm described
 // in the MinIndexCoinSelector struct.
-func (s MinIndexCoinSelector) CoinSelect(targetValue int64, coins []Coin) (Coins, error) {
+func (s MinIndexCoinSelector) CoinSelect(targetValue btcutil.Amount, coins []Coin) (Coins, error) {
 	cs := NewCoinSet(nil)
 	for n := 0; n < len(coins) && n < s.MaxInputs; n++ {
 		cs.PushCoin(coins[n])
@@ -188,12 +188,12 @@ func (s MinIndexCoinSelector) CoinSelect(targetValue int64, coins []Coin) (Coins
 // that uses as few of the inputs as possible.
 type MinNumberCoinSelector struct {
 	MaxInputs       int
-	MinChangeAmount int64
+	MinChangeAmount btcutil.Amount
 }
 
 // CoinSelect will attempt to select coins using the algorithm described
 // in the MinNumberCoinSelector struct.
-func (s MinNumberCoinSelector) CoinSelect(targetValue int64, coins []Coin) (Coins, error) {
+func (s MinNumberCoinSelector) CoinSelect(targetValue btcutil.Amount, coins []Coin) (Coins, error) {
 	sortedCoins := make([]Coin, 0, len(coins))
 	sortedCoins = append(sortedCoins, coins...)
 	sort.Sort(sort.Reverse(byAmount(sortedCoins)))
@@ -212,12 +212,12 @@ func (s MinNumberCoinSelector) CoinSelect(targetValue int64, coins []Coin) (Coin
 // block.
 type MaxValueAgeCoinSelector struct {
 	MaxInputs       int
-	MinChangeAmount int64
+	MinChangeAmount btcutil.Amount
 }
 
 // CoinSelect will attempt to select coins using the algorithm described
 // in the MaxValueAgeCoinSelector struct.
-func (s MaxValueAgeCoinSelector) CoinSelect(targetValue int64, coins []Coin) (Coins, error) {
+func (s MaxValueAgeCoinSelector) CoinSelect(targetValue btcutil.Amount, coins []Coin) (Coins, error) {
 	sortedCoins := make([]Coin, 0, len(coins))
 	sortedCoins = append(sortedCoins, coins...)
 	sort.Sort(sort.Reverse(byValueAge(sortedCoins)))
@@ -239,13 +239,13 @@ func (s MaxValueAgeCoinSelector) CoinSelect(targetValue int64, coins []Coin) (Co
 //
 type MinPriorityCoinSelector struct {
 	MaxInputs              int
-	MinChangeAmount        int64
+	MinChangeAmount        btcutil.Amount
 	MinAvgValueAgePerInput int64
 }
 
 // CoinSelect will attempt to select coins using the algorithm described
 // in the MinPriorityCoinSelector struct.
-func (s MinPriorityCoinSelector) CoinSelect(targetValue int64, coins []Coin) (Coins, error) {
+func (s MinPriorityCoinSelector) CoinSelect(targetValue btcutil.Amount, coins []Coin) (Coins, error) {
 	possibleCoins := make([]Coin, 0, len(coins))
 	possibleCoins = append(possibleCoins, coins...)
 
@@ -368,8 +368,8 @@ func (c *SimpleCoin) txOut() *btcwire.TxOut {
 }
 
 // Value returns the value of the Coin
-func (c *SimpleCoin) Value() int64 {
-	return c.txOut().Value
+func (c *SimpleCoin) Value() btcutil.Amount {
+	return btcutil.Amount(c.txOut().Value)
 }
 
 // PkScript returns the outpoint script of the Coin.
@@ -390,5 +390,5 @@ func (c *SimpleCoin) NumConfs() int64 {
 // ValueAge returns the product of the value and the number of confirmations.  This is
 // used as an input to calculate the priority of the transaction.
 func (c *SimpleCoin) ValueAge() int64 {
-	return c.TxNumConfs * c.Value()
+	return c.TxNumConfs * int64(c.Value())
 }

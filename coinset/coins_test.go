@@ -14,18 +14,18 @@ import (
 type TestCoin struct {
 	TxHash     *btcwire.ShaHash
 	TxIndex    uint32
-	TxValue    int64
+	TxValue    btcutil.Amount
 	TxNumConfs int64
 }
 
 func (c *TestCoin) Hash() *btcwire.ShaHash { return c.TxHash }
 func (c *TestCoin) Index() uint32          { return c.TxIndex }
-func (c *TestCoin) Value() int64           { return c.TxValue }
+func (c *TestCoin) Value() btcutil.Amount  { return c.TxValue }
 func (c *TestCoin) PkScript() []byte       { return nil }
 func (c *TestCoin) NumConfs() int64        { return c.TxNumConfs }
-func (c *TestCoin) ValueAge() int64        { return c.TxValue * c.TxNumConfs }
+func (c *TestCoin) ValueAge() int64        { return int64(c.TxValue) * c.TxNumConfs }
 
-func NewCoin(index, value, numConfs int64) coinset.Coin {
+func NewCoin(index int64, value btcutil.Amount, numConfs int64) coinset.Coin {
 	h := fastsha256.New()
 	h.Write([]byte(fmt.Sprintf("%d", index)))
 	hash, _ := btcwire.NewShaHash(h.Sum(nil))
@@ -41,7 +41,7 @@ func NewCoin(index, value, numConfs int64) coinset.Coin {
 type coinSelectTest struct {
 	selector      coinset.CoinSelector
 	inputCoins    []coinset.Coin
-	targetValue   int64
+	targetValue   btcutil.Amount
 	expectedCoins []coinset.Coin
 	expectedError error
 }
@@ -216,9 +216,11 @@ func TestMinPrioritySelector(t *testing.T) {
 
 var (
 	// should be two outpoints, with 1st one having 0.035BTC value.
+	testSimpleCoinNumConfs            = int64(1)
 	testSimpleCoinTxHash              = "9b5965c86de51d5dc824e179a05cf232db78c80ae86ca9d7cb2a655b5e19c1e2"
 	testSimpleCoinTxHex               = "0100000001a214a110f79e4abe073865ea5b3745c6e82c913bad44be70652804a5e4003b0a010000008c493046022100edd18a69664efa57264be207100c203e6cade1888cbb88a0ad748548256bb2f0022100f1027dc2e6c7f248d78af1dd90027b5b7d8ec563bb62aa85d4e74d6376f3868c0141048f3757b65ed301abd1b0e8942d1ab5b50594d3314cff0299f300c696376a0a9bf72e74710a8af7a5372d4af4bb519e2701a094ef48c8e48e3b65b28502452dceffffffff02e0673500000000001976a914686dd149a79b4a559d561fbc396d3e3c6628b98d88ace86ef102000000001976a914ac3f995655e81b875b38b64351d6f896ddbfc68588ac00000000"
-	testSimpleCoinTxValue0            = int64(3500000)
+	testSimpleCoinTxValue0            = btcutil.Amount(3500000)
+	testSimpleCoinTxValueAge0         = int64(testSimpleCoinTxValue0) * testSimpleCoinNumConfs
 	testSimpleCoinTxPkScript0Hex      = "76a914686dd149a79b4a559d561fbc396d3e3c6628b98d88ac"
 	testSimpleCoinTxPkScript0Bytes, _ = hex.DecodeString(testSimpleCoinTxPkScript0Hex)
 	testSimpleCoinTxBytes, _          = hex.DecodeString(testSimpleCoinTxHex)
@@ -226,7 +228,7 @@ var (
 	testSimpleCoin                    = &coinset.SimpleCoin{
 		Tx:         testSimpleCoinTx,
 		TxIndex:    0,
-		TxNumConfs: 1,
+		TxNumConfs: testSimpleCoinNumConfs,
 	}
 )
 
@@ -246,7 +248,7 @@ func TestSimpleCoin(t *testing.T) {
 	if testSimpleCoin.NumConfs() != 1 {
 		t.Error("Differet value of num confs than expected")
 	}
-	if testSimpleCoin.ValueAge() != testSimpleCoinTxValue0 {
+	if testSimpleCoin.ValueAge() != testSimpleCoinTxValueAge0 {
 		t.Error("Different value of coin value * age than expected")
 	}
 }
