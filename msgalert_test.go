@@ -13,19 +13,19 @@ import (
 	"testing"
 )
 
-// TestAlert tests the MsgAlert API.
-func TestAlert(t *testing.T) {
+// TestMsgAlert tests the MsgAlert API.
+func TestMsgAlert(t *testing.T) {
 	pver := btcwire.ProtocolVersion
-	payloadblob := "some message"
-	signature := "some sig"
+	serializedpayload := []byte("some message")
+	signature := []byte("some sig")
 
 	// Ensure we get the same payload and signature back out.
-	msg := btcwire.NewMsgAlert(payloadblob, signature)
-	if msg.PayloadBlob != payloadblob {
-		t.Errorf("NewMsgAlert: wrong payloadblob - got %v, want %v",
-			msg.PayloadBlob, payloadblob)
+	msg := btcwire.NewMsgAlert(serializedpayload, signature)
+	if !reflect.DeepEqual(msg.SerializedPayload, serializedpayload) {
+		t.Errorf("NewMsgAlert: wrong serializedpayload - got %v, want %v",
+			msg.SerializedPayload, serializedpayload)
 	}
-	if msg.Signature != signature {
+	if !reflect.DeepEqual(msg.Signature, signature) {
 		t.Errorf("NewMsgAlert: wrong signature - got %v, want %v",
 			msg.Signature, signature)
 	}
@@ -46,14 +46,46 @@ func TestAlert(t *testing.T) {
 			maxPayload, wantPayload)
 	}
 
-	return
+	// Test BtcEncode with Payload == nil
+	var buf bytes.Buffer
+	err := msg.BtcEncode(&buf, pver)
+	if err != nil {
+		t.Error(err.Error())
+	}
+	// expected = 0x0c + serializedpayload + 0x08 + signature
+	expectedBuf := append([]byte{0x0c}, serializedpayload...)
+	expectedBuf = append(expectedBuf, []byte{0x08}...)
+	expectedBuf = append(expectedBuf, signature...)
+	if !bytes.Equal(buf.Bytes(), expectedBuf) {
+		t.Errorf("BtcEncode got: %s want: %s",
+			spew.Sdump(buf.Bytes()), spew.Sdump(expectedBuf))
+	}
+
+	// Test BtcEncode with Payload != nil
+	// note: Payload is an empty Alert but not nil
+	msg.Payload = new(btcwire.Alert)
+	buf = *new(bytes.Buffer)
+	err = msg.BtcEncode(&buf, pver)
+	if err != nil {
+		t.Error(err.Error())
+	}
+	// empty Alert is 45 null bytes, see Alert comments
+	// for details
+	// expected = 0x2d + 45*0x00 + 0x08 + signature
+	expectedBuf = append([]byte{0x2d}, bytes.Repeat([]byte{0x00}, 45)...)
+	expectedBuf = append(expectedBuf, []byte{0x08}...)
+	expectedBuf = append(expectedBuf, signature...)
+	if !bytes.Equal(buf.Bytes(), expectedBuf) {
+		t.Errorf("BtcEncode got: %s want: %s",
+			spew.Sdump(buf.Bytes()), spew.Sdump(expectedBuf))
+	}
 }
 
-// TestAlertWire tests the MsgAlert wire encode and decode for various protocol
+// TestMsgAlertWire tests the MsgAlert wire encode and decode for various protocol
 // versions.
-func TestAlertWire(t *testing.T) {
-	baseAlert := btcwire.NewMsgAlert("some payload", "somesig")
-	baseAlertEncoded := []byte{
+func TestMsgAlertWire(t *testing.T) {
+	baseMsgAlert := btcwire.NewMsgAlert([]byte("some payload"), []byte("somesig"))
+	baseMsgAlertEncoded := []byte{
 		0x0c, // Varint for payload length
 		0x73, 0x6f, 0x6d, 0x65, 0x20, 0x70, 0x61, 0x79,
 		0x6c, 0x6f, 0x61, 0x64, // "some payload"
@@ -69,41 +101,41 @@ func TestAlertWire(t *testing.T) {
 	}{
 		// Latest protocol version.
 		{
-			baseAlert,
-			baseAlert,
-			baseAlertEncoded,
+			baseMsgAlert,
+			baseMsgAlert,
+			baseMsgAlertEncoded,
 			btcwire.ProtocolVersion,
 		},
 
 		// Protocol version BIP0035Version.
 		{
-			baseAlert,
-			baseAlert,
-			baseAlertEncoded,
+			baseMsgAlert,
+			baseMsgAlert,
+			baseMsgAlertEncoded,
 			btcwire.BIP0035Version,
 		},
 
 		// Protocol version BIP0031Version.
 		{
-			baseAlert,
-			baseAlert,
-			baseAlertEncoded,
+			baseMsgAlert,
+			baseMsgAlert,
+			baseMsgAlertEncoded,
 			btcwire.BIP0031Version,
 		},
 
 		// Protocol version NetAddressTimeVersion.
 		{
-			baseAlert,
-			baseAlert,
-			baseAlertEncoded,
+			baseMsgAlert,
+			baseMsgAlert,
+			baseMsgAlertEncoded,
 			btcwire.NetAddressTimeVersion,
 		},
 
 		// Protocol version MultipleAddressVersion.
 		{
-			baseAlert,
-			baseAlert,
-			baseAlertEncoded,
+			baseMsgAlert,
+			baseMsgAlert,
+			baseMsgAlertEncoded,
 			btcwire.MultipleAddressVersion,
 		},
 	}
@@ -139,13 +171,13 @@ func TestAlertWire(t *testing.T) {
 	}
 }
 
-// TestAlertWireErrors performs negative tests against wire encode and decode
+// TestMsgAlertWireErrors performs negative tests against wire encode and decode
 // of MsgAlert to confirm error paths work correctly.
-func TestAlertWireErrors(t *testing.T) {
+func TestMsgAlertWireErrors(t *testing.T) {
 	pver := btcwire.ProtocolVersion
 
-	baseAlert := btcwire.NewMsgAlert("some payload", "somesig")
-	baseAlertEncoded := []byte{
+	baseMsgAlert := btcwire.NewMsgAlert([]byte("some payload"), []byte("somesig"))
+	baseMsgAlertEncoded := []byte{
 		0x0c, // Varint for payload length
 		0x73, 0x6f, 0x6d, 0x65, 0x20, 0x70, 0x61, 0x79,
 		0x6c, 0x6f, 0x61, 0x64, // "some payload"
@@ -162,13 +194,13 @@ func TestAlertWireErrors(t *testing.T) {
 		readErr  error             // Expected read error
 	}{
 		// Force error in payload length.
-		{baseAlert, baseAlertEncoded, pver, 0, io.ErrShortWrite, io.EOF},
+		{baseMsgAlert, baseMsgAlertEncoded, pver, 0, io.ErrShortWrite, io.EOF},
 		// Force error in payload.
-		{baseAlert, baseAlertEncoded, pver, 1, io.ErrShortWrite, io.EOF},
+		{baseMsgAlert, baseMsgAlertEncoded, pver, 1, io.ErrShortWrite, io.EOF},
 		// Force error in signature length.
-		{baseAlert, baseAlertEncoded, pver, 13, io.ErrShortWrite, io.EOF},
+		{baseMsgAlert, baseMsgAlertEncoded, pver, 13, io.ErrShortWrite, io.EOF},
 		// Force error in signature.
-		{baseAlert, baseAlertEncoded, pver, 14, io.ErrShortWrite, io.EOF},
+		{baseMsgAlert, baseMsgAlertEncoded, pver, 14, io.ErrShortWrite, io.EOF},
 	}
 
 	t.Logf("Running %d tests", len(tests))
@@ -211,5 +243,224 @@ func TestAlertWireErrors(t *testing.T) {
 				continue
 			}
 		}
+	}
+
+	// Test Error on empty Payload
+	baseMsgAlert.SerializedPayload = []byte{}
+	w := new(bytes.Buffer)
+	err := baseMsgAlert.BtcEncode(w, pver)
+	if _, ok := err.(*btcwire.MessageError); !ok {
+		t.Errorf("MsgAlert.BtcEncode wrong error got: %T, want: %T",
+			err, btcwire.MessageError{})
+	}
+
+	// Test Payload Serialize error
+	// overflow the max number of elements in SetCancel
+	baseMsgAlert.Payload = new(btcwire.Alert)
+	baseMsgAlert.Payload.SetCancel = make([]int32, btcwire.MaxCountSetCancel+1)
+	buf := *new(bytes.Buffer)
+	err = baseMsgAlert.BtcEncode(&buf, pver)
+	if _, ok := err.(*btcwire.MessageError); !ok {
+		t.Errorf("MsgAlert.BtcEncode wrong error got: %T, want: %T",
+			err, btcwire.MessageError{})
+	}
+
+	// overflow the max number of elements in SetSubVer
+	baseMsgAlert.Payload = new(btcwire.Alert)
+	baseMsgAlert.Payload.SetSubVer = make([]string, btcwire.MaxCountSetSubVer+1)
+	buf = *new(bytes.Buffer)
+	err = baseMsgAlert.BtcEncode(&buf, pver)
+	if _, ok := err.(*btcwire.MessageError); !ok {
+		t.Errorf("MsgAlert.BtcEncode wrong error got: %T, want: %T",
+			err, btcwire.MessageError{})
+	}
+}
+
+// TestAlert tests serialization and deserialization
+// of the payload to Alert
+func TestAlert(t *testing.T) {
+	pver := btcwire.ProtocolVersion
+	alert := btcwire.NewAlert(
+		1, 1337093712, 1368628812, 1015,
+		1013, []int32{1014}, 0, 40599, []string{"/Satoshi:0.7.2/"}, 5000, "",
+		"URGENT: upgrade required, see http://bitcoin.org/dos for details", "",
+	)
+	w := new(bytes.Buffer)
+	err := alert.Serialize(w, pver)
+	if err != nil {
+		t.Error(err.Error())
+	}
+	serializedpayload := w.Bytes()
+	newAlert, err := btcwire.NewAlertFromPayload(serializedpayload, pver)
+	if err != nil {
+		t.Error(err.Error())
+	}
+
+	if alert.Version != newAlert.Version {
+		t.Errorf("NewAlertFromPayload: wrong Version - got %v, want %v ",
+			alert.Version, newAlert.Version)
+	}
+	if alert.RelayUntil != newAlert.RelayUntil {
+		t.Errorf("NewAlertFromPayload: wrong RelayUntil - got %v, want %v ",
+			alert.RelayUntil, newAlert.RelayUntil)
+	}
+	if alert.Expiration != newAlert.Expiration {
+		t.Errorf("NewAlertFromPayload: wrong Expiration - got %v, want %v ",
+			alert.Expiration, newAlert.Expiration)
+	}
+	if alert.ID != newAlert.ID {
+		t.Errorf("NewAlertFromPayload: wrong ID - got %v, want %v ",
+			alert.ID, newAlert.ID)
+	}
+	if alert.Cancel != newAlert.Cancel {
+		t.Errorf("NewAlertFromPayload: wrong Cancel - got %v, want %v ",
+			alert.Cancel, newAlert.Cancel)
+	}
+	if len(alert.SetCancel) != len(newAlert.SetCancel) {
+		t.Errorf("NewAlertFromPayload: wrong number of SetCancel - got %v, want %v ",
+			len(alert.SetCancel), len(newAlert.SetCancel))
+	}
+	for i := 0; i < len(alert.SetCancel); i++ {
+		if alert.SetCancel[i] != newAlert.SetCancel[i] {
+			t.Errorf("NewAlertFromPayload: wrong SetCancel[%v] - got %v, want %v ",
+				len(alert.SetCancel), alert.SetCancel[i], newAlert.SetCancel[i])
+		}
+	}
+	if alert.MinVer != newAlert.MinVer {
+		t.Errorf("NewAlertFromPayload: wrong MinVer - got %v, want %v ",
+			alert.MinVer, newAlert.MinVer)
+	}
+	if alert.MaxVer != newAlert.MaxVer {
+		t.Errorf("NewAlertFromPayload: wrong MaxVer - got %v, want %v ",
+			alert.MaxVer, newAlert.MaxVer)
+	}
+	if len(alert.SetSubVer) != len(newAlert.SetSubVer) {
+		t.Errorf("NewAlertFromPayload: wrong number of SetSubVer - got %v, want %v ",
+			len(alert.SetSubVer), len(newAlert.SetSubVer))
+	}
+	for i := 0; i < len(alert.SetSubVer); i++ {
+		if alert.SetSubVer[i] != newAlert.SetSubVer[i] {
+			t.Errorf("NewAlertFromPayload: wrong SetSubVer[%v] - got %v, want %v ",
+				len(alert.SetSubVer), alert.SetSubVer[i], newAlert.SetSubVer[i])
+		}
+	}
+	if alert.Priority != newAlert.Priority {
+		t.Errorf("NewAlertFromPayload: wrong Priority - got %v, want %v ",
+			alert.Priority, newAlert.Priority)
+	}
+	if alert.Comment != newAlert.Comment {
+		t.Errorf("NewAlertFromPayload: wrong Comment - got %v, want %v ",
+			alert.Comment, newAlert.Comment)
+	}
+	if alert.StatusBar != newAlert.StatusBar {
+		t.Errorf("NewAlertFromPayload: wrong StatusBar - got %v, want %v ",
+			alert.StatusBar, newAlert.StatusBar)
+	}
+	if alert.Reserved != newAlert.Reserved {
+		t.Errorf("NewAlertFromPayload: wrong Reserved - got %v, want %v ",
+			alert.Reserved, newAlert.Reserved)
+	}
+}
+
+// TestAlertErrors performs negative tests against payload serialization,
+// deserialization of Alert to confirm error paths work correctly.
+func TestAlertErrors(t *testing.T) {
+	pver := btcwire.ProtocolVersion
+
+	baseAlert := btcwire.NewAlert(
+		1, 1337093712, 1368628812, 1015,
+		1013, []int32{1014}, 0, 40599, []string{"/Satoshi:0.7.2/"}, 5000, "",
+		"URGENT", "",
+	)
+	baseAlertEncoded := []byte{
+		0x01, 0x00, 0x00, 0x00, 0x50, 0x6e, 0xb2, 0x4f, 0x00, 0x00, 0x00, 0x00, 0x4c, 0x9e, 0x93, 0x51, //|....Pn.O....L..Q|
+		0x00, 0x00, 0x00, 0x00, 0xf7, 0x03, 0x00, 0x00, 0xf5, 0x03, 0x00, 0x00, 0x01, 0xf6, 0x03, 0x00, //|................|
+		0x00, 0x00, 0x00, 0x00, 0x00, 0x97, 0x9e, 0x00, 0x00, 0x01, 0x0f, 0x2f, 0x53, 0x61, 0x74, 0x6f, //|.........../Sato|
+		0x73, 0x68, 0x69, 0x3a, 0x30, 0x2e, 0x37, 0x2e, 0x32, 0x2f, 0x88, 0x13, 0x00, 0x00, 0x00, 0x06, //|shi:0.7.2/......|
+		0x55, 0x52, 0x47, 0x45, 0x4e, 0x54, 0x00, //|URGENT.|
+	}
+	tests := []struct {
+		in       *btcwire.Alert // Value to encode
+		buf      []byte         // Wire encoding
+		pver     uint32         // Protocol version for wire encoding
+		max      int            // Max size of fixed buffer to induce errors
+		writeErr error          // Expected write error
+		readErr  error          // Expected read error
+	}{
+		// Force error in Version
+		{baseAlert, baseAlertEncoded, pver, 0, io.ErrShortWrite, io.EOF},
+		// Force error in SetCancel VarInt.
+		{baseAlert, baseAlertEncoded, pver, 28, io.ErrShortWrite, io.EOF},
+		// Force error in SetCancel ints.
+		{baseAlert, baseAlertEncoded, pver, 29, io.ErrShortWrite, io.EOF},
+		// Force error in MinVer
+		{baseAlert, baseAlertEncoded, pver, 40, io.ErrShortWrite, io.EOF},
+		// Force error in SetSubVer string VarInt.
+		{baseAlert, baseAlertEncoded, pver, 41, io.ErrShortWrite, io.EOF},
+		// Force error in SetSubVer strings.
+		{baseAlert, baseAlertEncoded, pver, 48, io.ErrShortWrite, io.EOF},
+		// Force error in Priority
+		{baseAlert, baseAlertEncoded, pver, 60, io.ErrShortWrite, io.EOF},
+		// Force error in Comment string.
+		{baseAlert, baseAlertEncoded, pver, 62, io.ErrShortWrite, io.EOF},
+		// Force error in StatusBar string.
+		{baseAlert, baseAlertEncoded, pver, 64, io.ErrShortWrite, io.EOF},
+		// Force error in Reserved string.
+		{baseAlert, baseAlertEncoded, pver, 70, io.ErrShortWrite, io.EOF},
+	}
+
+	t.Logf("Running %d tests", len(tests))
+	for i, test := range tests {
+		w := newFixedWriter(test.max)
+		err := test.in.Serialize(w, test.pver)
+		if reflect.TypeOf(err) != reflect.TypeOf(test.writeErr) {
+			t.Errorf("Alert.Serialize #%d wrong error got: %v, want: %v",
+				i, err, test.writeErr)
+			continue
+		}
+
+		var alert btcwire.Alert
+		r := newFixedReader(test.max, test.buf)
+		err = alert.Deserialize(r, test.pver)
+		if reflect.TypeOf(err) != reflect.TypeOf(test.readErr) {
+			t.Errorf("Alert.Deserialize #%d wrong error got: %v, want: %v",
+				i, err, test.readErr)
+			continue
+		}
+	}
+
+	// overflow the max number of elements in SetCancel
+	// maxCountSetCancel + 1 == 8388575 == \xdf\xff\x7f\x00
+	// replace bytes 29-33
+	badAlertEncoded := []byte{
+		0x01, 0x00, 0x00, 0x00, 0x50, 0x6e, 0xb2, 0x4f, 0x00, 0x00, 0x00, 0x00, 0x4c, 0x9e, 0x93, 0x51, //|....Pn.O....L..Q|
+		0x00, 0x00, 0x00, 0x00, 0xf7, 0x03, 0x00, 0x00, 0xf5, 0x03, 0x00, 0x00, 0xfe, 0xdf, 0xff, 0x7f, //|................|
+		0x00, 0x00, 0x00, 0x00, 0x00, 0x97, 0x9e, 0x00, 0x00, 0x01, 0x0f, 0x2f, 0x53, 0x61, 0x74, 0x6f, //|.........../Sato|
+		0x73, 0x68, 0x69, 0x3a, 0x30, 0x2e, 0x37, 0x2e, 0x32, 0x2f, 0x88, 0x13, 0x00, 0x00, 0x00, 0x06, //|shi:0.7.2/......|
+		0x55, 0x52, 0x47, 0x45, 0x4e, 0x54, 0x00, //|URGENT.|
+	}
+	var alert btcwire.Alert
+	r := bytes.NewBuffer(badAlertEncoded)
+	err := alert.Deserialize(r, pver)
+	if _, ok := err.(*btcwire.MessageError); !ok {
+		t.Errorf("Alert.Deserialize wrong error got: %T, want: %T",
+			err, btcwire.MessageError{})
+	}
+
+	// overflow the max number of elements in SetSubVer
+	// maxCountSetSubVer + 1 == 131071 + 1 == \x00\x00\x02\x00
+	// replace bytes 42-46
+	badAlertEncoded = []byte{
+		0x01, 0x00, 0x00, 0x00, 0x50, 0x6e, 0xb2, 0x4f, 0x00, 0x00, 0x00, 0x00, 0x4c, 0x9e, 0x93, 0x51, //|....Pn.O....L..Q|
+		0x00, 0x00, 0x00, 0x00, 0xf7, 0x03, 0x00, 0x00, 0xf5, 0x03, 0x00, 0x00, 0x01, 0xf6, 0x03, 0x00, //|................|
+		0x00, 0x00, 0x00, 0x00, 0x00, 0x97, 0x9e, 0x00, 0x00, 0xfe, 0x00, 0x00, 0x02, 0x00, 0x74, 0x6f, //|.........../Sato|
+		0x73, 0x68, 0x69, 0x3a, 0x30, 0x2e, 0x37, 0x2e, 0x32, 0x2f, 0x88, 0x13, 0x00, 0x00, 0x00, 0x06, //|shi:0.7.2/......|
+		0x55, 0x52, 0x47, 0x45, 0x4e, 0x54, 0x00, //|URGENT.|
+	}
+	r = bytes.NewBuffer(badAlertEncoded)
+	err = alert.Deserialize(r, pver)
+	if _, ok := err.(*btcwire.MessageError); !ok {
+		t.Errorf("Alert.Deserialize wrong error got: %T, want: %T",
+			err, btcwire.MessageError{})
 	}
 }

@@ -501,6 +501,139 @@ func TestVarStringOverflowErrors(t *testing.T) {
 
 }
 
+// TestVarBytesWire tests wire encode and decode for variable length byte array.
+func TestVarBytesWire(t *testing.T) {
+	pver := btcwire.ProtocolVersion
+
+	// bytes256 is a byte array that takes a 2-byte varint to encode.
+	bytes256 := bytes.Repeat([]byte{0x01}, 256)
+
+	tests := []struct {
+		in   []byte // Byte Array to write
+		buf  []byte // Wire encoding
+		pver uint32 // Protocol version for wire encoding
+	}{
+		// Latest protocol version.
+		// Empty byte array
+		{[]byte{}, []byte{0x00}, pver},
+		// Single byte varint + byte array
+		{[]byte{0x01}, []byte{0x01, 0x01}, pver},
+		// 2-byte varint + byte array
+		{bytes256, append([]byte{0xfd, 0x00, 0x01}, bytes256...), pver},
+	}
+
+	t.Logf("Running %d tests", len(tests))
+	for i, test := range tests {
+		// Encode to wire format.
+		var buf bytes.Buffer
+		err := btcwire.TstWriteVarBytes(&buf, test.pver, test.in)
+		if err != nil {
+			t.Errorf("writeVarBytes #%d error %v", i, err)
+			continue
+		}
+		if !bytes.Equal(buf.Bytes(), test.buf) {
+			t.Errorf("writeVarBytes #%d\n got: %s want: %s", i,
+				spew.Sdump(buf.Bytes()), spew.Sdump(test.buf))
+			continue
+		}
+
+		// Decode from wire format.
+		rbuf := bytes.NewBuffer(test.buf)
+		val, err := btcwire.TstReadVarBytes(rbuf, test.pver, btcwire.MaxMessagePayload,
+			"alert serialized payload")
+		if err != nil {
+			t.Errorf("readVarBytes #%d error %v", i, err)
+			continue
+		}
+		if !bytes.Equal(buf.Bytes(), test.buf) {
+			t.Errorf("readVarBytes #%d\n got: %s want: %s", i,
+				val, test.buf)
+			continue
+		}
+	}
+}
+
+// TestVarBytesWireErrors performs negative tests against wire encode and
+// decode of variable length byte arrays to confirm error paths work correctly.
+func TestVarBytesWireErrors(t *testing.T) {
+	pver := btcwire.ProtocolVersion
+
+	// bytes256 is a byte array that takes a 2-byte varint to encode.
+	bytes256 := bytes.Repeat([]byte{0x01}, 256)
+
+	tests := []struct {
+		in       []byte // Byte Array to write
+		buf      []byte // Wire encoding
+		pver     uint32 // Protocol version for wire encoding
+		max      int    // Max size of fixed buffer to induce errors
+		writeErr error  // Expected write error
+		readErr  error  // Expected read error
+	}{
+		// Latest protocol version with intentional read/write errors.
+		// Force errors on empty byte array.
+		{[]byte{}, []byte{0x00}, pver, 0, io.ErrShortWrite, io.EOF},
+		// Force error on single byte varint + byte array.
+		{[]byte{0x01, 0x02, 0x03}, []byte{0x04}, pver, 2, io.ErrShortWrite, io.ErrUnexpectedEOF},
+		// Force errors on 2-byte varint + byte array.
+		{bytes256, []byte{0xfd}, pver, 2, io.ErrShortWrite, io.ErrUnexpectedEOF},
+	}
+
+	t.Logf("Running %d tests", len(tests))
+	for i, test := range tests {
+		// Encode to wire format.
+		w := newFixedWriter(test.max)
+		err := btcwire.TstWriteVarBytes(w, test.pver, test.in)
+		if err != test.writeErr {
+			t.Errorf("writeVarBytes #%d wrong error got: %v, want: %v",
+				i, err, test.writeErr)
+			continue
+		}
+
+		// Decode from wire format.
+		r := newFixedReader(test.max, test.buf)
+		_, err = btcwire.TstReadVarBytes(r, test.pver, btcwire.MaxMessagePayload,
+			"alert serialized payload")
+		if err != test.readErr {
+			t.Errorf("readVarBytes #%d wrong error got: %v, want: %v",
+				i, err, test.readErr)
+			continue
+		}
+	}
+}
+
+// TestVarBytesOverflowErrors performs tests to ensure deserializing variable
+// length byte arrays intentionally crafted to use large values for the array
+// length are handled properly.  This could otherwise potentially be used as an
+// attack vector.
+func TestVarBytesOverflowErrors(t *testing.T) {
+	pver := btcwire.ProtocolVersion
+
+	tests := []struct {
+		buf  []byte // Wire encoding
+		pver uint32 // Protocol version for wire encoding
+		err  error  // Expected error
+	}{
+		{[]byte{0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff},
+			pver, &btcwire.MessageError{}},
+		{[]byte{0xff, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01},
+			pver, &btcwire.MessageError{}},
+	}
+
+	t.Logf("Running %d tests", len(tests))
+	for i, test := range tests {
+		// Decode from wire format.
+		rbuf := bytes.NewBuffer(test.buf)
+		_, err := btcwire.TstReadVarBytes(rbuf, test.pver, btcwire.MaxMessagePayload,
+			"alert serialized payload")
+		if reflect.TypeOf(err) != reflect.TypeOf(test.err) {
+			t.Errorf("readVarBytes #%d wrong error got: %v, "+
+				"want: %v", i, err, reflect.TypeOf(test.err))
+			continue
+		}
+	}
+
+}
+
 // TestRandomUint64 exercises the randomness of the random number generator on
 // the system by ensuring the probability of the generated numbers.  If the RNG
 // is evenly distributed as a proper cryptographic RNG should be, there really

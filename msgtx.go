@@ -470,27 +470,11 @@ func readTxIn(r io.Reader, pver uint32, version uint32, ti *TxIn) error {
 	}
 	ti.PreviousOutpoint = op
 
-	count, err := readVarInt(r, pver)
+	ti.SignatureScript, err = readVarBytes(r, pver, maxMessagePayload,
+		"transaction input signature script")
 	if err != nil {
 		return err
 	}
-
-	// Prevent signature script larger than the max message size.  It would
-	// be possible to cause memory exhaustion and panics without a sane
-	// upper bound on this count.
-	if count > uint64(maxMessagePayload) {
-		str := fmt.Sprintf("transaction input signature script is "+
-			"larger than max message size [count %d, max %d]",
-			count, maxMessagePayload)
-		return messageError("MsgTx.BtcDecode", str)
-	}
-
-	b := make([]byte, count)
-	_, err = io.ReadFull(r, b)
-	if err != nil {
-		return err
-	}
-	ti.SignatureScript = b
 
 	var buf [4]byte
 	_, err = io.ReadFull(r, buf[:])
@@ -510,13 +494,7 @@ func writeTxIn(w io.Writer, pver uint32, version uint32, ti *TxIn) error {
 		return err
 	}
 
-	slen := uint64(len(ti.SignatureScript))
-	err = writeVarInt(w, pver, slen)
-	if err != nil {
-		return err
-	}
-
-	_, err = w.Write(ti.SignatureScript)
+	err = writeVarBytes(w, pver, ti.SignatureScript)
 	if err != nil {
 		return err
 	}
@@ -541,27 +519,11 @@ func readTxOut(r io.Reader, pver uint32, version uint32, to *TxOut) error {
 	}
 	to.Value = int64(binary.LittleEndian.Uint64(buf[:]))
 
-	count, err := readVarInt(r, pver)
+	to.PkScript, err = readVarBytes(r, pver, maxMessagePayload,
+		"transaction output public key script")
 	if err != nil {
 		return err
 	}
-
-	// Prevent public key script larger than the max message size.  It would
-	// be possible to cause memory exhaustion and panics without a sane
-	// upper bound on this count.
-	if count > uint64(maxMessagePayload) {
-		str := fmt.Sprintf("transaction output public key script is "+
-			"larger than max message size [count %d, max %d]",
-			count, maxMessagePayload)
-		return messageError("MsgTx.BtcDecode", str)
-	}
-
-	b := make([]byte, count)
-	_, err = io.ReadFull(r, b)
-	if err != nil {
-		return err
-	}
-	to.PkScript = b
 
 	return nil
 }
@@ -576,16 +538,9 @@ func writeTxOut(w io.Writer, pver uint32, version uint32, to *TxOut) error {
 		return err
 	}
 
-	pkLen := uint64(len(to.PkScript))
-	err = writeVarInt(w, pver, pkLen)
+	err = writeVarBytes(w, pver, to.PkScript)
 	if err != nil {
 		return err
 	}
-
-	_, err = w.Write(to.PkScript)
-	if err != nil {
-		return err
-	}
-
 	return nil
 }

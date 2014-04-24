@@ -19,6 +19,14 @@ import (
 // the test package.
 const MaxMessagePayload uint32 = maxMessagePayload
 
+// MaxCountSetCancel makes the internal maxCountSetCancel constant available to
+// the test package.
+const MaxCountSetCancel uint32 = maxCountSetCancel
+
+// MaxCountSetSubVer makes the internal maxCountSetSubVer constant available to
+// the test package.
+const MaxCountSetSubVer uint32 = maxCountSetSubVer
+
 // CommandSize makes the internal commandSize constant available to the test
 // package.
 const CommandSize = commandSize
@@ -63,6 +71,18 @@ func TstReadVarString(r io.Reader, pver uint32) (string, error) {
 // test package.
 func TstWriteVarString(w io.Writer, pver uint32, str string) error {
 	return writeVarString(w, pver, str)
+}
+
+// TstReadVarBytes makes the internal readVarBytes function available to the
+// test package.
+func TstReadVarBytes(r io.Reader, pver uint32, maxAllowed uint32, fieldName string) ([]byte, error) {
+	return readVarBytes(r, pver, maxAllowed, fieldName)
+}
+
+// TstWriteVarBytes makes the internal writeVarBytes function available to the
+// test package.
+func TstWriteVarBytes(w io.Writer, pver uint32, bytes []byte) error {
+	return writeVarBytes(w, pver, bytes)
 }
 
 // TstReadNetAddress makes the internal readNetAddress function available to

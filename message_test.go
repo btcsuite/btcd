@@ -66,7 +66,7 @@ func TestMessage(t *testing.T) {
 	msgPong := btcwire.NewMsgPong(123123)
 	msgGetHeaders := btcwire.NewMsgGetHeaders()
 	msgHeaders := btcwire.NewMsgHeaders()
-	msgAlert := btcwire.NewMsgAlert("payload", "signature")
+	msgAlert := btcwire.NewMsgAlert([]byte("payload"), []byte("signature"))
 	msgMemPool := btcwire.NewMsgMemPool()
 
 	tests := []struct {
