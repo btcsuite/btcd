@@ -507,6 +507,11 @@ func (a *AddressPubKey) AddressPubKeyHash() *AddressPubKeyHash {
 
 }
 
+// PubKey returns the underlying public key for the address.
+func (a *AddressPubKey) PubKey() *btcec.PublicKey {
+	return a.pubKey
+}
+
 // EncodePrivateKey takes a 32-byte private key and encodes it into the
 // Wallet Import Format (WIF).
 func EncodePrivateKey(privKey []byte, net btcwire.BitcoinNet, compressed bool) (string, error) {
