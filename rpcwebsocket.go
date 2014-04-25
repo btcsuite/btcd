@@ -832,10 +832,12 @@ type wsResponse struct {
 func createMarshalledReply(id, result interface{}, replyErr error) ([]byte, error) {
 	var jsonErr *btcjson.Error
 	if replyErr != nil {
-		if jErr, ok := replyErr.(*btcjson.Error); !ok {
+		if jErr, ok := replyErr.(*btcjson.Error); ok {
+			jsonErr = jErr
+		} else {
 			jsonErr = &btcjson.Error{
 				Code:    btcjson.ErrInternal.Code,
-				Message: jErr.Error(),
+				Message: replyErr.Error(),
 			}
 		}
 	}
