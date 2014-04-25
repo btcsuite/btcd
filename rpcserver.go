@@ -170,6 +170,7 @@ func (s *rpcServer) Start() {
 	}
 	rpcServeMux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Connection", "close")
+		w.Header().Set("Content-Type", "application/json")
 		r.Close = true
 
 		// Limit the number of connections to max allowed.
