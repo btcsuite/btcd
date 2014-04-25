@@ -1481,14 +1481,6 @@ type rescanKeys struct {
 // rescanBlock rescans all transactions in a single block.  This is a helper
 // function for handleRescan.
 func rescanBlock(wsc *wsClient, lookups *rescanKeys, blk *btcutil.Block) {
-	// Vars used for map keys.  If necessary, the byte slice for each
-	// checked item is copied into and then used as the lookup key.
-	// This is quite a bit more efficient than creating an address
-	// string as it saves on GC and performs less copying.
-	var compressedPubkey [33]byte
-	var uncompressedPubkey [65]byte
-	var outpoint btcwire.OutPoint
-
 	for _, tx := range blk.Transactions() {
 		// Hexadecimal representation of this tx.  Only created if
 		// needed, and reused for later notifications if already made.
@@ -1545,24 +1537,35 @@ func rescanBlock(wsc *wsClient, lookups *rescanKeys, blk *btcutil.Block) {
 					}
 
 				case *btcutil.AddressPubKey:
-					pubkeyBytes := a.ScriptAddress()
-					switch len(pubkeyBytes) {
+					found := false
+					switch sa := a.ScriptAddress(); len(sa) {
 					case 33: // Compressed
-						copy(compressedPubkey[:], pubkeyBytes)
-						_, ok := lookups.compressedPubkeys[compressedPubkey]
-						if !ok {
-							continue
+						var key [33]byte
+						copy(key[:], sa)
+						if _, ok := lookups.compressedPubkeys[key]; ok {
+							found = true
 						}
 
 					case 65: // Uncompressed
-						copy(uncompressedPubkey[:], pubkeyBytes)
-						_, ok := lookups.uncompressedPubkeys[uncompressedPubkey]
-						if !ok {
-							continue
+						var key [65]byte
+						copy(key[:], sa)
+						if _, ok := lookups.uncompressedPubkeys[key]; ok {
+							found = true
 						}
 
-					default: // wtf
+					default:
+						rpcsLog.Warnf("Skipping rescanned pubkey of unknown "+
+							"serialized length %d", len(sa))
 						continue
+					}
+
+					// If the transaction output pays to the pubkey of
+					// a rescanned P2PKH address, include it as well.
+					if !found {
+						pkh := a.AddressPubKeyHash()
+						if _, ok := lookups.pubKeyHashes[*pkh.Hash160()]; !ok {
+							continue
+						}
 					}
 
 				default:
@@ -1575,8 +1578,10 @@ func rescanBlock(wsc *wsClient, lookups *rescanKeys, blk *btcutil.Block) {
 					}
 				}
 
-				copy(outpoint.Hash[:], tx.Sha()[:])
-				outpoint.Index = uint32(txOutIdx)
+				outpoint := btcwire.OutPoint{
+					Hash:  *tx.Sha(),
+					Index: uint32(txOutIdx),
+				}
 				lookups.unspent[outpoint] = struct{}{}
 
 				if recvNotified {
