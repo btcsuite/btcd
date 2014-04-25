@@ -324,7 +324,12 @@ func ParseMarshaledCmd(b []byte) (Cmd, error) {
 		// None of the standard Bitcoin RPC methods matched.  Try
 		// registered custom commands.
 		if c, ok := customCmds[r.Method]; ok {
-			return c.parser(&r)
+			cmd, err := c.parser(&r)
+			if err != nil {
+				cmd = newUnparsableCmd(r.Id, r.Method)
+				return cmd, err
+			}
+			return cmd, nil
 		}
 	}
 
