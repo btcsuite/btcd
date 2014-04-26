@@ -361,7 +361,7 @@ func (n *upnpNAT) AddPortMapping(protocol string, externalPort, internalPort int
 	// A single concatenation would break ARM compilation.
 	message := "<u:AddPortMapping xmlns:u=\"urn:schemas-upnp-org:service:WANIPConnection:1\">\r\n" +
 		"<NewRemoteHost></NewRemoteHost><NewExternalPort>" + strconv.Itoa(externalPort)
-	message += "</NewExternalPort><NewProtocol>" + protocol + "</NewProtocol>"
+	message += "</NewExternalPort><NewProtocol>" + strings.ToUpper(protocol) + "</NewProtocol>"
 	message += "<NewInternalPort>" + strconv.Itoa(internalPort) + "</NewInternalPort>" +
 		"<NewInternalClient>" + n.ourIP + "</NewInternalClient>" +
 		"<NewEnabled>1</NewEnabled><NewPortMappingDescription>"
@@ -389,7 +389,7 @@ func (n *upnpNAT) DeletePortMapping(protocol string, externalPort, internalPort 
 
 	message := "<u:DeletePortMapping xmlns:u=\"urn:schemas-upnp-org:service:WANIPConnection:1\">\r\n" +
 		"<NewRemoteHost></NewRemoteHost><NewExternalPort>" + strconv.Itoa(externalPort) +
-		"</NewExternalPort><NewProtocol>" + protocol + "</NewProtocol>" +
+		"</NewExternalPort><NewProtocol>" + strings.ToUpper(protocol) + "</NewProtocol>" +
 		"</u:DeletePortMapping>"
 
 	response, err := soapRequest(n.serviceURL, "DeletePortMapping", message)
