@@ -9,7 +9,6 @@ import (
 	"code.google.com/p/go.crypto/ripemd160"
 	"code.google.com/p/go.net/websocket"
 	"container/list"
-	"crypto/sha256"
 	"crypto/subtle"
 	"encoding/base64"
 	"encoding/hex"
@@ -21,6 +20,7 @@ import (
 	"github.com/conformal/btcutil"
 	"github.com/conformal/btcwire"
 	"github.com/conformal/btcws"
+	"github.com/conformal/fastsha256"
 	"io"
 	"sync"
 	"time"
@@ -942,7 +942,7 @@ func (c *wsClient) handleMessage(msg string) {
 		// Check credentials.
 		login := authCmd.Username + ":" + authCmd.Passphrase
 		auth := "Basic " + base64.StdEncoding.EncodeToString([]byte(login))
-		authSha := sha256.Sum256([]byte(auth))
+		authSha := fastsha256.Sum256([]byte(auth))
 		cmp := subtle.ConstantTimeCompare(authSha[:], c.server.authsha[:])
 		if cmp != 1 {
 			rpcsLog.Warnf("Auth failure.")
