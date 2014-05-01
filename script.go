@@ -290,7 +290,7 @@ func isMultiSig(pops []parsedOpcode) bool {
 // false otherwise.
 func isNullData(pops []parsedOpcode) bool {
 	// A nulldata transaction is either a single OP_RETURN or an
-	// OP_RETURN SMALLDATA (where SMALLDATA is a push data up to 80 bytes).
+	// OP_RETURN SMALLDATA (where SMALLDATA is a push data up to 40 bytes).
 	l := len(pops)
 	if l == 1 && pops[0].opcode.value == OP_RETURN {
 		return true
@@ -299,7 +299,7 @@ func isNullData(pops []parsedOpcode) bool {
 	return l == 2 &&
 		pops[0].opcode.value == OP_RETURN &&
 		pops[1].opcode.value <= OP_PUSHDATA4 &&
-		len(pops[1].data) <= 80
+		len(pops[1].data) <= 40
 }
 
 // isPushOnly returns true if the script only pushes data, false otherwise.
