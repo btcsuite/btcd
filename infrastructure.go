@@ -714,6 +714,8 @@ func (c *Client) Shutdown() {
 	}
 	c.requestLock.Unlock()
 	c.removeAllRequests()
+
+	c.Disconnect()
 }
 
 // Start begins processing input and output messages.
