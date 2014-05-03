@@ -1028,6 +1028,12 @@ out:
 					}
 				}
 
+				// Query the db for the latest best block since
+				// the block that was processed could be on a
+				// side chain or have caused a reorg.
+				newestSha, newestHeight, _ := b.server.db.NewestSha()
+				b.updateChainState(newestSha, newestHeight)
+
 				blockSha, _ := msg.block.Sha()
 				msg.reply <- processBlockResponse{
 					isOrphan: b.blockChain.IsKnownOrphan(

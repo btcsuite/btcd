@@ -1870,7 +1870,7 @@ func handleSubmitBlock(s *rpcServer, cmd btcjson.Cmd) (interface{}, error) {
 		return nil, err
 	}
 
-	err = s.server.blockManager.blockChain.ProcessBlock(block, false)
+	_, err = s.server.blockManager.ProcessBlock(block)
 	if err != nil {
 		return fmt.Sprintf("rejected: %s", err.Error()), nil
 	}
