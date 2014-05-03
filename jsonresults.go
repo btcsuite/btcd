@@ -12,22 +12,22 @@ import (
 
 // InfoResult contains the data returned by the getinfo command.
 type InfoResult struct {
-	Version         int     `json:"version,omitempty"`
-	ProtocolVersion int     `json:"protocolversion,omitempty"`
+	Version         int     `json:"version"`
+	ProtocolVersion int     `json:"protocolversion"`
 	WalletVersion   int     `json:"walletversion,omitempty"`
 	Balance         float64 `json:"balance,omitempty"`
-	Blocks          int     `json:"blocks,omitempty"`
-	TimeOffset      int64   `json:"timeoffset,omitempty"`
-	Connections     int     `json:"connections,omitempty"`
-	Proxy           string  `json:"proxy,omitempty"`
-	Difficulty      float64 `json:"difficulty,omitempty"`
-	TestNet         bool    `json:"testnet,omitempty"`
+	Blocks          int     `json:"blocks"`
+	TimeOffset      int64   `json:"timeoffset"`
+	Connections     int     `json:"connections"`
+	Proxy           string  `json:"proxy"`
+	Difficulty      float64 `json:"difficulty"`
+	TestNet         bool    `json:"testnet"`
 	KeypoolOldest   int64   `json:"keypoololdest,omitempty"`
 	KeypoolSize     int     `json:"keypoolsize,omitempty"`
 	UnlockedUntil   int64   `json:"unlocked_until,omitempty"`
 	PaytxFee        float64 `json:"paytxfee,omitempty"`
-	RelayFee        float64 `json:"relayfee,omitempty"`
-	Errors          string  `json:"errors,omitempty"`
+	RelayFee        float64 `json:"relayfee"`
+	Errors          string  `json:"errors"`
 }
 
 // BlockResult models the data from the getblock command when the verbose flag
