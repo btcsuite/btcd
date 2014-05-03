@@ -1122,6 +1122,7 @@ func handleGetInfo(s *rpcServer, cmd btcjson.Cmd) (interface{}, error) {
 		ProtocolVersion: int(btcwire.ProtocolVersion),
 		Blocks:          int(height),
 		TimeOffset:      0,
+		Connections:     s.server.ConnectedCount(),
 		Proxy:           cfg.Proxy,
 		Difficulty:      getDifficultyRatio(blkHeader.Bits),
 		TestNet:         cfg.TestNet3,
