@@ -289,7 +289,7 @@ func (r FutureGetWork) Receive() (*btcjson.GetWorkResult, error) {
 	result, ok := reply.(btcjson.GetWorkResult)
 	if !ok {
 		return nil, fmt.Errorf("unexpected response type for "+
-			"getwork: %T\n", reply)
+			"getwork (request data): %T\n", reply)
 	}
 
 	return &result, nil
@@ -310,10 +310,56 @@ func (c *Client) GetWorkAsync() FutureGetWork {
 	return c.sendCmd(cmd)
 }
 
-// TODO(davec): Correct this
 // GetWork returns hash data to work on.
+//
+// See GetWorkSubmit to submit the found solution.
 func (c *Client) GetWork() (*btcjson.GetWorkResult, error) {
 	return c.GetWorkAsync().Receive()
+}
+
+// FutureGetWorkSubmit is a future promise to deliver the result of a
+// GetWorkSubmitAsync RPC invocation (or an applicable error).
+type FutureGetWorkSubmit chan *futureResult
+
+// Receive waits for the response promised by the future and returns whether
+// or not the submitted block header was accepted.
+func (r FutureGetWorkSubmit) Receive() (bool, error) {
+	reply, err := receiveFuture(r)
+	if err != nil {
+		return false, err
+	}
+
+	// Ensure the returned data is the expected type.
+	accepted, ok := reply.(bool)
+	if !ok {
+		return false, fmt.Errorf("unexpected response type for "+
+			"getwork (submit data): %T\n", reply)
+	}
+
+	return accepted, nil
+}
+
+// GetWorkSubmitAsync returns an instance of a type that can be used to get the
+// result of the RPC at some future time by invoking the Receive function on the
+// returned instance.
+//
+// See GetWorkSubmit for the blocking version and more details.
+func (c *Client) GetWorkSubmitAsync(data string) FutureGetWorkSubmit {
+	id := c.NextID()
+	cmd, err := btcjson.NewGetWorkCmd(id, data)
+	if err != nil {
+		return newFutureError(err)
+	}
+
+	return c.sendCmd(cmd)
+}
+
+// GetWorkSubmit submits a block header which is a solution to previously
+// requested data and returns whether or not the solution was accepted.
+//
+// See GetWork to request data to work on.
+func (c *Client) GetWorkSubmit(data string) (bool, error) {
+	return c.GetWorkSubmitAsync(data).Receive()
 }
 
 // FutureSubmitBlockResult is a future promise to deliver the result of a
