@@ -90,6 +90,7 @@ var rpcHandlersBeforeInit = map[string]commandHandler{
 	"getgenerate":          handleGetGenerate,
 	"gethashespersec":      handleGetHashesPerSec,
 	"getinfo":              handleGetInfo,
+	"getmininginfo":        handleGetMiningInfo,
 	"getnettotals":         handleGetNetTotals,
 	"getnetworkhashps":     handleGetNetworkHashPS,
 	"getpeerinfo":          handleGetPeerInfo,
@@ -160,9 +161,7 @@ var rpcAskWallet = map[string]bool{
 }
 
 // Commands that are temporarily unimplemented.
-var rpcUnimplemented = map[string]bool{
-	"getmininginfo": true,
-}
+var rpcUnimplemented = map[string]bool{}
 
 // workStateBlockInfo houses information about how to reconstruct a block given
 // its template and signature script.
@@ -1130,6 +1129,66 @@ func handleGetInfo(s *rpcServer, cmd btcjson.Cmd) (interface{}, error) {
 	}
 
 	return ret, nil
+}
+
+// handleGetMiningInfo implements the getmininginfo command. We only return the
+// fields that are not related to wallet functionality.
+func handleGetMiningInfo(s *rpcServer, cmd btcjson.Cmd) (interface{}, error) {
+	sha, height, err := s.server.db.NewestSha()
+	if err != nil {
+		rpcsLog.Errorf("Error getting sha: %v", err)
+		return nil, btcjson.ErrBlockCount
+	}
+	block, err := s.server.db.FetchBlockBySha(sha)
+	if err != nil {
+		rpcsLog.Errorf("Error getting block: %v", err)
+		return nil, btcjson.ErrBlockNotFound
+	}
+	blockBytes, err := block.Bytes()
+	if err != nil {
+		rpcsLog.Errorf("Error getting block: %v", err)
+		return nil, btcjson.Error{
+			Code:    btcjson.ErrInternal.Code,
+			Message: err.Error(),
+		}
+	}
+
+	// Create a default getnetworkhashps command to use defaults and make
+	// use of the existing getnetworkhashps handler.
+	gnhpsCmd, err := btcjson.NewGetNetworkHashPSCmd(0)
+	if err != nil {
+		return nil, btcjson.Error{
+			Code:    btcjson.ErrInternal.Code,
+			Message: err.Error(),
+		}
+	}
+	rpcsLog.Info(gnhpsCmd.Blocks, gnhpsCmd.Height)
+	networkHashesPerSecIface, err := handleGetNetworkHashPS(s, gnhpsCmd)
+	if err != nil {
+		// This is already a btcjson.Error from the handler.
+		return nil, err
+	}
+	networkHashesPerSec, ok := networkHashesPerSecIface.(int64)
+	if !ok {
+		return nil, btcjson.Error{
+			Code:    btcjson.ErrInternal.Code,
+			Message: "networkHashesPerSec is not an int64",
+		}
+	}
+
+	result := &btcjson.GetMiningInfoResult{
+		Blocks:           height,
+		CurrentBlockSize: uint64(len(blockBytes)),
+		CurrentBlockTx:   uint64(len(block.MsgBlock().Transactions)),
+		Difficulty:       getDifficultyRatio(block.MsgBlock().Header.Bits),
+		Generate:         false, // no built-in miner
+		GenProcLimit:     -1,    // no built-in miner
+		HashesPerSec:     0,     // no built-in miner
+		NetworkHashPS:    networkHashesPerSec,
+		PooledTx:         uint64(s.server.txMemPool.Count()),
+		TestNet:          cfg.TestNet3,
+	}
+	return &result, nil
 }
 
 // handleGetNetTotals implements the getnettotals command.

@@ -1039,6 +1039,17 @@ func (mp *txMemPool) ProcessTransaction(tx *btcutil.Tx, allowOrphan, rateLimit b
 	return nil
 }
 
+// Count returns the number of transactions in the main pool.  It does not
+// include the orphan pool.
+//
+// This function is safe for concurrent access.
+func (mp *txMemPool) Count() int {
+	mp.RLock()
+	defer mp.RUnlock()
+
+	return len(mp.pool)
+}
+
 // TxShas returns a slice of hashes for all of the transactions in the memory
 // pool.
 //
