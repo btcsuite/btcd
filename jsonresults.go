@@ -247,7 +247,7 @@ type GetMiningInfoResult struct {
 	HashesPerSec     int64   `json:"hashespersec"`
 	NetworkHashPS    int64   `json:"networkhashps"`
 	PooledTx         uint64  `json:"pooledtx"`
-	Testnet          bool    `json:"testnet"`
+	TestNet          bool    `json:"testnet"`
 }
 
 // GetWorkResult models the data from the getwork command.
