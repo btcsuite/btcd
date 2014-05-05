@@ -427,7 +427,7 @@ func ReadResultCmd(cmd string, message []byte) (Reply, error) {
 	case "getrawtransaction":
 		// getrawtransaction can either return a JSON object or a
 		// hex-encoded string depending on the verbose flag.  Choose the
-		// right form accordingly.=
+		// right form accordingly.
 		if bytes.IndexByte(objmap["result"], '{') > -1 {
 			var res TxRawResult
 			err = json.Unmarshal(objmap["result"], &res)
