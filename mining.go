@@ -146,13 +146,13 @@ func (r FutureGetMiningInfoResult) Receive() (*btcjson.GetMiningInfoResult, erro
 	}
 
 	// Ensure the returned data is the expected type.
-	result, ok := reply.(btcjson.GetMiningInfoResult)
+	result, ok := reply.(*btcjson.GetMiningInfoResult)
 	if !ok {
 		return nil, fmt.Errorf("unexpected response type for "+
 			"getmininginfo: %T\n", reply)
 	}
 
-	return &result, nil
+	return result, nil
 }
 
 // GetMiningInfoAsync returns an instance of a type that can be used to get
@@ -286,13 +286,13 @@ func (r FutureGetWork) Receive() (*btcjson.GetWorkResult, error) {
 	}
 
 	// Ensure the returned data is the expected type.
-	result, ok := reply.(btcjson.GetWorkResult)
+	result, ok := reply.(*btcjson.GetWorkResult)
 	if !ok {
 		return nil, fmt.Errorf("unexpected response type for "+
 			"getwork (request data): %T\n", reply)
 	}
 
-	return &result, nil
+	return result, nil
 }
 
 // GetWorkAsync returns an instance of a type that can be used to get the result

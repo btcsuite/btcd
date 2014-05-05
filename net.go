@@ -297,13 +297,13 @@ func (r FutureGetNetTotalsResult) Receive() (*btcjson.GetNetTotalsResult, error)
 	}
 
 	// Ensure the returned data is the expected type.
-	totals, ok := reply.(btcjson.GetNetTotalsResult)
+	totals, ok := reply.(*btcjson.GetNetTotalsResult)
 	if !ok {
 		return nil, fmt.Errorf("unexpected response type for "+
 			"getnettotals: %T\n", reply)
 	}
 
-	return &totals, nil
+	return totals, nil
 }
 
 // GetNetTotalsAsync returns an instance of a type that can be used to get the

@@ -126,13 +126,13 @@ func (r FutureGetBlockVerboseResult) Receive() (*btcjson.BlockResult, error) {
 	}
 
 	// Ensure the returned data is the expected type.
-	blockResult, ok := reply.(btcjson.BlockResult)
+	blockResult, ok := reply.(*btcjson.BlockResult)
 	if !ok {
 		return nil, fmt.Errorf("unexpected response type for "+
 			"getblock (verbose=1): %T\n", reply)
 	}
 
-	return &blockResult, nil
+	return blockResult, nil
 }
 
 // GetBlockVerboseAsync returns an instance of a type that can be used to get

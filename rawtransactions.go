@@ -322,7 +322,7 @@ func (r FutureSignRawTransactionResult) Receive() (*btcwire.MsgTx, bool, error) 
 	}
 
 	// Ensure the returned data is the expected type.
-	result, ok := reply.(btcjson.SignRawTransactionResult)
+	result, ok := reply.(*btcjson.SignRawTransactionResult)
 	if !ok {
 		return nil, false, fmt.Errorf("unexpected response type for "+
 			"signrawtransaction: %T\n", reply)

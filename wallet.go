@@ -29,13 +29,13 @@ func (r FutureGetTransactionResult) Receive() (*btcjson.GetTransactionResult, er
 	}
 
 	// Ensure the returned data is the expected type.
-	result, ok := reply.(btcjson.GetTransactionResult)
+	result, ok := reply.(*btcjson.GetTransactionResult)
 	if !ok {
 		return nil, fmt.Errorf("unexpected response type for "+
 			"gettransaction: %T\n", reply)
 	}
 
-	return &result, nil
+	return result, nil
 }
 
 // GetTransactionAsync returns an instance of a type that can be used to get the
@@ -173,13 +173,13 @@ func (r FutureListSinceBlockResult) Receive() (*btcjson.ListSinceBlockResult, er
 	}
 
 	// Ensure the returned data is the expected type.
-	listResult, ok := reply.(btcjson.ListSinceBlockResult)
+	listResult, ok := reply.(*btcjson.ListSinceBlockResult)
 	if !ok {
 		return nil, fmt.Errorf("unexpected response type for "+
 			"listsinceblock: %T\n", reply)
 	}
 
-	return &listResult, nil
+	return listResult, nil
 }
 
 // ListSinceBlockAsync returns an instance of a type that can be used to get
@@ -690,13 +690,13 @@ func (r FutureCreateMultisigResult) Receive() (*btcjson.CreateMultiSigResult, er
 	}
 
 	// Ensure the returned data is the expected type.
-	result, ok := reply.(btcjson.CreateMultiSigResult)
+	result, ok := reply.(*btcjson.CreateMultiSigResult)
 	if !ok {
 		return nil, fmt.Errorf("unexpected response type for "+
 			"createmultisig: %T\n", reply)
 	}
 
-	return &result, nil
+	return result, nil
 }
 
 // CreateMultisigAsync returns an instance of a type that can be used to get
@@ -1001,13 +1001,13 @@ func (r FutureValidateAddressResult) Receive() (*btcjson.ValidateAddressResult, 
 	}
 
 	// Ensure the returned data is the expected type.
-	result, ok := reply.(btcjson.ValidateAddressResult)
+	result, ok := reply.(*btcjson.ValidateAddressResult)
 	if !ok {
 		return nil, fmt.Errorf("unexpected response type for "+
 			"validateaddress: %T\n", reply)
 	}
 
-	return &result, nil
+	return result, nil
 }
 
 // ValidateAddressAsync returns an instance of a type that can be used to get
