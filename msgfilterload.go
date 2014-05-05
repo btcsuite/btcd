@@ -9,33 +9,37 @@ import (
 	"io"
 )
 
+// BloomUpdateType specifies how the filter is updated when a match is found
 type BloomUpdateType uint8
 
 const (
-	// BloomUpdateNone indicates the filter is not adjusted when a match is found.
+	// BloomUpdateNone indicates the filter is not adjusted when a match is
+	// found.
 	BloomUpdateNone BloomUpdateType = 0
 
 	// BloomUpdateAll indicates if the filter matches any data element in a
-	// scriptPubKey, the outpoint is serialized and inserted into the filter.
+	// public key script, the outpoint is serialized and inserted into the
+	// filter.
 	BloomUpdateAll BloomUpdateType = 1
 
-	// BloomUpdateP2PubkeyOnly indicates if the filter matches a data element in
-	// a scriptPubkey and the script is of the standard payToPybKey or payToMultiSig,
-	// the outpoint is inserted into the filter.
+	// BloomUpdateP2PubkeyOnly indicates if the filter matches a data
+	// element in a public key script and the script is of the standard
+	// pay-to-pubkey or multisig, the outpoint is serialized and inserted
+	// into the filter.
 	BloomUpdateP2PubkeyOnly BloomUpdateType = 2
 )
 
 const (
-	// MaxFilterLoadHashFuncs is the maximum number of hash functions to load
-	// into the Bloom filter.
+	// MaxFilterLoadHashFuncs is the maximum number of hash functions to
+	// load into the Bloom filter.
 	MaxFilterLoadHashFuncs = 50
 
 	// MaxFilterLoadFilterSize is the maximum size in bytes a filter may be.
 	MaxFilterLoadFilterSize = 36000
 )
 
-// MsgFilterLoad implements the Message interface and represents a bitcoin filterload
-// message which is used to reset a Bloom filter.
+// MsgFilterLoad implements the Message interface and represents a bitcoin
+// filterload message which is used to reset a Bloom filter.
 //
 // This message was not added until protocol version BIP0037Version.
 type MsgFilterLoad struct {
@@ -54,19 +58,9 @@ func (msg *MsgFilterLoad) BtcDecode(r io.Reader, pver uint32) error {
 		return messageError("MsgFilterLoad.BtcDecode", str)
 	}
 
-	// Read num filter and limit to max.
-	size, err := readVarInt(r, pver)
-	if err != nil {
-		return err
-	}
-	if size > MaxFilterLoadFilterSize {
-		str := fmt.Sprintf("filterload filter size too large for message "+
-			"[size %v, max %v]", size, MaxFilterLoadFilterSize)
-		return messageError("MsgFilterLoad.BtcDecode", str)
-	}
-
-	msg.Filter = make([]byte, size)
-	_, err = io.ReadFull(r, msg.Filter)
+	var err error
+	msg.Filter, err = readVarBytes(r, pver, MaxFilterLoadFilterSize,
+		"filterload filter size")
 	if err != nil {
 		return err
 	}
@@ -107,33 +101,17 @@ func (msg *MsgFilterLoad) BtcEncode(w io.Writer, pver uint32) error {
 		return messageError("MsgFilterLoad.BtcEncode", str)
 	}
 
-	err := writeVarInt(w, pver, uint64(size))
+	err := writeVarBytes(w, pver, msg.Filter)
 	if err != nil {
 		return err
 	}
-	err = writeElements(w, msg.Filter, msg.HashFuncs, msg.Tweak, msg.Flags)
+
+	err = writeElements(w, msg.HashFuncs, msg.Tweak, msg.Flags)
 	if err != nil {
 		return err
 	}
 
 	return nil
-}
-
-// Serialize encodes the transaction to w using a format that suitable for
-// long-term storage such as a database while respecting the Version field in
-// the transaction.  This function differs from BtcEncode in that BtcEncode
-// encodes the transaction to the bitcoin wire protocol in order to be sent
-// across the network.  The wire encoding can technically differ depending on
-// the protocol version and doesn't even really need to match the format of a
-// stored transaction at all.  As of the time this comment was written, the
-// encoded transaction is the same in both instances, but there is a distinct
-// difference and separating the two allows the API to be flexible enough to
-// deal with changes.
-func (msg *MsgFilterLoad) Serialize(w io.Writer) error {
-	// At the current time, there is no difference between the wire encoding
-	// at protocol version 0 and the stable long-term storage format.  As
-	// a result, make use of BtcEncode.
-	return msg.BtcEncode(w, BIP0037Version)
 }
 
 // Command returns the protocol command string for the message.  This is part
@@ -145,11 +123,14 @@ func (msg *MsgFilterLoad) Command() string {
 // MaxPayloadLength returns the maximum length the payload can be for the
 // receiver.  This is part of the Message interface implementation.
 func (msg *MsgFilterLoad) MaxPayloadLength(pver uint32) uint32 {
-	return MaxVarIntPayload + MaxFilterLoadFilterSize + 4 + 4 + 1
+	// Num filter bytes (varInt) + filter + 4 bytes hash funcs +
+	// 4 bytes tweak + 1 byte flags.
+	return uint32(VarIntSerializeSize(MaxFilterLoadFilterSize)) +
+		MaxFilterLoadFilterSize + 9
 }
 
-// NewMsgFilterLoad returns a new bitcoin filterload message that conforms to the Message
-// interface.  See MsgFilterLoad for details.
+// NewMsgFilterLoad returns a new bitcoin filterload message that conforms to
+// the Message interface.  See MsgFilterLoad for details.
 func NewMsgFilterLoad(filter []byte, hashFuncs uint32, tweak uint32, flags BloomUpdateType) *MsgFilterLoad {
 	return &MsgFilterLoad{
 		Filter:    filter,

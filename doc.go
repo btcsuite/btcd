@@ -153,6 +153,7 @@ This package includes spec changes outlined by the following BIPs:
 		BIP0014 (https://en.bitcoin.it/wiki/BIP_0014)
 		BIP0031 (https://en.bitcoin.it/wiki/BIP_0031)
 		BIP0035 (https://en.bitcoin.it/wiki/BIP_0035)
+		BIP0037 (https://en.bitcoin.it/wiki/BIP_0037)
 
 Other important information
 

@@ -44,8 +44,6 @@ type MsgBlock struct {
 
 // AddTransaction adds a transaction to the message.
 func (msg *MsgBlock) AddTransaction(tx *MsgTx) error {
-	// TODO: Return error if adding the transaction would make the message
-	// too large.
 	msg.Transactions = append(msg.Transactions, tx)
 	return nil
 

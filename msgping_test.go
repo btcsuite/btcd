@@ -96,7 +96,7 @@ func TestPingBIP0031(t *testing.T) {
 }
 
 // TestPingCrossProtocol tests the MsgPing API when encoding with the latest
-// protocol version and decoded with BIP0031Version.
+// protocol version and decoding with BIP0031Version.
 func TestPingCrossProtocol(t *testing.T) {
 	nonce, err := btcwire.RandomUint64()
 	if err != nil {

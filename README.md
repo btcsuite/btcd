@@ -103,12 +103,6 @@ from a remote peer is:
 	}
 ```
 
-## TODO
-
-- Implement alert message decoding/encoding
-- Implement bloom filter messages (filterload, filteradd, filterclear,
-  merkleblock) as defined in [BIP 0037](https://en.bitcoin.it/wiki/BIP_0037)
-
 ## GPG Verification Key
 
 All official release tags are signed by Conformal so users can ensure the code

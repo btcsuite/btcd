@@ -16,8 +16,9 @@ const (
 	MaxFilterAddDataSize = 520
 )
 
-// MsgFilterAdd implements the Message interface and represents a bitcoin filteradd
-// message which is used to add a data element to an existing Bloom filter.
+// MsgFilterAdd implements the Message interface and represents a bitcoin
+// filteradd message.  It is used to add a data element to an existing Bloom
+// filter.
 //
 // This message was not added until protocol version BIP0037Version.
 type MsgFilterAdd struct {
@@ -33,19 +34,9 @@ func (msg *MsgFilterAdd) BtcDecode(r io.Reader, pver uint32) error {
 		return messageError("MsgFilterAdd.BtcDecode", str)
 	}
 
-	size, err := readVarInt(r, pver)
-	if err != nil {
-		return err
-	}
-
-	if size > MaxFilterAddDataSize {
-		str := fmt.Sprintf("filteradd size too large for message "+
-			"[size %v, max %v]", size, MaxFilterAddDataSize)
-		return messageError("MsgFilterAdd.BtcDecode", str)
-	}
-
-	msg.Data = make([]byte, size)
-	_, err = io.ReadFull(r, msg.Data)
+	var err error
+	msg.Data, err = readVarBytes(r, pver, MaxFilterAddDataSize,
+		"filteradd data")
 	if err != nil {
 		return err
 	}
@@ -69,12 +60,7 @@ func (msg *MsgFilterAdd) BtcEncode(w io.Writer, pver uint32) error {
 		return messageError("MsgFilterAdd.BtcEncode", str)
 	}
 
-	err := writeVarInt(w, pver, uint64(size))
-	if err != nil {
-		return err
-	}
-
-	err = writeElement(w, msg.Data)
+	err := writeVarBytes(w, pver, msg.Data)
 	if err != nil {
 		return err
 	}
@@ -91,11 +77,12 @@ func (msg *MsgFilterAdd) Command() string {
 // MaxPayloadLength returns the maximum length the payload can be for the
 // receiver.  This is part of the Message interface implementation.
 func (msg *MsgFilterAdd) MaxPayloadLength(pver uint32) uint32 {
-	return MaxVarIntPayload + MaxFilterAddDataSize
+	return uint32(VarIntSerializeSize(MaxFilterAddDataSize)) +
+		MaxFilterAddDataSize
 }
 
-// NewMsgFilterAdd returns a new bitcoin filteradd message that conforms to the Message
-// interface.  See MsgFilterAdd for details.
+// NewMsgFilterAdd returns a new bitcoin filteradd message that conforms to the
+// Message interface.  See MsgFilterAdd for details.
 func NewMsgFilterAdd(data []byte) *MsgFilterAdd {
 	return &MsgFilterAdd{
 		Data: data,

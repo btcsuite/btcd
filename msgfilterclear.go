@@ -9,10 +9,11 @@ import (
 	"io"
 )
 
-// MsgFilterClear implements the Message interface and represents a bitcoin filterclear
-// message which is used to reset a Bloom filter.
+// MsgFilterClear implements the Message interface and represents a bitcoin
+// filterclear message which is used to reset a Bloom filter.
 //
-// This message was not added until protocol version BIP0037Version.
+// This message was not added until protocol version BIP0037Version and has
+// no payload.
 type MsgFilterClear struct{}
 
 // BtcDecode decodes r using the bitcoin protocol encoding into the receiver.

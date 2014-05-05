@@ -113,7 +113,7 @@ func TestPongBIP0031(t *testing.T) {
 }
 
 // TestPongCrossProtocol tests the MsgPong API when encoding with the latest
-// protocol version and decoded with BIP0031Version.
+// protocol version and decoding with BIP0031Version.
 func TestPongCrossProtocol(t *testing.T) {
 	nonce, err := btcwire.RandomUint64()
 	if err != nil {
@@ -140,7 +140,7 @@ func TestPongCrossProtocol(t *testing.T) {
 	}
 
 	// Since one of the protocol versions doesn't support the pong message,
-	// make  sure the nonce didn't get encoded and decoded back out.
+	// make sure the nonce didn't get encoded and decoded back out.
 	if msg.Nonce == readmsg.Nonce {
 		t.Error("Should not get same nonce for cross protocol")
 	}

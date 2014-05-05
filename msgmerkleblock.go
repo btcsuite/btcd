@@ -9,8 +9,14 @@ import (
 	"io"
 )
 
-// MsgMerkleBlock implements the Message interface and represents a bitcoin merkleblock
-// message which is used to reset a Bloom filter.
+// maxFlagsPerMerkleBlock is the maximum number of flag bytes that could
+// possibly fit into a merkle block.  Since each transaction is represented by
+// a single bit, this is the max number of transactions per block divided by
+// 8 bits per byte.  Then an extra one to cover partials.
+const maxFlagsPerMerkleBlock = maxTxPerBlock / 8
+
+// MsgMerkleBlock implements the Message interface and represents a bitcoin
+// merkleblock message which is used to reset a Bloom filter.
 //
 // This message was not added until protocol version BIP0037Version.
 type MsgMerkleBlock struct {
@@ -64,7 +70,7 @@ func (msg *MsgMerkleBlock) BtcDecode(r io.Reader, pver uint32) error {
 
 	msg.Hashes = make([]*ShaHash, 0, count)
 	for i := uint64(0); i < count; i++ {
-		sha := ShaHash{}
+		var sha ShaHash
 		err := readElement(r, &sha)
 		if err != nil {
 			return err
@@ -72,13 +78,8 @@ func (msg *MsgMerkleBlock) BtcDecode(r io.Reader, pver uint32) error {
 		msg.AddTxHash(&sha)
 	}
 
-	count, err = readVarInt(r, pver)
-	if err != nil {
-		return err
-	}
-
-	msg.Flags = make([]byte, 0, count)
-	err = readElement(r, &msg.Flags)
+	msg.Flags, err = readVarBytes(r, pver, maxFlagsPerMerkleBlock,
+		"merkle block flags size")
 	if err != nil {
 		return err
 	}
@@ -96,10 +97,16 @@ func (msg *MsgMerkleBlock) BtcEncode(w io.Writer, pver uint32) error {
 	}
 
 	// Read num transaction hashes and limit to max.
-	count := len(msg.Hashes)
-	if count > maxTxPerBlock {
+	numHashes := len(msg.Hashes)
+	if numHashes > maxTxPerBlock {
 		str := fmt.Sprintf("too many transaction hashes for message "+
-			"[count %v, max %v]", count, maxTxPerBlock)
+			"[count %v, max %v]", numHashes, maxTxPerBlock)
+		return messageError("MsgMerkleBlock.BtcDecode", str)
+	}
+	numFlagBytes := len(msg.Flags)
+	if numFlagBytes > maxFlagsPerMerkleBlock {
+		str := fmt.Sprintf("too many flag bytes for message [count %v, "+
+			"max %v]", numFlagBytes, maxFlagsPerMerkleBlock)
 		return messageError("MsgMerkleBlock.BtcDecode", str)
 	}
 
@@ -113,11 +120,10 @@ func (msg *MsgMerkleBlock) BtcEncode(w io.Writer, pver uint32) error {
 		return err
 	}
 
-	err = writeVarInt(w, pver, uint64(count))
+	err = writeVarInt(w, pver, uint64(numHashes))
 	if err != nil {
 		return err
 	}
-
 	for _, hash := range msg.Hashes {
 		err = writeElement(w, hash)
 		if err != nil {
@@ -125,12 +131,10 @@ func (msg *MsgMerkleBlock) BtcEncode(w io.Writer, pver uint32) error {
 		}
 	}
 
-	count = len(msg.Flags)
-	err = writeVarInt(w, pver, uint64(count))
+	err = writeVarInt(w, pver, uint64(numFlagBytes))
 	if err != nil {
 		return err
 	}
-
 	err = writeElement(w, msg.Flags)
 	if err != nil {
 		return err
@@ -151,8 +155,8 @@ func (msg *MsgMerkleBlock) MaxPayloadLength(pver uint32) uint32 {
 	return MaxBlockPayload
 }
 
-// NewMsgMerkleBlock returns a new bitcoin merkleblock message that conforms to the Message
-// interface.  See MsgMerkleBlock for details.
+// NewMsgMerkleBlock returns a new bitcoin merkleblock message that conforms to
+// the Message interface.  See MsgMerkleBlock for details.
 func NewMsgMerkleBlock(bh *BlockHeader) *MsgMerkleBlock {
 	return &MsgMerkleBlock{
 		Header:       *bh,

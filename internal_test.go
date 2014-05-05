@@ -15,21 +15,31 @@ import (
 	"io"
 )
 
-// MaxMessagePayload makes the internal maxMessagePayload constant available to
-// the test package.
-const MaxMessagePayload uint32 = maxMessagePayload
+const (
+	// MaxMessagePayload makes the internal maxMessagePayload constant
+	// available to the test package.
+	MaxMessagePayload uint32 = maxMessagePayload
 
-// MaxCountSetCancel makes the internal maxCountSetCancel constant available to
-// the test package.
-const MaxCountSetCancel uint32 = maxCountSetCancel
+	// MaxTxPerBlock makes the internal maxTxPerBlock constant available to
+	// the test package.
+	MaxTxPerBlock = maxTxPerBlock
 
-// MaxCountSetSubVer makes the internal maxCountSetSubVer constant available to
-// the test package.
-const MaxCountSetSubVer uint32 = maxCountSetSubVer
+	// MaxFlagsPerMerkleBlock makes the internal maxFlagsPerMerkleBlock
+	// constant available to the test package.
+	MaxFlagsPerMerkleBlock = maxFlagsPerMerkleBlock
 
-// CommandSize makes the internal commandSize constant available to the test
-// package.
-const CommandSize = commandSize
+	// MaxCountSetCancel makes the internal maxCountSetCancel constant
+	// available to the test package.
+	MaxCountSetCancel = maxCountSetCancel
+
+	// MaxCountSetSubVer makes the internal maxCountSetSubVer constant
+	// available to the test package.
+	MaxCountSetSubVer = maxCountSetSubVer
+
+	// CommandSize makes the internal commandSize constant available to the
+	// test package.
+	CommandSize = commandSize
+)
 
 // TstRandomUint64 makes the internal randomUint64 function available to the
 // test package.
