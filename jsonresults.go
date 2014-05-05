@@ -370,7 +370,7 @@ func ReadResultCmd(cmd string, message []byte) (Reply, error) {
 		// getaddednodeinfo can either return a JSON object or a
 		// slice of strings depending on the verbose flag.  Choose the
 		// right form accordingly.
-		if strings.Contains(string(objmap["result"]), "{") {
+		if bytes.IndexByte(objmap["result"], '{') > -1 {
 			var res []GetAddedNodeInfoResult
 			err = json.Unmarshal(objmap["result"], &res)
 			if err == nil {
@@ -393,7 +393,7 @@ func ReadResultCmd(cmd string, message []byte) (Reply, error) {
 		// getblock can either return a JSON object or a hex-encoded
 		// string depending on the verbose flag.  Choose the right form
 		// accordingly.
-		if strings.Contains(string(objmap["result"]), "{") {
+		if bytes.IndexByte(objmap["result"], '{') > -1 {
 			var res BlockResult
 			err = json.Unmarshal(objmap["result"], &res)
 			if err == nil {
@@ -463,7 +463,7 @@ func ReadResultCmd(cmd string, message []byte) (Reply, error) {
 		// getrawmempool can either return a map of JSON objects or
 		// an array of strings depending on the verbose flag.  Choose
 		// the right form accordingly.
-		if strings.Contains(string(objmap["result"]), "{") {
+		if bytes.IndexByte(objmap["result"], '{') > -1 {
 			var res map[string]GetRawMempoolResult
 			err = json.Unmarshal(objmap["result"], &res)
 			if err == nil {
@@ -486,7 +486,7 @@ func ReadResultCmd(cmd string, message []byte) (Reply, error) {
 		// getwork can either return a JSON object or a boolean
 		// depending on whether or not data was provided.  Choose the
 		// right form accordingly.
-		if strings.Contains(string(objmap["result"]), "{") {
+		if bytes.IndexByte(objmap["result"], '{') > -1 {
 			var res GetWorkResult
 			err = json.Unmarshal(objmap["result"], &res)
 			if err == nil {
