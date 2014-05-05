@@ -83,7 +83,7 @@ reply to the appropriate concrete type.
 
 	// Ensure there is a result and type assert it to a btcjson.InfoResult.
 	if reply.Result != nil {
-		if info, ok := reply.Result.(btcjson.InfoResult); ok {
+		if info, ok := reply.Result.(*btcjson.InfoResult); ok {
 			fmt.Println("balance =", info.Balance)
 		}
 	}

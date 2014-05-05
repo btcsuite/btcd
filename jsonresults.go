@@ -355,13 +355,13 @@ func ReadResultCmd(cmd string, message []byte) (Reply, error) {
 	// We handle the error condition after the switch statement.
 	switch cmd {
 	case "createmultisig":
-		var res CreateMultiSigResult
+		var res *CreateMultiSigResult
 		err = json.Unmarshal(objmap["result"], &res)
 		if err == nil {
 			result.Result = res
 		}
 	case "decodescript":
-		var res DecodeScriptResult
+		var res *DecodeScriptResult
 		err = json.Unmarshal(objmap["result"], &res)
 		if err == nil {
 			result.Result = res
@@ -384,7 +384,7 @@ func ReadResultCmd(cmd string, message []byte) (Reply, error) {
 			}
 		}
 	case "getinfo":
-		var res InfoResult
+		var res *InfoResult
 		err = json.Unmarshal(objmap["result"], &res)
 		if err == nil {
 			result.Result = res
@@ -394,7 +394,7 @@ func ReadResultCmd(cmd string, message []byte) (Reply, error) {
 		// string depending on the verbose flag.  Choose the right form
 		// accordingly.
 		if bytes.IndexByte(objmap["result"], '{') > -1 {
-			var res BlockResult
+			var res *BlockResult
 			err = json.Unmarshal(objmap["result"], &res)
 			if err == nil {
 				result.Result = res
@@ -407,7 +407,7 @@ func ReadResultCmd(cmd string, message []byte) (Reply, error) {
 			}
 		}
 	case "getnettotals":
-		var res GetNetTotalsResult
+		var res *GetNetTotalsResult
 		err = json.Unmarshal(objmap["result"], &res)
 		if err == nil {
 			result.Result = res
@@ -429,10 +429,10 @@ func ReadResultCmd(cmd string, message []byte) (Reply, error) {
 		// hex-encoded string depending on the verbose flag.  Choose the
 		// right form accordingly.
 		if bytes.IndexByte(objmap["result"], '{') > -1 {
-			var res TxRawResult
+			var res *TxRawResult
 			err = json.Unmarshal(objmap["result"], &res)
 			if err == nil {
-				result.Result = &res
+				result.Result = res
 			}
 		} else {
 			var res string
@@ -442,7 +442,7 @@ func ReadResultCmd(cmd string, message []byte) (Reply, error) {
 			}
 		}
 	case "decoderawtransaction":
-		var res TxRawDecodeResult
+		var res *TxRawDecodeResult
 		err = json.Unmarshal(objmap["result"], &res)
 		if err == nil {
 			result.Result = res
@@ -454,7 +454,7 @@ func ReadResultCmd(cmd string, message []byte) (Reply, error) {
 			result.Result = res
 		}
 	case "getmininginfo":
-		var res GetMiningInfoResult
+		var res *GetMiningInfoResult
 		err = json.Unmarshal(objmap["result"], &res)
 		if err == nil {
 			result.Result = res
@@ -477,7 +477,7 @@ func ReadResultCmd(cmd string, message []byte) (Reply, error) {
 			}
 		}
 	case "gettransaction":
-		var res GetTransactionResult
+		var res *GetTransactionResult
 		err = json.Unmarshal(objmap["result"], &res)
 		if err == nil {
 			result.Result = res
@@ -487,7 +487,7 @@ func ReadResultCmd(cmd string, message []byte) (Reply, error) {
 		// depending on whether or not data was provided.  Choose the
 		// right form accordingly.
 		if bytes.IndexByte(objmap["result"], '{') > -1 {
-			var res GetWorkResult
+			var res *GetWorkResult
 			err = json.Unmarshal(objmap["result"], &res)
 			if err == nil {
 				result.Result = res
@@ -500,13 +500,13 @@ func ReadResultCmd(cmd string, message []byte) (Reply, error) {
 			}
 		}
 	case "validateaddress":
-		var res ValidateAddressResult
+		var res *ValidateAddressResult
 		err = json.Unmarshal(objmap["result"], &res)
 		if err == nil {
 			result.Result = res
 		}
 	case "signrawtransaction":
-		var res SignRawTransactionResult
+		var res *SignRawTransactionResult
 		err = json.Unmarshal(objmap["result"], &res)
 		if err == nil {
 			result.Result = res
@@ -524,7 +524,7 @@ func ReadResultCmd(cmd string, message []byte) (Reply, error) {
 			result.Result = res
 		}
 	case "listsinceblock":
-		var res ListSinceBlockResult
+		var res *ListSinceBlockResult
 		err = json.Unmarshal(objmap["result"], &res)
 		if err == nil {
 			if res.Transactions == nil {
