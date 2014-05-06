@@ -1043,18 +1043,18 @@ func (cmd *NotifyNewTransactionsCmd) UnmarshalJSON(b []byte) error {
 // unmarshaling of notifyspent JSON websocket extension
 // commands.
 type NotifySpentCmd struct {
-	id interface{}
-	*OutPoint
+	id        interface{}
+	OutPoints []OutPoint
 }
 
 // Enforce that NotifySpentCmd satisifies the btcjson.Cmd interface.
 var _ btcjson.Cmd = &NotifySpentCmd{}
 
 // NewNotifySpentCmd creates a new NotifySpentCmd.
-func NewNotifySpentCmd(id interface{}, op *OutPoint) *NotifySpentCmd {
+func NewNotifySpentCmd(id interface{}, outpoints []OutPoint) *NotifySpentCmd {
 	return &NotifySpentCmd{
-		id:       id,
-		OutPoint: op,
+		id:        id,
+		OutPoints: outpoints,
 	}
 }
 
@@ -1066,13 +1066,14 @@ func parseNotifySpentCmd(r *btcjson.RawCmd) (btcjson.Cmd, error) {
 		return nil, btcjson.ErrWrongNumberOfParams
 	}
 
-	var outpoint OutPoint
-	if err := json.Unmarshal(r.Params[0], &outpoint); err != nil {
-		return nil, errors.New("first parameter 'outpoint' must be a " +
-			"an outpoint JSON object: " + err.Error())
+	var outpoints []OutPoint
+	if err := json.Unmarshal(r.Params[0], &outpoints); err != nil {
+		return nil, errors.New("first parameter 'outpoints' must be a " +
+			"an array of transaction outpoint JSON objects: " +
+			err.Error())
 	}
 
-	return NewNotifySpentCmd(r.Id, &outpoint), nil
+	return NewNotifySpentCmd(r.Id, outpoints), nil
 }
 
 // Id satisifies the Cmd interface by returning the ID of the command.
@@ -1093,7 +1094,7 @@ func (cmd *NotifySpentCmd) Method() string {
 // MarshalJSON returns the JSON encoding of cmd.  Part of the Cmd interface.
 func (cmd *NotifySpentCmd) MarshalJSON() ([]byte, error) {
 	params := []interface{}{
-		cmd.OutPoint,
+		cmd.OutPoints,
 	}
 
 	raw, err := btcjson.NewRawCmd(cmd.id, cmd.Method(), params)

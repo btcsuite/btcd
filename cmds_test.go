@@ -187,21 +187,25 @@ var cmdtests = []struct {
 	{
 		name: "notifyspent",
 		f: func() (btcjson.Cmd, error) {
-			op := &OutPoint{
-				Hash: "000102030405060708091011121314" +
-					"1516171819202122232425262728" +
-					"293031",
-				Index: 1,
+			ops := []OutPoint{
+				{
+					Hash: "000102030405060708091011121314" +
+						"1516171819202122232425262728" +
+						"293031",
+					Index: 1,
+				},
 			}
-			return NewNotifySpentCmd(float64(1), op), nil
+			return NewNotifySpentCmd(float64(1), ops), nil
 		},
 		result: &NotifySpentCmd{
 			id: float64(1),
-			OutPoint: &OutPoint{
-				Hash: "000102030405060708091011121314" +
-					"1516171819202122232425262728" +
-					"293031",
-				Index: 1,
+			OutPoints: []OutPoint{
+				{
+					Hash: "000102030405060708091011121314" +
+						"1516171819202122232425262728" +
+						"293031",
+					Index: 1,
+				},
 			},
 		},
 	},
