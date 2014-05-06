@@ -378,7 +378,7 @@ func (r FutureNotifySpentResult) Receive() error {
 // See NotifySpent for the blocking version and more details.
 //
 // NOTE: This is a btcd extension and requires a websocket connection.
-func (c *Client) NotifySpentAsync(outpoint *btcwire.OutPoint) FutureNotifySpentResult {
+func (c *Client) NotifySpentAsync(outpoints []*btcwire.OutPoint) FutureNotifySpentResult {
 	// Not supported in HTTP POST mode.
 	if c.config.HttpPostMode {
 		return newFutureError(ErrNotificationsNotSupported)
@@ -391,13 +391,17 @@ func (c *Client) NotifySpentAsync(outpoint *btcwire.OutPoint) FutureNotifySpentR
 	}
 
 	id := c.NextID()
-	cmd := btcws.NewNotifySpentCmd(id, btcws.NewOutPointFromWire(outpoint))
+	ops := make([]btcws.OutPoint, 0, len(outpoints))
+	for _, outpoint := range outpoints {
+		ops = append(ops, *btcws.NewOutPointFromWire(outpoint))
+	}
+	cmd := btcws.NewNotifySpentCmd(id, ops)
 
 	return c.sendCmd(cmd)
 }
 
 // NotifySpent registers the client to receive notifications when the passed
-// transaction output is spent.  The notifications are delivered to the
+// transaction outputs are spent.  The notifications are delivered to the
 // notification handlers associated with the client.  Calling this function has
 // no effect if there are no notification handlers and will result in an error
 // if the client is configured to run in HTTP POST mode.
@@ -406,8 +410,8 @@ func (c *Client) NotifySpentAsync(outpoint *btcwire.OutPoint) FutureNotifySpentR
 // OnRedeemingTx.
 //
 // NOTE: This is a btcd extension and requires a websocket connection.
-func (c *Client) NotifySpent(outpoint *btcwire.OutPoint) error {
-	return c.NotifySpentAsync(outpoint).Receive()
+func (c *Client) NotifySpent(outpoints []*btcwire.OutPoint) error {
+	return c.NotifySpentAsync(outpoints).Receive()
 }
 
 // FutureNotifyNewTransactionsResult is a future promise to deliver the result
