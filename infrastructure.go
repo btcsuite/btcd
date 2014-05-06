@@ -337,7 +337,8 @@ func (c *Client) sendMessage(marshalledJSON []byte) {
 }
 
 // resendCmds resends any commands that had not completed when the client
-// disconnected.  It is intended to be called once the client has reconnected.
+// disconnected.  It is intended to be called once the client has reconnected
+// as a separate goroutine.
 func (c *Client) resendCmds() {
 	// Since it's possible to block on send and more commands might be
 	// added by the caller while resending, make a copy of all of the
@@ -359,7 +360,6 @@ func (c *Client) resendCmds() {
 		}
 
 		c.marshalAndSend(req.cmd, req.responseChan)
-		time.Sleep(time.Second * 2)
 	}
 }
 
