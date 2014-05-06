@@ -526,14 +526,6 @@ func (c *Client) sendPostRequest(req *http.Request, command btcjson.Cmd, respons
 	}
 }
 
-// Disconnected returns whether or not the server is disconnected.
-func (c *Client) Disconnected() bool {
-	c.mtx.Lock()
-	defer c.mtx.Unlock()
-
-	return c.disconnected
-}
-
 // newFutureError returns a new future result channel that already has the
 // passed error waitin on the channel with the reply set to nil.  This is useful
 // to easily return errors from the various Async functions.
@@ -647,6 +639,14 @@ func (c *Client) sendCmdAndWait(cmd btcjson.Cmd) (interface{}, error) {
 	// Marshal the command to JSON-RPC, send it to the connected server, and
 	// wait for a response on the returned channel.
 	return receiveFuture(c.sendCmd(cmd))
+}
+
+// Disconnected returns whether or not the server is disconnected.
+func (c *Client) Disconnected() bool {
+	c.mtx.Lock()
+	defer c.mtx.Unlock()
+
+	return c.disconnected
 }
 
 // Disconnect disconnects the current websocket associated with the client.  The
