@@ -1419,16 +1419,21 @@ func handleNotifySpent(wsc *wsClient, icmd btcjson.Cmd) (interface{}, *btcjson.E
 		return nil, &btcjson.ErrInternal
 	}
 
-	blockHash, err := btcwire.NewShaHashFromStr(cmd.OutPoint.Hash)
-	if err != nil {
-		return nil, &btcjson.Error{
-			Code:    btcjson.ErrParse.Code,
-			Message: err.Error(),
+	outpoints := make([]*btcwire.OutPoint, 0, len(cmd.OutPoints))
+	for i := range cmd.OutPoints {
+		blockHash, err := btcwire.NewShaHashFromStr(cmd.OutPoints[i].Hash)
+		if err != nil {
+			return nil, &btcjson.Error{
+				Code:    btcjson.ErrParse.Code,
+				Message: err.Error(),
+			}
 		}
+		index := cmd.OutPoints[i].Index
+		outpoints = append(outpoints, btcwire.NewOutPoint(blockHash, index))
 	}
-
-	outpoint := btcwire.NewOutPoint(blockHash, cmd.Index)
-	wsc.server.ntfnMgr.RegisterSpentRequest(wsc, outpoint)
+	for _, outpoint := range outpoints {
+		wsc.server.ntfnMgr.RegisterSpentRequest(wsc, outpoint)
+	}
 	return nil, nil
 }
 
