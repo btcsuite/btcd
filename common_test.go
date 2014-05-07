@@ -539,8 +539,8 @@ func TestVarBytesWire(t *testing.T) {
 
 		// Decode from wire format.
 		rbuf := bytes.NewBuffer(test.buf)
-		val, err := btcwire.TstReadVarBytes(rbuf, test.pver, btcwire.MaxMessagePayload,
-			"alert serialized payload")
+		val, err := btcwire.TstReadVarBytes(rbuf, test.pver,
+			btcwire.MaxMessagePayload, "test payload")
 		if err != nil {
 			t.Errorf("readVarBytes #%d error %v", i, err)
 			continue
@@ -591,8 +591,8 @@ func TestVarBytesWireErrors(t *testing.T) {
 
 		// Decode from wire format.
 		r := newFixedReader(test.max, test.buf)
-		_, err = btcwire.TstReadVarBytes(r, test.pver, btcwire.MaxMessagePayload,
-			"alert serialized payload")
+		_, err = btcwire.TstReadVarBytes(r, test.pver,
+			btcwire.MaxMessagePayload, "test payload")
 		if err != test.readErr {
 			t.Errorf("readVarBytes #%d wrong error got: %v, want: %v",
 				i, err, test.readErr)
@@ -623,8 +623,8 @@ func TestVarBytesOverflowErrors(t *testing.T) {
 	for i, test := range tests {
 		// Decode from wire format.
 		rbuf := bytes.NewBuffer(test.buf)
-		_, err := btcwire.TstReadVarBytes(rbuf, test.pver, btcwire.MaxMessagePayload,
-			"alert serialized payload")
+		_, err := btcwire.TstReadVarBytes(rbuf, test.pver,
+			btcwire.MaxMessagePayload, "test payload")
 		if reflect.TypeOf(err) != reflect.TypeOf(test.err) {
 			t.Errorf("readVarBytes #%d wrong error got: %v, "+
 				"want: %v", i, err, reflect.TypeOf(test.err))

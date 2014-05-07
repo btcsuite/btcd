@@ -283,7 +283,7 @@ func TestAlert(t *testing.T) {
 	alert := btcwire.NewAlert(
 		1, 1337093712, 1368628812, 1015,
 		1013, []int32{1014}, 0, 40599, []string{"/Satoshi:0.7.2/"}, 5000, "",
-		"URGENT: upgrade required, see http://bitcoin.org/dos for details", "",
+		"URGENT: upgrade required, see http://bitcoin.org/dos for details",
 	)
 	w := new(bytes.Buffer)
 	err := alert.Serialize(w, pver)
@@ -370,7 +370,7 @@ func TestAlertErrors(t *testing.T) {
 	baseAlert := btcwire.NewAlert(
 		1, 1337093712, 1368628812, 1015,
 		1013, []int32{1014}, 0, 40599, []string{"/Satoshi:0.7.2/"}, 5000, "",
-		"URGENT", "",
+		"URGENT",
 	)
 	baseAlertEncoded := []byte{
 		0x01, 0x00, 0x00, 0x00, 0x50, 0x6e, 0xb2, 0x4f, 0x00, 0x00, 0x00, 0x00, 0x4c, 0x9e, 0x93, 0x51, //|....Pn.O....L..Q|

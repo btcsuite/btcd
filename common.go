@@ -281,32 +281,6 @@ func writeElements(w io.Writer, elements ...interface{}) error {
 	return nil
 }
 
-// readVarBytes reads a variable length byte array
-func readVarBytes(r io.Reader, pver uint32, maxAllowed uint32,
-	fieldName string) ([]byte, error) {
-
-	count, err := readVarInt(r, pver)
-	if err != nil {
-		return nil, err
-	}
-
-	// Prevent byte array larger than the max message size.  It would
-	// be possible to cause memory exhaustion and panics without a sane
-	// upper bound on this count.
-	if count > uint64(maxAllowed) {
-		str := fmt.Sprintf("%s is larger than the max allowed size "+
-			"[count %d, max %d]", fieldName, count, maxAllowed)
-		return nil, messageError("readVarBytes", str)
-	}
-
-	b := make([]byte, count)
-	_, err = io.ReadFull(r, b)
-	if err != nil {
-		return nil, err
-	}
-	return b, nil
-}
-
 // readVarInt reads a variable length integer from r and returns it as a uint64.
 func readVarInt(r io.Reader, pver uint32) (uint64, error) {
 	var b [8]byte
@@ -344,21 +318,6 @@ func readVarInt(r io.Reader, pver uint32) (uint64, error) {
 	}
 
 	return rv, nil
-}
-
-// writeVarBytes writes a variable length byte array
-func writeVarBytes(w io.Writer, pver uint32, bytes []byte) error {
-	slen := uint64(len(bytes))
-	err := writeVarInt(w, pver, slen)
-	if err != nil {
-		return err
-	}
-
-	_, err = w.Write(bytes)
-	if err != nil {
-		return err
-	}
-	return nil
 }
 
 // writeVarInt serializes val to w using a variable number of bytes depending
@@ -420,7 +379,7 @@ func VarIntSerializeSize(val uint64) int {
 // string, and the bytes that represent the string itself.  An error is returned
 // if the length is greater than the maximum block payload size, since it would
 // not be possible to put a varString of that size into a block anyways and it
-// also helps protect against memory exhuastion attacks and forced panics
+// also helps protect against memory exhaustion attacks and forced panics
 // through malformed messages.
 func readVarString(r io.Reader, pver uint32) (string, error) {
 	count, err := readVarInt(r, pver)
@@ -453,6 +412,54 @@ func writeVarString(w io.Writer, pver uint32, str string) error {
 		return err
 	}
 	_, err = w.Write([]byte(str))
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+// readVarBytes reads a variable length byte array.  A byte array is encoded
+// as a varInt containing the length of the array followed by the bytes
+// themselves.  An error is returned if the length is greater than the
+// passed maxAllowed parameter which helps protect against memory exhuastion
+// attacks and forced panics thorugh malformed messages.  The fieldName
+// parameter is only used for the error message so it provides more context in
+// the error.
+func readVarBytes(r io.Reader, pver uint32, maxAllowed uint32,
+	fieldName string) ([]byte, error) {
+
+	count, err := readVarInt(r, pver)
+	if err != nil {
+		return nil, err
+	}
+
+	// Prevent byte array larger than the max message size.  It would
+	// be possible to cause memory exhaustion and panics without a sane
+	// upper bound on this count.
+	if count > uint64(maxAllowed) {
+		str := fmt.Sprintf("%s is larger than the max allowed size "+
+			"[count %d, max %d]", fieldName, count, maxAllowed)
+		return nil, messageError("readVarBytes", str)
+	}
+
+	b := make([]byte, count)
+	_, err = io.ReadFull(r, b)
+	if err != nil {
+		return nil, err
+	}
+	return b, nil
+}
+
+// writeVarInt serializes a variable length byte array to w as a varInt
+// containing the number of bytes, followed by the bytes themselves.
+func writeVarBytes(w io.Writer, pver uint32, bytes []byte) error {
+	slen := uint64(len(bytes))
+	err := writeVarInt(w, pver, slen)
+	if err != nil {
+		return err
+	}
+
+	_, err = w.Write(bytes)
 	if err != nil {
 		return err
 	}

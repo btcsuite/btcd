@@ -58,46 +58,49 @@ import (
 //        |   Total  (Fixed)                |   45      |
 //        -----------------------------------------------
 //
-// note:
+// NOTE:
 //      * string is a VarString i.e VarInt length followed by the string itself
 //      * set<string> is a VarInt followed by as many number of strings
 //      * set<int32> is a VarInt followed by as many number of ints
 //      * fixedAlertSize = 40 + 5*min(VarInt)  = 40 + 5*1 = 45
-
+//
 // Now we can define bounds on Alert size, SetCancel and SetSubVer
 
 // Fixed size of the alert payload
 const fixedAlertSize = 45
 
-// Max size of the ECDSA signature
-// note: since this size is fixed and < 255, size of VarInt
-// required = 1 (fits in uint8)
+// maxSignatureSize is the max size of an ECDSA signature.
+// NOTE: Since this size is fixed and < 255, the size of VarInt required = 1.
 const maxSignatureSize = 72
 
-// Maximum size of the alert
+// maxAlertSize is the maximum size an alert.
+//
 // MessagePayload = VarInt(Alert) + Alert + VarInt(Signature) + Signature
 // maxMessagePayload = maxAlertSize + max(VarInt) + maxSignatureSize + 1
 const maxAlertSize = maxMessagePayload - maxSignatureSize - MaxVarIntPayload - 1
 
-// Maximum number of Cancel IDs from SetCancel to read
+// maxCountSetCancel is the maximum number of cancel IDs that could possibly
+// fit into a maximum size alert.
+//
 // maxAlertSize = fixedAlertSize + max(SetCancel) + max(SetSubVer) + 3*(string)
-// for caculating maximum number of Cancel IDs, set all other variable sizes to 0
+// for caculating maximum number of cancel IDs, set all other var  sizes to 0
 // maxAlertSize = fixedAlertSize + (MaxVarIntPayload-1) + x*sizeOf(int32)
 // x = (maxAlertSize - fixedAlertSize - MaxVarIntPayload + 1) / 4
 const maxCountSetCancel = (maxAlertSize - fixedAlertSize - MaxVarIntPayload + 1) / 4
 
-// Maximum number of subversions from SetSubVer to read
+// maxCountSetSubVer is the maximum number of subversions that could possibly
+// fit into a maximum size alert.
+//
 // maxAlertSize = fixedAlertSize + max(SetCancel) + max(SetSubVer) + 3*(string)
-// for caculating maximum number of subversions, set all other variable sizes to 0
+// for caculating maximum number of subversions, set all other var sizes to 0
 // maxAlertSize = fixedAlertSize + (MaxVarIntPayload-1) + x*sizeOf(string)
 // x = (maxAlertSize - fixedAlertSize - MaxVarIntPayload + 1) / sizeOf(string)
 // subversion would typically be something like "/Satoshi:0.7.2/" (15 bytes)
 // so assuming < 255 bytes, sizeOf(string) = sizeOf(uint8) + 255 = 256
 const maxCountSetSubVer = (maxAlertSize - fixedAlertSize - MaxVarIntPayload + 1) / 256
 
-// Alert contains the data deserialized from the MsgAlert payload
+// Alert contains the data deserialized from the MsgAlert payload.
 type Alert struct {
-
 	// Alert format version
 	Version int32
 
@@ -144,41 +147,7 @@ type Alert struct {
 	Reserved string
 }
 
-// NewAlert returns an new Alert with values provided
-func NewAlert(version int32, relayuntil int64, expiration int64,
-	id int32, cancel int32, setcancel []int32, minver int32,
-	maxver int32, setsubver []string, priority int32, comment string,
-	statusbar string, reserved string) *Alert {
-	return &Alert{
-		Version:    version,
-		RelayUntil: relayuntil,
-		Expiration: expiration,
-		ID:         id,
-		Cancel:     cancel,
-		SetCancel:  setcancel,
-		MinVer:     minver,
-		MaxVer:     maxver,
-		SetSubVer:  setsubver,
-		Priority:   priority,
-		Comment:    comment,
-		StatusBar:  statusbar,
-		Reserved:   reserved,
-	}
-}
-
-// NewAlertFromPayload returns an Alert with values deserialized
-// from the serializedpayload
-func NewAlertFromPayload(serializedpayload []byte, pver uint32) (*Alert, error) {
-	var alert Alert
-	r := bytes.NewReader(serializedpayload)
-	err := alert.Deserialize(r, pver)
-	if err != nil {
-		return nil, err
-	}
-	return &alert, nil
-}
-
-// Serialize writes a serialized byte array of the Alert
+// Serialize encodes the alert to w using the alert protocol encoding format.
 func (alert *Alert) Serialize(w io.Writer, pver uint32) error {
 	err := writeElements(w, &alert.Version,
 		&alert.RelayUntil, &alert.Expiration, &alert.ID, &alert.Cancel)
@@ -244,8 +213,8 @@ func (alert *Alert) Serialize(w io.Writer, pver uint32) error {
 	return nil
 }
 
-// Deserialize reads a byte array, deserializes
-// it and updates the Alert
+// Deserialize decodes from r into the receiver using the alert protocol
+// encoding format.
 func (alert *Alert) Deserialize(r io.Reader, pver uint32) error {
 	err := readElements(r, &alert.Version, &alert.RelayUntil,
 		&alert.Expiration, &alert.ID, &alert.Cancel)
@@ -314,6 +283,40 @@ func (alert *Alert) Deserialize(r io.Reader, pver uint32) error {
 		return err
 	}
 	return nil
+}
+
+// NewAlert returns an new Alert with values provided.
+func NewAlert(version int32, relayUntil int64, expiration int64,
+	id int32, cancel int32, setCancel []int32, minVer int32,
+	maxVer int32, setSubVer []string, priority int32, comment string,
+	statusBar string) *Alert {
+	return &Alert{
+		Version:    version,
+		RelayUntil: relayUntil,
+		Expiration: expiration,
+		ID:         id,
+		Cancel:     cancel,
+		SetCancel:  setCancel,
+		MinVer:     minVer,
+		MaxVer:     maxVer,
+		SetSubVer:  setSubVer,
+		Priority:   priority,
+		Comment:    comment,
+		StatusBar:  statusBar,
+		Reserved:   "",
+	}
+}
+
+// NewAlertFromPayload returns an Alert with values deserialized from the
+// serialized payload.
+func NewAlertFromPayload(serializedPayload []byte, pver uint32) (*Alert, error) {
+	var alert Alert
+	r := bytes.NewReader(serializedPayload)
+	err := alert.Deserialize(r, pver)
+	if err != nil {
+		return nil, err
+	}
+	return &alert, nil
 }
 
 // MsgAlert  implements the Message interface and defines a bitcoin alert
@@ -410,9 +413,9 @@ func (msg *MsgAlert) MaxPayloadLength(pver uint32) uint32 {
 
 // NewMsgAlert returns a new bitcoin alert message that conforms to the Message
 // interface.  See MsgAlert for details.
-func NewMsgAlert(serializedpayload []byte, signature []byte) *MsgAlert {
+func NewMsgAlert(serializedPayload []byte, signature []byte) *MsgAlert {
 	return &MsgAlert{
-		SerializedPayload: serializedpayload,
+		SerializedPayload: serializedPayload,
 		Signature:         signature,
 		Payload:           nil,
 	}
