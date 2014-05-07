@@ -1,0 +1,327 @@
+// Copyright (c) 2014 Conformal Systems LLC.
+// Use of this source code is governed by an ISC
+// license that can be found in the LICENSE file.
+
+package btcrpcclient
+
+import (
+	"fmt"
+	"github.com/conformal/btcjson"
+)
+
+// AddNodeCommand enumerates the available commands that the AddNode function
+// accepts.
+type AddNodeCommand string
+
+// Constants used to indicate the command for the AddNode function.
+const (
+	// ANAdd indicates the specified host should be added as a persistent
+	// peer.
+	ANAdd AddNodeCommand = "add"
+
+	// ANRemove indicates the specified peer should be removed.
+	ANRemove AddNodeCommand = "remove"
+
+	// ANOneTry indicates the specified host should try to connect once,
+	// but it should not be made persistent.
+	ANOneTry AddNodeCommand = "onetry"
+)
+
+// String returns the AddNodeCommand in human-readable form.
+func (cmd AddNodeCommand) String() string {
+	return string(cmd)
+}
+
+// FutureAddNodeResult is a future promise to deliver the result of an
+// AddNodeAsync RPC invocation (or an applicable error).
+type FutureAddNodeResult chan *futureResult
+
+// Receive waits for the response promised by the future and returns an error if
+// any occurred when performing the specified command.
+func (r FutureAddNodeResult) Receive() error {
+	_, err := receiveFuture(r)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// AddNodeAsync returns an instance of a type that can be used to get the result
+// of the RPC at some future time by invoking the Receive function on the
+// returned instance.
+//
+// See AddNode for the blocking version and more details.
+func (c *Client) AddNodeAsync(host string, command AddNodeCommand) FutureAddNodeResult {
+	id := c.NextID()
+	cmd, err := btcjson.NewAddNodeCmd(id, host, string(command))
+	if err != nil {
+		return newFutureError(err)
+	}
+
+	return c.sendCmd(cmd)
+}
+
+// AddNode attempts to perform the passed command on the passed persistent peer.
+// For example, it can be used to add or a remove a persistent peer, or to do
+// a one time connection to a peer.
+//
+// It may not be used to remove non-persistent peers.
+func (c *Client) AddNode(host string, command AddNodeCommand) error {
+	return c.AddNodeAsync(host, command).Receive()
+}
+
+// FutureGetAddedNodeInfoResult is a future promise to deliver the result of a
+// GetAddedNodeInfoAsync RPC invocation (or an applicable error).
+type FutureGetAddedNodeInfoResult chan *futureResult
+
+// Receive waits for the response promised by the future and returns information
+// about manually added (persistent) peers.
+func (r FutureGetAddedNodeInfoResult) Receive() ([]btcjson.GetAddedNodeInfoResult, error) {
+	reply, err := receiveFuture(r)
+	if err != nil {
+		return nil, err
+	}
+
+	// Ensure the returned data is the expected type.
+	nodeInfo, ok := reply.([]btcjson.GetAddedNodeInfoResult)
+	if !ok {
+		return nil, fmt.Errorf("unexpected response type for "+
+			"getaddednodeinfo (dns=true): %T\n", reply)
+	}
+
+	return nodeInfo, nil
+}
+
+// GetAddedNodeInfoAsync returns an instance of a type that can be used to get
+// the result of the RPC at some future time by invoking the Receive function on
+// the returned instance.
+//
+// See GetAddedNodeInfo for the blocking version and more details.
+func (c *Client) GetAddedNodeInfoAsync(peer string) FutureGetAddedNodeInfoResult {
+	id := c.NextID()
+	cmd, err := btcjson.NewGetAddedNodeInfoCmd(id, true, peer)
+	if err != nil {
+		return newFutureError(err)
+	}
+
+	return c.sendCmd(cmd)
+}
+
+// GetAddedNodeInfo returns information about manually added (persistent) peers.
+//
+// See GetAddedNodeInfoNoDNS to retrieve only a list of the added (persistent)
+// peers.
+func (c *Client) GetAddedNodeInfo(peer string) ([]btcjson.GetAddedNodeInfoResult, error) {
+	return c.GetAddedNodeInfoAsync(peer).Receive()
+}
+
+// FutureGetAddedNodeInfoNoDNSResult is a future promise to deliver the result
+// of a GetAddedNodeInfoNoDNSAsync RPC invocation (or an applicable error).
+type FutureGetAddedNodeInfoNoDNSResult chan *futureResult
+
+// Receive waits for the response promised by the future and returns a list of
+// manually added (persistent) peers.
+func (r FutureGetAddedNodeInfoNoDNSResult) Receive() ([]string, error) {
+	reply, err := receiveFuture(r)
+	if err != nil {
+		return nil, err
+	}
+
+	// Ensure the returned data is the expected type.
+	nodes, ok := reply.([]string)
+	if !ok {
+		return nil, fmt.Errorf("unexpected response type for "+
+			"getaddednodeinfo (dns=false): %T\n", reply)
+	}
+
+	return nodes, nil
+}
+
+// GetAddedNodeInfoNoDNSAsync returns an instance of a type that can be used to
+// get the result of the RPC at some future time by invoking the Receive
+// function on the returned instance.
+//
+// See GetAddedNodeInfoNoDNS for the blocking version and more details.
+func (c *Client) GetAddedNodeInfoNoDNSAsync(peer string) FutureGetAddedNodeInfoNoDNSResult {
+	id := c.NextID()
+	cmd, err := btcjson.NewGetAddedNodeInfoCmd(id, false, peer)
+	if err != nil {
+		return newFutureError(err)
+	}
+
+	return c.sendCmd(cmd)
+}
+
+// GetAddedNodeInfoNoDNS returns a list of manually added (persistent) peers.
+// This works by setting the dns flag to false in the underlying RPC.
+//
+// See GetAddedNodeInfo to obtain more information about each added (persistent)
+// peer.
+func (c *Client) GetAddedNodeInfoNoDNS(peer string) ([]string, error) {
+	return c.GetAddedNodeInfoNoDNSAsync(peer).Receive()
+}
+
+// FutureGetConnectionCountResult is a future promise to deliver the result
+// of a GetConnectionCountAsync RPC invocation (or an applicable error).
+type FutureGetConnectionCountResult chan *futureResult
+
+// Receive waits for the response promised by the future and returns the number
+// of active connections to other peers.
+func (r FutureGetConnectionCountResult) Receive() (int64, error) {
+	reply, err := receiveFuture(r)
+	if err != nil {
+		return 0, err
+	}
+
+	// Ensure the returned data is the expected type.
+	fcount, ok := reply.(float64)
+	if !ok {
+		return 0, fmt.Errorf("unexpected response type for "+
+			"getconnectioncount: %T\n", reply)
+	}
+
+	return int64(fcount), nil
+}
+
+// GetConnectionCountAsync returns an instance of a type that can be used to get
+// the result of the RPC at some future time by invoking the Receive function on
+// the returned instance.
+//
+// See GetConnectionCount for the blocking version and more details.
+func (c *Client) GetConnectionCountAsync() FutureGetConnectionCountResult {
+	id := c.NextID()
+	cmd, err := btcjson.NewGetConnectionCountCmd(id)
+	if err != nil {
+		return newFutureError(err)
+	}
+
+	return c.sendCmd(cmd)
+}
+
+// GetConnectionCount returns the number of active connections to other peers.
+func (c *Client) GetConnectionCount() (int64, error) {
+	return c.GetConnectionCountAsync().Receive()
+}
+
+// FuturePingResult is a future promise to deliver the result of a PingAsync RPC
+// invocation (or an applicable error).
+type FuturePingResult chan *futureResult
+
+// Receive waits for the response promised by the future and returns the result
+// of queueing a ping to be sent to each connected peer.
+func (r FuturePingResult) Receive() error {
+	_, err := receiveFuture(r)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// PingAsync returns an instance of a type that can be used to get the result of
+// the RPC at some future time by invoking the Receive function on the returned
+// instance.
+//
+// See Ping for the blocking version and more details.
+func (c *Client) PingAsync() FuturePingResult {
+	id := c.NextID()
+	cmd, err := btcjson.NewPingCmd(id)
+	if err != nil {
+		return newFutureError(err)
+	}
+
+	return c.sendCmd(cmd)
+}
+
+// Ping queues a ping to be sent to each connected peer.
+//
+// Use the GetPeerInfo function and examine the PingTime and PingWait fields to
+// access the ping times.
+func (c *Client) Ping() error {
+	return c.PingAsync().Receive()
+}
+
+// FutureGetPeerInfoResult is a future promise to deliver the result of a
+// GetPeerInfoAsync RPC invocation (or an applicable error).
+type FutureGetPeerInfoResult chan *futureResult
+
+// Receive waits for the response promised by the future and returns  data about
+// each connected network peer.
+func (r FutureGetPeerInfoResult) Receive() ([]btcjson.GetPeerInfoResult, error) {
+	reply, err := receiveFuture(r)
+	if err != nil {
+		return nil, err
+	}
+
+	// Ensure the returned data is the expected type.
+	peerInfo, ok := reply.([]btcjson.GetPeerInfoResult)
+	if !ok {
+		return nil, fmt.Errorf("unexpected response type for "+
+			"getpeerinfo: %T\n", reply)
+	}
+
+	return peerInfo, nil
+}
+
+// GetPeerInfoAsync returns an instance of a type that can be used to get the
+// result of the RPC at some future time by invoking the Receive function on the
+// returned instance.
+//
+// See GetPeerInfo for the blocking version and more details.
+func (c *Client) GetPeerInfoAsync() FutureGetPeerInfoResult {
+	id := c.NextID()
+	cmd, err := btcjson.NewGetPeerInfoCmd(id)
+	if err != nil {
+		return newFutureError(err)
+	}
+
+	return c.sendCmd(cmd)
+}
+
+// GetPeerInfo returns data about each connected network peer.
+func (c *Client) GetPeerInfo() ([]btcjson.GetPeerInfoResult, error) {
+	return c.GetPeerInfoAsync().Receive()
+}
+
+// FutureGetNetTotalsResult is a future promise to deliver the result of a
+// GetNetTotalsAsync RPC invocation (or an applicable error).
+type FutureGetNetTotalsResult chan *futureResult
+
+// Receive waits for the response promised by the future and returns network
+// traffic statistics.
+func (r FutureGetNetTotalsResult) Receive() (*btcjson.GetNetTotalsResult, error) {
+	reply, err := receiveFuture(r)
+	if err != nil {
+		return nil, err
+	}
+
+	// Ensure the returned data is the expected type.
+	totals, ok := reply.(btcjson.GetNetTotalsResult)
+	if !ok {
+		return nil, fmt.Errorf("unexpected response type for "+
+			"getnettotals: %T\n", reply)
+	}
+
+	return &totals, nil
+}
+
+// GetNetTotalsAsync returns an instance of a type that can be used to get the
+// result of the RPC at some future time by invoking the Receive function on the
+// returned instance.
+//
+// See GetNetTotals for the blocking version and more details.
+func (c *Client) GetNetTotalsAsync() FutureGetNetTotalsResult {
+	id := c.NextID()
+	cmd, err := btcjson.NewGetNetTotalsCmd(id)
+	if err != nil {
+		return newFutureError(err)
+	}
+
+	return c.sendCmd(cmd)
+}
+
+// GetNetTotals returns network traffic statistics.
+func (c *Client) GetNetTotals() (*btcjson.GetNetTotalsResult, error) {
+	return c.GetNetTotalsAsync().Receive()
+}

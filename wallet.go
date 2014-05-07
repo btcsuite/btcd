@@ -1,0 +1,1862 @@
+// Copyright (c) 2014 Conformal Systems LLC.
+// Use of this source code is governed by an ISC
+// license that can be found in the LICENSE file.
+
+package btcrpcclient
+
+import (
+	"fmt"
+	"github.com/conformal/btcjson"
+	"github.com/conformal/btcutil"
+	"github.com/conformal/btcwire"
+	"github.com/conformal/btcws"
+)
+
+// *****************************
+// Transaction Listing Functions
+// *****************************
+
+// FutureGetTransactionResult is a future promise to deliver the result
+// of a GetTransactionAsync RPC invocation (or an applicable error).
+type FutureGetTransactionResult chan *futureResult
+
+// Receive waits for the response promised by the future and returns detailed
+// information about a wallet transaction.
+func (r FutureGetTransactionResult) Receive() (*btcjson.GetTransactionResult, error) {
+	reply, err := receiveFuture(r)
+	if err != nil {
+		return nil, err
+	}
+
+	// Ensure the returned data is the expected type.
+	result, ok := reply.(btcjson.GetTransactionResult)
+	if !ok {
+		return nil, fmt.Errorf("unexpected response type for "+
+			"gettransaction: %T\n", reply)
+	}
+
+	return &result, nil
+}
+
+// GetTransactionAsync returns an instance of a type that can be used to get the
+// result of the RPC at some future time by invoking the Receive function on
+// the returned instance.
+//
+// See GetTransaction for the blocking version and more details.
+func (c *Client) GetTransactionAsync(txHash *btcwire.ShaHash) FutureGetTransactionResult {
+	id := c.NextID()
+	cmd, err := btcjson.NewGetTransactionCmd(id, txHash.String())
+	if err != nil {
+		return newFutureError(err)
+	}
+
+	return c.sendCmd(cmd)
+}
+
+// GetTransaction returns detailed information about a wallet transaction.
+//
+// See GetRawTransaction to return the raw transaction instead.
+func (c *Client) GetTransaction(txHash *btcwire.ShaHash) (*btcjson.GetTransactionResult, error) {
+	return c.GetTransactionAsync(txHash).Receive()
+}
+
+// FutureListTransactionsResult is a future promise to deliver the result of a
+// ListTransactionsAsync, ListTransactionsCountAsync, or
+// ListTransactionsCountFromAsync RPC invocation (or an applicable error).
+type FutureListTransactionsResult chan *futureResult
+
+// Receive waits for the response promised by the future and returns a list of
+// the most recent transactions.
+func (r FutureListTransactionsResult) Receive() ([]btcjson.ListTransactionsResult, error) {
+	reply, err := receiveFuture(r)
+	if err != nil {
+		return nil, err
+	}
+
+	// No transactions.
+	if reply == nil {
+		return nil, nil
+	}
+
+	// Ensure the returned data is the expected type.
+	transactions, ok := reply.([]btcjson.ListTransactionsResult)
+	if !ok {
+		return nil, fmt.Errorf("unexpected response type for "+
+			"listtransactions: %T\n", reply)
+	}
+
+	return transactions, nil
+}
+
+// ListTransactionsAsync returns an instance of a type that can be used to get
+// the result of the RPC at some future time by invoking the Receive function on
+// the returned instance.
+//
+// See ListTransactions for the blocking version and more details.
+func (c *Client) ListTransactionsAsync(account string) FutureListTransactionsResult {
+	id := c.NextID()
+	cmd, err := btcjson.NewListTransactionsCmd(id, account)
+	if err != nil {
+		return newFutureError(err)
+	}
+
+	return c.sendCmd(cmd)
+}
+
+// ListTransactions returns a list of the most recent transactions.
+//
+// See the ListTransactionsCount and ListTransactionsCountFrom to control the
+// number of transactions returned and starting point, respectively.
+func (c *Client) ListTransactions(account string) ([]btcjson.ListTransactionsResult, error) {
+	return c.ListTransactionsAsync(account).Receive()
+}
+
+// ListTransactionsCountAsync returns an instance of a type that can be used to
+// get the result of the RPC at some future time by invoking the Receive
+// function on the returned instance.
+//
+// See ListTransactionsCount for the blocking version and more details.
+func (c *Client) ListTransactionsCountAsync(account string, count int) FutureListTransactionsResult {
+	id := c.NextID()
+	cmd, err := btcjson.NewListTransactionsCmd(id, account, count)
+	if err != nil {
+		return newFutureError(err)
+	}
+
+	return c.sendCmd(cmd)
+}
+
+// ListTransactionsCount returns a list of the most recent transactions up
+// to the passed count.
+//
+// See the ListTransactions and ListTransactionsCountFrom functions for
+// different options.
+func (c *Client) ListTransactionsCount(account string, count int) ([]btcjson.ListTransactionsResult, error) {
+	return c.ListTransactionsCountAsync(account, count).Receive()
+}
+
+// ListTransactionsCountFromAsync returns an instance of a type that can be used
+// to get the result of the RPC at some future time by invoking the Receive
+// function on the returned instance.
+//
+// See ListTransactionsCountFrom for the blocking version and more details.
+func (c *Client) ListTransactionsCountFromAsync(account string, count, from int) FutureListTransactionsResult {
+	id := c.NextID()
+	cmd, err := btcjson.NewListTransactionsCmd(id, account, count, from)
+	if err != nil {
+		return newFutureError(err)
+	}
+
+	return c.sendCmd(cmd)
+}
+
+// ListTransactionsCountFrom returns a list of the most recent transactions up
+// to the passed count while skipping the first 'from' transactions.
+//
+// See the ListTransactions and ListTransactionsCount functions to use defaults.
+func (c *Client) ListTransactionsCountFrom(account string, count, from int) ([]btcjson.ListTransactionsResult, error) {
+	return c.ListTransactionsCountFromAsync(account, count, from).Receive()
+}
+
+// FutureListSinceBlockResult is a future promise to deliver the result of a
+// ListSinceBlockAsync or ListSinceBlockMinConfAsync RPC invocation (or an
+// applicable error).
+type FutureListSinceBlockResult chan *futureResult
+
+// Receive waits for the response promised by the future and returns all
+// transactions added in blocks since the specified block hash, or all
+// transactions if it is nil.
+func (r FutureListSinceBlockResult) Receive() (*btcjson.ListSinceBlockResult, error) {
+	reply, err := receiveFuture(r)
+	if err != nil {
+		return nil, err
+	}
+
+	// Ensure the returned data is the expected type.
+	listResult, ok := reply.(btcjson.ListSinceBlockResult)
+	if !ok {
+		return nil, fmt.Errorf("unexpected response type for "+
+			"listsinceblock: %T\n", reply)
+	}
+
+	return &listResult, nil
+}
+
+// ListSinceBlockAsync returns an instance of a type that can be used to get
+// the result of the RPC at some future time by invoking the Receive function on
+// the returned instance.
+//
+// See ListSinceBlock for the blocking version and more details.
+func (c *Client) ListSinceBlockAsync(blockHash *btcwire.ShaHash) FutureListSinceBlockResult {
+	hash := ""
+	if blockHash != nil {
+		hash = blockHash.String()
+	}
+	id := c.NextID()
+	cmd, err := btcjson.NewListSinceBlockCmd(id, hash)
+	if err != nil {
+		return newFutureError(err)
+	}
+
+	return c.sendCmd(cmd)
+}
+
+// ListSinceBlock returns all transactions added in blocks since the specified
+// block hash, or all transactions if it is nil, using the default number of
+// minimum confirmations as a filter.
+//
+// See ListSinceBlockMinConf to override the minimum number of confirmations.
+func (c *Client) ListSinceBlock(blockHash *btcwire.ShaHash) (*btcjson.ListSinceBlockResult, error) {
+	return c.ListSinceBlockAsync(blockHash).Receive()
+}
+
+// ListSinceBlockMinConfAsync returns an instance of a type that can be used to
+// get the result of the RPC at some future time by invoking the Receive
+// function on the returned instance.
+//
+// See ListSinceBlockMinConf for the blocking version and more details.
+func (c *Client) ListSinceBlockMinConfAsync(blockHash *btcwire.ShaHash, minConfirms int) FutureListSinceBlockResult {
+	hash := ""
+	if blockHash != nil {
+		hash = blockHash.String()
+	}
+	id := c.NextID()
+	cmd, err := btcjson.NewListSinceBlockCmd(id, hash, minConfirms)
+	if err != nil {
+		return newFutureError(err)
+	}
+
+	return c.sendCmd(cmd)
+}
+
+// ListSinceBlockMinConf returns all transactions added in blocks since the
+// specified block hash, or all transactions if it is nil, using the specified
+// number of minimum confirmations as a filter.
+//
+// See ListSinceBlock to use the default minimum number of confirmations.
+func (c *Client) ListSinceBlockMinConf(blockHash *btcwire.ShaHash, minConfirms int) (*btcjson.ListSinceBlockResult, error) {
+	return c.ListSinceBlockMinConfAsync(blockHash, minConfirms).Receive()
+}
+
+// **************************
+// Transaction Send Functions
+// **************************
+
+// FutureSetTxFeeResult is a future promise to deliver the result of a
+// SetTxFeeAsync RPC invocation (or an applicable error).
+type FutureSetTxFeeResult chan *futureResult
+
+// Receive waits for the response promised by the future and returns the result
+// of setting an optional transaction fee per KB that helps ensure transactions
+// are processed quickly.  Most transaction are 1KB.
+func (r FutureSetTxFeeResult) Receive() error {
+	_, err := receiveFuture(r)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// SetTxFeeAsync returns an instance of a type that can be used to get the
+// result of the RPC at some future time by invoking the Receive function on the
+// returned instance.
+//
+// See SetTxFee for the blocking version and more details.
+func (c *Client) SetTxFeeAsync(fee btcutil.Amount) FutureSetTxFeeResult {
+	id := c.NextID()
+	cmd, err := btcjson.NewSetTxFeeCmd(id, int64(fee))
+	if err != nil {
+		return newFutureError(err)
+	}
+
+	return c.sendCmd(cmd)
+}
+
+// SetTxFee sets an optional transaction fee per KB that helps ensure
+// transactions are processed quickly.  Most transaction are 1KB.
+func (c *Client) SetTxFee(fee btcutil.Amount) error {
+	return c.SetTxFeeAsync(fee).Receive()
+}
+
+// FutureSendToAddressResult is a future promise to deliver the result of a
+// SendToAddressAsync RPC invocation (or an applicable error).
+type FutureSendToAddressResult chan *futureResult
+
+// Receive waits for the response promised by the future and returns the hash
+// of the transaction sending the passed amount to the given address.
+func (r FutureSendToAddressResult) Receive() (*btcwire.ShaHash, error) {
+	reply, err := receiveFuture(r)
+	if err != nil {
+		return nil, err
+	}
+
+	txHash, ok := reply.(string)
+	if !ok {
+		return nil, fmt.Errorf("unexpected response type for "+
+			"sendtoaddress: %T\n", reply)
+	}
+
+	return btcwire.NewShaHashFromStr(txHash)
+}
+
+// SendToAddressAsync returns an instance of a type that can be used to get the
+// result of the RPC at some future time by invoking the Receive function on the
+// returned instance.
+//
+// See SendToAddress for the blocking version and more details.
+func (c *Client) SendToAddressAsync(address btcutil.Address, amount btcutil.Amount) FutureSendToAddressResult {
+	id := c.NextID()
+	addr := address.EncodeAddress()
+	cmd, err := btcjson.NewSendToAddressCmd(id, addr, int64(amount))
+	if err != nil {
+		return newFutureError(err)
+	}
+
+	return c.sendCmd(cmd)
+}
+
+// SendToAddress sends the passed amount to the given address.
+//
+// See SendToAddressComment to associate comments with the transaction in the
+// wallet.  The comments are not part of the transaction and are only internal
+// to the wallet.
+//
+// NOTE: This function requires to the wallet to be unlocked.  See the
+// WalletPassphrase function for more details.
+func (c *Client) SendToAddress(address btcutil.Address, amount btcutil.Amount) (*btcwire.ShaHash, error) {
+	return c.SendToAddressAsync(address, amount).Receive()
+}
+
+// SendToAddressCommentAsync returns an instance of a type that can be used to
+// get the result of the RPC at some future time by invoking the Receive
+// function on the returned instance.
+//
+// See SendToAddressComment for the blocking version and more details.
+func (c *Client) SendToAddressCommentAsync(address btcutil.Address,
+	amount btcutil.Amount, comment,
+	commentTo string) FutureSendToAddressResult {
+
+	id := c.NextID()
+	addr := address.EncodeAddress()
+	cmd, err := btcjson.NewSendToAddressCmd(id, addr, int64(amount),
+		comment, commentTo)
+	if err != nil {
+		return newFutureError(err)
+	}
+
+	return c.sendCmd(cmd)
+}
+
+// SendToAddressComment sends the passed amount to the given address and stores
+// the provided comment and comment to in the wallet.  The comment parameter is
+// intended to be used for the purpose of the transaction while the commentTo
+// parameter is indended to be used for who the transaction is being sent to.
+//
+// The comments are not part of the transaction and are only internal
+// to the wallet.
+//
+// See SendToAddress to avoid using comments.
+//
+// NOTE: This function requires to the wallet to be unlocked.  See the
+// WalletPassphrase function for more details.
+func (c *Client) SendToAddressComment(address btcutil.Address, amount btcutil.Amount, comment, commentTo string) (*btcwire.ShaHash, error) {
+	return c.SendToAddressCommentAsync(address, amount, comment,
+		commentTo).Receive()
+}
+
+// FutureSendFromResult is a future promise to deliver the result of a
+// SendFromAsync, SendFromMinConfAsync, or SendFromCommentAsync RPC invocation
+// (or an applicable error).
+type FutureSendFromResult chan *futureResult
+
+// Receive waits for the response promised by the future and returns the hash
+// of the transaction sending amount to the given address using the provided
+// account as a source of funds.
+func (r FutureSendFromResult) Receive() (*btcwire.ShaHash, error) {
+	reply, err := receiveFuture(r)
+	if err != nil {
+		return nil, err
+	}
+
+	// Ensure the returned data is the expected type.
+	txHash, ok := reply.(string)
+	if !ok {
+		return nil, fmt.Errorf("unexpected response type for "+
+			"sendfrom: %T\n", reply)
+	}
+
+	return btcwire.NewShaHashFromStr(txHash)
+}
+
+// SendFromAsync returns an instance of a type that can be used to get the
+// result of the RPC at some future time by invoking the Receive function on the
+// returned instance.
+//
+// See SendFrom for the blocking version and more details.
+func (c *Client) SendFromAsync(fromAccount string, toAddress btcutil.Address, amount btcutil.Amount) FutureSendFromResult {
+	id := c.NextID()
+	addr := toAddress.EncodeAddress()
+	cmd, err := btcjson.NewSendFromCmd(id, fromAccount, addr, int64(amount))
+	if err != nil {
+		return newFutureError(err)
+	}
+
+	return c.sendCmd(cmd)
+}
+
+// SendFrom sends the passed amount to the given address using the provided
+// account as a source of funds.  Only funds with the default number of minimum
+// confirmations will be used.
+//
+// See SendFromMinConf and SendFromComment for different options.
+//
+// NOTE: This function requires to the wallet to be unlocked.  See the
+// WalletPassphrase function for more details.
+func (c *Client) SendFrom(fromAccount string, toAddress btcutil.Address, amount btcutil.Amount) (*btcwire.ShaHash, error) {
+	return c.SendFromAsync(fromAccount, toAddress, amount).Receive()
+}
+
+// SendFromMinConfAsync returns an instance of a type that can be used to get
+// the result of the RPC at some future time by invoking the Receive function on
+// the returned instance.
+//
+// See SendFromMinConf for the blocking version and more details.
+func (c *Client) SendFromMinConfAsync(fromAccount string, toAddress btcutil.Address, amount btcutil.Amount, minConfirms int) FutureSendFromResult {
+	id := c.NextID()
+	addr := toAddress.EncodeAddress()
+	cmd, err := btcjson.NewSendFromCmd(id, fromAccount, addr, int64(amount),
+		minConfirms)
+	if err != nil {
+		return newFutureError(err)
+	}
+
+	return c.sendCmd(cmd)
+}
+
+// SendFromMinConf sends the passed amount to the given address using the
+// provided account as a source of funds.  Only funds with the passed number of
+// minimum confirmations will be used.
+//
+// See SendFrom to use the default number of minimum confirmations and
+// SendFromComment for additional options.
+//
+// NOTE: This function requires to the wallet to be unlocked.  See the
+// WalletPassphrase function for more details.
+func (c *Client) SendFromMinConf(fromAccount string, toAddress btcutil.Address, amount btcutil.Amount, minConfirms int) (*btcwire.ShaHash, error) {
+	return c.SendFromMinConfAsync(fromAccount, toAddress, amount,
+		minConfirms).Receive()
+}
+
+// SendFromCommentAsync returns an instance of a type that can be used to get
+// the result of the RPC at some future time by invoking the Receive function on
+// the returned instance.
+//
+// See SendFromComment for the blocking version and more details.
+func (c *Client) SendFromCommentAsync(fromAccount string,
+	toAddress btcutil.Address, amount btcutil.Amount, minConfirms int,
+	comment, commentTo string) FutureSendFromResult {
+
+	id := c.NextID()
+	addr := toAddress.EncodeAddress()
+	cmd, err := btcjson.NewSendFromCmd(id, fromAccount, addr, int64(amount),
+		minConfirms, comment, commentTo)
+	if err != nil {
+		return newFutureError(err)
+	}
+
+	return c.sendCmd(cmd)
+}
+
+// SendFromMinConf sends the passed amount to the given address using the
+// provided account as a source of funds and stores the provided comment and
+// comment to in the wallet.  The comment parameter is intended to be used for
+// the purpose of the transaction while the commentTo parameter is indended to
+// be used for who the transaction is being sent to.  Only funds with the passed
+// number of minimum confirmations will be used.
+//
+// See SendFrom and SendFromMinConf to use defaults.
+//
+// NOTE: This function requires to the wallet to be unlocked.  See the
+// WalletPassphrase function for more details.
+func (c *Client) SendFromComment(fromAccount string, toAddress btcutil.Address,
+	amount btcutil.Amount, minConfirms int,
+	comment, commentTo string) (*btcwire.ShaHash, error) {
+
+	return c.SendFromCommentAsync(fromAccount, toAddress, amount,
+		minConfirms, comment, commentTo).Receive()
+}
+
+// FutureSendManyResult is a future promise to deliver the result of a
+// SendManyAsync, SendManyMinConfAsync, or SendManyCommentAsync RPC invocation
+// (or an applicable error).
+type FutureSendManyResult chan *futureResult
+
+// Receive waits for the response promised by the future and returns the hash
+// of the transaction sending multiple amounts to multiple addresses using the
+// provided account as a source of funds.
+func (r FutureSendManyResult) Receive() (*btcwire.ShaHash, error) {
+	reply, err := receiveFuture(r)
+	if err != nil {
+		return nil, err
+	}
+
+	// Ensure the returned data is the expected type.
+	txHash, ok := reply.(string)
+	if !ok {
+		return nil, fmt.Errorf("unexpected response type for "+
+			"sendmany: %T\n", reply)
+	}
+
+	return btcwire.NewShaHashFromStr(txHash)
+}
+
+// SendManyAsync returns an instance of a type that can be used to get the
+// result of the RPC at some future time by invoking the Receive function on the
+// returned instance.
+//
+// See SendMany for the blocking version and more details.
+func (c *Client) SendManyAsync(fromAccount string, amounts map[btcutil.Address]btcutil.Amount) FutureSendManyResult {
+	convertedAmounts := make(map[string]int64, len(amounts))
+	for addr, amount := range amounts {
+		convertedAmounts[addr.EncodeAddress()] = int64(amount)
+	}
+	id := c.NextID()
+	cmd, err := btcjson.NewSendManyCmd(id, fromAccount, convertedAmounts)
+	if err != nil {
+		return newFutureError(err)
+	}
+
+	return c.sendCmd(cmd)
+}
+
+// SendMany sends multiple amounts to multiple addresses using the provided
+// account as a source of funds in a single transaction.  Only funds with the
+// default number of minimum confirmations will be used.
+//
+// See SendManyMinConf and SendManyComment for different options.
+//
+// NOTE: This function requires to the wallet to be unlocked.  See the
+// WalletPassphrase function for more details.
+func (c *Client) SendMany(fromAccount string, amounts map[btcutil.Address]btcutil.Amount) (*btcwire.ShaHash, error) {
+	return c.SendManyAsync(fromAccount, amounts).Receive()
+}
+
+// SendManyMinConfAsync returns an instance of a type that can be used to get
+// the result of the RPC at some future time by invoking the Receive function on
+// the returned instance.
+//
+// See SendManyMinConf for the blocking version and more details.
+func (c *Client) SendManyMinConfAsync(fromAccount string,
+	amounts map[btcutil.Address]btcutil.Amount,
+	minConfirms int) FutureSendManyResult {
+
+	convertedAmounts := make(map[string]int64, len(amounts))
+	for addr, amount := range amounts {
+		convertedAmounts[addr.EncodeAddress()] = int64(amount)
+	}
+	id := c.NextID()
+	cmd, err := btcjson.NewSendManyCmd(id, fromAccount, convertedAmounts,
+		minConfirms)
+	if err != nil {
+		return newFutureError(err)
+	}
+
+	return c.sendCmd(cmd)
+}
+
+// SendManyMinConf sends multiple amounts to multiple addresses using the
+// provided account as a source of funds in a single transaction.  Only funds
+// with the passed number of minimum confirmations will be used.
+//
+// See SendMany to use the default number of minimum confirmations and
+// SendManyComment for additional options.
+//
+// NOTE: This function requires to the wallet to be unlocked.  See the
+// WalletPassphrase function for more details.
+func (c *Client) SendManyMinConf(fromAccount string,
+	amounts map[btcutil.Address]btcutil.Amount,
+	minConfirms int) (*btcwire.ShaHash, error) {
+
+	return c.SendManyMinConfAsync(fromAccount, amounts, minConfirms).Receive()
+}
+
+// SendManyCommentAsync returns an instance of a type that can be used to get
+// the result of the RPC at some future time by invoking the Receive function on
+// the returned instance.
+//
+// See SendManyComment for the blocking version and more details.
+func (c *Client) SendManyCommentAsync(fromAccount string,
+	amounts map[btcutil.Address]btcutil.Amount, minConfirms int,
+	comment string) FutureSendManyResult {
+
+	convertedAmounts := make(map[string]int64, len(amounts))
+	for addr, amount := range amounts {
+		convertedAmounts[addr.EncodeAddress()] = int64(amount)
+	}
+	id := c.NextID()
+	cmd, err := btcjson.NewSendManyCmd(id, fromAccount, convertedAmounts,
+		minConfirms, comment)
+	if err != nil {
+		return newFutureError(err)
+	}
+
+	return c.sendCmd(cmd)
+}
+
+// SendManyComment sends multiple amounts to multiple addresses using the
+// provided account as a source of funds in a single transaction and stores the
+// provided comment in the wallet.  The comment parameter is intended to be used
+// for the purpose of the transaction   Only funds with the passed number of
+// minimum confirmations will be used.
+//
+// See SendMany and SendManyMinConf to use defaults.
+//
+// NOTE: This function requires to the wallet to be unlocked.  See the
+// WalletPassphrase function for more details.
+func (c *Client) SendManyComment(fromAccount string,
+	amounts map[btcutil.Address]btcutil.Amount, minConfirms int,
+	comment string) (*btcwire.ShaHash, error) {
+
+	return c.SendManyCommentAsync(fromAccount, amounts, minConfirms,
+		comment).Receive()
+}
+
+// *************************
+// Address/Account Functions
+// *************************
+
+// FutureAddMultisigAddressResult is a future promise to deliver the result of a
+// AddMultisigAddressAsync RPC invocation (or an applicable error).
+type FutureAddMultisigAddressResult chan *futureResult
+
+// Receive waits for the response promised by the future and returns the
+// multisignature address that requires the specified number of signatures for
+// the provided addresses.
+func (r FutureAddMultisigAddressResult) Receive() (btcutil.Address, error) {
+	reply, err := receiveFuture(r)
+	if err != nil {
+		return nil, err
+	}
+
+	// Ensure the returned data is the expected type.
+	addr, ok := reply.(string)
+	if !ok {
+		return nil, fmt.Errorf("unexpected response type for "+
+			"addmultisigaddress: %T\n", reply)
+	}
+
+	return btcutil.DecodeAddress(addr, btcwire.MainNet)
+}
+
+// AddMultisigAddressAsync returns an instance of a type that can be used to get
+// the result of the RPC at some future time by invoking the Receive function on
+// the returned instance.
+//
+// See AddMultisigAddress for the blocking version and more details.
+func (c *Client) AddMultisigAddressAsync(requiredSigs int, addresses []btcutil.Address, account string) FutureAddMultisigAddressResult {
+	id := c.NextID()
+
+	addrs := make([]string, 0, len(addresses))
+	for _, addr := range addresses {
+		addrs = append(addrs, addr.EncodeAddress())
+	}
+
+	cmd, err := btcjson.NewAddMultisigAddressCmd(id, requiredSigs, addrs, account)
+	if err != nil {
+		return newFutureError(err)
+	}
+
+	return c.sendCmd(cmd)
+}
+
+// AddMultisigAddress adds a multisignature address that requires the specified
+// number of signatures for the provided addresses to the wallet.
+func (c *Client) AddMultisigAddress(requiredSigs int, addresses []btcutil.Address, account string) (btcutil.Address, error) {
+	return c.AddMultisigAddressAsync(requiredSigs, addresses,
+		account).Receive()
+}
+
+// FutureCreateMultisigResult is a future promise to deliver the result of a
+// CreateMultisigAsync RPC invocation (or an applicable error).
+type FutureCreateMultisigResult chan *futureResult
+
+// Receive waits for the response promised by the future and returns the
+// multisignature address and script needed to redeem it.
+func (r FutureCreateMultisigResult) Receive() (*btcjson.CreateMultiSigResult, error) {
+	reply, err := receiveFuture(r)
+	if err != nil {
+		return nil, err
+	}
+
+	// Ensure the returned data is the expected type.
+	result, ok := reply.(btcjson.CreateMultiSigResult)
+	if !ok {
+		return nil, fmt.Errorf("unexpected response type for "+
+			"createmultisig: %T\n", reply)
+	}
+
+	return &result, nil
+}
+
+// CreateMultisigAsync returns an instance of a type that can be used to get
+// the result of the RPC at some future time by invoking the Receive function on
+// the returned instance.
+//
+// See CreateMultisig for the blocking version and more details.
+func (c *Client) CreateMultisigAsync(requiredSigs int, addresses []btcutil.Address) FutureCreateMultisigResult {
+	id := c.NextID()
+
+	addrs := make([]string, 0, len(addresses))
+	for _, addr := range addresses {
+		addrs = append(addrs, addr.EncodeAddress())
+	}
+
+	cmd, err := btcjson.NewCreateMultisigCmd(id, requiredSigs, addrs)
+	if err != nil {
+		return newFutureError(err)
+	}
+
+	return c.sendCmd(cmd)
+}
+
+// CreateMultisig creates a multisignature address that requires the specified
+// number of signatures for the provided addresses and returns the
+// multisignature address and script needed to redeem it.
+func (c *Client) CreateMultisig(requiredSigs int, addresses []btcutil.Address) (*btcjson.CreateMultiSigResult, error) {
+	return c.CreateMultisigAsync(requiredSigs, addresses).Receive()
+}
+
+// FutureGetNewAddressResult is a future promise to deliver the result of a
+// GetNewAddressAsync RPC invocation (or an applicable error).
+type FutureGetNewAddressResult chan *futureResult
+
+// Receive waits for the response promised by the future and returns a new
+// address.
+func (r FutureGetNewAddressResult) Receive() (btcutil.Address, error) {
+	reply, err := receiveFuture(r)
+	if err != nil {
+		return nil, err
+	}
+
+	// Ensure the returned data is the expected type.
+	addr, ok := reply.(string)
+	if !ok {
+		return nil, fmt.Errorf("unexpected response type for "+
+			"getnewaddress: %T\n", reply)
+	}
+
+	return btcutil.DecodeAddress(addr, btcwire.MainNet)
+}
+
+// GetNewAddressAsync returns an instance of a type that can be used to get the
+// result of the RPC at some future time by invoking the Receive function on the
+// returned instance.
+//
+// See GetNewAddress for the blocking version and more details.
+func (c *Client) GetNewAddressAsync() FutureGetNewAddressResult {
+	id := c.NextID()
+	cmd, err := btcjson.NewGetNewAddressCmd(id)
+	if err != nil {
+		return newFutureError(err)
+	}
+
+	return c.sendCmd(cmd)
+}
+
+// GetNewAddress returns a new address.
+func (c *Client) GetNewAddress() (btcutil.Address, error) {
+	return c.GetNewAddressAsync().Receive()
+}
+
+// FutureGetRawChangeAddressResult is a future promise to deliver the result of
+// a GetRawChangeAddressAsync RPC invocation (or an applicable error).
+type FutureGetRawChangeAddressResult chan *futureResult
+
+// Receive waits for the response promised by the future and returns a new
+// address for receiving change that will be associated with the provided
+// account.  Note that this is only for raw transactions and NOT for normal use.
+func (r FutureGetRawChangeAddressResult) Receive() (btcutil.Address, error) {
+	reply, err := receiveFuture(r)
+	if err != nil {
+		return nil, err
+	}
+
+	// Ensure the returned data is the expected type.
+	addr, ok := reply.(string)
+	if !ok {
+		return nil, fmt.Errorf("unexpected response type for "+
+			"getrawchangeaddress: %T\n", reply)
+	}
+
+	return btcutil.DecodeAddress(addr, btcwire.MainNet)
+}
+
+// GetRawChangeAddressAsync returns an instance of a type that can be used to
+// get the result of the RPC at some future time by invoking the Receive
+// function on the returned instance.
+//
+// See GetRawChangeAddress for the blocking version and more details.
+func (c *Client) GetRawChangeAddressAsync(account string) FutureGetRawChangeAddressResult {
+	id := c.NextID()
+	cmd, err := btcjson.NewGetRawChangeAddressCmd(id, account)
+	if err != nil {
+		return newFutureError(err)
+	}
+
+	return c.sendCmd(cmd)
+}
+
+// GetRawChangeAddress returns a new address for receiving change that will be
+// associated with the provided account.  Note that this is only for raw
+// transactions and NOT for normal use.
+func (c *Client) GetRawChangeAddress(account string) (btcutil.Address, error) {
+	return c.GetRawChangeAddressAsync(account).Receive()
+}
+
+// FutureGetAccountAddressResult is a future promise to deliver the result of a
+// GetAccountAddressAsync RPC invocation (or an applicable error).
+type FutureGetAccountAddressResult chan *futureResult
+
+// Receive waits for the response promised by the future and returns the current
+// Bitcoin address for receiving payments to the specified account.
+func (r FutureGetAccountAddressResult) Receive() (btcutil.Address, error) {
+	reply, err := receiveFuture(r)
+	if err != nil {
+		return nil, err
+	}
+
+	// Ensure the returned data is the expected type.
+	addr, ok := reply.(string)
+	if !ok {
+		return nil, fmt.Errorf("unexpected response type for "+
+			"getaccountaddress: %T\n", reply)
+	}
+
+	return btcutil.DecodeAddress(addr, btcwire.MainNet)
+}
+
+// GetAccountAddressAsync returns an instance of a type that can be used to get
+// the result of the RPC at some future time by invoking the Receive function on
+// the returned instance.
+//
+// See GetAccountAddress for the blocking version and more details.
+func (c *Client) GetAccountAddressAsync(account string) FutureGetAccountAddressResult {
+	id := c.NextID()
+	cmd, err := btcjson.NewGetAccountAddressCmd(id, account)
+	if err != nil {
+		return newFutureError(err)
+	}
+
+	return c.sendCmd(cmd)
+}
+
+// GetAccountAddress returns the current Bitcoin address for receiving payments
+// to the specified account.
+func (c *Client) GetAccountAddress(account string) (btcutil.Address, error) {
+	return c.GetAccountAddressAsync(account).Receive()
+}
+
+// FutureGetAccountResult is a future promise to deliver the result of a
+// GetAccountAsync RPC invocation (or an applicable error).
+type FutureGetAccountResult chan *futureResult
+
+// Receive waits for the response promised by the future and returns the account
+// associated with the passed address.
+func (r FutureGetAccountResult) Receive() (string, error) {
+	reply, err := receiveFuture(r)
+	if err != nil {
+		return "", err
+	}
+
+	// Ensure the returned data is the expected type.
+	account, ok := reply.(string)
+	if !ok {
+		return "", fmt.Errorf("unexpected response type for "+
+			"getaccount: %T\n", reply)
+	}
+
+	return account, nil
+}
+
+// GetAccountAsync returns an instance of a type that can be used to get the
+// result of the RPC at some future time by invoking the Receive function on the
+// returned instance.
+//
+// See GetAccount for the blocking version and more details.
+func (c *Client) GetAccountAsync(address btcutil.Address) FutureGetAccountResult {
+	id := c.NextID()
+	addr := address.EncodeAddress()
+	cmd, err := btcjson.NewGetAccountCmd(id, addr)
+	if err != nil {
+		return newFutureError(err)
+	}
+
+	return c.sendCmd(cmd)
+}
+
+// GetAccount returns the account associated with the passed address.
+func (c *Client) GetAccount(address btcutil.Address) (string, error) {
+	return c.GetAccountAsync(address).Receive()
+}
+
+// FutureSetAccountResult is a future promise to deliver the result of a
+// SetAccountAsync RPC invocation (or an applicable error).
+type FutureSetAccountResult chan *futureResult
+
+// Receive waits for the response promised by the future and returns the result
+// of setting the account to be associated with the passed address.
+func (r FutureSetAccountResult) Receive() error {
+	_, err := receiveFuture(r)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// SetAccountAsync returns an instance of a type that can be used to get the
+// result of the RPC at some future time by invoking the Receive function on the
+// returned instance.
+//
+// See SetAccount for the blocking version and more details.
+func (c *Client) SetAccountAsync(address btcutil.Address, account string) FutureSetAccountResult {
+	id := c.NextID()
+	addr := address.EncodeAddress()
+	cmd, err := btcjson.NewSetAccountCmd(id, addr, account)
+	if err != nil {
+		return newFutureError(err)
+	}
+
+	return c.sendCmd(cmd)
+}
+
+// SetAccount sets the account associated with the passed address.
+func (c *Client) SetAccount(address btcutil.Address, account string) error {
+	return c.SetAccountAsync(address, account).Receive()
+}
+
+// FutureGetAddressesByAccountResult is a future promise to deliver the result
+// of a GetAddressesByAccountAsync RPC invocation (or an applicable error).
+type FutureGetAddressesByAccountResult chan *futureResult
+
+// Receive waits for the response promised by the future and returns the list of
+// addresses associated with the passed account.
+func (r FutureGetAddressesByAccountResult) Receive() ([]btcutil.Address, error) {
+	reply, err := receiveFuture(r)
+	if err != nil {
+		return nil, err
+	}
+
+	// Ensure the returned data is the expected type.
+	addrStrings, ok := reply.([]string)
+	if !ok {
+		return nil, fmt.Errorf("unexpected response type for "+
+			"getaddressesbyaccount: %T\n", reply)
+	}
+
+	addrs := make([]btcutil.Address, 0, len(addrStrings))
+	for _, addrStr := range addrStrings {
+		addr, err := btcutil.DecodeAddress(addrStr, btcwire.MainNet)
+		if err != nil {
+			return nil, err
+		}
+		addrs = append(addrs, addr)
+	}
+
+	return addrs, nil
+}
+
+// GetAddressesByAccountAsync returns an instance of a type that can be used to
+// get the result of the RPC at some future time by invoking the Receive
+// function on the returned instance.
+//
+// See GetAddressesByAccount for the blocking version and more details.
+func (c *Client) GetAddressesByAccountAsync(account string) FutureGetAddressesByAccountResult {
+	id := c.NextID()
+	cmd, err := btcjson.NewGetAddressesByAccountCmd(id, account)
+	if err != nil {
+		return newFutureError(err)
+	}
+
+	return c.sendCmd(cmd)
+}
+
+// GetAddressesByAccount returns the list of addresses associated with the
+// passed account.
+func (c *Client) GetAddressesByAccount(account string) ([]btcutil.Address, error) {
+	return c.GetAddressesByAccountAsync(account).Receive()
+}
+
+// FutureValidateAddressResult is a future promise to deliver the result of a
+// ValidateAddressAsync RPC invocation (or an applicable error).
+type FutureValidateAddressResult chan *futureResult
+
+// Receive waits for the response promised by the future and returns information
+// about the given bitcoin address.
+func (r FutureValidateAddressResult) Receive() (*btcjson.ValidateAddressResult, error) {
+	reply, err := receiveFuture(r)
+	if err != nil {
+		return nil, err
+	}
+
+	// Ensure the returned data is the expected type.
+	result, ok := reply.(btcjson.ValidateAddressResult)
+	if !ok {
+		return nil, fmt.Errorf("unexpected response type for "+
+			"validateaddress: %T\n", reply)
+	}
+
+	return &result, nil
+}
+
+// ValidateAddressAsync returns an instance of a type that can be used to get
+// the result of the RPC at some future time by invoking the Receive function on
+// the returned instance.
+//
+// See ValidateAddress for the blocking version and more details.
+func (c *Client) ValidateAddressAsync(address btcutil.Address) FutureValidateAddressResult {
+	id := c.NextID()
+	addr := address.EncodeAddress()
+	cmd, err := btcjson.NewValidateAddressCmd(id, addr)
+	if err != nil {
+		return newFutureError(err)
+	}
+
+	return c.sendCmd(cmd)
+}
+
+// ValidateAddress returns information about the given bitcoin address.
+func (c *Client) ValidateAddress(address btcutil.Address) (*btcjson.ValidateAddressResult, error) {
+	return c.ValidateAddressAsync(address).Receive()
+}
+
+// FutureKeyPoolRefillResult is a future promise to deliver the result of a
+// KeyPoolRefillAsync RPC invocation (or an applicable error).
+type FutureKeyPoolRefillResult chan *futureResult
+
+// Receive waits for the response promised by the future and returns the result
+// of refilling the key pool.
+func (r FutureKeyPoolRefillResult) Receive() error {
+	_, err := receiveFuture(r)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// KeyPoolRefillAsync returns an instance of a type that can be used to get the
+// result of the RPC at some future time by invoking the Receive function on the
+// returned instance.
+//
+// See KeyPoolRefill for the blocking version and more details.
+func (c *Client) KeyPoolRefillAsync() FutureKeyPoolRefillResult {
+	id := c.NextID()
+	cmd, err := btcjson.NewKeyPoolRefillCmd(id)
+	if err != nil {
+		return newFutureError(err)
+	}
+
+	return c.sendCmd(cmd)
+}
+
+// KeyPoolRefill fills the key pool as necessary to reach the default size.
+//
+// See KeyPoolRefillSize to override the size of the key pool.
+func (c *Client) KeyPoolRefill() error {
+	return c.KeyPoolRefillAsync().Receive()
+}
+
+// KeyPoolRefillSizeAsync returns an instance of a type that can be used to get
+// the result of the RPC at some future time by invoking the Receive function on
+// the returned instance.
+//
+// See KeyPoolRefillSize for the blocking version and more details.
+func (c *Client) KeyPoolRefillSizeAsync(newSize uint) FutureKeyPoolRefillResult {
+	id := c.NextID()
+	cmd, err := btcjson.NewKeyPoolRefillCmd(id, newSize)
+	if err != nil {
+		return newFutureError(err)
+	}
+
+	return c.sendCmd(cmd)
+}
+
+// KeyPoolRefillSize fills the key pool as necessary to reach the specified
+// size.
+func (c *Client) KeyPoolRefillSize(newSize uint) error {
+	return c.KeyPoolRefillSizeAsync(newSize).Receive()
+}
+
+// ************************
+// Amount/Balance Functions
+// ************************
+
+// FutureListAccountsResult is a future promise to deliver the result of a
+// ListAccountsAsync or ListAccountsMinConfAsync RPC invocation (or an
+// applicable error).
+type FutureListAccountsResult chan *futureResult
+
+// Receive waits for the response promised by the future and returns returns a
+// map of account names and their associated balances.
+func (r FutureListAccountsResult) Receive() (map[string]btcutil.Amount, error) {
+	reply, err := receiveFuture(r)
+	if err != nil {
+		return nil, err
+	}
+
+	// Ensure the returned data is the expected type.
+	accounts, ok := reply.(map[string]float64)
+	if !ok {
+		return nil, fmt.Errorf("unexpected response type for "+
+			"listaccounts: %T\n", reply)
+	}
+
+	accountsMap := make(map[string]btcutil.Amount)
+	for k, v := range accounts {
+		satoshi, err := btcjson.JSONToAmount(v)
+		if err != nil {
+			return nil, err
+		}
+
+		accountsMap[k] = btcutil.Amount(satoshi)
+	}
+
+	return accountsMap, nil
+}
+
+// ListAccountsAsync returns an instance of a type that can be used to get the
+// result of the RPC at some future time by invoking the Receive function on the
+// returned instance.
+//
+// See ListAccounts for the blocking version and more details.
+func (c *Client) ListAccountsAsync() FutureListAccountsResult {
+	id := c.NextID()
+	cmd, err := btcjson.NewListAccountsCmd(id)
+	if err != nil {
+		return newFutureError(err)
+	}
+
+	return c.sendCmd(cmd)
+}
+
+// ListAccounts returns a map of account names and their associated balances
+// using the default number of minimum confirmations.
+//
+// See ListAccountsMinConf to override the minimum number of confirmations.
+func (c *Client) ListAccounts() (map[string]btcutil.Amount, error) {
+	return c.ListAccountsAsync().Receive()
+}
+
+// ListAccountsMinConfAsync returns an instance of a type that can be used to
+// get the result of the RPC at some future time by invoking the Receive
+// function on the returned instance.
+//
+// See ListAccountsMinConf for the blocking version and more details.
+func (c *Client) ListAccountsMinConfAsync(minConfirms int) FutureListAccountsResult {
+	id := c.NextID()
+	cmd, err := btcjson.NewListAccountsCmd(id, minConfirms)
+	if err != nil {
+		return newFutureError(err)
+	}
+
+	return c.sendCmd(cmd)
+}
+
+// ListAccountsMinConf returns a map of account names and their associated
+// balances using the specified number of minimum confirmations.
+//
+// See ListAccounts to use the default minimum number of confirmations.
+func (c *Client) ListAccountsMinConf(minConfirms int) (map[string]btcutil.Amount, error) {
+	return c.ListAccountsMinConfAsync(minConfirms).Receive()
+}
+
+// FutureGetBalanceResult is a future promise to deliver the result of a
+// GetBalanceAsync or GetBalanceMinConfAsync RPC invocation (or an applicable
+// error).
+type FutureGetBalanceResult chan *futureResult
+
+// Receive waits for the response promised by the future and returns the
+// available balance from the server for the specified account.
+func (r FutureGetBalanceResult) Receive() (btcutil.Amount, error) {
+	reply, err := receiveFuture(r)
+	if err != nil {
+		return 0, err
+	}
+
+	// Ensure the returned data is the expected type.
+	balance, ok := reply.(float64)
+	if !ok {
+		return 0, fmt.Errorf("unexpected response type for "+
+			"getbalance: %T\n", reply)
+	}
+
+	satoshi, err := btcjson.JSONToAmount(balance)
+	if err != nil {
+		return 0, err
+	}
+
+	return btcutil.Amount(satoshi), nil
+}
+
+// GetBalanceAsync returns an instance of a type that can be used to get the
+// result of the RPC at some future time by invoking the Receive function on the
+// returned instance.
+//
+// See GetBalance for the blocking version and more details.
+func (c *Client) GetBalanceAsync(account string) FutureGetBalanceResult {
+	// TODO(davec): Remove this hack once btcwallet is fixed.
+	if account == "*" {
+		account = ""
+	}
+	id := c.NextID()
+	cmd, err := btcjson.NewGetBalanceCmd(id, account)
+	if err != nil {
+		return newFutureError(err)
+	}
+
+	return c.sendCmd(cmd)
+}
+
+// GetBalance returns the available balance from the server for the specified
+// account using the default number of minimum confirmations.  The account may
+// be "*" for all accounts.
+//
+// See GetBalanceMinConf to override the minimum number of confirmations.
+func (c *Client) GetBalance(account string) (btcutil.Amount, error) {
+	return c.GetBalanceAsync(account).Receive()
+}
+
+// GetBalanceMinConfAsync returns an instance of a type that can be used to get
+// the result of the RPC at some future time by invoking the Receive function on
+// the returned instance.
+//
+// See GetBalanceMinConf for the blocking version and more details.
+func (c *Client) GetBalanceMinConfAsync(account string, minConfirms int) FutureGetBalanceResult {
+	// TODO(davec): Remove this hack once btcwallet is fixed.
+	if account == "*" {
+		account = ""
+	}
+	id := c.NextID()
+	cmd, err := btcjson.NewGetBalanceCmd(id, account, minConfirms)
+	if err != nil {
+		return newFutureError(err)
+	}
+
+	return c.sendCmd(cmd)
+}
+
+// GetBalanceMinConf returns the available balance from the server for the
+// specified account using the specified number of minimum confirmations.  The
+// account may be "*" for all accounts.
+//
+// See GetBalance to use the default minimum number of confirmations.
+func (c *Client) GetBalanceMinConf(account string, minConfirms int) (btcutil.Amount, error) {
+	return c.GetBalanceMinConfAsync(account, minConfirms).Receive()
+}
+
+// FutureGetReceivedByAccountResult is a future promise to deliver the result of
+// a GetReceivedByAccountAsync or GetReceivedByAccountMinConfAsync RPC
+// invocation (or an applicable error).
+type FutureGetReceivedByAccountResult chan *futureResult
+
+// Receive waits for the response promised by the future and returns the total
+// amount received with the specified account.
+func (r FutureGetReceivedByAccountResult) Receive() (btcutil.Amount, error) {
+	reply, err := receiveFuture(r)
+	if err != nil {
+		return 0, err
+	}
+
+	// Ensure the returned data is the expected type.
+	balance, ok := reply.(float64)
+	if !ok {
+		return 0, fmt.Errorf("unexpected response type for "+
+			"getreceivedbyaccount: %T\n", reply)
+	}
+
+	satoshi, err := btcjson.JSONToAmount(balance)
+	if err != nil {
+		return 0, err
+	}
+
+	return btcutil.Amount(satoshi), nil
+}
+
+// GetReceivedByAccountAsync returns an instance of a type that can be used to
+// get the result of the RPC at some future time by invoking the Receive
+// function on the returned instance.
+//
+// See GetReceivedByAccount for the blocking version and more details.
+func (c *Client) GetReceivedByAccountAsync(account string) FutureGetReceivedByAccountResult {
+	id := c.NextID()
+	cmd, err := btcjson.NewGetReceivedByAccountCmd(id, account)
+	if err != nil {
+		return newFutureError(err)
+	}
+
+	return c.sendCmd(cmd)
+}
+
+// GetReceivedByAccount returns the total amount received with the specified
+// account with at least the default number of minimum confirmations.
+//
+// See GetReceivedByAccountMinConf to override the minimum number of
+// confirmations.
+func (c *Client) GetReceivedByAccount(account string) (btcutil.Amount, error) {
+	return c.GetReceivedByAccountAsync(account).Receive()
+}
+
+// GetReceivedByAccountMinConfAsync returns an instance of a type that can be
+// used to get the result of the RPC at some future time by invoking the Receive
+// function on the returned instance.
+//
+// See GetReceivedByAccountMinConf for the blocking version and more details.
+func (c *Client) GetReceivedByAccountMinConfAsync(account string, minConfirms int) FutureGetReceivedByAccountResult {
+	id := c.NextID()
+	cmd, err := btcjson.NewGetReceivedByAccountCmd(id, account, minConfirms)
+	if err != nil {
+		return newFutureError(err)
+	}
+
+	return c.sendCmd(cmd)
+}
+
+// GetReceivedByAccountMinConf returns the total amount received with the
+// specified account with at least the specified number of minimum
+// confirmations.
+//
+// See GetReceivedByAccount to use the default minimum number of confirmations.
+func (c *Client) GetReceivedByAccountMinConf(account string, minConfirms int) (btcutil.Amount, error) {
+	return c.GetReceivedByAccountMinConfAsync(account, minConfirms).Receive()
+}
+
+// FutureGetUnconfirmedBalanceResult is a future promise to deliver the result
+// of a GetUnconfirmedBalanceAsync RPC invocation (or an applicable error).
+type FutureGetUnconfirmedBalanceResult chan *futureResult
+
+// Receive waits for the response promised by the future and returns returns the
+// unconfirmed balance from the server for the specified account.
+func (r FutureGetUnconfirmedBalanceResult) Receive() (btcutil.Amount, error) {
+	reply, err := receiveFuture(r)
+	if err != nil {
+		return 0, err
+	}
+
+	// Ensure the returned data is the expected type.
+	balance, ok := reply.(float64)
+	if !ok {
+		return 0, fmt.Errorf("unexpected response type for "+
+			"getunconfirmedbalance: %T\n", reply)
+	}
+
+	satoshi, err := btcjson.JSONToAmount(balance)
+	if err != nil {
+		return 0, err
+	}
+
+	return btcutil.Amount(satoshi), nil
+}
+
+// GetUnconfirmedBalanceAsync returns an instance of a type that can be used to
+// get the result of the RPC at some future time by invoking the Receive
+// function on the returned instance.
+//
+// See GetUnconfirmedBalance for the blocking version and more details.
+func (c *Client) GetUnconfirmedBalanceAsync(account string) FutureGetUnconfirmedBalanceResult {
+	id := c.NextID()
+	cmd, err := btcws.NewGetUnconfirmedBalanceCmd(id, account)
+	if err != nil {
+		return newFutureError(err)
+	}
+
+	return c.sendCmd(cmd)
+}
+
+// GetUnconfirmedBalance returns the unconfirmed balance from the server for
+// the specified account.
+func (c *Client) GetUnconfirmedBalance(account string) (btcutil.Amount, error) {
+	return c.GetUnconfirmedBalanceAsync(account).Receive()
+}
+
+// FutureGetReceivedByAddressResult is a future promise to deliver the result of
+// a GetReceivedByAddressAsync or GetReceivedByAddressMinConfAsync RPC
+// invocation (or an applicable error).
+type FutureGetReceivedByAddressResult chan *futureResult
+
+// Receive waits for the response promised by the future and returns the total
+// amount received by the specified address.
+func (r FutureGetReceivedByAddressResult) Receive() (btcutil.Amount, error) {
+	reply, err := receiveFuture(r)
+	if err != nil {
+		return 0, err
+	}
+
+	// Ensure the returned data is the expected type.
+	balance, ok := reply.(float64)
+	if !ok {
+		return 0, fmt.Errorf("unexpected response type for "+
+			"getreceivedbyaddress: %T\n", reply)
+	}
+
+	satoshi, err := btcjson.JSONToAmount(balance)
+	if err != nil {
+		return 0, err
+	}
+
+	return btcutil.Amount(satoshi), nil
+}
+
+// GetReceivedByAddressAsync returns an instance of a type that can be used to
+// get the result of the RPC at some future time by invoking the Receive
+// function on the returned instance.
+//
+// See GetReceivedByAddress for the blocking version and more details.
+func (c *Client) GetReceivedByAddressAsync(address btcutil.Address) FutureGetReceivedByAddressResult {
+	id := c.NextID()
+	addr := address.EncodeAddress()
+	cmd, err := btcjson.NewGetReceivedByAddressCmd(id, addr)
+	if err != nil {
+		return newFutureError(err)
+	}
+
+	return c.sendCmd(cmd)
+
+}
+
+// GetReceivedByAddress returns the total amount received by the specified
+// address with at least the default number of minimum confirmations.
+//
+// See GetReceivedByAddressMinConf to override the minimum number of
+// confirmations.
+func (c *Client) GetReceivedByAddress(address btcutil.Address) (btcutil.Amount, error) {
+	return c.GetReceivedByAddressAsync(address).Receive()
+}
+
+// GetReceivedByAddressMinConfAsync returns an instance of a type that can be
+// used to get the result of the RPC at some future time by invoking the Receive
+// function on the returned instance.
+//
+// See GetReceivedByAddressMinConf for the blocking version and more details.
+func (c *Client) GetReceivedByAddressMinConfAsync(address btcutil.Address, minConfirms int) FutureGetReceivedByAddressResult {
+	id := c.NextID()
+	addr := address.EncodeAddress()
+	cmd, err := btcjson.NewGetReceivedByAddressCmd(id, addr, minConfirms)
+	if err != nil {
+		return newFutureError(err)
+	}
+
+	return c.sendCmd(cmd)
+}
+
+// GetReceivedByAddressMinConf returns the total amount received by the specified
+// address with at least the specified number of minimum confirmations.
+//
+// See GetReceivedByAddress to use the default minimum number of confirmations.
+func (c *Client) GetReceivedByAddressMinConf(address btcutil.Address, minConfirms int) (btcutil.Amount, error) {
+	return c.GetReceivedByAddressMinConfAsync(address, minConfirms).Receive()
+}
+
+// FutureListReceivedByAccountResult is a future promise to deliver the result
+// of a ListReceivedByAccountAsync, ListReceivedByAccountMinConfAsync, or
+// ListReceivedByAccountIncludeEmptyAsync RPC invocation (or an applicable
+// error).
+type FutureListReceivedByAccountResult chan *futureResult
+
+// Receive waits for the response promised by the future and returns a list of
+// balances by account.
+func (r FutureListReceivedByAccountResult) Receive() ([]btcjson.ListReceivedByAccountResult, error) {
+	reply, err := receiveFuture(r)
+	if err != nil {
+		return nil, err
+	}
+
+	// No results.
+	if reply == nil {
+		return nil, nil
+	}
+
+	// Ensure the returned data is the expected type.
+	result, ok := reply.([]btcjson.ListReceivedByAccountResult)
+	if !ok {
+		return nil, fmt.Errorf("unexpected response type for "+
+			"listreceivedbyaccount: %T\n", reply)
+	}
+
+	return result, nil
+}
+
+// ListReceivedByAccountAsync returns an instance of a type that can be used to
+// get the result of the RPC at some future time by invoking the Receive
+// function on the returned instance.
+//
+// See ListReceivedByAccount for the blocking version and more details.
+func (c *Client) ListReceivedByAccountAsync() FutureListReceivedByAccountResult {
+	id := c.NextID()
+	cmd, err := btcjson.NewListReceivedByAccountCmd(id)
+	if err != nil {
+		return newFutureError(err)
+	}
+
+	return c.sendCmd(cmd)
+}
+
+// ListReceivedByAccount lists balances by account using the default number
+// of minimum confirmations and including accounts that haven't received any
+// payments.
+//
+// See ListReceivedByAccountMinConf to override the minimum number of
+// confirmations and ListReceivedByAccountIncludeEmpty to filter accounts that
+// haven't received any payments from the results.
+func (c *Client) ListReceivedByAccount() ([]btcjson.ListReceivedByAccountResult, error) {
+	return c.ListReceivedByAccountAsync().Receive()
+}
+
+// ListReceivedByAccountMinConfAsync returns an instance of a type that can be
+// used to get the result of the RPC at some future time by invoking the Receive
+// function on the returned instance.
+//
+// See ListReceivedByAccountMinConf for the blocking version and more details.
+func (c *Client) ListReceivedByAccountMinConfAsync(minConfirms int) FutureListReceivedByAccountResult {
+	id := c.NextID()
+	cmd, err := btcjson.NewListReceivedByAccountCmd(id, minConfirms)
+	if err != nil {
+		return newFutureError(err)
+	}
+
+	return c.sendCmd(cmd)
+}
+
+// ListReceivedByAccountMinConf lists balances by account using the specified
+// number of minimum confirmations and including accounts that haven't received
+// any payments.
+//
+// See ListReceivedByAccount to use the default minimum number of confirmations
+// and ListReceivedByAccountIncludeEmpty to also filter accounts that haven't
+// received any payments from the results.
+func (c *Client) ListReceivedByAccountMinConf(minConfirms int) ([]btcjson.ListReceivedByAccountResult, error) {
+	return c.ListReceivedByAccountMinConfAsync(minConfirms).Receive()
+}
+
+// ListReceivedByAccountIncludeEmptyAsync returns an instance of a type that can
+// be used to get the result of the RPC at some future time by invoking the
+// Receive function on the returned instance.
+//
+// See ListReceivedByAccountIncludeEmpt for the blocking version and more details.
+func (c *Client) ListReceivedByAccountIncludeEmptyAsync(minConfirms int, includeEmpty bool) FutureListReceivedByAccountResult {
+	id := c.NextID()
+	cmd, err := btcjson.NewListReceivedByAccountCmd(id, minConfirms, includeEmpty)
+	if err != nil {
+		return newFutureError(err)
+	}
+
+	return c.sendCmd(cmd)
+}
+
+// ListReceivedByAccountIncludeEmpty lists balances by account using the
+// specified number of minimum confirmations and including accounts that
+// haven't received any payments depending on specified flag.
+//
+// See ListReceivedByAccount and ListReceivedByAccountMinConf to use defaults.
+func (c *Client) ListReceivedByAccountIncludeEmpty(minConfirms int, includeEmpty bool) ([]btcjson.ListReceivedByAccountResult, error) {
+	return c.ListReceivedByAccountIncludeEmptyAsync(minConfirms,
+		includeEmpty).Receive()
+}
+
+// ************************
+// Wallet Locking Functions
+// ************************
+
+// FutureWalletLockResult is a future promise to deliver the result of a
+// WalletLockAsync RPC invocation (or an applicable error).
+type FutureWalletLockResult chan *futureResult
+
+// Receive waits for the response promised by the future and returns the result
+// of locking the wallet.
+func (r FutureWalletLockResult) Receive() error {
+	_, err := receiveFuture(r)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// WalletLockAsync returns an instance of a type that can be used to get the
+// result of the RPC at some future time by invoking the Receive function on the
+// returned instance.
+//
+// See WalletLock for the blocking version and more details.
+func (c *Client) WalletLockAsync() FutureWalletLockResult {
+	id := c.NextID()
+	cmd, err := btcjson.NewWalletLockCmd(id)
+	if err != nil {
+		return newFutureError(err)
+	}
+
+	return c.sendCmd(cmd)
+}
+
+// WalletLock locks the wallet by removing the encryption key from memory.
+//
+// After calling this function, the WalletPassphrase function must be used to
+// unlock the wallet prior to calling any other function which requires the
+// wallet to be unlocked.
+func (c *Client) WalletLock() error {
+	return c.WalletLockAsync().Receive()
+}
+
+// WalletPassphrase unlocks the wallet by using the passphrase to derive the
+// decryption key which is then stored in memory for the specified timeout
+// (in seconds).
+func (c *Client) WalletPassphrase(passphrase string, timeoutSecs int64) error {
+	id := c.NextID()
+	cmd, err := btcjson.NewWalletPassphraseCmd(id, passphrase, timeoutSecs)
+	if err != nil {
+		return err
+	}
+
+	_, err = c.sendCmdAndWait(cmd)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// FutureWalletPassphraseChangeResult is a future promise to deliver the result
+// of a WalletPassphraseChangeAsync RPC invocation (or an applicable error).
+type FutureWalletPassphraseChangeResult chan *futureResult
+
+// Receive waits for the response promised by the future and returns the result
+// of unlocking the wallet.
+func (r FutureWalletPassphraseChangeResult) Receive() error {
+	_, err := receiveFuture(r)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// WalletPassphraseChangeAsync returns an instance of a type that can be used to
+// get the result of the RPC at some future time by invoking the Receive
+// function on the returned instance.
+//
+// See WalletPassphraseChange for the blocking version and more details.
+func (c *Client) WalletPassphraseChangeAsync(old, new string) FutureWalletPassphraseChangeResult {
+	id := c.NextID()
+	cmd, err := btcjson.NewWalletPassphraseChangeCmd(id, old, new)
+	if err != nil {
+		return newFutureError(err)
+	}
+
+	return c.sendCmd(cmd)
+}
+
+// WalletPassphraseChange changes the wallet passphrase from the specified old
+// to new passphrase.
+func (c *Client) WalletPassphraseChange(old, new string) error {
+	return c.WalletPassphraseChangeAsync(old, new).Receive()
+}
+
+// *************************
+// Message Signing Functions
+// *************************
+
+// FutureSignMessageResult is a future promise to deliver the result of a
+// SignMessageAsync RPC invocation (or an applicable error).
+type FutureSignMessageResult chan *futureResult
+
+// Receive waits for the response promised by the future and returns the message
+// signed with the private key of the specified address.
+func (r FutureSignMessageResult) Receive() (string, error) {
+	reply, err := receiveFuture(r)
+	if err != nil {
+		return "", err
+	}
+
+	// Ensure the returned data is the expected type.
+	b64, ok := reply.(string)
+	if !ok {
+		return "", fmt.Errorf("unexpected response type for "+
+			"signmessage: %T\n", reply)
+	}
+
+	return b64, nil
+}
+
+// SignMessageAsync returns an instance of a type that can be used to get the
+// result of the RPC at some future time by invoking the Receive function on the
+// returned instance.
+//
+// See SignMessage for the blocking version and more details.
+func (c *Client) SignMessageAsync(address btcutil.Address, message string) FutureSignMessageResult {
+	id := c.NextID()
+	addr := address.EncodeAddress()
+	cmd, err := btcjson.NewSignMessageCmd(id, addr, message)
+	if err != nil {
+		return newFutureError(err)
+	}
+
+	return c.sendCmd(cmd)
+}
+
+// SignMessage signs a message with the private key of the specified address.
+//
+// NOTE: This function requires to the wallet to be unlocked.  See the
+// WalletPassphrase function for more details.
+func (c *Client) SignMessage(address btcutil.Address, message string) (string, error) {
+	return c.SignMessageAsync(address, message).Receive()
+}
+
+// FutureVerifyMessageResult is a future promise to deliver the result of a
+// VerifyMessageAsync RPC invocation (or an applicable error).
+type FutureVerifyMessageResult chan *futureResult
+
+// Receive waits for the response promised by the future and returns whether or
+// not the message was successfully verified.
+func (r FutureVerifyMessageResult) Receive() (bool, error) {
+	reply, err := receiveFuture(r)
+	if err != nil {
+		return false, err
+	}
+
+	// Ensure the returned data is the expected type.
+	verified, ok := reply.(bool)
+	if !ok {
+		return false, fmt.Errorf("unexpected response type for "+
+			"verifymessage: %T\n", reply)
+	}
+
+	return verified, nil
+}
+
+// VerifyMessageAsync returns an instance of a type that can be used to get the
+// result of the RPC at some future time by invoking the Receive function on the
+// returned instance.
+//
+// See VerifyMessage for the blocking version and more details.
+func (c *Client) VerifyMessageAsync(address btcutil.Address, signature, message string) FutureVerifyMessageResult {
+	id := c.NextID()
+	addr := address.EncodeAddress()
+	cmd, err := btcjson.NewVerifyMessageCmd(id, addr, signature, message)
+	if err != nil {
+		return newFutureError(err)
+	}
+
+	return c.sendCmd(cmd)
+}
+
+// VerifyMessage verifies a signed message.
+//
+// NOTE: This function requires to the wallet to be unlocked.  See the
+// WalletPassphrase function for more details.
+func (c *Client) VerifyMessage(address btcutil.Address, signature, message string) (bool, error) {
+	return c.VerifyMessageAsync(address, signature, message).Receive()
+}
+
+// *********************
+// Dump/Import Functions
+// *********************
+
+// FutureDumpPrivKeyResult is a future promise to deliver the result of a
+// DumpPrivKeyAsync RPC invocation (or an applicable error).
+type FutureDumpPrivKeyResult chan *futureResult
+
+// Receive waits for the response promised by the future and returns the private
+// key corresponding to the passed address encoded in the wallet import format
+// (WIF)
+func (r FutureDumpPrivKeyResult) Receive() (string, error) {
+	reply, err := receiveFuture(r)
+	if err != nil {
+		return "", err
+	}
+
+	// Ensure the returned data is the expected type.
+	privKeyWIF, ok := reply.(string)
+	if !ok {
+		return "", fmt.Errorf("unexpected response type for "+
+			"dumpprivkey: %T\n", reply)
+	}
+
+	return privKeyWIF, nil
+}
+
+// DumpPrivKeyAsync returns an instance of a type that can be used to get the
+// result of the RPC at some future time by invoking the Receive function on the
+// returned instance.
+//
+// See DumpPrivKey for the blocking version and more details.
+func (c *Client) DumpPrivKeyAsync(address btcutil.Address) FutureDumpPrivKeyResult {
+	id := c.NextID()
+	addr := address.EncodeAddress()
+	cmd, err := btcjson.NewDumpPrivKeyCmd(id, addr)
+	if err != nil {
+		return newFutureError(err)
+	}
+
+	return c.sendCmd(cmd)
+}
+
+// DumpPrivKey gets the private key corresponding to the passed address encoded
+// in the wallet import format (WIF).
+//
+// NOTE: This function requires to the wallet to be unlocked.  See the
+// WalletPassphrase function for more details.
+func (c *Client) DumpPrivKey(address btcutil.Address) (string, error) {
+	return c.DumpPrivKeyAsync(address).Receive()
+}
+
+// FutureImportPrivKeyResult is a future promise to deliver the result of an
+// ImportPrivKeyAsync RPC invocation (or an applicable error).
+type FutureImportPrivKeyResult chan *futureResult
+
+// Receive waits for the response promised by the future and returns the result
+// of importing the passed private key which must be the wallet import format
+// (WIF).
+func (r FutureImportPrivKeyResult) Receive() error {
+	_, err := receiveFuture(r)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// ImportPrivKeyAsync returns an instance of a type that can be used to get the
+// result of the RPC at some future time by invoking the Receive function on the
+// returned instance.
+//
+// See ImportPrivKey for the blocking version and more details.
+func (c *Client) ImportPrivKeyAsync(privKeyWIF string) FutureImportPrivKeyResult {
+	id := c.NextID()
+	cmd, err := btcjson.NewImportPrivKeyCmd(id, privKeyWIF)
+	if err != nil {
+		return newFutureError(err)
+	}
+
+	return c.sendCmd(cmd)
+}
+
+// ImportPrivKey imports the passed private key which must be the wallet import
+// format (WIF).
+func (c *Client) ImportPrivKey(privKeyWIF string) error {
+	return c.ImportPrivKeyAsync(privKeyWIF).Receive()
+}
+
+// TODO(davec): Implement
+// backupwallet (NYI in btcwallet)
+// encryptwallet (Won't be supported by btcwallet since it's always encrypted)
+// getwalletinfo (NYI in btcwallet or btcjson)
+// listaddressgroupings (NYI in btcwallet)
+// listlockunspent (NYI in btcwallet)
+// listreceivedbyaddress (NYI in btcwallet)
+// listreceivedbyaccount (NYI in btcwallet)
+// lockunspent (NYI in btcwallet)
+// move (NYI in btcwallet)
+
+// DUMP
+// importwallet (NYI in btcwallet)
+// dumpwallet (NYI in btcwallet)
