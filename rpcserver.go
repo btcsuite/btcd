@@ -1118,7 +1118,7 @@ func handleGetInfo(s *rpcServer, cmd btcjson.Cmd) (interface{}, error) {
 
 	ret := &btcjson.InfoResult{
 		Version:         int(1000000*appMajor + 10000*appMinor + 100*appPatch),
-		ProtocolVersion: int(btcwire.ProtocolVersion),
+		ProtocolVersion: int(maxProtocolVersion),
 		Blocks:          int(height),
 		TimeOffset:      0,
 		Connections:     s.server.ConnectedCount(),
