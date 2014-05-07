@@ -537,7 +537,7 @@ func handleAddNode(s *rpcServer, cmd btcjson.Cmd) (interface{}, error) {
 // latest protocol version and returns a hex-encoded string of the result.
 func messageToHex(msg btcwire.Message) (string, error) {
 	var buf bytes.Buffer
-	err := msg.BtcEncode(&buf, btcwire.ProtocolVersion)
+	err := msg.BtcEncode(&buf, maxProtocolVersion)
 	if err != nil {
 		return "", btcjson.Error{
 			Code:    btcjson.ErrInternal.Code,
