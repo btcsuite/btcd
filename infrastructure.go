@@ -650,7 +650,8 @@ func (c *Client) Disconnected() bool {
 }
 
 // Disconnect disconnects the current websocket associated with the client.  The
-// connection will automatically be re-established
+// connection will automatically be re-established unless the client was
+// created with the DisableAutoReconnect flag.
 //
 // This function has no effect when the client is running in HTTP POST mode.
 func (c *Client) Disconnect() {
