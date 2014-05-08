@@ -1630,7 +1630,7 @@ func (c *Client) WalletPassphrase(passphrase string, timeoutSecs int64) error {
 type FutureWalletPassphraseChangeResult chan *futureResult
 
 // Receive waits for the response promised by the future and returns the result
-// of unlocking the wallet.
+// of changing the wallet passphrase.
 func (r FutureWalletPassphraseChangeResult) Receive() error {
 	_, err := receiveFuture(r)
 	if err != nil {
