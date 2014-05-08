@@ -94,7 +94,7 @@ type jsonRequest struct {
 // the returned future will block until the result is available if it's not
 // already.
 type Client struct {
-	id int64 // atomic, so must stay 64-bit aligned
+	id uint64 // atomic, so must stay 64-bit aligned
 
 	// config holds the connection configuration assoiated with this client.
 	config *ConnConfig
@@ -119,7 +119,7 @@ type Client struct {
 
 	// Track command and their response channels by ID.
 	requestLock sync.Mutex
-	requestMap  map[int64]*list.Element
+	requestMap  map[uint64]*list.Element
 	requestList *list.List
 
 	// Notification handlers.
@@ -139,8 +139,8 @@ type Client struct {
 // to call this function, however, if a custom request is being created and used
 // this function should be used to ensure the ID is unique amongst all requests
 // being made.
-func (c *Client) NextID() int64 {
-	return atomic.AddInt64(&c.id, 1)
+func (c *Client) NextID() uint64 {
+	return atomic.AddUint64(&c.id, 1)
 }
 
 // addRequest associates the passed jsonRequest with the passed id.  This allows
@@ -148,7 +148,7 @@ func (c *Client) NextID() int64 {
 // type and sent to the specified channel when it is received.
 //
 // This function is safe for concurrent access.
-func (c *Client) addRequest(id int64, request *jsonRequest) {
+func (c *Client) addRequest(id uint64, request *jsonRequest) {
 	c.requestLock.Lock()
 	defer c.requestLock.Unlock()
 
@@ -162,7 +162,7 @@ func (c *Client) addRequest(id int64, request *jsonRequest) {
 // no association.
 //
 // This function is safe for concurrent access.
-func (c *Client) removeRequest(id int64) *jsonRequest {
+func (c *Client) removeRequest(id uint64) *jsonRequest {
 	c.requestLock.Lock()
 	defer c.requestLock.Unlock()
 
@@ -184,7 +184,7 @@ func (c *Client) removeAllRequests() {
 	c.requestLock.Lock()
 	defer c.requestLock.Unlock()
 
-	c.requestMap = make(map[int64]*list.Element)
+	c.requestMap = make(map[uint64]*list.Element)
 	c.requestList.Init()
 }
 
@@ -235,7 +235,7 @@ func (c *Client) handleMessage(msg string) {
 			*r.Id, *r.Id)
 		return
 	}
-	id := int64(fid)
+	id := uint64(fid)
 	log.Tracef("Received response for id %d (result %v)", id, r.Result)
 	request := c.removeRequest(id)
 
@@ -624,7 +624,7 @@ func (c *Client) sendCmd(cmd btcjson.Cmd) chan *futureResult {
 		return responseChan
 	}
 
-	c.addRequest(cmd.Id().(int64), &jsonRequest{
+	c.addRequest(cmd.Id().(uint64), &jsonRequest{
 		cmd:          cmd,
 		responseChan: responseChan,
 	})
@@ -920,7 +920,7 @@ func New(config *ConnConfig, ntfnHandlers *NotificationHandlers) (*Client, error
 		config:       config,
 		wsConn:       wsConn,
 		httpClient:   httpClient,
-		requestMap:   make(map[int64]*list.Element),
+		requestMap:   make(map[uint64]*list.Element),
 		requestList:  list.New(),
 		ntfnHandlers: ntfnHandlers,
 		sendChan:     make(chan []byte, sendBufferSize),
