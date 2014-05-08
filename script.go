@@ -1616,3 +1616,21 @@ func CalcMultiSigStats(script []byte) (int, int, error) {
 	numPubKeys := asSmallInt(pops[len(pops)-2].opcode)
 	return numPubKeys, numSigs, nil
 }
+
+// PushedData returns an array of byte slices containing any pushed data found
+// in the passed script.  This includes OP_0, but not OP_1 - OP_16.
+func PushedData(script []byte) ([][]byte, error) {
+	pops, err := parseScript(script)
+	if err != nil {
+		return nil, err
+	}
+	var data [][]byte
+	for _, pop := range pops {
+		if pop.data != nil {
+			data = append(data, pop.data)
+		} else if pop.opcode.value == OP_0 {
+			data = append(data, []byte{})
+		}
+	}
+	return data, nil
+}

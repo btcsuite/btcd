@@ -18,6 +18,66 @@ import (
 	"testing"
 )
 
+func TestPushedData(t *testing.T) {
+	var tests = []struct {
+		in    []byte
+		out   [][]byte
+		valid bool
+	}{
+		{
+			[]byte{btcscript.OP_0, btcscript.OP_IF, btcscript.OP_0, btcscript.OP_ELSE, btcscript.OP_2, btcscript.OP_ENDIF},
+			[][]byte{{}, {}},
+			true,
+		},
+		{
+			btcscript.NewScriptBuilder().AddInt64(16777216).AddInt64(10000000).Script(),
+			[][]byte{
+				{0x00, 0x00, 0x00, 0x01}, // 16777216
+				{0x80, 0x96, 0x98, 0x00}, // 10000000
+			},
+			true,
+		},
+		{
+			btcscript.NewScriptBuilder().AddOp(btcscript.OP_DUP).AddOp(btcscript.OP_HASH160).
+				AddData([]byte("17VZNX1SN5NtKa8UQFxwQbFeFc3iqRYhem")).AddOp(btcscript.OP_EQUALVERIFY).
+				AddOp(btcscript.OP_CHECKSIG).Script(),
+			[][]byte{
+				// 17VZNX1SN5NtKa8UQFxwQbFeFc3iqRYhem
+				{
+					0x31, 0x37, 0x56, 0x5a, 0x4e, 0x58, 0x31, 0x53, 0x4e, 0x35,
+					0x4e, 0x74, 0x4b, 0x61, 0x38, 0x55, 0x51, 0x46, 0x78, 0x77,
+					0x51, 0x62, 0x46, 0x65, 0x46, 0x63, 0x33, 0x69, 0x71, 0x52,
+					0x59, 0x68, 0x65, 0x6d,
+				},
+			},
+			true,
+		},
+		{
+			btcscript.NewScriptBuilder().AddOp(btcscript.OP_PUSHDATA4).AddInt64(1000).
+				AddOp(btcscript.OP_EQUAL).Script(),
+			[][]byte{},
+			false,
+		},
+	}
+
+	for x, test := range tests {
+		pushedData, err := btcscript.PushedData(test.in)
+		if test.valid && err != nil {
+			t.Errorf("TestPushedData failed test #%d: %v\n", x, err)
+			continue
+		} else if !test.valid && err == nil {
+			t.Errorf("TestPushedData failed test #%d: test should be invalid\n", x)
+			continue
+		}
+		for x, data := range pushedData {
+			if !bytes.Equal(data, test.out[x]) {
+				t.Errorf("TestPushedData failed test #%d: want: %x got: %x\n",
+					x, test.out[x], data)
+			}
+		}
+	}
+}
+
 func TestStandardPushes(t *testing.T) {
 	for i := 0; i < 1000; i++ {
 		builder := btcscript.NewScriptBuilder()
