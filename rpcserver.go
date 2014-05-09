@@ -1749,12 +1749,14 @@ func handleGetWork(s *rpcServer, cmd btcjson.Cmd) (interface{}, error) {
 
 	// Return an error if there are no peers connected since there is no
 	// way to relay a found block or receive transactions to work on.
-	if s.server.ConnectedCount() == 0 {
+	// However, allow this state when running in regression test mode.
+	if !cfg.RegressionTest && s.server.ConnectedCount() == 0 {
 		return nil, btcjson.ErrClientNotConnected
 	}
 
 	// No point in generating or accepting work before the chain is synced.
-	if !s.server.blockManager.IsCurrent() {
+	_, currentHeight := s.server.blockManager.chainState.Best()
+	if currentHeight != 0 && !s.server.blockManager.IsCurrent() {
 		return nil, btcjson.ErrClientInInitialDownload
 	}
 
