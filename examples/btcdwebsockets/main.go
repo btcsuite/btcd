@@ -5,9 +5,9 @@
 package main
 
 import (
+	"github.com/conformal/btcrpcclient"
 	"github.com/conformal/btcutil"
 	"github.com/conformal/btcwire"
-	"github.com/conformal/btcrpcclient"
 	"io/ioutil"
 	"log"
 	"path/filepath"
@@ -16,6 +16,9 @@ import (
 
 func main() {
 	// Only override the handlers for notifications you care about.
+	// Also note most of these handlers will only be called if you register
+	// for notifications.  See the documentation of the btcrpcclient
+	// NotificationHandlers type for more details about each handler.
 	ntfnHandlers := btcrpcclient.NotificationHandlers{
 		OnBlockConnected: func(hash *btcwire.ShaHash, height int32) {
 			log.Printf("Block connected: %v (%d)", hash, height)
@@ -42,6 +45,12 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
+
+	// Register for block connect and disconnect notifications.
+	if err := client.NotifyBlocks(); err != nil {
+		log.Fatal(err)
+	}
+	log.Println("NotifyBlocks: Registration Complete")
 
 	// Get the current block count.
 	blockCount, err := client.GetBlockCount()
