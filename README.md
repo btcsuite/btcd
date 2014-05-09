@@ -1,6 +1,9 @@
 btcrpcclient
 ============
 
+[![Build Status](https://travis-ci.org/conformal/btcrpcclient.png?branch=master)]
+(https://travis-ci.org/conformal/btcrpcclient)
+
 This package is currently under development.
 
 You really probably don't want to use this yet!
