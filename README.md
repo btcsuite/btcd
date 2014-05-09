@@ -3,6 +3,8 @@ btcrpcclient
 
 [![Build Status](https://travis-ci.org/conformal/btcrpcclient.png?branch=master)]
 (https://travis-ci.org/conformal/btcrpcclient)
+[![GoDoc](https://godoc.org/github.com/conformal/btcrpcclient?status.png)]
+(http://godoc.org/github.com/conformal/btcrpcclient)
 
 This package is currently under development.
 
