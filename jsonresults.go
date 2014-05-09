@@ -295,15 +295,15 @@ type ListSinceBlockResult struct {
 	LastBlock    string                   `json:"lastblock"`
 }
 
-// ListUnSpentResult models the data from the ListUnSpentResult command.
-type ListUnSpentResult struct {
+// ListUnspentResult models a successful response from the listunspent request.
+type ListUnspentResult struct {
 	TxId          string  `json:"txid"`
-	Vout          float64 `json:"vout"`
+	Vout          uint32  `json:"vout"`
 	Address       string  `json:"address"`
 	Account       string  `json:"account"`
 	ScriptPubKey  string  `json:"scriptPubKey"`
 	Amount        float64 `json:"amount"`
-	Confirmations float64 `json:"confirmations"`
+	Confirmations int64   `json:"confirmations"`
 }
 
 // GetAddedNodeInfoResultAddr models the data of the addresses portion of the
@@ -539,7 +539,7 @@ func ReadResultCmd(cmd string, message []byte) (Reply, error) {
 			result.Result = res
 		}
 	case "listunspent":
-		var res []ListUnSpentResult
+		var res []ListUnspentResult
 		err = json.Unmarshal(objmap["result"], &res)
 		if err == nil {
 			result.Result = res
