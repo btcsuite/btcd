@@ -6,7 +6,6 @@ package btcrpcclient
 
 import (
 	"bytes"
-	"code.google.com/p/go.net/websocket"
 	"container/list"
 	"crypto/tls"
 	"crypto/x509"
@@ -16,6 +15,7 @@ import (
 	"fmt"
 	"github.com/conformal/btcjson"
 	"github.com/conformal/go-socks"
+	"github.com/gorilla/websocket"
 	"net"
 	"net/http"
 	"net/url"
@@ -29,6 +29,11 @@ var (
 	// is either unable to authenticate or the specified endpoint is
 	// incorrect.
 	ErrInvalidAuth = errors.New("authentication failure")
+
+	// ErrInvalidEndpoint is an error to describe the condition where the
+	// websocket handshake failed with the specified endpoint.
+	ErrInvalidEndpoint = errors.New("the endpoint either does not support " +
+		"websockets or does not exist")
 
 	// ErrClientDisconnect is an error to describe the condition where the
 	// client has been disconnected from the RPC server.  When the
@@ -193,9 +198,9 @@ func (c *Client) removeAllRequests() {
 // (including pass through for standard RPC commands), sends the appropriate
 // response.  It also detects commands which are marked as long-running and
 // sends them off to the asyncHander for processing.
-func (c *Client) handleMessage(msg string) {
+func (c *Client) handleMessage(msg []byte) {
 	// Attempt to unmarshal the message as a known JSON-RPC command.
-	if cmd, err := btcjson.ParseMarshaledCmd([]byte(msg)); err == nil {
+	if cmd, err := btcjson.ParseMarshaledCmd(msg); err == nil {
 		// Commands that have an ID associated with them are not
 		// notifications.  Since this is a client, it should not
 		// be receiving non-notifications.
@@ -271,8 +276,8 @@ out:
 		default:
 		}
 
-		var msg string
-		if err := websocket.Message.Receive(c.wsConn, &msg); err != nil {
+		_, msg, err := c.wsConn.ReadMessage()
+		if err != nil {
 			// Log the error if it's not due to disconnecting.
 			if _, ok := err.(*net.OpError); !ok {
 				log.Errorf("Websocket receive error from "+
@@ -299,7 +304,7 @@ out:
 		// disconnected closed.
 		select {
 		case msg := <-c.sendChan:
-			err := websocket.Message.Send(c.wsConn, string(msg))
+			err := c.wsConn.WriteMessage(websocket.TextMessage, msg)
 			if err != nil {
 				c.Disconnect()
 				break out
@@ -832,63 +837,62 @@ func newHttpClient(config *ConnConfig) (*http.Client, error) {
 // dial opens a websocket connection using the passed connection configuration
 // details.
 func dial(config *ConnConfig) (*websocket.Conn, error) {
-	// Connect to websocket.
-	url := fmt.Sprintf("wss://%s/%s", config.Host, config.Endpoint)
-	wsConfig, err := websocket.NewConfig(url, "https://localhost/")
-	if err != nil {
-		return nil, err
+	// Setup TLS if not disabled.
+	var tlsConfig *tls.Config
+	var scheme = "ws"
+	if !config.DisableTLS {
+		pool := x509.NewCertPool()
+		pool.AppendCertsFromPEM(config.Certificates)
+		tlsConfig = &tls.Config{
+			RootCAs:    pool,
+			MinVersion: tls.VersionTLS12,
+		}
+		scheme = "wss"
 	}
 
-	pool := x509.NewCertPool()
-	pool.AppendCertsFromPEM(config.Certificates)
-	wsConfig.TlsConfig = &tls.Config{
-		RootCAs:    pool,
-		MinVersion: tls.VersionTLS12,
-	}
+	// Create a websocket dialer that will be used to make the connection.
+	// It is modified by the proxy setting below as needed.
+	dialer := websocket.Dialer{TLSClientConfig: tlsConfig}
 
-	// The wallet requires basic authorization, so use a custom config with
-	// with the Authorization header set.
-	login := config.User + ":" + config.Pass
-	auth := "Basic " + base64.StdEncoding.EncodeToString([]byte(login))
-	wsConfig.Header.Add("Authorization", auth)
-
-	// Attempt to connect to running wallet instance using a proxy if one
-	// is configured.
+	// Setup the proxy if one is configured.
 	if config.Proxy != "" {
 		proxy := &socks.Proxy{
 			Addr:     config.Proxy,
 			Username: config.ProxyUser,
 			Password: config.ProxyPass,
 		}
-		conn, err := proxy.Dial("tcp", config.Host)
-		if err != nil {
-			return nil, err
-		}
-
-		tlsConn := tls.Client(conn, wsConfig.TlsConfig)
-		ws, err := websocket.NewClient(wsConfig, tlsConn)
-		if err != nil {
-			return nil, err
-		}
-
-		return ws, nil
+		dialer.NetDial = proxy.Dial
 	}
 
-	// No proxy was specified, so attempt to connect to running wallet
-	// instance directly.
-	ws, err := websocket.DialConfig(wsConfig)
+	// The RPC server requires basic authorization, so create a custom
+	// request header with the Authorization header set.
+	login := config.User + ":" + config.Pass
+	auth := "Basic " + base64.StdEncoding.EncodeToString([]byte(login))
+	requestHeader := make(http.Header)
+	requestHeader.Add("Authorization", auth)
+
+	// Dial the connection.
+	url := fmt.Sprintf("%s://%s/%s", scheme, config.Host, config.Endpoint)
+	wsConn, resp, err := dialer.Dial(url, requestHeader)
 	if err != nil {
-		// XXX(davec): This is not really accurate, but unfortunately
-		// the current websocket package does not expose the status
-		// code, so it's impossible to tell for sure.
-		if dialError, ok := err.(*websocket.DialError); ok {
-			if dialError.Err == websocket.ErrBadStatus {
+		if err == websocket.ErrBadHandshake {
+			// Detect HTTP authentication error status codes.
+			if resp != nil &&
+				(resp.StatusCode == http.StatusUnauthorized ||
+					resp.StatusCode == http.StatusForbidden) {
+
 				return nil, ErrInvalidAuth
 			}
+
+			// The connection was authenticated, but the websocket
+			// handshake still failed, so the endpoint is invalid
+			// in some way.
+			return nil, ErrInvalidEndpoint
 		}
+
 		return nil, err
 	}
-	return ws, nil
+	return wsConn, nil
 }
 
 // New create a new RPC client based on the provided connection configuration
