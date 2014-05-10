@@ -33,8 +33,8 @@ implement and the API is not stable yet.
 * Supports Websockets (btcd/btcwallet) and HTTP POST mode (bitcoin core)
 * Provides callback and registration functions for btcd/btcwallet notifications
 * Supports btcd extensions
-* Translates  to and from higher-level and easier to use Go types
-* Offers a synchronous (blocking) and asynchrous API
+* Translates to and from higher-level and easier to use Go types
+* Offers a synchronous (blocking) and asynchronous API
 * When running in Websockets mode (the default):
   * Automatic reconnect handling (can be disabled)
   * Outstanding commands are automatically reissued
