@@ -12,6 +12,7 @@ import (
 	"github.com/conformal/btcutil"
 	"github.com/conformal/btcwire"
 	"github.com/conformal/btcws"
+	"sync"
 )
 
 var (
@@ -22,6 +23,46 @@ var (
 	ErrNotificationsNotSupported = errors.New("notifications are not " +
 		"supported when running in HTTP POST mode")
 )
+
+// notificationState is used to track the current state of successfuly
+// registered notification so the state can be automatically re-established on
+// reconnect.
+type notificationState struct {
+	sync.Mutex
+	notifyBlocks       bool
+	notifyNewTx        bool
+	notifyNewTxVerbose bool
+	notifyReceived     map[string]struct{}
+	notifySpent        map[btcws.OutPoint]struct{}
+}
+
+// Copy returns a deep copy of the receiver.
+//
+// This function is safe for concurrent access.
+func (s *notificationState) Copy() *notificationState {
+	s.Lock()
+	defer s.Unlock()
+
+	stateCopy := *s
+	stateCopy.notifyReceived = make(map[string]struct{})
+	for addr := range s.notifyReceived {
+		stateCopy.notifyReceived[addr] = struct{}{}
+	}
+	stateCopy.notifySpent = make(map[btcws.OutPoint]struct{})
+	for op := range s.notifySpent {
+		stateCopy.notifySpent[op] = struct{}{}
+	}
+
+	return &stateCopy
+}
+
+// newNotificationState returns a new notification state ready to be populated.
+func newNotificationState() *notificationState {
+	return &notificationState{
+		notifyReceived: make(map[string]struct{}),
+		notifySpent:    make(map[btcws.OutPoint]struct{}),
+	}
+}
 
 // newNilFutureResult returns a new future result channel that already has the
 // result waiting on the channel with the reply set to nil.  This is useful
@@ -371,6 +412,27 @@ func (r FutureNotifySpentResult) Receive() error {
 	return nil
 }
 
+// notifySpentInternal is the same as notifySpentAsync except it accepts
+// the converted outpoints as a parameter so the client can more efficiently
+// recreate the previous notification state on reconnect.
+func (c *Client) notifySpentInternal(outpoints []btcws.OutPoint) FutureNotifySpentResult {
+	// Not supported in HTTP POST mode.
+	if c.config.HttpPostMode {
+		return newFutureError(ErrNotificationsNotSupported)
+	}
+
+	// Ignore the notification if the client is not interested in
+	// notifications.
+	if c.ntfnHandlers == nil {
+		return newNilFutureResult()
+	}
+
+	id := c.NextID()
+	cmd := btcws.NewNotifySpentCmd(id, outpoints)
+
+	return c.sendCmd(cmd)
+}
+
 // NotifySpentAsync returns an instance of a type that can be used to get the
 // result of the RPC at some future time by invoking the Receive function on
 // the returned instance.
@@ -485,6 +547,28 @@ func (r FutureNotifyReceivedResult) Receive() error {
 	}
 
 	return nil
+}
+
+// notifyReceivedInternal is the same as notifyReceivedAsync except it accepts
+// the converted addresses as a parameter so the client can more efficiently
+// recreate the previous notification state on reconnect.
+func (c *Client) notifyReceivedInternal(addresses []string) FutureNotifyReceivedResult {
+	// Not supported in HTTP POST mode.
+	if c.config.HttpPostMode {
+		return newFutureError(ErrNotificationsNotSupported)
+	}
+
+	// Ignore the notification if the client is not interested in
+	// notifications.
+	if c.ntfnHandlers == nil {
+		return newNilFutureResult()
+	}
+
+	// Convert addresses to strings.
+	id := c.NextID()
+	cmd := btcws.NewNotifyReceivedCmd(id, addresses)
+
+	return c.sendCmd(cmd)
 }
 
 // NotifyReceivedAsync returns an instance of a type that can be used to get the
