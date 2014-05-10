@@ -12,7 +12,7 @@ import (
 func main() {
 	// Connect to local bitcoin core RPC server using HTTP POST mode.
 	connCfg := &btcrpcclient.ConnConfig{
-		Host:         "localhost:18332",
+		Host:         "localhost:8332",
 		User:         "yourrpcuser",
 		Pass:         "yourrpcpass",
 		HttpPostMode: true, // Bitcoin core only supports HTTP POST mode
