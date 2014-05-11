@@ -66,7 +66,7 @@ func main() {
 	time.AfterFunc(time.Second*10, func() {
 		log.Println("Client shutting down...")
 		client.Shutdown()
-		log.Println("Client shutting complete.")
+		log.Println("Client shutdown complete.")
 	})
 
 	// Wait until the client either shuts down gracefully (or the user
