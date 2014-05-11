@@ -20,6 +20,7 @@ import (
 	"github.com/conformal/btcscript"
 	"github.com/conformal/btcutil"
 	"github.com/conformal/btcwire"
+	"github.com/conformal/btcws"
 	"github.com/conformal/fastsha256"
 	"io/ioutil"
 	"math/big"
@@ -81,11 +82,13 @@ var rpcHandlersBeforeInit = map[string]commandHandler{
 	"decoderawtransaction": handleDecodeRawTransaction,
 	"decodescript":         handleDecodeScript,
 	"getaddednodeinfo":     handleGetAddedNodeInfo,
+	"getbestblock":         handleGetBestBlock,
 	"getbestblockhash":     handleGetBestBlockHash,
 	"getblock":             handleGetBlock,
 	"getblockcount":        handleGetBlockCount,
 	"getblockhash":         handleGetBlockHash,
 	"getconnectioncount":   handleGetConnectionCount,
+	"getcurrentnet":        handleGetCurrentNet,
 	"getdifficulty":        handleGetDifficulty,
 	"getgenerate":          handleGetGenerate,
 	"gethashespersec":      handleGetHashesPerSec,
@@ -939,6 +942,23 @@ func handleGetAddedNodeInfo(s *rpcServer, cmd btcjson.Cmd) (interface{}, error) 
 	return results, nil
 }
 
+// handleGetBestBlock implements the getbestblock command.
+func handleGetBestBlock(s *rpcServer, cmd btcjson.Cmd) (interface{}, error) {
+	// All other "get block" commands give either the height, the
+	// hash, or both but require the block SHA.  This gets both for
+	// the best block.
+	sha, height, err := s.server.db.NewestSha()
+	if err != nil {
+		return nil, btcjson.ErrBestBlockHash
+	}
+
+	result := &btcws.GetBestBlockResult{
+		Hash:   sha.String(),
+		Height: int32(height),
+	}
+	return result, nil
+}
+
 // handleGetBestBlockHash implements the getbestblockhash command.
 func handleGetBestBlockHash(s *rpcServer, cmd btcjson.Cmd) (interface{}, error) {
 	sha, _, err := s.server.db.NewestSha()
@@ -1072,6 +1092,11 @@ func handleGetBlockHash(s *rpcServer, cmd btcjson.Cmd) (interface{}, error) {
 // handleGetConnectionCount implements the getconnectioncount command.
 func handleGetConnectionCount(s *rpcServer, cmd btcjson.Cmd) (interface{}, error) {
 	return s.server.ConnectedCount(), nil
+}
+
+// handleGetCurrentNet implements the getcurrentnet command.
+func handleGetCurrentNet(s *rpcServer, cmd btcjson.Cmd) (interface{}, error) {
+	return s.server.btcnet, nil
 }
 
 // handleGetDifficulty implements the getdifficulty command.

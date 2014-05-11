@@ -46,8 +46,6 @@ type wsCommandHandler func(*wsClient, btcjson.Cmd) (interface{}, *btcjson.Error)
 // wsHandlers maps RPC command strings to appropriate websocket handler
 // functions.
 var wsHandlers = map[string]wsCommandHandler{
-	"getbestblock":          handleGetBestBlock,
-	"getcurrentnet":         handleGetCurrentNet,
 	"notifyblocks":          handleNotifyBlocks,
 	"notifynewtransactions": handleNotifyNewTransactions,
 	"notifyreceived":        handleNotifyReceived,
@@ -1378,30 +1376,6 @@ func newWebsocketClient(server *rpcServer, conn *websocket.Conn,
 		sendChan:      make(chan wsResponse, websocketSendBufferSize),
 		quit:          make(chan bool),
 	}
-}
-
-// handleGetBestBlock implements the getbestblock command extension
-// for websocket connections.
-func handleGetBestBlock(wsc *wsClient, icmd btcjson.Cmd) (interface{}, *btcjson.Error) {
-	// All other "get block" commands give either the height, the
-	// hash, or both but require the block SHA.  This gets both for
-	// the best block.
-	sha, height, err := wsc.server.server.db.NewestSha()
-	if err != nil {
-		return nil, &btcjson.ErrBestBlockHash
-	}
-
-	result := &btcws.GetBestBlockResult{
-		Hash:   sha.String(),
-		Height: int32(height),
-	}
-	return result, nil
-}
-
-// handleGetCurrentNet implements the getcurrentnet command extension
-// for websocket connections.
-func handleGetCurrentNet(wsc *wsClient, icmd btcjson.Cmd) (interface{}, *btcjson.Error) {
-	return wsc.server.server.btcnet, nil
 }
 
 // handleNotifyBlocks implements the notifyblocks command extension for
