@@ -137,10 +137,10 @@ func (r FutureGetBestBlockResult) Receive() (*btcwire.ShaHash, int32, error) {
 	}
 
 	// Ensure the returned data is the expected type.
-	result, ok := reply.(btcws.GetBestBlockResult)
+	result, ok := reply.(*btcws.GetBestBlockResult)
 	if !ok {
 		return nil, 0, fmt.Errorf("unexpected response type for "+
-			"listaddresstransactions: %T\n", reply)
+			"getbestblock: %T\n", reply)
 	}
 
 	// Convert hash string.
