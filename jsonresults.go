@@ -66,6 +66,17 @@ type DecodeScriptResult struct {
 	P2sh      string   `json:"p2sh"`
 }
 
+// GetBlockChainInfoResult models the data returned from the getblockchaininfo
+// command.
+type GetBlockChainInfoResult struct {
+	Chain                string  `json:"chain"`
+	Blocks               int32   `json:"blocks"`
+	BestBlockHash        string  `json:"bestblockhash"`
+	Difficulty           float64 `json:"difficulty"`
+	VerificationProgress float64 `json:"verificationprogress"`
+	ChainWork            string  `json:"chainwork"`
+}
+
 // GetPeerInfoResult models the data returned from the getpeerinfo command.
 type GetPeerInfoResult struct {
 	Addr           string `json:"addr"`

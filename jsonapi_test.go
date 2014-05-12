@@ -177,6 +177,8 @@ var cmdtests = []struct {
 	{"getrawchangeaddress", []interface{}{"something", "test"}, false},
 	{"getbestblockhash", []interface{}{}, true},
 	{"getbestblockhash", []interface{}{"something"}, false},
+	{"getblockchaininfo", []interface{}{}, true},
+	{"getblockchaininfo", []interface{}{"something"}, false},
 	{"submitblock", []interface{}{}, false},
 	{"submitblock", []interface{}{"something"}, true},
 	{"submitblock", []interface{}{"something", "something else"}, true},

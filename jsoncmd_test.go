@@ -349,6 +349,16 @@ var jsoncmdtests = []struct {
 	},
 	{
 		name: "basic",
+		cmd:  "getblockchaininfo",
+		f: func() (Cmd, error) {
+			return NewGetBlockChainInfoCmd(testId)
+		},
+		result: &GetBlockChainInfoCmd{
+			id: testId,
+		},
+	},
+	{
+		name: "basic",
 		cmd:  "getblockcount",
 		f: func() (Cmd, error) {
 			return NewGetBlockCountCmd(testId)

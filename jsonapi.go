@@ -91,7 +91,7 @@ func CreateMessageWithId(message string, id interface{}, args ...interface{}) ([
 		"getdifficulty", "getgenerate", "gethashespersec", "getinfo",
 		"getmininginfo", "getpeerinfo", "getrawmempool",
 		"keypoolrefill", "listaddressgroupings", "listlockunspent",
-		"stop", "walletlock", "getbestblockhash":
+		"stop", "walletlock", "getbestblockhash", "getblockchaininfo":
 		if len(args) > 0 {
 			err = fmt.Errorf("Too many arguments for %s", message)
 			return finalMessage, err

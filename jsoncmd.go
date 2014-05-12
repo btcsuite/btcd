@@ -158,6 +158,9 @@ func ParseMarshaledCmd(b []byte) (Cmd, error) {
 	case "getblock":
 		cmd = new(GetBlockCmd)
 
+	case "getblockchaininfo":
+		cmd = new(GetBlockChainInfoCmd)
+
 	case "getblockcount":
 		cmd = new(GetBlockCountCmd)
 
@@ -1920,6 +1923,69 @@ func (cmd *GetBlockCmd) UnmarshalJSON(b []byte) error {
 	}
 
 	newCmd, err := NewGetBlockCmd(r.Id, hash, optArgs...)
+	if err != nil {
+		return err
+	}
+
+	*cmd = *newCmd
+	return nil
+}
+
+// GetBlockChainInfoCmd is a type handling custom marshaling and
+// unmarshaling of getblockchaininfo JSON RPC commands.
+type GetBlockChainInfoCmd struct {
+	id interface{}
+}
+
+// Enforce that GetBlockChainInfoCmd satisifies the Cmd interface.
+var _ Cmd = &GetBlockChainInfoCmd{}
+
+// NewBlockChainInfoCmd creates a new GetBlockChainInfoCmd.
+func NewGetBlockChainInfoCmd(id interface{}) (*GetBlockChainInfoCmd, error) {
+	return &GetBlockChainInfoCmd{
+		id: id,
+	}, nil
+}
+
+// Id satisfies the Cmd interface by returning the id of the command.
+func (cmd *GetBlockChainInfoCmd) Id() interface{} {
+	return cmd.id
+}
+
+// SetId allows one to modify the Id of a Cmd to help in relaying them.
+func (cmd *GetBlockChainInfoCmd) SetId(id interface{}) {
+	cmd.id = id
+}
+
+// Method satisfies the Cmd interface by returning the json method.
+func (cmd *GetBlockChainInfoCmd) Method() string {
+	return "getblockchaininfo"
+}
+
+// MarshalJSON returns the JSON encoding of cmd.  Part of the Cmd interface.
+func (cmd *GetBlockChainInfoCmd) MarshalJSON() ([]byte, error) {
+	// Fill and marshal a RawCmd.
+	raw, err := NewRawCmd(cmd.id, cmd.Method(), []interface{}{})
+	if err != nil {
+		return nil, err
+	}
+	return json.Marshal(raw)
+}
+
+// UnmarshalJSON unmarshals the JSON encoding of cmd into cmd.  Part of
+// the Cmd interface.
+func (cmd *GetBlockChainInfoCmd) UnmarshalJSON(b []byte) error {
+	// Unmashal into a RawCmd
+	var r RawCmd
+	if err := json.Unmarshal(b, &r); err != nil {
+		return err
+	}
+
+	if len(r.Params) > 0 {
+		return ErrWrongNumberOfParams
+	}
+
+	newCmd, err := NewGetBlockChainInfoCmd(r.Id)
 	if err != nil {
 		return err
 	}
