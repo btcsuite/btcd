@@ -158,6 +158,130 @@ func (c *Client) ListTransactionsCountFrom(account string, count, from int) ([]b
 	return c.ListTransactionsCountFromAsync(account, count, from).Receive()
 }
 
+// FutureListUnspentResult is a future promise to deliver the result of a
+// ListUnspentAsync, ListUnspentMinAsync, ListUnspentMinMaxAsync, or
+// ListUnspentMinMaxAddressesAsync RPC invocation (or an applicable error).
+type FutureListUnspentResult chan *futureResult
+
+// Receive waits for the response promised by the future and returns all
+// unspent wallet transaction outputs returned by the RPC call.  If the
+// future wac returnd by a call to ListUnspentMinAsync, ListUnspentMinMaxAsync,
+// or ListUnspentMinMaxAddressesAsync, the range may be limited by the
+// parameters of the RPC invocation.
+func (r FutureListUnspentResult) Receive() ([]btcjson.ListUnspentResult, error) {
+	reply, err := receiveFuture(r)
+	if err != nil {
+		return nil, err
+	}
+
+	// No unspent transaction outputs.
+	if reply == nil {
+		return nil, nil
+	}
+
+	// Ensure the returned data is the expected type.
+	unspent, ok := reply.([]btcjson.ListUnspentResult)
+	if !ok {
+		return nil, fmt.Errorf("unexpected response type for "+
+			"listunspent: %T\n", reply)
+	}
+
+	return unspent, nil
+}
+
+// ListUnspentAsync returns an instance of a type that can be used to get
+// the result of the RPC at some future time by invoking the Receive function
+// on the returned instance.
+//
+// See ListUnspent for the blocking version and more details.
+func (c *Client) ListUnspentAsync() FutureListUnspentResult {
+	id := c.NextID()
+	cmd, err := btcjson.NewListUnspentCmd(id)
+	if err != nil {
+		return newFutureError(err)
+	}
+
+	return c.sendCmd(cmd)
+}
+
+// ListUnspentMinAsync returns an instance of a type that can be used to get
+// the result of the RPC at some future time by invoking the Receive function
+// on the returned instance.
+//
+// See ListUnspentMin for the blocking version and more details.
+func (c *Client) ListUnspentMinAsync(minConf int) FutureListUnspentResult {
+	id := c.NextID()
+	cmd, err := btcjson.NewListUnspentCmd(id, minConf)
+	if err != nil {
+		return newFutureError(err)
+	}
+
+	return c.sendCmd(cmd)
+}
+
+// ListUnspentMinMaxAsync returns an instance of a type that can be used to get
+// the result of the RPC at some future time by invoking the Receive function
+// on the returned instance.
+//
+// See ListUnspentMinMax for the blocking version and more details.
+func (c *Client) ListUnspentMinMaxAsync(minConf, maxConf int) FutureListUnspentResult {
+	id := c.NextID()
+	cmd, err := btcjson.NewListUnspentCmd(id, minConf, maxConf)
+	if err != nil {
+		return newFutureError(err)
+	}
+
+	return c.sendCmd(cmd)
+}
+
+// ListUnspentMinMaxAddressesAsync returns an instance of a type that can be
+// used to get the result of the RPC at some future time by invoking the Receive
+// function on the returned instance.
+//
+// See ListUnspentMinMaxAddresses for the blocking version and more details.
+func (c *Client) ListUnspentMinMaxAddressesAsync(minConf, maxConf int, addrs []btcutil.Address) FutureListUnspentResult {
+	addrStrs := make([]string, 0, len(addrs))
+	for _, a := range addrs {
+		addrStrs = append(addrStrs, a.EncodeAddress())
+	}
+
+	id := c.NextID()
+	cmd, err := btcjson.NewListUnspentCmd(id, minConf, maxConf, addrStrs)
+	if err != nil {
+		return newFutureError(err)
+	}
+
+	return c.sendCmd(cmd)
+}
+
+// ListUnspent returns all unspent transaction outputs known to a wallet, using
+// the default number of minimum and maximum number of confirmations as a
+// filter (1 and 999999, respectively).
+func (c *Client) ListUnspent() ([]btcjson.ListUnspentResult, error) {
+        return c.ListUnspentAsync().Receive()
+}
+
+// ListUnspentMin returns all unspent transaction outputs known to a wallet,
+// using the specified number of minimum conformations and default number of
+// maximum confiramtions (999999) as a filter.
+func (c *Client) ListUnspentMin(minConf int) ([]btcjson.ListUnspentResult, error) {
+        return c.ListUnspentMinAsync(minConf).Receive()
+}
+
+// ListUnspentMinMax returns all unspent transaction outputs known to a wallet,
+// using the specified number of minimum and maximum number of confirmations as
+// a filter.
+func (c *Client) ListUnspentMinMax(minConf, maxConf int) ([]btcjson.ListUnspentResult, error) {
+        return c.ListUnspentMinMaxAsync(minConf, maxConf).Receive()
+}
+
+// ListUnspentMinMaxAddresses returns all unspent transaction outputs that pay
+// to any of specified addresses in a wallet using the specified number of
+// minimum and maximum number of confirmations as a filter.
+func (c *Client) ListUnspentMinMaxAddresses(minConf, maxConf int, addrs []btcutil.Address) ([]btcjson.ListUnspentResult, error) {
+        return c.ListUnspentMinMaxAddressesAsync(minConf, maxConf, addrs).Receive()
+}
+
 // FutureListSinceBlockResult is a future promise to deliver the result of a
 // ListSinceBlockAsync or ListSinceBlockMinConfAsync RPC invocation (or an
 // applicable error).
