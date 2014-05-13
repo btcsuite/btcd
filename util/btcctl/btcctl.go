@@ -61,6 +61,7 @@ var commandHandlers = map[string]*handlerData{
 	"getbalance":            {0, 2, displayGeneric, []conversionHandler{nil, toInt}, makeGetBalance, "[account] [minconf=1]"},
 	"getbestblockhash":      {0, 0, displayGeneric, nil, makeGetBestBlockHash, ""},
 	"getblock":              {1, 2, displayJSONDump, []conversionHandler{nil, toBool, toBool}, makeGetBlock, "<blockhash>"},
+	"getblockchaininfo":     {0, 0, displayJSONDump, nil, makeGetBlockChainInfo, ""},
 	"getblockcount":         {0, 0, displayGeneric, nil, makeGetBlockCount, ""},
 	"getblockhash":          {1, 0, displayGeneric, []conversionHandler{toInt64}, makeGetBlockHash, "<blocknumber>"},
 	"getblocktemplate":      {0, 1, displayJSONDump, nil, makeGetBlockTemplate, "[jsonrequestobject]"},
@@ -340,6 +341,11 @@ func makeGetBlock(args []interface{}) (btcjson.Cmd, error) {
 	}
 
 	return getBlockCmd, nil
+}
+
+// makeGetBlockChainInfo generates the cmd structure for getblockchaininfo commands.
+func makeGetBlockChainInfo(args []interface{}) (btcjson.Cmd, error) {
+	return btcjson.NewGetBlockChainInfoCmd("btcctl")
 }
 
 // makeGetBlockCount generates the cmd structure for getblockcount commands.
