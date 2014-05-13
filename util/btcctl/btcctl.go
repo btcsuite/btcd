@@ -38,7 +38,6 @@ type handlerData struct {
 
 // Errors used in the various handlers.
 var (
-	ErrNoData           = errors.New("No data returned.")
 	ErrNoDisplayHandler = errors.New("No display handler specified.")
 	ErrUsage            = errors.New("btcctl usage") // Real usage is shown.
 )
@@ -792,10 +791,6 @@ func send(cfg *config, msg []byte) (interface{}, error) {
 		return nil, reply.Error
 	}
 
-	if reply.Result == nil {
-		return nil, ErrNoData
-	}
-
 	return reply.Result, nil
 }
 
@@ -869,9 +864,12 @@ func commandHandler(cfg *config, command string, data *handlerData, args []strin
 
 	// Display the results of the JSON-RPC command using the provided
 	// display handler.
-	err = data.displayHandler(reply)
-	if err != nil {
-		return err
+	if reply != nil {
+		err = data.displayHandler(reply)
+		if err != nil {
+			return err
+
+		}
 	}
 
 	return nil
