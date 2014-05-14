@@ -535,6 +535,16 @@ var jsoncmdtests = []struct {
 	},
 	{
 		name: "basic",
+		cmd:  "getnetworkinfo",
+		f: func() (Cmd, error) {
+			return NewGetNetworkInfoCmd(testId)
+		},
+		result: &GetNetworkInfoCmd{
+			id: testId,
+		},
+	},
+	{
+		name: "basic",
 		cmd:  "getnewaddress",
 		f: func() (Cmd, error) {
 			return NewGetNewAddressCmd(testId, "account")

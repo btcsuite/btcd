@@ -77,6 +77,24 @@ type GetBlockChainInfoResult struct {
 	ChainWork            string  `json:"chainwork"`
 }
 
+// LocalAddressesResult models the localaddresses data from the getnetworkinfo command.
+type LocalAddressesResult struct {
+	Address string `json:"address"`
+	Port    uint16 `json:"port"`
+	Score   int    `json:"score"`
+}
+
+// GetNetworkInfoResult models the data returned from the getnetworkinfo command.
+type GetNetworkInfoResult struct {
+	Version         uint32                 `json:"version"`
+	ProtocolVersion uint32                 `json:"protocolversion"`
+	TimeOffset      int64                  `json:"timeoffset"`
+	Connections     int                    `json:"connections"`
+	Proxy           string                 `json:"proxy,omitempty"`
+	RelayFee        float64                `json:"relayfee"`
+	LocalAddresses  []LocalAddressesResult `json:"localaddresses"`
+}
+
 // GetPeerInfoResult models the data returned from the getpeerinfo command.
 type GetPeerInfoResult struct {
 	Addr           string `json:"addr"`
@@ -417,6 +435,12 @@ func ReadResultCmd(cmd string, message []byte) (Reply, error) {
 				result.Result = res
 			}
 		}
+	case "getblockchaininfo":
+		var res *GetBlockChainInfoResult
+		err = json.Unmarshal(objmap["result"], &res)
+		if err == nil {
+			result.Result = res
+		}
 	case "getnettotals":
 		var res *GetNetTotalsResult
 		err = json.Unmarshal(objmap["result"], &res)
@@ -468,6 +492,15 @@ func ReadResultCmd(cmd string, message []byte) (Reply, error) {
 		var res *GetMiningInfoResult
 		err = json.Unmarshal(objmap["result"], &res)
 		if err == nil {
+			result.Result = res
+		}
+	case "getnetworkinfo":
+		var res *GetNetworkInfoResult
+		err = json.Unmarshal(objmap["result"], &res)
+		if err == nil {
+			if res.LocalAddresses == nil {
+				res.LocalAddresses = []LocalAddressesResult{}
+			}
 			result.Result = res
 		}
 	case "getrawmempool":

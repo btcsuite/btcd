@@ -194,6 +194,9 @@ func ParseMarshaledCmd(b []byte) (Cmd, error) {
 	case "getnetworkhashps":
 		cmd = new(GetNetworkHashPSCmd)
 
+	case "getnetworkinfo":
+		cmd = new(GetNetworkInfoCmd)
+
 	case "getnewaddress":
 		cmd = new(GetNewAddressCmd)
 
@@ -2596,6 +2599,69 @@ func (cmd *GetMiningInfoCmd) UnmarshalJSON(b []byte) error {
 	}
 
 	newCmd, err := NewGetMiningInfoCmd(r.Id)
+	if err != nil {
+		return err
+	}
+
+	*cmd = *newCmd
+	return nil
+}
+
+// GetNetworkInfoCmd is a type handling custom marshaling and
+// unmarshaling of getnetworkinfo JSON RPC commands.
+type GetNetworkInfoCmd struct {
+	id interface{}
+}
+
+// Enforce that GetNetworkInfoCmd satisifies the Cmd interface.
+var _ Cmd = &GetNetworkInfoCmd{}
+
+// NewNetworkInfoCmd creates a new GetNetworkInfoCmd.
+func NewGetNetworkInfoCmd(id interface{}) (*GetNetworkInfoCmd, error) {
+	return &GetNetworkInfoCmd{
+		id: id,
+	}, nil
+}
+
+// Id satisfies the Cmd interface by returning the id of the command.
+func (cmd *GetNetworkInfoCmd) Id() interface{} {
+	return cmd.id
+}
+
+// SetId allows one to modify the Id of a Cmd to help in relaying them.
+func (cmd *GetNetworkInfoCmd) SetId(id interface{}) {
+	cmd.id = id
+}
+
+// Method satisfies the Cmd interface by returning the json method.
+func (cmd *GetNetworkInfoCmd) Method() string {
+	return "getnetworkinfo"
+}
+
+// MarshalJSON returns the JSON encoding of cmd.  Part of the Cmd interface.
+func (cmd *GetNetworkInfoCmd) MarshalJSON() ([]byte, error) {
+	// Fill and marshal a RawCmd.
+	raw, err := NewRawCmd(cmd.id, cmd.Method(), []interface{}{})
+	if err != nil {
+		return nil, err
+	}
+	return json.Marshal(raw)
+}
+
+// UnmarshalJSON unmarshals the JSON encoding of cmd into cmd.  Part of
+// the Cmd interface.
+func (cmd *GetNetworkInfoCmd) UnmarshalJSON(b []byte) error {
+	// Unmashal into a RawCmd
+	var r RawCmd
+	if err := json.Unmarshal(b, &r); err != nil {
+		return err
+	}
+
+	if len(r.Params) > 0 {
+		return ErrWrongNumberOfParams
+	}
+
+	newCmd, err := NewGetNetworkInfoCmd(r.Id)
 	if err != nil {
 		return err
 	}
