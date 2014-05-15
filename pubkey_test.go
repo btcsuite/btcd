@@ -219,12 +219,24 @@ var pubKeyTests = []pubKeyTest{
 
 func TestPrivKeys(t *testing.T) {
 	for _, test := range privKeyTests {
-		_, pub := btcec.PrivKeyFromBytes(btcec.S256(), test.key)
+		priv, pub := btcec.PrivKeyFromBytes(btcec.S256(), test.key)
 
 		_, err := btcec.ParsePubKey(
 			pub.SerializeUncompressed(), btcec.S256())
 		if err != nil {
 			t.Errorf("%s privkey: %v", test.name, err)
+			continue
+		}
+
+		hash := []byte{0x0, 0x1, 0x2, 0x3, 0x4, 0x5, 0x6, 0x7, 0x8, 0x9}
+		sig, err := priv.Sign(hash)
+		if err != nil {
+			t.Errorf("%s could not sign: %v", test.name, err)
+			continue
+		}
+
+		if !pub.Verify(hash, sig) {
+			t.Errorf("%s could not verify: %v", test.name, err)
 			continue
 		}
 	}
