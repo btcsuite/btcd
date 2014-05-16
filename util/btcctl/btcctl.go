@@ -99,6 +99,7 @@ var commandHandlers = map[string]*handlerData{
 	"sendmany":               {2, 2, displayGeneric, []conversionHandler{nil, nil, toInt, nil}, makeSendMany, "<account> <{\"address\":amount,...}> [minconf=1] [comment]"},
 	"sendrawtransaction":     {1, 0, displayGeneric, nil, makeSendRawTransaction, "<hextx>"},
 	"sendtoaddress":          {2, 2, displayGeneric, []conversionHandler{nil, toSatoshi, nil, nil}, makeSendToAddress, "<address> <amount> [comment] [comment-to]"},
+	"setgenerate":            {1, 1, displayGeneric, []conversionHandler{toBool, toInt}, makeSetGenerate, "<generate> [genproclimit]"},
 	"settxfee":               {1, 0, displayGeneric, []conversionHandler{toSatoshi}, makeSetTxFee, "<amount>"},
 	"signmessage":            {2, 2, displayGeneric, nil, makeSignMessage, "<address> <message>"},
 	"stop":                   {0, 0, displayGeneric, nil, makeStop, ""},
@@ -694,6 +695,15 @@ func makeSendRawTransaction(args []interface{}) (btcjson.Cmd, error) {
 // makeSendToAddress generates the cmd struture for sendtoaddress commands.
 func makeSendToAddress(args []interface{}) (btcjson.Cmd, error) {
 	return btcjson.NewSendToAddressCmd("btcctl", args[0].(string), args[1].(int64), args[2:]...)
+}
+
+//  makeSetGenerate generates the cmd structure for setgenerate commands.
+func makeSetGenerate(args []interface{}) (btcjson.Cmd, error) {
+	var optargs = make([]int, 0, 1)
+	if len(args) > 1 {
+		optargs = append(optargs, args[1].(int))
+	}
+	return btcjson.NewSetGenerateCmd("btcctl", args[0].(bool), optargs...)
 }
 
 // makeSetTxFee generates the cmd structure for settxfee commands.
