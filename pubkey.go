@@ -11,6 +11,13 @@ import (
 	"math/big"
 )
 
+// These constants define the lengths of serialized public keys.
+const (
+	PubKeyBytesLenCompressed   = 33
+	PubKeyBytesLenUncompressed = 65
+	PubKeyBytesLenHybrid       = 65
+)
+
 func isOdd(a *big.Int) bool {
 	return a.Bit(0) == 1
 }
@@ -63,7 +70,7 @@ func ParsePubKey(pubKeyStr []byte, curve *KoblitzCurve) (key *PublicKey, err err
 	format &= ^byte(0x1)
 
 	switch len(pubKeyStr) {
-	case 65: // normal public key
+	case PubKeyBytesLenUncompressed:
 		if format != pubkeyUncompressed && format != pubkeyHybrid {
 			return nil, fmt.Errorf("invalid magic in pubkey str: "+
 				"%d", pubKeyStr[0])
@@ -75,7 +82,7 @@ func ParsePubKey(pubKeyStr []byte, curve *KoblitzCurve) (key *PublicKey, err err
 		if format == pubkeyHybrid && ybit != isOdd(pubkey.Y) {
 			return nil, fmt.Errorf("ybit doesn't match oddness")
 		}
-	case 33: // compressed public key
+	case PubKeyBytesLenCompressed:
 		// format is 0x2 | solution, <X coordinate>
 		// solution determines which solution of the curve we use.
 		/// y^2 = x^3 + Curve.B
@@ -117,45 +124,41 @@ func (p *PublicKey) ToECDSA() *ecdsa.PublicKey {
 // SerializeUncompressed serializes a public key in a 65-byte uncompressed
 // format.
 func (p *PublicKey) SerializeUncompressed() []byte {
-	b := make([]byte, 65)
-	b[0] = pubkeyUncompressed
-	copy(b[1:33], pad(32, p.X.Bytes()))
-	copy(b[33:], pad(32, p.Y.Bytes()))
-	return b
+	b := make([]byte, 0, PubKeyBytesLenUncompressed)
+	b = append(b, pubkeyUncompressed)
+	b = paddedAppend(32, b, p.X.Bytes())
+	return paddedAppend(32, b, p.Y.Bytes())
 }
 
 // SerializeCompressed serializes a public key in a 33-byte compressed format.
 func (p *PublicKey) SerializeCompressed() []byte {
-	b := make([]byte, 33)
+	b := make([]byte, 0, PubKeyBytesLenCompressed)
 	format := pubkeyCompressed
 	if isOdd(p.Y) {
 		format |= 0x1
 	}
-	b[0] = format
-	copy(b[1:33], pad(32, p.X.Bytes()))
-	return b
+	b = append(b, format)
+	return paddedAppend(32, b, p.X.Bytes())
 }
 
 // SerializeHybrid serializes a public key in a 65-byte hybrid format.
 func (p *PublicKey) SerializeHybrid() []byte {
-	b := make([]byte, 65)
+	b := make([]byte, 0, PubKeyBytesLenHybrid)
 	format := pubkeyHybrid
 	if isOdd(p.Y) {
 		format |= 0x1
 	}
-	b[0] = format
-	copy(b[1:33], pad(32, p.X.Bytes()))
-	copy(b[33:], pad(32, p.Y.Bytes()))
-	return b
+	b = append(b, format)
+	b = paddedAppend(32, b, p.X.Bytes())
+	return paddedAppend(32, b, p.Y.Bytes())
 }
 
-func pad(size int, b []byte) []byte {
-	// Prevent a possible panic if the input exceeds the expected size.
-	if len(b) > size {
-		size = len(b)
+// paddedAppend appends the src byte slice to dst, returning the new slice.
+// If the length of the source is smaller than the passed size, leading zero
+// bytes are appended to the dst slice before appending src.
+func paddedAppend(size uint, dst, src []byte) []byte {
+	for i := 0; i < int(size)-len(src); i++ {
+		dst = append(dst, 0)
 	}
-
-	p := make([]byte, size)
-	copy(p[size-len(b):], b)
-	return p
+	return append(dst, src...)
 }

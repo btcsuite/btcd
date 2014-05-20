@@ -30,11 +30,6 @@ func (f *fieldVal) TstSetRawInts(raw [10]uint32) *fieldVal {
 	return f
 }
 
-// TstPad makes the internal pad function available to the test package.
-func TstPad(size int, b []byte) []byte {
-	return pad(size, b)
-}
-
 // TstFieldJacobianToBigAffine makes the internal fieldJacobianToBigAffine
 // function available to the test package.
 func (curve *KoblitzCurve) TstFieldJacobianToBigAffine(x, y, z *fieldVal) (*big.Int, *big.Int) {
