@@ -54,6 +54,12 @@ func (sig *Signature) Serialize() []byte {
 	return b
 }
 
+// Verify calls ecdsa.Verify to verify the signature of hash using the public
+// key.  It returns true if the signature is valid, false otherwise.
+func (sig *Signature) Verify(hash []byte, pubKey *PublicKey) bool {
+	return ecdsa.Verify(pubKey.ToECDSA(), hash, sig.R, sig.S)
+}
+
 func parseSig(sigStr []byte, curve elliptic.Curve, der bool) (*Signature, error) {
 	// Originally this code used encoding/asn1 in order to parse the
 	// signature, but a number of problems were found with this approach.

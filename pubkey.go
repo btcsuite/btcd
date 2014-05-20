@@ -162,9 +162,3 @@ func paddedAppend(size uint, dst, src []byte) []byte {
 	}
 	return append(dst, src...)
 }
-
-// Verify calls ecdsa.Verify to verify the signature of hash using the public key.
-// Its return value records whether the signature is valid.
-func (p *PublicKey) Verify(hash []byte, sig *Signature) bool {
-	return ecdsa.Verify(p.ToECDSA(), hash, sig.R, sig.S)
-}
