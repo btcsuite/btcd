@@ -47,3 +47,13 @@ func (p *PrivateKey) Sign(hash []byte) (*Signature, error) {
 	}
 	return &Signature{R: r, S: s}, nil
 }
+
+// PrivKeyBytesLen defines the length in bytes of a serialized private key.
+const PrivKeyBytesLen = 32
+
+// Serialize returns the private key number d as a big-endian binary-encoded
+// number, padded to a length of 32 bytes.
+func (p *PrivateKey) Serialize() []byte {
+	b := make([]byte, 0, PrivKeyBytesLen)
+	return paddedAppend(PrivKeyBytesLen, b, p.ToECDSA().D.Bytes())
+}
