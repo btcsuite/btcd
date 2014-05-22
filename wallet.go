@@ -1899,20 +1899,20 @@ type FutureDumpPrivKeyResult chan *futureResult
 // Receive waits for the response promised by the future and returns the private
 // key corresponding to the passed address encoded in the wallet import format
 // (WIF)
-func (r FutureDumpPrivKeyResult) Receive() (string, error) {
+func (r FutureDumpPrivKeyResult) Receive() (*btcutil.WIF, error) {
 	reply, err := receiveFuture(r)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
 	// Ensure the returned data is the expected type.
 	privKeyWIF, ok := reply.(string)
 	if !ok {
-		return "", fmt.Errorf("unexpected response type for "+
+		return nil, fmt.Errorf("unexpected response type for "+
 			"dumpprivkey: %T\n", reply)
 	}
 
-	return privKeyWIF, nil
+	return btcutil.DecodeWIF(privKeyWIF)
 }
 
 // DumpPrivKeyAsync returns an instance of a type that can be used to get the
@@ -1936,7 +1936,7 @@ func (c *Client) DumpPrivKeyAsync(address btcutil.Address) FutureDumpPrivKeyResu
 //
 // NOTE: This function requires to the wallet to be unlocked.  See the
 // WalletPassphrase function for more details.
-func (c *Client) DumpPrivKey(address btcutil.Address) (string, error) {
+func (c *Client) DumpPrivKey(address btcutil.Address) (*btcutil.WIF, error) {
 	return c.DumpPrivKeyAsync(address).Receive()
 }
 
@@ -1961,9 +1961,14 @@ func (r FutureImportPrivKeyResult) Receive() error {
 // returned instance.
 //
 // See ImportPrivKey for the blocking version and more details.
-func (c *Client) ImportPrivKeyAsync(privKeyWIF string) FutureImportPrivKeyResult {
+func (c *Client) ImportPrivKeyAsync(privKeyWIF *btcutil.WIF) FutureImportPrivKeyResult {
+	wif := ""
+	if privKeyWIF != nil {
+		wif = privKeyWIF.String()
+	}
+
 	id := c.NextID()
-	cmd, err := btcjson.NewImportPrivKeyCmd(id, privKeyWIF)
+	cmd, err := btcjson.NewImportPrivKeyCmd(id, wif)
 	if err != nil {
 		return newFutureError(err)
 	}
@@ -1973,7 +1978,7 @@ func (c *Client) ImportPrivKeyAsync(privKeyWIF string) FutureImportPrivKeyResult
 
 // ImportPrivKey imports the passed private key which must be the wallet import
 // format (WIF).
-func (c *Client) ImportPrivKey(privKeyWIF string) error {
+func (c *Client) ImportPrivKey(privKeyWIF *btcutil.WIF) error {
 	return c.ImportPrivKeyAsync(privKeyWIF).Receive()
 }
 
