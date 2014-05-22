@@ -258,28 +258,28 @@ func (c *Client) ListUnspentMinMaxAddressesAsync(minConf, maxConf int, addrs []b
 // the default number of minimum and maximum number of confirmations as a
 // filter (1 and 999999, respectively).
 func (c *Client) ListUnspent() ([]btcjson.ListUnspentResult, error) {
-        return c.ListUnspentAsync().Receive()
+	return c.ListUnspentAsync().Receive()
 }
 
 // ListUnspentMin returns all unspent transaction outputs known to a wallet,
 // using the specified number of minimum conformations and default number of
 // maximum confiramtions (999999) as a filter.
 func (c *Client) ListUnspentMin(minConf int) ([]btcjson.ListUnspentResult, error) {
-        return c.ListUnspentMinAsync(minConf).Receive()
+	return c.ListUnspentMinAsync(minConf).Receive()
 }
 
 // ListUnspentMinMax returns all unspent transaction outputs known to a wallet,
 // using the specified number of minimum and maximum number of confirmations as
 // a filter.
 func (c *Client) ListUnspentMinMax(minConf, maxConf int) ([]btcjson.ListUnspentResult, error) {
-        return c.ListUnspentMinMaxAsync(minConf, maxConf).Receive()
+	return c.ListUnspentMinMaxAsync(minConf, maxConf).Receive()
 }
 
 // ListUnspentMinMaxAddresses returns all unspent transaction outputs that pay
 // to any of specified addresses in a wallet using the specified number of
 // minimum and maximum number of confirmations as a filter.
 func (c *Client) ListUnspentMinMaxAddresses(minConf, maxConf int, addrs []btcutil.Address) ([]btcjson.ListUnspentResult, error) {
-        return c.ListUnspentMinMaxAddressesAsync(minConf, maxConf, addrs).Receive()
+	return c.ListUnspentMinMaxAddressesAsync(minConf, maxConf, addrs).Receive()
 }
 
 // FutureListSinceBlockResult is a future promise to deliver the result of a
