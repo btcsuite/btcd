@@ -95,8 +95,13 @@ func (r FutureGetRawTransactionResult) Receive() (*btcutil.Tx, error) {
 //
 // See GetRawTransaction for the blocking version and more details.
 func (c *Client) GetRawTransactionAsync(txHash *btcwire.ShaHash) FutureGetRawTransactionResult {
+	hash := ""
+	if txHash != nil {
+		hash = txHash.String()
+	}
+
 	id := c.NextID()
-	cmd, err := btcjson.NewGetRawTransactionCmd(id, txHash.String(), 0)
+	cmd, err := btcjson.NewGetRawTransactionCmd(id, hash, 0)
 	if err != nil {
 		return newFutureError(err)
 	}
@@ -141,8 +146,13 @@ func (r FutureGetRawTransactionVerboseResult) Receive() (*btcjson.TxRawResult, e
 //
 // See GetRawTransactionVerbose for the blocking version and more details.
 func (c *Client) GetRawTransactionVerboseAsync(txHash *btcwire.ShaHash) FutureGetRawTransactionVerboseResult {
+	hash := ""
+	if txHash != nil {
+		hash = txHash.String()
+	}
+
 	id := c.NextID()
-	cmd, err := btcjson.NewGetRawTransactionCmd(id, txHash.String(), 1)
+	cmd, err := btcjson.NewGetRawTransactionCmd(id, hash, 1)
 	if err != nil {
 		return newFutureError(err)
 	}
@@ -294,12 +304,15 @@ func (r FutureSendRawTransactionResult) Receive() (*btcwire.ShaHash, error) {
 //
 // See SendRawTransaction for the blocking version and more details.
 func (c *Client) SendRawTransactionAsync(tx *btcwire.MsgTx, allowHighFees bool) FutureSendRawTransactionResult {
-	// Serialize the transaction and convert to hex string.
-	buf := bytes.NewBuffer(make([]byte, 0, tx.SerializeSize()))
-	if err := tx.Serialize(buf); err != nil {
-		return newFutureError(err)
+	txHex := ""
+	if tx != nil {
+		// Serialize the transaction and convert to hex string.
+		buf := bytes.NewBuffer(make([]byte, 0, tx.SerializeSize()))
+		if err := tx.Serialize(buf); err != nil {
+			return newFutureError(err)
+		}
+		txHex = hex.EncodeToString(buf.Bytes())
 	}
-	txHex := hex.EncodeToString(buf.Bytes())
 
 	id := c.NextID()
 	cmd, err := btcjson.NewSendRawTransactionCmd(id, txHex, allowHighFees)
@@ -357,12 +370,15 @@ func (r FutureSignRawTransactionResult) Receive() (*btcwire.MsgTx, bool, error) 
 //
 // See SignRawTransaction for the blocking version and more details.
 func (c *Client) SignRawTransactionAsync(tx *btcwire.MsgTx) FutureSignRawTransactionResult {
-	// Serialize the transaction and convert to hex string.
-	buf := bytes.NewBuffer(make([]byte, 0, tx.SerializeSize()))
-	if err := tx.Serialize(buf); err != nil {
-		return newFutureError(err)
+	txHex := ""
+	if tx != nil {
+		// Serialize the transaction and convert to hex string.
+		buf := bytes.NewBuffer(make([]byte, 0, tx.SerializeSize()))
+		if err := tx.Serialize(buf); err != nil {
+			return newFutureError(err)
+		}
+		txHex = hex.EncodeToString(buf.Bytes())
 	}
-	txHex := hex.EncodeToString(buf.Bytes())
 
 	id := c.NextID()
 	cmd, err := btcjson.NewSignRawTransactionCmd(id, txHex)
@@ -390,12 +406,15 @@ func (c *Client) SignRawTransaction(tx *btcwire.MsgTx) (*btcwire.MsgTx, bool, er
 //
 // See SignRawTransaction2 for the blocking version and more details.
 func (c *Client) SignRawTransaction2Async(tx *btcwire.MsgTx, inputs []btcjson.RawTxInput) FutureSignRawTransactionResult {
-	// Serialize the transaction and convert to hex string.
-	buf := bytes.NewBuffer(make([]byte, 0, tx.SerializeSize()))
-	if err := tx.Serialize(buf); err != nil {
-		return newFutureError(err)
+	txHex := ""
+	if tx != nil {
+		// Serialize the transaction and convert to hex string.
+		buf := bytes.NewBuffer(make([]byte, 0, tx.SerializeSize()))
+		if err := tx.Serialize(buf); err != nil {
+			return newFutureError(err)
+		}
+		txHex = hex.EncodeToString(buf.Bytes())
 	}
-	txHex := hex.EncodeToString(buf.Bytes())
 
 	id := c.NextID()
 	cmd, err := btcjson.NewSignRawTransactionCmd(id, txHex, inputs)
@@ -429,12 +448,15 @@ func (c *Client) SignRawTransaction3Async(tx *btcwire.MsgTx,
 	inputs []btcjson.RawTxInput,
 	privKeysWIF []string) FutureSignRawTransactionResult {
 
-	// Serialize the transaction and convert to hex string.
-	buf := bytes.NewBuffer(make([]byte, 0, tx.SerializeSize()))
-	if err := tx.Serialize(buf); err != nil {
-		return newFutureError(err)
+	txHex := ""
+	if tx != nil {
+		// Serialize the transaction and convert to hex string.
+		buf := bytes.NewBuffer(make([]byte, 0, tx.SerializeSize()))
+		if err := tx.Serialize(buf); err != nil {
+			return newFutureError(err)
+		}
+		txHex = hex.EncodeToString(buf.Bytes())
 	}
-	txHex := hex.EncodeToString(buf.Bytes())
 
 	id := c.NextID()
 	cmd, err := btcjson.NewSignRawTransactionCmd(id, txHex, inputs,
@@ -479,12 +501,15 @@ func (c *Client) SignRawTransaction4Async(tx *btcwire.MsgTx,
 	inputs []btcjson.RawTxInput, privKeysWIF []string,
 	hashType SigHashType) FutureSignRawTransactionResult {
 
-	// Serialize the transaction and convert to hex string.
-	buf := bytes.NewBuffer(make([]byte, 0, tx.SerializeSize()))
-	if err := tx.Serialize(buf); err != nil {
-		return newFutureError(err)
+	txHex := ""
+	if tx != nil {
+		// Serialize the transaction and convert to hex string.
+		buf := bytes.NewBuffer(make([]byte, 0, tx.SerializeSize()))
+		if err := tx.Serialize(buf); err != nil {
+			return newFutureError(err)
+		}
+		txHex = hex.EncodeToString(buf.Bytes())
 	}
-	txHex := hex.EncodeToString(buf.Bytes())
 
 	id := c.NextID()
 	cmd, err := btcjson.NewSignRawTransactionCmd(id, txHex, inputs,

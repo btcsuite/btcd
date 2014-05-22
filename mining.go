@@ -384,13 +384,17 @@ func (r FutureSubmitBlockResult) Receive() error {
 //
 // See SubmitBlock for the blocking version and more details.
 func (c *Client) SubmitBlockAsync(block *btcutil.Block, options *btcjson.SubmitBlockOptions) FutureSubmitBlockResult {
-	id := c.NextID()
-	blockBytes, err := block.Bytes()
-	if err != nil {
-		return newFutureError(err)
+	blockHex := ""
+	if block != nil {
+		blockBytes, err := block.Bytes()
+		if err != nil {
+			return newFutureError(err)
+		}
+
+		blockHex = hex.EncodeToString(blockBytes)
 	}
 
-	blockHex := hex.EncodeToString(blockBytes)
+	id := c.NextID()
 	cmd, err := btcjson.NewSubmitBlockCmd(id, blockHex, options)
 	if err != nil {
 		return newFutureError(err)

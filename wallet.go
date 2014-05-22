@@ -44,8 +44,13 @@ func (r FutureGetTransactionResult) Receive() (*btcjson.GetTransactionResult, er
 //
 // See GetTransaction for the blocking version and more details.
 func (c *Client) GetTransactionAsync(txHash *btcwire.ShaHash) FutureGetTransactionResult {
+	hash := ""
+	if txHash != nil {
+		hash = txHash.String()
+	}
+
 	id := c.NextID()
-	cmd, err := btcjson.NewGetTransactionCmd(id, txHash.String())
+	cmd, err := btcjson.NewGetTransactionCmd(id, hash)
 	if err != nil {
 		return newFutureError(err)
 	}
@@ -316,6 +321,7 @@ func (c *Client) ListSinceBlockAsync(blockHash *btcwire.ShaHash) FutureListSince
 	if blockHash != nil {
 		hash = blockHash.String()
 	}
+
 	id := c.NextID()
 	cmd, err := btcjson.NewListSinceBlockCmd(id, hash)
 	if err != nil {
@@ -344,6 +350,7 @@ func (c *Client) ListSinceBlockMinConfAsync(blockHash *btcwire.ShaHash, minConfi
 	if blockHash != nil {
 		hash = blockHash.String()
 	}
+
 	id := c.NextID()
 	cmd, err := btcjson.NewListSinceBlockCmd(id, hash, minConfirms)
 	if err != nil {

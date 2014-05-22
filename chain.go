@@ -96,8 +96,13 @@ func (r FutureGetBlockResult) Receive() (*btcutil.Block, error) {
 //
 // See GetBlock for the blocking version and more details.
 func (c *Client) GetBlockAsync(blockHash *btcwire.ShaHash) FutureGetBlockResult {
+	hash := ""
+	if blockHash != nil {
+		hash = blockHash.String()
+	}
+
 	id := c.NextID()
-	cmd, err := btcjson.NewGetBlockCmd(id, blockHash.String(), false)
+	cmd, err := btcjson.NewGetBlockCmd(id, hash, false)
 	if err != nil {
 		return newFutureError(err)
 	}
@@ -141,9 +146,13 @@ func (r FutureGetBlockVerboseResult) Receive() (*btcjson.BlockResult, error) {
 //
 // See GetBlockVerbose for the blocking version and more details.
 func (c *Client) GetBlockVerboseAsync(blockHash *btcwire.ShaHash, verboseTx bool) FutureGetBlockVerboseResult {
+	hash := ""
+	if blockHash != nil {
+		hash = blockHash.String()
+	}
+
 	id := c.NextID()
-	cmd, err := btcjson.NewGetBlockCmd(id, blockHash.String(), true,
-		verboseTx)
+	cmd, err := btcjson.NewGetBlockCmd(id, hash, true, verboseTx)
 	if err != nil {
 		return newFutureError(err)
 	}
