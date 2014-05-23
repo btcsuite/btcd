@@ -778,8 +778,9 @@ func (mp *txMemPool) maybeAcceptTransaction(tx *btcutil.Tx, isOrphan *bool, isNe
 	}
 	nextBlockHeight := curHeight + 1
 
-	// Don't allow non-standard transactions on the main network.
-	if activeNetParams.btcnet == btcwire.MainNet {
+	// Don't allow non-standard transactions if the network parameters
+	// forbid their relaying.
+	if !activeNetParams.RelayNonStdTxs {
 		err := checkTransactionStandard(tx, nextBlockHeight)
 		if err != nil {
 			str := fmt.Sprintf("transaction %v is not a standard "+
@@ -844,9 +845,9 @@ func (mp *txMemPool) maybeAcceptTransaction(tx *btcutil.Tx, isOrphan *bool, isNe
 		return err
 	}
 
-	// Don't allow transactions with non-standard inputs on the main
-	// network.
-	if activeNetParams.btcnet == btcwire.MainNet {
+	// Don't allow transactions with non-standard inputs if the network
+	// parameters forbid their relaying.
+	if !activeNetParams.RelayNonStdTxs {
 		err := checkInputsStandard(tx, txStore)
 		if err != nil {
 			str := fmt.Sprintf("transaction %v has a non-standard "+

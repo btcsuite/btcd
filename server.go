@@ -12,6 +12,7 @@ import (
 	"fmt"
 	"github.com/conformal/btcdb"
 	"github.com/conformal/btcjson"
+	"github.com/conformal/btcnet"
 	"github.com/conformal/btcwire"
 	"math"
 	"net"
@@ -1003,9 +1004,9 @@ out:
 }
 
 // newServer returns a new btcd server configured to listen on addr for the
-// bitcoin network type specified in btcnet.  Use start to begin accepting
+// bitcoin network type specified by netParams.  Use start to begin accepting
 // connections from peers.
-func newServer(listenAddrs []string, db btcdb.Db, btcnet btcwire.BitcoinNet) (*server, error) {
+func newServer(listenAddrs []string, db btcdb.Db, netParams *btcnet.Params) (*server, error) {
 	nonce, err := btcwire.RandomUint64()
 	if err != nil {
 		return nil, err
@@ -1128,7 +1129,7 @@ func newServer(listenAddrs []string, db btcdb.Db, btcnet btcwire.BitcoinNet) (*s
 	s := server{
 		nonce:                nonce,
 		listeners:            listeners,
-		btcnet:               btcnet,
+		btcnet:               netParams.Net,
 		addrManager:          amgr,
 		newPeers:             make(chan *peer, cfg.MaxPeers),
 		donePeers:            make(chan *peer, cfg.MaxPeers),

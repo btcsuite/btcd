@@ -215,7 +215,7 @@ func createCoinbaseTx(coinbaseScript []byte, nextBlockHeight int64, addr btcutil
 	})
 	tx.AddTxOut(&btcwire.TxOut{
 		Value: btcchain.CalcBlockSubsidy(nextBlockHeight,
-			activeNetParams.btcnet),
+			activeNetParams.Net),
 		PkScript: pkScript,
 	})
 	return btcutil.NewTx(tx), nil
@@ -787,11 +787,9 @@ func UpdateBlockTime(msgBlock *btcwire.MsgBlock, bManager *blockManager) error {
 	}
 	msgBlock.Header.Timestamp = newTimestamp
 
-	// Recalculate the required difficulty for the test networks since it
-	// can change based on time.
-	if activeNetParams.btcnet == btcwire.TestNet ||
-		activeNetParams.btcnet == btcwire.TestNet3 {
-
+	// If running on a network that requires recalculating the difficulty,
+	// do so now.
+	if activeNetParams.ResetMinDifficulty {
 		difficulty, err := bManager.CalcNextRequiredDifficulty(newTimestamp)
 		if err != nil {
 			return err

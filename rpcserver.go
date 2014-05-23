@@ -588,7 +588,7 @@ func handleCreateRawTransaction(s *rpcServer, cmd btcjson.Cmd) (interface{}, err
 
 		// Decode the provided address.
 		addr, err := btcutil.DecodeAddress(encodedAddr,
-			activeNetParams.btcnet)
+			activeNetParams.Net)
 		if err != nil {
 			return nil, btcjson.Error{
 				Code: btcjson.ErrInvalidAddressOrKey.Code,
@@ -1710,7 +1710,7 @@ func handleGetWorkSubmission(s *rpcServer, hexData string) (interface{}, error) 
 	msgBlock.Header.MerkleRoot = *merkles[len(merkles)-1]
 
 	// Ensure the submitted block hash is less than the target difficulty.
-	err = btcchain.CheckProofOfWork(block, activeNetParams.powLimit)
+	err = btcchain.CheckProofOfWork(block, activeNetParams.PowLimit)
 	if err != nil {
 		// Anything other than a rule violation is an unexpected error,
 		// so return that error as an internal error.
@@ -1998,7 +1998,7 @@ func verifyChain(db btcdb.Db, level, depth int32) error {
 		// Level 1 does basic chain sanity checks.
 		if level > 0 {
 			err := btcchain.CheckBlockSanity(block,
-				activeNetParams.powLimit)
+				activeNetParams.PowLimit)
 			if err != nil {
 				rpcsLog.Errorf("Verify is unable to "+
 					"validate block at sha %v height "+
@@ -2088,7 +2088,7 @@ func getDifficultyRatio(bits uint32) float64 {
 	// converted back to a number.  Note this is not the same as the the
 	// proof of work limit directly because the block difficulty is encoded
 	// in a block with the compact form which loses precision.
-	max := btcchain.CompactToBig(activeNetParams.powLimitBits)
+	max := btcchain.CompactToBig(activeNetParams.PowLimitBits)
 	target := btcchain.CompactToBig(bits)
 
 	difficulty := new(big.Rat).SetFrac(max, target)

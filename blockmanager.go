@@ -1487,14 +1487,14 @@ func loadBlockDB() (btcdb.Db, error) {
 	// Insert the appropriate genesis block for the bitcoin network being
 	// connected to if needed.
 	if height == -1 {
-		genesis := btcutil.NewBlock(activeNetParams.genesisBlock)
+		genesis := btcutil.NewBlock(activeNetParams.GenesisBlock)
 		_, err := db.InsertBlock(genesis)
 		if err != nil {
 			db.Close()
 			return nil, err
 		}
 		btcdLog.Infof("Inserted genesis block %v",
-			activeNetParams.genesisHash)
+			activeNetParams.GenesisHash)
 		height = 0
 	}
 

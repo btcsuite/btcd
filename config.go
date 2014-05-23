@@ -30,7 +30,6 @@ const (
 	defaultLogLevel          = "info"
 	defaultLogDirname        = "logs"
 	defaultLogFilename       = "btcd.log"
-	defaultBtcnet            = btcwire.MainNet
 	defaultMaxPeers          = 125
 	defaultBanDuration       = time.Hour * 24
 	defaultMaxRPCClients     = 10
@@ -49,7 +48,6 @@ var (
 	btcdHomeDir        = btcutil.AppDataDir("btcd", false)
 	defaultConfigFile  = filepath.Join(btcdHomeDir, defaultConfigFilename)
 	defaultDataDir     = filepath.Join(btcdHomeDir, defaultDataDirname)
-	defaultListener    = net.JoinHostPort("", netParams(defaultBtcnet).listenPort)
 	knownDbTypes       = btcdb.SupportedDBs()
 	defaultRPCKeyFile  = filepath.Join(btcdHomeDir, "rpc.key")
 	defaultRPCCertFile = filepath.Join(btcdHomeDir, "rpc.cert")
@@ -389,9 +387,9 @@ func loadConfig() (*config, []string, error) {
 	// Choose the active network params based on the testnet and regression
 	// test net flags.
 	if cfg.TestNet3 {
-		activeNetParams = netParams(btcwire.TestNet3)
+		activeNetParams = &testNet3Params
 	} else if cfg.RegressionTest {
-		activeNetParams = netParams(btcwire.TestNet)
+		activeNetParams = &regressionNetParams
 	}
 
 	// Append the network type to the data directory so it is "namespaced"
@@ -401,12 +399,12 @@ func loadConfig() (*config, []string, error) {
 	// means each individual piece of serialized data does not have to
 	// worry about changing names per network and such.
 	cfg.DataDir = cleanAndExpandPath(cfg.DataDir)
-	cfg.DataDir = filepath.Join(cfg.DataDir, activeNetParams.netName)
+	cfg.DataDir = filepath.Join(cfg.DataDir, netName(activeNetParams))
 
 	// Append the network type to the log directory so it is "namespaced"
 	// per network in the same fashion as the data directory.
 	cfg.LogDir = cleanAndExpandPath(cfg.LogDir)
-	cfg.LogDir = filepath.Join(cfg.LogDir, activeNetParams.netName)
+	cfg.LogDir = filepath.Join(cfg.LogDir, netName(activeNetParams))
 
 	// Special show command to list supported subsystems and exit.
 	if cfg.DebugLevel == "show" {
@@ -526,7 +524,7 @@ func loadConfig() (*config, []string, error) {
 	// Check keys are valid and saved parsed versions.
 	cfg.miningKeys = make([]btcutil.Address, 0, len(cfg.GetWorkKeys))
 	for _, strAddr := range cfg.GetWorkKeys {
-		addr, err := btcutil.DecodeAddress(strAddr, activeNetParams.btcnet)
+		addr, err := btcutil.DecodeAddress(strAddr, activeNetParams.Net)
 		if err != nil {
 			str := "%s: the specified getworkkey '%s' failed to decode: %v"
 			err := fmt.Errorf(str, "loadConfig", strAddr, err)
@@ -534,7 +532,7 @@ func loadConfig() (*config, []string, error) {
 			parser.WriteHelp(os.Stderr)
 			return nil, nil, err
 		}
-		if !addr.IsForNet(activeNetParams.btcnet) {
+		if !addr.IsForNet(activeNetParams.Net) {
 			str := "%s: the specified getworkkey '%s' is on the wrong network"
 			err := fmt.Errorf(str, "loadConfig", strAddr)
 			fmt.Fprintln(os.Stderr, err)
