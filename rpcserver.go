@@ -1589,7 +1589,6 @@ func handleGetWorkRequest(s *rpcServer) (interface{}, error) {
 			Code:    btcjson.ErrInternal.Code,
 			Message: errStr,
 		}
-		return nil, err
 	}
 
 	// Calculate the midstate for the block header.  The midstate here is
