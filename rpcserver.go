@@ -1743,7 +1743,7 @@ func handleGetWorkSubmission(s *rpcServer, hexData string) (interface{}, error) 
 		if _, ok := err.(btcchain.RuleError); !ok {
 			return false, btcjson.Error{
 				Code: btcjson.ErrInternal.Code,
-				Message: fmt.Sprintf("Unexpected error while",
+				Message: fmt.Sprintf("Unexpected error while "+
 					"processing block: %v", err),
 			}
 		}
