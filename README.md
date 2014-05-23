@@ -6,23 +6,26 @@ btcd
 
 btcd is an alternative full node bitcoin implementation written in Go (golang).
 
-This project is currently under active development and is in an Alpha state.
+This project is currently under active development and is in a Beta state.  It
+is extremely stable and has been in production use for over 6 months as of May
+2014, however there are still a couple of major features we want to add before
+we come out of beta.
 
-It currently properly downloads, validates, and serves the block chain using the
-exact rules (including bugs) for block acceptance as the reference
-implementation (bitcoind).  We have taken great care to avoid btcd causing a
-fork to the block chain.  It passes all of the 'official' block acceptance tests
-(https://github.com/TheBlueMatt/test-scripts).
+It properly downloads, validates, and serves the block chain using the exact
+rules (including bugs) for block acceptance as Bitcoin Core.  We have taken
+great care to avoid btcd causing a fork to the block chain.  It passes all of
+the 'official' block acceptance tests
+(https://github.com/TheBlueMatt/test-scripts) as well as all of the JSON test
+data in the Bitcoin Core code.
 
-It also properly relays newly mined blocks, maintains a transaction pool,
-and relays individual transactions that have not yet made it into a block.  It
-ensures all individual transactions admitted to the pool follow the rules
-required into the block chain and also includes the vast majority of the more
-strict checks which filter transactions based on miner requirements ("standard"
-transactions).
+It also relays newly mined blocks, maintains a transaction pool, and relays
+individual transactions that have not yet made it into a block.  It ensures all
+transactions admitted to the pool follow the rules required by the block chain
+and also includes the same checks which filter transactions based on
+miner requirements ("standard" transactions) as Bitcoin Core.
 
-One key difference between btcd and bitcoind is that btcd does *NOT* include
-wallet functionality and this was a very intentional design decision. See the
+One key difference between btcd and Bitcoin Core is that btcd does *NOT* include
+wallet functionality and this was a very intentional design decision.  See the
 blog entry [here](https://blog.conformal.com/btcd-not-your-moms-bitcoin-daemon)
 for more details.  This means you can't actually make or receive payments
 directly with btcd.  That functionality is provided by the
