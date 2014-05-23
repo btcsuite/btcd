@@ -41,6 +41,10 @@ type Params struct {
 	PowLimit               *big.Int
 	PowLimitBits           uint32
 	SubsidyHalvingInterval int32
+	ResetMinDifficulty     bool
+
+	// Mempool parameters
+	RelayNonStdTxs bool
 
 	// Encoding magics
 	PubKeyHashAddrID byte // First byte of a P2PKH address
@@ -59,6 +63,10 @@ var MainNetParams = Params{
 	PowLimit:               mainPowLimit,
 	PowLimitBits:           0x1d00ffff,
 	SubsidyHalvingInterval: 210000,
+	ResetMinDifficulty:     false,
+
+	// Mempool parameters
+	RelayNonStdTxs: false,
 
 	// Encoding magics
 	PubKeyHashAddrID: 0x00,
@@ -79,6 +87,10 @@ var RegressionNetParams = Params{
 	PowLimit:               regressionPowLimit,
 	PowLimitBits:           0x207fffff,
 	SubsidyHalvingInterval: 150,
+	ResetMinDifficulty:     true,
+
+	// Mempool parameters
+	RelayNonStdTxs: true,
 
 	// Encoding magics
 	PubKeyHashAddrID: 0x6f,
@@ -90,7 +102,7 @@ var RegressionNetParams = Params{
 // (version 3).  Not to be confused with the regression test network, this
 // network is sometimes simply called "testnet".
 var TestNet3Params = Params{
-	Name: "testnet",
+	Name: "testnet3",
 	Net:  btcwire.TestNet3,
 
 	// Chain parameters
@@ -99,6 +111,10 @@ var TestNet3Params = Params{
 	PowLimit:               testNet3PowLimit,
 	PowLimitBits:           0x1d00ffff,
 	SubsidyHalvingInterval: 210000,
+	ResetMinDifficulty:     true,
+
+	// Mempool parameters
+	RelayNonStdTxs: true,
 
 	// Encoding magics
 	PubKeyHashAddrID: 0x6f,
