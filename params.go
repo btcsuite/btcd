@@ -228,26 +228,19 @@ var (
 	ErrDuplicateNet = errors.New("duplicate Bitcoin network")
 )
 
-var nets = map[btcwire.BitcoinNet]*Params{
-	btcwire.MainNet:  &MainNetParams,
-	btcwire.TestNet:  &RegressionNetParams,
-	btcwire.TestNet3: &TestNet3Params,
-}
+var (
+	registeredNets = map[btcwire.BitcoinNet]struct{}{}
 
-// ParamsForNet returns the network parameters for a Bitcoin network, or
-// ErrUnknownNet if the network is not a default network (mainnet, regtest,
-// or testnet3) and not registered into the package with Register.
-//
-// This should be considered an unstable API and will be removed when all other
-// Conformal btc* packages (btcwire not included) are updated from using
-// btcwire.BitcoinNet to *Params.
-func ParamsForNet(net btcwire.BitcoinNet) (*Params, error) {
-	params, ok := nets[net]
-	if !ok {
-		return nil, ErrUnknownNet
+	pubKeyHashAddrIDs = map[byte]struct{}{
+		MainNetParams.PubKeyHashAddrID:  struct{}{},
+		TestNet3Params.PubKeyHashAddrID: struct{}{}, // shared with regtest
 	}
-	return params, nil
-}
+
+	scriptHashAddrIDs = map[byte]struct{}{
+		MainNetParams.ScriptHashAddrID:  struct{}{},
+		TestNet3Params.ScriptHashAddrID: struct{}{}, // shared with regtest
+	}
+)
 
 // Register registers the network parameters for a Bitcoin network.  This may
 // error with ErrDuplicateNet if the network is already registered.
@@ -256,16 +249,36 @@ func ParamsForNet(net btcwire.BitcoinNet) (*Params, error) {
 // as early as possible.  Then, library packages may lookup networks or network
 // parameters based on inputs and work regardless of the network being standard
 // or not.
-//
-// This should be considered an unstable API and will be removed when all other
-// Conformal btc* packages (btcwire not included) are updated from using
-// btcwire.BitcoinNet to *Params.
 func Register(params *Params) error {
-	if _, ok := nets[params.Net]; ok {
+	if _, ok := registeredNets[params.Net]; ok {
 		return ErrDuplicateNet
 	}
-	nets[params.Net] = params
+	registeredNets[params.Net] = struct{}{}
+	pubKeyHashAddrIDs[params.ScriptHashAddrID] = struct{}{}
+	scriptHashAddrIDs[params.ScriptHashAddrID] = struct{}{}
 	return nil
+}
+
+// IsPubKeyHashAddrID returns whether the id is an identifier known to prefix a
+// pay-to-pubkey-hash address on any default or registered network.  This is
+// used when decoding an address string into a specific address type.  It is up
+// to the caller to check both this and IsScriptHashAddrID and decide whether an
+// address is a pubkey hash address, script hash address, neither, or
+// undeterminable (if both return true).
+func IsPubKeyHashAddrID(id byte) bool {
+	_, ok := pubKeyHashAddrIDs[id]
+	return ok
+}
+
+// IsScriptHashAddrID returns whether the id is an identifier known to prefix a
+// pay-to-script-hash address on any default or registered network.  This is
+// used when decoding an address string into a specific address type.  It is up
+// to the caller to check both this and IsPubKeyHashAddrID and decide whether an
+// address is a pubkey hash address, script hash address, neither, or
+// undeterminable (if both return true).
+func IsScriptHashAddrID(id byte) bool {
+	_, ok := scriptHashAddrIDs[id]
+	return ok
 }
 
 // newShaHashFromStr converts the passed big-endian hex string into a
