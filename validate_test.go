@@ -6,6 +6,7 @@ package btcchain_test
 
 import (
 	"github.com/conformal/btcchain"
+	"github.com/conformal/btcnet"
 	"github.com/conformal/btcutil"
 	"github.com/conformal/btcwire"
 	"math"
@@ -39,7 +40,7 @@ func TestCheckConnectBlock(t *testing.T) {
 }
 
 func TestCheckBlockSanity(t *testing.T) {
-	powLimit := btcchain.ChainParams(btcwire.MainNet).PowLimit
+	powLimit := btcnet.MainNetParams.PowLimit
 	block := btcutil.NewBlock(&Block100000)
 	err := btcchain.CheckBlockSanity(block, powLimit)
 	if err != nil {

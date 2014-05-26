@@ -8,6 +8,7 @@ import (
 	"encoding/binary"
 	"fmt"
 	"github.com/conformal/btcdb"
+	"github.com/conformal/btcnet"
 	"github.com/conformal/btcscript"
 	"github.com/conformal/btcutil"
 	"github.com/conformal/btcwire"
@@ -165,10 +166,13 @@ func isBIP0030Node(node *blockNode) bool {
 //
 // At the target block generation rate for the main network, this is
 // approximately every 4 years.
-func CalcBlockSubsidy(height int64, btcnet btcwire.BitcoinNet) int64 {
+func CalcBlockSubsidy(height int64, netParams *btcnet.Params) int64 {
+	if netParams.SubsidyHalvingInterval == 0 {
+		return baseSubsidy
+	}
+
 	// Equivalent to: baseSubsidy / 2^(height/subsidyHalvingInterval)
-	return baseSubsidy >>
-		uint(height/ChainParams(btcnet).SubsidyHalvingInterval)
+	return baseSubsidy >> uint(height/int64(netParams.SubsidyHalvingInterval))
 }
 
 // CheckTransactionSanity performs some preliminary checks on a transaction to
@@ -728,7 +732,7 @@ func (b *BlockChain) checkConnectBlock(node *blockNode, block *btcutil.Block) er
 
 	// The coinbase for the Genesis block is not spendable, so just return
 	// now.
-	if node.hash.IsEqual(b.chainParams().GenesisHash) && b.bestChain == nil {
+	if node.hash.IsEqual(b.netParams.GenesisHash) && b.bestChain == nil {
 		return nil
 	}
 
@@ -836,7 +840,8 @@ func (b *BlockChain) checkConnectBlock(node *blockNode, block *btcutil.Block) er
 	for _, txOut := range transactions[0].MsgTx().TxOut {
 		totalSatoshiOut += txOut.Value
 	}
-	expectedSatoshiOut := CalcBlockSubsidy(node.height, b.btcnet) + totalFees
+	expectedSatoshiOut := CalcBlockSubsidy(node.height, b.netParams) +
+		totalFees
 	if totalSatoshiOut > expectedSatoshiOut {
 		str := fmt.Sprintf("coinbase transaction for block pays %v "+
 			"which is more than expected value of %v",

@@ -10,6 +10,7 @@ import (
 	"github.com/conformal/btcdb"
 	_ "github.com/conformal/btcdb/ldb"
 	_ "github.com/conformal/btcdb/memdb"
+	"github.com/conformal/btcnet"
 	"github.com/conformal/btcutil"
 	"github.com/conformal/btcwire"
 	"os"
@@ -110,6 +111,6 @@ func chainSetup(dbName string) (*btcchain.BlockChain, func(), error) {
 		return nil, nil, err
 	}
 
-	chain := btcchain.New(db, btcwire.MainNet, nil)
+	chain := btcchain.New(db, btcnet.MainNetParams, nil)
 	return chain, teardown, nil
 }

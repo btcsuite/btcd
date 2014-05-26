@@ -6,6 +6,7 @@ package btcchain
 
 import (
 	"fmt"
+	"github.com/conformal/btcnet"
 	"github.com/conformal/btcscript"
 	"github.com/conformal/btcutil"
 	"github.com/conformal/btcwire"
@@ -14,64 +15,6 @@ import (
 // CheckpointConfirmations is the number of blocks before the end of the current
 // best block chain that a good checkpoint candidate must be.
 const CheckpointConfirmations = 2016
-
-// Checkpoint identifies a known good point in the block chain.  Using
-// checkpoints allows a few optimizations for old blocks during initial download
-// and also prevents forks from old blocks.
-//
-// Each checkpoint is selected by the core developers based upon several
-// factors.  See the documentation for IsCheckpointCandidate for details
-// on the selection criteria.
-//
-// As alluded to above, this package provides an IsCheckpointCandidate function
-// which programatically identifies a block as a checkpoint candidate.  The idea
-// is that candidates are reviewed by a developer to make the final decision and
-// then manually added to the list of checkpoints.
-type Checkpoint struct {
-	Height int64
-	Hash   *btcwire.ShaHash
-}
-
-// checkpointData groups checkpoints and other pertinent checkpoint data into
-// a single type.
-type checkpointData struct {
-	// Checkpoints ordered from oldest to newest.
-	checkpoints []Checkpoint
-
-	// A map that will be automatically generated with the heights from
-	// the checkpoints as keys.
-	checkpointsByHeight map[int64]*Checkpoint
-}
-
-// checkpointDataMainNet contains checkpoint data for the main network.
-var checkpointDataMainNet = checkpointData{
-	checkpoints: []Checkpoint{
-		{11111, newShaHashFromStr("0000000069e244f73d78e8fd29ba2fd2ed618bd6fa2ee92559f542fdb26e7c1d")},
-		{33333, newShaHashFromStr("000000002dd5588a74784eaa7ab0507a18ad16a236e7b1ce69f00d7ddfb5d0a6")},
-		{74000, newShaHashFromStr("0000000000573993a3c9e41ce34471c079dcf5f52a0e824a81e7f953b8661a20")},
-		{105000, newShaHashFromStr("00000000000291ce28027faea320c8d2b054b2e0fe44a773f3eefb151d6bdc97")},
-		{134444, newShaHashFromStr("00000000000005b12ffd4cd315cd34ffd4a594f430ac814c91184a0d42d2b0fe")},
-		{168000, newShaHashFromStr("000000000000099e61ea72015e79632f216fe6cb33d7899acb35b75c8303b763")},
-		{193000, newShaHashFromStr("000000000000059f452a5f7340de6682a977387c17010ff6e6c3bd83ca8b1317")},
-		{210000, newShaHashFromStr("000000000000048b95347e83192f69cf0366076336c639f9b7228e9ba171342e")},
-		{216116, newShaHashFromStr("00000000000001b4f4b433e81ee46494af945cf96014816a4e2370f11b23df4e")},
-		{225430, newShaHashFromStr("00000000000001c108384350f74090433e7fcf79a606b8e797f065b130575932")},
-		{250000, newShaHashFromStr("000000000000003887df1f29024b06fc2200b55f8af8f35453d7be294df2d214")},
-		{267300, newShaHashFromStr("000000000000000a83fbd660e918f218bf37edd92b748ad940483c7c116179ac")},
-		{279000, newShaHashFromStr("0000000000000001ae8c72a0b0c301f67e3afca10e819efa9041e458e9bd7e40")},
-		{300255, newShaHashFromStr("0000000000000000162804527c6e9b9f0563a280525f9d08c12041def0a0f3b2")},
-	},
-	checkpointsByHeight: nil, // Automatically generated in init.
-}
-
-// checkpointDataTestNet3 contains checkpoint data for the test network (version
-// 3).
-var checkpointDataTestNet3 = checkpointData{
-	checkpoints: []Checkpoint{
-		{546, newShaHashFromStr("000000002a936ca763904c3c35fce2f3556c559c0214345d31b1bcebf76acb70")},
-	},
-	checkpointsByHeight: nil, // Automatically generated in init.
-}
 
 // newShaHashFromStr converts the passed big-endian hex string into a
 // btcwire.ShaHash.  It only differs from the one available in btcwire in that
@@ -89,38 +32,26 @@ func (b *BlockChain) DisableCheckpoints(disable bool) {
 	b.noCheckpoints = disable
 }
 
-// checkpointData returns the appropriate checkpoint data set depending on the
-// network configured for the block chain.
-func (b *BlockChain) checkpointData() *checkpointData {
-	switch b.btcnet {
-	case btcwire.TestNet3:
-		return &checkpointDataTestNet3
-	case btcwire.MainNet:
-		return &checkpointDataMainNet
-	}
-	return nil
-}
-
 // Checkpoints returns a slice of checkpoints (regardless of whether they are
 // already known).  When checkpoints are disabled or there are no checkpoints
 // for the active network, it will return nil.
-func (b *BlockChain) Checkpoints() []Checkpoint {
-	if b.noCheckpoints || b.checkpointData() == nil {
+func (b *BlockChain) Checkpoints() []btcnet.Checkpoint {
+	if b.noCheckpoints || len(b.netParams.Checkpoints) == 0 {
 		return nil
 	}
 
-	return b.checkpointData().checkpoints
+	return b.netParams.Checkpoints
 }
 
 // LatestCheckpoint returns the most recent checkpoint (regardless of whether it
 // is already known).  When checkpoints are disabled or there are no checkpoints
 // for the active network, it will return nil.
-func (b *BlockChain) LatestCheckpoint() *Checkpoint {
-	if b.noCheckpoints || b.checkpointData() == nil {
+func (b *BlockChain) LatestCheckpoint() *btcnet.Checkpoint {
+	if b.noCheckpoints || len(b.netParams.Checkpoints) == 0 {
 		return nil
 	}
 
-	checkpoints := b.checkpointData().checkpoints
+	checkpoints := b.netParams.Checkpoints
 	return &checkpoints[len(checkpoints)-1]
 }
 
@@ -128,12 +59,12 @@ func (b *BlockChain) LatestCheckpoint() *Checkpoint {
 // match the hard-coded checkpoint data.  It also returns true if there is no
 // checkpoint data for the passed block height.
 func (b *BlockChain) verifyCheckpoint(height int64, hash *btcwire.ShaHash) bool {
-	if b.noCheckpoints || b.checkpointData() == nil {
+	if b.noCheckpoints || len(b.netParams.Checkpoints) == 0 {
 		return true
 	}
 
 	// Nothing to check if there is no checkpoint data for the block height.
-	checkpoint, exists := b.checkpointData().checkpointsByHeight[height]
+	checkpoint, exists := b.checkpointsByHeight[height]
 	if !exists {
 		return true
 	}
@@ -152,12 +83,12 @@ func (b *BlockChain) verifyCheckpoint(height int64, hash *btcwire.ShaHash) bool 
 // associated block.  It returns nil if a checkpoint can't be found (this should
 // really only happen for blocks before the first checkpoint).
 func (b *BlockChain) findPreviousCheckpoint() (*btcutil.Block, error) {
-	if b.noCheckpoints || b.checkpointData() == nil {
+	if b.noCheckpoints || len(b.netParams.Checkpoints) == 0 {
 		return nil, nil
 	}
 
 	// No checkpoints.
-	checkpoints := b.checkpointData().checkpoints
+	checkpoints := b.netParams.Checkpoints
 	numCheckpoints := len(checkpoints)
 	if numCheckpoints == 0 {
 		return nil, nil
@@ -275,6 +206,9 @@ func isNonstandardTransaction(tx *btcutil.Tx) bool {
 //    (due to the median time allowance this is not always the case)
 //  - The block must not contain any strange transaction such as those with
 //    nonstandard scripts
+//
+// The intent is that candidates are reviewed by a developer to make the final
+// decision and then manually added to the list of checkpoints for a network.
 func (b *BlockChain) IsCheckpointCandidate(block *btcutil.Block) (bool, error) {
 	// Checkpoints must be enabled.
 	if b.noCheckpoints {
@@ -338,21 +272,4 @@ func (b *BlockChain) IsCheckpointCandidate(block *btcutil.Block) (bool, error) {
 	}
 
 	return true, nil
-}
-
-// init is called on package load.
-func init() {
-	// Generate the checkpoint by height maps from the checkpoint data
-	// when the package loads.
-	checkpointInitializeList := []*checkpointData{
-		&checkpointDataMainNet,
-		&checkpointDataTestNet3,
-	}
-	for _, data := range checkpointInitializeList {
-		data.checkpointsByHeight = make(map[int64]*Checkpoint)
-		for i := range data.checkpoints {
-			checkpoint := &data.checkpoints[i]
-			data.checkpointsByHeight[checkpoint.Height] = checkpoint
-		}
-	}
 }

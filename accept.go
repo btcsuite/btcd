@@ -7,7 +7,6 @@ package btcchain
 import (
 	"fmt"
 	"github.com/conformal/btcutil"
-	"github.com/conformal/btcwire"
 )
 
 // maybeAcceptBlock potentially accepts a block into the memory block chain.
@@ -109,21 +108,12 @@ func (b *BlockChain) maybeAcceptBlock(block *btcutil.Block, fastAdd bool) error 
 
 	if !fastAdd {
 		// Reject version 1 blocks once a majority of the network has
-		// upgraded.
-		// Rules:
-		//  95% (950 / 1000) for main network
-		//  75% (75 / 100) for the test network
-		// This is part of BIP_0034.
+		// upgraded.  This is part of BIP0034.
 		if blockHeader.Version == 1 {
-			minRequired := uint64(950)
-			numToCheck := uint64(1000)
-			if b.btcnet == btcwire.TestNet3 || b.btcnet ==
-				btcwire.TestNet {
-				minRequired = 75
-				numToCheck = 100
-			}
-			if b.isMajorityVersion(2, prevNode, minRequired,
-				numToCheck) {
+			if b.isMajorityVersion(2, prevNode,
+				b.netParams.BlockV1RejectNumRequired,
+				b.netParams.BlockV1RejectNumToCheck) {
+
 				str := "new blocks with version %d are no longer valid"
 				str = fmt.Sprintf(str, blockHeader.Version)
 				return RuleError(str)
@@ -132,21 +122,13 @@ func (b *BlockChain) maybeAcceptBlock(block *btcutil.Block, fastAdd bool) error 
 
 		// Ensure coinbase starts with serialized block heights for
 		// blocks whose version is the serializedHeightVersion or
-		// newer once a majority of the network has upgraded.
-		// Rules:
-		//  75% (750 / 1000) for main network
-		//  51% (51 / 100) for the test network
-		// This is part of BIP_0034.
+		// newer once a majority of the network has upgraded.  This is
+		// part of BIP0034.
 		if blockHeader.Version >= serializedHeightVersion {
-			minRequired := uint64(750)
-			numToCheck := uint64(1000)
-			if b.btcnet == btcwire.TestNet3 || b.btcnet ==
-				btcwire.TestNet {
-				minRequired = 51
-				numToCheck = 100
-			}
 			if b.isMajorityVersion(serializedHeightVersion,
-				prevNode, minRequired, numToCheck) {
+				prevNode,
+				b.netParams.CoinbaseBlockHeightNumRequired,
+				b.netParams.CoinbaseBlockHeightNumToCheck) {
 
 				expectedHeight := int64(0)
 				if prevNode != nil {

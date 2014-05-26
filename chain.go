@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/conformal/btcdb"
+	"github.com/conformal/btcnet"
 	"github.com/conformal/btcutil"
 	"github.com/conformal/btcwire"
 	"math/big"
@@ -140,22 +141,23 @@ func removeChildNode(children []*blockNode, node *blockNode) []*blockNode {
 // follow all rules, orphan handling, checkpoint handling, and best chain
 // selection with reorganization.
 type BlockChain struct {
-	db              btcdb.Db
-	btcnet          btcwire.BitcoinNet
-	notifications   NotificationCallback
-	root            *blockNode
-	bestChain       *blockNode
-	index           map[btcwire.ShaHash]*blockNode
-	depNodes        map[btcwire.ShaHash][]*blockNode
-	orphans         map[btcwire.ShaHash]*orphanBlock
-	prevOrphans     map[btcwire.ShaHash][]*orphanBlock
-	oldestOrphan    *orphanBlock
-	orphanLock      sync.RWMutex
-	blockCache      map[btcwire.ShaHash]*btcutil.Block
-	noVerify        bool
-	noCheckpoints   bool
-	nextCheckpoint  *Checkpoint
-	checkpointBlock *btcutil.Block
+	db                  btcdb.Db
+	netParams           *btcnet.Params
+	checkpointsByHeight map[int64]*btcnet.Checkpoint
+	notifications       NotificationCallback
+	root                *blockNode
+	bestChain           *blockNode
+	index               map[btcwire.ShaHash]*blockNode
+	depNodes            map[btcwire.ShaHash][]*blockNode
+	orphans             map[btcwire.ShaHash]*orphanBlock
+	prevOrphans         map[btcwire.ShaHash][]*orphanBlock
+	oldestOrphan        *orphanBlock
+	orphanLock          sync.RWMutex
+	blockCache          map[btcwire.ShaHash]*btcutil.Block
+	noVerify            bool
+	noCheckpoints       bool
+	nextCheckpoint      *btcnet.Checkpoint
+	checkpointBlock     *btcutil.Block
 }
 
 // DisableVerify provides a mechanism to disable transaction script validation
@@ -500,7 +502,7 @@ func (b *BlockChain) getPrevNodeFromNode(node *blockNode) (*blockNode, error) {
 	}
 
 	// Genesis block.
-	if node.hash.IsEqual(b.chainParams().GenesisHash) {
+	if node.hash.IsEqual(b.netParams.GenesisHash) {
 		return nil, nil
 	}
 
@@ -633,7 +635,7 @@ func (b *BlockChain) isMajorityVersion(minVer uint32, startNode *blockNode, numR
 func (b *BlockChain) calcPastMedianTime(startNode *blockNode) (time.Time, error) {
 	// Genesis block.
 	if startNode == nil {
-		return b.chainParams().GenesisBlock.Header.Timestamp, nil
+		return b.netParams.GenesisBlock.Header.Timestamp, nil
 	}
 
 	// Create a slice of the previous few block timestamps used to calculate
@@ -1015,18 +1017,29 @@ func (b *BlockChain) IsCurrent() bool {
 // Notification and NotificationType for details on the types and contents of
 // notifications.  The provided callback can be nil if the caller is not
 // interested in receiving notifications.
-func New(db btcdb.Db, btcnet btcwire.BitcoinNet, c NotificationCallback) *BlockChain {
+func New(db btcdb.Db, params *btcnet.Params, c NotificationCallback) *BlockChain {
+	// Generate a checkpoint by height map from the provided checkpoints.
+	var checkpointsByHeight map[int64]*btcnet.Checkpoint
+	if len(params.Checkpoints) > 0 {
+		checkpointsByHeight = make(map[int64]*btcnet.Checkpoint)
+		for i := range params.Checkpoints {
+			checkpoint := &params.Checkpoints[i]
+			checkpointsByHeight[checkpoint.Height] = checkpoint
+		}
+	}
+
 	b := BlockChain{
-		db:            db,
-		btcnet:        btcnet,
-		notifications: c,
-		root:          nil,
-		bestChain:     nil,
-		index:         make(map[btcwire.ShaHash]*blockNode),
-		depNodes:      make(map[btcwire.ShaHash][]*blockNode),
-		orphans:       make(map[btcwire.ShaHash]*orphanBlock),
-		prevOrphans:   make(map[btcwire.ShaHash][]*orphanBlock),
-		blockCache:    make(map[btcwire.ShaHash]*btcutil.Block),
+		db:                  db,
+		netParams:           params,
+		checkpointsByHeight: checkpointsByHeight,
+		notifications:       c,
+		root:                nil,
+		bestChain:           nil,
+		index:               make(map[btcwire.ShaHash]*blockNode),
+		depNodes:            make(map[btcwire.ShaHash][]*blockNode),
+		orphans:             make(map[btcwire.ShaHash]*orphanBlock),
+		prevOrphans:         make(map[btcwire.ShaHash][]*orphanBlock),
+		blockCache:          make(map[btcwire.ShaHash]*btcutil.Block),
 	}
 	return &b
 }
