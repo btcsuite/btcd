@@ -111,6 +111,6 @@ func chainSetup(dbName string) (*btcchain.BlockChain, func(), error) {
 		return nil, nil, err
 	}
 
-	chain := btcchain.New(db, btcnet.MainNetParams, nil)
+	chain := btcchain.New(db, &btcnet.MainNetParams, nil)
 	return chain, teardown, nil
 }
