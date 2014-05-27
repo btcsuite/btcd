@@ -1891,9 +1891,14 @@ func opcodeCheckMultiSig(op *parsedOpcode, s *Script) error {
 	}
 
 	// bug in bitcoind mean we pop one more stack value than should be used.
-	_, err = s.dstack.PopByteArray()
+	dummy, err := s.dstack.PopByteArray()
 	if err != nil {
 		return err
+	}
+
+	if s.strictMultiSig && len(dummy) != 0 {
+		return fmt.Errorf("multisig dummy argument is not zero length: %d",
+			len(dummy))
 	}
 
 	if len(signatures) == 0 {

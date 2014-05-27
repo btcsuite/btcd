@@ -207,6 +207,7 @@ type Script struct {
 	numOps          int
 	bip16           bool     // treat execution as pay-to-script-hash
 	der             bool     // enforce DER encoding
+	strictMultiSig  bool     // verify multisig stack item is zero length
 	savedFirstStack [][]byte // stack from first script for bip16 scripts
 }
 
@@ -508,6 +509,10 @@ const (
 	// recognized by creator of the transaction.  Performing a canonical
 	// check enforces script signatures use a unique DER format.
 	ScriptCanonicalSignatures
+
+	// ScriptStrictMultiSig defines whether to verify the stack item
+	// used by CHECKMULTISIG is zero length.
+	ScriptStrictMultiSig
 )
 
 // NewScript returns a new script engine for the provided tx and input idx with
@@ -549,6 +554,9 @@ func NewScript(scriptSig []byte, scriptPubKey []byte, txidx int, tx *btcwire.Msg
 	}
 	if flags&ScriptCanonicalSignatures == ScriptCanonicalSignatures {
 		m.der = true
+	}
+	if flags&ScriptStrictMultiSig == ScriptStrictMultiSig {
+		m.strictMultiSig = true
 	}
 
 	m.tx = *tx
