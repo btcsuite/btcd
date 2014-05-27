@@ -3913,7 +3913,7 @@ func TestBitcoindTxValidTests(t *testing.T) {
 
 	// for ma is eaitehr a ["this is a comment "]
 	// or [[[previous hash, previous index, previous scripbPubKey]...,]
-	//	serializedTransaction, enforceP2SH]
+	//	serializedTransaction, verifyFlags]
 testloop:
 	for i, test := range tests {
 		inputs, ok := test[0].([]interface{})
@@ -3945,15 +3945,21 @@ testloop:
 			continue
 		}
 
-		enforceP2SH, ok := test[2].(bool)
+		verifyFlags, ok := test[2].(string)
 		if !ok {
-			t.Errorf("bad test (arg 3 not bool) %d: %v", i, test)
+			t.Errorf("bad test (arg 3 not string) %d: %v", i, test)
 			continue
 		}
 
 		var flags ScriptFlags
-		if enforceP2SH {
-			flags |= ScriptBip16
+		vFlags := strings.Split(verifyFlags, ",")
+		for _, flag := range vFlags {
+			switch flag {
+			case "P2SH":
+				flags |= ScriptBip16
+			case "NULLDUMMY":
+				flags |= ScriptStrictMultiSig
+			}
 		}
 
 		prevOuts := make(map[btcwire.OutPoint][]byte)
@@ -4053,7 +4059,7 @@ func TestBitcoindTxInvalidTests(t *testing.T) {
 
 	// for ma is eaitehr a ["this is a comment "]
 	// or [[[previous hash, previous index, previous scripbPubKey]...,]
-	//	serializedTransaction, enforceP2SH]
+	//	serializedTransaction, verifyFlags]
 testloop:
 	for i, test := range tests {
 		inputs, ok := test[0].([]interface{})
@@ -4085,15 +4091,21 @@ testloop:
 			continue
 		}
 
-		enforceP2SH, ok := test[2].(bool)
+		verifyFlags, ok := test[2].(string)
 		if !ok {
-			t.Errorf("bad test (arg 3 not bool) %d: %v", i, test)
+			t.Errorf("bad test (arg 3 not string) %d: %v", i, test)
 			continue
 		}
 
 		var flags ScriptFlags
-		if enforceP2SH {
-			flags |= ScriptBip16
+		vFlags := strings.Split(verifyFlags, ",")
+		for _, flag := range vFlags {
+			switch flag {
+			case "P2SH":
+				flags |= ScriptBip16
+			case "NULLDUMMY":
+				flags |= ScriptStrictMultiSig
+			}
 		}
 
 		prevOuts := make(map[btcwire.OutPoint][]byte)
