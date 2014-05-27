@@ -485,7 +485,7 @@ func (m *wsNotificationManager) notifyForNewTx(clients map[chan bool]*wsClient, 
 	for _, wsc := range clients {
 		if wsc.verboseTxUpdates {
 			if verboseNtfn == nil {
-				net := m.server.server.btcnet
+				net := m.server.server.netParams
 				rawTx, err := createTxRawResult(net, txShaStr,
 					mtx, nil, 0, nil)
 				if err != nil {
@@ -620,7 +620,7 @@ func (m *wsNotificationManager) notifyForTxOuts(ops map[btcwire.OutPoint]map[cha
 	wscNotified := make(map[chan bool]bool)
 	for i, txOut := range tx.MsgTx().TxOut {
 		_, txAddrs, _, err := btcscript.ExtractPkScriptAddrs(
-			txOut.PkScript, m.server.server.btcnet)
+			txOut.PkScript, m.server.server.netParams)
 		if err != nil {
 			continue
 		}
@@ -1433,7 +1433,7 @@ func handleNotifyReceived(wsc *wsClient, icmd btcjson.Cmd) (interface{}, *btcjso
 	}
 
 	for _, addrStr := range cmd.Addresses {
-		addr, err := btcutil.DecodeAddress(addrStr, activeNetParams.Net)
+		addr, err := btcutil.DecodeAddress(addrStr, activeNetParams.Params)
 		if err != nil {
 			e := btcjson.Error{
 				Code:    btcjson.ErrInvalidAddressOrKey.Code,
@@ -1501,7 +1501,7 @@ func rescanBlock(wsc *wsClient, lookups *rescanKeys, blk *btcutil.Block) {
 
 		for txOutIdx, txout := range tx.MsgTx().TxOut {
 			_, addrs, _, _ := btcscript.ExtractPkScriptAddrs(
-				txout.PkScript, wsc.server.server.btcnet)
+				txout.PkScript, wsc.server.server.netParams)
 
 			for _, addr := range addrs {
 				switch a := addr.(type) {
@@ -1630,7 +1630,7 @@ func handleRescan(wsc *wsClient, icmd btcjson.Cmd) (interface{}, *btcjson.Error)
 	var compressedPubkey [33]byte
 	var uncompressedPubkey [65]byte
 	for _, addrStr := range cmd.Addresses {
-		addr, err := btcutil.DecodeAddress(addrStr, activeNetParams.Net)
+		addr, err := btcutil.DecodeAddress(addrStr, activeNetParams.Params)
 		if err != nil {
 			jsonErr := btcjson.Error{
 				Code:    btcjson.ErrInvalidAddressOrKey.Code,

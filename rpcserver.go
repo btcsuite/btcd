@@ -17,6 +17,7 @@ import (
 	"github.com/conformal/btcchain"
 	"github.com/conformal/btcdb"
 	"github.com/conformal/btcjson"
+	"github.com/conformal/btcnet"
 	"github.com/conformal/btcscript"
 	"github.com/conformal/btcutil"
 	"github.com/conformal/btcwire"
@@ -588,7 +589,7 @@ func handleCreateRawTransaction(s *rpcServer, cmd btcjson.Cmd) (interface{}, err
 
 		// Decode the provided address.
 		addr, err := btcutil.DecodeAddress(encodedAddr,
-			activeNetParams.Net)
+			activeNetParams.Params)
 		if err != nil {
 			return nil, btcjson.Error{
 				Code: btcjson.ErrInvalidAddressOrKey.Code,
@@ -606,7 +607,7 @@ func handleCreateRawTransaction(s *rpcServer, cmd btcjson.Cmd) (interface{}, err
 		default:
 			return nil, btcjson.ErrInvalidAddressOrKey
 		}
-		if !addr.IsForNet(s.server.btcnet) {
+		if !addr.IsForNet(s.server.netParams) {
 			return nil, btcjson.Error{
 				Code: btcjson.ErrInvalidAddressOrKey.Code,
 				Message: fmt.Sprintf("%s: %q",
@@ -688,7 +689,7 @@ func createVinList(mtx *btcwire.MsgTx) ([]btcjson.Vin, error) {
 
 // createVoutList returns a slice of JSON objects for the outputs of the passed
 // transaction.
-func createVoutList(mtx *btcwire.MsgTx, net btcwire.BitcoinNet) ([]btcjson.Vout, error) {
+func createVoutList(mtx *btcwire.MsgTx, net *btcnet.Params) ([]btcjson.Vout, error) {
 	voutList := make([]btcjson.Vout, len(mtx.TxOut))
 	for i, v := range mtx.TxOut {
 		voutList[i].N = i
@@ -726,7 +727,10 @@ func createVoutList(mtx *btcwire.MsgTx, net btcwire.BitcoinNet) ([]btcjson.Vout,
 
 // createTxRawResult converts the passed transaction and associated parameters
 // to a raw transaction JSON object.
-func createTxRawResult(net btcwire.BitcoinNet, txSha string, mtx *btcwire.MsgTx, blk *btcutil.Block, maxidx int64, blksha *btcwire.ShaHash) (*btcjson.TxRawResult, error) {
+func createTxRawResult(net *btcnet.Params, txSha string, mtx *btcwire.MsgTx,
+	blk *btcutil.Block, maxidx int64,
+	blksha *btcwire.ShaHash) (*btcjson.TxRawResult, error) {
+
 	mtxHex, err := messageToHex(mtx)
 	if err != nil {
 		return nil, err
@@ -795,7 +799,7 @@ func handleDecodeRawTransaction(s *rpcServer, cmd btcjson.Cmd) (interface{}, err
 	if err != nil {
 		return nil, err
 	}
-	vout, err := createVoutList(&mtx, s.server.btcnet)
+	vout, err := createVoutList(&mtx, s.server.netParams)
 	if err != nil {
 		return nil, err
 	}
@@ -832,7 +836,7 @@ func handleDecodeScript(s *rpcServer, cmd btcjson.Cmd) (interface{}, error) {
 	// Get information about the script.
 	// Ignore the error here since an error means the script couldn't parse
 	// and there is no additinal information about it anyways.
-	net := s.server.btcnet
+	net := s.server.netParams
 	scriptClass, addrs, reqSigs, _ := btcscript.ExtractPkScriptAddrs(script, net)
 	addresses := make([]string, len(addrs))
 	for i, addr := range addrs {
@@ -1040,8 +1044,8 @@ func handleGetBlock(s *rpcServer, cmd btcjson.Cmd) (interface{}, error) {
 			txSha := tx.Sha().String()
 			mtx := tx.MsgTx()
 
-			rawTxn, err := createTxRawResult(s.server.btcnet, txSha,
-				mtx, blk, maxidx, sha)
+			rawTxn, err := createTxRawResult(s.server.netParams,
+				txSha, mtx, blk, maxidx, sha)
 			if err != nil {
 				rpcsLog.Errorf("Cannot create TxRawResult for "+
 					"transaction %s: %v", txSha, err)
@@ -1096,7 +1100,7 @@ func handleGetConnectionCount(s *rpcServer, cmd btcjson.Cmd) (interface{}, error
 
 // handleGetCurrentNet implements the getcurrentnet command.
 func handleGetCurrentNet(s *rpcServer, cmd btcjson.Cmd) (interface{}, error) {
-	return s.server.btcnet, nil
+	return s.server.netParams.Net, nil
 }
 
 // handleGetDifficulty implements the getdifficulty command.
@@ -1422,7 +1426,8 @@ func handleGetRawTransaction(s *rpcServer, cmd btcjson.Cmd) (interface{}, error)
 		}
 	}
 
-	rawTxn, jsonErr := createTxRawResult(s.server.btcnet, c.Txid, mtx, blk, maxidx, blksha)
+	rawTxn, jsonErr := createTxRawResult(s.server.netParams, c.Txid, mtx,
+		blk, maxidx, blksha)
 	if err != nil {
 		rpcsLog.Errorf("Cannot create TxRawResult for txSha=%s: %v", txSha, err)
 		return nil, jsonErr

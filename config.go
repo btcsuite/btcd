@@ -524,7 +524,7 @@ func loadConfig() (*config, []string, error) {
 	// Check keys are valid and saved parsed versions.
 	cfg.miningKeys = make([]btcutil.Address, 0, len(cfg.GetWorkKeys))
 	for _, strAddr := range cfg.GetWorkKeys {
-		addr, err := btcutil.DecodeAddress(strAddr, activeNetParams.Net)
+		addr, err := btcutil.DecodeAddress(strAddr, activeNetParams.Params)
 		if err != nil {
 			str := "%s: the specified getworkkey '%s' failed to decode: %v"
 			err := fmt.Errorf(str, "loadConfig", strAddr, err)
@@ -532,7 +532,7 @@ func loadConfig() (*config, []string, error) {
 			parser.WriteHelp(os.Stderr)
 			return nil, nil, err
 		}
-		if !addr.IsForNet(activeNetParams.Net) {
+		if !addr.IsForNet(activeNetParams.Params) {
 			str := "%s: the specified getworkkey '%s' is on the wrong network"
 			err := fmt.Errorf(str, "loadConfig", strAddr)
 			fmt.Fprintln(os.Stderr, err)
