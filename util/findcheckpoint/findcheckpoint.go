@@ -51,7 +51,7 @@ func findCandidates(db btcdb.Db, latestHash *btcwire.ShaHash) ([]*btcchain.Check
 
 	// Setup chain and get the latest checkpoint.  Ignore notifications
 	// since they aren't needed for this util.
-	chain := btcchain.New(db, activeNetwork, nil)
+	chain := btcchain.New(db, activeNetwork.Net, nil)
 	latestCheckpoint := chain.LatestCheckpoint()
 	if latestCheckpoint == nil {
 		return nil, fmt.Errorf("unable to retrieve latest checkpoint")
@@ -76,7 +76,7 @@ func findCandidates(db btcdb.Db, latestHash *btcwire.ShaHash) ([]*btcchain.Check
 	defer fmt.Println()
 
 	// Loop backwards through the chain to find checkpoint candidates.
-	var candidates []*btcchain.Checkpoint
+	candidates := make([]*btcchain.Checkpoint, 0, cfg.NumCandidates)
 	numTested := int64(0)
 	for len(candidates) < cfg.NumCandidates && block.Height() > requiredHeight {
 		// Display progress.
