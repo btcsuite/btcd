@@ -9,6 +9,7 @@ import (
 	"errors"
 
 	"github.com/conformal/btcec"
+	"github.com/conformal/btcnet"
 	"github.com/conformal/btcwire"
 )
 
@@ -18,21 +19,9 @@ import (
 // encountered.
 var ErrMalformedPrivateKey = errors.New("malformed private key")
 
-// These constants define the magic numbers used for identifing components
-// of a WIF-encoded private key and the bitcoin address associated with it.
-const (
-	// mainNetKey is the magic number identifying a WIF private key for
-	// the MainNet bitcoin network.
-	mainNetKey byte = 0x80
-
-	// testNetKey is the magic number identifying a WIF private key for
-	// the regression test and TestNet3 bitcoin networks.
-	testNetKey byte = 0xef
-
-	// compressMagic is the magic byte used to identify a WIF encoding for
-	// an address created from a compressed serialized public key.
-	compressMagic byte = 0x01
-)
+// compressMagic is the magic byte used to identify a WIF encoding for
+// an address created from a compressed serialized public key.
+const compressMagic byte = 0x01
 
 // WIF contains the individual components described by the Wallet Import Format
 // (WIF).  A WIF string is typically used to represent a private key and its
@@ -56,35 +45,20 @@ type WIF struct {
 }
 
 // NewWIF creates a new WIF structure to export an address and its private key
-// as a string encoded in the Wallet Import Format.  The net argument must be
-// either btcwire.MainNet, btcwire.TestNet3 or btcwire.TestNet.  The compress
-// argument specifies whether the address intended to be imported or exported
-// was created by serializing the public key compressed rather than
-// uncompressed.
-func NewWIF(privKey *btcec.PrivateKey, net btcwire.BitcoinNet, compress bool) (*WIF, error) {
-	// Determine the key's network identifier byte.  The same byte is
-	// shared for TestNet3 and TestNet (the regression test network).
-	switch net {
-	case btcwire.MainNet:
-		return &WIF{privKey, compress, mainNetKey}, nil
-	case btcwire.TestNet, btcwire.TestNet3:
-		return &WIF{privKey, compress, testNetKey}, nil
-	default:
-		return nil, ErrUnknownNet
+// as a string encoded in the Wallet Import Format.  The compress argument
+// specifies whether the address intended to be imported or exported was created
+// by serializing the public key compressed rather than uncompressed.
+func NewWIF(privKey *btcec.PrivateKey, net *btcnet.Params, compress bool) (*WIF, error) {
+	if net == nil {
+		return nil, errors.New("no network")
 	}
+	return &WIF{privKey, compress, net.PrivateKeyID}, nil
 }
 
 // IsForNet returns whether or not the decoded WIF structure is associated
 // with the passed bitcoin network.
-func (w *WIF) IsForNet(net btcwire.BitcoinNet) bool {
-	switch net {
-	case btcwire.MainNet:
-		return w.netID == mainNetKey
-	case btcwire.TestNet, btcwire.TestNet3:
-		return w.netID == testNetKey
-	default:
-		return false
-	}
+func (w *WIF) IsForNet(net *btcnet.Params) bool {
+	return w.netID == net.PrivateKeyID
 }
 
 // DecodeWIF creates a new WIF structure by decoding the string encoding of
@@ -126,11 +100,6 @@ func DecodeWIF(wif string) (*WIF, error) {
 		return nil, ErrMalformedPrivateKey
 	}
 
-	netID := decoded[0]
-	if netID != mainNetKey && netID != testNetKey {
-		return nil, ErrUnknownNet
-	}
-
 	// Checksum is first four bytes of double SHA256 of the identifier byte
 	// and privKey.  Verify this matches the final 4 bytes of the decoded
 	// private key.
@@ -145,6 +114,7 @@ func DecodeWIF(wif string) (*WIF, error) {
 		return nil, ErrChecksumMismatch
 	}
 
+	netID := decoded[0]
 	privKeyBytes := decoded[1 : 1+btcec.PrivKeyBytesLen]
 	privKey, _ := btcec.PrivKeyFromBytes(btcec.S256(), privKeyBytes)
 	return &WIF{privKey, compress, netID}, nil

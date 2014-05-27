@@ -60,7 +60,7 @@ func TstAddressPubKey(serializedPubKey []byte, pubKeyFormat PubKeyFormat,
 	return &AddressPubKey{
 		pubKeyFormat: pubKeyFormat,
 		pubKey:       (*btcec.PublicKey)(pubKey),
-		netID:        netID,
+		pubKeyHashID: netID,
 	}
 }
 
