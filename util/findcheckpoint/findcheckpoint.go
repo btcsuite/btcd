@@ -9,6 +9,7 @@ import (
 	"github.com/conformal/btcchain"
 	"github.com/conformal/btcdb"
 	_ "github.com/conformal/btcdb/ldb"
+	"github.com/conformal/btcnet"
 	"github.com/conformal/btcwire"
 	"os"
 	"path/filepath"
@@ -42,7 +43,7 @@ func loadBlockDB() (btcdb.Db, error) {
 // candidates at the last checkpoint that is already hard coded into btcchain
 // since there is no point in finding candidates before already existing
 // checkpoints.
-func findCandidates(db btcdb.Db, latestHash *btcwire.ShaHash) ([]*btcchain.Checkpoint, error) {
+func findCandidates(db btcdb.Db, latestHash *btcwire.ShaHash) ([]*btcnet.Checkpoint, error) {
 	// Start with the latest block of the main chain.
 	block, err := db.FetchBlockBySha(latestHash)
 	if err != nil {
@@ -51,7 +52,7 @@ func findCandidates(db btcdb.Db, latestHash *btcwire.ShaHash) ([]*btcchain.Check
 
 	// Setup chain and get the latest checkpoint.  Ignore notifications
 	// since they aren't needed for this util.
-	chain := btcchain.New(db, activeNetwork.Net, nil)
+	chain := btcchain.New(db, activeNetwork, nil)
 	latestCheckpoint := chain.LatestCheckpoint()
 	if latestCheckpoint == nil {
 		return nil, fmt.Errorf("unable to retrieve latest checkpoint")
@@ -76,7 +77,7 @@ func findCandidates(db btcdb.Db, latestHash *btcwire.ShaHash) ([]*btcchain.Check
 	defer fmt.Println()
 
 	// Loop backwards through the chain to find checkpoint candidates.
-	candidates := make([]*btcchain.Checkpoint, 0, cfg.NumCandidates)
+	candidates := make([]*btcnet.Checkpoint, 0, cfg.NumCandidates)
 	numTested := int64(0)
 	for len(candidates) < cfg.NumCandidates && block.Height() > requiredHeight {
 		// Display progress.
@@ -97,7 +98,7 @@ func findCandidates(db btcdb.Db, latestHash *btcwire.ShaHash) ([]*btcchain.Check
 			if err != nil {
 				return nil, err
 			}
-			checkpoint := btcchain.Checkpoint{
+			checkpoint := btcnet.Checkpoint{
 				Height: block.Height(),
 				Hash:   candidateHash,
 			}
@@ -117,7 +118,7 @@ func findCandidates(db btcdb.Db, latestHash *btcwire.ShaHash) ([]*btcchain.Check
 // showCandidate display a checkpoint candidate using and output format
 // determined by the configuration parameters.  The Go syntax output
 // uses the format the btcchain code expects for checkpoints added to the list.
-func showCandidate(candidateNum int, checkpoint *btcchain.Checkpoint) {
+func showCandidate(candidateNum int, checkpoint *btcnet.Checkpoint) {
 	if cfg.UseGoOutput {
 		fmt.Printf("Candidate %d -- {%d, newShaHashFromStr(\"%v\")},\n",
 			candidateNum, checkpoint.Height, checkpoint.Hash)

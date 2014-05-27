@@ -63,6 +63,7 @@ type broadcastInventoryDel *btcwire.InvVect
 type server struct {
 	nonce                uint64
 	listeners            []net.Listener
+	netParams            *btcnet.Params
 	btcnet               btcwire.BitcoinNet
 	started              int32      // atomic
 	shutdown             int32      // atomic
@@ -1129,6 +1130,7 @@ func newServer(listenAddrs []string, db btcdb.Db, netParams *btcnet.Params) (*se
 	s := server{
 		nonce:                nonce,
 		listeners:            listeners,
+		netParams:            netParams,
 		btcnet:               netParams.Net,
 		addrManager:          amgr,
 		newPeers:             make(chan *peer, cfg.MaxPeers),

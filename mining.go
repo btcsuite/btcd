@@ -215,7 +215,7 @@ func createCoinbaseTx(coinbaseScript []byte, nextBlockHeight int64, addr btcutil
 	})
 	tx.AddTxOut(&btcwire.TxOut{
 		Value: btcchain.CalcBlockSubsidy(nextBlockHeight,
-			activeNetParams.Net),
+			activeNetParams.Params),
 		PkScript: pkScript,
 	})
 	return btcutil.NewTx(tx), nil

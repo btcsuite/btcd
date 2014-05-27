@@ -288,7 +288,7 @@ func newBlockImporter(db btcdb.Db, r io.ReadSeeker) *blockImporter {
 		doneChan:     make(chan bool),
 		errChan:      make(chan error),
 		quit:         make(chan bool),
-		chain:        btcchain.New(db, activeNetwork.Net, nil),
+		chain:        btcchain.New(db, activeNetwork, nil),
 		lastLogTime:  time.Now(),
 	}
 }
