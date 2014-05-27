@@ -7,6 +7,7 @@ package btcrpcclient
 import (
 	"fmt"
 	"github.com/conformal/btcjson"
+	"github.com/conformal/btcnet"
 	"github.com/conformal/btcutil"
 	"github.com/conformal/btcwire"
 	"github.com/conformal/btcws"
@@ -777,7 +778,7 @@ func (r FutureAddMultisigAddressResult) Receive() (btcutil.Address, error) {
 			"addmultisigaddress: %T\n", reply)
 	}
 
-	return btcutil.DecodeAddress(addr, btcwire.MainNet)
+	return btcutil.DecodeAddress(addr, &btcnet.MainNetParams)
 }
 
 // AddMultisigAddressAsync returns an instance of a type that can be used to get
@@ -877,7 +878,7 @@ func (r FutureGetNewAddressResult) Receive() (btcutil.Address, error) {
 			"getnewaddress: %T\n", reply)
 	}
 
-	return btcutil.DecodeAddress(addr, btcwire.MainNet)
+	return btcutil.DecodeAddress(addr, &btcnet.MainNetParams)
 }
 
 // GetNewAddressAsync returns an instance of a type that can be used to get the
@@ -920,7 +921,7 @@ func (r FutureGetRawChangeAddressResult) Receive() (btcutil.Address, error) {
 			"getrawchangeaddress: %T\n", reply)
 	}
 
-	return btcutil.DecodeAddress(addr, btcwire.MainNet)
+	return btcutil.DecodeAddress(addr, &btcnet.MainNetParams)
 }
 
 // GetRawChangeAddressAsync returns an instance of a type that can be used to
@@ -964,7 +965,7 @@ func (r FutureGetAccountAddressResult) Receive() (btcutil.Address, error) {
 			"getaccountaddress: %T\n", reply)
 	}
 
-	return btcutil.DecodeAddress(addr, btcwire.MainNet)
+	return btcutil.DecodeAddress(addr, &btcnet.MainNetParams)
 }
 
 // GetAccountAddressAsync returns an instance of a type that can be used to get
@@ -1088,7 +1089,7 @@ func (r FutureGetAddressesByAccountResult) Receive() ([]btcutil.Address, error) 
 
 	addrs := make([]btcutil.Address, 0, len(addrStrings))
 	for _, addrStr := range addrStrings {
-		addr, err := btcutil.DecodeAddress(addrStr, btcwire.MainNet)
+		addr, err := btcutil.DecodeAddress(addrStr, &btcnet.MainNetParams)
 		if err != nil {
 			return nil, err
 		}
