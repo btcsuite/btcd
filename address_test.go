@@ -5,9 +5,9 @@ package btcscript_test
 
 import (
 	"encoding/hex"
+	"github.com/conformal/btcnet"
 	"github.com/conformal/btcscript"
 	"github.com/conformal/btcutil"
-	"github.com/conformal/btcwire"
 	"reflect"
 	"testing"
 )
@@ -30,7 +30,8 @@ func decodeHex(hexStr string) []byte {
 // the tests as a helper since the only way it can fail is if there is an error
 // in the test source code.
 func newAddressPubKey(serializedPubKey []byte) btcutil.Address {
-	addr, err := btcutil.NewAddressPubKey(serializedPubKey, btcwire.MainNet)
+	addr, err := btcutil.NewAddressPubKey(serializedPubKey,
+		&btcnet.MainNetParams)
 	if err != nil {
 		panic("invalid public key in test source")
 	}
@@ -43,7 +44,7 @@ func newAddressPubKey(serializedPubKey []byte) btcutil.Address {
 // as a helper since the only way it can fail is if there is an error in the
 // test source code.
 func newAddressPubKeyHash(pkHash []byte) btcutil.Address {
-	addr, err := btcutil.NewAddressPubKeyHash(pkHash, btcwire.MainNet)
+	addr, err := btcutil.NewAddressPubKeyHash(pkHash, &btcnet.MainNetParams)
 	if err != nil {
 		panic("invalid public key hash in test source")
 	}
@@ -57,7 +58,7 @@ func newAddressPubKeyHash(pkHash []byte) btcutil.Address {
 // test source code.
 func newAddressScriptHash(scriptHash []byte) btcutil.Address {
 	addr, err := btcutil.NewAddressScriptHashFromHash(scriptHash,
-		btcwire.MainNet)
+		&btcnet.MainNetParams)
 	if err != nil {
 		panic("invalid script hash in test source")
 	}
@@ -338,7 +339,7 @@ func TestExtractPkScriptAddrs(t *testing.T) {
 	t.Logf("Running %d tests.", len(tests))
 	for i, test := range tests {
 		class, addrs, reqSigs, err := btcscript.ExtractPkScriptAddrs(
-			test.script, btcwire.MainNet)
+			test.script, &btcnet.MainNetParams)
 		if err != nil {
 		}
 

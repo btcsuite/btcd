@@ -12,6 +12,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/conformal/btcec"
+	"github.com/conformal/btcnet"
 	"github.com/conformal/btcutil"
 	"github.com/conformal/btcwire"
 	"github.com/davecgh/go-spew/spew"
@@ -1168,7 +1169,7 @@ func signMultiSig(tx *btcwire.MsgTx, idx int, subScript []byte, hashType byte,
 	return builder.Script(), signed == nRequired
 }
 
-func sign(net btcwire.BitcoinNet, tx *btcwire.MsgTx, idx int, subScript []byte,
+func sign(net *btcnet.Params, tx *btcwire.MsgTx, idx int, subScript []byte,
 	hashType byte, kdb KeyDB, sdb ScriptDB) ([]byte, ScriptClass,
 	[]btcutil.Address, int, error) {
 
@@ -1232,7 +1233,7 @@ func sign(net btcwire.BitcoinNet, tx *btcwire.MsgTx, idx int, subScript []byte,
 // The return value is the best effort merging of the two scripts. Calling this
 // function with addresses, class and nrequired that do not match pkScript is
 // an error and results in undefined behaviour.
-func mergeScripts(net btcwire.BitcoinNet, tx *btcwire.MsgTx, idx int,
+func mergeScripts(net *btcnet.Params, tx *btcwire.MsgTx, idx int,
 	pkScript []byte, class ScriptClass, addresses []btcutil.Address,
 	nRequired int, sigScript, prevScript []byte) []byte {
 
@@ -1444,7 +1445,7 @@ func (sc ScriptClosure) GetScript(address btcutil.Address) ([]byte, error) {
 // getScript. If previousScript is provided then the results in previousScript
 // will be merged in a type-dependant manner with the newly generated.
 // signature script.
-func SignTxOutput(net btcwire.BitcoinNet, tx *btcwire.MsgTx, idx int,
+func SignTxOutput(net *btcnet.Params, tx *btcwire.MsgTx, idx int,
 	pkScript []byte, hashType byte, kdb KeyDB, sdb ScriptDB,
 	previousScript []byte) ([]byte, error) {
 

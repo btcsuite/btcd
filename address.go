@@ -5,15 +5,15 @@
 package btcscript
 
 import (
+	"github.com/conformal/btcnet"
 	"github.com/conformal/btcutil"
-	"github.com/conformal/btcwire"
 )
 
 // ExtractPkScriptAddrs returns the type of script, addresses and required
 // signatures associated with the passed PkScript.  Note that it only works for
 // 'standard' transaction script types.  Any data such as public keys which are
 // invalid are omitted from the results.
-func ExtractPkScriptAddrs(pkScript []byte, net btcwire.BitcoinNet) (ScriptClass, []btcutil.Address, int, error) {
+func ExtractPkScriptAddrs(pkScript []byte, net *btcnet.Params) (ScriptClass, []btcutil.Address, int, error) {
 	var addrs []btcutil.Address
 	var requiredSigs int
 
