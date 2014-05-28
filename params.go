@@ -87,8 +87,8 @@ var MainNetParams = Params{
 	Net:  btcwire.MainNet,
 
 	// Chain parameters
-	GenesisBlock:           &btcwire.GenesisBlock,
-	GenesisHash:            &btcwire.GenesisHash,
+	GenesisBlock:           &genesisBlock,
+	GenesisHash:            &genesisHash,
 	PowLimit:               mainPowLimit,
 	PowLimitBits:           0x1d00ffff,
 	SubsidyHalvingInterval: 210000,
@@ -142,8 +142,8 @@ var RegressionNetParams = Params{
 	Net:  btcwire.TestNet,
 
 	// Chain parameters
-	GenesisBlock:           &btcwire.TestNetGenesisBlock,
-	GenesisHash:            &btcwire.TestNetGenesisHash,
+	GenesisBlock:           &regTestGenesisBlock,
+	GenesisHash:            &regTestGenesisHash,
 	PowLimit:               regressionPowLimit,
 	PowLimitBits:           0x207fffff,
 	SubsidyHalvingInterval: 150,
@@ -182,8 +182,8 @@ var TestNet3Params = Params{
 	Net:  btcwire.TestNet3,
 
 	// Chain parameters
-	GenesisBlock:           &btcwire.TestNet3GenesisBlock,
-	GenesisHash:            &btcwire.TestNet3GenesisHash,
+	GenesisBlock:           &testNet3GenesisBlock,
+	GenesisHash:            &testNet3GenesisHash,
 	PowLimit:               testNet3PowLimit,
 	PowLimitBits:           0x1d00ffff,
 	SubsidyHalvingInterval: 210000,
