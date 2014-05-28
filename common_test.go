@@ -12,7 +12,6 @@ import (
 	_ "github.com/conformal/btcdb/memdb"
 	"github.com/conformal/btcnet"
 	"github.com/conformal/btcutil"
-	"github.com/conformal/btcwire"
 	"os"
 	"path/filepath"
 )
@@ -103,7 +102,7 @@ func chainSetup(dbName string) (*btcchain.BlockChain, func(), error) {
 
 	// Insert the main network genesis block.  This is part of the initial
 	// database setup.
-	genesisBlock := btcutil.NewBlock(&btcwire.GenesisBlock)
+	genesisBlock := btcutil.NewBlock(btcnet.MainNetParams.GenesisBlock)
 	_, err := db.InsertBlock(genesisBlock)
 	if err != nil {
 		teardown()

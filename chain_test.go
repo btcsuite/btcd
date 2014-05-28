@@ -6,6 +6,7 @@ package btcchain_test
 
 import (
 	"github.com/conformal/btcchain"
+	"github.com/conformal/btcnet"
 	"github.com/conformal/btcutil"
 	"github.com/conformal/btcwire"
 	"testing"
@@ -65,7 +66,7 @@ func TestHaveBlock(t *testing.T) {
 		want bool
 	}{
 		// Genesis block should be present (in the main chain).
-		{hash: btcwire.GenesisHash.String(), want: true},
+		{hash: btcnet.MainNetParams.GenesisHash.String(), want: true},
 
 		// Block 3a should be present (on a side chain).
 		{hash: "00000000474284d20067a4d33f6a02284e6ef70764a3a26d6a5b9df52ef663dd", want: true},

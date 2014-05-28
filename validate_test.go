@@ -33,7 +33,8 @@ func TestCheckConnectBlock(t *testing.T) {
 
 	// The genesis block should fail to connect since it's already
 	// inserted.
-	err = chain.CheckConnectBlock(btcutil.NewBlock(&btcwire.GenesisBlock))
+	genesisBlock := btcnet.MainNetParams.GenesisBlock
+	err = chain.CheckConnectBlock(btcutil.NewBlock(genesisBlock))
 	if err == nil {
 		t.Errorf("CheckConnectBlock: Did not received expected error")
 	}
