@@ -30,6 +30,10 @@ var (
 	// can have for the test network (version 3).  It is the value
 	// 2^224 - 1.
 	testNet3PowLimit = new(big.Int).Sub(new(big.Int).Lsh(bigOne, 224), bigOne)
+
+	// simNetPowLimit is the highest proof of work value a Bitcoin block
+	// can have for the simulation test network.  It is the value 2^255 - 1.
+	simNetPowLimit = new(big.Int).Sub(new(big.Int).Lsh(bigOne, 255), bigOne)
 )
 
 // Checkpoint identifies a known good point in the block chain.  Using
@@ -220,6 +224,49 @@ var TestNet3Params = Params{
 	PrivateKeyID:     0xef,
 }
 
+// SimNetParams defines the network parameters for the simulation test Bitcoin
+// network.  This network is similar to the normal test network except it is
+// intended for private use within a group of individuals doing simulation
+// testing.  The functionality is intended to differ in that the only nodes
+// which are specifically specified are used to create the network rather than
+// following normal discovery rules.  This is important as otherwise it would
+// just turn into another public testnet.
+var SimNetParams = Params{
+	Name:        "simnet",
+	Net:         btcwire.SimNet,
+	DefaultPort: "18555",
+
+	// Chain parameters
+	GenesisBlock:           &simNetGenesisBlock,
+	GenesisHash:            &simNetGenesisHash,
+	PowLimit:               simNetPowLimit,
+	PowLimitBits:           0x207fffff,
+	SubsidyHalvingInterval: 150,
+	ResetMinDifficulty:     true,
+
+	// Checkpoints ordered from oldest to newest.
+	Checkpoints: nil,
+
+	// Reject version 1 blocks once a majority of the network has upgraded.
+	// 75% (75 / 100)
+	BlockV1RejectNumRequired: 75,
+	BlockV1RejectNumToCheck:  100,
+
+	// Ensure coinbase starts with serialized block heights for version 2
+	// blocks or newer once a majority of the network has upgraded.
+	// 51% (51 / 100)
+	CoinbaseBlockHeightNumRequired: 51,
+	CoinbaseBlockHeightNumToCheck:  100,
+
+	// Mempool parameters
+	RelayNonStdTxs: true,
+
+	// Encoding magics
+	PubKeyHashAddrID: 0x3f, // starts with S
+	ScriptHashAddrID: 0x7b, // starts with s
+	PrivateKeyID:     0x64, // starts with 4 (uncompressed) or F (compressed)
+}
+
 var (
 	// ErrDuplicateNet describes an error where the parameters for a Bitcoin
 	// network could not be set due to the network already being a standard
@@ -233,11 +280,13 @@ var (
 	pubKeyHashAddrIDs = map[byte]struct{}{
 		MainNetParams.PubKeyHashAddrID:  struct{}{},
 		TestNet3Params.PubKeyHashAddrID: struct{}{}, // shared with regtest
+		SimNetParams.PubKeyHashAddrID:   struct{}{},
 	}
 
 	scriptHashAddrIDs = map[byte]struct{}{
 		MainNetParams.ScriptHashAddrID:  struct{}{},
 		TestNet3Params.ScriptHashAddrID: struct{}{}, // shared with regtest
+		SimNetParams.ScriptHashAddrID:   struct{}{},
 	}
 )
 
