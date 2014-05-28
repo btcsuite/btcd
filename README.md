@@ -83,8 +83,8 @@ intentionally causes an error by attempting to process a duplicate block.
 		"github.com/conformal/btcchain"
 		"github.com/conformal/btcdb"
 		_ "github.com/conformal/btcdb/ldb"
+		"github.com/conformal/btcnet"
 		"github.com/conformal/btcutil"
-		"github.com/conformal/btcwire"
 		"os"
 	)
 
@@ -95,20 +95,20 @@ intentionally causes an error by attempting to process a duplicate block.
 		// calls to os.Remove would not be used either, but again, we want
 		// a complete working example here, so we make sure to remove the
 		// database.
-		dbName := "example.db"
-		_ = os.Remove(dbName)
+		dbName := "exampledb"
+		_ = os.RemoveAll(dbName)
 		db, err := btcdb.CreateDB("leveldb", dbName)
 		if err != nil {
 			fmt.Printf("Failed to create database: %v\n", err)
 			return
 		}
-		defer os.Remove(dbName) // Ignore error.
+		defer os.RemoveAll(dbName) // Ignore error.
 		defer db.Close()
 
 		// Insert the main network genesis block.  This is part of the initial
 		// database setup.  Like above, this typically would not be needed when
 		// opening an existing database.
-		genesisBlock := btcutil.NewBlock(&btcwire.GenesisBlock)
+		genesisBlock := btcutil.NewBlock(btcnet.MainNetParams.GenesisBlock)
 		_, err = db.InsertBlock(genesisBlock)
 		if err != nil {
 			fmt.Printf("Failed to insert genesis block: %v\n", err)
@@ -117,7 +117,7 @@ intentionally causes an error by attempting to process a duplicate block.
 
 		// Create a new BlockChain instance using the underlying database for
 		// the main bitcoin network and ignore notifications.
-		chain := btcchain.New(db, btcwire.MainNet, nil)
+		chain := btcchain.New(db, &btcnet.MainNetParams, nil)
 
 		// Process a block.  For this example, we are going to intentionally
 		// cause an error by trying to process the genesis block which already
