@@ -33,8 +33,8 @@ referenced parent block to already exist.  In a more concrete example:
 	import (
 		"github.com/conformal/btcdb"
 		_ "github.com/conformal/btcdb/ldb"
+		"github.com/conformal/btcnet"
 		"github.com/conformal/btcutil"
-		"github.com/conformal/btcwire"
 	)
 
 	// Create a database and schedule it to be closed on exit.
@@ -47,7 +47,7 @@ referenced parent block to already exist.  In a more concrete example:
 
 
 	// Insert the main network genesis block.
-	genesis := btcutil.NewBlock(&btcwire.GenesisBlock)
+	genesis := btcutil.NewBlock(btcnet.MainNetParams.GenesisBlock)
 	newHeight, err := db.InsertBlock(genesis)
 	if err != nil {
 		// Log and handle the error

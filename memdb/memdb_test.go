@@ -7,6 +7,7 @@ package memdb_test
 import (
 	"github.com/conformal/btcdb"
 	"github.com/conformal/btcdb/memdb"
+	"github.com/conformal/btcnet"
 	"github.com/conformal/btcutil"
 	"github.com/conformal/btcwire"
 	"reflect"
@@ -23,13 +24,13 @@ func TestClosed(t *testing.T) {
 		t.Errorf("Failed to open test database %v", err)
 		return
 	}
-	_, err = db.InsertBlock(btcutil.NewBlock(&btcwire.GenesisBlock))
+	_, err = db.InsertBlock(btcutil.NewBlock(btcnet.MainNetParams.GenesisBlock))
 	if err != nil {
 		t.Errorf("InsertBlock: %v", err)
 	}
 	db.Close()
 
-	genesisHash := &btcwire.GenesisHash
+	genesisHash := btcnet.MainNetParams.GenesisHash
 	if err := db.DropAfterBlockBySha(genesisHash); err != memdb.ErrDbClosed {
 		t.Errorf("DropAfterBlockBySha: unexpected error %v", err)
 	}
@@ -50,10 +51,14 @@ func TestClosed(t *testing.T) {
 		t.Errorf("FetchHeightRange: unexpected error %v", err)
 	}
 
-	genesisMerkleRoot := &btcwire.GenesisMerkleRoot
-	if exists := db.ExistsTxSha(genesisMerkleRoot); exists != false {
+	genesisCoinbaseTx := btcnet.MainNetParams.GenesisBlock.Transactions[0]
+	coinbaseHash, err := genesisCoinbaseTx.TxSha()
+	if err != nil {
+		t.Errorf("TxSha: unexpected error %v", err)
+	}
+	if exists := db.ExistsTxSha(&coinbaseHash); exists != false {
 		t.Errorf("ExistsTxSha: hash %v exists when it shouldn't",
-			genesisMerkleRoot)
+			&coinbaseHash)
 	}
 
 	if _, err := db.FetchTxBySha(genesisHash); err != memdb.ErrDbClosed {

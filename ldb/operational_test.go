@@ -9,6 +9,7 @@ import (
 	"encoding/binary"
 	"fmt"
 	"github.com/conformal/btcdb"
+	"github.com/conformal/btcnet"
 	"github.com/conformal/btcutil"
 	"github.com/conformal/btcwire"
 	"io"
@@ -246,7 +247,7 @@ func loadBlocks(t *testing.T, file string) (blocks []*btcutil.Block, err error) 
 	}()
 
 	// Set the first block as the genesis block.
-	genesis := btcutil.NewBlock(&btcwire.GenesisBlock)
+	genesis := btcutil.NewBlock(btcnet.MainNetParams.GenesisBlock)
 	blocks = append(blocks, genesis)
 
 	var block *btcutil.Block

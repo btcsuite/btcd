@@ -11,6 +11,7 @@ import (
 	"github.com/conformal/btcdb"
 	_ "github.com/conformal/btcdb/ldb"
 	_ "github.com/conformal/btcdb/memdb"
+	"github.com/conformal/btcnet"
 	"github.com/conformal/btcutil"
 	"github.com/conformal/btcwire"
 	"io"
@@ -138,7 +139,7 @@ func setupDB(dbType, dbName string) (btcdb.Db, func(), error) {
 
 	// Insert the main network genesis block.  This is part of the initial
 	// database setup.
-	genesisBlock := btcutil.NewBlock(&btcwire.GenesisBlock)
+	genesisBlock := btcutil.NewBlock(btcnet.MainNetParams.GenesisBlock)
 	_, err = db.InsertBlock(genesisBlock)
 	if err != nil {
 		teardown()
@@ -177,7 +178,7 @@ func loadBlocks(t *testing.T) ([]*btcutil.Block, error) {
 
 	// Set the first block as the genesis block.
 	blocks := make([]*btcutil.Block, 0, 256)
-	genesis := btcutil.NewBlock(&btcwire.GenesisBlock)
+	genesis := btcutil.NewBlock(btcnet.MainNetParams.GenesisBlock)
 	blocks = append(blocks, genesis)
 
 	for height := int64(1); err == nil; height++ {
