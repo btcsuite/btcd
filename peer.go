@@ -284,6 +284,47 @@ func (p *peer) pushVersionMsg() error {
 	return nil
 }
 
+// updateAddresses potentially adds addresses to the address manager and
+// requests known addresses from the remote peer depending on whether the peer
+// is an inbound or outbound peer and other factors such as address routability
+// and the negotiated protocol version.
+func (p *peer) updateAddresses(msg *btcwire.MsgVersion) {
+	// Outbound connections.
+	if !p.inbound {
+		// TODO(davec): Only do this if not doing the initial block
+		// download and the local address is routable.
+		if !cfg.DisableListen /* && isCurrent? */ {
+			// Get address that best matches.
+			lna := p.server.addrManager.getBestLocalAddress(p.na)
+			if Routable(lna) {
+				addresses := []*btcwire.NetAddress{lna}
+				p.pushAddrMsg(addresses)
+			}
+		}
+
+		// Request known addresses if the server address manager needs
+		// more and the peer has a protocol version new enough to
+		// include a timestamp with addresses.
+		hasTimestamp := p.ProtocolVersion() >=
+			btcwire.NetAddressTimeVersion
+		if p.server.addrManager.NeedMoreAddresses() && hasTimestamp {
+			p.QueueMessage(btcwire.NewMsgGetAddr(), nil)
+		}
+
+		// Mark the address as a known good address.
+		p.server.addrManager.Good(p.na)
+	} else {
+		// A peer might not be advertising the same address that it
+		// actually connected from.  One example of why this can happen
+		// is with NAT.  Only add the address to the address manager if
+		// the addresses agree.
+		if NetAddressKey(&msg.AddrMe) == NetAddressKey(p.na) {
+			p.server.addrManager.AddAddress(p.na, p.na)
+			p.server.addrManager.Good(p.na)
+		}
+	}
+}
+
 // handleVersionMsg is invoked when a peer receives a version bitcoin message
 // and is used to negotiate the protocol version details as well as kick start
 // the communications.
@@ -347,39 +388,13 @@ func (p *peer) handleVersionMsg(msg *btcwire.MsgVersion) {
 	// Send verack.
 	p.QueueMessage(btcwire.NewMsgVerAck(), nil)
 
-	// Outbound connections.
-	if !p.inbound {
-		// TODO(davec): Only do this if not doing the initial block
-		// download and the local address is routable.
-		if !cfg.DisableListen /* && isCurrent? */ {
-			// get address that best matches. p.na
-			lna := p.server.addrManager.getBestLocalAddress(p.na)
-			if Routable(lna) {
-				addresses := []*btcwire.NetAddress{lna}
-				p.pushAddrMsg(addresses)
-			}
-		}
-
-		// Request known addresses if the server address manager needs
-		// more and the peer has a protocol version new enough to
-		// include a timestamp with addresses.
-		hasTimestamp := p.ProtocolVersion() >=
-			btcwire.NetAddressTimeVersion
-		if p.server.addrManager.NeedMoreAddresses() && hasTimestamp {
-			p.QueueMessage(btcwire.NewMsgGetAddr(), nil)
-		}
-
-		// Mark the address as a known good address.
-		p.server.addrManager.Good(p.na)
-	} else {
-		// A peer might not be advertising the same address that it
-		// actually connected from.  One example of why this can happen
-		// is with NAT.  Only add the address to the address manager if
-		// the addresses agree.
-		if NetAddressKey(&msg.AddrMe) == NetAddressKey(p.na) {
-			p.server.addrManager.AddAddress(p.na, p.na)
-			p.server.addrManager.Good(p.na)
-		}
+	// Update the address manager and request known addresses from the
+	// remote peer for outbound connections.  This is skipped when running
+	// on the simulation test network since it is only intended to connect
+	// to specified peers and actively avoids advertising and connecting to
+	// discovered peers.
+	if !cfg.SimNet {
+		p.updateAddresses(msg)
 	}
 
 	// Signal the block manager this peer is a new sync candidate.
@@ -861,6 +876,14 @@ func (p *peer) handleGetHeadersMsg(msg *btcwire.MsgGetHeaders) {
 // and is used to provide the peer with known addresses from the address
 // manager.
 func (p *peer) handleGetAddrMsg(msg *btcwire.MsgGetAddr) {
+	// Don't return any addresses when running on the simulation test
+	// network.  This helps prevent the network from becoming another
+	// public test network since it will not be able to learn about other
+	// peers that have not specifically been provided.
+	if cfg.SimNet {
+		return
+	}
+
 	// Get the current known addresses from the address manager.
 	addrCache := p.server.addrManager.AddressCache()
 
@@ -917,6 +940,14 @@ func (p *peer) pushAddrMsg(addresses []*btcwire.NetAddress) error {
 // handleAddrMsg is invoked when a peer receives an addr bitcoin message and
 // is used to notify the server about advertised addresses.
 func (p *peer) handleAddrMsg(msg *btcwire.MsgAddr) {
+	// Ignore addresses when running on the simulation test network.  This
+	// helps prevent the network from becoming another public test network
+	// since it will not be able to learn about other peers that have not
+	// specifically been provided.
+	if cfg.SimNet {
+		return
+	}
+
 	// Ignore old style addresses which don't include a timestamp.
 	if p.ProtocolVersion() < btcwire.NetAddressTimeVersion {
 		return

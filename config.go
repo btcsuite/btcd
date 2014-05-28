@@ -91,6 +91,7 @@ type config struct {
 	NoOnion            bool          `long:"noonion" description:"Disable connecting to tor hidden services"`
 	TestNet3           bool          `long:"testnet" description:"Use the test network"`
 	RegressionTest     bool          `long:"regtest" description:"Use the regression test network"`
+	SimNet             bool          `long:"simnet" description:"Use the simulation test network"`
 	DisableCheckpoints bool          `long:"nocheckpoints" description:"Disable built-in checkpoints.  Don't do this unless you know what you're doing."`
 	DbType             string        `long:"dbtype" description:"Database backend to use for the Block Chain"`
 	Profile            string        `long:"profile" description:"Enable HTTP profiling on given port -- NOTE port must be between 1024 and 65536"`
@@ -348,7 +349,9 @@ func loadConfig() (*config, []string, error) {
 	// Load additional config from file.
 	var configFileError error
 	parser := newConfigParser(&cfg, &serviceOpts, flags.Default)
-	if !preCfg.RegressionTest || preCfg.ConfigFile != defaultConfigFile {
+	if !(preCfg.RegressionTest || preCfg.SimNet) || preCfg.ConfigFile !=
+		defaultConfigFile {
+
 		err := flags.NewIniParser(parser).ParseFile(preCfg.ConfigFile)
 		if err != nil {
 			if _, ok := err.(*os.PathError); !ok {
@@ -374,22 +377,36 @@ func loadConfig() (*config, []string, error) {
 		return nil, nil, err
 	}
 
-	// The two test networks can't be selected simultaneously.
-	if cfg.TestNet3 && cfg.RegressionTest {
-		str := "%s: The testnet and regtest params can't be used " +
-			"together -- choose one of the two"
+	// Multiple networks can't be selected simultaneously.
+	numNets := 0
+	if cfg.TestNet3 {
+		numNets++
+	}
+	if cfg.RegressionTest {
+		numNets++
+	}
+	if cfg.SimNet {
+		numNets++
+	}
+	if numNets > 1 {
+		str := "%s: The testnet, regtest, and simnet params can't be " +
+			"used together -- choose one of the three"
 		err := fmt.Errorf(str, "loadConfig")
 		fmt.Fprintln(os.Stderr, err)
 		parser.WriteHelp(os.Stderr)
 		return nil, nil, err
 	}
 
-	// Choose the active network params based on the testnet and regression
-	// test net flags.
-	if cfg.TestNet3 {
+	// Choose the active network params based on the selected network.
+	switch {
+	case cfg.TestNet3:
 		activeNetParams = &testNet3Params
-	} else if cfg.RegressionTest {
+	case cfg.RegressionTest:
 		activeNetParams = &regressionNetParams
+	case cfg.SimNet:
+		// Also disable dns seeding on the simulation test network.
+		activeNetParams = &simNetParams
+		cfg.DisableDNSSeed = true
 	}
 
 	// Append the network type to the data directory so it is "namespaced"

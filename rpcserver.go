@@ -1778,8 +1778,9 @@ func handleGetWork(s *rpcServer, cmd btcjson.Cmd) (interface{}, error) {
 
 	// Return an error if there are no peers connected since there is no
 	// way to relay a found block or receive transactions to work on.
-	// However, allow this state when running in regression test mode.
-	if !cfg.RegressionTest && s.server.ConnectedCount() == 0 {
+	// However, allow this state when running in the regression test or
+	// simulation test mode.
+	if !(cfg.RegressionTest || cfg.SimNet) && s.server.ConnectedCount() == 0 {
 		return nil, btcjson.ErrClientNotConnected
 	}
 

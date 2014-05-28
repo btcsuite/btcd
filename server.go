@@ -571,7 +571,15 @@ out:
 			break out
 		}
 
-		// Only try connect to more peers if we actually need more
+		// Don't try to connect to more peers when running on the
+		// simulation test network.  The simulation network is only
+		// intended to connect to specified peers and actively avoid
+		// advertising and connecting to discovered peers.
+		if cfg.SimNet {
+			continue
+		}
+
+		// Only try connect to more peers if we actually need more.
 		if !state.NeedMoreOutbound() || len(cfg.ConnectPeers) > 0 ||
 			atomic.LoadInt32(&s.shutdown) != 0 {
 			continue
