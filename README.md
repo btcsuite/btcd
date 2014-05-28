@@ -20,6 +20,7 @@ package main
 import (
 	"flag"
 	"fmt"
+	"log"
 
 	"github.com/conformal/btcnet"
 	"github.com/conformal/btcutil"
@@ -42,10 +43,9 @@ func main() {
 
 	// Create and print new payment address, specific to the active network.
 	pubKeyHash := make([]byte, 20)
-	addr, err := btcutil.NewAddressPubKeyHash(pubKeyHash, netParams.Net)
+	addr, err := btcutil.NewAddressPubKeyHash(pubKeyHash, netParams)
 	if err != nil {
-		// badness
-		return
+		log.Fatal(err)
 	}
 	fmt.Println(addr)
 }

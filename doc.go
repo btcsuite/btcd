@@ -48,7 +48,7 @@
 //
 //          // Create and print new payment address, specific to the active network.
 //          pubKeyHash := make([]byte, 20)
-//          addr, err := btcutil.NewAddressPubKeyHash(pubKeyHash, netParams.Net)
+//          addr, err := btcutil.NewAddressPubKeyHash(pubKeyHash, netParams)
 //          if err != nil {
 //                  log.Fatal(err)
 //          }
