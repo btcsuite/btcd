@@ -213,18 +213,9 @@ var TestNet3Params = Params{
 }
 
 var (
-	// ErrUnknownNet describes an error where the network parameters for a
-	// network cannot be looked up because the network is non-standard and
-	// is not registered into this package.
-	//
-	// This will be removed when ParamsForNet is eventually removed.
-	ErrUnknownNet = errors.New("unknown Bitcoin network")
-
 	// ErrDuplicateNet describes an error where the parameters for a Bitcoin
 	// network could not be set due to the network already being a standard
 	// network or previously-registered into this package.
-	//
-	// This will be removed when Register is eventually removed.
 	ErrDuplicateNet = errors.New("duplicate Bitcoin network")
 )
 
