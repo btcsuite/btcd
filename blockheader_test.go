@@ -21,8 +21,8 @@ func TestBlockHeader(t *testing.T) {
 	}
 	nonce := uint32(nonce64)
 
-	hash := btcwire.GenesisHash
-	merkleHash := btcwire.GenesisMerkleRoot
+	hash := mainNetGenesisHash
+	merkleHash := mainNetGenesisMerkleRoot
 	bits := uint32(0x1d00ffff)
 	bh := btcwire.NewBlockHeader(&hash, &merkleHash, bits, nonce)
 
@@ -51,13 +51,11 @@ func TestBlockHeaderWire(t *testing.T) {
 	nonce := uint32(123123) // 0x1e0f3
 
 	// baseBlockHdr is used in the various tests as a baseline BlockHeader.
-	hash := btcwire.GenesisHash
-	merkleHash := btcwire.GenesisMerkleRoot
 	bits := uint32(0x1d00ffff)
 	baseBlockHdr := &btcwire.BlockHeader{
 		Version:    1,
-		PrevBlock:  hash,
-		MerkleRoot: merkleHash,
+		PrevBlock:  mainNetGenesisHash,
+		MerkleRoot: mainNetGenesisMerkleRoot,
 		Timestamp:  time.Unix(0x495fab29, 0), // 2009-01-03 12:15:05 -0600 CST
 		Bits:       bits,
 		Nonce:      nonce,
@@ -162,13 +160,11 @@ func TestBlockHeaderSerialize(t *testing.T) {
 	nonce := uint32(123123) // 0x1e0f3
 
 	// baseBlockHdr is used in the various tests as a baseline BlockHeader.
-	hash := btcwire.GenesisHash
-	merkleHash := btcwire.GenesisMerkleRoot
 	bits := uint32(0x1d00ffff)
 	baseBlockHdr := &btcwire.BlockHeader{
 		Version:    1,
-		PrevBlock:  hash,
-		MerkleRoot: merkleHash,
+		PrevBlock:  mainNetGenesisHash,
+		MerkleRoot: mainNetGenesisMerkleRoot,
 		Timestamp:  time.Unix(0x495fab29, 0), // 2009-01-03 12:15:05 -0600 CST
 		Bits:       bits,
 		Nonce:      nonce,

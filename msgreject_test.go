@@ -50,7 +50,7 @@ func TestRejectLatest(t *testing.T) {
 	rejCommand := (&btcwire.MsgBlock{}).Command()
 	rejCode := btcwire.RejectDuplicate
 	rejReason := "duplicate block"
-	rejHash := btcwire.GenesisHash
+	rejHash := mainNetGenesisHash
 
 	// Ensure we get the correct data back out.
 	msg := btcwire.NewMsgReject(rejCommand, rejCode, rejReason)
@@ -128,7 +128,7 @@ func TestRejectBeforeAdded(t *testing.T) {
 	rejCommand := (&btcwire.MsgBlock{}).Command()
 	rejCode := btcwire.RejectDuplicate
 	rejReason := "duplicate block"
-	rejHash := btcwire.GenesisHash
+	rejHash := mainNetGenesisHash
 
 	msg := btcwire.NewMsgReject(rejCommand, rejCode, rejReason)
 	msg.Hash = rejHash
@@ -184,7 +184,7 @@ func TestRejectCrossProtocol(t *testing.T) {
 	rejCommand := (&btcwire.MsgBlock{}).Command()
 	rejCode := btcwire.RejectDuplicate
 	rejReason := "duplicate block"
-	rejHash := btcwire.GenesisHash
+	rejHash := mainNetGenesisHash
 
 	msg := btcwire.NewMsgReject(rejCommand, rejCode, rejReason)
 	msg.Hash = rejHash
@@ -251,7 +251,7 @@ func TestRejectWire(t *testing.T) {
 				Cmd:    "block",
 				Code:   btcwire.RejectDuplicate,
 				Reason: "duplicate block",
-				Hash:   btcwire.GenesisHash,
+				Hash:   mainNetGenesisHash,
 			},
 			[]byte{
 				0x05, 0x62, 0x6c, 0x6f, 0x63, 0x6b, // "block"
@@ -261,7 +261,7 @@ func TestRejectWire(t *testing.T) {
 				0x6f, 0xe2, 0x8c, 0x0a, 0xb6, 0xf1, 0xb3, 0x72,
 				0xc1, 0xa6, 0xa2, 0x46, 0xae, 0x63, 0xf7, 0x4f,
 				0x93, 0x1e, 0x83, 0x65, 0xe1, 0x5a, 0x08, 0x9c,
-				0x68, 0xd6, 0x19, 0x00, 0x00, 0x00, 0x00, 0x00, // btcwire.GenesisHash
+				0x68, 0xd6, 0x19, 0x00, 0x00, 0x00, 0x00, 0x00, // mainNetGenesisHash
 			},
 			btcwire.ProtocolVersion,
 		},
@@ -307,7 +307,7 @@ func TestRejectWireErrors(t *testing.T) {
 
 	baseReject := btcwire.NewMsgReject("block", btcwire.RejectDuplicate,
 		"duplicate block")
-	baseReject.Hash = btcwire.GenesisHash
+	baseReject.Hash = mainNetGenesisHash
 	baseRejectEncoded := []byte{
 		0x05, 0x62, 0x6c, 0x6f, 0x63, 0x6b, // "block"
 		0x12, // btcwire.RejectDuplicate
@@ -316,7 +316,7 @@ func TestRejectWireErrors(t *testing.T) {
 		0x6f, 0xe2, 0x8c, 0x0a, 0xb6, 0xf1, 0xb3, 0x72,
 		0xc1, 0xa6, 0xa2, 0x46, 0xae, 0x63, 0xf7, 0x4f,
 		0x93, 0x1e, 0x83, 0x65, 0xe1, 0x5a, 0x08, 0x9c,
-		0x68, 0xd6, 0x19, 0x00, 0x00, 0x00, 0x00, 0x00, // btcwire.GenesisHash
+		0x68, 0xd6, 0x19, 0x00, 0x00, 0x00, 0x00, 0x00, // mainNetGenesisHash
 	}
 
 	tests := []struct {

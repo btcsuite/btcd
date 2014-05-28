@@ -62,7 +62,7 @@ func TestHeaders(t *testing.T) {
 // TestHeadersWire tests the MsgHeaders wire encode and decode for various
 // numbers of headers and protocol versions.
 func TestHeadersWire(t *testing.T) {
-	hash := btcwire.GenesisHash
+	hash := mainNetGenesisHash
 	merkleHash := blockOne.Header.MerkleRoot
 	bits := uint32(0x1d00ffff)
 	nonce := uint32(0x9962e301)
@@ -219,7 +219,7 @@ func TestHeadersWireErrors(t *testing.T) {
 	pver := btcwire.ProtocolVersion
 	btcwireErr := &btcwire.MessageError{}
 
-	hash := btcwire.GenesisHash
+	hash := mainNetGenesisHash
 	merkleHash := blockOne.Header.MerkleRoot
 	bits := uint32(0x1d00ffff)
 	nonce := uint32(0x9962e301)

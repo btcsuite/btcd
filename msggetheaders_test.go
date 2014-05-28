@@ -307,10 +307,10 @@ func TestGetHeadersWireErrors(t *testing.T) {
 	// block locator hashes.
 	maxGetHeaders := btcwire.NewMsgGetHeaders()
 	for i := 0; i < btcwire.MaxBlockLocatorsPerMsg; i++ {
-		maxGetHeaders.AddBlockLocatorHash(&btcwire.GenesisHash)
+		maxGetHeaders.AddBlockLocatorHash(&mainNetGenesisHash)
 	}
 	maxGetHeaders.BlockLocatorHashes = append(maxGetHeaders.BlockLocatorHashes,
-		&btcwire.GenesisHash)
+		&mainNetGenesisHash)
 	maxGetHeadersEncoded := []byte{
 		0x62, 0xea, 0x00, 0x00, // Protocol version 60002
 		0xfd, 0xf5, 0x01, // Varint for number of block loc hashes (501)
