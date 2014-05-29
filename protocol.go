@@ -11,17 +11,6 @@ import (
 )
 
 const (
-	// MainPort is the port used by default on the main network.
-	MainPort = "8333"
-
-	// TestNetPort is the port used by default on the test network (version
-	// 3).
-	TestNetPort = "18333"
-
-	// RegressionTestPort is the port used by default on the regression test
-	// network.
-	RegressionTestPort = "18444"
-
 	// ProtocolVersion is the latest protocol version this package supports.
 	ProtocolVersion uint32 = 70002
 
