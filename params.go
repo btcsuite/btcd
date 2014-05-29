@@ -48,8 +48,9 @@ type Checkpoint struct {
 // used by Bitcoin applications to differentiate networks as well as addresses
 // and keys for one network from those intended for use on another network.
 type Params struct {
-	Name string
-	Net  btcwire.BitcoinNet
+	Name        string
+	Net         btcwire.BitcoinNet
+	DefaultPort string
 
 	// Chain parameters
 	GenesisBlock           *btcwire.MsgBlock
@@ -83,8 +84,9 @@ type Params struct {
 
 // MainNetParams defines the network parameters for the main Bitcoin network.
 var MainNetParams = Params{
-	Name: "mainnet",
-	Net:  btcwire.MainNet,
+	Name:        "mainnet",
+	Net:         btcwire.MainNet,
+	DefaultPort: "8333",
 
 	// Chain parameters
 	GenesisBlock:           &genesisBlock,
@@ -138,8 +140,9 @@ var MainNetParams = Params{
 // Bitcoin network.  Not to be confused with the test Bitcoin network (version
 // 3), this network is sometimes simply called "testnet".
 var RegressionNetParams = Params{
-	Name: "regtest",
-	Net:  btcwire.TestNet,
+	Name:        "regtest",
+	Net:         btcwire.TestNet,
+	DefaultPort: "18444",
 
 	// Chain parameters
 	GenesisBlock:           &regTestGenesisBlock,
@@ -178,8 +181,9 @@ var RegressionNetParams = Params{
 // (version 3).  Not to be confused with the regression test network, this
 // network is sometimes simply called "testnet".
 var TestNet3Params = Params{
-	Name: "testnet3",
-	Net:  btcwire.TestNet3,
+	Name:        "testnet3",
+	Net:         btcwire.TestNet3,
+	DefaultPort: "18333",
 
 	// Chain parameters
 	GenesisBlock:           &testNet3GenesisBlock,
