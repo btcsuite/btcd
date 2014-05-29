@@ -481,7 +481,7 @@ func loadConfig() (*config, []string, error) {
 	// we are to connect to.
 	if len(cfg.Listeners) == 0 {
 		cfg.Listeners = []string{
-			net.JoinHostPort("", activeNetParams.listenPort),
+			net.JoinHostPort("", activeNetParams.DefaultPort),
 		}
 	}
 
@@ -545,7 +545,7 @@ func loadConfig() (*config, []string, error) {
 	// Add default port to all listener addresses if needed and remove
 	// duplicate addresses.
 	cfg.Listeners = normalizeAddresses(cfg.Listeners,
-		activeNetParams.listenPort)
+		activeNetParams.DefaultPort)
 
 	// Add default port to all rpc listener addresses if needed and remove
 	// duplicate addresses.
@@ -555,9 +555,9 @@ func loadConfig() (*config, []string, error) {
 	// Add default port to all added peer addresses if needed and remove
 	// duplicate addresses.
 	cfg.AddPeers = normalizeAddresses(cfg.AddPeers,
-		activeNetParams.peerPort)
+		activeNetParams.DefaultPort)
 	cfg.ConnectPeers = normalizeAddresses(cfg.ConnectPeers,
-		activeNetParams.peerPort)
+		activeNetParams.DefaultPort)
 
 	// Setup dial and DNS resolution (lookup) functions depending on the
 	// specified options.  The default is to use the standard net.Dial

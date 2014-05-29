@@ -513,7 +513,7 @@ func handleAskWallet(s *rpcServer, cmd btcjson.Cmd) (interface{}, error) {
 func handleAddNode(s *rpcServer, cmd btcjson.Cmd) (interface{}, error) {
 	c := cmd.(*btcjson.AddNodeCmd)
 
-	addr := normalizeAddress(c.Addr, activeNetParams.peerPort)
+	addr := normalizeAddress(c.Addr, activeNetParams.DefaultPort)
 	var err error
 	switch c.SubCmd {
 	case "add":

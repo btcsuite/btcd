@@ -17,10 +17,8 @@ var activeNetParams = &mainNetParams
 // network and test networks.
 type params struct {
 	*btcnet.Params
-	peerPort   string
-	listenPort string
-	rpcPort    string
-	dnsSeeds   []string
+	rpcPort  string
+	dnsSeeds []string
 }
 
 // mainNetParams contains parameters specific to the main network
@@ -30,10 +28,8 @@ type params struct {
 // it does not handle on to btcd.  This approach allows the wallet process
 // to emulate the full reference implementation RPC API.
 var mainNetParams = params{
-	Params:     &btcnet.MainNetParams,
-	listenPort: btcwire.MainPort,
-	peerPort:   btcwire.MainPort,
-	rpcPort:    "8334",
+	Params:  &btcnet.MainNetParams,
+	rpcPort: "8334",
 	dnsSeeds: []string{
 		"seed.bitcoin.sipa.be",
 		"dnsseed.bluematt.me",
@@ -49,21 +45,17 @@ var mainNetParams = params{
 // than the reference implementation - see the mainNetParams comment for
 // details.
 var regressionNetParams = params{
-	Params:     &btcnet.RegressionNetParams,
-	listenPort: btcwire.RegressionTestPort,
-	peerPort:   btcwire.TestNetPort,
-	rpcPort:    "18334",
-	dnsSeeds:   []string{},
+	Params:   &btcnet.RegressionNetParams,
+	rpcPort:  "18334",
+	dnsSeeds: []string{},
 }
 
 // testNet3Params contains parameters specific to the test network (version 3)
 // (btcwire.TestNet3).  NOTE: The RPC port is intentionally different than the
 // reference implementation - see the mainNetParams comment for details.
 var testNet3Params = params{
-	Params:     &btcnet.TestNet3Params,
-	listenPort: btcwire.TestNetPort,
-	peerPort:   btcwire.TestNetPort,
-	rpcPort:    "18334",
+	Params:  &btcnet.TestNet3Params,
+	rpcPort: "18334",
 	dnsSeeds: []string{
 		"testnet-seed.bitcoin.petertodd.org",
 		"testnet-seed.bluematt.me",

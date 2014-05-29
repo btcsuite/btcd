@@ -468,7 +468,7 @@ func (s *server) seedFromDNS() {
 		}
 		addresses := make([]*btcwire.NetAddress, len(seedpeers))
 		// if this errors then we have *real* problems
-		intPort, _ := strconv.Atoi(activeNetParams.peerPort)
+		intPort, _ := strconv.Atoi(activeNetParams.DefaultPort)
 		for i, peer := range seedpeers {
 			addresses[i] = new(btcwire.NetAddress)
 			addresses[i].SetAddress(peer, uint16(intPort))
@@ -621,7 +621,7 @@ out:
 
 			// allow nondefault ports after 50 failed tries.
 			if fmt.Sprintf("%d", addr.na.Port) !=
-				activeNetParams.peerPort && tries < 50 {
+				activeNetParams.DefaultPort && tries < 50 {
 				continue
 			}
 
@@ -956,7 +956,7 @@ func (s *server) upnpUpdateThread() {
 	// Go off immediately to prevent code duplication, thereafter we renew
 	// lease every 15 minutes.
 	timer := time.NewTimer(0 * time.Second)
-	lport, _ := strconv.ParseInt(activeNetParams.listenPort, 10, 16)
+	lport, _ := strconv.ParseInt(activeNetParams.DefaultPort, 10, 16)
 	first := true
 out:
 	for {
@@ -1028,7 +1028,7 @@ func newServer(listenAddrs []string, db btcdb.Db, netParams *btcnet.Params) (*se
 			discover = false
 			// if this fails we have real issues.
 			port, _ := strconv.ParseUint(
-				activeNetParams.listenPort, 10, 16)
+				activeNetParams.DefaultPort, 10, 16)
 
 			for _, sip := range cfg.ExternalIPs {
 				eport := uint16(port)
@@ -1069,7 +1069,7 @@ func newServer(listenAddrs []string, db btcdb.Db, netParams *btcnet.Params) (*se
 		// TODO(oga) nonstandard port...
 		if wildcard {
 			port, err :=
-				strconv.ParseUint(activeNetParams.listenPort,
+				strconv.ParseUint(activeNetParams.DefaultPort,
 					10, 16)
 			if err != nil {
 				// I can't think of a cleaner way to do this...
