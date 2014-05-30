@@ -369,6 +369,9 @@ func (db *LevelDb) fetchTxDataByLoc(blkHeight int64, txOff int, txLen int, txspe
 
 // FetchTxBySha returns some data for the given Tx Sha.
 func (db *LevelDb) FetchTxBySha(txsha *btcwire.ShaHash) ([]*btcdb.TxListReply, error) {
+	db.dbLock.Lock()
+	defer db.dbLock.Unlock()
+
 	replylen := 0
 	replycnt := 0
 
