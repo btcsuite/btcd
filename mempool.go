@@ -905,8 +905,8 @@ func (mp *txMemPool) maybeAcceptTransaction(tx *btcutil.Tx, isOrphan *bool, isNe
 
 	// Verify crypto signatures for each input and reject the transaction if
 	// any don't verify.
-	flags := btcscript.ScriptBip16 | btcscript.ScriptCanonicalSignatures
-	err = btcchain.ValidateTransactionScripts(tx, txStore, flags)
+	err = btcchain.ValidateTransactionScripts(tx, txStore,
+		standardScriptVerifyFlags)
 	if err != nil {
 		return err
 	}

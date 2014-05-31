@@ -37,6 +37,17 @@ const (
 	// and is used to monitor BIP16 support as well as blocks that are
 	// generated via btcd.
 	coinbaseFlags = "/P2SH/btcd/"
+
+	// standardScriptVerifyFlags are the script flags which are used when
+	// executing transaction scripts to enforce additional checks which
+	// are required for the script to be considered standard.  These checks
+	// help reduce issues related to transaction malleability as well as
+	// allow pay-to-script hash transactions.  Note these flags are
+	// different than what is required for the consensus rules in that they
+	// are more strict.
+	standardScriptVerifyFlags = btcscript.ScriptBip16 |
+		btcscript.ScriptCanonicalSignatures |
+		btcscript.ScriptStrictMultiSig
 )
 
 // txPrioItem houses a transaction along with extra information that allows the
@@ -669,8 +680,8 @@ mempoolLoop:
 			logSkippedDeps(tx, deps)
 			continue
 		}
-		flags := btcscript.ScriptBip16 | btcscript.ScriptCanonicalSignatures
-		err = btcchain.ValidateTransactionScripts(tx, blockTxStore, flags)
+		err = btcchain.ValidateTransactionScripts(tx, blockTxStore,
+			standardScriptVerifyFlags)
 		if err != nil {
 			minrLog.Tracef("Skipping tx %s due to error in "+
 				"ValidateTransactionScripts: %v", tx.Sha(), err)
