@@ -118,12 +118,22 @@ func randomUint16Number(max uint16) uint16 {
 // AddRebroadcastInventory adds 'iv' to the list of inventories to be
 // rebroadcasted at random intervals until they show up in a block.
 func (s *server) AddRebroadcastInventory(iv *btcwire.InvVect) {
+	// Ignore if shutting down.
+	if atomic.LoadInt32(&s.shutdown) != 0 {
+		return
+	}
+
 	s.modifyRebroadcastInv <- broadcastInventoryAdd(iv)
 }
 
 // RemoveRebroadcastInventory removes 'iv' from the list of items to be
 // rebroadcasted if present.
 func (s *server) RemoveRebroadcastInventory(iv *btcwire.InvVect) {
+	// Ignore if shutting down.
+	if atomic.LoadInt32(&s.shutdown) != 0 {
+		return
+	}
+
 	s.modifyRebroadcastInv <- broadcastInventoryDel(iv)
 }
 
@@ -802,6 +812,16 @@ out:
 
 	timer.Stop()
 
+	// Drain channels before exiting so nothing is left waiting around
+	// to send.
+cleanup:
+	for {
+		select {
+		case <-s.modifyRebroadcastInv:
+		default:
+			break cleanup
+		}
+	}
 	s.wg.Done()
 }
 
