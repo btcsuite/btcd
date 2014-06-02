@@ -141,7 +141,7 @@ the type can vary, but usually will be best handled by simply showing/logging
 it.
 
 The third category of errors, that is errors returned by the server, can be
-detected by type asserting the error is a *btcjson.Error.  For example, to
+detected by type asserting the error in a *btcjson.Error.  For example, to
 detect if a command is unimplemented by the remote RPC server:
 
   amount, err := client.GetBalance("")

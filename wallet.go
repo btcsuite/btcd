@@ -600,7 +600,7 @@ func (c *Client) SendFromCommentAsync(fromAccount string,
 	return c.sendCmd(cmd)
 }
 
-// SendFromMinConf sends the passed amount to the given address using the
+// SendFromComment sends the passed amount to the given address using the
 // provided account as a source of funds and stores the provided comment and
 // comment to in the wallet.  The comment parameter is intended to be used for
 // the purpose of the transaction while the commentTo parameter is indended to

@@ -1016,7 +1016,7 @@ func dial(config *ConnConfig) (*websocket.Conn, error) {
 	return wsConn, nil
 }
 
-// New create a new RPC client based on the provided connection configuration
+// New creates a new RPC client based on the provided connection configuration
 // details.  The notification handlers parameter may be nil if you are not
 // interested in receiving notifications and will be ignored when if the
 // configuration is set to run in HTTP POST mode.
