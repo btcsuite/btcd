@@ -86,6 +86,7 @@ the following constants:
 	btcwire.MainNet
 	btcwire.TestNet  (Regression test network)
 	btcwire.TestNet3 (Test network version 3)
+	btcwire.SimNet   (Simulation test network)
 
 Determining Message Type
 
@@ -154,11 +155,5 @@ This package includes spec changes outlined by the following BIPs:
 		BIP0031 (https://en.bitcoin.it/wiki/BIP_0031)
 		BIP0035 (https://en.bitcoin.it/wiki/BIP_0035)
 		BIP0037 (https://en.bitcoin.it/wiki/BIP_0037)
-
-Other important information
-
-The package does not yet implement BIP0037 (https://en.bitcoin.it/wiki/BIP_0037)
-and therefore does not recognize filterload, filteradd, filterclear, or
-merkleblock messages.
 */
 package btcwire
