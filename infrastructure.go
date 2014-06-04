@@ -855,7 +855,15 @@ func (c *Client) start() {
 		c.wg.Add(1)
 		go c.sendPostHandler()
 	} else {
-		c.wg.Add(2)
+		c.wg.Add(3)
+		go func() {
+			if c.ntfnHandlers != nil {
+				if c.ntfnHandlers.OnClientConnected != nil {
+					c.ntfnHandlers.OnClientConnected()
+				}
+			}
+			c.wg.Done()
+		}()
 		go c.wsInHandler()
 		go c.wsOutHandler()
 	}

@@ -79,10 +79,16 @@ func newNilFutureResult() chan *futureResult {
 // notifications are effectively ignored until their handlers are set to a
 // concrete callback.
 //
-// NOTE: These handlers must NOT directly call any blocking calls on the client
-// instance since the input reader goroutine blocks until the callback has
-// completed.  Doing so will result in a deadlock situation.
+// NOTE: Unless otherwise documented, these handlers must NOT directly call any
+// blocking calls on the client instance since the input reader goroutine blocks
+// until the callback has completed.  Doing so will result in a deadlock
+// situation.
 type NotificationHandlers struct {
+	// OnClientConnected is invoked when the client connects or reconnects
+	// to the RPC server.  This callback is run async with the rest of the
+	// notification handlers, and is safe for blocking client requests.
+	OnClientConnected func()
+
 	// OnBlockConnected is invoked when a block is connected to the longest
 	// (best) chain.  It will only be invoked if a preceding call to
 	// NotifyBlocks has been made to register for the notification and the
