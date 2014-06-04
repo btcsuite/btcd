@@ -5,7 +5,6 @@
 package main
 
 import (
-	"bytes"
 	"container/list"
 	crand "crypto/rand" // for seeding
 	"encoding/base32"
@@ -356,12 +355,12 @@ func (a *AddrManager) getNewBucket(netAddr, srcAddr *btcwire.NetAddress) int {
 	hash1 := btcwire.DoubleSha256(data1)
 	hash64 := binary.LittleEndian.Uint64(hash1)
 	hash64 %= newBucketsPerGroup
-	hashbuf := new(bytes.Buffer)
-	binary.Write(hashbuf, binary.LittleEndian, hash64)
+	var hashbuf [8]byte
+	binary.LittleEndian.PutUint64(hashbuf[:], hash64)
 	data2 := []byte{}
 	data2 = append(data2, a.key[:]...)
 	data2 = append(data2, GroupKey(srcAddr)...)
-	data2 = append(data2, hashbuf.Bytes()...)
+	data2 = append(data2, hashbuf[:]...)
 
 	hash2 := btcwire.DoubleSha256(data2)
 	return int(binary.LittleEndian.Uint64(hash2) % newBucketCount)
@@ -376,12 +375,12 @@ func (a *AddrManager) getTriedBucket(netAddr *btcwire.NetAddress) int {
 	hash1 := btcwire.DoubleSha256(data1)
 	hash64 := binary.LittleEndian.Uint64(hash1)
 	hash64 %= triedBucketsPerGroup
-	hashbuf := new(bytes.Buffer)
-	binary.Write(hashbuf, binary.LittleEndian, hash64)
+	var hashbuf [8]byte
+	binary.LittleEndian.PutUint64(hashbuf[:], hash64)
 	data2 := []byte{}
 	data2 = append(data2, a.key[:]...)
 	data2 = append(data2, GroupKey(netAddr)...)
-	data2 = append(data2, hashbuf.Bytes()...)
+	data2 = append(data2, hashbuf[:]...)
 
 	hash2 := btcwire.DoubleSha256(data2)
 	return int(binary.LittleEndian.Uint64(hash2) % triedBucketCount)
