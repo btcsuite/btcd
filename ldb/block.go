@@ -7,7 +7,6 @@ package ldb
 import (
 	"bytes"
 	"encoding/binary"
-	"fmt"
 
 	"github.com/conformal/btcdb"
 	"github.com/conformal/btcutil"
@@ -72,25 +71,17 @@ func (db *LevelDb) FetchBlockHeaderBySha(sha *btcwire.ShaHash) (bh *btcwire.Bloc
 }
 
 func (db *LevelDb) getBlkLoc(sha *btcwire.ShaHash) (int64, error) {
-	var blkHeight int64
-
 	key := shaBlkToKey(sha)
 
 	data, err := db.lDb.Get(key, db.ro)
-
 	if err != nil {
 		return 0, err
 	}
 
 	// deserialize
-	dr := bytes.NewBuffer(data)
-	err = binary.Read(dr, binary.LittleEndian, &blkHeight)
-	if err != nil {
-		log.Tracef("get getBlkLoc len %v\n", len(data))
-		err = fmt.Errorf("Db Corrupt 0")
-		return 0, err
-	}
-	return blkHeight, nil
+	blkHeight := binary.LittleEndian.Uint64(data)
+
+	return int64(blkHeight), nil
 }
 
 func (db *LevelDb) getBlkByHeight(blkHeight int64) (rsha *btcwire.ShaHash, rbuf []byte, err error) {
@@ -131,17 +122,12 @@ func (db *LevelDb) getBlk(sha *btcwire.ShaHash) (rblkHeight int64, rbuf []byte, 
 	return blkHeight, buf, nil
 }
 
-func (db *LevelDb) setBlk(sha *btcwire.ShaHash, blkHeight int64, buf []byte) error {
-
+func (db *LevelDb) setBlk(sha *btcwire.ShaHash, blkHeight int64, buf []byte) {
 	// serialize
-	var lw bytes.Buffer
-	err := binary.Write(&lw, binary.LittleEndian, blkHeight)
-	if err != nil {
-		err = fmt.Errorf("Write Fail")
-		return err
-	}
-	shaKey := shaBlkToKey(sha)
+	var lw [8]byte
+	binary.LittleEndian.PutUint64(lw[:], uint64(blkHeight))
 
+	shaKey := shaBlkToKey(sha)
 	blkKey := int64ToKey(blkHeight)
 
 	shaB := sha.Bytes()
@@ -149,21 +135,15 @@ func (db *LevelDb) setBlk(sha *btcwire.ShaHash, blkHeight int64, buf []byte) err
 	copy(blkVal[0:], shaB)
 	copy(blkVal[len(shaB):], buf)
 
-	db.lBatch().Put(shaKey, lw.Bytes())
-
+	db.lBatch().Put(shaKey, lw[:])
 	db.lBatch().Put(blkKey, blkVal)
-
-	return nil
 }
 
 // insertSha stores a block hash and its associated data block with a
 // previous sha of `prevSha'.
 // insertSha shall be called with db lock held
-func (db *LevelDb) insertBlockData(sha *btcwire.ShaHash, prevSha *btcwire.ShaHash, buf []byte) (blockid int64, err error) {
-
-	var oBlkHeight int64
-	oBlkHeight, err = db.getBlkLoc(prevSha)
-
+func (db *LevelDb) insertBlockData(sha *btcwire.ShaHash, prevSha *btcwire.ShaHash, buf []byte) (int64, error) {
+	oBlkHeight, err := db.getBlkLoc(prevSha)
 	if err != nil {
 		// check current block count
 		// if count != 0  {
@@ -179,11 +159,7 @@ func (db *LevelDb) insertBlockData(sha *btcwire.ShaHash, prevSha *btcwire.ShaHas
 	// TODO(drahn) check curfile filesize, increment curfile if this puts it over
 	blkHeight := oBlkHeight + 1
 
-	err = db.setBlk(sha, blkHeight, buf)
-
-	if err != nil {
-		return
-	}
+	db.setBlk(sha, blkHeight, buf)
 
 	// update the last block cache
 	db.lastBlkShaCached = true

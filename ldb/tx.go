@@ -7,7 +7,6 @@ package ldb
 import (
 	"bytes"
 	"encoding/binary"
-	"fmt"
 
 	"github.com/conformal/btcdb"
 	"github.com/conformal/btcwire"
@@ -61,81 +60,36 @@ func (db *LevelDb) insertTx(txSha *btcwire.ShaHash, height int64, txoff int, txl
 }
 
 // formatTx generates the value buffer for the Tx db.
-func (db *LevelDb) formatTx(txu *txUpdateObj) ([]byte, error) {
-
-	blkHeight := txu.blkHeight
-	txoff := txu.txoff
-	txlen := txu.txlen
+func (db *LevelDb) formatTx(txu *txUpdateObj) []byte {
+	blkHeight := uint64(txu.blkHeight)
+	txOff := uint32(txu.txoff)
+	txLen := uint32(txu.txlen)
 	spentbuf := txu.spentData
 
-	txOff := int32(txoff)
-	txLen := int32(txlen)
+	txW := make([]byte, 16+len(spentbuf))
+	binary.LittleEndian.PutUint64(txW[:], blkHeight)
+	binary.LittleEndian.PutUint32(txW[8:], txOff)
+	binary.LittleEndian.PutUint32(txW[12:], txLen)
+	copy(txW[16:], spentbuf)
 
-	var txW bytes.Buffer
-
-	err := binary.Write(&txW, binary.LittleEndian, blkHeight)
-	if err != nil {
-		err = fmt.Errorf("Write fail")
-		return nil, err
-	}
-
-	err = binary.Write(&txW, binary.LittleEndian, txOff)
-	if err != nil {
-		err = fmt.Errorf("Write fail")
-		return nil, err
-	}
-
-	err = binary.Write(&txW, binary.LittleEndian, txLen)
-	if err != nil {
-		err = fmt.Errorf("Write fail")
-		return nil, err
-	}
-
-	err = binary.Write(&txW, binary.LittleEndian, spentbuf)
-	if err != nil {
-		err = fmt.Errorf("Write fail")
-		return nil, err
-	}
-
-	return txW.Bytes(), nil
+	return txW[:]
 }
 
-func (db *LevelDb) getTxData(txsha *btcwire.ShaHash) (rblkHeight int64,
-	rtxOff int, rtxLen int, rspentBuf []byte, err error) {
-	var buf []byte
-
+func (db *LevelDb) getTxData(txsha *btcwire.ShaHash) (int64, int, int, []byte, error) {
 	key := shaTxToKey(txsha)
-	buf, err = db.lDb.Get(key, db.ro)
+	buf, err := db.lDb.Get(key, db.ro)
 	if err != nil {
-		return
+		return 0, 0, 0, nil, err
 	}
 
-	var blkHeight int64
-	var txOff, txLen int32
-	dr := bytes.NewBuffer(buf)
-	err = binary.Read(dr, binary.LittleEndian, &blkHeight)
-	if err != nil {
-		err = fmt.Errorf("Db Corrupt 1")
-		return
-	}
-	err = binary.Read(dr, binary.LittleEndian, &txOff)
-	if err != nil {
-		err = fmt.Errorf("Db Corrupt 2")
-		return
-	}
-	err = binary.Read(dr, binary.LittleEndian, &txLen)
-	if err != nil {
-		err = fmt.Errorf("Db Corrupt 3")
-		return
-	}
-	// remainder of buffer is spentbuf
-	spentBuf := make([]byte, dr.Len())
-	err = binary.Read(dr, binary.LittleEndian, spentBuf)
-	if err != nil {
-		err = fmt.Errorf("Db Corrupt 4")
-		return
-	}
-	return blkHeight, int(txOff), int(txLen), spentBuf, nil
+	blkHeight := binary.LittleEndian.Uint64(buf)
+	txOff := binary.LittleEndian.Uint32(buf[8:])
+	txLen := binary.LittleEndian.Uint32(buf[12:])
+
+	spentBuf := make([]byte, len(buf)-16)
+	copy(spentBuf, buf[16:])
+
+	return int64(blkHeight), int(txOff), int(txLen), spentBuf, nil
 }
 
 func (db *LevelDb) getTxFullySpent(txsha *btcwire.ShaHash) ([]*spentTx, error) {
@@ -150,41 +104,22 @@ func (db *LevelDb) getTxFullySpent(txsha *btcwire.ShaHash) ([]*spentTx, error) {
 		return badTxList, err
 	}
 	txListLen := len(buf) / 20
-	txR := bytes.NewBuffer(buf)
+
 	spentTxList = make([]*spentTx, txListLen, txListLen)
-
 	for i := range spentTxList {
-		var sTx spentTx
-		var blkHeight int64
-		var txOff, txLen, numTxO int32
+		offset := i * 20
 
-		err := binary.Read(txR, binary.LittleEndian, &blkHeight)
-		if err != nil {
-			err = fmt.Errorf("sTx Read fail 0")
-			return nil, err
-		}
-		sTx.blkHeight = blkHeight
+		blkHeight := binary.LittleEndian.Uint64(buf[offset:])
+		txOff := binary.LittleEndian.Uint32(buf[offset+8:])
+		txLen := binary.LittleEndian.Uint32(buf[offset+12:])
+		numTxO := binary.LittleEndian.Uint32(buf[offset+16:])
 
-		err = binary.Read(txR, binary.LittleEndian, &txOff)
-		if err != nil {
-			err = fmt.Errorf("sTx Read fail 1")
-			return nil, err
+		sTx := spentTx{
+			blkHeight: int64(blkHeight),
+			txoff:     int(txOff),
+			txlen:     int(txLen),
+			numTxO:    int(numTxO),
 		}
-		sTx.txoff = int(txOff)
-
-		err = binary.Read(txR, binary.LittleEndian, &txLen)
-		if err != nil {
-			err = fmt.Errorf("sTx Read fail 2")
-			return nil, err
-		}
-		sTx.txlen = int(txLen)
-
-		err = binary.Read(txR, binary.LittleEndian, &numTxO)
-		if err != nil {
-			err = fmt.Errorf("sTx Read fail 3")
-			return nil, err
-		}
-		sTx.numTxO = int(numTxO)
 
 		spentTxList[i] = &sTx
 	}
@@ -192,41 +127,23 @@ func (db *LevelDb) getTxFullySpent(txsha *btcwire.ShaHash) ([]*spentTx, error) {
 	return spentTxList, nil
 }
 
-func (db *LevelDb) formatTxFullySpent(sTxList []*spentTx) ([]byte, error) {
-	var txW bytes.Buffer
+func (db *LevelDb) formatTxFullySpent(sTxList []*spentTx) []byte {
+	txW := make([]byte, 20*len(sTxList))
 
-	for _, sTx := range sTxList {
-		blkHeight := sTx.blkHeight
-		txOff := int32(sTx.txoff)
-		txLen := int32(sTx.txlen)
-		numTxO := int32(sTx.numTxO)
+	for i, sTx := range sTxList {
+		blkHeight := uint64(sTx.blkHeight)
+		txOff := uint32(sTx.txoff)
+		txLen := uint32(sTx.txlen)
+		numTxO := uint32(sTx.numTxO)
+		offset := i * 20
 
-		err := binary.Write(&txW, binary.LittleEndian, blkHeight)
-		if err != nil {
-			err = fmt.Errorf("Write fail")
-			return nil, err
-		}
-
-		err = binary.Write(&txW, binary.LittleEndian, txOff)
-		if err != nil {
-			err = fmt.Errorf("Write fail")
-			return nil, err
-		}
-
-		err = binary.Write(&txW, binary.LittleEndian, txLen)
-		if err != nil {
-			err = fmt.Errorf("Write fail")
-			return nil, err
-		}
-
-		err = binary.Write(&txW, binary.LittleEndian, numTxO)
-		if err != nil {
-			err = fmt.Errorf("Write fail")
-			return nil, err
-		}
+		binary.LittleEndian.PutUint64(txW[offset:], blkHeight)
+		binary.LittleEndian.PutUint32(txW[offset+8:], txOff)
+		binary.LittleEndian.PutUint32(txW[offset+12:], txLen)
+		binary.LittleEndian.PutUint32(txW[offset+16:], numTxO)
 	}
 
-	return txW.Bytes(), nil
+	return txW
 }
 
 // ExistsTxSha returns if the given tx sha exists in the database
