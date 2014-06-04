@@ -1209,12 +1209,10 @@ func GroupKey(na *btcwire.NetAddress) string {
 	}
 
 	// OK, so now we know ourselves to be a IPv6 address.
-	// bitcoind uses /32 for everything but what it calls he.net, which is
-	// it uses /36 for. he.net is actualy 2001:470::/32, whereas bitcoind
-	// counts it as 2011:470::/32.
-
+	// bitcoind uses /32 for everything, except for Hurricane Electric's
+	// (he.net) IP range, which it uses /36 for.
 	bits := 32
-	heNet := &net.IPNet{IP: net.ParseIP("2011:470::"),
+	heNet := &net.IPNet{IP: net.ParseIP("2001:470::"),
 		Mask: net.CIDRMask(32, 128)}
 	if heNet.Contains(na.IP) {
 		bits = 36
