@@ -24,7 +24,7 @@ func main() {
 			log.Printf("Block connected: %v (%d)", hash, height)
 		},
 		OnBlockDisconnected: func(hash *btcwire.ShaHash, height int32) {
-			log.Printf("Block disconnected: %v", hash, height)
+			log.Printf("Block disconnected: %v (%d)", hash, height)
 		},
 	}
 
