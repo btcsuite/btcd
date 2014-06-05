@@ -119,8 +119,7 @@ func TestFilterLoadMaxHashFuncsSize(t *testing.T) {
 		0x00, // update Type
 	}
 	// Decode with latest protocol version.
-	buf1 := bytes.NewBuffer(newBuf)
-	readbuf := bytes.NewReader(buf1.Bytes())
+	readbuf := bytes.NewReader(newBuf)
 	err = msg.BtcDecode(readbuf, btcwire.ProtocolVersion)
 	if err == nil {
 		t.Errorf("decode of MsgFilterLoad succeeded when it shouldn't have %v",

@@ -92,7 +92,7 @@ func BenchmarkWriteVarInt9(b *testing.B) {
 func BenchmarkReadVarInt1(b *testing.B) {
 	buf := []byte{0x01}
 	for i := 0; i < b.N; i++ {
-		btcwire.TstReadVarInt(bytes.NewBuffer(buf), 0)
+		btcwire.TstReadVarInt(bytes.NewReader(buf), 0)
 	}
 }
 
@@ -101,7 +101,7 @@ func BenchmarkReadVarInt1(b *testing.B) {
 func BenchmarkReadVarInt3(b *testing.B) {
 	buf := []byte{0x0fd, 0xff, 0xff}
 	for i := 0; i < b.N; i++ {
-		btcwire.TstReadVarInt(bytes.NewBuffer(buf), 0)
+		btcwire.TstReadVarInt(bytes.NewReader(buf), 0)
 	}
 }
 
@@ -110,7 +110,7 @@ func BenchmarkReadVarInt3(b *testing.B) {
 func BenchmarkReadVarInt5(b *testing.B) {
 	buf := []byte{0xfe, 0xff, 0xff, 0xff, 0xff}
 	for i := 0; i < b.N; i++ {
-		btcwire.TstReadVarInt(bytes.NewBuffer(buf), 0)
+		btcwire.TstReadVarInt(bytes.NewReader(buf), 0)
 	}
 }
 
@@ -119,7 +119,7 @@ func BenchmarkReadVarInt5(b *testing.B) {
 func BenchmarkReadVarInt9(b *testing.B) {
 	buf := []byte{0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff}
 	for i := 0; i < b.N; i++ {
-		btcwire.TstReadVarInt(bytes.NewBuffer(buf), 0)
+		btcwire.TstReadVarInt(bytes.NewReader(buf), 0)
 	}
 }
 
@@ -128,7 +128,7 @@ func BenchmarkReadVarInt9(b *testing.B) {
 func BenchmarkReadVarStr4(b *testing.B) {
 	buf := []byte{0x04, 't', 'e', 's', 't'}
 	for i := 0; i < b.N; i++ {
-		btcwire.TstReadVarString(bytes.NewBuffer(buf), 0)
+		btcwire.TstReadVarString(bytes.NewReader(buf), 0)
 	}
 }
 
@@ -137,7 +137,7 @@ func BenchmarkReadVarStr4(b *testing.B) {
 func BenchmarkReadVarStr10(b *testing.B) {
 	buf := []byte{0x0a, 't', 'e', 's', 't', '0', '1', '2', '3', '4', '5'}
 	for i := 0; i < b.N; i++ {
-		btcwire.TstReadVarString(bytes.NewBuffer(buf), 0)
+		btcwire.TstReadVarString(bytes.NewReader(buf), 0)
 	}
 }
 
@@ -169,7 +169,7 @@ func BenchmarkReadOutPoint(b *testing.B) {
 	}
 	var op btcwire.OutPoint
 	for i := 0; i < b.N; i++ {
-		btcwire.TstReadOutPoint(bytes.NewBuffer(buf), 0, 0, &op)
+		btcwire.TstReadOutPoint(bytes.NewReader(buf), 0, 0, &op)
 	}
 }
 
@@ -205,7 +205,7 @@ func BenchmarkReadTxOut(b *testing.B) {
 	}
 	var txOut btcwire.TxOut
 	for i := 0; i < b.N; i++ {
-		btcwire.TstReadTxOut(bytes.NewBuffer(buf), 0, 0, &txOut)
+		btcwire.TstReadTxOut(bytes.NewReader(buf), 0, 0, &txOut)
 	}
 }
 
@@ -233,7 +233,7 @@ func BenchmarkReadTxIn(b *testing.B) {
 	}
 	var txIn btcwire.TxIn
 	for i := 0; i < b.N; i++ {
-		btcwire.TstReadTxIn(bytes.NewBuffer(buf), 0, 0, &txIn)
+		btcwire.TstReadTxIn(bytes.NewReader(buf), 0, 0, &txIn)
 	}
 }
 
@@ -278,7 +278,7 @@ func BenchmarkDeserializeTx(b *testing.B) {
 	}
 	var tx btcwire.MsgTx
 	for i := 0; i < b.N; i++ {
-		tx.Deserialize(bytes.NewBuffer(buf))
+		tx.Deserialize(bytes.NewReader(buf))
 
 	}
 }
@@ -313,7 +313,7 @@ func BenchmarkReadBlockHeader(b *testing.B) {
 	}
 	var header btcwire.BlockHeader
 	for i := 0; i < b.N; i++ {
-		btcwire.TstReadBlockHeader(bytes.NewBuffer(buf), 0, &header)
+		btcwire.TstReadBlockHeader(bytes.NewReader(buf), 0, &header)
 	}
 }
 

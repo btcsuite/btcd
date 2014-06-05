@@ -191,7 +191,7 @@ func TestAddrWire(t *testing.T) {
 
 		// Decode the message from wire format.
 		var msg btcwire.MsgAddr
-		rbuf := bytes.NewBuffer(test.buf)
+		rbuf := bytes.NewReader(test.buf)
 		err = msg.BtcDecode(rbuf, test.pver)
 		if err != nil {
 			t.Errorf("BtcDecode #%d error %v", i, err)

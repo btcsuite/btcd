@@ -201,7 +201,7 @@ func TestNetAddressWire(t *testing.T) {
 
 		// Decode the message from wire format.
 		var na btcwire.NetAddress
-		rbuf := bytes.NewBuffer(test.buf)
+		rbuf := bytes.NewReader(test.buf)
 		err = btcwire.TstReadNetAddress(rbuf, test.pver, &na, test.ts)
 		if err != nil {
 			t.Errorf("readNetAddress #%d error %v", i, err)

@@ -153,7 +153,7 @@ func readMessageHeader(r io.Reader) (int, *messageHeader, error) {
 	if err != nil {
 		return n, nil, err
 	}
-	hr := bytes.NewBuffer(headerBytes[:])
+	hr := bytes.NewReader(headerBytes[:])
 
 	// Create and populate a messageHeader struct from the raw header bytes.
 	hdr := messageHeader{}
@@ -346,7 +346,8 @@ func ReadMessageN(r io.Reader, pver uint32, btcnet BitcoinNet) (int, Message, []
 		return totalBytes, nil, nil, messageError("ReadMessage", str)
 	}
 
-	// Unmarshal message.
+	// Unmarshal message.  NOTE: This must be a *bytes.Buffer since the
+	// MsgVersion BtcDecode function requires it.
 	pr := bytes.NewBuffer(payload)
 	err = msg.BtcDecode(pr, pver)
 	if err != nil {

@@ -122,7 +122,7 @@ func TestMessage(t *testing.T) {
 		}
 
 		// Decode from wire format.
-		rbuf := bytes.NewBuffer(buf.Bytes())
+		rbuf := bytes.NewReader(buf.Bytes())
 		nr, msg, _, err := btcwire.ReadMessageN(rbuf, test.pver, test.btcnet)
 		if err != nil {
 			t.Errorf("ReadMessage #%d error %v, msg %v", i, err,
@@ -155,7 +155,7 @@ func TestMessage(t *testing.T) {
 		}
 
 		// Decode from wire format.
-		rbuf := bytes.NewBuffer(buf.Bytes())
+		rbuf := bytes.NewReader(buf.Bytes())
 		msg, _, err := btcwire.ReadMessage(rbuf, test.pver, test.btcnet)
 		if err != nil {
 			t.Errorf("ReadMessage #%d error %v, msg %v", i, err,

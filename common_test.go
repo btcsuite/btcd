@@ -151,7 +151,7 @@ func TestElementWire(t *testing.T) {
 		}
 
 		// Read from wire format.
-		rbuf := bytes.NewBuffer(test.buf)
+		rbuf := bytes.NewReader(test.buf)
 		val := test.in
 		if reflect.ValueOf(test.in).Kind() != reflect.Ptr {
 			val = reflect.New(reflect.TypeOf(test.in)).Interface()
@@ -294,7 +294,7 @@ func TestVarIntWire(t *testing.T) {
 		}
 
 		// Decode from wire format.
-		rbuf := bytes.NewBuffer(test.buf)
+		rbuf := bytes.NewReader(test.buf)
 		val, err := btcwire.TstReadVarInt(rbuf, test.pver)
 		if err != nil {
 			t.Errorf("readVarInt #%d error %v", i, err)
@@ -426,7 +426,7 @@ func TestVarStringWire(t *testing.T) {
 		}
 
 		// Decode from wire format.
-		rbuf := bytes.NewBuffer(test.buf)
+		rbuf := bytes.NewReader(test.buf)
 		val, err := btcwire.TstReadVarString(rbuf, test.pver)
 		if err != nil {
 			t.Errorf("readVarString #%d error %v", i, err)
@@ -508,7 +508,7 @@ func TestVarStringOverflowErrors(t *testing.T) {
 	t.Logf("Running %d tests", len(tests))
 	for i, test := range tests {
 		// Decode from wire format.
-		rbuf := bytes.NewBuffer(test.buf)
+		rbuf := bytes.NewReader(test.buf)
 		_, err := btcwire.TstReadVarString(rbuf, test.pver)
 		if reflect.TypeOf(err) != reflect.TypeOf(test.err) {
 			t.Errorf("readVarString #%d wrong error got: %v, "+
@@ -556,7 +556,7 @@ func TestVarBytesWire(t *testing.T) {
 		}
 
 		// Decode from wire format.
-		rbuf := bytes.NewBuffer(test.buf)
+		rbuf := bytes.NewReader(test.buf)
 		val, err := btcwire.TstReadVarBytes(rbuf, test.pver,
 			btcwire.MaxMessagePayload, "test payload")
 		if err != nil {
@@ -640,7 +640,7 @@ func TestVarBytesOverflowErrors(t *testing.T) {
 	t.Logf("Running %d tests", len(tests))
 	for i, test := range tests {
 		// Decode from wire format.
-		rbuf := bytes.NewBuffer(test.buf)
+		rbuf := bytes.NewReader(test.buf)
 		_, err := btcwire.TstReadVarBytes(rbuf, test.pver,
 			btcwire.MaxMessagePayload, "test payload")
 		if reflect.TypeOf(err) != reflect.TypeOf(test.err) {

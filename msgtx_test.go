@@ -287,7 +287,7 @@ func TestTxWire(t *testing.T) {
 
 		// Decode the message from wire format.
 		var msg btcwire.MsgTx
-		rbuf := bytes.NewBuffer(test.buf)
+		rbuf := bytes.NewReader(test.buf)
 		err = msg.BtcDecode(rbuf, test.pver)
 		if err != nil {
 			t.Errorf("BtcDecode #%d error %v", i, err)
@@ -416,7 +416,7 @@ func TestTxSerialize(t *testing.T) {
 
 		// Deserialize the transaction.
 		var tx btcwire.MsgTx
-		rbuf := bytes.NewBuffer(test.buf)
+		rbuf := bytes.NewReader(test.buf)
 		err = tx.Deserialize(rbuf)
 		if err != nil {
 			t.Errorf("Deserialize #%d error %v", i, err)
@@ -568,7 +568,7 @@ func TestTxOverflowErrors(t *testing.T) {
 	for i, test := range tests {
 		// Decode from wire format.
 		var msg btcwire.MsgTx
-		r := bytes.NewBuffer(test.buf)
+		r := bytes.NewReader(test.buf)
 		err := msg.BtcDecode(r, test.pver)
 		if reflect.TypeOf(err) != reflect.TypeOf(test.err) {
 			t.Errorf("BtcDecode #%d wrong error got: %v, want: %v",
@@ -577,7 +577,7 @@ func TestTxOverflowErrors(t *testing.T) {
 		}
 
 		// Decode from wire format.
-		r = bytes.NewBuffer(test.buf)
+		r = bytes.NewReader(test.buf)
 		err = msg.Deserialize(r)
 		if reflect.TypeOf(err) != reflect.TypeOf(test.err) {
 			t.Errorf("Deserialize #%d wrong error got: %v, want: %v",

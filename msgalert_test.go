@@ -157,7 +157,7 @@ func TestMsgAlertWire(t *testing.T) {
 
 		// Decode the message from wire format.
 		var msg btcwire.MsgAlert
-		rbuf := bytes.NewBuffer(test.buf)
+		rbuf := bytes.NewReader(test.buf)
 		err = msg.BtcDecode(rbuf, test.pver)
 		if err != nil {
 			t.Errorf("BtcDecode #%d error %v", i, err)
@@ -440,7 +440,7 @@ func TestAlertErrors(t *testing.T) {
 		0x55, 0x52, 0x47, 0x45, 0x4e, 0x54, 0x00, //|URGENT.|
 	}
 	var alert btcwire.Alert
-	r := bytes.NewBuffer(badAlertEncoded)
+	r := bytes.NewReader(badAlertEncoded)
 	err := alert.Deserialize(r, pver)
 	if _, ok := err.(*btcwire.MessageError); !ok {
 		t.Errorf("Alert.Deserialize wrong error got: %T, want: %T",
@@ -457,7 +457,7 @@ func TestAlertErrors(t *testing.T) {
 		0x73, 0x68, 0x69, 0x3a, 0x30, 0x2e, 0x37, 0x2e, 0x32, 0x2f, 0x88, 0x13, 0x00, 0x00, 0x00, 0x06, //|shi:0.7.2/......|
 		0x55, 0x52, 0x47, 0x45, 0x4e, 0x54, 0x00, //|URGENT.|
 	}
-	r = bytes.NewBuffer(badAlertEncoded)
+	r = bytes.NewReader(badAlertEncoded)
 	err = alert.Deserialize(r, pver)
 	if _, ok := err.(*btcwire.MessageError); !ok {
 		t.Errorf("Alert.Deserialize wrong error got: %T, want: %T",

@@ -183,7 +183,7 @@ func TestBlockWire(t *testing.T) {
 
 		// Decode the message from wire format.
 		var msg btcwire.MsgBlock
-		rbuf := bytes.NewBuffer(test.buf)
+		rbuf := bytes.NewReader(test.buf)
 		err = msg.BtcDecode(rbuf, test.pver)
 		if err != nil {
 			t.Errorf("BtcDecode #%d error %v", i, err)
@@ -287,7 +287,7 @@ func TestBlockSerialize(t *testing.T) {
 
 		// Deserialize the block.
 		var block btcwire.MsgBlock
-		rbuf := bytes.NewBuffer(test.buf)
+		rbuf := bytes.NewReader(test.buf)
 		err = block.Deserialize(rbuf)
 		if err != nil {
 			t.Errorf("Deserialize #%d error %v", i, err)
@@ -302,8 +302,8 @@ func TestBlockSerialize(t *testing.T) {
 		// Deserialize the block while gathering transaction location
 		// information.
 		var txLocBlock btcwire.MsgBlock
-		rbuf = bytes.NewBuffer(test.buf)
-		txLocs, err := txLocBlock.DeserializeTxLoc(rbuf)
+		br := bytes.NewBuffer(test.buf)
+		txLocs, err := txLocBlock.DeserializeTxLoc(br)
 		if err != nil {
 			t.Errorf("DeserializeTxLoc #%d error %v", i, err)
 			continue
@@ -371,8 +371,8 @@ func TestBlockSerializeErrors(t *testing.T) {
 		}
 
 		var txLocBlock btcwire.MsgBlock
-		rbuf := bytes.NewBuffer(test.buf[0:test.max])
-		_, err = txLocBlock.DeserializeTxLoc(rbuf)
+		br := bytes.NewBuffer(test.buf[0:test.max])
+		_, err = txLocBlock.DeserializeTxLoc(br)
 		if err != test.readErr {
 			t.Errorf("DeserializeTxLoc #%d wrong error got: %v, want: %v",
 				i, err, test.readErr)
@@ -421,7 +421,7 @@ func TestBlockOverflowErrors(t *testing.T) {
 	for i, test := range tests {
 		// Decode from wire format.
 		var msg btcwire.MsgBlock
-		r := bytes.NewBuffer(test.buf)
+		r := bytes.NewReader(test.buf)
 		err := msg.BtcDecode(r, test.pver)
 		if reflect.TypeOf(err) != reflect.TypeOf(test.err) {
 			t.Errorf("BtcDecode #%d wrong error got: %v, want: %v",
@@ -430,7 +430,7 @@ func TestBlockOverflowErrors(t *testing.T) {
 		}
 
 		// Deserialize from wire format.
-		r = bytes.NewBuffer(test.buf)
+		r = bytes.NewReader(test.buf)
 		err = msg.Deserialize(r)
 		if reflect.TypeOf(err) != reflect.TypeOf(test.err) {
 			t.Errorf("Deserialize #%d wrong error got: %v, want: %v",
@@ -439,8 +439,8 @@ func TestBlockOverflowErrors(t *testing.T) {
 		}
 
 		// Deserialize with transaction location info from wire format.
-		r = bytes.NewBuffer(test.buf)
-		_, err = msg.DeserializeTxLoc(r)
+		br := bytes.NewBuffer(test.buf)
+		_, err = msg.DeserializeTxLoc(br)
 		if reflect.TypeOf(err) != reflect.TypeOf(test.err) {
 			t.Errorf("DeserializeTxLoc #%d wrong error got: %v, "+
 				"want: %v", i, err, reflect.TypeOf(test.err))

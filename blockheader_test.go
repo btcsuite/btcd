@@ -141,7 +141,7 @@ func TestBlockHeaderWire(t *testing.T) {
 
 		// Decode the block header from wire format.
 		var bh btcwire.BlockHeader
-		rbuf := bytes.NewBuffer(test.buf)
+		rbuf := bytes.NewReader(test.buf)
 		err = btcwire.TstReadBlockHeader(rbuf, test.pver, &bh)
 		if err != nil {
 			t.Errorf("readBlockHeader #%d error %v", i, err)
@@ -215,7 +215,7 @@ func TestBlockHeaderSerialize(t *testing.T) {
 
 		// Deserialize the block header.
 		var bh btcwire.BlockHeader
-		rbuf := bytes.NewBuffer(test.buf)
+		rbuf := bytes.NewReader(test.buf)
 		err = bh.Deserialize(rbuf)
 		if err != nil {
 			t.Errorf("Deserialize #%d error %v", i, err)
