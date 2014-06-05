@@ -649,10 +649,10 @@ func (db *LevelDb) processBatches() error {
 		for txSha, txU := range db.txUpdateMap {
 			key := shaTxToKey(&txSha)
 			if txU.delete {
-				log.Tracef("deleting tx %v", txSha)
+				//log.Tracef("deleting tx %v", txSha)
 				db.lbatch.Delete(key)
 			} else {
-				log.Tracef("inserting tx %v", txSha)
+				//log.Tracef("inserting tx %v", txSha)
 				txdat := db.formatTx(txU)
 				db.lbatch.Put(key, txdat)
 			}
@@ -660,10 +660,10 @@ func (db *LevelDb) processBatches() error {
 		for txSha, txSu := range db.txSpentUpdateMap {
 			key := shaSpentTxToKey(&txSha)
 			if txSu.delete {
-				log.Tracef("deleting tx %v", txSha)
+				//log.Tracef("deleting tx %v", txSha)
 				db.lbatch.Delete(key)
 			} else {
-				log.Tracef("inserting tx %v", txSha)
+				//log.Tracef("inserting tx %v", txSha)
 				txdat := db.formatTxFullySpent(txSu.txl)
 				db.lbatch.Put(key, txdat)
 			}

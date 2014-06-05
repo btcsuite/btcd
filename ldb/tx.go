@@ -67,9 +67,9 @@ func (db *LevelDb) formatTx(txu *txUpdateObj) []byte {
 	spentbuf := txu.spentData
 
 	txW := make([]byte, 16+len(spentbuf))
-	binary.LittleEndian.PutUint64(txW[:], blkHeight)
-	binary.LittleEndian.PutUint32(txW[8:], txOff)
-	binary.LittleEndian.PutUint32(txW[12:], txLen)
+	binary.LittleEndian.PutUint64(txW[0:8], blkHeight)
+	binary.LittleEndian.PutUint32(txW[8:12], txOff)
+	binary.LittleEndian.PutUint32(txW[12:16], txLen)
 	copy(txW[16:], spentbuf)
 
 	return txW[:]
@@ -82,9 +82,9 @@ func (db *LevelDb) getTxData(txsha *btcwire.ShaHash) (int64, int, int, []byte, e
 		return 0, 0, 0, nil, err
 	}
 
-	blkHeight := binary.LittleEndian.Uint64(buf)
-	txOff := binary.LittleEndian.Uint32(buf[8:])
-	txLen := binary.LittleEndian.Uint32(buf[12:])
+	blkHeight := binary.LittleEndian.Uint64(buf[0:8])
+	txOff := binary.LittleEndian.Uint32(buf[8:12])
+	txLen := binary.LittleEndian.Uint32(buf[12:16])
 
 	spentBuf := make([]byte, len(buf)-16)
 	copy(spentBuf, buf[16:])
@@ -109,10 +109,10 @@ func (db *LevelDb) getTxFullySpent(txsha *btcwire.ShaHash) ([]*spentTx, error) {
 	for i := range spentTxList {
 		offset := i * 20
 
-		blkHeight := binary.LittleEndian.Uint64(buf[offset:])
-		txOff := binary.LittleEndian.Uint32(buf[offset+8:])
-		txLen := binary.LittleEndian.Uint32(buf[offset+12:])
-		numTxO := binary.LittleEndian.Uint32(buf[offset+16:])
+		blkHeight := binary.LittleEndian.Uint64(buf[offset:offset+8])
+		txOff := binary.LittleEndian.Uint32(buf[offset+8:offset+12])
+		txLen := binary.LittleEndian.Uint32(buf[offset+12:offset+16])
+		numTxO := binary.LittleEndian.Uint32(buf[offset+16:offset+20])
 
 		sTx := spentTx{
 			blkHeight: int64(blkHeight),
@@ -137,10 +137,10 @@ func (db *LevelDb) formatTxFullySpent(sTxList []*spentTx) []byte {
 		numTxO := uint32(sTx.numTxO)
 		offset := i * 20
 
-		binary.LittleEndian.PutUint64(txW[offset:], blkHeight)
-		binary.LittleEndian.PutUint32(txW[offset+8:], txOff)
-		binary.LittleEndian.PutUint32(txW[offset+12:], txLen)
-		binary.LittleEndian.PutUint32(txW[offset+16:], numTxO)
+		binary.LittleEndian.PutUint64(txW[offset:offset+8], blkHeight)
+		binary.LittleEndian.PutUint32(txW[offset+8:offset+12], txOff)
+		binary.LittleEndian.PutUint32(txW[offset+12:offset+16], txLen)
+		binary.LittleEndian.PutUint32(txW[offset+16:offset+20], numTxO)
 	}
 
 	return txW
@@ -272,7 +272,7 @@ func (db *LevelDb) fetchTxDataByLoc(blkHeight int64, txOff int, txLen int, txspe
 		err = btcdb.TxShaMissing
 		return
 	}
-	rbuf := bytes.NewBuffer(blkbuf[txOff : txOff+txLen])
+	rbuf := bytes.NewReader(blkbuf[txOff : txOff+txLen])
 
 	var tx btcwire.MsgTx
 	err = tx.Deserialize(rbuf)

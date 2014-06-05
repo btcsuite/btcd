@@ -61,7 +61,7 @@ func (db *LevelDb) FetchBlockHeaderBySha(sha *btcwire.ShaHash) (bh *btcwire.Bloc
 	// Only deserialize the header portion and ensure the transaction count
 	// is zero since this is a standalone header.
 	var blockHeader btcwire.BlockHeader
-	err = blockHeader.Deserialize(bytes.NewBuffer(buf))
+	err = blockHeader.Deserialize(bytes.NewReader(buf))
 	if err != nil {
 		return nil, err
 	}
@@ -125,7 +125,7 @@ func (db *LevelDb) getBlk(sha *btcwire.ShaHash) (rblkHeight int64, rbuf []byte, 
 func (db *LevelDb) setBlk(sha *btcwire.ShaHash, blkHeight int64, buf []byte) {
 	// serialize
 	var lw [8]byte
-	binary.LittleEndian.PutUint64(lw[:], uint64(blkHeight))
+	binary.LittleEndian.PutUint64(lw[0:8], uint64(blkHeight))
 
 	shaKey := shaBlkToKey(sha)
 	blkKey := int64ToKey(blkHeight)
