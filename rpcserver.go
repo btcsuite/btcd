@@ -786,7 +786,7 @@ func handleDecodeRawTransaction(s *rpcServer, cmd btcjson.Cmd) (interface{}, err
 		}
 	}
 	var mtx btcwire.MsgTx
-	err = mtx.Deserialize(bytes.NewBuffer(serializedTx))
+	err = mtx.Deserialize(bytes.NewReader(serializedTx))
 	if err != nil {
 		return nil, btcjson.Error{
 			Code:    btcjson.ErrDeserialization.Code,
@@ -1683,7 +1683,7 @@ func handleGetWorkSubmission(s *rpcServer, hexData string) (interface{}, error) 
 
 	// Deserialize the block header from the data.
 	var submittedHeader btcwire.BlockHeader
-	bhBuf := bytes.NewBuffer(data[0:btcwire.MaxBlockHeaderPayload])
+	bhBuf := bytes.NewReader(data[0:btcwire.MaxBlockHeaderPayload])
 	err = submittedHeader.Deserialize(bhBuf)
 	if err != nil {
 		return false, btcjson.Error{
@@ -1888,7 +1888,7 @@ func handleSendRawTransaction(s *rpcServer, cmd btcjson.Cmd) (interface{}, error
 		return nil, btcjson.ErrDecodeHexString
 	}
 	msgtx := btcwire.NewMsgTx()
-	err = msgtx.Deserialize(bytes.NewBuffer(serializedTx))
+	err = msgtx.Deserialize(bytes.NewReader(serializedTx))
 	if err != nil {
 		err := btcjson.Error{
 			Code:    btcjson.ErrDeserialization.Code,
