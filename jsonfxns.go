@@ -53,7 +53,7 @@ func jsonRpcSend(user string, password string, server string, message []byte,
 	}
 	credentials := user + ":" + password
 	resp, err := client.Post(protocol+"://"+credentials+"@"+server,
-		"application/json", bytes.NewBuffer(message))
+		"application/json", bytes.NewReader(message))
 	if err != nil {
 		// We do not want to log the username/password in the errors.
 		replaceStr := "<username>:<password>"
