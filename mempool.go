@@ -187,9 +187,7 @@ func checkPkScriptStandard(pkScript []byte, scriptClass btcscript.ScriptClass) e
 		// A standard multi-signature public key script must contain
 		// from 1 to maxStandardMultiSigKeys public keys.
 		if numPubKeys < 1 {
-			str := fmt.Sprintf("multi-signature script with no " +
-				"pubkeys")
-			return TxRuleError(str)
+			return TxRuleError("multi-signature script with no pubkeys")
 		}
 		if numPubKeys > maxStandardMultiSigKeys {
 			str := fmt.Sprintf("multi-signature script with %d "+
@@ -202,9 +200,7 @@ func checkPkScriptStandard(pkScript []byte, scriptClass btcscript.ScriptClass) e
 		// least 1 signature and no more signatures than available
 		// public keys.
 		if numSigs < 1 {
-			str := fmt.Sprintf("multi-signature script with no " +
-				"signatures")
-			return TxRuleError(str)
+			return TxRuleError("multi-signature script with no signatures")
 		}
 		if numSigs > numPubKeys {
 			str := fmt.Sprintf("multi-signature script with %d "+
@@ -214,7 +210,7 @@ func checkPkScriptStandard(pkScript []byte, scriptClass btcscript.ScriptClass) e
 		}
 
 	case btcscript.NonStandardTy:
-		return TxRuleError(fmt.Sprintf("non-standard script form"))
+		return TxRuleError("non-standard script form")
 	}
 
 	return nil
@@ -241,8 +237,7 @@ func checkTransactionStandard(tx *btcutil.Tx, height int64) error {
 	// The transaction must be finalized to be standard and therefore
 	// considered for inclusion in a block.
 	if !btcchain.IsFinalizedTransaction(tx, height, time.Now()) {
-		str := fmt.Sprintf("transaction is not finalized")
-		return TxRuleError(str)
+		return TxRuleError("transaction is not finalized")
 	}
 
 	// Since extremely large transactions with a lot of inputs can cost
@@ -826,8 +821,7 @@ func (mp *txMemPool) maybeAcceptTransaction(tx *btcutil.Tx, isOrphan *bool, isNe
 	if txD, exists := txStore[*txHash]; exists && txD.Err == nil {
 		for _, isOutputSpent := range txD.Spent {
 			if !isOutputSpent {
-				str := fmt.Sprintf("transaction already exists")
-				return TxRuleError(str)
+				return TxRuleError("transaction already exists")
 			}
 		}
 	}
