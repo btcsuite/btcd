@@ -83,7 +83,7 @@ func (r FutureGetRawTransactionResult) Receive() (*btcutil.Tx, error) {
 
 	// Deserialize the transaction and return it.
 	var msgTx btcwire.MsgTx
-	if err := msgTx.Deserialize(bytes.NewBuffer(serializedTx)); err != nil {
+	if err := msgTx.Deserialize(bytes.NewReader(serializedTx)); err != nil {
 		return nil, err
 	}
 	return btcutil.NewTx(&msgTx), nil
@@ -240,7 +240,7 @@ func (r FutureCreateRawTransactionResult) Receive() (*btcwire.MsgTx, error) {
 
 	// Deserialize the transaction and return it.
 	var msgTx btcwire.MsgTx
-	if err := msgTx.Deserialize(bytes.NewBuffer(serializedTx)); err != nil {
+	if err := msgTx.Deserialize(bytes.NewReader(serializedTx)); err != nil {
 		return nil, err
 	}
 	return &msgTx, nil
@@ -357,7 +357,7 @@ func (r FutureSignRawTransactionResult) Receive() (*btcwire.MsgTx, bool, error) 
 
 	// Deserialize the transaction and return it.
 	var msgTx btcwire.MsgTx
-	if err := msgTx.Deserialize(bytes.NewBuffer(serializedTx)); err != nil {
+	if err := msgTx.Deserialize(bytes.NewReader(serializedTx)); err != nil {
 		return nil, false, err
 	}
 
