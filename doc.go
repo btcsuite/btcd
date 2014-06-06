@@ -170,5 +170,9 @@ The following full-blown client examples are in the examples directory:
    Connects to a btcd RPC server using TLS-secured websockets, registers for
    block connected and block disconnected notifications, and gets the current
    block count
+ - btcwalletwebsockets
+   Connects to a btcwallet RPC server using TLS-secured websockets, registers
+   for notifications about changes to account balances, and gets a list of
+   unspent transaction outputs (utxos) the wallet can sign
 */
 package btcrpcclient

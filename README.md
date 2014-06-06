@@ -21,9 +21,13 @@ implement and the API is not stable yet.
 
 * [API Reference](http://godoc.org/github.com/conformal/btcrpcclient)
 * [btcd Websockets Example](https://github.com/conformal/btcrpcclient/blob/master/examples/btcdwebsockets)  
-  Connects to a btcd RPC server using TLS-secured websockets,
-  registers for block connected and block disconnected notifications, and gets
-  the current block count
+  Connects to a btcd RPC server using TLS-secured websockets, registers for
+  block connected and block disconnected notifications, and gets the current
+  block count
+* [btcwallet Websockets Example](https://github.com/conformal/btcrpcclient/blob/master/examples/btcwalletwebsockets)  
+  Connects to a btcwallet RPC server using TLS-secured websockets, registers for
+  notifications about changes to account balances, and gets a list of unspent
+  transaction outputs (utxos) the wallet can sign
 * [Bitcoin Core HTTP POST Example](https://github.com/conformal/btcrpcclient/blob/master/examples/bitcoincorehttp)  
   Connects to a bitcoin core RPC server using HTTP POST mode with TLS disabled
   and gets the current block count
