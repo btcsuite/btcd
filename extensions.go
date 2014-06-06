@@ -36,6 +36,37 @@ func (r FutureDebugLevelResult) Receive() (string, error) {
 	return result, nil
 }
 
+// DebugLevelAsync returns an instance of a type that can be used to get the
+// result of the RPC at some future time by invoking the Receive function on
+// the returned instance.
+//
+// See DebugLevel for the blocking version and more details.
+//
+// NOTE: This is a btcd extension.
+func (c *Client) DebugLevelAsync(levelSpec string) FutureDebugLevelResult {
+	id := c.NextID()
+	cmd, err := btcjson.NewDebugLevelCmd(id, levelSpec)
+	if err != nil {
+		return newFutureError(err)
+	}
+
+	return c.sendCmd(cmd)
+}
+
+// DebugLevel dynamically sets the debug logging level to the passed level
+// specification.
+//
+// The levelspec can either a debug level or of the form:
+// 	<subsystem>=<level>,<subsystem2>=<level2>,...
+//
+// Additionally, the special keyword 'show' can be used to get a list of the
+// available subsystems.
+//
+// NOTE: This is a btcd extension.
+func (c *Client) DebugLevel(levelSpec string) (string, error) {
+	return c.DebugLevelAsync(levelSpec).Receive()
+}
+
 // FutureCreateEncryptedWalletResult is a future promise to deliver the error
 // result of a CreateEncryptedWalletAsync RPC invocation.
 type FutureCreateEncryptedWalletResult chan *futureResult
@@ -69,37 +100,6 @@ func (c *Client) CreateEncryptedWalletAsync(passphrase string) FutureCreateEncry
 // NOTE: This is a btcwallet extension.
 func (c *Client) CreateEncryptedWallet(passphrase string) error {
 	return c.CreateEncryptedWalletAsync(passphrase).Receive()
-}
-
-// DebugLevelAsync returns an instance of a type that can be used to get the
-// result of the RPC at some future time by invoking the Receive function on
-// the returned instance.
-//
-// See DebugLevel for the blocking version and more details.
-//
-// NOTE: This is a btcd extension.
-func (c *Client) DebugLevelAsync(levelSpec string) FutureDebugLevelResult {
-	id := c.NextID()
-	cmd, err := btcjson.NewDebugLevelCmd(id, levelSpec)
-	if err != nil {
-		return newFutureError(err)
-	}
-
-	return c.sendCmd(cmd)
-}
-
-// DebugLevel dynamically sets the debug logging level to the passed level
-// specification.
-//
-// The levelspec can either a debug level or of the form:
-// 	<subsystem>=<level>,<subsystem2>=<level2>,...
-//
-// Additionally, the special keyword 'show' can be used to get a list of the
-// available subsystems.
-//
-// NOTE: This is a btcd extension.
-func (c *Client) DebugLevel(levelSpec string) (string, error) {
-	return c.DebugLevelAsync(levelSpec).Receive()
 }
 
 // FutureListAddressTransactionsResult is a future promise to deliver the result
