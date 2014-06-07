@@ -16,10 +16,6 @@ import (
 )
 
 const (
-	// MaxMessagePayload makes the internal maxMessagePayload constant
-	// available to the test package.
-	MaxMessagePayload uint32 = maxMessagePayload
-
 	// MaxTxPerBlock makes the internal maxTxPerBlock constant available to
 	// the test package.
 	MaxTxPerBlock = maxTxPerBlock

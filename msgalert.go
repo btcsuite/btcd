@@ -76,8 +76,8 @@ const maxSignatureSize = 72
 // maxAlertSize is the maximum size an alert.
 //
 // MessagePayload = VarInt(Alert) + Alert + VarInt(Signature) + Signature
-// maxMessagePayload = maxAlertSize + max(VarInt) + maxSignatureSize + 1
-const maxAlertSize = maxMessagePayload - maxSignatureSize - MaxVarIntPayload - 1
+// MaxMessagePayload = maxAlertSize + max(VarInt) + maxSignatureSize + 1
+const maxAlertSize = MaxMessagePayload - maxSignatureSize - MaxVarIntPayload - 1
 
 // maxCountSetCancel is the maximum number of cancel IDs that could possibly
 // fit into a maximum size alert.
@@ -343,7 +343,7 @@ type MsgAlert struct {
 func (msg *MsgAlert) BtcDecode(r io.Reader, pver uint32) error {
 	var err error
 
-	msg.SerializedPayload, err = readVarBytes(r, pver, maxMessagePayload,
+	msg.SerializedPayload, err = readVarBytes(r, pver, MaxMessagePayload,
 		"alert serialized payload")
 	if err != nil {
 		return err
@@ -354,7 +354,7 @@ func (msg *MsgAlert) BtcDecode(r io.Reader, pver uint32) error {
 		msg.Payload = nil
 	}
 
-	msg.Signature, err = readVarBytes(r, pver, maxMessagePayload,
+	msg.Signature, err = readVarBytes(r, pver, MaxMessagePayload,
 		"alert signature")
 	if err != nil {
 		return err
@@ -408,7 +408,7 @@ func (msg *MsgAlert) Command() string {
 func (msg *MsgAlert) MaxPayloadLength(pver uint32) uint32 {
 	// Since this can vary depending on the message, make it the max
 	// size allowed.
-	return maxMessagePayload
+	return MaxMessagePayload
 }
 
 // NewMsgAlert returns a new bitcoin alert message that conforms to the Message

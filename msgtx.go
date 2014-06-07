@@ -39,7 +39,7 @@ const (
 
 	// maxTxInPerMessage is the maximum number of transactions inputs that
 	// a transaction which fits into a message could possibly have.
-	maxTxInPerMessage = (maxMessagePayload / minTxInPayload) + 1
+	maxTxInPerMessage = (MaxMessagePayload / minTxInPayload) + 1
 
 	// minTxOutPayload is the minimum payload size for a transaction output.
 	// Value 8 bytes + Varint for PkScript length 1 byte.
@@ -47,7 +47,7 @@ const (
 
 	// maxTxOutPerMessage is the maximum number of transactions outputs that
 	// a transaction which fits into a message could possibly have.
-	maxTxOutPerMessage = (maxMessagePayload / minTxOutPayload) + 1
+	maxTxOutPerMessage = (MaxMessagePayload / minTxOutPayload) + 1
 
 	// minTxPayload is the minimum payload size for a transaction.  Note
 	// that any realistically usable transaction must have at least one
@@ -470,7 +470,7 @@ func readTxIn(r io.Reader, pver uint32, version uint32, ti *TxIn) error {
 	}
 	ti.PreviousOutpoint = op
 
-	ti.SignatureScript, err = readVarBytes(r, pver, maxMessagePayload,
+	ti.SignatureScript, err = readVarBytes(r, pver, MaxMessagePayload,
 		"transaction input signature script")
 	if err != nil {
 		return err
@@ -519,7 +519,7 @@ func readTxOut(r io.Reader, pver uint32, version uint32, to *TxOut) error {
 	}
 	to.Value = int64(binary.LittleEndian.Uint64(buf[:]))
 
-	to.PkScript, err = readVarBytes(r, pver, maxMessagePayload,
+	to.PkScript, err = readVarBytes(r, pver, MaxMessagePayload,
 		"transaction output public key script")
 	if err != nil {
 		return err

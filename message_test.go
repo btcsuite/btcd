@@ -197,7 +197,7 @@ func TestReadMessageWireErrors(t *testing.T) {
 
 	// Wire encoded bytes for a message that exceeds max overall message
 	// length.
-	mpl := btcwire.MaxMessagePayload
+	mpl := uint32(btcwire.MaxMessagePayload)
 	exceedMaxPayloadBytes := makeHeader(btcnet, "getaddr", mpl+1, 0)
 
 	// Wire encoded bytes for a command which is invalid utf-8.
