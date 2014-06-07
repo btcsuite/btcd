@@ -378,6 +378,7 @@ func loadConfig() (*config, []string, error) {
 	}
 
 	// Multiple networks can't be selected simultaneously.
+	funcName := "loadConfig"
 	numNets := 0
 	if cfg.TestNet3 {
 		numNets++
@@ -391,7 +392,7 @@ func loadConfig() (*config, []string, error) {
 	if numNets > 1 {
 		str := "%s: The testnet, regtest, and simnet params can't be " +
 			"used together -- choose one of the three"
-		err := fmt.Errorf(str, "loadConfig")
+		err := fmt.Errorf(str, funcName)
 		fmt.Fprintln(os.Stderr, err)
 		parser.WriteHelp(os.Stderr)
 		return nil, nil, err
@@ -435,7 +436,7 @@ func loadConfig() (*config, []string, error) {
 
 	// Parse, validate, and set debug log level(s).
 	if err := parseAndSetDebugLevels(cfg.DebugLevel); err != nil {
-		err := fmt.Errorf("%s: %v", "loadConfig", err.Error())
+		err := fmt.Errorf("%s: %v", funcName, err.Error())
 		fmt.Fprintln(os.Stderr, err)
 		parser.WriteHelp(os.Stderr)
 		return nil, nil, err
@@ -445,7 +446,7 @@ func loadConfig() (*config, []string, error) {
 	if !validDbType(cfg.DbType) {
 		str := "%s: The specified database type [%v] is invalid -- " +
 			"supported types %v"
-		err := fmt.Errorf(str, "loadConfig", cfg.DbType, knownDbTypes)
+		err := fmt.Errorf(str, funcName, cfg.DbType, knownDbTypes)
 		fmt.Fprintln(os.Stderr, err)
 		parser.WriteHelp(os.Stderr)
 		return nil, nil, err
@@ -456,7 +457,7 @@ func loadConfig() (*config, []string, error) {
 		profilePort, err := strconv.Atoi(cfg.Profile)
 		if err != nil || profilePort < 1024 || profilePort > 65535 {
 			str := "%s: The profile port must be between 1024 and 65535"
-			err := fmt.Errorf(str, "loadConfig")
+			err := fmt.Errorf(str, funcName)
 			fmt.Fprintln(os.Stderr, err)
 			parser.WriteHelp(os.Stderr)
 			return nil, nil, err
@@ -466,7 +467,7 @@ func loadConfig() (*config, []string, error) {
 	// Don't allow ban durations that are too short.
 	if cfg.BanDuration < time.Duration(time.Second) {
 		str := "%s: The banduration option may not be less than 1s -- parsed [%v]"
-		err := fmt.Errorf(str, "loadConfig", cfg.BanDuration)
+		err := fmt.Errorf(str, funcName, cfg.BanDuration)
 		fmt.Fprintln(os.Stderr, err)
 		parser.WriteHelp(os.Stderr)
 		return nil, nil, err
@@ -476,7 +477,7 @@ func loadConfig() (*config, []string, error) {
 	if len(cfg.AddPeers) > 0 && len(cfg.ConnectPeers) > 0 {
 		str := "%s: the --addpeer and --connect options can not be " +
 			"mixed"
-		err := fmt.Errorf(str, "loadConfig")
+		err := fmt.Errorf(str, funcName)
 		fmt.Fprintln(os.Stderr, err)
 		parser.WriteHelp(os.Stderr)
 		return nil, nil, err
@@ -527,7 +528,7 @@ func loadConfig() (*config, []string, error) {
 
 		str := "%s: The blockmaxsize option must be in between %d " +
 			"and %d -- parsed [%d]"
-		err := fmt.Errorf(str, "loadConfig", blockMaxSizeMin,
+		err := fmt.Errorf(str, funcName, blockMaxSizeMin,
 			blockMaxSizeMax, cfg.BlockMaxSize)
 		fmt.Fprintln(os.Stderr, err)
 		parser.WriteHelp(os.Stderr)
@@ -544,14 +545,14 @@ func loadConfig() (*config, []string, error) {
 		addr, err := btcutil.DecodeAddress(strAddr, activeNetParams.Params)
 		if err != nil {
 			str := "%s: the specified getworkkey '%s' failed to decode: %v"
-			err := fmt.Errorf(str, "loadConfig", strAddr, err)
+			err := fmt.Errorf(str, funcName, strAddr, err)
 			fmt.Fprintln(os.Stderr, err)
 			parser.WriteHelp(os.Stderr)
 			return nil, nil, err
 		}
 		if !addr.IsForNet(activeNetParams.Params) {
 			str := "%s: the specified getworkkey '%s' is on the wrong network"
-			err := fmt.Errorf(str, "loadConfig", strAddr)
+			err := fmt.Errorf(str, funcName, strAddr)
 			fmt.Fprintln(os.Stderr, err)
 			parser.WriteHelp(os.Stderr)
 			return nil, nil, err
