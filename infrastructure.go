@@ -16,7 +16,7 @@ import (
 	"github.com/conformal/btcjson"
 	"github.com/conformal/btcws"
 	"github.com/conformal/go-socks"
-	"github.com/gorilla/websocket"
+	"github.com/conformal/websocket"
 	"net"
 	"net/http"
 	"net/url"
