@@ -6,7 +6,6 @@ package main
 
 import (
 	"bytes"
-	"code.google.com/p/go.net/websocket"
 	"crypto/subtle"
 	"crypto/tls"
 	"encoding/base64"
@@ -23,6 +22,7 @@ import (
 	"github.com/conformal/btcwire"
 	"github.com/conformal/btcws"
 	"github.com/conformal/fastsha256"
+	"github.com/conformal/websocket"
 	"io/ioutil"
 	"math/big"
 	"math/rand"
@@ -252,12 +252,18 @@ func (s *rpcServer) Start() {
 			http.Error(w, "401 Unauthorized.", http.StatusUnauthorized)
 			return
 		}
-		wsServer := websocket.Server{
-			Handler: websocket.Handler(func(ws *websocket.Conn) {
-				s.WebsocketHandler(ws, r.RemoteAddr, authenticated)
-			}),
+
+		// Attempt to upgrade the connection to a websocket connection
+		// using the default size for read/write buffers.
+		ws, err := websocket.Upgrade(w, r, nil, 0, 0)
+		if err != nil {
+			if _, ok := err.(websocket.HandshakeError); !ok {
+				rpcsLog.Errorf("Unexpected websocket error: %v",
+					err)
+			}
+			return
 		}
-		wsServer.ServeHTTP(w, r)
+		s.WebsocketHandler(ws, r.RemoteAddr, authenticated)
 	})
 
 	for _, listener := range s.listeners {

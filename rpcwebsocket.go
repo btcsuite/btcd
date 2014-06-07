@@ -7,7 +7,6 @@ package main
 import (
 	"bytes"
 	"code.google.com/p/go.crypto/ripemd160"
-	"code.google.com/p/go.net/websocket"
 	"container/list"
 	"crypto/subtle"
 	"encoding/base64"
@@ -21,6 +20,7 @@ import (
 	"github.com/conformal/btcwire"
 	"github.com/conformal/btcws"
 	"github.com/conformal/fastsha256"
+	"github.com/conformal/websocket"
 	"io"
 	"sync"
 	"time"
@@ -917,11 +917,11 @@ type wsClient struct {
 // (including pass through for standard RPC commands), sends the appropriate
 // response.  It also detects commands which are marked as long-running and
 // sends them off to the asyncHander for processing.
-func (c *wsClient) handleMessage(msg string) {
+func (c *wsClient) handleMessage(msg []byte) {
 	if !c.authenticated {
 		// Disconnect immediately if the provided command fails to
 		// parse when the client is not already authenticated.
-		cmd, jsonErr := parseCmd([]byte(msg))
+		cmd, jsonErr := parseCmd(msg)
 		if jsonErr != nil {
 			c.Disconnect()
 			return
@@ -961,7 +961,7 @@ func (c *wsClient) handleMessage(msg string) {
 	}
 
 	// Attmpt to parse the raw json into a known btcjson.Cmd.
-	cmd, jsonErr := parseCmd([]byte(msg))
+	cmd, jsonErr := parseCmd(msg)
 	if jsonErr != nil {
 		// Use the provided id for errors when a valid JSON-RPC message
 		// was parsed.  Requests with no IDs are ignored.
@@ -1051,8 +1051,8 @@ out:
 		default:
 		}
 
-		var msg string
-		if err := websocket.Message.Receive(c.conn, &msg); err != nil {
+		_, msg, err := c.conn.ReadMessage()
+		if err != nil {
 			// Log the error if it's not due to disconnecting.
 			if err != io.EOF {
 				rpcsLog.Errorf("Websocket receive error from "+
@@ -1153,7 +1153,7 @@ out:
 		// closed.
 		select {
 		case r := <-c.sendChan:
-			err := websocket.Message.Send(c.conn, string(r.msg))
+			err := c.conn.WriteMessage(websocket.TextMessage, r.msg)
 			if err != nil {
 				c.Disconnect()
 				break out
