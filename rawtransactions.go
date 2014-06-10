@@ -7,7 +7,7 @@ package btcrpcclient
 import (
 	"bytes"
 	"encoding/hex"
-	"fmt"
+	"encoding/json"
 	"github.com/conformal/btcjson"
 	"github.com/conformal/btcutil"
 	"github.com/conformal/btcwire"
@@ -58,21 +58,21 @@ func (s SigHashType) String() string {
 
 // FutureGetRawTransactionResult is a future promise to deliver the result of a
 // GetRawTransactionAsync RPC invocation (or an applicable error).
-type FutureGetRawTransactionResult chan *futureResult
+type FutureGetRawTransactionResult chan *response
 
 // Receive waits for the response promised by the future and returns a
 // transaction given its hash.
 func (r FutureGetRawTransactionResult) Receive() (*btcutil.Tx, error) {
-	reply, err := receiveFuture(r)
+	res, err := receiveFuture(r)
 	if err != nil {
 		return nil, err
 	}
 
-	// Ensure the returned data is the expected type.
-	txHex, ok := reply.(string)
-	if !ok {
-		return nil, fmt.Errorf("unexpected response type for "+
-			"getrawtransaction (verbose=0): %T\n", reply)
+	// Unmarshal result as a string.
+	var txHex string
+	err = json.Unmarshal(res, &txHex)
+	if err != nil {
+		return nil, err
 	}
 
 	// Decode the serialized transaction hex to raw bytes.
@@ -120,24 +120,24 @@ func (c *Client) GetRawTransaction(txHash *btcwire.ShaHash) (*btcutil.Tx, error)
 // FutureGetRawTransactionVerboseResult is a future promise to deliver the
 // result of a GetRawTransactionVerboseAsync RPC invocation (or an applicable
 // error).
-type FutureGetRawTransactionVerboseResult chan *futureResult
+type FutureGetRawTransactionVerboseResult chan *response
 
 // Receive waits for the response promised by the future and returns information
 // about a transaction given its hash.
 func (r FutureGetRawTransactionVerboseResult) Receive() (*btcjson.TxRawResult, error) {
-	reply, err := receiveFuture(r)
+	res, err := receiveFuture(r)
 	if err != nil {
 		return nil, err
 	}
 
-	// Ensure the returned data is the expected type.
-	result, ok := reply.(*btcjson.TxRawResult)
-	if !ok {
-		return nil, fmt.Errorf("unexpected response type for "+
-			"getrawtransaction (verbose=1): %T\n", reply)
+	// Unmarshal result as a gettrawtransaction result object.
+	var rawTxResult btcjson.TxRawResult
+	err = json.Unmarshal(res, &rawTxResult)
+	if err != nil {
+		return nil, err
 	}
 
-	return result, nil
+	return &rawTxResult, nil
 }
 
 // GetRawTransactionVerboseAsync returns an instance of a type that can be used
@@ -170,24 +170,24 @@ func (c *Client) GetRawTransactionVerbose(txHash *btcwire.ShaHash) (*btcjson.TxR
 
 // FutureDecodeRawTransactionResult is a future promise to deliver the result
 // of a DecodeRawTransactionAsync RPC invocation (or an applicable error).
-type FutureDecodeRawTransactionResult chan *futureResult
+type FutureDecodeRawTransactionResult chan *response
 
 // Receive waits for the response promised by the future and returns information
 // about a transaction given its serialized bytes.
 func (r FutureDecodeRawTransactionResult) Receive() (*btcjson.TxRawResult, error) {
-	reply, err := receiveFuture(r)
+	res, err := receiveFuture(r)
 	if err != nil {
 		return nil, err
 	}
 
-	// Ensure the returned data is the expected type.
-	result, ok := reply.(*btcjson.TxRawResult)
-	if !ok {
-		return nil, fmt.Errorf("unexpected response type for "+
-			"decoderawtransaction: %T\n", reply)
+	// Unmarshal result as a decoderawtransaction result object.
+	var rawTxResult btcjson.TxRawResult
+	err = json.Unmarshal(res, &rawTxResult)
+	if err != nil {
+		return nil, err
 	}
 
-	return result, nil
+	return &rawTxResult, nil
 }
 
 // DecodeRawTransactionAsync returns an instance of a type that can be used to
@@ -214,22 +214,22 @@ func (c *Client) DecodeRawTransaction(serializedTx []byte) (*btcjson.TxRawResult
 
 // FutureCreateRawTransactionResult is a future promise to deliver the result
 // of a CreateRawTransactionAsync RPC invocation (or an applicable error).
-type FutureCreateRawTransactionResult chan *futureResult
+type FutureCreateRawTransactionResult chan *response
 
 // Receive waits for the response promised by the future and returns a new
 // transaction spending the provided inputs and sending to the provided
 // addresses.
 func (r FutureCreateRawTransactionResult) Receive() (*btcwire.MsgTx, error) {
-	reply, err := receiveFuture(r)
+	res, err := receiveFuture(r)
 	if err != nil {
 		return nil, err
 	}
 
-	// Ensure the returned data is the expected type.
-	txHex, ok := reply.(string)
-	if !ok {
-		return nil, fmt.Errorf("unexpected response type for "+
-			"createrawtransaction: %T\n", reply)
+	// Unmarshal result as a string.
+	var txHex string
+	err = json.Unmarshal(res, &txHex)
+	if err != nil {
+		return nil, err
 	}
 
 	// Decode the serialized transaction hex to raw bytes.
@@ -277,22 +277,22 @@ func (c *Client) CreateRawTransaction(inputs []btcjson.TransactionInput,
 
 // FutureSendRawTransactionResult is a future promise to deliver the result
 // of a SendRawTransactionAsync RPC invocation (or an applicable error).
-type FutureSendRawTransactionResult chan *futureResult
+type FutureSendRawTransactionResult chan *response
 
 // Receive waits for the response promised by the future and returns the result
 // of submitting the encoded transaction to the server which then relays it to
 // the network.
 func (r FutureSendRawTransactionResult) Receive() (*btcwire.ShaHash, error) {
-	reply, err := receiveFuture(r)
+	res, err := receiveFuture(r)
 	if err != nil {
 		return nil, err
 	}
 
-	// Ensure the returned data is the expected type.
-	txHashStr, ok := reply.(string)
-	if !ok {
-		return nil, fmt.Errorf("unexpected response type for "+
-			"decoderawtransaction: %T\n", reply)
+	// Unmarshal result as a string.
+	var txHashStr string
+	err = json.Unmarshal(res, &txHashStr)
+	if err != nil {
+		return nil, err
 	}
 
 	return btcwire.NewShaHashFromStr(txHashStr)
@@ -332,25 +332,25 @@ func (c *Client) SendRawTransaction(tx *btcwire.MsgTx, allowHighFees bool) (*btc
 // FutureSignRawTransactionResult is a future promise to deliver the result
 // of one of the SignRawTransactionAsync family of RPC invocations (or an
 // applicable error).
-type FutureSignRawTransactionResult chan *futureResult
+type FutureSignRawTransactionResult chan *response
 
 // Receive waits for the response promised by the future and returns the
 // signed transaction as well as whether or not all inputs are now signed.
 func (r FutureSignRawTransactionResult) Receive() (*btcwire.MsgTx, bool, error) {
-	reply, err := receiveFuture(r)
+	res, err := receiveFuture(r)
 	if err != nil {
 		return nil, false, err
 	}
 
-	// Ensure the returned data is the expected type.
-	result, ok := reply.(*btcjson.SignRawTransactionResult)
-	if !ok {
-		return nil, false, fmt.Errorf("unexpected response type for "+
-			"signrawtransaction: %T\n", reply)
+	// Unmarshal as a signrawtransaction result.
+	var signRawTxResult btcjson.SignRawTransactionResult
+	err = json.Unmarshal(res, &signRawTxResult)
+	if err != nil {
+		return nil, false, err
 	}
 
 	// Decode the serialized transaction hex to raw bytes.
-	serializedTx, err := hex.DecodeString(result.Hex)
+	serializedTx, err := hex.DecodeString(signRawTxResult.Hex)
 	if err != nil {
 		return nil, false, err
 	}
@@ -361,7 +361,7 @@ func (r FutureSignRawTransactionResult) Receive() (*btcwire.MsgTx, bool, error) 
 		return nil, false, err
 	}
 
-	return &msgTx, result.Complete, nil
+	return &msgTx, signRawTxResult.Complete, nil
 }
 
 // SignRawTransactionAsync returns an instance of a type that can be used to get

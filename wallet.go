@@ -5,7 +5,7 @@
 package btcrpcclient
 
 import (
-	"fmt"
+	"encoding/json"
 	"github.com/conformal/btcjson"
 	"github.com/conformal/btcnet"
 	"github.com/conformal/btcutil"
@@ -19,24 +19,24 @@ import (
 
 // FutureGetTransactionResult is a future promise to deliver the result
 // of a GetTransactionAsync RPC invocation (or an applicable error).
-type FutureGetTransactionResult chan *futureResult
+type FutureGetTransactionResult chan *response
 
 // Receive waits for the response promised by the future and returns detailed
 // information about a wallet transaction.
 func (r FutureGetTransactionResult) Receive() (*btcjson.GetTransactionResult, error) {
-	reply, err := receiveFuture(r)
+	res, err := receiveFuture(r)
 	if err != nil {
 		return nil, err
 	}
 
-	// Ensure the returned data is the expected type.
-	result, ok := reply.(*btcjson.GetTransactionResult)
-	if !ok {
-		return nil, fmt.Errorf("unexpected response type for "+
-			"gettransaction: %T\n", reply)
+	// Unmarshal result as a gettransaction result object
+	var getTx btcjson.GetTransactionResult
+	err = json.Unmarshal(res, &getTx)
+	if err != nil {
+		return nil, err
 	}
 
-	return result, nil
+	return &getTx, nil
 }
 
 // GetTransactionAsync returns an instance of a type that can be used to get the
@@ -69,26 +69,21 @@ func (c *Client) GetTransaction(txHash *btcwire.ShaHash) (*btcjson.GetTransactio
 // FutureListTransactionsResult is a future promise to deliver the result of a
 // ListTransactionsAsync, ListTransactionsCountAsync, or
 // ListTransactionsCountFromAsync RPC invocation (or an applicable error).
-type FutureListTransactionsResult chan *futureResult
+type FutureListTransactionsResult chan *response
 
 // Receive waits for the response promised by the future and returns a list of
 // the most recent transactions.
 func (r FutureListTransactionsResult) Receive() ([]btcjson.ListTransactionsResult, error) {
-	reply, err := receiveFuture(r)
+	res, err := receiveFuture(r)
 	if err != nil {
 		return nil, err
 	}
 
-	// No transactions.
-	if reply == nil {
-		return nil, nil
-	}
-
-	// Ensure the returned data is the expected type.
-	transactions, ok := reply.([]btcjson.ListTransactionsResult)
-	if !ok {
-		return nil, fmt.Errorf("unexpected response type for "+
-			"listtransactions: %T\n", reply)
+	// Unmarshal result as an array of listtransaction result objects.
+	var transactions []btcjson.ListTransactionsResult
+	err = json.Unmarshal(res, &transactions)
+	if err != nil {
+		return nil, err
 	}
 
 	return transactions, nil
@@ -167,7 +162,7 @@ func (c *Client) ListTransactionsCountFrom(account string, count, from int) ([]b
 // FutureListUnspentResult is a future promise to deliver the result of a
 // ListUnspentAsync, ListUnspentMinAsync, ListUnspentMinMaxAsync, or
 // ListUnspentMinMaxAddressesAsync RPC invocation (or an applicable error).
-type FutureListUnspentResult chan *futureResult
+type FutureListUnspentResult chan *response
 
 // Receive waits for the response promised by the future and returns all
 // unspent wallet transaction outputs returned by the RPC call.  If the
@@ -175,21 +170,16 @@ type FutureListUnspentResult chan *futureResult
 // or ListUnspentMinMaxAddressesAsync, the range may be limited by the
 // parameters of the RPC invocation.
 func (r FutureListUnspentResult) Receive() ([]btcjson.ListUnspentResult, error) {
-	reply, err := receiveFuture(r)
+	res, err := receiveFuture(r)
 	if err != nil {
 		return nil, err
 	}
 
-	// No unspent transaction outputs.
-	if reply == nil {
-		return nil, nil
-	}
-
-	// Ensure the returned data is the expected type.
-	unspent, ok := reply.([]btcjson.ListUnspentResult)
-	if !ok {
-		return nil, fmt.Errorf("unexpected response type for "+
-			"listunspent: %T\n", reply)
+	// Unmarshal result as an array of listunspent results.
+	var unspent []btcjson.ListUnspentResult
+	err = json.Unmarshal(res, &unspent)
+	if err != nil {
+		return nil, err
 	}
 
 	return unspent, nil
@@ -291,25 +281,25 @@ func (c *Client) ListUnspentMinMaxAddresses(minConf, maxConf int, addrs []btcuti
 // FutureListSinceBlockResult is a future promise to deliver the result of a
 // ListSinceBlockAsync or ListSinceBlockMinConfAsync RPC invocation (or an
 // applicable error).
-type FutureListSinceBlockResult chan *futureResult
+type FutureListSinceBlockResult chan *response
 
 // Receive waits for the response promised by the future and returns all
 // transactions added in blocks since the specified block hash, or all
 // transactions if it is nil.
 func (r FutureListSinceBlockResult) Receive() (*btcjson.ListSinceBlockResult, error) {
-	reply, err := receiveFuture(r)
+	res, err := receiveFuture(r)
 	if err != nil {
 		return nil, err
 	}
 
-	// Ensure the returned data is the expected type.
-	listResult, ok := reply.(*btcjson.ListSinceBlockResult)
-	if !ok {
-		return nil, fmt.Errorf("unexpected response type for "+
-			"listsinceblock: %T\n", reply)
+	// Unmarshal result as a listsinceblock result object.
+	var listResult btcjson.ListSinceBlockResult
+	err = json.Unmarshal(res, &listResult)
+	if err != nil {
+		return nil, err
 	}
 
-	return listResult, nil
+	return &listResult, nil
 }
 
 // ListSinceBlockAsync returns an instance of a type that can be used to get
@@ -376,7 +366,7 @@ func (c *Client) ListSinceBlockMinConf(blockHash *btcwire.ShaHash, minConfirms i
 
 // FutureSetTxFeeResult is a future promise to deliver the result of a
 // SetTxFeeAsync RPC invocation (or an applicable error).
-type FutureSetTxFeeResult chan *futureResult
+type FutureSetTxFeeResult chan *response
 
 // Receive waits for the response promised by the future and returns the result
 // of setting an optional transaction fee per KB that helps ensure transactions
@@ -413,20 +403,21 @@ func (c *Client) SetTxFee(fee btcutil.Amount) error {
 
 // FutureSendToAddressResult is a future promise to deliver the result of a
 // SendToAddressAsync RPC invocation (or an applicable error).
-type FutureSendToAddressResult chan *futureResult
+type FutureSendToAddressResult chan *response
 
 // Receive waits for the response promised by the future and returns the hash
 // of the transaction sending the passed amount to the given address.
 func (r FutureSendToAddressResult) Receive() (*btcwire.ShaHash, error) {
-	reply, err := receiveFuture(r)
+	res, err := receiveFuture(r)
 	if err != nil {
 		return nil, err
 	}
 
-	txHash, ok := reply.(string)
-	if !ok {
-		return nil, fmt.Errorf("unexpected response type for "+
-			"sendtoaddress: %T\n", reply)
+	// Unmarshal result as a string.
+	var txHash string
+	err = json.Unmarshal(res, &txHash)
+	if err != nil {
+		return nil, err
 	}
 
 	return btcwire.NewShaHashFromStr(txHash)
@@ -500,22 +491,22 @@ func (c *Client) SendToAddressComment(address btcutil.Address, amount btcutil.Am
 // FutureSendFromResult is a future promise to deliver the result of a
 // SendFromAsync, SendFromMinConfAsync, or SendFromCommentAsync RPC invocation
 // (or an applicable error).
-type FutureSendFromResult chan *futureResult
+type FutureSendFromResult chan *response
 
 // Receive waits for the response promised by the future and returns the hash
 // of the transaction sending amount to the given address using the provided
 // account as a source of funds.
 func (r FutureSendFromResult) Receive() (*btcwire.ShaHash, error) {
-	reply, err := receiveFuture(r)
+	res, err := receiveFuture(r)
 	if err != nil {
 		return nil, err
 	}
 
-	// Ensure the returned data is the expected type.
-	txHash, ok := reply.(string)
-	if !ok {
-		return nil, fmt.Errorf("unexpected response type for "+
-			"sendfrom: %T\n", reply)
+	// Unmarshal result as a string.
+	var txHash string
+	err = json.Unmarshal(res, &txHash)
+	if err != nil {
+		return nil, err
 	}
 
 	return btcwire.NewShaHashFromStr(txHash)
@@ -622,22 +613,22 @@ func (c *Client) SendFromComment(fromAccount string, toAddress btcutil.Address,
 // FutureSendManyResult is a future promise to deliver the result of a
 // SendManyAsync, SendManyMinConfAsync, or SendManyCommentAsync RPC invocation
 // (or an applicable error).
-type FutureSendManyResult chan *futureResult
+type FutureSendManyResult chan *response
 
 // Receive waits for the response promised by the future and returns the hash
 // of the transaction sending multiple amounts to multiple addresses using the
 // provided account as a source of funds.
 func (r FutureSendManyResult) Receive() (*btcwire.ShaHash, error) {
-	reply, err := receiveFuture(r)
+	res, err := receiveFuture(r)
 	if err != nil {
 		return nil, err
 	}
 
-	// Ensure the returned data is the expected type.
-	txHash, ok := reply.(string)
-	if !ok {
-		return nil, fmt.Errorf("unexpected response type for "+
-			"sendmany: %T\n", reply)
+	// Unmashal result as a string.
+	var txHash string
+	err = json.Unmarshal(res, &txHash)
+	if err != nil {
+		return nil, err
 	}
 
 	return btcwire.NewShaHashFromStr(txHash)
@@ -760,22 +751,22 @@ func (c *Client) SendManyComment(fromAccount string,
 
 // FutureAddMultisigAddressResult is a future promise to deliver the result of a
 // AddMultisigAddressAsync RPC invocation (or an applicable error).
-type FutureAddMultisigAddressResult chan *futureResult
+type FutureAddMultisigAddressResult chan *response
 
 // Receive waits for the response promised by the future and returns the
 // multisignature address that requires the specified number of signatures for
 // the provided addresses.
 func (r FutureAddMultisigAddressResult) Receive() (btcutil.Address, error) {
-	reply, err := receiveFuture(r)
+	res, err := receiveFuture(r)
 	if err != nil {
 		return nil, err
 	}
 
-	// Ensure the returned data is the expected type.
-	addr, ok := reply.(string)
-	if !ok {
-		return nil, fmt.Errorf("unexpected response type for "+
-			"addmultisigaddress: %T\n", reply)
+	// Unmarshal result as a string.
+	var addr string
+	err = json.Unmarshal(res, &addr)
+	if err != nil {
+		return nil, err
 	}
 
 	return btcutil.DecodeAddress(addr, &btcnet.MainNetParams)
@@ -811,24 +802,24 @@ func (c *Client) AddMultisigAddress(requiredSigs int, addresses []btcutil.Addres
 
 // FutureCreateMultisigResult is a future promise to deliver the result of a
 // CreateMultisigAsync RPC invocation (or an applicable error).
-type FutureCreateMultisigResult chan *futureResult
+type FutureCreateMultisigResult chan *response
 
 // Receive waits for the response promised by the future and returns the
 // multisignature address and script needed to redeem it.
 func (r FutureCreateMultisigResult) Receive() (*btcjson.CreateMultiSigResult, error) {
-	reply, err := receiveFuture(r)
+	res, err := receiveFuture(r)
 	if err != nil {
 		return nil, err
 	}
 
-	// Ensure the returned data is the expected type.
-	result, ok := reply.(*btcjson.CreateMultiSigResult)
-	if !ok {
-		return nil, fmt.Errorf("unexpected response type for "+
-			"createmultisig: %T\n", reply)
+	// Unmarshal result as a createmultisig result object.
+	var multisigRes btcjson.CreateMultiSigResult
+	err = json.Unmarshal(res, &multisigRes)
+	if err != nil {
+		return nil, err
 	}
 
-	return result, nil
+	return &multisigRes, nil
 }
 
 // CreateMultisigAsync returns an instance of a type that can be used to get
@@ -861,21 +852,21 @@ func (c *Client) CreateMultisig(requiredSigs int, addresses []btcutil.Address) (
 
 // FutureGetNewAddressResult is a future promise to deliver the result of a
 // GetNewAddressAsync RPC invocation (or an applicable error).
-type FutureGetNewAddressResult chan *futureResult
+type FutureGetNewAddressResult chan *response
 
 // Receive waits for the response promised by the future and returns a new
 // address.
 func (r FutureGetNewAddressResult) Receive() (btcutil.Address, error) {
-	reply, err := receiveFuture(r)
+	res, err := receiveFuture(r)
 	if err != nil {
 		return nil, err
 	}
 
-	// Ensure the returned data is the expected type.
-	addr, ok := reply.(string)
-	if !ok {
-		return nil, fmt.Errorf("unexpected response type for "+
-			"getnewaddress: %T\n", reply)
+	// Unmarshal result as a string.
+	var addr string
+	err = json.Unmarshal(res, &addr)
+	if err != nil {
+		return nil, err
 	}
 
 	return btcutil.DecodeAddress(addr, &btcnet.MainNetParams)
@@ -903,22 +894,22 @@ func (c *Client) GetNewAddress() (btcutil.Address, error) {
 
 // FutureGetRawChangeAddressResult is a future promise to deliver the result of
 // a GetRawChangeAddressAsync RPC invocation (or an applicable error).
-type FutureGetRawChangeAddressResult chan *futureResult
+type FutureGetRawChangeAddressResult chan *response
 
 // Receive waits for the response promised by the future and returns a new
 // address for receiving change that will be associated with the provided
 // account.  Note that this is only for raw transactions and NOT for normal use.
 func (r FutureGetRawChangeAddressResult) Receive() (btcutil.Address, error) {
-	reply, err := receiveFuture(r)
+	res, err := receiveFuture(r)
 	if err != nil {
 		return nil, err
 	}
 
-	// Ensure the returned data is the expected type.
-	addr, ok := reply.(string)
-	if !ok {
-		return nil, fmt.Errorf("unexpected response type for "+
-			"getrawchangeaddress: %T\n", reply)
+	// Unmarshal result as a string.
+	var addr string
+	err = json.Unmarshal(res, &addr)
+	if err != nil {
+		return nil, err
 	}
 
 	return btcutil.DecodeAddress(addr, &btcnet.MainNetParams)
@@ -948,21 +939,21 @@ func (c *Client) GetRawChangeAddress(account string) (btcutil.Address, error) {
 
 // FutureGetAccountAddressResult is a future promise to deliver the result of a
 // GetAccountAddressAsync RPC invocation (or an applicable error).
-type FutureGetAccountAddressResult chan *futureResult
+type FutureGetAccountAddressResult chan *response
 
 // Receive waits for the response promised by the future and returns the current
 // Bitcoin address for receiving payments to the specified account.
 func (r FutureGetAccountAddressResult) Receive() (btcutil.Address, error) {
-	reply, err := receiveFuture(r)
+	res, err := receiveFuture(r)
 	if err != nil {
 		return nil, err
 	}
 
-	// Ensure the returned data is the expected type.
-	addr, ok := reply.(string)
-	if !ok {
-		return nil, fmt.Errorf("unexpected response type for "+
-			"getaccountaddress: %T\n", reply)
+	// Unmarshal result as a string.
+	var addr string
+	err = json.Unmarshal(res, &addr)
+	if err != nil {
+		return nil, err
 	}
 
 	return btcutil.DecodeAddress(addr, &btcnet.MainNetParams)
@@ -991,21 +982,21 @@ func (c *Client) GetAccountAddress(account string) (btcutil.Address, error) {
 
 // FutureGetAccountResult is a future promise to deliver the result of a
 // GetAccountAsync RPC invocation (or an applicable error).
-type FutureGetAccountResult chan *futureResult
+type FutureGetAccountResult chan *response
 
 // Receive waits for the response promised by the future and returns the account
 // associated with the passed address.
 func (r FutureGetAccountResult) Receive() (string, error) {
-	reply, err := receiveFuture(r)
+	res, err := receiveFuture(r)
 	if err != nil {
 		return "", err
 	}
 
-	// Ensure the returned data is the expected type.
-	account, ok := reply.(string)
-	if !ok {
-		return "", fmt.Errorf("unexpected response type for "+
-			"getaccount: %T\n", reply)
+	// Unmarshal result as a string.
+	var account string
+	err = json.Unmarshal(res, &account)
+	if err != nil {
+		return "", err
 	}
 
 	return account, nil
@@ -1034,7 +1025,7 @@ func (c *Client) GetAccount(address btcutil.Address) (string, error) {
 
 // FutureSetAccountResult is a future promise to deliver the result of a
 // SetAccountAsync RPC invocation (or an applicable error).
-type FutureSetAccountResult chan *futureResult
+type FutureSetAccountResult chan *response
 
 // Receive waits for the response promised by the future and returns the result
 // of setting the account to be associated with the passed address.
@@ -1070,21 +1061,21 @@ func (c *Client) SetAccount(address btcutil.Address, account string) error {
 
 // FutureGetAddressesByAccountResult is a future promise to deliver the result
 // of a GetAddressesByAccountAsync RPC invocation (or an applicable error).
-type FutureGetAddressesByAccountResult chan *futureResult
+type FutureGetAddressesByAccountResult chan *response
 
 // Receive waits for the response promised by the future and returns the list of
 // addresses associated with the passed account.
 func (r FutureGetAddressesByAccountResult) Receive() ([]btcutil.Address, error) {
-	reply, err := receiveFuture(r)
+	res, err := receiveFuture(r)
 	if err != nil {
 		return nil, err
 	}
 
-	// Ensure the returned data is the expected type.
-	addrStrings, ok := reply.([]string)
-	if !ok {
-		return nil, fmt.Errorf("unexpected response type for "+
-			"getaddressesbyaccount: %T\n", reply)
+	// Unmashal result as an array of string.
+	var addrStrings []string
+	err = json.Unmarshal(res, &addrStrings)
+	if err != nil {
+		return nil, err
 	}
 
 	addrs := make([]btcutil.Address, 0, len(addrStrings))
@@ -1122,24 +1113,24 @@ func (c *Client) GetAddressesByAccount(account string) ([]btcutil.Address, error
 
 // FutureValidateAddressResult is a future promise to deliver the result of a
 // ValidateAddressAsync RPC invocation (or an applicable error).
-type FutureValidateAddressResult chan *futureResult
+type FutureValidateAddressResult chan *response
 
 // Receive waits for the response promised by the future and returns information
 // about the given bitcoin address.
 func (r FutureValidateAddressResult) Receive() (*btcjson.ValidateAddressResult, error) {
-	reply, err := receiveFuture(r)
+	res, err := receiveFuture(r)
 	if err != nil {
 		return nil, err
 	}
 
-	// Ensure the returned data is the expected type.
-	result, ok := reply.(*btcjson.ValidateAddressResult)
-	if !ok {
-		return nil, fmt.Errorf("unexpected response type for "+
-			"validateaddress: %T\n", reply)
+	// Unmarshal result as a validateaddress result object.
+	var addrResult btcjson.ValidateAddressResult
+	err = json.Unmarshal(res, &addrResult)
+	if err != nil {
+		return nil, err
 	}
 
-	return result, nil
+	return &addrResult, nil
 }
 
 // ValidateAddressAsync returns an instance of a type that can be used to get
@@ -1165,7 +1156,7 @@ func (c *Client) ValidateAddress(address btcutil.Address) (*btcjson.ValidateAddr
 
 // FutureKeyPoolRefillResult is a future promise to deliver the result of a
 // KeyPoolRefillAsync RPC invocation (or an applicable error).
-type FutureKeyPoolRefillResult chan *futureResult
+type FutureKeyPoolRefillResult chan *response
 
 // Receive waits for the response promised by the future and returns the result
 // of refilling the key pool.
@@ -1228,21 +1219,21 @@ func (c *Client) KeyPoolRefillSize(newSize uint) error {
 // FutureListAccountsResult is a future promise to deliver the result of a
 // ListAccountsAsync or ListAccountsMinConfAsync RPC invocation (or an
 // applicable error).
-type FutureListAccountsResult chan *futureResult
+type FutureListAccountsResult chan *response
 
 // Receive waits for the response promised by the future and returns returns a
 // map of account names and their associated balances.
 func (r FutureListAccountsResult) Receive() (map[string]btcutil.Amount, error) {
-	reply, err := receiveFuture(r)
+	res, err := receiveFuture(r)
 	if err != nil {
 		return nil, err
 	}
 
-	// Ensure the returned data is the expected type.
-	accounts, ok := reply.(map[string]float64)
-	if !ok {
-		return nil, fmt.Errorf("unexpected response type for "+
-			"listaccounts: %T\n", reply)
+	// Unmarshal result as a json object.
+	var accounts map[string]float64
+	err = json.Unmarshal(res, &accounts)
+	if err != nil {
+		return nil, err
 	}
 
 	accountsMap := make(map[string]btcutil.Amount)
@@ -1307,21 +1298,21 @@ func (c *Client) ListAccountsMinConf(minConfirms int) (map[string]btcutil.Amount
 // FutureGetBalanceResult is a future promise to deliver the result of a
 // GetBalanceAsync or GetBalanceMinConfAsync RPC invocation (or an applicable
 // error).
-type FutureGetBalanceResult chan *futureResult
+type FutureGetBalanceResult chan *response
 
 // Receive waits for the response promised by the future and returns the
 // available balance from the server for the specified account.
 func (r FutureGetBalanceResult) Receive() (btcutil.Amount, error) {
-	reply, err := receiveFuture(r)
+	res, err := receiveFuture(r)
 	if err != nil {
 		return 0, err
 	}
 
-	// Ensure the returned data is the expected type.
-	balance, ok := reply.(float64)
-	if !ok {
-		return 0, fmt.Errorf("unexpected response type for "+
-			"getbalance: %T\n", reply)
+	// Unmarshal result as a floating point number.
+	var balance float64
+	err = json.Unmarshal(res, &balance)
+	if err != nil {
+		return 0, err
 	}
 
 	satoshi, err := btcjson.JSONToAmount(balance)
@@ -1391,21 +1382,21 @@ func (c *Client) GetBalanceMinConf(account string, minConfirms int) (btcutil.Amo
 // FutureGetReceivedByAccountResult is a future promise to deliver the result of
 // a GetReceivedByAccountAsync or GetReceivedByAccountMinConfAsync RPC
 // invocation (or an applicable error).
-type FutureGetReceivedByAccountResult chan *futureResult
+type FutureGetReceivedByAccountResult chan *response
 
 // Receive waits for the response promised by the future and returns the total
 // amount received with the specified account.
 func (r FutureGetReceivedByAccountResult) Receive() (btcutil.Amount, error) {
-	reply, err := receiveFuture(r)
+	res, err := receiveFuture(r)
 	if err != nil {
 		return 0, err
 	}
 
-	// Ensure the returned data is the expected type.
-	balance, ok := reply.(float64)
-	if !ok {
-		return 0, fmt.Errorf("unexpected response type for "+
-			"getreceivedbyaccount: %T\n", reply)
+	// Unmarshal result as a floating point number.
+	var balance float64
+	err = json.Unmarshal(res, &balance)
+	if err != nil {
+		return 0, err
 	}
 
 	satoshi, err := btcjson.JSONToAmount(balance)
@@ -1466,21 +1457,21 @@ func (c *Client) GetReceivedByAccountMinConf(account string, minConfirms int) (b
 
 // FutureGetUnconfirmedBalanceResult is a future promise to deliver the result
 // of a GetUnconfirmedBalanceAsync RPC invocation (or an applicable error).
-type FutureGetUnconfirmedBalanceResult chan *futureResult
+type FutureGetUnconfirmedBalanceResult chan *response
 
 // Receive waits for the response promised by the future and returns returns the
 // unconfirmed balance from the server for the specified account.
 func (r FutureGetUnconfirmedBalanceResult) Receive() (btcutil.Amount, error) {
-	reply, err := receiveFuture(r)
+	res, err := receiveFuture(r)
 	if err != nil {
 		return 0, err
 	}
 
-	// Ensure the returned data is the expected type.
-	balance, ok := reply.(float64)
-	if !ok {
-		return 0, fmt.Errorf("unexpected response type for "+
-			"getunconfirmedbalance: %T\n", reply)
+	// Unmarshal result as a floating point number.
+	var balance float64
+	err = json.Unmarshal(res, &balance)
+	if err != nil {
+		return 0, err
 	}
 
 	satoshi, err := btcjson.JSONToAmount(balance)
@@ -1515,21 +1506,21 @@ func (c *Client) GetUnconfirmedBalance(account string) (btcutil.Amount, error) {
 // FutureGetReceivedByAddressResult is a future promise to deliver the result of
 // a GetReceivedByAddressAsync or GetReceivedByAddressMinConfAsync RPC
 // invocation (or an applicable error).
-type FutureGetReceivedByAddressResult chan *futureResult
+type FutureGetReceivedByAddressResult chan *response
 
 // Receive waits for the response promised by the future and returns the total
 // amount received by the specified address.
 func (r FutureGetReceivedByAddressResult) Receive() (btcutil.Amount, error) {
-	reply, err := receiveFuture(r)
+	res, err := receiveFuture(r)
 	if err != nil {
 		return 0, err
 	}
 
-	// Ensure the returned data is the expected type.
-	balance, ok := reply.(float64)
-	if !ok {
-		return 0, fmt.Errorf("unexpected response type for "+
-			"getreceivedbyaddress: %T\n", reply)
+	// Unmarshal result as a floating point number.
+	var balance float64
+	err = json.Unmarshal(res, &balance)
+	if err != nil {
+		return 0, err
 	}
 
 	satoshi, err := btcjson.JSONToAmount(balance)
@@ -1594,29 +1585,24 @@ func (c *Client) GetReceivedByAddressMinConf(address btcutil.Address, minConfirm
 // of a ListReceivedByAccountAsync, ListReceivedByAccountMinConfAsync, or
 // ListReceivedByAccountIncludeEmptyAsync RPC invocation (or an applicable
 // error).
-type FutureListReceivedByAccountResult chan *futureResult
+type FutureListReceivedByAccountResult chan *response
 
 // Receive waits for the response promised by the future and returns a list of
 // balances by account.
 func (r FutureListReceivedByAccountResult) Receive() ([]btcjson.ListReceivedByAccountResult, error) {
-	reply, err := receiveFuture(r)
+	res, err := receiveFuture(r)
 	if err != nil {
 		return nil, err
 	}
 
-	// No results.
-	if reply == nil {
-		return nil, nil
+	// Unmarshal as an array of listreceivedbyaccount result objects.
+	var received []btcjson.ListReceivedByAccountResult
+	err = json.Unmarshal(res, &received)
+	if err != nil {
+		return nil, err
 	}
 
-	// Ensure the returned data is the expected type.
-	result, ok := reply.([]btcjson.ListReceivedByAccountResult)
-	if !ok {
-		return nil, fmt.Errorf("unexpected response type for "+
-			"listreceivedbyaccount: %T\n", reply)
-	}
-
-	return result, nil
+	return received, nil
 }
 
 // ListReceivedByAccountAsync returns an instance of a type that can be used to
@@ -1702,7 +1688,7 @@ func (c *Client) ListReceivedByAccountIncludeEmpty(minConfirms int, includeEmpty
 
 // FutureWalletLockResult is a future promise to deliver the result of a
 // WalletLockAsync RPC invocation (or an applicable error).
-type FutureWalletLockResult chan *futureResult
+type FutureWalletLockResult chan *response
 
 // Receive waits for the response promised by the future and returns the result
 // of locking the wallet.
@@ -1759,7 +1745,7 @@ func (c *Client) WalletPassphrase(passphrase string, timeoutSecs int64) error {
 
 // FutureWalletPassphraseChangeResult is a future promise to deliver the result
 // of a WalletPassphraseChangeAsync RPC invocation (or an applicable error).
-type FutureWalletPassphraseChangeResult chan *futureResult
+type FutureWalletPassphraseChangeResult chan *response
 
 // Receive waits for the response promised by the future and returns the result
 // of changing the wallet passphrase.
@@ -1799,21 +1785,21 @@ func (c *Client) WalletPassphraseChange(old, new string) error {
 
 // FutureSignMessageResult is a future promise to deliver the result of a
 // SignMessageAsync RPC invocation (or an applicable error).
-type FutureSignMessageResult chan *futureResult
+type FutureSignMessageResult chan *response
 
 // Receive waits for the response promised by the future and returns the message
 // signed with the private key of the specified address.
 func (r FutureSignMessageResult) Receive() (string, error) {
-	reply, err := receiveFuture(r)
+	res, err := receiveFuture(r)
 	if err != nil {
 		return "", err
 	}
 
-	// Ensure the returned data is the expected type.
-	b64, ok := reply.(string)
-	if !ok {
-		return "", fmt.Errorf("unexpected response type for "+
-			"signmessage: %T\n", reply)
+	// Unmarshal result as a string.
+	var b64 string
+	err = json.Unmarshal(res, &b64)
+	if err != nil {
+		return "", err
 	}
 
 	return b64, nil
@@ -1845,21 +1831,21 @@ func (c *Client) SignMessage(address btcutil.Address, message string) (string, e
 
 // FutureVerifyMessageResult is a future promise to deliver the result of a
 // VerifyMessageAsync RPC invocation (or an applicable error).
-type FutureVerifyMessageResult chan *futureResult
+type FutureVerifyMessageResult chan *response
 
 // Receive waits for the response promised by the future and returns whether or
 // not the message was successfully verified.
 func (r FutureVerifyMessageResult) Receive() (bool, error) {
-	reply, err := receiveFuture(r)
+	res, err := receiveFuture(r)
 	if err != nil {
 		return false, err
 	}
 
-	// Ensure the returned data is the expected type.
-	verified, ok := reply.(bool)
-	if !ok {
-		return false, fmt.Errorf("unexpected response type for "+
-			"verifymessage: %T\n", reply)
+	// Unmarshal result as a boolean.
+	var verified bool
+	err = json.Unmarshal(res, &verified)
+	if err != nil {
+		return false, err
 	}
 
 	return verified, nil
@@ -1895,22 +1881,22 @@ func (c *Client) VerifyMessage(address btcutil.Address, signature, message strin
 
 // FutureDumpPrivKeyResult is a future promise to deliver the result of a
 // DumpPrivKeyAsync RPC invocation (or an applicable error).
-type FutureDumpPrivKeyResult chan *futureResult
+type FutureDumpPrivKeyResult chan *response
 
 // Receive waits for the response promised by the future and returns the private
 // key corresponding to the passed address encoded in the wallet import format
 // (WIF)
 func (r FutureDumpPrivKeyResult) Receive() (*btcutil.WIF, error) {
-	reply, err := receiveFuture(r)
+	res, err := receiveFuture(r)
 	if err != nil {
 		return nil, err
 	}
 
-	// Ensure the returned data is the expected type.
-	privKeyWIF, ok := reply.(string)
-	if !ok {
-		return nil, fmt.Errorf("unexpected response type for "+
-			"dumpprivkey: %T\n", reply)
+	// Unmarshal result as a string.
+	var privKeyWIF string
+	err = json.Unmarshal(res, &privKeyWIF)
+	if err != nil {
+		return nil, err
 	}
 
 	return btcutil.DecodeWIF(privKeyWIF)
@@ -1943,7 +1929,7 @@ func (c *Client) DumpPrivKey(address btcutil.Address) (*btcutil.WIF, error) {
 
 // FutureImportPrivKeyResult is a future promise to deliver the result of an
 // ImportPrivKeyAsync RPC invocation (or an applicable error).
-type FutureImportPrivKeyResult chan *futureResult
+type FutureImportPrivKeyResult chan *response
 
 // Receive waits for the response promised by the future and returns the result
 // of importing the passed private key which must be the wallet import format

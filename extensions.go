@@ -6,6 +6,7 @@ package btcrpcclient
 
 import (
 	"encoding/base64"
+	"encoding/json"
 	"fmt"
 	"github.com/conformal/btcjson"
 	"github.com/conformal/btcutil"
@@ -15,24 +16,23 @@ import (
 
 // FutureDebugLevelResult is a future promise to deliver the result of a
 // DebugLevelAsync RPC invocation (or an applicable error).
-type FutureDebugLevelResult chan *futureResult
+type FutureDebugLevelResult chan *response
 
 // Receive waits for the response promised by the future and returns the result
 // of setting the debug logging level to the passed level specification or the
 // list of of the available subsystems for the special keyword 'show'.
 func (r FutureDebugLevelResult) Receive() (string, error) {
-	reply, err := receiveFuture(r)
+	res, err := receiveFuture(r)
 	if err != nil {
 		return "", err
 	}
 
-	// Ensure the returned data is the expected type.
-	result, ok := reply.(string)
-	if !ok {
-		return "", fmt.Errorf("unexpected response type for "+
-			"debuglevel: %T\n", reply)
+	// Unmashal the result as a string.
+	var result string
+	err = json.Unmarshal(res, &result)
+	if err != nil {
+		return "", err
 	}
-
 	return result, nil
 }
 
@@ -69,7 +69,7 @@ func (c *Client) DebugLevel(levelSpec string) (string, error) {
 
 // FutureCreateEncryptedWalletResult is a future promise to deliver the error
 // result of a CreateEncryptedWalletAsync RPC invocation.
-type FutureCreateEncryptedWalletResult chan *futureResult
+type FutureCreateEncryptedWalletResult chan *response
 
 // Receive waits for and returns the error response promised by the future.
 func (r FutureCreateEncryptedWalletResult) Receive() error {
@@ -104,28 +104,22 @@ func (c *Client) CreateEncryptedWallet(passphrase string) error {
 
 // FutureListAddressTransactionsResult is a future promise to deliver the result
 // of a ListAddressTransactionsAsync RPC invocation (or an applicable error).
-type FutureListAddressTransactionsResult chan *futureResult
+type FutureListAddressTransactionsResult chan *response
 
 // Receive waits for the response promised by the future and returns information
 // about all transactions associated with the provided addresses.
 func (r FutureListAddressTransactionsResult) Receive() ([]btcjson.ListTransactionsResult, error) {
-	reply, err := receiveFuture(r)
+	res, err := receiveFuture(r)
 	if err != nil {
 		return nil, err
 	}
 
-	// No transactions.
-	if reply == nil {
-		return nil, nil
+	// Unmarshal the result as an array of listtransactions objects.
+	var transactions []btcjson.ListTransactionsResult
+	err = json.Unmarshal(res, &transactions)
+	if err != nil {
+		return nil, err
 	}
-
-	// Ensure the returned data is the expected type.
-	transactions, ok := reply.([]btcjson.ListTransactionsResult)
-	if !ok {
-		return nil, fmt.Errorf("unexpected response type for "+
-			"listaddresstransactions: %T\n", reply)
-	}
-
 	return transactions, nil
 }
 
@@ -161,30 +155,30 @@ func (c *Client) ListAddressTransactions(addresses []btcutil.Address, account st
 
 // FutureGetBestBlockResult is a future promise to deliver the result of a
 // GetBestBlockAsync RPC invocation (or an applicable error).
-type FutureGetBestBlockResult chan *futureResult
+type FutureGetBestBlockResult chan *response
 
 // Receive waits for the response promised by the future and returns the hash
 // and height of the block in the longest (best) chain.
 func (r FutureGetBestBlockResult) Receive() (*btcwire.ShaHash, int32, error) {
-	reply, err := receiveFuture(r)
+	res, err := receiveFuture(r)
 	if err != nil {
 		return nil, 0, err
 	}
 
-	// Ensure the returned data is the expected type.
-	result, ok := reply.(*btcws.GetBestBlockResult)
-	if !ok {
-		return nil, 0, fmt.Errorf("unexpected response type for "+
-			"getbestblock: %T\n", reply)
+	// Unmarsal result as a getbestblock result object.
+	var bestBlock btcws.GetBestBlockResult
+	err = json.Unmarshal(res, &bestBlock)
+	if err != nil {
+		return nil, 0, err
 	}
 
 	// Convert hash string.
-	hash, err := btcwire.NewShaHashFromStr(result.Hash)
+	hash, err := btcwire.NewShaHashFromStr(bestBlock.Hash)
 	if err != nil {
 		return nil, 0, err
 	}
 
-	return hash, result.Height, nil
+	return hash, bestBlock.Height, nil
 }
 
 // GetBestBlockAsync returns an instance of a type that can be used to get the
@@ -211,24 +205,24 @@ func (c *Client) GetBestBlock() (*btcwire.ShaHash, int32, error) {
 
 // FutureGetCurrentNetResult is a future promise to deliver the result of a
 // GetCurrentNetAsync RPC invocation (or an applicable error).
-type FutureGetCurrentNetResult chan *futureResult
+type FutureGetCurrentNetResult chan *response
 
 // Receive waits for the response promised by the future and returns the network
 // the server is running on.
 func (r FutureGetCurrentNetResult) Receive() (btcwire.BitcoinNet, error) {
-	reply, err := receiveFuture(r)
+	res, err := receiveFuture(r)
 	if err != nil {
 		return 0, err
 	}
 
-	// Ensure the returned data is the expected type.
-	fnet, ok := reply.(float64)
-	if !ok {
-		return 0, fmt.Errorf("unexpected response type for "+
-			"getcurrentnet: %T\n", reply)
+	// Unmarshal result as an int64.
+	var net int64
+	err = json.Unmarshal(res, &net)
+	if err != nil {
+		return 0, err
 	}
 
-	return btcwire.BitcoinNet(fnet), nil
+	return btcwire.BitcoinNet(net), nil
 }
 
 // GetCurrentNetAsync returns an instance of a type that can be used to get the
@@ -254,34 +248,35 @@ func (c *Client) GetCurrentNet() (btcwire.BitcoinNet, error) {
 
 // FutureExportWatchingWalletResult is a future promise to deliver the result of
 // an ExportWatchingWalletAsync RPC invocation (or an applicable error).
-type FutureExportWatchingWalletResult chan *futureResult
+type FutureExportWatchingWalletResult chan *response
 
 // Receive waits for the response promised by the future and returns the
 // exported wallet.
 func (r FutureExportWatchingWalletResult) Receive() ([]byte, []byte, error) {
-	reply, err := receiveFuture(r)
+	res, err := receiveFuture(r)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	// Ensure the returned data is the expected type.
-	result, ok := reply.(map[string]interface{})
-	if !ok {
-		return nil, nil, fmt.Errorf("unexpected response type for "+
-			"exportwatchingwallet: %T\n", reply)
+	// Unmarshal result as a JSON object.
+	var obj map[string]interface{}
+	err = json.Unmarshal(res, &obj)
+	if err != nil {
+		return nil, nil, err
 	}
 
-	base64Wallet, ok := result["wallet"].(string)
+	// Check for the wallet and tx string fields in the object.
+	base64Wallet, ok := obj["wallet"].(string)
 	if !ok {
 		return nil, nil, fmt.Errorf("unexpected response type for "+
 			"exportwatchingwallet 'wallet' field: %T\n",
-			result["wallet"])
+			obj["wallet"])
 	}
-	base64TxStore, ok := result["tx"].(string)
+	base64TxStore, ok := obj["tx"].(string)
 	if !ok {
 		return nil, nil, fmt.Errorf("unexpected response type for "+
 			"exportwatchingwallet 'tx' field: %T\n",
-			result["tx"])
+			obj["tx"])
 	}
 
 	walletBytes, err := base64.StdEncoding.DecodeString(base64Wallet)

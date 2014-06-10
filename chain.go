@@ -7,7 +7,7 @@ package btcrpcclient
 import (
 	"bytes"
 	"encoding/hex"
-	"fmt"
+	"encoding/json"
 	"github.com/conformal/btcjson"
 	"github.com/conformal/btcutil"
 	"github.com/conformal/btcwire"
@@ -15,23 +15,22 @@ import (
 
 // FutureGetBestBlockHashResult is a future promise to deliver the result of a
 // GetBestBlockAsync RPC invocation (or an applicable error).
-type FutureGetBestBlockHashResult chan *futureResult
+type FutureGetBestBlockHashResult chan *response
 
 // Receive waits for the response promised by the future and returns the hash of
 // the best block in the longest block chain.
 func (r FutureGetBestBlockHashResult) Receive() (*btcwire.ShaHash, error) {
-	reply, err := receiveFuture(r)
+	res, err := receiveFuture(r)
 	if err != nil {
 		return nil, err
 	}
 
-	// Ensure the returned data is the expected type.
-	txHashStr, ok := reply.(string)
-	if !ok {
-		return nil, fmt.Errorf("unexpected response type for "+
-			"getbestblockhash: %T\n", reply)
+	// Unmarshal result as a string.
+	var txHashStr string
+	err = json.Unmarshal(res, &txHashStr)
+	if err != nil {
+		return nil, err
 	}
-
 	return btcwire.NewShaHashFromStr(txHashStr)
 }
 
@@ -58,21 +57,21 @@ func (c *Client) GetBestBlockHash() (*btcwire.ShaHash, error) {
 
 // FutureGetBlockResult is a future promise to deliver the result of a
 // GetBlockAsync RPC invocation (or an applicable error).
-type FutureGetBlockResult chan *futureResult
+type FutureGetBlockResult chan *response
 
 // Receive waits for the response promised by the future and returns the raw
 // block requested from the server given its hash.
 func (r FutureGetBlockResult) Receive() (*btcutil.Block, error) {
-	reply, err := receiveFuture(r)
+	res, err := receiveFuture(r)
 	if err != nil {
 		return nil, err
 	}
 
-	// Ensure the returned data is the expected type.
-	blockHex, ok := reply.(string)
-	if !ok {
-		return nil, fmt.Errorf("unexpected response type for "+
-			"getblock (verbose=0): %T\n", reply)
+	// Unmarshal result as a string.
+	var blockHex string
+	err = json.Unmarshal(res, &blockHex)
+	if err != nil {
+		return nil, err
 	}
 
 	// Decode the serialized block hex to raw bytes.
@@ -120,24 +119,23 @@ func (c *Client) GetBlock(blockHash *btcwire.ShaHash) (*btcutil.Block, error) {
 
 // FutureGetBlockVerboseResult is a future promise to deliver the result of a
 // GetBlockVerboseAsync RPC invocation (or an applicable error).
-type FutureGetBlockVerboseResult chan *futureResult
+type FutureGetBlockVerboseResult chan *response
 
 // Receive waits for the response promised by the future and returns the data
 // structure from the server with information about the requested block.
 func (r FutureGetBlockVerboseResult) Receive() (*btcjson.BlockResult, error) {
-	reply, err := receiveFuture(r)
+	res, err := receiveFuture(r)
 	if err != nil {
 		return nil, err
 	}
 
-	// Ensure the returned data is the expected type.
-	blockResult, ok := reply.(*btcjson.BlockResult)
-	if !ok {
-		return nil, fmt.Errorf("unexpected response type for "+
-			"getblock (verbose=1): %T\n", reply)
+	// Unmarshal the raw result into a BlockResult.
+	var blockResult btcjson.BlockResult
+	err = json.Unmarshal(res, &blockResult)
+	if err != nil {
+		return nil, err
 	}
-
-	return blockResult, nil
+	return &blockResult, nil
 }
 
 // GetBlockVerboseAsync returns an instance of a type that can be used to get
@@ -170,24 +168,23 @@ func (c *Client) GetBlockVerbose(blockHash *btcwire.ShaHash, verboseTx bool) (*b
 
 // FutureGetBlockCountResult is a future promise to deliver the result of a
 // GetBlockCountAsync RPC invocation (or an applicable error).
-type FutureGetBlockCountResult chan *futureResult
+type FutureGetBlockCountResult chan *response
 
 // Receive waits for the response promised by the future and returns the number
 // of blocks in the longest block chain.
 func (r FutureGetBlockCountResult) Receive() (int64, error) {
-	reply, err := receiveFuture(r)
+	res, err := receiveFuture(r)
 	if err != nil {
 		return 0, err
 	}
 
-	// Ensure the returned data is the expected type.
-	count, ok := reply.(float64)
-	if !ok {
-		return 0, fmt.Errorf("unexpected response type for "+
-			"getblockcount: %T\n", reply)
+	// Unmarshal the result as an int64.
+	var count int64
+	err = json.Unmarshal(res, &count)
+	if err != nil {
+		return 0, err
 	}
-
-	return int64(count), nil
+	return count, nil
 }
 
 // GetBlockCountAsync returns an instance of a type that can be used to get the
@@ -212,23 +209,22 @@ func (c *Client) GetBlockCount() (int64, error) {
 
 // FutureGetDifficultyResult is a future promise to deliver the result of a
 // GetDifficultyAsync RPC invocation (or an applicable error).
-type FutureGetDifficultyResult chan *futureResult
+type FutureGetDifficultyResult chan *response
 
 // Receive waits for the response promised by the future and returns the
 // proof-of-work difficulty as a multiple of the minimum difficulty.
 func (r FutureGetDifficultyResult) Receive() (float64, error) {
-	reply, err := receiveFuture(r)
+	res, err := receiveFuture(r)
 	if err != nil {
 		return 0, err
 	}
 
-	// Ensure the returned data is the expected type.
-	difficulty, ok := reply.(float64)
-	if !ok {
-		return 0, fmt.Errorf("unexpected response type for "+
-			"getdifficulty: %T\n", reply)
+	// Unmarshal the result as a float64.
+	var difficulty float64
+	err = json.Unmarshal(res, &difficulty)
+	if err != nil {
+		return 0, err
 	}
-
 	return difficulty, nil
 }
 
@@ -255,23 +251,22 @@ func (c *Client) GetDifficulty() (float64, error) {
 
 // FutureGetBlockHashResult is a future promise to deliver the result of a
 // GetBlockHashAsync RPC invocation (or an applicable error).
-type FutureGetBlockHashResult chan *futureResult
+type FutureGetBlockHashResult chan *response
 
 // Receive waits for the response promised by the future and returns the hash of
 // the block in the best block chain at the given height.
 func (r FutureGetBlockHashResult) Receive() (*btcwire.ShaHash, error) {
-	reply, err := receiveFuture(r)
+	res, err := receiveFuture(r)
 	if err != nil {
 		return nil, err
 	}
 
-	// Ensure the returned data is the expected type.
-	txHashStr, ok := reply.(string)
-	if !ok {
-		return nil, fmt.Errorf("unexpected response type for "+
-			"getblockhash: %T\n", reply)
+	// Unmarshal the result as a string-encoded sha.
+	var txHashStr string
+	err = json.Unmarshal(res, &txHashStr)
+	if err != nil {
+		return nil, err
 	}
-
 	return btcwire.NewShaHashFromStr(txHashStr)
 }
 
@@ -298,23 +293,24 @@ func (c *Client) GetBlockHash(blockHeight int64) (*btcwire.ShaHash, error) {
 
 // FutureGetRawMempoolResult is a future promise to deliver the result of a
 // GetRawMempoolAsync RPC invocation (or an applicable error).
-type FutureGetRawMempoolResult chan *futureResult
+type FutureGetRawMempoolResult chan *response
 
 // Receive waits for the response promised by the future and returns the hashes
 // of all transactions in the memory pool.
 func (r FutureGetRawMempoolResult) Receive() ([]*btcwire.ShaHash, error) {
-	reply, err := receiveFuture(r)
+	res, err := receiveFuture(r)
 	if err != nil {
 		return nil, err
 	}
 
-	// Ensure the returned data is the expected type.
-	txHashStrs, ok := reply.([]string)
-	if !ok {
-		return nil, fmt.Errorf("unexpected response type for "+
-			"getrawmempool (verbose=false): %T\n", reply)
+	// Unmarshal the result as an array of strings.
+	var txHashStrs []string
+	err = json.Unmarshal(res, &txHashStrs)
+	if err != nil {
+		return nil, err
 	}
 
+	// Create a slice of ShaHash arrays from the string slice.
 	txHashes := make([]*btcwire.ShaHash, 0, len(txHashStrs))
 	for _, hashStr := range txHashStrs {
 		txHash, err := btcwire.NewShaHashFromStr(hashStr)
@@ -352,24 +348,24 @@ func (c *Client) GetRawMempool() ([]*btcwire.ShaHash, error) {
 
 // FutureGetRawMempoolVerboseResult is a future promise to deliver the result of
 // a GetRawMempoolVerboseAsync RPC invocation (or an applicable error).
-type FutureGetRawMempoolVerboseResult chan *futureResult
+type FutureGetRawMempoolVerboseResult chan *response
 
 // Receive waits for the response promised by the future and returns a map of
 // transaction hashes to an associated data structure with information about the
 // transaction for all transactions in the memory pool.
 func (r FutureGetRawMempoolVerboseResult) Receive() (map[string]btcjson.GetRawMempoolResult, error) {
-	reply, err := receiveFuture(r)
+	res, err := receiveFuture(r)
 	if err != nil {
 		return nil, err
 	}
 
-	// Ensure the returned data is the expected type.
-	mempoolItems, ok := reply.(map[string]btcjson.GetRawMempoolResult)
-	if !ok {
-		return nil, fmt.Errorf("unexpected response type for "+
-			"getrawmempool (verbose=true): %T\n", reply)
+	// Unmarshal the result as a map of strings (tx shas) to their detailed
+	// results.
+	var mempoolItems map[string]btcjson.GetRawMempoolResult
+	err = json.Unmarshal(res, &mempoolItems)
+	if err != nil {
+		return nil, err
 	}
-
 	return mempoolItems, nil
 }
 
@@ -400,24 +396,23 @@ func (c *Client) GetRawMempoolVerbose() (map[string]btcjson.GetRawMempoolResult,
 // FutureVerifyChainResult is a future promise to deliver the result of a
 // VerifyChainAsync, VerifyChainLevelAsyncRPC, or VerifyChainBlocksAsync
 // invocation (or an applicable error).
-type FutureVerifyChainResult chan *futureResult
+type FutureVerifyChainResult chan *response
 
 // Receive waits for the response promised by the future and returns whether
 // or not the chain verified based on the check level and number of blocks
 // to verify specified in the original call.
 func (r FutureVerifyChainResult) Receive() (bool, error) {
-	reply, err := receiveFuture(r)
+	res, err := receiveFuture(r)
 	if err != nil {
 		return false, err
 	}
 
-	// Ensure the returned data is the expected type.
-	verified, ok := reply.(bool)
-	if !ok {
-		return false, fmt.Errorf("unexpected response type for "+
-			"verifychain: %T\n", reply)
+	// Unmarshal the result as a boolean.
+	var verified bool
+	err = json.Unmarshal(res, &verified)
+	if err != nil {
+		return false, err
 	}
-
 	return verified, nil
 }
 

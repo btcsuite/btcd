@@ -7,7 +7,9 @@ package btcrpcclient
 import (
 	"bytes"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
+	"fmt"
 	"github.com/conformal/btcjson"
 	"github.com/conformal/btcutil"
 	"github.com/conformal/btcwire"
@@ -68,9 +70,9 @@ func newNotificationState() *notificationState {
 // result waiting on the channel with the reply set to nil.  This is useful
 // to ignore things such as notifications when the caller didn't specify any
 // notification handlers.
-func newNilFutureResult() chan *futureResult {
-	responseChan := make(chan *futureResult, 1)
-	responseChan <- &futureResult{reply: nil}
+func newNilFutureResult() chan *response {
+	responseChan := make(chan *response, 1)
+	responseChan <- &response{result: nil, err: nil}
 	return responseChan
 }
 
@@ -161,183 +163,192 @@ type NotificationHandlers struct {
 	// for this package needs to be updated for a new notification type or
 	// the caller is using a custom notification this package does not know
 	// about.
-	OnUnknownNotification func(ntfn interface{})
+	OnUnknownNotification func(method string, params []json.RawMessage)
 }
 
 // handleNotification examines the passed notification type, performs
 // conversions to get the raw notification types into higher level types and
 // delivers the notification to the appropriate On<X> handler registered with
 // the client.
-func (c *Client) handleNotification(cmd btcjson.Cmd) {
+func (c *Client) handleNotification(ntfn *rawNotification) {
 	// Ignore the notification if the client is not interested in any
 	// notifications.
 	if c.ntfnHandlers == nil {
 		return
 	}
 
-	switch ntfn := cmd.(type) {
+	switch ntfn.Method {
 	// OnBlockConnected
-	case *btcws.BlockConnectedNtfn:
+	case btcws.BlockConnectedNtfnMethod:
 		// Ignore the notification is the client is not interested in
 		// it.
 		if c.ntfnHandlers.OnBlockConnected == nil {
 			return
 		}
 
-		hash, err := btcwire.NewShaHashFromStr(ntfn.Hash)
+		blockSha, blockHeight, err := parseChainNtfnParams(ntfn.Params)
 		if err != nil {
-			log.Warnf("Received block connected notification with "+
-				"invalid hash string: %q", ntfn.Hash)
+			log.Warnf("Received invalid block connected "+
+				"notification: %v", err)
 			return
 		}
 
-		c.ntfnHandlers.OnBlockConnected(hash, ntfn.Height)
+		c.ntfnHandlers.OnBlockConnected(blockSha, blockHeight)
 
 	// OnBlockDisconnected
-	case *btcws.BlockDisconnectedNtfn:
+	case btcws.BlockDisconnectedNtfnMethod:
 		// Ignore the notification is the client is not interested in
 		// it.
 		if c.ntfnHandlers.OnBlockDisconnected == nil {
 			return
 		}
 
-		hash, err := btcwire.NewShaHashFromStr(ntfn.Hash)
+		blockSha, blockHeight, err := parseChainNtfnParams(ntfn.Params)
 		if err != nil {
-			log.Warnf("Received block disconnected notification "+
-				"with invalid hash string: %q", ntfn.Hash)
+			log.Warnf("Received invalid block connected "+
+				"notification: %v", err)
 			return
 		}
 
-		c.ntfnHandlers.OnBlockDisconnected(hash, ntfn.Height)
+		c.ntfnHandlers.OnBlockDisconnected(blockSha, blockHeight)
 
 	// OnRecvTx
-	case *btcws.RecvTxNtfn:
+	case btcws.RecvTxNtfnMethod:
 		// Ignore the notification is the client is not interested in
 		// it.
 		if c.ntfnHandlers.OnRecvTx == nil {
 			return
 		}
 
-		// Decode the serialized transaction hex to raw bytes.
-		serializedTx, err := hex.DecodeString(ntfn.HexTx)
+		tx, block, err := parseChainTxNtfnParams(ntfn.Params)
 		if err != nil {
-			log.Warnf("Received recvtx notification with invalid "+
-				"transaction hex '%q': %v", ntfn.HexTx, err)
-		}
-
-		// Deserialize the transaction.
-		var msgTx btcwire.MsgTx
-		err = msgTx.Deserialize(bytes.NewReader(serializedTx))
-		if err != nil {
-			log.Warnf("Received recvtx notification with "+
-				"transaction that failed to deserialize: %v",
+			log.Warnf("Received invalid recvtx notification: %v",
 				err)
+			return
 		}
 
-		c.ntfnHandlers.OnRecvTx(btcutil.NewTx(&msgTx), ntfn.Block)
+		c.ntfnHandlers.OnRecvTx(tx, block)
 
 	// OnRedeemingTx
-	case *btcws.RedeemingTxNtfn:
+	case btcws.RedeemingTxNtfnMethod:
 		// Ignore the notification is the client is not interested in
 		// it.
 		if c.ntfnHandlers.OnRedeemingTx == nil {
 			return
 		}
 
-		// Decode the serialized transaction hex to raw bytes.
-		serializedTx, err := hex.DecodeString(ntfn.HexTx)
+		tx, block, err := parseChainTxNtfnParams(ntfn.Params)
 		if err != nil {
-			log.Warnf("Received redeemingtx notification with "+
-				"invalid transaction hex '%q': %v", ntfn.HexTx,
-				err)
+			log.Warnf("Received invalid redeemingtx "+
+				"notification: %v", err)
+			return
 		}
 
-		// Deserialize the transaction.
-		var msgTx btcwire.MsgTx
-		err = msgTx.Deserialize(bytes.NewReader(serializedTx))
-		if err != nil {
-			log.Warnf("Received redeemingtx notification with "+
-				"transaction that failed to deserialize: %v",
-				err)
-		}
-
-		c.ntfnHandlers.OnRedeemingTx(btcutil.NewTx(&msgTx), ntfn.Block)
+		c.ntfnHandlers.OnRedeemingTx(tx, block)
 
 	// OnRescanProgress
-	case *btcws.RescanProgressNtfn:
+	case btcws.RescanProgressNtfnMethod:
 		// Ignore the notification is the client is not interested in
 		// it.
 		if c.ntfnHandlers.OnRescanProgress == nil {
 			return
 		}
 
-		c.ntfnHandlers.OnRescanProgress(ntfn.LastProcessed)
+		lastProcessed, err := parseRescanProgressNtfnParams(ntfn.Params)
+		if err != nil {
+			log.Warnf("Received invalid rescanprogress "+
+				"notification: %v", err)
+			return
+		}
+
+		c.ntfnHandlers.OnRescanProgress(lastProcessed)
 
 	// OnTxAccepted
-	case *btcws.TxAcceptedNtfn:
+	case btcws.TxAcceptedNtfnMethod:
 		// Ignore the notification is the client is not interested in
 		// it.
 		if c.ntfnHandlers.OnTxAccepted == nil {
 			return
 		}
 
-		hash, err := btcwire.NewShaHashFromStr(ntfn.TxID)
+		hash, amt, err := parseTxAcceptedNtfnParams(ntfn.Params)
 		if err != nil {
-			log.Warnf("Received tx accepted notification with "+
-				"invalid hash string: %q", ntfn.TxID)
+			log.Warnf("Received invalid tx accepted "+
+				"notification: %v", err)
 			return
 		}
 
-		c.ntfnHandlers.OnTxAccepted(hash, btcutil.Amount(ntfn.Amount))
+		c.ntfnHandlers.OnTxAccepted(hash, amt)
 
 	// OnTxAcceptedVerbose
-	case *btcws.TxAcceptedVerboseNtfn:
+	case btcws.TxAcceptedVerboseNtfnMethod:
 		// Ignore the notification is the client is not interested in
 		// it.
 		if c.ntfnHandlers.OnTxAcceptedVerbose == nil {
 			return
 		}
 
-		c.ntfnHandlers.OnTxAcceptedVerbose(ntfn.RawTx)
+		rawTx, err := parseTxAcceptedVerboseNtfnParams(ntfn.Params)
+		if err != nil {
+			log.Warnf("Received invalid tx accepted verbose "+
+				"notification: %v", err)
+			return
+		}
+
+		c.ntfnHandlers.OnTxAcceptedVerbose(rawTx)
 
 	// OnBtcdConnected
-	case *btcws.BtcdConnectedNtfn:
+	case btcws.BtcdConnectedNtfnMethod:
 		// Ignore the notification is the client is not interested in
 		// it.
 		if c.ntfnHandlers.OnBtcdConnected == nil {
 			return
 		}
 
-		c.ntfnHandlers.OnBtcdConnected(ntfn.Connected)
+		connected, err := parseBtcdConnectedNtfnParams(ntfn.Params)
+		if err != nil {
+			log.Warnf("Received invalid btcd connected "+
+				"notification: %v", err)
+			return
+		}
+
+		c.ntfnHandlers.OnBtcdConnected(connected)
 
 	// OnAccountBalance
-	case *btcws.AccountBalanceNtfn:
+	case btcws.AccountBalanceNtfnMethod:
 		// Ignore the notification is the client is not interested in
 		// it.
 		if c.ntfnHandlers.OnAccountBalance == nil {
 			return
 		}
 
-		balance, err := btcjson.JSONToAmount(ntfn.Balance)
+		account, bal, conf, err := parseAccountBalanceNtfnParams(ntfn.Params)
 		if err != nil {
-			log.Warnf("Received account balance notification with "+
-				"an amount that does not parse: %v",
-				ntfn.Balance)
+			log.Warnf("Received invalid account balance "+
+				"notification: %v", err)
 			return
 		}
 
-		c.ntfnHandlers.OnAccountBalance(ntfn.Account,
-			btcutil.Amount(balance), ntfn.Confirmed)
+		c.ntfnHandlers.OnAccountBalance(account, bal, conf)
 
 	// OnWalletLockState
-	case *btcws.WalletLockStateNtfn:
+	case btcws.WalletLockStateNtfnMethod:
 		// Ignore the notification is the client is not interested in
 		// it.
 		if c.ntfnHandlers.OnWalletLockState == nil {
 			return
 		}
 
-		c.ntfnHandlers.OnWalletLockState(ntfn.Locked)
+		// The account name is not notified, so the return value is
+		// discarded.
+		_, locked, err := parseWalletLockStateNtfnParams(ntfn.Params)
+		if err != nil {
+			log.Warnf("Received invalid wallet lock state "+
+				"notification: %v", err)
+			return
+		}
+
+		c.ntfnHandlers.OnWalletLockState(locked)
 
 	// OnUnknownNotification
 	default:
@@ -345,13 +356,250 @@ func (c *Client) handleNotification(cmd btcjson.Cmd) {
 			return
 		}
 
-		c.ntfnHandlers.OnUnknownNotification(ntfn)
+		c.ntfnHandlers.OnUnknownNotification(ntfn.Method, ntfn.Params)
 	}
+}
+
+// wrongNumParams is an error type describing an unparseable JSON-RPC
+// notificiation due to an incorrect number of parameters for the
+// expected notification type.  The value is the number of parameters
+// of the invalid notification.
+type wrongNumParams int
+
+// Error satisifies the builtin error interface.
+func (e wrongNumParams) Error() string {
+	return fmt.Sprintf("wrong number of parameters (%d)", e)
+}
+
+// parseChainNtfnParams parses out the block hash and height from the parameters
+// of blockconnected and blockdisconnected notifications.
+func parseChainNtfnParams(params []json.RawMessage) (*btcwire.ShaHash,
+	int32, error) {
+
+	if len(params) != 2 {
+		return nil, 0, wrongNumParams(len(params))
+	}
+
+	// Unmarshal first parameter as a string.
+	var blockShaStr string
+	err := json.Unmarshal(params[0], &blockShaStr)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	// Unmarshal second parameter as an integer.
+	var blockHeight int32
+	err = json.Unmarshal(params[1], &blockHeight)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	// Create ShaHash from block sha string.
+	blockSha, err := btcwire.NewShaHashFromStr(blockShaStr)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	return blockSha, blockHeight, nil
+}
+
+// parseChainTxNtfnParams parses out the transaction and optional details about
+// the block it's mined in from the parameters of recvtx and redeemingtx
+// notifications.
+func parseChainTxNtfnParams(params []json.RawMessage) (*btcutil.Tx,
+	*btcws.BlockDetails, error) {
+
+	if len(params) == 0 || len(params) > 2 {
+		return nil, nil, wrongNumParams(len(params))
+	}
+
+	// Unmarshal first parameter as a string.
+	var txHex string
+	err := json.Unmarshal(params[0], &txHex)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	// If present, unmarshal second optional parameter as the block details
+	// JSON object.
+	var block *btcws.BlockDetails
+	if len(params) > 1 {
+		err = json.Unmarshal(params[1], &block)
+		if err != nil {
+			return nil, nil, err
+		}
+	}
+
+	// Hex decode and deserialize the transaction.
+	serializedTx, err := hex.DecodeString(txHex)
+	if err != nil {
+		return nil, nil, err
+	}
+	var msgTx btcwire.MsgTx
+	err = msgTx.Deserialize(bytes.NewReader(serializedTx))
+	if err != nil {
+		return nil, nil, err
+	}
+
+	// TODO: Change recvtx and redeemingtx callback signatures to use
+	// nicer types for details about the block (block sha as a
+	// btcwire.ShaHash, block time as a time.Time, etc.).
+	return btcutil.NewTx(&msgTx), block, nil
+}
+
+// parseRescanProgressNtfnParams parses out the height of the last rescanned
+// from the parameters of a rescanprogress notification.
+func parseRescanProgressNtfnParams(params []json.RawMessage) (int32, error) {
+	if len(params) != 1 {
+		return 0, wrongNumParams(len(params))
+	}
+
+	// Unmarshal first parameter as an integer.
+	var height int32
+	err := json.Unmarshal(params[0], &height)
+	if err != nil {
+		return 0, err
+	}
+
+	return height, nil
+}
+
+// parseTxAcceptedNtfnParams parses out the transaction hash and total amount
+// from the parameters of a txaccepted notification.
+func parseTxAcceptedNtfnParams(params []json.RawMessage) (*btcwire.ShaHash,
+	btcutil.Amount, error) {
+
+	if len(params) != 2 {
+		return nil, 0, wrongNumParams(len(params))
+	}
+
+	// Unmarshal first parameter as a string.
+	var txShaStr string
+	err := json.Unmarshal(params[0], &txShaStr)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	// Unmarshal second parameter as an integer.
+	var amt int64
+	err = json.Unmarshal(params[1], &amt)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	// Decode string encoding of transaction sha.
+	txSha, err := btcwire.NewShaHashFromStr(txShaStr)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	return txSha, btcutil.Amount(amt), nil
+}
+
+// parseTxAcceptedVerboseNtfnParams parses out details about a raw transaction
+// from the parameters of a txacceptedverbose notification.
+func parseTxAcceptedVerboseNtfnParams(params []json.RawMessage) (*btcjson.TxRawResult,
+	error) {
+
+	if len(params) != 1 {
+		return nil, wrongNumParams(len(params))
+	}
+
+	// Unmarshal first parameter as a raw transaction result object.
+	var rawTx btcjson.TxRawResult
+	err := json.Unmarshal(params[0], &rawTx)
+	if err != nil {
+		return nil, err
+	}
+
+	// TODO: change txacceptedverbose notifiation callbacks to use nicer
+	// types for all details about the transaction (i.e. decoding hashes
+	// from their string encoding).
+	return &rawTx, nil
+}
+
+// parseBtcdConnectedNtfnParams parses out the connection status of btcd
+// and btcwallet from the parameters of a btcdconnected notification.
+func parseBtcdConnectedNtfnParams(params []json.RawMessage) (bool, error) {
+	if len(params) != 1 {
+		return false, wrongNumParams(len(params))
+	}
+
+	// Unmarshal first parameter as a boolean.
+	var connected bool
+	err := json.Unmarshal(params[0], &connected)
+	if err != nil {
+		return false, err
+	}
+
+	return connected, nil
+}
+
+// parseAccountBalanceNtfnParams parses out the account name, total balance,
+// and whether or not the balance is confirmed or unconfirmed from the
+// parameters of an accountbalance notification.
+func parseAccountBalanceNtfnParams(params []json.RawMessage) (account string,
+	balance btcutil.Amount, confirmed bool, err error) {
+
+	if len(params) != 3 {
+		return "", 0, false, wrongNumParams(len(params))
+	}
+
+	// Unmarshal first parameter as a string.
+	err = json.Unmarshal(params[0], &account)
+	if err != nil {
+		return "", 0, false, err
+	}
+
+	// Unmarshal second parameter as a floating point number.
+	var fbal float64
+	err = json.Unmarshal(params[1], &fbal)
+	if err != nil {
+		return "", 0, false, err
+	}
+
+	// Unmarshal third parameter as a boolean.
+	err = json.Unmarshal(params[2], &confirmed)
+	if err != nil {
+		return "", 0, false, err
+	}
+
+	// Bounds check amount.
+	bal, err := btcjson.JSONToAmount(fbal)
+	if err != nil {
+		return "", 0, false, err
+	}
+
+	return account, btcutil.Amount(bal), confirmed, nil
+}
+
+// parseWalletLockStateNtfnParams parses out the account name and locked
+// state of an account from the parameters of a walletlockstate notification.
+func parseWalletLockStateNtfnParams(params []json.RawMessage) (account string,
+	locked bool, err error) {
+
+	if len(params) != 2 {
+		return "", false, wrongNumParams(len(params))
+	}
+
+	// Unmarshal first parameter as a string.
+	err = json.Unmarshal(params[0], &account)
+	if err != nil {
+		return "", false, err
+	}
+
+	// Unmarshal second parameter as a boolean.
+	err = json.Unmarshal(params[1], &locked)
+	if err != nil {
+		return "", false, err
+	}
+
+	return account, locked, nil
 }
 
 // FutureNotifyBlocksResult is a future promise to deliver the result of a
 // NotifyBlocksAsync RPC invocation (or an applicable error).
-type FutureNotifyBlocksResult chan *futureResult
+type FutureNotifyBlocksResult chan *response
 
 // Receive waits for the response promised by the future and returns an error
 // if the registration was not successful.
@@ -405,7 +653,7 @@ func (c *Client) NotifyBlocks() error {
 
 // FutureNotifySpentResult is a future promise to deliver the result of a
 // NotifySpentAsync RPC invocation (or an applicable error).
-type FutureNotifySpentResult chan *futureResult
+type FutureNotifySpentResult chan *response
 
 // Receive waits for the response promised by the future and returns an error
 // if the registration was not successful.
@@ -484,7 +732,7 @@ func (c *Client) NotifySpent(outpoints []*btcwire.OutPoint) error {
 
 // FutureNotifyNewTransactionsResult is a future promise to deliver the result
 // of a NotifyNewTransactionsAsync RPC invocation (or an applicable error).
-type FutureNotifyNewTransactionsResult chan *futureResult
+type FutureNotifyNewTransactionsResult chan *response
 
 // Receive waits for the response promised by the future and returns an error
 // if the registration was not successful.
@@ -542,7 +790,7 @@ func (c *Client) NotifyNewTransactions(verbose bool) error {
 
 // FutureNotifyReceivedResult is a future promise to deliver the result of a
 // NotifyReceivedAsync RPC invocation (or an applicable error).
-type FutureNotifyReceivedResult chan *futureResult
+type FutureNotifyReceivedResult chan *response
 
 // Receive waits for the response promised by the future and returns an error
 // if the registration was not successful.
@@ -630,7 +878,7 @@ func (c *Client) NotifyReceived(addresses []btcutil.Address) error {
 
 // FutureRescanResult is a future promise to deliver the result of a RescanAsync
 // or RescanEndHeightAsync RPC invocation (or an applicable error).
-type FutureRescanResult chan *futureResult
+type FutureRescanResult chan *response
 
 // Receive waits for the response promised by the future and returns an error
 // if the rescan was not successful.

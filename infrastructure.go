@@ -64,27 +64,20 @@ const (
 	connectionRetryInterval = time.Second * 5
 )
 
-// futureResult holds information about a future promise to deliver the result
-// of an asynchronous request.
-type futureResult struct {
-	reply *btcjson.Reply
-	err   error
-}
-
 // sendPostDetails houses an HTTP POST request to send to an RPC server as well
 // as the original JSON-RPC command and a channel to reply on when the server
 // responds with the result.
 type sendPostDetails struct {
 	command      btcjson.Cmd
 	request      *http.Request
-	responseChan chan *futureResult
+	responseChan chan *response
 }
 
 // jsonRequest holds information about a json request that is used to properly
 // detect, interpret, and deliver a reply to it.
 type jsonRequest struct {
 	cmd          btcjson.Cmd
-	responseChan chan *futureResult
+	responseChan chan *response
 }
 
 // Client represents a Bitcoin RPC client which allows easy access to the
@@ -231,70 +224,96 @@ func (c *Client) trackRegisteredNtfns(cmd btcjson.Cmd) {
 	}
 }
 
-// handleMessage is the main handler for incoming requests.  It enforces
-// authentication, parses the incoming json, looks up and executes handlers
-// (including pass through for standard RPC commands), sends the appropriate
-// response.  It also detects commands which are marked as long-running and
-// sends them off to the asyncHander for processing.
+type (
+	// inMessage is the first type that an incoming message is unmarshaled
+	// into. It supports both requests (for notification support) and
+	// responses.  The partially-unmarshaled message is a notification if
+	// the embedded ID (from the response) is nil.  Otherwise, it is a
+	// response.
+	inMessage struct {
+		ID *uint64 `json:"id"`
+		*rawNotification
+		*rawResponse
+	}
+
+	// rawNotification is a partially-unmarshaled JSON-RPC notification.
+	rawNotification struct {
+		Method string            `json:"method"`
+		Params []json.RawMessage `json:"params"`
+	}
+
+	// rawResponse is a partially-unmarshaled JSON-RPC response.  For this
+	// to be valid (according to JSON-RPC 1.0 spec), ID may not be nil.
+	rawResponse struct {
+		Result json.RawMessage `json:"result"`
+		Error  *btcjson.Error  `json:"error"`
+	}
+)
+
+// response is the raw bytes of a JSON-RPC result, or the error if the response
+// error object was non-null.
+type response struct {
+	result []byte
+	err    error
+}
+
+// result checks whether the unmarshaled response contains a non-nil error,
+// returning an unmarshaled btcjson.Error (or an unmarshaling error) if so.
+// If the response is not an error, the raw bytes of the request are
+// returned for further unmashaling into specific result types.
+func (r rawResponse) result() (result []byte, err error) {
+	if r.Error != nil {
+		return nil, r.Error
+	}
+	return r.Result, nil
+}
+
+// handleMessage is the main handler for incoming notifications and responses.
 func (c *Client) handleMessage(msg []byte) {
-	// Attempt to unmarshal the message as a known JSON-RPC command.
-	if cmd, err := btcjson.ParseMarshaledCmd(msg); err == nil {
-		// Commands that have an ID associated with them are not
-		// notifications.  Since this is a client, it should not
-		// be receiving non-notifications.
-		if cmd.Id() != nil {
-			// Invalid response
-			log.Warnf("Remote server sent a non-notification "+
-				"JSON-RPC Request (Id: %v)", cmd.Id())
+	// Attempt to unmarshal the message as either a notifiation or response.
+	in := inMessage{}
+	err := json.Unmarshal(msg, &in)
+	if err != nil {
+		log.Warnf("Remote server sent invalid message: %v", err)
+		return
+	}
+
+	// JSON-RPC 1.0 notifications are requests with a null id.
+	if in.ID == nil {
+		ntfn := in.rawNotification
+		if ntfn == nil {
+			log.Warn("Malformed notification: missing " +
+				"method and parameters")
 			return
 		}
-
+		if ntfn.Method == "" {
+			log.Warn("Malformed notification: missing method")
+			return
+		}
+		// params are not optional: nil isn't valid (but len == 0 is)
+		if ntfn.Params == nil {
+			log.Warn("Malformed notification: missing params")
+			return
+		}
 		// Deliver the notification.
-		log.Tracef("Received notification [%s]", cmd.Method())
-		c.handleNotification(cmd)
+		log.Tracef("Received notification [%s]", in.Method)
+		c.handleNotification(in.rawNotification)
 		return
 	}
 
-	// The message was not a command/notification, so it should be a reply
-	// to a previous request.
-
-	var r btcjson.Reply
-	if err := json.Unmarshal([]byte(msg), &r); err != nil {
-		log.Warnf("Unable to unmarshal inbound message as " +
-			"notification or response")
+	if in.rawResponse == nil {
+		log.Warn("Malformed response: missing result and error")
 		return
 	}
 
-	// Ensure the reply has an id.
-	if r.Id == nil {
-		log.Warnf("Received response with no id")
-		return
-	}
-
-	// Ensure the id is the expected type.
-	fid, ok := (*r.Id).(float64)
-	if !ok {
-		log.Warnf("Received unexpected id type: %T (value %v)",
-			*r.Id, *r.Id)
-		return
-	}
-	id := uint64(fid)
-	log.Tracef("Received response for id %d (result %v)", id, r.Result)
+	id := *in.ID
+	log.Tracef("Received response for id %d (result %s)", id, in.Result)
 	request := c.removeRequest(id)
 
 	// Nothing more to do if there is no request associated with this reply.
 	if request == nil || request.responseChan == nil {
-		log.Warnf("Received unexpected reply: %s (id %d)", r.Result, id)
-		return
-	}
-
-	// Unmarshal the reply into a concrete result if possible and deliver
-	// it to the associated channel.
-	reply, err := btcjson.ReadResultCmd(request.cmd.Method(), []byte(msg))
-	if err != nil {
-		log.Warnf("Failed to unmarshal reply to command [%s] "+
-			"(id %d): %v", request.cmd.Method(), id, err)
-		request.responseChan <- &futureResult{reply: nil, err: err}
+		log.Warnf("Received unexpected reply: %s (id %d)", in.Result,
+			id)
 		return
 	}
 
@@ -303,8 +322,9 @@ func (c *Client) handleMessage(msg []byte) {
 	// can automatically be re-established on reconnect.
 	c.trackRegisteredNtfns(request.cmd)
 
-	// Deliver the reply.
-	request.responseChan <- &futureResult{reply: &reply, err: nil}
+	// Deliver the response.
+	result, err := in.rawResponse.result()
+	request.responseChan <- &response{result: result, err: err}
 }
 
 // wsInHandler handles all incoming messages for the websocket connection
@@ -576,24 +596,17 @@ func (c *Client) handleSendPostMessage(details *sendPostDetails) {
 	log.Tracef("Sending command [%s] with id %d", cmd.Method(), cmd.Id())
 	httpResponse, err := c.httpClient.Do(details.request)
 	if err != nil {
-		details.responseChan <- &futureResult{reply: nil, err: err}
+		details.responseChan <- &response{result: nil, err: err}
 		return
 	}
 
 	// Read the raw bytes and close the response.
-	respBytes, err := btcjson.GetRaw(httpResponse.Body)
+	resp, err := btcjson.GetRaw(httpResponse.Body)
 	if err != nil {
-		details.responseChan <- &futureResult{reply: nil, err: err}
+		details.responseChan <- &response{result: nil, err: err}
 		return
 	}
-
-	// Unmarshal the reply into a concrete result if possible.
-	reply, err := btcjson.ReadResultCmd(cmd.Method(), respBytes)
-	if err != nil {
-		details.responseChan <- &futureResult{reply: nil, err: err}
-		return
-	}
-	details.responseChan <- &futureResult{reply: &reply, err: nil}
+	details.responseChan <- &response{result: resp, err: nil}
 }
 
 // sendPostHandler handles all outgoing messages when the client is running
@@ -620,9 +633,9 @@ cleanup:
 	for {
 		select {
 		case details := <-c.sendPostChan:
-			details.responseChan <- &futureResult{
-				reply: nil,
-				err:   ErrClientShutdown,
+			details.responseChan <- &response{
+				result: nil,
+				err:    ErrClientShutdown,
 			}
 
 		default:
@@ -637,17 +650,17 @@ cleanup:
 // sendPostRequest sends the passed HTTP request to the RPC server using the
 // HTTP client associated with the client.  It is backed by a buffered channel,
 // so it will not block until the send channel is full.
-func (c *Client) sendPostRequest(req *http.Request, command btcjson.Cmd, responseChan chan *futureResult) {
+func (c *Client) sendPostRequest(req *http.Request, command btcjson.Cmd, responseChan chan *response) {
 	// Don't send the message if shutting down.
 	select {
 	case <-c.shutdown:
-		responseChan <- &futureResult{reply: nil, err: ErrClientShutdown}
+		responseChan <- &response{result: nil, err: ErrClientShutdown}
 	default:
 	}
 
 	c.sendPostChan <- &sendPostDetails{
-		request:      req,
 		command:      command,
+		request:      req,
 		responseChan: responseChan,
 	}
 }
@@ -655,9 +668,9 @@ func (c *Client) sendPostRequest(req *http.Request, command btcjson.Cmd, respons
 // newFutureError returns a new future result channel that already has the
 // passed error waitin on the channel with the reply set to nil.  This is useful
 // to easily return errors from the various Async functions.
-func newFutureError(err error) chan *futureResult {
-	responseChan := make(chan *futureResult, 1)
-	responseChan <- &futureResult{err: err}
+func newFutureError(err error) chan *response {
+	responseChan := make(chan *response, 1)
+	responseChan <- &response{err: err}
 	return responseChan
 }
 
@@ -665,27 +678,10 @@ func newFutureError(err error) chan *futureResult {
 // reply or any errors.  The examined errors include an error in the
 // futureResult and the error in the reply from the server.  This will block
 // until the result is available on the passed channel.
-func receiveFuture(responseChan chan *futureResult) (interface{}, error) {
+func receiveFuture(f chan *response) ([]byte, error) {
 	// Wait for a response on the returned channel.
-	response := <-responseChan
-	if response.err != nil {
-		return nil, response.err
-	}
-
-	// At this point, the command was either sent to the server and
-	// there is a response from it, or it is intentionally a nil result
-	// used to bybass sends for cases such a requesting notifications when
-	// there are no handlers.
-	reply := response.reply
-	if reply == nil {
-		return nil, nil
-	}
-
-	if reply.Error != nil {
-		return nil, reply.Error
-	}
-
-	return reply.Result, nil
+	r := <-f
+	return r.result, r.err
 }
 
 // marshalAndSendPost marshals the passed command to JSON-RPC and sends it to
@@ -694,10 +690,10 @@ func receiveFuture(responseChan chan *futureResult) (interface{}, error) {
 // and closed for each command when using this method, however, the underlying
 // HTTP client might coalesce multiple commands depending on several factors
 // including the remote server configuration.
-func (c *Client) marshalAndSendPost(cmd btcjson.Cmd, responseChan chan *futureResult) {
+func (c *Client) marshalAndSendPost(cmd btcjson.Cmd, responseChan chan *response) {
 	marshalledJSON, err := json.Marshal(cmd)
 	if err != nil {
-		responseChan <- &futureResult{reply: nil, err: err}
+		responseChan <- &response{result: nil, err: err}
 		return
 	}
 
@@ -709,7 +705,7 @@ func (c *Client) marshalAndSendPost(cmd btcjson.Cmd, responseChan chan *futureRe
 	url := protocol + "://" + c.config.Host
 	req, err := http.NewRequest("POST", url, bytes.NewReader(marshalledJSON))
 	if err != nil {
-		responseChan <- &futureResult{reply: nil, err: err}
+		responseChan <- &response{result: nil, err: err}
 		return
 	}
 	req.Close = true
@@ -724,10 +720,10 @@ func (c *Client) marshalAndSendPost(cmd btcjson.Cmd, responseChan chan *futureRe
 
 // marshalAndSend marshals the passed command to JSON-RPC and sends it to the
 // server.  It returns a response channel on which the reply will be delivered.
-func (c *Client) marshalAndSend(cmd btcjson.Cmd, responseChan chan *futureResult) {
-	marshalledJSON, err := json.Marshal(cmd)
+func (c *Client) marshalAndSend(cmd btcjson.Cmd, responseChan chan *response) {
+	marshalledJSON, err := cmd.MarshalJSON()
 	if err != nil {
-		responseChan <- &futureResult{reply: nil, err: err}
+		responseChan <- &response{result: nil, err: err}
 		return
 	}
 
@@ -739,12 +735,12 @@ func (c *Client) marshalAndSend(cmd btcjson.Cmd, responseChan chan *futureResult
 // response channel on which the reply will be deliver at some point in the
 // future.  It handles both websocket and HTTP POST mode depending on the
 // configuration of the client.
-func (c *Client) sendCmd(cmd btcjson.Cmd) chan *futureResult {
+func (c *Client) sendCmd(cmd btcjson.Cmd) chan *response {
 	// Choose which marshal and send function to use depending on whether
 	// the client running in HTTP POST mode or not.  When running in HTTP
 	// POST mode, the command is issued via an HTTP client.  Otherwise,
 	// the command is issued via the asynchronous websocket channels.
-	responseChan := make(chan *futureResult, 1)
+	responseChan := make(chan *response, 1)
 	if c.config.HttpPostMode {
 		c.marshalAndSendPost(cmd, responseChan)
 		return responseChan
@@ -804,9 +800,9 @@ func (c *Client) Disconnect() {
 		c.requestLock.Lock()
 		for e := c.requestList.Front(); e != nil; e = e.Next() {
 			req := e.Value.(*jsonRequest)
-			req.responseChan <- &futureResult{
-				reply: nil,
-				err:   ErrClientDisconnect,
+			req.responseChan <- &response{
+				result: nil,
+				err:    ErrClientDisconnect,
 			}
 		}
 		c.requestLock.Unlock()
@@ -834,9 +830,9 @@ func (c *Client) Shutdown() {
 	c.requestLock.Lock()
 	for e := c.requestList.Front(); e != nil; e = e.Next() {
 		req := e.Value.(*jsonRequest)
-		req.responseChan <- &futureResult{
-			reply: nil,
-			err:   ErrClientShutdown,
+		req.responseChan <- &response{
+			result: nil,
+			err:    ErrClientShutdown,
 		}
 	}
 	c.requestLock.Unlock()

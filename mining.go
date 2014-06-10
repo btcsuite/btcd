@@ -6,28 +6,28 @@ package btcrpcclient
 
 import (
 	"encoding/hex"
-	"fmt"
+	"encoding/json"
 	"github.com/conformal/btcjson"
 	"github.com/conformal/btcutil"
 )
 
 // FutureGetGenerateResult is a future promise to deliver the result of a
 // GetGenerateAsync RPC invocation (or an applicable error).
-type FutureGetGenerateResult chan *futureResult
+type FutureGetGenerateResult chan *response
 
 // Receive waits for the response promised by the future and returns true if the
 // server is set to mine, otherwise false.
 func (r FutureGetGenerateResult) Receive() (bool, error) {
-	reply, err := receiveFuture(r)
+	res, err := receiveFuture(r)
 	if err != nil {
 		return false, err
 	}
 
-	// Ensure the returned data is the expected type.
-	result, ok := reply.(bool)
-	if !ok {
-		return false, fmt.Errorf("unexpected response type for "+
-			"getgenerate: %T\n", reply)
+	// Unmarshal result as a boolean.
+	var result bool
+	err = json.Unmarshal(res, &result)
+	if err != nil {
+		return false, err
 	}
 
 	return result, nil
@@ -55,7 +55,7 @@ func (c *Client) GetGenerate() (bool, error) {
 
 // FutureSetGenerateResult is a future promise to deliver the result of a
 // SetGenerateAsync RPC invocation (or an applicable error).
-type FutureSetGenerateResult chan *futureResult
+type FutureSetGenerateResult chan *response
 
 // Receive waits for the response promised by the future and returns an error if
 // any occurred when setting the server to generate coins (mine) or not.
@@ -90,22 +90,22 @@ func (c *Client) SetGenerate(enable bool, numCPUs int) error {
 
 // FutureGetHashesPerSecResult is a future promise to deliver the result of a
 // GetHashesPerSecAsync RPC invocation (or an applicable error).
-type FutureGetHashesPerSecResult chan *futureResult
+type FutureGetHashesPerSecResult chan *response
 
 // Receive waits for the response promised by the future and returns a recent
 // hashes per second performance measurement while generating coins (mining).
 // Zero is returned if the server is not mining.
 func (r FutureGetHashesPerSecResult) Receive() (int64, error) {
-	reply, err := receiveFuture(r)
+	res, err := receiveFuture(r)
 	if err != nil {
 		return -1, err
 	}
 
-	// Ensure the returned data is the expected type.
-	result, ok := reply.(int64)
-	if !ok {
-		return -1, fmt.Errorf("unexpected response type for "+
-			"getnetworkhashps: %T\n", reply)
+	// Unmarshal result as an int64.
+	var result int64
+	err = json.Unmarshal(res, &result)
+	if err != nil {
+		return 0, err
 	}
 
 	return result, nil
@@ -135,24 +135,24 @@ func (c *Client) GetHashesPerSec() (int64, error) {
 
 // FutureGetMiningInfoResult is a future promise to deliver the result of a
 // GetMiningInfoAsync RPC invocation (or an applicable error).
-type FutureGetMiningInfoResult chan *futureResult
+type FutureGetMiningInfoResult chan *response
 
 // Receive waits for the response promised by the future and returns the mining
 // information.
 func (r FutureGetMiningInfoResult) Receive() (*btcjson.GetMiningInfoResult, error) {
-	reply, err := receiveFuture(r)
+	res, err := receiveFuture(r)
 	if err != nil {
 		return nil, err
 	}
 
-	// Ensure the returned data is the expected type.
-	result, ok := reply.(*btcjson.GetMiningInfoResult)
-	if !ok {
-		return nil, fmt.Errorf("unexpected response type for "+
-			"getmininginfo: %T\n", reply)
+	// Unmarshal result as a getmininginfo result object.
+	var infoResult btcjson.GetMiningInfoResult
+	err = json.Unmarshal(res, &infoResult)
+	if err != nil {
+		return nil, err
 	}
 
-	return result, nil
+	return &infoResult, nil
 }
 
 // GetMiningInfoAsync returns an instance of a type that can be used to get
@@ -177,22 +177,22 @@ func (c *Client) GetMiningInfo() (*btcjson.GetMiningInfoResult, error) {
 
 // FutureGetNetworkHashPS is a future promise to deliver the result of a
 // GetNetworkHashPSAsync RPC invocation (or an applicable error).
-type FutureGetNetworkHashPS chan *futureResult
+type FutureGetNetworkHashPS chan *response
 
 // Receive waits for the response promised by the future and returns the
 // estimated network hashes per second for the block heights provided by the
 // parameters.
 func (r FutureGetNetworkHashPS) Receive() (int64, error) {
-	reply, err := receiveFuture(r)
+	res, err := receiveFuture(r)
 	if err != nil {
 		return -1, err
 	}
 
-	// Ensure the returned data is the expected type.
-	result, ok := reply.(int64)
-	if !ok {
-		return -1, fmt.Errorf("unexpected response type for "+
-			"getnetworkhashps: %T\n", reply)
+	// Unmarshal result as an int64.
+	var result int64
+	err = json.Unmarshal(res, &result)
+	if err != nil {
+		return 0, err
 	}
 
 	return result, nil
@@ -275,24 +275,24 @@ func (c *Client) GetNetworkHashPS3(blocks, height int) (int64, error) {
 
 // FutureGetWork is a future promise to deliver the result of a
 // GetWorkAsync RPC invocation (or an applicable error).
-type FutureGetWork chan *futureResult
+type FutureGetWork chan *response
 
 // Receive waits for the response promised by the future and returns the hash
 // data to work on.
 func (r FutureGetWork) Receive() (*btcjson.GetWorkResult, error) {
-	reply, err := receiveFuture(r)
+	res, err := receiveFuture(r)
 	if err != nil {
 		return nil, err
 	}
 
-	// Ensure the returned data is the expected type.
-	result, ok := reply.(*btcjson.GetWorkResult)
-	if !ok {
-		return nil, fmt.Errorf("unexpected response type for "+
-			"getwork (request data): %T\n", reply)
+	// Unmarshal result as a getwork result object.
+	var result btcjson.GetWorkResult
+	err = json.Unmarshal(res, &result)
+	if err != nil {
+		return nil, err
 	}
 
-	return result, nil
+	return &result, nil
 }
 
 // GetWorkAsync returns an instance of a type that can be used to get the result
@@ -319,21 +319,21 @@ func (c *Client) GetWork() (*btcjson.GetWorkResult, error) {
 
 // FutureGetWorkSubmit is a future promise to deliver the result of a
 // GetWorkSubmitAsync RPC invocation (or an applicable error).
-type FutureGetWorkSubmit chan *futureResult
+type FutureGetWorkSubmit chan *response
 
 // Receive waits for the response promised by the future and returns whether
 // or not the submitted block header was accepted.
 func (r FutureGetWorkSubmit) Receive() (bool, error) {
-	reply, err := receiveFuture(r)
+	res, err := receiveFuture(r)
 	if err != nil {
 		return false, err
 	}
 
-	// Ensure the returned data is the expected type.
-	accepted, ok := reply.(bool)
-	if !ok {
-		return false, fmt.Errorf("unexpected response type for "+
-			"getwork (submit data): %T\n", reply)
+	// Unmarshal result as a boolean.
+	var accepted bool
+	err = json.Unmarshal(res, &accepted)
+	if err != nil {
+		return false, err
 	}
 
 	return accepted, nil
@@ -364,7 +364,7 @@ func (c *Client) GetWorkSubmit(data string) (bool, error) {
 
 // FutureSubmitBlockResult is a future promise to deliver the result of a
 // SubmitBlockAsync RPC invocation (or an applicable error).
-type FutureSubmitBlockResult chan *futureResult
+type FutureSubmitBlockResult chan *response
 
 // Receive waits for the response promised by the future and returns an error if
 // any occurred when submitting the block.
