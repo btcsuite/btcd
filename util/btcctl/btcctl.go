@@ -53,6 +53,8 @@ var commandHandlers = map[string]*handlerData{
 	"decoderawtransaction":  {1, 0, displayJSONDump, nil, makeDecodeRawTransaction, "<txhash>"},
 	"decodescript":          {1, 0, displayJSONDump, nil, makeDecodeScript, "<hex>"},
 	"dumpprivkey":           {1, 0, displayGeneric, nil, makeDumpPrivKey, "<bitcoinaddress>"},
+	"estimatefee":           {1, 0, displayGeneric, []conversionHandler{toInt64}, makeEstimateFee, "<numblocks>"},
+	"estimatepriority":      {1, 0, displayGeneric, []conversionHandler{toInt64}, makeEstimatePriority, "<numblocks>"},
 	"getaccount":            {1, 0, displayGeneric, nil, makeGetAccount, "<address>"},
 	"getaccountaddress":     {1, 0, displayGeneric, nil, makeGetAccountAddress, "<account>"},
 	"getaddednodeinfo":      {1, 1, displayJSONDump, []conversionHandler{toBool, nil}, makeGetAddedNodeInfo, "<dns> [node]"},
@@ -265,6 +267,16 @@ func makeDecodeScript(args []interface{}) (btcjson.Cmd, error) {
 // dumpprivkey commands.
 func makeDumpPrivKey(args []interface{}) (btcjson.Cmd, error) {
 	return btcjson.NewDumpPrivKeyCmd("btcctl", args[0].(string))
+}
+
+// makeEstimateFee generates the cmd structure for estimatefee commands.
+func makeEstimateFee(args []interface{}) (btcjson.Cmd, error) {
+	return btcjson.NewEstimateFeeCmd("btcctl", args[0].(int64))
+}
+
+// makeEstimatePriority generates the cmd structure for estimatepriority commands.
+func makeEstimatePriority(args []interface{}) (btcjson.Cmd, error) {
+	return btcjson.NewEstimatePriorityCmd("btcctl", args[0].(int64))
 }
 
 // makeGetAccount generates the cmd structure for
