@@ -1615,13 +1615,6 @@ func TestCmds(t *testing.T) {
 				"got %v wanted %v", name, spew.Sdump(c2),
 				spew.Sdump(c))
 		}
-		newId := 2.0
-		c.SetId(newId)
-		id, ok = (c.Id()).(float64)
-		if !ok || id != newId {
-			t.Errorf("%s: id not returned properly after change.", name)
-		}
-
 	}
 }
 

@@ -24,7 +24,6 @@ type Cmd interface {
 	json.Marshaler
 	json.Unmarshaler
 	Id() interface{}
-	SetId(interface{})
 	Method() string
 }
 
@@ -382,11 +381,6 @@ func (cmd *unparsableCmd) Id() interface{} {
 	return cmd.id
 }
 
-// SetId allows one to modify the Id of a Cmd to help in relaying them.
-func (cmd *unparsableCmd) SetId(id interface{}) {
-	cmd.id = id
-}
-
 // Method satisfies the Cmd interface by returning the json method.
 func (cmd *unparsableCmd) Method() string {
 	return cmd.method
@@ -454,11 +448,6 @@ func NewAddMultisigAddressCmd(id interface{}, nRequired int, keys []string,
 // Id satisfies the Cmd interface by returning the id of the command.
 func (cmd *AddMultisigAddressCmd) Id() interface{} {
 	return cmd.id
-}
-
-// SetId allows one to modify the Id of a Cmd to help in relaying them.
-func (cmd *AddMultisigAddressCmd) SetId(id interface{}) {
-	cmd.id = id
 }
 
 // Method satisfies the Cmd interface by returning the json method.
@@ -559,11 +548,6 @@ func (cmd *AddNodeCmd) Id() interface{} {
 	return cmd.id
 }
 
-// SetId allows one to modify the Id of a Cmd to help in relaying them.
-func (cmd *AddNodeCmd) SetId(id interface{}) {
-	cmd.id = id
-}
-
 // Method satisfies the Cmd interface by returning the json method.
 func (cmd *AddNodeCmd) Method() string {
 	return "addnode"
@@ -640,11 +624,6 @@ func (cmd *BackupWalletCmd) Id() interface{} {
 	return cmd.id
 }
 
-// SetId allows one to modify the Id of a Cmd to help in relaying them.
-func (cmd *BackupWalletCmd) SetId(id interface{}) {
-	cmd.id = id
-}
-
 // Method satisfies the Cmd interface by returning the json method.
 func (cmd *BackupWalletCmd) Method() string {
 	return "backupwallet"
@@ -715,11 +694,6 @@ func NewCreateMultisigCmd(id interface{}, nRequired int, keys []string) (*Create
 // Id satisfies the Cmd interface by returning the id of the command.
 func (cmd *CreateMultisigCmd) Id() interface{} {
 	return cmd.id
-}
-
-// SetId allows one to modify the Id of a Cmd to help in relaying them.
-func (cmd *CreateMultisigCmd) SetId(id interface{}) {
-	cmd.id = id
 }
 
 // Method satisfies the Cmd interface by returning the json method.
@@ -804,11 +778,6 @@ func NewCreateRawTransactionCmd(id interface{}, inputs []TransactionInput, amoun
 // Id satisfies the Cmd interface by returning the id of the command.
 func (cmd *CreateRawTransactionCmd) Id() interface{} {
 	return cmd.id
-}
-
-// SetId allows one to modify the Id of a Cmd to help in relaying them.
-func (cmd *CreateRawTransactionCmd) SetId(id interface{}) {
-	cmd.id = id
 }
 
 // Method satisfies the Cmd interface by returning the json method.
@@ -903,11 +872,6 @@ func (cmd *DebugLevelCmd) Id() interface{} {
 	return cmd.id
 }
 
-// SetId allows one to modify the Id of a Cmd to help in relaying them.
-func (cmd *DebugLevelCmd) SetId(id interface{}) {
-	cmd.id = id
-}
-
 // Method satisfies the Cmd interface by returning the json method.
 func (cmd *DebugLevelCmd) Method() string {
 	return "debuglevel"
@@ -975,11 +939,6 @@ func NewDecodeRawTransactionCmd(id interface{}, hextx string) (*DecodeRawTransac
 // Id satisfies the Cmd interface by returning the id of the command.
 func (cmd *DecodeRawTransactionCmd) Id() interface{} {
 	return cmd.id
-}
-
-// SetId allows one to modify the Id of a Cmd to help in relaying them.
-func (cmd *DecodeRawTransactionCmd) SetId(id interface{}) {
-	cmd.id = id
 }
 
 // Method satisfies the Cmd interface by returning the json method.
@@ -1051,11 +1010,6 @@ func (cmd *DecodeScriptCmd) Id() interface{} {
 	return cmd.id
 }
 
-// SetId allows one to modify the Id of a Cmd to help in relaying them.
-func (cmd *DecodeScriptCmd) SetId(id interface{}) {
-	cmd.id = id
-}
-
 // Method satisfies the Cmd interface by returning the json method.
 func (cmd *DecodeScriptCmd) Method() string {
 	return "decodescript"
@@ -1123,11 +1077,6 @@ func NewDumpPrivKeyCmd(id interface{}, address string) (*DumpPrivKeyCmd, error) 
 // Id satisfies the Cmd interface by returning the id of the command.
 func (cmd *DumpPrivKeyCmd) Id() interface{} {
 	return cmd.id
-}
-
-// SetId allows one to modify the Id of a Cmd to help in relaying them.
-func (cmd *DumpPrivKeyCmd) SetId(id interface{}) {
-	cmd.id = id
 }
 
 // Method satisfies the Cmd interface by returning the json method.
@@ -1199,11 +1148,6 @@ func (cmd *DumpWalletCmd) Id() interface{} {
 	return cmd.id
 }
 
-// SetId allows one to modify the Id of a Cmd to help in relaying them.
-func (cmd *DumpWalletCmd) SetId(id interface{}) {
-	cmd.id = id
-}
-
 // Method satisfies the Cmd interface by returning the json method.
 func (cmd *DumpWalletCmd) Method() string {
 	return "dumpwallet"
@@ -1271,11 +1215,6 @@ func NewEncryptWalletCmd(id interface{}, passphrase string) (*EncryptWalletCmd, 
 // Id satisfies the Cmd interface by returning the id of the command.
 func (cmd *EncryptWalletCmd) Id() interface{} {
 	return cmd.id
-}
-
-// SetId allows one to modify the Id of a Cmd to help in relaying them.
-func (cmd *EncryptWalletCmd) SetId(id interface{}) {
-	cmd.id = id
 }
 
 // Method satisfies the Cmd interface by returning the json method.
@@ -1347,11 +1286,6 @@ func (cmd *EstimateFeeCmd) Id() interface{} {
 	return cmd.id
 }
 
-// SetId allows one to modify the Id of a Cmd to help in relaying them.
-func (cmd *EstimateFeeCmd) SetId(id interface{}) {
-	cmd.id = id
-}
-
 // Method satisfies the Cmd interface by returning the json method.
 func (cmd *EstimateFeeCmd) Method() string {
 	return "estimatefee"
@@ -1419,11 +1353,6 @@ func NewEstimatePriorityCmd(id interface{}, numblocks int64) (*EstimatePriorityC
 // Id satisfies the Cmd interface by returning the id of the command.
 func (cmd *EstimatePriorityCmd) Id() interface{} {
 	return cmd.id
-}
-
-// SetId allows one to modify the Id of a Cmd to help in relaying them.
-func (cmd *EstimatePriorityCmd) SetId(id interface{}) {
-	cmd.id = id
 }
 
 // Method satisfies the Cmd interface by returning the json method.
@@ -1495,11 +1424,6 @@ func (cmd *GetAccountCmd) Id() interface{} {
 	return cmd.id
 }
 
-// SetId allows one to modify the Id of a Cmd to help in relaying them.
-func (cmd *GetAccountCmd) SetId(id interface{}) {
-	cmd.id = id
-}
-
 // Method satisfies the Cmd interface by returning the json method.
 func (cmd *GetAccountCmd) Method() string {
 	return "getaccount"
@@ -1567,11 +1491,6 @@ func NewGetAccountAddressCmd(id interface{}, account string) (*GetAccountAddress
 // Id satisfies the Cmd interface by returning the id of the command.
 func (cmd *GetAccountAddressCmd) Id() interface{} {
 	return cmd.id
-}
-
-// SetId allows one to modify the Id of a Cmd to help in relaying them.
-func (cmd *GetAccountAddressCmd) SetId(id interface{}) {
-	cmd.id = id
 }
 
 // Method satisfies the Cmd interface by returning the json method.
@@ -1654,11 +1573,6 @@ func (cmd *GetAddedNodeInfoCmd) Id() interface{} {
 	return cmd.id
 }
 
-// SetId allows one to modify the Id of a Cmd to help in relaying them.
-func (cmd *GetAddedNodeInfoCmd) SetId(id interface{}) {
-	cmd.id = id
-}
-
 // Method satisfies the Cmd interface by returning the json method.
 func (cmd *GetAddedNodeInfoCmd) Method() string {
 	return "getaddednodeinfo"
@@ -1737,11 +1651,6 @@ func NewGetAddressesByAccountCmd(id interface{}, account string) (*GetAddressesB
 // Id satisfies the Cmd interface by returning the id of the command.
 func (cmd *GetAddressesByAccountCmd) Id() interface{} {
 	return cmd.id
-}
-
-// SetId allows one to modify the Id of a Cmd to help in relaying them.
-func (cmd *GetAddressesByAccountCmd) SetId(id interface{}) {
-	cmd.id = id
 }
 
 // Method satisfies the Cmd interface by returning the json method.
@@ -1838,11 +1747,6 @@ func (cmd *GetBalanceCmd) Id() interface{} {
 	return cmd.id
 }
 
-// SetId allows one to modify the Id of a Cmd to help in relaying them.
-func (cmd *GetBalanceCmd) SetId(id interface{}) {
-	cmd.id = id
-}
-
 // Method satisfies the Cmd interface by returning the json method.
 func (cmd *GetBalanceCmd) Method() string {
 	return "getbalance"
@@ -1926,11 +1830,6 @@ func (cmd *GetBestBlockHashCmd) Id() interface{} {
 	return cmd.id
 }
 
-// SetId allows one to modify the Id of a Cmd to help in relaying them.
-func (cmd *GetBestBlockHashCmd) SetId(id interface{}) {
-	cmd.id = id
-}
-
 // Method satisfies the Cmd interface by returning the json method.
 func (cmd *GetBestBlockHashCmd) Method() string {
 	return "getbestblockhash"
@@ -2011,11 +1910,6 @@ func NewGetBlockCmd(id interface{}, hash string, optArgs ...bool) (*GetBlockCmd,
 // Id satisfies the Cmd interface by returning the id of the command.
 func (cmd *GetBlockCmd) Id() interface{} {
 	return cmd.id
-}
-
-// SetId allows one to modify the Id of a Cmd to help in relaying them.
-func (cmd *GetBlockCmd) SetId(id interface{}) {
-	cmd.id = id
 }
 
 // Method satisfies the Cmd interface by returning the json method.
@@ -2109,11 +2003,6 @@ func (cmd *GetBlockChainInfoCmd) Id() interface{} {
 	return cmd.id
 }
 
-// SetId allows one to modify the Id of a Cmd to help in relaying them.
-func (cmd *GetBlockChainInfoCmd) SetId(id interface{}) {
-	cmd.id = id
-}
-
 // Method satisfies the Cmd interface by returning the json method.
 func (cmd *GetBlockChainInfoCmd) Method() string {
 	return "getblockchaininfo"
@@ -2170,11 +2059,6 @@ func NewGetBlockCountCmd(id interface{}) (*GetBlockCountCmd, error) {
 // Id satisfies the Cmd interface by returning the id of the command.
 func (cmd *GetBlockCountCmd) Id() interface{} {
 	return cmd.id
-}
-
-// SetId allows one to modify the Id of a Cmd to help in relaying them.
-func (cmd *GetBlockCountCmd) SetId(id interface{}) {
-	cmd.id = id
 }
 
 // Method satisfies the Cmd interface by returning the json method.
@@ -2235,11 +2119,6 @@ func NewGetBlockHashCmd(id interface{}, index int64) (*GetBlockHashCmd, error) {
 // Id satisfies the Cmd interface by returning the id of the command.
 func (cmd *GetBlockHashCmd) Id() interface{} {
 	return cmd.id
-}
-
-// SetId allows one to modify the Id of a Cmd to help in relaying them.
-func (cmd *GetBlockHashCmd) SetId(id interface{}) {
-	cmd.id = id
 }
 
 // Method satisfies the Cmd interface by returning the json method.
@@ -2327,11 +2206,6 @@ func (cmd *GetBlockTemplateCmd) Id() interface{} {
 	return cmd.id
 }
 
-// SetId allows one to modify the Id of a Cmd to help in relaying them.
-func (cmd *GetBlockTemplateCmd) SetId(id interface{}) {
-	cmd.id = id
-}
-
 // Method satisfies the Cmd interface by returning the json method.
 func (cmd *GetBlockTemplateCmd) Method() string {
 	return "getblocktemplate"
@@ -2404,11 +2278,6 @@ func (cmd *GetConnectionCountCmd) Id() interface{} {
 	return cmd.id
 }
 
-// SetId allows one to modify the Id of a Cmd to help in relaying them.
-func (cmd *GetConnectionCountCmd) SetId(id interface{}) {
-	cmd.id = id
-}
-
 // Method satisfies the Cmd interface by returning the json method.
 func (cmd *GetConnectionCountCmd) Method() string {
 	return "getconnectioncount"
@@ -2465,11 +2334,6 @@ func NewGetDifficultyCmd(id interface{}) (*GetDifficultyCmd, error) {
 // Id satisfies the Cmd interface by returning the id of the command.
 func (cmd *GetDifficultyCmd) Id() interface{} {
 	return cmd.id
-}
-
-// SetId allows one to modify the Id of a Cmd to help in relaying them.
-func (cmd *GetDifficultyCmd) SetId(id interface{}) {
-	cmd.id = id
 }
 
 // Method satisfies the Cmd interface by returning the json method.
@@ -2530,11 +2394,6 @@ func (cmd *GetGenerateCmd) Id() interface{} {
 	return cmd.id
 }
 
-// SetId allows one to modify the Id of a Cmd to help in relaying them.
-func (cmd *GetGenerateCmd) SetId(id interface{}) {
-	cmd.id = id
-}
-
 // Method satisfies the Cmd interface by returning the json method.
 func (cmd *GetGenerateCmd) Method() string {
 	return "getgenerate"
@@ -2591,11 +2450,6 @@ func NewGetHashesPerSecCmd(id interface{}) (*GetHashesPerSecCmd, error) {
 // Id satisfies the Cmd interface by returning the id of the command.
 func (cmd *GetHashesPerSecCmd) Id() interface{} {
 	return cmd.id
-}
-
-// SetId allows one to modify the Id of a Cmd to help in relaying them.
-func (cmd *GetHashesPerSecCmd) SetId(id interface{}) {
-	cmd.id = id
 }
 
 // Method satisfies the Cmd interface by returning the json method.
@@ -2656,11 +2510,6 @@ func (cmd *GetInfoCmd) Id() interface{} {
 	return cmd.id
 }
 
-// SetId allows one to modify the Id of a Cmd to help in relaying them.
-func (cmd *GetInfoCmd) SetId(id interface{}) {
-	cmd.id = id
-}
-
 // Method satisfies the Cmd interface by returning the json method.
 func (cmd *GetInfoCmd) Method() string {
 	return "getinfo"
@@ -2717,11 +2566,6 @@ func NewGetMiningInfoCmd(id interface{}) (*GetMiningInfoCmd, error) {
 // Id satisfies the Cmd interface by returning the id of the command.
 func (cmd *GetMiningInfoCmd) Id() interface{} {
 	return cmd.id
-}
-
-// SetId allows one to modify the Id of a Cmd to help in relaying them.
-func (cmd *GetMiningInfoCmd) SetId(id interface{}) {
-	cmd.id = id
 }
 
 // Method satisfies the Cmd interface by returning the json method.
@@ -2782,11 +2626,6 @@ func (cmd *GetNetworkInfoCmd) Id() interface{} {
 	return cmd.id
 }
 
-// SetId allows one to modify the Id of a Cmd to help in relaying them.
-func (cmd *GetNetworkInfoCmd) SetId(id interface{}) {
-	cmd.id = id
-}
-
 // Method satisfies the Cmd interface by returning the json method.
 func (cmd *GetNetworkInfoCmd) Method() string {
 	return "getnetworkinfo"
@@ -2843,11 +2682,6 @@ func NewGetNetTotalsCmd(id interface{}) (*GetNetTotalsCmd, error) {
 // Id satisfies the Cmd interface by returning the id of the command.
 func (cmd *GetNetTotalsCmd) Id() interface{} {
 	return cmd.id
-}
-
-// SetId allows one to modify the Id of a Cmd to help in relaying them.
-func (cmd *GetNetTotalsCmd) SetId(id interface{}) {
-	cmd.id = id
 }
 
 // Method satisfies the Cmd interface by returning the json method.
@@ -2924,11 +2758,6 @@ func NewGetNetworkHashPSCmd(id interface{}, optArgs ...int) (*GetNetworkHashPSCm
 // Id satisfies the Cmd interface by returning the id of the command.
 func (cmd *GetNetworkHashPSCmd) Id() interface{} {
 	return cmd.id
-}
-
-// SetId allows one to modify the Id of a Cmd to help in relaying them.
-func (cmd *GetNetworkHashPSCmd) SetId(id interface{}) {
-	cmd.id = id
 }
 
 // Method satisfies the Cmd interface by returning the json method.
@@ -3023,11 +2852,6 @@ func (cmd *GetNewAddressCmd) Id() interface{} {
 	return cmd.id
 }
 
-// SetId allows one to modify the Id of a Cmd to help in relaying them.
-func (cmd *GetNewAddressCmd) SetId(id interface{}) {
-	cmd.id = id
-}
-
 // Method satisfies the Cmd interface by returning the json method.
 func (cmd *GetNewAddressCmd) Method() string {
 	return "getnewaddress"
@@ -3100,11 +2924,6 @@ func (cmd *GetPeerInfoCmd) Id() interface{} {
 	return cmd.id
 }
 
-// SetId allows one to modify the Id of a Cmd to help in relaying them.
-func (cmd *GetPeerInfoCmd) SetId(id interface{}) {
-	cmd.id = id
-}
-
 // Method satisfies the Cmd interface by returning the json method.
 func (cmd *GetPeerInfoCmd) Method() string {
 	return "getpeerinfo"
@@ -3171,11 +2990,6 @@ func NewGetRawChangeAddressCmd(id interface{}, optArgs ...string) (*GetRawChange
 // Id satisfies the Cmd interface by returning the id of the command.
 func (cmd *GetRawChangeAddressCmd) Id() interface{} {
 	return cmd.id
-}
-
-// SetId allows one to modify the Id of a Cmd to help in relaying them.
-func (cmd *GetRawChangeAddressCmd) SetId(id interface{}) {
-	cmd.id = id
 }
 
 // Method satisfies the Cmd interface by returning the json method.
@@ -3257,11 +3071,6 @@ func NewGetRawMempoolCmd(id interface{}, optArgs ...bool) (*GetRawMempoolCmd, er
 // Id satisfies the Cmd interface by returning the id of the command.
 func (cmd *GetRawMempoolCmd) Id() interface{} {
 	return cmd.id
-}
-
-// SetId allows one to modify the Id of a Cmd to help in relaying them.
-func (cmd *GetRawMempoolCmd) SetId(id interface{}) {
-	cmd.id = id
 }
 
 // Method satisfies the Cmd interface by returning the json method.
@@ -3346,11 +3155,6 @@ func NewGetRawTransactionCmd(id interface{}, txid string, optArgs ...int) (*GetR
 // Id satisfies the Cmd interface by returning the id of the command.
 func (cmd *GetRawTransactionCmd) Id() interface{} {
 	return cmd.id
-}
-
-// SetId allows one to modify the Id of a Cmd to help in relaying them.
-func (cmd *GetRawTransactionCmd) SetId(id interface{}) {
-	cmd.id = id
 }
 
 // Method satisfies the Cmd interface by returning the json method.
@@ -3442,11 +3246,6 @@ func (cmd *GetReceivedByAccountCmd) Id() interface{} {
 	return cmd.id
 }
 
-// SetId allows one to modify the Id of a Cmd to help in relaying them.
-func (cmd *GetReceivedByAccountCmd) SetId(id interface{}) {
-	cmd.id = id
-}
-
 // Method satisfies the Cmd interface by returning the json method.
 func (cmd *GetReceivedByAccountCmd) Method() string {
 	return "getreceivedbyaccount"
@@ -3536,11 +3335,6 @@ func (cmd *GetReceivedByAddressCmd) Id() interface{} {
 	return cmd.id
 }
 
-// SetId allows one to modify the Id of a Cmd to help in relaying them.
-func (cmd *GetReceivedByAddressCmd) SetId(id interface{}) {
-	cmd.id = id
-}
-
 // Method satisfies the Cmd interface by returning the json method.
 func (cmd *GetReceivedByAddressCmd) Method() string {
 	return "getreceivedbyaddress"
@@ -3621,11 +3415,6 @@ func (cmd *GetTransactionCmd) Id() interface{} {
 	return cmd.id
 }
 
-// SetId allows one to modify the Id of a Cmd to help in relaying them.
-func (cmd *GetTransactionCmd) SetId(id interface{}) {
-	cmd.id = id
-}
-
 // Method satisfies the Cmd interface by returning the json method.
 func (cmd *GetTransactionCmd) Method() string {
 	return "gettransaction"
@@ -3704,11 +3493,6 @@ func NewGetTxOutCmd(id interface{}, txid string, output int, optArgs ...bool) (*
 // Id satisfies the Cmd interface by returning the id of the command.
 func (cmd *GetTxOutCmd) Id() interface{} {
 	return cmd.id
-}
-
-// SetId allows one to modify the Id of a Cmd to help in relaying them.
-func (cmd *GetTxOutCmd) SetId(id interface{}) {
-	cmd.id = id
 }
 
 // Method satisfies the Cmd interface by returning the json method.
@@ -3795,11 +3579,6 @@ func (cmd *GetTxOutSetInfoCmd) Id() interface{} {
 	return cmd.id
 }
 
-// SetId allows one to modify the Id of a Cmd to help in relaying them.
-func (cmd *GetTxOutSetInfoCmd) SetId(id interface{}) {
-	cmd.id = id
-}
-
 // Method satisfies the Cmd interface by returning the json method.
 func (cmd *GetTxOutSetInfoCmd) Method() string {
 	return "gettxoutsetinfo"
@@ -3866,11 +3645,6 @@ func NewGetWorkCmd(id interface{}, optArgs ...string) (*GetWorkCmd, error) {
 // Id satisfies the Cmd interface by returning the id of the command.
 func (cmd *GetWorkCmd) Id() interface{} {
 	return cmd.id
-}
-
-// SetId allows one to modify the Id of a Cmd to help in relaying them.
-func (cmd *GetWorkCmd) SetId(id interface{}) {
-	cmd.id = id
 }
 
 // Method satisfies the Cmd interface by returning the json method.
@@ -3951,11 +3725,6 @@ func NewHelpCmd(id interface{}, optArgs ...string) (*HelpCmd, error) {
 // Id satisfies the Cmd interface by returning the id of the command.
 func (cmd *HelpCmd) Id() interface{} {
 	return cmd.id
-}
-
-// SetId allows one to modify the Id of a Cmd to help in relaying them.
-func (cmd *HelpCmd) SetId(id interface{}) {
-	cmd.id = id
 }
 
 // Method satisfies the Cmd interface by returning the json method.
@@ -4056,11 +3825,6 @@ func (cmd *ImportPrivKeyCmd) Id() interface{} {
 	return cmd.id
 }
 
-// SetId allows one to modify the Id of a Cmd to help in relaying them.
-func (cmd *ImportPrivKeyCmd) SetId(id interface{}) {
-	cmd.id = id
-}
-
 // Method satisfies the Cmd interface by returning the json method.
 func (cmd *ImportPrivKeyCmd) Method() string {
 	return "importprivkey"
@@ -4153,11 +3917,6 @@ func (cmd *ImportWalletCmd) Id() interface{} {
 	return cmd.id
 }
 
-// SetId allows one to modify the Id of a Cmd to help in relaying them.
-func (cmd *ImportWalletCmd) SetId(id interface{}) {
-	cmd.id = id
-}
-
 // Method satisfies the Cmd interface by returning the json method.
 func (cmd *ImportWalletCmd) Method() string {
 	return "importwallet"
@@ -4235,11 +3994,6 @@ func NewKeyPoolRefillCmd(id interface{}, optArgs ...uint) (*KeyPoolRefillCmd, er
 // Id satisfies the Cmd interface by returning the id of the command.
 func (cmd *KeyPoolRefillCmd) Id() interface{} {
 	return cmd.id
-}
-
-// SetId allows one to modify the Id of a Cmd to help in relaying them.
-func (cmd *KeyPoolRefillCmd) SetId(id interface{}) {
-	cmd.id = id
 }
 
 // Method satisfies the Cmd interface by returning the json method.
@@ -4324,11 +4078,6 @@ func (cmd *ListAccountsCmd) Id() interface{} {
 	return cmd.id
 }
 
-// SetId allows one to modify the Id of a Cmd to help in relaying them.
-func (cmd *ListAccountsCmd) SetId(id interface{}) {
-	cmd.id = id
-}
-
 // Method satisfies the Cmd interface by returning the json method.
 func (cmd *ListAccountsCmd) Method() string {
 	return "listaccounts"
@@ -4402,11 +4151,6 @@ func (cmd *ListAddressGroupingsCmd) Id() interface{} {
 	return cmd.id
 }
 
-// SetId allows one to modify the Id of a Cmd to help in relaying them.
-func (cmd *ListAddressGroupingsCmd) SetId(id interface{}) {
-	cmd.id = id
-}
-
 // Method satisfies the Cmd interface by returning the json method.
 func (cmd *ListAddressGroupingsCmd) Method() string {
 	return "listaddressgroupings"
@@ -4464,11 +4208,6 @@ func NewListLockUnspentCmd(id interface{}) (*ListLockUnspentCmd, error) {
 // Id satisfies the Cmd interface by returning the id of the command.
 func (cmd *ListLockUnspentCmd) Id() interface{} {
 	return cmd.id
-}
-
-// SetId allows one to modify the Id of a Cmd to help in relaying them.
-func (cmd *ListLockUnspentCmd) SetId(id interface{}) {
-	cmd.id = id
 }
 
 // Method satisfies the Cmd interface by returning the json method.
@@ -4553,11 +4292,6 @@ func NewListReceivedByAccountCmd(id interface{}, optArgs ...interface{}) (*ListR
 // Id satisfies the Cmd interface by returning the id of the command.
 func (cmd *ListReceivedByAccountCmd) Id() interface{} {
 	return cmd.id
-}
-
-// SetId allows one to modify the Id of a Cmd to help in relaying them.
-func (cmd *ListReceivedByAccountCmd) SetId(id interface{}) {
-	cmd.id = id
 }
 
 // Method satisfies the Cmd interface by returning the json method.
@@ -4668,11 +4402,6 @@ func (cmd *ListReceivedByAddressCmd) Id() interface{} {
 	return cmd.id
 }
 
-// SetId allows one to modify the Id of a Cmd to help in relaying them.
-func (cmd *ListReceivedByAddressCmd) SetId(id interface{}) {
-	cmd.id = id
-}
-
 // Method satisfies the Cmd interface by returning the json method.
 func (cmd *ListReceivedByAddressCmd) Method() string {
 	return "listreceivedbyaddress"
@@ -4779,11 +4508,6 @@ func NewListSinceBlockCmd(id interface{}, optArgs ...interface{}) (*ListSinceBlo
 // Id satisfies the Cmd interface by returning the id of the command.
 func (cmd *ListSinceBlockCmd) Id() interface{} {
 	return cmd.id
-}
-
-// SetId allows one to modify the Id of a Cmd to help in relaying them.
-func (cmd *ListSinceBlockCmd) SetId(id interface{}) {
-	cmd.id = id
 }
 
 // Method satisfies the Cmd interface by returning the json method.
@@ -4903,11 +4627,6 @@ func NewListTransactionsCmd(id interface{}, optArgs ...interface{}) (*ListTransa
 // Id satisfies the Cmd interface by returning the id of the command.
 func (cmd *ListTransactionsCmd) Id() interface{} {
 	return cmd.id
-}
-
-// SetId allows one to modify the Id of a Cmd to help in relaying them.
-func (cmd *ListTransactionsCmd) SetId(id interface{}) {
-	cmd.id = id
 }
 
 // Method satisfies the Cmd interface by returning the json method.
@@ -5037,11 +4756,6 @@ func (cmd *ListUnspentCmd) Id() interface{} {
 	return cmd.id
 }
 
-// SetId allows one to modify the Id of a Cmd to help in relaying them.
-func (cmd *ListUnspentCmd) SetId(id interface{}) {
-	cmd.id = id
-}
-
 // Method satisfies the Cmd interface by returning the json method.
 func (cmd *ListUnspentCmd) Method() string {
 	return "listunspent"
@@ -5147,11 +4861,6 @@ func NewLockUnspentCmd(id interface{}, unlock bool, optArgs ...[]TransactionInpu
 // Id satisfies the Cmd interface by returning the id of the command.
 func (cmd *LockUnspentCmd) Id() interface{} {
 	return cmd.id
-}
-
-// SetId allows one to modify the Id of a Cmd to help in relaying them.
-func (cmd *LockUnspentCmd) SetId(id interface{}) {
-	cmd.id = id
 }
 
 // Method satisfies the Cmd interface by returning the json method.
@@ -5266,11 +4975,6 @@ func (cmd *MoveCmd) Id() interface{} {
 	return cmd.id
 }
 
-// SetId allows one to modify the Id of a Cmd to help in relaying them.
-func (cmd *MoveCmd) SetId(id interface{}) {
-	cmd.id = id
-}
-
 // Method satisfies the Cmd interface by returning the json method.
 func (cmd *MoveCmd) Method() string {
 	return "move"
@@ -5377,11 +5081,6 @@ func (cmd *PingCmd) Id() interface{} {
 	return cmd.id
 }
 
-// SetId allows one to modify the Id of a Cmd to help in relaying them.
-func (cmd *PingCmd) SetId(id interface{}) {
-	cmd.id = id
-}
-
 // Method satisfies the Cmd interface by returning the json method.
 func (cmd *PingCmd) Method() string {
 	return "ping"
@@ -5482,11 +5181,6 @@ func NewSendFromCmd(id interface{}, fromaccount string, toaddress string, amount
 // Id satisfies the Cmd interface by returning the id of the command.
 func (cmd *SendFromCmd) Id() interface{} {
 	return cmd.id
-}
-
-// SetId allows one to modify the Id of a Cmd to help in relaying them.
-func (cmd *SendFromCmd) SetId(id interface{}) {
-	cmd.id = id
 }
 
 // Method satisfies the Cmd interface by returning the json method.
@@ -5635,11 +5329,6 @@ func (cmd *SendManyCmd) Id() interface{} {
 	return cmd.id
 }
 
-// SetId allows one to modify the Id of a Cmd to help in relaying them.
-func (cmd *SendManyCmd) SetId(id interface{}) {
-	cmd.id = id
-}
-
 // Method satisfies the Cmd interface by returning the json method.
 func (cmd *SendManyCmd) Method() string {
 	return "sendmany"
@@ -5760,11 +5449,6 @@ func (cmd *SendRawTransactionCmd) Id() interface{} {
 	return cmd.id
 }
 
-// SetId allows one to modify the Id of a Cmd to help in relaying them.
-func (cmd *SendRawTransactionCmd) SetId(id interface{}) {
-	cmd.id = id
-}
-
 // Method satisfies the Cmd interface by returning the json method.
 func (cmd *SendRawTransactionCmd) Method() string {
 	return "sendrawtransaction"
@@ -5874,11 +5558,6 @@ func (cmd *SendToAddressCmd) Id() interface{} {
 	return cmd.id
 }
 
-// SetId allows one to modify the Id of a Cmd to help in relaying them.
-func (cmd *SendToAddressCmd) SetId(id interface{}) {
-	cmd.id = id
-}
-
 // Method satisfies the Cmd interface by returning the json method.
 func (cmd *SendToAddressCmd) Method() string {
 	return "sendtoaddress"
@@ -5983,11 +5662,6 @@ func (cmd *SetAccountCmd) Id() interface{} {
 	return cmd.id
 }
 
-// SetId allows one to modify the Id of a Cmd to help in relaying them.
-func (cmd *SetAccountCmd) SetId(id interface{}) {
-	cmd.id = id
-}
-
 // Method satisfies the Cmd interface by returning the json method.
 func (cmd *SetAccountCmd) Method() string {
 	return "setaccount"
@@ -6075,11 +5749,6 @@ func (cmd *SetGenerateCmd) Id() interface{} {
 	return cmd.id
 }
 
-// SetId allows one to modify the Id of a Cmd to help in relaying them.
-func (cmd *SetGenerateCmd) SetId(id interface{}) {
-	cmd.id = id
-}
-
 // Method satisfies the Cmd interface by returning the json method.
 func (cmd *SetGenerateCmd) Method() string {
 	return "setgenerate"
@@ -6161,11 +5830,6 @@ func (cmd *SetTxFeeCmd) Id() interface{} {
 	return cmd.id
 }
 
-// SetId allows one to modify the Id of a Cmd to help in relaying them.
-func (cmd *SetTxFeeCmd) SetId(id interface{}) {
-	cmd.id = id
-}
-
 // Method satisfies the Cmd interface by returning the json method.
 func (cmd *SetTxFeeCmd) Method() string {
 	return "settxfee"
@@ -6240,11 +5904,6 @@ func NewSignMessageCmd(id interface{}, address string, message string) (*SignMes
 // Id satisfies the Cmd interface by returning the id of the command.
 func (cmd *SignMessageCmd) Id() interface{} {
 	return cmd.id
-}
-
-// SetId allows one to modify the Id of a Cmd to help in relaying them.
-func (cmd *SignMessageCmd) SetId(id interface{}) {
-	cmd.id = id
 }
 
 // Method satisfies the Cmd interface by returning the json method.
@@ -6367,11 +6026,6 @@ func (cmd *SignRawTransactionCmd) Id() interface{} {
 	return cmd.id
 }
 
-// SetId allows one to modify the Id of a Cmd to help in relaying them.
-func (cmd *SignRawTransactionCmd) SetId(id interface{}) {
-	cmd.id = id
-}
-
 // Method satisfies the Cmd interface by returning the json method.
 func (cmd *SignRawTransactionCmd) Method() string {
 	return "signrawtransaction"
@@ -6474,11 +6128,6 @@ func (cmd *StopCmd) Id() interface{} {
 	return cmd.id
 }
 
-// SetId allows one to modify the Id of a Cmd to help in relaying them.
-func (cmd *StopCmd) SetId(id interface{}) {
-	cmd.id = id
-}
-
 // Method satisfies the Cmd interface by returning the json method.
 func (cmd *StopCmd) Method() string {
 	return "stop"
@@ -6555,11 +6204,6 @@ func NewSubmitBlockCmd(id interface{}, hexblock string, optArgs ...*SubmitBlockO
 // Id satisfies the Cmd interface by returning the id of the command.
 func (cmd *SubmitBlockCmd) Id() interface{} {
 	return cmd.id
-}
-
-// SetId allows one to modify the Id of a Cmd to help in relaying them.
-func (cmd *SubmitBlockCmd) SetId(id interface{}) {
-	cmd.id = id
 }
 
 // Method satisfies the Cmd interface by returning the json method.
@@ -6643,11 +6287,6 @@ func NewValidateAddressCmd(id interface{}, address string) (*ValidateAddressCmd,
 // Id satisfies the Cmd interface by returning the id of the command.
 func (cmd *ValidateAddressCmd) Id() interface{} {
 	return cmd.id
-}
-
-// SetId allows one to modify the Id of a Cmd to help in relaying them.
-func (cmd *ValidateAddressCmd) SetId(id interface{}) {
-	cmd.id = id
 }
 
 // Method satisfies the Cmd interface by returning the json method.
@@ -6735,11 +6374,6 @@ func NewVerifyChainCmd(id interface{}, optArgs ...int32) (*VerifyChainCmd, error
 // Id satisfies the Cmd interface by returning the id of the command.
 func (cmd *VerifyChainCmd) Id() interface{} {
 	return cmd.id
-}
-
-// SetId allows one to modify the Id of a Cmd to help in relaying them.
-func (cmd *VerifyChainCmd) SetId(id interface{}) {
-	cmd.id = id
 }
 
 // Method satisfies the Cmd interface by returning the json method.
@@ -6835,11 +6469,6 @@ func (cmd *VerifyMessageCmd) Id() interface{} {
 	return cmd.id
 }
 
-// SetId allows one to modify the Id of a Cmd to help in relaying them.
-func (cmd *VerifyMessageCmd) SetId(id interface{}) {
-	cmd.id = id
-}
-
 // Method satisfies the Cmd interface by returning the json method.
 func (cmd *VerifyMessageCmd) Method() string {
 	return "verifymessage"
@@ -6921,11 +6550,6 @@ func (cmd *WalletLockCmd) Id() interface{} {
 	return cmd.id
 }
 
-// SetId allows one to modify the Id of a Cmd to help in relaying them.
-func (cmd *WalletLockCmd) SetId(id interface{}) {
-	cmd.id = id
-}
-
 // Method satisfies the Cmd interface by returning the json method.
 func (cmd *WalletLockCmd) Method() string {
 	return "walletlock"
@@ -6988,11 +6612,6 @@ func NewWalletPassphraseCmd(id interface{}, passphrase string, timeout int64) (*
 // Id satisfies the Cmd interface by returning the id of the command.
 func (cmd *WalletPassphraseCmd) Id() interface{} {
 	return cmd.id
-}
-
-// SetId allows one to modify the Id of a Cmd to help in relaying them.
-func (cmd *WalletPassphraseCmd) SetId(id interface{}) {
-	cmd.id = id
 }
 
 // Method satisfies the Cmd interface by returning the json method.
@@ -7072,11 +6691,6 @@ func NewWalletPassphraseChangeCmd(id interface{}, oldpassphrase, newpassphrase s
 // Id satisfies the Cmd interface by returning the id of the command.
 func (cmd *WalletPassphraseChangeCmd) Id() interface{} {
 	return cmd.id
-}
-
-// SetId allows one to modify the Id of a Cmd to help in relaying them.
-func (cmd *WalletPassphraseChangeCmd) SetId(id interface{}) {
-	cmd.id = id
 }
 
 // Method satisfies the Cmd interface by returning the json method.
