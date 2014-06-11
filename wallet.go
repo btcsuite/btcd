@@ -1969,6 +1969,57 @@ func (c *Client) ImportPrivKey(privKeyWIF *btcutil.WIF) error {
 	return c.ImportPrivKeyAsync(privKeyWIF).Receive()
 }
 
+// ***********************
+// Miscellaneous Functions
+// ***********************
+
+// NOTE: While getinfo is implemented here (in wallet.go), a btcd chain server
+// will respond to getinfo requests as well, excluding any wallet information.
+
+// FutureGetInfoResult is a future promise to deliver the result of a
+// GetInfoAsync RPC invocation (or an applicable error).
+type FutureGetInfoResult chan *response
+
+// Receive waits for the response promised by the future and returns the info
+// provided by the server.
+func (r FutureGetInfoResult) Receive() (*btcjson.InfoResult, error) {
+	res, err := receiveFuture(r)
+	if err != nil {
+		return nil, err
+	}
+
+	// Unmarshal result as a getinfo result object.
+	var infoRes btcjson.InfoResult
+	err = json.Unmarshal(res, &infoRes)
+	if err != nil {
+		return nil, err
+	}
+
+	return &infoRes, nil
+}
+
+// GetInfoAsync returns an instance of a type that can be used to get the result
+// of the RPC at some future time by invoking the Receive function on the
+// returned instance.
+//
+// See GetInfo for the blocking version and more details.
+func (c *Client) GetInfoAsync() FutureGetInfoResult {
+	id := c.NextID()
+	cmd, err := btcjson.NewGetInfoCmd(id)
+	if err != nil {
+		return newFutureError(err)
+	}
+
+	return c.sendCmd(cmd)
+}
+
+// GetInfo returns miscellaneous info regarding the RPC server.  The returned
+// info object may be void of wallet information if the remote server does
+// not include wallet functionality.
+func (c *Client) GetInfo() (*btcjson.InfoResult, error) {
+	return c.GetInfoAsync().Receive()
+}
+
 // TODO(davec): Implement
 // backupwallet (NYI in btcwallet)
 // encryptwallet (Won't be supported by btcwallet since it's always encrypted)
