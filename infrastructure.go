@@ -474,6 +474,12 @@ func (c *Client) reregisterNtfns() error {
 	return nil
 }
 
+// ignoreResends is a set of all methods for requests that are "long running"
+// are not be reissued by the client on reconnect.
+var ignoreResends = map[string]struct{}{
+	"rescan": struct{}{},
+}
+
 // resendCmds resends any commands that had not completed when the client
 // disconnected.  It is intended to be called once the client has reconnected as
 // a separate goroutine.
@@ -492,9 +498,20 @@ func (c *Client) resendCmds() {
 	// also allows the lock to be released quickly.
 	c.requestLock.Lock()
 	resendCmds := make([]*jsonRequest, 0, c.requestList.Len())
-	for e := c.requestList.Front(); e != nil; e = e.Next() {
+	var nextElem *list.Element
+	for e := c.requestList.Front(); e != nil; e = nextElem {
+		nextElem = e.Next()
+
 		req := e.Value.(*jsonRequest)
-		resendCmds = append(resendCmds, req)
+		if _, ok := ignoreResends[req.cmd.Method()]; ok {
+			// If a request is not sent on reconnect, remove it
+			// from the request structures, since no reply is
+			// expected.
+			delete(c.requestMap, req.cmd.Id().(uint64))
+			c.requestList.Remove(e)
+		} else {
+			resendCmds = append(resendCmds, req)
+		}
 	}
 	c.requestLock.Unlock()
 

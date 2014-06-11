@@ -897,6 +897,12 @@ func (r FutureRescanResult) Receive() error {
 //
 // See Rescan for the blocking version and more details.
 //
+// NOTE: Rescan requests are not issued on client reconnect and must be
+// performed manually (ideally with a new start height based on the last
+// rescan progress notification).  See the OnClientConnected notification
+// callback for a good callsite to reissue rescan requests on connect and
+// reconnect.
+//
 // NOTE: This is a btcd extension and requires a websocket connection.
 func (c *Client) RescanAsync(startHeight int32, addresses []btcutil.Address,
 	outpoints []*btcwire.OutPoint) FutureRescanResult {
@@ -951,6 +957,12 @@ func (c *Client) RescanAsync(startHeight int32, addresses []btcutil.Address,
 //
 // See RescanEndHeight to also specify a block height at which to stop the
 // rescan if a bounded rescan is desired instead.
+//
+// NOTE: Rescan requests are not issued on client reconnect and must be
+// performed manually (ideally with a new start height based on the last
+// rescan progress notification).  See the OnClientConnected notification
+// callback for a good callsite to reissue rescan requests on connect and
+// reconnect.
 //
 // NOTE: This is a btcd extension and requires a websocket connection.
 func (c *Client) Rescan(startHeight int32, addresses []btcutil.Address,
