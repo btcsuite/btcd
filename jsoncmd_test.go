@@ -209,6 +209,28 @@ var jsoncmdtests = []struct {
 	},
 	{
 		name: "basic",
+		cmd:  "estimatefee",
+		f: func() (Cmd, error) {
+			return NewEstimateFeeCmd(testId, 1234)
+		},
+		result: &EstimateFeeCmd{
+			id:        testId,
+			NumBlocks: 1234,
+		},
+	},
+	{
+		name: "basic",
+		cmd:  "estimatepriority",
+		f: func() (Cmd, error) {
+			return NewEstimatePriorityCmd(testId, 1234)
+		},
+		result: &EstimatePriorityCmd{
+			id:        testId,
+			NumBlocks: 1234,
+		},
+	},
+	{
+		name: "basic",
 		cmd:  "getaccount",
 		f: func() (Cmd, error) {
 			return NewGetAccountCmd(testId,
@@ -1616,6 +1638,8 @@ func TestHelps(t *testing.T) {
 		"dumpprivkey",
 		"dumpwallet",
 		"encryptwallet",
+		"estimatefee",
+		"estimatepriority",
 		"getaccount",
 		"getaccountaddress",
 		"getaddednodeinfo",

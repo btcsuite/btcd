@@ -130,6 +130,14 @@ Encrypts the wallet with "passphrase". This command is for the initial
 encryption of an otherwise unencrypted wallet, changing a passphrase
 should use walletpassphrasechange.`,
 
+	"estimatefee": `estimatefee "numblocks"
+Estimates the approximate fee per kilobyte needed for a transaction to
+get confirmed within 'numblocks' blocks.`,
+
+	"estimatepriority": `estimatepriority "numblocks"
+Estimates the approximate priority a zero-fee transaction needs to get
+confirmed within 'numblocks' blocks.`,
+
 	"getaccount": `getaccount "address"
 Returns the account associated with the given "address" as a string.`,
 

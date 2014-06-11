@@ -137,6 +137,12 @@ func ParseMarshaledCmd(b []byte) (Cmd, error) {
 	case "encryptwallet":
 		cmd = new(EncryptWalletCmd)
 
+	case "estimatefee":
+		cmd = new(EstimateFeeCmd)
+
+	case "estimatepriority":
+		cmd = new(EstimatePriorityCmd)
+
 	case "getaccount":
 		cmd = new(GetAccountCmd)
 
@@ -1310,6 +1316,154 @@ func (cmd *EncryptWalletCmd) UnmarshalJSON(b []byte) error {
 	}
 
 	newCmd, err := NewEncryptWalletCmd(r.Id, passphrase)
+	if err != nil {
+		return err
+	}
+
+	*cmd = *newCmd
+	return nil
+}
+
+// EstimateFeeCmd is a type handling custom marshaling and
+// unmarshaling of estimatefee JSON RPC commands.
+type EstimateFeeCmd struct {
+	id        interface{}
+	NumBlocks int64
+}
+
+// Enforce that EstimateFeeCmd satisifies the Cmd interface.
+var _ Cmd = &EstimateFeeCmd{}
+
+// NewEstimateFeeCmd creates a new EstimateFeeCmd.
+func NewEstimateFeeCmd(id interface{}, numblocks int64) (*EstimateFeeCmd, error) {
+	return &EstimateFeeCmd{
+		id:        id,
+		NumBlocks: numblocks,
+	}, nil
+}
+
+// Id satisfies the Cmd interface by returning the id of the command.
+func (cmd *EstimateFeeCmd) Id() interface{} {
+	return cmd.id
+}
+
+// SetId allows one to modify the Id of a Cmd to help in relaying them.
+func (cmd *EstimateFeeCmd) SetId(id interface{}) {
+	cmd.id = id
+}
+
+// Method satisfies the Cmd interface by returning the json method.
+func (cmd *EstimateFeeCmd) Method() string {
+	return "estimatefee"
+}
+
+// MarshalJSON returns the JSON encoding of cmd.  Part of the Cmd interface.
+func (cmd *EstimateFeeCmd) MarshalJSON() ([]byte, error) {
+	params := []interface{}{
+		cmd.NumBlocks,
+	}
+
+	// Fill and marshal a RawCmd.
+	raw, err := NewRawCmd(cmd.id, cmd.Method(), params)
+	if err != nil {
+		return nil, err
+	}
+	return json.Marshal(raw)
+}
+
+// UnmarshalJSON unmarshals the JSON encoding of cmd into cmd.  Part of
+// the Cmd interface.
+func (cmd *EstimateFeeCmd) UnmarshalJSON(b []byte) error {
+	// Unmashal into a RawCmd
+	var r RawCmd
+	if err := json.Unmarshal(b, &r); err != nil {
+		return err
+	}
+
+	if len(r.Params) != 1 {
+		return ErrWrongNumberOfParams
+	}
+
+	var numblocks int64
+	if err := json.Unmarshal(r.Params[0], &numblocks); err != nil {
+		return fmt.Errorf("first parameter 'numblocks' must be an integer: %v", err)
+	}
+
+	newCmd, err := NewEstimateFeeCmd(r.Id, numblocks)
+	if err != nil {
+		return err
+	}
+
+	*cmd = *newCmd
+	return nil
+}
+
+// EstimatePriorityCmd is a type handling custom marshaling and
+// unmarshaling of estimatepriority JSON RPC commands.
+type EstimatePriorityCmd struct {
+	id        interface{}
+	NumBlocks int64
+}
+
+// Enforce that EstimatePriorityCmd satisifies the Cmd interface.
+var _ Cmd = &EstimatePriorityCmd{}
+
+// NewEstimatePriorityCmd creates a new EstimatePriorityCmd.
+func NewEstimatePriorityCmd(id interface{}, numblocks int64) (*EstimatePriorityCmd, error) {
+	return &EstimatePriorityCmd{
+		id:        id,
+		NumBlocks: numblocks,
+	}, nil
+}
+
+// Id satisfies the Cmd interface by returning the id of the command.
+func (cmd *EstimatePriorityCmd) Id() interface{} {
+	return cmd.id
+}
+
+// SetId allows one to modify the Id of a Cmd to help in relaying them.
+func (cmd *EstimatePriorityCmd) SetId(id interface{}) {
+	cmd.id = id
+}
+
+// Method satisfies the Cmd interface by returning the json method.
+func (cmd *EstimatePriorityCmd) Method() string {
+	return "estimatepriority"
+}
+
+// MarshalJSON returns the JSON encoding of cmd.  Part of the Cmd interface.
+func (cmd *EstimatePriorityCmd) MarshalJSON() ([]byte, error) {
+	params := []interface{}{
+		cmd.NumBlocks,
+	}
+
+	// Fill and marshal a RawCmd.
+	raw, err := NewRawCmd(cmd.id, cmd.Method(), params)
+	if err != nil {
+		return nil, err
+	}
+	return json.Marshal(raw)
+}
+
+// UnmarshalJSON unmarshals the JSON encoding of cmd into cmd.  Part of
+// the Cmd interface.
+func (cmd *EstimatePriorityCmd) UnmarshalJSON(b []byte) error {
+	// Unmashal into a RawCmd
+	var r RawCmd
+	if err := json.Unmarshal(b, &r); err != nil {
+		return err
+	}
+
+	if len(r.Params) != 1 {
+		return ErrWrongNumberOfParams
+	}
+
+	var numblocks int64
+	if err := json.Unmarshal(r.Params[0], &numblocks); err != nil {
+		return fmt.Errorf("first parameter 'numblocks' must be an integer: %v", err)
+	}
+
+	newCmd, err := NewEstimatePriorityCmd(r.Id, numblocks)
 	if err != nil {
 		return err
 	}

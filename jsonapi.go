@@ -113,7 +113,7 @@ func CreateMessageWithId(message string, id interface{}, args ...interface{}) ([
 		}
 		finalMessage, err = jsonWithArgs(message, id, args)
 	// One required int
-	case "getblockhash":
+	case "getblockhash", "estimatefee", "estimatepriority":
 		if len(args) != 1 {
 			err = fmt.Errorf("Missing argument for %s", message)
 			return finalMessage, err
