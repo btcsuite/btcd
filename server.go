@@ -375,7 +375,6 @@ func (s *server) handleQuery(querymsg interface{}, state *peerState) {
 				ConnTime:       p.timeConnected.Unix(),
 				Version:        p.protocolVersion,
 				SubVer:         p.userAgent,
-n
 				Inbound:        p.inbound,
 				StartingHeight: p.lastBlock,
 				BanScore:       0,
