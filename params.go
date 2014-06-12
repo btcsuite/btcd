@@ -302,7 +302,7 @@ func Register(params *Params) error {
 		return ErrDuplicateNet
 	}
 	registeredNets[params.Net] = struct{}{}
-	pubKeyHashAddrIDs[params.ScriptHashAddrID] = struct{}{}
+	pubKeyHashAddrIDs[params.PubKeyHashAddrID] = struct{}{}
 	scriptHashAddrIDs[params.ScriptHashAddrID] = struct{}{}
 	return nil
 }
