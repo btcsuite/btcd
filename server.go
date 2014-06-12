@@ -375,14 +375,15 @@ func (s *server) handleQuery(querymsg interface{}, state *peerState) {
 				ConnTime:       p.timeConnected.Unix(),
 				Version:        p.protocolVersion,
 				SubVer:         p.userAgent,
+n
 				Inbound:        p.inbound,
 				StartingHeight: p.lastBlock,
 				BanScore:       0,
 				SyncNode:       p == syncPeer,
 			}
-			info.PingTime = p.lastPingMicros
+			info.PingTime = float64(p.lastPingMicros)
 			if p.lastPingNonce != 0 {
-				wait := time.Now().Sub(p.lastPingTime).Nanoseconds()
+				wait := float64(time.Now().Sub(p.lastPingTime).Nanoseconds())
 				// We actually want microseconds.
 				info.PingWait = wait / 1000
 			}
