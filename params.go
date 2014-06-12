@@ -135,9 +135,9 @@ var MainNetParams = Params{
 	RelayNonStdTxs: false,
 
 	// Encoding magics
-	PubKeyHashAddrID: 0x00,
-	ScriptHashAddrID: 0x05,
-	PrivateKeyID:     0x80,
+	PubKeyHashAddrID: 0x00, // starts with 1
+	ScriptHashAddrID: 0x05, // starts with 3
+	PrivateKeyID:     0x80, // starts with 5 (uncompressed) or K (compressed)
 }
 
 // RegressionNetParams defines the network parameters for the regression test
@@ -176,9 +176,9 @@ var RegressionNetParams = Params{
 	RelayNonStdTxs: true,
 
 	// Encoding magics
-	PubKeyHashAddrID: 0x6f,
-	ScriptHashAddrID: 0xc4,
-	PrivateKeyID:     0xef,
+	PubKeyHashAddrID: 0x6f, // starts with m or n
+	ScriptHashAddrID: 0xc4, // starts with 2
+	PrivateKeyID:     0xef, // starts with 9 (uncompressed) or c (compressed)
 }
 
 // TestNet3Params defines the network parameters for the test Bitcoin network
@@ -219,9 +219,9 @@ var TestNet3Params = Params{
 	RelayNonStdTxs: true,
 
 	// Encoding magics
-	PubKeyHashAddrID: 0x6f,
-	ScriptHashAddrID: 0xc4,
-	PrivateKeyID:     0xef,
+	PubKeyHashAddrID: 0x6f, // starts with m or n
+	ScriptHashAddrID: 0xc4, // starts with 2
+	PrivateKeyID:     0xef, // starts with 9 (uncompressed) or c (compressed)
 }
 
 // SimNetParams defines the network parameters for the simulation test Bitcoin
