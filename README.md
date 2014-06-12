@@ -56,6 +56,9 @@ func main() {
 
 ## Documentation
 
+[![GoDoc](https://godoc.org/github.com/conformal/btcnet?status.png)]
+(http://godoc.org/github.com/conformal/btcnet)
+
 Full `go doc` style documentation for the project can be viewed online without
 installing this package by using the GoDoc site
 [here](http://godoc.org/github.com/conformal/btcnet).
