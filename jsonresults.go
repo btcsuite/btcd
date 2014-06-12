@@ -97,22 +97,22 @@ type GetNetworkInfoResult struct {
 
 // GetPeerInfoResult models the data returned from the getpeerinfo command.
 type GetPeerInfoResult struct {
-	Addr           string `json:"addr"`
-	AddrLocal      string `json:"addrlocal,omitempty"`
-	Services       string `json:"services"`
-	LastSend       int64  `json:"lastsend"`
-	LastRecv       int64  `json:"lastrecv"`
-	BytesSent      uint64 `json:"bytessent"`
-	BytesRecv      uint64 `json:"bytesrecv"`
-	PingTime       int64  `json:"pingtime"`
-	PingWait       int64  `json:"pingwait,omitempty"`
-	ConnTime       int64  `json:"conntime"`
-	Version        uint32 `json:"version"`
-	SubVer         string `json:"subver"`
-	Inbound        bool   `json:"inbound"`
-	StartingHeight int32  `json:"startingheight"`
-	BanScore       int    `json:"banscore,omitempty"`
-	SyncNode       bool   `json:"syncnode"`
+	Addr           string  `json:"addr"`
+	AddrLocal      string  `json:"addrlocal,omitempty"`
+	Services       string  `json:"services"`
+	LastSend       int64   `json:"lastsend"`
+	LastRecv       int64   `json:"lastrecv"`
+	BytesSent      uint64  `json:"bytessent"`
+	BytesRecv      uint64  `json:"bytesrecv"`
+	PingTime       float64 `json:"pingtime"`
+	PingWait       float64 `json:"pingwait,omitempty"`
+	ConnTime       int64   `json:"conntime"`
+	Version        uint32  `json:"version"`
+	SubVer         string  `json:"subver"`
+	Inbound        bool    `json:"inbound"`
+	StartingHeight int32   `json:"startingheight"`
+	BanScore       int     `json:"banscore,omitempty"`
+	SyncNode       bool    `json:"syncnode"`
 }
 
 // GetRawMempoolResult models the data returned from the getrawmempool command.
