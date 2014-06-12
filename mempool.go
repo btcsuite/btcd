@@ -769,7 +769,7 @@ func (mp *txMemPool) maybeAcceptTransaction(tx *btcutil.Tx, isOrphan *bool, isNe
 	// treated this field as an int32 and would treat anything larger
 	// incorrectly (as negative).
 	if tx.MsgTx().LockTime > math.MaxInt32 {
-		str := fmt.Sprintf("transaction %v is has a lock time after "+
+		str := fmt.Sprintf("transaction %v has a lock time after "+
 			"2038 which is not accepted yet", txHash)
 		return TxRuleError(str)
 	}
