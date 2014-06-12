@@ -1,6 +1,9 @@
 btcnet
 ======
 
+[![Build Status](https://travis-ci.org/conformal/btcnet.png?branch=master)]
+(https://travis-ci.org/conformal/btcnet)
+
 Package btcnet defines the network parameters for the three standard Bitcoin 
 networks and provides the ability for callers to define their own custom 
 Bitcoin networks.
