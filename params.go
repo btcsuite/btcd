@@ -241,7 +241,7 @@ var SimNetParams = Params{
 	GenesisHash:            &simNetGenesisHash,
 	PowLimit:               simNetPowLimit,
 	PowLimitBits:           0x207fffff,
-	SubsidyHalvingInterval: 150,
+	SubsidyHalvingInterval: 210000,
 	ResetMinDifficulty:     true,
 
 	// Checkpoints ordered from oldest to newest.
