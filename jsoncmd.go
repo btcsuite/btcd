@@ -5728,8 +5728,7 @@ var _ Cmd = &SetGenerateCmd{}
 // NewSetGenerateCmd creates a new SetGenerateCmd. Optionally a
 // pointer to a TemplateRequest may be provided.
 func NewSetGenerateCmd(id interface{}, generate bool, optArgs ...int) (*SetGenerateCmd, error) {
-
-	genproclimit := 0
+	genproclimit := -1
 	if len(optArgs) > 1 {
 		return nil, ErrTooManyOptArgs
 	}
@@ -5758,7 +5757,7 @@ func (cmd *SetGenerateCmd) Method() string {
 func (cmd *SetGenerateCmd) MarshalJSON() ([]byte, error) {
 	params := make([]interface{}, 1, 2)
 	params[0] = cmd.Generate
-	if cmd.GenProcLimit != 0 {
+	if cmd.GenProcLimit != -1 {
 		params = append(params, cmd.GenProcLimit)
 	}
 

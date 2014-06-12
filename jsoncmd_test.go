@@ -1359,8 +1359,9 @@ var jsoncmdtests = []struct {
 			return NewSetGenerateCmd(testId, true)
 		},
 		result: &SetGenerateCmd{
-			id:       testId,
-			Generate: true,
+			id:           testId,
+			Generate:     true,
+			GenProcLimit: -1,
 		},
 	},
 	{
