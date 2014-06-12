@@ -1515,7 +1515,7 @@ func handleGetWorkRequest(s *rpcServer) (interface{}, error) {
 
 		// Choose a payment address at random.
 		rand.Seed(time.Now().UnixNano())
-		payToAddr := cfg.miningKeys[rand.Intn(len(cfg.miningKeys))]
+		payToAddr := cfg.miningAddrs[rand.Intn(len(cfg.miningAddrs))]
 
 		template, err := NewBlockTemplate(payToAddr, s.server.txMemPool)
 		if err != nil {
@@ -1779,12 +1779,12 @@ func handleGetWorkSubmission(s *rpcServer, hexData string) (interface{}, error) 
 func handleGetWork(s *rpcServer, cmd btcjson.Cmd) (interface{}, error) {
 	c := cmd.(*btcjson.GetWorkCmd)
 
-	// Respond with an error if there are no public keys to pay the created
+	// Respond with an error if there are no addresses to pay the created
 	// blocks to.
-	if len(cfg.miningKeys) == 0 {
+	if len(cfg.miningAddrs) == 0 {
 		return nil, btcjson.Error{
 			Code:    btcjson.ErrInternal.Code,
-			Message: "No payment addresses specified via --getworkkey",
+			Message: "No payment addresses specified via --miningaddr",
 		}
 	}
 

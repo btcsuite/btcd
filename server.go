@@ -74,6 +74,7 @@ type server struct {
 	rpcServer            *rpcServer
 	blockManager         *blockManager
 	txMemPool            *txMemPool
+	cpuMiner             *CPUMiner
 	modifyRebroadcastInv chan interface{}
 	newPeers             chan *peer
 	donePeers            chan *peer
@@ -860,6 +861,11 @@ func (s *server) Start() {
 
 		s.rpcServer.Start()
 	}
+
+	// Start the CPU miner if generation is enabled.
+	if cfg.Generate {
+		s.cpuMiner.Start()
+	}
 }
 
 // Stop gracefully shuts down the server by stopping and disconnecting all
@@ -881,6 +887,9 @@ func (s *server) Stop() error {
 			return err
 		}
 	}
+
+	// Stop the CPU miner if needed
+	s.cpuMiner.Stop()
 
 	// Shutdown the RPC server if it's not disabled.
 	if !cfg.DisableRPC {
@@ -1177,6 +1186,7 @@ func newServer(listenAddrs []string, db btcdb.Db, netParams *btcnet.Params) (*se
 	}
 	s.blockManager = bm
 	s.txMemPool = newTxMemPool(&s)
+	s.cpuMiner = newCPUMiner(&s)
 
 	if !cfg.DisableRPC {
 		s.rpcServer, err = newRPCServer(cfg.RPCListeners, &s)
@@ -1184,6 +1194,7 @@ func newServer(listenAddrs []string, db btcdb.Db, netParams *btcnet.Params) (*se
 			return nil, err
 		}
 	}
+
 	return &s, nil
 }
 

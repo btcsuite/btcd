@@ -1059,6 +1059,7 @@ out:
 			break out
 		}
 	}
+
 	b.wg.Done()
 	bmgrLog.Trace("Block handler done")
 }
@@ -1295,7 +1296,7 @@ func (b *blockManager) CalcNextRequiredDifficulty(timestamp time.Time) (uint32, 
 // chain.  It is funneled through the block manager since btcchain is not safe
 // for concurrent access.
 func (b *blockManager) ProcessBlock(block *btcutil.Block) (bool, error) {
-	reply := make(chan processBlockResponse)
+	reply := make(chan processBlockResponse, 1)
 	b.msgChan <- processBlockMsg{block: block, reply: reply}
 	response := <-reply
 	return response.isOrphan, response.err
