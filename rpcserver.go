@@ -1132,14 +1132,12 @@ func handleGetDifficulty(s *rpcServer, cmd btcjson.Cmd) (interface{}, error) {
 
 // handleGetGenerate implements the getgenerate command.
 func handleGetGenerate(s *rpcServer, cmd btcjson.Cmd) (interface{}, error) {
-	// btcd does not do mining so we can hardcode replies here.
-	return false, nil
+	return s.server.cpuMiner.IsMining(), nil
 }
 
 // handleGetHashesPerSec implements the gethashespersec command.
 func handleGetHashesPerSec(s *rpcServer, cmd btcjson.Cmd) (interface{}, error) {
-	// btcd does not do mining so we can hardcode replies here.
-	return 0, nil
+	return int64(s.server.cpuMiner.HashesPerSecond()), nil
 }
 
 // handleGetInfo implements the getinfo command. We only return the fields
@@ -1203,7 +1201,6 @@ func handleGetMiningInfo(s *rpcServer, cmd btcjson.Cmd) (interface{}, error) {
 			Message: err.Error(),
 		}
 	}
-	rpcsLog.Info(gnhpsCmd.Blocks, gnhpsCmd.Height)
 	networkHashesPerSecIface, err := handleGetNetworkHashPS(s, gnhpsCmd)
 	if err != nil {
 		// This is already a btcjson.Error from the handler.
@@ -1222,9 +1219,9 @@ func handleGetMiningInfo(s *rpcServer, cmd btcjson.Cmd) (interface{}, error) {
 		CurrentBlockSize: uint64(len(blockBytes)),
 		CurrentBlockTx:   uint64(len(block.MsgBlock().Transactions)),
 		Difficulty:       getDifficultyRatio(block.MsgBlock().Header.Bits),
-		Generate:         false, // no built-in miner
-		GenProcLimit:     -1,    // no built-in miner
-		HashesPerSec:     0,     // no built-in miner
+		Generate:         s.server.cpuMiner.IsMining(),
+		GenProcLimit:     int(s.server.cpuMiner.NumWorkers()),
+		HashesPerSec:     int64(s.server.cpuMiner.HashesPerSecond()),
 		NetworkHashPS:    networkHashesPerSec,
 		PooledTx:         uint64(s.server.txMemPool.Count()),
 		TestNet:          cfg.TestNet3,
@@ -1819,17 +1816,8 @@ func handleGetWork(s *rpcServer, cmd btcjson.Cmd) (interface{}, error) {
 }
 
 var helpAddenda = map[string]string{
-	"getgenerate": `
-NOTE: btcd does not mine so this will always return false. The call is provided
-for compatibility only.`,
-	"gethashespersec": `
-NOTE: btcd does not mine so this will always return false. The call is provided
-for compatibility only.`,
 	"sendrawtransaction": `
 NOTE: btcd does not currently support the "allowhighfees" parameter.`,
-	"setgenerate": `
-NOTE: btcd does not mine so command has no effect. The call is provided
-for compatibility only.`,
 }
 
 // getHelp text retreives help text from btcjson for the command in question.
@@ -1942,7 +1930,33 @@ func handleSendRawTransaction(s *rpcServer, cmd btcjson.Cmd) (interface{}, error
 
 // handleSetGenerate implements the setgenerate command.
 func handleSetGenerate(s *rpcServer, cmd btcjson.Cmd) (interface{}, error) {
-	// btcd does not do mining so we can hardcode replies here.
+	c := cmd.(*btcjson.SetGenerateCmd)
+
+	// Disable generation regardless of the provided generate flag if the
+	// maximum number of threads (goroutines for our purposes) is 0.
+	// Otherwise enable or disable it depending on the provided flag.
+	generate := c.Generate
+	if c.GenProcLimit == 0 {
+		generate = false
+	}
+
+	if !generate {
+		s.server.cpuMiner.Stop()
+	} else {
+		// Respond with an error if there are no addresses to pay the
+		// created blocks to.
+		if len(cfg.miningAddrs) == 0 {
+			return nil, btcjson.Error{
+				Code: btcjson.ErrInternal.Code,
+				Message: "No payment addresses specified " +
+					"via --miningaddr",
+			}
+		}
+
+		// It's safe to call start even if it's already started.
+		s.server.cpuMiner.SetNumWorkers(int32(c.GenProcLimit))
+		s.server.cpuMiner.Start()
+	}
 	return nil, nil
 }
 
