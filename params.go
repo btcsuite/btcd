@@ -57,6 +57,7 @@ var testNet3Params = params{
 	Params:  &btcnet.TestNet3Params,
 	rpcPort: "18334",
 	dnsSeeds: []string{
+		"testnet-seed.alexykot.me",
 		"testnet-seed.bitcoin.petertodd.org",
 		"testnet-seed.bluematt.me",
 	},
