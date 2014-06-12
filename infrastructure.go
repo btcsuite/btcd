@@ -896,7 +896,7 @@ type ConnConfig struct {
 	Host string
 
 	// Endpoint is the websocket endpoint on the RPC server.  This is
-	// typically "ws" or "frontend".
+	// typically "ws".
 	Endpoint string
 
 	// User is the username to use to authenticate to the RPC server.

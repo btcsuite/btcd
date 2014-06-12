@@ -34,7 +34,7 @@ func main() {
 	}
 	connCfg := &btcrpcclient.ConnConfig{
 		Host:         "localhost:18332",
-		Endpoint:     "frontend",
+		Endpoint:     "ws",
 		User:         "yourrpcuser",
 		Pass:         "yourrpcpass",
 		Certificates: certs,
