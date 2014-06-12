@@ -1629,7 +1629,7 @@ func newPeerBase(s *server, inbound bool) *peer {
 	return &p
 }
 
-// newPeer returns a new inbound bitcoin peer for the provided server and
+// newInboundPeer returns a new inbound bitcoin peer for the provided server and
 // connection.  Use Start to begin processing incoming and outgoing messages.
 func newInboundPeer(s *server, conn net.Conn) *peer {
 	p := newPeerBase(s, true)
