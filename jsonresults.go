@@ -11,26 +11,6 @@ import (
 	"strings"
 )
 
-// InfoResult contains the data returned by the getinfo command.
-type InfoResult struct {
-	Version         int     `json:"version"`
-	ProtocolVersion int     `json:"protocolversion"`
-	WalletVersion   int     `json:"walletversion,omitempty"`
-	Balance         float64 `json:"balance,omitempty"`
-	Blocks          int     `json:"blocks"`
-	TimeOffset      int64   `json:"timeoffset"`
-	Connections     int     `json:"connections"`
-	Proxy           string  `json:"proxy"`
-	Difficulty      float64 `json:"difficulty"`
-	TestNet         bool    `json:"testnet"`
-	KeypoolOldest   int64   `json:"keypoololdest,omitempty"`
-	KeypoolSize     int     `json:"keypoolsize,omitempty"`
-	UnlockedUntil   int64   `json:"unlocked_until,omitempty"`
-	PaytxFee        float64 `json:"paytxfee,omitempty"`
-	RelayFee        float64 `json:"relayfee"`
-	Errors          string  `json:"errors"`
-}
-
 // BlockResult models the data from the getblock command when the verbose flag
 // is set.  When the verbose flag is not set, getblock return a hex-encoded
 // string.
@@ -66,6 +46,20 @@ type DecodeScriptResult struct {
 	P2sh      string   `json:"p2sh"`
 }
 
+// GetAddedNodeInfoResultAddr models the data of the addresses portion of the
+// getaddednodeinfo command.
+type GetAddedNodeInfoResultAddr struct {
+	Address   string `json:"address"`
+	Connected string `json:"connected"`
+}
+
+// GetAddedNodeInfoResult models the data from the getaddednodeinfo command.
+type GetAddedNodeInfoResult struct {
+	AddedNode string                        `json:"addednode"`
+	Connected *bool                         `json:"connected,omitempty"`
+	Addresses *[]GetAddedNodeInfoResultAddr `json:"addresses,omitempty"`
+}
+
 // GetBlockChainInfoResult models the data returned from the getblockchaininfo
 // command.
 type GetBlockChainInfoResult struct {
@@ -75,13 +69,6 @@ type GetBlockChainInfoResult struct {
 	Difficulty           float64 `json:"difficulty"`
 	VerificationProgress float64 `json:"verificationprogress"`
 	ChainWork            string  `json:"chainwork"`
-}
-
-// LocalAddressesResult models the localaddresses data from the getnetworkinfo command.
-type LocalAddressesResult struct {
-	Address string `json:"address"`
-	Port    uint16 `json:"port"`
-	Score   int    `json:"score"`
 }
 
 // GetNetworkInfoResult models the data returned from the getnetworkinfo command.
@@ -149,49 +136,6 @@ type GetTransactionResult struct {
 	TimeReceived    int64                         `json:"timereceived"`
 	Details         []GetTransactionDetailsResult `json:"details"`
 	Hex             string                        `json:"hex"`
-}
-
-// ListTransactionsResult models the data from the listtransactions command.
-type ListTransactionsResult struct {
-	Account         string   `json:"account"`
-	Address         string   `json:"address,omitempty"`
-	Category        string   `json:"category"`
-	Amount          float64  `json:"amount"`
-	Fee             float64  `json:"fee"`
-	Confirmations   int64    `json:"confirmations"`
-	Generated       bool     `json:"generated,omitempty"`
-	BlockHash       string   `json:"blockhash,omitempty"`
-	BlockIndex      int64    `json:"blockindex,omitempty"`
-	BlockTime       int64    `json:"blocktime,omitempty"`
-	TxID            string   `json:"txid"`
-	WalletConflicts []string `json:"walletconflicts"`
-	Time            int64    `json:"time"`
-	TimeReceived    int64    `json:"timereceived"`
-	Comment         string   `json:"comment,omitempty"`
-	OtherAccount    string   `json:"otheraccount"`
-}
-
-// TxRawResult models the data from the getrawtransaction command.
-type TxRawResult struct {
-	Hex           string `json:"hex"`
-	Txid          string `json:"txid"`
-	Version       uint32 `json:"version"`
-	LockTime      uint32 `json:"locktime"`
-	Vin           []Vin  `json:"vin"`
-	Vout          []Vout `json:"vout"`
-	BlockHash     string `json:"blockhash,omitempty"`
-	Confirmations uint64 `json:"confirmations,omitempty"`
-	Time          int64  `json:"time,omitempty"`
-	Blocktime     int64  `json:"blocktime,omitempty"`
-}
-
-// TxRawDecodeResult models the data from the decoderawtransaction command.
-type TxRawDecodeResult struct {
-	Txid     string `json:"txid"`
-	Version  uint32 `json:"version"`
-	Locktime uint32 `json:"locktime"`
-	Vin      []Vin  `json:"vin"`
-	Vout     []Vout `json:"vout"`
 }
 
 // GetNetTotalsResult models the data returned from the getnettotals command.
@@ -288,26 +232,51 @@ type GetWorkResult struct {
 	Target   string `json:"target"`
 }
 
-// ValidateAddressResult models the data from the validateaddress command.
-type ValidateAddressResult struct {
-	IsValid      bool     `json:"isvalid"`
-	Address      string   `json:"address,omitempty"`
-	IsMine       bool     `json:"ismine,omitempty"`
-	IsScript     bool     `json:"isscript,omitempty"`
-	PubKey       string   `json:"pubkey,omitempty"`
-	IsCompressed bool     `json:"iscompressed,omitempty"`
-	Account      string   `json:"account,omitempty"`
-	Addresses    []string `json:"addresses,omitempty"`
-	Hex          string   `json:"hex,omitempty"`
-	Script       string   `json:"script,omitempty"`
-	SigsRequired int      `json:"sigsrequired,omitempty"`
+// InfoResult contains the data returned by the getinfo command.
+type InfoResult struct {
+	Version         int     `json:"version"`
+	ProtocolVersion int     `json:"protocolversion"`
+	WalletVersion   int     `json:"walletversion,omitempty"`
+	Balance         float64 `json:"balance,omitempty"`
+	Blocks          int     `json:"blocks"`
+	TimeOffset      int64   `json:"timeoffset"`
+	Connections     int     `json:"connections"`
+	Proxy           string  `json:"proxy"`
+	Difficulty      float64 `json:"difficulty"`
+	TestNet         bool    `json:"testnet"`
+	KeypoolOldest   int64   `json:"keypoololdest,omitempty"`
+	KeypoolSize     int     `json:"keypoolsize,omitempty"`
+	UnlockedUntil   int64   `json:"unlocked_until,omitempty"`
+	PaytxFee        float64 `json:"paytxfee,omitempty"`
+	RelayFee        float64 `json:"relayfee"`
+	Errors          string  `json:"errors"`
 }
 
-// SignRawTransactionResult models the data from the signrawtransaction
-// command.
-type SignRawTransactionResult struct {
-	Hex      string `json:"hex"`
-	Complete bool   `json:"complete"`
+// ListTransactionsResult models the data from the listtransactions command.
+type ListTransactionsResult struct {
+	Account         string   `json:"account"`
+	Address         string   `json:"address,omitempty"`
+	Category        string   `json:"category"`
+	Amount          float64  `json:"amount"`
+	Fee             float64  `json:"fee"`
+	Confirmations   int64    `json:"confirmations"`
+	Generated       bool     `json:"generated,omitempty"`
+	BlockHash       string   `json:"blockhash,omitempty"`
+	BlockIndex      int64    `json:"blockindex,omitempty"`
+	BlockTime       int64    `json:"blocktime,omitempty"`
+	TxID            string   `json:"txid"`
+	WalletConflicts []string `json:"walletconflicts"`
+	Time            int64    `json:"time"`
+	TimeReceived    int64    `json:"timereceived"`
+	Comment         string   `json:"comment,omitempty"`
+	OtherAccount    string   `json:"otheraccount"`
+}
+
+// LocalAddressesResult models the localaddresses data from the getnetworkinfo command.
+type LocalAddressesResult struct {
+	Address string `json:"address"`
+	Port    uint16 `json:"port"`
+	Score   int    `json:"score"`
 }
 
 // ListReceivedByAccountResult models the data from the listreceivedbyaccount
@@ -345,18 +314,49 @@ type ListUnspentResult struct {
 	Confirmations int64   `json:"confirmations"`
 }
 
-// GetAddedNodeInfoResultAddr models the data of the addresses portion of the
-// getaddednodeinfo command.
-type GetAddedNodeInfoResultAddr struct {
-	Address   string `json:"address"`
-	Connected string `json:"connected"`
+// SignRawTransactionResult models the data from the signrawtransaction
+// command.
+type SignRawTransactionResult struct {
+	Hex      string `json:"hex"`
+	Complete bool   `json:"complete"`
 }
 
-// GetAddedNodeInfoResult models the data from the getaddednodeinfo command.
-type GetAddedNodeInfoResult struct {
-	AddedNode string                        `json:"addednode"`
-	Connected *bool                         `json:"connected,omitempty"`
-	Addresses *[]GetAddedNodeInfoResultAddr `json:"addresses,omitempty"`
+// TxRawResult models the data from the getrawtransaction command.
+type TxRawResult struct {
+	Hex           string `json:"hex"`
+	Txid          string `json:"txid"`
+	Version       uint32 `json:"version"`
+	LockTime      uint32 `json:"locktime"`
+	Vin           []Vin  `json:"vin"`
+	Vout          []Vout `json:"vout"`
+	BlockHash     string `json:"blockhash,omitempty"`
+	Confirmations uint64 `json:"confirmations,omitempty"`
+	Time          int64  `json:"time,omitempty"`
+	Blocktime     int64  `json:"blocktime,omitempty"`
+}
+
+// TxRawDecodeResult models the data from the decoderawtransaction command.
+type TxRawDecodeResult struct {
+	Txid     string `json:"txid"`
+	Version  uint32 `json:"version"`
+	Locktime uint32 `json:"locktime"`
+	Vin      []Vin  `json:"vin"`
+	Vout     []Vout `json:"vout"`
+}
+
+// ValidateAddressResult models the data from the validateaddress command.
+type ValidateAddressResult struct {
+	IsValid      bool     `json:"isvalid"`
+	Address      string   `json:"address,omitempty"`
+	IsMine       bool     `json:"ismine,omitempty"`
+	IsScript     bool     `json:"isscript,omitempty"`
+	PubKey       string   `json:"pubkey,omitempty"`
+	IsCompressed bool     `json:"iscompressed,omitempty"`
+	Account      string   `json:"account,omitempty"`
+	Addresses    []string `json:"addresses,omitempty"`
+	Hex          string   `json:"hex,omitempty"`
+	Script       string   `json:"script,omitempty"`
+	SigsRequired int      `json:"sigsrequired,omitempty"`
 }
 
 // ReadResultCmd unmarshalls the json reply with data struct for specific
