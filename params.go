@@ -275,7 +275,12 @@ var (
 )
 
 var (
-	registeredNets = map[btcwire.BitcoinNet]struct{}{}
+	registeredNets = map[btcwire.BitcoinNet]struct{}{
+		MainNetParams.Net:       struct{}{},
+		TestNet3Params.Net:      struct{}{},
+		RegressionNetParams.Net: struct{}{},
+		SimNetParams.Net:        struct{}{},
+	}
 
 	pubKeyHashAddrIDs = map[byte]struct{}{
 		MainNetParams.PubKeyHashAddrID:  struct{}{},
@@ -291,7 +296,9 @@ var (
 )
 
 // Register registers the network parameters for a Bitcoin network.  This may
-// error with ErrDuplicateNet if the network is already registered.
+// error with ErrDuplicateNet if the network is already registered (either
+// due to a previous Register call, or the network being one of the default
+// networks).
 //
 // Network parameters should be registered into this package by a main package
 // as early as possible.  Then, library packages may lookup networks or network
