@@ -257,7 +257,7 @@ func (c *Client) CreateRawTransactionAsync(inputs []btcjson.TransactionInput,
 	id := c.NextID()
 	convertedAmts := make(map[string]int64, len(amounts))
 	for addr, amount := range amounts {
-		convertedAmts[addr.EncodeAddress()] = int64(amount)
+		convertedAmts[addr.String()] = int64(amount)
 	}
 	cmd, err := btcjson.NewCreateRawTransactionCmd(id, inputs, convertedAmts)
 	if err != nil {

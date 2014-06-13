@@ -847,7 +847,7 @@ func (c *Client) NotifyReceivedAsync(addresses []btcutil.Address) FutureNotifyRe
 	// Convert addresses to strings.
 	addrs := make([]string, 0, len(addresses))
 	for _, addr := range addresses {
-		addrs = append(addrs, addr.EncodeAddress())
+		addrs = append(addrs, addr.String())
 	}
 	id := c.NextID()
 	cmd := btcws.NewNotifyReceivedCmd(id, addrs)
@@ -921,7 +921,7 @@ func (c *Client) RescanAsync(startHeight int32, addresses []btcutil.Address,
 	// Convert addresses to strings.
 	addrs := make([]string, 0, len(addresses))
 	for _, addr := range addresses {
-		addrs = append(addrs, addr.EncodeAddress())
+		addrs = append(addrs, addr.String())
 	}
 
 	// Convert outpoints.
@@ -996,7 +996,7 @@ func (c *Client) RescanEndHeightAsync(startHeight int32,
 	// Convert addresses to strings.
 	addrs := make([]string, 0, len(addresses))
 	for _, addr := range addresses {
-		addrs = append(addrs, addr.EncodeAddress())
+		addrs = append(addrs, addr.String())
 	}
 
 	// Convert outpoints.

@@ -782,7 +782,7 @@ func (c *Client) AddMultisigAddressAsync(requiredSigs int, addresses []btcutil.A
 
 	addrs := make([]string, 0, len(addresses))
 	for _, addr := range addresses {
-		addrs = append(addrs, addr.EncodeAddress())
+		addrs = append(addrs, addr.String())
 	}
 
 	cmd, err := btcjson.NewAddMultisigAddressCmd(id, requiredSigs, addrs, account)
@@ -832,7 +832,7 @@ func (c *Client) CreateMultisigAsync(requiredSigs int, addresses []btcutil.Addre
 
 	addrs := make([]string, 0, len(addresses))
 	for _, addr := range addresses {
-		addrs = append(addrs, addr.EncodeAddress())
+		addrs = append(addrs, addr.String())
 	}
 
 	cmd, err := btcjson.NewCreateMultisigCmd(id, requiredSigs, addrs)
