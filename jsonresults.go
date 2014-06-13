@@ -71,6 +71,46 @@ type GetBlockChainInfoResult struct {
 	ChainWork            string  `json:"chainwork"`
 }
 
+// GetBlockTemplateResultTransaction models the transactions field of the
+// getblocktemplate command.
+type GetBlockTemplateResultTx struct {
+	Data    string  `json:"data"`
+	Hash    string  `json:"hash"`
+	Depends []int64 `json:"depends"`
+	Fee     int64   `json:"fee"`
+	SigOps  int64   `json:"sigops"`
+}
+
+// GetBlockTemplateResultAux models the coinbaseaux field of the
+// getblocktemplate command.
+type GetBlockTemplateResultAux struct {
+	Flags string `json:"flags"`
+}
+
+// GetBlockTemplateResult models the data returned from the getblocktemplate
+// command.
+type GetBlockTemplateResult struct {
+	// Base fields from BIP 0022.  CoinbaseAux is optional.  One of
+	// CoinbaseTxn or CoinbaseValue must be specified, but not both.
+	Bits          string                     `json:"bits"`
+	CurTime       int64                      `json:"curtime"`
+	Height        int64                      `json:"height"`
+	PreviousHash  string                     `json:"previousblockhash"`
+	SigOpLimit    int64                      `json:"sigoplimit,omitempty"`
+	SizeLimit     int64                      `json:"sizelimit,omitempty"`
+	Transactions  []GetBlockTemplateResultTx `json:"transactions"`
+	Version       uint32                     `json:"version"`
+	CoinbaseAux   *GetBlockTemplateResultAux `json:"coinbaseaux,omitempty"`
+	CoinbaseTxn   *GetBlockTemplateResultTx  `json:"coinbasetxn,omitempty"`
+	CoinbaseValue *int64                     `json:"coinbasevalue,omitempty"`
+	WorkID        string                     `json:"workid,omitempty"`
+
+	// Optional long polling from BIP 0022.
+	LongPollID  string `json:"longpollid,omitempty"`
+	LongPollURI string `json:"longpolluri,omitempty"`
+	SubmitOld   *bool  `json:"submitold,omitempty"`
+}
+
 // GetNetworkInfoResult models the data returned from the getnetworkinfo command.
 type GetNetworkInfoResult struct {
 	Version         uint32                 `json:"version"`
