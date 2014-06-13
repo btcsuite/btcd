@@ -44,10 +44,10 @@ const (
 	// for outputs.
 	SigHashNoneAnyoneCanPay SigHashType = "NONE|ANYONECANPAY"
 
-	// SigHashAllAnyoneCanPay indicates that signer does not care where the
-	// other inputs to the transaction come from, so it allows other people
-	// to add inputs.  In addition, it uses the SigHashSingle signing method
-	// for outputs.
+	// SigHashSingleAnyoneCanPay indicates that signer does not care where
+	// the other inputs to the transaction come from, so it allows other
+	// people to add inputs.  In addition, it uses the SigHashSingle signing
+	// method for outputs.
 	SigHashSingleAnyoneCanPay SigHashType = "SINGLE|ANYONECANPAY"
 )
 

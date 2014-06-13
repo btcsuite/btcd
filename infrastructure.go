@@ -943,9 +943,9 @@ type ConnConfig struct {
 	HttpPostMode bool
 }
 
-// newHttpClient returns a new http client that is configured according to the
+// newHTTPClient returns a new http client that is configured according to the
 // proxy and TLS settings in the associated connection configuration.
-func newHttpClient(config *ConnConfig) (*http.Client, error) {
+func newHTTPClient(config *ConnConfig) (*http.Client, error) {
 	// Set proxy function if there is a proxy configured.
 	var proxyFunc func(*http.Request) (*url.URL, error)
 	if config.Proxy != "" {
@@ -1051,7 +1051,7 @@ func New(config *ConnConfig, ntfnHandlers *NotificationHandlers) (*Client, error
 		ntfnHandlers = nil
 
 		var err error
-		httpClient, err = newHttpClient(config)
+		httpClient, err = newHTTPClient(config)
 		if err != nil {
 			return nil, err
 		}
