@@ -490,13 +490,13 @@ func CreateMessageWithId(message string, id interface{}, args ...interface{}) ([
 		}
 		type vlist struct {
 			Txid string `json:"txid"`
-			Vout int    `json:"vout"`
+			Vout uint32 `json:"vout"`
 		}
 		vList := make([]vlist, len(args)/4)
 		addresses := make(map[string]float64)
 		for i := 0; i < len(args)/4; i += 1 {
 			txid, ok1 := args[(i*4)+0].(string)
-			vout, ok2 := args[(i*4)+1].(int)
+			vout, ok2 := args[(i*4)+1].(uint32)
 			add, ok3 := args[(i*4)+2].(string)
 			amt, ok4 := args[(i*4)+3].(float64)
 			if !ok1 || !ok2 || !ok3 || !ok4 {
@@ -574,14 +574,14 @@ func CreateMessageWithId(message string, id interface{}, args ...interface{}) ([
 		}
 		type txlist struct {
 			Txid         string `json:"txid"`
-			Vout         int    `json:"vout"`
+			Vout         uint32 `json:"vout"`
 			ScriptPubKey string `json:"scriptPubKey"`
 		}
 		txList := make([]txlist, 1)
 
 		if len(args) > 1 {
 			txid, ok2 := args[1].(string)
-			vout, ok3 := args[2].(int)
+			vout, ok3 := args[2].(uint32)
 			spkey, ok4 := args[3].(string)
 			if !ok1 || !ok2 || !ok3 || !ok4 {
 				err = fmt.Errorf("Incorrect arguement types.")

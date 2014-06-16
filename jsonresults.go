@@ -158,7 +158,7 @@ type ScriptSig struct {
 type Vin struct {
 	Coinbase  string     `json:"coinbase"`
 	Txid      string     `json:"txid"`
-	Vout      int        `json:"vout"`
+	Vout      uint32     `json:"vout"`
 	ScriptSig *ScriptSig `json:"scriptSig"`
 	Sequence  uint32     `json:"sequence"`
 }
@@ -183,7 +183,7 @@ func (v *Vin) MarshalJSON() ([]byte, error) {
 
 	txStruct := struct {
 		Txid      string     `json:"txid"`
-		Vout      int        `json:"vout"`
+		Vout      uint32     `json:"vout"`
 		ScriptSig *ScriptSig `json:"scriptSig"`
 		Sequence  uint32     `json:"sequence"`
 	}{
@@ -199,7 +199,7 @@ func (v *Vin) MarshalJSON() ([]byte, error) {
 // getrawtransaction and decoderawtransaction use the same structure.
 type Vout struct {
 	Value        float64 `json:"value"`
-	N            int     `json:"n"`
+	N            uint32  `json:"n"`
 	ScriptPubKey struct {
 		Asm       string   `json:"asm"`
 		Hex       string   `json:"hex"`

@@ -752,7 +752,7 @@ func (cmd *CreateMultisigCmd) UnmarshalJSON(b []byte) error {
 // transactionsha and output number pair.
 type TransactionInput struct {
 	Txid string `json:"txid"`
-	Vout int    `json:"vout"`
+	Vout uint32 `json:"vout"`
 }
 
 // CreateRawTransactionCmd is a type handling custom marshaling and
