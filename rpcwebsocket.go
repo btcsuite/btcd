@@ -1742,6 +1742,23 @@ func handleRescan(wsc *wsClient, icmd btcjson.Cmd) (interface{}, *btcjson.Error)
 		minBlock += int64(len(hashList))
 	}
 
+	// Notify websocket client of the finished rescan.  Due to how btcd
+	// asynchronously queues notifications to not block calling code,
+	// there is no guarantee that any of the notifications created during
+	// rescan (such as rescanprogress, recvtx and redeemingtx) will be
+	// received before the rescan RPC returns.  Therefore, another method
+	// is needed to safely inform clients that all rescan notifiations have
+	// been sent.
+	n := btcws.NewRescanFinishedNtfn(int32(minBlock))
+	if mn, err := n.MarshalJSON(); err != nil {
+		rpcsLog.Errorf("Failed to marshal rescan finished "+
+			"notification: %v", err)
+	} else {
+		// The rescan is finished, so we don't care whether the client
+		// has disconnected at this point, so discard error.
+		_ = wsc.QueueNotification(mn)
+	}
+
 	rpcsLog.Info("Finished rescan")
 	return nil, nil
 }
