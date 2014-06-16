@@ -5960,7 +5960,7 @@ func (cmd *SignMessageCmd) UnmarshalJSON(b []byte) error {
 // RawTxInput models the data needed for a raw tx input.
 type RawTxInput struct {
 	Txid         string `json:"txid"`
-	Vout         int    `json:"vout"`
+	Vout         uint32 `json:"vout"`
 	ScriptPubKey string `json:"scriptPubKey"`
 	RedeemScript string `json:"redeemScript"`
 }
