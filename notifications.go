@@ -53,6 +53,10 @@ const (
 	// notification.
 	RedeemingTxNtfnMethod = "redeemingtx"
 
+	// RescanFinishedNtfnMethod is the method of the btcd rescanfinished
+	// notification.
+	RescanFinishedNtfnMethod = "rescanfinished"
+
 	// RescanProgressNtfnMethod is the method of the btcd rescanprogress
 	// notification.
 	RescanProgressNtfnMethod = "rescanprogress"
@@ -74,6 +78,8 @@ func init() {
 		parseBtcdConnectedNtfn, nil, `TODO(jrick) fillmein`)
 	btcjson.RegisterCustomCmd(RecvTxNtfnMethod,
 		parseRecvTxNtfn, nil, `TODO(jrick) fillmein`)
+	btcjson.RegisterCustomCmd(RescanFinishedNtfnMethod,
+		parseRescanFinishedNtfn, nil, `TODO(jrick) fillmein`)
 	btcjson.RegisterCustomCmd(RescanProgressNtfnMethod,
 		parseRescanProgressNtfn, nil, `TODO(jrick) fillmein`)
 	btcjson.RegisterCustomCmd(RedeemingTxNtfnMethod, parseRedeemingTxNtfn,
@@ -662,6 +668,90 @@ func (n *RedeemingTxNtfn) UnmarshalJSON(b []byte) error {
 	}
 
 	concreteNtfn, ok := newNtfn.(*RedeemingTxNtfn)
+	if !ok {
+		return btcjson.ErrInternal
+	}
+	*n = *concreteNtfn
+	return nil
+}
+
+// RescanFinishedNtfn is type handling custom marshaling and
+// unmarshaling of rescanfinished JSON websocket notifications.
+type RescanFinishedNtfn struct {
+	LastProcessed int32
+}
+
+// Enforce that RescanFinishedNtfn satisifies the btcjson.Cmd interface.
+var _ btcjson.Cmd = &RescanFinishedNtfn{}
+
+// NewRescanFinishedNtfn creates a new RescanFinshedNtfn.
+func NewRescanFinishedNtfn(last int32) *RescanFinishedNtfn {
+	return &RescanFinishedNtfn{last}
+}
+
+// parseRescanFinishedNtfn parses a RawCmd into a concrete type satisifying
+// the btcjson.Cmd interface.  This is used when registering the notification
+// with the btcjson parser.
+func parseRescanFinishedNtfn(r *btcjson.RawCmd) (btcjson.Cmd, error) {
+	if r.Id != nil {
+		return nil, ErrNotANtfn
+	}
+
+	if len(r.Params) != 1 {
+		return nil, btcjson.ErrWrongNumberOfParams
+	}
+
+	var last int32
+	if err := json.Unmarshal(r.Params[0], &last); err != nil {
+		return nil, errors.New("first parameter 'last' must be a " +
+			"32-bit integer: " + err.Error())
+	}
+
+	return NewRescanFinishedNtfn(last), nil
+}
+
+// Id satisifies the btcjson.Cmd interface by returning nil for a
+// notification ID.
+func (n *RescanFinishedNtfn) Id() interface{} {
+	return nil
+}
+
+// Method satisifies the btcjson.Cmd interface by returning the method
+// of the notification.
+func (n *RescanFinishedNtfn) Method() string {
+	return RescanFinishedNtfnMethod
+}
+
+// MarshalJSON returns the JSON encoding of n.  Part of the btcjson.Cmd
+// interface.
+func (n *RescanFinishedNtfn) MarshalJSON() ([]byte, error) {
+	params := []interface{}{
+		n.LastProcessed,
+	}
+
+	// No ID for notifications.
+	raw, err := btcjson.NewRawCmd(nil, n.Method(), params)
+	if err != nil {
+		return nil, err
+	}
+	return json.Marshal(raw)
+}
+
+// UnmarshalJSON unmarshals the JSON encoding of n into n.  Part of
+// the btcjson.Cmd interface.
+func (n *RescanFinishedNtfn) UnmarshalJSON(b []byte) error {
+	// Unmarshal into a RawCmd.
+	var r btcjson.RawCmd
+	if err := json.Unmarshal(b, &r); err != nil {
+		return err
+	}
+
+	newNtfn, err := parseRescanFinishedNtfn(&r)
+	if err != nil {
+		return err
+	}
+
+	concreteNtfn, ok := newNtfn.(*RescanFinishedNtfn)
 	if !ok {
 		return btcjson.ErrInternal
 	}

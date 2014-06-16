@@ -124,6 +124,15 @@ var ntfntests = []struct {
 		},
 	},
 	{
+		name: "rescanfinished",
+		f: func() btcjson.Cmd {
+			return btcws.NewRescanFinishedNtfn(12345)
+		},
+		result: &btcws.RescanFinishedNtfn{
+			LastProcessed: 12345,
+		},
+	},
+	{
 		name: "rescanprogress",
 		f: func() btcjson.Cmd {
 			return btcws.NewRescanProgressNtfn(12345)
