@@ -122,6 +122,13 @@ type NotificationHandlers struct {
 	// this to invoked indirectly as the result of a NotifyReceived call.
 	OnRedeemingTx func(transaction *btcutil.Tx, details *btcws.BlockDetails)
 
+	// OnRescanFinished is invoked after a rescan finishes due to a previous
+	// call to Rescan or RescanEndHeight.  Finished rescans should be
+	// signaled on this notification, rather than relying on the return
+	// result of a rescan request, due to how btcd may send various rescan
+	// notifications after the rescan request has already returned.
+	OnRescanFinished func(lastProcessedHeight int32)
+
 	// OnRescanProgress is invoked periodically when a rescan is underway.
 	// It will only be invoked if a preceding call to Rescan or
 	// RescanEndHeight has been made and the function is non-nil.
@@ -246,6 +253,23 @@ func (c *Client) handleNotification(ntfn *rawNotification) {
 
 		c.ntfnHandlers.OnRedeemingTx(tx, block)
 
+	// OnRescanFinished
+	case btcws.RescanFinishedNtfnMethod:
+		// Ignore the notification is the client is not interested in
+		// it.
+		if c.ntfnHandlers.OnRescanFinished == nil {
+			return
+		}
+
+		lastProcessed, err := parseRescanHeightParams(ntfn.Params)
+		if err != nil {
+			log.Warnf("Received invalid rescanfinished "+
+				"notification: %v", err)
+			return
+		}
+
+		c.ntfnHandlers.OnRescanFinished(lastProcessed)
+
 	// OnRescanProgress
 	case btcws.RescanProgressNtfnMethod:
 		// Ignore the notification is the client is not interested in
@@ -254,7 +278,7 @@ func (c *Client) handleNotification(ntfn *rawNotification) {
 			return
 		}
 
-		lastProcessed, err := parseRescanProgressNtfnParams(ntfn.Params)
+		lastProcessed, err := parseRescanHeightParams(ntfn.Params)
 		if err != nil {
 			log.Warnf("Received invalid rescanprogress "+
 				"notification: %v", err)
@@ -447,9 +471,9 @@ func parseChainTxNtfnParams(params []json.RawMessage) (*btcutil.Tx,
 	return btcutil.NewTx(&msgTx), block, nil
 }
 
-// parseRescanProgressNtfnParams parses out the height of the last rescanned
-// from the parameters of a rescanprogress notification.
-func parseRescanProgressNtfnParams(params []json.RawMessage) (int32, error) {
+// parseRescanHeightParams parses out the height of the last rescanned block
+// from the parameters of rescanfinished and rescanprogress notifications.
+func parseRescanHeightParams(params []json.RawMessage) (int32, error) {
 	if len(params) != 1 {
 		return 0, wrongNumParams(len(params))
 	}
