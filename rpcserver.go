@@ -680,7 +680,7 @@ func createVinList(mtx *btcwire.MsgTx) ([]btcjson.Vin, error) {
 			vinList[i].Coinbase = hex.EncodeToString(v.SignatureScript)
 		} else {
 			vinList[i].Txid = v.PreviousOutpoint.Hash.String()
-			vinList[i].Vout = int(v.PreviousOutpoint.Index)
+			vinList[i].Vout = v.PreviousOutpoint.Index
 
 			disbuf, err := btcscript.DisasmString(v.SignatureScript)
 			if err != nil {
@@ -704,7 +704,7 @@ func createVinList(mtx *btcwire.MsgTx) ([]btcjson.Vin, error) {
 func createVoutList(mtx *btcwire.MsgTx, net *btcnet.Params) ([]btcjson.Vout, error) {
 	voutList := make([]btcjson.Vout, len(mtx.TxOut))
 	for i, v := range mtx.TxOut {
-		voutList[i].N = i
+		voutList[i].N = uint32(i)
 		voutList[i].Value = float64(v.Value) / float64(btcutil.SatoshiPerBitcoin)
 
 		disbuf, err := btcscript.DisasmString(v.PkScript)
