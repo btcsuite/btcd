@@ -2173,6 +2173,21 @@ func (cmd *GetBlockHashCmd) UnmarshalJSON(b []byte) error {
 type TemplateRequest struct {
 	Mode         string   `json:"mode,omitempty"`
 	Capabilities []string `json:"capabilities,omitempty"`
+
+	// Optional long polling.
+	LongPollID string `json:"longpollid,omitempty"`
+
+	// Optional template tweaking.  SigOpLimit and SizeLimit can be int64
+	// or bool.
+	SigOpLimit interface{} `json:"sigoplimit,omitempty"`
+	SizeLimit  interface{} `json:"sizelimit,omitempty"`
+	MaxVersion uint32      `json:"maxversion,omitempty"`
+}
+
+// isFloatInt64 returns whether the passed float64 is a whole number that safely
+// fits into a 64-bit integer.
+func isFloatInt64(a float64) bool {
+	return a == float64(int64(a))
 }
 
 // GetBlockTemplateCmd is a type handling custom marshaling and
@@ -2194,6 +2209,38 @@ func NewGetBlockTemplateCmd(id interface{}, optArgs ...*TemplateRequest) (*GetBl
 			return nil, ErrTooManyOptArgs
 		}
 		request = optArgs[0]
+		switch val := request.SigOpLimit.(type) {
+		case nil:
+		case bool:
+		case int64:
+		case float64:
+			if !isFloatInt64(val) {
+				return nil, errors.New("the sigoplimit field " +
+					"must be unspecified, a boolean, or a " +
+					"64-bit integer")
+			}
+			request.SigOpLimit = int64(val)
+		default:
+			return nil, errors.New("the sigoplimit field " +
+				"must be unspecified, a boolean, or a 64-bit " +
+				"integer")
+		}
+		switch val := request.SizeLimit.(type) {
+		case nil:
+		case bool:
+		case int64:
+		case float64:
+			if !isFloatInt64(val) {
+				return nil, errors.New("the sizelimit field " +
+					"must be unspecified, a boolean, or a " +
+					"64-bit integer")
+			}
+			request.SizeLimit = int64(val)
+		default:
+			return nil, errors.New("the sizelimit field " +
+				"must be unspecified, a boolean, or a 64-bit " +
+				"integer")
+		}
 	}
 	return &GetBlockTemplateCmd{
 		id:      id,
