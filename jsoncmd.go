@@ -2182,6 +2182,9 @@ type TemplateRequest struct {
 	SigOpLimit interface{} `json:"sigoplimit,omitempty"`
 	SizeLimit  interface{} `json:"sizelimit,omitempty"`
 	MaxVersion uint32      `json:"maxversion,omitempty"`
+
+	// Basic pool extension from BIP 0023.
+	Target string `json:"target,omitempty"`
 }
 
 // isFloatInt64 returns whether the passed float64 is a whole number that safely
