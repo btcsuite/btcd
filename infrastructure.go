@@ -271,7 +271,7 @@ func (r rawResponse) result() (result []byte, err error) {
 // handleMessage is the main handler for incoming notifications and responses.
 func (c *Client) handleMessage(msg []byte) {
 	// Attempt to unmarshal the message as either a notifiation or response.
-	in := inMessage{}
+	var in inMessage
 	err := json.Unmarshal(msg, &in)
 	if err != nil {
 		log.Warnf("Remote server sent invalid message: %v", err)
@@ -618,12 +618,19 @@ func (c *Client) handleSendPostMessage(details *sendPostDetails) {
 	}
 
 	// Read the raw bytes and close the response.
-	resp, err := btcjson.GetRaw(httpResponse.Body)
+	respBytes, err := btcjson.GetRaw(httpResponse.Body)
 	if err != nil {
 		details.responseChan <- &response{result: nil, err: err}
 		return
 	}
-	details.responseChan <- &response{result: resp, err: nil}
+	var resp rawResponse
+	err = json.Unmarshal(respBytes, &resp)
+	if err != nil {
+		details.responseChan <- &response{result: nil, err: err}
+		return
+	}
+	res, err := resp.result()
+	details.responseChan <- &response{result: res, err: err}
 }
 
 // sendPostHandler handles all outgoing messages when the client is running
