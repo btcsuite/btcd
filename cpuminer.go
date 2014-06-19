@@ -270,6 +270,14 @@ out:
 			// Non-blocking select to fall through
 		}
 
+		// Wait until there is a connection to at least one other peer
+		// since there is no way to relay a found block or receive
+		// transactions to work on when there are no connected peers.
+		if m.server.ConnectedCount() == 0 {
+			time.Sleep(time.Second)
+			continue
+		}
+
 		// No point in searching for a solution before the chain is
 		// synced.  Also, grab the same lock as used for block
 		// submission, since the current block will be changing and
