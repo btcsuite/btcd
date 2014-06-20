@@ -192,3 +192,110 @@ func TestAmountUnitConversions(t *testing.T) {
 		}
 	}
 }
+
+func TestAmountMulF64(t *testing.T) {
+	tests := []struct {
+		name string
+		amt  Amount
+		mul  float64
+		res  Amount
+	}{
+		{
+			name: "Multiply 0.1 BTC by 2",
+			amt:  100e5, // 0.1 BTC
+			mul:  2,
+			res:  200e5, // 0.2 BTC
+		},
+		{
+			name: "Multiply 0.2 BTC by 0.02",
+			amt:  200e5, // 0.2 BTC
+			mul:  1.02,
+			res:  204e5, // 0.204 BTC
+		},
+		{
+			name: "Multiply 0.1 BTC by -2",
+			amt:  100e5, // 0.1 BTC
+			mul:  -2,
+			res:  -200e5, // -0.2 BTC
+		},
+		{
+			name: "Multiply 0.2 BTC by -0.02",
+			amt:  200e5, // 0.2 BTC
+			mul:  -1.02,
+			res:  -204e5, // -0.204 BTC
+		},
+		{
+			name: "Multiply -0.1 BTC by 2",
+			amt:  -100e5, // -0.1 BTC
+			mul:  2,
+			res:  -200e5, // -0.2 BTC
+		},
+		{
+			name: "Multiply -0.2 BTC by 0.02",
+			amt:  -200e5, // -0.2 BTC
+			mul:  1.02,
+			res:  -204e5, // -0.204 BTC
+		},
+		{
+			name: "Multiply -0.1 BTC by -2",
+			amt:  -100e5, // -0.1 BTC
+			mul:  -2,
+			res:  200e5, // 0.2 BTC
+		},
+		{
+			name: "Multiply -0.2 BTC by -0.02",
+			amt:  -200e5, // -0.2 BTC
+			mul:  -1.02,
+			res:  204e5, // 0.204 BTC
+		},
+		{
+			name: "Round down",
+			amt:  49, // 49 Satoshis
+			mul:  0.01,
+			res:  0,
+		},
+		{
+			name: "Round up",
+			amt:  50, // 50 Satoshis
+			mul:  0.01,
+			res:  1, // 1 Satoshi
+		},
+		{
+			name: "Multiply by 0.",
+			amt:  1e8, // 1 BTC
+			mul:  0,
+			res:  0, // 0 BTC
+		},
+		{
+			name: "Multiply 1 by 0.5.",
+			amt:  1, // 1 Satoshi
+			mul:  0.5,
+			res:  1, // 1 Satoshi
+		},
+		{
+			name: "Multiply 100 by 66%.",
+			amt:  100, // 100 Satoshis
+			mul:  0.66,
+			res:  66, // 66 Satoshis
+		},
+		{
+			name: "Multiply 100 by 66.6%.",
+			amt:  100, // 100 Satoshis
+			mul:  0.666,
+			res:  67, // 67 Satoshis
+		},
+		{
+			name: "Multiply 100 by 2/3.",
+			amt:  100, // 100 Satoshis
+			mul:  2.0 / 3,
+			res:  67, // 67 Satoshis
+		},
+	}
+
+	for _, test := range tests {
+		a := test.amt.MulF64(test.mul)
+		if a != test.res {
+			t.Errorf("%v: expected %v got %v", test.name, test.res, a)
+		}
+	}
+}

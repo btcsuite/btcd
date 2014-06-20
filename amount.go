@@ -53,6 +53,17 @@ func (u AmountUnit) String() string {
 // to as a `Satoshi').  A single Amount is equal to 1e-8 of a bitcoin.
 type Amount int64
 
+// round converts a floating point number, which may or may not be representable
+// as an integer, to the Amount integer type by rounding to the nearest integer.
+// This is performed by adding or subtracting 0.5 depending on the sign, and
+// relying on integer truncation to round the value to the nearest Amount.
+func round(f float64) Amount {
+	if f < 0 {
+		return Amount(f - 0.5)
+	}
+	return Amount(f + 0.5)
+}
+
 // NewAmount creates an Amount from a floating point value representing
 // some value in bitcoin.  NewAmount errors if f is NaN or +-Infinity, but
 // does not check that the amount is within the total amount of bitcoin
@@ -69,16 +80,7 @@ func NewAmount(f float64) (Amount, error) {
 		return 0, errors.New("invalid bitcoin amount")
 	}
 
-	a := f * float64(SatoshiPerBitcoin)
-
-	// Depending on the sign, add or subtract 0.5 and rely on integer
-	// truncation to correctly round the value up or down.
-	if a < 0 {
-		a = a - 0.5
-	} else {
-		a = a + 0.5
-	}
-	return Amount(a), nil
+	return round(f * satoshiPerBitcoin), nil
 }
 
 // ToUnit converts a monetary amount counted in bitcoin base units to a
@@ -99,4 +101,12 @@ func (a Amount) Format(u AmountUnit) string {
 // String is the equivalent of calling Format with AmountBTC.
 func (a Amount) String() string {
 	return a.Format(AmountBTC)
+}
+
+// MulF64 multiplies an Amount by a floating point value.  While this is not
+// an operation that must typically be done by a full node or wallet, it is
+// useful for services that build on top of bitcoin (for example, calculating
+// a fee by multiplying by a percentage).
+func (a Amount) MulF64(f float64) Amount {
+	return round(float64(a) * f)
 }
