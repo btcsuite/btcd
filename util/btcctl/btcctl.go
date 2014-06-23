@@ -42,13 +42,15 @@ var (
 	ErrUsage            = errors.New("btcctl usage") // Real usage is shown.
 )
 
+const outpointArrayStr = `"[{"txid":"id","vout":n},...]"`
+
 // commandHandlers is a map of commands and associated handler data that is used
 // to validate correctness and perform the command.
 var commandHandlers = map[string]*handlerData{
 	"addmultisigaddress":    {2, 1, displayGeneric, []conversionHandler{toInt, nil, nil}, makeAddMultiSigAddress, "<numrequired> <[\"pubkey\",...]> [account]"},
 	"addnode":               {2, 0, displayJSONDump, nil, makeAddNode, "<ip> <add/remove/onetry>"},
 	"createencryptedwallet": {1, 0, displayGeneric, nil, makeCreateEncryptedWallet, "<passphrase>"},
-	"createrawtransaction":  {2, 0, displayGeneric, nil, makeCreateRawTransaction, "\"[{\"txid\":\"id\",\"vout\":n},...]\" \"{\"address\":amount,...}\""},
+	"createrawtransaction":  {2, 0, displayGeneric, nil, makeCreateRawTransaction, outpointArrayStr + " " + "\"{\"address\":amount,...}\""},
 	"debuglevel":            {1, 0, displayGeneric, nil, makeDebugLevel, "<levelspec>"},
 	"decoderawtransaction":  {1, 0, displayJSONDump, nil, makeDecodeRawTransaction, "<txhash>"},
 	"decodescript":          {1, 0, displayJSONDump, nil, makeDecodeScript, "<hex>"},
@@ -96,6 +98,7 @@ var commandHandlers = map[string]*handlerData{
 	"listsinceblock":        {0, 2, displayJSONDump, []conversionHandler{nil, toInt}, makeListSinceBlock, "[blockhash] [minconf=10]"},
 	"listtransactions":      {0, 3, displayJSONDump, []conversionHandler{nil, toInt, toInt}, makeListTransactions, "[account] [count=10] [from=0]"},
 	"listunspent":           {0, 3, displayJSONDump, []conversionHandler{toInt, toInt, nil}, makeListUnspent, "[minconf=1] [maxconf=9999999] [jsonaddressarray]"},
+	"lockunspent":           {1, 2, displayJSONDump, []conversionHandler{toBool, nil}, makeLockUnspent, "<unlock> " + outpointArrayStr},
 	"ping":                  {0, 0, displayGeneric, nil, makePing, ""},
 	"sendfrom": {3, 3, displayGeneric, []conversionHandler{nil, nil, toSatoshi, toInt, nil, nil},
 		makeSendFrom, "<account> <address> <amount> [minconf=1] [comment] [comment-to]"},
@@ -659,6 +662,21 @@ func makeListUnspent(args []interface{}) (btcjson.Cmd, error) {
 		optargs = append(optargs, addrs)
 	}
 	return btcjson.NewListUnspentCmd("btcctl", optargs...)
+}
+
+// makeLockUnspent generates the cmd structure for lockunspent commands.
+func makeLockUnspent(args []interface{}) (btcjson.Cmd, error) {
+	var optargs = make([][]btcjson.TransactionInput, 0, 1)
+	if len(args) > 1 {
+		var inputs []btcjson.TransactionInput
+		err := json.Unmarshal([]byte(args[1].(string)), &inputs)
+		if err != nil {
+			return nil, err
+		}
+		optargs = append(optargs, inputs)
+	}
+
+	return btcjson.NewLockUnspentCmd("btcctl", args[0].(bool), optargs...)
 }
 
 // makePing generates the cmd structure for ping commands.
