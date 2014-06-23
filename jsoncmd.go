@@ -4905,7 +4905,7 @@ func (cmd *LockUnspentCmd) UnmarshalJSON(b []byte) error {
 	optArgs := make([][]TransactionInput, 0, 1)
 	if len(r.Params) > 1 {
 		var transactions []TransactionInput
-		if err := json.Unmarshal(r.Params[0], &transactions); err != nil {
+		if err := json.Unmarshal(r.Params[1], &transactions); err != nil {
 			return fmt.Errorf("second optional parameter 'transactions' "+
 				"must be a JSON array of transaction input JSON objects: %v", err)
 		}
