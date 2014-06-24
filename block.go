@@ -208,7 +208,7 @@ func NewBlock(msgBlock *btcwire.MsgBlock) *Block {
 func NewBlockFromBytes(serializedBlock []byte) (*Block, error) {
 	// Deserialize the bytes into a MsgBlock.
 	var msgBlock btcwire.MsgBlock
-	br := bytes.NewBuffer(serializedBlock)
+	br := bytes.NewReader(serializedBlock)
 	err := msgBlock.Deserialize(br)
 	if err != nil {
 		return nil, err

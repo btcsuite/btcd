@@ -74,7 +74,7 @@ func NewTx(msgTx *btcwire.MsgTx) *Tx {
 func NewTxFromBytes(serializedTx []byte) (*Tx, error) {
 	// Deserialize the bytes into a MsgTx.
 	var msgTx btcwire.MsgTx
-	br := bytes.NewBuffer(serializedTx)
+	br := bytes.NewReader(serializedTx)
 	err := msgTx.Deserialize(br)
 	if err != nil {
 		return nil, err
