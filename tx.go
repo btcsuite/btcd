@@ -7,6 +7,7 @@ package btcutil
 import (
 	"bytes"
 	"github.com/conformal/btcwire"
+	"io"
 )
 
 // TxIndexUnknown is the value returned for a transaction index that is unknown.
@@ -19,10 +20,9 @@ const TxIndexUnknown = -1
 // transaction on its first access so subsequent accesses don't have to repeat
 // the relatively expensive hashing operations.
 type Tx struct {
-	msgTx        *btcwire.MsgTx   // Underlying MsgTx
-	serializedTx []byte           // Serialized bytes for the transaction
-	txSha        *btcwire.ShaHash // Cached transaction hash
-	txIndex      int              // Position within a block or TxIndexUnknown
+	msgTx   *btcwire.MsgTx   // Underlying MsgTx
+	txSha   *btcwire.ShaHash // Cached transaction hash
+	txIndex int              // Position within a block or TxIndexUnknown
 }
 
 // MsgTx returns the underlying btcwire.MsgTx for the transaction.
@@ -72,18 +72,23 @@ func NewTx(msgTx *btcwire.MsgTx) *Tx {
 // NewTxFromBytes returns a new instance of a bitcoin transaction given the
 // serialized bytes.  See Tx.
 func NewTxFromBytes(serializedTx []byte) (*Tx, error) {
+	br := bytes.NewReader(serializedTx)
+	return NewTxFromReader(br)
+}
+
+// NewTxFromReader returns a new instance of a bitcoin transaction given a
+// Reader to deserialize the transaction.  See Tx.
+func NewTxFromReader(r io.Reader) (*Tx, error) {
 	// Deserialize the bytes into a MsgTx.
 	var msgTx btcwire.MsgTx
-	br := bytes.NewReader(serializedTx)
-	err := msgTx.Deserialize(br)
+	err := msgTx.Deserialize(r)
 	if err != nil {
 		return nil, err
 	}
 
 	t := Tx{
-		msgTx:        &msgTx,
-		serializedTx: serializedTx,
-		txIndex:      TxIndexUnknown,
+		msgTx:   &msgTx,
+		txIndex: TxIndexUnknown,
 	}
 	return &t, nil
 }

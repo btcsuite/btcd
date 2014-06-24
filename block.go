@@ -8,6 +8,7 @@ import (
 	"bytes"
 	"fmt"
 	"github.com/conformal/btcwire"
+	"io"
 )
 
 // OutOfRangeError describes an error due to accessing an element that is out
@@ -206,18 +207,28 @@ func NewBlock(msgBlock *btcwire.MsgBlock) *Block {
 // NewBlockFromBytes returns a new instance of a bitcoin block given the
 // serialized bytes.  See Block.
 func NewBlockFromBytes(serializedBlock []byte) (*Block, error) {
+	br := bytes.NewReader(serializedBlock)
+	b, err := NewBlockFromReader(br)
+	if err != nil {
+		return nil, err
+	}
+	b.serializedBlock = serializedBlock
+	return b, nil
+}
+
+// NewBlockFromReader returns a new instance of a bitcoin block given a
+// Reader to deserialize the block.  See Block.
+func NewBlockFromReader(r io.Reader) (*Block, error) {
 	// Deserialize the bytes into a MsgBlock.
 	var msgBlock btcwire.MsgBlock
-	br := bytes.NewReader(serializedBlock)
-	err := msgBlock.Deserialize(br)
+	err := msgBlock.Deserialize(r)
 	if err != nil {
 		return nil, err
 	}
 
 	b := Block{
-		msgBlock:        &msgBlock,
-		serializedBlock: serializedBlock,
-		blockHeight:     BlockHeightUnknown,
+		msgBlock:    &msgBlock,
+		blockHeight: BlockHeightUnknown,
 	}
 	return &b, nil
 }
