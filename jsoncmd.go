@@ -2185,6 +2185,11 @@ type TemplateRequest struct {
 
 	// Basic pool extension from BIP 0023.
 	Target string `json:"target,omitempty"`
+
+	// Block proposal from BIP 0023.  Data is only provided when Mode is
+	// "proposal".
+	Data   string `json:"data,omitempty"`
+	WorkID string `json:"workid,omitempty"`
 }
 
 // isFloatInt64 returns whether the passed float64 is a whole number that safely

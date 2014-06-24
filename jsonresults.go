@@ -118,6 +118,10 @@ type GetBlockTemplateResult struct {
 	MinTime    int64    `json:"mintime,omitempty"`
 	Mutable    []string `json:"mutable,omitempty"`
 	NonceRange string   `json:"noncerange,omitempty"`
+
+	// Block proposal from BIP 0023.
+	Capabilities  []string `json:"capabilities,omitempty"`
+	RejectReasion string   `json:"reject-reason,omitempty"`
 }
 
 // GetNetworkInfoResult models the data returned from the getnetworkinfo command.
