@@ -47,7 +47,7 @@ func (b *BlockChain) maybeAcceptBlock(block *btcutil.Block, fastAdd bool) error 
 		if blockDifficulty != expectedDifficulty {
 			str := "block difficulty of %d is not the expected value of %d"
 			str = fmt.Sprintf(str, blockDifficulty, expectedDifficulty)
-			return RuleError(str)
+			return ruleError(ErrUnexpectedDifficulty, str)
 		}
 
 		// Ensure the timestamp for the block header is after the
@@ -61,7 +61,7 @@ func (b *BlockChain) maybeAcceptBlock(block *btcutil.Block, fastAdd bool) error 
 			str := "block timestamp of %v is not after expected %v"
 			str = fmt.Sprintf(str, blockHeader.Timestamp,
 				medianTime)
-			return RuleError(str)
+			return ruleError(ErrTimeTooOld, str)
 		}
 
 		// Ensure all transactions in the block are finalized.
@@ -70,7 +70,7 @@ func (b *BlockChain) maybeAcceptBlock(block *btcutil.Block, fastAdd bool) error 
 				blockHeader.Timestamp) {
 				str := fmt.Sprintf("block contains "+
 					"unfinalized transaction %v", tx.Sha())
-				return RuleError(str)
+				return ruleError(ErrUnfinalizedTx, str)
 			}
 		}
 
@@ -88,7 +88,7 @@ func (b *BlockChain) maybeAcceptBlock(block *btcutil.Block, fastAdd bool) error 
 		// known good point.
 		str := fmt.Sprintf("block at height %d does not match "+
 			"checkpoint hash", blockHeight)
-		return RuleError(str)
+		return ruleError(ErrBadCheckpoint, str)
 	}
 
 	// Find the previous checkpoint and prevent blocks which fork the main
@@ -103,7 +103,7 @@ func (b *BlockChain) maybeAcceptBlock(block *btcutil.Block, fastAdd bool) error 
 		str := fmt.Sprintf("block at height %d forks the main chain "+
 			"before the previous checkpoint at height %d",
 			blockHeight, checkpointBlock.Height())
-		return RuleError(str)
+		return ruleError(ErrForkTooOld, str)
 	}
 
 	if !fastAdd {
@@ -114,9 +114,10 @@ func (b *BlockChain) maybeAcceptBlock(block *btcutil.Block, fastAdd bool) error 
 				b.netParams.BlockV1RejectNumRequired,
 				b.netParams.BlockV1RejectNumToCheck) {
 
-				str := "new blocks with version %d are no longer valid"
+				str := "new blocks with version %d are no " +
+					"longer valid"
 				str = fmt.Sprintf(str, blockHeader.Version)
-				return RuleError(str)
+				return ruleError(ErrBlockVersionTooOld, str)
 			}
 		}
 

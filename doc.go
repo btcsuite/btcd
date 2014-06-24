@@ -124,7 +124,9 @@ Errors
 Errors returned by this package are either the raw errors provided by underlying
 calls or of type btcchain.RuleError.  This allows the caller to differentiate
 between unexpected errors, such as database errors, versus errors due to rule
-violations through type assertions.
+violations through type assertions.  In addition, callers can programmatically
+determine the specific rule violation by examining the ErrorCode field of the
+type asserted btcchain.RuleError.
 
 Bitcoin Improvement Proposals
 

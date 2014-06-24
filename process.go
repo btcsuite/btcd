@@ -10,17 +10,6 @@ import (
 	"github.com/conformal/btcwire"
 )
 
-// RuleError identifies a rule violation.  It is used to indicate that
-// processing of a block or transaction failed due to one of the many validation
-// rules.  The caller can use type assertions to determine if a failure was
-// specifically due to a rule violation.
-type RuleError string
-
-// Error satisfies the error interface to print human-readable errors.
-func (e RuleError) Error() string {
-	return string(e)
-}
-
 // blockExists determines whether a block with the given hash exists either in
 // the main chain or any side chains.
 func (b *BlockChain) blockExists(hash *btcwire.ShaHash) bool {
@@ -102,13 +91,13 @@ func (b *BlockChain) ProcessBlock(block *btcutil.Block, fastAdd bool) error {
 	// The block must not already exist in the main chain or side chains.
 	if b.blockExists(blockHash) {
 		str := fmt.Sprintf("already have block %v", blockHash)
-		return RuleError(str)
+		return ruleError(ErrDuplicateBlock, str)
 	}
 
 	// The block must not already exist as an orphan.
 	if _, exists := b.orphans[*blockHash]; exists {
 		str := fmt.Sprintf("already have block (orphan) %v", blockHash)
-		return RuleError(str)
+		return ruleError(ErrDuplicateBlock, str)
 	}
 
 	// Perform preliminary sanity checks on the block and its transactions.
@@ -136,7 +125,7 @@ func (b *BlockChain) ProcessBlock(block *btcutil.Block, fastAdd bool) error {
 			str := fmt.Sprintf("block %v has timestamp %v before "+
 				"last checkpoint timestamp %v", blockHash,
 				blockHeader.Timestamp, checkpointTime)
-			return RuleError(str)
+			return ruleError(ErrTimeTooOld, str)
 		}
 		if !fastAdd {
 			// Even though the checks prior to now have already ensured the
@@ -153,7 +142,7 @@ func (b *BlockChain) ProcessBlock(block *btcutil.Block, fastAdd bool) error {
 				str := fmt.Sprintf("block target difficulty of %064x "+
 					"is too low when compared to the previous "+
 					"checkpoint", currentTarget)
-				return RuleError(str)
+				return ruleError(ErrDifficultyTooLow, str)
 			}
 		}
 	}

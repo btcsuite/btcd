@@ -68,28 +68,35 @@ func TestCheckSerializedHeight(t *testing.T) {
 	coinbaseTx.Version = 2
 	coinbaseTx.AddTxIn(btcwire.NewTxIn(coinbaseOutpoint, nil))
 
-	//
+	// Expected rule errors.
+	missingHeightError := btcchain.RuleError{
+		ErrorCode: btcchain.ErrMissingCoinbaseHeight,
+	}
+	badHeightError := btcchain.RuleError{
+		ErrorCode: btcchain.ErrBadCoinbaseHeight,
+	}
+
 	tests := []struct {
 		sigScript  []byte // Serialized data
 		wantHeight int64  // Expected height
 		err        error  // Expected error type
 	}{
 		// No serialized height length.
-		{[]byte{}, 0, btcchain.RuleError("")},
+		{[]byte{}, 0, missingHeightError},
 		// Serialized height length with no height bytes.
-		{[]byte{0x02}, 0, btcchain.RuleError("")},
+		{[]byte{0x02}, 0, missingHeightError},
 		// Serialized height length with too few height bytes.
-		{[]byte{0x02, 0x4a}, 0, btcchain.RuleError("")},
+		{[]byte{0x02, 0x4a}, 0, missingHeightError},
 		// Serialized height that needs 2 bytes to encode.
 		{[]byte{0x02, 0x4a, 0x52}, 21066, nil},
 		// Serialized height that needs 2 bytes to encode, but backwards
 		// endianness.
-		{[]byte{0x02, 0x4a, 0x52}, 19026, btcchain.RuleError("")},
+		{[]byte{0x02, 0x4a, 0x52}, 19026, badHeightError},
 		// Serialized height that needs 3 bytes to encode.
 		{[]byte{0x03, 0x40, 0x0d, 0x03}, 200000, nil},
 		// Serialized height that needs 3 bytes to encode, but backwards
 		// endianness.
-		{[]byte{0x03, 0x40, 0x0d, 0x03}, 1074594560, btcchain.RuleError("")},
+		{[]byte{0x03, 0x40, 0x0d, 0x03}, 1074594560, badHeightError},
 	}
 
 	t.Logf("Running %d tests", len(tests))
@@ -104,6 +111,17 @@ func TestCheckSerializedHeight(t *testing.T) {
 				"got: %v <%T>, want: %T", i, err, err, test.err)
 			continue
 		}
+
+		if rerr, ok := err.(btcchain.RuleError); ok {
+			trerr := test.err.(btcchain.RuleError)
+			if rerr.ErrorCode != trerr.ErrorCode {
+				t.Errorf("checkSerializedHeight #%d wrong "+
+					"error code got: %v, want: %v", i,
+					rerr.ErrorCode, trerr.ErrorCode)
+				continue
+			}
+		}
+
 	}
 }
 
