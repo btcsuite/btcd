@@ -674,6 +674,8 @@ func (p *peer) handleGetDataMsg(msg *btcwire.MsgGetData) {
 			err = p.pushTxMsg(&iv.Hash, c, waitChan)
 		case btcwire.InvTypeBlock:
 			err = p.pushBlockMsg(&iv.Hash, c, waitChan)
+		case btcwire.InvTypeFilteredBlock: // unhandled
+			continue
 		default:
 			peerLog.Warnf("Unknown type in inventory request %d",
 				iv.Type)
