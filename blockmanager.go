@@ -162,7 +162,6 @@ type blockManager struct {
 	started           int32
 	shutdown          int32
 	blockChain        *btcchain.BlockChain
-	blockPeer         map[btcwire.ShaHash]*peer
 	requestedTxns     map[btcwire.ShaHash]bool
 	requestedBlocks   map[btcwire.ShaHash]bool
 	receivedLogBlocks int64
@@ -552,10 +551,6 @@ func (b *blockManager) handleBlockMsg(bmsg *blockMsg) {
 		}
 	}
 
-	// Keep track of which peer the block was sent from so the notification
-	// handler can request the parent blocks from the appropriate peer.
-	b.blockPeer[*blockSha] = bmsg.peer
-
 	// When in headers-first mode, if the block matches the hash of the
 	// first header in the list of headers that are being fetched, it's
 	// eligible for less validation since the headers have already been
@@ -588,10 +583,8 @@ func (b *blockManager) handleBlockMsg(bmsg *blockMsg) {
 
 	// Process the block to include validation, best chain selection, orphan
 	// handling, etc.
-	err := b.blockChain.ProcessBlock(bmsg.block, fastAdd)
+	isOrphan, err := b.blockChain.ProcessBlock(bmsg.block, fastAdd)
 	if err != nil {
-		delete(b.blockPeer, *blockSha)
-
 		// When the error is a rule error, it means the block was simply
 		// rejected as opposed to something actually going wrong, so log
 		// it as such.  Otherwise, something really did go wrong, so log
@@ -605,11 +598,20 @@ func (b *blockManager) handleBlockMsg(bmsg *blockMsg) {
 		return
 	}
 
-	// When the block is not an orphan, don't keep track of the peer that
-	// sent it any longer, log information about it, and update the chain
-	// state.
-	if !b.blockChain.IsKnownOrphan(blockSha) {
-		delete(b.blockPeer, *blockSha)
+	// Request the parents for the orphan block from the peer that sent it.
+	if isOrphan {
+		orphanRoot := b.blockChain.GetOrphanRoot(blockSha)
+		locator, err := b.blockChain.LatestBlockLocator()
+		if err != nil {
+			bmgrLog.Warnf("Failed to get block locator for the "+
+				"latest block: %v", err)
+		} else {
+			bmsg.peer.PushGetBlocksMsg(locator, orphanRoot)
+		}
+	} else {
+		// When the block is not an orphan, log information about it and
+		// update the chain state.
+
 		b.logBlockHeight(bmsg.block)
 
 		// Query the db for the latest best block since the block
@@ -1026,7 +1028,8 @@ out:
 				}
 
 			case processBlockMsg:
-				err := b.blockChain.ProcessBlock(msg.block, false)
+				isOrphan, err := b.blockChain.ProcessBlock(
+					msg.block, false)
 				if err != nil {
 					msg.reply <- processBlockResponse{
 						isOrphan: false,
@@ -1040,11 +1043,9 @@ out:
 				newestSha, newestHeight, _ := b.server.db.NewestSha()
 				b.updateChainState(newestSha, newestHeight)
 
-				blockSha, _ := msg.block.Sha()
 				msg.reply <- processBlockResponse{
-					isOrphan: b.blockChain.IsKnownOrphan(
-						blockSha),
-					err: nil,
+					isOrphan: isOrphan,
+					err:      nil,
 				}
 
 			case isCurrentMsg:
@@ -1068,25 +1069,6 @@ out:
 // as request orphan block parents and relay accepted blocks to connected peers.
 func (b *blockManager) handleNotifyMsg(notification *btcchain.Notification) {
 	switch notification.Type {
-	// An orphan block has been accepted by the block chain.  Request
-	// its parents from the peer that sent it.
-	case btcchain.NTOrphanBlock:
-		orphanHash := notification.Data.(*btcwire.ShaHash)
-		if peer, exists := b.blockPeer[*orphanHash]; exists {
-			orphanRoot := b.blockChain.GetOrphanRoot(orphanHash)
-			locator, err := b.blockChain.LatestBlockLocator()
-			if err != nil {
-				bmgrLog.Errorf("Failed to get block locator "+
-					"for the latest block: %v", err)
-				break
-			}
-			peer.PushGetBlocksMsg(locator, orphanRoot)
-			delete(b.blockPeer, *orphanRoot)
-		} else {
-			bmgrLog.Warnf("Notification for orphan %v with no peer",
-				orphanHash)
-		}
-
 	// A block has been accepted into the block chain.  Relay it to other
 	// peers.
 	case btcchain.NTBlockAccepted:
@@ -1320,7 +1302,6 @@ func newBlockManager(s *server) (*blockManager, error) {
 
 	bm := blockManager{
 		server:           s,
-		blockPeer:        make(map[btcwire.ShaHash]*peer),
 		requestedTxns:    make(map[btcwire.ShaHash]bool),
 		requestedBlocks:  make(map[btcwire.ShaHash]bool),
 		lastBlockLogTime: time.Now(),
