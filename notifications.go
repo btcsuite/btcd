@@ -17,16 +17,10 @@ type NotificationCallback func(*Notification)
 
 // Constants for the type of a notification message.
 const (
-	// NTOrphanBlock indicates an orphan block was processed and the
-	// associated block hash should be passed to the GetOrphanRoot function
-	// to find the root of all known orphans which should then be used to
-	// request the missing blocks.
-	NTOrphanBlock NotificationType = iota
-
 	// NTBlockAccepted indicates the associated block was accepted into
 	// the block chain.  Note that this does not necessarily mean it was
 	// added to the main chain.  For that, use NTBlockConnected.
-	NTBlockAccepted
+	NTBlockAccepted NotificationType = iota
 
 	// NTBlockConnected indicates the associated block was connected to the
 	// main chain.
@@ -40,7 +34,6 @@ const (
 // notificationTypeStrings is a map of notification types back to their constant
 // names for pretty printing.
 var notificationTypeStrings = map[NotificationType]string{
-	NTOrphanBlock:       "NTOrphanBlock",
 	NTBlockAccepted:     "NTBlockAccepted",
 	NTBlockConnected:    "NTBlockConnected",
 	NTBlockDisconnected: "NTBlockDisconnected",
@@ -57,7 +50,6 @@ func (n NotificationType) String() string {
 // Notification defines notification that is sent to the caller via the callback
 // function provided during the call to New and consists of a notification type
 // as well as associated data that depends on the type as follows:
-// 	- NTOrphanBlock:       *btcwire.ShaHash
 // 	- NTBlockAccepted:     *btcutil.Block
 // 	- NTBlockConnected:    *btcutil.Block
 // 	- NTBlockDisconnected: *btcutil.Block

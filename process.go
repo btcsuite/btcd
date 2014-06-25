@@ -81,29 +81,33 @@ func (b *BlockChain) processOrphans(hash *btcwire.ShaHash) error {
 // the block chain.  It includes functionality such as rejecting duplicate
 // blocks, ensuring blocks follow all rules, orphan handling, and insertion into
 // the block chain along with best chain selection and reorganization.
-func (b *BlockChain) ProcessBlock(block *btcutil.Block, fastAdd bool) error {
+//
+// It returns a bool which indicates whether or not the block is an orphan and
+// any errors that occurred during processing.  The returned bool is only valid
+// when the error is nil.
+func (b *BlockChain) ProcessBlock(block *btcutil.Block, fastAdd bool) (bool, error) {
 	blockHash, err := block.Sha()
 	if err != nil {
-		return err
+		return false, err
 	}
 	log.Tracef("Processing block %v", blockHash)
 
 	// The block must not already exist in the main chain or side chains.
 	if b.blockExists(blockHash) {
 		str := fmt.Sprintf("already have block %v", blockHash)
-		return ruleError(ErrDuplicateBlock, str)
+		return false, ruleError(ErrDuplicateBlock, str)
 	}
 
 	// The block must not already exist as an orphan.
 	if _, exists := b.orphans[*blockHash]; exists {
 		str := fmt.Sprintf("already have block (orphan) %v", blockHash)
-		return ruleError(ErrDuplicateBlock, str)
+		return false, ruleError(ErrDuplicateBlock, str)
 	}
 
 	// Perform preliminary sanity checks on the block and its transactions.
 	err = CheckBlockSanity(block, b.netParams.PowLimit)
 	if err != nil {
-		return err
+		return false, err
 	}
 
 	// Find the previous checkpoint and perform some additional checks based
@@ -115,7 +119,7 @@ func (b *BlockChain) ProcessBlock(block *btcutil.Block, fastAdd bool) error {
 	blockHeader := &block.MsgBlock().Header
 	checkpointBlock, err := b.findPreviousCheckpoint()
 	if err != nil {
-		return err
+		return false, err
 	}
 	if checkpointBlock != nil {
 		// Ensure the block timestamp is after the checkpoint timestamp.
@@ -125,7 +129,7 @@ func (b *BlockChain) ProcessBlock(block *btcutil.Block, fastAdd bool) error {
 			str := fmt.Sprintf("block %v has timestamp %v before "+
 				"last checkpoint timestamp %v", blockHash,
 				blockHeader.Timestamp, checkpointTime)
-			return ruleError(ErrTimeTooOld, str)
+			return false, ruleError(ErrTimeTooOld, str)
 		}
 		if !fastAdd {
 			// Even though the checks prior to now have already ensured the
@@ -142,7 +146,7 @@ func (b *BlockChain) ProcessBlock(block *btcutil.Block, fastAdd bool) error {
 				str := fmt.Sprintf("block target difficulty of %064x "+
 					"is too low when compared to the previous "+
 					"checkpoint", currentTarget)
-				return ruleError(ErrDifficultyTooLow, str)
+				return false, ruleError(ErrDifficultyTooLow, str)
 			}
 		}
 	}
@@ -155,16 +159,14 @@ func (b *BlockChain) ProcessBlock(block *btcutil.Block, fastAdd bool) error {
 			prevHash)
 		b.addOrphanBlock(block)
 
-		// Notify the caller so it can request missing blocks.
-		b.sendNotification(NTOrphanBlock, blockHash)
-		return nil
+		return true, nil
 	}
 
 	// The block has passed all context independent checks and appears sane
 	// enough to potentially accept it into the block chain.
 	err = b.maybeAcceptBlock(block, fastAdd)
 	if err != nil {
-		return err
+		return false, err
 	}
 
 	// Accept any orphan blocks that depend on this block (they are no
@@ -172,9 +174,9 @@ func (b *BlockChain) ProcessBlock(block *btcutil.Block, fastAdd bool) error {
 	// no more.
 	err = b.processOrphans(blockHash)
 	if err != nil {
-		return err
+		return false, err
 	}
 
 	log.Debugf("Accepted block %v", blockHash)
-	return nil
+	return false, nil
 }

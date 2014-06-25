@@ -57,11 +57,16 @@ func TestReorganization(t *testing.T) {
 	chain.DisableCheckpoints(true)
 	btcchain.TstSetCoinbaseMaturity(1)
 
+	expectedOrphans := map[int]bool{5: true, 6: true}
 	for i := 1; i < len(blocks); i++ {
-		err = chain.ProcessBlock(blocks[i], false)
+		isOrphan, err := chain.ProcessBlock(blocks[i], false)
 		if err != nil {
 			t.Errorf("ProcessBlock fail on block %v: %v\n", i, err)
 			return
+		}
+		if isOrphan && !expectedOrphans[i] {
+			t.Errorf("ProcessBlock incorrectly returned block %v "+
+				"is an orphan\n", i)
 		}
 	}
 
