@@ -1069,6 +1069,8 @@ func New(config *ConnConfig, ntfnHandlers *NotificationHandlers) (*Client, error
 			return nil, err
 		}
 	}
+	log.Infof("Established connection to RPC server %s",
+		config.Host)
 
 	client := &Client{
 		config:       config,
