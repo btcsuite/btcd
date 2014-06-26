@@ -112,7 +112,7 @@ intentionally causes an error by attempting to process a duplicate block.
 		// Process a block.  For this example, we are going to intentionally
 		// cause an error by trying to process the genesis block which already
 		// exists.
-		_, err = chain.ProcessBlock(genesisBlock, false)
+		_, err = chain.ProcessBlock(genesisBlock, btcchain.BFNone)
 		if err != nil {
 			fmt.Printf("Failed to process block: %v\n", err)
 			return

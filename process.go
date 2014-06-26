@@ -10,6 +10,21 @@ import (
 	"github.com/conformal/btcwire"
 )
 
+// BehaviorFlags is a bitmask defining tweaks to the normal behavior when
+// performing chain processing and consensus rules checks.
+type BehaviorFlags uint32
+
+const (
+	// BFFastAdd may be set to indicate that several checks can be avoided
+	// for the block since it is already known to fit into the chain due to
+	// already proving it correct links into the chain up to a known
+	// checkpoint.  This is primarily used for headers-first mode.
+	BFFastAdd BehaviorFlags = 1 << iota
+
+	// BFNone is a convenience value to specifically indicate no flags.
+	BFNone BehaviorFlags = 0
+)
+
 // blockExists determines whether a block with the given hash exists either in
 // the main chain or any side chains.
 func (b *BlockChain) blockExists(hash *btcwire.ShaHash) bool {
@@ -26,7 +41,10 @@ func (b *BlockChain) blockExists(hash *btcwire.ShaHash) bool {
 // block hash (they are no longer orphans if true) and potentially accepts them.
 // It repeats the process for the newly accepted blocks (to detect further
 // orphans which may no longer be orphans) until there are no more.
-func (b *BlockChain) processOrphans(hash *btcwire.ShaHash) error {
+//
+// The flags do not modify the behavior of this function directly, however they
+// are needed to pass along to maybeAcceptBlock.
+func (b *BlockChain) processOrphans(hash *btcwire.ShaHash, flags BehaviorFlags) error {
 	// Start with processing at least the passed hash.  Leave a little room
 	// for additional orphan blocks that need to be processed without
 	// needing to grow the array in the common case.
@@ -63,7 +81,7 @@ func (b *BlockChain) processOrphans(hash *btcwire.ShaHash) error {
 			i--
 
 			// Potentially accept the block into the block chain.
-			err := b.maybeAcceptBlock(orphan.block, false)
+			err := b.maybeAcceptBlock(orphan.block, flags)
 			if err != nil {
 				return err
 			}
@@ -85,7 +103,9 @@ func (b *BlockChain) processOrphans(hash *btcwire.ShaHash) error {
 // It returns a bool which indicates whether or not the block is an orphan and
 // any errors that occurred during processing.  The returned bool is only valid
 // when the error is nil.
-func (b *BlockChain) ProcessBlock(block *btcutil.Block, fastAdd bool) (bool, error) {
+func (b *BlockChain) ProcessBlock(block *btcutil.Block, flags BehaviorFlags) (bool, error) {
+	fastAdd := flags&BFFastAdd == BFFastAdd
+
 	blockHash, err := block.Sha()
 	if err != nil {
 		return false, err
@@ -154,7 +174,6 @@ func (b *BlockChain) ProcessBlock(block *btcutil.Block, fastAdd bool) (bool, err
 	// Handle orphan blocks.
 	prevHash := &blockHeader.PrevBlock
 	if !prevHash.IsEqual(zeroHash) && !b.blockExists(prevHash) {
-		// Add the orphan block to the orphan pool.
 		log.Infof("Adding orphan block %v with parent %v", blockHash,
 			prevHash)
 		b.addOrphanBlock(block)
@@ -164,7 +183,7 @@ func (b *BlockChain) ProcessBlock(block *btcutil.Block, fastAdd bool) (bool, err
 
 	// The block has passed all context independent checks and appears sane
 	// enough to potentially accept it into the block chain.
-	err = b.maybeAcceptBlock(block, fastAdd)
+	err = b.maybeAcceptBlock(block, flags)
 	if err != nil {
 		return false, err
 	}
@@ -172,7 +191,7 @@ func (b *BlockChain) ProcessBlock(block *btcutil.Block, fastAdd bool) (bool, err
 	// Accept any orphan blocks that depend on this block (they are no
 	// longer orphans) and repeat for those accepted blocks until there are
 	// no more.
-	err = b.processOrphans(blockHash)
+	err = b.processOrphans(blockHash, flags)
 	if err != nil {
 		return false, err
 	}

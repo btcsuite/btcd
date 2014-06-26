@@ -13,10 +13,12 @@ import (
 // It performs several validation checks which depend on its position within
 // the block chain before adding it.  The block is expected to have already gone
 // through ProcessBlock before calling this function with it.
-// The fastAdd argument modifies the behavior of the function by avoiding the
-// somewhat expensive operation: BIP34 validation, it also passes the argument
-// down to connectBestChain()
-func (b *BlockChain) maybeAcceptBlock(block *btcutil.Block, fastAdd bool) error {
+//
+// The flags modify the behavior of this function as follows:
+//  - BFFastAdd: The somewhat expensive BIP0034 validation is not performed.
+func (b *BlockChain) maybeAcceptBlock(block *btcutil.Block, flags BehaviorFlags) error {
+	fastAdd := flags&BFFastAdd == BFFastAdd
+
 	// Get a block node for the block previous to this one.  Will be nil
 	// if this is the genesis block.
 	prevNode, err := b.getPrevNodeFromBlock(block)
@@ -164,7 +166,7 @@ func (b *BlockChain) maybeAcceptBlock(block *btcutil.Block, fastAdd bool) error 
 	// Connect the passed block to the chain while respecting proper chain
 	// selection according to the chain with the most proof of work.  This
 	// also handles validation of the transaction scripts.
-	err = b.connectBestChain(newNode, block, fastAdd)
+	err = b.connectBestChain(newNode, block, flags)
 	if err != nil {
 		return err
 	}

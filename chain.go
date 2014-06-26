@@ -888,9 +888,13 @@ func (b *BlockChain) reorganizeChain(detachNodes, attachNodes *list.List) error 
 // chain.  However, it may also be extending (or creating) a side chain (fork)
 // which may or may not end up becoming the main chain depending on which fork
 // cumulatively has the most proof of work.
-// The fastAdd argument avoids the call to checkConnectBlock which does
-// several expensive transaction validation operations.
-func (b *BlockChain) connectBestChain(node *blockNode, block *btcutil.Block, fastAdd bool) error {
+//
+// The flags modify the behavior of this function as follows:
+//  - BFFastAdd: Avoids the call to checkConnectBlock which does several
+//    expensive transaction validation operations.
+func (b *BlockChain) connectBestChain(node *blockNode, block *btcutil.Block, flags BehaviorFlags) error {
+	fastAdd := flags&BFFastAdd == BFFastAdd
+
 	// We haven't selected a best chain yet or we are extending the main
 	// (best) chain with a new block.  This is the most common case.
 	if b.bestChain == nil || node.parent.hash.IsEqual(b.bestChain.hash) {
@@ -957,6 +961,7 @@ func (b *BlockChain) connectBestChain(node *blockNode, block *btcutil.Block, fas
 				"which forks the chain at height %d/block %v",
 				node.hash, fork.height, fork.hash)
 		}
+
 		return nil
 	}
 
