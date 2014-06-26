@@ -1969,6 +1969,59 @@ func (c *Client) ImportPrivKey(privKeyWIF *btcutil.WIF) error {
 	return c.ImportPrivKeyAsync(privKeyWIF).Receive()
 }
 
+// ImportPrivKeyLabelAsync returns an instance of a type that can be used to get the
+// result of the RPC at some future time by invoking the Receive function on the
+// returned instance.
+//
+// See ImportPrivKey for the blocking version and more details.
+func (c *Client) ImportPrivKeyLabelAsync(privKeyWIF *btcutil.WIF, label string) FutureImportPrivKeyResult {
+	wif := ""
+	if privKeyWIF != nil {
+		wif = privKeyWIF.String()
+	}
+
+	id := c.NextID()
+	cmd, err := btcjson.NewImportPrivKeyCmd(id, wif, label)
+	if err != nil {
+		return newFutureError(err)
+	}
+
+	return c.sendCmd(cmd)
+}
+
+// ImportPrivKeyLabel imports the passed private key which must be the wallet import
+// format (WIF). It sets the account label to the one provided.
+func (c *Client) ImportPrivKeyLabel(privKeyWIF *btcutil.WIF, label string) error {
+	return c.ImportPrivKeyLabelAsync(privKeyWIF, label).Receive()
+}
+
+// ImportPrivKeyRescanAsync returns an instance of a type that can be used to get the
+// result of the RPC at some future time by invoking the Receive function on the
+// returned instance.
+//
+// See ImportPrivKey for the blocking version and more details.
+func (c *Client) ImportPrivKeyRescanAsync(privKeyWIF *btcutil.WIF, label string, rescan bool) FutureImportPrivKeyResult {
+	wif := ""
+	if privKeyWIF != nil {
+		wif = privKeyWIF.String()
+	}
+
+	id := c.NextID()
+	cmd, err := btcjson.NewImportPrivKeyCmd(id, wif, label, rescan)
+	if err != nil {
+		return newFutureError(err)
+	}
+
+	return c.sendCmd(cmd)
+}
+
+// ImportPrivKeyRescan imports the passed private key which must be the wallet import
+// format (WIF). It sets the account label to the one provided. When rescan is true,
+// the block history is scanned for transactions addressed to provided privKey.
+func (c *Client) ImportPrivKeyRescan(privKeyWIF *btcutil.WIF, label string, rescan bool) error {
+	return c.ImportPrivKeyRescanAsync(privKeyWIF, label, rescan).Receive()
+}
+
 // ***********************
 // Miscellaneous Functions
 // ***********************
