@@ -56,7 +56,7 @@ var (
 	// coinbaseMaturity is the internal variable used for validating the
 	// spending of coinbase outputs.  A variable rather than the exported
 	// constant is used because the tests need the ability to modify it.
-	coinbaseMaturity int64 = CoinbaseMaturity
+	coinbaseMaturity = int64(CoinbaseMaturity)
 
 	// zeroHash is the zero value for a btcwire.ShaHash and is defined as
 	// a package level variable to avoid the need to create a new instance
