@@ -966,10 +966,12 @@ func newHTTPClient(config *ConnConfig) (*http.Client, error) {
 	// Configure TLS if needed.
 	var tlsConfig *tls.Config
 	if !config.DisableTLS {
-		pool := x509.NewCertPool()
-		pool.AppendCertsFromPEM(config.Certificates)
-		tlsConfig = &tls.Config{
-			RootCAs: pool,
+		if len(config.Certificates) > 0 {
+			pool := x509.NewCertPool()
+			pool.AppendCertsFromPEM(config.Certificates)
+			tlsConfig = &tls.Config{
+				RootCAs: pool,
+			}
 		}
 	}
 
@@ -990,11 +992,13 @@ func dial(config *ConnConfig) (*websocket.Conn, error) {
 	var tlsConfig *tls.Config
 	var scheme = "ws"
 	if !config.DisableTLS {
-		pool := x509.NewCertPool()
-		pool.AppendCertsFromPEM(config.Certificates)
 		tlsConfig = &tls.Config{
-			RootCAs:    pool,
 			MinVersion: tls.VersionTLS12,
+		}
+		if len(config.Certificates) > 0 {
+			pool := x509.NewCertPool()
+			pool.AppendCertsFromPEM(config.Certificates)
+			tlsConfig.RootCAs = pool
 		}
 		scheme = "wss"
 	}
