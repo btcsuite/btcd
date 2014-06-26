@@ -369,9 +369,14 @@ type FutureSubmitBlockResult chan *response
 // Receive waits for the response promised by the future and returns an error if
 // any occurred when submitting the block.
 func (r FutureSubmitBlockResult) Receive() error {
-	_, err := receiveFuture(r)
+	res, err := receiveFuture(r)
 	if err != nil {
 		return err
+	}
+
+	resStr := string(res)
+	if resStr != "null" {
+		return errors.New(resStr)
 	}
 
 	return nil
