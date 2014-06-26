@@ -113,6 +113,7 @@ type processBlockResponse struct {
 // way to call ProcessBlock on the internal block chain instance.
 type processBlockMsg struct {
 	block *btcutil.Block
+	flags btcchain.BehaviorFlags
 	reply chan processBlockResponse
 }
 
@@ -559,13 +560,13 @@ func (b *blockManager) handleBlockMsg(bmsg *blockMsg) {
 	// since it is needed to verify the next round of headers links
 	// properly.
 	isCheckpointBlock := false
-	fastAdd := false
+	behaviorFlags := btcchain.BFNone
 	if b.headersFirstMode {
 		firstNodeEl := b.headerList.Front()
 		if firstNodeEl != nil {
 			firstNode := firstNodeEl.Value.(*headerNode)
 			if blockSha.IsEqual(firstNode.sha) {
-				fastAdd = true
+				behaviorFlags |= btcchain.BFFastAdd
 				if firstNode.sha.IsEqual(b.nextCheckpoint.Hash) {
 					isCheckpointBlock = true
 				} else {
@@ -583,7 +584,7 @@ func (b *blockManager) handleBlockMsg(bmsg *blockMsg) {
 
 	// Process the block to include validation, best chain selection, orphan
 	// handling, etc.
-	isOrphan, err := b.blockChain.ProcessBlock(bmsg.block, fastAdd)
+	isOrphan, err := b.blockChain.ProcessBlock(bmsg.block, behaviorFlags)
 	if err != nil {
 		// When the error is a rule error, it means the block was simply
 		// rejected as opposed to something actually going wrong, so log
@@ -1029,7 +1030,7 @@ out:
 
 			case processBlockMsg:
 				isOrphan, err := b.blockChain.ProcessBlock(
-					msg.block, false)
+					msg.block, msg.flags)
 				if err != nil {
 					msg.reply <- processBlockResponse{
 						isOrphan: false,
@@ -1277,9 +1278,9 @@ func (b *blockManager) CalcNextRequiredDifficulty(timestamp time.Time) (uint32, 
 // ProcessBlock makes use of ProcessBlock on an internal instance of a block
 // chain.  It is funneled through the block manager since btcchain is not safe
 // for concurrent access.
-func (b *blockManager) ProcessBlock(block *btcutil.Block) (bool, error) {
+func (b *blockManager) ProcessBlock(block *btcutil.Block, flags btcchain.BehaviorFlags) (bool, error) {
 	reply := make(chan processBlockResponse, 1)
-	b.msgChan <- processBlockMsg{block: block, reply: reply}
+	b.msgChan <- processBlockMsg{block: block, flags: flags, reply: reply}
 	response := <-reply
 	return response.isOrphan, response.err
 }

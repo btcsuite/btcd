@@ -1750,7 +1750,7 @@ func handleGetWorkSubmission(s *rpcServer, hexData string) (interface{}, error) 
 
 	// Process this block using the same rules as blocks coming from other
 	// nodes.  This will in turn relay it to the network like normal.
-	isOrphan, err := s.server.blockManager.ProcessBlock(block)
+	isOrphan, err := s.server.blockManager.ProcessBlock(block, btcchain.BFNone)
 	if err != nil || isOrphan {
 		// Anything other than a rule violation is an unexpected error,
 		// so return that error as an internal error.
@@ -1988,7 +1988,7 @@ func handleSubmitBlock(s *rpcServer, cmd btcjson.Cmd) (interface{}, error) {
 		return nil, err
 	}
 
-	_, err = s.server.blockManager.ProcessBlock(block)
+	_, err = s.server.blockManager.ProcessBlock(block, btcchain.BFNone)
 	if err != nil {
 		return fmt.Sprintf("rejected: %s", err.Error()), nil
 	}
