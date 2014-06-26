@@ -268,10 +268,15 @@ func CheckTransactionSanity(tx *btcutil.Tx) error {
 	return nil
 }
 
-// CheckProofOfWork ensures the block header bits which indicate the target
+// checkProofOfWork ensures the block header bits which indicate the target
 // difficulty is in min/max range and that the block hash is less than the
 // target difficulty as claimed.
-func CheckProofOfWork(block *btcutil.Block, powLimit *big.Int) error {
+//
+//
+// The flags modify the behavior of this function as follows:
+//  - BFNoPoWCheck: The check to ensure the block hash is less than the target
+//    difficulty is not performed.
+func checkProofOfWork(block *btcutil.Block, powLimit *big.Int, flags BehaviorFlags) error {
 	// The target difficulty must be larger than zero.
 	target := CompactToBig(block.MsgBlock().Header.Bits)
 	if target.Sign() <= 0 {
@@ -287,19 +292,30 @@ func CheckProofOfWork(block *btcutil.Block, powLimit *big.Int) error {
 		return ruleError(ErrUnexpectedDifficulty, str)
 	}
 
-	// The block hash must be less than the claimed target.
-	blockHash, err := block.Sha()
-	if err != nil {
-		return err
-	}
-	hashNum := ShaHashToBig(blockHash)
-	if hashNum.Cmp(target) > 0 {
-		str := fmt.Sprintf("block hash of %064x is higher than "+
-			"expected max of %064x", hashNum, target)
-		return ruleError(ErrHighHash, str)
+	// The block hash must be less than the claimed target unless the flag
+	// to avoid proof of work checks is set.
+	if flags&BFNoPoWCheck != BFNoPoWCheck {
+		// The block hash must be less than the claimed target.
+		blockHash, err := block.Sha()
+		if err != nil {
+			return err
+		}
+		hashNum := ShaHashToBig(blockHash)
+		if hashNum.Cmp(target) > 0 {
+			str := fmt.Sprintf("block hash of %064x is higher than "+
+				"expected max of %064x", hashNum, target)
+			return ruleError(ErrHighHash, str)
+		}
 	}
 
 	return nil
+}
+
+// CheckProofOfWork ensures the block header bits which indicate the target
+// difficulty is in min/max range and that the block hash is less than the
+// target difficulty as claimed.
+func CheckProofOfWork(block *btcutil.Block, powLimit *big.Int) error {
+	return checkProofOfWork(block, powLimit, BFNone)
 }
 
 // CountSigOps returns the number of signature operations for all transaction
@@ -392,9 +408,12 @@ func CountP2SHSigOps(tx *btcutil.Tx, isCoinBaseTx bool, txStore TxStore) (int, e
 	return totalSigOps, nil
 }
 
-// CheckBlockSanity performs some preliminary checks on a block to ensure it is
+// checkBlockSanity performs some preliminary checks on a block to ensure it is
 // sane before continuing with block processing.  These checks are context free.
-func CheckBlockSanity(block *btcutil.Block, powLimit *big.Int) error {
+//
+// The flags do not modify the behavior of this function directly, however they
+// are needed to pass along to checkProofOfWork.
+func checkBlockSanity(block *btcutil.Block, powLimit *big.Int, flags BehaviorFlags) error {
 	// NOTE: bitcoind does size limits checking here, but the size limits
 	// have already been checked by btcwire for incoming blocks.  Also,
 	// btcwire checks the size limits on send too, so there is no need
@@ -403,7 +422,7 @@ func CheckBlockSanity(block *btcutil.Block, powLimit *big.Int) error {
 	// Ensure the proof of work bits in the block header is in min/max range
 	// and the block hash is less than the target value described by the
 	// bits.
-	err := CheckProofOfWork(block, powLimit)
+	err := checkProofOfWork(block, powLimit, flags)
 	if err != nil {
 		return err
 	}
@@ -504,6 +523,12 @@ func CheckBlockSanity(block *btcutil.Block, powLimit *big.Int) error {
 	}
 
 	return nil
+}
+
+// CheckBlockSanity performs some preliminary checks on a block to ensure it is
+// sane before continuing with block processing.  These checks are context free.
+func CheckBlockSanity(block *btcutil.Block, powLimit *big.Int) error {
+	return checkBlockSanity(block, powLimit, BFNone)
 }
 
 // checkSerializedHeight checks if the signature script in the passed

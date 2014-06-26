@@ -21,6 +21,11 @@ const (
 	// checkpoint.  This is primarily used for headers-first mode.
 	BFFastAdd BehaviorFlags = 1 << iota
 
+	// BFNoPoWCheck may be set to indicate the proof of work check which
+	// ensures a block hashes to a value less than the required target will
+	// not be performed.
+	BFNoPoWCheck
+
 	// BFNone is a convenience value to specifically indicate no flags.
 	BFNone BehaviorFlags = 0
 )
@@ -125,7 +130,7 @@ func (b *BlockChain) ProcessBlock(block *btcutil.Block, flags BehaviorFlags) (bo
 	}
 
 	// Perform preliminary sanity checks on the block and its transactions.
-	err = CheckBlockSanity(block, b.netParams.PowLimit)
+	err = checkBlockSanity(block, b.netParams.PowLimit, flags)
 	if err != nil {
 		return false, err
 	}
