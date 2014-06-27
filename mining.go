@@ -375,9 +375,14 @@ func (r FutureSubmitBlockResult) Receive() error {
 		return err
 	}
 
-	resStr := string(res)
-	if resStr != "null" {
-		return errors.New(resStr)
+	if string(res) != "null" {
+		var result string
+		err = json.Unmarshal(res, &result)
+		if err != nil {
+			return err
+		}
+
+		return errors.New(result)
 	}
 
 	return nil
