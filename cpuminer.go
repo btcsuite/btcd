@@ -298,7 +298,7 @@ out:
 		// Create a new block template using the available transactions
 		// in the memory pool as a source of transactions to potentially
 		// include in the block.
-		template, err := NewBlockTemplate(payToAddr, m.server.txMemPool)
+		template, err := NewBlockTemplate(m.server.txMemPool, payToAddr)
 		m.submitBlockLock.Unlock()
 		if err != nil {
 			errStr := fmt.Sprintf("Failed to create new block "+

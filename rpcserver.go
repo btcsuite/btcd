@@ -1621,7 +1621,7 @@ func handleGetWorkRequest(s *rpcServer) (interface{}, error) {
 		rand.Seed(time.Now().UnixNano())
 		payToAddr := cfg.miningAddrs[rand.Intn(len(cfg.miningAddrs))]
 
-		template, err := NewBlockTemplate(payToAddr, s.server.txMemPool)
+		template, err := NewBlockTemplate(s.server.txMemPool, payToAddr)
 		if err != nil {
 			errStr := fmt.Sprintf("Failed to create new block "+
 				"template: %v", err)

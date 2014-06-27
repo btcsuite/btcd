@@ -165,9 +165,11 @@ func newTxPriorityQueue(reserve int, sortByFee bool) *txPriorityQueue {
 // details about the fees and the number of signature operations for each
 // transaction in the block.
 type BlockTemplate struct {
-	block       *btcwire.MsgBlock
-	fees        []int64
-	sigOpCounts []int64
+	block           *btcwire.MsgBlock
+	fees            []int64
+	sigOpCounts     []int64
+	height          int64
+	validPayAddress bool
 }
 
 // minInt is a helper function to return the minimum of two ints.  This avoids
@@ -203,16 +205,25 @@ func standardCoinbaseScript(nextBlockHeight int64, extraNonce uint64) []byte {
 }
 
 // createCoinbaseTx returns a coinbase transaction paying an appropriate subsidy
-// based on the passed block height to the passed public key.  It also accepts
-// an extra nonce value for the signature script.  This extra nonce helps ensure
-// the transaction is not a duplicate transaction (paying the same value to the
-// same public key address would otherwise be an identical transaction for
-// block version 1).
+// based on the passed block height to the provided address.  When the address
+// is nil, the coinbase transaction will instead be redeemable by anyone.
+//
+// See the comment for NewBlockTemplate for more information about why the nil
+// address handling is useful.
 func createCoinbaseTx(coinbaseScript []byte, nextBlockHeight int64, addr btcutil.Address) (*btcutil.Tx, error) {
-	// Create a script to pay to the specific address.
-	pkScript, err := btcscript.PayToAddrScript(addr)
-	if err != nil {
-		return nil, err
+	// Create the script to pay to the provided payment address if one was
+	// specified.  Otherwise create a script that allows the coinbase to be
+	// redeemable by anyone.
+	var pkScript []byte
+	if addr != nil {
+		var err error
+		pkScript, err = btcscript.PayToAddrScript(addr)
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		scriptBuilder := btcscript.NewScriptBuilder()
+		pkScript = scriptBuilder.AddOp(btcscript.OP_TRUE).Script()
 	}
 
 	tx := btcwire.NewMsgTx()
@@ -332,16 +343,22 @@ func medianAdjustedTime(chainState *chainState) (time.Time, error) {
 	return newTimestamp, nil
 }
 
-// NewBlockTemplate returns a new block template using the transactions from the
-// passed transaction memory pool with a coinbase that pays to the passed
-// address and is ready to be solved.  The transactions selected and included
-// are prioritized according to several factors.  First, each transaction has a
-// priority calculated based on its value, age of inputs, and size.
-// Transactions which consist of larger amounts, older inputs, and small sizes
-// have the highest priority.  Second, a fee per kilobyte is calculated for each
-// transaction.  Transactions with a higher fee per kilobyte are preferred.
-// Finally, the block generation related configuration options are all taken
-// into account.
+// NewBlockTemplate returns a new block template that is ready to be solved
+// using the transactions from the passed transaction memory pool and a coinbase
+// that either pays to the passed address if it is not nil, or a coinbase that
+// is redeemable by anyone if the passed address is nil.  The nil address
+// functionality is useful since there are cases such as the getblocktemplate
+// RPC where external mining software is responsible for creating their own
+// coinbase which will replace the one generated for the block template.  Thus
+// the need to have configured address can be avoided.
+//
+// The transactions selected and included are prioritized according to several
+// factors.  First, each transaction has a priority calculated based on its
+// value, age of inputs, and size.  Transactions which consist of larger
+// amounts, older inputs, and small sizes have the highest priority.  Second, a
+// fee per kilobyte is calculated for each transaction.  Transactions with a
+// higher fee per kilobyte are preferred.  Finally, the block generation related
+// configuration options are all taken into account.
 //
 // Transactions which only spend outputs from other transactions already in the
 // block chain are immediately added to a priority queue which either
@@ -387,7 +404,7 @@ func medianAdjustedTime(chainState *chainState) (time.Time, error) {
 //  |  transactions (while block size   |   |
 //  |  <= cfg.BlockMinSize)             |   |
 //   -----------------------------------  --
-func NewBlockTemplate(payToAddress btcutil.Address, mempool *txMemPool) (*BlockTemplate, error) {
+func NewBlockTemplate(mempool *txMemPool, payToAddress btcutil.Address) (*BlockTemplate, error) {
 	blockManager := mempool.server.blockManager
 	chainState := &blockManager.chainState
 	chain := blockManager.blockChain
@@ -402,7 +419,10 @@ func NewBlockTemplate(payToAddress btcutil.Address, mempool *txMemPool) (*BlockT
 	// address.  NOTE: The coinbase value will be updated to include the
 	// fees from the selected transactions later after they have actually
 	// been selected.  It is created here to detect any errors early
-	// before potentially doing a lot of work below.
+	// before potentially doing a lot of work below.  The extra nonce helps
+	// ensure the transaction is not a duplicate transaction (paying the
+	// same value to the same public key address would otherwise be an
+	// identical transaction for block version 1).
 	extraNonce := uint64(0)
 	coinbaseScript := standardCoinbaseScript(nextBlockHeight, extraNonce)
 	coinbaseTx, err := createCoinbaseTx(coinbaseScript, nextBlockHeight,
@@ -444,8 +464,8 @@ func NewBlockTemplate(payToAddress btcutil.Address, mempool *txMemPool) (*BlockT
 	// a transaction as it is selected for inclusion in the final block.
 	// However, since the total fees aren't known yet, use a dummy value for
 	// the coinbase fee which will be updated later.
-	txFees := make([]int64, len(mempoolTxns))
-	txSigOpCounts := make([]int64, len(mempoolTxns))
+	txFees := make([]int64, 0, len(mempoolTxns))
+	txSigOpCounts := make([]int64, 0, len(mempoolTxns))
 	txFees = append(txFees, -1) // Updated once known
 	txSigOpCounts = append(txSigOpCounts, numCoinbaseSigOps)
 
@@ -776,9 +796,11 @@ mempoolLoop:
 		blockSize, btcchain.CompactToBig(msgBlock.Header.Bits))
 
 	return &BlockTemplate{
-		block:       &msgBlock,
-		fees:        txFees,
-		sigOpCounts: txSigOpCounts,
+		block:           &msgBlock,
+		fees:            txFees,
+		sigOpCounts:     txSigOpCounts,
+		height:          nextBlockHeight,
+		validPayAddress: payToAddress != nil,
 	}, nil
 }
 
@@ -813,7 +835,7 @@ func UpdateBlockTime(msgBlock *btcwire.MsgBlock, bManager *blockManager) error {
 
 // UpdateExtraNonce updates the extra nonce in the coinbase script of the passed
 // block by regenerating the coinbase script with the passed value and block
-// height.  It also recalculates and updates the new merkle root the results
+// height.  It also recalculates and updates the new merkle root that results
 // from changing the coinbase script.
 func UpdateExtraNonce(msgBlock *btcwire.MsgBlock, blockHeight int64, extraNonce uint64) error {
 	coinbaseScript := standardCoinbaseScript(blockHeight, extraNonce)
