@@ -762,7 +762,7 @@ func makeStop(args []interface{}) (btcjson.Cmd, error) {
 func makeSubmitBlock(args []interface{}) (btcjson.Cmd, error) {
 	opts := &btcjson.SubmitBlockOptions{}
 	if len(args) == 2 {
-		opts.WorkId = args[1].(string)
+		opts.WorkID = args[1].(string)
 	}
 
 	return btcjson.NewSubmitBlockCmd("btcctl", args[0].(string), opts)
