@@ -48,6 +48,8 @@ func TestErrorCodeStringer(t *testing.T) {
 		{btcchain.ErrBadCoinbaseValue, "ErrBadCoinbaseValue"},
 		{btcchain.ErrMissingCoinbaseHeight, "ErrMissingCoinbaseHeight"},
 		{btcchain.ErrBadCoinbaseHeight, "ErrBadCoinbaseHeight"},
+		{btcchain.ErrScriptMalformed, "ErrScriptMalformed"},
+		{btcchain.ErrScriptValidation, "ErrScriptValidation"},
 		{0xffff, "Unknown ErrorCode (65535)"},
 	}
 

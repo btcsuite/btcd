@@ -51,15 +51,15 @@ out:
 		select {
 		case txVI := <-v.validateChan:
 			// Ensure the referenced input transaction is available.
-			//txIn := txVI.tx.MsgTx().TxIn[txVI.txInIdx]
 			txIn := txVI.txIn
-			txInHash := &txIn.PreviousOutpoint.Hash
-			originTx, exists := v.txStore[*txInHash]
+			originTxHash := &txIn.PreviousOutpoint.Hash
+			originTx, exists := v.txStore[*originTxHash]
 			if !exists || originTx.Err != nil || originTx.Tx == nil {
-				err := fmt.Errorf("unable to find input "+
+				str := fmt.Sprintf("unable to find input "+
 					"transaction %v referenced from "+
-					"transaction %v", txInHash,
+					"transaction %v", originTxHash,
 					txVI.tx.Sha())
+				err := ruleError(ErrMissingTx, str)
 				v.sendResult(err)
 				break out
 			}
@@ -69,10 +69,12 @@ out:
 			// is available.
 			originTxIndex := txIn.PreviousOutpoint.Index
 			if originTxIndex >= uint32(len(originMsgTx.TxOut)) {
-				err := fmt.Errorf("out of bounds "+
+				str := fmt.Sprintf("out of bounds "+
 					"input index %d in transaction %v "+
 					"referenced from transaction %v",
-					originTxIndex, txInHash, txVI.tx.Sha())
+					originTxIndex, originTxHash,
+					txVI.tx.Sha())
+				err := ruleError(ErrBadTxInput, str)
 				v.sendResult(err)
 				break out
 			}
@@ -83,17 +85,26 @@ out:
 			engine, err := btcscript.NewScript(sigScript, pkScript,
 				txVI.txInIndex, txVI.tx.MsgTx(), v.flags)
 			if err != nil {
+				str := fmt.Sprintf("failed to parse input "+
+					"%s:%d which references output %s:%d - "+
+					"%v (input script bytes %x, prev output "+
+					"script bytes %x)", txVI.tx.Sha(),
+					txVI.txInIndex, originTxHash,
+					originTxIndex, err, sigScript, pkScript)
+				err := ruleError(ErrScriptMalformed, str)
 				v.sendResult(err)
 				break out
 			}
 
 			// Execute the script pair.
 			if err := engine.Execute(); err != nil {
-				err := fmt.Errorf("validate of input "+
-					"%d from transaction %s failed: %v "+
-					"(input script bytes %x, prev output "+
-					"script bytes %x)", txVI.txInIndex,
-					txInHash, err, sigScript, pkScript)
+				str := fmt.Sprintf("failed to validate input "+
+					"%s:%d which references output %s:%d - "+
+					"%v (input script bytes %x, prev output "+
+					"script bytes %x)", txVI.tx.Sha(),
+					txVI.txInIndex, originTxHash,
+					originTxIndex, err, sigScript, pkScript)
+				err := ruleError(ErrScriptValidation, str)
 				v.sendResult(err)
 				break out
 			}

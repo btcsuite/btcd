@@ -151,6 +151,17 @@ const (
 	// coinbase transaction for version 2 and higher blocks does not match
 	// the expected value.
 	ErrBadCoinbaseHeight
+
+	// ErrScriptMalformed indicates a transaction script is malformed in
+	// some way.  For example, it might be longer than the maximum allowed
+	// length or fail to parse.
+	ErrScriptMalformed
+
+	// ErrScriptValidation indicates the result of executing transaction
+	// script failed.  The error covers any failure when executing scripts
+	// such signature verification failures and execution past the end of
+	// the stack.
+	ErrScriptValidation
 )
 
 // Map of ErrorCode values back to their constant names for pretty printing.
@@ -187,6 +198,8 @@ var errorCodeStrings = map[ErrorCode]string{
 	ErrBadCoinbaseValue:      "ErrBadCoinbaseValue",
 	ErrMissingCoinbaseHeight: "ErrMissingCoinbaseHeight",
 	ErrBadCoinbaseHeight:     "ErrBadCoinbaseHeight",
+	ErrScriptMalformed:       "ErrScriptMalformed",
+	ErrScriptValidation:      "ErrScriptValidation",
 }
 
 // String returns the ErrorCode as a human-readable name.
