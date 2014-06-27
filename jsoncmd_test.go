@@ -1473,12 +1473,12 @@ var jsoncmdtests = []struct {
 		f: func() (Cmd, error) {
 			return NewSubmitBlockCmd(testId,
 				"lotsofhex",
-				&SubmitBlockOptions{WorkId: "otherstuff"})
+				&SubmitBlockOptions{WorkID: "otherstuff"})
 		},
 		result: &SubmitBlockCmd{
 			id:       testId,
 			HexBlock: "lotsofhex",
-			Options:  &SubmitBlockOptions{WorkId: "otherstuff"},
+			Options:  &SubmitBlockOptions{WorkID: "otherstuff"},
 		},
 	},
 	{

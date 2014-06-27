@@ -6168,7 +6168,7 @@ func (cmd *StopCmd) UnmarshalJSON(b []byte) error {
 // a SubmitBlockCmd command.
 type SubmitBlockOptions struct {
 	// must be provided if server provided a workid with template.
-	WorkId string `json:"workid,omitempty"`
+	WorkID string `json:"workid,omitempty"`
 }
 
 // SubmitBlockCmd is a type handling custom marshaling and
