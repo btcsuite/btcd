@@ -912,9 +912,13 @@ func (mp *txMemPool) maybeAcceptTransaction(tx *btcutil.Tx, isOrphan *bool, isNe
 	txmpLog.Debugf("Accepted transaction %v (pool size: %v)", txHash,
 		len(mp.pool))
 
-	// Notify websocket clients about mempool transactions.
 	if mp.server.rpcServer != nil {
+		// Notify websocket clients about mempool transactions.
 		mp.server.rpcServer.ntfnMgr.NotifyMempoolTx(tx, isNew)
+
+		// Potentially notify any getblocktemplate long poll clients
+		// about stale block templates due to the new transaction.
+		mp.server.rpcServer.gbtWorkState.NotifyMempoolTx(mp.lastUpdated)
 	}
 
 	return nil
