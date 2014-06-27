@@ -82,12 +82,6 @@ func (b *BlockChain) maybeAcceptBlock(block *btcutil.Block, flags BehaviorFlags)
 	// It's safe to ignore the error on Sha since it's already cached.
 	blockHash, _ := block.Sha()
 	if !b.verifyCheckpoint(blockHeight, blockHash) {
-		// TODO(davec): This should probably be a distinct error type
-		// (maybe CheckpointError).  Since this error shouldn't happen
-		// unless the peer is connected to a rogue network serving up an
-		// alternate chain, the caller would likely need to react by
-		// disconnecting peers and rolling back the chain to the last
-		// known good point.
 		str := fmt.Sprintf("block at height %d does not match "+
 			"checkpoint hash", blockHeight)
 		return ruleError(ErrBadCheckpoint, str)
