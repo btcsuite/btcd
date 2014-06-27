@@ -319,6 +319,20 @@ func logSkippedDeps(tx *btcutil.Tx, deps *list.List) {
 	}
 }
 
+// minimumMedianTime returns the minimum allowed timestamp for a block building
+// on the end of the current best chain.  In particular, it is one second after
+// the median timestamp of the last several blocks per the chain consensus
+// rules.
+func minimumMedianTime(chainState *chainState) (time.Time, error) {
+	chainState.Lock()
+	defer chainState.Unlock()
+	if chainState.pastMedianTimeErr != nil {
+		return time.Time{}, chainState.pastMedianTimeErr
+	}
+
+	return chainState.pastMedianTime.Add(time.Second), nil
+}
+
 // medianAdjustedTime returns the current time adjusted to ensure it is at least
 // one second after the median timestamp of the last several blocks per the
 // chain consensus rules.
