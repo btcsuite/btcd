@@ -1015,7 +1015,7 @@ func (c *wsClient) handleMessage(msg []byte) {
 	if !ok {
 		// No websocket-specific handler so handle like a legacy
 		// RPC connection.
-		response := standardCmdReply(cmd, c.server)
+		response := standardCmdReply(cmd, c.server, nil)
 		reply, err := json.Marshal(response)
 		if err != nil {
 			rpcsLog.Errorf("Failed to marshal reply for <%s> "+
