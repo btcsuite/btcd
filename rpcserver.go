@@ -63,6 +63,23 @@ const (
 	// padding format.
 	hash1Len = (1 + ((btcwire.HashSize + 8) / fastsha256.BlockSize)) *
 		fastsha256.BlockSize
+
+	// gbtRegenerateSeconds is the number of seconds that must pass before
+	// a new template is generated when the previous block hash has not
+	// changed and there have been changes to the available transactions
+	// in the memory pool.
+	gbtRegenerateSeconds = 60
+)
+
+var (
+	// gbtCoinbaseAux describes additional data that miners should include
+	// in the coinbase signature script.  It is declared here to avoid the
+	// overhead of creating a new object on every invocation for constant
+	// data.
+	gbtCoinbaseAux = &btcjson.GetBlockTemplateResultAux{
+		Flags: hex.EncodeToString(btcscript.NewScriptBuilder().
+			AddData([]byte(coinbaseFlags)).Script()),
+	}
 )
 
 // Errors
@@ -93,7 +110,7 @@ var rpcHandlersBeforeInit = map[string]commandHandler{
 	"getblockchaininfo":    handleUnimplemented,
 	"getblockcount":        handleGetBlockCount,
 	"getblockhash":         handleGetBlockHash,
-	"getblocktemplate":     handleUnimplemented,
+	"getblocktemplate":     handleGetBlockTemplate,
 	"getconnectioncount":   handleGetConnectionCount,
 	"getcurrentnet":        handleGetCurrentNet,
 	"getdifficulty":        handleGetDifficulty,
@@ -202,6 +219,23 @@ func newWorkState() *workState {
 	}
 }
 
+// gbtWorkState houses state that is used in between multiple RPC invocations to
+// getblocktemplate.
+type gbtWorkState struct {
+	sync.Mutex
+	lastTxUpdate  time.Time
+	lastGenerated time.Time
+	prevHash      *btcwire.ShaHash
+	minTimestamp  time.Time
+	template      *BlockTemplate
+}
+
+// newGbtWorkState returns a new instance of a gbtWorkState with all internal
+// fields initialized and ready to use.
+func newGbtWorkState() *gbtWorkState {
+	return &gbtWorkState{}
+}
+
 // rpcServer holds the items the rpc server may need to access (config,
 // shutdown, main server, etc.)
 type rpcServer struct {
@@ -217,6 +251,7 @@ type rpcServer struct {
 	wg              sync.WaitGroup
 	listeners       []net.Listener
 	workState       *workState
+	gbtWorkState    *gbtWorkState
 	quit            chan int
 }
 
@@ -469,11 +504,12 @@ func newRPCServer(listenAddrs []string, s *server) (*rpcServer, error) {
 	login := cfg.RPCUser + ":" + cfg.RPCPass
 	auth := "Basic " + base64.StdEncoding.EncodeToString([]byte(login))
 	rpc := rpcServer{
-		authsha:     fastsha256.Sum256([]byte(auth)),
-		server:      s,
-		statusLines: make(map[int]string),
-		workState:   newWorkState(),
-		quit:        make(chan int),
+		authsha:      fastsha256.Sum256([]byte(auth)),
+		server:       s,
+		statusLines:  make(map[int]string),
+		workState:    newWorkState(),
+		gbtWorkState: newGbtWorkState(),
+		quit:         make(chan int),
 	}
 	rpc.ntfnMgr = newWsNotificationManager(&rpc)
 
@@ -1214,6 +1250,357 @@ func handleGetBlockHash(s *rpcServer, cmd btcjson.Cmd, closeChan <-chan struct{}
 	}
 
 	return sha.String(), nil
+}
+
+// updateBlockTemplate creates or updates a block template for the work state.
+// A new block template will be generated when the current best block has
+// changed or the transactions in the memory pool have been updated and it has
+// been some time has passed since the last template was generated.  Otherwise,
+// the timestamp for the existing block template is updated (and possibly the
+// difficulty on testnet per the consesus rules).  Finally, if the
+// useCoinbaseValue flag is flase and the existing block template does not
+// already contain a valid payment address, the block template will be updated
+// with a randomly selected payment address from the list of configured
+// addresses.
+//
+// This function MUST be called with the state locked.
+func (state *gbtWorkState) updateBlockTemplate(s *rpcServer, useCoinbaseValue bool) error {
+	lastTxUpdate := s.server.txMemPool.LastUpdated()
+	if lastTxUpdate.IsZero() {
+		lastTxUpdate = time.Now()
+	}
+
+	// Generate a new block template when the current best block has
+	// changed or the transactions in the memory pool have been updated and
+	// it has been at least gbtRegenerateSecond since the last template was
+	// generated.
+	var msgBlock *btcwire.MsgBlock
+	var targetDifficulty string
+	latestHash, _ := s.server.blockManager.chainState.Best()
+	template := state.template
+	if template == nil || state.prevHash == nil ||
+		!state.prevHash.IsEqual(latestHash) ||
+		(state.lastTxUpdate != lastTxUpdate &&
+			time.Now().After(state.lastGenerated.Add(time.Second*
+				gbtRegenerateSeconds))) {
+
+		// Reset the previous best hash the block template was generated
+		// against so any errors below cause the next invocation to try
+		// again.
+		state.prevHash = nil
+
+		// Choose a payment address at random if the caller requests a
+		// full coinbase as opposed to only the pertinent details needed
+		// to create their own coinbase.
+		var payAddr btcutil.Address
+		if !useCoinbaseValue {
+			rand.Seed(time.Now().UnixNano())
+			payAddr = cfg.miningAddrs[rand.Intn(len(cfg.miningAddrs))]
+		}
+
+		// Create a new block template that has a coinbase which anyone
+		// can redeem.  This is only acceptable because the returned
+		// block template doesn't include the coinbase, so the caller
+		// will ultimately create their own coinbase which pays to the
+		// appropriate address(es).
+		blkTemplate, err := NewBlockTemplate(s.server.txMemPool, payAddr)
+		if err != nil {
+			errStr := fmt.Sprintf("Failed to create new block "+
+				"template: %v", err)
+			rpcsLog.Errorf(errStr)
+			return btcjson.Error{
+				Code:    btcjson.ErrInternal.Code,
+				Message: errStr,
+			}
+		}
+		template = blkTemplate
+		msgBlock = template.block
+		targetDifficulty = fmt.Sprintf("%064x",
+			btcchain.CompactToBig(msgBlock.Header.Bits))
+
+		// Find the minimum allowed timestamp for the block based on the
+		// median timestamp of the last several blocks per the chain
+		// consensus rules.
+		chainState := &s.server.blockManager.chainState
+		minTimestamp, err := minimumMedianTime(chainState)
+		if err != nil {
+			return btcjson.Error{
+				Code:    btcjson.ErrInternal.Code,
+				Message: err.Error(),
+			}
+		}
+
+		// Update work state to ensure another block template isn't
+		// generated until needed.
+		state.template = template
+		state.lastGenerated = time.Now()
+		state.lastTxUpdate = lastTxUpdate
+		state.prevHash = latestHash
+		state.minTimestamp = minTimestamp
+
+		rpcsLog.Debugf("Generated block template (timestamp %v, "+
+			"target %s, merkle root %s)",
+			msgBlock.Header.Timestamp, targetDifficulty,
+			msgBlock.Header.MerkleRoot)
+	} else {
+		// At this point, there is a saved block template and another
+		// request for a template was made, but either the available
+		// transactions haven't change or it hasn't been long enough to
+		// trigger a new block template to be generated.  So, update the
+		// existing block template.
+
+		// When the caller requires a full coinbase as opposed to only
+		// the pertinent details needed to create their own coinbase,
+		// add a payment address to the output of the coinbase of the
+		// template if it doesn't already have one.  Since this requires
+		// mining addresses to be specified via the config, an error is
+		// returned if none have been specified.
+		if !useCoinbaseValue && !template.validPayAddress {
+			// Choose a payment address at random.
+			rand.Seed(time.Now().UnixNano())
+			payToAddr := cfg.miningAddrs[rand.Intn(len(cfg.miningAddrs))]
+
+			// Update the block coinbase output of the template to
+			// pay to the randomly selected payment address.
+			pkScript, err := btcscript.PayToAddrScript(payToAddr)
+			if err != nil {
+				return btcjson.Error{
+					Code:    btcjson.ErrInternal.Code,
+					Message: err.Error(),
+				}
+			}
+			template.block.Transactions[0].TxOut[0].PkScript = pkScript
+			template.validPayAddress = true
+
+			// Update the merkle root.
+			block := btcutil.NewBlock(template.block)
+			merkles := btcchain.BuildMerkleTreeStore(block.Transactions())
+			template.block.Header.MerkleRoot = *merkles[len(merkles)-1]
+		}
+
+		// Set locals for convenience.
+		msgBlock = template.block
+		targetDifficulty = fmt.Sprintf("%064x",
+			btcchain.CompactToBig(msgBlock.Header.Bits))
+
+		// Update the time of the block template to the current time
+		// while accounting for the median time of the past several
+		// blocks per the chain consensus rules.
+		UpdateBlockTime(msgBlock, s.server.blockManager)
+		msgBlock.Header.Nonce = 0
+
+		rpcsLog.Debugf("Updated block template (timestamp %v, "+
+			"target %s)", msgBlock.Header.Timestamp,
+			targetDifficulty)
+	}
+
+	return nil
+}
+
+// blockTemplateResult returns the current block template associated with the
+// state as a btcjson.GetBlockTemplateResult that is ready to be encoded to JSON
+// and returned to the caller.
+//
+// This function MUST be called with the state locked.
+func (state *gbtWorkState) blockTemplateResult(useCoinbaseValue bool) (*btcjson.GetBlockTemplateResult, error) {
+	// Convert each transaction in the block template to a template result
+	// transaction.  The result does not include the coinbase, so notice
+	// the adjustments to the various lengths and indices.
+	template := state.template
+	msgBlock := template.block
+	numTx := len(msgBlock.Transactions)
+	transactions := make([]btcjson.GetBlockTemplateResultTx, 0, numTx-1)
+	txIndex := make(map[btcwire.ShaHash]int64, numTx)
+	for i, tx := range msgBlock.Transactions {
+		txHash, _ := tx.TxSha()
+		txIndex[txHash] = int64(i)
+
+		// Skip the coinbase transaction.
+		if i == 0 {
+			continue
+		}
+
+		// Create an array of 1-based indices to transactions that come
+		// before this one in the transactions list which this one
+		// depends on.  This is necessary since the created block must
+		// ensure proper ordering of the dependencies.  A map is used
+		// before creating the final array to prevent duplicate entries
+		// when mutiple inputs reference the same transaction.
+		dependsMap := make(map[int64]struct{})
+		for _, txIn := range tx.TxIn {
+			if idx, ok := txIndex[txIn.PreviousOutpoint.Hash]; ok {
+				dependsMap[idx] = struct{}{}
+			}
+		}
+		depends := make([]int64, 0, len(dependsMap))
+		for idx := range dependsMap {
+			depends = append(depends, idx)
+		}
+
+		// Serialize the transaction for later conversion to hex.
+		txBuf := bytes.NewBuffer(make([]byte, 0, tx.SerializeSize()))
+		if err := tx.Serialize(txBuf); err != nil {
+			return nil, btcjson.Error{
+				Code:    btcjson.ErrInternal.Code,
+				Message: err.Error(),
+			}
+		}
+
+		resultTx := btcjson.GetBlockTemplateResultTx{
+			Data:    hex.EncodeToString(txBuf.Bytes()),
+			Hash:    txHash.String(),
+			Depends: depends,
+			Fee:     template.fees[i],
+			SigOps:  template.sigOpCounts[i],
+		}
+		transactions = append(transactions, resultTx)
+	}
+
+	// Generate the block template reply.
+	header := &msgBlock.Header
+	reply := btcjson.GetBlockTemplateResult{
+		Bits:         strconv.FormatInt(int64(header.Bits), 16),
+		CurTime:      time.Now().Unix(),
+		Height:       template.height,
+		PreviousHash: header.PrevBlock.String(),
+		SigOpLimit:   btcchain.MaxSigOpsPerBlock,
+		SizeLimit:    btcwire.MaxBlockPayload,
+		Transactions: transactions,
+		Version:      header.Version,
+	}
+	if useCoinbaseValue {
+		reply.CoinbaseAux = gbtCoinbaseAux
+		reply.CoinbaseValue = &msgBlock.Transactions[0].TxOut[0].Value
+	} else {
+		// Ensure the template has a valid payment address associated
+		// with it when a full coinbase is requested.
+		if !template.validPayAddress {
+			return nil, btcjson.Error{
+				Code: btcjson.ErrInternal.Code,
+				Message: "A coinbase transaction has been " +
+					"requested, but the server has not " +
+					"been configured with a payment " +
+					"addresses via --miningaddr",
+			}
+		}
+
+		// Serialize the transaction for conversion to hex.
+		tx := msgBlock.Transactions[0]
+		txHash, _ := tx.TxSha()
+		txBuf := bytes.NewBuffer(make([]byte, 0, tx.SerializeSize()))
+		if err := tx.Serialize(txBuf); err != nil {
+			return nil, btcjson.Error{
+				Code:    btcjson.ErrInternal.Code,
+				Message: err.Error(),
+			}
+		}
+
+		resultTx := btcjson.GetBlockTemplateResultTx{
+			Data:    hex.EncodeToString(txBuf.Bytes()),
+			Hash:    txHash.String(),
+			Depends: []int64{},
+			Fee:     template.fees[0],
+			SigOps:  template.sigOpCounts[0],
+		}
+
+		reply.CoinbaseTxn = &resultTx
+	}
+
+	return &reply, nil
+}
+
+// handleGetBlockTemplateRequest is a helper for handleGetBlockTemplate which
+// deals with generating and returning block templates to the caller.  It
+// detects the capabilities reported by the caller in regards to whether or not
+// it supports creating its own coinbase (the coinbasetxn and coinbasevalue
+// capabilities) and modifies the returned block template accordingly.
+func handleGetBlockTemplateRequest(s *rpcServer, request *btcjson.TemplateRequest) (interface{}, error) {
+	// Extract the relevant passed capabilities and restrict the result to
+	// either a coinbase value or a coinbase transaction object depending on
+	// the request.  Default to only providing a coinbase value.
+	useCoinbaseValue := true
+	if request != nil {
+		var hasCoinbaseValue, hasCoinbaseTxn bool
+		for _, capability := range request.Capabilities {
+			switch capability {
+			case "coinbasetxn":
+				hasCoinbaseTxn = true
+			case "coinbasevalue":
+				hasCoinbaseValue = true
+			}
+		}
+
+		if hasCoinbaseTxn && !hasCoinbaseValue {
+			useCoinbaseValue = false
+		}
+	}
+
+	// When a coinbase transaction has been requested, respond with an error
+	// if there are no addresses to pay the created block template to.
+	if !useCoinbaseValue && len(cfg.miningAddrs) == 0 {
+		return nil, btcjson.Error{
+			Code: btcjson.ErrInternal.Code,
+			Message: "A coinbase transaction has been requested, " +
+				"but the server has not been configured with " +
+				"a payment addresses via --miningaddr",
+		}
+	}
+
+	// Return an error if there are no peers connected since there is no
+	// way to relay a found block or receive transactions to work on.
+	// However, allow this state when running in the regression test or
+	// simulation test mode.
+	if !(cfg.RegressionTest || cfg.SimNet) && s.server.ConnectedCount() == 0 {
+		return nil, btcjson.ErrClientNotConnected
+	}
+
+	// No point in generating or accepting work before the chain is synced.
+	_, currentHeight := s.server.blockManager.chainState.Best()
+	if currentHeight != 0 && !s.server.blockManager.IsCurrent() {
+		return nil, btcjson.ErrClientInInitialDownload
+	}
+
+	// Protect concurrent access when updating block templates.
+	state := s.gbtWorkState
+	state.Lock()
+	defer state.Unlock()
+
+	// Get and return a block template.  A new block template will be
+	// generated when the current best block has changed or the transactions
+	// in the memory pool have been updated and it has been at least five
+	// seconds since the last template was generated.  Otherwise, the
+	// timestamp for the existing block template is updated (and possibly
+	// the difficulty on testnet per the consesus rules).
+	if err := state.updateBlockTemplate(s, useCoinbaseValue); err != nil {
+		return nil, err
+	}
+	return state.blockTemplateResult(useCoinbaseValue)
+}
+
+// handleGetBlockTemplate implements the getblocktemplate command.
+//
+// See https://en.bitcoin.it/wiki/BIP_0022 for more details.
+func handleGetBlockTemplate(s *rpcServer, cmd btcjson.Cmd, closeChan <-chan struct{}) (interface{}, error) {
+	c := cmd.(*btcjson.GetBlockTemplateCmd)
+	request := c.Request
+
+	// Set the default mode and override it if supplied.
+	mode := "template"
+	if request != nil && request.Mode != "" {
+		mode = request.Mode
+	}
+
+	// The only supported mode is currently "template".  Use a switch to
+	// make other modes easier to implement.
+	switch mode {
+	case "template":
+		return handleGetBlockTemplateRequest(s, request)
+	}
+
+	return nil, btcjson.Error{
+		Code:    btcjson.ErrInvalidParameter.Code,
+		Message: "Invalid mode",
+	}
 }
 
 // handleGetConnectionCount implements the getconnectioncount command.
