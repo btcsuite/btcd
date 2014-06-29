@@ -449,6 +449,34 @@ func TestBlockOverflowErrors(t *testing.T) {
 	}
 }
 
+// TestBlockSerializeSize performs tests to ensure the serialize size for
+// various blocks is accurate.
+func TestBlockSerializeSize(t *testing.T) {
+	// Block with no transactions.
+	noTxBlock := btcwire.NewMsgBlock(&blockOne.Header)
+
+	tests := []struct {
+		in   *btcwire.MsgBlock // Block to encode
+		size int               // Expected serialized size
+	}{
+		// Block with no transactions.
+		{noTxBlock, 81},
+
+		// First block in the mainnet block chain.
+		{&blockOne, len(blockOneBytes)},
+	}
+
+	t.Logf("Running %d tests", len(tests))
+	for i, test := range tests {
+		serializedSize := test.in.SerializeSize()
+		if serializedSize != test.size {
+			t.Errorf("MsgBlock.SerializeSize: #%d got: %d, want: "+
+				"%d", i, serializedSize, test.size)
+			continue
+		}
+	}
+}
+
 var blockOne = btcwire.MsgBlock{
 	Header: btcwire.BlockHeader{
 		Version: 1,

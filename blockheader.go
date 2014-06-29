@@ -11,7 +11,7 @@ import (
 )
 
 // BlockVersion is the current latest supported block version.
-const BlockVersion uint32 = 2
+const BlockVersion = 2
 
 // Version 4 bytes + Timestamp 4 bytes + Bits 4 bytes + Nonce 4 bytes +
 // PrevBlock and MerkleRoot hashes.
@@ -21,7 +21,7 @@ const MaxBlockHeaderPayload = 16 + (HashSize * 2)
 // block (MsgBlock) and headers (MsgHeaders) messages.
 type BlockHeader struct {
 	// Version of the block.  This is not the same as the protocol version.
-	Version uint32
+	Version int32
 
 	// Hash of the previous block in the block chain.
 	PrevBlock ShaHash

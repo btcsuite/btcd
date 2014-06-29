@@ -141,36 +141,36 @@ func TstReadMessageHeader(r io.Reader) (int, *messageHeader, error) {
 
 // TstReadOutPoint makes the internal readOutPoint function available to the
 // test package.
-func TstReadOutPoint(r io.Reader, pver uint32, version uint32, op *OutPoint) error {
+func TstReadOutPoint(r io.Reader, pver uint32, version int32, op *OutPoint) error {
 	return readOutPoint(r, pver, version, op)
 }
 
 // TstWriteOutPoint makes the internal writeOutPoint function available to the
 // test package.
-func TstWriteOutPoint(w io.Writer, pver uint32, version uint32, op *OutPoint) error {
+func TstWriteOutPoint(w io.Writer, pver uint32, version int32, op *OutPoint) error {
 	return writeOutPoint(w, pver, version, op)
 }
 
 // TstReadTxOut makes the internal readTxOut function available to the test
 // package.
-func TstReadTxOut(r io.Reader, pver uint32, version uint32, to *TxOut) error {
+func TstReadTxOut(r io.Reader, pver uint32, version int32, to *TxOut) error {
 	return readTxOut(r, pver, version, to)
 }
 
 // TstWriteTxOut makes the internal writeTxOut function available to the test
 // package.
-func TstWriteTxOut(w io.Writer, pver uint32, version uint32, to *TxOut) error {
+func TstWriteTxOut(w io.Writer, pver uint32, version int32, to *TxOut) error {
 	return writeTxOut(w, pver, version, to)
 }
 
 // TstReadTxIn makes the internal readTxIn function available to the test
 // package.
-func TstReadTxIn(r io.Reader, pver uint32, version uint32, ti *TxIn) error {
+func TstReadTxIn(r io.Reader, pver uint32, version int32, ti *TxIn) error {
 	return readTxIn(r, pver, version, ti)
 }
 
 // TstWriteTxIn makes the internal writeTxIn function available to the test
 // package.
-func TstWriteTxIn(w io.Writer, pver uint32, version uint32, ti *TxIn) error {
+func TstWriteTxIn(w io.Writer, pver uint32, version int32, ti *TxIn) error {
 	return writeTxIn(w, pver, version, ti)
 }

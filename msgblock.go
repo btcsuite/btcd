@@ -194,6 +194,20 @@ func (msg *MsgBlock) Serialize(w io.Writer) error {
 	return msg.BtcEncode(w, 0)
 }
 
+// SerializeSize returns the number of bytes it would take to serialize the
+// the block.
+func (msg *MsgBlock) SerializeSize() int {
+	// Block header bytes + Serialized varint size for the number of
+	// transactions.
+	n := blockHeaderLen + VarIntSerializeSize(uint64(len(msg.Transactions)))
+
+	for _, tx := range msg.Transactions {
+		n += tx.SerializeSize()
+	}
+
+	return n
+}
+
 // Command returns the protocol command string for the message.  This is part
 // of the Message interface implementation.
 func (msg *MsgBlock) Command() string {

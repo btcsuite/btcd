@@ -133,7 +133,7 @@ func NewTxOut(value int64, pkScript []byte) *TxOut {
 // Use the AddTxIn and AddTxOut functions to build up the list of transaction
 // inputs and outputs.
 type MsgTx struct {
-	Version  uint32
+	Version  int32
 	TxIn     []*TxIn
 	TxOut    []*TxOut
 	LockTime uint32
@@ -240,7 +240,7 @@ func (msg *MsgTx) BtcDecode(r io.Reader, pver uint32) error {
 	if err != nil {
 		return err
 	}
-	msg.Version = binary.LittleEndian.Uint32(buf[:])
+	msg.Version = int32(binary.LittleEndian.Uint32(buf[:]))
 
 	count, err := readVarInt(r, pver)
 	if err != nil {
@@ -324,7 +324,7 @@ func (msg *MsgTx) Deserialize(r io.Reader) error {
 // database, as opposed to encoding transactions for the wire.
 func (msg *MsgTx) BtcEncode(w io.Writer, pver uint32) error {
 	var buf [4]byte
-	binary.LittleEndian.PutUint32(buf[:], msg.Version)
+	binary.LittleEndian.PutUint32(buf[:], uint32(msg.Version))
 	_, err := w.Write(buf[:])
 	if err != nil {
 		return err
@@ -428,7 +428,7 @@ func NewMsgTx() *MsgTx {
 }
 
 // readOutPoint reads the next sequence of bytes from r as an OutPoint.
-func readOutPoint(r io.Reader, pver uint32, version uint32, op *OutPoint) error {
+func readOutPoint(r io.Reader, pver uint32, version int32, op *OutPoint) error {
 	_, err := io.ReadFull(r, op.Hash[:])
 	if err != nil {
 		return err
@@ -445,7 +445,7 @@ func readOutPoint(r io.Reader, pver uint32, version uint32, op *OutPoint) error 
 
 // writeOutPoint encodes op to the bitcoin protocol encoding for an OutPoint
 // to w.
-func writeOutPoint(w io.Writer, pver uint32, version uint32, op *OutPoint) error {
+func writeOutPoint(w io.Writer, pver uint32, version int32, op *OutPoint) error {
 	_, err := w.Write(op.Hash[:])
 	if err != nil {
 		return err
@@ -462,7 +462,7 @@ func writeOutPoint(w io.Writer, pver uint32, version uint32, op *OutPoint) error
 
 // readTxIn reads the next sequence of bytes from r as a transaction input
 // (TxIn).
-func readTxIn(r io.Reader, pver uint32, version uint32, ti *TxIn) error {
+func readTxIn(r io.Reader, pver uint32, version int32, ti *TxIn) error {
 	var op OutPoint
 	err := readOutPoint(r, pver, version, &op)
 	if err != nil {
@@ -488,7 +488,7 @@ func readTxIn(r io.Reader, pver uint32, version uint32, ti *TxIn) error {
 
 // writeTxIn encodes ti to the bitcoin protocol encoding for a transaction
 // input (TxIn) to w.
-func writeTxIn(w io.Writer, pver uint32, version uint32, ti *TxIn) error {
+func writeTxIn(w io.Writer, pver uint32, version int32, ti *TxIn) error {
 	err := writeOutPoint(w, pver, version, &ti.PreviousOutpoint)
 	if err != nil {
 		return err
@@ -511,7 +511,7 @@ func writeTxIn(w io.Writer, pver uint32, version uint32, ti *TxIn) error {
 
 // readTxOut reads the next sequence of bytes from r as a transaction output
 // (TxOut).
-func readTxOut(r io.Reader, pver uint32, version uint32, to *TxOut) error {
+func readTxOut(r io.Reader, pver uint32, version int32, to *TxOut) error {
 	var buf [8]byte
 	_, err := io.ReadFull(r, buf[:])
 	if err != nil {
@@ -530,7 +530,7 @@ func readTxOut(r io.Reader, pver uint32, version uint32, to *TxOut) error {
 
 // writeTxOut encodes to into the bitcoin protocol encoding for a transaction
 // output (TxOut) to w.
-func writeTxOut(w io.Writer, pver uint32, version uint32, to *TxOut) error {
+func writeTxOut(w io.Writer, pver uint32, version int32, to *TxOut) error {
 	var buf [8]byte
 	binary.LittleEndian.PutUint64(buf[:], uint64(to.Value))
 	_, err := w.Write(buf[:])
