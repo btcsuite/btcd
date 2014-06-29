@@ -40,9 +40,9 @@ type BlockHeader struct {
 	Nonce uint32
 }
 
-// blockHashLen is a constant that represents how much of the block header is
-// used when computing the block sha 0:blockHashLen
-const blockHashLen = 80
+// blockHeaderLen is a constant that represents the number of bytes for a block
+// header.
+const blockHeaderLen = 80
 
 // BlockSha computes the block identifier hash for the given block header.
 func (h *BlockHeader) BlockSha() (ShaHash, error) {
@@ -55,7 +55,7 @@ func (h *BlockHeader) BlockSha() (ShaHash, error) {
 	var buf bytes.Buffer
 	var sha ShaHash
 	_ = writeBlockHeader(&buf, 0, h)
-	_ = sha.SetBytes(DoubleSha256(buf.Bytes()[0:blockHashLen]))
+	_ = sha.SetBytes(DoubleSha256(buf.Bytes()[0:blockHeaderLen]))
 
 	// Even though this function can't currently fail, it still returns
 	// a potential error to help future proof the API should a failure
