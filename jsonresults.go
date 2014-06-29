@@ -17,9 +17,9 @@ import (
 type BlockResult struct {
 	Hash          string        `json:"hash"`
 	Confirmations uint64        `json:"confirmations"`
-	Size          int           `json:"size"`
+	Size          int32         `json:"size"`
 	Height        int64         `json:"height"`
-	Version       uint32        `json:"version"`
+	Version       int32         `json:"version"`
 	MerkleRoot    string        `json:"merkleroot"`
 	Tx            []string      `json:"tx,omitempty"`
 	RawTx         []TxRawResult `json:"rawtx,omitempty"`
@@ -40,7 +40,7 @@ type CreateMultiSigResult struct {
 // DecodeScriptResult models the data returned from the decodescript command.
 type DecodeScriptResult struct {
 	Asm       string   `json:"asm"`
-	ReqSigs   int      `json:"reqSigs,omitempty"`
+	ReqSigs   int32    `json:"reqSigs,omitempty"`
 	Type      string   `json:"type"`
 	Addresses []string `json:"addresses,omitempty"`
 	P2sh      string   `json:"p2sh"`
@@ -99,7 +99,7 @@ type GetBlockTemplateResult struct {
 	SigOpLimit    int64                      `json:"sigoplimit,omitempty"`
 	SizeLimit     int64                      `json:"sizelimit,omitempty"`
 	Transactions  []GetBlockTemplateResultTx `json:"transactions"`
-	Version       uint32                     `json:"version"`
+	Version       int32                      `json:"version"`
 	CoinbaseAux   *GetBlockTemplateResultAux `json:"coinbaseaux,omitempty"`
 	CoinbaseTxn   *GetBlockTemplateResultTx  `json:"coinbasetxn,omitempty"`
 	CoinbaseValue *int64                     `json:"coinbasevalue,omitempty"`
@@ -126,10 +126,10 @@ type GetBlockTemplateResult struct {
 
 // GetNetworkInfoResult models the data returned from the getnetworkinfo command.
 type GetNetworkInfoResult struct {
-	Version         uint32                 `json:"version"`
-	ProtocolVersion uint32                 `json:"protocolversion"`
+	Version         int32                  `json:"version"`
+	ProtocolVersion int32                  `json:"protocolversion"`
 	TimeOffset      int64                  `json:"timeoffset"`
-	Connections     int                    `json:"connections"`
+	Connections     int32                  `json:"connections"`
 	Proxy           string                 `json:"proxy,omitempty"`
 	RelayFee        float64                `json:"relayfee"`
 	LocalAddresses  []LocalAddressesResult `json:"localaddresses"`
@@ -151,13 +151,13 @@ type GetPeerInfoResult struct {
 	SubVer         string  `json:"subver"`
 	Inbound        bool    `json:"inbound"`
 	StartingHeight int32   `json:"startingheight"`
-	BanScore       int     `json:"banscore,omitempty"`
+	BanScore       int32   `json:"banscore,omitempty"`
 	SyncNode       bool    `json:"syncnode"`
 }
 
 // GetRawMempoolResult models the data returned from the getrawmempool command.
 type GetRawMempoolResult struct {
-	Size             int      `json:"size"`
+	Size             int32    `json:"size"`
 	Fee              float64  `json:"fee"`
 	Time             int64    `json:"time"`
 	Height           int64    `json:"height"`
@@ -256,7 +256,7 @@ type Vout struct {
 	ScriptPubKey struct {
 		Asm       string   `json:"asm"`
 		Hex       string   `json:"hex"`
-		ReqSigs   int      `json:"reqSigs,omitempty"`
+		ReqSigs   int32    `json:"reqSigs,omitempty"`
 		Type      string   `json:"type"`
 		Addresses []string `json:"addresses,omitempty"`
 	} `json:"scriptPubKey"`
@@ -270,7 +270,7 @@ type GetMiningInfoResult struct {
 	Difficulty       float64 `json:"difficulty"`
 	Errors           string  `json:"errors"`
 	Generate         bool    `json:"generate"`
-	GenProcLimit     int     `json:"genproclimit"`
+	GenProcLimit     int32   `json:"genproclimit"`
 	HashesPerSec     int64   `json:"hashespersec"`
 	NetworkHashPS    int64   `json:"networkhashps"`
 	PooledTx         uint64  `json:"pooledtx"`
@@ -287,18 +287,18 @@ type GetWorkResult struct {
 
 // InfoResult contains the data returned by the getinfo command.
 type InfoResult struct {
-	Version         int     `json:"version"`
-	ProtocolVersion int     `json:"protocolversion"`
-	WalletVersion   int     `json:"walletversion,omitempty"`
+	Version         int32   `json:"version"`
+	ProtocolVersion int32   `json:"protocolversion"`
+	WalletVersion   int32   `json:"walletversion,omitempty"`
 	Balance         float64 `json:"balance,omitempty"`
-	Blocks          int     `json:"blocks"`
+	Blocks          int32   `json:"blocks"`
 	TimeOffset      int64   `json:"timeoffset"`
-	Connections     int     `json:"connections"`
+	Connections     int32   `json:"connections"`
 	Proxy           string  `json:"proxy"`
 	Difficulty      float64 `json:"difficulty"`
 	TestNet         bool    `json:"testnet"`
 	KeypoolOldest   int64   `json:"keypoololdest,omitempty"`
-	KeypoolSize     int     `json:"keypoolsize,omitempty"`
+	KeypoolSize     int32   `json:"keypoolsize,omitempty"`
 	UnlockedUntil   int64   `json:"unlocked_until,omitempty"`
 	PaytxFee        float64 `json:"paytxfee,omitempty"`
 	RelayFee        float64 `json:"relayfee"`
@@ -329,7 +329,7 @@ type ListTransactionsResult struct {
 type LocalAddressesResult struct {
 	Address string `json:"address"`
 	Port    uint16 `json:"port"`
-	Score   int    `json:"score"`
+	Score   int32  `json:"score"`
 }
 
 // ListReceivedByAccountResult models the data from the listreceivedbyaccount
@@ -378,7 +378,7 @@ type SignRawTransactionResult struct {
 type TxRawResult struct {
 	Hex           string `json:"hex"`
 	Txid          string `json:"txid"`
-	Version       uint32 `json:"version"`
+	Version       int32  `json:"version"`
 	LockTime      uint32 `json:"locktime"`
 	Vin           []Vin  `json:"vin"`
 	Vout          []Vout `json:"vout"`
@@ -391,7 +391,7 @@ type TxRawResult struct {
 // TxRawDecodeResult models the data from the decoderawtransaction command.
 type TxRawDecodeResult struct {
 	Txid     string `json:"txid"`
-	Version  uint32 `json:"version"`
+	Version  int32  `json:"version"`
 	Locktime uint32 `json:"locktime"`
 	Vin      []Vin  `json:"vin"`
 	Vout     []Vout `json:"vout"`
@@ -409,7 +409,7 @@ type ValidateAddressResult struct {
 	Addresses    []string `json:"addresses,omitempty"`
 	Hex          string   `json:"hex,omitempty"`
 	Script       string   `json:"script,omitempty"`
-	SigsRequired int      `json:"sigsrequired,omitempty"`
+	SigsRequired int32    `json:"sigsrequired,omitempty"`
 }
 
 // ReadResultCmd unmarshalls the json reply with data struct for specific
