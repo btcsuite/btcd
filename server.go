@@ -317,7 +317,7 @@ func (s *server) handleBroadcastMsg(state *peerState, bmsg *broadcastMsg) {
 }
 
 type getConnCountMsg struct {
-	reply chan int
+	reply chan int32
 }
 
 type getPeerInfoMsg struct {
@@ -344,7 +344,7 @@ type getAddedNodesMsg struct {
 func (s *server) handleQuery(querymsg interface{}, state *peerState) {
 	switch msg := querymsg.(type) {
 	case getConnCountMsg:
-		nconnected := 0
+		nconnected := int32(0)
 		state.forAllPeers(func(p *peer) {
 			if p.Connected() {
 				nconnected++
@@ -694,8 +694,8 @@ func (s *server) BroadcastMessage(msg btcwire.Message, exclPeers ...*peer) {
 }
 
 // ConnectedCount returns the number of currently connected peers.
-func (s *server) ConnectedCount() int {
-	replyChan := make(chan int)
+func (s *server) ConnectedCount() int32 {
+	replyChan := make(chan int32)
 
 	s.query <- getConnCountMsg{reply: replyChan}
 

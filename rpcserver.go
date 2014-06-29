@@ -828,7 +828,7 @@ func createVoutList(mtx *btcwire.MsgTx, net *btcnet.Params) ([]btcjson.Vout, err
 		// it anyways.
 		scriptClass, addrs, reqSigs, _ := btcscript.ExtractPkScriptAddrs(v.PkScript, net)
 		voutList[i].ScriptPubKey.Type = scriptClass.String()
-		voutList[i].ScriptPubKey.ReqSigs = reqSigs
+		voutList[i].ScriptPubKey.ReqSigs = int32(reqSigs)
 
 		if addrs == nil {
 			voutList[i].ScriptPubKey.Addresses = nil
@@ -973,7 +973,7 @@ func handleDecodeScript(s *rpcServer, cmd btcjson.Cmd, closeChan <-chan struct{}
 	// Generate and return the reply.
 	reply := btcjson.DecodeScriptResult{
 		Asm:       disbuf,
-		ReqSigs:   reqSigs,
+		ReqSigs:   int32(reqSigs),
 		Type:      scriptClass.String(),
 		Addresses: addresses,
 		P2sh:      p2sh.EncodeAddress(),
@@ -1142,7 +1142,7 @@ func handleGetBlock(s *rpcServer, cmd btcjson.Cmd, closeChan <-chan struct{}) (i
 		Time:          blockHeader.Timestamp.Unix(),
 		Confirmations: uint64(1 + maxidx - idx),
 		Height:        idx,
-		Size:          len(buf),
+		Size:          int32(len(buf)),
 		Bits:          strconv.FormatInt(int64(blockHeader.Bits), 16),
 		Difficulty:    getDifficultyRatio(blockHeader.Bits),
 	}
@@ -1262,9 +1262,9 @@ func handleGetInfo(s *rpcServer, cmd btcjson.Cmd, closeChan <-chan struct{}) (in
 	}
 
 	ret := &btcjson.InfoResult{
-		Version:         int(1000000*appMajor + 10000*appMinor + 100*appPatch),
-		ProtocolVersion: int(maxProtocolVersion),
-		Blocks:          int(height),
+		Version:         int32(1000000*appMajor + 10000*appMinor + 100*appPatch),
+		ProtocolVersion: int32(maxProtocolVersion),
+		Blocks:          int32(height),
 		TimeOffset:      0,
 		Connections:     s.server.ConnectedCount(),
 		Proxy:           cfg.Proxy,
@@ -1327,7 +1327,7 @@ func handleGetMiningInfo(s *rpcServer, cmd btcjson.Cmd, closeChan <-chan struct{
 		CurrentBlockTx:   uint64(len(block.MsgBlock().Transactions)),
 		Difficulty:       getDifficultyRatio(block.MsgBlock().Header.Bits),
 		Generate:         s.server.cpuMiner.IsMining(),
-		GenProcLimit:     int(s.server.cpuMiner.NumWorkers()),
+		GenProcLimit:     s.server.cpuMiner.NumWorkers(),
 		HashesPerSec:     int64(s.server.cpuMiner.HashesPerSecond()),
 		NetworkHashPS:    networkHashesPerSec,
 		PooledTx:         uint64(s.server.txMemPool.Count()),
@@ -1449,7 +1449,7 @@ func handleGetRawMempool(s *rpcServer, cmd btcjson.Cmd, closeChan <-chan struct{
 		result := make(map[string]*btcjson.GetRawMempoolResult, len(descs))
 		for _, desc := range descs {
 			mpd := &btcjson.GetRawMempoolResult{
-				Size: desc.Tx.MsgTx().SerializeSize(),
+				Size: int32(desc.Tx.MsgTx().SerializeSize()),
 				Fee: float64(desc.Fee) /
 					float64(btcutil.SatoshiPerBitcoin),
 				Time:             desc.Added.Unix(),
