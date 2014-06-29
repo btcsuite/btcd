@@ -16,8 +16,11 @@ import (
 //
 // The flags modify the behavior of this function as follows:
 //  - BFFastAdd: The somewhat expensive BIP0034 validation is not performed.
+//  - BFDryRun: The memory chain index will not be pruned and no accept
+//    notification will be sent since the block is not being accepted.
 func (b *BlockChain) maybeAcceptBlock(block *btcutil.Block, flags BehaviorFlags) error {
 	fastAdd := flags&BFFastAdd == BFFastAdd
+	dryRun := flags&BFDryRun == BFDryRun
 
 	// Get a block node for the block previous to this one.  Will be nil
 	// if this is the genesis block.
@@ -105,7 +108,7 @@ func (b *BlockChain) maybeAcceptBlock(block *btcutil.Block, flags BehaviorFlags)
 	if !fastAdd {
 		// Reject version 1 blocks once a majority of the network has
 		// upgraded.  This is part of BIP0034.
-		if blockHeader.Version == 1 {
+		if blockHeader.Version < 2 {
 			if b.isMajorityVersion(2, prevNode,
 				b.netParams.BlockV1RejectNumRequired,
 				b.netParams.BlockV1RejectNumToCheck) {
@@ -143,9 +146,11 @@ func (b *BlockChain) maybeAcceptBlock(block *btcutil.Block, flags BehaviorFlags)
 
 	// Prune block nodes which are no longer needed before creating
 	// a new node.
-	err = b.pruneBlockNodes()
-	if err != nil {
-		return err
+	if !dryRun {
+		err = b.pruneBlockNodes()
+		if err != nil {
+			return err
+		}
 	}
 
 	// Create a new block node for the block and add it to the in-memory
@@ -168,7 +173,9 @@ func (b *BlockChain) maybeAcceptBlock(block *btcutil.Block, flags BehaviorFlags)
 	// Notify the caller that the new block was accepted into the block
 	// chain.  The caller would typically want to react by relaying the
 	// inventory to other peers.
-	b.sendNotification(NTBlockAccepted, block)
+	if !dryRun {
+		b.sendNotification(NTBlockAccepted, block)
+	}
 
 	return nil
 }

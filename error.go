@@ -17,6 +17,10 @@ const (
 	// exists.
 	ErrDuplicateBlock ErrorCode = iota
 
+	// ErrBlockTooBig indicates the serialized block size exceeds the
+	// maximum allowed size.
+	ErrBlockTooBig
+
 	// ErrBlockVersionTooOld indicates the block version is too old and is
 	// no longer accepted since the majority of the network has upgraded
 	// to a newer version.
@@ -67,6 +71,10 @@ const (
 	// transaction.
 	ErrNoTransactions
 
+	// ErrTooManyTransactions indicates the block has more transactions than
+	// are allowed.
+	ErrTooManyTransactions
+
 	// ErrNoTxInputs indicates a transaction does not have any inputs.  A
 	// valid transaction must have at least one input.
 	ErrNoTxInputs
@@ -74,6 +82,10 @@ const (
 	// ErrNoTxOutputs indicates a transaction does not have any outputs.  A
 	// valid transaction must have at least one output.
 	ErrNoTxOutputs
+
+	// ErrTxTooBig indicates a transaction exceeds the maximum allowed size
+	// when serialized.
+	ErrTxTooBig
 
 	// ErrBadTxOutValue indicates an output value for a transaction is
 	// invalid in some way such as being out of range.
@@ -167,6 +179,7 @@ const (
 // Map of ErrorCode values back to their constant names for pretty printing.
 var errorCodeStrings = map[ErrorCode]string{
 	ErrDuplicateBlock:        "ErrDuplicateBlock",
+	ErrBlockTooBig:           "ErrBlockTooBig",
 	ErrBlockVersionTooOld:    "ErrBlockVersionTooOld",
 	ErrInvalidTime:           "ErrInvalidTime",
 	ErrTimeTooOld:            "ErrTimeTooOld",
@@ -178,8 +191,10 @@ var errorCodeStrings = map[ErrorCode]string{
 	ErrBadCheckpoint:         "ErrBadCheckpoint",
 	ErrForkTooOld:            "ErrForkTooOld",
 	ErrNoTransactions:        "ErrNoTransactions",
+	ErrTooManyTransactions:   "ErrTooManyTransactions",
 	ErrNoTxInputs:            "ErrNoTxInputs",
 	ErrNoTxOutputs:           "ErrNoTxOutputs",
+	ErrTxTooBig:              "ErrTxTooBig",
 	ErrBadTxOutValue:         "ErrBadTxOutValue",
 	ErrDuplicateTxInputs:     "ErrDuplicateTxInputs",
 	ErrBadTxInput:            "ErrBadTxInput",

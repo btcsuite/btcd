@@ -69,7 +69,7 @@ type blockNode struct {
 	inMainChain bool
 
 	// Some fields from block headers to aid in best chain selection.
-	version   uint32
+	version   int32
 	bits      uint32
 	timestamp time.Time
 }
@@ -605,7 +605,7 @@ func (b *BlockChain) pruneBlockNodes() error {
 
 // isMajorityVersion determines if a previous number of blocks in the chain
 // starting with startNode are at least the minimum passed version.
-func (b *BlockChain) isMajorityVersion(minVer uint32, startNode *blockNode, numRequired, numToCheck uint64) bool {
+func (b *BlockChain) isMajorityVersion(minVer int32, startNode *blockNode, numRequired, numToCheck uint64) bool {
 	numFound := uint64(0)
 	iterNode := startNode
 	for i := uint64(0); i < numToCheck && iterNode != nil; i++ {
@@ -811,7 +811,11 @@ func (b *BlockChain) disconnectBlock(node *blockNode, block *btcutil.Block) erro
 // disconnected must be in reverse order (think of popping them off
 // the end of the chain) and nodes the are being attached must be in forwards
 // order (think pushing them onto the end of the chain).
-func (b *BlockChain) reorganizeChain(detachNodes, attachNodes *list.List) error {
+//
+// The flags modify the behavior of this function as follows:
+//  - BFDryRun: Only the checks which ensure the reorganize can be completed
+//    successfully are performed.  The chain is not reorganized.
+func (b *BlockChain) reorganizeChain(detachNodes, attachNodes *list.List, flags BehaviorFlags) error {
 	// Ensure all of the needed side chain blocks are in the cache.
 	for e := attachNodes.Front(); e != nil; e = e.Next() {
 		n := e.Value.(*blockNode)
@@ -840,6 +844,12 @@ func (b *BlockChain) reorganizeChain(detachNodes, attachNodes *list.List) error 
 		if err != nil {
 			return err
 		}
+	}
+
+	// Skip disconnecting and connecting the blocks when running with the
+	// dry run flag set.
+	if flags&BFDryRun == BFDryRun {
+		return nil
 	}
 
 	// Disconnect blocks from the main chain.
@@ -892,8 +902,12 @@ func (b *BlockChain) reorganizeChain(detachNodes, attachNodes *list.List) error 
 // The flags modify the behavior of this function as follows:
 //  - BFFastAdd: Avoids the call to checkConnectBlock which does several
 //    expensive transaction validation operations.
+//  - BFDryRun: Prevents the block from being connected and avoids modifying the
+//    state of the memory chain index.  Also, any log messages related to
+//    modifying the state are avoided.
 func (b *BlockChain) connectBestChain(node *blockNode, block *btcutil.Block, flags BehaviorFlags) error {
 	fastAdd := flags&BFFastAdd == BFFastAdd
+	dryRun := flags&BFDryRun == BFDryRun
 
 	// We haven't selected a best chain yet or we are extending the main
 	// (best) chain with a new block.  This is the most common case.
@@ -908,6 +922,11 @@ func (b *BlockChain) connectBestChain(node *blockNode, block *btcutil.Block, fla
 			if err != nil {
 				return err
 			}
+		}
+
+		// Don't connect the block if performing a dry run.
+		if dryRun {
+			return nil
 		}
 
 		// Connect the block to the main chain.
@@ -932,7 +951,9 @@ func (b *BlockChain) connectBestChain(node *blockNode, block *btcutil.Block, fla
 	// become the main chain, but in either case we need the block stored
 	// for future processing, so add the block to the side chain holding
 	// cache.
-	log.Debugf("Adding block %v to side chain cache", node.hash)
+	if !dryRun {
+		log.Debugf("Adding block %v to side chain cache", node.hash)
+	}
 	b.blockCache[*node.hash] = block
 	b.index[*node.hash] = node
 
@@ -940,9 +961,27 @@ func (b *BlockChain) connectBestChain(node *blockNode, block *btcutil.Block, fla
 	node.inMainChain = false
 	node.parent.children = append(node.parent.children, node)
 
+	// Remove the block from the side chain cache and disconnect it from the
+	// parent node when the function returns when running in dry run mode.
+	if dryRun {
+		defer func() {
+			children := node.parent.children
+			children = removeChildNode(children, node)
+			node.parent.children = children
+
+			delete(b.index, *node.hash)
+			delete(b.blockCache, *node.hash)
+		}()
+	}
+
 	// We're extending (or creating) a side chain, but the cumulative
 	// work for this new side chain is not enough to make it the new chain.
 	if node.workSum.Cmp(b.bestChain.workSum) <= 0 {
+		// Skip Logging info when the dry run flag is set.
+		if dryRun {
+			return nil
+		}
+
 		// Find the fork point.
 		fork := node
 		for ; fork.parent != nil; fork = fork.parent {
@@ -975,8 +1014,11 @@ func (b *BlockChain) connectBestChain(node *blockNode, block *btcutil.Block, fla
 	detachNodes, attachNodes := b.getReorganizeNodes(node)
 
 	// Reorganize the chain.
-	log.Infof("REORGANIZE: Block %v is causing a reorganize.", node.hash)
-	err := b.reorganizeChain(detachNodes, attachNodes)
+	if !dryRun {
+		log.Infof("REORGANIZE: Block %v is causing a reorganize.",
+			node.hash)
+	}
+	err := b.reorganizeChain(detachNodes, attachNodes, flags)
 	if err != nil {
 		return err
 	}

@@ -49,6 +49,9 @@ func connectTransactions(txStore TxStore, block *btcutil.Block) error {
 			originHash := &txIn.PreviousOutpoint.Hash
 			originIndex := txIn.PreviousOutpoint.Index
 			if originTx, exists := txStore[*originHash]; exists {
+				if originIndex > uint32(len(originTx.Spent)) {
+					continue
+				}
 				originTx.Spent[originIndex] = true
 			}
 		}
@@ -82,6 +85,9 @@ func disconnectTransactions(txStore TxStore, block *btcutil.Block) error {
 			originIndex := txIn.PreviousOutpoint.Index
 			originTx, exists := txStore[*originHash]
 			if exists && originTx.Tx != nil && originTx.Err == nil {
+				if originIndex > uint32(len(originTx.Spent)) {
+					continue
+				}
 				originTx.Spent[originIndex] = false
 			}
 		}

@@ -16,6 +16,7 @@ func TestErrorCodeStringer(t *testing.T) {
 		want string
 	}{
 		{btcchain.ErrDuplicateBlock, "ErrDuplicateBlock"},
+		{btcchain.ErrBlockTooBig, "ErrBlockTooBig"},
 		{btcchain.ErrBlockVersionTooOld, "ErrBlockVersionTooOld"},
 		{btcchain.ErrInvalidTime, "ErrInvalidTime"},
 		{btcchain.ErrTimeTooOld, "ErrTimeTooOld"},
@@ -27,8 +28,10 @@ func TestErrorCodeStringer(t *testing.T) {
 		{btcchain.ErrBadCheckpoint, "ErrBadCheckpoint"},
 		{btcchain.ErrForkTooOld, "ErrForkTooOld"},
 		{btcchain.ErrNoTransactions, "ErrNoTransactions"},
+		{btcchain.ErrTooManyTransactions, "ErrTooManyTransactions"},
 		{btcchain.ErrNoTxInputs, "ErrNoTxInputs"},
 		{btcchain.ErrNoTxOutputs, "ErrNoTxOutputs"},
+		{btcchain.ErrTxTooBig, "ErrTxTooBig"},
 		{btcchain.ErrBadTxOutValue, "ErrBadTxOutValue"},
 		{btcchain.ErrDuplicateTxInputs, "ErrDuplicateTxInputs"},
 		{btcchain.ErrBadTxInput, "ErrBadTxInput"},

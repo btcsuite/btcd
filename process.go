@@ -26,6 +26,11 @@ const (
 	// not be performed.
 	BFNoPoWCheck
 
+	// BFDryRun may be set to indicate the block should not modify the chain
+	// or memory chain index.  This is useful to test that a block is valid
+	// without modifying the current state.
+	BFDryRun
+
 	// BFNone is a convenience value to specifically indicate no flags.
 	BFNone BehaviorFlags = 0
 )
@@ -110,6 +115,7 @@ func (b *BlockChain) processOrphans(hash *btcwire.ShaHash, flags BehaviorFlags) 
 // when the error is nil.
 func (b *BlockChain) ProcessBlock(block *btcutil.Block, flags BehaviorFlags) (bool, error) {
 	fastAdd := flags&BFFastAdd == BFFastAdd
+	dryRun := flags&BFDryRun == BFDryRun
 
 	blockHash, err := block.Sha()
 	if err != nil {
@@ -179,9 +185,11 @@ func (b *BlockChain) ProcessBlock(block *btcutil.Block, flags BehaviorFlags) (bo
 	// Handle orphan blocks.
 	prevHash := &blockHeader.PrevBlock
 	if !prevHash.IsEqual(zeroHash) && !b.blockExists(prevHash) {
-		log.Infof("Adding orphan block %v with parent %v", blockHash,
-			prevHash)
-		b.addOrphanBlock(block)
+		if !dryRun {
+			log.Infof("Adding orphan block %v with parent %v",
+				blockHash, prevHash)
+			b.addOrphanBlock(block)
+		}
 
 		return true, nil
 	}
@@ -193,14 +201,18 @@ func (b *BlockChain) ProcessBlock(block *btcutil.Block, flags BehaviorFlags) (bo
 		return false, err
 	}
 
-	// Accept any orphan blocks that depend on this block (they are no
-	// longer orphans) and repeat for those accepted blocks until there are
-	// no more.
-	err = b.processOrphans(blockHash, flags)
-	if err != nil {
-		return false, err
+	// Don't process any orphans or log when the dry run flag is set.
+	if !dryRun {
+		// Accept any orphan blocks that depend on this block (they are
+		// no longer orphans) and repeat for those accepted blocks until
+		// there are no more.
+		err := b.processOrphans(blockHash, flags)
+		if err != nil {
+			return false, err
+		}
+
+		log.Debugf("Accepted block %v", blockHash)
 	}
 
-	log.Debugf("Accepted block %v", blockHash)
 	return false, nil
 }

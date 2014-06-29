@@ -189,10 +189,14 @@ func CheckTransactionSanity(tx *btcutil.Tx) error {
 		return ruleError(ErrNoTxOutputs, "transaction has no outputs")
 	}
 
-	// NOTE: bitcoind does size limits checking here, but the size limits
-	// have already been checked by btcwire for incoming transactions.
-	// Also, btcwire checks the size limits on send too, so there is no need
-	// to double check it here.
+	// A transaction must not exceed the maximum allowed block payload when
+	// serialized.
+	serializedTxSize := tx.MsgTx().SerializeSize()
+	if serializedTxSize > btcwire.MaxBlockPayload {
+		str := fmt.Sprintf("serialized transaction is too big - got "+
+			"%d, max %d", serializedTxSize, btcwire.MaxBlockPayload)
+		return ruleError(ErrTxTooBig, str)
+	}
 
 	// Ensure the transaction amounts are in range.  Each transaction
 	// output must not be negative or more than the max allowed per
@@ -414,10 +418,29 @@ func CountP2SHSigOps(tx *btcutil.Tx, isCoinBaseTx bool, txStore TxStore) (int, e
 // The flags do not modify the behavior of this function directly, however they
 // are needed to pass along to checkProofOfWork.
 func checkBlockSanity(block *btcutil.Block, powLimit *big.Int, flags BehaviorFlags) error {
-	// NOTE: bitcoind does size limits checking here, but the size limits
-	// have already been checked by btcwire for incoming blocks.  Also,
-	// btcwire checks the size limits on send too, so there is no need
-	// to double check it here.
+	// A block must have at least one transaction.
+	msgBlock := block.MsgBlock()
+	numTx := len(msgBlock.Transactions)
+	if numTx == 0 {
+		return ruleError(ErrNoTransactions, "block does not contain "+
+			"any transactions")
+	}
+
+	// A block must not have more transactions than the max block payload.
+	if numTx > btcwire.MaxBlockPayload {
+		str := fmt.Sprintf("block contains too many transactions - "+
+			"got %d, max %d", numTx, btcwire.MaxBlockPayload)
+		return ruleError(ErrTooManyTransactions, str)
+	}
+
+	// A block must not exceed the maximum allowed block payload when
+	// serialized.
+	serializedSize := msgBlock.SerializeSize()
+	if serializedSize > btcwire.MaxBlockPayload {
+		str := fmt.Sprintf("serialized block is too big - got %d, "+
+			"max %d", serializedSize, btcwire.MaxBlockPayload)
+		return ruleError(ErrBlockTooBig, str)
+	}
 
 	// Ensure the proof of work bits in the block header is in min/max range
 	// and the block hash is less than the target value described by the
@@ -446,14 +469,8 @@ func checkBlockSanity(block *btcutil.Block, powLimit *big.Int, flags BehaviorFla
 		return ruleError(ErrTimeTooNew, str)
 	}
 
-	// A block must have at least one transaction.
-	transactions := block.Transactions()
-	if len(transactions) == 0 {
-		return ruleError(ErrNoTransactions, "block does not contain "+
-			"any transactions")
-	}
-
 	// The first transaction in a block must be a coinbase.
+	transactions := block.Transactions()
 	if !IsCoinBase(transactions[0]) {
 		return ruleError(ErrFirstTxNotCoinbase, "first transaction in "+
 			"block is not a coinbase")
