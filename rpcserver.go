@@ -1292,12 +1292,12 @@ func decodeTemplateID(templateID string) (*btcwire.ShaHash, int64, error) {
 	if err != nil {
 		return nil, 0, errors.New("invalid longpollid format")
 	}
-	lastGenerated, err := strconv.Atoi(fields[1])
+	lastGenerated, err := strconv.ParseInt(fields[1], 10, 64)
 	if err != nil {
 		return nil, 0, errors.New("invalid longpollid format")
 	}
 
-	return prevHash, int64(lastGenerated), nil
+	return prevHash, lastGenerated, nil
 }
 
 // notifyLongPollers notifies any channels that have been registered to be
@@ -1465,7 +1465,7 @@ func (state *gbtWorkState) updateBlockTemplate(s *rpcServer, useCoinbaseValue bo
 		if err != nil {
 			errStr := fmt.Sprintf("Failed to create new block "+
 				"template: %v", err)
-			rpcsLog.Errorf(errStr)
+			rpcsLog.Error(errStr)
 			return btcjson.Error{
 				Code:    btcjson.ErrInternal.Code,
 				Message: errStr,
@@ -1677,7 +1677,7 @@ func (state *gbtWorkState) blockTemplateResult(useCoinbaseValue bool, submitOld 
 				Code: btcjson.ErrInternal.Code,
 				Message: "A coinbase transaction has been " +
 					"requested, but the server has not " +
-					"been configured with a payment " +
+					"been configured with any payment " +
 					"addresses via --miningaddr",
 			}
 		}
@@ -1838,7 +1838,7 @@ func handleGetBlockTemplateRequest(s *rpcServer, request *btcjson.TemplateReques
 			Code: btcjson.ErrInternal.Code,
 			Message: "A coinbase transaction has been requested, " +
 				"but the server has not been configured with " +
-				"a payment addresses via --miningaddr",
+				"any payment addresses via --miningaddr",
 		}
 	}
 
@@ -2477,7 +2477,7 @@ func handleGetWorkRequest(s *rpcServer) (interface{}, error) {
 		if err != nil {
 			errStr := fmt.Sprintf("Failed to create new block "+
 				"template: %v", err)
-			rpcsLog.Errorf(errStr)
+			rpcsLog.Error(errStr)
 			return nil, btcjson.Error{
 				Code:    btcjson.ErrInternal.Code,
 				Message: errStr,
