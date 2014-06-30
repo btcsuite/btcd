@@ -29,6 +29,11 @@ const (
 	// the lock time is a uint32, the max is sometime around 2106.
 	lockTimeThreshold uint32 = 5e8 // Tue Nov 5 00:53:20 1985 UTC
 
+	// MaxTimeOffsetSeconds is the maximum number of seconds a block time
+	// is allowed to be ahead of the current time.  This is currently 2
+	// hours.
+	MaxTimeOffsetSeconds = 2 * 60 * 60
+
 	// MinCoinbaseScriptLen is the minimum length a coinbase script can be.
 	MinCoinbaseScriptLen = 2
 
@@ -462,8 +467,9 @@ func checkBlockSanity(block *btcutil.Block, powLimit *big.Int, flags BehaviorFla
 		return ruleError(ErrInvalidTime, str)
 	}
 
-	// Ensure the block time is not more than 2 hours in the future.
-	if header.Timestamp.After(time.Now().Add(time.Hour * 2)) {
+	// Ensure the block time is not too far in the future.
+	maxTimestamp := time.Now().Add(time.Second * MaxTimeOffsetSeconds)
+	if header.Timestamp.After(maxTimestamp) {
 		str := fmt.Sprintf("block timestamp of %v is too far in the "+
 			"future", header.Timestamp)
 		return ruleError(ErrTimeTooNew, str)
