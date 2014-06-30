@@ -1596,6 +1596,7 @@ func (state *gbtWorkState) blockTemplateResult(useCoinbaseValue bool, submitOld 
 
 	// Generate the block template reply.
 	header := &msgBlock.Header
+	targetDifficulty := fmt.Sprintf("%064x", btcchain.CompactToBig(header.Bits))
 	templateID := encodeTemplateID(state.prevHash, state.lastGenerated)
 	reply := btcjson.GetBlockTemplateResult{
 		Bits:         strconv.FormatInt(int64(header.Bits), 16),
@@ -1609,6 +1610,7 @@ func (state *gbtWorkState) blockTemplateResult(useCoinbaseValue bool, submitOld 
 		LongPollID:   templateID,
 		SubmitOld:    submitOld,
 		MinTime:      state.minTimestamp.Unix(),
+		Target:       targetDifficulty,
 	}
 	if useCoinbaseValue {
 		reply.CoinbaseAux = gbtCoinbaseAux
