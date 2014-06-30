@@ -364,6 +364,60 @@ func (c *Client) ListSinceBlockMinConf(blockHash *btcwire.ShaHash, minConfirms i
 // Transaction Send Functions
 // **************************
 
+// FutureLockUnspentResult is a future promise to deliver the error result of a
+// LockUnspentAsync RPC invocation.
+type FutureLockUnspentResult chan *response
+
+// Receive waits for the response promised by the future and returns the result
+// of locking or unlocking the unspent output(s).
+func (r FutureLockUnspentResult) Receive() error {
+	_, err := receiveFuture(r)
+	return err
+}
+
+// LockUnspentAsync returns an instance of a type that can be used to get the
+// result of the RPC at some future time by invoking the Receive function on the
+// returned instance.
+//
+// See LockUnspent for the blocking version and more details.
+func (c *Client) LockUnspentAsync(unlock bool, ops []*btcwire.OutPoint) FutureLockUnspentResult {
+	id := c.NextID()
+	outputs := make([]btcjson.TransactionInput, len(ops))
+	for i, op := range ops {
+		outputs[i] = btcjson.TransactionInput{
+			Txid: op.Hash.String(),
+			Vout: op.Index,
+		}
+	}
+	cmd, err := btcjson.NewLockUnspentCmd(id, unlock, outputs)
+	if err != nil {
+		return newFutureError(err)
+	}
+
+	return c.sendCmd(cmd)
+}
+
+// LockUnspent marks outputs as locked or unlocked, depending on the value of
+// the unlock bool.  When locked, the unspent output will not be selected as
+// input for newly created, non-raw transactions, and will not be returned in
+// future ListUnspent results, until the output is marked unlocked again.
+//
+// If unlock is false, each outpoint in ops will be marked locked.  If unlocked
+// is true and specific outputs are specified in ops (len != 0), exactly those
+// outputs will be marked unlocked.  If unlocked is true and no outpoints are
+// specified, all previous locked outputs are marked unlocked.
+//
+// The locked or unlocked state of outputs are not written to disk and after
+// restarting a wallet process, this data will be reset (every output unlocked).
+//
+// NOTE: While this method would be a bit more readable if the unlock bool was
+// reversed (that is, LockUnspent(true, ...) locked the outputs), it has been
+// left as unlock to keep compatibility with the reference client API and to
+// avoid confusion for those who are already familiar with the lockunspent RPC.
+func (c *Client) LockUnspent(unlock bool, ops []*btcwire.OutPoint) error {
+	return c.LockUnspentAsync(unlock, ops).Receive()
+}
+
 // FutureSetTxFeeResult is a future promise to deliver the result of a
 // SetTxFeeAsync RPC invocation (or an applicable error).
 type FutureSetTxFeeResult chan *response
@@ -2081,7 +2135,6 @@ func (c *Client) GetInfo() (*btcjson.InfoResult, error) {
 // listlockunspent (NYI in btcwallet)
 // listreceivedbyaddress (NYI in btcwallet)
 // listreceivedbyaccount (NYI in btcwallet)
-// lockunspent (NYI in btcwallet)
 // move (NYI in btcwallet)
 
 // DUMP
