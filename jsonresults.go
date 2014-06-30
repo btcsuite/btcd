@@ -115,6 +115,7 @@ type GetBlockTemplateResult struct {
 	Expires int64  `json:"expires,omitempty"`
 
 	// Mutations from BIP 0023.
+	MaxTime    int64    `json:"maxtime,omitempty"`
 	MinTime    int64    `json:"mintime,omitempty"`
 	Mutable    []string `json:"mutable,omitempty"`
 	NonceRange string   `json:"noncerange,omitempty"`
