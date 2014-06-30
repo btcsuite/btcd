@@ -155,10 +155,6 @@ var rpcHandlersBeforeInit = map[string]commandHandler{
 	"verifychain":          handleVerifyChain,
 }
 
-func init() {
-	rpcHandlers = rpcHandlersBeforeInit
-}
-
 // list of commands that we recognise, but for which btcd has no support because
 // it lacks support for wallet functionality. For these commands the user
 // should ask a connected instance of btcwallet.
@@ -1457,7 +1453,6 @@ func (state *gbtWorkState) updateBlockTemplate(s *rpcServer, useCoinbaseValue bo
 		// to create their own coinbase.
 		var payAddr btcutil.Address
 		if !useCoinbaseValue {
-			rand.Seed(time.Now().UnixNano())
 			payAddr = cfg.miningAddrs[rand.Intn(len(cfg.miningAddrs))]
 		}
 
@@ -1524,7 +1519,6 @@ func (state *gbtWorkState) updateBlockTemplate(s *rpcServer, useCoinbaseValue bo
 		// returned if none have been specified.
 		if !useCoinbaseValue && !template.validPayAddress {
 			// Choose a payment address at random.
-			rand.Seed(time.Now().UnixNano())
 			payToAddr := cfg.miningAddrs[rand.Intn(len(cfg.miningAddrs))]
 
 			// Update the block coinbase output of the template to
@@ -2477,7 +2471,6 @@ func handleGetWorkRequest(s *rpcServer) (interface{}, error) {
 		state.prevHash = nil
 
 		// Choose a payment address at random.
-		rand.Seed(time.Now().UnixNano())
 		payToAddr := cfg.miningAddrs[rand.Intn(len(cfg.miningAddrs))]
 
 		template, err := NewBlockTemplate(s.server.txMemPool, payToAddr)
@@ -3127,4 +3120,9 @@ func getDifficultyRatio(bits uint32) float64 {
 		return 0
 	}
 	return diff
+}
+
+func init() {
+	rpcHandlers = rpcHandlersBeforeInit
+	rand.Seed(time.Now().UnixNano())
 }
