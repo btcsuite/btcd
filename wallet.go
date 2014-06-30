@@ -418,6 +418,60 @@ func (c *Client) LockUnspent(unlock bool, ops []*btcwire.OutPoint) error {
 	return c.LockUnspentAsync(unlock, ops).Receive()
 }
 
+// FutureListLockUnspentResult is a future promise to deliver the result of a
+// ListLockUnspentAsync RPC invocation (or an applicable error).
+type FutureListLockUnspentResult chan *response
+
+// Receive waits for the response promised by the future and returns the result
+// of all currently locked unspent outputs.
+func (r FutureListLockUnspentResult) Receive() ([]*btcwire.OutPoint, error) {
+	res, err := receiveFuture(r)
+	if err != nil {
+		return nil, err
+	}
+
+	// Unmarshal as an array of transaction inputs.
+	var inputs []btcjson.TransactionInput
+	err = json.Unmarshal(res, &inputs)
+	if err != nil {
+		return nil, err
+	}
+
+	// Create a slice of outpoints from the transaction input structs.
+	ops := make([]*btcwire.OutPoint, len(inputs))
+	for i, input := range inputs {
+		sha, err := btcwire.NewShaHashFromStr(input.Txid)
+		if err != nil {
+			return nil, err
+		}
+		ops[i] = btcwire.NewOutPoint(sha, input.Vout)
+	}
+
+	return ops, nil
+}
+
+// ListLockUnspentAsync returns an instance of a type that can be used to get
+// the result of the RPC at some future time by invoking the Receive function on
+// the returned instance.
+//
+// See ListLockUnspent for the blocking version and more details.
+func (c *Client) ListLockUnspentAsync() FutureListLockUnspentResult {
+	id := c.NextID()
+	cmd, err := btcjson.NewListLockUnspentCmd(id)
+	if err != nil {
+		return newFutureError(err)
+	}
+
+	return c.sendCmd(cmd)
+}
+
+// ListLockUnspent returns a slice of outpoints for all unspent outputs marked
+// as locked by a wallet.  Unspent outputs may be marked locked using
+// LockOutput.
+func (c *Client) ListLockUnspent() ([]*btcwire.OutPoint, error) {
+	return c.ListLockUnspentAsync().Receive()
+}
+
 // FutureSetTxFeeResult is a future promise to deliver the result of a
 // SetTxFeeAsync RPC invocation (or an applicable error).
 type FutureSetTxFeeResult chan *response
@@ -2132,7 +2186,6 @@ func (c *Client) GetInfo() (*btcjson.InfoResult, error) {
 // encryptwallet (Won't be supported by btcwallet since it's always encrypted)
 // getwalletinfo (NYI in btcwallet or btcjson)
 // listaddressgroupings (NYI in btcwallet)
-// listlockunspent (NYI in btcwallet)
 // listreceivedbyaddress (NYI in btcwallet)
 // listreceivedbyaccount (NYI in btcwallet)
 // move (NYI in btcwallet)
