@@ -146,11 +146,11 @@ type peer struct {
 	connected          int32
 	disconnect         int32 // only to be used atomically
 	persistent         bool
-	knownAddresses     map[string]bool
+	knownAddresses     map[string]struct{}
 	knownInventory     *MruInventoryMap
 	knownInvMutex      sync.Mutex
-	requestedTxns      map[btcwire.ShaHash]bool // owned by blockmanager
-	requestedBlocks    map[btcwire.ShaHash]bool // owned by blockmanager
+	requestedTxns      map[btcwire.ShaHash]struct{} // owned by blockmanager
+	requestedBlocks    map[btcwire.ShaHash]struct{} // owned by blockmanager
 	retryCount         int64
 	prevGetBlocksBegin *btcwire.ShaHash // owned by blockmanager
 	prevGetBlocksStop  *btcwire.ShaHash // owned by blockmanager
@@ -911,7 +911,7 @@ func (p *peer) pushAddrMsg(addresses []*btcwire.NetAddress) error {
 	msg := btcwire.NewMsgAddr()
 	for _, na := range addresses {
 		// Filter addresses the peer already knows about.
-		if p.knownAddresses[NetAddressKey(na)] {
+		if _, ok := p.knownAddresses[NetAddressKey(na)]; ok {
 			continue
 		}
 
@@ -979,7 +979,7 @@ func (p *peer) handleAddrMsg(msg *btcwire.MsgAddr) {
 		}
 
 		// Add address to known addresses for this peer.
-		p.knownAddresses[NetAddressKey(na)] = true
+		p.knownAddresses[NetAddressKey(na)] = struct{}{}
 	}
 
 	// Add addresses to server address manager.  The address manager handles
@@ -1616,10 +1616,10 @@ func newPeerBase(s *server, inbound bool) *peer {
 		btcnet:          s.netParams.Net,
 		services:        btcwire.SFNodeNetwork,
 		inbound:         inbound,
-		knownAddresses:  make(map[string]bool),
+		knownAddresses:  make(map[string]struct{}),
 		knownInventory:  NewMruInventoryMap(maxKnownInventory),
-		requestedTxns:   make(map[btcwire.ShaHash]bool),
-		requestedBlocks: make(map[btcwire.ShaHash]bool),
+		requestedTxns:   make(map[btcwire.ShaHash]struct{}),
+		requestedBlocks: make(map[btcwire.ShaHash]struct{}),
 		requestQueue:    list.New(),
 		outputQueue:     make(chan outMsg, outputBufferSize),
 		sendQueue:       make(chan outMsg, 1), // nonblocking sync

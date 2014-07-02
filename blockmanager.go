@@ -164,8 +164,8 @@ type blockManager struct {
 	started           int32
 	shutdown          int32
 	blockChain        *btcchain.BlockChain
-	requestedTxns     map[btcwire.ShaHash]bool
-	requestedBlocks   map[btcwire.ShaHash]bool
+	requestedTxns     map[btcwire.ShaHash]struct{}
+	requestedBlocks   map[btcwire.ShaHash]struct{}
 	receivedLogBlocks int64
 	receivedLogTx     int64
 	lastBlockLogTime  time.Time
@@ -701,8 +701,8 @@ func (b *blockManager) fetchHeaderBlocks() {
 
 		iv := btcwire.NewInvVect(btcwire.InvTypeBlock, node.sha)
 		if !b.haveInventory(iv) {
-			b.requestedBlocks[*node.sha] = true
-			b.syncPeer.requestedBlocks[*node.sha] = true
+			b.requestedBlocks[*node.sha] = struct{}{}
+			b.syncPeer.requestedBlocks[*node.sha] = struct{}{}
 			gdmsg.AddInvVect(iv)
 			numRequested++
 		}
@@ -954,8 +954,8 @@ func (b *blockManager) handleInvMsg(imsg *invMsg) {
 			// Request the block if there is not already a pending
 			// request.
 			if _, exists := b.requestedBlocks[iv.Hash]; !exists {
-				b.requestedBlocks[iv.Hash] = true
-				imsg.peer.requestedBlocks[iv.Hash] = true
+				b.requestedBlocks[iv.Hash] = struct{}{}
+				imsg.peer.requestedBlocks[iv.Hash] = struct{}{}
 				gdmsg.AddInvVect(iv)
 				numRequested++
 			}
@@ -964,8 +964,8 @@ func (b *blockManager) handleInvMsg(imsg *invMsg) {
 			// Request the transaction if there is not already a
 			// pending request.
 			if _, exists := b.requestedTxns[iv.Hash]; !exists {
-				b.requestedTxns[iv.Hash] = true
-				imsg.peer.requestedTxns[iv.Hash] = true
+				b.requestedTxns[iv.Hash] = struct{}{}
+				imsg.peer.requestedTxns[iv.Hash] = struct{}{}
 				gdmsg.AddInvVect(iv)
 				numRequested++
 			}
@@ -1304,8 +1304,8 @@ func newBlockManager(s *server) (*blockManager, error) {
 
 	bm := blockManager{
 		server:           s,
-		requestedTxns:    make(map[btcwire.ShaHash]bool),
-		requestedBlocks:  make(map[btcwire.ShaHash]bool),
+		requestedTxns:    make(map[btcwire.ShaHash]struct{}),
+		requestedBlocks:  make(map[btcwire.ShaHash]struct{}),
 		lastBlockLogTime: time.Now(),
 		msgChan:          make(chan interface{}, cfg.MaxPeers*3),
 		headerList:       list.New(),

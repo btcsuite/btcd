@@ -233,11 +233,11 @@ func validDbType(dbType string) bool {
 // addrs removed.
 func removeDuplicateAddresses(addrs []string) []string {
 	result := make([]string, 0, len(addrs))
-	seen := map[string]bool{}
+	seen := map[string]struct{}{}
 	for _, val := range addrs {
 		if _, ok := seen[val]; !ok {
 			result = append(result, val)
-			seen[val] = true
+			seen[val] = struct{}{}
 		}
 	}
 	return result

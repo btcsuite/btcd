@@ -58,8 +58,8 @@ var wsHandlers = map[string]wsCommandHandler{
 // asynchronously to the main input handler goroutine.  This allows long-running
 // operations to run concurrently (and one at a time) while still responding
 // to the majority of normal requests which can be answered quickly.
-var wsAsyncHandlers = map[string]bool{
-	"rescan": true,
+var wsAsyncHandlers = map[string]struct{}{
+	"rescan": struct{}{},
 }
 
 // WebsocketHandler handles a new websocket client by creating a new wsClient,
@@ -618,7 +618,7 @@ func (m *wsNotificationManager) notifyForTxOuts(ops map[btcwire.OutPoint]map[cha
 	}
 
 	txHex := ""
-	wscNotified := make(map[chan bool]bool)
+	wscNotified := make(map[chan bool]struct{})
 	for i, txOut := range tx.MsgTx().TxOut {
 		_, txAddrs, _, err := btcscript.ExtractPkScriptAddrs(
 			txOut.PkScript, m.server.server.netParams)
@@ -647,8 +647,8 @@ func (m *wsNotificationManager) notifyForTxOuts(ops map[btcwire.OutPoint]map[cha
 			for wscQuit, wsc := range cmap {
 				m.addSpentRequest(ops, wsc, op)
 
-				if !wscNotified[wscQuit] {
-					wscNotified[wscQuit] = true
+				if _, ok := wscNotified[wscQuit]; !ok {
+					wscNotified[wscQuit] = struct{}{}
 					wsc.QueueNotification(marshalledJSON)
 				}
 			}
@@ -683,7 +683,7 @@ func (m *wsNotificationManager) notifyForTxIns(ops map[btcwire.OutPoint]map[chan
 	}
 
 	txHex := ""
-	wscNotified := make(map[chan bool]bool)
+	wscNotified := make(map[chan bool]struct{})
 	for _, txIn := range tx.MsgTx().TxIn {
 		prevOut := &txIn.PreviousOutpoint
 		if cmap, ok := ops[*prevOut]; ok {
@@ -700,8 +700,8 @@ func (m *wsNotificationManager) notifyForTxIns(ops map[btcwire.OutPoint]map[chan
 					m.removeSpentRequest(ops, wsc, prevOut)
 				}
 
-				if !wscNotified[wscQuit] {
-					wscNotified[wscQuit] = true
+				if _, ok := wscNotified[wscQuit]; !ok {
+					wscNotified[wscQuit] = struct{}{}
 					wsc.QueueNotification(marshalledJSON)
 				}
 			}
