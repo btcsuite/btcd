@@ -36,7 +36,7 @@ type blockImporter struct {
 	processQueue      chan []byte
 	doneChan          chan bool
 	errChan           chan error
-	quit              chan bool
+	quit              chan struct{}
 	wg                sync.WaitGroup
 	blocksProcessed   int64
 	blocksImported    int64
@@ -293,7 +293,7 @@ func newBlockImporter(db btcdb.Db, r io.ReadSeeker) *blockImporter {
 		processQueue: make(chan []byte, 2),
 		doneChan:     make(chan bool),
 		errChan:      make(chan error),
-		quit:         make(chan bool),
+		quit:         make(chan struct{}),
 		chain:        btcchain.New(db, activeNetwork, nil),
 		lastLogTime:  time.Now(),
 	}

@@ -146,11 +146,11 @@ type peer struct {
 	connected          int32
 	disconnect         int32 // only to be used atomically
 	persistent         bool
-	knownAddresses     map[string]bool
+	knownAddresses     map[string]struct{}
 	knownInventory     *MruInventoryMap
 	knownInvMutex      sync.Mutex
-	requestedTxns      map[btcwire.ShaHash]bool // owned by blockmanager
-	requestedBlocks    map[btcwire.ShaHash]bool // owned by blockmanager
+	requestedTxns      map[btcwire.ShaHash]struct{} // owned by blockmanager
+	requestedBlocks    map[btcwire.ShaHash]struct{} // owned by blockmanager
 	retryCount         int64
 	prevGetBlocksBegin *btcwire.ShaHash // owned by blockmanager
 	prevGetBlocksStop  *btcwire.ShaHash // owned by blockmanager
@@ -160,12 +160,12 @@ type peer struct {
 	continueHash       *btcwire.ShaHash
 	outputQueue        chan outMsg
 	sendQueue          chan outMsg
-	sendDoneQueue      chan bool
+	sendDoneQueue      chan struct{}
 	queueWg            sync.WaitGroup // TODO(oga) wg -> single use channel?
 	outputInvChan      chan *btcwire.InvVect
 	txProcessed        chan bool
 	blockProcessed     chan bool
-	quit               chan bool
+	quit               chan struct{}
 	StatsMtx           sync.Mutex // protects all statistics below here.
 	versionKnown       bool
 	protocolVersion    uint32
@@ -911,7 +911,7 @@ func (p *peer) pushAddrMsg(addresses []*btcwire.NetAddress) error {
 	msg := btcwire.NewMsgAddr()
 	for _, na := range addresses {
 		// Filter addresses the peer already knows about.
-		if p.knownAddresses[NetAddressKey(na)] {
+		if _, ok := p.knownAddresses[NetAddressKey(na)]; ok {
 			continue
 		}
 
@@ -979,7 +979,7 @@ func (p *peer) handleAddrMsg(msg *btcwire.MsgAddr) {
 		}
 
 		// Add address to known addresses for this peer.
-		p.knownAddresses[NetAddressKey(na)] = true
+		p.knownAddresses[NetAddressKey(na)] = struct{}{}
 	}
 
 	// Add addresses to server address manager.  The address manager handles
@@ -1478,7 +1478,7 @@ out:
 				msg.doneChan <- true
 			}
 			peerLog.Tracef("%s: acking queuehandler", p)
-			p.sendDoneQueue <- true
+			p.sendDoneQueue <- struct{}{}
 			peerLog.Tracef("%s: acked queuehandler", p)
 
 		case <-p.quit:
@@ -1616,18 +1616,18 @@ func newPeerBase(s *server, inbound bool) *peer {
 		btcnet:          s.netParams.Net,
 		services:        btcwire.SFNodeNetwork,
 		inbound:         inbound,
-		knownAddresses:  make(map[string]bool),
+		knownAddresses:  make(map[string]struct{}),
 		knownInventory:  NewMruInventoryMap(maxKnownInventory),
-		requestedTxns:   make(map[btcwire.ShaHash]bool),
-		requestedBlocks: make(map[btcwire.ShaHash]bool),
+		requestedTxns:   make(map[btcwire.ShaHash]struct{}),
+		requestedBlocks: make(map[btcwire.ShaHash]struct{}),
 		requestQueue:    list.New(),
 		outputQueue:     make(chan outMsg, outputBufferSize),
-		sendQueue:       make(chan outMsg, 1), // nonblocking sync
-		sendDoneQueue:   make(chan bool, 1),   // nonblocking sync
+		sendQueue:       make(chan outMsg, 1),   // nonblocking sync
+		sendDoneQueue:   make(chan struct{}, 1), // nonblocking sync
 		outputInvChan:   make(chan *btcwire.InvVect, outputBufferSize),
 		txProcessed:     make(chan bool, 1),
 		blockProcessed:  make(chan bool, 1),
-		quit:            make(chan bool),
+		quit:            make(chan struct{}),
 	}
 	return &p
 }

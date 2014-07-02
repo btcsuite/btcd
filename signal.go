@@ -36,7 +36,7 @@ func mainInterruptHandler() {
 			}
 
 			// Signal the main goroutine to shutdown.
-			shutdownChannel <- true
+			shutdownChannel <- struct{}{}
 
 		case handler := <-addHandlerChannel:
 			interruptCallbacks = append(interruptCallbacks, handler)
