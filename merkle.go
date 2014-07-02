@@ -5,9 +5,10 @@
 package btcchain
 
 import (
+	"math"
+
 	"github.com/conformal/btcutil"
 	"github.com/conformal/btcwire"
-	"math"
 )
 
 // nextPowerOfTwo returns the next highest power of two from a given number if

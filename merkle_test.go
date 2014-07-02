@@ -5,9 +5,10 @@
 package btcchain_test
 
 import (
+	"testing"
+
 	"github.com/conformal/btcchain"
 	"github.com/conformal/btcutil"
-	"testing"
 )
 
 // TestMerkle tests the BuildMerkleTreeStore API.

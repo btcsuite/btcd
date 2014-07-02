@@ -5,11 +5,12 @@
 package btcchain_test
 
 import (
-	"github.com/conformal/btcchain"
 	"reflect"
 	"sort"
 	"testing"
 	"time"
+
+	"github.com/conformal/btcchain"
 )
 
 // TestTimeSorter tests the timeSorter implementation.

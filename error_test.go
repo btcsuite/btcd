@@ -5,8 +5,9 @@
 package btcchain_test
 
 import (
-	"github.com/conformal/btcchain"
 	"testing"
+
+	"github.com/conformal/btcchain"
 )
 
 // TestErrorCodeStringer tests the stringized output for the ErrorCode type.

@@ -6,6 +6,7 @@ package btcchain
 
 import (
 	"fmt"
+
 	"github.com/conformal/btcnet"
 	"github.com/conformal/btcscript"
 	"github.com/conformal/btcutil"

@@ -12,8 +12,9 @@ interface.  The functions are only exported while the tests are being run.
 package btcchain
 
 import (
-	"github.com/conformal/btcutil"
 	"time"
+
+	"github.com/conformal/btcutil"
 )
 
 // TstSetCoinbaseMaturity makes the ability to set the coinbase maturity

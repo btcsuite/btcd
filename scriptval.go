@@ -6,11 +6,12 @@ package btcchain
 
 import (
 	"fmt"
+	"math"
+	"runtime"
+
 	"github.com/conformal/btcscript"
 	"github.com/conformal/btcutil"
 	"github.com/conformal/btcwire"
-	"math"
-	"runtime"
 )
 
 // txValidateItem holds a transaction along with which input to validate.

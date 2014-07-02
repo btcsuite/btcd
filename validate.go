@@ -7,14 +7,15 @@ package btcchain
 import (
 	"encoding/binary"
 	"fmt"
+	"math"
+	"math/big"
+	"time"
+
 	"github.com/conformal/btcdb"
 	"github.com/conformal/btcnet"
 	"github.com/conformal/btcscript"
 	"github.com/conformal/btcutil"
 	"github.com/conformal/btcwire"
-	"math"
-	"math/big"
-	"time"
 )
 
 const (

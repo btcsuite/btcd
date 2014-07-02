@@ -7,14 +7,15 @@ package btcchain_test
 import (
 	"compress/bzip2"
 	"encoding/binary"
-	"github.com/conformal/btcchain"
-	"github.com/conformal/btcutil"
-	"github.com/conformal/btcwire"
 	"io"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/conformal/btcchain"
+	"github.com/conformal/btcutil"
+	"github.com/conformal/btcwire"
 )
 
 // TestReorganization loads a set of test blocks which force a chain

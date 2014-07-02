@@ -5,9 +5,10 @@
 package btcchain_test
 
 import (
-	"github.com/conformal/btcchain"
 	"math/big"
 	"testing"
+
+	"github.com/conformal/btcchain"
 )
 
 func TestBigToCompact(t *testing.T) {

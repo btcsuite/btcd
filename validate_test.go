@@ -5,14 +5,15 @@
 package btcchain_test
 
 import (
-	"github.com/conformal/btcchain"
-	"github.com/conformal/btcnet"
-	"github.com/conformal/btcutil"
-	"github.com/conformal/btcwire"
 	"math"
 	"reflect"
 	"testing"
 	"time"
+
+	"github.com/conformal/btcchain"
+	"github.com/conformal/btcnet"
+	"github.com/conformal/btcutil"
+	"github.com/conformal/btcwire"
 )
 
 // TestCheckConnectBlock tests the CheckConnectBlock function to ensure it

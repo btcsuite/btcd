@@ -6,14 +6,15 @@ package btcchain_test
 
 import (
 	"fmt"
+	"os"
+	"path/filepath"
+
 	"github.com/conformal/btcchain"
 	"github.com/conformal/btcdb"
 	_ "github.com/conformal/btcdb/ldb"
 	_ "github.com/conformal/btcdb/memdb"
 	"github.com/conformal/btcnet"
 	"github.com/conformal/btcutil"
-	"os"
-	"path/filepath"
 )
 
 // testDbType is the database backend type to use for the tests.

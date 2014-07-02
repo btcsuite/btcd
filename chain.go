@@ -8,14 +8,15 @@ import (
 	"container/list"
 	"errors"
 	"fmt"
-	"github.com/conformal/btcdb"
-	"github.com/conformal/btcnet"
-	"github.com/conformal/btcutil"
-	"github.com/conformal/btcwire"
 	"math/big"
 	"sort"
 	"sync"
 	"time"
+
+	"github.com/conformal/btcdb"
+	"github.com/conformal/btcnet"
+	"github.com/conformal/btcutil"
+	"github.com/conformal/btcwire"
 )
 
 const (
