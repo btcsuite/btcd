@@ -80,12 +80,12 @@ type server struct {
 	newPeers             chan *peer
 	donePeers            chan *peer
 	banPeers             chan *peer
-	wakeup               chan bool
+	wakeup               chan struct{}
 	query                chan interface{}
 	relayInv             chan *btcwire.InvVect
 	broadcast            chan broadcastMsg
 	wg                   sync.WaitGroup
-	quit                 chan bool
+	quit                 chan struct{}
 	nat                  NAT
 	db                   btcdb.Db
 }
@@ -541,7 +541,7 @@ func (s *server) peerHandler() {
 	}
 
 	// if nothing else happens, wake us up soon.
-	time.AfterFunc(10*time.Second, func() { s.wakeup <- true })
+	time.AfterFunc(10*time.Second, func() { s.wakeup <- struct{}{} })
 
 out:
 	for {
@@ -658,7 +658,7 @@ out:
 		// We we need more peers, wake up in ten seconds and try again.
 		if state.NeedMoreOutbound() {
 			time.AfterFunc(10*time.Second, func() {
-				s.wakeup <- true
+				s.wakeup <- struct{}{}
 			})
 		}
 	}
@@ -1172,11 +1172,11 @@ func newServer(listenAddrs []string, db btcdb.Db, netParams *btcnet.Params) (*se
 		newPeers:             make(chan *peer, cfg.MaxPeers),
 		donePeers:            make(chan *peer, cfg.MaxPeers),
 		banPeers:             make(chan *peer, cfg.MaxPeers),
-		wakeup:               make(chan bool),
+		wakeup:               make(chan struct{}),
 		query:                make(chan interface{}),
 		relayInv:             make(chan *btcwire.InvVect, cfg.MaxPeers),
 		broadcast:            make(chan broadcastMsg, cfg.MaxPeers),
-		quit:                 make(chan bool),
+		quit:                 make(chan struct{}),
 		modifyRebroadcastInv: make(chan interface{}),
 		nat:                  nat,
 		db:                   db,

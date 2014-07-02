@@ -174,7 +174,7 @@ type blockManager struct {
 	msgChan           chan interface{}
 	chainState        chainState
 	wg                sync.WaitGroup
-	quit              chan bool
+	quit              chan struct{}
 
 	// The following fields are used for headers-first mode.
 	headersFirstMode bool
@@ -1309,7 +1309,7 @@ func newBlockManager(s *server) (*blockManager, error) {
 		lastBlockLogTime: time.Now(),
 		msgChan:          make(chan interface{}, cfg.MaxPeers*3),
 		headerList:       list.New(),
-		quit:             make(chan bool),
+		quit:             make(chan struct{}),
 	}
 	bm.blockChain = btcchain.New(s.db, s.netParams, bm.handleNotifyMsg)
 	bm.blockChain.DisableCheckpoints(cfg.DisableCheckpoints)
