@@ -898,7 +898,7 @@ func handleDecodeRawTransaction(s *rpcServer, cmd btcjson.Cmd, closeChan <-chan 
 	serializedTx, err := hex.DecodeString(hexStr)
 	if err != nil {
 		return nil, btcjson.Error{
-			Code: btcjson.ErrInvalidParameter.Code,
+			Code: btcjson.ErrDecodeHexString.Code,
 			Message: fmt.Sprintf("argument must be hexadecimal "+
 				"string (not %q)", hexStr),
 		}
@@ -938,12 +938,16 @@ func handleDecodeScript(s *rpcServer, cmd btcjson.Cmd, closeChan <-chan struct{}
 	c := cmd.(*btcjson.DecodeScriptCmd)
 
 	// Convert the hex script to bytes.
-	script, err := hex.DecodeString(c.HexScript)
+	hexStr := c.HexScript
+	if len(hexStr)%2 != 0 {
+		hexStr = "0" + hexStr
+	}
+	script, err := hex.DecodeString(hexStr)
 	if err != nil {
 		return nil, btcjson.Error{
-			Code: btcjson.ErrInvalidParameter.Code,
+			Code: btcjson.ErrDecodeHexString.Code,
 			Message: fmt.Sprintf("argument must be hexadecimal "+
-				"string (not %q)", c.HexScript),
+				"string (not %q)", hexStr),
 		}
 	}
 
@@ -1776,7 +1780,7 @@ func handleGetWorkSubmission(s *rpcServer, hexData string) (interface{}, error) 
 	data, err := hex.DecodeString(hexData)
 	if err != nil {
 		return false, btcjson.Error{
-			Code: btcjson.ErrInvalidParameter.Code,
+			Code: btcjson.ErrDecodeHexString.Code,
 			Message: fmt.Sprintf("argument must be "+
 				"hexadecimal string (not %q)", hexData),
 		}
@@ -1990,9 +1994,17 @@ func handlePing(s *rpcServer, cmd btcjson.Cmd, closeChan <-chan struct{}) (inter
 func handleSendRawTransaction(s *rpcServer, cmd btcjson.Cmd, closeChan <-chan struct{}) (interface{}, error) {
 	c := cmd.(*btcjson.SendRawTransactionCmd)
 	// Deserialize and send off to tx relay
-	serializedTx, err := hex.DecodeString(c.HexTx)
+	hexStr := c.HexTx
+	if len(hexStr)%2 != 0 {
+		hexStr = "0" + hexStr
+	}
+	serializedTx, err := hex.DecodeString(hexStr)
 	if err != nil {
-		return nil, btcjson.ErrDecodeHexString
+		return nil, btcjson.Error{
+			Code: btcjson.ErrDecodeHexString.Code,
+			Message: fmt.Sprintf("argument must be hexadecimal "+
+				"string (not %q)", hexStr),
+		}
 	}
 	msgtx := btcwire.NewMsgTx()
 	err = msgtx.Deserialize(bytes.NewReader(serializedTx))
@@ -2076,23 +2088,27 @@ func handleStop(s *rpcServer, cmd btcjson.Cmd, closeChan <-chan struct{}) (inter
 // handleSubmitBlock implements the submitblock command.
 func handleSubmitBlock(s *rpcServer, cmd btcjson.Cmd, closeChan <-chan struct{}) (interface{}, error) {
 	c := cmd.(*btcjson.SubmitBlockCmd)
-	// Deserialize and send off to block processor.
-	serializedBlock, err := hex.DecodeString(c.HexBlock)
+
+	// Deserialize the submitted block.
+	hexStr := c.HexBlock
+	if len(hexStr)%2 != 0 {
+		hexStr = "0" + c.HexBlock
+	}
+	serializedBlock, err := hex.DecodeString(hexStr)
 	if err != nil {
-		err := btcjson.Error{
-			Code:    btcjson.ErrDeserialization.Code,
-			Message: "Block decode failed",
+		return nil, btcjson.Error{
+			Code: btcjson.ErrDecodeHexString.Code,
+			Message: fmt.Sprintf("argument must be hexadecimal "+
+				"string (not %q)", hexStr),
 		}
-		return nil, err
 	}
 
 	block, err := btcutil.NewBlockFromBytes(serializedBlock)
 	if err != nil {
-		err := btcjson.Error{
+		return nil, btcjson.Error{
 			Code:    btcjson.ErrDeserialization.Code,
 			Message: "Block decode failed",
 		}
-		return nil, err
 	}
 
 	_, err = s.server.blockManager.ProcessBlock(block, btcchain.BFNone)
