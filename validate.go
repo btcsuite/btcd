@@ -243,13 +243,13 @@ func CheckTransactionSanity(tx *btcutil.Tx) error {
 	}
 
 	// Check for duplicate transaction inputs.
-	existingTxOut := make(map[btcwire.OutPoint]bool)
+	existingTxOut := make(map[btcwire.OutPoint]struct{})
 	for _, txIn := range msgTx.TxIn {
 		if _, exists := existingTxOut[txIn.PreviousOutpoint]; exists {
 			return ruleError(ErrDuplicateTxInputs, "transaction "+
 				"contains duplicate inputs")
 		}
-		existingTxOut[txIn.PreviousOutpoint] = true
+		existingTxOut[txIn.PreviousOutpoint] = struct{}{}
 	}
 
 	// Coinbase script length must be between min and max length.
@@ -518,7 +518,7 @@ func checkBlockSanity(block *btcutil.Block, powLimit *big.Int, flags BehaviorFla
 	// Check for duplicate transactions.  This check will be fairly quick
 	// since the transaction hashes are already cached due to building the
 	// merkle tree above.
-	existingTxHashes := make(map[btcwire.ShaHash]bool)
+	existingTxHashes := make(map[btcwire.ShaHash]struct{})
 	for _, tx := range transactions {
 		hash := tx.Sha()
 		if _, exists := existingTxHashes[*hash]; exists {
@@ -526,7 +526,7 @@ func checkBlockSanity(block *btcutil.Block, powLimit *big.Int, flags BehaviorFla
 				"transaction %v", hash)
 			return ruleError(ErrDuplicateTx, str)
 		}
-		existingTxHashes[*hash] = true
+		existingTxHashes[*hash] = struct{}{}
 	}
 
 	// The number of signature operations must be less than the maximum
@@ -611,9 +611,9 @@ func isTransactionSpent(txD *TxData) bool {
 func (b *BlockChain) checkBIP0030(node *blockNode, block *btcutil.Block) error {
 	// Attempt to fetch duplicate transactions for all of the transactions
 	// in this block from the point of view of the parent node.
-	fetchSet := make(map[btcwire.ShaHash]bool)
+	fetchSet := make(map[btcwire.ShaHash]struct{})
 	for _, tx := range block.Transactions() {
-		fetchSet[*tx.Sha()] = true
+		fetchSet[*tx.Sha()] = struct{}{}
 	}
 	txResults, err := b.fetchTxStore(node, fetchSet)
 	if err != nil {

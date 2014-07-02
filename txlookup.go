@@ -100,7 +100,7 @@ func disconnectTransactions(txStore TxStore, block *btcutil.Block) error {
 // transactions from the point of view of the end of the main chain.  It takes
 // a flag which specifies whether or not fully spent transaction should be
 // included in the results.
-func fetchTxStoreMain(db btcdb.Db, txSet map[btcwire.ShaHash]bool, includeSpent bool) TxStore {
+func fetchTxStoreMain(db btcdb.Db, txSet map[btcwire.ShaHash]struct{}, includeSpent bool) TxStore {
 	// Just return an empty store now if there are no requested hashes.
 	txStore := make(TxStore)
 	if len(txSet) == 0 {
@@ -160,7 +160,7 @@ func fetchTxStoreMain(db btcdb.Db, txSet map[btcwire.ShaHash]bool, includeSpent 
 // chain).  Another scenario is where a transaction exists from the point of
 // view of the main chain, but doesn't exist in a side chain that branches
 // before the block that contains the transaction on the main chain.
-func (b *BlockChain) fetchTxStore(node *blockNode, txSet map[btcwire.ShaHash]bool) (TxStore, error) {
+func (b *BlockChain) fetchTxStore(node *blockNode, txSet map[btcwire.ShaHash]struct{}) (TxStore, error) {
 	// Get the previous block node.  This function is used over simply
 	// accessing node.parent directly as it will dynamically create previous
 	// block nodes as needed.  This helps allow only the pieces of the chain
@@ -245,7 +245,7 @@ func (b *BlockChain) fetchInputTransactions(node *blockNode, block *btcutil.Bloc
 	// Loop through all of the transaction inputs (except for the coinbase
 	// which has no inputs) collecting them into sets of what is needed and
 	// what is already known (in-flight).
-	txNeededSet := make(map[btcwire.ShaHash]bool)
+	txNeededSet := make(map[btcwire.ShaHash]struct{})
 	txStore := make(TxStore)
 	for i, tx := range transactions[1:] {
 		for _, txIn := range tx.MsgTx().TxIn {
@@ -274,7 +274,7 @@ func (b *BlockChain) fetchInputTransactions(node *blockNode, block *btcutil.Bloc
 				txD.Spent = make([]bool, len(originTx.MsgTx().TxOut))
 				txD.Err = nil
 			} else {
-				txNeededSet[*originHash] = true
+				txNeededSet[*originHash] = struct{}{}
 			}
 		}
 	}
@@ -302,10 +302,10 @@ func (b *BlockChain) FetchTransactionStore(tx *btcutil.Tx) (TxStore, error) {
 	// Create a set of needed transactions from the transactions referenced
 	// by the inputs of the passed transaction.  Also, add the passed
 	// transaction itself as a way for the caller to detect duplicates.
-	txNeededSet := make(map[btcwire.ShaHash]bool)
-	txNeededSet[*tx.Sha()] = true
+	txNeededSet := make(map[btcwire.ShaHash]struct{})
+	txNeededSet[*tx.Sha()] = struct{}{}
 	for _, txIn := range tx.MsgTx().TxIn {
-		txNeededSet[txIn.PreviousOutpoint.Hash] = true
+		txNeededSet[txIn.PreviousOutpoint.Hash] = struct{}{}
 	}
 
 	// Request the input transactions from the point of view of the end of
