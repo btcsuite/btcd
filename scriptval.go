@@ -25,7 +25,7 @@ type txValidateItem struct {
 // function that is intended to be in run multiple goroutines.
 type txValidator struct {
 	validateChan chan *txValidateItem
-	quitChan     chan bool
+	quitChan     chan struct{}
 	resultChan   chan error
 	txStore      TxStore
 	flags        btcscript.ScriptFlags
@@ -181,7 +181,7 @@ func (v *txValidator) Validate(items []*txValidateItem) error {
 func newTxValidator(txStore TxStore, flags btcscript.ScriptFlags) *txValidator {
 	return &txValidator{
 		validateChan: make(chan *txValidateItem),
-		quitChan:     make(chan bool),
+		quitChan:     make(chan struct{}),
 		resultChan:   make(chan error),
 		txStore:      txStore,
 		flags:        flags,
