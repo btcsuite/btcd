@@ -2,12 +2,13 @@ package main
 
 import (
 	"fmt"
-	"github.com/conformal/btcutil"
-	"github.com/conformal/go-flags"
 	"net"
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/conformal/btcutil"
+	flags "github.com/conformal/go-flags"
 )
 
 var (

@@ -7,6 +7,7 @@ package main
 import (
 	"container/list"
 	"fmt"
+
 	"github.com/conformal/btcwire"
 )
 

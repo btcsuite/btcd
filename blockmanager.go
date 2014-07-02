@@ -6,17 +6,18 @@ package main
 
 import (
 	"container/list"
-	"github.com/conformal/btcchain"
-	"github.com/conformal/btcdb"
-	"github.com/conformal/btcnet"
-	"github.com/conformal/btcutil"
-	"github.com/conformal/btcwire"
 	"net"
 	"os"
 	"path/filepath"
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"github.com/conformal/btcchain"
+	"github.com/conformal/btcdb"
+	"github.com/conformal/btcnet"
+	"github.com/conformal/btcutil"
+	"github.com/conformal/btcwire"
 )
 
 const (

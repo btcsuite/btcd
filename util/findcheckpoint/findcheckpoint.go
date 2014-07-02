@@ -6,13 +6,14 @@ package main
 
 import (
 	"fmt"
+	"os"
+	"path/filepath"
+
 	"github.com/conformal/btcchain"
 	"github.com/conformal/btcdb"
 	_ "github.com/conformal/btcdb/ldb"
 	"github.com/conformal/btcnet"
 	"github.com/conformal/btcwire"
-	"os"
-	"path/filepath"
 )
 
 const blockDbNamePrefix = "blocks"

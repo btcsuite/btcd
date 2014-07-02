@@ -6,14 +6,15 @@ package main
 
 import (
 	"fmt"
+	"os"
+	"path/filepath"
+
 	"github.com/conformal/btcdb"
 	_ "github.com/conformal/btcdb/ldb"
 	"github.com/conformal/btcnet"
 	"github.com/conformal/btcutil"
 	"github.com/conformal/btcwire"
-	"github.com/conformal/go-flags"
-	"os"
-	"path/filepath"
+	flags "github.com/conformal/go-flags"
 )
 
 const (

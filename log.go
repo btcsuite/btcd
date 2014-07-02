@@ -6,14 +6,15 @@ package main
 
 import (
 	"fmt"
+	"os"
+	"time"
+
 	"github.com/conformal/btcchain"
 	"github.com/conformal/btcdb"
 	"github.com/conformal/btclog"
 	"github.com/conformal/btcscript"
 	"github.com/conformal/btcwire"
 	"github.com/conformal/seelog"
-	"os"
-	"time"
 )
 
 const (

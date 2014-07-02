@@ -7,14 +7,15 @@ package main
 import (
 	"encoding/binary"
 	"fmt"
+	"io"
+	"sync"
+	"time"
+
 	"github.com/conformal/btcchain"
 	"github.com/conformal/btcdb"
 	_ "github.com/conformal/btcdb/ldb"
 	"github.com/conformal/btcutil"
 	"github.com/conformal/btcwire"
-	"io"
-	"sync"
-	"time"
 )
 
 var zeroHash = btcwire.ShaHash{}

@@ -6,8 +6,9 @@ package main
 
 import (
 	"crypto/rand"
-	"github.com/conformal/btcwire"
 	"testing"
+
+	"github.com/conformal/btcwire"
 )
 
 // BenchmarkMruInventoryList performs basic benchmarks on the most recently

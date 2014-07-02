@@ -10,10 +10,6 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
-	"github.com/conformal/btcdb"
-	"github.com/conformal/btcjson"
-	"github.com/conformal/btcnet"
-	"github.com/conformal/btcwire"
 	"math"
 	"net"
 	"runtime"
@@ -21,6 +17,11 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"github.com/conformal/btcdb"
+	"github.com/conformal/btcjson"
+	"github.com/conformal/btcnet"
+	"github.com/conformal/btcwire"
 )
 
 const (

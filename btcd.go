@@ -6,13 +6,14 @@ package main
 
 import (
 	"fmt"
-	"github.com/conformal/btcd/limits"
 	"net"
 	"net/http"
 	_ "net/http/pprof"
 	"os"
 	"runtime"
 	"runtime/pprof"
+
+	"github.com/conformal/btcd/limits"
 )
 
 var (

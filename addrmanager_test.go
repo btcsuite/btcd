@@ -5,10 +5,11 @@
 package main
 
 import (
-	"github.com/conformal/btcwire"
 	"net"
 	"testing"
 	"time"
+
+	"github.com/conformal/btcwire"
 )
 
 // naTest is used to describe a test to be perfomed against the NetAddressKey

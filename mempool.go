@@ -8,15 +8,16 @@ import (
 	"container/list"
 	"crypto/rand"
 	"fmt"
+	"math"
+	"math/big"
+	"sync"
+	"time"
+
 	"github.com/conformal/btcchain"
 	"github.com/conformal/btcdb"
 	"github.com/conformal/btcscript"
 	"github.com/conformal/btcutil"
 	"github.com/conformal/btcwire"
-	"math"
-	"math/big"
-	"sync"
-	"time"
 )
 
 // TxRuleError identifies a rule violation.  It is used to indicate that

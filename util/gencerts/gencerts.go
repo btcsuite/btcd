@@ -6,13 +6,14 @@ package main
 
 import (
 	"fmt"
-	"github.com/conformal/btcutil"
-	"github.com/conformal/go-flags"
 	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
 	"time"
+
+	"github.com/conformal/btcutil"
+	flags "github.com/conformal/go-flags"
 )
 
 type config struct {

@@ -6,12 +6,13 @@ package main
 
 import (
 	"fmt"
-	"github.com/conformal/winsvc/eventlog"
-	"github.com/conformal/winsvc/mgr"
-	"github.com/conformal/winsvc/svc"
 	"os"
 	"path/filepath"
 	"time"
+
+	"github.com/conformal/winsvc/eventlog"
+	"github.com/conformal/winsvc/mgr"
+	"github.com/conformal/winsvc/svc"
 )
 
 const (

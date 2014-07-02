@@ -6,13 +6,14 @@ package main
 
 import (
 	"fmt"
-	"github.com/conformal/btcchain"
-	"github.com/conformal/btcutil"
-	"github.com/conformal/btcwire"
 	"math/rand"
 	"runtime"
 	"sync"
 	"time"
+
+	"github.com/conformal/btcchain"
+	"github.com/conformal/btcutil"
+	"github.com/conformal/btcwire"
 )
 
 const (

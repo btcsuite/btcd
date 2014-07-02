@@ -8,12 +8,13 @@ import (
 	"container/heap"
 	"container/list"
 	"fmt"
+	"time"
+
 	"github.com/conformal/btcchain"
 	"github.com/conformal/btcdb"
 	"github.com/conformal/btcscript"
 	"github.com/conformal/btcutil"
 	"github.com/conformal/btcwire"
-	"time"
 )
 
 const (

@@ -7,15 +7,16 @@ package main
 import (
 	"errors"
 	"fmt"
+	"os"
+	"path/filepath"
+	"strconv"
+
 	"github.com/conformal/btcdb"
 	_ "github.com/conformal/btcdb/ldb"
 	"github.com/conformal/btclog"
 	"github.com/conformal/btcutil"
 	"github.com/conformal/btcwire"
-	"github.com/conformal/go-flags"
-	"os"
-	"path/filepath"
-	"strconv"
+	flags "github.com/conformal/go-flags"
 )
 
 type ShaHash btcwire.ShaHash

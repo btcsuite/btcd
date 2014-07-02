@@ -11,7 +11,6 @@ import (
 	"encoding/binary"
 	"encoding/json"
 	"fmt"
-	"github.com/conformal/btcwire"
 	"io"
 	"math"
 	"math/rand"
@@ -23,6 +22,8 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"github.com/conformal/btcwire"
 )
 
 const (

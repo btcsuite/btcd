@@ -7,13 +7,6 @@ package main
 import (
 	"errors"
 	"fmt"
-	"github.com/conformal/btcdb"
-	_ "github.com/conformal/btcdb/ldb"
-	_ "github.com/conformal/btcdb/memdb"
-	"github.com/conformal/btcutil"
-	"github.com/conformal/btcwire"
-	"github.com/conformal/go-flags"
-	"github.com/conformal/go-socks"
 	"net"
 	"os"
 	"path/filepath"
@@ -22,6 +15,14 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/conformal/btcdb"
+	_ "github.com/conformal/btcdb/ldb"
+	_ "github.com/conformal/btcdb/memdb"
+	"github.com/conformal/btcutil"
+	"github.com/conformal/btcwire"
+	flags "github.com/conformal/go-flags"
+	socks "github.com/conformal/go-socks"
 )
 
 const (

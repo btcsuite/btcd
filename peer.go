@@ -8,17 +8,18 @@ import (
 	"bytes"
 	"container/list"
 	"fmt"
-	"github.com/conformal/btcchain"
-	"github.com/conformal/btcdb"
-	"github.com/conformal/btcutil"
-	"github.com/conformal/btcwire"
-	"github.com/conformal/go-socks"
-	"github.com/davecgh/go-spew/spew"
 	"net"
 	"strconv"
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"github.com/conformal/btcchain"
+	"github.com/conformal/btcdb"
+	"github.com/conformal/btcutil"
+	"github.com/conformal/btcwire"
+	socks "github.com/conformal/go-socks"
+	"github.com/davecgh/go-spew/spew"
 )
 
 const (
