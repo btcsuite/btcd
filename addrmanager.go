@@ -754,7 +754,7 @@ func (a *AddrManager) reset() {
 	}
 }
 
-// New returns a new bitcoin address manager.
+// NewAddrManager returns a new bitcoin address manager.
 // Use Start to begin processing asynchronous address updates.
 func NewAddrManager() *AddrManager {
 	am := AddrManager{
@@ -789,7 +789,7 @@ func hostToNetAddress(host string, port uint16, services btcwire.ServiceFlag) (*
 			return nil, err
 		}
 		if len(ips) == 0 {
-			return nil, fmt.Errorf("No addresses found for %s", host)
+			return nil, fmt.Errorf("no addresses found for %s", host)
 		}
 		ip = ips[0]
 	}
@@ -805,9 +805,8 @@ func ipString(na *btcwire.NetAddress) string {
 		// We know now that na.IP is long enogh.
 		base32 := base32.StdEncoding.EncodeToString(na.IP[6:])
 		return strings.ToLower(base32) + ".onion"
-	} else {
-		return na.IP.String()
 	}
+	return na.IP.String()
 }
 
 // NetAddressKey returns a string key in the form of ip:port for IPv4 addresses
@@ -1229,7 +1228,7 @@ const (
 	InterfacePrio addressPrio = iota // address of local interface.
 	BoundPrio                        // Address explicitly bound to.
 	UpnpPrio                         // External IP discovered from UPnP
-	HttpPrio                         // Obtained from internet service.
+	HTTPPrio                         // Obtained from internet service.
 	ManualPrio                       // provided by --externalip.
 )
 
@@ -1274,54 +1273,76 @@ func getReachabilityFrom(na, fromna *btcwire.NetAddress) int {
 		Unreachable = 0
 		Default     = iota
 		Teredo
-		Ipv6_weak
+		Ipv6Weak
 		Ipv4
-		Ipv6_strong
+		Ipv6Strong
 		Private
 	)
+
 	if !Routable(fromna) {
 		return Unreachable
-	} else if Tor(fromna) {
+	}
+
+	if Tor(fromna) {
 		if Tor(na) {
 			return Private
-		} else if Routable(na) && na.IP.To4() != nil {
-			return Ipv4
-		} else {
-			return Default
 		}
-	} else if RFC4380(fromna) {
+
+		if Routable(na) && na.IP.To4() != nil {
+			return Ipv4
+		}
+
+		return Default
+	}
+
+	if RFC4380(fromna) {
 		if !Routable(na) {
 			return Default
-		} else if RFC4380(na) {
-			return Teredo
-		} else if na.IP.To4() != nil {
-			return Ipv4
-		} else { // ipv6
-			return Ipv6_weak
 		}
-	} else if fromna.IP.To4() != nil {
+
+		if RFC4380(na) {
+			return Teredo
+		}
+
+		if na.IP.To4() != nil {
+			return Ipv4
+		}
+
+		return Ipv6Weak
+	}
+
+	if fromna.IP.To4() != nil {
 		if Routable(na) && na.IP.To4() != nil {
 			return Ipv4
 		}
 		return Default
-	} else /* ipv6 */ {
-		var tunnelled bool
-		// Is our v6 is tunnelled?
-		if RFC3964(na) || RFC6052(na) || RFC6145(na) {
-			tunnelled = true
-		}
-		if !Routable(na) {
-			return Default
-		} else if RFC4380(na) {
-			return Teredo
-		} else if na.IP.To4() != nil {
-			return Ipv4
-		} else if tunnelled {
-			// only prioritise ipv6 if we aren't tunnelling it.
-			return Ipv6_weak
-		}
-		return Ipv6_strong
 	}
+
+	/* ipv6 */
+	var tunnelled bool
+	// Is our v6 is tunnelled?
+	if RFC3964(na) || RFC6052(na) || RFC6145(na) {
+		tunnelled = true
+	}
+
+	if !Routable(na) {
+		return Default
+	}
+
+	if RFC4380(na) {
+		return Teredo
+	}
+
+	if na.IP.To4() != nil {
+		return Ipv4
+	}
+
+	if tunnelled {
+		// only prioritise ipv6 if we aren't tunnelling it.
+		return Ipv6Weak
+	}
+
+	return Ipv6Strong
 }
 
 // getBestLocalAddress returns the most appropriate local address that we know

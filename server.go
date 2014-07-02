@@ -1160,7 +1160,7 @@ func newServer(listenAddrs []string, db btcdb.Db, netParams *btcnet.Params) (*se
 		}
 
 		if len(listeners) == 0 {
-			return nil, errors.New("No valid listen address")
+			return nil, errors.New("no valid listen address")
 		}
 	}
 

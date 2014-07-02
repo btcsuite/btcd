@@ -41,7 +41,7 @@ type ipTest struct {
 var naTests = make([]naTest, 0)
 var ipTests = make([]ipTest, 0)
 
-func addIpTest(ip string, rfc1918, rfc3849, rfc3927, rfc3964, rfc4193, rfc4380,
+func addIPTest(ip string, rfc1918, rfc3849, rfc3927, rfc3964, rfc4193, rfc4380,
 	rfc4843, rfc4862, rfc6052, rfc6145, local, valid, routable bool) {
 	nip := net.ParseIP(ip)
 	na := btcwire.NetAddress{
@@ -55,38 +55,38 @@ func addIpTest(ip string, rfc1918, rfc3849, rfc3927, rfc3964, rfc4193, rfc4380,
 	ipTests = append(ipTests, test)
 }
 
-func addIpTests() {
-	addIpTest("10.255.255.255", true, false, false, false, false, false,
+func addIPTests() {
+	addIPTest("10.255.255.255", true, false, false, false, false, false,
 		false, false, false, false, false, true, false)
-	addIpTest("192.168.0.1", true, false, false, false, false, false,
+	addIPTest("192.168.0.1", true, false, false, false, false, false,
 		false, false, false, false, false, true, false)
-	addIpTest("172.31.255.1", true, false, false, false, false, false,
+	addIPTest("172.31.255.1", true, false, false, false, false, false,
 		false, false, false, false, false, true, false)
-	addIpTest("172.32.1.1", false, false, false, false, false, false,
+	addIPTest("172.32.1.1", false, false, false, false, false, false,
 		false, false, false, false, false, true, true)
-	addIpTest("169.254.250.120", false, false, true, false, false, false,
+	addIPTest("169.254.250.120", false, false, true, false, false, false,
 		false, false, false, false, false, true, false)
-	addIpTest("0.0.0.0", false, false, false, false, false, false,
+	addIPTest("0.0.0.0", false, false, false, false, false, false,
 		false, false, false, false, true, false, false)
-	addIpTest("255.255.255.255", false, false, false, false, false, false,
+	addIPTest("255.255.255.255", false, false, false, false, false, false,
 		false, false, false, false, false, false, false)
-	addIpTest("127.0.0.1", false, false, false, false, false, false,
+	addIPTest("127.0.0.1", false, false, false, false, false, false,
 		false, false, false, false, true, true, false)
-	addIpTest("fd00:dead::1", false, false, false, false, true, false,
+	addIPTest("fd00:dead::1", false, false, false, false, true, false,
 		false, false, false, false, false, true, false)
-	addIpTest("2001::1", false, false, false, false, false, true,
+	addIPTest("2001::1", false, false, false, false, false, true,
 		false, false, false, false, false, true, true)
-	addIpTest("2001:10:abcd::1:1", false, false, false, false, false, false,
+	addIPTest("2001:10:abcd::1:1", false, false, false, false, false, false,
 		true, false, false, false, false, true, false)
-	addIpTest("fe80::1", false, false, false, false, false, false,
+	addIPTest("fe80::1", false, false, false, false, false, false,
 		false, true, false, false, false, true, false)
-	addIpTest("fe80:1::1", false, false, false, false, false, false,
+	addIPTest("fe80:1::1", false, false, false, false, false, false,
 		false, false, false, false, false, true, true)
-	addIpTest("64:ff9b::1", false, false, false, false, false, false,
+	addIPTest("64:ff9b::1", false, false, false, false, false, false,
 		false, false, true, false, false, true, true)
-	addIpTest("::ffff:abcd:ef12:1", false, false, false, false, false, false,
+	addIPTest("::ffff:abcd:ef12:1", false, false, false, false, false, false,
 		false, false, false, false, false, true, true)
-	addIpTest("::1", false, false, false, false, false, false,
+	addIPTest("::1", false, false, false, false, false, false,
 		false, false, false, false, true, true, false)
 }
 
@@ -170,8 +170,8 @@ func TestGetAddress(t *testing.T) {
 	}
 }
 
-func TestIpTypes(t *testing.T) {
-	addIpTests()
+func TestIPTypes(t *testing.T) {
+	addIPTests()
 
 	t.Logf("Running %d tests", len(ipTests))
 	for _, test := range ipTests {

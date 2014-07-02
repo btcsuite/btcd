@@ -56,8 +56,8 @@ func btcdMain(serverChan chan<- *server) error {
 	}
 
 	// Write cpu profile if requested.
-	if cfg.CpuProfile != "" {
-		f, err := os.Create(cfg.CpuProfile)
+	if cfg.CPUProfile != "" {
+		f, err := os.Create(cfg.CPUProfile)
 		if err != nil {
 			btcdLog.Errorf("Unable to create cpu profile: %v", err)
 			return err

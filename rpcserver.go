@@ -642,7 +642,7 @@ func handleAddNode(s *rpcServer, cmd btcjson.Cmd, closeChan <-chan struct{}) (in
 	case "onetry":
 		err = s.server.AddAddr(addr, false)
 	default:
-		err = errors.New("Invalid subcommand for addnode")
+		err = errors.New("invalid subcommand for addnode")
 	}
 
 	if err != nil {

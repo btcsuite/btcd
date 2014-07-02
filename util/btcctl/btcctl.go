@@ -39,7 +39,7 @@ type handlerData struct {
 
 // Errors used in the various handlers.
 var (
-	ErrNoDisplayHandler = errors.New("No display handler specified.")
+	ErrNoDisplayHandler = errors.New("no display handler specified")
 	ErrUsage            = errors.New("btcctl usage") // Real usage is shown.
 )
 
@@ -815,7 +815,7 @@ func makeWalletPassphraseChange(args []interface{}) (btcjson.Cmd, error) {
 func send(cfg *config, msg []byte) (interface{}, error) {
 	var reply btcjson.Reply
 	var err error
-	if cfg.NoTls || (cfg.RPCCert == "" && !cfg.TlsSkipVerify) {
+	if cfg.NoTLS || (cfg.RPCCert == "" && !cfg.TLSSkipVerify) {
 		reply, err = btcjson.RpcCommand(cfg.RPCUser, cfg.RPCPassword,
 			cfg.RPCServer, msg)
 	} else {
@@ -828,7 +828,7 @@ func send(cfg *config, msg []byte) (interface{}, error) {
 		}
 		reply, err = btcjson.TlsRpcCommand(cfg.RPCUser,
 			cfg.RPCPassword, cfg.RPCServer, msg, pem,
-			cfg.TlsSkipVerify)
+			cfg.TLSSkipVerify)
 	}
 	if err != nil {
 		return nil, err
@@ -847,12 +847,12 @@ func send(cfg *config, msg []byte) (interface{}, error) {
 func sendCommand(cfg *config, command btcjson.Cmd) (interface{}, error) {
 	msg, err := json.Marshal(command)
 	if err != nil {
-		return nil, fmt.Errorf("CreateMessage: %v", err.Error())
+		return nil, fmt.Errorf("createMessage: %v", err.Error())
 	}
 
 	reply, err := send(cfg, msg)
 	if err != nil {
-		return nil, fmt.Errorf("RpcCommand: %v", err.Error())
+		return nil, fmt.Errorf("rpcCommand: %v", err.Error())
 	}
 
 	return reply, nil
@@ -878,7 +878,7 @@ func commandHandler(cfg *config, command string, data *handlerData, args []strin
 	// specified.
 	convHandlers := data.conversionHandlers
 	if convHandlers != nil && len(convHandlers) < len(args) {
-		return fmt.Errorf("The number of conversion handlers is invalid.")
+		return fmt.Errorf("the number of conversion handlers is invalid")
 	}
 
 	// Convert input parameters per the conversion handlers.

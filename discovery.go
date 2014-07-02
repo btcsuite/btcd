@@ -17,26 +17,26 @@ const (
 	torNetUnreachable    = 0x03
 	torHostUnreachable   = 0x04
 	torConnectionRefused = 0x05
-	torTtlExpired        = 0x06
+	torTTLExpired        = 0x06
 	torCmdNotSupported   = 0x07
 	torAddrNotSupported  = 0x08
 )
 
 var (
-	ErrTorInvalidAddressResponse = errors.New("Invalid address response")
-	ErrTorInvalidProxyResponse   = errors.New("Invalid proxy response")
-	ErrTorUnrecognizedAuthMethod = errors.New("Invalid proxy authentication method")
+	ErrTorInvalidAddressResponse = errors.New("invalid address response")
+	ErrTorInvalidProxyResponse   = errors.New("invalid proxy response")
+	ErrTorUnrecognizedAuthMethod = errors.New("invalid proxy authentication method")
 
 	torStatusErrors = map[byte]error{
-		torSucceeded:         errors.New("Tor succeeded"),
-		torGeneralError:      errors.New("Tor general error"),
-		torNotAllowed:        errors.New("Tor not allowed"),
-		torNetUnreachable:    errors.New("Tor network is unreachable"),
-		torHostUnreachable:   errors.New("Tor host is unreachable"),
-		torConnectionRefused: errors.New("Tor connection refused"),
-		torTtlExpired:        errors.New("Tor ttl expired"),
-		torCmdNotSupported:   errors.New("Tor command not supported"),
-		torAddrNotSupported:  errors.New("Tor address type not supported"),
+		torSucceeded:         errors.New("tor succeeded"),
+		torGeneralError:      errors.New("tor general error"),
+		torNotAllowed:        errors.New("tor not allowed"),
+		torNetUnreachable:    errors.New("tor network is unreachable"),
+		torHostUnreachable:   errors.New("tor host is unreachable"),
+		torConnectionRefused: errors.New("tor connection refused"),
+		torTTLExpired:        errors.New("tor TTL expired"),
+		torCmdNotSupported:   errors.New("tor command not supported"),
+		torAddrNotSupported:  errors.New("tor address type not supported"),
 	}
 )
 

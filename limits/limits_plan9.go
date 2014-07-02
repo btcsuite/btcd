@@ -4,7 +4,7 @@
 
 package limits
 
-// Plan 9 has no process accounting. no-op here
+// SetLimits is a no-op on Plan 9 due to the lack of process accounting.
 func SetLimits() error {
 	return nil
 }
