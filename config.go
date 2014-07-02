@@ -231,7 +231,7 @@ func validDbType(dbType string) bool {
 // removeDuplicateAddresses returns a new slice with all duplicate entries in
 // addrs removed.
 func removeDuplicateAddresses(addrs []string) []string {
-	var result []string
+	result := make([]string, 0, len(addrs))
 	seen := map[string]bool{}
 	for _, val := range addrs {
 		if _, ok := seen[val]; !ok {
