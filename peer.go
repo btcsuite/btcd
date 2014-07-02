@@ -160,12 +160,12 @@ type peer struct {
 	continueHash       *btcwire.ShaHash
 	outputQueue        chan outMsg
 	sendQueue          chan outMsg
-	sendDoneQueue      chan bool
+	sendDoneQueue      chan struct{}
 	queueWg            sync.WaitGroup // TODO(oga) wg -> single use channel?
 	outputInvChan      chan *btcwire.InvVect
 	txProcessed        chan bool
 	blockProcessed     chan bool
-	quit               chan bool
+	quit               chan struct{}
 	StatsMtx           sync.Mutex // protects all statistics below here.
 	versionKnown       bool
 	protocolVersion    uint32
@@ -1478,7 +1478,7 @@ out:
 				msg.doneChan <- true
 			}
 			peerLog.Tracef("%s: acking queuehandler", p)
-			p.sendDoneQueue <- true
+			p.sendDoneQueue <- struct{}{}
 			peerLog.Tracef("%s: acked queuehandler", p)
 
 		case <-p.quit:
@@ -1622,12 +1622,12 @@ func newPeerBase(s *server, inbound bool) *peer {
 		requestedBlocks: make(map[btcwire.ShaHash]struct{}),
 		requestQueue:    list.New(),
 		outputQueue:     make(chan outMsg, outputBufferSize),
-		sendQueue:       make(chan outMsg, 1), // nonblocking sync
-		sendDoneQueue:   make(chan bool, 1),   // nonblocking sync
+		sendQueue:       make(chan outMsg, 1),   // nonblocking sync
+		sendDoneQueue:   make(chan struct{}, 1), // nonblocking sync
 		outputInvChan:   make(chan *btcwire.InvVect, outputBufferSize),
 		txProcessed:     make(chan bool, 1),
 		blockProcessed:  make(chan bool, 1),
-		quit:            make(chan bool),
+		quit:            make(chan struct{}),
 	}
 	return &p
 }

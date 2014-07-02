@@ -18,7 +18,7 @@ import (
 
 var (
 	cfg             *config
-	shutdownChannel = make(chan bool)
+	shutdownChannel = make(chan struct{})
 )
 
 // winServiceMain is only invoked on Windows.  It detects when btcd is running
@@ -114,7 +114,7 @@ func btcdMain(serverChan chan<- *server) error {
 	go func() {
 		server.WaitForShutdown()
 		srvrLog.Infof("Server shutdown complete")
-		shutdownChannel <- true
+		shutdownChannel <- struct{}{}
 	}()
 
 	// Wait for shutdown signal from either a graceful server stop or from

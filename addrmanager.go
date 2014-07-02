@@ -338,7 +338,7 @@ type AddrManager struct {
 	started        int32
 	shutdown       int32
 	wg             sync.WaitGroup
-	quit           chan bool
+	quit           chan struct{}
 	nTried         int
 	nNew           int
 	lamtx          sync.Mutex
@@ -759,7 +759,7 @@ func (a *AddrManager) reset() {
 func NewAddrManager() *AddrManager {
 	am := AddrManager{
 		rand:           rand.New(rand.NewSource(time.Now().UnixNano())),
-		quit:           make(chan bool),
+		quit:           make(chan struct{}),
 		localAddresses: make(map[string]*localAddress),
 	}
 	am.reset()

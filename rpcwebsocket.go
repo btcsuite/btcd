@@ -259,7 +259,7 @@ type notificationUnregisterAddr struct {
 // handler and processes one at a time.
 func (m *wsNotificationManager) notificationHandler() {
 	// clients is a map of all currently connected websocket clients.
-	clients := make(map[chan bool]*wsClient)
+	clients := make(map[chan struct{}]*wsClient)
 
 	// Maps used to hold lists of websocket clients to be notified on
 	// certain events.  Each websocket client also keeps maps for the events
@@ -268,10 +268,10 @@ func (m *wsNotificationManager) notificationHandler() {
 	//
 	// Where possible, the quit channel is used as the unique id for a client
 	// since it is quite a bit more efficient than using the entire struct.
-	blockNotifications := make(map[chan bool]*wsClient)
-	txNotifications := make(map[chan bool]*wsClient)
-	watchedOutPoints := make(map[btcwire.OutPoint]map[chan bool]*wsClient)
-	watchedAddrs := make(map[string]map[chan bool]*wsClient)
+	blockNotifications := make(map[chan struct{}]*wsClient)
+	txNotifications := make(map[chan struct{}]*wsClient)
+	watchedOutPoints := make(map[btcwire.OutPoint]map[chan struct{}]*wsClient)
+	watchedAddrs := make(map[string]map[chan struct{}]*wsClient)
 
 out:
 	for {
@@ -398,7 +398,7 @@ func (m *wsNotificationManager) UnregisterBlockUpdates(wsc *wsClient) {
 
 // notifyBlockConnected notifies websocket clients that have registered for
 // block updates when a block is connected to the main chain.
-func (*wsNotificationManager) notifyBlockConnected(clients map[chan bool]*wsClient,
+func (*wsNotificationManager) notifyBlockConnected(clients map[chan struct{}]*wsClient,
 	block *btcutil.Block) {
 
 	hash, err := block.Sha()
@@ -423,7 +423,7 @@ func (*wsNotificationManager) notifyBlockConnected(clients map[chan bool]*wsClie
 // notifyBlockDisconnected notifies websocket clients that have registered for
 // block updates when a block is disconnected from the main chain (due to a
 // reorganize).
-func (*wsNotificationManager) notifyBlockDisconnected(clients map[chan bool]*wsClient, block *btcutil.Block) {
+func (*wsNotificationManager) notifyBlockDisconnected(clients map[chan struct{}]*wsClient, block *btcutil.Block) {
 	// Skip notification creation if no clients have requested block
 	// connected/disconnected notifications.
 	if len(clients) == 0 {
@@ -465,7 +465,7 @@ func (m *wsNotificationManager) UnregisterNewMempoolTxsUpdates(wsc *wsClient) {
 
 // notifyForNewTx notifies websocket clients that have registerd for updates
 // when a new transaction is added to the memory pool.
-func (m *wsNotificationManager) notifyForNewTx(clients map[chan bool]*wsClient, tx *btcutil.Tx) {
+func (m *wsNotificationManager) notifyForNewTx(clients map[chan struct{}]*wsClient, tx *btcutil.Tx) {
 	txShaStr := tx.Sha().String()
 	mtx := tx.MsgTx()
 
@@ -521,7 +521,7 @@ func (m *wsNotificationManager) RegisterSpentRequest(wsc *wsClient, op *btcwire.
 // addSpentRequest modifies a map of watched outpoints to sets of websocket
 // clients to add a new request watch the outpoint op and create and send
 // a notification when spent to the websocket client wsc.
-func (*wsNotificationManager) addSpentRequest(ops map[btcwire.OutPoint]map[chan bool]*wsClient,
+func (*wsNotificationManager) addSpentRequest(ops map[btcwire.OutPoint]map[chan struct{}]*wsClient,
 	wsc *wsClient, op *btcwire.OutPoint) {
 
 	// Track the request in the client as well so it can be quickly be
@@ -532,7 +532,7 @@ func (*wsNotificationManager) addSpentRequest(ops map[btcwire.OutPoint]map[chan 
 	// Create the list as needed.
 	cmap, ok := ops[*op]
 	if !ok {
-		cmap = make(map[chan bool]*wsClient)
+		cmap = make(map[chan struct{}]*wsClient)
 		ops[*op] = cmap
 	}
 	cmap[wsc.quit] = wsc
@@ -552,7 +552,7 @@ func (m *wsNotificationManager) UnregisterSpentRequest(wsc *wsClient, op *btcwir
 // websocket client wsc from the set of clients to be notified when a
 // watched outpoint is spent.  If wsc is the last client, the outpoint
 // key is removed from the map.
-func (*wsNotificationManager) removeSpentRequest(ops map[btcwire.OutPoint]map[chan bool]*wsClient,
+func (*wsNotificationManager) removeSpentRequest(ops map[btcwire.OutPoint]map[chan struct{}]*wsClient,
 	wsc *wsClient, op *btcwire.OutPoint) {
 
 	// Remove the request tracking from the client.
@@ -609,8 +609,8 @@ func newRedeemingTxNotification(txHex string, index int, block *btcutil.Block) (
 // websocket clients of the transaction if an output spends to a watched
 // address.  A spent notification request is automatically registered for
 // the client for each matching output.
-func (m *wsNotificationManager) notifyForTxOuts(ops map[btcwire.OutPoint]map[chan bool]*wsClient,
-	addrs map[string]map[chan bool]*wsClient, tx *btcutil.Tx, block *btcutil.Block) {
+func (m *wsNotificationManager) notifyForTxOuts(ops map[btcwire.OutPoint]map[chan struct{}]*wsClient,
+	addrs map[string]map[chan struct{}]*wsClient, tx *btcutil.Tx, block *btcutil.Block) {
 
 	// Nothing to do if nobody is listening for address notifications.
 	if len(addrs) == 0 {
@@ -618,7 +618,7 @@ func (m *wsNotificationManager) notifyForTxOuts(ops map[btcwire.OutPoint]map[cha
 	}
 
 	txHex := ""
-	wscNotified := make(map[chan bool]struct{})
+	wscNotified := make(map[chan struct{}]struct{})
 	for i, txOut := range tx.MsgTx().TxOut {
 		_, txAddrs, _, err := btcscript.ExtractPkScriptAddrs(
 			txOut.PkScript, m.server.server.netParams)
@@ -659,8 +659,8 @@ func (m *wsNotificationManager) notifyForTxOuts(ops map[btcwire.OutPoint]map[cha
 // notifyForTx examines the inputs and outputs of the passed transaction,
 // notifying websocket clients of outputs spending to a watched address
 // and inputs spending a watched outpoint.
-func (m *wsNotificationManager) notifyForTx(ops map[btcwire.OutPoint]map[chan bool]*wsClient,
-	addrs map[string]map[chan bool]*wsClient, tx *btcutil.Tx, block *btcutil.Block) {
+func (m *wsNotificationManager) notifyForTx(ops map[btcwire.OutPoint]map[chan struct{}]*wsClient,
+	addrs map[string]map[chan struct{}]*wsClient, tx *btcutil.Tx, block *btcutil.Block) {
 
 	if len(ops) != 0 {
 		m.notifyForTxIns(ops, tx, block)
@@ -674,7 +674,7 @@ func (m *wsNotificationManager) notifyForTx(ops map[btcwire.OutPoint]map[chan bo
 // interested websocket clients a redeemingtx notification if any inputs
 // spend a watched output.  If block is non-nil, any matching spent
 // requests are removed.
-func (m *wsNotificationManager) notifyForTxIns(ops map[btcwire.OutPoint]map[chan bool]*wsClient,
+func (m *wsNotificationManager) notifyForTxIns(ops map[btcwire.OutPoint]map[chan struct{}]*wsClient,
 	tx *btcutil.Tx, block *btcutil.Block) {
 
 	// Nothing to do if nobody is watching outpoints.
@@ -683,7 +683,7 @@ func (m *wsNotificationManager) notifyForTxIns(ops map[btcwire.OutPoint]map[chan
 	}
 
 	txHex := ""
-	wscNotified := make(map[chan bool]struct{})
+	wscNotified := make(map[chan struct{}]struct{})
 	for _, txIn := range tx.MsgTx().TxIn {
 		prevOut := &txIn.PreviousOutpoint
 		if cmap, ok := ops[*prevOut]; ok {
@@ -721,7 +721,7 @@ func (m *wsNotificationManager) RegisterTxOutAddressRequest(wsc *wsClient, addr 
 // addAddrRequest adds the websocket client wsc to the address to client set
 // addrs so wsc will be notified for any mempool or block transaction outputs
 // spending to addr.
-func (*wsNotificationManager) addAddrRequest(addrs map[string]map[chan bool]*wsClient,
+func (*wsNotificationManager) addAddrRequest(addrs map[string]map[chan struct{}]*wsClient,
 	wsc *wsClient, addr string) {
 
 	// Track the request in the client as well so it can be quickly be
@@ -732,7 +732,7 @@ func (*wsNotificationManager) addAddrRequest(addrs map[string]map[chan bool]*wsC
 	// seen.  Create map as needed.
 	cmap, ok := addrs[addr]
 	if !ok {
-		cmap = make(map[chan bool]*wsClient)
+		cmap = make(map[chan struct{}]*wsClient)
 		addrs[addr] = cmap
 	}
 	cmap[wsc.quit] = wsc
@@ -750,7 +750,7 @@ func (m *wsNotificationManager) UnregisterTxOutAddressRequest(wsc *wsClient, add
 // removeAddrRequest removes the websocket client wsc from the address to
 // client set addrs so it will no longer receive notification updates for
 // any transaction outputs send to addr.
-func (*wsNotificationManager) removeAddrRequest(addrs map[string]map[chan bool]*wsClient,
+func (*wsNotificationManager) removeAddrRequest(addrs map[string]map[chan struct{}]*wsClient,
 	wsc *wsClient, addr string) {
 
 	// Remove the request tracking from the client.
@@ -909,7 +909,7 @@ type wsClient struct {
 	asyncChan    chan btcjson.Cmd
 	ntfnChan     chan []byte
 	sendChan     chan wsResponse
-	quit         chan bool
+	quit         chan struct{}
 	wg           sync.WaitGroup
 }
 
@@ -1193,7 +1193,7 @@ cleanup:
 // serialized.  It must be run as a goroutine.  Also, this goroutine is not
 // started until/if the first long-running request is made.
 func (c *wsClient) asyncHandler() {
-	asyncHandlerDoneChan := make(chan bool, 1) // nonblocking sync
+	asyncHandlerDoneChan := make(chan struct{}, 1) // nonblocking sync
 	pendingCmds := list.New()
 	waiting := false
 
@@ -1226,7 +1226,7 @@ out:
 				c.wg.Add(1)
 				go func(cmd btcjson.Cmd) {
 					runHandler(cmd)
-					asyncHandlerDoneChan <- true
+					asyncHandlerDoneChan <- struct{}{}
 					c.wg.Done()
 				}(cmd)
 			} else {
@@ -1249,7 +1249,7 @@ out:
 			c.wg.Add(1)
 			go func(cmd btcjson.Cmd) {
 				runHandler(cmd)
-				asyncHandlerDoneChan <- true
+				asyncHandlerDoneChan <- struct{}{}
 				c.wg.Done()
 			}(element.(btcjson.Cmd))
 
@@ -1375,7 +1375,7 @@ func newWebsocketClient(server *rpcServer, conn *websocket.Conn,
 		ntfnChan:      make(chan []byte, 1),      // nonblocking sync
 		asyncChan:     make(chan btcjson.Cmd, 1), // nonblocking sync
 		sendChan:      make(chan wsResponse, websocketSendBufferSize),
-		quit:          make(chan bool),
+		quit:          make(chan struct{}),
 	}
 }
 
