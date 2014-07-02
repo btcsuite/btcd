@@ -96,7 +96,7 @@ type config struct {
 	DisableCheckpoints bool          `long:"nocheckpoints" description:"Disable built-in checkpoints.  Don't do this unless you know what you're doing."`
 	DbType             string        `long:"dbtype" description:"Database backend to use for the Block Chain"`
 	Profile            string        `long:"profile" description:"Enable HTTP profiling on given port -- NOTE port must be between 1024 and 65536"`
-	CpuProfile         string        `long:"cpuprofile" description:"Write CPU profile to the specified file"`
+	CPUProfile         string        `long:"cpuprofile" description:"Write CPU profile to the specified file"`
 	DebugLevel         string        `short:"d" long:"debuglevel" description:"Logging level for all subsystems {trace, debug, info, warn, error, critical} -- You may also specify <subsystem>=<level>,<subsystem2>=<level>,... to set the log level for individual subsystems -- Use show to list available subsystems"`
 	Upnp               bool          `long:"upnp" description:"Use UPnP to map our listening port outside of NAT"`
 	FreeTxRelayLimit   float64       `long:"limitfreerelay" description:"Limit relay of transactions with no transaction fee to the given amount in thousands of bytes per minute"`
@@ -231,7 +231,7 @@ func validDbType(dbType string) bool {
 // removeDuplicateAddresses returns a new slice with all duplicate entries in
 // addrs removed.
 func removeDuplicateAddresses(addrs []string) []string {
-	result := make([]string, 0)
+	var result []string
 	seen := map[string]bool{}
 	for _, val := range addrs {
 		if _, ok := seen[val]; !ok {

@@ -30,10 +30,10 @@ type config struct {
 	RPCPassword   string `short:"P" long:"rpcpass" default-mask:"-" description:"RPC password"`
 	RPCServer     string `short:"s" long:"rpcserver" description:"RPC server to connect to"`
 	RPCCert       string `short:"c" long:"rpccert" description:"RPC server certificate chain for validation"`
-	NoTls         bool   `long:"notls" description:"Disable TLS"`
+	NoTLS         bool   `long:"notls" description:"Disable TLS"`
 	TestNet3      bool   `long:"testnet" description:"Connect to testnet"`
 	SimNet        bool   `long:"simnet" description:"Connect to the simulation test network"`
-	TlsSkipVerify bool   `long:"skipverify" description:"Do not verify tls certificates (not recommended!)"`
+	TLSSkipVerify bool   `long:"skipverify" description:"Do not verify tls certificates (not recommended!)"`
 	Wallet        bool   `long:"wallet" description:"Connect to wallet"`
 }
 
