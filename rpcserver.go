@@ -205,19 +205,18 @@ func newWorkState() *workState {
 // rpcServer holds the items the rpc server may need to access (config,
 // shutdown, main server, etc.)
 type rpcServer struct {
-	started         int32
-	shutdown        int32
-	server          *server
-	authsha         [fastsha256.Size]byte
-	ntfnMgr         *wsNotificationManager
-	numClients      int
-	numClientsMutex sync.Mutex
-	statusLines     map[int]string
-	statusLock      sync.RWMutex
-	wg              sync.WaitGroup
-	listeners       []net.Listener
-	workState       *workState
-	quit            chan int
+	started     int32
+	shutdown    int32
+	server      *server
+	authsha     [fastsha256.Size]byte
+	ntfnMgr     *wsNotificationManager
+	numClients  int32
+	statusLines map[int]string
+	statusLock  sync.RWMutex
+	wg          sync.WaitGroup
+	listeners   []net.Listener
+	workState   *workState
+	quit        chan int
 }
 
 // Start is used by server.go to start the rpc listener.
@@ -353,10 +352,7 @@ func (s *rpcServer) writeHTTPResponseHeaders(req *http.Request, headers http.Hea
 //
 // This function is safe for concurrent access.
 func (s *rpcServer) limitConnections(w http.ResponseWriter, remoteAddr string) bool {
-	s.numClientsMutex.Lock()
-	defer s.numClientsMutex.Unlock()
-
-	if s.numClients+1 > cfg.RPCMaxClients {
+	if int(atomic.LoadInt32(&s.numClients)+1) > cfg.RPCMaxClients {
 		rpcsLog.Infof("Max RPC clients exceeded [%d] - "+
 			"disconnecting client %s", cfg.RPCMaxClients,
 			remoteAddr)
@@ -373,10 +369,7 @@ func (s *rpcServer) limitConnections(w http.ResponseWriter, remoteAddr string) b
 //
 // This function is safe for concurrent access.
 func (s *rpcServer) incrementClients() {
-	s.numClientsMutex.Lock()
-	defer s.numClientsMutex.Unlock()
-
-	s.numClients++
+	atomic.AddInt32(&s.numClients, 1)
 }
 
 // decrementClients subtracts one from the number of connected RPC clients.
@@ -385,10 +378,7 @@ func (s *rpcServer) incrementClients() {
 //
 // This function is safe for concurrent access.
 func (s *rpcServer) decrementClients() {
-	s.numClientsMutex.Lock()
-	defer s.numClientsMutex.Unlock()
-
-	s.numClients--
+	atomic.AddInt32(&s.numClients, -1)
 }
 
 // checkAuth checks the HTTP Basic authentication supplied by a wallet
