@@ -8,15 +8,16 @@ import (
 	"compress/bzip2"
 	"encoding/binary"
 	"fmt"
-	"github.com/conformal/btcdb"
-	"github.com/conformal/btcnet"
-	"github.com/conformal/btcutil"
-	"github.com/conformal/btcwire"
 	"io"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/conformal/btcdb"
+	"github.com/conformal/btcnet"
+	"github.com/conformal/btcutil"
+	"github.com/conformal/btcwire"
 )
 
 var network = btcwire.MainNet

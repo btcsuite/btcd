@@ -6,12 +6,13 @@ package ldb_test
 
 import (
 	"fmt"
-	"github.com/conformal/btcdb"
-	"github.com/conformal/btcutil"
-	"github.com/conformal/btcwire"
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/conformal/btcdb"
+	"github.com/conformal/btcutil"
+	"github.com/conformal/btcwire"
 )
 
 func Test_dupTx(t *testing.T) {

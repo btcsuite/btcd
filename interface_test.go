@@ -5,12 +5,13 @@
 package btcdb_test
 
 import (
+	"reflect"
+	"testing"
+
 	"github.com/conformal/btcdb"
 	"github.com/conformal/btcutil"
 	"github.com/conformal/btcwire"
 	"github.com/davecgh/go-spew/spew"
-	"reflect"
-	"testing"
 )
 
 // testContext is used to store context information about a running test which

@@ -6,6 +6,7 @@ package ldb
 
 import (
 	"fmt"
+
 	"github.com/conformal/btcdb"
 	"github.com/conformal/btcwire"
 )

@@ -6,6 +6,7 @@ package btcdb
 
 import (
 	"errors"
+
 	"github.com/conformal/btcutil"
 	"github.com/conformal/btcwire"
 )

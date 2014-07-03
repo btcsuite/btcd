@@ -7,6 +7,9 @@ package ldb
 import (
 	"encoding/binary"
 	"fmt"
+	"os"
+	"sync"
+
 	"github.com/conformal/btcdb"
 	"github.com/conformal/btclog"
 	"github.com/conformal/btcutil"
@@ -14,8 +17,6 @@ import (
 	"github.com/conformal/goleveldb/leveldb"
 	"github.com/conformal/goleveldb/leveldb/cache"
 	"github.com/conformal/goleveldb/leveldb/opt"
-	"os"
-	"sync"
 )
 
 const (

@@ -7,11 +7,12 @@ package memdb
 import (
 	"errors"
 	"fmt"
+	"math"
+	"sync"
+
 	"github.com/conformal/btcdb"
 	"github.com/conformal/btcutil"
 	"github.com/conformal/btcwire"
-	"math"
-	"sync"
 )
 
 // Errors that the various database functions may return.

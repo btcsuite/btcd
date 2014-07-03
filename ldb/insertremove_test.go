@@ -6,13 +6,14 @@ package ldb_test
 
 import (
 	"fmt"
+	"os"
+	"path/filepath"
+	"testing"
+
 	"github.com/conformal/btcdb"
 	_ "github.com/conformal/btcdb/ldb"
 	"github.com/conformal/btcutil"
 	"github.com/conformal/btcwire"
-	"os"
-	"path/filepath"
-	"testing"
 )
 
 var tstBlocks []*btcutil.Block

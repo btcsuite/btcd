@@ -6,8 +6,9 @@ package btcdb_test
 
 import (
 	"fmt"
-	"github.com/conformal/btcdb"
 	"testing"
+
+	"github.com/conformal/btcdb"
 )
 
 var (

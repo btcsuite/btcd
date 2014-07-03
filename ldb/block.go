@@ -8,6 +8,7 @@ import (
 	"bytes"
 	"encoding/binary"
 	"fmt"
+
 	"github.com/conformal/btcdb"
 	"github.com/conformal/btcutil"
 	"github.com/conformal/btcwire"

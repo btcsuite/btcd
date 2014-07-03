@@ -5,13 +5,14 @@
 package memdb_test
 
 import (
+	"reflect"
+	"testing"
+
 	"github.com/conformal/btcdb"
 	"github.com/conformal/btcdb/memdb"
 	"github.com/conformal/btcnet"
 	"github.com/conformal/btcutil"
 	"github.com/conformal/btcwire"
-	"reflect"
-	"testing"
 )
 
 // TestClosed ensure calling the interface functions on a closed database

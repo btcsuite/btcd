@@ -5,10 +5,11 @@
 package ldb_test
 
 import (
-	"github.com/conformal/btcdb"
-	"github.com/conformal/btcwire"
 	"os"
 	"testing"
+
+	"github.com/conformal/btcdb"
+	"github.com/conformal/btcwire"
 )
 
 // we need to test for empty databas and make certain it returns proper value
