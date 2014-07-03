@@ -414,6 +414,10 @@ func (p *peer) pushTxMsg(sha *btcwire.ShaHash, doneChan, waitChan chan bool) err
 	if err != nil {
 		peerLog.Tracef("Unable to fetch tx %v from transaction "+
 			"pool: %v", sha, err)
+
+		if doneChan != nil {
+			doneChan <- false
+		}
 		return err
 	}
 
@@ -434,6 +438,10 @@ func (p *peer) pushBlockMsg(sha *btcwire.ShaHash, doneChan, waitChan chan bool) 
 	if err != nil {
 		peerLog.Tracef("Unable to fetch requested block sha %v: %v",
 			sha, err)
+
+		if doneChan != nil {
+			doneChan <- false
+		}
 		return err
 	}
 
@@ -465,10 +473,7 @@ func (p *peer) pushBlockMsg(sha *btcwire.ShaHash, doneChan, waitChan chan bool) 
 			p.QueueMessage(invMsg, doneChan)
 			p.continueHash = nil
 		} else if doneChan != nil {
-			// Avoid deadlock when caller waits on channel.
-			go func() {
-				doneChan <- false
-			}()
+			doneChan <- false
 		}
 	}
 	return nil
@@ -658,15 +663,15 @@ func (p *peer) handleGetDataMsg(msg *btcwire.MsgGetData) {
 	// The waiting occurs after the database fetch for the next one to
 	// provide a little pipelining.
 	var waitChan chan bool
-	doneChan := make(chan bool)
+	doneChan := make(chan bool, 1)
 
 	for i, iv := range msg.InvList {
 		var c chan bool
 		// If this will be the last message we send.
 		if i == len(msg.InvList)-1 && len(notFound.InvList) == 0 {
 			c = doneChan
-		} else if i > 0 && i+1%3 == 0 {
-			// buffered so as to not make the send goroutine block.
+		} else if (i+1)%3 == 0 {
+			// Buffered so as to not make the send goroutine block.
 			c = make(chan bool, 1)
 		}
 		var err error
@@ -684,6 +689,15 @@ func (p *peer) handleGetDataMsg(msg *btcwire.MsgGetData) {
 		}
 		if err != nil {
 			notFound.AddInvVect(iv)
+
+			// When there is a failure fetching the final entry
+			// and the done channel was sent in due to there
+			// being no outstanding not found inventory, consume
+			// it here because there is now not found inventory
+			// that will use the channel momentarily.
+			if i == len(msg.InvList)-1 && c != nil {
+				<-c
+			}
 		}
 		numAdded++
 		waitChan = c
