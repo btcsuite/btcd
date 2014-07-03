@@ -481,7 +481,10 @@ func (a *AddrManager) savePeers() {
 	}
 	enc := json.NewEncoder(w)
 	defer w.Close()
-	enc.Encode(&sam)
+	if err := enc.Encode(&sam); err != nil {
+		amgrLog.Errorf("Failed to encode %s: %v", filePath, err)
+		return
+	}
 }
 
 // loadPeers loads the known address from the saved file.  If empty, missing, or
