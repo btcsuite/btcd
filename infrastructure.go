@@ -1037,22 +1037,26 @@ func dial(config *ConnConfig) (*websocket.Conn, error) {
 	url := fmt.Sprintf("%s://%s/%s", scheme, config.Host, config.Endpoint)
 	wsConn, resp, err := dialer.Dial(url, requestHeader)
 	if err != nil {
-		if err == websocket.ErrBadHandshake {
-			// Detect HTTP authentication error status codes.
-			if resp != nil &&
-				(resp.StatusCode == http.StatusUnauthorized ||
-					resp.StatusCode == http.StatusForbidden) {
+		if err != websocket.ErrBadHandshake || resp == nil {
+			return nil, err
+		}
 
-				return nil, ErrInvalidAuth
-			}
+		// Detect HTTP authentication error status codes.
+		if resp.StatusCode == http.StatusUnauthorized ||
+			resp.StatusCode == http.StatusForbidden {
+			return nil, ErrInvalidAuth
+		}
 
-			// The connection was authenticated, but the websocket
-			// handshake still failed, so the endpoint is invalid
-			// in some way.
+		// The connection was authenticated and the status response was
+		// ok, but the websocket handshake still failed, so the endpoint
+		// is invalid in some way.
+		if resp.StatusCode == http.StatusOK {
 			return nil, ErrInvalidEndpoint
 		}
 
-		return nil, err
+		// Return the status text from the server if none of the special
+		// cases above apply.
+		return nil, errors.New(resp.Status)
 	}
 	return wsConn, nil
 }
