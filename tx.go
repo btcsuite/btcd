@@ -6,8 +6,9 @@ package btcutil
 
 import (
 	"bytes"
-	"github.com/conformal/btcwire"
 	"io"
+
+	"github.com/conformal/btcwire"
 )
 
 // TxIndexUnknown is the value returned for a transaction index that is unknown.

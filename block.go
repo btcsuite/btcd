@@ -7,8 +7,9 @@ package btcutil
 import (
 	"bytes"
 	"fmt"
-	"github.com/conformal/btcwire"
 	"io"
+
+	"github.com/conformal/btcwire"
 )
 
 // OutOfRangeError describes an error due to accessing an element that is out

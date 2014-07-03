@@ -7,8 +7,9 @@ package btcutil_test
 import (
 	"bytes"
 	"encoding/hex"
-	"github.com/conformal/btcutil"
 	"testing"
+
+	"github.com/conformal/btcutil"
 )
 
 var stringTests = []struct {

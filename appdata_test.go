@@ -5,13 +5,14 @@
 package btcutil_test
 
 import (
-	"github.com/conformal/btcutil"
 	"os"
 	"os/user"
 	"path/filepath"
 	"runtime"
 	"testing"
 	"unicode"
+
+	"github.com/conformal/btcutil"
 )
 
 // TestAppDataDir tests the API for AppDataDir to ensure it gives expected

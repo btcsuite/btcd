@@ -5,9 +5,10 @@
 package btcutil_test
 
 import (
-	. "github.com/conformal/btcutil"
 	"math"
 	"testing"
+
+	. "github.com/conformal/btcutil"
 )
 
 func TestAmountCreation(t *testing.T) {

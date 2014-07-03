@@ -5,9 +5,10 @@
 package btcutil
 
 import (
+	"hash"
+
 	"code.google.com/p/go.crypto/ripemd160"
 	"github.com/conformal/fastsha256"
-	"hash"
 )
 
 // Calculate the hash of hasher over buf.

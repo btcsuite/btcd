@@ -6,12 +6,13 @@ package btcutil_test
 
 import (
 	"bytes"
-	"github.com/conformal/btcutil"
-	"github.com/conformal/btcwire"
-	"github.com/davecgh/go-spew/spew"
 	"io"
 	"reflect"
 	"testing"
+
+	"github.com/conformal/btcutil"
+	"github.com/conformal/btcwire"
+	"github.com/davecgh/go-spew/spew"
 )
 
 // TestTx tests the API for Tx.

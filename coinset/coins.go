@@ -3,9 +3,10 @@ package coinset
 import (
 	"container/list"
 	"errors"
+	"sort"
+
 	"github.com/conformal/btcutil"
 	"github.com/conformal/btcwire"
-	"sort"
 )
 
 // Coin represents a spendable transaction outpoint

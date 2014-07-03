@@ -6,9 +6,10 @@ package btcutil
 
 import (
 	"bytes"
-	"code.google.com/p/go.crypto/ripemd160"
 	"encoding/hex"
 	"errors"
+
+	"code.google.com/p/go.crypto/ripemd160"
 	"github.com/conformal/btcec"
 	"github.com/conformal/btcnet"
 	"github.com/conformal/btcwire"
