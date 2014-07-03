@@ -7,6 +7,7 @@ package btcrpcclient
 import (
 	"encoding/json"
 	"errors"
+
 	"github.com/conformal/btcjson"
 )
 

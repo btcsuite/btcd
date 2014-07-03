@@ -6,8 +6,9 @@ package btcrpcclient
 
 import (
 	"errors"
-	"github.com/conformal/btclog"
 	"io"
+
+	"github.com/conformal/btclog"
 )
 
 // log is a logger that is initialized with no output filters.  This

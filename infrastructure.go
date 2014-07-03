@@ -13,16 +13,17 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/conformal/btcjson"
-	"github.com/conformal/btcws"
-	"github.com/conformal/go-socks"
-	"github.com/conformal/websocket"
 	"net"
 	"net/http"
 	"net/url"
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"github.com/conformal/btcjson"
+	"github.com/conformal/btcws"
+	"github.com/conformal/go-socks"
+	"github.com/conformal/websocket"
 )
 
 var (

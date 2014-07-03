@@ -8,6 +8,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+
 	"github.com/conformal/btcjson"
 	"github.com/conformal/btcutil"
 )

@@ -5,13 +5,14 @@
 package main
 
 import (
-	"github.com/conformal/btcrpcclient"
-	"github.com/conformal/btcutil"
-	"github.com/davecgh/go-spew/spew"
 	"io/ioutil"
 	"log"
 	"path/filepath"
 	"time"
+
+	"github.com/conformal/btcrpcclient"
+	"github.com/conformal/btcutil"
+	"github.com/davecgh/go-spew/spew"
 )
 
 func main() {

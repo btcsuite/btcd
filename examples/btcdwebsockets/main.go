@@ -5,13 +5,14 @@
 package main
 
 import (
-	"github.com/conformal/btcrpcclient"
-	"github.com/conformal/btcutil"
-	"github.com/conformal/btcwire"
 	"io/ioutil"
 	"log"
 	"path/filepath"
 	"time"
+
+	"github.com/conformal/btcrpcclient"
+	"github.com/conformal/btcutil"
+	"github.com/conformal/btcwire"
 )
 
 func main() {

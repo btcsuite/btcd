@@ -5,8 +5,9 @@
 package main
 
 import (
-	"github.com/conformal/btcrpcclient"
 	"log"
+
+	"github.com/conformal/btcrpcclient"
 )
 
 func main() {
