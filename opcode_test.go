@@ -6,10 +6,11 @@ package btcscript_test
 
 import (
 	"bytes"
+	"testing"
+
 	"github.com/conformal/btcscript"
 	"github.com/conformal/btcwire"
 	"github.com/davecgh/go-spew/spew"
-	"testing"
 )
 
 // test scripts to test as many opcodes as possible.

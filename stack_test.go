@@ -8,9 +8,10 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"github.com/conformal/btcscript"
 	"math/big"
 	"testing"
+
+	"github.com/conformal/btcscript"
 )
 
 type stackTest struct {

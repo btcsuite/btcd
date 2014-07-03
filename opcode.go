@@ -6,17 +6,18 @@ package btcscript
 
 import (
 	"bytes"
-	"code.google.com/p/go.crypto/ripemd160"
 	"crypto/ecdsa"
 	"crypto/sha1"
 	"encoding/binary"
 	"fmt"
+	"hash"
+	"math/big"
+
+	"code.google.com/p/go.crypto/ripemd160"
 	"github.com/conformal/btcec"
 	"github.com/conformal/btcwire"
 	"github.com/conformal/fastsha256"
 	"github.com/davecgh/go-spew/spew"
-	"hash"
-	"math/big"
 )
 
 // An opcode defines the information related to a btcscript opcode.

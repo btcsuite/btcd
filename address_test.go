@@ -5,11 +5,12 @@ package btcscript_test
 
 import (
 	"encoding/hex"
+	"reflect"
+	"testing"
+
 	"github.com/conformal/btcnet"
 	"github.com/conformal/btcscript"
 	"github.com/conformal/btcutil"
-	"reflect"
-	"testing"
 )
 
 // decodeHex decodes the passed hex string and returns the resulting bytes.  It

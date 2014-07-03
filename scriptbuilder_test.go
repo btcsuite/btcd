@@ -6,8 +6,9 @@ package btcscript_test
 
 import (
 	"bytes"
-	"github.com/conformal/btcscript"
 	"testing"
+
+	"github.com/conformal/btcscript"
 )
 
 // TestScriptBuilderAddOp tests that pushing opcodes to a script via the

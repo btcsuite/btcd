@@ -9,12 +9,13 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/conformal/btcutil"
-	"github.com/conformal/btcwire"
 	"io/ioutil"
 	"strconv"
 	"strings"
 	"testing"
+
+	"github.com/conformal/btcutil"
+	"github.com/conformal/btcwire"
 )
 
 // this file is present to export some internal interfaces so that we can

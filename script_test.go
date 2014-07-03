@@ -10,13 +10,14 @@ import (
 	"crypto/rand"
 	"errors"
 	"fmt"
+	"math/big"
+	"testing"
+
 	"github.com/conformal/btcec"
 	"github.com/conformal/btcnet"
 	"github.com/conformal/btcscript"
 	"github.com/conformal/btcutil"
 	"github.com/conformal/btcwire"
-	"math/big"
-	"testing"
 )
 
 func TestPushedData(t *testing.T) {
@@ -2934,7 +2935,6 @@ func (b *bogusAddress) IsForNet(net *btcnet.Params) bool {
 func (b *bogusAddress) String() string {
 	return ""
 }
-
 
 func TestPayToAddrScript(t *testing.T) {
 	// 1MirQ9bwyQcGVJPwKUgapu5ouK2E2Ey4gX
