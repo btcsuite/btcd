@@ -5,11 +5,12 @@
 package btcws_test
 
 import (
+	"reflect"
+	"testing"
+
 	"github.com/conformal/btcjson"
 	"github.com/conformal/btcws"
 	"github.com/davecgh/go-spew/spew"
-	"reflect"
-	"testing"
 )
 
 var ntfntests = []struct {

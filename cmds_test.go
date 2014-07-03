@@ -6,11 +6,12 @@
 package btcws
 
 import (
+	"reflect"
+	"testing"
+
 	"github.com/conformal/btcdb"
 	"github.com/conformal/btcjson"
 	"github.com/davecgh/go-spew/spew"
-	"reflect"
-	"testing"
 )
 
 var cmdtests = []struct {

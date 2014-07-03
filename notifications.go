@@ -7,6 +7,7 @@ package btcws
 import (
 	"encoding/json"
 	"errors"
+
 	"github.com/conformal/btcjson"
 )
 
