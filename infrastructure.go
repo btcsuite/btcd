@@ -614,22 +614,30 @@ func (c *Client) handleSendPostMessage(details *sendPostDetails) {
 	log.Tracef("Sending command [%s] with id %d", cmd.Method(), cmd.Id())
 	httpResponse, err := c.httpClient.Do(details.request)
 	if err != nil {
-		details.responseChan <- &response{result: nil, err: err}
+		details.responseChan <- &response{err: err}
 		return
 	}
 
 	// Read the raw bytes and close the response.
 	respBytes, err := btcjson.GetRaw(httpResponse.Body)
 	if err != nil {
-		details.responseChan <- &response{result: nil, err: err}
+		details.responseChan <- &response{err: err}
 		return
 	}
+
+	// Handle unsuccessful HTTP responses
+	if httpResponse.StatusCode < 200 || httpResponse.StatusCode >= 300 {
+		details.responseChan <- &response{err: errors.New(string(respBytes))}
+		return
+	}
+
 	var resp rawResponse
 	err = json.Unmarshal(respBytes, &resp)
 	if err != nil {
-		details.responseChan <- &response{result: nil, err: err}
+		details.responseChan <- &response{err: err}
 		return
 	}
+
 	res, err := resp.result()
 	details.responseChan <- &response{result: res, err: err}
 }
