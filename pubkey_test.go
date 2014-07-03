@@ -6,9 +6,10 @@ package btcec_test
 
 import (
 	"bytes"
+	"testing"
+
 	"github.com/conformal/btcec"
 	"github.com/davecgh/go-spew/spew"
-	"testing"
 )
 
 type privKeyTest struct {

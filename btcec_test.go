@@ -13,9 +13,10 @@ import (
 	"crypto/sha1"
 	"encoding/hex"
 	"fmt"
-	"github.com/conformal/btcec"
 	"math/big"
 	"testing"
+
+	"github.com/conformal/btcec"
 )
 
 // TestAddJacobian tests addition of points projected in Jacobian coordinates.

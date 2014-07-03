@@ -6,9 +6,10 @@
 package btcec_test
 
 import (
-	"github.com/conformal/btcec"
 	"reflect"
 	"testing"
+
+	"github.com/conformal/btcec"
 )
 
 // TestSetInt ensures that setting a field value to various native integers

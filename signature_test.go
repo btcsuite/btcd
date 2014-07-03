@@ -9,9 +9,10 @@ import (
 	"crypto/ecdsa"
 	"crypto/rand"
 	"fmt"
-	"github.com/conformal/btcec"
 	"math/big"
 	"testing"
+
+	"github.com/conformal/btcec"
 )
 
 type signatureTest struct {
