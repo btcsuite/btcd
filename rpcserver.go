@@ -1508,8 +1508,11 @@ func handleGetRawTransaction(s *rpcServer, cmd btcjson.Cmd, closeChan <-chan str
 	tx, err := s.server.txMemPool.FetchTransaction(txSha)
 	if err != nil {
 		txList, err := s.server.db.FetchTxBySha(txSha)
-		if err != nil || len(txList) == 0 {
+		if err != nil {
 			rpcsLog.Errorf("Error fetching tx: %v", err)
+			return nil, btcjson.ErrNoTxInfo
+		}
+		if len(txList) == 0 {
 			return nil, btcjson.ErrNoTxInfo
 		}
 
