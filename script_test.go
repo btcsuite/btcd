@@ -2929,6 +2929,13 @@ func (b *bogusAddress) IsForNet(net *btcnet.Params) bool {
 	return true // why not?
 }
 
+// String simply returns an empty string.  It exists to satsify the
+// btcutil.Address interface.
+func (b *bogusAddress) String() string {
+	return ""
+}
+
+
 func TestPayToAddrScript(t *testing.T) {
 	// 1MirQ9bwyQcGVJPwKUgapu5ouK2E2Ey4gX
 	p2pkhMain, err := btcutil.NewAddressPubKeyHash([]byte{
