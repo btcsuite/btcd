@@ -114,6 +114,7 @@ var rpcHandlersBeforeInit = map[string]commandHandler{
 	"setgenerate":          handleSetGenerate,
 	"stop":                 handleStop,
 	"submitblock":          handleSubmitBlock,
+	"validateaddress":      handleValidateAddress,
 	"verifychain":          handleVerifyChain,
 }
 
@@ -165,7 +166,6 @@ var rpcAskWallet = map[string]struct{}{
 	"settxfee":               struct{}{},
 	"signmessage":            struct{}{},
 	"signrawtransaction":     struct{}{},
-	"validateaddress":        struct{}{},
 	"verifymessage":          struct{}{},
 	"walletlock":             struct{}{},
 	"walletpassphrase":       struct{}{},
@@ -2168,6 +2168,24 @@ func verifyChain(db btcdb.Db, level, depth int32) error {
 	return nil
 }
 
+// handleValidateAddress implements the validateaddress command.
+func handleValidateAddress(s *rpcServer, cmd btcjson.Cmd, closeChan <-chan struct{}) (interface{}, error) {
+	c := cmd.(*btcjson.ValidateAddressCmd)
+
+	result := btcjson.ValidateAddressResult{}
+	addr, err := btcutil.DecodeAddress(c.Address, activeNetParams.Params)
+	if err != nil {
+		// Return the default value (false) for IsValid.
+		return result, nil
+	}
+
+	result.Address = addr.EncodeAddress()
+	result.IsValid = true
+
+	return result, nil
+}
+
+// handleVerifyChain implements the verifychain command.
 func handleVerifyChain(s *rpcServer, cmd btcjson.Cmd, closeChan <-chan struct{}) (interface{}, error) {
 	c := cmd.(*btcjson.VerifyChainCmd)
 
