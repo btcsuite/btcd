@@ -6,8 +6,9 @@ package btcwire_test
 
 import (
 	"bytes"
-	"github.com/conformal/btcwire"
 	"testing"
+
+	"github.com/conformal/btcwire"
 )
 
 func TestMemPool(t *testing.T) {

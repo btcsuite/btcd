@@ -7,8 +7,9 @@ package btcwire_test
 import (
 	"bytes"
 	"encoding/hex"
-	"github.com/conformal/btcwire"
 	"testing"
+
+	"github.com/conformal/btcwire"
 )
 
 // TestShaHash tests the ShaHash API.

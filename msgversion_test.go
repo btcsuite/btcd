@@ -6,14 +6,15 @@ package btcwire_test
 
 import (
 	"bytes"
-	"github.com/conformal/btcwire"
-	"github.com/davecgh/go-spew/spew"
 	"io"
 	"net"
 	"reflect"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/conformal/btcwire"
+	"github.com/davecgh/go-spew/spew"
 )
 
 // TestVersion tests the MsgVersion API.

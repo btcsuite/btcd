@@ -6,10 +6,11 @@ package btcwire_test
 
 import (
 	"bytes"
-	"github.com/conformal/btcwire"
 	"io"
 	"reflect"
 	"testing"
+
+	"github.com/conformal/btcwire"
 )
 
 // TestFilterCLearLatest tests the MsgFilterLoad API against the latest protocol

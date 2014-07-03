@@ -6,11 +6,12 @@ package btcwire_test
 
 import (
 	"bytes"
-	"github.com/conformal/btcwire"
-	"github.com/davecgh/go-spew/spew"
 	"io"
 	"reflect"
 	"testing"
+
+	"github.com/conformal/btcwire"
+	"github.com/davecgh/go-spew/spew"
 )
 
 // TestHeaders tests the MsgHeaders API.

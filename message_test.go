@@ -7,13 +7,14 @@ package btcwire_test
 import (
 	"bytes"
 	"encoding/binary"
-	"github.com/conformal/btcwire"
-	"github.com/davecgh/go-spew/spew"
 	"io"
 	"net"
 	"reflect"
 	"testing"
 	"time"
+
+	"github.com/conformal/btcwire"
+	"github.com/davecgh/go-spew/spew"
 )
 
 // makeHeader is a convenience function to make a message header in the form of

@@ -6,9 +6,10 @@ package btcwire_test
 
 import (
 	"bytes"
-	"github.com/conformal/btcwire"
 	"io/ioutil"
 	"testing"
+
+	"github.com/conformal/btcwire"
 )
 
 // genesisCoinbaseTx is the coinbase transaction for the genesis blocks for

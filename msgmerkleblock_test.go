@@ -7,12 +7,13 @@ package btcwire_test
 import (
 	"bytes"
 	"crypto/rand"
-	"github.com/conformal/btcwire"
-	"github.com/davecgh/go-spew/spew"
 	"io"
 	"reflect"
 	"testing"
 	"time"
+
+	"github.com/conformal/btcwire"
+	"github.com/davecgh/go-spew/spew"
 )
 
 // TestMerkleBlock tests the MsgMerkleBlock API.

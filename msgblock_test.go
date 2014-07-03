@@ -6,12 +6,13 @@ package btcwire_test
 
 import (
 	"bytes"
-	"github.com/conformal/btcwire"
-	"github.com/davecgh/go-spew/spew"
 	"io"
 	"reflect"
 	"testing"
 	"time"
+
+	"github.com/conformal/btcwire"
+	"github.com/davecgh/go-spew/spew"
 )
 
 // TestBlock tests the MsgBlock API.

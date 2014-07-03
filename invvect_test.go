@@ -6,10 +6,11 @@ package btcwire_test
 
 import (
 	"bytes"
-	"github.com/conformal/btcwire"
-	"github.com/davecgh/go-spew/spew"
 	"reflect"
 	"testing"
+
+	"github.com/conformal/btcwire"
+	"github.com/davecgh/go-spew/spew"
 )
 
 // TestInvVectStringer tests the stringized output for inventory vector types.

@@ -7,12 +7,13 @@ package btcwire_test
 import (
 	"bytes"
 	"fmt"
-	"github.com/conformal/btcwire"
-	"github.com/davecgh/go-spew/spew"
 	"io"
 	"reflect"
 	"strings"
 	"testing"
+
+	"github.com/conformal/btcwire"
+	"github.com/davecgh/go-spew/spew"
 )
 
 // mainNetGenesisHash is the hash of the first block in the block chain for the
