@@ -5,8 +5,9 @@
 package btcnet
 
 import (
-	"github.com/conformal/btcwire"
 	"time"
+
+	"github.com/conformal/btcwire"
 )
 
 // genesisCoinbaseTx is the coinbase transaction for the genesis blocks for

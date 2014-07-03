@@ -1,8 +1,9 @@
 package btcnet_test
 
 import (
-	. "github.com/conformal/btcnet"
 	"testing"
+
+	. "github.com/conformal/btcnet"
 )
 
 // Define some of the required parameters for a user-registered

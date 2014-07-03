@@ -6,9 +6,10 @@ package btcnet_test
 
 import (
 	"bytes"
+	"testing"
+
 	"github.com/conformal/btcnet"
 	"github.com/davecgh/go-spew/spew"
-	"testing"
 )
 
 // TestGenesisBlock tests the genesis block of the main network for validity by
