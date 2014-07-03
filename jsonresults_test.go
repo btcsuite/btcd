@@ -7,8 +7,9 @@ package btcjson_test
 import (
 	"bytes"
 	"encoding/json"
-	"github.com/conformal/btcjson"
 	"testing"
+
+	"github.com/conformal/btcjson"
 )
 
 var resulttests = []struct {

@@ -7,10 +7,11 @@ package btcjson_test
 import (
 	"bytes"
 	"fmt"
-	"github.com/conformal/btcjson"
 	"io"
 	"io/ioutil"
 	"testing"
+
+	"github.com/conformal/btcjson"
 )
 
 // cmdtests is a table of all the possible commands and a list of inputs,

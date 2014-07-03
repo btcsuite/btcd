@@ -7,8 +7,9 @@ package btcjson_test
 import (
 	"bytes"
 	"fmt"
-	"github.com/conformal/btcjson"
 	"testing"
+
+	"github.com/conformal/btcjson"
 )
 
 // TestMarshallAndSend tests the MarshallAndSend function to make sure it can

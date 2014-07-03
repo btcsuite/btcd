@@ -7,10 +7,11 @@ package btcjson
 
 import (
 	"encoding/json"
-	"github.com/davecgh/go-spew/spew"
 	"reflect"
 	"strings"
 	"testing"
+
+	"github.com/davecgh/go-spew/spew"
 )
 
 var testId = float64(1)
