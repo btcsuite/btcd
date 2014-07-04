@@ -85,6 +85,7 @@ var commandHandlers = map[string]*handlerData{
 	"getreceivedbyaccount":  {1, 1, displayGeneric, []conversionHandler{nil, toInt}, makeGetReceivedByAccount, "<account> [minconf=1]"},
 	"getreceivedbyaddress":  {1, 1, displayGeneric, []conversionHandler{nil, toInt}, makeGetReceivedByAddress, "<address> [minconf=1]"},
 	"gettransaction":        {1, 1, displayJSONDump, nil, makeGetTransaction, "txid"},
+	"gettxout":              {2, 1, displayJSONDump, []conversionHandler{nil, toInt, toBool}, makeGetTxOut, "<txid> <n> [includemempool=false]"},
 	"gettxoutsetinfo":       {0, 0, displayJSONDump, nil, makeGetTxOutSetInfo, ""},
 	"getwork":               {0, 1, displayJSONDump, nil, makeGetWork, "[data]"},
 	"help":                  {0, 1, displayGeneric, nil, makeHelp, "[commandName]"},
@@ -504,6 +505,15 @@ func makeGetReceivedByAddress(args []interface{}) (btcjson.Cmd, error) {
 // makeGetTransaction generates the cmd structure for gettransaction commands.
 func makeGetTransaction(args []interface{}) (btcjson.Cmd, error) {
 	return btcjson.NewGetTransactionCmd("btcctl", args[0].(string))
+}
+
+// makeGetTxOut generates the cmd structure for gettxout commands.
+func makeGetTxOut(args []interface{}) (btcjson.Cmd, error) {
+	opt := make([]bool, 0, 1)
+	if len(args) > 2 {
+		opt = append(opt, args[2].(bool))
+	}
+	return btcjson.NewGetTxOutCmd("btcctl", args[0].(string), args[1].(int), opt...)
 }
 
 // makeGetTxOutSetInfo generates the cmd structure for gettxoutsetinfo commands.
