@@ -125,17 +125,12 @@ func torLookupIP(host, proxy string) ([]net.IP, error) {
 
 // dnsDiscover looks up the list of peers resolved by DNS for all hosts in
 // seeders. If proxy is not "" then it is used as a tor proxy for the
-// resolution. If any errors occur then the seeder that errored will not have
-// any hosts in the list. Therefore if all hosts failed an empty slice of
-// strings will be returned.
-func dnsDiscover(seeder string) []net.IP {
-	discLog.Debugf("Fetching list of seeds from %v", seeder)
+// resolution.
+func dnsDiscover(seeder string) ([]net.IP, error) {
 	peers, err := btcdLookup(seeder)
 	if err != nil {
-		discLog.Debugf("Unable to fetch dns seeds from %s: %v",
-			seeder, err)
-		return []net.IP{}
+		return nil, err
 	}
 
-	return peers
+	return peers, nil
 }

@@ -474,33 +474,41 @@ func (s *server) seedFromDNS() {
 	}
 
 	for _, seeder := range activeNetParams.dnsSeeds {
-		seedpeers := dnsDiscover(seeder)
-		if len(seedpeers) == 0 {
-			continue
-		}
-		addresses := make([]*btcwire.NetAddress, len(seedpeers))
-		// if this errors then we have *real* problems
-		intPort, _ := strconv.Atoi(activeNetParams.DefaultPort)
-		for i, peer := range seedpeers {
-			addresses[i] = new(btcwire.NetAddress)
-			addresses[i].SetAddress(peer, uint16(intPort))
-			// bitcoind seeds with addresses from
-			// a time randomly selected between 3
-			// and 7 days ago.
-			addresses[i].Timestamp = time.Now().Add(-1 *
-				time.Second * time.Duration(secondsIn3Days+
-				s.addrManager.rand.Int31n(secondsIn4Days)))
-		}
+		go func(seeder string) {
+			seedpeers, err := dnsDiscover(seeder)
+			if err != nil {
+				discLog.Infof("DNS discovery failed on seed %s: %v", seeder, err)
+				return
+			}
+			numPeers := len(seedpeers)
 
-		// Bitcoind uses a lookup of the dns seeder here. This
-		// is rather strange since the values looked up by the
-		// DNS seed lookups will vary quite a lot.
-		// to replicate this behaviour we put all addresses as
-		// having come from the first one.
-		s.addrManager.AddAddresses(addresses, addresses[0])
+			discLog.Infof("%d addresses found from DNS seed %s", numPeers, seeder)
+
+			if numPeers == 0 {
+				return
+			}
+			addresses := make([]*btcwire.NetAddress, len(seedpeers))
+			// if this errors then we have *real* problems
+			intPort, _ := strconv.Atoi(activeNetParams.DefaultPort)
+			for i, peer := range seedpeers {
+				addresses[i] = new(btcwire.NetAddress)
+				addresses[i].SetAddress(peer, uint16(intPort))
+				// bitcoind seeds with addresses from
+				// a time randomly selected between 3
+				// and 7 days ago.
+				addresses[i].Timestamp = time.Now().Add(-1 *
+					time.Second * time.Duration(secondsIn3Days+
+					s.addrManager.rand.Int31n(secondsIn4Days)))
+			}
+
+			// Bitcoind uses a lookup of the dns seeder here. This
+			// is rather strange since the values looked up by the
+			// DNS seed lookups will vary quite a lot.
+			// to replicate this behaviour we put all addresses as
+			// having come from the first one.
+			s.addrManager.AddAddresses(addresses, addresses[0])
+		}(seeder)
 	}
-	// XXX if this is empty do we want to use hardcoded
-	// XXX peers like bitcoind does?
 }
 
 // peerHandler is used to handle peer operations such as adding and removing
@@ -617,10 +625,9 @@ out:
 			// Just check that we don't already have an address
 			// in the same group so that we are not connecting
 			// to the same network segment at the expense of
-			// others. bitcoind breaks out of the loop here, but
-			// we continue to try other addresses.
+			// others.
 			if state.outboundGroups[key] != 0 {
-				continue
+				break
 			}
 
 			tries++
