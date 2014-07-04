@@ -743,9 +743,10 @@ var jsoncmdtests = []struct {
 				10)
 		},
 		result: &GetTxOutCmd{
-			id:     testId,
-			Txid:   "sometx",
-			Output: 10,
+			id:             testId,
+			Txid:           "sometx",
+			Output:         10,
+			IncludeMempool: true,
 		},
 	},
 	{

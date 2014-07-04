@@ -192,6 +192,16 @@ type GetTransactionResult struct {
 	Hex             string                        `json:"hex"`
 }
 
+// GetTxOutResult models the data from the gettxout command.
+type GetTxOutResult struct {
+	BestBlock     string             `json:"bestblock"`
+	Confirmations int64              `json:"confirmations"`
+	Value         float64            `json:"value"`
+	ScriptPubKey  ScriptPubKeyResult `json:"scriptPubKey"`
+	Version       int32              `json:"version"`
+	Coinbase      bool               `json:"coinbase"`
+}
+
 // GetNetTotalsResult models the data returned from the getnettotals command.
 type GetNetTotalsResult struct {
 	TotalBytesRecv uint64 `json:"totalbytesrecv"`
@@ -249,18 +259,22 @@ func (v *Vin) MarshalJSON() ([]byte, error) {
 	return json.Marshal(txStruct)
 }
 
+// ScriptPubKeyResult models the scriptPubKey data of a tx script.  It is
+// defined separately since it is used by multiple commands.
+type ScriptPubKeyResult struct {
+	Asm       string   `json:"asm"`
+	Hex       string   `json:"hex,omitempty"`
+	ReqSigs   int32    `json:"reqSigs,omitempty"`
+	Type      string   `json:"type"`
+	Addresses []string `json:"addresses,omitempty"`
+}
+
 // Vout models parts of the tx data.  It is defined seperately since both
 // getrawtransaction and decoderawtransaction use the same structure.
 type Vout struct {
-	Value        float64 `json:"value"`
-	N            uint32  `json:"n"`
-	ScriptPubKey struct {
-		Asm       string   `json:"asm"`
-		Hex       string   `json:"hex"`
-		ReqSigs   int32    `json:"reqSigs,omitempty"`
-		Type      string   `json:"type"`
-		Addresses []string `json:"addresses,omitempty"`
-	} `json:"scriptPubKey"`
+	Value        float64            `json:"value"`
+	N            uint32             `json:"n"`
+	ScriptPubKey ScriptPubKeyResult `json:"scriptPubKey"`
 }
 
 // GetMiningInfoResult models the data from the getmininginfo command.
@@ -589,6 +603,15 @@ func ReadResultCmd(cmd string, message []byte) (Reply, error) {
 		err = json.Unmarshal(objmap["result"], &res)
 		if err == nil {
 			result.Result = res
+		}
+	case "gettxout":
+		var res *GetTxOutResult
+		err = json.Unmarshal(objmap["result"], &res)
+		if err == nil {
+			if res.ScriptPubKey.Addresses == nil {
+				res.ScriptPubKey.Addresses = []string{}
+			}
+			result.Result = true
 		}
 	case "getwork":
 		// getwork can either return a JSON object or a boolean

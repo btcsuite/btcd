@@ -3530,7 +3530,7 @@ var _ Cmd = &GetTxOutCmd{}
 
 // NewGetTxOutCmd creates a new GetTxOutCmd.
 func NewGetTxOutCmd(id interface{}, txid string, output int, optArgs ...bool) (*GetTxOutCmd, error) {
-	var mempool bool
+	mempool := true
 	if len(optArgs) > 0 {
 		if len(optArgs) > 1 {
 			return nil, ErrTooManyOptArgs
@@ -3560,7 +3560,7 @@ func (cmd *GetTxOutCmd) MarshalJSON() ([]byte, error) {
 	params := make([]interface{}, 2, 3)
 	params[0] = cmd.Txid
 	params[1] = cmd.Output
-	if cmd.IncludeMempool != false {
+	if !cmd.IncludeMempool {
 		params = append(params, cmd.IncludeMempool)
 	}
 
