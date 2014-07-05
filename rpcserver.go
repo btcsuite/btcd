@@ -107,7 +107,7 @@ var rpcHandlersBeforeInit = map[string]commandHandler{
 	"getpeerinfo":          handleGetPeerInfo,
 	"getrawmempool":        handleGetRawMempool,
 	"getrawtransaction":    handleGetRawTransaction,
-	"gettxout":             handleUnimplemented,
+	"gettxout":             handleGetTxOut,
 	"getwork":              handleGetWork,
 	"help":                 handleHelp,
 	"ping":                 handlePing,
@@ -1592,6 +1592,97 @@ func reverseUint32Array(b []byte) {
 		b[i], b[i+3] = b[i+3], b[i]
 		b[i+1], b[i+2] = b[i+2], b[i+1]
 	}
+}
+
+// handleCreateRawTransaction handles gettxout commands.
+func handleGetTxOut(s *rpcServer, cmd btcjson.Cmd, closeChan <-chan struct{}) (interface{}, error) {
+	c := cmd.(*btcjson.GetTxOutCmd)
+
+	// Convert the provided transaction hash hex to a ShaHash.
+	txSha, err := btcwire.NewShaHashFromStr(c.Txid)
+	if err != nil {
+		rpcsLog.Errorf("Error generating sha: %v", err)
+		return nil, btcjson.Error{
+			Code:    btcjson.ErrBlockNotFound.Code,
+			Message: "Parameter 1 must be a hexaecimal string",
+		}
+	}
+
+	// If requested and the tx is available in the mempool try to fetch it from
+	// there, otherwise attempt to fetch from the block database.
+	var mtx *btcwire.MsgTx
+	var bestBlockSha string
+	var confirmations int64
+	if c.IncludeMempool && s.server.txMemPool.HaveTransaction(txSha) {
+		tx, err := s.server.txMemPool.FetchTransaction(txSha)
+		if err != nil {
+			rpcsLog.Errorf("Error fetching tx: %v", err)
+			return nil, btcjson.ErrNoTxInfo
+		}
+		mtx = tx.MsgTx()
+		confirmations = 0
+		bestBlockSha = ""
+	} else {
+		txList, err := s.server.db.FetchTxBySha(txSha)
+		if err != nil || len(txList) == 0 {
+			rpcsLog.Errorf("Error fetching tx: %v", err)
+			return nil, btcjson.ErrNoTxInfo
+		}
+
+		lastTx := len(txList) - 1
+		mtx = txList[lastTx].Tx
+		blksha := txList[lastTx].BlkSha
+		txHeight := txList[lastTx].Height
+
+		_, bestHeight, err := s.server.db.NewestSha()
+		if err != nil {
+			rpcsLog.Errorf("Cannot get newest sha: %v", err)
+			return nil, btcjson.ErrBlockNotFound
+		}
+
+		confirmations = 1 + bestHeight - txHeight
+		bestBlockSha = blksha.String()
+	}
+
+	if c.Output < 0 || c.Output > len(mtx.TxOut)-1 || mtx.TxOut[c.Output] == nil {
+		return nil, btcjson.ErrInvalidTxVout
+	}
+
+	// Disassemble script into single line printable format.
+	script := mtx.TxOut[c.Output].PkScript
+	disbuf, err := btcscript.DisasmString(script)
+	if err != nil {
+		return nil, btcjson.Error{
+			Code:    btcjson.ErrInternal.Code,
+			Message: err.Error(),
+		}
+	}
+
+	// Get further info about the script.
+	// Ignore the error here since an error means the script couldn't parse
+	// and there is no additinal information about it anyways.
+	net := s.server.netParams
+	scriptClass, addrs, reqSigs, _ := btcscript.ExtractPkScriptAddrs(script, net)
+	addresses := make([]string, len(addrs))
+	for i, addr := range addrs {
+		addresses[i] = addr.EncodeAddress()
+	}
+
+	txOutReply := &btcjson.GetTxOutResult{
+		BestBlock:     bestBlockSha,
+		Confirmations: confirmations,
+		Value:         float64(mtx.TxOut[c.Output].Value) / float64(btcutil.SatoshiPerBitcoin),
+		Version:       mtx.Version,
+		ScriptPubKey: btcjson.ScriptPubKeyResult{
+			Asm:       disbuf,
+			Hex:       hex.EncodeToString(script),
+			ReqSigs:   int32(reqSigs),
+			Type:      scriptClass.String(),
+			Addresses: addresses,
+		},
+		Coinbase: btcchain.IsCoinBase(btcutil.NewTx(mtx)),
+	}
+	return txOutReply, nil
 }
 
 // handleGetWorkRequest is a helper for handleGetWork which deals with
