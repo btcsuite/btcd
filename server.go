@@ -1030,7 +1030,10 @@ out:
 				}
 				na := btcwire.NewNetAddressIPPort(externalip, uint16(listenPort),
 					btcwire.SFNodeNetwork)
-				s.addrManager.AddLocalAddress(na, addrmgr.UpnpPrio)
+				err = s.addrManager.AddLocalAddress(na, addrmgr.UpnpPrio)
+				if err != nil {
+					// XXX DeletePortMapping?
+				}
 				srvrLog.Warnf("Successfully bound via UPnP to %s", addrmgr.NetAddressKey(na))
 				first = false
 			}
@@ -1104,7 +1107,10 @@ func newServer(listenAddrs []string, db btcdb.Db, netParams *btcnet.Params) (*se
 					continue
 				}
 
-				amgr.AddLocalAddress(na, addrmgr.ManualPrio)
+				err = amgr.AddLocalAddress(na, addrmgr.ManualPrio)
+				if err != nil {
+					amgrLog.Warnf("Skipping specified external IP: %v", err)
+				}
 			}
 		} else if discover && cfg.Upnp {
 			nat, err = Discover()
@@ -1132,7 +1138,10 @@ func newServer(listenAddrs []string, db btcdb.Db, netParams *btcnet.Params) (*se
 				na := btcwire.NewNetAddressIPPort(ip,
 					uint16(port), btcwire.SFNodeNetwork)
 				if discover {
-					amgr.AddLocalAddress(na, addrmgr.InterfacePrio)
+					err = amgr.AddLocalAddress(na, addrmgr.InterfacePrio)
+					if err != nil {
+						amgrLog.Debugf("Skipping local address: %v", err)
+					}
 				}
 			}
 		}
@@ -1148,8 +1157,11 @@ func newServer(listenAddrs []string, db btcdb.Db, netParams *btcnet.Params) (*se
 			listeners = append(listeners, listener)
 
 			if discover {
-				if na, err := amgr.DeserialiseNetAddress(addr); err == nil {
-					amgr.AddLocalAddress(na, addrmgr.BoundPrio)
+				if na, err := amgr.DeserializeNetAddress(addr); err == nil {
+					err = amgr.AddLocalAddress(na, addrmgr.BoundPrio)
+					if err != nil {
+						amgrLog.Warnf("Skipping bound address: %v", err)
+					}
 				}
 			}
 		}
@@ -1163,8 +1175,11 @@ func newServer(listenAddrs []string, db btcdb.Db, netParams *btcnet.Params) (*se
 			}
 			listeners = append(listeners, listener)
 			if discover {
-				if na, err := amgr.DeserialiseNetAddress(addr); err == nil {
-					amgr.AddLocalAddress(na, addrmgr.BoundPrio)
+				if na, err := amgr.DeserializeNetAddress(addr); err == nil {
+					err = amgr.AddLocalAddress(na, addrmgr.BoundPrio)
+					if err != nil {
+						amgrLog.Debugf("Skipping bound address: %v", err)
+					}
 				}
 			}
 		}

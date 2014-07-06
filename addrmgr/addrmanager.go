@@ -35,7 +35,7 @@ const (
 
 	// dumpAddressInterval is the interval used to dump the address
 	// cache to disk for future use.
-	dumpAddressInterval = time.Minute * 2
+	dumpAddressInterval = time.Minute * 10
 
 	// triedBucketSize is the maximum number of addresses in each
 	// tried address bucket.
@@ -155,46 +155,30 @@ func bad(ka *knownAddress) bool {
 }
 
 // chance returns the selection probability for a known address.  The priority
-// depends upon how recent the address has been seen, how recent it was last
+// depends upon how recently the address has been seen, how recently it was last
 // attempted and how often attempts to connect to it have failed.
 func chance(ka *knownAddress) float64 {
-	c := 1.0
-
 	now := time.Now()
-	var lastSeen float64
-	var lastTry float64
-	if !ka.na.Timestamp.After(now) {
-		var dur time.Duration
-		if ka.na.Timestamp.IsZero() {
-			// use unix epoch to match bitcoind.
-			dur = now.Sub(time.Unix(0, 0))
+	lastSeen := now.Sub(ka.na.Timestamp)
+	lastAttempt := now.Sub(ka.lastattempt)
 
-		} else {
-			dur = now.Sub(ka.na.Timestamp)
-		}
-		lastSeen = dur.Seconds()
+	if lastSeen < 0 {
+		lastSeen = 0
 	}
-	if !ka.lastattempt.After(now) {
-		var dur time.Duration
-		if ka.lastattempt.IsZero() {
-			// use unix epoch to match bitcoind.
-			dur = now.Sub(time.Unix(0, 0))
-		} else {
-			dur = now.Sub(ka.lastattempt)
-		}
-		lastTry = dur.Seconds()
+	if lastAttempt < 0 {
+		lastAttempt = 0
 	}
 
-	c = 600.0 / (600.0 + lastSeen)
+	c := 600.0 / (600.0 + lastSeen.Seconds())
 
 	// Very recent attempts are less likely to be retried.
-	if lastTry > 60.0*10.0 {
+	if lastAttempt > 10*time.Minute {
 		c *= 0.01
 	}
 
 	// Failed attempts deprioritise.
-	if ka.attempts > 0 {
-		c /= float64(ka.attempts) * 1.5
+	for i := ka.attempts; i < 0; i++ {
+		c /= 1.5
 	}
 
 	return c
@@ -226,7 +210,7 @@ type AddrManager struct {
 func (a *AddrManager) updateAddress(netAddr, srcAddr *btcwire.NetAddress) {
 	// Filter out non-routable addresses. Note that non-routable
 	// also includes invalid and local addresses.
-	if !Routable(netAddr) {
+	if !IsRoutable(netAddr) {
 		return
 	}
 
@@ -420,7 +404,7 @@ out:
 	log.Trace("Address handler done")
 }
 
-type serialisedKnownAddress struct {
+type serializedKnownAddress struct {
 	Addr        string
 	Src         string
 	Attempts    int
@@ -430,10 +414,10 @@ type serialisedKnownAddress struct {
 	// no refcount or tried, that is available from context.
 }
 
-type serialisedAddrManager struct {
+type serializedAddrManager struct {
 	Version      int
 	Key          [32]byte
-	Addresses    []*serialisedKnownAddress
+	Addresses    []*serializedKnownAddress
 	NewBuckets   [newBucketCount][]string // string is NetAddressKey
 	TriedBuckets [triedBucketCount][]string
 }
@@ -446,14 +430,14 @@ func (a *AddrManager) savePeers() {
 	// First we make a serialisable datastructure so we can encode it to
 	// json.
 
-	sam := new(serialisedAddrManager)
+	sam := new(serializedAddrManager)
 	sam.Version = serialisationVersion
 	copy(sam.Key[:], a.key[:])
 
-	sam.Addresses = make([]*serialisedKnownAddress, len(a.addrIndex))
+	sam.Addresses = make([]*serializedKnownAddress, len(a.addrIndex))
 	i := 0
 	for k, v := range a.addrIndex {
-		ska := new(serialisedKnownAddress)
+		ska := new(serializedKnownAddress)
 		ska.Addr = k
 		ska.TimeStamp = v.na.Timestamp.Unix()
 		ska.Src = NetAddressKey(v.srcAddr)
@@ -510,7 +494,7 @@ func (a *AddrManager) loadPeers() {
 	filename := "peers.json"
 	filePath := filepath.Join(a.dataDir, filename)
 
-	err := a.deserialisePeers(filePath)
+	err := a.deserializePeers(filePath)
 	if err != nil {
 		log.Errorf("Failed to parse %s: %v", filePath, err)
 		// if it is invalid we nuke the old one unconditionally.
@@ -524,7 +508,7 @@ func (a *AddrManager) loadPeers() {
 	log.Infof("Loaded %d addresses from '%s'", a.nNew+a.nTried, filePath)
 }
 
-func (a *AddrManager) deserialisePeers(filePath string) error {
+func (a *AddrManager) deserializePeers(filePath string) error {
 
 	_, err := os.Stat(filePath)
 	if os.IsNotExist(err) {
@@ -536,7 +520,7 @@ func (a *AddrManager) deserialisePeers(filePath string) error {
 	}
 	defer r.Close()
 
-	var sam serialisedAddrManager
+	var sam serializedAddrManager
 	dec := json.NewDecoder(r)
 	err = dec.Decode(&sam)
 	if err != nil {
@@ -544,21 +528,21 @@ func (a *AddrManager) deserialisePeers(filePath string) error {
 	}
 
 	if sam.Version != serialisationVersion {
-		return fmt.Errorf("unknown version %v in serialised "+
+		return fmt.Errorf("unknown version %v in serialized "+
 			"addrmanager", sam.Version)
 	}
 	copy(a.key[:], sam.Key[:])
 
 	for _, v := range sam.Addresses {
 		ka := new(knownAddress)
-		ka.na, err = a.DeserialiseNetAddress(v.Addr)
+		ka.na, err = a.DeserializeNetAddress(v.Addr)
 		if err != nil {
-			return fmt.Errorf("failed to deserialise netaddress "+
+			return fmt.Errorf("failed to deserialize netaddress "+
 				"%s: %v", v.Addr, err)
 		}
-		ka.srcAddr, err = a.DeserialiseNetAddress(v.Src)
+		ka.srcAddr, err = a.DeserializeNetAddress(v.Src)
 		if err != nil {
-			return fmt.Errorf("failed to deserialise netaddress "+
+			return fmt.Errorf("failed to deserialize netaddress "+
 				"%s: %v", v.Src, err)
 		}
 		ka.attempts = v.Attempts
@@ -612,7 +596,8 @@ func (a *AddrManager) deserialisePeers(filePath string) error {
 	return nil
 }
 
-func (a *AddrManager) DeserialiseNetAddress(addr string) (*btcwire.NetAddress, error) {
+// DeserializeNetAddress converts a given address string to a *btcwire.NetAddress
+func (a *AddrManager) DeserializeNetAddress(addr string) (*btcwire.NetAddress, error) {
 	host, portStr, err := net.SplitHostPort(addr)
 	if err != nil {
 		return nil, err
@@ -803,7 +788,7 @@ func (a *AddrManager) HostToNetAddress(host string, port uint16, services btcwir
 // ip is in the range used for tor addresses then it will be transformed into
 // the relavent .onion address.
 func ipString(na *btcwire.NetAddress) string {
-	if Tor(na) {
+	if IsOnionCatTor(na) {
 		// We know now that na.IP is long enogh.
 		base32 := base32.StdEncoding.EncodeToString(na.IP[6:])
 		return strings.ToLower(base32) + ".onion"
@@ -844,7 +829,7 @@ func (a *AddrManager) GetAddress(class string, newBias int) *knownAddress {
 		(100.0 - float64(newBias))
 	newCorrelation := math.Sqrt(float64(a.nNew)) * float64(newBias)
 
-	if (newCorrelation+triedCorrelation)*a.rand.Float64() <
+	if ((newCorrelation + triedCorrelation) * a.rand.Float64()) <
 		triedCorrelation {
 		// Tried entry.
 		large := 1 << 30
@@ -906,12 +891,8 @@ func (a *AddrManager) find(addr *btcwire.NetAddress) *knownAddress {
 	return a.addrIndex[NetAddressKey(addr)]
 }
 
-/*
- * Connected - updates the last seen time but only every 20 minutes.
- * Good - last tried = last success = last seen = now. attmempts = 0.
- *      - move address to tried.
- * Attempted - set last tried to time. nattempts++
- */
+// Attempt increases the given address' attempt counter and updates
+// the last attempt time.
 func (a *AddrManager) Attempt(addr *btcwire.NetAddress) {
 	a.mtx.Lock()
 	defer a.mtx.Unlock()
@@ -1039,217 +1020,38 @@ func (a *AddrManager) Good(addr *btcwire.NetAddress) {
 	a.addrNew[newBucket][rmkey] = rmka
 }
 
-// RFC1918: IPv4 Private networks (10.0.0.0/8, 192.168.0.0/16, 172.16.0.0/12)
-var rfc1918ten = net.IPNet{IP: net.ParseIP("10.0.0.0"),
-					Mask: net.CIDRMask(8, 32)}
-var rfc1918oneninetwo = net.IPNet{IP: net.ParseIP("192.168.0.0"),
-					Mask: net.CIDRMask(16, 32)}
-var rfc1918oneseventwo = net.IPNet{IP: net.ParseIP("172.16.0.0"),
-	Mask: net.CIDRMask(12, 32)}
-
-func RFC1918(na *btcwire.NetAddress) bool {
-	return rfc1918ten.Contains(na.IP) ||
-		rfc1918oneninetwo.Contains(na.IP) ||
-		rfc1918oneseventwo.Contains(na.IP)
-}
-
-// RFC3849 IPv6 Documentation address  (2001:0DB8::/32)
-var rfc3849 = net.IPNet{IP: net.ParseIP("2001:0DB8::"),
-	Mask: net.CIDRMask(32, 128)}
-
-func RFC3849(na *btcwire.NetAddress) bool {
-	return rfc3849.Contains(na.IP)
-}
-
-// RFC3927 IPv4 Autoconfig (169.254.0.0/16)
-var rfc3927 = net.IPNet{IP: net.ParseIP("169.254.0.0"), Mask: net.CIDRMask(16, 32)}
-
-func RFC3927(na *btcwire.NetAddress) bool {
-	return rfc3927.Contains(na.IP)
-}
-
-// RFC3964 IPv6 6to4 (2002::/16)
-var rfc3964 = net.IPNet{IP: net.ParseIP("2002::"),
-	Mask: net.CIDRMask(16, 128)}
-
-func RFC3964(na *btcwire.NetAddress) bool {
-	return rfc3964.Contains(na.IP)
-}
-
-// RFC4193 IPv6 unique local (FC00::/7)
-var rfc4193 = net.IPNet{IP: net.ParseIP("FC00::"),
-	Mask: net.CIDRMask(7, 128)}
-
-func RFC4193(na *btcwire.NetAddress) bool {
-	return rfc4193.Contains(na.IP)
-}
-
-// RFC4380 IPv6 Teredo tunneling (2001::/32)
-var rfc4380 = net.IPNet{IP: net.ParseIP("2001::"),
-	Mask: net.CIDRMask(32, 128)}
-
-func RFC4380(na *btcwire.NetAddress) bool {
-	return rfc4380.Contains(na.IP)
-}
-
-// RFC4843 IPv6 ORCHID: (2001:10::/28)
-var rfc4843 = net.IPNet{IP: net.ParseIP("2001:10::"),
-	Mask: net.CIDRMask(28, 128)}
-
-func RFC4843(na *btcwire.NetAddress) bool {
-	return rfc4843.Contains(na.IP)
-}
-
-// RFC4862 IPv6 Autoconfig (FE80::/64)
-var rfc4862 = net.IPNet{IP: net.ParseIP("FE80::"),
-	Mask: net.CIDRMask(64, 128)}
-
-func RFC4862(na *btcwire.NetAddress) bool {
-	return rfc4862.Contains(na.IP)
-}
-
-// RFC6052: IPv6 well known prefix (64:FF9B::/96)
-var rfc6052 = net.IPNet{IP: net.ParseIP("64:FF9B::"),
-	Mask: net.CIDRMask(96, 128)}
-
-func RFC6052(na *btcwire.NetAddress) bool {
-	return rfc6052.Contains(na.IP)
-}
-
-// RFC6145: IPv6 IPv4 translated address ::FFFF:0:0:0/96
-var rfc6145 = net.IPNet{IP: net.ParseIP("::FFFF:0:0:0"),
-	Mask: net.CIDRMask(96, 128)}
-
-func RFC6145(na *btcwire.NetAddress) bool {
-	return rfc6145.Contains(na.IP)
-}
-
-var onioncatrange = net.IPNet{IP: net.ParseIP("FD87:d87e:eb43::"),
-	Mask: net.CIDRMask(48, 128)}
-
-func Tor(na *btcwire.NetAddress) bool {
-	// bitcoind encodes a .onion address as a 16 byte number by decoding the
-	// address prior to the .onion (i.e. the key hash) base32 into a ten
-	// byte number. it then stores the first 6 bytes of the address as
-	// 0xfD, 0x87, 0xD8, 0x7e, 0xeb, 0x43
-	// this is the same range used by onioncat, part of the
-	// RFC4193 Unique local IPv6 range.
-	// In summary the format is:
-	// { magic 6 bytes, 10 bytes base32 decode of key hash }
-	return onioncatrange.Contains(na.IP)
-}
-
-var zero4 = net.IPNet{IP: net.ParseIP("0.0.0.0"),
-	Mask: net.CIDRMask(8, 32)}
-
-func Local(na *btcwire.NetAddress) bool {
-	return na.IP.IsLoopback() || zero4.Contains(na.IP)
-}
-
-// Valid returns true if an address is not one of the invalid formats.
-// For IPv4 these are either a 0 or all bits set address. For IPv6 a zero
-// address or one that matches the RFC3849 documentation address format.
-func Valid(na *btcwire.NetAddress) bool {
-	// IsUnspecified returns if address is 0, so only all bits set, and
-	// RFC3849 need to be explicitly checked. bitcoind here also checks for
-	// invalid protocol addresses from earlier versions of bitcoind (before
-	// 0.2.9), however, since protocol versions before 70001 are
-	// disconnected by the bitcoin network now we have elided it.
-	return na.IP != nil && !(na.IP.IsUnspecified() || RFC3849(na) ||
-		na.IP.Equal(net.IPv4bcast))
-}
-
-// Routable returns whether a netaddress is routable on the public internet or
-// not. This is true as long as the address is valid and is not in any reserved
-// ranges.
-func Routable(na *btcwire.NetAddress) bool {
-	// TODO(oga) bitcoind doesn't include RFC3849 here, but should we?
-	return Valid(na) && !(RFC1918(na) || RFC3927(na) || RFC4862(na) ||
-		(RFC4193(na) && !Tor(na)) || RFC4843(na) || Local(na))
-}
-
-// GroupKey returns a string representing the network group an address
-// is part of.
-// This is the /16 for IPv6, the /32 (/36 for he.net) for IPv6, the string
-// "local" for a local address and the string "unroutable for an unroutable
-// address.
-func GroupKey(na *btcwire.NetAddress) string {
-	if Local(na) {
-		return "local"
-	}
-	if !Routable(na) {
-		return "unroutable"
-	}
-
-	if ipv4 := na.IP.To4(); ipv4 != nil {
-		return (&net.IPNet{IP: na.IP, Mask: net.CIDRMask(16, 32)}).String()
-	}
-	if RFC6145(na) || RFC6052(na) {
-		// last four bytes are the ip address
-		ip := net.IP(na.IP[12:16])
-		return (&net.IPNet{IP: ip, Mask: net.CIDRMask(16, 32)}).String()
-	}
-
-	if RFC3964(na) {
-		ip := net.IP(na.IP[2:7])
-		return (&net.IPNet{IP: ip, Mask: net.CIDRMask(16, 32)}).String()
-
-	}
-	if RFC4380(na) {
-		// teredo tunnels have the last 4 bytes as the v4 address XOR
-		// 0xff.
-		ip := net.IP(make([]byte, 4))
-		for i, byte := range na.IP[12:16] {
-			ip[i] = byte ^ 0xff
-		}
-		return (&net.IPNet{IP: ip, Mask: net.CIDRMask(16, 32)}).String()
-	}
-	if Tor(na) {
-		// group is keyed off the first 4 bits of the actual onion key.
-		return fmt.Sprintf("tor:%d", na.IP[6]&((1<<4)-1))
-	}
-
-	// OK, so now we know ourselves to be a IPv6 address.
-	// bitcoind uses /32 for everything, except for Hurricane Electric's
-	// (he.net) IP range, which it uses /36 for.
-	bits := 32
-	heNet := &net.IPNet{IP: net.ParseIP("2001:470::"),
-		Mask: net.CIDRMask(32, 128)}
-	if heNet.Contains(na.IP) {
-		bits = 36
-	}
-
-	return (&net.IPNet{IP: na.IP, Mask: net.CIDRMask(bits, 128)}).String()
-}
-
-// addressPrio is an enum type used to describe the heirarchy of local address
+// AddressPriority type is used to describe the heirarchy of local address
 // discovery methods.
-type addressPrio int
+type AddressPriority int
 
 const (
-	InterfacePrio addressPrio = iota // address of local interface.
-	BoundPrio                        // Address explicitly bound to.
-	UpnpPrio                         // External IP discovered from UPnP
-	HTTPPrio                         // Obtained from internet service.
-	ManualPrio                       // provided by --externalip.
+	// InterfacePrio signifies the address is on a local interface
+	InterfacePrio AddressPriority = iota
+
+	// BoundPrio signifies the address has been explicity bounded to.
+	BoundPrio
+
+	// UpnpPrio signifies the address was obtained from UPnP.
+	UpnpPrio
+
+	// HTTPPrio signifies the address was obtained from an external HTTP service.
+	HTTPPrio
+
+	// ManualPrio signifies the address was provided by --externalip.
+	ManualPrio
 )
 
 type localAddress struct {
 	na    *btcwire.NetAddress
-	score addressPrio
+	score AddressPriority
 }
 
 // AddLocalAddress adds na to the list of known local addresses to advertise
 // with the given priority.
-func (a *AddrManager) AddLocalAddress(na *btcwire.NetAddress,
-	priority addressPrio) {
-	// sanity check.
-	if !Routable(na) {
-		log.Debugf("rejecting address %s:%d due to routability",
-			na.IP, na.Port)
-		return
+func (a *AddrManager) AddLocalAddress(na *btcwire.NetAddress, priority AddressPriority) error {
+	if !IsRoutable(na) {
+		return fmt.Errorf("address %s is not routable", na.IP)
 	}
-	log.Debugf("adding address %s:%d", na.IP, na.Port)
 
 	a.lamtx.Lock()
 	defer a.lamtx.Unlock()
@@ -1266,10 +1068,12 @@ func (a *AddrManager) AddLocalAddress(na *btcwire.NetAddress,
 			}
 		}
 	}
+	return nil
 }
 
-// getReachabilityFrom returns the relative reachability of na from fromna.
-func getReachabilityFrom(na, fromna *btcwire.NetAddress) int {
+// getReachabilityFrom returns the relative reachability of the provided local
+// address to the provided remote address.
+func getReachabilityFrom(localAddr, remoteAddr *btcwire.NetAddress) int {
 	const (
 		Unreachable = 0
 		Default     = iota
@@ -1280,61 +1084,61 @@ func getReachabilityFrom(na, fromna *btcwire.NetAddress) int {
 		Private
 	)
 
-	if !Routable(fromna) {
+	if !IsRoutable(remoteAddr) {
 		return Unreachable
 	}
 
-	if Tor(fromna) {
-		if Tor(na) {
+	if IsOnionCatTor(remoteAddr) {
+		if IsOnionCatTor(localAddr) {
 			return Private
 		}
 
-		if Routable(na) && na.IP.To4() != nil {
+		if IsRoutable(localAddr) && IsIPv4(localAddr) {
 			return Ipv4
 		}
 
 		return Default
 	}
 
-	if RFC4380(fromna) {
-		if !Routable(na) {
+	if IsRFC4380(remoteAddr) {
+		if !IsRoutable(localAddr) {
 			return Default
 		}
 
-		if RFC4380(na) {
+		if IsRFC4380(localAddr) {
 			return Teredo
 		}
 
-		if na.IP.To4() != nil {
+		if IsIPv4(localAddr) {
 			return Ipv4
 		}
 
 		return Ipv6Weak
 	}
 
-	if fromna.IP.To4() != nil {
-		if Routable(na) && na.IP.To4() != nil {
+	if IsIPv4(remoteAddr) {
+		if IsRoutable(localAddr) && IsIPv4(localAddr) {
 			return Ipv4
 		}
-		return Default
+		return Unreachable
 	}
 
 	/* ipv6 */
 	var tunnelled bool
 	// Is our v6 is tunnelled?
-	if RFC3964(na) || RFC6052(na) || RFC6145(na) {
+	if IsRFC3964(localAddr) || IsRFC6052(localAddr) || IsRFC6145(localAddr) {
 		tunnelled = true
 	}
 
-	if !Routable(na) {
+	if !IsRoutable(localAddr) {
 		return Default
 	}
 
-	if RFC4380(na) {
+	if IsRFC4380(localAddr) {
 		return Teredo
 	}
 
-	if na.IP.To4() != nil {
+	if IsIPv4(localAddr) {
 		return Ipv4
 	}
 
@@ -1346,39 +1150,45 @@ func getReachabilityFrom(na, fromna *btcwire.NetAddress) int {
 	return Ipv6Strong
 }
 
-// getBestLocalAddress returns the most appropriate local address that we know
-// of to be contacted by rna.
-func (a *AddrManager) GetBestLocalAddress(rna *btcwire.NetAddress) *btcwire.NetAddress {
+// GetBestLocalAddress returns the most appropriate local address to use
+// for the given remote address.
+func (a *AddrManager) GetBestLocalAddress(remoteAddr *btcwire.NetAddress) *btcwire.NetAddress {
 	a.lamtx.Lock()
 	defer a.lamtx.Unlock()
 
 	bestreach := 0
-	var bestscore addressPrio
-	var bestna *btcwire.NetAddress
+	var bestscore AddressPriority
+	var bestAddress *btcwire.NetAddress
 	for _, la := range a.localAddresses {
-		reach := getReachabilityFrom(la.na, rna)
+		reach := getReachabilityFrom(la.na, remoteAddr)
 		if reach > bestreach ||
 			(reach == bestreach && la.score > bestscore) {
 			bestreach = reach
 			bestscore = la.score
-			bestna = la.na
+			bestAddress = la.na
 		}
 	}
-	if bestna != nil {
-		log.Debugf("Suggesting address %s:%d for %s:%d", bestna.IP,
-			bestna.Port, rna.IP, rna.Port)
+	if bestAddress != nil {
+		log.Debugf("Suggesting address %s:%d for %s:%d", bestAddress.IP,
+			bestAddress.Port, remoteAddr.IP, remoteAddr.Port)
 	} else {
-		log.Debugf("No worthy address for %s:%d", rna.IP, rna.Port)
+		log.Debugf("No worthy address for %s:%d", remoteAddr.IP,
+			remoteAddr.Port)
+
 		// Send something unroutable if nothing suitable.
-		bestna = &btcwire.NetAddress{
+		bestAddress = &btcwire.NetAddress{
 			Timestamp: time.Now(),
-			Services:  0,
-			IP:        net.IP([]byte{0, 0, 0, 0}),
+			Services:  btcwire.SFNodeNetwork,
 			Port:      0,
+		}
+		if !IsIPv4(remoteAddr) && !IsOnionCatTor(remoteAddr) {
+			bestAddress.IP = net.IPv6zero
+		} else {
+			bestAddress.IP = net.IPv4zero
 		}
 	}
 
-	return bestna
+	return bestAddress
 }
 
 // New returns a new bitcoin address manager.

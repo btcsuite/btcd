@@ -298,7 +298,7 @@ func (p *peer) updateAddresses(msg *btcwire.MsgVersion) {
 		if !cfg.DisableListen /* && isCurrent? */ {
 			// Get address that best matches.
 			lna := p.server.addrManager.GetBestLocalAddress(p.na)
-			if addrmgr.Routable(lna) {
+			if addrmgr.IsRoutable(lna) {
 				addresses := []*btcwire.NetAddress{lna}
 				p.pushAddrMsg(addresses)
 			}

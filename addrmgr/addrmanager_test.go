@@ -21,88 +21,9 @@ type naTest struct {
 	want string
 }
 
-type ipTest struct {
-	in       btcwire.NetAddress
-	rfc1918  bool
-	rfc3849  bool
-	rfc3927  bool
-	rfc3964  bool
-	rfc4193  bool
-	rfc4380  bool
-	rfc4843  bool
-	rfc4862  bool
-	rfc6052  bool
-	rfc6145  bool
-	local    bool
-	valid    bool
-	routable bool
-}
-
 // naTests houses all of the tests to be performed against the NetAddressKey
 // method.
 var naTests = make([]naTest, 0)
-var ipTests = make([]ipTest, 0)
-
-func addIPTest(ip string, rfc1918, rfc3849, rfc3927, rfc3964, rfc4193, rfc4380,
-	rfc4843, rfc4862, rfc6052, rfc6145, local, valid, routable bool) {
-	nip := net.ParseIP(ip)
-	na := btcwire.NetAddress{
-		Timestamp: time.Now(),
-		Services:  btcwire.SFNodeNetwork,
-		IP:        nip,
-		Port:      8333,
-	}
-	test := ipTest{na, rfc1918, rfc3849, rfc3927, rfc3964, rfc4193, rfc4380,
-		rfc4843, rfc4862, rfc6052, rfc6145, local, valid, routable}
-	ipTests = append(ipTests, test)
-}
-
-func addIPTests() {
-	addIPTest("10.255.255.255", true, false, false, false, false, false,
-		false, false, false, false, false, true, false)
-	addIPTest("192.168.0.1", true, false, false, false, false, false,
-		false, false, false, false, false, true, false)
-	addIPTest("172.31.255.1", true, false, false, false, false, false,
-		false, false, false, false, false, true, false)
-	addIPTest("172.32.1.1", false, false, false, false, false, false,
-		false, false, false, false, false, true, true)
-	addIPTest("169.254.250.120", false, false, true, false, false, false,
-		false, false, false, false, false, true, false)
-	addIPTest("0.0.0.0", false, false, false, false, false, false,
-		false, false, false, false, true, false, false)
-	addIPTest("255.255.255.255", false, false, false, false, false, false,
-		false, false, false, false, false, false, false)
-	addIPTest("127.0.0.1", false, false, false, false, false, false,
-		false, false, false, false, true, true, false)
-	addIPTest("fd00:dead::1", false, false, false, false, true, false,
-		false, false, false, false, false, true, false)
-	addIPTest("2001::1", false, false, false, false, false, true,
-		false, false, false, false, false, true, true)
-	addIPTest("2001:10:abcd::1:1", false, false, false, false, false, false,
-		true, false, false, false, false, true, false)
-	addIPTest("fe80::1", false, false, false, false, false, false,
-		false, true, false, false, false, true, false)
-	addIPTest("fe80:1::1", false, false, false, false, false, false,
-		false, false, false, false, false, true, true)
-	addIPTest("64:ff9b::1", false, false, false, false, false, false,
-		false, false, true, false, false, true, true)
-	addIPTest("::ffff:abcd:ef12:1", false, false, false, false, false, false,
-		false, false, false, false, false, true, true)
-	addIPTest("::1", false, false, false, false, false, false,
-		false, false, false, false, true, true, false)
-}
-
-func addNaTest(ip string, port uint16, want string) {
-	nip := net.ParseIP(ip)
-	na := btcwire.NetAddress{
-		Timestamp: time.Now(),
-		Services:  btcwire.SFNodeNetwork,
-		IP:        nip,
-		Port:      port,
-	}
-	test := naTest{na, want}
-	naTests = append(naTests, test)
-}
 
 // addNaTests
 func addNaTests() {
@@ -165,8 +86,62 @@ func addNaTests() {
 	addNaTest("fef3::4:4", 8336, "[fef3::4:4]:8336")
 }
 
+func addNaTest(ip string, port uint16, want string) {
+	nip := net.ParseIP(ip)
+	na := btcwire.NetAddress{
+		Timestamp: time.Now(),
+		Services:  btcwire.SFNodeNetwork,
+		IP:        nip,
+		Port:      port,
+	}
+	test := naTest{na, want}
+	naTests = append(naTests, test)
+}
+
 func lookupFunc(host string) ([]net.IP, error) {
 	return nil, errors.New("not implemented")
+}
+
+func TestAddLocalAddress(t *testing.T) {
+	var tests = []struct {
+		address btcwire.NetAddress
+		valid   bool
+	}{
+		{
+			btcwire.NetAddress{IP: net.ParseIP("192.168.0.100")},
+			false,
+		},
+		{
+			btcwire.NetAddress{IP: net.ParseIP("204.124.1.1")},
+			true,
+		},
+		{
+			btcwire.NetAddress{IP: net.ParseIP("::1")},
+			false,
+		},
+		{
+			btcwire.NetAddress{IP: net.ParseIP("fe80::1")},
+			false,
+		},
+		{
+			btcwire.NetAddress{IP: net.ParseIP("2620:100::1")},
+			true,
+		},
+	}
+	amgr := addrmgr.New("", nil)
+	for x, test := range tests {
+		result := amgr.AddLocalAddress(&test.address, addrmgr.InterfacePrio)
+		if result == nil && !test.valid {
+			t.Errorf("TestAddLocalAddress test #%d failed: %s should have "+
+				"been accepted", x, test.address.IP)
+			continue
+		}
+		if result != nil && test.valid {
+			t.Errorf("TestAddLocalAddress test #%d failed: %s should not have "+
+				"been accepted", test.address.IP)
+			continue
+		}
+	}
 }
 
 func TestGetAddress(t *testing.T) {
@@ -176,101 +151,95 @@ func TestGetAddress(t *testing.T) {
 	}
 }
 
-func TestIPTypes(t *testing.T) {
-	addIPTests()
+func TestGetBestLocalAddress(t *testing.T) {
+	localAddrs := []btcwire.NetAddress{
+		{IP: net.ParseIP("192.168.0.100")},
+		{IP: net.ParseIP("::1")},
+		{IP: net.ParseIP("fe80::1")},
+		{IP: net.ParseIP("2001:470::1")},
+	}
 
-	t.Logf("Running %d tests", len(ipTests))
-	for _, test := range ipTests {
-		rv := addrmgr.RFC1918(&test.in)
-		if rv != test.rfc1918 {
-			t.Errorf("RFC1918 %s\n got: %v want: %v", test.in.IP, rv, test.rfc1918)
+	var tests = []struct {
+		remoteAddr btcwire.NetAddress
+		want1      btcwire.NetAddress
+		want2      btcwire.NetAddress
+		want3      btcwire.NetAddress
+	}{
+		{
+			// Remote connection from public IPv4
+			btcwire.NetAddress{IP: net.ParseIP("204.124.8.1")},
+			btcwire.NetAddress{IP: net.IPv4zero},
+			btcwire.NetAddress{IP: net.ParseIP("204.124.8.100")},
+			btcwire.NetAddress{IP: net.ParseIP("fd87:d87e:eb43:25::1")},
+		},
+		{
+			// Remote connection from private IPv4
+			btcwire.NetAddress{IP: net.ParseIP("172.16.0.254")},
+			btcwire.NetAddress{IP: net.IPv4zero},
+			btcwire.NetAddress{IP: net.IPv4zero},
+			btcwire.NetAddress{IP: net.IPv4zero},
+		},
+		{
+			// Remote connection from public IPv6
+			btcwire.NetAddress{IP: net.ParseIP("2602:100:abcd::102")},
+			btcwire.NetAddress{IP: net.ParseIP("2001:470::1")},
+			btcwire.NetAddress{IP: net.ParseIP("2001:470::1")},
+			btcwire.NetAddress{IP: net.ParseIP("2001:470::1")},
+		},
+		/* XXX
+		{
+			// Remote connection from Tor
+			btcwire.NetAddress{IP: net.ParseIP("fd87:d87e:eb43::100")},
+			btcwire.NetAddress{IP: net.IPv4zero},
+			btcwire.NetAddress{IP: net.ParseIP("204.124.8.100")},
+			btcwire.NetAddress{IP: net.ParseIP("fd87:d87e:eb43:25::1")},
+		},
+		*/
+	}
+
+	amgr := addrmgr.New("", nil)
+	for _, localAddr := range localAddrs {
+		amgr.AddLocalAddress(&localAddr, addrmgr.InterfacePrio)
+	}
+
+	// Test against want1
+	for x, test := range tests {
+		got := amgr.GetBestLocalAddress(&test.remoteAddr)
+		if !test.want1.IP.Equal(got.IP) {
+			t.Errorf("TestGetBestLocalAddress test1 #%d failed for remote address %s: want %s got %s",
+				x, test.remoteAddr.IP, test.want1.IP, got.IP)
 			continue
 		}
 	}
-	for _, test := range ipTests {
-		rv := addrmgr.RFC3849(&test.in)
-		if rv != test.rfc3849 {
-			t.Errorf("RFC3849 %s\n got: %v want: %v", test.in.IP, rv, test.rfc3849)
+
+	// Add a public IP to the list of local addresses.
+	localAddr := btcwire.NetAddress{IP: net.ParseIP("204.124.8.100")}
+	amgr.AddLocalAddress(&localAddr, addrmgr.InterfacePrio)
+
+	// Test against want2
+	for x, test := range tests {
+		got := amgr.GetBestLocalAddress(&test.remoteAddr)
+		if !test.want2.IP.Equal(got.IP) {
+			t.Errorf("TestGetBestLocalAddress test2 #%d failed for remote address %s: want %s got %s",
+				x, test.remoteAddr.IP, test.want2.IP, got.IP)
 			continue
 		}
 	}
-	for _, test := range ipTests {
-		rv := addrmgr.RFC3927(&test.in)
-		if rv != test.rfc3927 {
-			t.Errorf("RFC3927 %s\n got: %v want: %v", test.in.IP, rv, test.rfc3927)
-			continue
+	/*
+		// Add a tor generated IP address
+		localAddr = btcwire.NetAddress{IP: net.ParseIP("fd87:d87e:eb43:25::1")}
+		amgr.AddLocalAddress(&localAddr, addrmgr.ManualPrio)
+
+		// Test against want3
+		for x, test := range tests {
+			got := amgr.GetBestLocalAddress(&test.remoteAddr)
+			if !test.want3.IP.Equal(got.IP) {
+				t.Errorf("TestGetBestLocalAddress test3 #%d failed for remote address %s: want %s got %s",
+					x, test.remoteAddr.IP, test.want3.IP, got.IP)
+				continue
+			}
 		}
-	}
-	for _, test := range ipTests {
-		rv := addrmgr.RFC3964(&test.in)
-		if rv != test.rfc3964 {
-			t.Errorf("RFC3964 %s\n got: %v want: %v", test.in.IP, rv, test.rfc3964)
-			continue
-		}
-	}
-	for _, test := range ipTests {
-		rv := addrmgr.RFC4193(&test.in)
-		if rv != test.rfc4193 {
-			t.Errorf("RFC4193 %s\n got: %v want: %v", test.in.IP, rv, test.rfc4193)
-			continue
-		}
-	}
-	for _, test := range ipTests {
-		rv := addrmgr.RFC4380(&test.in)
-		if rv != test.rfc4380 {
-			t.Errorf("RFC4380 %s\n got: %v want: %v", test.in.IP, rv, test.rfc4380)
-			continue
-		}
-	}
-	for _, test := range ipTests {
-		rv := addrmgr.RFC4843(&test.in)
-		if rv != test.rfc4843 {
-			t.Errorf("RFC4843 %s\n got: %v want: %v", test.in.IP, rv, test.rfc4843)
-			continue
-		}
-	}
-	for _, test := range ipTests {
-		rv := addrmgr.RFC4862(&test.in)
-		if rv != test.rfc4862 {
-			t.Errorf("RFC4862 %s\n got: %v want: %v", test.in.IP, rv, test.rfc4862)
-			continue
-		}
-	}
-	for _, test := range ipTests {
-		rv := addrmgr.RFC6052(&test.in)
-		if rv != test.rfc6052 {
-			t.Errorf("RFC6052 %s\n got: %v want: %v", test.in.IP, rv, test.rfc6052)
-			continue
-		}
-	}
-	for _, test := range ipTests {
-		rv := addrmgr.RFC6145(&test.in)
-		if rv != test.rfc6145 {
-			t.Errorf("RFC1918 %s\n got: %v want: %v", test.in.IP, rv, test.rfc6145)
-			continue
-		}
-	}
-	for _, test := range ipTests {
-		rv := addrmgr.Local(&test.in)
-		if rv != test.local {
-			t.Errorf("Local %s\n got: %v want: %v", test.in.IP, rv, test.local)
-			continue
-		}
-	}
-	for _, test := range ipTests {
-		rv := addrmgr.Valid(&test.in)
-		if rv != test.valid {
-			t.Errorf("Valid %s\n got: %v want: %v", test.in.IP, rv, test.valid)
-			continue
-		}
-	}
-	for _, test := range ipTests {
-		rv := addrmgr.Routable(&test.in)
-		if rv != test.routable {
-			t.Errorf("Routable %s\n got: %v want: %v", test.in.IP, rv, test.routable)
-			continue
-		}
-	}
+	*/
 }
 
 func TestNetAddressKey(t *testing.T) {
