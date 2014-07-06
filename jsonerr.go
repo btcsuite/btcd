@@ -148,6 +148,10 @@ var (
 		Code:    -5,
 		Message: "No information about newest block",
 	}
+	ErrInvalidTxVout = Error{
+		Code:    -5,
+		Message: "Ouput index number (vout) does not exist for transaction.",
+	}
 	ErrRawTxString = Error{
 		Code:    -32602,
 		Message: "Raw tx is not a string",

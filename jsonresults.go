@@ -607,11 +607,11 @@ func ReadResultCmd(cmd string, message []byte) (Reply, error) {
 	case "gettxout":
 		var res *GetTxOutResult
 		err = json.Unmarshal(objmap["result"], &res)
-		if err == nil {
+		if res != nil && err == nil {
 			if res.ScriptPubKey.Addresses == nil {
 				res.ScriptPubKey.Addresses = []string{}
 			}
-			result.Result = true
+			result.Result = res
 		}
 	case "getwork":
 		// getwork can either return a JSON object or a boolean
