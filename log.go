@@ -9,6 +9,8 @@ import (
 	"os"
 	"time"
 
+	"github.com/conformal/btcd/addrmgr"
+
 	"github.com/conformal/btcchain"
 	"github.com/conformal/btcdb"
 	"github.com/conformal/btclog"
@@ -89,6 +91,7 @@ func useLogger(subsystemID string, logger btclog.Logger) {
 	switch subsystemID {
 	case "AMGR":
 		amgrLog = logger
+		addrmgr.UseLogger(logger)
 
 	case "BCDB":
 		bcdbLog = logger

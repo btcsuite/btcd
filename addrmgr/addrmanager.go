@@ -2,7 +2,7 @@
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
-package main
+package addrmgr
 
 import (
 	"container/list"
@@ -94,84 +94,27 @@ const (
 	serialisationVersion = 1
 )
 
-// updateAddress is a helper function to either update an address already known
-// to the address manager, or to add the address if not already known.
-func (a *AddrManager) updateAddress(netAddr, srcAddr *btcwire.NetAddress) {
-	// Filter out non-routable addresses. Note that non-routable
-	// also includes invalid and local addresses.
-	if !Routable(netAddr) {
-		return
-	}
+// knownAddress tracks information about a known network address that is used
+// to determine how viable an address is.
+type knownAddress struct {
+	na          *btcwire.NetAddress
+	srcAddr     *btcwire.NetAddress
+	attempts    int
+	lastattempt time.Time
+	lastsuccess time.Time
+	tried       bool
+	refs        int // reference count of new buckets
+}
 
-	// Protect concurrent access.
-	a.mtx.Lock()
-	defer a.mtx.Unlock()
+// NetAddress returns the underlying btcwire.NetAddress associated with the
+// known address.
+func (ka *knownAddress) NetAddress() *btcwire.NetAddress {
+	return ka.na
+}
 
-	addr := NetAddressKey(netAddr)
-	ka := a.find(netAddr)
-	if ka != nil {
-		// TODO(oga) only update adresses periodically.
-		// Update the last seen time and services.
-		// note that to prevent causing excess garbage on getaddr
-		// messages the netaddresses in addrmaanger are *immutable*,
-		// if we need to change them then we replace the pointer with a
-		// new copy so that we don't have to copy every na for getaddr.
-		if netAddr.Timestamp.After(ka.na.Timestamp) ||
-			(ka.na.Services&netAddr.Services) !=
-				netAddr.Services {
-
-			naCopy := *ka.na
-			naCopy.Timestamp = netAddr.Timestamp
-			naCopy.AddService(netAddr.Services)
-			ka.na = &naCopy
-		}
-
-		// If already in tried, we have nothing to do here.
-		if ka.tried {
-			return
-		}
-
-		// Already at our max?
-		if ka.refs == newBucketsPerAddress {
-			return
-		}
-
-		// The more entries we have, the less likely we are to add more.
-		// likelyhood is 2N.
-		factor := int32(2 * ka.refs)
-		if a.rand.Int31n(factor) != 0 {
-			return
-		}
-	} else {
-		// Make a copy of the net address to avoid races since it is
-		// updated elsewhere in the addrmanager code and would otherwise
-		// change the actual netaddress on the peer.
-		netAddrCopy := *netAddr
-		ka = &knownAddress{na: &netAddrCopy, srcAddr: srcAddr}
-		a.addrIndex[addr] = ka
-		a.nNew++
-		// XXX time penalty?
-	}
-
-	bucket := a.getNewBucket(netAddr, srcAddr)
-
-	// Already exists?
-	if _, ok := a.addrNew[bucket][addr]; ok {
-		return
-	}
-
-	// Enforce max addresses.
-	if len(a.addrNew[bucket]) > newBucketSize {
-		amgrLog.Tracef("new bucket is full, expiring old ")
-		a.expireNew(bucket)
-	}
-
-	// Add to new bucket.
-	ka.refs++
-	a.addrNew[bucket][addr] = ka
-
-	amgrLog.Tracef("Added new address %s for a total of %d addresses",
-		addr, a.nTried+a.nNew)
+// LastAttempt returns the last time the known address was attempted.
+func (ka *knownAddress) LastAttempt() time.Time {
+	return ka.lastattempt
 }
 
 // bad returns true if the address in question has not been tried in the last
@@ -257,6 +200,107 @@ func chance(ka *knownAddress) float64 {
 	return c
 }
 
+// AddrManager provides a concurrency safe address manager for caching potential
+// peers on the bitcoin network.
+type AddrManager struct {
+	mtx            sync.Mutex
+	dataDir        string
+	lookupFunc     func(string) ([]net.IP, error)
+	rand           *rand.Rand
+	key            [32]byte
+	addrIndex      map[string]*knownAddress // address key to ka for all addrs.
+	addrNew        [newBucketCount]map[string]*knownAddress
+	addrTried      [triedBucketCount]*list.List
+	started        int32
+	shutdown       int32
+	wg             sync.WaitGroup
+	quit           chan struct{}
+	nTried         int
+	nNew           int
+	lamtx          sync.Mutex
+	localAddresses map[string]*localAddress
+}
+
+// updateAddress is a helper function to either update an address already known
+// to the address manager, or to add the address if not already known.
+func (a *AddrManager) updateAddress(netAddr, srcAddr *btcwire.NetAddress) {
+	// Filter out non-routable addresses. Note that non-routable
+	// also includes invalid and local addresses.
+	if !Routable(netAddr) {
+		return
+	}
+
+	// Protect concurrent access.
+	a.mtx.Lock()
+	defer a.mtx.Unlock()
+
+	addr := NetAddressKey(netAddr)
+	ka := a.find(netAddr)
+	if ka != nil {
+		// TODO(oga) only update adresses periodically.
+		// Update the last seen time and services.
+		// note that to prevent causing excess garbage on getaddr
+		// messages the netaddresses in addrmaanger are *immutable*,
+		// if we need to change them then we replace the pointer with a
+		// new copy so that we don't have to copy every na for getaddr.
+		if netAddr.Timestamp.After(ka.na.Timestamp) ||
+			(ka.na.Services&netAddr.Services) !=
+				netAddr.Services {
+
+			naCopy := *ka.na
+			naCopy.Timestamp = netAddr.Timestamp
+			naCopy.AddService(netAddr.Services)
+			ka.na = &naCopy
+		}
+
+		// If already in tried, we have nothing to do here.
+		if ka.tried {
+			return
+		}
+
+		// Already at our max?
+		if ka.refs == newBucketsPerAddress {
+			return
+		}
+
+		// The more entries we have, the less likely we are to add more.
+		// likelyhood is 2N.
+		factor := int32(2 * ka.refs)
+		if a.rand.Int31n(factor) != 0 {
+			return
+		}
+	} else {
+		// Make a copy of the net address to avoid races since it is
+		// updated elsewhere in the addrmanager code and would otherwise
+		// change the actual netaddress on the peer.
+		netAddrCopy := *netAddr
+		ka = &knownAddress{na: &netAddrCopy, srcAddr: srcAddr}
+		a.addrIndex[addr] = ka
+		a.nNew++
+		// XXX time penalty?
+	}
+
+	bucket := a.getNewBucket(netAddr, srcAddr)
+
+	// Already exists?
+	if _, ok := a.addrNew[bucket][addr]; ok {
+		return
+	}
+
+	// Enforce max addresses.
+	if len(a.addrNew[bucket]) > newBucketSize {
+		log.Tracef("new bucket is full, expiring old ")
+		a.expireNew(bucket)
+	}
+
+	// Add to new bucket.
+	ka.refs++
+	a.addrNew[bucket][addr] = ka
+
+	log.Tracef("Added new address %s for a total of %d addresses", addr,
+		a.nTried+a.nNew)
+}
+
 // expireNew makes space in the new buckets by expiring the really bad entries.
 // If no bad entries are available we look at a few and remove the oldest.
 func (a *AddrManager) expireNew(bucket int) {
@@ -268,7 +312,7 @@ func (a *AddrManager) expireNew(bucket int) {
 	var oldest *knownAddress
 	for k, v := range a.addrNew[bucket] {
 		if bad(v) {
-			amgrLog.Tracef("expiring bad address %v", k)
+			log.Tracef("expiring bad address %v", k)
 			delete(a.addrNew[bucket], k)
 			v.refs--
 			if v.refs == 0 {
@@ -286,7 +330,7 @@ func (a *AddrManager) expireNew(bucket int) {
 
 	if oldest != nil {
 		key := NetAddressKey(oldest.na)
-		amgrLog.Tracef("expiring oldest address %v", key)
+		log.Tracef("expiring oldest address %v", key)
 
 		delete(a.addrNew[bucket], key)
 		oldest.refs--
@@ -312,37 +356,6 @@ func (a *AddrManager) pickTried(bucket int) *list.Element {
 
 	}
 	return oldestElem
-}
-
-// knownAddress tracks information about a known network address that is used
-// to determine how viable an address is.
-type knownAddress struct {
-	na          *btcwire.NetAddress
-	srcAddr     *btcwire.NetAddress
-	attempts    int
-	lastattempt time.Time
-	lastsuccess time.Time
-	tried       bool
-	refs        int // reference count of new buckets
-}
-
-// AddrManager provides a concurrency safe address manager for caching potential
-// peers on the bitcoin network.
-type AddrManager struct {
-	mtx            sync.Mutex
-	rand           *rand.Rand
-	key            [32]byte
-	addrIndex      map[string]*knownAddress // address key to ka for all addrs.
-	addrNew        [newBucketCount]map[string]*knownAddress
-	addrTried      [triedBucketCount]*list.List
-	started        int32
-	shutdown       int32
-	wg             sync.WaitGroup
-	quit           chan struct{}
-	nTried         int
-	nNew           int
-	lamtx          sync.Mutex
-	localAddresses map[string]*localAddress
 }
 
 func (a *AddrManager) getNewBucket(netAddr, srcAddr *btcwire.NetAddress) int {
@@ -404,7 +417,7 @@ out:
 	dumpAddressTicker.Stop()
 	a.savePeers()
 	a.wg.Done()
-	amgrLog.Trace("Address handler done")
+	log.Trace("Address handler done")
 }
 
 type serialisedKnownAddress struct {
@@ -472,17 +485,17 @@ func (a *AddrManager) savePeers() {
 
 	// May give some way to specify this later.
 	filename := "peers.json"
-	filePath := filepath.Join(cfg.DataDir, filename)
+	filePath := filepath.Join(a.dataDir, filename)
 
 	w, err := os.Create(filePath)
 	if err != nil {
-		amgrLog.Error("Error opening file: ", filePath, err)
+		log.Error("Error opening file: ", filePath, err)
 		return
 	}
 	enc := json.NewEncoder(w)
 	defer w.Close()
 	if err := enc.Encode(&sam); err != nil {
-		amgrLog.Errorf("Failed to encode %s: %v", filePath, err)
+		log.Errorf("Failed to encode %s: %v", filePath, err)
 		return
 	}
 }
@@ -495,21 +508,20 @@ func (a *AddrManager) loadPeers() {
 
 	// May give some way to specify this later.
 	filename := "peers.json"
-	filePath := filepath.Join(cfg.DataDir, filename)
+	filePath := filepath.Join(a.dataDir, filename)
 
 	err := a.deserialisePeers(filePath)
 	if err != nil {
-		amgrLog.Errorf("Failed to parse %s: %v", filePath, err)
+		log.Errorf("Failed to parse %s: %v", filePath, err)
 		// if it is invalid we nuke the old one unconditionally.
 		err = os.Remove(filePath)
 		if err != nil {
-			amgrLog.Warn("Failed to remove corrupt peers "+
-				"file: ", err)
+			log.Warn("Failed to remove corrupt peers file: ", err)
 		}
 		a.reset()
 		return
 	}
-	amgrLog.Infof("Loaded %d addresses from '%s'", a.nNew+a.nTried, filePath)
+	log.Infof("Loaded %d addresses from '%s'", a.nNew+a.nTried, filePath)
 }
 
 func (a *AddrManager) deserialisePeers(filePath string) error {
@@ -539,12 +551,12 @@ func (a *AddrManager) deserialisePeers(filePath string) error {
 
 	for _, v := range sam.Addresses {
 		ka := new(knownAddress)
-		ka.na, err = deserialiseNetAddress(v.Addr)
+		ka.na, err = a.DeserialiseNetAddress(v.Addr)
 		if err != nil {
 			return fmt.Errorf("failed to deserialise netaddress "+
 				"%s: %v", v.Addr, err)
 		}
-		ka.srcAddr, err = deserialiseNetAddress(v.Src)
+		ka.srcAddr, err = a.DeserialiseNetAddress(v.Src)
 		if err != nil {
 			return fmt.Errorf("failed to deserialise netaddress "+
 				"%s: %v", v.Src, err)
@@ -600,7 +612,7 @@ func (a *AddrManager) deserialisePeers(filePath string) error {
 	return nil
 }
 
-func deserialiseNetAddress(addr string) (*btcwire.NetAddress, error) {
+func (a *AddrManager) DeserialiseNetAddress(addr string) (*btcwire.NetAddress, error) {
 	host, portStr, err := net.SplitHostPort(addr)
 	if err != nil {
 		return nil, err
@@ -610,7 +622,7 @@ func deserialiseNetAddress(addr string) (*btcwire.NetAddress, error) {
 		return nil, err
 	}
 
-	return hostToNetAddress(host, uint16(port), btcwire.SFNodeNetwork)
+	return a.HostToNetAddress(host, uint16(port), btcwire.SFNodeNetwork)
 }
 
 // Start begins the core address handler which manages a pool of known
@@ -621,7 +633,7 @@ func (a *AddrManager) Start() {
 		return
 	}
 
-	amgrLog.Trace("Starting address manager")
+	log.Trace("Starting address manager")
 
 	a.wg.Add(1)
 
@@ -635,12 +647,12 @@ func (a *AddrManager) Start() {
 // Stop gracefully shuts down the address manager by stopping the main handler.
 func (a *AddrManager) Stop() error {
 	if atomic.AddInt32(&a.shutdown, 1) != 1 {
-		amgrLog.Warnf("Address manager is already in the process of " +
+		log.Warnf("Address manager is already in the process of " +
 			"shutting down")
 		return nil
 	}
 
-	amgrLog.Infof("Address manager shutting down")
+	log.Infof("Address manager shutting down")
 	close(a.quit)
 	a.wg.Wait()
 	return nil
@@ -649,8 +661,7 @@ func (a *AddrManager) Stop() error {
 // AddAddresses adds new addresses to the address manager.  It enforces a max
 // number of addresses and silently ignores duplicate addresses.  It is
 // safe for concurrent access.
-func (a *AddrManager) AddAddresses(addrs []*btcwire.NetAddress,
-	srcAddr *btcwire.NetAddress) {
+func (a *AddrManager) AddAddresses(addrs []*btcwire.NetAddress, srcAddr *btcwire.NetAddress) {
 	for _, na := range addrs {
 		a.updateAddress(na, srcAddr)
 	}
@@ -670,8 +681,8 @@ func (a *AddrManager) AddAddressByIP(addrIP string) {
 	// Split IP and port
 	addr, portStr, err := net.SplitHostPort(addrIP)
 	if err != nil {
-		amgrLog.Warnf("AddADddressByIP given bullshit adddress"+
-			"(%s): %v", err)
+		log.Warnf("AddADddressByIP given bullshit adddress (%s): %v",
+			err)
 		return
 	}
 	// Put it in btcwire.Netaddress
@@ -679,12 +690,12 @@ func (a *AddrManager) AddAddressByIP(addrIP string) {
 	na.Timestamp = time.Now()
 	na.IP = net.ParseIP(addr)
 	if na.IP == nil {
-		amgrLog.Error("Invalid ip address:", addr)
+		log.Error("Invalid ip address:", addr)
 		return
 	}
 	port, err := strconv.ParseUint(portStr, 10, 0)
 	if err != nil {
-		amgrLog.Error("Invalid port: ", portStr, err)
+		log.Error("Invalid port: ", portStr, err)
 		return
 	}
 	na.Port = uint16(port)
@@ -757,22 +768,10 @@ func (a *AddrManager) reset() {
 	}
 }
 
-// NewAddrManager returns a new bitcoin address manager.
-// Use Start to begin processing asynchronous address updates.
-func NewAddrManager() *AddrManager {
-	am := AddrManager{
-		rand:           rand.New(rand.NewSource(time.Now().UnixNano())),
-		quit:           make(chan struct{}),
-		localAddresses: make(map[string]*localAddress),
-	}
-	am.reset()
-	return &am
-}
-
-// hostToNetAddress returns a netaddress given a host address. If the address is
+// HostToNetAddress returns a netaddress given a host address. If the address is
 // a tor .onion address this will be taken care of. else if the host is not an
 // IP address it will be resolved (via tor if required).
-func hostToNetAddress(host string, port uint16, services btcwire.ServiceFlag) (*btcwire.NetAddress, error) {
+func (a *AddrManager) HostToNetAddress(host string, port uint16, services btcwire.ServiceFlag) (*btcwire.NetAddress, error) {
 	// tor address is 16 char base32 + ".onion"
 	var ip net.IP
 	if len(host) == 22 && host[16:] == ".onion" {
@@ -787,7 +786,7 @@ func hostToNetAddress(host string, port uint16, services btcwire.ServiceFlag) (*
 		prefix := []byte{0xfd, 0x87, 0xd8, 0x7e, 0xeb, 0x43}
 		ip = net.IP(append(prefix, data...))
 	} else if ip = net.ParseIP(host); ip == nil {
-		ips, err := btcdLookup(host)
+		ips, err := a.lookupFunc(host)
 		if err != nil {
 			return nil, err
 		}
@@ -866,7 +865,7 @@ func (a *AddrManager) GetAddress(class string, newBias int) *knownAddress {
 			ka := e.Value.(*knownAddress)
 			randval := a.rand.Intn(large)
 			if float64(randval) < (factor * chance(ka) * float64(large)) {
-				amgrLog.Tracef("Selected %v from tried bucket",
+				log.Tracef("Selected %v from tried bucket",
 					NetAddressKey(ka.na))
 				return ka
 			}
@@ -894,7 +893,7 @@ func (a *AddrManager) GetAddress(class string, newBias int) *knownAddress {
 			}
 			randval := a.rand.Intn(large)
 			if float64(randval) < (factor * chance(ka) * float64(large)) {
-				amgrLog.Tracef("Selected %v from new bucket",
+				log.Tracef("Selected %v from new bucket",
 					NetAddressKey(ka.na))
 				return ka
 			}
@@ -1034,7 +1033,7 @@ func (a *AddrManager) Good(addr *btcwire.NetAddress) {
 	a.nNew++
 
 	rmkey := NetAddressKey(rmka.na)
-	amgrLog.Tracef("Replacing %s with %s in tried", rmkey, addrKey)
+	log.Tracef("Replacing %s with %s in tried", rmkey, addrKey)
 
 	// We made sure there is space here just above.
 	a.addrNew[newBucket][rmkey] = rmka
@@ -1240,18 +1239,17 @@ type localAddress struct {
 	score addressPrio
 }
 
-// addLocalAddress adds na to the list of known local addresses to advertise
+// AddLocalAddress adds na to the list of known local addresses to advertise
 // with the given priority.
-func (a *AddrManager) addLocalAddress(na *btcwire.NetAddress,
+func (a *AddrManager) AddLocalAddress(na *btcwire.NetAddress,
 	priority addressPrio) {
 	// sanity check.
 	if !Routable(na) {
-		amgrLog.Debugf("rejecting address %s:%d due to routability",
+		log.Debugf("rejecting address %s:%d due to routability",
 			na.IP, na.Port)
 		return
 	}
-	amgrLog.Debugf("adding address %s:%d",
-		na.IP, na.Port)
+	log.Debugf("adding address %s:%d", na.IP, na.Port)
 
 	a.lamtx.Lock()
 	defer a.lamtx.Unlock()
@@ -1349,8 +1347,8 @@ func getReachabilityFrom(na, fromna *btcwire.NetAddress) int {
 }
 
 // getBestLocalAddress returns the most appropriate local address that we know
-// of to be contacted by rna
-func (a *AddrManager) getBestLocalAddress(rna *btcwire.NetAddress) *btcwire.NetAddress {
+// of to be contacted by rna.
+func (a *AddrManager) GetBestLocalAddress(rna *btcwire.NetAddress) *btcwire.NetAddress {
 	a.lamtx.Lock()
 	defer a.lamtx.Unlock()
 
@@ -1367,11 +1365,10 @@ func (a *AddrManager) getBestLocalAddress(rna *btcwire.NetAddress) *btcwire.NetA
 		}
 	}
 	if bestna != nil {
-		amgrLog.Debugf("Suggesting address %s:%d for %s:%d",
-			bestna.IP, bestna.Port, rna.IP, rna.Port)
+		log.Debugf("Suggesting address %s:%d for %s:%d", bestna.IP,
+			bestna.Port, rna.IP, rna.Port)
 	} else {
-		amgrLog.Debugf("No worthy address for %s:%d",
-			rna.IP, rna.Port)
+		log.Debugf("No worthy address for %s:%d", rna.IP, rna.Port)
 		// Send something unroutable if nothing suitable.
 		bestna = &btcwire.NetAddress{
 			Timestamp: time.Now(),
@@ -1382,4 +1379,18 @@ func (a *AddrManager) getBestLocalAddress(rna *btcwire.NetAddress) *btcwire.NetA
 	}
 
 	return bestna
+}
+
+// New returns a new bitcoin address manager.
+// Use Start to begin processing asynchronous address updates.
+func New(dataDir string, lookupFunc func(string) ([]net.IP, error)) *AddrManager {
+	am := AddrManager{
+		dataDir:        dataDir,
+		lookupFunc:     lookupFunc,
+		rand:           rand.New(rand.NewSource(time.Now().UnixNano())),
+		quit:           make(chan struct{}),
+		localAddresses: make(map[string]*localAddress),
+	}
+	am.reset()
+	return &am
 }

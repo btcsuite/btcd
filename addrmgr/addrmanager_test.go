@@ -2,13 +2,15 @@
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
-package main
+package addrmgr_test
 
 import (
+	"errors"
 	"net"
 	"testing"
 	"time"
 
+	"github.com/conformal/btcd/addrmgr"
 	"github.com/conformal/btcwire"
 )
 
@@ -163,8 +165,12 @@ func addNaTests() {
 	addNaTest("fef3::4:4", 8336, "[fef3::4:4]:8336")
 }
 
+func lookupFunc(host string) ([]net.IP, error) {
+	return nil, errors.New("not implemented")
+}
+
 func TestGetAddress(t *testing.T) {
-	n := NewAddrManager()
+	n := addrmgr.New("testdir", lookupFunc)
 	if rv := n.GetAddress("any", 10); rv != nil {
 		t.Errorf("GetAddress failed: got: %v want: %v\n", rv, nil)
 	}
@@ -175,91 +181,91 @@ func TestIPTypes(t *testing.T) {
 
 	t.Logf("Running %d tests", len(ipTests))
 	for _, test := range ipTests {
-		rv := RFC1918(&test.in)
+		rv := addrmgr.RFC1918(&test.in)
 		if rv != test.rfc1918 {
 			t.Errorf("RFC1918 %s\n got: %v want: %v", test.in.IP, rv, test.rfc1918)
 			continue
 		}
 	}
 	for _, test := range ipTests {
-		rv := RFC3849(&test.in)
+		rv := addrmgr.RFC3849(&test.in)
 		if rv != test.rfc3849 {
 			t.Errorf("RFC3849 %s\n got: %v want: %v", test.in.IP, rv, test.rfc3849)
 			continue
 		}
 	}
 	for _, test := range ipTests {
-		rv := RFC3927(&test.in)
+		rv := addrmgr.RFC3927(&test.in)
 		if rv != test.rfc3927 {
 			t.Errorf("RFC3927 %s\n got: %v want: %v", test.in.IP, rv, test.rfc3927)
 			continue
 		}
 	}
 	for _, test := range ipTests {
-		rv := RFC3964(&test.in)
+		rv := addrmgr.RFC3964(&test.in)
 		if rv != test.rfc3964 {
 			t.Errorf("RFC3964 %s\n got: %v want: %v", test.in.IP, rv, test.rfc3964)
 			continue
 		}
 	}
 	for _, test := range ipTests {
-		rv := RFC4193(&test.in)
+		rv := addrmgr.RFC4193(&test.in)
 		if rv != test.rfc4193 {
 			t.Errorf("RFC4193 %s\n got: %v want: %v", test.in.IP, rv, test.rfc4193)
 			continue
 		}
 	}
 	for _, test := range ipTests {
-		rv := RFC4380(&test.in)
+		rv := addrmgr.RFC4380(&test.in)
 		if rv != test.rfc4380 {
 			t.Errorf("RFC4380 %s\n got: %v want: %v", test.in.IP, rv, test.rfc4380)
 			continue
 		}
 	}
 	for _, test := range ipTests {
-		rv := RFC4843(&test.in)
+		rv := addrmgr.RFC4843(&test.in)
 		if rv != test.rfc4843 {
 			t.Errorf("RFC4843 %s\n got: %v want: %v", test.in.IP, rv, test.rfc4843)
 			continue
 		}
 	}
 	for _, test := range ipTests {
-		rv := RFC4862(&test.in)
+		rv := addrmgr.RFC4862(&test.in)
 		if rv != test.rfc4862 {
 			t.Errorf("RFC4862 %s\n got: %v want: %v", test.in.IP, rv, test.rfc4862)
 			continue
 		}
 	}
 	for _, test := range ipTests {
-		rv := RFC6052(&test.in)
+		rv := addrmgr.RFC6052(&test.in)
 		if rv != test.rfc6052 {
 			t.Errorf("RFC6052 %s\n got: %v want: %v", test.in.IP, rv, test.rfc6052)
 			continue
 		}
 	}
 	for _, test := range ipTests {
-		rv := RFC6145(&test.in)
+		rv := addrmgr.RFC6145(&test.in)
 		if rv != test.rfc6145 {
 			t.Errorf("RFC1918 %s\n got: %v want: %v", test.in.IP, rv, test.rfc6145)
 			continue
 		}
 	}
 	for _, test := range ipTests {
-		rv := Local(&test.in)
+		rv := addrmgr.Local(&test.in)
 		if rv != test.local {
 			t.Errorf("Local %s\n got: %v want: %v", test.in.IP, rv, test.local)
 			continue
 		}
 	}
 	for _, test := range ipTests {
-		rv := Valid(&test.in)
+		rv := addrmgr.Valid(&test.in)
 		if rv != test.valid {
 			t.Errorf("Valid %s\n got: %v want: %v", test.in.IP, rv, test.valid)
 			continue
 		}
 	}
 	for _, test := range ipTests {
-		rv := Routable(&test.in)
+		rv := addrmgr.Routable(&test.in)
 		if rv != test.routable {
 			t.Errorf("Routable %s\n got: %v want: %v", test.in.IP, rv, test.routable)
 			continue
@@ -272,7 +278,7 @@ func TestNetAddressKey(t *testing.T) {
 
 	t.Logf("Running %d tests", len(naTests))
 	for i, test := range naTests {
-		key := NetAddressKey(&test.in)
+		key := addrmgr.NetAddressKey(&test.in)
 		if key != test.want {
 			t.Errorf("NetAddressKey #%d\n got: %s want: %s", i, key, test.want)
 			continue

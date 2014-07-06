@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/conformal/btcchain"
+	"github.com/conformal/btcd/addrmgr"
 	"github.com/conformal/btcdb"
 	"github.com/conformal/btcutil"
 	"github.com/conformal/btcwire"
@@ -253,7 +254,7 @@ func (p *peer) pushVersionMsg() error {
 
 	// Version message.
 	msg := btcwire.NewMsgVersion(
-		p.server.addrManager.getBestLocalAddress(p.na), theirNa,
+		p.server.addrManager.GetBestLocalAddress(p.na), theirNa,
 		p.server.nonce, int32(blockNum))
 	msg.AddUserAgent(userAgentName, userAgentVersion)
 
@@ -296,8 +297,8 @@ func (p *peer) updateAddresses(msg *btcwire.MsgVersion) {
 		// download and the local address is routable.
 		if !cfg.DisableListen /* && isCurrent? */ {
 			// Get address that best matches.
-			lna := p.server.addrManager.getBestLocalAddress(p.na)
-			if Routable(lna) {
+			lna := p.server.addrManager.GetBestLocalAddress(p.na)
+			if addrmgr.Routable(lna) {
 				addresses := []*btcwire.NetAddress{lna}
 				p.pushAddrMsg(addresses)
 			}
@@ -319,7 +320,7 @@ func (p *peer) updateAddresses(msg *btcwire.MsgVersion) {
 		// actually connected from.  One example of why this can happen
 		// is with NAT.  Only add the address to the address manager if
 		// the addresses agree.
-		if NetAddressKey(&msg.AddrMe) == NetAddressKey(p.na) {
+		if addrmgr.NetAddressKey(&msg.AddrMe) == addrmgr.NetAddressKey(p.na) {
 			p.server.addrManager.AddAddress(p.na, p.na)
 			p.server.addrManager.Good(p.na)
 		}
@@ -925,7 +926,7 @@ func (p *peer) pushAddrMsg(addresses []*btcwire.NetAddress) error {
 	msg := btcwire.NewMsgAddr()
 	for _, na := range addresses {
 		// Filter addresses the peer already knows about.
-		if _, ok := p.knownAddresses[NetAddressKey(na)]; ok {
+		if _, ok := p.knownAddresses[addrmgr.NetAddressKey(na)]; ok {
 			continue
 		}
 
@@ -993,7 +994,7 @@ func (p *peer) handleAddrMsg(msg *btcwire.MsgAddr) {
 		}
 
 		// Add address to known addresses for this peer.
-		p.knownAddresses[NetAddressKey(na)] = struct{}{}
+		p.knownAddresses[addrmgr.NetAddressKey(na)] = struct{}{}
 	}
 
 	// Add addresses to server address manager.  The address manager handles
@@ -1687,7 +1688,7 @@ func newOutboundPeer(s *server, addr string, persistent bool) *peer {
 		return nil
 	}
 
-	p.na, err = hostToNetAddress(host, uint16(port), 0)
+	p.na, err = s.addrManager.HostToNetAddress(host, uint16(port), 0)
 	if err != nil {
 		p.logError("Can not turn host %s into netaddress: %v",
 			host, err)

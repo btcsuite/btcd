@@ -11,6 +11,7 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	mrand "math/rand"
 	"net"
 	"runtime"
 	"strconv"
@@ -18,6 +19,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/conformal/btcd/addrmgr"
 	"github.com/conformal/btcdb"
 	"github.com/conformal/btcjson"
 	"github.com/conformal/btcnet"
@@ -71,7 +73,7 @@ type server struct {
 	bytesMutex           sync.Mutex // For the following two fields.
 	bytesReceived        uint64     // Total bytes received from all peers since start.
 	bytesSent            uint64     // Total bytes sent by all peers since start.
-	addrManager          *AddrManager
+	addrManager          *addrmgr.AddrManager
 	rpcServer            *rpcServer
 	blockManager         *blockManager
 	txMemPool            *txMemPool
@@ -224,7 +226,7 @@ func (s *server) handleAddPeerMsg(state *peerState, p *peer) bool {
 		state.peers.PushBack(p)
 		p.Start()
 	} else {
-		state.outboundGroups[GroupKey(p.na)]++
+		state.outboundGroups[addrmgr.GroupKey(p.na)]++
 		if p.persistent {
 			state.persistentPeers.PushBack(p)
 		} else {
@@ -256,7 +258,7 @@ func (s *server) handleDonePeerMsg(state *peerState, p *peer) {
 				return
 			}
 			if !p.inbound {
-				state.outboundGroups[GroupKey(p.na)]--
+				state.outboundGroups[addrmgr.GroupKey(p.na)]--
 			}
 			list.Remove(e)
 			srvrLog.Debugf("Removed peer %s", p)
@@ -418,7 +420,7 @@ func (s *server) handleQuery(querymsg interface{}, state *peerState) {
 			if peer.addr == msg.addr {
 				// Keep group counts ok since we remove from
 				// the list now.
-				state.outboundGroups[GroupKey(peer.na)]--
+				state.outboundGroups[addrmgr.GroupKey(peer.na)]--
 				// This is ok because we are not continuing
 				// to iterate so won't corrupt the loop.
 				state.persistentPeers.Remove(e)
@@ -473,6 +475,7 @@ func (s *server) seedFromDNS() {
 		return
 	}
 
+	randSource := mrand.New(mrand.NewSource(time.Now().UnixNano()))
 	for _, seeder := range activeNetParams.dnsSeeds {
 		go func(seeder string) {
 			seedpeers, err := dnsDiscover(seeder)
@@ -498,7 +501,7 @@ func (s *server) seedFromDNS() {
 				// and 7 days ago.
 				addresses[i].Timestamp = time.Now().Add(-1 *
 					time.Second * time.Duration(secondsIn3Days+
-					s.addrManager.rand.Int31n(secondsIn4Days)))
+					randSource.Int31n(secondsIn4Days)))
 			}
 
 			// Bitcoind uses a lookup of the dns seeder here. This
@@ -619,7 +622,7 @@ out:
 			if addr == nil {
 				break
 			}
-			key := GroupKey(addr.na)
+			key := addrmgr.GroupKey(addr.NetAddress())
 			// Address will not be invalid, local or unroutable
 			// because addrmanager rejects those on addition.
 			// Just check that we don't already have an address
@@ -641,18 +644,18 @@ out:
 
 			// only allow recent nodes (10mins) after we failed 30
 			// times
-			if time.Now().After(addr.lastattempt.Add(10*time.Minute)) &&
+			if time.Now().After(addr.LastAttempt().Add(10*time.Minute)) &&
 				tries < 30 {
 				continue
 			}
 
 			// allow nondefault ports after 50 failed tries.
-			if fmt.Sprintf("%d", addr.na.Port) !=
+			if fmt.Sprintf("%d", addr.NetAddress().Port) !=
 				activeNetParams.DefaultPort && tries < 50 {
 				continue
 			}
 
-			addrStr := NetAddressKey(addr.na)
+			addrStr := addrmgr.NetAddressKey(addr.NetAddress())
 
 			tries = 0
 			// any failure will be due to banned peers etc. we have
@@ -1027,8 +1030,8 @@ out:
 				}
 				na := btcwire.NewNetAddressIPPort(externalip, uint16(listenPort),
 					btcwire.SFNodeNetwork)
-				s.addrManager.addLocalAddress(na, UpnpPrio)
-				srvrLog.Warnf("Successfully bound via UPnP to %s", NetAddressKey(na))
+				s.addrManager.AddLocalAddress(na, addrmgr.UpnpPrio)
+				srvrLog.Warnf("Successfully bound via UPnP to %s", addrmgr.NetAddressKey(na))
 				first = false
 			}
 			timer.Reset(time.Minute * 15)
@@ -1057,7 +1060,7 @@ func newServer(listenAddrs []string, db btcdb.Db, netParams *btcnet.Params) (*se
 		return nil, err
 	}
 
-	amgr := NewAddrManager()
+	amgr := addrmgr.New(cfg.DataDir, btcdLookup)
 
 	var listeners []net.Listener
 	var nat NAT
@@ -1093,7 +1096,7 @@ func newServer(listenAddrs []string, db btcdb.Db, netParams *btcnet.Params) (*se
 					}
 					eport = uint16(port)
 				}
-				na, err := hostToNetAddress(host, eport,
+				na, err := amgr.HostToNetAddress(host, eport,
 					btcwire.SFNodeNetwork)
 				if err != nil {
 					srvrLog.Warnf("Not adding %s as "+
@@ -1101,7 +1104,7 @@ func newServer(listenAddrs []string, db btcdb.Db, netParams *btcnet.Params) (*se
 					continue
 				}
 
-				amgr.addLocalAddress(na, ManualPrio)
+				amgr.AddLocalAddress(na, addrmgr.ManualPrio)
 			}
 		} else if discover && cfg.Upnp {
 			nat, err = Discover()
@@ -1129,7 +1132,7 @@ func newServer(listenAddrs []string, db btcdb.Db, netParams *btcnet.Params) (*se
 				na := btcwire.NewNetAddressIPPort(ip,
 					uint16(port), btcwire.SFNodeNetwork)
 				if discover {
-					amgr.addLocalAddress(na, InterfacePrio)
+					amgr.AddLocalAddress(na, addrmgr.InterfacePrio)
 				}
 			}
 		}
@@ -1145,8 +1148,8 @@ func newServer(listenAddrs []string, db btcdb.Db, netParams *btcnet.Params) (*se
 			listeners = append(listeners, listener)
 
 			if discover {
-				if na, err := deserialiseNetAddress(addr); err == nil {
-					amgr.addLocalAddress(na, BoundPrio)
+				if na, err := amgr.DeserialiseNetAddress(addr); err == nil {
+					amgr.AddLocalAddress(na, addrmgr.BoundPrio)
 				}
 			}
 		}
@@ -1160,8 +1163,8 @@ func newServer(listenAddrs []string, db btcdb.Db, netParams *btcnet.Params) (*se
 			}
 			listeners = append(listeners, listener)
 			if discover {
-				if na, err := deserialiseNetAddress(addr); err == nil {
-					amgr.addLocalAddress(na, BoundPrio)
+				if na, err := amgr.DeserialiseNetAddress(addr); err == nil {
+					amgr.AddLocalAddress(na, addrmgr.BoundPrio)
 				}
 			}
 		}
