@@ -145,17 +145,33 @@ func (c *Client) NextID() uint64 {
 }
 
 // addRequest associates the passed jsonRequest with the passed id.  This allows
-// the response from the remote server to be unmarshalled to the appropriate
-// type and sent to the specified channel when it is received.
+// the response from the remote server to be unmarshalled to the appropiate type
+// and sent to the specified channel when it is received.
+//
+// If the client has already begun shutting down, ErrClientShutdown is returned
+// and the request is not added.
 //
 // This function is safe for concurrent access.
-func (c *Client) addRequest(id uint64, request *jsonRequest) {
+func (c *Client) addRequest(id uint64, request *jsonRequest) error {
 	c.requestLock.Lock()
 	defer c.requestLock.Unlock()
+
+	// A non-blocking read of the shutdown channel with the request lock
+	// held avoids adding the request to the client's internal data
+	// structures if the client is in the process of shutting down (and
+	// has not yet grabbed the request lock), or has finished shutdown
+	// already (responding to each outstanding request with
+	// ErrClientShutdown).
+	select {
+	case <-c.shutdown:
+		return ErrClientShutdown
+	default:
+	}
 
 	// TODO(davec): Already there?
 	element := c.requestList.PushBack(request)
 	c.requestMap[id] = element
+	return nil
 }
 
 // removeRequest returns and removes the jsonRequest which contains the response
@@ -779,10 +795,14 @@ func (c *Client) sendCmd(cmd btcjson.Cmd) chan *response {
 		return responseChan
 	}
 
-	c.addRequest(cmd.Id().(uint64), &jsonRequest{
+	err := c.addRequest(cmd.Id().(uint64), &jsonRequest{
 		cmd:          cmd,
 		responseChan: responseChan,
 	})
+	if err != nil {
+		responseChan <- &response{err: err}
+		return responseChan
+	}
 	c.marshalAndSend(cmd, responseChan)
 	return responseChan
 }
