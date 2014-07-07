@@ -802,7 +802,7 @@ func createVoutList(mtx *btcwire.MsgTx, net *btcnet.Params) ([]btcjson.Vout, err
 	voutList := make([]btcjson.Vout, len(mtx.TxOut))
 	for i, v := range mtx.TxOut {
 		voutList[i].N = uint32(i)
-		voutList[i].Value = float64(v.Value) / float64(btcutil.SatoshiPerBitcoin)
+		voutList[i].Value = float64(v.Value) / btcutil.SatoshiPerBitcoin
 
 		disbuf, err := btcscript.DisasmString(v.PkScript)
 		if err != nil {
@@ -1265,7 +1265,7 @@ func handleGetInfo(s *rpcServer, cmd btcjson.Cmd, closeChan <-chan struct{}) (in
 		Proxy:           cfg.Proxy,
 		Difficulty:      getDifficultyRatio(blkHeader.Bits),
 		TestNet:         cfg.TestNet3,
-		RelayFee:        float64(minTxRelayFee) / float64(btcutil.SatoshiPerBitcoin),
+		RelayFee:        float64(minTxRelayFee) / btcutil.SatoshiPerBitcoin,
 	}
 
 	return ret, nil
@@ -1446,7 +1446,7 @@ func handleGetRawMempool(s *rpcServer, cmd btcjson.Cmd, closeChan <-chan struct{
 			mpd := &btcjson.GetRawMempoolResult{
 				Size: int32(desc.Tx.MsgTx().SerializeSize()),
 				Fee: float64(desc.Fee) /
-					float64(btcutil.SatoshiPerBitcoin),
+					btcutil.SatoshiPerBitcoin,
 				Time:             desc.Added.Unix(),
 				Height:           desc.Height,
 				StartingPriority: 0, // We don't mine.

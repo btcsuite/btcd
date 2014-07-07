@@ -28,7 +28,7 @@ const (
 
 	// minHighPriority is the minimum priority value that allows a
 	// transaction to be considered high priority.
-	minHighPriority = btcutil.SatoshiPerBitcoin * 144 / 250
+	minHighPriority = btcutil.SatoshiPerBitcoin * 144.0 / 250
 
 	// blockHeaderOverhead is the max number of bytes it takes to serialize
 	// a block header and max possible transaction count.
@@ -666,13 +666,13 @@ mempoolLoop:
 		// the priority size or there are no more high-priority
 		// transactions.
 		if !sortedByFee && (blockPlusTxSize >= cfg.BlockPrioritySize ||
-			prioItem.priority <= float64(minHighPriority)) {
+			prioItem.priority <= minHighPriority) {
 
 			minrLog.Tracef("Switching to sort by fees per "+
 				"kilobyte blockSize %d >= BlockPrioritySize "+
 				"%d || priority %.2f <= minHighPriority %.2f",
 				blockPlusTxSize, cfg.BlockPrioritySize,
-				prioItem.priority, float64(minHighPriority))
+				prioItem.priority, minHighPriority)
 
 			sortedByFee = true
 			priorityQueue.SetLessFunc(txPQByFee)
@@ -684,7 +684,7 @@ mempoolLoop:
 			// final one in the high-priority section, so just fall
 			// though to the code below so it is added now.
 			if blockPlusTxSize > cfg.BlockPrioritySize ||
-				prioItem.priority < float64(minHighPriority) {
+				prioItem.priority < minHighPriority {
 
 				heap.Push(priorityQueue, prioItem)
 				continue

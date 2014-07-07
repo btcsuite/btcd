@@ -129,7 +129,7 @@ func toSatoshi(val string) (interface{}, error) {
 	if err != nil {
 		return nil, err
 	}
-	return int64(float64(btcutil.SatoshiPerBitcoin) * idx), nil
+	return int64(btcutil.SatoshiPerBitcoin * idx), nil
 }
 
 // toInt attempts to convert the passed string to an integer.  It returns the
@@ -720,7 +720,7 @@ func makeSendMany(args []interface{}) (btcjson.Cmd, error) {
 	}
 	pairs := make(map[string]int64)
 	for addr, value := range origPairs {
-		pairs[addr] = int64(float64(btcutil.SatoshiPerBitcoin) * value)
+		pairs[addr] = int64(btcutil.SatoshiPerBitcoin * value)
 	}
 
 	var optargs = make([]interface{}, 0, 2)
