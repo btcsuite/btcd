@@ -8,6 +8,7 @@ import (
 	"encoding/binary"
 	"fmt"
 	"os"
+	"strconv"
 	"sync"
 
 	"github.com/conformal/btcdb"
@@ -608,7 +609,7 @@ func (db *LevelDb) setclearSpentData(txsha *btcwire.ShaHash, idx uint32, set boo
 }
 
 func int64ToKey(keyint int64) []byte {
-	key := fmt.Sprintf("%d", keyint)
+	key := strconv.FormatInt(keyint, 10)
 	return []byte(key)
 }
 
