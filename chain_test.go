@@ -97,7 +97,11 @@ func TestHaveBlock(t *testing.T) {
 			continue
 		}
 
-		result := chain.HaveBlock(hash)
+		result, err := chain.HaveBlock(hash)
+		if err != nil {
+			t.Errorf("HaveBlock #%d unexpected error: %v", i, err)
+			return
+		}
 		if result != test.want {
 			t.Errorf("HaveBlock #%d got %v want %v", i, result,
 				test.want)

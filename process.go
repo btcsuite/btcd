@@ -38,10 +38,10 @@ const (
 
 // blockExists determines whether a block with the given hash exists either in
 // the main chain or any side chains.
-func (b *BlockChain) blockExists(hash *btcwire.ShaHash) bool {
+func (b *BlockChain) blockExists(hash *btcwire.ShaHash) (bool, error) {
 	// Check memory chain first (could be main chain or side chain blocks).
 	if _, ok := b.index[*hash]; ok {
-		return true
+		return true, nil
 	}
 
 	// Check in database (rest of main chain not in memory).
@@ -125,7 +125,11 @@ func (b *BlockChain) ProcessBlock(block *btcutil.Block, flags BehaviorFlags) (bo
 	log.Tracef("Processing block %v", blockHash)
 
 	// The block must not already exist in the main chain or side chains.
-	if b.blockExists(blockHash) {
+	exists, err := b.blockExists(blockHash)
+	if err != nil {
+		return false, err
+	}
+	if exists {
 		str := fmt.Sprintf("already have block %v", blockHash)
 		return false, ruleError(ErrDuplicateBlock, str)
 	}
@@ -185,14 +189,20 @@ func (b *BlockChain) ProcessBlock(block *btcutil.Block, flags BehaviorFlags) (bo
 
 	// Handle orphan blocks.
 	prevHash := &blockHeader.PrevBlock
-	if !prevHash.IsEqual(zeroHash) && !b.blockExists(prevHash) {
-		if !dryRun {
-			log.Infof("Adding orphan block %v with parent %v",
-				blockHash, prevHash)
-			b.addOrphanBlock(block)
+	if !prevHash.IsEqual(zeroHash) {
+		prevHashExists, err := b.blockExists(prevHash)
+		if err != nil {
+			return false, err
 		}
+		if !prevHashExists {
+			if !dryRun {
+				log.Infof("Adding orphan block %v with parent %v",
+					blockHash, prevHash)
+				b.addOrphanBlock(block)
+			}
 
-		return true, nil
+			return true, nil
+		}
 	}
 
 	// The block has passed all context independent checks and appears sane

@@ -175,8 +175,12 @@ func (b *BlockChain) DisableVerify(disable bool) {
 // be like part of the main chain, on a side chain, or in the orphan pool.
 //
 // This function is NOT safe for concurrent access.
-func (b *BlockChain) HaveBlock(hash *btcwire.ShaHash) bool {
-	return b.IsKnownOrphan(hash) || b.blockExists(hash)
+func (b *BlockChain) HaveBlock(hash *btcwire.ShaHash) (bool, error) {
+	exists, err := b.blockExists(hash)
+	if err != nil {
+		return false, err
+	}
+	return b.IsKnownOrphan(hash) || exists, nil
 }
 
 // IsKnownOrphan returns whether the passed hash is currently a known orphan.

@@ -103,7 +103,12 @@ func (b *BlockChain) findPreviousCheckpoint() (*btcutil.Block, error) {
 		// that we already have.
 		checkpointIndex := -1
 		for i := numCheckpoints - 1; i >= 0; i-- {
-			if b.db.ExistsSha(checkpoints[i].Hash) {
+			exists, err := b.db.ExistsSha(checkpoints[i].Hash)
+			if err != nil {
+				return nil, err
+			}
+
+			if exists {
 				checkpointIndex = i
 				break
 			}
@@ -222,7 +227,11 @@ func (b *BlockChain) IsCheckpointCandidate(block *btcutil.Block) (bool, error) {
 	}
 
 	// A checkpoint must be in the main chain.
-	if !b.db.ExistsSha(blockHash) {
+	exists, err := b.db.ExistsSha(blockHash)
+	if err != nil {
+		return false, err
+	}
+	if !exists {
 		return false, nil
 	}
 
