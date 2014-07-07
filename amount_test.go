@@ -29,49 +29,49 @@ func TestAmountCreation(t *testing.T) {
 			name:     "max producable",
 			amount:   21e6,
 			valid:    true,
-			expected: Amount(MaxSatoshi),
+			expected: MaxSatoshi,
 		},
 		{
 			name:     "min producable",
 			amount:   -21e6,
 			valid:    true,
-			expected: Amount(-MaxSatoshi),
+			expected: -MaxSatoshi,
 		},
 		{
 			name:     "exceeds max producable",
 			amount:   21e6 + 1e-8,
 			valid:    true,
-			expected: Amount(MaxSatoshi + 1),
+			expected: MaxSatoshi + 1,
 		},
 		{
 			name:     "exceeds min producable",
 			amount:   -21e6 - 1e-8,
 			valid:    true,
-			expected: Amount(-MaxSatoshi - 1),
+			expected: -MaxSatoshi - 1,
 		},
 		{
 			name:     "one hundred",
 			amount:   100,
 			valid:    true,
-			expected: Amount(100 * SatoshiPerBitcoin),
+			expected: 100 * SatoshiPerBitcoin,
 		},
 		{
 			name:     "fraction",
 			amount:   0.01234567,
 			valid:    true,
-			expected: Amount(1234567),
+			expected: 1234567,
 		},
 		{
 			name:     "rounding up",
 			amount:   54.999999999999943157,
 			valid:    true,
-			expected: Amount(55 * SatoshiPerBitcoin),
+			expected: 55 * SatoshiPerBitcoin,
 		},
 		{
 			name:     "rounding down",
 			amount:   55.000000000000056843,
 			valid:    true,
-			expected: Amount(55 * SatoshiPerBitcoin),
+			expected: 55 * SatoshiPerBitcoin,
 		},
 
 		// Negative tests.
@@ -120,28 +120,28 @@ func TestAmountUnitConversions(t *testing.T) {
 	}{
 		{
 			name:      "MBTC",
-			amount:    Amount(MaxSatoshi),
+			amount:    MaxSatoshi,
 			unit:      AmountMegaBTC,
 			converted: 21,
 			s:         "21 MBTC",
 		},
 		{
 			name:      "kBTC",
-			amount:    Amount(44433322211100),
+			amount:    44433322211100,
 			unit:      AmountKiloBTC,
 			converted: 444.33322211100,
 			s:         "444.333222111 kBTC",
 		},
 		{
 			name:      "BTC",
-			amount:    Amount(44433322211100),
+			amount:    44433322211100,
 			unit:      AmountBTC,
 			converted: 444333.22211100,
 			s:         "444333.222111 BTC",
 		},
 		{
 			name:      "mBTC",
-			amount:    Amount(44433322211100),
+			amount:    44433322211100,
 			unit:      AmountMilliBTC,
 			converted: 444333222.11100,
 			s:         "444333222.111 mBTC",
@@ -149,7 +149,7 @@ func TestAmountUnitConversions(t *testing.T) {
 		{
 
 			name:      "μBTC",
-			amount:    Amount(44433322211100),
+			amount:    44433322211100,
 			unit:      AmountMicroBTC,
 			converted: 444333222111.00,
 			s:         "444333222111 μBTC",
@@ -157,7 +157,7 @@ func TestAmountUnitConversions(t *testing.T) {
 		{
 
 			name:      "satoshi",
-			amount:    Amount(44433322211100),
+			amount:    44433322211100,
 			unit:      AmountSatoshi,
 			converted: 44433322211100,
 			s:         "44433322211100 Satoshi",
@@ -165,7 +165,7 @@ func TestAmountUnitConversions(t *testing.T) {
 		{
 
 			name:      "non-standard unit",
-			amount:    Amount(44433322211100),
+			amount:    44433322211100,
 			unit:      AmountUnit(-1),
 			converted: 4443332.2211100,
 			s:         "4443332.22111 1e-1 BTC",

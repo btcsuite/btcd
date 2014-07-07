@@ -5,17 +5,12 @@
 package btcutil
 
 const (
-	// satoshiPerBitcoin is the untyped version of SatoshiPerBitcoin.
-	//
-	// TODO(jrick): Switch the exported consts below to be untyped.
-	satoshiPerBitcoin = 1e8
-
 	// SatoshiPerBitcent is the number of satoshi in one bitcoin cent.
-	SatoshiPerBitcent int64 = 1e6
+	SatoshiPerBitcent = 1e6
 
 	// SatoshiPerBitcoin is the number of satoshi in one bitcoin (1 BTC).
-	SatoshiPerBitcoin int64 = satoshiPerBitcoin
+	SatoshiPerBitcoin = 1e8
 
 	// MaxSatoshi is the maximum transaction amount allowed in satoshi.
-	MaxSatoshi int64 = 21e6 * SatoshiPerBitcoin
+	MaxSatoshi = 21e6 * SatoshiPerBitcoin
 )
