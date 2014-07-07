@@ -109,10 +109,10 @@ func (db *LevelDb) getTxFullySpent(txsha *btcwire.ShaHash) ([]*spentTx, error) {
 	for i := range spentTxList {
 		offset := i * 20
 
-		blkHeight := binary.LittleEndian.Uint64(buf[offset:offset+8])
-		txOff := binary.LittleEndian.Uint32(buf[offset+8:offset+12])
-		txLen := binary.LittleEndian.Uint32(buf[offset+12:offset+16])
-		numTxO := binary.LittleEndian.Uint32(buf[offset+16:offset+20])
+		blkHeight := binary.LittleEndian.Uint64(buf[offset : offset+8])
+		txOff := binary.LittleEndian.Uint32(buf[offset+8 : offset+12])
+		txLen := binary.LittleEndian.Uint32(buf[offset+12 : offset+16])
+		numTxO := binary.LittleEndian.Uint32(buf[offset+16 : offset+20])
 
 		sTx := spentTx{
 			blkHeight: int64(blkHeight),
