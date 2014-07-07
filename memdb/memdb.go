@@ -668,42 +668,6 @@ func (db *MemDb) InsertBlock(block *btcutil.Block) (int64, error) {
 	return newHeight, nil
 }
 
-// InvalidateBlockCache releases all cached blocks.  This is part of the
-// btcdb.Db interface implementation.
-//
-// There is no need for a cache with this implementation since the entire
-// database is already in memory  As a result, this function doesn't do anything
-// useful and is only provided to conform to the interface.
-func (db *MemDb) InvalidateBlockCache() {
-	if db.closed {
-		log.Warnf("InvalidateBlockCache called after db close.")
-	}
-}
-
-// InvalidateCache releases all cached blocks and transactions.  This is part of
-// the btcdb.Db interface implementation.
-//
-// There is no need for a cache with this implementation since the entire
-// database is already in memory  As a result, this function doesn't do anything
-// useful and is only provided to conform to the interface.
-func (db *MemDb) InvalidateCache() {
-	if db.closed {
-		log.Warnf("InvalidateCache called after db close.")
-	}
-}
-
-// InvalidateTxCache releases all cached transactions.  This is part of the
-// btcdb.Db interface implementation.
-//
-// There is no need for a cache with this implementation since the entire
-// database is already in memory  As a result, this function doesn't do anything
-// useful and is only provided to conform to the interface.
-func (db *MemDb) InvalidateTxCache() {
-	if db.closed {
-		log.Warnf("InvalidateTxCache called after db close.")
-	}
-}
-
 // NewestSha returns the hash and block height of the most recent (end) block of
 // the block chain.  It will return the zero hash, -1 for the block height, and
 // no error (nil) if there are not any blocks in the database yet.  This is part
