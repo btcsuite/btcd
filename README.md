@@ -59,7 +59,6 @@ $ go get github.com/conformal/btcdb
 
 ## TODO
 - Increase test coverage to 100%
-- Allow other database backends
 
 ## GPG Verification Key
 
