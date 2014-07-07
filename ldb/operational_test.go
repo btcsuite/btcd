@@ -44,7 +44,11 @@ func testOperationalMode(t *testing.T) {
 	}
 	defer os.RemoveAll(dbname)
 	defer os.RemoveAll(dbnamever)
-	defer db.Close()
+	defer func() {
+		if err := db.Close(); err != nil {
+			t.Errorf("Close: unexpected error: %v", err)
+		}
+	}()
 
 	testdatafile := filepath.Join("..", "testdata", "blocks1-256.bz2")
 	blocks, err := loadBlocks(t, testdatafile)
@@ -67,9 +71,14 @@ out:
 				origintxsha := &txin.PreviousOutpoint.Hash
 				txneededList = append(txneededList, origintxsha)
 
-				if !db.ExistsTxSha(origintxsha) {
+				exists, err := db.ExistsTxSha(origintxsha)
+				if err != nil {
+					t.Errorf("ExistsTxSha: unexpected error %v ", err)
+				}
+				if !exists {
 					t.Errorf("referenced tx not found %v ", origintxsha)
 				}
+
 				_, err = db.FetchTxBySha(origintxsha)
 				if err != nil {
 					t.Errorf("referenced tx not found %v err %v ", origintxsha, err)
@@ -178,14 +187,20 @@ func testBackout(t *testing.T) {
 		t.Errorf("Failed to open test database %v", err)
 		return
 	}
-	defer db.Close()
+	defer func() {
+		if err := db.Close(); err != nil {
+			t.Errorf("Close: unexpected error: %v", err)
+		}
+	}()
 
 	sha, err := blocks[99].Sha()
 	if err != nil {
 		t.Errorf("failed to get block 99 sha err %v", err)
 		return
 	}
-	_ = db.ExistsSha(sha)
+	if _, err := db.ExistsSha(sha); err != nil {
+		t.Errorf("ExistsSha: unexpected error: %v")
+	}
 	_, err = db.FetchBlockBySha(sha)
 	if err != nil {
 		t.Errorf("failed to load block 99 from db %v", err)
@@ -197,7 +212,9 @@ func testBackout(t *testing.T) {
 		t.Errorf("failed to get block 110 sha err %v", err)
 		return
 	}
-	_ = db.ExistsSha(sha)
+	if _, err := db.ExistsSha(sha); err != nil {
+		t.Errorf("ExistsSha: unexpected error: %v")
+	}
 	_, err = db.FetchBlockBySha(sha)
 	if err != nil {
 		t.Errorf("loaded block 119 from db")
@@ -207,7 +224,10 @@ func testBackout(t *testing.T) {
 	block := blocks[119]
 	mblock := block.MsgBlock()
 	txsha, err := mblock.Transactions[0].TxSha()
-	exists := db.ExistsTxSha(&txsha)
+	exists, err := db.ExistsTxSha(&txsha)
+	if err != nil {
+		t.Errorf("ExistsTxSha: unexpected error %v ", err)
+	}
 	if !exists {
 		t.Errorf("tx %v not located db\n", txsha)
 	}

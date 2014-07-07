@@ -147,7 +147,7 @@ func (db *LevelDb) formatTxFullySpent(sTxList []*spentTx) []byte {
 }
 
 // ExistsTxSha returns if the given tx sha exists in the database
-func (db *LevelDb) ExistsTxSha(txsha *btcwire.ShaHash) (exists bool) {
+func (db *LevelDb) ExistsTxSha(txsha *btcwire.ShaHash) (bool, error) {
 	db.dbLock.Lock()
 	defer db.dbLock.Unlock()
 
@@ -156,15 +156,15 @@ func (db *LevelDb) ExistsTxSha(txsha *btcwire.ShaHash) (exists bool) {
 
 // existsTxSha returns if the given tx sha exists in the database.o
 // Must be called with the db lock held.
-func (db *LevelDb) existsTxSha(txSha *btcwire.ShaHash) (exists bool) {
+func (db *LevelDb) existsTxSha(txSha *btcwire.ShaHash) (bool, error) {
 	_, _, _, _, err := db.getTxData(txSha)
-	if err == nil {
-		return true
+	switch err {
+	case nil:
+		return true, nil
+	case leveldb.ErrNotFound:
+		return false, nil
 	}
-
-	// BUG(drahn) If there was an error beside non-existant deal with it.
-
-	return false
+	return false, err
 }
 
 // FetchTxByShaList returns the most recent tx of the name fully spent or not

@@ -29,15 +29,17 @@ func TestClosed(t *testing.T) {
 	if err != nil {
 		t.Errorf("InsertBlock: %v", err)
 	}
-	db.Close()
+	if err := db.Close(); err != nil {
+		t.Errorf("Close: unexpected error %v", err)
+	}
 
 	genesisHash := btcnet.MainNetParams.GenesisHash
 	if err := db.DropAfterBlockBySha(genesisHash); err != memdb.ErrDbClosed {
 		t.Errorf("DropAfterBlockBySha: unexpected error %v", err)
 	}
 
-	if exists := db.ExistsSha(genesisHash); exists != false {
-		t.Errorf("ExistsSha: genesis hash exists after close")
+	if _, err := db.ExistsSha(genesisHash); err != memdb.ErrDbClosed {
+		t.Errorf("ExistsSha: Unexpected error: %v", err)
 	}
 
 	if _, err := db.FetchBlockBySha(genesisHash); err != memdb.ErrDbClosed {
@@ -57,9 +59,8 @@ func TestClosed(t *testing.T) {
 	if err != nil {
 		t.Errorf("TxSha: unexpected error %v", err)
 	}
-	if exists := db.ExistsTxSha(&coinbaseHash); exists != false {
-		t.Errorf("ExistsTxSha: hash %v exists when it shouldn't",
-			&coinbaseHash)
+	if _, err := db.ExistsTxSha(&coinbaseHash); err != memdb.ErrDbClosed {
+		t.Errorf("ExistsTxSha: unexpected error %v", err)
 	}
 
 	if _, err := db.FetchTxBySha(genesisHash); err != memdb.ErrDbClosed {
@@ -103,9 +104,15 @@ func TestClosed(t *testing.T) {
 		t.Errorf("NewestSha: unexpected error %v", err)
 	}
 
-	// The following calls don't return errors from the interface to be able
-	// to detect a closed database, so just call them to ensure there are no
-	// panics.
-	db.Sync()
-	db.RollbackClose()
+	if err := db.Sync(); err != memdb.ErrDbClosed {
+		t.Errorf("Sync: unexpected error %v", err)
+	}
+
+	if err := db.RollbackClose(); err != memdb.ErrDbClosed {
+		t.Errorf("RollbackClose: unexpected error %v", err)
+	}
+
+	if err := db.Close(); err != memdb.ErrDbClosed {
+		t.Errorf("Close: unexpected error %v", err)
+	}
 }

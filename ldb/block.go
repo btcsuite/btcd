@@ -11,6 +11,7 @@ import (
 	"github.com/conformal/btcdb"
 	"github.com/conformal/btcutil"
 	"github.com/conformal/btcwire"
+	"github.com/conformal/goleveldb/leveldb"
 )
 
 // FetchBlockBySha - return a btcutil Block
@@ -186,30 +187,26 @@ func (db *LevelDb) fetchSha(sha *btcwire.ShaHash) (rbuf []byte,
 
 // ExistsSha looks up the given block hash
 // returns true if it is present in the database.
-func (db *LevelDb) ExistsSha(sha *btcwire.ShaHash) (exists bool) {
+func (db *LevelDb) ExistsSha(sha *btcwire.ShaHash) (bool, error) {
 	db.dbLock.Lock()
 	defer db.dbLock.Unlock()
 
 	// not in cache, try database
-	exists = db.blkExistsSha(sha)
-	return
+	return db.blkExistsSha(sha)
 }
 
 // blkExistsSha looks up the given block hash
 // returns true if it is present in the database.
 // CALLED WITH LOCK HELD
-func (db *LevelDb) blkExistsSha(sha *btcwire.ShaHash) bool {
-
+func (db *LevelDb) blkExistsSha(sha *btcwire.ShaHash) (bool, error) {
 	_, err := db.getBlkLoc(sha)
-
-	if err != nil {
-		/*
-			 should this warn if the failure is something besides does not exist ?
-			log.Warnf("blkExistsSha: fail %v", err)
-		*/
-		return false
+	switch err {
+	case nil:
+		return true, nil
+	case leveldb.ErrNotFound:
+		return false, nil
 	}
-	return true
+	return false, err
 }
 
 // FetchBlockShaByHeight returns a block hash based on its height in the

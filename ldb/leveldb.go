@@ -255,26 +255,27 @@ func CreateDB(args ...interface{}) (btcdb.Db, error) {
 	return db, err
 }
 
-func (db *LevelDb) close() {
-	db.lDb.Close()
+func (db *LevelDb) close() error {
+	return db.lDb.Close()
 }
 
 // Sync verifies that the database is coherent on disk,
 // and no outstanding transactions are in flight.
-func (db *LevelDb) Sync() {
+func (db *LevelDb) Sync() error {
 	db.dbLock.Lock()
 	defer db.dbLock.Unlock()
 
 	// while specified by the API, does nothing
 	// however does grab lock to verify it does not return until other operations are complete.
+	return nil
 }
 
 // Close cleanly shuts down database, syncing all data.
-func (db *LevelDb) Close() {
+func (db *LevelDb) Close() error {
 	db.dbLock.Lock()
 	defer db.dbLock.Unlock()
 
-	db.close()
+	return db.close()
 }
 
 // DropAfterBlockBySha will remove any blocks from the database after
@@ -682,9 +683,9 @@ func (db *LevelDb) processBatches() error {
 	return nil
 }
 
-func (db *LevelDb) RollbackClose() {
+func (db *LevelDb) RollbackClose() error {
 	db.dbLock.Lock()
 	defer db.dbLock.Unlock()
 
-	db.close()
+	return db.close()
 }

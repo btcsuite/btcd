@@ -37,14 +37,20 @@ func TestEmptyDB(t *testing.T) {
 	}
 
 	// This is a reopen test
-	db.Close()
+	if err := db.Close(); err != nil {
+		t.Errorf("Close: unexpected error: %v", err)
+	}
 
 	db, err = btcdb.OpenDB("leveldb", dbname)
 	if err != nil {
 		t.Errorf("Failed to open test database %v", err)
 		return
 	}
-	defer db.Close()
+	defer func() {
+		if err := db.Close(); err != nil {
+			t.Errorf("Close: unexpected error: %v", err)
+		}
+	}()
 
 	sha, height, err = db.NewestSha()
 	if !sha.IsEqual(&btcwire.ShaHash{}) {

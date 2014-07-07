@@ -29,7 +29,11 @@ func Test_dupTx(t *testing.T) {
 	}
 	defer os.RemoveAll(dbname)
 	defer os.RemoveAll(dbnamever)
-	defer db.Close()
+	defer func() {
+		if err := db.Close(); err != nil {
+			t.Errorf("Close: unexpected error: %v", err)
+		}
+	}()
 
 	testdatafile := filepath.Join("testdata", "blocks1-256.bz2")
 	blocks, err := loadBlocks(t, testdatafile)
@@ -58,7 +62,11 @@ out:
 				origintxsha := &txin.PreviousOutpoint.Hash
 				txneededList = append(txneededList, origintxsha)
 
-				if !db.ExistsTxSha(origintxsha) {
+				exists, err := db.ExistsTxSha(origintxsha)
+				if err != nil {
+					t.Errorf("ExistsTxSha: unexpected error %v ", err)
+				}
+				if !exists {
 					t.Errorf("referenced tx not found %v ", origintxsha)
 				}
 

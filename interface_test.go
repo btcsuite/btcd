@@ -85,7 +85,13 @@ func testNewestSha(tc *testContext) bool {
 // testExistsSha ensures ExistsSha conforms to the interface contract.
 func testExistsSha(tc *testContext) bool {
 	// The block must exist in the database.
-	if exists := tc.db.ExistsSha(tc.blockHash); !exists {
+	exists, err := tc.db.ExistsSha(tc.blockHash)
+	if err != nil {
+		tc.t.Errorf("ExistsSha (%s): block #%d (%s) unexpected error: "+
+			"%v", tc.dbType, tc.blockHeight, tc.blockHash, err)
+		return false
+	}
+	if !exists {
 		tc.t.Errorf("ExistsSha (%s): block #%d (%s) does not exist",
 			tc.dbType, tc.blockHeight, tc.blockHash)
 		return false
@@ -232,7 +238,14 @@ func testExistsTxSha(tc *testContext) bool {
 	for i, tx := range tc.block.Transactions() {
 		// The transaction must exist in the database.
 		txHash := tx.Sha()
-		if exists := tc.db.ExistsTxSha(txHash); !exists {
+		exists, err := tc.db.ExistsTxSha(txHash)
+		if err != nil {
+			tc.t.Errorf("ExistsTxSha (%s): block #%d (%s) tx #%d "+
+				"(%s) unexpected error: %v", tc.dbType,
+				tc.blockHeight, tc.blockHash, i, txHash, err)
+			return false
+		}
+		if !exists {
 			_, err := tc.db.FetchTxBySha(txHash)
 			if err != nil {
 				tc.t.Errorf("ExistsTxSha (%s): block #%d (%s) "+

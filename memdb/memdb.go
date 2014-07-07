@@ -138,14 +138,19 @@ func (db *MemDb) removeTx(msgTx *btcwire.MsgTx, txHash *btcwire.ShaHash) {
 //
 // All data is purged upon close with this implementation since it is a
 // memory-only database.
-func (db *MemDb) Close() {
+func (db *MemDb) Close() error {
 	db.Lock()
 	defer db.Unlock()
+
+	if db.closed {
+		return ErrDbClosed
+	}
 
 	db.blocks = nil
 	db.blocksBySha = nil
 	db.txns = nil
 	db.closed = true
+	return nil
 }
 
 // DropAfterBlockBySha removes any blocks from the database after the given
@@ -192,20 +197,19 @@ func (db *MemDb) DropAfterBlockBySha(sha *btcwire.ShaHash) error {
 
 // ExistsSha returns whether or not the given block hash is present in the
 // database.  This is part of the btcdb.Db interface implementation.
-func (db *MemDb) ExistsSha(sha *btcwire.ShaHash) bool {
+func (db *MemDb) ExistsSha(sha *btcwire.ShaHash) (bool, error) {
 	db.Lock()
 	defer db.Unlock()
 
 	if db.closed {
-		log.Warnf("ExistsSha called after db close.")
-		return false
+		return false, ErrDbClosed
 	}
 
 	if _, exists := db.blocksBySha[*sha]; exists {
-		return true
+		return true, nil
 	}
 
-	return false
+	return false, nil
 }
 
 // FetchBlockBySha returns a btcutil.Block.  The implementation may cache the
@@ -346,20 +350,19 @@ func (db *MemDb) FetchHeightRange(startHeight, endHeight int64) ([]btcwire.ShaHa
 // ExistsTxSha returns whether or not the given transaction hash is present in
 // the database and is not fully spent.  This is part of the btcdb.Db interface
 // implementation.
-func (db *MemDb) ExistsTxSha(sha *btcwire.ShaHash) bool {
+func (db *MemDb) ExistsTxSha(sha *btcwire.ShaHash) (bool, error) {
 	db.Lock()
 	defer db.Unlock()
 
 	if db.closed {
-		log.Warnf("ExistsTxSha called after db close.")
-		return false
+		return false, ErrDbClosed
 	}
 
 	if txns, exists := db.txns[*sha]; exists {
-		return !isFullySpent(txns[len(txns)-1])
+		return !isFullySpent(txns[len(txns)-1]), nil
 	}
 
-	return false
+	return false, nil
 }
 
 // FetchTxBySha returns some data for the given transaction hash. The
@@ -702,10 +705,10 @@ func (db *MemDb) NewestSha() (*btcwire.ShaHash, int64, error) {
 // The database is completely purged on close with this implementation since the
 // entire database is only in memory.  As a result, this function behaves no
 // differently than Close.
-func (db *MemDb) RollbackClose() {
+func (db *MemDb) RollbackClose() error {
 	// Rollback doesn't apply to a memory database, so just call Close.
 	// Close handles the mutex locks.
-	db.Close()
+	return db.Close()
 }
 
 // Sync verifies that the database is coherent on disk and no outstanding
@@ -714,18 +717,18 @@ func (db *MemDb) RollbackClose() {
 //
 // This implementation does not write any data to disk, so this function only
 // grabs a lock to ensure it doesn't return until other operations are complete.
-func (db *MemDb) Sync() {
+func (db *MemDb) Sync() error {
 	db.Lock()
 	defer db.Unlock()
 
 	if db.closed {
-		log.Warnf("Sync called after db close.")
+		return ErrDbClosed
 	}
 
 	// There is nothing extra to do to sync the memory database.  However,
 	// the lock is still grabbed to ensure the function does not return
 	// until other operations are complete.
-	return
+	return nil
 }
 
 // newMemDb returns a new memory-only database ready for block inserts.

@@ -30,7 +30,7 @@ const AllShas = int64(^uint64(0) >> 1)
 // used to add a new backend data storage method.
 type Db interface {
 	// Close cleanly shuts down the database and syncs all data.
-	Close()
+	Close() (err error)
 
 	// DropAfterBlockBySha will remove any blocks from the database after
 	// the given block.  It terminates any existing transaction and performs
@@ -40,7 +40,7 @@ type Db interface {
 
 	// ExistsSha returns whether or not the given block hash is present in
 	// the database.
-	ExistsSha(sha *btcwire.ShaHash) (exists bool)
+	ExistsSha(sha *btcwire.ShaHash) (exists bool, err error)
 
 	// FetchBlockBySha returns a btcutil Block.  The implementation may
 	// cache the underlying data if desired.
@@ -65,7 +65,7 @@ type Db interface {
 
 	// ExistsTxSha returns whether or not the given tx hash is present in
 	// the database
-	ExistsTxSha(sha *btcwire.ShaHash) (exists bool)
+	ExistsTxSha(sha *btcwire.ShaHash) (exists bool, err error)
 
 	// FetchTxBySha returns some data for the given transaction hash. The
 	// implementation may cache the underlying data if desired.
@@ -75,12 +75,22 @@ type Db interface {
 	// hashes.  The implementation may cache the underlying data if desired.
 	// This differs from FetchUnSpentTxByShaList in that it will return
 	// the most recent known Tx, if it is fully spent or not.
+	//
+	// NOTE: This function does not return an error directly since it MUST
+	// return at least one TxListReply instance for each requested
+	// transaction.  Each TxListReply instance then contains an Err field
+	// which can be used to detect errors.
 	FetchTxByShaList(txShaList []*btcwire.ShaHash) []*TxListReply
 
 	// FetchUnSpentTxByShaList returns a TxListReply given an array of
 	// transaction hashes.  The implementation may cache the underlying
 	// data if desired. Fully spent transactions will not normally not
 	// be returned in this operation.
+	//
+	// NOTE: This function does not return an error directly since it MUST
+	// return at least one TxListReply instance for each requested
+	// transaction.  Each TxListReply instance then contains an Err field
+	// which can be used to detect errors.
 	FetchUnSpentTxByShaList(txShaList []*btcwire.ShaHash) []*TxListReply
 
 	// InsertBlock inserts raw block and transaction data from a block
@@ -97,11 +107,11 @@ type Db interface {
 
 	// RollbackClose discards the recent database changes to the previously
 	// saved data at last Sync and closes the database.
-	RollbackClose()
+	RollbackClose() (err error)
 
 	// Sync verifies that the database is coherent on disk and no
 	// outstanding transactions are in flight.
-	Sync()
+	Sync() (err error)
 }
 
 // DriverDB defines a structure for backend drivers to use when they registered

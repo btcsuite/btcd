@@ -55,7 +55,11 @@ func testUnspentInsert(t *testing.T) {
 	}
 	defer os.RemoveAll(dbname)
 	defer os.RemoveAll(dbnamever)
-	defer db.Close()
+	defer func() {
+		if err := db.Close(); err != nil {
+			t.Errorf("Close: unexpected error: %v", err)
+		}
+	}()
 
 	blocks := loadblocks(t)
 endtest:
@@ -79,10 +83,13 @@ endtest:
 				txneededList = append(txneededList, origintxsha)
 				txlookupList = append(txlookupList, origintxsha)
 
-				if !db.ExistsTxSha(origintxsha) {
+				exists, err := db.ExistsTxSha(origintxsha)
+				if err != nil {
+					t.Errorf("ExistsTxSha: unexpected error %v ", err)
+				}
+				if !exists {
 					t.Errorf("referenced tx not found %v ", origintxsha)
 				}
-
 			}
 			txshaname, _ := tx.TxSha()
 			txlookupList = append(txlookupList, &txshaname)
