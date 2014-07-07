@@ -108,15 +108,26 @@ func (bi *blockImporter) processBlock(serializedBlock []byte) (bool, error) {
 	bi.receivedLogTx += int64(len(block.MsgBlock().Transactions))
 
 	// Skip blocks that already exist.
-	if bi.db.ExistsSha(blockSha) {
+	exists, err := bi.db.ExistsSha(blockSha)
+	if err != nil {
+		return false, err
+	}
+	if exists {
 		return false, nil
 	}
 
 	// Don't bother trying to process orphans.
 	prevHash := &block.MsgBlock().Header.PrevBlock
-	if !prevHash.IsEqual(&zeroHash) && !bi.db.ExistsSha(prevHash) {
-		return false, fmt.Errorf("import file contains block %v which "+
-			"does not link to the available block chain", blockSha)
+	if !prevHash.IsEqual(&zeroHash) {
+		exists, err := bi.db.ExistsSha(blockSha)
+		if err != nil {
+			return false, err
+		}
+		if !exists {
+			return false, fmt.Errorf("import file contains block "+
+				"%v which does not link to the available "+
+				"block chain", blockSha)
+		}
 	}
 
 	// Ensure the blocks follows all of the chain rules and match up to the

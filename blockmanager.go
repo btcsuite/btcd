@@ -701,7 +701,13 @@ func (b *blockManager) fetchHeaderBlocks() {
 		}
 
 		iv := btcwire.NewInvVect(btcwire.InvTypeBlock, node.sha)
-		if !b.haveInventory(iv) {
+		haveInv, err := b.haveInventory(iv)
+		if err != nil {
+			bmgrLog.Warn("Unexpected failure when checking for "+
+				"existing inventory during header block "+
+				"fetch: %v", err)
+		}
+		if !haveInv {
 			b.requestedBlocks[*node.sha] = struct{}{}
 			b.syncPeer.requestedBlocks[*node.sha] = struct{}{}
 			gdmsg.AddInvVect(iv)
@@ -829,7 +835,7 @@ func (b *blockManager) handleHeadersMsg(hmsg *headersMsg) {
 // inventory can be when it is in different states such as blocks that are part
 // of the main chain, on a side chain, in the orphan pool, and transactions that
 // are in the memory pool (either the main pool or orphan pool).
-func (b *blockManager) haveInventory(invVect *btcwire.InvVect) bool {
+func (b *blockManager) haveInventory(invVect *btcwire.InvVect) (bool, error) {
 	switch invVect.Type {
 	case btcwire.InvTypeBlock:
 		// Ask chain if the block is known to it in any form (main
@@ -840,7 +846,7 @@ func (b *blockManager) haveInventory(invVect *btcwire.InvVect) bool {
 		// Ask the transaction memory pool if the transaction is known
 		// to it in any form (main pool or orphan).
 		if b.server.txMemPool.HaveTransaction(&invVect.Hash) {
-			return true
+			return true, nil
 		}
 
 		// Check if the transaction exists from the point of view of the
@@ -850,7 +856,7 @@ func (b *blockManager) haveInventory(invVect *btcwire.InvVect) bool {
 
 	// The requested inventory is is an unsupported type, so just claim
 	// it is known to avoid requesting it.
-	return true
+	return true, nil
 }
 
 // handleInvMsg handles inv messages from all peers.
@@ -894,7 +900,14 @@ func (b *blockManager) handleInvMsg(imsg *invMsg) {
 		}
 
 		// Request the inventory if we don't already have it.
-		if !b.haveInventory(iv) {
+		haveInv, err := b.haveInventory(iv)
+		if err != nil {
+			bmgrLog.Warn("Unexpected failure when checking for "+
+				"existing inventory during inv message "+
+				"processing: %v", err)
+			continue
+		}
+		if !haveInv {
 			// Add it to the request queue.
 			imsg.peer.requestQueue.PushBack(iv)
 			continue
