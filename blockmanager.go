@@ -622,6 +622,14 @@ func (b *blockManager) handleBlockMsg(bmsg *blockMsg) {
 		// a reorg.
 		newestSha, newestHeight, _ := b.server.db.NewestSha()
 		b.updateChainState(newestSha, newestHeight)
+
+		// Allow any clients performing long polling via the
+		// getblocktemplate RPC to be notified when the new block causes
+		// their old block template to become stale.
+		rpcServer := b.server.rpcServer
+		if rpcServer != nil {
+			rpcServer.gbtWorkState.NotifyBlockConnected(blockSha)
+		}
 	}
 
 	// Sync the db to disk.
@@ -1116,9 +1124,9 @@ func (b *blockManager) handleNotifyMsg(notification *btcchain.Notification) {
 		}
 
 		if r := b.server.rpcServer; r != nil {
-			// Now that this block is in the blockchain we can mark all the
-			// transactions (except the coinbase) as no longer needing
-			// rebroadcasting.
+			// Now that this block is in the blockchain we can mark
+			// all the transactions (except the coinbase) as no
+			// longer needing rebroadcasting.
 			for _, tx := range block.Transactions()[1:] {
 				iv := btcwire.NewInvVect(btcwire.InvTypeTx, tx.Sha())
 				b.server.RemoveRebroadcastInventory(iv)
