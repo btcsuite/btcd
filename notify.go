@@ -188,7 +188,7 @@ func (c *Client) handleNotification(ntfn *rawNotification) {
 	switch ntfn.Method {
 	// OnBlockConnected
 	case btcws.BlockConnectedNtfnMethod:
-		// Ignore the notification is the client is not interested in
+		// Ignore the notification if the client is not interested in
 		// it.
 		if c.ntfnHandlers.OnBlockConnected == nil {
 			return
@@ -205,7 +205,7 @@ func (c *Client) handleNotification(ntfn *rawNotification) {
 
 	// OnBlockDisconnected
 	case btcws.BlockDisconnectedNtfnMethod:
-		// Ignore the notification is the client is not interested in
+		// Ignore the notification if the client is not interested in
 		// it.
 		if c.ntfnHandlers.OnBlockDisconnected == nil {
 			return
@@ -222,7 +222,7 @@ func (c *Client) handleNotification(ntfn *rawNotification) {
 
 	// OnRecvTx
 	case btcws.RecvTxNtfnMethod:
-		// Ignore the notification is the client is not interested in
+		// Ignore the notification if the client is not interested in
 		// it.
 		if c.ntfnHandlers.OnRecvTx == nil {
 			return
@@ -239,7 +239,7 @@ func (c *Client) handleNotification(ntfn *rawNotification) {
 
 	// OnRedeemingTx
 	case btcws.RedeemingTxNtfnMethod:
-		// Ignore the notification is the client is not interested in
+		// Ignore the notification if the client is not interested in
 		// it.
 		if c.ntfnHandlers.OnRedeemingTx == nil {
 			return
@@ -256,7 +256,7 @@ func (c *Client) handleNotification(ntfn *rawNotification) {
 
 	// OnRescanFinished
 	case btcws.RescanFinishedNtfnMethod:
-		// Ignore the notification is the client is not interested in
+		// Ignore the notification if the client is not interested in
 		// it.
 		if c.ntfnHandlers.OnRescanFinished == nil {
 			return
@@ -273,7 +273,7 @@ func (c *Client) handleNotification(ntfn *rawNotification) {
 
 	// OnRescanProgress
 	case btcws.RescanProgressNtfnMethod:
-		// Ignore the notification is the client is not interested in
+		// Ignore the notification if the client is not interested in
 		// it.
 		if c.ntfnHandlers.OnRescanProgress == nil {
 			return
@@ -290,7 +290,7 @@ func (c *Client) handleNotification(ntfn *rawNotification) {
 
 	// OnTxAccepted
 	case btcws.TxAcceptedNtfnMethod:
-		// Ignore the notification is the client is not interested in
+		// Ignore the notification if the client is not interested in
 		// it.
 		if c.ntfnHandlers.OnTxAccepted == nil {
 			return
@@ -307,7 +307,7 @@ func (c *Client) handleNotification(ntfn *rawNotification) {
 
 	// OnTxAcceptedVerbose
 	case btcws.TxAcceptedVerboseNtfnMethod:
-		// Ignore the notification is the client is not interested in
+		// Ignore the notification if the client is not interested in
 		// it.
 		if c.ntfnHandlers.OnTxAcceptedVerbose == nil {
 			return
@@ -324,7 +324,7 @@ func (c *Client) handleNotification(ntfn *rawNotification) {
 
 	// OnBtcdConnected
 	case btcws.BtcdConnectedNtfnMethod:
-		// Ignore the notification is the client is not interested in
+		// Ignore the notification if the client is not interested in
 		// it.
 		if c.ntfnHandlers.OnBtcdConnected == nil {
 			return
@@ -341,7 +341,7 @@ func (c *Client) handleNotification(ntfn *rawNotification) {
 
 	// OnAccountBalance
 	case btcws.AccountBalanceNtfnMethod:
-		// Ignore the notification is the client is not interested in
+		// Ignore the notification if the client is not interested in
 		// it.
 		if c.ntfnHandlers.OnAccountBalance == nil {
 			return
@@ -358,7 +358,7 @@ func (c *Client) handleNotification(ntfn *rawNotification) {
 
 	// OnWalletLockState
 	case btcws.WalletLockStateNtfnMethod:
-		// Ignore the notification is the client is not interested in
+		// Ignore the notification if the client is not interested in
 		// it.
 		if c.ntfnHandlers.OnWalletLockState == nil {
 			return
