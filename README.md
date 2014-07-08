@@ -45,7 +45,7 @@ $ go get github.com/conformal/btcscript
 ## Examples
 
 * [Standard Pay-to-pubkey-hash Script]
-  (http://godoc.org/github.com/conformal/btcdb#example-PayToAddrScript)  
+  (http://godoc.org/github.com/conformal/btcscript#example-PayToAddrScript)  
   Demonstrates creating a script which pays to a bitcoin address.  It also
   prints the created script hex and uses the DisasmString function to display
   the disassembled script.
