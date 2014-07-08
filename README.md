@@ -23,15 +23,6 @@ the bitcoin transactions.  This language is not turing complete
 although it is still fairly powerful.  A description of the language
 can be found at https://en.bitcoin.it/wiki/Script
 
-## Sample Use
-
-```Go
-	pkscript := txS.TxOut[origintxidx].PkScript
-	engine, err := btcscript.NewScript(sigScript, pkscript, txInIdx,
-		txValidator, timestamp.After(btcscript.Bip16Activation))
-	err = engine.Execute()
-```
-
 ## Documentation
 
 [![GoDoc](https://godoc.org/github.com/conformal/btcscript?status.png)]
@@ -50,6 +41,14 @@ http://localhost:6060/pkg/github.com/conformal/btcscript
 ```bash
 $ go get github.com/conformal/btcscript
 ```
+
+## Examples
+
+* [Standard Pay-to-pubkey-hash Script]
+  (http://godoc.org/github.com/conformal/btcdb#example-PayToAddrScript)  
+  Demonstrates creating a script which pays to a bitcoin address.  It also
+  prints the created script hex and uses the DisasmString function to display
+  the disassembled script.
 
 ## TODO
 

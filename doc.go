@@ -30,29 +30,6 @@ is used to prove the the spender is authorized to perform the transaction.
 One benefit of using a scripting language is added flexibility in specifying
 what conditions must be met in order to spend bitcoins.
 
-Usage
-
-The usage of this package consists of creating a new script engine for a pair
-of transaction inputs and outputs and using the engine to execute the scripts.
-
-The following function is an example of how to create and execute a script
-engine to validate a transaction.
-
-	// ValidateTx validates the txIdx'th input of tx. The output transaction
-	// corresponding to the this input is the txInIdx'th output of txIn. The
-	// block timestamp of tx is timestamp.
-	func ValidateTx(tx *btcwire.MsgTx, txIdx int, txIn *btcwire.MsgTx, txInIdx int, timestamp time.Time) {
-		pkScript := txIn.TxOut[txInIdx].PkScript
-		sigScript := tx.txIn[TxIdx]
-		var flags btcscript.ScriptFlags
-		if timestamp.After(btcscript.Bip16Activation) {
-			flags |= btcscript.ScriptBip16
-		}
-		engine, err := btcscript.NewScript(sigScript, pkScript, txInIdx,
-			tx, flags)
-		return engine.Execute()
-	}
-
 Errors
 
 Errors returned by this package are of the form btcscript.StackErrX where X
