@@ -82,27 +82,21 @@ intentionally causes an error by attempting to process a duplicate block.
 		"fmt"
 		"github.com/conformal/btcchain"
 		"github.com/conformal/btcdb"
-		_ "github.com/conformal/btcdb/ldb"
+		_ "github.com/conformal/btcdb/memdb"
 		"github.com/conformal/btcnet"
 		"github.com/conformal/btcutil"
-		"os"
 	)
 
 	func main() {
 		// Create a new database to store the accepted blocks into.  Typically
-		// this would be opening an existing database, but we create a new db
-		// here so this is a complete working example.  Also, typically the
-		// calls to os.Remove would not be used either, but again, we want
-		// a complete working example here, so we make sure to remove the
-		// database.
-		dbName := "exampledb"
-		_ = os.RemoveAll(dbName)
-		db, err := btcdb.CreateDB("leveldb", dbName)
+		// this would be opening an existing database and would not use memdb
+		// which is a memory-only database backend, but we create a new db
+		// here so this is a complete working example.
+		db, err := btcdb.CreateDB("memdb")
 		if err != nil {
 			fmt.Printf("Failed to create database: %v\n", err)
 			return
 		}
-		defer os.RemoveAll(dbName) // Ignore error.
 		defer db.Close()
 
 		// Insert the main network genesis block.  This is part of the initial
@@ -122,7 +116,7 @@ intentionally causes an error by attempting to process a duplicate block.
 		// Process a block.  For this example, we are going to intentionally
 		// cause an error by trying to process the genesis block which already
 		// exists.
-		err = chain.ProcessBlock(genesisBlock, false)
+		_, err = chain.ProcessBlock(genesisBlock, btcchain.BFNone)
 		if err != nil {
 			fmt.Printf("Failed to process block: %v\n", err)
 			return
