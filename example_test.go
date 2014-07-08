@@ -18,7 +18,7 @@ import (
 // overview documentation describes, this includes all of the Bitcoin consensus
 // rules.  This example intentionally attempts to insert a duplicate genesis
 // block to illustrate how an invalid block is handled.
-func ExampleProcessBlock() {
+func ExampleBlockChain_ProcessBlock() {
 	// Create a new database to store the accepted blocks into.  Typically
 	// this would be opening an existing database and would not use memdb
 	// which is a memory-only database backend, but we create a new db
