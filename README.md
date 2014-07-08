@@ -33,8 +33,12 @@ $ go get github.com/conformal/btcdb
 
 * [CreateDB Example]
   (http://godoc.org/github.com/conformal/btcdb#example-CreateDB)  
-  Demonstrates creating a new database and inserting the genesis
-  block into it.
+  Demonstrates creating a new database and inserting the genesis block into it.
+
+* [NewestSha Example]
+  (http://godoc.org/github.com/conformal/btcdb#example-CreateDB)  
+  Demonstrates  querying the database for the most recent best block height and
+  hash.
 
 ## TODO
 - Increase test coverage to 100%

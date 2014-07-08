@@ -48,3 +48,46 @@ func ExampleCreateDB() {
 	// Output:
 	// New height: 0
 }
+
+// exampleLoadDb is used in the example to elide the setup code.
+func exampleLoadDb() (btcdb.Db, error) {
+	db, err := btcdb.CreateDB("memdb")
+	if err != nil {
+		return nil, err
+	}
+
+	// Insert the main network genesis block.
+	genesis := btcutil.NewBlock(btcnet.MainNetParams.GenesisBlock)
+	_, err = db.InsertBlock(genesis)
+	if err != nil {
+		return nil, err
+	}
+
+	return db, err
+}
+
+// This example demonstrates querying the database for the most recent best
+// block height and hash.
+func ExampleDb_NewestSha() {
+	// Load a database for the purposes of this example and schedule it to
+	// be closed on exit.  See the CreateDB example for more details on what
+	// this step is doing.
+	db, err := exampleLoadDb()
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+	defer db.Close()
+
+	latestHash, latestHeight, err := db.NewestSha()
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+	fmt.Println("Latest hash:", latestHash)
+	fmt.Println("Latest height:", latestHeight)
+
+	// Output:
+	// Latest hash: 000000000019d6689c085ae165831e934ff763ae46a2a6c172b3f1b60a8ce26f
+	// Latest height: 0
+}
