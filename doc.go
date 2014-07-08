@@ -61,57 +61,13 @@ is by no means exhaustive:
    coins
  - Insert the block into the block database
 
-Block Processing Example
+Examples
 
-The following example program demonstrates processing a block.  This example
-intentionally causes an error by attempting to process a duplicate block.
-
-	package main
-
-	import (
-		"fmt"
-		"github.com/conformal/btcchain"
-		"github.com/conformal/btcdb"
-		_ "github.com/conformal/btcdb/memdb"
-		"github.com/conformal/btcnet"
-		"github.com/conformal/btcutil"
-	)
-
-	func main() {
-		// Create a new database to store the accepted blocks into.  Typically
-		// this would be opening an existing database and would not use memdb
-		// which is a memory-only database backend, but we create a new db
-		// here so this is a complete working example.
-		db, err := btcdb.CreateDB("memdb")
-		if err != nil {
-			fmt.Printf("Failed to create database: %v\n", err)
-			return
-		}
-		defer db.Close()
-
-		// Insert the main network genesis block.  This is part of the initial
-		// database setup.  Like above, this typically would not be needed when
-		// opening an existing database.
-		genesisBlock := btcutil.NewBlock(btcnet.MainNetParams.GenesisBlock)
-		_, err = db.InsertBlock(genesisBlock)
-		if err != nil {
-			fmt.Printf("Failed to insert genesis block: %v\n", err)
-			return
-		}
-
-		// Create a new BlockChain instance using the underlying database for
-		// the main bitcoin network and ignore notifications.
-		chain := btcchain.New(db, &btcnet.MainNetParams, nil)
-
-		// Process a block.  For this example, we are going to intentionally
-		// cause an error by trying to process the genesis block which already
-		// exists.
-		_, err = chain.ProcessBlock(genesisBlock, btcchain.BFNone)
-		if err != nil {
-			fmt.Printf("Failed to process block: %v\n", err)
-			return
-		}
-	}
+ - ProcessBlock Example
+   Demonstrates how to create a new chain instance and use ProcessBlock to
+   attempt to attempt add a block to the chain.  This example intentionally
+   attempts to insert a duplicate genesis block to illustrate how an invalid
+   block is handled.
 
 Errors
 
