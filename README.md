@@ -119,4 +119,6 @@ signature perform the following:
 
 ## License
 
-Package btcchain is licensed under the liberal ISC License.
+
+Package btcchain is licensed under the [copyfree](http://copyfree.org) ISC
+License.
