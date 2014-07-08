@@ -34,6 +34,9 @@ can be found at https://en.bitcoin.it/wiki/Script
 
 ## Documentation
 
+[![GoDoc](https://godoc.org/github.com/conformal/btcscript?status.png)]
+(http://godoc.org/github.com/conformal/btcscript)
+
 Full `go doc` style documentation for the project can be viewed online without
 installing this package by using the GoDoc site
 [here](http://godoc.org/github.com/conformal/btcscript).
