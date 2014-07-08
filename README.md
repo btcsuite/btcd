@@ -50,6 +50,10 @@ $ go get github.com/conformal/btcscript
   prints the created script hex and uses the DisasmString function to display
   the disassembled script.
 
+* [Extracting Details from Standard Scripts]
+  (http://godoc.org/github.com/conformal/btcscript#example-ExtractPkScriptAddrs)  
+  Demonstrates extracting information from a standard public key script.
+
 ## TODO
 
 - Increase test coverage to 100%
