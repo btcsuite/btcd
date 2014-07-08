@@ -60,9 +60,7 @@ $ go get github.com/conformal/btcjson
 
 ## TODO
 
-- Add data structures for remaining commands.
 - Increase test coverage to 100%.
-- Add https support.
 
 ## GPG Verification Key
 
