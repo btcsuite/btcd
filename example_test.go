@@ -15,6 +15,14 @@ import (
 // This example demonstrates creating a new database and inserting the genesis
 // block into it.
 func ExampleCreateDB() {
+	// Notice in these example imports that the memdb driver is loaded.
+	// Ordinarily this would be whatever driver(s) your application
+	// requires.
+	// import (
+	//	"github.com/conformal/btcdb"
+	// 	_ "github.com/conformal/btcdb/memdb"
+	// )
+
 	// Create a database and schedule it to be closed on exit.  This example
 	// uses a memory-only database to avoid needing to write anything to
 	// the disk.  Typically, you would specify a persistent database driver
