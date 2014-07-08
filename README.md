@@ -82,6 +82,12 @@ is by no means exhaustive:
   attempts to insert a duplicate genesis block to illustrate how an invalid
   block is handled.
 
+* [CompactToBig Example]
+  (http://godoc.org/github.com/conformal/btcchain#example-CompactToBig)  
+  Demonstrates how to convert the "bits" in a block header which represent the
+  target difficulty to a big integer and display it using the typical hex
+  notation.
+
 ## TODO
 
 - Increase test coverage

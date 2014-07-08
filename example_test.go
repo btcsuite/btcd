@@ -57,3 +57,18 @@ func ExampleBlockChain_ProcessBlock() {
 	// Output:
 	// Failed to process block: already have block 000000000019d6689c085ae165831e934ff763ae46a2a6c172b3f1b60a8ce26f
 }
+
+// This example demonstrates how to convert the "bits" in a block header which
+// represent the target difficulty to a big integer and display it using the
+// typical hex notation..
+func ExampleCompactToBig() {
+	// Convert the bits from block 300000 in the main block chain.
+	bits := uint32(419465580)
+	targetDifficulty := btcchain.CompactToBig(bits)
+
+	// Display it in hex.
+	fmt.Printf("%064x\n", targetDifficulty.Bytes())
+
+	// Output:
+	// 0000000000000000896c00000000000000000000000000000000000000000000
+}
