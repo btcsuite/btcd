@@ -10,9 +10,6 @@ See `test_coverage.txt` for the current coverage (using gocov).  Alternatively,
 if you are running a POSIX OS, you can run the cov_report.sh script for a
 real-time report.  Package btcdb is licensed under the liberal ISC license.
 
-Note that the main `Db` interface is not yet finalized, so it is subject to
-change.
-
 ## Sample Use
 
 ```Go
@@ -42,6 +39,9 @@ change.
 ```
 
 ## Documentation
+
+[![GoDoc](https://godoc.org/github.com/conformal/btcdb?status.png)]
+(http://godoc.org/github.com/conformal/btcdb)
 
 Full `go doc` style documentation for the project can be viewed online without
 installing this package by using the GoDoc site
