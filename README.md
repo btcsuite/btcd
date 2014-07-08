@@ -84,9 +84,14 @@ is by no means exhaustive:
 
 * [CompactToBig Example]
   (http://godoc.org/github.com/conformal/btcchain#example-CompactToBig)  
-  Demonstrates how to convert the "bits" in a block header which represent the
-  target difficulty to a big integer and display it using the typical hex
-  notation.
+  Demonstrates how to convert the compact "bits" in a block header which
+  represent the target difficulty to a big integer and display it using the
+  typical hex notation.
+
+* [BigToCompact Example]
+  (http://godoc.org/github.com/conformal/btcchain#example-BigToCompact)  
+  Demonstrates how to convert how to convert a target difficulty into the
+  compact "bits" in a block header which represent that target difficulty.
 
 ## TODO
 
