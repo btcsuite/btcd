@@ -36,7 +36,7 @@ $ go get github.com/conformal/btcdb
   Demonstrates creating a new database and inserting the genesis block into it.
 
 * [NewestSha Example]
-  (http://godoc.org/github.com/conformal/btcdb#example-Db)  
+  (http://godoc.org/github.com/conformal/btcdb#example-Db_newestSha)  
   Demonstrates  querying the database for the most recent best block height and
   hash.
 
