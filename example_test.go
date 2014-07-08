@@ -49,8 +49,8 @@ func ExampleCreateDB() {
 	// New height: 0
 }
 
-// exampleLoadDb is used in the example to elide the setup code.
-func exampleLoadDb() (btcdb.Db, error) {
+// exampleLoadDB is used in the example to elide the setup code.
+func exampleLoadDB() (btcdb.Db, error) {
 	db, err := btcdb.CreateDB("memdb")
 	if err != nil {
 		return nil, err
@@ -68,11 +68,11 @@ func exampleLoadDb() (btcdb.Db, error) {
 
 // This example demonstrates querying the database for the most recent best
 // block height and hash.
-func ExampleDb_NewestSha() {
+func ExampleDb() {
 	// Load a database for the purposes of this example and schedule it to
 	// be closed on exit.  See the CreateDB example for more details on what
 	// this step is doing.
-	db, err := exampleLoadDb()
+	db, err := exampleLoadDB()
 	if err != nil {
 		fmt.Println(err)
 		return
