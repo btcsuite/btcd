@@ -10,34 +10,6 @@ See `test_coverage.txt` for the current coverage (using gocov).  Alternatively,
 if you are running a POSIX OS, you can run the cov_report.sh script for a
 real-time report.  Package btcdb is licensed under the liberal ISC license.
 
-## Sample Use
-
-```Go
-	// Import packages.
-	import (
-		"github.com/conformal/btcdb"
-		_ "github.com/conformal/btcdb/ldb"
-		"github.com/conformal/btcnet"
-		"github.com/conformal/btcutil"
-	)
-
-	// Create a database and schedule it to be closed on exit.
-	dbName := "example"
-	db, err := btcdb.CreateDB("leveldb", dbName)
-	if err != nil {
-		// Log and handle the error
-	}
-	defer db.Close()
-
-
-	// Insert the main network genesis block.
-	genesis := btcutil.NewBlock(btcnet.MainNetParams.GenesisBlock)
-	newHeight, err := db.InsertBlock(genesis)
-	if err != nil {
-		// Log and handle the error
-	}
-```
-
 ## Documentation
 
 [![GoDoc](https://godoc.org/github.com/conformal/btcdb?status.png)]
@@ -56,6 +28,13 @@ http://localhost:6060/pkg/github.com/conformal/btcdb
 ```bash
 $ go get github.com/conformal/btcdb
 ```
+
+## Examples
+
+* [CreateDB Example]
+  (http://godoc.org/github.com/conformal/btcdb#example-CreateDB)  
+  Demonstrates creating a new database and inserting the genesis
+  block into it.
 
 ## TODO
 - Increase test coverage to 100%

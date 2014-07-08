@@ -27,30 +27,6 @@ At the highest level, the use of this packages just requires that you
 import it, setup a database, insert some data into it, and optionally,
 query the data back.  The first block inserted into the database will be
 treated as the genesis block.  Every subsequent block insert requires the
-referenced parent block to already exist.  In a more concrete example:
-
-	// Import packages.
-	import (
-		"github.com/conformal/btcdb"
-		_ "github.com/conformal/btcdb/ldb"
-		"github.com/conformal/btcnet"
-		"github.com/conformal/btcutil"
-	)
-
-	// Create a database and schedule it to be closed on exit.
-	dbName := "example.db"
-	db, err := btcdb.CreateDB("leveldb", dbName)
-	if err != nil {
-		// Log and handle the error
-	}
-	defer db.Close()
-
-
-	// Insert the main network genesis block.
-	genesis := btcutil.NewBlock(btcnet.MainNetParams.GenesisBlock)
-	newHeight, err := db.InsertBlock(genesis)
-	if err != nil {
-		// Log and handle the error
-	}
+referenced parent block to already exist.
 */
 package btcdb
