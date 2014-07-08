@@ -21,6 +21,9 @@ handle processing of blocks into the bitcoin block chain.
 
 ## Documentation
 
+[![GoDoc](https://godoc.org/github.com/conformal/btcchain?status.png)]
+(http://godoc.org/github.com/conformal/btcchain)
+
 Full `go doc` style documentation for the project can be viewed online without
 installing this package by using the GoDoc site here:
 http://godoc.org/github.com/conformal/btcchain
