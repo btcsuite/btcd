@@ -1,10 +1,13 @@
-package bloomfilter_test
+package bloom_test
 
 import (
-	"github.com/conformal/btcutil/bloomfilter"
 	"testing"
+
+	"github.com/conformal/btcutil/bloom"
 )
 
+// TestMurmurHash3 ensure the MurmurHash3 function produces the correct hash
+// when given various seeds and data.
 func TestMurmurHash3(t *testing.T) {
 	var tests = []struct {
 		seed uint32
@@ -27,11 +30,11 @@ func TestMurmurHash3(t *testing.T) {
 		{0x00000000, []byte{0x00, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88}, 0xb4698def},
 	}
 
-	for x, test := range tests {
-		result := bloomfilter.MurmurHash3(test.seed, test.data)
+	for i, test := range tests {
+		result := bloom.MurmurHash3(test.seed, test.data)
 		if result != test.out {
 			t.Errorf("MurmurHash3 test #%d failed: got %v want %v\n",
-				x, result, test.out)
+				i, result, test.out)
 			continue
 		}
 	}
