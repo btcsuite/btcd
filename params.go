@@ -37,6 +37,7 @@ var mainNetParams = params{
 		"seed.bitcoinstats.com",
 		"seed.bitnodes.io",
 		"bitseed.xf2.org",
+		"seeds.bitcoin.open-nodes.org",
 	},
 }
 
