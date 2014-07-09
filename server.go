@@ -292,9 +292,33 @@ func (s *server) handleRelayInvMsg(state *peerState, iv *btcwire.InvVect) {
 			return
 		}
 
-		// Queue the inventory to be relayed with the next batch.  It
-		// will be ignored if the peer is already known to have the
-		// inventory.
+		if iv.Type == btcwire.InvTypeTx {
+			// Don't relay the transaction to the peer when it has
+			// transaction relaying disabled.
+			if p.RelayTxDisabled() {
+				return
+			}
+
+			// Don't relay the transaction if there is a bloom
+			// filter loaded and the transaction doesn't match it.
+			if p.filter.IsLoaded() {
+				tx, err := s.txMemPool.FetchTransaction(&iv.Hash)
+				if err != nil {
+					peerLog.Warn("Attempt to relay tx %s "+
+						"that is not in the memory pool",
+						iv.Hash)
+					return
+				}
+
+				if !p.filter.MatchTxAndUpdate(tx) {
+					return
+				}
+			}
+		}
+
+		// Queue the inventory to be relayed with the next batch.
+		// It will be ignored if the peer is already known to
+		// have the inventory.
 		p.QueueInventory(iv)
 	})
 }
