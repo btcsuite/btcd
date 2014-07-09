@@ -129,7 +129,11 @@ func toSatoshi(val string) (interface{}, error) {
 	if err != nil {
 		return nil, err
 	}
-	return int64(btcutil.SatoshiPerBitcoin * idx), nil
+	amt, err := btcutil.NewAmount(idx)
+	if err != nil {
+		return nil, err
+	}
+	return int64(amt), nil
 }
 
 // toInt attempts to convert the passed string to an integer.  It returns the
