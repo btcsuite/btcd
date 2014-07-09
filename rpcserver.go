@@ -2868,7 +2868,7 @@ func handleSendRawTransaction(s *rpcServer, cmd btcjson.Cmd, closeChan <-chan st
 		// so log it as an actual error.  In both cases, a JSON-RPC
 		// error is returned to the client with the deserialization
 		// error code (to match bitcoind behavior).
-		if _, ok := err.(TxRuleError); ok {
+		if _, ok := err.(RuleError); ok {
 			rpcsLog.Debugf("Rejected transaction %v: %v", tx.Sha(),
 				err)
 		} else {

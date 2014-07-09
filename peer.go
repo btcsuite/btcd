@@ -8,6 +8,7 @@ import (
 	"bytes"
 	"container/list"
 	"fmt"
+	"io"
 	"net"
 	"strconv"
 	"sync"
@@ -26,7 +27,7 @@ import (
 
 const (
 	// maxProtocolVersion is the max protocol version the peer supports.
-	maxProtocolVersion = 70001
+	maxProtocolVersion = 70002
 
 	// outputBufferSize is the number of elements the output channels use.
 	outputBufferSize = 50
@@ -353,12 +354,35 @@ func (p *peer) handleVersionMsg(msg *btcwire.MsgVersion) {
 		return
 	}
 
-	p.StatsMtx.Lock() // Updating a bunch of stats.
+	// Notify and disconnect clients that have a protocol version that is
+	// too old.
+	if msg.ProtocolVersion < int32(btcwire.MultipleAddressVersion) {
+		// Send a reject message indicating the protocol version is
+		// obsolete and wait for the message to be sent before
+		// disconnecting.
+		reason := fmt.Sprintf("protocol version must be %d or greater",
+			btcwire.MultipleAddressVersion)
+		p.PushRejectMsg(msg.Command(), btcwire.RejectObsolete, reason,
+			nil, true)
+		p.Disconnect()
+		return
+	}
+
+	// Updating a bunch of stats.
+	p.StatsMtx.Lock()
+
 	// Limit to one version message per peer.
 	if p.versionKnown {
 		p.logError("Only one version message per peer is allowed %s.",
 			p)
 		p.StatsMtx.Unlock()
+
+		// Send an reject message indicating the version message was
+		// incorrectly sent twice and wait for the message to be sent
+		// before disconnecting.
+		p.PushRejectMsg(msg.Command(), btcwire.RejectDuplicate,
+			"duplicate version message", nil, true)
+
 		p.Disconnect()
 		return
 	}
@@ -651,6 +675,40 @@ func (p *peer) PushGetHeadersMsg(locator btcchain.BlockLocator, stopHash *btcwir
 	p.prevGetHdrsBegin = beginHash
 	p.prevGetHdrsStop = stopHash
 	return nil
+}
+
+// PushRejectMsg sends a reject message for the provided command, reject code,
+// and reject reason, and hash.  The hash will only be used when the command
+// is a tx or block and should be nil in other cases.  The wait parameter will
+// cause the function to block until the reject message has actually been sent.
+func (p *peer) PushRejectMsg(command string, code btcwire.RejectCode, reason string, hash *btcwire.ShaHash, wait bool) {
+	// Don't bother sending the reject message if the protocol version
+	// is too low.
+	if p.VersionKnown() && p.ProtocolVersion() < btcwire.RejectVersion {
+		return
+	}
+
+	msg := btcwire.NewMsgReject(command, code, reason)
+	if command == btcwire.CmdTx || command == btcwire.CmdBlock {
+		if hash == nil {
+			peerLog.Warnf("Sending a reject message for command "+
+				"type %v which should have specified a hash "+
+				"but does not", command)
+			hash = &zeroHash
+		}
+		msg.Hash = *hash
+	}
+
+	// Send the message without waiting if the caller has not requested it.
+	if !wait {
+		p.QueueMessage(msg, nil)
+		return
+	}
+
+	// Send the message and block until it has been sent before returning.
+	doneChan := make(chan struct{}, 1)
+	p.QueueMessage(msg, doneChan)
+	<-doneChan
 }
 
 // handleMemPoolMsg is invoked when a peer receives a mempool bitcoin message.
@@ -1231,9 +1289,11 @@ func (p *peer) writeMessage(msg btcwire.Message) {
 		switch msg.(type) {
 		case *btcwire.MsgVersion:
 			// This is OK.
+		case *btcwire.MsgReject:
+			// This is OK.
 		default:
-			// We drop all messages other than version if we
-			// haven't done the handshake already.
+			// Drop all messages other than version and reject if
+			// the handshake has not already been done.
 			return
 		}
 	}
@@ -1332,10 +1392,32 @@ out:
 				continue
 			}
 
-			// Only log the error if we're not forcibly disconnecting.
+			// Only log the error and possibly send reject message
+			// if we're not forcibly disconnecting.
 			if atomic.LoadInt32(&p.disconnect) == 0 {
-				p.logError("Can't read message from %s: %v",
-					p, err)
+				errMsg := fmt.Sprintf("Can't read message "+
+					"from %s: %v", p, err)
+				p.logError(errMsg)
+
+				// Only send the reject message if it's not
+				// because the remote client disconnected.
+				if err != io.EOF {
+					// Push a reject message for the
+					// malformed message and wait for the
+					// message to be sent before
+					// disconnecting.
+					//
+					// NOTE: Ideally this would include the
+					// command in the header if at least
+					// that much of the message was valid,
+					// but that is not currently exposed by
+					// btcwire, so just used malformed for
+					// the command.
+					p.PushRejectMsg("malformed",
+						btcwire.RejectMalformed, errMsg,
+						nil, true)
+				}
+
 			}
 			break out
 		}
@@ -1344,8 +1426,14 @@ out:
 		p.StatsMtx.Unlock()
 
 		// Ensure version message comes first.
-		if _, ok := rmsg.(*btcwire.MsgVersion); !ok && !p.VersionKnown() {
-			p.logError("A version message must precede all others")
+		if vmsg, ok := rmsg.(*btcwire.MsgVersion); !ok && !p.VersionKnown() {
+			errStr := "A version message must precede all others"
+			p.logError(errStr)
+
+			// Push a reject message and wait for the message to be
+			// sent before disconnecting.
+			p.PushRejectMsg(vmsg.Command(), btcwire.RejectMalformed,
+				errStr, nil, true)
 			break out
 		}
 
@@ -1416,6 +1504,10 @@ out:
 
 		case *btcwire.MsgFilterLoad:
 			p.handleFilterLoadMsg(msg)
+
+		case *btcwire.MsgReject:
+			// Nothing to do currently.  Logging of the rejected
+			// message is handled already in readMessage.
 
 		default:
 			peerLog.Debugf("Received unhandled message of type %v: Fix Me",

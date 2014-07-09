@@ -7,6 +7,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/conformal/btcd/addrmgr"
@@ -26,6 +27,10 @@ const (
 	// years.  However, if the field is interpreted as a timestamp, given
 	// the lock time is a uint32, the max is sometime around 2106.
 	lockTimeThreshold uint32 = 5e8 // Tue Nov 5 00:53:20 1985 UTC
+
+	// maxRejectReasonLen is the maximum length of a sanitized reject reason
+	// that will be logged.
+	maxRejectReasonLen = 200
 )
 
 // Loggers per subsytem.  Note that backendLog is a seelog logger that all of
@@ -250,6 +255,30 @@ func locatorSummary(locator []*btcwire.ShaHash, stopHash *btcwire.ShaHash) strin
 
 }
 
+// sanitizeString strips any characters which are even remotely dangerous, such
+// as html control characters, from the passed string.  It also limits it to
+// the passed maximum size, which can be 0 for unlimited.  When the string is
+// limited, it will also add "..." to the string to indicate it was truncated.
+func sanitizeString(str string, maxLength uint) string {
+	const safeChars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXY" +
+		"Z01234567890 .,;_/:?@"
+
+	// Strip any characters not in the safeChars string removed.
+	str = strings.Map(func(r rune) rune {
+		if strings.IndexRune(safeChars, r) >= 0 {
+			return r
+		}
+		return -1
+	}, str)
+
+	// Limit the string to the max allowed length.
+	if maxLength > 0 && uint(len(str)) > maxLength {
+		str = str[:maxLength]
+		str = str + "..."
+	}
+	return str
+}
+
 // messageSummary returns a human-readable string which summarizes a message.
 // Not all messages have or need a summary.  This is used for debug logging.
 func messageSummary(msg btcwire.Message) string {
@@ -308,6 +337,20 @@ func messageSummary(msg btcwire.Message) string {
 
 	case *btcwire.MsgHeaders:
 		return fmt.Sprintf("num %d", len(msg.Headers))
+
+	case *btcwire.MsgReject:
+		// Ensure the variable length strings don't contain any
+		// characters which are even remotely dangerous such as HTML
+		// control characters, etc.  Also limit them to sane length for
+		// logging.
+		rejCommand := sanitizeString(msg.Cmd, btcwire.CommandSize)
+		rejReason := sanitizeString(msg.Reason, maxRejectReasonLen)
+		summary := fmt.Sprintf("cmd %v, code %v, reason %v", rejCommand,
+			msg.Code, rejReason)
+		if rejCommand == btcwire.CmdBlock || rejCommand == btcwire.CmdTx {
+			summary += fmt.Sprintf(", hash %v", msg.Hash)
+		}
+		return summary
 	}
 
 	// No summary for other messages.

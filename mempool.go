@@ -20,17 +20,6 @@ import (
 	"github.com/conformal/btcwire"
 )
 
-// TxRuleError identifies a rule violation.  It is used to indicate that
-// processing of a transaction failed due to one of the many validation
-// rules.  The caller can use type assertions to determine if a failure was
-// specifically due to a rule violation.
-type TxRuleError string
-
-// Error satisfies the error interface to print human-readable errors.
-func (e TxRuleError) Error() string {
-	return string(e)
-}
-
 const (
 	// mempoolHeight is the height used for the "block" height field of the
 	// contextual transaction information provided in a transaction store.
@@ -182,36 +171,41 @@ func checkPkScriptStandard(pkScript []byte, scriptClass btcscript.ScriptClass) e
 	case btcscript.MultiSigTy:
 		numPubKeys, numSigs, err := btcscript.CalcMultiSigStats(pkScript)
 		if err != nil {
-			return err
+			str := fmt.Sprintf("multi-signature script parse "+
+				"failure: %v", err)
+			return txRuleError(btcwire.RejectNonstandard, str)
 		}
 
 		// A standard multi-signature public key script must contain
 		// from 1 to maxStandardMultiSigKeys public keys.
 		if numPubKeys < 1 {
-			return TxRuleError("multi-signature script with no pubkeys")
+			str := "multi-signature script with no pubkeys"
+			return txRuleError(btcwire.RejectNonstandard, str)
 		}
 		if numPubKeys > maxStandardMultiSigKeys {
 			str := fmt.Sprintf("multi-signature script with %d "+
 				"public keys which is more than the allowed "+
 				"max of %d", numPubKeys, maxStandardMultiSigKeys)
-			return TxRuleError(str)
+			return txRuleError(btcwire.RejectNonstandard, str)
 		}
 
 		// A standard multi-signature public key script must have at
 		// least 1 signature and no more signatures than available
 		// public keys.
 		if numSigs < 1 {
-			return TxRuleError("multi-signature script with no signatures")
+			return txRuleError(btcwire.RejectNonstandard,
+				"multi-signature script with no signatures")
 		}
 		if numSigs > numPubKeys {
 			str := fmt.Sprintf("multi-signature script with %d "+
 				"signatures which is more than the available "+
 				"%d public keys", numSigs, numPubKeys)
-			return TxRuleError(str)
+			return txRuleError(btcwire.RejectNonstandard, str)
 		}
 
 	case btcscript.NonStandardTy:
-		return TxRuleError("non-standard script form")
+		return txRuleError(btcwire.RejectNonstandard,
+			"non-standard script form")
 	}
 
 	return nil
@@ -232,13 +226,14 @@ func checkTransactionStandard(tx *btcutil.Tx, height int64) error {
 		str := fmt.Sprintf("transaction version %d is not in the "+
 			"valid range of %d-%d", msgTx.Version, 1,
 			btcwire.TxVersion)
-		return TxRuleError(str)
+		return txRuleError(btcwire.RejectNonstandard, str)
 	}
 
 	// The transaction must be finalized to be standard and therefore
 	// considered for inclusion in a block.
 	if !btcchain.IsFinalizedTransaction(tx, height, time.Now()) {
-		return TxRuleError("transaction is not finalized")
+		return txRuleError(btcwire.RejectNonstandard,
+			"transaction is not finalized")
 	}
 
 	// Since extremely large transactions with a lot of inputs can cost
@@ -249,7 +244,7 @@ func checkTransactionStandard(tx *btcutil.Tx, height int64) error {
 	if serializedLen > maxStandardTxSize {
 		str := fmt.Sprintf("transaction size of %v is larger than max "+
 			"allowed size of %v", serializedLen, maxStandardTxSize)
-		return TxRuleError(str)
+		return txRuleError(btcwire.RejectNonstandard, str)
 	}
 
 	for i, txIn := range msgTx.TxIn {
@@ -262,7 +257,7 @@ func checkTransactionStandard(tx *btcutil.Tx, height int64) error {
 				"script size of %d bytes is large than max "+
 				"allowed size of %d bytes", i, sigScriptLen,
 				maxStandardSigScriptSize)
-			return TxRuleError(str)
+			return txRuleError(btcwire.RejectNonstandard, str)
 		}
 
 		// Each transaction input signature script must only contain
@@ -270,7 +265,7 @@ func checkTransactionStandard(tx *btcutil.Tx, height int64) error {
 		if !btcscript.IsPushOnlyScript(txIn.SignatureScript) {
 			str := fmt.Sprintf("transaction input %d: signature "+
 				"script is not push only", i)
-			return TxRuleError(str)
+			return txRuleError(btcwire.RejectNonstandard, str)
 		}
 
 		// Each transaction input signature script must only contain
@@ -280,7 +275,7 @@ func checkTransactionStandard(tx *btcutil.Tx, height int64) error {
 		if !btcscript.HasCanonicalPushes(txIn.SignatureScript) {
 			str := fmt.Sprintf("transaction input %d: signature "+
 				"script has a non-canonical data push", i)
-			return TxRuleError(str)
+			return txRuleError(btcwire.RejectNonstandard, str)
 		}
 	}
 
@@ -291,8 +286,15 @@ func checkTransactionStandard(tx *btcutil.Tx, height int64) error {
 		scriptClass := btcscript.GetScriptClass(txOut.PkScript)
 		err := checkPkScriptStandard(txOut.PkScript, scriptClass)
 		if err != nil {
+			// Attempt to extract a reject code from the error so
+			// it can be retained.  When not possible, fall back to
+			// a non standard error.
+			rejectCode, found := extractRejectCode(err)
+			if !found {
+				rejectCode = btcwire.RejectNonstandard
+			}
 			str := fmt.Sprintf("transaction output %d: %v", i, err)
-			return TxRuleError(str)
+			return txRuleError(rejectCode, str)
 		}
 
 		// Accumulate the number of outputs which only carry data.
@@ -303,15 +305,15 @@ func checkTransactionStandard(tx *btcutil.Tx, height int64) error {
 		if isDust(txOut) {
 			str := fmt.Sprintf("transaction output %d: payment "+
 				"of %d is dust", i, txOut.Value)
-			return TxRuleError(str)
+			return txRuleError(btcwire.RejectDust, str)
 		}
 	}
 
 	// A standard transaction must not have more than one output script that
 	// only carries data.
 	if numNullDataOutputs > 1 {
-		return TxRuleError("more than one transaction output is a " +
-			"nulldata script")
+		str := "more than one transaction output in a nulldata script"
+		return txRuleError(btcwire.RejectNonstandard, str)
 	}
 
 	return nil
@@ -341,7 +343,9 @@ func checkInputsStandard(tx *btcutil.Tx, txStore btcchain.TxStore) error {
 		scriptInfo, err := btcscript.CalcScriptInfo(txIn.SignatureScript,
 			originPkScript, true)
 		if err != nil {
-			return err
+			str := fmt.Sprintf("transaction input #%d script parse "+
+				"failure: %v", i, err)
+			return txRuleError(btcwire.RejectNonstandard, str)
 		}
 
 		// A negative value for expected inputs indicates the script is
@@ -349,7 +353,7 @@ func checkInputsStandard(tx *btcutil.Tx, txStore btcchain.TxStore) error {
 		if scriptInfo.ExpectedInputs < 0 {
 			str := fmt.Sprintf("transaction input #%d expects %d "+
 				"inputs", i, scriptInfo.ExpectedInputs)
-			return TxRuleError(str)
+			return txRuleError(btcwire.RejectNonstandard, str)
 		}
 
 		// The script pair is non-standard if the number of available
@@ -359,7 +363,7 @@ func checkInputsStandard(tx *btcutil.Tx, txStore btcchain.TxStore) error {
 				"inputs, but referenced output script provides "+
 				"%d", i, scriptInfo.ExpectedInputs,
 				scriptInfo.NumInputs)
-			return TxRuleError(str)
+			return txRuleError(btcwire.RejectNonstandard, str)
 		}
 	}
 
@@ -511,7 +515,7 @@ func (mp *txMemPool) maybeAddOrphan(tx *btcutil.Tx) error {
 		str := fmt.Sprintf("orphan transaction size of %d bytes is "+
 			"larger than max allowed size of %d bytes",
 			serializedLen, maxOrphanTxSize)
-		return TxRuleError(str)
+		return txRuleError(btcwire.RejectNonstandard, str)
 	}
 
 	// Add the orphan if the none of the above disqualified it.
@@ -677,7 +681,7 @@ func (mp *txMemPool) checkPoolDoubleSpend(tx *btcutil.Tx) error {
 		if txR, exists := mp.outpoints[txIn.PreviousOutpoint]; exists {
 			str := fmt.Sprintf("transaction %v in the pool "+
 				"already spends the same coins", txR.Sha())
-			return TxRuleError(str)
+			return txRuleError(btcwire.RejectDuplicate, str)
 		}
 	}
 
@@ -744,7 +748,7 @@ func (mp *txMemPool) maybeAcceptTransaction(tx *btcutil.Tx, isOrphan *bool, isNe
 	// be a quick check to weed out duplicates.
 	if mp.haveTransaction(txHash) {
 		str := fmt.Sprintf("already have transaction %v", txHash)
-		return TxRuleError(str)
+		return txRuleError(btcwire.RejectDuplicate, str)
 	}
 
 	// Perform preliminary sanity checks on the transaction.  This makes
@@ -752,8 +756,8 @@ func (mp *txMemPool) maybeAcceptTransaction(tx *btcutil.Tx, isOrphan *bool, isNe
 	// transactions are allowed into blocks.
 	err := btcchain.CheckTransactionSanity(tx)
 	if err != nil {
-		if _, ok := err.(btcchain.RuleError); ok {
-			return TxRuleError(err.Error())
+		if cerr, ok := err.(btcchain.RuleError); ok {
+			return chainRuleError(cerr)
 		}
 		return err
 	}
@@ -762,7 +766,7 @@ func (mp *txMemPool) maybeAcceptTransaction(tx *btcutil.Tx, isOrphan *bool, isNe
 	if btcchain.IsCoinBase(tx) {
 		str := fmt.Sprintf("transaction %v is an individual coinbase",
 			txHash)
-		return TxRuleError(str)
+		return txRuleError(btcwire.RejectInvalid, str)
 	}
 
 	// Don't accept transactions with a lock time after the maximum int32
@@ -772,7 +776,7 @@ func (mp *txMemPool) maybeAcceptTransaction(tx *btcutil.Tx, isOrphan *bool, isNe
 	if tx.MsgTx().LockTime > math.MaxInt32 {
 		str := fmt.Sprintf("transaction %v has a lock time after "+
 			"2038 which is not accepted yet", txHash)
-		return TxRuleError(str)
+		return txRuleError(btcwire.RejectNonstandard, str)
 	}
 
 	// Get the current height of the main chain.  A standalone transaction
@@ -780,6 +784,8 @@ func (mp *txMemPool) maybeAcceptTransaction(tx *btcutil.Tx, isOrphan *bool, isNe
 	// one more than the current height.
 	_, curHeight, err := mp.server.db.NewestSha()
 	if err != nil {
+		// This is an unexpected error so don't turn it into a rule
+		// error.
 		return err
 	}
 	nextBlockHeight := curHeight + 1
@@ -789,9 +795,16 @@ func (mp *txMemPool) maybeAcceptTransaction(tx *btcutil.Tx, isOrphan *bool, isNe
 	if !activeNetParams.RelayNonStdTxs {
 		err := checkTransactionStandard(tx, nextBlockHeight)
 		if err != nil {
-			str := fmt.Sprintf("transaction %v is not a standard "+
-				"transaction: %v", txHash, err)
-			return TxRuleError(str)
+			// Attempt to extract a reject code from the error so
+			// it can be retained.  When not possible, fall back to
+			// a non standard error.
+			rejectCode, found := extractRejectCode(err)
+			if !found {
+				rejectCode = btcwire.RejectNonstandard
+			}
+			str := fmt.Sprintf("transaction %v is not standard: %v",
+				txHash, err)
+			return txRuleError(rejectCode, str)
 		}
 	}
 
@@ -814,6 +827,9 @@ func (mp *txMemPool) maybeAcceptTransaction(tx *btcutil.Tx, isOrphan *bool, isNe
 	// needing to do a separate lookup.
 	txStore, err := mp.fetchInputTransactions(tx)
 	if err != nil {
+		if cerr, ok := err.(btcchain.RuleError); ok {
+			return chainRuleError(cerr)
+		}
 		return err
 	}
 
@@ -822,7 +838,8 @@ func (mp *txMemPool) maybeAcceptTransaction(tx *btcutil.Tx, isOrphan *bool, isNe
 	if txD, exists := txStore[*txHash]; exists && txD.Err == nil {
 		for _, isOutputSpent := range txD.Spent {
 			if !isOutputSpent {
-				return TxRuleError("transaction already exists")
+				return txRuleError(btcwire.RejectDuplicate,
+					"transaction already exists")
 			}
 		}
 	}
@@ -844,8 +861,8 @@ func (mp *txMemPool) maybeAcceptTransaction(tx *btcutil.Tx, isOrphan *bool, isNe
 	// used later.
 	txFee, err := btcchain.CheckTransactionInputs(tx, nextBlockHeight, txStore)
 	if err != nil {
-		if _, ok := err.(btcchain.RuleError); ok {
-			return TxRuleError(err.Error())
+		if cerr, ok := err.(btcchain.RuleError); ok {
+			return chainRuleError(cerr)
 		}
 		return err
 	}
@@ -855,9 +872,16 @@ func (mp *txMemPool) maybeAcceptTransaction(tx *btcutil.Tx, isOrphan *bool, isNe
 	if !activeNetParams.RelayNonStdTxs {
 		err := checkInputsStandard(tx, txStore)
 		if err != nil {
+			// Attempt to extract a reject code from the error so
+			// it can be retained.  When not possible, fall back to
+			// a non standard error.
+			rejectCode, found := extractRejectCode(err)
+			if !found {
+				rejectCode = btcwire.RejectNonstandard
+			}
 			str := fmt.Sprintf("transaction %v has a non-standard "+
 				"input: %v", txHash, err)
-			return TxRuleError(str)
+			return txRuleError(rejectCode, str)
 		}
 	}
 
@@ -871,7 +895,7 @@ func (mp *txMemPool) maybeAcceptTransaction(tx *btcutil.Tx, isOrphan *bool, isNe
 		str := fmt.Sprintf("transaction %v has %d fees which is under "+
 			"the required amount of %d", txHash, txFee,
 			minRequiredFee)
-		return TxRuleError(str)
+		return txRuleError(btcwire.RejectInsufficientFee, str)
 	}
 
 	// Free-to-relay transactions are rate limited here to prevent
@@ -888,7 +912,7 @@ func (mp *txMemPool) maybeAcceptTransaction(tx *btcutil.Tx, isOrphan *bool, isNe
 		if mp.pennyTotal >= cfg.FreeTxRelayLimit*10*1000 {
 			str := fmt.Sprintf("transaction %v has 0 fees and has "+
 				"been rejected by the rate limiter", txHash)
-			return TxRuleError(str)
+			return txRuleError(btcwire.RejectInsufficientFee, str)
 		}
 		oldTotal := mp.pennyTotal
 
@@ -903,6 +927,9 @@ func (mp *txMemPool) maybeAcceptTransaction(tx *btcutil.Tx, isOrphan *bool, isNe
 	err = btcchain.ValidateTransactionScripts(tx, txStore,
 		standardScriptVerifyFlags)
 	if err != nil {
+		if cerr, ok := err.(btcchain.RuleError); ok {
+			return chainRuleError(cerr)
+		}
 		return err
 	}
 
@@ -1036,7 +1063,14 @@ func (mp *txMemPool) ProcessTransaction(tx *btcutil.Tx, allowOrphan, rateLimit b
 		// The transaction is an orphan (has inputs missing).  Reject
 		// it if the flag to allow orphans is not set.
 		if !allowOrphan {
-			return TxRuleError("transaction spends unknown inputs")
+			// NOTE: RejectDuplicate is really not an accurate
+			// reject code here, but it matches the reference
+			// implementation and there isn't a better choice due
+			// to the limited number of reject codes.  Missing
+			// inputs is assumed to mean they are already spent
+			// which is not really always the case.
+			return txRuleError(btcwire.RejectDuplicate,
+				"transaction spends unknown inputs")
 		}
 
 		// Potentially add the orphan transaction to the orphan pool.

@@ -499,12 +499,19 @@ func (b *blockManager) handleTxMsg(tmsg *txMsg) {
 		// simply rejected as opposed to something actually going wrong,
 		// so log it as such.  Otherwise, something really did go wrong,
 		// so log it as an actual error.
-		if _, ok := err.(TxRuleError); ok {
-			bmgrLog.Debugf("Rejected transaction %v from %s: %v", txHash,
-				tmsg.peer, err)
+		if _, ok := err.(RuleError); ok {
+			bmgrLog.Debugf("Rejected transaction %v from %s: %v",
+				txHash, tmsg.peer, err)
 		} else {
-			bmgrLog.Errorf("Failed to process transaction %v: %v", txHash, err)
+			bmgrLog.Errorf("Failed to process transaction %v: %v",
+				txHash, err)
 		}
+
+		// Convert the error into an appropriate reject message and
+		// send it.
+		code, reason := errToRejectErr(err)
+		tmsg.peer.PushRejectMsg(btcwire.CmdBlock, code, reason, txHash,
+			false)
 		return
 	}
 }
@@ -594,8 +601,15 @@ func (b *blockManager) handleBlockMsg(bmsg *blockMsg) {
 			bmgrLog.Infof("Rejected block %v from %s: %v", blockSha,
 				bmsg.peer, err)
 		} else {
-			bmgrLog.Errorf("Failed to process block %v: %v", blockSha, err)
+			bmgrLog.Errorf("Failed to process block %v: %v",
+				blockSha, err)
 		}
+
+		// Convert the error into an appropriate reject message and
+		// send it.
+		code, reason := errToRejectErr(err)
+		bmsg.peer.PushRejectMsg(btcwire.CmdBlock, code, reason,
+			blockSha, false)
 		return
 	}
 
