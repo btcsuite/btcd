@@ -1316,7 +1316,7 @@ func handleGetMiningInfo(s *rpcServer, cmd btcjson.Cmd, closeChan <-chan struct{
 		}
 	}
 
-	result := &btcjson.GetMiningInfoResult{
+	result := btcjson.GetMiningInfoResult{
 		Blocks:           height,
 		CurrentBlockSize: uint64(len(blockBytes)),
 		CurrentBlockTx:   uint64(len(block.MsgBlock().Transactions)),
