@@ -1296,7 +1296,7 @@ func (c *wsClient) SendMessage(marshalledJSON []byte, doneChan chan bool) {
 // to the client having already been disconnected or dropped.
 var ErrClientQuit = errors.New("client quit")
 
-// QueueMessage queues the passed notification to be sent to the websocket
+// QueueNotification queues the passed notification to be sent to the websocket
 // client.  This function, as the name implies, is only intended for
 // notifications since it has additional logic to prevent other subsystems, such
 // as the memory pool and block manager, from blocking even when the send
