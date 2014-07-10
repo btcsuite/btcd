@@ -662,29 +662,26 @@ func (a *AddrManager) AddAddress(addr *btcwire.NetAddress,
 
 // AddAddressByIP adds an address where we are given an ip:port and not a
 // btcwire.NetAddress.
-func (a *AddrManager) AddAddressByIP(addrIP string) {
+func (a *AddrManager) AddAddressByIP(addrIP string) error {
 	// Split IP and port
 	addr, portStr, err := net.SplitHostPort(addrIP)
 	if err != nil {
-		log.Warnf("AddADddressByIP given bullshit adddress (%s): %v",
-			err)
-		return
+		return err
 	}
 	// Put it in btcwire.Netaddress
 	var na btcwire.NetAddress
 	na.Timestamp = time.Now()
 	na.IP = net.ParseIP(addr)
 	if na.IP == nil {
-		log.Error("Invalid ip address:", addr)
-		return
+		return fmt.Errorf("invalid ip address %s", addr)
 	}
 	port, err := strconv.ParseUint(portStr, 10, 0)
 	if err != nil {
-		log.Error("Invalid port: ", portStr, err)
-		return
+		return fmt.Errorf("invalid port %s: %v", portStr, err)
 	}
 	na.Port = uint16(port)
 	a.AddAddress(&na, &na) // XXX use correct src address
+	return nil
 }
 
 // NeedMoreAddresses returns whether or not the address manager needs more
