@@ -499,9 +499,10 @@ func (s *server) seedFromDNS() {
 		return
 	}
 
-	randSource := mrand.New(mrand.NewSource(time.Now().UnixNano()))
 	for _, seeder := range activeNetParams.dnsSeeds {
 		go func(seeder string) {
+			randSource := mrand.New(mrand.NewSource(time.Now().UnixNano()))
+
 			seedpeers, err := dnsDiscover(seeder)
 			if err != nil {
 				discLog.Infof("DNS discovery failed on seed %s: %v", seeder, err)
