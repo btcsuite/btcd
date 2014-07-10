@@ -1,6 +1,9 @@
 coinset
 =======
 
+[![Build Status](https://travis-ci.org/conformal/btcutil.png?branch=master)]
+(https://travis-ci.org/conformal/btcutil)
+
 Package coinset provides bitcoin-specific convenience functions for selecting
 from and managing sets of unspent transaction outpoints (UTXOs).
 

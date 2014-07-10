@@ -1,6 +1,9 @@
 bloom
 =====
 
+[![Build Status](https://travis-ci.org/conformal/btcutil.png?branch=master)]
+(https://travis-ci.org/conformal/btcutil)
+
 Package bloom provides an API for dealing with bitcoin-specific bloom filters.
 
 A comprehensive suite of tests is provided to ensure proper functionality.  See
