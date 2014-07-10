@@ -11,6 +11,9 @@ report.  Package coinset is licensed under the liberal ISC license.
 
 ## Documentation
 
+[![GoDoc](https://godoc.org/github.com/conformal/btcutil/coinset?status.png)]
+(http://godoc.org/github.com/conformal/btcutil/coinset)
+
 Full `go doc` style documentation for the project can be viewed online without
 installing this package by using the GoDoc site here:
 http://godoc.org/github.com/conformal/btcutil/coinset
