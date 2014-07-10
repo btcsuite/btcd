@@ -76,4 +76,5 @@ transaction and transmit it to the network.
 
 ## License
 
-Package coinset is licensed under the liberal ISC License.
+Package coinset is licensed under the [copyfree](http://copyfree.org) ISC
+License.

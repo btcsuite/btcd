@@ -57,4 +57,5 @@ signature perform the following:
 
 ## License
 
-Package btcutil is licensed under the liberal ISC License.
+Package btcutil is licensed under the [copyfree](http://copyfree.org) ISC
+License.
