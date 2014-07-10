@@ -76,8 +76,8 @@ func (m *merkleBlock) traverseAndBuild(height, pos uint32) {
 	}
 }
 
-// NewMerkleBlock returns a new *btcwire.MsgMerkleBlock based on the passed
-// block and filter.
+// NewMerkleBlock returns a new *btcwire.MsgMerkleBlock and an array of the matched
+// transaction hashes based on the passed block and filter.
 func NewMerkleBlock(block *btcutil.Block, filter *Filter) (*btcwire.MsgMerkleBlock, []*btcwire.ShaHash) {
 	numTx := uint32(len(block.Transactions()))
 	mBlock := merkleBlock{
