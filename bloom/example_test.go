@@ -13,8 +13,8 @@ import (
 	"github.com/conformal/btcwire"
 )
 
-// This example creates a new bloom filter, adds a transaction hash to it, and
-// shows how to check if the filter matches the transaction.
+// This example demonstrates how to create a new bloom filter, add a transaction
+// hash to it, and check if the filter matches the transaction.
 func ExampleNewFilter() {
 	rand.Seed(time.Now().UnixNano())
 	tweak := rand.Uint32()
