@@ -1220,6 +1220,111 @@ func (c *Client) GetAddressesByAccount(account string) ([]btcutil.Address, error
 	return c.GetAddressesByAccountAsync(account).Receive()
 }
 
+// FutureMoveResult is a future promise to deliver the result of a MoveAsync,
+// MoveMinConfAsync, or MoveCommentAsync RPC invocation (or an applicable
+// error).
+type FutureMoveResult chan *response
+
+// Receive waits for the response promised by the future and returns the result
+// of the move operation.
+func (r FutureMoveResult) Receive() (bool, error) {
+	res, err := receiveFuture(r)
+	if err != nil {
+		return false, err
+	}
+
+	// Unmarshal result as a boolean.
+	var moveResult bool
+	err = json.Unmarshal(res, &moveResult)
+	if err != nil {
+		return false, err
+	}
+
+	return moveResult, nil
+}
+
+// MoveAsync returns an instance of a type that can be used to get the result of
+// the RPC at some future time by invoking the Receive function on the returned
+// instance.
+//
+// See Move for the blocking version and more details.
+func (c *Client) MoveAsync(fromAccount, toAccount string, amount btcutil.Amount) FutureMoveResult {
+	id := c.NextID()
+	cmd, err := btcjson.NewMoveCmd(id, fromAccount, toAccount, int64(amount))
+	if err != nil {
+		return newFutureError(err)
+	}
+
+	return c.sendCmd(cmd)
+}
+
+// Move moves specified amount from one account in your wallet to another.  Only
+// funds with the default number of minimum confirmations will be used.
+//
+// See MoveMinConf and MoveComment for different options.
+func (c *Client) Move(fromAccount, toAccount string, amount btcutil.Amount) (bool, error) {
+	return c.MoveAsync(fromAccount, toAccount, amount).Receive()
+}
+
+// MoveMinConfAsync returns an instance of a type that can be used to get the
+// result of the RPC at some future time by invoking the Receive function on the
+// returned instance.
+//
+// See MoveMinConf for the blocking version and more details.
+func (c *Client) MoveMinConfAsync(fromAccount, toAccount string,
+	amount btcutil.Amount, minConfirms int) FutureMoveResult {
+
+	id := c.NextID()
+	cmd, err := btcjson.NewMoveCmd(id, fromAccount, toAccount, int64(amount),
+		minConfirms)
+	if err != nil {
+		return newFutureError(err)
+	}
+
+	return c.sendCmd(cmd)
+}
+
+// MoveMinConf moves specified amount from one account in your wallet to
+// another.  Only funds with the passed number of minimum confirmations will be
+// used.
+//
+// See Move to use the default number of minimum confirmations and MoveComment
+// for additional options.
+func (c *Client) MoveMinConf(fromAccount, toAccount string, amount btcutil.Amount, minConf int) (bool, error) {
+	return c.MoveMinConfAsync(fromAccount, toAccount, amount, minConf).Receive()
+}
+
+// MoveCommentAsync returns an instance of a type that can be used to get the
+// result of the RPC at some future time by invoking the Receive function on the
+// returned instance.
+//
+// See MoveComment for the blocking version and more details.
+func (c *Client) MoveCommentAsync(fromAccount, toAccount string,
+	amount btcutil.Amount, minConfirms int, comment string) FutureMoveResult {
+
+	id := c.NextID()
+	cmd, err := btcjson.NewMoveCmd(id, fromAccount, toAccount, int64(amount),
+		minConfirms, comment)
+	if err != nil {
+		return newFutureError(err)
+	}
+
+	return c.sendCmd(cmd)
+}
+
+// MoveComment moves specified amount from one account in your wallet to
+// another and stores the provided comment in the wallet.  The comment
+// parameter is only available in the wallet.  Only funds with the passed number
+// of minimum confirmations will be used.
+//
+// See Move and MoveMinConf to use defaults.
+func (c *Client) MoveComment(fromAccount, toAccount string, amount btcutil.Amount,
+	minConf int, comment string) (bool, error) {
+
+	return c.MoveCommentAsync(fromAccount, toAccount, amount, minConf,
+		comment).Receive()
+}
+
 // FutureValidateAddressResult is a future promise to deliver the result of a
 // ValidateAddressAsync RPC invocation (or an applicable error).
 type FutureValidateAddressResult chan *response
@@ -2189,7 +2294,6 @@ func (c *Client) GetInfo() (*btcjson.InfoResult, error) {
 // listaddressgroupings (NYI in btcwallet)
 // listreceivedbyaddress (NYI in btcwallet)
 // listreceivedbyaccount (NYI in btcwallet)
-// move (NYI in btcwallet)
 
 // DUMP
 // importwallet (NYI in btcwallet)
