@@ -473,9 +473,6 @@ func (b *blockManager) logBlockHeight(block *btcutil.Block) {
 
 // handleTxMsg handles transaction messages from all peers.
 func (b *blockManager) handleTxMsg(tmsg *txMsg) {
-	// Keep track of which peer the tx was sent from.
-	txHash := tmsg.tx.Sha()
-
 	// NOTE:  BitcoinJ, and possibly other wallets, don't follow the spec of
 	// sending an inventory message and allowing the remote peer to decide
 	// whether or not they want to request the transaction via a getdata
@@ -493,6 +490,7 @@ func (b *blockManager) handleTxMsg(tmsg *txMsg) {
 	// already knows about it and as such we shouldn't have any more
 	// instances of trying to fetch it, or we failed to insert and thus
 	// we'll retry next time we get an inv.
+	txHash := tmsg.tx.Sha()
 	delete(tmsg.peer.requestedTxns, *txHash)
 	delete(b.requestedTxns, *txHash)
 
