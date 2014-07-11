@@ -28,6 +28,7 @@ func TestErrorCodeStringer(t *testing.T) {
 		{btcchain.ErrBadMerkleRoot, "ErrBadMerkleRoot"},
 		{btcchain.ErrBadCheckpoint, "ErrBadCheckpoint"},
 		{btcchain.ErrForkTooOld, "ErrForkTooOld"},
+		{btcchain.ErrCheckpointTimeTooOld, "ErrCheckpointTimeTooOld"},
 		{btcchain.ErrNoTransactions, "ErrNoTransactions"},
 		{btcchain.ErrTooManyTransactions, "ErrTooManyTransactions"},
 		{btcchain.ErrNoTxInputs, "ErrNoTxInputs"},

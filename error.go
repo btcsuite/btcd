@@ -62,9 +62,13 @@ const (
 	// checkpoint height does not match the expected one.
 	ErrBadCheckpoint
 
-	// ErrForkTooOld indicates a block is attempted to fork the block chain
+	// ErrForkTooOld indicates a block is attempting to fork the block chain
 	// before the most recent checkpoint.
 	ErrForkTooOld
+
+	// ErrCheckpointTimeTooOld indicates a block has a timestamp before the
+	// most recent checkpoint.
+	ErrCheckpointTimeTooOld
 
 	// ErrNoTransactions indicates the block does not have a least one
 	// transaction.  A valid block must have at least the coinbase
@@ -190,6 +194,7 @@ var errorCodeStrings = map[ErrorCode]string{
 	ErrBadMerkleRoot:         "ErrBadMerkleRoot",
 	ErrBadCheckpoint:         "ErrBadCheckpoint",
 	ErrForkTooOld:            "ErrForkTooOld",
+	ErrCheckpointTimeTooOld:  "ErrCheckpointTimeTooOld",
 	ErrNoTransactions:        "ErrNoTransactions",
 	ErrTooManyTransactions:   "ErrTooManyTransactions",
 	ErrNoTxInputs:            "ErrNoTxInputs",
