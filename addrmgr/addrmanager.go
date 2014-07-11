@@ -26,6 +26,71 @@ import (
 	"github.com/conformal/btcwire"
 )
 
+// AddrManager provides a concurrency safe address manager for caching potential
+// peers on the bitcoin network.
+type AddrManager struct {
+	mtx            sync.Mutex
+	dataDir        string
+	lookupFunc     func(string) ([]net.IP, error)
+	rand           *rand.Rand
+	key            [32]byte
+	addrIndex      map[string]*knownAddress // address key to ka for all addrs.
+	addrNew        [newBucketCount]map[string]*knownAddress
+	addrTried      [triedBucketCount]*list.List
+	started        int32
+	shutdown       int32
+	wg             sync.WaitGroup
+	quit           chan struct{}
+	nTried         int
+	nNew           int
+	lamtx          sync.Mutex
+	localAddresses map[string]*localAddress
+}
+
+type serializedKnownAddress struct {
+	Addr        string
+	Src         string
+	Attempts    int
+	TimeStamp   int64
+	LastAttempt int64
+	LastSuccess int64
+	// no refcount or tried, that is available from context.
+}
+
+type serializedAddrManager struct {
+	Version      int
+	Key          [32]byte
+	Addresses    []*serializedKnownAddress
+	NewBuckets   [newBucketCount][]string // string is NetAddressKey
+	TriedBuckets [triedBucketCount][]string
+}
+
+type localAddress struct {
+	na    *btcwire.NetAddress
+	score AddressPriority
+}
+
+// AddressPriority type is used to describe the heirarchy of local address
+// discovery methods.
+type AddressPriority int
+
+const (
+	// InterfacePrio signifies the address is on a local interface
+	InterfacePrio AddressPriority = iota
+
+	// BoundPrio signifies the address has been explicity bounded to.
+	BoundPrio
+
+	// UpnpPrio signifies the address was obtained from UPnP.
+	UpnpPrio
+
+	// HTTPPrio signifies the address was obtained from an external HTTP service.
+	HTTPPrio
+
+	// ManualPrio signifies the address was provided by --externalip.
+	ManualPrio
+)
+
 const (
 	// needAddressThreshold is the number of addresses under which the
 	// address manager will claim to need more addresses.
@@ -93,117 +158,6 @@ const (
 	// serialisationVersion is the current version of the on-disk format.
 	serialisationVersion = 1
 )
-
-// knownAddress tracks information about a known network address that is used
-// to determine how viable an address is.
-type knownAddress struct {
-	na          *btcwire.NetAddress
-	srcAddr     *btcwire.NetAddress
-	attempts    int
-	lastattempt time.Time
-	lastsuccess time.Time
-	tried       bool
-	refs        int // reference count of new buckets
-}
-
-// NetAddress returns the underlying btcwire.NetAddress associated with the
-// known address.
-func (ka *knownAddress) NetAddress() *btcwire.NetAddress {
-	return ka.na
-}
-
-// LastAttempt returns the last time the known address was attempted.
-func (ka *knownAddress) LastAttempt() time.Time {
-	return ka.lastattempt
-}
-
-// bad returns true if the address in question has not been tried in the last
-// minute and meets one of the following criteria:
-// 1) It claims to be from the future
-// 2) It hasn't been seen in over a month
-// 3) It has failed at least three times and never succeeded
-// 4) It has failed ten times in the last week
-// All addresses that meet these criteria are assumed to be worthless and not
-// worth keeping hold of.
-func bad(ka *knownAddress) bool {
-	if ka.lastattempt.After(time.Now().Add(-1 * time.Minute)) {
-		return false
-	}
-
-	// From the future?
-	if ka.na.Timestamp.After(time.Now().Add(10 * time.Minute)) {
-		return true
-	}
-
-	// Over a month old?
-	if ka.na.Timestamp.After(time.Now().Add(-1 * numMissingDays * time.Hour * 24)) {
-		return true
-	}
-
-	// Never succeeded?
-	if ka.lastsuccess.IsZero() && ka.attempts >= numRetries {
-		return true
-	}
-
-	// Hasn't succeeded in too long?
-	if !ka.lastsuccess.After(time.Now().Add(-1*minBadDays*time.Hour*24)) &&
-		ka.attempts >= maxFailures {
-		return true
-	}
-
-	return false
-}
-
-// chance returns the selection probability for a known address.  The priority
-// depends upon how recently the address has been seen, how recently it was last
-// attempted and how often attempts to connect to it have failed.
-func chance(ka *knownAddress) float64 {
-	now := time.Now()
-	lastSeen := now.Sub(ka.na.Timestamp)
-	lastAttempt := now.Sub(ka.lastattempt)
-
-	if lastSeen < 0 {
-		lastSeen = 0
-	}
-	if lastAttempt < 0 {
-		lastAttempt = 0
-	}
-
-	c := 600.0 / (600.0 + lastSeen.Seconds())
-
-	// Very recent attempts are less likely to be retried.
-	if lastAttempt > 10*time.Minute {
-		c *= 0.01
-	}
-
-	// Failed attempts deprioritise.
-	for i := ka.attempts; i < 0; i++ {
-		c /= 1.5
-	}
-
-	return c
-}
-
-// AddrManager provides a concurrency safe address manager for caching potential
-// peers on the bitcoin network.
-type AddrManager struct {
-	mtx            sync.Mutex
-	dataDir        string
-	lookupFunc     func(string) ([]net.IP, error)
-	rand           *rand.Rand
-	key            [32]byte
-	addrIndex      map[string]*knownAddress // address key to ka for all addrs.
-	addrNew        [newBucketCount]map[string]*knownAddress
-	addrTried      [triedBucketCount]*list.List
-	started        int32
-	shutdown       int32
-	wg             sync.WaitGroup
-	quit           chan struct{}
-	nTried         int
-	nNew           int
-	lamtx          sync.Mutex
-	localAddresses map[string]*localAddress
-}
 
 // updateAddress is a helper function to either update an address already known
 // to the address manager, or to add the address if not already known.
@@ -273,7 +227,7 @@ func (a *AddrManager) updateAddress(netAddr, srcAddr *btcwire.NetAddress) {
 
 	// Enforce max addresses.
 	if len(a.addrNew[bucket]) > newBucketSize {
-		log.Tracef("new bucket is full, expiring old ")
+		log.Tracef("new bucket is full, expiring old")
 		a.expireNew(bucket)
 	}
 
@@ -295,7 +249,7 @@ func (a *AddrManager) expireNew(bucket int) {
 	// use that information instead.
 	var oldest *knownAddress
 	for k, v := range a.addrNew[bucket] {
-		if bad(v) {
+		if v.isBad() {
 			log.Tracef("expiring bad address %v", k)
 			delete(a.addrNew[bucket], k)
 			v.refs--
@@ -303,7 +257,7 @@ func (a *AddrManager) expireNew(bucket int) {
 				a.nNew--
 				delete(a.addrIndex, k)
 			}
-			return
+			continue
 		}
 		if oldest == nil {
 			oldest = v
@@ -402,24 +356,6 @@ out:
 	a.savePeers()
 	a.wg.Done()
 	log.Trace("Address handler done")
-}
-
-type serializedKnownAddress struct {
-	Addr        string
-	Src         string
-	Attempts    int
-	TimeStamp   int64
-	LastAttempt int64
-	LastSuccess int64
-	// no refcount or tried, that is available from context.
-}
-
-type serializedAddrManager struct {
-	Version      int
-	Key          [32]byte
-	Addresses    []*serializedKnownAddress
-	NewBuckets   [newBucketCount][]string // string is NetAddressKey
-	TriedBuckets [triedBucketCount][]string
 }
 
 // savePeers saves all the known addresses to a file so they can be read back
@@ -846,7 +782,7 @@ func (a *AddrManager) GetAddress(class string, newBias int) *knownAddress {
 			}
 			ka := e.Value.(*knownAddress)
 			randval := a.rand.Intn(large)
-			if float64(randval) < (factor * chance(ka) * float64(large)) {
+			if float64(randval) < (factor * ka.chance() * float64(large)) {
 				log.Tracef("Selected %v from tried bucket",
 					NetAddressKey(ka.na))
 				return ka
@@ -874,7 +810,7 @@ func (a *AddrManager) GetAddress(class string, newBias int) *knownAddress {
 				nth--
 			}
 			randval := a.rand.Intn(large)
-			if float64(randval) < (factor * chance(ka) * float64(large)) {
+			if float64(randval) < (factor * ka.chance() * float64(large)) {
 				log.Tracef("Selected %v from new bucket",
 					NetAddressKey(ka.na))
 				return ka
@@ -1015,32 +951,6 @@ func (a *AddrManager) Good(addr *btcwire.NetAddress) {
 
 	// We made sure there is space here just above.
 	a.addrNew[newBucket][rmkey] = rmka
-}
-
-// AddressPriority type is used to describe the heirarchy of local address
-// discovery methods.
-type AddressPriority int
-
-const (
-	// InterfacePrio signifies the address is on a local interface
-	InterfacePrio AddressPriority = iota
-
-	// BoundPrio signifies the address has been explicity bounded to.
-	BoundPrio
-
-	// UpnpPrio signifies the address was obtained from UPnP.
-	UpnpPrio
-
-	// HTTPPrio signifies the address was obtained from an external HTTP service.
-	HTTPPrio
-
-	// ManualPrio signifies the address was provided by --externalip.
-	ManualPrio
-)
-
-type localAddress struct {
-	na    *btcwire.NetAddress
-	score AddressPriority
 }
 
 // AddLocalAddress adds na to the list of known local addresses to advertise
