@@ -555,7 +555,7 @@ func (p *peer) pushMerkleBlockMsg(sha *btcwire.ShaHash, doneChan, waitChan chan 
 	// Send the merkleblock.  Only send the done channel with this message
 	// if no transactions will be sent afterwards.
 	var dc chan bool
-	if finalValidTxIndex > -1 {
+	if finalValidTxIndex == -1 {
 		dc = doneChan
 	}
 	p.QueueMessage(merkle, dc)
