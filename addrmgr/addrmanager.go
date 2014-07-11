@@ -168,10 +168,6 @@ func (a *AddrManager) updateAddress(netAddr, srcAddr *btcwire.NetAddress) {
 		return
 	}
 
-	// Protect concurrent access.
-	a.mtx.Lock()
-	defer a.mtx.Unlock()
-
 	addr := NetAddressKey(netAddr)
 	ka := a.find(netAddr)
 	if ka != nil {
@@ -363,9 +359,9 @@ out:
 func (a *AddrManager) savePeers() {
 	a.mtx.Lock()
 	defer a.mtx.Unlock()
+
 	// First we make a serialisable datastructure so we can encode it to
 	// json.
-
 	sam := new(serializedAddrManager)
 	sam.Version = serialisationVersion
 	copy(sam.Key[:], a.key[:])
@@ -556,12 +552,11 @@ func (a *AddrManager) Start() {
 
 	log.Trace("Starting address manager")
 
-	a.wg.Add(1)
-
 	// Load peers we already know about from file.
 	a.loadPeers()
 
 	// Start the address ticker to save addresses periodically.
+	a.wg.Add(1)
 	go a.addressHandler()
 }
 
@@ -583,6 +578,9 @@ func (a *AddrManager) Stop() error {
 // number of addresses and silently ignores duplicate addresses.  It is
 // safe for concurrent access.
 func (a *AddrManager) AddAddresses(addrs []*btcwire.NetAddress, srcAddr *btcwire.NetAddress) {
+	a.mtx.Lock()
+	defer a.mtx.Unlock()
+
 	for _, na := range addrs {
 		a.updateAddress(na, srcAddr)
 	}
@@ -591,9 +589,11 @@ func (a *AddrManager) AddAddresses(addrs []*btcwire.NetAddress, srcAddr *btcwire
 // AddAddress adds a new address to the address manager.  It enforces a max
 // number of addresses and silently ignores duplicate addresses.  It is
 // safe for concurrent access.
-func (a *AddrManager) AddAddress(addr *btcwire.NetAddress,
-	srcAddr *btcwire.NetAddress) {
-	a.AddAddresses([]*btcwire.NetAddress{addr}, srcAddr)
+func (a *AddrManager) AddAddress(addr, srcAddr *btcwire.NetAddress) {
+	a.mtx.Lock()
+	defer a.mtx.Unlock()
+
+	a.updateAddress(addr, srcAddr)
 }
 
 // AddAddressByIP adds an address where we are given an ip:port and not a
@@ -620,12 +620,9 @@ func (a *AddrManager) AddAddressByIP(addrIP string) error {
 	return nil
 }
 
-// NeedMoreAddresses returns whether or not the address manager needs more
-// addresses.
-func (a *AddrManager) NeedMoreAddresses() bool {
-	// NumAddresses handles concurrent access for us.
-
-	return a.NumAddresses() < needAddressThreshold
+// NumAddresses returns the number of addresses known to the address manager.
+func (a *AddrManager) numAddresses() int {
+	return a.nTried + a.nNew
 }
 
 // NumAddresses returns the number of addresses known to the address manager.
@@ -633,7 +630,16 @@ func (a *AddrManager) NumAddresses() int {
 	a.mtx.Lock()
 	defer a.mtx.Unlock()
 
-	return a.nTried + a.nNew
+	return a.numAddresses()
+}
+
+// NeedMoreAddresses returns whether or not the address manager needs more
+// addresses.
+func (a *AddrManager) NeedMoreAddresses() bool {
+	a.mtx.Lock()
+	defer a.mtx.Unlock()
+
+	return a.numAddresses() < needAddressThreshold
 }
 
 // AddressCache returns the current address cache.  It must be treated as
@@ -726,6 +732,7 @@ func ipString(na *btcwire.NetAddress) string {
 		base32 := base32.StdEncoding.EncodeToString(na.IP[6:])
 		return strings.ToLower(base32) + ".onion"
 	}
+
 	return na.IP.String()
 }
 
@@ -733,8 +740,8 @@ func ipString(na *btcwire.NetAddress) string {
 // or [ip]:port for IPv6 addresses.
 func NetAddressKey(na *btcwire.NetAddress) string {
 	port := strconv.FormatUint(uint64(na.Port), 10)
-	addr := net.JoinHostPort(ipString(na), port)
-	return addr
+
+	return net.JoinHostPort(ipString(na), port)
 }
 
 // GetAddress returns a single address that should be routable.  It picks a
@@ -742,13 +749,13 @@ func NetAddressKey(na *btcwire.NetAddress) string {
 // have not been used recently and should not pick 'close' addresses
 // consecutively.
 func (a *AddrManager) GetAddress(class string, newBias int) *knownAddress {
-	if a.NumAddresses() == 0 {
-		return nil
-	}
-
 	// Protect concurrent access.
 	a.mtx.Lock()
 	defer a.mtx.Unlock()
+
+	if a.numAddresses() == 0 {
+		return nil
+	}
 
 	if newBias > 100 {
 		newBias = 100
