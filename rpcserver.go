@@ -1907,6 +1907,8 @@ func chainErrToGBTErrString(err error) string {
 		return "bad-checkpoint"
 	case btcchain.ErrForkTooOld:
 		return "fork-too-old"
+	case btcchain.ErrCheckpointTimeTooOld:
+		return "checkpoint-time-too-old"
 	case btcchain.ErrNoTransactions:
 		return "bad-txns-none"
 	case btcchain.ErrTooManyTransactions:
