@@ -1018,11 +1018,11 @@ out:
 
 			case *txMsg:
 				b.handleTxMsg(msg)
-				msg.peer.txProcessed <- true
+				msg.peer.txProcessed <- struct{}{}
 
 			case *blockMsg:
 				b.handleBlockMsg(msg)
-				msg.peer.blockProcessed <- true
+				msg.peer.blockProcessed <- struct{}{}
 
 			case *invMsg:
 				b.handleInvMsg(msg)
@@ -1189,7 +1189,7 @@ func (b *blockManager) NewPeer(p *peer) {
 func (b *blockManager) QueueTx(tx *btcutil.Tx, p *peer) {
 	// Don't accept more transactions if we're shutting down.
 	if atomic.LoadInt32(&b.shutdown) != 0 {
-		p.txProcessed <- false
+		p.txProcessed <- struct{}{}
 		return
 	}
 
@@ -1200,7 +1200,7 @@ func (b *blockManager) QueueTx(tx *btcutil.Tx, p *peer) {
 func (b *blockManager) QueueBlock(block *btcutil.Block, p *peer) {
 	// Don't accept more blocks if we're shutting down.
 	if atomic.LoadInt32(&b.shutdown) != 0 {
-		p.blockProcessed <- false
+		p.blockProcessed <- struct{}{}
 		return
 	}
 

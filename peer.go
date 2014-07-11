@@ -168,8 +168,8 @@ type peer struct {
 	sendDoneQueue      chan struct{}
 	queueWg            sync.WaitGroup // TODO(oga) wg -> single use channel?
 	outputInvChan      chan *btcwire.InvVect
-	txProcessed        chan bool
-	blockProcessed     chan bool
+	txProcessed        chan struct{}
+	blockProcessed     chan struct{}
 	quit               chan struct{}
 	StatsMtx           sync.Mutex // protects all statistics below here.
 	versionKnown       bool
@@ -1795,8 +1795,8 @@ func newPeerBase(s *server, inbound bool) *peer {
 		sendQueue:       make(chan outMsg, 1),   // nonblocking sync
 		sendDoneQueue:   make(chan struct{}, 1), // nonblocking sync
 		outputInvChan:   make(chan *btcwire.InvVect, outputBufferSize),
-		txProcessed:     make(chan bool, 1),
-		blockProcessed:  make(chan bool, 1),
+		txProcessed:     make(chan struct{}, 1),
+		blockProcessed:  make(chan struct{}, 1),
 		quit:            make(chan struct{}),
 	}
 	return &p
