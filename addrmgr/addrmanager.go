@@ -30,7 +30,7 @@ import (
 // peers on the bitcoin network.
 type AddrManager struct {
 	mtx            sync.Mutex
-	dataDir        string
+	peersFile      string
 	lookupFunc     func(string) ([]net.IP, error)
 	rand           *rand.Rand
 	key            [32]byte
@@ -399,19 +399,15 @@ func (a *AddrManager) savePeers() {
 		}
 	}
 
-	// May give some way to specify this later.
-	filename := "peers.json"
-	filePath := filepath.Join(a.dataDir, filename)
-
-	w, err := os.Create(filePath)
+	w, err := os.Create(a.peersFile)
 	if err != nil {
-		log.Error("Error opening file: ", filePath, err)
+		log.Error("Error opening file %s: %v", a.peersFile, err)
 		return
 	}
 	enc := json.NewEncoder(w)
 	defer w.Close()
 	if err := enc.Encode(&sam); err != nil {
-		log.Errorf("Failed to encode %s: %v", filePath, err)
+		log.Errorf("Failed to encode file %s: %v", a.peersFile, err)
 		return
 	}
 }
@@ -422,22 +418,19 @@ func (a *AddrManager) loadPeers() {
 	a.mtx.Lock()
 	defer a.mtx.Unlock()
 
-	// May give some way to specify this later.
-	filename := "peers.json"
-	filePath := filepath.Join(a.dataDir, filename)
-
-	err := a.deserializePeers(filePath)
+	err := a.deserializePeers(a.peersFile)
 	if err != nil {
-		log.Errorf("Failed to parse %s: %v", filePath, err)
+		log.Errorf("Failed to parse file %s: %v", a.peersFile, err)
 		// if it is invalid we nuke the old one unconditionally.
-		err = os.Remove(filePath)
+		err = os.Remove(a.peersFile)
 		if err != nil {
-			log.Warn("Failed to remove corrupt peers file: ", err)
+			log.Warnf("Failed to remove corrupt peers file %s: %v",
+				a.peersFile, err)
 		}
 		a.reset()
 		return
 	}
-	log.Infof("Loaded %d addresses from '%s'", a.nNew+a.nTried, filePath)
+	log.Infof("Loaded %d addresses from file '%s'", a.numAddresses(), a.peersFile)
 }
 
 func (a *AddrManager) deserializePeers(filePath string) error {
@@ -1109,7 +1102,7 @@ func (a *AddrManager) GetBestLocalAddress(remoteAddr *btcwire.NetAddress) *btcwi
 // Use Start to begin processing asynchronous address updates.
 func New(dataDir string, lookupFunc func(string) ([]net.IP, error)) *AddrManager {
 	am := AddrManager{
-		dataDir:        dataDir,
+		peersFile:      filepath.Join(dataDir, "peers.json"),
 		lookupFunc:     lookupFunc,
 		rand:           rand.New(rand.NewSource(time.Now().UnixNano())),
 		quit:           make(chan struct{}),
