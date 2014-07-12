@@ -16,9 +16,9 @@ import (
 // checksum 4 bytes.
 const MessageHeaderSize = 24
 
-// commandSize is the fixed size of all commands in the common bitcoin message
+// CommandSize is the fixed size of all commands in the common bitcoin message
 // header.  Shorter commands must be zero padded.
-const commandSize = 12
+const CommandSize = 12
 
 // MaxMessagePayload is the maximum bytes a message can be regardless of other
 // individual limits imposed by messages themselves.
@@ -157,7 +157,7 @@ func readMessageHeader(r io.Reader) (int, *messageHeader, error) {
 
 	// Create and populate a messageHeader struct from the raw header bytes.
 	hdr := messageHeader{}
-	var command [commandSize]byte
+	var command [CommandSize]byte
 	readElements(hr, &hdr.magic, &command, &hdr.length, &hdr.checksum)
 
 	// Strip trailing zeros from command string.
@@ -193,11 +193,11 @@ func WriteMessageN(w io.Writer, msg Message, pver uint32, btcnet BitcoinNet) (in
 	totalBytes := 0
 
 	// Enforce max command size.
-	var command [commandSize]byte
+	var command [CommandSize]byte
 	cmd := msg.Command()
-	if len(cmd) > commandSize {
+	if len(cmd) > CommandSize {
 		str := fmt.Sprintf("command [%s] is too long [max %v]",
-			cmd, commandSize)
+			cmd, CommandSize)
 		return totalBytes, messageError("WriteMessage", str)
 	}
 	copy(command[:], []byte(cmd))

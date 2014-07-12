@@ -31,10 +31,6 @@ const (
 	// MaxCountSetSubVer makes the internal maxCountSetSubVer constant
 	// available to the test package.
 	MaxCountSetSubVer = maxCountSetSubVer
-
-	// CommandSize makes the internal commandSize constant available to the
-	// test package.
-	CommandSize = commandSize
 )
 
 // TstRandomUint64 makes the internal randomUint64 function available to the
