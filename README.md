@@ -125,4 +125,5 @@ signature perform the following:
 
 ## License
 
-Package btcwire is licensed under the liberal ISC License.
+Package btcwire is licensed under the [copyfree](http://copyfree.org) ISC
+License.
