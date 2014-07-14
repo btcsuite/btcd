@@ -2959,6 +2959,10 @@ func handleSubmitBlock(s *rpcServer, cmd btcjson.Cmd, closeChan <-chan struct{})
 		return fmt.Sprintf("rejected: %s", err.Error()), nil
 	}
 
+	blockSha, err := block.Sha()
+	if err == nil {
+		rpcsLog.Infof("Accepted block %s via submitblock", blockSha)
+	}
 	return nil, nil
 }
 
