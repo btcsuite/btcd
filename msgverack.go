@@ -30,7 +30,7 @@ func (msg *MsgVerAck) BtcEncode(w io.Writer, pver uint32) error {
 // Command returns the protocol command string for the message.  This is part
 // of the Message interface implementation.
 func (msg *MsgVerAck) Command() string {
-	return cmdVerAck
+	return CmdVerAck
 }
 
 // MaxPayloadLength returns the maximum length the payload can be for the

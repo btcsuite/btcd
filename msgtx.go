@@ -405,7 +405,7 @@ func (msg *MsgTx) SerializeSize() int {
 // Command returns the protocol command string for the message.  This is part
 // of the Message interface implementation.
 func (msg *MsgTx) Command() string {
-	return cmdTx
+	return CmdTx
 }
 
 // MaxPayloadLength returns the maximum length the payload can be for the

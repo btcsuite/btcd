@@ -26,27 +26,27 @@ const MaxMessagePayload = (1024 * 1024 * 32) // 32MB
 
 // Commands used in bitcoin message headers which describe the type of message.
 const (
-	cmdVersion     = "version"
-	cmdVerAck      = "verack"
-	cmdGetAddr     = "getaddr"
-	cmdAddr        = "addr"
-	cmdGetBlocks   = "getblocks"
-	cmdInv         = "inv"
-	cmdGetData     = "getdata"
-	cmdNotFound    = "notfound"
-	cmdBlock       = "block"
-	cmdTx          = "tx"
-	cmdGetHeaders  = "getheaders"
-	cmdHeaders     = "headers"
-	cmdPing        = "ping"
-	cmdPong        = "pong"
-	cmdAlert       = "alert"
-	cmdMemPool     = "mempool"
-	cmdFilterAdd   = "filteradd"
-	cmdFilterClear = "filterclear"
-	cmdFilterLoad  = "filterload"
-	cmdMerkleBlock = "merkleblock"
-	cmdReject      = "reject"
+	CmdVersion     = "version"
+	CmdVerAck      = "verack"
+	CmdGetAddr     = "getaddr"
+	CmdAddr        = "addr"
+	CmdGetBlocks   = "getblocks"
+	CmdInv         = "inv"
+	CmdGetData     = "getdata"
+	CmdNotFound    = "notfound"
+	CmdBlock       = "block"
+	CmdTx          = "tx"
+	CmdGetHeaders  = "getheaders"
+	CmdHeaders     = "headers"
+	CmdPing        = "ping"
+	CmdPong        = "pong"
+	CmdAlert       = "alert"
+	CmdMemPool     = "mempool"
+	CmdFilterAdd   = "filteradd"
+	CmdFilterClear = "filterclear"
+	CmdFilterLoad  = "filterload"
+	CmdMerkleBlock = "merkleblock"
+	CmdReject      = "reject"
 )
 
 // Message is an interface that describes a bitcoin message.  A type that
@@ -65,67 +65,67 @@ type Message interface {
 func makeEmptyMessage(command string) (Message, error) {
 	var msg Message
 	switch command {
-	case cmdVersion:
+	case CmdVersion:
 		msg = &MsgVersion{}
 
-	case cmdVerAck:
+	case CmdVerAck:
 		msg = &MsgVerAck{}
 
-	case cmdGetAddr:
+	case CmdGetAddr:
 		msg = &MsgGetAddr{}
 
-	case cmdAddr:
+	case CmdAddr:
 		msg = &MsgAddr{}
 
-	case cmdGetBlocks:
+	case CmdGetBlocks:
 		msg = &MsgGetBlocks{}
 
-	case cmdBlock:
+	case CmdBlock:
 		msg = &MsgBlock{}
 
-	case cmdInv:
+	case CmdInv:
 		msg = &MsgInv{}
 
-	case cmdGetData:
+	case CmdGetData:
 		msg = &MsgGetData{}
 
-	case cmdNotFound:
+	case CmdNotFound:
 		msg = &MsgNotFound{}
 
-	case cmdTx:
+	case CmdTx:
 		msg = &MsgTx{}
 
-	case cmdPing:
+	case CmdPing:
 		msg = &MsgPing{}
 
-	case cmdPong:
+	case CmdPong:
 		msg = &MsgPong{}
 
-	case cmdGetHeaders:
+	case CmdGetHeaders:
 		msg = &MsgGetHeaders{}
 
-	case cmdHeaders:
+	case CmdHeaders:
 		msg = &MsgHeaders{}
 
-	case cmdAlert:
+	case CmdAlert:
 		msg = &MsgAlert{}
 
-	case cmdMemPool:
+	case CmdMemPool:
 		msg = &MsgMemPool{}
 
-	case cmdFilterAdd:
+	case CmdFilterAdd:
 		msg = &MsgFilterAdd{}
 
-	case cmdFilterClear:
+	case CmdFilterClear:
 		msg = &MsgFilterClear{}
 
-	case cmdFilterLoad:
+	case CmdFilterLoad:
 		msg = &MsgFilterLoad{}
 
-	case cmdMerkleBlock:
+	case CmdMerkleBlock:
 		msg = &MsgMerkleBlock{}
 
-	case cmdReject:
+	case CmdReject:
 		msg = &MsgReject{}
 
 	default:

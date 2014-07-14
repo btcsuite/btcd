@@ -118,7 +118,7 @@ func (msg *MsgAddr) BtcEncode(w io.Writer, pver uint32) error {
 // Command returns the protocol command string for the message.  This is part
 // of the Message interface implementation.
 func (msg *MsgAddr) Command() string {
-	return cmdAddr
+	return CmdAddr
 }
 
 // MaxPayloadLength returns the maximum length the payload can be for the

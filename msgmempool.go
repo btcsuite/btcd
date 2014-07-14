@@ -44,7 +44,7 @@ func (msg *MsgMemPool) BtcEncode(w io.Writer, pver uint32) error {
 // Command returns the protocol command string for the message.  This is part
 // of the Message interface implementation.
 func (msg *MsgMemPool) Command() string {
-	return cmdMemPool
+	return CmdMemPool
 }
 
 // MaxPayloadLength returns the maximum length the payload can be for the

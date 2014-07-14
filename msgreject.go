@@ -52,7 +52,7 @@ func (code RejectCode) String() string {
 // This message was not added until protocol version RejectVersion.
 type MsgReject struct {
 	// Cmd is the command for the message which was rejected such as
-	// as cmdBlock or cmdTx.  This can be obtained from the Command function
+	// as CmdBlock or CmdTx.  This can be obtained from the Command function
 	// of a Message.
 	Cmd string
 
@@ -99,9 +99,9 @@ func (msg *MsgReject) BtcDecode(r io.Reader, pver uint32) error {
 	}
 	msg.Reason = reason
 
-	// cmdBlock and cmdTx messages have an additional hash field that
+	// CmdBlock and CmdTx messages have an additional hash field that
 	// identifies the specific block or transaction.
-	if msg.Cmd == cmdBlock || msg.Cmd == cmdTx {
+	if msg.Cmd == CmdBlock || msg.Cmd == CmdTx {
 		err := readElement(r, &msg.Hash)
 		if err != nil {
 			return err
@@ -139,9 +139,9 @@ func (msg *MsgReject) BtcEncode(w io.Writer, pver uint32) error {
 		return err
 	}
 
-	// cmdBlock and cmdTx messages have an additional hash field that
+	// CmdBlock and CmdTx messages have an additional hash field that
 	// identifies the specific block or transaction.
-	if msg.Cmd == cmdBlock || msg.Cmd == cmdTx {
+	if msg.Cmd == CmdBlock || msg.Cmd == CmdTx {
 		err := writeElement(w, &msg.Hash)
 		if err != nil {
 			return err
@@ -154,7 +154,7 @@ func (msg *MsgReject) BtcEncode(w io.Writer, pver uint32) error {
 // Command returns the protocol command string for the message.  This is part
 // of the Message interface implementation.
 func (msg *MsgReject) Command() string {
-	return cmdReject
+	return CmdReject
 }
 
 // MaxPayloadLength returns the maximum length the payload can be for the
