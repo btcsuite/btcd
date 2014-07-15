@@ -70,7 +70,7 @@ func GetRaw(resp io.ReadCloser) ([]byte, error) {
 	body, err := ioutil.ReadAll(resp)
 	resp.Close()
 	if err != nil {
-		err = fmt.Errorf("Error reading json reply: %v", err)
+		err = fmt.Errorf("error reading json reply: %v", err)
 		return body, err
 	}
 	return body, nil

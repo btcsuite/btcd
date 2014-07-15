@@ -533,7 +533,7 @@ func NewAddNodeCmd(id interface{}, addr string, subcmd string) (
 	case "onetry":
 		// fine
 	default:
-		return nil, errors.New("Invalid subcommand for addnode")
+		return nil, errors.New("invalid subcommand for addnode")
 	}
 
 	return &AddNodeCmd{
@@ -1714,7 +1714,7 @@ var _ Cmd = &GetBalanceCmd{}
 // and an int for minconf may be provided as arguments.
 func NewGetBalanceCmd(id interface{}, optArgs ...interface{}) (*GetBalanceCmd, error) {
 	var account string
-	var minconf int = 1
+	var minconf = 1
 
 	if len(optArgs) > 2 {
 		return nil, ErrWrongNumberOfParams
@@ -1991,7 +1991,7 @@ type GetBlockChainInfoCmd struct {
 // Enforce that GetBlockChainInfoCmd satisifies the Cmd interface.
 var _ Cmd = &GetBlockChainInfoCmd{}
 
-// NewBlockChainInfoCmd creates a new GetBlockChainInfoCmd.
+// NewGetBlockChainInfoCmd creates a new GetBlockChainInfoCmd.
 func NewGetBlockChainInfoCmd(id interface{}) (*GetBlockChainInfoCmd, error) {
 	return &GetBlockChainInfoCmd{
 		id: id,
@@ -2669,7 +2669,7 @@ type GetNetworkInfoCmd struct {
 // Enforce that GetNetworkInfoCmd satisifies the Cmd interface.
 var _ Cmd = &GetNetworkInfoCmd{}
 
-// NewNetworkInfoCmd creates a new GetNetworkInfoCmd.
+// NewGetNetworkInfoCmd creates a new GetNetworkInfoCmd.
 func NewGetNetworkInfoCmd(id interface{}) (*GetNetworkInfoCmd, error) {
 	return &GetNetworkInfoCmd{
 		id: id,
@@ -3285,7 +3285,7 @@ func NewGetReceivedByAccountCmd(id interface{}, account string, optArgs ...int) 
 	if len(optArgs) > 1 {
 		return nil, ErrTooManyOptArgs
 	}
-	var minconf int = 1
+	var minconf = 1
 	if len(optArgs) > 0 {
 		minconf = optArgs[0]
 	}
@@ -3374,7 +3374,7 @@ func NewGetReceivedByAddressCmd(id interface{}, address string, optArgs ...int) 
 	if len(optArgs) > 1 {
 		return nil, ErrTooManyOptArgs
 	}
-	var minconf int = 1
+	var minconf = 1
 	if len(optArgs) > 0 {
 		minconf = optArgs[0]
 	}

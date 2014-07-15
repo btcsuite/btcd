@@ -71,7 +71,7 @@ type GetBlockChainInfoResult struct {
 	ChainWork            string  `json:"chainwork"`
 }
 
-// GetBlockTemplateResultTransaction models the transactions field of the
+// GetBlockTemplateResultTx models the transactions field of the
 // getblocktemplate command.
 type GetBlockTemplateResultTx struct {
 	Data    string  `json:"data"`
@@ -437,9 +437,9 @@ func ReadResultCmd(cmd string, message []byte) (Reply, error) {
 	err = json.Unmarshal(message, &objmap)
 	if err != nil {
 		if strings.Contains(string(message), "401 Unauthorized.") {
-			err = fmt.Errorf("Authentication error.")
+			err = fmt.Errorf("authentication error")
 		} else {
-			err = fmt.Errorf("Error unmarshalling json reply: %v", err)
+			err = fmt.Errorf("error unmarshalling json reply: %v", err)
 		}
 		return result, err
 	}
@@ -448,12 +448,12 @@ func ReadResultCmd(cmd string, message []byte) (Reply, error) {
 	var id interface{}
 	err = json.Unmarshal(objmap["error"], &jsonErr)
 	if err != nil {
-		err = fmt.Errorf("Error unmarshalling json reply: %v", err)
+		err = fmt.Errorf("error unmarshalling json reply: %v", err)
 		return result, err
 	}
 	err = json.Unmarshal(objmap["id"], &id)
 	if err != nil {
-		err = fmt.Errorf("Error unmarshalling json reply: %v", err)
+		err = fmt.Errorf("error unmarshalling json reply: %v", err)
 		return result, err
 	}
 
@@ -709,7 +709,7 @@ func ReadResultCmd(cmd string, message []byte) (Reply, error) {
 		}
 	}
 	if err != nil {
-		err = fmt.Errorf("Error unmarshalling json reply: %v", err)
+		err = fmt.Errorf("error unmarshalling json reply: %v", err)
 		return result, err
 	}
 	// Only want the error field when there is an actual error to report.

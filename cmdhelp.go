@@ -770,5 +770,5 @@ func GetHelpString(cmdName string) (string, error) {
 	if c, ok := customCmds[cmdName]; ok {
 		return c.helpString, nil
 	}
-	return helpstr, errors.New("Invalid command specified")
+	return helpstr, errors.New("invalid command specified")
 }

@@ -279,7 +279,7 @@ func TestRpcReply(t *testing.T) {
 }
 
 var idtests = []struct {
-	testId []interface{}
+	testID []interface{}
 	pass   bool
 }{
 	{[]interface{}{"string test"}, true},
@@ -293,7 +293,7 @@ var idtests = []struct {
 // types).
 func TestIsValidIdType(t *testing.T) {
 	for _, tt := range idtests {
-		res := btcjson.IsValidIdType(tt.testId[0])
+		res := btcjson.IsValidIdType(tt.testID[0])
 		if res != tt.pass {
 			t.Errorf("Incorrect type result %v.", tt)
 		}
