@@ -333,9 +333,10 @@ func loadConfig() (*config, []string, error) {
 	preParser.Parse()
 
 	// Show the version and exit if the version flag was specified.
+	appName := filepath.Base(os.Args[0])
+	appName = strings.TrimSuffix(appName, filepath.Ext(appName))
+	usageMessage := fmt.Sprintf("Use %s -h to show usage", appName)
 	if preCfg.ShowVersion {
-		appName := filepath.Base(os.Args[0])
-		appName = strings.TrimSuffix(appName, filepath.Ext(appName))
 		fmt.Println(appName, "version", version())
 		os.Exit(0)
 	}
@@ -360,8 +361,9 @@ func loadConfig() (*config, []string, error) {
 		err := flags.NewIniParser(parser).ParseFile(preCfg.ConfigFile)
 		if err != nil {
 			if _, ok := err.(*os.PathError); !ok {
-				fmt.Fprintln(os.Stderr, err)
-				parser.WriteHelp(os.Stderr)
+				fmt.Fprintf(os.Stderr, "Error parsing config "+
+					"file: %v\n", err)
+				fmt.Fprintln(os.Stderr, usageMessage)
 				return nil, nil, err
 			}
 			configFileError = err
@@ -377,7 +379,7 @@ func loadConfig() (*config, []string, error) {
 	remainingArgs, err := parser.Parse()
 	if err != nil {
 		if e, ok := err.(*flags.Error); !ok || e.Type != flags.ErrHelp {
-			parser.WriteHelp(os.Stderr)
+			fmt.Fprintln(os.Stderr, usageMessage)
 		}
 		return nil, nil, err
 	}
@@ -399,7 +401,7 @@ func loadConfig() (*config, []string, error) {
 			"used together -- choose one of the three"
 		err := fmt.Errorf(str, funcName)
 		fmt.Fprintln(os.Stderr, err)
-		parser.WriteHelp(os.Stderr)
+		fmt.Fprintln(os.Stderr, usageMessage)
 		return nil, nil, err
 	}
 
@@ -443,7 +445,7 @@ func loadConfig() (*config, []string, error) {
 	if err := parseAndSetDebugLevels(cfg.DebugLevel); err != nil {
 		err := fmt.Errorf("%s: %v", funcName, err.Error())
 		fmt.Fprintln(os.Stderr, err)
-		parser.WriteHelp(os.Stderr)
+		fmt.Fprintln(os.Stderr, usageMessage)
 		return nil, nil, err
 	}
 
@@ -453,7 +455,7 @@ func loadConfig() (*config, []string, error) {
 			"supported types %v"
 		err := fmt.Errorf(str, funcName, cfg.DbType, knownDbTypes)
 		fmt.Fprintln(os.Stderr, err)
-		parser.WriteHelp(os.Stderr)
+		fmt.Fprintln(os.Stderr, usageMessage)
 		return nil, nil, err
 	}
 
@@ -464,7 +466,7 @@ func loadConfig() (*config, []string, error) {
 			str := "%s: The profile port must be between 1024 and 65535"
 			err := fmt.Errorf(str, funcName)
 			fmt.Fprintln(os.Stderr, err)
-			parser.WriteHelp(os.Stderr)
+			fmt.Fprintln(os.Stderr, usageMessage)
 			return nil, nil, err
 		}
 	}
@@ -474,7 +476,7 @@ func loadConfig() (*config, []string, error) {
 		str := "%s: The banduration option may not be less than 1s -- parsed [%v]"
 		err := fmt.Errorf(str, funcName, cfg.BanDuration)
 		fmt.Fprintln(os.Stderr, err)
-		parser.WriteHelp(os.Stderr)
+		fmt.Fprintln(os.Stderr, usageMessage)
 		return nil, nil, err
 	}
 
@@ -484,7 +486,7 @@ func loadConfig() (*config, []string, error) {
 			"mixed"
 		err := fmt.Errorf(str, funcName)
 		fmt.Fprintln(os.Stderr, err)
-		parser.WriteHelp(os.Stderr)
+		fmt.Fprintln(os.Stderr, usageMessage)
 		return nil, nil, err
 	}
 
@@ -536,7 +538,7 @@ func loadConfig() (*config, []string, error) {
 		err := fmt.Errorf(str, funcName, blockMaxSizeMin,
 			blockMaxSizeMax, cfg.BlockMaxSize)
 		fmt.Fprintln(os.Stderr, err)
-		parser.WriteHelp(os.Stderr)
+		fmt.Fprintln(os.Stderr, usageMessage)
 		return nil, nil, err
 	}
 
@@ -554,14 +556,14 @@ func loadConfig() (*config, []string, error) {
 			str := "%s: getworkkey '%s' failed to decode: %v"
 			err := fmt.Errorf(str, funcName, strAddr, err)
 			fmt.Fprintln(os.Stderr, err)
-			parser.WriteHelp(os.Stderr)
+			fmt.Fprintln(os.Stderr, usageMessage)
 			return nil, nil, err
 		}
 		if !addr.IsForNet(activeNetParams.Params) {
 			str := "%s: getworkkey '%s' is on the wrong network"
 			err := fmt.Errorf(str, funcName, strAddr)
 			fmt.Fprintln(os.Stderr, err)
-			parser.WriteHelp(os.Stderr)
+			fmt.Fprintln(os.Stderr, usageMessage)
 			return nil, nil, err
 		}
 		cfg.miningAddrs = append(cfg.miningAddrs, addr)
@@ -574,14 +576,14 @@ func loadConfig() (*config, []string, error) {
 			str := "%s: mining address '%s' failed to decode: %v"
 			err := fmt.Errorf(str, funcName, strAddr, err)
 			fmt.Fprintln(os.Stderr, err)
-			parser.WriteHelp(os.Stderr)
+			fmt.Fprintln(os.Stderr, usageMessage)
 			return nil, nil, err
 		}
 		if !addr.IsForNet(activeNetParams.Params) {
 			str := "%s: mining address '%s' is on the wrong network"
 			err := fmt.Errorf(str, funcName, strAddr)
 			fmt.Fprintln(os.Stderr, err)
-			parser.WriteHelp(os.Stderr)
+			fmt.Fprintln(os.Stderr, usageMessage)
 			return nil, nil, err
 		}
 		cfg.miningAddrs = append(cfg.miningAddrs, addr)
@@ -594,7 +596,7 @@ func loadConfig() (*config, []string, error) {
 			"addresses specified "
 		err := fmt.Errorf(str, funcName)
 		fmt.Fprintln(os.Stderr, err)
-		parser.WriteHelp(os.Stderr)
+		fmt.Fprintln(os.Stderr, usageMessage)
 		return nil, nil, err
 	}
 
