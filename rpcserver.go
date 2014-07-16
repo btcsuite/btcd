@@ -1594,7 +1594,7 @@ func reverseUint32Array(b []byte) {
 	}
 }
 
-// handleCreateRawTransaction handles gettxout commands.
+// handleGetTxOut handles gettxout commands.
 func handleGetTxOut(s *rpcServer, cmd btcjson.Cmd, closeChan <-chan struct{}) (interface{}, error) {
 	c := cmd.(*btcjson.GetTxOutCmd)
 
@@ -1603,8 +1603,9 @@ func handleGetTxOut(s *rpcServer, cmd btcjson.Cmd, closeChan <-chan struct{}) (i
 	if err != nil {
 		rpcsLog.Errorf("Error generating sha: %v", err)
 		return nil, btcjson.Error{
-			Code:    btcjson.ErrBlockNotFound.Code,
-			Message: "Parameter 1 must be a hexaecimal string",
+			Code: btcjson.ErrInvalidParameter.Code,
+			Message: fmt.Sprintf("argument must be hexadecimal "+
+				"string (not %q)", c.Txid),
 		}
 	}
 
@@ -1649,18 +1650,14 @@ func handleGetTxOut(s *rpcServer, cmd btcjson.Cmd, closeChan <-chan struct{}) (i
 	}
 
 	// Disassemble script into single line printable format.
+	// The disassembled string will contain [error] inline if the script
+	// doesn't fully parse, so ignore the error here.
 	script := mtx.TxOut[c.Output].PkScript
-	disbuf, err := btcscript.DisasmString(script)
-	if err != nil {
-		return nil, btcjson.Error{
-			Code:    btcjson.ErrInternal.Code,
-			Message: err.Error(),
-		}
-	}
+	disbuf, _ := btcscript.DisasmString(script)
 
 	// Get further info about the script.
 	// Ignore the error here since an error means the script couldn't parse
-	// and there is no additinal information about it anyways.
+	// and there is no additional information about it anyways.
 	net := s.server.netParams
 	scriptClass, addrs, reqSigs, _ := btcscript.ExtractPkScriptAddrs(script, net)
 	addresses := make([]string, len(addrs))
@@ -1671,7 +1668,7 @@ func handleGetTxOut(s *rpcServer, cmd btcjson.Cmd, closeChan <-chan struct{}) (i
 	txOutReply := &btcjson.GetTxOutResult{
 		BestBlock:     bestBlockSha,
 		Confirmations: confirmations,
-		Value:         float64(mtx.TxOut[c.Output].Value) / float64(btcutil.SatoshiPerBitcoin),
+		Value:         btcutil.Amount(mtx.TxOut[c.Output].Value).ToUnit(btcutil.AmountBTC),
 		Version:       mtx.Version,
 		ScriptPubKey: btcjson.ScriptPubKeyResult{
 			Asm:       disbuf,
