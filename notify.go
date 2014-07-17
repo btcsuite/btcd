@@ -11,6 +11,7 @@ import (
 	"errors"
 	"fmt"
 	"sync"
+	"time"
 
 	"github.com/conformal/btcjson"
 	"github.com/conformal/btcutil"
@@ -128,12 +129,12 @@ type NotificationHandlers struct {
 	// signaled on this notification, rather than relying on the return
 	// result of a rescan request, due to how btcd may send various rescan
 	// notifications after the rescan request has already returned.
-	OnRescanFinished func(lastProcessedHeight int32)
+	OnRescanFinished func(hash *btcwire.ShaHash, height int32, blkTime time.Time)
 
 	// OnRescanProgress is invoked periodically when a rescan is underway.
 	// It will only be invoked if a preceding call to Rescan or
 	// RescanEndHeight has been made and the function is non-nil.
-	OnRescanProgress func(lastProcessedHeight int32)
+	OnRescanProgress func(hash *btcwire.ShaHash, height int32, blkTime time.Time)
 
 	// OnTxAccepted is invoked when a transaction is accepted into the
 	// memory pool.  It will only be invoked if a preceding call to
@@ -262,14 +263,14 @@ func (c *Client) handleNotification(ntfn *rawNotification) {
 			return
 		}
 
-		lastProcessed, err := parseRescanHeightParams(ntfn.Params)
+		hash, height, blkTime, err := parseRescanProgressParams(ntfn.Params)
 		if err != nil {
 			log.Warnf("Received invalid rescanfinished "+
 				"notification: %v", err)
 			return
 		}
 
-		c.ntfnHandlers.OnRescanFinished(lastProcessed)
+		c.ntfnHandlers.OnRescanFinished(hash, height, blkTime)
 
 	// OnRescanProgress
 	case btcws.RescanProgressNtfnMethod:
@@ -279,14 +280,14 @@ func (c *Client) handleNotification(ntfn *rawNotification) {
 			return
 		}
 
-		lastProcessed, err := parseRescanHeightParams(ntfn.Params)
+		hash, height, blkTime, err := parseRescanProgressParams(ntfn.Params)
 		if err != nil {
 			log.Warnf("Received invalid rescanprogress "+
 				"notification: %v", err)
 			return
 		}
 
-		c.ntfnHandlers.OnRescanProgress(lastProcessed)
+		c.ntfnHandlers.OnRescanProgress(hash, height, blkTime)
 
 	// OnTxAccepted
 	case btcws.TxAcceptedNtfnMethod:
@@ -472,21 +473,41 @@ func parseChainTxNtfnParams(params []json.RawMessage) (*btcutil.Tx,
 	return btcutil.NewTx(&msgTx), block, nil
 }
 
-// parseRescanHeightParams parses out the height of the last rescanned block
+// parseRescanProgressParams parses out the height of the last rescanned block
 // from the parameters of rescanfinished and rescanprogress notifications.
-func parseRescanHeightParams(params []json.RawMessage) (int32, error) {
-	if len(params) != 1 {
-		return 0, wrongNumParams(len(params))
+func parseRescanProgressParams(params []json.RawMessage) (*btcwire.ShaHash, int32, time.Time, error) {
+	if len(params) != 3 {
+		return nil, 0, time.Time{}, wrongNumParams(len(params))
 	}
 
-	// Unmarshal first parameter as an integer.
-	var height int32
-	err := json.Unmarshal(params[0], &height)
+	// Unmarshal first parameter as an string.
+	var hashStr string
+	err := json.Unmarshal(params[0], &hashStr)
 	if err != nil {
-		return 0, err
+		return nil, 0, time.Time{}, err
 	}
 
-	return height, nil
+	// Unmarshal second parameter as an integer.
+	var height int32
+	err = json.Unmarshal(params[1], &height)
+	if err != nil {
+		return nil, 0, time.Time{}, err
+	}
+
+	// Unmarshal third parameter as an integer.
+	var blkTime int64
+	err = json.Unmarshal(params[2], &blkTime)
+	if err != nil {
+		return nil, 0, time.Time{}, err
+	}
+
+	// Decode string encoding of block hash.
+	hash, err := btcwire.NewShaHashFromStr(hashStr)
+	if err != nil {
+		return nil, 0, time.Time{}, err
+	}
+
+	return hash, height, time.Unix(blkTime, 0), nil
 }
 
 // parseTxAcceptedNtfnParams parses out the transaction hash and total amount
@@ -929,7 +950,8 @@ func (r FutureRescanResult) Receive() error {
 // reconnect.
 //
 // NOTE: This is a btcd extension and requires a websocket connection.
-func (c *Client) RescanAsync(startHeight int32, addresses []btcutil.Address,
+func (c *Client) RescanAsync(startBlock *btcwire.ShaHash,
+	addresses []btcutil.Address,
 	outpoints []*btcwire.OutPoint) FutureRescanResult {
 
 	// Not supported in HTTP POST mode.
@@ -943,6 +965,12 @@ func (c *Client) RescanAsync(startHeight int32, addresses []btcutil.Address,
 		return newNilFutureResult()
 	}
 
+	// Convert block hashes to strings.
+	var startBlockShaStr string
+	if startBlock != nil {
+		startBlockShaStr = startBlock.String()
+	}
+
 	// Convert addresses to strings.
 	addrs := make([]string, 0, len(addresses))
 	for _, addr := range addresses {
@@ -956,7 +984,7 @@ func (c *Client) RescanAsync(startHeight int32, addresses []btcutil.Address,
 	}
 
 	id := c.NextID()
-	cmd, err := btcws.NewRescanCmd(id, startHeight, addrs, ops)
+	cmd, err := btcws.NewRescanCmd(id, startBlockShaStr, addrs, ops)
 	if err != nil {
 		return newFutureError(err)
 	}
@@ -964,9 +992,9 @@ func (c *Client) RescanAsync(startHeight int32, addresses []btcutil.Address,
 	return c.sendCmd(cmd)
 }
 
-// Rescan rescans the block chain starting from the provided start height to the
-// end of the longest chain for transactions that pay to the passed addresses
-// and transactions which spend the passed outpoints.
+// Rescan rescans the block chain starting from the provided starting block to
+// the end of the longest chain for transactions that pay to the passed
+// addresses and transactions which spend the passed outpoints.
 //
 // The notifications of found transactions are delivered to the notification
 // handlers associated with client and this call will not return until the
@@ -980,8 +1008,8 @@ func (c *Client) RescanAsync(startHeight int32, addresses []btcutil.Address,
 // to one of the passed addresses), and OnRescanProgress (for rescan progress
 // updates).
 //
-// See RescanEndHeight to also specify a block height at which to stop the
-// rescan if a bounded rescan is desired instead.
+// See RescanEndBlock to also specify an ending block to finish the rescan
+// without continuing through the best block on the main chain.
 //
 // NOTE: Rescan requests are not issued on client reconnect and must be
 // performed manually (ideally with a new start height based on the last
@@ -990,22 +1018,23 @@ func (c *Client) RescanAsync(startHeight int32, addresses []btcutil.Address,
 // reconnect.
 //
 // NOTE: This is a btcd extension and requires a websocket connection.
-func (c *Client) Rescan(startHeight int32, addresses []btcutil.Address,
+func (c *Client) Rescan(startBlock *btcwire.ShaHash,
+	addresses []btcutil.Address,
 	outpoints []*btcwire.OutPoint) error {
 
-	return c.RescanAsync(startHeight, addresses, outpoints).Receive()
+	return c.RescanAsync(startBlock, addresses, outpoints).Receive()
 }
 
-// RescanEndHeightAsync returns an instance of a type that can be used to get
+// RescanEndBlockAsync returns an instance of a type that can be used to get
 // the result of the RPC at some future time by invoking the Receive function on
 // the returned instance.
 //
-// See RescanEndHeight for the blocking version and more details.
+// See RescanEndBlock for the blocking version and more details.
 //
 // NOTE: This is a btcd extension and requires a websocket connection.
-func (c *Client) RescanEndHeightAsync(startHeight int32,
+func (c *Client) RescanEndBlockAsync(startBlock *btcwire.ShaHash,
 	addresses []btcutil.Address, outpoints []*btcwire.OutPoint,
-	endHeight int64) FutureRescanResult {
+	endBlock *btcwire.ShaHash) FutureRescanResult {
 
 	// Not supported in HTTP POST mode.
 	if c.config.HttpPostMode {
@@ -1016,6 +1045,15 @@ func (c *Client) RescanEndHeightAsync(startHeight int32,
 	// notifications.
 	if c.ntfnHandlers == nil {
 		return newNilFutureResult()
+	}
+
+	// Convert block hashes to strings.
+	var startBlockShaStr, endBlockShaStr string
+	if startBlock != nil {
+		startBlockShaStr = startBlock.String()
+	}
+	if endBlock != nil {
+		endBlockShaStr = endBlock.String()
 	}
 
 	// Convert addresses to strings.
@@ -1031,7 +1069,8 @@ func (c *Client) RescanEndHeightAsync(startHeight int32,
 	}
 
 	id := c.NextID()
-	cmd, err := btcws.NewRescanCmd(id, startHeight, addrs, ops, endHeight)
+	cmd, err := btcws.NewRescanCmd(id, startBlockShaStr, addrs, ops,
+		endBlockShaStr)
 	if err != nil {
 		return newFutureError(err)
 	}
@@ -1039,9 +1078,9 @@ func (c *Client) RescanEndHeightAsync(startHeight int32,
 	return c.sendCmd(cmd)
 }
 
-// RescanEndHeight rescans the block chain starting from the provided start
-// height up to the provided end height for transactions that pay to the passed
-// addresses and transactions which spend the passed outpoints.
+// RescanEndBlock rescans the block chain starting from the provided starting
+// block up to the provided ending block for transactions that pay to the
+// passed addresses and transactions which spend the passed outpoints.
 //
 // The notifications of found transactions are delivered to the notification
 // handlers associated with client and this call will not return until the
@@ -1058,9 +1097,10 @@ func (c *Client) RescanEndHeightAsync(startHeight int32,
 // See Rescan to also perform a rescan through current end of the longest chain.
 //
 // NOTE: This is a btcd extension and requires a websocket connection.
-func (c *Client) RescanEndHeight(startHeight int32, addresses []btcutil.Address,
-	outpoints []*btcwire.OutPoint, endHeight int64) error {
+func (c *Client) RescanEndHeight(startBlock *btcwire.ShaHash,
+	addresses []btcutil.Address, outpoints []*btcwire.OutPoint,
+	endBlock *btcwire.ShaHash) error {
 
-	return c.RescanEndHeightAsync(startHeight, addresses, outpoints,
-		endHeight).Receive()
+	return c.RescanEndBlockAsync(startBlock, addresses, outpoints,
+		endBlock).Receive()
 }
