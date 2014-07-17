@@ -1601,7 +1601,6 @@ func handleGetTxOut(s *rpcServer, cmd btcjson.Cmd, closeChan <-chan struct{}) (i
 	// Convert the provided transaction hash hex to a ShaHash.
 	txSha, err := btcwire.NewShaHashFromStr(c.Txid)
 	if err != nil {
-		rpcsLog.Errorf("Error generating sha: %v", err)
 		return nil, btcjson.Error{
 			Code: btcjson.ErrInvalidParameter.Code,
 			Message: fmt.Sprintf("argument must be hexadecimal "+
@@ -1626,7 +1625,6 @@ func handleGetTxOut(s *rpcServer, cmd btcjson.Cmd, closeChan <-chan struct{}) (i
 	} else {
 		txList, err := s.server.db.FetchTxBySha(txSha)
 		if err != nil || len(txList) == 0 {
-			rpcsLog.Errorf("Error fetching tx: %v", err)
 			return nil, btcjson.ErrNoTxInfo
 		}
 
@@ -1645,8 +1643,13 @@ func handleGetTxOut(s *rpcServer, cmd btcjson.Cmd, closeChan <-chan struct{}) (i
 		bestBlockSha = blksha.String()
 	}
 
-	if c.Output < 0 || c.Output > len(mtx.TxOut)-1 || mtx.TxOut[c.Output] == nil {
+	if c.Output < 0 || c.Output > len(mtx.TxOut)-1 {
 		return nil, btcjson.ErrInvalidTxVout
+	}
+
+	if mtx.TxOut[c.Output] == nil {
+		rpcsLog.Errorf("Output index: %d, for txid: %s does not exist.", c.Output, c.Txid)
+		return nil, btcjson.ErrInternal
 	}
 
 	// Disassemble script into single line printable format.
