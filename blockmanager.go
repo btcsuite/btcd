@@ -723,7 +723,7 @@ func (b *blockManager) fetchHeaderBlocks() {
 		iv := btcwire.NewInvVect(btcwire.InvTypeBlock, node.sha)
 		haveInv, err := b.haveInventory(iv)
 		if err != nil {
-			bmgrLog.Warn("Unexpected failure when checking for "+
+			bmgrLog.Warnf("Unexpected failure when checking for "+
 				"existing inventory during header block "+
 				"fetch: %v", err)
 		}
@@ -922,7 +922,7 @@ func (b *blockManager) handleInvMsg(imsg *invMsg) {
 		// Request the inventory if we don't already have it.
 		haveInv, err := b.haveInventory(iv)
 		if err != nil {
-			bmgrLog.Warn("Unexpected failure when checking for "+
+			bmgrLog.Warnf("Unexpected failure when checking for "+
 				"existing inventory during inv message "+
 				"processing: %v", err)
 			continue
