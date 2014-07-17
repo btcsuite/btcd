@@ -8,7 +8,6 @@ import (
 	"encoding/json"
 	"errors"
 
-	"github.com/conformal/btcdb"
 	"github.com/conformal/btcjson"
 	"github.com/conformal/btcwire"
 )
@@ -633,10 +632,10 @@ func NewOutPointFromWire(op *btcwire.OutPoint) *OutPoint {
 // commands.
 type RescanCmd struct {
 	id         interface{}
-	BeginBlock int32
+	BeginBlock string
 	Addresses  []string
 	OutPoints  []OutPoint
-	EndBlock   int64 // TODO: switch this and btcdb.AllShas to int32
+	EndBlock   string
 }
 
 // Enforce that RescanCmd satisifies the btcjson.Cmd interface.
@@ -644,12 +643,12 @@ var _ btcjson.Cmd = &RescanCmd{}
 
 // NewRescanCmd creates a new RescanCmd, parsing the optional
 // arguments optArgs which may either be empty or a single upper
-// block height.
-func NewRescanCmd(id interface{}, begin int32, addresses []string,
-	outpoints []OutPoint, optArgs ...int64) (*RescanCmd, error) {
+// block hash.
+func NewRescanCmd(id interface{}, begin string, addresses []string,
+	outpoints []OutPoint, optArgs ...string) (*RescanCmd, error) {
 
 	// Optional parameters set to their defaults.
-	end := btcdb.AllShas
+	var end string
 
 	if len(optArgs) > 0 {
 		if len(optArgs) > 1 {
@@ -675,10 +674,10 @@ func parseRescanCmd(r *btcjson.RawCmd) (btcjson.Cmd, error) {
 		return nil, btcjson.ErrWrongNumberOfParams
 	}
 
-	var begin int32
+	var begin string
 	if err := json.Unmarshal(r.Params[0], &begin); err != nil {
 		return nil, errors.New("first parameter 'begin' must be a " +
-			"32-bit integer: " + err.Error())
+			"string: " + err.Error())
 	}
 
 	var addresses []string
@@ -694,12 +693,12 @@ func parseRescanCmd(r *btcjson.RawCmd) (btcjson.Cmd, error) {
 			err.Error())
 	}
 
-	optArgs := make([]int64, 0, 1)
+	optArgs := make([]string, 0, 1)
 	if len(r.Params) > 3 {
-		var endblock int64
+		var endblock string
 		if err := json.Unmarshal(r.Params[3], &endblock); err != nil {
 			return nil, errors.New("fourth optional parameter " +
-				" 'endblock' must be an integer: " + err.Error())
+				"'endblock' must be a string: " + err.Error())
 		}
 		optArgs = append(optArgs, endblock)
 	}
@@ -723,7 +722,7 @@ func (cmd *RescanCmd) MarshalJSON() ([]byte, error) {
 	params[0] = cmd.BeginBlock
 	params[1] = cmd.Addresses
 	params[2] = cmd.OutPoints
-	if cmd.EndBlock != btcdb.AllShas {
+	if cmd.EndBlock != "" {
 		params = append(params, cmd.EndBlock)
 	}
 

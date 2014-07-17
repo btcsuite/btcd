@@ -9,7 +9,6 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/conformal/btcdb"
 	"github.com/conformal/btcjson"
 	"github.com/davecgh/go-spew/spew"
 )
@@ -224,13 +223,13 @@ var cmdtests = []struct {
 			}
 			return NewRescanCmd(
 				float64(1),
-				270000,
+				"0000000000000002a775aec59dc6a9e4bb1c025cf1b8c2195dd9dc3998c827c5",
 				addrs,
 				ops)
 		},
 		result: &RescanCmd{
 			id:         float64(1),
-			BeginBlock: 270000,
+			BeginBlock: "0000000000000002a775aec59dc6a9e4bb1c025cf1b8c2195dd9dc3998c827c5",
 			Addresses:  []string{"17XhEvq9Nahdj7Xe1nv6oRe1tEmaHUuynH"},
 			OutPoints: []OutPoint{
 				{
@@ -240,7 +239,7 @@ var cmdtests = []struct {
 					Index: 1,
 				},
 			},
-			EndBlock: btcdb.AllShas,
+			EndBlock: "",
 		},
 	},
 	{
@@ -257,14 +256,14 @@ var cmdtests = []struct {
 			}
 			return NewRescanCmd(
 				float64(1),
-				270000,
+				"0000000000000002a775aec59dc6a9e4bb1c025cf1b8c2195dd9dc3998c827c5",
 				addrs,
 				ops,
-				280000)
+				"0000000000000001c091ada69f444dc0282ecaabe4808ddbb2532e5555db0c03")
 		},
 		result: &RescanCmd{
 			id:         float64(1),
-			BeginBlock: 270000,
+			BeginBlock: "0000000000000002a775aec59dc6a9e4bb1c025cf1b8c2195dd9dc3998c827c5",
 			Addresses:  []string{"17XhEvq9Nahdj7Xe1nv6oRe1tEmaHUuynH"},
 			OutPoints: []OutPoint{
 				{
@@ -274,7 +273,7 @@ var cmdtests = []struct {
 					Index: 1,
 				},
 			},
-			EndBlock: 280000,
+			EndBlock: "0000000000000001c091ada69f444dc0282ecaabe4808ddbb2532e5555db0c03",
 		},
 	},
 	{

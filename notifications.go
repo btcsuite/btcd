@@ -679,15 +679,17 @@ func (n *RedeemingTxNtfn) UnmarshalJSON(b []byte) error {
 // RescanFinishedNtfn is type handling custom marshaling and
 // unmarshaling of rescanfinished JSON websocket notifications.
 type RescanFinishedNtfn struct {
-	LastProcessed int32
+	Hash   string
+	Height int32
+	Time   int64
 }
 
 // Enforce that RescanFinishedNtfn satisifies the btcjson.Cmd interface.
 var _ btcjson.Cmd = &RescanFinishedNtfn{}
 
 // NewRescanFinishedNtfn creates a new RescanFinshedNtfn.
-func NewRescanFinishedNtfn(last int32) *RescanFinishedNtfn {
-	return &RescanFinishedNtfn{last}
+func NewRescanFinishedNtfn(hash string, height int32, time int64) *RescanFinishedNtfn {
+	return &RescanFinishedNtfn{hash, height, time}
 }
 
 // parseRescanFinishedNtfn parses a RawCmd into a concrete type satisifying
@@ -698,17 +700,29 @@ func parseRescanFinishedNtfn(r *btcjson.RawCmd) (btcjson.Cmd, error) {
 		return nil, ErrNotANtfn
 	}
 
-	if len(r.Params) != 1 {
+	if len(r.Params) != 3 {
 		return nil, btcjson.ErrWrongNumberOfParams
 	}
 
-	var last int32
-	if err := json.Unmarshal(r.Params[0], &last); err != nil {
-		return nil, errors.New("first parameter 'last' must be a " +
+	var hash string
+	if err := json.Unmarshal(r.Params[0], &hash); err != nil {
+		return nil, errors.New("first parameter 'hash' must be a " +
+			"string: " + err.Error())
+	}
+
+	var height int32
+	if err := json.Unmarshal(r.Params[1], &height); err != nil {
+		return nil, errors.New("second parameter 'height' must be a " +
 			"32-bit integer: " + err.Error())
 	}
 
-	return NewRescanFinishedNtfn(last), nil
+	var time int64
+	if err := json.Unmarshal(r.Params[2], &time); err != nil {
+		return nil, errors.New("third parameter 'time' must be a " +
+			"64-bit integer: " + err.Error())
+	}
+
+	return NewRescanFinishedNtfn(hash, height, time), nil
 }
 
 // Id satisifies the btcjson.Cmd interface by returning nil for a
@@ -727,7 +741,9 @@ func (n *RescanFinishedNtfn) Method() string {
 // interface.
 func (n *RescanFinishedNtfn) MarshalJSON() ([]byte, error) {
 	params := []interface{}{
-		n.LastProcessed,
+		n.Hash,
+		n.Height,
+		n.Time,
 	}
 
 	// No ID for notifications.
@@ -763,15 +779,17 @@ func (n *RescanFinishedNtfn) UnmarshalJSON(b []byte) error {
 // RescanProgressNtfn is type handling custom marshaling and
 // unmarshaling of rescanprogress JSON websocket notifications.
 type RescanProgressNtfn struct {
-	LastProcessed int32
+	Hash   string
+	Height int32
+	Time   int64
 }
 
 // Enforce that RescanProgressNtfn satisifies the btcjson.Cmd interface.
 var _ btcjson.Cmd = &RescanProgressNtfn{}
 
 // NewRescanProgressNtfn creates a new RescanProgressNtfn.
-func NewRescanProgressNtfn(last int32) *RescanProgressNtfn {
-	return &RescanProgressNtfn{last}
+func NewRescanProgressNtfn(hash string, height int32, time int64) *RescanProgressNtfn {
+	return &RescanProgressNtfn{hash, height, time}
 }
 
 // parseRescanProgressNtfn parses a RawCmd into a concrete type satisifying
@@ -782,17 +800,29 @@ func parseRescanProgressNtfn(r *btcjson.RawCmd) (btcjson.Cmd, error) {
 		return nil, ErrNotANtfn
 	}
 
-	if len(r.Params) != 1 {
+	if len(r.Params) != 3 {
 		return nil, btcjson.ErrWrongNumberOfParams
 	}
 
-	var last int32
-	if err := json.Unmarshal(r.Params[0], &last); err != nil {
-		return nil, errors.New("first parameter 'last' must be a " +
+	var hash string
+	if err := json.Unmarshal(r.Params[0], &hash); err != nil {
+		return nil, errors.New("first parameter 'hash' must be a " +
+			"string: " + err.Error())
+	}
+
+	var height int32
+	if err := json.Unmarshal(r.Params[1], &height); err != nil {
+		return nil, errors.New("second parameter 'height' must be a " +
 			"32-bit integer: " + err.Error())
 	}
 
-	return NewRescanProgressNtfn(last), nil
+	var time int64
+	if err := json.Unmarshal(r.Params[2], &time); err != nil {
+		return nil, errors.New("third parameter 'time' must be a " +
+			"64-bit integer: " + err.Error())
+	}
+
+	return NewRescanProgressNtfn(hash, height, time), nil
 }
 
 // Id satisifies the btcjson.Cmd interface by returning nil for a
@@ -811,7 +841,9 @@ func (n *RescanProgressNtfn) Method() string {
 // interface.
 func (n *RescanProgressNtfn) MarshalJSON() ([]byte, error) {
 	params := []interface{}{
-		n.LastProcessed,
+		n.Hash,
+		n.Height,
+		n.Time,
 	}
 
 	// No ID for notifications.

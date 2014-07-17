@@ -127,19 +127,27 @@ var ntfntests = []struct {
 	{
 		name: "rescanfinished",
 		f: func() btcjson.Cmd {
-			return btcws.NewRescanFinishedNtfn(12345)
+			return btcws.NewRescanFinishedNtfn(
+				"00000000b8980ec1fe96bc1b4425788ddc88dd36699521a448ebca2020b38699",
+				12345, 1240784732)
 		},
 		result: &btcws.RescanFinishedNtfn{
-			LastProcessed: 12345,
+			Hash:   "00000000b8980ec1fe96bc1b4425788ddc88dd36699521a448ebca2020b38699",
+			Height: 12345,
+			Time:   1240784732,
 		},
 	},
 	{
 		name: "rescanprogress",
 		f: func() btcjson.Cmd {
-			return btcws.NewRescanProgressNtfn(12345)
+			return btcws.NewRescanProgressNtfn(
+				"00000000b8980ec1fe96bc1b4425788ddc88dd36699521a448ebca2020b38699",
+				12345, 1240784732)
 		},
 		result: &btcws.RescanProgressNtfn{
-			LastProcessed: 12345,
+			Hash:   "00000000b8980ec1fe96bc1b4425788ddc88dd36699521a448ebca2020b38699",
+			Height: 12345,
+			Time:   1240784732,
 		},
 	},
 	{
