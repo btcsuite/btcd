@@ -1,6 +1,8 @@
 package btcnet_test
 
 import (
+	"bytes"
+	"reflect"
 	"testing"
 
 	. "github.com/conformal/btcnet"
@@ -14,6 +16,8 @@ var mockNetParams = Params{
 	Net:              1<<32 - 1,
 	PubKeyHashAddrID: 0x9f,
 	ScriptHashAddrID: 0xf9,
+	HDPrivateKeyID:   [4]byte{0x01, 0x02, 0x03, 0x04},
+	HDPublicKeyID:    [4]byte{0x05, 0x06, 0x07, 0x08},
 }
 
 func TestRegister(t *testing.T) {
@@ -26,12 +30,18 @@ func TestRegister(t *testing.T) {
 		magic byte
 		valid bool
 	}
+	type hdTest struct {
+		priv []byte
+		want []byte
+		err  error
+	}
 
 	tests := []struct {
 		name        string
 		register    []registerTest
 		p2pkhMagics []magicTest
 		p2shMagics  []magicTest
+		hdMagics    []hdTest
 	}{
 		{
 			name: "default networks",
@@ -109,6 +119,40 @@ func TestRegister(t *testing.T) {
 					valid: false,
 				},
 			},
+			hdMagics: []hdTest{
+				{
+					priv: MainNetParams.HDPrivateKeyID[:],
+					want: MainNetParams.HDPublicKeyID[:],
+					err:  nil,
+				},
+				{
+					priv: TestNet3Params.HDPrivateKeyID[:],
+					want: TestNet3Params.HDPublicKeyID[:],
+					err:  nil,
+				},
+				{
+					priv: RegressionNetParams.HDPrivateKeyID[:],
+					want: RegressionNetParams.HDPublicKeyID[:],
+					err:  nil,
+				},
+				{
+					priv: SimNetParams.HDPrivateKeyID[:],
+					want: SimNetParams.HDPublicKeyID[:],
+					err:  nil,
+				},
+				{
+					priv: mockNetParams.HDPrivateKeyID[:],
+					err:  ErrUnknownHDKeyID,
+				},
+				{
+					priv: []byte{0xff, 0xff, 0xff, 0xff},
+					err:  ErrUnknownHDKeyID,
+				},
+				{
+					priv: []byte{0xff},
+					err:  ErrUnknownHDKeyID,
+				},
+			},
 		},
 		{
 			name: "register mocknet",
@@ -169,6 +213,13 @@ func TestRegister(t *testing.T) {
 				{
 					magic: 0xFF,
 					valid: false,
+				},
+			},
+			hdMagics: []hdTest{
+				{
+					priv: mockNetParams.HDPrivateKeyID[:],
+					want: mockNetParams.HDPublicKeyID[:],
+					err:  nil,
 				},
 			},
 		},
@@ -253,6 +304,41 @@ func TestRegister(t *testing.T) {
 					valid: false,
 				},
 			},
+			hdMagics: []hdTest{
+				{
+					priv: MainNetParams.HDPrivateKeyID[:],
+					want: MainNetParams.HDPublicKeyID[:],
+					err:  nil,
+				},
+				{
+					priv: TestNet3Params.HDPrivateKeyID[:],
+					want: TestNet3Params.HDPublicKeyID[:],
+					err:  nil,
+				},
+				{
+					priv: RegressionNetParams.HDPrivateKeyID[:],
+					want: RegressionNetParams.HDPublicKeyID[:],
+					err:  nil,
+				},
+				{
+					priv: SimNetParams.HDPrivateKeyID[:],
+					want: SimNetParams.HDPublicKeyID[:],
+					err:  nil,
+				},
+				{
+					priv: mockNetParams.HDPrivateKeyID[:],
+					want: mockNetParams.HDPublicKeyID[:],
+					err:  nil,
+				},
+				{
+					priv: []byte{0xff, 0xff, 0xff, 0xff},
+					err:  ErrUnknownHDKeyID,
+				},
+				{
+					priv: []byte{0xff},
+					err:  ErrUnknownHDKeyID,
+				},
+			},
 		},
 	}
 
@@ -276,6 +362,18 @@ func TestRegister(t *testing.T) {
 			if valid != magTest.valid {
 				t.Errorf("%s: P2SH magic %d valid mismatch: got %v expected %v",
 					test.name, i, valid, magTest.valid)
+			}
+		}
+		for i, magTest := range test.hdMagics {
+			pubKey, err := HDPrivateKeyToPublicKeyID(magTest.priv[:])
+			if !reflect.DeepEqual(err, magTest.err) {
+				t.Errorf("%s: HD magic %d mismatched error: got %v expected %v ",
+					test.name, i, err, magTest.err)
+				continue
+			}
+			if magTest.err == nil && !bytes.Equal(pubKey, magTest.want[:]) {
+				t.Errorf("%s: HD magic %d private and public mismatch: got %v expected %v ",
+					test.name, i, pubKey, magTest.want[:])
 			}
 		}
 	}

@@ -80,10 +80,14 @@ type Params struct {
 	// Mempool parameters
 	RelayNonStdTxs bool
 
-	// Encoding magics
+	// Address encoding magics
 	PubKeyHashAddrID byte // First byte of a P2PKH address
 	ScriptHashAddrID byte // First byte of a P2SH address
 	PrivateKeyID     byte // First byte of a WIF private key
+
+	// BIP32 hierarchical deterministic extended key magics
+	HDPrivateKeyID [4]byte
+	HDPublicKeyID  [4]byte
 }
 
 // MainNetParams defines the network parameters for the main Bitcoin network.
@@ -134,10 +138,14 @@ var MainNetParams = Params{
 	// Mempool parameters
 	RelayNonStdTxs: false,
 
-	// Encoding magics
+	// Address encoding magics
 	PubKeyHashAddrID: 0x00, // starts with 1
 	ScriptHashAddrID: 0x05, // starts with 3
 	PrivateKeyID:     0x80, // starts with 5 (uncompressed) or K (compressed)
+
+	// BIP32 hierarchical deterministic extended key magics
+	HDPrivateKeyID: [4]byte{0x04, 0x88, 0xad, 0xe4}, // starts with xprv
+	HDPublicKeyID:  [4]byte{0x04, 0x88, 0xb2, 0x1e}, // starts with xpub
 }
 
 // RegressionNetParams defines the network parameters for the regression test
@@ -175,10 +183,14 @@ var RegressionNetParams = Params{
 	// Mempool parameters
 	RelayNonStdTxs: true,
 
-	// Encoding magics
+	// Address encoding magics
 	PubKeyHashAddrID: 0x6f, // starts with m or n
 	ScriptHashAddrID: 0xc4, // starts with 2
 	PrivateKeyID:     0xef, // starts with 9 (uncompressed) or c (compressed)
+
+	// BIP32 hierarchical deterministic extended key magics
+	HDPrivateKeyID: [4]byte{0x04, 0x35, 0x83, 0x94}, // starts with tprv
+	HDPublicKeyID:  [4]byte{0x04, 0x35, 0x87, 0xcf}, // starts with tpub
 }
 
 // TestNet3Params defines the network parameters for the test Bitcoin network
@@ -218,10 +230,14 @@ var TestNet3Params = Params{
 	// Mempool parameters
 	RelayNonStdTxs: true,
 
-	// Encoding magics
+	// Address encoding magics
 	PubKeyHashAddrID: 0x6f, // starts with m or n
 	ScriptHashAddrID: 0xc4, // starts with 2
 	PrivateKeyID:     0xef, // starts with 9 (uncompressed) or c (compressed)
+
+	// BIP32 hierarchical deterministic extended key magics
+	HDPrivateKeyID: [4]byte{0x04, 0x35, 0x83, 0x94}, // starts with tprv
+	HDPublicKeyID:  [4]byte{0x04, 0x35, 0x87, 0xcf}, // starts with tpub
 }
 
 // SimNetParams defines the network parameters for the simulation test Bitcoin
@@ -261,10 +277,14 @@ var SimNetParams = Params{
 	// Mempool parameters
 	RelayNonStdTxs: true,
 
-	// Encoding magics
+	// Address encoding magics
 	PubKeyHashAddrID: 0x3f, // starts with S
 	ScriptHashAddrID: 0x7b, // starts with s
 	PrivateKeyID:     0x64, // starts with 4 (uncompressed) or F (compressed)
+
+	// BIP32 hierarchical deterministic extended key magics
+	HDPrivateKeyID: [4]byte{0x04, 0x20, 0xb9, 0x00}, // starts with sprv
+	HDPublicKeyID:  [4]byte{0x04, 0x20, 0xbd, 0x3a}, // starts with spub
 }
 
 var (
@@ -272,6 +292,11 @@ var (
 	// network could not be set due to the network already being a standard
 	// network or previously-registered into this package.
 	ErrDuplicateNet = errors.New("duplicate Bitcoin network")
+
+	// ErrUnknownHDKeyID describes an error where the provided id which
+	// is intended to identify the network for a hierarchical deterministic
+	// private extended key is not registered.
+	ErrUnknownHDKeyID = errors.New("unknown hd private extended key bytes")
 )
 
 var (
@@ -293,6 +318,13 @@ var (
 		TestNet3Params.ScriptHashAddrID: struct{}{}, // shared with regtest
 		SimNetParams.ScriptHashAddrID:   struct{}{},
 	}
+
+	// Testnet is shared with regtest.
+	hdPrivToPubKeyIDs = map[[4]byte][]byte{
+		MainNetParams.HDPrivateKeyID:  MainNetParams.HDPublicKeyID[:],
+		TestNet3Params.HDPrivateKeyID: TestNet3Params.HDPublicKeyID[:],
+		SimNetParams.HDPrivateKeyID:   SimNetParams.HDPublicKeyID[:],
+	}
 )
 
 // Register registers the network parameters for a Bitcoin network.  This may
@@ -311,6 +343,7 @@ func Register(params *Params) error {
 	registeredNets[params.Net] = struct{}{}
 	pubKeyHashAddrIDs[params.PubKeyHashAddrID] = struct{}{}
 	scriptHashAddrIDs[params.ScriptHashAddrID] = struct{}{}
+	hdPrivToPubKeyIDs[params.HDPrivateKeyID] = params.HDPublicKeyID[:]
 	return nil
 }
 
@@ -334,6 +367,24 @@ func IsPubKeyHashAddrID(id byte) bool {
 func IsScriptHashAddrID(id byte) bool {
 	_, ok := scriptHashAddrIDs[id]
 	return ok
+}
+
+// HDPrivateKeyToPublicKeyID accepts a private hierarchical deterministic
+// extended key id and returns the associated public key id.  When the provided
+// id is not registered, the ErrUnknownHDKeyID error will be returned.
+func HDPrivateKeyToPublicKeyID(id []byte) ([]byte, error) {
+	if len(id) != 4 {
+		return nil, ErrUnknownHDKeyID
+	}
+
+	var key [4]byte
+	copy(key[:], id)
+	pubBytes, ok := hdPrivToPubKeyIDs[key]
+	if !ok {
+		return nil, ErrUnknownHDKeyID
+	}
+
+	return pubBytes, nil
 }
 
 // newShaHashFromStr converts the passed big-endian hex string into a
