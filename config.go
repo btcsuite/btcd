@@ -387,14 +387,21 @@ func loadConfig() (*config, []string, error) {
 	// Multiple networks can't be selected simultaneously.
 	funcName := "loadConfig"
 	numNets := 0
+	// Count number of network flags passed; assign active network params
+	// while we're at it
 	if cfg.TestNet3 {
 		numNets++
+		activeNetParams = &testNet3Params
 	}
 	if cfg.RegressionTest {
 		numNets++
+		activeNetParams = &regressionNetParams
 	}
 	if cfg.SimNet {
 		numNets++
+		// Also disable dns seeding on the simulation test network.
+		activeNetParams = &simNetParams
+		cfg.DisableDNSSeed = true
 	}
 	if numNets > 1 {
 		str := "%s: The testnet, regtest, and simnet params can't be " +
@@ -403,18 +410,6 @@ func loadConfig() (*config, []string, error) {
 		fmt.Fprintln(os.Stderr, err)
 		fmt.Fprintln(os.Stderr, usageMessage)
 		return nil, nil, err
-	}
-
-	// Choose the active network params based on the selected network.
-	switch {
-	case cfg.TestNet3:
-		activeNetParams = &testNet3Params
-	case cfg.RegressionTest:
-		activeNetParams = &regressionNetParams
-	case cfg.SimNet:
-		// Also disable dns seeding on the simulation test network.
-		activeNetParams = &simNetParams
-		cfg.DisableDNSSeed = true
 	}
 
 	// Append the network type to the data directory so it is "namespaced"

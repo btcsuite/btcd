@@ -25,21 +25,23 @@ const (
 )
 
 var (
-	btcdHomeDir    = btcutil.AppDataDir("btcd", false)
-	defaultDataDir = filepath.Join(btcdHomeDir, "data")
-	knownDbTypes   = btcdb.SupportedDBs()
-	activeNetwork  = &btcnet.MainNetParams
+	btcdHomeDir     = btcutil.AppDataDir("btcd", false)
+	defaultDataDir  = filepath.Join(btcdHomeDir, "data")
+	knownDbTypes    = btcdb.SupportedDBs()
+	activeNetParams = &btcnet.MainNetParams
 )
 
 // config defines the configuration options for findcheckpoint.
 //
 // See loadConfig for details on the configuration load process.
 type config struct {
-	DataDir       string `short:"b" long:"datadir" description:"Location of the btcd data directory"`
-	DbType        string `long:"dbtype" description:"Database backend to use for the Block Chain"`
-	TestNet3      bool   `long:"testnet" description:"Use the test network"`
-	NumCandidates int    `short:"n" long:"numcandidates" description:"Max num of checkpoint candidates to show {1-20}"`
-	UseGoOutput   bool   `short:"g" long:"gooutput" description:"Display the candidates using Go syntax that is ready to insert into the btcchain checkpoint list"`
+	DataDir        string `short:"b" long:"datadir" description:"Location of the btcd data directory"`
+	DbType         string `long:"dbtype" description:"Database backend to use for the Block Chain"`
+	TestNet3       bool   `long:"testnet" description:"Use the test network"`
+	RegressionTest bool   `long:"regtest" description:"Use the regression test network"`
+	SimNet         bool   `long:"simnet" description:"Use the simulation test network"`
+	NumCandidates  int    `short:"n" long:"numcandidates" description:"Max num of checkpoint candidates to show {1-20}"`
+	UseGoOutput    bool   `short:"g" long:"gooutput" description:"Display the candidates using Go syntax that is ready to insert into the btcchain checkpoint list"`
 }
 
 // validDbType returns whether or not dbType is a supported database type.
@@ -90,9 +92,30 @@ func loadConfig() (*config, []string, error) {
 		return nil, nil, err
 	}
 
-	// Choose the active network based on the flags.
+	// Multiple networks can't be selected simultaneously.
+	funcName := "loadConfig"
+	numNets := 0
+	// Count number of network flags passed; assign active network params
+	// while we're at it
 	if cfg.TestNet3 {
-		activeNetwork = &btcnet.TestNet3Params
+		numNets++
+		activeNetParams = &btcnet.TestNet3Params
+	}
+	if cfg.RegressionTest {
+		numNets++
+		activeNetParams = &btcnet.RegressionNetParams
+	}
+	if cfg.SimNet {
+		numNets++
+		activeNetParams = &btcnet.SimNetParams
+	}
+	if numNets > 1 {
+		str := "%s: The testnet, regtest, and simnet params can't be " +
+			"used together -- choose one of the three"
+		err := fmt.Errorf(str, funcName)
+		fmt.Fprintln(os.Stderr, err)
+		parser.WriteHelp(os.Stderr)
+		return nil, nil, err
 	}
 
 	// Validate database type.
@@ -111,7 +134,7 @@ func loadConfig() (*config, []string, error) {
 	// All data is specific to a network, so namespacing the data directory
 	// means each individual piece of serialized data does not have to
 	// worry about changing names per network and such.
-	cfg.DataDir = filepath.Join(cfg.DataDir, netName(activeNetwork))
+	cfg.DataDir = filepath.Join(cfg.DataDir, netName(activeNetParams))
 
 	// Validate the number of candidates.
 	if cfg.NumCandidates < minCandidates || cfg.NumCandidates > maxCandidates {

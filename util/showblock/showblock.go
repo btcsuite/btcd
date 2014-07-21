@@ -7,6 +7,7 @@ package main
 import (
 	"encoding/binary"
 	"errors"
+	"fmt"
 	"io"
 	"os"
 	"path/filepath"
@@ -15,6 +16,7 @@ import (
 	"github.com/conformal/btcdb"
 	_ "github.com/conformal/btcdb/ldb"
 	"github.com/conformal/btclog"
+	"github.com/conformal/btcnet"
 	"github.com/conformal/btcutil"
 	"github.com/conformal/btcwire"
 	flags "github.com/conformal/go-flags"
@@ -24,28 +26,49 @@ import (
 type ShaHash btcwire.ShaHash
 
 type config struct {
-	DataDir    string `short:"b" long:"datadir" description:"Directory to store data"`
-	DbType     string `long:"dbtype" description:"Database backend"`
-	TestNet3   bool   `long:"testnet" description:"Use the test network"`
-	OutFile    string `short:"o" description:"outfile"`
-	Progress   bool   `short:"p" description:"show progress"`
-	ShaString  string `short:"s" description:"Block SHA to process" required:"true"`
-	EShaString string `short:"e" description:"End Block SHA to process"`
-	RawBlock   bool   `short:"r" description:"Raw Block"`
-	FmtBlock   bool   `short:"f" description:"Format Block"`
-	ShowTx     bool   `short:"t" description:"Show transaction"`
+	DataDir        string `short:"b" long:"datadir" description:"Directory to store data"`
+	DbType         string `long:"dbtype" description:"Database backend"`
+	TestNet3       bool   `long:"testnet" description:"Use the test network"`
+	RegressionTest bool   `long:"regtest" description:"Use the regression test network"`
+	SimNet         bool   `long:"simnet" description:"Use the simulation test network"`
+	OutFile        string `short:"o" description:"outfile"`
+	Progress       bool   `short:"p" description:"show progress"`
+	ShaString      string `short:"s" description:"Block SHA to process" required:"true"`
+	EShaString     string `short:"e" description:"End Block SHA to process"`
+	RawBlock       bool   `short:"r" description:"Raw Block"`
+	FmtBlock       bool   `short:"f" description:"Format Block"`
+	ShowTx         bool   `short:"t" description:"Show transaction"`
 }
 
 var (
-	btcdHomeDir    = btcutil.AppDataDir("btcd", false)
-	defaultDataDir = filepath.Join(btcdHomeDir, "data")
-	log            btclog.Logger
+	btcdHomeDir     = btcutil.AppDataDir("btcd", false)
+	defaultDataDir  = filepath.Join(btcdHomeDir, "data")
+	log             btclog.Logger
+	activeNetParams = &btcnet.MainNetParams
 )
 
 const (
 	ArgSha = iota
 	ArgHeight
 )
+
+// netName returns the name used when referring to a bitcoin network.  At the
+// time of writing, btcd currently places blocks for testnet version 3 in the
+// data and log directory "testnet", which does not match the Name field of the
+// btcnet parameters.  This function can be used to override this directory name
+// as "testnet" when the passed active network matches btcwire.TestNet3.
+//
+// A proper upgrade to move the data and log directories for this network to
+// "testnet3" is planned for the future, at which point this function can be
+// removed and the network parameter's name used instead.
+func netName(netParams *btcnet.Params) string {
+	switch netParams.Net {
+	case btcwire.TestNet3:
+		return "testnet"
+	default:
+		return netParams.Name
+	}
+}
 
 func main() {
 	end := int64(-1)
@@ -68,14 +91,32 @@ func main() {
 	log = btclog.NewSubsystemLogger(backendLogger, "")
 	btcdb.UseLogger(log)
 
-	var testnet string
+	// Multiple networks can't be selected simultaneously.
+	funcName := "main"
+	numNets := 0
+	// Count number of network flags passed; assign active network params
+	// while we're at it
 	if cfg.TestNet3 {
-		testnet = "testnet"
-	} else {
-		testnet = "mainnet"
+		numNets++
+		activeNetParams = &btcnet.TestNet3Params
 	}
-
-	cfg.DataDir = filepath.Join(cfg.DataDir, testnet)
+	if cfg.RegressionTest {
+		numNets++
+		activeNetParams = &btcnet.RegressionNetParams
+	}
+	if cfg.SimNet {
+		numNets++
+		activeNetParams = &btcnet.SimNetParams
+	}
+	if numNets > 1 {
+		str := "%s: The testnet, regtest, and simnet params can't be " +
+			"used together -- choose one of the three"
+		err := fmt.Errorf(str, funcName)
+		fmt.Fprintln(os.Stderr, err)
+		parser.WriteHelp(os.Stderr)
+		return
+	}
+	cfg.DataDir = filepath.Join(cfg.DataDir, netName(activeNetParams))
 
 	blockDbNamePrefix := "blocks"
 	dbName := blockDbNamePrefix + "_" + cfg.DbType
