@@ -61,9 +61,9 @@ func (bi *blockImporter) readBlock() ([]byte, error) {
 		// No block and no error means there are no more blocks to read.
 		return nil, nil
 	}
-	if net != uint32(activeNetwork.Net) {
+	if net != uint32(activeNetParams.Net) {
 		return nil, fmt.Errorf("network mismatch -- got %x, want %x",
-			net, uint32(activeNetwork.Net))
+			net, uint32(activeNetParams.Net))
 	}
 
 	// Read the block length and ensure it is sane.
@@ -305,7 +305,7 @@ func newBlockImporter(db btcdb.Db, r io.ReadSeeker) *blockImporter {
 		doneChan:     make(chan bool),
 		errChan:      make(chan error),
 		quit:         make(chan struct{}),
-		chain:        btcchain.New(db, activeNetwork, nil),
+		chain:        btcchain.New(db, activeNetParams, nil),
 		lastLogTime:  time.Now(),
 	}
 }
