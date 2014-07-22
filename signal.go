@@ -9,6 +9,8 @@ import (
 	"os/signal"
 )
 
+var shutdownInProgress bool
+
 // interruptChannel is used to receive SIGINT (Ctrl+C) signals.
 var interruptChannel chan os.Signal
 
@@ -27,7 +29,9 @@ func mainInterruptHandler() {
 	for {
 		select {
 		case <-interruptChannel:
+			shutdownInProgress = true
 			btcdLog.Infof("Received SIGINT (Ctrl+C).  Shutting down...")
+
 			// run handlers in LIFO order.
 			for i := range interruptCallbacks {
 				idx := len(interruptCallbacks) - 1 - i
@@ -47,6 +51,12 @@ func mainInterruptHandler() {
 // addInterruptHandler adds a handler to call when a SIGINT (Ctrl+C) is
 // received.
 func addInterruptHandler(handler func()) {
+	// if shutdown is in progress, just finish the handler and exit
+	if shutdownInProgress {
+		handler()
+		return
+	}
+
 	// Create the channel and start the main interrupt handler which invokes
 	// all other callbacks and exits if not already done.
 	if interruptChannel == nil {
