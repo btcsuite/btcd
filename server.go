@@ -252,9 +252,8 @@ func (s *server) handleDonePeerMsg(state *peerState, p *peer) {
 		if e.Value == p {
 			// Issue an asynchronous reconnect if the peer was a
 			// persistent outbound connection.
-			if !p.inbound && p.persistent &&
-				atomic.LoadInt32(&s.shutdown) == 0 {
-				e.Value = newOutboundPeer(s, p.addr, true)
+			if !p.inbound && p.persistent && atomic.LoadInt32(&s.shutdown) == 0 {
+				e.Value = newOutboundPeer(s, p.addr, true, p.retryCount+1)
 				return
 			}
 			if !p.inbound {
@@ -431,7 +430,7 @@ func (s *server) handleQuery(querymsg interface{}, state *peerState) {
 		}
 		// TODO(oga) if too many, nuke a non-perm peer.
 		if s.handleAddPeerMsg(state,
-			newOutboundPeer(s, msg.addr, msg.permanent)) {
+			newOutboundPeer(s, msg.addr, msg.permanent, 0)) {
 			msg.reply <- nil
 		} else {
 			msg.reply <- errors.New("failed to add peer")
@@ -573,7 +572,7 @@ func (s *server) peerHandler() {
 		permanentPeers = cfg.AddPeers
 	}
 	for _, addr := range permanentPeers {
-		s.handleAddPeerMsg(state, newOutboundPeer(s, addr, true))
+		s.handleAddPeerMsg(state, newOutboundPeer(s, addr, true, 0))
 	}
 
 	// if nothing else happens, wake us up soon.
@@ -686,11 +685,11 @@ out:
 			// any failure will be due to banned peers etc. we have
 			// already checked that we have room for more peers.
 			if s.handleAddPeerMsg(state,
-				newOutboundPeer(s, addrStr, false)) {
+				newOutboundPeer(s, addrStr, false, 0)) {
 			}
 		}
 
-		// We we need more peers, wake up in ten seconds and try again.
+		// We need more peers, wake up in ten seconds and try again.
 		if state.NeedMoreOutbound() {
 			time.AfterFunc(10*time.Second, func() {
 				s.wakeup <- struct{}{}

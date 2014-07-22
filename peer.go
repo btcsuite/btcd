@@ -1527,6 +1527,7 @@ out:
 		// ok we got a message, reset the timer.
 		// timer just calls p.Disconnect() after logging.
 		idleTimer.Reset(idleTimeoutMinutes * time.Minute)
+		p.retryCount = 0
 	}
 
 	idleTimer.Stop()
@@ -1910,10 +1911,11 @@ func newInboundPeer(s *server, conn net.Conn) *peer {
 // newOutbountPeer returns a new outbound bitcoin peer for the provided server and
 // address and connects to it asynchronously. If the connection is successful
 // then the peer will also be started.
-func newOutboundPeer(s *server, addr string, persistent bool) *peer {
+func newOutboundPeer(s *server, addr string, persistent bool, retryCount int64) *peer {
 	p := newPeerBase(s, false)
 	p.addr = addr
 	p.persistent = persistent
+	p.retryCount = retryCount
 
 	// Setup p.na with a temporary address that we are connecting to with
 	// faked up service flags.  We will replace this with the real one after
@@ -1945,45 +1947,34 @@ func newOutboundPeer(s *server, addr string, persistent bool) *peer {
 	}
 
 	go func() {
-		// Attempt to connect to the peer.  If the connection fails and
-		// this is a persistent connection, retry after the retry
-		// interval.
-		for atomic.LoadInt32(&p.disconnect) == 0 {
-			srvrLog.Debugf("Attempting to connect to %s", addr)
-			conn, err := btcdDial("tcp", addr)
-			if err != nil {
-				p.retryCount++
-				srvrLog.Debugf("Failed to connect to %s: %v",
-					addr, err)
-				if !persistent {
-					p.server.donePeers <- p
-					return
-				}
-				scaledInterval := connectionRetryInterval.Nanoseconds() * p.retryCount / 2
-				scaledDuration := time.Duration(scaledInterval)
-				srvrLog.Debugf("Retrying connection to %s in "+
-					"%s", addr, scaledDuration)
-				time.Sleep(scaledDuration)
-				continue
-			}
-
-			// While we were sleeping trying to connect, the server
-			// may have scheduled a shutdown.  In that case ditch
-			// the peer immediately.
-			if atomic.LoadInt32(&p.disconnect) == 0 {
-				p.timeConnected = time.Now()
-				p.server.addrManager.Attempt(p.na)
-
-				// Connection was successful so log it and start peer.
-				srvrLog.Debugf("Connected to %s",
-					conn.RemoteAddr())
-				p.conn = conn
-				atomic.AddInt32(&p.connected, 1)
-				p.retryCount = 0
-				p.Start()
-			}
-
+		if atomic.LoadInt32(&p.disconnect) != 0 {
 			return
+		}
+		if p.retryCount > 0 {
+			scaledInterval := connectionRetryInterval.Nanoseconds() * p.retryCount / 2
+			scaledDuration := time.Duration(scaledInterval)
+			srvrLog.Debugf("Retrying connection to %s in %s", addr, scaledDuration)
+			time.Sleep(scaledDuration)
+		}
+		srvrLog.Debugf("Attempting to connect to %s", addr)
+		conn, err := btcdDial("tcp", addr)
+		if err != nil {
+			srvrLog.Debugf("Failed to connect to %s: %v", addr, err)
+			p.server.donePeers <- p
+			return
+		}
+
+		// We may have slept and the server may have scheduled a shutdown.  In that
+		// case ditch the peer immediately.
+		if atomic.LoadInt32(&p.disconnect) == 0 {
+			p.timeConnected = time.Now()
+			p.server.addrManager.Attempt(p.na)
+
+			// Connection was successful so log it and start peer.
+			srvrLog.Debugf("Connected to %s", conn.RemoteAddr())
+			p.conn = conn
+			atomic.AddInt32(&p.connected, 1)
+			p.Start()
 		}
 	}()
 	return p
