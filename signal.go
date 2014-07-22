@@ -24,11 +24,26 @@ func mainInterruptHandler() {
 	// SIGINT (Ctrl+C) is received.
 	var interruptCallbacks []func()
 
+	// isShutdown is a flag which is used to indicate whether or not
+	// the shutdown signal has already been received and hence any future
+	// attempts to add a new interrupt handler should invoke them
+	// immediately.
+	var isShutdown bool
+
 	for {
 		select {
 		case <-interruptChannel:
+			// Ignore more than one shutdown signal.
+			if isShutdown {
+				btcdLog.Infof("Received SIGINT (Ctrl+C).  " +
+					"Already shutting down...")
+				continue
+			}
+
+			isShutdown = true
 			btcdLog.Infof("Received SIGINT (Ctrl+C).  Shutting down...")
-			// run handlers in LIFO order.
+
+			// Run handlers in LIFO order.
 			for i := range interruptCallbacks {
 				idx := len(interruptCallbacks) - 1 - i
 				callback := interruptCallbacks[idx]
@@ -36,9 +51,17 @@ func mainInterruptHandler() {
 			}
 
 			// Signal the main goroutine to shutdown.
-			shutdownChannel <- struct{}{}
+			go func() {
+				shutdownChannel <- struct{}{}
+			}()
 
 		case handler := <-addHandlerChannel:
+			// The shutdown signal has already been received, so
+			// just invoke and new handlers immediately.
+			if isShutdown {
+				handler()
+			}
+
 			interruptCallbacks = append(interruptCallbacks, handler)
 		}
 	}
