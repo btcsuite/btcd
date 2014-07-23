@@ -1858,9 +1858,14 @@ func opcodeCheckMultiSig(op *parsedOpcode, s *Script) error {
 	if err != nil {
 		return err
 	}
-
 	// PopInt promises that the int returned is 32 bit.
 	nsig := int(numSignatures.Int64())
+	if nsig < 0 {
+		return fmt.Errorf("number of signatures %d is less than 0", nsig)
+	}
+	if nsig > npk {
+		return fmt.Errorf("more signatures than pubkeys: %d > %d", nsig, npk)
+	}
 
 	sigStrings := make([][]byte, nsig)
 	signatures := make([]sig, 0, nsig)
