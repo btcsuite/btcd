@@ -144,12 +144,12 @@ type peer struct {
 	server             *server
 	btcnet             btcwire.BitcoinNet
 	started            int32
+	connected          int32
+	disconnect         int32 // only to be used atomically
 	conn               net.Conn
 	addr               string
 	na                 *btcwire.NetAddress
 	inbound            bool
-	connected          int32
-	disconnect         int32 // only to be used atomically
 	persistent         bool
 	knownAddresses     map[string]struct{}
 	knownInventory     *MruInventoryMap
