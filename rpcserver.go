@@ -2453,6 +2453,7 @@ func handleGetTxOut(s *rpcServer, cmd btcjson.Cmd, closeChan <-chan struct{}) (i
 	var mtx *btcwire.MsgTx
 	var bestBlockSha string
 	var confirmations int64
+	var dbSpentInfo []bool
 	if c.IncludeMempool && s.server.txMemPool.HaveTransaction(txSha) {
 		tx, err := s.server.txMemPool.FetchTransaction(txSha)
 		if err != nil {
@@ -2468,10 +2469,11 @@ func handleGetTxOut(s *rpcServer, cmd btcjson.Cmd, closeChan <-chan struct{}) (i
 			return nil, btcjson.ErrNoTxInfo
 		}
 
-		lastTx := len(txList) - 1
-		mtx = txList[lastTx].Tx
-		blksha := txList[lastTx].BlkSha
-		txHeight := txList[lastTx].Height
+		lastTx := txList[len(txList)-1]
+		mtx = lastTx.Tx
+		blksha := lastTx.BlkSha
+		txHeight := lastTx.Height
+		dbSpentInfo = lastTx.TxSpent
 
 		_, bestHeight, err := s.server.db.NewestSha()
 		if err != nil {
@@ -2487,15 +2489,25 @@ func handleGetTxOut(s *rpcServer, cmd btcjson.Cmd, closeChan <-chan struct{}) (i
 		return nil, btcjson.ErrInvalidTxVout
 	}
 
-	if mtx.TxOut[c.Output] == nil {
+	txOut := mtx.TxOut[c.Output]
+	if txOut == nil {
 		rpcsLog.Errorf("Output index: %d, for txid: %s does not exist.", c.Output, c.Txid)
 		return nil, btcjson.ErrInternal
+	}
+
+	// To match the behavior of the reference client, this handler returns
+	// nil (JSON null) if the transaction output is spent by another
+	// transaction already in the database.  Unspent transaction outputs
+	// from transactions in mempool, as well as mined transactions that are
+	// spent by a mempool transaction, are not affected by this.
+	if dbSpentInfo != nil && dbSpentInfo[c.Output] {
+		return nil, nil
 	}
 
 	// Disassemble script into single line printable format.
 	// The disassembled string will contain [error] inline if the script
 	// doesn't fully parse, so ignore the error here.
-	script := mtx.TxOut[c.Output].PkScript
+	script := txOut.PkScript
 	disbuf, _ := btcscript.DisasmString(script)
 
 	// Get further info about the script.
@@ -2511,7 +2523,7 @@ func handleGetTxOut(s *rpcServer, cmd btcjson.Cmd, closeChan <-chan struct{}) (i
 	txOutReply := &btcjson.GetTxOutResult{
 		BestBlock:     bestBlockSha,
 		Confirmations: confirmations,
-		Value:         btcutil.Amount(mtx.TxOut[c.Output].Value).ToUnit(btcutil.AmountBTC),
+		Value:         btcutil.Amount(txOut.Value).ToUnit(btcutil.AmountBTC),
 		Version:       mtx.Version,
 		ScriptPubKey: btcjson.ScriptPubKeyResult{
 			Asm:       disbuf,
