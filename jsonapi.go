@@ -6,8 +6,13 @@ package btcjson
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 )
+
+// ErrIncorrectArgTypes describes an error where the wrong argument types
+// are present.
+var ErrIncorrectArgTypes = errors.New("incorrect arguement types")
 
 // Message contains a message to be sent to the bitcoin client.
 type Message struct {
@@ -500,8 +505,7 @@ func CreateMessageWithId(message string, id interface{}, args ...interface{}) ([
 			add, ok3 := args[(i*4)+2].(string)
 			amt, ok4 := args[(i*4)+3].(float64)
 			if !ok1 || !ok2 || !ok3 || !ok4 {
-				err = fmt.Errorf("incorrect arguement types")
-				return finalMessage, err
+				return finalMessage, ErrIncorrectArgTypes
 			}
 			vList[i].Txid = txid
 			vList[i].Vout = vout
@@ -518,8 +522,7 @@ func CreateMessageWithId(message string, id interface{}, args ...interface{}) ([
 		var comment string
 		_, ok1 := args[0].(string)
 		if !ok1 {
-			err = fmt.Errorf("incorrect arguement types")
-			return finalMessage, err
+			return finalMessage, ErrIncorrectArgTypes
 		}
 		addresses := make(map[string]float64)
 		for i := 1; i < len(args); i += 2 {
@@ -528,8 +531,7 @@ func CreateMessageWithId(message string, id interface{}, args ...interface{}) ([
 				if len(args) > i+1 {
 					amt, ok2 := args[i+1].(float64)
 					if !ok2 {
-						err = fmt.Errorf("incorrect arguement types")
-						return finalMessage, err
+						return finalMessage, ErrIncorrectArgTypes
 					}
 					// Put a single pair into addresses
 					addresses[add] = amt
@@ -556,8 +558,7 @@ func CreateMessageWithId(message string, id interface{}, args ...interface{}) ([
 		}
 		_, ok1 := args[0].(bool)
 		if !ok1 {
-			err = fmt.Errorf("incorrect arguement types")
-			return finalMessage, err
+			return finalMessage, ErrIncorrectArgTypes
 		}
 		finalMessage, err = jsonWithArgs(message, id, args)
 	// one required string (hex) and optional sets of one string, one int,
@@ -569,8 +570,7 @@ func CreateMessageWithId(message string, id interface{}, args ...interface{}) ([
 		}
 		_, ok1 := args[0].(string)
 		if !ok1 {
-			err = fmt.Errorf("incorrect arguement types")
-			return finalMessage, err
+			return finalMessage, ErrIncorrectArgTypes
 		}
 		type txlist struct {
 			Txid         string `json:"txid"`
@@ -584,8 +584,7 @@ func CreateMessageWithId(message string, id interface{}, args ...interface{}) ([
 			vout, ok3 := args[2].(uint32)
 			spkey, ok4 := args[3].(string)
 			if !ok1 || !ok2 || !ok3 || !ok4 {
-				err = fmt.Errorf("incorrect arguement types")
-				return finalMessage, err
+				return finalMessage, ErrIncorrectArgTypes
 			}
 			txList[0].Txid = txid
 			txList[0].Vout = vout
@@ -600,8 +599,7 @@ func CreateMessageWithId(message string, id interface{}, args ...interface{}) ([
 				spkey, ok3 := args[(i*4)+3].(string)
 				pkey, ok4 := args[(i*4)+4].(string)
 				if !ok1 || !ok2 || !ok3 || !ok4 {
-					err = fmt.Errorf("Incorrect arguement types.")
-					return finalMessage, err
+					return finalMessage, ErrIncorrectArgTypes
 				}
 				txList[i].Txid = txid
 				txList[i].Vout = vout
