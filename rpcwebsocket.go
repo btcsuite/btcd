@@ -160,6 +160,8 @@ out:
 			if len(q) == 0 {
 				dequeue = nil
 				skipQueue = out
+			} else {
+				next = q[0]
 			}
 
 		case <-quit:
