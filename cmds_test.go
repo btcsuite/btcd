@@ -31,33 +31,6 @@ var cmdtests = []struct {
 		},
 	},
 	{
-		name: "getaddressbalance no optargs",
-		f: func() (btcjson.Cmd, error) {
-			return NewGetAddressBalanceCmd(
-				float64(1),
-				"17XhEvq9Nahdj7Xe1nv6oRe1tEmaHUuynH")
-		},
-		result: &GetAddressBalanceCmd{
-			id:      float64(1),
-			Address: "17XhEvq9Nahdj7Xe1nv6oRe1tEmaHUuynH",
-			Minconf: 1,
-		},
-	},
-	{
-		name: "getaddressbalance one optarg",
-		f: func() (btcjson.Cmd, error) {
-			return NewGetAddressBalanceCmd(
-				float64(1),
-				"17XhEvq9Nahdj7Xe1nv6oRe1tEmaHUuynH",
-				0)
-		},
-		result: &GetAddressBalanceCmd{
-			id:      float64(1),
-			Address: "17XhEvq9Nahdj7Xe1nv6oRe1tEmaHUuynH",
-			Minconf: 0,
-		},
-	},
-	{
 		name: "getbestblock",
 		f: func() (btcjson.Cmd, error) {
 			return NewGetBestBlockCmd(float64(1)), nil

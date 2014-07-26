@@ -27,8 +27,6 @@ func init() {
 		parseCreateEncryptedWalletCmd, nil, `TODO(jrick) fillmein`)
 	btcjson.RegisterCustomCmd("exportwatchingwallet",
 		parseExportWatchingWalletCmd, nil, `TODO(jrick) fillmein`)
-	btcjson.RegisterCustomCmd("getaddressbalance",
-		parseGetAddressBalanceCmd, nil, `TODO(jrick) fillmein`)
 	btcjson.RegisterCustomCmd("getbestblock", parseGetBestBlockCmd,
 		parseGetBestBlockCmdReply, `TODO(jrick) fillmein`)
 	btcjson.RegisterCustomCmd("getcurrentnet", parseGetCurrentNetCmd, nil,
@@ -1475,117 +1473,6 @@ func (cmd *ListAllTransactionsCmd) UnmarshalJSON(b []byte) error {
 	}
 
 	concreteCmd, ok := newCmd.(*ListAllTransactionsCmd)
-	if !ok {
-		return btcjson.ErrInternal
-	}
-	*cmd = *concreteCmd
-	return nil
-}
-
-// GetAddressBalanceCmd is a type handling custom marshaling
-// and unmarshaling of getaddressbalance JSON websocket extension
-// commands.
-type GetAddressBalanceCmd struct {
-	id      interface{}
-	Address string
-	Minconf int
-}
-
-// Enforce that GetAddressBalanceCmd satisifies the btcjson.Cmd
-// interface.
-var _ btcjson.Cmd = &GetAddressBalanceCmd{}
-
-// parseGetAddressBalanceCmd parses a GetAddressBalanceCmd into a concrete
-// type satisifying the btcjson.Cmd interface.  This is used when
-// registering the custom command with the btcjson parser.
-func parseGetAddressBalanceCmd(r *btcjson.RawCmd) (btcjson.Cmd, error) {
-	// Length of param slice must be minimum 1 (one required parameter)
-	// and maximum 2 (1 optional parameter).
-	if len(r.Params) < 1 || len(r.Params) > 2 {
-		return nil, btcjson.ErrInvalidParams
-	}
-
-	var address string
-	if err := json.Unmarshal(r.Params[0], &address); err != nil {
-		return nil, errors.New("first parameter 'address' must be a " +
-			" string: " + err.Error())
-	}
-
-	optArgs := make([]int, 0, 1)
-	if len(r.Params) > 1 {
-		var minConf int
-		if err := json.Unmarshal(r.Params[1], &minConf); err != nil {
-			return nil, errors.New("second optional parameter " +
-				" 'minconf' must be an integer: " + err.Error())
-		}
-		optArgs = append(optArgs, minConf)
-	}
-
-	return NewGetAddressBalanceCmd(r.Id, address, optArgs...)
-}
-
-// NewGetAddressBalanceCmd creates a new GetAddressBalanceCmd.
-func NewGetAddressBalanceCmd(id interface{}, address string,
-	optArgs ...int) (*GetAddressBalanceCmd, error) {
-
-	// Optional arguments set to their default values.
-	minconf := 1
-
-	if len(optArgs) > 1 {
-		return nil, btcjson.ErrInvalidParams
-	}
-
-	if len(optArgs) == 1 {
-		minconf = optArgs[0]
-	}
-
-	return &GetAddressBalanceCmd{
-		id:      id,
-		Address: address,
-		Minconf: minconf,
-	}, nil
-}
-
-// Id satisifies the Cmd interface by returning the ID of the command.
-func (cmd *GetAddressBalanceCmd) Id() interface{} {
-	return cmd.id
-}
-
-// Method satisfies the Cmd interface by returning the RPC method.
-func (cmd *GetAddressBalanceCmd) Method() string {
-	return "getaddressbalance"
-}
-
-// MarshalJSON returns the JSON encoding of cmd.  Part of the Cmd interface.
-func (cmd *GetAddressBalanceCmd) MarshalJSON() ([]byte, error) {
-	params := make([]interface{}, 1, 2)
-	params[0] = cmd.Address
-	if cmd.Minconf != 1 {
-		params = append(params, cmd.Minconf)
-	}
-
-	raw, err := btcjson.NewRawCmd(cmd.id, cmd.Method(), params)
-	if err != nil {
-		return nil, err
-	}
-	return json.Marshal(raw)
-}
-
-// UnmarshalJSON unmarshals the JSON encoding of cmd into cmd.  Part of
-// the Cmd interface.
-func (cmd *GetAddressBalanceCmd) UnmarshalJSON(b []byte) error {
-	// Unmarshal into a RawCmd.
-	var r btcjson.RawCmd
-	if err := json.Unmarshal(b, &r); err != nil {
-		return err
-	}
-
-	newCmd, err := parseGetAddressBalanceCmd(&r)
-	if err != nil {
-		return err
-	}
-
-	concreteCmd, ok := newCmd.(*GetAddressBalanceCmd)
 	if !ok {
 		return btcjson.ErrInternal
 	}
