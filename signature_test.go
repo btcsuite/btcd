@@ -391,7 +391,7 @@ func TestSignatureSerialize(t *testing.T) {
 			"valid 3 - s most significant bit is one",
 			&btcec.Signature{
 				R: fromHex("1cadddc2838598fee7dc35a12b340c6bde8b389f7bfd19a1252a17c4b5ed2d71"),
-				S: fromHex("00c1a251bbecb14b058a8bd77f65de87e51c47e95904f4c0e9d52eddc21c1415ac"),
+				S: new(big.Int).Add(fromHex("00c1a251bbecb14b058a8bd77f65de87e51c47e95904f4c0e9d52eddc21c1415ac"), btcec.S256().N),
 			},
 			[]byte{
 				0x30, 0x45, 0x02, 0x20, 0x1c, 0xad, 0xdd, 0xc2,

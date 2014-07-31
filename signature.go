@@ -25,6 +25,12 @@ type Signature struct {
 	S *big.Int
 }
 
+// curve order and halforder, used to tame ECDSA malleability (see BIP-0062)
+var (
+	order     = new(big.Int).Set(S256().N)
+	halforder = new(big.Int).Rsh(order, 1)
+)
+
 // Serialize returns the ECDSA signature in the more strict DER format.  Note
 // that the serialized bytes returned do not include the appended hash type
 // used in Bitcoin signature scripts.
@@ -33,10 +39,15 @@ type Signature struct {
 //
 // 0x30 <length> 0x02 <length r> r 0x02 <length s> s
 func (sig *Signature) Serialize() []byte {
+	// low 'S' malleability breaker
+	sigS := sig.S
+	if sigS.Cmp(halforder) == 1 {
+		sigS = new(big.Int).Sub(order, sigS)
+	}
 	// Ensure the encoded bytes for the r and s values are canonical and
 	// thus suitable for DER encoding.
 	rb := canonicalizeInt(sig.R)
-	sb := canonicalizeInt(sig.S)
+	sb := canonicalizeInt(sigS)
 
 	// total length of returned signature is 1 byte for each magic and
 	// length (6 total), plus lengths of r and s
