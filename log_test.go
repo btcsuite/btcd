@@ -38,14 +38,29 @@ func TestSetLogWriter(t *testing.T) {
 			level:    "off",
 			expected: errors.New("Min level can't be greater than max. Got min: 6, max: 5"),
 		},
+		{
+			name:     "pass",
+			w:        os.Stdout,
+			level:    "debug",
+			expected: nil,
+		},
 	}
 
 	t.Logf("Running %d tests", len(tests))
 	for i, test := range tests {
-		if err := btcscript.SetLogWriter(test.w, test.level); err.Error() != test.expected.Error() {
-			t.Errorf("SetLogWriter #%d (%s) wrong result\n"+
-				"got: %x\nwant: %x", i, test.name, err,
-				test.expected)
+		err := btcscript.SetLogWriter(test.w, test.level)
+		if err != nil {
+			if err.Error() != test.expected.Error() {
+				t.Errorf("SetLogWriter #%d (%s) wrong result\n"+
+					"got: %x\nwant: %x", i, test.name, err,
+					test.expected)
+			}
+		} else {
+			if test.expected != nil {
+				t.Errorf("SetLogWriter #%d (%s) wrong result\n"+
+					"got: %x\nwant: %x", i, test.name, err,
+					test.expected)
+			}
 		}
 	}
 }
