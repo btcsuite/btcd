@@ -898,9 +898,14 @@ func (mp *txMemPool) maybeAcceptTransaction(tx *btcutil.Tx, isOrphan *bool, isNe
 		return txRuleError(btcwire.RejectInsufficientFee, str)
 	}
 
+	// minRelayFee is the required relay fee (regardless of transaction size)
+	// In case we have a tiny transaction with 0 required fee, we want to rate-limit
+	// it, if the fee is less than this amount
+	minRelayFee := (1 + int64(tx.MsgTx().SerializeSize())/1000) * minTxRelayFee
+
 	// Free-to-relay transactions are rate limited here to prevent
 	// penny-flooding with tiny transactions as a form of attack.
-	if rateLimit && minRequiredFee == 0 {
+	if rateLimit && txFee < minRelayFee && txFee == 0 {
 		nowUnix := time.Now().Unix()
 		// we decay passed data with an exponentially decaying ~10
 		// minutes window - matches bitcoind handling.
