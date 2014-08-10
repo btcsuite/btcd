@@ -34,7 +34,9 @@ use secp256k1 elliptic curve cryptography.
 ## Documentation
 
 [![GoDoc](https://godoc.org/github.com/conformal/btcec?status.png)]
-(http://godoc.org/github.com/conformal/btcec)
+(http://godoc.org/github.com/conformal/btcec) [![Coverage Status]
+(https://coveralls.io/repos/conformal/btcec/badge.png?branch=master)]
+(https://coveralls.io/r/conformal/btcec?branch=master)
 
 Full `go doc` style documentation for the project can be viewed online without
 installing this package by using the GoDoc site
