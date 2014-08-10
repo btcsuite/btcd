@@ -20,18 +20,6 @@ Although it was primarily written for btcd, this package has intentionally been
 designed so it can be used as a standalone package for any projects needing to
 use secp256k1 elliptic curve cryptography.
 
-## Sample Use
-
-```Go
-	import crypto/ecdsa
-
-	pubKey, err := btcec.ParsePubKey(pkStr, btcec.S256())
-
-	signature, err := btcec.ParseSignature(sigStr, btcec.S256())
-
-	ok := ecdsa.Verify(pubKey, message, signature.R, signature.S)
-```
-
 ## Documentation
 
 [![GoDoc](https://godoc.org/github.com/conformal/btcec?status.png)]
@@ -50,6 +38,18 @@ http://localhost:6060/pkg/github.com/conformal/btcec
 ```bash
 $ go get github.com/conformal/btcec
 ```
+
+## Examples
+
+* [Sign Message]
+  (http://godoc.org/github.com/conformal/btcec#example-package--SignMessage)  
+  Demonstrates signing a message with a secp256k1 private key that is first
+  parsed form raw bytes and serializing the generated signature.
+
+* [Verify Signature]
+  (http://godoc.org/github.com/conformal/btcec#example-package--verifySignature)  
+  Demonstrates verifying a secp256k1 signature against a public key that is
+  first parsed from raw bytes.  The signature is also parsed from raw bytes.
 
 ## GPG Verification Key
 
