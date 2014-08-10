@@ -47,7 +47,7 @@ $ go get github.com/conformal/btcec
   parsed form raw bytes and serializing the generated signature.
 
 * [Verify Signature]
-  (http://godoc.org/github.com/conformal/btcec#example-package--verifySignature)  
+  (http://godoc.org/github.com/conformal/btcec#example-package--VerifySignature)  
   Demonstrates verifying a secp256k1 signature against a public key that is
   first parsed from raw bytes.  The signature is also parsed from raw bytes.
 
