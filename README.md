@@ -73,6 +73,6 @@ signature perform the following:
 
 ## License
 
-Package btcec is licensed under the liberal ISC License except for
-btcec.go and btcec_test.go which is under the same license as Go.
+Package btcec is licensed under the [copyfree](http://copyfree.org) ISC License
+except for btcec.go and btcec_test.go which is under the same license as Go.
 
