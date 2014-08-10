@@ -2,7 +2,9 @@ btcec
 =====
 
 [![Build Status](https://travis-ci.org/conformal/btcec.png?branch=master)]
-(https://travis-ci.org/conformal/btcec)
+(https://travis-ci.org/conformal/btcec) [![Coverage Status]
+(https://coveralls.io/repos/conformal/btcec/badge.png?branch=master)]
+(https://coveralls.io/r/conformal/btcec?branch=master)
 
 Package btcec implements elliptic curve cryptography needed for working with
 Bitcoin (secp256k1 only for now). It is designed so that it may be used with the
@@ -34,9 +36,7 @@ use secp256k1 elliptic curve cryptography.
 ## Documentation
 
 [![GoDoc](https://godoc.org/github.com/conformal/btcec?status.png)]
-(http://godoc.org/github.com/conformal/btcec) [![Coverage Status]
-(https://coveralls.io/repos/conformal/btcec/badge.png?branch=master)]
-(https://coveralls.io/r/conformal/btcec?branch=master)
+(http://godoc.org/github.com/conformal/btcec)
 
 Full `go doc` style documentation for the project can be viewed online without
 installing this package by using the GoDoc site
