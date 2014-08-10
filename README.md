@@ -8,11 +8,10 @@ btcec
 
 Package btcec implements elliptic curve cryptography needed for working with
 Bitcoin (secp256k1 only for now). It is designed so that it may be used with the
-standard crypto/ecdsa packages provided with go.  There is a test suite which
-provides extensive coverage.  See `test_coverage.txt` for the current coverage
-(using gocov).  On a UNIX-like OS, the script `cov_report.sh` can be used to
-generate the report.  Package btcec uses work from ThePiachu which is licensed
-under the same terms as Go.  The Conformal original is licensed under the
+standard crypto/ecdsa packages provided with go.  A comprehensive suite of test
+is provided to ensure proper functionality.  Package btcec was originally based
+on work from ThePiachu which is licensed under the same terms as Go, but it has
+signficantly diverged since then.  The Conformal original is licensed under the
 liberal ISC license.
 
 This package is one of the core packages from btcd, an alternative full-node
