@@ -88,6 +88,10 @@ type Params struct {
 	// BIP32 hierarchical deterministic extended key magics
 	HDPrivateKeyID [4]byte
 	HDPublicKeyID  [4]byte
+
+	// BIP44 coin type used in the hierarchical deterministic path for
+	// address generation.
+	HDCoinType uint32
 }
 
 // MainNetParams defines the network parameters for the main Bitcoin network.
@@ -146,6 +150,10 @@ var MainNetParams = Params{
 	// BIP32 hierarchical deterministic extended key magics
 	HDPrivateKeyID: [4]byte{0x04, 0x88, 0xad, 0xe4}, // starts with xprv
 	HDPublicKeyID:  [4]byte{0x04, 0x88, 0xb2, 0x1e}, // starts with xpub
+
+	// BIP44 coin type used in the hierarchical deterministic path for
+	// address generation.
+	HDCoinType: 0,
 }
 
 // RegressionNetParams defines the network parameters for the regression test
@@ -191,6 +199,10 @@ var RegressionNetParams = Params{
 	// BIP32 hierarchical deterministic extended key magics
 	HDPrivateKeyID: [4]byte{0x04, 0x35, 0x83, 0x94}, // starts with tprv
 	HDPublicKeyID:  [4]byte{0x04, 0x35, 0x87, 0xcf}, // starts with tpub
+
+	// BIP44 coin type used in the hierarchical deterministic path for
+	// address generation.
+	HDCoinType: 1,
 }
 
 // TestNet3Params defines the network parameters for the test Bitcoin network
@@ -238,6 +250,10 @@ var TestNet3Params = Params{
 	// BIP32 hierarchical deterministic extended key magics
 	HDPrivateKeyID: [4]byte{0x04, 0x35, 0x83, 0x94}, // starts with tprv
 	HDPublicKeyID:  [4]byte{0x04, 0x35, 0x87, 0xcf}, // starts with tpub
+
+	// BIP44 coin type used in the hierarchical deterministic path for
+	// address generation.
+	HDCoinType: 1,
 }
 
 // SimNetParams defines the network parameters for the simulation test Bitcoin
@@ -285,6 +301,10 @@ var SimNetParams = Params{
 	// BIP32 hierarchical deterministic extended key magics
 	HDPrivateKeyID: [4]byte{0x04, 0x20, 0xb9, 0x00}, // starts with sprv
 	HDPublicKeyID:  [4]byte{0x04, 0x20, 0xbd, 0x3a}, // starts with spub
+
+	// BIP44 coin type used in the hierarchical deterministic path for
+	// address generation.
+	HDCoinType: 115, // ASCII for s
 }
 
 var (
