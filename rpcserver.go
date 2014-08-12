@@ -131,6 +131,7 @@ var rpcHandlersBeforeInit = map[string]commandHandler{
 	"getblockcount":        handleGetBlockCount,
 	"getblockhash":         handleGetBlockHash,
 	"getblocktemplate":     handleGetBlockTemplate,
+	"getchaintips":         handleUnimplemented,
 	"getconnectioncount":   handleGetConnectionCount,
 	"getcurrentnet":        handleGetCurrentNet,
 	"getdifficulty":        handleGetDifficulty,
