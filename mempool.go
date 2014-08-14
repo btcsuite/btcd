@@ -36,6 +36,11 @@ const (
 	// of big orphans.
 	maxOrphanTxSize = 5000
 
+	// maxSigOpsPerTx is the maximum number of signature operations
+	// in a single transaction we will relay or mine.  It is a fraction
+	// of the max signature operations for a block.
+	maxSigOpsPerTx = btcchain.MaxSigOpsPerBlock / 5
+
 	// maxStandardTxSize is the maximum size allowed for transactions that
 	// are considered standard and will therefore be relayed and considered
 	// for mining.
@@ -875,6 +880,25 @@ func (mp *txMemPool) maybeAcceptTransaction(tx *btcutil.Tx, isOrphan *bool, isNe
 	// NOTE: if you modify this code to accept non-standard transactions,
 	// you should add code here to check that the transaction does a
 	// reasonable number of ECDSA signature verifications.
+
+	// Don't allow transactions with an excessive number of signature
+	// operations which would result in making it impossible to mine.  Since
+	// the coinbase address itself can contain signature operations, the
+	// maximum allowed signature operations per transaction is less than
+	// the maximum allowed signature operations per block.
+	numSigOps, err := btcchain.CountP2SHSigOps(tx, false, txStore)
+	if err != nil {
+		if cerr, ok := err.(btcchain.RuleError); ok {
+			return chainRuleError(cerr)
+		}
+		return err
+	}
+	numSigOps += btcchain.CountSigOps(tx)
+	if numSigOps > maxSigOpsPerTx {
+		str := fmt.Sprintf("transaction %v has too many sigops: %d > %d",
+			txHash, numSigOps, maxSigOpsPerTx)
+		return txRuleError(btcwire.RejectNonstandard, str)
+	}
 
 	// Don't allow transactions with fees too low to get into a mined block.
 	//
