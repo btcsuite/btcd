@@ -27,7 +27,7 @@ func TestBIP0032Vectors(t *testing.T) {
 	testVec2MasterHex := "fffcf9f6f3f0edeae7e4e1dedbd8d5d2cfccc9c6c3c0bdbab7b4b1aeaba8a5a29f9c999693908d8a8784817e7b7875726f6c696663605d5a5754514e4b484542"
 	hkStart := uint32(0x80000000)
 
-	var tests = []struct {
+	tests := []struct {
 		name     string
 		master   string
 		path     []uint32
@@ -189,7 +189,7 @@ func TestPublicDerivation(t *testing.T) {
 	testVec1MasterPubKey := "xpub661MyMwAqRbcFtXgS5sYJABqqG9YLmC4Q1Rdap9gSE8NqtwybGhePY2gZ29ESFjqJoCu1Rupje8YtGqsefD265TMg7usUDFdp6W1EGMcet8"
 	testVec2MasterPubKey := "xpub661MyMwAqRbcFW31YEwpkMuc5THy2PSt5bDMsktWQcFF8syAmRUapSCGu8ED9W6oDMSgv6Zz8idoc4a6mr8BDzTJY47LJhkJ8UB7WEGuduB"
 
-	var tests = []struct {
+	tests := []struct {
 		name    string
 		master  string
 		path    []uint32
@@ -305,7 +305,7 @@ tests:
 func TestGenenerateSeed(t *testing.T) {
 	wantErr := errors.New("seed length must be between 128 and 512 bits")
 
-	var tests = []struct {
+	tests := []struct {
 		name   string
 		length uint8
 		err    error
@@ -341,7 +341,7 @@ func TestGenenerateSeed(t *testing.T) {
 
 // TestExtendedKeyAPI ensures the API on the ExtendedKey type works as intended.
 func TestExtendedKeyAPI(t *testing.T) {
-	var tests = []struct {
+	tests := []struct {
 		name       string
 		extKey     string
 		isPrivate  bool
@@ -449,7 +449,7 @@ func TestExtendedKeyAPI(t *testing.T) {
 
 // TestNet ensures the network related APIs work as intended.
 func TestNet(t *testing.T) {
-	var tests = []struct {
+	tests := []struct {
 		name      string
 		key       string
 		origNet   *btcnet.Params
