@@ -370,9 +370,29 @@ func checkInputsStandard(tx *btcutil.Tx, txStore btcchain.TxStore) error {
 	return nil
 }
 
+// calcTxFee returns the minimum transaction fee required for the passed
+// transaction.
+func calcTxFee(size int) int64 {
+	// Calculate the minimum fee for a transaction to be allowed into the
+	// mempool and relayed by scaling the base fee (which is the minimum
+	// free transaction relay fee).  minTxRelayFee is in Satoshi/KB, so
+	// divide the transaction size by 1000 to convert to kilobytes.  Also,
+	// integer division is used so fees only increase on full kilobyte
+	// boundaries.
+	minFee := (1 + size/1000) * minTxRelayFee
+
+	// Set the minimum fee to the maximum possible value if the calculated
+	// fee is not in the valid range for monetary amounts.
+	if minFee < 0 || minFee > btcutil.MaxSatoshi {
+		minFee = btcutil.MaxSatoshi
+	}
+
+	return int64(minFee)
+}
+
 // calcMinRelayFee retuns the minimum transaction fee required for the passed
 // transaction to be accepted into the memory pool and relayed.
-func calcMinRelayFee(tx *btcutil.Tx) int64 {
+func calcMinTxRelayFee(size int) int64 {
 	// Most miners allow a free transaction area in blocks they mine to go
 	// alongside the area used for high-priority transactions as well as
 	// transactions with fees.  A transaction size of up to 1000 bytes is
@@ -382,26 +402,11 @@ func calcMinRelayFee(tx *btcutil.Tx) int64 {
 	// which is more desirable.  Therefore, as long as the size of the
 	// transaction does not exceeed 1000 less than the reserved space for
 	// high-priority transactions, don't require a fee for it.
-	serializedLen := int64(tx.MsgTx().SerializeSize())
-	if serializedLen < (defaultBlockPrioritySize - 1000) {
+	if size < (defaultBlockPrioritySize - 1000) {
 		return 0
 	}
 
-	// Calculate the minimum fee for a transaction to be allowed into the
-	// mempool and relayed by scaling the base fee (which is the minimum
-	// free transaction relay fee).  minTxRelayFee is in Satoshi/KB, so
-	// divide the transaction size by 1000 to convert to kilobytes.  Also,
-	// integer division is used so fees only increase on full kilobyte
-	// boundaries.
-	minFee := (1 + serializedLen/1000) * minTxRelayFee
-
-	// Set the minimum fee to the maximum possible value if the calculated
-	// fee is not in the valid range for monetary amounts.
-	if minFee < 0 || minFee > btcutil.MaxSatoshi {
-		minFee = btcutil.MaxSatoshi
-	}
-
-	return minFee
+	return calcTxFee(size)
 }
 
 // removeOrphan removes the passed orphan transaction from the orphan pool and
@@ -890,7 +895,8 @@ func (mp *txMemPool) maybeAcceptTransaction(tx *btcutil.Tx, isOrphan *bool, isNe
 	// reasonable number of ECDSA signature verifications.
 
 	// Don't allow transactions with fees too low to get into a mined block.
-	minRequiredFee := calcMinRelayFee(tx)
+	serializedSize := tx.MsgTx().SerializeSize()
+	minRequiredFee := calcMinTxRelayFee(serializedSize)
 	if txFee < minRequiredFee {
 		str := fmt.Sprintf("transaction %v has %d fees which is under "+
 			"the required amount of %d", txHash, txFee,
@@ -900,7 +906,7 @@ func (mp *txMemPool) maybeAcceptTransaction(tx *btcutil.Tx, isOrphan *bool, isNe
 
 	// Free-to-relay transactions are rate limited here to prevent
 	// penny-flooding with tiny transactions as a form of attack.
-	if rateLimit && minRequiredFee == 0 {
+	if rateLimit && txFee < calcTxFee(serializedSize) {
 		nowUnix := time.Now().Unix()
 		// we decay passed data with an exponentially decaying ~10
 		// minutes window - matches bitcoind handling.
@@ -910,13 +916,13 @@ func (mp *txMemPool) maybeAcceptTransaction(tx *btcutil.Tx, isOrphan *bool, isNe
 
 		// Are we still over the limit?
 		if mp.pennyTotal >= cfg.FreeTxRelayLimit*10*1000 {
-			str := fmt.Sprintf("transaction %v has 0 fees and has "+
-				"been rejected by the rate limiter", txHash)
+			str := fmt.Sprintf("transaction %v has been rejected "+
+				"by the rate limiter due to low fees", txHash)
 			return txRuleError(btcwire.RejectInsufficientFee, str)
 		}
 		oldTotal := mp.pennyTotal
 
-		mp.pennyTotal += float64(tx.MsgTx().SerializeSize())
+		mp.pennyTotal += float64(serializedSize)
 		txmpLog.Tracef("rate limit: curTotal %v, nextTotal: %v, "+
 			"limit %v", oldTotal, mp.pennyTotal,
 			cfg.FreeTxRelayLimit*10*1000)
