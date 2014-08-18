@@ -674,3 +674,82 @@ func TestErrors(t *testing.T) {
 		}
 	}
 }
+
+// TestZero ensures that zeroing an extended key works as intended.
+func TestZero(t *testing.T) {
+	tests := []struct {
+		name   string
+		extKey string
+	}{
+		// Test vector 1
+		{
+			name:   "test vector 1 chain m",
+			extKey: "xprv9s21ZrQH143K3QTDL4LXw2F7HEK3wJUD2nW2nRk4stbPy6cq3jPPqjiChkVvvNKmPGJxWUtg6LnF5kejMRNNU3TGtRBeJgk33yuGBxrMPHi",
+		},
+	}
+
+	for i, test := range tests {
+		key, err := hdkeychain.NewKeyFromString(test.extKey)
+		if err != nil {
+			t.Errorf("NewKeyFromString #%d (%s): unexpected "+
+				"error: %v", i, test.name, err)
+			continue
+		}
+		key.Zero()
+
+		// Zeroing a key should result in it no longer being private
+		if key.IsPrivate() != false {
+			t.Errorf("IsPrivate #%d (%s): mismatched key type -- "+
+				"want private %v, got private %v", i, test.name,
+				false, key.IsPrivate())
+			continue
+		}
+
+		parentFP := key.ParentFingerprint()
+		if parentFP != 0 {
+			t.Errorf("ParentFingerprint #%d (%s): mismatched "+
+				"parent fingerprint -- want %d, got %d", i,
+				test.name, 0, parentFP)
+			continue
+		}
+
+		wantKey := "zeroed extended key"
+		serializedKey := key.String()
+		if serializedKey != wantKey {
+			t.Errorf("String #%d (%s): mismatched serialized key "+
+				"-- want %s, got %s", i, test.name, wantKey,
+				serializedKey)
+			continue
+		}
+
+		wantErr := hdkeychain.ErrNotPrivExtKey
+		_, err = key.ECPrivKey()
+		if !reflect.DeepEqual(err, wantErr) {
+			t.Errorf("ECPrivKey #%d (%s): mismatched error: want "+
+				"%v, got %v", i, test.name, wantErr, err)
+			continue
+		}
+
+		wantErr = errors.New("pubkey string is empty")
+		_, err = key.ECPubKey()
+		if !reflect.DeepEqual(err, wantErr) {
+			t.Errorf("ECPubKey #%d (%s): mismatched error: want "+
+				"%v, got %v", i, test.name, wantErr, err)
+			continue
+		}
+
+		wantAddr := "1HT7xU2Ngenf7D4yocz2SAcnNLW7rK8d4E"
+		addr, err := key.Address(&btcnet.MainNetParams)
+		if err != nil {
+			t.Errorf("Addres s #%d (%s): unexpected error: %v", i,
+				test.name, err)
+			continue
+		}
+		if addr.EncodeAddress() != wantAddr {
+			t.Errorf("Address #%d (%s): mismatched address -- want "+
+				"%s, got %s", i, test.name, wantAddr,
+				addr.EncodeAddress())
+			continue
+		}
+	}
+}

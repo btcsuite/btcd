@@ -360,6 +360,10 @@ func (k *ExtendedKey) Address(net *btcnet.Params) (*btcutil.AddressPubKeyHash, e
 
 // String returns the extended key as a human-readable base58-encoded string.
 func (k *ExtendedKey) String() string {
+	if len(k.key) == 0 {
+		return "zeroed extended key"
+	}
+
 	var childNumBytes [4]byte
 	depthByte := byte(k.depth % 256)
 	binary.BigEndian.PutUint32(childNumBytes[:], k.childNum)
@@ -400,6 +404,31 @@ func (k *ExtendedKey) SetNet(net *btcnet.Params) {
 	} else {
 		k.version = net.HDPublicKeyID[:]
 	}
+}
+
+// zero sets all bytes in the passed slice to zero.  This is used to
+// explicitly clear private key material from memory.
+func zero(b []byte) {
+	lenb := len(b)
+	for i := 0; i < lenb; i++ {
+		b[i] = 0
+	}
+}
+
+// Zero manually clears all fields and bytes in the extended key.  This can be
+// used to explicitly clear key material from memory for enhanced security
+// against memory scraping.  This function only clears this particular key and
+// not any children that have already been derived.
+func (k *ExtendedKey) Zero() {
+	zero(k.key)
+	zero(k.pubKey)
+	zero(k.chainCode)
+	zero(k.parentFP)
+	zero(k.version)
+	k.key = nil
+	k.depth = 0
+	k.childNum = 0
+	k.isPrivate = false
 }
 
 // NewMaster creates a new master node for use in creating a hierarchical
