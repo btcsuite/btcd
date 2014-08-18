@@ -370,22 +370,10 @@ func checkInputsStandard(tx *btcutil.Tx, txStore btcchain.TxStore) error {
 	return nil
 }
 
-// calcMinRelayFee retuns the minimum transaction fee required for the passed
-// transaction to be accepted into the memory pool and relayed.
-func calcMinRelayFee(tx *btcutil.Tx) int64 {
-	// Most miners allow a free transaction area in blocks they mine to go
-	// alongside the area used for high-priority transactions as well as
-	// transactions with fees.  A transaction size of up to 1000 bytes is
-	// considered safe to go into this section.  Further, the minimum fee
-	// calculated below on its own would encourage several small
-	// transactions to avoid fees rather than one single larger transaction
-	// which is more desirable.  Therefore, as long as the size of the
-	// transaction does not exceeed 1000 less than the reserved space for
-	// high-priority transactions, don't require a fee for it.
+// calcMinTxRelayFee returns the minimum transaction fee required for the passed
+// transaction.
+func calcMinTxRelayFee(tx *btcutil.Tx) int64 {
 	serializedLen := int64(tx.MsgTx().SerializeSize())
-	if serializedLen < (defaultBlockPrioritySize - 1000) {
-		return 0
-	}
 
 	// Calculate the minimum fee for a transaction to be allowed into the
 	// mempool and relayed by scaling the base fee (which is the minimum
@@ -399,6 +387,27 @@ func calcMinRelayFee(tx *btcutil.Tx) int64 {
 	// fee is not in the valid range for monetary amounts.
 	if minFee < 0 || minFee > btcutil.MaxSatoshi {
 		minFee = btcutil.MaxSatoshi
+	}
+	return minFee
+}
+
+// calcMinRelayFee retuns the minimum transaction fee required for the passed
+// transaction to be accepted into the memory pool and relayed.
+func calcMinRelayFee(tx *btcutil.Tx) int64 {
+	minFee := calcMinTxRelayFee(tx)
+
+	// Most miners allow a free transaction area in blocks they mine to go
+	// alongside the area used for high-priority transactions as well as
+	// transactions with fees.  A transaction size of up to 1000 bytes is
+	// considered safe to go into this section.  Further, the minimum fee
+	// calculated below on its own would encourage several small
+	// transactions to avoid fees rather than one single larger transaction
+	// which is more desirable.  Therefore, as long as the size of the
+	// transaction does not exceeed 1000 less than the reserved space for
+	// high-priority transactions, don't require a fee for it.
+	serializedLen := int64(tx.MsgTx().SerializeSize())
+	if serializedLen < (defaultBlockPrioritySize - 1000) {
+		return 0
 	}
 
 	return minFee
@@ -900,7 +909,7 @@ func (mp *txMemPool) maybeAcceptTransaction(tx *btcutil.Tx, isOrphan *bool, isNe
 
 	// Free-to-relay transactions are rate limited here to prevent
 	// penny-flooding with tiny transactions as a form of attack.
-	if rateLimit && minRequiredFee == 0 {
+	if rateLimit && txFee < calcMinTxRelayFee(tx) {
 		nowUnix := time.Now().Unix()
 		// we decay passed data with an exponentially decaying ~10
 		// minutes window - matches bitcoind handling.
