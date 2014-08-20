@@ -326,11 +326,18 @@ func loadConfig() (*config, []string, error) {
 	}
 
 	// Pre-parse the command line options to see if an alternative config
-	// file or the version flag was specified.  Any errors can be ignored
-	// here since they will be caught be the final parse below.
+	// file or the version flag was specified.  Any errors aside from the
+	// help message error can be ignored here since they will be caught by
+	// the final parse below.
 	preCfg := cfg
-	preParser := newConfigParser(&preCfg, &serviceOpts, flags.None)
-	preParser.Parse()
+	preParser := newConfigParser(&preCfg, &serviceOpts, flags.HelpFlag)
+	_, err = preParser.Parse()
+	if err != nil {
+		if e, ok := err.(*flags.Error); ok && e.Type == flags.ErrHelp {
+			fmt.Fprintln(os.Stderr, err)
+			return nil, nil, err
+		}
+	}
 
 	// Show the version and exit if the version flag was specified.
 	appName := filepath.Base(os.Args[0])
