@@ -779,10 +779,20 @@ func makeSignMessage(args []interface{}) (btcjson.Cmd, error) {
 func makeSignRawTransaction(args []interface{}) (btcjson.Cmd, error) {
 	optArgs := make([]interface{}, 0, 3)
 	if len(args) > 1 {
-		optArgs = append(optArgs, args[1])
+		var inputs []btcjson.RawTxInput
+		err := json.Unmarshal([]byte(args[1].(string)), &inputs)
+		if err != nil {
+			return nil, err
+		}
+		optArgs = append(optArgs, inputs)
 	}
 	if len(args) > 2 {
-		optArgs = append(optArgs, args[2])
+		var inputs []string
+		err := json.Unmarshal([]byte(args[2].(string)), &inputs)
+		if err != nil {
+			return nil, err
+		}
+		optArgs = append(optArgs, inputs)
 	}
 	if len(args) > 3 {
 		optArgs = append(optArgs, args[3])
