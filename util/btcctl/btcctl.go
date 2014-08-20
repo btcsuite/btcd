@@ -110,7 +110,7 @@ var commandHandlers = map[string]*handlerData{
 	"setgenerate":            {1, 1, displayGeneric, []conversionHandler{toBool, toInt}, makeSetGenerate, "<generate> [genproclimit]"},
 	"settxfee":               {1, 0, displayGeneric, []conversionHandler{toSatoshi}, makeSetTxFee, "<amount>"},
 	"signmessage":            {2, 2, displayGeneric, nil, makeSignMessage, "<address> <message>"},
-	"signrawtransaction":     {1, 3, displayGeneric, nil, makeSignRawTransaction, "<hex> [{\"txid\":txid,\"vout\":n,\"scriptPubKey\":hex,\"redeemScript\":hex},...] [<privatekey1>,...] [sighashtype=\"ALL\"]"},
+	"signrawtransaction":     {1, 3, displayJSONDump, nil, makeSignRawTransaction, "<hex> [{\"txid\":txid,\"vout\":n,\"scriptPubKey\":hex,\"redeemScript\":hex},...] [<privatekey1>,...] [sighashtype=\"ALL\"]"},
 	"stop":                   {0, 0, displayGeneric, nil, makeStop, ""},
 	"submitblock":            {1, 1, displayGeneric, nil, makeSubmitBlock, "<hexdata> [jsonparametersobject]"},
 	"validateaddress":        {1, 0, displayJSONDump, nil, makeValidateAddress, "<address>"},
