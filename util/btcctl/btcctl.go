@@ -110,6 +110,7 @@ var commandHandlers = map[string]*handlerData{
 	"setgenerate":            {1, 1, displayGeneric, []conversionHandler{toBool, toInt}, makeSetGenerate, "<generate> [genproclimit]"},
 	"settxfee":               {1, 0, displayGeneric, []conversionHandler{toSatoshi}, makeSetTxFee, "<amount>"},
 	"signmessage":            {2, 2, displayGeneric, nil, makeSignMessage, "<address> <message>"},
+	"signrawtransaction":     {1, 3, displayGeneric, nil, makeSignRawTransaction, "<hex> [{\"txid\":txid,\"vout\":n,\"scriptPubKey\":hex,\"redeemScript\":hex},...] [<privatekey1>,...] [sighashtype=\"ALL\"]"},
 	"stop":                   {0, 0, displayGeneric, nil, makeStop, ""},
 	"submitblock":            {1, 1, displayGeneric, nil, makeSubmitBlock, "<hexdata> [jsonparametersobject]"},
 	"validateaddress":        {1, 0, displayJSONDump, nil, makeValidateAddress, "<address>"},
@@ -766,6 +767,21 @@ func makeSetTxFee(args []interface{}) (btcjson.Cmd, error) {
 func makeSignMessage(args []interface{}) (btcjson.Cmd, error) {
 	return btcjson.NewSignMessageCmd("btcctl", args[0].(string),
 		args[1].(string))
+}
+
+// makeSignRawTransaction generates the cmd structure for signrawtransaction commands.
+func makeSignRawTransaction(args []interface{}) (btcjson.Cmd, error) {
+	optArgs := make([]interface{}, 0, 3)
+	if len(args) > 1 {
+		optArgs = append(optArgs, args[1])
+	}
+	if len(args) > 2 {
+		optArgs = append(optArgs, args[2])
+	}
+	if len(args) > 3 {
+		optArgs = append(optArgs, args[3])
+	}
+	return btcjson.NewSignRawTransactionCmd("btcctl", args[0].(string), optArgs...)
 }
 
 // makeStop generates the cmd structure for stop commands.
