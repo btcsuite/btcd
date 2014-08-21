@@ -28,6 +28,7 @@ import (
 
 	"github.com/conformal/btcchain"
 	"github.com/conformal/btcdb"
+	"github.com/conformal/btcec"
 	"github.com/conformal/btcjson"
 	"github.com/conformal/btcnet"
 	"github.com/conformal/btcscript"
@@ -155,6 +156,7 @@ var rpcHandlersBeforeInit = map[string]commandHandler{
 	"submitblock":          handleSubmitBlock,
 	"validateaddress":      handleValidateAddress,
 	"verifychain":          handleVerifyChain,
+	"verifymessage":        handleVerifyMessage,
 }
 
 // list of commands that we recognise, but for which btcd has no support because
@@ -200,7 +202,6 @@ var rpcAskWallet = map[string]struct{}{
 	"settxfee":               struct{}{},
 	"signmessage":            struct{}{},
 	"signrawtransaction":     struct{}{},
-	"verifymessage":          struct{}{},
 	"walletlock":             struct{}{},
 	"walletpassphrase":       struct{}{},
 	"walletpassphrasechange": struct{}{},
@@ -3141,6 +3142,67 @@ func handleVerifyChain(s *rpcServer, cmd btcjson.Cmd, closeChan <-chan struct{})
 
 	err := verifyChain(s.server.db, c.CheckLevel, c.CheckDepth)
 	return err == nil, nil
+}
+
+// handleVerifyMessage implements the verifymessage command.
+func handleVerifyMessage(s *rpcServer, cmd btcjson.Cmd, closeChan <-chan struct{}) (interface{}, error) {
+	c := cmd.(*btcjson.VerifyMessageCmd)
+
+	// Decode the provided address.
+	addr, err := btcutil.DecodeAddress(c.Address, activeNetParams.Params)
+	if err != nil {
+		return nil, btcjson.Error{
+			Code: btcjson.ErrInvalidAddressOrKey.Code,
+			Message: fmt.Sprintf("%s: %v",
+				btcjson.ErrInvalidAddressOrKey.Message, err),
+		}
+	}
+
+	// Only P2PKH addresses are valid for signing.
+	if _, ok := addr.(*btcutil.AddressPubKeyHash); !ok {
+		return nil, btcjson.Error{
+			Code:    btcjson.ErrType.Code,
+			Message: "Address is not a pay-to-pubkey-hash address",
+		}
+	}
+
+	// Decode base64 signature.
+	sig, err := base64.StdEncoding.DecodeString(c.Signature)
+	if err != nil {
+		return nil, btcjson.Error{
+			Code:    btcjson.ErrParse.Code,
+			Message: fmt.Sprintf("Malformed base64 encoding: %v", err),
+		}
+	}
+
+	// Validate the signature - this just shows that it was valid at all.
+	// we will compare it with the key next.
+	pk, wasCompressed, err := btcec.RecoverCompact(btcec.S256(), sig,
+		btcwire.DoubleSha256([]byte("Bitcoin Signed Message:\n"+c.Message)))
+	if err != nil {
+		// Mirror Bitcoin Core behavior, which treats error in RecoverCompact as
+		// invalid signature.
+		return false, nil
+	}
+
+	// Reconstruct the pubkey hash.
+	btcPK := (*btcec.PublicKey)(pk)
+	var serializedPK []byte
+	if wasCompressed {
+		serializedPK = btcPK.SerializeCompressed()
+	} else {
+		serializedPK = btcPK.SerializeUncompressed()
+	}
+	address, err := btcutil.NewAddressPubKey(serializedPK,
+		activeNetParams.Params)
+	if err != nil {
+		// Again mirror Bitcoin Core behavior, which treats error in public key
+		// reconstruction as invalid signature.
+		return false, nil
+	}
+
+	// Return boolean if addresses match.
+	return address.EncodeAddress() == c.Address, nil
 }
 
 // parseCmd parses a marshaled known command, returning any errors as a
