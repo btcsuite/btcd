@@ -2537,7 +2537,7 @@ var coinbaseOutPoint = &btcwire.OutPoint{
 // Pregenerated private key, with associated public key and pkScripts
 // for the uncompressed and compressed hash160.
 var (
-	privkeyD = []byte{0x6b, 0x0f, 0xd8, 0xda, 0x54, 0x22, 0xd0, 0xb7,
+	privKeyD = []byte{0x6b, 0x0f, 0xd8, 0xda, 0x54, 0x22, 0xd0, 0xb7,
 		0xb4, 0xfc, 0x4e, 0x55, 0xd4, 0x88, 0x42, 0xb3, 0xa1, 0x65,
 		0xac, 0x70, 0x7f, 0x3d, 0xa4, 0x39, 0x5e, 0xcb, 0x3b, 0xb0,
 		0xd6, 0x0e, 0x06, 0x92}
@@ -2766,7 +2766,7 @@ var SigScriptTests = []TstSigScript{
 // created for the MsgTxs in txTests, since they come from the blockchain
 // and we don't have the private keys.
 func TestSignatureScript(t *testing.T) {
-	privkey := &ecdsa.PrivateKey{
+	privKey := &ecdsa.PrivateKey{
 		PublicKey: ecdsa.PublicKey{
 			Curve: btcec.S256(),
 			X:     new(big.Int),
@@ -2774,9 +2774,9 @@ func TestSignatureScript(t *testing.T) {
 		},
 		D: new(big.Int),
 	}
-	privkey.D.SetBytes(privkeyD)
-	privkey.PublicKey.X.SetBytes(pubkeyX)
-	privkey.PublicKey.Y.SetBytes(pubkeyY)
+	privKey.D.SetBytes(privKeyD)
+	privKey.PublicKey.X.SetBytes(pubkeyX)
+	privKey.PublicKey.Y.SetBytes(pubkeyY)
 
 nexttest:
 	for i := range SigScriptTests {
@@ -2802,7 +2802,7 @@ nexttest:
 			}
 			script, err = btcscript.SignatureScript(tx, idx,
 				SigScriptTests[i].inputs[j].txout.PkScript,
-				SigScriptTests[i].hashtype, privkey,
+				SigScriptTests[i].hashtype, privKey,
 				SigScriptTests[i].compress)
 
 			if (err == nil) != SigScriptTests[i].inputs[j].sigscriptGenerates {
@@ -3369,7 +3369,7 @@ func TestSignTxOutput(t *testing.T) {
 			key, err := ecdsa.GenerateKey(btcec.S256(),
 				rand.Reader)
 			if err != nil {
-				t.Errorf("failed to make privkey for %s: %v",
+				t.Errorf("failed to make privKey for %s: %v",
 					msg, err)
 				break
 			}
@@ -3407,7 +3407,7 @@ func TestSignTxOutput(t *testing.T) {
 			key, err := ecdsa.GenerateKey(btcec.S256(),
 				rand.Reader)
 			if err != nil {
-				t.Errorf("failed to make privkey for %s: %v",
+				t.Errorf("failed to make privKey for %s: %v",
 					msg, err)
 				break
 			}
@@ -3469,7 +3469,7 @@ func TestSignTxOutput(t *testing.T) {
 			key, err := ecdsa.GenerateKey(btcec.S256(),
 				rand.Reader)
 			if err != nil {
-				t.Errorf("failed to make privkey for %s: %v",
+				t.Errorf("failed to make privKey for %s: %v",
 					msg, err)
 				break
 			}
@@ -3508,7 +3508,7 @@ func TestSignTxOutput(t *testing.T) {
 			key, err := ecdsa.GenerateKey(btcec.S256(),
 				rand.Reader)
 			if err != nil {
-				t.Errorf("failed to make privkey for %s: %v",
+				t.Errorf("failed to make privKey for %s: %v",
 					msg, err)
 				break
 			}
@@ -3570,7 +3570,7 @@ func TestSignTxOutput(t *testing.T) {
 			key, err := ecdsa.GenerateKey(btcec.S256(),
 				rand.Reader)
 			if err != nil {
-				t.Errorf("failed to make privkey for %s: %v",
+				t.Errorf("failed to make privKey for %s: %v",
 					msg, err)
 				break
 			}
@@ -3609,7 +3609,7 @@ func TestSignTxOutput(t *testing.T) {
 			key, err := ecdsa.GenerateKey(btcec.S256(),
 				rand.Reader)
 			if err != nil {
-				t.Errorf("failed to make privkey for %s: %v",
+				t.Errorf("failed to make privKey for %s: %v",
 					msg, err)
 				break
 			}
@@ -3671,7 +3671,7 @@ func TestSignTxOutput(t *testing.T) {
 			key, err := ecdsa.GenerateKey(btcec.S256(),
 				rand.Reader)
 			if err != nil {
-				t.Errorf("failed to make privkey for %s: %v",
+				t.Errorf("failed to make privKey for %s: %v",
 					msg, err)
 				break
 			}
@@ -3710,7 +3710,7 @@ func TestSignTxOutput(t *testing.T) {
 			key, err := ecdsa.GenerateKey(btcec.S256(),
 				rand.Reader)
 			if err != nil {
-				t.Errorf("failed to make privkey for %s: %v",
+				t.Errorf("failed to make privKey for %s: %v",
 					msg, err)
 				break
 			}
@@ -3772,7 +3772,7 @@ func TestSignTxOutput(t *testing.T) {
 			key, err := ecdsa.GenerateKey(btcec.S256(),
 				rand.Reader)
 			if err != nil {
-				t.Errorf("failed to make privkey for %s: %v",
+				t.Errorf("failed to make privKey for %s: %v",
 					msg, err)
 				break
 			}
@@ -3830,7 +3830,7 @@ func TestSignTxOutput(t *testing.T) {
 			key, err := ecdsa.GenerateKey(btcec.S256(),
 				rand.Reader)
 			if err != nil {
-				t.Errorf("failed to make privkey for %s: %v",
+				t.Errorf("failed to make privKey for %s: %v",
 					msg, err)
 				break
 			}
@@ -3913,7 +3913,7 @@ func TestSignTxOutput(t *testing.T) {
 			key, err := ecdsa.GenerateKey(btcec.S256(),
 				rand.Reader)
 			if err != nil {
-				t.Errorf("failed to make privkey for %s: %v",
+				t.Errorf("failed to make privKey for %s: %v",
 					msg, err)
 				break
 			}
@@ -3971,7 +3971,7 @@ func TestSignTxOutput(t *testing.T) {
 			key, err := ecdsa.GenerateKey(btcec.S256(),
 				rand.Reader)
 			if err != nil {
-				t.Errorf("failed to make privkey for %s: %v",
+				t.Errorf("failed to make privKey for %s: %v",
 					msg, err)
 				break
 			}
@@ -4053,7 +4053,7 @@ func TestSignTxOutput(t *testing.T) {
 			key, err := ecdsa.GenerateKey(btcec.S256(),
 				rand.Reader)
 			if err != nil {
-				t.Errorf("failed to make privkey for %s: %v",
+				t.Errorf("failed to make privKey for %s: %v",
 					msg, err)
 				break
 			}
@@ -4111,7 +4111,7 @@ func TestSignTxOutput(t *testing.T) {
 			key, err := ecdsa.GenerateKey(btcec.S256(),
 				rand.Reader)
 			if err != nil {
-				t.Errorf("failed to make privkey for %s: %v",
+				t.Errorf("failed to make privKey for %s: %v",
 					msg, err)
 				break
 			}
@@ -4193,7 +4193,7 @@ func TestSignTxOutput(t *testing.T) {
 			key, err := ecdsa.GenerateKey(btcec.S256(),
 				rand.Reader)
 			if err != nil {
-				t.Errorf("failed to make privkey for %s: %v",
+				t.Errorf("failed to make privKey for %s: %v",
 					msg, err)
 				break
 			}
@@ -4251,7 +4251,7 @@ func TestSignTxOutput(t *testing.T) {
 			key, err := ecdsa.GenerateKey(btcec.S256(),
 				rand.Reader)
 			if err != nil {
-				t.Errorf("failed to make privkey for %s: %v",
+				t.Errorf("failed to make privKey for %s: %v",
 					msg, err)
 				break
 			}
@@ -4333,7 +4333,7 @@ func TestSignTxOutput(t *testing.T) {
 			key1, err := ecdsa.GenerateKey(btcec.S256(),
 				rand.Reader)
 			if err != nil {
-				t.Errorf("failed to make privkey for %s: %v",
+				t.Errorf("failed to make privKey for %s: %v",
 					msg, err)
 				break
 			}
@@ -4351,7 +4351,7 @@ func TestSignTxOutput(t *testing.T) {
 			key2, err := ecdsa.GenerateKey(btcec.S256(),
 				rand.Reader)
 			if err != nil {
-				t.Errorf("failed to make privkey 2 for %s: %v",
+				t.Errorf("failed to make privKey 2 for %s: %v",
 					msg, err)
 				break
 			}
@@ -4412,7 +4412,7 @@ func TestSignTxOutput(t *testing.T) {
 			key1, err := ecdsa.GenerateKey(btcec.S256(),
 				rand.Reader)
 			if err != nil {
-				t.Errorf("failed to make privkey for %s: %v",
+				t.Errorf("failed to make privKey for %s: %v",
 					msg, err)
 				break
 			}
@@ -4430,7 +4430,7 @@ func TestSignTxOutput(t *testing.T) {
 			key2, err := ecdsa.GenerateKey(btcec.S256(),
 				rand.Reader)
 			if err != nil {
-				t.Errorf("failed to make privkey 2 for %s: %v",
+				t.Errorf("failed to make privKey 2 for %s: %v",
 					msg, err)
 				break
 			}
@@ -4521,7 +4521,7 @@ func TestSignTxOutput(t *testing.T) {
 			key1, err := ecdsa.GenerateKey(btcec.S256(),
 				rand.Reader)
 			if err != nil {
-				t.Errorf("failed to make privkey for %s: %v",
+				t.Errorf("failed to make privKey for %s: %v",
 					msg, err)
 				break
 			}
@@ -4539,7 +4539,7 @@ func TestSignTxOutput(t *testing.T) {
 			key2, err := ecdsa.GenerateKey(btcec.S256(),
 				rand.Reader)
 			if err != nil {
-				t.Errorf("failed to make privkey 2 for %s: %v",
+				t.Errorf("failed to make privKey 2 for %s: %v",
 					msg, err)
 				break
 			}

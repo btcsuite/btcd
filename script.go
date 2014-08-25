@@ -1137,8 +1137,8 @@ func signTxOutputCustomReader(reader io.Reader, tx *btcwire.MsgTx, idx int,
 	return append((&btcec.Signature{R: r, S: s}).Serialize(), hashType), nil
 }
 
-func p2pkSignatureScript(tx *btcwire.MsgTx, idx int, subScript []byte, hashType byte, privkey *ecdsa.PrivateKey) ([]byte, error) {
-	sig, err := signTxOutput(tx, idx, subScript, hashType, privkey)
+func p2pkSignatureScript(tx *btcwire.MsgTx, idx int, subScript []byte, hashType byte, privKey *ecdsa.PrivateKey) ([]byte, error) {
+	sig, err := signTxOutput(tx, idx, subScript, hashType, privKey)
 	if err != nil {
 		return nil, err
 	}
