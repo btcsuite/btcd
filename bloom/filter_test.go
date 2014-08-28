@@ -29,13 +29,13 @@ func TestFilterLoad(t *testing.T) {
 
 	f := bloom.LoadFilter(&merkle)
 	if !f.IsLoaded() {
-		t.Errorf("TestFilterLoad IsLoaded test failed: want %d got %d",
+		t.Errorf("TestFilterLoad IsLoaded test failed: want %v got %v",
 			true, !f.IsLoaded())
 		return
 	}
 	f.Unload()
 	if f.IsLoaded() {
-		t.Errorf("TestFilterLoad IsLoaded test failed: want %d got %d",
+		t.Errorf("TestFilterLoad IsLoaded test failed: want %v got %v",
 			f.IsLoaded(), false)
 		return
 	}
