@@ -401,7 +401,7 @@ func (a *AddrManager) savePeers() {
 
 	w, err := os.Create(a.peersFile)
 	if err != nil {
-		log.Error("Error opening file %s: %v", a.peersFile, err)
+		log.Errorf("Error opening file %s: %v", a.peersFile, err)
 		return
 	}
 	enc := json.NewEncoder(w)
