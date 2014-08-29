@@ -77,6 +77,7 @@ var commandHandlers = map[string]*handlerData{
 	"getmininginfo":         {0, 0, displayJSONDump, nil, makeGetMiningInfo, ""},
 	"getnetworkhashps":      {0, 2, displayGeneric, []conversionHandler{toInt, toInt}, makeGetNetworkHashPS, "[blocks height]"},
 	"getnettotals":          {0, 0, displayJSONDump, nil, makeGetNetTotals, ""},
+	"getnetworkinfo":        {0, 0, displayJSONDump, nil, makeGetNetworkInfo, ""},
 	"getnewaddress":         {0, 1, displayGeneric, nil, makeGetNewAddress, "[account]"},
 	"getpeerinfo":           {0, 0, displayJSONDump, nil, makeGetPeerInfo, ""},
 	"getrawchangeaddress":   {0, 0, displayGeneric, nil, makeGetRawChangeAddress, ""},
@@ -450,6 +451,11 @@ func makeGetNetworkHashPS(args []interface{}) (btcjson.Cmd, error) {
 	}
 
 	return cmd, nil
+}
+
+// makeGetNetworkInfo generates the cmd structure for getnetworkinfo commands.
+func makeGetNetworkInfo(args []interface{}) (btcjson.Cmd, error) {
+	return btcjson.NewGetNetworkInfoCmd("btcctl")
 }
 
 // makeGetNetTotals generates the cmd structure for getnettotals commands.
