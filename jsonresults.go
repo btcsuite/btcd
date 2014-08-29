@@ -131,7 +131,7 @@ type GetNetworkInfoResult struct {
 	ProtocolVersion int32                  `json:"protocolversion"`
 	TimeOffset      int64                  `json:"timeoffset"`
 	Connections     int32                  `json:"connections"`
-	Proxy           string                 `json:"proxy,omitempty"`
+	Networks        []NetworksResult       `json:"networks"`
 	RelayFee        float64                `json:"relayfee"`
 	LocalAddresses  []LocalAddressesResult `json:"localaddresses"`
 }
@@ -380,6 +380,14 @@ type ListUnspentResult struct {
 	RedeemScript  string  `json:"redeemScript,omitempty"`
 	Amount        float64 `json:"amount"`
 	Confirmations int64   `json:"confirmations"`
+}
+
+// NetworksResult models the networks data from the getnetworkinfo command.
+type NetworksResult struct {
+	Name      string `json:"name"`
+	Limited   bool   `json:"limited"`
+	Reachable bool   `json:"reachable"`
+	Proxy     string `json:"proxy"`
 }
 
 // SignRawTransactionResult models the data from the signrawtransaction
