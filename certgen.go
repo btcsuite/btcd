@@ -77,7 +77,7 @@ func NewTLSCertPair(organization string, validUntil time.Time, extraHosts []stri
 		"localhost": true,
 	}
 
-	addrs, err := net.InterfaceAddrs()
+	addrs, err := interfaceAddrs()
 	if err != nil {
 		return nil, nil, err
 	}
