@@ -18,7 +18,6 @@ import (
 	"github.com/conformal/btcnet"
 	"github.com/conformal/btcutil"
 	"github.com/conformal/btcwire"
-	"github.com/davecgh/go-spew/spew"
 )
 
 var (
@@ -589,10 +588,10 @@ func (s *Script) Execute() (err error) {
 
 			// if we're tracing, dump the stacks.
 			if s.dstack.Depth() != 0 {
-				dstr = "Stack\n" + spew.Sdump(s.dstack)
+				dstr = "Stack:\n" + s.dstack.String()
 			}
 			if s.astack.Depth() != 0 {
-				astr = "AltStack\n" + spew.Sdump(s.astack)
+				astr = "AltStack:\n" + s.astack.String()
 			}
 
 			return dstr + astr

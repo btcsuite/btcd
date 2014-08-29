@@ -9,6 +9,7 @@ import (
 	"crypto/ecdsa"
 	"crypto/sha1"
 	"encoding/binary"
+	"encoding/hex"
 	"fmt"
 	"hash"
 	"math/big"
@@ -17,7 +18,6 @@ import (
 	"github.com/conformal/btcec"
 	"github.com/conformal/btcwire"
 	"github.com/conformal/fastsha256"
-	"github.com/davecgh/go-spew/spew"
 )
 
 // An opcode defines the information related to a btcscript opcode.
@@ -1802,10 +1802,15 @@ func opcodeCheckSig(op *parsedOpcode, s *Script) error {
 	}
 
 	log.Tracef("%v", newLogClosure(func() string {
-		return fmt.Sprintf("op_checksig pubKey %v\npk.x: %v\n "+
-			"pk.y: %v\n r: %v\n s: %v\ncheckScriptHash  %v",
-			spew.Sdump(pkStr), pubKey.X, pubKey.Y,
-			signature.R, signature.S, spew.Sdump(hash))
+		return fmt.Sprintf("op_checksig\n"+
+			"pubKey:\n%v"+
+			"pubKey.X: %v\n"+
+			"pubKey.Y: %v\n"+
+			"signature.R: %v\n"+
+			"signature.S: %v\n"+
+			"checkScriptHash:\n%v",
+			hex.Dump(pkStr), pubKey.X, pubKey.Y,
+			signature.R, signature.S, hex.Dump(hash))
 	}))
 	ok := ecdsa.Verify(pubKey.ToECDSA(), hash, signature.R, signature.S)
 	s.dstack.PushBool(ok)

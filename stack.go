@@ -5,6 +5,7 @@
 package btcscript
 
 import (
+	"encoding/hex"
 	"math/big"
 )
 
@@ -354,4 +355,15 @@ func (s *Stack) RollN(n int) error {
 	s.PushByteArray(so)
 
 	return nil
+}
+
+// String returns the stack in a readable format.
+func (s *Stack) String() string {
+	var result string
+
+	for _, stack := range s.stk {
+		result += hex.Dump(stack)
+	}
+
+	return result
 }

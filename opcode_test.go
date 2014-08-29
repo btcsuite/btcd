@@ -10,7 +10,6 @@ import (
 
 	"github.com/conformal/btcscript"
 	"github.com/conformal/btcwire"
-	"github.com/davecgh/go-spew/spew"
 )
 
 // test scripts to test as many opcodes as possible.
@@ -4364,14 +4363,13 @@ func testOpcode(t *testing.T, test *detailedTest) {
 
 	after := engine.GetStack()
 	if !stacksEqual(after, test.after) {
-		t.Errorf("Stacks not equal after %s:\ngot: %v\n exp: %v",
-			test.name, spew.Sdump(after), spew.Sdump(test.after))
+		t.Errorf("Stacks not equal after %s:\ngot:\n%vexp:\n%v",
+			test.name, after, test.after)
 	}
 	altafter := engine.GetAltStack()
 	if !stacksEqual(altafter, test.altafter) {
-		t.Errorf("AltStacks not equal after %s:\n got: %v\nexp: %v",
-			test.name, spew.Sdump(altafter),
-			spew.Sdump(test.altafter))
+		t.Errorf("AltStacks not equal after %s:\n got:\n%vexp:\n%v",
+			test.name, altafter, test.altafter)
 	}
 }
 
