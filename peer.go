@@ -1092,7 +1092,7 @@ func (p *peer) handleFilterLoadMsg(msg *btcwire.MsgFilterLoad) {
 	p.disableRelayTx = false
 	p.relayMtx.Unlock()
 
-	p.filter = bloom.LoadFilter(msg)
+	p.filter.Reload(msg)
 }
 
 // handleGetAddrMsg is invoked when a peer receives a getaddr bitcoin message
