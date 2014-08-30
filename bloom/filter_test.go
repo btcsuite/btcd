@@ -582,3 +582,18 @@ func TestFilterInsertP2PubKeyOnly(t *testing.T) {
 		return
 	}
 }
+
+func TestFilterReload(t *testing.T) {
+	f := bloom.NewFilter(10, 0, 0.000001, btcwire.BloomUpdateAll)
+
+	bFilter := bloom.LoadFilter(f.MsgFilterLoad())
+	if bFilter.MsgFilterLoad() == nil {
+		t.Errorf("TestFilterReload LoadFilter test failed")
+		return
+	}
+	bFilter.Reload(nil)
+
+	if bFilter.MsgFilterLoad() != nil {
+		t.Errorf("TestFilterReload Reload test failed")
+	}
+}

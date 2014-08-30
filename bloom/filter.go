@@ -93,7 +93,17 @@ func (bf *Filter) IsLoaded() bool {
 	return bf.msgFilterLoad != nil
 }
 
-// Unload clears the bloom filter.
+// Reload loads a new filter replacing any existing filter.
+//
+// This function is safe for concurrent access.
+func (bf *Filter) Reload(filter *btcwire.MsgFilterLoad) {
+	bf.Lock()
+	defer bf.Unlock()
+
+	bf.msgFilterLoad = filter
+}
+
+// Unload unloads the bloom filter.
 //
 // This function is safe for concurrent access.
 func (bf *Filter) Unload() {
