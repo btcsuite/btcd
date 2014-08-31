@@ -116,7 +116,7 @@ func loadConfig() (*flags.Parser, *config, []string, error) {
 	// here since they will be caught be the final parse below.
 	preCfg := cfg
 	preParser := flags.NewParser(&preCfg, flags.None)
-	preParser.Parse()
+	_, _ = preParser.Parse()
 
 	// Show the version and exit if the version flag was specified.
 	if preCfg.ShowVersion {
