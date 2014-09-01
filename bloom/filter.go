@@ -29,7 +29,7 @@ func minUint32(a, b uint32) uint32 {
 // Filter defines a bitcoin bloom filter that provides easy manipulation of raw
 // filter data.
 type Filter struct {
-	sync.Mutex
+	mtx           sync.Mutex
 	msgFilterLoad *btcwire.MsgFilterLoad
 }
 
@@ -87,30 +87,28 @@ func LoadFilter(filter *btcwire.MsgFilterLoad) *Filter {
 //
 // This function is safe for concurrent access.
 func (bf *Filter) IsLoaded() bool {
-	bf.Lock()
-	defer bf.Unlock()
-
-	return bf.msgFilterLoad != nil
+	bf.mtx.Lock()
+	loaded := bf.msgFilterLoad != nil
+	bf.mtx.Unlock()
+	return loaded
 }
 
 // Reload loads a new filter replacing any existing filter.
 //
 // This function is safe for concurrent access.
 func (bf *Filter) Reload(filter *btcwire.MsgFilterLoad) {
-	bf.Lock()
-	defer bf.Unlock()
-
+	bf.mtx.Lock()
 	bf.msgFilterLoad = filter
+	bf.mtx.Unlock()
 }
 
 // Unload unloads the bloom filter.
 //
 // This function is safe for concurrent access.
 func (bf *Filter) Unload() {
-	bf.Lock()
-	defer bf.Unlock()
-
+	bf.mtx.Lock()
 	bf.msgFilterLoad = nil
+	bf.mtx.Unlock()
 }
 
 // hash returns the bit offset in the bloom filter which corresponds to the
@@ -156,10 +154,10 @@ func (bf *Filter) matches(data []byte) bool {
 //
 // This function is safe for concurrent access.
 func (bf *Filter) Matches(data []byte) bool {
-	bf.Lock()
-	defer bf.Unlock()
-
-	return bf.matches(data)
+	bf.mtx.Lock()
+	match := bf.matches(data)
+	bf.mtx.Unlock()
+	return match
 }
 
 // matchesOutPoint returns true if the bloom filter might contain the passed
@@ -180,10 +178,10 @@ func (bf *Filter) matchesOutPoint(outpoint *btcwire.OutPoint) bool {
 //
 // This function is safe for concurrent access.
 func (bf *Filter) MatchesOutPoint(outpoint *btcwire.OutPoint) bool {
-	bf.Lock()
-	defer bf.Unlock()
-
-	return bf.matchesOutPoint(outpoint)
+	bf.mtx.Lock()
+	match := bf.matchesOutPoint(outpoint)
+	bf.mtx.Unlock()
+	return match
 }
 
 // add adds the passed byte slice to the bloom filter.
@@ -211,20 +209,18 @@ func (bf *Filter) add(data []byte) {
 //
 // This function is safe for concurrent access.
 func (bf *Filter) Add(data []byte) {
-	bf.Lock()
-	defer bf.Unlock()
-
+	bf.mtx.Lock()
 	bf.add(data)
+	bf.mtx.Unlock()
 }
 
 // AddShaHash adds the passed btcwire.ShaHash to the Filter.
 //
 // This function is safe for concurrent access.
 func (bf *Filter) AddShaHash(sha *btcwire.ShaHash) {
-	bf.Lock()
-	defer bf.Unlock()
-
+	bf.mtx.Lock()
 	bf.add(sha.Bytes())
+	bf.mtx.Unlock()
 }
 
 // addOutPoint adds the passed transaction outpoint to the bloom filter.
@@ -243,10 +239,9 @@ func (bf *Filter) addOutPoint(outpoint *btcwire.OutPoint) {
 //
 // This function is safe for concurrent access.
 func (bf *Filter) AddOutPoint(outpoint *btcwire.OutPoint) {
-	bf.Lock()
-	defer bf.Unlock()
-
+	bf.mtx.Lock()
 	bf.addOutPoint(outpoint)
+	bf.mtx.Unlock()
 }
 
 // maybeAddOutpoint potentially adds the passed outpoint to the bloom filter
@@ -340,10 +335,10 @@ func (bf *Filter) matchTxAndUpdate(tx *btcutil.Tx) bool {
 //
 // This function is safe for concurrent access.
 func (bf *Filter) MatchTxAndUpdate(tx *btcutil.Tx) bool {
-	bf.Lock()
-	defer bf.Unlock()
-
-	return bf.matchTxAndUpdate(tx)
+	bf.mtx.Lock()
+	match := bf.matchTxAndUpdate(tx)
+	bf.mtx.Unlock()
+	return match
 }
 
 // MsgFilterLoad returns the underlying btcwire.MsgFilterLoad for the bloom
@@ -351,8 +346,8 @@ func (bf *Filter) MatchTxAndUpdate(tx *btcutil.Tx) bool {
 //
 // This function is safe for concurrent access.
 func (bf *Filter) MsgFilterLoad() *btcwire.MsgFilterLoad {
-	bf.Lock()
-	defer bf.Unlock()
-
-	return bf.msgFilterLoad
+	bf.mtx.Lock()
+	msg := bf.msgFilterLoad
+	bf.mtx.Unlock()
+	return msg
 }
