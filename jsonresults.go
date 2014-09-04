@@ -358,10 +358,12 @@ type ListReceivedByAccountResult struct {
 // ListReceivedByAddressResult models the data from the listreceivedbyaddress
 // command.
 type ListReceivedByAddressResult struct {
-	Account       string  `json:"account"`
-	Address       string  `json:"address"`
-	Amount        float64 `json:"amount"`
-	Confirmations uint64  `json:"confirmations"`
+	Account           string   `json:"account"`
+	Address           string   `json:"address"`
+	Amount            float64  `json:"amount"`
+	Confirmations     uint64   `json:"confirmations"`
+	Tx                []string `json:"tx,omitempty"`
+	InvolvesWatchonly bool     `json:"involvesWatchonly,omitempty"`
 }
 
 // ListSinceBlockResult models the data from the listsinceblock command.
