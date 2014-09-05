@@ -42,16 +42,16 @@ func TestJsonWithArgs(t *testing.T) {
 	return
 }
 
-// TestJsonRpcSend tests jsonRpcSend which actually send the rpc command.
+// TestJsonRPCSend tests jsonRPCSend which actually send the rpc command.
 // This currently a negative test only until we setup a fake http server to
 // test the actually connection code.
-func TestJsonRpcSend(t *testing.T) {
+func TestJsonRPCSend(t *testing.T) {
 	// Just negative test right now.
 	user := "something"
 	password := "something"
 	server := "invalid"
 	var message []byte
-	_, err := jsonRpcSend(user, password, server, message, false, nil, false)
+	_, err := jsonRPCSend(user, password, server, message, false, nil, false)
 	if err == nil {
 		t.Errorf("Should fail when it cannot connect.")
 	}

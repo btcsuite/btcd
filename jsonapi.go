@@ -705,7 +705,7 @@ func rpcRawCommand(user string, password string, server string,
 		err := fmt.Errorf("error, message does not appear to be valid json: %v", err)
 		return result, err
 	}
-	resp, err := jsonRpcSend(user, password, server, message, https,
+	resp, err := jsonRPCSend(user, password, server, message, https,
 		certificates, skipverify)
 	if err != nil {
 		err := fmt.Errorf("error sending json message: " + err.Error())

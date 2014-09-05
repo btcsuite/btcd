@@ -6,6 +6,7 @@ package btcjson
 
 import (
 	"bytes"
+	// Need to import this size it registers hash we need.
 	_ "crypto/sha512"
 	"crypto/tls"
 	"crypto/x509"
@@ -31,11 +32,11 @@ func MarshallAndSend(rawReply Reply, w io.Writer) (string, error) {
 	return msg, nil
 }
 
-// jsonRpcSend connects to the daemon with the specified username, password,
+// jsonRPCSend connects to the daemon with the specified username, password,
 // and ip/port and then send the supplied message.  This uses net/http rather
 // than net/rpc/jsonrpc since that one doesn't support http connections and is
 // therefore useless.
-func jsonRpcSend(user string, password string, server string, message []byte,
+func jsonRPCSend(user string, password string, server string, message []byte,
 	https bool, certificates []byte, skipverify bool) (*http.Response, error) {
 	client := &http.Client{}
 	protocol := "http"
