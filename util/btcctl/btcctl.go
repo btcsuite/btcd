@@ -250,10 +250,19 @@ func makeCreateRawTransaction(args []interface{}) (btcjson.Cmd, error) {
 		return nil, err
 	}
 
-	var amounts map[string]int64
-	err = json.Unmarshal([]byte(args[1].(string)), &amounts)
+	var famounts map[string]float64
+	err = json.Unmarshal([]byte(args[1].(string)), &famounts)
 	if err != nil {
 		return nil, err
+	}
+
+	amounts := make(map[string]int64, len(famounts))
+	for k, v := range famounts {
+		amt, err := btcutil.NewAmount(v)
+		if err != nil {
+			return nil, err
+		}
+		amounts[k] = int64(amt)
 	}
 
 	return btcjson.NewCreateRawTransactionCmd("btcctl", inputs, amounts)
