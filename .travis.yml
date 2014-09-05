@@ -1,3 +1,11 @@
 language: go
 go: release
-install: go get -d -t -v ./...
+install:
+- go get code.google.com/p/go.tools/cmd/vet
+- go get github.com/GeertJohan/fgt
+- go get github.com/golang/lint/golint
+- go get -d -t -v ./...
+script:
+- $HOME/gopath/bin/fgt $HOME/gopath/bin/golint -min_confidence=0.9 *.go
+- go vet *.go
+- go test -v ./...
