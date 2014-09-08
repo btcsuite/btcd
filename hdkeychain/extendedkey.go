@@ -424,7 +424,7 @@ func (k *ExtendedKey) Zero() {
 	zero(k.pubKey)
 	zero(k.chainCode)
 	zero(k.parentFP)
-	zero(k.version)
+	k.version = nil
 	k.key = nil
 	k.depth = 0
 	k.childNum = 0
