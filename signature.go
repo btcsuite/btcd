@@ -283,7 +283,7 @@ func recoverKeyFromSignature(curve *KoblitzCurve, sig *Signature, msg []byte,
 	if doChecks {
 		nRx, nRy := curve.ScalarMult(Rx, Ry, curve.Params().N.Bytes())
 		if nRx.Sign() != 0 || nRy.Sign() != 0 {
-			return nil, errors.New("R*n does not equal the point at infinity")
+			return nil, errors.New("n*R does not equal the point at infinity")
 		}
 	}
 
