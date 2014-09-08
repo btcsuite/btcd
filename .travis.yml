@@ -5,12 +5,10 @@ go:
 install:
   - go get -d -t -v ./...
   - go get -v code.google.com/p/go.tools/cmd/cover
-  - go get code.google.com/p/go.tools/cmd/vet
   - go get github.com/GeertJohan/fgt
   - go get github.com/golang/lint/golint
 script:
   - export PATH=$PATH:$HOME/gopath/bin
-  - go vet *.go
   - fgt golint *.go
   - go test -v -covermode=count -coverprofile=profile.cov
 after_success:
