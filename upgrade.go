@@ -61,7 +61,7 @@ func upgradeDBPathNet(oldDbPath, netName string) error {
 		}
 
 		// The new database name is based on the database type and
-		// resides in the a directory named after the network type.
+		// resides in a directory named after the network type.
 		newDbRoot := filepath.Join(filepath.Dir(cfg.DataDir), netName)
 		newDbName := blockDbNamePrefix + "_" + oldDbType
 		if oldDbType == "sqlite" {
@@ -91,7 +91,7 @@ func upgradeDBPaths() error {
 	// Prior to version 0.2.0, the databases were in the "db" directory and
 	// their names were suffixed by "testnet" and "regtest" for their
 	// respective networks.  Check for the old database and update it to the
-	// new path introduced with version 0.2.0 accodingly.
+	// new path introduced with version 0.2.0 accordingly.
 	oldDbRoot := filepath.Join(oldBtcdHomeDir(), "db")
 	upgradeDBPathNet(filepath.Join(oldDbRoot, "btcd.db"), "mainnet")
 	upgradeDBPathNet(filepath.Join(oldDbRoot, "btcd_testnet.db"), "testnet")

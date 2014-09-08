@@ -466,7 +466,7 @@ func (m *wsNotificationManager) UnregisterNewMempoolTxsUpdates(wsc *wsClient) {
 	m.queueNotification <- (*notificationUnregisterNewMempoolTxs)(wsc)
 }
 
-// notifyForNewTx notifies websocket clients that have registerd for updates
+// notifyForNewTx notifies websocket clients that have registered for updates
 // when a new transaction is added to the memory pool.
 func (m *wsNotificationManager) notifyForNewTx(clients map[chan struct{}]*wsClient, tx *btcutil.Tx) {
 	txShaStr := tx.Sha().String()
@@ -821,7 +821,7 @@ func newWsNotificationManager(server *rpcServer) *wsNotificationManager {
 	}
 }
 
-// wsResponse houses a message to send to the a connected websocket client as
+// wsResponse houses a message to send to a connected websocket client as
 // well as a channel to reply on when the message is sent.
 type wsResponse struct {
 	msg      []byte
