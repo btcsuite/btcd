@@ -109,7 +109,7 @@ type processBlockResponse struct {
 
 // processBlockMsg is a message type to be sent across the message channel
 // for requested a block is processed.  Note this call differs from blockMsg
-// above in that blockMsg is intended for blocks that can from peers and have
+// above in that blockMsg is intended for blocks that came from peers and have
 // extra handling whereas this message essentially is just a concurrent safe
 // way to call ProcessBlock on the internal block chain instance.
 type processBlockMsg struct {

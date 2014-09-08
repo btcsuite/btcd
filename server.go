@@ -540,7 +540,7 @@ func (s *server) seedFromDNS() {
 
 // peerHandler is used to handle peer operations such as adding and removing
 // peers to and from the server, banning peers, and broadcasting messages to
-// peers.  It must be run a a goroutine.
+// peers.  It must be run in a goroutine.
 func (s *server) peerHandler() {
 	// Start the address manager and block manager, both of which are needed
 	// by peers.  This is done here since their lifecycle is closely tied

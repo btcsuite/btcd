@@ -116,7 +116,7 @@ func newNetAddress(addr net.Addr, services btcwire.ServiceFlag) (*btcwire.NetAdd
 }
 
 // outMsg is used to house a message to be sent along with a channel to signal
-// when the message has been sent (or won't be sent due to tings such as
+// when the message has been sent (or won't be sent due to things such as
 // shutdown)
 type outMsg struct {
 	msg      btcwire.Message
@@ -127,7 +127,7 @@ type outMsg struct {
 // overall data flow is split into 3 goroutines and a separate block manager.
 // Inbound messages are read via the inHandler goroutine and generally
 // dispatched to their own handler.  For inbound data-related messages such as
-// blocks, transactions, and inventory, the data is pased on to the block
+// blocks, transactions, and inventory, the data is passed on to the block
 // manager to handle it.  Outbound messages are queued via QueueMessage or
 // QueueInventory.  QueueMessage is intended for all messages, including
 // responses to data such as blocks and transactions.  QueueInventory, on the
@@ -527,7 +527,7 @@ func (p *peer) pushBlockMsg(sha *btcwire.ShaHash, doneChan, waitChan chan struct
 
 // pushMerkleBlockMsg sends a merkleblock message for the provided block hash to
 // the connected peer.  Since a merkle block requires the peer to have a filter
-// loaded, this call will simply be ignored if there is no filter laoded.  An
+// loaded, this call will simply be ignored if there is no filter loaded.  An
 // error is returned if the block hash is not known.
 func (p *peer) pushMerkleBlockMsg(sha *btcwire.ShaHash, doneChan, waitChan chan struct{}) error {
 	// Do not send a response if the peer doesn't have a filter loaded.
@@ -1055,7 +1055,7 @@ func (p *peer) handleGetHeadersMsg(msg *btcwire.MsgGetHeaders) {
 
 // handleFilterAddMsg is invoked when a peer receives a filteradd bitcoin
 // message and is used by remote peers to add data to an already loaded bloom
-// filter.  The peer will be disonnected if a filter is not loaded when this
+// filter.  The peer will be disconnected if a filter is not loaded when this
 // message is received.
 func (p *peer) handleFilterAddMsg(msg *btcwire.MsgFilterAdd) {
 	if !p.filter.IsLoaded() {
@@ -1070,7 +1070,7 @@ func (p *peer) handleFilterAddMsg(msg *btcwire.MsgFilterAdd) {
 
 // handleFilterClearMsg is invoked when a peer receives a filterclear bitcoin
 // message and is used by remote peers to clear an already loaded bloom filter.
-// The peer will be disonnected if a filter is not loaded when this message is
+// The peer will be disconnected if a filter is not loaded when this message is
 // received.
 func (p *peer) handleFilterClearMsg(msg *btcwire.MsgFilterClear) {
 	if !p.filter.IsLoaded() {

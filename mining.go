@@ -68,7 +68,7 @@ type txPrioItem struct {
 }
 
 // txPriorityQueueLessFunc describes a function that can be used as a compare
-// function for a transation priority queue (txPriorityQueue).
+// function for a transaction priority queue (txPriorityQueue).
 type txPriorityQueueLessFunc func(*txPriorityQueue, int, int) bool
 
 // txPriorityQueue implements a priority queue of txPrioItem elements that

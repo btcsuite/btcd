@@ -12,7 +12,7 @@ import (
 )
 
 var (
-	// rfc1918Nets specifies the IPv4 private adddress blocks as defined by
+	// rfc1918Nets specifies the IPv4 private address blocks as defined by
 	// by RFC1918 (10.0.0.0/8, 172.16.0.0/12, and 192.168.0.0/16).
 	rfc1918Nets = []net.IPNet{
 		ipNet("10.0.0.0", 8, 32),

@@ -70,7 +70,7 @@ type localAddress struct {
 	score AddressPriority
 }
 
-// AddressPriority type is used to describe the heirarchy of local address
+// AddressPriority type is used to describe the hierarchy of local address
 // discovery methods.
 type AddressPriority int
 
@@ -78,7 +78,7 @@ const (
 	// InterfacePrio signifies the address is on a local interface
 	InterfacePrio AddressPriority = iota
 
-	// BoundPrio signifies the address has been explicity bounded to.
+	// BoundPrio signifies the address has been explicitly bounded to.
 	BoundPrio
 
 	// UpnpPrio signifies the address was obtained from UPnP.
@@ -114,11 +114,11 @@ const (
 	// bucket.
 	newBucketSize = 64
 
-	// newBucketCount is the number of buckets taht we spread new addresses
+	// newBucketCount is the number of buckets that we spread new addresses
 	// over.
 	newBucketCount = 256
 
-	// triedBucketsPerGroup is the number of trieed buckets over which an
+	// triedBucketsPerGroup is the number of tried buckets over which an
 	// address group will be spread.
 	triedBucketsPerGroup = 4
 
@@ -171,7 +171,7 @@ func (a *AddrManager) updateAddress(netAddr, srcAddr *btcwire.NetAddress) {
 	addr := NetAddressKey(netAddr)
 	ka := a.find(netAddr)
 	if ka != nil {
-		// TODO(oga) only update adresses periodically.
+		// TODO(oga) only update addresses periodically.
 		// Update the last seen time and services.
 		// note that to prevent causing excess garbage on getaddr
 		// messages the netaddresses in addrmaanger are *immutable*,
@@ -198,7 +198,7 @@ func (a *AddrManager) updateAddress(netAddr, srcAddr *btcwire.NetAddress) {
 		}
 
 		// The more entries we have, the less likely we are to add more.
-		// likelyhood is 2N.
+		// likelihood is 2N.
 		factor := int32(2 * ka.refs)
 		if a.rand.Int31n(factor) != 0 {
 			return
@@ -294,7 +294,7 @@ func (a *AddrManager) pickTried(bucket int) *list.Element {
 
 func (a *AddrManager) getNewBucket(netAddr, srcAddr *btcwire.NetAddress) int {
 	// bitcoind:
-	// doublesha256(key + sourcegroup + int64(doublesha256(key + group + sourcegroup))%bucket_per_source_group) % num_new_buckes
+	// doublesha256(key + sourcegroup + int64(doublesha256(key + group + sourcegroup))%bucket_per_source_group) % num_new_buckets
 
 	data1 := []byte{}
 	data1 = append(data1, a.key[:]...)
@@ -718,7 +718,7 @@ func (a *AddrManager) HostToNetAddress(host string, port uint16, services btcwir
 
 // ipString returns a string for the ip from the provided NetAddress. If the
 // ip is in the range used for tor addresses then it will be transformed into
-// the relavent .onion address.
+// the relevant .onion address.
 func ipString(na *btcwire.NetAddress) string {
 	if IsOnionCatTor(na) {
 		// We know now that na.IP is long enogh.
@@ -865,7 +865,7 @@ func (a *AddrManager) Connected(addr *btcwire.NetAddress) {
 }
 
 // Good marks the given address as good.  To be called after a successful
-// connection and version exchange.  If the address is unknown to the addresss
+// connection and version exchange.  If the address is unknown to the address
 // manager it will be ignored.
 func (a *AddrManager) Good(addr *btcwire.NetAddress) {
 	a.mtx.Lock()

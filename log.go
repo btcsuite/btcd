@@ -218,7 +218,7 @@ func formatLockTime(lockTime uint32) string {
 	return time.Unix(int64(lockTime), 0).String()
 }
 
-// invSummary returns an inventory messege as a human-readable string.
+// invSummary returns an inventory message as a human-readable string.
 func invSummary(invList []*btcwire.InvVect) string {
 	// No inventory.
 	invLen := len(invList)
