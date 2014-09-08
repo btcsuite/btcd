@@ -6,6 +6,7 @@ install:
 - go get github.com/golang/lint/golint
 - go get -d -t -v ./...
 script:
-- $HOME/gopath/bin/fgt $HOME/gopath/bin/golint -min_confidence=0.9 *.go
+- export PATH=$PATH:$HOME/gopath/bin
+- fgt golint -min_confidence=0.9 *.go
 - go vet *.go
 - go test -v ./...
