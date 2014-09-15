@@ -8,7 +8,16 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net/http"
 )
+
+// BadStatusCode describes a HTTP error when a response has non-200 status code
+type BadStatusCode int
+
+func (e BadStatusCode) Error() string {
+	status := int(e)
+	return fmt.Sprintf("http bad status: %d %s", status, http.StatusText(status))
+}
 
 // ErrIncorrectArgTypes describes an error where the wrong argument types
 // are present.
@@ -695,6 +704,9 @@ func rpcRawCommand(user string, password string, server string,
 	if err != nil {
 		err := fmt.Errorf("error sending json message: " + err.Error())
 		return result, err
+	}
+	if resp.StatusCode != http.StatusOK {
+		return nil, BadStatusCode(resp.StatusCode)
 	}
 	result, err = GetRaw(resp.Body)
 	if err != nil {

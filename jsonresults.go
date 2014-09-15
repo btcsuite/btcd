@@ -8,7 +8,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"strings"
 )
 
 // BlockResult models the data from the getblock command when the verbose flag
@@ -446,11 +445,6 @@ func ReadResultCmd(cmd string, message []byte) (Reply, error) {
 	var objmap map[string]json.RawMessage
 	err = json.Unmarshal(message, &objmap)
 	if err != nil {
-		if strings.Contains(string(message), "401 Unauthorized.") {
-			err = fmt.Errorf("authentication error")
-		} else {
-			err = fmt.Errorf("error unmarshalling json reply: %v", err)
-		}
 		return result, err
 	}
 	// Take care of the parts that are the same for all replies.
