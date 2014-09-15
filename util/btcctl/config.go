@@ -7,12 +7,12 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/conformal/btcutil"
 	flags "github.com/conformal/go-flags"
+	"github.com/mably/btcutil"
 )
 
 var (
-	btcdHomeDir           = btcutil.AppDataDir("btcd", false)
+	btcdHomeDir           = btcutil.AppDataDir("ppcd", false)
 	btcctlHomeDir         = btcutil.AppDataDir("btcctl", false)
 	btcwalletHomeDir      = btcutil.AppDataDir("btcwallet", false)
 	defaultConfigFile     = filepath.Join(btcctlHomeDir, "btcctl.conf")

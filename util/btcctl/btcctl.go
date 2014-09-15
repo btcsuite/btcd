@@ -11,10 +11,10 @@ import (
 	"strconv"
 
 	"github.com/conformal/btcjson"
-	"github.com/conformal/btcutil"
-	"github.com/conformal/btcws"
 	flags "github.com/conformal/go-flags"
 	"github.com/davecgh/go-spew/spew"
+	"github.com/mably/btcutil"
+	"github.com/mably/btcws"
 )
 
 // conversionHandler is a handler that is used to convert parameters from the

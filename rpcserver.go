@@ -26,17 +26,17 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/conformal/btcchain"
-	"github.com/conformal/btcdb"
 	"github.com/conformal/btcec"
 	"github.com/conformal/btcjson"
-	"github.com/conformal/btcnet"
-	"github.com/conformal/btcscript"
-	"github.com/conformal/btcutil"
-	"github.com/conformal/btcwire"
-	"github.com/conformal/btcws"
 	"github.com/conformal/fastsha256"
 	"github.com/conformal/websocket"
+	"github.com/mably/btcchain"
+	"github.com/mably/btcdb"
+	"github.com/mably/btcnet"
+	"github.com/mably/btcscript"
+	"github.com/mably/btcutil"
+	"github.com/mably/btcwire"
+	"github.com/mably/btcws"
 )
 
 const (
@@ -2075,7 +2075,7 @@ func handleGetDifficulty(s *rpcServer, cmd btcjson.Cmd, closeChan <-chan struct{
 		rpcsLog.Errorf("Error getting sha: %v", err)
 		return nil, btcjson.ErrDifficulty
 	}
-	blockHeader, err := s.server.db.FetchBlockHeaderBySha(sha)
+	blockHeader, _, err := s.server.db.FetchBlockHeaderBySha(sha)
 	if err != nil {
 		rpcsLog.Errorf("Error getting block: %v", err)
 		return nil, btcjson.ErrDifficulty
@@ -2102,7 +2102,7 @@ func handleGetInfo(s *rpcServer, cmd btcjson.Cmd, closeChan <-chan struct{}) (in
 		rpcsLog.Errorf("Error getting sha: %v", err)
 		return nil, btcjson.ErrBlockCount
 	}
-	blkHeader, err := s.server.db.FetchBlockHeaderBySha(sha)
+	blkHeader, _, err := s.server.db.FetchBlockHeaderBySha(sha)
 	if err != nil {
 		rpcsLog.Errorf("Error getting block: %v", err)
 		return nil, btcjson.ErrDifficulty
@@ -2247,7 +2247,7 @@ func handleGetNetworkHashPS(s *rpcServer, cmd btcjson.Cmd, closeChan <-chan stru
 			}
 		}
 
-		header, err := s.server.db.FetchBlockHeaderBySha(hash)
+		header, _, err := s.server.db.FetchBlockHeaderBySha(hash)
 		if err != nil {
 			return nil, btcjson.Error{
 				Code:    btcjson.ErrInternal.Code,

@@ -5,8 +5,8 @@
 package main
 
 import (
-	"github.com/conformal/btcnet"
-	"github.com/conformal/btcwire"
+	"github.com/mably/btcnet"
+	"github.com/mably/btcwire"
 )
 
 // activeNetParams is a pointer to the parameters specific to the
@@ -29,15 +29,13 @@ type params struct {
 // to emulate the full reference implementation RPC API.
 var mainNetParams = params{
 	Params:  &btcnet.MainNetParams,
-	rpcPort: "8334",
+	rpcPort: "9902",
 	dnsSeeds: []string{
-		"seed.bitcoin.sipa.be",
-		"dnsseed.bluematt.me",
-		"dnsseed.bitcoin.dashjr.org",
-		"seed.bitcoinstats.com",
-		"seed.bitnodes.io",
-		"bitseed.xf2.org",
-		"seeds.bitcoin.open-nodes.org",
+		"seed.ppcoin.net",
+		"seedppc.ppcoin.net",
+		"dnsseed.ppc.altcointech.net",
+		"tnseed.ppcoin.net",
+		"tnseedppc.ppcoin.net",
 	},
 }
 

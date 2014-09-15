@@ -8,7 +8,7 @@ import (
 	"fmt"
 	"net"
 
-	"github.com/conformal/btcwire"
+	"github.com/mably/btcwire"
 )
 
 var (

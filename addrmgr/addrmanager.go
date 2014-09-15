@@ -23,7 +23,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/conformal/btcwire"
+	"github.com/mably/btcwire"
 )
 
 // AddrManager provides a concurrency safe address manager for caching potential

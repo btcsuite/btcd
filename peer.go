@@ -15,19 +15,19 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/conformal/btcchain"
-	"github.com/conformal/btcd/addrmgr"
-	"github.com/conformal/btcdb"
-	"github.com/conformal/btcutil"
-	"github.com/conformal/btcutil/bloom"
-	"github.com/conformal/btcwire"
 	socks "github.com/conformal/go-socks"
 	"github.com/davecgh/go-spew/spew"
+	"github.com/mably/btcchain"
+	"github.com/mably/btcdb"
+	"github.com/mably/btcutil"
+	"github.com/mably/btcutil/bloom"
+	"github.com/mably/btcwire"
+	"github.com/mably/ppcd/addrmgr"
 )
 
 const (
 	// maxProtocolVersion is the max protocol version the peer supports.
-	maxProtocolVersion = 70002
+	maxProtocolVersion = 60004
 
 	// outputBufferSize is the number of elements the output channels use.
 	outputBufferSize = 50
@@ -57,7 +57,7 @@ const (
 var (
 	// userAgentName is the user agent name and is used to help identify
 	// ourselves to other bitcoin peers.
-	userAgentName = "btcd"
+	userAgentName = "ppcd"
 
 	// userAgentVersion is the user agent version and is used to help
 	// identify ourselves to other bitcoin peers.
@@ -981,7 +981,7 @@ func (p *peer) handleGetHeadersMsg(msg *btcwire.MsgGetHeaders) {
 		}
 
 		// Fetch and send the requested block header.
-		header, err := p.server.db.FetchBlockHeaderBySha(&msg.HashStop)
+		header, _, err := p.server.db.FetchBlockHeaderBySha(&msg.HashStop)
 		if err != nil {
 			peerLog.Warnf("Lookup of known block hash failed: %v",
 				err)
@@ -1037,7 +1037,7 @@ func (p *peer) handleGetHeadersMsg(msg *btcwire.MsgGetHeaders) {
 
 		// Add headers to the message.
 		for _, hash := range hashList {
-			header, err := p.server.db.FetchBlockHeaderBySha(&hash)
+			header, _, err := p.server.db.FetchBlockHeaderBySha(&hash)
 			if err != nil {
 				peerLog.Warnf("Lookup of known block hash "+
 					"failed: %v", err)
