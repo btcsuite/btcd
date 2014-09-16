@@ -175,7 +175,7 @@ func openDB(dbpath string, create bool) (pbdb btcdb.Db, err error) {
 	} else {
 		_, err = os.Stat(dbpath)
 		if err != nil {
-			err = btcdb.DbDoesNotExist
+			err = btcdb.ErrDbDoesNotExist
 			return
 		}
 	}

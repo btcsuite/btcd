@@ -77,7 +77,7 @@ func (db *LevelDb) getBlkLoc(sha *btcwire.ShaHash) (int64, error) {
 	data, err := db.lDb.Get(key, db.ro)
 	if err != nil {
 		if err == leveldb.ErrNotFound {
-			err = btcdb.BlockShaMissing
+			err = btcdb.ErrBlockShaMissing
 		}
 		return 0, err
 	}
@@ -206,7 +206,7 @@ func (db *LevelDb) blkExistsSha(sha *btcwire.ShaHash) (bool, error) {
 	switch err {
 	case nil:
 		return true, nil
-	case leveldb.ErrNotFound, btcdb.BlockShaMissing:
+	case leveldb.ErrNotFound, btcdb.ErrBlockShaMissing:
 		return false, nil
 	}
 	return false, err

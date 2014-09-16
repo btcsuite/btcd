@@ -13,12 +13,12 @@ import (
 
 // Errors that the various database functions may return.
 var (
-	PrevShaMissing  = errors.New("Previous sha missing from database")
-	TxShaMissing    = errors.New("Requested transaction does not exist")
-	BlockShaMissing = errors.New("Requested block does not exist")
-	DuplicateSha    = errors.New("Duplicate insert attempted")
-	DbDoesNotExist  = errors.New("Non-existent database")
-	DbUnknownType   = errors.New("Non-existent database type")
+	ErrPrevShaMissing  = errors.New("previous sha missing from database")
+	ErrTxShaMissing    = errors.New("requested transaction does not exist")
+	ErrBlockShaMissing = errors.New("requested block does not exist")
+	ErrDuplicateSha    = errors.New("duplicate insert attempted")
+	ErrDbDoesNotExist  = errors.New("non-existent database")
+	ErrDbUnknownType   = errors.New("non-existent database type")
 )
 
 // AllShas is a special value that can be used as the final sha when requesting
@@ -156,7 +156,7 @@ func CreateDB(dbtype string, args ...interface{}) (pbdb Db, err error) {
 			return drv.CreateDB(args...)
 		}
 	}
-	return nil, DbUnknownType
+	return nil, ErrDbUnknownType
 }
 
 // OpenDB opens an existing database.
@@ -166,7 +166,7 @@ func OpenDB(dbtype string, args ...interface{}) (pbdb Db, err error) {
 			return drv.OpenDB(args...)
 		}
 	}
-	return nil, DbUnknownType
+	return nil, ErrDbUnknownType
 }
 
 // SupportedDBs returns a slice of strings that represent the database drivers

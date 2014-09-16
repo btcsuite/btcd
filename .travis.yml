@@ -11,6 +11,7 @@ install:
 script:
   - export PATH=$PATH:$HOME/gopath/bin
   - go vet ./...
+  - fgt golint .
   - fgt golint memdb
   - fgt golint ldb
   - go test -v

@@ -99,7 +99,7 @@ func (db *LevelDb) getTxFullySpent(txsha *btcwire.ShaHash) ([]*spentTx, error) {
 	key := shaSpentTxToKey(txsha)
 	buf, err := db.lDb.Get(key, db.ro)
 	if err == leveldb.ErrNotFound {
-		return badTxList, btcdb.TxShaMissing
+		return badTxList, btcdb.ErrTxShaMissing
 	} else if err != nil {
 		return badTxList, err
 	}
@@ -186,7 +186,7 @@ func (db *LevelDb) FetchTxByShaList(txShaList []*btcwire.ShaHash) []*btcdb.TxLis
 				btxspent[idx] = (txspent[byteidx] & (byte(1) << byteoff)) != 0
 			}
 		}
-		if err == btcdb.TxShaMissing {
+		if err == btcdb.ErrTxShaMissing {
 			// if the unspent pool did not have the tx,
 			// look in the fully spent pool (only last instance
 
@@ -244,7 +244,7 @@ func (db *LevelDb) fetchTxDataBySha(txsha *btcwire.ShaHash) (rtx *btcwire.MsgTx,
 	blkHeight, txOff, txLen, txspent, err = db.getTxData(txsha)
 	if err != nil {
 		if err == leveldb.ErrNotFound {
-			err = btcdb.TxShaMissing
+			err = btcdb.ErrTxShaMissing
 		}
 		return
 	}
@@ -260,7 +260,7 @@ func (db *LevelDb) fetchTxDataByLoc(blkHeight int64, txOff int, txLen int, txspe
 	blksha, blkbuf, err = db.getBlkByHeight(blkHeight)
 	if err != nil {
 		if err == leveldb.ErrNotFound {
-			err = btcdb.TxShaMissing
+			err = btcdb.ErrTxShaMissing
 		}
 		return
 	}
@@ -269,7 +269,7 @@ func (db *LevelDb) fetchTxDataByLoc(blkHeight int64, txOff int, txLen int, txspe
 	//	txsha, blksha, blkHeight, txOff, txLen)
 
 	if len(blkbuf) < txOff+txLen {
-		err = btcdb.TxShaMissing
+		err = btcdb.ErrTxShaMissing
 		return
 	}
 	rbuf := bytes.NewReader(blkbuf[txOff : txOff+txLen])
@@ -297,7 +297,7 @@ func (db *LevelDb) FetchTxBySha(txsha *btcwire.ShaHash) ([]*btcdb.TxListReply, e
 	if txerr == nil {
 		replylen++
 	} else {
-		if txerr != btcdb.TxShaMissing {
+		if txerr != btcdb.ErrTxShaMissing {
 			return []*btcdb.TxListReply{}, txerr
 		}
 	}
@@ -305,7 +305,7 @@ func (db *LevelDb) FetchTxBySha(txsha *btcwire.ShaHash) ([]*btcdb.TxListReply, e
 	sTxList, fSerr := db.getTxFullySpent(txsha)
 
 	if fSerr != nil {
-		if fSerr != btcdb.TxShaMissing {
+		if fSerr != btcdb.ErrTxShaMissing {
 			return []*btcdb.TxListReply{}, fSerr
 		}
 	} else {

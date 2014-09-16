@@ -17,7 +17,7 @@ func FetchSha(db btcdb.Db, sha *btcwire.ShaHash) (buf []byte, pver uint32,
 	blkid int64, err error) {
 	sqldb, ok := db.(*LevelDb)
 	if !ok {
-		err = fmt.Errorf("Invalid data type")
+		err = fmt.Errorf("invalid data type")
 		return
 	}
 	buf, blkid, err = sqldb.fetchSha(sha)
