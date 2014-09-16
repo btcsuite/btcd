@@ -12,5 +12,4 @@ script:
   - export PATH=$PATH:$HOME/gopath/bin
   - go vet
   - fgt golint -min_confidence=0.9 .
-  - go vet *.go
   - go test -v
