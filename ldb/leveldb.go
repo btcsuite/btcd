@@ -36,6 +36,7 @@ type tTxInsertData struct {
 	usedbuf []byte
 }
 
+// LevelDb holds internal state for databse.
 type LevelDb struct {
 	// lock preventing multiple entry
 	dbLock sync.Mutex
@@ -146,6 +147,7 @@ blocknarrow:
 	return db, nil
 }
 
+// CurrentDBVersion is the database version.
 var CurrentDBVersion int32 = 1
 
 func openDB(dbpath string, create bool) (pbdb btcdb.Db, err error) {
@@ -683,6 +685,9 @@ func (db *LevelDb) processBatches() error {
 	return nil
 }
 
+// RollbackClose this is part of the btcdb.Db interface and should discard
+// recent changes to the db and the close the db.  This currently just does
+// a clean shutdown.
 func (db *LevelDb) RollbackClose() error {
 	db.dbLock.Lock()
 	defer db.dbLock.Unlock()
