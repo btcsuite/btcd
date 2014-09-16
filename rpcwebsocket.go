@@ -1790,7 +1790,7 @@ fetchRange:
 			if err != nil {
 				// Only handle reorgs if a block could not be
 				// found for the hash.
-				if err != btcdb.BlockShaMissing {
+				if err != btcdb.ErrBlockShaMissing {
 					rpcsLog.Errorf("Error looking up "+
 						"block: %v", err)
 					return nil, &btcjson.ErrDatabase

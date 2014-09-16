@@ -1476,7 +1476,7 @@ func setupBlockDB() (btcdb.Db, error) {
 	if err != nil {
 		// Return the error if it's not because the database
 		// doesn't exist.
-		if err != btcdb.DbDoesNotExist {
+		if err != btcdb.ErrDbDoesNotExist {
 			return nil, err
 		}
 

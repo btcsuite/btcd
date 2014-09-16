@@ -693,7 +693,7 @@ func (mp *txMemPool) fetchInputTransactions(tx *btcutil.Tx) (btcchain.TxStore, e
 
 	// Attempt to populate any missing inputs from the transaction pool.
 	for _, txD := range txStore {
-		if txD.Err == btcdb.TxShaMissing || txD.Tx == nil {
+		if txD.Err == btcdb.ErrTxShaMissing || txD.Tx == nil {
 			if poolTxDesc, exists := mp.pool[*txD.Hash]; exists {
 				poolTx := poolTxDesc.Tx
 				txD.Tx = poolTx
@@ -839,7 +839,7 @@ func (mp *txMemPool) maybeAcceptTransaction(tx *btcutil.Tx, isOrphan *bool, isNe
 
 	// Transaction is an orphan if any of the inputs don't exist.
 	for _, txD := range txStore {
-		if txD.Err == btcdb.TxShaMissing {
+		if txD.Err == btcdb.ErrTxShaMissing {
 			if isOrphan != nil {
 				*isOrphan = true
 			}

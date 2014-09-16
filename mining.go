@@ -188,8 +188,8 @@ func minInt(a, b int) int {
 func mergeTxStore(txStoreA btcchain.TxStore, txStoreB btcchain.TxStore) {
 	for hash, txDataB := range txStoreB {
 		if txDataA, exists := txStoreA[hash]; !exists ||
-			(txDataA.Err == btcdb.TxShaMissing && txDataB.Err !=
-				btcdb.TxShaMissing) {
+			(txDataA.Err == btcdb.ErrTxShaMissing && txDataB.Err !=
+				btcdb.ErrTxShaMissing) {
 
 			txStoreA[hash] = txDataB
 		}
