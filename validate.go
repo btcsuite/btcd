@@ -626,7 +626,7 @@ func (b *BlockChain) checkBIP0030(node *blockNode, block *btcutil.Block) error {
 		switch txD.Err {
 		// A duplicate transaction was not found.  This is the most
 		// common case.
-		case btcdb.TxShaMissing:
+		case btcdb.ErrTxShaMissing:
 			continue
 
 		// A duplicate transaction was found.  This is only allowed if
