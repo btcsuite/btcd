@@ -1,12 +1,16 @@
 language: go
-go: release
+go:
+  - 1.2
+  - release
+  - tip
 install:
-- go get code.google.com/p/go.tools/cmd/vet
-- go get github.com/GeertJohan/fgt
-- go get github.com/golang/lint/golint
-- go get -d -t -v ./...
+  - go get -d -t -v ./...
+  - go get -v code.google.com/p/go.tools/cmd/vet
+  - go get -v github.com/GeertJohan/fgt
+  - go get -v github.com/golang/lint/golint
 script:
-- export PATH=$PATH:$HOME/gopath/bin
-- fgt golint -min_confidence=0.9 *.go
-- go vet *.go
-- go test -v ./...
+  - export PATH=$PATH:$HOME/gopath/bin
+  - go vet
+  - fgt golint -min_confidence=0.9 .
+  - go vet *.go
+  - go test -v
