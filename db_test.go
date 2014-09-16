@@ -151,18 +151,18 @@ func TestCreateOpenUnsupported(t *testing.T) {
 	// expected error.
 	dbType := "unsupported"
 	_, err := btcdb.CreateDB(dbType, "unsupportedcreatetest")
-	if err != btcdb.DbUnknownType {
+	if err != btcdb.ErrDbUnknownType {
 		t.Errorf("TestCreateOpenUnsupported: expected error not "+
-			"received - got: %v, want %v", err, btcdb.DbUnknownType)
+			"received - got: %v, want %v", err, btcdb.ErrDbUnknownType)
 		return
 	}
 
 	// Ensure opening a database with the new type fails with the expected
 	// error.
 	_, err = btcdb.OpenDB(dbType, "unsupportedopentest")
-	if err != btcdb.DbUnknownType {
+	if err != btcdb.ErrDbUnknownType {
 		t.Errorf("TestCreateOpenUnsupported: expected error not "+
-			"received - got: %v, want %v", err, btcdb.DbUnknownType)
+			"received - got: %v, want %v", err, btcdb.ErrDbUnknownType)
 		return
 	}
 }
