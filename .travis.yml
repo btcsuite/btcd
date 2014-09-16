@@ -1,5 +1,15 @@
 language: go
 go:
+  - 1.2
   - release
   - tip
-install: go get -d -t -v ./...
+install:
+  - go get -d -t -v ./...
+  - go get -v code.google.com/p/go.tools/cmd/vet
+  - go get -v github.com/GeertJohan/fgt
+  - go get -v github.com/golang/lint/golint
+script:
+  - export PATH=$PATH:$HOME/gopath/bin
+  - go vet
+  - fgt golint .
+  - go test -v
