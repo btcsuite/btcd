@@ -303,7 +303,7 @@ func (s *server) handleRelayInvMsg(state *peerState, iv *btcwire.InvVect) {
 			if p.filter.IsLoaded() {
 				tx, err := s.txMemPool.FetchTransaction(&iv.Hash)
 				if err != nil {
-					peerLog.Warn("Attempt to relay tx %s "+
+					peerLog.Warnf("Attempt to relay tx %s "+
 						"that is not in the memory pool",
 						iv.Hash)
 					return
