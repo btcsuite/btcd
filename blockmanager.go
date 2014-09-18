@@ -1138,14 +1138,16 @@ func (b *blockManager) handleNotifyMsg(notification *btcchain.Notification) {
 		}
 
 		// Remove all of the transactions (except the coinbase) in the
-		// connected block from the transaction pool.  Also, remove any
+		// connected block from the transaction pool.  Secondly, remove any
 		// transactions which are now double spends as a result of these
-		// new transactions.  Note that removing a transaction from
+		// new transactions.  Finally, remove any transaction that is
+		// no longer an orphan.  Note that removing a transaction from
 		// pool also removes any transactions which depend on it,
 		// recursively.
 		for _, tx := range block.Transactions()[1:] {
 			b.server.txMemPool.RemoveTransaction(tx)
 			b.server.txMemPool.RemoveDoubleSpends(tx)
+			b.server.txMemPool.RemoveOrphan(tx.Sha())
 		}
 
 		if r := b.server.rpcServer; r != nil {
