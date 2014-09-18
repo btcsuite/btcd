@@ -396,9 +396,8 @@ func calcMinRequiredTxRelayFee(serializedSize int64) int64 {
 	return minFee
 }
 
-// removeOrphan removes the passed orphan transaction from the orphan pool and
-// previous orphan index.
-//
+// removeOrphan is the internal function which implements the public
+// RemoveOrphan.  See the comment for RemoveOrphan for more details.
 // This function MUST be called with the mempool lock held (for writes).
 func (mp *txMemPool) removeOrphan(txHash *btcwire.ShaHash) {
 	// Nothing to do if passed tx is not an orphan.
@@ -428,6 +427,15 @@ func (mp *txMemPool) removeOrphan(txHash *btcwire.ShaHash) {
 
 	// Remove the transaction from the orphan pool.
 	delete(mp.orphans, *txHash)
+}
+
+// RemoveOrphan removes the passed orphan transaction from the orphan pool and
+// previous orphan index.
+// This function is safe for concurrent access.
+func (mp *txMemPool) RemoveOrphan(txHash *btcwire.ShaHash) {
+	mp.Lock()
+	mp.removeOrphan(txHash)
+	mp.Unlock()
 }
 
 // limitNumOrphans limits the number of orphan transactions by evicting a random
