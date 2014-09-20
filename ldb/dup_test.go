@@ -154,7 +154,7 @@ out:
 
 	listReply = db.FetchUnSpentTxByShaList(fetchList)
 	for _, lr := range listReply {
-		if lr.Err != btcdb.TxShaMissing {
+		if lr.Err != btcdb.ErrTxShaMissing {
 			t.Errorf("sha %v spent %v err %v\n", lr.Sha,
 				lr.TxSpent, lr.Err)
 		}
