@@ -708,7 +708,7 @@ mempoolLoop:
 		// Ensure the transaction inputs pass all of the necessary
 		// preconditions before allowing it to be added to the block.
 		_, err = btcchain.CheckTransactionInputs(tx, nextBlockHeight,
-			blockTxStore, activeNetParams.CoinbaseMaturity)
+			blockTxStore, chain)
 		if err != nil {
 			minrLog.Tracef("Skipping tx %s due to error in "+
 				"CheckTransactionInputs: %v", tx.Sha(), err)

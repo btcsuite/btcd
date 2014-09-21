@@ -851,7 +851,8 @@ func (mp *txMemPool) maybeAcceptTransaction(tx *btcutil.Tx, isOrphan *bool, isNe
 	// rules in btcchain for what transactions are allowed into blocks.
 	// Also returns the fees associated with the transaction which will be
 	// used later.
-	txFee, err := btcchain.CheckTransactionInputs(tx, nextBlockHeight, txStore, activeNetParams.CoinbaseMaturity)
+	txFee, err := btcchain.CheckTransactionInputs(tx, nextBlockHeight, txStore,
+		mp.server.blockManager.blockChain)
 	if err != nil {
 		if cerr, ok := err.(btcchain.RuleError); ok {
 			return chainRuleError(cerr)

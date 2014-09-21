@@ -3104,8 +3104,8 @@ func verifyChain(db btcdb.Db, level, depth int32) error {
 
 		// Level 1 does basic chain sanity checks.
 		if level > 0 {
-			err := btcchain.CheckBlockSanity(block,
-				activeNetParams.PowLimit)
+			err := btcchain.CheckBlockSanity(activeNetParams.Params,
+				block, activeNetParams.PowLimit)
 			if err != nil {
 				rpcsLog.Errorf("Verify is unable to "+
 					"validate block at sha %v height "+
