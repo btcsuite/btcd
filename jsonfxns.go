@@ -15,6 +15,7 @@ import (
 	"io"
 	"io/ioutil"
 	"net/http"
+	"net/url"
 	"strings"
 )
 
@@ -52,7 +53,7 @@ func jsonRPCSend(user string, password string, server string, message []byte,
 		client.Transport = transport
 		protocol = "https"
 	}
-	credentials := user + ":" + password
+	credentials := url.UserPassword(user, password).String()
 	resp, err := client.Post(protocol+"://"+credentials+"@"+server,
 		"application/json", bytes.NewReader(message))
 	if err != nil {
