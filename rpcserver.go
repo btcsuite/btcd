@@ -918,6 +918,7 @@ func createTxRawResult(net *btcnet.Params, txSha string, mtx *btcwire.MsgTx,
 		Vin:      vin,
 		Version:  mtx.Version,
 		LockTime: mtx.LockTime,
+		Time:     mtx.Time.Unix(), // ppc:
 	}
 
 	if blk != nil {
@@ -925,7 +926,7 @@ func createTxRawResult(net *btcnet.Params, txSha string, mtx *btcwire.MsgTx,
 		idx := blk.Height()
 
 		// This is not a typo, they are identical in bitcoind as well.
-		txReply.Time = blockHeader.Timestamp.Unix()
+		//txReply.Time = blockHeader.Timestamp.Unix() // ppc:
 		txReply.Blocktime = blockHeader.Timestamp.Unix()
 		txReply.BlockHash = blksha.String()
 		txReply.Confirmations = uint64(1 + maxidx - idx)
