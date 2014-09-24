@@ -48,9 +48,9 @@ func BenchmarkAddJacobianNotZOne(b *testing.B) {
 	}
 }
 
-// BechmarkScalarBaseMult benchmarks the secp256k1 curve ScalarBaseMult
+// BenchmarkScalarBaseMult benchmarks the secp256k1 curve ScalarBaseMult
 // function.
-func BechmarkScalarBaseMult(b *testing.B) {
+func BenchmarkScalarBaseMult(b *testing.B) {
 	k := fromHex("d74bf844b0862475103d96a611cf2d898447e288d34b360bc885cb8ce7c00575")
 	curve := btcec.S256()
 	for i := 0; i < b.N; i++ {

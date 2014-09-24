@@ -555,6 +555,28 @@ func TestBaseMult(t *testing.T) {
 	}
 }
 
+func TestBaseMultVerify(t *testing.T) {
+	s256 := btcec.S256()
+	for bytes := 1; bytes < 35; bytes++ {
+		for i := 0; i < 30; i++ {
+			data := make([]byte, bytes)
+			_, err := rand.Read(data)
+			if err != nil {
+				t.Errorf("failed to read random data for %s", i)
+				continue
+			}
+			x, y := s256.ScalarBaseMult(data)
+			xWant, yWant := s256.ScalarMult(s256.Gx, s256.Gy, data)
+			if x.Cmp(xWant) != 0 || y.Cmp(yWant) != 0 {
+				t.Errorf("%d: bad output for %X: got (%X, %X), want (%X, %X)", i, data, x, y, xWant, yWant)
+			}
+			if testing.Short() && i > 2 {
+				break
+			}
+		}
+	}
+}
+
 //TODO: test more curves?
 func BenchmarkBaseMult(b *testing.B) {
 	b.ResetTimer()

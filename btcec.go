@@ -37,8 +37,9 @@ var (
 // interface from crypto/elliptic.
 type KoblitzCurve struct {
 	*elliptic.CurveParams
-	q *big.Int
-	H int // cofactor of the curve.
+	q          *big.Int
+	H          int // cofactor of the curve.
+	bytePoints *[32][256][3]fieldVal
 }
 
 // Params returns the parameters for the curve.
@@ -627,7 +628,28 @@ func (curve *KoblitzCurve) ScalarMult(Bx, By *big.Int, k []byte) (*big.Int, *big
 // big endian integer.
 // Part of the elliptic.Curve interface.
 func (curve *KoblitzCurve) ScalarBaseMult(k []byte) (*big.Int, *big.Int) {
-	return curve.ScalarMult(curve.Gx, curve.Gy, k)
+	// Fall back to slower generic scalar point multiplication when the integer is
+	// larger than what can be used with the precomputed table which enables
+	// accelerated multiplication by the known fixed point.
+	if len(k) > len(curve.bytePoints) {
+		return curve.ScalarMult(curve.Gx, curve.Gy, k)
+	}
+
+	diff := len(curve.bytePoints) - len(k)
+
+	// Point Q = ∞ (point at infinity).
+	qx, qy, qz := new(fieldVal), new(fieldVal), new(fieldVal)
+
+	// curve.bytePoints has all 256 byte points for each 8-bit window. The
+	// strategy is to add up the byte points. This is best understood by
+	// expressing k in base-256 which it already sort of is.
+	// Each "digit" in the 8-bit window can be looked up using bytePoints
+	// and added together.
+	for i, byteVal := range k {
+		point := &curve.bytePoints[diff+i][byteVal]
+		curve.addJacobian(qx, qy, qz, &point[0], &point[1], &point[2], qx, qy, qz)
+	}
+	return curve.fieldJacobianToBigAffine(qx, qy, qz)
 }
 
 // QPlus1Div4 returns the Q+1/4 constant for the curve for use in calculating
@@ -656,6 +678,7 @@ func initS256() {
 	secp256k1.H = 1
 	secp256k1.q = new(big.Int).Div(new(big.Int).Add(secp256k1.P,
 		big.NewInt(1)), big.NewInt(4))
+	secp256k1.bytePoints = &secp256k1BytePoints
 }
 
 // S256 returns a Curve which implements secp256k1.
