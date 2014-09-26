@@ -35,13 +35,13 @@ const (
 	// for hardened child keys is [2^31, 2^32 - 1].
 	HardenedKeyStart = 0x80000000 // 2^31
 
-	// minSeedBytes is the minimum number of bytes allowed for a seed to
+	// MinSeedBytes is the minimum number of bytes allowed for a seed to
 	// a master node.
-	minSeedBytes = 16 // 128 bits
+	MinSeedBytes = 16 // 128 bits
 
-	// maxSeedBytes is the maximum number of bytes allowed for a seed to
+	// MaxSeedBytes is the maximum number of bytes allowed for a seed to
 	// a master node.
-	maxSeedBytes = 64 // 512 bits
+	MaxSeedBytes = 64 // 512 bits
 
 	// serializedKeyLen is the length of a serialized public or private
 	// extended key.  It consists of 4 bytes version, 1 byte depth, 4 bytes
@@ -77,7 +77,7 @@ var (
 	// ErrInvalidSeedLen describes an error in which the provided seed or
 	// seed length is not in the allowed range.
 	ErrInvalidSeedLen = fmt.Errorf("seed length must be between %d and %d "+
-		"bits", minSeedBytes*8, maxSeedBytes*8)
+		"bits", MinSeedBytes*8, MaxSeedBytes*8)
 
 	// ErrBadChecksum describes an error in which the checksum encoded with
 	// a serialized extended key does not match the calculated value.
@@ -440,8 +440,8 @@ func (k *ExtendedKey) Zero() {
 // returned if this should occur, so the caller must check for it and generate a
 // new seed accordingly.
 func NewMaster(seed []byte) (*ExtendedKey, error) {
-	// Per [BIP32], the seed must be in range [minSeedBytes, maxSeedBytes].
-	if len(seed) < minSeedBytes || len(seed) > maxSeedBytes {
+	// Per [BIP32], the seed must be in range [MinSeedBytes, MaxSeedBytes].
+	if len(seed) < MinSeedBytes || len(seed) > MaxSeedBytes {
 		return nil, ErrInvalidSeedLen
 	}
 
@@ -529,8 +529,8 @@ func NewKeyFromString(key string) (*ExtendedKey, error) {
 // The recommended length is 32 (256 bits) as defined by the RecommendedSeedLen
 // constant.
 func GenerateSeed(length uint8) ([]byte, error) {
-	// Per [BIP32], the seed must be in range [minSeedBytes, maxSeedBytes].
-	if length < minSeedBytes || length > maxSeedBytes {
+	// Per [BIP32], the seed must be in range [MinSeedBytes, MaxSeedBytes].
+	if length < MinSeedBytes || length > MaxSeedBytes {
 		return nil, ErrInvalidSeedLen
 	}
 
