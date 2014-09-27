@@ -427,7 +427,8 @@ func TestSignatureSerialize(t *testing.T) {
 
 func testSignCompact(t *testing.T, tag string, curve *btcec.KoblitzCurve,
 	data []byte, isCompressed bool) {
-	priv, _ := ecdsa.GenerateKey(curve, rand.Reader)
+	tmp, _ := ecdsa.GenerateKey(curve, rand.Reader)
+	priv := (*btcec.PrivateKey)(tmp)
 
 	hashed := []byte("testing")
 	sig, err := btcec.SignCompact(curve, priv, hashed, isCompressed)

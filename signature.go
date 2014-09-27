@@ -7,7 +7,6 @@ package btcec
 import (
 	"crypto/ecdsa"
 	"crypto/elliptic"
-	"crypto/rand"
 	"errors"
 	"fmt"
 	"math/big"
@@ -263,7 +262,7 @@ func hashToInt(hash []byte, c elliptic.Curve) *big.Int {
 // case in step 1.6. This counter is used in the bitcoin compressed signature
 // format and thus we match bitcoind's behaviour here.
 func recoverKeyFromSignature(curve *KoblitzCurve, sig *Signature, msg []byte,
-	iter int, doChecks bool) (*ecdsa.PublicKey, error) {
+	iter int, doChecks bool) (*PublicKey, error) {
 	// 1.1 x = (n * i) + r
 	Rx := new(big.Int).Mul(curve.Params().N,
 		new(big.Int).SetInt64(int64(iter/2)))
@@ -314,7 +313,7 @@ func recoverKeyFromSignature(curve *KoblitzCurve, sig *Signature, msg []byte,
 	// step to prevent the jacobian conversion back and forth.
 	Qx, Qy := curve.Add(sRx, sRy, minuseGx, minuseGy)
 
-	return &ecdsa.PublicKey{
+	return &PublicKey{
 		Curve: curve,
 		X:     Qx,
 		Y:     Qy,
@@ -328,14 +327,13 @@ func recoverKeyFromSignature(curve *KoblitzCurve, sig *Signature, msg []byte,
 // returned in the format:
 // <(byte of 27+public key solution)+4 if compressed >< padded bytes for signature R><padded bytes for signature S>
 // where the R and S parameters are padde up to the bitlengh of the curve.
-func SignCompact(curve *KoblitzCurve, key *ecdsa.PrivateKey,
+func SignCompact(curve *KoblitzCurve, key *PrivateKey,
 	hash []byte, isCompressedKey bool) ([]byte, error) {
-	r, s, err := ecdsa.Sign(rand.Reader, key, hash)
+	sig, err := key.Sign(hash)
 	if err != nil {
 		return nil, err
 	}
 
-	sig := &Signature{R: r, S: s}
 	// bitcoind checks the bit length of R and S here. The ecdsa signature
 	// algorithm returns R and S mod N therefore they will be the bitsize of
 	// the curve, and thus correctly sized.
@@ -377,7 +375,7 @@ func SignCompact(curve *KoblitzCurve, key *ecdsa.PrivateKey,
 // key will be returned as well as a boolen if the original key was compressed
 // or not, else an error will be returned.
 func RecoverCompact(curve *KoblitzCurve, signature,
-	hash []byte) (*ecdsa.PublicKey, bool, error) {
+	hash []byte) (*PublicKey, bool, error) {
 	bitlen := (curve.BitSize + 7) / 8
 	if len(signature) != 1+bitlen*2 {
 		return nil, false, errors.New("invalid compact signature size")
