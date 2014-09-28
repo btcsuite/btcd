@@ -135,7 +135,7 @@ var rpcHandlersBeforeInit = map[string]commandHandler{
 	"getchaintips":         handleUnimplemented,
 	"getconnectioncount":   handleGetConnectionCount,
 	"getcurrentnet":        handleGetCurrentNet,
-	"getdifficulty":        handleGetDifficulty,
+	"getdifficulty":        ppcHandleGetDifficulty, // ppc: get both PoS and PoW difficulties
 	"getgenerate":          handleGetGenerate,
 	"gethashespersec":      handleGetHashesPerSec,
 	"getinfo":              handleGetInfo,
@@ -2102,9 +2102,15 @@ func handleGetInfo(s *rpcServer, cmd btcjson.Cmd, closeChan <-chan struct{}) (in
 		rpcsLog.Errorf("Error getting sha: %v", err)
 		return nil, btcjson.ErrBlockCount
 	}
-	blkHeader, blkMeta, err := s.server.db.FetchBlockHeaderBySha(sha)
+	_, blkMeta, err := s.server.db.FetchBlockHeaderBySha(sha)
 	if err != nil {
 		rpcsLog.Errorf("Error getting block: %v", err)
+		return nil, btcjson.ErrDifficulty
+	}
+
+	powDifficulty, err := ppcGetDifficultyRatio(s.server.db, sha, false) // ppc: PoW
+	if err != nil {
+		rpcsLog.Errorf("Error getting difficulty: %v", err)
 		return nil, btcjson.ErrDifficulty
 	}
 
@@ -2116,7 +2122,7 @@ func handleGetInfo(s *rpcServer, cmd btcjson.Cmd, closeChan <-chan struct{}) (in
 		TimeOffset:      0,
 		Connections:     s.server.ConnectedCount(),
 		Proxy:           cfg.Proxy,
-		Difficulty:      getDifficultyRatio(blkHeader.Bits),
+		Difficulty:      powDifficulty, // ppc: POW only
 		TestNet:         cfg.TestNet3,
 		RelayFee:        float64(minTxRelayFee) / btcutil.SatoshiPerBitcoin,
 	}

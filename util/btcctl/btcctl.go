@@ -70,7 +70,7 @@ var commandHandlers = map[string]*handlerData{
 	"getblockhash":          {1, 0, displayGeneric, []conversionHandler{toInt64}, makeGetBlockHash, "<blocknumber>"},
 	"getblocktemplate":      {0, 1, displayJSONDump, nil, makeGetBlockTemplate, "[jsonrequestobject]"},
 	"getconnectioncount":    {0, 0, displayGeneric, nil, makeGetConnectionCount, ""},
-	"getdifficulty":         {0, 0, displayFloat64, nil, makeGetDifficulty, ""},
+	"getdifficulty":         {0, 0, displayJSONDump, nil, makeGetDifficulty, ""},
 	"getgenerate":           {0, 0, displayGeneric, nil, makeGetGenerate, ""},
 	"gethashespersec":       {0, 0, displayGeneric, nil, makeGetHashesPerSec, ""},
 	"getinfo":               {0, 0, displayJSONDump, nil, makeGetInfo, ""},
