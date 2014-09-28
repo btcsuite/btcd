@@ -2102,7 +2102,7 @@ func handleGetInfo(s *rpcServer, cmd btcjson.Cmd, closeChan <-chan struct{}) (in
 		rpcsLog.Errorf("Error getting sha: %v", err)
 		return nil, btcjson.ErrBlockCount
 	}
-	blkHeader, _, err := s.server.db.FetchBlockHeaderBySha(sha)
+	blkHeader, blkMeta, err := s.server.db.FetchBlockHeaderBySha(sha)
 	if err != nil {
 		rpcsLog.Errorf("Error getting block: %v", err)
 		return nil, btcjson.ErrDifficulty
@@ -2111,6 +2111,7 @@ func handleGetInfo(s *rpcServer, cmd btcjson.Cmd, closeChan <-chan struct{}) (in
 	ret := &btcjson.InfoResult{
 		Version:         int32(1000000*appMajor + 10000*appMinor + 100*appPatch),
 		ProtocolVersion: int32(maxProtocolVersion),
+		MoneySupply:     btcjson.FloatAmount(blkMeta.MoneySupply) / btcutil.SatoshiPerBitcoin,
 		Blocks:          int32(height),
 		TimeOffset:      0,
 		Connections:     s.server.ConnectedCount(),
