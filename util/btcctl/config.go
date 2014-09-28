@@ -14,7 +14,7 @@ import (
 var (
 	btcdHomeDir           = btcutil.AppDataDir("ppcd", false)
 	btcctlHomeDir         = btcutil.AppDataDir("btcctl", false)
-	btcwalletHomeDir      = btcutil.AppDataDir("btcwallet", false)
+	btcwalletHomeDir      = btcutil.AppDataDir("ppcwallet", false)
 	defaultConfigFile     = filepath.Join(btcctlHomeDir, "btcctl.conf")
 	defaultRPCServer      = "localhost"
 	defaultRPCCertFile    = filepath.Join(btcdHomeDir, "rpc.cert")
