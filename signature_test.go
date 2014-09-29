@@ -6,7 +6,6 @@ package btcec_test
 
 import (
 	"bytes"
-	"crypto/ecdsa"
 	"crypto/rand"
 	"fmt"
 	"math/big"
@@ -427,7 +426,7 @@ func TestSignatureSerialize(t *testing.T) {
 
 func testSignCompact(t *testing.T, tag string, curve *btcec.KoblitzCurve,
 	data []byte, isCompressed bool) {
-	tmp, _ := ecdsa.GenerateKey(curve, rand.Reader)
+	tmp, _ := btcec.NewPrivateKey(curve)
 	priv := (*btcec.PrivateKey)(tmp)
 
 	hashed := []byte("testing")

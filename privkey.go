@@ -33,6 +33,21 @@ func PrivKeyFromBytes(curve *KoblitzCurve, pk []byte) (*PrivateKey,
 	return (*PrivateKey)(priv), (*PublicKey)(&priv.PublicKey)
 }
 
+// NewPrivateKey is a wrapper for ecdsa.GenerateKey that returns a PrivateKey
+// instead of the normal ecdsa.PrivateKey.
+func NewPrivateKey(curve *KoblitzCurve) (*PrivateKey, error) {
+	key, err := ecdsa.GenerateKey(curve, rand.Reader)
+	if err != nil {
+		return nil, err
+	}
+	return (*PrivateKey)(key), nil
+}
+
+// PubKey returns the PublicKey corresponding to this private key.
+func (p *PrivateKey) PubKey() *PublicKey {
+	return (*PublicKey)(&p.PublicKey)
+}
+
 // ToECDSA returns the private key as a *ecdsa.PrivateKey.
 func (p *PrivateKey) ToECDSA() *ecdsa.PrivateKey {
 	return (*ecdsa.PrivateKey)(p)

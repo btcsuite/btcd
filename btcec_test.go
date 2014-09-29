@@ -7,8 +7,6 @@
 package btcec_test
 
 import (
-	"crypto/ecdsa"
-	"crypto/elliptic"
 	"crypto/rand"
 	"crypto/sha1"
 	"encoding/hex"
@@ -591,8 +589,8 @@ func BenchmarkBaseMult(b *testing.B) {
 
 // Test this curve's usage with the ecdsa package.
 
-func testKeyGeneration(t *testing.T, c elliptic.Curve, tag string) {
-	priv, err := ecdsa.GenerateKey(c, rand.Reader)
+func testKeyGeneration(t *testing.T, c *btcec.KoblitzCurve, tag string) {
+	priv, err := btcec.NewPrivateKey(c)
 	if err != nil {
 		t.Errorf("%s: error: %s", tag, err)
 		return
@@ -606,22 +604,23 @@ func TestKeyGeneration(t *testing.T) {
 	testKeyGeneration(t, btcec.S256(), "S256")
 }
 
-func testSignAndVerify(t *testing.T, c elliptic.Curve, tag string) {
-	priv, _ := ecdsa.GenerateKey(c, rand.Reader)
+func testSignAndVerify(t *testing.T, c *btcec.KoblitzCurve, tag string) {
+	priv, _ := btcec.NewPrivateKey(c)
+	pub := priv.PubKey()
 
 	hashed := []byte("testing")
-	r, s, err := ecdsa.Sign(rand.Reader, priv, hashed)
+	sig, err := priv.Sign(hashed)
 	if err != nil {
 		t.Errorf("%s: error signing: %s", tag, err)
 		return
 	}
 
-	if !ecdsa.Verify(&priv.PublicKey, hashed, r, s) {
+	if !sig.Verify(hashed, pub) {
 		t.Errorf("%s: Verify failed", tag)
 	}
 
 	hashed[0] ^= 0xff
-	if ecdsa.Verify(&priv.PublicKey, hashed, r, s) {
+	if sig.Verify(hashed, pub) {
 		t.Errorf("%s: Verify always works!", tag)
 	}
 }
@@ -778,7 +777,7 @@ func TestVectors(t *testing.T) {
 	sha := sha1.New()
 
 	for i, test := range testVectors {
-		pub := ecdsa.PublicKey{
+		pub := btcec.PublicKey{
 			Curve: btcec.S256(),
 			X:     fromHex(test.Qx),
 			Y:     fromHex(test.Qy),
@@ -787,9 +786,8 @@ func TestVectors(t *testing.T) {
 		sha.Reset()
 		sha.Write(msg)
 		hashed := sha.Sum(nil)
-		r := fromHex(test.r)
-		s := fromHex(test.s)
-		if fuck := ecdsa.Verify(&pub, hashed, r, s); fuck != test.ok {
+		sig := btcec.Signature{R: fromHex(test.r), S: fromHex(test.s)}
+		if fuck := sig.Verify(hashed, &pub); fuck != test.ok {
 			//t.Errorf("%d: bad result %v %v", i, pub, hashed)
 			t.Errorf("%d: bad result %v instead of %v", i, fuck,
 				test.ok)
