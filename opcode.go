@@ -6,7 +6,6 @@ package btcscript
 
 import (
 	"bytes"
-	"crypto/ecdsa"
 	"crypto/sha1"
 	"encoding/binary"
 	"encoding/hex"
@@ -1812,7 +1811,7 @@ func opcodeCheckSig(op *parsedOpcode, s *Script) error {
 			hex.Dump(pkStr), pubKey.X, pubKey.Y,
 			signature.R, signature.S, hex.Dump(hash))
 	}))
-	ok := ecdsa.Verify(pubKey.ToECDSA(), hash, signature.R, signature.S)
+	ok := signature.Verify(hash, pubKey)
 	s.dstack.PushBool(ok)
 	return nil
 }
@@ -1947,8 +1946,7 @@ func opcodeCheckMultiSig(op *parsedOpcode, s *Script) error {
 					continue
 				}
 			}
-			success = ecdsa.Verify(pubKeys[curPk].ToECDSA(), hash,
-				signatures[i].s.R, signatures[i].s.S)
+			success = signatures[i].s.Verify(hash, pubKeys[curPk])
 			if success {
 				break inner
 			}
