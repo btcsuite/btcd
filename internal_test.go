@@ -4019,7 +4019,7 @@ testloop:
 		}
 
 		for k, txin := range tx.MsgTx().TxIn {
-			pkScript, ok := prevOuts[txin.PreviousOutpoint]
+			pkScript, ok := prevOuts[txin.PreviousOutPoint]
 			if !ok {
 				t.Errorf("bad test (missing %dth input) %d:%v",
 					k, i, test)
@@ -4165,7 +4165,7 @@ testloop:
 		}
 
 		for k, txin := range tx.MsgTx().TxIn {
-			pkScript, ok := prevOuts[txin.PreviousOutpoint]
+			pkScript, ok := prevOuts[txin.PreviousOutPoint]
 			if !ok {
 				t.Errorf("bad test (missing %dth input) %d:%v",
 					k, i, test)

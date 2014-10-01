@@ -484,7 +484,7 @@ func testScript(t *testing.T, script []byte, canonical bool) (err error) {
 		Version: 1,
 		TxIn: []*btcwire.TxIn{
 			{
-				PreviousOutpoint: btcwire.OutPoint{
+				PreviousOutPoint: btcwire.OutPoint{
 					Hash:  btcwire.ShaHash{},
 					Index: 0xffffffff,
 				},
@@ -4267,7 +4267,7 @@ func testOpcode(t *testing.T, test *detailedTest) {
 		Version: 1,
 		TxIn: []*btcwire.TxIn{
 			{
-				PreviousOutpoint: btcwire.OutPoint{
+				PreviousOutPoint: btcwire.OutPoint{
 					Hash:  btcwire.ShaHash{},
 					Index: 0xffffffff,
 				},

@@ -129,7 +129,7 @@ var txTests = []txTest{
 			Version: 1,
 			TxIn: []*btcwire.TxIn{
 				{
-					PreviousOutpoint: btcwire.OutPoint{
+					PreviousOutPoint: btcwire.OutPoint{
 						Hash: btcwire.ShaHash([32]byte{
 							0xc9, 0x97, 0xa5, 0xe5,
 							0x6e, 0x10, 0x41, 0x02,
@@ -235,7 +235,7 @@ var txTests = []txTest{
 			Version: 1,
 			TxIn: []*btcwire.TxIn{
 				{
-					PreviousOutpoint: btcwire.OutPoint{
+					PreviousOutPoint: btcwire.OutPoint{
 						Hash: btcwire.ShaHash([32]byte{
 							0xc9, 0x97, 0xa5, 0xe5,
 							0x6e, 0x10, 0x41, 0x02,
@@ -341,7 +341,7 @@ var txTests = []txTest{
 			Version: 1,
 			TxIn: []*btcwire.TxIn{
 				{
-					PreviousOutpoint: btcwire.OutPoint{
+					PreviousOutPoint: btcwire.OutPoint{
 						Hash: btcwire.ShaHash([32]byte{
 							0xc9, 0x97, 0xa5, 0xe5,
 							0x6e, 0x10, 0x41, 0x02,
@@ -449,7 +449,7 @@ var txTests = []txTest{
 			Version: 1,
 			TxIn: []*btcwire.TxIn{
 				{
-					PreviousOutpoint: btcwire.OutPoint{
+					PreviousOutPoint: btcwire.OutPoint{
 						Hash: btcwire.ShaHash([32]byte{
 							0xc9, 0x97, 0xa5, 0xe5,
 							0x6e, 0x10, 0x41, 0x02,
@@ -558,7 +558,7 @@ var txTests = []txTest{
 			Version: 1,
 			TxIn: []*btcwire.TxIn{
 				{
-					PreviousOutpoint: btcwire.OutPoint{
+					PreviousOutPoint: btcwire.OutPoint{
 						Hash: btcwire.ShaHash([32]byte{
 							0x5f, 0x38, 0x6c, 0x8a,
 							0x38, 0x42, 0xc9, 0xa9,
@@ -664,7 +664,7 @@ var txTests = []txTest{
 			Version: 1,
 			TxIn: []*btcwire.TxIn{
 				{
-					PreviousOutpoint: btcwire.OutPoint{
+					PreviousOutPoint: btcwire.OutPoint{
 						Hash: btcwire.ShaHash([32]byte{
 							0xfe, 0x15, 0x62, 0xc4,
 							0x8b, 0x3a, 0xa6, 0x37,
@@ -712,7 +712,7 @@ var txTests = []txTest{
 					Sequence: 4294967295,
 				},
 				{
-					PreviousOutpoint: btcwire.OutPoint{
+					PreviousOutPoint: btcwire.OutPoint{
 						Hash: btcwire.ShaHash([32]byte{
 							0x2a, 0xc7, 0xee, 0xf8,
 							0xa9, 0x62, 0x2d, 0xda,
@@ -838,7 +838,7 @@ var txTests = []txTest{
 			Version: 1,
 			TxIn: []*btcwire.TxIn{
 				{
-					PreviousOutpoint: btcwire.OutPoint{
+					PreviousOutPoint: btcwire.OutPoint{
 						Hash: btcwire.ShaHash([32]byte{
 							0xf6, 0x04, 0x4c, 0x0a,
 							0xd4, 0x85, 0xf6, 0x33,
@@ -880,7 +880,7 @@ var txTests = []txTest{
 					Sequence: 4294967295,
 				},
 				{
-					PreviousOutpoint: btcwire.OutPoint{
+					PreviousOutPoint: btcwire.OutPoint{
 						Hash: btcwire.ShaHash([32]byte{
 							0x9c, 0x6a, 0xf0, 0xdf,
 							0x66, 0x69, 0xbc, 0xde,
@@ -968,7 +968,7 @@ var txTests = []txTest{
 			Version: 1,
 			TxIn: []*btcwire.TxIn{
 				{
-					PreviousOutpoint: btcwire.OutPoint{
+					PreviousOutPoint: btcwire.OutPoint{
 						Hash: btcwire.ShaHash([32]byte{
 							0x37, 0xb1, 0x7d, 0x76,
 							0x38, 0x51, 0xcd, 0x1a,
@@ -1006,7 +1006,7 @@ var txTests = []txTest{
 					Sequence: 4294967295,
 				},
 				{
-					PreviousOutpoint: btcwire.OutPoint{
+					PreviousOutPoint: btcwire.OutPoint{
 						Hash: btcwire.ShaHash([32]byte{
 							0x37, 0xb1, 0x7d, 0x76,
 							0x38, 0x51, 0xcd, 0x1a,
@@ -1091,7 +1091,7 @@ var txTests = []txTest{
 			Version: 1,
 			TxIn: []*btcwire.TxIn{
 				{
-					PreviousOutpoint: btcwire.OutPoint{
+					PreviousOutPoint: btcwire.OutPoint{
 						Hash: btcwire.ShaHash([32]byte{
 							0x37, 0xb1, 0x7d, 0x76,
 							0x38, 0x51, 0xcd, 0x1a,
@@ -1129,7 +1129,7 @@ var txTests = []txTest{
 					Sequence: 4294967295,
 				},
 				{
-					PreviousOutpoint: btcwire.OutPoint{
+					PreviousOutPoint: btcwire.OutPoint{
 						Hash: btcwire.ShaHash([32]byte{
 							0x37, 0xb1, 0x7d, 0x76,
 							0x38, 0x51, 0xcd, 0x1a,
@@ -1217,7 +1217,7 @@ var txTests = []txTest{
 			Version: 1,
 			TxIn: []*btcwire.TxIn{
 				{
-					PreviousOutpoint: btcwire.OutPoint{
+					PreviousOutPoint: btcwire.OutPoint{
 						Hash: btcwire.ShaHash([32]byte{
 							0x37, 0xb1, 0x7d, 0x76,
 							0x38, 0x51, 0xcd, 0x1a,
@@ -1277,7 +1277,7 @@ var txTests = []txTest{
 			Version: 1,
 			TxIn: []*btcwire.TxIn{
 				{
-					PreviousOutpoint: btcwire.OutPoint{
+					PreviousOutPoint: btcwire.OutPoint{
 						Hash: btcwire.ShaHash([32]byte{
 							0x6d, 0x58, 0xf8, 0xa3,
 							0xaa, 0x43, 0x0b, 0x84,
@@ -1343,7 +1343,7 @@ var txTests = []txTest{
 			Version: 1,
 			TxIn: []*btcwire.TxIn{
 				{
-					PreviousOutpoint: btcwire.OutPoint{
+					PreviousOutPoint: btcwire.OutPoint{
 						Hash: btcwire.ShaHash([32]byte{
 							0x6d, 0x58, 0xf8, 0xa3,
 							0xaa, 0x43, 0x0b, 0x84,
@@ -1408,7 +1408,7 @@ var txTests = []txTest{
 			Version: 1,
 			TxIn: []*btcwire.TxIn{
 				{
-					PreviousOutpoint: btcwire.OutPoint{
+					PreviousOutPoint: btcwire.OutPoint{
 						Hash: btcwire.ShaHash([32]byte{
 							0x6d, 0x58, 0xf8, 0xa3,
 							0xaa, 0x43, 0x0b, 0x84,
@@ -1467,7 +1467,7 @@ var txTests = []txTest{
 			Version: 1,
 			TxIn: []*btcwire.TxIn{
 				{
-					PreviousOutpoint: btcwire.OutPoint{
+					PreviousOutPoint: btcwire.OutPoint{
 						Hash: btcwire.ShaHash([32]byte{
 							0x6d, 0x58, 0xf8, 0xa3,
 							0xaa, 0x43, 0x0b, 0x84,
@@ -1531,7 +1531,7 @@ var txTests = []txTest{
 			Version: 1,
 			TxIn: []*btcwire.TxIn{
 				{
-					PreviousOutpoint: btcwire.OutPoint{
+					PreviousOutPoint: btcwire.OutPoint{
 						Hash: btcwire.ShaHash([32]byte{
 							0x6d, 0x58, 0xf8, 0xa3,
 							0xaa, 0x43, 0x0b, 0x84,
@@ -2377,7 +2377,7 @@ func TestBadPC(t *testing.T) {
 		Version: 1,
 		TxIn: []*btcwire.TxIn{
 			{
-				PreviousOutpoint: btcwire.OutPoint{
+				PreviousOutPoint: btcwire.OutPoint{
 					Hash: btcwire.ShaHash([32]byte{
 						0xc9, 0x97, 0xa5, 0xe5,
 						0x6e, 0x10, 0x41, 0x02,
@@ -2436,7 +2436,7 @@ func TestCheckErrorCondition(t *testing.T) {
 		Version: 1,
 		TxIn: []*btcwire.TxIn{
 			{
-				PreviousOutpoint: btcwire.OutPoint{
+				PreviousOutPoint: btcwire.OutPoint{
 					Hash: btcwire.ShaHash([32]byte{
 						0xc9, 0x97, 0xa5, 0xe5,
 						0x6e, 0x10, 0x41, 0x02,
@@ -3327,21 +3327,21 @@ func TestSignTxOutput(t *testing.T) {
 		Version: 1,
 		TxIn: []*btcwire.TxIn{
 			&btcwire.TxIn{
-				PreviousOutpoint: btcwire.OutPoint{
+				PreviousOutPoint: btcwire.OutPoint{
 					Hash:  btcwire.ShaHash{},
 					Index: 0,
 				},
 				Sequence: 4294967295,
 			},
 			&btcwire.TxIn{
-				PreviousOutpoint: btcwire.OutPoint{
+				PreviousOutPoint: btcwire.OutPoint{
 					Hash:  btcwire.ShaHash{},
 					Index: 1,
 				},
 				Sequence: 4294967295,
 			},
 			&btcwire.TxIn{
-				PreviousOutpoint: btcwire.OutPoint{
+				PreviousOutPoint: btcwire.OutPoint{
 					Hash:  btcwire.ShaHash{},
 					Index: 2,
 				},
