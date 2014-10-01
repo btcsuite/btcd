@@ -33,7 +33,7 @@ const defaultTxInOutAlloc = 15
 
 const (
 	// minTxInPayload is the minimum payload size for a transaction input.
-	// PreviousOutpoint.Hash + PreviousOutpoint.Index 4 bytes + Varint for
+	// PreviousOutPoint.Hash + PreviousOutPoint.Index 4 bytes + Varint for
 	// SignatureScript length 1 byte + Sequence 4 bytes.
 	minTxInPayload = 9 + HashSize
 
