@@ -77,7 +77,7 @@ func NewOutPoint(hash *ShaHash, index uint32) *OutPoint {
 
 // TxIn defines a bitcoin transaction input.
 type TxIn struct {
-	PreviousOutpoint OutPoint
+	PreviousOutPoint OutPoint
 	SignatureScript  []byte
 	Sequence         uint32
 }
@@ -97,7 +97,7 @@ func (t *TxIn) SerializeSize() int {
 // MaxTxInSequenceNum.
 func NewTxIn(prevOut *OutPoint, signatureScript []byte) *TxIn {
 	return &TxIn{
-		PreviousOutpoint: *prevOut,
+		PreviousOutPoint: *prevOut,
 		SignatureScript:  signatureScript,
 		Sequence:         MaxTxInSequenceNum,
 	}
@@ -183,7 +183,7 @@ func (msg *MsgTx) Copy() *MsgTx {
 	// Deep copy the old TxIn data.
 	for _, oldTxIn := range msg.TxIn {
 		// Deep copy the old previous outpoint.
-		oldOutPoint := oldTxIn.PreviousOutpoint
+		oldOutPoint := oldTxIn.PreviousOutPoint
 		newOutPoint := OutPoint{}
 		newOutPoint.Hash.SetBytes(oldOutPoint.Hash[:])
 		newOutPoint.Index = oldOutPoint.Index
@@ -200,7 +200,7 @@ func (msg *MsgTx) Copy() *MsgTx {
 		// Create new txIn with the deep copied data and append it to
 		// new Tx.
 		newTxIn := TxIn{
-			PreviousOutpoint: newOutPoint,
+			PreviousOutPoint: newOutPoint,
 			SignatureScript:  newScript,
 			Sequence:         oldTxIn.Sequence,
 		}
@@ -468,7 +468,7 @@ func readTxIn(r io.Reader, pver uint32, version int32, ti *TxIn) error {
 	if err != nil {
 		return err
 	}
-	ti.PreviousOutpoint = op
+	ti.PreviousOutPoint = op
 
 	ti.SignatureScript, err = readVarBytes(r, pver, MaxMessagePayload,
 		"transaction input signature script")
@@ -489,7 +489,7 @@ func readTxIn(r io.Reader, pver uint32, version int32, ti *TxIn) error {
 // writeTxIn encodes ti to the bitcoin protocol encoding for a transaction
 // input (TxIn) to w.
 func writeTxIn(w io.Writer, pver uint32, version int32, ti *TxIn) error {
-	err := writeOutPoint(w, pver, version, &ti.PreviousOutpoint)
+	err := writeOutPoint(w, pver, version, &ti.PreviousOutPoint)
 	if err != nil {
 		return err
 	}

@@ -503,7 +503,7 @@ var blockOne = btcwire.MsgBlock{
 			Version: 1,
 			TxIn: []*btcwire.TxIn{
 				{
-					PreviousOutpoint: btcwire.OutPoint{
+					PreviousOutPoint: btcwire.OutPoint{
 						Hash:  btcwire.ShaHash{},
 						Index: 0xffffffff,
 					},
