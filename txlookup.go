@@ -47,8 +47,8 @@ func connectTransactions(txStore TxStore, block *btcutil.Block) error {
 
 		// Spend the origin transaction output.
 		for _, txIn := range msgTx.TxIn {
-			originHash := &txIn.PreviousOutpoint.Hash
-			originIndex := txIn.PreviousOutpoint.Index
+			originHash := &txIn.PreviousOutPoint.Hash
+			originIndex := txIn.PreviousOutPoint.Index
 			if originTx, exists := txStore[*originHash]; exists {
 				if originIndex > uint32(len(originTx.Spent)) {
 					continue
@@ -82,8 +82,8 @@ func disconnectTransactions(txStore TxStore, block *btcutil.Block) error {
 
 		// Unspend the origin transaction output.
 		for _, txIn := range tx.MsgTx().TxIn {
-			originHash := &txIn.PreviousOutpoint.Hash
-			originIndex := txIn.PreviousOutpoint.Index
+			originHash := &txIn.PreviousOutPoint.Hash
+			originIndex := txIn.PreviousOutPoint.Index
 			originTx, exists := txStore[*originHash]
 			if exists && originTx.Tx != nil && originTx.Err == nil {
 				if originIndex > uint32(len(originTx.Spent)) {
@@ -252,7 +252,7 @@ func (b *BlockChain) fetchInputTransactions(node *blockNode, block *btcutil.Bloc
 		for _, txIn := range tx.MsgTx().TxIn {
 			// Add an entry to the transaction store for the needed
 			// transaction with it set to missing by default.
-			originHash := &txIn.PreviousOutpoint.Hash
+			originHash := &txIn.PreviousOutPoint.Hash
 			txD := &TxData{Hash: originHash, Err: btcdb.ErrTxShaMissing}
 			txStore[*originHash] = txD
 
@@ -306,7 +306,7 @@ func (b *BlockChain) FetchTransactionStore(tx *btcutil.Tx) (TxStore, error) {
 	txNeededSet := make(map[btcwire.ShaHash]struct{})
 	txNeededSet[*tx.Sha()] = struct{}{}
 	for _, txIn := range tx.MsgTx().TxIn {
-		txNeededSet[txIn.PreviousOutpoint.Hash] = struct{}{}
+		txNeededSet[txIn.PreviousOutPoint.Hash] = struct{}{}
 	}
 
 	// Request the input transactions from the point of view of the end of

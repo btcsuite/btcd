@@ -104,7 +104,7 @@ func IsCoinBase(tx *btcutil.Tx) bool {
 
 	// The previous output of a coin base must have a max value index and
 	// a zero hash.
-	prevOut := msgTx.TxIn[0].PreviousOutpoint
+	prevOut := msgTx.TxIn[0].PreviousOutPoint
 	if prevOut.Index != math.MaxUint32 || !prevOut.Hash.IsEqual(zeroHash) {
 		return false
 	}
@@ -246,11 +246,11 @@ func CheckTransactionSanity(tx *btcutil.Tx) error {
 	// Check for duplicate transaction inputs.
 	existingTxOut := make(map[btcwire.OutPoint]struct{})
 	for _, txIn := range msgTx.TxIn {
-		if _, exists := existingTxOut[txIn.PreviousOutpoint]; exists {
+		if _, exists := existingTxOut[txIn.PreviousOutPoint]; exists {
 			return ruleError(ErrDuplicateTxInputs, "transaction "+
 				"contains duplicate inputs")
 		}
-		existingTxOut[txIn.PreviousOutpoint] = struct{}{}
+		existingTxOut[txIn.PreviousOutPoint] = struct{}{}
 	}
 
 	// Coinbase script length must be between min and max length.
@@ -266,7 +266,7 @@ func CheckTransactionSanity(tx *btcutil.Tx) error {
 		// Previous transaction outputs referenced by the inputs to this
 		// transaction must not be null.
 		for _, txIn := range msgTx.TxIn {
-			prevOut := &txIn.PreviousOutpoint
+			prevOut := &txIn.PreviousOutPoint
 			if isNullOutpoint(prevOut) {
 				return ruleError(ErrBadTxInput, "transaction "+
 					"input refers to previous output that "+
@@ -369,7 +369,7 @@ func CountP2SHSigOps(tx *btcutil.Tx, isCoinBaseTx bool, txStore TxStore) (int, e
 	totalSigOps := 0
 	for _, txIn := range msgTx.TxIn {
 		// Ensure the referenced input transaction is available.
-		txInHash := &txIn.PreviousOutpoint.Hash
+		txInHash := &txIn.PreviousOutPoint.Hash
 		originTx, exists := txStore[*txInHash]
 		if !exists || originTx.Err != nil || originTx.Tx == nil {
 			str := fmt.Sprintf("unable to find input transaction "+
@@ -381,7 +381,7 @@ func CountP2SHSigOps(tx *btcutil.Tx, isCoinBaseTx bool, txStore TxStore) (int, e
 
 		// Ensure the output index in the referenced transaction is
 		// available.
-		originTxIndex := txIn.PreviousOutpoint.Index
+		originTxIndex := txIn.PreviousOutPoint.Index
 		if originTxIndex >= uint32(len(originMsgTx.TxOut)) {
 			str := fmt.Sprintf("out of bounds input index %d in "+
 				"transaction %v referenced from transaction %v",
@@ -667,7 +667,7 @@ func CheckTransactionInputs(tx *btcutil.Tx, txHeight int64, txStore TxStore) (in
 	var totalSatoshiIn int64
 	for _, txIn := range tx.MsgTx().TxIn {
 		// Ensure the input is available.
-		txInHash := &txIn.PreviousOutpoint.Hash
+		txInHash := &txIn.PreviousOutPoint.Hash
 		originTx, exists := txStore[*txInHash]
 		if !exists || originTx.Err != nil || originTx.Tx == nil {
 			str := fmt.Sprintf("unable to find input transaction "+
@@ -691,7 +691,7 @@ func CheckTransactionInputs(tx *btcutil.Tx, txHeight int64, txStore TxStore) (in
 		}
 
 		// Ensure the transaction is not double spending coins.
-		originTxIndex := txIn.PreviousOutpoint.Index
+		originTxIndex := txIn.PreviousOutPoint.Index
 		if originTxIndex >= uint32(len(originTx.Spent)) {
 			str := fmt.Sprintf("out of bounds input index %d in "+
 				"transaction %v referenced from transaction %v",

@@ -53,7 +53,7 @@ out:
 		case txVI := <-v.validateChan:
 			// Ensure the referenced input transaction is available.
 			txIn := txVI.txIn
-			originTxHash := &txIn.PreviousOutpoint.Hash
+			originTxHash := &txIn.PreviousOutPoint.Hash
 			originTx, exists := v.txStore[*originTxHash]
 			if !exists || originTx.Err != nil || originTx.Tx == nil {
 				str := fmt.Sprintf("unable to find input "+
@@ -68,7 +68,7 @@ out:
 
 			// Ensure the output index in the referenced transaction
 			// is available.
-			originTxIndex := txIn.PreviousOutpoint.Index
+			originTxIndex := txIn.PreviousOutPoint.Index
 			if originTxIndex >= uint32(len(originMsgTx.TxOut)) {
 				str := fmt.Sprintf("out of bounds "+
 					"input index %d in transaction %v "+
@@ -198,7 +198,7 @@ func ValidateTransactionScripts(tx *btcutil.Tx, txStore TxStore, flags btcscript
 	txValItems := make([]*txValidateItem, 0, len(txIns))
 	for txInIdx, txIn := range txIns {
 		// Skip coinbases.
-		if txIn.PreviousOutpoint.Index == math.MaxUint32 {
+		if txIn.PreviousOutPoint.Index == math.MaxUint32 {
 			continue
 		}
 
@@ -240,7 +240,7 @@ func checkBlockScripts(block *btcutil.Block, txStore TxStore) error {
 	for _, tx := range block.Transactions() {
 		for txInIdx, txIn := range tx.MsgTx().TxIn {
 			// Skip coinbases.
-			if txIn.PreviousOutpoint.Index == math.MaxUint32 {
+			if txIn.PreviousOutPoint.Index == math.MaxUint32 {
 				continue
 			}
 
