@@ -56,10 +56,10 @@ out:
 		var txneededList []*btcwire.ShaHash
 		for _, tx := range mblock.Transactions {
 			for _, txin := range tx.TxIn {
-				if txin.PreviousOutpoint.Index == uint32(4294967295) {
+				if txin.PreviousOutPoint.Index == uint32(4294967295) {
 					continue
 				}
-				origintxsha := &txin.PreviousOutpoint.Hash
+				origintxsha := &txin.PreviousOutPoint.Hash
 				txneededList = append(txneededList, origintxsha)
 
 				exists, err := db.ExistsTxSha(origintxsha)

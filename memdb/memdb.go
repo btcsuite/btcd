@@ -52,7 +52,7 @@ func newShaHashFromStr(hexStr string) *btcwire.ShaHash {
 // a single input that has a previous output transaction index set to the
 // maximum value along with a zero hash.
 func isCoinbaseInput(txIn *btcwire.TxIn) bool {
-	prevOut := &txIn.PreviousOutpoint
+	prevOut := &txIn.PreviousOutPoint
 	if prevOut.Index == math.MaxUint32 && prevOut.Hash.IsEqual(&zeroHash) {
 		return true
 	}
@@ -105,7 +105,7 @@ func (db *MemDb) removeTx(msgTx *btcwire.MsgTx, txHash *btcwire.ShaHash) {
 			continue
 		}
 
-		prevOut := &txIn.PreviousOutpoint
+		prevOut := &txIn.PreviousOutPoint
 		originTxns, exists := db.txns[prevOut.Hash]
 		if !exists {
 			log.Warnf("Unable to find input transaction %s to "+
@@ -593,7 +593,7 @@ func (db *MemDb) InsertBlock(block *btcutil.Block) (int64, error) {
 			// the output of another transaction in this block only
 			// if the referenced transaction comes before the
 			// current one in this block.
-			prevOut := &txIn.PreviousOutpoint
+			prevOut := &txIn.PreviousOutPoint
 			if inFlightIndex, ok := txInFlight[prevOut.Hash]; ok {
 				if i <= inFlightIndex {
 					log.Warnf("InsertBlock: requested hash "+
@@ -661,7 +661,7 @@ func (db *MemDb) InsertBlock(block *btcutil.Block) (int64, error) {
 			}
 
 			// Already checked for existing and valid ranges above.
-			prevOut := &txIn.PreviousOutpoint
+			prevOut := &txIn.PreviousOutPoint
 			originTxns := db.txns[prevOut.Hash]
 			originTxD := originTxns[len(originTxns)-1]
 			originTxD.spentBuf[prevOut.Index] = true

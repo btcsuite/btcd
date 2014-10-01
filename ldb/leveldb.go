@@ -455,8 +455,8 @@ func (db *LevelDb) doSpend(tx *btcwire.MsgTx) error {
 	for txinidx := range tx.TxIn {
 		txin := tx.TxIn[txinidx]
 
-		inTxSha := txin.PreviousOutpoint.Hash
-		inTxidx := txin.PreviousOutpoint.Index
+		inTxSha := txin.PreviousOutPoint.Hash
+		inTxidx := txin.PreviousOutPoint.Index
 
 		if inTxidx == ^uint32(0) {
 			continue
@@ -478,8 +478,8 @@ func (db *LevelDb) unSpend(tx *btcwire.MsgTx) error {
 	for txinidx := range tx.TxIn {
 		txin := tx.TxIn[txinidx]
 
-		inTxSha := txin.PreviousOutpoint.Hash
-		inTxidx := txin.PreviousOutpoint.Index
+		inTxSha := txin.PreviousOutPoint.Hash
+		inTxidx := txin.PreviousOutPoint.Index
 
 		if inTxidx == ^uint32(0) {
 			continue

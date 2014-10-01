@@ -74,12 +74,12 @@ endtest:
 		var txInList []*btcwire.OutPoint
 		for _, tx := range mblock.Transactions {
 			for _, txin := range tx.TxIn {
-				if txin.PreviousOutpoint.Index == uint32(4294967295) {
+				if txin.PreviousOutPoint.Index == uint32(4294967295) {
 					continue
 				}
-				origintxsha := &txin.PreviousOutpoint.Hash
+				origintxsha := &txin.PreviousOutPoint.Hash
 
-				txInList = append(txInList, &txin.PreviousOutpoint)
+				txInList = append(txInList, &txin.PreviousOutPoint)
 				txneededList = append(txneededList, origintxsha)
 				txlookupList = append(txlookupList, origintxsha)
 
