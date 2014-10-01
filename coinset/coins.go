@@ -125,7 +125,7 @@ func NewMsgTxWithInputCoins(inputCoins Coins) *btcwire.MsgTx {
 	msgTx.TxIn = make([]*btcwire.TxIn, len(coins))
 	for i, coin := range coins {
 		msgTx.TxIn[i] = &btcwire.TxIn{
-			PreviousOutpoint: btcwire.OutPoint{
+			PreviousOutPoint: btcwire.OutPoint{
 				Hash:  *coin.Hash(),
 				Index: coin.Index(),
 			},

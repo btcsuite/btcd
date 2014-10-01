@@ -310,7 +310,7 @@ func (bf *Filter) matchTxAndUpdate(tx *btcutil.Tx) bool {
 	// Check if the filter matches any outpoints this transaction spends or
 	// any any data elements in the signature scripts of any of the inputs.
 	for _, txin := range tx.MsgTx().TxIn {
-		if bf.matchesOutPoint(&txin.PreviousOutpoint) {
+		if bf.matchesOutPoint(&txin.PreviousOutPoint) {
 			return true
 		}
 
