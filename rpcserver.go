@@ -833,8 +833,8 @@ func createVinList(mtx *btcwire.MsgTx) ([]btcjson.Vin, error) {
 		if btcchain.IsCoinBase(tx) {
 			vinList[i].Coinbase = hex.EncodeToString(v.SignatureScript)
 		} else {
-			vinList[i].Txid = v.PreviousOutpoint.Hash.String()
-			vinList[i].Vout = v.PreviousOutpoint.Index
+			vinList[i].Txid = v.PreviousOutPoint.Hash.String()
+			vinList[i].Vout = v.PreviousOutPoint.Index
 
 			disbuf, err := btcscript.DisasmString(v.SignatureScript)
 			if err != nil {
@@ -1606,7 +1606,7 @@ func (state *gbtWorkState) blockTemplateResult(useCoinbaseValue bool, submitOld 
 		// when mutiple inputs reference the same transaction.
 		dependsMap := make(map[int64]struct{})
 		for _, txIn := range tx.TxIn {
-			if idx, ok := txIndex[txIn.PreviousOutpoint.Hash]; ok {
+			if idx, ok := txIndex[txIn.PreviousOutPoint.Hash]; ok {
 				dependsMap[idx] = struct{}{}
 			}
 		}
@@ -2306,7 +2306,7 @@ func handleGetRawMempool(s *rpcServer, cmd btcjson.Cmd, closeChan <-chan struct{
 				Depends:          make([]string, 0),
 			}
 			for _, txIn := range desc.Tx.MsgTx().TxIn {
-				hash := &txIn.PreviousOutpoint.Hash
+				hash := &txIn.PreviousOutPoint.Hash
 				if s.server.txMemPool.HaveTransaction(hash) {
 					mpd.Depends = append(mpd.Depends,
 						hash.String())

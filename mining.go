@@ -231,7 +231,7 @@ func createCoinbaseTx(coinbaseScript []byte, nextBlockHeight int64, addr btcutil
 	tx.AddTxIn(&btcwire.TxIn{
 		// Coinbase transactions have no inputs, so previous outpoint is
 		// zero hash and max index.
-		PreviousOutpoint: *btcwire.NewOutPoint(&btcwire.ShaHash{},
+		PreviousOutPoint: *btcwire.NewOutPoint(&btcwire.ShaHash{},
 			btcwire.MaxPrevOutIndex),
 		SignatureScript: coinbaseScript,
 		Sequence:        btcwire.MaxTxInSequenceNum,
@@ -287,8 +287,8 @@ func calcPriority(tx *btcutil.Tx, serializedTxSize int, inputValueAge float64) f
 // the store at the provided height.
 func spendTransaction(txStore btcchain.TxStore, tx *btcutil.Tx, height int64) error {
 	for _, txIn := range tx.MsgTx().TxIn {
-		originHash := &txIn.PreviousOutpoint.Hash
-		originIndex := txIn.PreviousOutpoint.Index
+		originHash := &txIn.PreviousOutPoint.Hash
+		originIndex := txIn.PreviousOutPoint.Index
 		if originTx, exists := txStore[*originHash]; exists {
 			originTx.Spent[originIndex] = true
 		}
@@ -523,8 +523,8 @@ mempoolLoop:
 		prioItem := &txPrioItem{tx: txDesc.Tx}
 		inputValueAge := float64(0.0)
 		for _, txIn := range tx.MsgTx().TxIn {
-			originHash := &txIn.PreviousOutpoint.Hash
-			originIndex := txIn.PreviousOutpoint.Index
+			originHash := &txIn.PreviousOutPoint.Hash
+			originIndex := txIn.PreviousOutPoint.Index
 			txData, exists := txStore[*originHash]
 			if !exists || txData.Err != nil || txData.Tx == nil {
 				if !mempool.HaveTransaction(originHash) {

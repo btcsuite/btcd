@@ -340,7 +340,7 @@ func checkInputsStandard(tx *btcutil.Tx, txStore btcchain.TxStore) error {
 		// It is safe to elide existence and index checks here since
 		// they have already been checked prior to calling this
 		// function.
-		prevOut := txIn.PreviousOutpoint
+		prevOut := txIn.PreviousOutPoint
 		originTx := txStore[prevOut.Hash].Tx.MsgTx()
 		originPkScript := originTx.TxOut[prevOut.Index].PkScript
 
@@ -408,7 +408,7 @@ func (mp *txMemPool) removeOrphan(txHash *btcwire.ShaHash) {
 
 	// Remove the reference from the previous orphan index.
 	for _, txIn := range tx.MsgTx().TxIn {
-		originTxHash := txIn.PreviousOutpoint.Hash
+		originTxHash := txIn.PreviousOutPoint.Hash
 		if orphans, exists := mp.orphansByPrev[originTxHash]; exists {
 			for e := orphans.Front(); e != nil; e = e.Next() {
 				if e.Value.(*btcutil.Tx) == tx {
@@ -485,7 +485,7 @@ func (mp *txMemPool) addOrphan(tx *btcutil.Tx) {
 
 	mp.orphans[*tx.Sha()] = tx
 	for _, txIn := range tx.MsgTx().TxIn {
-		originTxHash := txIn.PreviousOutpoint.Hash
+		originTxHash := txIn.PreviousOutPoint.Hash
 		if mp.orphansByPrev[originTxHash] == nil {
 			mp.orphansByPrev[originTxHash] = list.New()
 		}
@@ -610,7 +610,7 @@ func (mp *txMemPool) removeTransaction(tx *btcutil.Tx) {
 	// by the pool.
 	if txDesc, exists := mp.pool[*txHash]; exists {
 		for _, txIn := range txDesc.Tx.MsgTx().TxIn {
-			delete(mp.outpoints, txIn.PreviousOutpoint)
+			delete(mp.outpoints, txIn.PreviousOutPoint)
 		}
 		delete(mp.pool, *txHash)
 		mp.lastUpdated = time.Now()
@@ -642,7 +642,7 @@ func (mp *txMemPool) RemoveDoubleSpends(tx *btcutil.Tx) {
 	defer mp.Unlock()
 
 	for _, txIn := range tx.MsgTx().TxIn {
-		if txRedeemer, ok := mp.outpoints[txIn.PreviousOutpoint]; ok {
+		if txRedeemer, ok := mp.outpoints[txIn.PreviousOutPoint]; ok {
 			if !txRedeemer.Sha().IsEqual(tx.Sha()) {
 				mp.removeTransaction(txRedeemer)
 			}
@@ -665,7 +665,7 @@ func (mp *txMemPool) addTransaction(tx *btcutil.Tx, height, fee int64) {
 		Fee:    fee,
 	}
 	for _, txIn := range tx.MsgTx().TxIn {
-		mp.outpoints[txIn.PreviousOutpoint] = tx
+		mp.outpoints[txIn.PreviousOutPoint] = tx
 	}
 	mp.lastUpdated = time.Now()
 }
@@ -678,7 +678,7 @@ func (mp *txMemPool) addTransaction(tx *btcutil.Tx, height, fee int64) {
 // This function MUST be called with the mempool lock held (for reads).
 func (mp *txMemPool) checkPoolDoubleSpend(tx *btcutil.Tx) error {
 	for _, txIn := range tx.MsgTx().TxIn {
-		if txR, exists := mp.outpoints[txIn.PreviousOutpoint]; exists {
+		if txR, exists := mp.outpoints[txIn.PreviousOutPoint]; exists {
 			str := fmt.Sprintf("transaction %v in the pool "+
 				"already spends the same coins", txR.Sha())
 			return txRuleError(btcwire.RejectDuplicate, str)

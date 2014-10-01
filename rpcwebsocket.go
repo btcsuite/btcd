@@ -688,7 +688,7 @@ func (m *wsNotificationManager) notifyForTxIns(ops map[btcwire.OutPoint]map[chan
 	txHex := ""
 	wscNotified := make(map[chan struct{}]struct{})
 	for _, txIn := range tx.MsgTx().TxIn {
-		prevOut := &txIn.PreviousOutpoint
+		prevOut := &txIn.PreviousOutPoint
 		if cmap, ok := ops[*prevOut]; ok {
 			if txHex == "" {
 				txHex = txHexString(tx)
@@ -1484,8 +1484,8 @@ func rescanBlock(wsc *wsClient, lookups *rescanKeys, blk *btcutil.Block) {
 		recvNotified := false
 
 		for _, txin := range tx.MsgTx().TxIn {
-			if _, ok := lookups.unspent[txin.PreviousOutpoint]; ok {
-				delete(lookups.unspent, txin.PreviousOutpoint)
+			if _, ok := lookups.unspent[txin.PreviousOutPoint]; ok {
+				delete(lookups.unspent, txin.PreviousOutPoint)
 
 				if spentNotified {
 					continue
