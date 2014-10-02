@@ -109,4 +109,4 @@ signature perform the following:
 -->
 ## License
 
-btcd is licensed under the [copyfree](http://copyfree.org) ISC License.
+btcd and ppcd are licensed under the [copyfree](http://copyfree.org) ISC License.
