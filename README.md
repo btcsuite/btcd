@@ -72,7 +72,7 @@ $ ./ppcd
 ## IRC server
 
 - chat.freenode.net:6697
-- channel #peercoin
+- channel #ppcd
 
 ## Forum
 
