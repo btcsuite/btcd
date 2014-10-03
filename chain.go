@@ -1038,7 +1038,7 @@ func (b *BlockChain) connectBestChain(node *blockNode, block *btcutil.Block, fla
 //  - Latest block has a timestamp newer than 24 hours ago
 //
 // This function is NOT safe for concurrent access.
-func (b *BlockChain) IsCurrent() bool {
+func (b *BlockChain) IsCurrent(timeSource MedianTimeSource) bool {
 	// Not current if there isn't a main (best) chain yet.
 	if b.bestChain == nil {
 		return false
@@ -1053,8 +1053,8 @@ func (b *BlockChain) IsCurrent() bool {
 
 	// Not current if the latest best block has a timestamp before 24 hours
 	// ago.
-	now := time.Now()
-	if b.bestChain.timestamp.Before(now.Add(-24 * time.Hour)) {
+	minus24Hours := timeSource.AdjustedTime().Add(-24 * time.Hour)
+	if b.bestChain.timestamp.Before(minus24Hours) {
 		return false
 	}
 

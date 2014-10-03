@@ -423,7 +423,7 @@ func CountP2SHSigOps(tx *btcutil.Tx, isCoinBaseTx bool, txStore TxStore) (int, e
 //
 // The flags do not modify the behavior of this function directly, however they
 // are needed to pass along to checkProofOfWork.
-func checkBlockSanity(block *btcutil.Block, powLimit *big.Int, flags BehaviorFlags) error {
+func checkBlockSanity(block *btcutil.Block, powLimit *big.Int, timeSource MedianTimeSource, flags BehaviorFlags) error {
 	// A block must have at least one transaction.
 	msgBlock := block.MsgBlock()
 	numTx := len(msgBlock.Transactions)
@@ -469,7 +469,8 @@ func checkBlockSanity(block *btcutil.Block, powLimit *big.Int, flags BehaviorFla
 	}
 
 	// Ensure the block time is not too far in the future.
-	maxTimestamp := time.Now().Add(time.Second * MaxTimeOffsetSeconds)
+	maxTimestamp := timeSource.AdjustedTime().Add(time.Second *
+		MaxTimeOffsetSeconds)
 	if header.Timestamp.After(maxTimestamp) {
 		str := fmt.Sprintf("block timestamp of %v is too far in the "+
 			"future", header.Timestamp)
@@ -551,8 +552,8 @@ func checkBlockSanity(block *btcutil.Block, powLimit *big.Int, flags BehaviorFla
 
 // CheckBlockSanity performs some preliminary checks on a block to ensure it is
 // sane before continuing with block processing.  These checks are context free.
-func CheckBlockSanity(block *btcutil.Block, powLimit *big.Int) error {
-	return checkBlockSanity(block, powLimit, BFNone)
+func CheckBlockSanity(block *btcutil.Block, powLimit *big.Int, timeSource MedianTimeSource) error {
+	return checkBlockSanity(block, powLimit, timeSource, BFNone)
 }
 
 // checkSerializedHeight checks if the signature script in the passed

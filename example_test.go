@@ -45,10 +45,16 @@ func ExampleBlockChain_ProcessBlock() {
 	// the main bitcoin network and ignore notifications.
 	chain := btcchain.New(db, &btcnet.MainNetParams, nil)
 
+	// Create a new median time source that is required by the upcoming
+	// call to ProcessBlock.  Ordinarily this would also add time values
+	// obtained from other peers on the network so the local time is
+	// adjusted to be in agreement with other peers.
+	timeSource := btcchain.NewMedianTime()
+
 	// Process a block.  For this example, we are going to intentionally
 	// cause an error by trying to process the genesis block which already
 	// exists.
-	isOrphan, err := chain.ProcessBlock(genesisBlock, btcchain.BFNone)
+	isOrphan, err := chain.ProcessBlock(genesisBlock, timeSource, btcchain.BFNone)
 	if err != nil {
 		fmt.Printf("Failed to process block: %v\n", err)
 		return
