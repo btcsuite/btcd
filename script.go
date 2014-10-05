@@ -1423,7 +1423,7 @@ type KeyDB interface {
 	GetKey(btcutil.Address) (*ecdsa.PrivateKey, bool, error)
 }
 
-// KeyClosure implements ScriptDB with a closure
+// KeyClosure implements KeyDB with a closure
 type KeyClosure func(btcutil.Address) (*ecdsa.PrivateKey, bool, error)
 
 // GetKey implements KeyDB by returning the result of calling the closure
