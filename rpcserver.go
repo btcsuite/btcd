@@ -3071,7 +3071,7 @@ func handleSubmitBlock(s *rpcServer, cmd btcjson.Cmd, closeChan <-chan struct{})
 	return nil, nil
 }
 
-func verifyChain(db btcdb.Db, level, depth int32) error {
+func verifyChain(db btcdb.Db, level, depth int32, timeSource btcchain.MedianTimeSource) error {
 	_, curHeight64, err := db.NewestSha()
 	if err != nil {
 		rpcsLog.Errorf("Verify is unable to fetch current block "+
@@ -3105,7 +3105,7 @@ func verifyChain(db btcdb.Db, level, depth int32) error {
 		// Level 1 does basic chain sanity checks.
 		if level > 0 {
 			err := btcchain.CheckBlockSanity(block,
-				activeNetParams.PowLimit)
+				activeNetParams.PowLimit, timeSource)
 			if err != nil {
 				rpcsLog.Errorf("Verify is unable to "+
 					"validate block at sha %v height "+
@@ -3140,7 +3140,8 @@ func handleValidateAddress(s *rpcServer, cmd btcjson.Cmd, closeChan <-chan struc
 func handleVerifyChain(s *rpcServer, cmd btcjson.Cmd, closeChan <-chan struct{}) (interface{}, error) {
 	c := cmd.(*btcjson.VerifyChainCmd)
 
-	err := verifyChain(s.server.db, c.CheckLevel, c.CheckDepth)
+	err := verifyChain(s.server.db, c.CheckLevel, c.CheckDepth,
+		s.server.timeSource)
 	return err == nil, nil
 }
 

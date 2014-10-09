@@ -519,7 +519,7 @@ func (b *blockManager) handleTxMsg(tmsg *txMsg) {
 // current returns true if we believe we are synced with our peers, false if we
 // still have blocks to check
 func (b *blockManager) current() bool {
-	if !b.blockChain.IsCurrent() {
+	if !b.blockChain.IsCurrent(b.server.timeSource) {
 		return false
 	}
 
@@ -591,7 +591,8 @@ func (b *blockManager) handleBlockMsg(bmsg *blockMsg) {
 
 	// Process the block to include validation, best chain selection, orphan
 	// handling, etc.
-	isOrphan, err := b.blockChain.ProcessBlock(bmsg.block, behaviorFlags)
+	isOrphan, err := b.blockChain.ProcessBlock(bmsg.block,
+		b.server.timeSource, behaviorFlags)
 	if err != nil {
 		// When the error is a rule error, it means the block was simply
 		// rejected as opposed to something actually going wrong, so log
@@ -1065,7 +1066,8 @@ out:
 
 			case processBlockMsg:
 				isOrphan, err := b.blockChain.ProcessBlock(
-					msg.block, msg.flags)
+					msg.block, b.server.timeSource,
+					msg.flags)
 				if err != nil {
 					msg.reply <- processBlockResponse{
 						isOrphan: false,
