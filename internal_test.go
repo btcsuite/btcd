@@ -34,3 +34,9 @@ func TstTimeSorter(times []time.Time) timeSorter {
 func TstCheckSerializedHeight(coinbaseTx *btcutil.Tx, wantHeight int64) error {
 	return checkSerializedHeight(coinbaseTx, wantHeight)
 }
+
+// TstSetMaxMedianTimeEntries makes the ability to set the maximum number of
+// median tiem entries available to the test package.
+func TstSetMaxMedianTimeEntries(val int) {
+	maxMedianTimeEntries = val
+}
