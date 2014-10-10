@@ -1449,7 +1449,7 @@ func (sc ScriptClosure) GetScript(address btcutil.Address) ([]byte, error) {
 // SignTxOutput signs output idx of the given tx to resolve the script given in
 // pkScript with a signature type of hashType. Any keys required will be
 // looked up by calling getKey() with the string of the given address.
-// Any pay-to-script-hash signatures will be similarly lookedu p by calling
+// Any pay-to-script-hash signatures will be similarly looked up by calling
 // getScript. If previousScript is provided then the results in previousScript
 // will be merged in a type-dependant manner with the newly generated.
 // signature script.
