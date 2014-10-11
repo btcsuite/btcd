@@ -12,6 +12,7 @@ interface.  The functions are only exported while the tests are being run.
 package btcchain
 
 import (
+	"sort"
 	"time"
 
 	"github.com/conformal/btcutil"
@@ -25,7 +26,7 @@ func TstSetCoinbaseMaturity(maturity int64) {
 
 // TstTimeSorter makes the internal timeSorter type available to the test
 // package.
-func TstTimeSorter(times []time.Time) timeSorter {
+func TstTimeSorter(times []time.Time) sort.Interface {
 	return timeSorter(times)
 }
 
