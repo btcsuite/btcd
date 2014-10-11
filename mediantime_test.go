@@ -84,12 +84,17 @@ func TestMedianTime(t *testing.T) {
 			continue
 		}
 
-		adjustedTime := time.Unix(filter.AdjustedTime().Unix(), 0)
-		wantTime := time.Now().Add(filter.Offset())
-		wantTime = time.Unix(wantTime.Unix(), 0)
-		if !adjustedTime.Equal(wantTime) {
+		// Since it is possible that the time.Now call in AdjustedTime
+		// and the time.Now call here in the tests will be off by one
+		// second, allow a fudge factor to compensate.
+		adjustedTime := filter.AdjustedTime()
+		now := time.Unix(time.Now().Unix(), 0)
+		wantTime := now.Add(filter.Offset())
+		wantTime2 := now.Add(filter.Offset() - time.Second)
+		if !adjustedTime.Equal(wantTime) && !adjustedTime.Equal(wantTime2) {
 			t.Errorf("AdjustedTime #%d: unexpected result -- got %v, "+
-				"want %v", i, adjustedTime, wantTime)
+				"want %v or %v", i, adjustedTime, wantTime,
+				wantTime2)
 			continue
 		}
 	}
