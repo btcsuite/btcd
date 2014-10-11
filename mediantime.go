@@ -118,7 +118,8 @@ func (m *medianTime) AddTimeSample(sourceID string, timeVal time.Time) {
 	// of offsets while respecting the maximum number of allowed entries by
 	// replacing the oldest entry with the new entry once the maximum number
 	// of entries is reached.
-	offsetSecs := int64(time.Now().Sub(timeVal).Seconds())
+	now := time.Unix(time.Now().Unix(), 0)
+	offsetSecs := int64(now.Sub(timeVal).Seconds())
 	numOffsets := len(m.offsets)
 	if numOffsets == maxMedianTimeEntries && maxMedianTimeEntries > 0 {
 		m.offsets = m.offsets[1:]

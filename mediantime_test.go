@@ -62,8 +62,8 @@ func TestMedianTime(t *testing.T) {
 		filter := btcchain.NewMedianTime()
 		for j, offset := range test.in {
 			id := strconv.Itoa(j)
-			tOffset := time.Now().Add(time.Duration(offset) *
-				time.Second)
+			now := time.Unix(time.Now().Unix(), 0)
+			tOffset := now.Add(time.Duration(offset) * time.Second)
 			filter.AddTimeSample(id, tOffset)
 
 			// Ensure the duplicate IDs are ignored.
@@ -76,11 +76,16 @@ func TestMedianTime(t *testing.T) {
 			}
 		}
 
+		// Since it is possible that the time.Now call in AddTimeSample
+		// and the time.Now calls here in the tests will be off by one
+		// second, allow a fudge factor to compensate.
 		gotOffset := filter.Offset()
 		wantOffset := time.Duration(test.wantOffset) * time.Second
-		if gotOffset != wantOffset {
+		wantOffset2 := time.Duration(test.wantOffset-1) * time.Second
+		if gotOffset != wantOffset && gotOffset != wantOffset2 {
 			t.Errorf("Offset #%d: unexpected offset -- got %v, "+
-				"want %v", i, gotOffset, wantOffset)
+				"want %v or %v", i, gotOffset, wantOffset,
+				wantOffset2)
 			continue
 		}
 
