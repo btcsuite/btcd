@@ -2518,7 +2518,7 @@ func TestCheckErrorCondition(t *testing.T) {
 type TstSigScript struct {
 	name               string
 	inputs             []TstInput
-	hashtype           byte
+	hashType           btcscript.SigHashType
 	compress           bool
 	scriptAtWrongIndex bool
 }
@@ -2577,7 +2577,7 @@ var SigScriptTests = []TstSigScript{
 				indexOutOfRange:    false,
 			},
 		},
-		hashtype:           btcscript.SigHashAll,
+		hashType:           btcscript.SigHashAll,
 		compress:           false,
 		scriptAtWrongIndex: false,
 	},
@@ -2597,7 +2597,7 @@ var SigScriptTests = []TstSigScript{
 				indexOutOfRange:    false,
 			},
 		},
-		hashtype:           btcscript.SigHashAll,
+		hashType:           btcscript.SigHashAll,
 		compress:           false,
 		scriptAtWrongIndex: false,
 	},
@@ -2611,7 +2611,7 @@ var SigScriptTests = []TstSigScript{
 				indexOutOfRange:    false,
 			},
 		},
-		hashtype:           btcscript.SigHashAll,
+		hashType:           btcscript.SigHashAll,
 		compress:           true,
 		scriptAtWrongIndex: false,
 	},
@@ -2631,12 +2631,12 @@ var SigScriptTests = []TstSigScript{
 				indexOutOfRange:    false,
 			},
 		},
-		hashtype:           btcscript.SigHashAll,
+		hashType:           btcscript.SigHashAll,
 		compress:           true,
 		scriptAtWrongIndex: false,
 	},
 	{
-		name: "hashtype SigHashNone",
+		name: "hashType SigHashNone",
 		inputs: []TstInput{
 			{
 				txout:              btcwire.NewTxOut(coinbaseVal, uncompressedPkScript),
@@ -2645,12 +2645,12 @@ var SigScriptTests = []TstSigScript{
 				indexOutOfRange:    false,
 			},
 		},
-		hashtype:           btcscript.SigHashNone,
+		hashType:           btcscript.SigHashNone,
 		compress:           false,
 		scriptAtWrongIndex: false,
 	},
 	{
-		name: "hashtype SigHashSingle",
+		name: "hashType SigHashSingle",
 		inputs: []TstInput{
 			{
 				txout:              btcwire.NewTxOut(coinbaseVal, uncompressedPkScript),
@@ -2659,12 +2659,12 @@ var SigScriptTests = []TstSigScript{
 				indexOutOfRange:    false,
 			},
 		},
-		hashtype:           btcscript.SigHashSingle,
+		hashType:           btcscript.SigHashSingle,
 		compress:           false,
 		scriptAtWrongIndex: false,
 	},
 	{
-		name: "hashtype SigHashAnyoneCanPay",
+		name: "hashType SigHashAnyoneCanPay",
 		inputs: []TstInput{
 			{
 				txout:              btcwire.NewTxOut(coinbaseVal, uncompressedPkScript),
@@ -2673,12 +2673,12 @@ var SigScriptTests = []TstSigScript{
 				indexOutOfRange:    false,
 			},
 		},
-		hashtype:           btcscript.SigHashAnyOneCanPay,
+		hashType:           btcscript.SigHashAnyOneCanPay,
 		compress:           false,
 		scriptAtWrongIndex: false,
 	},
 	{
-		name: "hashtype non-standard",
+		name: "hashType non-standard",
 		inputs: []TstInput{
 			{
 				txout:              btcwire.NewTxOut(coinbaseVal, uncompressedPkScript),
@@ -2687,7 +2687,7 @@ var SigScriptTests = []TstSigScript{
 				indexOutOfRange:    false,
 			},
 		},
-		hashtype:           0x04,
+		hashType:           0x04,
 		compress:           false,
 		scriptAtWrongIndex: false,
 	},
@@ -2701,7 +2701,7 @@ var SigScriptTests = []TstSigScript{
 				indexOutOfRange:    false,
 			},
 		},
-		hashtype:           btcscript.SigHashAll,
+		hashType:           btcscript.SigHashAll,
 		compress:           true,
 		scriptAtWrongIndex: false,
 	},
@@ -2714,7 +2714,7 @@ var SigScriptTests = []TstSigScript{
 				indexOutOfRange:    false,
 			},
 		},
-		hashtype:           btcscript.SigHashAll,
+		hashType:           btcscript.SigHashAll,
 		compress:           false,
 		scriptAtWrongIndex: false,
 	},
@@ -2734,7 +2734,7 @@ var SigScriptTests = []TstSigScript{
 				indexOutOfRange:    false,
 			},
 		},
-		hashtype:           btcscript.SigHashAll,
+		hashType:           btcscript.SigHashAll,
 		compress:           false,
 		scriptAtWrongIndex: true,
 	},
@@ -2754,14 +2754,14 @@ var SigScriptTests = []TstSigScript{
 				indexOutOfRange:    false,
 			},
 		},
-		hashtype:           btcscript.SigHashAll,
+		hashType:           btcscript.SigHashAll,
 		compress:           false,
 		scriptAtWrongIndex: true,
 	},
 }
 
 // Test the sigscript generation for valid and invalid inputs, all
-// hashtypes, and with and without compression.  This test creates
+// hashTypes, and with and without compression.  This test creates
 // sigscripts to spend fake coinbase inputs, as sigscripts cannot be
 // created for the MsgTxs in txTests, since they come from the blockchain
 // and we don't have the private keys.
@@ -2802,7 +2802,7 @@ nexttest:
 			}
 			script, err = btcscript.SignatureScript(tx, idx,
 				SigScriptTests[i].inputs[j].txout.PkScript,
-				SigScriptTests[i].hashtype, privKey,
+				SigScriptTests[i].hashType, privKey,
 				SigScriptTests[i].compress)
 
 			if (err == nil) != SigScriptTests[i].inputs[j].sigscriptGenerates {
@@ -3239,7 +3239,7 @@ func TestMultiSigScript(t *testing.T) {
 }
 
 func signAndCheck(msg string, tx *btcwire.MsgTx, idx int, pkScript []byte,
-	hashType byte, kdb btcscript.KeyDB, sdb btcscript.ScriptDB,
+	hashType btcscript.SigHashType, kdb btcscript.KeyDB, sdb btcscript.ScriptDB,
 	previousScript []byte) error {
 
 	sigScript, err := btcscript.SignTxOutput(
@@ -3314,7 +3314,7 @@ func TestSignTxOutput(t *testing.T) {
 	// make key
 	// make script based on key.
 	// sign with magic pixie dust.
-	hashTypes := []byte{
+	hashTypes := []btcscript.SigHashType{
 		btcscript.SigHashOld, // no longer used but should act like all
 		btcscript.SigHashAll,
 		btcscript.SigHashNone,

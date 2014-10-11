@@ -145,13 +145,16 @@ var ErrUnsupportedAddress = errors.New("unsupported address type")
 // This timestamp corresponds to Sun Apr 1 00:00:00 UTC 2012.
 var Bip16Activation = time.Unix(1333238400, 0)
 
+// SigHashType represents hash type bits at the end of a signature.
+type SigHashType byte
+
 // Hash type bits from the end of a signature.
 const (
-	SigHashOld          = 0x0
-	SigHashAll          = 0x1
-	SigHashNone         = 0x2
-	SigHashSingle       = 0x3
-	SigHashAnyOneCanPay = 0x80
+	SigHashOld          SigHashType = 0x0
+	SigHashAll          SigHashType = 0x1
+	SigHashNone         SigHashType = 0x2
+	SigHashSingle       SigHashType = 0x3
+	SigHashAnyOneCanPay SigHashType = 0x80
 )
 
 // These are the constants specified for maximums in individual scripts.
@@ -805,7 +808,7 @@ func DisasmString(buf []byte) (string, error) {
 // calcScriptHash will, given the a script and hashtype for the current
 // scriptmachine, calculate the doubleSha256 hash of the transaction and
 // script to be used for signature signing and verification.
-func calcScriptHash(script []parsedOpcode, hashType byte, tx *btcwire.MsgTx, idx int) []byte {
+func calcScriptHash(script []parsedOpcode, hashType SigHashType, tx *btcwire.MsgTx, idx int) []byte {
 
 	// remove all instances of OP_CODESEPARATOR still left in the script
 	script = removeOpcode(script, OP_CODESEPARATOR)
@@ -1097,7 +1100,7 @@ func MultiSigScript(pubkeys []*btcutil.AddressPubKey, nrequired int) ([]byte, er
 // serialized in either a compressed or uncompressed format based on
 // compress. This format must match the same format used to generate
 // the payment address, or the script validation will fail.
-func SignatureScript(tx *btcwire.MsgTx, idx int, subscript []byte, hashType byte, privKey *ecdsa.PrivateKey, compress bool) ([]byte, error) {
+func SignatureScript(tx *btcwire.MsgTx, idx int, subscript []byte, hashType SigHashType, privKey *ecdsa.PrivateKey, compress bool) ([]byte, error) {
 	sig, err := signTxOutput(tx, idx, subscript, hashType, privKey)
 	if err != nil {
 		return nil, err
@@ -1114,7 +1117,7 @@ func SignatureScript(tx *btcwire.MsgTx, idx int, subscript []byte, hashType byte
 	return NewScriptBuilder().AddData(sig).AddData(pkData).Script(), nil
 }
 
-func signTxOutput(tx *btcwire.MsgTx, idx int, subScript []byte, hashType byte,
+func signTxOutput(tx *btcwire.MsgTx, idx int, subScript []byte, hashType SigHashType,
 	key *ecdsa.PrivateKey) ([]byte, error) {
 
 	return signTxOutputCustomReader(rand.Reader, tx, idx, subScript,
@@ -1122,7 +1125,7 @@ func signTxOutput(tx *btcwire.MsgTx, idx int, subScript []byte, hashType byte,
 }
 
 func signTxOutputCustomReader(reader io.Reader, tx *btcwire.MsgTx, idx int,
-	subScript []byte, hashType byte, key *ecdsa.PrivateKey) ([]byte, error) {
+	subScript []byte, hashType SigHashType, key *ecdsa.PrivateKey) ([]byte, error) {
 	parsedScript, err := parseScript(subScript)
 	if err != nil {
 		return nil, fmt.Errorf("cannot parse output script: %v", err)
@@ -1133,10 +1136,11 @@ func signTxOutputCustomReader(reader io.Reader, tx *btcwire.MsgTx, idx int,
 		return nil, fmt.Errorf("cannot sign tx input: %s", err)
 	}
 
-	return append((&btcec.Signature{R: r, S: s}).Serialize(), hashType), nil
+	return append((&btcec.Signature{R: r, S: s}).Serialize(),
+		byte(hashType)), nil
 }
 
-func p2pkSignatureScript(tx *btcwire.MsgTx, idx int, subScript []byte, hashType byte, privKey *ecdsa.PrivateKey) ([]byte, error) {
+func p2pkSignatureScript(tx *btcwire.MsgTx, idx int, subScript []byte, hashType SigHashType, privKey *ecdsa.PrivateKey) ([]byte, error) {
 	sig, err := signTxOutput(tx, idx, subScript, hashType, privKey)
 	if err != nil {
 		return nil, err
@@ -1149,7 +1153,7 @@ func p2pkSignatureScript(tx *btcwire.MsgTx, idx int, subScript []byte, hashType 
 // possible. It returns the generated script and a boolean if the script fulfils
 // the contract (i.e. nrequired signatures are provided).  Since it is arguably
 // legal to not be able to sign any of the outputs, no error is returned.
-func signMultiSig(tx *btcwire.MsgTx, idx int, subScript []byte, hashType byte,
+func signMultiSig(tx *btcwire.MsgTx, idx int, subScript []byte, hashType SigHashType,
 	addresses []btcutil.Address, nRequired int, kdb KeyDB) ([]byte, bool) {
 	// We start with a single OP_FALSE to work around the (now standard)
 	// but in the reference implementation that causes a spurious pop at
@@ -1178,7 +1182,7 @@ func signMultiSig(tx *btcwire.MsgTx, idx int, subScript []byte, hashType byte,
 }
 
 func sign(net *btcnet.Params, tx *btcwire.MsgTx, idx int, subScript []byte,
-	hashType byte, kdb KeyDB, sdb ScriptDB) ([]byte, ScriptClass,
+	hashType SigHashType, kdb KeyDB, sdb ScriptDB) ([]byte, ScriptClass,
 	[]btcutil.Address, int, error) {
 
 	class, addresses, nrequired, err := ExtractPkScriptAddrs(subScript, net)
@@ -1355,7 +1359,7 @@ sigLoop:
 			continue
 		}
 		tSig := sig[:len(sig)-1]
-		hashType := sig[len(sig)-1]
+		hashType := SigHashType(sig[len(sig)-1])
 
 		pSig, err := btcec.ParseDERSignature(tSig, btcec.S256())
 		if err != nil {
@@ -1454,7 +1458,7 @@ func (sc ScriptClosure) GetScript(address btcutil.Address) ([]byte, error) {
 // will be merged in a type-dependant manner with the newly generated.
 // signature script.
 func SignTxOutput(net *btcnet.Params, tx *btcwire.MsgTx, idx int,
-	pkScript []byte, hashType byte, kdb KeyDB, sdb ScriptDB,
+	pkScript []byte, hashType SigHashType, kdb KeyDB, sdb ScriptDB,
 	previousScript []byte) ([]byte, error) {
 
 	sigScript, class, addresses, nrequired, err := sign(net, tx, idx,

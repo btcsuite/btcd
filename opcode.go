@@ -1771,7 +1771,7 @@ func opcodeCheckSig(op *parsedOpcode, s *Script) error {
 	}
 
 	// Trim off hashtype from the signature string.
-	hashType := sigStr[len(sigStr)-1]
+	hashType := SigHashType(sigStr[len(sigStr)-1])
 	sigStr = sigStr[:len(sigStr)-1]
 
 	// Get script from the last OP_CODESEPARATOR and without any subsequent
@@ -1932,7 +1932,8 @@ func opcodeCheckMultiSig(op *parsedOpcode, s *Script) error {
 		// check signatures.
 		success := false
 
-		hash := calcScriptHash(script, signatures[i].ht, &s.tx, s.txidx)
+		hash := calcScriptHash(script, SigHashType(signatures[i].ht),
+			&s.tx, s.txidx)
 	inner:
 		// Find first pubkey that successfully validates signature.
 		// we start off the search from the key that was successful
