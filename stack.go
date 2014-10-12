@@ -14,7 +14,7 @@ import (
 func asInt(v []byte) (*big.Int, error) {
 	// Only 32bit numbers allowed.
 	if len(v) > 4 {
-		return nil, StackErrNumberTooBig
+		return nil, ErrStackNumberTooBig
 	}
 	if len(v) == 0 {
 		return big.NewInt(0), nil
@@ -149,7 +149,7 @@ func (s *Stack) PopBool() (bool, error) {
 func (s *Stack) PeekByteArray(idx int) (so []byte, err error) {
 	sz := len(s.stk)
 	if idx < 0 || idx >= sz {
-		return nil, StackErrUnderflow
+		return nil, ErrStackUnderflow
 	}
 	return s.stk[sz-idx-1], nil
 }
@@ -177,7 +177,7 @@ func (s *Stack) PeekBool(idx int) (i bool, err error) {
 func (s *Stack) nipN(idx int) (so []byte, err error) {
 	sz := len(s.stk)
 	if idx < 0 || idx > sz-1 {
-		err = StackErrUnderflow
+		err = ErrStackUnderflow
 		return
 	}
 	so = s.stk[sz-idx-1]
@@ -231,7 +231,7 @@ func (s *Stack) Depth() (sz int) {
 // DropN(2): 1,2,3 -> 1
 func (s *Stack) DropN(n int) error {
 	if n < 1 {
-		return StackErrInvalidArgs
+		return ErrStackInvalidArgs
 	}
 	for ; n > 0; n-- {
 		_, err := s.PopByteArray()
@@ -248,7 +248,7 @@ func (s *Stack) DropN(n int) error {
 // DupN(2): 1,2,3 -> 1,2,3,2,3
 func (s *Stack) DupN(n int) error {
 	if n < 1 {
-		return StackErrInvalidArgs
+		return ErrStackInvalidArgs
 	}
 	// Iteratively duplicate the value n-1 down the stack n times.
 	// this leaves us with an in-order duplicate of the top N items on the
@@ -268,7 +268,7 @@ func (s *Stack) DupN(n int) error {
 // RotN(1): 1,2,3 -> 2,3,1
 func (s *Stack) RotN(n int) error {
 	if n < 1 {
-		return StackErrInvalidArgs
+		return ErrStackInvalidArgs
 	}
 	entry := 3*n - 1
 	// Nip the 3n-1th item from the stack to the top n times to rotate
@@ -290,7 +290,7 @@ func (s *Stack) RotN(n int) error {
 // SwapN(2): 1,2,3,4 -> 3,4,1,2
 func (s *Stack) SwapN(n int) error {
 	if n < 1 {
-		return StackErrInvalidArgs
+		return ErrStackInvalidArgs
 	}
 	entry := 2*n - 1
 	for i := n; i > 0; i-- {
@@ -311,7 +311,7 @@ func (s *Stack) SwapN(n int) error {
 // OverN(2): 1,2,3,4 -> 1,2,3,4,1,2
 func (s *Stack) OverN(n int) error {
 	if n < 1 {
-		return StackErrInvalidArgs
+		return ErrStackInvalidArgs
 	}
 	// Copy 2n-1th entry to top of the stack
 	entry := 2*n - 1

@@ -39,7 +39,7 @@ var stackTests = []stackTest{
 			_, err := stack.PeekByteArray(5)
 			return err
 		},
-		btcscript.StackErrUnderflow,
+		btcscript.ErrStackUnderflow,
 		[][]byte{},
 	},
 	{
@@ -49,7 +49,7 @@ var stackTests = []stackTest{
 			_, err := stack.PeekInt(5)
 			return err
 		},
-		btcscript.StackErrUnderflow,
+		btcscript.ErrStackUnderflow,
 		[][]byte{},
 	},
 	{
@@ -59,7 +59,7 @@ var stackTests = []stackTest{
 			_, err := stack.PeekBool(5)
 			return err
 		},
-		btcscript.StackErrUnderflow,
+		btcscript.ErrStackUnderflow,
 		[][]byte{},
 	},
 	{
@@ -121,7 +121,7 @@ var stackTests = []stackTest{
 			}
 			return nil
 		},
-		btcscript.StackErrUnderflow,
+		btcscript.ErrStackUnderflow,
 		[][]byte{},
 	},
 	{
@@ -169,7 +169,7 @@ var stackTests = []stackTest{
 
 			return nil
 		},
-		btcscript.StackErrUnderflow,
+		btcscript.ErrStackUnderflow,
 		[][]byte{},
 	},
 	{
@@ -411,7 +411,7 @@ var stackTests = []stackTest{
 
 			return nil
 		},
-		btcscript.StackErrInvalidArgs,
+		btcscript.ErrStackInvalidArgs,
 		[][]byte{},
 	},
 	{
@@ -425,7 +425,7 @@ var stackTests = []stackTest{
 
 			return nil
 		},
-		btcscript.StackErrInvalidArgs,
+		btcscript.ErrStackInvalidArgs,
 		[][]byte{},
 	},
 	{
@@ -439,7 +439,7 @@ var stackTests = []stackTest{
 
 			return nil
 		},
-		btcscript.StackErrUnderflow,
+		btcscript.ErrStackUnderflow,
 		[][]byte{},
 	},
 	{
@@ -453,7 +453,7 @@ var stackTests = []stackTest{
 
 			return nil
 		},
-		btcscript.StackErrInvalidArgs,
+		btcscript.ErrStackInvalidArgs,
 		[][]byte{},
 	},
 	{
@@ -602,7 +602,7 @@ var stackTests = []stackTest{
 			// bite off more than we can chew
 			return stack.NipN(3)
 		},
-		btcscript.StackErrUnderflow,
+		btcscript.ErrStackUnderflow,
 		[][]byte{{2}, {3}},
 	},
 	{
@@ -612,7 +612,7 @@ var stackTests = []stackTest{
 			// bite off more than we can chew
 			return stack.NipN(3)
 		},
-		btcscript.StackErrUnderflow,
+		btcscript.ErrStackUnderflow,
 		[][]byte{{2}, {3}},
 	},
 	{
@@ -630,7 +630,7 @@ var stackTests = []stackTest{
 		func(stack *btcscript.Stack) error {
 			return stack.Tuck()
 		},
-		btcscript.StackErrUnderflow,
+		btcscript.ErrStackUnderflow,
 		[][]byte{},
 	},
 	{
@@ -639,7 +639,7 @@ var stackTests = []stackTest{
 		func(stack *btcscript.Stack) error {
 			return stack.Tuck()
 		},
-		btcscript.StackErrUnderflow,
+		btcscript.ErrStackUnderflow,
 		[][]byte{},
 	},
 	{
@@ -684,7 +684,7 @@ var stackTests = []stackTest{
 		func(stack *btcscript.Stack) error {
 			return stack.DropN(5)
 		},
-		btcscript.StackErrUnderflow,
+		btcscript.ErrStackUnderflow,
 		[][]byte{},
 	},
 	{
@@ -693,7 +693,7 @@ var stackTests = []stackTest{
 		func(stack *btcscript.Stack) error {
 			return stack.DropN(0)
 		},
-		btcscript.StackErrInvalidArgs,
+		btcscript.ErrStackInvalidArgs,
 		[][]byte{},
 	},
 	{
@@ -720,7 +720,7 @@ var stackTests = []stackTest{
 		func(stack *btcscript.Stack) error {
 			return stack.RotN(1)
 		},
-		btcscript.StackErrUnderflow,
+		btcscript.ErrStackUnderflow,
 		[][]byte{},
 	},
 	{
@@ -729,7 +729,7 @@ var stackTests = []stackTest{
 		func(stack *btcscript.Stack) error {
 			return stack.RotN(0)
 		},
-		btcscript.StackErrInvalidArgs,
+		btcscript.ErrStackInvalidArgs,
 		[][]byte{},
 	},
 	{
@@ -756,7 +756,7 @@ var stackTests = []stackTest{
 		func(stack *btcscript.Stack) error {
 			return stack.SwapN(1)
 		},
-		btcscript.StackErrUnderflow,
+		btcscript.ErrStackUnderflow,
 		[][]byte{},
 	},
 	{
@@ -765,7 +765,7 @@ var stackTests = []stackTest{
 		func(stack *btcscript.Stack) error {
 			return stack.SwapN(0)
 		},
-		btcscript.StackErrInvalidArgs,
+		btcscript.ErrStackInvalidArgs,
 		[][]byte{},
 	},
 	{
@@ -792,7 +792,7 @@ var stackTests = []stackTest{
 		func(stack *btcscript.Stack) error {
 			return stack.OverN(1)
 		},
-		btcscript.StackErrUnderflow,
+		btcscript.ErrStackUnderflow,
 		[][]byte{},
 	},
 	{
@@ -801,7 +801,7 @@ var stackTests = []stackTest{
 		func(stack *btcscript.Stack) error {
 			return stack.OverN(0)
 		},
-		btcscript.StackErrInvalidArgs,
+		btcscript.ErrStackInvalidArgs,
 		[][]byte{},
 	},
 	{
@@ -828,7 +828,7 @@ var stackTests = []stackTest{
 		func(stack *btcscript.Stack) error {
 			return stack.PickN(1)
 		},
-		btcscript.StackErrUnderflow,
+		btcscript.ErrStackUnderflow,
 		[][]byte{},
 	},
 	{
@@ -855,7 +855,7 @@ var stackTests = []stackTest{
 		func(stack *btcscript.Stack) error {
 			return stack.RollN(1)
 		},
-		btcscript.StackErrUnderflow,
+		btcscript.ErrStackUnderflow,
 		[][]byte{},
 	},
 	{
@@ -958,7 +958,7 @@ var stackTests = []stackTest{
 			_, err := stack.PopInt()
 			return err
 		},
-		btcscript.StackErrUnderflow,
+		btcscript.ErrStackUnderflow,
 		[][]byte{},
 	},
 }

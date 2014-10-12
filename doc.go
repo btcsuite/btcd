@@ -32,7 +32,7 @@ what conditions must be met in order to spend bitcoins.
 
 Errors
 
-Errors returned by this package are of the form btcscript.StackErrX where X
+Errors returned by this package are of the form btcscript.ErrStackX where X
 indicates the specific error.  See Variables in the package documentation for a
 full list.
 */

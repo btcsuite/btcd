@@ -99,7 +99,7 @@ var popTests = []popTest{
 			opcode: opcodemapPreinit[OP_FALSE],
 			data:   make([]byte, 1),
 		},
-		expectedErr: StackErrInvalidOpcode,
+		expectedErr: ErrStackInvalidOpcode,
 	},
 	{
 		name: "OP_DATA_1 short",
@@ -107,7 +107,7 @@ var popTests = []popTest{
 			opcode: opcodemapPreinit[OP_DATA_1],
 			data:   nil,
 		},
-		expectedErr: StackErrInvalidOpcode,
+		expectedErr: ErrStackInvalidOpcode,
 	},
 	{
 		name: "OP_DATA_1",
@@ -123,7 +123,7 @@ var popTests = []popTest{
 			opcode: opcodemapPreinit[OP_DATA_1],
 			data:   make([]byte, 2),
 		},
-		expectedErr: StackErrInvalidOpcode,
+		expectedErr: ErrStackInvalidOpcode,
 	},
 	{
 		name: "OP_DATA_2 short",
@@ -131,7 +131,7 @@ var popTests = []popTest{
 			opcode: opcodemapPreinit[OP_DATA_2],
 			data:   make([]byte, 1),
 		},
-		expectedErr: StackErrInvalidOpcode,
+		expectedErr: ErrStackInvalidOpcode,
 	},
 	{
 		name: "OP_DATA_2",
@@ -147,7 +147,7 @@ var popTests = []popTest{
 			opcode: opcodemapPreinit[OP_DATA_2],
 			data:   make([]byte, 3),
 		},
-		expectedErr: StackErrInvalidOpcode,
+		expectedErr: ErrStackInvalidOpcode,
 	},
 	{
 		name: "OP_DATA_3 short",
@@ -155,7 +155,7 @@ var popTests = []popTest{
 			opcode: opcodemapPreinit[OP_DATA_3],
 			data:   make([]byte, 2),
 		},
-		expectedErr: StackErrInvalidOpcode,
+		expectedErr: ErrStackInvalidOpcode,
 	},
 	{
 		name: "OP_DATA_3",
@@ -171,7 +171,7 @@ var popTests = []popTest{
 			opcode: opcodemapPreinit[OP_DATA_3],
 			data:   make([]byte, 4),
 		},
-		expectedErr: StackErrInvalidOpcode,
+		expectedErr: ErrStackInvalidOpcode,
 	},
 	{
 		name: "OP_DATA_4 short",
@@ -179,7 +179,7 @@ var popTests = []popTest{
 			opcode: opcodemapPreinit[OP_DATA_4],
 			data:   make([]byte, 3),
 		},
-		expectedErr: StackErrInvalidOpcode,
+		expectedErr: ErrStackInvalidOpcode,
 	},
 	{
 		name: "OP_DATA_4",
@@ -195,7 +195,7 @@ var popTests = []popTest{
 			opcode: opcodemapPreinit[OP_DATA_4],
 			data:   make([]byte, 5),
 		},
-		expectedErr: StackErrInvalidOpcode,
+		expectedErr: ErrStackInvalidOpcode,
 	},
 	{
 		name: "OP_DATA_5 short",
@@ -203,7 +203,7 @@ var popTests = []popTest{
 			opcode: opcodemapPreinit[OP_DATA_5],
 			data:   make([]byte, 4),
 		},
-		expectedErr: StackErrInvalidOpcode,
+		expectedErr: ErrStackInvalidOpcode,
 	},
 	{
 		name: "OP_DATA_5",
@@ -219,7 +219,7 @@ var popTests = []popTest{
 			opcode: opcodemapPreinit[OP_DATA_5],
 			data:   make([]byte, 6),
 		},
-		expectedErr: StackErrInvalidOpcode,
+		expectedErr: ErrStackInvalidOpcode,
 	},
 	{
 		name: "OP_DATA_6 short",
@@ -227,7 +227,7 @@ var popTests = []popTest{
 			opcode: opcodemapPreinit[OP_DATA_6],
 			data:   make([]byte, 5),
 		},
-		expectedErr: StackErrInvalidOpcode,
+		expectedErr: ErrStackInvalidOpcode,
 	},
 	{
 		name: "OP_DATA_6",
@@ -243,7 +243,7 @@ var popTests = []popTest{
 			opcode: opcodemapPreinit[OP_DATA_6],
 			data:   make([]byte, 7),
 		},
-		expectedErr: StackErrInvalidOpcode,
+		expectedErr: ErrStackInvalidOpcode,
 	},
 	{
 		name: "OP_DATA_7 short",
@@ -251,7 +251,7 @@ var popTests = []popTest{
 			opcode: opcodemapPreinit[OP_DATA_7],
 			data:   make([]byte, 6),
 		},
-		expectedErr: StackErrInvalidOpcode,
+		expectedErr: ErrStackInvalidOpcode,
 	},
 	{
 		name: "OP_DATA_7",
@@ -267,7 +267,7 @@ var popTests = []popTest{
 			opcode: opcodemapPreinit[OP_DATA_7],
 			data:   make([]byte, 8),
 		},
-		expectedErr: StackErrInvalidOpcode,
+		expectedErr: ErrStackInvalidOpcode,
 	},
 	{
 		name: "OP_DATA_8 short",
@@ -275,7 +275,7 @@ var popTests = []popTest{
 			opcode: opcodemapPreinit[OP_DATA_8],
 			data:   make([]byte, 7),
 		},
-		expectedErr: StackErrInvalidOpcode,
+		expectedErr: ErrStackInvalidOpcode,
 	},
 	{
 		name: "OP_DATA_8",
@@ -291,7 +291,7 @@ var popTests = []popTest{
 			opcode: opcodemapPreinit[OP_DATA_8],
 			data:   make([]byte, 9),
 		},
-		expectedErr: StackErrInvalidOpcode,
+		expectedErr: ErrStackInvalidOpcode,
 	},
 	{
 		name: "OP_DATA_9 short",
@@ -299,7 +299,7 @@ var popTests = []popTest{
 			opcode: opcodemapPreinit[OP_DATA_9],
 			data:   make([]byte, 8),
 		},
-		expectedErr: StackErrInvalidOpcode,
+		expectedErr: ErrStackInvalidOpcode,
 	},
 	{
 		name: "OP_DATA_9",
@@ -315,7 +315,7 @@ var popTests = []popTest{
 			opcode: opcodemapPreinit[OP_DATA_9],
 			data:   make([]byte, 10),
 		},
-		expectedErr: StackErrInvalidOpcode,
+		expectedErr: ErrStackInvalidOpcode,
 	},
 	{
 		name: "OP_DATA_10 short",
@@ -323,7 +323,7 @@ var popTests = []popTest{
 			opcode: opcodemapPreinit[OP_DATA_10],
 			data:   make([]byte, 9),
 		},
-		expectedErr: StackErrInvalidOpcode,
+		expectedErr: ErrStackInvalidOpcode,
 	},
 	{
 		name: "OP_DATA_10",
@@ -339,7 +339,7 @@ var popTests = []popTest{
 			opcode: opcodemapPreinit[OP_DATA_10],
 			data:   make([]byte, 11),
 		},
-		expectedErr: StackErrInvalidOpcode,
+		expectedErr: ErrStackInvalidOpcode,
 	},
 	{
 		name: "OP_DATA_11 short",
@@ -347,7 +347,7 @@ var popTests = []popTest{
 			opcode: opcodemapPreinit[OP_DATA_11],
 			data:   make([]byte, 10),
 		},
-		expectedErr: StackErrInvalidOpcode,
+		expectedErr: ErrStackInvalidOpcode,
 	},
 	{
 		name: "OP_DATA_11",
@@ -363,7 +363,7 @@ var popTests = []popTest{
 			opcode: opcodemapPreinit[OP_DATA_11],
 			data:   make([]byte, 12),
 		},
-		expectedErr: StackErrInvalidOpcode,
+		expectedErr: ErrStackInvalidOpcode,
 	},
 	{
 		name: "OP_DATA_12 short",
@@ -371,7 +371,7 @@ var popTests = []popTest{
 			opcode: opcodemapPreinit[OP_DATA_12],
 			data:   make([]byte, 11),
 		},
-		expectedErr: StackErrInvalidOpcode,
+		expectedErr: ErrStackInvalidOpcode,
 	},
 	{
 		name: "OP_DATA_12",
@@ -387,7 +387,7 @@ var popTests = []popTest{
 			opcode: opcodemapPreinit[OP_DATA_12],
 			data:   make([]byte, 13),
 		},
-		expectedErr: StackErrInvalidOpcode,
+		expectedErr: ErrStackInvalidOpcode,
 	},
 	{
 		name: "OP_DATA_13 short",
@@ -395,7 +395,7 @@ var popTests = []popTest{
 			opcode: opcodemapPreinit[OP_DATA_13],
 			data:   make([]byte, 12),
 		},
-		expectedErr: StackErrInvalidOpcode,
+		expectedErr: ErrStackInvalidOpcode,
 	},
 	{
 		name: "OP_DATA_13",
@@ -411,7 +411,7 @@ var popTests = []popTest{
 			opcode: opcodemapPreinit[OP_DATA_13],
 			data:   make([]byte, 14),
 		},
-		expectedErr: StackErrInvalidOpcode,
+		expectedErr: ErrStackInvalidOpcode,
 	},
 	{
 		name: "OP_DATA_14 short",
@@ -419,7 +419,7 @@ var popTests = []popTest{
 			opcode: opcodemapPreinit[OP_DATA_14],
 			data:   make([]byte, 13),
 		},
-		expectedErr: StackErrInvalidOpcode,
+		expectedErr: ErrStackInvalidOpcode,
 	},
 	{
 		name: "OP_DATA_14",
@@ -435,7 +435,7 @@ var popTests = []popTest{
 			opcode: opcodemapPreinit[OP_DATA_14],
 			data:   make([]byte, 15),
 		},
-		expectedErr: StackErrInvalidOpcode,
+		expectedErr: ErrStackInvalidOpcode,
 	},
 	{
 		name: "OP_DATA_15 short",
@@ -443,7 +443,7 @@ var popTests = []popTest{
 			opcode: opcodemapPreinit[OP_DATA_15],
 			data:   make([]byte, 14),
 		},
-		expectedErr: StackErrInvalidOpcode,
+		expectedErr: ErrStackInvalidOpcode,
 	},
 	{
 		name: "OP_DATA_15",
@@ -459,7 +459,7 @@ var popTests = []popTest{
 			opcode: opcodemapPreinit[OP_DATA_15],
 			data:   make([]byte, 16),
 		},
-		expectedErr: StackErrInvalidOpcode,
+		expectedErr: ErrStackInvalidOpcode,
 	},
 	{
 		name: "OP_DATA_16 short",
@@ -467,7 +467,7 @@ var popTests = []popTest{
 			opcode: opcodemapPreinit[OP_DATA_16],
 			data:   make([]byte, 15),
 		},
-		expectedErr: StackErrInvalidOpcode,
+		expectedErr: ErrStackInvalidOpcode,
 	},
 	{
 		name: "OP_DATA_16",
@@ -483,7 +483,7 @@ var popTests = []popTest{
 			opcode: opcodemapPreinit[OP_DATA_16],
 			data:   make([]byte, 17),
 		},
-		expectedErr: StackErrInvalidOpcode,
+		expectedErr: ErrStackInvalidOpcode,
 	},
 	{
 		name: "OP_DATA_17 short",
@@ -491,7 +491,7 @@ var popTests = []popTest{
 			opcode: opcodemapPreinit[OP_DATA_17],
 			data:   make([]byte, 16),
 		},
-		expectedErr: StackErrInvalidOpcode,
+		expectedErr: ErrStackInvalidOpcode,
 	},
 	{
 		name: "OP_DATA_17",
@@ -507,7 +507,7 @@ var popTests = []popTest{
 			opcode: opcodemapPreinit[OP_DATA_17],
 			data:   make([]byte, 18),
 		},
-		expectedErr: StackErrInvalidOpcode,
+		expectedErr: ErrStackInvalidOpcode,
 	},
 	{
 		name: "OP_DATA_18 short",
@@ -515,7 +515,7 @@ var popTests = []popTest{
 			opcode: opcodemapPreinit[OP_DATA_18],
 			data:   make([]byte, 17),
 		},
-		expectedErr: StackErrInvalidOpcode,
+		expectedErr: ErrStackInvalidOpcode,
 	},
 	{
 		name: "OP_DATA_18",
@@ -531,7 +531,7 @@ var popTests = []popTest{
 			opcode: opcodemapPreinit[OP_DATA_18],
 			data:   make([]byte, 19),
 		},
-		expectedErr: StackErrInvalidOpcode,
+		expectedErr: ErrStackInvalidOpcode,
 	},
 	{
 		name: "OP_DATA_19 short",
@@ -539,7 +539,7 @@ var popTests = []popTest{
 			opcode: opcodemapPreinit[OP_DATA_19],
 			data:   make([]byte, 18),
 		},
-		expectedErr: StackErrInvalidOpcode,
+		expectedErr: ErrStackInvalidOpcode,
 	},
 	{
 		name: "OP_DATA_19",
@@ -555,7 +555,7 @@ var popTests = []popTest{
 			opcode: opcodemapPreinit[OP_DATA_19],
 			data:   make([]byte, 20),
 		},
-		expectedErr: StackErrInvalidOpcode,
+		expectedErr: ErrStackInvalidOpcode,
 	},
 	{
 		name: "OP_DATA_20 short",
@@ -563,7 +563,7 @@ var popTests = []popTest{
 			opcode: opcodemapPreinit[OP_DATA_20],
 			data:   make([]byte, 19),
 		},
-		expectedErr: StackErrInvalidOpcode,
+		expectedErr: ErrStackInvalidOpcode,
 	},
 	{
 		name: "OP_DATA_20",
@@ -579,7 +579,7 @@ var popTests = []popTest{
 			opcode: opcodemapPreinit[OP_DATA_20],
 			data:   make([]byte, 21),
 		},
-		expectedErr: StackErrInvalidOpcode,
+		expectedErr: ErrStackInvalidOpcode,
 	},
 	{
 		name: "OP_DATA_21 short",
@@ -587,7 +587,7 @@ var popTests = []popTest{
 			opcode: opcodemapPreinit[OP_DATA_21],
 			data:   make([]byte, 20),
 		},
-		expectedErr: StackErrInvalidOpcode,
+		expectedErr: ErrStackInvalidOpcode,
 	},
 	{
 		name: "OP_DATA_21",
@@ -603,7 +603,7 @@ var popTests = []popTest{
 			opcode: opcodemapPreinit[OP_DATA_21],
 			data:   make([]byte, 22),
 		},
-		expectedErr: StackErrInvalidOpcode,
+		expectedErr: ErrStackInvalidOpcode,
 	},
 	{
 		name: "OP_DATA_22 short",
@@ -611,7 +611,7 @@ var popTests = []popTest{
 			opcode: opcodemapPreinit[OP_DATA_22],
 			data:   make([]byte, 21),
 		},
-		expectedErr: StackErrInvalidOpcode,
+		expectedErr: ErrStackInvalidOpcode,
 	},
 	{
 		name: "OP_DATA_22",
@@ -627,7 +627,7 @@ var popTests = []popTest{
 			opcode: opcodemapPreinit[OP_DATA_22],
 			data:   make([]byte, 23),
 		},
-		expectedErr: StackErrInvalidOpcode,
+		expectedErr: ErrStackInvalidOpcode,
 	},
 	{
 		name: "OP_DATA_23 short",
@@ -635,7 +635,7 @@ var popTests = []popTest{
 			opcode: opcodemapPreinit[OP_DATA_23],
 			data:   make([]byte, 22),
 		},
-		expectedErr: StackErrInvalidOpcode,
+		expectedErr: ErrStackInvalidOpcode,
 	},
 	{
 		name: "OP_DATA_23",
@@ -651,7 +651,7 @@ var popTests = []popTest{
 			opcode: opcodemapPreinit[OP_DATA_23],
 			data:   make([]byte, 24),
 		},
-		expectedErr: StackErrInvalidOpcode,
+		expectedErr: ErrStackInvalidOpcode,
 	},
 	{
 		name: "OP_DATA_24 short",
@@ -659,7 +659,7 @@ var popTests = []popTest{
 			opcode: opcodemapPreinit[OP_DATA_24],
 			data:   make([]byte, 23),
 		},
-		expectedErr: StackErrInvalidOpcode,
+		expectedErr: ErrStackInvalidOpcode,
 	},
 	{
 		name: "OP_DATA_24",
@@ -675,7 +675,7 @@ var popTests = []popTest{
 			opcode: opcodemapPreinit[OP_DATA_24],
 			data:   make([]byte, 25),
 		},
-		expectedErr: StackErrInvalidOpcode,
+		expectedErr: ErrStackInvalidOpcode,
 	},
 	{
 		name: "OP_DATA_25 short",
@@ -683,7 +683,7 @@ var popTests = []popTest{
 			opcode: opcodemapPreinit[OP_DATA_25],
 			data:   make([]byte, 24),
 		},
-		expectedErr: StackErrInvalidOpcode,
+		expectedErr: ErrStackInvalidOpcode,
 	},
 	{
 		name: "OP_DATA_25",
@@ -699,7 +699,7 @@ var popTests = []popTest{
 			opcode: opcodemapPreinit[OP_DATA_25],
 			data:   make([]byte, 26),
 		},
-		expectedErr: StackErrInvalidOpcode,
+		expectedErr: ErrStackInvalidOpcode,
 	},
 	{
 		name: "OP_DATA_26 short",
@@ -707,7 +707,7 @@ var popTests = []popTest{
 			opcode: opcodemapPreinit[OP_DATA_26],
 			data:   make([]byte, 25),
 		},
-		expectedErr: StackErrInvalidOpcode,
+		expectedErr: ErrStackInvalidOpcode,
 	},
 	{
 		name: "OP_DATA_26",
@@ -723,7 +723,7 @@ var popTests = []popTest{
 			opcode: opcodemapPreinit[OP_DATA_26],
 			data:   make([]byte, 27),
 		},
-		expectedErr: StackErrInvalidOpcode,
+		expectedErr: ErrStackInvalidOpcode,
 	},
 	{
 		name: "OP_DATA_27 short",
@@ -731,7 +731,7 @@ var popTests = []popTest{
 			opcode: opcodemapPreinit[OP_DATA_27],
 			data:   make([]byte, 26),
 		},
-		expectedErr: StackErrInvalidOpcode,
+		expectedErr: ErrStackInvalidOpcode,
 	},
 	{
 		name: "OP_DATA_27",
@@ -747,7 +747,7 @@ var popTests = []popTest{
 			opcode: opcodemapPreinit[OP_DATA_27],
 			data:   make([]byte, 28),
 		},
-		expectedErr: StackErrInvalidOpcode,
+		expectedErr: ErrStackInvalidOpcode,
 	},
 	{
 		name: "OP_DATA_28 short",
@@ -755,7 +755,7 @@ var popTests = []popTest{
 			opcode: opcodemapPreinit[OP_DATA_28],
 			data:   make([]byte, 27),
 		},
-		expectedErr: StackErrInvalidOpcode,
+		expectedErr: ErrStackInvalidOpcode,
 	},
 	{
 		name: "OP_DATA_28",
@@ -771,7 +771,7 @@ var popTests = []popTest{
 			opcode: opcodemapPreinit[OP_DATA_28],
 			data:   make([]byte, 29),
 		},
-		expectedErr: StackErrInvalidOpcode,
+		expectedErr: ErrStackInvalidOpcode,
 	},
 	{
 		name: "OP_DATA_29 short",
@@ -779,7 +779,7 @@ var popTests = []popTest{
 			opcode: opcodemapPreinit[OP_DATA_29],
 			data:   make([]byte, 28),
 		},
-		expectedErr: StackErrInvalidOpcode,
+		expectedErr: ErrStackInvalidOpcode,
 	},
 	{
 		name: "OP_DATA_29",
@@ -795,7 +795,7 @@ var popTests = []popTest{
 			opcode: opcodemapPreinit[OP_DATA_29],
 			data:   make([]byte, 30),
 		},
-		expectedErr: StackErrInvalidOpcode,
+		expectedErr: ErrStackInvalidOpcode,
 	},
 	{
 		name: "OP_DATA_30 short",
@@ -803,7 +803,7 @@ var popTests = []popTest{
 			opcode: opcodemapPreinit[OP_DATA_30],
 			data:   make([]byte, 29),
 		},
-		expectedErr: StackErrInvalidOpcode,
+		expectedErr: ErrStackInvalidOpcode,
 	},
 	{
 		name: "OP_DATA_30",
@@ -819,7 +819,7 @@ var popTests = []popTest{
 			opcode: opcodemapPreinit[OP_DATA_30],
 			data:   make([]byte, 31),
 		},
-		expectedErr: StackErrInvalidOpcode,
+		expectedErr: ErrStackInvalidOpcode,
 	},
 	{
 		name: "OP_DATA_31 short",
@@ -827,7 +827,7 @@ var popTests = []popTest{
 			opcode: opcodemapPreinit[OP_DATA_31],
 			data:   make([]byte, 30),
 		},
-		expectedErr: StackErrInvalidOpcode,
+		expectedErr: ErrStackInvalidOpcode,
 	},
 	{
 		name: "OP_DATA_31",
@@ -843,7 +843,7 @@ var popTests = []popTest{
 			opcode: opcodemapPreinit[OP_DATA_31],
 			data:   make([]byte, 32),
 		},
-		expectedErr: StackErrInvalidOpcode,
+		expectedErr: ErrStackInvalidOpcode,
 	},
 	{
 		name: "OP_DATA_32 short",
@@ -851,7 +851,7 @@ var popTests = []popTest{
 			opcode: opcodemapPreinit[OP_DATA_32],
 			data:   make([]byte, 31),
 		},
-		expectedErr: StackErrInvalidOpcode,
+		expectedErr: ErrStackInvalidOpcode,
 	},
 	{
 		name: "OP_DATA_32",
@@ -867,7 +867,7 @@ var popTests = []popTest{
 			opcode: opcodemapPreinit[OP_DATA_32],
 			data:   make([]byte, 33),
 		},
-		expectedErr: StackErrInvalidOpcode,
+		expectedErr: ErrStackInvalidOpcode,
 	},
 	{
 		name: "OP_DATA_33 short",
@@ -875,7 +875,7 @@ var popTests = []popTest{
 			opcode: opcodemapPreinit[OP_DATA_33],
 			data:   make([]byte, 32),
 		},
-		expectedErr: StackErrInvalidOpcode,
+		expectedErr: ErrStackInvalidOpcode,
 	},
 	{
 		name: "OP_DATA_33",
@@ -891,7 +891,7 @@ var popTests = []popTest{
 			opcode: opcodemapPreinit[OP_DATA_33],
 			data:   make([]byte, 34),
 		},
-		expectedErr: StackErrInvalidOpcode,
+		expectedErr: ErrStackInvalidOpcode,
 	},
 	{
 		name: "OP_DATA_34 short",
@@ -899,7 +899,7 @@ var popTests = []popTest{
 			opcode: opcodemapPreinit[OP_DATA_34],
 			data:   make([]byte, 33),
 		},
-		expectedErr: StackErrInvalidOpcode,
+		expectedErr: ErrStackInvalidOpcode,
 	},
 	{
 		name: "OP_DATA_34",
@@ -915,7 +915,7 @@ var popTests = []popTest{
 			opcode: opcodemapPreinit[OP_DATA_34],
 			data:   make([]byte, 35),
 		},
-		expectedErr: StackErrInvalidOpcode,
+		expectedErr: ErrStackInvalidOpcode,
 	},
 	{
 		name: "OP_DATA_35 short",
@@ -923,7 +923,7 @@ var popTests = []popTest{
 			opcode: opcodemapPreinit[OP_DATA_35],
 			data:   make([]byte, 34),
 		},
-		expectedErr: StackErrInvalidOpcode,
+		expectedErr: ErrStackInvalidOpcode,
 	},
 	{
 		name: "OP_DATA_35",
@@ -939,7 +939,7 @@ var popTests = []popTest{
 			opcode: opcodemapPreinit[OP_DATA_35],
 			data:   make([]byte, 36),
 		},
-		expectedErr: StackErrInvalidOpcode,
+		expectedErr: ErrStackInvalidOpcode,
 	},
 	{
 		name: "OP_DATA_36 short",
@@ -947,7 +947,7 @@ var popTests = []popTest{
 			opcode: opcodemapPreinit[OP_DATA_36],
 			data:   make([]byte, 35),
 		},
-		expectedErr: StackErrInvalidOpcode,
+		expectedErr: ErrStackInvalidOpcode,
 	},
 	{
 		name: "OP_DATA_36",
@@ -963,7 +963,7 @@ var popTests = []popTest{
 			opcode: opcodemapPreinit[OP_DATA_36],
 			data:   make([]byte, 37),
 		},
-		expectedErr: StackErrInvalidOpcode,
+		expectedErr: ErrStackInvalidOpcode,
 	},
 	{
 		name: "OP_DATA_37 short",
@@ -971,7 +971,7 @@ var popTests = []popTest{
 			opcode: opcodemapPreinit[OP_DATA_37],
 			data:   make([]byte, 36),
 		},
-		expectedErr: StackErrInvalidOpcode,
+		expectedErr: ErrStackInvalidOpcode,
 	},
 	{
 		name: "OP_DATA_37",
@@ -987,7 +987,7 @@ var popTests = []popTest{
 			opcode: opcodemapPreinit[OP_DATA_37],
 			data:   make([]byte, 38),
 		},
-		expectedErr: StackErrInvalidOpcode,
+		expectedErr: ErrStackInvalidOpcode,
 	},
 	{
 		name: "OP_DATA_38 short",
@@ -995,7 +995,7 @@ var popTests = []popTest{
 			opcode: opcodemapPreinit[OP_DATA_38],
 			data:   make([]byte, 37),
 		},
-		expectedErr: StackErrInvalidOpcode,
+		expectedErr: ErrStackInvalidOpcode,
 	},
 	{
 		name: "OP_DATA_38",
@@ -1011,7 +1011,7 @@ var popTests = []popTest{
 			opcode: opcodemapPreinit[OP_DATA_38],
 			data:   make([]byte, 39),
 		},
-		expectedErr: StackErrInvalidOpcode,
+		expectedErr: ErrStackInvalidOpcode,
 	},
 	{
 		name: "OP_DATA_39 short",
@@ -1019,7 +1019,7 @@ var popTests = []popTest{
 			opcode: opcodemapPreinit[OP_DATA_39],
 			data:   make([]byte, 38),
 		},
-		expectedErr: StackErrInvalidOpcode,
+		expectedErr: ErrStackInvalidOpcode,
 	},
 	{
 		name: "OP_DATA_39",
@@ -1035,7 +1035,7 @@ var popTests = []popTest{
 			opcode: opcodemapPreinit[OP_DATA_39],
 			data:   make([]byte, 40),
 		},
-		expectedErr: StackErrInvalidOpcode,
+		expectedErr: ErrStackInvalidOpcode,
 	},
 	{
 		name: "OP_DATA_40 short",
@@ -1043,7 +1043,7 @@ var popTests = []popTest{
 			opcode: opcodemapPreinit[OP_DATA_40],
 			data:   make([]byte, 39),
 		},
-		expectedErr: StackErrInvalidOpcode,
+		expectedErr: ErrStackInvalidOpcode,
 	},
 	{
 		name: "OP_DATA_40",
@@ -1059,7 +1059,7 @@ var popTests = []popTest{
 			opcode: opcodemapPreinit[OP_DATA_40],
 			data:   make([]byte, 41),
 		},
-		expectedErr: StackErrInvalidOpcode,
+		expectedErr: ErrStackInvalidOpcode,
 	},
 	{
 		name: "OP_DATA_41 short",
@@ -1067,7 +1067,7 @@ var popTests = []popTest{
 			opcode: opcodemapPreinit[OP_DATA_41],
 			data:   make([]byte, 40),
 		},
-		expectedErr: StackErrInvalidOpcode,
+		expectedErr: ErrStackInvalidOpcode,
 	},
 	{
 		name: "OP_DATA_41",
@@ -1083,7 +1083,7 @@ var popTests = []popTest{
 			opcode: opcodemapPreinit[OP_DATA_41],
 			data:   make([]byte, 42),
 		},
-		expectedErr: StackErrInvalidOpcode,
+		expectedErr: ErrStackInvalidOpcode,
 	},
 	{
 		name: "OP_DATA_42 short",
@@ -1091,7 +1091,7 @@ var popTests = []popTest{
 			opcode: opcodemapPreinit[OP_DATA_42],
 			data:   make([]byte, 41),
 		},
-		expectedErr: StackErrInvalidOpcode,
+		expectedErr: ErrStackInvalidOpcode,
 	},
 	{
 		name: "OP_DATA_42",
@@ -1107,7 +1107,7 @@ var popTests = []popTest{
 			opcode: opcodemapPreinit[OP_DATA_42],
 			data:   make([]byte, 43),
 		},
-		expectedErr: StackErrInvalidOpcode,
+		expectedErr: ErrStackInvalidOpcode,
 	},
 	{
 		name: "OP_DATA_43 short",
@@ -1115,7 +1115,7 @@ var popTests = []popTest{
 			opcode: opcodemapPreinit[OP_DATA_43],
 			data:   make([]byte, 42),
 		},
-		expectedErr: StackErrInvalidOpcode,
+		expectedErr: ErrStackInvalidOpcode,
 	},
 	{
 		name: "OP_DATA_43",
@@ -1131,7 +1131,7 @@ var popTests = []popTest{
 			opcode: opcodemapPreinit[OP_DATA_43],
 			data:   make([]byte, 44),
 		},
-		expectedErr: StackErrInvalidOpcode,
+		expectedErr: ErrStackInvalidOpcode,
 	},
 	{
 		name: "OP_DATA_44 short",
@@ -1139,7 +1139,7 @@ var popTests = []popTest{
 			opcode: opcodemapPreinit[OP_DATA_44],
 			data:   make([]byte, 43),
 		},
-		expectedErr: StackErrInvalidOpcode,
+		expectedErr: ErrStackInvalidOpcode,
 	},
 	{
 		name: "OP_DATA_44",
@@ -1155,7 +1155,7 @@ var popTests = []popTest{
 			opcode: opcodemapPreinit[OP_DATA_44],
 			data:   make([]byte, 45),
 		},
-		expectedErr: StackErrInvalidOpcode,
+		expectedErr: ErrStackInvalidOpcode,
 	},
 	{
 		name: "OP_DATA_45 short",
@@ -1163,7 +1163,7 @@ var popTests = []popTest{
 			opcode: opcodemapPreinit[OP_DATA_45],
 			data:   make([]byte, 44),
 		},
-		expectedErr: StackErrInvalidOpcode,
+		expectedErr: ErrStackInvalidOpcode,
 	},
 	{
 		name: "OP_DATA_45",
@@ -1179,7 +1179,7 @@ var popTests = []popTest{
 			opcode: opcodemapPreinit[OP_DATA_45],
 			data:   make([]byte, 46),
 		},
-		expectedErr: StackErrInvalidOpcode,
+		expectedErr: ErrStackInvalidOpcode,
 	},
 	{
 		name: "OP_DATA_46 short",
@@ -1187,7 +1187,7 @@ var popTests = []popTest{
 			opcode: opcodemapPreinit[OP_DATA_46],
 			data:   make([]byte, 45),
 		},
-		expectedErr: StackErrInvalidOpcode,
+		expectedErr: ErrStackInvalidOpcode,
 	},
 	{
 		name: "OP_DATA_46",
@@ -1203,7 +1203,7 @@ var popTests = []popTest{
 			opcode: opcodemapPreinit[OP_DATA_46],
 			data:   make([]byte, 47),
 		},
-		expectedErr: StackErrInvalidOpcode,
+		expectedErr: ErrStackInvalidOpcode,
 	},
 	{
 		name: "OP_DATA_47 short",
@@ -1211,7 +1211,7 @@ var popTests = []popTest{
 			opcode: opcodemapPreinit[OP_DATA_47],
 			data:   make([]byte, 46),
 		},
-		expectedErr: StackErrInvalidOpcode,
+		expectedErr: ErrStackInvalidOpcode,
 	},
 	{
 		name: "OP_DATA_47",
@@ -1227,7 +1227,7 @@ var popTests = []popTest{
 			opcode: opcodemapPreinit[OP_DATA_47],
 			data:   make([]byte, 48),
 		},
-		expectedErr: StackErrInvalidOpcode,
+		expectedErr: ErrStackInvalidOpcode,
 	},
 	{
 		name: "OP_DATA_48 short",
@@ -1235,7 +1235,7 @@ var popTests = []popTest{
 			opcode: opcodemapPreinit[OP_DATA_48],
 			data:   make([]byte, 47),
 		},
-		expectedErr: StackErrInvalidOpcode,
+		expectedErr: ErrStackInvalidOpcode,
 	},
 	{
 		name: "OP_DATA_48",
@@ -1251,7 +1251,7 @@ var popTests = []popTest{
 			opcode: opcodemapPreinit[OP_DATA_48],
 			data:   make([]byte, 49),
 		},
-		expectedErr: StackErrInvalidOpcode,
+		expectedErr: ErrStackInvalidOpcode,
 	},
 	{
 		name: "OP_DATA_49 short",
@@ -1259,7 +1259,7 @@ var popTests = []popTest{
 			opcode: opcodemapPreinit[OP_DATA_49],
 			data:   make([]byte, 48),
 		},
-		expectedErr: StackErrInvalidOpcode,
+		expectedErr: ErrStackInvalidOpcode,
 	},
 	{
 		name: "OP_DATA_49",
@@ -1275,7 +1275,7 @@ var popTests = []popTest{
 			opcode: opcodemapPreinit[OP_DATA_49],
 			data:   make([]byte, 50),
 		},
-		expectedErr: StackErrInvalidOpcode,
+		expectedErr: ErrStackInvalidOpcode,
 	},
 	{
 		name: "OP_DATA_50 short",
@@ -1283,7 +1283,7 @@ var popTests = []popTest{
 			opcode: opcodemapPreinit[OP_DATA_50],
 			data:   make([]byte, 49),
 		},
-		expectedErr: StackErrInvalidOpcode,
+		expectedErr: ErrStackInvalidOpcode,
 	},
 	{
 		name: "OP_DATA_50",
@@ -1299,7 +1299,7 @@ var popTests = []popTest{
 			opcode: opcodemapPreinit[OP_DATA_50],
 			data:   make([]byte, 51),
 		},
-		expectedErr: StackErrInvalidOpcode,
+		expectedErr: ErrStackInvalidOpcode,
 	},
 	{
 		name: "OP_DATA_51 short",
@@ -1307,7 +1307,7 @@ var popTests = []popTest{
 			opcode: opcodemapPreinit[OP_DATA_51],
 			data:   make([]byte, 50),
 		},
-		expectedErr: StackErrInvalidOpcode,
+		expectedErr: ErrStackInvalidOpcode,
 	},
 	{
 		name: "OP_DATA_51",
@@ -1323,7 +1323,7 @@ var popTests = []popTest{
 			opcode: opcodemapPreinit[OP_DATA_51],
 			data:   make([]byte, 52),
 		},
-		expectedErr: StackErrInvalidOpcode,
+		expectedErr: ErrStackInvalidOpcode,
 	},
 	{
 		name: "OP_DATA_52 short",
@@ -1331,7 +1331,7 @@ var popTests = []popTest{
 			opcode: opcodemapPreinit[OP_DATA_52],
 			data:   make([]byte, 51),
 		},
-		expectedErr: StackErrInvalidOpcode,
+		expectedErr: ErrStackInvalidOpcode,
 	},
 	{
 		name: "OP_DATA_52",
@@ -1347,7 +1347,7 @@ var popTests = []popTest{
 			opcode: opcodemapPreinit[OP_DATA_52],
 			data:   make([]byte, 53),
 		},
-		expectedErr: StackErrInvalidOpcode,
+		expectedErr: ErrStackInvalidOpcode,
 	},
 	{
 		name: "OP_DATA_53 short",
@@ -1355,7 +1355,7 @@ var popTests = []popTest{
 			opcode: opcodemapPreinit[OP_DATA_53],
 			data:   make([]byte, 52),
 		},
-		expectedErr: StackErrInvalidOpcode,
+		expectedErr: ErrStackInvalidOpcode,
 	},
 	{
 		name: "OP_DATA_53",
@@ -1371,7 +1371,7 @@ var popTests = []popTest{
 			opcode: opcodemapPreinit[OP_DATA_53],
 			data:   make([]byte, 54),
 		},
-		expectedErr: StackErrInvalidOpcode,
+		expectedErr: ErrStackInvalidOpcode,
 	},
 	{
 		name: "OP_DATA_54 short",
@@ -1379,7 +1379,7 @@ var popTests = []popTest{
 			opcode: opcodemapPreinit[OP_DATA_54],
 			data:   make([]byte, 53),
 		},
-		expectedErr: StackErrInvalidOpcode,
+		expectedErr: ErrStackInvalidOpcode,
 	},
 	{
 		name: "OP_DATA_54",
@@ -1395,7 +1395,7 @@ var popTests = []popTest{
 			opcode: opcodemapPreinit[OP_DATA_54],
 			data:   make([]byte, 55),
 		},
-		expectedErr: StackErrInvalidOpcode,
+		expectedErr: ErrStackInvalidOpcode,
 	},
 	{
 		name: "OP_DATA_55 short",
@@ -1403,7 +1403,7 @@ var popTests = []popTest{
 			opcode: opcodemapPreinit[OP_DATA_55],
 			data:   make([]byte, 54),
 		},
-		expectedErr: StackErrInvalidOpcode,
+		expectedErr: ErrStackInvalidOpcode,
 	},
 	{
 		name: "OP_DATA_55",
@@ -1419,7 +1419,7 @@ var popTests = []popTest{
 			opcode: opcodemapPreinit[OP_DATA_55],
 			data:   make([]byte, 56),
 		},
-		expectedErr: StackErrInvalidOpcode,
+		expectedErr: ErrStackInvalidOpcode,
 	},
 	{
 		name: "OP_DATA_56 short",
@@ -1427,7 +1427,7 @@ var popTests = []popTest{
 			opcode: opcodemapPreinit[OP_DATA_56],
 			data:   make([]byte, 55),
 		},
-		expectedErr: StackErrInvalidOpcode,
+		expectedErr: ErrStackInvalidOpcode,
 	},
 	{
 		name: "OP_DATA_56",
@@ -1443,7 +1443,7 @@ var popTests = []popTest{
 			opcode: opcodemapPreinit[OP_DATA_56],
 			data:   make([]byte, 57),
 		},
-		expectedErr: StackErrInvalidOpcode,
+		expectedErr: ErrStackInvalidOpcode,
 	},
 	{
 		name: "OP_DATA_57 short",
@@ -1451,7 +1451,7 @@ var popTests = []popTest{
 			opcode: opcodemapPreinit[OP_DATA_57],
 			data:   make([]byte, 56),
 		},
-		expectedErr: StackErrInvalidOpcode,
+		expectedErr: ErrStackInvalidOpcode,
 	},
 	{
 		name: "OP_DATA_57",
@@ -1467,7 +1467,7 @@ var popTests = []popTest{
 			opcode: opcodemapPreinit[OP_DATA_57],
 			data:   make([]byte, 58),
 		},
-		expectedErr: StackErrInvalidOpcode,
+		expectedErr: ErrStackInvalidOpcode,
 	},
 	{
 		name: "OP_DATA_58 short",
@@ -1475,7 +1475,7 @@ var popTests = []popTest{
 			opcode: opcodemapPreinit[OP_DATA_58],
 			data:   make([]byte, 57),
 		},
-		expectedErr: StackErrInvalidOpcode,
+		expectedErr: ErrStackInvalidOpcode,
 	},
 	{
 		name: "OP_DATA_58",
@@ -1491,7 +1491,7 @@ var popTests = []popTest{
 			opcode: opcodemapPreinit[OP_DATA_58],
 			data:   make([]byte, 59),
 		},
-		expectedErr: StackErrInvalidOpcode,
+		expectedErr: ErrStackInvalidOpcode,
 	},
 	{
 		name: "OP_DATA_59 short",
@@ -1499,7 +1499,7 @@ var popTests = []popTest{
 			opcode: opcodemapPreinit[OP_DATA_59],
 			data:   make([]byte, 58),
 		},
-		expectedErr: StackErrInvalidOpcode,
+		expectedErr: ErrStackInvalidOpcode,
 	},
 	{
 		name: "OP_DATA_59",
@@ -1515,7 +1515,7 @@ var popTests = []popTest{
 			opcode: opcodemapPreinit[OP_DATA_59],
 			data:   make([]byte, 60),
 		},
-		expectedErr: StackErrInvalidOpcode,
+		expectedErr: ErrStackInvalidOpcode,
 	},
 	{
 		name: "OP_DATA_60 short",
@@ -1523,7 +1523,7 @@ var popTests = []popTest{
 			opcode: opcodemapPreinit[OP_DATA_60],
 			data:   make([]byte, 59),
 		},
-		expectedErr: StackErrInvalidOpcode,
+		expectedErr: ErrStackInvalidOpcode,
 	},
 	{
 		name: "OP_DATA_60",
@@ -1539,7 +1539,7 @@ var popTests = []popTest{
 			opcode: opcodemapPreinit[OP_DATA_60],
 			data:   make([]byte, 61),
 		},
-		expectedErr: StackErrInvalidOpcode,
+		expectedErr: ErrStackInvalidOpcode,
 	},
 	{
 		name: "OP_DATA_61 short",
@@ -1547,7 +1547,7 @@ var popTests = []popTest{
 			opcode: opcodemapPreinit[OP_DATA_61],
 			data:   make([]byte, 60),
 		},
-		expectedErr: StackErrInvalidOpcode,
+		expectedErr: ErrStackInvalidOpcode,
 	},
 	{
 		name: "OP_DATA_61",
@@ -1563,7 +1563,7 @@ var popTests = []popTest{
 			opcode: opcodemapPreinit[OP_DATA_61],
 			data:   make([]byte, 62),
 		},
-		expectedErr: StackErrInvalidOpcode,
+		expectedErr: ErrStackInvalidOpcode,
 	},
 	{
 		name: "OP_DATA_62 short",
@@ -1571,7 +1571,7 @@ var popTests = []popTest{
 			opcode: opcodemapPreinit[OP_DATA_62],
 			data:   make([]byte, 61),
 		},
-		expectedErr: StackErrInvalidOpcode,
+		expectedErr: ErrStackInvalidOpcode,
 	},
 	{
 		name: "OP_DATA_62",
@@ -1587,7 +1587,7 @@ var popTests = []popTest{
 			opcode: opcodemapPreinit[OP_DATA_62],
 			data:   make([]byte, 63),
 		},
-		expectedErr: StackErrInvalidOpcode,
+		expectedErr: ErrStackInvalidOpcode,
 	},
 	{
 		name: "OP_DATA_63 short",
@@ -1595,7 +1595,7 @@ var popTests = []popTest{
 			opcode: opcodemapPreinit[OP_DATA_63],
 			data:   make([]byte, 62),
 		},
-		expectedErr: StackErrInvalidOpcode,
+		expectedErr: ErrStackInvalidOpcode,
 	},
 	{
 		name: "OP_DATA_63",
@@ -1611,7 +1611,7 @@ var popTests = []popTest{
 			opcode: opcodemapPreinit[OP_DATA_63],
 			data:   make([]byte, 64),
 		},
-		expectedErr: StackErrInvalidOpcode,
+		expectedErr: ErrStackInvalidOpcode,
 	},
 	{
 		name: "OP_DATA_64 short",
@@ -1619,7 +1619,7 @@ var popTests = []popTest{
 			opcode: opcodemapPreinit[OP_DATA_64],
 			data:   make([]byte, 63),
 		},
-		expectedErr: StackErrInvalidOpcode,
+		expectedErr: ErrStackInvalidOpcode,
 	},
 	{
 		name: "OP_DATA_64",
@@ -1635,7 +1635,7 @@ var popTests = []popTest{
 			opcode: opcodemapPreinit[OP_DATA_64],
 			data:   make([]byte, 65),
 		},
-		expectedErr: StackErrInvalidOpcode,
+		expectedErr: ErrStackInvalidOpcode,
 	},
 	{
 		name: "OP_DATA_65 short",
@@ -1643,7 +1643,7 @@ var popTests = []popTest{
 			opcode: opcodemapPreinit[OP_DATA_65],
 			data:   make([]byte, 64),
 		},
-		expectedErr: StackErrInvalidOpcode,
+		expectedErr: ErrStackInvalidOpcode,
 	},
 	{
 		name: "OP_DATA_65",
@@ -1659,7 +1659,7 @@ var popTests = []popTest{
 			opcode: opcodemapPreinit[OP_DATA_65],
 			data:   make([]byte, 66),
 		},
-		expectedErr: StackErrInvalidOpcode,
+		expectedErr: ErrStackInvalidOpcode,
 	},
 	{
 		name: "OP_DATA_66 short",
@@ -1667,7 +1667,7 @@ var popTests = []popTest{
 			opcode: opcodemapPreinit[OP_DATA_66],
 			data:   make([]byte, 65),
 		},
-		expectedErr: StackErrInvalidOpcode,
+		expectedErr: ErrStackInvalidOpcode,
 	},
 	{
 		name: "OP_DATA_66",
@@ -1683,7 +1683,7 @@ var popTests = []popTest{
 			opcode: opcodemapPreinit[OP_DATA_66],
 			data:   make([]byte, 67),
 		},
-		expectedErr: StackErrInvalidOpcode,
+		expectedErr: ErrStackInvalidOpcode,
 	},
 	{
 		name: "OP_DATA_67 short",
@@ -1691,7 +1691,7 @@ var popTests = []popTest{
 			opcode: opcodemapPreinit[OP_DATA_67],
 			data:   make([]byte, 66),
 		},
-		expectedErr: StackErrInvalidOpcode,
+		expectedErr: ErrStackInvalidOpcode,
 	},
 	{
 		name: "OP_DATA_67",
@@ -1707,7 +1707,7 @@ var popTests = []popTest{
 			opcode: opcodemapPreinit[OP_DATA_67],
 			data:   make([]byte, 68),
 		},
-		expectedErr: StackErrInvalidOpcode,
+		expectedErr: ErrStackInvalidOpcode,
 	},
 	{
 		name: "OP_DATA_68 short",
@@ -1715,7 +1715,7 @@ var popTests = []popTest{
 			opcode: opcodemapPreinit[OP_DATA_68],
 			data:   make([]byte, 67),
 		},
-		expectedErr: StackErrInvalidOpcode,
+		expectedErr: ErrStackInvalidOpcode,
 	},
 	{
 		name: "OP_DATA_68",
@@ -1731,7 +1731,7 @@ var popTests = []popTest{
 			opcode: opcodemapPreinit[OP_DATA_68],
 			data:   make([]byte, 69),
 		},
-		expectedErr: StackErrInvalidOpcode,
+		expectedErr: ErrStackInvalidOpcode,
 	},
 	{
 		name: "OP_DATA_69 short",
@@ -1739,7 +1739,7 @@ var popTests = []popTest{
 			opcode: opcodemapPreinit[OP_DATA_69],
 			data:   make([]byte, 68),
 		},
-		expectedErr: StackErrInvalidOpcode,
+		expectedErr: ErrStackInvalidOpcode,
 	},
 	{
 		name: "OP_DATA_69",
@@ -1755,7 +1755,7 @@ var popTests = []popTest{
 			opcode: opcodemapPreinit[OP_DATA_69],
 			data:   make([]byte, 70),
 		},
-		expectedErr: StackErrInvalidOpcode,
+		expectedErr: ErrStackInvalidOpcode,
 	},
 	{
 		name: "OP_DATA_70 short",
@@ -1763,7 +1763,7 @@ var popTests = []popTest{
 			opcode: opcodemapPreinit[OP_DATA_70],
 			data:   make([]byte, 69),
 		},
-		expectedErr: StackErrInvalidOpcode,
+		expectedErr: ErrStackInvalidOpcode,
 	},
 	{
 		name: "OP_DATA_70",
@@ -1779,7 +1779,7 @@ var popTests = []popTest{
 			opcode: opcodemapPreinit[OP_DATA_70],
 			data:   make([]byte, 71),
 		},
-		expectedErr: StackErrInvalidOpcode,
+		expectedErr: ErrStackInvalidOpcode,
 	},
 	{
 		name: "OP_DATA_71 short",
@@ -1787,7 +1787,7 @@ var popTests = []popTest{
 			opcode: opcodemapPreinit[OP_DATA_71],
 			data:   make([]byte, 70),
 		},
-		expectedErr: StackErrInvalidOpcode,
+		expectedErr: ErrStackInvalidOpcode,
 	},
 	{
 		name: "OP_DATA_71",
@@ -1803,7 +1803,7 @@ var popTests = []popTest{
 			opcode: opcodemapPreinit[OP_DATA_71],
 			data:   make([]byte, 72),
 		},
-		expectedErr: StackErrInvalidOpcode,
+		expectedErr: ErrStackInvalidOpcode,
 	},
 	{
 		name: "OP_DATA_72 short",
@@ -1811,7 +1811,7 @@ var popTests = []popTest{
 			opcode: opcodemapPreinit[OP_DATA_72],
 			data:   make([]byte, 71),
 		},
-		expectedErr: StackErrInvalidOpcode,
+		expectedErr: ErrStackInvalidOpcode,
 	},
 	{
 		name: "OP_DATA_72",
@@ -1827,7 +1827,7 @@ var popTests = []popTest{
 			opcode: opcodemapPreinit[OP_DATA_72],
 			data:   make([]byte, 73),
 		},
-		expectedErr: StackErrInvalidOpcode,
+		expectedErr: ErrStackInvalidOpcode,
 	},
 	{
 		name: "OP_DATA_73 short",
@@ -1835,7 +1835,7 @@ var popTests = []popTest{
 			opcode: opcodemapPreinit[OP_DATA_73],
 			data:   make([]byte, 72),
 		},
-		expectedErr: StackErrInvalidOpcode,
+		expectedErr: ErrStackInvalidOpcode,
 	},
 	{
 		name: "OP_DATA_73",
@@ -1851,7 +1851,7 @@ var popTests = []popTest{
 			opcode: opcodemapPreinit[OP_DATA_73],
 			data:   make([]byte, 74),
 		},
-		expectedErr: StackErrInvalidOpcode,
+		expectedErr: ErrStackInvalidOpcode,
 	},
 	{
 		name: "OP_DATA_74 short",
@@ -1859,7 +1859,7 @@ var popTests = []popTest{
 			opcode: opcodemapPreinit[OP_DATA_74],
 			data:   make([]byte, 73),
 		},
-		expectedErr: StackErrInvalidOpcode,
+		expectedErr: ErrStackInvalidOpcode,
 	},
 	{
 		name: "OP_DATA_74",
@@ -1875,7 +1875,7 @@ var popTests = []popTest{
 			opcode: opcodemapPreinit[OP_DATA_74],
 			data:   make([]byte, 75),
 		},
-		expectedErr: StackErrInvalidOpcode,
+		expectedErr: ErrStackInvalidOpcode,
 	},
 	{
 		name: "OP_DATA_75 short",
@@ -1883,7 +1883,7 @@ var popTests = []popTest{
 			opcode: opcodemapPreinit[OP_DATA_75],
 			data:   make([]byte, 74),
 		},
-		expectedErr: StackErrInvalidOpcode,
+		expectedErr: ErrStackInvalidOpcode,
 	},
 	{
 		name: "OP_DATA_75",
@@ -1899,7 +1899,7 @@ var popTests = []popTest{
 			opcode: opcodemapPreinit[OP_DATA_75],
 			data:   make([]byte, 76),
 		},
-		expectedErr: StackErrInvalidOpcode,
+		expectedErr: ErrStackInvalidOpcode,
 	},
 	{
 		name: "OP_PUSHDATA1",
@@ -1939,7 +1939,7 @@ var popTests = []popTest{
 			opcode: opcodemapPreinit[OP_1NEGATE],
 			data:   make([]byte, 1),
 		},
-		expectedErr: StackErrInvalidOpcode,
+		expectedErr: ErrStackInvalidOpcode,
 	},
 	{
 		name: "OP_RESERVED",
@@ -1955,7 +1955,7 @@ var popTests = []popTest{
 			opcode: opcodemapPreinit[OP_RESERVED],
 			data:   make([]byte, 1),
 		},
-		expectedErr: StackErrInvalidOpcode,
+		expectedErr: ErrStackInvalidOpcode,
 	},
 	{
 		name: "OP_TRUE",
@@ -1971,7 +1971,7 @@ var popTests = []popTest{
 			opcode: opcodemapPreinit[OP_TRUE],
 			data:   make([]byte, 1),
 		},
-		expectedErr: StackErrInvalidOpcode,
+		expectedErr: ErrStackInvalidOpcode,
 	},
 	{
 		name: "OP_2",
@@ -1987,7 +1987,7 @@ var popTests = []popTest{
 			opcode: opcodemapPreinit[OP_2],
 			data:   make([]byte, 1),
 		},
-		expectedErr: StackErrInvalidOpcode,
+		expectedErr: ErrStackInvalidOpcode,
 	},
 	{
 		name: "OP_2",
@@ -2003,7 +2003,7 @@ var popTests = []popTest{
 			opcode: opcodemapPreinit[OP_2],
 			data:   make([]byte, 1),
 		},
-		expectedErr: StackErrInvalidOpcode,
+		expectedErr: ErrStackInvalidOpcode,
 	},
 	{
 		name: "OP_3",
@@ -2019,7 +2019,7 @@ var popTests = []popTest{
 			opcode: opcodemapPreinit[OP_3],
 			data:   make([]byte, 1),
 		},
-		expectedErr: StackErrInvalidOpcode,
+		expectedErr: ErrStackInvalidOpcode,
 	},
 	{
 		name: "OP_4",
@@ -2035,7 +2035,7 @@ var popTests = []popTest{
 			opcode: opcodemapPreinit[OP_4],
 			data:   make([]byte, 1),
 		},
-		expectedErr: StackErrInvalidOpcode,
+		expectedErr: ErrStackInvalidOpcode,
 	},
 	{
 		name: "OP_5",
@@ -2051,7 +2051,7 @@ var popTests = []popTest{
 			opcode: opcodemapPreinit[OP_5],
 			data:   make([]byte, 1),
 		},
-		expectedErr: StackErrInvalidOpcode,
+		expectedErr: ErrStackInvalidOpcode,
 	},
 	{
 		name: "OP_6",
@@ -2067,7 +2067,7 @@ var popTests = []popTest{
 			opcode: opcodemapPreinit[OP_6],
 			data:   make([]byte, 1),
 		},
-		expectedErr: StackErrInvalidOpcode,
+		expectedErr: ErrStackInvalidOpcode,
 	},
 	{
 		name: "OP_7",
@@ -2083,7 +2083,7 @@ var popTests = []popTest{
 			opcode: opcodemapPreinit[OP_7],
 			data:   make([]byte, 1),
 		},
-		expectedErr: StackErrInvalidOpcode,
+		expectedErr: ErrStackInvalidOpcode,
 	},
 	{
 		name: "OP_8",
@@ -2099,7 +2099,7 @@ var popTests = []popTest{
 			opcode: opcodemapPreinit[OP_8],
 			data:   make([]byte, 1),
 		},
-		expectedErr: StackErrInvalidOpcode,
+		expectedErr: ErrStackInvalidOpcode,
 	},
 	{
 		name: "OP_9",
@@ -2115,7 +2115,7 @@ var popTests = []popTest{
 			opcode: opcodemapPreinit[OP_9],
 			data:   make([]byte, 1),
 		},
-		expectedErr: StackErrInvalidOpcode,
+		expectedErr: ErrStackInvalidOpcode,
 	},
 	{
 		name: "OP_10",
@@ -2131,7 +2131,7 @@ var popTests = []popTest{
 			opcode: opcodemapPreinit[OP_10],
 			data:   make([]byte, 1),
 		},
-		expectedErr: StackErrInvalidOpcode,
+		expectedErr: ErrStackInvalidOpcode,
 	},
 	{
 		name: "OP_11",
@@ -2147,7 +2147,7 @@ var popTests = []popTest{
 			opcode: opcodemapPreinit[OP_11],
 			data:   make([]byte, 1),
 		},
-		expectedErr: StackErrInvalidOpcode,
+		expectedErr: ErrStackInvalidOpcode,
 	},
 	{
 		name: "OP_12",
@@ -2163,7 +2163,7 @@ var popTests = []popTest{
 			opcode: opcodemapPreinit[OP_12],
 			data:   make([]byte, 1),
 		},
-		expectedErr: StackErrInvalidOpcode,
+		expectedErr: ErrStackInvalidOpcode,
 	},
 	{
 		name: "OP_13",
@@ -2179,7 +2179,7 @@ var popTests = []popTest{
 			opcode: opcodemapPreinit[OP_13],
 			data:   make([]byte, 1),
 		},
-		expectedErr: StackErrInvalidOpcode,
+		expectedErr: ErrStackInvalidOpcode,
 	},
 	{
 		name: "OP_14",
@@ -2195,7 +2195,7 @@ var popTests = []popTest{
 			opcode: opcodemapPreinit[OP_14],
 			data:   make([]byte, 1),
 		},
-		expectedErr: StackErrInvalidOpcode,
+		expectedErr: ErrStackInvalidOpcode,
 	},
 	{
 		name: "OP_15",
@@ -2211,7 +2211,7 @@ var popTests = []popTest{
 			opcode: opcodemapPreinit[OP_15],
 			data:   make([]byte, 1),
 		},
-		expectedErr: StackErrInvalidOpcode,
+		expectedErr: ErrStackInvalidOpcode,
 	},
 	{
 		name: "OP_16",
@@ -2227,7 +2227,7 @@ var popTests = []popTest{
 			opcode: opcodemapPreinit[OP_16],
 			data:   make([]byte, 1),
 		},
-		expectedErr: StackErrInvalidOpcode,
+		expectedErr: ErrStackInvalidOpcode,
 	},
 	{
 		name: "OP_NOP",
@@ -2243,7 +2243,7 @@ var popTests = []popTest{
 			opcode: opcodemapPreinit[OP_NOP],
 			data:   make([]byte, 1),
 		},
-		expectedErr: StackErrInvalidOpcode,
+		expectedErr: ErrStackInvalidOpcode,
 	},
 	{
 		name: "OP_VER",
@@ -2259,7 +2259,7 @@ var popTests = []popTest{
 			opcode: opcodemapPreinit[OP_VER],
 			data:   make([]byte, 1),
 		},
-		expectedErr: StackErrInvalidOpcode,
+		expectedErr: ErrStackInvalidOpcode,
 	},
 	{
 		name: "OP_IF",
@@ -2275,7 +2275,7 @@ var popTests = []popTest{
 			opcode: opcodemapPreinit[OP_IF],
 			data:   make([]byte, 1),
 		},
-		expectedErr: StackErrInvalidOpcode,
+		expectedErr: ErrStackInvalidOpcode,
 	},
 	{
 		name: "OP_NOTIF",
@@ -2291,7 +2291,7 @@ var popTests = []popTest{
 			opcode: opcodemapPreinit[OP_NOTIF],
 			data:   make([]byte, 1),
 		},
-		expectedErr: StackErrInvalidOpcode,
+		expectedErr: ErrStackInvalidOpcode,
 	},
 	{
 		name: "OP_VERIF",
@@ -2307,7 +2307,7 @@ var popTests = []popTest{
 			opcode: opcodemapPreinit[OP_VERIF],
 			data:   make([]byte, 1),
 		},
-		expectedErr: StackErrInvalidOpcode,
+		expectedErr: ErrStackInvalidOpcode,
 	},
 	{
 		name: "OP_VERNOTIF",
@@ -2323,7 +2323,7 @@ var popTests = []popTest{
 			opcode: opcodemapPreinit[OP_VERNOTIF],
 			data:   make([]byte, 1),
 		},
-		expectedErr: StackErrInvalidOpcode,
+		expectedErr: ErrStackInvalidOpcode,
 	},
 	{
 		name: "OP_ELSE",
@@ -2339,7 +2339,7 @@ var popTests = []popTest{
 			opcode: opcodemapPreinit[OP_ELSE],
 			data:   make([]byte, 1),
 		},
-		expectedErr: StackErrInvalidOpcode,
+		expectedErr: ErrStackInvalidOpcode,
 	},
 	{
 		name: "OP_ENDIF",
@@ -2355,7 +2355,7 @@ var popTests = []popTest{
 			opcode: opcodemapPreinit[OP_ENDIF],
 			data:   make([]byte, 1),
 		},
-		expectedErr: StackErrInvalidOpcode,
+		expectedErr: ErrStackInvalidOpcode,
 	},
 	{
 		name: "OP_VERIFY",
@@ -2371,7 +2371,7 @@ var popTests = []popTest{
 			opcode: opcodemapPreinit[OP_VERIFY],
 			data:   make([]byte, 1),
 		},
-		expectedErr: StackErrInvalidOpcode,
+		expectedErr: ErrStackInvalidOpcode,
 	},
 	{
 		name: "OP_RETURN",
@@ -2387,7 +2387,7 @@ var popTests = []popTest{
 			opcode: opcodemapPreinit[OP_RETURN],
 			data:   make([]byte, 1),
 		},
-		expectedErr: StackErrInvalidOpcode,
+		expectedErr: ErrStackInvalidOpcode,
 	},
 	{
 		name: "OP_TOALTSTACK",
@@ -2403,7 +2403,7 @@ var popTests = []popTest{
 			opcode: opcodemapPreinit[OP_TOALTSTACK],
 			data:   make([]byte, 1),
 		},
-		expectedErr: StackErrInvalidOpcode,
+		expectedErr: ErrStackInvalidOpcode,
 	},
 	{
 		name: "OP_FROMALTSTACK",
@@ -2419,7 +2419,7 @@ var popTests = []popTest{
 			opcode: opcodemapPreinit[OP_FROMALTSTACK],
 			data:   make([]byte, 1),
 		},
-		expectedErr: StackErrInvalidOpcode,
+		expectedErr: ErrStackInvalidOpcode,
 	},
 	{
 		name: "OP_2DROP",
@@ -2435,7 +2435,7 @@ var popTests = []popTest{
 			opcode: opcodemapPreinit[OP_2DROP],
 			data:   make([]byte, 1),
 		},
-		expectedErr: StackErrInvalidOpcode,
+		expectedErr: ErrStackInvalidOpcode,
 	},
 	{
 		name: "OP_2DUP",
@@ -2451,7 +2451,7 @@ var popTests = []popTest{
 			opcode: opcodemapPreinit[OP_2DUP],
 			data:   make([]byte, 1),
 		},
-		expectedErr: StackErrInvalidOpcode,
+		expectedErr: ErrStackInvalidOpcode,
 	},
 	{
 		name: "OP_3DUP",
@@ -2467,7 +2467,7 @@ var popTests = []popTest{
 			opcode: opcodemapPreinit[OP_3DUP],
 			data:   make([]byte, 1),
 		},
-		expectedErr: StackErrInvalidOpcode,
+		expectedErr: ErrStackInvalidOpcode,
 	},
 	{
 		name: "OP_2OVER",
@@ -2483,7 +2483,7 @@ var popTests = []popTest{
 			opcode: opcodemapPreinit[OP_2OVER],
 			data:   make([]byte, 1),
 		},
-		expectedErr: StackErrInvalidOpcode,
+		expectedErr: ErrStackInvalidOpcode,
 	},
 	{
 		name: "OP_2ROT",
@@ -2499,7 +2499,7 @@ var popTests = []popTest{
 			opcode: opcodemapPreinit[OP_2ROT],
 			data:   make([]byte, 1),
 		},
-		expectedErr: StackErrInvalidOpcode,
+		expectedErr: ErrStackInvalidOpcode,
 	},
 	{
 		name: "OP_2SWAP",
@@ -2515,7 +2515,7 @@ var popTests = []popTest{
 			opcode: opcodemapPreinit[OP_2SWAP],
 			data:   make([]byte, 1),
 		},
-		expectedErr: StackErrInvalidOpcode,
+		expectedErr: ErrStackInvalidOpcode,
 	},
 	{
 		name: "OP_IFDUP",
@@ -2531,7 +2531,7 @@ var popTests = []popTest{
 			opcode: opcodemapPreinit[OP_IFDUP],
 			data:   make([]byte, 1),
 		},
-		expectedErr: StackErrInvalidOpcode,
+		expectedErr: ErrStackInvalidOpcode,
 	},
 	{
 		name: "OP_DEPTH",
@@ -2547,7 +2547,7 @@ var popTests = []popTest{
 			opcode: opcodemapPreinit[OP_DEPTH],
 			data:   make([]byte, 1),
 		},
-		expectedErr: StackErrInvalidOpcode,
+		expectedErr: ErrStackInvalidOpcode,
 	},
 	{
 		name: "OP_DROP",
@@ -2563,7 +2563,7 @@ var popTests = []popTest{
 			opcode: opcodemapPreinit[OP_DROP],
 			data:   make([]byte, 1),
 		},
-		expectedErr: StackErrInvalidOpcode,
+		expectedErr: ErrStackInvalidOpcode,
 	},
 	{
 		name: "OP_DUP",
@@ -2579,7 +2579,7 @@ var popTests = []popTest{
 			opcode: opcodemapPreinit[OP_DUP],
 			data:   make([]byte, 1),
 		},
-		expectedErr: StackErrInvalidOpcode,
+		expectedErr: ErrStackInvalidOpcode,
 	},
 	{
 		name: "OP_NIP",
@@ -2595,7 +2595,7 @@ var popTests = []popTest{
 			opcode: opcodemapPreinit[OP_NIP],
 			data:   make([]byte, 1),
 		},
-		expectedErr: StackErrInvalidOpcode,
+		expectedErr: ErrStackInvalidOpcode,
 	},
 	{
 		name: "OP_OVER",
@@ -2611,7 +2611,7 @@ var popTests = []popTest{
 			opcode: opcodemapPreinit[OP_OVER],
 			data:   make([]byte, 1),
 		},
-		expectedErr: StackErrInvalidOpcode,
+		expectedErr: ErrStackInvalidOpcode,
 	},
 	{
 		name: "OP_PICK",
@@ -2627,7 +2627,7 @@ var popTests = []popTest{
 			opcode: opcodemapPreinit[OP_PICK],
 			data:   make([]byte, 1),
 		},
-		expectedErr: StackErrInvalidOpcode,
+		expectedErr: ErrStackInvalidOpcode,
 	},
 	{
 		name: "OP_ROLL",
@@ -2643,7 +2643,7 @@ var popTests = []popTest{
 			opcode: opcodemapPreinit[OP_ROLL],
 			data:   make([]byte, 1),
 		},
-		expectedErr: StackErrInvalidOpcode,
+		expectedErr: ErrStackInvalidOpcode,
 	},
 	{
 		name: "OP_ROT",
@@ -2659,7 +2659,7 @@ var popTests = []popTest{
 			opcode: opcodemapPreinit[OP_ROT],
 			data:   make([]byte, 1),
 		},
-		expectedErr: StackErrInvalidOpcode,
+		expectedErr: ErrStackInvalidOpcode,
 	},
 	{
 		name: "OP_SWAP",
@@ -2675,7 +2675,7 @@ var popTests = []popTest{
 			opcode: opcodemapPreinit[OP_SWAP],
 			data:   make([]byte, 1),
 		},
-		expectedErr: StackErrInvalidOpcode,
+		expectedErr: ErrStackInvalidOpcode,
 	},
 	{
 		name: "OP_TUCK",
@@ -2691,7 +2691,7 @@ var popTests = []popTest{
 			opcode: opcodemapPreinit[OP_TUCK],
 			data:   make([]byte, 1),
 		},
-		expectedErr: StackErrInvalidOpcode,
+		expectedErr: ErrStackInvalidOpcode,
 	},
 	{
 		name: "OP_CAT",
@@ -2707,7 +2707,7 @@ var popTests = []popTest{
 			opcode: opcodemapPreinit[OP_CAT],
 			data:   make([]byte, 1),
 		},
-		expectedErr: StackErrInvalidOpcode,
+		expectedErr: ErrStackInvalidOpcode,
 	},
 	{
 		name: "OP_SUBSTR",
@@ -2723,7 +2723,7 @@ var popTests = []popTest{
 			opcode: opcodemapPreinit[OP_SUBSTR],
 			data:   make([]byte, 1),
 		},
-		expectedErr: StackErrInvalidOpcode,
+		expectedErr: ErrStackInvalidOpcode,
 	},
 	{
 		name: "OP_LEFT",
@@ -2739,7 +2739,7 @@ var popTests = []popTest{
 			opcode: opcodemapPreinit[OP_LEFT],
 			data:   make([]byte, 1),
 		},
-		expectedErr: StackErrInvalidOpcode,
+		expectedErr: ErrStackInvalidOpcode,
 	},
 	{
 		name: "OP_LEFT",
@@ -2755,7 +2755,7 @@ var popTests = []popTest{
 			opcode: opcodemapPreinit[OP_LEFT],
 			data:   make([]byte, 1),
 		},
-		expectedErr: StackErrInvalidOpcode,
+		expectedErr: ErrStackInvalidOpcode,
 	},
 	{
 		name: "OP_RIGHT",
@@ -2771,7 +2771,7 @@ var popTests = []popTest{
 			opcode: opcodemapPreinit[OP_RIGHT],
 			data:   make([]byte, 1),
 		},
-		expectedErr: StackErrInvalidOpcode,
+		expectedErr: ErrStackInvalidOpcode,
 	},
 	{
 		name: "OP_SIZE",
@@ -2787,7 +2787,7 @@ var popTests = []popTest{
 			opcode: opcodemapPreinit[OP_SIZE],
 			data:   make([]byte, 1),
 		},
-		expectedErr: StackErrInvalidOpcode,
+		expectedErr: ErrStackInvalidOpcode,
 	},
 	{
 		name: "OP_INVERT",
@@ -2803,7 +2803,7 @@ var popTests = []popTest{
 			opcode: opcodemapPreinit[OP_INVERT],
 			data:   make([]byte, 1),
 		},
-		expectedErr: StackErrInvalidOpcode,
+		expectedErr: ErrStackInvalidOpcode,
 	},
 	{
 		name: "OP_AND",
@@ -2819,7 +2819,7 @@ var popTests = []popTest{
 			opcode: opcodemapPreinit[OP_AND],
 			data:   make([]byte, 1),
 		},
-		expectedErr: StackErrInvalidOpcode,
+		expectedErr: ErrStackInvalidOpcode,
 	},
 	{
 		name: "OP_OR",
@@ -2835,7 +2835,7 @@ var popTests = []popTest{
 			opcode: opcodemapPreinit[OP_OR],
 			data:   make([]byte, 1),
 		},
-		expectedErr: StackErrInvalidOpcode,
+		expectedErr: ErrStackInvalidOpcode,
 	},
 	{
 		name: "OP_XOR",
@@ -2851,7 +2851,7 @@ var popTests = []popTest{
 			opcode: opcodemapPreinit[OP_XOR],
 			data:   make([]byte, 1),
 		},
-		expectedErr: StackErrInvalidOpcode,
+		expectedErr: ErrStackInvalidOpcode,
 	},
 	{
 		name: "OP_EQUAL",
@@ -2867,7 +2867,7 @@ var popTests = []popTest{
 			opcode: opcodemapPreinit[OP_EQUAL],
 			data:   make([]byte, 1),
 		},
-		expectedErr: StackErrInvalidOpcode,
+		expectedErr: ErrStackInvalidOpcode,
 	},
 	{
 		name: "OP_EQUALVERIFY",
@@ -2883,7 +2883,7 @@ var popTests = []popTest{
 			opcode: opcodemapPreinit[OP_EQUALVERIFY],
 			data:   make([]byte, 1),
 		},
-		expectedErr: StackErrInvalidOpcode,
+		expectedErr: ErrStackInvalidOpcode,
 	},
 	{
 		name: "OP_RESERVED1",
@@ -2899,7 +2899,7 @@ var popTests = []popTest{
 			opcode: opcodemapPreinit[OP_RESERVED1],
 			data:   make([]byte, 1),
 		},
-		expectedErr: StackErrInvalidOpcode,
+		expectedErr: ErrStackInvalidOpcode,
 	},
 	{
 		name: "OP_RESERVED2",
@@ -2915,7 +2915,7 @@ var popTests = []popTest{
 			opcode: opcodemapPreinit[OP_RESERVED2],
 			data:   make([]byte, 1),
 		},
-		expectedErr: StackErrInvalidOpcode,
+		expectedErr: ErrStackInvalidOpcode,
 	},
 	{
 		name: "OP_1ADD",
@@ -2931,7 +2931,7 @@ var popTests = []popTest{
 			opcode: opcodemapPreinit[OP_1ADD],
 			data:   make([]byte, 1),
 		},
-		expectedErr: StackErrInvalidOpcode,
+		expectedErr: ErrStackInvalidOpcode,
 	},
 	{
 		name: "OP_1SUB",
@@ -2947,7 +2947,7 @@ var popTests = []popTest{
 			opcode: opcodemapPreinit[OP_1SUB],
 			data:   make([]byte, 1),
 		},
-		expectedErr: StackErrInvalidOpcode,
+		expectedErr: ErrStackInvalidOpcode,
 	},
 	{
 		name: "OP_2MUL",
@@ -2963,7 +2963,7 @@ var popTests = []popTest{
 			opcode: opcodemapPreinit[OP_2MUL],
 			data:   make([]byte, 1),
 		},
-		expectedErr: StackErrInvalidOpcode,
+		expectedErr: ErrStackInvalidOpcode,
 	},
 	{
 		name: "OP_2DIV",
@@ -2979,7 +2979,7 @@ var popTests = []popTest{
 			opcode: opcodemapPreinit[OP_2DIV],
 			data:   make([]byte, 1),
 		},
-		expectedErr: StackErrInvalidOpcode,
+		expectedErr: ErrStackInvalidOpcode,
 	},
 	{
 		name: "OP_NEGATE",
@@ -2995,7 +2995,7 @@ var popTests = []popTest{
 			opcode: opcodemapPreinit[OP_NEGATE],
 			data:   make([]byte, 1),
 		},
-		expectedErr: StackErrInvalidOpcode,
+		expectedErr: ErrStackInvalidOpcode,
 	},
 	{
 		name: "OP_ABS",
@@ -3011,7 +3011,7 @@ var popTests = []popTest{
 			opcode: opcodemapPreinit[OP_ABS],
 			data:   make([]byte, 1),
 		},
-		expectedErr: StackErrInvalidOpcode,
+		expectedErr: ErrStackInvalidOpcode,
 	},
 	{
 		name: "OP_NOT",
@@ -3027,7 +3027,7 @@ var popTests = []popTest{
 			opcode: opcodemapPreinit[OP_NOT],
 			data:   make([]byte, 1),
 		},
-		expectedErr: StackErrInvalidOpcode,
+		expectedErr: ErrStackInvalidOpcode,
 	},
 	{
 		name: "OP_0NOTEQUAL",
@@ -3043,7 +3043,7 @@ var popTests = []popTest{
 			opcode: opcodemapPreinit[OP_0NOTEQUAL],
 			data:   make([]byte, 1),
 		},
-		expectedErr: StackErrInvalidOpcode,
+		expectedErr: ErrStackInvalidOpcode,
 	},
 	{
 		name: "OP_ADD",
@@ -3059,7 +3059,7 @@ var popTests = []popTest{
 			opcode: opcodemapPreinit[OP_ADD],
 			data:   make([]byte, 1),
 		},
-		expectedErr: StackErrInvalidOpcode,
+		expectedErr: ErrStackInvalidOpcode,
 	},
 	{
 		name: "OP_SUB",
@@ -3075,7 +3075,7 @@ var popTests = []popTest{
 			opcode: opcodemapPreinit[OP_SUB],
 			data:   make([]byte, 1),
 		},
-		expectedErr: StackErrInvalidOpcode,
+		expectedErr: ErrStackInvalidOpcode,
 	},
 	{
 		name: "OP_MUL",
@@ -3091,7 +3091,7 @@ var popTests = []popTest{
 			opcode: opcodemapPreinit[OP_MUL],
 			data:   make([]byte, 1),
 		},
-		expectedErr: StackErrInvalidOpcode,
+		expectedErr: ErrStackInvalidOpcode,
 	},
 	{
 		name: "OP_DIV",
@@ -3107,7 +3107,7 @@ var popTests = []popTest{
 			opcode: opcodemapPreinit[OP_DIV],
 			data:   make([]byte, 1),
 		},
-		expectedErr: StackErrInvalidOpcode,
+		expectedErr: ErrStackInvalidOpcode,
 	},
 	{
 		name: "OP_MOD",
@@ -3123,7 +3123,7 @@ var popTests = []popTest{
 			opcode: opcodemapPreinit[OP_MOD],
 			data:   make([]byte, 1),
 		},
-		expectedErr: StackErrInvalidOpcode,
+		expectedErr: ErrStackInvalidOpcode,
 	},
 	{
 		name: "OP_LSHIFT",
@@ -3139,7 +3139,7 @@ var popTests = []popTest{
 			opcode: opcodemapPreinit[OP_LSHIFT],
 			data:   make([]byte, 1),
 		},
-		expectedErr: StackErrInvalidOpcode,
+		expectedErr: ErrStackInvalidOpcode,
 	},
 	{
 		name: "OP_RSHIFT",
@@ -3155,7 +3155,7 @@ var popTests = []popTest{
 			opcode: opcodemapPreinit[OP_RSHIFT],
 			data:   make([]byte, 1),
 		},
-		expectedErr: StackErrInvalidOpcode,
+		expectedErr: ErrStackInvalidOpcode,
 	},
 	{
 		name: "OP_BOOLAND",
@@ -3171,7 +3171,7 @@ var popTests = []popTest{
 			opcode: opcodemapPreinit[OP_BOOLAND],
 			data:   make([]byte, 1),
 		},
-		expectedErr: StackErrInvalidOpcode,
+		expectedErr: ErrStackInvalidOpcode,
 	},
 	{
 		name: "OP_BOOLOR",
@@ -3187,7 +3187,7 @@ var popTests = []popTest{
 			opcode: opcodemapPreinit[OP_BOOLOR],
 			data:   make([]byte, 1),
 		},
-		expectedErr: StackErrInvalidOpcode,
+		expectedErr: ErrStackInvalidOpcode,
 	},
 	{
 		name: "OP_NUMEQUAL",
@@ -3203,7 +3203,7 @@ var popTests = []popTest{
 			opcode: opcodemapPreinit[OP_NUMEQUAL],
 			data:   make([]byte, 1),
 		},
-		expectedErr: StackErrInvalidOpcode,
+		expectedErr: ErrStackInvalidOpcode,
 	},
 	{
 		name: "OP_NUMEQUALVERIFY",
@@ -3219,7 +3219,7 @@ var popTests = []popTest{
 			opcode: opcodemapPreinit[OP_NUMEQUALVERIFY],
 			data:   make([]byte, 1),
 		},
-		expectedErr: StackErrInvalidOpcode,
+		expectedErr: ErrStackInvalidOpcode,
 	},
 	{
 		name: "OP_NUMNOTEQUAL",
@@ -3235,7 +3235,7 @@ var popTests = []popTest{
 			opcode: opcodemapPreinit[OP_NUMNOTEQUAL],
 			data:   make([]byte, 1),
 		},
-		expectedErr: StackErrInvalidOpcode,
+		expectedErr: ErrStackInvalidOpcode,
 	},
 	{
 		name: "OP_LESSTHAN",
@@ -3251,7 +3251,7 @@ var popTests = []popTest{
 			opcode: opcodemapPreinit[OP_LESSTHAN],
 			data:   make([]byte, 1),
 		},
-		expectedErr: StackErrInvalidOpcode,
+		expectedErr: ErrStackInvalidOpcode,
 	},
 	{
 		name: "OP_GREATERTHAN",
@@ -3267,7 +3267,7 @@ var popTests = []popTest{
 			opcode: opcodemapPreinit[OP_GREATERTHAN],
 			data:   make([]byte, 1),
 		},
-		expectedErr: StackErrInvalidOpcode,
+		expectedErr: ErrStackInvalidOpcode,
 	},
 	{
 		name: "OP_LESSTHANOREQUAL",
@@ -3283,7 +3283,7 @@ var popTests = []popTest{
 			opcode: opcodemapPreinit[OP_LESSTHANOREQUAL],
 			data:   make([]byte, 1),
 		},
-		expectedErr: StackErrInvalidOpcode,
+		expectedErr: ErrStackInvalidOpcode,
 	},
 	{
 		name: "OP_GREATERTHANOREQUAL",
@@ -3299,7 +3299,7 @@ var popTests = []popTest{
 			opcode: opcodemapPreinit[OP_GREATERTHANOREQUAL],
 			data:   make([]byte, 1),
 		},
-		expectedErr: StackErrInvalidOpcode,
+		expectedErr: ErrStackInvalidOpcode,
 	},
 	{
 		name: "OP_MIN",
@@ -3315,7 +3315,7 @@ var popTests = []popTest{
 			opcode: opcodemapPreinit[OP_MIN],
 			data:   make([]byte, 1),
 		},
-		expectedErr: StackErrInvalidOpcode,
+		expectedErr: ErrStackInvalidOpcode,
 	},
 	{
 		name: "OP_MAX",
@@ -3331,7 +3331,7 @@ var popTests = []popTest{
 			opcode: opcodemapPreinit[OP_MAX],
 			data:   make([]byte, 1),
 		},
-		expectedErr: StackErrInvalidOpcode,
+		expectedErr: ErrStackInvalidOpcode,
 	},
 	{
 		name: "OP_WITHIN",
@@ -3347,7 +3347,7 @@ var popTests = []popTest{
 			opcode: opcodemapPreinit[OP_WITHIN],
 			data:   make([]byte, 1),
 		},
-		expectedErr: StackErrInvalidOpcode,
+		expectedErr: ErrStackInvalidOpcode,
 	},
 	{
 		name: "OP_RIPEMD160",
@@ -3363,7 +3363,7 @@ var popTests = []popTest{
 			opcode: opcodemapPreinit[OP_RIPEMD160],
 			data:   make([]byte, 1),
 		},
-		expectedErr: StackErrInvalidOpcode,
+		expectedErr: ErrStackInvalidOpcode,
 	},
 	{
 		name: "OP_SHA1",
@@ -3379,7 +3379,7 @@ var popTests = []popTest{
 			opcode: opcodemapPreinit[OP_SHA1],
 			data:   make([]byte, 1),
 		},
-		expectedErr: StackErrInvalidOpcode,
+		expectedErr: ErrStackInvalidOpcode,
 	},
 	{
 		name: "OP_SHA256",
@@ -3395,7 +3395,7 @@ var popTests = []popTest{
 			opcode: opcodemapPreinit[OP_SHA256],
 			data:   make([]byte, 1),
 		},
-		expectedErr: StackErrInvalidOpcode,
+		expectedErr: ErrStackInvalidOpcode,
 	},
 	{
 		name: "OP_HASH160",
@@ -3411,7 +3411,7 @@ var popTests = []popTest{
 			opcode: opcodemapPreinit[OP_HASH160],
 			data:   make([]byte, 1),
 		},
-		expectedErr: StackErrInvalidOpcode,
+		expectedErr: ErrStackInvalidOpcode,
 	},
 	{
 		name: "OP_HASH256",
@@ -3427,7 +3427,7 @@ var popTests = []popTest{
 			opcode: opcodemapPreinit[OP_HASH256],
 			data:   make([]byte, 1),
 		},
-		expectedErr: StackErrInvalidOpcode,
+		expectedErr: ErrStackInvalidOpcode,
 	},
 	{
 		name: "OP_CODESAPERATOR",
@@ -3443,7 +3443,7 @@ var popTests = []popTest{
 			opcode: opcodemapPreinit[OP_CODESEPARATOR],
 			data:   make([]byte, 1),
 		},
-		expectedErr: StackErrInvalidOpcode,
+		expectedErr: ErrStackInvalidOpcode,
 	},
 	{
 		name: "OP_CHECKSIG",
@@ -3459,7 +3459,7 @@ var popTests = []popTest{
 			opcode: opcodemapPreinit[OP_CHECKSIG],
 			data:   make([]byte, 1),
 		},
-		expectedErr: StackErrInvalidOpcode,
+		expectedErr: ErrStackInvalidOpcode,
 	},
 	{
 		name: "OP_CHECKSIGVERIFY",
@@ -3475,7 +3475,7 @@ var popTests = []popTest{
 			opcode: opcodemapPreinit[OP_CHECKSIGVERIFY],
 			data:   make([]byte, 1),
 		},
-		expectedErr: StackErrInvalidOpcode,
+		expectedErr: ErrStackInvalidOpcode,
 	},
 	{
 		name: "OP_CHECKMULTISIG",
@@ -3491,7 +3491,7 @@ var popTests = []popTest{
 			opcode: opcodemapPreinit[OP_CHECKMULTISIG],
 			data:   make([]byte, 1),
 		},
-		expectedErr: StackErrInvalidOpcode,
+		expectedErr: ErrStackInvalidOpcode,
 	},
 	{
 		name: "OP_CHECKMULTISIGVERIFY",
@@ -3507,7 +3507,7 @@ var popTests = []popTest{
 			opcode: opcodemapPreinit[OP_CHECKMULTISIGVERIFY],
 			data:   make([]byte, 1),
 		},
-		expectedErr: StackErrInvalidOpcode,
+		expectedErr: ErrStackInvalidOpcode,
 	},
 	{
 		name: "OP_NOP1",
@@ -3523,7 +3523,7 @@ var popTests = []popTest{
 			opcode: opcodemapPreinit[OP_NOP1],
 			data:   make([]byte, 1),
 		},
-		expectedErr: StackErrInvalidOpcode,
+		expectedErr: ErrStackInvalidOpcode,
 	},
 	{
 		name: "OP_NOP2",
@@ -3539,7 +3539,7 @@ var popTests = []popTest{
 			opcode: opcodemapPreinit[OP_NOP2],
 			data:   make([]byte, 1),
 		},
-		expectedErr: StackErrInvalidOpcode,
+		expectedErr: ErrStackInvalidOpcode,
 	},
 	{
 		name: "OP_NOP3",
@@ -3555,7 +3555,7 @@ var popTests = []popTest{
 			opcode: opcodemapPreinit[OP_NOP3],
 			data:   make([]byte, 1),
 		},
-		expectedErr: StackErrInvalidOpcode,
+		expectedErr: ErrStackInvalidOpcode,
 	},
 	{
 		name: "OP_NOP4",
@@ -3571,7 +3571,7 @@ var popTests = []popTest{
 			opcode: opcodemapPreinit[OP_NOP4],
 			data:   make([]byte, 1),
 		},
-		expectedErr: StackErrInvalidOpcode,
+		expectedErr: ErrStackInvalidOpcode,
 	},
 	{
 		name: "OP_NOP5",
@@ -3587,7 +3587,7 @@ var popTests = []popTest{
 			opcode: opcodemapPreinit[OP_NOP5],
 			data:   make([]byte, 1),
 		},
-		expectedErr: StackErrInvalidOpcode,
+		expectedErr: ErrStackInvalidOpcode,
 	},
 	{
 		name: "OP_NOP6",
@@ -3603,7 +3603,7 @@ var popTests = []popTest{
 			opcode: opcodemapPreinit[OP_NOP6],
 			data:   make([]byte, 1),
 		},
-		expectedErr: StackErrInvalidOpcode,
+		expectedErr: ErrStackInvalidOpcode,
 	},
 	{
 		name: "OP_NOP7",
@@ -3619,7 +3619,7 @@ var popTests = []popTest{
 			opcode: opcodemapPreinit[OP_NOP7],
 			data:   make([]byte, 1),
 		},
-		expectedErr: StackErrInvalidOpcode,
+		expectedErr: ErrStackInvalidOpcode,
 	},
 	{
 		name: "OP_NOP8",
@@ -3635,7 +3635,7 @@ var popTests = []popTest{
 			opcode: opcodemapPreinit[OP_NOP8],
 			data:   make([]byte, 1),
 		},
-		expectedErr: StackErrInvalidOpcode,
+		expectedErr: ErrStackInvalidOpcode,
 	},
 	{
 		name: "OP_NOP9",
@@ -3651,7 +3651,7 @@ var popTests = []popTest{
 			opcode: opcodemapPreinit[OP_NOP9],
 			data:   make([]byte, 1),
 		},
-		expectedErr: StackErrInvalidOpcode,
+		expectedErr: ErrStackInvalidOpcode,
 	},
 	{
 		name: "OP_NOP10",
@@ -3667,7 +3667,7 @@ var popTests = []popTest{
 			opcode: opcodemapPreinit[OP_NOP10],
 			data:   make([]byte, 1),
 		},
-		expectedErr: StackErrInvalidOpcode,
+		expectedErr: ErrStackInvalidOpcode,
 	},
 	{
 		name: "OP_PUBKEYHASH",
@@ -3683,7 +3683,7 @@ var popTests = []popTest{
 			opcode: opcodemapPreinit[OP_PUBKEYHASH],
 			data:   make([]byte, 1),
 		},
-		expectedErr: StackErrInvalidOpcode,
+		expectedErr: ErrStackInvalidOpcode,
 	},
 	{
 		name: "OP_PUBKEY",
@@ -3699,7 +3699,7 @@ var popTests = []popTest{
 			opcode: opcodemapPreinit[OP_PUBKEY],
 			data:   make([]byte, 1),
 		},
-		expectedErr: StackErrInvalidOpcode,
+		expectedErr: ErrStackInvalidOpcode,
 	},
 	{
 		name: "OP_INVALIDOPCODE",
@@ -3715,7 +3715,7 @@ var popTests = []popTest{
 			opcode: opcodemapPreinit[OP_INVALIDOPCODE],
 			data:   make([]byte, 1),
 		},
-		expectedErr: StackErrInvalidOpcode,
+		expectedErr: ErrStackInvalidOpcode,
 	},
 }
 

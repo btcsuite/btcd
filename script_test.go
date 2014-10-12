@@ -326,7 +326,7 @@ var txTests = []txTest{
 			0x12, 0xa3, btcscript.OP_CHECKSIG,
 		},
 		idx:     0,
-		err:     btcscript.StackErrScriptFailed,
+		err:     btcscript.ErrStackScriptFailed,
 		nSigOps: 1,
 		scriptInfo: btcscript.ScriptInfo{
 			PkScriptClass:  btcscript.PubKeyTy,
@@ -1082,7 +1082,7 @@ var txTests = []txTest{
 		idx:           1,
 		bip16:         false,
 		nSigOps:       0, // multisig is in the pkScript!
-		scriptInfoErr: btcscript.StackErrNonPushOnly,
+		scriptInfoErr: btcscript.ErrStackNonPushOnly,
 	},
 	// same as previous but with one byte changed to make signature fail
 	{
@@ -1204,9 +1204,9 @@ var txTests = []txTest{
 		},
 		idx:           1,
 		bip16:         false,
-		err:           btcscript.StackErrScriptFailed,
+		err:           btcscript.ErrStackScriptFailed,
 		nSigOps:       0, // multisig is in the pkScript!
-		scriptInfoErr: btcscript.StackErrNonPushOnly,
+		scriptInfoErr: btcscript.ErrStackNonPushOnly,
 	},
 	// taken from tx b2d93dfd0b2c1a380e55e76a8d9cb3075dec9f4474e9485be008c337fd62c1f7
 	// on testnet
@@ -1391,7 +1391,7 @@ var txTests = []txTest{
 			btcscript.OP_EQUAL,
 		},
 		idx:     0,
-		err:     btcscript.StackErrScriptFailed,
+		err:     btcscript.ErrStackScriptFailed,
 		bip16:   true,
 		nSigOps: 0, // no signature ops in the pushed script.
 		scriptInfo: btcscript.ScriptInfo{
@@ -1456,9 +1456,9 @@ var txTests = []txTest{
 			btcscript.OP_EQUAL,
 		},
 		idx:           0,
-		err:           btcscript.StackErrShortScript,
+		err:           btcscript.ErrStackShortScript,
 		bip16:         true,
-		scriptInfoErr: btcscript.StackErrShortScript,
+		scriptInfoErr: btcscript.ErrStackShortScript,
 	},
 	{
 		// sigscript changed so to be non pushonly.
@@ -1519,10 +1519,10 @@ var txTests = []txTest{
 			btcscript.OP_EQUAL,
 		},
 		idx:           0,
-		parseErr:      btcscript.StackErrP2SHNonPushOnly,
+		parseErr:      btcscript.ErrStackP2SHNonPushOnly,
 		bip16:         true,
 		nSigOps:       0, // no signature ops in the pushed script.
-		scriptInfoErr: btcscript.StackErrNonPushOnly,
+		scriptInfoErr: btcscript.ErrStackNonPushOnly,
 	},
 	{
 		// sigscript changed so to be non pushonly.
@@ -1663,7 +1663,7 @@ func TestGetPreciseSignOps(t *testing.T) {
 		{
 			name:      "scriptSig doesn't parse",
 			scriptSig: []byte{btcscript.OP_PUSHDATA1, 2},
-			err:       btcscript.StackErrShortScript,
+			err:       btcscript.ErrStackShortScript,
 		},
 		{
 			name:      "scriptSig isn't push only",
@@ -1686,7 +1686,7 @@ func TestGetPreciseSignOps(t *testing.T) {
 			name: "pushed script doesn't parse",
 			scriptSig: []byte{btcscript.OP_DATA_2,
 				btcscript.OP_PUSHDATA1, 2},
-			err: btcscript.StackErrShortScript,
+			err: btcscript.ErrStackShortScript,
 		},
 	}
 	// The signature in the p2sh script is nonsensical for the tests since
@@ -1766,7 +1766,7 @@ func TestScriptInfo(t *testing.T) {
 				0xc4, 0xf5, 0x9c,
 			},
 			bip16:         true,
-			scriptInfoErr: btcscript.StackErrShortScript,
+			scriptInfoErr: btcscript.ErrStackShortScript,
 		},
 		{
 			name: "sigScript doesn't parse",
@@ -1786,7 +1786,7 @@ func TestScriptInfo(t *testing.T) {
 				0xc4, 0xf5, 0x9c, 0x74, btcscript.OP_EQUAL,
 			},
 			bip16:         true,
-			scriptInfoErr: btcscript.StackErrShortScript,
+			scriptInfoErr: btcscript.ErrStackShortScript,
 		},
 		{
 			// Invented scripts, the hashes do not match
@@ -1945,13 +1945,13 @@ var removeOpcodeTests = []removeOpcodeTest{
 		name:   "invalid length (insruction)",
 		before: []byte{btcscript.OP_PUSHDATA1},
 		remove: btcscript.OP_CODESEPARATOR,
-		err:    btcscript.StackErrShortScript,
+		err:    btcscript.ErrStackShortScript,
 	},
 	{
 		name:   "invalid length (data)",
 		before: []byte{btcscript.OP_PUSHDATA1, 255, 254},
 		remove: btcscript.OP_CODESEPARATOR,
-		err:    btcscript.StackErrShortScript,
+		err:    btcscript.ErrStackShortScript,
 	},
 }
 
@@ -2083,13 +2083,13 @@ var removeOpcodeByDataTests = []removeOpcodeByDataTest{
 		name:   "invalid length (instruction)",
 		before: []byte{btcscript.OP_PUSHDATA1},
 		remove: []byte{1, 2, 3, 4},
-		err:    btcscript.StackErrShortScript,
+		err:    btcscript.ErrStackShortScript,
 	},
 	{
 		name:   "invalid length (data)",
 		before: []byte{btcscript.OP_PUSHDATA1, 255, 254},
 		remove: []byte{1, 2, 3, 4},
-		err:    btcscript.StackErrShortScript,
+		err:    btcscript.ErrStackShortScript,
 	},
 }
 
@@ -2493,7 +2493,7 @@ func TestCheckErrorCondition(t *testing.T) {
 		}
 
 		err = engine.CheckErrorCondition()
-		if err != btcscript.StackErrScriptUnfinished {
+		if err != btcscript.ErrStackScriptUnfinished {
 			t.Errorf("got unexepected error %v on %dth iteration",
 				err, i)
 			return
@@ -4638,7 +4638,7 @@ func TestCalcMultiSigStats(t *testing.T) {
 				0x71, 0x05, 0xcd, 0x6a, 0x82, 0x8e, 0x03, 0x90,
 				0x9a, 0x67, 0x96, 0x2e, 0x0e, 0xa1, 0xf6, 0x1d,
 			},
-			expected: btcscript.StackErrShortScript,
+			expected: btcscript.ErrStackShortScript,
 		},
 		{
 			name: "stack underflow",
@@ -4653,7 +4653,7 @@ func TestCalcMultiSigStats(t *testing.T) {
 				0xeb, 0x64, 0x9f, 0x6b, 0xc3, 0xf4, 0xce, 0xf3,
 				0x08,
 			},
-			expected: btcscript.StackErrUnderflow,
+			expected: btcscript.ErrStackUnderflow,
 		},
 		{
 			name: "multisig script",

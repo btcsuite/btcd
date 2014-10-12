@@ -21,110 +21,110 @@ import (
 )
 
 var (
-	// StackErrShortScript is returned if the script has an opcode that is
+	// ErrStackShortScript is returned if the script has an opcode that is
 	// too long for the length of the script.
-	StackErrShortScript = errors.New("execute past end of script")
+	ErrStackShortScript = errors.New("execute past end of script")
 
-	// StackErrLongScript is returned if the script has an opcode that is
+	// ErrStackLongScript is returned if the script has an opcode that is
 	// too long for the length of the script.
-	StackErrLongScript = errors.New("script is longer than maximum allowed")
+	ErrStackLongScript = errors.New("script is longer than maximum allowed")
 
-	// StackErrUnderflow is returned if an opcode requires more items on the
-	// stack than is present.
-	StackErrUnderflow = errors.New("stack underflow")
+	// ErrStackUnderflow is returned if an opcode requires more items on the
+	// stack than is present.f
+	ErrStackUnderflow = errors.New("stack underflow")
 
-	// StackErrInvalidArgs is returned if the argument for an opcode is out
+	// ErrStackInvalidArgs is returned if the argument for an opcode is out
 	// of acceptable range.
-	StackErrInvalidArgs = errors.New("invalid argument")
+	ErrStackInvalidArgs = errors.New("invalid argument")
 
-	// StackErrOpDisabled is returned when a disabled opcode is encountered
+	// ErrStackOpDisabled is returned when a disabled opcode is encountered
 	// in the script.
-	StackErrOpDisabled = errors.New("Disabled Opcode")
+	ErrStackOpDisabled = errors.New("Disabled Opcode")
 
-	// StackErrVerifyFailed is returned when one of the OP_VERIFY or
+	// ErrStackVerifyFailed is returned when one of the OP_VERIFY or
 	// OP_*VERIFY instructions is executed and the conditions fails.
-	StackErrVerifyFailed = errors.New("Verify failed")
+	ErrStackVerifyFailed = errors.New("Verify failed")
 
-	// StackErrNumberTooBig is returned when the argument for an opcode that
+	// ErrStackNumberTooBig is returned when the argument for an opcode that
 	// should be an offset is obviously far too large.
-	StackErrNumberTooBig = errors.New("number too big")
+	ErrStackNumberTooBig = errors.New("number too big")
 
-	// StackErrInvalidOpcode is returned when an opcode marked as invalid or
+	// ErrStackInvalidOpcode is returned when an opcode marked as invalid or
 	// a completely undefined opcode is encountered.
-	StackErrInvalidOpcode = errors.New("Invalid Opcode")
+	ErrStackInvalidOpcode = errors.New("Invalid Opcode")
 
-	// StackErrReservedOpcode is returned when an opcode marked as reserved
+	// ErrStackReservedOpcode is returned when an opcode marked as reserved
 	// is encountered.
-	StackErrReservedOpcode = errors.New("Reserved Opcode")
+	ErrStackReservedOpcode = errors.New("Reserved Opcode")
 
-	// StackErrEarlyReturn is returned when OP_RETURN is executed in the
+	// ErrStackEarlyReturn is returned when OP_RETURN is executed in the
 	// script.
-	StackErrEarlyReturn = errors.New("Script returned early")
+	ErrStackEarlyReturn = errors.New("Script returned early")
 
-	// StackErrNoIf is returned if an OP_ELSE or OP_ENDIF is encountered
+	// ErrStackNoIf is returned if an OP_ELSE or OP_ENDIF is encountered
 	// without first having an OP_IF or OP_NOTIF in the script.
-	StackErrNoIf = errors.New("OP_ELSE or OP_ENDIF with no matching OP_IF")
+	ErrStackNoIf = errors.New("OP_ELSE or OP_ENDIF with no matching OP_IF")
 
-	// StackErrMissingEndif is returned if the end of a script is reached
+	// ErrStackMissingEndif is returned if the end of a script is reached
 	// without and OP_ENDIF to correspond to a conditional expression.
-	StackErrMissingEndif = fmt.Errorf("execute fail, in conditional execution")
+	ErrStackMissingEndif = fmt.Errorf("execute fail, in conditional execution")
 
-	// StackErrTooManyPubkeys is returned if an OP_CHECKMULTISIG is
+	// ErrStackTooManyPubkeys is returned if an OP_CHECKMULTISIG is
 	// encountered with more than MaxPubKeysPerMultiSig pubkeys present.
-	StackErrTooManyPubkeys = errors.New("Invalid pubkey count in OP_CHECKMULTISIG")
+	ErrStackTooManyPubkeys = errors.New("Invalid pubkey count in OP_CHECKMULTISIG")
 
-	// StackErrTooManyOperations is returned if a script has more than
+	// ErrStackTooManyOperations is returned if a script has more than
 	// MaxOpsPerScript opcodes that do not push data.
-	StackErrTooManyOperations = errors.New("Too many operations in script")
+	ErrStackTooManyOperations = errors.New("Too many operations in script")
 
-	// StackErrElementTooBig is returned if the size of an element to be
+	// ErrStackElementTooBig is returned if the size of an element to be
 	// pushed to the stack is over MaxScriptElementSize.
-	StackErrElementTooBig = errors.New("Element in script too large")
+	ErrStackElementTooBig = errors.New("Element in script too large")
 
-	// StackErrUnknownAddress is returned when ScriptToAddrHash does not
+	// ErrStackUnknownAddress is returned when ScriptToAddrHash does not
 	// recognise the pattern of the script and thus can not find the address
 	// for payment.
-	StackErrUnknownAddress = errors.New("non-recognised address")
+	ErrStackUnknownAddress = errors.New("non-recognised address")
 
-	// StackErrScriptFailed is returned when at the end of a script the
+	// ErrStackScriptFailed is returned when at the end of a script the
 	// boolean on top of the stack is false signifying that the script has
 	// failed.
-	StackErrScriptFailed = errors.New("execute fail, fail on stack")
+	ErrStackScriptFailed = errors.New("execute fail, fail on stack")
 
-	// StackErrScriptUnfinished is returned when CheckErrorCondition is
+	// ErrStackScriptUnfinished is returned when CheckErrorCondition is
 	// called on a script that has not finished executing.
-	StackErrScriptUnfinished = errors.New("Error check when script unfinished")
+	ErrStackScriptUnfinished = errors.New("Error check when script unfinished")
 
-	// StackErrEmpyStack is returned when the stack is empty at the end of
+	// ErrStackEmptyStack is returned when the stack is empty at the end of
 	// execution. Normal operation requires that a boolean is on top of the
 	// stack when the scripts have finished executing.
-	StackErrEmptyStack = errors.New("Stack empty at end of execution")
+	ErrStackEmptyStack = errors.New("Stack empty at end of execution")
 
-	// StackErrP2SHNonPushOnly is returned when a Pay-to-Script-Hash
+	// ErrStackP2SHNonPushOnly is returned when a Pay-to-Script-Hash
 	// transaction is encountered and the ScriptSig does operations other
 	// than push data (in violation of bip16).
-	StackErrP2SHNonPushOnly = errors.New("pay to script hash with non " +
+	ErrStackP2SHNonPushOnly = errors.New("pay to script hash with non " +
 		"pushonly input")
 
-	// StackErrInvalidParseType is an internal error returned from
+	// ErrStackInvalidParseType is an internal error returned from
 	// ScriptToAddrHash ony if the internal data tables are wrong.
-	StackErrInvalidParseType = errors.New("internal error: invalid parsetype found")
+	ErrStackInvalidParseType = errors.New("internal error: invalid parsetype found")
 
-	// StackErrInvalidAddrOffset is an internal error returned from
+	// ErrStackInvalidAddrOffset is an internal error returned from
 	// ScriptToAddrHash ony if the internal data tables are wrong.
-	StackErrInvalidAddrOffset = errors.New("internal error: invalid offset found")
+	ErrStackInvalidAddrOffset = errors.New("internal error: invalid offset found")
 
-	// StackErrInvalidIndex is returned when an out-of-bounds index was
+	// ErrStackInvalidIndex is returned when an out-of-bounds index was
 	// passed to a function.
-	StackErrInvalidIndex = errors.New("Invalid script index")
+	ErrStackInvalidIndex = errors.New("Invalid script index")
 
-	// StackErrNonPushOnly is returned when ScriptInfo is called with a
+	// ErrStackNonPushOnly is returned when ScriptInfo is called with a
 	// pkScript that peforms operations other that pushing data to the stack.
-	StackErrNonPushOnly = errors.New("SigScript is non pushonly")
+	ErrStackNonPushOnly = errors.New("SigScript is non pushonly")
 
-	// StackErrOverflow is returned when stack and altstack combined depth
+	// ErrStackOverflow is returned when stack and altstack combined depth
 	// is over the limit.
-	StackErrOverflow = errors.New("Stacks overflowed")
+	ErrStackOverflow = errors.New("Stacks overflowed")
 )
 
 const (
@@ -421,7 +421,7 @@ func parseScriptTemplate(script []byte, opcodemap map[byte]*opcode) ([]parsedOpc
 		instr := script[i]
 		op, ok := opcodemap[instr]
 		if !ok {
-			return retScript, StackErrInvalidOpcode
+			return retScript, ErrStackInvalidOpcode
 		}
 		pop := parsedOpcode{opcode: op}
 		// parse data out of instruction.
@@ -431,7 +431,7 @@ func parseScriptTemplate(script []byte, opcodemap map[byte]*opcode) ([]parsedOpc
 			i++
 		case op.length > 1:
 			if len(script[i:]) < op.length {
-				return retScript, StackErrShortScript
+				return retScript, ErrStackShortScript
 			}
 			// slice out the data.
 			pop.data = script[i+1 : i+op.length]
@@ -441,7 +441,7 @@ func parseScriptTemplate(script []byte, opcodemap map[byte]*opcode) ([]parsedOpc
 			off := i + 1
 
 			if len(script[off:]) < -op.length {
-				return retScript, StackErrShortScript
+				return retScript, ErrStackShortScript
 			}
 
 			// Next -length bytes are little endian length of data.
@@ -466,7 +466,7 @@ func parseScriptTemplate(script []byte, opcodemap map[byte]*opcode) ([]parsedOpc
 			// Disallow entries that do not fit script or were
 			// sign extended.
 			if int(l) > len(script[off:]) || int(l) < 0 {
-				return retScript, StackErrShortScript
+				return retScript, ErrStackShortScript
 			}
 			pop.data = script[off : off+int(l)]
 			i += 1 - op.length + int(l)
@@ -528,7 +528,7 @@ func NewScript(scriptSig []byte, scriptPubKey []byte, txidx int, tx *btcwire.Msg
 	m.scripts = make([][]parsedOpcode, len(scripts))
 	for i, scr := range scripts {
 		if len(scr) > maxScriptSize {
-			return nil, StackErrLongScript
+			return nil, ErrStackLongScript
 		}
 		var err error
 		m.scripts[i], err = parseScript(scr)
@@ -551,7 +551,7 @@ func NewScript(scriptSig []byte, scriptPubKey []byte, txidx int, tx *btcwire.Msg
 		// if we are pay to scripthash then we only accept input
 		// scripts that push data
 		if !isPushOnly(m.scripts[0]) {
-			return nil, StackErrP2SHNonPushOnly
+			return nil, ErrStackP2SHNonPushOnly
 		}
 		m.bip16 = true
 	}
@@ -611,10 +611,10 @@ func (s *Script) CheckErrorCondition() (err error) {
 	// Check we are actually done. if pc is past the end of script array
 	// then we have run out of scripts to run.
 	if s.scriptidx < len(s.scripts) {
-		return StackErrScriptUnfinished
+		return ErrStackScriptUnfinished
 	}
 	if s.dstack.Depth() < 1 {
-		return StackErrEmptyStack
+		return ErrStackEmptyStack
 	}
 	v, err := s.dstack.PopBool()
 	if err == nil && v == false {
@@ -625,7 +625,7 @@ func (s *Script) CheckErrorCondition() (err error) {
 			return fmt.Sprintf("scripts failed: script0: %s\n"+
 				"script1: %s", dis0, dis1)
 		}))
-		err = StackErrScriptFailed
+		err = ErrStackScriptFailed
 	}
 	return err
 }
@@ -649,7 +649,7 @@ func (m *Script) Step() (done bool, err error) {
 	}
 
 	if m.dstack.Depth()+m.astack.Depth() > maxStackSize {
-		return false, StackErrOverflow
+		return false, ErrStackOverflow
 	}
 
 	// prepare for next instruction
@@ -657,7 +657,7 @@ func (m *Script) Step() (done bool, err error) {
 	if m.scriptoff >= len(m.scripts[m.scriptidx]) {
 		// Illegal to have an `if' that straddles two scripts.
 		if err == nil && len(m.condStack) != 1 {
-			return false, StackErrMissingEndif
+			return false, ErrStackMissingEndif
 		}
 
 		// alt stack doesn't persist.
@@ -728,7 +728,7 @@ func (m *Script) validPC() error {
 // ``idx''.  Where 0 is the scriptSig and 1 is the scriptPubKey.
 func (m *Script) DisasmScript(idx int) (disstr string, err error) {
 	if idx >= len(m.scripts) {
-		return "", StackErrInvalidIndex
+		return "", ErrStackInvalidIndex
 	}
 	for i := range m.scripts[idx] {
 		disstr = disstr + m.disasm(idx, i) + "\n"
@@ -1561,7 +1561,7 @@ func CalcScriptInfo(sigscript, pkscript []byte, bip16 bool) (*ScriptInfo, error)
 
 	// Can't have a pkScript that doesn't just push data.
 	if !isPushOnly(sigPops) {
-		return nil, StackErrNonPushOnly
+		return nil, ErrStackNonPushOnly
 	}
 
 	si.ExpectedInputs = expectedInputs(pkPops, si.PkScriptClass)
@@ -1622,7 +1622,7 @@ func CalcMultiSigStats(script []byte) (int, int, error) {
 	// items must be on the stack per:
 	//  OP_1 PUBKEY OP_1 OP_CHECKMULTISIG
 	if len(pops) < 4 {
-		return 0, 0, StackErrUnderflow
+		return 0, 0, ErrStackUnderflow
 	}
 
 	numSigs := asSmallInt(pops[0].opcode)
