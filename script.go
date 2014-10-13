@@ -635,67 +635,67 @@ func (s *Script) CheckErrorCondition() (err error) {
 // will return true in the case that the last opcode was successfully executed.
 // if an error is returned then the result of calling Step or any other method
 // is undefined.
-func (m *Script) Step() (done bool, err error) {
+func (s *Script) Step() (done bool, err error) {
 	// verify that it is pointing to a valid script address
-	err = m.validPC()
+	err = s.validPC()
 	if err != nil {
 		return true, err
 	}
-	opcode := m.scripts[m.scriptidx][m.scriptoff]
+	opcode := s.scripts[s.scriptidx][s.scriptoff]
 
-	err = opcode.exec(m)
+	err = opcode.exec(s)
 	if err != nil {
 		return true, err
 	}
 
-	if m.dstack.Depth()+m.astack.Depth() > maxStackSize {
+	if s.dstack.Depth()+s.astack.Depth() > maxStackSize {
 		return false, ErrStackOverflow
 	}
 
 	// prepare for next instruction
-	m.scriptoff++
-	if m.scriptoff >= len(m.scripts[m.scriptidx]) {
+	s.scriptoff++
+	if s.scriptoff >= len(s.scripts[s.scriptidx]) {
 		// Illegal to have an `if' that straddles two scripts.
-		if err == nil && len(m.condStack) != 1 {
+		if err == nil && len(s.condStack) != 1 {
 			return false, ErrStackMissingEndif
 		}
 
 		// alt stack doesn't persist.
-		_ = m.astack.DropN(m.astack.Depth())
+		_ = s.astack.DropN(s.astack.Depth())
 
-		m.numOps = 0 // number of ops is per script.
-		m.scriptoff = 0
-		if m.scriptidx == 0 && m.bip16 {
-			m.scriptidx++
-			m.savedFirstStack = m.GetStack()
-		} else if m.scriptidx == 1 && m.bip16 {
+		s.numOps = 0 // number of ops is per script.
+		s.scriptoff = 0
+		if s.scriptidx == 0 && s.bip16 {
+			s.scriptidx++
+			s.savedFirstStack = s.GetStack()
+		} else if s.scriptidx == 1 && s.bip16 {
 			// Put us past the end for CheckErrorCondition()
-			m.scriptidx++
+			s.scriptidx++
 			// We check script ran ok, if so then we pull
 			// the script out of the first stack and executre that.
-			err := m.CheckErrorCondition()
+			err := s.CheckErrorCondition()
 			if err != nil {
 				return false, err
 			}
 
-			script := m.savedFirstStack[len(m.savedFirstStack)-1]
+			script := s.savedFirstStack[len(s.savedFirstStack)-1]
 			pops, err := parseScript(script)
 			if err != nil {
 				return false, err
 			}
-			m.scripts = append(m.scripts, pops)
+			s.scripts = append(s.scripts, pops)
 			// Set stack to be the stack from first script
 			// minus the script itself
-			m.SetStack(m.savedFirstStack[:len(m.savedFirstStack)-1])
+			s.SetStack(s.savedFirstStack[:len(s.savedFirstStack)-1])
 		} else {
-			m.scriptidx++
+			s.scriptidx++
 		}
 		// there are zero length scripts in the wild
-		if m.scriptidx < len(m.scripts) && m.scriptoff >= len(m.scripts[m.scriptidx]) {
-			m.scriptidx++
+		if s.scriptidx < len(s.scripts) && s.scriptoff >= len(s.scripts[s.scriptidx]) {
+			s.scriptidx++
 		}
-		m.lastcodesep = 0
-		if m.scriptidx >= len(m.scripts) {
+		s.lastcodesep = 0
+		if s.scriptidx >= len(s.scripts) {
 			return true, nil
 		}
 	}
@@ -704,55 +704,55 @@ func (m *Script) Step() (done bool, err error) {
 
 // curPC returns either the current script and offset, or an error if the
 // position isn't valid.
-func (m *Script) curPC() (script int, off int, err error) {
-	err = m.validPC()
+func (s *Script) curPC() (script int, off int, err error) {
+	err = s.validPC()
 	if err != nil {
 		return 0, 0, err
 	}
-	return m.scriptidx, m.scriptoff, nil
+	return s.scriptidx, s.scriptoff, nil
 }
 
 // validPC returns an error if the current script position is valid for
 // execution, nil otherwise.
-func (m *Script) validPC() error {
-	if m.scriptidx >= len(m.scripts) {
-		return fmt.Errorf("Past input scripts %v:%v %v:xxxx", m.scriptidx, m.scriptoff, len(m.scripts))
+func (s *Script) validPC() error {
+	if s.scriptidx >= len(s.scripts) {
+		return fmt.Errorf("Past input scripts %v:%v %v:xxxx", s.scriptidx, s.scriptoff, len(s.scripts))
 	}
-	if m.scriptoff >= len(m.scripts[m.scriptidx]) {
-		return fmt.Errorf("Past input scripts %v:%v %v:%04d", m.scriptidx, m.scriptoff, m.scriptidx, len(m.scripts[m.scriptidx]))
+	if s.scriptoff >= len(s.scripts[s.scriptidx]) {
+		return fmt.Errorf("Past input scripts %v:%v %v:%04d", s.scriptidx, s.scriptoff, s.scriptidx, len(s.scripts[s.scriptidx]))
 	}
 	return nil
 }
 
 // DisasmScript returns the disassembly string for the script at offset
 // ``idx''.  Where 0 is the scriptSig and 1 is the scriptPubKey.
-func (m *Script) DisasmScript(idx int) (disstr string, err error) {
-	if idx >= len(m.scripts) {
+func (s *Script) DisasmScript(idx int) (disstr string, err error) {
+	if idx >= len(s.scripts) {
 		return "", ErrStackInvalidIndex
 	}
-	for i := range m.scripts[idx] {
-		disstr = disstr + m.disasm(idx, i) + "\n"
+	for i := range s.scripts[idx] {
+		disstr = disstr + s.disasm(idx, i) + "\n"
 	}
 	return disstr, nil
 }
 
 // DisasmPC returns the string for the disassembly of the opcode that will be
 // next to execute when Step() is called.
-func (m *Script) DisasmPC() (disstr string, err error) {
-	scriptidx, scriptoff, err := m.curPC()
+func (s *Script) DisasmPC() (disstr string, err error) {
+	scriptidx, scriptoff, err := s.curPC()
 	if err != nil {
 		return "", err
 	}
-	return m.disasm(scriptidx, scriptoff), nil
+	return s.disasm(scriptidx, scriptoff), nil
 }
 
 // disasm is a helper member to produce the output for DisasmPC and
 // DisasmScript. It produces the opcode prefixed by the program counter at the
 // provided position in the script. it does no error checking and leaves that
 // to the caller to provide a valid offse.
-func (m *Script) disasm(scriptidx int, scriptoff int) string {
+func (s *Script) disasm(scriptidx int, scriptoff int) string {
 	return fmt.Sprintf("%02x:%04x: %s", scriptidx, scriptoff,
-		m.scripts[scriptidx][scriptoff].print(false))
+		s.scripts[scriptidx][scriptoff].print(false))
 }
 
 // subScript will return the script since the last OP_CODESEPARATOR
@@ -1526,16 +1526,21 @@ func expectedInputs(pops []parsedOpcode, class ScriptClass) int {
 	}
 }
 
+// ScriptInfo houses information about a script pair that is determined by
+// CalcScriptInfo.
 type ScriptInfo struct {
 	// The class of the sigscript, equivalent to calling GetScriptClass
 	// on the sigScript.
 	PkScriptClass ScriptClass
-	// the number of inputs provided by the pkScript
+
+	// NumInputs is the number of inputs provided by the pkScript.
 	NumInputs int
-	// the number of outputs required by sigScript and any
+
+	// ExpectedInputs is the number of outputs required by sigScript and any
 	// pay-to-script-hash scripts. The number will be -1 if unknown.
 	ExpectedInputs int
-	// The nubmer of signature operations in the scriptpair.
+
+	// SigOps is the nubmer of signature operations in the script pair.
 	SigOps int
 }
 
