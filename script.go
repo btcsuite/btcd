@@ -6,11 +6,9 @@ package btcscript
 
 import (
 	"bytes"
-	"crypto/rand"
 	"encoding/binary"
 	"errors"
 	"fmt"
-	"io"
 	"time"
 
 	"github.com/conformal/btcec"
@@ -1116,15 +1114,8 @@ func SignatureScript(tx *btcwire.MsgTx, idx int, subscript []byte, hashType SigH
 	return NewScriptBuilder().AddData(sig).AddData(pkData).Script(), nil
 }
 
-func signTxOutput(tx *btcwire.MsgTx, idx int, subScript []byte, hashType SigHashType,
-	key *btcec.PrivateKey) ([]byte, error) {
-
-	return signTxOutputCustomReader(rand.Reader, tx, idx, subScript,
-		hashType, key)
-}
-
-func signTxOutputCustomReader(reader io.Reader, tx *btcwire.MsgTx, idx int,
-	subScript []byte, hashType SigHashType, key *btcec.PrivateKey) ([]byte, error) {
+func signTxOutput(tx *btcwire.MsgTx, idx int, subScript []byte,
+	hashType SigHashType, key *btcec.PrivateKey) ([]byte, error) {
 	parsedScript, err := parseScript(subScript)
 	if err != nil {
 		return nil, fmt.Errorf("cannot parse output script: %v", err)
