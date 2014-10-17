@@ -497,3 +497,56 @@ func (c *Client) VerifyChainBlocksAsync(checkLevel, numBlocks int32) FutureVerif
 func (c *Client) VerifyChainBlocks(checkLevel, numBlocks int32) (bool, error) {
 	return c.VerifyChainBlocksAsync(checkLevel, numBlocks).Receive()
 }
+
+// FutureGetTxOutResult is a future promise to deliver the result of a
+// GetTxOutAsync RPC invocation (or an applicable error).
+type FutureGetTxOutResult chan *response
+
+// Receive waits for the response promised by the future and returns a
+// transaction given its hash.
+func (r FutureGetTxOutResult) Receive() (*btcjson.GetTxOutResult, error) {
+	res, err := receiveFuture(r)
+	if err != nil {
+		return nil, err
+	}
+
+	// take care of the special case where the output has been spent already
+	// it should return the string "null"
+	if string(res) == "null" {
+		return nil, nil
+	}
+
+	// Unmarshal result as an gettxout result object.
+	var txOutInfo *btcjson.GetTxOutResult
+	err = json.Unmarshal(res, &txOutInfo)
+	if err != nil {
+		return nil, err
+	}
+
+	return txOutInfo, nil
+}
+
+// GetTxOutAsync returns an instance of a type that can be used to get
+// the result of the RPC at some future time by invoking the Receive function on
+// the returned instance.
+//
+// See GetTxOut for the blocking version and more details.
+func (c *Client) GetTxOutAsync(txHash *btcwire.ShaHash, index int, mempool bool) FutureGetTxOutResult {
+	hash := ""
+	if txHash != nil {
+		hash = txHash.String()
+	}
+
+	id := c.NextID()
+	cmd, err := btcjson.NewGetTxOutCmd(id, hash, index, mempool)
+	if err != nil {
+		return newFutureError(err)
+	}
+	return c.sendCmd(cmd)
+}
+
+// GetTxOut returns the transaction output info if it's unspent and
+// nil, otherwise.
+func (c *Client) GetTxOut(txHash *btcwire.ShaHash, index int, mempool bool) (*btcjson.GetTxOutResult, error) {
+	return c.GetTxOutAsync(txHash, index, mempool).Receive()
+}
