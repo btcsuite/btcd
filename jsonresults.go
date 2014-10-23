@@ -580,7 +580,7 @@ func ReadResultCmd(cmd string, message []byte) (Reply, error) {
 		var res *GetNetworkInfoResult
 		err = json.Unmarshal(objmap["result"], &res)
 		if err == nil {
-			if res.LocalAddresses == nil {
+			if res != nil && res.LocalAddresses == nil {
 				res.LocalAddresses = []LocalAddressesResult{}
 			}
 			result.Result = res
