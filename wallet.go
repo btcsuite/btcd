@@ -1899,12 +1899,12 @@ func (c *Client) ListReceivedByAccountMinConfAsync(minConfirms int) FutureListRe
 }
 
 // ListReceivedByAccountMinConf lists balances by account using the specified
-// number of minimum confirmations and including accounts that haven't received
+// number of minimum confirmations not including accounts that haven't received
 // any payments.
 //
 // See ListReceivedByAccount to use the default minimum number of confirmations
-// and ListReceivedByAccountIncludeEmpty to also filter accounts that haven't
-// received any payments from the results.
+// and ListReceivedByAccountIncludeEmpty to also include accounts that haven't
+// received any payments in the results.
 func (c *Client) ListReceivedByAccountMinConf(minConfirms int) ([]btcjson.ListReceivedByAccountResult, error) {
 	return c.ListReceivedByAccountMinConfAsync(minConfirms).Receive()
 }
@@ -1913,7 +1913,7 @@ func (c *Client) ListReceivedByAccountMinConf(minConfirms int) ([]btcjson.ListRe
 // be used to get the result of the RPC at some future time by invoking the
 // Receive function on the returned instance.
 //
-// See ListReceivedByAccountIncludeEmpt for the blocking version and more details.
+// See ListReceivedByAccountIncludeEmpty for the blocking version and more details.
 func (c *Client) ListReceivedByAccountIncludeEmptyAsync(minConfirms int, includeEmpty bool) FutureListReceivedByAccountResult {
 	id := c.NextID()
 	cmd, err := btcjson.NewListReceivedByAccountCmd(id, minConfirms, includeEmpty)
@@ -1931,6 +1931,108 @@ func (c *Client) ListReceivedByAccountIncludeEmptyAsync(minConfirms int, include
 // See ListReceivedByAccount and ListReceivedByAccountMinConf to use defaults.
 func (c *Client) ListReceivedByAccountIncludeEmpty(minConfirms int, includeEmpty bool) ([]btcjson.ListReceivedByAccountResult, error) {
 	return c.ListReceivedByAccountIncludeEmptyAsync(minConfirms,
+		includeEmpty).Receive()
+}
+
+// FutureListReceivedByAddressResult is a future promise to deliver the result
+// of a ListReceivedByAddressAsync, ListReceivedByAddressMinConfAsync, or
+// ListReceivedByAddressIncludeEmptyAsync RPC invocation (or an applicable
+// error).
+type FutureListReceivedByAddressResult chan *response
+
+// Receive waits for the response promised by the future and returns a list of
+// balances by address.
+func (r FutureListReceivedByAddressResult) Receive() ([]btcjson.ListReceivedByAddressResult, error) {
+	res, err := receiveFuture(r)
+	if err != nil {
+		return nil, err
+	}
+
+	// Unmarshal as an array of listreceivedbyaddress result objects.
+	var received []btcjson.ListReceivedByAddressResult
+	err = json.Unmarshal(res, &received)
+	if err != nil {
+		return nil, err
+	}
+
+	return received, nil
+}
+
+// ListReceivedByAddressAsync returns an instance of a type that can be used to
+// get the result of the RPC at some future time by invoking the Receive
+// function on the returned instance.
+//
+// See ListReceivedByAddress for the blocking version and more details.
+func (c *Client) ListReceivedByAddressAsync() FutureListReceivedByAddressResult {
+	id := c.NextID()
+	cmd, err := btcjson.NewListReceivedByAddressCmd(id)
+	if err != nil {
+		return newFutureError(err)
+	}
+
+	return c.sendCmd(cmd)
+}
+
+// ListReceivedByAddress lists balances by address using the default number
+// of minimum confirmations not including addresses that haven't received any
+// payments or watching only addresses.
+//
+// See ListReceivedByAddressMinConf to override the minimum number of
+// confirmations and ListReceivedByAddressIncludeEmpty to also include addresses
+// that haven't received any payments in the results.
+func (c *Client) ListReceivedByAddress() ([]btcjson.ListReceivedByAddressResult, error) {
+	return c.ListReceivedByAddressAsync().Receive()
+}
+
+// ListReceivedByAddressMinConfAsync returns an instance of a type that can be
+// used to get the result of the RPC at some future time by invoking the Receive
+// function on the returned instance.
+//
+// See ListReceivedByAddressMinConf for the blocking version and more details.
+func (c *Client) ListReceivedByAddressMinConfAsync(minConfirms int) FutureListReceivedByAddressResult {
+	id := c.NextID()
+	cmd, err := btcjson.NewListReceivedByAddressCmd(id, minConfirms)
+	if err != nil {
+		return newFutureError(err)
+	}
+
+	return c.sendCmd(cmd)
+}
+
+// ListReceivedByAddressMinConf lists balances by address using the specified
+// number of minimum confirmations not including addresses that haven't received
+// any payments.
+//
+// See ListReceivedByAddress to use the default minimum number of confirmations
+// and ListReceivedByAddressIncludeEmpty to also include addresses that haven't
+// received any payments in the results.
+func (c *Client) ListReceivedByAddressMinConf(minConfirms int) ([]btcjson.ListReceivedByAddressResult, error) {
+	return c.ListReceivedByAddressMinConfAsync(minConfirms).Receive()
+}
+
+// ListReceivedByAccountIncludeEmptyAsync returns an instance of a type that can
+// be used to get the result of the RPC at some future time by invoking the
+// Receive function on the returned instance.
+//
+// See ListReceivedByAccountIncludeEmpty for the blocking version and more details.
+func (c *Client) ListReceivedByAddressIncludeEmptyAsync(minConfirms int, includeEmpty bool) FutureListReceivedByAddressResult {
+	id := c.NextID()
+	cmd, err := btcjson.NewListReceivedByAddressCmd(id, minConfirms,
+		includeEmpty)
+	if err != nil {
+		return newFutureError(err)
+	}
+
+	return c.sendCmd(cmd)
+}
+
+// ListReceivedByAddressIncludeEmpty lists balances by address using the
+// specified number of minimum confirmations and including addresses that
+// haven't received any payments depending on specified flag.
+//
+// See ListReceivedByAddress and ListReceivedByAddressMinConf to use defaults.
+func (c *Client) ListReceivedByAddressIncludeEmpty(minConfirms int, includeEmpty bool) ([]btcjson.ListReceivedByAddressResult, error) {
+	return c.ListReceivedByAddressIncludeEmptyAsync(minConfirms,
 		includeEmpty).Receive()
 }
 
@@ -2330,7 +2432,6 @@ func (c *Client) GetInfo() (*btcjson.InfoResult, error) {
 // encryptwallet (Won't be supported by btcwallet since it's always encrypted)
 // getwalletinfo (NYI in btcwallet or btcjson)
 // listaddressgroupings (NYI in btcwallet)
-// listreceivedbyaddress (NYI in btcwallet)
 // listreceivedbyaccount (NYI in btcwallet)
 
 // DUMP
