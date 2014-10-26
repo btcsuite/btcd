@@ -361,7 +361,7 @@ type ListReceivedByAddressResult struct {
 	Address           string   `json:"address"`
 	Amount            float64  `json:"amount"`
 	Confirmations     uint64   `json:"confirmations"`
-	Tx                []string `json:"tx,omitempty"`
+	TxIDs             []string `json:"txids,omitempty"`
 	InvolvesWatchonly bool     `json:"involvesWatchonly,omitempty"`
 }
 
