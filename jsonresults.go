@@ -426,6 +426,7 @@ type ValidateAddressResult struct {
 	IsValid      bool     `json:"isvalid"`
 	Address      string   `json:"address,omitempty"`
 	IsMine       bool     `json:"ismine,omitempty"`
+	IsWatchOnly  bool     `json:"iswatchonly,omitempty"`
 	IsScript     bool     `json:"isscript,omitempty"`
 	PubKey       string   `json:"pubkey,omitempty"`
 	IsCompressed bool     `json:"iscompressed,omitempty"`
