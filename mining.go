@@ -513,15 +513,10 @@ mempoolLoop:
 			continue
 		}
 
-		// Calculate the input value age sum for the transaction.  This
-		// is comprised of the sum all of input amounts multiplied by
-		// their respective age (number of confirmations since the
-		// referenced input transaction).  While doing the above, also
-		// setup dependencies for any transactions which reference other
-		// transactions in the mempool so they can be properly ordered
-		// below.
+		// Setup dependencies for any transactions which reference
+		// other transactions in the mempool so they can be properly
+		// ordered below.
 		prioItem := &txPrioItem{tx: txDesc.Tx}
-		inputValueAge := float64(0.0)
 		for _, txIn := range tx.MsgTx().TxIn {
 			originHash := &txIn.PreviousOutPoint.Hash
 			originIndex := txIn.PreviousOutPoint.Index
@@ -550,9 +545,8 @@ mempoolLoop:
 				}
 				prioItem.dependsOn[*originHash] = struct{}{}
 
-				// No need to calculate or sum input value age
-				// for this input since it's zero due to
-				// the input age multiplier of 0.
+				// Skip the check below. We already know the
+				// referenced transaction is available.
 				continue
 			}
 
@@ -566,25 +560,19 @@ mempoolLoop:
 					originIndex, originHash)
 				continue mempoolLoop
 			}
-
-			// Sum the input value times age.
-			originTxOut := txData.Tx.MsgTx().TxOut[originIndex]
-			inputValue := originTxOut.Value
-			inputAge := nextBlockHeight - txData.BlockHeight
-			inputValueAge += float64(inputValue * inputAge)
 		}
 
 		// Calculate the final transaction priority using the input
 		// value age sum as well as the adjusted transaction size.  The
 		// formula is: sum(inputValue * inputAge) / adjustedTxSize
-		txSize := tx.MsgTx().SerializeSize()
-		prioItem.priority = calcPriority(tx, txSize, inputValueAge)
+		prioItem.priority = txDesc.CurrentPriority(txStore, nextBlockHeight)
 
 		// Calculate the fee in Satoshi/KB.
 		// NOTE: This is a more precise value than the one calculated
 		// during calcMinRelayFee which rounds up to the nearest full
 		// kilobyte boundary.  This is beneficial since it provides an
 		// incentive to create smaller transactions.
+		txSize := tx.MsgTx().SerializeSize()
 		prioItem.feePerKB = float64(txDesc.Fee) / (float64(txSize) / 1000)
 		prioItem.fee = txDesc.Fee
 
