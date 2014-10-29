@@ -2290,19 +2290,39 @@ func handleGetPeerInfo(s *rpcServer, cmd btcjson.Cmd, closeChan <-chan struct{})
 // handleGetRawMempool implements the getrawmempool command.
 func handleGetRawMempool(s *rpcServer, cmd btcjson.Cmd, closeChan <-chan struct{}) (interface{}, error) {
 	c := cmd.(*btcjson.GetRawMempoolCmd)
-	descs := s.server.txMemPool.TxDescs()
+	mp := s.server.txMemPool
+	descs := mp.TxDescs()
 
 	if c.Verbose {
 		result := make(map[string]*btcjson.GetRawMempoolResult, len(descs))
+
+		_, newestHeight, err := s.server.db.NewestSha()
+		if err != nil {
+			rpcsLog.Errorf("Cannot get newest sha: %v", err)
+			return nil, btcjson.ErrBlockNotFound
+		}
+
+		mp.RLock()
+		defer mp.RUnlock()
 		for _, desc := range descs {
+			// Calculate the starting and ending priority from the
+			// the tx's inputs. If we can't find the input for some
+			// reason, then we display zero in place.
+			inputTxs, err := mp.fetchInputTransactions(desc.Tx)
+			var startingPriority, endingPriority float64
+			if err == nil {
+				startingPriority = desc.StartingPriority(inputTxs)
+				endingPriority = desc.CurrentPriority(inputTxs,
+					newestHeight+1)
+			}
+
 			mpd := &btcjson.GetRawMempoolResult{
-				Size: int32(desc.Tx.MsgTx().SerializeSize()),
-				Fee: float64(desc.Fee) /
-					btcutil.SatoshiPerBitcoin,
+				Size:             int32(desc.Tx.MsgTx().SerializeSize()),
+				Fee:              btcutil.Amount(desc.Fee).ToUnit(btcutil.AmountSatoshi),
 				Time:             desc.Added.Unix(),
 				Height:           desc.Height,
-				StartingPriority: 0, // We don't mine.
-				CurrentPriority:  0, // We don't mine.
+				StartingPriority: startingPriority,
+				CurrentPriority:  endingPriority,
 				Depends:          make([]string, 0),
 			}
 			for _, txIn := range desc.Tx.MsgTx().TxIn {
