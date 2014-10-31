@@ -7,6 +7,7 @@ package main
 import (
 	"os"
 	"os/signal"
+	"syscall"
 )
 
 // interruptChannel is used to receive SIGINT (Ctrl+C) signals.
@@ -74,7 +75,7 @@ func addInterruptHandler(handler func()) {
 	// all other callbacks and exits if not already done.
 	if interruptChannel == nil {
 		interruptChannel = make(chan os.Signal, 1)
-		signal.Notify(interruptChannel, os.Interrupt)
+		signal.Notify(interruptChannel, os.Interrupt, syscall.SIGTERM)
 		go mainInterruptHandler()
 	}
 
