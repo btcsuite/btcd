@@ -1098,7 +1098,7 @@ func MultiSigScript(pubkeys []*btcutil.AddressPubKey, nrequired int) ([]byte, er
 // compress. This format must match the same format used to generate
 // the payment address, or the script validation will fail.
 func SignatureScript(tx *btcwire.MsgTx, idx int, subscript []byte, hashType SigHashType, privKey *btcec.PrivateKey, compress bool) ([]byte, error) {
-	sig, err := signTxOutput(tx, idx, subscript, hashType, privKey)
+	sig, err := RawTxInSignature(tx, idx, subscript, hashType, privKey)
 	if err != nil {
 		return nil, err
 	}
@@ -1114,7 +1114,9 @@ func SignatureScript(tx *btcwire.MsgTx, idx int, subscript []byte, hashType SigH
 	return NewScriptBuilder().AddData(sig).AddData(pkData).Script(), nil
 }
 
-func signTxOutput(tx *btcwire.MsgTx, idx int, subScript []byte,
+// RawTxInSignature returns the serialized ECDSA signature for the input
+// idx of the given transaction, with hashType appended to it.
+func RawTxInSignature(tx *btcwire.MsgTx, idx int, subScript []byte,
 	hashType SigHashType, key *btcec.PrivateKey) ([]byte, error) {
 	parsedScript, err := parseScript(subScript)
 	if err != nil {
@@ -1130,7 +1132,7 @@ func signTxOutput(tx *btcwire.MsgTx, idx int, subScript []byte,
 }
 
 func p2pkSignatureScript(tx *btcwire.MsgTx, idx int, subScript []byte, hashType SigHashType, privKey *btcec.PrivateKey) ([]byte, error) {
-	sig, err := signTxOutput(tx, idx, subScript, hashType, privKey)
+	sig, err := RawTxInSignature(tx, idx, subScript, hashType, privKey)
 	if err != nil {
 		return nil, err
 	}
@@ -1154,7 +1156,7 @@ func signMultiSig(tx *btcwire.MsgTx, idx int, subScript []byte, hashType SigHash
 		if err != nil {
 			continue
 		}
-		sig, err := signTxOutput(tx, idx, subScript, hashType, key)
+		sig, err := RawTxInSignature(tx, idx, subScript, hashType, key)
 		if err != nil {
 			continue
 		}
