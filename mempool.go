@@ -703,7 +703,8 @@ func (txD *TxDesc) CurrentPriority(txStore btcchain.TxStore, nextBlockHeight int
 // The total input age is the sum of this value for each txin. If the tx
 // depends on one currently in the mempool, then its input age is zero.
 func calcInputValueAge(txDesc *TxDesc, txStore btcchain.TxStore,
-	nextBlockHeight int64) (totalInputAge float64) {
+	nextBlockHeight int64) float64 {
+	var totalInputAge float64
 	for _, txIn := range txDesc.Tx.MsgTx().TxIn {
 		originHash := &txIn.PreviousOutPoint.Hash
 		originIndex := txIn.PreviousOutPoint.Index
@@ -728,10 +729,9 @@ func calcInputValueAge(txDesc *TxDesc, txStore btcchain.TxStore,
 			inputValue := originTxOut.Value
 			totalInputAge += float64(inputValue * inputAge)
 		}
-
 	}
 
-	return
+	return totalInputAge
 }
 
 // checkPoolDoubleSpend checks whether or not the passed transaction is
