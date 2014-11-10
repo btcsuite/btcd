@@ -960,6 +960,17 @@ func (c *Client) CreateMultisig(requiredSigs int, addresses []btcutil.Address) (
 	return c.CreateMultisigAsync(requiredSigs, addresses).Receive()
 }
 
+// CreateNewAccount creates a new wallet account.
+func (c *Client) CreateNewAccount(account string) error {
+	id := c.NextID()
+	cmd := btcws.NewCreateNewAccountCmd(id, account)
+	_, err := c.sendCmdAndWait(cmd)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
 // FutureGetNewAddressResult is a future promise to deliver the result of a
 // GetNewAddressAsync RPC invocation (or an applicable error).
 type FutureGetNewAddressResult chan *response
@@ -1324,6 +1335,17 @@ func (c *Client) MoveComment(fromAccount, toAccount string, amount btcutil.Amoun
 
 	return c.MoveCommentAsync(fromAccount, toAccount, amount, minConf,
 		comment).Receive()
+}
+
+// RenameAccount renames a wallet account.
+func (c *Client) RenameAccount(oldaccount, newaccount string) error {
+	id := c.NextID()
+	cmd := btcws.NewRenameAccountCmd(id, oldaccount, newaccount)
+	_, err := c.sendCmdAndWait(cmd)
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 // FutureValidateAddressResult is a future promise to deliver the result of a
