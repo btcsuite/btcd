@@ -51,6 +51,7 @@ var commandHandlers = map[string]*handlerData{
 	"addmultisigaddress":    {2, 1, displayGeneric, []conversionHandler{toInt, nil, nil}, makeAddMultiSigAddress, "<numrequired> <[\"pubkey\",...]> [account]"},
 	"addnode":               {2, 0, displayJSONDump, nil, makeAddNode, "<ip> <add/remove/onetry>"},
 	"createencryptedwallet": {1, 0, displayGeneric, nil, makeCreateEncryptedWallet, "<passphrase>"},
+	"createnewaccount":      {1, 0, displayGeneric, nil, makeCreateNewAccount, "<account>"},
 	"createrawtransaction":  {2, 0, displayGeneric, nil, makeCreateRawTransaction, outpointArrayStr + " " + "\"{\"address\":amount,...}\""},
 	"debuglevel":            {1, 0, displayGeneric, nil, makeDebugLevel, "<levelspec>"},
 	"decoderawtransaction":  {1, 0, displayJSONDump, nil, makeDecodeRawTransaction, "<txhash>"},
@@ -103,6 +104,7 @@ var commandHandlers = map[string]*handlerData{
 	"listunspent":           {0, 3, displayJSONDump, []conversionHandler{toInt, toInt, nil}, makeListUnspent, "[minconf=1] [maxconf=9999999] [jsonaddressarray]"},
 	"lockunspent":           {1, 2, displayJSONDump, []conversionHandler{toBool, nil}, makeLockUnspent, "<unlock> " + outpointArrayStr},
 	"ping":                  {0, 0, displayGeneric, nil, makePing, ""},
+	"renameaccount":         {2, 0, displayGeneric, nil, makeRenameAccount, "<oldaccount> <newaccount>"},
 	"sendfrom": {3, 3, displayGeneric, []conversionHandler{nil, nil, toSatoshi, toInt, nil, nil},
 		makeSendFrom, "<account> <address> <amount> [minconf=1] [comment] [comment-to]"},
 	"sendmany":               {2, 2, displayGeneric, []conversionHandler{nil, nil, toInt, nil}, makeSendMany, "<account> <{\"address\":amount,...}> [minconf=1] [comment]"},
@@ -239,6 +241,12 @@ func makeAddNode(args []interface{}) (btcjson.Cmd, error) {
 // createencryptedwallet commands.
 func makeCreateEncryptedWallet(args []interface{}) (btcjson.Cmd, error) {
 	return btcws.NewCreateEncryptedWalletCmd("btcctl", args[0].(string)), nil
+}
+
+// makeCreateNewAccount generates the cmd structure for
+// createnewaccount commands.
+func makeCreateNewAccount(args []interface{}) (btcjson.Cmd, error) {
+	return btcws.NewCreateNewAccountCmd("btcctl", args[0].(string)), nil
 }
 
 // makeCreateRawTransaction generates the cmd structure for createrawtransaction
@@ -713,6 +721,13 @@ func makeLockUnspent(args []interface{}) (btcjson.Cmd, error) {
 // makePing generates the cmd structure for ping commands.
 func makePing(args []interface{}) (btcjson.Cmd, error) {
 	return btcjson.NewPingCmd("btcctl")
+}
+
+// makeRenameAccount generates the cmd structure for
+// renameaccount commands.
+func makeRenameAccount(args []interface{}) (btcjson.Cmd, error) {
+	return btcws.NewRenameAccountCmd("btcctl", args[0].(string),
+		args[1].(string)), nil
 }
 
 // makeSendFrom generates the cmd structure for sendfrom commands.
