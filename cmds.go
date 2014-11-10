@@ -18,6 +18,12 @@ const (
 Authenticate the websocket with the RPC server.  This is only required if the
 credentials were not already supplied via HTTP auth headers.  It must be the
 first command sent or you will be disconnected.`
+
+	createNewAccountHelp = `createnewaccount "accountname"
+Create a new account with the given name.`
+
+	renameAccountHelp = `renameaccount "oldname" "newname"
+Rename an account to the given new name.`
 )
 
 func init() {
@@ -25,6 +31,8 @@ func init() {
 		authenticateHelp)
 	btcjson.RegisterCustomCmd("createencryptedwallet",
 		parseCreateEncryptedWalletCmd, nil, `TODO(jrick) fillmein`)
+	btcjson.RegisterCustomCmd("createnewaccount",
+		parseCreateNewAccountCmd, nil, createNewAccountHelp)
 	btcjson.RegisterCustomCmd("exportwatchingwallet",
 		parseExportWatchingWalletCmd, nil, `TODO(jrick) fillmein`)
 	btcjson.RegisterCustomCmd("getbestblock", parseGetBestBlockCmd,
@@ -48,6 +56,8 @@ func init() {
 		nil, `TODO(jrick) fillmein`)
 	btcjson.RegisterCustomCmd("recoveraddresses", parseRecoverAddressesCmd,
 		nil, `TODO(jrick) fillmein`)
+	btcjson.RegisterCustomCmd("renameaccount", parseRenameAccountCmd,
+		nil, renameAccountHelp)
 	btcjson.RegisterCustomCmd("rescan", parseRescanCmd,
 		nil, `TODO(jrick) fillmein`)
 	btcjson.RegisterCustomCmd("walletislocked", parseWalletIsLockedCmd,
@@ -609,6 +619,96 @@ func (cmd *RecoverAddressesCmd) UnmarshalJSON(b []byte) error {
 	return nil
 }
 
+// RenameAccountCmd is a type handling custom marshaling and
+// unmarshaling of renameaccount JSON websocket extension
+// commands.
+type RenameAccountCmd struct {
+	id         interface{}
+	OldAccount string
+	NewAccount string
+}
+
+// Enforce that RenameAccountCmd satisifies the btcjson.Cmd interface.
+var _ btcjson.Cmd = &RenameAccountCmd{}
+
+// NewRenameAccountCmd creates a new GetCurrentNetCmd.
+func NewRenameAccountCmd(id interface{}, oldaccount, newaccount string) *RenameAccountCmd {
+	return &RenameAccountCmd{
+		id:         id,
+		OldAccount: oldaccount,
+		NewAccount: newaccount,
+	}
+}
+
+// parseRenameAccountCmd parses a RawCmd into a concrete type satisifying
+// the btcjson.Cmd interface.  This is used when registering the custom
+// command with the btcjson parser.
+func parseRenameAccountCmd(r *btcjson.RawCmd) (btcjson.Cmd, error) {
+	if len(r.Params) != 2 {
+		return nil, btcjson.ErrWrongNumberOfParams
+	}
+
+	var oldaccount string
+	if err := json.Unmarshal(r.Params[0], &oldaccount); err != nil {
+		return nil, errors.New("first parameter 'oldaccount' must be " +
+			"a string: " + err.Error())
+	}
+
+	var newaccount string
+	if err := json.Unmarshal(r.Params[1], &newaccount); err != nil {
+		return nil, errors.New("second parameter 'newaccount' must " +
+			"be a string: " + err.Error())
+	}
+
+	return NewRenameAccountCmd(r.Id, oldaccount, newaccount), nil
+}
+
+// Id satisifies the Cmd interface by returning the ID of the command.
+func (cmd *RenameAccountCmd) Id() interface{} {
+	return cmd.id
+}
+
+// Method satisfies the Cmd interface by returning the RPC method.
+func (cmd *RenameAccountCmd) Method() string {
+	return "renameaccount"
+}
+
+// MarshalJSON returns the JSON encoding of cmd.  Part of the Cmd interface.
+func (cmd *RenameAccountCmd) MarshalJSON() ([]byte, error) {
+	params := []interface{}{
+		cmd.OldAccount,
+		cmd.NewAccount,
+	}
+
+	raw, err := btcjson.NewRawCmd(cmd.id, cmd.Method(), params)
+	if err != nil {
+		return nil, err
+	}
+	return json.Marshal(raw)
+}
+
+// UnmarshalJSON unmarshals the JSON encoding of cmd into cmd.  Part of
+// the Cmd interface.
+func (cmd *RenameAccountCmd) UnmarshalJSON(b []byte) error {
+	// Unmarshal into a RawCmd.
+	var r btcjson.RawCmd
+	if err := json.Unmarshal(b, &r); err != nil {
+		return err
+	}
+
+	newCmd, err := parseRenameAccountCmd(&r)
+	if err != nil {
+		return err
+	}
+
+	concreteCmd, ok := newCmd.(*RenameAccountCmd)
+	if !ok {
+		return btcjson.ErrInternal
+	}
+	*cmd = *concreteCmd
+	return nil
+}
+
 // OutPoint describes a transaction outpoint that will be marshalled to and
 // from JSON.
 type OutPoint struct {
@@ -1156,6 +1256,89 @@ func (cmd *CreateEncryptedWalletCmd) UnmarshalJSON(b []byte) error {
 	}
 
 	concreteCmd, ok := newCmd.(*CreateEncryptedWalletCmd)
+	if !ok {
+		return btcjson.ErrInternal
+	}
+	*cmd = *concreteCmd
+	return nil
+}
+
+// CreateNewAccountCmd is a type handling custom
+// marshaling and unmarshaling of createnewaccount
+// JSON websocket extension commands.
+type CreateNewAccountCmd struct {
+	id      interface{}
+	Account string
+}
+
+// Enforce that CreateNewAccountCmd satisifies the btcjson.Cmd
+// interface.
+var _ btcjson.Cmd = &CreateNewAccountCmd{}
+
+// NewCreateNewAccountCmd creates a new CreateNewAccountCmd.
+func NewCreateNewAccountCmd(id interface{}, account string) *CreateNewAccountCmd {
+	return &CreateNewAccountCmd{
+		id:      id,
+		Account: account,
+	}
+}
+
+// parseCreateNewAccountCmd parses a CreateNewAccountCmd
+// into a concrete type satisifying the btcjson.Cmd interface.
+// This is used when registering the custom command with the btcjson
+// parser.
+func parseCreateNewAccountCmd(r *btcjson.RawCmd) (btcjson.Cmd, error) {
+	if len(r.Params) != 1 {
+		return nil, btcjson.ErrWrongNumberOfParams
+	}
+
+	var account string
+	if err := json.Unmarshal(r.Params[0], &account); err != nil {
+		return nil, errors.New("first parameter 'account' must be " +
+			"a string: " + err.Error())
+	}
+
+	return NewCreateNewAccountCmd(r.Id, account), nil
+}
+
+// Id satisifies the Cmd interface by returning the ID of the command.
+func (cmd *CreateNewAccountCmd) Id() interface{} {
+	return cmd.id
+}
+
+// Method satisfies the Cmd interface by returning the RPC method.
+func (cmd *CreateNewAccountCmd) Method() string {
+	return "createnewaccount"
+}
+
+// MarshalJSON returns the JSON encoding of cmd.  Part of the Cmd interface.
+func (cmd *CreateNewAccountCmd) MarshalJSON() ([]byte, error) {
+	params := []interface{}{
+		cmd.Account,
+	}
+
+	raw, err := btcjson.NewRawCmd(cmd.id, cmd.Method(), params)
+	if err != nil {
+		return nil, err
+	}
+	return json.Marshal(raw)
+}
+
+// UnmarshalJSON unmarshals the JSON encoding of cmd into cmd.  Part of
+// the Cmd interface.
+func (cmd *CreateNewAccountCmd) UnmarshalJSON(b []byte) error {
+	// Unmarshal into a RawCmd.
+	var r btcjson.RawCmd
+	if err := json.Unmarshal(b, &r); err != nil {
+		return err
+	}
+
+	newCmd, err := parseCreateNewAccountCmd(&r)
+	if err != nil {
+		return err
+	}
+
+	concreteCmd, ok := newCmd.(*CreateNewAccountCmd)
 	if !ok {
 		return btcjson.ErrInternal
 	}

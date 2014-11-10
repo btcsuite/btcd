@@ -31,6 +31,18 @@ var cmdtests = []struct {
 		},
 	},
 	{
+		name: "createnewaccount",
+		f: func() (btcjson.Cmd, error) {
+			return NewCreateNewAccountCmd(
+				float64(1),
+				"account"), nil
+		},
+		result: &CreateNewAccountCmd{
+			id:      float64(1),
+			Account: "account",
+		},
+	},
+	{
 		name: "getbestblock",
 		f: func() (btcjson.Cmd, error) {
 			return NewGetBestBlockCmd(float64(1)), nil
@@ -180,6 +192,20 @@ var cmdtests = []struct {
 					Index: 1,
 				},
 			},
+		},
+	},
+	{
+		name: "renameaccount",
+		f: func() (btcjson.Cmd, error) {
+			return NewRenameAccountCmd(
+				float64(1),
+				"old",
+				"new"), nil
+		},
+		result: &RenameAccountCmd{
+			id:         float64(1),
+			OldAccount: "old",
+			NewAccount: "new",
 		},
 	},
 	{
