@@ -691,22 +691,11 @@ func TestRandomUint64(t *testing.T) {
 // and checks the results accordingly.
 func TestRandomUint64Errors(t *testing.T) {
 	// Test short reads.
-	fr := &fakeRandReader{n: 2, err: nil}
+	fr := &fakeRandReader{n: 2, err: io.EOF}
 	nonce, err := btcwire.TstRandomUint64(fr)
-	if err != io.ErrShortBuffer {
+	if err != io.ErrUnexpectedEOF {
 		t.Errorf("TestRandomUint64Fails: Error not expected value of %v [%v]",
 			io.ErrShortBuffer, err)
-	}
-	if nonce != 0 {
-		t.Errorf("TestRandomUint64Fails: nonce is not 0 [%v]", nonce)
-	}
-
-	// Test err with full read.
-	fr = &fakeRandReader{n: 20, err: io.ErrClosedPipe}
-	nonce, err = btcwire.TstRandomUint64(fr)
-	if err != io.ErrClosedPipe {
-		t.Errorf("TestRandomUint64Fails: Error not expected value of %v [%v]",
-			io.ErrClosedPipe, err)
 	}
 	if nonce != 0 {
 		t.Errorf("TestRandomUint64Fails: nonce is not 0 [%v]", nonce)

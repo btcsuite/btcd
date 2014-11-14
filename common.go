@@ -508,10 +508,7 @@ func writeVarBytes(w io.Writer, pver uint32, bytes []byte) error {
 // can be properly tested by passing a fake reader in the tests.
 func randomUint64(r io.Reader) (uint64, error) {
 	var b [8]byte
-	n, err := r.Read(b[:])
-	if n != len(b) {
-		return 0, io.ErrShortBuffer
-	}
+	_, err := io.ReadFull(r, b[:])
 	if err != nil {
 		return 0, err
 	}
