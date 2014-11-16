@@ -519,7 +519,7 @@ func (b *blockManager) handleTxMsg(tmsg *txMsg) {
 // current returns true if we believe we are synced with our peers, false if we
 // still have blocks to check
 func (b *blockManager) current() bool {
-	if !b.blockChain.IsCurrent() {
+	if !b.blockChain.IsCurrent(b.server.timeSource) {
 		return false
 	}
 
@@ -591,7 +591,8 @@ func (b *blockManager) handleBlockMsg(bmsg *blockMsg) {
 
 	// Process the block to include validation, best chain selection, orphan
 	// handling, etc.
-	isOrphan, err := b.blockChain.ProcessBlock(bmsg.block, behaviorFlags)
+	isOrphan, err := b.blockChain.ProcessBlock(bmsg.block,
+		b.server.timeSource, behaviorFlags)
 	if err != nil {
 		// When the error is a rule error, it means the block was simply
 		// rejected as opposed to something actually going wrong, so log
@@ -1068,7 +1069,8 @@ out:
 
 			case processBlockMsg:
 				isOrphan, err := b.blockChain.ProcessBlock(
-					msg.block, msg.flags)
+					msg.block, b.server.timeSource,
+					msg.flags)
 				if err != nil {
 					msg.reply <- processBlockResponse{
 						isOrphan: false,
@@ -1141,14 +1143,16 @@ func (b *blockManager) handleNotifyMsg(notification *btcchain.Notification) {
 		}
 
 		// Remove all of the transactions (except the coinbase) in the
-		// connected block from the transaction pool.  Also, remove any
+		// connected block from the transaction pool.  Secondly, remove any
 		// transactions which are now double spends as a result of these
-		// new transactions.  Note that removing a transaction from
+		// new transactions.  Finally, remove any transaction that is
+		// no longer an orphan.  Note that removing a transaction from
 		// pool also removes any transactions which depend on it,
 		// recursively.
 		for _, tx := range block.Transactions()[1:] {
 			b.server.txMemPool.RemoveTransaction(tx)
 			b.server.txMemPool.RemoveDoubleSpends(tx)
+			b.server.txMemPool.RemoveOrphan(tx.Sha())
 		}
 
 		if r := b.server.rpcServer; r != nil {
@@ -1479,7 +1483,7 @@ func setupBlockDB() (btcdb.Db, error) {
 	if err != nil {
 		// Return the error if it's not because the database
 		// doesn't exist.
-		if err != btcdb.DbDoesNotExist {
+		if err != btcdb.ErrDbDoesNotExist {
 			return nil, err
 		}
 

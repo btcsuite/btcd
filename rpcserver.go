@@ -27,11 +27,11 @@ import (
 	"time"
 
 	"github.com/conformal/btcec"
-	"github.com/conformal/btcjson"
 	"github.com/conformal/fastsha256"
 	"github.com/conformal/websocket"
 	"github.com/mably/btcchain"
 	"github.com/mably/btcdb"
+	"github.com/mably/btcjson"
 	"github.com/mably/btcnet"
 	"github.com/mably/btcscript"
 	"github.com/mably/btcutil"
@@ -833,8 +833,8 @@ func createVinList(mtx *btcwire.MsgTx) ([]btcjson.Vin, error) {
 		if btcchain.IsCoinBase(tx) {
 			vinList[i].Coinbase = hex.EncodeToString(v.SignatureScript)
 		} else {
-			vinList[i].Txid = v.PreviousOutpoint.Hash.String()
-			vinList[i].Vout = v.PreviousOutpoint.Index
+			vinList[i].Txid = v.PreviousOutPoint.Hash.String()
+			vinList[i].Vout = v.PreviousOutPoint.Index
 
 			disbuf, err := btcscript.DisasmString(v.SignatureScript)
 			if err != nil {
@@ -1606,7 +1606,7 @@ func (state *gbtWorkState) blockTemplateResult(useCoinbaseValue bool, submitOld 
 		// when mutiple inputs reference the same transaction.
 		dependsMap := make(map[int64]struct{})
 		for _, txIn := range tx.TxIn {
-			if idx, ok := txIndex[txIn.PreviousOutpoint.Hash]; ok {
+			if idx, ok := txIndex[txIn.PreviousOutPoint.Hash]; ok {
 				dependsMap[idx] = struct{}{}
 			}
 		}
@@ -2306,7 +2306,7 @@ func handleGetRawMempool(s *rpcServer, cmd btcjson.Cmd, closeChan <-chan struct{
 				Depends:          make([]string, 0),
 			}
 			for _, txIn := range desc.Tx.MsgTx().TxIn {
-				hash := &txIn.PreviousOutpoint.Hash
+				hash := &txIn.PreviousOutPoint.Hash
 				if s.server.txMemPool.HaveTransaction(hash) {
 					mpd.Depends = append(mpd.Depends,
 						hash.String())
@@ -3071,7 +3071,7 @@ func handleSubmitBlock(s *rpcServer, cmd btcjson.Cmd, closeChan <-chan struct{})
 	return nil, nil
 }
 
-func verifyChain(db btcdb.Db, level, depth int32) error {
+func verifyChain(db btcdb.Db, level, depth int32, timeSource btcchain.MedianTimeSource) error {
 	_, curHeight64, err := db.NewestSha()
 	if err != nil {
 		rpcsLog.Errorf("Verify is unable to fetch current block "+
@@ -3105,7 +3105,7 @@ func verifyChain(db btcdb.Db, level, depth int32) error {
 		// Level 1 does basic chain sanity checks.
 		if level > 0 {
 			err := btcchain.CheckBlockSanity(activeNetParams.Params,
-				block, activeNetParams.PowLimit)
+				block, activeNetParams.PowLimit, timeSource)
 			if err != nil {
 				rpcsLog.Errorf("Verify is unable to "+
 					"validate block at sha %v height "+
@@ -3140,7 +3140,8 @@ func handleValidateAddress(s *rpcServer, cmd btcjson.Cmd, closeChan <-chan struc
 func handleVerifyChain(s *rpcServer, cmd btcjson.Cmd, closeChan <-chan struct{}) (interface{}, error) {
 	c := cmd.(*btcjson.VerifyChainCmd)
 
-	err := verifyChain(s.server.db, c.CheckLevel, c.CheckDepth)
+	err := verifyChain(s.server.db, c.CheckLevel, c.CheckDepth,
+		s.server.timeSource)
 	return err == nil, nil
 }
 

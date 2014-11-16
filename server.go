@@ -19,8 +19,9 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/conformal/btcjson"
+	"github.com/mably/btcchain"
 	"github.com/mably/btcdb"
+	"github.com/mably/btcjson"
 	"github.com/mably/btcnet"
 	"github.com/mably/btcwire"
 	"github.com/mably/ppcd/addrmgr"
@@ -90,6 +91,7 @@ type server struct {
 	quit                 chan struct{}
 	nat                  NAT
 	db                   btcdb.Db
+	timeSource           btcchain.MedianTimeSource
 }
 
 type peerState struct {
@@ -303,7 +305,7 @@ func (s *server) handleRelayInvMsg(state *peerState, iv *btcwire.InvVect) {
 			if p.filter.IsLoaded() {
 				tx, err := s.txMemPool.FetchTransaction(&iv.Hash)
 				if err != nil {
-					peerLog.Warn("Attempt to relay tx %s "+
+					peerLog.Warnf("Attempt to relay tx %s "+
 						"that is not in the memory pool",
 						iv.Hash)
 					return
@@ -1231,6 +1233,7 @@ func newServer(listenAddrs []string, db btcdb.Db, netParams *btcnet.Params) (*se
 		modifyRebroadcastInv: make(chan interface{}),
 		nat:                  nat,
 		db:                   db,
+		timeSource:           btcchain.NewMedianTime(),
 	}
 	bm, err := newBlockManager(&s)
 	if err != nil {

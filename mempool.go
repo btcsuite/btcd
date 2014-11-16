@@ -340,7 +340,7 @@ func checkInputsStandard(tx *btcutil.Tx, txStore btcchain.TxStore) error {
 		// It is safe to elide existence and index checks here since
 		// they have already been checked prior to calling this
 		// function.
-		prevOut := txIn.PreviousOutpoint
+		prevOut := txIn.PreviousOutPoint
 		originTx := txStore[prevOut.Hash].Tx.MsgTx()
 		originPkScript := originTx.TxOut[prevOut.Index].PkScript
 
@@ -396,9 +396,8 @@ func calcMinRequiredTxRelayFee(serializedSize int64) int64 {
 	return minFee
 }
 
-// removeOrphan removes the passed orphan transaction from the orphan pool and
-// previous orphan index.
-//
+// removeOrphan is the internal function which implements the public
+// RemoveOrphan.  See the comment for RemoveOrphan for more details.
 // This function MUST be called with the mempool lock held (for writes).
 func (mp *txMemPool) removeOrphan(txHash *btcwire.ShaHash) {
 	// Nothing to do if passed tx is not an orphan.
@@ -409,7 +408,7 @@ func (mp *txMemPool) removeOrphan(txHash *btcwire.ShaHash) {
 
 	// Remove the reference from the previous orphan index.
 	for _, txIn := range tx.MsgTx().TxIn {
-		originTxHash := txIn.PreviousOutpoint.Hash
+		originTxHash := txIn.PreviousOutPoint.Hash
 		if orphans, exists := mp.orphansByPrev[originTxHash]; exists {
 			for e := orphans.Front(); e != nil; e = e.Next() {
 				if e.Value.(*btcutil.Tx) == tx {
@@ -428,6 +427,15 @@ func (mp *txMemPool) removeOrphan(txHash *btcwire.ShaHash) {
 
 	// Remove the transaction from the orphan pool.
 	delete(mp.orphans, *txHash)
+}
+
+// RemoveOrphan removes the passed orphan transaction from the orphan pool and
+// previous orphan index.
+// This function is safe for concurrent access.
+func (mp *txMemPool) RemoveOrphan(txHash *btcwire.ShaHash) {
+	mp.Lock()
+	mp.removeOrphan(txHash)
+	mp.Unlock()
 }
 
 // limitNumOrphans limits the number of orphan transactions by evicting a random
@@ -477,7 +485,7 @@ func (mp *txMemPool) addOrphan(tx *btcutil.Tx) {
 
 	mp.orphans[*tx.Sha()] = tx
 	for _, txIn := range tx.MsgTx().TxIn {
-		originTxHash := txIn.PreviousOutpoint.Hash
+		originTxHash := txIn.PreviousOutPoint.Hash
 		if mp.orphansByPrev[originTxHash] == nil {
 			mp.orphansByPrev[originTxHash] = list.New()
 		}
@@ -602,7 +610,7 @@ func (mp *txMemPool) removeTransaction(tx *btcutil.Tx) {
 	// by the pool.
 	if txDesc, exists := mp.pool[*txHash]; exists {
 		for _, txIn := range txDesc.Tx.MsgTx().TxIn {
-			delete(mp.outpoints, txIn.PreviousOutpoint)
+			delete(mp.outpoints, txIn.PreviousOutPoint)
 		}
 		delete(mp.pool, *txHash)
 		mp.lastUpdated = time.Now()
@@ -634,7 +642,7 @@ func (mp *txMemPool) RemoveDoubleSpends(tx *btcutil.Tx) {
 	defer mp.Unlock()
 
 	for _, txIn := range tx.MsgTx().TxIn {
-		if txRedeemer, ok := mp.outpoints[txIn.PreviousOutpoint]; ok {
+		if txRedeemer, ok := mp.outpoints[txIn.PreviousOutPoint]; ok {
 			if !txRedeemer.Sha().IsEqual(tx.Sha()) {
 				mp.removeTransaction(txRedeemer)
 			}
@@ -657,7 +665,7 @@ func (mp *txMemPool) addTransaction(tx *btcutil.Tx, height, fee int64) {
 		Fee:    fee,
 	}
 	for _, txIn := range tx.MsgTx().TxIn {
-		mp.outpoints[txIn.PreviousOutpoint] = tx
+		mp.outpoints[txIn.PreviousOutPoint] = tx
 	}
 	mp.lastUpdated = time.Now()
 }
@@ -670,7 +678,7 @@ func (mp *txMemPool) addTransaction(tx *btcutil.Tx, height, fee int64) {
 // This function MUST be called with the mempool lock held (for reads).
 func (mp *txMemPool) checkPoolDoubleSpend(tx *btcutil.Tx) error {
 	for _, txIn := range tx.MsgTx().TxIn {
-		if txR, exists := mp.outpoints[txIn.PreviousOutpoint]; exists {
+		if txR, exists := mp.outpoints[txIn.PreviousOutPoint]; exists {
 			str := fmt.Sprintf("transaction %v in the pool "+
 				"already spends the same coins", txR.Sha())
 			return txRuleError(btcwire.RejectDuplicate, str)
@@ -693,7 +701,7 @@ func (mp *txMemPool) fetchInputTransactions(tx *btcutil.Tx) (btcchain.TxStore, e
 
 	// Attempt to populate any missing inputs from the transaction pool.
 	for _, txD := range txStore {
-		if txD.Err == btcdb.TxShaMissing || txD.Tx == nil {
+		if txD.Err == btcdb.ErrTxShaMissing || txD.Tx == nil {
 			if poolTxDesc, exists := mp.pool[*txD.Hash]; exists {
 				poolTx := poolTxDesc.Tx
 				txD.Tx = poolTx
@@ -839,7 +847,7 @@ func (mp *txMemPool) maybeAcceptTransaction(tx *btcutil.Tx, isOrphan *bool, isNe
 
 	// Transaction is an orphan if any of the inputs don't exist.
 	for _, txD := range txStore {
-		if txD.Err == btcdb.TxShaMissing {
+		if txD.Err == btcdb.ErrTxShaMissing {
 			if isOrphan != nil {
 				*isOrphan = true
 			}

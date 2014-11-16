@@ -18,10 +18,10 @@ import (
 	"time"
 
 	"code.google.com/p/go.crypto/ripemd160"
-	"github.com/conformal/btcjson"
 	"github.com/conformal/fastsha256"
 	"github.com/conformal/websocket"
 	"github.com/mably/btcdb"
+	"github.com/mably/btcjson"
 	"github.com/mably/btcscript"
 	"github.com/mably/btcutil"
 	"github.com/mably/btcwire"
@@ -688,7 +688,7 @@ func (m *wsNotificationManager) notifyForTxIns(ops map[btcwire.OutPoint]map[chan
 	txHex := ""
 	wscNotified := make(map[chan struct{}]struct{})
 	for _, txIn := range tx.MsgTx().TxIn {
-		prevOut := &txIn.PreviousOutpoint
+		prevOut := &txIn.PreviousOutPoint
 		if cmap, ok := ops[*prevOut]; ok {
 			if txHex == "" {
 				txHex = txHexString(tx)
@@ -1484,8 +1484,8 @@ func rescanBlock(wsc *wsClient, lookups *rescanKeys, blk *btcutil.Block) {
 		recvNotified := false
 
 		for _, txin := range tx.MsgTx().TxIn {
-			if _, ok := lookups.unspent[txin.PreviousOutpoint]; ok {
-				delete(lookups.unspent, txin.PreviousOutpoint)
+			if _, ok := lookups.unspent[txin.PreviousOutPoint]; ok {
+				delete(lookups.unspent, txin.PreviousOutPoint)
 
 				if spentNotified {
 					continue
@@ -1790,7 +1790,7 @@ fetchRange:
 			if err != nil {
 				// Only handle reorgs if a block could not be
 				// found for the hash.
-				if err != btcdb.BlockShaMissing {
+				if err != btcdb.ErrBlockShaMissing {
 					rpcsLog.Errorf("Error looking up "+
 						"block: %v", err)
 					return nil, &btcjson.ErrDatabase
