@@ -3,6 +3,116 @@ User visible changes for btcd
   A full-node bitcoin implementation written in Go
 ============================================================================
 
+Changes in 0.9.0 (Sat Sep 20 2014)
+  - Protocol and network related changes:
+    - Add a new checkpoint at block height 319400
+    - Add support for BIP0037 bloom filters
+      (https://github.com/conformal/btcd/issues/132)
+    - Implement BIP0061 reject handling and hence support for protocol
+      version 70002 (https://github.com/conformal/btcd/issues/133)
+    - Add testnet DNS seeds for peer discovery (testnet-seed.alexykot.me
+      and testnet-seed.bitcoin.schildbach.de)
+    - Add mainnet DNS seed for peer discovery (seeds.bitcoin.open-nodes.org)
+    - Make multisig transactions with non-null dummy data nonstandard
+      (https://github.com/conformal/btcd/issues/131)
+    - Make transactions with an excessive number of signature operations
+      nonstandard
+    - Perform initial DNS lookups concurrently which allows connections
+      more quickly
+    - Improve the address manager to significantly reduce memory usage and
+      add tests
+    - Remove orphan transactions when they appear in a mined block
+      (https://github.com/conformal/btcd/issues/166)
+    - Apply incremental back off on connection retries for persistent peers
+      that give invalid replies to mirror the logic used for failed
+      connections (https://github.com/conformal/btcd/issues/103)
+    - Correct rate-limiting of free and low-fee transactions
+  - Mining support changes:
+    - Implement getblocktemplate RPC with the following support:
+      (https://github.com/conformal/btcd/issues/124)
+      - BIP0022 Non-Optional Sections
+      - BIP0022 Long Polling
+      - BIP0023 Basic Pool Extensions
+      - BIP0023 Mutation coinbase/append
+      - BIP0023 Mutations time, time/increment, and time/decrement
+      - BIP0023 Mutation transactions/add
+      - BIP0023 Mutations prevblock, coinbase, and generation
+      - BIP0023 Block Proposals
+    - Implement built-in concurrent CPU miner
+      (https://github.com/conformal/btcd/issues/137)
+      NOTE: CPU mining on mainnet is pointless.  This has been provided
+      for testing purposes such as for the new simulation test network
+    - Add --generate flag to enable CPU mining
+    - Deprecate the --getworkkey flag in favor of --miningaddr which
+      specifies which addresses generated blocks will choose from to pay
+      the subsidy to
+  - RPC changes:
+    - Implement gettxout command
+      (https://github.com/conformal/btcd/issues/141)
+    - Implement validateaddress command
+    - Implement verifymessage command
+    - Mark getunconfirmedbalance RPC as wallet-only
+    - Mark getwalletinfo RPC as wallet-only
+    - Update getgenerate, setgenerate, gethashespersec, and getmininginfo
+      to return the appropriate information about new CPU mining status
+    - Modify getpeerinfo pingtime and pingwait field types to float64 so
+      they are compatible
+    - Improve disconnect handling for normal HTTP clients
+    - Make error code returns for invalid hex more consistent
+  - Websocket changes:
+    - Switch to a new more efficient websocket package
+      (https://github.com/conformal/btcd/issues/134)
+    - Add rescanfinished notification
+    - Modify the rescanprogress notification to include block hash as well
+      as height (https://github.com/conformal/btcd/issues/151)
+  - btcctl utility changes:
+    - Accept --simnet flag which automatically selects the appropriate port
+      and TLS certificates needed to communicate with btcd and btcwallet on
+      the simulation test network
+    - Fix createrawtransaction command to send amounts denominated in BTC
+    - Add estimatefee command
+    - Add estimatepriority command
+    - Add getmininginfo command
+    - Add getnetworkinfo command
+    - Add gettxout command
+    - Add lockunspent command
+    - Add signrawtransaction command
+  - addblock utility changes:
+    - Accept --simnet flag which automatically selects the appropriate port
+      and TLS certificates needed to communicate with btcd and btcwallet on
+      the simulation test network
+  - Notable developer-related package changes:
+    - Provide a new bloom package in btcutil which allows creating and
+      working with BIP0037 bloom filters
+    - Provide a new hdkeychain package in btcutil which allows working with
+      BIP0032 hierarchical deterministic key chains
+    - Introduce a new btcnet package which houses network parameters
+    - Provide new simnet network (--simnet) which is useful for private
+      simulation testing
+    - Enforce low S values in serialized signatures as detailed in BIP0062
+    - Return errors from all methods on the btcdb.Db interface
+      (https://github.com/conformal/btcdb/issues/5)
+    - Allow behavior flags to alter btcchain.ProcessBlock
+      (https://github.com/conformal/btcchain/issues/5)
+    - Provide a new SerializeSize API for blocks
+      (https://github.com/conformal/btcwire/issues/19)
+    - Several of the core packages now work with Google App Engine
+  - Misc changes:
+    - Correct an issue where the database could corrupt under certain
+      circumstances which would require a new chain download
+    - Slightly optimize deserialization
+    - Use the correct IP block for he.net
+    - Fix an issue where it was possible the block manager could hang on
+      shutdown
+    - Update sample config file so the comments are on a separate line
+      rather than the end of a line so they are not interpreted as settings
+      (https://github.com/conformal/btcd/issues/135)
+    - Correct an issue where getdata requests were not being properly
+      throttled which could lead to larger than necessary memory usage
+    - Always show help when given the help flag even when the config file
+      contains invalid entries
+    - General code cleanup and minor optimizations
+
 Changes in 0.8.0-beta (Sun May 25 2014)
   - Btcd is now Beta (https://github.com/conformal/btcd/issues/130)
   - Add a new checkpoint at block height 300255

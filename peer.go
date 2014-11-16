@@ -444,6 +444,10 @@ func (p *peer) handleVersionMsg(msg *btcwire.MsgVersion) {
 		p.updateAddresses(msg)
 	}
 
+	// Add the remote peer time as a sample for creating an offset against
+	// the local clock to keep the network time in sync.
+	p.server.timeSource.AddTimeSample(p.addr, msg.Timestamp)
+
 	// Signal the block manager this peer is a new sync candidate.
 	p.server.blockManager.NewPeer(p)
 
