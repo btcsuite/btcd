@@ -671,10 +671,45 @@ func (mp *txMemPool) addTransaction(tx *btcutil.Tx, height, fee int64) {
 	mp.lastUpdated = time.Now()
 }
 
-// StartingPriority calculates the priority of this tx descriptor's
-// underlying transaction relative to when it was first added to the mempool.
-// The result is lazily computed and then cached for subsequent function
-// calls.
+// calcInputValueAge is a helper function used to calculate the input age of
+// a transaction.  The input age for a txin is the number of confirmations
+// since the referenced txout multiplied by its output value.  The total input
+// age is the sum of this value for each txin.  Any inputs to the transaction
+// which are currently in the mempool and hence not mined into a block yet,
+// contribute no additional input age to the transaction.
+func calcInputValueAge(txDesc *TxDesc, txStore btcchain.TxStore, nextBlockHeight int64) float64 {
+	var totalInputAge float64
+	for _, txIn := range txDesc.Tx.MsgTx().TxIn {
+		originHash := &txIn.PreviousOutPoint.Hash
+		originIndex := txIn.PreviousOutPoint.Index
+
+		// Don't attempt to accumulate the total input age if the txIn
+		// in question doesn't exist.
+		if txData, exists := txStore[*originHash]; exists && txData.Tx != nil {
+			// Inputs with dependencies currently in the mempool
+			// have their block height set to a special constant.
+			// Their input age should computed as zero since their
+			// parent hasn't made it into a block yet.
+			var inputAge int64
+			if txData.BlockHeight == mempoolHeight {
+				inputAge = 0
+			} else {
+				inputAge = nextBlockHeight - txData.BlockHeight
+			}
+
+			// Sum the input value times age.
+			originTxOut := txData.Tx.MsgTx().TxOut[originIndex]
+			inputValue := originTxOut.Value
+			totalInputAge += float64(inputValue * inputAge)
+		}
+	}
+
+	return totalInputAge
+}
+
+// StartingPriority calculates the priority of this tx descriptor's underlying
+// transaction relative to when it was first added to the mempool.  The result
+// is lazily computed and then cached for subsequent function calls.
 func (txD *TxDesc) StartingPriority(txStore btcchain.TxStore) float64 {
 	// Return our cached result.
 	if txD.startingPriority != float64(0) {
@@ -695,43 +730,6 @@ func (txD *TxDesc) CurrentPriority(txStore btcchain.TxStore, nextBlockHeight int
 	inputAge := calcInputValueAge(txD, txStore, nextBlockHeight)
 	txSize := txD.Tx.MsgTx().SerializeSize()
 	return calcPriority(txD.Tx, txSize, inputAge)
-}
-
-// calcInputValueAge is a helper function used to calculate the input age of
-// a transaction. The input age for a txin is the number of confirmations
-// since the referenced txout multiplied by its output value.
-// The total input age is the sum of this value for each txin. If the tx
-// depends on one currently in the mempool, then its input age is zero.
-func calcInputValueAge(txDesc *TxDesc, txStore btcchain.TxStore,
-	nextBlockHeight int64) float64 {
-	var totalInputAge float64
-	for _, txIn := range txDesc.Tx.MsgTx().TxIn {
-		originHash := &txIn.PreviousOutPoint.Hash
-		originIndex := txIn.PreviousOutPoint.Index
-
-		// Don't attempt to accumulate the total input age if the txIn
-		// in question doesn't exist.
-		if txData, exists := txStore[*originHash]; exists && txData.Tx != nil {
-			originTxOut := txData.Tx.MsgTx().TxOut[originIndex]
-
-			// Transactions with dependencies currently in the
-			// mempool have their block height set to a special
-			// constant. Their input age should computed as zero
-			// since their parent hasn't made it into a block yet.
-			var inputAge int64
-			if txData.BlockHeight == mempoolHeight {
-				inputAge = 0
-			} else {
-				inputAge = nextBlockHeight - txData.BlockHeight
-			}
-
-			// Sum the input value times age.
-			inputValue := originTxOut.Value
-			totalInputAge += float64(inputValue * inputAge)
-		}
-	}
-
-	return totalInputAge
 }
 
 // checkPoolDoubleSpend checks whether or not the passed transaction is

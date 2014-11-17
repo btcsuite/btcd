@@ -2305,14 +2305,14 @@ func handleGetRawMempool(s *rpcServer, cmd btcjson.Cmd, closeChan <-chan struct{
 		mp.RLock()
 		defer mp.RUnlock()
 		for _, desc := range descs {
-			// Calculate the starting and ending priority from the
-			// the tx's inputs. If we can't find the input for some
-			// reason, then we display zero in place.
+			// Calculate the starting and current priority from the
+			// the tx's inputs.  Use zeros if one or more of the
+			// input transactions can't be found for some reason.
+			var startingPriority, currentPriority float64
 			inputTxs, err := mp.fetchInputTransactions(desc.Tx)
-			var startingPriority, endingPriority float64
 			if err == nil {
 				startingPriority = desc.StartingPriority(inputTxs)
-				endingPriority = desc.CurrentPriority(inputTxs,
+				currentPriority = desc.CurrentPriority(inputTxs,
 					newestHeight+1)
 			}
 
@@ -2322,7 +2322,7 @@ func handleGetRawMempool(s *rpcServer, cmd btcjson.Cmd, closeChan <-chan struct{
 				Time:             desc.Added.Unix(),
 				Height:           desc.Height,
 				StartingPriority: startingPriority,
-				CurrentPriority:  endingPriority,
+				CurrentPriority:  currentPriority,
 				Depends:          make([]string, 0),
 			}
 			for _, txIn := range desc.Tx.MsgTx().TxIn {
