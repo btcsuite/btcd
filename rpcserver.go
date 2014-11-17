@@ -2327,7 +2327,7 @@ func handleGetRawMempool(s *rpcServer, cmd btcjson.Cmd, closeChan <-chan struct{
 			}
 			for _, txIn := range desc.Tx.MsgTx().TxIn {
 				hash := &txIn.PreviousOutPoint.Hash
-				if s.server.txMemPool.HaveTransaction(hash) {
+				if s.server.txMemPool.haveTransaction(hash) {
 					mpd.Depends = append(mpd.Depends,
 						hash.String())
 				}
