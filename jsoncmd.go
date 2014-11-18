@@ -1712,7 +1712,7 @@ func (cmd *GetAddressesByAccountCmd) UnmarshalJSON(b []byte) error {
 // unmarshaling of getbalance JSON RPC commands.
 type GetBalanceCmd struct {
 	id      interface{}
-	Account string
+	Account *string
 	MinConf int
 }
 
@@ -1722,7 +1722,7 @@ var _ Cmd = &GetBalanceCmd{}
 // NewGetBalanceCmd creates a new GetBalanceCmd. Optionally a string for account
 // and an int for minconf may be provided as arguments.
 func NewGetBalanceCmd(id interface{}, optArgs ...interface{}) (*GetBalanceCmd, error) {
-	var account string
+	var account *string
 	var minconf = 1
 
 	if len(optArgs) > 2 {
@@ -1733,7 +1733,7 @@ func NewGetBalanceCmd(id interface{}, optArgs ...interface{}) (*GetBalanceCmd, e
 		if !ok {
 			return nil, errors.New("first optional argument account is not a string")
 		}
-		account = a
+		account = &a
 	}
 
 	if len(optArgs) > 1 {
@@ -1764,7 +1764,7 @@ func (cmd *GetBalanceCmd) Method() string {
 // MarshalJSON returns the JSON encoding of cmd.  Part of the Cmd interface.
 func (cmd *GetBalanceCmd) MarshalJSON() ([]byte, error) {
 	params := make([]interface{}, 0, 2)
-	if cmd.Account != "" || cmd.MinConf != 1 {
+	if cmd.Account != nil {
 		params = append(params, cmd.Account)
 	}
 	if cmd.MinConf != 1 {
@@ -4709,7 +4709,7 @@ func (cmd *ListSinceBlockCmd) UnmarshalJSON(b []byte) error {
 // unmarshaling of listtransactions JSON RPC commands.
 type ListTransactionsCmd struct {
 	id      interface{}
-	Account string
+	Account *string
 	Count   int
 	From    int
 }
@@ -4720,7 +4720,7 @@ var _ Cmd = &ListTransactionsCmd{}
 // NewListTransactionsCmd creates a new ListTransactionsCmd. Optionally a
 // pointer to a TemplateRequest may be provided.
 func NewListTransactionsCmd(id interface{}, optArgs ...interface{}) (*ListTransactionsCmd, error) {
-	account := ""
+	var account *string
 	count := 10
 	from := 0
 
@@ -4732,7 +4732,7 @@ func NewListTransactionsCmd(id interface{}, optArgs ...interface{}) (*ListTransa
 		if !ok {
 			return nil, errors.New("first optional argument account is not a string")
 		}
-		account = ac
+		account = &ac
 	}
 	if len(optArgs) > 1 {
 		cnt, ok := optArgs[1].(int)
@@ -4771,7 +4771,7 @@ func (cmd *ListTransactionsCmd) Method() string {
 // MarshalJSON returns the JSON encoding of cmd.  Part of the Cmd interface.
 func (cmd *ListTransactionsCmd) MarshalJSON() ([]byte, error) {
 	params := make([]interface{}, 0, 3)
-	if cmd.Account != "" || cmd.Count != 10 || cmd.From != 0 {
+	if cmd.Account != nil {
 		params = append(params, cmd.Account)
 	}
 	if cmd.Count != 10 || cmd.From != 0 {

@@ -16,6 +16,9 @@ import (
 
 var testID = float64(1)
 
+var defaultAccount = ""
+var testAccount = "account"
+
 var jsoncmdtests = []struct {
 	name   string
 	cmd    string
@@ -33,7 +36,7 @@ var jsoncmdtests = []struct {
 			id:        testID,
 			NRequired: 1,
 			Keys:      []string{"foo", "bar"},
-			Account:   "",
+			Account:   defaultAccount,
 		},
 	},
 	{
@@ -247,11 +250,11 @@ var jsoncmdtests = []struct {
 		cmd:  "getaccountaddress",
 		f: func() (Cmd, error) {
 			return NewGetAccountAddressCmd(testID,
-				"account")
+				testAccount)
 		},
 		result: &GetAccountAddressCmd{
 			id:      testID,
-			Account: "account",
+			Account: testAccount,
 		},
 	},
 	{
@@ -294,11 +297,11 @@ var jsoncmdtests = []struct {
 		cmd:  "getaddressesbyaccount",
 		f: func() (Cmd, error) {
 			return NewGetAddressesByAccountCmd(testID,
-				"account")
+				testAccount)
 		},
 		result: &GetAddressesByAccountCmd{
 			id:      testID,
-			Account: "account",
+			Account: testAccount,
 		},
 	},
 	{
@@ -316,11 +319,11 @@ var jsoncmdtests = []struct {
 		name: "basic + account",
 		cmd:  "getbalance",
 		f: func() (Cmd, error) {
-			return NewGetBalanceCmd(testID, "account")
+			return NewGetBalanceCmd(testID, testAccount)
 		},
 		result: &GetBalanceCmd{
 			id:      testID,
-			Account: "account",
+			Account: &testAccount,
 			MinConf: 1, // the default
 		},
 	},
@@ -328,10 +331,11 @@ var jsoncmdtests = []struct {
 		name: "basic + minconf",
 		cmd:  "getbalance",
 		f: func() (Cmd, error) {
-			return NewGetBalanceCmd(testID, "", 2)
+			return NewGetBalanceCmd(testID, defaultAccount, 2)
 		},
 		result: &GetBalanceCmd{
 			id:      testID,
+			Account: &defaultAccount,
 			MinConf: 2,
 		},
 	},
@@ -339,11 +343,11 @@ var jsoncmdtests = []struct {
 		name: "basic + account + minconf",
 		cmd:  "getbalance",
 		f: func() (Cmd, error) {
-			return NewGetBalanceCmd(testID, "account", 2)
+			return NewGetBalanceCmd(testID, testAccount, 2)
 		},
 		result: &GetBalanceCmd{
 			id:      testID,
-			Account: "account",
+			Account: &testAccount,
 			MinConf: 2,
 		},
 	},
@@ -570,11 +574,11 @@ var jsoncmdtests = []struct {
 		name: "basic",
 		cmd:  "getnewaddress",
 		f: func() (Cmd, error) {
-			return NewGetNewAddressCmd(testID, "account")
+			return NewGetNewAddressCmd(testID, testAccount)
 		},
 		result: &GetNewAddressCmd{
 			id:      testID,
-			Account: "account",
+			Account: testAccount,
 		},
 	},
 	{
@@ -1050,7 +1054,7 @@ var jsoncmdtests = []struct {
 		},
 		result: &ListTransactionsCmd{
 			id:      testID,
-			Account: "",
+			Account: nil,
 			Count:   10,
 			From:    0,
 		},
@@ -1059,11 +1063,11 @@ var jsoncmdtests = []struct {
 		name: "+ 1 optarg",
 		cmd:  "listtransactions",
 		f: func() (Cmd, error) {
-			return NewListTransactionsCmd(testID, "abcde")
+			return NewListTransactionsCmd(testID, testAccount)
 		},
 		result: &ListTransactionsCmd{
 			id:      testID,
-			Account: "abcde",
+			Account: &testAccount,
 			Count:   10,
 			From:    0,
 		},
@@ -1072,11 +1076,11 @@ var jsoncmdtests = []struct {
 		name: "+ 2 optargs",
 		cmd:  "listtransactions",
 		f: func() (Cmd, error) {
-			return NewListTransactionsCmd(testID, "abcde", 123)
+			return NewListTransactionsCmd(testID, testAccount, 123)
 		},
 		result: &ListTransactionsCmd{
 			id:      testID,
-			Account: "abcde",
+			Account: &testAccount,
 			Count:   123,
 			From:    0,
 		},
@@ -1085,11 +1089,11 @@ var jsoncmdtests = []struct {
 		name: "+ 3 optargs",
 		cmd:  "listtransactions",
 		f: func() (Cmd, error) {
-			return NewListTransactionsCmd(testID, "abcde", 123, 456)
+			return NewListTransactionsCmd(testID, testAccount, 123, 456)
 		},
 		result: &ListTransactionsCmd{
 			id:      testID,
-			Account: "abcde",
+			Account: &testAccount,
 			Count:   123,
 			From:    456,
 		},
@@ -1224,14 +1228,14 @@ var jsoncmdtests = []struct {
 		cmd:  "sendfrom",
 		f: func() (Cmd, error) {
 			return NewSendFromCmd(testID,
-				"account",
+				testAccount,
 				"address",
 				12,
 				1)
 		},
 		result: &SendFromCmd{
 			id:          testID,
-			FromAccount: "account",
+			FromAccount: testAccount,
 			ToAddress:   "address",
 			Amount:      12,
 			MinConf:     1, // the default
@@ -1242,7 +1246,7 @@ var jsoncmdtests = []struct {
 		cmd:  "sendfrom",
 		f: func() (Cmd, error) {
 			return NewSendFromCmd(testID,
-				"account",
+				testAccount,
 				"address",
 				12,
 				1,
@@ -1251,7 +1255,7 @@ var jsoncmdtests = []struct {
 		},
 		result: &SendFromCmd{
 			id:          testID,
-			FromAccount: "account",
+			FromAccount: testAccount,
 			ToAddress:   "address",
 			Amount:      12,
 			MinConf:     1, // the default
@@ -1269,12 +1273,12 @@ var jsoncmdtests = []struct {
 				"address C": 3000,
 			}
 			return NewSendManyCmd(testID,
-				"account",
+				testAccount,
 				pairs)
 		},
 		result: &SendManyCmd{
 			id:          testID,
-			FromAccount: "account",
+			FromAccount: testAccount,
 			Amounts: map[string]int64{
 				"address A": 1000,
 				"address B": 2000,
@@ -1293,14 +1297,14 @@ var jsoncmdtests = []struct {
 				"address C": 3000,
 			}
 			return NewSendManyCmd(testID,
-				"account",
+				testAccount,
 				pairs,
 				10,
 				"comment")
 		},
 		result: &SendManyCmd{
 			id:          testID,
-			FromAccount: "account",
+			FromAccount: testAccount,
 			Amounts: map[string]int64{
 				"address A": 1000,
 				"address B": 2000,
