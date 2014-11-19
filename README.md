@@ -1,8 +1,8 @@
 ppcd
 ====
 
-[![Build Status](https://travis-ci.org/mably/ppcd.png?branch=master)]
-(https://travis-ci.org/mably/ppcd) [![tip for next commit](http://peer4commit.com/projects/130.svg)](http://peer4commit.com/projects/130)
+[![Build Status](https://travis-ci.org/mably/ppcd.png?branch=master)](https://travis-ci.org/mably/ppcd)
+[![tip for next commit](http://peer4commit.com/projects/130.svg)](http://peer4commit.com/projects/130)
 
 ppcd is an alternative full node peercoin implementation written in Go (golang) based on Conformal btcd code.
 
@@ -36,22 +36,22 @@ active development.
 #### Build from Source
 
 - Install Go according to the installation instructions here:
-  http://golang.org/doc/install
+http://golang.org/doc/install
 
 - Run the following command to obtain btcd, all dependencies, and install it:
-  ```$ go get github.com/mably/ppcd/...```
+```$ go get github.com/mably/ppcd/...```
 
 - btcd (and utilities) will now be installed in either ```$GOROOT/bin``` or
-  ```$GOPATH/bin``` depending on your configuration.  If you did not already
-  add the bin directory to your system path during Go installation, we
-  recommend you do so now.
+```$GOPATH/bin``` depending on your configuration.  If you did not already
+add the bin directory to your system path during Go installation, we
+recommend you do so now.
 
 ## Updating
 
 #### Build from Source
 
 - Run the following command to update btcd, all dependencies, and install it:
-  ```$ go get -u -v github.com/mably/ppcd/...```
+```$ go get -u -v github.com/mably/ppcd/...```
 
 ## Getting Started
 
@@ -94,18 +94,18 @@ has not been tampered with and is coming from Conformal.  To verify the
 signature perform the following:
 
 - Download the public key from the Conformal website at
-  https://opensource.conformal.com/GIT-GPG-KEY-conformal.txt
+https://opensource.conformal.com/GIT-GPG-KEY-conformal.txt
 
 - Import the public key into your GPG keyring:
-  ```bash
-  gpg --import GIT-GPG-KEY-conformal.txt
-  ```
+```bash
+gpg --import GIT-GPG-KEY-conformal.txt
+```
 
 - Verify the release tag with the following command where `TAG_NAME` is a
-  placeholder for the specific tag:
-  ```bash
-  git tag -v TAG_NAME
-  ```
+placeholder for the specific tag:
+```bash
+git tag -v TAG_NAME
+```
 -->
 ## License
 
