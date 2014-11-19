@@ -10,7 +10,7 @@ import (
 	"sort"
 	"strconv"
 
-	"github.com/conformal/btcjson"
+	"github.com/mably/btcjson"
 	flags "github.com/conformal/go-flags"
 	"github.com/davecgh/go-spew/spew"
 	"github.com/mably/btcutil"
