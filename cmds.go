@@ -1568,7 +1568,7 @@ func (cmd *ListAddressTransactionsCmd) UnmarshalJSON(b []byte) error {
 // unmarshaling of listalltransactions JSON websocket extension commands.
 type ListAllTransactionsCmd struct {
 	id      interface{}
-	Account string
+	Account *string
 }
 
 // Enforce that ListAllTransactionsCmd satisifies the btcjson.Cmd
@@ -1580,14 +1580,16 @@ func NewListAllTransactionsCmd(id interface{},
 	optArgs ...string) (*ListAllTransactionsCmd, error) {
 
 	// Optional arguments set to their default values.
-	account := ""
+	var account *string
 
 	if len(optArgs) > 1 {
 		return nil, btcjson.ErrInvalidParams
+	} else {
+		account = nil
 	}
 
 	if len(optArgs) == 1 {
-		account = optArgs[0]
+		account = &optArgs[0]
 	}
 
 	return &ListAllTransactionsCmd{
@@ -1630,7 +1632,7 @@ func (cmd *ListAllTransactionsCmd) Method() string {
 // MarshalJSON returns the JSON encoding of cmd.  Part of the Cmd interface.
 func (cmd *ListAllTransactionsCmd) MarshalJSON() ([]byte, error) {
 	params := make([]interface{}, 0, 1)
-	if cmd.Account != "" {
+	if cmd.Account != nil {
 		params = append(params, cmd.Account)
 	}
 

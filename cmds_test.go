@@ -13,6 +13,8 @@ import (
 	"github.com/davecgh/go-spew/spew"
 )
 
+var testAccount = "account"
+
 var cmdtests = []struct {
 	name   string
 	f      func() (btcjson.Cmd, error)
@@ -74,11 +76,11 @@ var cmdtests = []struct {
 		name: "getunconfirmedbalance one optarg",
 		f: func() (btcjson.Cmd, error) {
 			return NewGetUnconfirmedBalanceCmd(float64(1),
-				"abcde")
+				testAccount)
 		},
 		result: &GetUnconfirmedBalanceCmd{
 			id:      float64(1),
-			Account: "abcde",
+			Account: testAccount,
 		},
 	},
 	{
@@ -108,11 +110,11 @@ var cmdtests = []struct {
 			return NewListAddressTransactionsCmd(
 				float64(1),
 				addrs,
-				"abcde")
+				testAccount)
 		},
 		result: &ListAddressTransactionsCmd{
 			id:      float64(1),
-			Account: "abcde",
+			Account: testAccount,
 			Addresses: []string{
 				"17XhEvq9Nahdj7Xe1nv6oRe1tEmaHUuynH",
 			},
@@ -125,7 +127,7 @@ var cmdtests = []struct {
 		},
 		result: &ListAllTransactionsCmd{
 			id:      float64(1),
-			Account: "",
+			Account: nil,
 		},
 	},
 	{
@@ -133,11 +135,11 @@ var cmdtests = []struct {
 		f: func() (btcjson.Cmd, error) {
 			return NewListAllTransactionsCmd(
 				float64(1),
-				"abcde")
+				testAccount)
 		},
 		result: &ListAllTransactionsCmd{
 			id:      float64(1),
-			Account: "abcde",
+			Account: &testAccount,
 		},
 	},
 	{
@@ -290,11 +292,11 @@ var cmdtests = []struct {
 		f: func() (btcjson.Cmd, error) {
 			return NewWalletIsLockedCmd(
 				float64(1),
-				"abcde")
+				testAccount)
 		},
 		result: &WalletIsLockedCmd{
 			id:      float64(1),
-			Account: "abcde",
+			Account: testAccount,
 		},
 	},
 }
