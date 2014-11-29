@@ -369,6 +369,7 @@ func soapRequest(url, function, message string) (replyXML []byte, err error) {
 	if r.Body != nil {
 		defer r.Body.Close()
 	}
+
 	if r.StatusCode >= 400 {
 		// log.Stderr(function, r.StatusCode)
 		err = errors.New("Error " + strconv.Itoa(r.StatusCode) + " for " + function)
