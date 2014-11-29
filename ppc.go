@@ -5,8 +5,9 @@
 package main
 
 import (
-	"github.com/mably/btcdb"
+	"regexp"
 	"github.com/mably/btcchain"
+	"github.com/mably/btcdb"
 	"github.com/mably/btcjson"
 	"github.com/mably/btcwire"
 )
@@ -39,10 +40,18 @@ func ppcHandleGetDifficulty(s *rpcServer, cmd btcjson.Cmd, closeChan <-chan stru
 	}
 
 	ret := &btcjson.GetDifficultyResult{
-		ProofOfWork:      powDifficulty,
-		ProofOfStake:     posDifficulty,
-		SearchInterval:   int32(0),
+		ProofOfWork:    powDifficulty,
+		ProofOfStake:   posDifficulty,
+		SearchInterval: int32(0),
 	}
 
 	return ret, nil
+}
+
+func isIPv4(addr string) (bool, error) {
+	return regexp.MatchString("^(([01]?[0-9]?[0-9]|2([0-4][0-9]|5[0-5]))\\.){3}([01]?[0-9]?[0-9]|2([0-4][0-9]|5[0-5]))$", addr)
+}
+
+func isLoopBackIPv4(addr string) (bool ,error) {
+	return regexp.MatchString("^127\\.", addr)
 }

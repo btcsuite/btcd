@@ -82,11 +82,11 @@ func Discover() (nat NAT, err error) {
 		return
 	}
 
-	st := "ST: urn:schemas-upnp-org:device:InternetGatewayDevice:1\r\n"
+	stVal := "urn:schemas-upnp-org:device:InternetGatewayDevice:1\r\n"
 	buf := bytes.NewBufferString(
 		"M-SEARCH * HTTP/1.1\r\n" +
 			"HOST: 239.255.255.250:1900\r\n" +
-			st +
+			"ST: " + stVal +
 			"MAN: \"ssdp:discover\"\r\n" +
 			"MX: 2\r\n\r\n")
 	message := buf.Bytes()
@@ -104,7 +104,8 @@ func Discover() (nat NAT, err error) {
 			// return
 		}
 		answer := string(answerBytes[0:n])
-		if strings.Index(answer, "\r\n"+st) < 0 {
+		discLog.Tracef("Answer = %v", answer)
+		if strings.Index(answer, "\r\nST: "+stVal) < 0 && strings.Index(answer, "\r\nST:"+stVal) < 0 {
 			continue
 		}
 		// HTTP header field names are case-insensitive.
@@ -131,6 +132,7 @@ func Discover() (nat NAT, err error) {
 			return
 		}
 		nat = &upnpNAT{serviceURL: serviceURL, ourIP: ourIP}
+		discLog.Debugf("UPNP serviceURL = %v, ourIP = %v", serviceURL, ourIP)
 		return
 	}
 	err = errors.New("UPnP port discovery failed")
@@ -214,10 +216,64 @@ func getChildService(d *device, serviceType string) *service {
 // getOurIP returns a best guess at what the local IP is.
 func getOurIP() (ip string, err error) {
 	hostname, err := os.Hostname()
+	discLog.Tracef("hostname = %v", hostname)
 	if err != nil {
 		return
 	}
-	return net.LookupCNAME(hostname)
+	addrs, err := net.LookupHost(hostname)
+	for _, addr := range addrs {
+		ip, err = verifyIPv4Addr(addr)
+		if err != nil || ip > "" {
+			return
+		}
+	}
+	if ip == "" {
+		interfaces, _ := net.Interfaces()
+		for _, inter := range interfaces {
+			discLog.Tracef("name = %v, addr = %v", inter.Name, inter.HardwareAddr)
+			if addrs, errAddrs := inter.Addrs(); errAddrs == nil {
+				for _, addr := range addrs {
+					discLog.Trace(inter.Name, "->", addr)
+					var addrIP string
+					switch addr.(type) {
+					case *net.IPNet:
+						addrIP = addr.(*net.IPNet).IP.String()
+					case *net.IPAddr:
+						addrIP = addr.(*net.IPAddr).IP.String()
+					}
+					ip, err = verifyIPv4Addr(addrIP)
+					if err != nil || ip > "" {
+						return
+					}
+				}
+			}
+		}
+	}
+	return
+}
+
+func verifyIPv4Addr(addr string) (ip string, err error) {
+	if addr > "" {
+		isIPv4, errIP := isIPv4(addr)
+		discLog.Tracef("addr = %v, ipv4 = %v", addr, isIPv4)
+		if errIP != nil {
+			err = errIP
+			return
+		}
+		if isIPv4 {
+			discLog.Tracef("IPv4 address found = %v", addr)
+			isLoopBack, errLP := isLoopBackIPv4(addr)
+			if errLP != nil {
+				err = errLP
+				return
+			}
+			if isLoopBack {
+				return
+			}
+			ip = addr
+		}
+	}
+	return
 }
 
 // getServiceURL parses the xml description at the given root url to find the
@@ -288,21 +344,23 @@ type soapEnvelope struct {
 // the xml replied stripped of the soap headers. in the case that the request is
 // unsuccessful the an error is returned.
 func soapRequest(url, function, message string) (replyXML []byte, err error) {
-	fullMessage := "<?xml version=\"1.0\" ?>" +
+	fullMessage := "<?xml version=\"1.0\" ?>\r\n" +
 		"<s:Envelope xmlns:s=\"http://schemas.xmlsoap.org/soap/envelope/\" s:encodingStyle=\"http://schemas.xmlsoap.org/soap/encoding/\">\r\n" +
 		"<s:Body>" + message + "</s:Body></s:Envelope>"
-
+	discLog.Tracef("url = %v, fullMessage = %v", url, fullMessage)
 	req, err := http.NewRequest("POST", url, strings.NewReader(fullMessage))
 	if err != nil {
 		return nil, err
 	}
-	req.Header.Set("Content-Type", "text/xml ; charset=\"utf-8\"")
+	req.Header.Set("Content-Type", "text/xml") // ; charset=\"utf-8\"") ppc:
+	req.Header.Set("Content-Length", strconv.Itoa(len([]byte(fullMessage))))
 	req.Header.Set("User-Agent", "Darwin/10.0.0, UPnP/1.0, MiniUPnPc/1.3")
 	//req.Header.Set("Transfer-Encoding", "chunked")
 	req.Header.Set("SOAPAction", "\"urn:schemas-upnp-org:service:WANIPConnection:1#"+function+"\"")
 	req.Header.Set("Connection", "Close")
 	req.Header.Set("Cache-Control", "no-cache")
 	req.Header.Set("Pragma", "no-cache")
+	req.Close = true // ppc: needed (kac-)
 
 	r, err := http.DefaultClient.Do(req)
 	if err != nil {
@@ -311,7 +369,6 @@ func soapRequest(url, function, message string) (replyXML []byte, err error) {
 	if r.Body != nil {
 		defer r.Body.Close()
 	}
-
 	if r.StatusCode >= 400 {
 		// log.Stderr(function, r.StatusCode)
 		err = errors.New("Error " + strconv.Itoa(r.StatusCode) + " for " + function)
