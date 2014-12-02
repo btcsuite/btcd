@@ -9,8 +9,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/conformal/btcd/addrmgr"
-	"github.com/conformal/btcwire"
+	"github.com/mably/btcwire"
+	"github.com/mably/ppcd/addrmgr"
 )
 
 // TestIPTypes ensures the various functions which determine the type of an IP

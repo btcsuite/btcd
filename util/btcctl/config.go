@@ -7,14 +7,14 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/conformal/btcutil"
 	flags "github.com/conformal/go-flags"
+	"github.com/mably/btcutil"
 )
 
 var (
-	btcdHomeDir           = btcutil.AppDataDir("btcd", false)
+	btcdHomeDir           = btcutil.AppDataDir("ppcd", false)
 	btcctlHomeDir         = btcutil.AppDataDir("btcctl", false)
-	btcwalletHomeDir      = btcutil.AppDataDir("btcwallet", false)
+	btcwalletHomeDir      = btcutil.AppDataDir("ppcwallet", false)
 	defaultConfigFile     = filepath.Join(btcctlHomeDir, "btcctl.conf")
 	defaultRPCServer      = "localhost"
 	defaultRPCCertFile    = filepath.Join(btcdHomeDir, "rpc.cert")

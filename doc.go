@@ -13,7 +13,7 @@ The following section provides a usage overview which enumerates the flags.  An
 interesting point to note is that the long form of all of these options
 (except -C) can be specified in a configuration file that is automatically
 parsed when btcd starts up.  By default, the configuration file is located at
-~/.btcd/btcd.conf on POSIX-style operating systems and %LOCALAPPDATA%\btcd\btcd.conf
+~/.ppcd/ppcd.conf on POSIX-style operating systems and %LOCALAPPDATA%\ppcd\ppcd.conf
 on Windows.  The -C (--configfile) flag, as shown below, can be used to override
 this location.
 

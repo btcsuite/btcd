@@ -16,21 +16,21 @@ import (
 	"strings"
 	"time"
 
-	"github.com/conformal/btcdb"
-	_ "github.com/conformal/btcdb/ldb"
-	_ "github.com/conformal/btcdb/memdb"
-	"github.com/conformal/btcutil"
-	"github.com/conformal/btcwire"
 	flags "github.com/conformal/go-flags"
 	socks "github.com/conformal/go-socks"
+	"github.com/mably/btcdb"
+	_ "github.com/mably/btcdb/ldb"
+	_ "github.com/mably/btcdb/memdb"
+	"github.com/mably/btcutil"
+	"github.com/mably/btcwire"
 )
 
 const (
-	defaultConfigFilename    = "btcd.conf"
+	defaultConfigFilename    = "ppcd.conf"
 	defaultDataDirname       = "data"
 	defaultLogLevel          = "info"
 	defaultLogDirname        = "logs"
-	defaultLogFilename       = "btcd.log"
+	defaultLogFilename       = "ppcd.log"
 	defaultMaxPeers          = 125
 	defaultBanDuration       = time.Hour * 24
 	defaultMaxRPCClients     = 10
@@ -47,7 +47,7 @@ const (
 )
 
 var (
-	btcdHomeDir        = btcutil.AppDataDir("btcd", false)
+	btcdHomeDir        = btcutil.AppDataDir("ppcd", false)
 	defaultConfigFile  = filepath.Join(btcdHomeDir, defaultConfigFilename)
 	defaultDataDir     = filepath.Join(btcdHomeDir, defaultDataDirname)
 	knownDbTypes       = btcdb.SupportedDBs()

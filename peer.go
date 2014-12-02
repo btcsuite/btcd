@@ -7,6 +7,8 @@ package main
 import (
 	"bytes"
 	"container/list"
+	"crypto/md5"
+	"encoding/hex"
 	"fmt"
 	"io"
 	"net"
@@ -15,19 +17,20 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/conformal/btcchain"
-	"github.com/conformal/btcd/addrmgr"
-	"github.com/conformal/btcdb"
-	"github.com/conformal/btcutil"
-	"github.com/conformal/btcutil/bloom"
-	"github.com/conformal/btcwire"
 	socks "github.com/conformal/go-socks"
 	"github.com/davecgh/go-spew/spew"
+	"github.com/mably/btcchain"
+	"github.com/mably/btcdb"
+	"github.com/mably/btcutil"
+	"github.com/mably/btcutil/bloom"
+	"github.com/mably/btcwire"
+	"github.com/mably/ppcd/addrmgr"
+	"github.com/mably/ppcutil"
 )
 
 const (
 	// maxProtocolVersion is the max protocol version the peer supports.
-	maxProtocolVersion = 70002
+	maxProtocolVersion = 60004
 
 	// outputBufferSize is the number of elements the output channels use.
 	outputBufferSize = 50
@@ -57,7 +60,7 @@ const (
 var (
 	// userAgentName is the user agent name and is used to help identify
 	// ourselves to other bitcoin peers.
-	userAgentName = "btcd"
+	userAgentName = "ppcd"
 
 	// userAgentVersion is the user agent version and is used to help
 	// identify ourselves to other bitcoin peers.
@@ -188,6 +191,8 @@ type peer struct {
 	lastPingNonce      uint64    // Set to nonce if we have a pending ping.
 	lastPingTime       time.Time // Time we sent last ping.
 	lastPingMicros     int64     // Time for last ping to return.
+
+	msgSignatureCache  *ppcutil.Cache
 }
 
 // String returns the peer's address and directionality as a human-readable
@@ -985,7 +990,7 @@ func (p *peer) handleGetHeadersMsg(msg *btcwire.MsgGetHeaders) {
 		}
 
 		// Fetch and send the requested block header.
-		header, err := p.server.db.FetchBlockHeaderBySha(&msg.HashStop)
+		header, _, err := p.server.db.FetchBlockHeaderBySha(&msg.HashStop)
 		if err != nil {
 			peerLog.Warnf("Lookup of known block hash failed: %v",
 				err)
@@ -1041,7 +1046,7 @@ func (p *peer) handleGetHeadersMsg(msg *btcwire.MsgGetHeaders) {
 
 		// Add headers to the message.
 		for _, hash := range hashList {
-			header, err := p.server.db.FetchBlockHeaderBySha(&hash)
+			header, _, err := p.server.db.FetchBlockHeaderBySha(&hash)
 			if err != nil {
 				peerLog.Warnf("Lookup of known block hash "+
 					"failed: %v", err)
@@ -1283,6 +1288,39 @@ func (p *peer) readMessage() (btcwire.Message, []byte, error) {
 	return msg, buf, nil
 }
 
+func (p *peer) checkMisbehaving(msg btcwire.Message, buf []byte) bool {
+	switch msg.(type) {
+		case *btcwire.MsgGetBlocks:
+			return p.checkMsgSignatureDuplicates(msg, buf, 5)
+	}
+	return false
+}
+
+func (p *peer) checkMsgSignatureDuplicates(
+	msg btcwire.Message, buf []byte, maxDuplicates uint32) bool {
+	// TODO(mably) This part of the code handles looped requests (ex: getblocks)
+	// from misbehaving nodes. It's just a hotfix to allow us work on project
+	// further until more elaborate solution is found.
+	hasher := md5.New()
+	hasher.Write(buf)
+	msgMd5 := hasher.Sum(nil)
+	msgMd5Str := hex.EncodeToString(msgMd5)
+	peerLog.Tracef("Message %v MD5 = %v", msg.Command(), msgMd5Str)
+	if countValue, ok := p.msgSignatureCache.Get(msgMd5Str); ok {
+		count := countValue.(uint32)
+		count++
+		peerLog.Warnf("Repeated command %v : %v", msg.Command(), count)
+		if count > maxDuplicates {
+			return true
+		} else {
+			p.msgSignatureCache.Add(msgMd5Str, count)
+		}
+	} else {
+		p.msgSignatureCache.Add(msgMd5Str, uint32(0))
+	}
+	return false
+}
+
 // writeMessage sends a bitcoin Message to the peer with logging.
 func (p *peer) writeMessage(msg btcwire.Message) {
 	// Don't do anything if we're disconnecting.
@@ -1438,6 +1476,15 @@ out:
 			// sent before disconnecting.
 			p.PushRejectMsg(vmsg.Command(), btcwire.RejectMalformed,
 				errStr, nil, true)
+			break out
+		}
+
+		if p.checkMisbehaving(rmsg, buf) {
+			// TODO(mably) ban misbehaving peer.
+			errMsg := fmt.Sprintf("Banning misbehaving peer %v, %v, %v",
+				p, p.protocolVersion, p.userAgent)
+			p.logError(errMsg)
+			p.server.BanPeer(p)
 			break out
 		}
 
@@ -1898,6 +1945,7 @@ func newPeerBase(s *server, inbound bool) *peer {
 		blockProcessed:  make(chan struct{}, 1),
 		quit:            make(chan struct{}),
 	}
+	p.msgSignatureCache, _ = ppcutil.NewCache(100)
 	return &p
 }
 

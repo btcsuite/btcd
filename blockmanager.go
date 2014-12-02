@@ -13,11 +13,11 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/conformal/btcchain"
-	"github.com/conformal/btcdb"
-	"github.com/conformal/btcnet"
-	"github.com/conformal/btcutil"
-	"github.com/conformal/btcwire"
+	"github.com/mably/btcchain"
+	"github.com/mably/btcdb"
+	"github.com/mably/btcnet"
+	"github.com/mably/btcutil"
+	"github.com/mably/btcwire"
 )
 
 const (
@@ -776,6 +776,8 @@ func (b *blockManager) handleHeadersMsg(hmsg *headersMsg) {
 		}
 		finalHash = &blockHash
 
+		bmgrLog.Tracef("Received header %s : %+v", blockHash, blockHeader)
+
 		// Ensure there is a previous header to compare against.
 		prevNodeEl := b.headerList.Back()
 		if prevNodeEl == nil {
@@ -791,6 +793,7 @@ func (b *blockManager) handleHeadersMsg(hmsg *headersMsg) {
 		prevNode := prevNodeEl.Value.(*headerNode)
 		if prevNode.sha.IsEqual(&blockHeader.PrevBlock) {
 			node.height = prevNode.height + 1
+			//bmgrLog.Tracef("height %d", node.height)
 			e := b.headerList.PushBack(&node)
 			if b.startHeader == nil {
 				b.startHeader = e
@@ -1515,7 +1518,8 @@ func loadBlockDB() (btcdb.Db, error) {
 	// Insert the appropriate genesis block for the bitcoin network being
 	// connected to if needed.
 	if height == -1 {
-		genesis := btcutil.NewBlock(activeNetParams.GenesisBlock)
+		genesis := btcutil.NewBlockWithMetas(
+			activeNetParams.GenesisBlock, activeNetParams.GenesisMeta)
 		_, err := db.InsertBlock(genesis)
 		if err != nil {
 			db.Close()

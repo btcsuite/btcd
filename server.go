@@ -19,12 +19,12 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/conformal/btcchain"
-	"github.com/conformal/btcd/addrmgr"
-	"github.com/conformal/btcdb"
-	"github.com/conformal/btcjson"
-	"github.com/conformal/btcnet"
-	"github.com/conformal/btcwire"
+	"github.com/mably/btcchain"
+	"github.com/mably/btcdb"
+	"github.com/mably/btcjson"
+	"github.com/mably/btcnet"
+	"github.com/mably/btcwire"
+	"github.com/mably/ppcd/addrmgr"
 )
 
 const (
@@ -1042,7 +1042,7 @@ out:
 			// listen port?
 			// XXX this assumes timeout is in seconds.
 			listenPort, err := s.nat.AddPortMapping("tcp", int(lport), int(lport),
-				"btcd listen port", 20*60)
+				"ppcd listen port", 0) // ppc: 20*60 incompatibility with some routers
 			if err != nil {
 				srvrLog.Warnf("can't add UPnP port mapping: %v", err)
 			}
@@ -1084,6 +1084,7 @@ out:
 // bitcoin network type specified by netParams.  Use start to begin accepting
 // connections from peers.
 func newServer(listenAddrs []string, db btcdb.Db, netParams *btcnet.Params) (*server, error) {
+
 	nonce, err := btcwire.RandomUint64()
 	if err != nil {
 		return nil, err
@@ -1097,6 +1098,7 @@ func newServer(listenAddrs []string, db btcdb.Db, netParams *btcnet.Params) (*se
 		ipv4Addrs, ipv6Addrs, wildcard, err :=
 			parseListeners(listenAddrs)
 		if err != nil {
+			srvrLog.Warnf("Can not parse listeners")
 			return nil, err
 		}
 		listeners = make([]net.Listener, 0, len(ipv4Addrs)+len(ipv6Addrs))

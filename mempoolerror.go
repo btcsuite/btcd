@@ -5,8 +5,8 @@
 package main
 
 import (
-	"github.com/conformal/btcchain"
-	"github.com/conformal/btcwire"
+	"github.com/mably/btcchain"
+	"github.com/mably/btcwire"
 )
 
 // RuleError identifies a rule violation.  It is used to indicate that

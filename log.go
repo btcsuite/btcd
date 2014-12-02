@@ -10,14 +10,14 @@ import (
 	"strings"
 	"time"
 
-	"github.com/conformal/btcd/addrmgr"
+	"github.com/mably/ppcd/addrmgr"
 
-	"github.com/conformal/btcchain"
-	"github.com/conformal/btcdb"
 	"github.com/conformal/btclog"
-	"github.com/conformal/btcscript"
-	"github.com/conformal/btcwire"
 	"github.com/conformal/seelog"
+	"github.com/mably/btcchain"
+	"github.com/mably/btcdb"
+	"github.com/mably/btcscript"
+	"github.com/mably/btcwire"
 )
 
 const (

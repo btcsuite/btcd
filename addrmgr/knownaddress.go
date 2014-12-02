@@ -7,7 +7,7 @@ package addrmgr
 import (
 	"time"
 
-	"github.com/conformal/btcwire"
+	"github.com/mably/btcwire"
 )
 
 // knownAddress tracks information about a known network address that is used

@@ -13,11 +13,11 @@ import (
 	"sync"
 	"time"
 
-	"github.com/conformal/btcchain"
-	"github.com/conformal/btcdb"
-	"github.com/conformal/btcscript"
-	"github.com/conformal/btcutil"
-	"github.com/conformal/btcwire"
+	"github.com/mably/btcchain"
+	"github.com/mably/btcdb"
+	"github.com/mably/btcscript"
+	"github.com/mably/btcutil"
+	"github.com/mably/btcwire"
 )
 
 const (
@@ -921,7 +921,8 @@ func (mp *txMemPool) maybeAcceptTransaction(tx *btcutil.Tx, isOrphan *bool, isNe
 	// rules in btcchain for what transactions are allowed into blocks.
 	// Also returns the fees associated with the transaction which will be
 	// used later.
-	txFee, err := btcchain.CheckTransactionInputs(tx, nextBlockHeight, txStore)
+	txFee, err := btcchain.CheckTransactionInputs(tx, nextBlockHeight, txStore,
+		mp.server.blockManager.blockChain)
 	if err != nil {
 		if cerr, ok := err.(btcchain.RuleError); ok {
 			return chainRuleError(cerr)

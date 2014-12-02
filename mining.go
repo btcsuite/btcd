@@ -10,11 +10,11 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/conformal/btcchain"
-	"github.com/conformal/btcdb"
-	"github.com/conformal/btcscript"
-	"github.com/conformal/btcutil"
-	"github.com/conformal/btcwire"
+	"github.com/mably/btcchain"
+	"github.com/mably/btcdb"
+	"github.com/mably/btcscript"
+	"github.com/mably/btcutil"
+	"github.com/mably/btcwire"
 )
 
 const (
@@ -36,8 +36,8 @@ const (
 
 	// coinbaseFlags is added to the coinbase script of a generated block
 	// and is used to monitor BIP16 support as well as blocks that are
-	// generated via btcd.
-	coinbaseFlags = "/P2SH/btcd/"
+	// generated via ppcd.
+	coinbaseFlags = "/P2SH/ppcd/"
 
 	// standardScriptVerifyFlags are the script flags which are used when
 	// executing transaction scripts to enforce additional checks which
@@ -696,7 +696,7 @@ mempoolLoop:
 		// Ensure the transaction inputs pass all of the necessary
 		// preconditions before allowing it to be added to the block.
 		_, err = btcchain.CheckTransactionInputs(tx, nextBlockHeight,
-			blockTxStore)
+			blockTxStore, chain)
 		if err != nil {
 			minrLog.Tracef("Skipping tx %s due to error in "+
 				"CheckTransactionInputs: %v", tx.Sha(), err)

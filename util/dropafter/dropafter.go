@@ -11,13 +11,13 @@ import (
 	"path/filepath"
 	"strconv"
 
-	"github.com/conformal/btcdb"
-	_ "github.com/conformal/btcdb/ldb"
 	"github.com/conformal/btclog"
-	"github.com/conformal/btcnet"
-	"github.com/conformal/btcutil"
-	"github.com/conformal/btcwire"
 	flags "github.com/conformal/go-flags"
+	"github.com/mably/btcdb"
+	_ "github.com/mably/btcdb/ldb"
+	"github.com/mably/btcnet"
+	"github.com/mably/btcutil"
+	"github.com/mably/btcwire"
 )
 
 type ShaHash btcwire.ShaHash
@@ -32,7 +32,7 @@ type config struct {
 }
 
 var (
-	btcdHomeDir     = btcutil.AppDataDir("btcd", false)
+	btcdHomeDir     = btcutil.AppDataDir("ppcd", false)
 	defaultDataDir  = filepath.Join(btcdHomeDir, "data")
 	log             btclog.Logger
 	activeNetParams = &btcnet.MainNetParams

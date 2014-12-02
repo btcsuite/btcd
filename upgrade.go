@@ -32,13 +32,13 @@ func oldBtcdHomeDir() string {
 	// Search for Windows APPDATA first.  This won't exist on POSIX OSes.
 	appData := os.Getenv("APPDATA")
 	if appData != "" {
-		return filepath.Join(appData, "btcd")
+		return filepath.Join(appData, "ppcd")
 	}
 
 	// Fall back to standard HOME directory that works for most POSIX OSes.
 	home := os.Getenv("HOME")
 	if home != "" {
-		return filepath.Join(home, ".btcd")
+		return filepath.Join(home, ".ppcd")
 	}
 
 	// In the worst case, use the current directory.
