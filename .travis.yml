@@ -2,7 +2,6 @@ language: go
 go:
   - 1.2
   - release
-  - tip
 install:
   - go get -d -t -v ./...
   - go get -v code.google.com/p/go.tools/cmd/vet
