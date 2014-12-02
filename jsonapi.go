@@ -169,7 +169,8 @@ func CreateMessageWithId(message string, id interface{}, args ...interface{}) ([
 	case "backupwallet", "decoderawtransaction", "dumpprivkey",
 		"encryptwallet", "getaccount", "getaccountaddress",
 		"getaddressesbyaccount", "getblock",
-		"gettransaction", "sendrawtransaction", "validateaddress":
+		"gettransaction", "sendrawtransaction", "validateaddress",
+		"invalidateblock", "reconsiderblock":
 		if len(args) != 1 {
 			err = fmt.Errorf("%s requires one argument", message)
 			return finalMessage, err

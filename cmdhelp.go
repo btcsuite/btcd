@@ -416,7 +416,7 @@ following information about txid is returned:
 Returns the total amount of BTC received by addresses related to "account".
 Only transactions with at least "minconf" confirmations are considered.`,
 
-	"getreceivedbyaddress": `getreceivedbyaddress "address" ( minconf=1 ) 
+	"getreceivedbyaddress": `getreceivedbyaddress "address" ( minconf=1 )
 Returns the total amount of BTC received by the given address. Only transactions
 with "minconf" confirmations will be used for the total.`,
 
@@ -500,6 +500,9 @@ blockchain will be scanned for transaction.`,
 	"importwallet": `importwallet "filename"
 Imports keys from the wallet dump file in "filename".`,
 
+	"invalidateblock": `invalidateblock "hash"
+Mark block specified by "hash" as invalid.`,
+
 	"keypoolrefill": `keypoolrefill ( newsize=100 )
 Refills the wallet pregenerated key pool to a size of "newsize"`,
 
@@ -571,7 +574,7 @@ with "minconf" confirmations are listed.
 	"transactions":[
 		"account"		# String of account related to the transaction.
 		"address"		# String of related address of transaction.
-		"category":"send|receive"	# String detailing whether transaction was a send or receive of funds.	
+		"category":"send|receive"	# String detailing whether transaction was a send or receive of funds.
 		"amount":n,		# Numeric value of transaction. Negative if transaction category was "send"
 		"fee":n,		# Numeric value of transaction fee in BTC.
 		"confirmations":n,	# Number of transaction confirmations
@@ -594,7 +597,7 @@ accounts if none specified) skipping the first "from" transactions.
 	"transactions":[
 		"account"		# String of account related to the transaction.
 		"address"		# String of related address of transaction.
-		"category":"send|receive|move"	# String detailing whether transaction was a send or receive of funds.Move is a local move between accounts and doesnt touch the blockchain.	
+		"category":"send|receive|move"	# String detailing whether transaction was a send or receive of funds.Move is a local move between accounts and doesnt touch the blockchain.
 		"amount":n,		# Numeric value of transaction. Negative if transaction category was "send"
 		"fee":n,		# Numeric value of transaction fee in BTC.
 		"confirmations":n,	# Number of transaction confirmations
@@ -644,6 +647,9 @@ to denode success.`,
 	"ping": `ping
 Queues a ping to be sent to each connected peer. Ping times are provided in
 getpeerinfo.`,
+
+	"reconsiderblock": `reconsiderblock "hash"
+Remove invalid mark from block specified by "hash" so it is considered again.`,
 
 	"sendfrom": `sendfrom "fromaccount" "tobitcoinaddress" amount ( minconf=1 "comment" "comment-to" )
 Sends "amount" (rounded to the nearest 0.00000001) to

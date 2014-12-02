@@ -866,6 +866,18 @@ var jsoncmdtests = []struct {
 	},
 	{
 		name: "basic",
+		cmd:  "invalidateblock",
+		f: func() (Cmd, error) {
+			return NewInvalidateBlockCmd(testID,
+				"lotsofhex")
+		},
+		result: &InvalidateBlockCmd{
+			id:        testID,
+			BlockHash: "lotsofhex",
+		},
+	},
+	{
+		name: "basic",
 		cmd:  "keypoolrefill",
 		f: func() (Cmd, error) {
 			return NewKeyPoolRefillCmd(testID)
@@ -1178,6 +1190,18 @@ var jsoncmdtests = []struct {
 		},
 		result: &PingCmd{
 			id: testID,
+		},
+	},
+	{
+		name: "basic",
+		cmd:  "reconsiderblock",
+		f: func() (Cmd, error) {
+			return NewReconsiderBlockCmd(testID,
+				"lotsofhex")
+		},
+		result: &ReconsiderBlockCmd{
+			id:        testID,
+			BlockHash: "lotsofhex",
 		},
 	},
 	{
@@ -1668,6 +1692,7 @@ func TestHelps(t *testing.T) {
 		"help",
 		"importprivkey",
 		"importwallet",
+		"invalidateblock",
 		"keypoolrefill",
 		"listaccounts",
 		"listaddressgroupings",
@@ -1680,6 +1705,7 @@ func TestHelps(t *testing.T) {
 		"lockunspent",
 		"move",
 		"ping",
+		"reconsiderblock",
 		"sendfrom",
 		"sendmany",
 		"sendrawtransaction",

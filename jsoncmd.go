@@ -244,6 +244,9 @@ func ParseMarshaledCmd(b []byte) (Cmd, error) {
 	case "importwallet":
 		cmd = new(ImportWalletCmd)
 
+	case "invalidateblock":
+		cmd = new(InvalidateBlockCmd)
+
 	case "keypoolrefill":
 		cmd = new(KeyPoolRefillCmd)
 
@@ -279,6 +282,9 @@ func ParseMarshaledCmd(b []byte) (Cmd, error) {
 
 	case "ping":
 		cmd = new(PingCmd)
+
+	case "reconsiderblock":
+		cmd = new(ReconsiderBlockCmd)
 
 	case "sendfrom":
 		cmd = new(SendFromCmd)
@@ -4018,6 +4024,76 @@ func (cmd *ImportWalletCmd) UnmarshalJSON(b []byte) error {
 	return nil
 }
 
+// InvalidateBlockCmd is a type handling custom marshaling and
+// unmarshaling of invalidateblock JSON RPC commands.
+type InvalidateBlockCmd struct {
+	id        interface{}
+	BlockHash string
+}
+
+// Enforce that InvalidateBlockCmd satisifies the Cmd interface.
+var _ Cmd = &InvalidateBlockCmd{}
+
+// NewInvalidateBlockCmd creates a new InvalidateBlockCmd. Optionally a
+// pointer to a TemplateRequest may be provided.
+func NewInvalidateBlockCmd(id interface{}, blockhash string) (*InvalidateBlockCmd, error) {
+	return &InvalidateBlockCmd{
+		id:        id,
+		BlockHash: blockhash,
+	}, nil
+}
+
+// Id satisfies the Cmd interface by returning the id of the command.
+func (cmd *InvalidateBlockCmd) Id() interface{} {
+	return cmd.id
+}
+
+// Method satisfies the Cmd interface by returning the json method.
+func (cmd *InvalidateBlockCmd) Method() string {
+	return "invalidateblock"
+}
+
+// MarshalJSON returns the JSON encoding of cmd.  Part of the Cmd interface.
+func (cmd *InvalidateBlockCmd) MarshalJSON() ([]byte, error) {
+	params := []interface{}{
+		cmd.BlockHash,
+	}
+
+	// Fill and marshal a RawCmd.
+	raw, err := NewRawCmd(cmd.id, cmd.Method(), params)
+	if err != nil {
+		return nil, err
+	}
+	return json.Marshal(raw)
+}
+
+// UnmarshalJSON unmarshals the JSON encoding of cmd into cmd.  Part of
+// the Cmd interface.
+func (cmd *InvalidateBlockCmd) UnmarshalJSON(b []byte) error {
+	// Unmashal into a RawCmd
+	var r RawCmd
+	if err := json.Unmarshal(b, &r); err != nil {
+		return err
+	}
+
+	if len(r.Params) != 1 {
+		return ErrWrongNumberOfParams
+	}
+
+	var blockhash string
+	if err := json.Unmarshal(r.Params[0], &blockhash); err != nil {
+		return fmt.Errorf("first parameter 'hash' must be a string: %v", err)
+	}
+
+	newCmd, err := NewInvalidateBlockCmd(r.Id, blockhash)
+	if err != nil {
+		return err
+	}
+
+	*cmd = *newCmd
+	return nil
+}
+
 // KeyPoolRefillCmd is a type handling custom marshaling and
 // unmarshaling of keypoolrefill JSON RPC commands.
 type KeyPoolRefillCmd struct {
@@ -5165,6 +5241,76 @@ func (cmd *PingCmd) UnmarshalJSON(b []byte) error {
 	}
 
 	newCmd, err := NewPingCmd(r.Id)
+	if err != nil {
+		return err
+	}
+
+	*cmd = *newCmd
+	return nil
+}
+
+// ReconsiderBlockCmd is a type handling custom marshaling and
+// unmarshaling of reconsiderblock JSON RPC commands.
+type ReconsiderBlockCmd struct {
+	id        interface{}
+	BlockHash string
+}
+
+// Enforce that ReconsiderBlockCmd satisifies the Cmd interface.
+var _ Cmd = &ReconsiderBlockCmd{}
+
+// NewReconsiderBlockCmd creates a new ReconsiderBlockCmd. Optionally a
+// pointer to a TemplateRequest may be provided.
+func NewReconsiderBlockCmd(id interface{}, blockhash string) (*ReconsiderBlockCmd, error) {
+	return &ReconsiderBlockCmd{
+		id:        id,
+		BlockHash: blockhash,
+	}, nil
+}
+
+// Id satisfies the Cmd interface by returning the id of the command.
+func (cmd *ReconsiderBlockCmd) Id() interface{} {
+	return cmd.id
+}
+
+// Method satisfies the Cmd interface by returning the json method.
+func (cmd *ReconsiderBlockCmd) Method() string {
+	return "reconsiderblock"
+}
+
+// MarshalJSON returns the JSON encoding of cmd.  Part of the Cmd interface.
+func (cmd *ReconsiderBlockCmd) MarshalJSON() ([]byte, error) {
+	params := []interface{}{
+		cmd.BlockHash,
+	}
+
+	// Fill and marshal a RawCmd.
+	raw, err := NewRawCmd(cmd.id, cmd.Method(), params)
+	if err != nil {
+		return nil, err
+	}
+	return json.Marshal(raw)
+}
+
+// UnmarshalJSON unmarshals the JSON encoding of cmd into cmd.  Part of
+// the Cmd interface.
+func (cmd *ReconsiderBlockCmd) UnmarshalJSON(b []byte) error {
+	// Unmashal into a RawCmd
+	var r RawCmd
+	if err := json.Unmarshal(b, &r); err != nil {
+		return err
+	}
+
+	if len(r.Params) != 1 {
+		return ErrWrongNumberOfParams
+	}
+
+	var blockhash string
+	if err := json.Unmarshal(r.Params[0], &blockhash); err != nil {
+		return fmt.Errorf("first parameter 'hash' must be a string: %v", err)
+	}
+
+	newCmd, err := NewReconsiderBlockCmd(r.Id, blockhash)
 	if err != nil {
 		return err
 	}
