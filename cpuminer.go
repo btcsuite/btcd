@@ -72,6 +72,7 @@ func (m *CPUMiner) speedMonitor() {
 	var hashesPerSec float64
 	var totalHashes uint64
 	ticker := time.NewTicker(time.Second * hpsUpdateSecs)
+	defer ticker.Stop()
 
 out:
 	for {
@@ -261,6 +262,7 @@ func (m *CPUMiner) generateBlocks(quit chan struct{}) {
 	// Start a ticker which is used to signal checks for stale work and
 	// updates to the speed monitor.
 	ticker := time.NewTicker(time.Second * hashUpdateSecs)
+	defer ticker.Stop()
 out:
 	for {
 		// Quit when the miner is stopped.
@@ -318,7 +320,6 @@ out:
 		}
 	}
 
-	ticker.Stop()
 	m.workerWg.Done()
 	minrLog.Tracef("Generate blocks worker done")
 }

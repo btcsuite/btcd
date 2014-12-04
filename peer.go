@@ -1557,6 +1557,7 @@ func (p *peer) queueHandler() {
 	pendingMsgs := list.New()
 	invSendQueue := list.New()
 	trickleTicker := time.NewTicker(time.Second * 10)
+	defer trickleTicker.Stop()
 
 	// We keep the waiting flag so that we know if we have a message queued
 	// to the outHandler or not.  We could use the presence of a head of

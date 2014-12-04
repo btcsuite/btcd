@@ -338,6 +338,7 @@ func (a *AddrManager) getTriedBucket(netAddr *btcwire.NetAddress) int {
 // as a goroutine.
 func (a *AddrManager) addressHandler() {
 	dumpAddressTicker := time.NewTicker(dumpAddressInterval)
+	defer dumpAddressTicker.Stop()
 out:
 	for {
 		select {
@@ -348,7 +349,6 @@ out:
 			break out
 		}
 	}
-	dumpAddressTicker.Stop()
 	a.savePeers()
 	a.wg.Done()
 	log.Trace("Address handler done")
