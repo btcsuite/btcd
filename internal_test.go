@@ -3808,18 +3808,12 @@ func TestBitcoindInvalidTests(t *testing.T) {
 	}
 	tx := btcwire.NewMsgTx()
 	for x, test := range tests {
-		if len(test) < 2 && len(test) > 3 {
+		name, err := testName(test)
+		if err != nil {
 			t.Errorf("TestBitcoindInvalidTests: invalid test #%d\n",
 				x)
 			continue
 		}
-		name := ""
-		if len(test) == 3 {
-			name = fmt.Sprintf("test (%s)", test[2])
-		} else {
-			name = fmt.Sprintf("test ([%s, %s])", test[0], test[1])
-		}
-
 		scriptSig, err := ParseShortForm(test[0])
 		if err != nil {
 			t.Errorf("%s: can't parse scriptSig; %v", name, err)
@@ -3832,7 +3826,13 @@ func TestBitcoindInvalidTests(t *testing.T) {
 			continue
 		}
 
-		s, err := NewScript(scriptSig, scriptPubKey, 0, tx, ScriptBip16)
+		flags, err := parseScriptFlags(test[2])
+		if err != nil {
+			t.Errorf("%s: %v", name, err)
+			continue
+		}
+
+		s, err := NewScript(scriptSig, scriptPubKey, 0, tx, flags)
 		if err == nil {
 			if err := s.Execute(); err == nil {
 				t.Errorf("%s test succeeded when it "+
@@ -3853,22 +3853,17 @@ func TestBitcoindValidTests(t *testing.T) {
 	var tests [][]string
 	err = json.Unmarshal(file, &tests)
 	if err != nil {
-		t.Errorf("TestBitcoindInvalidTests couldn't Unmarshal: %v\n",
+		t.Errorf("TestBitcoindValidTests couldn't Unmarshal: %v\n",
 			err)
 		return
 	}
 	tx := btcwire.NewMsgTx()
 	for x, test := range tests {
-		if len(test) < 2 && len(test) > 3 {
-			t.Errorf("TestBitcoindInvalidTests: invalid test #%d\n",
+		name, err := testName(test)
+		if err != nil {
+			t.Errorf("TestBitcoindValidTests: invalid test #%d\n",
 				x)
 			continue
-		}
-		name := ""
-		if len(test) == 3 {
-			name = fmt.Sprintf("test (%s)", test[2])
-		} else {
-			name = fmt.Sprintf("test ([%s, %s])", test[0], test[1])
 		}
 
 		scriptSig, err := ParseShortForm(test[0])
@@ -3883,7 +3878,13 @@ func TestBitcoindValidTests(t *testing.T) {
 			continue
 		}
 
-		s, err := NewScript(scriptSig, scriptPubKey, 0, tx, ScriptBip16)
+		flags, err := parseScriptFlags(test[2])
+		if err != nil {
+			t.Errorf("%s: %v", name, err)
+			continue
+		}
+
+		s, err := NewScript(scriptSig, scriptPubKey, 0, tx, flags)
 		if err != nil {
 			t.Errorf("%s failed to create script: %v", name, err)
 			continue
@@ -3952,15 +3953,10 @@ testloop:
 			continue
 		}
 
-		var flags ScriptFlags
-		vFlags := strings.Split(verifyFlags, ",")
-		for _, flag := range vFlags {
-			switch flag {
-			case "P2SH":
-				flags |= ScriptBip16
-			case "NULLDUMMY":
-				flags |= ScriptStrictMultiSig
-			}
+		flags, err := parseScriptFlags(verifyFlags)
+		if err != nil {
+			t.Errorf("bad test %d: %v", i, err)
+			continue
 		}
 
 		prevOuts := make(map[btcwire.OutPoint][]byte)
@@ -4098,15 +4094,10 @@ testloop:
 			continue
 		}
 
-		var flags ScriptFlags
-		vFlags := strings.Split(verifyFlags, ",")
-		for _, flag := range vFlags {
-			switch flag {
-			case "P2SH":
-				flags |= ScriptBip16
-			case "NULLDUMMY":
-				flags |= ScriptStrictMultiSig
-			}
+		flags, err := parseScriptFlags(verifyFlags)
+		if err != nil {
+			t.Errorf("bad test %d: %v", i, err)
+			continue
 		}
 
 		prevOuts := make(map[btcwire.OutPoint][]byte)
@@ -4189,4 +4180,41 @@ testloop:
 		t.Errorf("test (%d:%v) succeeded when should fail",
 			i, test)
 	}
+}
+
+func parseScriptFlags(flagStr string) (ScriptFlags, error) {
+	var flags ScriptFlags
+
+	sFlags := strings.Split(flagStr, ",")
+	for _, flag := range sFlags {
+		switch flag {
+		case "NONE":
+			// Nothing.
+		case "NULLDUMMY":
+			flags |= ScriptStrictMultiSig
+		case "P2SH":
+			flags |= ScriptBip16
+		case "STRICTENC":
+			// This is always set.
+		default:
+			return flags, fmt.Errorf("invalid flag: %s", flag)
+		}
+	}
+	return flags, nil
+}
+
+func testName(test []string) (string, error) {
+	var name string
+
+	if len(test) < 3 || len(test) > 4 {
+		return name, fmt.Errorf("invalid test length %d", len(test))
+	}
+
+	if len(test) == 4 {
+		name = fmt.Sprintf("test (%s)", test[3])
+	} else {
+		name = fmt.Sprintf("test ([%s, %s, %s])", test[0], test[1],
+			test[2])
+	}
+	return name, nil
 }
