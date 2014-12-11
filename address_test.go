@@ -11,7 +11,7 @@ import (
 	"reflect"
 	"testing"
 
-	"code.google.com/p/go.crypto/ripemd160"
+	"golang.org/x/crypto/ripemd160"
 
 	"github.com/conformal/btcnet"
 	"github.com/conformal/btcutil"

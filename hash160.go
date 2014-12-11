@@ -7,7 +7,8 @@ package btcutil
 import (
 	"hash"
 
-	"code.google.com/p/go.crypto/ripemd160"
+	"golang.org/x/crypto/ripemd160"
+
 	"github.com/conformal/fastsha256"
 )
 

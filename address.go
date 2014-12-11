@@ -9,7 +9,8 @@ import (
 	"encoding/hex"
 	"errors"
 
-	"code.google.com/p/go.crypto/ripemd160"
+	"golang.org/x/crypto/ripemd160"
+
 	"github.com/conformal/btcec"
 	"github.com/conformal/btcnet"
 	"github.com/conformal/btcwire"
