@@ -13,7 +13,8 @@ import (
 	"hash"
 	"math/big"
 
-	"code.google.com/p/go.crypto/ripemd160"
+	"golang.org/x/crypto/ripemd160"
+
 	"github.com/conformal/btcec"
 	"github.com/conformal/btcwire"
 	"github.com/conformal/fastsha256"
