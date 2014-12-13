@@ -83,7 +83,7 @@ func (r FutureGetBlockResult) Receive() (*btcutil.Block, error) {
 
 	// Deserialize the block and return it.
 	var msgBlock btcwire.MsgBlock
-	msgBlock.Deserialize(bytes.NewReader(serializedBlock))
+	err = msgBlock.Deserialize(bytes.NewReader(serializedBlock))
 	if err != nil {
 		return nil, err
 	}
