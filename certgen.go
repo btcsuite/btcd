@@ -112,18 +112,25 @@ func NewTLSCertPair(organization string, validUntil time.Time, extraHosts []stri
 	derBytes, err := x509.CreateCertificate(rand.Reader, &template,
 		&template, &priv.PublicKey, priv)
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to create certificate: %v\n", err)
+		return nil, nil, fmt.Errorf("failed to create certificate: %v", err)
 	}
 
 	certBuf := &bytes.Buffer{}
-	pem.Encode(certBuf, &pem.Block{Type: "CERTIFICATE", Bytes: derBytes})
+	err = pem.Encode(certBuf, &pem.Block{Type: "CERTIFICATE", Bytes: derBytes})
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to encode certificate: %v", err)
+	}
 
 	keybytes, err := x509.MarshalECPrivateKey(priv)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, fmt.Errorf("failed to marshal private key: %v", err)
 	}
+
 	keyBuf := &bytes.Buffer{}
-	pem.Encode(keyBuf, &pem.Block{Type: "EC PRIVATE KEY", Bytes: keybytes})
+	err = pem.Encode(keyBuf, &pem.Block{Type: "EC PRIVATE KEY", Bytes: keybytes})
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to encode private key: %v", err)
+	}
 
 	return certBuf.Bytes(), keyBuf.Bytes(), nil
 }
