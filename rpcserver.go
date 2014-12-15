@@ -539,6 +539,7 @@ func newRPCServer(listenAddrs []string, s *server) (*rpcServer, error) {
 
 	tlsConfig := tls.Config{
 		Certificates: []tls.Certificate{keypair},
+		MinVersion:   tls.VersionTLS12,
 	}
 
 	// TODO(oga) this code is similar to that in server, should be
