@@ -19,6 +19,7 @@ func TestIPTypes(t *testing.T) {
 	type ipTest struct {
 		in       btcwire.NetAddress
 		rfc1918  bool
+		rfc2544  bool
 		rfc3849  bool
 		rfc3927  bool
 		rfc3964  bool
@@ -26,16 +27,18 @@ func TestIPTypes(t *testing.T) {
 		rfc4380  bool
 		rfc4843  bool
 		rfc4862  bool
+		rfc5737  bool
 		rfc6052  bool
 		rfc6145  bool
+		rfc6598  bool
 		local    bool
 		valid    bool
 		routable bool
 	}
 
-	newIPTest := func(ip string, rfc1918, rfc3849, rfc3927, rfc3964,
-		rfc4193, rfc4380, rfc4843, rfc4862, rfc6052, rfc6145, local,
-		valid, routable bool) ipTest {
+	newIPTest := func(ip string, rfc1918, rfc2544, rfc3849, rfc3927, rfc3964,
+		rfc4193, rfc4380, rfc4843, rfc4862, rfc5737, rfc6052, rfc6145, rfc6598,
+		local, valid, routable bool) ipTest {
 		nip := net.ParseIP(ip)
 		na := btcwire.NetAddress{
 			Timestamp: time.Now(),
@@ -43,44 +46,50 @@ func TestIPTypes(t *testing.T) {
 			IP:        nip,
 			Port:      8333,
 		}
-		test := ipTest{na, rfc1918, rfc3849, rfc3927, rfc3964, rfc4193, rfc4380,
-			rfc4843, rfc4862, rfc6052, rfc6145, local, valid, routable}
+		test := ipTest{na, rfc1918, rfc2544, rfc3849, rfc3927, rfc3964, rfc4193, rfc4380,
+			rfc4843, rfc4862, rfc5737, rfc6052, rfc6145, rfc6598, local, valid, routable}
 		return test
 	}
 
 	tests := []ipTest{
-		newIPTest("10.255.255.255", true, false, false, false, false,
-			false, false, false, false, false, false, true, false),
-		newIPTest("192.168.0.1", true, false, false, false, false,
-			false, false, false, false, false, false, true, false),
-		newIPTest("172.31.255.1", true, false, false, false, false,
-			false, false, false, false, false, false, true, false),
-		newIPTest("172.32.1.1", false, false, false, false, false,
+		newIPTest("10.255.255.255", true, false, false, false, false, false,
+			false, false, false, false, false, false, false, false, true, false),
+		newIPTest("192.168.0.1", true, false, false, false, false, false,
+			false, false, false, false, false, false, false, false, true, false),
+		newIPTest("172.31.255.1", true, false, false, false, false, false,
+			false, false, false, false, false, false, false, false, true, false),
+		newIPTest("172.32.1.1", false, false, false, false, false, false, false, false,
 			false, false, false, false, false, false, true, true),
-		newIPTest("169.254.250.120", false, false, true, false, false,
-			false, false, false, false, false, false, true, false),
-		newIPTest("0.0.0.0", false, false, false, false, false, false,
-			false, false, false, false, true, false, false),
-		newIPTest("255.255.255.255", false, false, false, false, false,
-			false, false, false, false, false, false, false, false),
-		newIPTest("127.0.0.1", false, false, false, false, false,
+		newIPTest("169.254.250.120", false, false, false, true, false, false,
+			false, false, false, false, false, false, false, false, true, false),
+		newIPTest("0.0.0.0", false, false, false, false, false, false, false,
+			false, false, false, false, false, false, true, false, false),
+		newIPTest("255.255.255.255", false, false, false, false, false, false,
+			false, false, false, false, false, false, false, false, false, false),
+		newIPTest("127.0.0.1", false, false, false, false, false, false,
+			false, false, false, false, false, false, false, true, true, false),
+		newIPTest("fd00:dead::1", false, false, false, false, false, true,
+			false, false, false, false, false, false, false, false, true, false),
+		newIPTest("2001::1", false, false, false, false, false, false,
+			true, false, false, false, false, false, false, false, true, true),
+		newIPTest("2001:10:abcd::1:1", false, false, false, false, false, false,
+			false, true, false, false, false, false, false, false, true, false),
+		newIPTest("fe80::1", false, false, false, false, false, false,
+			false, false, true, false, false, false, false, false, true, false),
+		newIPTest("fe80:1::1", false, false, false, false, false, false,
+			false, false, false, false, false, false, false, false, true, true),
+		newIPTest("64:ff9b::1", false, false, false, false, false, false,
+			false, false, false, false, true, false, false, false, true, true),
+		newIPTest("::ffff:abcd:ef12:1", false, false, false, false, false, false,
+			false, false, false, false, false, false, false, false, true, true),
+		newIPTest("::1", false, false, false, false, false, false, false, false,
 			false, false, false, false, false, true, true, false),
-		newIPTest("fd00:dead::1", false, false, false, false, true,
-			false, false, false, false, false, false, true, false),
-		newIPTest("2001::1", false, false, false, false, false,
-			true, false, false, false, false, false, true, true),
-		newIPTest("2001:10:abcd::1:1", false, false, false, false, false,
-			false, true, false, false, false, false, true, false),
-		newIPTest("fe80::1", false, false, false, false, false,
-			false, false, true, false, false, false, true, false),
-		newIPTest("fe80:1::1", false, false, false, false, false,
-			false, false, false, false, false, false, true, true),
-		newIPTest("64:ff9b::1", false, false, false, false, false,
-			false, false, false, true, false, false, true, true),
-		newIPTest("::ffff:abcd:ef12:1", false, false, false, false, false,
-			false, false, false, false, false, false, true, true),
-		newIPTest("::1", false, false, false, false, false,
-			false, false, false, false, false, true, true, false),
+		newIPTest("198.18.0.1", false, true, false, false, false, false, false,
+			false, false, false, false, false, false, false, true, false),
+		newIPTest("100.127.255.1", false, false, false, false, false, false, false,
+			false, false, false, false, false, true, false, true, false),
+		newIPTest("203.0.113.1", false, false, false, false, false, false, false,
+			false, false, false, false, false, false, false, true, false),
 	}
 
 	t.Logf("Running %d tests", len(tests))

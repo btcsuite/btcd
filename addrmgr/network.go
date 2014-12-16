@@ -20,6 +20,10 @@ var (
 		ipNet("192.168.0.0", 16, 32),
 	}
 
+	// rfc2544Net specifies the the IPv4 block as defined by RFC2544
+	// (198.18.0.0/15)
+	rfc2544Net = ipNet("198.18.0.0", 15, 32)
+
 	// rfc3849Net specifies the IPv6 documentation address block as defined
 	// by RFC3849 (2001:DB8::/32).
 	rfc3849Net = ipNet("2001:DB8::", 32, 128)
@@ -48,6 +52,14 @@ var (
 	// address block as defined by RFC4862 (FE80::/64).
 	rfc4862Net = ipNet("FE80::", 64, 128)
 
+	// rfc5737Net specifies the IPv4 documentation address blocks as defined
+	// by RFC5737 (192.0.2.0/24, 198.51.100.0/24, 203.0.113.0/24)
+	rfc5737Net = []net.IPNet{
+		ipNet("192.0.2.0", 24, 32),
+		ipNet("198.51.100.0", 24, 32),
+		ipNet("203.0.113.0", 24, 32),
+	}
+
 	// rfc6052Net specifies the IPv6 well-known prefix address block as
 	// defined by RFC6052 (64:FF9B::/96).
 	rfc6052Net = ipNet("64:FF9B::", 96, 128)
@@ -55,6 +67,9 @@ var (
 	// rfc6145Net specifies the IPv6 to IPv4 translated address range as
 	// defined by RFC6145 (::FFFF:0:0:0/96).
 	rfc6145Net = ipNet("::FFFF:0:0:0", 96, 128)
+
+	// rfc6598Net specifies the IPv4 block as defined by RFC6598 (100.64.0.0/10)
+	rfc6598Net = ipNet("100.64.0.0", 10, 32)
 
 	// onionCatNet defines the IPv6 address block used to support Tor.
 	// bitcoind encodes a .onion address as a 16 byte number by decoding the
@@ -114,6 +129,12 @@ func IsRFC1918(na *btcwire.NetAddress) bool {
 	return false
 }
 
+// IsRFC2544 returns whether or not the passed address is part of the IPv4
+// address space as defined by RFC2544 (198.18.0.0/15)
+func IsRFC2544(na *btcwire.NetAddress) bool {
+	return rfc2544Net.Contains(na.IP)
+}
+
 // IsRFC3849 returns whether or not the passed address is part of the IPv6
 // documentation range as defined by RFC3849 (2001:DB8::/32).
 func IsRFC3849(na *btcwire.NetAddress) bool {
@@ -156,16 +177,35 @@ func IsRFC4862(na *btcwire.NetAddress) bool {
 	return rfc4862Net.Contains(na.IP)
 }
 
+// IsRFC5737 returns whether or not the passed address is part of the IPv4
+// documentation address space as defined by RFC5737 (192.0.2.0/24,
+// 198.51.100.0/24, 203.0.113.0/24)
+func IsRFC5737(na *btcwire.NetAddress) bool {
+	for _, rfc := range rfc5737Net {
+		if rfc.Contains(na.IP) {
+			return true
+		}
+	}
+
+	return false
+}
+
 // IsRFC6052 returns whether or not the passed address is part of the IPv6
 // well-known prefix range as defined by RFC6052 (64:FF9B::/96).
 func IsRFC6052(na *btcwire.NetAddress) bool {
 	return rfc6052Net.Contains(na.IP)
 }
 
-// IsRFC6145 returns whether or not the passed address is  part of the IPv6 to
+// IsRFC6145 returns whether or not the passed address is part of the IPv6 to
 // IPv4 translated address range as defined by RFC6145 (::FFFF:0:0:0/96).
 func IsRFC6145(na *btcwire.NetAddress) bool {
 	return rfc6145Net.Contains(na.IP)
+}
+
+// IsRFC6598 returns whether or not the passed address is part of the IPv4
+// shared address space specified by RFC6598 (100.64.0.0/10)
+func IsRFC6598(na *btcwire.NetAddress) bool {
+	return rfc6598Net.Contains(na.IP)
 }
 
 // IsValid returns whether or not the passed address is valid.  The address is
@@ -183,8 +223,9 @@ func IsValid(na *btcwire.NetAddress) bool {
 // the public internet.  This is true as long as the address is valid and is not
 // in any reserved ranges.
 func IsRoutable(na *btcwire.NetAddress) bool {
-	return IsValid(na) && !(IsRFC1918(na) || IsRFC3927(na) ||
-		IsRFC4862(na) || IsRFC3849(na) || IsRFC4843(na) ||
+	return IsValid(na) && !(IsRFC1918(na) || IsRFC2544(na) ||
+		IsRFC3927(na) || IsRFC4862(na) || IsRFC3849(na) ||
+		IsRFC4843(na) || IsRFC5737(na) || IsRFC6598(na) ||
 		IsLocal(na) || (IsRFC4193(na) && !IsOnionCatTor(na)))
 }
 
