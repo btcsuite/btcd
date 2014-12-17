@@ -5,7 +5,6 @@
 package btcutil
 
 import (
-	"bytes"
 	"encoding/hex"
 	"errors"
 
@@ -13,7 +12,7 @@ import (
 
 	"github.com/conformal/btcec"
 	"github.com/conformal/btcnet"
-	"github.com/conformal/btcwire"
+	"github.com/conformal/btcutil/base58"
 )
 
 var (
@@ -43,12 +42,7 @@ var (
 func encodeAddress(hash160 []byte, netID byte) string {
 	// Format is 1 byte for a network and address class (i.e. P2PKH vs
 	// P2SH), 20 bytes for a RIPEMD160 hash, and 4 bytes of checksum.
-	b := make([]byte, 0, 1+ripemd160.Size+4)
-	b = append(b, netID)
-	b = append(b, hash160...)
-	cksum := btcwire.DoubleSha256(b)[:4]
-	b = append(b, cksum...)
-	return Base58Encode(b)
+	return base58.CheckEncode(hash160[:ripemd160.Size], netID)
 }
 
 // Address is an interface type for any type of destination a transaction
@@ -99,21 +93,18 @@ func DecodeAddress(addr string, defaultNet *btcnet.Params) (Address, error) {
 	}
 
 	// Switch on decoded length to determine the type.
-	decoded := Base58Decode(addr)
-	switch len(decoded) {
-	case 1 + ripemd160.Size + 4: // P2PKH or P2SH
-		// Verify hash checksum.  Checksum is calculated as the first
-		// four bytes of double SHA256 of the network byte and hash.
-		tosum := decoded[:ripemd160.Size+1]
-		cksum := btcwire.DoubleSha256(tosum)[:4]
-		if !bytes.Equal(cksum, decoded[len(decoded)-4:]) {
+	decoded, netID, err := base58.CheckDecode(addr)
+	if err != nil {
+		if err == base58.ErrChecksum {
 			return nil, ErrChecksumMismatch
 		}
-
-		netID := decoded[0]
+		return nil, errors.New("decoded address is of unknown format")
+	}
+	switch len(decoded) {
+	case ripemd160.Size: // P2PKH or P2SH
 		isP2PKH := btcnet.IsPubKeyHashAddrID(netID)
 		isP2SH := btcnet.IsScriptHashAddrID(netID)
-		switch hash160 := decoded[1 : ripemd160.Size+1]; {
+		switch hash160 := decoded; {
 		case isP2PKH && isP2SH:
 			return nil, ErrAddressCollision
 		case isP2PKH:

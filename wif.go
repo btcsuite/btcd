@@ -10,6 +10,7 @@ import (
 
 	"github.com/conformal/btcec"
 	"github.com/conformal/btcnet"
+	"github.com/conformal/btcutil/base58"
 	"github.com/conformal/btcwire"
 )
 
@@ -82,7 +83,7 @@ func (w *WIF) IsForNet(net *btcnet.Params) bool {
 // does not equal the expected value of 0x01.  ErrChecksumMismatch is returned
 // if the expected WIF checksum does not match the calculated checksum.
 func DecodeWIF(wif string) (*WIF, error) {
-	decoded := Base58Decode(wif)
+	decoded := base58.Decode(wif)
 	decodedLen := len(decoded)
 	var compress bool
 
@@ -143,7 +144,7 @@ func (w *WIF) String() string {
 	}
 	cksum := btcwire.DoubleSha256(a)[:4]
 	a = append(a, cksum...)
-	return Base58Encode(a)
+	return base58.Encode(a)
 }
 
 // SerializePubKey serializes the associated public key of the imported or

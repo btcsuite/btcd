@@ -15,6 +15,7 @@ import (
 	"golang.org/x/crypto/ripemd160"
 
 	"github.com/conformal/btcec"
+	"github.com/conformal/btcutil/base58"
 )
 
 // SetBlockBytes sets the internal serialized block byte buffer to the passed
@@ -68,6 +69,6 @@ func TstAddressPubKey(serializedPubKey []byte, pubKeyFormat PubKeyFormat,
 // TstAddressSAddr returns the expected script address bytes for
 // P2PKH and P2SH bitcoin addresses.
 func TstAddressSAddr(addr string) []byte {
-	decoded := Base58Decode(addr)
+	decoded := base58.Decode(addr)
 	return decoded[1 : 1+ripemd160.Size]
 }
