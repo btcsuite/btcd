@@ -1019,7 +1019,7 @@ func getSigOpCount(pops []parsedOpcode, precise bool) int {
 // payToPubKeyHashScript creates a new script to pay a transaction
 // output to a 20-byte pubkey hash. It is expected that the input is a valid
 // hash.
-func payToPubKeyHashScript(pubKeyHash []byte) []byte {
+func payToPubKeyHashScript(pubKeyHash []byte) ([]byte, error) {
 	return NewScriptBuilder().AddOp(OP_DUP).AddOp(OP_HASH160).
 		AddData(pubKeyHash).AddOp(OP_EQUALVERIFY).AddOp(OP_CHECKSIG).
 		Script()
@@ -1027,14 +1027,14 @@ func payToPubKeyHashScript(pubKeyHash []byte) []byte {
 
 // payToScriptHashScript creates a new script to pay a transaction output to a
 // script hash. It is expected that the input is a valid hash.
-func payToScriptHashScript(scriptHash []byte) []byte {
+func payToScriptHashScript(scriptHash []byte) ([]byte, error) {
 	return NewScriptBuilder().AddOp(OP_HASH160).AddData(scriptHash).
 		AddOp(OP_EQUAL).Script()
 }
 
 // payToPubkeyScript creates a new script to pay a transaction output to a
 // public key. It is expected that the input is a valid pubkey.
-func payToPubKeyScript(serializedPubKey []byte) []byte {
+func payToPubKeyScript(serializedPubKey []byte) ([]byte, error) {
 	return NewScriptBuilder().AddData(serializedPubKey).
 		AddOp(OP_CHECKSIG).Script()
 }
@@ -1047,19 +1047,19 @@ func PayToAddrScript(addr btcutil.Address) ([]byte, error) {
 		if addr == nil {
 			return nil, ErrUnsupportedAddress
 		}
-		return payToPubKeyHashScript(addr.ScriptAddress()), nil
+		return payToPubKeyHashScript(addr.ScriptAddress())
 
 	case *btcutil.AddressScriptHash:
 		if addr == nil {
 			return nil, ErrUnsupportedAddress
 		}
-		return payToScriptHashScript(addr.ScriptAddress()), nil
+		return payToScriptHashScript(addr.ScriptAddress())
 
 	case *btcutil.AddressPubKey:
 		if addr == nil {
 			return nil, ErrUnsupportedAddress
 		}
-		return payToPubKeyScript(addr.ScriptAddress()), nil
+		return payToPubKeyScript(addr.ScriptAddress())
 	}
 
 	return nil, ErrUnsupportedAddress
@@ -1085,7 +1085,7 @@ func MultiSigScript(pubkeys []*btcutil.AddressPubKey, nrequired int) ([]byte, er
 	builder.AddInt64(int64(len(pubkeys)))
 	builder.AddOp(OP_CHECKMULTISIG)
 
-	return builder.Script(), nil
+	return builder.Script()
 }
 
 // SignatureScript creates an input signature script for tx to spend
@@ -1111,7 +1111,7 @@ func SignatureScript(tx *btcwire.MsgTx, idx int, subscript []byte, hashType SigH
 		pkData = pk.SerializeUncompressed()
 	}
 
-	return NewScriptBuilder().AddData(sig).AddData(pkData).Script(), nil
+	return NewScriptBuilder().AddData(sig).AddData(pkData).Script()
 }
 
 // RawTxInSignature returns the serialized ECDSA signature for the input
@@ -1137,7 +1137,7 @@ func p2pkSignatureScript(tx *btcwire.MsgTx, idx int, subScript []byte, hashType 
 		return nil, err
 	}
 
-	return NewScriptBuilder().AddData(sig).Script(), nil
+	return NewScriptBuilder().AddData(sig).Script()
 }
 
 // signMultiSig signs as many of the outputs in the provided multisig script as
@@ -1169,7 +1169,8 @@ func signMultiSig(tx *btcwire.MsgTx, idx int, subScript []byte, hashType SigHash
 
 	}
 
-	return builder.Script(), signed == nRequired
+	script, _ := builder.Script()
+	return script, signed == nRequired
 }
 
 func sign(net *btcnet.Params, tx *btcwire.MsgTx, idx int, subScript []byte,
@@ -1277,7 +1278,8 @@ func mergeScripts(net *btcnet.Params, tx *btcwire.MsgTx, idx int,
 		builder := NewScriptBuilder()
 		builder.script = mergedScript
 		builder.AddData(script)
-		return builder.Script()
+		finalScript, _ := builder.Script()
+		return finalScript
 	case MultiSigTy:
 		return mergeMultiSig(tx, idx, addresses, nRequired, pkScript,
 			sigScript, prevScript)
@@ -1407,7 +1409,8 @@ sigLoop:
 		builder.AddOp(OP_0)
 	}
 
-	return builder.Script()
+	script, _ := builder.Script()
+	return script
 }
 
 // KeyDB is an interface type provided to SignTxOutput, it encapsulates
@@ -1470,7 +1473,7 @@ func SignTxOutput(net *btcnet.Params, tx *btcwire.MsgTx, idx int,
 		builder.script = realSigScript
 		builder.AddData(sigScript)
 
-		sigScript = builder.Script()
+		sigScript, _ = builder.Script()
 		// TODO keep a copy of the script for merging.
 	}
 

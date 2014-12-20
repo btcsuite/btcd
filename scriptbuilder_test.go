@@ -14,6 +14,8 @@ import (
 // TestScriptBuilderAddOp tests that pushing opcodes to a script via the
 // ScriptBuilder API works as expected.
 func TestScriptBuilderAddOp(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name     string
 		opcodes  []byte
@@ -43,7 +45,12 @@ func TestScriptBuilderAddOp(t *testing.T) {
 		for _, opcode := range test.opcodes {
 			builder.AddOp(opcode)
 		}
-		result := builder.Script()
+		result, err := builder.Script()
+		if err != nil {
+			t.Errorf("ScriptBuilder.AddOp #%d (%s) unexpected "+
+				"error: %v", i, test.name, err)
+			continue
+		}
 		if !bytes.Equal(result, test.expected) {
 			t.Errorf("ScriptBuilder.AddOp #%d (%s) wrong result\n"+
 				"got: %x\nwant: %x", i, test.name, result,
@@ -56,6 +63,8 @@ func TestScriptBuilderAddOp(t *testing.T) {
 // TestScriptBuilderAddInt64 tests that pushing signed integers to a script via
 // the ScriptBuilder API works as expected.
 func TestScriptBuilderAddInt64(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name     string
 		val      int64
@@ -105,7 +114,12 @@ func TestScriptBuilderAddInt64(t *testing.T) {
 	t.Logf("Running %d tests", len(tests))
 	for i, test := range tests {
 		builder.Reset().AddInt64(test.val)
-		result := builder.Script()
+		result, err := builder.Script()
+		if err != nil {
+			t.Errorf("ScriptBuilder.AddInt64 #%d (%s) unexpected "+
+				"error: %v", i, test.name, err)
+			continue
+		}
 		if !bytes.Equal(result, test.expected) {
 			t.Errorf("ScriptBuilder.AddInt64 #%d (%s) wrong result\n"+
 				"got: %x\nwant: %x", i, test.name, result,
@@ -118,6 +132,8 @@ func TestScriptBuilderAddInt64(t *testing.T) {
 // TestScriptBuilderAddUint64 tests that pushing unsigned integers to a script
 // via the ScriptBuilder API works as expected.
 func TestScriptBuilderAddUint64(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name     string
 		val      uint64
@@ -154,7 +170,12 @@ func TestScriptBuilderAddUint64(t *testing.T) {
 	t.Logf("Running %d tests", len(tests))
 	for i, test := range tests {
 		builder.Reset().AddUint64(test.val)
-		result := builder.Script()
+		result, err := builder.Script()
+		if err != nil {
+			t.Errorf("ScriptBuilder.AddUint64 #%d (%s) unexpected "+
+				"error: %v", err)
+			continue
+		}
 		if !bytes.Equal(result, test.expected) {
 			t.Errorf("ScriptBuilder.AddUint64 #%d (%s) wrong result\n"+
 				"got: %x\nwant: %x", i, test.name, result,
@@ -165,33 +186,48 @@ func TestScriptBuilderAddUint64(t *testing.T) {
 }
 
 // TestScriptBuilderAddData tests that pushing data to a script via the
-// ScriptBuilder API works as expected.
+// ScriptBuilder API works as expected and conforms to BIP0062.
 func TestScriptBuilderAddData(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name     string
 		data     []byte
 		expected []byte
+		useFull  bool // use AddFullData instead of AddData.
 	}{
-		// Start off with the small ints to ensure canonical encoding.
-		{name: "push small int 0", data: []byte{0}, expected: []byte{btcscript.OP_0}},
-		{name: "push small int 1", data: []byte{1}, expected: []byte{btcscript.OP_1}},
-		{name: "push small int 2", data: []byte{2}, expected: []byte{btcscript.OP_2}},
-		{name: "push small int 3", data: []byte{3}, expected: []byte{btcscript.OP_3}},
-		{name: "push small int 4", data: []byte{4}, expected: []byte{btcscript.OP_4}},
-		{name: "push small int 5", data: []byte{5}, expected: []byte{btcscript.OP_5}},
-		{name: "push small int 6", data: []byte{6}, expected: []byte{btcscript.OP_6}},
-		{name: "push small int 7", data: []byte{7}, expected: []byte{btcscript.OP_7}},
-		{name: "push small int 8", data: []byte{8}, expected: []byte{btcscript.OP_8}},
-		{name: "push small int 9", data: []byte{9}, expected: []byte{btcscript.OP_9}},
-		{name: "push small int 10", data: []byte{10}, expected: []byte{btcscript.OP_10}},
-		{name: "push small int 11", data: []byte{11}, expected: []byte{btcscript.OP_11}},
-		{name: "push small int 12", data: []byte{12}, expected: []byte{btcscript.OP_12}},
-		{name: "push small int 13", data: []byte{13}, expected: []byte{btcscript.OP_13}},
-		{name: "push small int 14", data: []byte{14}, expected: []byte{btcscript.OP_14}},
-		{name: "push small int 15", data: []byte{15}, expected: []byte{btcscript.OP_15}},
-		{name: "push small int 16", data: []byte{16}, expected: []byte{btcscript.OP_16}},
+		// BIP0062: Pushing an empty byte sequence must use OP_0.
+		{name: "push empty byte sequence", data: []byte{}, expected: []byte{btcscript.OP_0}},
+		{name: "push 1 byte 0x00", data: []byte{0x00}, expected: []byte{btcscript.OP_0}},
 
-		// 1-byte data push opcodes.
+		// BIP0062: Pushing a 1-byte sequence of byte 0x01 through 0x10 must use OP_n.
+		{name: "push 1 byte 0x01", data: []byte{0x01}, expected: []byte{btcscript.OP_1}},
+		{name: "push 1 byte 0x02", data: []byte{0x02}, expected: []byte{btcscript.OP_2}},
+		{name: "push 1 byte 0x03", data: []byte{0x03}, expected: []byte{btcscript.OP_3}},
+		{name: "push 1 byte 0x04", data: []byte{0x04}, expected: []byte{btcscript.OP_4}},
+		{name: "push 1 byte 0x05", data: []byte{0x05}, expected: []byte{btcscript.OP_5}},
+		{name: "push 1 byte 0x06", data: []byte{0x06}, expected: []byte{btcscript.OP_6}},
+		{name: "push 1 byte 0x07", data: []byte{0x07}, expected: []byte{btcscript.OP_7}},
+		{name: "push 1 byte 0x08", data: []byte{0x08}, expected: []byte{btcscript.OP_8}},
+		{name: "push 1 byte 0x09", data: []byte{0x09}, expected: []byte{btcscript.OP_9}},
+		{name: "push 1 byte 0x0a", data: []byte{0x0a}, expected: []byte{btcscript.OP_10}},
+		{name: "push 1 byte 0x0b", data: []byte{0x0b}, expected: []byte{btcscript.OP_11}},
+		{name: "push 1 byte 0x0c", data: []byte{0x0c}, expected: []byte{btcscript.OP_12}},
+		{name: "push 1 byte 0x0d", data: []byte{0x0d}, expected: []byte{btcscript.OP_13}},
+		{name: "push 1 byte 0x0e", data: []byte{0x0e}, expected: []byte{btcscript.OP_14}},
+		{name: "push 1 byte 0x0f", data: []byte{0x0f}, expected: []byte{btcscript.OP_15}},
+		{name: "push 1 byte 0x10", data: []byte{0x10}, expected: []byte{btcscript.OP_16}},
+
+		// BIP0062: Pushing the byte 0x81 must use OP_1NEGATE.
+		{name: "push 1 byte 0x81", data: []byte{0x81}, expected: []byte{btcscript.OP_1NEGATE}},
+
+		// BIP0062: Pushing any other byte sequence up to 75 bytes must
+		// use the normal data push (opcode byte n, with n the number of
+		// bytes, followed n bytes of data being pushed).
+		{name: "push 1 byte 0x11", data: []byte{0x11}, expected: []byte{btcscript.OP_DATA_1, 0x11}},
+		{name: "push 1 byte 0x80", data: []byte{0x80}, expected: []byte{btcscript.OP_DATA_1, 0x80}},
+		{name: "push 1 byte 0x82", data: []byte{0x82}, expected: []byte{btcscript.OP_DATA_1, 0x82}},
+		{name: "push 1 byte 0xff", data: []byte{0xff}, expected: []byte{btcscript.OP_DATA_1, 0xff}},
 		{
 			name:     "push data len 17",
 			data:     bytes.Repeat([]byte{0x49}, 17),
@@ -203,7 +239,7 @@ func TestScriptBuilderAddData(t *testing.T) {
 			expected: append([]byte{btcscript.OP_DATA_75}, bytes.Repeat([]byte{0x49}, 75)...),
 		},
 
-		// 2-byte data push via OP_PUSHDATA_1.
+		// BIP0062: Pushing 76 to 255 bytes must use OP_PUSHDATA1.
 		{
 			name:     "push data len 76",
 			data:     bytes.Repeat([]byte{0x49}, 76),
@@ -215,36 +251,225 @@ func TestScriptBuilderAddData(t *testing.T) {
 			expected: append([]byte{btcscript.OP_PUSHDATA1, 255}, bytes.Repeat([]byte{0x49}, 255)...),
 		},
 
-		// 3-byte data push via OP_PUSHDATA_2.
+		// BIP0062: Pushing 256 to 520 bytes must use OP_PUSHDATA2.
 		{
 			name:     "push data len 256",
 			data:     bytes.Repeat([]byte{0x49}, 256),
 			expected: append([]byte{btcscript.OP_PUSHDATA2, 0, 1}, bytes.Repeat([]byte{0x49}, 256)...),
 		},
 		{
-			name:     "push data len 32767",
+			name:     "push data len 520",
+			data:     bytes.Repeat([]byte{0x49}, 520),
+			expected: append([]byte{btcscript.OP_PUSHDATA2, 0x08, 0x02}, bytes.Repeat([]byte{0x49}, 520)...),
+		},
+
+		// BIP0062: OP_PUSHDATA4 can never be used, as pushes over 520
+		// bytes are not allowed, and those below can be done using
+		// other operators.
+		{
+			name:     "push data len 521",
+			data:     bytes.Repeat([]byte{0x49}, 521),
+			expected: []byte{},
+		},
+		{
+			name:     "push data len 32767 (canonical)",
+			data:     bytes.Repeat([]byte{0x49}, 32767),
+			expected: []byte{},
+		},
+		{
+			name:     "push data len 65536 (canonical)",
+			data:     bytes.Repeat([]byte{0x49}, 65536),
+			expected: []byte{},
+		},
+
+		// Additional tests for the PushFullData function that
+		// intentionally allows data pushes to exceed the limit for
+		// regression testing purposes.
+
+		// 3-byte data push via OP_PUSHDATA_2.
+		{
+			name:     "push data len 32767 (non-canonical)",
 			data:     bytes.Repeat([]byte{0x49}, 32767),
 			expected: append([]byte{btcscript.OP_PUSHDATA2, 255, 127}, bytes.Repeat([]byte{0x49}, 32767)...),
+			useFull:  true,
 		},
 
 		// 5-byte data push via OP_PUSHDATA_4.
 		{
-			name:     "push data len 65536",
+			name:     "push data len 65536 (non-canonical)",
 			data:     bytes.Repeat([]byte{0x49}, 65536),
 			expected: append([]byte{btcscript.OP_PUSHDATA4, 0, 0, 1, 0}, bytes.Repeat([]byte{0x49}, 65536)...),
+			useFull:  true,
 		},
 	}
 
 	builder := btcscript.NewScriptBuilder()
 	t.Logf("Running %d tests", len(tests))
 	for i, test := range tests {
-		builder.Reset().AddData(test.data)
-		result := builder.Script()
+		if !test.useFull {
+			builder.Reset().AddData(test.data)
+		} else {
+			builder.Reset().AddFullData(test.data)
+		}
+		result, _ := builder.Script()
 		if !bytes.Equal(result, test.expected) {
 			t.Errorf("ScriptBuilder.AddData #%d (%s) wrong result\n"+
 				"got: %x\nwant: %x", i, test.name, result,
 				test.expected)
 			continue
 		}
+	}
+}
+
+// TestExceedMaxScriptSize ensures that all of the functions that can be used
+// to add data to a script don't allow the script to exceed the max allowed
+// size.
+func TestExceedMaxScriptSize(t *testing.T) {
+	t.Parallel()
+
+	// Start off by constructing a max size script.
+	maxScriptSize := btcscript.TstMaxScriptSize
+	builder := btcscript.NewScriptBuilder()
+	builder.Reset().AddFullData(make([]byte, maxScriptSize-3))
+	origScript, err := builder.Script()
+	if err != nil {
+		t.Fatalf("Unexpected error for max size script: %v", err)
+	}
+
+	// Ensure adding data that would exceed the maximum size of the script
+	// does not add the data.
+	script, err := builder.AddData([]byte{0x00}).Script()
+	if _, ok := err.(btcscript.ErrScriptNotCanonical); !ok || err == nil {
+		t.Fatalf("ScriptBuilder.AddData allowed exceeding max script "+
+			"size: %v", len(script))
+	}
+	if !bytes.Equal(script, origScript) {
+		t.Fatalf("ScriptBuilder.AddData unexpected modified script - "+
+			"got len %d, want len %d", len(script), len(origScript))
+	}
+
+	// Ensure adding an opcode that would exceed the maximum size of the
+	// script does not add the data.
+	builder.Reset().AddFullData(make([]byte, maxScriptSize-3))
+	script, err = builder.AddOp(btcscript.OP_0).Script()
+	if _, ok := err.(btcscript.ErrScriptNotCanonical); !ok || err == nil {
+		t.Fatalf("ScriptBuilder.AddOp unexpected modified script - "+
+			"got len %d, want len %d", len(script), len(origScript))
+	}
+	if !bytes.Equal(script, origScript) {
+		t.Fatalf("ScriptBuilder.AddOp unexpected modified script - "+
+			"got len %d, want len %d", len(script), len(origScript))
+	}
+
+	// Ensure adding an integer that would exceed the maximum size of the
+	// script does not add the data.
+	builder.Reset().AddFullData(make([]byte, maxScriptSize-3))
+	script, err = builder.AddInt64(0).Script()
+	if _, ok := err.(btcscript.ErrScriptNotCanonical); !ok || err == nil {
+		t.Fatalf("ScriptBuilder.AddInt64 unexpected modified script - "+
+			"got len %d, want len %d", len(script), len(origScript))
+	}
+	if !bytes.Equal(script, origScript) {
+		t.Fatalf("ScriptBuilder.AddInt64 unexpected modified script - "+
+			"got len %d, want len %d", len(script), len(origScript))
+	}
+
+	// Ensure adding an unsigned integer that would exceed the maximum size
+	// of the script does not add the data.
+	builder.Reset().AddFullData(make([]byte, maxScriptSize-3))
+	script, err = builder.AddUint64(0).Script()
+	if _, ok := err.(btcscript.ErrScriptNotCanonical); !ok || err == nil {
+		t.Fatalf("ScriptBuilder.AddUint64 unexpected modified script - "+
+			"got len %d, want len %d", len(script), len(origScript))
+	}
+	if !bytes.Equal(script, origScript) {
+		t.Fatalf("ScriptBuilder.AddUint64 unexpected modified script - "+
+			"got len %d, want len %d", len(script), len(origScript))
+	}
+}
+
+// TestErroredScript ensures that all of the functions that can be used to add
+// data to a script don't modify the script once an error has happened.
+func TestErroredScript(t *testing.T) {
+	t.Parallel()
+
+	// Start off by constructing a near max size script that has enough
+	// space left to add each data type without an error and force an
+	// initial error condition.
+	maxScriptSize := btcscript.TstMaxScriptSize
+	builder := btcscript.NewScriptBuilder()
+	builder.Reset().AddFullData(make([]byte, maxScriptSize-8))
+	origScript, err := builder.Script()
+	if err != nil {
+		t.Fatalf("ScriptBuilder.AddFullData unexpected error: %v", err)
+	}
+	script, err := builder.AddData([]byte{0x00, 0x00, 0x00, 0x00, 0x00}).Script()
+	if _, ok := err.(btcscript.ErrScriptNotCanonical); !ok || err == nil {
+		t.Fatalf("ScriptBuilder.AddData allowed exceeding max script "+
+			"size: %v", len(script))
+	}
+	if !bytes.Equal(script, origScript) {
+		t.Fatalf("ScriptBuilder.AddData unexpected modified script - "+
+			"got len %d, want len %d", len(script), len(origScript))
+	}
+
+	// Ensure adding data, even using the non-canonical path, to a script
+	// that has errored doesn't succeed.
+	script, err = builder.AddFullData([]byte{0x00}).Script()
+	if _, ok := err.(btcscript.ErrScriptNotCanonical); !ok || err == nil {
+		t.Fatal("ScriptBuilder.AddFullData succeeded on errored script")
+	}
+	if !bytes.Equal(script, origScript) {
+		t.Fatalf("ScriptBuilder.AddFullData unexpected modified "+
+			"script - got len %d, want len %d", len(script),
+			len(origScript))
+	}
+
+	// Ensure adding data to a script that has errored doesn't succeed.
+	script, err = builder.AddData([]byte{0x00}).Script()
+	if _, ok := err.(btcscript.ErrScriptNotCanonical); !ok || err == nil {
+		t.Fatal("ScriptBuilder.AddData succeeded on errored script")
+	}
+	if !bytes.Equal(script, origScript) {
+		t.Fatalf("ScriptBuilder.AddData unexpected modified "+
+			"script - got len %d, want len %d", len(script),
+			len(origScript))
+	}
+
+	// Ensure adding an opcode to a script that has errored doesn't succeed.
+	script, err = builder.AddOp(btcscript.OP_0).Script()
+	if _, ok := err.(btcscript.ErrScriptNotCanonical); !ok || err == nil {
+		t.Fatal("ScriptBuilder.AddOp succeeded on errored script")
+	}
+	if !bytes.Equal(script, origScript) {
+		t.Fatalf("ScriptBuilder.AddOp unexpected modified script - "+
+			"got len %d, want len %d", len(script), len(origScript))
+	}
+
+	// Ensure adding an integer to a script that has errored doesn't
+	// succeed.
+	script, err = builder.AddInt64(0).Script()
+	if _, ok := err.(btcscript.ErrScriptNotCanonical); !ok || err == nil {
+		t.Fatal("ScriptBuilder.AddInt64 succeeded on errored script")
+	}
+	if !bytes.Equal(script, origScript) {
+		t.Fatalf("ScriptBuilder.AddInt64 unexpected modified script - "+
+			"got len %d, want len %d", len(script), len(origScript))
+	}
+
+	// Ensure adding an unsigned integer to a script that has errored
+	// doesn't succeed.
+	script, err = builder.AddUint64(0).Script()
+	if _, ok := err.(btcscript.ErrScriptNotCanonical); !ok || err == nil {
+		t.Fatal("ScriptBuilder.AddUint64 succeeded on errored script")
+	}
+	if !bytes.Equal(script, origScript) {
+		t.Fatalf("ScriptBuilder.AddUint64 unexpected modified script - "+
+			"got len %d, want len %d", len(script), len(origScript))
+	}
+
+	// Ensure the error has a message set.
+	if err.Error() == "" {
+		t.Fatal("ErrScriptNotCanonical.Error does not have any text")
 	}
 }

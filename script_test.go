@@ -17,6 +17,18 @@ import (
 	"github.com/btcsuite/btcwire"
 )
 
+// builderScript is a convenience function which is used in the tests.  It
+// allows access to the script from a known good script built with the builder.
+// Any errors are converted to a panic since it is only, and must only, be used
+// with hard coded, and therefore, known good, scripts.
+func builderScript(builder *btcscript.ScriptBuilder) []byte {
+	script, err := builder.Script()
+	if err != nil {
+		panic(err)
+	}
+	return script
+}
+
 func TestPushedData(t *testing.T) {
 	var tests = []struct {
 		in    []byte
@@ -29,7 +41,7 @@ func TestPushedData(t *testing.T) {
 			true,
 		},
 		{
-			btcscript.NewScriptBuilder().AddInt64(16777216).AddInt64(10000000).Script(),
+			builderScript(btcscript.NewScriptBuilder().AddInt64(16777216).AddInt64(10000000)),
 			[][]byte{
 				{0x00, 0x00, 0x00, 0x01}, // 16777216
 				{0x80, 0x96, 0x98, 0x00}, // 10000000
@@ -37,9 +49,9 @@ func TestPushedData(t *testing.T) {
 			true,
 		},
 		{
-			btcscript.NewScriptBuilder().AddOp(btcscript.OP_DUP).AddOp(btcscript.OP_HASH160).
+			builderScript(btcscript.NewScriptBuilder().AddOp(btcscript.OP_DUP).AddOp(btcscript.OP_HASH160).
 				AddData([]byte("17VZNX1SN5NtKa8UQFxwQbFeFc3iqRYhem")).AddOp(btcscript.OP_EQUALVERIFY).
-				AddOp(btcscript.OP_CHECKSIG).Script(),
+				AddOp(btcscript.OP_CHECKSIG)),
 			[][]byte{
 				// 17VZNX1SN5NtKa8UQFxwQbFeFc3iqRYhem
 				{
@@ -52,8 +64,8 @@ func TestPushedData(t *testing.T) {
 			true,
 		},
 		{
-			btcscript.NewScriptBuilder().AddOp(btcscript.OP_PUSHDATA4).AddInt64(1000).
-				AddOp(btcscript.OP_EQUAL).Script(),
+			builderScript(btcscript.NewScriptBuilder().AddOp(btcscript.OP_PUSHDATA4).AddInt64(1000).
+				AddOp(btcscript.OP_EQUAL)),
 			[][]byte{},
 			false,
 		},
@@ -78,25 +90,37 @@ func TestPushedData(t *testing.T) {
 }
 
 func TestStandardPushes(t *testing.T) {
-	for i := 0; i < 1000; i++ {
+	for i := 0; i < 65535; i++ {
 		builder := btcscript.NewScriptBuilder()
 		builder.AddInt64(int64(i))
-		if result := btcscript.IsPushOnlyScript(builder.Script()); !result {
-			t.Errorf("StandardPushesTests IsPushOnlyScript test #%d failed: %x\n", i, builder.Script())
+		script, err := builder.Script()
+		if err != nil {
+			t.Errorf("StandardPushesTests test #%d unexpected error: %v\n", i, err)
+			continue
 		}
-		if result := btcscript.HasCanonicalPushes(builder.Script()); !result {
-			t.Errorf("StandardPushesTests HasCanonicalPushes test #%d failed: %x\n", i, builder.Script())
+		if result := btcscript.IsPushOnlyScript(script); !result {
+			t.Errorf("StandardPushesTests IsPushOnlyScript test #%d failed: %x\n", i, script)
+			continue
+		}
+		if result := btcscript.HasCanonicalPushes(script); !result {
+			t.Errorf("StandardPushesTests HasCanonicalPushes test #%d failed: %x\n", i, script)
 			continue
 		}
 	}
-	for i := 0; i < 1000; i++ {
+	for i := 0; i <= btcscript.MaxScriptElementSize; i++ {
 		builder := btcscript.NewScriptBuilder()
 		builder.AddData(bytes.Repeat([]byte{0x49}, i))
-		if result := btcscript.IsPushOnlyScript(builder.Script()); !result {
-			t.Errorf("StandardPushesTests IsPushOnlyScript test #%d failed: %x\n", i, builder.Script())
+		script, err := builder.Script()
+		if err != nil {
+			t.Errorf("StandardPushesTests test #%d unexpected error: %v\n", i, err)
+			continue
 		}
-		if result := btcscript.HasCanonicalPushes(builder.Script()); !result {
-			t.Errorf("StandardPushesTests HasCanonicalPushes test #%d failed: %x\n", i, builder.Script())
+		if result := btcscript.IsPushOnlyScript(script); !result {
+			t.Errorf("StandardPushesTests IsPushOnlyScript test #%d failed: %x\n", i, script)
+			continue
+		}
+		if result := btcscript.HasCanonicalPushes(script); !result {
+			t.Errorf("StandardPushesTests HasCanonicalPushes test #%d failed: %x\n", i, script)
 			continue
 		}
 	}

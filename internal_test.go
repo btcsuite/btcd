@@ -18,6 +18,10 @@ import (
 	"github.com/btcsuite/btcwire"
 )
 
+// TstMaxScriptSize makes the internal maxScriptSize constant available to the
+// test package.
+const TstMaxScriptSize = maxScriptSize
+
 // this file is present to export some internal interfaces so that we can
 // test them reliably.
 
@@ -3781,7 +3785,7 @@ func ParseShortForm(script string) ([]byte, error) {
 			builder.script = append(builder.script, bts...)
 		} else if len(tok) >= 2 &&
 			tok[0] == '\'' && tok[len(tok)-1] == '\'' {
-			builder.AddData([]byte(tok[1 : len(tok)-1]))
+			builder.AddFullData([]byte(tok[1 : len(tok)-1]))
 		} else if opcode, ok := ops[tok]; ok {
 			builder.AddOp(opcode.value)
 		} else {
@@ -3789,7 +3793,7 @@ func ParseShortForm(script string) ([]byte, error) {
 		}
 
 	}
-	return builder.Script(), nil
+	return builder.Script()
 }
 
 func TestBitcoindInvalidTests(t *testing.T) {
