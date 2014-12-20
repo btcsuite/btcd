@@ -2,7 +2,9 @@ btcutil
 =======
 
 [![Build Status](https://travis-ci.org/conformal/btcutil.png?branch=master)]
-(https://travis-ci.org/conformal/btcutil)
+(https://travis-ci.org/conformal/btcutil) [![Coverage Status]
+(https://coveralls.io/repos/conformal/btcutil/badge.png?branch=master)]
+(https://coveralls.io/r/conformal/btcutil?branch=master)
 
 Package btcutil provides bitcoin-specific convenience functions and types.
 A comprehensive suite of tests is provided to ensure proper functionality.  See

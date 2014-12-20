@@ -12,4 +12,4 @@ script:
   - export PATH=$PATH:$HOME/gopath/bin
   - bash $goclean/goclean.sh
 after_success:
-  - goveralls -coverprofile=repo.cov -service=travis-ci
+  - goveralls -coverprofile=profile.cov -service=travis-ci
