@@ -3913,8 +3913,10 @@ func TestBitcoindTxValidTests(t *testing.T) {
 		return
 	}
 
-	// for ma is eaitehr a ["this is a comment "]
-	// or [[[previous hash, previous index, previous scripbPubKey]...,]
+	// form is either:
+	//   ["this is a comment "]
+	// or:
+	//   [[[previous hash, previous index, previous scriptPubKey]...,]
 	//	serializedTransaction, verifyFlags]
 testloop:
 	for i, test := range tests {
@@ -3924,9 +3926,8 @@ testloop:
 		}
 
 		if len(test) != 3 {
-			t.Errorf("bad test (bad lenggh) %d: %v", i, test)
+			t.Errorf("bad test (bad length) %d: %v", i, test)
 			continue
-
 		}
 		serializedhex, ok := test[1].(string)
 		if !ok {
@@ -4054,8 +4055,10 @@ func TestBitcoindTxInvalidTests(t *testing.T) {
 		return
 	}
 
-	// for ma is eaitehr a ["this is a comment "]
-	// or [[[previous hash, previous index, previous scripbPubKey]...,]
+	// form is either:
+	//   ["this is a comment "]
+	// or:
+	//   [[[previous hash, previous index, previous scriptPubKey]...,]
 	//	serializedTransaction, verifyFlags]
 testloop:
 	for i, test := range tests {
