@@ -48,6 +48,8 @@ Application Options:
       --norpc              Disable built-in RPC server -- NOTE: The RPC server
                            is disabled by default if no rpcuser/rpcpass is
                            specified
+      --notls              Disable TLS for the RPC server -- NOTE: This is only
+                           allowed if the RPC server is bound to localhost
       --nodnsseed          Disable DNS seeding for peers
       --externalip:        Add an ip to the list of local addresses we claim to
                            listen on to peers

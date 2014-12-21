@@ -524,22 +524,31 @@ func newRPCServer(listenAddrs []string, s *server) (*rpcServer, error) {
 	}
 	rpc.ntfnMgr = newWsNotificationManager(&rpc)
 
-	// check for existence of cert file and key file
-	if !fileExists(cfg.RPCKey) && !fileExists(cfg.RPCCert) {
-		// if both files do not exist, we generate them.
-		err := genCertPair(cfg.RPCCert, cfg.RPCKey)
+	// Setup TLS if not disabled.
+	listenFunc := net.Listen
+	if !cfg.DisableTLS {
+		// Generate the TLS cert and key file if both don't already
+		// exist.
+		if !fileExists(cfg.RPCKey) && !fileExists(cfg.RPCCert) {
+			err := genCertPair(cfg.RPCCert, cfg.RPCKey)
+			if err != nil {
+				return nil, err
+			}
+		}
+		keypair, err := tls.LoadX509KeyPair(cfg.RPCCert, cfg.RPCKey)
 		if err != nil {
 			return nil, err
 		}
-	}
-	keypair, err := tls.LoadX509KeyPair(cfg.RPCCert, cfg.RPCKey)
-	if err != nil {
-		return nil, err
-	}
 
-	tlsConfig := tls.Config{
-		Certificates: []tls.Certificate{keypair},
-		MinVersion:   tls.VersionTLS12,
+		tlsConfig := tls.Config{
+			Certificates: []tls.Certificate{keypair},
+			MinVersion:   tls.VersionTLS12,
+		}
+
+		// Change the standard net.Listen function to the tls one.
+		listenFunc = func(net string, laddr string) (net.Listener, error) {
+			return tls.Listen(net, laddr, &tlsConfig)
+		}
 	}
 
 	// TODO(oga) this code is similar to that in server, should be
@@ -551,20 +560,18 @@ func newRPCServer(listenAddrs []string, s *server) (*rpcServer, error) {
 	listeners := make([]net.Listener, 0,
 		len(ipv6ListenAddrs)+len(ipv4ListenAddrs))
 	for _, addr := range ipv4ListenAddrs {
-		listener, err := tls.Listen("tcp4", addr, &tlsConfig)
+		listener, err := listenFunc("tcp4", addr)
 		if err != nil {
-			rpcsLog.Warnf("Can't listen on %s: %v", addr,
-				err)
+			rpcsLog.Warnf("Can't listen on %s: %v", addr, err)
 			continue
 		}
 		listeners = append(listeners, listener)
 	}
 
 	for _, addr := range ipv6ListenAddrs {
-		listener, err := tls.Listen("tcp6", addr, &tlsConfig)
+		listener, err := listenFunc("tcp6", addr)
 		if err != nil {
-			rpcsLog.Warnf("Can't listen on %s: %v", addr,
-				err)
+			rpcsLog.Warnf("Can't listen on %s: %v", addr, err)
 			continue
 		}
 		listeners = append(listeners, listener)
