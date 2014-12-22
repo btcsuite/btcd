@@ -30,6 +30,21 @@ http://localhost:6060/pkg/github.com/conformal/btcutil/base58
 $ go get github.com/conformal/btcutil/base58
 ```
 
+## Examples
+
+* [Decode Example]
+  (http://godoc.org/github.com/conformal/btcutil/base58#example-Decode)  
+  Demonstrates how to decode modified base58 encoded data.
+* [Encode Example]
+  (http://godoc.org/github.com/conformal/btcutil/base58#example-Encode)  
+  Demonstrates how to encode data using the modified base58 encoding scheme.
+* [CheckDecode Example]
+  (http://godoc.org/github.com/conformal/btcutil/base58#example-CheckDecode)  
+  Demonstrates how to decode Base58Check encoded data.
+* [CheckEncode Example]
+  (http://godoc.org/github.com/conformal/btcutil/base58#example-CheckEncode)  
+  Demonstrates how to encode data using the Base58Check encoding scheme.
+
 ## License
 
 Package base58 is licensed under the [copyfree](http://copyfree.org) ISC
