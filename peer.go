@@ -9,6 +9,7 @@ import (
 	"container/list"
 	"fmt"
 	"io"
+	prand "math/rand"
 	"net"
 	"strconv"
 	"sync"
@@ -1131,11 +1132,19 @@ func (p *peer) pushAddrMsg(addresses []*btcwire.NetAddress) error {
 		return nil
 	}
 
+	r := prand.New(prand.NewSource(time.Now().UnixNano()))
 	numAdded := 0
 	msg := btcwire.NewMsgAddr()
 	for _, na := range addresses {
 		// Filter addresses the peer already knows about.
-		if _, ok := p.knownAddresses[addrmgr.NetAddressKey(na)]; ok {
+		if _, exists := p.knownAddresses[addrmgr.NetAddressKey(na)]; exists {
+			continue
+		}
+
+		// If the maxAddrs limit has been reached, randomize the list
+		// with the remaining addresses.
+		if numAdded == btcwire.MaxAddrPerMsg {
+			msg.AddrList[r.Intn(btcwire.MaxAddrPerMsg)] = na
 			continue
 		}
 
@@ -1145,20 +1154,13 @@ func (p *peer) pushAddrMsg(addresses []*btcwire.NetAddress) error {
 			return err
 		}
 		numAdded++
-
-		// Split into multiple messages as needed.
-		if numAdded > 0 && numAdded%btcwire.MaxAddrPerMsg == 0 {
-			p.QueueMessage(msg, nil)
-
-			// NOTE: This needs to be a new address message and not
-			// simply call ClearAddresses since the message is a
-			// pointer and queueing it does not make a copy.
-			msg = btcwire.NewMsgAddr()
-		}
 	}
+	if numAdded > 0 {
+		for _, na := range msg.AddrList {
+			// Add address to known addresses for this peer.
+			p.knownAddresses[addrmgr.NetAddressKey(na)] = struct{}{}
+		}
 
-	// Send message with remaining addresses if needed.
-	if numAdded%btcwire.MaxAddrPerMsg != 0 {
 		p.QueueMessage(msg, nil)
 	}
 	return nil
@@ -1729,7 +1731,6 @@ out:
 				// Should get us block, tx, or not found.
 			case *btcwire.MsgGetHeaders:
 				// Should get us headers back.
-
 			default:
 				// Not one of the above, no sure reply.
 				// We want to ping if nothing else
