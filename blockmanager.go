@@ -53,8 +53,8 @@ type invMsg struct {
 	peer *peer
 }
 
-// blockMsg packages a bitcoin block message and the peer it came from together
-// so the block handler has access to that information.
+// headersMsg packages a bitcoin headers message and the peer it came from
+// together so the block handler has access to that information.
 type headersMsg struct {
 	headers *wire.MsgHeaders
 	peer    *peer
