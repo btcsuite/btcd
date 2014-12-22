@@ -2413,11 +2413,11 @@ func handleGetRawTransaction(s *rpcServer, cmd btcjson.Cmd, closeChan <-chan str
 		}
 	}
 
-	rawTxn, jsonErr := createTxRawResult(s.server.netParams, c.Txid, mtx,
+	rawTxn, err := createTxRawResult(s.server.netParams, c.Txid, mtx,
 		blk, maxidx, blksha)
 	if err != nil {
 		rpcsLog.Errorf("Cannot create TxRawResult for txSha=%s: %v", txSha, err)
-		return nil, jsonErr
+		return nil, err
 	}
 	return *rawTxn, nil
 }
