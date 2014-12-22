@@ -4,13 +4,12 @@ base58
 [![Build Status](https://travis-ci.org/conformal/btcutil.png?branch=master)]
 (https://travis-ci.org/conformal/btcutil)
 
-Package base58 provides an API for for encoding and decoding to and from the base58 encoding.
-It also provides an API to do base58Check encoding, as described [here](https://en.bitcoin.it/wiki/Base58Check_encoding). 
+Package base58 provides an API for for encoding and decoding to and from the
+modified base58 encoding.  It also provides an API to do base58Check encoding,
+as described [here](https://en.bitcoin.it/wiki/Base58Check_encoding).
 
-A comprehensive suite of tests is provided to ensure proper functionality.  See
-`test_coverage.txt` for the gocov coverage report.  Alternatively, if you are
-running a POSIX OS, you can run the `cov_report.sh` script for a real-time
-report.  Package base58 is licensed under the liberal ISC license.
+A comprehensive suite of tests is provided to ensure proper functionality.
+Package base58 is licensed under the copyfree ISC license.
 
 ## Documentation
 
