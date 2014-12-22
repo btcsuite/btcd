@@ -18,16 +18,5 @@ A Tx defines a bitcoin transaction that provides more efficient manipulation of
 raw wire protocol transactions.  It memoizes the hash for the transaction on its
 first access so subsequent accesses don't have to repeat the relatively
 expensive hashing operations.
-
-Base58 Usage
-
-To decode a base58 string:
-
- rawData := btcutil.Base58Decode(encodedData)
-
-Similarly, to encode the same data:
-
- encodedData := btcutil.Base58Encode(rawData)
-
 */
 package btcutil

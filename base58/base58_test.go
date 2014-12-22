@@ -63,7 +63,7 @@ var hexTests = []struct {
 }
 
 func TestBase58(t *testing.T) {
-	// Base58Encode tests
+	// Encode tests
 	for x, test := range stringTests {
 		tmp := []byte(test.in)
 		if res := base58.Encode(tmp); res != test.out {
@@ -73,7 +73,7 @@ func TestBase58(t *testing.T) {
 		}
 	}
 
-	// Base58Decode tests
+	// Decode tests
 	for x, test := range hexTests {
 		b, err := hex.DecodeString(test.in)
 		if err != nil {
@@ -87,7 +87,7 @@ func TestBase58(t *testing.T) {
 		}
 	}
 
-	// Base58Decode with invalid input
+	// Decode with invalid input
 	for x, test := range invalidStringTests {
 		if res := base58.Decode(test.in); string(res) != test.out {
 			t.Errorf("Decode invalidString test #%d failed: got: %q want: %q",
