@@ -1,7 +1,7 @@
 btcdb
 =====
 
-[![Build Status](https://travis-ci.org/conformal/btcdb.png?branch=master)]
+[![Build Status](https://travis-ci.org/conformal/btcdb.svg?branch=master)]
 (https://travis-ci.org/conformal/btcdb)[![Coverage Status]
 (https://img.shields.io/coveralls/conformal/btcdb.svg)]
 (https://coveralls.io/r/conformal/btcdb)
