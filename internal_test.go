@@ -129,10 +129,16 @@ func TstWriteBlockHeader(w io.Writer, pver uint32, bh *BlockHeader) error {
 	return writeBlockHeader(w, pver, bh)
 }
 
+// TstMessageHeader is simply a redefinition of the internal messageHeader that
+// is used to make golint happy since it rightly complains that it's typically
+// not a good idea to return unexported types.
+type TstMessageHeader messageHeader
+
 // TstReadMessageHeader makes the internal readMessageHeader function available
 // to the test package.
-func TstReadMessageHeader(r io.Reader) (int, *messageHeader, error) {
-	return readMessageHeader(r)
+func TstReadMessageHeader(r io.Reader) (int, *TstMessageHeader, error) {
+	n, hdr, err := readMessageHeader(r)
+	return n, (*TstMessageHeader)(hdr), err
 }
 
 // TstReadOutPoint makes the internal readOutPoint function available to the
