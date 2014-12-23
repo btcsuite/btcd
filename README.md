@@ -1,10 +1,11 @@
 btcdb
 =====
 
-[![Build Status](https://travis-ci.org/conformal/btcdb.svg?branch=master)]
-(https://travis-ci.org/conformal/btcdb)[![Coverage Status]
+[![Build Status](http://img.shields.io/travis/conformal/btcdb.svg)]
+(https://travis-ci.org/conformal/btcdb) [![Coverage Status]
 (https://img.shields.io/coveralls/conformal/btcdb.svg)]
-(https://coveralls.io/r/conformal/btcdb)
+(https://coveralls.io/r/conformal/btcdb) [![ISC License]
+(http://img.shields.io/badge/license-ISC-blue.svg)](http://copyfree.org)
 
 Package btcdb provides a database interface for the bitcoin block chain and
 transactions.  There is a test suite with a high percentage of code coverage.
@@ -14,7 +15,7 @@ real-time report.  Package btcdb is licensed under the liberal ISC license.
 
 ## Documentation
 
-[![GoDoc](https://godoc.org/github.com/conformal/btcdb?status.png)]
+[![GoDoc](https://img.shields.io/badge/godoc-reference-blue.svg)]
 (http://godoc.org/github.com/conformal/btcdb)
 
 Full `go doc` style documentation for the project can be viewed online without
