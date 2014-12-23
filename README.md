@@ -1,10 +1,11 @@
 btcwire
 =======
 
-[![Build Status](https://travis-ci.org/conformal/btcwire.png?branch=master)]
+[![Build Status](http://img.shields.io/travis/conformal/btcwire.svg)]
 (https://travis-ci.org/conformal/btcwire) [![Coverage Status]
-(https://coveralls.io/repos/conformal/btcwire/badge.png?branch=master)]
-(https://coveralls.io/r/conformal/btcwire?branch=master)
+(https://img.shields.io/coveralls/conformal/btcwire.svg)]
+(https://coveralls.io/r/conformal/btcwire?branch=master) [![ISC License]
+(http://img.shields.io/badge/license-ISC-blue.svg)](http://copyfree.org)
 
 Package btcwire implements the bitcoin wire protocol.  A comprehensive suite of
 tests with 100% test coverage is provided to ensure proper functionality.
@@ -21,7 +22,7 @@ interface with bitcoin peers at the wire protocol level.
 
 ## Documentation
 
-[![GoDoc](https://godoc.org/github.com/conformal/btcwire?status.png)]
+[![GoDoc](https://img.shields.io/badge/godoc-reference-blue.svg)]
 (http://godoc.org/github.com/conformal/btcwire)
 
 Full `go doc` style documentation for the project can be viewed online without
