@@ -1,10 +1,11 @@
 btcnet
 ======
 
-[![Build Status](https://travis-ci.org/conformal/btcnet.png?branch=master)]
+[![Build Status](http://img.shields.io/travis/conformal/btcnet.svg)]
 (https://travis-ci.org/conformal/btcnet) [![Coverage Status]
-(https://coveralls.io/repos/conformal/btcnet/badge.png?branch=master)]
-(https://coveralls.io/r/conformal/btcnet?branch=master)
+(https://img.shields.io/coveralls/conformal/btcnet.svg)]
+(https://coveralls.io/r/conformal/btcnet?branch=master) [![ISC License]
+(http://img.shields.io/badge/license-ISC-blue.svg)](http://copyfree.org)
 
 Package btcnet defines the network parameters for the three standard Bitcoin 
 networks and provides the ability for callers to define their own custom 
@@ -58,7 +59,7 @@ func main() {
 
 ## Documentation
 
-[![GoDoc](https://godoc.org/github.com/conformal/btcnet?status.png)]
+[![GoDoc](https://img.shields.io/badge/godoc-reference-blue.svg)]
 (http://godoc.org/github.com/conformal/btcnet)
 
 Full `go doc` style documentation for the project can be viewed online without
@@ -97,4 +98,5 @@ signature perform the following:
 
 ## License
 
-Package btcnet is licensed under the liberal ISC License.
+Package btcnet is licensed under the [copyfree](http://copyfree.org) ISC
+License.
