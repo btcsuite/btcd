@@ -3806,15 +3806,19 @@ func TestBitcoindInvalidTests(t *testing.T) {
 	var tests [][]string
 	err = json.Unmarshal(file, &tests)
 	if err != nil {
-		t.Errorf("TestBitcoindInvalidTests couldn't Unmarshal: %v\n",
+		t.Errorf("TestBitcoindInvalidTests couldn't Unmarshal: %v",
 			err)
 		return
 	}
 	tx := btcwire.NewMsgTx()
 	for x, test := range tests {
+		// Skip comments
+		if len(test) == 1 {
+			continue
+		}
 		name, err := testName(test)
 		if err != nil {
-			t.Errorf("TestBitcoindInvalidTests: invalid test #%d\n",
+			t.Errorf("TestBitcoindInvalidTests: invalid test #%d",
 				x)
 			continue
 		}
@@ -3857,15 +3861,19 @@ func TestBitcoindValidTests(t *testing.T) {
 	var tests [][]string
 	err = json.Unmarshal(file, &tests)
 	if err != nil {
-		t.Errorf("TestBitcoindValidTests couldn't Unmarshal: %v\n",
+		t.Errorf("TestBitcoindValidTests couldn't Unmarshal: %v",
 			err)
 		return
 	}
 	tx := btcwire.NewMsgTx()
 	for x, test := range tests {
+		// Skip comments
+		if len(test) == 1 {
+			continue
+		}
 		name, err := testName(test)
 		if err != nil {
-			t.Errorf("TestBitcoindValidTests: invalid test #%d\n",
+			t.Errorf("TestBitcoindValidTests: invalid test #%d",
 				x)
 			continue
 		}
@@ -4195,6 +4203,8 @@ func parseScriptFlags(flagStr string) (ScriptFlags, error) {
 	sFlags := strings.Split(flagStr, ",")
 	for _, flag := range sFlags {
 		switch flag {
+		case "DISCOURAGE_UPGRADABLE_NOPS":
+			flags |= ScriptDiscourageUpgradableNops
 		case "NONE":
 			// Nothing.
 		case "NULLDUMMY":

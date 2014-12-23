@@ -195,20 +195,21 @@ func (t ScriptClass) String() string {
 
 // Script is the virtual machine that executes btcscripts.
 type Script struct {
-	scripts         [][]parsedOpcode
-	scriptidx       int
-	scriptoff       int
-	lastcodesep     int
-	dstack          Stack // data stack
-	astack          Stack // alt stack
-	tx              btcwire.MsgTx
-	txidx           int
-	condStack       []int
-	numOps          int
-	bip16           bool     // treat execution as pay-to-script-hash
-	der             bool     // enforce DER encoding
-	strictMultiSig  bool     // verify multisig stack item is zero length
-	savedFirstStack [][]byte // stack from first script for bip16 scripts
+	scripts                  [][]parsedOpcode
+	scriptidx                int
+	scriptoff                int
+	lastcodesep              int
+	dstack                   Stack // data stack
+	astack                   Stack // alt stack
+	tx                       btcwire.MsgTx
+	txidx                    int
+	condStack                []int
+	numOps                   int
+	bip16                    bool     // treat execution as pay-to-script-hash
+	der                      bool     // enforce DER encoding
+	strictMultiSig           bool     // verify multisig stack item is zero length
+	discourageUpgradableNops bool     // NOP1 to NOP10 are reserved for future soft-fork upgrades
+	savedFirstStack          [][]byte // stack from first script for bip16 scripts
 }
 
 // isSmallInt returns whether or not the opcode is considered a small integer,
@@ -513,6 +514,14 @@ const (
 	// ScriptStrictMultiSig defines whether to verify the stack item
 	// used by CHECKMULTISIG is zero length.
 	ScriptStrictMultiSig
+
+	// ScriptDiscourageUpgradableNops defines whether to verify that
+	// NOP1 through NOP10 are reserved for future soft-fork upgrades.  This
+	// flag must not be used for consensus critical code nor applied to
+	// blocks as this flag is only for stricter standard transaction
+	// checks.  This flag is only applied when the above opcodes are
+	// executed.
+	ScriptDiscourageUpgradableNops
 )
 
 // NewScript returns a new script engine for the provided tx and input idx with
@@ -557,6 +566,9 @@ func NewScript(scriptSig []byte, scriptPubKey []byte, txidx int, tx *btcwire.Msg
 	}
 	if flags&ScriptStrictMultiSig == ScriptStrictMultiSig {
 		m.strictMultiSig = true
+	}
+	if flags&ScriptDiscourageUpgradableNops == ScriptDiscourageUpgradableNops {
+		m.discourageUpgradableNops = true
 	}
 
 	m.tx = *tx

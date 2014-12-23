@@ -1085,7 +1085,13 @@ func opcodeN(op *parsedOpcode, s *Script) error {
 }
 
 func opcodeNop(op *parsedOpcode, s *Script) error {
-	// This page left intentionally blank
+	switch op.opcode.value {
+	case OP_NOP1, OP_NOP2, OP_NOP3, OP_NOP4, OP_NOP5,
+		OP_NOP6, OP_NOP7, OP_NOP8, OP_NOP9, OP_NOP10:
+		if s.discourageUpgradableNops {
+			return fmt.Errorf("%s reserved for soft-fork upgrades", opcodemap[op.opcode.value].name)
+		}
+	}
 	return nil
 }
 
