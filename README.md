@@ -8,10 +8,7 @@ btcdb
 (http://img.shields.io/badge/license-ISC-blue.svg)](http://copyfree.org)
 
 Package btcdb provides a database interface for the bitcoin block chain and
-transactions.  There is a test suite with a high percentage of code coverage.
-See `test_coverage.txt` for the current coverage (using gocov).  Alternatively,
-if you are running a POSIX OS, you can run the cov_report.sh script for a
-real-time report.  Package btcdb is licensed under the liberal ISC license.
+transactions.
 
 ## Documentation
 
@@ -68,4 +65,4 @@ signature perform the following:
 
 ## License
 
-Package btcdb is licensed under the liberal ISC License.
+Package btcdb is licensed under the [copyfree](http://copyfree.org) ISC License.
