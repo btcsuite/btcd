@@ -2,17 +2,17 @@ language: go
 go:
   - release
   - tip
+sudo: false
+before_install:
+  - gocleandeps=c16c849abae90c23419d
+  - git clone https://gist.github.com/$gocleandeps.git
+  - goclean=71d0380287747d956a26
+  - git clone https://gist.github.com/$goclean.git
 install:
   - go get -d -t -v ./...
-  - go get -v code.google.com/p/go.tools/cmd/cover
-  - go get -v code.google.com/p/go.tools/cmd/vet
-  - go get -v github.com/GeertJohan/fgt
-  - go get -v github.com/golang/lint/golint
+  - bash $gocleandeps/gocleandeps.sh
 script:
   - export PATH=$PATH:$HOME/gopath/bin
-  - go vet
-  - fgt golint .
-  - go test -v -covermode=count -coverprofile=profile.cov
+  - bash $goclean/goclean.sh
 after_success:
-  - go get -v github.com/mattn/goveralls
   - goveralls -coverprofile=profile.cov -service=travis-ci
