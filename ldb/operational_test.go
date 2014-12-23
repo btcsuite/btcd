@@ -199,7 +199,7 @@ func testBackout(t *testing.T) {
 		return
 	}
 	if _, err := db.ExistsSha(sha); err != nil {
-		t.Errorf("ExistsSha: unexpected error: %v")
+		t.Errorf("ExistsSha: unexpected error: %v", err)
 	}
 	_, err = db.FetchBlockBySha(sha)
 	if err != nil {
@@ -213,7 +213,7 @@ func testBackout(t *testing.T) {
 		return
 	}
 	if _, err := db.ExistsSha(sha); err != nil {
-		t.Errorf("ExistsSha: unexpected error: %v")
+		t.Errorf("ExistsSha: unexpected error: %v", err)
 	}
 	_, err = db.FetchBlockBySha(sha)
 	if err != nil {

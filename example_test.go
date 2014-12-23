@@ -6,6 +6,7 @@ package btcdb_test
 
 import (
 	"fmt"
+
 	"github.com/conformal/btcdb"
 	_ "github.com/conformal/btcdb/memdb"
 	"github.com/conformal/btcnet"
