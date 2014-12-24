@@ -290,3 +290,41 @@ func (db *LevelDb) NewestSha() (rsha *btcwire.ShaHash, rblkid int64, err error) 
 
 	return &sha, db.lastBlkIdx, nil
 }
+
+// fetchAddrIndexTip returns the last block height and block sha to be indexed.
+// Meta-data about the address tip is currently cached in memory, and will be
+// updated accordingly by functions that modify the state. This function is
+// used on start up to load the info into memory. Callers will use the public
+// version of this function below, which returns our cached copy.
+func (db *LevelDb) fetchAddrIndexTip() (*btcwire.ShaHash, int64, error) {
+	db.dbLock.Lock()
+	defer db.dbLock.Unlock()
+
+	data, err := db.lDb.Get(addrIndexMetaDataKey, db.ro)
+	if err != nil {
+		return &btcwire.ShaHash{}, -1, btcdb.ErrAddrIndexDoesNotExist
+	}
+
+	var blkSha btcwire.ShaHash
+	blkSha.SetBytes(data[0:32])
+
+	blkHeight := binary.LittleEndian.Uint64(data[32:])
+
+	return &blkSha, int64(blkHeight), nil
+}
+
+// FetchAddrIndexTip returns the hash and block height of the most recent
+// block whose transactions have been indexed by address. It will return
+// ErrAddrIndexDoesNotExist along with a zero hash, and -1 if the
+// addrindex hasn't yet been built up.
+func (db *LevelDb) FetchAddrIndexTip() (*btcwire.ShaHash, int64, error) {
+	db.dbLock.Lock()
+	defer db.dbLock.Unlock()
+
+	if db.lastAddrIndexBlkIdx == -1 {
+		return &btcwire.ShaHash{}, -1, btcdb.ErrAddrIndexDoesNotExist
+	}
+	sha := db.lastAddrIndexBlkSha
+
+	return &sha, db.lastAddrIndexBlkIdx, nil
+}

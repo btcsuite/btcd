@@ -110,7 +110,7 @@ out:
 		lastSha = blkSha
 	}
 
-	// genrate a new block based on the last sha
+	// generate a new block based on the last sha
 	// these block are not verified, so there are a bunch of garbage fields
 	// in the 'generated' block.
 

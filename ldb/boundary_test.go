@@ -12,7 +12,8 @@ import (
 	"github.com/btcsuite/btcwire"
 )
 
-// we need to test for empty databas and make certain it returns proper value
+// we need to test for an empty database and make certain it returns the proper
+// values
 
 func TestEmptyDB(t *testing.T) {
 

@@ -66,7 +66,7 @@ endtest:
 	for height := int64(0); height < int64(len(blocks)); height++ {
 
 		block := blocks[height]
-		// look up inputs to this x
+		// look up inputs to this tx
 		mblock := block.MsgBlock()
 		var txneededList []*btcwire.ShaHash
 		var txlookupList []*btcwire.ShaHash

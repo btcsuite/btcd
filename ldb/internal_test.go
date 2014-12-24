@@ -5,21 +5,60 @@
 package ldb
 
 import (
-	"fmt"
+	"bytes"
 
-	"github.com/btcsuite/btcdb"
-	"github.com/btcsuite/btcwire"
+	"testing"
+
+	"github.com/btcsuite/btcutil"
+	"golang.org/x/crypto/ripemd160"
 )
 
-// FetchSha returns the datablock and pver for the given ShaHash.
-// This is a testing only interface.
-func FetchSha(db btcdb.Db, sha *btcwire.ShaHash) (buf []byte, pver uint32,
-	blkid int64, err error) {
-	sqldb, ok := db.(*LevelDb)
-	if !ok {
-		err = fmt.Errorf("invalid data type")
-		return
+func TestAddrIndexKeySerialization(t *testing.T) {
+	var hash160Bytes [ripemd160.Size]byte
+
+	fakeHash160 := btcutil.Hash160([]byte("testing"))
+	copy(fakeHash160, hash160Bytes[:])
+
+	fakeIndex := txAddrIndex{
+		hash160:   hash160Bytes,
+		blkHeight: 1,
+		txoffset:  5,
+		txlen:     360,
 	}
-	buf, blkid, err = sqldb.fetchSha(sha)
-	return
+
+	serializedKey := addrIndexToKey(&fakeIndex)
+	unpackedIndex := unpackTxIndex(serializedKey[22:])
+
+	if unpackedIndex.blkHeight != fakeIndex.blkHeight {
+		t.Errorf("Incorrect block height. Unpack addr index key"+
+			"serialization failed. Expected %d, received %d",
+			1, unpackedIndex.blkHeight)
+	}
+
+	if unpackedIndex.txoffset != fakeIndex.txoffset {
+		t.Errorf("Incorrect tx offset. Unpack addr index key"+
+			"serialization failed. Expected %d, received %d",
+			5, unpackedIndex.txoffset)
+	}
+
+	if unpackedIndex.txlen != fakeIndex.txlen {
+		t.Errorf("Incorrect tx len. Unpack addr index key"+
+			"serialization failed. Expected %d, received %d",
+			360, unpackedIndex.txlen)
+	}
+}
+
+func TestBytesPrefix(t *testing.T) {
+	testKey := []byte("a")
+
+	prefixRange := bytesPrefix(testKey)
+	if !bytes.Equal(prefixRange.Start, []byte("a")) {
+		t.Errorf("Wrong prefix start, got %d, expected %d", prefixRange.Start,
+			[]byte("a"))
+	}
+
+	if !bytes.Equal(prefixRange.Limit, []byte("b")) {
+		t.Errorf("Wrong prefix end, got %d, expected %d", prefixRange.Limit,
+			[]byte("b"))
+	}
 }

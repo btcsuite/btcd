@@ -698,6 +698,31 @@ func (db *MemDb) NewestSha() (*btcwire.ShaHash, int64, error) {
 	return &blockSha, int64(numBlocks - 1), nil
 }
 
+// FetchAddrIndexTip isn't currently implemented. This is a part of the
+// btcdb.Db interface implementation.
+func (db *MemDb) FetchAddrIndexTip() (*btcwire.ShaHash, int64, error) {
+	return nil, 0, btcdb.ErrNotImplemented
+}
+
+// UpdateAddrIndexForBlock isn't currently implemented. This is a part of the
+// btcdb.Db interface implementation.
+func (db *MemDb) UpdateAddrIndexForBlock(*btcwire.ShaHash, int64,
+	btcdb.BlockAddrIndex) error {
+	return btcdb.ErrNotImplemented
+}
+
+// FetchTxsForAddr isn't currently implemented. This is a part of the btcdb.Db
+// interface implementation.
+func (db *MemDb) FetchTxsForAddr(btcutil.Address, int, int) ([]*btcdb.TxListReply, error) {
+	return nil, btcdb.ErrNotImplemented
+}
+
+// DeleteAddrIndex isn't currently implemented. This is a part of the btcdb.Db
+// interface implementation.
+func (db *MemDb) DeleteAddrIndex() error {
+	return btcdb.ErrNotImplemented
+}
+
 // RollbackClose discards the recent database changes to the previously saved
 // data at last Sync and closes the database.  This is part of the btcdb.Db
 // interface implementation.

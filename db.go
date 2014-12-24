@@ -9,16 +9,21 @@ import (
 
 	"github.com/btcsuite/btcutil"
 	"github.com/btcsuite/btcwire"
+	"golang.org/x/crypto/ripemd160"
 )
 
 // Errors that the various database functions may return.
 var (
+	ErrAddrIndexDoesNotExist  = errors.New("address index hasn't been built up yet")
+	ErrUnsupportedAddressType = errors.New("address type is not supported " +
+		"by the address-index")
 	ErrPrevShaMissing  = errors.New("previous sha missing from database")
 	ErrTxShaMissing    = errors.New("requested transaction does not exist")
 	ErrBlockShaMissing = errors.New("requested block does not exist")
 	ErrDuplicateSha    = errors.New("duplicate insert attempted")
 	ErrDbDoesNotExist  = errors.New("non-existent database")
 	ErrDbUnknownType   = errors.New("non-existent database type")
+	ErrNotImplemented  = errors.New("method has not yet been implemented")
 )
 
 // AllShas is a special value that can be used as the final sha when requesting
@@ -106,6 +111,34 @@ type Db interface {
 	// the database yet.
 	NewestSha() (sha *btcwire.ShaHash, height int64, err error)
 
+	// FetchAddrIndexTip returns the hash and block height of the most recent
+	// block which has had its address index populated. It will return
+	// ErrAddrIndexDoesNotExist along with a zero hash, and -1 if the
+	// addrindex hasn't yet been built up.
+	FetchAddrIndexTip() (sha *btcwire.ShaHash, height int64, err error)
+
+	// UpdateAddrIndexForBlock updates the stored addrindex with passed
+	// index information for a particular block height. Additionally, it
+	// will update the stored meta-data related to the curent tip of the
+	// addr index. These two operations are performed in an atomic
+	// transaction which is commited before the function returns.
+	// Addresses are indexed by the raw bytes of their base58 decoded
+	// hash160.
+	UpdateAddrIndexForBlock(blkSha *btcwire.ShaHash, height int64,
+		addrIndex BlockAddrIndex) error
+
+	// FetchTxsForAddr looks up and returns all transactions which either
+	// spend a previously created output of the passed address, or create
+	// a new output locked to the passed address. The, `limit` parameter
+	// should be the max number of transactions to be returned.
+	// Additionally, if the caller wishes to skip forward in the results
+	// some amount, the 'seek' represents how many results to skip.
+	// NOTE: Values for both `seek` and `limit` MUST be positive.
+	FetchTxsForAddr(addr btcutil.Address, skip int, limit int) ([]*TxListReply, error)
+
+	// DeleteAddrIndex deletes the entire addrindex stored within the DB.
+	DeleteAddrIndex() error
+
 	// RollbackClose discards the recent database changes to the previously
 	// saved data at last Sync and closes the database.
 	RollbackClose() (err error)
@@ -133,6 +166,14 @@ type TxListReply struct {
 	TxSpent []bool
 	Err     error
 }
+
+// AddrIndexKeySize is the number of bytes used by keys into the BlockAddrIndex.
+const AddrIndexKeySize = ripemd160.Size
+
+// BlockAddrIndex represents the indexing structure for addresses.
+// It maps a hash160 to a list of transaction locations within a block that
+// either pays to or spends from the passed UTXO for the hash160.
+type BlockAddrIndex map[[AddrIndexKeySize]byte][]*btcwire.TxLoc
 
 // driverList holds all of the registered database backends.
 var driverList []DriverDB

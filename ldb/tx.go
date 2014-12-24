@@ -7,11 +7,34 @@ package ldb
 import (
 	"bytes"
 	"encoding/binary"
+	"errors"
 
 	"github.com/btcsuite/btcdb"
+	"github.com/btcsuite/btcutil"
 	"github.com/btcsuite/btcwire"
 	"github.com/btcsuite/goleveldb/leveldb"
+	"github.com/btcsuite/goleveldb/leveldb/util"
+
+	"golang.org/x/crypto/ripemd160"
 )
+
+const (
+	// Each address index is 34 bytes:
+	// --------------------------------------------------------
+	// | Prefix  | Hash160  | BlkHeight | Tx Offset | Tx Size |
+	// --------------------------------------------------------
+	// | 2 bytes | 20 bytes |  4 bytes  |  4 bytes  | 4 bytes |
+	// --------------------------------------------------------
+	addrIndexKeyLength = 2 + ripemd160.Size + 4 + 4 + 4
+
+	batchDeleteThreshold = 10000
+)
+
+var addrIndexMetaDataKey = []byte("addrindex")
+
+// All address index entries share this prefix to facilitate the use of
+// iterators.
+var addrIndexKeyPrefix = []byte("a-")
 
 type txUpdateObj struct {
 	txSha     *btcwire.ShaHash
@@ -33,6 +56,13 @@ type spentTx struct {
 type spentTxUpdate struct {
 	txl    []*spentTx
 	delete bool
+}
+
+type txAddrIndex struct {
+	hash160   [ripemd160.Size]byte
+	blkHeight int64
+	txoffset  int
+	txlen     int
 }
 
 // InsertTx inserts a tx hash and its associated data into the database.
@@ -188,7 +218,7 @@ func (db *LevelDb) FetchTxByShaList(txShaList []*btcwire.ShaHash) []*btcdb.TxLis
 		}
 		if err == btcdb.ErrTxShaMissing {
 			// if the unspent pool did not have the tx,
-			// look in the fully spent pool (only last instance
+			// look in the fully spent pool (only last instance)
 
 			sTxList, fSerr := db.getTxFullySpent(txsha)
 			if fSerr == nil && len(sTxList) != 0 {
@@ -345,4 +375,209 @@ func (db *LevelDb) FetchTxBySha(txsha *btcwire.ShaHash) ([]*btcdb.TxListReply, e
 		replycnt++
 	}
 	return replies, nil
+}
+
+// addrIndexToKey serializes the passed txAddrIndex for storage within the DB.
+func addrIndexToKey(index *txAddrIndex) []byte {
+	record := make([]byte, addrIndexKeyLength, addrIndexKeyLength)
+	copy(record[:2], addrIndexKeyPrefix)
+	copy(record[2:22], index.hash160[:])
+
+	// The index itself.
+	binary.LittleEndian.PutUint32(record[22:26], uint32(index.blkHeight))
+	binary.LittleEndian.PutUint32(record[26:30], uint32(index.txoffset))
+	binary.LittleEndian.PutUint32(record[30:34], uint32(index.txlen))
+
+	return record
+}
+
+// unpackTxIndex deserializes the raw bytes of a address tx index.
+func unpackTxIndex(rawIndex []byte) *txAddrIndex {
+	return &txAddrIndex{
+		blkHeight: int64(binary.LittleEndian.Uint32(rawIndex[0:4])),
+		txoffset:  int(binary.LittleEndian.Uint32(rawIndex[4:8])),
+		txlen:     int(binary.LittleEndian.Uint32(rawIndex[8:12])),
+	}
+}
+
+// bytesPrefix returns key range that satisfy the given prefix.
+// This only applicable for the standard 'bytes comparer'.
+func bytesPrefix(prefix []byte) *util.Range {
+	var limit []byte
+	for i := len(prefix) - 1; i >= 0; i-- {
+		c := prefix[i]
+		if c < 0xff {
+			limit = make([]byte, i+1)
+			copy(limit, prefix)
+			limit[i] = c + 1
+			break
+		}
+	}
+	return &util.Range{Start: prefix, Limit: limit}
+}
+
+// FetchTxsForAddr looks up and returns all transactions which either
+// spend from a previously created output of the passed address, or
+// create a new output locked to the passed address. The, `limit` parameter
+// should be the max number of transactions to be returned. Additionally, if the
+// caller wishes to seek forward in the results some amount, the 'seek'
+// represents how many results to skip.
+func (db *LevelDb) FetchTxsForAddr(addr btcutil.Address, skip int,
+	limit int) ([]*btcdb.TxListReply, error) {
+	db.dbLock.Lock()
+	defer db.dbLock.Unlock()
+
+	// Enforce constraints for skip and limit.
+	if skip < 0 {
+		return nil, errors.New("offset for skip must be positive")
+	}
+	if limit < 0 {
+		return nil, errors.New("value for limit must be positive")
+	}
+
+	// Parse address type, bailing on an unknown type.
+	var addrKey []byte
+	switch addr := addr.(type) {
+	case *btcutil.AddressPubKeyHash:
+		hash160 := addr.Hash160()
+		addrKey = hash160[:]
+	case *btcutil.AddressScriptHash:
+		hash160 := addr.Hash160()
+		addrKey = hash160[:]
+	case *btcutil.AddressPubKey:
+		hash160 := addr.AddressPubKeyHash().Hash160()
+		addrKey = hash160[:]
+	default:
+		return nil, btcdb.ErrUnsupportedAddressType
+	}
+
+	// Create the prefix for our search.
+	addrPrefix := make([]byte, 22, 22)
+	copy(addrPrefix[:2], addrIndexKeyPrefix)
+	copy(addrPrefix[2:], addrKey)
+
+	var replies []*btcdb.TxListReply
+	iter := db.lDb.NewIterator(bytesPrefix(addrPrefix), nil)
+
+	for skip != 0 && iter.Next() {
+		skip--
+	}
+
+	// Iterate through all address indexes that match the targeted prefix.
+	for iter.Next() && limit != 0 {
+		rawIndex := make([]byte, 22, 22)
+		copy(rawIndex, iter.Key()[22:])
+		addrIndex := unpackTxIndex(rawIndex)
+
+		tx, blkSha, blkHeight, _, err := db.fetchTxDataByLoc(addrIndex.blkHeight,
+			addrIndex.txoffset, addrIndex.txlen, []byte{})
+		if err != nil {
+			// Eat a possible error due to a potential re-org.
+			continue
+		}
+
+		txSha, _ := tx.TxSha()
+		txReply := &btcdb.TxListReply{Sha: &txSha, Tx: tx,
+			BlkSha: blkSha, Height: blkHeight, TxSpent: []bool{}, Err: err}
+
+		replies = append(replies, txReply)
+		limit--
+	}
+	iter.Release()
+
+	return replies, nil
+}
+
+// UpdateAddrIndexForBlock updates the stored addrindex with passed
+// index information for a particular block height. Additionally, it
+// will update the stored meta-data related to the curent tip of the
+// addr index. These two operations are performed in an atomic
+// transaction which is commited before the function returns.
+// Transactions indexed by address are stored with the following format:
+//   * prefix || hash160 || blockHeight || txoffset || txlen
+// Indexes are stored purely in the key, with blank data for the actual value
+// in order to facilitate ease of iteration by their shared prefix and
+// also to allow limiting the number of returned transactions (RPC).
+// Alternatively, indexes for each address could be stored as an
+// append-only list for the stored value. However, this add unnecessary
+// overhead when storing and retrieving since the entire list must
+// be fetched each time.
+func (db *LevelDb) UpdateAddrIndexForBlock(blkSha *btcwire.ShaHash, blkHeight int64, addrIndex btcdb.BlockAddrIndex) error {
+	db.dbLock.Lock()
+	defer db.dbLock.Unlock()
+
+	var blankData []byte
+	batch := db.lBatch()
+	defer db.lbatch.Reset()
+
+	// Write all data for the new address indexes in a single batch
+	// transaction.
+	for addrKey, indexes := range addrIndex {
+		for _, txLoc := range indexes {
+			index := &txAddrIndex{
+				hash160:   addrKey,
+				blkHeight: blkHeight,
+				txoffset:  txLoc.TxStart,
+				txlen:     txLoc.TxLen,
+			}
+			// The index is stored purely in the key.
+			packedIndex := addrIndexToKey(index)
+			batch.Put(packedIndex, blankData)
+		}
+	}
+
+	// Update tip of addrindex.
+	newIndexTip := make([]byte, 40, 40)
+	copy(newIndexTip[:32], blkSha.Bytes())
+	binary.LittleEndian.PutUint64(newIndexTip[32:], uint64(blkHeight))
+	batch.Put(addrIndexMetaDataKey, newIndexTip)
+
+	if err := db.lDb.Write(batch, db.wo); err != nil {
+		return err
+	}
+
+	db.lastAddrIndexBlkIdx = blkHeight
+	db.lastAddrIndexBlkSha = *blkSha
+
+	return nil
+}
+
+// DeleteAddrIndex deletes the entire addrindex stored within the DB.
+// It also resets the cached in-memory metadata about the addr index.
+func (db *LevelDb) DeleteAddrIndex() error {
+	db.dbLock.Lock()
+	defer db.dbLock.Unlock()
+
+	batch := db.lBatch()
+	defer batch.Reset()
+
+	// Delete the entire index along with any metadata about it.
+	iter := db.lDb.NewIterator(bytesPrefix(addrIndexKeyPrefix), db.ro)
+	numInBatch := 0
+	for iter.Next() {
+		key := iter.Key()
+		batch.Delete(key)
+
+		numInBatch++
+
+		// Delete in chunks to potentially avoid very large batches.
+		if numInBatch >= batchDeleteThreshold {
+			if err := db.lDb.Write(batch, db.wo); err != nil {
+				return err
+			}
+			batch.Reset()
+			numInBatch = 0
+		}
+	}
+	iter.Release()
+
+	batch.Delete(addrIndexMetaDataKey)
+	if err := db.lDb.Write(batch, db.wo); err != nil {
+		return err
+	}
+
+	db.lastAddrIndexBlkIdx = -1
+	db.lastAddrIndexBlkSha = btcwire.ShaHash{}
+
+	return nil
 }

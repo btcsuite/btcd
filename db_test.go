@@ -19,7 +19,7 @@ var (
 	ignoreDbTypes = map[string]bool{"createopenfail": true}
 )
 
-// testNewestShaEmpty ensures the NewestSha returns the values expected by
+// testNewestShaEmpty ensures that NewestSha returns the values expected by
 // the interface contract.
 func testNewestShaEmpty(t *testing.T, db btcdb.Db) {
 	sha, height, err := db.NewestSha()

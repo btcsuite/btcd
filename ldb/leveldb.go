@@ -53,6 +53,9 @@ type LevelDb struct {
 	lastBlkSha       btcwire.ShaHash
 	lastBlkIdx       int64
 
+	lastAddrIndexBlkSha btcwire.ShaHash
+	lastAddrIndexBlkIdx int64
+
 	txUpdateMap      map[btcwire.ShaHash]*txUpdateObj
 	txSpentUpdateMap map[btcwire.ShaHash]*spentTxUpdate
 }
@@ -92,7 +95,6 @@ func OpenDB(args ...interface{}) (btcdb.Db, error) {
 	}
 
 	// Need to find last block and tx
-
 	var lastknownblock, nextunknownblock, testblock int64
 
 	increment := int64(100000)
@@ -137,6 +139,14 @@ blocknarrow:
 		if lastknownblock+1 == nextunknownblock {
 			break blocknarrow
 		}
+	}
+
+	// Load the last block whose transactions have been indexed by address.
+	if sha, idx, err := ldb.fetchAddrIndexTip(); err == nil {
+		ldb.lastAddrIndexBlkSha = *sha
+		ldb.lastAddrIndexBlkIdx = idx
+	} else {
+		ldb.lastAddrIndexBlkIdx = -1
 	}
 
 	ldb.lastBlkSha = *lastSha
@@ -250,6 +260,7 @@ func CreateDB(args ...interface{}) (btcdb.Db, error) {
 	if err == nil {
 		ldb := db.(*LevelDb)
 		ldb.lastBlkIdx = -1
+		ldb.lastAddrIndexBlkIdx = -1
 		ldb.nextBlock = 0
 	}
 	return db, err
