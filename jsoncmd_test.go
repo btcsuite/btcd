@@ -1205,6 +1205,21 @@ var jsoncmdtests = []struct {
 		},
 	},
 	{
+		name: "basic + optionals",
+		cmd:  "searchrawtransaction",
+		f: func() (Cmd, error) {
+			return NewSearchRawTransactionCmd(testID,
+				"someaddr", true, 5, 200)
+		},
+		result: &SearchRawTransactionCmd{
+			id:      testID,
+			Address: "someaddr",
+			Verbose: true,
+			Skip:    5,
+			Count:   200,
+		},
+	},
+	{
 		name: "basic",
 		cmd:  "sendfrom",
 		f: func() (Cmd, error) {
@@ -1706,6 +1721,7 @@ func TestHelps(t *testing.T) {
 		"move",
 		"ping",
 		"reconsiderblock",
+		"searchrawtransaction",
 		"sendfrom",
 		"sendmany",
 		"sendrawtransaction",

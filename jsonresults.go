@@ -217,7 +217,8 @@ type ScriptSig struct {
 }
 
 // Vin models parts of the tx data.  It is defined seperately since both
-// getrawtransaction and decoderawtransaction use the same structure.
+// getrawtransaction, sendrawtransaction, and decoderawtransaction use the
+// same structure.
 type Vin struct {
 	Coinbase  string     `json:"coinbase"`
 	Txid      string     `json:"txid"`
@@ -269,7 +270,8 @@ type ScriptPubKeyResult struct {
 }
 
 // Vout models parts of the tx data.  It is defined seperately since both
-// getrawtransaction and decoderawtransaction use the same structure.
+// getrawtransaction, sendrawtransaction, and decoderawtransaction use the same
+// structure.
 type Vout struct {
 	Value        float64            `json:"value"`
 	N            uint32             `json:"n"`
@@ -398,7 +400,8 @@ type SignRawTransactionResult struct {
 	Complete bool   `json:"complete"`
 }
 
-// TxRawResult models the data from the getrawtransaction command.
+// TxRawResult models the data from the getrawtransaction and sendrawtransaction
+// commands
 type TxRawResult struct {
 	Hex           string `json:"hex"`
 	Txid          string `json:"txid"`
@@ -685,6 +688,24 @@ func ReadResultCmd(cmd string, message []byte) (Reply, error) {
 		err = json.Unmarshal(objmap["result"], &res)
 		if err == nil {
 			result.Result = res
+		}
+
+	case "searchrawtransaction":
+		// searchrawtransaction can either return a list of JSON objects
+		// or a list of hex-encoded strings depending on the verbose flag.
+		// Choose the right form accordingly.
+		if bytes.IndexByte(objmap["result"], '{') > -1 {
+			var res []*TxRawResult
+			err = json.Unmarshal(objmap["result"], &res)
+			if err == nil {
+				result.Result = res
+			}
+		} else {
+			var res []string
+			err = json.Unmarshal(objmap["result"], &res)
+			if err == nil {
+				result.Result = res
+			}
 		}
 	// For commands that return a single item (or no items), we get it with
 	// the correct concrete type for free (but treat them separately

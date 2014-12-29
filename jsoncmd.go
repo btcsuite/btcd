@@ -286,6 +286,9 @@ func ParseMarshaledCmd(b []byte) (Cmd, error) {
 	case "reconsiderblock":
 		cmd = new(ReconsiderBlockCmd)
 
+	case "searchrawtransaction":
+		cmd = new(SearchRawTransactionCmd)
+
 	case "sendfrom":
 		cmd = new(SendFromCmd)
 
@@ -5318,6 +5321,146 @@ func (cmd *ReconsiderBlockCmd) UnmarshalJSON(b []byte) error {
 	*cmd = *newCmd
 	return nil
 }
+
+// SearchRawTransactionCmd is a type handling custom marshaling and
+// unmarshaling of sendrawtransaction JSON RPC commands.
+type SearchRawTransactionCmd struct {
+	id      interface{}
+	Address string
+	Verbose bool
+	Skip    int
+	Count   int
+}
+
+// NewSearchRawTransactionCmd creates a new SearchRawTransactionCmd.
+func NewSearchRawTransactionCmd(id interface{}, address string,
+	optArgs ...interface{}) (*SearchRawTransactionCmd, error) {
+	verbose := true
+	var skip int
+	count := 100
+
+	if len(optArgs) > 3 {
+		return nil, ErrTooManyOptArgs
+	}
+
+	if len(optArgs) > 0 {
+		v, ok := optArgs[0].(bool)
+		if !ok {
+			return nil, errors.New("first optional argument verbose is not a bool")
+		}
+
+		verbose = v
+	}
+	if len(optArgs) > 1 {
+		s, ok := optArgs[1].(int)
+		if !ok {
+			return nil, errors.New("second optional argument skip is not an int")
+		}
+		skip = s
+	}
+	if len(optArgs) > 2 {
+		c, ok := optArgs[2].(int)
+		if !ok {
+			return nil, errors.New("third optional argument count is not an int")
+		}
+
+		count = c
+	}
+
+	return &SearchRawTransactionCmd{
+		id:      id,
+		Address: address,
+		Verbose: verbose,
+		Skip:    skip,
+		Count:   count,
+	}, nil
+}
+
+// Id satisfies the Cmd interface by returning the id of the command.
+func (cmd *SearchRawTransactionCmd) Id() interface{} {
+	return cmd.id
+}
+
+// Method satisfies the Cmd interface by returning the json method.
+func (cmd *SearchRawTransactionCmd) Method() string {
+	return "searchrawtransaction"
+}
+
+// MarshalJSON returns the JSON encoding of cmd.  Part of the Cmd interface.
+func (cmd *SearchRawTransactionCmd) MarshalJSON() ([]byte, error) {
+	params := make([]interface{}, 1, 4)
+	params[0] = cmd.Address
+	if !cmd.Verbose || cmd.Skip != 0 || cmd.Count != 100 {
+		params = append(params, cmd.Verbose)
+	}
+	if cmd.Skip != 0 || cmd.Count != 100 {
+		params = append(params, cmd.Skip)
+	}
+	if cmd.Count != 100 {
+		params = append(params, cmd.Count)
+	}
+
+	// Fill and marshal a RawCmd.
+	raw, err := NewRawCmd(cmd.id, cmd.Method(), params)
+	if err != nil {
+		return nil, err
+
+	}
+	return json.Marshal(raw)
+}
+
+// UnmarshalJSON unmarshals the JSON encoding of cmd into cmd.  Part of
+// the Cmd interface.
+func (cmd *SearchRawTransactionCmd) UnmarshalJSON(b []byte) error {
+	// Unmarshal into a RawCmd
+	var r RawCmd
+	if err := json.Unmarshal(b, &r); err != nil {
+		return err
+	}
+
+	if len(r.Params) == 0 || len(r.Params) > 4 {
+		return ErrWrongNumberOfParams
+	}
+
+	var address string
+	if err := json.Unmarshal(r.Params[0], &address); err != nil {
+		return fmt.Errorf("first parameter 'address' must be a string: %v", err)
+	}
+
+	optArgs := make([]interface{}, 0, 3)
+	if len(r.Params) > 1 {
+		var verbose bool
+		if err := json.Unmarshal(r.Params[1], &verbose); err != nil {
+			return fmt.Errorf("second optional parameter 'verbose' must be an bool: %v", err)
+		}
+		optArgs = append(optArgs, verbose)
+	}
+	if len(r.Params) > 2 {
+		var skip int
+		if err := json.Unmarshal(r.Params[2], &skip); err != nil {
+			return fmt.Errorf("third optional parameter 'skip' must be an int: %v", err)
+		}
+		optArgs = append(optArgs, skip)
+	}
+	if len(r.Params) > 3 {
+		var count int
+		if err := json.Unmarshal(r.Params[3], &count); err != nil {
+			return fmt.Errorf("fourth optional parameter 'count' must be an int: %v", err)
+		}
+		optArgs = append(optArgs, count)
+	}
+
+	newCmd, err := NewSearchRawTransactionCmd(r.Id, address, optArgs...)
+	if err != nil {
+		return err
+	}
+
+	*cmd = *newCmd
+	return nil
+}
+
+// Enforce that SearchRawTransactionCmd satisifies the Cmd interface.
+var _ Cmd = &SearchRawTransactionCmd{}
 
 // SendFromCmd is a type handling custom marshaling and
 // unmarshaling of sendfrom JSON RPC commands.
