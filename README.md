@@ -4,25 +4,31 @@ btcjson
 [![Build Status](https://travis-ci.org/btcsuite/btcjson.png?branch=master)]
 (https://travis-ci.org/btcsuite/btcjson)
 
-Package btcjson implements the bitcoin JSON-RPC API.  There is a test
-suite which is aiming to reach 100% code coverage.  See
-`test_coverage.txt` for the current coverage (using gocov).  On a
-UNIX-like OS, the script `cov_report.sh` can be used to generate the
-report.  Package btcjson is licensed under the liberal ISC license.
+Package btcjson implements concrete types for marshalling to and from the
+bitcoin JSON-RPC API.  A comprehensive suite of tests is provided to ensure
+proper functionality.  Package btcjson is licensed under the copyfree ISC
+license.
 
 This package is one of the core packages from btcd, an alternative full-node
 implementation of bitcoin which is under active development by Conformal.
 Although it was primarily written for btcd, this package has intentionally been
 designed so it can be used as a standalone package for any projects needing to
-communicate with a bitcoin client using the json rpc interface.
-[BlockSafari](http://blocksafari.com) is one such program that uses
-btcjson to communicate with btcd (or bitcoind to help test btcd).
+marshal to and from bitcoin JSON-RPC requests and responses.
+
+Note that although it's possible to use this package directly to implement an
+RPC client, it is not recommended since it is only intended as an infrastructure
+package.  Instead, RPC clients should use the
+[btcrpcclient](https://github.com/btcsuite/btcrpcclient) package which provides
+a full blown RPC client with many features such as automatic connection
+management, websocket support, automatic notification re-registration on
+reconnect, and conversion from the raw underlying RPC types (strings, floats,
+ints, etc) to higher-level types with many nice and useful properties.
 
 ## JSON RPC
 
-Bitcoin provides an extensive API call list to control bitcoind or
-bitcoin-qt through json-rpc.  These can be used to get information
-from the client or to cause the client to perform some action.
+Bitcoin provides an extensive API call list to control bitcoind or bitcoin-qt
+through JSON-RPC.  These can be used to get information from the client or to
+cause the client to perform some action.
 
 The general form of the commands are:
 
@@ -30,16 +36,28 @@ The general form of the commands are:
 	{"jsonrpc": "1.0", "id":"test", "method": "getinfo", "params": []}
 ```
 
-btcjson provides code to easily create these commands from go (as some
-of the commands can be fairly complex), to send the commands to a
-running bitcoin rpc server, and to handle the replies (putting them in
-useful Go data structures).
+btcjson provides code to easily create these commands from go (as some of the
+commands can be fairly complex), to send the commands to a running bitcoin RPC
+server, and to handle the replies (putting them in useful Go data structures).
 
 ## Sample Use
 
 ```Go
-	msg, err := btcjson.CreateMessage("getinfo")
-	reply, err := btcjson.RpcCommand(user, password, server, msg)
+	// Create a new command.
+	cmd, err := btcjson.NewGetBlockCountCmd()
+	if err != nil {
+		// Handle error
+	}
+
+	// Marshal the command to a JSON-RPC formatted byte slice.
+	marshalled, err := btcjson.MarshalCmd(id, cmd)
+	if err != nil {
+		// Handle error
+	}
+
+	// At this point marshalled contains the raw bytes that are ready to send
+	// to the RPC server to issue the command.
+	fmt.Printf("%s\n", marshalled)
 ```
 
 ## Documentation
@@ -57,10 +75,6 @@ http://localhost:6060/pkg/github.com/btcsuite/btcjson
 ```bash
 $ go get github.com/btcsuite/btcjson
 ```
-
-## TODO
-
-- Increase test coverage to 100%.
 
 ## GPG Verification Key
 
@@ -84,4 +98,5 @@ signature perform the following:
 
 ## License
 
-Package btcjson is licensed under the liberal ISC License.
+Package btcjson is licensed under the [copyfree](http://copyfree.org) ISC
+License.
