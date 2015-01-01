@@ -13,6 +13,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io/ioutil"
 	"net"
 	"net/http"
 	"net/url"
@@ -20,8 +21,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/btcsuite/btcd/btcjson"
-	"github.com/btcsuite/btcd/btcjson/btcws"
+	"github.com/btcsuite/btcd/btcjson/v2/btcjson"
 	"github.com/btcsuite/go-socks/socks"
 	"github.com/btcsuite/websocket"
 )
@@ -87,16 +87,18 @@ const (
 // as the original JSON-RPC command and a channel to reply on when the server
 // responds with the result.
 type sendPostDetails struct {
-	command      btcjson.Cmd
-	request      *http.Request
-	responseChan chan *response
+	httpRequest *http.Request
+	jsonRequest *jsonRequest
 }
 
 // jsonRequest holds information about a json request that is used to properly
 // detect, interpret, and deliver a reply to it.
 type jsonRequest struct {
-	cmd          btcjson.Cmd
-	responseChan chan *response
+	id             uint64
+	method         string
+	cmd            interface{}
+	marshalledJSON []byte
+	responseChan   chan *response
 }
 
 // Client represents a Bitcoin RPC client which allows easy access to the
@@ -163,15 +165,15 @@ func (c *Client) NextID() uint64 {
 	return atomic.AddUint64(&c.id, 1)
 }
 
-// addRequest associates the passed jsonRequest with the passed id.  This allows
-// the response from the remote server to be unmarshalled to the appropriate
-// type and sent to the specified channel when it is received.
+// addRequest associates the passed jsonRequest with its id.  This allows the
+// response from the remote server to be unmarshalled to the appropriate type
+// and sent to the specified channel when it is received.
 //
 // If the client has already begun shutting down, ErrClientShutdown is returned
 // and the request is not added.
 //
 // This function is safe for concurrent access.
-func (c *Client) addRequest(id uint64, request *jsonRequest) error {
+func (c *Client) addRequest(jReq *jsonRequest) error {
 	c.requestLock.Lock()
 	defer c.requestLock.Unlock()
 
@@ -187,9 +189,8 @@ func (c *Client) addRequest(id uint64, request *jsonRequest) error {
 	default:
 	}
 
-	// TODO(davec): Already there?
-	element := c.requestList.PushBack(request)
-	c.requestMap[id] = element
+	element := c.requestList.PushBack(jReq)
+	c.requestMap[jReq.id] = element
 	return nil
 }
 
@@ -224,7 +225,7 @@ func (c *Client) removeAllRequests() {
 // trackRegisteredNtfns examines the passed command to see if it is one of
 // the notification commands and updates the notification state that is used
 // to automatically re-establish registered notifications on reconnects.
-func (c *Client) trackRegisteredNtfns(cmd btcjson.Cmd) {
+func (c *Client) trackRegisteredNtfns(cmd interface{}) {
 	// Nothing to do if the caller is not interested in notifications.
 	if c.ntfnHandlers == nil {
 		return
@@ -234,23 +235,23 @@ func (c *Client) trackRegisteredNtfns(cmd btcjson.Cmd) {
 	defer c.ntfnState.Unlock()
 
 	switch bcmd := cmd.(type) {
-	case *btcws.NotifyBlocksCmd:
+	case *btcjson.NotifyBlocksCmd:
 		c.ntfnState.notifyBlocks = true
 
-	case *btcws.NotifyNewTransactionsCmd:
-		if bcmd.Verbose {
+	case *btcjson.NotifyNewTransactionsCmd:
+		if bcmd.Verbose != nil && *bcmd.Verbose {
 			c.ntfnState.notifyNewTxVerbose = true
 		} else {
 			c.ntfnState.notifyNewTx = true
 
 		}
 
-	case *btcws.NotifySpentCmd:
+	case *btcjson.NotifySpentCmd:
 		for _, op := range bcmd.OutPoints {
 			c.ntfnState.notifySpent[op] = struct{}{}
 		}
 
-	case *btcws.NotifyReceivedCmd:
+	case *btcjson.NotifyReceivedCmd:
 		for _, addr := range bcmd.Addresses {
 			c.ntfnState.notifyReceived[addr] = struct{}{}
 		}
@@ -278,8 +279,8 @@ type (
 	// rawResponse is a partially-unmarshaled JSON-RPC response.  For this
 	// to be valid (according to JSON-RPC 1.0 spec), ID may not be nil.
 	rawResponse struct {
-		Result json.RawMessage `json:"result"`
-		Error  *btcjson.Error  `json:"error"`
+		Result json.RawMessage   `json:"result"`
+		Error  *btcjson.RPCError `json:"error"`
 	}
 )
 
@@ -291,7 +292,7 @@ type response struct {
 }
 
 // result checks whether the unmarshaled response contains a non-nil error,
-// returning an unmarshaled btcjson.Error (or an unmarshaling error) if so.
+// returning an unmarshaled btcjson.RPCError (or an unmarshaling error) if so.
 // If the response is not an error, the raw bytes of the request are
 // returned for further unmashaling into specific result types.
 func (r rawResponse) result() (result []byte, err error) {
@@ -303,7 +304,8 @@ func (r rawResponse) result() (result []byte, err error) {
 
 // handleMessage is the main handler for incoming notifications and responses.
 func (c *Client) handleMessage(msg []byte) {
-	// Attempt to unmarshal the message as either a notifiation or response.
+	// Attempt to unmarshal the message as either a notification or
+	// response.
 	var in inMessage
 	err := json.Unmarshal(msg, &in)
 	if err != nil {
@@ -441,7 +443,7 @@ func (c *Client) sendMessage(marshalledJSON []byte) {
 
 // reregisterNtfns creates and sends commands needed to re-establish the current
 // notification state associated with the client.  It should only be called on
-// on reconnect by the resendCmds function.
+// on reconnect by the resendRequests function.
 func (c *Client) reregisterNtfns() error {
 	// Nothing to do if the caller is not interested in notifications.
 	if c.ntfnHandlers == nil {
@@ -480,7 +482,7 @@ func (c *Client) reregisterNtfns() error {
 	// outpoints in one command if needed.
 	nslen := len(stateCopy.notifySpent)
 	if nslen > 0 {
-		outpoints := make([]btcws.OutPoint, 0, nslen)
+		outpoints := make([]btcjson.OutPoint, 0, nslen)
 		for op := range stateCopy.notifySpent {
 			outpoints = append(outpoints, op)
 		}
@@ -513,10 +515,10 @@ var ignoreResends = map[string]struct{}{
 	"rescan": struct{}{},
 }
 
-// resendCmds resends any commands that had not completed when the client
+// resendRequests resends any requests that had not completed when the client
 // disconnected.  It is intended to be called once the client has reconnected as
 // a separate goroutine.
-func (c *Client) resendCmds() {
+func (c *Client) resendRequests() {
 	// Set the notification state back up.  If anything goes wrong,
 	// disconnect the client.
 	if err := c.reregisterNtfns(); err != nil {
@@ -525,37 +527,39 @@ func (c *Client) resendCmds() {
 		return
 	}
 
-	// Since it's possible to block on send and more commands might be
+	// Since it's possible to block on send and more requests might be
 	// added by the caller while resending, make a copy of all of the
-	// commands that need to be resent now and work from the copy.  This
+	// requests that need to be resent now and work from the copy.  This
 	// also allows the lock to be released quickly.
 	c.requestLock.Lock()
-	resendCmds := make([]*jsonRequest, 0, c.requestList.Len())
+	resendReqs := make([]*jsonRequest, 0, c.requestList.Len())
 	var nextElem *list.Element
 	for e := c.requestList.Front(); e != nil; e = nextElem {
 		nextElem = e.Next()
 
-		req := e.Value.(*jsonRequest)
-		if _, ok := ignoreResends[req.cmd.Method()]; ok {
+		jReq := e.Value.(*jsonRequest)
+		if _, ok := ignoreResends[jReq.method]; ok {
 			// If a request is not sent on reconnect, remove it
 			// from the request structures, since no reply is
 			// expected.
-			delete(c.requestMap, req.cmd.Id().(uint64))
+			delete(c.requestMap, jReq.id)
 			c.requestList.Remove(e)
 		} else {
-			resendCmds = append(resendCmds, req)
+			resendReqs = append(resendReqs, jReq)
 		}
 	}
 	c.requestLock.Unlock()
 
-	for _, req := range resendCmds {
+	for _, jReq := range resendReqs {
 		// Stop resending commands if the client disconnected again
 		// since the next reconnect will handle them.
 		if c.Disconnected() {
 			return
 		}
 
-		c.marshalAndSend(req.cmd, req.responseChan)
+		log.Tracef("Sending command [%s] with id %d", jReq.method,
+			jReq.id)
+		c.sendMessage(jReq.marshalledJSON)
 	}
 }
 
@@ -624,9 +628,9 @@ out:
 			// new connection.
 			c.start()
 
-			// Reissue pending commands in another goroutine since
+			// Reissue pending requests in another goroutine since
 			// the send can block.
-			go c.resendCmds()
+			go c.resendRequests()
 
 			// Break out of the reconnect loop back to wait for
 			// disconnect again.
@@ -638,40 +642,41 @@ out:
 }
 
 // handleSendPostMessage handles performing the passed HTTP request, reading the
-// result, unmarshalling it, and delivering the unmarhsalled result to the
+// result, unmarshalling it, and delivering the unmarshalled result to the
 // provided response channel.
 func (c *Client) handleSendPostMessage(details *sendPostDetails) {
-	// Post the request.
-	cmd := details.command
-	log.Tracef("Sending command [%s] with id %d", cmd.Method(), cmd.Id())
-	httpResponse, err := c.httpClient.Do(details.request)
+	jReq := details.jsonRequest
+	log.Tracef("Sending command [%s] with id %d", jReq.method, jReq.id)
+	httpResponse, err := c.httpClient.Do(details.httpRequest)
 	if err != nil {
-		details.responseChan <- &response{err: err}
+		jReq.responseChan <- &response{err: err}
 		return
 	}
 
 	// Read the raw bytes and close the response.
-	respBytes, err := btcjson.GetRaw(httpResponse.Body)
+	respBytes, err := ioutil.ReadAll(httpResponse.Body)
+	httpResponse.Body.Close()
 	if err != nil {
-		details.responseChan <- &response{err: err}
+		err = fmt.Errorf("error reading json reply: %v", err)
+		jReq.responseChan <- &response{err: err}
 		return
 	}
 
 	// Handle unsuccessful HTTP responses
 	if httpResponse.StatusCode < 200 || httpResponse.StatusCode >= 300 {
-		details.responseChan <- &response{err: errors.New(string(respBytes))}
+		jReq.responseChan <- &response{err: errors.New(string(respBytes))}
 		return
 	}
 
 	var resp rawResponse
 	err = json.Unmarshal(respBytes, &resp)
 	if err != nil {
-		details.responseChan <- &response{err: err}
+		jReq.responseChan <- &response{err: err}
 		return
 	}
 
 	res, err := resp.result()
-	details.responseChan <- &response{result: res, err: err}
+	jReq.responseChan <- &response{result: res, err: err}
 }
 
 // sendPostHandler handles all outgoing messages when the client is running
@@ -698,7 +703,7 @@ cleanup:
 	for {
 		select {
 		case details := <-c.sendPostChan:
-			details.responseChan <- &response{
+			details.jsonRequest.responseChan <- &response{
 				result: nil,
 				err:    ErrClientShutdown,
 			}
@@ -715,18 +720,17 @@ cleanup:
 // sendPostRequest sends the passed HTTP request to the RPC server using the
 // HTTP client associated with the client.  It is backed by a buffered channel,
 // so it will not block until the send channel is full.
-func (c *Client) sendPostRequest(req *http.Request, command btcjson.Cmd, responseChan chan *response) {
+func (c *Client) sendPostRequest(httpReq *http.Request, jReq *jsonRequest) {
 	// Don't send the message if shutting down.
 	select {
 	case <-c.shutdown:
-		responseChan <- &response{result: nil, err: ErrClientShutdown}
+		jReq.responseChan <- &response{result: nil, err: ErrClientShutdown}
 	default:
 	}
 
 	c.sendPostChan <- &sendPostDetails{
-		command:      command,
-		request:      req,
-		responseChan: responseChan,
+		jsonRequest: jReq,
+		httpRequest: httpReq,
 	}
 }
 
@@ -749,66 +753,45 @@ func receiveFuture(f chan *response) ([]byte, error) {
 	return r.result, r.err
 }
 
-// marshalAndSendPost marshals the passed command to JSON-RPC and sends it to
-// the server by issuing an HTTP POST request and returns a response channel
-// on which the reply will be delivered.  Typically a new connection is opened
-// and closed for each command when using this method, however, the underlying
-// HTTP client might coalesce multiple commands depending on several factors
-// including the remote server configuration.
-func (c *Client) marshalAndSendPost(cmd btcjson.Cmd, responseChan chan *response) {
-	marshalledJSON, err := json.Marshal(cmd)
-	if err != nil {
-		responseChan <- &response{result: nil, err: err}
-		return
-	}
-
+// sendPost sends the passed request to the server by issuing an HTTP POST
+// request using the provided response channel for the reply.  Typically a new
+// connection is opened and closed for each command when using this method,
+// however, the underlying HTTP client might coalesce multiple commands
+// depending on several factors including the remote server configuration.
+func (c *Client) sendPost(jReq *jsonRequest) {
 	// Generate a request to the configured RPC server.
 	protocol := "http"
 	if !c.config.DisableTLS {
 		protocol = "https"
 	}
 	url := protocol + "://" + c.config.Host
-	req, err := http.NewRequest("POST", url, bytes.NewReader(marshalledJSON))
+	bodyReader := bytes.NewReader(jReq.marshalledJSON)
+	httpReq, err := http.NewRequest("POST", url, bodyReader)
 	if err != nil {
-		responseChan <- &response{result: nil, err: err}
+		jReq.responseChan <- &response{result: nil, err: err}
 		return
 	}
-	req.Close = true
-	req.Header.Set("Content-Type", "application/json")
+	httpReq.Close = true
+	httpReq.Header.Set("Content-Type", "application/json")
 
 	// Configure basic access authorization.
-	req.SetBasicAuth(c.config.User, c.config.Pass)
+	httpReq.SetBasicAuth(c.config.User, c.config.Pass)
 
-	log.Tracef("Sending command [%s] with id %d", cmd.Method(), cmd.Id())
-	c.sendPostRequest(req, cmd, responseChan)
+	log.Tracef("Sending command [%s] with id %d", jReq.method, jReq.id)
+	c.sendPostRequest(httpReq, jReq)
 }
 
-// marshalAndSend marshals the passed command to JSON-RPC and sends it to the
-// server.  It returns a response channel on which the reply will be delivered.
-func (c *Client) marshalAndSend(cmd btcjson.Cmd, responseChan chan *response) {
-	marshalledJSON, err := cmd.MarshalJSON()
-	if err != nil {
-		responseChan <- &response{result: nil, err: err}
-		return
-	}
-
-	log.Tracef("Sending command [%s] with id %d", cmd.Method(), cmd.Id())
-	c.sendMessage(marshalledJSON)
-}
-
-// sendCmd sends the passed command to the associated server and returns a
-// response channel on which the reply will be deliver at some point in the
-// future.  It handles both websocket and HTTP POST mode depending on the
-// configuration of the client.
-func (c *Client) sendCmd(cmd btcjson.Cmd) chan *response {
+// sendRequest sends the passed json request to the associated server using the
+// provided response channel for the reply.  It handles both websocket and HTTP
+// POST mode depending on the configuration of the client.
+func (c *Client) sendRequest(jReq *jsonRequest) {
 	// Choose which marshal and send function to use depending on whether
 	// the client running in HTTP POST mode or not.  When running in HTTP
 	// POST mode, the command is issued via an HTTP client.  Otherwise,
 	// the command is issued via the asynchronous websocket channels.
-	responseChan := make(chan *response, 1)
 	if c.config.HttpPostMode {
-		c.marshalAndSendPost(cmd, responseChan)
-		return responseChan
+		c.sendPost(jReq)
+		return
 	}
 
 	// Check whether the websocket connection has never been established,
@@ -816,26 +799,58 @@ func (c *Client) sendCmd(cmd btcjson.Cmd) chan *response {
 	select {
 	case <-c.connEstablished:
 	default:
-		responseChan <- &response{err: ErrClientNotConnected}
-		return responseChan
+		jReq.responseChan <- &response{err: ErrClientNotConnected}
+		return
 	}
 
-	err := c.addRequest(cmd.Id().(uint64), &jsonRequest{
-		cmd:          cmd,
-		responseChan: responseChan,
-	})
-	if err != nil {
-		responseChan <- &response{err: err}
-		return responseChan
+	// Add the request to the internal tracking map so the response from the
+	// remote server can be properly detected and routed to the response
+	// channel.  Then send the marshalled request via the websocket
+	// connection.
+	if err := c.addRequest(jReq); err != nil {
+		jReq.responseChan <- &response{err: err}
+		return
 	}
-	c.marshalAndSend(cmd, responseChan)
+	log.Tracef("Sending command [%s] with id %d", jReq.method, jReq.id)
+	c.sendMessage(jReq.marshalledJSON)
+}
+
+// sendCmd sends the passed command to the associated server and returns a
+// response channel on which the reply will be delivered at some point in the
+// future.  It handles both websocket and HTTP POST mode depending on the
+// configuration of the client.
+func (c *Client) sendCmd(cmd interface{}) chan *response {
+	// Get the method associated with the command.
+	method, err := btcjson.CmdMethod(cmd)
+	if err != nil {
+		return newFutureError(err)
+	}
+
+	// Marshal the command.
+	id := c.NextID()
+	marshalledJSON, err := btcjson.MarshalCmd(id, cmd)
+	if err != nil {
+		return newFutureError(err)
+	}
+
+	// Generate the request and send it along with a channel to respond on.
+	responseChan := make(chan *response, 1)
+	jReq := &jsonRequest{
+		id:             id,
+		method:         method,
+		cmd:            cmd,
+		marshalledJSON: marshalledJSON,
+		responseChan:   responseChan,
+	}
+	c.sendRequest(jReq)
+
 	return responseChan
 }
 
 // sendCmdAndWait sends the passed command to the associated server, waits
 // for the reply, and returns the result from it.  It will return the error
 // field in the reply if there is one.
-func (c *Client) sendCmdAndWait(cmd btcjson.Cmd) (interface{}, error) {
+func (c *Client) sendCmdAndWait(cmd interface{}) (interface{}, error) {
 	// Marshal the command to JSON-RPC, send it to the connected server, and
 	// wait for a response on the returned channel.
 	return receiveFuture(c.sendCmd(cmd))

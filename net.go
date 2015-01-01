@@ -7,7 +7,7 @@ package btcrpcclient
 import (
 	"encoding/json"
 
-	"github.com/btcsuite/btcd/btcjson"
+	"github.com/btcsuite/btcd/btcjson/v2/btcjson"
 )
 
 // AddNodeCommand enumerates the available commands that the AddNode function
@@ -54,12 +54,7 @@ func (r FutureAddNodeResult) Receive() error {
 //
 // See AddNode for the blocking version and more details.
 func (c *Client) AddNodeAsync(host string, command AddNodeCommand) FutureAddNodeResult {
-	id := c.NextID()
-	cmd, err := btcjson.NewAddNodeCmd(id, host, string(command))
-	if err != nil {
-		return newFutureError(err)
-	}
-
+	cmd := btcjson.NewAddNodeCmd(host, btcjson.AddNodeSubCmd(command))
 	return c.sendCmd(cmd)
 }
 
@@ -100,12 +95,7 @@ func (r FutureGetAddedNodeInfoResult) Receive() ([]btcjson.GetAddedNodeInfoResul
 //
 // See GetAddedNodeInfo for the blocking version and more details.
 func (c *Client) GetAddedNodeInfoAsync(peer string) FutureGetAddedNodeInfoResult {
-	id := c.NextID()
-	cmd, err := btcjson.NewGetAddedNodeInfoCmd(id, true, peer)
-	if err != nil {
-		return newFutureError(err)
-	}
-
+	cmd := btcjson.NewGetAddedNodeInfoCmd(true, &peer)
 	return c.sendCmd(cmd)
 }
 
@@ -145,12 +135,7 @@ func (r FutureGetAddedNodeInfoNoDNSResult) Receive() ([]string, error) {
 //
 // See GetAddedNodeInfoNoDNS for the blocking version and more details.
 func (c *Client) GetAddedNodeInfoNoDNSAsync(peer string) FutureGetAddedNodeInfoNoDNSResult {
-	id := c.NextID()
-	cmd, err := btcjson.NewGetAddedNodeInfoCmd(id, false, peer)
-	if err != nil {
-		return newFutureError(err)
-	}
-
+	cmd := btcjson.NewGetAddedNodeInfoCmd(false, &peer)
 	return c.sendCmd(cmd)
 }
 
@@ -191,12 +176,7 @@ func (r FutureGetConnectionCountResult) Receive() (int64, error) {
 //
 // See GetConnectionCount for the blocking version and more details.
 func (c *Client) GetConnectionCountAsync() FutureGetConnectionCountResult {
-	id := c.NextID()
-	cmd, err := btcjson.NewGetConnectionCountCmd(id)
-	if err != nil {
-		return newFutureError(err)
-	}
-
+	cmd := btcjson.NewGetConnectionCountCmd()
 	return c.sendCmd(cmd)
 }
 
@@ -226,12 +206,7 @@ func (r FuturePingResult) Receive() error {
 //
 // See Ping for the blocking version and more details.
 func (c *Client) PingAsync() FuturePingResult {
-	id := c.NextID()
-	cmd, err := btcjson.NewPingCmd(id)
-	if err != nil {
-		return newFutureError(err)
-	}
-
+	cmd := btcjson.NewPingCmd()
 	return c.sendCmd(cmd)
 }
 
@@ -271,12 +246,7 @@ func (r FutureGetPeerInfoResult) Receive() ([]btcjson.GetPeerInfoResult, error) 
 //
 // See GetPeerInfo for the blocking version and more details.
 func (c *Client) GetPeerInfoAsync() FutureGetPeerInfoResult {
-	id := c.NextID()
-	cmd, err := btcjson.NewGetPeerInfoCmd(id)
-	if err != nil {
-		return newFutureError(err)
-	}
-
+	cmd := btcjson.NewGetPeerInfoCmd()
 	return c.sendCmd(cmd)
 }
 
@@ -313,12 +283,7 @@ func (r FutureGetNetTotalsResult) Receive() (*btcjson.GetNetTotalsResult, error)
 //
 // See GetNetTotals for the blocking version and more details.
 func (c *Client) GetNetTotalsAsync() FutureGetNetTotalsResult {
-	id := c.NextID()
-	cmd, err := btcjson.NewGetNetTotalsCmd(id)
-	if err != nil {
-		return newFutureError(err)
-	}
-
+	cmd := btcjson.NewGetNetTotalsCmd()
 	return c.sendCmd(cmd)
 }
 

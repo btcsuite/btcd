@@ -141,14 +141,14 @@ the type can vary, but usually will be best handled by simply showing/logging
 it.
 
 The third category of errors, that is errors returned by the server, can be
-detected by type asserting the error in a *btcjson.Error.  For example, to
+detected by type asserting the error in a *btcjson.RPCError.  For example, to
 detect if a command is unimplemented by the remote RPC server:
 
   amount, err := client.GetBalance("")
   if err != nil {
-  	if jerr, ok := err.(*btcjson.Error); ok {
+  	if jerr, ok := err.(*btcjson.RPCError); ok {
   		switch jerr.Code {
-		case btcjson.ErrUnimplemented.Code:
+  		case btcjson.ErrRPCUnimplemented:
   			// Handle not implemented error
 
   		// Handle other specific errors you care about

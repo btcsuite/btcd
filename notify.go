@@ -13,8 +13,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/btcsuite/btcd/btcjson"
-	"github.com/btcsuite/btcd/btcjson/btcws"
+	"github.com/btcsuite/btcd/btcjson/v2/btcjson"
 	"github.com/btcsuite/btcd/wire"
 	"github.com/btcsuite/btcutil"
 )
@@ -37,7 +36,7 @@ type notificationState struct {
 	notifyNewTx        bool
 	notifyNewTxVerbose bool
 	notifyReceived     map[string]struct{}
-	notifySpent        map[btcws.OutPoint]struct{}
+	notifySpent        map[btcjson.OutPoint]struct{}
 }
 
 // Copy returns a deep copy of the receiver.
@@ -52,7 +51,7 @@ func (s *notificationState) Copy() *notificationState {
 	for addr := range s.notifyReceived {
 		stateCopy.notifyReceived[addr] = struct{}{}
 	}
-	stateCopy.notifySpent = make(map[btcws.OutPoint]struct{})
+	stateCopy.notifySpent = make(map[btcjson.OutPoint]struct{})
 	for op := range s.notifySpent {
 		stateCopy.notifySpent[op] = struct{}{}
 	}
@@ -64,7 +63,7 @@ func (s *notificationState) Copy() *notificationState {
 func newNotificationState() *notificationState {
 	return &notificationState{
 		notifyReceived: make(map[string]struct{}),
-		notifySpent:    make(map[btcws.OutPoint]struct{}),
+		notifySpent:    make(map[btcjson.OutPoint]struct{}),
 	}
 }
 
@@ -110,7 +109,7 @@ type NotificationHandlers struct {
 	// connected to the longest (best) chain.  It will only be invoked if a
 	// preceding call to NotifyReceived, Rescan, or RescanEndHeight has been
 	// made to register for the notification and the function is non-nil.
-	OnRecvTx func(transaction *btcutil.Tx, details *btcws.BlockDetails)
+	OnRecvTx func(transaction *btcutil.Tx, details *btcjson.BlockDetails)
 
 	// OnRedeemingTx is invoked when a transaction that spends a registered
 	// outpoint is received into the memory pool and also connected to the
@@ -122,7 +121,7 @@ type NotificationHandlers struct {
 	// for the outpoints that are now "owned" as a result of receiving
 	// funds to the registered addresses.  This means it is possible for
 	// this to invoked indirectly as the result of a NotifyReceived call.
-	OnRedeemingTx func(transaction *btcutil.Tx, details *btcws.BlockDetails)
+	OnRedeemingTx func(transaction *btcutil.Tx, details *btcjson.BlockDetails)
 
 	// OnRescanFinished is invoked after a rescan finishes due to a previous
 	// call to Rescan or RescanEndHeight.  Finished rescans should be
@@ -188,7 +187,7 @@ func (c *Client) handleNotification(ntfn *rawNotification) {
 
 	switch ntfn.Method {
 	// OnBlockConnected
-	case btcws.BlockConnectedNtfnMethod:
+	case btcjson.BlockConnectedNtfnMethod:
 		// Ignore the notification if the client is not interested in
 		// it.
 		if c.ntfnHandlers.OnBlockConnected == nil {
@@ -205,7 +204,7 @@ func (c *Client) handleNotification(ntfn *rawNotification) {
 		c.ntfnHandlers.OnBlockConnected(blockSha, blockHeight)
 
 	// OnBlockDisconnected
-	case btcws.BlockDisconnectedNtfnMethod:
+	case btcjson.BlockDisconnectedNtfnMethod:
 		// Ignore the notification if the client is not interested in
 		// it.
 		if c.ntfnHandlers.OnBlockDisconnected == nil {
@@ -222,7 +221,7 @@ func (c *Client) handleNotification(ntfn *rawNotification) {
 		c.ntfnHandlers.OnBlockDisconnected(blockSha, blockHeight)
 
 	// OnRecvTx
-	case btcws.RecvTxNtfnMethod:
+	case btcjson.RecvTxNtfnMethod:
 		// Ignore the notification if the client is not interested in
 		// it.
 		if c.ntfnHandlers.OnRecvTx == nil {
@@ -239,7 +238,7 @@ func (c *Client) handleNotification(ntfn *rawNotification) {
 		c.ntfnHandlers.OnRecvTx(tx, block)
 
 	// OnRedeemingTx
-	case btcws.RedeemingTxNtfnMethod:
+	case btcjson.RedeemingTxNtfnMethod:
 		// Ignore the notification if the client is not interested in
 		// it.
 		if c.ntfnHandlers.OnRedeemingTx == nil {
@@ -256,7 +255,7 @@ func (c *Client) handleNotification(ntfn *rawNotification) {
 		c.ntfnHandlers.OnRedeemingTx(tx, block)
 
 	// OnRescanFinished
-	case btcws.RescanFinishedNtfnMethod:
+	case btcjson.RescanFinishedNtfnMethod:
 		// Ignore the notification if the client is not interested in
 		// it.
 		if c.ntfnHandlers.OnRescanFinished == nil {
@@ -273,7 +272,7 @@ func (c *Client) handleNotification(ntfn *rawNotification) {
 		c.ntfnHandlers.OnRescanFinished(hash, height, blkTime)
 
 	// OnRescanProgress
-	case btcws.RescanProgressNtfnMethod:
+	case btcjson.RescanProgressNtfnMethod:
 		// Ignore the notification if the client is not interested in
 		// it.
 		if c.ntfnHandlers.OnRescanProgress == nil {
@@ -290,7 +289,7 @@ func (c *Client) handleNotification(ntfn *rawNotification) {
 		c.ntfnHandlers.OnRescanProgress(hash, height, blkTime)
 
 	// OnTxAccepted
-	case btcws.TxAcceptedNtfnMethod:
+	case btcjson.TxAcceptedNtfnMethod:
 		// Ignore the notification if the client is not interested in
 		// it.
 		if c.ntfnHandlers.OnTxAccepted == nil {
@@ -307,7 +306,7 @@ func (c *Client) handleNotification(ntfn *rawNotification) {
 		c.ntfnHandlers.OnTxAccepted(hash, amt)
 
 	// OnTxAcceptedVerbose
-	case btcws.TxAcceptedVerboseNtfnMethod:
+	case btcjson.TxAcceptedVerboseNtfnMethod:
 		// Ignore the notification if the client is not interested in
 		// it.
 		if c.ntfnHandlers.OnTxAcceptedVerbose == nil {
@@ -324,7 +323,7 @@ func (c *Client) handleNotification(ntfn *rawNotification) {
 		c.ntfnHandlers.OnTxAcceptedVerbose(rawTx)
 
 	// OnBtcdConnected
-	case btcws.BtcdConnectedNtfnMethod:
+	case btcjson.BtcdConnectedNtfnMethod:
 		// Ignore the notification if the client is not interested in
 		// it.
 		if c.ntfnHandlers.OnBtcdConnected == nil {
@@ -341,7 +340,7 @@ func (c *Client) handleNotification(ntfn *rawNotification) {
 		c.ntfnHandlers.OnBtcdConnected(connected)
 
 	// OnAccountBalance
-	case btcws.AccountBalanceNtfnMethod:
+	case btcjson.AccountBalanceNtfnMethod:
 		// Ignore the notification if the client is not interested in
 		// it.
 		if c.ntfnHandlers.OnAccountBalance == nil {
@@ -358,7 +357,7 @@ func (c *Client) handleNotification(ntfn *rawNotification) {
 		c.ntfnHandlers.OnAccountBalance(account, bal, conf)
 
 	// OnWalletLockState
-	case btcws.WalletLockStateNtfnMethod:
+	case btcjson.WalletLockStateNtfnMethod:
 		// Ignore the notification if the client is not interested in
 		// it.
 		if c.ntfnHandlers.OnWalletLockState == nil {
@@ -433,7 +432,7 @@ func parseChainNtfnParams(params []json.RawMessage) (*wire.ShaHash,
 // the block it's mined in from the parameters of recvtx and redeemingtx
 // notifications.
 func parseChainTxNtfnParams(params []json.RawMessage) (*btcutil.Tx,
-	*btcws.BlockDetails, error) {
+	*btcjson.BlockDetails, error) {
 
 	if len(params) == 0 || len(params) > 2 {
 		return nil, nil, wrongNumParams(len(params))
@@ -448,7 +447,7 @@ func parseChainTxNtfnParams(params []json.RawMessage) (*btcutil.Tx,
 
 	// If present, unmarshal second optional parameter as the block details
 	// JSON object.
-	var block *btcws.BlockDetails
+	var block *btcjson.BlockDetails
 	if len(params) > 1 {
 		err = json.Unmarshal(params[1], &block)
 		if err != nil {
@@ -558,7 +557,7 @@ func parseTxAcceptedVerboseNtfnParams(params []json.RawMessage) (*btcjson.TxRawR
 		return nil, err
 	}
 
-	// TODO: change txacceptedverbose notifiation callbacks to use nicer
+	// TODO: change txacceptedverbose notification callbacks to use nicer
 	// types for all details about the transaction (i.e. decoding hashes
 	// from their string encoding).
 	return &rawTx, nil
@@ -611,7 +610,7 @@ func parseAccountBalanceNtfnParams(params []json.RawMessage) (account string,
 	}
 
 	// Bounds check amount.
-	bal, err := btcjson.JSONToAmount(fbal)
+	bal, err := btcutil.NewAmount(fbal)
 	if err != nil {
 		return "", 0, false, err
 	}
@@ -677,9 +676,7 @@ func (c *Client) NotifyBlocksAsync() FutureNotifyBlocksResult {
 		return newNilFutureResult()
 	}
 
-	id := c.NextID()
-	cmd := btcws.NewNotifyBlocksCmd(id)
-
+	cmd := btcjson.NewNotifyBlocksCmd()
 	return c.sendCmd(cmd)
 }
 
@@ -715,7 +712,7 @@ func (r FutureNotifySpentResult) Receive() error {
 // notifySpentInternal is the same as notifySpentAsync except it accepts
 // the converted outpoints as a parameter so the client can more efficiently
 // recreate the previous notification state on reconnect.
-func (c *Client) notifySpentInternal(outpoints []btcws.OutPoint) FutureNotifySpentResult {
+func (c *Client) notifySpentInternal(outpoints []btcjson.OutPoint) FutureNotifySpentResult {
 	// Not supported in HTTP POST mode.
 	if c.config.HttpPostMode {
 		return newFutureError(ErrNotificationsNotSupported)
@@ -727,9 +724,7 @@ func (c *Client) notifySpentInternal(outpoints []btcws.OutPoint) FutureNotifySpe
 		return newNilFutureResult()
 	}
 
-	id := c.NextID()
-	cmd := btcws.NewNotifySpentCmd(id, outpoints)
-
+	cmd := btcjson.NewNotifySpentCmd(outpoints)
 	return c.sendCmd(cmd)
 }
 
@@ -752,13 +747,11 @@ func (c *Client) NotifySpentAsync(outpoints []*wire.OutPoint) FutureNotifySpentR
 		return newNilFutureResult()
 	}
 
-	id := c.NextID()
-	ops := make([]btcws.OutPoint, 0, len(outpoints))
+	ops := make([]btcjson.OutPoint, 0, len(outpoints))
 	for _, outpoint := range outpoints {
-		ops = append(ops, *btcws.NewOutPointFromWire(outpoint))
+		ops = append(ops, *btcjson.NewOutPointFromWire(outpoint))
 	}
-	cmd := btcws.NewNotifySpentCmd(id, ops)
-
+	cmd := btcjson.NewNotifySpentCmd(ops)
 	return c.sendCmd(cmd)
 }
 
@@ -810,12 +803,7 @@ func (c *Client) NotifyNewTransactionsAsync(verbose bool) FutureNotifyNewTransac
 		return newNilFutureResult()
 	}
 
-	id := c.NextID()
-	cmd, err := btcws.NewNotifyNewTransactionsCmd(id, verbose)
-	if err != nil {
-		return newFutureError(err)
-	}
-
+	cmd := btcjson.NewNotifyNewTransactionsCmd(&verbose)
 	return c.sendCmd(cmd)
 }
 
@@ -865,9 +853,7 @@ func (c *Client) notifyReceivedInternal(addresses []string) FutureNotifyReceived
 	}
 
 	// Convert addresses to strings.
-	id := c.NextID()
-	cmd := btcws.NewNotifyReceivedCmd(id, addresses)
-
+	cmd := btcjson.NewNotifyReceivedCmd(addresses)
 	return c.sendCmd(cmd)
 }
 
@@ -895,9 +881,7 @@ func (c *Client) NotifyReceivedAsync(addresses []btcutil.Address) FutureNotifyRe
 	for _, addr := range addresses {
 		addrs = append(addrs, addr.String())
 	}
-	id := c.NextID()
-	cmd := btcws.NewNotifyReceivedCmd(id, addrs)
-
+	cmd := btcjson.NewNotifyReceivedCmd(addrs)
 	return c.sendCmd(cmd)
 }
 
@@ -978,17 +962,12 @@ func (c *Client) RescanAsync(startBlock *wire.ShaHash,
 	}
 
 	// Convert outpoints.
-	ops := make([]btcws.OutPoint, 0, len(outpoints))
+	ops := make([]btcjson.OutPoint, 0, len(outpoints))
 	for _, op := range outpoints {
-		ops = append(ops, *btcws.NewOutPointFromWire(op))
+		ops = append(ops, *btcjson.NewOutPointFromWire(op))
 	}
 
-	id := c.NextID()
-	cmd, err := btcws.NewRescanCmd(id, startBlockShaStr, addrs, ops)
-	if err != nil {
-		return newFutureError(err)
-	}
-
+	cmd := btcjson.NewRescanCmd(startBlockShaStr, addrs, ops, nil)
 	return c.sendCmd(cmd)
 }
 
@@ -1063,18 +1042,13 @@ func (c *Client) RescanEndBlockAsync(startBlock *wire.ShaHash,
 	}
 
 	// Convert outpoints.
-	ops := make([]btcws.OutPoint, 0, len(outpoints))
+	ops := make([]btcjson.OutPoint, 0, len(outpoints))
 	for _, op := range outpoints {
-		ops = append(ops, *btcws.NewOutPointFromWire(op))
+		ops = append(ops, *btcjson.NewOutPointFromWire(op))
 	}
 
-	id := c.NextID()
-	cmd, err := btcws.NewRescanCmd(id, startBlockShaStr, addrs, ops,
-		endBlockShaStr)
-	if err != nil {
-		return newFutureError(err)
-	}
-
+	cmd := btcjson.NewRescanCmd(startBlockShaStr, addrs, ops,
+		&endBlockShaStr)
 	return c.sendCmd(cmd)
 }
 

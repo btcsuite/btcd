@@ -9,7 +9,7 @@ import (
 	"encoding/json"
 	"errors"
 
-	"github.com/btcsuite/btcd/btcjson"
+	"github.com/btcsuite/btcd/btcjson/v2/btcjson"
 	"github.com/btcsuite/btcutil"
 )
 
@@ -41,12 +41,7 @@ func (r FutureGetGenerateResult) Receive() (bool, error) {
 //
 // See GetGenerate for the blocking version and more details.
 func (c *Client) GetGenerateAsync() FutureGetGenerateResult {
-	id := c.NextID()
-	cmd, err := btcjson.NewGetGenerateCmd(id)
-	if err != nil {
-		return newFutureError(err)
-	}
-
+	cmd := btcjson.NewGetGenerateCmd()
 	return c.sendCmd(cmd)
 }
 
@@ -76,12 +71,7 @@ func (r FutureSetGenerateResult) Receive() error {
 //
 // See SetGenerate for the blocking version and more details.
 func (c *Client) SetGenerateAsync(enable bool, numCPUs int) FutureSetGenerateResult {
-	id := c.NextID()
-	cmd, err := btcjson.NewSetGenerateCmd(id, enable, numCPUs)
-	if err != nil {
-		return newFutureError(err)
-	}
-
+	cmd := btcjson.NewSetGenerateCmd(enable, &numCPUs)
 	return c.sendCmd(cmd)
 }
 
@@ -119,12 +109,7 @@ func (r FutureGetHashesPerSecResult) Receive() (int64, error) {
 //
 // See GetHashesPerSec for the blocking version and more details.
 func (c *Client) GetHashesPerSecAsync() FutureGetHashesPerSecResult {
-	id := c.NextID()
-	cmd, err := btcjson.NewGetHashesPerSecCmd(id)
-	if err != nil {
-		return newFutureError(err)
-	}
-
+	cmd := btcjson.NewGetHashesPerSecCmd()
 	return c.sendCmd(cmd)
 }
 
@@ -163,12 +148,7 @@ func (r FutureGetMiningInfoResult) Receive() (*btcjson.GetMiningInfoResult, erro
 //
 // See GetMiningInfo for the blocking version and more details.
 func (c *Client) GetMiningInfoAsync() FutureGetMiningInfoResult {
-	id := c.NextID()
-	cmd, err := btcjson.NewGetMiningInfoCmd(id)
-	if err != nil {
-		return newFutureError(err)
-	}
-
+	cmd := btcjson.NewGetMiningInfoCmd()
 	return c.sendCmd(cmd)
 }
 
@@ -206,12 +186,7 @@ func (r FutureGetNetworkHashPS) Receive() (int64, error) {
 //
 // See GetNetworkHashPS for the blocking version and more details.
 func (c *Client) GetNetworkHashPSAsync() FutureGetNetworkHashPS {
-	id := c.NextID()
-	cmd, err := btcjson.NewGetNetworkHashPSCmd(id)
-	if err != nil {
-		return newFutureError(err)
-	}
-
+	cmd := btcjson.NewGetNetworkHashPSCmd(nil, nil)
 	return c.sendCmd(cmd)
 }
 
@@ -230,12 +205,7 @@ func (c *Client) GetNetworkHashPS() (int64, error) {
 //
 // See GetNetworkHashPS2 for the blocking version and more details.
 func (c *Client) GetNetworkHashPS2Async(blocks int) FutureGetNetworkHashPS {
-	id := c.NextID()
-	cmd, err := btcjson.NewGetNetworkHashPSCmd(id, blocks)
-	if err != nil {
-		return newFutureError(err)
-	}
-
+	cmd := btcjson.NewGetNetworkHashPSCmd(&blocks, nil)
 	return c.sendCmd(cmd)
 }
 
@@ -256,12 +226,7 @@ func (c *Client) GetNetworkHashPS2(blocks int) (int64, error) {
 //
 // See GetNetworkHashPS3 for the blocking version and more details.
 func (c *Client) GetNetworkHashPS3Async(blocks, height int) FutureGetNetworkHashPS {
-	id := c.NextID()
-	cmd, err := btcjson.NewGetNetworkHashPSCmd(id, blocks, height)
-	if err != nil {
-		return newFutureError(err)
-	}
-
+	cmd := btcjson.NewGetNetworkHashPSCmd(&blocks, &height)
 	return c.sendCmd(cmd)
 }
 
@@ -303,12 +268,7 @@ func (r FutureGetWork) Receive() (*btcjson.GetWorkResult, error) {
 //
 // See GetWork for the blocking version and more details.
 func (c *Client) GetWorkAsync() FutureGetWork {
-	id := c.NextID()
-	cmd, err := btcjson.NewGetWorkCmd(id)
-	if err != nil {
-		return newFutureError(err)
-	}
-
+	cmd := btcjson.NewGetWorkCmd(nil)
 	return c.sendCmd(cmd)
 }
 
@@ -347,12 +307,7 @@ func (r FutureGetWorkSubmit) Receive() (bool, error) {
 //
 // See GetWorkSubmit for the blocking version and more details.
 func (c *Client) GetWorkSubmitAsync(data string) FutureGetWorkSubmit {
-	id := c.NextID()
-	cmd, err := btcjson.NewGetWorkCmd(id, data)
-	if err != nil {
-		return newFutureError(err)
-	}
-
+	cmd := btcjson.NewGetWorkCmd(&data)
 	return c.sendCmd(cmd)
 }
 
@@ -406,12 +361,7 @@ func (c *Client) SubmitBlockAsync(block *btcutil.Block, options *btcjson.SubmitB
 		blockHex = hex.EncodeToString(blockBytes)
 	}
 
-	id := c.NextID()
-	cmd, err := btcjson.NewSubmitBlockCmd(id, blockHex, options)
-	if err != nil {
-		return newFutureError(err)
-	}
-
+	cmd := btcjson.NewSubmitBlockCmd(blockHex, options)
 	return c.sendCmd(cmd)
 }
 

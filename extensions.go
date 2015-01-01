@@ -9,8 +9,7 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/btcsuite/btcd/btcjson"
-	"github.com/btcsuite/btcd/btcjson/btcws"
+	"github.com/btcsuite/btcd/btcjson/v2/btcjson"
 	"github.com/btcsuite/btcd/wire"
 	"github.com/btcsuite/btcutil"
 )
@@ -45,12 +44,7 @@ func (r FutureDebugLevelResult) Receive() (string, error) {
 //
 // NOTE: This is a btcd extension.
 func (c *Client) DebugLevelAsync(levelSpec string) FutureDebugLevelResult {
-	id := c.NextID()
-	cmd, err := btcjson.NewDebugLevelCmd(id, levelSpec)
-	if err != nil {
-		return newFutureError(err)
-	}
-
+	cmd := btcjson.NewDebugLevelCmd(levelSpec)
 	return c.sendCmd(cmd)
 }
 
@@ -86,8 +80,7 @@ func (r FutureCreateEncryptedWalletResult) Receive() error {
 //
 // NOTE: This is a btcwallet extension.
 func (c *Client) CreateEncryptedWalletAsync(passphrase string) FutureCreateEncryptedWalletResult {
-	id := c.NextID()
-	cmd := btcws.NewCreateEncryptedWalletCmd(id, passphrase)
+	cmd := btcjson.NewCreateEncryptedWalletCmd(passphrase)
 	return c.sendCmd(cmd)
 }
 
@@ -137,12 +130,7 @@ func (c *Client) ListAddressTransactionsAsync(addresses []btcutil.Address, accou
 	for _, addr := range addresses {
 		addrs = append(addrs, addr.EncodeAddress())
 	}
-	id := c.NextID()
-	cmd, err := btcws.NewListAddressTransactionsCmd(id, addrs, account)
-	if err != nil {
-		return newFutureError(err)
-	}
-
+	cmd := btcjson.NewListAddressTransactionsCmd(addrs, &account)
 	return c.sendCmd(cmd)
 }
 
@@ -167,7 +155,7 @@ func (r FutureGetBestBlockResult) Receive() (*wire.ShaHash, int32, error) {
 	}
 
 	// Unmarsal result as a getbestblock result object.
-	var bestBlock btcws.GetBestBlockResult
+	var bestBlock btcjson.GetBestBlockResult
 	err = json.Unmarshal(res, &bestBlock)
 	if err != nil {
 		return nil, 0, err
@@ -190,9 +178,7 @@ func (r FutureGetBestBlockResult) Receive() (*wire.ShaHash, int32, error) {
 //
 // NOTE: This is a btcd extension.
 func (c *Client) GetBestBlockAsync() FutureGetBestBlockResult {
-	id := c.NextID()
-	cmd := btcws.NewGetBestBlockCmd(id)
-
+	cmd := btcjson.NewGetBestBlockCmd()
 	return c.sendCmd(cmd)
 }
 
@@ -234,9 +220,7 @@ func (r FutureGetCurrentNetResult) Receive() (wire.BitcoinNet, error) {
 //
 // NOTE: This is a btcd extension.
 func (c *Client) GetCurrentNetAsync() FutureGetCurrentNetResult {
-	id := c.NextID()
-	cmd := btcws.NewGetCurrentNetCmd(id)
-
+	cmd := btcjson.NewGetCurrentNetCmd()
 	return c.sendCmd(cmd)
 }
 
@@ -302,12 +286,7 @@ func (r FutureExportWatchingWalletResult) Receive() ([]byte, []byte, error) {
 //
 // NOTE: This is a btcwallet extension.
 func (c *Client) ExportWatchingWalletAsync(account string) FutureExportWatchingWalletResult {
-	id := c.NextID()
-	cmd, err := btcws.NewExportWatchingWalletCmd(id, account, true)
-	if err != nil {
-		return newFutureError(err)
-	}
-
+	cmd := btcjson.NewExportWatchingWalletCmd(&account, btcjson.Bool(true))
 	return c.sendCmd(cmd)
 }
 

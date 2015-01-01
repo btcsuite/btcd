@@ -9,7 +9,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 
-	"github.com/btcsuite/btcd/btcjson"
+	"github.com/btcsuite/btcd/btcjson/v2/btcjson"
 	"github.com/btcsuite/btcd/wire"
 	"github.com/btcsuite/btcutil"
 )
@@ -101,12 +101,7 @@ func (c *Client) GetRawTransactionAsync(txHash *wire.ShaHash) FutureGetRawTransa
 		hash = txHash.String()
 	}
 
-	id := c.NextID()
-	cmd, err := btcjson.NewGetRawTransactionCmd(id, hash, 0)
-	if err != nil {
-		return newFutureError(err)
-	}
-
+	cmd := btcjson.NewGetRawTransactionCmd(hash, btcjson.Int(0))
 	return c.sendCmd(cmd)
 }
 
@@ -152,12 +147,7 @@ func (c *Client) GetRawTransactionVerboseAsync(txHash *wire.ShaHash) FutureGetRa
 		hash = txHash.String()
 	}
 
-	id := c.NextID()
-	cmd, err := btcjson.NewGetRawTransactionCmd(id, hash, 1)
-	if err != nil {
-		return newFutureError(err)
-	}
-
+	cmd := btcjson.NewGetRawTransactionCmd(hash, btcjson.Int(1))
 	return c.sendCmd(cmd)
 }
 
@@ -197,13 +187,8 @@ func (r FutureDecodeRawTransactionResult) Receive() (*btcjson.TxRawResult, error
 //
 // See DecodeRawTransaction for the blocking version and more details.
 func (c *Client) DecodeRawTransactionAsync(serializedTx []byte) FutureDecodeRawTransactionResult {
-	id := c.NextID()
 	txHex := hex.EncodeToString(serializedTx)
-	cmd, err := btcjson.NewDecodeRawTransactionCmd(id, txHex)
-	if err != nil {
-		return newFutureError(err)
-	}
-
+	cmd := btcjson.NewDecodeRawTransactionCmd(txHex)
 	return c.sendCmd(cmd)
 }
 
@@ -255,16 +240,11 @@ func (r FutureCreateRawTransactionResult) Receive() (*wire.MsgTx, error) {
 func (c *Client) CreateRawTransactionAsync(inputs []btcjson.TransactionInput,
 	amounts map[btcutil.Address]btcutil.Amount) FutureCreateRawTransactionResult {
 
-	id := c.NextID()
-	convertedAmts := make(map[string]int64, len(amounts))
+	convertedAmts := make(map[string]float64, len(amounts))
 	for addr, amount := range amounts {
-		convertedAmts[addr.String()] = int64(amount)
+		convertedAmts[addr.String()] = amount.ToBTC()
 	}
-	cmd, err := btcjson.NewCreateRawTransactionCmd(id, inputs, convertedAmts)
-	if err != nil {
-		return newFutureError(err)
-	}
-
+	cmd := btcjson.NewCreateRawTransactionCmd(inputs, convertedAmts)
 	return c.sendCmd(cmd)
 }
 
@@ -315,12 +295,7 @@ func (c *Client) SendRawTransactionAsync(tx *wire.MsgTx, allowHighFees bool) Fut
 		txHex = hex.EncodeToString(buf.Bytes())
 	}
 
-	id := c.NextID()
-	cmd, err := btcjson.NewSendRawTransactionCmd(id, txHex, allowHighFees)
-	if err != nil {
-		return newFutureError(err)
-	}
-
+	cmd := btcjson.NewSendRawTransactionCmd(txHex, &allowHighFees)
 	return c.sendCmd(cmd)
 }
 
@@ -381,12 +356,7 @@ func (c *Client) SignRawTransactionAsync(tx *wire.MsgTx) FutureSignRawTransactio
 		txHex = hex.EncodeToString(buf.Bytes())
 	}
 
-	id := c.NextID()
-	cmd, err := btcjson.NewSignRawTransactionCmd(id, txHex)
-	if err != nil {
-		return newFutureError(err)
-	}
-
+	cmd := btcjson.NewSignRawTransactionCmd(txHex, nil, nil, nil)
 	return c.sendCmd(cmd)
 }
 
@@ -417,12 +387,7 @@ func (c *Client) SignRawTransaction2Async(tx *wire.MsgTx, inputs []btcjson.RawTx
 		txHex = hex.EncodeToString(buf.Bytes())
 	}
 
-	id := c.NextID()
-	cmd, err := btcjson.NewSignRawTransactionCmd(id, txHex, inputs)
-	if err != nil {
-		return newFutureError(err)
-	}
-
+	cmd := btcjson.NewSignRawTransactionCmd(txHex, &inputs, nil, nil)
 	return c.sendCmd(cmd)
 }
 
@@ -459,13 +424,8 @@ func (c *Client) SignRawTransaction3Async(tx *wire.MsgTx,
 		txHex = hex.EncodeToString(buf.Bytes())
 	}
 
-	id := c.NextID()
-	cmd, err := btcjson.NewSignRawTransactionCmd(id, txHex, inputs,
-		privKeysWIF)
-	if err != nil {
-		return newFutureError(err)
-	}
-
+	cmd := btcjson.NewSignRawTransactionCmd(txHex, &inputs, &privKeysWIF,
+		nil)
 	return c.sendCmd(cmd)
 }
 
@@ -512,13 +472,8 @@ func (c *Client) SignRawTransaction4Async(tx *wire.MsgTx,
 		txHex = hex.EncodeToString(buf.Bytes())
 	}
 
-	id := c.NextID()
-	cmd, err := btcjson.NewSignRawTransactionCmd(id, txHex, inputs,
-		privKeysWIF, string(hashType))
-	if err != nil {
-		return newFutureError(err)
-	}
-
+	cmd := btcjson.NewSignRawTransactionCmd(txHex, &inputs, &privKeysWIF,
+		btcjson.String(string(hashType)))
 	return c.sendCmd(cmd)
 }
 

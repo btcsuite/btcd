@@ -8,39 +8,8 @@ import (
 	"encoding/json"
 	"errors"
 
-	"github.com/btcsuite/btcd/btcjson"
+	"github.com/btcsuite/btcd/btcjson/v2/btcjson"
 )
-
-// rawRequest satisifies the btcjson.Cmd interface for btcjson raw commands.
-// This type exists here rather than making btcjson.RawCmd satisify the Cmd
-// interface due to conflict between the Id and Method field names vs method
-// names.
-type rawRequest struct {
-	btcjson.RawCmd
-}
-
-// Enforce that rawRequest is a btcjson.Cmd.
-var _ btcjson.Cmd = &rawRequest{}
-
-// Id returns the JSON-RPC id of the request.
-func (r *rawRequest) Id() interface{} {
-	return r.RawCmd.Id
-}
-
-// Method returns the method string of the request.
-func (r *rawRequest) Method() string {
-	return r.RawCmd.Method
-}
-
-// MarshalJSON marshals the raw request as a JSON-RPC 1.0 object.
-func (r *rawRequest) MarshalJSON() ([]byte, error) {
-	return json.Marshal(r.RawCmd)
-}
-
-// UnmarshalJSON unmarshals a JSON-RPC 1.0 object into the raw request.
-func (r *rawRequest) UnmarshalJSON(b []byte) error {
-	return json.Unmarshal(b, &r.RawCmd)
-}
 
 // FutureRawResult is a future promise to deliver the result of a RawRequest RPC
 // invocation (or an applicable error).
@@ -69,16 +38,34 @@ func (c *Client) RawRequestAsync(method string, params []json.RawMessage) Future
 		params = []json.RawMessage{}
 	}
 
-	cmd := &rawRequest{
-		RawCmd: btcjson.RawCmd{
-			Jsonrpc: "1.0",
-			Id:      c.NextID(),
-			Method:  method,
-			Params:  params,
-		},
+	// Create a raw JSON-RPC request using the provided method and params
+	// and marshal it.  This is done rather than using the sendCmd function
+	// since that relies on marshalling registered btcjson commands rather
+	// than custom commands.
+	id := c.NextID()
+	rawRequest := &btcjson.Request{
+		Jsonrpc: "1.0",
+		ID:      id,
+		Method:  method,
+		Params:  params,
+	}
+	marshalledJSON, err := json.Marshal(rawRequest)
+	if err != nil {
+		return newFutureError(err)
 	}
 
-	return c.sendCmd(cmd)
+	// Generate the request and send it along with a channel to respond on.
+	responseChan := make(chan *response, 1)
+	jReq := &jsonRequest{
+		id:             id,
+		method:         method,
+		cmd:            nil,
+		marshalledJSON: marshalledJSON,
+		responseChan:   responseChan,
+	}
+	c.sendRequest(jReq)
+
+	return responseChan
 }
 
 // RawRequest allows the caller to send a raw or custom request to the server.
