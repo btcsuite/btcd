@@ -383,7 +383,7 @@ func (n *upnpNAT) AddPortMapping(protocol string, externalPort, internalPort int
 	return
 }
 
-// AddPortMapping implements the NAT interface by removing up a port forwarding
+// DeletePortMapping implements the NAT interface by removing up a port forwarding
 // from the UPnP router to the local machine with the given ports and.
 func (n *upnpNAT) DeletePortMapping(protocol string, externalPort, internalPort int) (err error) {
 
