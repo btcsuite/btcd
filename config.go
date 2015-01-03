@@ -319,21 +319,26 @@ func loadConfig() (*config, []string, error) {
 	// Service options which are only added on Windows.
 	serviceOpts := serviceOptions{}
 
+	// Create appName and usageMessage for later use
+	appName := filepath.Base(os.Args[0])
+	appName = strings.TrimSuffix(appName, filepath.Ext(appName))
+	usageMessage := fmt.Sprintf("Use %s -h to show usage", appName)
+
 	// Pre-parse the command line options to see if an alternative config
 	// file or the version flag was specified.  Any errors aside from the
 	// help message error can be ignored here since they will be caught by
 	// the final parse below.
 	preCfg := cfg
-	preParser := newConfigParser(&preCfg, &serviceOpts, flags.HelpFlag|flags.PrintErrors)
+	preParser := newConfigParser(&preCfg, &serviceOpts, flags.Default)
 	_, err := preParser.Parse()
 	if err != nil {
+		if e, ok := err.(*flags.Error); !ok || e.Type != flags.ErrHelp {
+			fmt.Fprintln(os.Stderr, usageMessage)
+		}
 		return nil, nil, err
 	}
 
 	// Show the version and exit if the version flag was specified.
-	appName := filepath.Base(os.Args[0])
-	appName = strings.TrimSuffix(appName, filepath.Ext(appName))
-	usageMessage := fmt.Sprintf("Use %s -h to show usage", appName)
 	if preCfg.ShowVersion {
 		fmt.Println(appName, "version", version())
 		os.Exit(0)
