@@ -549,6 +549,7 @@ The following is an overview of the RPC methods which are implemented by btcd, b
 |1|[debuglevel](#debuglevel)|Dynamically changes the debug logging level.|
 |2|[getbestblock](#getbestblock)|Get block height and hash of best block in the main chain.|None|
 |3|[getcurrentnet](#getcurrentnet)|Get bitcoin network btcd is running on.|None|
+|4|[searchrawtransactions](#searchrawtransactions)|Query for transactions related to a particular address.|None|
 
 <a name="ExtMethodDetails" />
 **6.2 Method Details**<br />
@@ -559,10 +560,10 @@ The following is an overview of the RPC methods which are implemented by btcd, b
 |---|---|
 |Method|debuglevel|
 |Parameters|1. _levelspec_ (string)|
-|Description|Dynamically changes the debug logging level.<br />The levelspec can either a debug level or of the form `<subsystem>=<level>,<subsystem2>=<level2>,...`<br />The valid debug levels are `trace`, `debug`, `info`, `warn`, `error`, and `critical`.<br />The valid subsystems are `AMGR`, `BCDB`, `BMGR`, `BTCD`, `CHAN`, `DISC`, `PEER`, `RPCS`, `SCRP`, `SRVR`, and `TXMP`.<br />Additionally, the special keyword `show` can be used to get a list of the available subsystems.|
+|Description|Dynamically changes the debug logging level.<br />The levelspec can either a debug level or of the form `<subsystem>=<level>,<subsystem2>=<level2>,...`<br />The valid debug levels are `trace`, `debug`, `info`, `warn`, `error`, and `critical`.<br />The valid subsystems are `AMGR`, `ADXR`, `BCDB`, `BMGR`, `BTCD`, `CHAN`, `DISC`, `PEER`, `RPCS`, `SCRP`, `SRVR`, and `TXMP`.<br />Additionally, the special keyword `show` can be used to get a list of the available subsystems.|
 |Returns|string|
 |Example Return|`Done.`|
-|Example `show` Return|`Supported subsystems [AMGR BCDB BMGR BTCD CHAN DISC PEER RPCS SCRP SRVR TXMP]`|
+|Example `show` Return|`Supported subsystems [AMGR ADXR BCDB BMGR BTCD CHAN DISC PEER RPCS SCRP SRVR TXMP]`|
 [Return to Overview](#ExtMethodOverview)<br />
 
 ***
@@ -588,6 +589,19 @@ The following is an overview of the RPC methods which are implemented by btcd, b
 |Description|Get bitcoin network btcd is running on.|
 |Returns|numeric|
 |Example Return|`3652501241` (mainnet)<br />`118034699` (testnet3)|
+[Return to Overview](#ExtMethodOverview)<br />
+
+***
+
+<a name="searchrawtransactions"/>
+
+|   |   |
+|---|---|
+|Method|searchrawtransactions|
+|Parameters|1. address (string, required) - bitcoin address <br /> 2. verbose (int, optional, default=true) - specifies the transaction is returned as a JSON object instead of hex-encoded string <br />3. skip (int, optional, default=0) - the number of leading transactions to leave out of the final response <br /> 4. count (int, optional, default=100) - the maximum number of transactions to return|
+|Description|Returns raw data for transactions involving the passed address. Returned transactions are pulled from both the database, and transactions currently in the mempool. Transactions pulled from the mempool will have the `"confirmations"` field set to 0. Usage of this RPC requires the optional `--addrindex` flag to be activated, otherwise all responses will simply return with an error stating the address index has not yet been built up. Similarly, until the address index has caught up with the current best height, all requests will return an error response in order to avoid serving stale data.|
+|Returns (verbose=0)|`"data" (string) hex-encoded bytes of the serialized transaction`|
+|Returns (verbose=1)|`{ (json object)`<br />&nbsp;&nbsp;`"hex": "data",  (string) hex-encoded transaction`<br />&nbsp;&nbsp;`"txid": "hash",  (string) the hash of the transaction`<br />&nbsp;&nbsp;`"version": n,  (numeric) the transaction version`<br />&nbsp;&nbsp;`"locktime": n,  (numeric) the transaction lock time`<br />&nbsp;&nbsp;`"vin": [  (array of json objects) the transaction inputs as json objects`<br />&nbsp;&nbsp;<font color="orange">For coinbase transactions:</font><br />&nbsp;&nbsp;&nbsp;&nbsp;`{ (json object)`<br />&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;`"coinbase": "data",  (string) the hex-dencoded bytes of the signature script`<br />&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;`"sequence": n,  (numeric) the script sequence number`<br />&nbsp;&nbsp;&nbsp;&nbsp;`}`<br />&nbsp;&nbsp;<font color="orange">For non-coinbase transactions:</font><br />&nbsp;&nbsp;&nbsp;&nbsp;`{ (json object)`<br />&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;`"txid": "hash", (string) the hash of the origin transaction`<br />&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;`"vout": n, (numeric) the index of the output being redeemed from the origin transaction`<br />&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;`"scriptSig": { (json object) the signature script used to redeem the origin transaction`<br />&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;`"asm": "asm", (string) disassembly of the script`<br />&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;`"hex": "data",  (string) hex-encoded bytes of the script`<br />&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;`}`<br />&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;`"sequence": n,  (numeric) the script sequence number`<br />&nbsp;&nbsp;&nbsp;&nbsp;`}, ...`<br />&nbsp;&nbsp;`]`<br />&nbsp;&nbsp;`"vout": [  (array of json objects) the transaction outputs as json objects`<br />&nbsp;&nbsp;&nbsp;&nbsp;`{ (json object)`<br />&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;`"value": n, (numeric) the value in BTC`<br />&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;`"n": n, (numeric) the index of this transaction output`<br />&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;`"scriptPubKey": { (json object) the public key script used to pay coins`<br />&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;`"asm": "asm",  (string) disassembly of the script`<br />&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;`"hex": "data", (string) hex-encoded bytes of the script`<br />&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;`"reqSigs": n,  (numeric) the number of required signatures`<br />&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;`"type": "scripttype" (string) the type of the script (e.g. 'pubkeyhash')`<br />&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;`"addresses": [ (json array of string) the bitcoin addresses associated with this output`<br />&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;`"address",  (string) the bitcoin address`<br />&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;`...`<br />&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;`]`<br />&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;`}`<br />&nbsp;&nbsp;&nbsp;&nbsp;`}, ...`<br /> &nbsp;&nbsp;&nbsp;`]`<br />&nbsp;&nbsp; `"blockhash":"hash" Hash of the block the transaction is part of.` <br /> &nbsp;&nbsp; `"confirmations":n,  Number of numeric confirmations of block.` <br /> &nbsp;&nbsp;&nbsp;`"time":t, Transaction time in seconds since the epoch.` <br /> &nbsp;&nbsp;&nbsp;`"blocktime":t, Block time in seconds since the epoch.`<br /> `}`|
 [Return to Overview](#ExtMethodOverview)<br />
 
 ***

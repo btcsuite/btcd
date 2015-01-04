@@ -85,6 +85,7 @@ type server struct {
 	addrManager          *addrmgr.AddrManager
 	rpcServer            *rpcServer
 	blockManager         *blockManager
+	addrIndexer          *addrIndexer
 	txMemPool            *txMemPool
 	cpuMiner             *CPUMiner
 	modifyRebroadcastInv chan interface{}
@@ -706,6 +707,9 @@ out:
 		}
 	}
 
+	if cfg.AddrIndex {
+		s.addrIndexer.Stop()
+	}
 	s.blockManager.Stop()
 	s.addrManager.Stop()
 	s.wg.Done()
@@ -909,6 +913,10 @@ func (s *server) Start() {
 	// Start the CPU miner if generation is enabled.
 	if cfg.Generate {
 		s.cpuMiner.Start()
+	}
+
+	if cfg.AddrIndex {
+		s.addrIndexer.Start()
 	}
 }
 
@@ -1247,6 +1255,14 @@ func newServer(listenAddrs []string, db database.Db, netParams *btcnet.Params) (
 	s.blockManager = bm
 	s.txMemPool = newTxMemPool(&s)
 	s.cpuMiner = newCPUMiner(&s)
+
+	if cfg.AddrIndex {
+		ai, err := newAddrIndexer(&s)
+		if err != nil {
+			return nil, err
+		}
+		s.addrIndexer = ai
+	}
 
 	if !cfg.DisableRPC {
 		s.rpcServer, err = newRPCServer(cfg.RPCListeners, &s)

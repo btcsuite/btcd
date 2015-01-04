@@ -39,6 +39,7 @@ const (
 // function.
 var (
 	backendLog = seelog.Disabled
+	adxrLog    = btclog.Disabled
 	amgrLog    = btclog.Disabled
 	bcdbLog    = btclog.Disabled
 	bmgrLog    = btclog.Disabled
@@ -55,6 +56,7 @@ var (
 
 // subsystemLoggers maps each subsystem identifier to its associated logger.
 var subsystemLoggers = map[string]btclog.Logger{
+	"ADXR": adxrLog,
 	"AMGR": amgrLog,
 	"BCDB": bcdbLog,
 	"BMGR": bmgrLog,
@@ -94,6 +96,9 @@ func useLogger(subsystemID string, logger btclog.Logger) {
 	subsystemLoggers[subsystemID] = logger
 
 	switch subsystemID {
+	case "ADXR":
+		adxrLog = logger
+
 	case "AMGR":
 		amgrLog = logger
 		addrmgr.UseLogger(logger)

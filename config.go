@@ -44,6 +44,7 @@ const (
 	blockMaxSizeMax          = wire.MaxBlockPayload - 1000
 	defaultBlockPrioritySize = 50000
 	defaultGenerate          = false
+	defaultAddrIndex         = false
 )
 
 var (
@@ -108,6 +109,8 @@ type config struct {
 	BlockMaxSize       uint32        `long:"blockmaxsize" description:"Maximum block size in bytes to be used when creating a block"`
 	BlockPrioritySize  uint32        `long:"blockprioritysize" description:"Size in bytes for high-priority/low-fee transactions when creating a block"`
 	GetWorkKeys        []string      `long:"getworkkey" description:"DEPRECATED -- Use the --miningaddr option instead"`
+	AddrIndex          bool          `long:"addrindex" description:"Build and maintain a full address index. Currently only supported by leveldb."`
+	DropAddrIndex      bool          `long:"dropaddrindex" description:"Deletes the address-based transaction index from the database on start up, and the exits."`
 	onionlookup        func(string) ([]net.IP, error)
 	lookup             func(string) ([]net.IP, error)
 	oniondial          func(string, string) (net.Conn, error)
@@ -314,6 +317,7 @@ func loadConfig() (*config, []string, error) {
 		BlockMaxSize:      defaultBlockMaxSize,
 		BlockPrioritySize: defaultBlockPrioritySize,
 		Generate:          defaultGenerate,
+		AddrIndex:         defaultAddrIndex,
 	}
 
 	// Service options which are only added on Windows.
@@ -469,6 +473,22 @@ func loadConfig() (*config, []string, error) {
 		str := "%s: The specified database type [%v] is invalid -- " +
 			"supported types %v"
 		err := fmt.Errorf(str, funcName, cfg.DbType, knownDbTypes)
+		fmt.Fprintln(os.Stderr, err)
+		fmt.Fprintln(os.Stderr, usageMessage)
+		return nil, nil, err
+	}
+
+	if cfg.AddrIndex && cfg.DropAddrIndex {
+		err := fmt.Errorf("addrindex and dropaddrindex cannot be " +
+			"activated at the same")
+		fmt.Fprintln(os.Stderr, err)
+		fmt.Fprintln(os.Stderr, usageMessage)
+		return nil, nil, err
+	}
+
+	// Memdb does not currently support the addrindex.
+	if cfg.DbType == "memdb" && cfg.AddrIndex {
+		err := fmt.Errorf("memdb does not currently support the addrindex")
 		fmt.Fprintln(os.Stderr, err)
 		fmt.Fprintln(os.Stderr, usageMessage)
 		return nil, nil, err

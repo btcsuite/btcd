@@ -97,6 +97,7 @@ type txMemPool struct {
 	pool          map[wire.ShaHash]*TxDesc
 	orphans       map[wire.ShaHash]*btcutil.Tx
 	orphansByPrev map[wire.ShaHash]*list.List
+	addrindex     map[string]map[*btcutil.Tx]struct{} // maps address to txs
 	outpoints     map[wire.OutPoint]*btcutil.Tx
 	lastUpdated   time.Time // last time pool was updated
 	pennyTotal    float64   // exponentially decaying total for penny spends.
@@ -610,12 +611,59 @@ func (mp *txMemPool) removeTransaction(tx *btcutil.Tx) {
 	// Remove the transaction and mark the referenced outpoints as unspent
 	// by the pool.
 	if txDesc, exists := mp.pool[*txHash]; exists {
+		if cfg.AddrIndex {
+			mp.removeTransactionFromAddrIndex(tx)
+		}
+
 		for _, txIn := range txDesc.Tx.MsgTx().TxIn {
 			delete(mp.outpoints, txIn.PreviousOutPoint)
 		}
 		delete(mp.pool, *txHash)
 		mp.lastUpdated = time.Now()
 	}
+
+}
+
+// removeTransactionFromAddrIndex removes the passed transaction from our
+// address based index.
+//
+// This function MUST be called with the mempool lock held (for writes).
+func (mp *txMemPool) removeTransactionFromAddrIndex(tx *btcutil.Tx) error {
+	previousOutputScripts, err := mp.fetchReferencedOutputScripts(tx)
+	if err != nil {
+		txmpLog.Errorf("Unable to obtain referenced output scripts for "+
+			"the passed tx (addrindex): %v", err)
+		return err
+	}
+
+	for _, pkScript := range previousOutputScripts {
+		mp.removeScriptFromAddrIndex(pkScript, tx)
+	}
+
+	for _, txOut := range tx.MsgTx().TxOut {
+		mp.removeScriptFromAddrIndex(txOut.PkScript, tx)
+	}
+
+	return nil
+}
+
+// removeScriptFromAddrIndex dissociates the address encoded by the
+// passed pkScript from the passed tx in our address based tx index.
+//
+// This function MUST be called with the mempool lock held (for writes).
+func (mp *txMemPool) removeScriptFromAddrIndex(pkScript []byte, tx *btcutil.Tx) error {
+	_, addresses, _, err := txscript.ExtractPkScriptAddrs(pkScript,
+		activeNetParams.Params)
+	if err != nil {
+		txmpLog.Errorf("Unable to extract encoded addresses from script "+
+			"for addrindex (addrindex): %v", err)
+		return err
+	}
+	for _, addr := range addresses {
+		delete(mp.addrindex[addr.EncodeAddress()], tx)
+	}
+
+	return nil
 }
 
 // RemoveTransaction removes the passed transaction and any transactions which
@@ -669,6 +717,79 @@ func (mp *txMemPool) addTransaction(tx *btcutil.Tx, height, fee int64) {
 		mp.outpoints[txIn.PreviousOutPoint] = tx
 	}
 	mp.lastUpdated = time.Now()
+
+	if cfg.AddrIndex {
+		mp.addTransactionToAddrIndex(tx)
+	}
+}
+
+// addTransactionToAddrIndex adds all addresses related to the transaction to
+// our in-memory address index. Note that this address is only populated when
+// we're running with the optional address index activated.
+//
+// This function MUST be called with the mempool lock held (for writes).
+func (mp *txMemPool) addTransactionToAddrIndex(tx *btcutil.Tx) error {
+	previousOutScripts, err := mp.fetchReferencedOutputScripts(tx)
+	if err != nil {
+		txmpLog.Errorf("Unable to obtain referenced output scripts for "+
+			"the passed tx (addrindex): %v", err)
+		return err
+	}
+	// Index addresses of all referenced previous output tx's.
+	for _, pkScript := range previousOutScripts {
+		mp.indexScriptAddressToTx(pkScript, tx)
+	}
+
+	// Index addresses of all created outputs.
+	for _, txOut := range tx.MsgTx().TxOut {
+		mp.indexScriptAddressToTx(txOut.PkScript, tx)
+	}
+
+	return nil
+}
+
+// fetchReferencedOutputScripts looks up and returns all the scriptPubKeys
+// referenced by inputs of the passed transaction.
+//
+// This function MUST be called with the mempool lock held (for reads).
+func (mp *txMemPool) fetchReferencedOutputScripts(tx *btcutil.Tx) ([][]byte, error) {
+	txStore, err := mp.fetchInputTransactions(tx)
+	if err != nil || len(txStore) == 0 {
+		return nil, err
+	}
+
+	previousOutScripts := make([][]byte, 0, len(tx.MsgTx().TxIn))
+	for _, txIn := range tx.MsgTx().TxIn {
+		outPoint := txIn.PreviousOutPoint
+		if txStore[outPoint.Hash].Err == nil {
+			referencedOutPoint := txStore[outPoint.Hash].Tx.MsgTx().TxOut[outPoint.Index]
+			previousOutScripts = append(previousOutScripts, referencedOutPoint.PkScript)
+		}
+	}
+	return previousOutScripts, nil
+}
+
+// indexScriptByAddress alters our address index by indexing the payment address
+// encoded by the passed scriptPubKey to the passed transaction.
+//
+// This function MUST be called with the mempool lock held (for writes).
+func (mp *txMemPool) indexScriptAddressToTx(pkScript []byte, tx *btcutil.Tx) error {
+	_, addresses, _, err := txscript.ExtractPkScriptAddrs(pkScript,
+		activeNetParams.Params)
+	if err != nil {
+		txmpLog.Errorf("Unable to extract encoded addresses from script "+
+			"for addrindex: %v", err)
+		return err
+	}
+
+	for _, addr := range addresses {
+		if mp.addrindex[addr.EncodeAddress()] == nil {
+			mp.addrindex[addr.EncodeAddress()] = make(map[*btcutil.Tx]struct{})
+		}
+		mp.addrindex[addr.EncodeAddress()][tx] = struct{}{}
+	}
+
+	return nil
 }
 
 // calcInputValueAge is a helper function used to calculate the input age of
@@ -793,6 +914,25 @@ func (mp *txMemPool) FetchTransaction(txHash *wire.ShaHash) (*btcutil.Tx, error)
 	}
 
 	return nil, fmt.Errorf("transaction is not in the pool")
+}
+
+// FilterTransactionsByAddress returns all transactions currently in the
+// mempool that either create an output to the passed address or spend a
+// previously created ouput to the address.
+func (mp *txMemPool) FilterTransactionsByAddress(addr btcutil.Address) ([]*btcutil.Tx, error) {
+	// Protect concurrent access.
+	mp.RLock()
+	defer mp.RUnlock()
+
+	if txs, exists := mp.addrindex[addr.EncodeAddress()]; exists {
+		addressTxs := make([]*btcutil.Tx, 0, len(txs))
+		for tx := range txs {
+			addressTxs = append(addressTxs, tx)
+		}
+		return addressTxs, nil
+	}
+
+	return nil, fmt.Errorf("address does not have any transactions in the pool")
 }
 
 // maybeAcceptTransaction is the internal function which implements the public
@@ -1276,11 +1416,15 @@ func (mp *txMemPool) LastUpdated() time.Time {
 // newTxMemPool returns a new memory pool for validating and storing standalone
 // transactions until they are mined into a block.
 func newTxMemPool(server *server) *txMemPool {
-	return &txMemPool{
+	memPool := &txMemPool{
 		server:        server,
 		pool:          make(map[wire.ShaHash]*TxDesc),
 		orphans:       make(map[wire.ShaHash]*btcutil.Tx),
 		orphansByPrev: make(map[wire.ShaHash]*list.List),
 		outpoints:     make(map[wire.OutPoint]*btcutil.Tx),
 	}
+	if cfg.AddrIndex {
+		memPool.addrindex = make(map[string]map[*btcutil.Tx]struct{})
+	}
+	return memPool
 }

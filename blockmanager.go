@@ -166,9 +166,9 @@ type blockManager struct {
 	blockChain        *blockchain.BlockChain
 	requestedTxns     map[wire.ShaHash]struct{}
 	requestedBlocks   map[wire.ShaHash]struct{}
+	progressLogger    *blockProgressLogger
 	receivedLogBlocks int64
 	receivedLogTx     int64
-	lastBlockLogTime  time.Time
 	processingReqs    bool
 	syncPeer          *peer
 	msgChan           chan interface{}
@@ -436,41 +436,6 @@ func (b *blockManager) handleDonePeerMsg(peers *list.List, p *peer) {
 	}
 }
 
-// logBlockHeight logs a new block height as an information message to show
-// progress to the user.  In order to prevent spam, it limits logging to one
-// message every 10 seconds with duration and totals included.
-func (b *blockManager) logBlockHeight(block *btcutil.Block) {
-	b.receivedLogBlocks++
-	b.receivedLogTx += int64(len(block.MsgBlock().Transactions))
-
-	now := time.Now()
-	duration := now.Sub(b.lastBlockLogTime)
-	if duration < time.Second*10 {
-		return
-	}
-
-	// Truncate the duration to 10s of milliseconds.
-	durationMillis := int64(duration / time.Millisecond)
-	tDuration := 10 * time.Millisecond * time.Duration(durationMillis/10)
-
-	// Log information about new block height.
-	blockStr := "blocks"
-	if b.receivedLogBlocks == 1 {
-		blockStr = "block"
-	}
-	txStr := "transactions"
-	if b.receivedLogTx == 1 {
-		txStr = "transaction"
-	}
-	bmgrLog.Infof("Processed %d %s in the last %s (%d %s, height %d, %s)",
-		b.receivedLogBlocks, blockStr, tDuration, b.receivedLogTx,
-		txStr, block.Height(), block.MsgBlock().Header.Timestamp)
-
-	b.receivedLogBlocks = 0
-	b.receivedLogTx = 0
-	b.lastBlockLogTime = now
-}
-
 // handleTxMsg handles transaction messages from all peers.
 func (b *blockManager) handleTxMsg(tmsg *txMsg) {
 	// NOTE:  BitcoinJ, and possibly other wallets, don't follow the spec of
@@ -628,7 +593,7 @@ func (b *blockManager) handleBlockMsg(bmsg *blockMsg) {
 		// When the block is not an orphan, log information about it and
 		// update the chain state.
 
-		b.logBlockHeight(bmsg.block)
+		b.progressLogger.LogBlockHeight(bmsg.block)
 
 		// Query the db for the latest best block since the block
 		// that was processed could be on a side chain or have caused
@@ -834,7 +799,7 @@ func (b *blockManager) handleHeadersMsg(hmsg *headersMsg) {
 		b.headerList.Remove(b.headerList.Front())
 		bmgrLog.Infof("Received %v block headers: Fetching blocks",
 			b.headerList.Len())
-		b.lastBlockLogTime = time.Now()
+		b.progressLogger.SetLastLogTime(time.Now())
 		b.fetchHeaderBlocks()
 		return
 	}
@@ -1167,6 +1132,12 @@ func (b *blockManager) handleNotifyMsg(notification *blockchain.Notification) {
 			r.ntfnMgr.NotifyBlockConnected(block)
 		}
 
+		// If we're maintaing the address index, and it is up to date
+		// then update it based off this new block.
+		if cfg.AddrIndex && b.server.addrIndexer.IsCaughtUp() {
+			b.server.addrIndexer.UpdateAddressIndex(block)
+		}
+
 	// A block has been disconnected from the main block chain.
 	case blockchain.NTBlockDisconnected:
 		block, ok := notification.Data.(*btcutil.Block)
@@ -1344,14 +1315,15 @@ func newBlockManager(s *server) (*blockManager, error) {
 	}
 
 	bm := blockManager{
-		server:           s,
-		requestedTxns:    make(map[wire.ShaHash]struct{}),
-		requestedBlocks:  make(map[wire.ShaHash]struct{}),
-		lastBlockLogTime: time.Now(),
-		msgChan:          make(chan interface{}, cfg.MaxPeers*3),
-		headerList:       list.New(),
-		quit:             make(chan struct{}),
+		server:          s,
+		requestedTxns:   make(map[wire.ShaHash]struct{}),
+		requestedBlocks: make(map[wire.ShaHash]struct{}),
+		progressLogger:  newBlockProgressLogger("Processed", bmgrLog),
+		msgChan:         make(chan interface{}, cfg.MaxPeers*3),
+		headerList:      list.New(),
+		quit:            make(chan struct{}),
 	}
+	bm.progressLogger = newBlockProgressLogger("Processed", bmgrLog)
 	bm.blockChain = blockchain.New(s.db, s.netParams, bm.handleNotifyMsg)
 	bm.blockChain.DisableCheckpoints(cfg.DisableCheckpoints)
 	if !cfg.DisableCheckpoints {

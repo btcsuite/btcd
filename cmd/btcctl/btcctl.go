@@ -105,6 +105,7 @@ var commandHandlers = map[string]*handlerData{
 	"lockunspent":           {1, 2, displayJSONDump, []conversionHandler{toBool, nil}, makeLockUnspent, "<unlock> " + outpointArrayStr},
 	"ping":                  {0, 0, displayGeneric, nil, makePing, ""},
 	"renameaccount":         {2, 0, displayGeneric, nil, makeRenameAccount, "<oldaccount> <newaccount>"},
+	"searchrawtransactions": {1, 3, displayJSONDump, []conversionHandler{nil, toInt, toInt, toInt}, makeSearchRawTransactions, "<address> [verbose=1] [skip=0] [count=100]"},
 	"sendfrom": {3, 3, displayGeneric, []conversionHandler{nil, nil, toSatoshi, toInt, nil, nil},
 		makeSendFrom, "<account> <address> <amount> [minconf=1] [comment] [comment-to]"},
 	"sendmany":               {2, 2, displayGeneric, []conversionHandler{nil, nil, toInt, nil}, makeSendMany, "<account> <{\"address\":amount,...}> [minconf=1] [comment]"},
@@ -728,6 +729,24 @@ func makePing(args []interface{}) (btcjson.Cmd, error) {
 func makeRenameAccount(args []interface{}) (btcjson.Cmd, error) {
 	return btcws.NewRenameAccountCmd("btcctl", args[0].(string),
 		args[1].(string)), nil
+}
+
+// makeSearchRawTransactions generates the cmd strucutre for
+// searchrawtransactions commands.
+func makeSearchRawTransactions(args []interface{}) (btcjson.Cmd, error) {
+	optArgs := make([]interface{}, 0, 3)
+	if len(args) > 1 {
+		optArgs = append(optArgs, args[1].(int))
+	}
+	if len(args) > 2 {
+		optArgs = append(optArgs, args[2].(int))
+	}
+	if len(args) > 3 {
+		optArgs = append(optArgs, args[3].(int))
+	}
+
+	return btcjson.NewSearchRawTransactionsCmd("btcctl", args[0].(string),
+		optArgs...)
 }
 
 // makeSendFrom generates the cmd structure for sendfrom commands.
