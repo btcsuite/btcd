@@ -24,14 +24,13 @@ var ErrHashStrSize = fmt.Errorf("max hash string length is %v bytes", MaxHashStr
 // typically represents the double sha256 of data.
 type ShaHash [HashSize]byte
 
-// String returns the ShaHash in the standard bitcoin big-endian form.
+// String returns the ShaHash as the hexidecimal string of the byte-reversed
+// hash.
 func (hash ShaHash) String() string {
-	hashstr := ""
-	for i := range hash {
-		hashstr += fmt.Sprintf("%02x", hash[HashSize-1-i])
+	for i := 0; i < HashSize/2; i++ {
+		hash[i], hash[HashSize-1-i] = hash[HashSize-1-i], hash[i]
 	}
-
-	return hashstr
+	return hex.EncodeToString(hash[:])
 }
 
 // Bytes returns the bytes which represent the hash as a byte slice.
