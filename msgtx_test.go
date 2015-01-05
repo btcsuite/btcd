@@ -6,6 +6,7 @@ package btcwire_test
 
 import (
 	"bytes"
+	"fmt"
 	"io"
 	"reflect"
 	"testing"
@@ -44,6 +45,8 @@ func TestTx(t *testing.T) {
 	}
 
 	// Ensure we get the same transaction output point data back out.
+	// NOTE: This is a block hash and made up index, but we're only
+	// testing package functionality.
 	prevOutIndex := uint32(1)
 	prevOut := btcwire.NewOutPoint(hash, prevOutIndex)
 	if !prevOut.Hash.IsEqual(hash) {
@@ -53,6 +56,11 @@ func TestTx(t *testing.T) {
 	if prevOut.Index != prevOutIndex {
 		t.Errorf("NewOutPoint: wrong index - got %v, want %v",
 			prevOut.Index, prevOutIndex)
+	}
+	prevOutStr := fmt.Sprintf("%s:%d", hash.String(), prevOutIndex)
+	if s := prevOut.String(); s != prevOutStr {
+		t.Errorf("OutPoint.String: unexpected result - got %v, "+
+			"want %v", s, prevOutStr)
 	}
 
 	// Ensure we get the same transaction input back out.
