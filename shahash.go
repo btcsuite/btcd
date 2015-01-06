@@ -24,7 +24,7 @@ var ErrHashStrSize = fmt.Errorf("max hash string length is %v bytes", MaxHashStr
 // typically represents the double sha256 of data.
 type ShaHash [HashSize]byte
 
-// String returns the ShaHash as the hexidecimal string of the byte-reversed
+// String returns the ShaHash as the hexadecimal string of the byte-reversed
 // hash.
 func (hash ShaHash) String() string {
 	for i := 0; i < HashSize/2; i++ {
@@ -70,8 +70,9 @@ func NewShaHash(newHash []byte) (*ShaHash, error) {
 	return &sh, err
 }
 
-// NewShaHashFromStr converts a hash string in the standard bitcoin big-endian
-// form to a ShaHash (which is little-endian).
+// NewShaHashFromStr creates a ShaHash from a hash string.  The string should be
+// the hexadecimal string of a byte-reversed hash, but any missing characters
+// result in zero padding at the end of the ShaHash.
 func NewShaHashFromStr(hash string) (*ShaHash, error) {
 	// Return error if hash string is too long.
 	if len(hash) > MaxHashStringSize {
@@ -89,21 +90,19 @@ func NewShaHashFromStr(hash string) (*ShaHash, error) {
 		return nil, err
 	}
 
-	// The string was given in big-endian, so reverse the bytes to little
-	// endian.
+	// Un-reverse the decoded bytes, copying into in leading bytes of a
+	// ShaHash.  There is no need to explicitly pad the result as any
+	// missing (when len(buf) < HashSize) bytes from the decoded hex string
+	// will remain zeros at the end of the ShaHash.
+	var ret ShaHash
 	blen := len(buf)
-	for i := 0; i < blen/2; i++ {
-		buf[i], buf[blen-1-i] = buf[blen-1-i], buf[i]
+	mid := blen / 2
+	if blen%2 != 0 {
+		mid++
 	}
-
-	// Make sure the byte slice is the right length by appending zeros to
-	// pad it out.
-	pbuf := buf
-	if HashSize-blen > 0 {
-		pbuf = make([]byte, HashSize)
-		copy(pbuf, buf)
+	blen--
+	for i, b := range buf[:mid] {
+		ret[i], ret[blen-i] = buf[blen-i], b
 	}
-
-	// Create the sha hash using the byte slice and return it.
-	return NewShaHash(pbuf)
+	return &ret, nil
 }

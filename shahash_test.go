@@ -116,6 +116,13 @@ func TestNewShaHashFromStr(t *testing.T) {
 			nil,
 		},
 
+		// Empty string.
+		{
+			"",
+			btcwire.ShaHash{},
+			nil,
+		},
+
 		// Single digit hash.
 		{
 			"1",
