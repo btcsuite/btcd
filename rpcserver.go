@@ -834,7 +834,7 @@ func handleDebugLevel(s *rpcServer, cmd btcjson.Cmd, closeChan <-chan struct{}) 
 
 // createVinList returns a slice of JSON objects for the inputs of the passed
 // transaction.
-func createVinList(mtx *btcwire.MsgTx) ([]btcjson.Vin, error) {
+func createVinList(mtx *btcwire.MsgTx) []btcjson.Vin {
 	tx := btcutil.NewTx(mtx)
 	vinList := make([]btcjson.Vin, len(mtx.TxIn))
 	for i, v := range mtx.TxIn {
@@ -844,13 +844,10 @@ func createVinList(mtx *btcwire.MsgTx) ([]btcjson.Vin, error) {
 			vinList[i].Txid = v.PreviousOutPoint.Hash.String()
 			vinList[i].Vout = v.PreviousOutPoint.Index
 
-			disbuf, err := btcscript.DisasmString(v.SignatureScript)
-			if err != nil {
-				return nil, btcjson.Error{
-					Code:    btcjson.ErrInternal.Code,
-					Message: err.Error(),
-				}
-			}
+			// The disassembled string will contain [error] inline
+			// if the script doesn't fully parse, so ignore the
+			// error here.
+			disbuf, _ := btcscript.DisasmString(v.SignatureScript)
 			vinList[i].ScriptSig = new(btcjson.ScriptSig)
 			vinList[i].ScriptSig.Asm = disbuf
 			vinList[i].ScriptSig.Hex = hex.EncodeToString(v.SignatureScript)
@@ -858,24 +855,20 @@ func createVinList(mtx *btcwire.MsgTx) ([]btcjson.Vin, error) {
 		vinList[i].Sequence = v.Sequence
 	}
 
-	return vinList, nil
+	return vinList
 }
 
 // createVoutList returns a slice of JSON objects for the outputs of the passed
 // transaction.
-func createVoutList(mtx *btcwire.MsgTx, net *btcnet.Params) ([]btcjson.Vout, error) {
+func createVoutList(mtx *btcwire.MsgTx, net *btcnet.Params) []btcjson.Vout {
 	voutList := make([]btcjson.Vout, len(mtx.TxOut))
 	for i, v := range mtx.TxOut {
 		voutList[i].N = uint32(i)
 		voutList[i].Value = float64(v.Value) / btcutil.SatoshiPerBitcoin
 
-		disbuf, err := btcscript.DisasmString(v.PkScript)
-		if err != nil {
-			return nil, btcjson.Error{
-				Code:    btcjson.ErrInternal.Code,
-				Message: err.Error(),
-			}
-		}
+		// The disassembled string will contain [error] inline if the
+		// script doesn't fully parse, so ignore the error here.
+		disbuf, _ := btcscript.DisasmString(v.PkScript)
 		voutList[i].ScriptPubKey.Asm = disbuf
 		voutList[i].ScriptPubKey.Hex = hex.EncodeToString(v.PkScript)
 
@@ -896,7 +889,7 @@ func createVoutList(mtx *btcwire.MsgTx, net *btcnet.Params) ([]btcjson.Vout, err
 		}
 	}
 
-	return voutList, nil
+	return voutList
 }
 
 // createTxRawResult converts the passed transaction and associated parameters
@@ -910,20 +903,11 @@ func createTxRawResult(net *btcnet.Params, txSha string, mtx *btcwire.MsgTx,
 		return nil, err
 	}
 
-	vin, err := createVinList(mtx)
-	if err != nil {
-		return nil, err
-	}
-	vout, err := createVoutList(mtx, net)
-	if err != nil {
-		return nil, err
-	}
-
 	txReply := &btcjson.TxRawResult{
 		Hex:      mtxHex,
 		Txid:     txSha,
-		Vout:     vout,
-		Vin:      vin,
+		Vout:     createVoutList(mtx, net),
+		Vin:      createVinList(mtx),
 		Version:  mtx.Version,
 		LockTime: mtx.LockTime,
 	}
@@ -969,22 +953,13 @@ func handleDecodeRawTransaction(s *rpcServer, cmd btcjson.Cmd, closeChan <-chan 
 	}
 	txSha, _ := mtx.TxSha()
 
-	vin, err := createVinList(&mtx)
-	if err != nil {
-		return nil, err
-	}
-	vout, err := createVoutList(&mtx, s.server.netParams)
-	if err != nil {
-		return nil, err
-	}
-
 	// Create and return the result.
 	txReply := btcjson.TxRawDecodeResult{
 		Txid:     txSha.String(),
 		Version:  mtx.Version,
 		Locktime: mtx.LockTime,
-		Vin:      vin,
-		Vout:     vout,
+		Vin:      createVinList(&mtx),
+		Vout:     createVoutList(&mtx, s.server.netParams),
 	}
 	return txReply, nil
 }
