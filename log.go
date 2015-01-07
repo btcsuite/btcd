@@ -30,7 +30,7 @@ const (
 
 	// maxRejectReasonLen is the maximum length of a sanitized reject reason
 	// that will be logged.
-	maxRejectReasonLen = 200
+	maxRejectReasonLen = 250
 )
 
 // Loggers per subsytem.  Note that backendLog is a seelog logger that all of

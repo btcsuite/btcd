@@ -1176,7 +1176,8 @@ func (b *blockManager) handleNotifyMsg(notification *btcchain.Notification) {
 		// Reinsert all of the transactions (except the coinbase) into
 		// the transaction pool.
 		for _, tx := range block.Transactions()[1:] {
-			err := b.server.txMemPool.MaybeAcceptTransaction(tx, nil, false, true)
+			_, err := b.server.txMemPool.MaybeAcceptTransaction(tx,
+				false, true)
 			if err != nil {
 				// Remove the transaction and all transactions
 				// that depend on it if it wasn't accepted into
