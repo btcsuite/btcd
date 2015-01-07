@@ -701,8 +701,7 @@ func CheckTransactionInputs(tx *btcutil.Tx, txHeight int64, txStore TxStore) (in
 		}
 		if originTx.Spent[originTxIndex] {
 			str := fmt.Sprintf("transaction %v tried to double "+
-				"spend coins from transaction %v", txHash,
-				txInHash)
+				"spend output %v", txHash, txIn.PreviousOutPoint)
 			return 0, ruleError(ErrDoubleSpend, str)
 		}
 
