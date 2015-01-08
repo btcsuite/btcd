@@ -930,7 +930,7 @@ func (b *blockManager) handleInvMsg(imsg *invMsg) {
 		}
 		if !haveInv {
 			// Add it to the request queue.
-			imsg.peer.requestQueue.PushBack(iv)
+			imsg.peer.requestQueue = append(imsg.peer.requestQueue, iv)
 			continue
 		}
 
@@ -980,9 +980,10 @@ func (b *blockManager) handleInvMsg(imsg *invMsg) {
 	numRequested := 0
 	gdmsg := btcwire.NewMsgGetData()
 	requestQueue := imsg.peer.requestQueue
-	for e := requestQueue.Front(); e != nil; e = requestQueue.Front() {
-		iv := e.Value.(*btcwire.InvVect)
-		imsg.peer.requestQueue.Remove(e)
+	for len(requestQueue) != 0 {
+		iv := requestQueue[0]
+		requestQueue[0] = nil
+		requestQueue = requestQueue[1:]
 
 		switch iv.Type {
 		case btcwire.InvTypeBlock:
@@ -1010,6 +1011,7 @@ func (b *blockManager) handleInvMsg(imsg *invMsg) {
 			break
 		}
 	}
+	imsg.peer.requestQueue = requestQueue
 	if len(gdmsg.InvList) > 0 {
 		imsg.peer.QueueMessage(gdmsg, nil)
 	}

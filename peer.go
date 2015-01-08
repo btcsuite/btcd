@@ -162,7 +162,7 @@ type peer struct {
 	prevGetBlocksStop  *btcwire.ShaHash // owned by blockmanager
 	prevGetHdrsBegin   *btcwire.ShaHash // owned by blockmanager
 	prevGetHdrsStop    *btcwire.ShaHash // owned by blockmanager
-	requestQueue       *list.List
+	requestQueue       []*btcwire.InvVect
 	filter             *bloom.Filter
 	relayMtx           sync.Mutex
 	disableRelayTx     bool
@@ -1890,7 +1890,6 @@ func newPeerBase(s *server, inbound bool) *peer {
 		knownInventory:  NewMruInventoryMap(maxKnownInventory),
 		requestedTxns:   make(map[btcwire.ShaHash]struct{}),
 		requestedBlocks: make(map[btcwire.ShaHash]struct{}),
-		requestQueue:    list.New(),
 		filter:          bloom.LoadFilter(nil),
 		outputQueue:     make(chan outMsg, outputBufferSize),
 		sendQueue:       make(chan outMsg, 1),   // nonblocking sync
