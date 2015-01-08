@@ -1,15 +1,17 @@
 language: go
 go:
-  - 1.2
   - release
   - tip
+sudo: false
+before_install:
+  - gotools=golang.org/x/tools
+  - if [ "$TRAVIS_GO_VERSION" = "release" ]; then gotools=code.google.com/p/go.tools; fi
 install:
   - go get -d -t -v ./...
-  - go get -v code.google.com/p/go.tools/cmd/vet
-  - go get -v github.com/GeertJohan/fgt
+  - go get -v $gotools/cmd/cover
+  - go get -v $gotools/cmd/vet
+  - go get -v github.com/bradfitz/goimports
   - go get -v github.com/golang/lint/golint
 script:
   - export PATH=$PATH:$HOME/gopath/bin
-  - go vet
-  - fgt golint .
-  - go test -v
+  - ./goclean.sh
