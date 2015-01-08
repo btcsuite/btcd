@@ -6,12 +6,13 @@ package btcchain_test
 
 import (
 	"fmt"
+	"math/big"
+
 	"github.com/conformal/btcchain"
 	"github.com/conformal/btcdb"
 	_ "github.com/conformal/btcdb/memdb"
 	"github.com/conformal/btcnet"
 	"github.com/conformal/btcutil"
-	"math/big"
 )
 
 // This example demonstrates how to create a new chain instance and use

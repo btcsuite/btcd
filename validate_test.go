@@ -125,7 +125,6 @@ func TestCheckSerializedHeight(t *testing.T) {
 				continue
 			}
 		}
-
 	}
 }
 

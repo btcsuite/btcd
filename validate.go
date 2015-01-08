@@ -935,8 +935,8 @@ func (b *BlockChain) checkConnectBlock(node *blockNode, block *btcutil.Block) er
 // the checks performed are ensuring connecting the block would not cause any
 // duplicate transaction hashes for old transactions that aren't already fully
 // spent, double spends, exceeding the maximum allowed signature operations
-// per block, invalid values in relation to the expected block subisidy, or
-// fail transaction script validation.
+// per block, invalid values in relation to the expected block subsidy, or fail
+// transaction script validation.
 //
 // This function is NOT safe for concurrent access.
 func (b *BlockChain) CheckConnectBlock(block *btcutil.Block) error {

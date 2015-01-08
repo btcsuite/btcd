@@ -217,7 +217,6 @@ func ValidateTransactionScripts(tx *btcutil.Tx, txStore TxStore, flags btcscript
 	}
 
 	return nil
-
 }
 
 // checkBlockScripts executes and validates the scripts for all transactions in

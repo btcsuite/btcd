@@ -14,8 +14,6 @@ package btcchain
 import (
 	"sort"
 	"time"
-
-	"github.com/conformal/btcutil"
 )
 
 // TstSetCoinbaseMaturity makes the ability to set the coinbase maturity
@@ -32,12 +30,14 @@ func TstTimeSorter(times []time.Time) sort.Interface {
 
 // TstCheckSerializedHeight makes the internal checkSerializedHeight function
 // available to the test package.
-func TstCheckSerializedHeight(coinbaseTx *btcutil.Tx, wantHeight int64) error {
-	return checkSerializedHeight(coinbaseTx, wantHeight)
-}
+var TstCheckSerializedHeight = checkSerializedHeight
 
 // TstSetMaxMedianTimeEntries makes the ability to set the maximum number of
 // median tiem entries available to the test package.
 func TstSetMaxMedianTimeEntries(val int) {
 	maxMedianTimeEntries = val
 }
+
+// TstCheckBlockScripts makes the internal checkBlockScripts function available
+// to the test package.
+var TstCheckBlockScripts = checkBlockScripts
