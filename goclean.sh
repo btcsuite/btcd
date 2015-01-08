@@ -4,8 +4,7 @@
 # 2. goimports     (https://github.com/bradfitz/goimports)
 # 3. golint        (https://github.com/golang/lint)
 # 4. go vet        (http://golang.org/cmd/vet)
-# 5. race detector (http://blog.golang.org/race-detector)
-# 6. test coverage (http://blog.golang.org/cover)
+# 5. test coverage (http://blog.golang.org/cover)
 
 set -e
 
@@ -14,7 +13,6 @@ test -z "$(gofmt -l -w .     | tee /dev/stderr)"
 test -z "$(goimports -l -w . | tee /dev/stderr)"
 test -z "$(golint .          | tee /dev/stderr)"
 go vet ./...
-go test -race ./...
 
 # Run test coverage on each subdirectories and merge the coverage profile.
 
