@@ -247,13 +247,15 @@ type gbtWorkState struct {
 	minTimestamp  time.Time
 	template      *BlockTemplate
 	notifyMap     map[btcwire.ShaHash]map[int64]chan struct{}
+	timeSource    btcchain.MedianTimeSource
 }
 
 // newGbtWorkState returns a new instance of a gbtWorkState with all internal
 // fields initialized and ready to use.
-func newGbtWorkState() *gbtWorkState {
+func newGbtWorkState(timeSource btcchain.MedianTimeSource) *gbtWorkState {
 	return &gbtWorkState{
-		notifyMap: make(map[btcwire.ShaHash]map[int64]chan struct{}),
+		notifyMap:  make(map[btcwire.ShaHash]map[int64]chan struct{}),
+		timeSource: timeSource,
 	}
 }
 
@@ -519,7 +521,7 @@ func newRPCServer(listenAddrs []string, s *server) (*rpcServer, error) {
 		server:       s,
 		statusLines:  make(map[int]string),
 		workState:    newWorkState(),
-		gbtWorkState: newGbtWorkState(),
+		gbtWorkState: newGbtWorkState(s.timeSource),
 		quit:         make(chan int),
 	}
 	rpc.ntfnMgr = newWsNotificationManager(&rpc)
@@ -1546,23 +1548,15 @@ func (state *gbtWorkState) blockTemplateResult(useCoinbaseValue bool, submitOld 
 	template := state.template
 	msgBlock := template.block
 	header := &msgBlock.Header
-	curTime := time.Now()
-	if curTime.Before(state.minTimestamp) {
-		return nil, btcjson.Error{
-			Code: btcjson.ErrOutOfRange.Code,
-			Message: fmt.Sprintf("The local time is before the "+
-				"minimum allowed time for a block - current "+
-				"time %v, minimum time %v", curTime,
-				state.minTimestamp),
-		}
-	}
-	maxTime := curTime.Add(time.Second * btcchain.MaxTimeOffsetSeconds)
+	adjustedTime := state.timeSource.AdjustedTime()
+	maxTime := adjustedTime.Add(time.Second * btcchain.MaxTimeOffsetSeconds)
 	if header.Timestamp.After(maxTime) {
 		return nil, btcjson.Error{
 			Code: btcjson.ErrOutOfRange.Code,
 			Message: fmt.Sprintf("The template time is after the "+
 				"maximum allowed time for a block - template "+
-				"time %v, maximum time %v", curTime, maxTime),
+				"time %v, maximum time %v", adjustedTime,
+				maxTime),
 		}
 	}
 
@@ -1625,7 +1619,7 @@ func (state *gbtWorkState) blockTemplateResult(useCoinbaseValue bool, submitOld 
 	templateID := encodeTemplateID(state.prevHash, state.lastGenerated)
 	reply := btcjson.GetBlockTemplateResult{
 		Bits:         strconv.FormatInt(int64(header.Bits), 16),
-		CurTime:      curTime.Unix(),
+		CurTime:      header.Timestamp.Unix(),
 		Height:       template.height,
 		PreviousHash: header.PrevBlock.String(),
 		SigOpLimit:   btcchain.MaxSigOpsPerBlock,
