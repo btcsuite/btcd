@@ -286,7 +286,7 @@ func checkTransactionStandard(tx *btcutil.Tx, height int64) error {
 	}
 
 	// None of the output public key scripts can be a non-standard script or
-	// be "dust".
+	// be "dust" (except when the script is a null data script).
 	numNullDataOutputs := 0
 	for i, txOut := range msgTx.TxOut {
 		scriptClass := btcscript.GetScriptClass(txOut.PkScript)
@@ -303,12 +303,12 @@ func checkTransactionStandard(tx *btcutil.Tx, height int64) error {
 			return txRuleError(rejectCode, str)
 		}
 
-		// Accumulate the number of outputs which only carry data.
+		// Accumulate the number of outputs which only carry data.  For
+		// all other script types, ensure the output value is not
+		// "dust".
 		if scriptClass == btcscript.NullDataTy {
 			numNullDataOutputs++
-		}
-
-		if isDust(txOut) {
+		} else if isDust(txOut) {
 			str := fmt.Sprintf("transaction output %d: payment "+
 				"of %d is dust", i, txOut.Value)
 			return txRuleError(btcwire.RejectDust, str)
