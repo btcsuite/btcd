@@ -131,11 +131,7 @@ func (msg *MsgMerkleBlock) BtcEncode(w io.Writer, pver uint32) error {
 		}
 	}
 
-	err = writeVarInt(w, pver, uint64(numFlagBytes))
-	if err != nil {
-		return err
-	}
-	err = writeElement(w, msg.Flags)
+	err = writeVarBytes(w, pver, msg.Flags)
 	if err != nil {
 		return err
 	}

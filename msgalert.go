@@ -149,8 +149,8 @@ type Alert struct {
 
 // Serialize encodes the alert to w using the alert protocol encoding format.
 func (alert *Alert) Serialize(w io.Writer, pver uint32) error {
-	err := writeElements(w, &alert.Version,
-		&alert.RelayUntil, &alert.Expiration, &alert.ID, &alert.Cancel)
+	err := writeElements(w, alert.Version, alert.RelayUntil,
+		alert.Expiration, alert.ID, alert.Cancel)
 	if err != nil {
 		return err
 	}
@@ -166,13 +166,13 @@ func (alert *Alert) Serialize(w io.Writer, pver uint32) error {
 		return err
 	}
 	for i := 0; i < int(count); i++ {
-		err = writeElement(w, &alert.SetCancel[i])
+		err = writeElement(w, alert.SetCancel[i])
 		if err != nil {
 			return err
 		}
 	}
 
-	err = writeElements(w, &alert.MinVer, &alert.MaxVer)
+	err = writeElements(w, alert.MinVer, alert.MaxVer)
 	if err != nil {
 		return err
 	}
@@ -194,7 +194,7 @@ func (alert *Alert) Serialize(w io.Writer, pver uint32) error {
 		}
 	}
 
-	err = writeElement(w, &alert.Priority)
+	err = writeElement(w, alert.Priority)
 	if err != nil {
 		return err
 	}
