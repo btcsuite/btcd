@@ -2,24 +2,23 @@
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
-package btcwire_test
+package btcwire
 
 import (
 	"bytes"
 	"io/ioutil"
 	"testing"
-
-	"github.com/conformal/btcwire"
+	"time"
 )
 
 // genesisCoinbaseTx is the coinbase transaction for the genesis blocks for
 // the main network, regression test network, and test network (version 3).
-var genesisCoinbaseTx = btcwire.MsgTx{
+var genesisCoinbaseTx = MsgTx{
 	Version: 1,
-	TxIn: []*btcwire.TxIn{
+	TxIn: []*TxIn{
 		{
-			PreviousOutPoint: btcwire.OutPoint{
-				Hash:  btcwire.ShaHash{},
+			PreviousOutPoint: OutPoint{
+				Hash:  ShaHash{},
 				Index: 0xffffffff,
 			},
 			SignatureScript: []byte{
@@ -37,7 +36,7 @@ var genesisCoinbaseTx = btcwire.MsgTx{
 			Sequence: 0xffffffff,
 		},
 	},
-	TxOut: []*btcwire.TxOut{
+	TxOut: []*TxOut{
 		{
 			Value: 0x12a05f200,
 			PkScript: []byte{
@@ -56,11 +55,70 @@ var genesisCoinbaseTx = btcwire.MsgTx{
 	LockTime: 0,
 }
 
+// blockOne is the first block in the mainnet block chain.
+var blockOne = MsgBlock{
+	Header: BlockHeader{
+		Version: 1,
+		PrevBlock: ShaHash([HashSize]byte{ // Make go vet happy.
+			0x6f, 0xe2, 0x8c, 0x0a, 0xb6, 0xf1, 0xb3, 0x72,
+			0xc1, 0xa6, 0xa2, 0x46, 0xae, 0x63, 0xf7, 0x4f,
+			0x93, 0x1e, 0x83, 0x65, 0xe1, 0x5a, 0x08, 0x9c,
+			0x68, 0xd6, 0x19, 0x00, 0x00, 0x00, 0x00, 0x00,
+		}),
+		MerkleRoot: ShaHash([HashSize]byte{ // Make go vet happy.
+			0x98, 0x20, 0x51, 0xfd, 0x1e, 0x4b, 0xa7, 0x44,
+			0xbb, 0xbe, 0x68, 0x0e, 0x1f, 0xee, 0x14, 0x67,
+			0x7b, 0xa1, 0xa3, 0xc3, 0x54, 0x0b, 0xf7, 0xb1,
+			0xcd, 0xb6, 0x06, 0xe8, 0x57, 0x23, 0x3e, 0x0e,
+		}),
+
+		Timestamp: time.Unix(0x4966bc61, 0), // 2009-01-08 20:54:25 -0600 CST
+		Bits:      0x1d00ffff,               // 486604799
+		Nonce:     0x9962e301,               // 2573394689
+	},
+	Transactions: []*MsgTx{
+		{
+			Version: 1,
+			TxIn: []*TxIn{
+				{
+					PreviousOutPoint: OutPoint{
+						Hash:  ShaHash{},
+						Index: 0xffffffff,
+					},
+					SignatureScript: []byte{
+						0x04, 0xff, 0xff, 0x00, 0x1d, 0x01, 0x04,
+					},
+					Sequence: 0xffffffff,
+				},
+			},
+			TxOut: []*TxOut{
+				{
+					Value: 0x12a05f200,
+					PkScript: []byte{
+						0x41, // OP_DATA_65
+						0x04, 0x96, 0xb5, 0x38, 0xe8, 0x53, 0x51, 0x9c,
+						0x72, 0x6a, 0x2c, 0x91, 0xe6, 0x1e, 0xc1, 0x16,
+						0x00, 0xae, 0x13, 0x90, 0x81, 0x3a, 0x62, 0x7c,
+						0x66, 0xfb, 0x8b, 0xe7, 0x94, 0x7b, 0xe6, 0x3c,
+						0x52, 0xda, 0x75, 0x89, 0x37, 0x95, 0x15, 0xd4,
+						0xe0, 0xa6, 0x04, 0xf8, 0x14, 0x17, 0x81, 0xe6,
+						0x22, 0x94, 0x72, 0x11, 0x66, 0xbf, 0x62, 0x1e,
+						0x73, 0xa8, 0x2c, 0xbf, 0x23, 0x42, 0xc8, 0x58,
+						0xee, // 65-byte signature
+						0xac, // OP_CHECKSIG
+					},
+				},
+			},
+			LockTime: 0,
+		},
+	},
+}
+
 // BenchmarkWriteVarInt1 performs a benchmark on how long it takes to write
 // a single byte variable length integer.
 func BenchmarkWriteVarInt1(b *testing.B) {
 	for i := 0; i < b.N; i++ {
-		btcwire.TstWriteVarInt(ioutil.Discard, 0, 1)
+		writeVarInt(ioutil.Discard, 0, 1)
 	}
 }
 
@@ -68,7 +126,7 @@ func BenchmarkWriteVarInt1(b *testing.B) {
 // a three byte variable length integer.
 func BenchmarkWriteVarInt3(b *testing.B) {
 	for i := 0; i < b.N; i++ {
-		btcwire.TstWriteVarInt(ioutil.Discard, 0, 65535)
+		writeVarInt(ioutil.Discard, 0, 65535)
 	}
 }
 
@@ -76,7 +134,7 @@ func BenchmarkWriteVarInt3(b *testing.B) {
 // a five byte variable length integer.
 func BenchmarkWriteVarInt5(b *testing.B) {
 	for i := 0; i < b.N; i++ {
-		btcwire.TstWriteVarInt(ioutil.Discard, 0, 4294967295)
+		writeVarInt(ioutil.Discard, 0, 4294967295)
 	}
 }
 
@@ -84,7 +142,7 @@ func BenchmarkWriteVarInt5(b *testing.B) {
 // a nine byte variable length integer.
 func BenchmarkWriteVarInt9(b *testing.B) {
 	for i := 0; i < b.N; i++ {
-		btcwire.TstWriteVarInt(ioutil.Discard, 0, 18446744073709551615)
+		writeVarInt(ioutil.Discard, 0, 18446744073709551615)
 	}
 }
 
@@ -93,7 +151,7 @@ func BenchmarkWriteVarInt9(b *testing.B) {
 func BenchmarkReadVarInt1(b *testing.B) {
 	buf := []byte{0x01}
 	for i := 0; i < b.N; i++ {
-		btcwire.TstReadVarInt(bytes.NewReader(buf), 0)
+		readVarInt(bytes.NewReader(buf), 0)
 	}
 }
 
@@ -102,7 +160,7 @@ func BenchmarkReadVarInt1(b *testing.B) {
 func BenchmarkReadVarInt3(b *testing.B) {
 	buf := []byte{0x0fd, 0xff, 0xff}
 	for i := 0; i < b.N; i++ {
-		btcwire.TstReadVarInt(bytes.NewReader(buf), 0)
+		readVarInt(bytes.NewReader(buf), 0)
 	}
 }
 
@@ -111,7 +169,7 @@ func BenchmarkReadVarInt3(b *testing.B) {
 func BenchmarkReadVarInt5(b *testing.B) {
 	buf := []byte{0xfe, 0xff, 0xff, 0xff, 0xff}
 	for i := 0; i < b.N; i++ {
-		btcwire.TstReadVarInt(bytes.NewReader(buf), 0)
+		readVarInt(bytes.NewReader(buf), 0)
 	}
 }
 
@@ -120,7 +178,7 @@ func BenchmarkReadVarInt5(b *testing.B) {
 func BenchmarkReadVarInt9(b *testing.B) {
 	buf := []byte{0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff}
 	for i := 0; i < b.N; i++ {
-		btcwire.TstReadVarInt(bytes.NewReader(buf), 0)
+		readVarInt(bytes.NewReader(buf), 0)
 	}
 }
 
@@ -129,7 +187,7 @@ func BenchmarkReadVarInt9(b *testing.B) {
 func BenchmarkReadVarStr4(b *testing.B) {
 	buf := []byte{0x04, 't', 'e', 's', 't'}
 	for i := 0; i < b.N; i++ {
-		btcwire.TstReadVarString(bytes.NewReader(buf), 0)
+		readVarString(bytes.NewReader(buf), 0)
 	}
 }
 
@@ -138,7 +196,7 @@ func BenchmarkReadVarStr4(b *testing.B) {
 func BenchmarkReadVarStr10(b *testing.B) {
 	buf := []byte{0x0a, 't', 'e', 's', 't', '0', '1', '2', '3', '4', '5'}
 	for i := 0; i < b.N; i++ {
-		btcwire.TstReadVarString(bytes.NewReader(buf), 0)
+		readVarString(bytes.NewReader(buf), 0)
 	}
 }
 
@@ -146,7 +204,7 @@ func BenchmarkReadVarStr10(b *testing.B) {
 // four byte variable length string.
 func BenchmarkWriteVarStr4(b *testing.B) {
 	for i := 0; i < b.N; i++ {
-		btcwire.TstWriteVarString(ioutil.Discard, 0, "test")
+		writeVarString(ioutil.Discard, 0, "test")
 	}
 }
 
@@ -154,7 +212,7 @@ func BenchmarkWriteVarStr4(b *testing.B) {
 // ten byte variable length string.
 func BenchmarkWriteVarStr10(b *testing.B) {
 	for i := 0; i < b.N; i++ {
-		btcwire.TstWriteVarString(ioutil.Discard, 0, "test012345")
+		writeVarString(ioutil.Discard, 0, "test012345")
 	}
 }
 
@@ -168,21 +226,21 @@ func BenchmarkReadOutPoint(b *testing.B) {
 		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // Previous output hash
 		0xff, 0xff, 0xff, 0xff, // Previous output index
 	}
-	var op btcwire.OutPoint
+	var op OutPoint
 	for i := 0; i < b.N; i++ {
-		btcwire.TstReadOutPoint(bytes.NewReader(buf), 0, 0, &op)
+		readOutPoint(bytes.NewReader(buf), 0, 0, &op)
 	}
 }
 
 // BenchmarkWriteOutPoint performs a benchmark on how long it takes to write a
 // transaction output point.
 func BenchmarkWriteOutPoint(b *testing.B) {
-	op := &btcwire.OutPoint{
-		Hash:  btcwire.ShaHash{},
+	op := &OutPoint{
+		Hash:  ShaHash{},
 		Index: 0,
 	}
 	for i := 0; i < b.N; i++ {
-		btcwire.TstWriteOutPoint(ioutil.Discard, 0, 0, op)
+		writeOutPoint(ioutil.Discard, 0, 0, op)
 	}
 }
 
@@ -204,9 +262,9 @@ func BenchmarkReadTxOut(b *testing.B) {
 		0xee, // 65-byte signature
 		0xac, // OP_CHECKSIG
 	}
-	var txOut btcwire.TxOut
+	var txOut TxOut
 	for i := 0; i < b.N; i++ {
-		btcwire.TstReadTxOut(bytes.NewReader(buf), 0, 0, &txOut)
+		readTxOut(bytes.NewReader(buf), 0, 0, &txOut)
 	}
 }
 
@@ -215,7 +273,7 @@ func BenchmarkReadTxOut(b *testing.B) {
 func BenchmarkWriteTxOut(b *testing.B) {
 	txOut := blockOne.Transactions[0].TxOut[0]
 	for i := 0; i < b.N; i++ {
-		btcwire.TstWriteTxOut(ioutil.Discard, 0, 0, txOut)
+		writeTxOut(ioutil.Discard, 0, 0, txOut)
 	}
 }
 
@@ -232,9 +290,9 @@ func BenchmarkReadTxIn(b *testing.B) {
 		0x04, 0xff, 0xff, 0x00, 0x1d, 0x01, 0x04, // Signature script
 		0xff, 0xff, 0xff, 0xff, // Sequence
 	}
-	var txIn btcwire.TxIn
+	var txIn TxIn
 	for i := 0; i < b.N; i++ {
-		btcwire.TstReadTxIn(bytes.NewReader(buf), 0, 0, &txIn)
+		readTxIn(bytes.NewReader(buf), 0, 0, &txIn)
 	}
 }
 
@@ -243,7 +301,7 @@ func BenchmarkReadTxIn(b *testing.B) {
 func BenchmarkWriteTxIn(b *testing.B) {
 	txIn := blockOne.Transactions[0].TxIn[0]
 	for i := 0; i < b.N; i++ {
-		btcwire.TstWriteTxIn(ioutil.Discard, 0, 0, txIn)
+		writeTxIn(ioutil.Discard, 0, 0, txIn)
 	}
 }
 
@@ -277,7 +335,7 @@ func BenchmarkDeserializeTx(b *testing.B) {
 		0xac,                   // OP_CHECKSIG
 		0x00, 0x00, 0x00, 0x00, // Lock time
 	}
-	var tx btcwire.MsgTx
+	var tx MsgTx
 	for i := 0; i < b.N; i++ {
 		tx.Deserialize(bytes.NewReader(buf))
 
@@ -312,9 +370,9 @@ func BenchmarkReadBlockHeader(b *testing.B) {
 		0xf3, 0xe0, 0x01, 0x00, // Nonce
 		0x00, // TxnCount Varint
 	}
-	var header btcwire.BlockHeader
+	var header BlockHeader
 	for i := 0; i < b.N; i++ {
-		btcwire.TstReadBlockHeader(bytes.NewReader(buf), 0, &header)
+		readBlockHeader(bytes.NewReader(buf), 0, &header)
 	}
 }
 
@@ -323,7 +381,7 @@ func BenchmarkReadBlockHeader(b *testing.B) {
 func BenchmarkWriteBlockHeader(b *testing.B) {
 	header := blockOne.Header
 	for i := 0; i < b.N; i++ {
-		btcwire.TstWriteBlockHeader(ioutil.Discard, 0, &header)
+		writeBlockHeader(ioutil.Discard, 0, &header)
 	}
 }
 
