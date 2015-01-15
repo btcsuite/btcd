@@ -27,6 +27,7 @@ import (
 	"time"
 
 	"github.com/btcsuite/btcutil"
+	"github.com/btcsuite/websocket"
 	"github.com/conformal/btcchain"
 	"github.com/conformal/btcdb"
 	"github.com/conformal/btcec"
@@ -36,7 +37,6 @@ import (
 	"github.com/conformal/btcwire"
 	"github.com/conformal/btcws"
 	"github.com/conformal/fastsha256"
-	"github.com/conformal/websocket"
 )
 
 const (
