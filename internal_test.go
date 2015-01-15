@@ -14,7 +14,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/conformal/btcutil"
+	"github.com/btcsuite/btcutil"
 	"github.com/conformal/btcwire"
 )
 

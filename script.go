@@ -11,9 +11,9 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/btcsuite/btcutil"
 	"github.com/conformal/btcec"
 	"github.com/conformal/btcnet"
-	"github.com/conformal/btcutil"
 	"github.com/conformal/btcwire"
 )
 
