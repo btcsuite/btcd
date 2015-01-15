@@ -7,7 +7,7 @@ package btcchain
 import (
 	"fmt"
 
-	"github.com/conformal/btcutil"
+	"github.com/btcsuite/btcutil"
 	"github.com/conformal/btcwire"
 )
 

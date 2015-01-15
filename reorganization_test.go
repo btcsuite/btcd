@@ -13,8 +13,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/btcsuite/btcutil"
 	"github.com/conformal/btcchain"
-	"github.com/conformal/btcutil"
 	"github.com/conformal/btcwire"
 )
 

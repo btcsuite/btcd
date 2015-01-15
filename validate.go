@@ -11,10 +11,10 @@ import (
 	"math/big"
 	"time"
 
+	"github.com/btcsuite/btcutil"
 	"github.com/conformal/btcdb"
 	"github.com/conformal/btcnet"
 	"github.com/conformal/btcscript"
-	"github.com/conformal/btcutil"
 	"github.com/conformal/btcwire"
 )
 

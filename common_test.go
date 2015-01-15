@@ -13,12 +13,12 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/btcsuite/btcutil"
 	"github.com/conformal/btcchain"
 	"github.com/conformal/btcdb"
 	_ "github.com/conformal/btcdb/ldb"
 	_ "github.com/conformal/btcdb/memdb"
 	"github.com/conformal/btcnet"
-	"github.com/conformal/btcutil"
 	"github.com/conformal/btcwire"
 )
 
