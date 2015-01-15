@@ -27,8 +27,8 @@
 //          "fmt"
 //          "log"
 //
+//          "github.com/btcsuite/btcutil"
 //          "github.com/conformal/btcnet"
-//          "github.com/conformal/btcutil"
 //  )
 //
 //  var testnet = flag.Bool("testnet", false, "operate on the testnet Bitcoin network")
