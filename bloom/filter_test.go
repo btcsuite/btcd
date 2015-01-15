@@ -9,8 +9,8 @@ import (
 	"encoding/hex"
 	"testing"
 
-	"github.com/conformal/btcutil"
-	"github.com/conformal/btcutil/bloom"
+	"github.com/btcsuite/btcutil"
+	"github.com/btcsuite/btcutil/bloom"
 	"github.com/conformal/btcwire"
 )
 

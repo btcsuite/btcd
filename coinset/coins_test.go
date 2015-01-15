@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/conformal/btcutil"
-	"github.com/conformal/btcutil/coinset"
+	"github.com/btcsuite/btcutil"
+	"github.com/btcsuite/btcutil/coinset"
 	"github.com/conformal/btcwire"
 	"github.com/conformal/fastsha256"
 )

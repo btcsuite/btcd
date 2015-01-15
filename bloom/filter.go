@@ -9,8 +9,8 @@ import (
 	"math"
 	"sync"
 
+	"github.com/btcsuite/btcutil"
 	"github.com/conformal/btcscript"
-	"github.com/conformal/btcutil"
 	"github.com/conformal/btcwire"
 )
 

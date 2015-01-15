@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/conformal/btcutil"
+	"github.com/btcsuite/btcutil"
 	//"github.com/davecgh/go-spew/spew"
 )
 

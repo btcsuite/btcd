@@ -13,8 +13,8 @@ import (
 
 	"golang.org/x/crypto/ripemd160"
 
+	"github.com/btcsuite/btcutil"
 	"github.com/conformal/btcnet"
-	"github.com/conformal/btcutil"
 	"github.com/conformal/btcwire"
 )
 

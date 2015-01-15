@@ -18,10 +18,10 @@ import (
 	"fmt"
 	"math/big"
 
+	"github.com/btcsuite/btcutil"
+	"github.com/btcsuite/btcutil/base58"
 	"github.com/conformal/btcec"
 	"github.com/conformal/btcnet"
-	"github.com/conformal/btcutil"
-	"github.com/conformal/btcutil/base58"
 	"github.com/conformal/btcwire"
 )
 

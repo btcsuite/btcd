@@ -15,8 +15,8 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/btcsuite/btcutil/hdkeychain"
 	"github.com/conformal/btcnet"
-	"github.com/conformal/btcutil/hdkeychain"
 )
 
 // TestBIP0032Vectors tests the vectors provided by [BIP32] to ensure the

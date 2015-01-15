@@ -9,7 +9,7 @@ import (
 	"math/rand"
 	"time"
 
-	"github.com/conformal/btcutil/bloom"
+	"github.com/btcsuite/btcutil/bloom"
 	"github.com/conformal/btcwire"
 )
 
