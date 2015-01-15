@@ -646,7 +646,7 @@ func (curve *KoblitzCurve) ScalarBaseMult(k []byte) (*big.Int, *big.Int) {
 	// Each "digit" in the 8-bit window can be looked up using bytePoints
 	// and added together.
 	for i, byteVal := range k {
-		point := &curve.bytePoints[diff+i][byteVal]
+		point := curve.bytePoints[diff+i][byteVal]
 		curve.addJacobian(qx, qy, qz, &point[0], &point[1], &point[2], qx, qy, qz)
 	}
 	return curve.fieldJacobianToBigAffine(qx, qy, qz)
