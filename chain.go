@@ -9,8 +9,8 @@ import (
 	"encoding/hex"
 	"encoding/json"
 
+	"github.com/btcsuite/btcutil"
 	"github.com/conformal/btcjson"
-	"github.com/conformal/btcutil"
 	"github.com/conformal/btcwire"
 )
 

@@ -13,8 +13,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/btcsuite/btcutil"
 	"github.com/conformal/btcjson"
-	"github.com/conformal/btcutil"
 	"github.com/conformal/btcwire"
 	"github.com/conformal/btcws"
 )

@@ -8,9 +8,9 @@ import (
 	"encoding/json"
 	"strconv"
 
+	"github.com/btcsuite/btcutil"
 	"github.com/conformal/btcjson"
 	"github.com/conformal/btcnet"
-	"github.com/conformal/btcutil"
 	"github.com/conformal/btcwire"
 	"github.com/conformal/btcws"
 )

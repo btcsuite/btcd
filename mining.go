@@ -9,8 +9,8 @@ import (
 	"encoding/json"
 	"errors"
 
+	"github.com/btcsuite/btcutil"
 	"github.com/conformal/btcjson"
-	"github.com/conformal/btcutil"
 )
 
 // FutureGetGenerateResult is a future promise to deliver the result of a
