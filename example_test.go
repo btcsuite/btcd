@@ -7,10 +7,10 @@ package btcdb_test
 import (
 	"fmt"
 
+	"github.com/btcsuite/btcutil"
 	"github.com/conformal/btcdb"
 	_ "github.com/conformal/btcdb/memdb"
 	"github.com/conformal/btcnet"
-	"github.com/conformal/btcutil"
 )
 
 // This example demonstrates creating a new database and inserting the genesis

@@ -10,9 +10,9 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/btcsuite/btcutil"
 	"github.com/conformal/btcdb"
 	_ "github.com/conformal/btcdb/ldb"
-	"github.com/conformal/btcutil"
 	"github.com/conformal/btcwire"
 )
 

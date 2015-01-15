@@ -10,8 +10,8 @@ import (
 	"math"
 	"sync"
 
+	"github.com/btcsuite/btcutil"
 	"github.com/conformal/btcdb"
-	"github.com/conformal/btcutil"
 	"github.com/conformal/btcwire"
 )
 
