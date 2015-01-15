@@ -16,11 +16,11 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/btcsuite/btcutil"
+	"github.com/btcsuite/btcutil/bloom"
 	"github.com/conformal/btcchain"
 	"github.com/conformal/btcd/addrmgr"
 	"github.com/conformal/btcdb"
-	"github.com/conformal/btcutil"
-	"github.com/conformal/btcutil/bloom"
 	"github.com/conformal/btcwire"
 	socks "github.com/conformal/go-socks"
 	"github.com/davecgh/go-spew/spew"

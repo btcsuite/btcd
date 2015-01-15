@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/conformal/btcutil"
+	"github.com/btcsuite/btcutil"
 	flags "github.com/conformal/go-flags"
 )
 
