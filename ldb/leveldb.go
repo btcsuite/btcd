@@ -11,13 +11,12 @@ import (
 	"strconv"
 	"sync"
 
+	"github.com/btcsuite/goleveldb/leveldb"
+	"github.com/btcsuite/goleveldb/leveldb/opt"
 	"github.com/conformal/btcdb"
 	"github.com/conformal/btclog"
 	"github.com/conformal/btcutil"
 	"github.com/conformal/btcwire"
-	"github.com/conformal/goleveldb/leveldb"
-	"github.com/conformal/goleveldb/leveldb/cache"
-	"github.com/conformal/goleveldb/leveldb/opt"
 )
 
 const (
@@ -197,11 +196,10 @@ func openDB(dbpath string, create bool) (pbdb btcdb.Db, err error) {
 		}
 	}
 
-	myCache := cache.NewEmptyCache()
 	opts := &opt.Options{
-		BlockCache:   myCache,
-		MaxOpenFiles: 256,
-		Compression:  opt.NoCompression,
+		BlockCacher:     opt.DefaultBlockCacher,
+		Compression:     opt.NoCompression,
+		OpenFilesCacher: opt.DefaultOpenFilesCacher,
 	}
 
 	switch dbversion {
