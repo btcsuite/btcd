@@ -17,11 +17,11 @@ import (
 	"time"
 
 	"github.com/btcsuite/btcutil"
+	flags "github.com/btcsuite/go-flags"
 	"github.com/conformal/btcdb"
 	_ "github.com/conformal/btcdb/ldb"
 	_ "github.com/conformal/btcdb/memdb"
 	"github.com/conformal/btcwire"
-	flags "github.com/conformal/go-flags"
 	socks "github.com/conformal/go-socks"
 )
 
