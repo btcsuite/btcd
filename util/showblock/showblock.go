@@ -13,11 +13,11 @@ import (
 	"path/filepath"
 	"strconv"
 
+	"github.com/btcsuite/btclog"
 	"github.com/btcsuite/btcutil"
 	flags "github.com/btcsuite/go-flags"
 	"github.com/conformal/btcdb"
 	_ "github.com/conformal/btcdb/ldb"
-	"github.com/conformal/btclog"
 	"github.com/conformal/btcnet"
 	"github.com/conformal/btcwire"
 	"github.com/davecgh/go-spew/spew"
