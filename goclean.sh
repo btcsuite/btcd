@@ -11,7 +11,7 @@ set -e
 # Automatic checks
 test -z "$(gofmt -l -w .     | tee /dev/stderr)"
 test -z "$(goimports -l -w . | tee /dev/stderr)"
-#test -z "$(golint .          | tee /dev/stderr)"
+test -z "$(golint .          | tee /dev/stderr)"
 go vet ./...
 env GORACE="halt_on_error=1" go test -v -race ./...
 
