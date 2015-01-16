@@ -8,8 +8,8 @@ import (
 	"encoding/hex"
 	"fmt"
 
+	"github.com/btcsuite/btcnet"
 	"github.com/btcsuite/btcutil"
-	"github.com/conformal/btcnet"
 	"github.com/conformal/btcscript"
 )
 

@@ -8,8 +8,8 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/btcsuite/btcnet"
 	"github.com/btcsuite/btcutil"
-	"github.com/conformal/btcnet"
 	"github.com/conformal/btcscript"
 )
 
