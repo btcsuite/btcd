@@ -666,7 +666,7 @@ func (r FutureNotifyBlocksResult) Receive() error {
 // NOTE: This is a btcd extension and requires a websocket connection.
 func (c *Client) NotifyBlocksAsync() FutureNotifyBlocksResult {
 	// Not supported in HTTP POST mode.
-	if c.config.HttpPostMode {
+	if c.config.HTTPPostMode {
 		return newFutureError(ErrNotificationsNotSupported)
 	}
 
@@ -714,7 +714,7 @@ func (r FutureNotifySpentResult) Receive() error {
 // recreate the previous notification state on reconnect.
 func (c *Client) notifySpentInternal(outpoints []btcjson.OutPoint) FutureNotifySpentResult {
 	// Not supported in HTTP POST mode.
-	if c.config.HttpPostMode {
+	if c.config.HTTPPostMode {
 		return newFutureError(ErrNotificationsNotSupported)
 	}
 
@@ -737,7 +737,7 @@ func (c *Client) notifySpentInternal(outpoints []btcjson.OutPoint) FutureNotifyS
 // NOTE: This is a btcd extension and requires a websocket connection.
 func (c *Client) NotifySpentAsync(outpoints []*wire.OutPoint) FutureNotifySpentResult {
 	// Not supported in HTTP POST mode.
-	if c.config.HttpPostMode {
+	if c.config.HTTPPostMode {
 		return newFutureError(ErrNotificationsNotSupported)
 	}
 
@@ -793,7 +793,7 @@ func (r FutureNotifyNewTransactionsResult) Receive() error {
 // NOTE: This is a btcd extension and requires a websocket connection.
 func (c *Client) NotifyNewTransactionsAsync(verbose bool) FutureNotifyNewTransactionsResult {
 	// Not supported in HTTP POST mode.
-	if c.config.HttpPostMode {
+	if c.config.HTTPPostMode {
 		return newFutureError(ErrNotificationsNotSupported)
 	}
 
@@ -842,7 +842,7 @@ func (r FutureNotifyReceivedResult) Receive() error {
 // recreate the previous notification state on reconnect.
 func (c *Client) notifyReceivedInternal(addresses []string) FutureNotifyReceivedResult {
 	// Not supported in HTTP POST mode.
-	if c.config.HttpPostMode {
+	if c.config.HTTPPostMode {
 		return newFutureError(ErrNotificationsNotSupported)
 	}
 
@@ -866,7 +866,7 @@ func (c *Client) notifyReceivedInternal(addresses []string) FutureNotifyReceived
 // NOTE: This is a btcd extension and requires a websocket connection.
 func (c *Client) NotifyReceivedAsync(addresses []btcutil.Address) FutureNotifyReceivedResult {
 	// Not supported in HTTP POST mode.
-	if c.config.HttpPostMode {
+	if c.config.HTTPPostMode {
 		return newFutureError(ErrNotificationsNotSupported)
 	}
 
@@ -939,7 +939,7 @@ func (c *Client) RescanAsync(startBlock *wire.ShaHash,
 	outpoints []*wire.OutPoint) FutureRescanResult {
 
 	// Not supported in HTTP POST mode.
-	if c.config.HttpPostMode {
+	if c.config.HTTPPostMode {
 		return newFutureError(ErrNotificationsNotSupported)
 	}
 
@@ -1016,7 +1016,7 @@ func (c *Client) RescanEndBlockAsync(startBlock *wire.ShaHash,
 	endBlock *wire.ShaHash) FutureRescanResult {
 
 	// Not supported in HTTP POST mode.
-	if c.config.HttpPostMode {
+	if c.config.HTTPPostMode {
 		return newFutureError(ErrNotificationsNotSupported)
 	}
 

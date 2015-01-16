@@ -16,7 +16,7 @@ func main() {
 		Host:         "localhost:8332",
 		User:         "yourrpcuser",
 		Pass:         "yourrpcpass",
-		HttpPostMode: true, // Bitcoin core only supports HTTP POST mode
+		HTTPPostMode: true, // Bitcoin core only supports HTTP POST mode
 		DisableTLS:   true, // Bitcoin core does not provide TLS by default
 	}
 	// Notice the notification parameter is nil since notifications are
