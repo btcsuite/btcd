@@ -8,7 +8,7 @@ import (
 	"bytes"
 	"testing"
 
-	"github.com/conformal/btcwire"
+	"github.com/btcsuite/btcwire"
 )
 
 func TestMemPool(t *testing.T) {

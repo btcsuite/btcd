@@ -7,7 +7,7 @@ package btcwire_test
 import (
 	"io"
 
-	"github.com/conformal/btcwire"
+	"github.com/btcsuite/btcwire"
 )
 
 // fakeMessage implements the btcwire.Message interface and is used to force
