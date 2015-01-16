@@ -8,8 +8,8 @@ import (
 	"fmt"
 
 	"github.com/btcsuite/btcutil"
+	"github.com/btcsuite/btcwire"
 	"github.com/conformal/btcdb"
-	"github.com/conformal/btcwire"
 )
 
 // TxData contains contextual information about transactions such as which block

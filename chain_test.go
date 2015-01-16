@@ -8,9 +8,9 @@ import (
 	"testing"
 
 	"github.com/btcsuite/btcutil"
+	"github.com/btcsuite/btcwire"
 	"github.com/conformal/btcchain"
 	"github.com/conformal/btcnet"
-	"github.com/conformal/btcwire"
 )
 
 // TestHaveBlock tests the HaveBlock API to ensure proper functionality.

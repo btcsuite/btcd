@@ -12,10 +12,10 @@ import (
 	"time"
 
 	"github.com/btcsuite/btcutil"
+	"github.com/btcsuite/btcwire"
 	"github.com/conformal/btcdb"
 	"github.com/conformal/btcnet"
 	"github.com/conformal/btcscript"
-	"github.com/conformal/btcwire"
 )
 
 const (

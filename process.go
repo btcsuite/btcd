@@ -8,7 +8,7 @@ import (
 	"fmt"
 
 	"github.com/btcsuite/btcutil"
-	"github.com/conformal/btcwire"
+	"github.com/btcsuite/btcwire"
 )
 
 // BehaviorFlags is a bitmask defining tweaks to the normal behavior when

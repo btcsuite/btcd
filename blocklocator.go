@@ -5,7 +5,7 @@
 package btcchain
 
 import (
-	"github.com/conformal/btcwire"
+	"github.com/btcsuite/btcwire"
 )
 
 // BlockLocator is used to help locate a specific block.  The algorithm for
