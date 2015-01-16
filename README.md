@@ -1,10 +1,10 @@
 btcutil
 =======
 
-[![Build Status](https://travis-ci.org/conformal/btcutil.png?branch=master)]
-(https://travis-ci.org/conformal/btcutil) [![Coverage Status]
-(https://coveralls.io/repos/conformal/btcutil/badge.png?branch=master)]
-(https://coveralls.io/r/conformal/btcutil?branch=master)
+[![Build Status](https://travis-ci.org/btcsuite/btcutil.png?branch=master)]
+(https://travis-ci.org/btcsuite/btcutil) [![Coverage Status]
+(https://coveralls.io/repos/btcsuite/btcutil/badge.png?branch=master)]
+(https://coveralls.io/r/btcsuite/btcutil?branch=master)
 
 Package btcutil provides bitcoin-specific convenience functions and types.
 A comprehensive suite of tests is provided to ensure proper functionality.  See
@@ -20,21 +20,21 @@ provided.
 
 ## Documentation
 
-[![GoDoc](https://godoc.org/github.com/conformal/btcutil?status.png)]
-(http://godoc.org/github.com/conformal/btcutil)
+[![GoDoc](https://godoc.org/github.com/btcsuite/btcutil?status.png)]
+(http://godoc.org/github.com/btcsuite/btcutil)
 
 Full `go doc` style documentation for the project can be viewed online without
 installing this package by using the GoDoc site here:
-http://godoc.org/github.com/conformal/btcutil
+http://godoc.org/github.com/btcsuite/btcutil
 
 You can also view the documentation locally once the package is installed with
 the `godoc` tool by running `godoc -http=":6060"` and pointing your browser to
-http://localhost:6060/pkg/github.com/conformal/btcutil
+http://localhost:6060/pkg/github.com/btcsuite/btcutil
 
 ## Installation
 
 ```bash
-$ go get github.com/conformal/btcutil
+$ go get github.com/btcsuite/btcutil
 ```
 
 ## GPG Verification Key
