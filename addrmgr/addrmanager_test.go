@@ -138,7 +138,7 @@ func TestAddLocalAddress(t *testing.T) {
 		}
 		if result != nil && test.valid {
 			t.Errorf("TestAddLocalAddress test #%d failed: %s should not have "+
-				"been accepted", test.address.IP)
+				"been accepted", x, test.address.IP)
 			continue
 		}
 	}
