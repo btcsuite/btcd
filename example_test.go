@@ -8,8 +8,8 @@ import (
 	"encoding/hex"
 	"fmt"
 
+	"github.com/btcsuite/btcwire"
 	"github.com/conformal/btcec"
-	"github.com/conformal/btcwire"
 )
 
 // This example demonstrates signing a message with a secp256k1 private key that
