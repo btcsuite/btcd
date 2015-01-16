@@ -23,8 +23,16 @@ const (
 )
 
 var (
+	// ErrTorInvalidAddressResponse indicates an invalid address was
+	// returned by the Tor DNS resolver.
 	ErrTorInvalidAddressResponse = errors.New("invalid address response")
-	ErrTorInvalidProxyResponse   = errors.New("invalid proxy response")
+
+	// ErrTorInvalidProxyResponse indicates the Tor proxy returned a
+	// response in an unexpected format.
+	ErrTorInvalidProxyResponse = errors.New("invalid proxy response")
+
+	// ErrTorUnrecognizedAuthMethod indicates the authentication method
+	// provided is not recognized.
 	ErrTorUnrecognizedAuthMethod = errors.New("invalid proxy authentication method")
 
 	torStatusErrors = map[byte]error{
