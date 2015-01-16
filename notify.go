@@ -1078,7 +1078,7 @@ func (c *Client) RescanEndBlockAsync(startBlock *btcwire.ShaHash,
 	return c.sendCmd(cmd)
 }
 
-// RescanEndBlock rescans the block chain starting from the provided starting
+// RescanEndHeight rescans the block chain starting from the provided starting
 // block up to the provided ending block for transactions that pay to the
 // passed addresses and transactions which spend the passed outpoints.
 //

@@ -2010,7 +2010,7 @@ func (c *Client) ListReceivedByAddressMinConf(minConfirms int) ([]btcjson.ListRe
 	return c.ListReceivedByAddressMinConfAsync(minConfirms).Receive()
 }
 
-// ListReceivedByAccountIncludeEmptyAsync returns an instance of a type that can
+// ListReceivedByAddressIncludeEmptyAsync returns an instance of a type that can
 // be used to get the result of the RPC at some future time by invoking the
 // Receive function on the returned instance.
 //
