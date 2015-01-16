@@ -8,11 +8,11 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/btcsuite/btcnet"
 	"github.com/btcsuite/btcutil"
 	"github.com/btcsuite/btcwire"
 	"github.com/conformal/btcdb"
 	"github.com/conformal/btcdb/memdb"
-	"github.com/conformal/btcnet"
 )
 
 // TestClosed ensure calling the interface functions on a closed database
