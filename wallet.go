@@ -9,9 +9,9 @@ import (
 	"strconv"
 
 	"github.com/btcsuite/btcutil"
+	"github.com/btcsuite/btcwire"
 	"github.com/conformal/btcjson"
 	"github.com/conformal/btcnet"
-	"github.com/conformal/btcwire"
 	"github.com/conformal/btcws"
 )
 
