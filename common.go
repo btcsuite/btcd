@@ -11,7 +11,7 @@ import (
 	"io"
 	"math"
 
-	"github.com/conformal/fastsha256"
+	"github.com/btcsuite/fastsha256"
 )
 
 // Maximum payload size for a variable length integer.
