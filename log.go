@@ -13,11 +13,11 @@ import (
 	"github.com/conformal/btcd/addrmgr"
 
 	"github.com/btcsuite/btclog"
+	"github.com/btcsuite/btcwire"
 	"github.com/btcsuite/seelog"
 	"github.com/conformal/btcchain"
 	"github.com/conformal/btcdb"
 	"github.com/conformal/btcscript"
-	"github.com/conformal/btcwire"
 )
 
 const (

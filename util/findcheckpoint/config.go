@@ -10,11 +10,11 @@ import (
 	"path/filepath"
 
 	"github.com/btcsuite/btcutil"
+	"github.com/btcsuite/btcwire"
 	flags "github.com/btcsuite/go-flags"
 	"github.com/conformal/btcdb"
 	_ "github.com/conformal/btcdb/ldb"
 	"github.com/conformal/btcnet"
-	"github.com/conformal/btcwire"
 )
 
 const (

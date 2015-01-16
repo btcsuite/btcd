@@ -12,10 +12,10 @@ import (
 	"time"
 
 	"github.com/btcsuite/btcutil"
+	"github.com/btcsuite/btcwire"
 	"github.com/conformal/btcchain"
 	"github.com/conformal/btcdb"
 	_ "github.com/conformal/btcdb/ldb"
-	"github.com/conformal/btcwire"
 )
 
 var zeroHash = btcwire.ShaHash{}
