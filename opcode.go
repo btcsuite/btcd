@@ -15,9 +15,9 @@ import (
 
 	"golang.org/x/crypto/ripemd160"
 
+	"github.com/btcsuite/fastsha256"
 	"github.com/conformal/btcec"
 	"github.com/conformal/btcwire"
-	"github.com/conformal/fastsha256"
 )
 
 // An opcode defines the information related to a btcscript opcode.
