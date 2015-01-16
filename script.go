@@ -12,9 +12,9 @@ import (
 	"time"
 
 	"github.com/btcsuite/btcutil"
+	"github.com/btcsuite/btcwire"
 	"github.com/conformal/btcec"
 	"github.com/conformal/btcnet"
-	"github.com/conformal/btcwire"
 )
 
 var (

@@ -15,7 +15,7 @@ import (
 	"testing"
 
 	"github.com/btcsuite/btcutil"
-	"github.com/conformal/btcwire"
+	"github.com/btcsuite/btcwire"
 )
 
 // this file is present to export some internal interfaces so that we can
