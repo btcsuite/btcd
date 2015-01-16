@@ -11,11 +11,11 @@ import (
 	"strconv"
 	"sync"
 
+	"github.com/btcsuite/btclog"
 	"github.com/btcsuite/btcutil"
 	"github.com/btcsuite/goleveldb/leveldb"
 	"github.com/btcsuite/goleveldb/leveldb/opt"
 	"github.com/conformal/btcdb"
-	"github.com/conformal/btclog"
 	"github.com/conformal/btcwire"
 )
 
