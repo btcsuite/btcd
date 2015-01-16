@@ -29,7 +29,7 @@ import (
 	"log"
 
 	"github.com/btcsuite/btcutil"
-	"github.com/conformal/btcnet"
+	"github.com/btcsuite/btcnet"
 )
 
 var testnet = flag.Bool("testnet", false, "operate on the testnet Bitcoin network")
@@ -60,20 +60,20 @@ func main() {
 ## Documentation
 
 [![GoDoc](https://img.shields.io/badge/godoc-reference-blue.svg)]
-(http://godoc.org/github.com/conformal/btcnet)
+(http://godoc.org/github.com/btcsuite/btcnet)
 
 Full `go doc` style documentation for the project can be viewed online without
 installing this package by using the GoDoc site
-[here](http://godoc.org/github.com/conformal/btcnet).
+[here](http://godoc.org/github.com/btcsuite/btcnet).
 
 You can also view the documentation locally once the package is installed with
 the `godoc` tool by running `godoc -http=":6060"` and pointing your browser to
-http://localhost:6060/pkg/github.com/conformal/btcnet
+http://localhost:6060/pkg/github.com/btcsuite/btcnet
 
 ## Installation
 
 ```bash
-$ go get github.com/conformal/btcnet
+$ go get github.com/btcsuite/btcnet
 ```
 
 ## GPG Verification Key
