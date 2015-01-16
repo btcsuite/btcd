@@ -14,8 +14,8 @@ import (
 	"golang.org/x/crypto/ripemd160"
 
 	"github.com/btcsuite/btcutil"
+	"github.com/btcsuite/btcwire"
 	"github.com/conformal/btcnet"
-	"github.com/conformal/btcwire"
 )
 
 // invalidNet is an invalid bitcoin network.

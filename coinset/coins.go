@@ -6,7 +6,7 @@ import (
 	"sort"
 
 	"github.com/btcsuite/btcutil"
-	"github.com/conformal/btcwire"
+	"github.com/btcsuite/btcwire"
 )
 
 // Coin represents a spendable transaction outpoint

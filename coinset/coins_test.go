@@ -8,8 +8,8 @@ import (
 
 	"github.com/btcsuite/btcutil"
 	"github.com/btcsuite/btcutil/coinset"
+	"github.com/btcsuite/btcwire"
 	"github.com/btcsuite/fastsha256"
-	"github.com/conformal/btcwire"
 )
 
 type TestCoin struct {

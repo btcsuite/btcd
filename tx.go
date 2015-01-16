@@ -8,7 +8,7 @@ import (
 	"bytes"
 	"io"
 
-	"github.com/conformal/btcwire"
+	"github.com/btcsuite/btcwire"
 )
 
 // TxIndexUnknown is the value returned for a transaction index that is unknown.

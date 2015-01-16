@@ -10,7 +10,7 @@ import (
 	"time"
 
 	"github.com/btcsuite/btcutil/bloom"
-	"github.com/conformal/btcwire"
+	"github.com/btcsuite/btcwire"
 )
 
 // This example demonstrates how to create a new bloom filter, add a transaction
