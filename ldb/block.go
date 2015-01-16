@@ -9,9 +9,9 @@ import (
 	"encoding/binary"
 
 	"github.com/btcsuite/btcutil"
+	"github.com/btcsuite/btcwire"
 	"github.com/btcsuite/goleveldb/leveldb"
 	"github.com/conformal/btcdb"
-	"github.com/conformal/btcwire"
 )
 
 // FetchBlockBySha - return a btcutil Block

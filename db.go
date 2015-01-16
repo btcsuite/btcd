@@ -8,7 +8,7 @@ import (
 	"errors"
 
 	"github.com/btcsuite/btcutil"
-	"github.com/conformal/btcwire"
+	"github.com/btcsuite/btcwire"
 )
 
 // Errors that the various database functions may return.

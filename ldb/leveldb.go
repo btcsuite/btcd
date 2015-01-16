@@ -13,10 +13,10 @@ import (
 
 	"github.com/btcsuite/btclog"
 	"github.com/btcsuite/btcutil"
+	"github.com/btcsuite/btcwire"
 	"github.com/btcsuite/goleveldb/leveldb"
 	"github.com/btcsuite/goleveldb/leveldb/opt"
 	"github.com/conformal/btcdb"
-	"github.com/conformal/btcwire"
 )
 
 const (

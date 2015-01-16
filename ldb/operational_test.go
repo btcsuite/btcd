@@ -15,9 +15,9 @@ import (
 	"testing"
 
 	"github.com/btcsuite/btcutil"
+	"github.com/btcsuite/btcwire"
 	"github.com/conformal/btcdb"
 	"github.com/conformal/btcnet"
-	"github.com/conformal/btcwire"
 )
 
 var network = btcwire.MainNet

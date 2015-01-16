@@ -7,8 +7,8 @@ package ldb
 import (
 	"fmt"
 
+	"github.com/btcsuite/btcwire"
 	"github.com/conformal/btcdb"
-	"github.com/conformal/btcwire"
 )
 
 // FetchSha returns the datablock and pver for the given ShaHash.

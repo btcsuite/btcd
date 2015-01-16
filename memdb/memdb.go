@@ -11,8 +11,8 @@ import (
 	"sync"
 
 	"github.com/btcsuite/btcutil"
+	"github.com/btcsuite/btcwire"
 	"github.com/conformal/btcdb"
-	"github.com/conformal/btcwire"
 )
 
 // Errors that the various database functions may return.

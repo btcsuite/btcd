@@ -9,8 +9,8 @@ import (
 	"testing"
 
 	"github.com/btcsuite/btcutil"
+	"github.com/btcsuite/btcwire"
 	"github.com/conformal/btcdb"
-	"github.com/conformal/btcwire"
 	"github.com/davecgh/go-spew/spew"
 )
 

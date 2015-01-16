@@ -9,10 +9,10 @@ import (
 	"testing"
 
 	"github.com/btcsuite/btcutil"
+	"github.com/btcsuite/btcwire"
 	"github.com/conformal/btcdb"
 	"github.com/conformal/btcdb/memdb"
 	"github.com/conformal/btcnet"
-	"github.com/conformal/btcwire"
 )
 
 // TestClosed ensure calling the interface functions on a closed database
