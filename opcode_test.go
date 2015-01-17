@@ -8,8 +8,8 @@ import (
 	"bytes"
 	"testing"
 
+	"github.com/btcsuite/btcscript"
 	"github.com/btcsuite/btcwire"
-	"github.com/conformal/btcscript"
 )
 
 // test scripts to test as many opcodes as possible.

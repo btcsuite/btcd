@@ -9,8 +9,8 @@ import (
 	"fmt"
 
 	"github.com/btcsuite/btcnet"
+	"github.com/btcsuite/btcscript"
 	"github.com/btcsuite/btcutil"
-	"github.com/conformal/btcscript"
 )
 
 // This example demonstrates creating a script which pays to a bitcoin address.

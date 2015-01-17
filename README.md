@@ -1,8 +1,8 @@
 btcscript
 =========
 
-[![Build Status](https://travis-ci.org/conformal/btcscript.png?branch=master)]
-(https://travis-ci.org/conformal/btcscript)
+[![Build Status](https://travis-ci.org/btcsuite/btcscript.png?branch=master)]
+(https://travis-ci.org/btcsuite/btcscript)
 
 Package btcscript implements the bitcoin transaction scripts.  There is
 a comprehensive test suite. `test_coverage.txt` contains the current
@@ -25,33 +25,33 @@ can be found at https://en.bitcoin.it/wiki/Script
 
 ## Documentation
 
-[![GoDoc](https://godoc.org/github.com/conformal/btcscript?status.png)]
-(http://godoc.org/github.com/conformal/btcscript)
+[![GoDoc](https://godoc.org/github.com/btcsuite/btcscript?status.png)]
+(http://godoc.org/github.com/btcsuite/btcscript)
 
 Full `go doc` style documentation for the project can be viewed online without
 installing this package by using the GoDoc site
-[here](http://godoc.org/github.com/conformal/btcscript).
+[here](http://godoc.org/github.com/btcsuite/btcscript).
 
 You can also view the documentation locally once the package is installed with
 the `godoc` tool by running `godoc -http=":6060"` and pointing your browser to
-http://localhost:6060/pkg/github.com/conformal/btcscript
+http://localhost:6060/pkg/github.com/btcsuite/btcscript
 
 ## Installation
 
 ```bash
-$ go get github.com/conformal/btcscript
+$ go get github.com/btcsuite/btcscript
 ```
 
 ## Examples
 
 * [Standard Pay-to-pubkey-hash Script]
-  (http://godoc.org/github.com/conformal/btcscript#example-PayToAddrScript)  
+  (http://godoc.org/github.com/btcsuite/btcscript#example-PayToAddrScript)  
   Demonstrates creating a script which pays to a bitcoin address.  It also
   prints the created script hex and uses the DisasmString function to display
   the disassembled script.
 
 * [Extracting Details from Standard Scripts]
-  (http://godoc.org/github.com/conformal/btcscript#example-ExtractPkScriptAddrs)  
+  (http://godoc.org/github.com/btcsuite/btcscript#example-ExtractPkScriptAddrs)  
   Demonstrates extracting information from a standard public key script.
 
 ## TODO

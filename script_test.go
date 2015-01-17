@@ -12,9 +12,9 @@ import (
 
 	"github.com/btcsuite/btcec"
 	"github.com/btcsuite/btcnet"
+	"github.com/btcsuite/btcscript"
 	"github.com/btcsuite/btcutil"
 	"github.com/btcsuite/btcwire"
-	"github.com/conformal/btcscript"
 )
 
 func TestPushedData(t *testing.T) {

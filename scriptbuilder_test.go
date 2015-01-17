@@ -8,7 +8,7 @@ import (
 	"bytes"
 	"testing"
 
-	"github.com/conformal/btcscript"
+	"github.com/btcsuite/btcscript"
 )
 
 // TestScriptBuilderAddOp tests that pushing opcodes to a script via the
