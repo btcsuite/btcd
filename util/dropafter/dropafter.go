@@ -11,13 +11,13 @@ import (
 	"path/filepath"
 	"strconv"
 
+	"github.com/btcsuite/btcdb"
+	_ "github.com/btcsuite/btcdb/ldb"
 	"github.com/btcsuite/btclog"
 	"github.com/btcsuite/btcnet"
 	"github.com/btcsuite/btcutil"
 	"github.com/btcsuite/btcwire"
 	flags "github.com/btcsuite/go-flags"
-	"github.com/conformal/btcdb"
-	_ "github.com/conformal/btcdb/ldb"
 )
 
 type ShaHash btcwire.ShaHash
