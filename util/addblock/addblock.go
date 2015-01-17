@@ -10,10 +10,10 @@ import (
 	"runtime"
 
 	"github.com/btcsuite/btcchain"
+	"github.com/btcsuite/btcd/limits"
 	"github.com/btcsuite/btcdb"
 	_ "github.com/btcsuite/btcdb/ldb"
 	"github.com/btcsuite/btclog"
-	"github.com/conformal/btcd/limits"
 )
 
 const (

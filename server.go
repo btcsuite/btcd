@@ -20,11 +20,11 @@ import (
 	"time"
 
 	"github.com/btcsuite/btcchain"
+	"github.com/btcsuite/btcd/addrmgr"
 	"github.com/btcsuite/btcdb"
 	"github.com/btcsuite/btcjson"
 	"github.com/btcsuite/btcnet"
 	"github.com/btcsuite/btcwire"
-	"github.com/conformal/btcd/addrmgr"
 )
 
 const (

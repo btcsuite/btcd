@@ -10,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/conformal/btcd/addrmgr"
+	"github.com/btcsuite/btcd/addrmgr"
 
 	"github.com/btcsuite/btcchain"
 	"github.com/btcsuite/btcdb"

@@ -1,8 +1,8 @@
 btcd
 ====
 
-[![Build Status](https://travis-ci.org/conformal/btcd.png?branch=master)]
-(https://travis-ci.org/conformal/btcd)
+[![Build Status](https://travis-ci.org/btcsuite/btcd.png?branch=master)]
+(https://travis-ci.org/btcsuite/btcd)
 
 btcd is an alternative full node bitcoin implementation written in Go (golang).
 
@@ -41,7 +41,7 @@ active development.
 
 #### Windows - MSI Available
 
-https://github.com/conformal/btcd/releases
+https://github.com/btcsuite/btcd/releases
 
 #### Linux/BSD/POSIX - Build from Source
 
@@ -49,7 +49,7 @@ https://github.com/conformal/btcd/releases
   http://golang.org/doc/install
 
 - Run the following command to obtain btcd, all dependencies, and install it:
-  ```$ go get github.com/conformal/btcd/...```
+  ```$ go get github.com/btcsuite/btcd/...```
 
 - btcd (and utilities) will now be installed in either ```$GOROOT/bin``` or
   ```$GOPATH/bin``` depending on your configuration.  If you did not already
@@ -65,7 +65,7 @@ Install a newer MSI
 #### Linux/BSD/POSIX - Build from Source
 
 - Run the following command to update btcd, all dependencies, and install it:
-  ```$ go get -u -v github.com/conformal/btcd/...```
+  ```$ go get -u -v github.com/btcsuite/btcd/...```
 
 ## Getting Started
 
@@ -98,12 +98,12 @@ To subscribe to a given list, send email to list+subscribe@opensource.conformal.
 
 ## Issue Tracker
 
-The [integrated github issue tracker](https://github.com/conformal/btcd/issues)
+The [integrated github issue tracker](https://github.com/btcsuite/btcd/issues)
 is used for this project.
 
 ## Documentation
 
-The documentation is a work-in-progress.  It uses the [github wiki](https://github.com/conformal/btcd/wiki) facility.
+The documentation is a work-in-progress.  It uses the [github wiki](https://github.com/btcsuite/btcd/wiki) facility.
 
 ## GPG Verification Key
 

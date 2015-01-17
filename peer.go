@@ -17,12 +17,12 @@ import (
 	"time"
 
 	"github.com/btcsuite/btcchain"
+	"github.com/btcsuite/btcd/addrmgr"
 	"github.com/btcsuite/btcdb"
 	"github.com/btcsuite/btcutil"
 	"github.com/btcsuite/btcutil/bloom"
 	"github.com/btcsuite/btcwire"
 	"github.com/btcsuite/go-socks/socks"
-	"github.com/conformal/btcd/addrmgr"
 	"github.com/davecgh/go-spew/spew"
 )
 
