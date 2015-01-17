@@ -22,32 +22,32 @@ use secp256k1 elliptic curve cryptography.
 
 ## Documentation
 
-[![GoDoc](https://godoc.org/github.com/conformal/btcec?status.png)]
-(http://godoc.org/github.com/conformal/btcec)
+[![GoDoc](https://godoc.org/github.com/btcsuite/btcec?status.png)]
+(http://godoc.org/github.com/btcsuite/btcec)
 
 Full `go doc` style documentation for the project can be viewed online without
 installing this package by using the GoDoc site
-[here](http://godoc.org/github.com/conformal/btcec).
+[here](http://godoc.org/github.com/btcsuite/btcec).
 
 You can also view the documentation locally once the package is installed with
 the `godoc` tool by running `godoc -http=":6060"` and pointing your browser to
-http://localhost:6060/pkg/github.com/conformal/btcec
+http://localhost:6060/pkg/github.com/btcsuite/btcec
 
 ## Installation
 
 ```bash
-$ go get github.com/conformal/btcec
+$ go get github.com/btcsuite/btcec
 ```
 
 ## Examples
 
 * [Sign Message]
-  (http://godoc.org/github.com/conformal/btcec#example-package--SignMessage)  
+  (http://godoc.org/github.com/btcsuite/btcec#example-package--SignMessage)  
   Demonstrates signing a message with a secp256k1 private key that is first
   parsed form raw bytes and serializing the generated signature.
 
 * [Verify Signature]
-  (http://godoc.org/github.com/conformal/btcec#example-package--VerifySignature)  
+  (http://godoc.org/github.com/btcsuite/btcec#example-package--VerifySignature)  
   Demonstrates verifying a secp256k1 signature against a public key that is
   first parsed from raw bytes.  The signature is also parsed from raw bytes.
 
