@@ -15,9 +15,9 @@ import (
 	"github.com/btcsuite/btcchain"
 	"github.com/btcsuite/btcdb"
 	"github.com/btcsuite/btclog"
+	"github.com/btcsuite/btcscript"
 	"github.com/btcsuite/btcwire"
 	"github.com/btcsuite/seelog"
-	"github.com/conformal/btcscript"
 )
 
 const (
