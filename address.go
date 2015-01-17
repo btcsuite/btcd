@@ -10,9 +10,9 @@ import (
 
 	"golang.org/x/crypto/ripemd160"
 
+	"github.com/btcsuite/btcec"
 	"github.com/btcsuite/btcnet"
 	"github.com/btcsuite/btcutil/base58"
-	"github.com/conformal/btcec"
 )
 
 var (
