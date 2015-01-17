@@ -22,7 +22,7 @@ handle processing of blocks into the bitcoin block chain.
 
 ## Documentation
 
-[![GoDoc](https://img.shields.io/badge/godoc-reference-blue.svg]
+[![GoDoc](https://img.shields.io/badge/godoc-reference-blue.svg)]
 (http://godoc.org/github.com/btcsuite/btcchain)
 
 Full `go doc` style documentation for the project can be viewed online without
