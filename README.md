@@ -1,10 +1,10 @@
 btcdb
 =====
 
-[![Build Status](http://img.shields.io/travis/conformal/btcdb.svg)]
-(https://travis-ci.org/conformal/btcdb) [![Coverage Status]
-(https://img.shields.io/coveralls/conformal/btcdb.svg)]
-(https://coveralls.io/r/conformal/btcdb) [![ISC License]
+[![Build Status](http://img.shields.io/travis/btcsuite/btcdb.svg)]
+(https://travis-ci.org/btcsuite/btcdb) [![Coverage Status]
+(https://img.shields.io/coveralls/btcsuite/btcdb.svg)]
+(https://coveralls.io/r/btcsuite/btcdb) [![ISC License]
 (http://img.shields.io/badge/license-ISC-blue.svg)](http://copyfree.org)
 
 Package btcdb provides a database interface for the bitcoin block chain and
