@@ -1,10 +1,10 @@
 btcec
 =====
 
-[![Build Status](https://travis-ci.org/conformal/btcec.png?branch=master)]
-(https://travis-ci.org/conformal/btcec) [![Coverage Status]
-(https://coveralls.io/repos/conformal/btcec/badge.png?branch=master)]
-(https://coveralls.io/r/conformal/btcec?branch=master)
+[![Build Status](https://travis-ci.org/btcsuite/btcec.png?branch=master)]
+(https://travis-ci.org/btcsuite/btcec) [![Coverage Status]
+(https://coveralls.io/repos/btcsuite/btcec/badge.png?branch=master)]
+(https://coveralls.io/r/btcsuite/btcec?branch=master)
 
 Package btcec implements elliptic curve cryptography needed for working with
 Bitcoin (secp256k1 only for now). It is designed so that it may be used with the
