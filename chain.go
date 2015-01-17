@@ -13,10 +13,10 @@ import (
 	"sync"
 	"time"
 
+	"github.com/btcsuite/btcdb"
 	"github.com/btcsuite/btcnet"
 	"github.com/btcsuite/btcutil"
 	"github.com/btcsuite/btcwire"
-	"github.com/conformal/btcdb"
 )
 
 const (

@@ -7,9 +7,9 @@ package btcchain
 import (
 	"fmt"
 
+	"github.com/btcsuite/btcdb"
 	"github.com/btcsuite/btcutil"
 	"github.com/btcsuite/btcwire"
-	"github.com/conformal/btcdb"
 )
 
 // TxData contains contextual information about transactions such as which block
