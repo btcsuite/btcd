@@ -10,10 +10,10 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/btcsuite/btcdb"
+	_ "github.com/btcsuite/btcdb/ldb"
 	"github.com/btcsuite/btcutil"
 	"github.com/btcsuite/btcwire"
-	"github.com/conformal/btcdb"
-	_ "github.com/conformal/btcdb/ldb"
 )
 
 var tstBlocks []*btcutil.Block

@@ -7,10 +7,10 @@ package btcdb_test
 import (
 	"fmt"
 
+	"github.com/btcsuite/btcdb"
+	_ "github.com/btcsuite/btcdb/memdb"
 	"github.com/btcsuite/btcnet"
 	"github.com/btcsuite/btcutil"
-	"github.com/conformal/btcdb"
-	_ "github.com/conformal/btcdb/memdb"
 )
 
 // This example demonstrates creating a new database and inserting the genesis
@@ -20,8 +20,8 @@ func ExampleCreateDB() {
 	// Ordinarily this would be whatever driver(s) your application
 	// requires.
 	// import (
-	//	"github.com/conformal/btcdb"
-	// 	_ "github.com/conformal/btcdb/memdb"
+	//	"github.com/btcsuite/btcdb"
+	// 	_ "github.com/btcsuite/btcdb/memdb"
 	// )
 
 	// Create a database and schedule it to be closed on exit.  This example

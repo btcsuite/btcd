@@ -8,9 +8,9 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/btcsuite/btcdb"
 	"github.com/btcsuite/btcutil"
 	"github.com/btcsuite/btcwire"
-	"github.com/conformal/btcdb"
 	"github.com/davecgh/go-spew/spew"
 )
 

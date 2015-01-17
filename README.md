@@ -13,30 +13,30 @@ transactions.
 ## Documentation
 
 [![GoDoc](https://img.shields.io/badge/godoc-reference-blue.svg)]
-(http://godoc.org/github.com/conformal/btcdb)
+(http://godoc.org/github.com/btcsuite/btcdb)
 
 Full `go doc` style documentation for the project can be viewed online without
 installing this package by using the GoDoc site
-[here](http://godoc.org/github.com/conformal/btcdb).
+[here](http://godoc.org/github.com/btcsuite/btcdb).
 
 You can also view the documentation locally once the package is installed with
 the `godoc` tool by running `godoc -http=":6060"` and pointing your browser to
-http://localhost:6060/pkg/github.com/conformal/btcdb
+http://localhost:6060/pkg/github.com/btcsuite/btcdb
 
 ## Installation
 
 ```bash
-$ go get github.com/conformal/btcdb
+$ go get github.com/btcsuite/btcdb
 ```
 
 ## Examples
 
 * [CreateDB Example]
-  (http://godoc.org/github.com/conformal/btcdb#example-CreateDB)  
+  (http://godoc.org/github.com/btcsuite/btcdb#example-CreateDB)  
   Demonstrates creating a new database and inserting the genesis block into it.
 
 * [NewestSha Example]
-  (http://godoc.org/github.com/conformal/btcdb#example-Db--NewestSha)  
+  (http://godoc.org/github.com/btcsuite/btcdb#example-Db--NewestSha)  
   Demonstrates  querying the database for the most recent best block height and
   hash.
 

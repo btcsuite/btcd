@@ -7,8 +7,8 @@ package memdb
 import (
 	"fmt"
 
+	"github.com/btcsuite/btcdb"
 	"github.com/btcsuite/btclog"
-	"github.com/conformal/btcdb"
 )
 
 var log = btclog.Disabled
