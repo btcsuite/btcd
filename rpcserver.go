@@ -26,6 +26,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/btcsuite/btcchain"
 	"github.com/btcsuite/btcdb"
 	"github.com/btcsuite/btcec"
 	"github.com/btcsuite/btcnet"
@@ -33,7 +34,6 @@ import (
 	"github.com/btcsuite/btcwire"
 	"github.com/btcsuite/fastsha256"
 	"github.com/btcsuite/websocket"
-	"github.com/conformal/btcchain"
 	"github.com/conformal/btcjson"
 	"github.com/conformal/btcscript"
 	"github.com/conformal/btcws"
