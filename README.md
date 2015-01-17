@@ -29,7 +29,7 @@ wallet functionality and this was a very intentional design decision.  See the
 blog entry [here](https://blog.conformal.com/btcd-not-your-moms-bitcoin-daemon)
 for more details.  This means you can't actually make or receive payments
 directly with btcd.  That functionality is provided by the
-[btcwallet](https://github.com/conformal/btcwallet) and
+[btcwallet](https://github.com/btcsuite/btcwallet) and
 [btcgui](https://github.com/btcsuite/btcgui) projects which are both under
 active development.
 
