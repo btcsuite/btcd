@@ -9,9 +9,9 @@ import (
 	"encoding/hex"
 	"encoding/json"
 
+	"github.com/btcsuite/btcjson"
 	"github.com/btcsuite/btcutil"
 	"github.com/btcsuite/btcwire"
-	"github.com/conformal/btcjson"
 )
 
 // FutureGetBestBlockHashResult is a future promise to deliver the result of a

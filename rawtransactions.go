@@ -9,9 +9,9 @@ import (
 	"encoding/hex"
 	"encoding/json"
 
+	"github.com/btcsuite/btcjson"
 	"github.com/btcsuite/btcutil"
 	"github.com/btcsuite/btcwire"
-	"github.com/conformal/btcjson"
 )
 
 // SigHashType enumerates the available signature hashing types that the
