@@ -8,8 +8,8 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/btcsuite/btcjson"
 	"github.com/btcsuite/btcws"
-	"github.com/conformal/btcjson"
 	"github.com/davecgh/go-spew/spew"
 )
 
