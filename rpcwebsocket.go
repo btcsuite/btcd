@@ -23,10 +23,10 @@ import (
 	"github.com/btcsuite/btcscript"
 	"github.com/btcsuite/btcutil"
 	"github.com/btcsuite/btcwire"
+	"github.com/btcsuite/btcws"
 	"github.com/btcsuite/fastsha256"
 	"github.com/btcsuite/websocket"
 	"github.com/conformal/btcjson"
-	"github.com/conformal/btcws"
 )
 
 const (

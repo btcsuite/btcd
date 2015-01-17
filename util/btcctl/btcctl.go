@@ -11,9 +11,9 @@ import (
 	"strconv"
 
 	"github.com/btcsuite/btcutil"
+	"github.com/btcsuite/btcws"
 	flags "github.com/btcsuite/go-flags"
 	"github.com/conformal/btcjson"
-	"github.com/conformal/btcws"
 	"github.com/davecgh/go-spew/spew"
 )
 
