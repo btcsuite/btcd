@@ -23,20 +23,20 @@ handle processing of blocks into the bitcoin block chain.
 ## Documentation
 
 [![GoDoc](https://img.shields.io/badge/godoc-reference-blue.svg]
-(http://godoc.org/github.com/conformal/btcchain)
+(http://godoc.org/github.com/btcsuite/btcchain)
 
 Full `go doc` style documentation for the project can be viewed online without
 installing this package by using the GoDoc site here:
-http://godoc.org/github.com/conformal/btcchain
+http://godoc.org/github.com/btcsuite/btcchain
 
 You can also view the documentation locally once the package is installed with
 the `godoc` tool by running `godoc -http=":6060"` and pointing your browser to
-http://localhost:6060/pkg/github.com/conformal/btcchain
+http://localhost:6060/pkg/github.com/btcsuite/btcchain
 
 ## Installation
 
 ```bash
-$ go get github.com/conformal/btcchain
+$ go get github.com/btcsuite/btcchain
 ```
 
 ## Bitcoin Chain Processing Overview
@@ -77,20 +77,20 @@ is by no means exhaustive:
 ## Examples
 
 * [ProcessBlock Example]
-  (http://godoc.org/github.com/conformal/btcchain#example-BlockChain-ProcessBlock)  
+  (http://godoc.org/github.com/btcsuite/btcchain#example-BlockChain-ProcessBlock)  
   Demonstrates how to create a new chain instance and use ProcessBlock to
   attempt to attempt add a block to the chain.  This example intentionally
   attempts to insert a duplicate genesis block to illustrate how an invalid
   block is handled.
 
 * [CompactToBig Example]
-  (http://godoc.org/github.com/conformal/btcchain#example-CompactToBig)  
+  (http://godoc.org/github.com/btcsuite/btcchain#example-CompactToBig)  
   Demonstrates how to convert the compact "bits" in a block header which
   represent the target difficulty to a big integer and display it using the
   typical hex notation.
 
 * [BigToCompact Example]
-  (http://godoc.org/github.com/conformal/btcchain#example-BigToCompact)  
+  (http://godoc.org/github.com/btcsuite/btcchain#example-BigToCompact)  
   Demonstrates how to convert how to convert a target difficulty into the
   compact "bits" in a block header which represent that target difficulty.
 

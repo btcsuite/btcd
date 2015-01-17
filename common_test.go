@@ -13,13 +13,13 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/btcsuite/btcchain"
 	"github.com/btcsuite/btcdb"
 	_ "github.com/btcsuite/btcdb/ldb"
 	_ "github.com/btcsuite/btcdb/memdb"
 	"github.com/btcsuite/btcnet"
 	"github.com/btcsuite/btcutil"
 	"github.com/btcsuite/btcwire"
-	"github.com/conformal/btcchain"
 )
 
 // testDbType is the database backend type to use for the tests.

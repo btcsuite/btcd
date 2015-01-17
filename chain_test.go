@@ -7,10 +7,10 @@ package btcchain_test
 import (
 	"testing"
 
+	"github.com/btcsuite/btcchain"
 	"github.com/btcsuite/btcnet"
 	"github.com/btcsuite/btcutil"
 	"github.com/btcsuite/btcwire"
-	"github.com/conformal/btcchain"
 )
 
 // TestHaveBlock tests the HaveBlock API to ensure proper functionality.

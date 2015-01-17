@@ -9,7 +9,7 @@ import (
 	"runtime"
 	"testing"
 
-	"github.com/conformal/btcchain"
+	"github.com/btcsuite/btcchain"
 )
 
 // TestCheckBlockScripts ensures that validating the all of the scripts in a
