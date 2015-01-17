@@ -1,10 +1,10 @@
 btcwire
 =======
 
-[![Build Status](http://img.shields.io/travis/conformal/btcwire.svg)]
-(https://travis-ci.org/conformal/btcwire) [![Coverage Status]
-(https://img.shields.io/coveralls/conformal/btcwire.svg)]
-(https://coveralls.io/r/conformal/btcwire?branch=master) [![ISC License]
+[![Build Status](http://img.shields.io/travis/btcsuite/btcwire.svg)]
+(https://travis-ci.org/btcsuite/btcwire) [![Coverage Status]
+(https://img.shields.io/coveralls/btcsuite/btcwire.svg)]
+(https://coveralls.io/r/btcsuite/btcwire?branch=master) [![ISC License]
 (http://img.shields.io/badge/license-ISC-blue.svg)](http://copyfree.org)
 
 Package btcwire implements the bitcoin wire protocol.  A comprehensive suite of
