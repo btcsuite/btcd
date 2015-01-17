@@ -10,10 +10,10 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/btcsuite/btcec"
 	"github.com/btcsuite/btcnet"
 	"github.com/btcsuite/btcutil"
 	"github.com/btcsuite/btcwire"
-	"github.com/conformal/btcec"
 	"github.com/conformal/btcscript"
 )
 
