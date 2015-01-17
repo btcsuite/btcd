@@ -1,8 +1,8 @@
 btcchain
 ========
 
-[![Build Status](http://img.shields.io/travis/conformal/btcchain.svg)]
-(https://travis-ci.org/conformal/btcchain) [![ISC License]
+[![Build Status](http://img.shields.io/travis/btcsuite/btcchain.svg)]
+(https://travis-ci.org/btcsuite/btcchain) [![ISC License]
 (http://img.shields.io/badge/license-ISC-blue.svg)](http://copyfree.org)
 
 Package btcchain implements bitcoin block handling and chain selection rules.
