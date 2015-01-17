@@ -1,8 +1,8 @@
 btcjson
 =======
 
-[![Build Status](https://travis-ci.org/conformal/btcjson.png?branch=master)]
-(https://travis-ci.org/conformal/btcjson)
+[![Build Status](https://travis-ci.org/btcsuite/btcjson.png?branch=master)]
+(https://travis-ci.org/btcsuite/btcjson)
 
 Package btcjson implements the bitcoin JSON-RPC API.  There is a test
 suite which is aiming to reach 100% code coverage.  See
@@ -46,16 +46,16 @@ useful Go data structures).
 
 Full `go doc` style documentation for the project can be viewed online without
 installing this package by using the GoDoc site
-[here](http://godoc.org/github.com/conformal/btcjson).
+[here](http://godoc.org/github.com/btcsuite/btcjson).
 
 You can also view the documentation locally once the package is installed with
 the `godoc` tool by running `godoc -http=":6060"` and pointing your browser to
-http://localhost:6060/pkg/github.com/conformal/btcjson
+http://localhost:6060/pkg/github.com/btcsuite/btcjson
 
 ## Installation
 
 ```bash
-$ go get github.com/conformal/btcjson
+$ go get github.com/btcsuite/btcjson
 ```
 
 ## TODO

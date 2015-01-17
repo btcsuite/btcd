@@ -9,7 +9,7 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/conformal/btcjson"
+	"github.com/btcsuite/btcjson"
 )
 
 // TestMarshallAndSend tests the MarshallAndSend function to make sure it can
