@@ -20,13 +20,13 @@ import (
 	"golang.org/x/crypto/ripemd160"
 
 	"github.com/btcsuite/btcdb"
+	"github.com/btcsuite/btcjson"
 	"github.com/btcsuite/btcscript"
 	"github.com/btcsuite/btcutil"
 	"github.com/btcsuite/btcwire"
 	"github.com/btcsuite/btcws"
 	"github.com/btcsuite/fastsha256"
 	"github.com/btcsuite/websocket"
-	"github.com/conformal/btcjson"
 )
 
 const (

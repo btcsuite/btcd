@@ -21,10 +21,10 @@ import (
 
 	"github.com/btcsuite/btcchain"
 	"github.com/btcsuite/btcdb"
+	"github.com/btcsuite/btcjson"
 	"github.com/btcsuite/btcnet"
 	"github.com/btcsuite/btcwire"
 	"github.com/conformal/btcd/addrmgr"
-	"github.com/conformal/btcjson"
 )
 
 const (

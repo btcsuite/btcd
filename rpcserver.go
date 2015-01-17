@@ -29,6 +29,7 @@ import (
 	"github.com/btcsuite/btcchain"
 	"github.com/btcsuite/btcdb"
 	"github.com/btcsuite/btcec"
+	"github.com/btcsuite/btcjson"
 	"github.com/btcsuite/btcnet"
 	"github.com/btcsuite/btcscript"
 	"github.com/btcsuite/btcutil"
@@ -36,7 +37,6 @@ import (
 	"github.com/btcsuite/btcws"
 	"github.com/btcsuite/fastsha256"
 	"github.com/btcsuite/websocket"
-	"github.com/conformal/btcjson"
 )
 
 const (
