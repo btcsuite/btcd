@@ -8,9 +8,9 @@ import (
 	"fmt"
 
 	"github.com/btcsuite/btcnet"
+	"github.com/btcsuite/btcscript"
 	"github.com/btcsuite/btcutil"
 	"github.com/btcsuite/btcwire"
-	"github.com/conformal/btcscript"
 )
 
 // CheckpointConfirmations is the number of blocks before the end of the current
