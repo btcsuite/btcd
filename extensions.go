@@ -11,8 +11,8 @@ import (
 
 	"github.com/btcsuite/btcutil"
 	"github.com/btcsuite/btcwire"
+	"github.com/btcsuite/btcws"
 	"github.com/conformal/btcjson"
-	"github.com/conformal/btcws"
 )
 
 // FutureDebugLevelResult is a future promise to deliver the result of a
