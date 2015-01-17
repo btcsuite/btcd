@@ -1,10 +1,10 @@
 btcnet
 ======
 
-[![Build Status](http://img.shields.io/travis/conformal/btcnet.svg)]
-(https://travis-ci.org/conformal/btcnet) [![Coverage Status]
-(https://img.shields.io/coveralls/conformal/btcnet.svg)]
-(https://coveralls.io/r/conformal/btcnet?branch=master) [![ISC License]
+[![Build Status](http://img.shields.io/travis/btcsuite/btcnet.svg)]
+(https://travis-ci.org/btcsuite/btcnet) [![Coverage Status]
+(https://img.shields.io/coveralls/btcsuite/btcnet.svg)]
+(https://coveralls.io/r/btcsuite/btcnet?branch=master) [![ISC License]
 (http://img.shields.io/badge/license-ISC-blue.svg)](http://copyfree.org)
 
 Package btcnet defines the network parameters for the three standard Bitcoin 
