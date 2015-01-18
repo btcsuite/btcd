@@ -103,7 +103,7 @@ is used for this project.
 
 ## Documentation
 
-The documentation is a work-in-progress.  It uses the [github wiki](https://github.com/btcsuite/btcd/wiki) facility.
+The documentation is a work-in-progress.  It is located in the [docs](https://github.com/btcsuite/btcd/tree/master/docs) folder.
 
 ## GPG Verification Key
 
