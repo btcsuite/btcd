@@ -1,3 +1,7 @@
+// Copyright (c) 2013-2015 Conformal Systems LLC.
+// Use of this source code is governed by an ISC
+// license that can be found in the LICENSE file.
+
 package main
 
 import (
@@ -7,8 +11,16 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/btcsuite/btcd/btcjson/v2/btcjson"
 	"github.com/btcsuite/btcutil"
 	flags "github.com/btcsuite/go-flags"
+)
+
+const (
+	// unusableFlags are the command usage flags which this utility are not
+	// able to use.  In particular it doesn't support websockets and
+	// consequently notifications.
+	unusableFlags = btcjson.UFWebsocketOnly | btcjson.UFNotification
 )
 
 var (
@@ -21,17 +33,74 @@ var (
 	defaultWalletCertFile = filepath.Join(btcwalletHomeDir, "rpc.cert")
 )
 
+// listCommands categorizes and lists all of the usable commands along with
+// their one-line usage.
+func listCommands() {
+	const (
+		categoryChain uint8 = iota
+		categoryWallet
+		numCategories
+	)
+
+	// Get a list of registered commands and categorize and filter them.
+	cmdMethods := btcjson.RegisteredCmdMethods()
+	categorized := make([][]string, numCategories)
+	for _, method := range cmdMethods {
+		flags, err := btcjson.MethodUsageFlags(method)
+		if err != nil {
+			// This should never happen since the method was just
+			// returned from the package, but be safe.
+			continue
+		}
+
+		// Skip the commands that aren't usable from this utility.
+		if flags&unusableFlags != 0 {
+			continue
+		}
+
+		usage, err := btcjson.MethodUsageText(method)
+		if err != nil {
+			// This should never happen since the method was just
+			// returned from the package, but be safe.
+			continue
+		}
+
+		// Categorize the command based on the usage flags.
+		category := categoryChain
+		if flags&btcjson.UFWalletOnly != 0 {
+			category = categoryWallet
+		}
+		categorized[category] = append(categorized[category], usage)
+	}
+
+	// Display the command according to their categories.
+	categoryTitles := make([]string, numCategories)
+	categoryTitles[categoryChain] = "Chain Server Commands:"
+	categoryTitles[categoryWallet] = "Wallet Server Commands (--wallet):"
+	for category := uint8(0); category < numCategories; category++ {
+		fmt.Println(categoryTitles[category])
+		for _, usage := range categorized[category] {
+			fmt.Println(usage)
+		}
+		fmt.Println()
+	}
+}
+
 // config defines the configuration options for btcctl.
 //
 // See loadConfig for details on the configuration load process.
 type config struct {
 	ShowVersion   bool   `short:"V" long:"version" description:"Display version information and exit"`
+	ListCommands  bool   `short:"l" long:"listcommands" description:"List all of the supported commands and exit"`
 	ConfigFile    string `short:"C" long:"configfile" description:"Path to configuration file"`
 	RPCUser       string `short:"u" long:"rpcuser" description:"RPC username"`
 	RPCPassword   string `short:"P" long:"rpcpass" default-mask:"-" description:"RPC password"`
 	RPCServer     string `short:"s" long:"rpcserver" description:"RPC server to connect to"`
 	RPCCert       string `short:"c" long:"rpccert" description:"RPC server certificate chain for validation"`
 	NoTLS         bool   `long:"notls" description:"Disable TLS"`
+	Proxy         string `long:"proxy" description:"Connect via SOCKS5 proxy (eg. 127.0.0.1:9050)"`
+	ProxyUser     string `long:"proxyuser" description:"Username for proxy server"`
+	ProxyPass     string `long:"proxypass" default-mask:"-" description:"Password for proxy server"`
 	TestNet3      bool   `long:"testnet" description:"Connect to testnet"`
 	SimNet        bool   `long:"simnet" description:"Connect to the simulation test network"`
 	TLSSkipVerify bool   `long:"skipverify" description:"Do not verify tls certificates (not recommended!)"`
@@ -96,7 +165,7 @@ func cleanAndExpandPath(path string) string {
 // The above results in functioning properly without any config settings
 // while still allowing the user to override settings with config files and
 // command line options.  Command line options always take precedence.
-func loadConfig() (*flags.Parser, *config, []string, error) {
+func loadConfig() (*config, []string, error) {
 	// Default config.
 	cfg := config{
 		ConfigFile: defaultConfigFile,
@@ -112,34 +181,54 @@ func loadConfig() (*flags.Parser, *config, []string, error) {
 	}
 
 	// Pre-parse the command line options to see if an alternative config
-	// file or the version flag was specified.  Any errors can be ignored
-	// here since they will be caught be the final parse below.
+	// file, the version flag, or the list commands flag was specified.  Any
+	// errors aside from the help message error can be ignored here since
+	// they will be caught by the final parse below.
 	preCfg := cfg
-	preParser := flags.NewParser(&preCfg, flags.None)
-	_, _ = preParser.Parse()
+	preParser := flags.NewParser(&preCfg, flags.HelpFlag)
+	_, err = preParser.Parse()
+	if err != nil {
+		if e, ok := err.(*flags.Error); ok && e.Type == flags.ErrHelp {
+			fmt.Fprintln(os.Stderr, err)
+			return nil, nil, err
+		}
+	}
 
 	// Show the version and exit if the version flag was specified.
+	appName := filepath.Base(os.Args[0])
+	appName = strings.TrimSuffix(appName, filepath.Ext(appName))
+	usageMessage := fmt.Sprintf("Use %s -h to show options", appName)
 	if preCfg.ShowVersion {
-		appName := filepath.Base(os.Args[0])
-		appName = strings.TrimSuffix(appName, filepath.Ext(appName))
 		fmt.Println(appName, "version", version())
 		os.Exit(0)
 	}
 
+	// Show the available commands and exit if the associated flag was
+	// specified.
+	if preCfg.ListCommands {
+		listCommands()
+		os.Exit(0)
+	}
+
 	// Load additional config from file.
-	parser := flags.NewParser(&cfg, flags.PassDoubleDash|flags.HelpFlag)
+	parser := flags.NewParser(&cfg, flags.Default)
 	err = flags.NewIniParser(parser).ParseFile(preCfg.ConfigFile)
 	if err != nil {
 		if _, ok := err.(*os.PathError); !ok {
-			fmt.Fprintln(os.Stderr, err)
-			return parser, nil, nil, err
+			fmt.Fprintf(os.Stderr, "Error parsing config file: %v\n",
+				err)
+			fmt.Fprintln(os.Stderr, usageMessage)
+			return nil, nil, err
 		}
 	}
 
 	// Parse command line options again to ensure they take precedence.
 	remainingArgs, err := parser.Parse()
 	if err != nil {
-		return parser, nil, nil, err
+		if e, ok := err.(*flags.Error); !ok || e.Type != flags.ErrHelp {
+			fmt.Fprintln(os.Stderr, usageMessage)
+		}
+		return nil, nil, err
 	}
 
 	// Multiple networks can't be selected simultaneously.
@@ -155,7 +244,7 @@ func loadConfig() (*flags.Parser, *config, []string, error) {
 			"together -- choose one of the two"
 		err := fmt.Errorf(str, "loadConfig")
 		fmt.Fprintln(os.Stderr, err)
-		return parser, nil, nil, err
+		return nil, nil, err
 	}
 
 	// Override the RPC certificate if the --wallet flag was specified and
@@ -172,5 +261,5 @@ func loadConfig() (*flags.Parser, *config, []string, error) {
 	cfg.RPCServer = normalizeAddress(cfg.RPCServer, cfg.TestNet3,
 		cfg.SimNet, cfg.Wallet)
 
-	return parser, &cfg, remainingArgs, nil
+	return &cfg, remainingArgs, nil
 }
