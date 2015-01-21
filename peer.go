@@ -50,9 +50,12 @@ const (
 	// we time out a peer.
 	idleTimeoutMinutes = 5
 
-	// pingTimeoutMinutes is the number of minutes since we last sent a
-	// message requiring a reply before we will ping a host.
-	pingTimeoutMinutes = 2
+	// pingInterval is the interval in which a ping is sent to the peer
+	pingInterval = 2 * time.Minute
+
+	// pingTimeoutMinutes is the number of minutes the server will wait
+	// for a pong before disconnecting the peer.
+	pingTimeoutMinutes = 1 * time.Minute
 )
 
 var (
@@ -186,9 +189,10 @@ type peer struct {
 	bytesSent          uint64
 	userAgent          string
 	lastBlock          int32
-	lastPingNonce      uint64    // Set to nonce if we have a pending ping.
-	lastPingTime       time.Time // Time we sent last ping.
-	lastPingMicros     int64     // Time for last ping to return.
+	lastPingNonce      uint64        // Set to nonce if we have a pending ping.
+	lastPingTime       time.Time     // Time we sent last ping.
+	lastPingResponse   time.Duration // Time taken for last ping to return.
+	pingTimer          *time.Timer   // Used to disconnect nonresponsive peers.
 }
 
 // String returns the peer's address and directionality as a human-readable
@@ -1245,10 +1249,12 @@ func (p *peer) handlePongMsg(msg *btcwire.MsgPong) {
 	// infrequently enough that if they overlap we would have timed out
 	// the peer.
 	if p.protocolVersion > btcwire.BIP0031Version &&
-		p.lastPingNonce != 0 && msg.Nonce == p.lastPingNonce {
-		p.lastPingMicros = time.Now().Sub(p.lastPingTime).Nanoseconds()
-		p.lastPingMicros /= 1000 // convert to usec.
-		p.lastPingNonce = 0
+		msg.Nonce == p.lastPingNonce {
+		if p.pingTimer != nil {
+			p.pingTimer.Stop()
+			p.pingTimer = nil
+		}
+		p.lastPingResponse = time.Since(p.lastPingTime)
 	}
 }
 
@@ -1291,6 +1297,7 @@ func (p *peer) writeMessage(msg btcwire.Message) {
 	if atomic.LoadInt32(&p.disconnect) != 0 {
 		return
 	}
+
 	if !p.VersionKnown() {
 		switch msg.(type) {
 		case *btcwire.MsgVersion:
@@ -1688,75 +1695,58 @@ cleanup:
 // goroutine.  It uses a buffered channel to serialize output messages while
 // allowing the sender to continue running asynchronously.
 func (p *peer) outHandler() {
-	pingTimer := time.AfterFunc(pingTimeoutMinutes*time.Minute, func() {
-		nonce, err := btcwire.RandomUint64()
-		if err != nil {
-			peerLog.Errorf("Not sending ping on timeout to %s: %v",
-				p, err)
-			return
-		}
-		p.QueueMessage(btcwire.NewMsgPing(nonce), nil)
-	})
+	pingTicker := time.NewTicker(pingInterval)
+	defer pingTicker.Stop()
+
 out:
 	for {
 		select {
+		case <-pingTicker.C:
+			nonce, err := btcwire.RandomUint64()
+			if err != nil {
+				peerLog.Errorf("Failed to generate nonce for ping to %s: %v",
+					p, err)
+				continue
+			}
+			p.QueueMessage(btcwire.NewMsgPing(nonce), nil)
 		case msg := <-p.sendQueue:
-			// If the message is one we should get a reply for
-			// then reset the timer, we only want to send pings
-			// when otherwise we would not receive a reply from
-			// the peer. We specifically do not count block or inv
-			// messages here since they are not sure of a reply if
-			// the inv is of no interest explicitly solicited invs
-			// should elicit a reply but we don't track them
-			// specially.
-			peerLog.Tracef("%s: received from queuehandler", p)
-			reset := true
 			switch m := msg.msg.(type) {
-			case *btcwire.MsgVersion:
-				// should get an ack
-			case *btcwire.MsgGetAddr:
-				// should get addresses
 			case *btcwire.MsgPing:
-				// expects pong
-				// Also set up statistics.
+				// Set up statistics.
 				p.StatsMtx.Lock()
 				if p.protocolVersion > btcwire.BIP0031Version {
 					p.lastPingNonce = m.Nonce
 					p.lastPingTime = time.Now()
+
+					// Setup a timer to disconnect the peer if a pong is not received in
+					// pingTimeoutMinutes
+					if p.pingTimer == nil {
+						p.pingTimer = time.AfterFunc(pingTimeoutMinutes, func() {
+							peerLog.Infof("Ping timeout for peer %v -- disconnecting", p)
+							p.Disconnect()
+						})
+						defer p.pingTimer.Stop()
+					} else {
+						p.pingTimer.Reset(pingTimeoutMinutes)
+					}
 				}
 				p.StatsMtx.Unlock()
-			case *btcwire.MsgMemPool:
-				// Should return an inv.
-			case *btcwire.MsgGetData:
-				// Should get us block, tx, or not found.
-			case *btcwire.MsgGetHeaders:
-				// Should get us headers back.
-			default:
-				// Not one of the above, no sure reply.
-				// We want to ping if nothing else
-				// interesting happens.
-				reset = false
-			}
-			if reset {
-				pingTimer.Reset(pingTimeoutMinutes * time.Minute)
 			}
 			p.writeMessage(msg.msg)
+
 			p.StatsMtx.Lock()
 			p.lastSend = time.Now()
 			p.StatsMtx.Unlock()
+
 			if msg.doneChan != nil {
 				msg.doneChan <- struct{}{}
 			}
-			peerLog.Tracef("%s: acking queuehandler", p)
 			p.sendDoneQueue <- struct{}{}
-			peerLog.Tracef("%s: acked queuehandler", p)
 
 		case <-p.quit:
 			break out
 		}
 	}
-
-	pingTimer.Stop()
 
 	p.queueWg.Wait()
 
