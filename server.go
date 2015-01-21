@@ -408,11 +408,10 @@ func (s *server) handleQuery(querymsg interface{}, state *peerState) {
 				BanScore:       0,
 				SyncNode:       p == syncPeer,
 			}
-			info.PingTime = float64(p.lastPingMicros)
+			info.PingTime = float64(p.lastPingResponse.Nanoseconds() / 1000)
 			if p.lastPingNonce != 0 {
-				wait := float64(time.Now().Sub(p.lastPingTime).Nanoseconds())
-				// We actually want microseconds.
-				info.PingWait = wait / 1000
+				wait := time.Since(p.lastPingTime).Nanoseconds() / 1000
+				info.PingWait = float64(wait)
 			}
 			p.StatsMtx.Unlock()
 			infos = append(infos, info)
