@@ -658,7 +658,7 @@ func (curve *KoblitzCurve) QPlus1Div4() *big.Int {
 	return curve.q
 }
 
-// Curve parameters taken from: http://www.secg.org/collateral/sec2_final.pdf
+// Curve parameters taken from: http://www.secg.org/sec2-v2.pdf
 var initonce sync.Once
 var secp256k1 KoblitzCurve
 
