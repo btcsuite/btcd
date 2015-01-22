@@ -18,8 +18,7 @@ var secp256k1BytePoints = []byte{}
 // 0..n-1 where n is the curve's bit size (256 in the case of secp256k1)
 // the coordinates are recorded as Jacobian coordinates.
 func (curve *KoblitzCurve) getDoublingPoints() [][3]fieldVal {
-	bitSize := curve.Params().BitSize
-	doublingPoints := make([][3]fieldVal, bitSize)
+	doublingPoints := make([][3]fieldVal, curve.BitSize)
 
 	// initialize px, py, pz to the Jacobian coordinates for the base point
 	px, py := curve.bigAffineToField(curve.Gx, curve.Gy)
@@ -36,8 +35,7 @@ func (curve *KoblitzCurve) getDoublingPoints() [][3]fieldVal {
 // the possible points per 8-bit window.  This is used to when generating
 // secp256k1.go.
 func (curve *KoblitzCurve) SerializedBytePoints() []byte {
-	bitSize := curve.Params().BitSize
-	byteSize := bitSize / 8
+	byteSize := curve.BitSize / 8
 	doublingPoints := curve.getDoublingPoints()
 
 	// Segregate the bits into byte-sized windows

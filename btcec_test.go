@@ -555,7 +555,7 @@ func TestBaseMult(t *testing.T) {
 
 func TestBaseMultVerify(t *testing.T) {
 	s256 := btcec.S256()
-	for bytes := 1; bytes < 35; bytes++ {
+	for bytes := 1; bytes < 40; bytes++ {
 		for i := 0; i < 30; i++ {
 			data := make([]byte, bytes)
 			_, err := rand.Read(data)
@@ -571,6 +571,33 @@ func TestBaseMultVerify(t *testing.T) {
 			if testing.Short() && i > 2 {
 				break
 			}
+		}
+	}
+}
+
+func TestScalarMult(t *testing.T) {
+	// Strategy for this test:
+	// Get a random exponent from the generator point at first
+	// This creates a new point which is used in the next iteration
+	// Use another random exponent on the new point.
+	// We use BaseMult to verify by multiplying the previous exponent
+	// and the new random exponent together (mod N)
+	s256 := btcec.S256()
+	x, y := s256.Gx, s256.Gy
+	exponent := big.NewInt(1)
+	for i := 0; i < 1024; i++ {
+		data := make([]byte, 32)
+		_, err := rand.Read(data)
+		if err != nil {
+			t.Fatalf("failed to read random data at %d", i)
+			break
+		}
+		x, y = s256.ScalarMult(x, y, data)
+		exponent.Mul(exponent, new(big.Int).SetBytes(data))
+		xWant, yWant := s256.ScalarBaseMult(exponent.Bytes())
+		if x.Cmp(xWant) != 0 || y.Cmp(yWant) != 0 {
+			t.Fatalf("%d: bad output for %X: got (%X, %X), want (%X, %X)", i, data, x, y, xWant, yWant)
+			break
 		}
 	}
 }

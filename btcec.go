@@ -37,8 +37,23 @@ var (
 // interface from crypto/elliptic.
 type KoblitzCurve struct {
 	*elliptic.CurveParams
-	q          *big.Int
-	H          int // cofactor of the curve.
+	q *big.Int
+	H int // cofactor of the curve.
+
+	// The next 6 values are used specifically for endomorphism optimizations
+	// in ScalarMult.
+
+	// lambda should fulfill lambda^3 = 1 mod N where N is the order of G
+	lambda *big.Int
+	// beta should fulfill beta^3 = 1 mod P where P is the prime field of the curve
+	beta *fieldVal
+	// a1, b1, a2 and b2 are explained in detail in Guide To Elliptical Curve
+	// Cryptography (Hankerson, Menezes, Vanstone) in Algorithm 3.74
+	a1         *big.Int
+	b1         *big.Int
+	a2         *big.Int
+	b2         *big.Int
+	byteSize   int
 	bytePoints *[32][256][3]fieldVal
 }
 
@@ -594,29 +609,133 @@ func (curve *KoblitzCurve) Double(x1, y1 *big.Int) (*big.Int, *big.Int) {
 	return curve.fieldJacobianToBigAffine(fx3, fy3, fz3)
 }
 
+// splitK returns a balanced length-two representation of k and their
+// signs.
+// This is algorithm 3.74 from Guide to Elliptical Curve Cryptography (ref above)
+// One thing of note about this algorithm is that no matter what c1 and c2 are,
+// the final equation of k = k1 + k2 * lambda (mod n) will hold. This is provable
+// mathematically due to how a1/b1/a2/b2 are computed.
+// c1 and c2 are chosen to minimize the max(k1,k2).
+func (curve *KoblitzCurve) splitK(k []byte) ([]byte, []byte, int, int) {
+
+	// All math here is done with big.Int, which is slow.
+	// At some point, it might be useful to write something similar to fieldVal
+	// but for N instead of P as the prime field if this ends up being a
+	// bottleneck.
+	bigIntK, c1, c2, tmp1, tmp2, k1, k2 := new(big.Int), new(big.Int), new(big.Int), new(big.Int), new(big.Int), new(big.Int), new(big.Int)
+
+	bigIntK.SetBytes(k)
+	// c1 = round(b2 * k / n) from step 4.
+	// Rounding isn't really necessary and costs too much, hence skipped
+	c1.Mul(curve.b2, bigIntK)
+	c1.Div(c1, curve.N)
+	// c2 = round(b1 * k / n) from step 4 (sign reversed to optimize one step)
+	// Rounding isn't really necessary and costs too much, hence skipped
+	c2.Mul(curve.b1, bigIntK)
+	c2.Div(c2, curve.N)
+	// k1 = k - c1 * a1 - c2 * a2 from step 5 (note c2's sign is reversed)
+	tmp1.Mul(c1, curve.a1)
+	tmp2.Mul(c2, curve.a2)
+	k1.Sub(bigIntK, tmp1)
+	k1.Add(k1, tmp2)
+	// k2 = - c1 * b1 - c2 * b2 from step 5 (note c2's sign is reversed)
+	tmp1.Mul(c1, curve.b1)
+	tmp2.Mul(c2, curve.b2)
+	k2.Sub(tmp2, tmp1)
+
+	// Note Bytes() throws out the sign of k1 and k2. This matters
+	// since k1 and/or k2 can be negative. Hence, we pass that
+	// back separately.
+	return k1.Bytes(), k2.Bytes(), k1.Sign(), k2.Sign()
+}
+
+// moduloReduce reduces k from more than 32 bytes to 32 bytes and under.
+// This is done by doing a simple modulo curve.N. We can do this since
+// G^N = 1 and thus any other valid point on the elliptical curve has the
+// same order.
+func (curve *KoblitzCurve) moduloReduce(k []byte) []byte {
+	// Since the order of G is curve.N, we can use a much smaller number
+	// by doing modulo curve.N
+	if len(k) > curve.byteSize {
+		// reduce k by performing modulo curve.N
+		tmpK := new(big.Int).SetBytes(k)
+		tmpK.Mod(tmpK, curve.N)
+		return tmpK.Bytes()
+	}
+
+	return k
+}
+
 // ScalarMult returns k*(Bx, By) where k is a big endian integer.
 // Part of the elliptic.Curve interface.
 func (curve *KoblitzCurve) ScalarMult(Bx, By *big.Int, k []byte) (*big.Int, *big.Int) {
-	// This uses the left to right binary method for point multiplication:
-
 	// Point Q = ∞ (point at infinity).
 	qx, qy, qz := new(fieldVal), new(fieldVal), new(fieldVal)
 
-	// Point P = the point to multiply the scalar with.
-	px, py := curve.bigAffineToField(Bx, By)
-	pz := new(fieldVal).SetInt(1)
+	// decompose K into k1 and k2 in order to halve the number of EC ops
+	// see Algorithm 3.74 in Guide to Elliptical Curve Cryptography by
+	// Hankerson, et al.
+	k1, k2, signK1, signK2 := curve.splitK(curve.moduloReduce(k))
+	k1Len := len(k1)
+	k2Len := len(k2)
+	m := k1Len
+	if k2Len > m {
+		m = k2Len
+	}
 
-	// Double and add as necessary depending on the bits set in the scalar.
-	for _, byteVal := range k {
+	// The main equation here to remember is
+	// k * P = k1 * P + k2 * ϕ(P)
+	// P1 below is P in the equation, P2 below is ϕ(P) in the equation
+	p1x, p1y := curve.bigAffineToField(Bx, By)
+	p1z := new(fieldVal).SetInt(1)
+	// Note ϕ(x,y) = (βx,y), the Jacobian z coordinate is 1, so this math
+	// goes through.
+	p2x := new(fieldVal).Set(p1x).Mul(curve.beta)
+	p2y := new(fieldVal).Set(p1y)
+	p2z := new(fieldVal).SetInt(1)
+
+	// If k1 or k2 are negative, we only need to flip the y of the respective
+	// Jacobian point. In ECC terms, we're reflecting the point over the
+	// x-axis which is guaranteed to still be on the curve.
+	if signK1 == -1 {
+		p1y.Negate(1)
+	}
+	if signK2 == -1 {
+		p2y.Negate(1)
+	}
+
+	// We use the left to right binary addition method.
+	// At each bit of k1 and k2, we add the current part of the
+	// k * P = k1 * P + k2 * ϕ(P) equation (that is, P1 and P2) and double.
+	// A further optimization using NAF is possible here but unimplemented.
+	var byteVal1, byteVal2 byte
+	for i := 0; i < m; i++ {
+		// Note that if k1 or k2 has less than the max number of bytes, we
+		// want to ignore the bytes at the front since we're going left to
+		// right.
+		if i < m-k1Len {
+			byteVal1 = 0
+		} else {
+			byteVal1 = k1[i-m+k1Len]
+		}
+		if i < m-k2Len {
+			byteVal2 = 0
+		} else {
+			byteVal2 = k2[i-m+k2Len]
+		}
 		for bitNum := 0; bitNum < 8; bitNum++ {
 			// Q = 2*Q
 			curve.doubleJacobian(qx, qy, qz, qx, qy, qz)
-			if byteVal&0x80 == 0x80 {
-				// Q = Q + P
-				curve.addJacobian(qx, qy, qz, px, py, pz, qx,
-					qy, qz)
+			if byteVal1&0x80 == 0x80 {
+				// Q = Q + P1
+				curve.addJacobian(qx, qy, qz, p1x, p1y, p1z, qx, qy, qz)
 			}
-			byteVal <<= 1
+			if byteVal2&0x80 == 0x80 {
+				// Q = Q + P2
+				curve.addJacobian(qx, qy, qz, p2x, p2y, p2z, qx, qy, qz)
+			}
+			byteVal1 <<= 1
+			byteVal2 <<= 1
 		}
 	}
 
@@ -628,14 +747,8 @@ func (curve *KoblitzCurve) ScalarMult(Bx, By *big.Int, k []byte) (*big.Int, *big
 // big endian integer.
 // Part of the elliptic.Curve interface.
 func (curve *KoblitzCurve) ScalarBaseMult(k []byte) (*big.Int, *big.Int) {
-	// Fall back to slower generic scalar point multiplication when the integer is
-	// larger than what can be used with the precomputed table which enables
-	// accelerated multiplication by the known fixed point.
-	if len(k) > len(curve.bytePoints) {
-		return curve.ScalarMult(curve.Gx, curve.Gy, k)
-	}
-
-	diff := len(curve.bytePoints) - len(k)
+	newK := curve.moduloReduce(k)
+	diff := len(curve.bytePoints) - len(newK)
 
 	// Point Q = ∞ (point at infinity).
 	qx, qy, qz := new(fieldVal), new(fieldVal), new(fieldVal)
@@ -645,7 +758,7 @@ func (curve *KoblitzCurve) ScalarBaseMult(k []byte) (*big.Int, *big.Int) {
 	// expressing k in base-256 which it already sort of is.
 	// Each "digit" in the 8-bit window can be looked up using bytePoints
 	// and added together.
-	for i, byteVal := range k {
+	for i, byteVal := range newK {
 		point := curve.bytePoints[diff+i][byteVal]
 		curve.addJacobian(qx, qy, qz, &point[0], &point[1], &point[2], qx, qy, qz)
 	}
@@ -684,6 +797,31 @@ func initS256() {
 	if err := loadS256BytePoints(); err != nil {
 		panic(err)
 	}
+
+	// Next 6 constants are from Hal Finney's bitcointalk.org post:
+	// https://bitcointalk.org/index.php?topic=3238.msg45565#msg45565
+	// May he rest in peace.
+	secp256k1.lambda, _ = new(big.Int).SetString("5363AD4CC05C30E0A5261C028812645A122E22EA20816678DF02967C1B23BD72", 16)
+	secp256k1.beta = new(fieldVal).SetHex("7AE96A2B657C07106E64479EAC3434E99CF0497512F58995C1396C28719501EE")
+	secp256k1.a1, _ = new(big.Int).SetString("3086D221A7D46BCDE86C90E49284EB15", 16)
+	secp256k1.b1, _ = new(big.Int).SetString("-E4437ED6010E88286F547FA90ABFE4C3", 16)
+	secp256k1.a2, _ = new(big.Int).SetString("114CA50F7A8E2F3F657C1108D9D44CFD8", 16)
+	secp256k1.b2, _ = new(big.Int).SetString("3086D221A7D46BCDE86C90E49284EB15", 16)
+
+	// for convenience this gets computed repeatedly
+	secp256k1.byteSize = secp256k1.BitSize / 8
+
+	// Alternatively, we can use the parameters below, however, they seem
+	//  to be about 8% slower.
+	// λ = AC9C52B33FA3CF1F5AD9E3FD77ED9BA4A880B9FC8EC739C2E0CFC810B51283CE
+	// β = 851695D49A83F8EF919BB86153CBCB16630FB68AED0A766A3EC693D68E6AFA40
+	// secp256k1.lambda, _ = new(big.Int).SetString("AC9C52B33FA3CF1F5AD9E3FD77ED9BA4A880B9FC8EC739C2E0CFC810B51283CE", 16)
+	// secp256k1.beta = new(fieldVal).SetHex("851695D49A83F8EF919BB86153CBCB16630FB68AED0A766A3EC693D68E6AFA40")
+	// secp256k1.a1, _ = new(big.Int).SetString("E4437ED6010E88286F547FA90ABFE4C3", 16)
+	// secp256k1.b1, _ = new(big.Int).SetString("-3086D221A7D46BCDE86C90E49284EB15", 16)
+	// secp256k1.a2, _ = new(big.Int).SetString("3086D221A7D46BCDE86C90E49284EB15", 16)
+	// secp256k1.b2, _ = new(big.Int).SetString("114CA50F7A8E2F3F657C1108D9D44CFD8", 16)
+
 }
 
 // S256 returns a Curve which implements secp256k1.

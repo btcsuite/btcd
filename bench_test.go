@@ -57,6 +57,16 @@ func BenchmarkScalarBaseMult(b *testing.B) {
 	}
 }
 
+// BenchmarkScalarBaseMultLarge benchmarks the secp256k1 curve ScalarBaseMult
+// function with abnormally large k values.
+func BenchmarkScalarBaseMultLarge(b *testing.B) {
+	k := fromHex("d74bf844b0862475103d96a611cf2d898447e288d34b360bc885cb8ce7c005751111111011111110")
+	curve := btcec.S256()
+	for i := 0; i < b.N; i++ {
+		curve.ScalarBaseMult(k.Bytes())
+	}
+}
+
 // BenchmarkScalarMult benchmarks the secp256k1 curve ScalarMult function.
 func BenchmarkScalarMult(b *testing.B) {
 	x := fromHex("34f9460f0e4f08393d192b3c5133a6ba099aa0ad9fd54ebccfacdfa239ff49c6")
