@@ -78,6 +78,14 @@ func BenchmarkScalarMult(b *testing.B) {
 	}
 }
 
+// BenchmarkNAF benchmarks the NAF function.
+func BenchmarkNAF(b *testing.B) {
+	k := fromHex("d74bf844b0862475103d96a611cf2d898447e288d34b360bc885cb8ce7c00575")
+	for i := 0; i < b.N; i++ {
+		btcec.NAF(k.Bytes())
+	}
+}
+
 // BenchmarkSigVerify benchmarks how long it takes the secp256k1 curve to
 // verify signatures.
 func BenchmarkSigVerify(b *testing.B) {

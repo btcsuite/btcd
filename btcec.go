@@ -666,6 +666,78 @@ func (curve *KoblitzCurve) moduloReduce(k []byte) []byte {
 	return k
 }
 
+// NAF takes a positive integer k and returns the Non-Adjacent Form (NAF)
+// as two byte slices. The first is where 1's should be. The second is where
+// -1's should be.
+// NAF is also convenient in that on average, only 1/3rd of its values are
+// non-zero.
+// The algorithm here is from Guide to Elliptical Cryptography 3.30 (ref above)
+// Essentially, this makes it possible to minimize the number of operations
+// since the resulting ints returned will be at least 50% 0's.
+func NAF(k []byte) ([]byte, []byte) {
+
+	// The essence of this algorithm is that whenever we have consecutive 1s
+	// in the binary, we want to put a -1 in the lowest bit and get a bunch of
+	// 0s up to the highest bit of consecutive 1s. This is due to this identity:
+	// 2^n + 2^(n-1) + 2^(n-2) + ... + 2^(n-k) = 2^(n+1) - 2^(n-k)
+	// The algorithm thus may need to go 1 more bit than the length of the bits
+	// we actually have, hence bits being 1 bit longer than was necessary.
+	// Since we need to know whether adding will cause a carry, we go from
+	// right-to-left in this addition.
+	var carry, curIsOne, nextIsOne bool
+	// these default to zero
+	retPos := make([]byte, len(k)+1)
+	retNeg := make([]byte, len(k)+1)
+	for i := len(k) - 1; i >= 0; i-- {
+		curByte := k[i]
+		for j := uint(0); j < 8; j++ {
+			curIsOne = curByte&1 == 1
+			if j == 7 {
+				if i == 0 {
+					nextIsOne = false
+				} else {
+					nextIsOne = k[i-1]&1 == 1
+				}
+			} else {
+				nextIsOne = curByte&2 == 2
+			}
+			if carry {
+				if curIsOne {
+					// This bit is 1, so we continue to carry and
+					// don't need to do anything
+				} else {
+					// We've hit a 0 after some number of 1s.
+					if nextIsOne {
+						// We start carrying again since we're starting
+						// a new sequence of 1s.
+						retNeg[i+1] += 1 << j
+					} else {
+						// We stop carrying since 1s have stopped.
+						carry = false
+						retPos[i+1] += 1 << j
+					}
+				}
+			} else if curIsOne {
+				if nextIsOne {
+					// if this is the start of at least 2 consecutive 1's
+					// we want to set the current one to -1 and start carrying
+					retNeg[i+1] += 1 << j
+					carry = true
+				} else {
+					// this is a singleton, not consecutive 1's.
+					retPos[i+1] += 1 << j
+				}
+			}
+			curByte >>= 1
+		}
+	}
+	if carry {
+		retPos[0] = 1
+	}
+
+	return retPos, retNeg
+}
+
 // ScalarMult returns k*(Bx, By) where k is a big endian integer.
 // Part of the elliptic.Curve interface.
 func (curve *KoblitzCurve) ScalarMult(Bx, By *big.Int, k []byte) (*big.Int, *big.Int) {
@@ -676,66 +748,85 @@ func (curve *KoblitzCurve) ScalarMult(Bx, By *big.Int, k []byte) (*big.Int, *big
 	// see Algorithm 3.74 in Guide to Elliptical Curve Cryptography by
 	// Hankerson, et al.
 	k1, k2, signK1, signK2 := curve.splitK(curve.moduloReduce(k))
-	k1Len := len(k1)
-	k2Len := len(k2)
-	m := k1Len
-	if k2Len > m {
-		m = k2Len
-	}
 
 	// The main equation here to remember is
 	// k * P = k1 * P + k2 * ϕ(P)
 	// P1 below is P in the equation, P2 below is ϕ(P) in the equation
 	p1x, p1y := curve.bigAffineToField(Bx, By)
+	// For NAF, we need the negative point
+	p1yNeg := new(fieldVal).NegateVal(p1y, 1)
 	p1z := new(fieldVal).SetInt(1)
 	// Note ϕ(x,y) = (βx,y), the Jacobian z coordinate is 1, so this math
 	// goes through.
-	p2x := new(fieldVal).Set(p1x).Mul(curve.beta)
+	p2x := new(fieldVal).Mul2(p1x, curve.beta)
 	p2y := new(fieldVal).Set(p1y)
+	// For NAF, we need the negative point
+	p2yNeg := new(fieldVal).NegateVal(p2y, 1)
 	p2z := new(fieldVal).SetInt(1)
 
-	// If k1 or k2 are negative, we only need to flip the y of the respective
-	// Jacobian point. In ECC terms, we're reflecting the point over the
-	// x-axis which is guaranteed to still be on the curve.
+	// If k1 or k2 are negative, we flip the positive/negative values
 	if signK1 == -1 {
-		p1y.Negate(1)
+		p1y, p1yNeg = p1yNeg, p1y
 	}
 	if signK2 == -1 {
-		p2y.Negate(1)
+		p2y, p2yNeg = p2yNeg, p2y
 	}
 
-	// We use the left to right binary addition method.
-	// At each bit of k1 and k2, we add the current part of the
-	// k * P = k1 * P + k2 * ϕ(P) equation (that is, P1 and P2) and double.
-	// A further optimization using NAF is possible here but unimplemented.
-	var byteVal1, byteVal2 byte
+	// NAF versions of k1 and k2 should have a lot more zeros
+	// the Pos version of the bytes contain the +1's and the Neg versions
+	// contain the -1's
+	k1PosNAF, k1NegNAF := NAF(k1)
+	k2PosNAF, k2NegNAF := NAF(k2)
+	k1Len := len(k1PosNAF)
+	k2Len := len(k2PosNAF)
+
+	m := k1Len
+	if m < k2Len {
+		m = k2Len
+	}
+
+	// We add left-to-right using the NAF optimization. This is using
+	// algorithm 3.77 from Guide to Elliptical Curve Cryptography.
+	// This should be faster overall since there will be a lot more instances
+	// of 0, hence reducing the number of Jacobian additions at the cost
+	// of 1 possible extra doubling.
+	var k1BytePos, k1ByteNeg, k2BytePos, k2ByteNeg byte
 	for i := 0; i < m; i++ {
-		// Note that if k1 or k2 has less than the max number of bytes, we
-		// want to ignore the bytes at the front since we're going left to
-		// right.
+		// Since we're going left-to-right, we need to pad the front with 0's
 		if i < m-k1Len {
-			byteVal1 = 0
+			k1BytePos = 0
+			k1ByteNeg = 0
 		} else {
-			byteVal1 = k1[i-m+k1Len]
+			k1BytePos = k1PosNAF[i-(m-k1Len)]
+			k1ByteNeg = k1NegNAF[i-(m-k1Len)]
 		}
 		if i < m-k2Len {
-			byteVal2 = 0
+			k2BytePos = 0
+			k2ByteNeg = 0
 		} else {
-			byteVal2 = k2[i-m+k2Len]
+			k2BytePos = k2PosNAF[i-(m-k2Len)]
+			k2ByteNeg = k2NegNAF[i-(m-k2Len)]
 		}
-		for bitNum := 0; bitNum < 8; bitNum++ {
-			// Q = 2*Q
+
+		for j := 7; j >= 0; j-- {
+			// Q = 2 * Q
 			curve.doubleJacobian(qx, qy, qz, qx, qy, qz)
-			if byteVal1&0x80 == 0x80 {
-				// Q = Q + P1
+
+			if k1BytePos&0x80 == 0x80 {
 				curve.addJacobian(qx, qy, qz, p1x, p1y, p1z, qx, qy, qz)
+			} else if k1ByteNeg&0x80 == 0x80 {
+				curve.addJacobian(qx, qy, qz, p1x, p1yNeg, p1z, qx, qy, qz)
 			}
-			if byteVal2&0x80 == 0x80 {
-				// Q = Q + P2
+
+			if k2BytePos&0x80 == 0x80 {
 				curve.addJacobian(qx, qy, qz, p2x, p2y, p2z, qx, qy, qz)
+			} else if k2ByteNeg&0x80 == 0x80 {
+				curve.addJacobian(qx, qy, qz, p2x, p2yNeg, p2z, qx, qy, qz)
 			}
-			byteVal1 <<= 1
-			byteVal2 <<= 1
+			k1BytePos <<= 1
+			k1ByteNeg <<= 1
+			k2BytePos <<= 1
+			k2ByteNeg <<= 1
 		}
 	}
 
@@ -801,6 +892,8 @@ func initS256() {
 	// Next 6 constants are from Hal Finney's bitcointalk.org post:
 	// https://bitcointalk.org/index.php?topic=3238.msg45565#msg45565
 	// May he rest in peace.
+	// These have been independently verified by Dave Collins using
+	// an ecc math script.
 	secp256k1.lambda, _ = new(big.Int).SetString("5363AD4CC05C30E0A5261C028812645A122E22EA20816678DF02967C1B23BD72", 16)
 	secp256k1.beta = new(fieldVal).SetHex("7AE96A2B657C07106E64479EAC3434E99CF0497512F58995C1396C28719501EE")
 	secp256k1.a1, _ = new(big.Int).SetString("3086D221A7D46BCDE86C90E49284EB15", 16)

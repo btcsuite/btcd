@@ -35,15 +35,14 @@ func (curve *KoblitzCurve) getDoublingPoints() [][3]fieldVal {
 // the possible points per 8-bit window.  This is used to when generating
 // secp256k1.go.
 func (curve *KoblitzCurve) SerializedBytePoints() []byte {
-	byteSize := curve.BitSize / 8
 	doublingPoints := curve.getDoublingPoints()
 
 	// Segregate the bits into byte-sized windows
-	serialized := make([]byte, byteSize*256*3*10*4)
+	serialized := make([]byte, curve.byteSize*256*3*10*4)
 	offset := 0
-	for byteNum := 0; byteNum < byteSize; byteNum++ {
+	for byteNum := 0; byteNum < curve.byteSize; byteNum++ {
 		// Grab the 8 bits that make up this byte from doublingPoints.
-		startingBit := 8 * (byteSize - byteNum - 1)
+		startingBit := 8 * (curve.byteSize - byteNum - 1)
 		computingPoints := doublingPoints[startingBit : startingBit+8]
 
 		// Compute all points in this window and serialize them.

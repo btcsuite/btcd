@@ -656,6 +656,41 @@ func TestSignAndVerify(t *testing.T) {
 	testSignAndVerify(t, btcec.S256(), "S256")
 }
 
+func TestNAF(t *testing.T) {
+	negOne := big.NewInt(-1)
+	one := big.NewInt(1)
+	two := big.NewInt(2)
+	for i := 0; i < 1024; i++ {
+		data := make([]byte, 32)
+		_, err := rand.Read(data)
+		if err != nil {
+			t.Fatalf("failed to read random data at %d", i)
+			break
+		}
+		nafPos, nafNeg := btcec.NAF(data)
+		want := new(big.Int).SetBytes(data)
+		got := big.NewInt(0)
+		// Check that the NAF representation comes up with the right number
+		for i := 0; i < len(nafPos); i++ {
+			bytePos := nafPos[i]
+			byteNeg := nafNeg[i]
+			for j := 7; j >= 0; j-- {
+				got.Mul(got, two)
+				if bytePos&0x80 == 0x80 {
+					got.Add(got, one)
+				} else if byteNeg&0x80 == 0x80 {
+					got.Add(got, negOne)
+				}
+				bytePos <<= 1
+				byteNeg <<= 1
+			}
+		}
+		if got.Cmp(want) != 0 {
+			t.Errorf("%d: Failed NAF got %X want %X", i, got, want)
+		}
+	}
+}
+
 func fromHex(s string) *big.Int {
 	r, ok := new(big.Int).SetString(s, 16)
 	if !ok {
