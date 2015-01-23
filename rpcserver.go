@@ -2089,7 +2089,7 @@ func handleGetInfo(s *rpcServer, cmd btcjson.Cmd, closeChan <-chan struct{}) (in
 		Version:         int32(1000000*appMajor + 10000*appMinor + 100*appPatch),
 		ProtocolVersion: int32(maxProtocolVersion),
 		Blocks:          int32(height),
-		TimeOffset:      0,
+		TimeOffset:      int64(s.server.timeSource.Offset().Seconds()),
 		Connections:     s.server.ConnectedCount(),
 		Proxy:           cfg.Proxy,
 		Difficulty:      getDifficultyRatio(blkHeader.Bits),
