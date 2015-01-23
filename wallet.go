@@ -960,15 +960,35 @@ func (c *Client) CreateMultisig(requiredSigs int, addresses []btcutil.Address) (
 	return c.CreateMultisigAsync(requiredSigs, addresses).Receive()
 }
 
-// CreateNewAccount creates a new wallet account.
-func (c *Client) CreateNewAccount(account string) error {
-	id := c.NextID()
-	cmd := btcws.NewCreateNewAccountCmd(id, account)
-	_, err := c.sendCmdAndWait(cmd)
+// FutureCreateNewAccountResult is a future promise to deliver the result of a
+// CreateNewAccountAsync RPC invocation (or an applicable error).
+type FutureCreateNewAccountResult chan *response
+
+// Receive waits for the response promised by the future and returns the
+// result of creating new account.
+func (r FutureCreateNewAccountResult) Receive() error {
+	_, err := receiveFuture(r)
 	if err != nil {
 		return err
 	}
+
 	return nil
+}
+
+// CreateNewAccountAsync returns an instance of a type that can be used to get the
+// result of the RPC at some future time by invoking the Receive function on the
+// returned instance.
+//
+// See CreateNewAccount for the blocking version and more details.
+func (c *Client) CreateNewAccountAsync(account string) FutureCreateNewAccountResult {
+	id := c.NextID()
+	cmd := btcws.NewCreateNewAccountCmd(id, account)
+	return c.sendCmd(cmd)
+}
+
+// CreateNewAccount creates a new wallet account.
+func (c *Client) CreateNewAccount(account string) error {
+	return c.CreateNewAccountAsync(account).Receive()
 }
 
 // FutureGetNewAddressResult is a future promise to deliver the result of a
@@ -1337,15 +1357,35 @@ func (c *Client) MoveComment(fromAccount, toAccount string, amount btcutil.Amoun
 		comment).Receive()
 }
 
-// RenameAccount renames a wallet account.
-func (c *Client) RenameAccount(oldaccount, newaccount string) error {
-	id := c.NextID()
-	cmd := btcws.NewRenameAccountCmd(id, oldaccount, newaccount)
-	_, err := c.sendCmdAndWait(cmd)
+// FutureRenameAccountResult is a future promise to deliver the result of a
+// RenameAccountAsync RPC invocation (or an applicable error).
+type FutureRenameAccountResult chan *response
+
+// Receive waits for the response promised by the future and returns the
+// result of creating new account.
+func (r FutureRenameAccountResult) Receive() error {
+	_, err := receiveFuture(r)
 	if err != nil {
 		return err
 	}
+
 	return nil
+}
+
+// RenameAccountAsync returns an instance of a type that can be used to get the
+// result of the RPC at some future time by invoking the Receive function on the
+// returned instance.
+//
+// See RenameAccount for the blocking version and more details.
+func (c *Client) RenameAccountAsync(oldaccount, newaccount string) FutureRenameAccountResult {
+	id := c.NextID()
+	cmd := btcws.NewRenameAccountCmd(id, oldaccount, newaccount)
+	return c.sendCmd(cmd)
+}
+
+// RenameAccount creates a new wallet account.
+func (c *Client) RenameAccount(oldaccount, newaccount string) error {
+	return c.RenameAccountAsync(oldaccount, newaccount).Receive()
 }
 
 // FutureValidateAddressResult is a future promise to deliver the result of a
