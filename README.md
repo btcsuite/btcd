@@ -43,7 +43,7 @@ active development.
 
 https://github.com/btcsuite/btcd/releases
 
-#### Linux/BSD/POSIX - Build from Source
+#### Linux/BSD/MacOSX/POSIX - Build from Source
 
 - Install Go according to the installation instructions here:
   http://golang.org/doc/install
@@ -62,7 +62,7 @@ https://github.com/btcsuite/btcd/releases
 
 Install a newer MSI
 
-#### Linux/BSD/POSIX - Build from Source
+#### Linux/BSD/MacOSX/POSIX - Build from Source
 
 - Run the following command to update btcd, all dependencies, and install it:
   ```$ go get -u -v github.com/btcsuite/btcd/...```
