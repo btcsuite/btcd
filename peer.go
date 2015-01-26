@@ -1468,7 +1468,14 @@ out:
 			p.handlePongMsg(msg)
 
 		case *btcwire.MsgAlert:
-			p.server.BroadcastMessage(msg, p)
+			// Intentionally ignore alert messages.
+			//
+			// The reference client currently bans peers that send
+			// alerts not signed with its key.  We could verify
+			// against their key, but since the reference client
+			// is currently unwilling to support other
+			// implementions' alert messages, we will not relay
+			// theirs.
 
 		case *btcwire.MsgMemPool:
 			p.handleMemPoolMsg(msg)
