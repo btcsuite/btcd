@@ -238,6 +238,12 @@ func ParseMarshaledCmd(b []byte) (Cmd, error) {
 	case "help":
 		cmd = new(HelpCmd)
 
+	case "importaddress":
+		cmd = new(ImportAddressCmd)
+
+	case "importpubkey":
+		cmd = new(ImportPubKeyCmd)
+
 	case "importprivkey":
 		cmd = new(ImportPrivKeyCmd)
 
@@ -3834,6 +3840,194 @@ func (cmd *HelpCmd) UnmarshalJSON(b []byte) error {
 	}
 
 	newCmd, err := NewHelpCmd(r.Id, optArgs...)
+	if err != nil {
+		return err
+	}
+
+	*cmd = *newCmd
+	return nil
+}
+
+// ImportAddressCmd is a type handling custom marshaling and
+// unmarshaling of importaddress JSON RPC commands.
+type ImportAddressCmd struct {
+	id      interface{}
+	Address string
+	Rescan  bool
+}
+
+// Enforce that ImportAddressCmd satisifies the Cmd interface.
+var _ Cmd = &ImportAddressCmd{}
+
+// NewImportAddressCmd creates a new ImportAddressCmd.
+func NewImportAddressCmd(id interface{}, address string, optArgs ...interface{}) (*ImportAddressCmd, error) {
+	rescan := true
+	var ok bool
+
+	if len(optArgs) > 1 {
+		return nil, ErrTooManyOptArgs
+	}
+	if len(optArgs) > 0 {
+		rescan, ok = optArgs[0].(bool)
+		if !ok {
+			return nil, errors.New("first optional argument rescan is not a bool")
+		}
+	}
+	return &ImportAddressCmd{
+		id:      id,
+		Address: address,
+		Rescan:  rescan,
+	}, nil
+}
+
+// Id satisfies the Cmd interface by returning the id of the command.
+func (cmd *ImportAddressCmd) Id() interface{} {
+	return cmd.id
+}
+
+// Method satisfies the Cmd interface by returning the json method.
+func (cmd *ImportAddressCmd) Method() string {
+	return "importaddress"
+}
+
+// MarshalJSON returns the JSON encoding of cmd.  Part of the Cmd interface.
+func (cmd *ImportAddressCmd) MarshalJSON() ([]byte, error) {
+	params := make([]interface{}, 1, 2)
+	params[0] = cmd.Address
+	if !cmd.Rescan {
+		params = append(params, cmd.Rescan)
+	}
+
+	// Fill and marshal a RawCmd.
+	raw, err := NewRawCmd(cmd.id, cmd.Method(), params)
+	if err != nil {
+		return nil, err
+	}
+	return json.Marshal(raw)
+}
+
+// UnmarshalJSON unmarshals the JSON encoding of cmd into cmd.  Part of
+// the Cmd interface.
+func (cmd *ImportAddressCmd) UnmarshalJSON(b []byte) error {
+	// Unmarshal into a RawCmd
+	var r RawCmd
+	if err := json.Unmarshal(b, &r); err != nil {
+		return err
+	}
+
+	if len(r.Params) == 0 || len(r.Params) > 2 {
+		return ErrWrongNumberOfParams
+	}
+
+	var address string
+	if err := json.Unmarshal(r.Params[0], &address); err != nil {
+		return fmt.Errorf("first parameter 'address' must be a string: %v", err)
+	}
+
+	var optArgs []interface{}
+	if len(r.Params) > 1 {
+		var rescan bool
+		if err := json.Unmarshal(r.Params[1], &rescan); err != nil {
+			return fmt.Errorf("first optional parameter 'rescan' must be a bool: %v", err)
+		}
+		optArgs = append(optArgs, rescan)
+	}
+
+	newCmd, err := NewImportAddressCmd(r.Id, address, optArgs...)
+	if err != nil {
+		return err
+	}
+
+	*cmd = *newCmd
+	return nil
+}
+
+// ImportPubKeyCmd is a type handling custom marshaling and
+// unmarshaling of importpubkey JSON RPC commands.
+type ImportPubKeyCmd struct {
+	id     interface{}
+	PubKey string
+	Rescan bool
+}
+
+// Enforce that ImportPubKeyCmd satisifies the Cmd interface.
+var _ Cmd = &ImportPubKeyCmd{}
+
+// NewImportPubKeyCmd creates a new ImportPubKeyCmd.
+func NewImportPubKeyCmd(id interface{}, pubkey string, optArgs ...interface{}) (*ImportPubKeyCmd, error) {
+	rescan := true
+	var ok bool
+
+	if len(optArgs) > 1 {
+		return nil, ErrTooManyOptArgs
+	}
+	if len(optArgs) > 0 {
+		rescan, ok = optArgs[0].(bool)
+		if !ok {
+			return nil, errors.New("first optional argument rescan is not a bool")
+		}
+	}
+	return &ImportPubKeyCmd{
+		id:     id,
+		PubKey: pubkey,
+		Rescan: rescan,
+	}, nil
+}
+
+// Id satisfies the Cmd interface by returning the id of the command.
+func (cmd *ImportPubKeyCmd) Id() interface{} {
+	return cmd.id
+}
+
+// Method satisfies the Cmd interface by returning the json method.
+func (cmd *ImportPubKeyCmd) Method() string {
+	return "importpubkey"
+}
+
+// MarshalJSON returns the JSON encoding of cmd.  Part of the Cmd interface.
+func (cmd *ImportPubKeyCmd) MarshalJSON() ([]byte, error) {
+	params := make([]interface{}, 1, 2)
+	params[0] = cmd.PubKey
+	if !cmd.Rescan {
+		params = append(params, cmd.Rescan)
+	}
+
+	// Fill and marshal a RawCmd.
+	raw, err := NewRawCmd(cmd.id, cmd.Method(), params)
+	if err != nil {
+		return nil, err
+	}
+	return json.Marshal(raw)
+}
+
+// UnmarshalJSON unmarshals the JSON encoding of cmd into cmd.  Part of
+// the Cmd interface.
+func (cmd *ImportPubKeyCmd) UnmarshalJSON(b []byte) error {
+	// Unmarshal into a RawCmd
+	var r RawCmd
+	if err := json.Unmarshal(b, &r); err != nil {
+		return err
+	}
+
+	if len(r.Params) == 0 || len(r.Params) > 2 {
+		return ErrWrongNumberOfParams
+	}
+
+	var pubkey string
+	if err := json.Unmarshal(r.Params[0], &pubkey); err != nil {
+		return fmt.Errorf("first parameter 'pubkey' must be a string: %v", err)
+	}
+
+	var optArgs []interface{}
+	if len(r.Params) > 1 {
+		var rescan bool
+		if err := json.Unmarshal(r.Params[1], &rescan); err != nil {
+			return fmt.Errorf("first optional parameter 'rescan' must be a bool: %v", err)
+		}
+		optArgs = append(optArgs, rescan)
+	}
+
+	newCmd, err := NewImportPubKeyCmd(r.Id, pubkey, optArgs...)
 	if err != nil {
 		return err
 	}

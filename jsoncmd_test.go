@@ -814,6 +814,58 @@ var jsoncmdtests = []struct {
 	},
 	{
 		name: "basic",
+		cmd:  "importaddress",
+		f: func() (Cmd, error) {
+			return NewImportAddressCmd(testID,
+				"address")
+		},
+		result: &ImportAddressCmd{
+			id:      testID,
+			Address: "address",
+			Rescan:  true,
+		},
+	},
+	{
+		name: "basic + optional cmd",
+		cmd:  "importaddress",
+		f: func() (Cmd, error) {
+			return NewImportAddressCmd(testID,
+				"address", false)
+		},
+		result: &ImportAddressCmd{
+			id:      testID,
+			Address: "address",
+			Rescan:  false,
+		},
+	},
+	{
+		name: "basic",
+		cmd:  "importpubkey",
+		f: func() (Cmd, error) {
+			return NewImportPubKeyCmd(testID,
+				"pubkey")
+		},
+		result: &ImportPubKeyCmd{
+			id:     testID,
+			PubKey: "pubkey",
+			Rescan: true,
+		},
+	},
+	{
+		name: "basic + optional cmd",
+		cmd:  "importpubkey",
+		f: func() (Cmd, error) {
+			return NewImportPubKeyCmd(testID,
+				"pubkey", false)
+		},
+		result: &ImportPubKeyCmd{
+			id:     testID,
+			PubKey: "pubkey",
+			Rescan: false,
+		},
+	},
+	{
+		name: "basic",
 		cmd:  "importprivkey",
 		f: func() (Cmd, error) {
 			return NewImportPrivKeyCmd(testID,
