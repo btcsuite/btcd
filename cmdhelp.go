@@ -54,6 +54,7 @@ Alternatively levelspec  may be a specification of the form:
 <subsystem>=<level>,<subsystem2>=<level2>
 Where the valid subsystem names are:
 AMGR,
+ADXR,
 BCDB,
 BMGR,
 BTCD,
