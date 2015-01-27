@@ -10,8 +10,8 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/btcsuite/btcdb"
-	_ "github.com/btcsuite/btcdb/ldb"
+	"github.com/btcsuite/btcd/database"
+	_ "github.com/btcsuite/btcd/database/ldb"
 	"github.com/btcsuite/btcutil"
 	"github.com/btcsuite/btcwire"
 )
@@ -48,7 +48,7 @@ func testUnspentInsert(t *testing.T) {
 	dbnamever := dbname + ".ver"
 	_ = os.RemoveAll(dbname)
 	_ = os.RemoveAll(dbnamever)
-	db, err := btcdb.CreateDB("leveldb", dbname)
+	db, err := database.CreateDB("leveldb", dbname)
 	if err != nil {
 		t.Errorf("Failed to open test database %v", err)
 		return
@@ -96,7 +96,7 @@ endtest:
 			txOutList = append(txOutList, &txshaname)
 		}
 
-		txneededmap := map[btcwire.ShaHash]*btcdb.TxListReply{}
+		txneededmap := map[btcwire.ShaHash]*database.TxListReply{}
 		txlist := db.FetchUnSpentTxByShaList(txneededList)
 		for _, txe := range txlist {
 			if txe.Err != nil {
@@ -122,7 +122,7 @@ endtest:
 			break endtest
 		}
 
-		txlookupmap := map[btcwire.ShaHash]*btcdb.TxListReply{}
+		txlookupmap := map[btcwire.ShaHash]*database.TxListReply{}
 		txlist = db.FetchTxByShaList(txlookupList)
 		for _, txe := range txlist {
 			if txe.Err != nil {
@@ -158,7 +158,7 @@ endtest:
 			break endtest
 		}
 
-		txlookupmap = map[btcwire.ShaHash]*btcdb.TxListReply{}
+		txlookupmap = map[btcwire.ShaHash]*database.TxListReply{}
 		txlist = db.FetchUnSpentTxByShaList(txlookupList)
 		for _, txe := range txlist {
 			if txe.Err != nil {
@@ -180,7 +180,7 @@ endtest:
 			t.Errorf("failed to insert block %v err %v", height, err)
 			break endtest
 		}
-		txlookupmap = map[btcwire.ShaHash]*btcdb.TxListReply{}
+		txlookupmap = map[btcwire.ShaHash]*database.TxListReply{}
 		txlist = db.FetchTxByShaList(txlookupList)
 		for _, txe := range txlist {
 			if txe.Err != nil {

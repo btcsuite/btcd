@@ -15,7 +15,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/btcsuite/btcdb"
+	"github.com/btcsuite/btcd/database"
 	"github.com/btcsuite/btcnet"
 	"github.com/btcsuite/btcscript"
 	"github.com/btcsuite/btcutil"
@@ -29,7 +29,7 @@ var network = btcwire.MainNet
 // the `cleanUpFunc` *must* be called after each test to maintain db
 // consistency across tests.
 type testDb struct {
-	db          btcdb.Db
+	db          database.Db
 	blocks      []*btcutil.Block
 	dbName      string
 	dbNameVer   string
@@ -42,7 +42,7 @@ func setUpTestDb(t *testing.T) (*testDb, error) {
 	dbnamever := dbname + ".ver"
 	_ = os.RemoveAll(dbname)
 	_ = os.RemoveAll(dbnamever)
-	db, err := btcdb.CreateDB("leveldb", dbname)
+	db, err := database.CreateDB("leveldb", dbname)
 	if err != nil {
 		return nil, err
 	}
@@ -74,10 +74,10 @@ func TestOperational(t *testing.T) {
 
 // testAddrIndexOperations ensures that all normal operations concerning
 // the optional address index function correctly.
-func testAddrIndexOperations(t *testing.T, db btcdb.Db, newestBlock *btcutil.Block, newestSha *btcwire.ShaHash, newestBlockIdx int64) {
+func testAddrIndexOperations(t *testing.T, db database.Db, newestBlock *btcutil.Block, newestSha *btcwire.ShaHash, newestBlockIdx int64) {
 	// Metadata about the current addr index state should be unset.
 	sha, height, err := db.FetchAddrIndexTip()
-	if err != btcdb.ErrAddrIndexDoesNotExist {
+	if err != database.ErrAddrIndexDoesNotExist {
 		t.Fatalf("Address index metadata shouldn't be in db, hasn't been built up yet.")
 	}
 
@@ -104,7 +104,7 @@ func testAddrIndexOperations(t *testing.T, db btcdb.Db, newestBlock *btcutil.Blo
 	}
 
 	// Simple test to index outputs(s) of the first tx.
-	testIndex := make(btcdb.BlockAddrIndex)
+	testIndex := make(database.BlockAddrIndex)
 	testTx, err := newestBlock.Tx(0)
 	if err != nil {
 		t.Fatalf("Block has no transactions, unable to test addr "+
@@ -160,7 +160,7 @@ func testAddrIndexOperations(t *testing.T, db btcdb.Db, newestBlock *btcutil.Blo
 	db.Close()
 
 	// Re-Open, tip still should be updated to current height and sha.
-	db, err = btcdb.OpenDB("leveldb", "tstdbop1")
+	db, err = database.OpenDB("leveldb", "tstdbop1")
 	if err != nil {
 		t.Fatalf("Unable to re-open created db, err %v", err)
 	}
@@ -184,13 +184,13 @@ func testAddrIndexOperations(t *testing.T, db btcdb.Db, newestBlock *btcutil.Blo
 	}
 
 	// Tip should be blanked out.
-	if _, _, err := db.FetchAddrIndexTip(); err != btcdb.ErrAddrIndexDoesNotExist {
+	if _, _, err := db.FetchAddrIndexTip(); err != database.ErrAddrIndexDoesNotExist {
 		t.Fatalf("Address index was not fully deleted.")
 	}
 
 }
 
-func assertAddrIndexTipIsUpdated(db btcdb.Db, t *testing.T, newestSha *btcwire.ShaHash, newestBlockIdx int64) {
+func assertAddrIndexTipIsUpdated(db database.Db, t *testing.T, newestSha *btcwire.ShaHash, newestBlockIdx int64) {
 	// Safe to ignore error, since height will be < 0 in "error" case.
 	sha, height, _ := db.FetchAddrIndexTip()
 	if newestBlockIdx != height {
@@ -337,7 +337,7 @@ func testBackout(t *testing.T) {
 	// db was closed at height 120, so no cleanup is possible.
 
 	// reopen db
-	testDb.db, err = btcdb.OpenDB("leveldb", testDb.dbName)
+	testDb.db, err = database.OpenDB("leveldb", testDb.dbName)
 	if err != nil {
 		t.Errorf("Failed to open test database %v", err)
 		return
@@ -465,7 +465,7 @@ func loadBlocks(t *testing.T, file string) (blocks []*btcutil.Block, err error) 
 	return
 }
 
-func testFetchHeightRange(t *testing.T, db btcdb.Db, blocks []*btcutil.Block) {
+func testFetchHeightRange(t *testing.T, db database.Db, blocks []*btcutil.Block) {
 
 	var testincrement int64 = 50
 	var testcnt int64 = 100
@@ -486,7 +486,7 @@ func testFetchHeightRange(t *testing.T, db btcdb.Db, blocks []*btcutil.Block) {
 		endheight := startheight + testcnt
 
 		if endheight > nBlocks {
-			endheight = btcdb.AllShas
+			endheight = database.AllShas
 		}
 
 		shalist, err := db.FetchHeightRange(startheight, endheight)
@@ -494,7 +494,7 @@ func testFetchHeightRange(t *testing.T, db btcdb.Db, blocks []*btcutil.Block) {
 			t.Errorf("FetchHeightRange: unexpected failure looking up shas %v", err)
 		}
 
-		if endheight == btcdb.AllShas {
+		if endheight == database.AllShas {
 			if int64(len(shalist)) != nBlocks-startheight {
 				t.Errorf("FetchHeightRange: expected A %v shas, got %v", nBlocks-startheight, len(shalist))
 			}
@@ -549,7 +549,7 @@ func TestLimitAndSkipFetchTxsForAddr(t *testing.T) {
 
 	// Create and insert an address index for out test addr.
 	txLoc, _ := testBlock.TxLoc()
-	index := make(btcdb.BlockAddrIndex)
+	index := make(database.BlockAddrIndex)
 	for i := range testBlock.Transactions() {
 		var hash160 [ripemd160.Size]byte
 		scriptAddr := targetAddr.ScriptAddress()

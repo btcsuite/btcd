@@ -2,13 +2,13 @@
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
-package btcdb_test
+package database_test
 
 import (
 	"fmt"
 
-	"github.com/btcsuite/btcdb"
-	_ "github.com/btcsuite/btcdb/memdb"
+	"github.com/btcsuite/btcd/database"
+	_ "github.com/btcsuite/btcd/database/memdb"
 	"github.com/btcsuite/btcnet"
 	"github.com/btcsuite/btcutil"
 )
@@ -20,8 +20,8 @@ func ExampleCreateDB() {
 	// Ordinarily this would be whatever driver(s) your application
 	// requires.
 	// import (
-	//	"github.com/btcsuite/btcdb"
-	// 	_ "github.com/btcsuite/btcdb/memdb"
+	//	"github.com/btcsuite/btcd/database"
+	// 	_ "github.com/btcsuite/btcd/database/memdb"
 	// )
 
 	// Create a database and schedule it to be closed on exit.  This example
@@ -29,7 +29,7 @@ func ExampleCreateDB() {
 	// the disk.  Typically, you would specify a persistent database driver
 	// such as "leveldb" and give it a database name as the second
 	// parameter.
-	db, err := btcdb.CreateDB("memdb")
+	db, err := database.CreateDB("memdb")
 	if err != nil {
 		fmt.Println(err)
 		return
@@ -51,8 +51,8 @@ func ExampleCreateDB() {
 }
 
 // exampleLoadDB is used in the example to elide the setup code.
-func exampleLoadDB() (btcdb.Db, error) {
-	db, err := btcdb.CreateDB("memdb")
+func exampleLoadDB() (database.Db, error) {
+	db, err := database.CreateDB("memdb")
 	if err != nil {
 		return nil, err
 	}

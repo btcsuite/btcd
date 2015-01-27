@@ -2,13 +2,13 @@
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
-package btcdb_test
+package database_test
 
 import (
 	"fmt"
 	"testing"
 
-	"github.com/btcsuite/btcdb"
+	"github.com/btcsuite/btcd/database"
 )
 
 var (
@@ -21,7 +21,7 @@ var (
 
 // testNewestShaEmpty ensures that NewestSha returns the values expected by
 // the interface contract.
-func testNewestShaEmpty(t *testing.T, db btcdb.Db) {
+func testNewestShaEmpty(t *testing.T, db database.Db) {
 	sha, height, err := db.NewestSha()
 	if err != nil {
 		t.Errorf("NewestSha error %v", err)
@@ -37,7 +37,7 @@ func testNewestShaEmpty(t *testing.T, db btcdb.Db) {
 
 // TestEmptyDB tests that empty databases are handled properly.
 func TestEmptyDB(t *testing.T) {
-	for _, dbType := range btcdb.SupportedDBs() {
+	for _, dbType := range database.SupportedDBs() {
 		// Ensure NewestSha returns expected values for a newly created
 		// db.
 		db, teardown, err := createDB(dbType, "emptydb", false)
@@ -66,7 +66,7 @@ func TestEmptyDB(t *testing.T) {
 // TestAddDuplicateDriver ensures that adding a duplicate driver does not
 // overwrite an existing one.
 func TestAddDuplicateDriver(t *testing.T) {
-	supportedDBs := btcdb.SupportedDBs()
+	supportedDBs := database.SupportedDBs()
 	if len(supportedDBs) == 0 {
 		t.Errorf("TestAddDuplicateDriver: No backends to test")
 		return
@@ -77,7 +77,7 @@ func TestAddDuplicateDriver(t *testing.T) {
 	// driver function and intentionally returns a failure that can be
 	// detected if the interface allows a duplicate driver to overwrite an
 	// existing one.
-	bogusCreateDB := func(args ...interface{}) (btcdb.Db, error) {
+	bogusCreateDB := func(args ...interface{}) (database.Db, error) {
 		return nil, fmt.Errorf("duplicate driver allowed for database "+
 			"type [%v]", dbType)
 	}
@@ -85,12 +85,12 @@ func TestAddDuplicateDriver(t *testing.T) {
 	// Create a driver that tries to replace an existing one.  Set its
 	// create and open functions to a function that causes a test failure if
 	// they are invoked.
-	driver := btcdb.DriverDB{
+	driver := database.DriverDB{
 		DbType:   dbType,
 		CreateDB: bogusCreateDB,
 		OpenDB:   bogusCreateDB,
 	}
-	btcdb.AddDBDriver(driver)
+	database.AddDBDriver(driver)
 
 	// Ensure creating a database of the type that we tried to replace
 	// doesn't fail (if it does, it indicates the driver was erroneously
@@ -112,22 +112,22 @@ func TestCreateOpenFail(t *testing.T) {
 	dbType := "createopenfail"
 	openError := fmt.Errorf("failed to create or open database for "+
 		"database type [%v]", dbType)
-	bogusCreateDB := func(args ...interface{}) (btcdb.Db, error) {
+	bogusCreateDB := func(args ...interface{}) (database.Db, error) {
 		return nil, openError
 	}
 
 	// Create and add driver that intentionally fails when created or opened
 	// to ensure errors on database open and create are handled properly.
-	driver := btcdb.DriverDB{
+	driver := database.DriverDB{
 		DbType:   dbType,
 		CreateDB: bogusCreateDB,
 		OpenDB:   bogusCreateDB,
 	}
-	btcdb.AddDBDriver(driver)
+	database.AddDBDriver(driver)
 
 	// Ensure creating a database with the new type fails with the expected
 	// error.
-	_, err := btcdb.CreateDB(dbType, "createfailtest")
+	_, err := database.CreateDB(dbType, "createfailtest")
 	if err != openError {
 		t.Errorf("TestCreateOpenFail: expected error not received - "+
 			"got: %v, want %v", err, openError)
@@ -136,7 +136,7 @@ func TestCreateOpenFail(t *testing.T) {
 
 	// Ensure opening a database with the new type fails with the expected
 	// error.
-	_, err = btcdb.OpenDB(dbType, "openfailtest")
+	_, err = database.OpenDB(dbType, "openfailtest")
 	if err != openError {
 		t.Errorf("TestCreateOpenFail: expected error not received - "+
 			"got: %v, want %v", err, openError)
@@ -150,28 +150,28 @@ func TestCreateOpenUnsupported(t *testing.T) {
 	// Ensure creating a database with an unsupported type fails with the
 	// expected error.
 	dbType := "unsupported"
-	_, err := btcdb.CreateDB(dbType, "unsupportedcreatetest")
-	if err != btcdb.ErrDbUnknownType {
+	_, err := database.CreateDB(dbType, "unsupportedcreatetest")
+	if err != database.ErrDbUnknownType {
 		t.Errorf("TestCreateOpenUnsupported: expected error not "+
-			"received - got: %v, want %v", err, btcdb.ErrDbUnknownType)
+			"received - got: %v, want %v", err, database.ErrDbUnknownType)
 		return
 	}
 
 	// Ensure opening a database with the new type fails with the expected
 	// error.
-	_, err = btcdb.OpenDB(dbType, "unsupportedopentest")
-	if err != btcdb.ErrDbUnknownType {
+	_, err = database.OpenDB(dbType, "unsupportedopentest")
+	if err != database.ErrDbUnknownType {
 		t.Errorf("TestCreateOpenUnsupported: expected error not "+
-			"received - got: %v, want %v", err, btcdb.ErrDbUnknownType)
+			"received - got: %v, want %v", err, database.ErrDbUnknownType)
 		return
 	}
 }
 
-// TestInterface performs tests for the various interfaces of btcdb which
-// require state in the database for each supported database type (those loaded
-// in common_test.go that is).
+// TestInterface performs tests for the various interfaces of the database
+// package which require state in the database for each supported database
+// type (those loaded in common_test.go that is).
 func TestInterface(t *testing.T) {
-	for _, dbType := range btcdb.SupportedDBs() {
+	for _, dbType := range database.SupportedDBs() {
 		if _, exists := ignoreDbTypes[dbType]; !exists {
 			testInterface(t, dbType)
 		}

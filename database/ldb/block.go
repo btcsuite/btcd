@@ -8,7 +8,7 @@ import (
 	"bytes"
 	"encoding/binary"
 
-	"github.com/btcsuite/btcdb"
+	"github.com/btcsuite/btcd/database"
 	"github.com/btcsuite/btcutil"
 	"github.com/btcsuite/btcwire"
 	"github.com/btcsuite/goleveldb/leveldb"
@@ -40,7 +40,7 @@ func (db *LevelDb) fetchBlockBySha(sha *btcwire.ShaHash) (blk *btcutil.Block, er
 }
 
 // FetchBlockHeightBySha returns the block height for the given hash.  This is
-// part of the btcdb.Db interface implementation.
+// part of the database.Db interface implementation.
 func (db *LevelDb) FetchBlockHeightBySha(sha *btcwire.ShaHash) (int64, error) {
 	db.dbLock.Lock()
 	defer db.dbLock.Unlock()
@@ -77,7 +77,7 @@ func (db *LevelDb) getBlkLoc(sha *btcwire.ShaHash) (int64, error) {
 	data, err := db.lDb.Get(key, db.ro)
 	if err != nil {
 		if err == leveldb.ErrNotFound {
-			err = btcdb.ErrBlockShaMissing
+			err = database.ErrBlockShaMissing
 		}
 		return 0, err
 	}
@@ -151,7 +151,7 @@ func (db *LevelDb) insertBlockData(sha *btcwire.ShaHash, prevSha *btcwire.ShaHas
 	if err != nil {
 		// check current block count
 		// if count != 0  {
-		//	err = btcdb.PrevShaMissing
+		//	err = database.PrevShaMissing
 		//	return
 		// }
 		oBlkHeight = -1
@@ -206,7 +206,7 @@ func (db *LevelDb) blkExistsSha(sha *btcwire.ShaHash) (bool, error) {
 	switch err {
 	case nil:
 		return true, nil
-	case leveldb.ErrNotFound, btcdb.ErrBlockShaMissing:
+	case leveldb.ErrNotFound, database.ErrBlockShaMissing:
 		return false, nil
 	}
 	return false, err
@@ -247,7 +247,7 @@ func (db *LevelDb) FetchHeightRange(startHeight, endHeight int64) (rshalist []bt
 	defer db.dbLock.Unlock()
 
 	var endidx int64
-	if endHeight == btcdb.AllShas {
+	if endHeight == database.AllShas {
 		endidx = startHeight + 500
 	} else {
 		endidx = endHeight
@@ -302,7 +302,7 @@ func (db *LevelDb) fetchAddrIndexTip() (*btcwire.ShaHash, int64, error) {
 
 	data, err := db.lDb.Get(addrIndexMetaDataKey, db.ro)
 	if err != nil {
-		return &btcwire.ShaHash{}, -1, btcdb.ErrAddrIndexDoesNotExist
+		return &btcwire.ShaHash{}, -1, database.ErrAddrIndexDoesNotExist
 	}
 
 	var blkSha btcwire.ShaHash
@@ -322,7 +322,7 @@ func (db *LevelDb) FetchAddrIndexTip() (*btcwire.ShaHash, int64, error) {
 	defer db.dbLock.Unlock()
 
 	if db.lastAddrIndexBlkIdx == -1 {
-		return &btcwire.ShaHash{}, -1, btcdb.ErrAddrIndexDoesNotExist
+		return &btcwire.ShaHash{}, -1, database.ErrAddrIndexDoesNotExist
 	}
 	sha := db.lastAddrIndexBlkSha
 

@@ -10,7 +10,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/btcsuite/btcdb"
+	"github.com/btcsuite/btcd/database"
 	"github.com/btcsuite/btcutil"
 	"github.com/btcsuite/btcwire"
 )
@@ -22,7 +22,7 @@ func Test_dupTx(t *testing.T) {
 	dbnamever := dbname + ".ver"
 	_ = os.RemoveAll(dbname)
 	_ = os.RemoveAll(dbnamever)
-	db, err := btcdb.CreateDB("leveldb", dbname)
+	db, err := database.CreateDB("leveldb", dbname)
 	if err != nil {
 		t.Errorf("Failed to open test database %v", err)
 		return
@@ -154,7 +154,7 @@ out:
 
 	listReply = db.FetchUnSpentTxByShaList(fetchList)
 	for _, lr := range listReply {
-		if lr.Err != btcdb.ErrTxShaMissing {
+		if lr.Err != database.ErrTxShaMissing {
 			t.Errorf("sha %v spent %v err %v\n", lr.Sha,
 				lr.TxSpent, lr.Err)
 		}

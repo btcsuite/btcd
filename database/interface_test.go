@@ -2,13 +2,13 @@
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
-package btcdb_test
+package database_test
 
 import (
 	"reflect"
 	"testing"
 
-	"github.com/btcsuite/btcdb"
+	"github.com/btcsuite/btcd/database"
 	"github.com/btcsuite/btcutil"
 	"github.com/btcsuite/btcwire"
 	"github.com/davecgh/go-spew/spew"
@@ -25,7 +25,7 @@ import (
 type testContext struct {
 	t           *testing.T
 	dbType      string
-	db          btcdb.Db
+	db          database.Db
 	blockHeight int64
 	blockHash   *btcwire.ShaHash
 	block       *btcutil.Block
@@ -523,8 +523,8 @@ func testIntegrity(tc *testContext) bool {
 	return true
 }
 
-// testInterface tests performs tests for the various interfaces of btcdb which
-// require state in the database for the given database type.
+// testInterface tests performs tests for the various interfaces of the database
+// package which require state in the database for the given database type.
 func testInterface(t *testing.T, dbType string) {
 	db, teardown, err := setupDB(dbType, "interface")
 	if err != nil {

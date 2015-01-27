@@ -8,8 +8,8 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/btcsuite/btcdb"
-	"github.com/btcsuite/btcdb/memdb"
+	"github.com/btcsuite/btcd/database"
+	"github.com/btcsuite/btcd/database/memdb"
 	"github.com/btcsuite/btcnet"
 	"github.com/btcsuite/btcutil"
 	"github.com/btcsuite/btcwire"
@@ -20,7 +20,7 @@ import (
 // and does not panic or otherwise misbehave for functions which do not return
 // errors.
 func TestClosed(t *testing.T) {
-	db, err := btcdb.CreateDB("memdb")
+	db, err := database.CreateDB("memdb")
 	if err != nil {
 		t.Errorf("Failed to open test database %v", err)
 		return
@@ -74,7 +74,7 @@ func TestClosed(t *testing.T) {
 			"got: %d, want: %d", len(reply), len(requestHashes))
 	}
 	for i, txLR := range reply {
-		wantReply := &btcdb.TxListReply{
+		wantReply := &database.TxListReply{
 			Sha: requestHashes[i],
 			Err: memdb.ErrDbClosed,
 		}
@@ -90,7 +90,7 @@ func TestClosed(t *testing.T) {
 			"got: %d, want: %d", len(reply), len(requestHashes))
 	}
 	for i, txLR := range reply {
-		wantReply := &btcdb.TxListReply{
+		wantReply := &database.TxListReply{
 			Sha: requestHashes[i],
 			Err: memdb.ErrDbClosed,
 		}

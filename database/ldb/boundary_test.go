@@ -8,7 +8,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/btcsuite/btcdb"
+	"github.com/btcsuite/btcd/database"
 	"github.com/btcsuite/btcwire"
 )
 
@@ -21,7 +21,7 @@ func TestEmptyDB(t *testing.T) {
 	dbnamever := dbname + ".ver"
 	_ = os.RemoveAll(dbname)
 	_ = os.RemoveAll(dbnamever)
-	db, err := btcdb.CreateDB("leveldb", dbname)
+	db, err := database.CreateDB("leveldb", dbname)
 	if err != nil {
 		t.Errorf("Failed to open test database %v", err)
 		return
@@ -42,7 +42,7 @@ func TestEmptyDB(t *testing.T) {
 		t.Errorf("Close: unexpected error: %v", err)
 	}
 
-	db, err = btcdb.OpenDB("leveldb", dbname)
+	db, err = database.OpenDB("leveldb", dbname)
 	if err != nil {
 		t.Errorf("Failed to open test database %v", err)
 		return

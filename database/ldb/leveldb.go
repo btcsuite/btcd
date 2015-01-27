@@ -11,7 +11,7 @@ import (
 	"strconv"
 	"sync"
 
-	"github.com/btcsuite/btcdb"
+	"github.com/btcsuite/btcd/database"
 	"github.com/btcsuite/btclog"
 	"github.com/btcsuite/btcutil"
 	"github.com/btcsuite/btcwire"
@@ -60,13 +60,13 @@ type LevelDb struct {
 	txSpentUpdateMap map[btcwire.ShaHash]*spentTxUpdate
 }
 
-var self = btcdb.DriverDB{DbType: "leveldb", CreateDB: CreateDB, OpenDB: OpenDB}
+var self = database.DriverDB{DbType: "leveldb", CreateDB: CreateDB, OpenDB: OpenDB}
 
 func init() {
-	btcdb.AddDBDriver(self)
+	database.AddDBDriver(self)
 }
 
-// parseArgs parses the arguments from the btcdb Open/Create methods.
+// parseArgs parses the arguments from the database package Open/Create methods.
 func parseArgs(funcName string, args ...interface{}) (string, error) {
 	if len(args) != 1 {
 		return "", fmt.Errorf("Invalid arguments to ldb.%s -- "+
@@ -81,13 +81,13 @@ func parseArgs(funcName string, args ...interface{}) (string, error) {
 }
 
 // OpenDB opens an existing database for use.
-func OpenDB(args ...interface{}) (btcdb.Db, error) {
+func OpenDB(args ...interface{}) (database.Db, error) {
 	dbpath, err := parseArgs("OpenDB", args...)
 	if err != nil {
 		return nil, err
 	}
 
-	log = btcdb.GetLog()
+	log = database.GetLog()
 
 	db, err := openDB(dbpath, false)
 	if err != nil {
@@ -159,7 +159,7 @@ blocknarrow:
 // CurrentDBVersion is the database version.
 var CurrentDBVersion int32 = 1
 
-func openDB(dbpath string, create bool) (pbdb btcdb.Db, err error) {
+func openDB(dbpath string, create bool) (pbdb database.Db, err error) {
 	var db LevelDb
 	var tlDb *leveldb.DB
 	var dbversion int32
@@ -184,7 +184,7 @@ func openDB(dbpath string, create bool) (pbdb btcdb.Db, err error) {
 	} else {
 		_, err = os.Stat(dbpath)
 		if err != nil {
-			err = btcdb.ErrDbDoesNotExist
+			err = database.ErrDbDoesNotExist
 			return
 		}
 	}
@@ -247,13 +247,13 @@ func openDB(dbpath string, create bool) (pbdb btcdb.Db, err error) {
 }
 
 // CreateDB creates, initializes and opens a database for use.
-func CreateDB(args ...interface{}) (btcdb.Db, error) {
+func CreateDB(args ...interface{}) (database.Db, error) {
 	dbpath, err := parseArgs("Create", args...)
 	if err != nil {
 		return nil, err
 	}
 
-	log = btcdb.GetLog()
+	log = database.GetLog()
 
 	// No special setup needed, just OpenBB
 	db, err := openDB(dbpath, true)
@@ -694,7 +694,7 @@ func (db *LevelDb) processBatches() error {
 	return nil
 }
 
-// RollbackClose this is part of the btcdb.Db interface and should discard
+// RollbackClose this is part of the database.Db interface and should discard
 // recent changes to the db and the close the db.  This currently just does
 // a clean shutdown.
 func (db *LevelDb) RollbackClose() error {

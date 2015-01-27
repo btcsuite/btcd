@@ -3,7 +3,7 @@
 // license that can be found in the LICENSE file.
 
 /*
-Package ldb implements an instance of btcdb backed by leveldb.
+Package ldb implements an instance of the database package backed by leveldb.
 
 Database version number is stored in a flat file <dbname>.ver
 Currently a single (littlendian) integer in the file. If there is

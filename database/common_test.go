@@ -2,7 +2,7 @@
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
-package btcdb_test
+package database_test
 
 import (
 	"compress/bzip2"
@@ -14,9 +14,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/btcsuite/btcdb"
-	_ "github.com/btcsuite/btcdb/ldb"
-	_ "github.com/btcsuite/btcdb/memdb"
+	"github.com/btcsuite/btcd/database"
+	_ "github.com/btcsuite/btcd/database/ldb"
+	_ "github.com/btcsuite/btcd/database/memdb"
 	"github.com/btcsuite/btcnet"
 	"github.com/btcsuite/btcutil"
 	"github.com/btcsuite/btcwire"
@@ -53,10 +53,10 @@ func fileExists(name string) bool {
 
 // openDB is used to open an existing database based on the database type and
 // name.
-func openDB(dbType, dbName string) (btcdb.Db, error) {
+func openDB(dbType, dbName string) (database.Db, error) {
 	// Handle memdb specially since it has no files on disk.
 	if dbType == "memdb" {
-		db, err := btcdb.OpenDB(dbType)
+		db, err := database.OpenDB(dbType)
 		if err != nil {
 			return nil, fmt.Errorf("error opening db: %v", err)
 		}
@@ -64,7 +64,7 @@ func openDB(dbType, dbName string) (btcdb.Db, error) {
 	}
 
 	dbPath := filepath.Join(testDbRoot, dbName)
-	db, err := btcdb.OpenDB(dbType, dbPath)
+	db, err := database.OpenDB(dbType, dbPath)
 	if err != nil {
 		return nil, fmt.Errorf("error opening db: %v", err)
 	}
@@ -76,11 +76,11 @@ func openDB(dbType, dbName string) (btcdb.Db, error) {
 // should invoke when done testing to clean up.  The close flag indicates
 // whether or not the teardown function should sync and close the database
 // during teardown.
-func createDB(dbType, dbName string, close bool) (btcdb.Db, func(), error) {
+func createDB(dbType, dbName string, close bool) (database.Db, func(), error) {
 	// Handle memory database specially since it doesn't need the disk
 	// specific handling.
 	if dbType == "memdb" {
-		db, err := btcdb.CreateDB(dbType)
+		db, err := database.CreateDB(dbType)
 		if err != nil {
 			return nil, nil, fmt.Errorf("error creating db: %v", err)
 		}
@@ -108,7 +108,7 @@ func createDB(dbType, dbName string, close bool) (btcdb.Db, func(), error) {
 	// Create a new database to store the accepted blocks into.
 	dbPath := filepath.Join(testDbRoot, dbName)
 	_ = os.RemoveAll(dbPath)
-	db, err := btcdb.CreateDB(dbType, dbPath)
+	db, err := database.CreateDB(dbType, dbPath)
 	if err != nil {
 		return nil, nil, fmt.Errorf("error creating db: %v", err)
 	}
@@ -132,7 +132,7 @@ func createDB(dbType, dbName string, close bool) (btcdb.Db, func(), error) {
 // setupDB is used to create a new db instance with the genesis block already
 // inserted.  In addition to the new db instance, it returns a teardown function
 // the caller should invoke when done testing to clean up.
-func setupDB(dbType, dbName string) (btcdb.Db, func(), error) {
+func setupDB(dbType, dbName string) (database.Db, func(), error) {
 	db, teardown, err := createDB(dbType, dbName, true)
 	if err != nil {
 		return nil, nil, err
