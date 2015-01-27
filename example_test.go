@@ -9,8 +9,8 @@ import (
 	"math/big"
 
 	"github.com/btcsuite/btcchain"
-	"github.com/btcsuite/btcdb"
-	_ "github.com/btcsuite/btcdb/memdb"
+	"github.com/btcsuite/btcd/database"
+	_ "github.com/btcsuite/btcd/database/memdb"
 	"github.com/btcsuite/btcnet"
 	"github.com/btcsuite/btcutil"
 )
@@ -25,7 +25,7 @@ func ExampleBlockChain_ProcessBlock() {
 	// this would be opening an existing database and would not use memdb
 	// which is a memory-only database backend, but we create a new db
 	// here so this is a complete working example.
-	db, err := btcdb.CreateDB("memdb")
+	db, err := database.CreateDB("memdb")
 	if err != nil {
 		fmt.Printf("Failed to create database: %v\n", err)
 		return

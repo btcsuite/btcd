@@ -13,7 +13,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/btcsuite/btcdb"
+	"github.com/btcsuite/btcd/database"
 	"github.com/btcsuite/btcnet"
 	"github.com/btcsuite/btcutil"
 	"github.com/btcsuite/btcwire"
@@ -142,7 +142,7 @@ func removeChildNode(children []*blockNode, node *blockNode) []*blockNode {
 // follow all rules, orphan handling, checkpoint handling, and best chain
 // selection with reorganization.
 type BlockChain struct {
-	db                  btcdb.Db
+	db                  database.Db
 	netParams           *btcnet.Params
 	checkpointsByHeight map[int64]*btcnet.Checkpoint
 	notifications       NotificationCallback
@@ -1069,7 +1069,7 @@ func (b *BlockChain) IsCurrent(timeSource MedianTimeSource) bool {
 // Notification and NotificationType for details on the types and contents of
 // notifications.  The provided callback can be nil if the caller is not
 // interested in receiving notifications.
-func New(db btcdb.Db, params *btcnet.Params, c NotificationCallback) *BlockChain {
+func New(db database.Db, params *btcnet.Params, c NotificationCallback) *BlockChain {
 	// Generate a checkpoint by height map from the provided checkpoints.
 	var checkpointsByHeight map[int64]*btcnet.Checkpoint
 	if len(params.Checkpoints) > 0 {

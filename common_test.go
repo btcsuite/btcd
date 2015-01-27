@@ -14,9 +14,9 @@ import (
 	"strings"
 
 	"github.com/btcsuite/btcchain"
-	"github.com/btcsuite/btcdb"
-	_ "github.com/btcsuite/btcdb/ldb"
-	_ "github.com/btcsuite/btcdb/memdb"
+	"github.com/btcsuite/btcd/database"
+	_ "github.com/btcsuite/btcd/database/ldb"
+	_ "github.com/btcsuite/btcd/database/memdb"
 	"github.com/btcsuite/btcnet"
 	"github.com/btcsuite/btcutil"
 	"github.com/btcsuite/btcwire"
@@ -41,7 +41,7 @@ func fileExists(name string) bool {
 // isSupportedDbType returns whether or not the passed database type is
 // currently supported.
 func isSupportedDbType(dbType string) bool {
-	supportedDBs := btcdb.SupportedDBs()
+	supportedDBs := database.SupportedDBs()
 	for _, sDbType := range supportedDBs {
 		if dbType == sDbType {
 			return true
@@ -61,10 +61,10 @@ func chainSetup(dbName string) (*btcchain.BlockChain, func(), error) {
 
 	// Handle memory database specially since it doesn't need the disk
 	// specific handling.
-	var db btcdb.Db
+	var db database.Db
 	var teardown func()
 	if testDbType == "memdb" {
-		ndb, err := btcdb.CreateDB(testDbType)
+		ndb, err := database.CreateDB(testDbType)
 		if err != nil {
 			return nil, nil, fmt.Errorf("error creating db: %v", err)
 		}
@@ -88,7 +88,7 @@ func chainSetup(dbName string) (*btcchain.BlockChain, func(), error) {
 		// Create a new database to store the accepted blocks into.
 		dbPath := filepath.Join(testDbRoot, dbName)
 		_ = os.RemoveAll(dbPath)
-		ndb, err := btcdb.CreateDB(testDbType, dbPath)
+		ndb, err := database.CreateDB(testDbType, dbPath)
 		if err != nil {
 			return nil, nil, fmt.Errorf("error creating db: %v", err)
 		}

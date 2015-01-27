@@ -7,7 +7,7 @@ package btcchain
 import (
 	"fmt"
 
-	"github.com/btcsuite/btcdb"
+	"github.com/btcsuite/btcd/database"
 	"github.com/btcsuite/btcutil"
 	"github.com/btcsuite/btcwire"
 )
@@ -77,7 +77,7 @@ func disconnectTransactions(txStore TxStore, block *btcutil.Block) error {
 			txD.Tx = nil
 			txD.BlockHeight = 0
 			txD.Spent = nil
-			txD.Err = btcdb.ErrTxShaMissing
+			txD.Err = database.ErrTxShaMissing
 		}
 
 		// Unspend the origin transaction output.
@@ -101,7 +101,7 @@ func disconnectTransactions(txStore TxStore, block *btcutil.Block) error {
 // transactions from the point of view of the end of the main chain.  It takes
 // a flag which specifies whether or not fully spent transaction should be
 // included in the results.
-func fetchTxStoreMain(db btcdb.Db, txSet map[btcwire.ShaHash]struct{}, includeSpent bool) TxStore {
+func fetchTxStoreMain(db database.Db, txSet map[btcwire.ShaHash]struct{}, includeSpent bool) TxStore {
 	// Just return an empty store now if there are no requested hashes.
 	txStore := make(TxStore)
 	if len(txSet) == 0 {
@@ -114,7 +114,7 @@ func fetchTxStoreMain(db btcdb.Db, txSet map[btcwire.ShaHash]struct{}, includeSp
 	txList := make([]*btcwire.ShaHash, 0, len(txSet))
 	for hash := range txSet {
 		hashCopy := hash
-		txStore[hash] = &TxData{Hash: &hashCopy, Err: btcdb.ErrTxShaMissing}
+		txStore[hash] = &TxData{Hash: &hashCopy, Err: database.ErrTxShaMissing}
 		txList = append(txList, &hashCopy)
 	}
 
@@ -253,7 +253,7 @@ func (b *BlockChain) fetchInputTransactions(node *blockNode, block *btcutil.Bloc
 			// Add an entry to the transaction store for the needed
 			// transaction with it set to missing by default.
 			originHash := &txIn.PreviousOutPoint.Hash
-			txD := &TxData{Hash: originHash, Err: btcdb.ErrTxShaMissing}
+			txD := &TxData{Hash: originHash, Err: database.ErrTxShaMissing}
 			txStore[*originHash] = txD
 
 			// It is acceptable for a transaction input to reference
