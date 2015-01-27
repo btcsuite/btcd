@@ -11,8 +11,8 @@ import (
 	"path/filepath"
 	"strconv"
 
-	"github.com/btcsuite/btcdb"
-	_ "github.com/btcsuite/btcdb/ldb"
+	"github.com/btcsuite/btcd/database"
+	_ "github.com/btcsuite/btcd/database/ldb"
 	"github.com/btcsuite/btclog"
 	"github.com/btcsuite/btcnet"
 	"github.com/btcsuite/btcutil"
@@ -78,7 +78,7 @@ func main() {
 	backendLogger := btclog.NewDefaultBackendLogger()
 	defer backendLogger.Flush()
 	log = btclog.NewSubsystemLogger(backendLogger, "")
-	btcdb.UseLogger(log)
+	database.UseLogger(log)
 
 	// Multiple networks can't be selected simultaneously.
 	funcName := "main"
@@ -115,7 +115,7 @@ func main() {
 	dbPath := filepath.Join(cfg.DataDir, dbName)
 
 	log.Infof("loading db")
-	db, err := btcdb.OpenDB(cfg.DbType, dbPath)
+	db, err := database.OpenDB(cfg.DbType, dbPath)
 	if err != nil {
 		log.Warnf("db open failed: %v", err)
 		return
@@ -139,7 +139,7 @@ func main() {
 
 }
 
-func getSha(db btcdb.Db, str string) (btcwire.ShaHash, error) {
+func getSha(db database.Db, str string) (btcwire.ShaHash, error) {
 	argtype, idx, sha, err := parsesha(str)
 	if err != nil {
 		log.Warnf("unable to decode [%v] %v", str, err)

@@ -10,8 +10,8 @@ import (
 	"path/filepath"
 
 	"github.com/btcsuite/btcchain"
-	"github.com/btcsuite/btcdb"
-	_ "github.com/btcsuite/btcdb/ldb"
+	"github.com/btcsuite/btcd/database"
+	_ "github.com/btcsuite/btcd/database/ldb"
 	"github.com/btcsuite/btcnet"
 	"github.com/btcsuite/btcwire"
 )
@@ -23,7 +23,7 @@ var (
 )
 
 // loadBlockDB opens the block database and returns a handle to it.
-func loadBlockDB() (btcdb.Db, error) {
+func loadBlockDB() (database.Db, error) {
 	// The database name is based on the database type.
 	dbType := cfg.DbType
 	dbName := blockDbNamePrefix + "_" + dbType
@@ -32,7 +32,7 @@ func loadBlockDB() (btcdb.Db, error) {
 	}
 	dbPath := filepath.Join(cfg.DataDir, dbName)
 	fmt.Printf("Loading block database from '%s'\n", dbPath)
-	db, err := btcdb.OpenDB(dbType, dbPath)
+	db, err := database.OpenDB(dbType, dbPath)
 	if err != nil {
 		return nil, err
 	}
@@ -44,7 +44,7 @@ func loadBlockDB() (btcdb.Db, error) {
 // candidates at the last checkpoint that is already hard coded into btcchain
 // since there is no point in finding candidates before already existing
 // checkpoints.
-func findCandidates(db btcdb.Db, latestHash *btcwire.ShaHash) ([]*btcnet.Checkpoint, error) {
+func findCandidates(db database.Db, latestHash *btcwire.ShaHash) ([]*btcnet.Checkpoint, error) {
 	// Start with the latest block of the main chain.
 	block, err := db.FetchBlockBySha(latestHash)
 	if err != nil {

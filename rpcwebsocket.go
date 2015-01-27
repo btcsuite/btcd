@@ -19,7 +19,7 @@ import (
 
 	"golang.org/x/crypto/ripemd160"
 
-	"github.com/btcsuite/btcdb"
+	"github.com/btcsuite/btcd/database"
 	"github.com/btcsuite/btcjson"
 	"github.com/btcsuite/btcscript"
 	"github.com/btcsuite/btcutil"
@@ -1607,7 +1607,7 @@ func rescanBlock(wsc *wsClient, lookups *rescanKeys, blk *btcutil.Block) {
 // verifies that the new range of blocks is on the same fork as a previous
 // range of blocks.  If this condition does not hold true, the JSON-RPC error
 // for an unrecoverable reorganize is returned.
-func recoverFromReorg(db btcdb.Db, minBlock, maxBlock int64,
+func recoverFromReorg(db database.Db, minBlock, maxBlock int64,
 	lastBlock *btcutil.Block) ([]btcwire.ShaHash, *btcjson.Error) {
 
 	hashList, err := db.FetchHeightRange(minBlock, maxBlock)
@@ -1753,7 +1753,7 @@ func handleRescan(wsc *wsClient, icmd btcjson.Cmd) (interface{}, *btcjson.Error)
 		return nil, &btcjson.ErrBlockNotFound
 	}
 
-	maxBlock := btcdb.AllShas
+	maxBlock := database.AllShas
 	if cmd.EndBlock != "" {
 		maxBlockSha, err := btcwire.NewShaHashFromStr(cmd.EndBlock)
 		if err != nil {
@@ -1791,7 +1791,7 @@ fetchRange:
 			if err != nil {
 				// Only handle reorgs if a block could not be
 				// found for the hash.
-				if err != btcdb.ErrBlockShaMissing {
+				if err != database.ErrBlockShaMissing {
 					rpcsLog.Errorf("Error looking up "+
 						"block: %v", err)
 					return nil, &btcjson.ErrDatabase
@@ -1799,7 +1799,7 @@ fetchRange:
 
 				// If an absolute max block was specified, don't
 				// attempt to handle the reorg.
-				if maxBlock != btcdb.AllShas {
+				if maxBlock != database.AllShas {
 					rpcsLog.Errorf("Stopping rescan for "+
 						"reorged block %v",
 						cmd.EndBlock)

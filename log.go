@@ -13,7 +13,7 @@ import (
 	"github.com/btcsuite/btcd/addrmgr"
 
 	"github.com/btcsuite/btcchain"
-	"github.com/btcsuite/btcdb"
+	"github.com/btcsuite/btcd/database"
 	"github.com/btcsuite/btclog"
 	"github.com/btcsuite/btcscript"
 	"github.com/btcsuite/btcwire"
@@ -100,7 +100,7 @@ func useLogger(subsystemID string, logger btclog.Logger) {
 
 	case "BCDB":
 		bcdbLog = logger
-		btcdb.UseLogger(logger)
+		database.UseLogger(logger)
 
 	case "BMGR":
 		bmgrLog = logger

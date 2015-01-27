@@ -202,8 +202,8 @@ information.
     * [btcscript](https://github.com/btcsuite/btcscript) - Implements the
 	  Bitcoin transaction scripting language
     * [btcec](https://github.com/btcsuite/btcec) - Implements support for the
-	  elliptic curve cryptographic functions needed for the Bitcoin scripts
-    * [btcdb](https://github.com/btcsuite/btcdb) - Provides a database interface
-	  for the Bitcoin block chain
+    * [database](https://github.com/btcsuite/btcd/tree/master/database) -
+	  Provides a database interface elliptic curve cryptographic functions
+	  needed for the Bitcoin scripts for the Bitcoin block chain
     * [btcutil](https://github.com/btcsuite/btcutil) - Provides Bitcoin-specific
 	  convenience functions and types

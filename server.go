@@ -21,7 +21,7 @@ import (
 
 	"github.com/btcsuite/btcchain"
 	"github.com/btcsuite/btcd/addrmgr"
-	"github.com/btcsuite/btcdb"
+	"github.com/btcsuite/btcd/database"
 	"github.com/btcsuite/btcjson"
 	"github.com/btcsuite/btcnet"
 	"github.com/btcsuite/btcwire"
@@ -90,7 +90,7 @@ type server struct {
 	wg                   sync.WaitGroup
 	quit                 chan struct{}
 	nat                  NAT
-	db                   btcdb.Db
+	db                   database.Db
 	timeSource           btcchain.MedianTimeSource
 }
 
@@ -1083,7 +1083,7 @@ out:
 // newServer returns a new btcd server configured to listen on addr for the
 // bitcoin network type specified by netParams.  Use start to begin accepting
 // connections from peers.
-func newServer(listenAddrs []string, db btcdb.Db, netParams *btcnet.Params) (*server, error) {
+func newServer(listenAddrs []string, db database.Db, netParams *btcnet.Params) (*server, error) {
 	nonce, err := btcwire.RandomUint64()
 	if err != nil {
 		return nil, err

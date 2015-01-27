@@ -11,7 +11,7 @@ import (
 	"time"
 
 	"github.com/btcsuite/btcchain"
-	"github.com/btcsuite/btcdb"
+	"github.com/btcsuite/btcd/database"
 	"github.com/btcsuite/btcscript"
 	"github.com/btcsuite/btcutil"
 	"github.com/btcsuite/btcwire"
@@ -188,8 +188,8 @@ func minInt(a, b int) int {
 func mergeTxStore(txStoreA btcchain.TxStore, txStoreB btcchain.TxStore) {
 	for hash, txDataB := range txStoreB {
 		if txDataA, exists := txStoreA[hash]; !exists ||
-			(txDataA.Err == btcdb.ErrTxShaMissing && txDataB.Err !=
-				btcdb.ErrTxShaMissing) {
+			(txDataA.Err == database.ErrTxShaMissing &&
+				txDataB.Err != database.ErrTxShaMissing) {
 
 			txStoreA[hash] = txDataB
 		}

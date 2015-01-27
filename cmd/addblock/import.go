@@ -12,8 +12,8 @@ import (
 	"time"
 
 	"github.com/btcsuite/btcchain"
-	"github.com/btcsuite/btcdb"
-	_ "github.com/btcsuite/btcdb/ldb"
+	"github.com/btcsuite/btcd/database"
+	_ "github.com/btcsuite/btcd/database/ldb"
 	"github.com/btcsuite/btcutil"
 	"github.com/btcsuite/btcwire"
 )
@@ -30,7 +30,7 @@ type importResults struct {
 // blockImporter houses information about an ongoing import from a block data
 // file to the block database.
 type blockImporter struct {
-	db                btcdb.Db
+	db                database.Db
 	chain             *btcchain.BlockChain
 	medianTime        btcchain.MedianTimeSource
 	r                 io.ReadSeeker
@@ -299,7 +299,7 @@ func (bi *blockImporter) Import() chan *importResults {
 
 // newBlockImporter returns a new importer for the provided file reader seeker
 // and database.
-func newBlockImporter(db btcdb.Db, r io.ReadSeeker) *blockImporter {
+func newBlockImporter(db database.Db, r io.ReadSeeker) *blockImporter {
 	return &blockImporter{
 		db:           db,
 		r:            r,

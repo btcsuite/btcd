@@ -27,7 +27,7 @@ import (
 	"time"
 
 	"github.com/btcsuite/btcchain"
-	"github.com/btcsuite/btcdb"
+	"github.com/btcsuite/btcd/database"
 	"github.com/btcsuite/btcec"
 	"github.com/btcsuite/btcjson"
 	"github.com/btcsuite/btcnet"
@@ -3068,7 +3068,7 @@ func handleSubmitBlock(s *rpcServer, cmd btcjson.Cmd, closeChan <-chan struct{})
 	return nil, nil
 }
 
-func verifyChain(db btcdb.Db, level, depth int32, timeSource btcchain.MedianTimeSource) error {
+func verifyChain(db database.Db, level, depth int32, timeSource btcchain.MedianTimeSource) error {
 	_, curHeight64, err := db.NewestSha()
 	if err != nil {
 		rpcsLog.Errorf("Verify is unable to fetch current block "+

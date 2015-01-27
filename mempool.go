@@ -14,7 +14,7 @@ import (
 	"time"
 
 	"github.com/btcsuite/btcchain"
-	"github.com/btcsuite/btcdb"
+	"github.com/btcsuite/btcd/database"
 	"github.com/btcsuite/btcscript"
 	"github.com/btcsuite/btcutil"
 	"github.com/btcsuite/btcwire"
@@ -764,7 +764,7 @@ func (mp *txMemPool) fetchInputTransactions(tx *btcutil.Tx) (btcchain.TxStore, e
 
 	// Attempt to populate any missing inputs from the transaction pool.
 	for _, txD := range txStore {
-		if txD.Err == btcdb.ErrTxShaMissing || txD.Tx == nil {
+		if txD.Err == database.ErrTxShaMissing || txD.Tx == nil {
 			if poolTxDesc, exists := mp.pool[*txD.Hash]; exists {
 				poolTx := poolTxDesc.Tx
 				txD.Tx = poolTx
@@ -911,7 +911,7 @@ func (mp *txMemPool) maybeAcceptTransaction(tx *btcutil.Tx, isNew, rateLimit boo
 	// behavior is desired.
 	var missingParents []*btcwire.ShaHash
 	for _, txD := range txStore {
-		if txD.Err == btcdb.ErrTxShaMissing {
+		if txD.Err == database.ErrTxShaMissing {
 			missingParents = append(missingParents, txD.Hash)
 		}
 	}

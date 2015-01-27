@@ -9,8 +9,8 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/btcsuite/btcdb"
-	_ "github.com/btcsuite/btcdb/ldb"
+	"github.com/btcsuite/btcd/database"
+	_ "github.com/btcsuite/btcd/database/ldb"
 	"github.com/btcsuite/btcnet"
 	"github.com/btcsuite/btcutil"
 	"github.com/btcsuite/btcwire"
@@ -26,7 +26,7 @@ const (
 var (
 	btcdHomeDir     = btcutil.AppDataDir("btcd", false)
 	defaultDataDir  = filepath.Join(btcdHomeDir, "data")
-	knownDbTypes    = btcdb.SupportedDBs()
+	knownDbTypes    = database.SupportedDBs()
 	activeNetParams = &btcnet.MainNetParams
 )
 

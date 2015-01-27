@@ -16,9 +16,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/btcsuite/btcdb"
-	_ "github.com/btcsuite/btcdb/ldb"
-	_ "github.com/btcsuite/btcdb/memdb"
+	"github.com/btcsuite/btcd/database"
+	_ "github.com/btcsuite/btcd/database/ldb"
+	_ "github.com/btcsuite/btcd/database/memdb"
 	"github.com/btcsuite/btcutil"
 	"github.com/btcsuite/btcwire"
 	flags "github.com/btcsuite/go-flags"
@@ -50,7 +50,7 @@ var (
 	btcdHomeDir        = btcutil.AppDataDir("btcd", false)
 	defaultConfigFile  = filepath.Join(btcdHomeDir, defaultConfigFilename)
 	defaultDataDir     = filepath.Join(btcdHomeDir, defaultDataDirname)
-	knownDbTypes       = btcdb.SupportedDBs()
+	knownDbTypes       = database.SupportedDBs()
 	defaultRPCKeyFile  = filepath.Join(btcdHomeDir, "rpc.key")
 	defaultRPCCertFile = filepath.Join(btcdHomeDir, "rpc.cert")
 	defaultLogDir      = filepath.Join(btcdHomeDir, defaultLogDirname)

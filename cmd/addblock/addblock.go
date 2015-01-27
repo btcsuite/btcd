@@ -10,9 +10,9 @@ import (
 	"runtime"
 
 	"github.com/btcsuite/btcchain"
+	"github.com/btcsuite/btcd/database"
+	_ "github.com/btcsuite/btcd/database/ldb"
 	"github.com/btcsuite/btcd/limits"
-	"github.com/btcsuite/btcdb"
-	_ "github.com/btcsuite/btcdb/ldb"
 	"github.com/btcsuite/btclog"
 )
 
@@ -27,7 +27,7 @@ var (
 )
 
 // loadBlockDB opens the block database and returns a handle to it.
-func loadBlockDB() (btcdb.Db, error) {
+func loadBlockDB() (database.Db, error) {
 	// The database name is based on the database type.
 	dbName := blockDbNamePrefix + "_" + cfg.DbType
 	if cfg.DbType == "sqlite" {
@@ -36,11 +36,11 @@ func loadBlockDB() (btcdb.Db, error) {
 	dbPath := filepath.Join(cfg.DataDir, dbName)
 
 	log.Infof("Loading block database from '%s'", dbPath)
-	db, err := btcdb.OpenDB(cfg.DbType, dbPath)
+	db, err := database.OpenDB(cfg.DbType, dbPath)
 	if err != nil {
 		// Return the error if it's not because the database doesn't
 		// exist.
-		if err != btcdb.ErrDbDoesNotExist {
+		if err != database.ErrDbDoesNotExist {
 			return nil, err
 		}
 
@@ -49,7 +49,7 @@ func loadBlockDB() (btcdb.Db, error) {
 		if err != nil {
 			return nil, err
 		}
-		db, err = btcdb.CreateDB(cfg.DbType, dbPath)
+		db, err = database.CreateDB(cfg.DbType, dbPath)
 		if err != nil {
 			return nil, err
 		}
@@ -80,7 +80,7 @@ func realMain() error {
 	backendLogger := btclog.NewDefaultBackendLogger()
 	defer backendLogger.Flush()
 	log = btclog.NewSubsystemLogger(backendLogger, "")
-	btcdb.UseLogger(btclog.NewSubsystemLogger(backendLogger, "BCDB: "))
+	database.UseLogger(btclog.NewSubsystemLogger(backendLogger, "BCDB: "))
 	btcchain.UseLogger(btclog.NewSubsystemLogger(backendLogger, "CHAN: "))
 
 	// Load the block database.

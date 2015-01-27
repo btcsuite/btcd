@@ -8,7 +8,6 @@ import (
 	"bytes"
 	"compress/bzip2"
 	"encoding/binary"
-	"fmt"
 	"io"
 	"os"
 	"path/filepath"
@@ -36,9 +35,8 @@ type testDb struct {
 	cleanUpFunc func()
 }
 
-func setUpTestDb(t *testing.T) (*testDb, error) {
+func setUpTestDb(t *testing.T, dbname string) (*testDb, error) {
 	// Ignore db remove errors since it means we didn't have an old one.
-	dbname := fmt.Sprintf("tstdbop1")
 	dbnamever := dbname + ".ver"
 	_ = os.RemoveAll(dbname)
 	_ = os.RemoveAll(dbnamever)
@@ -160,7 +158,7 @@ func testAddrIndexOperations(t *testing.T, db database.Db, newestBlock *btcutil.
 	db.Close()
 
 	// Re-Open, tip still should be updated to current height and sha.
-	db, err = database.OpenDB("leveldb", "tstdbop1")
+	db, err = database.OpenDB("leveldb", "tstdbopmode")
 	if err != nil {
 		t.Fatalf("Unable to re-open created db, err %v", err)
 	}
@@ -209,12 +207,12 @@ func testOperationalMode(t *testing.T) {
 	// 2) look up all txin (except coinbase in db)
 	// 3) insert block
 	// 4) exercise the optional addridex
-	testDb, err := setUpTestDb(t)
-	defer testDb.cleanUpFunc()
+	testDb, err := setUpTestDb(t, "tstdbopmode")
 	if err != nil {
-		t.Errorf("Unable to load blocks from test data: %v", err)
+		t.Errorf("Failed to open test database %v", err)
 		return
 	}
+	defer testDb.cleanUpFunc()
 	err = nil
 out:
 	for height := int64(0); height < int64(len(testDb.blocks)); height++ {
@@ -295,13 +293,12 @@ func testBackout(t *testing.T) {
 	// 2) look up all txin (except coinbase in db)
 	// 3) insert block
 
-	testDb, err := setUpTestDb(t)
-	defer testDb.cleanUpFunc()
-
+	testDb, err := setUpTestDb(t, "tstdbbackout")
 	if err != nil {
 		t.Errorf("Failed to open test database %v", err)
 		return
 	}
+	defer testDb.cleanUpFunc()
 
 	if len(testDb.blocks) < 120 {
 		t.Errorf("test data too small")
@@ -516,7 +513,11 @@ func testFetchHeightRange(t *testing.T, db database.Db, blocks []*btcutil.Block)
 }
 
 func TestLimitAndSkipFetchTxsForAddr(t *testing.T) {
-	testDb, err := setUpTestDb(t)
+	testDb, err := setUpTestDb(t, "tstdbtxaddr")
+	if err != nil {
+		t.Errorf("Failed to open test database %v", err)
+		return
+	}
 	defer testDb.cleanUpFunc()
 
 	// Insert a block with some fake test transactions. The block will have

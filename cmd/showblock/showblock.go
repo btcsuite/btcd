@@ -13,8 +13,8 @@ import (
 	"path/filepath"
 	"strconv"
 
-	"github.com/btcsuite/btcdb"
-	_ "github.com/btcsuite/btcdb/ldb"
+	"github.com/btcsuite/btcd/database"
+	_ "github.com/btcsuite/btcd/database/ldb"
 	"github.com/btcsuite/btclog"
 	"github.com/btcsuite/btcnet"
 	"github.com/btcsuite/btcutil"
@@ -89,7 +89,7 @@ func main() {
 	backendLogger := btclog.NewDefaultBackendLogger()
 	defer backendLogger.Flush()
 	log = btclog.NewSubsystemLogger(backendLogger, "")
-	btcdb.UseLogger(log)
+	database.UseLogger(log)
 
 	// Multiple networks can't be selected simultaneously.
 	funcName := "main"
@@ -126,7 +126,7 @@ func main() {
 	dbPath := filepath.Join(cfg.DataDir, dbName)
 
 	log.Infof("loading db %v", cfg.DbType)
-	db, err := btcdb.OpenDB(cfg.DbType, dbPath)
+	db, err := database.OpenDB(cfg.DbType, dbPath)
 	if err != nil {
 		log.Warnf("db open failed: %v", err)
 		return
@@ -179,7 +179,7 @@ func main() {
 	}
 }
 
-func getHeight(db btcdb.Db, str string) (int64, error) {
+func getHeight(db database.Db, str string) (int64, error) {
 	argtype, idx, sha, err := parsesha(str)
 	if err != nil {
 		log.Warnf("unable to decode [%v] %v", str, err)
@@ -201,7 +201,7 @@ func getHeight(db btcdb.Db, str string) (int64, error) {
 	return idx, nil
 }
 
-func DumpBlock(db btcdb.Db, height int64, fo io.Writer, rflag bool, fflag bool, tflag bool) error {
+func DumpBlock(db database.Db, height int64, fo io.Writer, rflag bool, fflag bool, tflag bool) error {
 	sha, err := db.FetchBlockShaByHeight(height)
 
 	if err != nil {
