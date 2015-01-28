@@ -8,6 +8,16 @@ database
 Package database provides a database interface for the bitcoin block chain and
 transactions.
 
+Please note that this package is intended to enable btcd to support different
+database backends and is not something that a client can directly access as only
+one entity can have the database open at a time (for most database backends),
+and that entity will be btcd.
+
+When a client wants programmatic access to the data provided by btcd, they'll
+likely want to use the [btcrpcclient](https://github.com/btcsuite/btcrpcclient)
+package which makes use of the [JSON-RPC API]
+(https://github.com/btcsuite/btcd/tree/master/docs/json_rpc_api.md).
+
 ## Documentation
 
 [![GoDoc](https://img.shields.io/badge/godoc-reference-blue.svg)]
