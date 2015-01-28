@@ -20,8 +20,6 @@ import (
 	flags "github.com/btcsuite/go-flags"
 )
 
-type ShaHash btcwire.ShaHash
-
 type config struct {
 	DataDir        string `short:"b" long:"datadir" description:"Directory to store data"`
 	DbType         string `long:"dbtype" description:"Database backend"`
@@ -39,8 +37,8 @@ var (
 )
 
 const (
-	ArgSha = iota
-	ArgHeight
+	argSha = iota
+	argHeight
 )
 
 // netName returns the name used when referring to a bitcoin network.  At the
@@ -147,9 +145,9 @@ func getSha(db database.Db, str string) (btcwire.ShaHash, error) {
 	}
 
 	switch argtype {
-	case ArgSha:
+	case argSha:
 		// nothing to do
-	case ArgHeight:
+	case argHeight:
 		sha, err = db.FetchBlockShaByHeight(idx)
 		if err != nil {
 			return btcwire.ShaHash{}, err
@@ -165,9 +163,9 @@ var ntxcnt int64
 var txspendcnt int64
 var txgivecnt int64
 
-var ErrBadShaPrefix = errors.New("invalid prefix")
-var ErrBadShaLen = errors.New("invalid len")
-var ErrBadShaChar = errors.New("invalid character")
+var errBadShaPrefix = errors.New("invalid prefix")
+var errBadShaLen = errors.New("invalid len")
+var errBadShaChar = errors.New("invalid character")
 
 func parsesha(argstr string) (argtype int, height int64, psha *btcwire.ShaHash, err error) {
 	var sha btcwire.ShaHash
@@ -180,14 +178,14 @@ func parsesha(argstr string) (argtype int, height int64, psha *btcwire.ShaHash, 
 	case 66:
 		if argstr[0:2] != "0x" {
 			log.Infof("prefix is %v", argstr[0:2])
-			err = ErrBadShaPrefix
+			err = errBadShaPrefix
 			return
 		}
 		hashbuf = argstr[2:]
 	default:
 		if len(argstr) <= 16 {
 			// assume value is height
-			argtype = ArgHeight
+			argtype = argHeight
 			var h int
 			h, err = strconv.Atoi(argstr)
 			if err == nil {
@@ -196,7 +194,7 @@ func parsesha(argstr string) (argtype int, height int64, psha *btcwire.ShaHash, 
 			}
 			log.Infof("Unable to parse height %v, err %v", height, err)
 		}
-		err = ErrBadShaLen
+		err = errBadShaLen
 		return
 	}
 
@@ -212,7 +210,7 @@ func parsesha(argstr string) (argtype int, height int64, psha *btcwire.ShaHash, 
 		case ch >= 'A' && ch <= 'F':
 			val = ch - 'A' + rune(10)
 		default:
-			err = ErrBadShaChar
+			err = errBadShaChar
 			return
 		}
 		b := buf[31-idx/2]

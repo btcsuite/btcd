@@ -34,8 +34,8 @@ type AddrManager struct {
 	lookupFunc     func(string) ([]net.IP, error)
 	rand           *rand.Rand
 	key            [32]byte
-	addrIndex      map[string]*knownAddress // address key to ka for all addrs.
-	addrNew        [newBucketCount]map[string]*knownAddress
+	addrIndex      map[string]*KnownAddress // address key to ka for all addrs.
+	addrNew        [newBucketCount]map[string]*KnownAddress
 	addrTried      [triedBucketCount]*list.List
 	started        int32
 	shutdown       int32
@@ -208,7 +208,7 @@ func (a *AddrManager) updateAddress(netAddr, srcAddr *btcwire.NetAddress) {
 		// updated elsewhere in the addrmanager code and would otherwise
 		// change the actual netaddress on the peer.
 		netAddrCopy := *netAddr
-		ka = &knownAddress{na: &netAddrCopy, srcAddr: srcAddr}
+		ka = &KnownAddress{na: &netAddrCopy, srcAddr: srcAddr}
 		a.addrIndex[addr] = ka
 		a.nNew++
 		// XXX time penalty?
@@ -243,7 +243,7 @@ func (a *AddrManager) expireNew(bucket int) {
 	// Bitcoind here chooses four random and just throws the oldest of
 	// those away, but we keep track of oldest in the initial traversal and
 	// use that information instead.
-	var oldest *knownAddress
+	var oldest *KnownAddress
 	for k, v := range a.addrNew[bucket] {
 		if v.isBad() {
 			log.Tracef("expiring bad address %v", k)
@@ -279,10 +279,10 @@ func (a *AddrManager) expireNew(bucket int) {
 // We just choose the eldest. Bitcoind selects 4 random entries and throws away
 // the older of them.
 func (a *AddrManager) pickTried(bucket int) *list.Element {
-	var oldest *knownAddress
+	var oldest *KnownAddress
 	var oldestElem *list.Element
 	for e := a.addrTried[bucket].Front(); e != nil; e = e.Next() {
-		ka := e.Value.(*knownAddress)
+		ka := e.Value.(*KnownAddress)
 		if oldest == nil || oldest.na.Timestamp.After(ka.na.Timestamp) {
 			oldestElem = e
 			oldest = ka
@@ -393,7 +393,7 @@ func (a *AddrManager) savePeers() {
 		sam.TriedBuckets[i] = make([]string, a.addrTried[i].Len())
 		j := 0
 		for e := a.addrTried[i].Front(); e != nil; e = e.Next() {
-			ka := e.Value.(*knownAddress)
+			ka := e.Value.(*KnownAddress)
 			sam.TriedBuckets[i][j] = NetAddressKey(ka.na)
 			j++
 		}
@@ -459,7 +459,7 @@ func (a *AddrManager) deserializePeers(filePath string) error {
 	copy(a.key[:], sam.Key[:])
 
 	for _, v := range sam.Addresses {
-		ka := new(knownAddress)
+		ka := new(KnownAddress)
 		ka.na, err = a.DeserializeNetAddress(v.Addr)
 		if err != nil {
 			return fmt.Errorf("failed to deserialize netaddress "+
@@ -673,12 +673,12 @@ func (a *AddrManager) AddressCache() []*btcwire.NetAddress {
 // and allocating fresh empty bucket storage.
 func (a *AddrManager) reset() {
 
-	a.addrIndex = make(map[string]*knownAddress)
+	a.addrIndex = make(map[string]*KnownAddress)
 
 	// fill key with bytes from a good random source.
 	io.ReadFull(crand.Reader, a.key[:])
 	for i := range a.addrNew {
-		a.addrNew[i] = make(map[string]*knownAddress)
+		a.addrNew[i] = make(map[string]*KnownAddress)
 	}
 	for i := range a.addrTried {
 		a.addrTried[i] = list.New()
@@ -741,7 +741,7 @@ func NetAddressKey(na *btcwire.NetAddress) string {
 // random one from the possible addresses with preference given to ones that
 // have not been used recently and should not pick 'close' addresses
 // consecutively.
-func (a *AddrManager) GetAddress(class string, newBias int) *knownAddress {
+func (a *AddrManager) GetAddress(class string, newBias int) *KnownAddress {
 	// Protect concurrent access.
 	a.mtx.Lock()
 	defer a.mtx.Unlock()
@@ -780,7 +780,7 @@ func (a *AddrManager) GetAddress(class string, newBias int) *knownAddress {
 				a.rand.Int63n(int64(a.addrTried[bucket].Len())); i > 0; i-- {
 				e = e.Next()
 			}
-			ka := e.Value.(*knownAddress)
+			ka := e.Value.(*KnownAddress)
 			randval := a.rand.Intn(large)
 			if float64(randval) < (factor * ka.chance() * float64(large)) {
 				log.Tracef("Selected %v from tried bucket",
@@ -801,7 +801,7 @@ func (a *AddrManager) GetAddress(class string, newBias int) *knownAddress {
 				continue
 			}
 			// Then, a random entry in it.
-			var ka *knownAddress
+			var ka *KnownAddress
 			nth := a.rand.Intn(len(a.addrNew[bucket]))
 			for _, value := range a.addrNew[bucket] {
 				if nth == 0 {
@@ -820,7 +820,7 @@ func (a *AddrManager) GetAddress(class string, newBias int) *knownAddress {
 	}
 }
 
-func (a *AddrManager) find(addr *btcwire.NetAddress) *knownAddress {
+func (a *AddrManager) find(addr *btcwire.NetAddress) *KnownAddress {
 	return a.addrIndex[NetAddressKey(addr)]
 }
 
@@ -923,7 +923,7 @@ func (a *AddrManager) Good(addr *btcwire.NetAddress) {
 
 	// No room, we have to evict something else.
 	entry := a.pickTried(bucket)
-	rmka := entry.Value.(*knownAddress)
+	rmka := entry.Value.(*KnownAddress)
 
 	// First bucket it would have been put in.
 	newBucket := a.getNewBucket(rmka.na, rmka.srcAddr)

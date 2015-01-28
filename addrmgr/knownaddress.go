@@ -10,9 +10,9 @@ import (
 	"github.com/btcsuite/btcwire"
 )
 
-// knownAddress tracks information about a known network address that is used
+// KnownAddress tracks information about a known network address that is used
 // to determine how viable an address is.
-type knownAddress struct {
+type KnownAddress struct {
 	na          *btcwire.NetAddress
 	srcAddr     *btcwire.NetAddress
 	attempts    int
@@ -24,19 +24,19 @@ type knownAddress struct {
 
 // NetAddress returns the underlying btcwire.NetAddress associated with the
 // known address.
-func (ka *knownAddress) NetAddress() *btcwire.NetAddress {
+func (ka *KnownAddress) NetAddress() *btcwire.NetAddress {
 	return ka.na
 }
 
 // LastAttempt returns the last time the known address was attempted.
-func (ka *knownAddress) LastAttempt() time.Time {
+func (ka *KnownAddress) LastAttempt() time.Time {
 	return ka.lastattempt
 }
 
 // chance returns the selection probability for a known address.  The priority
 // depends upon how recently the address has been seen, how recently it was last
 // attempted and how often attempts to connect to it have failed.
-func (ka *knownAddress) chance() float64 {
+func (ka *KnownAddress) chance() float64 {
 	now := time.Now()
 	lastSeen := now.Sub(ka.na.Timestamp)
 	lastAttempt := now.Sub(ka.lastattempt)
@@ -71,7 +71,7 @@ func (ka *knownAddress) chance() float64 {
 // 4) It has failed ten times in the last week
 // All addresses that meet these criteria are assumed to be worthless and not
 // worth keeping hold of.
-func (ka *knownAddress) isBad() bool {
+func (ka *KnownAddress) isBad() bool {
 	if ka.lastattempt.After(time.Now().Add(-1 * time.Minute)) {
 		return false
 	}
