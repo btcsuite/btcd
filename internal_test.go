@@ -3796,6 +3796,32 @@ func ParseShortForm(script string) ([]byte, error) {
 	return builder.Script()
 }
 
+// createSpendTx generates a basic spending transaction given the passed
+// signature and public key scripts.
+func createSpendingTx(sigScript, pkScript []byte) (*btcwire.MsgTx, error) {
+	coinbaseTx := btcwire.NewMsgTx()
+
+	outPoint := btcwire.NewOutPoint(&btcwire.ShaHash{}, ^uint32(0))
+	txIn := btcwire.NewTxIn(outPoint, []byte{OP_0, OP_0})
+	txOut := btcwire.NewTxOut(0, pkScript)
+	coinbaseTx.AddTxIn(txIn)
+	coinbaseTx.AddTxOut(txOut)
+
+	spendingTx := btcwire.NewMsgTx()
+	coinbaseTxSha, err := coinbaseTx.TxSha()
+	if err != nil {
+		return nil, err
+	}
+	outPoint = btcwire.NewOutPoint(&coinbaseTxSha, 0)
+	txIn = btcwire.NewTxIn(outPoint, sigScript)
+	txOut = btcwire.NewTxOut(0, nil)
+
+	spendingTx.AddTxIn(txIn)
+	spendingTx.AddTxOut(txOut)
+
+	return spendingTx, nil
+}
+
 func TestBitcoindInvalidTests(t *testing.T) {
 	file, err := ioutil.ReadFile("data/script_invalid.json")
 	if err != nil {
@@ -3810,7 +3836,6 @@ func TestBitcoindInvalidTests(t *testing.T) {
 			err)
 		return
 	}
-	tx := btcwire.NewMsgTx()
 	for x, test := range tests {
 		// Skip comments
 		if len(test) == 1 {
@@ -3827,19 +3852,21 @@ func TestBitcoindInvalidTests(t *testing.T) {
 			t.Errorf("%s: can't parse scriptSig; %v", name, err)
 			continue
 		}
-
 		scriptPubKey, err := ParseShortForm(test[1])
 		if err != nil {
 			t.Errorf("%s: can't parse scriptPubkey; %v", name, err)
 			continue
 		}
-
 		flags, err := parseScriptFlags(test[2])
 		if err != nil {
 			t.Errorf("%s: %v", name, err)
 			continue
 		}
-
+		tx, err := createSpendingTx(scriptSig, scriptPubKey)
+		if err != nil {
+			t.Errorf("createSpendingTx failed on test %s: %v", name, err)
+			continue
+		}
 		s, err := NewScript(scriptSig, scriptPubKey, 0, tx, flags)
 		if err == nil {
 			if err := s.Execute(); err == nil {
@@ -3865,7 +3892,6 @@ func TestBitcoindValidTests(t *testing.T) {
 			err)
 		return
 	}
-	tx := btcwire.NewMsgTx()
 	for x, test := range tests {
 		// Skip comments
 		if len(test) == 1 {
@@ -3877,31 +3903,31 @@ func TestBitcoindValidTests(t *testing.T) {
 				x)
 			continue
 		}
-
 		scriptSig, err := ParseShortForm(test[0])
 		if err != nil {
 			t.Errorf("%s: can't parse scriptSig; %v", name, err)
 			continue
 		}
-
 		scriptPubKey, err := ParseShortForm(test[1])
 		if err != nil {
 			t.Errorf("%s: can't parse scriptPubkey; %v", name, err)
 			continue
 		}
-
 		flags, err := parseScriptFlags(test[2])
 		if err != nil {
 			t.Errorf("%s: %v", name, err)
 			continue
 		}
-
+		tx, err := createSpendingTx(scriptSig, scriptPubKey)
+		if err != nil {
+			t.Errorf("createSpendingTx failed on test %s: %v", name, err)
+			continue
+		}
 		s, err := NewScript(scriptSig, scriptPubKey, 0, tx, flags)
 		if err != nil {
 			t.Errorf("%s failed to create script: %v", name, err)
 			continue
 		}
-
 		err = s.Execute()
 		if err != nil {
 			t.Errorf("%s failed to execute: %v", name, err)
@@ -4205,12 +4231,14 @@ func parseScriptFlags(flagStr string) (ScriptFlags, error) {
 		switch flag {
 		case "DISCOURAGE_UPGRADABLE_NOPS":
 			flags |= ScriptDiscourageUpgradableNops
-		case "NONE":
+		case "", "NONE":
 			// Nothing.
 		case "NULLDUMMY":
 			flags |= ScriptStrictMultiSig
 		case "P2SH":
 			flags |= ScriptBip16
+		case "SIGPUSHONLY":
+			flags |= ScriptVerifySigPushOnly
 		case "STRICTENC":
 			// This is always set.
 		default:

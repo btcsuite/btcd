@@ -522,6 +522,10 @@ const (
 	// checks.  This flag is only applied when the above opcodes are
 	// executed.
 	ScriptDiscourageUpgradableNops
+
+	// ScriptVerifySigPushOnly defines that signature scripts must contain
+	// only pushed data.  This is rule 2 of BIP0062.
+	ScriptVerifySigPushOnly
 )
 
 // NewScript returns a new script engine for the provided tx and input idx with
@@ -530,6 +534,10 @@ const (
 // pay-to-script hash transactions will be fully validated.
 func NewScript(scriptSig []byte, scriptPubKey []byte, txidx int, tx *btcwire.MsgTx, flags ScriptFlags) (*Script, error) {
 	var m Script
+	if flags&ScriptVerifySigPushOnly == ScriptVerifySigPushOnly && !IsPushOnlyScript(scriptSig) {
+		return nil, ErrStackNonPushOnly
+	}
+
 	scripts := [][]byte{scriptSig, scriptPubKey}
 	m.scripts = make([][]parsedOpcode, len(scripts))
 	for i, scr := range scripts {
