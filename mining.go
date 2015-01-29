@@ -48,7 +48,8 @@ const (
 	// are more strict.
 	standardScriptVerifyFlags = btcscript.ScriptBip16 |
 		btcscript.ScriptCanonicalSignatures |
-		btcscript.ScriptStrictMultiSig
+		btcscript.ScriptStrictMultiSig |
+		btcscript.ScriptDiscourageUpgradableNops
 )
 
 // txPrioItem houses a transaction along with extra information that allows the
