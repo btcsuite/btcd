@@ -1131,7 +1131,7 @@ func (b *blockManager) handleNotifyMsg(notification *btcchain.Notification) {
 
 		// Generate the inventory vector and relay it.
 		iv := btcwire.NewInvVect(btcwire.InvTypeBlock, hash)
-		b.server.RelayInventory(iv)
+		b.server.RelayInventory(iv, nil)
 
 	// A block has been connected to the main block chain.
 	case btcchain.NTBlockConnected:

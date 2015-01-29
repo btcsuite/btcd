@@ -1123,7 +1123,7 @@ func (mp *txMemPool) processOrphans(hash *btcwire.ShaHash) error {
 				// Generate and relay the inventory vector for the
 				// newly accepted transaction.
 				iv := btcwire.NewInvVect(btcwire.InvTypeTx, tx.Sha())
-				mp.server.RelayInventory(iv)
+				mp.server.RelayInventory(iv, tx)
 			} else {
 				// Transaction is still an orphan.
 				// TODO(jrick): This removeOrphan call is
@@ -1175,7 +1175,7 @@ func (mp *txMemPool) ProcessTransaction(tx *btcutil.Tx, allowOrphan, rateLimit b
 	if len(missingParents) == 0 {
 		// Generate the inventory vector and relay it.
 		iv := btcwire.NewInvVect(btcwire.InvTypeTx, tx.Sha())
-		mp.server.RelayInventory(iv)
+		mp.server.RelayInventory(iv, tx)
 
 		// Accept any orphan transactions that depend on this
 		// transaction (they may no longer be orphans if all inputs
