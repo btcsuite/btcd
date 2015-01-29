@@ -92,8 +92,8 @@ var (
 	// overhead of creating a new object on every invocation for constant
 	// data.
 	gbtCoinbaseAux = &btcjson.GetBlockTemplateResultAux{
-		Flags: hex.EncodeToString(btcscript.NewScriptBuilder().
-			AddData([]byte(coinbaseFlags)).Script()),
+		Flags: hex.EncodeToString(builderScript(btcscript.
+			NewScriptBuilder().AddData([]byte(coinbaseFlags)))),
 	}
 
 	// gbtCapabilities describes additional capabilities returned with a
@@ -209,6 +209,18 @@ var rpcAskWallet = map[string]struct{}{
 
 // Commands that are temporarily unimplemented.
 var rpcUnimplemented = map[string]struct{}{}
+
+// builderScript is a convenience function which is used to for hard-coded
+// scripts built with the script builder.   Any errors are converted to a panic
+// since it is only, and must only, be used with hard-coded, and therefore,
+// known good, scripts.
+func builderScript(builder *btcscript.ScriptBuilder) []byte {
+	script, err := builder.Script()
+	if err != nil {
+		panic(err)
+	}
+	return script
+}
 
 // workStateBlockInfo houses information about how to reconstruct a block given
 // its template and signature script.
