@@ -30,6 +30,8 @@ func builderScript(builder *btcscript.ScriptBuilder) []byte {
 }
 
 func TestPushedData(t *testing.T) {
+	t.Parallel()
+
 	var tests = []struct {
 		in    []byte
 		out   [][]byte
@@ -90,6 +92,8 @@ func TestPushedData(t *testing.T) {
 }
 
 func TestStandardPushes(t *testing.T) {
+	t.Parallel()
+
 	for i := 0; i < 65535; i++ {
 		builder := btcscript.NewScriptBuilder()
 		builder.AddInt64(int64(i))
@@ -1652,12 +1656,16 @@ func testTx(t *testing.T, test txTest) {
 }
 
 func TestTX(t *testing.T) {
+	t.Parallel()
+
 	for i := range txTests {
 		testTx(t, txTests[i])
 	}
 }
 
 func TestGetPreciseSignOps(t *testing.T) {
+	t.Parallel()
+
 	// First we go over the range of tests in testTx and count the sigops in
 	// them.
 	for _, test := range txTests {
@@ -1742,6 +1750,8 @@ type scriptInfoTest struct {
 }
 
 func TestScriptInfo(t *testing.T) {
+	t.Parallel()
+
 	for _, test := range txTests {
 		si, err := btcscript.CalcScriptInfo(
 			test.tx.TxIn[test.idx].SignatureScript,
@@ -1996,6 +2006,8 @@ func testRemoveOpcode(t *testing.T, test *removeOpcodeTest) {
 }
 
 func TestRemoveOpcodes(t *testing.T) {
+	t.Parallel()
+
 	for i := range removeOpcodeTests {
 		testRemoveOpcode(t, &removeOpcodeTests[i])
 	}
@@ -2134,6 +2146,8 @@ func testRemoveOpcodeByData(t *testing.T, test *removeOpcodeByDataTest) {
 	}
 }
 func TestRemoveOpcodeByDatas(t *testing.T) {
+	t.Parallel()
+
 	for i := range removeOpcodeByDataTests {
 		testRemoveOpcodeByData(t, &removeOpcodeByDataTests[i])
 	}
@@ -2361,12 +2375,16 @@ func testScriptType(t *testing.T, test *scriptTypeTest) {
 }
 
 func TestScriptTypes(t *testing.T) {
+	t.Parallel()
+
 	for i := range scriptTypeTests {
 		testScriptType(t, &scriptTypeTests[i])
 	}
 }
 
 func TestIsPayToScriptHash(t *testing.T) {
+	t.Parallel()
+
 	for _, test := range scriptTypeTests {
 		shouldBe := (test.scripttype == btcscript.ScriptHashTy)
 		p2sh := btcscript.IsPayToScriptHash(test.script)
@@ -2380,6 +2398,8 @@ func TestIsPayToScriptHash(t *testing.T) {
 // This test sets the pc to a deliberately bad result then confirms that Step()
 //  and Disasm fail correctly.
 func TestBadPC(t *testing.T) {
+	t.Parallel()
+
 	type pcTest struct {
 		script, off int
 	}
@@ -2452,6 +2472,8 @@ func TestBadPC(t *testing.T) {
 // Most codepaths in CheckErrorCondition() are testd elsewhere, this tests
 // the execute early test.
 func TestCheckErrorCondition(t *testing.T) {
+	t.Parallel()
+
 	// tx with almost empty scripts.
 	tx := &btcwire.MsgTx{
 		Version: 1,
@@ -2787,6 +2809,8 @@ var SigScriptTests = []TstSigScript{
 // created for the MsgTxs in txTests, since they come from the blockchain
 // and we don't have the private keys.
 func TestSignatureScript(t *testing.T) {
+	t.Parallel()
+
 	privKey, _ := btcec.PrivKeyFromBytes(btcec.S256(), privKeyD)
 
 nexttest:
@@ -2868,50 +2892,52 @@ nexttest:
 	}
 }
 
-var classStringifyTests = []struct {
-	name        string
-	scriptclass btcscript.ScriptClass
-	stringed    string
-}{
-	{
-		name:        "nonstandardty",
-		scriptclass: btcscript.NonStandardTy,
-		stringed:    "nonstandard",
-	},
-	{
-		name:        "pubkey",
-		scriptclass: btcscript.PubKeyTy,
-		stringed:    "pubkey",
-	},
-	{
-		name:        "pubkeyhash",
-		scriptclass: btcscript.PubKeyHashTy,
-		stringed:    "pubkeyhash",
-	},
-	{
-		name:        "scripthash",
-		scriptclass: btcscript.ScriptHashTy,
-		stringed:    "scripthash",
-	},
-	{
-		name:        "multisigty",
-		scriptclass: btcscript.MultiSigTy,
-		stringed:    "multisig",
-	},
-	{
-		name:        "nulldataty",
-		scriptclass: btcscript.NullDataTy,
-		stringed:    "nulldata",
-	},
-	{
-		name:        "broken",
-		scriptclass: btcscript.ScriptClass(255),
-		stringed:    "Invalid",
-	},
-}
-
 func TestStringifyClass(t *testing.T) {
-	for _, test := range classStringifyTests {
+	t.Parallel()
+
+	tests := []struct {
+		name        string
+		scriptclass btcscript.ScriptClass
+		stringed    string
+	}{
+		{
+			name:        "nonstandardty",
+			scriptclass: btcscript.NonStandardTy,
+			stringed:    "nonstandard",
+		},
+		{
+			name:        "pubkey",
+			scriptclass: btcscript.PubKeyTy,
+			stringed:    "pubkey",
+		},
+		{
+			name:        "pubkeyhash",
+			scriptclass: btcscript.PubKeyHashTy,
+			stringed:    "pubkeyhash",
+		},
+		{
+			name:        "scripthash",
+			scriptclass: btcscript.ScriptHashTy,
+			stringed:    "scripthash",
+		},
+		{
+			name:        "multisigty",
+			scriptclass: btcscript.MultiSigTy,
+			stringed:    "multisig",
+		},
+		{
+			name:        "nulldataty",
+			scriptclass: btcscript.NullDataTy,
+			stringed:    "nulldata",
+		},
+		{
+			name:        "broken",
+			scriptclass: btcscript.ScriptClass(255),
+			stringed:    "Invalid",
+		},
+	}
+
+	for _, test := range tests {
 		typeString := test.scriptclass.String()
 		if typeString != test.stringed {
 			t.Errorf("%s: got \"%s\" expected \"%s\"", test.name,
@@ -2948,6 +2974,8 @@ func (b *bogusAddress) String() string {
 }
 
 func TestPayToAddrScript(t *testing.T) {
+	t.Parallel()
+
 	// 1MirQ9bwyQcGVJPwKUgapu5ouK2E2Ey4gX
 	p2pkhMain, err := btcutil.NewAddressPubKeyHash([]byte{
 		0xe3, 0x4c, 0xce, 0x70, 0xc8, 0x63, 0x73, 0x27, 0x3e, 0xfc,
@@ -3102,6 +3130,8 @@ func TestPayToAddrScript(t *testing.T) {
 }
 
 func TestMultiSigScript(t *testing.T) {
+	t.Parallel()
+
 	//  mainnet p2pk 13CG6SJ3yHUXo4Cr2RY4THLLJrNFuG3gUg
 	p2pkCompressedMain, err := btcutil.NewAddressPubKey([]byte{
 		0x02, 0x19, 0x2d, 0x74, 0xd0, 0xcb, 0x94, 0x34, 0x4c, 0x95,
@@ -3322,6 +3352,8 @@ func mkGetScript(scripts map[string][]byte) btcscript.ScriptDB {
 }
 
 func TestSignTxOutput(t *testing.T) {
+	t.Parallel()
+
 	// make key
 	// make script based on key.
 	// sign with magic pixie dust.
@@ -4614,6 +4646,8 @@ func TestSignTxOutput(t *testing.T) {
 }
 
 func TestCalcMultiSigStats(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name     string
 		script   []byte
@@ -4691,6 +4725,8 @@ func TestCalcMultiSigStats(t *testing.T) {
 }
 
 func TestHasCanonicalPushes(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name     string
 		script   []byte
@@ -4723,6 +4759,8 @@ func TestHasCanonicalPushes(t *testing.T) {
 }
 
 func TestIsPushOnlyScript(t *testing.T) {
+	t.Parallel()
+
 	test := struct {
 		name     string
 		script   []byte
