@@ -4752,7 +4752,7 @@ func TestHasCanonicalPushes(t *testing.T) {
 	for i, test := range tests {
 		if btcscript.HasCanonicalPushes(test.script) != test.expected {
 			t.Errorf("HasCanonicalPushes #%d (%s) wrong result\n"+
-				"got: %x\nwant: %x", i, test.name, true,
+				"got: %v\nwant: %v", i, test.name, true,
 				test.expected)
 		}
 	}
@@ -4778,7 +4778,7 @@ func TestIsPushOnlyScript(t *testing.T) {
 
 	if btcscript.IsPushOnlyScript(test.script) != test.expected {
 		t.Errorf("IsPushOnlyScript (%s) wrong result\n"+
-			"got: %x\nwant: %x", test.name, true,
+			"got: %v\nwant: %v", test.name, true,
 			test.expected)
 	}
 }

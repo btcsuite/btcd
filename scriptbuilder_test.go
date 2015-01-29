@@ -173,7 +173,7 @@ func TestScriptBuilderAddUint64(t *testing.T) {
 		result, err := builder.Script()
 		if err != nil {
 			t.Errorf("ScriptBuilder.AddUint64 #%d (%s) unexpected "+
-				"error: %v", err)
+				"error: %v", i, test.name, err)
 			continue
 		}
 		if !bytes.Equal(result, test.expected) {
