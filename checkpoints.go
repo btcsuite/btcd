@@ -7,8 +7,8 @@ package btcchain
 import (
 	"fmt"
 
+	"github.com/btcsuite/btcd/txscript"
 	"github.com/btcsuite/btcnet"
-	"github.com/btcsuite/btcscript"
 	"github.com/btcsuite/btcutil"
 	"github.com/btcsuite/btcwire"
 )
@@ -192,8 +192,8 @@ func isNonstandardTransaction(tx *btcutil.Tx) bool {
 
 	// Check all of the output public key scripts for non-standard scripts.
 	for _, txOut := range tx.MsgTx().TxOut {
-		scriptClass := btcscript.GetScriptClass(txOut.PkScript)
-		if scriptClass == btcscript.NonStandardTy {
+		scriptClass := txscript.GetScriptClass(txOut.PkScript)
+		if scriptClass == txscript.NonStandardTy {
 			return true
 		}
 	}

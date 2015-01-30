@@ -12,8 +12,8 @@ import (
 	"time"
 
 	"github.com/btcsuite/btcd/database"
+	"github.com/btcsuite/btcd/txscript"
 	"github.com/btcsuite/btcnet"
-	"github.com/btcsuite/btcscript"
 	"github.com/btcsuite/btcutil"
 	"github.com/btcsuite/btcwire"
 )
@@ -331,7 +331,7 @@ func CheckProofOfWork(block *btcutil.Block, powLimit *big.Int) error {
 // CountSigOps returns the number of signature operations for all transaction
 // input and output scripts in the provided transaction.  This uses the
 // quicker, but imprecise, signature operation counting mechanism from
-// btcscript.
+// txscript.
 func CountSigOps(tx *btcutil.Tx) int {
 	msgTx := tx.MsgTx()
 
@@ -339,14 +339,14 @@ func CountSigOps(tx *btcutil.Tx) int {
 	// inputs.
 	totalSigOps := 0
 	for _, txIn := range msgTx.TxIn {
-		numSigOps := btcscript.GetSigOpCount(txIn.SignatureScript)
+		numSigOps := txscript.GetSigOpCount(txIn.SignatureScript)
 		totalSigOps += numSigOps
 	}
 
 	// Accumulate the number of signature operations in all transaction
 	// outputs.
 	for _, txOut := range msgTx.TxOut {
-		numSigOps := btcscript.GetSigOpCount(txOut.PkScript)
+		numSigOps := txscript.GetSigOpCount(txOut.PkScript)
 		totalSigOps += numSigOps
 	}
 
@@ -355,8 +355,8 @@ func CountSigOps(tx *btcutil.Tx) int {
 
 // CountP2SHSigOps returns the number of signature operations for all input
 // transactions which are of the pay-to-script-hash type.  This uses the
-// precise, signature operation counting mechanism from btcscript which requires
-// access to the input transaction scripts.
+// precise, signature operation counting mechanism from the script engine which
+// requires access to the input transaction scripts.
 func CountP2SHSigOps(tx *btcutil.Tx, isCoinBaseTx bool, txStore TxStore) (int, error) {
 	// Coinbase transactions have no interesting inputs.
 	if isCoinBaseTx {
@@ -392,14 +392,14 @@ func CountP2SHSigOps(tx *btcutil.Tx, isCoinBaseTx bool, txStore TxStore) (int, e
 		// We're only interested in pay-to-script-hash types, so skip
 		// this input if it's not one.
 		pkScript := originMsgTx.TxOut[originTxIndex].PkScript
-		if !btcscript.IsPayToScriptHash(pkScript) {
+		if !txscript.IsPayToScriptHash(pkScript) {
 			continue
 		}
 
 		// Count the precise number of signature operations in the
 		// referenced public key script.
 		sigScript := txIn.SignatureScript
-		numSigOps := btcscript.GetPreciseSigOpCount(sigScript, pkScript,
+		numSigOps := txscript.GetPreciseSigOpCount(sigScript, pkScript,
 			true)
 
 		// We could potentially overflow the accumulator so check for
@@ -817,10 +817,10 @@ func (b *BlockChain) checkConnectBlock(node *blockNode, block *btcutil.Block) er
 
 	// BIP0016 describes a pay-to-script-hash type that is considered a
 	// "standard" type.  The rules for this BIP only apply to transactions
-	// after the timestamp defined by btcscript.Bip16Activation.  See
+	// after the timestamp defined by txscript.Bip16Activation.  See
 	// https://en.bitcoin.it/wiki/BIP_0016 for more details.
 	enforceBIP0016 := false
-	if node.timestamp.After(btcscript.Bip16Activation) {
+	if node.timestamp.After(txscript.Bip16Activation) {
 		enforceBIP0016 = true
 	}
 

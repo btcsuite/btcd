@@ -9,7 +9,7 @@ import (
 	"math"
 	"runtime"
 
-	"github.com/btcsuite/btcscript"
+	"github.com/btcsuite/btcd/txscript"
 	"github.com/btcsuite/btcutil"
 	"github.com/btcsuite/btcwire"
 )
@@ -29,7 +29,7 @@ type txValidator struct {
 	quitChan     chan struct{}
 	resultChan   chan error
 	txStore      TxStore
-	flags        btcscript.ScriptFlags
+	flags        txscript.ScriptFlags
 }
 
 // sendResult sends the result of a script pair validation on the internal
@@ -83,7 +83,7 @@ out:
 			// Create a new script engine for the script pair.
 			sigScript := txIn.SignatureScript
 			pkScript := originMsgTx.TxOut[originTxIndex].PkScript
-			engine, err := btcscript.NewScript(sigScript, pkScript,
+			engine, err := txscript.NewScript(sigScript, pkScript,
 				txVI.txInIndex, txVI.tx.MsgTx(), v.flags)
 			if err != nil {
 				str := fmt.Sprintf("failed to parse input "+
@@ -179,7 +179,7 @@ func (v *txValidator) Validate(items []*txValidateItem) error {
 
 // newTxValidator returns a new instance of txValidator to be used for
 // validating transaction scripts asynchronously.
-func newTxValidator(txStore TxStore, flags btcscript.ScriptFlags) *txValidator {
+func newTxValidator(txStore TxStore, flags txscript.ScriptFlags) *txValidator {
 	return &txValidator{
 		validateChan: make(chan *txValidateItem),
 		quitChan:     make(chan struct{}),
@@ -191,7 +191,7 @@ func newTxValidator(txStore TxStore, flags btcscript.ScriptFlags) *txValidator {
 
 // ValidateTransactionScripts validates the scripts for the passed transaction
 // using multiple goroutines.
-func ValidateTransactionScripts(tx *btcutil.Tx, txStore TxStore, flags btcscript.ScriptFlags) error {
+func ValidateTransactionScripts(tx *btcutil.Tx, txStore TxStore, flags txscript.ScriptFlags) error {
 	// Collect all of the transaction inputs and required information for
 	// validation.
 	txIns := tx.MsgTx().TxIn
@@ -224,9 +224,9 @@ func ValidateTransactionScripts(tx *btcutil.Tx, txStore TxStore, flags btcscript
 func checkBlockScripts(block *btcutil.Block, txStore TxStore) error {
 	// Setup the script validation flags.  Blocks created after the BIP0016
 	// activation time need to have the pay-to-script-hash checks enabled.
-	var flags btcscript.ScriptFlags
-	if block.MsgBlock().Header.Timestamp.After(btcscript.Bip16Activation) {
-		flags |= btcscript.ScriptBip16
+	var flags txscript.ScriptFlags
+	if block.MsgBlock().Header.Timestamp.After(txscript.Bip16Activation) {
+		flags |= txscript.ScriptBip16
 	}
 
 	// Collect all of the transaction inputs and required information for
