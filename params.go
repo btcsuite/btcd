@@ -41,8 +41,8 @@ var (
 // and also prevents forks from old blocks.
 //
 // Each checkpoint is selected based upon several factors.  See the
-// documentation for btcchain.IsCheckpointCandidate for details on the selection
-// criteria.
+// documentation for blockchain.IsCheckpointCandidate for details on the
+// selection criteria.
 type Checkpoint struct {
 	Height int64
 	Hash   *btcwire.ShaHash
