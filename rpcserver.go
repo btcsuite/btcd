@@ -28,10 +28,10 @@ import (
 
 	"github.com/btcsuite/btcchain"
 	"github.com/btcsuite/btcd/database"
+	"github.com/btcsuite/btcd/txscript"
 	"github.com/btcsuite/btcec"
 	"github.com/btcsuite/btcjson"
 	"github.com/btcsuite/btcnet"
-	"github.com/btcsuite/btcscript"
 	"github.com/btcsuite/btcutil"
 	"github.com/btcsuite/btcwire"
 	"github.com/btcsuite/btcws"
@@ -92,7 +92,7 @@ var (
 	// overhead of creating a new object on every invocation for constant
 	// data.
 	gbtCoinbaseAux = &btcjson.GetBlockTemplateResultAux{
-		Flags: hex.EncodeToString(builderScript(btcscript.
+		Flags: hex.EncodeToString(builderScript(txscript.
 			NewScriptBuilder().AddData([]byte(coinbaseFlags)))),
 	}
 
@@ -214,7 +214,7 @@ var rpcUnimplemented = map[string]struct{}{}
 // scripts built with the script builder.   Any errors are converted to a panic
 // since it is only, and must only, be used with hard-coded, and therefore,
 // known good, scripts.
-func builderScript(builder *btcscript.ScriptBuilder) []byte {
+func builderScript(builder *txscript.ScriptBuilder) []byte {
 	script, err := builder.Script()
 	if err != nil {
 		panic(err)
@@ -805,7 +805,7 @@ func handleCreateRawTransaction(s *rpcServer, cmd btcjson.Cmd, closeChan <-chan 
 		}
 
 		// Create a new script which pays to the provided address.
-		pkScript, err := btcscript.PayToAddrScript(addr)
+		pkScript, err := txscript.PayToAddrScript(addr)
 		if err != nil {
 			return nil, btcjson.Error{
 				Code:    btcjson.ErrInternal.Code,
@@ -861,7 +861,7 @@ func createVinList(mtx *btcwire.MsgTx) []btcjson.Vin {
 			// The disassembled string will contain [error] inline
 			// if the script doesn't fully parse, so ignore the
 			// error here.
-			disbuf, _ := btcscript.DisasmString(v.SignatureScript)
+			disbuf, _ := txscript.DisasmString(v.SignatureScript)
 			vinList[i].ScriptSig = new(btcjson.ScriptSig)
 			vinList[i].ScriptSig.Asm = disbuf
 			vinList[i].ScriptSig.Hex = hex.EncodeToString(v.SignatureScript)
@@ -882,14 +882,14 @@ func createVoutList(mtx *btcwire.MsgTx, net *btcnet.Params) []btcjson.Vout {
 
 		// The disassembled string will contain [error] inline if the
 		// script doesn't fully parse, so ignore the error here.
-		disbuf, _ := btcscript.DisasmString(v.PkScript)
+		disbuf, _ := txscript.DisasmString(v.PkScript)
 		voutList[i].ScriptPubKey.Asm = disbuf
 		voutList[i].ScriptPubKey.Hex = hex.EncodeToString(v.PkScript)
 
 		// Ignore the error here since an error means the script
 		// couldn't parse and there is no additional information about
 		// it anyways.
-		scriptClass, addrs, reqSigs, _ := btcscript.ExtractPkScriptAddrs(v.PkScript, net)
+		scriptClass, addrs, reqSigs, _ := txscript.ExtractPkScriptAddrs(v.PkScript, net)
 		voutList[i].ScriptPubKey.Type = scriptClass.String()
 		voutList[i].ScriptPubKey.ReqSigs = int32(reqSigs)
 
@@ -998,13 +998,13 @@ func handleDecodeScript(s *rpcServer, cmd btcjson.Cmd, closeChan <-chan struct{}
 
 	// The disassembled string will contain [error] inline if the script
 	// doesn't fully parse, so ignore the error here.
-	disbuf, _ := btcscript.DisasmString(script)
+	disbuf, _ := txscript.DisasmString(script)
 
 	// Get information about the script.
 	// Ignore the error here since an error means the script couldn't parse
 	// and there is no additinal information about it anyways.
 	net := s.server.netParams
-	scriptClass, addrs, reqSigs, _ := btcscript.ExtractPkScriptAddrs(script, net)
+	scriptClass, addrs, reqSigs, _ := txscript.ExtractPkScriptAddrs(script, net)
 	addresses := make([]string, len(addrs))
 	for i, addr := range addrs {
 		addresses[i] = addr.EncodeAddress()
@@ -1512,7 +1512,7 @@ func (state *gbtWorkState) updateBlockTemplate(s *rpcServer, useCoinbaseValue bo
 
 			// Update the block coinbase output of the template to
 			// pay to the randomly selected payment address.
-			pkScript, err := btcscript.PayToAddrScript(payToAddr)
+			pkScript, err := txscript.PayToAddrScript(payToAddr)
 			if err != nil {
 				return btcjson.Error{
 					Code:    btcjson.ErrInternal.Code,
@@ -2519,13 +2519,13 @@ func handleGetTxOut(s *rpcServer, cmd btcjson.Cmd, closeChan <-chan struct{}) (i
 	// The disassembled string will contain [error] inline if the script
 	// doesn't fully parse, so ignore the error here.
 	script := txOut.PkScript
-	disbuf, _ := btcscript.DisasmString(script)
+	disbuf, _ := txscript.DisasmString(script)
 
 	// Get further info about the script.
 	// Ignore the error here since an error means the script couldn't parse
 	// and there is no additional information about it anyways.
 	net := s.server.netParams
-	scriptClass, addrs, reqSigs, _ := btcscript.ExtractPkScriptAddrs(script, net)
+	scriptClass, addrs, reqSigs, _ := txscript.ExtractPkScriptAddrs(script, net)
 	addresses := make([]string, len(addrs))
 	for i, addr := range addrs {
 		addresses[i] = addr.EncodeAddress()

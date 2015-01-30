@@ -199,7 +199,7 @@ information.
 	  wire protocol
     * [btcchain](https://github.com/btcsuite/btcchain) - Implements Bitcoin
 	  block handling and chain selection rules
-    * [btcscript](https://github.com/btcsuite/btcscript) - Implements the
+    * [txscript](https://github.com/btcsuite/btcd/txscript) - Implements the
 	  Bitcoin transaction scripting language
     * [btcec](https://github.com/btcsuite/btcec) - Implements support for the
 	  elliptic curve cryptographic functions needed for the Bitcoin scripts

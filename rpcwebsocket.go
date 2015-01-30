@@ -20,8 +20,8 @@ import (
 	"golang.org/x/crypto/ripemd160"
 
 	"github.com/btcsuite/btcd/database"
+	"github.com/btcsuite/btcd/txscript"
 	"github.com/btcsuite/btcjson"
-	"github.com/btcsuite/btcscript"
 	"github.com/btcsuite/btcutil"
 	"github.com/btcsuite/btcwire"
 	"github.com/btcsuite/btcws"
@@ -624,7 +624,7 @@ func (m *wsNotificationManager) notifyForTxOuts(ops map[btcwire.OutPoint]map[cha
 	txHex := ""
 	wscNotified := make(map[chan struct{}]struct{})
 	for i, txOut := range tx.MsgTx().TxOut {
-		_, txAddrs, _, err := btcscript.ExtractPkScriptAddrs(
+		_, txAddrs, _, err := txscript.ExtractPkScriptAddrs(
 			txOut.PkScript, m.server.server.netParams)
 		if err != nil {
 			continue
@@ -1512,7 +1512,7 @@ func rescanBlock(wsc *wsClient, lookups *rescanKeys, blk *btcutil.Block) {
 		}
 
 		for txOutIdx, txout := range tx.MsgTx().TxOut {
-			_, addrs, _, _ := btcscript.ExtractPkScriptAddrs(
+			_, addrs, _, _ := txscript.ExtractPkScriptAddrs(
 				txout.PkScript, wsc.server.server.netParams)
 
 			for _, addr := range addrs {

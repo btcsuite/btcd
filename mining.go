@@ -12,7 +12,7 @@ import (
 
 	"github.com/btcsuite/btcchain"
 	"github.com/btcsuite/btcd/database"
-	"github.com/btcsuite/btcscript"
+	"github.com/btcsuite/btcd/txscript"
 	"github.com/btcsuite/btcutil"
 	"github.com/btcsuite/btcwire"
 )
@@ -46,10 +46,10 @@ const (
 	// allow pay-to-script hash transactions.  Note these flags are
 	// different than what is required for the consensus rules in that they
 	// are more strict.
-	standardScriptVerifyFlags = btcscript.ScriptBip16 |
-		btcscript.ScriptCanonicalSignatures |
-		btcscript.ScriptStrictMultiSig |
-		btcscript.ScriptDiscourageUpgradableNops
+	standardScriptVerifyFlags = txscript.ScriptBip16 |
+		txscript.ScriptCanonicalSignatures |
+		txscript.ScriptStrictMultiSig |
+		txscript.ScriptDiscourageUpgradableNops
 )
 
 // txPrioItem houses a transaction along with extra information that allows the
@@ -202,7 +202,7 @@ func mergeTxStore(txStoreA btcchain.TxStore, txStoreB btcchain.TxStore) {
 // it starts with the block height that is required by version 2 blocks and adds
 // the extra nonce as well as additional coinbase flags.
 func standardCoinbaseScript(nextBlockHeight int64, extraNonce uint64) ([]byte, error) {
-	return btcscript.NewScriptBuilder().AddInt64(nextBlockHeight).
+	return txscript.NewScriptBuilder().AddInt64(nextBlockHeight).
 		AddUint64(extraNonce).AddData([]byte(coinbaseFlags)).Script()
 }
 
@@ -219,14 +219,14 @@ func createCoinbaseTx(coinbaseScript []byte, nextBlockHeight int64, addr btcutil
 	var pkScript []byte
 	if addr != nil {
 		var err error
-		pkScript, err = btcscript.PayToAddrScript(addr)
+		pkScript, err = txscript.PayToAddrScript(addr)
 		if err != nil {
 			return nil, err
 		}
 	} else {
 		var err error
-		scriptBuilder := btcscript.NewScriptBuilder()
-		pkScript, err = scriptBuilder.AddOp(btcscript.OP_TRUE).Script()
+		scriptBuilder := txscript.NewScriptBuilder()
+		pkScript, err = scriptBuilder.AddOp(txscript.OP_TRUE).Script()
 		if err != nil {
 			return nil, err
 		}

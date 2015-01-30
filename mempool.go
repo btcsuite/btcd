@@ -15,7 +15,7 @@ import (
 
 	"github.com/btcsuite/btcchain"
 	"github.com/btcsuite/btcd/database"
-	"github.com/btcsuite/btcscript"
+	"github.com/btcsuite/btcd/txscript"
 	"github.com/btcsuite/btcutil"
 	"github.com/btcsuite/btcwire"
 )
@@ -172,10 +172,10 @@ func isDust(txOut *btcwire.TxOut) bool {
 // A standard public key script is one that is a recognized form, and for
 // multi-signature scripts, only contains from 1 to maxStandardMultiSigKeys
 // public keys.
-func checkPkScriptStandard(pkScript []byte, scriptClass btcscript.ScriptClass) error {
+func checkPkScriptStandard(pkScript []byte, scriptClass txscript.ScriptClass) error {
 	switch scriptClass {
-	case btcscript.MultiSigTy:
-		numPubKeys, numSigs, err := btcscript.CalcMultiSigStats(pkScript)
+	case txscript.MultiSigTy:
+		numPubKeys, numSigs, err := txscript.CalcMultiSigStats(pkScript)
 		if err != nil {
 			str := fmt.Sprintf("multi-signature script parse "+
 				"failure: %v", err)
@@ -209,7 +209,7 @@ func checkPkScriptStandard(pkScript []byte, scriptClass btcscript.ScriptClass) e
 			return txRuleError(btcwire.RejectNonstandard, str)
 		}
 
-	case btcscript.NonStandardTy:
+	case txscript.NonStandardTy:
 		return txRuleError(btcwire.RejectNonstandard,
 			"non-standard script form")
 	}
@@ -268,7 +268,7 @@ func checkTransactionStandard(tx *btcutil.Tx, height int64) error {
 
 		// Each transaction input signature script must only contain
 		// opcodes which push data onto the stack.
-		if !btcscript.IsPushOnlyScript(txIn.SignatureScript) {
+		if !txscript.IsPushOnlyScript(txIn.SignatureScript) {
 			str := fmt.Sprintf("transaction input %d: signature "+
 				"script is not push only", i)
 			return txRuleError(btcwire.RejectNonstandard, str)
@@ -278,7 +278,7 @@ func checkTransactionStandard(tx *btcutil.Tx, height int64) error {
 		// canonical data pushes.  A canonical data push is one where
 		// the minimum possible number of bytes is used to represent
 		// the data push as possible.
-		if !btcscript.HasCanonicalPushes(txIn.SignatureScript) {
+		if !txscript.HasCanonicalPushes(txIn.SignatureScript) {
 			str := fmt.Sprintf("transaction input %d: signature "+
 				"script has a non-canonical data push", i)
 			return txRuleError(btcwire.RejectNonstandard, str)
@@ -289,7 +289,7 @@ func checkTransactionStandard(tx *btcutil.Tx, height int64) error {
 	// be "dust" (except when the script is a null data script).
 	numNullDataOutputs := 0
 	for i, txOut := range msgTx.TxOut {
-		scriptClass := btcscript.GetScriptClass(txOut.PkScript)
+		scriptClass := txscript.GetScriptClass(txOut.PkScript)
 		err := checkPkScriptStandard(txOut.PkScript, scriptClass)
 		if err != nil {
 			// Attempt to extract a reject code from the error so
@@ -306,7 +306,7 @@ func checkTransactionStandard(tx *btcutil.Tx, height int64) error {
 		// Accumulate the number of outputs which only carry data.  For
 		// all other script types, ensure the output value is not
 		// "dust".
-		if scriptClass == btcscript.NullDataTy {
+		if scriptClass == txscript.NullDataTy {
 			numNullDataOutputs++
 		} else if isDust(txOut) {
 			str := fmt.Sprintf("transaction output %d: payment "+
@@ -346,7 +346,7 @@ func checkInputsStandard(tx *btcutil.Tx, txStore btcchain.TxStore) error {
 		originPkScript := originTx.TxOut[prevOut.Index].PkScript
 
 		// Calculate stats for the script pair.
-		scriptInfo, err := btcscript.CalcScriptInfo(txIn.SignatureScript,
+		scriptInfo, err := txscript.CalcScriptInfo(txIn.SignatureScript,
 			originPkScript, true)
 		if err != nil {
 			str := fmt.Sprintf("transaction input #%d script parse "+

@@ -15,8 +15,8 @@ import (
 	"testing"
 
 	"github.com/btcsuite/btcd/database"
+	"github.com/btcsuite/btcd/txscript"
 	"github.com/btcsuite/btcnet"
-	"github.com/btcsuite/btcscript"
 	"github.com/btcsuite/btcutil"
 	"github.com/btcsuite/btcwire"
 	"golang.org/x/crypto/ripemd160"
@@ -110,7 +110,7 @@ func testAddrIndexOperations(t *testing.T, db database.Db, newestBlock *btcutil.
 	}
 
 	// Extract the dest addr from the tx.
-	_, testAddrs, _, err := btcscript.ExtractPkScriptAddrs(testTx.MsgTx().TxOut[0].PkScript, &btcnet.MainNetParams)
+	_, testAddrs, _, err := txscript.ExtractPkScriptAddrs(testTx.MsgTx().TxOut[0].PkScript, &btcnet.MainNetParams)
 	if err != nil {
 		t.Fatalf("Unable to decode tx output, err %v", err)
 	}
@@ -527,7 +527,7 @@ func TestLimitAndSkipFetchTxsForAddr(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Unable to decode test address: %v", err)
 	}
-	outputScript, err := btcscript.PayToAddrScript(targetAddr)
+	outputScript, err := txscript.PayToAddrScript(targetAddr)
 	if err != nil {
 		t.Fatalf("Unable make test pkScript %v", err)
 	}

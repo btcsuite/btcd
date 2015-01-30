@@ -14,8 +14,8 @@ import (
 
 	"github.com/btcsuite/btcchain"
 	"github.com/btcsuite/btcd/database"
+	"github.com/btcsuite/btcd/txscript"
 	"github.com/btcsuite/btclog"
-	"github.com/btcsuite/btcscript"
 	"github.com/btcsuite/btcwire"
 	"github.com/btcsuite/seelog"
 )
@@ -126,7 +126,7 @@ func useLogger(subsystemID string, logger btclog.Logger) {
 
 	case "SCRP":
 		scrpLog = logger
-		btcscript.UseLogger(logger)
+		txscript.UseLogger(logger)
 
 	case "SRVR":
 		srvrLog = logger
