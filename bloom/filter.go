@@ -9,7 +9,7 @@ import (
 	"math"
 	"sync"
 
-	"github.com/btcsuite/btcscript"
+	"github.com/btcsuite/btcd/txscript"
 	"github.com/btcsuite/btcutil"
 	"github.com/btcsuite/btcwire"
 )
@@ -255,8 +255,8 @@ func (bf *Filter) maybeAddOutpoint(pkScript []byte, outHash *btcwire.ShaHash, ou
 		outpoint := btcwire.NewOutPoint(outHash, outIdx)
 		bf.addOutPoint(outpoint)
 	case btcwire.BloomUpdateP2PubkeyOnly:
-		class := btcscript.GetScriptClass(pkScript)
-		if class == btcscript.PubKeyTy || class == btcscript.MultiSigTy {
+		class := txscript.GetScriptClass(pkScript)
+		if class == txscript.PubKeyTy || class == txscript.MultiSigTy {
 			outpoint := btcwire.NewOutPoint(outHash, outIdx)
 			bf.addOutPoint(outpoint)
 		}
@@ -283,7 +283,7 @@ func (bf *Filter) matchTxAndUpdate(tx *btcutil.Tx) bool {
 	// from the client and avoids some potential races that could otherwise
 	// occur.
 	for i, txOut := range tx.MsgTx().TxOut {
-		pushedData, err := btcscript.PushedData(txOut.PkScript)
+		pushedData, err := txscript.PushedData(txOut.PkScript)
 		if err != nil {
 			continue
 		}
@@ -314,7 +314,7 @@ func (bf *Filter) matchTxAndUpdate(tx *btcutil.Tx) bool {
 			return true
 		}
 
-		pushedData, err := btcscript.PushedData(txin.SignatureScript)
+		pushedData, err := txscript.PushedData(txin.SignatureScript)
 		if err != nil {
 			continue
 		}

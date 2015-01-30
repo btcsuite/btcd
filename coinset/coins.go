@@ -377,7 +377,7 @@ func (c *SimpleCoin) Value() btcutil.Amount {
 //
 // This can be used to determine what type of script the Coin uses
 // and extract standard addresses if possible using
-// btcscript.ExtractPkScriptAddrs for example.
+// txscript.ExtractPkScriptAddrs for example.
 func (c *SimpleCoin) PkScript() []byte {
 	return c.txOut().PkScript
 }
