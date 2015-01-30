@@ -1,8 +1,8 @@
-// Copyright (c) 2013-2014 Conformal Systems LLC.
+// Copyright (c) 2013-2015 Conformal Systems LLC.
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
-package btcscript_test
+package txscript_test
 
 import (
 	"bytes"
@@ -10,9 +10,9 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/btcsuite/btcd/txscript"
 	"github.com/btcsuite/btcec"
 	"github.com/btcsuite/btcnet"
-	"github.com/btcsuite/btcscript"
 	"github.com/btcsuite/btcutil"
 	"github.com/btcsuite/btcwire"
 )
@@ -21,7 +21,7 @@ import (
 // allows access to the script from a known good script built with the builder.
 // Any errors are converted to a panic since it is only, and must only, be used
 // with hard coded, and therefore, known good, scripts.
-func builderScript(builder *btcscript.ScriptBuilder) []byte {
+func builderScript(builder *txscript.ScriptBuilder) []byte {
 	script, err := builder.Script()
 	if err != nil {
 		panic(err)
@@ -38,12 +38,12 @@ func TestPushedData(t *testing.T) {
 		valid bool
 	}{
 		{
-			[]byte{btcscript.OP_0, btcscript.OP_IF, btcscript.OP_0, btcscript.OP_ELSE, btcscript.OP_2, btcscript.OP_ENDIF},
+			[]byte{txscript.OP_0, txscript.OP_IF, txscript.OP_0, txscript.OP_ELSE, txscript.OP_2, txscript.OP_ENDIF},
 			[][]byte{{}, {}},
 			true,
 		},
 		{
-			builderScript(btcscript.NewScriptBuilder().AddInt64(16777216).AddInt64(10000000)),
+			builderScript(txscript.NewScriptBuilder().AddInt64(16777216).AddInt64(10000000)),
 			[][]byte{
 				{0x00, 0x00, 0x00, 0x01}, // 16777216
 				{0x80, 0x96, 0x98, 0x00}, // 10000000
@@ -51,9 +51,9 @@ func TestPushedData(t *testing.T) {
 			true,
 		},
 		{
-			builderScript(btcscript.NewScriptBuilder().AddOp(btcscript.OP_DUP).AddOp(btcscript.OP_HASH160).
-				AddData([]byte("17VZNX1SN5NtKa8UQFxwQbFeFc3iqRYhem")).AddOp(btcscript.OP_EQUALVERIFY).
-				AddOp(btcscript.OP_CHECKSIG)),
+			builderScript(txscript.NewScriptBuilder().AddOp(txscript.OP_DUP).AddOp(txscript.OP_HASH160).
+				AddData([]byte("17VZNX1SN5NtKa8UQFxwQbFeFc3iqRYhem")).AddOp(txscript.OP_EQUALVERIFY).
+				AddOp(txscript.OP_CHECKSIG)),
 			[][]byte{
 				// 17VZNX1SN5NtKa8UQFxwQbFeFc3iqRYhem
 				{
@@ -66,15 +66,15 @@ func TestPushedData(t *testing.T) {
 			true,
 		},
 		{
-			builderScript(btcscript.NewScriptBuilder().AddOp(btcscript.OP_PUSHDATA4).AddInt64(1000).
-				AddOp(btcscript.OP_EQUAL)),
+			builderScript(txscript.NewScriptBuilder().AddOp(txscript.OP_PUSHDATA4).AddInt64(1000).
+				AddOp(txscript.OP_EQUAL)),
 			[][]byte{},
 			false,
 		},
 	}
 
 	for x, test := range tests {
-		pushedData, err := btcscript.PushedData(test.in)
+		pushedData, err := txscript.PushedData(test.in)
 		if test.valid && err != nil {
 			t.Errorf("TestPushedData failed test #%d: %v\n", x, err)
 			continue
@@ -95,35 +95,35 @@ func TestStandardPushes(t *testing.T) {
 	t.Parallel()
 
 	for i := 0; i < 65535; i++ {
-		builder := btcscript.NewScriptBuilder()
+		builder := txscript.NewScriptBuilder()
 		builder.AddInt64(int64(i))
 		script, err := builder.Script()
 		if err != nil {
 			t.Errorf("StandardPushesTests test #%d unexpected error: %v\n", i, err)
 			continue
 		}
-		if result := btcscript.IsPushOnlyScript(script); !result {
+		if result := txscript.IsPushOnlyScript(script); !result {
 			t.Errorf("StandardPushesTests IsPushOnlyScript test #%d failed: %x\n", i, script)
 			continue
 		}
-		if result := btcscript.HasCanonicalPushes(script); !result {
+		if result := txscript.HasCanonicalPushes(script); !result {
 			t.Errorf("StandardPushesTests HasCanonicalPushes test #%d failed: %x\n", i, script)
 			continue
 		}
 	}
-	for i := 0; i <= btcscript.MaxScriptElementSize; i++ {
-		builder := btcscript.NewScriptBuilder()
+	for i := 0; i <= txscript.MaxScriptElementSize; i++ {
+		builder := txscript.NewScriptBuilder()
 		builder.AddData(bytes.Repeat([]byte{0x49}, i))
 		script, err := builder.Script()
 		if err != nil {
 			t.Errorf("StandardPushesTests test #%d unexpected error: %v\n", i, err)
 			continue
 		}
-		if result := btcscript.IsPushOnlyScript(script); !result {
+		if result := txscript.IsPushOnlyScript(script); !result {
 			t.Errorf("StandardPushesTests IsPushOnlyScript test #%d failed: %x\n", i, script)
 			continue
 		}
-		if result := btcscript.HasCanonicalPushes(script); !result {
+		if result := txscript.HasCanonicalPushes(script); !result {
 			t.Errorf("StandardPushesTests HasCanonicalPushes test #%d failed: %x\n", i, script)
 			continue
 		}
@@ -133,16 +133,16 @@ func TestStandardPushes(t *testing.T) {
 type txTest struct {
 	name          string
 	tx            *btcwire.MsgTx
-	pkScript      []byte               // output script of previous tx
-	idx           int                  // tx idx to be run.
-	bip16         bool                 // is bip16 active?
-	canonicalSigs bool                 // should signatures be validated as canonical?
-	parseErr      error                // failure of NewScript
-	err           error                // Failure of Executre
-	shouldFail    bool                 // Execute should fail with nonspecified error.
-	nSigOps       int                  // result of GetPreciseSigOpsCount
-	scriptInfo    btcscript.ScriptInfo // result of ScriptInfo
-	scriptInfoErr error                // error return of ScriptInfo
+	pkScript      []byte              // output script of previous tx
+	idx           int                 // tx idx to be run.
+	bip16         bool                // is bip16 active?
+	canonicalSigs bool                // should signatures be validated as canonical?
+	parseErr      error               // failure of NewScript
+	err           error               // Failure of Executre
+	shouldFail    bool                // Execute should fail with nonspecified error.
+	nSigOps       int                 // result of GetPreciseSigOpsCount
+	scriptInfo    txscript.ScriptInfo // result of ScriptInfo
+	scriptInfoErr error               // error return of ScriptInfo
 }
 
 var txTests = []txTest{
@@ -168,7 +168,7 @@ var txTests = []txTest{
 						Index: 0,
 					},
 					SignatureScript: []uint8{
-						btcscript.OP_DATA_71,
+						txscript.OP_DATA_71,
 						0x30, 0x44, 0x02, 0x20, 0x4e,
 						0x45, 0xe1, 0x69, 0x32, 0xb8,
 						0xaf, 0x51, 0x49, 0x61, 0xa1,
@@ -193,7 +193,7 @@ var txTests = []txTest{
 				{
 					Value: 1000000000,
 					PkScript: []byte{
-						btcscript.OP_DATA_65,
+						txscript.OP_DATA_65,
 						0x04, 0xae, 0x1a, 0x62, 0xfe,
 						0x09, 0xc5, 0xf5, 0x1b, 0x13,
 						0x90, 0x5f, 0x07, 0xf0, 0x6b,
@@ -207,13 +207,13 @@ var txTests = []txTest{
 						0x8a, 0x06, 0x26, 0xf1, 0xba,
 						0xde, 0xd5, 0xc7, 0x2a, 0x70,
 						0x4f, 0x7e, 0x6c, 0xd8, 0x4c,
-						btcscript.OP_CHECKSIG,
+						txscript.OP_CHECKSIG,
 					},
 				},
 				{
 					Value: 4000000000,
 					PkScript: []byte{
-						btcscript.OP_DATA_65,
+						txscript.OP_DATA_65,
 						0x04, 0x11, 0xdb, 0x93, 0xe1,
 						0xdc, 0xdb, 0x8a, 0x01, 0x6b,
 						0x49, 0x84, 0x0f, 0x8c, 0x53,
@@ -227,14 +227,14 @@ var txTests = []txTest{
 						0x8b, 0x64, 0xf9, 0xd4, 0xc0,
 						0x3f, 0x99, 0x9b, 0x86, 0x43,
 						0xf6, 0x56, 0xb4, 0x12, 0xa3,
-						btcscript.OP_CHECKSIG,
+						txscript.OP_CHECKSIG,
 					},
 				},
 			},
 			LockTime: 0,
 		},
 		pkScript: []byte{
-			btcscript.OP_DATA_65,
+			txscript.OP_DATA_65,
 			0x04, 0x11, 0xdb, 0x93, 0xe1, 0xdc, 0xdb, 0x8a, 0x01,
 			0x6b, 0x49, 0x84, 0x0f, 0x8c, 0x53, 0xbc, 0x1e, 0xb6,
 			0x8a, 0x38, 0x2e, 0x97, 0xb1, 0x48, 0x2e, 0xca, 0xd7,
@@ -242,12 +242,12 @@ var txTests = []txTest{
 			0xdd, 0xfb, 0x84, 0xcc, 0xf9, 0x74, 0x44, 0x64, 0xf8,
 			0x2e, 0x16, 0x0b, 0xfa, 0x9b, 0x8b, 0x64, 0xf9, 0xd4,
 			0xc0, 0x3f, 0x99, 0x9b, 0x86, 0x43, 0xf6, 0x56, 0xb4,
-			0x12, 0xa3, btcscript.OP_CHECKSIG,
+			0x12, 0xa3, txscript.OP_CHECKSIG,
 		},
 		idx:     0,
 		nSigOps: 1,
-		scriptInfo: btcscript.ScriptInfo{
-			PkScriptClass:  btcscript.PubKeyTy,
+		scriptInfo: txscript.ScriptInfo{
+			PkScriptClass:  txscript.PubKeyTy,
 			NumInputs:      1,
 			ExpectedInputs: 1,
 			SigOps:         1,
@@ -274,7 +274,7 @@ var txTests = []txTest{
 						Index: 0,
 					},
 					SignatureScript: []uint8{
-						btcscript.OP_DATA_71,
+						txscript.OP_DATA_71,
 						0x30, 0x44, 0x02, 0x20, 0x4e,
 						0x45, 0xe1, 0x69, 0x32, 0xb8,
 						0xaf, 0x51, 0x49, 0x61, 0xa1,
@@ -299,7 +299,7 @@ var txTests = []txTest{
 				{
 					Value: 1000000000,
 					PkScript: []byte{
-						btcscript.OP_DATA_65,
+						txscript.OP_DATA_65,
 						0x04, 0xae, 0x1a, 0x62, 0xfe,
 						0x09, 0xc5, 0xf5, 0x1b, 0x13,
 						0x90, 0x5f, 0x07, 0xf0, 0x6b,
@@ -313,13 +313,13 @@ var txTests = []txTest{
 						0x8a, 0x06, 0x26, 0xf1, 0xba,
 						0xde, 0xd5, 0xc7, 0x2a, 0x70,
 						0x4f, 0x7e, 0x6c, 0xd8, 0x4c,
-						btcscript.OP_CHECKSIG,
+						txscript.OP_CHECKSIG,
 					},
 				},
 				{
 					Value: 5000000000,
 					PkScript: []byte{
-						btcscript.OP_DATA_65,
+						txscript.OP_DATA_65,
 						0x04, 0x11, 0xdb, 0x93, 0xe1,
 						0xdc, 0xdb, 0x8a, 0x01, 0x6b,
 						0x49, 0x84, 0x0f, 0x8c, 0x53,
@@ -333,14 +333,14 @@ var txTests = []txTest{
 						0x8b, 0x64, 0xf9, 0xd4, 0xc0,
 						0x3f, 0x99, 0x9b, 0x86, 0x43,
 						0xf6, 0x56, 0xb4, 0x12, 0xa3,
-						btcscript.OP_CHECKSIG,
+						txscript.OP_CHECKSIG,
 					},
 				},
 			},
 			LockTime: 0,
 		},
 		pkScript: []byte{
-			btcscript.OP_DATA_65,
+			txscript.OP_DATA_65,
 			0x04, 0x11, 0xdb, 0x93, 0xe1, 0xdc, 0xdb, 0x8a, 0x01,
 			0x6b, 0x49, 0x84, 0x0f, 0x8c, 0x53, 0xbc, 0x1e, 0xb6,
 			0x8a, 0x38, 0x2e, 0x97, 0xb1, 0x48, 0x2e, 0xca, 0xd7,
@@ -348,13 +348,13 @@ var txTests = []txTest{
 			0xdd, 0xfb, 0x84, 0xcc, 0xf9, 0x74, 0x44, 0x64, 0xf8,
 			0x2e, 0x16, 0x0b, 0xfa, 0x9b, 0x8b, 0x64, 0xf9, 0xd4,
 			0xc0, 0x3f, 0x99, 0x9b, 0x86, 0x43, 0xf6, 0x56, 0xb4,
-			0x12, 0xa3, btcscript.OP_CHECKSIG,
+			0x12, 0xa3, txscript.OP_CHECKSIG,
 		},
 		idx:     0,
-		err:     btcscript.ErrStackScriptFailed,
+		err:     txscript.ErrStackScriptFailed,
 		nSigOps: 1,
-		scriptInfo: btcscript.ScriptInfo{
-			PkScriptClass:  btcscript.PubKeyTy,
+		scriptInfo: txscript.ScriptInfo{
+			PkScriptClass:  txscript.PubKeyTy,
 			NumInputs:      1,
 			ExpectedInputs: 1,
 			SigOps:         1,
@@ -382,7 +382,7 @@ var txTests = []txTest{
 					// Signature has length fiddled to
 					// fail parsing.
 					SignatureScript: []uint8{
-						btcscript.OP_DATA_71,
+						txscript.OP_DATA_71,
 						0x30, 0x45, 0x02, 0x20, 0x4e,
 						0x45, 0xe1, 0x69, 0x32, 0xb8,
 						0xaf, 0x51, 0x49, 0x61, 0xa1,
@@ -407,7 +407,7 @@ var txTests = []txTest{
 				{
 					Value: 1000000000,
 					PkScript: []byte{
-						btcscript.OP_DATA_65,
+						txscript.OP_DATA_65,
 						0x04, 0xae, 0x1a, 0x62, 0xfe,
 						0x09, 0xc5, 0xf5, 0x1b, 0x13,
 						0x90, 0x5f, 0x07, 0xf0, 0x6b,
@@ -421,13 +421,13 @@ var txTests = []txTest{
 						0x8a, 0x06, 0x26, 0xf1, 0xba,
 						0xde, 0xd5, 0xc7, 0x2a, 0x70,
 						0x4f, 0x7e, 0x6c, 0xd8, 0x4c,
-						btcscript.OP_CHECKSIG,
+						txscript.OP_CHECKSIG,
 					},
 				},
 				{
 					Value: 4000000000,
 					PkScript: []byte{
-						btcscript.OP_DATA_65,
+						txscript.OP_DATA_65,
 						0x04, 0x11, 0xdb, 0x93, 0xe1,
 						0xdc, 0xdb, 0x8a, 0x01, 0x6b,
 						0x49, 0x84, 0x0f, 0x8c, 0x53,
@@ -441,14 +441,14 @@ var txTests = []txTest{
 						0x8b, 0x64, 0xf9, 0xd4, 0xc0,
 						0x3f, 0x99, 0x9b, 0x86, 0x43,
 						0xf6, 0x56, 0xb4, 0x12, 0xa3,
-						btcscript.OP_CHECKSIG,
+						txscript.OP_CHECKSIG,
 					},
 				},
 			},
 			LockTime: 0,
 		},
 		pkScript: []byte{
-			btcscript.OP_DATA_65,
+			txscript.OP_DATA_65,
 			0x04, 0x11, 0xdb, 0x93, 0xe1, 0xdc, 0xdb, 0x8a, 0x01,
 			0x6b, 0x49, 0x84, 0x0f, 0x8c, 0x53, 0xbc, 0x1e, 0xb6,
 			0x8a, 0x38, 0x2e, 0x97, 0xb1, 0x48, 0x2e, 0xca, 0xd7,
@@ -456,13 +456,13 @@ var txTests = []txTest{
 			0xdd, 0xfb, 0x84, 0xcc, 0xf9, 0x74, 0x44, 0x64, 0xf8,
 			0x2e, 0x16, 0x0b, 0xfa, 0x9b, 0x8b, 0x64, 0xf9, 0xd4,
 			0xc0, 0x3f, 0x99, 0x9b, 0x86, 0x43, 0xf6, 0x56, 0xb4,
-			0x12, 0xa3, btcscript.OP_CHECKSIG,
+			0x12, 0xa3, txscript.OP_CHECKSIG,
 		},
 		idx:        0,
 		shouldFail: true,
 		nSigOps:    1,
-		scriptInfo: btcscript.ScriptInfo{
-			PkScriptClass:  btcscript.PubKeyTy,
+		scriptInfo: txscript.ScriptInfo{
+			PkScriptClass:  txscript.PubKeyTy,
 			NumInputs:      1,
 			ExpectedInputs: 1,
 			SigOps:         1,
@@ -488,7 +488,7 @@ var txTests = []txTest{
 						Index: 0,
 					},
 					SignatureScript: []uint8{
-						btcscript.OP_DATA_71,
+						txscript.OP_DATA_71,
 						0x30, 0x44, 0x02, 0x20, 0x4e,
 						0x45, 0xe1, 0x69, 0x32, 0xb8,
 						0xaf, 0x51, 0x49, 0x61, 0xa1,
@@ -513,7 +513,7 @@ var txTests = []txTest{
 				{
 					Value: 1000000000,
 					PkScript: []byte{
-						btcscript.OP_DATA_65,
+						txscript.OP_DATA_65,
 						0x04, 0xae, 0x1a, 0x62, 0xfe,
 						0x09, 0xc5, 0xf5, 0x1b, 0x13,
 						0x90, 0x5f, 0x07, 0xf0, 0x6b,
@@ -527,13 +527,13 @@ var txTests = []txTest{
 						0x8a, 0x06, 0x26, 0xf1, 0xba,
 						0xde, 0xd5, 0xc7, 0x2a, 0x70,
 						0x4f, 0x7e, 0x6c, 0xd8, 0x4c,
-						btcscript.OP_CHECKSIG,
+						txscript.OP_CHECKSIG,
 					},
 				},
 				{
 					Value: 4000000000,
 					PkScript: []byte{
-						btcscript.OP_DATA_65,
+						txscript.OP_DATA_65,
 						0x04, 0x11, 0xdb, 0x93, 0xe1,
 						0xdc, 0xdb, 0x8a, 0x01, 0x6b,
 						0x49, 0x84, 0x0f, 0x8c, 0x53,
@@ -547,7 +547,7 @@ var txTests = []txTest{
 						0x8b, 0x64, 0xf9, 0xd4, 0xc0,
 						0x3f, 0x99, 0x9b, 0x86, 0x43,
 						0xf6, 0x56, 0xb4, 0x12, 0xa3,
-						btcscript.OP_CHECKSIG,
+						txscript.OP_CHECKSIG,
 					},
 				},
 			},
@@ -555,7 +555,7 @@ var txTests = []txTest{
 		},
 		// pubkey header magic byte has been changed to parse wrong.
 		pkScript: []byte{
-			btcscript.OP_DATA_65,
+			txscript.OP_DATA_65,
 			0x02, 0x11, 0xdb, 0x93, 0xe1, 0xdc, 0xdb, 0x8a, 0x01,
 			0x6b, 0x49, 0x84, 0x0f, 0x8c, 0x53, 0xbc, 0x1e, 0xb6,
 			0x8a, 0x38, 0x2e, 0x97, 0xb1, 0x48, 0x2e, 0xca, 0xd7,
@@ -563,13 +563,13 @@ var txTests = []txTest{
 			0xdd, 0xfb, 0x84, 0xcc, 0xf9, 0x74, 0x44, 0x64, 0xf8,
 			0x2e, 0x16, 0x0b, 0xfa, 0x9b, 0x8b, 0x64, 0xf9, 0xd4,
 			0xc0, 0x3f, 0x99, 0x9b, 0x86, 0x43, 0xf6, 0x56, 0xb4,
-			0x12, 0xa3, btcscript.OP_CHECKSIG,
+			0x12, 0xa3, txscript.OP_CHECKSIG,
 		},
 		idx:        0,
 		shouldFail: true,
 		nSigOps:    1,
-		scriptInfo: btcscript.ScriptInfo{
-			PkScriptClass:  btcscript.PubKeyTy,
+		scriptInfo: txscript.ScriptInfo{
+			PkScriptClass:  txscript.PubKeyTy,
 			NumInputs:      1,
 			ExpectedInputs: 1,
 			SigOps:         1,
@@ -597,7 +597,7 @@ var txTests = []txTest{
 						Index: 1,
 					},
 					SignatureScript: []byte{
-						btcscript.OP_DATA_71,
+						txscript.OP_DATA_71,
 						0x30, 0x44, 0x02, 0x20, 0xbb,
 						0x4f, 0xbc, 0x49, 0x5a, 0xa2,
 						0x3b, 0xab, 0xb2, 0xc2, 0xbe,
@@ -613,7 +613,7 @@ var txTests = []txTest{
 						0x75, 0x67, 0x82, 0xee, 0x6f,
 						0x8a, 0x22, 0xa9, 0x59, 0xa2,
 						0x02,
-						btcscript.OP_DATA_65,
+						txscript.OP_DATA_65,
 						0x04, 0xf1, 0x93, 0x9a, 0xe6,
 						0xb0, 0x1e, 0x84, 0x9b, 0xf0,
 						0x5d, 0x0e, 0xd5, 0x1f, 0xd5,
@@ -635,49 +635,49 @@ var txTests = []txTest{
 				{
 					Value: 1000000,
 					PkScript: []byte{
-						btcscript.OP_DUP,
-						btcscript.OP_HASH160,
-						btcscript.OP_DATA_20,
+						txscript.OP_DUP,
+						txscript.OP_HASH160,
+						txscript.OP_DATA_20,
 						0x66, 0x0d, 0x4e, 0xf3, 0xa7,
 						0x43, 0xe3, 0xe6, 0x96, 0xad,
 						0x99, 0x03, 0x64, 0xe5, 0x55,
 						0xc2, 0x71, 0xad, 0x50, 0x4b,
-						btcscript.OP_EQUALVERIFY,
-						btcscript.OP_CHECKSIG,
+						txscript.OP_EQUALVERIFY,
+						txscript.OP_CHECKSIG,
 					},
 				},
 				{
 					Value: 29913632,
 					PkScript: []byte{
-						btcscript.OP_DUP,
-						btcscript.OP_HASH160,
-						btcscript.OP_DATA_20,
+						txscript.OP_DUP,
+						txscript.OP_HASH160,
+						txscript.OP_DATA_20,
 						0x21, 0xc4, 0x3c, 0xe4, 0x00,
 						0x90, 0x13, 0x12, 0xa6, 0x03,
 						0xe4, 0x20, 0x7a, 0xad, 0xfd,
 						0x74, 0x2b, 0xe8, 0xe7, 0xda,
-						btcscript.OP_EQUALVERIFY,
-						btcscript.OP_CHECKSIG,
+						txscript.OP_EQUALVERIFY,
+						txscript.OP_CHECKSIG,
 					},
 				},
 			},
 			LockTime: 0,
 		},
 		pkScript: []byte{
-			btcscript.OP_DUP,
-			btcscript.OP_HASH160,
-			btcscript.OP_DATA_20,
+			txscript.OP_DUP,
+			txscript.OP_HASH160,
+			txscript.OP_DATA_20,
 			0x21, 0xc4, 0x3c, 0xe4, 0x00, 0x90, 0x13, 0x12, 0xa6,
 			0x03, 0xe4, 0x20, 0x7a, 0xad, 0xfd, 0x74, 0x2b, 0xe8,
 			0xe7, 0xda,
-			btcscript.OP_EQUALVERIFY,
-			btcscript.OP_CHECKSIG,
+			txscript.OP_EQUALVERIFY,
+			txscript.OP_CHECKSIG,
 		},
 		idx:     0,
 		bip16:   true, // after threshold
 		nSigOps: 1,
-		scriptInfo: btcscript.ScriptInfo{
-			PkScriptClass:  btcscript.PubKeyHashTy,
+		scriptInfo: txscript.ScriptInfo{
+			PkScriptClass:  txscript.PubKeyHashTy,
 			NumInputs:      2,
 			ExpectedInputs: 2,
 			SigOps:         1,
@@ -703,7 +703,7 @@ var txTests = []txTest{
 						Index: 1,
 					},
 					SignatureScript: []byte{
-						btcscript.OP_DATA_71,
+						txscript.OP_DATA_71,
 						0x30, 0x44, 0x02, 0x20, 0xa0,
 						0x42, 0xde, 0xe5, 0x52, 0x6b,
 						0xf2, 0x29, 0x4d, 0x3f, 0x3e,
@@ -719,7 +719,7 @@ var txTests = []txTest{
 						0x68, 0x02, 0x6a, 0x97, 0x5c,
 						0x7d, 0xae, 0x11, 0x2e, 0x4f,
 						0x01,
-						btcscript.OP_DATA_65,
+						txscript.OP_DATA_65,
 						0x04, 0x49, 0x45, 0x33, 0x18,
 						0xbd, 0x5e, 0xcf, 0xea, 0x5f,
 						0x86, 0x32, 0x8c, 0x6d, 0x8e,
@@ -751,7 +751,7 @@ var txTests = []txTest{
 						Index: 1,
 					},
 					SignatureScript: []byte{
-						btcscript.OP_DATA_71,
+						txscript.OP_DATA_71,
 						0x30, 0x44, 0x02, 0x20, 0xc3,
 						0x02, 0x3b, 0xed, 0x85, 0x0d,
 						0x94, 0x27, 0x8e, 0x06, 0xd2,
@@ -767,7 +767,7 @@ var txTests = []txTest{
 						0x4a, 0x72, 0x73, 0xeb, 0x5b,
 						0x8d, 0x1d, 0xd7, 0x02, 0xcc,
 						0x01,
-						btcscript.OP_DATA_65,
+						txscript.OP_DATA_65,
 						0x04, 0x49, 0x5c, 0x8f, 0x66,
 						0x90, 0x0d, 0xb7, 0x62, 0x69,
 						0x0b, 0x54, 0x49, 0xa1, 0xf4,
@@ -789,43 +789,43 @@ var txTests = []txTest{
 				{
 					Value: 630320000,
 					PkScript: []byte{
-						btcscript.OP_DUP,
-						btcscript.OP_HASH160,
-						btcscript.OP_DATA_20,
+						txscript.OP_DUP,
+						txscript.OP_HASH160,
+						txscript.OP_DATA_20,
 						0x43, 0xdc, 0x32, 0x1b, 0x66,
 						0x00, 0x51, 0x1f, 0xe0, 0xa9,
 						0x6a, 0x97, 0xc2, 0x59, 0x3a,
 						0x90, 0x54, 0x29, 0x74, 0xd6,
-						btcscript.OP_EQUALVERIFY,
-						btcscript.OP_CHECKSIG,
+						txscript.OP_EQUALVERIFY,
+						txscript.OP_CHECKSIG,
 					},
 				},
 				{
 					Value: 100000181,
 					PkScript: []byte{
-						btcscript.OP_DUP,
-						btcscript.OP_HASH160,
-						btcscript.OP_DATA_20,
+						txscript.OP_DUP,
+						txscript.OP_HASH160,
+						txscript.OP_DATA_20,
 						0xa4, 0x05, 0xea, 0x18, 0x09,
 						0x14, 0xa9, 0x11, 0xd0, 0xb8,
 						0x07, 0x99, 0x19, 0x2b, 0x0b,
 						0x84, 0xae, 0x80, 0x1e, 0xbd,
-						btcscript.OP_EQUALVERIFY,
-						btcscript.OP_CHECKSIG,
+						txscript.OP_EQUALVERIFY,
+						txscript.OP_CHECKSIG,
 					},
 				},
 				{
 					Value: 596516343,
 					PkScript: []byte{
-						btcscript.OP_DUP,
-						btcscript.OP_HASH160,
-						btcscript.OP_DATA_20,
+						txscript.OP_DUP,
+						txscript.OP_HASH160,
+						txscript.OP_DATA_20,
 						0x24, 0x56, 0x76, 0x45, 0x4f,
 						0x6f, 0xff, 0x28, 0x88, 0x39,
 						0x47, 0xea, 0x70, 0x23, 0x86,
 						0x9b, 0x8a, 0x71, 0xa3, 0x05,
-						btcscript.OP_EQUALVERIFY,
-						btcscript.OP_CHECKSIG,
+						txscript.OP_EQUALVERIFY,
+						txscript.OP_CHECKSIG,
 					},
 				},
 			},
@@ -833,22 +833,22 @@ var txTests = []txTest{
 		},
 		// Test input 0
 		pkScript: []byte{
-			btcscript.OP_DUP,
-			btcscript.OP_HASH160,
-			btcscript.OP_DATA_20,
+			txscript.OP_DUP,
+			txscript.OP_HASH160,
+			txscript.OP_DATA_20,
 			0xfd, 0xf6, 0xea, 0xe7, 0x10,
 			0xa0, 0xc4, 0x49, 0x7a, 0x8d,
 			0x0f, 0xd2, 0x9a, 0xf6, 0x6b,
 			0xac, 0x94, 0xaf, 0x6c, 0x98,
-			btcscript.OP_EQUALVERIFY,
-			btcscript.OP_CHECKSIG,
+			txscript.OP_EQUALVERIFY,
+			txscript.OP_CHECKSIG,
 		},
 		idx:           0,
 		canonicalSigs: true,
 		shouldFail:    true,
 		nSigOps:       1,
-		scriptInfo: btcscript.ScriptInfo{
-			PkScriptClass:  btcscript.PubKeyHashTy,
+		scriptInfo: txscript.ScriptInfo{
+			PkScriptClass:  txscript.PubKeyHashTy,
 			NumInputs:      2,
 			ExpectedInputs: 2,
 			SigOps:         1,
@@ -877,7 +877,7 @@ var txTests = []txTest{
 						Index: 1,
 					},
 					SignatureScript: []byte{
-						btcscript.OP_DATA_72,
+						txscript.OP_DATA_72,
 						0x30, 0x45, 0x02, 0x20, 0x58,
 						0x53, 0xc7, 0xf1, 0x39, 0x57,
 						0x85, 0xbf, 0xab, 0xb0, 0x3c,
@@ -893,7 +893,7 @@ var txTests = []txTest{
 						0x7d, 0x48, 0x5d, 0xc5, 0x29,
 						0xaf, 0xc5, 0x16, 0xc2, 0xdd,
 						0xb4, 0x81,
-						btcscript.OP_DATA_33,
+						txscript.OP_DATA_33,
 						0x03, 0x05, 0x58, 0x49, 0x80,
 						0x36, 0x7b, 0x32, 0x1f, 0xad,
 						0x7f, 0x1c, 0x1f, 0x4d, 0x5d,
@@ -919,7 +919,7 @@ var txTests = []txTest{
 						Index: 1,
 					},
 					SignatureScript: []byte{
-						btcscript.OP_DATA_73,
+						txscript.OP_DATA_73,
 						0x30, 0x46, 0x02, 0x21, 0x00,
 						0x82, 0x69, 0xc9, 0xd7, 0xba,
 						0x0a, 0x7e, 0x73, 0x0d, 0xd1,
@@ -935,7 +935,7 @@ var txTests = []txTest{
 						0xbc, 0xff, 0x0d, 0x81, 0xd0,
 						0x5b, 0x39, 0xff, 0x0f, 0x42,
 						0x17, 0xb2, 0x81,
-						btcscript.OP_DATA_33,
+						txscript.OP_DATA_33,
 						0x03, 0xaa, 0xe3, 0x03, 0xd8,
 						0x25, 0x42, 0x15, 0x45, 0xc5,
 						0xbc, 0x7c, 0xcd, 0x5a, 0xc8,
@@ -951,35 +951,35 @@ var txTests = []txTest{
 				{
 					Value: 300000,
 					PkScript: []byte{
-						btcscript.OP_DUP,
-						btcscript.OP_HASH160,
-						btcscript.OP_DATA_20,
+						txscript.OP_DUP,
+						txscript.OP_HASH160,
+						txscript.OP_DATA_20,
 						0x5c, 0x11, 0xf9, 0x17, 0x88,
 						0x3b, 0x92, 0x7e, 0xef, 0x77,
 						0xdc, 0x57, 0x70, 0x7a, 0xeb,
 						0x85, 0x3f, 0x6d, 0x38, 0x94,
-						btcscript.OP_EQUALVERIFY,
-						btcscript.OP_CHECKSIG,
+						txscript.OP_EQUALVERIFY,
+						txscript.OP_CHECKSIG,
 					},
 				},
 			},
 			LockTime: 0,
 		},
 		pkScript: []byte{
-			btcscript.OP_DUP,
-			btcscript.OP_HASH160,
-			btcscript.OP_DATA_20,
+			txscript.OP_DUP,
+			txscript.OP_HASH160,
+			txscript.OP_DATA_20,
 			0x85, 0x51, 0xe4, 0x8a, 0x53, 0xde, 0xcd, 0x1c, 0xfc,
 			0x63, 0x07, 0x9a, 0x45, 0x81, 0xbc, 0xcc, 0xfa, 0xd1,
 			0xa9, 0x3c,
-			btcscript.OP_EQUALVERIFY,
-			btcscript.OP_CHECKSIG,
+			txscript.OP_EQUALVERIFY,
+			txscript.OP_CHECKSIG,
 		},
 		idx:     0,
 		bip16:   true, // after threshold
 		nSigOps: 1,
-		scriptInfo: btcscript.ScriptInfo{
-			PkScriptClass:  btcscript.PubKeyHashTy,
+		scriptInfo: txscript.ScriptInfo{
+			PkScriptClass:  txscript.PubKeyHashTy,
 			NumInputs:      2,
 			ExpectedInputs: 2,
 			SigOps:         1,
@@ -1007,7 +1007,7 @@ var txTests = []txTest{
 						Index: 0,
 					},
 					SignatureScript: []byte{
-						btcscript.OP_DATA_71,
+						txscript.OP_DATA_71,
 						0x30, 0x44, 0x02, 0x20, 0x02,
 						0xdb, 0xe4, 0xb5, 0xa2, 0xfb,
 						0xb5, 0x21, 0xe4, 0xdc, 0x5f,
@@ -1045,8 +1045,8 @@ var txTests = []txTest{
 						Index: 1,
 					},
 					SignatureScript: []uint8{
-						btcscript.OP_FALSE,
-						btcscript.OP_DATA_72,
+						txscript.OP_FALSE,
+						txscript.OP_DATA_72,
 						0x30, 0x45, 0x02, 0x20, 0x10,
 						0x6a, 0x3e, 0x4e, 0xf0, 0xb5,
 						0x1b, 0x76, 0x4a, 0x28, 0x87,
@@ -1062,9 +1062,9 @@ var txTests = []txTest{
 						0x1f, 0xe0, 0x72, 0x82, 0xe3,
 						0xb6, 0xec, 0xb5, 0xf3, 0xbb,
 						0x28, 0x01,
-						btcscript.OP_CODESEPARATOR,
-						btcscript.OP_TRUE,
-						btcscript.OP_DATA_33,
+						txscript.OP_CODESEPARATOR,
+						txscript.OP_TRUE,
+						txscript.OP_DATA_33,
 						0x02, 0x32, 0xab, 0xdc, 0x89,
 						0x3e, 0x7f, 0x06, 0x31, 0x36,
 						0x4d, 0x7f, 0xd0, 0x1c, 0xb3,
@@ -1072,8 +1072,8 @@ var txTests = []txTest{
 						0x9a, 0x00, 0x35, 0x7b, 0x3a,
 						0x78, 0x86, 0x21, 0x1a, 0xb4,
 						0x14, 0xd5, 0x5a,
-						btcscript.OP_TRUE,
-						btcscript.OP_CHECKMULTISIG,
+						txscript.OP_TRUE,
+						txscript.OP_CHECKMULTISIG,
 					},
 					Sequence: 4294967295,
 				},
@@ -1082,15 +1082,15 @@ var txTests = []txTest{
 				{
 					Value: 4800000,
 					PkScript: []byte{
-						btcscript.OP_DUP,
-						btcscript.OP_HASH160,
-						btcscript.OP_DATA_20,
+						txscript.OP_DUP,
+						txscript.OP_HASH160,
+						txscript.OP_DATA_20,
 						0x0d, 0x77, 0x13, 0x64, 0x9f,
 						0x9a, 0x06, 0x78, 0xf4, 0xe8,
 						0x80, 0xb4, 0x0f, 0x86, 0xb9,
 						0x32, 0x89, 0xd1, 0xbb, 0x27,
-						btcscript.OP_EQUALVERIFY,
-						btcscript.OP_CHECKSIG,
+						txscript.OP_EQUALVERIFY,
+						txscript.OP_CHECKSIG,
 					},
 				},
 			},
@@ -1098,16 +1098,16 @@ var txTests = []txTest{
 		},
 		// This is a very weird script...
 		pkScript: []byte{
-			btcscript.OP_DATA_20,
+			txscript.OP_DATA_20,
 			0x2a, 0x9b, 0xc5, 0x44, 0x7d, 0x66, 0x4c, 0x1d, 0x01,
 			0x41, 0x39, 0x2a, 0x84, 0x2d, 0x23, 0xdb, 0xa4, 0x5c,
 			0x4f, 0x13,
-			btcscript.OP_NOP2, btcscript.OP_DROP,
+			txscript.OP_NOP2, txscript.OP_DROP,
 		},
 		idx:           1,
 		bip16:         false,
 		nSigOps:       0, // multisig is in the pkScript!
-		scriptInfoErr: btcscript.ErrStackNonPushOnly,
+		scriptInfoErr: txscript.ErrStackNonPushOnly,
 	},
 	// same as previous but with one byte changed to make signature fail
 	{
@@ -1130,7 +1130,7 @@ var txTests = []txTest{
 						Index: 0,
 					},
 					SignatureScript: []byte{
-						btcscript.OP_DATA_71,
+						txscript.OP_DATA_71,
 						0x30, 0x44, 0x02, 0x20, 0x02,
 						0xdb, 0xe4, 0xb5, 0xa2, 0xfb,
 						0xb5, 0x21, 0xe4, 0xdc, 0x5f,
@@ -1168,8 +1168,8 @@ var txTests = []txTest{
 						Index: 1,
 					},
 					SignatureScript: []uint8{
-						btcscript.OP_FALSE,
-						btcscript.OP_DATA_72,
+						txscript.OP_FALSE,
+						txscript.OP_DATA_72,
 						0x30, 0x45, 0x02, 0x20, 0x10,
 						0x6a, 0x3e, 0x4e, 0xf0, 0xb5,
 						0x1b, 0x76, 0x4a, 0x28, 0x87,
@@ -1185,9 +1185,9 @@ var txTests = []txTest{
 						0x1f, 0xe0, 0x72, 0x82, 0xe3,
 						0xb6, 0xec, 0xb5, 0xf3, 0xbb,
 						0x28, 0x01,
-						btcscript.OP_CODESEPARATOR,
-						btcscript.OP_TRUE,
-						btcscript.OP_DATA_33,
+						txscript.OP_CODESEPARATOR,
+						txscript.OP_TRUE,
+						txscript.OP_DATA_33,
 						0x02, 0x32, 0xab, 0xdc, 0x89,
 						0x3e, 0x7f, 0x06, 0x31, 0x36,
 						0x4d, 0x7f, 0xd0, 0x1c, 0xb3,
@@ -1195,8 +1195,8 @@ var txTests = []txTest{
 						0x9a, 0x00, 0x35, 0x7b, 0x3a,
 						0x78, 0x86, 0x21, 0x1a, 0xb4,
 						0x14, 0xd5, 0x5a,
-						btcscript.OP_TRUE,
-						btcscript.OP_CHECKMULTISIG,
+						txscript.OP_TRUE,
+						txscript.OP_CHECKMULTISIG,
 					},
 					Sequence: 4294967295,
 				},
@@ -1205,15 +1205,15 @@ var txTests = []txTest{
 				{
 					Value: 5800000,
 					PkScript: []byte{
-						btcscript.OP_DUP,
-						btcscript.OP_HASH160,
-						btcscript.OP_DATA_20,
+						txscript.OP_DUP,
+						txscript.OP_HASH160,
+						txscript.OP_DATA_20,
 						0x0d, 0x77, 0x13, 0x64, 0x9f,
 						0x9a, 0x06, 0x78, 0xf4, 0xe8,
 						0x80, 0xb4, 0x0f, 0x86, 0xb9,
 						0x32, 0x89, 0xd1, 0xbb, 0x27,
-						btcscript.OP_EQUALVERIFY,
-						btcscript.OP_CHECKSIG,
+						txscript.OP_EQUALVERIFY,
+						txscript.OP_CHECKSIG,
 					},
 				},
 			},
@@ -1221,17 +1221,17 @@ var txTests = []txTest{
 		},
 		// This is a very weird script...
 		pkScript: []byte{
-			btcscript.OP_DATA_20,
+			txscript.OP_DATA_20,
 			0x2a, 0x9b, 0xc5, 0x44, 0x7d, 0x66, 0x4c, 0x1d, 0x01,
 			0x41, 0x39, 0x2a, 0x84, 0x2d, 0x23, 0xdb, 0xa4, 0x5c,
 			0x4f, 0x13,
-			btcscript.OP_NOP2, btcscript.OP_DROP,
+			txscript.OP_NOP2, txscript.OP_DROP,
 		},
 		idx:           1,
 		bip16:         false,
-		err:           btcscript.ErrStackScriptFailed,
+		err:           txscript.ErrStackScriptFailed,
 		nSigOps:       0, // multisig is in the pkScript!
-		scriptInfoErr: btcscript.ErrStackNonPushOnly,
+		scriptInfoErr: txscript.ErrStackNonPushOnly,
 	},
 	// taken from tx b2d93dfd0b2c1a380e55e76a8d9cb3075dec9f4474e9485be008c337fd62c1f7
 	// on testnet
@@ -1256,10 +1256,10 @@ var txTests = []txTest{
 						Index: 0,
 					},
 					SignatureScript: []byte{
-						btcscript.OP_0,
-						btcscript.OP_DATA_37,
-						btcscript.OP_0,
-						btcscript.OP_DATA_33,
+						txscript.OP_0,
+						txscript.OP_DATA_37,
+						txscript.OP_0,
+						txscript.OP_DATA_33,
 						0x02, 0x4a, 0xb3, 0x3c, 0x3a,
 						0x54, 0x7a, 0x37, 0x29, 0x3e,
 						0xb8, 0x75, 0xb4, 0xbb, 0xdb,
@@ -1267,8 +1267,8 @@ var txTests = []txTest{
 						0xfd, 0xf3, 0x56, 0x87, 0xe7,
 						0x97, 0x44, 0xdc, 0xd7, 0x0f,
 						0x6e, 0x4d, 0xe2,
-						btcscript.OP_1,
-						btcscript.OP_CHECKMULTISIG,
+						txscript.OP_1,
+						txscript.OP_CHECKMULTISIG,
 					},
 					Sequence: 4294967295,
 				},
@@ -1277,18 +1277,18 @@ var txTests = []txTest{
 			LockTime: 0,
 		},
 		pkScript: []byte{
-			btcscript.OP_HASH160,
-			btcscript.OP_DATA_20,
+			txscript.OP_HASH160,
+			txscript.OP_DATA_20,
 			0x2c, 0x6b, 0x10, 0x7f, 0xdf, 0x10, 0x6f, 0x22, 0x6f,
 			0x3f, 0xa3, 0x27, 0xba, 0x36, 0xd6, 0xe3, 0xca, 0xc7,
 			0x3d, 0xf0,
-			btcscript.OP_EQUAL,
+			txscript.OP_EQUAL,
 		},
 		idx:     0,
 		bip16:   true,
 		nSigOps: 1,
-		scriptInfo: btcscript.ScriptInfo{
-			PkScriptClass:  btcscript.ScriptHashTy,
+		scriptInfo: txscript.ScriptInfo{
+			PkScriptClass:  txscript.ScriptHashTy,
 			NumInputs:      2,
 			ExpectedInputs: 2,
 			SigOps:         1,
@@ -1316,7 +1316,7 @@ var txTests = []txTest{
 						Index: 0,
 					},
 					SignatureScript: []byte{
-						btcscript.OP_DATA_2,
+						txscript.OP_DATA_2,
 						// OP_3 OP_7
 						0x53, 0x57,
 					},
@@ -1327,33 +1327,33 @@ var txTests = []txTest{
 				{
 					Value: 1000000,
 					PkScript: []byte{
-						btcscript.OP_DUP,
-						btcscript.OP_HASH160,
-						btcscript.OP_DATA_20,
+						txscript.OP_DUP,
+						txscript.OP_HASH160,
+						txscript.OP_DATA_20,
 						0x5b, 0x69, 0xd8, 0xb9, 0xdf,
 						0xa6, 0xe4, 0x12, 0x26, 0x47,
 						0xe1, 0x79, 0x4e, 0xaa, 0x3b,
 						0xfc, 0x11, 0x1f, 0x70, 0xef,
-						btcscript.OP_EQUALVERIFY,
-						btcscript.OP_CHECKSIG,
+						txscript.OP_EQUALVERIFY,
+						txscript.OP_CHECKSIG,
 					},
 				},
 			},
 			LockTime: 0,
 		},
 		pkScript: []byte{
-			btcscript.OP_HASH160,
-			btcscript.OP_DATA_20,
+			txscript.OP_HASH160,
+			txscript.OP_DATA_20,
 			0x43, 0x3e, 0xc2, 0xac, 0x1f, 0xfa, 0x1b, 0x7b, 0x7d,
 			0x02, 0x7f, 0x56, 0x45, 0x29, 0xc5, 0x71, 0x97, 0xf9,
 			0xae, 0x88,
-			btcscript.OP_EQUAL,
+			txscript.OP_EQUAL,
 		},
 		idx:     0,
 		bip16:   true,
 		nSigOps: 0, // no signature ops in the pushed script.
-		scriptInfo: btcscript.ScriptInfo{
-			PkScriptClass:  btcscript.ScriptHashTy,
+		scriptInfo: txscript.ScriptInfo{
+			PkScriptClass:  txscript.ScriptHashTy,
 			NumInputs:      1,
 			ExpectedInputs: -1, // p2sh script is non standard
 			SigOps:         0,
@@ -1382,7 +1382,7 @@ var txTests = []txTest{
 						Index: 0,
 					},
 					SignatureScript: []byte{
-						btcscript.OP_DATA_2,
+						txscript.OP_DATA_2,
 						// OP_3 OP_8
 						0x53, 0x58,
 					},
@@ -1393,34 +1393,34 @@ var txTests = []txTest{
 				{
 					Value: 1000000,
 					PkScript: []byte{
-						btcscript.OP_DUP,
-						btcscript.OP_HASH160,
-						btcscript.OP_DATA_20,
+						txscript.OP_DUP,
+						txscript.OP_HASH160,
+						txscript.OP_DATA_20,
 						0x5b, 0x69, 0xd8, 0xb9, 0xdf,
 						0xa6, 0xe4, 0x12, 0x26, 0x47,
 						0xe1, 0x79, 0x4e, 0xaa, 0x3b,
 						0xfc, 0x11, 0x1f, 0x70, 0xef,
-						btcscript.OP_EQUALVERIFY,
-						btcscript.OP_CHECKSIG,
+						txscript.OP_EQUALVERIFY,
+						txscript.OP_CHECKSIG,
 					},
 				},
 			},
 			LockTime: 0,
 		},
 		pkScript: []byte{
-			btcscript.OP_HASH160,
-			btcscript.OP_DATA_20,
+			txscript.OP_HASH160,
+			txscript.OP_DATA_20,
 			0x43, 0x3e, 0xc2, 0xac, 0x1f, 0xfa, 0x1b, 0x7b, 0x7d,
 			0x02, 0x7f, 0x56, 0x45, 0x29, 0xc5, 0x71, 0x97, 0xf9,
 			0xae, 0x88,
-			btcscript.OP_EQUAL,
+			txscript.OP_EQUAL,
 		},
 		idx:     0,
-		err:     btcscript.ErrStackScriptFailed,
+		err:     txscript.ErrStackScriptFailed,
 		bip16:   true,
 		nSigOps: 0, // no signature ops in the pushed script.
-		scriptInfo: btcscript.ScriptInfo{
-			PkScriptClass:  btcscript.ScriptHashTy,
+		scriptInfo: txscript.ScriptInfo{
+			PkScriptClass:  txscript.ScriptHashTy,
 			NumInputs:      1,
 			ExpectedInputs: -1, // p2sh script is non standard
 			SigOps:         0,
@@ -1447,9 +1447,9 @@ var txTests = []txTest{
 						Index: 0,
 					},
 					SignatureScript: []byte{
-						btcscript.OP_DATA_2,
+						txscript.OP_DATA_2,
 						// pushed script.
-						btcscript.OP_DATA_2, 0x1,
+						txscript.OP_DATA_2, 0x1,
 					},
 					Sequence: 4294967295,
 				},
@@ -1458,32 +1458,32 @@ var txTests = []txTest{
 				{
 					Value: 1000000,
 					PkScript: []byte{
-						btcscript.OP_DUP,
-						btcscript.OP_HASH160,
-						btcscript.OP_DATA_20,
+						txscript.OP_DUP,
+						txscript.OP_HASH160,
+						txscript.OP_DATA_20,
 						0x5b, 0x69, 0xd8, 0xb9, 0xdf,
 						0xa6, 0xe4, 0x12, 0x26, 0x47,
 						0xe1, 0x79, 0x4e, 0xaa, 0x3b,
 						0xfc, 0x11, 0x1f, 0x70, 0xef,
-						btcscript.OP_EQUALVERIFY,
-						btcscript.OP_CHECKSIG,
+						txscript.OP_EQUALVERIFY,
+						txscript.OP_CHECKSIG,
 					},
 				},
 			},
 			LockTime: 0,
 		},
 		pkScript: []byte{
-			btcscript.OP_HASH160,
-			btcscript.OP_DATA_20,
+			txscript.OP_HASH160,
+			txscript.OP_DATA_20,
 			0xd4, 0x8c, 0xe8, 0x6c, 0x69, 0x8f, 0x24, 0x68, 0x29,
 			0x92, 0x1b, 0xa9, 0xfb, 0x2a, 0x84, 0x4a, 0xe2, 0xad,
 			0xba, 0x67,
-			btcscript.OP_EQUAL,
+			txscript.OP_EQUAL,
 		},
 		idx:           0,
-		err:           btcscript.ErrStackShortScript,
+		err:           txscript.ErrStackShortScript,
 		bip16:         true,
-		scriptInfoErr: btcscript.ErrStackShortScript,
+		scriptInfoErr: txscript.ErrStackShortScript,
 	},
 	{
 		// sigscript changed so to be non pushonly.
@@ -1509,10 +1509,10 @@ var txTests = []txTest{
 					// will never run.
 					SignatureScript: []byte{
 
-						btcscript.OP_DATA_2,
+						txscript.OP_DATA_2,
 						// pushed script.
-						btcscript.OP_DATA_1, 0x1,
-						btcscript.OP_DUP,
+						txscript.OP_DATA_1, 0x1,
+						txscript.OP_DUP,
 					},
 					Sequence: 4294967295,
 				},
@@ -1521,33 +1521,33 @@ var txTests = []txTest{
 				{
 					Value: 1000000,
 					PkScript: []byte{
-						btcscript.OP_DUP,
-						btcscript.OP_HASH160,
-						btcscript.OP_DATA_20,
+						txscript.OP_DUP,
+						txscript.OP_HASH160,
+						txscript.OP_DATA_20,
 						0x5b, 0x69, 0xd8, 0xb9, 0xdf,
 						0xa6, 0xe4, 0x12, 0x26, 0x47,
 						0xe1, 0x79, 0x4e, 0xaa, 0x3b,
 						0xfc, 0x11, 0x1f, 0x70, 0xef,
-						btcscript.OP_EQUALVERIFY,
-						btcscript.OP_CHECKSIG,
+						txscript.OP_EQUALVERIFY,
+						txscript.OP_CHECKSIG,
 					},
 				},
 			},
 			LockTime: 0,
 		},
 		pkScript: []byte{
-			btcscript.OP_HASH160,
-			btcscript.OP_DATA_20,
+			txscript.OP_HASH160,
+			txscript.OP_DATA_20,
 			0x43, 0x3e, 0xc2, 0xac, 0x1f, 0xfa, 0x1b, 0x7b, 0x7d,
 			0x02, 0x7f, 0x56, 0x45, 0x29, 0xc5, 0x71, 0x97, 0xf9,
 			0xae, 0x88,
-			btcscript.OP_EQUAL,
+			txscript.OP_EQUAL,
 		},
 		idx:           0,
-		parseErr:      btcscript.ErrStackP2SHNonPushOnly,
+		parseErr:      txscript.ErrStackP2SHNonPushOnly,
 		bip16:         true,
 		nSigOps:       0, // no signature ops in the pushed script.
-		scriptInfoErr: btcscript.ErrStackNonPushOnly,
+		scriptInfoErr: txscript.ErrStackNonPushOnly,
 	},
 	{
 		// sigscript changed so to be non pushonly.
@@ -1572,7 +1572,7 @@ var txTests = []txTest{
 					// doesn't have to match signature.
 					// will never run.
 					SignatureScript: []byte{
-						btcscript.OP_TRUE,
+						txscript.OP_TRUE,
 					},
 					Sequence: 4294967295,
 				},
@@ -1581,15 +1581,15 @@ var txTests = []txTest{
 				{
 					Value: 1000000,
 					PkScript: []byte{
-						btcscript.OP_DUP,
-						btcscript.OP_HASH160,
-						btcscript.OP_DATA_20,
+						txscript.OP_DUP,
+						txscript.OP_HASH160,
+						txscript.OP_DATA_20,
 						0x5b, 0x69, 0xd8, 0xb9, 0xdf,
 						0xa6, 0xe4, 0x12, 0x26, 0x47,
 						0xe1, 0x79, 0x4e, 0xaa, 0x3b,
 						0xfc, 0x11, 0x1f, 0x70, 0xef,
-						btcscript.OP_EQUALVERIFY,
-						btcscript.OP_CHECKSIG,
+						txscript.OP_EQUALVERIFY,
+						txscript.OP_CHECKSIG,
 					},
 				},
 			},
@@ -1599,8 +1599,8 @@ var txTests = []txTest{
 		idx:      0,
 		bip16:    true,
 		nSigOps:  0, // no signature ops in the pushed script.
-		scriptInfo: btcscript.ScriptInfo{
-			PkScriptClass:  btcscript.NonStandardTy,
+		scriptInfo: txscript.ScriptInfo{
+			PkScriptClass:  txscript.NonStandardTy,
 			NumInputs:      1,
 			ExpectedInputs: -1,
 			SigOps:         0,
@@ -1615,14 +1615,14 @@ var txTests = []txTest{
 // nothing in the blockchain that we have yet seen uses them, making it hard
 // to confirm we implemented the spec correctly.
 func testTx(t *testing.T, test txTest) {
-	var flags btcscript.ScriptFlags
+	var flags txscript.ScriptFlags
 	if test.bip16 {
-		flags |= btcscript.ScriptBip16
+		flags |= txscript.ScriptBip16
 	}
 	if test.canonicalSigs {
-		flags |= btcscript.ScriptCanonicalSignatures
+		flags |= txscript.ScriptCanonicalSignatures
 	}
-	engine, err := btcscript.NewScript(
+	engine, err := txscript.NewScript(
 		test.tx.TxIn[test.idx].SignatureScript, test.pkScript,
 		test.idx, test.tx, flags)
 	if err != nil {
@@ -1669,7 +1669,7 @@ func TestGetPreciseSignOps(t *testing.T) {
 	// First we go over the range of tests in testTx and count the sigops in
 	// them.
 	for _, test := range txTests {
-		count := btcscript.GetPreciseSigOpCount(
+		count := txscript.GetPreciseSigOpCount(
 			test.tx.TxIn[test.idx].SignatureScript, test.pkScript,
 			test.bip16)
 		if count != test.nSigOps {
@@ -1691,12 +1691,12 @@ func TestGetPreciseSignOps(t *testing.T) {
 	psocTests := []psocTest{
 		{
 			name:      "scriptSig doesn't parse",
-			scriptSig: []byte{btcscript.OP_PUSHDATA1, 2},
-			err:       btcscript.ErrStackShortScript,
+			scriptSig: []byte{txscript.OP_PUSHDATA1, 2},
+			err:       txscript.ErrStackShortScript,
 		},
 		{
 			name:      "scriptSig isn't push only",
-			scriptSig: []byte{btcscript.OP_1, btcscript.OP_DUP},
+			scriptSig: []byte{txscript.OP_1, txscript.OP_DUP},
 			nSigOps:   0,
 		},
 		{
@@ -1707,30 +1707,30 @@ func TestGetPreciseSignOps(t *testing.T) {
 		{
 			name: "No script at the end",
 			// No script at end but still push only.
-			scriptSig: []byte{btcscript.OP_1, btcscript.OP_1},
+			scriptSig: []byte{txscript.OP_1, txscript.OP_1},
 			nSigOps:   0,
 		},
 		// pushed script doesn't parse.
 		{
 			name: "pushed script doesn't parse",
-			scriptSig: []byte{btcscript.OP_DATA_2,
-				btcscript.OP_PUSHDATA1, 2},
-			err: btcscript.ErrStackShortScript,
+			scriptSig: []byte{txscript.OP_DATA_2,
+				txscript.OP_PUSHDATA1, 2},
+			err: txscript.ErrStackShortScript,
 		},
 	}
 	// The signature in the p2sh script is nonsensical for the tests since
 	// this script will never be executed. What matters is that it matches
 	// the right pattern.
 	pkScript := []byte{
-		btcscript.OP_HASH160,
-		btcscript.OP_DATA_20,
+		txscript.OP_HASH160,
+		txscript.OP_DATA_20,
 		0x43, 0x3e, 0xc2, 0xac, 0x1f, 0xfa, 0x1b, 0x7b, 0x7d,
 		0x02, 0x7f, 0x56, 0x45, 0x29, 0xc5, 0x71, 0x97, 0xf9,
 		0xae, 0x88,
-		btcscript.OP_EQUAL,
+		txscript.OP_EQUAL,
 	}
 	for _, test := range psocTests {
-		count := btcscript.GetPreciseSigOpCount(
+		count := txscript.GetPreciseSigOpCount(
 			test.scriptSig, pkScript, true)
 		if count != test.nSigOps {
 			t.Errorf("%s: expected count of %d, got %d", test.name,
@@ -1745,7 +1745,7 @@ type scriptInfoTest struct {
 	sigScript     []byte
 	pkScript      []byte
 	bip16         bool
-	scriptInfo    btcscript.ScriptInfo
+	scriptInfo    txscript.ScriptInfo
 	scriptInfoErr error
 }
 
@@ -1753,7 +1753,7 @@ func TestScriptInfo(t *testing.T) {
 	t.Parallel()
 
 	for _, test := range txTests {
-		si, err := btcscript.CalcScriptInfo(
+		si, err := txscript.CalcScriptInfo(
 			test.tx.TxIn[test.idx].SignatureScript,
 			test.pkScript, test.bip16)
 		if err != nil {
@@ -1781,65 +1781,65 @@ func TestScriptInfo(t *testing.T) {
 		{
 			// Invented scripts, the hashes do not match
 			name: "pkscript doesn't parse",
-			sigScript: []byte{btcscript.OP_TRUE,
-				btcscript.OP_DATA_1, 81,
-				btcscript.OP_DATA_8,
-				btcscript.OP_2DUP, btcscript.OP_EQUAL,
-				btcscript.OP_NOT, btcscript.OP_VERIFY,
-				btcscript.OP_ABS, btcscript.OP_SWAP,
-				btcscript.OP_ABS, btcscript.OP_EQUAL,
+			sigScript: []byte{txscript.OP_TRUE,
+				txscript.OP_DATA_1, 81,
+				txscript.OP_DATA_8,
+				txscript.OP_2DUP, txscript.OP_EQUAL,
+				txscript.OP_NOT, txscript.OP_VERIFY,
+				txscript.OP_ABS, txscript.OP_SWAP,
+				txscript.OP_ABS, txscript.OP_EQUAL,
 			},
 			// truncated version of test below:
-			pkScript: []byte{btcscript.OP_HASH160,
-				btcscript.OP_DATA_20,
+			pkScript: []byte{txscript.OP_HASH160,
+				txscript.OP_DATA_20,
 				0xfe, 0x44, 0x10, 0x65, 0xb6, 0x53, 0x22, 0x31,
 				0xde, 0x2f, 0xac, 0x56, 0x31, 0x52, 0x20, 0x5e,
 				0xc4, 0xf5, 0x9c,
 			},
 			bip16:         true,
-			scriptInfoErr: btcscript.ErrStackShortScript,
+			scriptInfoErr: txscript.ErrStackShortScript,
 		},
 		{
 			name: "sigScript doesn't parse",
 			// Truncated version of p2sh script below.
-			sigScript: []byte{btcscript.OP_TRUE,
-				btcscript.OP_DATA_1, 81,
-				btcscript.OP_DATA_8,
-				btcscript.OP_2DUP, btcscript.OP_EQUAL,
-				btcscript.OP_NOT, btcscript.OP_VERIFY,
-				btcscript.OP_ABS, btcscript.OP_SWAP,
-				btcscript.OP_ABS,
+			sigScript: []byte{txscript.OP_TRUE,
+				txscript.OP_DATA_1, 81,
+				txscript.OP_DATA_8,
+				txscript.OP_2DUP, txscript.OP_EQUAL,
+				txscript.OP_NOT, txscript.OP_VERIFY,
+				txscript.OP_ABS, txscript.OP_SWAP,
+				txscript.OP_ABS,
 			},
-			pkScript: []byte{btcscript.OP_HASH160,
-				btcscript.OP_DATA_20,
+			pkScript: []byte{txscript.OP_HASH160,
+				txscript.OP_DATA_20,
 				0xfe, 0x44, 0x10, 0x65, 0xb6, 0x53, 0x22, 0x31,
 				0xde, 0x2f, 0xac, 0x56, 0x31, 0x52, 0x20, 0x5e,
-				0xc4, 0xf5, 0x9c, 0x74, btcscript.OP_EQUAL,
+				0xc4, 0xf5, 0x9c, 0x74, txscript.OP_EQUAL,
 			},
 			bip16:         true,
-			scriptInfoErr: btcscript.ErrStackShortScript,
+			scriptInfoErr: txscript.ErrStackShortScript,
 		},
 		{
 			// Invented scripts, the hashes do not match
 			name: "p2sh standard script",
-			sigScript: []byte{btcscript.OP_TRUE,
-				btcscript.OP_DATA_1, 81,
-				btcscript.OP_DATA_25,
-				btcscript.OP_DUP, btcscript.OP_HASH160,
-				btcscript.OP_DATA_20, 0x1, 0x2, 0x3, 0x4, 0x5,
+			sigScript: []byte{txscript.OP_TRUE,
+				txscript.OP_DATA_1, 81,
+				txscript.OP_DATA_25,
+				txscript.OP_DUP, txscript.OP_HASH160,
+				txscript.OP_DATA_20, 0x1, 0x2, 0x3, 0x4, 0x5,
 				0x6, 0x7, 0x8, 0x9, 0xa, 0xb, 0xc, 0xd, 0xe,
 				0xf, 0x10, 0x11, 0x12, 0x13, 0x14,
-				btcscript.OP_EQUALVERIFY, btcscript.OP_CHECKSIG,
+				txscript.OP_EQUALVERIFY, txscript.OP_CHECKSIG,
 			},
-			pkScript: []byte{btcscript.OP_HASH160,
-				btcscript.OP_DATA_20,
+			pkScript: []byte{txscript.OP_HASH160,
+				txscript.OP_DATA_20,
 				0xfe, 0x44, 0x10, 0x65, 0xb6, 0x53, 0x22, 0x31,
 				0xde, 0x2f, 0xac, 0x56, 0x31, 0x52, 0x20, 0x5e,
-				0xc4, 0xf5, 0x9c, 0x74, btcscript.OP_EQUAL,
+				0xc4, 0xf5, 0x9c, 0x74, txscript.OP_EQUAL,
 			},
 			bip16: true,
-			scriptInfo: btcscript.ScriptInfo{
-				PkScriptClass:  btcscript.ScriptHashTy,
+			scriptInfo: txscript.ScriptInfo{
+				PkScriptClass:  txscript.ScriptHashTy,
 				NumInputs:      3,
 				ExpectedInputs: 3, // nonstandard p2sh.
 				SigOps:         1,
@@ -1849,23 +1849,23 @@ func TestScriptInfo(t *testing.T) {
 			// from 567a53d1ce19ce3d07711885168484439965501536d0d0294c5d46d46c10e53b
 			// from the blockchain.
 			name: "p2sh nonstandard script",
-			sigScript: []byte{btcscript.OP_TRUE,
-				btcscript.OP_DATA_1, 81,
-				btcscript.OP_DATA_8,
-				btcscript.OP_2DUP, btcscript.OP_EQUAL,
-				btcscript.OP_NOT, btcscript.OP_VERIFY,
-				btcscript.OP_ABS, btcscript.OP_SWAP,
-				btcscript.OP_ABS, btcscript.OP_EQUAL,
+			sigScript: []byte{txscript.OP_TRUE,
+				txscript.OP_DATA_1, 81,
+				txscript.OP_DATA_8,
+				txscript.OP_2DUP, txscript.OP_EQUAL,
+				txscript.OP_NOT, txscript.OP_VERIFY,
+				txscript.OP_ABS, txscript.OP_SWAP,
+				txscript.OP_ABS, txscript.OP_EQUAL,
 			},
-			pkScript: []byte{btcscript.OP_HASH160,
-				btcscript.OP_DATA_20,
+			pkScript: []byte{txscript.OP_HASH160,
+				txscript.OP_DATA_20,
 				0xfe, 0x44, 0x10, 0x65, 0xb6, 0x53, 0x22, 0x31,
 				0xde, 0x2f, 0xac, 0x56, 0x31, 0x52, 0x20, 0x5e,
-				0xc4, 0xf5, 0x9c, 0x74, btcscript.OP_EQUAL,
+				0xc4, 0xf5, 0x9c, 0x74, txscript.OP_EQUAL,
 			},
 			bip16: true,
-			scriptInfo: btcscript.ScriptInfo{
-				PkScriptClass:  btcscript.ScriptHashTy,
+			scriptInfo: txscript.ScriptInfo{
+				PkScriptClass:  txscript.ScriptHashTy,
 				NumInputs:      3,
 				ExpectedInputs: -1, // nonstandard p2sh.
 				SigOps:         0,
@@ -1874,31 +1874,31 @@ func TestScriptInfo(t *testing.T) {
 		{
 			// Script is invented, numbers all fake.
 			name: "multisig script",
-			sigScript: []byte{btcscript.OP_TRUE,
-				btcscript.OP_TRUE, btcscript.OP_TRUE,
-				btcscript.OP_0, // Extra arg for OP_CHECKMULTISIG bug
+			sigScript: []byte{txscript.OP_TRUE,
+				txscript.OP_TRUE, txscript.OP_TRUE,
+				txscript.OP_0, // Extra arg for OP_CHECKMULTISIG bug
 			},
 			pkScript: []byte{
-				btcscript.OP_3, btcscript.OP_DATA_33,
+				txscript.OP_3, txscript.OP_DATA_33,
 				0x1, 0x2, 0x3, 0x4, 0x5, 0x6, 0x7, 0x8, 0x9,
 				0xa, 0xb, 0xc, 0xd, 0xe, 0xf, 0x10, 0x11, 0x12,
 				0x13, 0x14, 0x15, 0x16, 0x17, 0x18, 0x19, 0x1a,
 				0x1b, 0x1c, 0x1d, 0x1e, 0x1f, 0x20, 0x21,
-				btcscript.OP_DATA_33,
+				txscript.OP_DATA_33,
 				0x1, 0x2, 0x3, 0x4, 0x5, 0x6, 0x7, 0x8, 0x9,
 				0xa, 0xb, 0xc, 0xd, 0xe, 0xf, 0x10, 0x11, 0x12,
 				0x13, 0x14, 0x15, 0x16, 0x17, 0x18, 0x19, 0x1a,
 				0x1b, 0x1c, 0x1d, 0x1e, 0x1f, 0x20, 0x21,
-				btcscript.OP_DATA_33,
+				txscript.OP_DATA_33,
 				0x1, 0x2, 0x3, 0x4, 0x5, 0x6, 0x7, 0x8, 0x9,
 				0xa, 0xb, 0xc, 0xd, 0xe, 0xf, 0x10, 0x11, 0x12,
 				0x13, 0x14, 0x15, 0x16, 0x17, 0x18, 0x19, 0x1a,
 				0x1b, 0x1c, 0x1d, 0x1e, 0x1f, 0x20, 0x21,
-				btcscript.OP_3, btcscript.OP_CHECKMULTISIG,
+				txscript.OP_3, txscript.OP_CHECKMULTISIG,
 			},
 			bip16: true,
-			scriptInfo: btcscript.ScriptInfo{
-				PkScriptClass:  btcscript.MultiSigTy,
+			scriptInfo: txscript.ScriptInfo{
+				PkScriptClass:  txscript.MultiSigTy,
 				NumInputs:      4,
 				ExpectedInputs: 4,
 				SigOps:         3,
@@ -1907,7 +1907,7 @@ func TestScriptInfo(t *testing.T) {
 	}
 
 	for _, test := range extraTests {
-		si, err := btcscript.CalcScriptInfo(test.sigScript,
+		si, err := txscript.CalcScriptInfo(test.sigScript,
 			test.pkScript, test.bip16)
 		if err != nil {
 			if err != test.scriptInfoErr {
@@ -1944,50 +1944,50 @@ var removeOpcodeTests = []removeOpcodeTest{
 	// Nothing to remove.
 	{
 		name:   "nothing to remove",
-		before: []byte{btcscript.OP_NOP},
-		remove: btcscript.OP_CODESEPARATOR,
-		after:  []byte{btcscript.OP_NOP},
+		before: []byte{txscript.OP_NOP},
+		remove: txscript.OP_CODESEPARATOR,
+		after:  []byte{txscript.OP_NOP},
 	},
 	// Test basic opcode removal
 	{
 		name: "codeseparator 1",
-		before: []byte{btcscript.OP_NOP, btcscript.OP_CODESEPARATOR,
-			btcscript.OP_TRUE},
-		remove: btcscript.OP_CODESEPARATOR,
-		after:  []byte{btcscript.OP_NOP, btcscript.OP_TRUE},
+		before: []byte{txscript.OP_NOP, txscript.OP_CODESEPARATOR,
+			txscript.OP_TRUE},
+		remove: txscript.OP_CODESEPARATOR,
+		after:  []byte{txscript.OP_NOP, txscript.OP_TRUE},
 	},
 	// The opcode in question is actually part of the data in a previous
 	// opcode
 	{
 		name: "codeseparator by coincidence",
-		before: []byte{btcscript.OP_NOP, btcscript.OP_DATA_1, btcscript.OP_CODESEPARATOR,
-			btcscript.OP_TRUE},
-		remove: btcscript.OP_CODESEPARATOR,
-		after: []byte{btcscript.OP_NOP, btcscript.OP_DATA_1, btcscript.OP_CODESEPARATOR,
-			btcscript.OP_TRUE},
+		before: []byte{txscript.OP_NOP, txscript.OP_DATA_1, txscript.OP_CODESEPARATOR,
+			txscript.OP_TRUE},
+		remove: txscript.OP_CODESEPARATOR,
+		after: []byte{txscript.OP_NOP, txscript.OP_DATA_1, txscript.OP_CODESEPARATOR,
+			txscript.OP_TRUE},
 	},
 	{
 		name:   "invalid opcode",
-		before: []byte{btcscript.OP_UNKNOWN186},
-		remove: btcscript.OP_CODESEPARATOR,
-		after:  []byte{btcscript.OP_UNKNOWN186},
+		before: []byte{txscript.OP_UNKNOWN186},
+		remove: txscript.OP_CODESEPARATOR,
+		after:  []byte{txscript.OP_UNKNOWN186},
 	},
 	{
 		name:   "invalid length (insruction)",
-		before: []byte{btcscript.OP_PUSHDATA1},
-		remove: btcscript.OP_CODESEPARATOR,
-		err:    btcscript.ErrStackShortScript,
+		before: []byte{txscript.OP_PUSHDATA1},
+		remove: txscript.OP_CODESEPARATOR,
+		err:    txscript.ErrStackShortScript,
 	},
 	{
 		name:   "invalid length (data)",
-		before: []byte{btcscript.OP_PUSHDATA1, 255, 254},
-		remove: btcscript.OP_CODESEPARATOR,
-		err:    btcscript.ErrStackShortScript,
+		before: []byte{txscript.OP_PUSHDATA1, 255, 254},
+		remove: txscript.OP_CODESEPARATOR,
+		err:    txscript.ErrStackShortScript,
 	},
 }
 
 func testRemoveOpcode(t *testing.T, test *removeOpcodeTest) {
-	result, err := btcscript.TstRemoveOpcode(test.before, test.remove)
+	result, err := txscript.TstRemoveOpcode(test.before, test.remove)
 	if test.err != nil {
 		if err != test.err {
 			t.Errorf("%s: got unexpected error. exp: \"%v\" "+
@@ -2024,110 +2024,110 @@ type removeOpcodeByDataTest struct {
 var removeOpcodeByDataTests = []removeOpcodeByDataTest{
 	{
 		name:   "nothing to do",
-		before: []byte{btcscript.OP_NOP},
+		before: []byte{txscript.OP_NOP},
 		remove: []byte{1, 2, 3, 4},
-		after:  []byte{btcscript.OP_NOP},
+		after:  []byte{txscript.OP_NOP},
 	},
 	{
 		name:   "simple case",
-		before: []byte{btcscript.OP_DATA_4, 1, 2, 3, 4},
+		before: []byte{txscript.OP_DATA_4, 1, 2, 3, 4},
 		remove: []byte{1, 2, 3, 4},
 		after:  []byte{},
 	},
 	{
 		name:   "simple case (miss)",
-		before: []byte{btcscript.OP_DATA_4, 1, 2, 3, 4},
+		before: []byte{txscript.OP_DATA_4, 1, 2, 3, 4},
 		remove: []byte{1, 2, 3, 5},
-		after:  []byte{btcscript.OP_DATA_4, 1, 2, 3, 4},
+		after:  []byte{txscript.OP_DATA_4, 1, 2, 3, 4},
 	},
 	{
 		// padded to keep it canonical.
 		name: "simple case (pushdata1)",
-		before: append(append([]byte{btcscript.OP_PUSHDATA1, 76},
+		before: append(append([]byte{txscript.OP_PUSHDATA1, 76},
 			bytes.Repeat([]byte{0}, 72)...), []byte{1, 2, 3, 4}...),
 		remove: []byte{1, 2, 3, 4},
 		after:  []byte{},
 	},
 	{
 		name: "simple case (pushdata1 miss)",
-		before: append(append([]byte{btcscript.OP_PUSHDATA1, 76},
+		before: append(append([]byte{txscript.OP_PUSHDATA1, 76},
 			bytes.Repeat([]byte{0}, 72)...), []byte{1, 2, 3, 4}...),
 		remove: []byte{1, 2, 3, 5},
-		after: append(append([]byte{btcscript.OP_PUSHDATA1, 76},
+		after: append(append([]byte{txscript.OP_PUSHDATA1, 76},
 			bytes.Repeat([]byte{0}, 72)...), []byte{1, 2, 3, 4}...),
 	},
 	{
 		name:   "simple case (pushdata1 miss noncanonical)",
-		before: []byte{btcscript.OP_PUSHDATA1, 4, 1, 2, 3, 4},
+		before: []byte{txscript.OP_PUSHDATA1, 4, 1, 2, 3, 4},
 		remove: []byte{1, 2, 3, 4},
-		after:  []byte{btcscript.OP_PUSHDATA1, 4, 1, 2, 3, 4},
+		after:  []byte{txscript.OP_PUSHDATA1, 4, 1, 2, 3, 4},
 	},
 	{
 		name: "simple case (pushdata2)",
-		before: append(append([]byte{btcscript.OP_PUSHDATA2, 0, 1},
+		before: append(append([]byte{txscript.OP_PUSHDATA2, 0, 1},
 			bytes.Repeat([]byte{0}, 252)...), []byte{1, 2, 3, 4}...),
 		remove: []byte{1, 2, 3, 4},
 		after:  []byte{},
 	},
 	{
 		name: "simple case (pushdata2 miss)",
-		before: append(append([]byte{btcscript.OP_PUSHDATA2, 0, 1},
+		before: append(append([]byte{txscript.OP_PUSHDATA2, 0, 1},
 			bytes.Repeat([]byte{0}, 252)...), []byte{1, 2, 3, 4}...),
 		remove: []byte{1, 2, 3, 4, 5},
-		after: append(append([]byte{btcscript.OP_PUSHDATA2, 0, 1},
+		after: append(append([]byte{txscript.OP_PUSHDATA2, 0, 1},
 			bytes.Repeat([]byte{0}, 252)...), []byte{1, 2, 3, 4}...),
 	},
 	{
 		name:   "simple case (pushdata2 miss noncanonical)",
-		before: []byte{btcscript.OP_PUSHDATA2, 4, 0, 1, 2, 3, 4},
+		before: []byte{txscript.OP_PUSHDATA2, 4, 0, 1, 2, 3, 4},
 		remove: []byte{1, 2, 3, 4},
-		after:  []byte{btcscript.OP_PUSHDATA2, 4, 0, 1, 2, 3, 4},
+		after:  []byte{txscript.OP_PUSHDATA2, 4, 0, 1, 2, 3, 4},
 	},
 	{
 		// This is padded to make the push canonical.
 		name: "simple case (pushdata4)",
-		before: append(append([]byte{btcscript.OP_PUSHDATA4, 0, 0, 1, 0},
+		before: append(append([]byte{txscript.OP_PUSHDATA4, 0, 0, 1, 0},
 			bytes.Repeat([]byte{0}, 65532)...), []byte{1, 2, 3, 4}...),
 		remove: []byte{1, 2, 3, 4},
 		after:  []byte{},
 	},
 	{
 		name:   "simple case (pushdata4 miss noncanonical)",
-		before: []byte{btcscript.OP_PUSHDATA4, 4, 0, 0, 0, 1, 2, 3, 4},
+		before: []byte{txscript.OP_PUSHDATA4, 4, 0, 0, 0, 1, 2, 3, 4},
 		remove: []byte{1, 2, 3, 4},
-		after:  []byte{btcscript.OP_PUSHDATA4, 4, 0, 0, 0, 1, 2, 3, 4},
+		after:  []byte{txscript.OP_PUSHDATA4, 4, 0, 0, 0, 1, 2, 3, 4},
 	},
 	{
 		// This is padded to make the push canonical.
 		name: "simple case (pushdata4 miss)",
-		before: append(append([]byte{btcscript.OP_PUSHDATA4, 0, 0, 1, 0},
+		before: append(append([]byte{txscript.OP_PUSHDATA4, 0, 0, 1, 0},
 			bytes.Repeat([]byte{0}, 65532)...), []byte{1, 2, 3, 4}...),
 		remove: []byte{1, 2, 3, 4, 5},
-		after: append(append([]byte{btcscript.OP_PUSHDATA4, 0, 0, 1, 0},
+		after: append(append([]byte{txscript.OP_PUSHDATA4, 0, 0, 1, 0},
 			bytes.Repeat([]byte{0}, 65532)...), []byte{1, 2, 3, 4}...),
 	},
 	{
 		name:   "invalid opcode ",
-		before: []byte{btcscript.OP_UNKNOWN187},
+		before: []byte{txscript.OP_UNKNOWN187},
 		remove: []byte{1, 2, 3, 4},
-		after:  []byte{btcscript.OP_UNKNOWN187},
+		after:  []byte{txscript.OP_UNKNOWN187},
 	},
 	{
 		name:   "invalid length (instruction)",
-		before: []byte{btcscript.OP_PUSHDATA1},
+		before: []byte{txscript.OP_PUSHDATA1},
 		remove: []byte{1, 2, 3, 4},
-		err:    btcscript.ErrStackShortScript,
+		err:    txscript.ErrStackShortScript,
 	},
 	{
 		name:   "invalid length (data)",
-		before: []byte{btcscript.OP_PUSHDATA1, 255, 254},
+		before: []byte{txscript.OP_PUSHDATA1, 255, 254},
 		remove: []byte{1, 2, 3, 4},
-		err:    btcscript.ErrStackShortScript,
+		err:    txscript.ErrStackShortScript,
 	},
 }
 
 func testRemoveOpcodeByData(t *testing.T, test *removeOpcodeByDataTest) {
-	result, err := btcscript.TstRemoveOpcodeByData(test.before,
+	result, err := txscript.TstRemoveOpcodeByData(test.before,
 		test.remove)
 	if test.err != nil {
 		if err != test.err {
@@ -2158,7 +2158,7 @@ func TestRemoveOpcodeByDatas(t *testing.T) {
 type scriptTypeTest struct {
 	name       string
 	script     []byte
-	scripttype btcscript.ScriptClass
+	scripttype txscript.ScriptClass
 }
 
 var scriptTypeTests = []scriptTypeTest{
@@ -2166,7 +2166,7 @@ var scriptTypeTests = []scriptTypeTest{
 	{
 		name: "Pay Pubkey",
 		script: []byte{
-			btcscript.OP_DATA_65,
+			txscript.OP_DATA_65,
 			0x04, 0x11, 0xdb, 0x93, 0xe1, 0xdc, 0xdb, 0x8a, 0x01,
 			0x6b, 0x49, 0x84, 0x0f, 0x8c, 0x53, 0xbc, 0x1e, 0xb6,
 			0x8a, 0x38, 0x2e, 0x97, 0xb1, 0x48, 0x2e, 0xca, 0xd7,
@@ -2175,24 +2175,24 @@ var scriptTypeTests = []scriptTypeTest{
 			0x2e, 0x16, 0x0b, 0xfa, 0x9b, 0x8b, 0x64, 0xf9, 0xd4,
 			0xc0, 0x3f, 0x99, 0x9b, 0x86, 0x43, 0xf6, 0x56, 0xb4,
 			0x12, 0xa3,
-			btcscript.OP_CHECKSIG,
+			txscript.OP_CHECKSIG,
 		},
-		scripttype: btcscript.PubKeyTy,
+		scripttype: txscript.PubKeyTy,
 	},
 	// tx 599e47a8114fe098103663029548811d2651991b62397e057f0c863c2bc9f9ea
 	{
 		name: "Pay PubkeyHash",
 		script: []byte{
-			btcscript.OP_DUP,
-			btcscript.OP_HASH160,
-			btcscript.OP_DATA_20,
+			txscript.OP_DUP,
+			txscript.OP_HASH160,
+			txscript.OP_DATA_20,
 			0x66, 0x0d, 0x4e, 0xf3, 0xa7, 0x43, 0xe3, 0xe6, 0x96,
 			0xad, 0x99, 0x03, 0x64, 0xe5, 0x55, 0xc2, 0x71, 0xad,
 			0x50, 0x4b,
-			btcscript.OP_EQUALVERIFY,
-			btcscript.OP_CHECKSIG,
+			txscript.OP_EQUALVERIFY,
+			txscript.OP_CHECKSIG,
 		},
-		scripttype: btcscript.PubKeyHashTy,
+		scripttype: txscript.PubKeyHashTy,
 	},
 	// part of tx 6d36bc17e947ce00bb6f12f8e7a56a1585c5a36188ffa2b05e10b4743273a74b
 	// codeseparator parts have been elided. (bitcoind's checks for multisig
@@ -2200,55 +2200,55 @@ var scriptTypeTests = []scriptTypeTest{
 	{
 		name: "multisig",
 		script: []byte{
-			btcscript.OP_TRUE,
-			btcscript.OP_DATA_33,
+			txscript.OP_TRUE,
+			txscript.OP_DATA_33,
 			0x02, 0x32, 0xab, 0xdc, 0x89, 0x3e, 0x7f, 0x06, 0x31,
 			0x36, 0x4d, 0x7f, 0xd0, 0x1c, 0xb3, 0x3d, 0x24, 0xda,
 			0x45, 0x32, 0x9a, 0x00, 0x35, 0x7b, 0x3a, 0x78, 0x86,
 			0x21, 0x1a, 0xb4, 0x14, 0xd5, 0x5a,
-			btcscript.OP_TRUE,
-			btcscript.OP_CHECKMULTISIG,
+			txscript.OP_TRUE,
+			txscript.OP_CHECKMULTISIG,
 		},
-		scripttype: btcscript.MultiSigTy,
+		scripttype: txscript.MultiSigTy,
 	},
 	// tx e5779b9e78f9650debc2893fd9636d827b26b4ddfa6a8172fe8708c924f5c39d
 	// P2SH
 	{
 		name: "P2SH",
 		script: []byte{
-			btcscript.OP_HASH160,
-			btcscript.OP_DATA_20,
+			txscript.OP_HASH160,
+			txscript.OP_DATA_20,
 			0x43, 0x3e, 0xc2, 0xac, 0x1f, 0xfa, 0x1b, 0x7b, 0x7d,
 			0x02, 0x7f, 0x56, 0x45, 0x29, 0xc5, 0x71, 0x97, 0xf9,
 			0xae, 0x88,
-			btcscript.OP_EQUAL,
+			txscript.OP_EQUAL,
 		},
-		scripttype: btcscript.ScriptHashTy,
+		scripttype: txscript.ScriptHashTy,
 	},
 	// Nulldata with no data at all.
 	{
 		name: "nulldata",
 		script: []byte{
-			btcscript.OP_RETURN,
+			txscript.OP_RETURN,
 		},
-		scripttype: btcscript.NullDataTy,
+		scripttype: txscript.NullDataTy,
 	},
 	// Nulldata with small data.
 	{
 		name: "nulldata2",
 		script: []byte{
-			btcscript.OP_RETURN,
-			btcscript.OP_DATA_8,
+			txscript.OP_RETURN,
+			txscript.OP_DATA_8,
 			0x04, 0x67, 0x08, 0xaf, 0xdb, 0x0f, 0xe5, 0x54,
 		},
-		scripttype: btcscript.NullDataTy,
+		scripttype: txscript.NullDataTy,
 	},
 	// Nulldata with max allowed data.
 	{
 		name: "nulldata3",
 		script: []byte{
-			btcscript.OP_RETURN,
-			btcscript.OP_PUSHDATA1,
+			txscript.OP_RETURN,
+			txscript.OP_PUSHDATA1,
 			0x28, // 40
 			0x04, 0x67, 0x08, 0xaf, 0xdb, 0x0f, 0xe5, 0x54,
 			0x82, 0x71, 0x96, 0x7f, 0x1a, 0x67, 0x13, 0x0b,
@@ -2256,14 +2256,14 @@ var scriptTypeTests = []scriptTypeTest{
 			0x9a, 0x67, 0x96, 0x2e, 0x0e, 0xa1, 0xf6, 0x1d,
 			0xeb, 0x64, 0x9f, 0x6b, 0xc3, 0xf4, 0xce, 0xf3,
 		},
-		scripttype: btcscript.NullDataTy,
+		scripttype: txscript.NullDataTy,
 	},
 	// Nulldata with more than max allowed data (so therefore nonstandard)
 	{
 		name: "nulldata4",
 		script: []byte{
-			btcscript.OP_RETURN,
-			btcscript.OP_PUSHDATA1,
+			txscript.OP_RETURN,
+			txscript.OP_PUSHDATA1,
 			0x29, // 41
 			0x04, 0x67, 0x08, 0xaf, 0xdb, 0x0f, 0xe5, 0x54,
 			0x82, 0x71, 0x96, 0x7f, 0x1a, 0x67, 0x13, 0x0b,
@@ -2272,102 +2272,102 @@ var scriptTypeTests = []scriptTypeTest{
 			0xeb, 0x64, 0x9f, 0x6b, 0xc3, 0xf4, 0xce, 0xf3,
 			0x08,
 		},
-		scripttype: btcscript.NonStandardTy,
+		scripttype: txscript.NonStandardTy,
 	},
 	// Almost nulldata, but add an additional opcode after the data to make
 	// it nonstandard.
 	{
 		name: "nulldata5",
 		script: []byte{
-			btcscript.OP_RETURN,
-			btcscript.OP_DATA_1,
+			txscript.OP_RETURN,
+			txscript.OP_DATA_1,
 			0x04,
-			btcscript.OP_TRUE,
+			txscript.OP_TRUE,
 		},
-		scripttype: btcscript.NonStandardTy,
+		scripttype: txscript.NonStandardTy,
 	}, // The next few are almost multisig (it is the more complex script type)
 	// but with various changes to make it fail.
 	{
 		// multisig but funny nsigs..
 		name: "strange 1",
 		script: []byte{
-			btcscript.OP_DUP,
-			btcscript.OP_DATA_33,
+			txscript.OP_DUP,
+			txscript.OP_DATA_33,
 			0x02, 0x32, 0xab, 0xdc, 0x89, 0x3e, 0x7f, 0x06, 0x31,
 			0x36, 0x4d, 0x7f, 0xd0, 0x1c, 0xb3, 0x3d, 0x24, 0xda,
 			0x45, 0x32, 0x9a, 0x00, 0x35, 0x7b, 0x3a, 0x78, 0x86,
 			0x21, 0x1a, 0xb4, 0x14, 0xd5, 0x5a,
-			btcscript.OP_TRUE,
-			btcscript.OP_CHECKMULTISIG,
+			txscript.OP_TRUE,
+			txscript.OP_CHECKMULTISIG,
 		},
-		scripttype: btcscript.NonStandardTy,
+		scripttype: txscript.NonStandardTy,
 	},
 	{
 		name: "strange 2",
 		// multisig but funny pubkey.
 		script: []byte{
-			btcscript.OP_TRUE,
-			btcscript.OP_TRUE,
-			btcscript.OP_TRUE,
-			btcscript.OP_CHECKMULTISIG,
+			txscript.OP_TRUE,
+			txscript.OP_TRUE,
+			txscript.OP_TRUE,
+			txscript.OP_CHECKMULTISIG,
 		},
-		scripttype: btcscript.NonStandardTy,
+		scripttype: txscript.NonStandardTy,
 	},
 	{
 		name: "strange 3",
 		// multisig but no matching npubkeys opcode.
 		script: []byte{
-			btcscript.OP_TRUE,
-			btcscript.OP_DATA_33,
+			txscript.OP_TRUE,
+			txscript.OP_DATA_33,
 			0x02, 0x32, 0xab, 0xdc, 0x89, 0x3e, 0x7f, 0x06, 0x31,
 			0x36, 0x4d, 0x7f, 0xd0, 0x1c, 0xb3, 0x3d, 0x24, 0xda,
 			0x45, 0x32, 0x9a, 0x00, 0x35, 0x7b, 0x3a, 0x78, 0x86,
 			0x21, 0x1a, 0xb4, 0x14, 0xd5, 0x5a,
-			btcscript.OP_DATA_33,
+			txscript.OP_DATA_33,
 			0x02, 0x32, 0xab, 0xdc, 0x89, 0x3e, 0x7f, 0x06, 0x31,
 			0x36, 0x4d, 0x7f, 0xd0, 0x1c, 0xb3, 0x3d, 0x24, 0xda,
 			0x45, 0x32, 0x9a, 0x00, 0x35, 0x7b, 0x3a, 0x78, 0x86,
 			0x21, 0x1a, 0xb4, 0x14, 0xd5, 0x5a,
 			// No number.
-			btcscript.OP_CHECKMULTISIG,
+			txscript.OP_CHECKMULTISIG,
 		},
-		scripttype: btcscript.NonStandardTy,
+		scripttype: txscript.NonStandardTy,
 	},
 	{
 		name: "strange 4",
 		// multisig but with multisigverify
 		script: []byte{
-			btcscript.OP_TRUE,
-			btcscript.OP_DATA_33,
+			txscript.OP_TRUE,
+			txscript.OP_DATA_33,
 			0x02, 0x32, 0xab, 0xdc, 0x89, 0x3e, 0x7f, 0x06, 0x31,
 			0x36, 0x4d, 0x7f, 0xd0, 0x1c, 0xb3, 0x3d, 0x24, 0xda,
 			0x45, 0x32, 0x9a, 0x00, 0x35, 0x7b, 0x3a, 0x78, 0x86,
 			0x21, 0x1a, 0xb4, 0x14, 0xd5, 0x5a,
-			btcscript.OP_TRUE,
-			btcscript.OP_CHECKMULTISIGVERIFY,
+			txscript.OP_TRUE,
+			txscript.OP_CHECKMULTISIGVERIFY,
 		},
-		scripttype: btcscript.NonStandardTy,
+		scripttype: txscript.NonStandardTy,
 	},
 	{
 		name: "strange 5",
 		// multisig but wrong length.
 		script: []byte{
-			btcscript.OP_TRUE,
-			btcscript.OP_CHECKMULTISIG,
+			txscript.OP_TRUE,
+			txscript.OP_CHECKMULTISIG,
 		},
-		scripttype: btcscript.NonStandardTy,
+		scripttype: txscript.NonStandardTy,
 	},
 	{
 		name: "doesn't parse",
 		script: []byte{
-			btcscript.OP_DATA_5, 0x1, 0x2, 0x3, 0x4,
+			txscript.OP_DATA_5, 0x1, 0x2, 0x3, 0x4,
 		},
-		scripttype: btcscript.NonStandardTy,
+		scripttype: txscript.NonStandardTy,
 	},
 }
 
 func testScriptType(t *testing.T, test *scriptTypeTest) {
-	scripttype := btcscript.GetScriptClass(test.script)
+	scripttype := txscript.GetScriptClass(test.script)
 	if scripttype != test.scripttype {
 		t.Errorf("%s: expected %s got %s", test.name, test.scripttype,
 			scripttype)
@@ -2386,8 +2386,8 @@ func TestIsPayToScriptHash(t *testing.T) {
 	t.Parallel()
 
 	for _, test := range scriptTypeTests {
-		shouldBe := (test.scripttype == btcscript.ScriptHashTy)
-		p2sh := btcscript.IsPayToScriptHash(test.script)
+		shouldBe := (test.scripttype == txscript.ScriptHashTy)
+		p2sh := txscript.IsPayToScriptHash(test.script)
 		if p2sh != shouldBe {
 			t.Errorf("%s: epxected p2sh %v, got %v", test.name,
 				shouldBe, p2sh)
@@ -2431,7 +2431,7 @@ func TestBadPC(t *testing.T) {
 					}),
 					Index: 0,
 				},
-				SignatureScript: []uint8{btcscript.OP_NOP},
+				SignatureScript: []uint8{txscript.OP_NOP},
 				Sequence:        4294967295,
 			},
 		},
@@ -2443,10 +2443,10 @@ func TestBadPC(t *testing.T) {
 		},
 		LockTime: 0,
 	}
-	pkScript := []byte{btcscript.OP_NOP}
+	pkScript := []byte{txscript.OP_NOP}
 
 	for _, test := range pcTests {
-		engine, err := btcscript.NewScript(tx.TxIn[0].SignatureScript,
+		engine, err := txscript.NewScript(tx.TxIn[0].SignatureScript,
 			pkScript, 0, tx, 0)
 		if err != nil {
 			t.Errorf("Failed to create script: %v", err)
@@ -2505,20 +2505,20 @@ func TestCheckErrorCondition(t *testing.T) {
 		LockTime: 0,
 	}
 	pkScript := []byte{
-		btcscript.OP_NOP,
-		btcscript.OP_NOP,
-		btcscript.OP_NOP,
-		btcscript.OP_NOP,
-		btcscript.OP_NOP,
-		btcscript.OP_NOP,
-		btcscript.OP_NOP,
-		btcscript.OP_NOP,
-		btcscript.OP_NOP,
-		btcscript.OP_NOP,
-		btcscript.OP_TRUE,
+		txscript.OP_NOP,
+		txscript.OP_NOP,
+		txscript.OP_NOP,
+		txscript.OP_NOP,
+		txscript.OP_NOP,
+		txscript.OP_NOP,
+		txscript.OP_NOP,
+		txscript.OP_NOP,
+		txscript.OP_NOP,
+		txscript.OP_NOP,
+		txscript.OP_TRUE,
 	}
 
-	engine, err := btcscript.NewScript(tx.TxIn[0].SignatureScript, pkScript,
+	engine, err := txscript.NewScript(tx.TxIn[0].SignatureScript, pkScript,
 		0, tx, 0)
 	if err != nil {
 		t.Errorf("failed to create script: %v", err)
@@ -2536,7 +2536,7 @@ func TestCheckErrorCondition(t *testing.T) {
 		}
 
 		err = engine.CheckErrorCondition()
-		if err != btcscript.ErrStackScriptUnfinished {
+		if err != txscript.ErrStackScriptUnfinished {
 			t.Errorf("got unexepected error %v on %dth iteration",
 				err, i)
 			return
@@ -2561,7 +2561,7 @@ func TestCheckErrorCondition(t *testing.T) {
 type TstSigScript struct {
 	name               string
 	inputs             []TstInput
-	hashType           btcscript.SigHashType
+	hashType           txscript.SigHashType
 	compress           bool
 	scriptAtWrongIndex bool
 }
@@ -2620,7 +2620,7 @@ var SigScriptTests = []TstSigScript{
 				indexOutOfRange:    false,
 			},
 		},
-		hashType:           btcscript.SigHashAll,
+		hashType:           txscript.SigHashAll,
 		compress:           false,
 		scriptAtWrongIndex: false,
 	},
@@ -2640,7 +2640,7 @@ var SigScriptTests = []TstSigScript{
 				indexOutOfRange:    false,
 			},
 		},
-		hashType:           btcscript.SigHashAll,
+		hashType:           txscript.SigHashAll,
 		compress:           false,
 		scriptAtWrongIndex: false,
 	},
@@ -2654,7 +2654,7 @@ var SigScriptTests = []TstSigScript{
 				indexOutOfRange:    false,
 			},
 		},
-		hashType:           btcscript.SigHashAll,
+		hashType:           txscript.SigHashAll,
 		compress:           true,
 		scriptAtWrongIndex: false,
 	},
@@ -2674,7 +2674,7 @@ var SigScriptTests = []TstSigScript{
 				indexOutOfRange:    false,
 			},
 		},
-		hashType:           btcscript.SigHashAll,
+		hashType:           txscript.SigHashAll,
 		compress:           true,
 		scriptAtWrongIndex: false,
 	},
@@ -2688,7 +2688,7 @@ var SigScriptTests = []TstSigScript{
 				indexOutOfRange:    false,
 			},
 		},
-		hashType:           btcscript.SigHashNone,
+		hashType:           txscript.SigHashNone,
 		compress:           false,
 		scriptAtWrongIndex: false,
 	},
@@ -2702,7 +2702,7 @@ var SigScriptTests = []TstSigScript{
 				indexOutOfRange:    false,
 			},
 		},
-		hashType:           btcscript.SigHashSingle,
+		hashType:           txscript.SigHashSingle,
 		compress:           false,
 		scriptAtWrongIndex: false,
 	},
@@ -2716,7 +2716,7 @@ var SigScriptTests = []TstSigScript{
 				indexOutOfRange:    false,
 			},
 		},
-		hashType:           btcscript.SigHashAnyOneCanPay,
+		hashType:           txscript.SigHashAnyOneCanPay,
 		compress:           false,
 		scriptAtWrongIndex: false,
 	},
@@ -2744,7 +2744,7 @@ var SigScriptTests = []TstSigScript{
 				indexOutOfRange:    false,
 			},
 		},
-		hashType:           btcscript.SigHashAll,
+		hashType:           txscript.SigHashAll,
 		compress:           true,
 		scriptAtWrongIndex: false,
 	},
@@ -2757,7 +2757,7 @@ var SigScriptTests = []TstSigScript{
 				indexOutOfRange:    false,
 			},
 		},
-		hashType:           btcscript.SigHashAll,
+		hashType:           txscript.SigHashAll,
 		compress:           false,
 		scriptAtWrongIndex: false,
 	},
@@ -2777,7 +2777,7 @@ var SigScriptTests = []TstSigScript{
 				indexOutOfRange:    false,
 			},
 		},
-		hashType:           btcscript.SigHashAll,
+		hashType:           txscript.SigHashAll,
 		compress:           false,
 		scriptAtWrongIndex: true,
 	},
@@ -2797,7 +2797,7 @@ var SigScriptTests = []TstSigScript{
 				indexOutOfRange:    false,
 			},
 		},
-		hashType:           btcscript.SigHashAll,
+		hashType:           txscript.SigHashAll,
 		compress:           false,
 		scriptAtWrongIndex: true,
 	},
@@ -2817,7 +2817,7 @@ nexttest:
 	for i := range SigScriptTests {
 		tx := btcwire.NewMsgTx()
 
-		output := btcwire.NewTxOut(500, []byte{btcscript.OP_RETURN})
+		output := btcwire.NewTxOut(500, []byte{txscript.OP_RETURN})
 		tx.AddTxOut(output)
 
 		for _ = range SigScriptTests[i].inputs {
@@ -2835,7 +2835,7 @@ nexttest:
 			} else {
 				idx = j
 			}
-			script, err = btcscript.SignatureScript(tx, idx,
+			script, err = txscript.SignatureScript(tx, idx,
 				SigScriptTests[i].inputs[j].txout.PkScript,
 				SigScriptTests[i].hashType, privKey,
 				SigScriptTests[i].compress)
@@ -2867,9 +2867,9 @@ nexttest:
 		}
 
 		// Validate tx input scripts
-		scriptFlags := btcscript.ScriptBip16 | btcscript.ScriptCanonicalSignatures
+		scriptFlags := txscript.ScriptBip16 | txscript.ScriptCanonicalSignatures
 		for j, txin := range tx.TxIn {
-			engine, err := btcscript.NewScript(txin.SignatureScript,
+			engine, err := txscript.NewScript(txin.SignatureScript,
 				SigScriptTests[i].inputs[j].txout.PkScript,
 				j, tx, scriptFlags)
 			if err != nil {
@@ -2897,42 +2897,42 @@ func TestStringifyClass(t *testing.T) {
 
 	tests := []struct {
 		name        string
-		scriptclass btcscript.ScriptClass
+		scriptclass txscript.ScriptClass
 		stringed    string
 	}{
 		{
 			name:        "nonstandardty",
-			scriptclass: btcscript.NonStandardTy,
+			scriptclass: txscript.NonStandardTy,
 			stringed:    "nonstandard",
 		},
 		{
 			name:        "pubkey",
-			scriptclass: btcscript.PubKeyTy,
+			scriptclass: txscript.PubKeyTy,
 			stringed:    "pubkey",
 		},
 		{
 			name:        "pubkeyhash",
-			scriptclass: btcscript.PubKeyHashTy,
+			scriptclass: txscript.PubKeyHashTy,
 			stringed:    "pubkeyhash",
 		},
 		{
 			name:        "scripthash",
-			scriptclass: btcscript.ScriptHashTy,
+			scriptclass: txscript.ScriptHashTy,
 			stringed:    "scripthash",
 		},
 		{
 			name:        "multisigty",
-			scriptclass: btcscript.MultiSigTy,
+			scriptclass: txscript.MultiSigTy,
 			stringed:    "multisig",
 		},
 		{
 			name:        "nulldataty",
-			scriptclass: btcscript.NullDataTy,
+			scriptclass: txscript.NullDataTy,
 			stringed:    "nulldata",
 		},
 		{
 			name:        "broken",
-			scriptclass: btcscript.ScriptClass(255),
+			scriptclass: txscript.ScriptClass(255),
 			stringed:    "Invalid",
 		},
 	}
@@ -3063,12 +3063,12 @@ func TestPayToAddrScript(t *testing.T) {
 		{
 			p2pkCompressedMain,
 			[]byte{
-				btcscript.OP_DATA_33,
+				txscript.OP_DATA_33,
 				0x02, 0x19, 0x2d, 0x74, 0xd0, 0xcb, 0x94, 0x34,
 				0x4c, 0x95, 0x69, 0xc2, 0xe7, 0x79, 0x01, 0x57,
 				0x3d, 0x8d, 0x79, 0x03, 0xc3, 0xeb, 0xec, 0x3a,
 				0x95, 0x77, 0x24, 0x89, 0x5d, 0xca, 0x52, 0xc6,
-				0xb4, btcscript.OP_CHECKSIG,
+				0xb4, txscript.OP_CHECKSIG,
 			},
 			nil,
 		},
@@ -3076,12 +3076,12 @@ func TestPayToAddrScript(t *testing.T) {
 		{
 			p2pkCompressed2Main,
 			[]byte{
-				btcscript.OP_DATA_33,
+				txscript.OP_DATA_33,
 				0x03, 0xb0, 0xbd, 0x63, 0x42, 0x34, 0xab, 0xbb,
 				0x1b, 0xa1, 0xe9, 0x86, 0xe8, 0x84, 0x18, 0x5c,
 				0x61, 0xcf, 0x43, 0xe0, 0x01, 0xf9, 0x13, 0x7f,
 				0x23, 0xc2, 0xc4, 0x09, 0x27, 0x3e, 0xb1, 0x6e,
-				0x65, btcscript.OP_CHECKSIG,
+				0x65, txscript.OP_CHECKSIG,
 			},
 			nil,
 		},
@@ -3089,7 +3089,7 @@ func TestPayToAddrScript(t *testing.T) {
 		{
 			p2pkUncompressedMain,
 			[]byte{
-				btcscript.OP_DATA_65,
+				txscript.OP_DATA_65,
 				0x04, 0x11, 0xdb, 0x93, 0xe1, 0xdc, 0xdb, 0x8a,
 				0x01, 0x6b, 0x49, 0x84, 0x0f, 0x8c, 0x53, 0xbc,
 				0x1e, 0xb6, 0x8a, 0x38, 0x2e, 0x97, 0xb1, 0x48,
@@ -3098,23 +3098,23 @@ func TestPayToAddrScript(t *testing.T) {
 				0xf9, 0x74, 0x44, 0x64, 0xf8, 0x2e, 0x16, 0x0b,
 				0xfa, 0x9b, 0x8b, 0x64, 0xf9, 0xd4, 0xc0, 0x3f,
 				0x99, 0x9b, 0x86, 0x43, 0xf6, 0x56, 0xb4, 0x12,
-				0xa3, btcscript.OP_CHECKSIG,
+				0xa3, txscript.OP_CHECKSIG,
 			},
 			nil,
 		},
 
 		// Supported address types with nil pointers.
-		{(*btcutil.AddressPubKeyHash)(nil), []byte{}, btcscript.ErrUnsupportedAddress},
-		{(*btcutil.AddressScriptHash)(nil), []byte{}, btcscript.ErrUnsupportedAddress},
-		{(*btcutil.AddressPubKey)(nil), []byte{}, btcscript.ErrUnsupportedAddress},
+		{(*btcutil.AddressPubKeyHash)(nil), []byte{}, txscript.ErrUnsupportedAddress},
+		{(*btcutil.AddressScriptHash)(nil), []byte{}, txscript.ErrUnsupportedAddress},
+		{(*btcutil.AddressPubKey)(nil), []byte{}, txscript.ErrUnsupportedAddress},
 
 		// Unsupported address type.
-		{&bogusAddress{}, []byte{}, btcscript.ErrUnsupportedAddress},
+		{&bogusAddress{}, []byte{}, txscript.ErrUnsupportedAddress},
 	}
 
 	t.Logf("Running %d tests", len(tests))
 	for i, test := range tests {
-		pkScript, err := btcscript.PayToAddrScript(test.in)
+		pkScript, err := txscript.PayToAddrScript(test.in)
 		if err != test.err {
 			t.Errorf("PayToAddrScript #%d unexpected error - "+
 				"got %v, want %v", i, err, test.err)
@@ -3181,20 +3181,20 @@ func TestMultiSigScript(t *testing.T) {
 			},
 			1,
 			[]byte{
-				btcscript.OP_1,
-				btcscript.OP_DATA_33,
+				txscript.OP_1,
+				txscript.OP_DATA_33,
 				0x02, 0x19, 0x2d, 0x74, 0xd0, 0xcb, 0x94, 0x34,
 				0x4c, 0x95, 0x69, 0xc2, 0xe7, 0x79, 0x01, 0x57,
 				0x3d, 0x8d, 0x79, 0x03, 0xc3, 0xeb, 0xec, 0x3a,
 				0x95, 0x77, 0x24, 0x89, 0x5d, 0xca, 0x52, 0xc6,
 				0xb4,
-				btcscript.OP_DATA_33,
+				txscript.OP_DATA_33,
 				0x03, 0xb0, 0xbd, 0x63, 0x42, 0x34, 0xab, 0xbb,
 				0x1b, 0xa1, 0xe9, 0x86, 0xe8, 0x84, 0x18, 0x5c,
 				0x61, 0xcf, 0x43, 0xe0, 0x01, 0xf9, 0x13, 0x7f,
 				0x23, 0xc2, 0xc4, 0x09, 0x27, 0x3e, 0xb1, 0x6e,
 				0x65,
-				btcscript.OP_2, btcscript.OP_CHECKMULTISIG,
+				txscript.OP_2, txscript.OP_CHECKMULTISIG,
 			},
 			nil,
 		},
@@ -3205,20 +3205,20 @@ func TestMultiSigScript(t *testing.T) {
 			},
 			2,
 			[]byte{
-				btcscript.OP_2,
-				btcscript.OP_DATA_33,
+				txscript.OP_2,
+				txscript.OP_DATA_33,
 				0x02, 0x19, 0x2d, 0x74, 0xd0, 0xcb, 0x94, 0x34,
 				0x4c, 0x95, 0x69, 0xc2, 0xe7, 0x79, 0x01, 0x57,
 				0x3d, 0x8d, 0x79, 0x03, 0xc3, 0xeb, 0xec, 0x3a,
 				0x95, 0x77, 0x24, 0x89, 0x5d, 0xca, 0x52, 0xc6,
 				0xb4,
-				btcscript.OP_DATA_33,
+				txscript.OP_DATA_33,
 				0x03, 0xb0, 0xbd, 0x63, 0x42, 0x34, 0xab, 0xbb,
 				0x1b, 0xa1, 0xe9, 0x86, 0xe8, 0x84, 0x18, 0x5c,
 				0x61, 0xcf, 0x43, 0xe0, 0x01, 0xf9, 0x13, 0x7f,
 				0x23, 0xc2, 0xc4, 0x09, 0x27, 0x3e, 0xb1, 0x6e,
 				0x65,
-				btcscript.OP_2, btcscript.OP_CHECKMULTISIG,
+				txscript.OP_2, txscript.OP_CHECKMULTISIG,
 			},
 			nil,
 		},
@@ -3229,7 +3229,7 @@ func TestMultiSigScript(t *testing.T) {
 			},
 			3,
 			[]byte{},
-			btcscript.ErrBadNumRequired,
+			txscript.ErrBadNumRequired,
 		},
 		{
 			[]*btcutil.AddressPubKey{
@@ -3237,7 +3237,7 @@ func TestMultiSigScript(t *testing.T) {
 			},
 			1,
 			[]byte{
-				btcscript.OP_1, btcscript.OP_DATA_65,
+				txscript.OP_1, txscript.OP_DATA_65,
 				0x04, 0x11, 0xdb, 0x93, 0xe1, 0xdc, 0xdb, 0x8a,
 				0x01, 0x6b, 0x49, 0x84, 0x0f, 0x8c, 0x53, 0xbc,
 				0x1e, 0xb6, 0x8a, 0x38, 0x2e, 0x97, 0xb1, 0x48,
@@ -3247,7 +3247,7 @@ func TestMultiSigScript(t *testing.T) {
 				0xfa, 0x9b, 0x8b, 0x64, 0xf9, 0xd4, 0xc0, 0x3f,
 				0x99, 0x9b, 0x86, 0x43, 0xf6, 0x56, 0xb4, 0x12,
 				0xa3,
-				btcscript.OP_1, btcscript.OP_CHECKMULTISIG,
+				txscript.OP_1, txscript.OP_CHECKMULTISIG,
 			},
 			nil,
 		},
@@ -3257,13 +3257,13 @@ func TestMultiSigScript(t *testing.T) {
 			},
 			2,
 			[]byte{},
-			btcscript.ErrBadNumRequired,
+			txscript.ErrBadNumRequired,
 		},
 	}
 
 	t.Logf("Running %d tests", len(tests))
 	for i, test := range tests {
-		script, err := btcscript.MultiSigScript(test.keys,
+		script, err := txscript.MultiSigScript(test.keys,
 			test.nrequired)
 		if err != test.err {
 			t.Errorf("MultiSigScript #%d unexpected error - "+
@@ -3280,10 +3280,10 @@ func TestMultiSigScript(t *testing.T) {
 }
 
 func signAndCheck(msg string, tx *btcwire.MsgTx, idx int, pkScript []byte,
-	hashType btcscript.SigHashType, kdb btcscript.KeyDB, sdb btcscript.ScriptDB,
+	hashType txscript.SigHashType, kdb txscript.KeyDB, sdb txscript.ScriptDB,
 	previousScript []byte) error {
 
-	sigScript, err := btcscript.SignTxOutput(
+	sigScript, err := txscript.SignTxOutput(
 		&btcnet.TestNet3Params, tx, idx, pkScript, hashType,
 		kdb, sdb, []byte{})
 	if err != nil {
@@ -3295,9 +3295,9 @@ func signAndCheck(msg string, tx *btcwire.MsgTx, idx int, pkScript []byte,
 
 func checkScripts(msg string, tx *btcwire.MsgTx, idx int,
 	sigScript, pkScript []byte) error {
-	engine, err := btcscript.NewScript(sigScript, pkScript, idx, tx,
-		btcscript.ScriptBip16|
-			btcscript.ScriptCanonicalSignatures)
+	engine, err := txscript.NewScript(sigScript, pkScript, idx, tx,
+		txscript.ScriptBip16|
+			txscript.ScriptCanonicalSignatures)
 	if err != nil {
 		return fmt.Errorf("failed to make script engine for %s: %v",
 			msg, err)
@@ -3317,14 +3317,14 @@ type addressToKey struct {
 	compressed bool
 }
 
-func mkGetKey(keys map[string]addressToKey) btcscript.KeyDB {
+func mkGetKey(keys map[string]addressToKey) txscript.KeyDB {
 	if keys == nil {
-		return btcscript.KeyClosure(func(addr btcutil.Address) (*btcec.PrivateKey,
+		return txscript.KeyClosure(func(addr btcutil.Address) (*btcec.PrivateKey,
 			bool, error) {
 			return nil, false, errors.New("nope")
 		})
 	}
-	return btcscript.KeyClosure(func(addr btcutil.Address) (*btcec.PrivateKey,
+	return txscript.KeyClosure(func(addr btcutil.Address) (*btcec.PrivateKey,
 		bool, error) {
 		a2k, ok := keys[addr.EncodeAddress()]
 		if !ok {
@@ -3334,14 +3334,14 @@ func mkGetKey(keys map[string]addressToKey) btcscript.KeyDB {
 	})
 }
 
-func mkGetScript(scripts map[string][]byte) btcscript.ScriptDB {
+func mkGetScript(scripts map[string][]byte) txscript.ScriptDB {
 	if scripts == nil {
-		return btcscript.ScriptClosure(func(addr btcutil.Address) (
+		return txscript.ScriptClosure(func(addr btcutil.Address) (
 			[]byte, error) {
 			return nil, errors.New("nope")
 		})
 	}
-	return btcscript.ScriptClosure(func(addr btcutil.Address) ([]byte,
+	return txscript.ScriptClosure(func(addr btcutil.Address) ([]byte,
 		error) {
 		script, ok := scripts[addr.EncodeAddress()]
 		if !ok {
@@ -3357,14 +3357,14 @@ func TestSignTxOutput(t *testing.T) {
 	// make key
 	// make script based on key.
 	// sign with magic pixie dust.
-	hashTypes := []btcscript.SigHashType{
-		btcscript.SigHashOld, // no longer used but should act like all
-		btcscript.SigHashAll,
-		btcscript.SigHashNone,
-		btcscript.SigHashSingle,
-		btcscript.SigHashAll | btcscript.SigHashAnyOneCanPay,
-		btcscript.SigHashNone | btcscript.SigHashAnyOneCanPay,
-		btcscript.SigHashSingle | btcscript.SigHashAnyOneCanPay,
+	hashTypes := []txscript.SigHashType{
+		txscript.SigHashOld, // no longer used but should act like all
+		txscript.SigHashAll,
+		txscript.SigHashNone,
+		txscript.SigHashSingle,
+		txscript.SigHashAll | txscript.SigHashAnyOneCanPay,
+		txscript.SigHashNone | txscript.SigHashAnyOneCanPay,
+		txscript.SigHashSingle | txscript.SigHashAnyOneCanPay,
 	}
 	tx := &btcwire.MsgTx{
 		Version: 1,
@@ -3426,7 +3426,7 @@ func TestSignTxOutput(t *testing.T) {
 				break
 			}
 
-			pkScript, err := btcscript.PayToAddrScript(address)
+			pkScript, err := txscript.PayToAddrScript(address)
 			if err != nil {
 				t.Errorf("failed to make pkscript "+
 					"for %s: %v", msg, err)
@@ -3463,13 +3463,13 @@ func TestSignTxOutput(t *testing.T) {
 				break
 			}
 
-			pkScript, err := btcscript.PayToAddrScript(address)
+			pkScript, err := txscript.PayToAddrScript(address)
 			if err != nil {
 				t.Errorf("failed to make pkscript "+
 					"for %s: %v", msg, err)
 			}
 
-			sigScript, err := btcscript.SignTxOutput(
+			sigScript, err := txscript.SignTxOutput(
 				&btcnet.TestNet3Params, tx, i, pkScript,
 				hashType, mkGetKey(map[string]addressToKey{
 					address.EncodeAddress(): {key, false},
@@ -3482,7 +3482,7 @@ func TestSignTxOutput(t *testing.T) {
 
 			// by the above loop, this should be valid, now sign
 			// again and merge.
-			sigScript, err = btcscript.SignTxOutput(
+			sigScript, err = txscript.SignTxOutput(
 				&btcnet.TestNet3Params, tx, i, pkScript,
 				hashType, mkGetKey(map[string]addressToKey{
 					address.EncodeAddress(): {key, false},
@@ -3524,7 +3524,7 @@ func TestSignTxOutput(t *testing.T) {
 				break
 			}
 
-			pkScript, err := btcscript.PayToAddrScript(address)
+			pkScript, err := txscript.PayToAddrScript(address)
 			if err != nil {
 				t.Errorf("failed to make pkscript "+
 					"for %s: %v", msg, err)
@@ -3562,13 +3562,13 @@ func TestSignTxOutput(t *testing.T) {
 				break
 			}
 
-			pkScript, err := btcscript.PayToAddrScript(address)
+			pkScript, err := txscript.PayToAddrScript(address)
 			if err != nil {
 				t.Errorf("failed to make pkscript "+
 					"for %s: %v", msg, err)
 			}
 
-			sigScript, err := btcscript.SignTxOutput(
+			sigScript, err := txscript.SignTxOutput(
 				&btcnet.TestNet3Params, tx, i, pkScript,
 				hashType, mkGetKey(map[string]addressToKey{
 					address.EncodeAddress(): {key, true},
@@ -3581,7 +3581,7 @@ func TestSignTxOutput(t *testing.T) {
 
 			// by the above loop, this should be valid, now sign
 			// again and merge.
-			sigScript, err = btcscript.SignTxOutput(
+			sigScript, err = txscript.SignTxOutput(
 				&btcnet.TestNet3Params, tx, i, pkScript,
 				hashType, mkGetKey(map[string]addressToKey{
 					address.EncodeAddress(): {key, true},
@@ -3623,7 +3623,7 @@ func TestSignTxOutput(t *testing.T) {
 				break
 			}
 
-			pkScript, err := btcscript.PayToAddrScript(address)
+			pkScript, err := txscript.PayToAddrScript(address)
 			if err != nil {
 				t.Errorf("failed to make pkscript "+
 					"for %s: %v", msg, err)
@@ -3661,13 +3661,13 @@ func TestSignTxOutput(t *testing.T) {
 				break
 			}
 
-			pkScript, err := btcscript.PayToAddrScript(address)
+			pkScript, err := txscript.PayToAddrScript(address)
 			if err != nil {
 				t.Errorf("failed to make pkscript "+
 					"for %s: %v", msg, err)
 			}
 
-			sigScript, err := btcscript.SignTxOutput(
+			sigScript, err := txscript.SignTxOutput(
 				&btcnet.TestNet3Params, tx, i, pkScript,
 				hashType, mkGetKey(map[string]addressToKey{
 					address.EncodeAddress(): {key, false},
@@ -3680,7 +3680,7 @@ func TestSignTxOutput(t *testing.T) {
 
 			// by the above loop, this should be valid, now sign
 			// again and merge.
-			sigScript, err = btcscript.SignTxOutput(
+			sigScript, err = txscript.SignTxOutput(
 				&btcnet.TestNet3Params, tx, i, pkScript,
 				hashType, mkGetKey(map[string]addressToKey{
 					address.EncodeAddress(): {key, false},
@@ -3722,7 +3722,7 @@ func TestSignTxOutput(t *testing.T) {
 				break
 			}
 
-			pkScript, err := btcscript.PayToAddrScript(address)
+			pkScript, err := txscript.PayToAddrScript(address)
 			if err != nil {
 				t.Errorf("failed to make pkscript "+
 					"for %s: %v", msg, err)
@@ -3760,13 +3760,13 @@ func TestSignTxOutput(t *testing.T) {
 				break
 			}
 
-			pkScript, err := btcscript.PayToAddrScript(address)
+			pkScript, err := txscript.PayToAddrScript(address)
 			if err != nil {
 				t.Errorf("failed to make pkscript "+
 					"for %s: %v", msg, err)
 			}
 
-			sigScript, err := btcscript.SignTxOutput(
+			sigScript, err := txscript.SignTxOutput(
 				&btcnet.TestNet3Params, tx, i, pkScript,
 				hashType, mkGetKey(map[string]addressToKey{
 					address.EncodeAddress(): {key, true},
@@ -3779,7 +3779,7 @@ func TestSignTxOutput(t *testing.T) {
 
 			// by the above loop, this should be valid, now sign
 			// again and merge.
-			sigScript, err = btcscript.SignTxOutput(
+			sigScript, err = txscript.SignTxOutput(
 				&btcnet.TestNet3Params, tx, i, pkScript,
 				hashType, mkGetKey(map[string]addressToKey{
 					address.EncodeAddress(): {key, true},
@@ -3821,7 +3821,7 @@ func TestSignTxOutput(t *testing.T) {
 				break
 			}
 
-			pkScript, err := btcscript.PayToAddrScript(address)
+			pkScript, err := txscript.PayToAddrScript(address)
 			if err != nil {
 				t.Errorf("failed to make pkscript "+
 					"for %s: %v", msg, err)
@@ -3836,7 +3836,7 @@ func TestSignTxOutput(t *testing.T) {
 				break
 			}
 
-			scriptPkScript, err := btcscript.PayToAddrScript(
+			scriptPkScript, err := txscript.PayToAddrScript(
 				scriptAddr)
 			if err != nil {
 				t.Errorf("failed to make script pkscript for "+
@@ -3878,7 +3878,7 @@ func TestSignTxOutput(t *testing.T) {
 				break
 			}
 
-			pkScript, err := btcscript.PayToAddrScript(address)
+			pkScript, err := txscript.PayToAddrScript(address)
 			if err != nil {
 				t.Errorf("failed to make pkscript "+
 					"for %s: %v", msg, err)
@@ -3893,7 +3893,7 @@ func TestSignTxOutput(t *testing.T) {
 				break
 			}
 
-			scriptPkScript, err := btcscript.PayToAddrScript(
+			scriptPkScript, err := txscript.PayToAddrScript(
 				scriptAddr)
 			if err != nil {
 				t.Errorf("failed to make script pkscript for "+
@@ -3901,7 +3901,7 @@ func TestSignTxOutput(t *testing.T) {
 				break
 			}
 
-			sigScript, err := btcscript.SignTxOutput(
+			sigScript, err := txscript.SignTxOutput(
 				&btcnet.TestNet3Params, tx, i, scriptPkScript,
 				hashType, mkGetKey(map[string]addressToKey{
 					address.EncodeAddress(): {key, false},
@@ -3916,7 +3916,7 @@ func TestSignTxOutput(t *testing.T) {
 
 			// by the above loop, this should be valid, now sign
 			// again and merge.
-			sigScript, err = btcscript.SignTxOutput(
+			sigScript, err = txscript.SignTxOutput(
 				&btcnet.TestNet3Params, tx, i, scriptPkScript,
 				hashType, mkGetKey(map[string]addressToKey{
 					address.EncodeAddress(): {key, false},
@@ -3960,7 +3960,7 @@ func TestSignTxOutput(t *testing.T) {
 				break
 			}
 
-			pkScript, err := btcscript.PayToAddrScript(address)
+			pkScript, err := txscript.PayToAddrScript(address)
 			if err != nil {
 				t.Errorf("failed to make pkscript "+
 					"for %s: %v", msg, err)
@@ -3974,7 +3974,7 @@ func TestSignTxOutput(t *testing.T) {
 				break
 			}
 
-			scriptPkScript, err := btcscript.PayToAddrScript(
+			scriptPkScript, err := txscript.PayToAddrScript(
 				scriptAddr)
 			if err != nil {
 				t.Errorf("failed to make script pkscript for "+
@@ -4017,7 +4017,7 @@ func TestSignTxOutput(t *testing.T) {
 				break
 			}
 
-			pkScript, err := btcscript.PayToAddrScript(address)
+			pkScript, err := txscript.PayToAddrScript(address)
 			if err != nil {
 				t.Errorf("failed to make pkscript "+
 					"for %s: %v", msg, err)
@@ -4031,7 +4031,7 @@ func TestSignTxOutput(t *testing.T) {
 				break
 			}
 
-			scriptPkScript, err := btcscript.PayToAddrScript(
+			scriptPkScript, err := txscript.PayToAddrScript(
 				scriptAddr)
 			if err != nil {
 				t.Errorf("failed to make script pkscript for "+
@@ -4039,7 +4039,7 @@ func TestSignTxOutput(t *testing.T) {
 				break
 			}
 
-			sigScript, err := btcscript.SignTxOutput(
+			sigScript, err := txscript.SignTxOutput(
 				&btcnet.TestNet3Params, tx, i, scriptPkScript,
 				hashType, mkGetKey(map[string]addressToKey{
 					address.EncodeAddress(): {key, true},
@@ -4054,7 +4054,7 @@ func TestSignTxOutput(t *testing.T) {
 
 			// by the above loop, this should be valid, now sign
 			// again and merge.
-			sigScript, err = btcscript.SignTxOutput(
+			sigScript, err = txscript.SignTxOutput(
 				&btcnet.TestNet3Params, tx, i, scriptPkScript,
 				hashType, mkGetKey(map[string]addressToKey{
 					address.EncodeAddress(): {key, true},
@@ -4098,7 +4098,7 @@ func TestSignTxOutput(t *testing.T) {
 				break
 			}
 
-			pkScript, err := btcscript.PayToAddrScript(address)
+			pkScript, err := txscript.PayToAddrScript(address)
 			if err != nil {
 				t.Errorf("failed to make pkscript "+
 					"for %s: %v", msg, err)
@@ -4112,7 +4112,7 @@ func TestSignTxOutput(t *testing.T) {
 				break
 			}
 
-			scriptPkScript, err := btcscript.PayToAddrScript(
+			scriptPkScript, err := txscript.PayToAddrScript(
 				scriptAddr)
 			if err != nil {
 				t.Errorf("failed to make script pkscript for "+
@@ -4155,7 +4155,7 @@ func TestSignTxOutput(t *testing.T) {
 				break
 			}
 
-			pkScript, err := btcscript.PayToAddrScript(address)
+			pkScript, err := txscript.PayToAddrScript(address)
 			if err != nil {
 				t.Errorf("failed to make pkscript "+
 					"for %s: %v", msg, err)
@@ -4169,7 +4169,7 @@ func TestSignTxOutput(t *testing.T) {
 				break
 			}
 
-			scriptPkScript, err := btcscript.PayToAddrScript(
+			scriptPkScript, err := txscript.PayToAddrScript(
 				scriptAddr)
 			if err != nil {
 				t.Errorf("failed to make script pkscript for "+
@@ -4177,7 +4177,7 @@ func TestSignTxOutput(t *testing.T) {
 				break
 			}
 
-			sigScript, err := btcscript.SignTxOutput(
+			sigScript, err := txscript.SignTxOutput(
 				&btcnet.TestNet3Params, tx, i, scriptPkScript,
 				hashType, mkGetKey(map[string]addressToKey{
 					address.EncodeAddress(): {key, false},
@@ -4192,7 +4192,7 @@ func TestSignTxOutput(t *testing.T) {
 
 			// by the above loop, this should be valid, now sign
 			// again and merge.
-			sigScript, err = btcscript.SignTxOutput(
+			sigScript, err = txscript.SignTxOutput(
 				&btcnet.TestNet3Params, tx, i, scriptPkScript,
 				hashType, mkGetKey(map[string]addressToKey{
 					address.EncodeAddress(): {key, false},
@@ -4236,7 +4236,7 @@ func TestSignTxOutput(t *testing.T) {
 				break
 			}
 
-			pkScript, err := btcscript.PayToAddrScript(address)
+			pkScript, err := txscript.PayToAddrScript(address)
 			if err != nil {
 				t.Errorf("failed to make pkscript "+
 					"for %s: %v", msg, err)
@@ -4250,7 +4250,7 @@ func TestSignTxOutput(t *testing.T) {
 				break
 			}
 
-			scriptPkScript, err := btcscript.PayToAddrScript(
+			scriptPkScript, err := txscript.PayToAddrScript(
 				scriptAddr)
 			if err != nil {
 				t.Errorf("failed to make script pkscript for "+
@@ -4293,7 +4293,7 @@ func TestSignTxOutput(t *testing.T) {
 				break
 			}
 
-			pkScript, err := btcscript.PayToAddrScript(address)
+			pkScript, err := txscript.PayToAddrScript(address)
 			if err != nil {
 				t.Errorf("failed to make pkscript "+
 					"for %s: %v", msg, err)
@@ -4307,7 +4307,7 @@ func TestSignTxOutput(t *testing.T) {
 				break
 			}
 
-			scriptPkScript, err := btcscript.PayToAddrScript(
+			scriptPkScript, err := txscript.PayToAddrScript(
 				scriptAddr)
 			if err != nil {
 				t.Errorf("failed to make script pkscript for "+
@@ -4315,7 +4315,7 @@ func TestSignTxOutput(t *testing.T) {
 				break
 			}
 
-			sigScript, err := btcscript.SignTxOutput(
+			sigScript, err := txscript.SignTxOutput(
 				&btcnet.TestNet3Params, tx, i, scriptPkScript,
 				hashType, mkGetKey(map[string]addressToKey{
 					address.EncodeAddress(): {key, true},
@@ -4330,7 +4330,7 @@ func TestSignTxOutput(t *testing.T) {
 
 			// by the above loop, this should be valid, now sign
 			// again and merge.
-			sigScript, err = btcscript.SignTxOutput(
+			sigScript, err = txscript.SignTxOutput(
 				&btcnet.TestNet3Params, tx, i, scriptPkScript,
 				hashType, mkGetKey(map[string]addressToKey{
 					address.EncodeAddress(): {key, true},
@@ -4391,7 +4391,7 @@ func TestSignTxOutput(t *testing.T) {
 				break
 			}
 
-			pkScript, err := btcscript.MultiSigScript(
+			pkScript, err := txscript.MultiSigScript(
 				[]*btcutil.AddressPubKey{address1, address2},
 				2)
 			if err != nil {
@@ -4407,7 +4407,7 @@ func TestSignTxOutput(t *testing.T) {
 				break
 			}
 
-			scriptPkScript, err := btcscript.PayToAddrScript(
+			scriptPkScript, err := txscript.PayToAddrScript(
 				scriptAddr)
 			if err != nil {
 				t.Errorf("failed to make script pkscript for "+
@@ -4468,7 +4468,7 @@ func TestSignTxOutput(t *testing.T) {
 				break
 			}
 
-			pkScript, err := btcscript.MultiSigScript(
+			pkScript, err := txscript.MultiSigScript(
 				[]*btcutil.AddressPubKey{address1, address2},
 				2)
 			if err != nil {
@@ -4484,7 +4484,7 @@ func TestSignTxOutput(t *testing.T) {
 				break
 			}
 
-			scriptPkScript, err := btcscript.PayToAddrScript(
+			scriptPkScript, err := txscript.PayToAddrScript(
 				scriptAddr)
 			if err != nil {
 				t.Errorf("failed to make script pkscript for "+
@@ -4492,7 +4492,7 @@ func TestSignTxOutput(t *testing.T) {
 				break
 			}
 
-			sigScript, err := btcscript.SignTxOutput(
+			sigScript, err := txscript.SignTxOutput(
 				&btcnet.TestNet3Params, tx, i, scriptPkScript,
 				hashType, mkGetKey(map[string]addressToKey{
 					address1.EncodeAddress(): {key1, true},
@@ -4513,7 +4513,7 @@ func TestSignTxOutput(t *testing.T) {
 			}
 
 			// Sign with the other key and merge
-			sigScript, err = btcscript.SignTxOutput(
+			sigScript, err = txscript.SignTxOutput(
 				&btcnet.TestNet3Params, tx, i, scriptPkScript,
 				hashType, mkGetKey(map[string]addressToKey{
 					address2.EncodeAddress(): {key2, true},
@@ -4575,7 +4575,7 @@ func TestSignTxOutput(t *testing.T) {
 				break
 			}
 
-			pkScript, err := btcscript.MultiSigScript(
+			pkScript, err := txscript.MultiSigScript(
 				[]*btcutil.AddressPubKey{address1, address2},
 				2)
 			if err != nil {
@@ -4591,7 +4591,7 @@ func TestSignTxOutput(t *testing.T) {
 				break
 			}
 
-			scriptPkScript, err := btcscript.PayToAddrScript(
+			scriptPkScript, err := txscript.PayToAddrScript(
 				scriptAddr)
 			if err != nil {
 				t.Errorf("failed to make script pkscript for "+
@@ -4599,7 +4599,7 @@ func TestSignTxOutput(t *testing.T) {
 				break
 			}
 
-			sigScript, err := btcscript.SignTxOutput(
+			sigScript, err := txscript.SignTxOutput(
 				&btcnet.TestNet3Params, tx, i, scriptPkScript,
 				hashType, mkGetKey(map[string]addressToKey{
 					address1.EncodeAddress(): {key1, true},
@@ -4620,7 +4620,7 @@ func TestSignTxOutput(t *testing.T) {
 			}
 
 			// Sign with the other key and merge
-			sigScript, err = btcscript.SignTxOutput(
+			sigScript, err = txscript.SignTxOutput(
 				&btcnet.TestNet3Params, tx, i, scriptPkScript,
 				hashType, mkGetKey(map[string]addressToKey{
 					address1.EncodeAddress(): {key1, true},
@@ -4661,13 +4661,13 @@ func TestCalcMultiSigStats(t *testing.T) {
 				0x71, 0x05, 0xcd, 0x6a, 0x82, 0x8e, 0x03, 0x90,
 				0x9a, 0x67, 0x96, 0x2e, 0x0e, 0xa1, 0xf6, 0x1d,
 			},
-			expected: btcscript.ErrStackShortScript,
+			expected: txscript.ErrStackShortScript,
 		},
 		{
 			name: "stack underflow",
 			script: []byte{
-				btcscript.OP_RETURN,
-				btcscript.OP_PUSHDATA1,
+				txscript.OP_RETURN,
+				txscript.OP_PUSHDATA1,
 				0x29,
 				0x04, 0x67, 0x08, 0xaf, 0xdb, 0x0f, 0xe5, 0x54,
 				0x82, 0x71, 0x96, 0x7f, 0x1a, 0x67, 0x13, 0x0b,
@@ -4676,13 +4676,13 @@ func TestCalcMultiSigStats(t *testing.T) {
 				0xeb, 0x64, 0x9f, 0x6b, 0xc3, 0xf4, 0xce, 0xf3,
 				0x08,
 			},
-			expected: btcscript.ErrStackUnderflow,
+			expected: txscript.ErrStackUnderflow,
 		},
 		{
 			name: "multisig script",
 			script: []uint8{
-				btcscript.OP_FALSE,
-				btcscript.OP_DATA_72,
+				txscript.OP_FALSE,
+				txscript.OP_DATA_72,
 				0x30, 0x45, 0x02, 0x20, 0x10,
 				0x6a, 0x3e, 0x4e, 0xf0, 0xb5,
 				0x1b, 0x76, 0x4a, 0x28, 0x87,
@@ -4698,9 +4698,9 @@ func TestCalcMultiSigStats(t *testing.T) {
 				0x1f, 0xe0, 0x72, 0x82, 0xe3,
 				0xb6, 0xec, 0xb5, 0xf3, 0xbb,
 				0x28, 0x01,
-				btcscript.OP_CODESEPARATOR,
-				btcscript.OP_TRUE,
-				btcscript.OP_DATA_33,
+				txscript.OP_CODESEPARATOR,
+				txscript.OP_TRUE,
+				txscript.OP_DATA_33,
 				0x02, 0x32, 0xab, 0xdc, 0x89,
 				0x3e, 0x7f, 0x06, 0x31, 0x36,
 				0x4d, 0x7f, 0xd0, 0x1c, 0xb3,
@@ -4708,15 +4708,15 @@ func TestCalcMultiSigStats(t *testing.T) {
 				0x9a, 0x00, 0x35, 0x7b, 0x3a,
 				0x78, 0x86, 0x21, 0x1a, 0xb4,
 				0x14, 0xd5, 0x5a,
-				btcscript.OP_TRUE,
-				btcscript.OP_CHECKMULTISIG,
+				txscript.OP_TRUE,
+				txscript.OP_CHECKMULTISIG,
 			},
 			expected: nil,
 		},
 	}
 
 	for i, test := range tests {
-		if _, _, err := btcscript.CalcMultiSigStats(test.script); err != test.expected {
+		if _, _, err := txscript.CalcMultiSigStats(test.script); err != test.expected {
 			t.Errorf("CalcMultiSigStats #%d (%s) wrong result\n"+
 				"got: %x\nwant: %x", i, test.name, err,
 				test.expected)
@@ -4744,13 +4744,13 @@ func TestHasCanonicalPushes(t *testing.T) {
 		},
 		{
 			name:     "non-canonical push",
-			script:   []byte{btcscript.OP_PUSHDATA1, 4, 1, 2, 3, 4},
+			script:   []byte{txscript.OP_PUSHDATA1, 4, 1, 2, 3, 4},
 			expected: false,
 		},
 	}
 
 	for i, test := range tests {
-		if btcscript.HasCanonicalPushes(test.script) != test.expected {
+		if txscript.HasCanonicalPushes(test.script) != test.expected {
 			t.Errorf("HasCanonicalPushes #%d (%s) wrong result\n"+
 				"got: %v\nwant: %v", i, test.name, true,
 				test.expected)
@@ -4776,7 +4776,7 @@ func TestIsPushOnlyScript(t *testing.T) {
 		expected: false,
 	}
 
-	if btcscript.IsPushOnlyScript(test.script) != test.expected {
+	if txscript.IsPushOnlyScript(test.script) != test.expected {
 		t.Errorf("IsPushOnlyScript (%s) wrong result\n"+
 			"got: %v\nwant: %v", test.name, true,
 			test.expected)

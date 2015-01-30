@@ -1,20 +1,15 @@
-btcscript
-=========
+txscript
+========
 
-[![Build Status](https://travis-ci.org/btcsuite/btcscript.png?branch=master)]
-(https://travis-ci.org/btcsuite/btcscript)
+[![Build Status](https://travis-ci.org/btcsuite/btcd.png?branch=master)]
+(https://travis-ci.org/btcsuite/btcd)
 
-Package btcscript implements the bitcoin transaction scripts.  There is
-a comprehensive test suite. `test_coverage.txt` contains the current
-coverage statistics (generated using gocov).  On a UNIX-like OS, the
-script `cov_report.sh` can be used to generate the report.  Package
-btcscript is licensed under the liberal ISC license.
+Package txscript implements the bitcoin transaction script language.  There is
+a comprehensive test suite.  Package txscript is licensed under the liberal ISC
+license.
 
-This package is one of the core packages from btcd, an alternative full-node
-implementation of bitcoin which is under active development by Conformal.
-Although it was primarily written for btcd, this package has intentionally been
-designed so it can be used as a standalone package for any projects needing to
-use or validate bitcoin transaction scripts.
+This package has intentionally been designed so it can be used as a standalone
+package for any projects needing to use or validate bitcoin transaction scripts.
 
 ## Bitcoin Scripts
 
@@ -25,38 +20,34 @@ can be found at https://en.bitcoin.it/wiki/Script
 
 ## Documentation
 
-[![GoDoc](https://godoc.org/github.com/btcsuite/btcscript?status.png)]
-(http://godoc.org/github.com/btcsuite/btcscript)
+[![GoDoc](https://godoc.org/github.com/btcsuite/btcd/txscript?status.png)]
+(http://godoc.org/github.com/btcsuite/btcd/txscript)
 
 Full `go doc` style documentation for the project can be viewed online without
 installing this package by using the GoDoc site
-[here](http://godoc.org/github.com/btcsuite/btcscript).
+[here](http://godoc.org/github.com/btcsuite/btcd/txscript).
 
 You can also view the documentation locally once the package is installed with
 the `godoc` tool by running `godoc -http=":6060"` and pointing your browser to
-http://localhost:6060/pkg/github.com/btcsuite/btcscript
+http://localhost:6060/pkg/github.com/btcsuite/btcd/txscript
 
 ## Installation
 
 ```bash
-$ go get github.com/btcsuite/btcscript
+$ go get github.com/btcsuite/btcd/txscript
 ```
 
 ## Examples
 
 * [Standard Pay-to-pubkey-hash Script]
-  (http://godoc.org/github.com/btcsuite/btcscript#example-PayToAddrScript)  
+  (http://godoc.org/github.com/btcsuite/btcd/txscript#example-PayToAddrScript)  
   Demonstrates creating a script which pays to a bitcoin address.  It also
   prints the created script hex and uses the DisasmString function to display
   the disassembled script.
 
 * [Extracting Details from Standard Scripts]
-  (http://godoc.org/github.com/btcsuite/btcscript#example-ExtractPkScriptAddrs)  
+  (http://godoc.org/github.com/btcsuite/btcd/txscript#example-ExtractPkScriptAddrs)  
   Demonstrates extracting information from a standard public key script.
-
-## TODO
-
-- Increase test coverage to 100%
 
 ## GPG Verification Key
 
@@ -80,4 +71,4 @@ signature perform the following:
 
 ## License
 
-Package btcscript is licensed under the liberal ISC License.
+Package txscript is licensed under the liberal ISC License.

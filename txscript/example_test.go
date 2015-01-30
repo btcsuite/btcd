@@ -1,15 +1,15 @@
-// Copyright (c) 2014 Conformal Systems LLC.
+// Copyright (c) 2014-2015 Conformal Systems LLC.
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
-package btcscript_test
+package txscript_test
 
 import (
 	"encoding/hex"
 	"fmt"
 
+	"github.com/btcsuite/btcd/txscript"
 	"github.com/btcsuite/btcnet"
-	"github.com/btcsuite/btcscript"
 	"github.com/btcsuite/btcutil"
 )
 
@@ -29,14 +29,14 @@ func ExamplePayToAddrScript() {
 	}
 
 	// Create a public key script that pays to the address.
-	script, err := btcscript.PayToAddrScript(address)
+	script, err := txscript.PayToAddrScript(address)
 	if err != nil {
 		fmt.Println(err)
 		return
 	}
 	fmt.Printf("Script Hex: %x\n", script)
 
-	disasm, err := btcscript.DisasmString(script)
+	disasm, err := txscript.DisasmString(script)
 	if err != nil {
 		fmt.Println(err)
 		return
@@ -60,7 +60,7 @@ func ExampleExtractPkScriptAddrs() {
 	}
 
 	// Extract and print details from the script.
-	scriptClass, addresses, reqSigs, err := btcscript.ExtractPkScriptAddrs(
+	scriptClass, addresses, reqSigs, err := txscript.ExtractPkScriptAddrs(
 		script, &btcnet.MainNetParams)
 	if err != nil {
 		fmt.Println(err)

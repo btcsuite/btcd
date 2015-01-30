@@ -1,8 +1,8 @@
-// Copyright (c) 2013-2014 Conformal Systems LLC.
+// Copyright (c) 2013-2015 Conformal Systems LLC.
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
-package btcscript
+package txscript
 
 import (
 	"bytes"
@@ -20,7 +20,7 @@ import (
 	"github.com/btcsuite/fastsha256"
 )
 
-// An opcode defines the information related to a btcscript opcode.
+// An opcode defines the information related to a txscript opcode.
 // opfunc if present is the function to call to perform the opcode on
 // the script. The current script is passed in as a slice with the firs
 // member being the opcode itself.

@@ -1,8 +1,8 @@
-// Copyright (c) 2013-2014 Conformal Systems LLC.
+// Copyright (c) 2013-2015 Conformal Systems LLC.
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
-package btcscript_test
+package txscript_test
 
 import (
 	"errors"
@@ -10,7 +10,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/btcsuite/btcscript"
+	"github.com/btcsuite/btcd/txscript"
 )
 
 func TestSetLogWriter(t *testing.T) {
@@ -48,7 +48,7 @@ func TestSetLogWriter(t *testing.T) {
 
 	t.Logf("Running %d tests", len(tests))
 	for i, test := range tests {
-		err := btcscript.SetLogWriter(test.w, test.level)
+		err := txscript.SetLogWriter(test.w, test.level)
 		if err != nil {
 			if err.Error() != test.expected.Error() {
 				t.Errorf("SetLogWriter #%d (%s) wrong result\n"+

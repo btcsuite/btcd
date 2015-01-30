@@ -1,15 +1,15 @@
-// Copyright (c) 2013-2014 Conformal Systems LLC.
+// Copyright (c) 2013-2015 Conformal Systems LLC.
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
-package btcscript_test
+package txscript_test
 
 import (
 	"encoding/hex"
 	"reflect"
 	"testing"
 
+	"github.com/btcsuite/btcd/txscript"
 	"github.com/btcsuite/btcnet"
-	"github.com/btcsuite/btcscript"
 	"github.com/btcsuite/btcutil"
 )
 
@@ -75,7 +75,7 @@ func TestExtractPkScriptAddrs(t *testing.T) {
 		script  []byte
 		addrs   []btcutil.Address
 		reqSigs int
-		class   btcscript.ScriptClass
+		class   txscript.ScriptClass
 	}{
 		{
 			name: "standard p2pk with compressed pubkey (0x02)",
@@ -87,7 +87,7 @@ func TestExtractPkScriptAddrs(t *testing.T) {
 					"4895dca52c6b4")),
 			},
 			reqSigs: 1,
-			class:   btcscript.PubKeyTy,
+			class:   txscript.PubKeyTy,
 		},
 		{
 			name: "standard p2pk with uncompressed pubkey (0x04)",
@@ -103,7 +103,7 @@ func TestExtractPkScriptAddrs(t *testing.T) {
 					"412a3")),
 			},
 			reqSigs: 1,
-			class:   btcscript.PubKeyTy,
+			class:   txscript.PubKeyTy,
 		},
 		{
 			name: "standard p2pk with hybrid pubkey (0x06)",
@@ -119,7 +119,7 @@ func TestExtractPkScriptAddrs(t *testing.T) {
 					"f453e")),
 			},
 			reqSigs: 1,
-			class:   btcscript.PubKeyTy,
+			class:   txscript.PubKeyTy,
 		},
 		{
 			name: "standard p2pk with compressed pubkey (0x03)",
@@ -131,7 +131,7 @@ func TestExtractPkScriptAddrs(t *testing.T) {
 					"409273eb16e65")),
 			},
 			reqSigs: 1,
-			class:   btcscript.PubKeyTy,
+			class:   txscript.PubKeyTy,
 		},
 		{
 			name: "2nd standard p2pk with uncompressed pubkey (0x04)",
@@ -147,7 +147,7 @@ func TestExtractPkScriptAddrs(t *testing.T) {
 					"8ef7b")),
 			},
 			reqSigs: 1,
-			class:   btcscript.PubKeyTy,
+			class:   txscript.PubKeyTy,
 		},
 		{
 			name: "standard p2pk with hybrid pubkey (0x07)",
@@ -163,7 +163,7 @@ func TestExtractPkScriptAddrs(t *testing.T) {
 					"8ef7b")),
 			},
 			reqSigs: 1,
-			class:   btcscript.PubKeyTy,
+			class:   txscript.PubKeyTy,
 		},
 		{
 			name: "standard p2pkh",
@@ -174,7 +174,7 @@ func TestExtractPkScriptAddrs(t *testing.T) {
 					"cbca9a9e3713bd7587509a30564")),
 			},
 			reqSigs: 1,
-			class:   btcscript.PubKeyHashTy,
+			class:   txscript.PubKeyHashTy,
 		},
 		{
 			name: "standard p2sh",
@@ -185,7 +185,7 @@ func TestExtractPkScriptAddrs(t *testing.T) {
 					"ee0189dd5cc67f1b0e5f02f45cb")),
 			},
 			reqSigs: 1,
-			class:   btcscript.ScriptHashTy,
+			class:   txscript.ScriptHashTy,
 		},
 		// from real tx 60a20bd93aa49ab4b28d514ec10b06e1829ce6818ec06cd3aabd013ebcdc4bb1, vout 0
 		{
@@ -210,7 +210,7 @@ func TestExtractPkScriptAddrs(t *testing.T) {
 					"342af")),
 			},
 			reqSigs: 1,
-			class:   btcscript.MultiSigTy,
+			class:   txscript.MultiSigTy,
 		},
 		// from real tx d646f82bd5fbdb94a36872ce460f97662b80c3050ad3209bef9d1e398ea277ab, vin 1
 		{
@@ -243,7 +243,7 @@ func TestExtractPkScriptAddrs(t *testing.T) {
 					"0421a")),
 			},
 			reqSigs: 2,
-			class:   btcscript.MultiSigTy,
+			class:   txscript.MultiSigTy,
 		},
 
 		// The below are nonstandard script due to things such as
@@ -258,7 +258,7 @@ func TestExtractPkScriptAddrs(t *testing.T) {
 				"f656b412a3"),
 			addrs:   nil,
 			reqSigs: 0,
-			class:   btcscript.NonStandardTy,
+			class:   txscript.NonStandardTy,
 		},
 		{
 			name: "valid signature from a sigscript - no addresses",
@@ -268,7 +268,7 @@ func TestExtractPkScriptAddrs(t *testing.T) {
 				"4622082221a8768d1d0901"),
 			addrs:   nil,
 			reqSigs: 0,
-			class:   btcscript.NonStandardTy,
+			class:   txscript.NonStandardTy,
 		},
 		// Note the technically the pubkey is the second item on the
 		// stack, but since the address extraction intentionally only
@@ -285,7 +285,7 @@ func TestExtractPkScriptAddrs(t *testing.T) {
 				"a75a71042d40388a4d307f887d"),
 			addrs:   nil,
 			reqSigs: 0,
-			class:   btcscript.NonStandardTy,
+			class:   txscript.NonStandardTy,
 		},
 		// from real tx 691dd277dc0e90a462a3d652a1171686de49cf19067cd33c7df0392833fb986a, vout 0
 		// invalid public keys
@@ -303,7 +303,7 @@ func TestExtractPkScriptAddrs(t *testing.T) {
 				"35616463636453ae"),
 			addrs:   []btcutil.Address{},
 			reqSigs: 1,
-			class:   btcscript.MultiSigTy,
+			class:   txscript.MultiSigTy,
 		},
 		// from real tx: 691dd277dc0e90a462a3d652a1171686de49cf19067cd33c7df0392833fb986a, vout 44
 		// invalid public keys
@@ -319,27 +319,27 @@ func TestExtractPkScriptAddrs(t *testing.T) {
 				"38613663663530616234636434340a00000053ae"),
 			addrs:   []btcutil.Address{},
 			reqSigs: 1,
-			class:   btcscript.MultiSigTy,
+			class:   txscript.MultiSigTy,
 		},
 		{
 			name:    "empty script",
 			script:  []byte{},
 			addrs:   nil,
 			reqSigs: 0,
-			class:   btcscript.NonStandardTy,
+			class:   txscript.NonStandardTy,
 		},
 		{
 			name:    "script that does not parse",
-			script:  []byte{btcscript.OP_DATA_45},
+			script:  []byte{txscript.OP_DATA_45},
 			addrs:   nil,
 			reqSigs: 0,
-			class:   btcscript.NonStandardTy,
+			class:   txscript.NonStandardTy,
 		},
 	}
 
 	t.Logf("Running %d tests.", len(tests))
 	for i, test := range tests {
-		class, addrs, reqSigs, err := btcscript.ExtractPkScriptAddrs(
+		class, addrs, reqSigs, err := txscript.ExtractPkScriptAddrs(
 			test.script, &btcnet.MainNetParams)
 		if err != nil {
 		}

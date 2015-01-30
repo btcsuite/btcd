@@ -1,8 +1,8 @@
-// Copyright (c) 2013-2014 Conformal Systems LLC.
+// Copyright (c) 2013-2015 Conformal Systems LLC.
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
-package btcscript
+package txscript
 
 import (
 	"encoding/binary"
@@ -38,10 +38,10 @@ func (e ErrScriptNotCanonical) Error() string {
 // For example, the following would build a 2-of-3 multisig script for usage in
 // a pay-to-script-hash (although in this situation MultiSigScript() would be a
 // better choice to generate the script):
-// 	builder := btcscript.NewScriptBuilder()
-// 	builder.AddOp(btcscript.OP_2).AddData(pubKey1).AddData(pubKey2)
-// 	builder.AddData(pubKey3).AddOp(btcscript.OP_3)
-// 	builder.AddOp(btcscript.OP_CHECKMULTISIG)
+// 	builder := txscript.NewScriptBuilder()
+// 	builder.AddOp(txscript.OP_2).AddData(pubKey1).AddData(pubKey2)
+// 	builder.AddData(pubKey3).AddOp(txscript.OP_3)
+// 	builder.AddOp(txscript.OP_CHECKMULTISIG)
 // 	script, err := builder.Script()
 // 	if err != nil {
 // 		// Handle the error.

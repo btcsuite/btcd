@@ -1,9 +1,9 @@
-// Copyright (c) 2013-2014 Conformal Systems LLC.
+// Copyright (c) 2013-2015 Conformal Systems LLC.
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
 /*
-Package btcscript implements bitcoin transaction scripts.
+Package txscript implements the bitcoin transaction script language.
 
 A complete description of the script language used by bitcoin can be found at
 https://en.bitcoin.it/wiki/Script.  The following only serves as a quick
@@ -32,8 +32,8 @@ what conditions must be met in order to spend bitcoins.
 
 Errors
 
-Errors returned by this package are of the form btcscript.ErrStackX where X
+Errors returned by this package are of the form txscript.ErrStackX where X
 indicates the specific error.  See Variables in the package documentation for a
 full list.
 */
-package btcscript
+package txscript
