@@ -5,7 +5,7 @@
 package bloom
 
 import (
-	"github.com/btcsuite/btcchain"
+	"github.com/btcsuite/btcd/blockchain"
 	"github.com/btcsuite/btcutil"
 	"github.com/btcsuite/btcwire"
 )
@@ -40,7 +40,7 @@ func (m *merkleBlock) calcHash(height, pos uint32) *btcwire.ShaHash {
 	} else {
 		right = left
 	}
-	return btcchain.HashMerkleBranches(left, right)
+	return blockchain.HashMerkleBranches(left, right)
 }
 
 // traverseAndBuild builds a partial merkle tree using a recursive depth-first
