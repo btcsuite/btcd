@@ -5,7 +5,7 @@
 package main
 
 import (
-	"github.com/btcsuite/btcchain"
+	"github.com/btcsuite/btcd/blockchain"
 	"github.com/btcsuite/btcwire"
 )
 
@@ -13,7 +13,8 @@ import (
 // processing of a transaction failed due to one of the many validation
 // rules.  The caller can use type assertions to determine if a failure was
 // specifically due to a rule violation and use the Err field to access the
-// underlying error, which will be either a TxRuleError or a btcchain.RuleError.
+// underlying error, which will be either a TxRuleError or a
+// blockchain.RuleError.
 type RuleError struct {
 	Err error
 }
@@ -50,8 +51,8 @@ func txRuleError(c btcwire.RejectCode, desc string) RuleError {
 }
 
 // chainRuleError returns a RuleError that encapsulates the given
-// btcchain.RuleError.
-func chainRuleError(chainErr btcchain.RuleError) RuleError {
+// blockchain.RuleError.
+func chainRuleError(chainErr blockchain.RuleError) RuleError {
 	return RuleError{
 		Err: chainErr,
 	}
@@ -67,28 +68,28 @@ func extractRejectCode(err error) (btcwire.RejectCode, bool) {
 	}
 
 	switch err := err.(type) {
-	case btcchain.RuleError:
+	case blockchain.RuleError:
 		// Convert the chain error to a reject code.
 		var code btcwire.RejectCode
 		switch err.ErrorCode {
 		// Rejected due to duplicate.
-		case btcchain.ErrDuplicateBlock:
+		case blockchain.ErrDuplicateBlock:
 			fallthrough
-		case btcchain.ErrDoubleSpend:
+		case blockchain.ErrDoubleSpend:
 			code = btcwire.RejectDuplicate
 
 		// Rejected due to obsolete version.
-		case btcchain.ErrBlockVersionTooOld:
+		case blockchain.ErrBlockVersionTooOld:
 			code = btcwire.RejectObsolete
 
 		// Rejected due to checkpoint.
-		case btcchain.ErrCheckpointTimeTooOld:
+		case blockchain.ErrCheckpointTimeTooOld:
 			fallthrough
-		case btcchain.ErrDifficultyTooLow:
+		case blockchain.ErrDifficultyTooLow:
 			fallthrough
-		case btcchain.ErrBadCheckpoint:
+		case blockchain.ErrBadCheckpoint:
 			fallthrough
-		case btcchain.ErrForkTooOld:
+		case blockchain.ErrForkTooOld:
 			code = btcwire.RejectCheckpoint
 
 		// Everything else is due to the block or transaction being invalid.

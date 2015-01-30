@@ -12,7 +12,7 @@ import (
 
 	"github.com/btcsuite/btcd/addrmgr"
 
-	"github.com/btcsuite/btcchain"
+	"github.com/btcsuite/btcd/blockchain"
 	"github.com/btcsuite/btcd/database"
 	"github.com/btcsuite/btcd/txscript"
 	"github.com/btcsuite/btclog"
@@ -110,7 +110,7 @@ func useLogger(subsystemID string, logger btclog.Logger) {
 
 	case "CHAN":
 		chanLog = logger
-		btcchain.UseLogger(logger)
+		blockchain.UseLogger(logger)
 
 	case "DISC":
 		discLog = logger

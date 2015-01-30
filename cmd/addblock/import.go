@@ -11,7 +11,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/btcsuite/btcchain"
+	"github.com/btcsuite/btcd/blockchain"
 	"github.com/btcsuite/btcd/database"
 	_ "github.com/btcsuite/btcd/database/ldb"
 	"github.com/btcsuite/btcutil"
@@ -31,8 +31,8 @@ type importResults struct {
 // file to the block database.
 type blockImporter struct {
 	db                database.Db
-	chain             *btcchain.BlockChain
-	medianTime        btcchain.MedianTimeSource
+	chain             *blockchain.BlockChain
+	medianTime        blockchain.MedianTimeSource
 	r                 io.ReadSeeker
 	processQueue      chan []byte
 	doneChan          chan bool
@@ -134,7 +134,7 @@ func (bi *blockImporter) processBlock(serializedBlock []byte) (bool, error) {
 	// Ensure the blocks follows all of the chain rules and match up to the
 	// known checkpoints.
 	isOrphan, err := bi.chain.ProcessBlock(block, bi.medianTime,
-		btcchain.BFFastAdd)
+		blockchain.BFFastAdd)
 	if err != nil {
 		return false, err
 	}
@@ -307,8 +307,8 @@ func newBlockImporter(db database.Db, r io.ReadSeeker) *blockImporter {
 		doneChan:     make(chan bool),
 		errChan:      make(chan error),
 		quit:         make(chan struct{}),
-		chain:        btcchain.New(db, activeNetParams, nil),
-		medianTime:   btcchain.NewMedianTime(),
+		chain:        blockchain.New(db, activeNetParams, nil),
+		medianTime:   blockchain.NewMedianTime(),
 		lastLogTime:  time.Now(),
 	}
 }

@@ -9,7 +9,7 @@ import (
 	"path/filepath"
 	"runtime"
 
-	"github.com/btcsuite/btcchain"
+	"github.com/btcsuite/btcd/blockchain"
 	"github.com/btcsuite/btcd/database"
 	_ "github.com/btcsuite/btcd/database/ldb"
 	"github.com/btcsuite/btcd/limits"
@@ -81,7 +81,7 @@ func realMain() error {
 	defer backendLogger.Flush()
 	log = btclog.NewSubsystemLogger(backendLogger, "")
 	database.UseLogger(btclog.NewSubsystemLogger(backendLogger, "BCDB: "))
-	btcchain.UseLogger(btclog.NewSubsystemLogger(backendLogger, "CHAN: "))
+	blockchain.UseLogger(btclog.NewSubsystemLogger(backendLogger, "CHAN: "))
 
 	// Load the block database.
 	db, err := loadBlockDB()

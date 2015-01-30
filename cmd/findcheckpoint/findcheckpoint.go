@@ -9,7 +9,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/btcsuite/btcchain"
+	"github.com/btcsuite/btcd/blockchain"
 	"github.com/btcsuite/btcd/database"
 	_ "github.com/btcsuite/btcd/database/ldb"
 	"github.com/btcsuite/btcnet"
@@ -53,7 +53,7 @@ func findCandidates(db database.Db, latestHash *btcwire.ShaHash) ([]*btcnet.Chec
 
 	// Setup chain and get the latest checkpoint.  Ignore notifications
 	// since they aren't needed for this util.
-	chain := btcchain.New(db, activeNetParams, nil)
+	chain := blockchain.New(db, activeNetParams, nil)
 	latestCheckpoint := chain.LatestCheckpoint()
 	if latestCheckpoint == nil {
 		return nil, fmt.Errorf("unable to retrieve latest checkpoint")
@@ -61,7 +61,7 @@ func findCandidates(db database.Db, latestHash *btcwire.ShaHash) ([]*btcnet.Chec
 
 	// The latest known block must be at least the last known checkpoint
 	// plus required checkpoint confirmations.
-	checkpointConfirmations := int64(btcchain.CheckpointConfirmations)
+	checkpointConfirmations := int64(blockchain.CheckpointConfirmations)
 	requiredHeight := latestCheckpoint.Height + checkpointConfirmations
 	if block.Height() < requiredHeight {
 		return nil, fmt.Errorf("the block database is only at height "+

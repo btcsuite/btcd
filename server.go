@@ -19,8 +19,8 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/btcsuite/btcchain"
 	"github.com/btcsuite/btcd/addrmgr"
+	"github.com/btcsuite/btcd/blockchain"
 	"github.com/btcsuite/btcd/database"
 	"github.com/btcsuite/btcjson"
 	"github.com/btcsuite/btcnet"
@@ -99,7 +99,7 @@ type server struct {
 	quit                 chan struct{}
 	nat                  NAT
 	db                   database.Db
-	timeSource           btcchain.MedianTimeSource
+	timeSource           blockchain.MedianTimeSource
 }
 
 type peerState struct {
@@ -1238,7 +1238,7 @@ func newServer(listenAddrs []string, db database.Db, netParams *btcnet.Params) (
 		modifyRebroadcastInv: make(chan interface{}),
 		nat:                  nat,
 		db:                   db,
-		timeSource:           btcchain.NewMedianTime(),
+		timeSource:           blockchain.NewMedianTime(),
 	}
 	bm, err := newBlockManager(&s)
 	if err != nil {

@@ -11,7 +11,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/btcsuite/btcchain"
+	"github.com/btcsuite/btcd/blockchain"
 	"github.com/btcsuite/btcutil"
 	"github.com/btcsuite/btcwire"
 )
@@ -129,11 +129,11 @@ func (m *CPUMiner) submitBlock(block *btcutil.Block) bool {
 
 	// Process this block using the same rules as blocks coming from other
 	// nodes.  This will in turn relay it to the network like normal.
-	isOrphan, err := m.server.blockManager.ProcessBlock(block, btcchain.BFNone)
+	isOrphan, err := m.server.blockManager.ProcessBlock(block, blockchain.BFNone)
 	if err != nil {
 		// Anything other than a rule violation is an unexpected error,
 		// so log that error as an internal error.
-		if _, ok := err.(btcchain.RuleError); !ok {
+		if _, ok := err.(blockchain.RuleError); !ok {
 			minrLog.Errorf("Unexpected error while processing "+
 				"block submitted via CPU miner: %v", err)
 			return false
@@ -178,7 +178,7 @@ func (m *CPUMiner) solveBlock(msgBlock *btcwire.MsgBlock, blockHeight int64,
 
 	// Create a couple of convenience variables.
 	header := &msgBlock.Header
-	targetDifficulty := btcchain.CompactToBig(header.Bits)
+	targetDifficulty := blockchain.CompactToBig(header.Bits)
 
 	// Initial state.
 	lastGenerated := time.Now()
@@ -239,7 +239,7 @@ func (m *CPUMiner) solveBlock(msgBlock *btcwire.MsgBlock, blockHeight int64,
 
 			// The block is solved when the new block hash is less
 			// than the target difficulty.  Yay!
-			if btcchain.ShaHashToBig(&hash).Cmp(targetDifficulty) <= 0 {
+			if blockchain.ShaHashToBig(&hash).Cmp(targetDifficulty) <= 0 {
 				m.updateHashes <- hashesCompleted
 				return true
 			}

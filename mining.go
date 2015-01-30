@@ -10,7 +10,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/btcsuite/btcchain"
+	"github.com/btcsuite/btcd/blockchain"
 	"github.com/btcsuite/btcd/database"
 	"github.com/btcsuite/btcd/txscript"
 	"github.com/btcsuite/btcutil"
@@ -186,7 +186,7 @@ func minInt(a, b int) int {
 // mergeTxStore adds all of the transactions in txStoreB to txStoreA.  The
 // result is that txStoreA will contain all of its original transactions plus
 // all of the transactions in txStoreB.
-func mergeTxStore(txStoreA btcchain.TxStore, txStoreB btcchain.TxStore) {
+func mergeTxStore(txStoreA blockchain.TxStore, txStoreB blockchain.TxStore) {
 	for hash, txDataB := range txStoreB {
 		if txDataA, exists := txStoreA[hash]; !exists ||
 			(txDataA.Err == database.ErrTxShaMissing &&
@@ -242,7 +242,7 @@ func createCoinbaseTx(coinbaseScript []byte, nextBlockHeight int64, addr btcutil
 		Sequence:        btcwire.MaxTxInSequenceNum,
 	})
 	tx.AddTxOut(&btcwire.TxOut{
-		Value: btcchain.CalcBlockSubsidy(nextBlockHeight,
+		Value: blockchain.CalcBlockSubsidy(nextBlockHeight,
 			activeNetParams.Params),
 		PkScript: pkScript,
 	})
@@ -290,7 +290,7 @@ func calcPriority(tx *btcutil.Tx, serializedTxSize int, inputValueAge float64) f
 // spendTransaction updates the passed transaction store by marking the inputs
 // to the passed transaction as spent.  It also adds the passed transaction to
 // the store at the provided height.
-func spendTransaction(txStore btcchain.TxStore, tx *btcutil.Tx, height int64) error {
+func spendTransaction(txStore blockchain.TxStore, tx *btcutil.Tx, height int64) error {
 	for _, txIn := range tx.MsgTx().TxIn {
 		originHash := &txIn.PreviousOutPoint.Hash
 		originIndex := txIn.PreviousOutPoint.Index
@@ -299,7 +299,7 @@ func spendTransaction(txStore btcchain.TxStore, tx *btcutil.Tx, height int64) er
 		}
 	}
 
-	txStore[*tx.Sha()] = &btcchain.TxData{
+	txStore[*tx.Sha()] = &blockchain.TxData{
 		Tx:          tx,
 		Hash:        tx.Sha(),
 		BlockHeight: height,
@@ -453,7 +453,7 @@ func NewBlockTemplate(mempool *txMemPool, payToAddress btcutil.Address) (*BlockT
 	if err != nil {
 		return nil, err
 	}
-	numCoinbaseSigOps := int64(btcchain.CountSigOps(coinbaseTx))
+	numCoinbaseSigOps := int64(blockchain.CountSigOps(coinbaseTx))
 
 	// Get the current memory pool transactions and create a priority queue
 	// to hold the transactions which are ready for inclusion into a block
@@ -472,7 +472,7 @@ func NewBlockTemplate(mempool *txMemPool, payToAddress btcutil.Address) (*BlockT
 	// can be avoided.
 	blockTxns := make([]*btcutil.Tx, 0, len(mempoolTxns))
 	blockTxns = append(blockTxns, coinbaseTx)
-	blockTxStore := make(btcchain.TxStore)
+	blockTxStore := make(blockchain.TxStore)
 
 	// dependers is used to track transactions which depend on another
 	// transaction in the memory pool.  This, in conjunction with the
@@ -500,11 +500,11 @@ mempoolLoop:
 		// A block can't have more than one coinbase or contain
 		// non-finalized transactions.
 		tx := txDesc.Tx
-		if btcchain.IsCoinBase(tx) {
+		if blockchain.IsCoinBase(tx) {
 			minrLog.Tracef("Skipping coinbase tx %s", tx.Sha())
 			continue
 		}
-		if !btcchain.IsFinalizedTransaction(tx, nextBlockHeight, time.Now()) {
+		if !blockchain.IsFinalizedTransaction(tx, nextBlockHeight, time.Now()) {
 			minrLog.Tracef("Skipping non-finalized tx %s", tx.Sha())
 			continue
 		}
@@ -632,15 +632,15 @@ mempoolLoop:
 
 		// Enforce maximum signature operations per block.  Also check
 		// for overflow.
-		numSigOps := int64(btcchain.CountSigOps(tx))
+		numSigOps := int64(blockchain.CountSigOps(tx))
 		if blockSigOps+numSigOps < blockSigOps ||
-			blockSigOps+numSigOps > btcchain.MaxSigOpsPerBlock {
+			blockSigOps+numSigOps > blockchain.MaxSigOpsPerBlock {
 			minrLog.Tracef("Skipping tx %s because it would "+
 				"exceed the maximum sigops per block", tx.Sha())
 			logSkippedDeps(tx, deps)
 			continue
 		}
-		numP2SHSigOps, err := btcchain.CountP2SHSigOps(tx, false,
+		numP2SHSigOps, err := blockchain.CountP2SHSigOps(tx, false,
 			blockTxStore)
 		if err != nil {
 			minrLog.Tracef("Skipping tx %s due to error in "+
@@ -650,7 +650,7 @@ mempoolLoop:
 		}
 		numSigOps += int64(numP2SHSigOps)
 		if blockSigOps+numSigOps < blockSigOps ||
-			blockSigOps+numSigOps > btcchain.MaxSigOpsPerBlock {
+			blockSigOps+numSigOps > blockchain.MaxSigOpsPerBlock {
 			minrLog.Tracef("Skipping tx %s because it would "+
 				"exceed the maximum sigops per block (p2sh)",
 				tx.Sha())
@@ -703,7 +703,7 @@ mempoolLoop:
 
 		// Ensure the transaction inputs pass all of the necessary
 		// preconditions before allowing it to be added to the block.
-		_, err = btcchain.CheckTransactionInputs(tx, nextBlockHeight,
+		_, err = blockchain.CheckTransactionInputs(tx, nextBlockHeight,
 			blockTxStore)
 		if err != nil {
 			minrLog.Tracef("Skipping tx %s due to error in "+
@@ -711,7 +711,7 @@ mempoolLoop:
 			logSkippedDeps(tx, deps)
 			continue
 		}
-		err = btcchain.ValidateTransactionScripts(tx, blockTxStore,
+		err = blockchain.ValidateTransactionScripts(tx, blockTxStore,
 			standardScriptVerifyFlags)
 		if err != nil {
 			minrLog.Tracef("Skipping tx %s due to error in "+
@@ -777,7 +777,7 @@ mempoolLoop:
 	}
 
 	// Create a new block ready to be solved.
-	merkles := btcchain.BuildMerkleTreeStore(blockTxns)
+	merkles := blockchain.BuildMerkleTreeStore(blockTxns)
 	var msgBlock btcwire.MsgBlock
 	msgBlock.Header = btcwire.BlockHeader{
 		Version:    generatedBlockVersion,
@@ -804,7 +804,7 @@ mempoolLoop:
 	minrLog.Debugf("Created new block template (%d transactions, %d in "+
 		"fees, %d signature operations, %d bytes, target difficulty "+
 		"%064x)", len(msgBlock.Transactions), totalFees, blockSigOps,
-		blockSize, btcchain.CompactToBig(msgBlock.Header.Bits))
+		blockSize, blockchain.CompactToBig(msgBlock.Header.Bits))
 
 	return &BlockTemplate{
 		block:           &msgBlock,
@@ -853,11 +853,11 @@ func UpdateExtraNonce(msgBlock *btcwire.MsgBlock, blockHeight int64, extraNonce 
 	if err != nil {
 		return err
 	}
-	if len(coinbaseScript) > btcchain.MaxCoinbaseScriptLen {
+	if len(coinbaseScript) > blockchain.MaxCoinbaseScriptLen {
 		return fmt.Errorf("coinbase transaction script length "+
 			"of %d is out of range (min: %d, max: %d)",
-			len(coinbaseScript), btcchain.MinCoinbaseScriptLen,
-			btcchain.MaxCoinbaseScriptLen)
+			len(coinbaseScript), blockchain.MinCoinbaseScriptLen,
+			blockchain.MaxCoinbaseScriptLen)
 	}
 	msgBlock.Transactions[0].TxIn[0].SignatureScript = coinbaseScript
 
@@ -867,7 +867,7 @@ func UpdateExtraNonce(msgBlock *btcwire.MsgBlock, blockHeight int64, extraNonce 
 
 	// Recalculate the merkle root with the updated extra nonce.
 	block := btcutil.NewBlock(msgBlock)
-	merkles := btcchain.BuildMerkleTreeStore(block.Transactions())
+	merkles := blockchain.BuildMerkleTreeStore(block.Transactions())
 	msgBlock.Header.MerkleRoot = *merkles[len(merkles)-1]
 	return nil
 }
