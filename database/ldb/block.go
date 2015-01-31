@@ -202,14 +202,9 @@ func (db *LevelDb) ExistsSha(sha *btcwire.ShaHash) (bool, error) {
 // returns true if it is present in the database.
 // CALLED WITH LOCK HELD
 func (db *LevelDb) blkExistsSha(sha *btcwire.ShaHash) (bool, error) {
-	_, err := db.getBlkLoc(sha)
-	switch err {
-	case nil:
-		return true, nil
-	case leveldb.ErrNotFound, database.ErrBlockShaMissing:
-		return false, nil
-	}
-	return false, err
+	key := shaBlkToKey(sha)
+
+	return db.lDb.Has(key, db.ro)
 }
 
 // FetchBlockShaByHeight returns a block hash based on its height in the
