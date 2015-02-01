@@ -937,6 +937,8 @@ func (pop *parsedOpcode) conditional() bool {
 // it is hidden by conditionals, but some rules still must be tested in this
 // case.
 func (pop *parsedOpcode) exec(s *Script) error {
+	popLen := len(pop.data)
+
 	// Disabled opcodes are ``fail on program counter''.
 	if pop.disabled() {
 		return ErrStackOpDisabled
@@ -954,14 +956,28 @@ func (pop *parsedOpcode) exec(s *Script) error {
 			return ErrStackTooManyOperations
 		}
 
-	} else if len(pop.data) > MaxScriptElementSize {
+	} else if popLen > MaxScriptElementSize {
 		return ErrStackElementTooBig
+	}
+	if s.verifyMinimalData && popLen > 0 &&
+		pop.data[popLen-1]&0x7f == 0x7f &&
+		(popLen == 1 || pop.data[popLen-2]&0x80 == 0x80) {
+		return ErrStackMinimalData
 	}
 
 	// If we are not a conditional opcode and we aren't executing, then
 	// we are done now.
 	if s.condStack[0] != OpCondTrue && !pop.conditional() {
 		return nil
+	}
+
+	// If we are executiung, verify all push operations have the minimal
+	// required encocdings, if enabled.
+	if s.verifyMinimalData && s.condStack[0] == OpCondTrue &&
+		pop.opcode.value >= 0 && pop.opcode.value <= OP_PUSHDATA4 {
+		if !hasMinimalData(*pop) {
+			return ErrStackMinimalData
+		}
 	}
 	return pop.opcode.opfunc(pop, s)
 }
