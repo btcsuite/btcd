@@ -18,6 +18,11 @@ import (
 )
 
 var (
+	// ErrStackMinimalData is returned if the flag ScriptVerifyMinimalData
+	// was set and the the script did not contain the minimal encodings
+	// for all push operations.
+	ErrStackMinimalData = errors.New("non-minimally encoded script number")
+
 	// ErrStackShortScript is returned if the script has an opcode that is
 	// too long for the length of the script.
 	ErrStackShortScript = errors.New("execute past end of script")
@@ -209,6 +214,7 @@ type Script struct {
 	der                      bool     // enforce DER encoding
 	strictMultiSig           bool     // verify multisig stack item is zero length
 	discourageUpgradableNops bool     // NOP1 to NOP10 are reserved for future soft-fork upgrades
+	verifyMinimalData        bool     // require minimal encodings for all push operations
 	savedFirstStack          [][]byte // stack from first script for bip16 scripts
 }
 
@@ -326,6 +332,27 @@ func IsPushOnlyScript(script []byte) bool {
 		return false
 	}
 	return isPushOnly(pops)
+}
+
+func hasMinimalData(pop parsedOpcode) bool {
+	opcode := pop.opcode.value
+	data := pop.data
+	dataLen := len(pop.data)
+
+	if dataLen == 0 {
+		return opcode == OP_0
+	} else if dataLen == 1 && data[0] >= 1 && data[0] <= 16 {
+		return opcode == OP_1+(data[0]-1)
+	} else if dataLen == 1 && data[0] == 0x81 {
+		return opcode == OP_1NEGATE
+	} else if dataLen <= 75 {
+		return int(opcode) == dataLen
+	} else if dataLen <= 255 {
+		return opcode == OP_PUSHDATA1
+	} else if dataLen <= 65535 {
+		return opcode == OP_PUSHDATA2
+	}
+	return true
 }
 
 // canonicalPush returns true if the object is either not a push instruction
@@ -526,6 +553,10 @@ const (
 	// ScriptVerifySigPushOnly defines that signature scripts must contain
 	// only pushed data.  This is rule 2 of BIP0062.
 	ScriptVerifySigPushOnly
+
+	// ScriptVerifyMinimalData defines that scripts must contain minimal
+	// encodings for all push operations.  The is rules 3 and 4 of BIP0062.
+	ScriptVerifyMinimalData
 )
 
 // NewScript returns a new script engine for the provided tx and input idx with
@@ -560,8 +591,7 @@ func NewScript(scriptSig []byte, scriptPubKey []byte, txidx int, tx *btcwire.Msg
 	}
 
 	// Parse flags.
-	bip16 := flags&ScriptBip16 == ScriptBip16
-	if bip16 && isScriptHash(m.scripts[1]) {
+	if flags&ScriptBip16 == ScriptBip16 && isScriptHash(m.scripts[1]) {
 		// if we are pay to scripthash then we only accept input
 		// scripts that push data
 		if !isPushOnly(m.scripts[0]) {
@@ -577,6 +607,9 @@ func NewScript(scriptSig []byte, scriptPubKey []byte, txidx int, tx *btcwire.Msg
 	}
 	if flags&ScriptDiscourageUpgradableNops == ScriptDiscourageUpgradableNops {
 		m.discourageUpgradableNops = true
+	}
+	if flags&ScriptVerifyMinimalData == ScriptVerifyMinimalData {
+		m.verifyMinimalData = true
 	}
 
 	m.tx = *tx

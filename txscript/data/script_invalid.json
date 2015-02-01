@@ -390,6 +390,9 @@
 ["0 0x01 VER", "HASH160 0x14 0x0f4d7845db968f2a81b530b6f3c1d6246d4c7e01 EQUAL", "P2SH,STRICTENC", "OP_VER in P2SH should fail"],
 
 ["0x00", "'00' EQUAL", "P2SH,STRICTENC", "Basic OP_0 execution"],
+["1 IF 0x01 0x81 ENDIF 1", "", "MINIMALDATA", "evaluated non-minimal data"],
+["1 IF 0x01 0x05 ENDIF 1", "", "MINIMALDATA", "evaluated non-minimal data"],
+["1 IF 0x4c 0x03 0x222222 ENDIF 1", "", "MINIMALDATA", "evaluated non-minimal data"],
 
 [
     "0 0x47 0x3044022035341cc377b19138f944f90c45772cb06338c6d56a4c0c31a65bf1a8a105fadc022046dd232850b6bacb25879c9da82a7a628982aa19d055f1753468f68047662e0301 DUP",
