@@ -8,7 +8,7 @@ package btcec
 
 // References:
 //   [SECG]: Recommended Elliptic Curve Domain Parameters
-//     http://www.secg.org/download/aid-784/sec2-v2.pdf
+//     http://www.secg.org/sec2-v2.pdf
 
 // This package operates, internally, on Jacobian coordinates. For a given
 // (x, y) position on the curve, the Jacobian coordinates are (x1, y1, z1)
@@ -658,7 +658,6 @@ func (curve *KoblitzCurve) QPlus1Div4() *big.Int {
 	return curve.q
 }
 
-// Curve parameters taken from: http://www.secg.org/sec2-v2.pdf
 var initonce sync.Once
 var secp256k1 KoblitzCurve
 
@@ -667,7 +666,7 @@ func initAll() {
 }
 
 func initS256() {
-	// See [SECG] section 2.7.1
+	// Curve parameters taken from [SECG] section 2.4.1.
 	secp256k1.CurveParams = new(elliptic.CurveParams)
 	secp256k1.P, _ = new(big.Int).SetString("FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEFFFFFC2F", 16)
 	secp256k1.N, _ = new(big.Int).SetString("FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141", 16)
@@ -678,7 +677,13 @@ func initS256() {
 	secp256k1.H = 1
 	secp256k1.q = new(big.Int).Div(new(big.Int).Add(secp256k1.P,
 		big.NewInt(1)), big.NewInt(4))
-	secp256k1.bytePoints = &secp256k1BytePoints
+
+	// Deserialize and set the pre-computed table used to accelerate scalar
+	// base multiplication.  This is hard-coded data, so any errors are
+	// panics because it means something is wrong in the source code.
+	if err := loadS256BytePoints(); err != nil {
+		panic(err)
+	}
 }
 
 // S256 returns a Curve which implements secp256k1.
