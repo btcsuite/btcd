@@ -91,6 +91,7 @@ Application Options:
       --blockprioritysize= Size in bytes for high-priority/low-fee transactions
                            when creating a block (50000)
       --getworkkey=        DEPRECATED -- Use the --miningaddr option instead
+      --nobloom=           Disable bloom filtering (BIP0037) support
 Help Options:
   -h, --help           Show this help message
 

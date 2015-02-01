@@ -554,10 +554,29 @@ func (p *peer) pushMerkleBlockMsg(sha *btcwire.ShaHash, doneChan, waitChan chan 
 		return err
 	}
 
-	// Generate a merkle block by filtering the requested block according
-	// to the filter for the peer and fetch any matched transactions from
-	// the database.
-	merkle, matchedHashes := bloom.NewMerkleBlock(blk, p.filter)
+	var merkle *btcwire.MsgMerkleBlock
+	var matchedHashes []*btcwire.ShaHash
+	if cfg.NoBloom {
+		// Since bloom filtering support is disabled, generate a merkle block
+		// manually.  The merkle block will contain all tx hashes from the
+		// original block.
+		header := blk.MsgBlock().Header
+		numTxs := len(blk.Transactions())
+
+		merkle = btcwire.NewMsgMerkleBlock(&header)
+		merkle.Transactions = uint32(numTxs)
+		for _, tx := range blk.Transactions() {
+			merkle.Hashes = append(merkle.Hashes, tx.Sha())
+		}
+		merkle.Flags = bytes.Repeat([]byte{0x01}, numTxs)
+		matchedHashes = merkle.Hashes
+	} else {
+		// Generate a merkle block by filtering the requested block according
+		// to the filter for the peer and fetch any matched transactions from
+		// the database.
+		merkle, matchedHashes = bloom.NewMerkleBlock(blk, p.filter)
+	}
+
 	txList := p.server.db.FetchTxByShaList(matchedHashes)
 
 	// Warn on any missing transactions which should not happen since the
