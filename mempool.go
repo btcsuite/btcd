@@ -76,6 +76,14 @@ const (
 	// and as a base for calculating minimum required fees for larger
 	// transactions.  This value is in Satoshi/1000 bytes.
 	minTxRelayFee = 1000
+
+	// janitorScanInterval is the interval of time the janitor uses
+	// between scans to purge old transactions from the mempool.
+	janitorScanInterval = time.Hour * 24
+
+	// janitorMaxAge is the maximum duration a transaction is allowed
+	// to exist in the mempool.
+	janitorMaxAge = time.Hour * 24 * 3
 )
 
 // TxDesc is a descriptor containing a transaction in the mempool and the
@@ -1273,14 +1281,36 @@ func (mp *txMemPool) LastUpdated() time.Time {
 	return mp.lastUpdated
 }
 
+// janitorHandler scans the mempool at the interval specified by
+// janitorScanInterval removing any transactions that are older
+// than the duration specified by janitorMaxAge.
+func (mp *txMemPool) janitorHandler() {
+	for {
+		time.Sleep(janitorScanInterval)
+
+		mp.Lock()
+		for _, desc := range mp.pool {
+			if time.Since(desc.Added) > janitorMaxAge {
+				mp.removeTransaction(desc.Tx)
+			}
+		}
+		mp.Unlock()
+	}
+}
+
 // newTxMemPool returns a new memory pool for validating and storing standalone
 // transactions until they are mined into a block.
 func newTxMemPool(server *server) *txMemPool {
-	return &txMemPool{
+	mempool := &txMemPool{
 		server:        server,
 		pool:          make(map[btcwire.ShaHash]*TxDesc),
 		orphans:       make(map[btcwire.ShaHash]*btcutil.Tx),
 		orphansByPrev: make(map[btcwire.ShaHash]*list.List),
 		outpoints:     make(map[btcwire.OutPoint]*btcutil.Tx),
 	}
+
+	// Start the janitor.
+	go mempool.janitorHandler()
+
+	return mempool
 }
