@@ -869,14 +869,26 @@ func initAll() {
 	initS256()
 }
 
+// fromHex converts the passed hex string into a big integer pointer and will
+// panic is there is an error.  This is only provided for the hard-coded
+// constants so errors in the source code can bet detected. It will only (and
+// must only) be called for initialization purposes.
+func fromHex(s string) *big.Int {
+	r, ok := new(big.Int).SetString(s, 16)
+	if !ok {
+		panic("invalid hex in source file: " + s)
+	}
+	return r
+}
+
 func initS256() {
 	// Curve parameters taken from [SECG] section 2.4.1.
 	secp256k1.CurveParams = new(elliptic.CurveParams)
-	secp256k1.P, _ = new(big.Int).SetString("FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEFFFFFC2F", 16)
-	secp256k1.N, _ = new(big.Int).SetString("FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141", 16)
-	secp256k1.B, _ = new(big.Int).SetString("0000000000000000000000000000000000000000000000000000000000000007", 16)
-	secp256k1.Gx, _ = new(big.Int).SetString("79BE667EF9DCBBAC55A06295CE870B07029BFCDB2DCE28D959F2815B16F81798", 16)
-	secp256k1.Gy, _ = new(big.Int).SetString("483ADA7726A3C4655DA4FBFC0E1108A8FD17B448A68554199C47D08FFB10D4B8", 16)
+	secp256k1.P = fromHex("FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEFFFFFC2F")
+	secp256k1.N = fromHex("FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141")
+	secp256k1.B = fromHex("0000000000000000000000000000000000000000000000000000000000000007")
+	secp256k1.Gx = fromHex("79BE667EF9DCBBAC55A06295CE870B07029BFCDB2DCE28D959F2815B16F81798")
+	secp256k1.Gy = fromHex("483ADA7726A3C4655DA4FBFC0E1108A8FD17B448A68554199C47D08FFB10D4B8")
 	secp256k1.BitSize = 256
 	secp256k1.H = 1
 	secp256k1.q = new(big.Int).Div(new(big.Int).Add(secp256k1.P,
@@ -894,12 +906,12 @@ func initS256() {
 	// May he rest in peace.
 	// These have been independently verified by Dave Collins using
 	// an ecc math script.
-	secp256k1.lambda, _ = new(big.Int).SetString("5363AD4CC05C30E0A5261C028812645A122E22EA20816678DF02967C1B23BD72", 16)
+	secp256k1.lambda = fromHex("5363AD4CC05C30E0A5261C028812645A122E22EA20816678DF02967C1B23BD72")
 	secp256k1.beta = new(fieldVal).SetHex("7AE96A2B657C07106E64479EAC3434E99CF0497512F58995C1396C28719501EE")
-	secp256k1.a1, _ = new(big.Int).SetString("3086D221A7D46BCDE86C90E49284EB15", 16)
-	secp256k1.b1, _ = new(big.Int).SetString("-E4437ED6010E88286F547FA90ABFE4C3", 16)
-	secp256k1.a2, _ = new(big.Int).SetString("114CA50F7A8E2F3F657C1108D9D44CFD8", 16)
-	secp256k1.b2, _ = new(big.Int).SetString("3086D221A7D46BCDE86C90E49284EB15", 16)
+	secp256k1.a1 = fromHex("3086D221A7D46BCDE86C90E49284EB15")
+	secp256k1.b1 = fromHex("-E4437ED6010E88286F547FA90ABFE4C3")
+	secp256k1.a2 = fromHex("114CA50F7A8E2F3F657C1108D9D44CFD8")
+	secp256k1.b2 = fromHex("3086D221A7D46BCDE86C90E49284EB15")
 
 	// for convenience this gets computed repeatedly
 	secp256k1.byteSize = secp256k1.BitSize / 8
@@ -908,13 +920,12 @@ func initS256() {
 	//  to be about 8% slower.
 	// λ = AC9C52B33FA3CF1F5AD9E3FD77ED9BA4A880B9FC8EC739C2E0CFC810B51283CE
 	// β = 851695D49A83F8EF919BB86153CBCB16630FB68AED0A766A3EC693D68E6AFA40
-	// secp256k1.lambda, _ = new(big.Int).SetString("AC9C52B33FA3CF1F5AD9E3FD77ED9BA4A880B9FC8EC739C2E0CFC810B51283CE", 16)
+	// secp256k1.lambda = fromHex("AC9C52B33FA3CF1F5AD9E3FD77ED9BA4A880B9FC8EC739C2E0CFC810B51283CE")
 	// secp256k1.beta = new(fieldVal).SetHex("851695D49A83F8EF919BB86153CBCB16630FB68AED0A766A3EC693D68E6AFA40")
-	// secp256k1.a1, _ = new(big.Int).SetString("E4437ED6010E88286F547FA90ABFE4C3", 16)
-	// secp256k1.b1, _ = new(big.Int).SetString("-3086D221A7D46BCDE86C90E49284EB15", 16)
-	// secp256k1.a2, _ = new(big.Int).SetString("3086D221A7D46BCDE86C90E49284EB15", 16)
-	// secp256k1.b2, _ = new(big.Int).SetString("114CA50F7A8E2F3F657C1108D9D44CFD8", 16)
-
+	// secp256k1.a1 = fromHex("E4437ED6010E88286F547FA90ABFE4C3")
+	// secp256k1.b1 = fromHex("-3086D221A7D46BCDE86C90E49284EB15")
+	// secp256k1.a2 = fromHex("3086D221A7D46BCDE86C90E49284EB15")
+	// secp256k1.b2 = fromHex("114CA50F7A8E2F3F657C1108D9D44CFD8")
 }
 
 // S256 returns a Curve which implements secp256k1.
