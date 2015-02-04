@@ -91,6 +91,8 @@ var commandHandlers = map[string]*handlerData{
 	"gettxoutsetinfo":       {0, 0, displayJSONDump, nil, makeGetTxOutSetInfo, ""},
 	"getwork":               {0, 1, displayJSONDump, nil, makeGetWork, "[data]"},
 	"help":                  {0, 1, displayGeneric, nil, makeHelp, "[commandName]"},
+	"importaddress":         {1, 1, displayGeneric, []conversionHandler{nil, toBool}, makeImportAddress, "<bitcoinaddress> [rescan=true]"},
+	"importpubkey":          {1, 1, displayGeneric, []conversionHandler{nil, toBool}, makeImportPubKey, "<pubkey> [rescan=true]"},
 	"importprivkey":         {1, 2, displayGeneric, []conversionHandler{nil, nil, toBool}, makeImportPrivKey, "<wifprivkey> [label] [rescan=true]"},
 	"importwallet":          {1, 0, displayGeneric, nil, makeImportWallet, "<filename>"},
 	"keypoolrefill":         {0, 1, displayGeneric, []conversionHandler{toInt}, makeKeyPoolRefill, "[newsize]"},
@@ -578,6 +580,28 @@ func makeGetRawTransaction(args []interface{}) (btcjson.Cmd, error) {
 	}
 
 	return btcjson.NewGetRawTransactionCmd("btcctl", args[0].(string), opt...)
+}
+
+// makeImportAddress generates the cmd structure for
+// importaddress commands.
+func makeImportAddress(args []interface{}) (btcjson.Cmd, error) {
+	var optargs = make([]interface{}, 0, 1)
+	if len(args) > 1 {
+		optargs = append(optargs, args[1].(bool))
+	}
+
+	return btcjson.NewImportAddressCmd("btcctl", args[0].(string), optargs...)
+}
+
+// makeImportPubKey generates the cmd structure for
+// importpubkey commands.
+func makeImportPubKey(args []interface{}) (btcjson.Cmd, error) {
+	var optargs = make([]interface{}, 0, 1)
+	if len(args) > 1 {
+		optargs = append(optargs, args[1].(bool))
+	}
+
+	return btcjson.NewImportPubKeyCmd("btcctl", args[0].(string), optargs...)
 }
 
 // makeImportPrivKey generates the cmd structure for
