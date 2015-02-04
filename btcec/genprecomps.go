@@ -51,4 +51,13 @@ func main() {
 	fmt.Fprintln(fi, "// DO NOT EDIT")
 	fmt.Fprintln(fi)
 	fmt.Fprintf(fi, "var secp256k1BytePoints = []byte(%q)\n", encoded)
+
+	a1, b1, a2, b2 := btcec.S256().EndomorphismVectors()
+	fmt.Println("The following values are the computed linearly " +
+		"independent vectors needed to make use of the secp256k1 " +
+		"endomorphism:")
+	fmt.Printf("a1: %x\n", a1)
+	fmt.Printf("b1: %x\n", b1)
+	fmt.Printf("a2: %x\n", a2)
+	fmt.Printf("b2: %x\n", b2)
 }
