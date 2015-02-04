@@ -641,7 +641,7 @@ func (f *fieldVal) MulInt(val uint) *fieldVal {
 // Mul multiplies the passed value to the existing field value and stores the
 // result in f.  Note that this function can overflow if multiplying any
 // of the individual words exceeds a max uint32.  In practice, this means the
-// magnitude of either value invovled in the multiplication must be a max of
+// magnitude of either value involved in the multiplication must be a max of
 // 8.
 //
 // The field value is returned to support chaining.  This enables syntax like:
@@ -653,7 +653,7 @@ func (f *fieldVal) Mul(val *fieldVal) *fieldVal {
 // Mul2 multiplies the passed two field values together and stores the result
 // result in f.  Note that this function can overflow if multiplying any of
 // the individual words exceeds a max uint32.  In practice, this means the
-// magnitude of either value invovled in the multiplication must be a max of
+// magnitude of either value involved in the multiplication must be a max of
 // 8.
 //
 // The field value is returned to support chaining.  This enables syntax like:

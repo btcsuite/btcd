@@ -9,6 +9,8 @@ package btcec
 // References:
 //   [SECG]: Recommended Elliptic Curve Domain Parameters
 //     http://www.secg.org/sec2-v2.pdf
+//
+//   [GECC]: Guide to Elliptic Curve Cryptography (Hankerson, Menezes, Vanstone)
 
 // This package operates, internally, on Jacobian coordinates. For a given
 // (x, y) position on the curve, the Jacobian coordinates are (x1, y1, z1)
@@ -22,9 +24,6 @@ import (
 	"math/big"
 	"sync"
 )
-
-//TODO: examine if we need to care about EC optimization as descibed here
-//      https://bitcointalk.org/index.php?topic=155054.0;all
 
 var (
 	// fieldOne is simply the integer 1 in field representation.  It is
@@ -40,21 +39,29 @@ type KoblitzCurve struct {
 	q *big.Int
 	H int // cofactor of the curve.
 
-	// The next 6 values are used specifically for endomorphism optimizations
-	// in ScalarMult.
+	// byteSize is simply the bit size / 8 and is provided for convenience
+	// since it is calculated repeatedly.
+	byteSize int
 
-	// lambda should fulfill lambda^3 = 1 mod N where N is the order of G
-	lambda *big.Int
-	// beta should fulfill beta^3 = 1 mod P where P is the prime field of the curve
-	beta *fieldVal
-	// a1, b1, a2 and b2 are explained in detail in Guide To Elliptical Curve
-	// Cryptography (Hankerson, Menezes, Vanstone) in Algorithm 3.74
-	a1         *big.Int
-	b1         *big.Int
-	a2         *big.Int
-	b2         *big.Int
-	byteSize   int
+	// bytePoints
 	bytePoints *[32][256][3]fieldVal
+
+	// The next 6 values are used specifically for endomorphism
+	// optimizations in ScalarMult.
+
+	// lambda must fulfill lambda^3 = 1 mod N where N is the order of G.
+	lambda *big.Int
+
+	// beta must fulfill beta^3 = 1 mod P where P is the prime field of the
+	// curve.
+	beta *fieldVal
+
+	// See the EndomorphismVectors in gensecp256k1.go to see how these are
+	// derived.
+	a1 *big.Int
+	b1 *big.Int
+	a2 *big.Int
+	b2 *big.Int
 }
 
 // Params returns the parameters for the curve.
@@ -609,20 +616,23 @@ func (curve *KoblitzCurve) Double(x1, y1 *big.Int) (*big.Int, *big.Int) {
 	return curve.fieldJacobianToBigAffine(fx3, fy3, fz3)
 }
 
-// splitK returns a balanced length-two representation of k and their
-// signs.
-// This is algorithm 3.74 from Guide to Elliptical Curve Cryptography (ref above)
+// splitK returns a balanced length-two representation of k and their signs.
+// This is algorithm 3.74 from [GECC].
+//
 // One thing of note about this algorithm is that no matter what c1 and c2 are,
-// the final equation of k = k1 + k2 * lambda (mod n) will hold. This is provable
-// mathematically due to how a1/b1/a2/b2 are computed.
+// the final equation of k = k1 + k2 * lambda (mod n) will hold.  This is
+// provable mathematically due to how a1/b1/a2/b2 are computed.
+//
 // c1 and c2 are chosen to minimize the max(k1,k2).
 func (curve *KoblitzCurve) splitK(k []byte) ([]byte, []byte, int, int) {
-
 	// All math here is done with big.Int, which is slow.
-	// At some point, it might be useful to write something similar to fieldVal
-	// but for N instead of P as the prime field if this ends up being a
-	// bottleneck.
-	bigIntK, c1, c2, tmp1, tmp2, k1, k2 := new(big.Int), new(big.Int), new(big.Int), new(big.Int), new(big.Int), new(big.Int), new(big.Int)
+	// At some point, it might be useful to write something similar to
+	// fieldVal but for N instead of P as the prime field if this ends up
+	// being a bottleneck.
+	bigIntK := new(big.Int)
+	c1, c2 := new(big.Int), new(big.Int)
+	tmp1, tmp2 := new(big.Int), new(big.Int)
+	k1, k2 := new(big.Int), new(big.Int)
 
 	bigIntK.SetBytes(k)
 	// c1 = round(b2 * k / n) from step 4.
@@ -649,15 +659,14 @@ func (curve *KoblitzCurve) splitK(k []byte) ([]byte, []byte, int, int) {
 	return k1.Bytes(), k2.Bytes(), k1.Sign(), k2.Sign()
 }
 
-// moduloReduce reduces k from more than 32 bytes to 32 bytes and under.
-// This is done by doing a simple modulo curve.N. We can do this since
-// G^N = 1 and thus any other valid point on the elliptical curve has the
-// same order.
+// moduloReduce reduces k from more than 32 bytes to 32 bytes and under.  This
+// is done by doing a simple modulo curve.N.  We can do this since G^N = 1 and
+// thus any other valid point on the elliptic curve has the same order.
 func (curve *KoblitzCurve) moduloReduce(k []byte) []byte {
 	// Since the order of G is curve.N, we can use a much smaller number
 	// by doing modulo curve.N
 	if len(k) > curve.byteSize {
-		// reduce k by performing modulo curve.N
+		// Reduce k by performing modulo curve.N.
 		tmpK := new(big.Int).SetBytes(k)
 		tmpK.Mod(tmpK, curve.N)
 		return tmpK.Bytes()
@@ -666,24 +675,24 @@ func (curve *KoblitzCurve) moduloReduce(k []byte) []byte {
 	return k
 }
 
-// NAF takes a positive integer k and returns the Non-Adjacent Form (NAF)
-// as two byte slices. The first is where 1's should be. The second is where
-// -1's should be.
-// NAF is also convenient in that on average, only 1/3rd of its values are
-// non-zero.
-// The algorithm here is from Guide to Elliptical Cryptography 3.30 (ref above)
+// NAF takes a positive integer k and returns the Non-Adjacent Form (NAF) as two
+// byte slices.  The first is where 1s will be.  The second is where -1s will
+// be.  NAF is convenient in that on average, only 1/3rd of its values are
+// non-zero.  This is algorithm 3.30 from [GECC].
+//
 // Essentially, this makes it possible to minimize the number of operations
-// since the resulting ints returned will be at least 50% 0's.
+// since the resulting ints returned will be at least 50% 0s.
 func NAF(k []byte) ([]byte, []byte) {
-
 	// The essence of this algorithm is that whenever we have consecutive 1s
-	// in the binary, we want to put a -1 in the lowest bit and get a bunch of
-	// 0s up to the highest bit of consecutive 1s. This is due to this identity:
+	// in the binary, we want to put a -1 in the lowest bit and get a bunch
+	// of 0s up to the highest bit of consecutive 1s.  This is due to this
+	// identity:
 	// 2^n + 2^(n-1) + 2^(n-2) + ... + 2^(n-k) = 2^(n+1) - 2^(n-k)
-	// The algorithm thus may need to go 1 more bit than the length of the bits
-	// we actually have, hence bits being 1 bit longer than was necessary.
-	// Since we need to know whether adding will cause a carry, we go from
-	// right-to-left in this addition.
+	//
+	// The algorithm thus may need to go 1 more bit than the length of the
+	// bits we actually have, hence bits being 1 bit longer than was
+	// necessary.  Since we need to know whether adding will cause a carry,
+	// we go from right-to-left in this addition.
 	var carry, curIsOne, nextIsOne bool
 	// these default to zero
 	retPos := make([]byte, len(k)+1)
@@ -703,28 +712,33 @@ func NAF(k []byte) ([]byte, []byte) {
 			}
 			if carry {
 				if curIsOne {
-					// This bit is 1, so we continue to carry and
-					// don't need to do anything
+					// This bit is 1, so continue to carry
+					// and don't need to do anything.
 				} else {
-					// We've hit a 0 after some number of 1s.
+					// We've hit a 0 after some number of
+					// 1s.
 					if nextIsOne {
-						// We start carrying again since we're starting
-						// a new sequence of 1s.
+						// Start carrying again since
+						// a new sequence of 1s is
+						// starting.
 						retNeg[i+1] += 1 << j
 					} else {
-						// We stop carrying since 1s have stopped.
+						// Stop carrying since 1s have
+						// stopped.
 						carry = false
 						retPos[i+1] += 1 << j
 					}
 				}
 			} else if curIsOne {
 				if nextIsOne {
-					// if this is the start of at least 2 consecutive 1's
-					// we want to set the current one to -1 and start carrying
+					// If this is the start of at least 2
+					// consecutive 1s, set the current one
+					// to -1 and start carrying.
 					retNeg[i+1] += 1 << j
 					carry = true
 				} else {
-					// this is a singleton, not consecutive 1's.
+					// This is a singleton, not consecutive
+					// 1s.
 					retPos[i+1] += 1 << j
 				}
 			}
@@ -744,27 +758,31 @@ func (curve *KoblitzCurve) ScalarMult(Bx, By *big.Int, k []byte) (*big.Int, *big
 	// Point Q = ∞ (point at infinity).
 	qx, qy, qz := new(fieldVal), new(fieldVal), new(fieldVal)
 
-	// decompose K into k1 and k2 in order to halve the number of EC ops
-	// see Algorithm 3.74 in Guide to Elliptical Curve Cryptography by
-	// Hankerson, et al.
+	// Decompose K into k1 and k2 in order to halve the number of EC ops.
+	// See Algorithm 3.74 in [GECC].
 	k1, k2, signK1, signK2 := curve.splitK(curve.moduloReduce(k))
 
-	// The main equation here to remember is
-	// k * P = k1 * P + k2 * ϕ(P)
+	// The main equation here to remember is:
+	//   k * P = k1 * P + k2 * ϕ(P)
+	//
 	// P1 below is P in the equation, P2 below is ϕ(P) in the equation
 	p1x, p1y := curve.bigAffineToField(Bx, By)
-	// For NAF, we need the negative point
 	p1yNeg := new(fieldVal).NegateVal(p1y, 1)
 	p1z := new(fieldVal).SetInt(1)
-	// Note ϕ(x,y) = (βx,y), the Jacobian z coordinate is 1, so this math
+
+	// NOTE: ϕ(x,y) = (βx,y).  The Jacobian z coordinate is 1, so this math
 	// goes through.
 	p2x := new(fieldVal).Mul2(p1x, curve.beta)
 	p2y := new(fieldVal).Set(p1y)
-	// For NAF, we need the negative point
 	p2yNeg := new(fieldVal).NegateVal(p2y, 1)
 	p2z := new(fieldVal).SetInt(1)
 
-	// If k1 or k2 are negative, we flip the positive/negative values
+	// Flip the positive and negative values of the points as needed
+	// depending on the signs of k1 and k2.  As mentioned in the equation
+	// above, each of k1 and k2 are multiplied by the respective point.
+	// Since -k * P is the same thing as k * -P, and the group law for
+	// elliptic curves states that P(x, y) = -P(x, -y), it's faster and
+	// simplifies the code to just make the point negative.
 	if signK1 == -1 {
 		p1y, p1yNeg = p1yNeg, p1y
 	}
@@ -772,9 +790,10 @@ func (curve *KoblitzCurve) ScalarMult(Bx, By *big.Int, k []byte) (*big.Int, *big
 		p2y, p2yNeg = p2yNeg, p2y
 	}
 
-	// NAF versions of k1 and k2 should have a lot more zeros
-	// the Pos version of the bytes contain the +1's and the Neg versions
-	// contain the -1's
+	// NAF versions of k1 and k2 should have a lot more zeros.
+	//
+	// The Pos version of the bytes contain the +1s and the Neg versions
+	// contain the -1s.
 	k1PosNAF, k1NegNAF := NAF(k1)
 	k2PosNAF, k2NegNAF := NAF(k2)
 	k1Len := len(k1PosNAF)
@@ -785,14 +804,13 @@ func (curve *KoblitzCurve) ScalarMult(Bx, By *big.Int, k []byte) (*big.Int, *big
 		m = k2Len
 	}
 
-	// We add left-to-right using the NAF optimization. This is using
-	// algorithm 3.77 from Guide to Elliptical Curve Cryptography.
-	// This should be faster overall since there will be a lot more instances
-	// of 0, hence reducing the number of Jacobian additions at the cost
-	// of 1 possible extra doubling.
+	// Add left-to-right using the NAF optimization.  See algorithm 3.77
+	// from [GECC].  This should be faster overall since there will be a lot
+	// more instances of 0, hence reducing the number of Jacobian additions
+	// at the cost of 1 possible extra doubling.
 	var k1BytePos, k1ByteNeg, k2BytePos, k2ByteNeg byte
 	for i := 0; i < m; i++ {
-		// Since we're going left-to-right, we need to pad the front with 0's
+		// Since we're going left-to-right, pad the front with 0s.
 		if i < m-k1Len {
 			k1BytePos = 0
 			k1ByteNeg = 0
@@ -813,15 +831,19 @@ func (curve *KoblitzCurve) ScalarMult(Bx, By *big.Int, k []byte) (*big.Int, *big
 			curve.doubleJacobian(qx, qy, qz, qx, qy, qz)
 
 			if k1BytePos&0x80 == 0x80 {
-				curve.addJacobian(qx, qy, qz, p1x, p1y, p1z, qx, qy, qz)
+				curve.addJacobian(qx, qy, qz, p1x, p1y, p1z,
+					qx, qy, qz)
 			} else if k1ByteNeg&0x80 == 0x80 {
-				curve.addJacobian(qx, qy, qz, p1x, p1yNeg, p1z, qx, qy, qz)
+				curve.addJacobian(qx, qy, qz, p1x, p1yNeg, p1z,
+					qx, qy, qz)
 			}
 
 			if k2BytePos&0x80 == 0x80 {
-				curve.addJacobian(qx, qy, qz, p2x, p2y, p2z, qx, qy, qz)
+				curve.addJacobian(qx, qy, qz, p2x, p2y, p2z,
+					qx, qy, qz)
 			} else if k2ByteNeg&0x80 == 0x80 {
-				curve.addJacobian(qx, qy, qz, p2x, p2yNeg, p2z, qx, qy, qz)
+				curve.addJacobian(qx, qy, qz, p2x, p2yNeg, p2z,
+					qx, qy, qz)
 			}
 			k1BytePos <<= 1
 			k1ByteNeg <<= 1
@@ -850,8 +872,8 @@ func (curve *KoblitzCurve) ScalarBaseMult(k []byte) (*big.Int, *big.Int) {
 	// Each "digit" in the 8-bit window can be looked up using bytePoints
 	// and added together.
 	for i, byteVal := range newK {
-		point := curve.bytePoints[diff+i][byteVal]
-		curve.addJacobian(qx, qy, qz, &point[0], &point[1], &point[2], qx, qy, qz)
+		p := curve.bytePoints[diff+i][byteVal]
+		curve.addJacobian(qx, qy, qz, &p[0], &p[1], &p[2], qx, qy, qz)
 	}
 	return curve.fieldJacobianToBigAffine(qx, qy, qz)
 }
@@ -894,6 +916,9 @@ func initS256() {
 	secp256k1.q = new(big.Int).Div(new(big.Int).Add(secp256k1.P,
 		big.NewInt(1)), big.NewInt(4))
 
+	// Provided for convenience since this gets computed repeatedly.
+	secp256k1.byteSize = secp256k1.BitSize / 8
+
 	// Deserialize and set the pre-computed table used to accelerate scalar
 	// base multiplication.  This is hard-coded data, so any errors are
 	// panics because it means something is wrong in the source code.
@@ -904,8 +929,9 @@ func initS256() {
 	// Next 6 constants are from Hal Finney's bitcointalk.org post:
 	// https://bitcointalk.org/index.php?topic=3238.msg45565#msg45565
 	// May he rest in peace.
-	// These have been independently verified by Dave Collins using
-	// an ecc math script.
+	//
+	// They have also been independently derived from the code in the
+	// EndomorphismVectors function in gensecp256k1.go.
 	secp256k1.lambda = fromHex("5363AD4CC05C30E0A5261C028812645A122E22EA20816678DF02967C1B23BD72")
 	secp256k1.beta = new(fieldVal).SetHex("7AE96A2B657C07106E64479EAC3434E99CF0497512F58995C1396C28719501EE")
 	secp256k1.a1 = fromHex("3086D221A7D46BCDE86C90E49284EB15")
@@ -913,13 +939,8 @@ func initS256() {
 	secp256k1.a2 = fromHex("114CA50F7A8E2F3F657C1108D9D44CFD8")
 	secp256k1.b2 = fromHex("3086D221A7D46BCDE86C90E49284EB15")
 
-	// for convenience this gets computed repeatedly
-	secp256k1.byteSize = secp256k1.BitSize / 8
-
 	// Alternatively, we can use the parameters below, however, they seem
 	//  to be about 8% slower.
-	// λ = AC9C52B33FA3CF1F5AD9E3FD77ED9BA4A880B9FC8EC739C2E0CFC810B51283CE
-	// β = 851695D49A83F8EF919BB86153CBCB16630FB68AED0A766A3EC693D68E6AFA40
 	// secp256k1.lambda = fromHex("AC9C52B33FA3CF1F5AD9E3FD77ED9BA4A880B9FC8EC739C2E0CFC810B51283CE")
 	// secp256k1.beta = new(fieldVal).SetHex("851695D49A83F8EF919BB86153CBCB16630FB68AED0A766A3EC693D68E6AFA40")
 	// secp256k1.a1 = fromHex("E4437ED6010E88286F547FA90ABFE4C3")
