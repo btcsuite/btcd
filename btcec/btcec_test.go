@@ -602,18 +602,6 @@ func TestScalarMult(t *testing.T) {
 	}
 }
 
-//TODO: test more curves?
-func BenchmarkBaseMult(b *testing.B) {
-	b.ResetTimer()
-	s256 := btcec.S256()
-	e := s256BaseMultTests[0] //TODO: check, used to be 25 instead of 0, but it's probably ok
-	k, _ := new(big.Int).SetString(e.k, 16)
-	b.StartTimer()
-	for i := 0; i < b.N; i++ {
-		s256.ScalarBaseMult(k.Bytes())
-	}
-}
-
 // Test this curve's usage with the ecdsa package.
 
 func testKeyGeneration(t *testing.T, c *btcec.KoblitzCurve, tag string) {
