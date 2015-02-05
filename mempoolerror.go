@@ -6,7 +6,7 @@ package main
 
 import (
 	"github.com/btcsuite/btcd/blockchain"
-	"github.com/btcsuite/btcwire"
+	"github.com/btcsuite/btcd/wire"
 )
 
 // RuleError identifies a rule violation.  It is used to indicate that
@@ -33,8 +33,8 @@ func (e RuleError) Error() string {
 // specifically due to a rule violation and access the ErrorCode field to
 // ascertain the specific reason for the rule violation.
 type TxRuleError struct {
-	RejectCode  btcwire.RejectCode // The code to send with reject messages
-	Description string             // Human readable description of the issue
+	RejectCode  wire.RejectCode // The code to send with reject messages
+	Description string          // Human readable description of the issue
 }
 
 // Error satisfies the error interface and prints human-readable errors.
@@ -44,7 +44,7 @@ func (e TxRuleError) Error() string {
 
 // txRuleError creates an underlying TxRuleError with the given a set of
 // arguments and returns a RuleError that encapsulates it.
-func txRuleError(c btcwire.RejectCode, desc string) RuleError {
+func txRuleError(c wire.RejectCode, desc string) RuleError {
 	return RuleError{
 		Err: TxRuleError{RejectCode: c, Description: desc},
 	}
@@ -61,7 +61,7 @@ func chainRuleError(chainErr blockchain.RuleError) RuleError {
 // extractRejectCode attempts to return a relevant reject code for a given error
 // by examining the error for known types.  It will return true if a code
 // was successfully extracted.
-func extractRejectCode(err error) (btcwire.RejectCode, bool) {
+func extractRejectCode(err error) (wire.RejectCode, bool) {
 	// Pull the underlying error out of a RuleError.
 	if rerr, ok := err.(RuleError); ok {
 		err = rerr.Err
@@ -70,17 +70,17 @@ func extractRejectCode(err error) (btcwire.RejectCode, bool) {
 	switch err := err.(type) {
 	case blockchain.RuleError:
 		// Convert the chain error to a reject code.
-		var code btcwire.RejectCode
+		var code wire.RejectCode
 		switch err.ErrorCode {
 		// Rejected due to duplicate.
 		case blockchain.ErrDuplicateBlock:
 			fallthrough
 		case blockchain.ErrDoubleSpend:
-			code = btcwire.RejectDuplicate
+			code = wire.RejectDuplicate
 
 		// Rejected due to obsolete version.
 		case blockchain.ErrBlockVersionTooOld:
-			code = btcwire.RejectObsolete
+			code = wire.RejectObsolete
 
 		// Rejected due to checkpoint.
 		case blockchain.ErrCheckpointTimeTooOld:
@@ -90,11 +90,11 @@ func extractRejectCode(err error) (btcwire.RejectCode, bool) {
 		case blockchain.ErrBadCheckpoint:
 			fallthrough
 		case blockchain.ErrForkTooOld:
-			code = btcwire.RejectCheckpoint
+			code = wire.RejectCheckpoint
 
 		// Everything else is due to the block or transaction being invalid.
 		default:
-			code = btcwire.RejectInvalid
+			code = wire.RejectInvalid
 		}
 
 		return code, true
@@ -103,15 +103,15 @@ func extractRejectCode(err error) (btcwire.RejectCode, bool) {
 		return err.RejectCode, true
 
 	case nil:
-		return btcwire.RejectInvalid, false
+		return wire.RejectInvalid, false
 	}
 
-	return btcwire.RejectInvalid, false
+	return wire.RejectInvalid, false
 }
 
 // errToRejectErr examines the underlying type of the error and returns a reject
-// code and string appropriate to be sent in a btcwire.MsgReject message.
-func errToRejectErr(err error) (btcwire.RejectCode, string) {
+// code and string appropriate to be sent in a wire.MsgReject message.
+func errToRejectErr(err error) (wire.RejectCode, string) {
 	// Return the reject code along with the error text if it can be
 	// extracted from the error.
 	rejectCode, found := extractRejectCode(err)
@@ -125,11 +125,11 @@ func errToRejectErr(err error) (btcwire.RejectCode, string) {
 	// string rather than allowing the following code that derferences the
 	// err to panic.
 	if err == nil {
-		return btcwire.RejectInvalid, "rejected"
+		return wire.RejectInvalid, "rejected"
 	}
 
 	// When the underlying error is not one of the above cases, just return
-	// btcwire.RejectInvalid with a generic rejected string plus the error
+	// wire.RejectInvalid with a generic rejected string plus the error
 	// text.
-	return btcwire.RejectInvalid, "rejected: " + err.Error()
+	return wire.RejectInvalid, "rejected: " + err.Error()
 }

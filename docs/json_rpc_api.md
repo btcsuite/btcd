@@ -907,7 +907,7 @@ package main
 import (
 	"github.com/btcsuite/btcrpcclient"
 	"github.com/btcsuite/btcutil"
-	"github.com/btcsuite/btcwire"
+	"github.com/btcsuite/btcd/wire"
 	"io/ioutil"
 	"log"
 	"path/filepath"
@@ -944,7 +944,7 @@ func main() {
 	// command with the verbose flag set to true and the verboseTx flag
 	// set to false.
 	genesisHashStr := "000000000019d6689c085ae165831e934ff763ae46a2a6c172b3f1b60a8ce26f"
-	blockHash, err := btcwire.NewShaHashFromStr(genesisHashStr)
+	blockHash, err := wire.NewShaHashFromStr(genesisHashStr)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -997,7 +997,7 @@ package main
 import (
 	"github.com/btcsuite/btcrpcclient"
 	"github.com/btcsuite/btcutil"
-	"github.com/btcsuite/btcwire"
+	"github.com/btcsuite/btcd/wire"
 	"io/ioutil"
 	"log"
 	"path/filepath"
@@ -1008,10 +1008,10 @@ func main() {
 	// Setup handlers for blockconnected and blockdisconnected
 	// notifications.
 	ntfnHandlers := btcrpcclient.NotificationHandlers{
-		OnBlockConnected: func(hash *btcwire.ShaHash, height int32) {
+		OnBlockConnected: func(hash *wire.ShaHash, height int32) {
 			log.Printf("Block connected: %v (%d)", hash, height)
 		},
-		OnBlockDisconnected: func(hash *btcwire.ShaHash, height int32) {
+		OnBlockDisconnected: func(hash *wire.ShaHash, height int32) {
 			log.Printf("Block disconnected: %v", hash, height)
 		},
 	}

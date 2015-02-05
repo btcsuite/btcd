@@ -5,7 +5,7 @@
 package blockchain
 
 import (
-	"github.com/btcsuite/btcwire"
+	"github.com/btcsuite/btcd/wire"
 )
 
 // BlockLocator is used to help locate a specific block.  The algorithm for
@@ -23,7 +23,7 @@ import (
 //
 // The block locator for block 17a would be the hashes of blocks:
 // [17a 16a 15 14 13 12 11 10 9 8 6 2 genesis]
-type BlockLocator []*btcwire.ShaHash
+type BlockLocator []*wire.ShaHash
 
 // BlockLocatorFromHash returns a block locator for the passed block hash.
 // See BlockLocator for details on the algotirhm used to create a block locator.
@@ -35,9 +35,9 @@ type BlockLocator []*btcwire.ShaHash
 //    therefore the block locator will only consist of the genesis hash
 //  - If the passed hash is not currently known, the block locator will only
 //    consist of the passed hash
-func (b *BlockChain) BlockLocatorFromHash(hash *btcwire.ShaHash) BlockLocator {
+func (b *BlockChain) BlockLocatorFromHash(hash *wire.ShaHash) BlockLocator {
 	// The locator contains the requested hash at the very least.
-	locator := make(BlockLocator, 0, btcwire.MaxBlockLocatorsPerMsg)
+	locator := make(BlockLocator, 0, wire.MaxBlockLocatorsPerMsg)
 	locator = append(locator, hash)
 
 	// Nothing more to do if a locator for the genesis hash was requested.
@@ -81,7 +81,7 @@ func (b *BlockChain) BlockLocatorFromHash(hash *btcwire.ShaHash) BlockLocator {
 	// final genesis hash.
 	iterNode := node
 	increment := int64(1)
-	for len(locator) < btcwire.MaxBlockLocatorsPerMsg-1 {
+	for len(locator) < wire.MaxBlockLocatorsPerMsg-1 {
 		// Once there are 10 locators, exponentially increase the
 		// distance between each block locator.
 		if len(locator) > 10 {

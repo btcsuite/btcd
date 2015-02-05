@@ -21,9 +21,9 @@ import (
 
 	"github.com/btcsuite/btcd/database"
 	"github.com/btcsuite/btcd/txscript"
+	"github.com/btcsuite/btcd/wire"
 	"github.com/btcsuite/btcjson"
 	"github.com/btcsuite/btcutil"
-	"github.com/btcsuite/btcwire"
 	"github.com/btcsuite/btcws"
 	"github.com/btcsuite/fastsha256"
 	"github.com/btcsuite/websocket"
@@ -244,11 +244,11 @@ type notificationRegisterNewMempoolTxs wsClient
 type notificationUnregisterNewMempoolTxs wsClient
 type notificationRegisterSpent struct {
 	wsc *wsClient
-	op  *btcwire.OutPoint
+	op  *wire.OutPoint
 }
 type notificationUnregisterSpent struct {
 	wsc *wsClient
-	op  *btcwire.OutPoint
+	op  *wire.OutPoint
 }
 type notificationRegisterAddr struct {
 	wsc  *wsClient
@@ -274,7 +274,7 @@ func (m *wsNotificationManager) notificationHandler() {
 	// since it is quite a bit more efficient than using the entire struct.
 	blockNotifications := make(map[chan struct{}]*wsClient)
 	txNotifications := make(map[chan struct{}]*wsClient)
-	watchedOutPoints := make(map[btcwire.OutPoint]map[chan struct{}]*wsClient)
+	watchedOutPoints := make(map[wire.OutPoint]map[chan struct{}]*wsClient)
 	watchedAddrs := make(map[string]map[chan struct{}]*wsClient)
 
 out:
@@ -515,7 +515,7 @@ func (m *wsNotificationManager) notifyForNewTx(clients map[chan struct{}]*wsClie
 // confirmed spent (contained in a block connected to the main chain) for the
 // passed websocket client.  The request is automatically removed once the
 // notification has been sent.
-func (m *wsNotificationManager) RegisterSpentRequest(wsc *wsClient, op *btcwire.OutPoint) {
+func (m *wsNotificationManager) RegisterSpentRequest(wsc *wsClient, op *wire.OutPoint) {
 	m.queueNotification <- &notificationRegisterSpent{
 		wsc: wsc,
 		op:  op,
@@ -525,8 +525,8 @@ func (m *wsNotificationManager) RegisterSpentRequest(wsc *wsClient, op *btcwire.
 // addSpentRequest modifies a map of watched outpoints to sets of websocket
 // clients to add a new request watch the outpoint op and create and send
 // a notification when spent to the websocket client wsc.
-func (*wsNotificationManager) addSpentRequest(ops map[btcwire.OutPoint]map[chan struct{}]*wsClient,
-	wsc *wsClient, op *btcwire.OutPoint) {
+func (*wsNotificationManager) addSpentRequest(ops map[wire.OutPoint]map[chan struct{}]*wsClient,
+	wsc *wsClient, op *wire.OutPoint) {
 
 	// Track the request in the client as well so it can be quickly be
 	// removed on disconnect.
@@ -545,7 +545,7 @@ func (*wsNotificationManager) addSpentRequest(ops map[btcwire.OutPoint]map[chan 
 // UnregisterSpentRequest removes a request from the passed websocket client
 // to be notified when the passed outpoint is confirmed spent (contained in a
 // block connected to the main chain).
-func (m *wsNotificationManager) UnregisterSpentRequest(wsc *wsClient, op *btcwire.OutPoint) {
+func (m *wsNotificationManager) UnregisterSpentRequest(wsc *wsClient, op *wire.OutPoint) {
 	m.queueNotification <- &notificationUnregisterSpent{
 		wsc: wsc,
 		op:  op,
@@ -556,8 +556,8 @@ func (m *wsNotificationManager) UnregisterSpentRequest(wsc *wsClient, op *btcwir
 // websocket client wsc from the set of clients to be notified when a
 // watched outpoint is spent.  If wsc is the last client, the outpoint
 // key is removed from the map.
-func (*wsNotificationManager) removeSpentRequest(ops map[btcwire.OutPoint]map[chan struct{}]*wsClient,
-	wsc *wsClient, op *btcwire.OutPoint) {
+func (*wsNotificationManager) removeSpentRequest(ops map[wire.OutPoint]map[chan struct{}]*wsClient,
+	wsc *wsClient, op *wire.OutPoint) {
 
 	// Remove the request tracking from the client.
 	delete(wsc.spentRequests, *op)
@@ -613,7 +613,7 @@ func newRedeemingTxNotification(txHex string, index int, block *btcutil.Block) (
 // websocket clients of the transaction if an output spends to a watched
 // address.  A spent notification request is automatically registered for
 // the client for each matching output.
-func (m *wsNotificationManager) notifyForTxOuts(ops map[btcwire.OutPoint]map[chan struct{}]*wsClient,
+func (m *wsNotificationManager) notifyForTxOuts(ops map[wire.OutPoint]map[chan struct{}]*wsClient,
 	addrs map[string]map[chan struct{}]*wsClient, tx *btcutil.Tx, block *btcutil.Block) {
 
 	// Nothing to do if nobody is listening for address notifications.
@@ -647,7 +647,7 @@ func (m *wsNotificationManager) notifyForTxOuts(ops map[btcwire.OutPoint]map[cha
 				continue
 			}
 
-			op := btcwire.NewOutPoint(tx.Sha(), uint32(i))
+			op := wire.NewOutPoint(tx.Sha(), uint32(i))
 			for wscQuit, wsc := range cmap {
 				m.addSpentRequest(ops, wsc, op)
 
@@ -663,7 +663,7 @@ func (m *wsNotificationManager) notifyForTxOuts(ops map[btcwire.OutPoint]map[cha
 // notifyForTx examines the inputs and outputs of the passed transaction,
 // notifying websocket clients of outputs spending to a watched address
 // and inputs spending a watched outpoint.
-func (m *wsNotificationManager) notifyForTx(ops map[btcwire.OutPoint]map[chan struct{}]*wsClient,
+func (m *wsNotificationManager) notifyForTx(ops map[wire.OutPoint]map[chan struct{}]*wsClient,
 	addrs map[string]map[chan struct{}]*wsClient, tx *btcutil.Tx, block *btcutil.Block) {
 
 	if len(ops) != 0 {
@@ -678,7 +678,7 @@ func (m *wsNotificationManager) notifyForTx(ops map[btcwire.OutPoint]map[chan st
 // interested websocket clients a redeemingtx notification if any inputs
 // spend a watched output.  If block is non-nil, any matching spent
 // requests are removed.
-func (m *wsNotificationManager) notifyForTxIns(ops map[btcwire.OutPoint]map[chan struct{}]*wsClient,
+func (m *wsNotificationManager) notifyForTxIns(ops map[wire.OutPoint]map[chan struct{}]*wsClient,
 	tx *btcutil.Tx, block *btcutil.Block) {
 
 	// Nothing to do if nobody is watching outpoints.
@@ -906,7 +906,7 @@ type wsClient struct {
 	// spentRequests is a set of unspent Outpoints a wallet has requested
 	// notifications for when they are spent by a processed transaction.
 	// Owned by the notification manager.
-	spentRequests map[btcwire.OutPoint]struct{}
+	spentRequests map[wire.OutPoint]struct{}
 
 	// Networking infrastructure.
 	asyncStarted bool
@@ -1375,7 +1375,7 @@ func newWebsocketClient(server *rpcServer, conn *websocket.Conn,
 		authenticated: authenticated,
 		server:        server,
 		addrRequests:  make(map[string]struct{}),
-		spentRequests: make(map[btcwire.OutPoint]struct{}),
+		spentRequests: make(map[wire.OutPoint]struct{}),
 		ntfnChan:      make(chan []byte, 1),      // nonblocking sync
 		asyncChan:     make(chan btcjson.Cmd, 1), // nonblocking sync
 		sendChan:      make(chan wsResponse, websocketSendBufferSize),
@@ -1398,9 +1398,9 @@ func handleNotifySpent(wsc *wsClient, icmd btcjson.Cmd) (interface{}, *btcjson.E
 		return nil, &btcjson.ErrInternal
 	}
 
-	outpoints := make([]*btcwire.OutPoint, 0, len(cmd.OutPoints))
+	outpoints := make([]*wire.OutPoint, 0, len(cmd.OutPoints))
 	for i := range cmd.OutPoints {
-		blockHash, err := btcwire.NewShaHashFromStr(cmd.OutPoints[i].Hash)
+		blockHash, err := wire.NewShaHashFromStr(cmd.OutPoints[i].Hash)
 		if err != nil {
 			return nil, &btcjson.Error{
 				Code:    btcjson.ErrParse.Code,
@@ -1408,7 +1408,7 @@ func handleNotifySpent(wsc *wsClient, icmd btcjson.Cmd) (interface{}, *btcjson.E
 			}
 		}
 		index := cmd.OutPoints[i].Index
-		outpoints = append(outpoints, btcwire.NewOutPoint(blockHash, index))
+		outpoints = append(outpoints, wire.NewOutPoint(blockHash, index))
 	}
 	for _, outpoint := range outpoints {
 		wsc.server.ntfnMgr.RegisterSpentRequest(wsc, outpoint)
@@ -1459,7 +1459,7 @@ type rescanKeys struct {
 	scriptHashes        map[[ripemd160.Size]byte]struct{}
 	compressedPubkeys   map[[33]byte]struct{}
 	uncompressedPubkeys map[[65]byte]struct{}
-	unspent             map[btcwire.OutPoint]struct{}
+	unspent             map[wire.OutPoint]struct{}
 }
 
 // ErrRescanReorg defines the error that is returned when an unrecoverable
@@ -1569,7 +1569,7 @@ func rescanBlock(wsc *wsClient, lookups *rescanKeys, blk *btcutil.Block) {
 					}
 				}
 
-				outpoint := btcwire.OutPoint{
+				outpoint := wire.OutPoint{
 					Hash:  *tx.Sha(),
 					Index: uint32(txOutIdx),
 				}
@@ -1608,7 +1608,7 @@ func rescanBlock(wsc *wsClient, lookups *rescanKeys, blk *btcutil.Block) {
 // range of blocks.  If this condition does not hold true, the JSON-RPC error
 // for an unrecoverable reorganize is returned.
 func recoverFromReorg(db database.Db, minBlock, maxBlock int64,
-	lastBlock *btcutil.Block) ([]btcwire.ShaHash, *btcjson.Error) {
+	lastBlock *btcutil.Block) ([]wire.ShaHash, *btcjson.Error) {
 
 	hashList, err := db.FetchHeightRange(minBlock, maxBlock)
 	if err != nil {
@@ -1665,9 +1665,9 @@ func handleRescan(wsc *wsClient, icmd btcjson.Cmd) (interface{}, *btcjson.Error)
 		return nil, &btcjson.ErrInternal
 	}
 
-	outpoints := make([]*btcwire.OutPoint, 0, len(cmd.OutPoints))
+	outpoints := make([]*wire.OutPoint, 0, len(cmd.OutPoints))
 	for i := range cmd.OutPoints {
-		blockHash, err := btcwire.NewShaHashFromStr(cmd.OutPoints[i].Hash)
+		blockHash, err := wire.NewShaHashFromStr(cmd.OutPoints[i].Hash)
 		if err != nil {
 			return nil, &btcjson.Error{
 				Code:    btcjson.ErrParse.Code,
@@ -1675,7 +1675,7 @@ func handleRescan(wsc *wsClient, icmd btcjson.Cmd) (interface{}, *btcjson.Error)
 			}
 		}
 		index := cmd.OutPoints[i].Index
-		outpoints = append(outpoints, btcwire.NewOutPoint(blockHash, index))
+		outpoints = append(outpoints, wire.NewOutPoint(blockHash, index))
 	}
 
 	numAddrs := len(cmd.Addresses)
@@ -1692,7 +1692,7 @@ func handleRescan(wsc *wsClient, icmd btcjson.Cmd) (interface{}, *btcjson.Error)
 		scriptHashes:        map[[ripemd160.Size]byte]struct{}{},
 		compressedPubkeys:   map[[33]byte]struct{}{},
 		uncompressedPubkeys: map[[65]byte]struct{}{},
-		unspent:             map[btcwire.OutPoint]struct{}{},
+		unspent:             map[wire.OutPoint]struct{}{},
 	}
 	var compressedPubkey [33]byte
 	var uncompressedPubkey [65]byte
@@ -1744,7 +1744,7 @@ func handleRescan(wsc *wsClient, icmd btcjson.Cmd) (interface{}, *btcjson.Error)
 
 	db := wsc.server.server.db
 
-	minBlockSha, err := btcwire.NewShaHashFromStr(cmd.BeginBlock)
+	minBlockSha, err := wire.NewShaHashFromStr(cmd.BeginBlock)
 	if err != nil {
 		return nil, &btcjson.ErrDecodeHexString
 	}
@@ -1755,7 +1755,7 @@ func handleRescan(wsc *wsClient, icmd btcjson.Cmd) (interface{}, *btcjson.Error)
 
 	maxBlock := database.AllShas
 	if cmd.EndBlock != "" {
-		maxBlockSha, err := btcwire.NewShaHashFromStr(cmd.EndBlock)
+		maxBlockSha, err := wire.NewShaHashFromStr(cmd.EndBlock)
 		if err != nil {
 			return nil, &btcjson.ErrDecodeHexString
 		}

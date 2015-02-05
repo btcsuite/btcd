@@ -15,9 +15,9 @@ import (
 
 	"github.com/btcsuite/btcd/blockchain"
 	"github.com/btcsuite/btcd/database"
+	"github.com/btcsuite/btcd/wire"
 	"github.com/btcsuite/btcnet"
 	"github.com/btcsuite/btcutil"
-	"github.com/btcsuite/btcwire"
 )
 
 const (
@@ -49,14 +49,14 @@ type blockMsg struct {
 // invMsg packages a bitcoin inv message and the peer it came from together
 // so the block handler has access to that information.
 type invMsg struct {
-	inv  *btcwire.MsgInv
+	inv  *wire.MsgInv
 	peer *peer
 }
 
 // blockMsg packages a bitcoin block message and the peer it came from together
 // so the block handler has access to that information.
 type headersMsg struct {
-	headers *btcwire.MsgHeaders
+	headers *wire.MsgHeaders
 	peer    *peer
 }
 
@@ -129,7 +129,7 @@ type isCurrentMsg struct {
 // between checkpoints.
 type headerNode struct {
 	height int64
-	sha    *btcwire.ShaHash
+	sha    *wire.ShaHash
 }
 
 // chainState tracks the state of the best chain as blocks are inserted.  This
@@ -140,7 +140,7 @@ type headerNode struct {
 // is inserted and protecting it with a mutex.
 type chainState struct {
 	sync.Mutex
-	newestHash        *btcwire.ShaHash
+	newestHash        *wire.ShaHash
 	newestHeight      int64
 	pastMedianTime    time.Time
 	pastMedianTimeErr error
@@ -150,7 +150,7 @@ type chainState struct {
 // chain.
 //
 // This function is safe for concurrent access.
-func (c *chainState) Best() (*btcwire.ShaHash, int64) {
+func (c *chainState) Best() (*wire.ShaHash, int64) {
 	c.Lock()
 	defer c.Unlock()
 
@@ -164,8 +164,8 @@ type blockManager struct {
 	started           int32
 	shutdown          int32
 	blockChain        *blockchain.BlockChain
-	requestedTxns     map[btcwire.ShaHash]struct{}
-	requestedBlocks   map[btcwire.ShaHash]struct{}
+	requestedTxns     map[wire.ShaHash]struct{}
+	requestedBlocks   map[wire.ShaHash]struct{}
 	receivedLogBlocks int64
 	receivedLogTx     int64
 	lastBlockLogTime  time.Time
@@ -185,7 +185,7 @@ type blockManager struct {
 
 // resetHeaderState sets the headers-first mode state to values appropriate for
 // syncing from a new peer.
-func (b *blockManager) resetHeaderState(newestHash *btcwire.ShaHash, newestHeight int64) {
+func (b *blockManager) resetHeaderState(newestHash *wire.ShaHash, newestHeight int64) {
 	b.headersFirstMode = false
 	b.headerList.Init()
 	b.startHeader = nil
@@ -203,7 +203,7 @@ func (b *blockManager) resetHeaderState(newestHash *btcwire.ShaHash, newestHeigh
 // This allows fast access to chain information since btcchain is currently not
 // safe for concurrent access and the block manager is typically quite busy
 // processing block and inventory.
-func (b *blockManager) updateChainState(newestHash *btcwire.ShaHash, newestHeight int64) {
+func (b *blockManager) updateChainState(newestHash *wire.ShaHash, newestHeight int64) {
 	b.chainState.Lock()
 	defer b.chainState.Unlock()
 
@@ -354,7 +354,7 @@ func (b *blockManager) isSyncCandidate(p *peer) bool {
 		}
 	} else {
 		// The peer is not a candidate for sync if it's not a full node.
-		if p.services&btcwire.SFNodeNetwork != btcwire.SFNodeNetwork {
+		if p.services&wire.SFNodeNetwork != wire.SFNodeNetwork {
 			return false
 		}
 	}
@@ -510,7 +510,7 @@ func (b *blockManager) handleTxMsg(tmsg *txMsg) {
 		// Convert the error into an appropriate reject message and
 		// send it.
 		code, reason := errToRejectErr(err)
-		tmsg.peer.PushRejectMsg(btcwire.CmdBlock, code, reason, txHash,
+		tmsg.peer.PushRejectMsg(wire.CmdBlock, code, reason, txHash,
 			false)
 		return
 	}
@@ -609,7 +609,7 @@ func (b *blockManager) handleBlockMsg(bmsg *blockMsg) {
 		// Convert the error into an appropriate reject message and
 		// send it.
 		code, reason := errToRejectErr(err)
-		bmsg.peer.PushRejectMsg(btcwire.CmdBlock, code, reason,
+		bmsg.peer.PushRejectMsg(wire.CmdBlock, code, reason,
 			blockSha, false)
 		return
 	}
@@ -672,7 +672,7 @@ func (b *blockManager) handleBlockMsg(bmsg *blockMsg) {
 	prevHash := b.nextCheckpoint.Hash
 	b.nextCheckpoint = b.findNextHeaderCheckpoint(prevHeight)
 	if b.nextCheckpoint != nil {
-		locator := blockchain.BlockLocator([]*btcwire.ShaHash{prevHash})
+		locator := blockchain.BlockLocator([]*wire.ShaHash{prevHash})
 		err := bmsg.peer.PushGetHeadersMsg(locator, b.nextCheckpoint.Hash)
 		if err != nil {
 			bmgrLog.Warnf("Failed to send getheaders message to "+
@@ -691,7 +691,7 @@ func (b *blockManager) handleBlockMsg(bmsg *blockMsg) {
 	b.headersFirstMode = false
 	b.headerList.Init()
 	bmgrLog.Infof("Reached the final checkpoint -- switching to normal mode")
-	locator := blockchain.BlockLocator([]*btcwire.ShaHash{blockSha})
+	locator := blockchain.BlockLocator([]*wire.ShaHash{blockSha})
 	err = bmsg.peer.PushGetBlocksMsg(locator, &zeroHash)
 	if err != nil {
 		bmgrLog.Warnf("Failed to send getblocks message to peer %s: %v",
@@ -710,9 +710,9 @@ func (b *blockManager) fetchHeaderBlocks() {
 	}
 
 	// Build up a getdata request for the list of blocks the headers
-	// describe.  The size hint will be limited to btcwire.MaxInvPerMsg by
+	// describe.  The size hint will be limited to wire.MaxInvPerMsg by
 	// the function, so no need to double check it here.
-	gdmsg := btcwire.NewMsgGetDataSizeHint(uint(b.headerList.Len()))
+	gdmsg := wire.NewMsgGetDataSizeHint(uint(b.headerList.Len()))
 	numRequested := 0
 	for e := b.startHeader; e != nil; e = e.Next() {
 		node, ok := e.Value.(*headerNode)
@@ -721,7 +721,7 @@ func (b *blockManager) fetchHeaderBlocks() {
 			continue
 		}
 
-		iv := btcwire.NewInvVect(btcwire.InvTypeBlock, node.sha)
+		iv := wire.NewInvVect(wire.InvTypeBlock, node.sha)
 		haveInv, err := b.haveInventory(iv)
 		if err != nil {
 			bmgrLog.Warnf("Unexpected failure when checking for "+
@@ -735,7 +735,7 @@ func (b *blockManager) fetchHeaderBlocks() {
 			numRequested++
 		}
 		b.startHeader = e.Next()
-		if numRequested >= btcwire.MaxInvPerMsg {
+		if numRequested >= wire.MaxInvPerMsg {
 			break
 		}
 	}
@@ -764,7 +764,7 @@ func (b *blockManager) handleHeadersMsg(hmsg *headersMsg) {
 	// Process all of the received headers ensuring each one connects to the
 	// previous and that checkpoints match.
 	receivedCheckpoint := false
-	var finalHash *btcwire.ShaHash
+	var finalHash *wire.ShaHash
 	for _, blockHeader := range msg.Headers {
 		blockHash, err := blockHeader.BlockSha()
 		if err != nil {
@@ -842,7 +842,7 @@ func (b *blockManager) handleHeadersMsg(hmsg *headersMsg) {
 	// This header is not a checkpoint, so request the next batch of
 	// headers starting from the latest known header and ending with the
 	// next checkpoint.
-	locator := blockchain.BlockLocator([]*btcwire.ShaHash{finalHash})
+	locator := blockchain.BlockLocator([]*wire.ShaHash{finalHash})
 	err := hmsg.peer.PushGetHeadersMsg(locator, b.nextCheckpoint.Hash)
 	if err != nil {
 		bmgrLog.Warnf("Failed to send getheaders message to "+
@@ -856,14 +856,14 @@ func (b *blockManager) handleHeadersMsg(hmsg *headersMsg) {
 // inventory can be when it is in different states such as blocks that are part
 // of the main chain, on a side chain, in the orphan pool, and transactions that
 // are in the memory pool (either the main pool or orphan pool).
-func (b *blockManager) haveInventory(invVect *btcwire.InvVect) (bool, error) {
+func (b *blockManager) haveInventory(invVect *wire.InvVect) (bool, error) {
 	switch invVect.Type {
-	case btcwire.InvTypeBlock:
+	case wire.InvTypeBlock:
 		// Ask chain if the block is known to it in any form (main
 		// chain, side chain, or orphan).
 		return b.blockChain.HaveBlock(&invVect.Hash)
 
-	case btcwire.InvTypeTx:
+	case wire.InvTypeTx:
 		// Ask the transaction memory pool if the transaction is known
 		// to it in any form (main pool or orphan).
 		if b.server.txMemPool.HaveTransaction(&invVect.Hash) {
@@ -894,7 +894,7 @@ func (b *blockManager) handleInvMsg(imsg *invMsg) {
 	lastBlock := -1
 	invVects := imsg.inv.InvList
 	for i := len(invVects) - 1; i >= 0; i-- {
-		if invVects[i].Type == btcwire.InvTypeBlock {
+		if invVects[i].Type == wire.InvTypeBlock {
 			lastBlock = i
 			break
 		}
@@ -907,7 +907,7 @@ func (b *blockManager) handleInvMsg(imsg *invMsg) {
 	chain := b.blockChain
 	for i, iv := range invVects {
 		// Ignore unsupported inventory types.
-		if iv.Type != btcwire.InvTypeBlock && iv.Type != btcwire.InvTypeTx {
+		if iv.Type != wire.InvTypeBlock && iv.Type != wire.InvTypeTx {
 			continue
 		}
 
@@ -934,7 +934,7 @@ func (b *blockManager) handleInvMsg(imsg *invMsg) {
 			continue
 		}
 
-		if iv.Type == btcwire.InvTypeBlock {
+		if iv.Type == wire.InvTypeBlock {
 			// The block is an orphan block that we already have.
 			// When the existing orphan was processed, it requested
 			// the missing parent blocks.  When this scenario
@@ -978,7 +978,7 @@ func (b *blockManager) handleInvMsg(imsg *invMsg) {
 	// Request as much as possible at once.  Anything that won't fit into
 	// the request will be requested on the next inv message.
 	numRequested := 0
-	gdmsg := btcwire.NewMsgGetData()
+	gdmsg := wire.NewMsgGetData()
 	requestQueue := imsg.peer.requestQueue
 	for len(requestQueue) != 0 {
 		iv := requestQueue[0]
@@ -986,7 +986,7 @@ func (b *blockManager) handleInvMsg(imsg *invMsg) {
 		requestQueue = requestQueue[1:]
 
 		switch iv.Type {
-		case btcwire.InvTypeBlock:
+		case wire.InvTypeBlock:
 			// Request the block if there is not already a pending
 			// request.
 			if _, exists := b.requestedBlocks[iv.Hash]; !exists {
@@ -996,7 +996,7 @@ func (b *blockManager) handleInvMsg(imsg *invMsg) {
 				numRequested++
 			}
 
-		case btcwire.InvTypeTx:
+		case wire.InvTypeTx:
 			// Request the transaction if there is not already a
 			// pending request.
 			if _, exists := b.requestedTxns[iv.Hash]; !exists {
@@ -1007,7 +1007,7 @@ func (b *blockManager) handleInvMsg(imsg *invMsg) {
 			}
 		}
 
-		if numRequested >= btcwire.MaxInvPerMsg {
+		if numRequested >= wire.MaxInvPerMsg {
 			break
 		}
 	}
@@ -1130,7 +1130,7 @@ func (b *blockManager) handleNotifyMsg(notification *blockchain.Notification) {
 		hash, _ := block.Sha()
 
 		// Generate the inventory vector and relay it.
-		iv := btcwire.NewInvVect(btcwire.InvTypeBlock, hash)
+		iv := wire.NewInvVect(wire.InvTypeBlock, hash)
 		b.server.RelayInventory(iv, nil)
 
 	// A block has been connected to the main block chain.
@@ -1159,7 +1159,7 @@ func (b *blockManager) handleNotifyMsg(notification *blockchain.Notification) {
 			// all the transactions (except the coinbase) as no
 			// longer needing rebroadcasting.
 			for _, tx := range block.Transactions()[1:] {
-				iv := btcwire.NewInvVect(btcwire.InvTypeTx, tx.Sha())
+				iv := wire.NewInvVect(wire.InvTypeTx, tx.Sha())
 				b.server.RemoveRebroadcastInventory(iv)
 			}
 
@@ -1229,7 +1229,7 @@ func (b *blockManager) QueueBlock(block *btcutil.Block, p *peer) {
 }
 
 // QueueInv adds the passed inv message and peer to the block handling queue.
-func (b *blockManager) QueueInv(inv *btcwire.MsgInv, p *peer) {
+func (b *blockManager) QueueInv(inv *wire.MsgInv, p *peer) {
 	// No channel handling here because peers do not need to block on inv
 	// messages.
 	if atomic.LoadInt32(&b.shutdown) != 0 {
@@ -1241,7 +1241,7 @@ func (b *blockManager) QueueInv(inv *btcwire.MsgInv, p *peer) {
 
 // QueueHeaders adds the passed headers message and peer to the block handling
 // queue.
-func (b *blockManager) QueueHeaders(headers *btcwire.MsgHeaders, p *peer) {
+func (b *blockManager) QueueHeaders(headers *wire.MsgHeaders, p *peer) {
 	// No channel handling here because peers do not need to block on
 	// headers messages.
 	if atomic.LoadInt32(&b.shutdown) != 0 {
@@ -1345,8 +1345,8 @@ func newBlockManager(s *server) (*blockManager, error) {
 
 	bm := blockManager{
 		server:           s,
-		requestedTxns:    make(map[btcwire.ShaHash]struct{}),
-		requestedBlocks:  make(map[btcwire.ShaHash]struct{}),
+		requestedTxns:    make(map[wire.ShaHash]struct{}),
+		requestedBlocks:  make(map[wire.ShaHash]struct{}),
 		lastBlockLogTime: time.Now(),
 		msgChan:          make(chan interface{}, cfg.MaxPeers*3),
 		headerList:       list.New(),

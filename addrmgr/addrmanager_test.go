@@ -11,13 +11,13 @@ import (
 	"time"
 
 	"github.com/btcsuite/btcd/addrmgr"
-	"github.com/btcsuite/btcwire"
+	"github.com/btcsuite/btcd/wire"
 )
 
 // naTest is used to describe a test to be perfomed against the NetAddressKey
 // method.
 type naTest struct {
-	in   btcwire.NetAddress
+	in   wire.NetAddress
 	want string
 }
 
@@ -88,9 +88,9 @@ func addNaTests() {
 
 func addNaTest(ip string, port uint16, want string) {
 	nip := net.ParseIP(ip)
-	na := btcwire.NetAddress{
+	na := wire.NetAddress{
 		Timestamp: time.Now(),
-		Services:  btcwire.SFNodeNetwork,
+		Services:  wire.SFNodeNetwork,
 		IP:        nip,
 		Port:      port,
 	}
@@ -104,27 +104,27 @@ func lookupFunc(host string) ([]net.IP, error) {
 
 func TestAddLocalAddress(t *testing.T) {
 	var tests = []struct {
-		address btcwire.NetAddress
+		address wire.NetAddress
 		valid   bool
 	}{
 		{
-			btcwire.NetAddress{IP: net.ParseIP("192.168.0.100")},
+			wire.NetAddress{IP: net.ParseIP("192.168.0.100")},
 			false,
 		},
 		{
-			btcwire.NetAddress{IP: net.ParseIP("204.124.1.1")},
+			wire.NetAddress{IP: net.ParseIP("204.124.1.1")},
 			true,
 		},
 		{
-			btcwire.NetAddress{IP: net.ParseIP("::1")},
+			wire.NetAddress{IP: net.ParseIP("::1")},
 			false,
 		},
 		{
-			btcwire.NetAddress{IP: net.ParseIP("fe80::1")},
+			wire.NetAddress{IP: net.ParseIP("fe80::1")},
 			false,
 		},
 		{
-			btcwire.NetAddress{IP: net.ParseIP("2620:100::1")},
+			wire.NetAddress{IP: net.ParseIP("2620:100::1")},
 			true,
 		},
 	}
@@ -152,7 +152,7 @@ func TestGetAddress(t *testing.T) {
 }
 
 func TestGetBestLocalAddress(t *testing.T) {
-	localAddrs := []btcwire.NetAddress{
+	localAddrs := []wire.NetAddress{
 		{IP: net.ParseIP("192.168.0.100")},
 		{IP: net.ParseIP("::1")},
 		{IP: net.ParseIP("fe80::1")},
@@ -160,39 +160,39 @@ func TestGetBestLocalAddress(t *testing.T) {
 	}
 
 	var tests = []struct {
-		remoteAddr btcwire.NetAddress
-		want1      btcwire.NetAddress
-		want2      btcwire.NetAddress
-		want3      btcwire.NetAddress
+		remoteAddr wire.NetAddress
+		want1      wire.NetAddress
+		want2      wire.NetAddress
+		want3      wire.NetAddress
 	}{
 		{
 			// Remote connection from public IPv4
-			btcwire.NetAddress{IP: net.ParseIP("204.124.8.1")},
-			btcwire.NetAddress{IP: net.IPv4zero},
-			btcwire.NetAddress{IP: net.ParseIP("204.124.8.100")},
-			btcwire.NetAddress{IP: net.ParseIP("fd87:d87e:eb43:25::1")},
+			wire.NetAddress{IP: net.ParseIP("204.124.8.1")},
+			wire.NetAddress{IP: net.IPv4zero},
+			wire.NetAddress{IP: net.ParseIP("204.124.8.100")},
+			wire.NetAddress{IP: net.ParseIP("fd87:d87e:eb43:25::1")},
 		},
 		{
 			// Remote connection from private IPv4
-			btcwire.NetAddress{IP: net.ParseIP("172.16.0.254")},
-			btcwire.NetAddress{IP: net.IPv4zero},
-			btcwire.NetAddress{IP: net.IPv4zero},
-			btcwire.NetAddress{IP: net.IPv4zero},
+			wire.NetAddress{IP: net.ParseIP("172.16.0.254")},
+			wire.NetAddress{IP: net.IPv4zero},
+			wire.NetAddress{IP: net.IPv4zero},
+			wire.NetAddress{IP: net.IPv4zero},
 		},
 		{
 			// Remote connection from public IPv6
-			btcwire.NetAddress{IP: net.ParseIP("2602:100:abcd::102")},
-			btcwire.NetAddress{IP: net.ParseIP("2001:470::1")},
-			btcwire.NetAddress{IP: net.ParseIP("2001:470::1")},
-			btcwire.NetAddress{IP: net.ParseIP("2001:470::1")},
+			wire.NetAddress{IP: net.ParseIP("2602:100:abcd::102")},
+			wire.NetAddress{IP: net.ParseIP("2001:470::1")},
+			wire.NetAddress{IP: net.ParseIP("2001:470::1")},
+			wire.NetAddress{IP: net.ParseIP("2001:470::1")},
 		},
 		/* XXX
 		{
 			// Remote connection from Tor
-			btcwire.NetAddress{IP: net.ParseIP("fd87:d87e:eb43::100")},
-			btcwire.NetAddress{IP: net.IPv4zero},
-			btcwire.NetAddress{IP: net.ParseIP("204.124.8.100")},
-			btcwire.NetAddress{IP: net.ParseIP("fd87:d87e:eb43:25::1")},
+			wire.NetAddress{IP: net.ParseIP("fd87:d87e:eb43::100")},
+			wire.NetAddress{IP: net.IPv4zero},
+			wire.NetAddress{IP: net.ParseIP("204.124.8.100")},
+			wire.NetAddress{IP: net.ParseIP("fd87:d87e:eb43:25::1")},
 		},
 		*/
 	}
@@ -213,7 +213,7 @@ func TestGetBestLocalAddress(t *testing.T) {
 	}
 
 	// Add a public IP to the list of local addresses.
-	localAddr := btcwire.NetAddress{IP: net.ParseIP("204.124.8.100")}
+	localAddr := wire.NetAddress{IP: net.ParseIP("204.124.8.100")}
 	amgr.AddLocalAddress(&localAddr, addrmgr.InterfacePrio)
 
 	// Test against want2
@@ -227,7 +227,7 @@ func TestGetBestLocalAddress(t *testing.T) {
 	}
 	/*
 		// Add a tor generated IP address
-		localAddr = btcwire.NetAddress{IP: net.ParseIP("fd87:d87e:eb43:25::1")}
+		localAddr = wire.NetAddress{IP: net.ParseIP("fd87:d87e:eb43:25::1")}
 		amgr.AddLocalAddress(&localAddr, addrmgr.ManualPrio)
 
 		// Test against want3

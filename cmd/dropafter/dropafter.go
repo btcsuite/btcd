@@ -13,10 +13,10 @@ import (
 
 	"github.com/btcsuite/btcd/database"
 	_ "github.com/btcsuite/btcd/database/ldb"
+	"github.com/btcsuite/btcd/wire"
 	"github.com/btcsuite/btclog"
 	"github.com/btcsuite/btcnet"
 	"github.com/btcsuite/btcutil"
-	"github.com/btcsuite/btcwire"
 	flags "github.com/btcsuite/go-flags"
 )
 
@@ -45,14 +45,14 @@ const (
 // time of writing, btcd currently places blocks for testnet version 3 in the
 // data and log directory "testnet", which does not match the Name field of the
 // btcnet parameters.  This function can be used to override this directory name
-// as "testnet" when the passed active network matches btcwire.TestNet3.
+// as "testnet" when the passed active network matches wire.TestNet3.
 //
 // A proper upgrade to move the data and log directories for this network to
 // "testnet3" is planned for the future, at which point this function can be
 // removed and the network parameter's name used instead.
 func netName(netParams *btcnet.Params) string {
 	switch netParams.Net {
-	case btcwire.TestNet3:
+	case wire.TestNet3:
 		return "testnet"
 	default:
 		return netParams.Name
@@ -137,11 +137,11 @@ func main() {
 
 }
 
-func getSha(db database.Db, str string) (btcwire.ShaHash, error) {
+func getSha(db database.Db, str string) (wire.ShaHash, error) {
 	argtype, idx, sha, err := parsesha(str)
 	if err != nil {
 		log.Warnf("unable to decode [%v] %v", str, err)
-		return btcwire.ShaHash{}, err
+		return wire.ShaHash{}, err
 	}
 
 	switch argtype {
@@ -150,7 +150,7 @@ func getSha(db database.Db, str string) (btcwire.ShaHash, error) {
 	case argHeight:
 		sha, err = db.FetchBlockShaByHeight(idx)
 		if err != nil {
-			return btcwire.ShaHash{}, err
+			return wire.ShaHash{}, err
 		}
 	}
 	if sha == nil {
@@ -167,8 +167,8 @@ var errBadShaPrefix = errors.New("invalid prefix")
 var errBadShaLen = errors.New("invalid len")
 var errBadShaChar = errors.New("invalid character")
 
-func parsesha(argstr string) (argtype int, height int64, psha *btcwire.ShaHash, err error) {
-	var sha btcwire.ShaHash
+func parsesha(argstr string) (argtype int, height int64, psha *wire.ShaHash, err error) {
+	var sha wire.ShaHash
 
 	var hashbuf string
 

@@ -10,14 +10,14 @@ import (
 	"runtime"
 
 	"github.com/btcsuite/btcd/txscript"
+	"github.com/btcsuite/btcd/wire"
 	"github.com/btcsuite/btcutil"
-	"github.com/btcsuite/btcwire"
 )
 
 // txValidateItem holds a transaction along with which input to validate.
 type txValidateItem struct {
 	txInIndex int
-	txIn      *btcwire.TxIn
+	txIn      *wire.TxIn
 	tx        *btcutil.Tx
 }
 

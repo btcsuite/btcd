@@ -9,8 +9,8 @@ import (
 	"testing"
 
 	"github.com/btcsuite/btcd/database"
+	"github.com/btcsuite/btcd/wire"
 	"github.com/btcsuite/btcutil"
-	"github.com/btcsuite/btcwire"
 	"github.com/davecgh/go-spew/spew"
 )
 
@@ -27,7 +27,7 @@ type testContext struct {
 	dbType      string
 	db          database.Db
 	blockHeight int64
-	blockHash   *btcwire.ShaHash
+	blockHash   *wire.ShaHash
 	block       *btcutil.Block
 	useSpends   bool
 }
@@ -356,7 +356,7 @@ func testFetchTxByShaListCommon(tc *testContext, includeSpent bool) bool {
 	}
 
 	transactions := tc.block.Transactions()
-	txHashes := make([]*btcwire.ShaHash, len(transactions))
+	txHashes := make([]*wire.ShaHash, len(transactions))
 	for i, tx := range transactions {
 		txHashes[i] = tx.Sha()
 	}
@@ -620,17 +620,17 @@ func testInterface(t *testing.T, dbType string) {
 	// TODO(davec): Add tests for the following functions:
 	/*
 	   - Close()
-	   - DropAfterBlockBySha(*btcwire.ShaHash) (err error)
-	   x ExistsSha(sha *btcwire.ShaHash) (exists bool)
-	   x FetchBlockBySha(sha *btcwire.ShaHash) (blk *btcutil.Block, err error)
-	   x FetchBlockShaByHeight(height int64) (sha *btcwire.ShaHash, err error)
-	   - FetchHeightRange(startHeight, endHeight int64) (rshalist []btcwire.ShaHash, err error)
-	   x ExistsTxSha(sha *btcwire.ShaHash) (exists bool)
-	   x FetchTxBySha(txsha *btcwire.ShaHash) ([]*TxListReply, error)
-	   x FetchTxByShaList(txShaList []*btcwire.ShaHash) []*TxListReply
-	   x FetchUnSpentTxByShaList(txShaList []*btcwire.ShaHash) []*TxListReply
+	   - DropAfterBlockBySha(*wire.ShaHash) (err error)
+	   x ExistsSha(sha *wire.ShaHash) (exists bool)
+	   x FetchBlockBySha(sha *wire.ShaHash) (blk *btcutil.Block, err error)
+	   x FetchBlockShaByHeight(height int64) (sha *wire.ShaHash, err error)
+	   - FetchHeightRange(startHeight, endHeight int64) (rshalist []wire.ShaHash, err error)
+	   x ExistsTxSha(sha *wire.ShaHash) (exists bool)
+	   x FetchTxBySha(txsha *wire.ShaHash) ([]*TxListReply, error)
+	   x FetchTxByShaList(txShaList []*wire.ShaHash) []*TxListReply
+	   x FetchUnSpentTxByShaList(txShaList []*wire.ShaHash) []*TxListReply
 	   x InsertBlock(block *btcutil.Block) (height int64, err error)
-	   x NewestSha() (sha *btcwire.ShaHash, height int64, err error)
+	   x NewestSha() (sha *wire.ShaHash, height int64, err error)
 	   - RollbackClose()
 	   - Sync()
 	*/

@@ -9,7 +9,7 @@ import (
 	"testing"
 
 	"github.com/btcsuite/btcd/txscript"
-	"github.com/btcsuite/btcwire"
+	"github.com/btcsuite/btcd/wire"
 )
 
 // TestScripts tests script execution for a wide variety of opcodes.  All tests
@@ -480,19 +480,19 @@ func TestScripts(t *testing.T) {
 	}
 
 	// Mock up fake tx used during script execution.
-	mockTx := &btcwire.MsgTx{
+	mockTx := &wire.MsgTx{
 		Version: 1,
-		TxIn: []*btcwire.TxIn{
+		TxIn: []*wire.TxIn{
 			{
-				PreviousOutPoint: btcwire.OutPoint{
-					Hash:  btcwire.ShaHash{},
+				PreviousOutPoint: wire.OutPoint{
+					Hash:  wire.ShaHash{},
 					Index: 0xffffffff,
 				},
 				SignatureScript: []byte{txscript.OP_NOP},
 				Sequence:        0xffffffff,
 			},
 		},
-		TxOut: []*btcwire.TxOut{
+		TxOut: []*wire.TxOut{
 			{
 				Value:    0x12a05f200,
 				PkScript: []byte{},
@@ -4263,19 +4263,19 @@ func stacksEqual(a, b [][]byte) bool {
 
 func testOpcode(t *testing.T, test *detailedTest) {
 	// mock up fake tx.
-	tx := &btcwire.MsgTx{
+	tx := &wire.MsgTx{
 		Version: 1,
-		TxIn: []*btcwire.TxIn{
+		TxIn: []*wire.TxIn{
 			{
-				PreviousOutPoint: btcwire.OutPoint{
-					Hash:  btcwire.ShaHash{},
+				PreviousOutPoint: wire.OutPoint{
+					Hash:  wire.ShaHash{},
 					Index: 0xffffffff,
 				},
 				SignatureScript: []byte{},
 				Sequence:        0xffffffff,
 			},
 		},
-		TxOut: []*btcwire.TxOut{
+		TxOut: []*wire.TxOut{
 			{
 				Value:    0x12a05f200,
 				PkScript: []byte{},

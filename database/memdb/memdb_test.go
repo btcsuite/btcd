@@ -10,9 +10,9 @@ import (
 
 	"github.com/btcsuite/btcd/database"
 	"github.com/btcsuite/btcd/database/memdb"
+	"github.com/btcsuite/btcd/wire"
 	"github.com/btcsuite/btcnet"
 	"github.com/btcsuite/btcutil"
-	"github.com/btcsuite/btcwire"
 )
 
 // TestClosed ensure calling the interface functions on a closed database
@@ -67,7 +67,7 @@ func TestClosed(t *testing.T) {
 		t.Errorf("FetchTxBySha: unexpected error %v", err)
 	}
 
-	requestHashes := []*btcwire.ShaHash{genesisHash}
+	requestHashes := []*wire.ShaHash{genesisHash}
 	reply := db.FetchTxByShaList(requestHashes)
 	if len(reply) != len(requestHashes) {
 		t.Errorf("FetchUnSpentTxByShaList unexpected number of replies "+

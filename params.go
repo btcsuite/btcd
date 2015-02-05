@@ -5,8 +5,8 @@
 package main
 
 import (
+	"github.com/btcsuite/btcd/wire"
 	"github.com/btcsuite/btcnet"
-	"github.com/btcsuite/btcwire"
 )
 
 // activeNetParams is a pointer to the parameters specific to the
@@ -22,7 +22,7 @@ type params struct {
 }
 
 // mainNetParams contains parameters specific to the main network
-// (btcwire.MainNet).  NOTE: The RPC port is intentionally different than the
+// (wire.MainNet).  NOTE: The RPC port is intentionally different than the
 // reference implementation because btcd does not handle wallet requests.  The
 // separate wallet process listens on the well-known port and forwards requests
 // it does not handle on to btcd.  This approach allows the wallet process
@@ -42,7 +42,7 @@ var mainNetParams = params{
 }
 
 // regressionNetParams contains parameters specific to the regression test
-// network (btcwire.TestNet).  NOTE: The RPC port is intentionally different
+// network (wire.TestNet).  NOTE: The RPC port is intentionally different
 // than the reference implementation - see the mainNetParams comment for
 // details.
 var regressionNetParams = params{
@@ -52,7 +52,7 @@ var regressionNetParams = params{
 }
 
 // testNet3Params contains parameters specific to the test network (version 3)
-// (btcwire.TestNet3).  NOTE: The RPC port is intentionally different than the
+// (wire.TestNet3).  NOTE: The RPC port is intentionally different than the
 // reference implementation - see the mainNetParams comment for details.
 var testNet3Params = params{
 	Params:  &btcnet.TestNet3Params,
@@ -66,7 +66,7 @@ var testNet3Params = params{
 }
 
 // simNetParams contains parameters specific to the simulation test network
-// (btcwire.SimNet).
+// (wire.SimNet).
 var simNetParams = params{
 	Params:   &btcnet.SimNetParams,
 	rpcPort:  "18556",
@@ -77,14 +77,14 @@ var simNetParams = params{
 // time of writing, btcd currently places blocks for testnet version 3 in the
 // data and log directory "testnet", which does not match the Name field of the
 // btcnet parameters.  This function can be used to override this directory name
-// as "testnet" when the passed active network matches btcwire.TestNet3.
+// as "testnet" when the passed active network matches wire.TestNet3.
 //
 // A proper upgrade to move the data and log directories for this network to
 // "testnet3" is planned for the future, at which point this function can be
 // removed and the network parameter's name used instead.
 func netName(netParams *params) string {
 	switch netParams.Net {
-	case btcwire.TestNet3:
+	case wire.TestNet3:
 		return "testnet"
 	default:
 		return netParams.Name

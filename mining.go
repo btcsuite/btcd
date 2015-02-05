@@ -13,14 +13,14 @@ import (
 	"github.com/btcsuite/btcd/blockchain"
 	"github.com/btcsuite/btcd/database"
 	"github.com/btcsuite/btcd/txscript"
+	"github.com/btcsuite/btcd/wire"
 	"github.com/btcsuite/btcutil"
-	"github.com/btcsuite/btcwire"
 )
 
 const (
 	// generatedBlockVersion is the version of the block being generated.
 	// It is defined as a constant here rather than using the
-	// btcwire.BlockVersion constant since a change in the block version
+	// wire.BlockVersion constant since a change in the block version
 	// will require changes to the generated block.  Using the btcwire
 	// constant for generated block version could allow creation of invalid
 	// blocks for the updated version.
@@ -32,7 +32,7 @@ const (
 
 	// blockHeaderOverhead is the max number of bytes it takes to serialize
 	// a block header and max possible transaction count.
-	blockHeaderOverhead = btcwire.MaxBlockHeaderPayload + btcwire.MaxVarIntPayload
+	blockHeaderOverhead = wire.MaxBlockHeaderPayload + wire.MaxVarIntPayload
 
 	// coinbaseFlags is added to the coinbase script of a generated block
 	// and is used to monitor BIP16 support as well as blocks that are
@@ -65,7 +65,7 @@ type txPrioItem struct {
 	// on.  It will only be set when the transaction references other
 	// transactions in the memory pool and hence must come after them in
 	// a block.
-	dependsOn map[btcwire.ShaHash]struct{}
+	dependsOn map[wire.ShaHash]struct{}
 }
 
 // txPriorityQueueLessFunc describes a function that can be used as a compare
@@ -167,7 +167,7 @@ func newTxPriorityQueue(reserve int, sortByFee bool) *txPriorityQueue {
 // details about the fees and the number of signature operations for each
 // transaction in the block.
 type BlockTemplate struct {
-	block           *btcwire.MsgBlock
+	block           *wire.MsgBlock
 	fees            []int64
 	sigOpCounts     []int64
 	height          int64
@@ -232,16 +232,16 @@ func createCoinbaseTx(coinbaseScript []byte, nextBlockHeight int64, addr btcutil
 		}
 	}
 
-	tx := btcwire.NewMsgTx()
-	tx.AddTxIn(&btcwire.TxIn{
+	tx := wire.NewMsgTx()
+	tx.AddTxIn(&wire.TxIn{
 		// Coinbase transactions have no inputs, so previous outpoint is
 		// zero hash and max index.
-		PreviousOutPoint: *btcwire.NewOutPoint(&btcwire.ShaHash{},
-			btcwire.MaxPrevOutIndex),
+		PreviousOutPoint: *wire.NewOutPoint(&wire.ShaHash{},
+			wire.MaxPrevOutIndex),
 		SignatureScript: coinbaseScript,
-		Sequence:        btcwire.MaxTxInSequenceNum,
+		Sequence:        wire.MaxTxInSequenceNum,
 	})
-	tx.AddTxOut(&btcwire.TxOut{
+	tx.AddTxOut(&wire.TxOut{
 		Value: blockchain.CalcBlockSubsidy(nextBlockHeight,
 			activeNetParams.Params),
 		PkScript: pkScript,
@@ -479,7 +479,7 @@ func NewBlockTemplate(mempool *txMemPool, payToAddress btcutil.Address) (*BlockT
 	// dependsOn map kept with each dependent transaction helps quickly
 	// determine which dependent transactions are now eligible for inclusion
 	// in the block once each transaction has been included.
-	dependers := make(map[btcwire.ShaHash]*list.List)
+	dependers := make(map[wire.ShaHash]*list.List)
 
 	// Create slices to hold the fees and number of signature operations
 	// for each of the selected transactions and add an entry for the
@@ -549,7 +549,7 @@ mempoolLoop:
 				depList.PushBack(prioItem)
 				if prioItem.dependsOn == nil {
 					prioItem.dependsOn = make(
-						map[btcwire.ShaHash]struct{})
+						map[wire.ShaHash]struct{})
 				}
 				prioItem.dependsOn[*originHash] = struct{}{}
 
@@ -759,8 +759,8 @@ mempoolLoop:
 	// Now that the actual transactions have been selected, update the
 	// block size for the real transaction count and coinbase value with
 	// the total fees accordingly.
-	blockSize -= btcwire.MaxVarIntPayload -
-		uint32(btcwire.VarIntSerializeSize(uint64(len(blockTxns))))
+	blockSize -= wire.MaxVarIntPayload -
+		uint32(wire.VarIntSerializeSize(uint64(len(blockTxns))))
 	coinbaseTx.MsgTx().TxOut[0].Value += totalFees
 	txFees[0] = -totalFees
 
@@ -778,8 +778,8 @@ mempoolLoop:
 
 	// Create a new block ready to be solved.
 	merkles := blockchain.BuildMerkleTreeStore(blockTxns)
-	var msgBlock btcwire.MsgBlock
-	msgBlock.Header = btcwire.BlockHeader{
+	var msgBlock wire.MsgBlock
+	msgBlock.Header = wire.BlockHeader{
 		Version:    generatedBlockVersion,
 		PrevBlock:  *prevHash,
 		MerkleRoot: *merkles[len(merkles)-1],
@@ -821,7 +821,7 @@ mempoolLoop:
 // consensus rules.  Finally, it will update the target difficulty if needed
 // based on the new time for the test networks since their target difficulty can
 // change based upon time.
-func UpdateBlockTime(msgBlock *btcwire.MsgBlock, bManager *blockManager) error {
+func UpdateBlockTime(msgBlock *wire.MsgBlock, bManager *blockManager) error {
 	// The new timestamp is potentially adjusted to ensure it comes after
 	// the median time of the last several blocks per the chain consensus
 	// rules.
@@ -848,7 +848,7 @@ func UpdateBlockTime(msgBlock *btcwire.MsgBlock, bManager *blockManager) error {
 // block by regenerating the coinbase script with the passed value and block
 // height.  It also recalculates and updates the new merkle root that results
 // from changing the coinbase script.
-func UpdateExtraNonce(msgBlock *btcwire.MsgBlock, blockHeight int64, extraNonce uint64) error {
+func UpdateExtraNonce(msgBlock *wire.MsgBlock, blockHeight int64, extraNonce uint64) error {
 	coinbaseScript, err := standardCoinbaseScript(blockHeight, extraNonce)
 	if err != nil {
 		return err

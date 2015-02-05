@@ -10,14 +10,14 @@ import (
 	"time"
 
 	"github.com/btcsuite/btcd/addrmgr"
-	"github.com/btcsuite/btcwire"
+	"github.com/btcsuite/btcd/wire"
 )
 
 // TestIPTypes ensures the various functions which determine the type of an IP
 // address based on RFCs work as intended.
 func TestIPTypes(t *testing.T) {
 	type ipTest struct {
-		in       btcwire.NetAddress
+		in       wire.NetAddress
 		rfc1918  bool
 		rfc2544  bool
 		rfc3849  bool
@@ -40,9 +40,9 @@ func TestIPTypes(t *testing.T) {
 		rfc4193, rfc4380, rfc4843, rfc4862, rfc5737, rfc6052, rfc6145, rfc6598,
 		local, valid, routable bool) ipTest {
 		nip := net.ParseIP(ip)
-		na := btcwire.NetAddress{
+		na := wire.NetAddress{
 			Timestamp: time.Now(),
-			Services:  btcwire.SFNodeNetwork,
+			Services:  wire.SFNodeNetwork,
 			IP:        nip,
 			Port:      8333,
 		}
@@ -198,9 +198,9 @@ func TestGroupKey(t *testing.T) {
 
 	for i, test := range tests {
 		nip := net.ParseIP(test.ip)
-		na := btcwire.NetAddress{
+		na := wire.NetAddress{
 			Timestamp: time.Now(),
-			Services:  btcwire.SFNodeNetwork,
+			Services:  wire.SFNodeNetwork,
 			IP:        nip,
 			Port:      8333,
 		}

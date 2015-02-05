@@ -22,10 +22,10 @@ import (
 	"github.com/btcsuite/btcd/addrmgr"
 	"github.com/btcsuite/btcd/blockchain"
 	"github.com/btcsuite/btcd/database"
+	"github.com/btcsuite/btcd/wire"
 	"github.com/btcsuite/btcjson"
 	"github.com/btcsuite/btcnet"
 	"github.com/btcsuite/btcutil"
-	"github.com/btcsuite/btcwire"
 )
 
 const (
@@ -38,7 +38,7 @@ const (
 const (
 	// supportedServices describes which services are supported by the
 	// server.
-	supportedServices = btcwire.SFNodeNetwork
+	supportedServices = wire.SFNodeNetwork
 
 	// connectionRetryInterval is the amount of time to wait in between
 	// retries when connecting to persistent peers.
@@ -51,7 +51,7 @@ const (
 // broadcastMsg provides the ability to house a bitcoin message to be broadcast
 // to all connected peers except specified excluded peers.
 type broadcastMsg struct {
-	message      btcwire.Message
+	message      wire.Message
 	excludePeers []*peer
 }
 
@@ -61,12 +61,12 @@ type broadcastInventoryAdd relayMsg
 
 // broadcastInventoryDel is a type used to declare that the InvVect it contains
 // needs to be removed from the rebroadcast map
-type broadcastInventoryDel *btcwire.InvVect
+type broadcastInventoryDel *wire.InvVect
 
 // relayMsg packages an inventory vector along with the newly discovered
 // inventory so the relay has access to that information.
 type relayMsg struct {
-	invVect *btcwire.InvVect
+	invVect *wire.InvVect
 	data    interface{}
 }
 
@@ -131,7 +131,7 @@ func randomUint16Number(max uint16) uint16 {
 
 // AddRebroadcastInventory adds 'iv' to the list of inventories to be
 // rebroadcasted at random intervals until they show up in a block.
-func (s *server) AddRebroadcastInventory(iv *btcwire.InvVect, data interface{}) {
+func (s *server) AddRebroadcastInventory(iv *wire.InvVect, data interface{}) {
 	// Ignore if shutting down.
 	if atomic.LoadInt32(&s.shutdown) != 0 {
 		return
@@ -142,7 +142,7 @@ func (s *server) AddRebroadcastInventory(iv *btcwire.InvVect, data interface{}) 
 
 // RemoveRebroadcastInventory removes 'iv' from the list of items to be
 // rebroadcasted if present.
-func (s *server) RemoveRebroadcastInventory(iv *btcwire.InvVect) {
+func (s *server) RemoveRebroadcastInventory(iv *wire.InvVect) {
 	// Ignore if shutting down.
 	if atomic.LoadInt32(&s.shutdown) != 0 {
 		return
@@ -301,7 +301,7 @@ func (s *server) handleRelayInvMsg(state *peerState, msg relayMsg) {
 			return
 		}
 
-		if msg.invVect.Type == btcwire.InvTypeTx {
+		if msg.invVect.Type == wire.InvTypeTx {
 			// Don't relay the transaction to the peer when it has
 			// transaction relaying disabled.
 			if p.RelayTxDisabled() {
@@ -523,11 +523,11 @@ func (s *server) seedFromDNS() {
 			if numPeers == 0 {
 				return
 			}
-			addresses := make([]*btcwire.NetAddress, len(seedpeers))
+			addresses := make([]*wire.NetAddress, len(seedpeers))
 			// if this errors then we have *real* problems
 			intPort, _ := strconv.Atoi(activeNetParams.DefaultPort)
 			for i, peer := range seedpeers {
-				addresses[i] = new(btcwire.NetAddress)
+				addresses[i] = new(wire.NetAddress)
 				addresses[i].SetAddress(peer, uint16(intPort))
 				// bitcoind seeds with addresses from
 				// a time randomly selected between 3
@@ -724,13 +724,13 @@ func (s *server) BanPeer(p *peer) {
 
 // RelayInventory relays the passed inventory to all connected peers that are
 // not already known to have it.
-func (s *server) RelayInventory(invVect *btcwire.InvVect, data interface{}) {
+func (s *server) RelayInventory(invVect *wire.InvVect, data interface{}) {
 	s.relayInv <- relayMsg{invVect: invVect, data: data}
 }
 
 // BroadcastMessage sends msg to all peers currently connected to the server
 // except those in the passed peers to exclude.
-func (s *server) BroadcastMessage(msg btcwire.Message, exclPeers ...*peer) {
+func (s *server) BroadcastMessage(msg wire.Message, exclPeers ...*peer) {
 	// XXX: Need to determine if this is an alert that has already been
 	// broadcast and refrain from broadcasting again.
 	bmsg := broadcastMsg{message: msg, excludePeers: exclPeers}
@@ -818,7 +818,7 @@ func (s *server) NetTotals() (uint64, uint64) {
 func (s *server) rebroadcastHandler() {
 	// Wait 5 min before first tx rebroadcast.
 	timer := time.NewTimer(5 * time.Minute)
-	pendingInvs := make(map[btcwire.InvVect]interface{})
+	pendingInvs := make(map[wire.InvVect]interface{})
 
 out:
 	for {
@@ -1061,8 +1061,8 @@ out:
 					srvrLog.Warnf("UPnP can't get external address: %v", err)
 					continue out
 				}
-				na := btcwire.NewNetAddressIPPort(externalip, uint16(listenPort),
-					btcwire.SFNodeNetwork)
+				na := wire.NewNetAddressIPPort(externalip, uint16(listenPort),
+					wire.SFNodeNetwork)
 				err = s.addrManager.AddLocalAddress(na, addrmgr.UpnpPrio)
 				if err != nil {
 					// XXX DeletePortMapping?
@@ -1091,7 +1091,7 @@ out:
 // bitcoin network type specified by netParams.  Use start to begin accepting
 // connections from peers.
 func newServer(listenAddrs []string, db database.Db, netParams *btcnet.Params) (*server, error) {
-	nonce, err := btcwire.RandomUint64()
+	nonce, err := wire.RandomUint64()
 	if err != nil {
 		return nil, err
 	}
@@ -1133,7 +1133,7 @@ func newServer(listenAddrs []string, db database.Db, netParams *btcnet.Params) (
 					eport = uint16(port)
 				}
 				na, err := amgr.HostToNetAddress(host, eport,
-					btcwire.SFNodeNetwork)
+					wire.SFNodeNetwork)
 				if err != nil {
 					srvrLog.Warnf("Not adding %s as "+
 						"externalip: %v", sip, err)
@@ -1168,8 +1168,8 @@ func newServer(listenAddrs []string, db database.Db, netParams *btcnet.Params) (
 				if err != nil {
 					continue
 				}
-				na := btcwire.NewNetAddressIPPort(ip,
-					uint16(port), btcwire.SFNodeNetwork)
+				na := wire.NewNetAddressIPPort(ip,
+					uint16(port), wire.SFNodeNetwork)
 				if discover {
 					err = amgr.AddLocalAddress(na, addrmgr.InterfacePrio)
 					if err != nil {

@@ -7,8 +7,8 @@ package blockchain
 import (
 	"math"
 
+	"github.com/btcsuite/btcd/wire"
 	"github.com/btcsuite/btcutil"
-	"github.com/btcsuite/btcwire"
 )
 
 // nextPowerOfTwo returns the next highest power of two from a given number if
@@ -28,16 +28,16 @@ func nextPowerOfTwo(n int) int {
 // HashMerkleBranches takes two hashes, treated as the left and right tree
 // nodes, and returns the hash of their concatenation.  This is a helper
 // function used to aid in the generation of a merkle tree.
-func HashMerkleBranches(left *btcwire.ShaHash, right *btcwire.ShaHash) *btcwire.ShaHash {
+func HashMerkleBranches(left *wire.ShaHash, right *wire.ShaHash) *wire.ShaHash {
 	// Concatenate the left and right nodes.
-	var sha [btcwire.HashSize * 2]byte
-	copy(sha[:btcwire.HashSize], left.Bytes())
-	copy(sha[btcwire.HashSize:], right.Bytes())
+	var sha [wire.HashSize * 2]byte
+	copy(sha[:wire.HashSize], left.Bytes())
+	copy(sha[wire.HashSize:], right.Bytes())
 
 	// Create a new sha hash from the double sha 256.  Ignore the error
 	// here since SetBytes can't fail here due to the fact DoubleSha256
 	// always returns a []byte of the right size regardless of input.
-	newSha, _ := btcwire.NewShaHash(btcwire.DoubleSha256(sha[:]))
+	newSha, _ := wire.NewShaHash(wire.DoubleSha256(sha[:]))
 	return newSha
 }
 
@@ -69,12 +69,12 @@ func HashMerkleBranches(left *btcwire.ShaHash, right *btcwire.ShaHash) *btcwire.
 // are calculated by concatenating the left node with itself before hashing.
 // Since this function uses nodes that are pointers to the hashes, empty nodes
 // will be nil.
-func BuildMerkleTreeStore(transactions []*btcutil.Tx) []*btcwire.ShaHash {
+func BuildMerkleTreeStore(transactions []*btcutil.Tx) []*wire.ShaHash {
 	// Calculate how many entries are required to hold the binary merkle
 	// tree as a linear array and create an array of that size.
 	nextPoT := nextPowerOfTwo(len(transactions))
 	arraySize := nextPoT*2 - 1
-	merkles := make([]*btcwire.ShaHash, arraySize)
+	merkles := make([]*wire.ShaHash, arraySize)
 
 	// Create the base transaction shas and populate the array with them.
 	for i, tx := range transactions {

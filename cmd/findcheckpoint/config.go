@@ -11,9 +11,9 @@ import (
 
 	"github.com/btcsuite/btcd/database"
 	_ "github.com/btcsuite/btcd/database/ldb"
+	"github.com/btcsuite/btcd/wire"
 	"github.com/btcsuite/btcnet"
 	"github.com/btcsuite/btcutil"
-	"github.com/btcsuite/btcwire"
 	flags "github.com/btcsuite/go-flags"
 )
 
@@ -59,14 +59,14 @@ func validDbType(dbType string) bool {
 // time of writing, btcd currently places blocks for testnet version 3 in the
 // data and log directory "testnet", which does not match the Name field of the
 // btcnet parameters.  This function can be used to override this directory name
-// as "testnet" when the passed active network matches btcwire.TestNet3.
+// as "testnet" when the passed active network matches wire.TestNet3.
 //
 // A proper upgrade to move the data and log directories for this network to
 // "testnet3" is planned for the future, at which point this function can be
 // removed and the network parameter's name used instead.
 func netName(netParams *btcnet.Params) string {
 	switch netParams.Net {
-	case btcwire.TestNet3:
+	case wire.TestNet3:
 		return "testnet"
 	default:
 		return netParams.Name

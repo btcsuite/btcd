@@ -7,8 +7,8 @@ package database
 import (
 	"errors"
 
+	"github.com/btcsuite/btcd/wire"
 	"github.com/btcsuite/btcutil"
-	"github.com/btcsuite/btcwire"
 	"golang.org/x/crypto/ripemd160"
 )
 
@@ -42,40 +42,40 @@ type Db interface {
 	// the given block.  It terminates any existing transaction and performs
 	// its operations in an atomic transaction which is commited before
 	// the function returns.
-	DropAfterBlockBySha(*btcwire.ShaHash) (err error)
+	DropAfterBlockBySha(*wire.ShaHash) (err error)
 
 	// ExistsSha returns whether or not the given block hash is present in
 	// the database.
-	ExistsSha(sha *btcwire.ShaHash) (exists bool, err error)
+	ExistsSha(sha *wire.ShaHash) (exists bool, err error)
 
 	// FetchBlockBySha returns a btcutil Block.  The implementation may
 	// cache the underlying data if desired.
-	FetchBlockBySha(sha *btcwire.ShaHash) (blk *btcutil.Block, err error)
+	FetchBlockBySha(sha *wire.ShaHash) (blk *btcutil.Block, err error)
 
 	// FetchBlockHeightBySha returns the block height for the given hash.
-	FetchBlockHeightBySha(sha *btcwire.ShaHash) (height int64, err error)
+	FetchBlockHeightBySha(sha *wire.ShaHash) (height int64, err error)
 
-	// FetchBlockHeaderBySha returns a btcwire.BlockHeader for the given
+	// FetchBlockHeaderBySha returns a wire.BlockHeader for the given
 	// sha.  The implementation may cache the underlying data if desired.
-	FetchBlockHeaderBySha(sha *btcwire.ShaHash) (bh *btcwire.BlockHeader, err error)
+	FetchBlockHeaderBySha(sha *wire.ShaHash) (bh *wire.BlockHeader, err error)
 
 	// FetchBlockShaByHeight returns a block hash based on its height in the
 	// block chain.
-	FetchBlockShaByHeight(height int64) (sha *btcwire.ShaHash, err error)
+	FetchBlockShaByHeight(height int64) (sha *wire.ShaHash, err error)
 
 	// FetchHeightRange looks up a range of blocks by the start and ending
 	// heights.  Fetch is inclusive of the start height and exclusive of the
 	// ending height. To fetch all hashes from the start height until no
 	// more are present, use the special id `AllShas'.
-	FetchHeightRange(startHeight, endHeight int64) (rshalist []btcwire.ShaHash, err error)
+	FetchHeightRange(startHeight, endHeight int64) (rshalist []wire.ShaHash, err error)
 
 	// ExistsTxSha returns whether or not the given tx hash is present in
 	// the database
-	ExistsTxSha(sha *btcwire.ShaHash) (exists bool, err error)
+	ExistsTxSha(sha *wire.ShaHash) (exists bool, err error)
 
 	// FetchTxBySha returns some data for the given transaction hash. The
 	// implementation may cache the underlying data if desired.
-	FetchTxBySha(txsha *btcwire.ShaHash) ([]*TxListReply, error)
+	FetchTxBySha(txsha *wire.ShaHash) ([]*TxListReply, error)
 
 	// FetchTxByShaList returns a TxListReply given an array of transaction
 	// hashes.  The implementation may cache the underlying data if desired.
@@ -86,7 +86,7 @@ type Db interface {
 	// return at least one TxListReply instance for each requested
 	// transaction.  Each TxListReply instance then contains an Err field
 	// which can be used to detect errors.
-	FetchTxByShaList(txShaList []*btcwire.ShaHash) []*TxListReply
+	FetchTxByShaList(txShaList []*wire.ShaHash) []*TxListReply
 
 	// FetchUnSpentTxByShaList returns a TxListReply given an array of
 	// transaction hashes.  The implementation may cache the underlying
@@ -97,7 +97,7 @@ type Db interface {
 	// return at least one TxListReply instance for each requested
 	// transaction.  Each TxListReply instance then contains an Err field
 	// which can be used to detect errors.
-	FetchUnSpentTxByShaList(txShaList []*btcwire.ShaHash) []*TxListReply
+	FetchUnSpentTxByShaList(txShaList []*wire.ShaHash) []*TxListReply
 
 	// InsertBlock inserts raw block and transaction data from a block
 	// into the database.  The first block inserted into the database
@@ -109,13 +109,13 @@ type Db interface {
 	// block of the block chain.  It will return the zero hash, -1 for
 	// the block height, and no error (nil) if there are not any blocks in
 	// the database yet.
-	NewestSha() (sha *btcwire.ShaHash, height int64, err error)
+	NewestSha() (sha *wire.ShaHash, height int64, err error)
 
 	// FetchAddrIndexTip returns the hash and block height of the most recent
 	// block which has had its address index populated. It will return
 	// ErrAddrIndexDoesNotExist along with a zero hash, and -1 if the
 	// addrindex hasn't yet been built up.
-	FetchAddrIndexTip() (sha *btcwire.ShaHash, height int64, err error)
+	FetchAddrIndexTip() (sha *wire.ShaHash, height int64, err error)
 
 	// UpdateAddrIndexForBlock updates the stored addrindex with passed
 	// index information for a particular block height. Additionally, it
@@ -124,7 +124,7 @@ type Db interface {
 	// transaction which is commited before the function returns.
 	// Addresses are indexed by the raw bytes of their base58 decoded
 	// hash160.
-	UpdateAddrIndexForBlock(blkSha *btcwire.ShaHash, height int64,
+	UpdateAddrIndexForBlock(blkSha *wire.ShaHash, height int64,
 		addrIndex BlockAddrIndex) error
 
 	// FetchTxsForAddr looks up and returns all transactions which either
@@ -159,9 +159,9 @@ type DriverDB struct {
 // TxListReply is used to return individual transaction information when
 // data about multiple transactions is requested in a single call.
 type TxListReply struct {
-	Sha     *btcwire.ShaHash
-	Tx      *btcwire.MsgTx
-	BlkSha  *btcwire.ShaHash
+	Sha     *wire.ShaHash
+	Tx      *wire.MsgTx
+	BlkSha  *wire.ShaHash
 	Height  int64
 	TxSpent []bool
 	Err     error
@@ -173,7 +173,7 @@ const AddrIndexKeySize = ripemd160.Size
 // BlockAddrIndex represents the indexing structure for addresses.
 // It maps a hash160 to a list of transaction locations within a block that
 // either pays to or spends from the passed UTXO for the hash160.
-type BlockAddrIndex map[[AddrIndexKeySize]byte][]*btcwire.TxLoc
+type BlockAddrIndex map[[AddrIndexKeySize]byte][]*wire.TxLoc
 
 // driverList holds all of the registered database backends.
 var driverList []DriverDB

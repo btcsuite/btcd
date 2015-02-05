@@ -17,9 +17,9 @@ import (
 	"github.com/btcsuite/btcd/database"
 	_ "github.com/btcsuite/btcd/database/ldb"
 	_ "github.com/btcsuite/btcd/database/memdb"
+	"github.com/btcsuite/btcd/wire"
 	"github.com/btcsuite/btcnet"
 	"github.com/btcsuite/btcutil"
-	"github.com/btcsuite/btcwire"
 )
 
 // testDbType is the database backend type to use for the tests.
@@ -161,14 +161,14 @@ func loadTxStore(filename string) (blockchain.TxStore, error) {
 			return nil, err
 		}
 		serializedTxLen := uintBuf
-		if serializedTxLen > btcwire.MaxBlockPayload {
+		if serializedTxLen > wire.MaxBlockPayload {
 			return nil, fmt.Errorf("Read serialized transaction "+
 				"length of %d is larger max allowed %d",
-				serializedTxLen, btcwire.MaxBlockPayload)
+				serializedTxLen, wire.MaxBlockPayload)
 		}
 
 		// Transaction.
-		var msgTx btcwire.MsgTx
+		var msgTx wire.MsgTx
 		err = msgTx.Deserialize(r)
 		if err != nil {
 			return nil, err

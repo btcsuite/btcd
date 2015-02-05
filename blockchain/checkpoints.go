@@ -8,9 +8,9 @@ import (
 	"fmt"
 
 	"github.com/btcsuite/btcd/txscript"
+	"github.com/btcsuite/btcd/wire"
 	"github.com/btcsuite/btcnet"
 	"github.com/btcsuite/btcutil"
-	"github.com/btcsuite/btcwire"
 )
 
 // CheckpointConfirmations is the number of blocks before the end of the current
@@ -18,11 +18,11 @@ import (
 const CheckpointConfirmations = 2016
 
 // newShaHashFromStr converts the passed big-endian hex string into a
-// btcwire.ShaHash.  It only differs from the one available in btcwire in that
+// wire.ShaHash.  It only differs from the one available in btcwire in that
 // it ignores the error since it will only (and must only) be called with
 // hard-coded, and therefore known good, hashes.
-func newShaHashFromStr(hexStr string) *btcwire.ShaHash {
-	sha, _ := btcwire.NewShaHashFromStr(hexStr)
+func newShaHashFromStr(hexStr string) *wire.ShaHash {
+	sha, _ := wire.NewShaHashFromStr(hexStr)
 	return sha
 }
 
@@ -59,7 +59,7 @@ func (b *BlockChain) LatestCheckpoint() *btcnet.Checkpoint {
 // verifyCheckpoint returns whether the passed block height and hash combination
 // match the hard-coded checkpoint data.  It also returns true if there is no
 // checkpoint data for the passed block height.
-func (b *BlockChain) verifyCheckpoint(height int64, hash *btcwire.ShaHash) bool {
+func (b *BlockChain) verifyCheckpoint(height int64, hash *wire.ShaHash) bool {
 	if b.noCheckpoints || len(b.netParams.Checkpoints) == 0 {
 		return true
 	}

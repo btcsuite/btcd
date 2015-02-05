@@ -7,14 +7,14 @@ package addrmgr
 import (
 	"time"
 
-	"github.com/btcsuite/btcwire"
+	"github.com/btcsuite/btcd/wire"
 )
 
 // KnownAddress tracks information about a known network address that is used
 // to determine how viable an address is.
 type KnownAddress struct {
-	na          *btcwire.NetAddress
-	srcAddr     *btcwire.NetAddress
+	na          *wire.NetAddress
+	srcAddr     *wire.NetAddress
 	attempts    int
 	lastattempt time.Time
 	lastsuccess time.Time
@@ -22,9 +22,9 @@ type KnownAddress struct {
 	refs        int // reference count of new buckets
 }
 
-// NetAddress returns the underlying btcwire.NetAddress associated with the
+// NetAddress returns the underlying wire.NetAddress associated with the
 // known address.
-func (ka *KnownAddress) NetAddress() *btcwire.NetAddress {
+func (ka *KnownAddress) NetAddress() *wire.NetAddress {
 	return ka.na
 }
 

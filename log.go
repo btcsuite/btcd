@@ -15,8 +15,8 @@ import (
 	"github.com/btcsuite/btcd/blockchain"
 	"github.com/btcsuite/btcd/database"
 	"github.com/btcsuite/btcd/txscript"
+	"github.com/btcsuite/btcd/wire"
 	"github.com/btcsuite/btclog"
-	"github.com/btcsuite/btcwire"
 	"github.com/btcsuite/seelog"
 )
 
@@ -219,7 +219,7 @@ func formatLockTime(lockTime uint32) string {
 }
 
 // invSummary returns an inventory message as a human-readable string.
-func invSummary(invList []*btcwire.InvVect) string {
+func invSummary(invList []*wire.InvVect) string {
 	// No inventory.
 	invLen := len(invList)
 	if invLen == 0 {
@@ -230,11 +230,11 @@ func invSummary(invList []*btcwire.InvVect) string {
 	if invLen == 1 {
 		iv := invList[0]
 		switch iv.Type {
-		case btcwire.InvTypeError:
+		case wire.InvTypeError:
 			return fmt.Sprintf("error %s", iv.Hash)
-		case btcwire.InvTypeBlock:
+		case wire.InvTypeBlock:
 			return fmt.Sprintf("block %s", iv.Hash)
-		case btcwire.InvTypeTx:
+		case wire.InvTypeTx:
 			return fmt.Sprintf("tx %s", iv.Hash)
 		}
 
@@ -246,7 +246,7 @@ func invSummary(invList []*btcwire.InvVect) string {
 }
 
 // locatorSummary returns a block locator as a human-readable string.
-func locatorSummary(locator []*btcwire.ShaHash, stopHash *btcwire.ShaHash) string {
+func locatorSummary(locator []*wire.ShaHash, stopHash *wire.ShaHash) string {
 	if len(locator) > 0 {
 		return fmt.Sprintf("locator %s, stop %s", locator[0], stopHash)
 	}
@@ -281,73 +281,73 @@ func sanitizeString(str string, maxLength uint) string {
 
 // messageSummary returns a human-readable string which summarizes a message.
 // Not all messages have or need a summary.  This is used for debug logging.
-func messageSummary(msg btcwire.Message) string {
+func messageSummary(msg wire.Message) string {
 	switch msg := msg.(type) {
-	case *btcwire.MsgVersion:
+	case *wire.MsgVersion:
 		return fmt.Sprintf("agent %s, pver %d, block %d",
 			msg.UserAgent, msg.ProtocolVersion, msg.LastBlock)
 
-	case *btcwire.MsgVerAck:
+	case *wire.MsgVerAck:
 		// No summary.
 
-	case *btcwire.MsgGetAddr:
+	case *wire.MsgGetAddr:
 		// No summary.
 
-	case *btcwire.MsgAddr:
+	case *wire.MsgAddr:
 		return fmt.Sprintf("%d addr", len(msg.AddrList))
 
-	case *btcwire.MsgPing:
+	case *wire.MsgPing:
 		// No summary - perhaps add nonce.
 
-	case *btcwire.MsgPong:
+	case *wire.MsgPong:
 		// No summary - perhaps add nonce.
 
-	case *btcwire.MsgAlert:
+	case *wire.MsgAlert:
 		// No summary.
 
-	case *btcwire.MsgMemPool:
+	case *wire.MsgMemPool:
 		// No summary.
 
-	case *btcwire.MsgTx:
+	case *wire.MsgTx:
 		hash, _ := msg.TxSha()
 		return fmt.Sprintf("hash %s, %d inputs, %d outputs, lock %s",
 			hash, len(msg.TxIn), len(msg.TxOut),
 			formatLockTime(msg.LockTime))
 
-	case *btcwire.MsgBlock:
+	case *wire.MsgBlock:
 		header := &msg.Header
 		hash, _ := msg.BlockSha()
 		return fmt.Sprintf("hash %s, ver %d, %d tx, %s", hash,
 			header.Version, len(msg.Transactions), header.Timestamp)
 
-	case *btcwire.MsgInv:
+	case *wire.MsgInv:
 		return invSummary(msg.InvList)
 
-	case *btcwire.MsgNotFound:
+	case *wire.MsgNotFound:
 		return invSummary(msg.InvList)
 
-	case *btcwire.MsgGetData:
+	case *wire.MsgGetData:
 		return invSummary(msg.InvList)
 
-	case *btcwire.MsgGetBlocks:
+	case *wire.MsgGetBlocks:
 		return locatorSummary(msg.BlockLocatorHashes, &msg.HashStop)
 
-	case *btcwire.MsgGetHeaders:
+	case *wire.MsgGetHeaders:
 		return locatorSummary(msg.BlockLocatorHashes, &msg.HashStop)
 
-	case *btcwire.MsgHeaders:
+	case *wire.MsgHeaders:
 		return fmt.Sprintf("num %d", len(msg.Headers))
 
-	case *btcwire.MsgReject:
+	case *wire.MsgReject:
 		// Ensure the variable length strings don't contain any
 		// characters which are even remotely dangerous such as HTML
 		// control characters, etc.  Also limit them to sane length for
 		// logging.
-		rejCommand := sanitizeString(msg.Cmd, btcwire.CommandSize)
+		rejCommand := sanitizeString(msg.Cmd, wire.CommandSize)
 		rejReason := sanitizeString(msg.Reason, maxRejectReasonLen)
 		summary := fmt.Sprintf("cmd %v, code %v, reason %v", rejCommand,
 			msg.Code, rejReason)
-		if rejCommand == btcwire.CmdBlock || rejCommand == btcwire.CmdTx {
+		if rejCommand == wire.CmdBlock || rejCommand == wire.CmdTx {
 			summary += fmt.Sprintf(", hash %v", msg.Hash)
 		}
 		return summary

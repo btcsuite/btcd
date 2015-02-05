@@ -29,11 +29,11 @@ import (
 	"github.com/btcsuite/btcd/blockchain"
 	"github.com/btcsuite/btcd/database"
 	"github.com/btcsuite/btcd/txscript"
+	"github.com/btcsuite/btcd/wire"
 	"github.com/btcsuite/btcec"
 	"github.com/btcsuite/btcjson"
 	"github.com/btcsuite/btcnet"
 	"github.com/btcsuite/btcutil"
-	"github.com/btcsuite/btcwire"
 	"github.com/btcsuite/btcws"
 	"github.com/btcsuite/fastsha256"
 	"github.com/btcsuite/websocket"
@@ -56,14 +56,14 @@ const (
 	// by length of the message in bits encoded as a big-endian uint64
 	// (8 bytes).  Thus, the resulting length is a multiple of the sha256
 	// block size (64 bytes).
-	getworkDataLen = (1 + ((btcwire.MaxBlockHeaderPayload + 8) /
+	getworkDataLen = (1 + ((wire.MaxBlockHeaderPayload + 8) /
 		fastsha256.BlockSize)) * fastsha256.BlockSize
 
 	// hash1Len is the length of the hash1 field of the getwork RPC.  It
 	// consists of a zero hash plus the internal sha256 padding.  See
 	// the getworkDataLen comment for details about the internal sha256
 	// padding format.
-	hash1Len = (1 + ((btcwire.HashSize + 8) / fastsha256.BlockSize)) *
+	hash1Len = (1 + ((wire.HashSize + 8) / fastsha256.BlockSize)) *
 		fastsha256.BlockSize
 
 	// gbtNonceRange is two 32-bit big-endian hexadecimal integers which
@@ -225,7 +225,7 @@ func builderScript(builder *txscript.ScriptBuilder) []byte {
 // workStateBlockInfo houses information about how to reconstruct a block given
 // its template and signature script.
 type workStateBlockInfo struct {
-	msgBlock        *btcwire.MsgBlock
+	msgBlock        *wire.MsgBlock
 	signatureScript []byte
 }
 
@@ -235,17 +235,17 @@ type workState struct {
 	sync.Mutex
 	lastTxUpdate  time.Time
 	lastGenerated time.Time
-	prevHash      *btcwire.ShaHash
-	msgBlock      *btcwire.MsgBlock
+	prevHash      *wire.ShaHash
+	msgBlock      *wire.MsgBlock
 	extraNonce    uint64
-	blockInfo     map[btcwire.ShaHash]*workStateBlockInfo
+	blockInfo     map[wire.ShaHash]*workStateBlockInfo
 }
 
 // newWorkState returns a new instance of a workState with all internal fields
 // initialized and ready to use.
 func newWorkState() *workState {
 	return &workState{
-		blockInfo: make(map[btcwire.ShaHash]*workStateBlockInfo),
+		blockInfo: make(map[wire.ShaHash]*workStateBlockInfo),
 	}
 }
 
@@ -255,10 +255,10 @@ type gbtWorkState struct {
 	sync.Mutex
 	lastTxUpdate  time.Time
 	lastGenerated time.Time
-	prevHash      *btcwire.ShaHash
+	prevHash      *wire.ShaHash
 	minTimestamp  time.Time
 	template      *BlockTemplate
-	notifyMap     map[btcwire.ShaHash]map[int64]chan struct{}
+	notifyMap     map[wire.ShaHash]map[int64]chan struct{}
 	timeSource    blockchain.MedianTimeSource
 }
 
@@ -266,7 +266,7 @@ type gbtWorkState struct {
 // fields initialized and ready to use.
 func newGbtWorkState(timeSource blockchain.MedianTimeSource) *gbtWorkState {
 	return &gbtWorkState{
-		notifyMap:  make(map[btcwire.ShaHash]map[int64]chan struct{}),
+		notifyMap:  make(map[wire.ShaHash]map[int64]chan struct{}),
 		timeSource: timeSource,
 	}
 }
@@ -727,7 +727,7 @@ func handleAddNode(s *rpcServer, cmd btcjson.Cmd, closeChan <-chan struct{}) (in
 
 // messageToHex serializes a message to the wire protocol encoding using the
 // latest protocol version and returns a hex-encoded string of the result.
-func messageToHex(msg btcwire.Message) (string, error) {
+func messageToHex(msg wire.Message) (string, error) {
 	var buf bytes.Buffer
 	err := msg.BtcEncode(&buf, maxProtocolVersion)
 	if err != nil {
@@ -745,9 +745,9 @@ func handleCreateRawTransaction(s *rpcServer, cmd btcjson.Cmd, closeChan <-chan 
 
 	// Add all transaction inputs to a new transaction after performing
 	// some validity checks.
-	mtx := btcwire.NewMsgTx()
+	mtx := wire.NewMsgTx()
 	for _, input := range c.Inputs {
-		txHash, err := btcwire.NewShaHashFromStr(input.Txid)
+		txHash, err := wire.NewShaHashFromStr(input.Txid)
 		if err != nil {
 			return nil, btcjson.ErrDecodeHexString
 		}
@@ -759,8 +759,8 @@ func handleCreateRawTransaction(s *rpcServer, cmd btcjson.Cmd, closeChan <-chan 
 			}
 		}
 
-		prevOut := btcwire.NewOutPoint(txHash, uint32(input.Vout))
-		txIn := btcwire.NewTxIn(prevOut, []byte{})
+		prevOut := wire.NewOutPoint(txHash, uint32(input.Vout))
+		txIn := wire.NewTxIn(prevOut, []byte{})
 		mtx.AddTxIn(txIn)
 	}
 
@@ -813,7 +813,7 @@ func handleCreateRawTransaction(s *rpcServer, cmd btcjson.Cmd, closeChan <-chan 
 			}
 		}
 
-		txOut := btcwire.NewTxOut(amount, pkScript)
+		txOut := wire.NewTxOut(amount, pkScript)
 		mtx.AddTxOut(txOut)
 	}
 
@@ -848,7 +848,7 @@ func handleDebugLevel(s *rpcServer, cmd btcjson.Cmd, closeChan <-chan struct{}) 
 
 // createVinList returns a slice of JSON objects for the inputs of the passed
 // transaction.
-func createVinList(mtx *btcwire.MsgTx) []btcjson.Vin {
+func createVinList(mtx *wire.MsgTx) []btcjson.Vin {
 	tx := btcutil.NewTx(mtx)
 	vinList := make([]btcjson.Vin, len(mtx.TxIn))
 	for i, v := range mtx.TxIn {
@@ -874,7 +874,7 @@ func createVinList(mtx *btcwire.MsgTx) []btcjson.Vin {
 
 // createVoutList returns a slice of JSON objects for the outputs of the passed
 // transaction.
-func createVoutList(mtx *btcwire.MsgTx, net *btcnet.Params) []btcjson.Vout {
+func createVoutList(mtx *wire.MsgTx, net *btcnet.Params) []btcjson.Vout {
 	voutList := make([]btcjson.Vout, len(mtx.TxOut))
 	for i, v := range mtx.TxOut {
 		voutList[i].N = uint32(i)
@@ -908,9 +908,9 @@ func createVoutList(mtx *btcwire.MsgTx, net *btcnet.Params) []btcjson.Vout {
 
 // createTxRawResult converts the passed transaction and associated parameters
 // to a raw transaction JSON object.
-func createTxRawResult(net *btcnet.Params, txSha string, mtx *btcwire.MsgTx,
+func createTxRawResult(net *btcnet.Params, txSha string, mtx *wire.MsgTx,
 	blk *btcutil.Block, maxidx int64,
-	blksha *btcwire.ShaHash) (*btcjson.TxRawResult, error) {
+	blksha *wire.ShaHash) (*btcjson.TxRawResult, error) {
 
 	mtxHex, err := messageToHex(mtx)
 	if err != nil {
@@ -957,7 +957,7 @@ func handleDecodeRawTransaction(s *rpcServer, cmd btcjson.Cmd, closeChan <-chan 
 				"string (not %q)", hexStr),
 		}
 	}
-	var mtx btcwire.MsgTx
+	var mtx wire.MsgTx
 	err = mtx.Deserialize(bytes.NewReader(serializedTx))
 	if err != nil {
 		return nil, btcjson.Error{
@@ -1144,7 +1144,7 @@ func handleGetBestBlockHash(s *rpcServer, cmd btcjson.Cmd, closeChan <-chan stru
 // handleGetBlock implements the getblock command.
 func handleGetBlock(s *rpcServer, cmd btcjson.Cmd, closeChan <-chan struct{}) (interface{}, error) {
 	c := cmd.(*btcjson.GetBlockCmd)
-	sha, err := btcwire.NewShaHashFromStr(c.Hash)
+	sha, err := wire.NewShaHashFromStr(c.Hash)
 	if err != nil {
 		rpcsLog.Errorf("Error generating sha: %v", err)
 		return nil, btcjson.ErrBlockNotFound
@@ -1225,7 +1225,7 @@ func handleGetBlock(s *rpcServer, cmd btcjson.Cmd, closeChan <-chan struct{}) (i
 
 	// Get next block unless we are already at the top.
 	if idx < maxidx {
-		var shaNext *btcwire.ShaHash
+		var shaNext *wire.ShaHash
 		shaNext, err = s.server.db.FetchBlockShaByHeight(int64(idx + 1))
 		if err != nil {
 			rpcsLog.Errorf("No next block: %v", err)
@@ -1262,7 +1262,7 @@ func handleGetBlockHash(s *rpcServer, cmd btcjson.Cmd, closeChan <-chan struct{}
 
 // encodeTemplateID encodes the passed details into an ID that can be used to
 // uniquely identify a block template.
-func encodeTemplateID(prevHash *btcwire.ShaHash, lastGenerated time.Time) string {
+func encodeTemplateID(prevHash *wire.ShaHash, lastGenerated time.Time) string {
 	return fmt.Sprintf("%s-%d", prevHash.String(), lastGenerated.Unix())
 }
 
@@ -1271,13 +1271,13 @@ func encodeTemplateID(prevHash *btcwire.ShaHash, lastGenerated time.Time) string
 // that are using long polling for block templates.  The ID consists of the
 // previous block hash for the associated template and the time the associated
 // template was generated.
-func decodeTemplateID(templateID string) (*btcwire.ShaHash, int64, error) {
+func decodeTemplateID(templateID string) (*wire.ShaHash, int64, error) {
 	fields := strings.Split(templateID, "-")
 	if len(fields) != 2 {
 		return nil, 0, errors.New("invalid longpollid format")
 	}
 
-	prevHash, err := btcwire.NewShaHashFromStr(fields[0])
+	prevHash, err := wire.NewShaHashFromStr(fields[0])
 	if err != nil {
 		return nil, 0, errors.New("invalid longpollid format")
 	}
@@ -1293,7 +1293,7 @@ func decodeTemplateID(templateID string) (*btcwire.ShaHash, int64, error) {
 // notified when block templates are stale.
 //
 // This function MUST be called with the state locked.
-func (state *gbtWorkState) notifyLongPollers(latestHash *btcwire.ShaHash, lastGenerated time.Time) {
+func (state *gbtWorkState) notifyLongPollers(latestHash *wire.ShaHash, lastGenerated time.Time) {
 	// Notify anything that is waiting for a block template update from a
 	// hash which is not the hash of the tip of the best chain since their
 	// work is now invalid.
@@ -1340,7 +1340,7 @@ func (state *gbtWorkState) notifyLongPollers(latestHash *btcwire.ShaHash, lastGe
 // NotifyBlockConnected uses the newly-connected block to notify any long poll
 // clients with a new block template when their existing block template is
 // stale due to the newly connected block.
-func (state *gbtWorkState) NotifyBlockConnected(blockSha *btcwire.ShaHash) {
+func (state *gbtWorkState) NotifyBlockConnected(blockSha *wire.ShaHash) {
 	go func() {
 		state.Lock()
 		defer state.Unlock()
@@ -1379,7 +1379,7 @@ func (state *gbtWorkState) NotifyMempoolTx(lastUpdated time.Time) {
 // without requiring a different channel for each client.
 //
 // This function MUST be called with the state locked.
-func (state *gbtWorkState) templateUpdateChan(prevHash *btcwire.ShaHash, lastGenerated int64) chan struct{} {
+func (state *gbtWorkState) templateUpdateChan(prevHash *wire.ShaHash, lastGenerated int64) chan struct{} {
 	// Either get the current list of channels waiting for updates about
 	// changes to block template for the previous hash or create a new one.
 	channels, ok := state.notifyMap[*prevHash]
@@ -1422,7 +1422,7 @@ func (state *gbtWorkState) updateBlockTemplate(s *rpcServer, useCoinbaseValue bo
 	// changed or the transactions in the memory pool have been updated and
 	// it has been at least gbtRegenerateSecond since the last template was
 	// generated.
-	var msgBlock *btcwire.MsgBlock
+	var msgBlock *wire.MsgBlock
 	var targetDifficulty string
 	latestHash, _ := s.server.blockManager.chainState.Best()
 	template := state.template
@@ -1577,7 +1577,7 @@ func (state *gbtWorkState) blockTemplateResult(useCoinbaseValue bool, submitOld 
 	// the adjustments to the various lengths and indices.
 	numTx := len(msgBlock.Transactions)
 	transactions := make([]btcjson.GetBlockTemplateResultTx, 0, numTx-1)
-	txIndex := make(map[btcwire.ShaHash]int64, numTx)
+	txIndex := make(map[wire.ShaHash]int64, numTx)
 	for i, tx := range msgBlock.Transactions {
 		txHash, _ := tx.TxSha()
 		txIndex[txHash] = int64(i)
@@ -1635,7 +1635,7 @@ func (state *gbtWorkState) blockTemplateResult(useCoinbaseValue bool, submitOld 
 		Height:       template.height,
 		PreviousHash: header.PrevBlock.String(),
 		SigOpLimit:   blockchain.MaxSigOpsPerBlock,
-		SizeLimit:    btcwire.MaxBlockPayload,
+		SizeLimit:    wire.MaxBlockPayload,
 		Transactions: transactions,
 		Version:      header.Version,
 		LongPollID:   templateID,
@@ -1982,7 +1982,7 @@ func handleGetBlockTemplateProposal(s *rpcServer, request *btcjson.TemplateReque
 				"hexadecimal string (not %q)", hexData),
 		}
 	}
-	var msgBlock btcwire.MsgBlock
+	var msgBlock wire.MsgBlock
 	if err := msgBlock.Deserialize(bytes.NewReader(dataBytes)); err != nil {
 		return nil, btcjson.Error{
 			Code:    btcjson.ErrDeserialization.Code,
@@ -2343,7 +2343,7 @@ func handleGetRawTransaction(s *rpcServer, cmd btcjson.Cmd, closeChan <-chan str
 	c := cmd.(*btcjson.GetRawTransactionCmd)
 
 	// Convert the provided transaction hash hex to a ShaHash.
-	txSha, err := btcwire.NewShaHashFromStr(c.Txid)
+	txSha, err := wire.NewShaHashFromStr(c.Txid)
 	if err != nil {
 		rpcsLog.Errorf("Error generating sha: %v", err)
 		return nil, btcjson.Error{
@@ -2354,8 +2354,8 @@ func handleGetRawTransaction(s *rpcServer, cmd btcjson.Cmd, closeChan <-chan str
 
 	// Try to fetch the transaction from the memory pool and if that fails,
 	// try the block database.
-	var mtx *btcwire.MsgTx
-	var blksha *btcwire.ShaHash
+	var mtx *wire.MsgTx
+	var blksha *wire.ShaHash
 	tx, err := s.server.txMemPool.FetchTransaction(txSha)
 	if err != nil {
 		txList, err := s.server.db.FetchTxBySha(txSha)
@@ -2450,7 +2450,7 @@ func handleGetTxOut(s *rpcServer, cmd btcjson.Cmd, closeChan <-chan struct{}) (i
 	c := cmd.(*btcjson.GetTxOutCmd)
 
 	// Convert the provided transaction hash hex to a ShaHash.
-	txSha, err := btcwire.NewShaHashFromStr(c.Txid)
+	txSha, err := wire.NewShaHashFromStr(c.Txid)
 	if err != nil {
 		return nil, btcjson.Error{
 			Code: btcjson.ErrInvalidParameter.Code,
@@ -2461,7 +2461,7 @@ func handleGetTxOut(s *rpcServer, cmd btcjson.Cmd, closeChan <-chan struct{}) (i
 
 	// If requested and the tx is available in the mempool try to fetch it from
 	// there, otherwise attempt to fetch from the block database.
-	var mtx *btcwire.MsgTx
+	var mtx *wire.MsgTx
 	var bestBlockSha string
 	var confirmations int64
 	var dbSpentInfo []bool
@@ -2571,7 +2571,7 @@ func handleGetWorkRequest(s *rpcServer) (interface{}, error) {
 		// variations if the best block changed.
 		if state.prevHash != nil && !state.prevHash.IsEqual(latestHash) {
 			state.extraNonce = 0
-			state.blockInfo = make(map[btcwire.ShaHash]*workStateBlockInfo)
+			state.blockInfo = make(map[wire.ShaHash]*workStateBlockInfo)
 		}
 
 		// Reset the previous best hash the block template was generated
@@ -2690,17 +2690,17 @@ func handleGetWorkRequest(s *rpcServer) (interface{}, error) {
 	// caller to make use of only the second chunk along with the midstate
 	// for the first chunk.
 	data = data[:getworkDataLen]
-	data[btcwire.MaxBlockHeaderPayload] = 0x80
+	data[wire.MaxBlockHeaderPayload] = 0x80
 	binary.BigEndian.PutUint64(data[len(data)-8:],
-		btcwire.MaxBlockHeaderPayload*8)
+		wire.MaxBlockHeaderPayload*8)
 
 	// Create the hash1 field which is a zero hash along with the internal
 	// sha256 padding as described above.  This field is really quite
 	// useless, but it is required for compatibility with the reference
 	// implementation.
 	var hash1 [hash1Len]byte
-	hash1[btcwire.HashSize] = 0x80
-	binary.BigEndian.PutUint64(hash1[len(hash1)-8:], btcwire.HashSize*8)
+	hash1[wire.HashSize] = 0x80
+	binary.BigEndian.PutUint64(hash1[len(hash1)-8:], wire.HashSize*8)
 
 	// The final result reverses the each of the fields to little endian.
 	// In particular, the data, hash1, and midstate fields are treated as
@@ -2759,8 +2759,8 @@ func handleGetWorkSubmission(s *rpcServer, hexData string) (interface{}, error) 
 	reverseUint32Array(data)
 
 	// Deserialize the block header from the data.
-	var submittedHeader btcwire.BlockHeader
-	bhBuf := bytes.NewReader(data[0:btcwire.MaxBlockHeaderPayload])
+	var submittedHeader wire.BlockHeader
+	bhBuf := bytes.NewReader(data[0:wire.MaxBlockHeaderPayload])
 	err = submittedHeader.Deserialize(bhBuf)
 	if err != nil {
 		return false, btcjson.Error{
@@ -2937,12 +2937,12 @@ func handleHelp(s *rpcServer, cmd btcjson.Cmd, closeChan <-chan struct{}) (inter
 // handlePing implements the ping command.
 func handlePing(s *rpcServer, cmd btcjson.Cmd, closeChan <-chan struct{}) (interface{}, error) {
 	// Ask server to ping \o_
-	nonce, err := btcwire.RandomUint64()
+	nonce, err := wire.RandomUint64()
 	if err != nil {
 		return nil, fmt.Errorf("Not sending ping - can not generate "+
 			"nonce: %v", err)
 	}
-	s.server.BroadcastMessage(btcwire.NewMsgPing(nonce))
+	s.server.BroadcastMessage(wire.NewMsgPing(nonce))
 
 	return nil, nil
 }
@@ -2963,7 +2963,7 @@ func handleSendRawTransaction(s *rpcServer, cmd btcjson.Cmd, closeChan <-chan st
 				"string (not %q)", hexStr),
 		}
 	}
-	msgtx := btcwire.NewMsgTx()
+	msgtx := wire.NewMsgTx()
 	err = msgtx.Deserialize(bytes.NewReader(serializedTx))
 	if err != nil {
 		err := btcjson.Error{
@@ -2998,7 +2998,7 @@ func handleSendRawTransaction(s *rpcServer, cmd btcjson.Cmd, closeChan <-chan st
 
 	// We keep track of all the sendrawtransaction request txs so that we
 	// can rebroadcast them if they don't make their way into a block.
-	iv := btcwire.NewInvVect(btcwire.InvTypeTx, tx.Sha())
+	iv := wire.NewInvVect(wire.InvTypeTx, tx.Sha())
 	s.server.AddRebroadcastInventory(iv, tx)
 
 	return tx.Sha().String(), nil
@@ -3188,7 +3188,7 @@ func handleVerifyMessage(s *rpcServer, cmd btcjson.Cmd, closeChan <-chan struct{
 	// Validate the signature - this just shows that it was valid at all.
 	// we will compare it with the key next.
 	pk, wasCompressed, err := btcec.RecoverCompact(btcec.S256(), sig,
-		btcwire.DoubleSha256([]byte("Bitcoin Signed Message:\n"+c.Message)))
+		wire.DoubleSha256([]byte("Bitcoin Signed Message:\n"+c.Message)))
 	if err != nil {
 		// Mirror Bitcoin Core behavior, which treats error in RecoverCompact as
 		// invalid signature.

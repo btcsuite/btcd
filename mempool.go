@@ -16,8 +16,8 @@ import (
 	"github.com/btcsuite/btcd/blockchain"
 	"github.com/btcsuite/btcd/database"
 	"github.com/btcsuite/btcd/txscript"
+	"github.com/btcsuite/btcd/wire"
 	"github.com/btcsuite/btcutil"
-	"github.com/btcsuite/btcwire"
 )
 
 const (
@@ -29,7 +29,7 @@ const (
 	// that can be queued.  At the time this comment was written, this
 	// equates to 10,000 transactions, but will increase if the max allowed
 	// block payload increases.
-	maxOrphanTransactions = btcwire.MaxBlockPayload / 100
+	maxOrphanTransactions = wire.MaxBlockPayload / 100
 
 	// maxOrphanTxSize is the maximum size allowed for orphan transactions.
 	// This helps prevent memory exhaustion attacks from sending a lot of
@@ -94,10 +94,10 @@ type TxDesc struct {
 type txMemPool struct {
 	sync.RWMutex
 	server        *server
-	pool          map[btcwire.ShaHash]*TxDesc
-	orphans       map[btcwire.ShaHash]*btcutil.Tx
-	orphansByPrev map[btcwire.ShaHash]*list.List
-	outpoints     map[btcwire.OutPoint]*btcutil.Tx
+	pool          map[wire.ShaHash]*TxDesc
+	orphans       map[wire.ShaHash]*btcutil.Tx
+	orphansByPrev map[wire.ShaHash]*list.List
+	outpoints     map[wire.OutPoint]*btcutil.Tx
 	lastUpdated   time.Time // last time pool was updated
 	pennyTotal    float64   // exponentially decaying total for penny spends.
 	lastPennyUnix int64     // unix time of last ``penny spend''
@@ -107,7 +107,7 @@ type txMemPool struct {
 // considered dust or not.  Dust is defined in terms of the minimum transaction
 // relay fee.  In particular, if the cost to the network to spend coins is more
 // than 1/3 of the minimum transaction relay fee, it is considered dust.
-func isDust(txOut *btcwire.TxOut) bool {
+func isDust(txOut *wire.TxOut) bool {
 	// The total serialized size consists of the output and the associated
 	// input script to redeem it.  Since there is no input script
 	// to redeem it yet, use the minimum size of a typical input script.
@@ -179,38 +179,38 @@ func checkPkScriptStandard(pkScript []byte, scriptClass txscript.ScriptClass) er
 		if err != nil {
 			str := fmt.Sprintf("multi-signature script parse "+
 				"failure: %v", err)
-			return txRuleError(btcwire.RejectNonstandard, str)
+			return txRuleError(wire.RejectNonstandard, str)
 		}
 
 		// A standard multi-signature public key script must contain
 		// from 1 to maxStandardMultiSigKeys public keys.
 		if numPubKeys < 1 {
 			str := "multi-signature script with no pubkeys"
-			return txRuleError(btcwire.RejectNonstandard, str)
+			return txRuleError(wire.RejectNonstandard, str)
 		}
 		if numPubKeys > maxStandardMultiSigKeys {
 			str := fmt.Sprintf("multi-signature script with %d "+
 				"public keys which is more than the allowed "+
 				"max of %d", numPubKeys, maxStandardMultiSigKeys)
-			return txRuleError(btcwire.RejectNonstandard, str)
+			return txRuleError(wire.RejectNonstandard, str)
 		}
 
 		// A standard multi-signature public key script must have at
 		// least 1 signature and no more signatures than available
 		// public keys.
 		if numSigs < 1 {
-			return txRuleError(btcwire.RejectNonstandard,
+			return txRuleError(wire.RejectNonstandard,
 				"multi-signature script with no signatures")
 		}
 		if numSigs > numPubKeys {
 			str := fmt.Sprintf("multi-signature script with %d "+
 				"signatures which is more than the available "+
 				"%d public keys", numSigs, numPubKeys)
-			return txRuleError(btcwire.RejectNonstandard, str)
+			return txRuleError(wire.RejectNonstandard, str)
 		}
 
 	case txscript.NonStandardTy:
-		return txRuleError(btcwire.RejectNonstandard,
+		return txRuleError(wire.RejectNonstandard,
 			"non-standard script form")
 	}
 
@@ -228,17 +228,17 @@ func checkTransactionStandard(tx *btcutil.Tx, height int64) error {
 	msgTx := tx.MsgTx()
 
 	// The transaction must be a currently supported version.
-	if msgTx.Version > btcwire.TxVersion || msgTx.Version < 1 {
+	if msgTx.Version > wire.TxVersion || msgTx.Version < 1 {
 		str := fmt.Sprintf("transaction version %d is not in the "+
 			"valid range of %d-%d", msgTx.Version, 1,
-			btcwire.TxVersion)
-		return txRuleError(btcwire.RejectNonstandard, str)
+			wire.TxVersion)
+		return txRuleError(wire.RejectNonstandard, str)
 	}
 
 	// The transaction must be finalized to be standard and therefore
 	// considered for inclusion in a block.
 	if !blockchain.IsFinalizedTransaction(tx, height, time.Now()) {
-		return txRuleError(btcwire.RejectNonstandard,
+		return txRuleError(wire.RejectNonstandard,
 			"transaction is not finalized")
 	}
 
@@ -250,7 +250,7 @@ func checkTransactionStandard(tx *btcutil.Tx, height int64) error {
 	if serializedLen > maxStandardTxSize {
 		str := fmt.Sprintf("transaction size of %v is larger than max "+
 			"allowed size of %v", serializedLen, maxStandardTxSize)
-		return txRuleError(btcwire.RejectNonstandard, str)
+		return txRuleError(wire.RejectNonstandard, str)
 	}
 
 	for i, txIn := range msgTx.TxIn {
@@ -263,7 +263,7 @@ func checkTransactionStandard(tx *btcutil.Tx, height int64) error {
 				"script size of %d bytes is large than max "+
 				"allowed size of %d bytes", i, sigScriptLen,
 				maxStandardSigScriptSize)
-			return txRuleError(btcwire.RejectNonstandard, str)
+			return txRuleError(wire.RejectNonstandard, str)
 		}
 
 		// Each transaction input signature script must only contain
@@ -271,7 +271,7 @@ func checkTransactionStandard(tx *btcutil.Tx, height int64) error {
 		if !txscript.IsPushOnlyScript(txIn.SignatureScript) {
 			str := fmt.Sprintf("transaction input %d: signature "+
 				"script is not push only", i)
-			return txRuleError(btcwire.RejectNonstandard, str)
+			return txRuleError(wire.RejectNonstandard, str)
 		}
 
 		// Each transaction input signature script must only contain
@@ -281,7 +281,7 @@ func checkTransactionStandard(tx *btcutil.Tx, height int64) error {
 		if !txscript.HasCanonicalPushes(txIn.SignatureScript) {
 			str := fmt.Sprintf("transaction input %d: signature "+
 				"script has a non-canonical data push", i)
-			return txRuleError(btcwire.RejectNonstandard, str)
+			return txRuleError(wire.RejectNonstandard, str)
 		}
 	}
 
@@ -297,7 +297,7 @@ func checkTransactionStandard(tx *btcutil.Tx, height int64) error {
 			// a non standard error.
 			rejectCode, found := extractRejectCode(err)
 			if !found {
-				rejectCode = btcwire.RejectNonstandard
+				rejectCode = wire.RejectNonstandard
 			}
 			str := fmt.Sprintf("transaction output %d: %v", i, err)
 			return txRuleError(rejectCode, str)
@@ -311,7 +311,7 @@ func checkTransactionStandard(tx *btcutil.Tx, height int64) error {
 		} else if isDust(txOut) {
 			str := fmt.Sprintf("transaction output %d: payment "+
 				"of %d is dust", i, txOut.Value)
-			return txRuleError(btcwire.RejectDust, str)
+			return txRuleError(wire.RejectDust, str)
 		}
 	}
 
@@ -319,7 +319,7 @@ func checkTransactionStandard(tx *btcutil.Tx, height int64) error {
 	// only carries data.
 	if numNullDataOutputs > 1 {
 		str := "more than one transaction output in a nulldata script"
-		return txRuleError(btcwire.RejectNonstandard, str)
+		return txRuleError(wire.RejectNonstandard, str)
 	}
 
 	return nil
@@ -351,7 +351,7 @@ func checkInputsStandard(tx *btcutil.Tx, txStore blockchain.TxStore) error {
 		if err != nil {
 			str := fmt.Sprintf("transaction input #%d script parse "+
 				"failure: %v", i, err)
-			return txRuleError(btcwire.RejectNonstandard, str)
+			return txRuleError(wire.RejectNonstandard, str)
 		}
 
 		// A negative value for expected inputs indicates the script is
@@ -359,7 +359,7 @@ func checkInputsStandard(tx *btcutil.Tx, txStore blockchain.TxStore) error {
 		if scriptInfo.ExpectedInputs < 0 {
 			str := fmt.Sprintf("transaction input #%d expects %d "+
 				"inputs", i, scriptInfo.ExpectedInputs)
-			return txRuleError(btcwire.RejectNonstandard, str)
+			return txRuleError(wire.RejectNonstandard, str)
 		}
 
 		// The script pair is non-standard if the number of available
@@ -369,7 +369,7 @@ func checkInputsStandard(tx *btcutil.Tx, txStore blockchain.TxStore) error {
 				"inputs, but referenced output script provides "+
 				"%d", i, scriptInfo.ExpectedInputs,
 				scriptInfo.NumInputs)
-			return txRuleError(btcwire.RejectNonstandard, str)
+			return txRuleError(wire.RejectNonstandard, str)
 		}
 	}
 
@@ -400,7 +400,7 @@ func calcMinRequiredTxRelayFee(serializedSize int64) int64 {
 // removeOrphan is the internal function which implements the public
 // RemoveOrphan.  See the comment for RemoveOrphan for more details.
 // This function MUST be called with the mempool lock held (for writes).
-func (mp *txMemPool) removeOrphan(txHash *btcwire.ShaHash) {
+func (mp *txMemPool) removeOrphan(txHash *wire.ShaHash) {
 	// Nothing to do if passed tx is not an orphan.
 	tx, exists := mp.orphans[*txHash]
 	if !exists {
@@ -433,7 +433,7 @@ func (mp *txMemPool) removeOrphan(txHash *btcwire.ShaHash) {
 // RemoveOrphan removes the passed orphan transaction from the orphan pool and
 // previous orphan index.
 // This function is safe for concurrent access.
-func (mp *txMemPool) RemoveOrphan(txHash *btcwire.ShaHash) {
+func (mp *txMemPool) RemoveOrphan(txHash *wire.ShaHash) {
 	mp.Lock()
 	mp.removeOrphan(txHash)
 	mp.Unlock()
@@ -446,7 +446,7 @@ func (mp *txMemPool) RemoveOrphan(txHash *btcwire.ShaHash) {
 func (mp *txMemPool) limitNumOrphans() error {
 	if len(mp.orphans)+1 > maxOrphanTransactions {
 		// Generate a cryptographically random hash.
-		randHashBytes := make([]byte, btcwire.HashSize)
+		randHashBytes := make([]byte, wire.HashSize)
 		_, err := rand.Read(randHashBytes)
 		if err != nil {
 			return err
@@ -458,7 +458,7 @@ func (mp *txMemPool) limitNumOrphans() error {
 		// to Go's range statement over maps) as a fallback if none of
 		// the hashes in the orphan pool are larger than the random
 		// hash.
-		var foundHash *btcwire.ShaHash
+		var foundHash *wire.ShaHash
 		for txHash := range mp.orphans {
 			if foundHash == nil {
 				foundHash = &txHash
@@ -516,7 +516,7 @@ func (mp *txMemPool) maybeAddOrphan(tx *btcutil.Tx) error {
 		str := fmt.Sprintf("orphan transaction size of %d bytes is "+
 			"larger than max allowed size of %d bytes",
 			serializedLen, maxOrphanTxSize)
-		return txRuleError(btcwire.RejectNonstandard, str)
+		return txRuleError(wire.RejectNonstandard, str)
 	}
 
 	// Add the orphan if the none of the above disqualified it.
@@ -529,7 +529,7 @@ func (mp *txMemPool) maybeAddOrphan(tx *btcutil.Tx) error {
 // exists in the main pool.
 //
 // This function MUST be called with the mempool lock held (for reads).
-func (mp *txMemPool) isTransactionInPool(hash *btcwire.ShaHash) bool {
+func (mp *txMemPool) isTransactionInPool(hash *wire.ShaHash) bool {
 	if _, exists := mp.pool[*hash]; exists {
 		return true
 	}
@@ -541,7 +541,7 @@ func (mp *txMemPool) isTransactionInPool(hash *btcwire.ShaHash) bool {
 // exists in the main pool.
 //
 // This function is safe for concurrent access.
-func (mp *txMemPool) IsTransactionInPool(hash *btcwire.ShaHash) bool {
+func (mp *txMemPool) IsTransactionInPool(hash *wire.ShaHash) bool {
 	// Protect concurrent access.
 	mp.RLock()
 	defer mp.RUnlock()
@@ -553,7 +553,7 @@ func (mp *txMemPool) IsTransactionInPool(hash *btcwire.ShaHash) bool {
 // in the orphan pool.
 //
 // This function MUST be called with the mempool lock held (for reads).
-func (mp *txMemPool) isOrphanInPool(hash *btcwire.ShaHash) bool {
+func (mp *txMemPool) isOrphanInPool(hash *wire.ShaHash) bool {
 	if _, exists := mp.orphans[*hash]; exists {
 		return true
 	}
@@ -565,7 +565,7 @@ func (mp *txMemPool) isOrphanInPool(hash *btcwire.ShaHash) bool {
 // in the orphan pool.
 //
 // This function is safe for concurrent access.
-func (mp *txMemPool) IsOrphanInPool(hash *btcwire.ShaHash) bool {
+func (mp *txMemPool) IsOrphanInPool(hash *wire.ShaHash) bool {
 	// Protect concurrent access.
 	mp.RLock()
 	defer mp.RUnlock()
@@ -577,7 +577,7 @@ func (mp *txMemPool) IsOrphanInPool(hash *btcwire.ShaHash) bool {
 // in the main pool or in the orphan pool.
 //
 // This function MUST be called with the mempool lock held (for reads).
-func (mp *txMemPool) haveTransaction(hash *btcwire.ShaHash) bool {
+func (mp *txMemPool) haveTransaction(hash *wire.ShaHash) bool {
 	return mp.isTransactionInPool(hash) || mp.isOrphanInPool(hash)
 }
 
@@ -585,7 +585,7 @@ func (mp *txMemPool) haveTransaction(hash *btcwire.ShaHash) bool {
 // in the main pool or in the orphan pool.
 //
 // This function is safe for concurrent access.
-func (mp *txMemPool) HaveTransaction(hash *btcwire.ShaHash) bool {
+func (mp *txMemPool) HaveTransaction(hash *wire.ShaHash) bool {
 	// Protect concurrent access.
 	mp.RLock()
 	defer mp.RUnlock()
@@ -601,7 +601,7 @@ func (mp *txMemPool) removeTransaction(tx *btcutil.Tx) {
 	// Remove any transactions which rely on this one.
 	txHash := tx.Sha()
 	for i := uint32(0); i < uint32(len(tx.MsgTx().TxOut)); i++ {
-		outpoint := btcwire.NewOutPoint(txHash, i)
+		outpoint := wire.NewOutPoint(txHash, i)
 		if txRedeemer, exists := mp.outpoints[*outpoint]; exists {
 			mp.removeTransaction(txRedeemer)
 		}
@@ -744,7 +744,7 @@ func (mp *txMemPool) checkPoolDoubleSpend(tx *btcutil.Tx) error {
 			str := fmt.Sprintf("output %v already spent by "+
 				"transaction %v in the memory pool",
 				txIn.PreviousOutPoint, txR.Sha())
-			return txRuleError(btcwire.RejectDuplicate, str)
+			return txRuleError(wire.RejectDuplicate, str)
 		}
 	}
 
@@ -783,7 +783,7 @@ func (mp *txMemPool) fetchInputTransactions(tx *btcutil.Tx) (blockchain.TxStore,
 // orphans.
 //
 // This function is safe for concurrent access.
-func (mp *txMemPool) FetchTransaction(txHash *btcwire.ShaHash) (*btcutil.Tx, error) {
+func (mp *txMemPool) FetchTransaction(txHash *wire.ShaHash) (*btcutil.Tx, error) {
 	// Protect concurrent access.
 	mp.RLock()
 	defer mp.RUnlock()
@@ -800,7 +800,7 @@ func (mp *txMemPool) FetchTransaction(txHash *btcwire.ShaHash) (*btcutil.Tx, err
 // more details.
 //
 // This function MUST be called with the mempool lock held (for writes).
-func (mp *txMemPool) maybeAcceptTransaction(tx *btcutil.Tx, isNew, rateLimit bool) ([]*btcwire.ShaHash, error) {
+func (mp *txMemPool) maybeAcceptTransaction(tx *btcutil.Tx, isNew, rateLimit bool) ([]*wire.ShaHash, error) {
 	txHash := tx.Sha()
 
 	// Don't accept the transaction if it already exists in the pool.  This
@@ -808,7 +808,7 @@ func (mp *txMemPool) maybeAcceptTransaction(tx *btcutil.Tx, isNew, rateLimit boo
 	// be a quick check to weed out duplicates.
 	if mp.haveTransaction(txHash) {
 		str := fmt.Sprintf("already have transaction %v", txHash)
-		return nil, txRuleError(btcwire.RejectDuplicate, str)
+		return nil, txRuleError(wire.RejectDuplicate, str)
 	}
 
 	// Perform preliminary sanity checks on the transaction.  This makes
@@ -826,7 +826,7 @@ func (mp *txMemPool) maybeAcceptTransaction(tx *btcutil.Tx, isNew, rateLimit boo
 	if blockchain.IsCoinBase(tx) {
 		str := fmt.Sprintf("transaction %v is an individual coinbase",
 			txHash)
-		return nil, txRuleError(btcwire.RejectInvalid, str)
+		return nil, txRuleError(wire.RejectInvalid, str)
 	}
 
 	// Don't accept transactions with a lock time after the maximum int32
@@ -836,7 +836,7 @@ func (mp *txMemPool) maybeAcceptTransaction(tx *btcutil.Tx, isNew, rateLimit boo
 	if tx.MsgTx().LockTime > math.MaxInt32 {
 		str := fmt.Sprintf("transaction %v has a lock time after "+
 			"2038 which is not accepted yet", txHash)
-		return nil, txRuleError(btcwire.RejectNonstandard, str)
+		return nil, txRuleError(wire.RejectNonstandard, str)
 	}
 
 	// Get the current height of the main chain.  A standalone transaction
@@ -860,7 +860,7 @@ func (mp *txMemPool) maybeAcceptTransaction(tx *btcutil.Tx, isNew, rateLimit boo
 			// a non standard error.
 			rejectCode, found := extractRejectCode(err)
 			if !found {
-				rejectCode = btcwire.RejectNonstandard
+				rejectCode = wire.RejectNonstandard
 			}
 			str := fmt.Sprintf("transaction %v is not standard: %v",
 				txHash, err)
@@ -898,7 +898,7 @@ func (mp *txMemPool) maybeAcceptTransaction(tx *btcutil.Tx, isNew, rateLimit boo
 	if txD, exists := txStore[*txHash]; exists && txD.Err == nil {
 		for _, isOutputSpent := range txD.Spent {
 			if !isOutputSpent {
-				return nil, txRuleError(btcwire.RejectDuplicate,
+				return nil, txRuleError(wire.RejectDuplicate,
 					"transaction already exists")
 			}
 		}
@@ -909,7 +909,7 @@ func (mp *txMemPool) maybeAcceptTransaction(tx *btcutil.Tx, isNew, rateLimit boo
 	// don't exist.  Adding orphans to the orphan pool is not handled by
 	// this function, and the caller should use maybeAddOrphan if this
 	// behavior is desired.
-	var missingParents []*btcwire.ShaHash
+	var missingParents []*wire.ShaHash
 	for _, txD := range txStore {
 		if txD.Err == database.ErrTxShaMissing {
 			missingParents = append(missingParents, txD.Hash)
@@ -941,7 +941,7 @@ func (mp *txMemPool) maybeAcceptTransaction(tx *btcutil.Tx, isNew, rateLimit boo
 			// a non standard error.
 			rejectCode, found := extractRejectCode(err)
 			if !found {
-				rejectCode = btcwire.RejectNonstandard
+				rejectCode = wire.RejectNonstandard
 			}
 			str := fmt.Sprintf("transaction %v has a non-standard "+
 				"input: %v", txHash, err)
@@ -969,7 +969,7 @@ func (mp *txMemPool) maybeAcceptTransaction(tx *btcutil.Tx, isNew, rateLimit boo
 	if numSigOps > maxSigOpsPerTx {
 		str := fmt.Sprintf("transaction %v has too many sigops: %d > %d",
 			txHash, numSigOps, maxSigOpsPerTx)
-		return nil, txRuleError(btcwire.RejectNonstandard, str)
+		return nil, txRuleError(wire.RejectNonstandard, str)
 	}
 
 	// Don't allow transactions with fees too low to get into a mined block.
@@ -989,7 +989,7 @@ func (mp *txMemPool) maybeAcceptTransaction(tx *btcutil.Tx, isNew, rateLimit boo
 		str := fmt.Sprintf("transaction %v has %d fees which is under "+
 			"the required amount of %d", txHash, txFee,
 			minFee)
-		return nil, txRuleError(btcwire.RejectInsufficientFee, str)
+		return nil, txRuleError(wire.RejectInsufficientFee, str)
 	}
 
 	// Free-to-relay transactions are rate limited here to prevent
@@ -1006,7 +1006,7 @@ func (mp *txMemPool) maybeAcceptTransaction(tx *btcutil.Tx, isNew, rateLimit boo
 		if mp.pennyTotal >= cfg.FreeTxRelayLimit*10*1000 {
 			str := fmt.Sprintf("transaction %v has been rejected "+
 				"by the rate limiter due to low fees", txHash)
-			return nil, txRuleError(btcwire.RejectInsufficientFee, str)
+			return nil, txRuleError(wire.RejectInsufficientFee, str)
 		}
 		oldTotal := mp.pennyTotal
 
@@ -1056,7 +1056,7 @@ func (mp *txMemPool) maybeAcceptTransaction(tx *btcutil.Tx, isNew, rateLimit boo
 // be added to the orphan pool.
 //
 // This function is safe for concurrent access.
-func (mp *txMemPool) MaybeAcceptTransaction(tx *btcutil.Tx, isNew, rateLimit bool) ([]*btcwire.ShaHash, error) {
+func (mp *txMemPool) MaybeAcceptTransaction(tx *btcutil.Tx, isNew, rateLimit bool) ([]*wire.ShaHash, error) {
 	// Protect concurrent access.
 	mp.Lock()
 	defer mp.Unlock()
@@ -1071,14 +1071,14 @@ func (mp *txMemPool) MaybeAcceptTransaction(tx *btcutil.Tx, isNew, rateLimit boo
 // orphans) until there are no more.
 //
 // This function MUST be called with the mempool lock held (for writes).
-func (mp *txMemPool) processOrphans(hash *btcwire.ShaHash) error {
+func (mp *txMemPool) processOrphans(hash *wire.ShaHash) error {
 	// Start with processing at least the passed hash.
 	processHashes := list.New()
 	processHashes.PushBack(hash)
 	for processHashes.Len() > 0 {
 		// Pop the first hash to process.
 		firstElement := processHashes.Remove(processHashes.Front())
-		processHash := firstElement.(*btcwire.ShaHash)
+		processHash := firstElement.(*wire.ShaHash)
 
 		// Look up all orphans that are referenced by the transaction we
 		// just accepted.  This will typically only be one, but it could
@@ -1122,7 +1122,7 @@ func (mp *txMemPool) processOrphans(hash *btcwire.ShaHash) error {
 			if len(missingParents) == 0 {
 				// Generate and relay the inventory vector for the
 				// newly accepted transaction.
-				iv := btcwire.NewInvVect(btcwire.InvTypeTx, tx.Sha())
+				iv := wire.NewInvVect(wire.InvTypeTx, tx.Sha())
 				mp.server.RelayInventory(iv, tx)
 			} else {
 				// Transaction is still an orphan.
@@ -1174,7 +1174,7 @@ func (mp *txMemPool) ProcessTransaction(tx *btcutil.Tx, allowOrphan, rateLimit b
 
 	if len(missingParents) == 0 {
 		// Generate the inventory vector and relay it.
-		iv := btcwire.NewInvVect(btcwire.InvTypeTx, tx.Sha())
+		iv := wire.NewInvVect(wire.InvTypeTx, tx.Sha())
 		mp.server.RelayInventory(iv, tx)
 
 		// Accept any orphan transactions that depend on this
@@ -1201,7 +1201,7 @@ func (mp *txMemPool) ProcessTransaction(tx *btcutil.Tx, allowOrphan, rateLimit b
 			str := fmt.Sprintf("orphan transaction %v references "+
 				"outputs of unknown or fully-spent "+
 				"transaction %v", tx.Sha(), missingParents[0])
-			return txRuleError(btcwire.RejectDuplicate, str)
+			return txRuleError(wire.RejectDuplicate, str)
 		}
 
 		// Potentially add the orphan transaction to the orphan pool.
@@ -1229,11 +1229,11 @@ func (mp *txMemPool) Count() int {
 // pool.
 //
 // This function is safe for concurrent access.
-func (mp *txMemPool) TxShas() []*btcwire.ShaHash {
+func (mp *txMemPool) TxShas() []*wire.ShaHash {
 	mp.RLock()
 	defer mp.RUnlock()
 
-	hashes := make([]*btcwire.ShaHash, len(mp.pool))
+	hashes := make([]*wire.ShaHash, len(mp.pool))
 	i := 0
 	for hash := range mp.pool {
 		hashCopy := hash
@@ -1278,9 +1278,9 @@ func (mp *txMemPool) LastUpdated() time.Time {
 func newTxMemPool(server *server) *txMemPool {
 	return &txMemPool{
 		server:        server,
-		pool:          make(map[btcwire.ShaHash]*TxDesc),
-		orphans:       make(map[btcwire.ShaHash]*btcutil.Tx),
-		orphansByPrev: make(map[btcwire.ShaHash]*list.List),
-		outpoints:     make(map[btcwire.OutPoint]*btcutil.Tx),
+		pool:          make(map[wire.ShaHash]*TxDesc),
+		orphans:       make(map[wire.ShaHash]*btcutil.Tx),
+		orphansByPrev: make(map[wire.ShaHash]*list.List),
+		outpoints:     make(map[wire.OutPoint]*btcutil.Tx),
 	}
 }

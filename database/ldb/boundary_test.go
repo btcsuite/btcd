@@ -9,7 +9,7 @@ import (
 	"testing"
 
 	"github.com/btcsuite/btcd/database"
-	"github.com/btcsuite/btcwire"
+	"github.com/btcsuite/btcd/wire"
 )
 
 // we need to test for an empty database and make certain it returns the proper
@@ -30,7 +30,7 @@ func TestEmptyDB(t *testing.T) {
 	defer os.RemoveAll(dbnamever)
 
 	sha, height, err := db.NewestSha()
-	if !sha.IsEqual(&btcwire.ShaHash{}) {
+	if !sha.IsEqual(&wire.ShaHash{}) {
 		t.Errorf("sha not zero hash")
 	}
 	if height != -1 {
@@ -54,7 +54,7 @@ func TestEmptyDB(t *testing.T) {
 	}()
 
 	sha, height, err = db.NewestSha()
-	if !sha.IsEqual(&btcwire.ShaHash{}) {
+	if !sha.IsEqual(&wire.ShaHash{}) {
 		t.Errorf("sha not zero hash")
 	}
 	if height != -1 {

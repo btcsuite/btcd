@@ -15,8 +15,8 @@ import (
 
 	"golang.org/x/crypto/ripemd160"
 
+	"github.com/btcsuite/btcd/wire"
 	"github.com/btcsuite/btcec"
-	"github.com/btcsuite/btcwire"
 	"github.com/btcsuite/fastsha256"
 )
 
@@ -1746,7 +1746,7 @@ func opcodeHash256(op *parsedOpcode, s *Script) error {
 		return err
 	}
 
-	s.dstack.PushByteArray(btcwire.DoubleSha256(buf))
+	s.dstack.PushByteArray(wire.DoubleSha256(buf))
 	return nil
 }
 

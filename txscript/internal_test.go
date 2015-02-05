@@ -14,8 +14,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/btcsuite/btcd/wire"
 	"github.com/btcsuite/btcutil"
-	"github.com/btcsuite/btcwire"
 )
 
 // TstMaxScriptSize makes the internal maxScriptSize constant available to the
@@ -3798,23 +3798,23 @@ func ParseShortForm(script string) ([]byte, error) {
 
 // createSpendTx generates a basic spending transaction given the passed
 // signature and public key scripts.
-func createSpendingTx(sigScript, pkScript []byte) (*btcwire.MsgTx, error) {
-	coinbaseTx := btcwire.NewMsgTx()
+func createSpendingTx(sigScript, pkScript []byte) (*wire.MsgTx, error) {
+	coinbaseTx := wire.NewMsgTx()
 
-	outPoint := btcwire.NewOutPoint(&btcwire.ShaHash{}, ^uint32(0))
-	txIn := btcwire.NewTxIn(outPoint, []byte{OP_0, OP_0})
-	txOut := btcwire.NewTxOut(0, pkScript)
+	outPoint := wire.NewOutPoint(&wire.ShaHash{}, ^uint32(0))
+	txIn := wire.NewTxIn(outPoint, []byte{OP_0, OP_0})
+	txOut := wire.NewTxOut(0, pkScript)
 	coinbaseTx.AddTxIn(txIn)
 	coinbaseTx.AddTxOut(txOut)
 
-	spendingTx := btcwire.NewMsgTx()
+	spendingTx := wire.NewMsgTx()
 	coinbaseTxSha, err := coinbaseTx.TxSha()
 	if err != nil {
 		return nil, err
 	}
-	outPoint = btcwire.NewOutPoint(&coinbaseTxSha, 0)
-	txIn = btcwire.NewTxIn(outPoint, sigScript)
-	txOut = btcwire.NewTxOut(0, nil)
+	outPoint = wire.NewOutPoint(&coinbaseTxSha, 0)
+	txIn = wire.NewTxIn(outPoint, sigScript)
+	txOut = wire.NewTxOut(0, nil)
 
 	spendingTx.AddTxIn(txIn)
 	spendingTx.AddTxOut(txOut)
@@ -3998,7 +3998,7 @@ testloop:
 			continue
 		}
 
-		prevOuts := make(map[btcwire.OutPoint][]byte)
+		prevOuts := make(map[wire.OutPoint][]byte)
 		for j, iinput := range inputs {
 			input, ok := iinput.([]interface{})
 			if !ok {
@@ -4020,7 +4020,7 @@ testloop:
 				continue
 			}
 
-			prevhash, err := btcwire.NewShaHashFromStr(previoustx)
+			prevhash, err := wire.NewShaHashFromStr(previoustx)
 			if err != nil {
 				t.Errorf("bad test (%dth input sha not sha %v)"+
 					"%d: %v", j, err, i, test)
@@ -4050,7 +4050,7 @@ testloop:
 				continue
 			}
 
-			prevOuts[*btcwire.NewOutPoint(prevhash, idx)] = script
+			prevOuts[*wire.NewOutPoint(prevhash, idx)] = script
 		}
 
 		for k, txin := range tx.MsgTx().TxIn {
@@ -4141,7 +4141,7 @@ testloop:
 			continue
 		}
 
-		prevOuts := make(map[btcwire.OutPoint][]byte)
+		prevOuts := make(map[wire.OutPoint][]byte)
 		for j, iinput := range inputs {
 			input, ok := iinput.([]interface{})
 			if !ok {
@@ -4163,7 +4163,7 @@ testloop:
 				continue testloop
 			}
 
-			prevhash, err := btcwire.NewShaHashFromStr(previoustx)
+			prevhash, err := wire.NewShaHashFromStr(previoustx)
 			if err != nil {
 				t.Errorf("bad test (%dth input sha not sha %v)"+
 					"%d: %v", j, err, i, test)
@@ -4193,7 +4193,7 @@ testloop:
 				continue testloop
 			}
 
-			prevOuts[*btcwire.NewOutPoint(prevhash, idx)] = script
+			prevOuts[*wire.NewOutPoint(prevhash, idx)] = script
 		}
 
 		for k, txin := range tx.MsgTx().TxIn {

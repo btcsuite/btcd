@@ -8,15 +8,15 @@ import (
 	"fmt"
 
 	"github.com/btcsuite/btcd/database"
+	"github.com/btcsuite/btcd/wire"
 	"github.com/btcsuite/btcutil"
-	"github.com/btcsuite/btcwire"
 )
 
 // TxData contains contextual information about transactions such as which block
 // they were found in and whether or not the outputs are spent.
 type TxData struct {
 	Tx          *btcutil.Tx
-	Hash        *btcwire.ShaHash
+	Hash        *wire.ShaHash
 	BlockHeight int64
 	Spent       []bool
 	Err         error
@@ -26,7 +26,7 @@ type TxData struct {
 // such as script validation and double spend prevention.  This also allows the
 // transaction data to be treated as a view since it can contain the information
 // from the point-of-view of different points in the chain.
-type TxStore map[btcwire.ShaHash]*TxData
+type TxStore map[wire.ShaHash]*TxData
 
 // connectTransactions updates the passed map by applying transaction and
 // spend information for all the transactions in the passed block.  Only
@@ -101,7 +101,7 @@ func disconnectTransactions(txStore TxStore, block *btcutil.Block) error {
 // transactions from the point of view of the end of the main chain.  It takes
 // a flag which specifies whether or not fully spent transaction should be
 // included in the results.
-func fetchTxStoreMain(db database.Db, txSet map[btcwire.ShaHash]struct{}, includeSpent bool) TxStore {
+func fetchTxStoreMain(db database.Db, txSet map[wire.ShaHash]struct{}, includeSpent bool) TxStore {
 	// Just return an empty store now if there are no requested hashes.
 	txStore := make(TxStore)
 	if len(txSet) == 0 {
@@ -111,7 +111,7 @@ func fetchTxStoreMain(db database.Db, txSet map[btcwire.ShaHash]struct{}, includ
 	// The transaction store map needs to have an entry for every requested
 	// transaction.  By default, all the transactions are marked as missing.
 	// Each entry will be filled in with the appropriate data below.
-	txList := make([]*btcwire.ShaHash, 0, len(txSet))
+	txList := make([]*wire.ShaHash, 0, len(txSet))
 	for hash := range txSet {
 		hashCopy := hash
 		txStore[hash] = &TxData{Hash: &hashCopy, Err: database.ErrTxShaMissing}
@@ -161,7 +161,7 @@ func fetchTxStoreMain(db database.Db, txSet map[btcwire.ShaHash]struct{}, includ
 // chain).  Another scenario is where a transaction exists from the point of
 // view of the main chain, but doesn't exist in a side chain that branches
 // before the block that contains the transaction on the main chain.
-func (b *BlockChain) fetchTxStore(node *blockNode, txSet map[btcwire.ShaHash]struct{}) (TxStore, error) {
+func (b *BlockChain) fetchTxStore(node *blockNode, txSet map[wire.ShaHash]struct{}) (TxStore, error) {
 	// Get the previous block node.  This function is used over simply
 	// accessing node.parent directly as it will dynamically create previous
 	// block nodes as needed.  This helps allow only the pieces of the chain
@@ -237,7 +237,7 @@ func (b *BlockChain) fetchInputTransactions(node *blockNode, block *btcutil.Bloc
 	// Build a map of in-flight transactions because some of the inputs in
 	// this block could be referencing other transactions earlier in this
 	// block which are not yet in the chain.
-	txInFlight := map[btcwire.ShaHash]int{}
+	txInFlight := map[wire.ShaHash]int{}
 	transactions := block.Transactions()
 	for i, tx := range transactions {
 		txInFlight[*tx.Sha()] = i
@@ -246,7 +246,7 @@ func (b *BlockChain) fetchInputTransactions(node *blockNode, block *btcutil.Bloc
 	// Loop through all of the transaction inputs (except for the coinbase
 	// which has no inputs) collecting them into sets of what is needed and
 	// what is already known (in-flight).
-	txNeededSet := make(map[btcwire.ShaHash]struct{})
+	txNeededSet := make(map[wire.ShaHash]struct{})
 	txStore := make(TxStore)
 	for i, tx := range transactions[1:] {
 		for _, txIn := range tx.MsgTx().TxIn {
@@ -303,7 +303,7 @@ func (b *BlockChain) FetchTransactionStore(tx *btcutil.Tx) (TxStore, error) {
 	// Create a set of needed transactions from the transactions referenced
 	// by the inputs of the passed transaction.  Also, add the passed
 	// transaction itself as a way for the caller to detect duplicates.
-	txNeededSet := make(map[btcwire.ShaHash]struct{})
+	txNeededSet := make(map[wire.ShaHash]struct{})
 	txNeededSet[*tx.Sha()] = struct{}{}
 	for _, txIn := range tx.MsgTx().TxIn {
 		txNeededSet[txIn.PreviousOutPoint.Hash] = struct{}{}

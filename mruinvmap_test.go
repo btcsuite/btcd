@@ -8,7 +8,7 @@ import (
 	"crypto/rand"
 	"testing"
 
-	"github.com/btcsuite/btcwire"
+	"github.com/btcsuite/btcd/wire"
 )
 
 // BenchmarkMruInventoryList performs basic benchmarks on the most recently
@@ -18,12 +18,12 @@ func BenchmarkMruInventoryList(b *testing.B) {
 	// the mru inventory code.
 	b.StopTimer()
 	numInvVects := 100000
-	invVects := make([]*btcwire.InvVect, 0, numInvVects)
+	invVects := make([]*wire.InvVect, 0, numInvVects)
 	for i := 0; i < numInvVects; i++ {
-		hashBytes := make([]byte, btcwire.HashSize)
+		hashBytes := make([]byte, wire.HashSize)
 		rand.Read(hashBytes)
-		hash, _ := btcwire.NewShaHash(hashBytes)
-		iv := btcwire.NewInvVect(btcwire.InvTypeBlock, hash)
+		hash, _ := wire.NewShaHash(hashBytes)
+		iv := wire.NewInvVect(wire.InvTypeBlock, hash)
 		invVects = append(invVects, iv)
 	}
 	b.StartTimer()

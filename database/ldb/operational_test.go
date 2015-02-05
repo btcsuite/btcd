@@ -16,13 +16,13 @@ import (
 
 	"github.com/btcsuite/btcd/database"
 	"github.com/btcsuite/btcd/txscript"
+	"github.com/btcsuite/btcd/wire"
 	"github.com/btcsuite/btcnet"
 	"github.com/btcsuite/btcutil"
-	"github.com/btcsuite/btcwire"
 	"golang.org/x/crypto/ripemd160"
 )
 
-var network = btcwire.MainNet
+var network = wire.MainNet
 
 // testDb is used to store db related context for a running test.
 // the `cleanUpFunc` *must* be called after each test to maintain db
@@ -72,14 +72,14 @@ func TestOperational(t *testing.T) {
 
 // testAddrIndexOperations ensures that all normal operations concerning
 // the optional address index function correctly.
-func testAddrIndexOperations(t *testing.T, db database.Db, newestBlock *btcutil.Block, newestSha *btcwire.ShaHash, newestBlockIdx int64) {
+func testAddrIndexOperations(t *testing.T, db database.Db, newestBlock *btcutil.Block, newestSha *wire.ShaHash, newestBlockIdx int64) {
 	// Metadata about the current addr index state should be unset.
 	sha, height, err := db.FetchAddrIndexTip()
 	if err != database.ErrAddrIndexDoesNotExist {
 		t.Fatalf("Address index metadata shouldn't be in db, hasn't been built up yet.")
 	}
 
-	var zeroHash btcwire.ShaHash
+	var zeroHash wire.ShaHash
 	if !sha.IsEqual(&zeroHash) {
 		t.Fatalf("AddrIndexTip wrong hash got: %s, want %s", sha, &zeroHash)
 
@@ -122,7 +122,7 @@ func testAddrIndexOperations(t *testing.T, db database.Db, newestBlock *btcutil.
 
 	// Create a fake index.
 	blktxLoc, _ := newestBlock.TxLoc()
-	testIndex[hash160Bytes] = []*btcwire.TxLoc{&blktxLoc[0]}
+	testIndex[hash160Bytes] = []*wire.TxLoc{&blktxLoc[0]}
 
 	// Insert our test addr index into the DB.
 	err = db.UpdateAddrIndexForBlock(newestSha, newestBlockIdx, testIndex)
@@ -188,7 +188,7 @@ func testAddrIndexOperations(t *testing.T, db database.Db, newestBlock *btcutil.
 
 }
 
-func assertAddrIndexTipIsUpdated(db database.Db, t *testing.T, newestSha *btcwire.ShaHash, newestBlockIdx int64) {
+func assertAddrIndexTipIsUpdated(db database.Db, t *testing.T, newestSha *wire.ShaHash, newestBlockIdx int64) {
 	// Safe to ignore error, since height will be < 0 in "error" case.
 	sha, height, _ := db.FetchAddrIndexTip()
 	if newestBlockIdx != height {
@@ -218,7 +218,7 @@ out:
 	for height := int64(0); height < int64(len(testDb.blocks)); height++ {
 		block := testDb.blocks[height]
 		mblock := block.MsgBlock()
-		var txneededList []*btcwire.ShaHash
+		var txneededList []*wire.ShaHash
 		for _, tx := range mblock.Transactions {
 			for _, txin := range tx.TxIn {
 				if txin.PreviousOutPoint.Index == uint32(4294967295) {
@@ -467,7 +467,7 @@ func testFetchHeightRange(t *testing.T, db database.Db, blocks []*btcutil.Block)
 	var testincrement int64 = 50
 	var testcnt int64 = 100
 
-	shanames := make([]*btcwire.ShaHash, len(blocks))
+	shanames := make([]*wire.ShaHash, len(blocks))
 
 	nBlocks := int64(len(blocks))
 
@@ -531,12 +531,12 @@ func TestLimitAndSkipFetchTxsForAddr(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Unable make test pkScript %v", err)
 	}
-	fakeTxOut := btcwire.NewTxOut(10, outputScript)
-	var emptyHash btcwire.ShaHash
-	fakeHeader := btcwire.NewBlockHeader(&emptyHash, &emptyHash, 1, 1)
-	msgBlock := btcwire.NewMsgBlock(fakeHeader)
+	fakeTxOut := wire.NewTxOut(10, outputScript)
+	var emptyHash wire.ShaHash
+	fakeHeader := wire.NewBlockHeader(&emptyHash, &emptyHash, 1, 1)
+	msgBlock := wire.NewMsgBlock(fakeHeader)
 	for i := 0; i < 10; i++ {
-		mtx := btcwire.NewMsgTx()
+		mtx := wire.NewMsgTx()
 		mtx.AddTxOut(fakeTxOut)
 		msgBlock.AddTransaction(mtx)
 	}

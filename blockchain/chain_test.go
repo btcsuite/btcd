@@ -8,9 +8,9 @@ import (
 	"testing"
 
 	"github.com/btcsuite/btcd/blockchain"
+	"github.com/btcsuite/btcd/wire"
 	"github.com/btcsuite/btcnet"
 	"github.com/btcsuite/btcutil"
-	"github.com/btcsuite/btcwire"
 )
 
 // TestHaveBlock tests the HaveBlock API to ensure proper functionality.
@@ -94,7 +94,7 @@ func TestHaveBlock(t *testing.T) {
 	}
 
 	for i, test := range tests {
-		hash, err := btcwire.NewShaHashFromStr(test.hash)
+		hash, err := wire.NewShaHashFromStr(test.hash)
 		if err != nil {
 			t.Errorf("NewShaHashFromStr: %v", err)
 			continue

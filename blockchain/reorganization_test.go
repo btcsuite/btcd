@@ -14,8 +14,8 @@ import (
 	"testing"
 
 	"github.com/btcsuite/btcd/blockchain"
+	"github.com/btcsuite/btcd/wire"
 	"github.com/btcsuite/btcutil"
-	"github.com/btcsuite/btcwire"
 )
 
 // TestReorganization loads a set of test blocks which force a chain
@@ -81,7 +81,7 @@ func TestReorganization(t *testing.T) {
 func loadBlocks(filename string) (blocks []*btcutil.Block, err error) {
 	filename = filepath.Join("testdata/", filename)
 
-	var network = btcwire.MainNet
+	var network = wire.MainNet
 	var dr io.Reader
 	var fi io.ReadCloser
 

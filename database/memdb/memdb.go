@@ -11,8 +11,8 @@ import (
 	"sync"
 
 	"github.com/btcsuite/btcd/database"
+	"github.com/btcsuite/btcd/wire"
 	"github.com/btcsuite/btcutil"
-	"github.com/btcsuite/btcwire"
 )
 
 // Errors that the various database functions may return.
@@ -21,7 +21,7 @@ var (
 )
 
 var (
-	zeroHash = btcwire.ShaHash{}
+	zeroHash = wire.ShaHash{}
 
 	// The following two hashes are ones that must be specially handled.
 	// See the comments where they're used for more details.
@@ -38,11 +38,11 @@ type tTxInsertData struct {
 }
 
 // newShaHashFromStr converts the passed big-endian hex string into a
-// btcwire.ShaHash.  It only differs from the one available in btcwire in that
+// wire.ShaHash.  It only differs from the one available in btcwire in that
 // it ignores the error since it will only (and must only) be called with
 // hard-coded, and therefore known good, hashes.
-func newShaHashFromStr(hexStr string) *btcwire.ShaHash {
-	sha, _ := btcwire.NewShaHashFromStr(hexStr)
+func newShaHashFromStr(hexStr string) *wire.ShaHash {
+	sha, _ := wire.NewShaHashFromStr(hexStr)
 	return sha
 }
 
@@ -51,7 +51,7 @@ func newShaHashFromStr(hexStr string) *btcwire.ShaHash {
 // has no inputs.  This is represented in the block chain by a transaction with
 // a single input that has a previous output transaction index set to the
 // maximum value along with a zero hash.
-func isCoinbaseInput(txIn *btcwire.TxIn) bool {
+func isCoinbaseInput(txIn *wire.TxIn) bool {
 	prevOut := &txIn.PreviousOutPoint
 	if prevOut.Index == math.MaxUint32 && prevOut.Hash.IsEqual(&zeroHash) {
 		return true
@@ -82,15 +82,15 @@ type MemDb struct {
 
 	// blocks holds all of the bitcoin blocks that will be in the memory
 	// database.
-	blocks []*btcwire.MsgBlock
+	blocks []*wire.MsgBlock
 
 	// blocksBySha keeps track of block heights by hash.  The height can
 	// be used as an index into the blocks slice.
-	blocksBySha map[btcwire.ShaHash]int64
+	blocksBySha map[wire.ShaHash]int64
 
 	// txns holds information about transactions such as which their
 	// block height and spent status of all their outputs.
-	txns map[btcwire.ShaHash][]*tTxInsertData
+	txns map[wire.ShaHash][]*tTxInsertData
 
 	// closed indicates whether or not the database has been closed and is
 	// therefore invalidated.
@@ -98,7 +98,7 @@ type MemDb struct {
 }
 
 // removeTx removes the passed transaction including unspending it.
-func (db *MemDb) removeTx(msgTx *btcwire.MsgTx, txHash *btcwire.ShaHash) {
+func (db *MemDb) removeTx(msgTx *wire.MsgTx, txHash *wire.ShaHash) {
 	// Undo all of the spends for the transaction.
 	for _, txIn := range msgTx.TxIn {
 		if isCoinbaseInput(txIn) {
@@ -157,7 +157,7 @@ func (db *MemDb) Close() error {
 // block.  This is different than a simple truncate since the spend information
 // for each block must also be unwound.  This is part of the database.Db interface
 // implementation.
-func (db *MemDb) DropAfterBlockBySha(sha *btcwire.ShaHash) error {
+func (db *MemDb) DropAfterBlockBySha(sha *wire.ShaHash) error {
 	db.Lock()
 	defer db.Unlock()
 
@@ -197,7 +197,7 @@ func (db *MemDb) DropAfterBlockBySha(sha *btcwire.ShaHash) error {
 
 // ExistsSha returns whether or not the given block hash is present in the
 // database.  This is part of the database.Db interface implementation.
-func (db *MemDb) ExistsSha(sha *btcwire.ShaHash) (bool, error) {
+func (db *MemDb) ExistsSha(sha *wire.ShaHash) (bool, error) {
 	db.Lock()
 	defer db.Unlock()
 
@@ -218,7 +218,7 @@ func (db *MemDb) ExistsSha(sha *btcwire.ShaHash) (bool, error) {
 //
 // This implementation does not use any additional cache since the entire
 // database is already in memory.
-func (db *MemDb) FetchBlockBySha(sha *btcwire.ShaHash) (*btcutil.Block, error) {
+func (db *MemDb) FetchBlockBySha(sha *wire.ShaHash) (*btcutil.Block, error) {
 	db.Lock()
 	defer db.Unlock()
 
@@ -237,7 +237,7 @@ func (db *MemDb) FetchBlockBySha(sha *btcwire.ShaHash) (*btcutil.Block, error) {
 
 // FetchBlockHeightBySha returns the block height for the given hash.  This is
 // part of the database.Db interface implementation.
-func (db *MemDb) FetchBlockHeightBySha(sha *btcwire.ShaHash) (int64, error) {
+func (db *MemDb) FetchBlockHeightBySha(sha *wire.ShaHash) (int64, error) {
 	db.Lock()
 	defer db.Unlock()
 
@@ -252,13 +252,13 @@ func (db *MemDb) FetchBlockHeightBySha(sha *btcwire.ShaHash) (int64, error) {
 	return 0, fmt.Errorf("block %v is not in database", sha)
 }
 
-// FetchBlockHeaderBySha returns a btcwire.BlockHeader for the given sha.  The
+// FetchBlockHeaderBySha returns a wire.BlockHeader for the given sha.  The
 // implementation may cache the underlying data if desired.  This is part of the
 // database.Db interface implementation.
 //
 // This implementation does not use any additional cache since the entire
 // database is already in memory.
-func (db *MemDb) FetchBlockHeaderBySha(sha *btcwire.ShaHash) (*btcwire.BlockHeader, error) {
+func (db *MemDb) FetchBlockHeaderBySha(sha *wire.ShaHash) (*wire.BlockHeader, error) {
 	db.Lock()
 	defer db.Unlock()
 
@@ -275,7 +275,7 @@ func (db *MemDb) FetchBlockHeaderBySha(sha *btcwire.ShaHash) (*btcwire.BlockHead
 
 // FetchBlockShaByHeight returns a block hash based on its height in the block
 // chain.  This is part of the database.Db interface implementation.
-func (db *MemDb) FetchBlockShaByHeight(height int64) (*btcwire.ShaHash, error) {
+func (db *MemDb) FetchBlockShaByHeight(height int64) (*wire.ShaHash, error) {
 	db.Lock()
 	defer db.Unlock()
 
@@ -303,7 +303,7 @@ func (db *MemDb) FetchBlockShaByHeight(height int64) (*btcwire.ShaHash, error) {
 // Fetch is inclusive of the start height and exclusive of the ending height.
 // To fetch all hashes from the start height until no more are present, use the
 // special id `AllShas'.  This is part of the database.Db interface implementation.
-func (db *MemDb) FetchHeightRange(startHeight, endHeight int64) ([]btcwire.ShaHash, error) {
+func (db *MemDb) FetchHeightRange(startHeight, endHeight int64) ([]wire.ShaHash, error) {
 	db.Lock()
 	defer db.Unlock()
 
@@ -330,7 +330,7 @@ func (db *MemDb) FetchHeightRange(startHeight, endHeight int64) ([]btcwire.ShaHa
 
 	// Fetch as many as are availalbe within the specified range.
 	lastBlockIndex := int64(len(db.blocks) - 1)
-	hashList := make([]btcwire.ShaHash, 0, endHeight-startHeight)
+	hashList := make([]wire.ShaHash, 0, endHeight-startHeight)
 	for i := startHeight; i < endHeight; i++ {
 		if i > lastBlockIndex {
 			break
@@ -350,7 +350,7 @@ func (db *MemDb) FetchHeightRange(startHeight, endHeight int64) ([]btcwire.ShaHa
 // ExistsTxSha returns whether or not the given transaction hash is present in
 // the database and is not fully spent.  This is part of the database.Db interface
 // implementation.
-func (db *MemDb) ExistsTxSha(sha *btcwire.ShaHash) (bool, error) {
+func (db *MemDb) ExistsTxSha(sha *wire.ShaHash) (bool, error) {
 	db.Lock()
 	defer db.Unlock()
 
@@ -371,7 +371,7 @@ func (db *MemDb) ExistsTxSha(sha *btcwire.ShaHash) (bool, error) {
 //
 // This implementation does not use any additional cache since the entire
 // database is already in memory.
-func (db *MemDb) FetchTxBySha(txHash *btcwire.ShaHash) ([]*database.TxListReply, error) {
+func (db *MemDb) FetchTxBySha(txHash *wire.ShaHash) ([]*database.TxListReply, error) {
 	db.Lock()
 	defer db.Unlock()
 
@@ -422,7 +422,7 @@ func (db *MemDb) FetchTxBySha(txHash *btcwire.ShaHash) ([]*database.TxListReply,
 // will indicate the transaction does not exist.
 //
 // This function must be called with the db lock held.
-func (db *MemDb) fetchTxByShaList(txShaList []*btcwire.ShaHash, includeSpent bool) []*database.TxListReply {
+func (db *MemDb) fetchTxByShaList(txShaList []*wire.ShaHash, includeSpent bool) []*database.TxListReply {
 	replyList := make([]*database.TxListReply, 0, len(txShaList))
 	for i, hash := range txShaList {
 		// Every requested entry needs a response, so start with nothing
@@ -498,7 +498,7 @@ func (db *MemDb) fetchTxByShaList(txShaList []*btcwire.ShaHash, includeSpent boo
 //
 // This implementation does not use any additional cache since the entire
 // database is already in memory.
-func (db *MemDb) FetchTxByShaList(txShaList []*btcwire.ShaHash) []*database.TxListReply {
+func (db *MemDb) FetchTxByShaList(txShaList []*wire.ShaHash) []*database.TxListReply {
 	db.Lock()
 	defer db.Unlock()
 
@@ -517,7 +517,7 @@ func (db *MemDb) FetchTxByShaList(txShaList []*btcwire.ShaHash) []*database.TxLi
 //
 // This implementation does not use any additional cache since the entire
 // database is already in memory.
-func (db *MemDb) FetchUnSpentTxByShaList(txShaList []*btcwire.ShaHash) []*database.TxListReply {
+func (db *MemDb) FetchUnSpentTxByShaList(txShaList []*wire.ShaHash) []*database.TxListReply {
 	db.Lock()
 	defer db.Unlock()
 
@@ -555,7 +555,7 @@ func (db *MemDb) InsertBlock(block *btcutil.Block) (int64, error) {
 	// Build a map of in-flight transactions because some of the inputs in
 	// this block could be referencing other transactions earlier in this
 	// block which are not yet in the chain.
-	txInFlight := map[btcwire.ShaHash]int{}
+	txInFlight := map[wire.ShaHash]int{}
 	transactions := block.Transactions()
 	for i, tx := range transactions {
 		txInFlight[*tx.Sha()] = i
@@ -675,7 +675,7 @@ func (db *MemDb) InsertBlock(block *btcutil.Block) (int64, error) {
 // the block chain.  It will return the zero hash, -1 for the block height, and
 // no error (nil) if there are not any blocks in the database yet.  This is part
 // of the database.Db interface implementation.
-func (db *MemDb) NewestSha() (*btcwire.ShaHash, int64, error) {
+func (db *MemDb) NewestSha() (*wire.ShaHash, int64, error) {
 	db.Lock()
 	defer db.Unlock()
 
@@ -700,13 +700,13 @@ func (db *MemDb) NewestSha() (*btcwire.ShaHash, int64, error) {
 
 // FetchAddrIndexTip isn't currently implemented. This is a part of the
 // database.Db interface implementation.
-func (db *MemDb) FetchAddrIndexTip() (*btcwire.ShaHash, int64, error) {
+func (db *MemDb) FetchAddrIndexTip() (*wire.ShaHash, int64, error) {
 	return nil, 0, database.ErrNotImplemented
 }
 
 // UpdateAddrIndexForBlock isn't currently implemented. This is a part of the
 // database.Db interface implementation.
-func (db *MemDb) UpdateAddrIndexForBlock(*btcwire.ShaHash, int64,
+func (db *MemDb) UpdateAddrIndexForBlock(*wire.ShaHash, int64,
 	database.BlockAddrIndex) error {
 	return database.ErrNotImplemented
 }
@@ -759,9 +759,9 @@ func (db *MemDb) Sync() error {
 // newMemDb returns a new memory-only database ready for block inserts.
 func newMemDb() *MemDb {
 	db := MemDb{
-		blocks:      make([]*btcwire.MsgBlock, 0, 200000),
-		blocksBySha: make(map[btcwire.ShaHash]int64),
-		txns:        make(map[btcwire.ShaHash][]*tTxInsertData),
+		blocks:      make([]*wire.MsgBlock, 0, 200000),
+		blocksBySha: make(map[wire.ShaHash]int64),
+		txns:        make(map[wire.ShaHash][]*tTxInsertData),
 	}
 	return &db
 }

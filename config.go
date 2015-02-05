@@ -19,8 +19,8 @@ import (
 	"github.com/btcsuite/btcd/database"
 	_ "github.com/btcsuite/btcd/database/ldb"
 	_ "github.com/btcsuite/btcd/database/memdb"
+	"github.com/btcsuite/btcd/wire"
 	"github.com/btcsuite/btcutil"
-	"github.com/btcsuite/btcwire"
 	flags "github.com/btcsuite/go-flags"
 	"github.com/btcsuite/go-socks/socks"
 )
@@ -41,7 +41,7 @@ const (
 	defaultBlockMinSize      = 0
 	defaultBlockMaxSize      = 750000
 	blockMaxSizeMin          = 1000
-	blockMaxSizeMax          = btcwire.MaxBlockPayload - 1000
+	blockMaxSizeMax          = wire.MaxBlockPayload - 1000
 	defaultBlockPrioritySize = 50000
 	defaultGenerate          = false
 )

@@ -10,8 +10,8 @@ import (
 	"errors"
 
 	"github.com/btcsuite/btcd/database"
+	"github.com/btcsuite/btcd/wire"
 	"github.com/btcsuite/btcutil"
-	"github.com/btcsuite/btcwire"
 	"github.com/btcsuite/goleveldb/leveldb"
 	"github.com/btcsuite/goleveldb/leveldb/util"
 
@@ -37,7 +37,7 @@ var addrIndexMetaDataKey = []byte("addrindex")
 var addrIndexKeyPrefix = []byte("a-")
 
 type txUpdateObj struct {
-	txSha     *btcwire.ShaHash
+	txSha     *wire.ShaHash
 	blkHeight int64
 	txoff     int
 	txlen     int
@@ -66,7 +66,7 @@ type txAddrIndex struct {
 }
 
 // InsertTx inserts a tx hash and its associated data into the database.
-func (db *LevelDb) InsertTx(txsha *btcwire.ShaHash, height int64, txoff int, txlen int, spentbuf []byte) (err error) {
+func (db *LevelDb) InsertTx(txsha *wire.ShaHash, height int64, txoff int, txlen int, spentbuf []byte) (err error) {
 	db.dbLock.Lock()
 	defer db.dbLock.Unlock()
 
@@ -75,7 +75,7 @@ func (db *LevelDb) InsertTx(txsha *btcwire.ShaHash, height int64, txoff int, txl
 
 // insertTx inserts a tx hash and its associated data into the database.
 // Must be called with db lock held.
-func (db *LevelDb) insertTx(txSha *btcwire.ShaHash, height int64, txoff int, txlen int, spentbuf []byte) (err error) {
+func (db *LevelDb) insertTx(txSha *wire.ShaHash, height int64, txoff int, txlen int, spentbuf []byte) (err error) {
 	var txU txUpdateObj
 
 	txU.txSha = txSha
@@ -105,7 +105,7 @@ func (db *LevelDb) formatTx(txu *txUpdateObj) []byte {
 	return txW[:]
 }
 
-func (db *LevelDb) getTxData(txsha *btcwire.ShaHash) (int64, int, int, []byte, error) {
+func (db *LevelDb) getTxData(txsha *wire.ShaHash) (int64, int, int, []byte, error) {
 	key := shaTxToKey(txsha)
 	buf, err := db.lDb.Get(key, db.ro)
 	if err != nil {
@@ -122,7 +122,7 @@ func (db *LevelDb) getTxData(txsha *btcwire.ShaHash) (int64, int, int, []byte, e
 	return int64(blkHeight), int(txOff), int(txLen), spentBuf, nil
 }
 
-func (db *LevelDb) getTxFullySpent(txsha *btcwire.ShaHash) ([]*spentTx, error) {
+func (db *LevelDb) getTxFullySpent(txsha *wire.ShaHash) ([]*spentTx, error) {
 
 	var badTxList, spentTxList []*spentTx
 
@@ -177,7 +177,7 @@ func (db *LevelDb) formatTxFullySpent(sTxList []*spentTx) []byte {
 }
 
 // ExistsTxSha returns if the given tx sha exists in the database
-func (db *LevelDb) ExistsTxSha(txsha *btcwire.ShaHash) (bool, error) {
+func (db *LevelDb) ExistsTxSha(txsha *wire.ShaHash) (bool, error) {
 	db.dbLock.Lock()
 	defer db.dbLock.Unlock()
 
@@ -186,14 +186,14 @@ func (db *LevelDb) ExistsTxSha(txsha *btcwire.ShaHash) (bool, error) {
 
 // existsTxSha returns if the given tx sha exists in the database.o
 // Must be called with the db lock held.
-func (db *LevelDb) existsTxSha(txSha *btcwire.ShaHash) (bool, error) {
+func (db *LevelDb) existsTxSha(txSha *wire.ShaHash) (bool, error) {
 	key := shaTxToKey(txSha)
 
 	return db.lDb.Has(key, db.ro)
 }
 
 // FetchTxByShaList returns the most recent tx of the name fully spent or not
-func (db *LevelDb) FetchTxByShaList(txShaList []*btcwire.ShaHash) []*database.TxListReply {
+func (db *LevelDb) FetchTxByShaList(txShaList []*wire.ShaHash) []*database.TxListReply {
 	db.dbLock.Lock()
 	defer db.dbLock.Unlock()
 
@@ -238,7 +238,7 @@ func (db *LevelDb) FetchTxByShaList(txShaList []*btcwire.ShaHash) []*database.Tx
 
 // FetchUnSpentTxByShaList given a array of ShaHash, look up the transactions
 // and return them in a TxListReply array.
-func (db *LevelDb) FetchUnSpentTxByShaList(txShaList []*btcwire.ShaHash) []*database.TxListReply {
+func (db *LevelDb) FetchUnSpentTxByShaList(txShaList []*wire.ShaHash) []*database.TxListReply {
 	db.dbLock.Lock()
 	defer db.dbLock.Unlock()
 
@@ -261,7 +261,7 @@ func (db *LevelDb) FetchUnSpentTxByShaList(txShaList []*btcwire.ShaHash) []*data
 }
 
 // fetchTxDataBySha returns several pieces of data regarding the given sha.
-func (db *LevelDb) fetchTxDataBySha(txsha *btcwire.ShaHash) (rtx *btcwire.MsgTx, rblksha *btcwire.ShaHash, rheight int64, rtxspent []byte, err error) {
+func (db *LevelDb) fetchTxDataBySha(txsha *wire.ShaHash) (rtx *wire.MsgTx, rblksha *wire.ShaHash, rheight int64, rtxspent []byte, err error) {
 	var blkHeight int64
 	var txspent []byte
 	var txOff, txLen int
@@ -278,8 +278,8 @@ func (db *LevelDb) fetchTxDataBySha(txsha *btcwire.ShaHash) (rtx *btcwire.MsgTx,
 
 // fetchTxDataByLoc returns several pieces of data regarding the given tx
 // located by the block/offset/size location
-func (db *LevelDb) fetchTxDataByLoc(blkHeight int64, txOff int, txLen int, txspent []byte) (rtx *btcwire.MsgTx, rblksha *btcwire.ShaHash, rheight int64, rtxspent []byte, err error) {
-	var blksha *btcwire.ShaHash
+func (db *LevelDb) fetchTxDataByLoc(blkHeight int64, txOff int, txLen int, txspent []byte) (rtx *wire.MsgTx, rblksha *wire.ShaHash, rheight int64, rtxspent []byte, err error) {
+	var blksha *wire.ShaHash
 	var blkbuf []byte
 
 	blksha, blkbuf, err = db.getBlkByHeight(blkHeight)
@@ -299,7 +299,7 @@ func (db *LevelDb) fetchTxDataByLoc(blkHeight int64, txOff int, txLen int, txspe
 	}
 	rbuf := bytes.NewReader(blkbuf[txOff : txOff+txLen])
 
-	var tx btcwire.MsgTx
+	var tx wire.MsgTx
 	err = tx.Deserialize(rbuf)
 	if err != nil {
 		log.Warnf("unable to decode tx block %v %v txoff %v txlen %v",
@@ -311,7 +311,7 @@ func (db *LevelDb) fetchTxDataByLoc(blkHeight int64, txOff int, txLen int, txspe
 }
 
 // FetchTxBySha returns some data for the given Tx Sha.
-func (db *LevelDb) FetchTxBySha(txsha *btcwire.ShaHash) ([]*database.TxListReply, error) {
+func (db *LevelDb) FetchTxBySha(txsha *wire.ShaHash) ([]*database.TxListReply, error) {
 	db.dbLock.Lock()
 	defer db.dbLock.Unlock()
 
@@ -497,7 +497,7 @@ func (db *LevelDb) FetchTxsForAddr(addr btcutil.Address, skip int,
 // append-only list for the stored value. However, this add unnecessary
 // overhead when storing and retrieving since the entire list must
 // be fetched each time.
-func (db *LevelDb) UpdateAddrIndexForBlock(blkSha *btcwire.ShaHash, blkHeight int64, addrIndex database.BlockAddrIndex) error {
+func (db *LevelDb) UpdateAddrIndexForBlock(blkSha *wire.ShaHash, blkHeight int64, addrIndex database.BlockAddrIndex) error {
 	db.dbLock.Lock()
 	defer db.dbLock.Unlock()
 
@@ -572,7 +572,7 @@ func (db *LevelDb) DeleteAddrIndex() error {
 	}
 
 	db.lastAddrIndexBlkIdx = -1
-	db.lastAddrIndexBlkSha = btcwire.ShaHash{}
+	db.lastAddrIndexBlkSha = wire.ShaHash{}
 
 	return nil
 }
