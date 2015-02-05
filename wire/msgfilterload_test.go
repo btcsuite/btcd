@@ -146,11 +146,11 @@ func TestFilterLoadWireErrors(t *testing.T) {
 
 	tests := []struct {
 		in       *wire.MsgFilterLoad // Value to encode
-		buf      []byte                 // Wire encoding
-		pver     uint32                 // Protocol version for wire encoding
-		max      int                    // Max size of fixed buffer to induce errors
-		writeErr error                  // Expected write error
-		readErr  error                  // Expected read error
+		buf      []byte              // Wire encoding
+		pver     uint32              // Protocol version for wire encoding
+		max      int                 // Max size of fixed buffer to induce errors
+		writeErr error               // Expected write error
+		readErr  error               // Expected read error
 	}{
 		// Latest protocol version with intentional read/write errors.
 		// Force error in filter size.
