@@ -286,8 +286,8 @@ func ParseMarshaledCmd(b []byte) (Cmd, error) {
 	case "reconsiderblock":
 		cmd = new(ReconsiderBlockCmd)
 
-	case "searchrawtransaction":
-		cmd = new(SearchRawTransactionCmd)
+	case "searchrawtransactions":
+		cmd = new(SearchRawTransactionsCmd)
 
 	case "sendfrom":
 		cmd = new(SendFromCmd)
@@ -5322,21 +5322,21 @@ func (cmd *ReconsiderBlockCmd) UnmarshalJSON(b []byte) error {
 	return nil
 }
 
-// SearchRawTransactionCmd is a type handling custom marshaling and
-// unmarshaling of sendrawtransaction JSON RPC commands.
-type SearchRawTransactionCmd struct {
+// SearchRawTransactionsCmd is a type handling custom marshaling and
+// unmarshaling of sendrawtransactions JSON RPC commands.
+type SearchRawTransactionsCmd struct {
 	id      interface{}
 	Address string
-	Verbose bool
+	Verbose int
 	Skip    int
 	Count   int
 }
 
-// NewSearchRawTransactionCmd creates a new SearchRawTransactionCmd.
-func NewSearchRawTransactionCmd(id interface{}, address string,
-	optArgs ...interface{}) (*SearchRawTransactionCmd, error) {
-	verbose := true
+// NewSearchRawTransactionsCmd creates a new SearchRawTransactionsCmd.
+func NewSearchRawTransactionsCmd(id interface{}, address string,
+	optArgs ...interface{}) (*SearchRawTransactionsCmd, error) {
 	var skip int
+	verbose := 1
 	count := 100
 
 	if len(optArgs) > 3 {
@@ -5344,9 +5344,9 @@ func NewSearchRawTransactionCmd(id interface{}, address string,
 	}
 
 	if len(optArgs) > 0 {
-		v, ok := optArgs[0].(bool)
+		v, ok := optArgs[0].(int)
 		if !ok {
-			return nil, errors.New("first optional argument verbose is not a bool")
+			return nil, errors.New("first optional argument verbose is not a int")
 		}
 
 		verbose = v
@@ -5367,7 +5367,7 @@ func NewSearchRawTransactionCmd(id interface{}, address string,
 		count = c
 	}
 
-	return &SearchRawTransactionCmd{
+	return &SearchRawTransactionsCmd{
 		id:      id,
 		Address: address,
 		Verbose: verbose,
@@ -5377,20 +5377,20 @@ func NewSearchRawTransactionCmd(id interface{}, address string,
 }
 
 // Id satisfies the Cmd interface by returning the id of the command.
-func (cmd *SearchRawTransactionCmd) Id() interface{} {
+func (cmd *SearchRawTransactionsCmd) Id() interface{} {
 	return cmd.id
 }
 
 // Method satisfies the Cmd interface by returning the json method.
-func (cmd *SearchRawTransactionCmd) Method() string {
-	return "searchrawtransaction"
+func (cmd *SearchRawTransactionsCmd) Method() string {
+	return "searchrawtransactions"
 }
 
 // MarshalJSON returns the JSON encoding of cmd.  Part of the Cmd interface.
-func (cmd *SearchRawTransactionCmd) MarshalJSON() ([]byte, error) {
+func (cmd *SearchRawTransactionsCmd) MarshalJSON() ([]byte, error) {
 	params := make([]interface{}, 1, 4)
 	params[0] = cmd.Address
-	if !cmd.Verbose || cmd.Skip != 0 || cmd.Count != 100 {
+	if cmd.Verbose != 1 || cmd.Skip != 0 || cmd.Count != 100 {
 		params = append(params, cmd.Verbose)
 	}
 	if cmd.Skip != 0 || cmd.Count != 100 {
@@ -5411,7 +5411,7 @@ func (cmd *SearchRawTransactionCmd) MarshalJSON() ([]byte, error) {
 
 // UnmarshalJSON unmarshals the JSON encoding of cmd into cmd.  Part of
 // the Cmd interface.
-func (cmd *SearchRawTransactionCmd) UnmarshalJSON(b []byte) error {
+func (cmd *SearchRawTransactionsCmd) UnmarshalJSON(b []byte) error {
 	// Unmarshal into a RawCmd
 	var r RawCmd
 	if err := json.Unmarshal(b, &r); err != nil {
@@ -5429,9 +5429,9 @@ func (cmd *SearchRawTransactionCmd) UnmarshalJSON(b []byte) error {
 
 	optArgs := make([]interface{}, 0, 3)
 	if len(r.Params) > 1 {
-		var verbose bool
+		var verbose int
 		if err := json.Unmarshal(r.Params[1], &verbose); err != nil {
-			return fmt.Errorf("second optional parameter 'verbose' must be an bool: %v", err)
+			return fmt.Errorf("second optional parameter 'verbose' must be an int: %v", err)
 		}
 		optArgs = append(optArgs, verbose)
 	}
@@ -5450,7 +5450,7 @@ func (cmd *SearchRawTransactionCmd) UnmarshalJSON(b []byte) error {
 		optArgs = append(optArgs, count)
 	}
 
-	newCmd, err := NewSearchRawTransactionCmd(r.Id, address, optArgs...)
+	newCmd, err := NewSearchRawTransactionsCmd(r.Id, address, optArgs...)
 	if err != nil {
 		return err
 	}
@@ -5459,8 +5459,8 @@ func (cmd *SearchRawTransactionCmd) UnmarshalJSON(b []byte) error {
 	return nil
 }
 
-// Enforce that SearchRawTransactionCmd satisifies the Cmd interface.
-var _ Cmd = &SearchRawTransactionCmd{}
+// Enforce that SearchRawTransactionsCmd satisifies the Cmd interface.
+var _ Cmd = &SearchRawTransactionsCmd{}
 
 // SendFromCmd is a type handling custom marshaling and
 // unmarshaling of sendfrom JSON RPC commands.

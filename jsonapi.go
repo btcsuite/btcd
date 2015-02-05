@@ -619,7 +619,7 @@ func CreateMessageWithId(message string, id interface{}, args ...interface{}) ([
 		*/
 		finalMessage, err = jsonWithArgs(message, id, []interface{}{args[0].(string), txList})
 		// one required string (address), one optional bool, two optional ints.
-	case "searchrawtransaction":
+	case "searchrawtransactions":
 		if len(args) > 4 || len(args) == 0 {
 			err = fmt.Errorf("wrong number of arguments for %s", message)
 			return finalMessage, err
@@ -629,7 +629,7 @@ func CreateMessageWithId(message string, id interface{}, args ...interface{}) ([
 		ok3 := true
 		ok4 := true
 		if len(args) >= 2 {
-			_, ok2 = args[1].(bool)
+			_, ok2 = args[1].(int)
 		}
 		if len(args) >= 3 {
 			_, ok3 = args[2].(int)

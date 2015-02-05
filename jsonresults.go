@@ -690,8 +690,8 @@ func ReadResultCmd(cmd string, message []byte) (Reply, error) {
 			result.Result = res
 		}
 
-	case "searchrawtransaction":
-		// searchrawtransaction can either return a list of JSON objects
+	case "searchrawtransactions":
+		// searchrawtransactions can either return a list of JSON objects
 		// or a list of hex-encoded strings depending on the verbose flag.
 		// Choose the right form accordingly.
 		if bytes.IndexByte(objmap["result"], '{') > -1 {

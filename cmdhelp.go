@@ -652,7 +652,7 @@ getpeerinfo.`,
 	"reconsiderblock": `reconsiderblock "hash"
 Remove invalid mark from block specified by "hash" so it is considered again.`,
 
-	"searchrawtransaction": `searchrawtransaction "address" (verbose=1 skip=0 count=100)
+	"searchrawtransactions": `searchrawtransactions "address" (verbose=1 skip=0 count=100)
 Returns raw tx data related to credits or debits to "address". Skip indicates
 the number of leading transactions to leave out of the final result. Count 
 represents the max number of transactions to return. If verbose is false, a 

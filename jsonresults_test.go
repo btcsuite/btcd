@@ -61,9 +61,9 @@ var resulttests = []struct {
 	{"signrawtransaction", []byte(`{"error":null,"id":1,"result":{false}}`), false, false},
 	{"listunspent", []byte(`{"error":null,"id":1,"result":[{"txid":"something"}]}`), false, true},
 	{"listunspent", []byte(`{"error":null,"id":1,"result":[{"txid"}]}`), false, false},
-	{"searchrawtransaction", []byte(`{"error":null,"id":1,"result":{"a":"b"}}`), false, false},
-	{"searchrawtransaction", []byte(`{"error":null,"id":1,"result":["sometxhex"]}`), false, true},
-	{"searchrawtransaction", []byte(`{"error":null,"id":1,"result":[{"hex":"somejunk","version":1}]}`), false, true},
+	{"searchrawtransactions", []byte(`{"error":null,"id":1,"result":{"a":"b"}}`), false, false},
+	{"searchrawtransactions", []byte(`{"error":null,"id":1,"result":["sometxhex"]}`), false, true},
+	{"searchrawtransactions", []byte(`{"error":null,"id":1,"result":[{"hex":"somejunk","version":1}]}`), false, true},
 }
 
 // TestReadResultCmd tests that readResultCmd can properly unmarshall the
