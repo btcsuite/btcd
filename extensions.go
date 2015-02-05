@@ -9,9 +9,9 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"github.com/btcsuite/btcd/wire"
 	"github.com/btcsuite/btcjson"
 	"github.com/btcsuite/btcutil"
-	"github.com/btcsuite/btcwire"
 	"github.com/btcsuite/btcws"
 )
 
@@ -160,7 +160,7 @@ type FutureGetBestBlockResult chan *response
 
 // Receive waits for the response promised by the future and returns the hash
 // and height of the block in the longest (best) chain.
-func (r FutureGetBestBlockResult) Receive() (*btcwire.ShaHash, int32, error) {
+func (r FutureGetBestBlockResult) Receive() (*wire.ShaHash, int32, error) {
 	res, err := receiveFuture(r)
 	if err != nil {
 		return nil, 0, err
@@ -174,7 +174,7 @@ func (r FutureGetBestBlockResult) Receive() (*btcwire.ShaHash, int32, error) {
 	}
 
 	// Convert hash string.
-	hash, err := btcwire.NewShaHashFromStr(bestBlock.Hash)
+	hash, err := wire.NewShaHashFromStr(bestBlock.Hash)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -200,7 +200,7 @@ func (c *Client) GetBestBlockAsync() FutureGetBestBlockResult {
 // chain.
 //
 // NOTE: This is a btcd extension.
-func (c *Client) GetBestBlock() (*btcwire.ShaHash, int32, error) {
+func (c *Client) GetBestBlock() (*wire.ShaHash, int32, error) {
 	return c.GetBestBlockAsync().Receive()
 }
 
@@ -210,7 +210,7 @@ type FutureGetCurrentNetResult chan *response
 
 // Receive waits for the response promised by the future and returns the network
 // the server is running on.
-func (r FutureGetCurrentNetResult) Receive() (btcwire.BitcoinNet, error) {
+func (r FutureGetCurrentNetResult) Receive() (wire.BitcoinNet, error) {
 	res, err := receiveFuture(r)
 	if err != nil {
 		return 0, err
@@ -223,7 +223,7 @@ func (r FutureGetCurrentNetResult) Receive() (btcwire.BitcoinNet, error) {
 		return 0, err
 	}
 
-	return btcwire.BitcoinNet(net), nil
+	return wire.BitcoinNet(net), nil
 }
 
 // GetCurrentNetAsync returns an instance of a type that can be used to get the
@@ -243,7 +243,7 @@ func (c *Client) GetCurrentNetAsync() FutureGetCurrentNetResult {
 // GetCurrentNet returns the network the server is running on.
 //
 // NOTE: This is a btcd extension.
-func (c *Client) GetCurrentNet() (btcwire.BitcoinNet, error) {
+func (c *Client) GetCurrentNet() (wire.BitcoinNet, error) {
 	return c.GetCurrentNetAsync().Receive()
 }
 

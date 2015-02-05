@@ -9,9 +9,9 @@ import (
 	"encoding/hex"
 	"encoding/json"
 
+	"github.com/btcsuite/btcd/wire"
 	"github.com/btcsuite/btcjson"
 	"github.com/btcsuite/btcutil"
-	"github.com/btcsuite/btcwire"
 )
 
 // SigHashType enumerates the available signature hashing types that the
@@ -83,7 +83,7 @@ func (r FutureGetRawTransactionResult) Receive() (*btcutil.Tx, error) {
 	}
 
 	// Deserialize the transaction and return it.
-	var msgTx btcwire.MsgTx
+	var msgTx wire.MsgTx
 	if err := msgTx.Deserialize(bytes.NewReader(serializedTx)); err != nil {
 		return nil, err
 	}
@@ -95,7 +95,7 @@ func (r FutureGetRawTransactionResult) Receive() (*btcutil.Tx, error) {
 // the returned instance.
 //
 // See GetRawTransaction for the blocking version and more details.
-func (c *Client) GetRawTransactionAsync(txHash *btcwire.ShaHash) FutureGetRawTransactionResult {
+func (c *Client) GetRawTransactionAsync(txHash *wire.ShaHash) FutureGetRawTransactionResult {
 	hash := ""
 	if txHash != nil {
 		hash = txHash.String()
@@ -114,7 +114,7 @@ func (c *Client) GetRawTransactionAsync(txHash *btcwire.ShaHash) FutureGetRawTra
 //
 // See GetRawTransactionVerbose to obtain additional information about the
 // transaction.
-func (c *Client) GetRawTransaction(txHash *btcwire.ShaHash) (*btcutil.Tx, error) {
+func (c *Client) GetRawTransaction(txHash *wire.ShaHash) (*btcutil.Tx, error) {
 	return c.GetRawTransactionAsync(txHash).Receive()
 }
 
@@ -146,7 +146,7 @@ func (r FutureGetRawTransactionVerboseResult) Receive() (*btcjson.TxRawResult, e
 // function on the returned instance.
 //
 // See GetRawTransactionVerbose for the blocking version and more details.
-func (c *Client) GetRawTransactionVerboseAsync(txHash *btcwire.ShaHash) FutureGetRawTransactionVerboseResult {
+func (c *Client) GetRawTransactionVerboseAsync(txHash *wire.ShaHash) FutureGetRawTransactionVerboseResult {
 	hash := ""
 	if txHash != nil {
 		hash = txHash.String()
@@ -165,7 +165,7 @@ func (c *Client) GetRawTransactionVerboseAsync(txHash *btcwire.ShaHash) FutureGe
 // its hash.
 //
 // See GetRawTransaction to obtain only the transaction already deserialized.
-func (c *Client) GetRawTransactionVerbose(txHash *btcwire.ShaHash) (*btcjson.TxRawResult, error) {
+func (c *Client) GetRawTransactionVerbose(txHash *wire.ShaHash) (*btcjson.TxRawResult, error) {
 	return c.GetRawTransactionVerboseAsync(txHash).Receive()
 }
 
@@ -220,7 +220,7 @@ type FutureCreateRawTransactionResult chan *response
 // Receive waits for the response promised by the future and returns a new
 // transaction spending the provided inputs and sending to the provided
 // addresses.
-func (r FutureCreateRawTransactionResult) Receive() (*btcwire.MsgTx, error) {
+func (r FutureCreateRawTransactionResult) Receive() (*wire.MsgTx, error) {
 	res, err := receiveFuture(r)
 	if err != nil {
 		return nil, err
@@ -240,7 +240,7 @@ func (r FutureCreateRawTransactionResult) Receive() (*btcwire.MsgTx, error) {
 	}
 
 	// Deserialize the transaction and return it.
-	var msgTx btcwire.MsgTx
+	var msgTx wire.MsgTx
 	if err := msgTx.Deserialize(bytes.NewReader(serializedTx)); err != nil {
 		return nil, err
 	}
@@ -271,7 +271,7 @@ func (c *Client) CreateRawTransactionAsync(inputs []btcjson.TransactionInput,
 // CreateRawTransaction returns a new transaction spending the provided inputs
 // and sending to the provided addresses.
 func (c *Client) CreateRawTransaction(inputs []btcjson.TransactionInput,
-	amounts map[btcutil.Address]btcutil.Amount) (*btcwire.MsgTx, error) {
+	amounts map[btcutil.Address]btcutil.Amount) (*wire.MsgTx, error) {
 
 	return c.CreateRawTransactionAsync(inputs, amounts).Receive()
 }
@@ -283,7 +283,7 @@ type FutureSendRawTransactionResult chan *response
 // Receive waits for the response promised by the future and returns the result
 // of submitting the encoded transaction to the server which then relays it to
 // the network.
-func (r FutureSendRawTransactionResult) Receive() (*btcwire.ShaHash, error) {
+func (r FutureSendRawTransactionResult) Receive() (*wire.ShaHash, error) {
 	res, err := receiveFuture(r)
 	if err != nil {
 		return nil, err
@@ -296,7 +296,7 @@ func (r FutureSendRawTransactionResult) Receive() (*btcwire.ShaHash, error) {
 		return nil, err
 	}
 
-	return btcwire.NewShaHashFromStr(txHashStr)
+	return wire.NewShaHashFromStr(txHashStr)
 }
 
 // SendRawTransactionAsync returns an instance of a type that can be used to get
@@ -304,7 +304,7 @@ func (r FutureSendRawTransactionResult) Receive() (*btcwire.ShaHash, error) {
 // the returned instance.
 //
 // See SendRawTransaction for the blocking version and more details.
-func (c *Client) SendRawTransactionAsync(tx *btcwire.MsgTx, allowHighFees bool) FutureSendRawTransactionResult {
+func (c *Client) SendRawTransactionAsync(tx *wire.MsgTx, allowHighFees bool) FutureSendRawTransactionResult {
 	txHex := ""
 	if tx != nil {
 		// Serialize the transaction and convert to hex string.
@@ -326,7 +326,7 @@ func (c *Client) SendRawTransactionAsync(tx *btcwire.MsgTx, allowHighFees bool) 
 
 // SendRawTransaction submits the encoded transaction to the server which will
 // then relay it to the network.
-func (c *Client) SendRawTransaction(tx *btcwire.MsgTx, allowHighFees bool) (*btcwire.ShaHash, error) {
+func (c *Client) SendRawTransaction(tx *wire.MsgTx, allowHighFees bool) (*wire.ShaHash, error) {
 	return c.SendRawTransactionAsync(tx, allowHighFees).Receive()
 }
 
@@ -337,7 +337,7 @@ type FutureSignRawTransactionResult chan *response
 
 // Receive waits for the response promised by the future and returns the
 // signed transaction as well as whether or not all inputs are now signed.
-func (r FutureSignRawTransactionResult) Receive() (*btcwire.MsgTx, bool, error) {
+func (r FutureSignRawTransactionResult) Receive() (*wire.MsgTx, bool, error) {
 	res, err := receiveFuture(r)
 	if err != nil {
 		return nil, false, err
@@ -357,7 +357,7 @@ func (r FutureSignRawTransactionResult) Receive() (*btcwire.MsgTx, bool, error) 
 	}
 
 	// Deserialize the transaction and return it.
-	var msgTx btcwire.MsgTx
+	var msgTx wire.MsgTx
 	if err := msgTx.Deserialize(bytes.NewReader(serializedTx)); err != nil {
 		return nil, false, err
 	}
@@ -370,7 +370,7 @@ func (r FutureSignRawTransactionResult) Receive() (*btcwire.MsgTx, bool, error) 
 // the returned instance.
 //
 // See SignRawTransaction for the blocking version and more details.
-func (c *Client) SignRawTransactionAsync(tx *btcwire.MsgTx) FutureSignRawTransactionResult {
+func (c *Client) SignRawTransactionAsync(tx *wire.MsgTx) FutureSignRawTransactionResult {
 	txHex := ""
 	if tx != nil {
 		// Serialize the transaction and convert to hex string.
@@ -397,7 +397,7 @@ func (c *Client) SignRawTransactionAsync(tx *btcwire.MsgTx) FutureSignRawTransac
 // private keys for the passed transaction which needs to be signed and uses the
 // default signature hash type.  Use one of the SignRawTransaction# variants to
 // specify that information if needed.
-func (c *Client) SignRawTransaction(tx *btcwire.MsgTx) (*btcwire.MsgTx, bool, error) {
+func (c *Client) SignRawTransaction(tx *wire.MsgTx) (*wire.MsgTx, bool, error) {
 	return c.SignRawTransactionAsync(tx).Receive()
 }
 
@@ -406,7 +406,7 @@ func (c *Client) SignRawTransaction(tx *btcwire.MsgTx) (*btcwire.MsgTx, bool, er
 // function on the returned instance.
 //
 // See SignRawTransaction2 for the blocking version and more details.
-func (c *Client) SignRawTransaction2Async(tx *btcwire.MsgTx, inputs []btcjson.RawTxInput) FutureSignRawTransactionResult {
+func (c *Client) SignRawTransaction2Async(tx *wire.MsgTx, inputs []btcjson.RawTxInput) FutureSignRawTransactionResult {
 	txHex := ""
 	if tx != nil {
 		// Serialize the transaction and convert to hex string.
@@ -436,7 +436,7 @@ func (c *Client) SignRawTransaction2Async(tx *btcwire.MsgTx, inputs []btcjson.Ra
 //
 // See SignRawTransaction if the RPC server already knows the input
 // transactions.
-func (c *Client) SignRawTransaction2(tx *btcwire.MsgTx, inputs []btcjson.RawTxInput) (*btcwire.MsgTx, bool, error) {
+func (c *Client) SignRawTransaction2(tx *wire.MsgTx, inputs []btcjson.RawTxInput) (*wire.MsgTx, bool, error) {
 	return c.SignRawTransaction2Async(tx, inputs).Receive()
 }
 
@@ -445,7 +445,7 @@ func (c *Client) SignRawTransaction2(tx *btcwire.MsgTx, inputs []btcjson.RawTxIn
 // function on the returned instance.
 //
 // See SignRawTransaction3 for the blocking version and more details.
-func (c *Client) SignRawTransaction3Async(tx *btcwire.MsgTx,
+func (c *Client) SignRawTransaction3Async(tx *wire.MsgTx,
 	inputs []btcjson.RawTxInput,
 	privKeysWIF []string) FutureSignRawTransactionResult {
 
@@ -486,9 +486,9 @@ func (c *Client) SignRawTransaction3Async(tx *btcwire.MsgTx,
 // See SignRawTransaction if the RPC server already knows the input
 // transactions and private keys or SignRawTransaction2 if it already knows the
 // private keys.
-func (c *Client) SignRawTransaction3(tx *btcwire.MsgTx,
+func (c *Client) SignRawTransaction3(tx *wire.MsgTx,
 	inputs []btcjson.RawTxInput,
-	privKeysWIF []string) (*btcwire.MsgTx, bool, error) {
+	privKeysWIF []string) (*wire.MsgTx, bool, error) {
 
 	return c.SignRawTransaction3Async(tx, inputs, privKeysWIF).Receive()
 }
@@ -498,7 +498,7 @@ func (c *Client) SignRawTransaction3(tx *btcwire.MsgTx,
 // function on the returned instance.
 //
 // See SignRawTransaction4 for the blocking version and more details.
-func (c *Client) SignRawTransaction4Async(tx *btcwire.MsgTx,
+func (c *Client) SignRawTransaction4Async(tx *wire.MsgTx,
 	inputs []btcjson.RawTxInput, privKeysWIF []string,
 	hashType SigHashType) FutureSignRawTransactionResult {
 
@@ -541,9 +541,9 @@ func (c *Client) SignRawTransaction4Async(tx *btcwire.MsgTx,
 // desired.  Otherwise, see SignRawTransaction if the RPC server already knows
 // the input transactions and private keys, SignRawTransaction2 if it already
 // knows the private keys, or SignRawTransaction3 if it does not know both.
-func (c *Client) SignRawTransaction4(tx *btcwire.MsgTx,
+func (c *Client) SignRawTransaction4(tx *wire.MsgTx,
 	inputs []btcjson.RawTxInput, privKeysWIF []string,
-	hashType SigHashType) (*btcwire.MsgTx, bool, error) {
+	hashType SigHashType) (*wire.MsgTx, bool, error) {
 
 	return c.SignRawTransaction4Async(tx, inputs, privKeysWIF,
 		hashType).Receive()
