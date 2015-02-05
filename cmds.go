@@ -8,8 +8,8 @@ import (
 	"encoding/json"
 	"errors"
 
+	"github.com/btcsuite/btcd/wire"
 	"github.com/btcsuite/btcjson"
-	"github.com/btcsuite/btcwire"
 )
 
 // Help texts
@@ -717,8 +717,8 @@ type OutPoint struct {
 }
 
 // NewOutPointFromWire creates a new OutPoint from the OutPoint structure
-// of the btcwire package.
-func NewOutPointFromWire(op *btcwire.OutPoint) *OutPoint {
+// of the wire package.
+func NewOutPointFromWire(op *wire.OutPoint) *OutPoint {
 	return &OutPoint{
 		Hash:  op.Hash.String(),
 		Index: op.Index,
