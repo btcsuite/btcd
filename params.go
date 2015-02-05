@@ -8,7 +8,7 @@ import (
 	"errors"
 	"math/big"
 
-	"github.com/btcsuite/btcwire"
+	"github.com/btcsuite/btcd/wire"
 )
 
 // These variables are the chain proof-of-work limit parameters for each default
@@ -45,7 +45,7 @@ var (
 // selection criteria.
 type Checkpoint struct {
 	Height int64
-	Hash   *btcwire.ShaHash
+	Hash   *wire.ShaHash
 }
 
 // Params defines a Bitcoin network by its parameters.  These parameters may be
@@ -53,12 +53,12 @@ type Checkpoint struct {
 // and keys for one network from those intended for use on another network.
 type Params struct {
 	Name        string
-	Net         btcwire.BitcoinNet
+	Net         wire.BitcoinNet
 	DefaultPort string
 
 	// Chain parameters
-	GenesisBlock           *btcwire.MsgBlock
-	GenesisHash            *btcwire.ShaHash
+	GenesisBlock           *wire.MsgBlock
+	GenesisHash            *wire.ShaHash
 	PowLimit               *big.Int
 	PowLimitBits           uint32
 	SubsidyHalvingInterval int32
@@ -97,7 +97,7 @@ type Params struct {
 // MainNetParams defines the network parameters for the main Bitcoin network.
 var MainNetParams = Params{
 	Name:        "mainnet",
-	Net:         btcwire.MainNet,
+	Net:         wire.MainNet,
 	DefaultPort: "8333",
 
 	// Chain parameters
@@ -162,7 +162,7 @@ var MainNetParams = Params{
 // 3), this network is sometimes simply called "testnet".
 var RegressionNetParams = Params{
 	Name:        "regtest",
-	Net:         btcwire.TestNet,
+	Net:         wire.TestNet,
 	DefaultPort: "18444",
 
 	// Chain parameters
@@ -211,7 +211,7 @@ var RegressionNetParams = Params{
 // network is sometimes simply called "testnet".
 var TestNet3Params = Params{
 	Name:        "testnet3",
-	Net:         btcwire.TestNet3,
+	Net:         wire.TestNet3,
 	DefaultPort: "18333",
 
 	// Chain parameters
@@ -266,7 +266,7 @@ var TestNet3Params = Params{
 // just turn into another public testnet.
 var SimNetParams = Params{
 	Name:        "simnet",
-	Net:         btcwire.SimNet,
+	Net:         wire.SimNet,
 	DefaultPort: "18555",
 
 	// Chain parameters
@@ -321,7 +321,7 @@ var (
 )
 
 var (
-	registeredNets = map[btcwire.BitcoinNet]struct{}{
+	registeredNets = map[wire.BitcoinNet]struct{}{
 		MainNetParams.Net:       struct{}{},
 		TestNet3Params.Net:      struct{}{},
 		RegressionNetParams.Net: struct{}{},
@@ -409,11 +409,11 @@ func HDPrivateKeyToPublicKeyID(id []byte) ([]byte, error) {
 }
 
 // newShaHashFromStr converts the passed big-endian hex string into a
-// btcwire.ShaHash.  It only differs from the one available in btcwire in that
+// wire.ShaHash.  It only differs from the one available in wire in that
 // it panics on an error since it will only (and must only) be called with
 // hard-coded, and therefore known good, hashes.
-func newShaHashFromStr(hexStr string) *btcwire.ShaHash {
-	sha, err := btcwire.NewShaHashFromStr(hexStr)
+func newShaHashFromStr(hexStr string) *wire.ShaHash {
+	sha, err := wire.NewShaHashFromStr(hexStr)
 	if err != nil {
 		// Ordinarily I don't like panics in library code since it
 		// can take applications down without them having a chance to
