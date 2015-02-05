@@ -48,7 +48,7 @@ func (db *LevelDb) FetchBlockHeightBySha(sha *wire.ShaHash) (int64, error) {
 	return db.getBlkLoc(sha)
 }
 
-// FetchBlockHeaderBySha - return a btcwire ShaHash
+// FetchBlockHeaderBySha - return a ShaHash
 func (db *LevelDb) FetchBlockHeaderBySha(sha *wire.ShaHash) (bh *wire.BlockHeader, err error) {
 	db.dbLock.Lock()
 	defer db.dbLock.Unlock()

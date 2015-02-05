@@ -195,12 +195,12 @@ information.
     * [btcws](https://github.com/btcsuite/btcws) - Custom types for btcd
 	  websocket extension commands (registers the extension commands with
 	  [btcjson](https://github.com/btcsuite/btcjson))
-    * [btcwire](https://github.com/btcsuite/btcwire) - Implements the Bitcoin
-	  wire protocol
+    * [wire](https://github.com/btcsuite/btcd/tree/master/wire) - Implements the
+	  Bitcoin wire protocol
     * [blockchain](https://github.com/btcsuite/btcd/blockchain) - Implements
 	  Bitcoin block handling and chain selection rules
-    * [txscript](https://github.com/btcsuite/btcd/txscript) - Implements the
-	  Bitcoin transaction scripting language
+    * [txscript](https://github.com/btcsuite/btcd/tree/master/txscript) -
+	  Implements the Bitcoin transaction scripting language
     * [btcec](https://github.com/btcsuite/btcec) - Implements support for the
 	  elliptic curve cryptographic functions needed for the Bitcoin scripts
     * [database](https://github.com/btcsuite/btcd/tree/master/database) -

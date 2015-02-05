@@ -38,8 +38,8 @@ type tTxInsertData struct {
 }
 
 // newShaHashFromStr converts the passed big-endian hex string into a
-// wire.ShaHash.  It only differs from the one available in btcwire in that
-// it ignores the error since it will only (and must only) be called with
+// wire.ShaHash.  It only differs from the one available in wire in that it
+// ignores the error since it will only (and must only) be called with
 // hard-coded, and therefore known good, hashes.
 func newShaHashFromStr(hexStr string) *wire.ShaHash {
 	sha, _ := wire.NewShaHashFromStr(hexStr)

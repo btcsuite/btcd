@@ -21,9 +21,9 @@ const (
 	// generatedBlockVersion is the version of the block being generated.
 	// It is defined as a constant here rather than using the
 	// wire.BlockVersion constant since a change in the block version
-	// will require changes to the generated block.  Using the btcwire
-	// constant for generated block version could allow creation of invalid
-	// blocks for the updated version.
+	// will require changes to the generated block.  Using the wire constant
+	// for generated block version could allow creation of invalid blocks
+	// for the updated version.
 	generatedBlockVersion = 2
 
 	// minHighPriority is the minimum priority value that allows a

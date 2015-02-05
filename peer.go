@@ -1417,8 +1417,8 @@ out:
 					// command in the header if at least
 					// that much of the message was valid,
 					// but that is not currently exposed by
-					// btcwire, so just used malformed for
-					// the command.
+					// wire, so just used malformed for the
+					// command.
 					p.PushRejectMsg("malformed",
 						wire.RejectMalformed, errMsg,
 						nil, true)
