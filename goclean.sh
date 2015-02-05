@@ -13,7 +13,7 @@ set -e
 test -z $(gofmt -l -w . | tee /dev/stderr)
 test -z $(goimports -l -w . | tee /dev/stderr)
 test -z $(golint ./... | grep -v "ALL_CAPS" | grep -v "OP_" | tee /dev/stderr)
-go vet ./...
+go tool vet -structtags=false .
 env GORACE="halt_on_error=1" go test -v -race ./...
 
 # Run test coverage on each subdirectories and merge the coverage profile.

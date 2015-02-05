@@ -1,11 +1,11 @@
 language: go
 go:
-  - go1.3
-  - release
+  - 1.3.3
+  - 1.4.1
 sudo: false
 before_install:
   - gotools=golang.org/x/tools
-  - if [ "$TRAVIS_GO_VERSION" = "release" ] || [ "$TRAVIS_GO_VERSION" = "go1.3.3" ]; then gotools=code.google.com/p/go.tools; fi
+  - if [ "$TRAVIS_GO_VERSION" = "go1.3.3" ]; then gotools=code.google.com/p/go.tools; fi
 install:
   - go get -d -t -v ./...
   - go get -v $gotools/cmd/cover
