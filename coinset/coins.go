@@ -5,13 +5,13 @@ import (
 	"errors"
 	"sort"
 
+	"github.com/btcsuite/btcd/wire"
 	"github.com/btcsuite/btcutil"
-	"github.com/btcsuite/btcwire"
 )
 
 // Coin represents a spendable transaction outpoint
 type Coin interface {
-	Hash() *btcwire.ShaHash
+	Hash() *wire.ShaHash
 	Index() uint32
 	Value() btcutil.Amount
 	PkScript() []byte
@@ -118,19 +118,19 @@ func (cs *CoinSet) removeElement(e *list.Element) Coin {
 }
 
 // NewMsgTxWithInputCoins takes the coins in the CoinSet and makes them
-// the inputs to a new btcwire.MsgTx which is returned.
-func NewMsgTxWithInputCoins(inputCoins Coins) *btcwire.MsgTx {
-	msgTx := btcwire.NewMsgTx()
+// the inputs to a new wire.MsgTx which is returned.
+func NewMsgTxWithInputCoins(inputCoins Coins) *wire.MsgTx {
+	msgTx := wire.NewMsgTx()
 	coins := inputCoins.Coins()
-	msgTx.TxIn = make([]*btcwire.TxIn, len(coins))
+	msgTx.TxIn = make([]*wire.TxIn, len(coins))
 	for i, coin := range coins {
-		msgTx.TxIn[i] = &btcwire.TxIn{
-			PreviousOutPoint: btcwire.OutPoint{
+		msgTx.TxIn[i] = &wire.TxIn{
+			PreviousOutPoint: wire.OutPoint{
 				Hash:  *coin.Hash(),
 				Index: coin.Index(),
 			},
 			SignatureScript: nil,
-			Sequence:        btcwire.MaxTxInSequenceNum,
+			Sequence:        wire.MaxTxInSequenceNum,
 		}
 	}
 	return msgTx
@@ -354,7 +354,7 @@ type SimpleCoin struct {
 var _ Coin = &SimpleCoin{}
 
 // Hash returns the hash value of the transaction on which the Coin is an output
-func (c *SimpleCoin) Hash() *btcwire.ShaHash {
+func (c *SimpleCoin) Hash() *wire.ShaHash {
 	return c.Tx.Sha()
 }
 
@@ -364,7 +364,7 @@ func (c *SimpleCoin) Index() uint32 {
 }
 
 // txOut returns the TxOut of the transaction the Coin represents
-func (c *SimpleCoin) txOut() *btcwire.TxOut {
+func (c *SimpleCoin) txOut() *wire.TxOut {
 	return c.Tx.MsgTx().TxOut[c.TxIndex]
 }
 

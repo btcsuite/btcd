@@ -6,16 +6,16 @@ package bloom
 
 import (
 	"github.com/btcsuite/btcd/blockchain"
+	"github.com/btcsuite/btcd/wire"
 	"github.com/btcsuite/btcutil"
-	"github.com/btcsuite/btcwire"
 )
 
 // merkleBlock is used to house intermediate information needed to generate a
-// btcwire.MsgMerkleBlock according to a filter.
+// wire.MsgMerkleBlock according to a filter.
 type merkleBlock struct {
 	numTx       uint32
-	allHashes   []*btcwire.ShaHash
-	finalHashes []*btcwire.ShaHash
+	allHashes   []*wire.ShaHash
+	finalHashes []*wire.ShaHash
 	matchedBits []byte
 	bits        []byte
 }
@@ -28,12 +28,12 @@ func (m *merkleBlock) calcTreeWidth(height uint32) uint32 {
 
 // calcHash returns the hash for a sub-tree given a depth-first height and
 // node position.
-func (m *merkleBlock) calcHash(height, pos uint32) *btcwire.ShaHash {
+func (m *merkleBlock) calcHash(height, pos uint32) *wire.ShaHash {
 	if height == 0 {
 		return m.allHashes[pos]
 	}
 
-	var right *btcwire.ShaHash
+	var right *wire.ShaHash
 	left := m.calcHash(height-1, pos*2)
 	if pos*2+1 < m.calcTreeWidth(height-1) {
 		right = m.calcHash(height-1, pos*2+1)
@@ -76,18 +76,18 @@ func (m *merkleBlock) traverseAndBuild(height, pos uint32) {
 	}
 }
 
-// NewMerkleBlock returns a new *btcwire.MsgMerkleBlock and an array of the matched
+// NewMerkleBlock returns a new *wire.MsgMerkleBlock and an array of the matched
 // transaction hashes based on the passed block and filter.
-func NewMerkleBlock(block *btcutil.Block, filter *Filter) (*btcwire.MsgMerkleBlock, []*btcwire.ShaHash) {
+func NewMerkleBlock(block *btcutil.Block, filter *Filter) (*wire.MsgMerkleBlock, []*wire.ShaHash) {
 	numTx := uint32(len(block.Transactions()))
 	mBlock := merkleBlock{
 		numTx:       numTx,
-		allHashes:   make([]*btcwire.ShaHash, 0, numTx),
+		allHashes:   make([]*wire.ShaHash, 0, numTx),
 		matchedBits: make([]byte, 0, numTx),
 	}
 
 	// Find and keep track of any transactions that match the filter.
-	var matchedHashes []*btcwire.ShaHash
+	var matchedHashes []*wire.ShaHash
 	for _, tx := range block.Transactions() {
 		if filter.MatchTxAndUpdate(tx) {
 			mBlock.matchedBits = append(mBlock.matchedBits, 0x01)
@@ -108,10 +108,10 @@ func NewMerkleBlock(block *btcutil.Block, filter *Filter) (*btcwire.MsgMerkleBlo
 	mBlock.traverseAndBuild(height, 0)
 
 	// Create and return the merkle block.
-	msgMerkleBlock := btcwire.MsgMerkleBlock{
+	msgMerkleBlock := wire.MsgMerkleBlock{
 		Header:       block.MsgBlock().Header,
 		Transactions: uint32(mBlock.numTx),
-		Hashes:       make([]*btcwire.ShaHash, 0, len(mBlock.finalHashes)),
+		Hashes:       make([]*wire.ShaHash, 0, len(mBlock.finalHashes)),
 		Flags:        make([]byte, (len(mBlock.bits)+7)/8),
 	}
 	for _, sha := range mBlock.finalHashes {

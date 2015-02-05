@@ -6,30 +6,30 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/btcsuite/btcd/wire"
 	"github.com/btcsuite/btcutil"
 	"github.com/btcsuite/btcutil/coinset"
-	"github.com/btcsuite/btcwire"
 	"github.com/btcsuite/fastsha256"
 )
 
 type TestCoin struct {
-	TxHash     *btcwire.ShaHash
+	TxHash     *wire.ShaHash
 	TxIndex    uint32
 	TxValue    btcutil.Amount
 	TxNumConfs int64
 }
 
-func (c *TestCoin) Hash() *btcwire.ShaHash { return c.TxHash }
-func (c *TestCoin) Index() uint32          { return c.TxIndex }
-func (c *TestCoin) Value() btcutil.Amount  { return c.TxValue }
-func (c *TestCoin) PkScript() []byte       { return nil }
-func (c *TestCoin) NumConfs() int64        { return c.TxNumConfs }
-func (c *TestCoin) ValueAge() int64        { return int64(c.TxValue) * c.TxNumConfs }
+func (c *TestCoin) Hash() *wire.ShaHash   { return c.TxHash }
+func (c *TestCoin) Index() uint32         { return c.TxIndex }
+func (c *TestCoin) Value() btcutil.Amount { return c.TxValue }
+func (c *TestCoin) PkScript() []byte      { return nil }
+func (c *TestCoin) NumConfs() int64       { return c.TxNumConfs }
+func (c *TestCoin) ValueAge() int64       { return int64(c.TxValue) * c.TxNumConfs }
 
 func NewCoin(index int64, value btcutil.Amount, numConfs int64) coinset.Coin {
 	h := fastsha256.New()
 	h.Write([]byte(fmt.Sprintf("%d", index)))
-	hash, _ := btcwire.NewShaHash(h.Sum(nil))
+	hash, _ := wire.NewShaHash(h.Sum(nil))
 	c := &TestCoin{
 		TxHash:     hash,
 		TxIndex:    0,

@@ -10,8 +10,8 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/btcsuite/btcd/wire"
 	"github.com/btcsuite/btcutil"
-	"github.com/btcsuite/btcwire"
 	"github.com/davecgh/go-spew/spew"
 )
 
@@ -36,7 +36,7 @@ func TestTx(t *testing.T) {
 
 	// Hash for block 100,000 transaction 0.
 	wantShaStr := "8c14f0db3df150123e6f3dbbf30f8b955a8249b62ac1d1ff16284aefa3d06d87"
-	wantSha, err := btcwire.NewShaHashFromStr(wantShaStr)
+	wantSha, err := wire.NewShaHashFromStr(wantShaStr)
 	if err != nil {
 		t.Errorf("NewShaHashFromStr: %v", err)
 	}

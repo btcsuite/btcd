@@ -13,13 +13,13 @@ import (
 
 	"golang.org/x/crypto/ripemd160"
 
+	"github.com/btcsuite/btcd/wire"
 	"github.com/btcsuite/btcnet"
 	"github.com/btcsuite/btcutil"
-	"github.com/btcsuite/btcwire"
 )
 
 // invalidNet is an invalid bitcoin network.
-const invalidNet = btcwire.BitcoinNet(0xffffffff)
+const invalidNet = wire.BitcoinNet(0xffffffff)
 
 func TestAddresses(t *testing.T) {
 	tests := []struct {
