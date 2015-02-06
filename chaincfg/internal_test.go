@@ -1,4 +1,4 @@
-package btcnet
+package chaincfg
 
 import (
 	"testing"

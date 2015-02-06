@@ -1,11 +1,11 @@
-package btcnet_test
+package chaincfg_test
 
 import (
 	"bytes"
 	"reflect"
 	"testing"
 
-	. "github.com/btcsuite/btcnet"
+	. "github.com/btcsuite/btcd/chaincfg"
 )
 
 // Define some of the required parameters for a user-registered

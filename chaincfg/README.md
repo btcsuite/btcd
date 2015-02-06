@@ -1,19 +1,15 @@
-btcnet
-======
+chaincfg
+========
 
-[![Build Status](http://img.shields.io/travis/btcsuite/btcnet.svg)]
-(https://travis-ci.org/btcsuite/btcnet) [![Coverage Status]
-(https://img.shields.io/coveralls/btcsuite/btcnet.svg)]
-(https://coveralls.io/r/btcsuite/btcnet?branch=master) [![ISC License]
+[![Build Status](http://img.shields.io/travis/btcsuite/btcd.svg)]
+(https://travis-ci.org/btcsuite/btcd) [![ISC License]
 (http://img.shields.io/badge/license-ISC-blue.svg)](http://copyfree.org)
 
-Package btcnet defines the network parameters for the three standard Bitcoin 
-networks and provides the ability for callers to define their own custom 
+Package chaincfg defines chain configuration parameters for the three standard
+Bitcoin networks and provides the ability for callers to define their own custom
 Bitcoin networks.
 
-This package is one of the core packages from btcd, an alternative full-node
-implementation of Bitcoin which is under active development by Conformal.
-Although it was primarily written for btcd, this package has intentionally been
+Although this package was primarily written for btcd, it has intentionally been
 designed so it can be used as a standalone package for any projects needing to
 use parameters for the standard Bitcoin networks or for projects needing to
 define their own network.
@@ -29,27 +25,27 @@ import (
 	"log"
 
 	"github.com/btcsuite/btcutil"
-	"github.com/btcsuite/btcnet"
+	"github.com/btcsuite/btcd/chaincfg"
 )
 
 var testnet = flag.Bool("testnet", false, "operate on the testnet Bitcoin network")
 
 // By default (without -testnet), use mainnet.
-var netParams = &btcnet.MainNetParams
+var chainParams = &chaincfg.MainNetParams
 
 func main() {
 	flag.Parse()
 
 	// Modify active network parameters if operating on testnet.
 	if *testnet {
-		netParams = &btcnet.TestNet3Params
+		chainParams = &chaincfg.TestNet3Params
 	}
 
 	// later...
 
 	// Create and print new payment address, specific to the active network.
 	pubKeyHash := make([]byte, 20)
-	addr, err := btcutil.NewAddressPubKeyHash(pubKeyHash, netParams)
+	addr, err := btcutil.NewAddressPubKeyHash(pubKeyHash, chainParams)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -60,20 +56,20 @@ func main() {
 ## Documentation
 
 [![GoDoc](https://img.shields.io/badge/godoc-reference-blue.svg)]
-(http://godoc.org/github.com/btcsuite/btcnet)
+(http://godoc.org/github.com/btcsuite/btcd/chaincfg)
 
 Full `go doc` style documentation for the project can be viewed online without
 installing this package by using the GoDoc site
-[here](http://godoc.org/github.com/btcsuite/btcnet).
+[here](http://godoc.org/github.com/btcsuite/btcd/chaincfg).
 
 You can also view the documentation locally once the package is installed with
 the `godoc` tool by running `godoc -http=":6060"` and pointing your browser to
-http://localhost:6060/pkg/github.com/btcsuite/btcnet
+http://localhost:6060/pkg/github.com/btcsuite/btcd/chaincfg
 
 ## Installation
 
 ```bash
-$ go get github.com/btcsuite/btcnet
+$ go get github.com/btcsuite/btcd/chaincfg
 ```
 
 ## GPG Verification Key
@@ -98,5 +94,5 @@ signature perform the following:
 
 ## License
 
-Package btcnet is licensed under the [copyfree](http://copyfree.org) ISC
+Package chaincfg is licensed under the [copyfree](http://copyfree.org) ISC
 License.
