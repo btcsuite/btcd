@@ -15,8 +15,8 @@ import (
 
 	"golang.org/x/crypto/ripemd160"
 
+	"github.com/btcsuite/btcd/btcec"
 	"github.com/btcsuite/btcd/wire"
-	"github.com/btcsuite/btcec"
 	"github.com/btcsuite/fastsha256"
 )
 
