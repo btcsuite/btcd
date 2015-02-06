@@ -1780,6 +1780,16 @@ func opcodeCheckSig(op *parsedOpcode, s *Script) error {
 	hashType := SigHashType(sigStr[len(sigStr)-1])
 	sigStr = sigStr[:len(sigStr)-1]
 
+	if err := s.checkHashTypeEncoding(hashType); err != nil {
+		return err
+	}
+	if err := s.checkSignatureEncoding(sigStr); err != nil {
+		return err
+	}
+	if err := s.checkPubKeyEncoding(pkStr); err != nil {
+		return err
+	}
+
 	// Get script from the last OP_CODESEPARATOR and without any subsequent
 	// OP_CODESEPARATORs
 	subScript := s.subScript()
@@ -1797,7 +1807,7 @@ func opcodeCheckSig(op *parsedOpcode, s *Script) error {
 	}
 
 	var signature *btcec.Signature
-	if s.der {
+	if s.der || s.verifyStrictEncoding || s.verifyDERSignatures {
 		signature, err = btcec.ParseDERSignature(sigStr, btcec.S256())
 	} else {
 		signature, err = btcec.ParseSignature(sigStr, btcec.S256())
@@ -1831,79 +1841,68 @@ func opcodeCheckSigVerify(op *parsedOpcode, s *Script) error {
 	return err
 }
 
-type sig struct {
-	s  *btcec.Signature
-	ht byte
+// parsedSigInfo houses a raw signature along with its parsed form and a flag
+// for whether or not it has already been parsed.  It is used to prevent parsing
+// the same signature multiple times when verify an multisig.
+type parsedSigInfo struct {
+	signature       []byte
+	parsedSignature *btcec.Signature
+	parsed          bool
 }
 
 // stack; sigs <numsigs> pubkeys <numpubkeys>
 func opcodeCheckMultiSig(op *parsedOpcode, s *Script) error {
-	numPubkeys, err := s.dstack.PopInt()
+	numKeys, err := s.dstack.PopInt()
 	if err != nil {
 		return err
 	}
 
 	// PopInt promises that the int returned is 32 bit.
-	npk := int(numPubkeys.Int64())
-	if npk < 0 || npk > MaxPubKeysPerMultiSig {
+	numPubKeys := int(numKeys.Int64())
+	if numPubKeys < 0 || numPubKeys > MaxPubKeysPerMultiSig {
 		return ErrStackTooManyPubkeys
 	}
-	s.numOps += npk
+	s.numOps += numPubKeys
 	if s.numOps > MaxOpsPerScript {
 		return ErrStackTooManyOperations
 	}
-	pubKeyStrings := make([][]byte, npk)
-	pubKeys := make([]*btcec.PublicKey, npk)
-	for i := range pubKeys {
-		pubKeyStrings[i], err = s.dstack.PopByteArray()
+
+	pubKeys := make([][]byte, 0, numPubKeys)
+	for i := 0; i < numPubKeys; i++ {
+		pubKey, err := s.dstack.PopByteArray()
 		if err != nil {
 			return err
 		}
+		pubKeys = append(pubKeys, pubKey)
 	}
 
-	numSignatures, err := s.dstack.PopInt()
+	numSigs, err := s.dstack.PopInt()
 	if err != nil {
 		return err
 	}
 	// PopInt promises that the int returned is 32 bit.
-	nsig := int(numSignatures.Int64())
-	if nsig < 0 {
-		return fmt.Errorf("number of signatures %d is less than 0", nsig)
+	numSignatures := int(numSigs.Int64())
+	if numSignatures < 0 {
+		return fmt.Errorf("number of signatures '%d' is less than 0",
+			numSignatures)
 	}
-	if nsig > npk {
-		return fmt.Errorf("more signatures than pubkeys: %d > %d", nsig, npk)
+	if numSignatures > numPubKeys {
+		return fmt.Errorf("more signatures than pubkeys: %d > %d",
+			numSignatures, numPubKeys)
 	}
 
-	sigStrings := make([][]byte, nsig)
-	signatures := make([]sig, 0, nsig)
-	for i := range sigStrings {
-		sigStrings[i], err = s.dstack.PopByteArray()
+	signatures := make([]*parsedSigInfo, 0, numSignatures)
+	for i := 0; i < numSignatures; i++ {
+		signature, err := s.dstack.PopByteArray()
 		if err != nil {
 			return err
 		}
-		if len(sigStrings[i]) == 0 {
-			continue
-		}
-		sig := sig{}
-		sig.ht = sigStrings[i][len(sigStrings[i])-1]
-		// skip off the last byte for hashtype
-		if s.der {
-			sig.s, err =
-				btcec.ParseDERSignature(
-					sigStrings[i][:len(sigStrings[i])-1],
-					btcec.S256())
-		} else {
-			sig.s, err =
-				btcec.ParseSignature(
-					sigStrings[i][:len(sigStrings[i])-1],
-					btcec.S256())
-		}
-		if err == nil {
-			signatures = append(signatures, sig)
-		}
+		sigInfo := &parsedSigInfo{signature: signature}
+		signatures = append(signatures, sigInfo)
 	}
 
-	// bug in bitcoind mean we pop one more stack value than should be used.
+	// bug in bitcoind means we pop one more stack value than should be
+	// used.
 	dummy, err := s.dstack.PopByteArray()
 	if err != nil {
 		return err
@@ -1914,56 +1913,102 @@ func opcodeCheckMultiSig(op *parsedOpcode, s *Script) error {
 			len(dummy))
 	}
 
-	if len(signatures) == 0 {
-		s.dstack.PushBool(nsig == 0)
-		return nil
-	} else if len(signatures) < nsig {
-		s.dstack.PushBool(false)
-		return nil
-	}
-
 	// Trim OP_CODESEPARATORs
 	script := s.subScript()
 
 	// Remove any of the signatures that happen to be in the script.
 	// can't sign somthing containing the signature you're making, after
 	// all
-	for i := range sigStrings {
-		script = removeOpcodeByData(script, sigStrings[i])
+	for _, sigInfo := range signatures {
+		script = removeOpcodeByData(script, sigInfo.signature)
 	}
 
-	curPk := 0
-	for i := range signatures {
-		// check signatures.
-		success := false
-
-		hash := calcScriptHash(script, SigHashType(signatures[i].ht),
-			&s.tx, s.txidx)
-	inner:
-		// Find first pubkey that successfully validates signature.
-		// we start off the search from the key that was successful
-		// last time.
-		for ; curPk < len(pubKeys); curPk++ {
-			if pubKeys[curPk] == nil {
-				pubKeys[curPk], err =
-					btcec.ParsePubKey(pubKeyStrings[curPk],
-						btcec.S256())
-				if err != nil {
-					continue
-				}
-			}
-			success = signatures[i].s.Verify(hash, pubKeys[curPk])
-			if success {
-				break inner
-			}
+	success := true
+	numPubKeys++
+	pubKeyIdx := -1
+	signatureIdx := 0
+	for numSignatures > 0 {
+		// When there are more signatures than public keys remaining,
+		// there is no way to succeed since too many signatures are
+		// invalid, so exit early.
+		pubKeyIdx++
+		numPubKeys--
+		if numSignatures > numPubKeys {
+			success = false
+			break
 		}
-		if success == false {
-			s.dstack.PushBool(false)
-			return nil
+
+		sigInfo := signatures[signatureIdx]
+		pubKey := pubKeys[pubKeyIdx]
+
+		// The order of the signature and public key evaluation is
+		// important here since it can be distinguished by an
+		// OP_CHECKMULTISIG NOT when the strict encoding flag is set.
+
+		rawSig := sigInfo.signature
+		if len(rawSig) == 0 {
+			// Skip to the next pubkey if signature is empty.
+			continue
+		}
+
+		// Split the signature into hash type and signature components.
+		hashType := SigHashType(rawSig[len(rawSig)-1])
+		signature := rawSig[:len(rawSig)-1]
+
+		// Only parse and check the signature encoding once.
+		var parsedSig *btcec.Signature
+		if !sigInfo.parsed {
+			if err := s.checkHashTypeEncoding(hashType); err != nil {
+				return err
+			}
+			if err := s.checkSignatureEncoding(signature); err != nil {
+				return err
+			}
+
+			// Parse the signature.
+			var err error
+			if s.der || s.verifyStrictEncoding || s.verifyDERSignatures {
+				parsedSig, err = btcec.ParseDERSignature(signature,
+					btcec.S256())
+			} else {
+				parsedSig, err = btcec.ParseSignature(signature,
+					btcec.S256())
+			}
+			sigInfo.parsed = true
+			if err != nil {
+				continue
+			}
+			sigInfo.parsedSignature = parsedSig
+		} else {
+			// Skip to the next pubkey if the signature is invalid.
+			if sigInfo.parsedSignature == nil {
+				continue
+			}
+
+			// Use the already parsed signature.
+			parsedSig = sigInfo.parsedSignature
+		}
+
+		if err := s.checkPubKeyEncoding(pubKey); err != nil {
+			return err
+		}
+
+		// Parse the pubkey.
+		parsedPubKey, err := btcec.ParsePubKey(pubKey, btcec.S256())
+		if err != nil {
+			continue
+		}
+
+		hash := calcScriptHash(script, hashType, &s.tx, s.txidx)
+
+		if parsedSig.Verify(hash, parsedPubKey) {
+			// PubKey verified, move on to the next signature.
+			signatureIdx++
+			numSignatures--
 		}
 	}
-	s.dstack.PushBool(true)
 
+	s.dstack.PushBool(success)
 	return nil
 }
 

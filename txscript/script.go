@@ -122,6 +122,10 @@ var (
 	// ErrStackOverflow is returned when stack and altstack combined depth
 	// is over the limit.
 	ErrStackOverflow = errors.New("Stacks overflowed")
+
+	// ErrStackInvalidPubKey is returned when the ScriptVerifyScriptEncoding
+	// flag is set and the script contains invalid pubkeys.
+	ErrStackInvalidPubKey = errors.New("invalid strict pubkey")
 )
 
 const (
@@ -209,6 +213,8 @@ type Script struct {
 	der                      bool     // enforce DER encoding
 	strictMultiSig           bool     // verify multisig stack item is zero length
 	discourageUpgradableNops bool     // NOP1 to NOP10 are reserved for future soft-fork upgrades
+	verifyStrictEncoding     bool     // verify strict encoding of signatures
+	verifyDERSignatures      bool     // verify signatures compily with the DER
 	savedFirstStack          [][]byte // stack from first script for bip16 scripts
 }
 
@@ -326,6 +332,126 @@ func IsPushOnlyScript(script []byte) bool {
 		return false
 	}
 	return isPushOnly(pops)
+}
+
+// checkHashTypeEncoding returns whether or not the passed hashtype adheres to
+// the strict encoding requirements if enabled.
+func (s *Script) checkHashTypeEncoding(hashType SigHashType) error {
+	if !s.verifyStrictEncoding {
+		return nil
+	}
+
+	sigHashType := hashType & ^SigHashAnyOneCanPay
+	if sigHashType < SigHashAll || sigHashType > SigHashSingle {
+		return fmt.Errorf("invalid hashtype: 0x%x\n", hashType)
+	}
+	return nil
+}
+
+// checkPubKeyEncoding returns whether or not the passed public key adheres to
+// the strict encoding requirements if enabled.
+func (s *Script) checkPubKeyEncoding(pubKey []byte) error {
+	if !s.verifyStrictEncoding {
+		return nil
+	}
+
+	if len(pubKey) == 33 && (pubKey[0] == 0x02 || pubKey[0] == 0x03) {
+		// Compressed
+		return nil
+	}
+	if len(pubKey) == 65 && pubKey[0] == 0x04 {
+		// Uncompressed
+		return nil
+	}
+	return ErrStackInvalidPubKey
+}
+
+// checkSignatureEncoding returns whether or not the passed signature adheres to
+// the strict encoding requirements if enabled.
+func (s *Script) checkSignatureEncoding(sig []byte) error {
+	if !s.verifyStrictEncoding && !s.verifyDERSignatures {
+		return nil
+	}
+
+	if len(sig) < 8 {
+		// Too short
+		return fmt.Errorf("malformed signature: too short: %d < 8",
+			len(sig))
+	}
+	if len(sig) > 72 {
+		// Too long
+		return fmt.Errorf("malformed signature: too long: %d > 72",
+			len(sig))
+	}
+	if sig[0] != 0x30 {
+		// Wrong type
+		return fmt.Errorf("malformed signature: format has wrong type: 0x%x",
+			sig[0])
+	}
+	if int(sig[1]) != len(sig)-2 {
+		// Invalid length
+		return fmt.Errorf("malformed signature: bad length: %d != %d",
+			sig[1], len(sig)-2)
+	}
+
+	rLen := int(sig[3])
+
+	// Make sure S is inside the signature
+	if rLen+5 > len(sig) {
+		return fmt.Errorf("malformed signature: S out of bounds")
+	}
+
+	sLen := int(sig[rLen+5])
+
+	// The length of the elements does not match
+	// the length of the signature
+	if rLen+sLen+6 != len(sig) {
+		return fmt.Errorf("malformed signature: invalid R length")
+	}
+
+	// R elements must be integers
+	if sig[2] != 0x02 {
+		return fmt.Errorf("malformed signature: missing first integer marker")
+	}
+
+	// Zero-length integers are not allowed for R
+	if rLen == 0 {
+		return fmt.Errorf("malformed signature: R length is zero")
+	}
+
+	// R must not be negative
+	if sig[4]&0x80 != 0 {
+		return fmt.Errorf("malformed signature: R value is negative")
+	}
+
+	// Null bytes at the start of R are not allowed, unless R would
+	// otherwise be interpreted as a negative number.
+	if rLen > 1 && sig[4] == 0x00 && sig[5]&0x80 == 0 {
+		return fmt.Errorf("malformed signature: invalid R value")
+	}
+
+	// S elements must be integers
+	if sig[rLen+4] != 0x02 {
+		return fmt.Errorf("malformed signature: missing second integer marker")
+	}
+
+	// Zero-length integers are not allowed for S
+	if sLen == 0 {
+		return fmt.Errorf("malformed signature: S length is zero")
+	}
+
+	// S must not be negative
+	if sig[rLen+6]&0x80 != 0 {
+		return fmt.Errorf("malformed signature: S value is negative")
+	}
+
+	// Null bytes at the start of S are not allowed, unless S would
+	// otherwise be interpreted as a negative number.
+	if sLen > 1 && sig[rLen+6] == 0x00 && sig[rLen+7]&0x80 == 0 {
+		return fmt.Errorf("malformed signature: invalid S value")
+	}
+
+	return nil
 }
 
 // canonicalPush returns true if the object is either not a push instruction
@@ -523,9 +649,17 @@ const (
 	// executed.
 	ScriptDiscourageUpgradableNops
 
+	// ScriptVerifyDERSignatures defines that signatures are required
+	// to compily with the DER format.
+	ScriptVerifyDERSignatures
+
 	// ScriptVerifySigPushOnly defines that signature scripts must contain
 	// only pushed data.  This is rule 2 of BIP0062.
 	ScriptVerifySigPushOnly
+
+	// ScriptVerifyStrictEncoding defines that signature scripts and
+	// public keys must follow the strict encoding requirements.
+	ScriptVerifyStrictEncoding
 )
 
 // NewScript returns a new script engine for the provided tx and input idx with
@@ -577,6 +711,12 @@ func NewScript(scriptSig []byte, scriptPubKey []byte, txidx int, tx *wire.MsgTx,
 	}
 	if flags&ScriptDiscourageUpgradableNops == ScriptDiscourageUpgradableNops {
 		m.discourageUpgradableNops = true
+	}
+	if flags&ScriptVerifyStrictEncoding == ScriptVerifyStrictEncoding {
+		m.verifyStrictEncoding = true
+	}
+	if flags&ScriptVerifyDERSignatures == ScriptVerifyDERSignatures {
+		m.verifyDERSignatures = true
 	}
 
 	m.tx = *tx
