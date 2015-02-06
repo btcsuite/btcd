@@ -490,7 +490,7 @@ func (m *wsNotificationManager) notifyForNewTx(clients map[chan struct{}]*wsClie
 	for _, wsc := range clients {
 		if wsc.verboseTxUpdates {
 			if verboseNtfn == nil {
-				net := m.server.server.netParams
+				net := m.server.server.chainParams
 				rawTx, err := createTxRawResult(net, txShaStr,
 					mtx, nil, 0, nil)
 				if err != nil {
@@ -625,7 +625,7 @@ func (m *wsNotificationManager) notifyForTxOuts(ops map[wire.OutPoint]map[chan s
 	wscNotified := make(map[chan struct{}]struct{})
 	for i, txOut := range tx.MsgTx().TxOut {
 		_, txAddrs, _, err := txscript.ExtractPkScriptAddrs(
-			txOut.PkScript, m.server.server.netParams)
+			txOut.PkScript, m.server.server.chainParams)
 		if err != nil {
 			continue
 		}
@@ -1513,7 +1513,7 @@ func rescanBlock(wsc *wsClient, lookups *rescanKeys, blk *btcutil.Block) {
 
 		for txOutIdx, txout := range tx.MsgTx().TxOut {
 			_, addrs, _, _ := txscript.ExtractPkScriptAddrs(
-				txout.PkScript, wsc.server.server.netParams)
+				txout.PkScript, wsc.server.server.chainParams)
 
 			for _, addr := range addrs {
 				switch a := addr.(type) {

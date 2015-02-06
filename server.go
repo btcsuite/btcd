@@ -21,10 +21,10 @@ import (
 
 	"github.com/btcsuite/btcd/addrmgr"
 	"github.com/btcsuite/btcd/blockchain"
+	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/btcsuite/btcd/database"
 	"github.com/btcsuite/btcd/wire"
 	"github.com/btcsuite/btcjson"
-	"github.com/btcsuite/btcnet"
 	"github.com/btcsuite/btcutil"
 )
 
@@ -75,7 +75,7 @@ type relayMsg struct {
 type server struct {
 	nonce                uint64
 	listeners            []net.Listener
-	netParams            *btcnet.Params
+	chainParams          *chaincfg.Params
 	started              int32      // atomic
 	shutdown             int32      // atomic
 	shutdownSched        int32      // atomic
@@ -1096,9 +1096,9 @@ out:
 }
 
 // newServer returns a new btcd server configured to listen on addr for the
-// bitcoin network type specified by netParams.  Use start to begin accepting
+// bitcoin network type specified by chainParams.  Use start to begin accepting
 // connections from peers.
-func newServer(listenAddrs []string, db database.Db, netParams *btcnet.Params) (*server, error) {
+func newServer(listenAddrs []string, db database.Db, chainParams *chaincfg.Params) (*server, error) {
 	nonce, err := wire.RandomUint64()
 	if err != nil {
 		return nil, err
@@ -1233,7 +1233,7 @@ func newServer(listenAddrs []string, db database.Db, netParams *btcnet.Params) (
 	s := server{
 		nonce:                nonce,
 		listeners:            listeners,
-		netParams:            netParams,
+		chainParams:          chainParams,
 		addrManager:          amgr,
 		newPeers:             make(chan *peer, cfg.MaxPeers),
 		donePeers:            make(chan *peer, cfg.MaxPeers),

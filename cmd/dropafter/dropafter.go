@@ -11,11 +11,11 @@ import (
 	"path/filepath"
 	"strconv"
 
+	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/btcsuite/btcd/database"
 	_ "github.com/btcsuite/btcd/database/ldb"
 	"github.com/btcsuite/btcd/wire"
 	"github.com/btcsuite/btclog"
-	"github.com/btcsuite/btcnet"
 	"github.com/btcsuite/btcutil"
 	flags "github.com/btcsuite/go-flags"
 )
@@ -33,7 +33,7 @@ var (
 	btcdHomeDir     = btcutil.AppDataDir("btcd", false)
 	defaultDataDir  = filepath.Join(btcdHomeDir, "data")
 	log             btclog.Logger
-	activeNetParams = &btcnet.MainNetParams
+	activeNetParams = &chaincfg.MainNetParams
 )
 
 const (
@@ -44,18 +44,18 @@ const (
 // netName returns the name used when referring to a bitcoin network.  At the
 // time of writing, btcd currently places blocks for testnet version 3 in the
 // data and log directory "testnet", which does not match the Name field of the
-// btcnet parameters.  This function can be used to override this directory name
+// chaincfg parameters.  This function can be used to override this directory name
 // as "testnet" when the passed active network matches wire.TestNet3.
 //
 // A proper upgrade to move the data and log directories for this network to
 // "testnet3" is planned for the future, at which point this function can be
 // removed and the network parameter's name used instead.
-func netName(netParams *btcnet.Params) string {
-	switch netParams.Net {
+func netName(chainParams *chaincfg.Params) string {
+	switch chainParams.Net {
 	case wire.TestNet3:
 		return "testnet"
 	default:
-		return netParams.Name
+		return chainParams.Name
 	}
 }
 
@@ -85,15 +85,15 @@ func main() {
 	// while we're at it
 	if cfg.TestNet3 {
 		numNets++
-		activeNetParams = &btcnet.TestNet3Params
+		activeNetParams = &chaincfg.TestNet3Params
 	}
 	if cfg.RegressionTest {
 		numNets++
-		activeNetParams = &btcnet.RegressionNetParams
+		activeNetParams = &chaincfg.RegressionNetParams
 	}
 	if cfg.SimNet {
 		numNets++
-		activeNetParams = &btcnet.SimNetParams
+		activeNetParams = &chaincfg.SimNetParams
 	}
 	if numNets > 1 {
 		str := "%s: The testnet, regtest, and simnet params can't be " +

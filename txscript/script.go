@@ -11,9 +11,9 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/btcsuite/btcd/wire"
 	"github.com/btcsuite/btcec"
-	"github.com/btcsuite/btcnet"
 	"github.com/btcsuite/btcutil"
 )
 
@@ -1193,11 +1193,12 @@ func signMultiSig(tx *wire.MsgTx, idx int, subScript []byte, hashType SigHashTyp
 	return script, signed == nRequired
 }
 
-func sign(net *btcnet.Params, tx *wire.MsgTx, idx int, subScript []byte,
-	hashType SigHashType, kdb KeyDB, sdb ScriptDB) ([]byte, ScriptClass,
-	[]btcutil.Address, int, error) {
+func sign(chainParams *chaincfg.Params, tx *wire.MsgTx, idx int,
+	subScript []byte, hashType SigHashType, kdb KeyDB, sdb ScriptDB) ([]byte,
+	ScriptClass, []btcutil.Address, int, error) {
 
-	class, addresses, nrequired, err := ExtractPkScriptAddrs(subScript, net)
+	class, addresses, nrequired, err := ExtractPkScriptAddrs(subScript,
+		chainParams)
 	if err != nil {
 		return nil, NonStandardTy, nil, 0, err
 	}
@@ -1257,7 +1258,7 @@ func sign(net *btcnet.Params, tx *wire.MsgTx, idx int, subScript []byte,
 // The return value is the best effort merging of the two scripts. Calling this
 // function with addresses, class and nrequired that do not match pkScript is
 // an error and results in undefined behaviour.
-func mergeScripts(net *btcnet.Params, tx *wire.MsgTx, idx int,
+func mergeScripts(chainParams *chaincfg.Params, tx *wire.MsgTx, idx int,
 	pkScript []byte, class ScriptClass, addresses []btcutil.Address,
 	nRequired int, sigScript, prevScript []byte) []byte {
 
@@ -1284,15 +1285,15 @@ func mergeScripts(net *btcnet.Params, tx *wire.MsgTx, idx int,
 
 		// We already know this information somewhere up the stack.
 		class, addresses, nrequired, err :=
-			ExtractPkScriptAddrs(script, net)
+			ExtractPkScriptAddrs(script, chainParams)
 
 		// regenerate scripts.
 		sigScript, _ := unparseScript(sigPops)
 		prevScript, _ := unparseScript(prevPops)
 
 		// Merge
-		mergedScript := mergeScripts(net, tx, idx, script, class,
-			addresses, nrequired, sigScript, prevScript)
+		mergedScript := mergeScripts(chainParams, tx, idx, script,
+			class, addresses, nrequired, sigScript, prevScript)
 
 		// Reappend the script and return the result.
 		builder := NewScriptBuilder()
@@ -1469,20 +1470,20 @@ func (sc ScriptClosure) GetScript(address btcutil.Address) ([]byte, error) {
 // getScript. If previousScript is provided then the results in previousScript
 // will be merged in a type-dependant manner with the newly generated.
 // signature script.
-func SignTxOutput(net *btcnet.Params, tx *wire.MsgTx, idx int,
+func SignTxOutput(chainParams *chaincfg.Params, tx *wire.MsgTx, idx int,
 	pkScript []byte, hashType SigHashType, kdb KeyDB, sdb ScriptDB,
 	previousScript []byte) ([]byte, error) {
 
-	sigScript, class, addresses, nrequired, err := sign(net, tx, idx,
-		pkScript, hashType, kdb, sdb)
+	sigScript, class, addresses, nrequired, err := sign(chainParams, tx,
+		idx, pkScript, hashType, kdb, sdb)
 	if err != nil {
 		return nil, err
 	}
 
 	if class == ScriptHashTy {
 		// TODO keep the sub addressed and pass down to merge.
-		realSigScript, _, _, _, err := sign(net, tx, idx, sigScript,
-			hashType, kdb, sdb)
+		realSigScript, _, _, _, err := sign(chainParams, tx, idx,
+			sigScript, hashType, kdb, sdb)
 		if err != nil {
 			return nil, err
 		}
@@ -1498,8 +1499,8 @@ func SignTxOutput(net *btcnet.Params, tx *wire.MsgTx, idx int,
 	}
 
 	// Merge scripts. with any previous data, if any.
-	mergedScript := mergeScripts(net, tx, idx, pkScript, class, addresses,
-		nrequired, sigScript, previousScript)
+	mergedScript := mergeScripts(chainParams, tx, idx, pkScript, class,
+		addresses, nrequired, sigScript, previousScript)
 	if err != nil {
 		return nil, err
 	}

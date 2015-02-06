@@ -14,10 +14,10 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/btcsuite/btcd/database"
 	"github.com/btcsuite/btcd/txscript"
 	"github.com/btcsuite/btcd/wire"
-	"github.com/btcsuite/btcnet"
 	"github.com/btcsuite/btcutil"
 	"golang.org/x/crypto/ripemd160"
 )
@@ -110,7 +110,7 @@ func testAddrIndexOperations(t *testing.T, db database.Db, newestBlock *btcutil.
 	}
 
 	// Extract the dest addr from the tx.
-	_, testAddrs, _, err := txscript.ExtractPkScriptAddrs(testTx.MsgTx().TxOut[0].PkScript, &btcnet.MainNetParams)
+	_, testAddrs, _, err := txscript.ExtractPkScriptAddrs(testTx.MsgTx().TxOut[0].PkScript, &chaincfg.MainNetParams)
 	if err != nil {
 		t.Fatalf("Unable to decode tx output, err %v", err)
 	}
@@ -420,7 +420,7 @@ func loadBlocks(t *testing.T, file string) (blocks []*btcutil.Block, err error) 
 	}()
 
 	// Set the first block as the genesis block.
-	genesis := btcutil.NewBlock(btcnet.MainNetParams.GenesisBlock)
+	genesis := btcutil.NewBlock(chaincfg.MainNetParams.GenesisBlock)
 	blocks = append(blocks, genesis)
 
 	var block *btcutil.Block
@@ -523,7 +523,7 @@ func TestLimitAndSkipFetchTxsForAddr(t *testing.T) {
 	// Insert a block with some fake test transactions. The block will have
 	// 10 copies of a fake transaction involving same address.
 	addrString := "1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa"
-	targetAddr, err := btcutil.DecodeAddress(addrString, &btcnet.MainNetParams)
+	targetAddr, err := btcutil.DecodeAddress(addrString, &chaincfg.MainNetParams)
 	if err != nil {
 		t.Fatalf("Unable to decode test address: %v", err)
 	}

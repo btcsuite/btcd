@@ -41,7 +41,7 @@ func (b *BlockChain) BlockLocatorFromHash(hash *wire.ShaHash) BlockLocator {
 	locator = append(locator, hash)
 
 	// Nothing more to do if a locator for the genesis hash was requested.
-	if hash.IsEqual(b.netParams.GenesisHash) {
+	if hash.IsEqual(b.chainParams.GenesisHash) {
 		return locator
 	}
 
@@ -124,7 +124,7 @@ func (b *BlockChain) BlockLocatorFromHash(hash *wire.ShaHash) BlockLocator {
 	}
 
 	// Append the appropriate genesis block.
-	locator = append(locator, b.netParams.GenesisHash)
+	locator = append(locator, b.chainParams.GenesisHash)
 	return locator
 }
 

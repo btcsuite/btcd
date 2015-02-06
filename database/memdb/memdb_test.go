@@ -8,10 +8,10 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/btcsuite/btcd/database"
 	"github.com/btcsuite/btcd/database/memdb"
 	"github.com/btcsuite/btcd/wire"
-	"github.com/btcsuite/btcnet"
 	"github.com/btcsuite/btcutil"
 )
 
@@ -25,7 +25,7 @@ func TestClosed(t *testing.T) {
 		t.Errorf("Failed to open test database %v", err)
 		return
 	}
-	_, err = db.InsertBlock(btcutil.NewBlock(btcnet.MainNetParams.GenesisBlock))
+	_, err = db.InsertBlock(btcutil.NewBlock(chaincfg.MainNetParams.GenesisBlock))
 	if err != nil {
 		t.Errorf("InsertBlock: %v", err)
 	}
@@ -33,7 +33,7 @@ func TestClosed(t *testing.T) {
 		t.Errorf("Close: unexpected error %v", err)
 	}
 
-	genesisHash := btcnet.MainNetParams.GenesisHash
+	genesisHash := chaincfg.MainNetParams.GenesisHash
 	if err := db.DropAfterBlockBySha(genesisHash); err != memdb.ErrDbClosed {
 		t.Errorf("DropAfterBlockBySha: unexpected error %v", err)
 	}
@@ -54,7 +54,7 @@ func TestClosed(t *testing.T) {
 		t.Errorf("FetchHeightRange: unexpected error %v", err)
 	}
 
-	genesisCoinbaseTx := btcnet.MainNetParams.GenesisBlock.Transactions[0]
+	genesisCoinbaseTx := chaincfg.MainNetParams.GenesisBlock.Transactions[0]
 	coinbaseHash, err := genesisCoinbaseTx.TxSha()
 	if err != nil {
 		t.Errorf("TxSha: unexpected error %v", err)

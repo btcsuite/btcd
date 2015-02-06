@@ -197,9 +197,9 @@ func (b *BlockChain) calcEasiestDifficulty(bits uint32, duration time.Duration) 
 	// The test network rules allow minimum difficulty blocks after more
 	// than twice the desired amount of time needed to generate a block has
 	// elapsed.
-	if b.netParams.ResetMinDifficulty {
+	if b.chainParams.ResetMinDifficulty {
 		if durationVal > int64(targetSpacing)*2 {
-			return b.netParams.PowLimitBits
+			return b.chainParams.PowLimitBits
 		}
 	}
 
@@ -208,14 +208,14 @@ func (b *BlockChain) calcEasiestDifficulty(bits uint32, duration time.Duration) 
 	// the number of retargets for the duration and starting difficulty
 	// multiplied by the max adjustment factor.
 	newTarget := CompactToBig(bits)
-	for durationVal > 0 && newTarget.Cmp(b.netParams.PowLimit) < 0 {
+	for durationVal > 0 && newTarget.Cmp(b.chainParams.PowLimit) < 0 {
 		newTarget.Mul(newTarget, adjustmentFactor)
 		durationVal -= maxRetargetTimespan
 	}
 
 	// Limit new value to the proof of work limit.
-	if newTarget.Cmp(b.netParams.PowLimit) > 0 {
-		newTarget.Set(b.netParams.PowLimit)
+	if newTarget.Cmp(b.chainParams.PowLimit) > 0 {
+		newTarget.Set(b.chainParams.PowLimit)
 	}
 
 	return BigToCompact(newTarget)
@@ -228,7 +228,7 @@ func (b *BlockChain) findPrevTestNetDifficulty(startNode *blockNode) (uint32, er
 	// the special rule applied.
 	iterNode := startNode
 	for iterNode != nil && iterNode.height%BlocksPerRetarget != 0 &&
-		iterNode.bits == b.netParams.PowLimitBits {
+		iterNode.bits == b.chainParams.PowLimitBits {
 
 		// Get the previous block node.  This function is used over
 		// simply accessing iterNode.parent directly as it will
@@ -245,7 +245,7 @@ func (b *BlockChain) findPrevTestNetDifficulty(startNode *blockNode) (uint32, er
 
 	// Return the found difficulty or the minimum difficulty if no
 	// appropriate block was found.
-	lastBits := b.netParams.PowLimitBits
+	lastBits := b.chainParams.PowLimitBits
 	if iterNode != nil {
 		lastBits = iterNode.bits
 	}
@@ -260,7 +260,7 @@ func (b *BlockChain) findPrevTestNetDifficulty(startNode *blockNode) (uint32, er
 func (b *BlockChain) calcNextRequiredDifficulty(lastNode *blockNode, newBlockTime time.Time) (uint32, error) {
 	// Genesis block.
 	if lastNode == nil {
-		return b.netParams.PowLimitBits, nil
+		return b.chainParams.PowLimitBits, nil
 	}
 
 	// Return the previous block's difficulty requirements if this block
@@ -269,13 +269,13 @@ func (b *BlockChain) calcNextRequiredDifficulty(lastNode *blockNode, newBlockTim
 		// The test network rules allow minimum difficulty blocks after
 		// more than twice the desired amount of time needed to generate
 		// a block has elapsed.
-		if b.netParams.ResetMinDifficulty {
+		if b.chainParams.ResetMinDifficulty {
 			// Return minimum difficulty when more than twice the
 			// desired amount of time needed to generate a block has
 			// elapsed.
 			allowMinTime := lastNode.timestamp.Add(targetSpacing * 2)
 			if newBlockTime.After(allowMinTime) {
-				return b.netParams.PowLimitBits, nil
+				return b.chainParams.PowLimitBits, nil
 			}
 
 			// The block was mined within the desired timeframe, so
@@ -333,8 +333,8 @@ func (b *BlockChain) calcNextRequiredDifficulty(lastNode *blockNode, newBlockTim
 	newTarget.Div(newTarget, big.NewInt(int64(targetTimespan)))
 
 	// Limit new value to the proof of work limit.
-	if newTarget.Cmp(b.netParams.PowLimit) > 0 {
-		newTarget.Set(b.netParams.PowLimit)
+	if newTarget.Cmp(b.chainParams.PowLimit) > 0 {
+		newTarget.Set(b.chainParams.PowLimit)
 	}
 
 	// Log new target difficulty and return it.  The new target logging is

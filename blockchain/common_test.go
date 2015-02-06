@@ -14,11 +14,11 @@ import (
 	"strings"
 
 	"github.com/btcsuite/btcd/blockchain"
+	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/btcsuite/btcd/database"
 	_ "github.com/btcsuite/btcd/database/ldb"
 	_ "github.com/btcsuite/btcd/database/memdb"
 	"github.com/btcsuite/btcd/wire"
-	"github.com/btcsuite/btcnet"
 	"github.com/btcsuite/btcutil"
 )
 
@@ -108,7 +108,7 @@ func chainSetup(dbName string) (*blockchain.BlockChain, func(), error) {
 
 	// Insert the main network genesis block.  This is part of the initial
 	// database setup.
-	genesisBlock := btcutil.NewBlock(btcnet.MainNetParams.GenesisBlock)
+	genesisBlock := btcutil.NewBlock(chaincfg.MainNetParams.GenesisBlock)
 	_, err := db.InsertBlock(genesisBlock)
 	if err != nil {
 		teardown()
@@ -116,7 +116,7 @@ func chainSetup(dbName string) (*blockchain.BlockChain, func(), error) {
 		return nil, nil, err
 	}
 
-	chain := blockchain.New(db, &btcnet.MainNetParams, nil)
+	chain := blockchain.New(db, &chaincfg.MainNetParams, nil)
 	return chain, teardown, nil
 }
 

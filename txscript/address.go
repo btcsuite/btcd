@@ -5,7 +5,7 @@
 package txscript
 
 import (
-	"github.com/btcsuite/btcnet"
+	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/btcsuite/btcutil"
 )
 
@@ -13,7 +13,7 @@ import (
 // signatures associated with the passed PkScript.  Note that it only works for
 // 'standard' transaction script types.  Any data such as public keys which are
 // invalid are omitted from the results.
-func ExtractPkScriptAddrs(pkScript []byte, net *btcnet.Params) (ScriptClass, []btcutil.Address, int, error) {
+func ExtractPkScriptAddrs(pkScript []byte, chainParams *chaincfg.Params) (ScriptClass, []btcutil.Address, int, error) {
 	var addrs []btcutil.Address
 	var requiredSigs int
 
@@ -32,7 +32,8 @@ func ExtractPkScriptAddrs(pkScript []byte, net *btcnet.Params) (ScriptClass, []b
 		// Therefore the pubkey hash is the 3rd item on the stack.
 		// Skip the pubkey hash if it's invalid for some reason.
 		requiredSigs = 1
-		addr, err := btcutil.NewAddressPubKeyHash(pops[2].data, net)
+		addr, err := btcutil.NewAddressPubKeyHash(pops[2].data,
+			chainParams)
 		if err == nil {
 			addrs = append(addrs, addr)
 		}
@@ -43,7 +44,7 @@ func ExtractPkScriptAddrs(pkScript []byte, net *btcnet.Params) (ScriptClass, []b
 		// Therefore the pubkey is the first item on the stack.
 		// Skip the pubkey if it's invalid for some reason.
 		requiredSigs = 1
-		addr, err := btcutil.NewAddressPubKey(pops[0].data, net)
+		addr, err := btcutil.NewAddressPubKey(pops[0].data, chainParams)
 		if err == nil {
 			addrs = append(addrs, addr)
 		}
@@ -54,7 +55,8 @@ func ExtractPkScriptAddrs(pkScript []byte, net *btcnet.Params) (ScriptClass, []b
 		// Therefore the script hash is the 2nd item on the stack.
 		// Skip the script hash if it's invalid for some reason.
 		requiredSigs = 1
-		addr, err := btcutil.NewAddressScriptHashFromHash(pops[1].data, net)
+		addr, err := btcutil.NewAddressScriptHashFromHash(pops[1].data,
+			chainParams)
 		if err == nil {
 			addrs = append(addrs, addr)
 		}
@@ -71,7 +73,8 @@ func ExtractPkScriptAddrs(pkScript []byte, net *btcnet.Params) (ScriptClass, []b
 		// Extract the public keys while skipping any that are invalid.
 		addrs = make([]btcutil.Address, 0, numPubKeys)
 		for i := 0; i < numPubKeys; i++ {
-			addr, err := btcutil.NewAddressPubKey(pops[i+1].data, net)
+			addr, err := btcutil.NewAddressPubKey(pops[i+1].data,
+				chainParams)
 			if err == nil {
 				addrs = append(addrs, addr)
 			}

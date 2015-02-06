@@ -14,9 +14,9 @@ import (
 	"time"
 
 	"github.com/btcsuite/btcd/blockchain"
+	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/btcsuite/btcd/database"
 	"github.com/btcsuite/btcd/wire"
-	"github.com/btcsuite/btcnet"
 	"github.com/btcsuite/btcutil"
 )
 
@@ -180,7 +180,7 @@ type blockManager struct {
 	headersFirstMode bool
 	headerList       *list.List
 	startHeader      *list.Element
-	nextCheckpoint   *btcnet.Checkpoint
+	nextCheckpoint   *chaincfg.Checkpoint
 }
 
 // resetHeaderState sets the headers-first mode state to values appropriate for
@@ -221,13 +221,13 @@ func (b *blockManager) updateChainState(newestHash *wire.ShaHash, newestHeight i
 // It returns nil when there is not one either because the height is already
 // later than the final checkpoint or some other reason such as disabled
 // checkpoints.
-func (b *blockManager) findNextHeaderCheckpoint(height int64) *btcnet.Checkpoint {
+func (b *blockManager) findNextHeaderCheckpoint(height int64) *chaincfg.Checkpoint {
 	// There is no next checkpoint if checkpoints are disabled or there are
 	// none for this current network.
 	if cfg.DisableCheckpoints {
 		return nil
 	}
-	checkpoints := b.server.netParams.Checkpoints
+	checkpoints := b.server.chainParams.Checkpoints
 	if len(checkpoints) == 0 {
 		return nil
 	}
@@ -1324,7 +1324,7 @@ func newBlockManager(s *server) (*blockManager, error) {
 		quit:            make(chan struct{}),
 	}
 	bm.progressLogger = newBlockProgressLogger("Processed", bmgrLog)
-	bm.blockChain = blockchain.New(s.db, s.netParams, bm.handleNotifyMsg)
+	bm.blockChain = blockchain.New(s.db, s.chainParams, bm.handleNotifyMsg)
 	bm.blockChain.DisableCheckpoints(cfg.DisableCheckpoints)
 	if !cfg.DisableCheckpoints {
 		// Initialize the next checkpoint based on the current height.

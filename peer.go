@@ -1890,7 +1890,7 @@ func newPeerBase(s *server, inbound bool) *peer {
 	p := peer{
 		server:          s,
 		protocolVersion: maxProtocolVersion,
-		btcnet:          s.netParams.Net,
+		btcnet:          s.chainParams.Net,
 		services:        wire.SFNodeNetwork,
 		inbound:         inbound,
 		knownAddresses:  make(map[string]struct{}),

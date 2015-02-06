@@ -141,7 +141,7 @@ func (b *BlockChain) ProcessBlock(block *btcutil.Block, timeSource MedianTimeSou
 	}
 
 	// Perform preliminary sanity checks on the block and its transactions.
-	err = checkBlockSanity(block, b.netParams.PowLimit, timeSource, flags)
+	err = checkBlockSanity(block, b.chainParams.PowLimit, timeSource, flags)
 	if err != nil {
 		return false, err
 	}

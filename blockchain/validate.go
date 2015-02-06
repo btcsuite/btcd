@@ -11,10 +11,10 @@ import (
 	"math/big"
 	"time"
 
+	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/btcsuite/btcd/database"
 	"github.com/btcsuite/btcd/txscript"
 	"github.com/btcsuite/btcd/wire"
-	"github.com/btcsuite/btcnet"
 	"github.com/btcsuite/btcutil"
 )
 
@@ -172,13 +172,13 @@ func isBIP0030Node(node *blockNode) bool {
 //
 // At the target block generation rate for the main network, this is
 // approximately every 4 years.
-func CalcBlockSubsidy(height int64, netParams *btcnet.Params) int64 {
-	if netParams.SubsidyHalvingInterval == 0 {
+func CalcBlockSubsidy(height int64, chainParams *chaincfg.Params) int64 {
+	if chainParams.SubsidyHalvingInterval == 0 {
 		return baseSubsidy
 	}
 
 	// Equivalent to: baseSubsidy / 2^(height/subsidyHalvingInterval)
-	return baseSubsidy >> uint(height/int64(netParams.SubsidyHalvingInterval))
+	return baseSubsidy >> uint(height/int64(chainParams.SubsidyHalvingInterval))
 }
 
 // CheckTransactionSanity performs some preliminary checks on a transaction to
@@ -786,7 +786,7 @@ func (b *BlockChain) checkConnectBlock(node *blockNode, block *btcutil.Block) er
 
 	// The coinbase for the Genesis block is not spendable, so just return
 	// now.
-	if node.hash.IsEqual(b.netParams.GenesisHash) && b.bestChain == nil {
+	if node.hash.IsEqual(b.chainParams.GenesisHash) && b.bestChain == nil {
 		return nil
 	}
 
@@ -894,7 +894,7 @@ func (b *BlockChain) checkConnectBlock(node *blockNode, block *btcutil.Block) er
 	for _, txOut := range transactions[0].MsgTx().TxOut {
 		totalSatoshiOut += txOut.Value
 	}
-	expectedSatoshiOut := CalcBlockSubsidy(node.height, b.netParams) +
+	expectedSatoshiOut := CalcBlockSubsidy(node.height, b.chainParams) +
 		totalFees
 	if totalSatoshiOut > expectedSatoshiOut {
 		str := fmt.Sprintf("coinbase transaction for block pays %v "+

@@ -27,12 +27,12 @@ import (
 	"time"
 
 	"github.com/btcsuite/btcd/blockchain"
+	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/btcsuite/btcd/database"
 	"github.com/btcsuite/btcd/txscript"
 	"github.com/btcsuite/btcd/wire"
 	"github.com/btcsuite/btcec"
 	"github.com/btcsuite/btcjson"
-	"github.com/btcsuite/btcnet"
 	"github.com/btcsuite/btcutil"
 	"github.com/btcsuite/btcws"
 	"github.com/btcsuite/fastsha256"
@@ -796,7 +796,7 @@ func handleCreateRawTransaction(s *rpcServer, cmd btcjson.Cmd, closeChan <-chan 
 		default:
 			return nil, btcjson.ErrInvalidAddressOrKey
 		}
-		if !addr.IsForNet(s.server.netParams) {
+		if !addr.IsForNet(s.server.chainParams) {
 			return nil, btcjson.Error{
 				Code: btcjson.ErrInvalidAddressOrKey.Code,
 				Message: fmt.Sprintf("%s: %q",
@@ -875,7 +875,7 @@ func createVinList(mtx *wire.MsgTx) []btcjson.Vin {
 
 // createVoutList returns a slice of JSON objects for the outputs of the passed
 // transaction.
-func createVoutList(mtx *wire.MsgTx, net *btcnet.Params) []btcjson.Vout {
+func createVoutList(mtx *wire.MsgTx, chainParams *chaincfg.Params) []btcjson.Vout {
 	voutList := make([]btcjson.Vout, len(mtx.TxOut))
 	for i, v := range mtx.TxOut {
 		voutList[i].N = uint32(i)
@@ -890,7 +890,8 @@ func createVoutList(mtx *wire.MsgTx, net *btcnet.Params) []btcjson.Vout {
 		// Ignore the error here since an error means the script
 		// couldn't parse and there is no additional information about
 		// it anyways.
-		scriptClass, addrs, reqSigs, _ := txscript.ExtractPkScriptAddrs(v.PkScript, net)
+		scriptClass, addrs, reqSigs, _ := txscript.ExtractPkScriptAddrs(
+			v.PkScript, chainParams)
 		voutList[i].ScriptPubKey.Type = scriptClass.String()
 		voutList[i].ScriptPubKey.ReqSigs = int32(reqSigs)
 
@@ -909,8 +910,8 @@ func createVoutList(mtx *wire.MsgTx, net *btcnet.Params) []btcjson.Vout {
 
 // createTxRawResult converts the passed transaction and associated parameters
 // to a raw transaction JSON object.
-func createTxRawResult(net *btcnet.Params, txSha string, mtx *wire.MsgTx,
-	blk *btcutil.Block, maxidx int64,
+func createTxRawResult(chainParams *chaincfg.Params, txSha string,
+	mtx *wire.MsgTx, blk *btcutil.Block, maxidx int64,
 	blksha *wire.ShaHash) (*btcjson.TxRawResult, error) {
 
 	mtxHex, err := messageToHex(mtx)
@@ -921,7 +922,7 @@ func createTxRawResult(net *btcnet.Params, txSha string, mtx *wire.MsgTx,
 	txReply := &btcjson.TxRawResult{
 		Hex:      mtxHex,
 		Txid:     txSha,
-		Vout:     createVoutList(mtx, net),
+		Vout:     createVoutList(mtx, chainParams),
 		Vin:      createVinList(mtx),
 		Version:  mtx.Version,
 		LockTime: mtx.LockTime,
@@ -974,7 +975,7 @@ func handleDecodeRawTransaction(s *rpcServer, cmd btcjson.Cmd, closeChan <-chan 
 		Version:  mtx.Version,
 		Locktime: mtx.LockTime,
 		Vin:      createVinList(&mtx),
-		Vout:     createVoutList(&mtx, s.server.netParams),
+		Vout:     createVoutList(&mtx, s.server.chainParams),
 	}
 	return txReply, nil
 }
@@ -1004,15 +1005,15 @@ func handleDecodeScript(s *rpcServer, cmd btcjson.Cmd, closeChan <-chan struct{}
 	// Get information about the script.
 	// Ignore the error here since an error means the script couldn't parse
 	// and there is no additinal information about it anyways.
-	net := s.server.netParams
-	scriptClass, addrs, reqSigs, _ := txscript.ExtractPkScriptAddrs(script, net)
+	scriptClass, addrs, reqSigs, _ := txscript.ExtractPkScriptAddrs(script,
+		s.server.chainParams)
 	addresses := make([]string, len(addrs))
 	for i, addr := range addrs {
 		addresses[i] = addr.EncodeAddress()
 	}
 
 	// Convert the script itself to a pay-to-script-hash address.
-	p2sh, err := btcutil.NewAddressScriptHash(script, net)
+	p2sh, err := btcutil.NewAddressScriptHash(script, s.server.chainParams)
 	if err != nil {
 		return nil, btcjson.Error{
 			Code:    btcjson.ErrInternal.Code,
@@ -1212,7 +1213,7 @@ func handleGetBlock(s *rpcServer, cmd btcjson.Cmd, closeChan <-chan struct{}) (i
 			txSha := tx.Sha().String()
 			mtx := tx.MsgTx()
 
-			rawTxn, err := createTxRawResult(s.server.netParams,
+			rawTxn, err := createTxRawResult(s.server.chainParams,
 				txSha, mtx, blk, maxidx, sha)
 			if err != nil {
 				rpcsLog.Errorf("Cannot create TxRawResult for "+
@@ -2055,7 +2056,7 @@ func handleGetConnectionCount(s *rpcServer, cmd btcjson.Cmd, closeChan <-chan st
 
 // handleGetCurrentNet implements the getcurrentnet command.
 func handleGetCurrentNet(s *rpcServer, cmd btcjson.Cmd, closeChan <-chan struct{}) (interface{}, error) {
-	return s.server.netParams.Net, nil
+	return s.server.chainParams.Net, nil
 }
 
 // handleGetDifficulty implements the getdifficulty command.
@@ -2402,7 +2403,7 @@ func handleGetRawTransaction(s *rpcServer, cmd btcjson.Cmd, closeChan <-chan str
 		}
 	}
 
-	rawTxn, err := createTxRawResult(s.server.netParams, c.Txid, mtx,
+	rawTxn, err := createTxRawResult(s.server.chainParams, c.Txid, mtx,
 		blk, maxidx, blksha)
 	if err != nil {
 		rpcsLog.Errorf("Cannot create TxRawResult for txSha=%s: %v", txSha, err)
@@ -2525,8 +2526,8 @@ func handleGetTxOut(s *rpcServer, cmd btcjson.Cmd, closeChan <-chan struct{}) (i
 	// Get further info about the script.
 	// Ignore the error here since an error means the script couldn't parse
 	// and there is no additional information about it anyways.
-	net := s.server.netParams
-	scriptClass, addrs, reqSigs, _ := txscript.ExtractPkScriptAddrs(script, net)
+	scriptClass, addrs, reqSigs, _ := txscript.ExtractPkScriptAddrs(script,
+		s.server.chainParams)
 	addresses := make([]string, len(addrs))
 	for i, addr := range addrs {
 		addresses[i] = addr.EncodeAddress()
@@ -2967,7 +2968,7 @@ func handleSearchRawTransactions(s *rpcServer, cmd btcjson.Cmd, closeChan <-chan
 	c := cmd.(*btcjson.SearchRawTransactionsCmd)
 
 	// Attempt to decode the supplied address.
-	addr, err := btcutil.DecodeAddress(c.Address, s.server.netParams)
+	addr, err := btcutil.DecodeAddress(c.Address, s.server.chainParams)
 	if err != nil {
 		return nil, btcjson.Error{
 			Code: btcjson.ErrInvalidAddressOrKey.Code,
@@ -3052,7 +3053,7 @@ func handleSearchRawTransactions(s *rpcServer, cmd btcjson.Cmd, closeChan <-chan
 			blkSha, _ = blk.Sha()
 		}
 
-		rawTxn, err := createTxRawResult(s.server.netParams,
+		rawTxn, err := createTxRawResult(s.server.chainParams,
 			txSha, mtx, blk, maxidx, blkSha)
 		if err != nil {
 			rpcsLog.Errorf("Cannot create TxRawResult for "+

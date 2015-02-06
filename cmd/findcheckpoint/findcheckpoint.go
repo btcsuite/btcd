@@ -10,10 +10,10 @@ import (
 	"path/filepath"
 
 	"github.com/btcsuite/btcd/blockchain"
+	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/btcsuite/btcd/database"
 	_ "github.com/btcsuite/btcd/database/ldb"
 	"github.com/btcsuite/btcd/wire"
-	"github.com/btcsuite/btcnet"
 )
 
 const blockDbNamePrefix = "blocks"
@@ -44,7 +44,7 @@ func loadBlockDB() (database.Db, error) {
 // candidates at the last checkpoint that is already hard coded into btcchain
 // since there is no point in finding candidates before already existing
 // checkpoints.
-func findCandidates(db database.Db, latestHash *wire.ShaHash) ([]*btcnet.Checkpoint, error) {
+func findCandidates(db database.Db, latestHash *wire.ShaHash) ([]*chaincfg.Checkpoint, error) {
 	// Start with the latest block of the main chain.
 	block, err := db.FetchBlockBySha(latestHash)
 	if err != nil {
@@ -78,7 +78,7 @@ func findCandidates(db database.Db, latestHash *wire.ShaHash) ([]*btcnet.Checkpo
 	defer fmt.Println()
 
 	// Loop backwards through the chain to find checkpoint candidates.
-	candidates := make([]*btcnet.Checkpoint, 0, cfg.NumCandidates)
+	candidates := make([]*chaincfg.Checkpoint, 0, cfg.NumCandidates)
 	numTested := int64(0)
 	for len(candidates) < cfg.NumCandidates && block.Height() > requiredHeight {
 		// Display progress.
@@ -99,7 +99,7 @@ func findCandidates(db database.Db, latestHash *wire.ShaHash) ([]*btcnet.Checkpo
 			if err != nil {
 				return nil, err
 			}
-			checkpoint := btcnet.Checkpoint{
+			checkpoint := chaincfg.Checkpoint{
 				Height: block.Height(),
 				Hash:   candidateHash,
 			}
@@ -119,7 +119,7 @@ func findCandidates(db database.Db, latestHash *wire.ShaHash) ([]*btcnet.Checkpo
 // showCandidate display a checkpoint candidate using and output format
 // determined by the configuration parameters.  The Go syntax output
 // uses the format the btcchain code expects for checkpoints added to the list.
-func showCandidate(candidateNum int, checkpoint *btcnet.Checkpoint) {
+func showCandidate(candidateNum int, checkpoint *chaincfg.Checkpoint) {
 	if cfg.UseGoOutput {
 		fmt.Printf("Candidate %d -- {%d, newShaHashFromStr(\"%v\")},\n",
 			candidateNum, checkpoint.Height, checkpoint.Hash)

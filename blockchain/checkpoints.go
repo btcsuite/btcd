@@ -7,9 +7,9 @@ package blockchain
 import (
 	"fmt"
 
+	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/btcsuite/btcd/txscript"
 	"github.com/btcsuite/btcd/wire"
-	"github.com/btcsuite/btcnet"
 	"github.com/btcsuite/btcutil"
 )
 
@@ -36,23 +36,23 @@ func (b *BlockChain) DisableCheckpoints(disable bool) {
 // Checkpoints returns a slice of checkpoints (regardless of whether they are
 // already known).  When checkpoints are disabled or there are no checkpoints
 // for the active network, it will return nil.
-func (b *BlockChain) Checkpoints() []btcnet.Checkpoint {
-	if b.noCheckpoints || len(b.netParams.Checkpoints) == 0 {
+func (b *BlockChain) Checkpoints() []chaincfg.Checkpoint {
+	if b.noCheckpoints || len(b.chainParams.Checkpoints) == 0 {
 		return nil
 	}
 
-	return b.netParams.Checkpoints
+	return b.chainParams.Checkpoints
 }
 
 // LatestCheckpoint returns the most recent checkpoint (regardless of whether it
 // is already known).  When checkpoints are disabled or there are no checkpoints
 // for the active network, it will return nil.
-func (b *BlockChain) LatestCheckpoint() *btcnet.Checkpoint {
-	if b.noCheckpoints || len(b.netParams.Checkpoints) == 0 {
+func (b *BlockChain) LatestCheckpoint() *chaincfg.Checkpoint {
+	if b.noCheckpoints || len(b.chainParams.Checkpoints) == 0 {
 		return nil
 	}
 
-	checkpoints := b.netParams.Checkpoints
+	checkpoints := b.chainParams.Checkpoints
 	return &checkpoints[len(checkpoints)-1]
 }
 
@@ -60,7 +60,7 @@ func (b *BlockChain) LatestCheckpoint() *btcnet.Checkpoint {
 // match the hard-coded checkpoint data.  It also returns true if there is no
 // checkpoint data for the passed block height.
 func (b *BlockChain) verifyCheckpoint(height int64, hash *wire.ShaHash) bool {
-	if b.noCheckpoints || len(b.netParams.Checkpoints) == 0 {
+	if b.noCheckpoints || len(b.chainParams.Checkpoints) == 0 {
 		return true
 	}
 
@@ -84,12 +84,12 @@ func (b *BlockChain) verifyCheckpoint(height int64, hash *wire.ShaHash) bool {
 // associated block.  It returns nil if a checkpoint can't be found (this should
 // really only happen for blocks before the first checkpoint).
 func (b *BlockChain) findPreviousCheckpoint() (*btcutil.Block, error) {
-	if b.noCheckpoints || len(b.netParams.Checkpoints) == 0 {
+	if b.noCheckpoints || len(b.chainParams.Checkpoints) == 0 {
 		return nil, nil
 	}
 
 	// No checkpoints.
-	checkpoints := b.netParams.Checkpoints
+	checkpoints := b.chainParams.Checkpoints
 	numCheckpoints := len(checkpoints)
 	if numCheckpoints == 0 {
 		return nil, nil

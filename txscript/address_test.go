@@ -8,8 +8,8 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/btcsuite/btcd/txscript"
-	"github.com/btcsuite/btcnet"
 	"github.com/btcsuite/btcutil"
 )
 
@@ -32,7 +32,7 @@ func decodeHex(hexStr string) []byte {
 // in the test source code.
 func newAddressPubKey(serializedPubKey []byte) btcutil.Address {
 	addr, err := btcutil.NewAddressPubKey(serializedPubKey,
-		&btcnet.MainNetParams)
+		&chaincfg.MainNetParams)
 	if err != nil {
 		panic("invalid public key in test source")
 	}
@@ -45,7 +45,7 @@ func newAddressPubKey(serializedPubKey []byte) btcutil.Address {
 // as a helper since the only way it can fail is if there is an error in the
 // test source code.
 func newAddressPubKeyHash(pkHash []byte) btcutil.Address {
-	addr, err := btcutil.NewAddressPubKeyHash(pkHash, &btcnet.MainNetParams)
+	addr, err := btcutil.NewAddressPubKeyHash(pkHash, &chaincfg.MainNetParams)
 	if err != nil {
 		panic("invalid public key hash in test source")
 	}
@@ -59,7 +59,7 @@ func newAddressPubKeyHash(pkHash []byte) btcutil.Address {
 // test source code.
 func newAddressScriptHash(scriptHash []byte) btcutil.Address {
 	addr, err := btcutil.NewAddressScriptHashFromHash(scriptHash,
-		&btcnet.MainNetParams)
+		&chaincfg.MainNetParams)
 	if err != nil {
 		panic("invalid script hash in test source")
 	}
@@ -340,7 +340,7 @@ func TestExtractPkScriptAddrs(t *testing.T) {
 	t.Logf("Running %d tests.", len(tests))
 	for i, test := range tests {
 		class, addrs, reqSigs, err := txscript.ExtractPkScriptAddrs(
-			test.script, &btcnet.MainNetParams)
+			test.script, &chaincfg.MainNetParams)
 		if err != nil {
 		}
 
