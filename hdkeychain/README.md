@@ -21,7 +21,7 @@ report.  Package hdkeychain is licensed under the liberal ISC license.
 - Support for multi-layer derivation
 - Easy serialization and deserialization for both private and public extended
   keys
-- Support for custom networks by registering them with btcnet
+- Support for custom networks by registering them with chaincfg
 - Obtaining the underlying EC pubkeys, EC privkeys, and associated bitcoin
   addresses ties in seamlessly with existing btcec and btcutil types which
   provide powerful tools for working with them to do things like sign

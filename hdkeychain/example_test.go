@@ -7,7 +7,7 @@ package hdkeychain_test
 import (
 	"fmt"
 
-	"github.com/btcsuite/btcnet"
+	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/btcsuite/btcutil/hdkeychain"
 )
 
@@ -118,12 +118,12 @@ func Example_defaultWalletLayout() {
 
 	// Get and show the address associated with the extended keys for the
 	// main bitcoin	network.
-	acct0ExtAddr, err := acct0Ext10.Address(&btcnet.MainNetParams)
+	acct0ExtAddr, err := acct0Ext10.Address(&chaincfg.MainNetParams)
 	if err != nil {
 		fmt.Println(err)
 		return
 	}
-	acct0IntAddr, err := acct0Int0.Address(&btcnet.MainNetParams)
+	acct0IntAddr, err := acct0Int0.Address(&chaincfg.MainNetParams)
 	if err != nil {
 		fmt.Println(err)
 		return

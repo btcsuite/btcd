@@ -15,7 +15,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/btcsuite/btcnet"
+	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/btcsuite/btcutil/hdkeychain"
 )
 
@@ -432,7 +432,7 @@ func TestExtendedKeyAPI(t *testing.T) {
 			continue
 		}
 
-		addr, err := key.Address(&btcnet.MainNetParams)
+		addr, err := key.Address(&chaincfg.MainNetParams)
 		if err != nil {
 			t.Errorf("Address #%d (%s): unexpected error: %v", i,
 				test.name, err)
@@ -452,8 +452,8 @@ func TestNet(t *testing.T) {
 	tests := []struct {
 		name      string
 		key       string
-		origNet   *btcnet.Params
-		newNet    *btcnet.Params
+		origNet   *chaincfg.Params
+		newNet    *chaincfg.Params
 		newPriv   string
 		newPub    string
 		isPrivate bool
@@ -462,8 +462,8 @@ func TestNet(t *testing.T) {
 		{
 			name:      "mainnet -> simnet",
 			key:       "xprv9s21ZrQH143K3QTDL4LXw2F7HEK3wJUD2nW2nRk4stbPy6cq3jPPqjiChkVvvNKmPGJxWUtg6LnF5kejMRNNU3TGtRBeJgk33yuGBxrMPHi",
-			origNet:   &btcnet.MainNetParams,
-			newNet:    &btcnet.SimNetParams,
+			origNet:   &chaincfg.MainNetParams,
+			newNet:    &chaincfg.SimNetParams,
 			newPriv:   "sprv8Erh3X3hFeKunvVdAGQQtambRPapECWiTDtvsTGdyrhzhbYgnSZajRRWbihzvq4AM4ivm6uso31VfKaukwJJUs3GYihXP8ebhMb3F2AHu3P",
 			newPub:    "spub4Tr3T2ab61tD1Qa6GHwRFiiKyRRJdfEZpSpXfqgFYCEyaPsqKysqHDjzSzMJSiUEGbcsG3w2SLMoTqn44B8x6u3MLRRkYfACTUBnHK79THk",
 			isPrivate: true,
@@ -471,8 +471,8 @@ func TestNet(t *testing.T) {
 		{
 			name:      "simnet -> mainnet",
 			key:       "sprv8Erh3X3hFeKunvVdAGQQtambRPapECWiTDtvsTGdyrhzhbYgnSZajRRWbihzvq4AM4ivm6uso31VfKaukwJJUs3GYihXP8ebhMb3F2AHu3P",
-			origNet:   &btcnet.SimNetParams,
-			newNet:    &btcnet.MainNetParams,
+			origNet:   &chaincfg.SimNetParams,
+			newNet:    &chaincfg.MainNetParams,
 			newPriv:   "xprv9s21ZrQH143K3QTDL4LXw2F7HEK3wJUD2nW2nRk4stbPy6cq3jPPqjiChkVvvNKmPGJxWUtg6LnF5kejMRNNU3TGtRBeJgk33yuGBxrMPHi",
 			newPub:    "xpub661MyMwAqRbcFtXgS5sYJABqqG9YLmC4Q1Rdap9gSE8NqtwybGhePY2gZ29ESFjqJoCu1Rupje8YtGqsefD265TMg7usUDFdp6W1EGMcet8",
 			isPrivate: true,
@@ -480,8 +480,8 @@ func TestNet(t *testing.T) {
 		{
 			name:      "mainnet -> regtest",
 			key:       "xprv9s21ZrQH143K3QTDL4LXw2F7HEK3wJUD2nW2nRk4stbPy6cq3jPPqjiChkVvvNKmPGJxWUtg6LnF5kejMRNNU3TGtRBeJgk33yuGBxrMPHi",
-			origNet:   &btcnet.MainNetParams,
-			newNet:    &btcnet.RegressionNetParams,
+			origNet:   &chaincfg.MainNetParams,
+			newNet:    &chaincfg.RegressionNetParams,
 			newPriv:   "tprv8ZgxMBicQKsPeDgjzdC36fs6bMjGApWDNLR9erAXMs5skhMv36j9MV5ecvfavji5khqjWaWSFhN3YcCUUdiKH6isR4Pwy3U5y5egddBr16m",
 			newPub:    "tpubD6NzVbkrYhZ4XgiXtGrdW5XDAPFCL9h7we1vwNCpn8tGbBcgfVYjXyhWo4E1xkh56hjod1RhGjxbaTLV3X4FyWuejifB9jusQ46QzG87VKp",
 			isPrivate: true,
@@ -489,8 +489,8 @@ func TestNet(t *testing.T) {
 		{
 			name:      "regtest -> mainnet",
 			key:       "tprv8ZgxMBicQKsPeDgjzdC36fs6bMjGApWDNLR9erAXMs5skhMv36j9MV5ecvfavji5khqjWaWSFhN3YcCUUdiKH6isR4Pwy3U5y5egddBr16m",
-			origNet:   &btcnet.RegressionNetParams,
-			newNet:    &btcnet.MainNetParams,
+			origNet:   &chaincfg.RegressionNetParams,
+			newNet:    &chaincfg.MainNetParams,
 			newPriv:   "xprv9s21ZrQH143K3QTDL4LXw2F7HEK3wJUD2nW2nRk4stbPy6cq3jPPqjiChkVvvNKmPGJxWUtg6LnF5kejMRNNU3TGtRBeJgk33yuGBxrMPHi",
 			newPub:    "xpub661MyMwAqRbcFtXgS5sYJABqqG9YLmC4Q1Rdap9gSE8NqtwybGhePY2gZ29ESFjqJoCu1Rupje8YtGqsefD265TMg7usUDFdp6W1EGMcet8",
 			isPrivate: true,
@@ -500,32 +500,32 @@ func TestNet(t *testing.T) {
 		{
 			name:      "mainnet -> simnet",
 			key:       "xpub661MyMwAqRbcFtXgS5sYJABqqG9YLmC4Q1Rdap9gSE8NqtwybGhePY2gZ29ESFjqJoCu1Rupje8YtGqsefD265TMg7usUDFdp6W1EGMcet8",
-			origNet:   &btcnet.MainNetParams,
-			newNet:    &btcnet.SimNetParams,
+			origNet:   &chaincfg.MainNetParams,
+			newNet:    &chaincfg.SimNetParams,
 			newPub:    "spub4Tr3T2ab61tD1Qa6GHwRFiiKyRRJdfEZpSpXfqgFYCEyaPsqKysqHDjzSzMJSiUEGbcsG3w2SLMoTqn44B8x6u3MLRRkYfACTUBnHK79THk",
 			isPrivate: false,
 		},
 		{
 			name:      "simnet -> mainnet",
 			key:       "spub4Tr3T2ab61tD1Qa6GHwRFiiKyRRJdfEZpSpXfqgFYCEyaPsqKysqHDjzSzMJSiUEGbcsG3w2SLMoTqn44B8x6u3MLRRkYfACTUBnHK79THk",
-			origNet:   &btcnet.SimNetParams,
-			newNet:    &btcnet.MainNetParams,
+			origNet:   &chaincfg.SimNetParams,
+			newNet:    &chaincfg.MainNetParams,
 			newPub:    "xpub661MyMwAqRbcFtXgS5sYJABqqG9YLmC4Q1Rdap9gSE8NqtwybGhePY2gZ29ESFjqJoCu1Rupje8YtGqsefD265TMg7usUDFdp6W1EGMcet8",
 			isPrivate: false,
 		},
 		{
 			name:      "mainnet -> regtest",
 			key:       "xpub661MyMwAqRbcFtXgS5sYJABqqG9YLmC4Q1Rdap9gSE8NqtwybGhePY2gZ29ESFjqJoCu1Rupje8YtGqsefD265TMg7usUDFdp6W1EGMcet8",
-			origNet:   &btcnet.MainNetParams,
-			newNet:    &btcnet.RegressionNetParams,
+			origNet:   &chaincfg.MainNetParams,
+			newNet:    &chaincfg.RegressionNetParams,
 			newPub:    "tpubD6NzVbkrYhZ4XgiXtGrdW5XDAPFCL9h7we1vwNCpn8tGbBcgfVYjXyhWo4E1xkh56hjod1RhGjxbaTLV3X4FyWuejifB9jusQ46QzG87VKp",
 			isPrivate: false,
 		},
 		{
 			name:      "regtest -> mainnet",
 			key:       "tpubD6NzVbkrYhZ4XgiXtGrdW5XDAPFCL9h7we1vwNCpn8tGbBcgfVYjXyhWo4E1xkh56hjod1RhGjxbaTLV3X4FyWuejifB9jusQ46QzG87VKp",
-			origNet:   &btcnet.RegressionNetParams,
-			newNet:    &btcnet.MainNetParams,
+			origNet:   &chaincfg.RegressionNetParams,
+			newNet:    &chaincfg.MainNetParams,
 			newPub:    "xpub661MyMwAqRbcFtXgS5sYJABqqG9YLmC4Q1Rdap9gSE8NqtwybGhePY2gZ29ESFjqJoCu1Rupje8YtGqsefD265TMg7usUDFdp6W1EGMcet8",
 			isPrivate: false,
 		},
@@ -650,7 +650,7 @@ func TestErrors(t *testing.T) {
 			key:       "xbad4LfUL9eKmA66w2GJdVMqhvDmYGJpTGjWRAtjHqoUY17sGaymoMV9Cm3ocn9Ud6Hh2vLFVC7KSKCRVVrqc6dsEdsTjRV1WUmkK85YEUujAPX",
 			err:       nil,
 			neuter:    true,
-			neuterErr: btcnet.ErrUnknownHDKeyID,
+			neuterErr: chaincfg.ErrUnknownHDKeyID,
 		},
 	}
 
@@ -743,7 +743,7 @@ func TestZero(t *testing.T) {
 		}
 
 		wantAddr := "1HT7xU2Ngenf7D4yocz2SAcnNLW7rK8d4E"
-		addr, err := key.Address(&btcnet.MainNetParams)
+		addr, err := key.Address(&chaincfg.MainNetParams)
 		if err != nil {
 			t.Errorf("Addres s #%d (%s): unexpected error: %v", i,
 				testName, err)

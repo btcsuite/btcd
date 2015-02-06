@@ -8,9 +8,9 @@ import (
 	"bytes"
 	"errors"
 
+	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/btcsuite/btcd/wire"
 	"github.com/btcsuite/btcec"
-	"github.com/btcsuite/btcnet"
 	"github.com/btcsuite/btcutil/base58"
 )
 
@@ -49,7 +49,7 @@ type WIF struct {
 // as a string encoded in the Wallet Import Format.  The compress argument
 // specifies whether the address intended to be imported or exported was created
 // by serializing the public key compressed rather than uncompressed.
-func NewWIF(privKey *btcec.PrivateKey, net *btcnet.Params, compress bool) (*WIF, error) {
+func NewWIF(privKey *btcec.PrivateKey, net *chaincfg.Params, compress bool) (*WIF, error) {
 	if net == nil {
 		return nil, errors.New("no network")
 	}
@@ -58,7 +58,7 @@ func NewWIF(privKey *btcec.PrivateKey, net *btcnet.Params, compress bool) (*WIF,
 
 // IsForNet returns whether or not the decoded WIF structure is associated
 // with the passed bitcoin network.
-func (w *WIF) IsForNet(net *btcnet.Params) bool {
+func (w *WIF) IsForNet(net *chaincfg.Params) bool {
 	return w.netID == net.PrivateKeyID
 }
 

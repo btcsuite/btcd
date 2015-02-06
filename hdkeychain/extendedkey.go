@@ -18,9 +18,9 @@ import (
 	"fmt"
 	"math/big"
 
+	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/btcsuite/btcd/wire"
 	"github.com/btcsuite/btcec"
-	"github.com/btcsuite/btcnet"
 	"github.com/btcsuite/btcutil"
 	"github.com/btcsuite/btcutil/base58"
 )
@@ -321,7 +321,7 @@ func (k *ExtendedKey) Neuter() (*ExtendedKey, error) {
 	}
 
 	// Get the associated public extended key version bytes.
-	version, err := btcnet.HDPrivateKeyToPublicKeyID(k.version)
+	version, err := chaincfg.HDPrivateKeyToPublicKeyID(k.version)
 	if err != nil {
 		return nil, err
 	}
@@ -354,7 +354,7 @@ func (k *ExtendedKey) ECPrivKey() (*btcec.PrivateKey, error) {
 
 // Address converts the extended key to a standard bitcoin pay-to-pubkey-hash
 // address for the passed network.
-func (k *ExtendedKey) Address(net *btcnet.Params) (*btcutil.AddressPubKeyHash, error) {
+func (k *ExtendedKey) Address(net *chaincfg.Params) (*btcutil.AddressPubKeyHash, error) {
 	pkHash := btcutil.Hash160(k.pubKeyBytes())
 	return btcutil.NewAddressPubKeyHash(pkHash, net)
 }
@@ -392,14 +392,14 @@ func (k *ExtendedKey) String() string {
 
 // IsForNet returns whether or not the extended key is associated with the
 // passed bitcoin network.
-func (k *ExtendedKey) IsForNet(net *btcnet.Params) bool {
+func (k *ExtendedKey) IsForNet(net *chaincfg.Params) bool {
 	return bytes.Equal(k.version, net.HDPrivateKeyID[:]) ||
 		bytes.Equal(k.version, net.HDPublicKeyID[:])
 }
 
 // SetNet associates the extended key, and any child keys yet to be derived from
 // it, with the passed network.
-func (k *ExtendedKey) SetNet(net *btcnet.Params) {
+func (k *ExtendedKey) SetNet(net *chaincfg.Params) {
 	if k.isPrivate {
 		k.version = net.HDPrivateKeyID[:]
 	} else {
@@ -465,7 +465,7 @@ func NewMaster(seed []byte) (*ExtendedKey, error) {
 	}
 
 	parentFP := []byte{0x00, 0x00, 0x00, 0x00}
-	return newExtendedKey(btcnet.MainNetParams.HDPrivateKeyID[:], secretKey,
+	return newExtendedKey(chaincfg.MainNetParams.HDPrivateKeyID[:], secretKey,
 		chainCode, parentFP, 0, 0, true), nil
 }
 

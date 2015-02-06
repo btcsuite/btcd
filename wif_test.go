@@ -7,8 +7,8 @@ package btcutil_test
 import (
 	"testing"
 
+	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/btcsuite/btcec"
-	"github.com/btcsuite/btcnet"
 	. "github.com/btcsuite/btcutil"
 )
 
@@ -25,11 +25,11 @@ func TestEncodeDecodeWIF(t *testing.T) {
 		0x4e, 0x39, 0x6f, 0xb5, 0xdc, 0x29, 0x5f, 0xe9,
 		0x94, 0xb9, 0x67, 0x89, 0xb2, 0x1a, 0x03, 0x98})
 
-	wif1, err := NewWIF(priv1, &btcnet.MainNetParams, false)
+	wif1, err := NewWIF(priv1, &chaincfg.MainNetParams, false)
 	if err != nil {
 		t.Fatal(err)
 	}
-	wif2, err := NewWIF(priv2, &btcnet.TestNet3Params, true)
+	wif2, err := NewWIF(priv2, &chaincfg.TestNet3Params, true)
 	if err != nil {
 		t.Fatal(err)
 	}
