@@ -560,7 +560,7 @@ func TestBaseMultVerify(t *testing.T) {
 			data := make([]byte, bytes)
 			_, err := rand.Read(data)
 			if err != nil {
-				t.Errorf("failed to read random data for %s", i)
+				t.Errorf("failed to read random data for %d", i)
 				continue
 			}
 			x, y := s256.ScalarBaseMult(data)

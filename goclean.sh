@@ -12,7 +12,7 @@ set -e
 # Automatic checks
 test -z $(gofmt -l -w . | tee /dev/stderr)
 test -z $(goimports -l -w . | tee /dev/stderr)
-test -z $(golint ./... | grep -v "ALL_CAPS" | grep -v "OP_" | tee /dev/stderr)
+test -z $(golint ./... | grep -v "ALL_CAPS" | grep -v "OP_" | grep -v "NewFieldVal" | tee /dev/stderr)
 go tool vet -structtags=false .
 env GORACE="halt_on_error=1" go test -v -race ./...
 
