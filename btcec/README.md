@@ -1,10 +1,8 @@
 btcec
 =====
 
-[![Build Status](https://travis-ci.org/btcsuite/btcec.png?branch=master)]
-(https://travis-ci.org/btcsuite/btcec) [![Coverage Status]
-(https://coveralls.io/repos/btcsuite/btcec/badge.png?branch=master)]
-(https://coveralls.io/r/btcsuite/btcec?branch=master)
+[![Build Status](https://travis-ci.org/btcsuite/btcd.png?branch=master)]
+(https://travis-ci.org/btcsuite/btcec)
 
 Package btcec implements elliptic curve cryptography needed for working with
 Bitcoin (secp256k1 only for now). It is designed so that it may be used with the
@@ -14,24 +12,22 @@ on work from ThePiachu which is licensed under the same terms as Go, but it has
 signficantly diverged since then.  The Conformal original is licensed under the
 liberal ISC license.
 
-This package is one of the core packages from btcd, an alternative full-node
-implementation of bitcoin which is under active development by Conformal.
-Although it was primarily written for btcd, this package has intentionally been
+Although this package was primarily written for btcd, it has intentionally been
 designed so it can be used as a standalone package for any projects needing to
 use secp256k1 elliptic curve cryptography.
 
 ## Documentation
 
-[![GoDoc](https://godoc.org/github.com/btcsuite/btcec?status.png)]
-(http://godoc.org/github.com/btcsuite/btcec)
+[![GoDoc](https://godoc.org/github.com/btcsuite/btcd/btcec?status.png)]
+(http://godoc.org/github.com/btcsuite/btcd/btcec)
 
 Full `go doc` style documentation for the project can be viewed online without
 installing this package by using the GoDoc site
-[here](http://godoc.org/github.com/btcsuite/btcec).
+[here](http://godoc.org/github.com/btcsuite/btcd/btcec).
 
 You can also view the documentation locally once the package is installed with
 the `godoc` tool by running `godoc -http=":6060"` and pointing your browser to
-http://localhost:6060/pkg/github.com/btcsuite/btcec
+http://localhost:6060/pkg/github.com/btcsuite/btcd/btcec
 
 ## Installation
 
@@ -42,12 +38,12 @@ $ go get github.com/btcsuite/btcec
 ## Examples
 
 * [Sign Message]
-  (http://godoc.org/github.com/btcsuite/btcec#example-package--SignMessage)  
+  (http://godoc.org/github.com/btcsuite/btcd/btcec#example-package--SignMessage)  
   Demonstrates signing a message with a secp256k1 private key that is first
   parsed form raw bytes and serializing the generated signature.
 
 * [Verify Signature]
-  (http://godoc.org/github.com/btcsuite/btcec#example-package--VerifySignature)  
+  (http://godoc.org/github.com/btcsuite/btcd/btcec#example-package--VerifySignature)  
   Demonstrates verifying a secp256k1 signature against a public key that is
   first parsed from raw bytes.  The signature is also parsed from raw bytes.
 

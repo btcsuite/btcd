@@ -7,7 +7,7 @@ package btcec_test
 import (
 	"testing"
 
-	"github.com/btcsuite/btcec"
+	"github.com/btcsuite/btcd/btcec"
 )
 
 // BenchmarkAddJacobian benchmarks the secp256k1 curve addJacobian function with
