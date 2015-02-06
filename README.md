@@ -35,7 +35,7 @@ active development.
 
 ## Requirements
 
-[Go](http://golang.org) 1.2 or newer.
+[Go](http://golang.org) 1.3 or newer.
 
 ## Installation
 
