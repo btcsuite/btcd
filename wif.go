@@ -8,9 +8,9 @@ import (
 	"bytes"
 	"errors"
 
+	"github.com/btcsuite/btcd/btcec"
 	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/btcsuite/btcd/wire"
-	"github.com/btcsuite/btcec"
 	"github.com/btcsuite/btcutil/base58"
 )
 

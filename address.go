@@ -10,8 +10,8 @@ import (
 
 	"golang.org/x/crypto/ripemd160"
 
+	"github.com/btcsuite/btcd/btcec"
 	"github.com/btcsuite/btcd/chaincfg"
-	"github.com/btcsuite/btcec"
 	"github.com/btcsuite/btcutil/base58"
 )
 
