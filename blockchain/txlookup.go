@@ -122,11 +122,12 @@ func fetchTxStoreMain(db database.Db, txSet map[wire.ShaHash]struct{}, includeSp
 	// will return the information from the point of view of the end of the
 	// main chain.  Choose whether or not to include fully spent
 	// transactions depending on the passed flag.
-	fetchFunc := db.FetchUnSpentTxByShaList
+	var txReplyList []*database.TxListReply
 	if includeSpent {
-		fetchFunc = db.FetchTxByShaList
+		txReplyList = db.FetchTxByShaList(txList)
+	} else {
+		txReplyList = db.FetchUnSpentTxByShaList(txList)
 	}
-	txReplyList := fetchFunc(txList)
 	for _, txReply := range txReplyList {
 		// Lookup the existing results entry to modify.  Skip
 		// this reply if there is no corresponding entry in
