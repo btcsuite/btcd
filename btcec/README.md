@@ -32,7 +32,7 @@ http://localhost:6060/pkg/github.com/btcsuite/btcd/btcec
 ## Installation
 
 ```bash
-$ go get github.com/btcsuite/btcec
+$ go get github.com/btcsuite/btcd/btcec
 ```
 
 ## Examples
