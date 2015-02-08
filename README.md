@@ -49,7 +49,10 @@ https://github.com/btcsuite/btcd/releases
   http://golang.org/doc/install
 
 - Run the following command to obtain btcd, all dependencies, and install it:
-  ```$ go get github.com/btcsuite/btcd/...```
+
+```bash
+$ go get github.com/btcsuite/btcd/...
+```
 
 - btcd (and utilities) will now be installed in either ```$GOROOT/bin``` or
   ```$GOPATH/bin``` depending on your configuration.  If you did not already
@@ -65,7 +68,10 @@ Install a newer MSI
 #### Linux/BSD/MacOSX/POSIX - Build from Source
 
 - Run the following command to update btcd, all dependencies, and install it:
-  ```$ go get -u -v github.com/btcsuite/btcd/...```
+
+```bash
+$ go get -u -v github.com/btcsuite/btcd/...
+```
 
 ## Getting Started
 
