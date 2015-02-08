@@ -197,12 +197,13 @@ information.
 	  [btcjson](https://github.com/btcsuite/btcjson))
     * [wire](https://github.com/btcsuite/btcd/tree/master/wire) - Implements the
 	  Bitcoin wire protocol
-    * [blockchain](https://github.com/btcsuite/btcd/blockchain) - Implements
-	  Bitcoin block handling and chain selection rules
+    * [blockchain](https://github.com/btcsuite/btcd/tree/master/blockchain) -
+	  Implements Bitcoin block handling and chain selection rules
     * [txscript](https://github.com/btcsuite/btcd/tree/master/txscript) -
 	  Implements the Bitcoin transaction scripting language
-    * [btcec](https://github.com/btcsuite/btcec) - Implements support for the
-	  elliptic curve cryptographic functions needed for the Bitcoin scripts
+    * [btcec](https://github.com/btcsuite/btcd/tree/master/btcec) - Implements
+	  support for the elliptic curve cryptographic functions needed for the
+	  Bitcoin scripts
     * [database](https://github.com/btcsuite/btcd/tree/master/database) -
 	  Provides a database interface for the Bitcoin block chain
     * [btcutil](https://github.com/btcsuite/btcutil) - Provides Bitcoin-specific
