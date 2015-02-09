@@ -1501,10 +1501,6 @@ func SignTxOutput(chainParams *chaincfg.Params, tx *wire.MsgTx, idx int,
 	// Merge scripts. with any previous data, if any.
 	mergedScript := mergeScripts(chainParams, tx, idx, pkScript, class,
 		addresses, nrequired, sigScript, previousScript)
-	if err != nil {
-		return nil, err
-	}
-
 	return mergedScript, nil
 }
 
