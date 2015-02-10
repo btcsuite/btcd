@@ -21,7 +21,7 @@ env GORACE="halt_on_error=1" go test -v -race ./...
 echo "mode: count" > profile.cov
 
 # Standard go tooling behavior is to ignore dirs with leading underscores.
-for dir in $(/bin/find . -maxdepth 10 -not -path '.' -not -path './.git*' \
+for dir in $(find . -maxdepth 10 -not -path '.' -not -path './.git*' \
     -not -path '*/_*' -not -path './cmd*' -not -path './release*' -type d)
 do
 if ls $dir/*.go &> /dev/null; then
