@@ -1838,14 +1838,10 @@ type sig struct {
 
 // stack; sigs <numsigs> pubkeys <numpubkeys>
 func opcodeCheckMultiSig(op *parsedOpcode, s *Script) error {
-
 	numPubkeys, err := s.dstack.PopInt()
 	if err != nil {
 		return err
 	}
-
-	// XXX arbitrary limits
-	// nore more than 20 pubkeys, or 201 operations
 
 	// PopInt promises that the int returned is 32 bit.
 	npk := int(numPubkeys.Int64())
@@ -1920,6 +1916,9 @@ func opcodeCheckMultiSig(op *parsedOpcode, s *Script) error {
 
 	if len(signatures) == 0 {
 		s.dstack.PushBool(nsig == 0)
+		return nil
+	} else if len(signatures) < nsig {
+		s.dstack.PushBool(false)
 		return nil
 	}
 
