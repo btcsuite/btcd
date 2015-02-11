@@ -587,8 +587,40 @@ func (b *blockManager) handleBlockMsg(bmsg *blockMsg) {
 		return
 	}
 
+	// Meta-data about the new block this peer is reporting. We use this
+	// below to update this peer's lastest block height and the heights of
+	// other peers based on their last announced block sha. This allows us
+	// to dynamically update the block heights of peers, avoiding stale heights
+	// when looking for a new sync peer. Upon acceptance of a block or
+	// recognition of an orphan, we also use this information to update
+	// the block heights over other peers who's invs may have been ignored
+	// if we are actively syncing while the chain is not yet current or
+	// who may have lost the lock announcment race.
+	var heightUpdate int32
+	var blkShaUpdate *wire.ShaHash
+
 	// Request the parents for the orphan block from the peer that sent it.
 	if isOrphan {
+		// We've just received an orphan block from a peer. In order
+		// to update the height of the peer, we try to extract the
+		// block height from the scriptSig of the coinbase transaction.
+		// Extraction is only attempted if the block's version is
+		// high enough (ver 2+).
+		header := &bmsg.block.MsgBlock().Header
+		if blockchain.ShouldHaveSerializedBlockHeight(header) {
+			coinbaseTx := bmsg.block.Transactions()[0]
+			cbHeight, err := blockchain.ExtractCoinbaseHeight(coinbaseTx)
+			if err != nil {
+				bmgrLog.Warnf("Unable to extract height from "+
+					"coinbase tx: %v", err)
+			} else {
+				bmgrLog.Debugf("Extracted height of %v from "+
+					"orphan block", cbHeight)
+				heightUpdate = int32(cbHeight)
+				blkShaUpdate = blockSha
+			}
+		}
+
 		orphanRoot := b.blockChain.GetOrphanRoot(blockSha)
 		locator, err := b.blockChain.LatestBlockLocator()
 		if err != nil {
@@ -600,7 +632,6 @@ func (b *blockManager) handleBlockMsg(bmsg *blockMsg) {
 	} else {
 		// When the block is not an orphan, log information about it and
 		// update the chain state.
-
 		b.progressLogger.LogBlockHeight(bmsg.block)
 
 		// Query the db for the latest best block since the block
@@ -608,6 +639,11 @@ func (b *blockManager) handleBlockMsg(bmsg *blockMsg) {
 		// a reorg.
 		newestSha, newestHeight, _ := b.server.db.NewestSha()
 		b.updateChainState(newestSha, newestHeight)
+
+		// Update this peer's latest block height, for future
+		// potential sync node candidancy.
+		heightUpdate = int32(newestHeight)
+		blkShaUpdate = newestSha
 
 		// Allow any clients performing long polling via the
 		// getblocktemplate RPC to be notified when the new block causes
@@ -618,6 +654,16 @@ func (b *blockManager) handleBlockMsg(bmsg *blockMsg) {
 		}
 	}
 
+	// Update the block height for this peer. But only send a message to
+	// the server for updating peer heights if this is an orphan or our
+	// chain is "current". This avoid sending a spammy amount of messages
+	// if we're syncing the chain from scratch.
+	if blkShaUpdate != nil && heightUpdate != 0 {
+		bmsg.peer.UpdateLastBlockHeight(heightUpdate)
+		if isOrphan || b.current() {
+			go b.server.UpdatePeerHeights(blkShaUpdate, int32(heightUpdate), bmsg.peer)
+		}
+	}
 	// Sync the db to disk.
 	b.server.db.Sync()
 
@@ -856,12 +902,6 @@ func (b *blockManager) haveInventory(invVect *wire.InvVect) (bool, error) {
 // handleInvMsg handles inv messages from all peers.
 // We examine the inventory advertised by the remote peer and act accordingly.
 func (b *blockManager) handleInvMsg(imsg *invMsg) {
-	// Ignore invs from peers that aren't the sync if we are not current.
-	// Helps prevent fetching a mass of orphans.
-	if imsg.peer != b.syncPeer && !b.current() {
-		return
-	}
-
 	// Attempt to find the final block in the inventory list.  There may
 	// not be one.
 	lastBlock := -1
@@ -870,6 +910,36 @@ func (b *blockManager) handleInvMsg(imsg *invMsg) {
 		if invVects[i].Type == wire.InvTypeBlock {
 			lastBlock = i
 			break
+		}
+	}
+
+	// If this inv contains a block annoucement, and this isn't coming from
+	// our current sync peer or we're current, then update the last
+	// announced block for this peer. We'll use this information later to
+	// update the heights of peers based on blocks we've accepted that they
+	// previously announced.
+	if lastBlock != -1 && (imsg.peer != b.syncPeer || b.current()) {
+		imsg.peer.UpdateLastAnnouncedBlock(&invVects[lastBlock].Hash)
+	}
+
+	// Ignore invs from peers that aren't the sync if we are not current.
+	// Helps prevent fetching a mass of orphans.
+	if imsg.peer != b.syncPeer && !b.current() {
+		return
+	}
+
+	// If our chain is current and a peer announces a block we already
+	// know of, then update their current block height.
+	if lastBlock != -1 && b.current() {
+		exists, err := b.server.db.ExistsSha(&invVects[lastBlock].Hash)
+		if err == nil && exists {
+			blkHeight, err := b.server.db.FetchBlockHeightBySha(&invVects[lastBlock].Hash)
+			if err != nil {
+				bmgrLog.Warnf("Unable to fetch block height for block (sha: %v), %v",
+					&invVects[lastBlock].Hash, err)
+			} else {
+				imsg.peer.UpdateLastBlockHeight(int32(blkHeight))
+			}
 		}
 	}
 

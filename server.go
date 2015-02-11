@@ -5,6 +5,7 @@
 package main
 
 import (
+	"bytes"
 	"container/list"
 	"crypto/rand"
 	"encoding/binary"
@@ -70,6 +71,18 @@ type relayMsg struct {
 	data    interface{}
 }
 
+// updatePeerHeightsMsg is a message sent from the blockmanager to the server
+// after a new block has been accepted. The purpose of the message is to update
+// the heights of peers that were known to announce the block before we
+// connected it to the main chain or recognized it as an orphan. With these
+// updates, peer heights will be kept up to date, allowing for fresh data when
+// selecting sync peer candidacy.
+type updatePeerHeightsMsg struct {
+	newSha     *wire.ShaHash
+	newHeight  int32
+	originPeer *peer
+}
+
 // server provides a bitcoin server for handling communications to and from
 // bitcoin peers.
 type server struct {
@@ -96,6 +109,7 @@ type server struct {
 	query                chan interface{}
 	relayInv             chan relayMsg
 	broadcast            chan broadcastMsg
+	peerHeightsUpdate    chan updatePeerHeightsMsg
 	wg                   sync.WaitGroup
 	quit                 chan struct{}
 	nat                  NAT
@@ -183,6 +197,35 @@ func (p *peerState) forAllPeers(closure func(p *peer)) {
 		closure(e.Value.(*peer))
 	}
 	p.forAllOutboundPeers(closure)
+}
+
+// handleUpdatePeerHeight updates the heights of all peers who were known to
+// announce a block we recently accepted.
+func (s *server) handleUpdatePeerHeights(state *peerState, umsg updatePeerHeightsMsg) {
+	state.forAllPeers(func(p *peer) {
+		// The origin peer should already have the updated height.
+		if p == umsg.originPeer {
+			return
+		}
+
+		// Skip this peer if it hasn't recently announced any new blocks.
+		p.StatsMtx.Lock()
+		if p.lastAnnouncedBlock == nil {
+			p.StatsMtx.Unlock()
+			return
+		}
+
+		latestBlkSha := p.lastAnnouncedBlock.Bytes()
+		p.StatsMtx.Unlock()
+
+		// If the peer has recently announced a block, and this block
+		// matches our newly accepted block, then update their block
+		// height.
+		if bytes.Equal(latestBlkSha, umsg.newSha.Bytes()) {
+			p.UpdateLastBlockHeight(umsg.newHeight)
+			p.UpdateLastAnnouncedBlock(nil)
+		}
+	})
 }
 
 // handleAddPeerMsg deals with adding new peers.  It is invoked from the
@@ -414,7 +457,8 @@ func (s *server) handleQuery(querymsg interface{}, state *peerState) {
 				Version:        p.protocolVersion,
 				SubVer:         p.userAgent,
 				Inbound:        p.inbound,
-				StartingHeight: p.lastBlock,
+				StartingHeight: p.startingHeight,
+				CurrentHeight:  p.lastBlock,
 				BanScore:       0,
 				SyncNode:       p == syncPeer,
 			}
@@ -600,6 +644,10 @@ out:
 		// Disconnected peers.
 		case p := <-s.donePeers:
 			s.handleDonePeerMsg(state, p)
+
+		// Block accepted in mainchain or orphan, update peer height.
+		case umsg := <-s.peerHeightsUpdate:
+			s.handleUpdatePeerHeights(state, umsg)
 
 		// Peer to ban.
 		case p := <-s.banPeers:
@@ -816,6 +864,18 @@ func (s *server) NetTotals() (uint64, uint64) {
 	defer s.bytesMutex.Unlock()
 
 	return s.bytesReceived, s.bytesSent
+}
+
+// UpdatePeerHeights updates the heights of all peers who have have announced
+// the latest connected main chain block, or a recognized orphan. These height
+// updates allow us to dynamically refresh peer heights, ensuring sync peer
+// selection has access to the latest block heights for each peer.
+func (s *server) UpdatePeerHeights(latestBlkSha *wire.ShaHash, latestHeight int32, updateSource *peer) {
+	s.peerHeightsUpdate <- updatePeerHeightsMsg{
+		newSha:     latestBlkSha,
+		newHeight:  latestHeight,
+		originPeer: updateSource,
+	}
 }
 
 // rebroadcastHandler keeps track of user submitted inventories that we have
@@ -1246,6 +1306,7 @@ func newServer(listenAddrs []string, db database.Db, chainParams *chaincfg.Param
 		broadcast:            make(chan broadcastMsg, cfg.MaxPeers),
 		quit:                 make(chan struct{}),
 		modifyRebroadcastInv: make(chan interface{}),
+		peerHeightsUpdate:    make(chan updatePeerHeightsMsg),
 		nat:                  nat,
 		db:                   db,
 		timeSource:           blockchain.NewMedianTime(),

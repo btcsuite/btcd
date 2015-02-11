@@ -191,7 +191,9 @@ type peer struct {
 	bytesReceived      uint64
 	bytesSent          uint64
 	userAgent          string
+	startingHeight     int32
 	lastBlock          int32
+	lastAnnouncedBlock *wire.ShaHash
 	lastPingNonce      uint64    // Set to nonce if we have a pending ping.
 	lastPingTime       time.Time // Time we sent last ping.
 	lastPingMicros     int64     // Time for last ping to return.
@@ -213,6 +215,27 @@ func (p *peer) isKnownInventory(invVect *wire.InvVect) bool {
 		return true
 	}
 	return false
+}
+
+// UpdateLastBlockHeight updates the last known block for the peer. It is safe
+// for concurrent access.
+func (p *peer) UpdateLastBlockHeight(newHeight int32) {
+	p.StatsMtx.Lock()
+	defer p.StatsMtx.Unlock()
+
+	peerLog.Tracef("Updating last block height of peer %v from %v to %v",
+		p.addr, p.lastBlock, newHeight)
+	p.lastBlock = int32(newHeight)
+}
+
+// UpdateLastAnnouncedBlock updates meta-data about the last block sha this
+// peer is known to have announced. It is safe for concurrent access.
+func (p *peer) UpdateLastAnnouncedBlock(blkSha *wire.ShaHash) {
+	p.StatsMtx.Lock()
+	defer p.StatsMtx.Unlock()
+
+	peerLog.Tracef("Updating last blk for peer %v, %v", p.addr, blkSha)
+	p.lastAnnouncedBlock = blkSha
 }
 
 // AddKnownInventory adds the passed inventory to the cache of known inventory
@@ -400,6 +423,7 @@ func (p *peer) handleVersionMsg(msg *wire.MsgVersion) {
 	peerLog.Debugf("Negotiated protocol version %d for peer %s",
 		p.protocolVersion, p)
 	p.lastBlock = msg.LastBlock
+	p.startingHeight = msg.LastBlock
 
 	// Set the supported services for the peer to what the remote peer
 	// advertised.
