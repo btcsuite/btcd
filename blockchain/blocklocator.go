@@ -55,12 +55,12 @@ func (b *BlockChain) BlockLocatorFromHash(hash *wire.ShaHash) BlockLocator {
 		// Try to look up the height for passed block hash.  Assume an
 		// error means it doesn't exist and just return the locator for
 		// the block itself.
-		block, err := b.db.FetchBlockBySha(hash)
+		height, err := b.db.FetchBlockHeightBySha(hash)
 		if err != nil {
 			return locator
 		}
-		blockHeight = block.Height()
 
+		blockHeight = height
 	} else {
 		blockHeight = node.height
 
