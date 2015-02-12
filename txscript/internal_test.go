@@ -4563,11 +4563,15 @@ func parseScriptFlags(flagStr string) (ScriptFlags, error) {
 	sFlags := strings.Split(flagStr, ",")
 	for _, flag := range sFlags {
 		switch flag {
+		case "":
+			// Nothing.
 		case "DERSIG":
 			flags |= ScriptVerifyDERSignatures
 		case "DISCOURAGE_UPGRADABLE_NOPS":
 			flags |= ScriptDiscourageUpgradableNops
-		case "", "NONE":
+		case "MINIMALDATA":
+			flags |= ScriptVerifyMinimalData
+		case "NONE":
 			// Nothing.
 		case "NULLDUMMY":
 			flags |= ScriptStrictMultiSig

@@ -100,7 +100,34 @@ func fromBool(v bool) []byte {
 // Objects may be shared,  therefore in usage if a value is to be changed it
 // *must* be deep-copied first to avoid changing other values on the stack.
 type Stack struct {
-	stk [][]byte
+	stk               [][]byte
+	verifyMinimalData bool
+}
+
+// checkMinimalData returns whether or not the passed byte array adheres to
+// the minimal encoding requirements, if enabled.
+func (s *Stack) checkMinimalData(so []byte) error {
+	if !s.verifyMinimalData || len(so) == 0 {
+		return nil
+	}
+
+	// Check that the number is encoded with the minimum possible
+	// number of bytes.
+	//
+	// If the most-significant-byte - excluding the sign bit - is zero
+	// then we're not minimal. Note how this test also rejects the
+	// negative-zero encoding, 0x80.
+	if so[len(so)-1]&0x7f == 0 {
+		// One exception: if there's more than one byte and the most
+		// significant bit of the second-most-significant-byte is set
+		// it would conflict with the sign bit. An example of this case
+		// is +-255, which encode to 0xff00 and 0xff80 respectively.
+		// (big-endian).
+		if len(so) == 1 || so[len(so)-2]&0x80 == 0 {
+			return ErrStackMinimalData
+		}
+	}
+	return nil
 }
 
 // PushByteArray adds the given back array to the top of the stack.
@@ -132,6 +159,11 @@ func (s *Stack) PopInt() (*big.Int, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	if err := s.checkMinimalData(so); err != nil {
+		return nil, err
+	}
+
 	return asInt(so)
 }
 
@@ -160,6 +192,11 @@ func (s *Stack) PeekInt(idx int) (i *big.Int, err error) {
 	if err != nil {
 		return nil, err
 	}
+
+	if err := s.checkMinimalData(so); err != nil {
+		return nil, err
+	}
+
 	return asInt(so)
 }
 

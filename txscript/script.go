@@ -126,6 +126,11 @@ var (
 	// ErrStackInvalidPubKey is returned when the ScriptVerifyScriptEncoding
 	// flag is set and the script contains invalid pubkeys.
 	ErrStackInvalidPubKey = errors.New("invalid strict pubkey")
+
+	// ErrStackMinimalData is returned when the ScriptVerifyMinimalData flag
+	// is set and the script contains push operations that do not use
+	// the minimal opcode required.
+	ErrStackMinimalData = errors.New("non-minimally encoded script number")
 )
 
 const (
@@ -638,6 +643,10 @@ const (
 	// to compily with the DER format.
 	ScriptVerifyDERSignatures
 
+	// ScriptVerifyMinimalData defines that signatures must use the smallest
+	// push operator. This is both rules 3 and 4 of BIP0062.
+	ScriptVerifyMinimalData
+
 	// ScriptVerifySigPushOnly defines that signature scripts must contain
 	// only pushed data.  This is rule 2 of BIP0062.
 	ScriptVerifySigPushOnly
@@ -699,6 +708,10 @@ func NewScript(scriptSig []byte, scriptPubKey []byte, txidx int, tx *wire.MsgTx,
 	}
 	if flags&ScriptVerifyDERSignatures == ScriptVerifyDERSignatures {
 		m.verifyDERSignatures = true
+	}
+	if flags&ScriptVerifyMinimalData == ScriptVerifyMinimalData {
+		m.dstack.verifyMinimalData = true
+		m.astack.verifyMinimalData = true
 	}
 
 	m.tx = *tx
