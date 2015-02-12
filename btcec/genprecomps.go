@@ -50,7 +50,7 @@ func main() {
 	fmt.Fprintln(fi, "// Auto-generated file (see genprecomps.go)")
 	fmt.Fprintln(fi, "// DO NOT EDIT")
 	fmt.Fprintln(fi)
-	fmt.Fprintf(fi, "var secp256k1BytePoints = []byte(%q)\n", encoded)
+	fmt.Fprintf(fi, "var secp256k1BytePoints = %q\n", string(encoded))
 
 	a1, b1, a2, b2 := btcec.S256().EndomorphismVectors()
 	fmt.Println("The following values are the computed linearly " +

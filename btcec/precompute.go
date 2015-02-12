@@ -5,11 +5,11 @@
 package btcec
 
 import (
-	"bytes"
 	"compress/zlib"
 	"encoding/base64"
 	"encoding/binary"
 	"io/ioutil"
+	"strings"
 )
 
 //go:generate go run -tags gensecp256k1 genprecomps.go
@@ -23,17 +23,14 @@ import (
 func loadS256BytePoints() error {
 	// There will be no byte points to load when generating them.
 	bp := secp256k1BytePoints
-	if len(secp256k1BytePoints) == 0 {
+	if len(bp) == 0 {
 		return nil
 	}
 
 	// Decompress the pre-computed table used to accelerate scalar base
 	// multiplication.
-	decoded := make([]byte, base64.StdEncoding.DecodedLen(len(bp)))
-	if _, err := base64.StdEncoding.Decode(decoded, bp); err != nil {
-		return err
-	}
-	r, err := zlib.NewReader(bytes.NewReader(decoded))
+	decoder := base64.NewDecoder(base64.StdEncoding, strings.NewReader(bp))
+	r, err := zlib.NewReader(decoder)
 	if err != nil {
 		return err
 	}
@@ -48,7 +45,9 @@ func loadS256BytePoints() error {
 	for byteNum := 0; byteNum < 32; byteNum++ {
 		// All points in this window.
 		for i := 0; i < 256; i++ {
-			px, py, pz := new(fieldVal), new(fieldVal), new(fieldVal)
+			px := &bytePoints[byteNum][i][0]
+			py := &bytePoints[byteNum][i][1]
+			pz := &bytePoints[byteNum][i][2]
 			for i := 0; i < 10; i++ {
 				px.n[i] = binary.LittleEndian.Uint32(serialized[offset:])
 				offset += 4
@@ -61,9 +60,6 @@ func loadS256BytePoints() error {
 				pz.n[i] = binary.LittleEndian.Uint32(serialized[offset:])
 				offset += 4
 			}
-			bytePoints[byteNum][i][0] = *px
-			bytePoints[byteNum][i][1] = *py
-			bytePoints[byteNum][i][2] = *pz
 		}
 	}
 	secp256k1.bytePoints = &bytePoints

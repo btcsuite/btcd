@@ -18,7 +18,7 @@ import (
 
 // secp256k1BytePoints are dummy points used so the code which generates the
 // real values can compile.
-var secp256k1BytePoints = []byte{}
+var secp256k1BytePoints = ""
 
 // getDoublingPoints returns all the possible G^(2^i) for i in
 // 0..n-1 where n is the curve's bit size (256 in the case of secp256k1)
