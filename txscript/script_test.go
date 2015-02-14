@@ -136,7 +136,7 @@ type txTest struct {
 	pkScript      []byte              // output script of previous tx
 	idx           int                 // tx idx to be run.
 	bip16         bool                // is bip16 active?
-	canonicalSigs bool                // should signatures be validated as canonical?
+	strictSigs    bool                // should signatures be validated as strict?
 	parseErr      error               // failure of NewScript
 	err           error               // Failure of Executre
 	shouldFail    bool                // Execute should fail with nonspecified error.
@@ -843,10 +843,10 @@ var txTests = []txTest{
 			txscript.OP_EQUALVERIFY,
 			txscript.OP_CHECKSIG,
 		},
-		idx:           0,
-		canonicalSigs: true,
-		shouldFail:    true,
-		nSigOps:       1,
+		idx:        0,
+		strictSigs: true,
+		shouldFail: true,
+		nSigOps:    1,
 		scriptInfo: txscript.ScriptInfo{
 			PkScriptClass:  txscript.PubKeyHashTy,
 			NumInputs:      2,
@@ -1619,8 +1619,8 @@ func testTx(t *testing.T, test txTest) {
 	if test.bip16 {
 		flags |= txscript.ScriptBip16
 	}
-	if test.canonicalSigs {
-		flags |= txscript.ScriptCanonicalSignatures
+	if test.strictSigs {
+		flags |= txscript.ScriptVerifyDERSignatures
 	}
 	engine, err := txscript.NewScript(
 		test.tx.TxIn[test.idx].SignatureScript, test.pkScript,
@@ -2867,7 +2867,7 @@ nexttest:
 		}
 
 		// Validate tx input scripts
-		scriptFlags := txscript.ScriptBip16 | txscript.ScriptCanonicalSignatures
+		scriptFlags := txscript.ScriptBip16 | txscript.ScriptVerifyDERSignatures
 		for j, txin := range tx.TxIn {
 			engine, err := txscript.NewScript(txin.SignatureScript,
 				SigScriptTests[i].inputs[j].txout.PkScript,
@@ -3297,7 +3297,7 @@ func checkScripts(msg string, tx *wire.MsgTx, idx int,
 	sigScript, pkScript []byte) error {
 	engine, err := txscript.NewScript(sigScript, pkScript, idx, tx,
 		txscript.ScriptBip16|
-			txscript.ScriptCanonicalSignatures)
+			txscript.ScriptVerifyDERSignatures)
 	if err != nil {
 		return fmt.Errorf("failed to make script engine for %s: %v",
 			msg, err)

@@ -47,7 +47,7 @@ const (
 	// different than what is required for the consensus rules in that they
 	// are more strict.
 	standardScriptVerifyFlags = txscript.ScriptBip16 |
-		txscript.ScriptCanonicalSignatures |
+		txscript.ScriptVerifyDERSignatures |
 		txscript.ScriptStrictMultiSig |
 		txscript.ScriptDiscourageUpgradableNops
 )

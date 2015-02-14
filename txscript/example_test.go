@@ -166,7 +166,7 @@ func ExampleSignTxOutput() {
 
 	// Prove that the transaction has been validly signed by executing the
 	// script pair.
-	flags := txscript.ScriptBip16 | txscript.ScriptCanonicalSignatures |
+	flags := txscript.ScriptBip16 | txscript.ScriptVerifyDERSignatures |
 		txscript.ScriptStrictMultiSig |
 		txscript.ScriptDiscourageUpgradableNops
 	s, err := txscript.NewScript(redeemTx.TxIn[0].SignatureScript,

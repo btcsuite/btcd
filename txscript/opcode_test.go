@@ -19,7 +19,7 @@ func TestScripts(t *testing.T) {
 
 	tests := []struct {
 		script     []byte
-		canonical  bool
+		strictSigs bool
 		shouldPass bool
 		shouldFail error
 	}{
@@ -383,7 +383,6 @@ func TestScripts(t *testing.T) {
 			0x8a, 0x06, 0x26, 0xf1, 0xba, 0xde, 0xd5, 0xc7, 0x2a, 0x70,
 			0x4f, 0x7e, 0x6c, 0xd8, 0x4c,
 			txscript.OP_1, txscript.OP_CHECKMULTISIG},
-			canonical:  false,
 			shouldPass: false},
 		{script: []byte{txscript.OP_1, txscript.OP_1, txscript.OP_DATA_65,
 			0x04, 0xae, 0x1a, 0x62, 0xfe, 0x09, 0xc5, 0xf5, 0x1b, 0x13,
@@ -394,7 +393,7 @@ func TestScripts(t *testing.T) {
 			0x8a, 0x06, 0x26, 0xf1, 0xba, 0xde, 0xd5, 0xc7, 0x2a, 0x70,
 			0x4f, 0x7e, 0x6c, 0xd8, 0x4c,
 			txscript.OP_1, txscript.OP_CHECKMULTISIG},
-			canonical:  true,
+			strictSigs: true,
 			shouldPass: false},
 		/* up here because no defined error case. */
 		{script: []byte{txscript.OP_1, txscript.OP_1, txscript.OP_DATA_65,
@@ -504,8 +503,8 @@ func TestScripts(t *testing.T) {
 	for i, test := range tests {
 		// Parse and execute the test script.
 		var flags txscript.ScriptFlags
-		if test.canonical {
-			flags = txscript.ScriptCanonicalSignatures
+		if test.strictSigs {
+			flags = txscript.ScriptVerifyDERSignatures
 		}
 		mockTx.TxOut[0].PkScript = test.script
 		sigScript := mockTx.TxIn[0].SignatureScript

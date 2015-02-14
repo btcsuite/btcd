@@ -210,7 +210,6 @@ type Script struct {
 	condStack                []int
 	numOps                   int
 	bip16                    bool     // treat execution as pay-to-script-hash
-	der                      bool     // enforce DER encoding
 	strictMultiSig           bool     // verify multisig stack item is zero length
 	discourageUpgradableNops bool     // NOP1 to NOP10 are reserved for future soft-fork upgrades
 	verifyStrictEncoding     bool     // verify strict encoding of signatures
@@ -623,20 +622,6 @@ const (
 	// pay-to-script hash transactions will be fully validated.
 	ScriptBip16 ScriptFlags = 1 << iota
 
-	// ScriptCanonicalSignatures defines whether additional canonical
-	// signature checks are performed when parsing a signature.
-	//
-	// Canonical (DER) signatures are not required in the tx rules for
-	// block acceptance, but are checked in recent versions of bitcoind
-	// when accepting transactions to the mempool.  Non-canonical (valid
-	// BER but not valid DER) transactions can potentially be changed
-	// before mined into a block, either by adding extra padding or
-	// flipping the sign of the R or S value in the signature, creating a
-	// transaction that still validates and spends the inputs, but is not
-	// recognized by creator of the transaction.  Performing a canonical
-	// check enforces script signatures use a unique DER format.
-	ScriptCanonicalSignatures
-
 	// ScriptStrictMultiSig defines whether to verify the stack item
 	// used by CHECKMULTISIG is zero length.
 	ScriptStrictMultiSig
@@ -702,9 +687,6 @@ func NewScript(scriptSig []byte, scriptPubKey []byte, txidx int, tx *wire.MsgTx,
 			return nil, ErrStackP2SHNonPushOnly
 		}
 		m.bip16 = true
-	}
-	if flags&ScriptCanonicalSignatures == ScriptCanonicalSignatures {
-		m.der = true
 	}
 	if flags&ScriptStrictMultiSig == ScriptStrictMultiSig {
 		m.strictMultiSig = true

@@ -1807,7 +1807,7 @@ func opcodeCheckSig(op *parsedOpcode, s *Script) error {
 	}
 
 	var signature *btcec.Signature
-	if s.der || s.verifyStrictEncoding || s.verifyDERSignatures {
+	if s.verifyStrictEncoding || s.verifyDERSignatures {
 		signature, err = btcec.ParseDERSignature(sigStr, btcec.S256())
 	} else {
 		signature, err = btcec.ParseSignature(sigStr, btcec.S256())
@@ -1967,7 +1967,7 @@ func opcodeCheckMultiSig(op *parsedOpcode, s *Script) error {
 
 			// Parse the signature.
 			var err error
-			if s.der || s.verifyStrictEncoding || s.verifyDERSignatures {
+			if s.verifyStrictEncoding || s.verifyDERSignatures {
 				parsedSig, err = btcec.ParseDERSignature(signature,
 					btcec.S256())
 			} else {
