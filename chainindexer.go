@@ -6,6 +6,7 @@ package main
 
 import (
 	"container/heap"
+	"fmt"
 	"runtime"
 	"sync"
 	"sync/atomic"
@@ -239,7 +240,7 @@ func (a *addrIndexer) indexManager() {
 			addrIndex, err := a.indexBlockAddrs(indexJob.blk)
 			if err != nil {
 				adxrLog.Errorf("Unable to index transactions of"+
-					" block %v", err)
+					" block: %v", err)
 				a.server.Stop()
 				goto fin
 			}
@@ -400,7 +401,7 @@ out:
 			addrIndex, err := a.indexBlockAddrs(indexJob.blk)
 			if err != nil {
 				adxrLog.Errorf("Unable to index transactions of"+
-					" block %v", err)
+					" block: %v", err)
 				a.server.Stop()
 				break out
 			}
@@ -467,9 +468,13 @@ func (a *addrIndexer) indexBlockAddrs(blk *btcutil.Block) (database.BlockAddrInd
 				// Lookup and fetch the referenced output's tx.
 				prevOut := txIn.PreviousOutPoint
 				txList, err := a.server.db.FetchTxBySha(&prevOut.Hash)
-				if err != nil || len(txList) == 0 {
-					adxrLog.Errorf("Couldn't get referenced "+
-						"txOut (%v): %v", prevOut, err)
+				if len(txList) == 0 {
+					return nil, fmt.Errorf("transaction %v not found",
+						prevOut.Hash)
+				}
+				if err != nil {
+					adxrLog.Errorf("Error fetching tx %v: %v",
+						prevOut.Hash, err)
 					return nil, err
 				}
 				prevOutTx := txList[len(txList)-1]
