@@ -610,10 +610,13 @@ func (b *BlockChain) pruneBlockNodes() error {
 
 // isMajorityVersion determines if a previous number of blocks in the chain
 // starting with startNode are at least the minimum passed version.
-func (b *BlockChain) isMajorityVersion(minVer int32, startNode *blockNode, numRequired, numToCheck uint64) bool {
+func (b *BlockChain) isMajorityVersion(minVer int32, startNode *blockNode,
+	numRequired uint64) bool {
+
 	numFound := uint64(0)
 	iterNode := startNode
-	for i := uint64(0); i < numToCheck && iterNode != nil; i++ {
+	for i := uint64(0); i < b.chainParams.BlockUpgradeNumToCheck &&
+		numFound < numRequired && iterNode != nil; i++ {
 		// This node has a version that is at least the minimum version.
 		if iterNode.version >= minVer {
 			numFound++

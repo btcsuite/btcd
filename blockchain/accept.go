@@ -111,8 +111,7 @@ func (b *BlockChain) maybeAcceptBlock(block *btcutil.Block, flags BehaviorFlags)
 		// upgraded.  This is part of BIP0034.
 		if blockHeader.Version < 2 {
 			if b.isMajorityVersion(2, prevNode,
-				b.chainParams.BlockV1RejectNumRequired,
-				b.chainParams.BlockV1RejectNumToCheck) {
+				b.chainParams.BlockRejectNumRequired) {
 
 				str := "new blocks with version %d are no " +
 					"longer valid"
@@ -128,8 +127,7 @@ func (b *BlockChain) maybeAcceptBlock(block *btcutil.Block, flags BehaviorFlags)
 		if blockHeader.Version >= serializedHeightVersion {
 			if b.isMajorityVersion(serializedHeightVersion,
 				prevNode,
-				b.chainParams.CoinbaseBlockHeightNumRequired,
-				b.chainParams.CoinbaseBlockHeightNumToCheck) {
+				b.chainParams.BlockEnforceNumRequired) {
 
 				expectedHeight := int64(0)
 				if prevNode != nil {

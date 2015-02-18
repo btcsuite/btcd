@@ -67,15 +67,16 @@ type Params struct {
 	// Checkpoints ordered from oldest to newest.
 	Checkpoints []Checkpoint
 
-	// Reject version 1 blocks once a majority of the network has upgraded.
-	// This is part of BIP0034.
-	BlockV1RejectNumRequired uint64
-	BlockV1RejectNumToCheck  uint64
+	// Enforce current block version once network has
+	// upgraded.  This is part of BIP0034.
+	BlockEnforceNumRequired uint64
 
-	// Ensure coinbase starts with serialized block heights for version 2
-	// blocks or newer once a majority of the network has upgraded.
-	CoinbaseBlockHeightNumRequired uint64
-	CoinbaseBlockHeightNumToCheck  uint64
+	// Reject previous block versions once network has
+	// upgraded.  This is part of BIP0034.
+	BlockRejectNumRequired uint64
+
+	// The number of nodes to check.  This is part of BIP0034.
+	BlockUpgradeNumToCheck uint64
 
 	// Mempool parameters
 	RelayNonStdTxs bool
@@ -127,18 +128,15 @@ var MainNetParams = Params{
 		{319400, newShaHashFromStr("000000000000000021c6052e9becade189495d1c539aa37c58917305fd15f13b")},
 	},
 
-	// Reject version 1 blocks once a majority of the network has upgraded.
-	// 95% (950 / 1000)
-	// This is part of BIP0034.
-	BlockV1RejectNumRequired: 950,
-	BlockV1RejectNumToCheck:  1000,
-
-	// Ensure coinbase starts with serialized block heights for version 2
-	// blocks or newer once a majority of the network has upgraded.
+	// Enforce current block version once majority of the network has
+	// upgraded.
 	// 75% (750 / 1000)
-	// This is part of BIP0034.
-	CoinbaseBlockHeightNumRequired: 750,
-	CoinbaseBlockHeightNumToCheck:  1000,
+	// Reject previous block versions once a majority of the network has
+	// upgraded.
+	// 95% (950 / 1000)
+	BlockEnforceNumRequired: 750,
+	BlockRejectNumRequired:  950,
+	BlockUpgradeNumToCheck:  1000,
 
 	// Mempool parameters
 	RelayNonStdTxs: false,
@@ -176,18 +174,15 @@ var RegressionNetParams = Params{
 	// Checkpoints ordered from oldest to newest.
 	Checkpoints: nil,
 
-	// Reject version 1 blocks once a majority of the network has upgraded.
-	// 75% (75 / 100)
-	// This is part of BIP0034.
-	BlockV1RejectNumRequired: 75,
-	BlockV1RejectNumToCheck:  100,
-
-	// Ensure coinbase starts with serialized block heights for version 2
-	// blocks or newer once a majority of the network has upgraded.
-	// 51% (51 / 100)
-	// This is part of BIP0034.
-	CoinbaseBlockHeightNumRequired: 51,
-	CoinbaseBlockHeightNumToCheck:  100,
+	// Enforce current block version once majority of the network has
+	// upgraded.
+	// 75% (750 / 1000)
+	// Reject previous block versions once a majority of the network has
+	// upgraded.
+	// 95% (950 / 1000)
+	BlockEnforceNumRequired: 750,
+	BlockRejectNumRequired:  950,
+	BlockUpgradeNumToCheck:  1000,
 
 	// Mempool parameters
 	RelayNonStdTxs: true,
@@ -227,18 +222,15 @@ var TestNet3Params = Params{
 		{546, newShaHashFromStr("000000002a936ca763904c3c35fce2f3556c559c0214345d31b1bcebf76acb70")},
 	},
 
-	// Reject version 1 blocks once a majority of the network has upgraded.
-	// 75% (75 / 100)
-	// This is part of BIP0034.
-	BlockV1RejectNumRequired: 75,
-	BlockV1RejectNumToCheck:  100,
-
-	// Ensure coinbase starts with serialized block heights for version 2
-	// blocks or newer once a majority of the network has upgraded.
+	// Enforce current block version once majority of the network has
+	// upgraded.
 	// 51% (51 / 100)
-	// This is part of BIP0034.
-	CoinbaseBlockHeightNumRequired: 51,
-	CoinbaseBlockHeightNumToCheck:  100,
+	// Reject previous block versions once a majority of the network has
+	// upgraded.
+	// 75% (75 / 100)
+	BlockEnforceNumRequired: 51,
+	BlockRejectNumRequired:  75,
+	BlockUpgradeNumToCheck:  100,
 
 	// Mempool parameters
 	RelayNonStdTxs: true,
@@ -280,16 +272,15 @@ var SimNetParams = Params{
 	// Checkpoints ordered from oldest to newest.
 	Checkpoints: nil,
 
-	// Reject version 1 blocks once a majority of the network has upgraded.
-	// 75% (75 / 100)
-	BlockV1RejectNumRequired: 75,
-	BlockV1RejectNumToCheck:  100,
-
-	// Ensure coinbase starts with serialized block heights for version 2
-	// blocks or newer once a majority of the network has upgraded.
+	// Enforce current block version once majority of the network has
+	// upgraded.
 	// 51% (51 / 100)
-	CoinbaseBlockHeightNumRequired: 51,
-	CoinbaseBlockHeightNumToCheck:  100,
+	// Reject previous block versions once a majority of the network has
+	// upgraded.
+	// 75% (75 / 100)
+	BlockEnforceNumRequired: 51,
+	BlockRejectNumRequired:  75,
+	BlockUpgradeNumToCheck:  100,
 
 	// Mempool parameters
 	RelayNonStdTxs: true,
