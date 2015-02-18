@@ -2055,6 +2055,52 @@ func (c *Client) DumpPrivKey(address btcutil.Address) (*btcutil.WIF, error) {
 	return c.DumpPrivKeyAsync(address).Receive()
 }
 
+// FutureImportAddressResult is a future promise to deliver the result of an
+// ImportAddressAsync RPC invocation (or an applicable error).
+type FutureImportAddressResult chan *response
+
+// Receive waits for the response promised by the future and returns the result
+// of importing the passed public address.
+func (r FutureImportAddressResult) Receive() error {
+	_, err := receiveFuture(r)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// ImportAddressAsync returns an instance of a type that can be used to get the
+// result of the RPC at some future time by invoking the Receive function on the
+// returned instance.
+//
+// See ImportAddress for the blocking version and more details.
+func (c *Client) ImportAddressAsync(address string) FutureImportAddressResult {
+	cmd := btcjson.NewImportAddressCmd(address, nil)
+	return c.sendCmd(cmd)
+}
+
+// ImportAddress imports the passed public address.
+func (c *Client) ImportAddress(address string) error {
+	return c.ImportAddressAsync(address).Receive()
+}
+
+// ImportAddressRescanAsync returns an instance of a type that can be used to get the
+// result of the RPC at some future time by invoking the Receive function on the
+// returned instance.
+//
+// See ImportAddress for the blocking version and more details.
+func (c *Client) ImportAddressRescanAsync(address string, rescan bool) FutureImportAddressResult {
+	cmd := btcjson.NewImportAddressCmd(address, &rescan)
+	return c.sendCmd(cmd)
+}
+
+// ImportAddressRescan imports the passed public address. When rescan is true,
+// the block history is scanned for transactions addressed to provided address.
+func (c *Client) ImportAddressRescan(address string, rescan bool) error {
+	return c.ImportAddressRescanAsync(address, rescan).Receive()
+}
+
 // FutureImportPrivKeyResult is a future promise to deliver the result of an
 // ImportPrivKeyAsync RPC invocation (or an applicable error).
 type FutureImportPrivKeyResult chan *response
@@ -2133,6 +2179,52 @@ func (c *Client) ImportPrivKeyRescanAsync(privKeyWIF *btcutil.WIF, label string,
 // the block history is scanned for transactions addressed to provided privKey.
 func (c *Client) ImportPrivKeyRescan(privKeyWIF *btcutil.WIF, label string, rescan bool) error {
 	return c.ImportPrivKeyRescanAsync(privKeyWIF, label, rescan).Receive()
+}
+
+// FutureImportPubKeyResult is a future promise to deliver the result of an
+// ImportPubKeyAsync RPC invocation (or an applicable error).
+type FutureImportPubKeyResult chan *response
+
+// Receive waits for the response promised by the future and returns the result
+// of importing the passed public key.
+func (r FutureImportPubKeyResult) Receive() error {
+	_, err := receiveFuture(r)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// ImportPubKeyAsync returns an instance of a type that can be used to get the
+// result of the RPC at some future time by invoking the Receive function on the
+// returned instance.
+//
+// See ImportPubKey for the blocking version and more details.
+func (c *Client) ImportPubKeyAsync(pubKey string) FutureImportPubKeyResult {
+	cmd := btcjson.NewImportPubKeyCmd(pubKey, nil)
+	return c.sendCmd(cmd)
+}
+
+// ImportPubKey imports the passed public key.
+func (c *Client) ImportPubKey(pubKey string) error {
+	return c.ImportPubKeyAsync(pubKey).Receive()
+}
+
+// ImportPubKeyRescanAsync returns an instance of a type that can be used to get the
+// result of the RPC at some future time by invoking the Receive function on the
+// returned instance.
+//
+// See ImportPubKey for the blocking version and more details.
+func (c *Client) ImportPubKeyRescanAsync(pubKey string, rescan bool) FutureImportPubKeyResult {
+	cmd := btcjson.NewImportPubKeyCmd(pubKey, &rescan)
+	return c.sendCmd(cmd)
+}
+
+// ImportPubKeyRescan imports the passed public key. When rescan is true, the
+// block history is scanned for transactions addressed to provided pubkey.
+func (c *Client) ImportPubKeyRescan(pubKey string, rescan bool) error {
+	return c.ImportPubKeyRescanAsync(pubKey, rescan).Receive()
 }
 
 // ***********************
