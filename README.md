@@ -36,7 +36,7 @@ websocket.JSON.Send(btcdWSConn, cmd)
 // Server Side
 import (
 	"golang.org/x/net/websocket"
-	"github.com/btcsuite/btcjson"
+	"github.com/btcsuite/btcd/btcjson"
 	"github.com/btcsuite/btcws"
 )
 
