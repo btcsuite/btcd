@@ -10,7 +10,7 @@ import (
 	"sort"
 	"strconv"
 
-	"github.com/btcsuite/btcjson"
+	"github.com/btcsuite/btcd/btcjson"
 	"github.com/btcsuite/btcutil"
 	"github.com/btcsuite/btcws"
 	flags "github.com/btcsuite/go-flags"
