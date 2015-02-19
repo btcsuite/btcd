@@ -8,7 +8,7 @@ import (
 	"encoding/json"
 	"errors"
 
-	"github.com/btcsuite/btcjson"
+	"github.com/btcsuite/btcd/btcjson"
 )
 
 // rawRequest satisifies the btcjson.Cmd interface for btcjson raw commands.
