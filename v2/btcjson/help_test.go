@@ -320,7 +320,7 @@ func TestResultStructHelp(t *testing.T) {
 			name: "struct with primitive field and json tag",
 			reflectType: func() reflect.Type {
 				type s struct {
-					field int `json:"f"`
+					Field int `json:"f"`
 				}
 				return reflect.TypeOf(s{})
 			}(),
