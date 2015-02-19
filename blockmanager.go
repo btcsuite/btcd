@@ -125,6 +125,14 @@ type isCurrentMsg struct {
 	reply chan bool
 }
 
+// pauseMsg is a message type to be sent across the message channel for
+// pausing the block manager.  This effectively provides the caller with
+// exclusive access over the manager until a receive is performed on the
+// unpause channel.
+type pauseMsg struct {
+	unpause <-chan struct{}
+}
+
 // headerNode is used as a node in a list of headers that are linked together
 // between checkpoints.
 type headerNode struct {
@@ -1056,6 +1064,10 @@ out:
 			case isCurrentMsg:
 				msg.reply <- b.current()
 
+			case pauseMsg:
+				// Wait until the sender unpauses the manager.
+				<-msg.unpause
+
 			default:
 				bmgrLog.Warnf("Invalid message type in block "+
 					"handler: %T", msg)
@@ -1304,6 +1316,16 @@ func (b *blockManager) IsCurrent() bool {
 	reply := make(chan bool)
 	b.msgChan <- isCurrentMsg{reply: reply}
 	return <-reply
+}
+
+// Pause pauses the block manager until the returned channel is closed.
+//
+// Note that while paused, all peer and block processing is halted.  The
+// message sender should avoid pausing the block manager for long durations.
+func (b *blockManager) Pause() chan<- struct{} {
+	c := make(chan struct{})
+	b.msgChan <- pauseMsg{c}
+	return c
 }
 
 // newBlockManager returns a new bitcoin block manager.
