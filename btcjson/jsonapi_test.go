@@ -11,7 +11,7 @@ import (
 	"io/ioutil"
 	"testing"
 
-	"github.com/btcsuite/btcjson"
+	"github.com/btcsuite/btcd/btcjson"
 )
 
 // cmdtests is a table of all the possible commands and a list of inputs,

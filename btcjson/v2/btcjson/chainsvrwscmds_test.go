@@ -11,8 +11,8 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/btcsuite/btcd/btcjson/v2/btcjson"
 	"github.com/btcsuite/btcd/wire"
-	"github.com/btcsuite/btcjson/v2/btcjson"
 )
 
 // TestChainSvrWsCmds tests all of the chain server websocket-specific commands

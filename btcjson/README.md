@@ -1,10 +1,8 @@
 btcjson
 =======
 
-[![Build Status](https://travis-ci.org/btcsuite/btcjson.png?branch=master)]
-(https://travis-ci.org/btcsuite/btcjson) [![Coverage Status]
-(https://img.shields.io/coveralls/btcsuite/btcjson.svg)]
-(https://coveralls.io/r/btcsuite/btcjson?branch=master) [![ISC License]
+[![Build Status](https://travis-ci.org/btcsuite/btcd.png?branch=master)]
+(https://travis-ci.org/btcsuite/btcd) [![ISC License]
 (http://img.shields.io/badge/license-ISC-blue.svg)](http://copyfree.org)
 
 Package btcjson implements concrete types for marshalling to and from the
@@ -12,9 +10,7 @@ bitcoin JSON-RPC API.  A comprehensive suite of tests is provided to ensure
 proper functionality.  Package btcjson is licensed under the copyfree ISC
 license.
 
-This package is one of the core packages from btcd, an alternative full-node
-implementation of bitcoin which is under active development by Conformal.
-Although it was primarily written for btcd, this package has intentionally been
+Although this package was primarily written for btcd, it has intentionally been
 designed so it can be used as a standalone package for any projects needing to
 marshal to and from bitcoin JSON-RPC requests and responses.
 
@@ -29,9 +25,9 @@ ints, etc) to higher-level types with many nice and useful properties.
 
 ## JSON RPC
 
-Bitcoin provides an extensive API call list to control bitcoind or bitcoin-qt
-through JSON-RPC.  These can be used to get information from the client or to
-cause the client to perform some action.
+Bitcoin provides an extensive API call list to control the chain and wallet
+servers through JSON-RPC.  These can be used to get information from the server
+or to cause the server to perform some action.
 
 The general form of the commands are:
 
@@ -66,20 +62,20 @@ server, and to handle the replies (putting them in useful Go data structures).
 ## Documentation
 
 [![GoDoc](https://img.shields.io/badge/godoc-reference-blue.svg)]
-(http://godoc.org/github.com/btcsuite/btcjson)
+(http://godoc.org/github.com/btcsuite/btcd/btcjson)
 
 Full `go doc` style documentation for the project can be viewed online without
 installing this package by using the GoDoc site
-[here](http://godoc.org/github.com/btcsuite/btcjson).
+[here](http://godoc.org/github.com/btcsuite/btcd/btcjson).
 
 You can also view the documentation locally once the package is installed with
 the `godoc` tool by running `godoc -http=":6060"` and pointing your browser to
-http://localhost:6060/pkg/github.com/btcsuite/btcjson
+http://localhost:6060/pkg/github.com/btcsuite/btcd/btcjson
 
 ## Installation
 
 ```bash
-$ go get github.com/btcsuite/btcjson
+$ go get github.com/btcsuite/btcd/btcjson
 ```
 
 ## GPG Verification Key
