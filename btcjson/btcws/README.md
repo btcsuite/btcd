@@ -1,7 +1,7 @@
 btcws
 =====
 
-[![Build Status](https://travis-ci.org/btcsuite/btcws.png?branch=master)]
+[![Build Status](https://travis-ci.org/btcsuite/btcd.png?branch=master)]
 (https://travis-ci.org/btcsuite/btcws)
 
 Package btcws implements extensions to the standard bitcoind JSON-RPC
@@ -14,7 +14,7 @@ btcjson (using btcjson.RegisterCustomCmd).
 // Client Side
 import (
 	"golang.org/x/net/websocket"
-	"github.com/btcsuite/btcws"
+	"github.com/btcsuite/btcd/btcjson/btcws"
 )
 
 // Create rescan command.
@@ -37,7 +37,7 @@ websocket.JSON.Send(btcdWSConn, cmd)
 import (
 	"golang.org/x/net/websocket"
 	"github.com/btcsuite/btcd/btcjson"
-	"github.com/btcsuite/btcws"
+	"github.com/btcsuite/btcd/btcjson/btcws"
 )
 
 // Get marshaled request.
@@ -60,7 +60,7 @@ if ok {
 ## Installation
 
 ```bash
-$ go get github.com/btcsuite/btcws
+$ go get github.com/btcsuite/btcd/btcjson/btcws
 ```
 
 ## GPG Verification Key

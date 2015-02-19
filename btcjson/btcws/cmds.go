@@ -1584,8 +1584,6 @@ func NewListAllTransactionsCmd(id interface{},
 
 	if len(optArgs) > 1 {
 		return nil, btcjson.ErrInvalidParams
-	} else {
-		account = nil
 	}
 
 	if len(optArgs) == 1 {
