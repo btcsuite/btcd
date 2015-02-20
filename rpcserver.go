@@ -3286,7 +3286,7 @@ func (s *rpcServer) Start() {
 	rpcServeMux.HandleFunc("/ws", func(w http.ResponseWriter, r *http.Request) {
 		authenticated, err := s.checkAuth(r, false)
 		if err != nil {
-			http.Error(w, "401 Unauthorized.", http.StatusUnauthorized)
+			jsonAuthFail(w)
 			return
 		}
 
@@ -3298,6 +3298,7 @@ func (s *rpcServer) Start() {
 				rpcsLog.Errorf("Unexpected websocket error: %v",
 					err)
 			}
+			http.Error(w, "400 Bad Request.", http.StatusBadRequest)
 			return
 		}
 		s.WebsocketHandler(ws, r.RemoteAddr, authenticated)
