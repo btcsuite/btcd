@@ -417,7 +417,7 @@ func NewGetRawTransactionCmd(txHash string, verbose *int) *GetRawTransactionCmd 
 // GetTxOutCmd defines the gettxout JSON-RPC command.
 type GetTxOutCmd struct {
 	Txid           string
-	Vout           int
+	Vout           uint32
 	IncludeMempool *bool `jsonrpcdefault:"true"`
 }
 
@@ -426,7 +426,7 @@ type GetTxOutCmd struct {
 //
 // The parameters which are pointers indicate they are optional.  Passing nil
 // for optional parameters will use the default value.
-func NewGetTxOutCmd(txHash string, vout int, includeMempool *bool) *GetTxOutCmd {
+func NewGetTxOutCmd(txHash string, vout uint32, includeMempool *bool) *GetTxOutCmd {
 	return &GetTxOutCmd{
 		Txid:           txHash,
 		Vout:           vout,
