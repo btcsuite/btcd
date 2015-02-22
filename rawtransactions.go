@@ -503,3 +503,112 @@ func (c *Client) SignRawTransaction4(tx *wire.MsgTx,
 	return c.SignRawTransaction4Async(tx, inputs, privKeysWIF,
 		hashType).Receive()
 }
+
+// FutureSearchRawTransactionsResult is a future promise to deliver the result
+// of the SearchRawTransactionsAsync RPC invocation (or an applicable error).
+type FutureSearchRawTransactionsResult chan *response
+
+// Receive waits for the response promised by the future and returns the
+// found raw transactions.
+func (r FutureSearchRawTransactionsResult) Receive() ([]*wire.MsgTx, error) {
+	res, err := receiveFuture(r)
+	if err != nil {
+		return nil, err
+	}
+
+	// Unmarshal as an array of strings.
+	var searchRawTxnsResult []string
+	err = json.Unmarshal(res, &searchRawTxnsResult)
+	if err != nil {
+		return nil, err
+	}
+
+	// Decode and deserialize each transaction.
+	msgTxns := make([]*wire.MsgTx, 0, len(searchRawTxnsResult))
+	for _, hexTx := range searchRawTxnsResult {
+		// Decode the serialized transaction hex to raw bytes.
+		serializedTx, err := hex.DecodeString(hexTx)
+		if err != nil {
+			return nil, err
+		}
+
+		// Deserialize the transaction and add it to the result slice.
+		var msgTx wire.MsgTx
+		err = msgTx.Deserialize(bytes.NewReader(serializedTx))
+		if err != nil {
+			return nil, err
+		}
+		msgTxns = append(msgTxns, &msgTx)
+	}
+
+	return msgTxns, nil
+}
+
+// SearchRawTransactionsAsync returns an instance of a type that can be used to
+// get the result of the RPC at some future time by invoking the Receive
+// function on the returned instance.
+//
+// See SearchRawTransactions for the blocking version and more details.
+func (c *Client) SearchRawTransactionsAsync(address btcutil.Address, skip, count int) FutureSearchRawTransactionsResult {
+	addr := address.EncodeAddress()
+	verbose := btcjson.Int(0)
+	cmd := btcjson.NewSearchRawTransactionsCmd(addr, verbose, &skip, &count)
+	return c.sendCmd(cmd)
+}
+
+// SearchRawTransactions returns transactions that involve the passed address.
+//
+// NOTE: Chain servers do not typically provide this capability unless it has
+// specifically been enabled.
+//
+// See SearchRawTransactionsVerbose to retrieve a list of data structures with
+// information about the transactions instead of the transactions themselves.
+func (c *Client) SearchRawTransactions(address btcutil.Address, skip, count int) ([]*wire.MsgTx, error) {
+	return c.SearchRawTransactionsAsync(address, skip, count).Receive()
+}
+
+// FutureSearchRawTransactionsVerboseResult is a future promise to deliver the
+// result of the SearchRawTransactionsVerboseAsync RPC invocation (or an
+// applicable error).
+type FutureSearchRawTransactionsVerboseResult chan *response
+
+// Receive waits for the response promised by the future and returns the
+// found raw transactions.
+func (r FutureSearchRawTransactionsVerboseResult) Receive() ([]*btcjson.TxRawResult, error) {
+	res, err := receiveFuture(r)
+	if err != nil {
+		return nil, err
+	}
+
+	// Unmarshal as an array of raw transaction results.
+	var result []*btcjson.TxRawResult
+	err = json.Unmarshal(res, &result)
+	if err != nil {
+		return nil, err
+	}
+
+	return result, nil
+}
+
+// SearchRawTransactionsVerboseAsync returns an instance of a type that can be
+// used to get the result of the RPC at some future time by invoking the Receive
+// function on the returned instance.
+//
+// See SearchRawTransactionsVerbose for the blocking version and more details.
+func (c *Client) SearchRawTransactionsVerboseAsync(address btcutil.Address, skip, count int) FutureSearchRawTransactionsVerboseResult {
+	addr := address.EncodeAddress()
+	verbose := btcjson.Int(1)
+	cmd := btcjson.NewSearchRawTransactionsCmd(addr, verbose, &skip, &count)
+	return c.sendCmd(cmd)
+}
+
+// SearchRawTransactionsVerbose returns a list of data structures that describe
+// transactions which involve the passed address.
+//
+// NOTE: Chain servers do not typically provide this capability unless it has
+// specifically been enabled.
+//
+// See SearchRawTransactions to retrieve a list of raw transactions instead.
+func (c *Client) SearchRawTransactionsVerbose(address btcutil.Address, skip, count int) ([]*btcjson.TxRawResult, error) {
+	return c.SearchRawTransactionsVerboseAsync(address, skip, count).Receive()
+}
