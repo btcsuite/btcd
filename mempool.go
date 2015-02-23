@@ -1179,6 +1179,24 @@ func (mp *txMemPool) maybeAcceptTransaction(tx *btcutil.Tx, isNew, rateLimit boo
 		return nil, txRuleError(wire.RejectInsufficientFee, str)
 	}
 
+	// Require that free transactions have sufficient priority to be mined
+	// in the next block.
+	if !cfg.NoRelayPriority && txFee < minFee {
+		txD := &TxDesc{
+			Tx:     tx,
+			Added:  time.Now(),
+			Height: curHeight,
+			Fee:    txFee,
+		}
+		currentPriority := txD.CurrentPriority(txStore, nextBlockHeight)
+		if currentPriority <= minHighPriority {
+			str := fmt.Sprintf("transaction %v has insufficient "+
+				"priority (%g <= %g)", txHash,
+				currentPriority, minHighPriority)
+			return nil, txRuleError(wire.RejectInsufficientFee, str)
+		}
+	}
+
 	// Free-to-relay transactions are rate limited here to prevent
 	// penny-flooding with tiny transactions as a form of attack.
 	if rateLimit && txFee < minFee {
