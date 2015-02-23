@@ -2641,7 +2641,7 @@ func handleSearchRawTransactions(s *rpcServer, cmd interface{}, closeChan <-chan
 	}
 
 	// When not in verbose mode, simply return a list of serialized txs.
-	if c.Verbose != nil && *c.Verbose == false {
+	if c.Verbose != nil && *c.Verbose == 0 {
 		serializedTxs := make([]string, len(addressTxs), len(addressTxs))
 		for i, txReply := range addressTxs {
 			serializedTxs[i], err = messageToHex(txReply.Tx)
