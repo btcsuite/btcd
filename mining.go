@@ -174,15 +174,6 @@ type BlockTemplate struct {
 	validPayAddress bool
 }
 
-// minInt is a helper function to return the minimum of two ints.  This avoids
-// a math import and the need to cast to floats.
-func minInt(a, b int) int {
-	if a < b {
-		return a
-	}
-	return b
-}
-
 // mergeTxStore adds all of the transactions in txStoreB to txStoreA.  The
 // result is that txStoreA will contain all of its original transactions plus
 // all of the transactions in txStoreB.
@@ -247,44 +238,6 @@ func createCoinbaseTx(coinbaseScript []byte, nextBlockHeight int64, addr btcutil
 		PkScript: pkScript,
 	})
 	return btcutil.NewTx(tx), nil
-}
-
-// calcPriority returns a transaction priority given a transaction and the sum
-// of each of its input values multiplied by their age (# of confirmations).
-// Thus, the final formula for the priority is:
-// sum(inputValue * inputAge) / adjustedTxSize
-func calcPriority(tx *btcutil.Tx, serializedTxSize int, inputValueAge float64) float64 {
-	// In order to encourage spending multiple old unspent transaction
-	// outputs thereby reducing the total set, don't count the constant
-	// overhead for each input as well as enough bytes of the signature
-	// script to cover a pay-to-script-hash redemption with a compressed
-	// pubkey.  This makes additional inputs free by boosting the priority
-	// of the transaction accordingly.  No more incentive is given to avoid
-	// encouraging gaming future transactions through the use of junk
-	// outputs.  This is the same logic used in the reference
-	// implementation.
-	//
-	// The constant overhead for a txin is 41 bytes since the previous
-	// outpoint is 36 bytes + 4 bytes for the sequence + 1 byte the
-	// signature script length.
-	//
-	// A compressed pubkey pay-to-script-hash redemption with a maximum len
-	// signature is of the form:
-	// [OP_DATA_73 <73-byte sig> + OP_DATA_35 + {OP_DATA_33
-	// <33 byte compresed pubkey> + OP_CHECKSIG}]
-	//
-	// Thus 1 + 73 + 1 + 1 + 33 + 1 = 110
-	overhead := 0
-	for _, txIn := range tx.MsgTx().TxIn {
-		// Max inputs + size can't possibly overflow here.
-		overhead += 41 + minInt(110, len(txIn.SignatureScript))
-	}
-
-	if overhead >= serializedTxSize {
-		return 0.0
-	}
-
-	return inputValueAge / float64(serializedTxSize-overhead)
 }
 
 // spendTransaction updates the passed transaction store by marking the inputs
