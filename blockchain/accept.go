@@ -107,6 +107,16 @@ func (b *BlockChain) maybeAcceptBlock(block *btcutil.Block, flags BehaviorFlags)
 	}
 
 	if !fastAdd {
+		// Reject version 2 blocks once a majority of the network has
+		// upgraded.  This is part of BIP0066.
+		if blockHeader.Version < 3 && b.isMajorityVersion(3, prevNode,
+			b.chainParams.BlockRejectNumRequired) {
+
+			str := "new blocks with version %d are no longer valid"
+			str = fmt.Sprintf(str, blockHeader.Version)
+			return ruleError(ErrBlockVersionTooOld, str)
+		}
+
 		// Reject version 1 blocks once a majority of the network has
 		// upgraded.  This is part of BIP0034.
 		if blockHeader.Version < 2 && b.isMajorityVersion(2, prevNode,

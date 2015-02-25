@@ -11,7 +11,7 @@ import (
 )
 
 // BlockVersion is the current latest supported block version.
-const BlockVersion = 2
+const BlockVersion = 3
 
 // Version 4 bytes + Timestamp 4 bytes + Bits 4 bytes + Nonce 4 bytes +
 // PrevBlock and MerkleRoot hashes.
