@@ -1,4 +1,4 @@
-// Copyright (c) 2013-2014 Conformal Systems LLC.
+// Copyright (c) 2013-2015 Conformal Systems LLC.
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -109,36 +109,30 @@ func (b *BlockChain) maybeAcceptBlock(block *btcutil.Block, flags BehaviorFlags)
 	if !fastAdd {
 		// Reject version 1 blocks once a majority of the network has
 		// upgraded.  This is part of BIP0034.
-		if blockHeader.Version < 2 {
-			if b.isMajorityVersion(2, prevNode,
-				b.chainParams.BlockRejectNumRequired) {
+		if blockHeader.Version < 2 && b.isMajorityVersion(2, prevNode,
+			b.chainParams.BlockRejectNumRequired) {
 
-				str := "new blocks with version %d are no " +
-					"longer valid"
-				str = fmt.Sprintf(str, blockHeader.Version)
-				return ruleError(ErrBlockVersionTooOld, str)
-			}
+			str := "new blocks with version %d are no longer valid"
+			str = fmt.Sprintf(str, blockHeader.Version)
+			return ruleError(ErrBlockVersionTooOld, str)
 		}
 
 		// Ensure coinbase starts with serialized block heights for
 		// blocks whose version is the serializedHeightVersion or
 		// newer once a majority of the network has upgraded.  This is
 		// part of BIP0034.
-		if blockHeader.Version >= serializedHeightVersion {
-			if b.isMajorityVersion(serializedHeightVersion,
-				prevNode,
+		if blockHeader.Version >= serializedHeightVersion &&
+			b.isMajorityVersion(serializedHeightVersion, prevNode,
 				b.chainParams.BlockEnforceNumRequired) {
 
-				expectedHeight := int64(0)
-				if prevNode != nil {
-					expectedHeight = prevNode.height + 1
-				}
-				coinbaseTx := block.Transactions()[0]
-				err := checkSerializedHeight(coinbaseTx,
-					expectedHeight)
-				if err != nil {
-					return err
-				}
+			expectedHeight := int64(0)
+			if prevNode != nil {
+				expectedHeight = prevNode.height + 1
+			}
+			coinbaseTx := block.Transactions()[0]
+			err := checkSerializedHeight(coinbaseTx, expectedHeight)
+			if err != nil {
+				return err
 			}
 		}
 	}

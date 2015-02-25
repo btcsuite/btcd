@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/btcsuite/btcd/blockchain"
+	"github.com/btcsuite/btcd/txscript"
 )
 
 // TestCheckBlockScripts ensures that validating the all of the scripts in a
@@ -35,7 +36,9 @@ func TestCheckBlockScripts(t *testing.T) {
 		return
 	}
 
-	if err := blockchain.TstCheckBlockScripts(blocks[0], txStore); err != nil {
+	scriptFlags := txscript.ScriptBip16
+	err = blockchain.TstCheckBlockScripts(blocks[0], txStore, scriptFlags)
+	if err != nil {
 		t.Errorf("Transaction script validation failed: %v\n",
 			err)
 		return

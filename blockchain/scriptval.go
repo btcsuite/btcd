@@ -221,13 +221,8 @@ func ValidateTransactionScripts(tx *btcutil.Tx, txStore TxStore, flags txscript.
 
 // checkBlockScripts executes and validates the scripts for all transactions in
 // the passed block.
-func checkBlockScripts(block *btcutil.Block, txStore TxStore) error {
-	// Setup the script validation flags.  Blocks created after the BIP0016
-	// activation time need to have the pay-to-script-hash checks enabled.
-	var flags txscript.ScriptFlags
-	if block.MsgBlock().Header.Timestamp.After(txscript.Bip16Activation) {
-		flags |= txscript.ScriptBip16
-	}
+func checkBlockScripts(block *btcutil.Block, txStore TxStore,
+	scriptFlags txscript.ScriptFlags) error {
 
 	// Collect all of the transaction inputs and required information for
 	// validation for all transactions in the block into a single slice.
@@ -253,7 +248,7 @@ func checkBlockScripts(block *btcutil.Block, txStore TxStore) error {
 	}
 
 	// Validate all of the inputs.
-	validator := newTxValidator(txStore, flags)
+	validator := newTxValidator(txStore, scriptFlags)
 	if err := validator.Validate(txValItems); err != nil {
 		return err
 	}

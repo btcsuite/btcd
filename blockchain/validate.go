@@ -915,12 +915,19 @@ func (b *BlockChain) checkConnectBlock(node *blockNode, block *btcutil.Block) er
 		runScripts = false
 	}
 
+	// Blocks created after the BIP0016 activation time need to have the
+	// pay-to-script-hash checks enabled.
+	var scriptFlags txscript.ScriptFlags
+	if block.MsgBlock().Header.Timestamp.After(txscript.Bip16Activation) {
+		scriptFlags |= txscript.ScriptBip16
+	}
+
 	// Now that the inexpensive checks are done and have passed, verify the
 	// transactions are actually allowed to spend the coins by running the
 	// expensive ECDSA signature check scripts.  Doing this last helps
 	// prevent CPU exhaustion attacks.
 	if runScripts {
-		err := checkBlockScripts(block, txInputStore)
+		err := checkBlockScripts(block, txInputStore, scriptFlags)
 		if err != nil {
 			return err
 		}
