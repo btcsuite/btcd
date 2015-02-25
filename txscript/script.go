@@ -127,10 +127,19 @@ var (
 	// flag is set and the script contains invalid pubkeys.
 	ErrStackInvalidPubKey = errors.New("invalid strict pubkey")
 
+	// ErrStackCleanStack is returned when the ScriptVerifyCleanStack flag
+	// is set and after evalution the stack does not contain only one element,
+	// which also must be true if interpreted as a boolean.
+	ErrStackCleanStack = errors.New("stack is not clean")
+
 	// ErrStackMinimalData is returned when the ScriptVerifyMinimalData flag
 	// is set and the script contains push operations that do not use
 	// the minimal opcode required.
 	ErrStackMinimalData = errors.New("non-minimally encoded script number")
+
+	// ErrInvalidFlags is returned when the passed flags to NewScript contain
+	// an invalid combination.
+	ErrInvalidFlags = errors.New("invalid flags combination")
 )
 
 const (
@@ -222,6 +231,7 @@ type Script struct {
 	strictMultiSig           bool     // verify multisig stack item is zero length
 	discourageUpgradableNops bool     // NOP1 to NOP10 are reserved for future soft-fork upgrades
 	verifyStrictEncoding     bool     // verify strict encoding of signatures
+	verifyCleanStack         bool     // verify stack is clean after script evaluation
 	verifyDERSignatures      bool     // verify signatures compily with the DER
 	savedFirstStack          [][]byte // stack from first script for bip16 scripts
 }
@@ -624,6 +634,12 @@ const (
 	// executed.
 	ScriptDiscourageUpgradableNops
 
+	// ScriptVerifyCleanStack defines that the stack must contain only
+	// one stack element after evaluation and that the element must be
+	// true if interpreted as a boolean.  This is rule 6 of BIP0062.
+	// This flag should never be used without the ScriptBip16 flag.
+	ScriptVerifyCleanStack
+
 	// ScriptVerifyDERSignatures defines that signatures are required
 	// to compily with the DER format.
 	ScriptVerifyDERSignatures
@@ -655,7 +671,8 @@ const (
 		ScriptVerifyStrictEncoding |
 		ScriptVerifyMinimalData |
 		ScriptStrictMultiSig |
-		ScriptDiscourageUpgradableNops
+		ScriptDiscourageUpgradableNops |
+		ScriptVerifyCleanStack
 )
 
 // NewScript returns a new script engine for the provided tx and input idx with
@@ -690,8 +707,7 @@ func NewScript(scriptSig []byte, scriptPubKey []byte, txidx int, tx *wire.MsgTx,
 	}
 
 	// Parse flags.
-	bip16 := flags&ScriptBip16 == ScriptBip16
-	if bip16 && isScriptHash(m.scripts[1]) {
+	if flags&ScriptBip16 == ScriptBip16 && isScriptHash(m.scripts[1]) {
 		// if we are pay to scripthash then we only accept input
 		// scripts that push data
 		if !isPushOnly(m.scripts[0]) {
@@ -714,6 +730,12 @@ func NewScript(scriptSig []byte, scriptPubKey []byte, txidx int, tx *wire.MsgTx,
 	if flags&ScriptVerifyMinimalData == ScriptVerifyMinimalData {
 		m.dstack.verifyMinimalData = true
 		m.astack.verifyMinimalData = true
+	}
+	if flags&ScriptVerifyCleanStack == ScriptVerifyCleanStack {
+		if flags&ScriptBip16 != ScriptBip16 {
+			return nil, ErrInvalidFlags
+		}
+		m.verifyCleanStack = true
 	}
 
 	m.tx = *tx
@@ -755,23 +777,29 @@ func (s *Script) Execute() (err error) {
 		}))
 	}
 
-	return s.CheckErrorCondition()
+	return s.CheckErrorCondition(true)
 }
 
 // CheckErrorCondition returns nil if the running script has ended and was
 // successful, leaving a a true boolean on the stack. An error otherwise,
 // including if the script has not finished.
-func (s *Script) CheckErrorCondition() (err error) {
+func (s *Script) CheckErrorCondition(finalScript bool) error {
 	// Check we are actually done. if pc is past the end of script array
 	// then we have run out of scripts to run.
 	if s.scriptidx < len(s.scripts) {
 		return ErrStackScriptUnfinished
 	}
-	if s.dstack.Depth() < 1 {
+	if finalScript && s.verifyCleanStack && s.dstack.Depth() != 1 {
+		return ErrStackCleanStack
+	} else if s.dstack.Depth() < 1 {
 		return ErrStackEmptyStack
 	}
+
 	v, err := s.dstack.PopBool()
-	if err == nil && v == false {
+	if err != nil {
+		return err
+	}
+	if v == false {
 		// log interesting data.
 		log.Tracef("%v", newLogClosure(func() string {
 			dis0, _ := s.DisasmScript(0)
@@ -779,9 +807,9 @@ func (s *Script) CheckErrorCondition() (err error) {
 			return fmt.Sprintf("scripts failed: script0: %s\n"+
 				"script1: %s", dis0, dis1)
 		}))
-		err = ErrStackScriptFailed
+		return ErrStackScriptFailed
 	}
-	return err
+	return nil
 }
 
 // Step will execute the next instruction and move the program counter to the
@@ -827,7 +855,7 @@ func (s *Script) Step() (done bool, err error) {
 			s.scriptidx++
 			// We check script ran ok, if so then we pull
 			// the script out of the first stack and executre that.
-			err := s.CheckErrorCondition()
+			err := s.CheckErrorCondition(false)
 			if err != nil {
 				return false, err
 			}
@@ -880,10 +908,12 @@ func (s *Script) validPC() error {
 
 // DisasmScript returns the disassembly string for the script at offset
 // ``idx''.  Where 0 is the scriptSig and 1 is the scriptPubKey.
-func (s *Script) DisasmScript(idx int) (disstr string, err error) {
+func (s *Script) DisasmScript(idx int) (string, error) {
 	if idx >= len(s.scripts) {
 		return "", ErrStackInvalidIndex
 	}
+
+	var disstr string
 	for i := range s.scripts[idx] {
 		disstr = disstr + s.disasm(idx, i) + "\n"
 	}
@@ -892,7 +922,7 @@ func (s *Script) DisasmScript(idx int) (disstr string, err error) {
 
 // DisasmPC returns the string for the disassembly of the opcode that will be
 // next to execute when Step() is called.
-func (s *Script) DisasmPC() (disstr string, err error) {
+func (s *Script) DisasmPC() (string, error) {
 	scriptidx, scriptoff, err := s.curPC()
 	if err != nil {
 		return "", err

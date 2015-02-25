@@ -2559,7 +2559,7 @@ func TestCheckErrorCondition(t *testing.T) {
 			return
 		}
 
-		err = engine.CheckErrorCondition()
+		err = engine.CheckErrorCondition(false)
 		if err != txscript.ErrStackScriptUnfinished {
 			t.Errorf("got unexepected error %v on %dth iteration",
 				err, i)
@@ -2576,7 +2576,7 @@ func TestCheckErrorCondition(t *testing.T) {
 		return
 	}
 
-	err = engine.CheckErrorCondition()
+	err = engine.CheckErrorCondition(false)
 	if err != nil {
 		t.Errorf("unexpected error %v on final check", err)
 	}
@@ -4814,5 +4814,55 @@ func TestIsPushOnlyScript(t *testing.T) {
 		t.Errorf("IsPushOnlyScript (%s) wrong result\n"+
 			"got: %v\nwant: %v", test.name, true,
 			test.expected)
+	}
+}
+
+func TestInvalidFlagCombinations(t *testing.T) {
+	t.Parallel()
+
+	tests := []txscript.ScriptFlags{
+		txscript.ScriptVerifyCleanStack,
+	}
+
+	// tx with almost empty scripts.
+	tx := &wire.MsgTx{
+		Version: 1,
+		TxIn: []*wire.TxIn{
+			{
+				PreviousOutPoint: wire.OutPoint{
+					Hash: wire.ShaHash([32]byte{
+						0xc9, 0x97, 0xa5, 0xe5,
+						0x6e, 0x10, 0x41, 0x02,
+						0xfa, 0x20, 0x9c, 0x6a,
+						0x85, 0x2d, 0xd9, 0x06,
+						0x60, 0xa2, 0x0b, 0x2d,
+						0x9c, 0x35, 0x24, 0x23,
+						0xed, 0xce, 0x25, 0x85,
+						0x7f, 0xcd, 0x37, 0x04,
+					}),
+					Index: 0,
+				},
+				SignatureScript: []uint8{txscript.OP_NOP},
+				Sequence:        4294967295,
+			},
+		},
+		TxOut: []*wire.TxOut{
+			{
+				Value:    1000000000,
+				PkScript: []byte{},
+			},
+		},
+		LockTime: 0,
+	}
+	pkScript := []byte{txscript.OP_NOP}
+
+	for i, test := range tests {
+		_, err := txscript.NewScript(tx.TxIn[0].SignatureScript,
+			pkScript, 0, tx, test)
+
+		if err != txscript.ErrInvalidFlags {
+			t.Fatalf("TestInvalidFlagCombinations #%d unexpected "+
+				"error: %v", i, err)
+		}
 	}
 }

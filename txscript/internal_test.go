@@ -4573,6 +4573,8 @@ func parseScriptFlags(flagStr string) (ScriptFlags, error) {
 		switch flag {
 		case "":
 			// Nothing.
+		case "CLEANSTACK":
+			flags |= ScriptVerifyCleanStack
 		case "DERSIG":
 			flags |= ScriptVerifyDERSignatures
 		case "DISCOURAGE_UPGRADABLE_NOPS":
