@@ -48,6 +48,7 @@ const (
 	// are more strict.
 	standardScriptVerifyFlags = txscript.ScriptBip16 |
 		txscript.ScriptVerifyDERSignatures |
+		txscript.ScriptVerifyMinimalData |
 		txscript.ScriptStrictMultiSig |
 		txscript.ScriptDiscourageUpgradableNops
 )

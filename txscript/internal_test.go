@@ -22,6 +22,14 @@ import (
 // test package.
 const TstMaxScriptSize = maxScriptSize
 
+// TstHasCanoncialPushes makes the internal isCanonicalPush function available
+// to the test package.
+var TstHasCanonicalPushes = canonicalPush
+
+// TstParseScript makes the internal parseScript function available to the
+// test package.
+var TstParseScript = parseScript
+
 // this file is present to export some internal interfaces so that we can
 // test them reliably.
 

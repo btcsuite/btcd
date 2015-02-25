@@ -106,9 +106,16 @@ func TestStandardPushes(t *testing.T) {
 			t.Errorf("StandardPushesTests IsPushOnlyScript test #%d failed: %x\n", i, script)
 			continue
 		}
-		if result := txscript.HasCanonicalPushes(script); !result {
-			t.Errorf("StandardPushesTests HasCanonicalPushes test #%d failed: %x\n", i, script)
+		pops, err := txscript.TstParseScript(script)
+		if err != nil {
+			t.Errorf("StandardPushesTests #%d failed to TstParseScript: %v", i, err)
 			continue
+		}
+		for _, pop := range pops {
+			if result := txscript.TstHasCanonicalPushes(pop); !result {
+				t.Errorf("StandardPushesTests TstHasCanonicalPushes test #%d failed: %x\n", i, script)
+				break
+			}
 		}
 	}
 	for i := 0; i <= txscript.MaxScriptElementSize; i++ {
@@ -123,9 +130,16 @@ func TestStandardPushes(t *testing.T) {
 			t.Errorf("StandardPushesTests IsPushOnlyScript test #%d failed: %x\n", i, script)
 			continue
 		}
-		if result := txscript.HasCanonicalPushes(script); !result {
-			t.Errorf("StandardPushesTests HasCanonicalPushes test #%d failed: %x\n", i, script)
+		pops, err := txscript.TstParseScript(script)
+		if err != nil {
+			t.Errorf("StandardPushesTests #%d failed to TstParseScript: %v", i, err)
 			continue
+		}
+		for _, pop := range pops {
+			if result := txscript.TstHasCanonicalPushes(pop); !result {
+				t.Errorf("StandardPushesTests TstHasCanonicalPushes test #%d failed: %x\n", i, script)
+				break
+			}
 		}
 	}
 }
@@ -4750,10 +4764,20 @@ func TestHasCanonicalPushes(t *testing.T) {
 	}
 
 	for i, test := range tests {
-		if txscript.HasCanonicalPushes(test.script) != test.expected {
-			t.Errorf("HasCanonicalPushes #%d (%s) wrong result\n"+
-				"got: %v\nwant: %v", i, test.name, true,
-				test.expected)
+		pops, err := txscript.TstParseScript(test.script)
+		if err != nil {
+			if test.expected {
+				t.Errorf("StandardPushesTests #%d failed to TstParseScript: %v", i, err)
+			}
+			continue
+		}
+		for _, pop := range pops {
+			if txscript.TstHasCanonicalPushes(pop) != test.expected {
+				t.Errorf("TstHasCanonicalPushes #%d (%s) wrong result\n"+
+					"got: %v\nwant: %v", i, test.name, true,
+					test.expected)
+				break
+			}
 		}
 	}
 }
