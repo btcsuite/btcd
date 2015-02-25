@@ -592,10 +592,31 @@ func (p *peer) pushMerkleBlockMsg(sha *wire.ShaHash, doneChan, waitChan chan str
 		return err
 	}
 
-	// Generate a merkle block by filtering the requested block according
-	// to the filter for the peer and fetch any matched transactions from
-	// the database.
-	merkle, matchedHashes := bloom.NewMerkleBlock(blk, p.filter)
+	var merkle *wire.MsgMerkleBlock
+	var matchedHashes []*wire.ShaHash
+	if cfg.NoBloom {
+		numTx := len(blk.Transactions())
+
+		merkle.Header = blk.MsgBlock().Header
+		merkle.Transactions = uint32(numTx)
+		merkle.Hashes = make([]*wire.ShaHash, 0, len(blk.Transactions()))
+		matchedHashes = make([]*wire.ShaHash, 0, len(blk.Transactions()))
+
+		for _, txHash := range blk.Transactions() {
+			merkle.Hashes = append(merkle.Hashes, txHash.Sha())
+			matchedHashes = append(matchedHashes, txHash.Sha())
+		}
+
+		for i := 0; i < numTx; i++ {
+			merkle.Flags = append(merkle.Flags, 0x01)
+		}
+	} else {
+		// Generate a merkle block by filtering the requested block
+		// according to the filter for the peer and fetch any matched
+		// transactions from the database.
+		merkle, matchedHashes = bloom.NewMerkleBlock(blk, p.filter)
+	}
+
 	txList := p.server.db.FetchTxByShaList(matchedHashes)
 
 	// Warn on any missing transactions which should not happen since the

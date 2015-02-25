@@ -93,6 +93,7 @@ Application Options:
       --blockprioritysize= Size in bytes for high-priority/low-fee transactions
                            when creating a block (50000)
       --getworkkey=        DEPRECATED -- Use the --miningaddr option instead
+      --nobloom=           Disable bloom filtering (BIP0037) support
       --addrindex=         Build and maintain a full address index. Currently
                            only supported by leveldb.
       --dropaddrindex=     Deletes the address-based transaction index from the
