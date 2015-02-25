@@ -694,10 +694,10 @@ func TestRandomUint64Errors(t *testing.T) {
 	fr := &fakeRandReader{n: 2, err: io.EOF}
 	nonce, err := wire.TstRandomUint64(fr)
 	if err != io.ErrUnexpectedEOF {
-		t.Errorf("TestRandomUint64Fails: Error not expected value of %v [%v]",
-			io.ErrShortBuffer, err)
+		t.Errorf("Error not expected value of %v [%v]",
+			io.ErrUnexpectedEOF, err)
 	}
 	if nonce != 0 {
-		t.Errorf("TestRandomUint64Fails: nonce is not 0 [%v]", nonce)
+		t.Errorf("Nonce is not 0 [%v]", nonce)
 	}
 }
