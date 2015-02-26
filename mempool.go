@@ -1180,8 +1180,10 @@ func (mp *txMemPool) maybeAcceptTransaction(tx *btcutil.Tx, isNew, rateLimit boo
 	}
 
 	// Require that free transactions have sufficient priority to be mined
-	// in the next block.
-	if !cfg.NoRelayPriority && txFee < minFee {
+	// in the next block.  Transactions which are being added back to the
+	// memory pool from blocks that have been disconnected during a reorg
+	// are exempted.
+	if isNew && !cfg.NoRelayPriority && txFee < minFee {
 		txD := &TxDesc{
 			Tx:     tx,
 			Added:  time.Now(),
