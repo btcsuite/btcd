@@ -287,9 +287,9 @@ const (
 	OP_UNKNOWN246          = 246
 	OP_UNKNOWN247          = 247
 	OP_UNKNOWN248          = 248
-	OP_UNKNOWN249          = 249
-	OP_UNKNOWN250          = 250
-	OP_UNKNOWN251          = 251
+	OP_SMALLDATA           = 249 // bitcoind internal, for completeness
+	OP_SMALLINTEGER        = 250 // bitcoind internal, for completeness
+	OP_PUBKEYS             = 251 // bitcoind internal, for completeness
 	OP_UNKNOWN252          = 252
 	OP_PUBKEYHASH          = 253 // bitcoind internal, for completeness
 	OP_PUBKEY              = 254 // bitcoind internal, for completeness
@@ -816,11 +816,11 @@ var opcodemapPreinit = map[byte]*opcode{
 		opfunc: opcodeInvalid},
 	OP_UNKNOWN248: {value: OP_UNKNOWN248, name: "OP_UNKNOWN248", length: 1,
 		opfunc: opcodeInvalid},
-	OP_UNKNOWN249: {value: OP_UNKNOWN249, name: "OP_UNKNOWN249", length: 1,
+	OP_SMALLDATA: {value: OP_SMALLDATA, name: "OP_SMALLDATA", length: 1,
 		opfunc: opcodeInvalid},
-	OP_UNKNOWN250: {value: OP_UNKNOWN250, name: "OP_UNKNOWN250", length: 1,
+	OP_SMALLINTEGER: {value: OP_SMALLINTEGER, name: "OP_SMALLINTEGER", length: 1,
 		opfunc: opcodeInvalid},
-	OP_UNKNOWN251: {value: OP_UNKNOWN251, name: "OP_UNKNOWN251", length: 1,
+	OP_PUBKEYS: {value: OP_PUBKEYS, name: "OP_PUBKEYS", length: 1,
 		opfunc: opcodeInvalid},
 	OP_UNKNOWN252: {value: OP_UNKNOWN252, name: "OP_UNKNOWN252", length: 1,
 		opfunc: opcodeInvalid},
