@@ -87,12 +87,12 @@ type BlockDetails struct {
 // RecvTxNtfn defines the recvtx JSON-RPC notification.
 type RecvTxNtfn struct {
 	HexTx string
-	Block BlockDetails
+	Block *BlockDetails
 }
 
 // NewRecvTxNtfn returns a new instance which can be used to issue a recvtx
 // JSON-RPC notification.
-func NewRecvTxNtfn(hexTx string, block BlockDetails) *RecvTxNtfn {
+func NewRecvTxNtfn(hexTx string, block *BlockDetails) *RecvTxNtfn {
 	return &RecvTxNtfn{
 		HexTx: hexTx,
 		Block: block,
@@ -102,12 +102,12 @@ func NewRecvTxNtfn(hexTx string, block BlockDetails) *RecvTxNtfn {
 // RedeemingTxNtfn defines the redeemingtx JSON-RPC notification.
 type RedeemingTxNtfn struct {
 	HexTx string
-	Block BlockDetails
+	Block *BlockDetails
 }
 
 // NewRedeemingTxNtfn returns a new instance which can be used to issue a
 // redeemingtx JSON-RPC notification.
-func NewRedeemingTxNtfn(hexTx string, block BlockDetails) *RedeemingTxNtfn {
+func NewRedeemingTxNtfn(hexTx string, block *BlockDetails) *RedeemingTxNtfn {
 	return &RedeemingTxNtfn{
 		HexTx: hexTx,
 		Block: block,

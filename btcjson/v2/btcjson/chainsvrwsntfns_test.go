@@ -68,12 +68,12 @@ func TestChainSvrWsNtfns(t *testing.T) {
 					Index:  0,
 					Time:   12345678,
 				}
-				return btcjson.NewRecvTxNtfn("001122", blockDetails)
+				return btcjson.NewRecvTxNtfn("001122", &blockDetails)
 			},
 			marshalled: `{"jsonrpc":"1.0","method":"recvtx","params":["001122",{"height":100000,"hash":"123","index":0,"time":12345678}],"id":null}`,
 			unmarshalled: &btcjson.RecvTxNtfn{
 				HexTx: "001122",
-				Block: btcjson.BlockDetails{
+				Block: &btcjson.BlockDetails{
 					Height: 100000,
 					Hash:   "123",
 					Index:  0,
@@ -93,12 +93,12 @@ func TestChainSvrWsNtfns(t *testing.T) {
 					Index:  0,
 					Time:   12345678,
 				}
-				return btcjson.NewRedeemingTxNtfn("001122", blockDetails)
+				return btcjson.NewRedeemingTxNtfn("001122", &blockDetails)
 			},
 			marshalled: `{"jsonrpc":"1.0","method":"redeemingtx","params":["001122",{"height":100000,"hash":"123","index":0,"time":12345678}],"id":null}`,
 			unmarshalled: &btcjson.RedeemingTxNtfn{
 				HexTx: "001122",
-				Block: btcjson.BlockDetails{
+				Block: &btcjson.BlockDetails{
 					Height: 100000,
 					Hash:   "123",
 					Index:  0,
