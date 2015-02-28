@@ -225,7 +225,7 @@ func checkPkScriptStandard(pkScript []byte, scriptClass txscript.ScriptClass) er
 // finalized, conforming to more stringent size constraints, having scripts
 // of recognized forms, and not containing "dust" outputs (those that are
 // so small it costs more to process them than they are worth).
-func checkTransactionStandard(tx *btcutil.Tx, height int64) error {
+func (mp *txMemPool) checkTransactionStandard(tx *btcutil.Tx, height int64) error {
 	msgTx := tx.MsgTx()
 
 	// The transaction must be a currently supported version.
@@ -238,7 +238,8 @@ func checkTransactionStandard(tx *btcutil.Tx, height int64) error {
 
 	// The transaction must be finalized to be standard and therefore
 	// considered for inclusion in a block.
-	if !blockchain.IsFinalizedTransaction(tx, height, time.Now()) {
+	adjustedTime := mp.server.timeSource.AdjustedTime()
+	if !blockchain.IsFinalizedTransaction(tx, height, adjustedTime) {
 		return txRuleError(wire.RejectNonstandard,
 			"transaction is not finalized")
 	}
@@ -1030,7 +1031,7 @@ func (mp *txMemPool) maybeAcceptTransaction(tx *btcutil.Tx, isNew, rateLimit boo
 	// Don't allow non-standard transactions if the network parameters
 	// forbid their relaying.
 	if !activeNetParams.RelayNonStdTxs {
-		err := checkTransactionStandard(tx, nextBlockHeight)
+		err := mp.checkTransactionStandard(tx, nextBlockHeight)
 		if err != nil {
 			// Attempt to extract a reject code from the error so
 			// it can be retained.  When not possible, fall back to

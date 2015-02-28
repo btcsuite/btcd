@@ -282,7 +282,7 @@ func minimumMedianTime(chainState *chainState) (time.Time, error) {
 // medianAdjustedTime returns the current time adjusted to ensure it is at least
 // one second after the median timestamp of the last several blocks per the
 // chain consensus rules.
-func medianAdjustedTime(chainState *chainState) (time.Time, error) {
+func medianAdjustedTime(chainState *chainState, timeSource blockchain.MedianTimeSource) (time.Time, error) {
 	chainState.Lock()
 	defer chainState.Unlock()
 	if chainState.pastMedianTimeErr != nil {
@@ -295,7 +295,7 @@ func medianAdjustedTime(chainState *chainState) (time.Time, error) {
 	// timestamp is truncated to a second boundary before comparison since a
 	// block timestamp does not supported a precision greater than one
 	// second.
-	newTimestamp := time.Unix(time.Now().Unix(), 0)
+	newTimestamp := timeSource.AdjustedTime()
 	minTimestamp := chainState.pastMedianTime.Add(time.Second)
 	if newTimestamp.Before(minTimestamp) {
 		newTimestamp = minTimestamp
@@ -367,6 +367,7 @@ func medianAdjustedTime(chainState *chainState) (time.Time, error) {
 //   -----------------------------------  --
 func NewBlockTemplate(mempool *txMemPool, payToAddress btcutil.Address) (*BlockTemplate, error) {
 	blockManager := mempool.server.blockManager
+	timeSource := mempool.server.timeSource
 	chainState := &blockManager.chainState
 	chain := blockManager.blockChain
 
@@ -445,7 +446,9 @@ mempoolLoop:
 			minrLog.Tracef("Skipping coinbase tx %s", tx.Sha())
 			continue
 		}
-		if !blockchain.IsFinalizedTransaction(tx, nextBlockHeight, time.Now()) {
+		if !blockchain.IsFinalizedTransaction(tx, nextBlockHeight,
+			timeSource.AdjustedTime()) {
+
 			minrLog.Tracef("Skipping non-finalized tx %s", tx.Sha())
 			continue
 		}
@@ -708,7 +711,7 @@ mempoolLoop:
 	// Calculate the required difficulty for the block.  The timestamp
 	// is potentially adjusted to ensure it comes after the median time of
 	// the last several blocks per the chain consensus rules.
-	ts, err := medianAdjustedTime(chainState)
+	ts, err := medianAdjustedTime(chainState, timeSource)
 	if err != nil {
 		return nil, err
 	}
@@ -766,7 +769,8 @@ func UpdateBlockTime(msgBlock *wire.MsgBlock, bManager *blockManager) error {
 	// The new timestamp is potentially adjusted to ensure it comes after
 	// the median time of the last several blocks per the chain consensus
 	// rules.
-	newTimestamp, err := medianAdjustedTime(&bManager.chainState)
+	newTimestamp, err := medianAdjustedTime(&bManager.chainState,
+		bManager.server.timeSource)
 	if err != nil {
 		return err
 	}
