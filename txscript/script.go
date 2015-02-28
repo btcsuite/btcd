@@ -134,6 +134,10 @@ var (
 )
 
 const (
+	// maxDataCarrierSize is the maximum number of bytes allowed in pushed
+	// data to be considered a nulldata transaction
+	maxDataCarrierSize = 80
+
 	// maxStackSize is the maximum combined height of stack and alt stack
 	// during execution.
 	maxStackSize = 1000
@@ -303,7 +307,8 @@ func isMultiSig(pops []parsedOpcode) bool {
 // false otherwise.
 func isNullData(pops []parsedOpcode) bool {
 	// A nulldata transaction is either a single OP_RETURN or an
-	// OP_RETURN SMALLDATA (where SMALLDATA is a push data up to 40 bytes).
+	// OP_RETURN SMALLDATA (where SMALLDATA is a push data up to
+	// maxDataCarrierSize bytes).
 	l := len(pops)
 	if l == 1 && pops[0].opcode.value == OP_RETURN {
 		return true
@@ -312,7 +317,7 @@ func isNullData(pops []parsedOpcode) bool {
 	return l == 2 &&
 		pops[0].opcode.value == OP_RETURN &&
 		pops[1].opcode.value <= OP_PUSHDATA4 &&
-		len(pops[1].data) <= 40
+		len(pops[1].data) <= maxDataCarrierSize
 }
 
 // isPushOnly returns true if the script only pushes data, false otherwise.
@@ -1728,7 +1733,6 @@ func CalcScriptInfo(sigscript, pkscript []byte, bip16 bool) (*ScriptInfo, error)
 
 		shInputs := expectedInputs(shPops, shClass)
 		if shInputs == -1 {
-			// We have no fucking clue, then.
 			si.ExpectedInputs = -1
 		} else {
 			si.ExpectedInputs += shInputs
