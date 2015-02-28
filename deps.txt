@@ -168,3 +168,15 @@ goleveldb    ca108ee68824577f394aa81c72ac2f473ce9d04d
 seelog       6b91ad56123bb473755caa213db2bde5422177bf
 websocket    08812523f279944afd46e7fb820fa55e31f207f2
 winsvc       2a5f78f6f2059b884aad8f6907fb029afda48c43
+
+btcd 0.10.0 Beta
+----------------
+btclog       baa3c5ace9907202e5659ee1416ee902facde213
+btcutil      499e9e0daa5be5eb34fb6e5efc091d245b38edcf
+fastsha256   17eaa235e05dfb79432c9594dcafe20bb05690a7
+go-flags     6c288d648c1cc1befcb90cb5511dcacf64ae8e61
+go-socks     a7a73aaa00584d5aee1efdb0891e19b7228d8d69
+goleveldb    aa685406548ca8a61d8e546a37129081798445ad
+seelog       313961b101eb55f65ae0f03ddd4e322731763b6c
+websocket    31079b6807923eb23992c421b114992b95131b55
+winsvc       f8fb11f83f7e860e3769a08e6811d1b399a43722
