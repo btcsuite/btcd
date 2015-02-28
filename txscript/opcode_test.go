@@ -3800,30 +3800,11 @@ var detailedTests = []detailedTest{
 		disassembly:    "OP_UNKNOWN248",
 	},
 	{
-		name:           "invalid opcode 249",
-		script:         []byte{txscript.OP_UNKNOWN249},
-		expectedReturn: txscript.ErrStackInvalidOpcode,
-		disassembly:    "OP_UNKNOWN249",
-	},
-	{
-		name:           "invalid opcode 250",
-		script:         []byte{txscript.OP_UNKNOWN250},
-		expectedReturn: txscript.ErrStackInvalidOpcode,
-		disassembly:    "OP_UNKNOWN250",
-	},
-	{
-		name:           "invalid opcode 251",
-		script:         []byte{txscript.OP_UNKNOWN251},
-		expectedReturn: txscript.ErrStackInvalidOpcode,
-		disassembly:    "OP_UNKNOWN251",
-	},
-	{
 		name:           "invalid opcode 252",
 		script:         []byte{txscript.OP_UNKNOWN252},
 		expectedReturn: txscript.ErrStackInvalidOpcode,
 		disassembly:    "OP_UNKNOWN252",
 	},
-
 	{
 		name:        "invalid opcode 186 if noexec",
 		script:      []byte{txscript.OP_FALSE, txscript.OP_IF, txscript.OP_UNKNOWN186, txscript.OP_ELSE, txscript.OP_TRUE, txscript.OP_ENDIF},
@@ -4203,22 +4184,22 @@ var detailedTests = []detailedTest{
 		disassembly: "0 OP_IF OP_UNKNOWN248 OP_ELSE 1 OP_ENDIF",
 	},
 	{
-		name:        "invalid opcode 249 if noexec",
-		script:      []byte{txscript.OP_FALSE, txscript.OP_IF, txscript.OP_UNKNOWN249, txscript.OP_ELSE, txscript.OP_TRUE, txscript.OP_ENDIF},
-		after:       [][]byte{{0x01}},
-		disassembly: "0 OP_IF OP_UNKNOWN249 OP_ELSE 1 OP_ENDIF",
+		name:           "invalid opcode OP_SMALLDATA",
+		script:         []byte{txscript.OP_SMALLDATA},
+		expectedReturn: txscript.ErrStackInvalidOpcode,
+		disassembly:    "OP_SMALLDATA",
 	},
 	{
-		name:        "invalid opcode 250 if noexec",
-		script:      []byte{txscript.OP_FALSE, txscript.OP_IF, txscript.OP_UNKNOWN250, txscript.OP_ELSE, txscript.OP_TRUE, txscript.OP_ENDIF},
-		after:       [][]byte{{0x01}},
-		disassembly: "0 OP_IF OP_UNKNOWN250 OP_ELSE 1 OP_ENDIF",
+		name:           "invalid opcode OP_SMALLINTEGER",
+		script:         []byte{txscript.OP_SMALLINTEGER},
+		expectedReturn: txscript.ErrStackInvalidOpcode,
+		disassembly:    "OP_SMALLINTEGER",
 	},
 	{
-		name:        "invalid opcode 251 if noexec",
-		script:      []byte{txscript.OP_FALSE, txscript.OP_IF, txscript.OP_UNKNOWN251, txscript.OP_ELSE, txscript.OP_TRUE, txscript.OP_ENDIF},
-		after:       [][]byte{{0x01}},
-		disassembly: "0 OP_IF OP_UNKNOWN251 OP_ELSE 1 OP_ENDIF",
+		name:           "invalid opcode OP_PUBKEYS",
+		script:         []byte{txscript.OP_PUBKEYS},
+		expectedReturn: txscript.ErrStackInvalidOpcode,
+		disassembly:    "OP_PUBKEYS",
 	},
 	{
 		name:        "invalid opcode 252 if noexec",
@@ -4226,7 +4207,6 @@ var detailedTests = []detailedTest{
 		after:       [][]byte{{0x01}},
 		disassembly: "0 OP_IF OP_UNKNOWN252 OP_ELSE 1 OP_ENDIF",
 	},
-
 	{
 		name:           "invalid opcode OP_PUBKEY",
 		script:         []byte{txscript.OP_PUBKEY},
