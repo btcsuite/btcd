@@ -43,6 +43,19 @@ func TestBtcdExtCmds(t *testing.T) {
 			},
 		},
 		{
+			name: "dropnode",
+			newCmd: func() (interface{}, error) {
+				return btcjson.NewCmd("dropnode", "1.1.1.1")
+			},
+			staticCmd: func() interface{} {
+				return btcjson.NewDropNodeCmd("1.1.1.1")
+			},
+			marshalled: `{"jsonrpc":"1.0","method":"dropnode","params":["1.1.1.1"],"id":1}`,
+			unmarshalled: &btcjson.DropNodeCmd{
+				Addr: "1.1.1.1",
+			},
+		},
+		{
 			name: "getbestblock",
 			newCmd: func() (interface{}, error) {
 				return btcjson.NewCmd("getbestblock")

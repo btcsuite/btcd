@@ -33,6 +33,10 @@ var helpDescsEnUS = map[string]string{
 	"addnode-addr":      "IP address and port of the peer to operate on",
 	"addnode-subcmd":    "'add' to add a persistent peer, 'remove' to remove a persistent peer, or 'onetry' to try a single connection to a peer",
 
+	// DropNodeCmd help.
+	"dropnode--synopsis": "Attempts to remove a peer.",
+	"dropnode-addr":      "IP address and port of the peer to operate on",
+
 	// TransactionInput help.
 	"transactioninput-txid": "The hash of the input transaction",
 	"transactioninput-vout": "The specific output of the input transaction to redeem",
@@ -494,6 +498,7 @@ var helpDescsEnUS = map[string]string{
 // pointer to the type (or nil to indicate no return value).
 var rpcResultTypes = map[string][]interface{}{
 	"addnode":               nil,
+	"dropnode":              nil,
 	"createrawtransaction":  []interface{}{(*string)(nil)},
 	"debuglevel":            []interface{}{(*string)(nil), (*string)(nil)},
 	"decoderawtransaction":  []interface{}{(*btcjson.TxRawDecodeResult)(nil)},
