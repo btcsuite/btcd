@@ -402,6 +402,7 @@ func (s *server) handleQuery(querymsg interface{}, state *peerState) {
 			// version.
 			p.StatsMtx.Lock()
 			info := &btcjson.GetPeerInfoResult{
+				ID:             p.id,
 				Addr:           p.addr,
 				Services:       fmt.Sprintf("%08d", p.services),
 				LastSend:       p.lastSend.Unix(),
@@ -409,6 +410,7 @@ func (s *server) handleQuery(querymsg interface{}, state *peerState) {
 				BytesSent:      p.bytesSent,
 				BytesRecv:      p.bytesReceived,
 				ConnTime:       p.timeConnected.Unix(),
+				TimeOffset:     p.timeOffset,
 				Version:        p.protocolVersion,
 				SubVer:         p.userAgent,
 				Inbound:        p.inbound,

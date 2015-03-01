@@ -329,14 +329,16 @@ Returns a list of JSON objects containing information about each connected
 network node. The objects have the following format:
 [
 	{
+		"id":n,			# Unique node ID.
 		"addr":"host:port"	# IP and port of the peer as a string.
 		"addrlocal":"ip:port"	# Local address as a string.
 		"services":"00000001",	# Services bitmask as a string.
 		"lastsend":t,		# Time in seconds since epoch since last send.
 		"lastrecv":t,		# Time in seconds since epoch since last received message.
 		"bytessent":n,		# Total number of bytes sent.
-		"bytesrecv":n,		# Total number of bytes received
-		"conntime":t,		# Connection time in seconds since epoc.
+		"bytesrecv":n,		# Total number of bytes received.
+		"conntime":t,		# Connection time in seconds since epoch.
+		"timeoffset":n,		# Peer time offset.
 		"pingtime":n,		# Ping time
 		"pingwait":n,		# Ping wait.
 		"version":n,		# The numeric peer version.

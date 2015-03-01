@@ -307,6 +307,7 @@ var helpDescsEnUS = map[string]string{
 	"getnettotalsresult-timemillis":     "Number of milliseconds since 1 Jan 1970 GMT",
 
 	// GetPeerInfoResult help.
+	"getpeerinforesult-id":             "A unique node ID",
 	"getpeerinforesult-addr":           "The ip address and port of the peer",
 	"getpeerinforesult-addrlocal":      "Local address",
 	"getpeerinforesult-services":       "Services bitmask which represents the services supported by the peer",
@@ -315,6 +316,7 @@ var helpDescsEnUS = map[string]string{
 	"getpeerinforesult-bytessent":      "Total bytes sent",
 	"getpeerinforesult-bytesrecv":      "Total bytes received",
 	"getpeerinforesult-conntime":       "Time the connection was made in seconds since 1 Jan 1970 GMT",
+	"getpeerinforesult-timeoffset":     "The time offset of the peer",
 	"getpeerinforesult-pingtime":       "Number of microseconds the last ping took",
 	"getpeerinforesult-pingwait":       "Number of microseconds a queued ping has been waiting for a response",
 	"getpeerinforesult-version":        "The protocol version of the peer",

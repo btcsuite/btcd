@@ -137,6 +137,7 @@ type GetNetworkInfoResult struct {
 
 // GetPeerInfoResult models the data returned from the getpeerinfo command.
 type GetPeerInfoResult struct {
+	ID             string  `json:"id"`
 	Addr           string  `json:"addr"`
 	AddrLocal      string  `json:"addrlocal,omitempty"`
 	Services       string  `json:"services"`
@@ -144,9 +145,10 @@ type GetPeerInfoResult struct {
 	LastRecv       int64   `json:"lastrecv"`
 	BytesSent      uint64  `json:"bytessent"`
 	BytesRecv      uint64  `json:"bytesrecv"`
+	ConnTime       int64   `json:"conntime"`
+	TimeOffset     int64   `json:"timeoffset"`
 	PingTime       float64 `json:"pingtime"`
 	PingWait       float64 `json:"pingwait,omitempty"`
-	ConnTime       int64   `json:"conntime"`
 	Version        uint32  `json:"version"`
 	SubVer         string  `json:"subver"`
 	Inbound        bool    `json:"inbound"`

@@ -56,6 +56,10 @@ const (
 )
 
 var (
+	// nodeCount is the total number of peer connections made since startup
+	// and is used to assign an id to a peer.
+	nodeCount int32
+
 	// userAgentName is the user agent name and is used to help identify
 	// ourselves to other bitcoin peers.
 	userAgentName = "btcd"
@@ -150,6 +154,7 @@ type peer struct {
 	conn               net.Conn
 	addr               string
 	na                 *wire.NetAddress
+	id                 int32
 	inbound            bool
 	persistent         bool
 	knownAddresses     map[string]struct{}
@@ -179,6 +184,7 @@ type peer struct {
 	versionKnown       bool
 	protocolVersion    uint32
 	services           wire.ServiceFlag
+	timeOffset         int64
 	timeConnected      time.Time
 	lastSend           time.Time
 	lastRecv           time.Time
@@ -401,6 +407,12 @@ func (p *peer) handleVersionMsg(msg *wire.MsgVersion) {
 
 	// Set the remote peer's user agent.
 	p.userAgent = msg.UserAgent
+
+	// Set the peer's time offset.
+	p.timeOffset = msg.Timestamp.Unix() - time.Now().Unix()
+
+	// Set the peer's ID.
+	p.id = atomic.AddInt32(&nodeCount, 1)
 
 	p.StatsMtx.Unlock()
 
