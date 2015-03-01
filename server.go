@@ -26,6 +26,7 @@ import (
 	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/database"
+	"github.com/btcsuite/btcd/mempool"
 	"github.com/btcsuite/btcd/mining"
 	"github.com/btcsuite/btcd/peer"
 	"github.com/btcsuite/btcd/txscript"
@@ -184,7 +185,7 @@ type server struct {
 	sigCache             *txscript.SigCache
 	rpcServer            *rpcServer
 	blockManager         *blockManager
-	txMemPool            *txMemPool
+	txMemPool            *mempool.TxPool
 	cpuMiner             *CPUMiner
 	modifyRebroadcastInv chan interface{}
 	pendingPeers         chan *serverPeer
@@ -2522,8 +2523,8 @@ func newServer(listenAddrs []string, db database.DB, chainParams *chaincfg.Param
 	}
 	s.blockManager = bm
 
-	txC := mempoolConfig{
-		Policy: mempoolPolicy{
+	txC := mempool.Config{
+		Policy: mempool.Policy{
 			DisableRelayPriority: cfg.NoRelayPriority,
 			FreeTxRelayLimit:     cfg.FreeTxRelayLimit,
 			MaxOrphanTxs:         cfg.MaxOrphanTxs,
@@ -2531,13 +2532,14 @@ func newServer(listenAddrs []string, db database.DB, chainParams *chaincfg.Param
 			MaxSigOpsPerTx:       blockchain.MaxSigOpsPerBlock / 5,
 			MinRelayTxFee:        cfg.minRelayTxFee,
 		},
+		ChainParams:   chainParams,
 		FetchUtxoView: s.blockManager.chain.FetchUtxoView,
 		Chain:         s.blockManager.chain,
 		SigCache:      s.sigCache,
 		TimeSource:    s.timeSource,
 		AddrIndex:     s.addrIndex,
 	}
-	s.txMemPool = newTxMemPool(&txC)
+	s.txMemPool = mempool.New(&txC)
 
 	// Create the mining policy based on the configuration options.
 	// NOTE: The CPU miner relies on the mempool, so the mempool has to be

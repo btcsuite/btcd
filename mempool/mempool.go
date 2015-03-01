@@ -2,7 +2,7 @@
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
-package main
+package mempool
 
 import (
 	"container/list"
@@ -16,6 +16,8 @@ import (
 
 	"github.com/btcsuite/btcd/blockchain"
 	"github.com/btcsuite/btcd/blockchain/indexers"
+	"github.com/btcsuite/btcd/btcjson"
+	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/mining"
 	"github.com/btcsuite/btcd/txscript"
@@ -24,26 +26,30 @@ import (
 )
 
 const (
+	// DefaultBlockPrioritySize is the default size in bytes for high-
+	// priority / low-fee transactions.  It is used to help determine which
+	// are allowed into the mempool and consequently affects their relay and
+	// inclusion when generating block templates.
+	DefaultBlockPrioritySize = 50000
+
+	// MinHighPriority is the minimum priority value that allows a
+	// transaction to be considered high priority.
+	MinHighPriority = btcutil.SatoshiPerBitcoin * 144.0 / 250
+
 	// mempoolHeight is the height used for the "block" height field of the
 	// contextual transaction information provided in a transaction view.
 	mempoolHeight = 0x7fffffff
 )
 
-// mempoolTxDesc is a descriptor containing a transaction in the mempool along
-// with additional metadata.
-type mempoolTxDesc struct {
-	mining.TxDesc
-
-	// StartingPriority is the priority of the transaction when it was added
-	// to the pool.
-	StartingPriority float64
-}
-
-// mempoolConfig is a descriptor containing the memory pool configuration.
-type mempoolConfig struct {
+// Config is a descriptor containing the memory pool configuration.
+type Config struct {
 	// Policy defines the various mempool configuration options related
 	// to policy.
-	Policy mempoolPolicy
+	Policy Policy
+
+	// ChainParams identifies which chain parameters the txpool is
+	// associated with.
+	ChainParams *chaincfg.Params
 
 	// FetchUtxoView defines the function to use to fetch unspent
 	// transaction output information.
@@ -65,9 +71,9 @@ type mempoolConfig struct {
 	AddrIndex *indexers.AddrIndex
 }
 
-// mempoolPolicy houses the policy (configuration parameters) which is used to
+// Policy houses the policy (configuration parameters) which is used to
 // control the mempool.
-type mempoolPolicy struct {
+type Policy struct {
 	// DisableRelayPriority defines whether to relay free or low-fee
 	// transactions that do not have enough priority to be relayed.
 	DisableRelayPriority bool
@@ -95,16 +101,26 @@ type mempoolPolicy struct {
 	MinRelayTxFee btcutil.Amount
 }
 
-// txMemPool is used as a source of transactions that need to be mined into
-// blocks and relayed to other peers.  It is safe for concurrent access from
-// multiple peers.
-type txMemPool struct {
+// TxDesc is a descriptor containing a transaction in the mempool along with
+// additional metadata.
+type TxDesc struct {
+	mining.TxDesc
+
+	// StartingPriority is the priority of the transaction when it was added
+	// to the pool.
+	StartingPriority float64
+}
+
+// TxPool is used as a source of transactions that need to be mined into blocks
+// and relayed to other peers.  It is safe for concurrent access from multiple
+// peers.
+type TxPool struct {
 	// The following variables must only be used atomically.
 	lastUpdated int64 // last time pool was updated
 
 	sync.RWMutex
-	cfg           mempoolConfig
-	pool          map[chainhash.Hash]*mempoolTxDesc
+	cfg           Config
+	pool          map[chainhash.Hash]*TxDesc
 	orphans       map[chainhash.Hash]*btcutil.Tx
 	orphansByPrev map[chainhash.Hash]map[chainhash.Hash]*btcutil.Tx
 	outpoints     map[wire.OutPoint]*btcutil.Tx
@@ -112,14 +128,14 @@ type txMemPool struct {
 	lastPennyUnix int64   // unix time of last ``penny spend''
 }
 
-// Ensure the txMemPool type implements the mining.TxSource interface.
-var _ mining.TxSource = (*txMemPool)(nil)
+// Ensure the TxPool type implements the mining.TxSource interface.
+var _ mining.TxSource = (*TxPool)(nil)
 
 // removeOrphan is the internal function which implements the public
 // RemoveOrphan.  See the comment for RemoveOrphan for more details.
 //
 // This function MUST be called with the mempool lock held (for writes).
-func (mp *txMemPool) removeOrphan(txHash *chainhash.Hash) {
+func (mp *TxPool) removeOrphan(txHash *chainhash.Hash) {
 	// Nothing to do if passed tx is not an orphan.
 	tx, exists := mp.orphans[*txHash]
 	if !exists {
@@ -148,7 +164,7 @@ func (mp *txMemPool) removeOrphan(txHash *chainhash.Hash) {
 // previous orphan index.
 //
 // This function is safe for concurrent access.
-func (mp *txMemPool) RemoveOrphan(txHash *chainhash.Hash) {
+func (mp *TxPool) RemoveOrphan(txHash *chainhash.Hash) {
 	mp.Lock()
 	mp.removeOrphan(txHash)
 	mp.Unlock()
@@ -158,7 +174,7 @@ func (mp *txMemPool) RemoveOrphan(txHash *chainhash.Hash) {
 // orphan if adding a new one would cause it to overflow the max allowed.
 //
 // This function MUST be called with the mempool lock held (for writes).
-func (mp *txMemPool) limitNumOrphans() error {
+func (mp *TxPool) limitNumOrphans() error {
 	if len(mp.orphans)+1 > mp.cfg.Policy.MaxOrphanTxs &&
 		mp.cfg.Policy.MaxOrphanTxs > 0 {
 
@@ -196,7 +212,7 @@ func (mp *txMemPool) limitNumOrphans() error {
 // addOrphan adds an orphan transaction to the orphan pool.
 //
 // This function MUST be called with the mempool lock held (for writes).
-func (mp *txMemPool) addOrphan(tx *btcutil.Tx) {
+func (mp *TxPool) addOrphan(tx *btcutil.Tx) {
 	// Limit the number orphan transactions to prevent memory exhaustion.  A
 	// random orphan is evicted to make room if needed.
 	mp.limitNumOrphans()
@@ -211,14 +227,14 @@ func (mp *txMemPool) addOrphan(tx *btcutil.Tx) {
 		mp.orphansByPrev[originTxHash][*tx.Hash()] = tx
 	}
 
-	txmpLog.Debugf("Stored orphan transaction %v (total: %d)", tx.Hash(),
+	log.Debugf("Stored orphan transaction %v (total: %d)", tx.Hash(),
 		len(mp.orphans))
 }
 
 // maybeAddOrphan potentially adds an orphan to the orphan pool.
 //
 // This function MUST be called with the mempool lock held (for writes).
-func (mp *txMemPool) maybeAddOrphan(tx *btcutil.Tx) error {
+func (mp *TxPool) maybeAddOrphan(tx *btcutil.Tx) error {
 	// Ignore orphan transactions that are too large.  This helps avoid
 	// a memory exhaustion attack based on sending a lot of really large
 	// orphans.  In the case there is a valid transaction larger than this,
@@ -247,7 +263,7 @@ func (mp *txMemPool) maybeAddOrphan(tx *btcutil.Tx) error {
 // exists in the main pool.
 //
 // This function MUST be called with the mempool lock held (for reads).
-func (mp *txMemPool) isTransactionInPool(hash *chainhash.Hash) bool {
+func (mp *TxPool) isTransactionInPool(hash *chainhash.Hash) bool {
 	if _, exists := mp.pool[*hash]; exists {
 		return true
 	}
@@ -259,7 +275,7 @@ func (mp *txMemPool) isTransactionInPool(hash *chainhash.Hash) bool {
 // exists in the main pool.
 //
 // This function is safe for concurrent access.
-func (mp *txMemPool) IsTransactionInPool(hash *chainhash.Hash) bool {
+func (mp *TxPool) IsTransactionInPool(hash *chainhash.Hash) bool {
 	// Protect concurrent access.
 	mp.RLock()
 	defer mp.RUnlock()
@@ -271,7 +287,7 @@ func (mp *txMemPool) IsTransactionInPool(hash *chainhash.Hash) bool {
 // in the orphan pool.
 //
 // This function MUST be called with the mempool lock held (for reads).
-func (mp *txMemPool) isOrphanInPool(hash *chainhash.Hash) bool {
+func (mp *TxPool) isOrphanInPool(hash *chainhash.Hash) bool {
 	if _, exists := mp.orphans[*hash]; exists {
 		return true
 	}
@@ -283,7 +299,7 @@ func (mp *txMemPool) isOrphanInPool(hash *chainhash.Hash) bool {
 // in the orphan pool.
 //
 // This function is safe for concurrent access.
-func (mp *txMemPool) IsOrphanInPool(hash *chainhash.Hash) bool {
+func (mp *TxPool) IsOrphanInPool(hash *chainhash.Hash) bool {
 	// Protect concurrent access.
 	mp.RLock()
 	defer mp.RUnlock()
@@ -295,7 +311,7 @@ func (mp *txMemPool) IsOrphanInPool(hash *chainhash.Hash) bool {
 // in the main pool or in the orphan pool.
 //
 // This function MUST be called with the mempool lock held (for reads).
-func (mp *txMemPool) haveTransaction(hash *chainhash.Hash) bool {
+func (mp *TxPool) haveTransaction(hash *chainhash.Hash) bool {
 	return mp.isTransactionInPool(hash) || mp.isOrphanInPool(hash)
 }
 
@@ -303,7 +319,7 @@ func (mp *txMemPool) haveTransaction(hash *chainhash.Hash) bool {
 // in the main pool or in the orphan pool.
 //
 // This function is safe for concurrent access.
-func (mp *txMemPool) HaveTransaction(hash *chainhash.Hash) bool {
+func (mp *TxPool) HaveTransaction(hash *chainhash.Hash) bool {
 	// Protect concurrent access.
 	mp.RLock()
 	defer mp.RUnlock()
@@ -315,7 +331,7 @@ func (mp *txMemPool) HaveTransaction(hash *chainhash.Hash) bool {
 // RemoveTransaction.  See the comment for RemoveTransaction for more details.
 //
 // This function MUST be called with the mempool lock held (for writes).
-func (mp *txMemPool) removeTransaction(tx *btcutil.Tx, removeRedeemers bool) {
+func (mp *TxPool) removeTransaction(tx *btcutil.Tx, removeRedeemers bool) {
 	txHash := tx.Hash()
 	if removeRedeemers {
 		// Remove any transactions which rely on this one.
@@ -350,7 +366,7 @@ func (mp *txMemPool) removeTransaction(tx *btcutil.Tx, removeRedeemers bool) {
 // they would otherwise become orphans.
 //
 // This function is safe for concurrent access.
-func (mp *txMemPool) RemoveTransaction(tx *btcutil.Tx, removeRedeemers bool) {
+func (mp *TxPool) RemoveTransaction(tx *btcutil.Tx, removeRedeemers bool) {
 	// Protect concurrent access.
 	mp.Lock()
 	defer mp.Unlock()
@@ -365,7 +381,7 @@ func (mp *txMemPool) RemoveTransaction(tx *btcutil.Tx, removeRedeemers bool) {
 // contain transactions which were previously unknown to the memory pool.
 //
 // This function is safe for concurrent access.
-func (mp *txMemPool) RemoveDoubleSpends(tx *btcutil.Tx) {
+func (mp *TxPool) RemoveDoubleSpends(tx *btcutil.Tx) {
 	// Protect concurrent access.
 	mp.Lock()
 	defer mp.Unlock()
@@ -384,17 +400,17 @@ func (mp *txMemPool) RemoveDoubleSpends(tx *btcutil.Tx) {
 // helper for maybeAcceptTransaction.
 //
 // This function MUST be called with the mempool lock held (for writes).
-func (mp *txMemPool) addTransaction(utxoView *blockchain.UtxoViewpoint, tx *btcutil.Tx, height int32, fee int64) {
+func (mp *TxPool) addTransaction(utxoView *blockchain.UtxoViewpoint, tx *btcutil.Tx, height int32, fee int64) {
 	// Add the transaction to the pool and mark the referenced outpoints
 	// as spent by the pool.
-	mp.pool[*tx.Hash()] = &mempoolTxDesc{
+	mp.pool[*tx.Hash()] = &TxDesc{
 		TxDesc: mining.TxDesc{
 			Tx:     tx,
 			Added:  time.Now(),
 			Height: height,
 			Fee:    fee,
 		},
-		StartingPriority: calcPriority(tx.MsgTx(), utxoView, height),
+		StartingPriority: CalcPriority(tx.MsgTx(), utxoView, height),
 	}
 	for _, txIn := range tx.MsgTx().TxIn {
 		mp.outpoints[txIn.PreviousOutPoint] = tx
@@ -414,7 +430,7 @@ func (mp *txMemPool) addTransaction(utxoView *blockchain.UtxoViewpoint, tx *btcu
 // main chain.
 //
 // This function MUST be called with the mempool lock held (for reads).
-func (mp *txMemPool) checkPoolDoubleSpend(tx *btcutil.Tx) error {
+func (mp *TxPool) checkPoolDoubleSpend(tx *btcutil.Tx) error {
 	for _, txIn := range tx.MsgTx().TxIn {
 		if txR, exists := mp.outpoints[txIn.PreviousOutPoint]; exists {
 			str := fmt.Sprintf("output %v already spent by "+
@@ -433,7 +449,7 @@ func (mp *txMemPool) checkPoolDoubleSpend(tx *btcutil.Tx) error {
 // transaction pool.
 //
 // This function MUST be called with the mempool lock held (for reads).
-func (mp *txMemPool) fetchInputUtxos(tx *btcutil.Tx) (*blockchain.UtxoViewpoint, error) {
+func (mp *TxPool) fetchInputUtxos(tx *btcutil.Tx) (*blockchain.UtxoViewpoint, error) {
 	utxoView, err := mp.cfg.FetchUtxoView(tx)
 	if err != nil {
 		return nil, err
@@ -457,7 +473,7 @@ func (mp *txMemPool) fetchInputUtxos(tx *btcutil.Tx) (*blockchain.UtxoViewpoint,
 // orphans.
 //
 // This function is safe for concurrent access.
-func (mp *txMemPool) FetchTransaction(txHash *chainhash.Hash) (*btcutil.Tx, error) {
+func (mp *TxPool) FetchTransaction(txHash *chainhash.Hash) (*btcutil.Tx, error) {
 	// Protect concurrent access.
 	mp.RLock()
 	defer mp.RUnlock()
@@ -474,7 +490,7 @@ func (mp *txMemPool) FetchTransaction(txHash *chainhash.Hash) (*btcutil.Tx, erro
 // more details.
 //
 // This function MUST be called with the mempool lock held (for writes).
-func (mp *txMemPool) maybeAcceptTransaction(tx *btcutil.Tx, isNew, rateLimit bool) ([]*chainhash.Hash, error) {
+func (mp *TxPool) maybeAcceptTransaction(tx *btcutil.Tx, isNew, rateLimit bool) ([]*chainhash.Hash, error) {
 	txHash := tx.Hash()
 
 	// Don't accept the transaction if it already exists in the pool.  This
@@ -521,7 +537,7 @@ func (mp *txMemPool) maybeAcceptTransaction(tx *btcutil.Tx, isNew, rateLimit boo
 
 	// Don't allow non-standard transactions if the network parameters
 	// forbid their relaying.
-	if !activeNetParams.RelayNonStdTxs {
+	if !mp.cfg.ChainParams.RelayNonStdTxs {
 		err := checkTransactionStandard(tx, nextBlockHeight,
 			mp.cfg.TimeSource, mp.cfg.Policy.MinRelayTxFee)
 		if err != nil {
@@ -596,7 +612,7 @@ func (mp *txMemPool) maybeAcceptTransaction(tx *btcutil.Tx, isNew, rateLimit boo
 	// Also returns the fees associated with the transaction which will be
 	// used later.
 	txFee, err := blockchain.CheckTransactionInputs(tx, nextBlockHeight,
-		utxoView, activeNetParams.Params)
+		utxoView, mp.cfg.ChainParams)
 	if err != nil {
 		if cerr, ok := err.(blockchain.RuleError); ok {
 			return nil, chainRuleError(cerr)
@@ -606,7 +622,7 @@ func (mp *txMemPool) maybeAcceptTransaction(tx *btcutil.Tx, isNew, rateLimit boo
 
 	// Don't allow transactions with non-standard inputs if the network
 	// parameters forbid their relaying.
-	if !activeNetParams.RelayNonStdTxs {
+	if !mp.cfg.ChainParams.RelayNonStdTxs {
 		err := checkInputsStandard(tx, utxoView)
 		if err != nil {
 			// Attempt to extract a reject code from the error so
@@ -659,7 +675,7 @@ func (mp *txMemPool) maybeAcceptTransaction(tx *btcutil.Tx, isNew, rateLimit boo
 	serializedSize := int64(tx.MsgTx().SerializeSize())
 	minFee := calcMinRequiredTxRelayFee(serializedSize,
 		mp.cfg.Policy.MinRelayTxFee)
-	if serializedSize >= (defaultBlockPrioritySize-1000) && txFee < minFee {
+	if serializedSize >= (DefaultBlockPrioritySize-1000) && txFee < minFee {
 		str := fmt.Sprintf("transaction %v has %d fees which is under "+
 			"the required amount of %d", txHash, txFee,
 			minFee)
@@ -671,12 +687,12 @@ func (mp *txMemPool) maybeAcceptTransaction(tx *btcutil.Tx, isNew, rateLimit boo
 	// memory pool from blocks that have been disconnected during a reorg
 	// are exempted.
 	if isNew && !mp.cfg.Policy.DisableRelayPriority && txFee < minFee {
-		currentPriority := calcPriority(tx.MsgTx(), utxoView,
+		currentPriority := CalcPriority(tx.MsgTx(), utxoView,
 			nextBlockHeight)
-		if currentPriority <= minHighPriority {
+		if currentPriority <= MinHighPriority {
 			str := fmt.Sprintf("transaction %v has insufficient "+
 				"priority (%g <= %g)", txHash,
-				currentPriority, minHighPriority)
+				currentPriority, MinHighPriority)
 			return nil, txRuleError(wire.RejectInsufficientFee, str)
 		}
 	}
@@ -685,8 +701,8 @@ func (mp *txMemPool) maybeAcceptTransaction(tx *btcutil.Tx, isNew, rateLimit boo
 	// penny-flooding with tiny transactions as a form of attack.
 	if rateLimit && txFee < minFee {
 		nowUnix := time.Now().Unix()
-		// we decay passed data with an exponentially decaying ~10
-		// minutes window - matches bitcoind handling.
+		// Decay passed data with an exponentially decaying ~10 minute
+		// window - matches bitcoind handling.
 		mp.pennyTotal *= math.Pow(1.0-1.0/600.0,
 			float64(nowUnix-mp.lastPennyUnix))
 		mp.lastPennyUnix = nowUnix
@@ -700,7 +716,7 @@ func (mp *txMemPool) maybeAcceptTransaction(tx *btcutil.Tx, isNew, rateLimit boo
 		oldTotal := mp.pennyTotal
 
 		mp.pennyTotal += float64(serializedSize)
-		txmpLog.Tracef("rate limit: curTotal %v, nextTotal: %v, "+
+		log.Tracef("rate limit: curTotal %v, nextTotal: %v, "+
 			"limit %v", oldTotal, mp.pennyTotal,
 			mp.cfg.Policy.FreeTxRelayLimit*10*1000)
 	}
@@ -719,7 +735,7 @@ func (mp *txMemPool) maybeAcceptTransaction(tx *btcutil.Tx, isNew, rateLimit boo
 	// Add to transaction pool.
 	mp.addTransaction(utxoView, tx, best.Height, txFee)
 
-	txmpLog.Debugf("Accepted transaction %v (pool size: %v)", txHash,
+	log.Debugf("Accepted transaction %v (pool size: %v)", txHash,
 		len(mp.pool))
 
 	return nil, nil
@@ -736,7 +752,7 @@ func (mp *txMemPool) maybeAcceptTransaction(tx *btcutil.Tx, isNew, rateLimit boo
 // be added to the orphan pool.
 //
 // This function is safe for concurrent access.
-func (mp *txMemPool) MaybeAcceptTransaction(tx *btcutil.Tx, isNew, rateLimit bool) ([]*chainhash.Hash, error) {
+func (mp *TxPool) MaybeAcceptTransaction(tx *btcutil.Tx, isNew, rateLimit bool) ([]*chainhash.Hash, error) {
 	// Protect concurrent access.
 	mp.Lock()
 	defer mp.Unlock()
@@ -748,7 +764,7 @@ func (mp *txMemPool) MaybeAcceptTransaction(tx *btcutil.Tx, isNew, rateLimit boo
 // ProcessOrphans.  See the comment for ProcessOrphans for more details.
 //
 // This function MUST be called with the mempool lock held (for writes).
-func (mp *txMemPool) processOrphans(hash *chainhash.Hash) []*btcutil.Tx {
+func (mp *TxPool) processOrphans(hash *chainhash.Hash) []*btcutil.Tx {
 	var acceptedTxns []*btcutil.Tx
 
 	// Start with processing at least the passed hash.
@@ -793,9 +809,8 @@ func (mp *txMemPool) processOrphans(hash *chainhash.Hash) []*btcutil.Tx {
 			if err != nil {
 				// TODO: Remove orphans that depend on this
 				// failed transaction.
-				txmpLog.Debugf("Unable to move "+
-					"orphan transaction %v to mempool: %v",
-					tx.Hash(), err)
+				log.Debugf("Unable to move orphan transaction "+
+					"%v to mempool: %v", tx.Hash(), err)
 				continue
 			}
 
@@ -840,7 +855,7 @@ func (mp *txMemPool) processOrphans(hash *chainhash.Hash) []*btcutil.Tx {
 // no transactions were moved from the orphan pool to the mempool.
 //
 // This function is safe for concurrent access.
-func (mp *txMemPool) ProcessOrphans(hash *chainhash.Hash) []*btcutil.Tx {
+func (mp *TxPool) ProcessOrphans(hash *chainhash.Hash) []*btcutil.Tx {
 	mp.Lock()
 	acceptedTxns := mp.processOrphans(hash)
 	mp.Unlock()
@@ -859,12 +874,12 @@ func (mp *txMemPool) ProcessOrphans(hash *chainhash.Hash) []*btcutil.Tx {
 // the passed one being accepted.
 //
 // This function is safe for concurrent access.
-func (mp *txMemPool) ProcessTransaction(tx *btcutil.Tx, allowOrphan, rateLimit bool) ([]*btcutil.Tx, error) {
+func (mp *TxPool) ProcessTransaction(tx *btcutil.Tx, allowOrphan, rateLimit bool) ([]*btcutil.Tx, error) {
 	// Protect concurrent access.
 	mp.Lock()
 	defer mp.Unlock()
 
-	txmpLog.Tracef("Processing transaction %v", tx.Hash())
+	log.Tracef("Processing transaction %v", tx.Hash())
 
 	// Potentially accept the transaction to the memory pool.
 	missingParents, err := mp.maybeAcceptTransaction(tx, true, rateLimit)
@@ -919,7 +934,7 @@ func (mp *txMemPool) ProcessTransaction(tx *btcutil.Tx, allowOrphan, rateLimit b
 // include the orphan pool.
 //
 // This function is safe for concurrent access.
-func (mp *txMemPool) Count() int {
+func (mp *TxPool) Count() int {
 	mp.RLock()
 	defer mp.RUnlock()
 
@@ -930,7 +945,7 @@ func (mp *txMemPool) Count() int {
 // pool.
 //
 // This function is safe for concurrent access.
-func (mp *txMemPool) TxHashes() []*chainhash.Hash {
+func (mp *TxPool) TxHashes() []*chainhash.Hash {
 	mp.RLock()
 	defer mp.RUnlock()
 
@@ -949,11 +964,11 @@ func (mp *txMemPool) TxHashes() []*chainhash.Hash {
 // The descriptors are to be treated as read only.
 //
 // This function is safe for concurrent access.
-func (mp *txMemPool) TxDescs() []*mempoolTxDesc {
+func (mp *TxPool) TxDescs() []*TxDesc {
 	mp.RLock()
 	defer mp.RUnlock()
 
-	descs := make([]*mempoolTxDesc, len(mp.pool))
+	descs := make([]*TxDesc, len(mp.pool))
 	i := 0
 	for _, desc := range mp.pool {
 		descs[i] = desc
@@ -968,7 +983,7 @@ func (mp *txMemPool) TxDescs() []*mempoolTxDesc {
 //
 // This is part of the mining.TxSource interface implementation and is safe for
 // concurrent access as required by the interface contract.
-func (mp *txMemPool) MiningDescs() []*mining.TxDesc {
+func (mp *TxPool) MiningDescs() []*mining.TxDesc {
 	mp.RLock()
 	defer mp.RUnlock()
 
@@ -982,23 +997,69 @@ func (mp *txMemPool) MiningDescs() []*mining.TxDesc {
 	return descs
 }
 
+// RawMempoolVerbose returns all of the entries in the mempool as a fully
+// populated btcjson result.
+//
+// This function is safe for concurrent access.
+func (mp *TxPool) RawMempoolVerbose() map[string]*btcjson.GetRawMempoolVerboseResult {
+	mp.RLock()
+	defer mp.RUnlock()
+
+	result := make(map[string]*btcjson.GetRawMempoolVerboseResult,
+		len(mp.pool))
+	best := mp.cfg.Chain.BestSnapshot()
+
+	for _, desc := range mp.pool {
+		// Calculate the current priority based on the inputs to
+		// the transaction.  Use zero if one or more of the
+		// input transactions can't be found for some reason.
+		tx := desc.Tx
+		var currentPriority float64
+		utxos, err := mp.fetchInputUtxos(tx)
+		if err == nil {
+			currentPriority = CalcPriority(tx.MsgTx(), utxos,
+				best.Height+1)
+		}
+
+		mpd := &btcjson.GetRawMempoolVerboseResult{
+			Size:             int32(tx.MsgTx().SerializeSize()),
+			Fee:              btcutil.Amount(desc.Fee).ToBTC(),
+			Time:             desc.Added.Unix(),
+			Height:           int64(desc.Height),
+			StartingPriority: desc.StartingPriority,
+			CurrentPriority:  currentPriority,
+			Depends:          make([]string, 0),
+		}
+		for _, txIn := range tx.MsgTx().TxIn {
+			hash := &txIn.PreviousOutPoint.Hash
+			if mp.haveTransaction(hash) {
+				mpd.Depends = append(mpd.Depends,
+					hash.String())
+			}
+		}
+
+		result[tx.Hash().String()] = mpd
+	}
+
+	return result
+}
+
 // LastUpdated returns the last time a transaction was added to or removed from
 // the main pool.  It does not include the orphan pool.
 //
 // This function is safe for concurrent access.
-func (mp *txMemPool) LastUpdated() time.Time {
+func (mp *TxPool) LastUpdated() time.Time {
 	return time.Unix(atomic.LoadInt64(&mp.lastUpdated), 0)
 }
 
-// newTxMemPool returns a new memory pool for validating and storing standalone
+// New returns a new memory pool for validating and storing standalone
 // transactions until they are mined into a block.
-func newTxMemPool(cfg *mempoolConfig) *txMemPool {
-	memPool := &txMemPool{
+func New(cfg *Config) *TxPool {
+	return &TxPool{
 		cfg:           *cfg,
-		pool:          make(map[chainhash.Hash]*mempoolTxDesc),
+		pool:          make(map[chainhash.Hash]*TxDesc),
 		orphans:       make(map[chainhash.Hash]*btcutil.Tx),
 		orphansByPrev: make(map[chainhash.Hash]map[chainhash.Hash]*btcutil.Tx),
 		outpoints:     make(map[wire.OutPoint]*btcutil.Tx),
 	}
-	return memPool
 }

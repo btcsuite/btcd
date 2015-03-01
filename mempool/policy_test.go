@@ -2,7 +2,7 @@
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
-package main
+package mempool
 
 import (
 	"bytes"
@@ -36,13 +36,13 @@ func TestCalcMinRequiredTxRelayFee(t *testing.T) {
 		{
 			"100 bytes with default minimum relay fee",
 			100,
-			defaultMinRelayTxFee,
+			DefaultMinRelayTxFee,
 			100,
 		},
 		{
 			"max standard tx size with default minimum relay fee",
 			maxStandardTxSize,
-			defaultMinRelayTxFee,
+			DefaultMinRelayTxFee,
 			100000,
 		},
 		{
@@ -470,7 +470,7 @@ func TestCheckTransactionStandard(t *testing.T) {
 	for _, test := range tests {
 		// Ensure standardness is as expected.
 		err := checkTransactionStandard(btcutil.NewTx(&test.tx),
-			test.height, timeSource, defaultMinRelayTxFee)
+			test.height, timeSource, DefaultMinRelayTxFee)
 		if err == nil && test.isStandard {
 			// Test passes since function returned standard for a
 			// transaction which is intended to be standard.
