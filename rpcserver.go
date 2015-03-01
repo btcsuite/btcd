@@ -1832,7 +1832,7 @@ func handleGetNetworkHashPS(s *rpcServer, cmd interface{}, closeChan <-chan stru
 	// since we can't reasonably calculate the number of network hashes
 	// per second from invalid values.  When it's negative, use the current
 	// best block height.
-	var endHeight int64
+	endHeight := int64(-1)
 	if c.Height != nil {
 		endHeight = int64(*c.Height)
 	}
@@ -1847,7 +1847,7 @@ func handleGetNetworkHashPS(s *rpcServer, cmd interface{}, closeChan <-chan stru
 	// blocks.  When the passed value is negative, use the last block the
 	// difficulty changed as the starting height.  Also make sure the
 	// starting height is not before the beginning of the chain.
-	var numBlocks int64
+	numBlocks := int64(120)
 	if c.Blocks != nil {
 		numBlocks = int64(*c.Blocks)
 	}
