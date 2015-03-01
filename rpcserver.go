@@ -1816,6 +1816,10 @@ func handleGetNetTotals(s *rpcServer, cmd interface{}, closeChan <-chan struct{}
 
 // handleGetNetworkHashPS implements the getnetworkhashps command.
 func handleGetNetworkHashPS(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (interface{}, error) {
+	// Note: All valid error return paths should return an int64.
+	// Literal zeros are inferred as int, and won't coerce to int64
+	// because the return value is an interface{}.
+
 	c := cmd.(*btcjson.GetNetworkHashPSCmd)
 
 	_, newestHeight, err := s.server.db.NewestSha()
@@ -1833,7 +1837,7 @@ func handleGetNetworkHashPS(s *rpcServer, cmd interface{}, closeChan <-chan stru
 		endHeight = int64(*c.Height)
 	}
 	if endHeight > newestHeight || endHeight == 0 {
-		return 0, nil
+		return int64(0), nil
 	}
 	if endHeight < 0 {
 		endHeight = newestHeight
@@ -1896,7 +1900,7 @@ func handleGetNetworkHashPS(s *rpcServer, cmd interface{}, closeChan <-chan stru
 	// time difference.
 	timeDiff := int64(maxTimestamp.Sub(minTimestamp) / time.Second)
 	if timeDiff == 0 {
-		return 0, nil
+		return int64(0), nil
 	}
 
 	hashesPerSec := new(big.Int).Div(totalWork, big.NewInt(timeDiff))
