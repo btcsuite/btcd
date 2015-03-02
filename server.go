@@ -465,9 +465,9 @@ func (s *server) handleQuery(querymsg interface{}, state *peerState) {
 		}
 
 	case dropNodeMsg:
-		// Check inbound peers. We pass an empty callback since we don't
+		// Check inbound peers. We pass a nil callback since we don't
 		// require any additional actions on disconnect for inbound peers.
-		found := disconnectPeer(state.peers, msg.addr, func(p *peer) {})
+		found := disconnectPeer(state.peers, msg.addr, nil)
 		if found {
 			msg.reply <- nil
 			return
@@ -500,16 +500,19 @@ func (s *server) handleQuery(querymsg interface{}, state *peerState) {
 
 // disconnectPeer attempts to drop the connection of a tageted peer in the
 // passed peer list. This function returns true on success and false if the
-// peer is unable to be located. If the peer is found, the passed callback
-// function `whenFound' called with the peer as the argument before it is
-// removed from the peerList and is disconnected from the server
+// peer is unable to be located. If the peer is found, and the passed callback:
+// `whenFound' isn't nil, we call it with the peer as the argument before
+// it is removed from the peerList, and is disconnected from the server.
 func disconnectPeer(peerList *list.List, targetAddr string, whenFound func(*peer)) bool {
 	for e := peerList.Front(); e != nil; e = e.Next() {
 		peer := e.Value.(*peer)
 		if peer.addr == targetAddr {
+			if whenFound != nil {
+				whenFound(peer)
+			}
+
 			// This is ok because we are not continuing
 			// to iterate so won't corrupt the loop.
-			whenFound(peer)
 			peerList.Remove(e)
 			peer.Disconnect()
 			return true
