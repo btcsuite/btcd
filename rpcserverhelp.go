@@ -475,14 +475,24 @@ var helpDescsEnUS = map[string]string{
 	// NotifyBlocksCmd help.
 	"notifyblocks--synopsis": "Request notifications for whenever a block is connected or disconnected from the main (best) chain.",
 
+	// StopNotifyBlocksCmd help.
+	"stopnotifyblocks--synopsis": "Cancel registered notifications for whenever a block is connected or disconnected from the main (best) chain.",
+
 	// NotifyNewTransactionsCmd help.
 	"notifynewtransactions--synopsis": "Send either a txaccepted or a txacceptedverbose notification when a new transaction is accepted into the mempool.",
 	"notifynewtransactions-verbose":   "Specifies which type of notification to receive. If verbose is true, then the caller receives txacceptedverbose, otherwise the caller receives txaccepted",
+
+	// StopNotifyNewTransactionsCmd help.
+	"stopnotifynewtransactions--synopsis": "Stop sending either a txaccepted or a txacceptedverbose notification when a new transaction is accepted into the mempool.",
 
 	// NotifyReceivedCmd help.
 	"notifyreceived--synopsis": "Send a recvtx notification when a transaction added to mempool or appears in a newly-attached block contains a txout pkScript sending to any of the passed addresses.\n" +
 		"Matching outpoints are automatically registered for redeemingtx notifications.",
 	"notifyreceived-addresses": "List of address to receive notifications about",
+
+	// StopNotifyReceivedCmd help.
+	"stopnotifyreceived--synopsis": "Cancel registered receive notifications for each passed address.",
+	"stopnotifyreceived-addresses": "List of address to cancel receive notifications for",
 
 	// OutPoint help.
 	"outpoint-hash":  "The hex-encoded bytes of the outpoint hash",
@@ -491,6 +501,10 @@ var helpDescsEnUS = map[string]string{
 	// NotifySpentCmd help.
 	"notifyspent--synopsis": "Send a redeemingtx notification when a transaction spending an outpoint appears in mempool (if relayed to this btcd instance) and when such a transaction first appears in a newly-attached block.",
 	"notifyspent-outpoints": "List of transaction outpoints to monitor.",
+
+	// StopNotifySpentCmd help.
+	"stopnotifyspent--synopsis": "Cancel registered spending notifications for each passed outpoint.",
+	"stopnotifyspent-outpoints": "List of transaction outpoints to stop monitoring.",
 
 	// Rescan help.
 	"rescan--synopsis": "Rescan block chain for transactions to addresses.\n" +
@@ -547,11 +561,15 @@ var rpcResultTypes = map[string][]interface{}{
 	"verifymessage":         []interface{}{(*bool)(nil)},
 
 	// Websocket commands.
-	"notifyblocks":          nil,
-	"notifynewtransactions": nil,
-	"notifyreceived":        nil,
-	"notifyspent":           nil,
-	"rescan":                nil,
+	"notifyblocks":              nil,
+	"stopnotifyblocks":          nil,
+	"notifynewtransactions":     nil,
+	"stopnotifynewtransactions": nil,
+	"notifyreceived":            nil,
+	"stopnotifyreceived":        nil,
+	"notifyspent":               nil,
+	"stopnotifyspent":           nil,
+	"rescan":                    nil,
 }
 
 // helpCacher provides a concurrent safe type that provides help and usage for

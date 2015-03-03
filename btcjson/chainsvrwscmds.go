@@ -31,6 +31,15 @@ func NewNotifyBlocksCmd() *NotifyBlocksCmd {
 	return &NotifyBlocksCmd{}
 }
 
+// StopNotifyBlocksCmd defines the stopnotifyblocks JSON-RPC command.
+type StopNotifyBlocksCmd struct{}
+
+// NewStopNotifyBlocksCmd returns a new instance which can be used to issue a
+// stopnotifyblocks JSON-RPC command.
+func NewStopNotifyBlocksCmd() *StopNotifyBlocksCmd {
+	return &StopNotifyBlocksCmd{}
+}
+
 // NotifyNewTransactionsCmd defines the notifynewtransactions JSON-RPC command.
 type NotifyNewTransactionsCmd struct {
 	Verbose *bool `jsonrpcdefault:"false"`
@@ -45,6 +54,18 @@ func NewNotifyNewTransactionsCmd(verbose *bool) *NotifyNewTransactionsCmd {
 	return &NotifyNewTransactionsCmd{
 		Verbose: verbose,
 	}
+}
+
+// StopNotifyNewTransactionsCmd defines the stopnotifynewtransactions JSON-RPC command.
+type StopNotifyNewTransactionsCmd struct{}
+
+// NewStopNotifyNewTransactionsCmd returns a new instance which can be used to issue
+// a stopnotifynewtransactions JSON-RPC command.
+//
+// The parameters which are pointers indicate they are optional.  Passing nil
+// for optional parameters will use the default value.
+func NewStopNotifyNewTransactionsCmd() *StopNotifyNewTransactionsCmd {
+	return &StopNotifyNewTransactionsCmd{}
 }
 
 // NotifyReceivedCmd defines the notifyreceived JSON-RPC command.
@@ -80,6 +101,32 @@ func NewNotifySpentCmd(outPoints []OutPoint) *NotifySpentCmd {
 	}
 }
 
+// StopNotifyReceivedCmd defines the stopnotifyreceived JSON-RPC command.
+type StopNotifyReceivedCmd struct {
+	Addresses []string
+}
+
+// NewStopNotifyReceivedCmd returns a new instance which can be used to issue a
+// stopnotifyreceived JSON-RPC command.
+func NewStopNotifyReceivedCmd(addresses []string) *StopNotifyReceivedCmd {
+	return &StopNotifyReceivedCmd{
+		Addresses: addresses,
+	}
+}
+
+// StopNotifySpentCmd defines the stopnotifyspent JSON-RPC command.
+type StopNotifySpentCmd struct {
+	OutPoints []OutPoint
+}
+
+// NewStopNotifySpentCmd returns a new instance which can be used to issue a
+// stopnotifyspent JSON-RPC command.
+func NewStopNotifySpentCmd(outPoints []OutPoint) *StopNotifySpentCmd {
+	return &StopNotifySpentCmd{
+		OutPoints: outPoints,
+	}
+}
+
 // RescanCmd defines the rescan JSON-RPC command.
 type RescanCmd struct {
 	BeginBlock string
@@ -111,5 +158,9 @@ func init() {
 	MustRegisterCmd("notifynewtransactions", (*NotifyNewTransactionsCmd)(nil), flags)
 	MustRegisterCmd("notifyreceived", (*NotifyReceivedCmd)(nil), flags)
 	MustRegisterCmd("notifyspent", (*NotifySpentCmd)(nil), flags)
+	MustRegisterCmd("stopnotifyblocks", (*StopNotifyBlocksCmd)(nil), flags)
+	MustRegisterCmd("stopnotifynewtransactions", (*StopNotifyNewTransactionsCmd)(nil), flags)
+	MustRegisterCmd("stopnotifyspent", (*StopNotifySpentCmd)(nil), flags)
+	MustRegisterCmd("stopnotifyreceived", (*StopNotifyReceivedCmd)(nil), flags)
 	MustRegisterCmd("rescan", (*RescanCmd)(nil), flags)
 }
