@@ -10,7 +10,7 @@ import (
 	"testing"
 
 	"github.com/btcsuite/btcutil"
-	"golang.org/x/crypto/ripemd160"
+	"github.com/btcsuite/golangcrypto/ripemd160"
 )
 
 func TestAddrIndexKeySerialization(t *testing.T) {

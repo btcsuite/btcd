@@ -9,7 +9,7 @@ import (
 
 	"github.com/btcsuite/btcd/wire"
 	"github.com/btcsuite/btcutil"
-	"golang.org/x/crypto/ripemd160"
+	"github.com/btcsuite/golangcrypto/ripemd160"
 )
 
 // Errors that the various database functions may return.
