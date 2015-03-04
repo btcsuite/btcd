@@ -371,6 +371,11 @@ type delNodeMsg struct {
 	reply chan error
 }
 
+type dropNodeMsg struct {
+	addr  string
+	reply chan error
+}
+
 type getAddedNodesMsg struct {
 	reply chan []*peer
 }
@@ -447,27 +452,39 @@ func (s *server) handleQuery(querymsg interface{}, state *peerState) {
 		}
 
 	case delNodeMsg:
-		found := false
-		for e := state.persistentPeers.Front(); e != nil; e = e.Next() {
-			peer := e.Value.(*peer)
-			if peer.addr == msg.addr {
-				// Keep group counts ok since we remove from
-				// the list now.
-				state.outboundGroups[addrmgr.GroupKey(peer.na)]--
-				// This is ok because we are not continuing
-				// to iterate so won't corrupt the loop.
-				state.persistentPeers.Remove(e)
-				peer.Disconnect()
-				found = true
-				break
-			}
-		}
+		found := disconnectPeer(state.persistentPeers, msg.addr, func(p *peer) {
+			// Keep group counts ok since we remove from
+			// the list now.
+			state.outboundGroups[addrmgr.GroupKey(p.na)]--
+		})
 
 		if found {
 			msg.reply <- nil
 		} else {
 			msg.reply <- errors.New("peer not found")
 		}
+
+	case dropNodeMsg:
+		// Check inbound peers. We pass a nil callback since we don't
+		// require any additional actions on disconnect for inbound peers.
+		found := disconnectPeer(state.peers, msg.addr, nil)
+		if found {
+			msg.reply <- nil
+			return
+		}
+
+		// Check outbound peers.
+		found = disconnectPeer(state.outboundPeers, msg.addr, func(p *peer) {
+			// Keep group counts ok since we remove from
+			// the list now.
+			state.outboundGroups[addrmgr.GroupKey(p.na)]--
+		})
+		if found {
+			msg.reply <- nil
+			return
+		}
+
+		msg.reply <- errors.New("peer not found")
 
 	// Request a list of the persistent (added) peers.
 	case getAddedNodesMsg:
@@ -479,6 +496,29 @@ func (s *server) handleQuery(querymsg interface{}, state *peerState) {
 		}
 		msg.reply <- peers
 	}
+}
+
+// disconnectPeer attempts to drop the connection of a tageted peer in the
+// passed peer list. This function returns true on success and false if the
+// peer is unable to be located. If the peer is found, and the passed callback:
+// `whenFound' isn't nil, we call it with the peer as the argument before
+// it is removed from the peerList, and is disconnected from the server.
+func disconnectPeer(peerList *list.List, targetAddr string, whenFound func(*peer)) bool {
+	for e := peerList.Front(); e != nil; e = e.Next() {
+		peer := e.Value.(*peer)
+		if peer.addr == targetAddr {
+			if whenFound != nil {
+				whenFound(peer)
+			}
+
+			// This is ok because we are not continuing
+			// to iterate so won't corrupt the loop.
+			peerList.Remove(e)
+			peer.Disconnect()
+			return true
+		}
+	}
+	return false
 }
 
 // listenHandler is the main listener which accepts incoming connections for the
@@ -785,6 +825,16 @@ func (s *server) RemoveAddr(addr string) error {
 	replyChan := make(chan error)
 
 	s.query <- delNodeMsg{addr: addr, reply: replyChan}
+
+	return <-replyChan
+}
+
+// DropAddr removes `addr` from the list of all peers if present.
+// An error will be returned if the peer was not found.
+func (s *server) DropAddr(addr string) error {
+	replyChan := make(chan error)
+
+	s.query <- dropNodeMsg{addr: addr, reply: replyChan}
 
 	return <-replyChan
 }

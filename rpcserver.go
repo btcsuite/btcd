@@ -129,6 +129,7 @@ type commandHandler func(*rpcServer, interface{}, <-chan struct{}) (interface{},
 var rpcHandlers map[string]commandHandler
 var rpcHandlersBeforeInit = map[string]commandHandler{
 	"addnode":               handleAddNode,
+	"dropnode":              handleDropNode,
 	"createrawtransaction":  handleCreateRawTransaction,
 	"debuglevel":            handleDebugLevel,
 	"decoderawtransaction":  handleDecodeRawTransaction,
@@ -338,6 +339,22 @@ func handleAddNode(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (in
 
 	if err != nil {
 		return nil, internalRPCError(err.Error(), "")
+	}
+	// no data returned unless an error.
+	return nil, nil
+}
+
+// handleDropNode handles dropnode commands.
+func handleDropNode(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (interface{}, error) {
+	c := cmd.(*btcjson.DropNodeCmd)
+
+	addr := normalizeAddress(c.Addr, activeNetParams.DefaultPort)
+
+	if err := s.server.DropAddr(addr); err != nil {
+		return nil, btcjson.RPCError{
+			Code:    btcjson.ErrRPCInternal.Code,
+			Message: err.Error(),
+		}
 	}
 
 	// no data returned unless an error.

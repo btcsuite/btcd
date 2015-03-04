@@ -13,6 +13,17 @@ type DebugLevelCmd struct {
 	LevelSpec string
 }
 
+// DropNodeCmd defines the dropnode JSON-RPC command.
+type DropNodeCmd struct {
+	Addr string
+}
+
+// NewDropNodeCmd returns a new instance which can be used to issue a dropnode
+// JSON-RPC command.
+func NewDropNodeCmd(addr string) *DropNodeCmd {
+	return &DropNodeCmd{Addr: addr}
+}
+
 // NewDebugLevelCmd returns a new DebugLevelCmd which can be used to issue a
 // debuglevel JSON-RPC command.  This command is not a standard Bitcoin command.
 // It is an extension for btcd.
@@ -45,6 +56,7 @@ func init() {
 	flags := UsageFlag(0)
 
 	MustRegisterCmd("debuglevel", (*DebugLevelCmd)(nil), flags)
+	MustRegisterCmd("dropnode", (*DropNodeCmd)(nil), flags)
 	MustRegisterCmd("getbestblock", (*GetBestBlockCmd)(nil), flags)
 	MustRegisterCmd("getcurrentnet", (*GetCurrentNetCmd)(nil), flags)
 }
