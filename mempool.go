@@ -832,7 +832,7 @@ func minInt(a, b int) int {
 // of each of its input values multiplied by their age (# of confirmations).
 // Thus, the final formula for the priority is:
 // sum(inputValue * inputAge) / adjustedTxSize
-func calcPriority(tx *btcutil.Tx, serializedTxSize int, inputValueAge float64) float64 {
+func calcPriority(tx *btcutil.Tx, inputValueAge float64) float64 {
 	// In order to encourage spending multiple old unspent transaction
 	// outputs thereby reducing the total set, don't count the constant
 	// overhead for each input as well as enough bytes of the signature
@@ -859,6 +859,7 @@ func calcPriority(tx *btcutil.Tx, serializedTxSize int, inputValueAge float64) f
 		overhead += 41 + minInt(110, len(txIn.SignatureScript))
 	}
 
+	serializedTxSize := tx.MsgTx().SerializeSize()
 	if overhead >= serializedTxSize {
 		return 0.0
 	}
@@ -877,8 +878,7 @@ func (txD *TxDesc) StartingPriority(txStore blockchain.TxStore) float64 {
 
 	// Compute our starting priority caching the result.
 	inputAge := calcInputValueAge(txD, txStore, txD.Height)
-	txSize := txD.Tx.MsgTx().SerializeSize()
-	txD.startingPriority = calcPriority(txD.Tx, txSize, inputAge)
+	txD.startingPriority = calcPriority(txD.Tx, inputAge)
 
 	return txD.startingPriority
 }
@@ -887,8 +887,7 @@ func (txD *TxDesc) StartingPriority(txStore blockchain.TxStore) float64 {
 // underlying transaction relative to the next block height.
 func (txD *TxDesc) CurrentPriority(txStore blockchain.TxStore, nextBlockHeight int64) float64 {
 	inputAge := calcInputValueAge(txD, txStore, nextBlockHeight)
-	txSize := txD.Tx.MsgTx().SerializeSize()
-	return calcPriority(txD.Tx, txSize, inputAge)
+	return calcPriority(txD.Tx, inputAge)
 }
 
 // checkPoolDoubleSpend checks whether or not the passed transaction is
