@@ -12,10 +12,9 @@ interface. The functions are only exported while the tests are being run.
 package btcutil
 
 import (
-	"golang.org/x/crypto/ripemd160"
-
 	"github.com/btcsuite/btcd/btcec"
 	"github.com/btcsuite/btcutil/base58"
+	"github.com/btcsuite/golangcrypto/ripemd160"
 )
 
 // SetBlockBytes sets the internal serialized block byte buffer to the passed
