@@ -13,11 +13,10 @@ import (
 	"hash"
 	"math/big"
 
-	"golang.org/x/crypto/ripemd160"
-
 	"github.com/btcsuite/btcd/btcec"
 	"github.com/btcsuite/btcd/wire"
 	"github.com/btcsuite/fastsha256"
+	"github.com/btcsuite/golangcrypto/ripemd160"
 )
 
 // An opcode defines the information related to a txscript opcode.

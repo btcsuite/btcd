@@ -17,14 +17,13 @@ import (
 	"sync"
 	"time"
 
-	"golang.org/x/crypto/ripemd160"
-
 	"github.com/btcsuite/btcd/btcjson/v2/btcjson"
 	"github.com/btcsuite/btcd/database"
 	"github.com/btcsuite/btcd/txscript"
 	"github.com/btcsuite/btcd/wire"
 	"github.com/btcsuite/btcutil"
 	"github.com/btcsuite/fastsha256"
+	"github.com/btcsuite/golangcrypto/ripemd160"
 	"github.com/btcsuite/websocket"
 )
 

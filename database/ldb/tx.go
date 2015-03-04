@@ -12,10 +12,9 @@ import (
 	"github.com/btcsuite/btcd/database"
 	"github.com/btcsuite/btcd/wire"
 	"github.com/btcsuite/btcutil"
+	"github.com/btcsuite/golangcrypto/ripemd160"
 	"github.com/btcsuite/goleveldb/leveldb"
 	"github.com/btcsuite/goleveldb/leveldb/util"
-
-	"golang.org/x/crypto/ripemd160"
 )
 
 const (
