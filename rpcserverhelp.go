@@ -33,6 +33,12 @@ var helpDescsEnUS = map[string]string{
 	"addnode-addr":      "IP address and port of the peer to operate on",
 	"addnode-subcmd":    "'add' to add a persistent peer, 'remove' to remove a persistent peer, or 'onetry' to try a single connection to a peer",
 
+	// NodeCmd help.
+	"node--synopsis":     "Attempts to add or remove a peer.",
+	"node-subcmd":        "'disconnect' to remove all matching non-persistent peers, 'remove' to remove a persistent peer, or 'connect' to connect to a peer",
+	"node-target":        "Either the IP address and port of the peer to operate on, or a valid peer ID.",
+	"node-connectsubcmd": "'perm' to make the connected peer a permanent one, 'temp' to try a single connect to a peer",
+
 	// TransactionInput help.
 	"transactioninput-txid": "The hash of the input transaction",
 	"transactioninput-vout": "The specific output of the input transaction to redeem",
@@ -521,6 +527,7 @@ var rpcResultTypes = map[string][]interface{}{
 	"getrawtransaction":     []interface{}{(*string)(nil), (*btcjson.TxRawResult)(nil)},
 	"gettxout":              []interface{}{(*btcjson.GetTxOutResult)(nil)},
 	"getwork":               []interface{}{(*btcjson.GetWorkResult)(nil), (*bool)(nil)},
+	"node":                  nil,
 	"help":                  []interface{}{(*string)(nil), (*string)(nil)},
 	"ping":                  nil,
 	"searchrawtransactions": []interface{}{(*string)(nil), (*[]btcjson.TxRawResult)(nil)},

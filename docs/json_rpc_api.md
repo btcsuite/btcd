@@ -186,7 +186,7 @@ the method name for further details such as parameter and return information.
 |   |   |
 |---|---|
 |Method|addnode|
-|Parameters|1. peer (string, required) - ip address and port of the peer tooperate on<br />2. command (string, required) - `add` to add a persistent peer, `remove` to remove a persistent peer, or `onetry` to try a single connection to a peer|
+|Parameters|1. peer (string, required) - ip address and port of the peer to operate on<br />2. command (string, required) - `add` to add a persistent peer, `remove` to remove a persistent peer, or `onetry` to try a single connection to a peer|
 |Description|Attempts to add or remove a persistent peer.|
 |Returns|Nothing|
 [Return to Overview](#MethodOverview)<br />
@@ -553,6 +553,8 @@ The following is an overview of the RPC methods which are implemented by btcd, b
 |2|[getbestblock](#getbestblock)|Y|Get block height and hash of best block in the main chain.|None|
 |3|[getcurrentnet](#getcurrentnet)|Y|Get bitcoin network btcd is running on.|None|
 |4|[searchrawtransactions](#searchrawtransactions)|Y|Query for transactions related to a particular address.|None|
+|5|[node](#node)|N|Attempts to add or remove a peer. |None|
+
 
 <a name="ExtMethodDetails" />
 **6.2 Method Details**<br />
@@ -606,6 +608,18 @@ The following is an overview of the RPC methods which are implemented by btcd, b
 |Returns (verbose=0)|`[ (json array of strings)` <br/>&nbsp;&nbsp; `"serializedtx", ... hex-encoded bytes of the serialized transaction` <br/>`]` |
 |Returns (verbose=1)|`[ (array of json objects)` <br/> &nbsp;&nbsp; `{ (json object)`<br />&nbsp;&nbsp;`"hex": "data",  (string) hex-encoded transaction`<br />&nbsp;&nbsp;`"txid": "hash",  (string) the hash of the transaction`<br />&nbsp;&nbsp;`"version": n,  (numeric) the transaction version`<br />&nbsp;&nbsp;`"locktime": n,  (numeric) the transaction lock time`<br />&nbsp;&nbsp;`"vin": [  (array of json objects) the transaction inputs as json objects`<br />&nbsp;&nbsp;<font color="orange">For coinbase transactions:</font><br />&nbsp;&nbsp;&nbsp;&nbsp;`{ (json object)`<br />&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;`"coinbase": "data",  (string) the hex-dencoded bytes of the signature script`<br />&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;`"sequence": n,  (numeric) the script sequence number`<br />&nbsp;&nbsp;&nbsp;&nbsp;`}`<br />&nbsp;&nbsp;<font color="orange">For non-coinbase transactions:</font><br />&nbsp;&nbsp;&nbsp;&nbsp;`{ (json object)`<br />&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;`"txid": "hash", (string) the hash of the origin transaction`<br />&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;`"vout": n, (numeric) the index of the output being redeemed from the origin transaction`<br />&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;`"scriptSig": { (json object) the signature script used to redeem the origin transaction`<br />&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;`"asm": "asm", (string) disassembly of the script`<br />&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;`"hex": "data",  (string) hex-encoded bytes of the script`<br />&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;`}`<br />&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;`"sequence": n,  (numeric) the script sequence number`<br />&nbsp;&nbsp;&nbsp;&nbsp;`}, ...`<br />&nbsp;&nbsp;`]`<br />&nbsp;&nbsp;`"vout": [  (array of json objects) the transaction outputs as json objects`<br />&nbsp;&nbsp;&nbsp;&nbsp;`{ (json object)`<br />&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;`"value": n, (numeric) the value in BTC`<br />&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;`"n": n, (numeric) the index of this transaction output`<br />&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;`"scriptPubKey": { (json object) the public key script used to pay coins`<br />&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;`"asm": "asm",  (string) disassembly of the script`<br />&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;`"hex": "data", (string) hex-encoded bytes of the script`<br />&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;`"reqSigs": n,  (numeric) the number of required signatures`<br />&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;`"type": "scripttype" (string) the type of the script (e.g. 'pubkeyhash')`<br />&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;`"addresses": [ (json array of string) the bitcoin addresses associated with this output`<br />&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;`"address",  (string) the bitcoin address`<br />&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;`...`<br />&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;`]`<br />&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;`}`<br />&nbsp;&nbsp;&nbsp;&nbsp;`}, ...`<br /> &nbsp;&nbsp;&nbsp;`]`<br />&nbsp;&nbsp; `"blockhash":"hash" Hash of the block the transaction is part of.` <br /> &nbsp;&nbsp; `"confirmations":n,  Number of numeric confirmations of block.` <br /> &nbsp;&nbsp;&nbsp;`"time":t, Transaction time in seconds since the epoch.` <br /> &nbsp;&nbsp;&nbsp;`"blocktime":t, Block time in seconds since the epoch.`<br />`},...`<br/> `]`|
 [Return to Overview](#ExtMethodOverview)<br />
+
+***
+
+<a name="node"/>
+
+|   |   |
+|---|---|
+|Method|node|
+|Parameters|1. command (string, required) - `connect` to add a peer (defaults to temporary), `remove` to remove a persistent peer, or `disconnect` to remove all matching non-persistent peers <br /> 2. peer (string, required) - ip address and port, or ID of the peer to operate on<br /> 3. connection type (string, optional) - `perm` indicates the peer should be added as a permanent peer, `temp` indicates a connection should only be attempted once. |
+|Description|Attempts to add or remove a peer.|
+|Returns|Nothing|
+[Return to Overview](#MethodOverview)<br />
 
 ***
 

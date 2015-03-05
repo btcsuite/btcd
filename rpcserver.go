@@ -155,6 +155,7 @@ var rpcHandlersBeforeInit = map[string]commandHandler{
 	"gettxout":              handleGetTxOut,
 	"getwork":               handleGetWork,
 	"help":                  handleHelp,
+	"node":                  handleNode,
 	"ping":                  handlePing,
 	"searchrawtransactions": handleSearchRawTransactions,
 	"sendrawtransaction":    handleSendRawTransaction,
@@ -369,15 +370,123 @@ func handleAddNode(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (in
 	case "onetry":
 		err = s.server.AddAddr(addr, false)
 	default:
-		err = errors.New("invalid subcommand for addnode")
+		return nil, &btcjson.RPCError{
+			Code:    btcjson.ErrRPCInvalidParameter,
+			Message: "invalid subcommand for addnode",
+		}
 	}
 
 	if err != nil {
-		return nil, internalRPCError(err.Error(), "")
+		return nil, &btcjson.RPCError{
+			Code:    btcjson.ErrRPCInvalidParameter,
+			Message: err.Error(),
+		}
 	}
 
 	// no data returned unless an error.
 	return nil, nil
+}
+
+// handleNode handles node commands.
+func handleNode(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (interface{}, error) {
+	c := cmd.(*btcjson.NodeCmd)
+
+	var addr string
+	var nodeId uint64
+	var errN, err error
+	switch c.SubCmd {
+	case "disconnect":
+		// If we have a valid uint disconnect by node id. Otherwise,
+		// attempt to disconnect by address, returning an error if a
+		// valid IP address is not supplied.
+		if nodeId, errN = strconv.ParseUint(c.Target, 10, 32); errN == nil {
+			err = s.server.DisconnectNodeById(int32(nodeId))
+		} else {
+			if _, _, errP := net.SplitHostPort(c.Target); errP == nil || net.ParseIP(c.Target) != nil {
+				addr = normalizeAddress(c.Target, activeNetParams.DefaultPort)
+				err = s.server.DisconnectNodeByAddr(addr)
+			} else {
+				return nil, &btcjson.RPCError{
+					Code:    btcjson.ErrRPCInvalidParameter,
+					Message: "invalid address or node ID",
+				}
+			}
+		}
+		if err != nil && peerExists(s.server.PeerInfo(), addr, int32(nodeId)) {
+			return nil, &btcjson.RPCError{
+				Code:    btcjson.ErrRPCMisc,
+				Message: "can't disconnect a permanent peer, use remove",
+			}
+		}
+	case "remove":
+		// If we have a valid uint disconnect by node id. Otherwise,
+		// attempt to disconnect by address, returning an error if a
+		// valid IP address is not supplied.
+		if nodeId, errN = strconv.ParseUint(c.Target, 10, 32); errN == nil {
+			err = s.server.RemoveNodeById(int32(nodeId))
+		} else {
+			if _, _, errP := net.SplitHostPort(c.Target); errP == nil || net.ParseIP(c.Target) != nil {
+				addr = normalizeAddress(c.Target, activeNetParams.DefaultPort)
+				err = s.server.RemoveNodeByAddr(addr)
+			} else {
+				return nil, &btcjson.RPCError{
+					Code:    btcjson.ErrRPCInvalidParameter,
+					Message: "invalid address or node ID",
+				}
+			}
+		}
+		if err != nil && peerExists(s.server.PeerInfo(), addr, int32(nodeId)) {
+			return nil, &btcjson.RPCError{
+				Code:    btcjson.ErrRPCMisc,
+				Message: "can't remove a temporary peer, use disconnect",
+			}
+		}
+	case "connect":
+		addr = normalizeAddress(c.Target, activeNetParams.DefaultPort)
+
+		// Default to temporary connections.
+		subCmd := "temp"
+		if c.ConnectSubCmd != nil {
+			subCmd = *c.ConnectSubCmd
+		}
+
+		switch subCmd {
+		case "perm", "temp":
+			err = s.server.ConnectNode(addr, subCmd == "perm")
+		default:
+			return nil, &btcjson.RPCError{
+				Code:    btcjson.ErrRPCInvalidParameter,
+				Message: "invalid subcommand for node connect",
+			}
+		}
+	default:
+		return nil, &btcjson.RPCError{
+			Code:    btcjson.ErrRPCInvalidParameter,
+			Message: "invalid subcommand for node",
+		}
+	}
+
+	if err != nil {
+		return nil, &btcjson.RPCError{
+			Code:    btcjson.ErrRPCInvalidParameter,
+			Message: err.Error(),
+		}
+	}
+
+	// no data returned unless an error.
+	return nil, nil
+}
+
+// peerExists determines if a certain peer is currently connected given
+// information about all currently connected peers. Peer existence is
+// determined using either a target address or node id.
+func peerExists(peerInfos []*btcjson.GetPeerInfoResult, addr string, nodeId int32) bool {
+	for _, peerInfo := range peerInfos {
+		if peerInfo.ID == nodeId || peerInfo.Addr == addr {
+			return true
+		}
+	}
+	return false
 }
 
 // messageToHex serializes a message to the wire protocol encoding using the

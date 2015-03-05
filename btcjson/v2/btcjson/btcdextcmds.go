@@ -7,6 +7,42 @@
 
 package btcjson
 
+// NodeSubCmd defines the type used in the addnode JSON-RPC command for the
+// sub command field.
+type NodeSubCmd string
+
+const (
+	// NConnect indicates the specified host that should be connected to.
+	NConnect NodeSubCmd = "connect"
+
+	// NRemove indicates the specified peer that should be removed as a
+	// persistent peer.
+	NRemove NodeSubCmd = "remove"
+
+	// NDisconnect indicates the specified peer should be disonnected.
+	NDisconnect NodeSubCmd = "disconnect"
+)
+
+// NodeCmd defines the dropnode JSON-RPC command.
+type NodeCmd struct {
+	SubCmd        NodeSubCmd `jsonrpcusage:"\"connect|remove|disconnect\""`
+	Target        string
+	ConnectSubCmd *string `jsonrpcusage:"\"perm|temp\""`
+}
+
+// NewNodeCmd returns a new instance which can be used to issue a `node`
+// JSON-RPC command.
+//
+// The parameters which are pointers indicate they are optional.  Passing nil
+// for optional parameters will use the default value.
+func NewNodeCmd(subCmd NodeSubCmd, target string, connectSubCmd *string) *NodeCmd {
+	return &NodeCmd{
+		SubCmd:        subCmd,
+		Target:        target,
+		ConnectSubCmd: connectSubCmd,
+	}
+}
+
 // DebugLevelCmd defines the debuglevel JSON-RPC command.  This command is not a
 // standard Bitcoin command.  It is an extension for btcd.
 type DebugLevelCmd struct {
@@ -45,6 +81,7 @@ func init() {
 	flags := UsageFlag(0)
 
 	MustRegisterCmd("debuglevel", (*DebugLevelCmd)(nil), flags)
+	MustRegisterCmd("node", (*NodeCmd)(nil), flags)
 	MustRegisterCmd("getbestblock", (*GetBestBlockCmd)(nil), flags)
 	MustRegisterCmd("getcurrentnet", (*GetCurrentNetCmd)(nil), flags)
 }

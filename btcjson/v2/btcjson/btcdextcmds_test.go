@@ -43,6 +43,64 @@ func TestBtcdExtCmds(t *testing.T) {
 			},
 		},
 		{
+			name: "node",
+			newCmd: func() (interface{}, error) {
+				return btcjson.NewCmd("node", btcjson.NRemove, "1.1.1.1")
+			},
+			staticCmd: func() interface{} {
+				return btcjson.NewNodeCmd("remove", "1.1.1.1", nil)
+			},
+			marshalled: `{"jsonrpc":"1.0","method":"node","params":["remove","1.1.1.1"],"id":1}`,
+			unmarshalled: &btcjson.NodeCmd{
+				SubCmd: btcjson.NRemove,
+				Target: "1.1.1.1",
+			},
+		},
+		{
+			name: "node",
+			newCmd: func() (interface{}, error) {
+				return btcjson.NewCmd("node", btcjson.NDisconnect, "1.1.1.1")
+			},
+			staticCmd: func() interface{} {
+				return btcjson.NewNodeCmd("disconnect", "1.1.1.1", nil)
+			},
+			marshalled: `{"jsonrpc":"1.0","method":"node","params":["disconnect","1.1.1.1"],"id":1}`,
+			unmarshalled: &btcjson.NodeCmd{
+				SubCmd: btcjson.NDisconnect,
+				Target: "1.1.1.1",
+			},
+		},
+		{
+			name: "node",
+			newCmd: func() (interface{}, error) {
+				return btcjson.NewCmd("node", btcjson.NConnect, "1.1.1.1", "perm")
+			},
+			staticCmd: func() interface{} {
+				return btcjson.NewNodeCmd("connect", "1.1.1.1", btcjson.String("perm"))
+			},
+			marshalled: `{"jsonrpc":"1.0","method":"node","params":["connect","1.1.1.1","perm"],"id":1}`,
+			unmarshalled: &btcjson.NodeCmd{
+				SubCmd:        btcjson.NConnect,
+				Target:        "1.1.1.1",
+				ConnectSubCmd: btcjson.String("perm"),
+			},
+		},
+		{
+			name: "node",
+			newCmd: func() (interface{}, error) {
+				return btcjson.NewCmd("node", btcjson.NConnect, "1.1.1.1", "temp")
+			},
+			staticCmd: func() interface{} {
+				return btcjson.NewNodeCmd("connect", "1.1.1.1", btcjson.String("temp"))
+			},
+			marshalled: `{"jsonrpc":"1.0","method":"node","params":["connect","1.1.1.1","temp"],"id":1}`,
+			unmarshalled: &btcjson.NodeCmd{
+				SubCmd:        btcjson.NConnect,
+				Target:        "1.1.1.1",
+				ConnectSubCmd: btcjson.String("temp"),
+			},
+		},
+		{
 			name: "getbestblock",
 			newCmd: func() (interface{}, error) {
 				return btcjson.NewCmd("getbestblock")

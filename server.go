@@ -411,12 +411,28 @@ type addNodeMsg struct {
 }
 
 type delNodeMsg struct {
-	addr  string
+	cmp   func(*peer) bool
 	reply chan error
 }
 
 type getAddedNodesMsg struct {
 	reply chan []*peer
+}
+
+type disconnectNodeMsg struct {
+	cmp   func(*peer) bool
+	reply chan error
+}
+
+type connectNodeMsg struct {
+	addr      string
+	permanent bool
+	reply     chan error
+}
+
+type removeNodeMsg struct {
+	cmp   func(*peer) bool
+	reply chan error
 }
 
 // handleQuery is the central handler for all queries and commands from other
@@ -475,16 +491,20 @@ func (s *server) handleQuery(querymsg interface{}, state *peerState) {
 		msg.reply <- infos
 
 	case addNodeMsg:
+	case connectNodeMsg:
 		// XXX(oga) duplicate oneshots?
-		if msg.permanent {
-			for e := state.persistentPeers.Front(); e != nil; e = e.Next() {
-				peer := e.Value.(*peer)
-				if peer.addr == msg.addr {
+		for e := state.persistentPeers.Front(); e != nil; e = e.Next() {
+			peer := e.Value.(*peer)
+			if peer.addr == msg.addr {
+				if msg.permanent {
 					msg.reply <- errors.New("peer already connected")
-					return
+				} else {
+					msg.reply <- errors.New("peer exists as a permanent peer")
 				}
+				return
 			}
 		}
+
 		// TODO(oga) if too many, nuke a non-perm peer.
 		if s.handleAddPeerMsg(state,
 			newOutboundPeer(s, msg.addr, msg.permanent, 0)) {
@@ -494,21 +514,12 @@ func (s *server) handleQuery(querymsg interface{}, state *peerState) {
 		}
 
 	case delNodeMsg:
-		found := false
-		for e := state.persistentPeers.Front(); e != nil; e = e.Next() {
-			peer := e.Value.(*peer)
-			if peer.addr == msg.addr {
-				// Keep group counts ok since we remove from
-				// the list now.
-				state.outboundGroups[addrmgr.GroupKey(peer.na)]--
-				// This is ok because we are not continuing
-				// to iterate so won't corrupt the loop.
-				state.persistentPeers.Remove(e)
-				peer.Disconnect()
-				found = true
-				break
-			}
-		}
+	case removeNodeMsg:
+		found := disconnectPeer(state.persistentPeers, msg.cmp, func(p *peer) {
+			// Keep group counts ok since we remove from
+			// the list now.
+			state.outboundGroups[addrmgr.GroupKey(p.na)]--
+		})
 
 		if found {
 			msg.reply <- nil
@@ -525,7 +536,61 @@ func (s *server) handleQuery(querymsg interface{}, state *peerState) {
 			peers = append(peers, peer)
 		}
 		msg.reply <- peers
+	case disconnectNodeMsg:
+		// Check inbound peers. We pass a nil callback since we don't
+		// require any additional actions on disconnect for inbound peers.
+		found := disconnectPeer(state.peers, msg.cmp, nil)
+		if found {
+			msg.reply <- nil
+			return
+		}
+
+		// Check outbound peers.
+		found = disconnectPeer(state.outboundPeers, msg.cmp, func(p *peer) {
+			// Keep group counts ok since we remove from
+			// the list now.
+			state.outboundGroups[addrmgr.GroupKey(p.na)]--
+		})
+		if found {
+			// If there are multiple outbound connections to the same
+			// ip:port, continue disconnecting them all until no such
+			// peers are found.
+			for found {
+				found = disconnectPeer(state.outboundPeers, msg.cmp, func(p *peer) {
+					state.outboundGroups[addrmgr.GroupKey(p.na)]--
+				})
+			}
+			msg.reply <- nil
+			return
+		}
+
+		msg.reply <- errors.New("peer not found")
 	}
+}
+
+// disconnectPeer attempts to drop the connection of a tageted peer in the
+// passed peer list. Targets are identified via usage of the passed
+// `compareFunc`, which should return `true` if the passed peer is the target
+// peer. This function returns true on success and false if the peer is unable
+// to be located. If the peer is found, and the passed callback: `whenFound'
+// isn't nil, we call it with the peer as the argument before it is removed
+// from the peerList, and is disconnected from the server.
+func disconnectPeer(peerList *list.List, compareFunc func(*peer) bool, whenFound func(*peer)) bool {
+	for e := peerList.Front(); e != nil; e = e.Next() {
+		peer := e.Value.(*peer)
+		if compareFunc(peer) {
+			if whenFound != nil {
+				whenFound(peer)
+			}
+
+			// This is ok because we are not continuing
+			// to iterate so won't corrupt the loop.
+			peerList.Remove(e)
+			peer.Disconnect()
+			return true
+		}
+	}
+	return false
 }
 
 // listenHandler is the main listener which accepts incoming connections for the
@@ -831,7 +896,75 @@ func (s *server) AddAddr(addr string, permanent bool) error {
 func (s *server) RemoveAddr(addr string) error {
 	replyChan := make(chan error)
 
-	s.query <- delNodeMsg{addr: addr, reply: replyChan}
+	s.query <- delNodeMsg{
+		cmp:   func(p *peer) bool { return p.addr == addr },
+		reply: replyChan,
+	}
+
+	return <-replyChan
+}
+
+// DisconnectNodeByAddr disconnects a peer by target address. Both outbound and
+// inbound nodes will be searched for the target node. An error message will
+// be returned if the peer was not found.
+func (s *server) DisconnectNodeByAddr(addr string) error {
+	replyChan := make(chan error)
+
+	s.query <- disconnectNodeMsg{
+		cmp:   func(p *peer) bool { return p.addr == addr },
+		reply: replyChan,
+	}
+
+	return <-replyChan
+}
+
+// DisconnectNodeByID disconnects a peer by target node id. Both outbound and
+// inbound nodes will be searched for the target node. An error message will be
+// returned if the peer was not found.
+func (s *server) DisconnectNodeById(id int32) error {
+	replyChan := make(chan error)
+
+	s.query <- disconnectNodeMsg{
+		cmp:   func(p *peer) bool { return p.id == id },
+		reply: replyChan,
+	}
+
+	return <-replyChan
+}
+
+// RemoveNodeByAddr removes a peer from the list of persistent peers if
+// present. An error will be returned if the peer was not found.
+func (s *server) RemoveNodeByAddr(addr string) error {
+	replyChan := make(chan error)
+
+	s.query <- removeNodeMsg{
+		cmp:   func(p *peer) bool { return p.addr == addr },
+		reply: replyChan,
+	}
+
+	return <-replyChan
+}
+
+// RemoveNodeById removes a peer by node ID from the list of persistent peers
+// if present. An error will be returned if the peer was not found.
+func (s *server) RemoveNodeById(id int32) error {
+	replyChan := make(chan error)
+
+	s.query <- removeNodeMsg{
+		cmp:   func(p *peer) bool { return p.id == id },
+		reply: replyChan,
+	}
+
+	return <-replyChan
+}
+
+// ConnectNode adds `addr' as a new outbound peer. If permanent is true then the
+// peer will be persistent and reconnect if the connection is lost.
+// It is an error to call this with an already existing peer.
+func (s *server) ConnectNode(addr string, permanent bool) error {
+	replyChan := make(chan error)
+
+	s.query <- connectNodeMsg{addr: addr, permanent: permanent, reply: replyChan}
 
 	return <-replyChan
 }
