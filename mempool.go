@@ -391,6 +391,7 @@ func calcMinRequiredTxRelayFee(serializedSize int64) int64 {
 
 // removeOrphan is the internal function which implements the public
 // RemoveOrphan.  See the comment for RemoveOrphan for more details.
+//
 // This function MUST be called with the mempool lock held (for writes).
 func (mp *txMemPool) removeOrphan(txHash *wire.ShaHash) {
 	// Nothing to do if passed tx is not an orphan.
@@ -424,6 +425,7 @@ func (mp *txMemPool) removeOrphan(txHash *wire.ShaHash) {
 
 // RemoveOrphan removes the passed orphan transaction from the orphan pool and
 // previous orphan index.
+//
 // This function is safe for concurrent access.
 func (mp *txMemPool) RemoveOrphan(txHash *wire.ShaHash) {
 	mp.Lock()
@@ -1261,11 +1263,8 @@ func (mp *txMemPool) MaybeAcceptTransaction(tx *btcutil.Tx, isNew, rateLimit boo
 	return mp.maybeAcceptTransaction(tx, isNew, rateLimit)
 }
 
-// processOrphans determines if there are any orphans which depend on the passed
-// transaction hash (it is possible that they are no longer orphans) and
-// potentially accepts them to the memory pool.  It repeats the process for the
-// newly accepted transactions (to detect further orphans which may no longer be
-// orphans) until there are no more.
+// processOrphans is the internal function which implements the public
+// ProcessOrphans.  See the comment for ProcessOrphans for more details.
 //
 // This function MUST be called with the mempool lock held (for writes).
 func (mp *txMemPool) processOrphans(hash *wire.ShaHash) error {
@@ -1348,6 +1347,20 @@ func (mp *txMemPool) processOrphans(hash *wire.ShaHash) error {
 	}
 
 	return nil
+}
+
+// ProcessOrphans determines if there are any orphans which depend on the passed
+// transaction hash (it is possible that they are no longer orphans) and
+// potentially accepts them to the memory pool.  It repeats the process for the
+// newly accepted transactions (to detect further orphans which may no longer be
+// orphans) until there are no more.
+//
+// This function is safe for concurrent access.
+func (mp *txMemPool) ProcessOrphans(hash *wire.ShaHash) error {
+	mp.Lock()
+	defer mp.Unlock()
+
+	return mp.processOrphans(hash)
 }
 
 // ProcessTransaction is the main workhorse for handling insertion of new
