@@ -389,15 +389,17 @@ func TestTxSerialize(t *testing.T) {
 	}
 
 	tests := []struct {
-		in  *wire.MsgTx // Message to encode
-		out *wire.MsgTx // Expected decoded message
-		buf []byte      // Serialized data
+		in           *wire.MsgTx // Message to encode
+		out          *wire.MsgTx // Expected decoded message
+		buf          []byte      // Serialized data
+		pkScriptLocs []int       // Expected output script locations
 	}{
 		// No transactions.
 		{
 			noTx,
 			noTx,
 			noTxEncoded,
+			nil,
 		},
 
 		// Multiple transactions.
@@ -405,6 +407,7 @@ func TestTxSerialize(t *testing.T) {
 			multiTx,
 			multiTx,
 			multiTxEncoded,
+			multiTxPkScriptLocs,
 		},
 	}
 
@@ -435,6 +438,25 @@ func TestTxSerialize(t *testing.T) {
 			t.Errorf("Deserialize #%d\n got: %s want: %s", i,
 				spew.Sdump(&tx), spew.Sdump(test.out))
 			continue
+		}
+
+		// Ensure the public key script locations are accurate.
+		pkScriptLocs := test.in.PkScriptLocs()
+		if !reflect.DeepEqual(pkScriptLocs, test.pkScriptLocs) {
+			t.Errorf("PkScriptLocs #%d\n got: %s want: %s", i,
+				spew.Sdump(pkScriptLocs),
+				spew.Sdump(test.pkScriptLocs))
+			continue
+		}
+		for j, loc := range pkScriptLocs {
+			wantPkScript := test.in.TxOut[j].PkScript
+			gotPkScript := test.buf[loc : loc+len(wantPkScript)]
+			if !bytes.Equal(gotPkScript, wantPkScript) {
+				t.Errorf("PkScriptLocs #%d:%d\n unexpected "+
+					"script got: %s want: %s", i, j,
+					spew.Sdump(gotPkScript),
+					spew.Sdump(wantPkScript))
+			}
 		}
 	}
 }
@@ -611,7 +633,7 @@ func TestTxSerializeSize(t *testing.T) {
 		{noTx, 10},
 
 		// Transcaction with an input and an output.
-		{multiTx, 134},
+		{multiTx, 210},
 	}
 
 	t.Logf("Running %d tests", len(tests))
@@ -657,6 +679,22 @@ var multiTx = &wire.MsgTx{
 				0xac, // OP_CHECKSIG
 			},
 		},
+		{
+			Value: 0x5f5e100,
+			PkScript: []byte{
+				0x41, // OP_DATA_65
+				0x04, 0xd6, 0x4b, 0xdf, 0xd0, 0x9e, 0xb1, 0xc5,
+				0xfe, 0x29, 0x5a, 0xbd, 0xeb, 0x1d, 0xca, 0x42,
+				0x81, 0xbe, 0x98, 0x8e, 0x2d, 0xa0, 0xb6, 0xc1,
+				0xc6, 0xa5, 0x9d, 0xc2, 0x26, 0xc2, 0x86, 0x24,
+				0xe1, 0x81, 0x75, 0xe8, 0x51, 0xc9, 0x6b, 0x97,
+				0x3d, 0x81, 0xb0, 0x1c, 0xc3, 0x1f, 0x04, 0x78,
+				0x34, 0xbc, 0x06, 0xd6, 0xd6, 0xed, 0xf6, 0x20,
+				0xd1, 0x84, 0x24, 0x1a, 0x6a, 0xed, 0x8b, 0x63,
+				0xa6, // 65-byte signature
+				0xac, // OP_CHECKSIG
+			},
+		},
 	},
 	LockTime: 0,
 }
@@ -674,8 +712,21 @@ var multiTxEncoded = []byte{
 	0x07,                                     // Varint for length of signature script
 	0x04, 0x31, 0xdc, 0x00, 0x1b, 0x01, 0x62, // Signature script
 	0xff, 0xff, 0xff, 0xff, // Sequence
-	0x01,                                           // Varint for number of output transactions
+	0x02,                                           // Varint for number of output transactions
 	0x00, 0xf2, 0x05, 0x2a, 0x01, 0x00, 0x00, 0x00, // Transaction amount
+	0x43, // Varint for length of pk script
+	0x41, // OP_DATA_65
+	0x04, 0xd6, 0x4b, 0xdf, 0xd0, 0x9e, 0xb1, 0xc5,
+	0xfe, 0x29, 0x5a, 0xbd, 0xeb, 0x1d, 0xca, 0x42,
+	0x81, 0xbe, 0x98, 0x8e, 0x2d, 0xa0, 0xb6, 0xc1,
+	0xc6, 0xa5, 0x9d, 0xc2, 0x26, 0xc2, 0x86, 0x24,
+	0xe1, 0x81, 0x75, 0xe8, 0x51, 0xc9, 0x6b, 0x97,
+	0x3d, 0x81, 0xb0, 0x1c, 0xc3, 0x1f, 0x04, 0x78,
+	0x34, 0xbc, 0x06, 0xd6, 0xd6, 0xed, 0xf6, 0x20,
+	0xd1, 0x84, 0x24, 0x1a, 0x6a, 0xed, 0x8b, 0x63,
+	0xa6,                                           // 65-byte signature
+	0xac,                                           // OP_CHECKSIG
+	0x00, 0xe1, 0xf5, 0x05, 0x00, 0x00, 0x00, 0x00, // Transaction amount
 	0x43, // Varint for length of pk script
 	0x41, // OP_DATA_65
 	0x04, 0xd6, 0x4b, 0xdf, 0xd0, 0x9e, 0xb1, 0xc5,
@@ -690,3 +741,7 @@ var multiTxEncoded = []byte{
 	0xac,                   // OP_CHECKSIG
 	0x00, 0x00, 0x00, 0x00, // Lock time
 }
+
+// multiTxPkScriptLocs is the location information for the public key scripts
+// located in multiTx.
+var multiTxPkScriptLocs = []int{63, 139}

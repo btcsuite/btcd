@@ -430,6 +430,43 @@ func (msg *MsgTx) MaxPayloadLength(pver uint32) uint32 {
 	return MaxBlockPayload
 }
 
+// PkScriptLocs returns a slice containing the start of each public key script
+// within the raw serialized transaction.  The caller can easily obtain the
+// length of each script by using len on the script available via the
+// appropriate transaction output entry.
+func (msg *MsgTx) PkScriptLocs() []int {
+	numTxOut := len(msg.TxOut)
+	if numTxOut == 0 {
+		return nil
+	}
+
+	// The starting offset in the serialized transaction of the first
+	// transaction output is:
+	//
+	// Version 4 bytes + serialized varint size for the number of
+	// transaction inputs and outputs + serialized size of each transaction
+	// input.
+	n := 4 + VarIntSerializeSize(uint64(len(msg.TxIn))) +
+		VarIntSerializeSize(uint64(numTxOut))
+	for _, txIn := range msg.TxIn {
+		n += txIn.SerializeSize()
+	}
+
+	// Calculate and set the appropriate offset for each public key script.
+	pkScriptLocs := make([]int, numTxOut)
+	for i, txOut := range msg.TxOut {
+		// The offset of the script in the transaction output is:
+		//
+		// Value 8 bytes + serialized varint size for the length of
+		// PkScript.
+		n += 8 + VarIntSerializeSize(uint64(len(txOut.PkScript)))
+		pkScriptLocs[i] = n
+		n += len(txOut.PkScript)
+	}
+
+	return pkScriptLocs
+}
+
 // NewMsgTx returns a new bitcoin tx message that conforms to the Message
 // interface.  The return instance has a default version of TxVersion and there
 // are no transaction inputs or outputs.  Also, the lock time is set to zero

@@ -108,8 +108,9 @@ func (msg *MsgBlock) Deserialize(r io.Reader) error {
 }
 
 // DeserializeTxLoc decodes r in the same manner Deserialize does, but it takes
-// a byte buffer instead of a generic reader and returns a slice containing the start and length of
-// each transaction within the raw data that is being deserialized.
+// a byte buffer instead of a generic reader and returns a slice containing the
+// start and length of each transaction within the raw data that is being
+// deserialized.
 func (msg *MsgBlock) DeserializeTxLoc(r *bytes.Buffer) ([]TxLoc, error) {
 	fullLen := r.Len()
 
