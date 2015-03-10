@@ -1,4 +1,4 @@
-// Copyright (c) 2013-2014 Conformal Systems LLC.
+// Copyright (c) 2013-2015 Conformal Systems LLC.
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -89,14 +89,15 @@ func isNullOutpoint(outpoint *wire.OutPoint) bool {
 	return false
 }
 
-// IsCoinBase determines whether or not a transaction is a coinbase.  A coinbase
-// is a special transaction created by miners that has no inputs.  This is
-// represented in the block chain by a transaction with a single input that has
-// a previous output transaction index set to the maximum value along with a
+// IsCoinBaseTx determines whether or not a transaction is a coinbase.  A
+// coinbase is a special transaction created by miners that has no inputs.  This
+// is represented in the block chain by a transaction with a single input that
+// has a previous output transaction index set to the maximum value along with a
 // zero hash.
-func IsCoinBase(tx *btcutil.Tx) bool {
-	msgTx := tx.MsgTx()
-
+//
+// This function only differs from IsCoinBase in that it works with a raw wire
+// transaction as opposed to a higher level util transaction.
+func IsCoinBaseTx(msgTx *wire.MsgTx) bool {
 	// A coin base must only have one transaction input.
 	if len(msgTx.TxIn) != 1 {
 		return false
@@ -104,12 +105,24 @@ func IsCoinBase(tx *btcutil.Tx) bool {
 
 	// The previous output of a coin base must have a max value index and
 	// a zero hash.
-	prevOut := msgTx.TxIn[0].PreviousOutPoint
+	prevOut := &msgTx.TxIn[0].PreviousOutPoint
 	if prevOut.Index != math.MaxUint32 || !prevOut.Hash.IsEqual(zeroHash) {
 		return false
 	}
 
 	return true
+}
+
+// IsCoinBase determines whether or not a transaction is a coinbase.  A coinbase
+// is a special transaction created by miners that has no inputs.  This is
+// represented in the block chain by a transaction with a single input that has
+// a previous output transaction index set to the maximum value along with a
+// zero hash.
+//
+// This function only differs from IsCoinBaseTx in that it works with a higher
+// level util transaction as opposed to a raw wire transaction.
+func IsCoinBase(tx *btcutil.Tx) bool {
+	return IsCoinBaseTx(tx.MsgTx())
 }
 
 // IsFinalizedTransaction determines whether or not a transaction is finalized.
