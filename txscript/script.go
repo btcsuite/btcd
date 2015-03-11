@@ -9,6 +9,7 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"math/big"
 	"time"
 
 	"github.com/btcsuite/btcd/btcec"
@@ -123,6 +124,11 @@ var (
 	// is over the limit.
 	ErrStackOverflow = errors.New("Stacks overflowed")
 
+	// ErrStackInvalidLowSSignature is returned when the ScriptVerifyLowS
+	// flag is set and the script contains any signatures whose S values
+	// are higher than the half order.
+	ErrStackInvalidLowSSignature = errors.New("invalid low s signature")
+
 	// ErrStackInvalidPubKey is returned when the ScriptVerifyScriptEncoding
 	// flag is set and the script contains invalid pubkeys.
 	ErrStackInvalidPubKey = errors.New("invalid strict pubkey")
@@ -163,6 +169,9 @@ var ErrUnsupportedAddress = errors.New("unsupported address type")
 // blockchain.  To be used to determine if BIP0016 should be called for or not.
 // This timestamp corresponds to Sun Apr 1 00:00:00 UTC 2012.
 var Bip16Activation = time.Unix(1333238400, 0)
+
+// curve halforder, used to tame ECDSA malleability (see BIP0062)
+var halfOrder = new(big.Int).Rsh(btcec.S256().N, 1)
 
 // SigHashType represents hash type bits at the end of a signature.
 type SigHashType byte
@@ -232,7 +241,8 @@ type Script struct {
 	discourageUpgradableNops bool     // NOP1 to NOP10 are reserved for future soft-fork upgrades
 	verifyStrictEncoding     bool     // verify strict encoding of signatures
 	verifyCleanStack         bool     // verify stack is clean after script evaluation
-	verifyDERSignatures      bool     // verify signatures compily with the DER
+	verifyDERSignatures      bool     // verify signatures comply with the DER format
+	verifyLowS               bool     // verify signatures comply with the DER format and have an S value <= halforder
 	savedFirstStack          [][]byte // stack from first script for bip16 scripts
 }
 
@@ -388,7 +398,7 @@ func (s *Script) checkPubKeyEncoding(pubKey []byte) error {
 // checkSignatureEncoding returns whether or not the passed signature adheres to
 // the strict encoding requirements if enabled.
 func (s *Script) checkSignatureEncoding(sig []byte) error {
-	if !s.verifyStrictEncoding && !s.verifyDERSignatures {
+	if !s.verifyDERSignatures && !s.verifyLowS && !s.verifyStrictEncoding {
 		return nil
 	}
 
@@ -468,6 +478,14 @@ func (s *Script) checkSignatureEncoding(sig []byte) error {
 	// otherwise be interpreted as a negative number.
 	if sLen > 1 && sig[rLen+6] == 0x00 && sig[rLen+7]&0x80 == 0 {
 		return fmt.Errorf("malformed signature: invalid S value")
+	}
+
+	// Verify the S value is <= halforder.
+	if s.verifyLowS {
+		sValue := new(big.Int).SetBytes(sig[rLen+6 : rLen+6+sLen])
+		if sValue.Cmp(halfOrder) > 0 {
+			return ErrStackInvalidLowSSignature
+		}
 	}
 
 	return nil
@@ -644,6 +662,11 @@ const (
 	// to compily with the DER format.
 	ScriptVerifyDERSignatures
 
+	// ScriptVerifyLowS defines that signtures are required to comply with
+	// the DER format and whose S value is <= order / 2.  This is rule 5
+	// of BIP0062.
+	ScriptVerifyLowS
+
 	// ScriptVerifyMinimalData defines that signatures must use the smallest
 	// push operator. This is both rules 3 and 4 of BIP0062.
 	ScriptVerifyMinimalData
@@ -736,6 +759,9 @@ func NewScript(scriptSig []byte, scriptPubKey []byte, txidx int, tx *wire.MsgTx,
 			return nil, ErrInvalidFlags
 		}
 		m.verifyCleanStack = true
+	}
+	if flags&ScriptVerifyLowS == ScriptVerifyLowS {
+		m.verifyLowS = true
 	}
 
 	m.tx = *tx
