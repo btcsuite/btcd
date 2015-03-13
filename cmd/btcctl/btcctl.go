@@ -1,9 +1,11 @@
 package main
 
 import (
+	"bufio"
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -72,8 +74,31 @@ func main() {
 
 	// Convert remaining command line args to a slice of interface values
 	// to be passed along as parameters to new command creation function.
+	//
+	// Since some commands, such as submitblock, can involve data which is
+	// too large for the Operating System to allow as a normal command line
+	// parameter, support using '-' as an argument to allow the argument
+	// to be read from a stdin pipe.
+	bio := bufio.NewReader(os.Stdin)
 	params := make([]interface{}, 0, len(args[1:]))
 	for _, arg := range args[1:] {
+		if arg == "-" {
+			param, err := bio.ReadString('\n')
+			if err != nil && err != io.EOF {
+				fmt.Fprintf(os.Stderr, "Failed to read data "+
+					"from stdin: %v\n", err)
+				os.Exit(1)
+			}
+			if err == io.EOF && len(param) == 0 {
+				fmt.Fprintln(os.Stderr, "Not enough lines "+
+					"provided on stdin")
+				os.Exit(1)
+			}
+			param = strings.TrimRight(param, "\r\n")
+			params = append(params, param)
+			continue
+		}
+
 		params = append(params, arg)
 	}
 
