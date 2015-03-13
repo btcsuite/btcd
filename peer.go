@@ -1150,6 +1150,12 @@ func (p *peer) handleGetAddrMsg(msg *wire.MsgGetAddr) {
 		return
 	}
 
+	// Do not accept getaddr requests from outbound peers.  This reduces
+	// fingerprinting attacks.
+	if !p.inbound {
+		return
+	}
+
 	// Get the current known addresses from the address manager.
 	addrCache := p.server.addrManager.AddressCache()
 
