@@ -15,6 +15,7 @@ import (
 
 func TestAddrIndexKeySerialization(t *testing.T) {
 	var hash160Bytes [ripemd160.Size]byte
+	var packedIndex [12]byte
 
 	fakeHash160 := btcutil.Hash160([]byte("testing"))
 	copy(fakeHash160, hash160Bytes[:])
@@ -27,7 +28,8 @@ func TestAddrIndexKeySerialization(t *testing.T) {
 	}
 
 	serializedKey := addrIndexToKey(&fakeIndex)
-	unpackedIndex := unpackTxIndex(serializedKey[22:])
+	copy(packedIndex[:], serializedKey[22:34])
+	unpackedIndex := unpackTxIndex(packedIndex)
 
 	if unpackedIndex.blkHeight != fakeIndex.blkHeight {
 		t.Errorf("Incorrect block height. Unpack addr index key"+

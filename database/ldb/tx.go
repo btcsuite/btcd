@@ -374,7 +374,7 @@ func (db *LevelDb) FetchTxBySha(txsha *wire.ShaHash) ([]*database.TxListReply, e
 // addrIndexToKey serializes the passed txAddrIndex for storage within the DB.
 func addrIndexToKey(index *txAddrIndex) []byte {
 	record := make([]byte, addrIndexKeyLength, addrIndexKeyLength)
-	copy(record[:2], addrIndexKeyPrefix)
+	copy(record[0:2], addrIndexKeyPrefix)
 	copy(record[2:22], index.hash160[:])
 
 	// The index itself.
@@ -386,7 +386,7 @@ func addrIndexToKey(index *txAddrIndex) []byte {
 }
 
 // unpackTxIndex deserializes the raw bytes of a address tx index.
-func unpackTxIndex(rawIndex []byte) *txAddrIndex {
+func unpackTxIndex(rawIndex [12]byte) *txAddrIndex {
 	return &txAddrIndex{
 		blkHeight: int64(binary.LittleEndian.Uint32(rawIndex[0:4])),
 		txoffset:  int(binary.LittleEndian.Uint32(rawIndex[4:8])),
@@ -447,20 +447,19 @@ func (db *LevelDb) FetchTxsForAddr(addr btcutil.Address, skip int,
 
 	// Create the prefix for our search.
 	addrPrefix := make([]byte, 22, 22)
-	copy(addrPrefix[:2], addrIndexKeyPrefix)
-	copy(addrPrefix[2:], addrKey)
+	copy(addrPrefix[0:2], addrIndexKeyPrefix)
+	copy(addrPrefix[2:22], addrKey)
 
-	var replies []*database.TxListReply
 	iter := db.lDb.NewIterator(bytesPrefix(addrPrefix), nil)
-
 	for skip != 0 && iter.Next() {
 		skip--
 	}
 
 	// Iterate through all address indexes that match the targeted prefix.
+	var replies []*database.TxListReply
+	var rawIndex [12]byte
 	for iter.Next() && limit != 0 {
-		rawIndex := make([]byte, 22, 22)
-		copy(rawIndex, iter.Key()[22:])
+		copy(rawIndex[:], iter.Key()[22:34])
 		addrIndex := unpackTxIndex(rawIndex)
 
 		tx, blkSha, blkHeight, _, err := db.fetchTxDataByLoc(addrIndex.blkHeight,
@@ -478,6 +477,9 @@ func (db *LevelDb) FetchTxsForAddr(addr btcutil.Address, skip int,
 		limit--
 	}
 	iter.Release()
+	if err := iter.Error(); err != nil {
+		return nil, err
+	}
 
 	return replies, nil
 }
@@ -522,8 +524,8 @@ func (db *LevelDb) UpdateAddrIndexForBlock(blkSha *wire.ShaHash, blkHeight int64
 
 	// Update tip of addrindex.
 	newIndexTip := make([]byte, 40, 40)
-	copy(newIndexTip[:32], blkSha.Bytes())
-	binary.LittleEndian.PutUint64(newIndexTip[32:], uint64(blkHeight))
+	copy(newIndexTip[0:32], blkSha.Bytes())
+	binary.LittleEndian.PutUint64(newIndexTip[32:40], uint64(blkHeight))
 	batch.Put(addrIndexMetaDataKey, newIndexTip)
 
 	if err := db.lDb.Write(batch, db.wo); err != nil {
@@ -557,6 +559,7 @@ func (db *LevelDb) DeleteAddrIndex() error {
 		// Delete in chunks to potentially avoid very large batches.
 		if numInBatch >= batchDeleteThreshold {
 			if err := db.lDb.Write(batch, db.wo); err != nil {
+				iter.Release()
 				return err
 			}
 			batch.Reset()
@@ -564,6 +567,9 @@ func (db *LevelDb) DeleteAddrIndex() error {
 		}
 	}
 	iter.Release()
+	if err := iter.Error(); err != nil {
+		return err
+	}
 
 	batch.Delete(addrIndexMetaDataKey)
 	if err := db.lDb.Write(batch, db.wo); err != nil {
