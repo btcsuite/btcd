@@ -862,12 +862,12 @@ func (a *AddrManager) Good(addr *wire.NetAddress) {
 	if ka == nil {
 		return
 	}
+
+	// ka.Timestamp is not updated here to avoid leaking information
+	// about currently connected peers.
 	now := time.Now()
 	ka.lastsuccess = now
 	ka.lastattempt = now
-	naCopy := *ka.na
-	naCopy.Timestamp = time.Now()
-	ka.na = &naCopy
 	ka.attempts = 0
 
 	// move to tried set, optionally evicting other addresses if neeed.
