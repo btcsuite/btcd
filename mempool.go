@@ -97,7 +97,7 @@ type txMemPool struct {
 	pool          map[wire.ShaHash]*TxDesc
 	orphans       map[wire.ShaHash]*btcutil.Tx
 	orphansByPrev map[wire.ShaHash]*list.List
-	addrindex     map[string]map[*btcutil.Tx]struct{} // maps address to txs
+	addrindex     map[string]map[wire.ShaHash]struct{} // maps address to txs
 	outpoints     map[wire.OutPoint]*btcutil.Tx
 	lastUpdated   time.Time // last time pool was updated
 	pennyTotal    float64   // exponentially decaying total for penny spends.
@@ -653,7 +653,7 @@ func (mp *txMemPool) removeScriptFromAddrIndex(pkScript []byte, tx *btcutil.Tx) 
 		return err
 	}
 	for _, addr := range addresses {
-		delete(mp.addrindex[addr.EncodeAddress()], tx)
+		delete(mp.addrindex[addr.EncodeAddress()], *tx.Sha())
 	}
 
 	return nil
@@ -777,9 +777,9 @@ func (mp *txMemPool) indexScriptAddressToTx(pkScript []byte, tx *btcutil.Tx) err
 
 	for _, addr := range addresses {
 		if mp.addrindex[addr.EncodeAddress()] == nil {
-			mp.addrindex[addr.EncodeAddress()] = make(map[*btcutil.Tx]struct{})
+			mp.addrindex[addr.EncodeAddress()] = make(map[wire.ShaHash]struct{})
 		}
-		mp.addrindex[addr.EncodeAddress()][tx] = struct{}{}
+		mp.addrindex[addr.EncodeAddress()][*tx.Sha()] = struct{}{}
 	}
 
 	return nil
@@ -965,8 +965,10 @@ func (mp *txMemPool) FilterTransactionsByAddress(addr btcutil.Address) ([]*btcut
 
 	if txs, exists := mp.addrindex[addr.EncodeAddress()]; exists {
 		addressTxs := make([]*btcutil.Tx, 0, len(txs))
-		for tx := range txs {
-			addressTxs = append(addressTxs, tx)
+		for txHash := range txs {
+			if tx, exists := mp.pool[txHash]; exists {
+				addressTxs = append(addressTxs, tx.Tx)
+			}
 		}
 		return addressTxs, nil
 	}
@@ -1494,7 +1496,7 @@ func newTxMemPool(server *server) *txMemPool {
 		outpoints:     make(map[wire.OutPoint]*btcutil.Tx),
 	}
 	if cfg.AddrIndex {
-		memPool.addrindex = make(map[string]map[*btcutil.Tx]struct{})
+		memPool.addrindex = make(map[string]map[wire.ShaHash]struct{})
 	}
 	return memPool
 }

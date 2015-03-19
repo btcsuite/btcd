@@ -2598,15 +2598,6 @@ func handleSearchRawTransactions(s *rpcServer, cmd interface{}, closeChan <-chan
 
 	var addressTxs []*database.TxListReply
 
-	// First check the mempool for relevent transactions.
-	memPoolTxs, err := s.server.txMemPool.FilterTransactionsByAddress(addr)
-	if err == nil && len(memPoolTxs) != 0 {
-		for _, tx := range memPoolTxs {
-			txReply := &database.TxListReply{Tx: tx.MsgTx(), Sha: tx.Sha()}
-			addressTxs = append(addressTxs, txReply)
-		}
-	}
-
 	var numRequested, numToSkip int
 	if c.Count != nil {
 		numRequested = *c.Count
@@ -2620,17 +2611,31 @@ func handleSearchRawTransactions(s *rpcServer, cmd interface{}, closeChan <-chan
 			numToSkip = 0
 		}
 	}
-	if len(addressTxs) >= numRequested {
-		// Tx's in the mempool exceed the requested number of tx's.
-		// Slice off any possible overflow.
-		addressTxs = addressTxs[:numRequested]
-	} else {
-		// Otherwise, we'll also take a look into the database.
-		dbTxs, err := s.server.db.FetchTxsForAddr(addr, numToSkip,
-			numRequested-len(addressTxs))
-		if err == nil && len(dbTxs) != 0 {
-			for _, txReply := range dbTxs {
+
+	// While it's more efficient to check the mempool for relevant transactions
+	// first, we want to return results in order of occurrence/dependency so
+	// we'll check the mempool only if there aren't enough results returned
+	// by the database.
+	dbTxs, err := s.server.db.FetchTxsForAddr(addr, numToSkip,
+		numRequested-len(addressTxs))
+	if err == nil {
+		for _, txReply := range dbTxs {
+			addressTxs = append(addressTxs, txReply)
+		}
+	}
+
+	// This code (and txMemPool.FilterTransactionsByAddress()) doesn't sort by
+	// dependency. This might be something we want to do in the future when we
+	// return results for the client's convenience, or leave it to the client.
+	if len(addressTxs) < numRequested {
+		memPoolTxs, err := s.server.txMemPool.FilterTransactionsByAddress(addr)
+		if err == nil {
+			for _, tx := range memPoolTxs {
+				txReply := &database.TxListReply{Tx: tx.MsgTx(), Sha: tx.Sha()}
 				addressTxs = append(addressTxs, txReply)
+				if len(addressTxs) == numRequested {
+					break
+				}
 			}
 		}
 	}

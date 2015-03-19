@@ -286,6 +286,28 @@ func (db *LevelDb) NewestSha() (rsha *wire.ShaHash, rblkid int64, err error) {
 	return &sha, db.lastBlkIdx, nil
 }
 
+// checkAddrIndexVersion returns an error if the address index version stored
+// in the database is less than the current version, or if it doesn't exist.
+// This function is used on startup to signal OpenDB to drop the address index
+// if it's in an old, incompatible format.
+func (db *LevelDb) checkAddrIndexVersion() error {
+	db.dbLock.Lock()
+	defer db.dbLock.Unlock()
+
+	data, err := db.lDb.Get(addrIndexVersionKey, db.ro)
+	if err != nil {
+		return database.ErrAddrIndexDoesNotExist
+	}
+
+	indexVersion := binary.LittleEndian.Uint16(data)
+
+	if indexVersion != uint16(addrIndexCurrentVersion) {
+		return database.ErrAddrIndexDoesNotExist
+	}
+
+	return nil
+}
+
 // fetchAddrIndexTip returns the last block height and block sha to be indexed.
 // Meta-data about the address tip is currently cached in memory, and will be
 // updated accordingly by functions that modify the state. This function is

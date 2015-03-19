@@ -22,18 +22,27 @@ const (
 	// --------------------------------------------------------
 	// | Prefix  | Hash160  | BlkHeight | Tx Offset | Tx Size |
 	// --------------------------------------------------------
-	// | 2 bytes | 20 bytes |  4 bytes  |  4 bytes  | 4 bytes |
+	// | 3 bytes | 20 bytes |  4 bytes  |  4 bytes  | 4 bytes |
 	// --------------------------------------------------------
-	addrIndexKeyLength = 2 + ripemd160.Size + 4 + 4 + 4
+	addrIndexKeyLength = 3 + ripemd160.Size + 4 + 4 + 4
 
 	batchDeleteThreshold = 10000
+
+	addrIndexCurrentVersion = 1
 )
 
 var addrIndexMetaDataKey = []byte("addrindex")
 
 // All address index entries share this prefix to facilitate the use of
 // iterators.
-var addrIndexKeyPrefix = []byte("a-")
+var addrIndexKeyPrefix = []byte("a+-")
+
+// Address index version is required to drop/rebuild address index if version
+// is older than current as the format of the index may have changed. This is
+// true when going from no version to version 1 as the address index is stored
+// as big endian in version 1 and little endian in the original code. Version
+// is stored as two bytes, little endian (to match all the code but the index).
+var addrIndexVersionKey = []byte("addrindexversion")
 
 type txUpdateObj struct {
 	txSha     *wire.ShaHash
@@ -372,15 +381,19 @@ func (db *LevelDb) FetchTxBySha(txsha *wire.ShaHash) ([]*database.TxListReply, e
 }
 
 // addrIndexToKey serializes the passed txAddrIndex for storage within the DB.
+// We want to use BigEndian to store at least block height and TX offset
+// in order to ensure that the transactions are sorted in the index.
+// This gives us the ability to use the index in more client-side
+// applications that are order-dependent (specifically by dependency).
 func addrIndexToKey(index *txAddrIndex) []byte {
 	record := make([]byte, addrIndexKeyLength, addrIndexKeyLength)
-	copy(record[0:2], addrIndexKeyPrefix)
-	copy(record[2:22], index.hash160[:])
+	copy(record[0:3], addrIndexKeyPrefix)
+	copy(record[3:23], index.hash160[:])
 
 	// The index itself.
-	binary.LittleEndian.PutUint32(record[22:26], uint32(index.blkHeight))
-	binary.LittleEndian.PutUint32(record[26:30], uint32(index.txoffset))
-	binary.LittleEndian.PutUint32(record[30:34], uint32(index.txlen))
+	binary.BigEndian.PutUint32(record[23:27], uint32(index.blkHeight))
+	binary.BigEndian.PutUint32(record[27:31], uint32(index.txoffset))
+	binary.BigEndian.PutUint32(record[31:35], uint32(index.txlen))
 
 	return record
 }
@@ -388,9 +401,9 @@ func addrIndexToKey(index *txAddrIndex) []byte {
 // unpackTxIndex deserializes the raw bytes of a address tx index.
 func unpackTxIndex(rawIndex [12]byte) *txAddrIndex {
 	return &txAddrIndex{
-		blkHeight: int64(binary.LittleEndian.Uint32(rawIndex[0:4])),
-		txoffset:  int(binary.LittleEndian.Uint32(rawIndex[4:8])),
-		txlen:     int(binary.LittleEndian.Uint32(rawIndex[8:12])),
+		blkHeight: int64(binary.BigEndian.Uint32(rawIndex[0:4])),
+		txoffset:  int(binary.BigEndian.Uint32(rawIndex[4:8])),
+		txlen:     int(binary.BigEndian.Uint32(rawIndex[8:12])),
 	}
 }
 
@@ -446,9 +459,9 @@ func (db *LevelDb) FetchTxsForAddr(addr btcutil.Address, skip int,
 	}
 
 	// Create the prefix for our search.
-	addrPrefix := make([]byte, 22, 22)
-	copy(addrPrefix[0:2], addrIndexKeyPrefix)
-	copy(addrPrefix[2:22], addrKey)
+	addrPrefix := make([]byte, 23, 23)
+	copy(addrPrefix[0:3], addrIndexKeyPrefix)
+	copy(addrPrefix[3:23], addrKey)
 
 	iter := db.lDb.NewIterator(bytesPrefix(addrPrefix), nil)
 	for skip != 0 && iter.Next() {
@@ -459,7 +472,7 @@ func (db *LevelDb) FetchTxsForAddr(addr btcutil.Address, skip int,
 	var replies []*database.TxListReply
 	var rawIndex [12]byte
 	for iter.Next() && limit != 0 {
-		copy(rawIndex[:], iter.Key()[22:34])
+		copy(rawIndex[:], iter.Key()[23:35])
 		addrIndex := unpackTxIndex(rawIndex)
 
 		tx, blkSha, blkHeight, _, err := db.fetchTxDataByLoc(addrIndex.blkHeight,
@@ -528,6 +541,12 @@ func (db *LevelDb) UpdateAddrIndexForBlock(blkSha *wire.ShaHash, blkHeight int64
 	binary.LittleEndian.PutUint64(newIndexTip[32:40], uint64(blkHeight))
 	batch.Put(addrIndexMetaDataKey, newIndexTip)
 
+	// Ensure we're writing an address index version
+	newIndexVersion := make([]byte, 2, 2)
+	binary.LittleEndian.PutUint16(newIndexVersion[0:2],
+		uint16(addrIndexCurrentVersion))
+	batch.Put(addrIndexVersionKey, newIndexVersion)
+
 	if err := db.lDb.Write(batch, db.wo); err != nil {
 		return err
 	}
@@ -552,9 +571,12 @@ func (db *LevelDb) DeleteAddrIndex() error {
 	numInBatch := 0
 	for iter.Next() {
 		key := iter.Key()
-		batch.Delete(key)
-
-		numInBatch++
+		// With a 24-bit index key prefix, 1 in every 2^24 keys is a collision.
+		// We check the length to make sure we only delete address index keys.
+		if len(key) == addrIndexKeyLength {
+			batch.Delete(key)
+			numInBatch++
+		}
 
 		// Delete in chunks to potentially avoid very large batches.
 		if numInBatch >= batchDeleteThreshold {
@@ -572,6 +594,61 @@ func (db *LevelDb) DeleteAddrIndex() error {
 	}
 
 	batch.Delete(addrIndexMetaDataKey)
+	batch.Delete(addrIndexVersionKey)
+
+	if err := db.lDb.Write(batch, db.wo); err != nil {
+		return err
+	}
+
+	db.lastAddrIndexBlkIdx = -1
+	db.lastAddrIndexBlkSha = wire.ShaHash{}
+
+	return nil
+}
+
+// deleteOldAddrIndex deletes the entire addrindex stored within the DB for a
+// 2-byte addrIndexKeyPrefix. It also resets the cached in-memory metadata about
+// the addr index.
+func (db *LevelDb) deleteOldAddrIndex() error {
+	db.dbLock.Lock()
+	defer db.dbLock.Unlock()
+
+	batch := db.lBatch()
+	defer batch.Reset()
+
+	// Delete the entire index along with any metadata about it.
+	iter := db.lDb.NewIterator(bytesPrefix([]byte("a-")), db.ro)
+	numInBatch := 0
+	for iter.Next() {
+		key := iter.Key()
+		// With a 24-bit index key prefix, 1 in every 2^24 keys is a collision.
+		// We check the length to make sure we only delete address index keys.
+		// We also check the last two bytes to make sure the suffix doesn't
+		// match other types of index that are 34 bytes long.
+		if len(key) == 34 && !bytes.HasSuffix(key, recordSuffixTx) &&
+			!bytes.HasSuffix(key, recordSuffixSpentTx) {
+			batch.Delete(key)
+			numInBatch++
+		}
+
+		// Delete in chunks to potentially avoid very large batches.
+		if numInBatch >= batchDeleteThreshold {
+			if err := db.lDb.Write(batch, db.wo); err != nil {
+				iter.Release()
+				return err
+			}
+			batch.Reset()
+			numInBatch = 0
+		}
+	}
+	iter.Release()
+	if err := iter.Error(); err != nil {
+		return err
+	}
+
+	batch.Delete(addrIndexMetaDataKey)
+	batch.Delete(addrIndexVersionKey)
+
 	if err := db.lDb.Write(batch, db.wo); err != nil {
 		return err
 	}

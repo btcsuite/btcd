@@ -80,6 +80,9 @@ func parseArgs(funcName string, args ...interface{}) (string, error) {
 	return dbPath, nil
 }
 
+// CurrentDBVersion is the database version.
+var CurrentDBVersion int32 = 1
+
 // OpenDB opens an existing database for use.
 func OpenDB(args ...interface{}) (database.Db, error) {
 	dbpath, err := parseArgs("OpenDB", args...)
@@ -141,10 +144,20 @@ blocknarrow:
 		}
 	}
 
+	log.Infof("Checking address index")
+
 	// Load the last block whose transactions have been indexed by address.
 	if sha, idx, err := ldb.fetchAddrIndexTip(); err == nil {
-		ldb.lastAddrIndexBlkSha = *sha
-		ldb.lastAddrIndexBlkIdx = idx
+		if err = ldb.checkAddrIndexVersion(); err == nil {
+			ldb.lastAddrIndexBlkSha = *sha
+			ldb.lastAddrIndexBlkIdx = idx
+			log.Infof("Address index good, continuing")
+		} else {
+			log.Infof("Address index in old, incompatible format, dropping...")
+			ldb.deleteOldAddrIndex()
+			ldb.DeleteAddrIndex()
+			log.Infof("Old, incompatible address index dropped and can now be rebuilt")
+		}
 	} else {
 		ldb.lastAddrIndexBlkIdx = -1
 	}
@@ -155,9 +168,6 @@ blocknarrow:
 
 	return db, nil
 }
-
-// CurrentDBVersion is the database version.
-var CurrentDBVersion int32 = 1
 
 func openDB(dbpath string, create bool) (pbdb database.Db, err error) {
 	var db LevelDb
@@ -630,15 +640,20 @@ func shaBlkToKey(sha *wire.ShaHash) []byte {
 	return shaB
 }
 
+// These are used here and in tx.go's deleteOldAddrIndex() to prevent deletion
+// of indexes other than the addrindex now.
+var recordSuffixTx = []byte{'t', 'x'}
+var recordSuffixSpentTx = []byte{'s', 'x'}
+
 func shaTxToKey(sha *wire.ShaHash) []byte {
 	shaB := sha.Bytes()
-	shaB = append(shaB, "tx"...)
+	shaB = append(shaB, recordSuffixTx...)
 	return shaB
 }
 
 func shaSpentTxToKey(sha *wire.ShaHash) []byte {
 	shaB := sha.Bytes()
-	shaB = append(shaB, "sx"...)
+	shaB = append(shaB, recordSuffixSpentTx...)
 	return shaB
 }
 

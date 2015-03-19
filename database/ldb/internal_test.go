@@ -28,7 +28,7 @@ func TestAddrIndexKeySerialization(t *testing.T) {
 	}
 
 	serializedKey := addrIndexToKey(&fakeIndex)
-	copy(packedIndex[:], serializedKey[22:34])
+	copy(packedIndex[:], serializedKey[23:35])
 	unpackedIndex := unpackTxIndex(packedIndex)
 
 	if unpackedIndex.blkHeight != fakeIndex.blkHeight {
