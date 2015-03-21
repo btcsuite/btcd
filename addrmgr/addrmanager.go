@@ -904,12 +904,12 @@ func (a *AddrManager) Good(addr *btcwire.NetAddress) {
 			}
 		}
 	}
-	a.nNew--
 
 	if oldBucket == -1 {
 		// What? wasn't in a bucket after all.... Panic?
 		return
 	}
+	a.nNew--
 
 	bucket := a.getTriedBucket(ka.na)
 
