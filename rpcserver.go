@@ -144,6 +144,7 @@ var rpcHandlersBeforeInit = map[string]commandHandler{
 	"getcurrentnet":         handleGetCurrentNet,
 	"getdifficulty":         handleGetDifficulty,
 	"getgenerate":           handleGetGenerate,
+	"getheader":             handleGetHeader,
 	"gethashespersec":       handleGetHashesPerSec,
 	"getinfo":               handleGetInfo,
 	"getmininginfo":         handleGetMiningInfo,
@@ -153,6 +154,7 @@ var rpcHandlersBeforeInit = map[string]commandHandler{
 	"getrawmempool":         handleGetRawMempool,
 	"getrawtransaction":     handleGetRawTransaction,
 	"gettxout":              handleGetTxOut,
+	"getspvproof":           handleGetSPVProof,
 	"getwork":               handleGetWork,
 	"help":                  handleHelp,
 	"ping":                  handlePing,
@@ -1718,6 +1720,20 @@ func handleGetGenerate(s *rpcServer, cmd interface{}, closeChan <-chan struct{})
 	return s.server.cpuMiner.IsMining(), nil
 }
 
+// handleGetHeader returns 80-byte block headers
+func handleGetHeader(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (interface{}, error) {
+	l, err := s.server.db.FetchHeightRange(1, 1)
+	if err != nil {
+		rpcsLog.Errorf("Error getting block: %v", err)
+		return nil, &btcjson.RPCError{
+			Code:    btcjson.ErrRPCDifficulty,
+			Message: "Error getting header: " + err.Error(),
+		}
+	}
+	b, err := s.server.db.FetchBlockBySha(&l[0])
+	return b.MsgBlock().Header, nil
+}
+
 // handleGetHashesPerSec implements the gethashespersec command.
 func handleGetHashesPerSec(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (interface{}, error) {
 	return int64(s.server.cpuMiner.HashesPerSecond()), nil
@@ -2196,6 +2212,14 @@ func handleGetTxOut(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (i
 		Coinbase: blockchain.IsCoinBase(btcutil.NewTx(mtx)),
 	}
 	return txOutReply, nil
+}
+
+// handleGetSPVProof will return the block height, transaction index, and
+// a slice of hashes to prove it.
+
+func handleGetSPVProof(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (interface{}, error) {
+	x := s.server.db.NewestSha
+	return x, nil
 }
 
 // handleGetWorkRequest is a helper for handleGetWork which deals with
