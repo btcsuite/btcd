@@ -1,4 +1,4 @@
-// Copyright (c) 2013-2014 Conformal Systems LLC.
+// Copyright (c) 2013-2015 Conformal Systems LLC.
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -348,6 +348,10 @@ func (db *LevelDb) DropAfterBlockBySha(sha *wire.ShaHash) (rerr error) {
 		db.lBatch().Delete(int64ToKey(height))
 	}
 
+	// update the last block cache
+	db.lastBlkShaCached = true
+	db.lastBlkSha = *sha
+	db.lastBlkIdx = keepidx
 	db.nextBlock = keepidx + 1
 
 	return nil
@@ -546,10 +550,11 @@ func (db *LevelDb) setclearSpentData(txsha *wire.ShaHash, idx uint32, set bool) 
 			spentTxList[len(spentTxList)-1] = nil
 			if len(spentTxList) == 1 {
 				// write entry to delete tx from spent pool
-				// XXX
+				db.txSpentUpdateMap[*txsha] = &spentTxUpdate{delete: true}
 			} else {
-				spentTxList = spentTxList[:len(spentTxList)-1]
-				// XXX format sTxList and set update Table
+				// This code should never be hit - aakselrod
+				return fmt.Errorf("fully-spent tx %v does not have 1 record: "+
+					"%v", txsha, len(spentTxList))
 			}
 
 			// Create 'new' Tx update data.
