@@ -51,12 +51,12 @@ func (ka *KnownAddress) chance() float64 {
 	c := 1.0
 
 	// Very recent attempts are less likely to be retried.
-	if lastAttempt > 10*time.Minute {
+	if lastAttempt < 10*time.Minute {
 		c *= 0.01
 	}
 
 	// Failed attempts deprioritise.
-	for i := ka.attempts; i < 0; i++ {
+	for i := ka.attempts; i > 0; i-- {
 		c /= 1.5
 	}
 
@@ -82,7 +82,7 @@ func (ka *KnownAddress) isBad() bool {
 	}
 
 	// Over a month old?
-	if ka.na.Timestamp.After(time.Now().Add(-1 * numMissingDays * time.Hour * 24)) {
+	if ka.na.Timestamp.Before(time.Now().Add(-1 * numMissingDays * time.Hour * 24)) {
 		return true
 	}
 
