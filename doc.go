@@ -37,6 +37,8 @@ Application Options:
                            are {s, m, h}.  Minimum 1 second (24h0m0s)
   -u, --rpcuser=           Username for RPC connections
   -P, --rpcpass=           Password for RPC connections
+      --rpclimituser=      Username for limited RPC connections
+      --rpclimitpass=      Password for limited RPC connections
       --rpclisten=         Add an interface/port to listen for RPC connections
                            (default port: 8334, testnet: 18334)
       --rpccert=           File containing the certificate file

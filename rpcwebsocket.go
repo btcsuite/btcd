@@ -71,7 +71,7 @@ var wsAsyncHandlers = map[string]struct{}{
 // server handler which runs each new connection in a new goroutine thereby
 // satisfying the requirement.
 func (s *rpcServer) WebsocketHandler(conn *websocket.Conn, remoteAddr string,
-	authenticated bool) {
+	authenticated bool, isAdmin bool) {
 
 	// Clear the read deadline that was set before the websocket hijacked
 	// the connection.
@@ -90,7 +90,7 @@ func (s *rpcServer) WebsocketHandler(conn *websocket.Conn, remoteAddr string,
 	// Create a new websocket client to handle the new websocket connection
 	// and wait for it to shutdown.  Once it has shutdown (and hence
 	// disconnected), remove it and any notifications it registered for.
-	client := newWebsocketClient(s, conn, remoteAddr, authenticated)
+	client := newWebsocketClient(s, conn, remoteAddr, authenticated, isAdmin)
 	s.ntfnMgr.AddClient(client)
 	client.Start()
 	client.WaitForShutdown()
@@ -875,6 +875,10 @@ type wsClient struct {
 	// and therefore is allowed to communicated over the websocket.
 	authenticated bool
 
+	// isAdmin specifies whether a client may change the state of the server;
+	// false means its access is only to the limited set of RPC calls.
+	isAdmin bool
+
 	// verboseTxUpdates specifies whether a client has requested verbose
 	// information about all new transactions.
 	verboseTxUpdates bool
@@ -933,12 +937,14 @@ func (c *wsClient) handleMessage(msg []byte) {
 		auth := "Basic " + base64.StdEncoding.EncodeToString([]byte(login))
 		authSha := fastsha256.Sum256([]byte(auth))
 		cmp := subtle.ConstantTimeCompare(authSha[:], c.server.authsha[:])
-		if cmp != 1 {
+		limitcmp := subtle.ConstantTimeCompare(authSha[:], c.server.limitauthsha[:])
+		if cmp != 1 && limitcmp != 1 {
 			rpcsLog.Warnf("Auth failure.")
 			c.Disconnect()
 			return
 		}
 		c.authenticated = true
+		c.isAdmin = cmp == 1
 
 		// Marshal and send response.
 		reply, err := createMarshalledReply(parsedCmd.id, nil, nil)
@@ -973,6 +979,25 @@ func (c *wsClient) handleMessage(msg []byte) {
 	// JSON-RPC spec.
 	if request.ID == nil {
 		return
+	}
+
+	// Check if the user is limited and disconnect client if unauthorized
+	if !c.isAdmin {
+		if _, ok := rpcLimited[request.Method]; !ok {
+			jsonErr := &btcjson.RPCError{
+				Code:    btcjson.ErrRPCInvalidParams.Code,
+				Message: "limited user not authorized for this method",
+			}
+			// Marshal and send response.
+			reply, err := createMarshalledReply(request.ID, nil, jsonErr)
+			if err != nil {
+				rpcsLog.Errorf("Failed to marshal parse failure "+
+					"reply: %v", err)
+				return
+			}
+			c.SendMessage(reply, nil)
+			return
+		}
 	}
 
 	// Attempt to parse the JSON-RPC request into a known concrete command.
@@ -1368,12 +1393,13 @@ func (c *wsClient) WaitForShutdown() {
 // incoming and outgoing messages in separate goroutines complete with queueing
 // and asynchrous handling for long-running operations.
 func newWebsocketClient(server *rpcServer, conn *websocket.Conn,
-	remoteAddr string, authenticated bool) *wsClient {
+	remoteAddr string, authenticated bool, isAdmin bool) *wsClient {
 
 	return &wsClient{
 		conn:          conn,
 		addr:          remoteAddr,
 		authenticated: authenticated,
+		isAdmin:       isAdmin,
 		server:        server,
 		addrRequests:  make(map[string]struct{}),
 		spentRequests: make(map[wire.OutPoint]struct{}),

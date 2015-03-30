@@ -77,12 +77,14 @@ type config struct {
 	BanDuration        time.Duration `long:"banduration" description:"How long to ban misbehaving peers.  Valid time units are {s, m, h}.  Minimum 1 second"`
 	RPCUser            string        `short:"u" long:"rpcuser" description:"Username for RPC connections"`
 	RPCPass            string        `short:"P" long:"rpcpass" default-mask:"-" description:"Password for RPC connections"`
+	RPCLimitUser       string        `long:"rpclimituser" description:"Username for limited RPC connections"`
+	RPCLimitPass       string        `long:"rpclimitpass" default-mask:"-" description:"Password for limited RPC connections"`
 	RPCListeners       []string      `long:"rpclisten" description:"Add an interface/port to listen for RPC connections (default port: 8334, testnet: 18334)"`
 	RPCCert            string        `long:"rpccert" description:"File containing the certificate file"`
 	RPCKey             string        `long:"rpckey" description:"File containing the certificate key"`
 	RPCMaxClients      int           `long:"rpcmaxclients" description:"Max number of RPC clients for standard connections"`
 	RPCMaxWebsockets   int           `long:"rpcmaxwebsockets" description:"Max number of RPC websocket connections"`
-	DisableRPC         bool          `long:"norpc" description:"Disable built-in RPC server -- NOTE: The RPC server is disabled by default if no rpcuser/rpcpass is specified"`
+	DisableRPC         bool          `long:"norpc" description:"Disable built-in RPC server -- NOTE: The RPC server is disabled by default if no rpcuser/rpcpass or rpclimituser/rpclimitpass is specified"`
 	DisableTLS         bool          `long:"notls" description:"Disable TLS for the RPC server -- NOTE: This is only allowed if the RPC server is bound to localhost"`
 	DisableDNSSeed     bool          `long:"nodnsseed" description:"Disable DNS seeding for peers"`
 	ExternalIPs        []string      `long:"externalip" description:"Add an ip to the list of local addresses we claim to listen on to peers"`
@@ -546,8 +548,29 @@ func loadConfig() (*config, []string, error) {
 		}
 	}
 
+	// Check to make sure limited and admin users don't have the same username
+	if cfg.RPCUser == cfg.RPCLimitUser && cfg.RPCUser != "" {
+		str := "%s: --rpcuser and --rpclimituser must not specify the " +
+			"same username"
+		err := fmt.Errorf(str, funcName)
+		fmt.Fprintln(os.Stderr, err)
+		fmt.Fprintln(os.Stderr, usageMessage)
+		return nil, nil, err
+	}
+
+	// Check to make sure limited and admin users don't have the same password
+	if cfg.RPCPass == cfg.RPCLimitPass && cfg.RPCPass != "" {
+		str := "%s: --rpcpass and --rpclimitpass must not specify the " +
+			"same password"
+		err := fmt.Errorf(str, funcName)
+		fmt.Fprintln(os.Stderr, err)
+		fmt.Fprintln(os.Stderr, usageMessage)
+		return nil, nil, err
+	}
+
 	// The RPC server is disabled if no username or password is provided.
-	if cfg.RPCUser == "" || cfg.RPCPass == "" {
+	if (cfg.RPCUser == "" || cfg.RPCPass == "") &&
+		(cfg.RPCLimitUser == "" || cfg.RPCLimitPass == "") {
 		cfg.DisableRPC = true
 	}
 

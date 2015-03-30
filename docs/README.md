@@ -89,13 +89,15 @@ options, which can be viewed by running: `$ btcd --help`.
 btcctl is a command line utility that can be used to both control and query btcd
 via [RPC](http://www.wikipedia.org/wiki/Remote_procedure_call).  btcd does
 **not** enable its RPC server by default;  You must configure at minimum both an
-RPC username and password:
+RPC username and password or both an RPC limited username and password:
 
 * btcd.conf configuration file
 ```
 [Application Options]
 rpcuser=myuser
 rpcpass=SomeDecentp4ssw0rd
+rpclimituser=mylimituser
+rpclimitpass=Limitedp4ssw0rd
 ```
 * btcctl.conf configuration file
 ```
@@ -103,12 +105,19 @@ rpcpass=SomeDecentp4ssw0rd
 rpcuser=myuser
 rpcpass=SomeDecentp4ssw0rd
 ```
+OR
+```
+[Application Options]
+rpcuser=mylimituser
+rpcpass=Limitedp4ssw0rd
+```
 For a list of available options, run: `$ btcctl --help`
 
 <a name="Mining" />
 **2.4 Mining**<br />
 btcd supports both the `getwork` and `getblocktemplate` RPCs although the
-`getwork` RPC is deprecated and will likely be removed in a future release.<br />
+`getwork` RPC is deprecated and will likely be removed in a future release.
+The limited user cannot access these RPCs.<br />
 
 **1. Add the payment addresses with the `miningaddr` option.**<br />
 

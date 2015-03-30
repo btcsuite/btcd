@@ -223,6 +223,42 @@ var rpcUnimplemented = map[string]struct{}{
 	"getnetworkinfo":    struct{}{},
 }
 
+// Commands that are available to a limited user
+var rpcLimited = map[string]struct{}{
+	// Websockets commands
+	"notifyblocks":          struct{}{},
+	"notifynewtransactions": struct{}{},
+	"notifyreceived":        struct{}{},
+	"notifyspent":           struct{}{},
+	"rescan":                struct{}{},
+
+	// Websockets AND HTTP/S commands
+	"help": struct{}{},
+
+	// HTTP/S-only commands
+	"createrawtransaction":  struct{}{},
+	"decoderawtransaction":  struct{}{},
+	"decodescript":          struct{}{},
+	"getbestblock":          struct{}{},
+	"getbestblockhash":      struct{}{},
+	"getblock":              struct{}{},
+	"getblockcount":         struct{}{},
+	"getblockhash":          struct{}{},
+	"getcurrentnet":         struct{}{},
+	"getdifficulty":         struct{}{},
+	"getinfo":               struct{}{},
+	"getnettotals":          struct{}{},
+	"getnetworkhashps":      struct{}{},
+	"getrawmempool":         struct{}{},
+	"getrawtransaction":     struct{}{},
+	"gettxout":              struct{}{},
+	"searchrawtransactions": struct{}{},
+	"sendrawtransaction":    struct{}{},
+	"submitblock":           struct{}{},
+	"validateaddress":       struct{}{},
+	"verifymessage":         struct{}{},
+}
+
 // builderScript is a convenience function which is used for hard-coded scripts
 // built with the script builder.   Any errors are converted to a panic since it
 // is only, and must only, be used with hard-coded, and therefore, known good,
@@ -2981,6 +3017,7 @@ type rpcServer struct {
 	shutdown     int32
 	server       *server
 	authsha      [fastsha256.Size]byte
+	limitauthsha [fastsha256.Size]byte
 	ntfnMgr      *wsNotificationManager
 	numClients   int32
 	statusLines  map[int]string
@@ -3114,25 +3151,42 @@ func (s *rpcServer) decrementClients() {
 // returned.
 //
 // This check is time-constant.
-func (s *rpcServer) checkAuth(r *http.Request, require bool) (bool, error) {
+//
+// The first bool return value signifies auth success (true if successful) and
+// the second bool return value specifies whether the user can change the state
+// of the server (true) or whether the user is limited (false). The second is
+// always false if the first is.
+func (s *rpcServer) checkAuth(r *http.Request, require bool) (bool, bool,
+	error) {
 	authhdr := r.Header["Authorization"]
 	if len(authhdr) <= 0 {
 		if require {
 			rpcsLog.Warnf("RPC authentication failure from %s",
 				r.RemoteAddr)
-			return false, errors.New("auth failure")
+			return false, false, errors.New("auth failure")
 		}
 
-		return false, nil
+		return false, false, nil
 	}
 
 	authsha := fastsha256.Sum256([]byte(authhdr[0]))
-	cmp := subtle.ConstantTimeCompare(authsha[:], s.authsha[:])
-	if cmp != 1 {
-		rpcsLog.Warnf("RPC authentication failure from %s", r.RemoteAddr)
-		return false, errors.New("auth failure")
+
+	// Check for limited auth first as in environments with limited users, those
+	// are probably expected to have a higher volume of calls
+	limitcmp := subtle.ConstantTimeCompare(authsha[:], s.limitauthsha[:])
+	if limitcmp == 1 {
+		return true, false, nil
 	}
-	return true, nil
+
+	// Check for admin-level auth
+	cmp := subtle.ConstantTimeCompare(authsha[:], s.authsha[:])
+	if cmp == 1 {
+		return true, true, nil
+	}
+
+	// Request's auth doesn't match either user
+	rpcsLog.Warnf("RPC authentication failure from %s", r.RemoteAddr)
+	return false, false, errors.New("auth failure")
 }
 
 // parsedRPCCmd represents a JSON-RPC request object that has been parsed into
@@ -3218,7 +3272,8 @@ func createMarshalledReply(id, result interface{}, replyErr error) ([]byte, erro
 }
 
 // jsonRPCRead handles reading and responding to RPC messages.
-func (s *rpcServer) jsonRPCRead(w http.ResponseWriter, r *http.Request) {
+func (s *rpcServer) jsonRPCRead(w http.ResponseWriter, r *http.Request,
+	isAdmin bool) {
 	if atomic.LoadInt32(&s.shutdown) != 0 {
 		return
 	}
@@ -3293,14 +3348,25 @@ func (s *rpcServer) jsonRPCRead(w http.ResponseWriter, r *http.Request) {
 			}
 		}()
 
-		// Attempt to parse the JSON-RPC request into a known concrete
-		// command.
-		parsedCmd := parseCmd(&request)
-		if parsedCmd.err != nil {
-			jsonErr = parsedCmd.err
-		} else {
-			result, jsonErr = s.standardCmdResult(parsedCmd,
-				closeChan)
+		// Check if the user is limited and set error if method unauthorized
+		if !isAdmin {
+			if _, ok := rpcLimited[request.Method]; !ok {
+				jsonErr = &btcjson.RPCError{
+					Code:    btcjson.ErrRPCInvalidParams.Code,
+					Message: "limited user not authorized for this method",
+				}
+			}
+		}
+
+		if jsonErr == nil {
+			// Attempt to parse the JSON-RPC request into a known concrete
+			// command.
+			parsedCmd := parseCmd(&request)
+			if parsedCmd.err != nil {
+				jsonErr = parsedCmd.err
+			} else {
+				result, jsonErr = s.standardCmdResult(parsedCmd, closeChan)
+			}
 		}
 	}
 
@@ -3356,18 +3422,19 @@ func (s *rpcServer) Start() {
 		// Keep track of the number of connected clients.
 		s.incrementClients()
 		defer s.decrementClients()
-		if _, err := s.checkAuth(r, true); err != nil {
+		_, isAdmin, err := s.checkAuth(r, true)
+		if err != nil {
 			jsonAuthFail(w)
 			return
 		}
 
 		// Read and respond to the request.
-		s.jsonRPCRead(w, r)
+		s.jsonRPCRead(w, r, isAdmin)
 	})
 
 	// Websocket endpoint.
 	rpcServeMux.HandleFunc("/ws", func(w http.ResponseWriter, r *http.Request) {
-		authenticated, err := s.checkAuth(r, false)
+		authenticated, isAdmin, err := s.checkAuth(r, false)
 		if err != nil {
 			jsonAuthFail(w)
 			return
@@ -3384,7 +3451,7 @@ func (s *rpcServer) Start() {
 			http.Error(w, "400 Bad Request.", http.StatusBadRequest)
 			return
 		}
-		s.WebsocketHandler(ws, r.RemoteAddr, authenticated)
+		s.WebsocketHandler(ws, r.RemoteAddr, authenticated, isAdmin)
 	})
 
 	for _, listener := range s.listeners {
@@ -3426,16 +3493,23 @@ func genCertPair(certFile, keyFile string) error {
 
 // newRPCServer returns a new instance of the rpcServer struct.
 func newRPCServer(listenAddrs []string, s *server) (*rpcServer, error) {
-	login := cfg.RPCUser + ":" + cfg.RPCPass
-	auth := "Basic " + base64.StdEncoding.EncodeToString([]byte(login))
 	rpc := rpcServer{
-		authsha:      fastsha256.Sum256([]byte(auth)),
 		server:       s,
 		statusLines:  make(map[int]string),
 		workState:    newWorkState(),
 		gbtWorkState: newGbtWorkState(s.timeSource),
 		helpCacher:   newHelpCacher(),
 		quit:         make(chan int),
+	}
+	if cfg.RPCUser != "" && cfg.RPCPass != "" {
+		login := cfg.RPCUser + ":" + cfg.RPCPass
+		auth := "Basic " + base64.StdEncoding.EncodeToString([]byte(login))
+		rpc.authsha = fastsha256.Sum256([]byte(auth))
+	}
+	if cfg.RPCLimitUser != "" && cfg.RPCLimitPass != "" {
+		login := cfg.RPCLimitUser + ":" + cfg.RPCLimitPass
+		auth := "Basic " + base64.StdEncoding.EncodeToString([]byte(login))
+		rpc.limitauthsha = fastsha256.Sum256([]byte(auth))
 	}
 	rpc.ntfnMgr = newWsNotificationManager(&rpc)
 
