@@ -107,6 +107,20 @@ type processBlockResponse struct {
 	err      error
 }
 
+// fetchTransactionStoreResponse is a response sent to the reply channel of a
+// fetchTransactionStoreMsg.
+type fetchTransactionStoreResponse struct {
+	TxStore blockchain.TxStore
+	err     error
+}
+
+// fetchTransactionStoreMsg is a message type to be sent across the message
+// channel fetching the tx input store for some Tx.
+type fetchTransactionStoreMsg struct {
+	tx    *btcutil.Tx
+	reply chan fetchTransactionStoreResponse
+}
+
 // processBlockMsg is a message type to be sent across the message channel
 // for requested a block is processed.  Note this call differs from blockMsg
 // above in that blockMsg is intended for blocks that came from peers and have
@@ -1109,6 +1123,13 @@ out:
 					err:        err,
 				}
 
+			case fetchTransactionStoreMsg:
+				txStore, err := b.blockChain.FetchTransactionStore(msg.tx)
+				msg.reply <- fetchTransactionStoreResponse{
+					TxStore: txStore,
+					err:     err,
+				}
+
 			case processBlockMsg:
 				isOrphan, err := b.blockChain.ProcessBlock(
 					msg.block, b.server.timeSource,
@@ -1369,6 +1390,15 @@ func (b *blockManager) CalcNextRequiredDifficulty(timestamp time.Time) (uint32, 
 	b.msgChan <- calcNextReqDifficultyMsg{timestamp: timestamp, reply: reply}
 	response := <-reply
 	return response.difficulty, response.err
+}
+
+// FetchTransactionStore makes use of FetchTransactionStore on an internal
+// instance of a block chain. It is safe for concurrent access.
+func (b *blockManager) FetchTransactionStore(tx *btcutil.Tx) (blockchain.TxStore, error) {
+	reply := make(chan fetchTransactionStoreResponse, 1)
+	b.msgChan <- fetchTransactionStoreMsg{tx: tx, reply: reply}
+	response := <-reply
+	return response.TxStore, response.err
 }
 
 // ProcessBlock makes use of ProcessBlock on an internal instance of a block

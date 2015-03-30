@@ -369,7 +369,6 @@ func NewBlockTemplate(mempool *txMemPool, payToAddress btcutil.Address) (*BlockT
 	blockManager := mempool.server.blockManager
 	timeSource := mempool.server.timeSource
 	chainState := &blockManager.chainState
-	chain := blockManager.blockChain
 
 	// Extend the most recently known best block.
 	chainState.Lock()
@@ -458,7 +457,7 @@ mempoolLoop:
 		// inputs from the mempool since a transaction which depends on
 		// other transactions in the mempool must come after those
 		// dependencies in the final generated block.
-		txStore, err := chain.FetchTransactionStore(tx)
+		txStore, err := blockManager.FetchTransactionStore(tx)
 		if err != nil {
 			minrLog.Warnf("Unable to fetch transaction store for "+
 				"tx %s: %v", tx.Sha(), err)
