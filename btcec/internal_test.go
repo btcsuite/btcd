@@ -69,3 +69,8 @@ func (curve *KoblitzCurve) TstDoubleJacobian(x1, y1, z1, x3, y3, z3 *fieldVal) {
 func NewFieldVal() *fieldVal {
 	return new(fieldVal)
 }
+
+// TstNonceRFC6979 makes the nonceRFC6979 function available to the test package.
+func TstNonceRFC6979(privkey *big.Int, hash []byte) *big.Int {
+	return nonceRFC6979(privkey, hash)
+}
