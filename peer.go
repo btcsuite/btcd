@@ -22,7 +22,6 @@ import (
 	"github.com/btcsuite/btcd/wire"
 	"github.com/btcsuite/btcutil"
 	"github.com/btcsuite/btcutil/bloom"
-	"github.com/btcsuite/go-socks/socks"
 	"github.com/davecgh/go-spew/spew"
 )
 
@@ -89,17 +88,6 @@ func newNetAddress(addr net.Addr, services wire.ServiceFlag) (*wire.NetAddress, 
 	if tcpAddr, ok := addr.(*net.TCPAddr); ok {
 		ip := tcpAddr.IP
 		port := uint16(tcpAddr.Port)
-		na := wire.NewNetAddressIPPort(ip, port, services)
-		return na, nil
-	}
-
-	// addr will be a socks.ProxiedAddr when using a proxy.
-	if proxiedAddr, ok := addr.(*socks.ProxiedAddr); ok {
-		ip := net.ParseIP(proxiedAddr.Host)
-		if ip == nil {
-			ip = net.ParseIP("0.0.0.0")
-		}
-		port := uint16(proxiedAddr.Port)
 		na := wire.NewNetAddressIPPort(ip, port, services)
 		return na, nil
 	}
