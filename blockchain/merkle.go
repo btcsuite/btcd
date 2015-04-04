@@ -31,8 +31,8 @@ func nextPowerOfTwo(n int) int {
 func HashMerkleBranches(left *wire.ShaHash, right *wire.ShaHash) *wire.ShaHash {
 	// Concatenate the left and right nodes.
 	var sha [wire.HashSize * 2]byte
-	copy(sha[:wire.HashSize], left.Bytes())
-	copy(sha[wire.HashSize:], right.Bytes())
+	copy(sha[:wire.HashSize], left[:])
+	copy(sha[wire.HashSize:], right[:])
 
 	// Create a new sha hash from the double sha 256.  Ignore the error
 	// here since SetBytes can't fail here due to the fact DoubleSha256

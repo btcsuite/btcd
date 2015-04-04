@@ -641,8 +641,7 @@ func int64ToKey(keyint int64) []byte {
 }
 
 func shaBlkToKey(sha *wire.ShaHash) []byte {
-	shaB := sha.Bytes()
-	return shaB
+	return sha[:]
 }
 
 // These are used here and in tx.go's deleteOldAddrIndex() to prevent deletion
@@ -651,15 +650,17 @@ var recordSuffixTx = []byte{'t', 'x'}
 var recordSuffixSpentTx = []byte{'s', 'x'}
 
 func shaTxToKey(sha *wire.ShaHash) []byte {
-	shaB := sha.Bytes()
-	shaB = append(shaB, recordSuffixTx...)
-	return shaB
+	key := make([]byte, len(sha)+len(recordSuffixTx))
+	copy(key, sha[:])
+	copy(key[len(sha):], recordSuffixTx)
+	return key
 }
 
 func shaSpentTxToKey(sha *wire.ShaHash) []byte {
-	shaB := sha.Bytes()
-	shaB = append(shaB, recordSuffixSpentTx...)
-	return shaB
+	key := make([]byte, len(sha)+len(recordSuffixSpentTx))
+	copy(key, sha[:])
+	copy(key[len(sha):], recordSuffixSpentTx)
+	return key
 }
 
 func (db *LevelDb) lBatch() *leveldb.Batch {

@@ -5,7 +5,6 @@
 package main
 
 import (
-	"bytes"
 	"container/list"
 	"crypto/rand"
 	"encoding/binary"
@@ -215,13 +214,15 @@ func (s *server) handleUpdatePeerHeights(state *peerState, umsg updatePeerHeight
 			return
 		}
 
-		latestBlkSha := p.lastAnnouncedBlock.Bytes()
+		// This is a pointer to the underlying memory which doesn't
+		// change.
+		latestBlkSha := p.lastAnnouncedBlock
 		p.StatsMtx.Unlock()
 
 		// If the peer has recently announced a block, and this block
 		// matches our newly accepted block, then update their block
 		// height.
-		if bytes.Equal(latestBlkSha, umsg.newSha.Bytes()) {
+		if *latestBlkSha == *umsg.newSha {
 			p.UpdateLastBlockHeight(umsg.newHeight)
 			p.UpdateLastAnnouncedBlock(nil)
 		}

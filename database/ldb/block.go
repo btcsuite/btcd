@@ -134,10 +134,9 @@ func (db *LevelDb) setBlk(sha *wire.ShaHash, blkHeight int64, buf []byte) {
 	shaKey := shaBlkToKey(sha)
 	blkKey := int64ToKey(blkHeight)
 
-	shaB := sha.Bytes()
-	blkVal := make([]byte, len(shaB)+len(buf))
-	copy(blkVal[0:], shaB)
-	copy(blkVal[len(shaB):], buf)
+	blkVal := make([]byte, len(sha)+len(buf))
+	copy(blkVal[0:], sha[:])
+	copy(blkVal[len(sha):], buf)
 
 	db.lBatch().Put(shaKey, lw[:])
 	db.lBatch().Put(blkKey, blkVal)

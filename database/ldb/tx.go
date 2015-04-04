@@ -537,7 +537,7 @@ func (db *LevelDb) UpdateAddrIndexForBlock(blkSha *wire.ShaHash, blkHeight int64
 
 	// Update tip of addrindex.
 	newIndexTip := make([]byte, 40, 40)
-	copy(newIndexTip[0:32], blkSha.Bytes())
+	copy(newIndexTip[0:32], blkSha[:])
 	binary.LittleEndian.PutUint64(newIndexTip[32:40], uint64(blkHeight))
 	batch.Put(addrIndexMetaDataKey, newIndexTip)
 

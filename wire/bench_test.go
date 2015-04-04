@@ -392,3 +392,20 @@ func BenchmarkTxSha(b *testing.B) {
 		genesisCoinbaseTx.TxSha()
 	}
 }
+
+// BenchmarkDoubleSha256 performs a benchmark on how long it takes to perform a
+// double sha 256.
+func BenchmarkDoubleSha256(b *testing.B) {
+	b.StopTimer()
+	var buf bytes.Buffer
+	if err := genesisCoinbaseTx.Serialize(&buf); err != nil {
+		b.Errorf("Serialize: unexpected error: %v", err)
+		return
+	}
+	txBytes := buf.Bytes()
+	b.StartTimer()
+
+	for i := 0; i < b.N; i++ {
+		_ = DoubleSha256(txBytes)
+	}
+}

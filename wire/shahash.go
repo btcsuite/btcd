@@ -5,7 +5,6 @@
 package wire
 
 import (
-	"bytes"
 	"encoding/hex"
 	"fmt"
 )
@@ -34,6 +33,10 @@ func (hash ShaHash) String() string {
 }
 
 // Bytes returns the bytes which represent the hash as a byte slice.
+//
+// NOTE: This makes a copy of the bytes and should have probably been named
+// CloneBytes.  It is generally cheaper to just slice the hash directly thereby
+// reusing the same bytes rather than calling this method.
 func (hash *ShaHash) Bytes() []byte {
 	newHash := make([]byte, HashSize)
 	copy(newHash, hash[:])
@@ -49,14 +52,14 @@ func (hash *ShaHash) SetBytes(newHash []byte) error {
 		return fmt.Errorf("invalid sha length of %v, want %v", nhlen,
 			HashSize)
 	}
-	copy(hash[:], newHash[0:HashSize])
+	copy(hash[:], newHash)
 
 	return nil
 }
 
 // IsEqual returns true if target is the same as hash.
 func (hash *ShaHash) IsEqual(target *ShaHash) bool {
-	return bytes.Equal(hash[:], target[:])
+	return *hash == *target
 }
 
 // NewShaHash returns a new ShaHash from a byte slice.  An error is returned if

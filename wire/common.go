@@ -522,10 +522,7 @@ func RandomUint64() (uint64, error) {
 
 // DoubleSha256 calculates sha256(sha256(b)) and returns the resulting bytes.
 func DoubleSha256(b []byte) []byte {
-	hasher := fastsha256.New()
-	hasher.Write(b)
-	sum := hasher.Sum(nil)
-	hasher.Reset()
-	hasher.Write(sum)
-	return hasher.Sum(nil)
+	first := fastsha256.Sum256(b)
+	second := fastsha256.Sum256(first[:])
+	return second[:]
 }

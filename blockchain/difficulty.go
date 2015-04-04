@@ -57,15 +57,14 @@ var (
 // perform math comparisons.
 func ShaHashToBig(hash *wire.ShaHash) *big.Int {
 	// A ShaHash is in little-endian, but the big package wants the bytes
-	// in big-endian.  Reverse them.  ShaHash.Bytes makes a copy, so it
-	// is safe to modify the returned buffer.
-	buf := hash.Bytes()
+	// in big-endian, so reverse them.
+	buf := *hash
 	blen := len(buf)
 	for i := 0; i < blen/2; i++ {
 		buf[i], buf[blen-1-i] = buf[blen-1-i], buf[i]
 	}
 
-	return new(big.Int).SetBytes(buf)
+	return new(big.Int).SetBytes(buf[:])
 }
 
 // CompactToBig converts a compact representation of a whole number N to an
