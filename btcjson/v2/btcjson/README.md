@@ -41,6 +41,26 @@ http://localhost:6060/pkg/github.com/btcsuite/btcd/btcjson/v2/btcjson
 $ go get github.com/btcsuite/btcd/btcjson/v2/btcjson
 ```
 
+## Examples
+
+* [Marshal Command]
+  (http://godoc.org/github.com/btcsuite/btcd/btcjson/v2/btcjson#example-MarshalCmd)  
+  Demonstrates how to create and marshal a command into a JSON-RPC request.
+
+* [Unmarshal Command]
+  (http://godoc.org/github.com/btcsuite/btcd/btcjson/v2/btcjson#example-UnmarshalCmd)  
+  Demonstrates how to unmarshal a JSON-RPC request and then unmarshal the
+  concrete request into a concrete command.
+
+* [Marshal Response]
+  (http://godoc.org/github.com/btcsuite/btcd/btcjson/v2/btcjson#example-MarshalResponse)  
+  Demonstrates how to marshal a JSON-RPC response.
+
+* [Unmarshal Response]
+  (http://godoc.org/github.com/btcsuite/btcd/btcjson/v2/btcjson#example-package--UnmarshalResponse)  
+  Demonstrates how to unmarshal a JSON-RPC response and then unmarshal the
+  result field in the response to a concrete type.
+
 ## GPG Verification Key
 
 All official release tags are signed by Conformal so users can ensure the code
