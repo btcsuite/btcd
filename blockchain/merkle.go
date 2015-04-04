@@ -34,11 +34,8 @@ func HashMerkleBranches(left *wire.ShaHash, right *wire.ShaHash) *wire.ShaHash {
 	copy(sha[:wire.HashSize], left[:])
 	copy(sha[wire.HashSize:], right[:])
 
-	// Create a new sha hash from the double sha 256.  Ignore the error
-	// here since SetBytes can't fail here due to the fact DoubleSha256
-	// always returns a []byte of the right size regardless of input.
-	newSha, _ := wire.NewShaHash(wire.DoubleSha256(sha[:]))
-	return newSha
+	newSha := wire.DoubleSha256SH(sha[:])
+	return &newSha
 }
 
 // BuildMerkleTreeStore creates a merkle tree from a slice of transactions,

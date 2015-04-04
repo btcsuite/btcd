@@ -526,3 +526,10 @@ func DoubleSha256(b []byte) []byte {
 	second := fastsha256.Sum256(first[:])
 	return second[:]
 }
+
+// DoubleSha256SH calculates sha256(sha256(b)) and returns the resulting bytes
+// as a ShaHash.
+func DoubleSha256SH(b []byte) ShaHash {
+	first := fastsha256.Sum256(b)
+	return ShaHash(fastsha256.Sum256(first[:]))
+}
