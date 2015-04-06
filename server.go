@@ -695,15 +695,11 @@ out:
 		tries := 0
 		for state.NeedMoreOutbound() &&
 			atomic.LoadInt32(&s.shutdown) == 0 {
-			// We bias like bitcoind does, 10 for no outgoing
-			// up to 90 (8) for the selection of new vs tried
-			//addresses.
-
 			nPeers := state.OutboundCount()
 			if nPeers > 8 {
 				nPeers = 8
 			}
-			addr := s.addrManager.GetAddress("any", 10+nPeers*10)
+			addr := s.addrManager.GetAddress("any")
 			if addr == nil {
 				break
 			}
