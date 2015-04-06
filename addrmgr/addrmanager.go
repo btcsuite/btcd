@@ -104,7 +104,7 @@ const (
 
 	// triedBucketSize is the maximum number of addresses in each
 	// tried address bucket.
-	triedBucketSize = 64
+	triedBucketSize = 256
 
 	// triedBucketCount is the number of buckets we split tried
 	// addresses over.
@@ -116,19 +116,19 @@ const (
 
 	// newBucketCount is the number of buckets that we spread new addresses
 	// over.
-	newBucketCount = 256
+	newBucketCount = 1024
 
 	// triedBucketsPerGroup is the number of tried buckets over which an
 	// address group will be spread.
-	triedBucketsPerGroup = 4
+	triedBucketsPerGroup = 8
 
 	// newBucketsPerGroup is the number of new buckets over which an
 	// source address group will be spread.
-	newBucketsPerGroup = 32
+	newBucketsPerGroup = 64
 
 	// newBucketsPerAddress is the number of buckets a frequently seen new
 	// address may end up in.
-	newBucketsPerAddress = 4
+	newBucketsPerAddress = 8
 
 	// numMissingDays is the number of days before which we assume an
 	// address has vanished if we have not seen it announced  in that long.
