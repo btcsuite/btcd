@@ -29,8 +29,7 @@ import (
 
 	"github.com/btcsuite/btcd/blockchain"
 	"github.com/btcsuite/btcd/btcec"
-	"github.com/btcsuite/btcd/btcjson/btcws"
-	"github.com/btcsuite/btcd/btcjson/v2/btcjson"
+	"github.com/btcsuite/btcd/btcjson"
 	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/btcsuite/btcd/database"
 	"github.com/btcsuite/btcd/txscript"
@@ -880,7 +879,7 @@ func handleGetBestBlock(s *rpcServer, cmd interface{}, closeChan <-chan struct{}
 		}
 	}
 
-	result := &btcws.GetBestBlockResult{
+	result := &btcjson.GetBestBlockResult{
 		Hash:   sha.String(),
 		Height: int32(height),
 	}
