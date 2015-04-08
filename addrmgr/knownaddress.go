@@ -48,7 +48,7 @@ func (ka *KnownAddress) chance() float64 {
 		lastAttempt = 0
 	}
 
-	c := 600.0 / (600.0 + lastSeen.Seconds())
+	c := 1.0
 
 	// Very recent attempts are less likely to be retried.
 	if lastAttempt > 10*time.Minute {
