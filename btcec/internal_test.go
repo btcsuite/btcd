@@ -74,3 +74,9 @@ func NewFieldVal() *fieldVal {
 func TstNonceRFC6979(privkey *big.Int, hash []byte) *big.Int {
 	return nonceRFC6979(privkey, hash)
 }
+
+// TstRemovePKCSPadding makes the internal removePKCSPadding function available
+// to the test package.
+func TstRemovePKCSPadding(src []byte) ([]byte, error) {
+	return removePKCSPadding(src)
+}

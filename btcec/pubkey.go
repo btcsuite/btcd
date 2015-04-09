@@ -107,7 +107,7 @@ func ParsePubKey(pubKeyStr []byte, curve *KoblitzCurve) (key *PublicKey, err err
 		return nil, fmt.Errorf("pubkey Y parameter is >= to P")
 	}
 	if !pubkey.Curve.IsOnCurve(pubkey.X, pubkey.Y) {
-		return nil, fmt.Errorf("pubkey isn't on secp265k1 curve")
+		return nil, fmt.Errorf("pubkey isn't on secp256k1 curve")
 	}
 	return &pubkey, nil
 }
