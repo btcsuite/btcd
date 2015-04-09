@@ -169,7 +169,7 @@ out:
 		} else {
 			for _, lr := range txReply {
 				if lr.Err != nil {
-					fmt.Errorf("stx %v spent %v err %v\n", lr.Sha,
+					t.Errorf("stx %v spent %v err %v\n", lr.Sha,
 						lr.TxSpent, lr.Err)
 				}
 			}
