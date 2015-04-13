@@ -762,7 +762,9 @@ func (a *AddrManager) GetAddress(class string, newBias int) *KnownAddress {
 		(100.0 - float64(newBias))
 	newCorrelation := math.Sqrt(float64(a.nNew)) * float64(newBias)
 
-	if ((newCorrelation + triedCorrelation) * a.rand.Float64()) <
+	// If there are tried vectors but no new vectors, automatically select from tried
+	// vectors. Otherwise choose which to select from according to the random rule.
+	if a.nNew == 0 || ((newCorrelation+triedCorrelation)*a.rand.Float64()) <
 		triedCorrelation {
 		// Tried entry.
 		large := 1 << 30
