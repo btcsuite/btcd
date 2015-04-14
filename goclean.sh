@@ -7,7 +7,7 @@
 # 5. race detector (http://blog.golang.org/race-detector)
 # 6. test coverage (http://blog.golang.org/cover)
 
-set -e
+set -ex
 
 # Automatic checks
 test -z $(gofmt -l -w . | tee /dev/stderr)
@@ -18,6 +18,7 @@ env GORACE="halt_on_error=1" go test -v -race ./...
 
 # Run test coverage on each subdirectories and merge the coverage profile.
 
+set +x
 echo "mode: count" > profile.cov
 
 # Standard go tooling behavior is to ignore dirs with leading underscores.
