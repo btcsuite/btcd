@@ -41,11 +41,8 @@ func (t *Tx) Sha() *wire.ShaHash {
 		return t.txSha
 	}
 
-	// Generate the transaction hash.  Ignore the error since TxSha can't
-	// currently fail.
-	sha, _ := t.msgTx.TxSha()
-
 	// Cache the hash and return it.
+	sha := t.msgTx.TxSha()
 	t.txSha = &sha
 	return &sha
 }

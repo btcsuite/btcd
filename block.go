@@ -76,11 +76,8 @@ func (b *Block) Sha() *wire.ShaHash {
 		return b.blockSha
 	}
 
-	// Generate the block hash.  Ignore the error since BlockSha can't
-	// currently fail.
-	sha, _ := b.msgBlock.BlockSha()
-
 	// Cache the block hash and return it.
+	sha := b.msgBlock.BlockSha()
 	b.blockSha = &sha
 	return &sha
 }
