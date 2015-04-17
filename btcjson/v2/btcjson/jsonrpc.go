@@ -44,7 +44,7 @@ func NewRPCError(code RPCErrorCode, message string) *RPCError {
 // requests, responses, or notifications) is valid.  JSON-RPC 1.0 allows any
 // valid JSON type.  JSON-RPC 2.0 (which bitcoind follows for some parts) only
 // allows string, number, or null, so this function restricts the allowed types
-// to that list.  This funciton is only provided in case the caller is manually
+// to that list.  This function is only provided in case the caller is manually
 // marshalling for some reason.    The functions which accept an ID in this
 // package already call this function to ensure the provided id is valid.
 func IsValidIDType(id interface{}) bool {
