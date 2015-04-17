@@ -43,11 +43,7 @@ func TestBlock(t *testing.T) {
 
 	// Request the sha multiple times to test generation and caching.
 	for i := 0; i < 2; i++ {
-		sha, err := b.Sha()
-		if err != nil {
-			t.Errorf("Sha: %v", err)
-			continue
-		}
+		sha := b.Sha()
 		if !sha.IsEqual(wantSha) {
 			t.Errorf("Sha #%d mismatched sha - got %v, want %v", i,
 				sha, wantSha)

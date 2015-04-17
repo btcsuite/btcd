@@ -70,10 +70,10 @@ func (b *Block) Bytes() ([]byte, error) {
 // Sha returns the block identifier hash for the Block.  This is equivalent to
 // calling BlockSha on the underlying wire.MsgBlock, however it caches the
 // result so subsequent calls are more efficient.
-func (b *Block) Sha() (*wire.ShaHash, error) {
+func (b *Block) Sha() *wire.ShaHash {
 	// Return the cached block hash if it has already been generated.
 	if b.blockSha != nil {
-		return b.blockSha, nil
+		return b.blockSha
 	}
 
 	// Generate the block hash.  Ignore the error since BlockSha can't
@@ -82,7 +82,7 @@ func (b *Block) Sha() (*wire.ShaHash, error) {
 
 	// Cache the block hash and return it.
 	b.blockSha = &sha
-	return &sha, nil
+	return &sha
 }
 
 // Tx returns a wrapped transaction (btcutil.Tx) for the transaction at the
