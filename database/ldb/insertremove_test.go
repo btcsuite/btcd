@@ -150,9 +150,8 @@ endtest:
 			continue
 		}
 		dropblock := blocks[height-1]
-		dropsha, _ := dropblock.Sha()
 
-		err = db.DropAfterBlockBySha(dropsha)
+		err = db.DropAfterBlockBySha(dropblock.Sha())
 		if err != nil {
 			t.Errorf("failed to drop block %v err %v", height, err)
 			break endtest

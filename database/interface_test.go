@@ -549,13 +549,8 @@ func testInterface(t *testing.T, dbType string) {
 		// Get the appropriate block and hash and update the test
 		// context accordingly.
 		block := blocks[height]
-		blockHash, err := block.Sha()
-		if err != nil {
-			t.Errorf("block.Sha: %v", err)
-			return
-		}
 		context.blockHeight = height
-		context.blockHash = blockHash
+		context.blockHash = block.Sha()
 		context.block = block
 
 		// The block must insert without any errors and return the
@@ -590,13 +585,8 @@ func testInterface(t *testing.T, dbType string) {
 		// Get the appropriate block and hash and update the
 		// test context accordingly.
 		block := blocks[height]
-		blockHash, err := block.Sha()
-		if err != nil {
-			t.Errorf("block.Sha: %v", err)
-			return
-		}
 		context.blockHeight = height
-		context.blockHash = blockHash
+		context.blockHash = block.Sha()
 		context.block = block
 
 		testIntegrity(&context)

@@ -34,13 +34,10 @@ func testReorganization(t *testing.T, dbType string) {
 	}
 
 	for i := int64(0); i <= 2; i++ {
-		blkHash, err := blocks[i].Sha()
-		if err != nil {
-			t.Fatalf("Error getting SHA for block %d: %v", i, err)
-		}
 		_, err = db.InsertBlock(blocks[i])
 		if err != nil {
-			t.Fatalf("Error inserting block %d (%v): %v", i, blkHash, err)
+			t.Fatalf("Error inserting block %d (%v): %v", i,
+				blocks[i].Sha(), err)
 		}
 		var txIDs []string
 		for _, tx := range blocks[i].Transactions() {
@@ -49,10 +46,7 @@ func testReorganization(t *testing.T, dbType string) {
 	}
 
 	for i := int64(1); i >= 0; i-- {
-		blkHash, err := blocks[i].Sha()
-		if err != nil {
-			t.Fatalf("Error getting SHA for block %d: %v", i, err)
-		}
+		blkHash := blocks[i].Sha()
 		err = db.DropAfterBlockBySha(blkHash)
 		if err != nil {
 			t.Fatalf("Error removing block %d for reorganization: %v", i, err)
@@ -70,7 +64,7 @@ func testReorganization(t *testing.T, dbType string) {
 	}
 
 	for i := int64(3); i < int64(len(blocks)); i++ {
-		blkHash, err := blocks[i].Sha()
+		blkHash := blocks[i].Sha()
 		if err != nil {
 			t.Fatalf("Error getting SHA for block %dA: %v", i-2, err)
 		}

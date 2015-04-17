@@ -268,7 +268,7 @@ out:
 			t.Errorf("height does not match latest block height %v %v %v", blkid, height, err)
 		}
 
-		blkSha, _ := block.Sha()
+		blkSha := block.Sha()
 		if *newSha != *blkSha {
 			t.Errorf("Newest block sha does not match freshly inserted one %v %v %v ", newSha, blkSha, err)
 		}
@@ -345,11 +345,7 @@ func testBackout(t *testing.T) {
 		}
 	}()
 
-	sha, err := testDb.blocks[99].Sha()
-	if err != nil {
-		t.Errorf("failed to get block 99 sha err %v", err)
-		return
-	}
+	sha := testDb.blocks[99].Sha()
 	if _, err := testDb.db.ExistsSha(sha); err != nil {
 		t.Errorf("ExistsSha: unexpected error: %v", err)
 	}
@@ -359,11 +355,7 @@ func testBackout(t *testing.T) {
 		return
 	}
 
-	sha, err = testDb.blocks[119].Sha()
-	if err != nil {
-		t.Errorf("failed to get block 110 sha err %v", err)
-		return
-	}
+	sha = testDb.blocks[119].Sha()
 	if _, err := testDb.db.ExistsSha(sha); err != nil {
 		t.Errorf("ExistsSha: unexpected error: %v", err)
 	}
@@ -472,11 +464,7 @@ func testFetchHeightRange(t *testing.T, db database.Db, blocks []*btcutil.Block)
 	nBlocks := int64(len(blocks))
 
 	for i := range blocks {
-		blockSha, err := blocks[i].Sha()
-		if err != nil {
-			t.Errorf("FetchHeightRange: unexpected failure computing block sah %v", err)
-		}
-		shanames[i] = blockSha
+		shanames[i] = blocks[i].Sha()
 	}
 
 	for startheight := int64(0); startheight < nBlocks; startheight += testincrement {
@@ -557,7 +545,7 @@ func TestLimitAndSkipFetchTxsForAddr(t *testing.T) {
 		copy(hash160[:], scriptAddr[:])
 		index[hash160] = append(index[hash160], &txLoc[i])
 	}
-	blkSha, _ := testBlock.Sha()
+	blkSha := testBlock.Sha()
 	err = testDb.db.UpdateAddrIndexForBlock(blkSha, newheight, index)
 	if err != nil {
 		t.Fatalf("UpdateAddrIndexForBlock: failed to index"+
