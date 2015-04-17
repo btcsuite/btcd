@@ -525,9 +525,15 @@ func parseTxAcceptedNtfnParams(params []json.RawMessage) (*wire.ShaHash,
 		return nil, 0, err
 	}
 
-	// Unmarshal second parameter as an integer.
-	var amt int64
-	err = json.Unmarshal(params[1], &amt)
+	// Unmarshal second parameter as a floating point number.
+	var famt float64
+	err = json.Unmarshal(params[1], &famt)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	// Bounds check amount.
+	amt, err := btcutil.NewAmount(famt)
 	if err != nil {
 		return nil, 0, err
 	}
