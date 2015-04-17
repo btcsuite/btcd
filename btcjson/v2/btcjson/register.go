@@ -136,19 +136,19 @@ func isAcceptableKind(kind reflect.Kind) bool {
 // The type format is very strict since it needs to be able to automatically
 // marshal to and from JSON-RPC 1.0.  The following enumerates the requirements:
 //
-// - The provided command must be a single pointer to a struct
-// - All fields must be exported
-// - The order of the positional parameters in the marshalled JSON will be in
-//   the same order as declared in the struct definition
-// - Struct embedding is not supported
-// - Struct fields may NOT be channels, functions, complex, or interface
-// - A field in the provided struct with a pointer is treated as optional
-// - Multiple indirections (i.e **int) are not supported
-// - Once the first optional field (pointer) is encountered, the remaining
-//   fields must also be optional fields (pointers) as required by positional
-//   params
-// - A field that has a 'jsonrpcdefault' struct tag must be an optional field
-//   (pointer)
+//   - The provided command must be a single pointer to a struct
+//   - All fields must be exported
+//   - The order of the positional parameters in the marshalled JSON will be in
+//     the same order as declared in the struct definition
+//   - Struct embedding is not supported
+//   - Struct fields may NOT be channels, functions, complex, or interface
+//   - A field in the provided struct with a pointer is treated as optional
+//   - Multiple indirections (i.e **int) are not supported
+//   - Once the first optional field (pointer) is encountered, the remaining
+//     fields must also be optional fields (pointers) as required by positional
+//     params
+//   - A field that has a 'jsonrpcdefault' struct tag must be an optional field
+//     (pointer)
 //
 // NOTE: This function only needs to be able to examine the structure of the
 // passed struct, so it does not need to be an actual instance.  Therefore, it

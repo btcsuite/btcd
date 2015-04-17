@@ -495,19 +495,19 @@ func assignField(paramNum int, fieldName string, dest reflect.Value, src reflect
 // to be passed unaltered.  In particular, the following conversions are
 // supported:
 //
-// - Conversion between any size signed or unsigned integer so long as the value
-//   does not overflow the destination type
-// - Conversion between float32 and float64 so long as the value does not
-//   overflow the destination type
-// - Conversion from string to boolean for everything strconv.ParseBool
-//   recognizes
-// - Conversion from string to any size integer for everything strconv.ParseInt
-//   and strconv.ParseUint recognizes
-// - Conversion from string to any size float for everything strconv.ParseFloat
-//   recognizes
-// - Conversion from string to arrays, slices, structs, and maps by treating
-//   the string as marshalled JSON and calling json.Unmarshal into the
-//   destination field
+//   - Conversion between any size signed or unsigned integer so long as the
+//     value does not overflow the destination type
+//   - Conversion between float32 and float64 so long as the value does not
+//     overflow the destination type
+//   - Conversion from string to boolean for everything strconv.ParseBool
+//     recognizes
+//   - Conversion from string to any size integer for everything
+//     strconv.ParseInt and strconv.ParseUint recognizes
+//   - Conversion from string to any size float for everything
+//     strconv.ParseFloat recognizes
+//   - Conversion from string to arrays, slices, structs, and maps by treating
+//     the string as marshalled JSON and calling json.Unmarshal into the
+//     destination field
 func NewCmd(method string, args ...interface{}) (interface{}, error) {
 	// Look up details about the provided method.  Any methods that aren't
 	// registered are an error.
