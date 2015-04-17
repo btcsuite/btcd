@@ -45,7 +45,7 @@ type BlockHeader struct {
 const blockHeaderLen = 80
 
 // BlockSha computes the block identifier hash for the given block header.
-func (h *BlockHeader) BlockSha() (ShaHash, error) {
+func (h *BlockHeader) BlockSha() ShaHash {
 	// Encode the header and double sha256 everything prior to the number of
 	// transactions.  Ignore the error returns since there is no way the
 	// encode could fail except being out of memory which would cause a
@@ -53,10 +53,7 @@ func (h *BlockHeader) BlockSha() (ShaHash, error) {
 	var buf bytes.Buffer
 	_ = writeBlockHeader(&buf, 0, h)
 
-	// Even though this function can't currently fail, it still returns
-	// a potential error to help future proof the API should a failure
-	// become possible.
-	return DoubleSha256SH(buf.Bytes()), nil
+	return DoubleSha256SH(buf.Bytes())
 }
 
 // Deserialize decodes a block header from r into the receiver using a format

@@ -367,7 +367,7 @@ func testBackout(t *testing.T) {
 
 	block := testDb.blocks[119]
 	mblock := block.MsgBlock()
-	txsha, err := mblock.Transactions[0].TxSha()
+	txsha := mblock.Transactions[0].TxSha()
 	exists, err := testDb.db.ExistsTxSha(&txsha)
 	if err != nil {
 		t.Errorf("ExistsTxSha: unexpected error %v ", err)

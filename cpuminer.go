@@ -233,7 +233,7 @@ func (m *CPUMiner) solveBlock(msgBlock *wire.MsgBlock, blockHeight int64,
 			// increment the number of hashes completed for each
 			// attempt accordingly.
 			header.Nonce = i
-			hash, _ := header.BlockSha()
+			hash := header.BlockSha()
 			hashesCompleted += 2
 
 			// The block is solved when the new block hash is less

@@ -184,7 +184,7 @@ func (db *MemDb) DropAfterBlockBySha(sha *wire.ShaHash) error {
 		transactions := db.blocks[i].Transactions
 		for j := len(transactions) - 1; j >= 0; j-- {
 			tx := transactions[j]
-			txHash, _ := tx.TxSha()
+			txHash := tx.TxSha()
 			db.removeTx(tx, &txHash)
 		}
 
@@ -291,11 +291,7 @@ func (db *MemDb) FetchBlockShaByHeight(height int64) (*wire.ShaHash, error) {
 	}
 
 	msgBlock := db.blocks[height]
-	blockHash, err := msgBlock.BlockSha()
-	if err != nil {
-		return nil, err
-	}
-
+	blockHash := msgBlock.BlockSha()
 	return &blockHash, nil
 }
 
@@ -337,10 +333,7 @@ func (db *MemDb) FetchHeightRange(startHeight, endHeight int64) ([]wire.ShaHash,
 		}
 
 		msgBlock := db.blocks[i]
-		blockHash, err := msgBlock.BlockSha()
-		if err != nil {
-			return nil, err
-		}
+		blockHash := msgBlock.BlockSha()
 		hashList = append(hashList, blockHash)
 	}
 
@@ -390,10 +383,7 @@ func (db *MemDb) FetchTxBySha(txHash *wire.ShaHash) ([]*database.TxListReply, er
 	replyList := make([]*database.TxListReply, len(txns))
 	for i, txD := range txns {
 		msgBlock := db.blocks[txD.blockHeight]
-		blockSha, err := msgBlock.BlockSha()
-		if err != nil {
-			return nil, err
-		}
+		blockSha := msgBlock.BlockSha()
 
 		spentBuf := make([]bool, len(txD.spentBuf))
 		copy(spentBuf, txD.spentBuf)
@@ -455,11 +445,7 @@ func (db *MemDb) fetchTxByShaList(txShaList []*wire.ShaHash, includeSpent bool) 
 			// the reply error appropriately and go to the next
 			// requested transaction if anything goes wrong.
 			msgBlock := db.blocks[txD.blockHeight]
-			blockSha, err := msgBlock.BlockSha()
-			if err != nil {
-				reply.Err = err
-				continue
-			}
+			blockSha := msgBlock.BlockSha()
 
 			// Make a copy of the spent buf to return so the caller
 			// can't accidentally modify it.
@@ -685,11 +671,7 @@ func (db *MemDb) NewestSha() (*wire.ShaHash, int64, error) {
 		return &zeroHash, -1, nil
 	}
 
-	blockSha, err := db.blocks[numBlocks-1].BlockSha()
-	if err != nil {
-		return nil, -1, err
-	}
-
+	blockSha := db.blocks[numBlocks-1].BlockSha()
 	return &blockSha, int64(numBlocks - 1), nil
 }
 

@@ -482,7 +482,7 @@ func (db *LevelDb) FetchTxsForAddr(addr btcutil.Address, skip int,
 			continue
 		}
 
-		txSha, _ := tx.TxSha()
+		txSha := tx.TxSha()
 		txReply := &database.TxListReply{Sha: &txSha, Tx: tx,
 			BlkSha: blkSha, Height: blkHeight, TxSpent: []bool{}, Err: err}
 

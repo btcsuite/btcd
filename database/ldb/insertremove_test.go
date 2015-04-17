@@ -91,7 +91,7 @@ endtest:
 					t.Errorf("referenced tx not found %v ", origintxsha)
 				}
 			}
-			txshaname, _ := tx.TxSha()
+			txshaname := tx.TxSha()
 			txlookupList = append(txlookupList, &txshaname)
 			txOutList = append(txOutList, &txshaname)
 		}

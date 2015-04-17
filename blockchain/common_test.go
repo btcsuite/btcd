@@ -176,10 +176,7 @@ func loadTxStore(filename string) (blockchain.TxStore, error) {
 		txD.Tx = btcutil.NewTx(&msgTx)
 
 		// Transaction hash.
-		txHash, err := msgTx.TxSha()
-		if err != nil {
-			return nil, err
-		}
+		txHash := msgTx.TxSha()
 		txD.Hash = &txHash
 
 		// Block height the transaction came from.

@@ -4140,7 +4140,7 @@ func ParseShortForm(script string) ([]byte, error) {
 
 // createSpendTx generates a basic spending transaction given the passed
 // signature and public key scripts.
-func createSpendingTx(sigScript, pkScript []byte) (*wire.MsgTx, error) {
+func createSpendingTx(sigScript, pkScript []byte) *wire.MsgTx {
 	coinbaseTx := wire.NewMsgTx()
 
 	outPoint := wire.NewOutPoint(&wire.ShaHash{}, ^uint32(0))
@@ -4150,10 +4150,7 @@ func createSpendingTx(sigScript, pkScript []byte) (*wire.MsgTx, error) {
 	coinbaseTx.AddTxOut(txOut)
 
 	spendingTx := wire.NewMsgTx()
-	coinbaseTxSha, err := coinbaseTx.TxSha()
-	if err != nil {
-		return nil, err
-	}
+	coinbaseTxSha := coinbaseTx.TxSha()
 	outPoint = wire.NewOutPoint(&coinbaseTxSha, 0)
 	txIn = wire.NewTxIn(outPoint, sigScript)
 	txOut = wire.NewTxOut(0, nil)
@@ -4161,7 +4158,7 @@ func createSpendingTx(sigScript, pkScript []byte) (*wire.MsgTx, error) {
 	spendingTx.AddTxIn(txIn)
 	spendingTx.AddTxOut(txOut)
 
-	return spendingTx, nil
+	return spendingTx
 }
 
 func TestBitcoindInvalidTests(t *testing.T) {
@@ -4204,11 +4201,7 @@ func TestBitcoindInvalidTests(t *testing.T) {
 			t.Errorf("%s: %v", name, err)
 			continue
 		}
-		tx, err := createSpendingTx(scriptSig, scriptPubKey)
-		if err != nil {
-			t.Errorf("createSpendingTx failed on test %s: %v", name, err)
-			continue
-		}
+		tx := createSpendingTx(scriptSig, scriptPubKey)
 		s, err := NewScript(scriptSig, scriptPubKey, 0, tx, flags)
 		if err == nil {
 			if err := s.Execute(); err == nil {
@@ -4260,11 +4253,7 @@ func TestBitcoindValidTests(t *testing.T) {
 			t.Errorf("%s: %v", name, err)
 			continue
 		}
-		tx, err := createSpendingTx(scriptSig, scriptPubKey)
-		if err != nil {
-			t.Errorf("createSpendingTx failed on test %s: %v", name, err)
-			continue
-		}
+		tx := createSpendingTx(scriptSig, scriptPubKey)
 		s, err := NewScript(scriptSig, scriptPubKey, 0, tx, flags)
 		if err != nil {
 			t.Errorf("%s failed to create script: %v", name, err)

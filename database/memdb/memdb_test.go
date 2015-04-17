@@ -55,10 +55,7 @@ func TestClosed(t *testing.T) {
 	}
 
 	genesisCoinbaseTx := chaincfg.MainNetParams.GenesisBlock.Transactions[0]
-	coinbaseHash, err := genesisCoinbaseTx.TxSha()
-	if err != nil {
-		t.Errorf("TxSha: unexpected error %v", err)
-	}
+	coinbaseHash := genesisCoinbaseTx.TxSha()
 	if _, err := db.ExistsTxSha(&coinbaseHash); err != memdb.ErrDbClosed {
 		t.Errorf("ExistsTxSha: unexpected error %v", err)
 	}

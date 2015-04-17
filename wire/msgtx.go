@@ -166,18 +166,14 @@ func (msg *MsgTx) AddTxOut(to *TxOut) {
 }
 
 // TxSha generates the ShaHash name for the transaction.
-func (msg *MsgTx) TxSha() (ShaHash, error) {
+func (msg *MsgTx) TxSha() ShaHash {
 	// Encode the transaction and calculate double sha256 on the result.
 	// Ignore the error returns since the only way the encode could fail
 	// is being out of memory or due to nil pointers, both of which would
 	// cause a run-time panic.
 	buf := bytes.NewBuffer(make([]byte, 0, msg.SerializeSize()))
 	_ = msg.Serialize(buf)
-
-	// Even though this function can't currently fail, it still returns
-	// a potential error to help future proof the API should a failure
-	// become possible.
-	return DoubleSha256SH(buf.Bytes()), nil
+	return DoubleSha256SH(buf.Bytes())
 }
 
 // Copy creates a deep copy of a transaction so that the original does not get

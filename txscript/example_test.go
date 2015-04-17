@@ -111,12 +111,7 @@ func ExampleSignTxOutput() {
 	}
 	txOut := wire.NewTxOut(100000000, pkScript)
 	originTx.AddTxOut(txOut)
-
-	originTxHash, err := originTx.TxSha()
-	if err != nil {
-		fmt.Println(err)
-		return
-	}
+	originTxHash := originTx.TxSha()
 
 	// Create the transaction to redeem the fake transaction.
 	redeemTx := wire.NewMsgTx()

@@ -169,10 +169,7 @@ func TestTxSha(t *testing.T) {
 	msgTx.LockTime = 0
 
 	// Ensure the hash produced is expected.
-	txHash, err := msgTx.TxSha()
-	if err != nil {
-		t.Errorf("TxSha: %v", err)
-	}
+	txHash := msgTx.TxSha()
 	if !txHash.IsEqual(wantHash) {
 		t.Errorf("TxSha: wrong hash - got %v, want %v",
 			spew.Sprint(txHash), spew.Sprint(wantHash))

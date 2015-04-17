@@ -799,14 +799,7 @@ func (b *blockManager) handleHeadersMsg(hmsg *headersMsg) {
 	receivedCheckpoint := false
 	var finalHash *wire.ShaHash
 	for _, blockHeader := range msg.Headers {
-		blockHash, err := blockHeader.BlockSha()
-		if err != nil {
-			bmgrLog.Warnf("Failed to compute hash of header "+
-				"received from peer %s -- disconnecting",
-				hmsg.peer.addr)
-			hmsg.peer.Disconnect()
-			return
-		}
+		blockHash := blockHeader.BlockSha()
 		finalHash = &blockHash
 
 		// Ensure there is a previous header to compare against.
