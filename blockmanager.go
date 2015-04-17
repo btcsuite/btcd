@@ -531,7 +531,7 @@ func (b *blockManager) current() bool {
 // handleBlockMsg handles block messages from all peers.
 func (b *blockManager) handleBlockMsg(bmsg *blockMsg) {
 	// If we didn't ask for this block then the peer is misbehaving.
-	blockSha, _ := bmsg.block.Sha()
+	blockSha := bmsg.block.Sha()
 	if _, ok := bmsg.peer.requestedBlocks[*blockSha]; !ok {
 		// The regression test intentionally sends some blocks twice
 		// to test duplicate block insertion fails.  Don't disconnect
@@ -1193,12 +1193,8 @@ func (b *blockManager) handleNotifyMsg(notification *blockchain.Notification) {
 			break
 		}
 
-		// It's ok to ignore the error here since the notification is
-		// coming from the chain code which has already cached the hash.
-		hash, _ := block.Sha()
-
 		// Generate the inventory vector and relay it.
-		iv := wire.NewInvVect(wire.InvTypeBlock, hash)
+		iv := wire.NewInvVect(wire.InvTypeBlock, block.Sha())
 		b.server.RelayInventory(iv, nil)
 
 	// A block has been connected to the main block chain.

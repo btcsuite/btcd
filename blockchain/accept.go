@@ -83,8 +83,7 @@ func (b *BlockChain) maybeAcceptBlock(block *btcutil.Block, flags BehaviorFlags)
 	}
 
 	// Ensure chain matches up to predetermined checkpoints.
-	// It's safe to ignore the error on Sha since it's already cached.
-	blockHash, _ := block.Sha()
+	blockHash := block.Sha()
 	if !b.verifyCheckpoint(blockHeight, blockHash) {
 		str := fmt.Sprintf("block at height %d does not match "+
 			"checkpoint hash", blockHeight)

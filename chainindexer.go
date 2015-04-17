@@ -368,7 +368,7 @@ out:
 	for {
 		select {
 		case nextWrite := <-minHeightWrite:
-			sha, _ := nextWrite.blk.Sha() // Can never fail.
+			sha := nextWrite.blk.Sha()
 			height := nextWrite.blk.Height()
 			err := a.server.db.UpdateAddrIndexForBlock(sha, height,
 				nextWrite.addrIndex)

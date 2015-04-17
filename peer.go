@@ -822,12 +822,7 @@ func (p *peer) handleBlockMsg(msg *wire.MsgBlock, buf []byte) {
 	block := btcutil.NewBlockFromBlockAndBytes(msg, buf)
 
 	// Add the block to the known inventory for the peer.
-	hash, err := block.Sha()
-	if err != nil {
-		peerLog.Errorf("Unable to get block hash: %v", err)
-		return
-	}
-	iv := wire.NewInvVect(wire.InvTypeBlock, hash)
+	iv := wire.NewInvVect(wire.InvTypeBlock, block.Sha())
 	p.AddKnownInventory(iv)
 
 	// Queue the block up to be handled by the block

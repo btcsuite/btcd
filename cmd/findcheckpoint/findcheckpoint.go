@@ -95,13 +95,9 @@ func findCandidates(db database.Db, latestHash *wire.ShaHash) ([]*chaincfg.Check
 		// All checks passed, so this node seems like a reasonable
 		// checkpoint candidate.
 		if isCandidate {
-			candidateHash, err := block.Sha()
-			if err != nil {
-				return nil, err
-			}
 			checkpoint := chaincfg.Checkpoint{
 				Height: block.Height(),
-				Hash:   candidateHash,
+				Hash:   block.Sha(),
 			}
 			candidates = append(candidates, &checkpoint)
 		}

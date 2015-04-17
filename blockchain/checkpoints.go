@@ -221,13 +221,8 @@ func (b *BlockChain) IsCheckpointCandidate(block *btcutil.Block) (bool, error) {
 		return false, fmt.Errorf("checkpoints are disabled")
 	}
 
-	blockHash, err := block.Sha()
-	if err != nil {
-		return false, err
-	}
-
 	// A checkpoint must be in the main chain.
-	exists, err := b.db.ExistsSha(blockHash)
+	exists, err := b.db.ExistsSha(block.Sha())
 	if err != nil {
 		return false, err
 	}

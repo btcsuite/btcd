@@ -239,9 +239,8 @@ func (b *BlockChain) removeOrphanBlock(orphan *orphanBlock) {
 	b.orphanLock.Lock()
 	defer b.orphanLock.Unlock()
 
-	// Remove the orphan block from the orphan pool.  It's safe to ignore
-	// the error on Sha since it's cached.
-	orphanHash, _ := orphan.block.Sha()
+	// Remove the orphan block from the orphan pool.
+	orphanHash := orphan.block.Sha()
 	delete(b.orphans, *orphanHash)
 
 	// Remove the reference from the previous orphan index too.  An indexing
@@ -251,7 +250,7 @@ func (b *BlockChain) removeOrphanBlock(orphan *orphanBlock) {
 	prevHash := &orphan.block.MsgBlock().Header.PrevBlock
 	orphans := b.prevOrphans[*prevHash]
 	for i := 0; i < len(orphans); i++ {
-		hash, _ := orphans[i].block.Sha()
+		hash := orphans[i].block.Sha()
 		if hash.IsEqual(orphanHash) {
 			copy(orphans[i:], orphans[i+1:])
 			orphans[len(orphans)-1] = nil
@@ -296,10 +295,6 @@ func (b *BlockChain) addOrphanBlock(block *btcutil.Block) {
 		b.oldestOrphan = nil
 	}
 
-	// Get the block sha.  It is safe to ignore the error here since any
-	// errors would've been caught prior to calling this function.
-	blockSha, _ := block.Sha()
-
 	// Protect concurrent access.  This is intentionally done here instead
 	// of near the top since removeOrphanBlock does its own locking and
 	// the range iterator is not invalidated by removing map entries.
@@ -313,7 +308,7 @@ func (b *BlockChain) addOrphanBlock(block *btcutil.Block) {
 		block:      block,
 		expiration: expiration,
 	}
-	b.orphans[*blockSha] = oBlock
+	b.orphans[*block.Sha()] = oBlock
 
 	// Add to previous hash lookup index for faster dependency lookups.
 	prevHash := &block.MsgBlock().Header.PrevBlock
@@ -951,8 +946,8 @@ func (b *BlockChain) connectBestChain(node *blockNode, block *btcutil.Block, fla
 		return nil
 	}
 	if fastAdd {
-		bsha, _ := block.Sha()
-		log.Warnf("fastAdd set in the side chain case? %v\n", bsha)
+		log.Warnf("fastAdd set in the side chain case? %v\n",
+			block.Sha())
 	}
 
 	// We're extending (or creating) a side chain which may or may not

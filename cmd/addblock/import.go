@@ -99,16 +99,12 @@ func (bi *blockImporter) processBlock(serializedBlock []byte) (bool, error) {
 		return false, err
 	}
 
-	blockSha, err := block.Sha()
-	if err != nil {
-		return false, err
-	}
-
 	// update progress statistics
 	bi.lastBlockTime = block.MsgBlock().Header.Timestamp
 	bi.receivedLogTx += int64(len(block.MsgBlock().Transactions))
 
 	// Skip blocks that already exist.
+	blockSha := block.Sha()
 	exists, err := bi.db.ExistsSha(blockSha)
 	if err != nil {
 		return false, err

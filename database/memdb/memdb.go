@@ -537,11 +537,6 @@ func (db *MemDb) InsertBlock(block *btcutil.Block) (int64, error) {
 		return 0, ErrDbClosed
 	}
 
-	blockHash, err := block.Sha()
-	if err != nil {
-		return 0, err
-	}
-
 	// Reject the insert if the previously reference block does not exist
 	// except in the case there are no blocks inserted yet where the first
 	// inserted block is assumed to be a genesis block.
@@ -640,7 +635,7 @@ func (db *MemDb) InsertBlock(block *btcutil.Block) (int64, error) {
 	}
 
 	db.blocks = append(db.blocks, msgBlock)
-	db.blocksBySha[*blockHash] = newHeight
+	db.blocksBySha[*block.Sha()] = newHeight
 
 	// Insert information about eacj transaction and spend all of the
 	// outputs referenced by the inputs to the transactions.
