@@ -304,13 +304,12 @@ func CheckTransactionSanity(tx *btcutil.Tx) error {
 // difficulty is in min/max range and that the block hash is less than the
 // target difficulty as claimed.
 //
-//
 // The flags modify the behavior of this function as follows:
 //  - BFNoPoWCheck: The check to ensure the block hash is less than the target
 //    difficulty is not performed.
-func checkProofOfWork(block *btcutil.Block, powLimit *big.Int, flags BehaviorFlags) error {
+func checkProofOfWork(header *wire.BlockHeader, powLimit *big.Int, flags BehaviorFlags) error {
 	// The target difficulty must be larger than zero.
-	target := CompactToBig(block.MsgBlock().Header.Bits)
+	target := CompactToBig(header.Bits)
 	if target.Sign() <= 0 {
 		str := fmt.Sprintf("block target difficulty of %064x is too low",
 			target)
@@ -328,7 +327,8 @@ func checkProofOfWork(block *btcutil.Block, powLimit *big.Int, flags BehaviorFla
 	// to avoid proof of work checks is set.
 	if flags&BFNoPoWCheck != BFNoPoWCheck {
 		// The block hash must be less than the claimed target.
-		hashNum := ShaHashToBig(block.Sha())
+		hash := header.BlockSha()
+		hashNum := ShaHashToBig(&hash)
 		if hashNum.Cmp(target) > 0 {
 			str := fmt.Sprintf("block hash of %064x is higher than "+
 				"expected max of %064x", hashNum, target)
@@ -343,7 +343,7 @@ func checkProofOfWork(block *btcutil.Block, powLimit *big.Int, flags BehaviorFla
 // difficulty is in min/max range and that the block hash is less than the
 // target difficulty as claimed.
 func CheckProofOfWork(block *btcutil.Block, powLimit *big.Int) error {
-	return checkProofOfWork(block, powLimit, BFNone)
+	return checkProofOfWork(&block.MsgBlock().Header, powLimit, BFNone)
 }
 
 // CountSigOps returns the number of signature operations for all transaction
@@ -436,14 +436,58 @@ func CountP2SHSigOps(tx *btcutil.Tx, isCoinBaseTx bool, txStore TxStore) (int, e
 	return totalSigOps, nil
 }
 
+// checkBlockHeaderSanity performs some preliminary checks on a block header to
+// ensure it is sane before continuing with processing.  These checks are
+// context free.
+//
+// The flags do not modify the behavior of this function directly, however they
+// are needed to pass along to checkProofOfWork.
+func checkBlockHeaderSanity(header *wire.BlockHeader, powLimit *big.Int, timeSource MedianTimeSource, flags BehaviorFlags) error {
+	// Ensure the proof of work bits in the block header is in min/max range
+	// and the block hash is less than the target value described by the
+	// bits.
+	err := checkProofOfWork(header, powLimit, flags)
+	if err != nil {
+		return err
+	}
+
+	// A block timestamp must not have a greater precision than one second.
+	// This check is necessary because Go time.Time values support
+	// nanosecond precision whereas the consensus rules only apply to
+	// seconds and it's much nicer to deal with standard Go time values
+	// instead of converting to seconds everywhere.
+	if !header.Timestamp.Equal(time.Unix(header.Timestamp.Unix(), 0)) {
+		str := fmt.Sprintf("block timestamp of %v has a higher "+
+			"precision than one second", header.Timestamp)
+		return ruleError(ErrInvalidTime, str)
+	}
+
+	// Ensure the block time is not too far in the future.
+	maxTimestamp := timeSource.AdjustedTime().Add(time.Second *
+		MaxTimeOffsetSeconds)
+	if header.Timestamp.After(maxTimestamp) {
+		str := fmt.Sprintf("block timestamp of %v is too far in the "+
+			"future", header.Timestamp)
+		return ruleError(ErrTimeTooNew, str)
+	}
+
+	return nil
+}
+
 // checkBlockSanity performs some preliminary checks on a block to ensure it is
 // sane before continuing with block processing.  These checks are context free.
 //
 // The flags do not modify the behavior of this function directly, however they
-// are needed to pass along to checkProofOfWork.
+// are needed to pass along to checkBlockHeaderSanity.
 func checkBlockSanity(block *btcutil.Block, powLimit *big.Int, timeSource MedianTimeSource, flags BehaviorFlags) error {
-	// A block must have at least one transaction.
 	msgBlock := block.MsgBlock()
+	header := &msgBlock.Header
+	err := checkBlockHeaderSanity(header, powLimit, timeSource, flags)
+	if err != nil {
+		return err
+	}
+
+	// A block must have at least one transaction.
 	numTx := len(msgBlock.Transactions)
 	if numTx == 0 {
 		return ruleError(ErrNoTransactions, "block does not contain "+
@@ -464,35 +508,6 @@ func checkBlockSanity(block *btcutil.Block, powLimit *big.Int, timeSource Median
 		str := fmt.Sprintf("serialized block is too big - got %d, "+
 			"max %d", serializedSize, wire.MaxBlockPayload)
 		return ruleError(ErrBlockTooBig, str)
-	}
-
-	// Ensure the proof of work bits in the block header is in min/max range
-	// and the block hash is less than the target value described by the
-	// bits.
-	err := checkProofOfWork(block, powLimit, flags)
-	if err != nil {
-		return err
-	}
-
-	// A block timestamp must not have a greater precision than one second.
-	// This check is necessary because Go time.Time values support
-	// nanosecond precision whereas the consensus rules only apply to
-	// seconds and it's much nicer to deal with standard Go time values
-	// instead of converting to seconds everywhere.
-	header := &block.MsgBlock().Header
-	if !header.Timestamp.Equal(time.Unix(header.Timestamp.Unix(), 0)) {
-		str := fmt.Sprintf("block timestamp of %v has a higher "+
-			"precision than one second", header.Timestamp)
-		return ruleError(ErrInvalidTime, str)
-	}
-
-	// Ensure the block time is not too far in the future.
-	maxTimestamp := timeSource.AdjustedTime().Add(time.Second *
-		MaxTimeOffsetSeconds)
-	if header.Timestamp.After(maxTimestamp) {
-		str := fmt.Sprintf("block timestamp of %v is too far in the "+
-			"future", header.Timestamp)
-		return ruleError(ErrTimeTooNew, str)
 	}
 
 	// The first transaction in a block must be a coinbase.
@@ -574,10 +589,162 @@ func CheckBlockSanity(block *btcutil.Block, powLimit *big.Int, timeSource Median
 	return checkBlockSanity(block, powLimit, timeSource, BFNone)
 }
 
-// ExtractCoinbaseHeight attempts to extract the height of the block
-// from the scriptSig of a coinbase transaction. Coinbase heights
-// are only present in blocks of version 2 or later. This was added as part of
-// BIP0034.
+// checkBlockHeaderContext peforms several validation checks on the block header
+// which depend on its position within the block chain.
+//
+// The flags modify the behavior of this function as follows:
+//  - BFFastAdd: All checks except those involving comparing the header against
+//    the checkpoints are not performed.
+func (b *BlockChain) checkBlockHeaderContext(header *wire.BlockHeader, prevNode *blockNode, flags BehaviorFlags) error {
+	// The genesis block is valid by definition.
+	if prevNode == nil {
+		return nil
+	}
+
+	fastAdd := flags&BFFastAdd == BFFastAdd
+	if !fastAdd {
+		// Ensure the difficulty specified in the block header matches
+		// the calculated difficulty based on the previous block and
+		// difficulty retarget rules.
+		expectedDifficulty, err := b.calcNextRequiredDifficulty(prevNode,
+			header.Timestamp)
+		if err != nil {
+			return err
+		}
+		blockDifficulty := header.Bits
+		if blockDifficulty != expectedDifficulty {
+			str := "block difficulty of %d is not the expected value of %d"
+			str = fmt.Sprintf(str, blockDifficulty, expectedDifficulty)
+			return ruleError(ErrUnexpectedDifficulty, str)
+		}
+
+		// Ensure the timestamp for the block header is after the
+		// median time of the last several blocks (medianTimeBlocks).
+		medianTime, err := b.calcPastMedianTime(prevNode)
+		if err != nil {
+			log.Errorf("calcPastMedianTime: %v", err)
+			return err
+		}
+		if !header.Timestamp.After(medianTime) {
+			str := "block timestamp of %v is not after expected %v"
+			str = fmt.Sprintf(str, header.Timestamp, medianTime)
+			return ruleError(ErrTimeTooOld, str)
+		}
+	}
+
+	// The height of this block is one more than the referenced previous
+	// block.
+	blockHeight := prevNode.height + 1
+
+	// Ensure chain matches up to predetermined checkpoints.
+	blockHash := header.BlockSha()
+	if !b.verifyCheckpoint(blockHeight, &blockHash) {
+		str := fmt.Sprintf("block at height %d does not match "+
+			"checkpoint hash", blockHeight)
+		return ruleError(ErrBadCheckpoint, str)
+	}
+
+	// Find the previous checkpoint and prevent blocks which fork the main
+	// chain before it.  This prevents storage of new, otherwise valid,
+	// blocks which build off of old blocks that are likely at a much easier
+	// difficulty and therefore could be used to waste cache and disk space.
+	checkpointBlock, err := b.findPreviousCheckpoint()
+	if err != nil {
+		return err
+	}
+	if checkpointBlock != nil && blockHeight < checkpointBlock.Height() {
+		str := fmt.Sprintf("block at height %d forks the main chain "+
+			"before the previous checkpoint at height %d",
+			blockHeight, checkpointBlock.Height())
+		return ruleError(ErrForkTooOld, str)
+	}
+
+	if !fastAdd {
+		// Reject version 2 blocks once a majority of the network has
+		// upgraded.  This is part of BIP0066.
+		if header.Version < 3 && b.isMajorityVersion(3, prevNode,
+			b.chainParams.BlockRejectNumRequired) {
+
+			str := "new blocks with version %d are no longer valid"
+			str = fmt.Sprintf(str, header.Version)
+			return ruleError(ErrBlockVersionTooOld, str)
+		}
+
+		// Reject version 1 blocks once a majority of the network has
+		// upgraded.  This is part of BIP0034.
+		if header.Version < 2 && b.isMajorityVersion(2, prevNode,
+			b.chainParams.BlockRejectNumRequired) {
+
+			str := "new blocks with version %d are no longer valid"
+			str = fmt.Sprintf(str, header.Version)
+			return ruleError(ErrBlockVersionTooOld, str)
+		}
+	}
+
+	return nil
+}
+
+// checkBlockContext peforms several validation checks on the block which depend
+// on its position within the block chain.
+//
+// The flags modify the behavior of this function as follows:
+//  - BFFastAdd: The transaction are not checked to see if they are finalized
+//    and the somewhat expensive BIP0034 validation is not performed.
+//
+// The flags are also passed to checkBlockHeaderContext.  See its documentation
+// for how the flags modify its behavior.
+func (b *BlockChain) checkBlockContext(block *btcutil.Block, prevNode *blockNode, flags BehaviorFlags) error {
+	// The genesis block is valid by definition.
+	if prevNode == nil {
+		return nil
+	}
+
+	// Perform all block header related validation checks.
+	header := &block.MsgBlock().Header
+	err := b.checkBlockHeaderContext(header, prevNode, flags)
+	if err != nil {
+		return err
+	}
+
+	fastAdd := flags&BFFastAdd == BFFastAdd
+	if !fastAdd {
+		// The height of this block is one more than the referenced
+		// previous block.
+		blockHeight := prevNode.height + 1
+
+		// Ensure all transactions in the block are finalized.
+		for _, tx := range block.Transactions() {
+			if !IsFinalizedTransaction(tx, blockHeight,
+				header.Timestamp) {
+
+				str := fmt.Sprintf("block contains unfinalized "+
+					"transaction %v", tx.Sha())
+				return ruleError(ErrUnfinalizedTx, str)
+			}
+		}
+
+		// Ensure coinbase starts with serialized block heights for
+		// blocks whose version is the serializedHeightVersion or newer
+		// once a majority of the network has upgraded.  This is part of
+		// BIP0034.
+		if ShouldHaveSerializedBlockHeight(header) &&
+			b.isMajorityVersion(serializedHeightVersion, prevNode,
+				b.chainParams.BlockEnforceNumRequired) {
+
+			coinbaseTx := block.Transactions()[0]
+			err := checkSerializedHeight(coinbaseTx, blockHeight)
+			if err != nil {
+				return err
+			}
+		}
+	}
+
+	return nil
+}
+
+// ExtractCoinbaseHeight attempts to extract the height of the block from the
+// scriptSig of a coinbase transaction.  Coinbase heights are only present in
+// blocks of version 2 or later.  This was added as part of BIP0034.
 func ExtractCoinbaseHeight(coinbaseTx *btcutil.Tx) (int64, error) {
 	sigScript := coinbaseTx.MsgTx().TxIn[0].SignatureScript
 	if len(sigScript) < 1 {
