@@ -1636,7 +1636,7 @@ func testTx(t *testing.T, test txTest) {
 	if test.strictSigs {
 		flags |= txscript.ScriptVerifyDERSignatures
 	}
-	engine, err := txscript.NewScript(test.pkScript, test.tx, test.idx,
+	vm, err := txscript.NewEngine(test.pkScript, test.tx, test.idx,
 		flags)
 	if err != nil {
 		if err != test.parseErr {
@@ -1650,7 +1650,7 @@ func testTx(t *testing.T, test txTest) {
 			test.parseErr)
 	}
 
-	err = engine.Execute()
+	err = vm.Execute()
 	if err != nil {
 		// failed means no specified error
 		if test.shouldFail == true {
@@ -2418,167 +2418,6 @@ func TestIsPayToScriptHash(t *testing.T) {
 	}
 }
 
-// This test sets the pc to a deliberately bad result then confirms that Step()
-//  and Disasm fail correctly.
-func TestBadPC(t *testing.T) {
-	t.Parallel()
-
-	type pcTest struct {
-		script, off int
-	}
-	pcTests := []pcTest{
-		{
-			script: 2,
-			off:    0,
-		},
-		{
-			script: 0,
-			off:    2,
-		},
-	}
-	// tx with almost empty scripts.
-	tx := &wire.MsgTx{
-		Version: 1,
-		TxIn: []*wire.TxIn{
-			{
-				PreviousOutPoint: wire.OutPoint{
-					Hash: wire.ShaHash([32]byte{
-						0xc9, 0x97, 0xa5, 0xe5,
-						0x6e, 0x10, 0x41, 0x02,
-						0xfa, 0x20, 0x9c, 0x6a,
-						0x85, 0x2d, 0xd9, 0x06,
-						0x60, 0xa2, 0x0b, 0x2d,
-						0x9c, 0x35, 0x24, 0x23,
-						0xed, 0xce, 0x25, 0x85,
-						0x7f, 0xcd, 0x37, 0x04,
-					}),
-					Index: 0,
-				},
-				SignatureScript: []uint8{txscript.OP_NOP},
-				Sequence:        4294967295,
-			},
-		},
-		TxOut: []*wire.TxOut{
-			{
-				Value:    1000000000,
-				PkScript: []byte{},
-			},
-		},
-		LockTime: 0,
-	}
-	pkScript := []byte{txscript.OP_NOP}
-
-	for _, test := range pcTests {
-		engine, err := txscript.NewScript(pkScript, tx, 0, 0)
-		if err != nil {
-			t.Errorf("Failed to create script: %v", err)
-		}
-
-		// set to after all scripts
-		engine.TstSetPC(test.script, test.off)
-
-		_, err = engine.Step()
-		if err == nil {
-			t.Errorf("Step with invalid pc (%v) succeeds!", test)
-			continue
-		}
-
-		_, err = engine.DisasmPC()
-		if err == nil {
-			t.Errorf("DisasmPC with invalid pc (%v) succeeds!",
-				test)
-		}
-	}
-}
-
-// Most codepaths in CheckErrorCondition() are testd elsewhere, this tests
-// the execute early test.
-func TestCheckErrorCondition(t *testing.T) {
-	t.Parallel()
-
-	// tx with almost empty scripts.
-	tx := &wire.MsgTx{
-		Version: 1,
-		TxIn: []*wire.TxIn{
-			{
-				PreviousOutPoint: wire.OutPoint{
-					Hash: wire.ShaHash([32]byte{
-						0xc9, 0x97, 0xa5, 0xe5,
-						0x6e, 0x10, 0x41, 0x02,
-						0xfa, 0x20, 0x9c, 0x6a,
-						0x85, 0x2d, 0xd9, 0x06,
-						0x60, 0xa2, 0x0b, 0x2d,
-						0x9c, 0x35, 0x24, 0x23,
-						0xed, 0xce, 0x25, 0x85,
-						0x7f, 0xcd, 0x37, 0x04,
-					}),
-					Index: 0,
-				},
-				SignatureScript: []uint8{},
-				Sequence:        4294967295,
-			},
-		},
-		TxOut: []*wire.TxOut{
-			{
-				Value:    1000000000,
-				PkScript: []byte{},
-			},
-		},
-		LockTime: 0,
-	}
-	pkScript := []byte{
-		txscript.OP_NOP,
-		txscript.OP_NOP,
-		txscript.OP_NOP,
-		txscript.OP_NOP,
-		txscript.OP_NOP,
-		txscript.OP_NOP,
-		txscript.OP_NOP,
-		txscript.OP_NOP,
-		txscript.OP_NOP,
-		txscript.OP_NOP,
-		txscript.OP_TRUE,
-	}
-
-	engine, err := txscript.NewScript(pkScript, tx, 0, 0)
-	if err != nil {
-		t.Errorf("failed to create script: %v", err)
-	}
-
-	for i := 0; i < len(pkScript)-1; i++ {
-		done, err := engine.Step()
-		if err != nil {
-			t.Errorf("failed to step %dth time: %v", i, err)
-			return
-		}
-		if done {
-			t.Errorf("finshed early on %dth time", i)
-			return
-		}
-
-		err = engine.CheckErrorCondition(false)
-		if err != txscript.ErrStackScriptUnfinished {
-			t.Errorf("got unexepected error %v on %dth iteration",
-				err, i)
-			return
-		}
-	}
-	done, err := engine.Step()
-	if err != nil {
-		t.Errorf("final step failed %v", err)
-		return
-	}
-	if !done {
-		t.Errorf("final step isn't done!")
-		return
-	}
-
-	err = engine.CheckErrorCondition(false)
-	if err != nil {
-		t.Errorf("unexpected error %v on final check", err)
-	}
-}
-
 type TstSigScript struct {
 	name               string
 	inputs             []TstInput
@@ -2890,14 +2729,14 @@ nexttest:
 		// Validate tx input scripts
 		scriptFlags := txscript.ScriptBip16 | txscript.ScriptVerifyDERSignatures
 		for j := range tx.TxIn {
-			engine, err := txscript.NewScript(SigScriptTests[i].
+			vm, err := txscript.NewEngine(SigScriptTests[i].
 				inputs[j].txout.PkScript, tx, j, scriptFlags)
 			if err != nil {
 				t.Errorf("cannot create script vm for test %v: %v",
 					SigScriptTests[i].name, err)
 				continue nexttest
 			}
-			err = engine.Execute()
+			err = vm.Execute()
 			if (err == nil) != SigScriptTests[i].inputs[j].inputValidates {
 				if err == nil {
 					t.Errorf("passed test '%v' validation incorrectly: %v",
@@ -3314,14 +3153,14 @@ func signAndCheck(msg string, tx *wire.MsgTx, idx int, pkScript []byte,
 
 func checkScripts(msg string, tx *wire.MsgTx, idx int, sigScript, pkScript []byte) error {
 	tx.TxIn[idx].SignatureScript = sigScript
-	engine, err := txscript.NewScript(pkScript, tx, idx,
+	vm, err := txscript.NewEngine(pkScript, tx, idx,
 		txscript.ScriptBip16|txscript.ScriptVerifyDERSignatures)
 	if err != nil {
 		return fmt.Errorf("failed to make script engine for %s: %v",
 			msg, err)
 	}
 
-	err = engine.Execute()
+	err = vm.Execute()
 	if err != nil {
 		return fmt.Errorf("invalid script signature for %s: %v", msg,
 			err)
@@ -4851,7 +4690,7 @@ func TestInvalidFlagCombinations(t *testing.T) {
 	pkScript := []byte{txscript.OP_NOP}
 
 	for i, test := range tests {
-		_, err := txscript.NewScript(pkScript, tx, 0, test)
+		_, err := txscript.NewEngine(pkScript, tx, 0, test)
 		if err != txscript.ErrInvalidFlags {
 			t.Fatalf("TestInvalidFlagCombinations #%d unexpected "+
 				"error: %v", i, err)

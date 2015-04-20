@@ -507,9 +507,9 @@ func TestScripts(t *testing.T) {
 			flags = txscript.ScriptVerifyDERSignatures
 		}
 		mockTx.TxOut[0].PkScript = test.script
-		engine, err := txscript.NewScript(test.script, mockTx, 0, flags)
+		vm, err := txscript.NewEngine(test.script, mockTx, 0, flags)
 		if err == nil {
-			err = engine.Execute()
+			err = vm.Execute()
 		}
 
 		if test.shouldFail != nil {
@@ -4283,7 +4283,7 @@ func testOpcode(t *testing.T, test *detailedTest) {
 
 	tx.TxOut[0].PkScript = test.script
 
-	engine, err := txscript.NewScript(tx.TxOut[0].PkScript, tx, 0, 0)
+	vm, err := txscript.NewEngine(tx.TxOut[0].PkScript, tx, 0, 0)
 	if err != nil {
 		if err != test.expectedReturn {
 			t.Errorf("Error return not expected %s: %v %v",
@@ -4292,8 +4292,8 @@ func testOpcode(t *testing.T, test *detailedTest) {
 		}
 		return
 	}
-	engine.SetStack(test.before)
-	engine.SetAltStack(test.altbefore)
+	vm.SetStack(test.before)
+	vm.SetAltStack(test.altbefore)
 
 	// test disassembly engine.
 	// pc is at start of script 1, so check that DisasmScript matches
@@ -4302,7 +4302,7 @@ func testOpcode(t *testing.T, test *detailedTest) {
 	// disassemble.
 	var disScript, disPC string
 	if test.disassembly != "" {
-		dis0, err := engine.DisasmScript(0)
+		dis0, err := vm.DisasmScript(0)
 		if err != nil {
 			t.Errorf("%s: failed to disassemble script0: %v",
 				test.name, err)
@@ -4311,12 +4311,12 @@ func testOpcode(t *testing.T, test *detailedTest) {
 			t.Errorf("%s: disassembly of empty script gave \"%s\"",
 				test.name, dis0)
 		}
-		disScript, err = engine.DisasmScript(1)
+		disScript, err = vm.DisasmScript(1)
 		if err != nil {
 			t.Errorf("%s: failed to disassemble script: %v",
 				test.name, err)
 		}
-		_, err = engine.DisasmScript(2)
+		_, err = vm.DisasmScript(2)
 		if err != txscript.ErrStackInvalidIndex {
 			t.Errorf("%s: got unexpected error for invalid "+
 				"disassembly index: \"%v\"", test.name, err)
@@ -4326,7 +4326,7 @@ func testOpcode(t *testing.T, test *detailedTest) {
 	done := false
 	for !done {
 		if test.disassembly != "" {
-			disCurPC, err := engine.DisasmPC()
+			disCurPC, err := vm.DisasmPC()
 			if err != nil {
 				t.Errorf("failed to disassemble pc for %s: %v",
 					test.name, err)
@@ -4334,7 +4334,7 @@ func testOpcode(t *testing.T, test *detailedTest) {
 			disPC += disCurPC + "\n"
 		}
 
-		done, err = engine.Step()
+		done, err = vm.Step()
 		if err != nil {
 			if err != test.expectedReturn {
 				t.Errorf("Error return not expected %s: %v %v",
@@ -4357,12 +4357,12 @@ func testOpcode(t *testing.T, test *detailedTest) {
 		}
 	}
 
-	after := engine.GetStack()
+	after := vm.GetStack()
 	if !stacksEqual(after, test.after) {
 		t.Errorf("Stacks not equal after %s:\ngot:\n%vexp:\n%v",
 			test.name, after, test.after)
 	}
-	altafter := engine.GetAltStack()
+	altafter := vm.GetAltStack()
 	if !stacksEqual(altafter, test.altafter) {
 		t.Errorf("AltStacks not equal after %s:\n got:\n%vexp:\n%v",
 			test.name, altafter, test.altafter)
@@ -4428,7 +4428,7 @@ func TestSigOps(t *testing.T) {
 
 // A basic test of GetPreciseSigOpCount for most opcodes, we do this by
 // running the same test for every one of the detailed tests with a fake
-// sigscript. Sicne disassembly errors are always parse errors, and so are
+// sigscript. Since disassembly errors are always parse errors, and so are
 // sigops count errors we use the same error code.
 // While this isn't as precise as using full transaction scripts, this gives
 // us coverage over a wider range of opcodes. See script_test.go for tests

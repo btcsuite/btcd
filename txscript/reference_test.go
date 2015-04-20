@@ -201,9 +201,9 @@ func TestScriptInvalidTests(t *testing.T) {
 			continue
 		}
 		tx := createSpendingTx(scriptSig, scriptPubKey)
-		s, err := NewScript(scriptPubKey, tx, 0, flags)
+		vm, err := NewEngine(scriptPubKey, tx, 0, flags)
 		if err == nil {
-			if err := s.Execute(); err == nil {
+			if err := vm.Execute(); err == nil {
 				t.Errorf("%s test succeeded when it "+
 					"should have failed\n", name)
 			}
@@ -255,12 +255,12 @@ func TestScriptValidTests(t *testing.T) {
 			continue
 		}
 		tx := createSpendingTx(scriptSig, scriptPubKey)
-		s, err := NewScript(scriptPubKey, tx, 0, flags)
+		vm, err := NewEngine(scriptPubKey, tx, 0, flags)
 		if err != nil {
 			t.Errorf("%s failed to create script: %v", name, err)
 			continue
 		}
-		err = s.Execute()
+		err = vm.Execute()
 		if err != nil {
 			t.Errorf("%s failed to execute: %v", name, err)
 			continue
@@ -398,12 +398,12 @@ testloop:
 			// These are meant to fail, so as soon as the first
 			// input fails the transaction has failed. (some of the
 			// test txns have good inputs, too..
-			s, err := NewScript(pkScript, tx.MsgTx(), k, flags)
+			vm, err := NewEngine(pkScript, tx.MsgTx(), k, flags)
 			if err != nil {
 				continue testloop
 			}
 
-			err = s.Execute()
+			err = vm.Execute()
 			if err != nil {
 				continue testloop
 			}
@@ -539,14 +539,14 @@ testloop:
 					k, i, test)
 				continue testloop
 			}
-			s, err := NewScript(pkScript, tx.MsgTx(), k, flags)
+			vm, err := NewEngine(pkScript, tx.MsgTx(), k, flags)
 			if err != nil {
 				t.Errorf("test (%d:%v:%d) failed to create "+
 					"script: %v", i, test, k, err)
 				continue
 			}
 
-			err = s.Execute()
+			err = vm.Execute()
 			if err != nil {
 				t.Errorf("test (%d:%v:%d) failed to execute: "+
 					"%v", i, test, k, err)

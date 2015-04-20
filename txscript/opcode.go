@@ -27,8 +27,8 @@ type opcode struct {
 	value     byte
 	name      string
 	length    int
-	opfunc    func(*parsedOpcode, *Script) error
-	parsefunc func(*opcode, *Script, []byte) error
+	opfunc    func(*parsedOpcode, *Engine) error
+	parsefunc func(*opcode, *Engine, []byte) error
 }
 
 // These constants are the values of the official opcode used on the btc wiki,
@@ -859,7 +859,6 @@ var opcodeOnelineRepls = map[string]string{
 type parsedOpcode struct {
 	opcode *opcode
 	data   []byte
-	opfunc func(op parsedOpcode, s Script) error
 }
 
 // The following opcodes are disabled and are thus always bad to see in the
@@ -970,7 +969,7 @@ func (pop *parsedOpcode) checkMinimalDataPush() error {
 // exec peforms execution on the opcode. It takes into account whether or not
 // it is hidden by conditionals, but some rules still must be tested in this
 // case.
-func (pop *parsedOpcode) exec(s *Script) error {
+func (pop *parsedOpcode) exec(vm *Engine) error {
 	// Disabled opcodes are ``fail on program counter''.
 	if pop.disabled() {
 		return ErrStackOpDisabled
@@ -983,8 +982,8 @@ func (pop *parsedOpcode) exec(s *Script) error {
 
 	// Note that this includes OP_RESERVED which counts as a push operation.
 	if pop.opcode.value > OP_16 {
-		s.numOps++
-		if s.numOps > MaxOpsPerScript {
+		vm.numOps++
+		if vm.numOps > MaxOpsPerScript {
 			return ErrStackTooManyOperations
 		}
 
@@ -994,20 +993,20 @@ func (pop *parsedOpcode) exec(s *Script) error {
 
 	// If we are not a conditional opcode and we aren't executing, then
 	// we are done now.
-	if s.condStack[0] != OpCondTrue && !pop.conditional() {
+	if vm.condStack[0] != OpCondTrue && !pop.conditional() {
 		return nil
 	}
 
 	// Ensure all executed data push opcodes use the minimal encoding when
 	// the minimal data verification is set.
-	if s.dstack.verifyMinimalData && s.condStack[0] == OpCondTrue &&
+	if vm.dstack.verifyMinimalData && vm.condStack[0] == OpCondTrue &&
 		pop.opcode.value >= 0 && pop.opcode.value <= OP_PUSHDATA4 {
 		if err := pop.checkMinimalDataPush(); err != nil {
 			return err
 		}
 	}
 
-	return pop.opcode.opfunc(pop, s)
+	return pop.opcode.opfunc(pop, vm)
 }
 
 func (pop *parsedOpcode) print(oneline bool) string {
@@ -1093,46 +1092,46 @@ func (pop *parsedOpcode) bytes() ([]byte, error) {
 
 // opcode implementation functions from here
 
-func opcodeDisabled(op *parsedOpcode, s *Script) error {
+func opcodeDisabled(op *parsedOpcode, vm *Engine) error {
 	return ErrStackOpDisabled
 }
 
-func opcodeReserved(op *parsedOpcode, s *Script) error {
+func opcodeReserved(op *parsedOpcode, vm *Engine) error {
 	return ErrStackReservedOpcode
 }
 
 // Recognised opcode, but for bitcoind internal use only.
-func opcodeInvalid(op *parsedOpcode, s *Script) error {
+func opcodeInvalid(op *parsedOpcode, vm *Engine) error {
 	return ErrStackInvalidOpcode
 }
 
-func opcodeFalse(op *parsedOpcode, s *Script) error {
-	s.dstack.PushByteArray([]byte(""))
+func opcodeFalse(op *parsedOpcode, vm *Engine) error {
+	vm.dstack.PushByteArray([]byte(""))
 
 	return nil
 }
 
-func opcodePushData(op *parsedOpcode, s *Script) error {
-	s.dstack.PushByteArray(op.data)
+func opcodePushData(op *parsedOpcode, vm *Engine) error {
+	vm.dstack.PushByteArray(op.data)
 	return nil
 }
 
-func opcode1Negate(op *parsedOpcode, s *Script) error {
-	s.dstack.PushInt(big.NewInt(-1))
+func opcode1Negate(op *parsedOpcode, vm *Engine) error {
+	vm.dstack.PushInt(big.NewInt(-1))
 	return nil
 }
 
-func opcodeN(op *parsedOpcode, s *Script) error {
+func opcodeN(op *parsedOpcode, vm *Engine) error {
 	// 16 consecutive opcodes add increasing numbers to the stack.
-	s.dstack.PushInt(big.NewInt(int64(op.opcode.value - (OP_1 - 1))))
+	vm.dstack.PushInt(big.NewInt(int64(op.opcode.value - (OP_1 - 1))))
 	return nil
 }
 
-func opcodeNop(op *parsedOpcode, s *Script) error {
+func opcodeNop(op *parsedOpcode, vm *Engine) error {
 	switch op.opcode.value {
 	case OP_NOP1, OP_NOP2, OP_NOP3, OP_NOP4, OP_NOP5,
 		OP_NOP6, OP_NOP7, OP_NOP8, OP_NOP9, OP_NOP10:
-		if s.discourageUpgradableNops {
+		if vm.discourageUpgradableNops {
 			return fmt.Errorf("%s reserved for soft-fork upgrades", opcodemap[op.opcode.value].name)
 		}
 	}
@@ -1141,12 +1140,12 @@ func opcodeNop(op *parsedOpcode, s *Script) error {
 
 // opcodeIf computes true/false based on the value on the stack and pushes
 // the condition on the condStack (conditional execution stack)
-func opcodeIf(op *parsedOpcode, s *Script) error {
+func opcodeIf(op *parsedOpcode, vm *Engine) error {
 	// opcodeIf will be executed even if it is on the non-execute side
 	// of the conditional, this is so proper nesting is maintained
 	var condval int
-	if s.condStack[0] == OpCondTrue {
-		ok, err := s.dstack.PopBool()
+	if vm.condStack[0] == OpCondTrue {
+		ok, err := vm.dstack.PopBool()
 		if err != nil {
 			return err
 		}
@@ -1158,19 +1157,19 @@ func opcodeIf(op *parsedOpcode, s *Script) error {
 	}
 	cond := []int{condval}
 	// push condition to the 'head' of the slice
-	s.condStack = append(cond, s.condStack...)
+	vm.condStack = append(cond, vm.condStack...)
 	// TODO(drahn) check if a maximum condtitional stack limit exists
 	return nil
 }
 
 // opcodeNotIf computes true/false based on the value on the stack and pushes
 // the (inverted) condition on the condStack (conditional execution stack)
-func opcodeNotIf(op *parsedOpcode, s *Script) error {
+func opcodeNotIf(op *parsedOpcode, vm *Engine) error {
 	// opcodeIf will be executed even if it is on the non-execute side
 	// of the conditional, this is so proper nesting is maintained
 	var condval int
-	if s.condStack[0] == OpCondTrue {
-		ok, err := s.dstack.PopBool()
+	if vm.condStack[0] == OpCondTrue {
+		ok, err := vm.dstack.PopBool()
 		if err != nil {
 			return err
 		}
@@ -1182,23 +1181,23 @@ func opcodeNotIf(op *parsedOpcode, s *Script) error {
 	}
 	cond := []int{condval}
 	// push condition to the 'head' of the slice
-	s.condStack = append(cond, s.condStack...)
+	vm.condStack = append(cond, vm.condStack...)
 	// TODO(drahn) check if a maximum condtitional stack limit exists
 	return nil
 }
 
 // opcodeElse inverts conditional execution for other half of if/else/endif
-func opcodeElse(op *parsedOpcode, s *Script) error {
-	if len(s.condStack) < 2 {
+func opcodeElse(op *parsedOpcode, vm *Engine) error {
+	if len(vm.condStack) < 2 {
 		// intial true cannot be toggled, only pushed conditionals
 		return ErrStackNoIf
 	}
 
-	switch s.condStack[0] {
+	switch vm.condStack[0] {
 	case OpCondTrue:
-		s.condStack[0] = OpCondFalse
+		vm.condStack[0] = OpCondFalse
 	case OpCondFalse:
-		s.condStack[0] = OpCondTrue
+		vm.condStack[0] = OpCondTrue
 	case OpCondSkip:
 		// value doesn't change in skip
 	}
@@ -1207,20 +1206,20 @@ func opcodeElse(op *parsedOpcode, s *Script) error {
 
 // opcodeEndif terminates a conditional block, removing the  value from the
 // conditional execution stack.
-func opcodeEndif(op *parsedOpcode, s *Script) error {
-	if len(s.condStack) < 2 {
+func opcodeEndif(op *parsedOpcode, vm *Engine) error {
+	if len(vm.condStack) < 2 {
 		// intial true cannot be popped, only pushed conditionals
 		return ErrStackNoIf
 	}
 
-	stk := make([]int, len(s.condStack)-1, len(s.condStack)-1)
-	copy(stk, s.condStack[1:])
-	s.condStack = stk
+	stk := make([]int, len(vm.condStack)-1, len(vm.condStack)-1)
+	copy(stk, vm.condStack[1:])
+	vm.condStack = stk
 	return nil
 }
 
-func opcodeVerify(op *parsedOpcode, s *Script) error {
-	verified, err := s.dstack.PopBool()
+func opcodeVerify(op *parsedOpcode, vm *Engine) error {
+	verified, err := vm.dstack.PopBool()
 	if err != nil {
 		return err
 	}
@@ -1231,93 +1230,93 @@ func opcodeVerify(op *parsedOpcode, s *Script) error {
 	return nil
 }
 
-func opcodeReturn(op *parsedOpcode, s *Script) error {
+func opcodeReturn(op *parsedOpcode, vm *Engine) error {
 	return ErrStackEarlyReturn
 }
 
-func opcodeToAltStack(op *parsedOpcode, s *Script) error {
-	so, err := s.dstack.PopByteArray()
+func opcodeToAltStack(op *parsedOpcode, vm *Engine) error {
+	so, err := vm.dstack.PopByteArray()
 	if err != nil {
 		return err
 	}
-	s.astack.PushByteArray(so)
+	vm.astack.PushByteArray(so)
 
 	return nil
 }
 
-func opcodeFromAltStack(op *parsedOpcode, s *Script) error {
-	so, err := s.astack.PopByteArray()
+func opcodeFromAltStack(op *parsedOpcode, vm *Engine) error {
+	so, err := vm.astack.PopByteArray()
 	if err != nil {
 		return err
 	}
-	s.dstack.PushByteArray(so)
+	vm.dstack.PushByteArray(so)
 
 	return nil
 }
 
-func opcode2Drop(op *parsedOpcode, s *Script) error {
-	return s.dstack.DropN(2)
+func opcode2Drop(op *parsedOpcode, vm *Engine) error {
+	return vm.dstack.DropN(2)
 }
 
-func opcode2Dup(op *parsedOpcode, s *Script) error {
-	return s.dstack.DupN(2)
+func opcode2Dup(op *parsedOpcode, vm *Engine) error {
+	return vm.dstack.DupN(2)
 }
 
-func opcode3Dup(op *parsedOpcode, s *Script) error {
-	return s.dstack.DupN(3)
+func opcode3Dup(op *parsedOpcode, vm *Engine) error {
+	return vm.dstack.DupN(3)
 }
 
-func opcode2Over(op *parsedOpcode, s *Script) error {
-	return s.dstack.OverN(2)
+func opcode2Over(op *parsedOpcode, vm *Engine) error {
+	return vm.dstack.OverN(2)
 }
 
-func opcode2Rot(op *parsedOpcode, s *Script) error {
-	return s.dstack.RotN(2)
+func opcode2Rot(op *parsedOpcode, vm *Engine) error {
+	return vm.dstack.RotN(2)
 }
 
-func opcode2Swap(op *parsedOpcode, s *Script) error {
-	return s.dstack.SwapN(2)
+func opcode2Swap(op *parsedOpcode, vm *Engine) error {
+	return vm.dstack.SwapN(2)
 }
 
-func opcodeIfDup(op *parsedOpcode, s *Script) error {
-	val, err := s.dstack.PeekInt(0)
+func opcodeIfDup(op *parsedOpcode, vm *Engine) error {
+	val, err := vm.dstack.PeekInt(0)
 	if err != nil {
 		return err
 	}
 
 	// Push copy of data iff it isn't zero
 	if val.Sign() != 0 {
-		s.dstack.PushInt(val)
+		vm.dstack.PushInt(val)
 	}
 
 	return nil
 }
 
-func opcodeDepth(op *parsedOpcode, s *Script) error {
-	s.dstack.PushInt(big.NewInt(int64(s.dstack.Depth())))
+func opcodeDepth(op *parsedOpcode, vm *Engine) error {
+	vm.dstack.PushInt(big.NewInt(int64(vm.dstack.Depth())))
 	return nil
 }
 
-func opcodeDrop(op *parsedOpcode, s *Script) error {
-	return s.dstack.DropN(1)
+func opcodeDrop(op *parsedOpcode, vm *Engine) error {
+	return vm.dstack.DropN(1)
 }
 
-func opcodeDup(op *parsedOpcode, s *Script) error {
-	return s.dstack.DupN(1)
+func opcodeDup(op *parsedOpcode, vm *Engine) error {
+	return vm.dstack.DupN(1)
 }
 
-func opcodeNip(op *parsedOpcode, s *Script) error {
-	return s.dstack.NipN(1)
+func opcodeNip(op *parsedOpcode, vm *Engine) error {
+	return vm.dstack.NipN(1)
 }
 
-func opcodeOver(op *parsedOpcode, s *Script) error {
-	return s.dstack.OverN(1)
+func opcodeOver(op *parsedOpcode, vm *Engine) error {
+	return vm.dstack.OverN(1)
 }
 
 // Copy object N items back in the stack to the top. Where N is the value in
 // the top of the stack.
-func opcodePick(op *parsedOpcode, s *Script) error {
-	pidx, err := s.dstack.PopInt()
+func opcodePick(op *parsedOpcode, vm *Engine) error {
+	pidx, err := vm.dstack.PopInt()
 	if err != nil {
 		return err
 	}
@@ -1325,13 +1324,13 @@ func opcodePick(op *parsedOpcode, s *Script) error {
 	// PopInt promises that the int returned is 32 bit.
 	val := int(pidx.Int64())
 
-	return s.dstack.PickN(val)
+	return vm.dstack.PickN(val)
 }
 
 // Move object N items back in the stack to the top. Where N is the value in
 // the top of the stack.
-func opcodeRoll(op *parsedOpcode, s *Script) error {
-	ridx, err := s.dstack.PopInt()
+func opcodeRoll(op *parsedOpcode, vm *Engine) error {
+	ridx, err := vm.dstack.PopInt()
 	if err != nil {
 		return err
 	}
@@ -1339,181 +1338,181 @@ func opcodeRoll(op *parsedOpcode, s *Script) error {
 	// PopInt promises that the int returned is 32 bit.
 	val := int(ridx.Int64())
 
-	return s.dstack.RollN(val)
+	return vm.dstack.RollN(val)
 }
 
 // Rotate top three items on the stack to the left.
 // e.g. 1,2,3 -> 2,3,1
-func opcodeRot(op *parsedOpcode, s *Script) error {
-	return s.dstack.RotN(1)
+func opcodeRot(op *parsedOpcode, vm *Engine) error {
+	return vm.dstack.RotN(1)
 }
 
 // Swap the top two items on the stack: 1,2 -> 2,1
-func opcodeSwap(op *parsedOpcode, s *Script) error {
-	return s.dstack.SwapN(1)
+func opcodeSwap(op *parsedOpcode, vm *Engine) error {
+	return vm.dstack.SwapN(1)
 }
 
 // The item at the top of the stack is copied and inserted before the
 // second-to-top item. e.g.: 2,1, -> 2,1,2
-func opcodeTuck(op *parsedOpcode, s *Script) error {
-	return s.dstack.Tuck()
+func opcodeTuck(op *parsedOpcode, vm *Engine) error {
+	return vm.dstack.Tuck()
 }
 
 // Push the size of the item on top of the stack onto the stack.
-func opcodeSize(op *parsedOpcode, s *Script) error {
-	i, err := s.dstack.PeekByteArray(0)
+func opcodeSize(op *parsedOpcode, vm *Engine) error {
+	i, err := vm.dstack.PeekByteArray(0)
 	if err != nil {
 		return err
 	}
 
-	s.dstack.PushInt(big.NewInt(int64(len(i))))
+	vm.dstack.PushInt(big.NewInt(int64(len(i))))
 	return nil
 }
 
-func opcodeEqual(op *parsedOpcode, s *Script) error {
-	a, err := s.dstack.PopByteArray()
+func opcodeEqual(op *parsedOpcode, vm *Engine) error {
+	a, err := vm.dstack.PopByteArray()
 	if err != nil {
 		return err
 	}
-	b, err := s.dstack.PopByteArray()
+	b, err := vm.dstack.PopByteArray()
 	if err != nil {
 		return err
 	}
 
-	s.dstack.PushBool(bytes.Equal(a, b))
+	vm.dstack.PushBool(bytes.Equal(a, b))
 	return nil
 }
 
-func opcodeEqualVerify(op *parsedOpcode, s *Script) error {
-	err := opcodeEqual(op, s)
+func opcodeEqualVerify(op *parsedOpcode, vm *Engine) error {
+	err := opcodeEqual(op, vm)
 	if err == nil {
-		err = opcodeVerify(op, s)
+		err = opcodeVerify(op, vm)
 	}
 	return err
 }
 
-func opcode1Add(op *parsedOpcode, s *Script) error {
-	m, err := s.dstack.PopInt()
+func opcode1Add(op *parsedOpcode, vm *Engine) error {
+	m, err := vm.dstack.PopInt()
 	if err != nil {
 		return err
 	}
 
-	s.dstack.PushInt(new(big.Int).Add(m, big.NewInt(1)))
+	vm.dstack.PushInt(new(big.Int).Add(m, big.NewInt(1)))
 
 	return nil
 }
 
-func opcode1Sub(op *parsedOpcode, s *Script) error {
-	m, err := s.dstack.PopInt()
+func opcode1Sub(op *parsedOpcode, vm *Engine) error {
+	m, err := vm.dstack.PopInt()
 	if err != nil {
 		return err
 	}
-	s.dstack.PushInt(new(big.Int).Sub(m, big.NewInt(1)))
+	vm.dstack.PushInt(new(big.Int).Sub(m, big.NewInt(1)))
 
 	return nil
 }
 
-func opcodeNegate(op *parsedOpcode, s *Script) error {
+func opcodeNegate(op *parsedOpcode, vm *Engine) error {
 	// XXX when we remove types just flip the 0x80 bit of msb
-	m, err := s.dstack.PopInt()
+	m, err := vm.dstack.PopInt()
 	if err != nil {
 		return err
 	}
 
-	s.dstack.PushInt(new(big.Int).Neg(m))
+	vm.dstack.PushInt(new(big.Int).Neg(m))
 	return nil
 }
 
-func opcodeAbs(op *parsedOpcode, s *Script) error {
+func opcodeAbs(op *parsedOpcode, vm *Engine) error {
 	// XXX when we remove types just &= ~0x80 on msb
-	m, err := s.dstack.PopInt()
+	m, err := vm.dstack.PopInt()
 	if err != nil {
 		return err
 	}
 
-	s.dstack.PushInt(new(big.Int).Abs(m))
+	vm.dstack.PushInt(new(big.Int).Abs(m))
 
 	return nil
 }
 
 // If then input is 0 or 1, it is flipped. Otherwise the output will be 0.
 // (n.b. official client just has 1 is 0, else 0)
-func opcodeNot(op *parsedOpcode, s *Script) error {
-	m, err := s.dstack.PopInt()
+func opcodeNot(op *parsedOpcode, vm *Engine) error {
+	m, err := vm.dstack.PopInt()
 	if err != nil {
 		return err
 	}
 	if m.Sign() == 0 {
-		s.dstack.PushInt(big.NewInt(1))
+		vm.dstack.PushInt(big.NewInt(1))
 	} else {
-		s.dstack.PushInt(big.NewInt(0))
+		vm.dstack.PushInt(big.NewInt(0))
 	}
 	return nil
 }
 
 // opcode returns 0 if the input is 0, 1 otherwise.
-func opcode0NotEqual(op *parsedOpcode, s *Script) error {
-	m, err := s.dstack.PopInt()
+func opcode0NotEqual(op *parsedOpcode, vm *Engine) error {
+	m, err := vm.dstack.PopInt()
 	if err != nil {
 		return err
 	}
 	if m.Sign() != 0 {
 		m.SetInt64(1)
 	}
-	s.dstack.PushInt(m)
+	vm.dstack.PushInt(m)
 
 	return nil
 }
 
 // Push result of adding top two entries on stack
-func opcodeAdd(op *parsedOpcode, s *Script) error {
-	v0, err := s.dstack.PopInt()
+func opcodeAdd(op *parsedOpcode, vm *Engine) error {
+	v0, err := vm.dstack.PopInt()
 	if err != nil {
 		return err
 	}
 
-	v1, err := s.dstack.PopInt()
+	v1, err := vm.dstack.PopInt()
 	if err != nil {
 		return err
 	}
 
-	s.dstack.PushInt(new(big.Int).Add(v0, v1))
+	vm.dstack.PushInt(new(big.Int).Add(v0, v1))
 	return nil
 }
 
 // Push result of subtracting 2nd entry on stack from first.
-func opcodeSub(op *parsedOpcode, s *Script) error {
-	v0, err := s.dstack.PopInt()
+func opcodeSub(op *parsedOpcode, vm *Engine) error {
+	v0, err := vm.dstack.PopInt()
 	if err != nil {
 		return err
 	}
 
-	v1, err := s.dstack.PopInt()
+	v1, err := vm.dstack.PopInt()
 	if err != nil {
 		return err
 	}
 
-	s.dstack.PushInt(new(big.Int).Sub(v1, v0))
+	vm.dstack.PushInt(new(big.Int).Sub(v1, v0))
 	return nil
 }
 
 // If both of the top two entries on the stack are not zero output is 1.
 // Otherwise, 0.
-func opcodeBoolAnd(op *parsedOpcode, s *Script) error {
-	v0, err := s.dstack.PopInt()
+func opcodeBoolAnd(op *parsedOpcode, vm *Engine) error {
+	v0, err := vm.dstack.PopInt()
 	if err != nil {
 		return err
 	}
 
-	v1, err := s.dstack.PopInt()
+	v1, err := vm.dstack.PopInt()
 	if err != nil {
 		return err
 	}
 
 	if v0.Sign() != 0 && v1.Sign() != 0 {
-		s.dstack.PushInt(big.NewInt(1))
+		vm.dstack.PushInt(big.NewInt(1))
 	} else {
-		s.dstack.PushInt(big.NewInt(0))
+		vm.dstack.PushInt(big.NewInt(0))
 	}
 
 	return nil
@@ -1521,187 +1520,187 @@ func opcodeBoolAnd(op *parsedOpcode, s *Script) error {
 
 // If either of the top two entries on the stack are not zero output is 1.
 // Otherwise, 0.
-func opcodeBoolOr(op *parsedOpcode, s *Script) error {
-	v0, err := s.dstack.PopInt()
+func opcodeBoolOr(op *parsedOpcode, vm *Engine) error {
+	v0, err := vm.dstack.PopInt()
 	if err != nil {
 		return err
 	}
 
-	v1, err := s.dstack.PopInt()
+	v1, err := vm.dstack.PopInt()
 	if err != nil {
 		return err
 	}
 
 	if v0.Sign() != 0 || v1.Sign() != 0 {
-		s.dstack.PushInt(big.NewInt(1))
+		vm.dstack.PushInt(big.NewInt(1))
 	} else {
-		s.dstack.PushInt(big.NewInt(0))
+		vm.dstack.PushInt(big.NewInt(0))
 	}
 
 	return nil
 }
 
-func opcodeNumEqual(op *parsedOpcode, s *Script) error {
-	v0, err := s.dstack.PopInt()
+func opcodeNumEqual(op *parsedOpcode, vm *Engine) error {
+	v0, err := vm.dstack.PopInt()
 	if err != nil {
 		return err
 	}
 
-	v1, err := s.dstack.PopInt()
+	v1, err := vm.dstack.PopInt()
 	if err != nil {
 		return err
 	}
 
 	if v0.Cmp(v1) == 0 {
-		s.dstack.PushInt(big.NewInt(1))
+		vm.dstack.PushInt(big.NewInt(1))
 	} else {
-		s.dstack.PushInt(big.NewInt(0))
+		vm.dstack.PushInt(big.NewInt(0))
 	}
 
 	return nil
 }
 
-func opcodeNumEqualVerify(op *parsedOpcode, s *Script) error {
-	err := opcodeNumEqual(op, s)
+func opcodeNumEqualVerify(op *parsedOpcode, vm *Engine) error {
+	err := opcodeNumEqual(op, vm)
 	if err == nil {
-		err = opcodeVerify(op, s)
+		err = opcodeVerify(op, vm)
 	}
 	return err
 }
 
-func opcodeNumNotEqual(op *parsedOpcode, s *Script) error {
-	v0, err := s.dstack.PopInt()
+func opcodeNumNotEqual(op *parsedOpcode, vm *Engine) error {
+	v0, err := vm.dstack.PopInt()
 	if err != nil {
 		return err
 	}
 
-	v1, err := s.dstack.PopInt()
+	v1, err := vm.dstack.PopInt()
 	if err != nil {
 		return err
 	}
 
 	if v0.Cmp(v1) != 0 {
-		s.dstack.PushInt(big.NewInt(1))
+		vm.dstack.PushInt(big.NewInt(1))
 	} else {
-		s.dstack.PushInt(big.NewInt(0))
+		vm.dstack.PushInt(big.NewInt(0))
 	}
 
 	return nil
 }
 
-func opcodeLessThan(op *parsedOpcode, s *Script) error {
-	v0, err := s.dstack.PopInt()
+func opcodeLessThan(op *parsedOpcode, vm *Engine) error {
+	v0, err := vm.dstack.PopInt()
 	if err != nil {
 		return err
 	}
 
-	v1, err := s.dstack.PopInt()
+	v1, err := vm.dstack.PopInt()
 	if err != nil {
 		return err
 	}
 
 	if v1.Cmp(v0) == -1 {
-		s.dstack.PushInt(big.NewInt(1))
+		vm.dstack.PushInt(big.NewInt(1))
 	} else {
-		s.dstack.PushInt(big.NewInt(0))
+		vm.dstack.PushInt(big.NewInt(0))
 	}
 
 	return nil
 }
 
-func opcodeGreaterThan(op *parsedOpcode, s *Script) error {
-	v0, err := s.dstack.PopInt()
+func opcodeGreaterThan(op *parsedOpcode, vm *Engine) error {
+	v0, err := vm.dstack.PopInt()
 	if err != nil {
 		return err
 	}
 
-	v1, err := s.dstack.PopInt()
+	v1, err := vm.dstack.PopInt()
 	if err != nil {
 		return err
 	}
 
 	if v1.Cmp(v0) == 1 {
-		s.dstack.PushInt(big.NewInt(1))
+		vm.dstack.PushInt(big.NewInt(1))
 	} else {
-		s.dstack.PushInt(big.NewInt(0))
+		vm.dstack.PushInt(big.NewInt(0))
 	}
 	return nil
 }
 
-func opcodeLessThanOrEqual(op *parsedOpcode, s *Script) error {
-	v0, err := s.dstack.PopInt()
+func opcodeLessThanOrEqual(op *parsedOpcode, vm *Engine) error {
+	v0, err := vm.dstack.PopInt()
 	if err != nil {
 		return err
 	}
 
-	v1, err := s.dstack.PopInt()
+	v1, err := vm.dstack.PopInt()
 	if err != nil {
 		return err
 	}
 
 	if v1.Cmp(v0) <= 0 {
-		s.dstack.PushInt(big.NewInt(1))
+		vm.dstack.PushInt(big.NewInt(1))
 	} else {
-		s.dstack.PushInt(big.NewInt(0))
+		vm.dstack.PushInt(big.NewInt(0))
 	}
 	return nil
 }
 
-func opcodeGreaterThanOrEqual(op *parsedOpcode, s *Script) error {
-	v0, err := s.dstack.PopInt()
+func opcodeGreaterThanOrEqual(op *parsedOpcode, vm *Engine) error {
+	v0, err := vm.dstack.PopInt()
 	if err != nil {
 		return err
 	}
 
-	v1, err := s.dstack.PopInt()
+	v1, err := vm.dstack.PopInt()
 	if err != nil {
 		return err
 	}
 
 	if v1.Cmp(v0) >= 0 {
-		s.dstack.PushInt(big.NewInt(1))
+		vm.dstack.PushInt(big.NewInt(1))
 	} else {
-		s.dstack.PushInt(big.NewInt(0))
+		vm.dstack.PushInt(big.NewInt(0))
 	}
 
 	return nil
 }
 
-func opcodeMin(op *parsedOpcode, s *Script) error {
-	v0, err := s.dstack.PopInt()
+func opcodeMin(op *parsedOpcode, vm *Engine) error {
+	v0, err := vm.dstack.PopInt()
 	if err != nil {
 		return err
 	}
 
-	v1, err := s.dstack.PopInt()
+	v1, err := vm.dstack.PopInt()
 	if err != nil {
 		return err
 	}
 
 	if v1.Cmp(v0) == -1 {
-		s.dstack.PushInt(new(big.Int).Set(v1))
+		vm.dstack.PushInt(new(big.Int).Set(v1))
 	} else {
-		s.dstack.PushInt(new(big.Int).Set(v0))
+		vm.dstack.PushInt(new(big.Int).Set(v0))
 	}
 
 	return nil
 }
 
-func opcodeMax(op *parsedOpcode, s *Script) error {
-	v0, err := s.dstack.PopInt()
+func opcodeMax(op *parsedOpcode, vm *Engine) error {
+	v0, err := vm.dstack.PopInt()
 	if err != nil {
 		return err
 	}
 
-	v1, err := s.dstack.PopInt()
+	v1, err := vm.dstack.PopInt()
 	if err != nil {
 		return err
 	}
 
 	if v1.Cmp(v0) == 1 {
-		s.dstack.PushInt(new(big.Int).Set(v1))
+		vm.dstack.PushInt(new(big.Int).Set(v1))
 	} else {
-		s.dstack.PushInt(new(big.Int).Set(v0))
+		vm.dstack.PushInt(new(big.Int).Set(v0))
 	}
 
 	return nil
@@ -1709,26 +1708,26 @@ func opcodeMax(op *parsedOpcode, s *Script) error {
 
 // stack input: x, min, max. Returns 1 if x is within specified range
 // (left inclusive), 0 otherwise
-func opcodeWithin(op *parsedOpcode, s *Script) error {
-	maxVal, err := s.dstack.PopInt()
+func opcodeWithin(op *parsedOpcode, vm *Engine) error {
+	maxVal, err := vm.dstack.PopInt()
 	if err != nil {
 		return err
 	}
 
-	minVal, err := s.dstack.PopInt()
+	minVal, err := vm.dstack.PopInt()
 	if err != nil {
 		return err
 	}
 
-	x, err := s.dstack.PopInt()
+	x, err := vm.dstack.PopInt()
 	if err != nil {
 		return err
 	}
 
 	if x.Cmp(minVal) >= 0 && x.Cmp(maxVal) == -1 {
-		s.dstack.PushInt(big.NewInt(1))
+		vm.dstack.PushInt(big.NewInt(1))
 	} else {
-		s.dstack.PushInt(big.NewInt(0))
+		vm.dstack.PushInt(big.NewInt(0))
 	}
 	return nil
 }
@@ -1744,70 +1743,70 @@ func calcHash160(buf []byte) []byte {
 	return calcHash(calcHash(buf, fastsha256.New()), ripemd160.New())
 }
 
-func opcodeRipemd160(op *parsedOpcode, s *Script) error {
-	buf, err := s.dstack.PopByteArray()
+func opcodeRipemd160(op *parsedOpcode, vm *Engine) error {
+	buf, err := vm.dstack.PopByteArray()
 	if err != nil {
 		return err
 	}
 
-	s.dstack.PushByteArray(calcHash(buf, ripemd160.New()))
+	vm.dstack.PushByteArray(calcHash(buf, ripemd160.New()))
 	return nil
 }
 
-func opcodeSha1(op *parsedOpcode, s *Script) error {
-	buf, err := s.dstack.PopByteArray()
+func opcodeSha1(op *parsedOpcode, vm *Engine) error {
+	buf, err := vm.dstack.PopByteArray()
 	if err != nil {
 		return err
 	}
 
-	s.dstack.PushByteArray(calcHash(buf, sha1.New()))
+	vm.dstack.PushByteArray(calcHash(buf, sha1.New()))
 	return nil
 }
 
-func opcodeSha256(op *parsedOpcode, s *Script) error {
-	buf, err := s.dstack.PopByteArray()
+func opcodeSha256(op *parsedOpcode, vm *Engine) error {
+	buf, err := vm.dstack.PopByteArray()
 	if err != nil {
 		return err
 	}
 
-	s.dstack.PushByteArray(calcHash(buf, fastsha256.New()))
+	vm.dstack.PushByteArray(calcHash(buf, fastsha256.New()))
 	return nil
 }
 
-func opcodeHash160(op *parsedOpcode, s *Script) error {
-	buf, err := s.dstack.PopByteArray()
+func opcodeHash160(op *parsedOpcode, vm *Engine) error {
+	buf, err := vm.dstack.PopByteArray()
 	if err != nil {
 		return err
 	}
 
-	s.dstack.PushByteArray(calcHash160(buf))
+	vm.dstack.PushByteArray(calcHash160(buf))
 	return nil
 }
 
-func opcodeHash256(op *parsedOpcode, s *Script) error {
-	buf, err := s.dstack.PopByteArray()
+func opcodeHash256(op *parsedOpcode, vm *Engine) error {
+	buf, err := vm.dstack.PopByteArray()
 	if err != nil {
 		return err
 	}
 
-	s.dstack.PushByteArray(wire.DoubleSha256(buf))
+	vm.dstack.PushByteArray(wire.DoubleSha256(buf))
 	return nil
 }
 
-func opcodeCodeSeparator(op *parsedOpcode, s *Script) error {
-	s.lastcodesep = s.scriptoff
+func opcodeCodeSeparator(op *parsedOpcode, vm *Engine) error {
+	vm.lastcodesep = vm.scriptOff
 
 	return nil
 }
 
-func opcodeCheckSig(op *parsedOpcode, s *Script) error {
+func opcodeCheckSig(op *parsedOpcode, vm *Engine) error {
 
-	pkStr, err := s.dstack.PopByteArray()
+	pkStr, err := vm.dstack.PopByteArray()
 	if err != nil {
 		return err
 	}
 
-	sigStr, err := s.dstack.PopByteArray()
+	sigStr, err := vm.dstack.PopByteArray()
 	if err != nil {
 		return err
 	}
@@ -1816,7 +1815,7 @@ func opcodeCheckSig(op *parsedOpcode, s *Script) error {
 	// at least  1 byte for the below. btcec will check full length upon
 	// parsing the signature.
 	if len(sigStr) < 1 {
-		s.dstack.PushBool(false)
+		vm.dstack.PushBool(false)
 		return nil
 	}
 
@@ -1824,40 +1823,40 @@ func opcodeCheckSig(op *parsedOpcode, s *Script) error {
 	hashType := SigHashType(sigStr[len(sigStr)-1])
 	sigStr = sigStr[:len(sigStr)-1]
 
-	if err := s.checkHashTypeEncoding(hashType); err != nil {
+	if err := vm.checkHashTypeEncoding(hashType); err != nil {
 		return err
 	}
-	if err := s.checkSignatureEncoding(sigStr); err != nil {
+	if err := vm.checkSignatureEncoding(sigStr); err != nil {
 		return err
 	}
-	if err := s.checkPubKeyEncoding(pkStr); err != nil {
+	if err := vm.checkPubKeyEncoding(pkStr); err != nil {
 		return err
 	}
 
 	// Get script from the last OP_CODESEPARATOR and without any subsequent
 	// OP_CODESEPARATORs
-	subScript := s.subScript()
+	subScript := vm.subScript()
 
 	// Unlikely to hit any cases here, but remove the signature from
 	// the script if present.
 	subScript = removeOpcodeByData(subScript, sigStr)
 
-	hash := calcScriptHash(subScript, hashType, &s.tx, s.txidx)
+	hash := calcScriptHash(subScript, hashType, &vm.tx, vm.txIdx)
 
 	pubKey, err := btcec.ParsePubKey(pkStr, btcec.S256())
 	if err != nil {
-		s.dstack.PushBool(false)
+		vm.dstack.PushBool(false)
 		return nil
 	}
 
 	var signature *btcec.Signature
-	if s.verifyStrictEncoding || s.verifyDERSignatures {
+	if vm.verifyStrictEncoding || vm.verifyDERSignatures {
 		signature, err = btcec.ParseDERSignature(sigStr, btcec.S256())
 	} else {
 		signature, err = btcec.ParseSignature(sigStr, btcec.S256())
 	}
 	if err != nil {
-		s.dstack.PushBool(false)
+		vm.dstack.PushBool(false)
 		return nil
 	}
 
@@ -1873,21 +1872,21 @@ func opcodeCheckSig(op *parsedOpcode, s *Script) error {
 			signature.R, signature.S, hex.Dump(hash))
 	}))
 	ok := signature.Verify(hash, pubKey)
-	s.dstack.PushBool(ok)
+	vm.dstack.PushBool(ok)
 	return nil
 }
 
-func opcodeCheckSigVerify(op *parsedOpcode, s *Script) error {
-	err := opcodeCheckSig(op, s)
+func opcodeCheckSigVerify(op *parsedOpcode, vm *Engine) error {
+	err := opcodeCheckSig(op, vm)
 	if err == nil {
-		err = opcodeVerify(op, s)
+		err = opcodeVerify(op, vm)
 	}
 	return err
 }
 
 // parsedSigInfo houses a raw signature along with its parsed form and a flag
 // for whether or not it has already been parsed.  It is used to prevent parsing
-// the same signature multiple times when verify an multisig.
+// the same signature multiple times when verify a multisig.
 type parsedSigInfo struct {
 	signature       []byte
 	parsedSignature *btcec.Signature
@@ -1895,8 +1894,8 @@ type parsedSigInfo struct {
 }
 
 // stack; sigs <numsigs> pubkeys <numpubkeys>
-func opcodeCheckMultiSig(op *parsedOpcode, s *Script) error {
-	numKeys, err := s.dstack.PopInt()
+func opcodeCheckMultiSig(op *parsedOpcode, vm *Engine) error {
+	numKeys, err := vm.dstack.PopInt()
 	if err != nil {
 		return err
 	}
@@ -1906,21 +1905,21 @@ func opcodeCheckMultiSig(op *parsedOpcode, s *Script) error {
 	if numPubKeys < 0 || numPubKeys > MaxPubKeysPerMultiSig {
 		return ErrStackTooManyPubkeys
 	}
-	s.numOps += numPubKeys
-	if s.numOps > MaxOpsPerScript {
+	vm.numOps += numPubKeys
+	if vm.numOps > MaxOpsPerScript {
 		return ErrStackTooManyOperations
 	}
 
 	pubKeys := make([][]byte, 0, numPubKeys)
 	for i := 0; i < numPubKeys; i++ {
-		pubKey, err := s.dstack.PopByteArray()
+		pubKey, err := vm.dstack.PopByteArray()
 		if err != nil {
 			return err
 		}
 		pubKeys = append(pubKeys, pubKey)
 	}
 
-	numSigs, err := s.dstack.PopInt()
+	numSigs, err := vm.dstack.PopInt()
 	if err != nil {
 		return err
 	}
@@ -1937,7 +1936,7 @@ func opcodeCheckMultiSig(op *parsedOpcode, s *Script) error {
 
 	signatures := make([]*parsedSigInfo, 0, numSignatures)
 	for i := 0; i < numSignatures; i++ {
-		signature, err := s.dstack.PopByteArray()
+		signature, err := vm.dstack.PopByteArray()
 		if err != nil {
 			return err
 		}
@@ -1947,18 +1946,18 @@ func opcodeCheckMultiSig(op *parsedOpcode, s *Script) error {
 
 	// bug in bitcoind means we pop one more stack value than should be
 	// used.
-	dummy, err := s.dstack.PopByteArray()
+	dummy, err := vm.dstack.PopByteArray()
 	if err != nil {
 		return err
 	}
 
-	if s.strictMultiSig && len(dummy) != 0 {
+	if vm.strictMultiSig && len(dummy) != 0 {
 		return fmt.Errorf("multisig dummy argument is not zero length: %d",
 			len(dummy))
 	}
 
 	// Trim OP_CODESEPARATORs
-	script := s.subScript()
+	script := vm.subScript()
 
 	// Remove any of the signatures that happen to be in the script.
 	// can't sign somthing containing the signature you're making, after
@@ -2002,16 +2001,16 @@ func opcodeCheckMultiSig(op *parsedOpcode, s *Script) error {
 		// Only parse and check the signature encoding once.
 		var parsedSig *btcec.Signature
 		if !sigInfo.parsed {
-			if err := s.checkHashTypeEncoding(hashType); err != nil {
+			if err := vm.checkHashTypeEncoding(hashType); err != nil {
 				return err
 			}
-			if err := s.checkSignatureEncoding(signature); err != nil {
+			if err := vm.checkSignatureEncoding(signature); err != nil {
 				return err
 			}
 
 			// Parse the signature.
 			var err error
-			if s.verifyStrictEncoding || s.verifyDERSignatures {
+			if vm.verifyStrictEncoding || vm.verifyDERSignatures {
 				parsedSig, err = btcec.ParseDERSignature(signature,
 					btcec.S256())
 			} else {
@@ -2033,7 +2032,7 @@ func opcodeCheckMultiSig(op *parsedOpcode, s *Script) error {
 			parsedSig = sigInfo.parsedSignature
 		}
 
-		if err := s.checkPubKeyEncoding(pubKey); err != nil {
+		if err := vm.checkPubKeyEncoding(pubKey); err != nil {
 			return err
 		}
 
@@ -2043,7 +2042,7 @@ func opcodeCheckMultiSig(op *parsedOpcode, s *Script) error {
 			continue
 		}
 
-		hash := calcScriptHash(script, hashType, &s.tx, s.txidx)
+		hash := calcScriptHash(script, hashType, &vm.tx, vm.txIdx)
 
 		if parsedSig.Verify(hash, parsedPubKey) {
 			// PubKey verified, move on to the next signature.
@@ -2052,14 +2051,14 @@ func opcodeCheckMultiSig(op *parsedOpcode, s *Script) error {
 		}
 	}
 
-	s.dstack.PushBool(success)
+	vm.dstack.PushBool(success)
 	return nil
 }
 
-func opcodeCheckMultiSigVerify(op *parsedOpcode, s *Script) error {
-	err := opcodeCheckMultiSig(op, s)
+func opcodeCheckMultiSigVerify(op *parsedOpcode, vm *Engine) error {
+	err := opcodeCheckMultiSig(op, vm)
 	if err == nil {
-		err = opcodeVerify(op, s)
+		err = opcodeVerify(op, vm)
 	}
 	return err
 }

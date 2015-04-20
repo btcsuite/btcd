@@ -164,13 +164,13 @@ func ExampleSignTxOutput() {
 	flags := txscript.ScriptBip16 | txscript.ScriptVerifyDERSignatures |
 		txscript.ScriptStrictMultiSig |
 		txscript.ScriptDiscourageUpgradableNops
-	s, err := txscript.NewScript(originTx.TxOut[0].PkScript, redeemTx, 0,
+	vm, err := txscript.NewEngine(originTx.TxOut[0].PkScript, redeemTx, 0,
 		flags)
 	if err != nil {
 		fmt.Println(err)
 		return
 	}
-	if err := s.Execute(); err != nil {
+	if err := vm.Execute(); err != nil {
 		fmt.Println(err)
 		return
 	}

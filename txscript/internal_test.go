@@ -79,11 +79,9 @@ func TestCheckPubKeyEncoding(t *testing.T) {
 			isValid: false,
 		},
 	}
-	s := Script{
-		verifyStrictEncoding: true,
-	}
+	vm := Engine{verifyStrictEncoding: true}
 	for _, test := range tests {
-		err := s.checkPubKeyEncoding(test.key)
+		err := vm.checkPubKeyEncoding(test.key)
 		if err != nil && test.isValid {
 			t.Errorf("checkSignatureEncoding test '%s' failed "+
 				"when it should have succeeded: %v", test.name,
@@ -339,11 +337,9 @@ func TestCheckSignatureEncoding(t *testing.T) {
 		},
 	}
 
-	s := Script{
-		verifyStrictEncoding: true,
-	}
+	vm := Engine{verifyStrictEncoding: true}
 	for _, test := range tests {
-		err := s.checkSignatureEncoding(test.sig)
+		err := vm.checkSignatureEncoding(test.sig)
 		if err != nil && test.isValid {
 			t.Errorf("checkSignatureEncoding test '%s' failed "+
 				"when it should have succeeded: %v", test.name,
@@ -375,9 +371,9 @@ func TstRemoveOpcodeByData(pkscript []byte, data []byte) ([]byte, error) {
 
 // TestSetPC allows the test modules to set the program counter to whatever they
 // want.
-func (s *Script) TstSetPC(script, off int) {
-	s.scriptidx = script
-	s.scriptoff = off
+func (vm *Engine) TstSetPC(script, off int) {
+	vm.scriptIdx = script
+	vm.scriptOff = off
 }
 
 // Internal tests for opcodde parsing with bad data templates.
