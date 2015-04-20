@@ -1636,9 +1636,8 @@ func testTx(t *testing.T, test txTest) {
 	if test.strictSigs {
 		flags |= txscript.ScriptVerifyDERSignatures
 	}
-	engine, err := txscript.NewScript(
-		test.tx.TxIn[test.idx].SignatureScript, test.pkScript,
-		test.idx, test.tx, flags)
+	engine, err := txscript.NewScript(test.pkScript, test.tx, test.idx,
+		flags)
 	if err != nil {
 		if err != test.parseErr {
 			t.Errorf("Failed to parse %s: got \"%v\" expected "+
@@ -2470,8 +2469,7 @@ func TestBadPC(t *testing.T) {
 	pkScript := []byte{txscript.OP_NOP}
 
 	for _, test := range pcTests {
-		engine, err := txscript.NewScript(tx.TxIn[0].SignatureScript,
-			pkScript, 0, tx, 0)
+		engine, err := txscript.NewScript(pkScript, tx, 0, 0)
 		if err != nil {
 			t.Errorf("Failed to create script: %v", err)
 		}
@@ -2542,8 +2540,7 @@ func TestCheckErrorCondition(t *testing.T) {
 		txscript.OP_TRUE,
 	}
 
-	engine, err := txscript.NewScript(tx.TxIn[0].SignatureScript, pkScript,
-		0, tx, 0)
+	engine, err := txscript.NewScript(pkScript, tx, 0, 0)
 	if err != nil {
 		t.Errorf("failed to create script: %v", err)
 	}
@@ -2892,10 +2889,9 @@ nexttest:
 
 		// Validate tx input scripts
 		scriptFlags := txscript.ScriptBip16 | txscript.ScriptVerifyDERSignatures
-		for j, txin := range tx.TxIn {
-			engine, err := txscript.NewScript(txin.SignatureScript,
-				SigScriptTests[i].inputs[j].txout.PkScript,
-				j, tx, scriptFlags)
+		for j := range tx.TxIn {
+			engine, err := txscript.NewScript(SigScriptTests[i].
+				inputs[j].txout.PkScript, tx, j, scriptFlags)
 			if err != nil {
 				t.Errorf("cannot create script vm for test %v: %v",
 					SigScriptTests[i].name, err)
@@ -3307,9 +3303,8 @@ func signAndCheck(msg string, tx *wire.MsgTx, idx int, pkScript []byte,
 	hashType txscript.SigHashType, kdb txscript.KeyDB, sdb txscript.ScriptDB,
 	previousScript []byte) error {
 
-	sigScript, err := txscript.SignTxOutput(
-		&chaincfg.TestNet3Params, tx, idx, pkScript, hashType,
-		kdb, sdb, []byte{})
+	sigScript, err := txscript.SignTxOutput(&chaincfg.TestNet3Params, tx,
+		idx, pkScript, hashType, kdb, sdb, []byte{})
 	if err != nil {
 		return fmt.Errorf("failed to sign output %s: %v", msg, err)
 	}
@@ -3317,11 +3312,10 @@ func signAndCheck(msg string, tx *wire.MsgTx, idx int, pkScript []byte,
 	return checkScripts(msg, tx, idx, sigScript, pkScript)
 }
 
-func checkScripts(msg string, tx *wire.MsgTx, idx int,
-	sigScript, pkScript []byte) error {
-	engine, err := txscript.NewScript(sigScript, pkScript, idx, tx,
-		txscript.ScriptBip16|
-			txscript.ScriptVerifyDERSignatures)
+func checkScripts(msg string, tx *wire.MsgTx, idx int, sigScript, pkScript []byte) error {
+	tx.TxIn[idx].SignatureScript = sigScript
+	engine, err := txscript.NewScript(pkScript, tx, idx,
+		txscript.ScriptBip16|txscript.ScriptVerifyDERSignatures)
 	if err != nil {
 		return fmt.Errorf("failed to make script engine for %s: %v",
 			msg, err)
@@ -4857,9 +4851,7 @@ func TestInvalidFlagCombinations(t *testing.T) {
 	pkScript := []byte{txscript.OP_NOP}
 
 	for i, test := range tests {
-		_, err := txscript.NewScript(tx.TxIn[0].SignatureScript,
-			pkScript, 0, tx, test)
-
+		_, err := txscript.NewScript(pkScript, tx, 0, test)
 		if err != txscript.ErrInvalidFlags {
 			t.Fatalf("TestInvalidFlagCombinations #%d unexpected "+
 				"error: %v", i, err)

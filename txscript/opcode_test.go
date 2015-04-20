@@ -507,9 +507,7 @@ func TestScripts(t *testing.T) {
 			flags = txscript.ScriptVerifyDERSignatures
 		}
 		mockTx.TxOut[0].PkScript = test.script
-		sigScript := mockTx.TxIn[0].SignatureScript
-		engine, err := txscript.NewScript(sigScript, test.script, 0,
-			mockTx, flags)
+		engine, err := txscript.NewScript(test.script, mockTx, 0, flags)
 		if err == nil {
 			err = engine.Execute()
 		}
@@ -4285,8 +4283,7 @@ func testOpcode(t *testing.T, test *detailedTest) {
 
 	tx.TxOut[0].PkScript = test.script
 
-	engine, err := txscript.NewScript(tx.TxIn[0].SignatureScript,
-		tx.TxOut[0].PkScript, 0, tx, 0)
+	engine, err := txscript.NewScript(tx.TxOut[0].PkScript, tx, 0, 0)
 	if err != nil {
 		if err != test.expectedReturn {
 			t.Errorf("Error return not expected %s: %v %v",

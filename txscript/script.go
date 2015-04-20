@@ -146,6 +146,10 @@ var (
 	// ErrInvalidFlags is returned when the passed flags to NewScript contain
 	// an invalid combination.
 	ErrInvalidFlags = errors.New("invalid flags combination")
+
+	// ErrInvalidIndex is returned when the passed input index for the
+	// provided transaction is out of range.
+	ErrInvalidIndex = errors.New("invalid input index")
 )
 
 const (
@@ -699,10 +703,15 @@ const (
 )
 
 // NewScript returns a new script engine for the provided tx and input idx with
-// a signature script scriptSig and a pubkeyscript scriptPubKey. If bip16 is
-// true then it will be treated as if the bip16 threshhold has passed and thus
-// pay-to-script hash transactions will be fully validated.
-func NewScript(scriptSig []byte, scriptPubKey []byte, txidx int, tx *wire.MsgTx, flags ScriptFlags) (*Script, error) {
+// with a pubkeyscript scriptPubKey. If bip16 is true then it will be treated as
+// if the bip16 threshhold has passed and thus pay-to-script hash transactions
+// will be fully validated.
+func NewScript(scriptPubKey []byte, tx *wire.MsgTx, txidx int, flags ScriptFlags) (*Script, error) {
+	if txidx < 0 || txidx >= len(tx.TxIn) {
+		return nil, ErrInvalidIndex
+	}
+	scriptSig := tx.TxIn[txidx].SignatureScript
+
 	var m Script
 	if flags&ScriptVerifySigPushOnly == ScriptVerifySigPushOnly && !IsPushOnlyScript(scriptSig) {
 		return nil, ErrStackNonPushOnly

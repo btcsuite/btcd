@@ -83,8 +83,8 @@ out:
 			// Create a new script engine for the script pair.
 			sigScript := txIn.SignatureScript
 			pkScript := originMsgTx.TxOut[originTxIndex].PkScript
-			engine, err := txscript.NewScript(sigScript, pkScript,
-				txVI.txInIndex, txVI.tx.MsgTx(), v.flags)
+			engine, err := txscript.NewScript(pkScript,
+				txVI.tx.MsgTx(), txVI.txInIndex, v.flags)
 			if err != nil {
 				str := fmt.Sprintf("failed to parse input "+
 					"%s:%d which references output %s:%d - "+

@@ -4202,7 +4202,7 @@ func TestBitcoindInvalidTests(t *testing.T) {
 			continue
 		}
 		tx := createSpendingTx(scriptSig, scriptPubKey)
-		s, err := NewScript(scriptSig, scriptPubKey, 0, tx, flags)
+		s, err := NewScript(scriptPubKey, tx, 0, flags)
 		if err == nil {
 			if err := s.Execute(); err == nil {
 				t.Errorf("%s test succeeded when it "+
@@ -4254,7 +4254,7 @@ func TestBitcoindValidTests(t *testing.T) {
 			continue
 		}
 		tx := createSpendingTx(scriptSig, scriptPubKey)
-		s, err := NewScript(scriptSig, scriptPubKey, 0, tx, flags)
+		s, err := NewScript(scriptPubKey, tx, 0, flags)
 		if err != nil {
 			t.Errorf("%s failed to create script: %v", name, err)
 			continue
@@ -4391,8 +4391,7 @@ testloop:
 					k, i, test)
 				continue testloop
 			}
-			s, err := NewScript(txin.SignatureScript, pkScript, k,
-				tx.MsgTx(), flags)
+			s, err := NewScript(pkScript, tx.MsgTx(), k, flags)
 			if err != nil {
 				t.Errorf("test (%d:%v:%d) failed to create "+
 					"script: %v", i, test, k, err)
@@ -4537,8 +4536,7 @@ testloop:
 			// These are meant to fail, so as soon as the first
 			// input fails the transaction has failed. (some of the
 			// test txns have good inputs, too..
-			s, err := NewScript(txin.SignatureScript, pkScript, k,
-				tx.MsgTx(), flags)
+			s, err := NewScript(pkScript, tx.MsgTx(), k, flags)
 			if err != nil {
 				continue testloop
 			}
