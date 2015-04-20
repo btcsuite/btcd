@@ -1131,8 +1131,9 @@ func opcodeNop(op *parsedOpcode, vm *Engine) error {
 	switch op.opcode.value {
 	case OP_NOP1, OP_NOP2, OP_NOP3, OP_NOP4, OP_NOP5,
 		OP_NOP6, OP_NOP7, OP_NOP8, OP_NOP9, OP_NOP10:
-		if vm.discourageUpgradableNops {
-			return fmt.Errorf("%s reserved for soft-fork upgrades", opcodemap[op.opcode.value].name)
+		if vm.hasFlag(ScriptDiscourageUpgradableNops) {
+			return fmt.Errorf("%s reserved for soft-fork upgrades",
+				opcodemap[op.opcode.value].name)
 		}
 	}
 	return nil
@@ -1850,7 +1851,9 @@ func opcodeCheckSig(op *parsedOpcode, vm *Engine) error {
 	}
 
 	var signature *btcec.Signature
-	if vm.verifyStrictEncoding || vm.verifyDERSignatures {
+	if vm.hasFlag(ScriptVerifyStrictEncoding) ||
+		vm.hasFlag(ScriptVerifyDERSignatures) {
+
 		signature, err = btcec.ParseDERSignature(sigStr, btcec.S256())
 	} else {
 		signature, err = btcec.ParseSignature(sigStr, btcec.S256())
@@ -1951,7 +1954,7 @@ func opcodeCheckMultiSig(op *parsedOpcode, vm *Engine) error {
 		return err
 	}
 
-	if vm.strictMultiSig && len(dummy) != 0 {
+	if vm.hasFlag(ScriptStrictMultiSig) && len(dummy) != 0 {
 		return fmt.Errorf("multisig dummy argument is not zero length: %d",
 			len(dummy))
 	}
@@ -2010,7 +2013,9 @@ func opcodeCheckMultiSig(op *parsedOpcode, vm *Engine) error {
 
 			// Parse the signature.
 			var err error
-			if vm.verifyStrictEncoding || vm.verifyDERSignatures {
+			if vm.hasFlag(ScriptVerifyStrictEncoding) ||
+				vm.hasFlag(ScriptVerifyDERSignatures) {
+
 				parsedSig, err = btcec.ParseDERSignature(signature,
 					btcec.S256())
 			} else {

@@ -80,24 +80,24 @@ const (
 
 // Engine is the virtual machine that executes scripts.
 type Engine struct {
-	scripts                  [][]parsedOpcode
-	scriptIdx                int
-	scriptOff                int
-	lastcodesep              int
-	dstack                   Stack // data stack
-	astack                   Stack // alt stack
-	tx                       wire.MsgTx
-	txIdx                    int
-	condStack                []int
-	numOps                   int
-	bip16                    bool     // treat execution as pay-to-script-hash
-	strictMultiSig           bool     // verify multisig stack item is zero length
-	discourageUpgradableNops bool     // NOP1 to NOP10 are reserved for future soft-fork upgrades
-	verifyStrictEncoding     bool     // verify strict encoding of signatures
-	verifyCleanStack         bool     // verify stack is clean after script evaluation
-	verifyDERSignatures      bool     // verify signatures comply with the DER format
-	verifyLowS               bool     // verify signatures comply with the DER format and have an S value <= halforder
-	savedFirstStack          [][]byte // stack from first script for bip16 scripts
+	scripts         [][]parsedOpcode
+	scriptIdx       int
+	scriptOff       int
+	lastcodesep     int
+	dstack          Stack // data stack
+	astack          Stack // alt stack
+	tx              wire.MsgTx
+	txIdx           int
+	condStack       []int
+	numOps          int
+	flags           ScriptFlags
+	bip16           bool     // treat execution as pay-to-script-hash
+	savedFirstStack [][]byte // stack from first script for bip16 scripts
+}
+
+// hasFlag returns whether the script engine instance has the passed flag set.
+func (vm *Engine) hasFlag(flag ScriptFlags) bool {
+	return vm.flags&flag == flag
 }
 
 // Execute will execute all script in the script engine and return either nil
@@ -144,7 +144,9 @@ func (vm *Engine) CheckErrorCondition(finalScript bool) error {
 	if vm.scriptIdx < len(vm.scripts) {
 		return ErrStackScriptUnfinished
 	}
-	if finalScript && vm.verifyCleanStack && vm.dstack.Depth() != 1 {
+	if finalScript && vm.hasFlag(ScriptVerifyCleanStack) &&
+		vm.dstack.Depth() != 1 {
+
 		return ErrStackCleanStack
 	} else if vm.dstack.Depth() < 1 {
 		return ErrStackEmptyStack
@@ -302,7 +304,7 @@ func (vm *Engine) subScript() []parsedOpcode {
 // checkHashTypeEncoding returns whether or not the passed hashtype adheres to
 // the strict encoding requirements if enabled.
 func (vm *Engine) checkHashTypeEncoding(hashType SigHashType) error {
-	if !vm.verifyStrictEncoding {
+	if !vm.hasFlag(ScriptVerifyStrictEncoding) {
 		return nil
 	}
 
@@ -316,7 +318,7 @@ func (vm *Engine) checkHashTypeEncoding(hashType SigHashType) error {
 // checkPubKeyEncoding returns whether or not the passed public key adheres to
 // the strict encoding requirements if enabled.
 func (vm *Engine) checkPubKeyEncoding(pubKey []byte) error {
-	if !vm.verifyStrictEncoding {
+	if !vm.hasFlag(ScriptVerifyStrictEncoding) {
 		return nil
 	}
 
@@ -334,7 +336,10 @@ func (vm *Engine) checkPubKeyEncoding(pubKey []byte) error {
 // checkSignatureEncoding returns whether or not the passed signature adheres to
 // the strict encoding requirements if enabled.
 func (vm *Engine) checkSignatureEncoding(sig []byte) error {
-	if !vm.verifyDERSignatures && !vm.verifyLowS && !vm.verifyStrictEncoding {
+	if !vm.hasFlag(ScriptVerifyDERSignatures) &&
+		!vm.hasFlag(ScriptVerifyLowS) &&
+		!vm.hasFlag(ScriptVerifyStrictEncoding) {
+
 		return nil
 	}
 
@@ -417,7 +422,7 @@ func (vm *Engine) checkSignatureEncoding(sig []byte) error {
 	}
 
 	// Verify the S value is <= halforder.
-	if vm.verifyLowS {
+	if vm.hasFlag(ScriptVerifyLowS) {
 		sValue := new(big.Int).SetBytes(sig[rLen+6 : rLen+6+sLen])
 		if sValue.Cmp(halfOrder) > 0 {
 			return ErrStackInvalidLowSSignature
@@ -481,8 +486,8 @@ func NewEngine(scriptPubKey []byte, tx *wire.MsgTx, txIdx int, flags ScriptFlags
 	}
 	scriptSig := tx.TxIn[txIdx].SignatureScript
 
-	var vm Engine
-	if flags&ScriptVerifySigPushOnly != 0 && !IsPushOnlyScript(scriptSig) {
+	vm := Engine{flags: flags}
+	if vm.hasFlag(ScriptVerifySigPushOnly) && !IsPushOnlyScript(scriptSig) {
 		return nil, ErrStackNonPushOnly
 	}
 
@@ -508,7 +513,7 @@ func NewEngine(scriptPubKey []byte, tx *wire.MsgTx, txIdx int, flags ScriptFlags
 	}
 
 	// Parse flags.
-	if flags&ScriptBip16 == ScriptBip16 && isScriptHash(vm.scripts[1]) {
+	if vm.hasFlag(ScriptBip16) && isScriptHash(vm.scripts[1]) {
 		// if we are pay to scripthash then we only accept input
 		// scripts that push data
 		if !isPushOnly(vm.scripts[0]) {
@@ -516,30 +521,12 @@ func NewEngine(scriptPubKey []byte, tx *wire.MsgTx, txIdx int, flags ScriptFlags
 		}
 		vm.bip16 = true
 	}
-	if flags&ScriptStrictMultiSig == ScriptStrictMultiSig {
-		vm.strictMultiSig = true
-	}
-	if flags&ScriptDiscourageUpgradableNops == ScriptDiscourageUpgradableNops {
-		vm.discourageUpgradableNops = true
-	}
-	if flags&ScriptVerifyStrictEncoding == ScriptVerifyStrictEncoding {
-		vm.verifyStrictEncoding = true
-	}
-	if flags&ScriptVerifyDERSignatures == ScriptVerifyDERSignatures {
-		vm.verifyDERSignatures = true
-	}
-	if flags&ScriptVerifyMinimalData == ScriptVerifyMinimalData {
+	if vm.hasFlag(ScriptVerifyMinimalData) {
 		vm.dstack.verifyMinimalData = true
 		vm.astack.verifyMinimalData = true
 	}
-	if flags&ScriptVerifyCleanStack == ScriptVerifyCleanStack {
-		if flags&ScriptBip16 != ScriptBip16 {
-			return nil, ErrInvalidFlags
-		}
-		vm.verifyCleanStack = true
-	}
-	if flags&ScriptVerifyLowS == ScriptVerifyLowS {
-		vm.verifyLowS = true
+	if vm.hasFlag(ScriptVerifyCleanStack) && !vm.hasFlag(ScriptBip16) {
+		return nil, ErrInvalidFlags
 	}
 
 	vm.tx = *tx

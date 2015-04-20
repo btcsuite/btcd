@@ -79,7 +79,7 @@ func TestCheckPubKeyEncoding(t *testing.T) {
 			isValid: false,
 		},
 	}
-	vm := Engine{verifyStrictEncoding: true}
+	vm := Engine{flags: ScriptVerifyStrictEncoding}
 	for _, test := range tests {
 		err := vm.checkPubKeyEncoding(test.key)
 		if err != nil && test.isValid {
@@ -337,7 +337,7 @@ func TestCheckSignatureEncoding(t *testing.T) {
 		},
 	}
 
-	vm := Engine{verifyStrictEncoding: true}
+	vm := Engine{flags: ScriptVerifyStrictEncoding}
 	for _, test := range tests {
 		err := vm.checkSignatureEncoding(test.sig)
 		if err != nil && test.isValid {
