@@ -46,7 +46,7 @@ func parseHex(tok string) ([]byte, error) {
 // parseShortForm parses a string as as used in the Bitcoin Core reference tests
 // into the script it came from.
 func parseShortForm(script string) ([]byte, error) {
-	ops := make(map[string]*opcode)
+	ops := make(map[string]byte)
 
 	// the format used for these tests is pretty simple if ad-hoc:
 	// -  opcodes other than the push opcodes and unknown are present as
@@ -56,16 +56,15 @@ func parseShortForm(script string) ([]byte, error) {
 	// 0x14 is OP_DATA_20)
 	// - single quoted strings are pushed as data.
 	// - anything else is an error.
-	for i := range opcodeArray {
-		op := &opcodeArray[i]
-		if op.value < OP_NOP && op.value != OP_RESERVED {
+	for opcodeName, opcodeValue := range OpcodeByName {
+		if opcodeValue < OP_NOP && opcodeValue != OP_RESERVED {
 			continue
 		}
-		if strings.Contains(op.name, "OP_UNKNOWN") {
+		if strings.Contains(opcodeName, "OP_UNKNOWN") {
 			continue
 		}
-		ops[op.name] = op
-		ops[strings.TrimPrefix(op.name, "OP_")] = op
+		ops[opcodeName] = opcodeValue
+		ops[strings.TrimPrefix(opcodeName, "OP_")] = opcodeValue
 	}
 	// do once, build map.
 
@@ -90,7 +89,7 @@ func parseShortForm(script string) ([]byte, error) {
 			tok[0] == '\'' && tok[len(tok)-1] == '\'' {
 			builder.AddFullData([]byte(tok[1 : len(tok)-1]))
 		} else if opcode, ok := ops[tok]; ok {
-			builder.AddOp(opcode.value)
+			builder.AddOp(opcode)
 		} else {
 			return nil, fmt.Errorf("bad token \"%s\"", tok)
 		}

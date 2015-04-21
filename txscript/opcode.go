@@ -1819,3 +1819,18 @@ func opcodeCheckMultiSigVerify(op *parsedOpcode, vm *Engine) error {
 	}
 	return err
 }
+
+// OpcodeByName is a map that can be used to lookup an opcode by its
+// human-readable name (OP_CHECKMULTISIG, OP_CHECKSIG, etc).
+var OpcodeByName = make(map[string]byte)
+
+func init() {
+	// Initialize the opcode name to value map using the contents of the
+	// opcode array.  Also add entries for "OP_FALSE" and "OP_TRUE" since
+	// they are aliases for "OP_0" and "OP_1", respectively.
+	for _, op := range opcodeArray {
+		OpcodeByName[op.name] = op.value
+	}
+	OpcodeByName["OP_FALSE"] = OP_FALSE
+	OpcodeByName["OP_TRUE"] = OP_TRUE
+}
