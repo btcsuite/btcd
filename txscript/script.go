@@ -264,21 +264,18 @@ func typeOfScript(pops []parsedOpcode) ScriptClass {
 // parseScript preparses the script in bytes into a list of parsedOpcodes while
 // applying a number of sanity checks.
 func parseScript(script []byte) ([]parsedOpcode, error) {
-	return parseScriptTemplate(script, opcodemap)
+	return parseScriptTemplate(script, &opcodeArray)
 }
 
 // parseScriptTemplate is the same as parseScript but allows the passing of the
 // template list for testing purposes. On error we return the list of parsed
 // opcodes so far.
-func parseScriptTemplate(script []byte, opcodemap map[byte]*opcode) ([]parsedOpcode, error) {
+func parseScriptTemplate(script []byte, opcodes *[256]opcode) ([]parsedOpcode, error) {
 	retScript := make([]parsedOpcode, 0, len(script))
 	for i := 0; i < len(script); {
 		instr := script[i]
-		op, ok := opcodemap[instr]
-		if !ok {
-			return retScript, ErrStackInvalidOpcode
-		}
-		pop := parsedOpcode{opcode: op}
+		op := opcodes[instr]
+		pop := parsedOpcode{opcode: &op}
 		// parse data out of instruction.
 		switch {
 		case op.length == 1:

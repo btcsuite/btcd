@@ -56,7 +56,8 @@ func parseShortForm(script string) ([]byte, error) {
 	// 0x14 is OP_DATA_20)
 	// - single quoted strings are pushed as data.
 	// - anything else is an error.
-	for _, op := range opcodemap {
+	for i := range opcodeArray {
+		op := &opcodeArray[i]
 		if op.value < OP_NOP && op.value != OP_RESERVED {
 			continue
 		}
