@@ -404,17 +404,6 @@ type getPeerInfoMsg struct {
 	reply chan []*btcjson.GetPeerInfoResult
 }
 
-type addNodeMsg struct {
-	addr      string
-	permanent bool
-	reply     chan error
-}
-
-type delNodeMsg struct {
-	cmp   func(*peer) bool
-	reply chan error
-}
-
 type getAddedNodesMsg struct {
 	reply chan []*peer
 }
@@ -490,7 +479,6 @@ func (s *server) handleQuery(querymsg interface{}, state *peerState) {
 		})
 		msg.reply <- infos
 
-	case addNodeMsg:
 	case connectNodeMsg:
 		// XXX(oga) duplicate oneshots?
 		for e := state.persistentPeers.Front(); e != nil; e = e.Next() {
@@ -512,8 +500,6 @@ func (s *server) handleQuery(querymsg interface{}, state *peerState) {
 		} else {
 			msg.reply <- errors.New("failed to add peer")
 		}
-
-	case delNodeMsg:
 	case removeNodeMsg:
 		found := disconnectPeer(state.persistentPeers, msg.cmp, func(p *peer) {
 			// Keep group counts ok since we remove from
@@ -526,7 +512,6 @@ func (s *server) handleQuery(querymsg interface{}, state *peerState) {
 		} else {
 			msg.reply <- errors.New("peer not found")
 		}
-
 	// Request a list of the persistent (added) peers.
 	case getAddedNodesMsg:
 		// Respond with a slice of the relavent peers.
@@ -876,30 +861,6 @@ func (s *server) PeerInfo() []*btcjson.GetPeerInfoResult {
 	replyChan := make(chan []*btcjson.GetPeerInfoResult)
 
 	s.query <- getPeerInfoMsg{reply: replyChan}
-
-	return <-replyChan
-}
-
-// AddAddr adds `addr' as a new outbound peer. If permanent is true then the
-// peer will be persistent and reconnect if the connection is lost.
-// It is an error to call this with an already existing peer.
-func (s *server) AddAddr(addr string, permanent bool) error {
-	replyChan := make(chan error)
-
-	s.query <- addNodeMsg{addr: addr, permanent: permanent, reply: replyChan}
-
-	return <-replyChan
-}
-
-// RemoveAddr removes `addr' from the list of persistent peers if present.
-// An error will be returned if the peer was not found.
-func (s *server) RemoveAddr(addr string) error {
-	replyChan := make(chan error)
-
-	s.query <- delNodeMsg{
-		cmp:   func(p *peer) bool { return p.addr == addr },
-		reply: replyChan,
-	}
 
 	return <-replyChan
 }

@@ -364,11 +364,11 @@ func handleAddNode(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (in
 	var err error
 	switch c.SubCmd {
 	case "add":
-		err = s.server.AddAddr(addr, true)
+		err = s.server.ConnectNode(addr, true)
 	case "remove":
-		err = s.server.RemoveAddr(addr)
+		err = s.server.RemoveNodeByAddr(addr)
 	case "onetry":
-		err = s.server.AddAddr(addr, false)
+		err = s.server.ConnectNode(addr, false)
 	default:
 		return nil, &btcjson.RPCError{
 			Code:    btcjson.ErrRPCInvalidParameter,
