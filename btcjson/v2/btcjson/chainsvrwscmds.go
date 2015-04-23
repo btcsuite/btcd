@@ -7,10 +7,6 @@
 
 package btcjson
 
-import (
-	"github.com/btcsuite/btcd/wire"
-)
-
 // AuthenticateCmd defines the authenticate JSON-RPC command.
 type AuthenticateCmd struct {
 	Username   string
@@ -69,15 +65,6 @@ func NewNotifyReceivedCmd(addresses []string) *NotifyReceivedCmd {
 type OutPoint struct {
 	Hash  string `json:"hash"`
 	Index uint32 `json:"index"`
-}
-
-// NewOutPointFromWire creates a new OutPoint from the OutPoint structure
-// of the btcwire package.
-func NewOutPointFromWire(op *wire.OutPoint) *OutPoint {
-	return &OutPoint{
-		Hash:  op.Hash.String(),
-		Index: op.Index,
-	}
 }
 
 // NotifySpentCmd defines the notifyspent JSON-RPC command.

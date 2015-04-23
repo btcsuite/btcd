@@ -12,7 +12,6 @@ import (
 	"testing"
 
 	"github.com/btcsuite/btcd/btcjson/v2/btcjson"
-	"github.com/btcsuite/btcd/wire"
 )
 
 // TestChainSvrWsCmds tests all of the chain server websocket-specific commands
@@ -112,9 +111,10 @@ func TestChainSvrWsCmds(t *testing.T) {
 			},
 			staticCmd: func() interface{} {
 				addrs := []string{"1Address"}
-				hash, _ := wire.NewShaHashFromStr("123")
-				op := wire.NewOutPoint(hash, 0)
-				ops := []btcjson.OutPoint{*btcjson.NewOutPointFromWire(op)}
+				ops := []btcjson.OutPoint{{
+					Hash:  "0000000000000000000000000000000000000000000000000000000000000123",
+					Index: 0,
+				}}
 				return btcjson.NewRescanCmd("123", addrs, ops, nil)
 			},
 			marshalled: `{"jsonrpc":"1.0","method":"rescan","params":["123",["1Address"],[{"hash":"0000000000000000000000000000000000000000000000000000000000000123","index":0}]],"id":1}`,
