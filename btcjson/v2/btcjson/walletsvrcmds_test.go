@@ -42,7 +42,7 @@ func TestWalletSvrCmds(t *testing.T) {
 			unmarshalled: &btcjson.AddMultisigAddressCmd{
 				NRequired: 2,
 				Keys:      []string{"031234", "035678"},
-				Account:   btcjson.String(""),
+				Account:   nil,
 			},
 		},
 		{
@@ -177,7 +177,7 @@ func TestWalletSvrCmds(t *testing.T) {
 			},
 			marshalled: `{"jsonrpc":"1.0","method":"getbalance","params":[],"id":1}`,
 			unmarshalled: &btcjson.GetBalanceCmd{
-				Account: btcjson.String("*"),
+				Account: nil,
 				MinConf: btcjson.Int(1),
 			},
 		},
@@ -219,7 +219,7 @@ func TestWalletSvrCmds(t *testing.T) {
 			},
 			marshalled: `{"jsonrpc":"1.0","method":"getnewaddress","params":[],"id":1}`,
 			unmarshalled: &btcjson.GetNewAddressCmd{
-				Account: btcjson.String(""),
+				Account: nil,
 			},
 		},
 		{
@@ -245,7 +245,7 @@ func TestWalletSvrCmds(t *testing.T) {
 			},
 			marshalled: `{"jsonrpc":"1.0","method":"getrawchangeaddress","params":[],"id":1}`,
 			unmarshalled: &btcjson.GetRawChangeAddressCmd{
-				Account: btcjson.String(""),
+				Account: nil,
 			},
 		},
 		{
@@ -356,7 +356,7 @@ func TestWalletSvrCmds(t *testing.T) {
 			marshalled: `{"jsonrpc":"1.0","method":"importprivkey","params":["abc"],"id":1}`,
 			unmarshalled: &btcjson.ImportPrivKeyCmd{
 				PrivKey: "abc",
-				Label:   btcjson.String(""),
+				Label:   nil,
 				Rescan:  btcjson.Bool(true),
 			},
 		},

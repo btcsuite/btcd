@@ -50,7 +50,7 @@ func TestWalletSvrWsCmds(t *testing.T) {
 			},
 			marshalled: `{"jsonrpc":"1.0","method":"exportwatchingwallet","params":[],"id":1}`,
 			unmarshalled: &btcjson.ExportWatchingWalletCmd{
-				Account:  btcjson.String(""),
+				Account:  nil,
 				Download: btcjson.Bool(false),
 			},
 		},
@@ -93,7 +93,7 @@ func TestWalletSvrWsCmds(t *testing.T) {
 			},
 			marshalled: `{"jsonrpc":"1.0","method":"getunconfirmedbalance","params":[],"id":1}`,
 			unmarshalled: &btcjson.GetUnconfirmedBalanceCmd{
-				Account: btcjson.String(""),
+				Account: nil,
 			},
 		},
 		{
@@ -120,7 +120,7 @@ func TestWalletSvrWsCmds(t *testing.T) {
 			marshalled: `{"jsonrpc":"1.0","method":"listaddresstransactions","params":[["1Address"]],"id":1}`,
 			unmarshalled: &btcjson.ListAddressTransactionsCmd{
 				Addresses: []string{"1Address"},
-				Account:   btcjson.String(""),
+				Account:   nil,
 			},
 		},
 		{
@@ -148,7 +148,7 @@ func TestWalletSvrWsCmds(t *testing.T) {
 			},
 			marshalled: `{"jsonrpc":"1.0","method":"listalltransactions","params":[],"id":1}`,
 			unmarshalled: &btcjson.ListAllTransactionsCmd{
-				Account: btcjson.String(""),
+				Account: nil,
 			},
 		},
 		{

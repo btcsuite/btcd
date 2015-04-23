@@ -11,7 +11,7 @@ package btcjson
 type AddMultisigAddressCmd struct {
 	NRequired int
 	Keys      []string
-	Account   *string `jsonrpcdefault:"\"\""`
+	Account   *string
 }
 
 // NewAddMultisigAddressCmd returns a new instance which can be used to issue a
@@ -135,8 +135,8 @@ func NewGetAddressesByAccountCmd(account string) *GetAddressesByAccountCmd {
 
 // GetBalanceCmd defines the getbalance JSON-RPC command.
 type GetBalanceCmd struct {
-	Account *string `jsonrpcdefault:"\"*\""`
-	MinConf *int    `jsonrpcdefault:"1"`
+	Account *string
+	MinConf *int `jsonrpcdefault:"1"`
 }
 
 // NewGetBalanceCmd returns a new instance which can be used to issue a
@@ -153,7 +153,7 @@ func NewGetBalanceCmd(account *string, minConf *int) *GetBalanceCmd {
 
 // GetNewAddressCmd defines the getnewaddress JSON-RPC command.
 type GetNewAddressCmd struct {
-	Account *string `jsonrpcdefault:"\"\""`
+	Account *string
 }
 
 // NewGetNewAddressCmd returns a new instance which can be used to issue a
@@ -169,7 +169,7 @@ func NewGetNewAddressCmd(account *string) *GetNewAddressCmd {
 
 // GetRawChangeAddressCmd defines the getrawchangeaddress JSON-RPC command.
 type GetRawChangeAddressCmd struct {
-	Account *string `jsonrpcdefault:"\"\""`
+	Account *string
 }
 
 // NewGetRawChangeAddressCmd returns a new instance which can be used to issue a
@@ -240,8 +240,8 @@ func NewGetTransactionCmd(txHash string, includeWatchOnly *bool) *GetTransaction
 // ImportPrivKeyCmd defines the importprivkey JSON-RPC command.
 type ImportPrivKeyCmd struct {
 	PrivKey string
-	Label   *string `jsonrpcdefault:"\"\""`
-	Rescan  *bool   `jsonrpcdefault:"true"`
+	Label   *string
+	Rescan  *bool `jsonrpcdefault:"true"`
 }
 
 // NewImportPrivKeyCmd returns a new instance which can be used to issue a
