@@ -745,13 +745,13 @@ func (pop *parsedOpcode) exec(vm *Engine) error {
 
 	// If we are not a conditional opcode and we aren't executing, then
 	// we are done now.
-	if vm.condStack[0] != OpCondTrue && !pop.conditional() {
+	if !vm.isBranchExecuting() && !pop.conditional() {
 		return nil
 	}
 
 	// Ensure all executed data push opcodes use the minimal encoding when
 	// the minimal data verification is set.
-	if vm.dstack.verifyMinimalData && vm.condStack[0] == OpCondTrue &&
+	if vm.dstack.verifyMinimalData && vm.isBranchExecuting() &&
 		pop.opcode.value >= 0 && pop.opcode.value <= OP_PUSHDATA4 {
 		if err := pop.checkMinimalDataPush(); err != nil {
 			return err
@@ -896,22 +896,19 @@ func opcodeNop(op *parsedOpcode, vm *Engine) error {
 func opcodeIf(op *parsedOpcode, vm *Engine) error {
 	// opcodeIf will be executed even if it is on the non-execute side
 	// of the conditional, this is so proper nesting is maintained
-	var condval int
-	if vm.condStack[0] == OpCondTrue {
+	condVal := OpCondFalse
+	if vm.isBranchExecuting() {
 		ok, err := vm.dstack.PopBool()
 		if err != nil {
 			return err
 		}
 		if ok {
-			condval = OpCondTrue
+			condVal = OpCondTrue
 		}
 	} else {
-		condval = OpCondSkip
+		condVal = OpCondSkip
 	}
-	cond := []int{condval}
-	// push condition to the 'head' of the slice
-	vm.condStack = append(cond, vm.condStack...)
-	// TODO(drahn) check if a maximum condtitional stack limit exists
+	vm.condStack = append(vm.condStack, condVal)
 	return nil
 }
 
@@ -920,37 +917,34 @@ func opcodeIf(op *parsedOpcode, vm *Engine) error {
 func opcodeNotIf(op *parsedOpcode, vm *Engine) error {
 	// opcodeIf will be executed even if it is on the non-execute side
 	// of the conditional, this is so proper nesting is maintained
-	var condval int
-	if vm.condStack[0] == OpCondTrue {
+	condVal := OpCondFalse
+	if vm.isBranchExecuting() {
 		ok, err := vm.dstack.PopBool()
 		if err != nil {
 			return err
 		}
 		if !ok {
-			condval = OpCondTrue
+			condVal = OpCondTrue
 		}
 	} else {
-		condval = OpCondSkip
+		condVal = OpCondSkip
 	}
-	cond := []int{condval}
-	// push condition to the 'head' of the slice
-	vm.condStack = append(cond, vm.condStack...)
-	// TODO(drahn) check if a maximum condtitional stack limit exists
+	vm.condStack = append(vm.condStack, condVal)
 	return nil
 }
 
 // opcodeElse inverts conditional execution for other half of if/else/endif
 func opcodeElse(op *parsedOpcode, vm *Engine) error {
-	if len(vm.condStack) < 2 {
-		// intial true cannot be toggled, only pushed conditionals
+	if len(vm.condStack) == 0 {
 		return ErrStackNoIf
 	}
 
-	switch vm.condStack[0] {
+	conditionalIdx := len(vm.condStack) - 1
+	switch vm.condStack[conditionalIdx] {
 	case OpCondTrue:
-		vm.condStack[0] = OpCondFalse
+		vm.condStack[conditionalIdx] = OpCondFalse
 	case OpCondFalse:
-		vm.condStack[0] = OpCondTrue
+		vm.condStack[conditionalIdx] = OpCondTrue
 	case OpCondSkip:
 		// value doesn't change in skip
 	}
@@ -960,14 +954,11 @@ func opcodeElse(op *parsedOpcode, vm *Engine) error {
 // opcodeEndif terminates a conditional block, removing the  value from the
 // conditional execution stack.
 func opcodeEndif(op *parsedOpcode, vm *Engine) error {
-	if len(vm.condStack) < 2 {
-		// intial true cannot be popped, only pushed conditionals
+	if len(vm.condStack) == 0 {
 		return ErrStackNoIf
 	}
 
-	stk := make([]int, len(vm.condStack)-1, len(vm.condStack)-1)
-	copy(stk, vm.condStack[1:])
-	vm.condStack = stk
+	vm.condStack = vm.condStack[:len(vm.condStack)-1]
 	return nil
 }
 

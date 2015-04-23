@@ -100,6 +100,17 @@ func (vm *Engine) hasFlag(flag ScriptFlags) bool {
 	return vm.flags&flag == flag
 }
 
+// isBranchExecuting returns whether or not the current conditional branch is
+// actively executing.  For example, when the data stack has an OP_FALSE on it
+// and an OP_IF is encountered, the branch is inactive until an OP_ELSE or
+// OP_ENDIF is encountered.  It properly handles nested conditionals.
+func (vm *Engine) isBranchExecuting() bool {
+	if len(vm.condStack) == 0 {
+		return true
+	}
+	return vm.condStack[len(vm.condStack)-1] == OpCondTrue
+}
+
 // Execute will execute all script in the script engine and return either nil
 // for successful validation or an error if one occurred.
 func (vm *Engine) Execute() (err error) {
@@ -195,7 +206,7 @@ func (vm *Engine) Step() (done bool, err error) {
 	vm.scriptOff++
 	if vm.scriptOff >= len(vm.scripts[vm.scriptIdx]) {
 		// Illegal to have an `if' that straddles two scripts.
-		if err == nil && len(vm.condStack) != 1 {
+		if err == nil && len(vm.condStack) != 0 {
 			return false, ErrStackMissingEndif
 		}
 
@@ -531,7 +542,6 @@ func NewEngine(scriptPubKey []byte, tx *wire.MsgTx, txIdx int, flags ScriptFlags
 
 	vm.tx = *tx
 	vm.txIdx = txIdx
-	vm.condStack = []int{OpCondTrue}
 
 	return &vm, nil
 }
