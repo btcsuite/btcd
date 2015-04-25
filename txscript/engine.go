@@ -84,8 +84,8 @@ type Engine struct {
 	scriptIdx       int
 	scriptOff       int
 	lastcodesep     int
-	dstack          Stack // data stack
-	astack          Stack // alt stack
+	dstack          stack // data stack
+	astack          stack // alt stack
 	tx              wire.MsgTx
 	txIdx           int
 	condStack       []int
@@ -444,7 +444,7 @@ func (vm *Engine) checkSignatureEncoding(sig []byte) error {
 }
 
 // getStack returns the contents of stack as a byte array bottom up
-func getStack(stack *Stack) [][]byte {
+func getStack(stack *stack) [][]byte {
 	array := make([][]byte, stack.Depth())
 	for i := range array {
 		// PeekByteArry can't fail due to overflow, already checked
@@ -455,7 +455,7 @@ func getStack(stack *Stack) [][]byte {
 
 // setStack sets the stack to the contents of the array where the last item in
 // the array is the top item in the stack.
-func setStack(stack *Stack, data [][]byte) {
+func setStack(stack *stack, data [][]byte) {
 	// This can not error. Only errors are for invalid arguments.
 	_ = stack.DropN(stack.Depth())
 
