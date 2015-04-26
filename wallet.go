@@ -901,14 +901,14 @@ func (r FutureGetNewAddressResult) Receive() (btcutil.Address, error) {
 // returned instance.
 //
 // See GetNewAddress for the blocking version and more details.
-func (c *Client) GetNewAddressAsync() FutureGetNewAddressResult {
-	cmd := btcjson.NewGetNewAddressCmd(nil)
+func (c *Client) GetNewAddressAsync(account string) FutureGetNewAddressResult {
+	cmd := btcjson.NewGetNewAddressCmd(&account)
 	return c.sendCmd(cmd)
 }
 
 // GetNewAddress returns a new address.
-func (c *Client) GetNewAddress() (btcutil.Address, error) {
-	return c.GetNewAddressAsync().Receive()
+func (c *Client) GetNewAddress(account string) (btcutil.Address, error) {
+	return c.GetNewAddressAsync(account).Receive()
 }
 
 // FutureGetRawChangeAddressResult is a future promise to deliver the result of
