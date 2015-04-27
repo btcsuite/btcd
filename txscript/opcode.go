@@ -1482,11 +1482,6 @@ func calcHash(buf []byte, hasher hash.Hash) []byte {
 	return hasher.Sum(nil)
 }
 
-// calculate hash160 which is ripemd160(sha256(data))
-func calcHash160(buf []byte) []byte {
-	return calcHash(calcHash(buf, fastsha256.New()), ripemd160.New())
-}
-
 func opcodeRipemd160(op *parsedOpcode, vm *Engine) error {
 	buf, err := vm.dstack.PopByteArray()
 	if err != nil {
@@ -1503,7 +1498,8 @@ func opcodeSha1(op *parsedOpcode, vm *Engine) error {
 		return err
 	}
 
-	vm.dstack.PushByteArray(calcHash(buf, sha1.New()))
+	hash := sha1.Sum(buf)
+	vm.dstack.PushByteArray(hash[:])
 	return nil
 }
 
@@ -1513,7 +1509,8 @@ func opcodeSha256(op *parsedOpcode, vm *Engine) error {
 		return err
 	}
 
-	vm.dstack.PushByteArray(calcHash(buf, fastsha256.New()))
+	hash := fastsha256.Sum256(buf)
+	vm.dstack.PushByteArray(hash[:])
 	return nil
 }
 
@@ -1523,7 +1520,8 @@ func opcodeHash160(op *parsedOpcode, vm *Engine) error {
 		return err
 	}
 
-	vm.dstack.PushByteArray(calcHash160(buf))
+	hash := fastsha256.Sum256(buf)
+	vm.dstack.PushByteArray(calcHash(hash[:], ripemd160.New()))
 	return nil
 }
 
