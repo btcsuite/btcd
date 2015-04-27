@@ -111,6 +111,49 @@ func (vm *Engine) isBranchExecuting() bool {
 	return vm.condStack[len(vm.condStack)-1] == OpCondTrue
 }
 
+// executeOpcode peforms execution on the passed opcode.  It takes into account
+// whether or not it is hidden by conditionals, but some rules still must be
+// tested in this case.
+func (vm *Engine) executeOpcode(pop *parsedOpcode) error {
+	// Disabled opcodes are ``fail on program counter''.
+	if pop.disabled() {
+		return ErrStackOpDisabled
+	}
+
+	// Always-illegal opcodes are ``fail on program counter''.
+	if pop.alwaysIllegal() {
+		return ErrStackReservedOpcode
+	}
+
+	// Note that this includes OP_RESERVED which counts as a push operation.
+	if pop.opcode.value > OP_16 {
+		vm.numOps++
+		if vm.numOps > MaxOpsPerScript {
+			return ErrStackTooManyOperations
+		}
+
+	} else if len(pop.data) > MaxScriptElementSize {
+		return ErrStackElementTooBig
+	}
+
+	// If we are not a conditional opcode and we aren't executing, then
+	// we are done now.
+	if !vm.isBranchExecuting() && !pop.conditional() {
+		return nil
+	}
+
+	// Ensure all executed data push opcodes use the minimal encoding when
+	// the minimal data verification is set.
+	if vm.dstack.verifyMinimalData && vm.isBranchExecuting() &&
+		pop.opcode.value >= 0 && pop.opcode.value <= OP_PUSHDATA4 {
+		if err := pop.checkMinimalDataPush(); err != nil {
+			return err
+		}
+	}
+
+	return pop.opcode.opfunc(pop, vm)
+}
+
 // Execute will execute all script in the script engine and return either nil
 // for successful validation or an error if one occurred.
 func (vm *Engine) Execute() (err error) {
@@ -191,9 +234,9 @@ func (vm *Engine) Step() (done bool, err error) {
 	if err != nil {
 		return true, err
 	}
-	opcode := vm.scripts[vm.scriptIdx][vm.scriptOff]
+	opcode := &vm.scripts[vm.scriptIdx][vm.scriptOff]
 
-	err = opcode.exec(vm)
+	err = vm.executeOpcode(opcode)
 	if err != nil {
 		return true, err
 	}

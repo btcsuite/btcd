@@ -718,49 +718,6 @@ func (pop *parsedOpcode) checkMinimalDataPush() error {
 	return nil
 }
 
-// exec peforms execution on the opcode. It takes into account whether or not
-// it is hidden by conditionals, but some rules still must be tested in this
-// case.
-func (pop *parsedOpcode) exec(vm *Engine) error {
-	// Disabled opcodes are ``fail on program counter''.
-	if pop.disabled() {
-		return ErrStackOpDisabled
-	}
-
-	// Always-illegal opcodes are ``fail on program counter''.
-	if pop.alwaysIllegal() {
-		return ErrStackReservedOpcode
-	}
-
-	// Note that this includes OP_RESERVED which counts as a push operation.
-	if pop.opcode.value > OP_16 {
-		vm.numOps++
-		if vm.numOps > MaxOpsPerScript {
-			return ErrStackTooManyOperations
-		}
-
-	} else if len(pop.data) > MaxScriptElementSize {
-		return ErrStackElementTooBig
-	}
-
-	// If we are not a conditional opcode and we aren't executing, then
-	// we are done now.
-	if !vm.isBranchExecuting() && !pop.conditional() {
-		return nil
-	}
-
-	// Ensure all executed data push opcodes use the minimal encoding when
-	// the minimal data verification is set.
-	if vm.dstack.verifyMinimalData && vm.isBranchExecuting() &&
-		pop.opcode.value >= 0 && pop.opcode.value <= OP_PUSHDATA4 {
-		if err := pop.checkMinimalDataPush(); err != nil {
-			return err
-		}
-	}
-
-	return pop.opcode.opfunc(pop, vm)
-}
-
 func (pop *parsedOpcode) print(oneline bool) string {
 	// The reference implementation one-line disassembly replaces opcodes
 	// which represent values (e.g. OP_0 through OP_16 and OP_1NEGATE)
