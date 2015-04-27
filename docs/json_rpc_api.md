@@ -554,6 +554,7 @@ The following is an overview of the RPC methods which are implemented by btcd, b
 |3|[getcurrentnet](#getcurrentnet)|Y|Get bitcoin network btcd is running on.|None|
 |4|[searchrawtransactions](#searchrawtransactions)|Y|Query for transactions related to a particular address.|None|
 |5|[node](#node)|N|Attempts to add or remove a peer. |None|
+|6|[generate](#generate)|N|When in simnet or regtest mode, generate a set number of blocks. |None|
 
 
 <a name="ExtMethodDetails" />
@@ -619,6 +620,18 @@ The following is an overview of the RPC methods which are implemented by btcd, b
 |Parameters|1. command (string, required) - `connect` to add a peer (defaults to temporary), `remove` to remove a persistent peer, or `disconnect` to remove all matching non-persistent peers <br /> 2. peer (string, required) - ip address and port, or ID of the peer to operate on<br /> 3. connection type (string, optional) - `perm` indicates the peer should be added as a permanent peer, `temp` indicates a connection should only be attempted once. |
 |Description|Attempts to add or remove a peer.|
 |Returns|Nothing|
+[Return to Overview](#MethodOverview)<br />
+
+***
+
+<a name="generate"/>
+
+|   |   |
+|---|---|
+|Method|generate|
+|Parameters|1. numblocks (int, required) - The number of blocks to generate |
+|Description|When in simnet or regtest mode, generates `numblocks` blocks. If blocks arrive from elsewhere, they are built upon but don't count toward the number of blocks to generate. Only generated blocks are returned. This RPC call will exit with an error if the server is already CPU mining, and will prevent the server from CPU mining for another command while it runs. |
+|Returns|`[ (json array of strings)` <br/>&nbsp;&nbsp; `"blockhash", ... hash of the generated block` <br/>`]` |
 [Return to Overview](#MethodOverview)<br />
 
 ***

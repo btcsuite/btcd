@@ -63,6 +63,7 @@ type Params struct {
 	PowLimitBits           uint32
 	SubsidyHalvingInterval int32
 	ResetMinDifficulty     bool
+	GenerateSupported      bool
 
 	// Checkpoints ordered from oldest to newest.
 	Checkpoints []Checkpoint
@@ -108,6 +109,7 @@ var MainNetParams = Params{
 	PowLimitBits:           0x1d00ffff,
 	SubsidyHalvingInterval: 210000,
 	ResetMinDifficulty:     false,
+	GenerateSupported:      false,
 
 	// Checkpoints ordered from oldest to newest.
 	Checkpoints: []Checkpoint{
@@ -171,6 +173,7 @@ var RegressionNetParams = Params{
 	PowLimitBits:           0x207fffff,
 	SubsidyHalvingInterval: 150,
 	ResetMinDifficulty:     true,
+	GenerateSupported:      true,
 
 	// Checkpoints ordered from oldest to newest.
 	Checkpoints: nil,
@@ -217,6 +220,7 @@ var TestNet3Params = Params{
 	PowLimitBits:           0x1d00ffff,
 	SubsidyHalvingInterval: 210000,
 	ResetMinDifficulty:     true,
+	GenerateSupported:      false,
 
 	// Checkpoints ordered from oldest to newest.
 	Checkpoints: []Checkpoint{
@@ -269,6 +273,7 @@ var SimNetParams = Params{
 	PowLimitBits:           0x207fffff,
 	SubsidyHalvingInterval: 210000,
 	ResetMinDifficulty:     true,
+	GenerateSupported:      true,
 
 	// Checkpoints ordered from oldest to newest.
 	Checkpoints: nil,

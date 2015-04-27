@@ -58,6 +58,19 @@ func NewDebugLevelCmd(levelSpec string) *DebugLevelCmd {
 	}
 }
 
+// GenerateCmd defines the generate JSON-RPC command.
+type GenerateCmd struct {
+	NumBlocks uint32
+}
+
+// NewGenerateCmd returns a new instance which can be used to issue a generate
+// JSON-RPC command.
+func NewGenerateCmd(numBlocks uint32) *GenerateCmd {
+	return &GenerateCmd{
+		NumBlocks: numBlocks,
+	}
+}
+
 // GetBestBlockCmd defines the getbestblock JSON-RPC command.
 type GetBestBlockCmd struct{}
 
@@ -82,6 +95,7 @@ func init() {
 
 	MustRegisterCmd("debuglevel", (*DebugLevelCmd)(nil), flags)
 	MustRegisterCmd("node", (*NodeCmd)(nil), flags)
+	MustRegisterCmd("generate", (*GenerateCmd)(nil), flags)
 	MustRegisterCmd("getbestblock", (*GetBestBlockCmd)(nil), flags)
 	MustRegisterCmd("getcurrentnet", (*GetCurrentNetCmd)(nil), flags)
 }
