@@ -8,7 +8,6 @@ import (
 	"bytes"
 	"crypto/sha1"
 	"encoding/binary"
-	"encoding/hex"
 	"fmt"
 	"hash"
 	"math/big"
@@ -729,27 +728,32 @@ func (pop *parsedOpcode) print(oneline bool) string {
 		if replName, ok := opcodeOnelineRepls[opcodeName]; ok {
 			opcodeName = replName
 		}
+
+		// Nothing more to do for non-data push opcodes.
+		if pop.opcode.length == 1 {
+			return opcodeName
+		}
+
+		return fmt.Sprintf("%x", pop.data)
 	}
 
-	retString := opcodeName
+	// Nothing more to do for non-data push opcodes.
 	if pop.opcode.length == 1 {
-		return retString
+		return opcodeName
 	}
-	if oneline {
-		retString = ""
+
+	// Add length for the OP_PUSHDATA# opcodes.
+	retString := opcodeName
+	switch pop.opcode.length {
+	case -1:
+		retString += fmt.Sprintf(" 0x%02x", len(pop.data))
+	case -2:
+		retString += fmt.Sprintf(" 0x%04x", len(pop.data))
+	case -4:
+		retString += fmt.Sprintf(" 0x%08x", len(pop.data))
 	}
-	if !oneline && pop.opcode.length < 0 {
-		//add length to the end of retString
-		retString += fmt.Sprintf(" 0x%0*x", 2*-pop.opcode.length,
-			len(pop.data))
-	}
-	for _, val := range pop.data {
-		if !oneline {
-			retString += " "
-		}
-		retString += fmt.Sprintf("%02x", val)
-	}
-	return retString
+
+	return fmt.Sprintf("%s 0x%02x", retString, pop.data)
 }
 
 func (pop *parsedOpcode) bytes() ([]byte, error) {
@@ -1561,17 +1565,6 @@ func opcodeCheckSig(op *parsedOpcode, vm *Engine) error {
 		return nil
 	}
 
-	log.Tracef("%v", newLogClosure(func() string {
-		return fmt.Sprintf("op_checksig\n"+
-			"pubKey:\n%v"+
-			"pubKey.X: %v\n"+
-			"pubKey.Y: %v\n"+
-			"signature.R: %v\n"+
-			"signature.S: %v\n"+
-			"checkScriptHash:\n%v",
-			hex.Dump(pkStr), pubKey.X, pubKey.Y,
-			signature.R, signature.S, hex.Dump(hash))
-	}))
 	ok := signature.Verify(hash, pubKey)
 	vm.dstack.PushBool(ok)
 	return nil

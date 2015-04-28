@@ -606,16 +606,6 @@ func TestStack(t *testing.T) {
 			[][]byte{{2}, {3}},
 		},
 		{
-			"Nip too much",
-			[][]byte{{1}, {2}, {3}},
-			func(s *stack) error {
-				// bite off more than we can chew
-				return s.NipN(3)
-			},
-			ErrStackUnderflow,
-			[][]byte{{2}, {3}},
-		},
-		{
 			"keep on tucking",
 			[][]byte{{1}, {2}, {3}},
 			func(s *stack) error {
