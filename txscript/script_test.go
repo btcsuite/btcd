@@ -2875,7 +2875,7 @@ func TestCalcMultiSigStats(t *testing.T) {
 	for i, test := range tests {
 		if _, _, err := txscript.CalcMultiSigStats(test.script); err != test.expected {
 			t.Errorf("CalcMultiSigStats #%d (%s) wrong result\n"+
-				"got: %x\nwant: %x", i, test.name, err,
+				"got: %v\nwant: %v", i, test.name, err,
 				test.expected)
 		}
 	}

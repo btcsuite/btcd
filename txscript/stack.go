@@ -131,30 +131,45 @@ func (s *stack) checkMinimalData(so []byte) error {
 	return nil
 }
 
+// Depth returns the number of items on the stack.
+func (s *stack) Depth() int {
+	return len(s.stk)
+}
+
 // PushByteArray adds the given back array to the top of the stack.
+//
+// Stack transformation: [... x1 x2] -> [... x1 x2 data]
 func (s *stack) PushByteArray(so []byte) {
 	s.stk = append(s.stk, so)
 }
 
 // PushInt converts the provided bignum to a suitable byte array then pushes
 // it onto the top of the stack.
+//
+// Stack transformation: [... x1 x2] -> [... x1 x2 int]
 func (s *stack) PushInt(val *big.Int) {
 	s.PushByteArray(fromInt(val))
 }
 
 // PushBool converts the provided boolean to a suitable byte array then pushes
 // it onto the top of the stack.
+//
+// Stack transformation: [... x1 x2] -> [... x1 x2 bool]
 func (s *stack) PushBool(val bool) {
 	s.PushByteArray(fromBool(val))
 }
 
 // PopByteArray pops the value off the top of the stack and returns it.
+//
+// Stack transformation: [... x1 x2 x3] -> [... x1 x2]
 func (s *stack) PopByteArray() ([]byte, error) {
 	return s.nipN(0)
 }
 
 // PopInt pops the value off the top of the stack, converts it into a bignum and
 // returns it.
+//
+// Stack transformation: [... x1 x2 x3] -> [... x1 x2]
 func (s *stack) PopInt() (*big.Int, error) {
 	so, err := s.PopByteArray()
 	if err != nil {
@@ -168,27 +183,31 @@ func (s *stack) PopInt() (*big.Int, error) {
 	return asInt(so)
 }
 
-// PopBool pops the value off the top of the stack, converts it into a bool and
+// PopBool pops the value off the top of the stack, converts it into a bool, and
 // returns it.
+//
+// Stack transformation: [... x1 x2 x3] -> [... x1 x2]
 func (s *stack) PopBool() (bool, error) {
 	so, err := s.PopByteArray()
 	if err != nil {
 		return false, err
 	}
+
 	return asBool(so), nil
 }
 
 // PeekByteArray returns the nth item on the stack without removing it.
-func (s *stack) PeekByteArray(idx int) (so []byte, err error) {
+func (s *stack) PeekByteArray(idx int) ([]byte, error) {
 	sz := len(s.stk)
 	if idx < 0 || idx >= sz {
 		return nil, ErrStackUnderflow
 	}
+
 	return s.stk[sz-idx-1], nil
 }
 
-// PeekInt returns the nth item on the stack as a bignum without removing it.
-func (s *stack) PeekInt(idx int) (i *big.Int, err error) {
+// PeekInt returns the Nth item on the stack as a bignum without removing it.
+func (s *stack) PeekInt(idx int) (*big.Int, error) {
 	so, err := s.PeekByteArray(idx)
 	if err != nil {
 		return nil, err
@@ -201,24 +220,30 @@ func (s *stack) PeekInt(idx int) (i *big.Int, err error) {
 	return asInt(so)
 }
 
-// PeekBool returns the nth item on the stack as a bool without removing it.
+// PeekBool returns the Nth item on the stack as a bool without removing it.
 func (s *stack) PeekBool(idx int) (i bool, err error) {
 	so, err := s.PeekByteArray(idx)
 	if err != nil {
 		return false, err
 	}
+
 	return asBool(so), nil
 }
 
 // nipN is an internal function that removes the nth item on the stack and
 // returns it.
-func (s *stack) nipN(idx int) (so []byte, err error) {
+//
+// Stack transformation:
+// nipN(0): [... x1 x2 x3] -> [... x1 x2]
+// nipN(1): [... x1 x2 x3] -> [... x1 x3]
+// nipN(2): [... x1 x2 x3] -> [... x2 x3]
+func (s *stack) nipN(idx int) ([]byte, error) {
 	sz := len(s.stk)
 	if idx < 0 || idx > sz-1 {
-		err = ErrStackUnderflow
-		return
+		return nil, ErrStackUnderflow
 	}
-	so = s.stk[sz-idx-1]
+
+	so := s.stk[sz-idx-1]
 	if idx == 0 {
 		s.stk = s.stk[:sz-1]
 	} else if idx == sz-1 {
@@ -230,17 +255,24 @@ func (s *stack) nipN(idx int) (so []byte, err error) {
 		s.stk = s.stk[:sz-idx-1]
 		s.stk = append(s.stk, s1...)
 	}
-	return
+	return so, nil
 }
 
 // NipN removes the Nth object on the stack
+//
+// Stack transformation:
+// NipN(0): [... x1 x2 x3] -> [... x1 x2]
+// NipN(1): [... x1 x2 x3] -> [... x1 x3]
+// NipN(2): [... x1 x2 x3] -> [... x2 x3]
 func (s *stack) NipN(idx int) error {
 	_, err := s.nipN(idx)
 	return err
 }
 
 // Tuck copies the item at the top of the stack and inserts it before the 2nd
-// to top item. e.g.: 2,1 -> 2,1,2
+// to top item.
+//
+// Stack transformation: [... x1 x2] -> [... x2 x1 x2]
 func (s *stack) Tuck() error {
 	so2, err := s.PopByteArray()
 	if err != nil {
@@ -250,27 +282,23 @@ func (s *stack) Tuck() error {
 	if err != nil {
 		return err
 	}
-	s.PushByteArray(so2) // stack 2
-	s.PushByteArray(so1) // stack 1,2
-	s.PushByteArray(so2) // stack 2,1,2
+	s.PushByteArray(so2) // stack [... x2]
+	s.PushByteArray(so1) // stack [... x2 x1]
+	s.PushByteArray(so2) // stack [... x2 x1 x2]
 
 	return nil
 }
 
-// Depth returns the number of items on the stack.
-func (s *stack) Depth() (sz int) {
-	sz = len(s.stk)
-	return
-}
-
 // DropN removes the top N items from the stack.
-// e.g.
-// DropN(1): 1,2,3 -> 1,2
-// DropN(2): 1,2,3 -> 1
+//
+// Stack transformation:
+// DropN(1): [... x1 x2] -> [... x1]
+// DropN(2): [... x1 x2] -> [...]
 func (s *stack) DropN(n int) error {
 	if n < 1 {
 		return ErrStackInvalidArgs
 	}
+
 	for ; n > 0; n-- {
 		_, err := s.PopByteArray()
 		if err != nil {
@@ -281,16 +309,17 @@ func (s *stack) DropN(n int) error {
 }
 
 // DupN duplicates the top N items on the stack.
-// e.g.
-// DupN(1): 1,2,3 -> 1,2,3,3
-// DupN(2): 1,2,3 -> 1,2,3,2,3
+//
+// Stack transformation:
+// DupN(1): [... x1 x2] -> [... x1 x2 x2]
+// DupN(2): [... x1 x2] -> [... x1 x2 x1 x2]
 func (s *stack) DupN(n int) error {
 	if n < 1 {
 		return ErrStackInvalidArgs
 	}
+
 	// Iteratively duplicate the value n-1 down the stack n times.
-	// this leaves us with an in-order duplicate of the top N items on the
-	// stack.
+	// This leaves an in-order duplicate of the top n items on the stack.
 	for i := n; i > 0; i-- {
 		so, err := s.PeekByteArray(n - 1)
 		if err != nil {
@@ -301,16 +330,19 @@ func (s *stack) DupN(n int) error {
 	return nil
 }
 
-// RotN rotates the top 3N items on the stack to the left
-// e.g.
-// RotN(1): 1,2,3 -> 2,3,1
+// RotN rotates the top 3N items on the stack to the left N times.
+//
+// Stack transformation:
+// RotN(1): [... x1 x2 x3] -> [... x2 x3 x1]
+// RotN(2): [... x1 x2 x3 x4 x5 x6] -> [... x3 x4 x5 x6 x1 x2]
 func (s *stack) RotN(n int) error {
 	if n < 1 {
 		return ErrStackInvalidArgs
 	}
-	entry := 3*n - 1
+
 	// Nip the 3n-1th item from the stack to the top n times to rotate
 	// them up to the head of the stack.
+	entry := 3*n - 1
 	for i := n; i > 0; i-- {
 		so, err := s.nipN(entry)
 		if err != nil {
@@ -323,16 +355,18 @@ func (s *stack) RotN(n int) error {
 }
 
 // SwapN swaps the top N items on the stack with those below them.
-// E.g.:
-// SwapN(1): 1,2 -> 2,1
-// SwapN(2): 1,2,3,4 -> 3,4,1,2
+//
+// Stack transformation:
+// SwapN(1): [... x1 x2] -> [... x2 x1]
+// SwapN(2): [... x1 x2 x3 x4] -> [... x3 x4 x1 x2]
 func (s *stack) SwapN(n int) error {
 	if n < 1 {
 		return ErrStackInvalidArgs
 	}
+
 	entry := 2*n - 1
 	for i := n; i > 0; i-- {
-		// swap 2n-1th entry to topj
+		// Swap 2n-1th entry to top.
 		so, err := s.nipN(entry)
 		if err != nil {
 			return err
@@ -343,15 +377,17 @@ func (s *stack) SwapN(n int) error {
 	return nil
 }
 
-// OverN copies N items N spaces back to the top of the stack.
-// e.g.:
-// OverN(1): 1,2 -> 1,2,1
-// OverN(2): 1,2,3,4 -> 1,2,3,4,1,2
+// OverN copies N items N items back to the top of the stack.
+//
+// Stack transformation:
+// OverN(1): [... x1 x2 x3] -> [... x1 x2 x3 x2]
+// OverN(2): [... x1 x2 x3 x4] -> [... x1 x2 x3 x4 x1 x2]
 func (s *stack) OverN(n int) error {
 	if n < 1 {
 		return ErrStackInvalidArgs
 	}
-	// Copy 2n-1th entry to top of the stack
+
+	// Copy 2n-1th entry to top of the stack.
 	entry := 2*n - 1
 	for ; n > 0; n-- {
 		so, err := s.PeekByteArray(entry)
@@ -359,31 +395,33 @@ func (s *stack) OverN(n int) error {
 			return err
 		}
 		s.PushByteArray(so)
-		// 4,1,2,3,4, now code original 3rd entry to top.
 	}
 
 	return nil
 }
 
 // PickN copies the item N items back in the stack to the top.
-// e.g.:
-// PickN(1): 1,2,3 -> 1,2,3,2
-// PickN(2): 1,2,3 -> 1,2,3,1
+//
+// Stack transformation:
+// PickN(0): [x1 x2 x3] -> [x1 x2 x3 x3]
+// PickN(1): [x1 x2 x3] -> [x1 x2 x3 x2]
+// PickN(2): [x1 x2 x3] -> [x1 x2 x3 x1]
 func (s *stack) PickN(n int) error {
 	so, err := s.PeekByteArray(n)
 	if err != nil {
 		return err
 	}
-
 	s.PushByteArray(so)
 
 	return nil
 }
 
 // RollN moves the item N items back in the stack to the top.
-// e.g.:
-// RollN(1): 1,2,3 -> 1,3,2
-// RollN(2): 1,2,3 -> 2,3,1
+//
+// Stack transformation:
+// RollN(0): [x1 x2 x3] -> [x1 x2 x3]
+// RollN(1): [x1 x2 x3] -> [x1 x3 x2]
+// RollN(2): [x1 x2 x3] -> [x2 x3 x1]
 func (s *stack) RollN(n int) error {
 	so, err := s.nipN(n)
 	if err != nil {
@@ -398,7 +436,6 @@ func (s *stack) RollN(n int) error {
 // String returns the stack in a readable format.
 func (s *stack) String() string {
 	var result string
-
 	for _, stack := range s.stk {
 		result += hex.Dump(stack)
 	}
