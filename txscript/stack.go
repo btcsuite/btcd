@@ -4,79 +4,7 @@
 
 package txscript
 
-import (
-	"encoding/hex"
-	"math/big"
-)
-
-// asInt converts a byte array to a bignum by treating it as a little endian
-// number with sign bit.
-func asInt(v []byte) (*big.Int, error) {
-	// Only 32bit numbers allowed.
-	if len(v) > 4 {
-		return nil, ErrStackNumberTooBig
-	}
-	if len(v) == 0 {
-		return big.NewInt(0), nil
-	}
-	negative := false
-	origlen := len(v)
-	msb := v[len(v)-1]
-	if msb&0x80 == 0x80 {
-		negative = true
-		// remove sign bit
-		msb &= 0x7f
-	}
-	// trim leading 0 bytes
-	for ; msb == 0; msb = v[len(v)-1] {
-		v = v[:len(v)-1]
-		if len(v) == 0 {
-			break
-		}
-	}
-	// reverse bytes with a copy since stack is immutable.
-	intArray := make([]byte, len(v))
-	for i := range v {
-		intArray[len(v)-i-1] = v[i]
-	}
-	// IFF the value is negative and no 0 bytes were trimmed,
-	// the leading byte needs to be sign corrected
-	if negative && len(intArray) == origlen {
-		intArray[0] &= 0x7f
-	}
-
-	num := new(big.Int).SetBytes(intArray)
-	if negative {
-		num = num.Neg(num)
-	}
-	return num, nil
-}
-
-// fromInt provies a Big.Int in little endian format with the high bit of the
-// msb donating sign.
-func fromInt(v *big.Int) []byte {
-	negative := false
-	if v.Sign() == -1 {
-		negative = true
-	}
-	// Int.Bytes() trims leading zeros for us, so we don't have to.
-	b := v.Bytes()
-	if len(b) == 0 {
-		return []byte{}
-	}
-	arr := make([]byte, len(b))
-	for i := range b {
-		arr[len(b)-i-1] = b[i]
-	}
-	// if would otherwise be negative, add a zero byte
-	if arr[len(arr)-1]&0x80 == 0x80 {
-		arr = append(arr, 0)
-	}
-	if negative {
-		arr[len(arr)-1] |= 0x80
-	}
-	return arr
-}
+import "encoding/hex"
 
 // asBool gets the boolean value of the byte array.
 func asBool(t []byte) bool {
@@ -105,35 +33,9 @@ type stack struct {
 	verifyMinimalData bool
 }
 
-// checkMinimalData returns whether or not the passed byte array adheres to
-// the minimal encoding requirements, if enabled.
-func (s *stack) checkMinimalData(so []byte) error {
-	if !s.verifyMinimalData || len(so) == 0 {
-		return nil
-	}
-
-	// Check that the number is encoded with the minimum possible
-	// number of bytes.
-	//
-	// If the most-significant-byte - excluding the sign bit - is zero
-	// then we're not minimal. Note how this test also rejects the
-	// negative-zero encoding, 0x80.
-	if so[len(so)-1]&0x7f == 0 {
-		// One exception: if there's more than one byte and the most
-		// significant bit of the second-most-significant-byte is set
-		// it would conflict with the sign bit. An example of this case
-		// is +-255, which encode to 0xff00 and 0xff80 respectively.
-		// (big-endian).
-		if len(so) == 1 || so[len(so)-2]&0x80 == 0 {
-			return ErrStackMinimalData
-		}
-	}
-	return nil
-}
-
 // Depth returns the number of items on the stack.
-func (s *stack) Depth() int {
-	return len(s.stk)
+func (s *stack) Depth() int32 {
+	return int32(len(s.stk))
 }
 
 // PushByteArray adds the given back array to the top of the stack.
@@ -143,12 +45,12 @@ func (s *stack) PushByteArray(so []byte) {
 	s.stk = append(s.stk, so)
 }
 
-// PushInt converts the provided bignum to a suitable byte array then pushes
+// PushInt converts the provided scriptNum to a suitable byte array then pushes
 // it onto the top of the stack.
 //
 // Stack transformation: [... x1 x2] -> [... x1 x2 int]
-func (s *stack) PushInt(val *big.Int) {
-	s.PushByteArray(fromInt(val))
+func (s *stack) PushInt(val scriptNum) {
+	s.PushByteArray(val.Bytes())
 }
 
 // PushBool converts the provided boolean to a suitable byte array then pushes
@@ -166,21 +68,18 @@ func (s *stack) PopByteArray() ([]byte, error) {
 	return s.nipN(0)
 }
 
-// PopInt pops the value off the top of the stack, converts it into a bignum and
-// returns it.
+// PopInt pops the value off the top of the stack, converts it into a script
+// num, and returns it.  The act of converting to a script num enforces the
+// consensus rules imposed on data interpreted as numbers.
 //
 // Stack transformation: [... x1 x2 x3] -> [... x1 x2]
-func (s *stack) PopInt() (*big.Int, error) {
+func (s *stack) PopInt() (scriptNum, error) {
 	so, err := s.PopByteArray()
 	if err != nil {
-		return nil, err
+		return 0, err
 	}
 
-	if err := s.checkMinimalData(so); err != nil {
-		return nil, err
-	}
-
-	return asInt(so)
+	return makeScriptNum(so, s.verifyMinimalData)
 }
 
 // PopBool pops the value off the top of the stack, converts it into a bool, and
@@ -196,9 +95,9 @@ func (s *stack) PopBool() (bool, error) {
 	return asBool(so), nil
 }
 
-// PeekByteArray returns the nth item on the stack without removing it.
-func (s *stack) PeekByteArray(idx int) ([]byte, error) {
-	sz := len(s.stk)
+// PeekByteArray returns the Nth item on the stack without removing it.
+func (s *stack) PeekByteArray(idx int32) ([]byte, error) {
+	sz := int32(len(s.stk))
 	if idx < 0 || idx >= sz {
 		return nil, ErrStackUnderflow
 	}
@@ -206,22 +105,20 @@ func (s *stack) PeekByteArray(idx int) ([]byte, error) {
 	return s.stk[sz-idx-1], nil
 }
 
-// PeekInt returns the Nth item on the stack as a bignum without removing it.
-func (s *stack) PeekInt(idx int) (*big.Int, error) {
+// PeekInt returns the Nth item on the stack as a script num without removing
+// it.  The act of converting to a script num enforces the consensus rules
+// imposed on data interpreted as numbers.
+func (s *stack) PeekInt(idx int32) (scriptNum, error) {
 	so, err := s.PeekByteArray(idx)
 	if err != nil {
-		return nil, err
+		return 0, err
 	}
 
-	if err := s.checkMinimalData(so); err != nil {
-		return nil, err
-	}
-
-	return asInt(so)
+	return makeScriptNum(so, s.verifyMinimalData)
 }
 
 // PeekBool returns the Nth item on the stack as a bool without removing it.
-func (s *stack) PeekBool(idx int) (i bool, err error) {
+func (s *stack) PeekBool(idx int32) (bool, error) {
 	so, err := s.PeekByteArray(idx)
 	if err != nil {
 		return false, err
@@ -237,8 +134,8 @@ func (s *stack) PeekBool(idx int) (i bool, err error) {
 // nipN(0): [... x1 x2 x3] -> [... x1 x2]
 // nipN(1): [... x1 x2 x3] -> [... x1 x3]
 // nipN(2): [... x1 x2 x3] -> [... x2 x3]
-func (s *stack) nipN(idx int) ([]byte, error) {
-	sz := len(s.stk)
+func (s *stack) nipN(idx int32) ([]byte, error) {
+	sz := int32(len(s.stk))
 	if idx < 0 || idx > sz-1 {
 		return nil, ErrStackUnderflow
 	}
@@ -264,7 +161,7 @@ func (s *stack) nipN(idx int) ([]byte, error) {
 // NipN(0): [... x1 x2 x3] -> [... x1 x2]
 // NipN(1): [... x1 x2 x3] -> [... x1 x3]
 // NipN(2): [... x1 x2 x3] -> [... x2 x3]
-func (s *stack) NipN(idx int) error {
+func (s *stack) NipN(idx int32) error {
 	_, err := s.nipN(idx)
 	return err
 }
@@ -294,7 +191,7 @@ func (s *stack) Tuck() error {
 // Stack transformation:
 // DropN(1): [... x1 x2] -> [... x1]
 // DropN(2): [... x1 x2] -> [...]
-func (s *stack) DropN(n int) error {
+func (s *stack) DropN(n int32) error {
 	if n < 1 {
 		return ErrStackInvalidArgs
 	}
@@ -313,7 +210,7 @@ func (s *stack) DropN(n int) error {
 // Stack transformation:
 // DupN(1): [... x1 x2] -> [... x1 x2 x2]
 // DupN(2): [... x1 x2] -> [... x1 x2 x1 x2]
-func (s *stack) DupN(n int) error {
+func (s *stack) DupN(n int32) error {
 	if n < 1 {
 		return ErrStackInvalidArgs
 	}
@@ -335,7 +232,7 @@ func (s *stack) DupN(n int) error {
 // Stack transformation:
 // RotN(1): [... x1 x2 x3] -> [... x2 x3 x1]
 // RotN(2): [... x1 x2 x3 x4 x5 x6] -> [... x3 x4 x5 x6 x1 x2]
-func (s *stack) RotN(n int) error {
+func (s *stack) RotN(n int32) error {
 	if n < 1 {
 		return ErrStackInvalidArgs
 	}
@@ -359,7 +256,7 @@ func (s *stack) RotN(n int) error {
 // Stack transformation:
 // SwapN(1): [... x1 x2] -> [... x2 x1]
 // SwapN(2): [... x1 x2 x3 x4] -> [... x3 x4 x1 x2]
-func (s *stack) SwapN(n int) error {
+func (s *stack) SwapN(n int32) error {
 	if n < 1 {
 		return ErrStackInvalidArgs
 	}
@@ -382,7 +279,7 @@ func (s *stack) SwapN(n int) error {
 // Stack transformation:
 // OverN(1): [... x1 x2 x3] -> [... x1 x2 x3 x2]
 // OverN(2): [... x1 x2 x3 x4] -> [... x1 x2 x3 x4 x1 x2]
-func (s *stack) OverN(n int) error {
+func (s *stack) OverN(n int32) error {
 	if n < 1 {
 		return ErrStackInvalidArgs
 	}
@@ -406,7 +303,7 @@ func (s *stack) OverN(n int) error {
 // PickN(0): [x1 x2 x3] -> [x1 x2 x3 x3]
 // PickN(1): [x1 x2 x3] -> [x1 x2 x3 x2]
 // PickN(2): [x1 x2 x3] -> [x1 x2 x3 x1]
-func (s *stack) PickN(n int) error {
+func (s *stack) PickN(n int32) error {
 	so, err := s.PeekByteArray(n)
 	if err != nil {
 		return err
@@ -422,7 +319,7 @@ func (s *stack) PickN(n int) error {
 // RollN(0): [x1 x2 x3] -> [x1 x2 x3]
 // RollN(1): [x1 x2 x3] -> [x1 x3 x2]
 // RollN(2): [x1 x2 x3] -> [x2 x3 x1]
-func (s *stack) RollN(n int) error {
+func (s *stack) RollN(n int32) error {
 	so, err := s.nipN(n)
 	if err != nil {
 		return err

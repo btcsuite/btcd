@@ -8,7 +8,6 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"math/big"
 	"testing"
 )
 
@@ -180,7 +179,7 @@ func TestStack(t *testing.T) {
 				if err != nil {
 					return err
 				}
-				if v.Sign() != 0 {
+				if v != 0 {
 					return errors.New("0 != 0 on popInt")
 				}
 				return nil
@@ -196,7 +195,7 @@ func TestStack(t *testing.T) {
 				if err != nil {
 					return err
 				}
-				if v.Sign() != 0 {
+				if v != 0 {
 					return errors.New("-0 != 0 on popInt")
 				}
 				return nil
@@ -212,7 +211,7 @@ func TestStack(t *testing.T) {
 				if err != nil {
 					return err
 				}
-				if v.Cmp(big.NewInt(1)) != 0 {
+				if v != 1 {
 					return errors.New("1 != 1 on popInt")
 				}
 				return nil
@@ -228,8 +227,8 @@ func TestStack(t *testing.T) {
 				if err != nil {
 					return err
 				}
-				if v.Cmp(big.NewInt(1)) != 0 {
-					fmt.Printf("%v != %v\n", v, big.NewInt(1))
+				if v != 1 {
+					fmt.Printf("%v != %v\n", v, 1)
 					return errors.New("1 != 1 on popInt")
 				}
 				return nil
@@ -245,8 +244,8 @@ func TestStack(t *testing.T) {
 				if err != nil {
 					return err
 				}
-				if v.Cmp(big.NewInt(-1)) != 0 {
-					return errors.New("1 != 1 on popInt")
+				if v != -1 {
+					return errors.New("-1 != -1 on popInt")
 				}
 				return nil
 			},
@@ -261,8 +260,8 @@ func TestStack(t *testing.T) {
 				if err != nil {
 					return err
 				}
-				if v.Cmp(big.NewInt(-1)) != 0 {
-					fmt.Printf("%v != %v\n", v, big.NewInt(-1))
+				if v != -1 {
+					fmt.Printf("%v != %v\n", v, -1)
 					return errors.New("-1 != -1 on popInt")
 				}
 				return nil
@@ -279,8 +278,8 @@ func TestStack(t *testing.T) {
 				if err != nil {
 					return err
 				}
-				if v.Cmp(big.NewInt(-513)) != 0 {
-					fmt.Printf("%v != %v\n", v, big.NewInt(-513))
+				if v != -513 {
+					fmt.Printf("%v != %v\n", v, -513)
 					return errors.New("1 != 1 on popInt")
 				}
 				return nil
@@ -297,8 +296,8 @@ func TestStack(t *testing.T) {
 				if err != nil {
 					return err
 				}
-				if v.Cmp(big.NewInt(-1)) != 0 {
-					fmt.Printf("%v != %v\n", v, big.NewInt(-1))
+				if v != -1 {
+					fmt.Printf("%v != %v\n", v, -1)
 					return errors.New("-1 != -1 on popInt")
 				}
 				return nil
@@ -310,7 +309,7 @@ func TestStack(t *testing.T) {
 			"PushInt 0",
 			[][]byte{},
 			func(s *stack) error {
-				s.PushInt(big.NewInt(0))
+				s.PushInt(scriptNum(0))
 				return nil
 			},
 			nil,
@@ -320,7 +319,7 @@ func TestStack(t *testing.T) {
 			"PushInt 1",
 			[][]byte{},
 			func(s *stack) error {
-				s.PushInt(big.NewInt(1))
+				s.PushInt(scriptNum(1))
 				return nil
 			},
 			nil,
@@ -330,7 +329,7 @@ func TestStack(t *testing.T) {
 			"PushInt -1",
 			[][]byte{},
 			func(s *stack) error {
-				s.PushInt(big.NewInt(-1))
+				s.PushInt(scriptNum(-1))
 				return nil
 			},
 			nil,
@@ -340,7 +339,7 @@ func TestStack(t *testing.T) {
 			"PushInt two bytes",
 			[][]byte{},
 			func(s *stack) error {
-				s.PushInt(big.NewInt(256))
+				s.PushInt(scriptNum(256))
 				return nil
 			},
 			nil,
@@ -352,7 +351,7 @@ func TestStack(t *testing.T) {
 			[][]byte{},
 			func(s *stack) error {
 				// this will have the highbit set
-				s.PushInt(big.NewInt(128))
+				s.PushInt(scriptNum(128))
 				return nil
 			},
 			nil,
@@ -518,7 +517,7 @@ func TestStack(t *testing.T) {
 			"PushInt PopBool",
 			[][]byte{},
 			func(s *stack) error {
-				s.PushInt(big.NewInt(1))
+				s.PushInt(scriptNum(1))
 				val, err := s.PopBool()
 				if err != nil {
 					return err
@@ -536,7 +535,7 @@ func TestStack(t *testing.T) {
 			"PushInt PopBool 2",
 			[][]byte{},
 			func(s *stack) error {
-				s.PushInt(big.NewInt(0))
+				s.PushInt(scriptNum(0))
 				val, err := s.PopBool()
 				if err != nil {
 					return err
@@ -554,7 +553,7 @@ func TestStack(t *testing.T) {
 			"PushInt PopBool 2",
 			[][]byte{},
 			func(s *stack) error {
-				s.PushInt(big.NewInt(0))
+				s.PushInt(scriptNum(0))
 				val, err := s.PopBool()
 				if err != nil {
 					return err
@@ -894,7 +893,7 @@ func TestStack(t *testing.T) {
 				if err != nil {
 					return err
 				}
-				if val.Cmp(big.NewInt(1)) != 0 {
+				if val != 1 {
 					return errors.New("invalid result")
 				}
 				return nil
@@ -912,7 +911,7 @@ func TestStack(t *testing.T) {
 				if err != nil {
 					return err
 				}
-				if val.Cmp(big.NewInt(0)) != 0 {
+				if val != 0 {
 					return errors.New("invalid result")
 				}
 				return nil
@@ -924,14 +923,14 @@ func TestStack(t *testing.T) {
 			"pop int",
 			[][]byte{},
 			func(s *stack) error {
-				s.PushInt(big.NewInt(1))
+				s.PushInt(scriptNum(1))
 				// Peek int is otherwise pretty well tested,
 				// just check it works.
 				val, err := s.PopInt()
 				if err != nil {
 					return err
 				}
-				if val.Cmp(big.NewInt(1)) != 0 {
+				if val != 1 {
 					return errors.New("invalid result")
 				}
 				return nil
@@ -968,14 +967,14 @@ func TestStack(t *testing.T) {
 			continue
 		}
 
-		if len(test.after) != s.Depth() {
+		if int32(len(test.after)) != s.Depth() {
 			t.Errorf("%s: stack depth doesn't match expected: %v "+
 				"vs %v", test.name, len(test.after),
 				s.Depth())
 		}
 
 		for i := range test.after {
-			val, err := s.PeekByteArray(s.Depth() - i - 1)
+			val, err := s.PeekByteArray(s.Depth() - int32(i) - 1)
 			if err != nil {
 				t.Errorf("%s: can't peek %dth stack entry: %v",
 					test.name, i, err)

@@ -10,7 +10,6 @@ import (
 	"encoding/binary"
 	"fmt"
 	"hash"
-	"math/big"
 
 	"github.com/btcsuite/btcd/btcec"
 	"github.com/btcsuite/btcd/wire"
@@ -855,7 +854,7 @@ func opcodePushData(op *parsedOpcode, vm *Engine) error {
 
 // opcode1Negate pushes -1, encoded as a number, to the data stack.
 func opcode1Negate(op *parsedOpcode, vm *Engine) error {
-	vm.dstack.PushInt(big.NewInt(-1))
+	vm.dstack.PushInt(scriptNum(-1))
 	return nil
 }
 
@@ -865,7 +864,7 @@ func opcode1Negate(op *parsedOpcode, vm *Engine) error {
 func opcodeN(op *parsedOpcode, vm *Engine) error {
 	// The opcodes are all defined consecutively, so the numeric value is
 	// the difference.
-	vm.dstack.PushInt(big.NewInt(int64(op.opcode.value - (OP_1 - 1))))
+	vm.dstack.PushInt(scriptNum((op.opcode.value - (OP_1 - 1))))
 	return nil
 }
 
@@ -1091,7 +1090,7 @@ func opcodeIfDup(op *parsedOpcode, vm *Engine) error {
 	}
 
 	// Push copy of data iff it isn't zero
-	if val.Sign() != 0 {
+	if val != 0 {
 		vm.dstack.PushInt(val)
 	}
 
@@ -1105,7 +1104,7 @@ func opcodeIfDup(op *parsedOpcode, vm *Engine) error {
 // Example with 2 items: [x1 x2] -> [x1 x2 2]
 // Example with 3 items: [x1 x2 x3] -> [x1 x2 x3 3]
 func opcodeDepth(op *parsedOpcode, vm *Engine) error {
-	vm.dstack.PushInt(big.NewInt(int64(vm.dstack.Depth())))
+	vm.dstack.PushInt(scriptNum(vm.dstack.Depth()))
 	return nil
 }
 
@@ -1144,14 +1143,12 @@ func opcodeOver(op *parsedOpcode, vm *Engine) error {
 // Example with n=1: [x2 x1 x0 1] -> [x2 x1 x0 x1]
 // Example with n=2: [x2 x1 x0 2] -> [x2 x1 x0 x2]
 func opcodePick(op *parsedOpcode, vm *Engine) error {
-	pidx, err := vm.dstack.PopInt()
+	val, err := vm.dstack.PopInt()
 	if err != nil {
 		return err
 	}
 
-	// PopInt promises that the int returned is 32 bit.
-	val := int(pidx.Int64())
-	return vm.dstack.PickN(val)
+	return vm.dstack.PickN(val.Int32())
 }
 
 // opcodeRoll treats the top item on the data stack as an integer and moves
@@ -1161,14 +1158,12 @@ func opcodePick(op *parsedOpcode, vm *Engine) error {
 // Example with n=1: [x2 x1 x0 1] -> [x2 x0 x1]
 // Example with n=2: [x2 x1 x0 2] -> [x1 x0 x2]
 func opcodeRoll(op *parsedOpcode, vm *Engine) error {
-	ridx, err := vm.dstack.PopInt()
+	val, err := vm.dstack.PopInt()
 	if err != nil {
 		return err
 	}
 
-	// PopInt promises that the int returned is 32 bit.
-	val := int(ridx.Int64())
-	return vm.dstack.RollN(val)
+	return vm.dstack.RollN(val.Int32())
 }
 
 // opcodeRot rotates the top 3 items on the data stack to the left.
@@ -1203,7 +1198,7 @@ func opcodeSize(op *parsedOpcode, vm *Engine) error {
 		return err
 	}
 
-	vm.dstack.PushInt(big.NewInt(int64(len(so))))
+	vm.dstack.PushInt(scriptNum(len(so)))
 	return nil
 }
 
@@ -1250,7 +1245,7 @@ func opcode1Add(op *parsedOpcode, vm *Engine) error {
 		return err
 	}
 
-	vm.dstack.PushInt(new(big.Int).Add(m, big.NewInt(1)))
+	vm.dstack.PushInt(m + 1)
 	return nil
 }
 
@@ -1263,7 +1258,7 @@ func opcode1Sub(op *parsedOpcode, vm *Engine) error {
 	if err != nil {
 		return err
 	}
-	vm.dstack.PushInt(new(big.Int).Sub(m, big.NewInt(1)))
+	vm.dstack.PushInt(m - 1)
 
 	return nil
 }
@@ -1278,7 +1273,7 @@ func opcodeNegate(op *parsedOpcode, vm *Engine) error {
 		return err
 	}
 
-	vm.dstack.PushInt(new(big.Int).Neg(m))
+	vm.dstack.PushInt(-m)
 	return nil
 }
 
@@ -1292,7 +1287,10 @@ func opcodeAbs(op *parsedOpcode, vm *Engine) error {
 		return err
 	}
 
-	vm.dstack.PushInt(new(big.Int).Abs(m))
+	if m < 0 {
+		m = -m
+	}
+	vm.dstack.PushInt(m)
 	return nil
 }
 
@@ -1314,10 +1312,10 @@ func opcodeNot(op *parsedOpcode, vm *Engine) error {
 		return err
 	}
 
-	if m.Sign() == 0 {
-		vm.dstack.PushInt(big.NewInt(1))
+	if m == 0 {
+		vm.dstack.PushInt(scriptNum(1))
 	} else {
-		vm.dstack.PushInt(big.NewInt(0))
+		vm.dstack.PushInt(scriptNum(0))
 	}
 	return nil
 }
@@ -1334,8 +1332,8 @@ func opcode0NotEqual(op *parsedOpcode, vm *Engine) error {
 		return err
 	}
 
-	if m.Sign() != 0 {
-		m.SetInt64(1)
+	if m != 0 {
+		m = 1
 	}
 	vm.dstack.PushInt(m)
 	return nil
@@ -1356,7 +1354,7 @@ func opcodeAdd(op *parsedOpcode, vm *Engine) error {
 		return err
 	}
 
-	vm.dstack.PushInt(new(big.Int).Add(v0, v1))
+	vm.dstack.PushInt(v0 + v1)
 	return nil
 }
 
@@ -1376,7 +1374,7 @@ func opcodeSub(op *parsedOpcode, vm *Engine) error {
 		return err
 	}
 
-	vm.dstack.PushInt(new(big.Int).Sub(v1, v0))
+	vm.dstack.PushInt(v1 - v0)
 	return nil
 }
 
@@ -1398,10 +1396,10 @@ func opcodeBoolAnd(op *parsedOpcode, vm *Engine) error {
 		return err
 	}
 
-	if v0.Sign() != 0 && v1.Sign() != 0 {
-		vm.dstack.PushInt(big.NewInt(1))
+	if v0 != 0 && v1 != 0 {
+		vm.dstack.PushInt(scriptNum(1))
 	} else {
-		vm.dstack.PushInt(big.NewInt(0))
+		vm.dstack.PushInt(scriptNum(0))
 	}
 
 	return nil
@@ -1425,10 +1423,10 @@ func opcodeBoolOr(op *parsedOpcode, vm *Engine) error {
 		return err
 	}
 
-	if v0.Sign() != 0 || v1.Sign() != 0 {
-		vm.dstack.PushInt(big.NewInt(1))
+	if v0 != 0 || v1 != 0 {
+		vm.dstack.PushInt(scriptNum(1))
 	} else {
-		vm.dstack.PushInt(big.NewInt(0))
+		vm.dstack.PushInt(scriptNum(0))
 	}
 
 	return nil
@@ -1450,10 +1448,10 @@ func opcodeNumEqual(op *parsedOpcode, vm *Engine) error {
 		return err
 	}
 
-	if v0.Cmp(v1) == 0 {
-		vm.dstack.PushInt(big.NewInt(1))
+	if v0 == v1 {
+		vm.dstack.PushInt(scriptNum(1))
 	} else {
-		vm.dstack.PushInt(big.NewInt(0))
+		vm.dstack.PushInt(scriptNum(0))
 	}
 
 	return nil
@@ -1491,10 +1489,10 @@ func opcodeNumNotEqual(op *parsedOpcode, vm *Engine) error {
 		return err
 	}
 
-	if v0.Cmp(v1) != 0 {
-		vm.dstack.PushInt(big.NewInt(1))
+	if v0 != v1 {
+		vm.dstack.PushInt(scriptNum(1))
 	} else {
-		vm.dstack.PushInt(big.NewInt(0))
+		vm.dstack.PushInt(scriptNum(0))
 	}
 
 	return nil
@@ -1516,10 +1514,10 @@ func opcodeLessThan(op *parsedOpcode, vm *Engine) error {
 		return err
 	}
 
-	if v1.Cmp(v0) == -1 {
-		vm.dstack.PushInt(big.NewInt(1))
+	if v1 < v0 {
+		vm.dstack.PushInt(scriptNum(1))
 	} else {
-		vm.dstack.PushInt(big.NewInt(0))
+		vm.dstack.PushInt(scriptNum(0))
 	}
 
 	return nil
@@ -1541,10 +1539,10 @@ func opcodeGreaterThan(op *parsedOpcode, vm *Engine) error {
 		return err
 	}
 
-	if v1.Cmp(v0) == 1 {
-		vm.dstack.PushInt(big.NewInt(1))
+	if v1 > v0 {
+		vm.dstack.PushInt(scriptNum(1))
 	} else {
-		vm.dstack.PushInt(big.NewInt(0))
+		vm.dstack.PushInt(scriptNum(0))
 	}
 	return nil
 }
@@ -1565,10 +1563,10 @@ func opcodeLessThanOrEqual(op *parsedOpcode, vm *Engine) error {
 		return err
 	}
 
-	if v1.Cmp(v0) <= 0 {
-		vm.dstack.PushInt(big.NewInt(1))
+	if v1 <= v0 {
+		vm.dstack.PushInt(scriptNum(1))
 	} else {
-		vm.dstack.PushInt(big.NewInt(0))
+		vm.dstack.PushInt(scriptNum(0))
 	}
 	return nil
 }
@@ -1589,10 +1587,10 @@ func opcodeGreaterThanOrEqual(op *parsedOpcode, vm *Engine) error {
 		return err
 	}
 
-	if v1.Cmp(v0) >= 0 {
-		vm.dstack.PushInt(big.NewInt(1))
+	if v1 >= v0 {
+		vm.dstack.PushInt(scriptNum(1))
 	} else {
-		vm.dstack.PushInt(big.NewInt(0))
+		vm.dstack.PushInt(scriptNum(0))
 	}
 
 	return nil
@@ -1613,10 +1611,10 @@ func opcodeMin(op *parsedOpcode, vm *Engine) error {
 		return err
 	}
 
-	if v1.Cmp(v0) == -1 {
-		vm.dstack.PushInt(new(big.Int).Set(v1))
+	if v1 < v0 {
+		vm.dstack.PushInt(v1)
 	} else {
-		vm.dstack.PushInt(new(big.Int).Set(v0))
+		vm.dstack.PushInt(v0)
 	}
 
 	return nil
@@ -1637,10 +1635,10 @@ func opcodeMax(op *parsedOpcode, vm *Engine) error {
 		return err
 	}
 
-	if v1.Cmp(v0) == 1 {
-		vm.dstack.PushInt(new(big.Int).Set(v1))
+	if v1 > v0 {
+		vm.dstack.PushInt(v1)
 	} else {
-		vm.dstack.PushInt(new(big.Int).Set(v0))
+		vm.dstack.PushInt(v0)
 	}
 
 	return nil
@@ -1670,10 +1668,10 @@ func opcodeWithin(op *parsedOpcode, vm *Engine) error {
 		return err
 	}
 
-	if x.Cmp(minVal) >= 0 && x.Cmp(maxVal) == -1 {
-		vm.dstack.PushInt(big.NewInt(1))
+	if x >= minVal && x < maxVal {
+		vm.dstack.PushInt(scriptNum(1))
 	} else {
-		vm.dstack.PushInt(big.NewInt(0))
+		vm.dstack.PushInt(scriptNum(0))
 	}
 	return nil
 }
@@ -1904,8 +1902,7 @@ func opcodeCheckMultiSig(op *parsedOpcode, vm *Engine) error {
 		return err
 	}
 
-	// PopInt promises that the int returned is 32 bit.
-	numPubKeys := int(numKeys.Int64())
+	numPubKeys := int(numKeys.Int32())
 	if numPubKeys < 0 || numPubKeys > MaxPubKeysPerMultiSig {
 		return ErrStackTooManyPubkeys
 	}
@@ -1927,8 +1924,7 @@ func opcodeCheckMultiSig(op *parsedOpcode, vm *Engine) error {
 	if err != nil {
 		return err
 	}
-	// PopInt promises that the int returned is 32 bit.
-	numSignatures := int(numSigs.Int64())
+	numSignatures := int(numSigs.Int32())
 	if numSignatures < 0 {
 		return fmt.Errorf("number of signatures '%d' is less than 0",
 			numSignatures)
