@@ -18,7 +18,7 @@
 5. [Developer Resources](#DeveloperResources)
     1. [Code Contribution Guidelines](#ContributionGuidelines)
     2. [JSON-RPC Reference](#JSONRPCReference)
-    3. [Conformal Bitcoin-related Go Packages](#GoPackages)
+    3. [The btcsuite Bitcoin-related Go Packages](#GoPackages)
 
 <a name="About" />
 ### 1. About
@@ -196,7 +196,7 @@ information.
 * [JSON-RPC Reference](https://github.com/btcsuite/btcd/tree/master/docs/json_rpc_api.md)
     * [RPC Examples](https://github.com/btcsuite/btcd/tree/master/docs/json_rpc_api.md#ExampleCode)
 <a name="GoPackages" />
-* Conformal Bitcoin-related Go Packages:
+* The btcsuite Bitcoin-related Go Packages:
     * [btcrpcclient](https://github.com/btcsuite/btcrpcclient) - Implements a
 	  robust and easy to use Websocket-enabled Bitcoin JSON-RPC client
     * [btcjson](https://github.com/btcsuite/btcjson) - Provides an extensive API
