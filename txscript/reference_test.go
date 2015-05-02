@@ -2,7 +2,7 @@
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
-package txscript
+package txscript_test
 
 import (
 	"encoding/hex"
@@ -14,6 +14,7 @@ import (
 	"strings"
 	"testing"
 
+	. "github.com/btcsuite/btcd/txscript"
 	"github.com/btcsuite/btcd/wire"
 	"github.com/btcsuite/btcutil"
 )
@@ -43,30 +44,46 @@ func parseHex(tok string) ([]byte, error) {
 	return hex.DecodeString(tok[2:])
 }
 
+// shortFormOps holds a map of opcode names to values for use in short form
+// parsing.  It is declared here so it only needs to be created once.
+var shortFormOps map[string]byte
+
 // parseShortForm parses a string as as used in the Bitcoin Core reference tests
 // into the script it came from.
+//
+// The format used for these tests is pretty simple if ad-hoc:
+//   - Opcodes other than the push opcodes and unknown are present as
+//     either OP_NAME or just NAME
+//   - Plain numbers are made into push operations
+//   - Numbers beginning with 0x are inserted into the []byte as-is (so
+//     0x14 is OP_DATA_20)
+//   - Single quoted strings are pushed as data
+//   - Anything else is an error
 func parseShortForm(script string) ([]byte, error) {
-	ops := make(map[string]byte)
+	// Only create the short form opcode map once.
+	if shortFormOps == nil {
+		ops := make(map[string]byte)
+		for opcodeName, opcodeValue := range OpcodeByName {
+			if strings.Contains(opcodeName, "OP_UNKNOWN") {
+				continue
+			}
+			ops[opcodeName] = opcodeValue
 
-	// the format used for these tests is pretty simple if ad-hoc:
-	// -  opcodes other than the push opcodes and unknown are present as
-	// either OP_NAME or just NAME
-	// - plain numbers are made into push operations
-	// -  numbers beginning with 0x are inserted into the []byte as-is (so
-	// 0x14 is OP_DATA_20)
-	// - single quoted strings are pushed as data.
-	// - anything else is an error.
-	for opcodeName, opcodeValue := range OpcodeByName {
-		if opcodeValue < OP_NOP && opcodeValue != OP_RESERVED {
-			continue
+			// The opcodes named OP_# can't have the OP_ prefix
+			// stripped or they would conflict with the plain
+			// numbers.  Also, since OP_FALSE and OP_TRUE are
+			// aliases for the OP_0, and OP_1, respectively, they
+			// have the same value, so detect those by name and
+			// allow them.
+			if (opcodeName == "OP_FALSE" || opcodeName == "OP_TRUE") ||
+				(opcodeValue != OP_0 && (opcodeValue < OP_1 ||
+					opcodeValue > OP_16)) {
+
+				ops[strings.TrimPrefix(opcodeName, "OP_")] = opcodeValue
+			}
 		}
-		if strings.Contains(opcodeName, "OP_UNKNOWN") {
-			continue
-		}
-		ops[opcodeName] = opcodeValue
-		ops[strings.TrimPrefix(opcodeName, "OP_")] = opcodeValue
+		shortFormOps = ops
 	}
-	// do once, build map.
 
 	// Split only does one separator so convert all \n and tab into  space.
 	script = strings.Replace(script, "\n", " ", -1)
@@ -83,12 +100,11 @@ func parseShortForm(script string) ([]byte, error) {
 			builder.AddInt64(num)
 			continue
 		} else if bts, err := parseHex(tok); err == nil {
-			// naughty...
-			builder.script = append(builder.script, bts...)
+			builder.TstConcatRawScript(bts)
 		} else if len(tok) >= 2 &&
 			tok[0] == '\'' && tok[len(tok)-1] == '\'' {
 			builder.AddFullData([]byte(tok[1 : len(tok)-1]))
-		} else if opcode, ok := ops[tok]; ok {
+		} else if opcode, ok := shortFormOps[tok]; ok {
 			builder.AddOp(opcode)
 		} else {
 			return nil, fmt.Errorf("bad token \"%s\"", tok)

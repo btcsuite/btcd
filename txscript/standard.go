@@ -372,7 +372,7 @@ func PushedData(script []byte) ([][]byte, error) {
 		if pop.data != nil {
 			data = append(data, pop.data)
 		} else if pop.opcode.value == OP_0 {
-			data = append(data, []byte{})
+			data = append(data, nil)
 		}
 	}
 	return data, nil

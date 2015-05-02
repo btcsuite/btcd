@@ -141,7 +141,7 @@ func TestScriptBuilderAddData(t *testing.T) {
 		useFull  bool // use AddFullData instead of AddData.
 	}{
 		// BIP0062: Pushing an empty byte sequence must use OP_0.
-		{name: "push empty byte sequence", data: []byte{}, expected: []byte{txscript.OP_0}},
+		{name: "push empty byte sequence", data: nil, expected: []byte{txscript.OP_0}},
 		{name: "push 1 byte 0x00", data: []byte{0x00}, expected: []byte{txscript.OP_0}},
 
 		// BIP0062: Pushing a 1-byte sequence of byte 0x01 through 0x10 must use OP_n.
@@ -213,17 +213,17 @@ func TestScriptBuilderAddData(t *testing.T) {
 		{
 			name:     "push data len 521",
 			data:     bytes.Repeat([]byte{0x49}, 521),
-			expected: []byte{},
+			expected: nil,
 		},
 		{
 			name:     "push data len 32767 (canonical)",
 			data:     bytes.Repeat([]byte{0x49}, 32767),
-			expected: []byte{},
+			expected: nil,
 		},
 		{
 			name:     "push data len 65536 (canonical)",
 			data:     bytes.Repeat([]byte{0x49}, 65536),
-			expected: []byte{},
+			expected: nil,
 		},
 
 		// Additional tests for the PushFullData function that

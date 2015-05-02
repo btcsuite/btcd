@@ -6,39 +6,29 @@ package txscript_test
 
 import (
 	"bytes"
+	"reflect"
 	"testing"
 
 	"github.com/btcsuite/btcd/txscript"
-	"github.com/btcsuite/btcd/wire"
 )
 
-// builderScript is a convenience function which is used in the tests.  It
-// allows access to the script from a known good script built with the builder.
-// Any errors are converted to a panic since it is only, and must only, be used
-// with hard coded, and therefore, known good, scripts.
-func builderScript(builder *txscript.ScriptBuilder) []byte {
-	script, err := builder.Script()
-	if err != nil {
-		panic(err)
-	}
-	return script
-}
-
+// TestPushedData ensured the PushedData function extracts the expected data out
+// of various scripts.
 func TestPushedData(t *testing.T) {
 	t.Parallel()
 
 	var tests = []struct {
-		in    []byte
-		out   [][]byte
-		valid bool
+		script string
+		out    [][]byte
+		valid  bool
 	}{
 		{
-			[]byte{txscript.OP_0, txscript.OP_IF, txscript.OP_0, txscript.OP_ELSE, txscript.OP_2, txscript.OP_ENDIF},
-			[][]byte{{}, {}},
+			"0 IF 0 ELSE 2 ENDIF",
+			[][]byte{nil, nil},
 			true,
 		},
 		{
-			builderScript(txscript.NewScriptBuilder().AddInt64(16777216).AddInt64(10000000)),
+			"16777216 10000000",
 			[][]byte{
 				{0x00, 0x00, 0x00, 0x01}, // 16777216
 				{0x80, 0x96, 0x98, 0x00}, // 10000000
@@ -46,9 +36,7 @@ func TestPushedData(t *testing.T) {
 			true,
 		},
 		{
-			builderScript(txscript.NewScriptBuilder().AddOp(txscript.OP_DUP).AddOp(txscript.OP_HASH160).
-				AddData([]byte("17VZNX1SN5NtKa8UQFxwQbFeFc3iqRYhem")).AddOp(txscript.OP_EQUALVERIFY).
-				AddOp(txscript.OP_CHECKSIG)),
+			"DUP HASH160 '17VZNX1SN5NtKa8UQFxwQbFeFc3iqRYhem' EQUALVERIFY CHECKSIG",
 			[][]byte{
 				// 17VZNX1SN5NtKa8UQFxwQbFeFc3iqRYhem
 				{
@@ -61,32 +49,32 @@ func TestPushedData(t *testing.T) {
 			true,
 		},
 		{
-			builderScript(txscript.NewScriptBuilder().AddOp(txscript.OP_PUSHDATA4).AddInt64(1000).
-				AddOp(txscript.OP_EQUAL)),
-			[][]byte{},
+			"PUSHDATA4 1000 EQUAL",
+			nil,
 			false,
 		},
 	}
 
-	for x, test := range tests {
-		pushedData, err := txscript.PushedData(test.in)
+	for i, test := range tests {
+		script := mustParseShortForm(test.script)
+		data, err := txscript.PushedData(script)
 		if test.valid && err != nil {
-			t.Errorf("TestPushedData failed test #%d: %v\n", x, err)
+			t.Errorf("TestPushedData failed test #%d: %v\n", i, err)
 			continue
 		} else if !test.valid && err == nil {
-			t.Errorf("TestPushedData failed test #%d: test should be invalid\n", x)
+			t.Errorf("TestPushedData failed test #%d: test should "+
+				"be invalid\n", i)
 			continue
 		}
-		for x, data := range pushedData {
-			if !bytes.Equal(data, test.out[x]) {
-				t.Errorf("TestPushedData failed test #%d: want: %x got: %x\n",
-					x, test.out[x], data)
-			}
+		if !reflect.DeepEqual(data, test.out) {
+			t.Errorf("TestPushedData failed test #%d: want: %x "+
+				"got: %x\n", i, test.out, data)
 		}
 	}
 }
 
-func TestStandardPushes(t *testing.T) {
+// TestHasCanonicalPush ensures the canonicalPush function works as expected.
+func TestHasCanonicalPush(t *testing.T) {
 	t.Parallel()
 
 	for i := 0; i < 65535; i++ {
@@ -94,21 +82,24 @@ func TestStandardPushes(t *testing.T) {
 		builder.AddInt64(int64(i))
 		script, err := builder.Script()
 		if err != nil {
-			t.Errorf("StandardPushesTests test #%d unexpected error: %v\n", i, err)
+			t.Errorf("Script: test #%d unexpected error: %v\n", i,
+				err)
 			continue
 		}
 		if result := txscript.IsPushOnlyScript(script); !result {
-			t.Errorf("StandardPushesTests IsPushOnlyScript test #%d failed: %x\n", i, script)
+			t.Errorf("IsPushOnlyScript: test #%d failed: %x\n", i,
+				script)
 			continue
 		}
 		pops, err := txscript.TstParseScript(script)
 		if err != nil {
-			t.Errorf("StandardPushesTests #%d failed to TstParseScript: %v", i, err)
+			t.Errorf("TstParseScript: #%d failed: %v", i, err)
 			continue
 		}
 		for _, pop := range pops {
 			if result := txscript.TstHasCanonicalPushes(pop); !result {
-				t.Errorf("StandardPushesTests TstHasCanonicalPushes test #%d failed: %x\n", i, script)
+				t.Errorf("TstHasCanonicalPushes: test #%d "+
+					"failed: %x\n", i, script)
 				break
 			}
 		}
@@ -139,1564 +130,17 @@ func TestStandardPushes(t *testing.T) {
 	}
 }
 
-type txTest struct {
-	name          string
-	tx            *wire.MsgTx
-	pkScript      []byte              // output script of previous tx
-	idx           int                 // tx idx to be run.
-	bip16         bool                // is bip16 active?
-	strictSigs    bool                // should signatures be validated as strict?
-	parseErr      error               // failure of NewScript
-	err           error               // Failure of Executre
-	shouldFail    bool                // Execute should fail with nonspecified error.
-	nSigOps       int                 // result of GetPreciseSigOpsCount
-	scriptInfo    txscript.ScriptInfo // result of ScriptInfo
-	scriptInfoErr error               // error return of ScriptInfo
-}
-
-var txTests = []txTest{
-	// tx 0437cd7f8525ceed2324359c2d0ba26006d92d85. the first tx in the
-	// blockchain that verifies signatures.
-	{
-		name: "CheckSig",
-		tx: &wire.MsgTx{
-			Version: 1,
-			TxIn: []*wire.TxIn{
-				{
-					PreviousOutPoint: wire.OutPoint{
-						Hash: wire.ShaHash([32]byte{
-							0xc9, 0x97, 0xa5, 0xe5,
-							0x6e, 0x10, 0x41, 0x02,
-							0xfa, 0x20, 0x9c, 0x6a,
-							0x85, 0x2d, 0xd9, 0x06,
-							0x60, 0xa2, 0x0b, 0x2d,
-							0x9c, 0x35, 0x24, 0x23,
-							0xed, 0xce, 0x25, 0x85,
-							0x7f, 0xcd, 0x37, 0x04,
-						}),
-						Index: 0,
-					},
-					SignatureScript: []uint8{
-						txscript.OP_DATA_71,
-						0x30, 0x44, 0x02, 0x20, 0x4e,
-						0x45, 0xe1, 0x69, 0x32, 0xb8,
-						0xaf, 0x51, 0x49, 0x61, 0xa1,
-						0xd3, 0xa1, 0xa2, 0x5f, 0xdf,
-						0x3f, 0x4f, 0x77, 0x32, 0xe9,
-						0xd6, 0x24, 0xc6, 0xc6, 0x15,
-						0x48, 0xab, 0x5f, 0xb8, 0xcd,
-						0x41, 0x02, 0x20, 0x18, 0x15,
-						0x22, 0xec, 0x8e, 0xca, 0x07,
-						0xde, 0x48, 0x60, 0xa4, 0xac,
-						0xdd, 0x12, 0x90, 0x9d, 0x83,
-						0x1c, 0xc5, 0x6c, 0xbb, 0xac,
-						0x46, 0x22, 0x08, 0x22, 0x21,
-						0xa8, 0x76, 0x8d, 0x1d, 0x09,
-						0x01,
-					},
-
-					Sequence: 4294967295,
-				},
-			},
-			TxOut: []*wire.TxOut{
-				{
-					Value: 1000000000,
-					PkScript: []byte{
-						txscript.OP_DATA_65,
-						0x04, 0xae, 0x1a, 0x62, 0xfe,
-						0x09, 0xc5, 0xf5, 0x1b, 0x13,
-						0x90, 0x5f, 0x07, 0xf0, 0x6b,
-						0x99, 0xa2, 0xf7, 0x15, 0x9b,
-						0x22, 0x25, 0xf3, 0x74, 0xcd,
-						0x37, 0x8d, 0x71, 0x30, 0x2f,
-						0xa2, 0x84, 0x14, 0xe7, 0xaa,
-						0xb3, 0x73, 0x97, 0xf5, 0x54,
-						0xa7, 0xdf, 0x5f, 0x14, 0x2c,
-						0x21, 0xc1, 0xb7, 0x30, 0x3b,
-						0x8a, 0x06, 0x26, 0xf1, 0xba,
-						0xde, 0xd5, 0xc7, 0x2a, 0x70,
-						0x4f, 0x7e, 0x6c, 0xd8, 0x4c,
-						txscript.OP_CHECKSIG,
-					},
-				},
-				{
-					Value: 4000000000,
-					PkScript: []byte{
-						txscript.OP_DATA_65,
-						0x04, 0x11, 0xdb, 0x93, 0xe1,
-						0xdc, 0xdb, 0x8a, 0x01, 0x6b,
-						0x49, 0x84, 0x0f, 0x8c, 0x53,
-						0xbc, 0x1e, 0xb6, 0x8a, 0x38,
-						0x2e, 0x97, 0xb1, 0x48, 0x2e,
-						0xca, 0xd7, 0xb1, 0x48, 0xa6,
-						0x90, 0x9a, 0x5c, 0xb2, 0xe0,
-						0xea, 0xdd, 0xfb, 0x84, 0xcc,
-						0xf9, 0x74, 0x44, 0x64, 0xf8,
-						0x2e, 0x16, 0x0b, 0xfa, 0x9b,
-						0x8b, 0x64, 0xf9, 0xd4, 0xc0,
-						0x3f, 0x99, 0x9b, 0x86, 0x43,
-						0xf6, 0x56, 0xb4, 0x12, 0xa3,
-						txscript.OP_CHECKSIG,
-					},
-				},
-			},
-			LockTime: 0,
-		},
-		pkScript: []byte{
-			txscript.OP_DATA_65,
-			0x04, 0x11, 0xdb, 0x93, 0xe1, 0xdc, 0xdb, 0x8a, 0x01,
-			0x6b, 0x49, 0x84, 0x0f, 0x8c, 0x53, 0xbc, 0x1e, 0xb6,
-			0x8a, 0x38, 0x2e, 0x97, 0xb1, 0x48, 0x2e, 0xca, 0xd7,
-			0xb1, 0x48, 0xa6, 0x90, 0x9a, 0x5c, 0xb2, 0xe0, 0xea,
-			0xdd, 0xfb, 0x84, 0xcc, 0xf9, 0x74, 0x44, 0x64, 0xf8,
-			0x2e, 0x16, 0x0b, 0xfa, 0x9b, 0x8b, 0x64, 0xf9, 0xd4,
-			0xc0, 0x3f, 0x99, 0x9b, 0x86, 0x43, 0xf6, 0x56, 0xb4,
-			0x12, 0xa3, txscript.OP_CHECKSIG,
-		},
-		idx:     0,
-		nSigOps: 1,
-		scriptInfo: txscript.ScriptInfo{
-			PkScriptClass:  txscript.PubKeyTy,
-			NumInputs:      1,
-			ExpectedInputs: 1,
-			SigOps:         1,
-		},
-	},
-	// Previous test with the value of one output changed.
-	{
-		name: "CheckSig Failure",
-		tx: &wire.MsgTx{
-			Version: 1,
-			TxIn: []*wire.TxIn{
-				{
-					PreviousOutPoint: wire.OutPoint{
-						Hash: wire.ShaHash([32]byte{
-							0xc9, 0x97, 0xa5, 0xe5,
-							0x6e, 0x10, 0x41, 0x02,
-							0xfa, 0x20, 0x9c, 0x6a,
-							0x85, 0x2d, 0xd9, 0x06,
-							0x60, 0xa2, 0x0b, 0x2d,
-							0x9c, 0x35, 0x24, 0x23,
-							0xed, 0xce, 0x25, 0x85,
-							0x7f, 0xcd, 0x37, 0x04,
-						}),
-						Index: 0,
-					},
-					SignatureScript: []uint8{
-						txscript.OP_DATA_71,
-						0x30, 0x44, 0x02, 0x20, 0x4e,
-						0x45, 0xe1, 0x69, 0x32, 0xb8,
-						0xaf, 0x51, 0x49, 0x61, 0xa1,
-						0xd3, 0xa1, 0xa2, 0x5f, 0xdf,
-						0x3f, 0x4f, 0x77, 0x32, 0xe9,
-						0xd6, 0x24, 0xc6, 0xc6, 0x15,
-						0x48, 0xab, 0x5f, 0xb8, 0xcd,
-						0x41, 0x02, 0x20, 0x18, 0x15,
-						0x22, 0xec, 0x8e, 0xca, 0x07,
-						0xde, 0x48, 0x60, 0xa4, 0xac,
-						0xdd, 0x12, 0x90, 0x9d, 0x83,
-						0x1c, 0xc5, 0x6c, 0xbb, 0xac,
-						0x46, 0x22, 0x08, 0x22, 0x21,
-						0xa8, 0x76, 0x8d, 0x1d, 0x09,
-						0x01,
-					},
-
-					Sequence: 4294967295,
-				},
-			},
-			TxOut: []*wire.TxOut{
-				{
-					Value: 1000000000,
-					PkScript: []byte{
-						txscript.OP_DATA_65,
-						0x04, 0xae, 0x1a, 0x62, 0xfe,
-						0x09, 0xc5, 0xf5, 0x1b, 0x13,
-						0x90, 0x5f, 0x07, 0xf0, 0x6b,
-						0x99, 0xa2, 0xf7, 0x15, 0x9b,
-						0x22, 0x25, 0xf3, 0x74, 0xcd,
-						0x37, 0x8d, 0x71, 0x30, 0x2f,
-						0xa2, 0x84, 0x14, 0xe7, 0xaa,
-						0xb3, 0x73, 0x97, 0xf5, 0x54,
-						0xa7, 0xdf, 0x5f, 0x14, 0x2c,
-						0x21, 0xc1, 0xb7, 0x30, 0x3b,
-						0x8a, 0x06, 0x26, 0xf1, 0xba,
-						0xde, 0xd5, 0xc7, 0x2a, 0x70,
-						0x4f, 0x7e, 0x6c, 0xd8, 0x4c,
-						txscript.OP_CHECKSIG,
-					},
-				},
-				{
-					Value: 5000000000,
-					PkScript: []byte{
-						txscript.OP_DATA_65,
-						0x04, 0x11, 0xdb, 0x93, 0xe1,
-						0xdc, 0xdb, 0x8a, 0x01, 0x6b,
-						0x49, 0x84, 0x0f, 0x8c, 0x53,
-						0xbc, 0x1e, 0xb6, 0x8a, 0x38,
-						0x2e, 0x97, 0xb1, 0x48, 0x2e,
-						0xca, 0xd7, 0xb1, 0x48, 0xa6,
-						0x90, 0x9a, 0x5c, 0xb2, 0xe0,
-						0xea, 0xdd, 0xfb, 0x84, 0xcc,
-						0xf9, 0x74, 0x44, 0x64, 0xf8,
-						0x2e, 0x16, 0x0b, 0xfa, 0x9b,
-						0x8b, 0x64, 0xf9, 0xd4, 0xc0,
-						0x3f, 0x99, 0x9b, 0x86, 0x43,
-						0xf6, 0x56, 0xb4, 0x12, 0xa3,
-						txscript.OP_CHECKSIG,
-					},
-				},
-			},
-			LockTime: 0,
-		},
-		pkScript: []byte{
-			txscript.OP_DATA_65,
-			0x04, 0x11, 0xdb, 0x93, 0xe1, 0xdc, 0xdb, 0x8a, 0x01,
-			0x6b, 0x49, 0x84, 0x0f, 0x8c, 0x53, 0xbc, 0x1e, 0xb6,
-			0x8a, 0x38, 0x2e, 0x97, 0xb1, 0x48, 0x2e, 0xca, 0xd7,
-			0xb1, 0x48, 0xa6, 0x90, 0x9a, 0x5c, 0xb2, 0xe0, 0xea,
-			0xdd, 0xfb, 0x84, 0xcc, 0xf9, 0x74, 0x44, 0x64, 0xf8,
-			0x2e, 0x16, 0x0b, 0xfa, 0x9b, 0x8b, 0x64, 0xf9, 0xd4,
-			0xc0, 0x3f, 0x99, 0x9b, 0x86, 0x43, 0xf6, 0x56, 0xb4,
-			0x12, 0xa3, txscript.OP_CHECKSIG,
-		},
-		idx:     0,
-		err:     txscript.ErrStackScriptFailed,
-		nSigOps: 1,
-		scriptInfo: txscript.ScriptInfo{
-			PkScriptClass:  txscript.PubKeyTy,
-			NumInputs:      1,
-			ExpectedInputs: 1,
-			SigOps:         1,
-		},
-	},
-	{
-		name: "CheckSig invalid signature",
-		tx: &wire.MsgTx{
-			Version: 1,
-			TxIn: []*wire.TxIn{
-				{
-					PreviousOutPoint: wire.OutPoint{
-						Hash: wire.ShaHash([32]byte{
-							0xc9, 0x97, 0xa5, 0xe5,
-							0x6e, 0x10, 0x41, 0x02,
-							0xfa, 0x20, 0x9c, 0x6a,
-							0x85, 0x2d, 0xd9, 0x06,
-							0x60, 0xa2, 0x0b, 0x2d,
-							0x9c, 0x35, 0x24, 0x23,
-							0xed, 0xce, 0x25, 0x85,
-							0x7f, 0xcd, 0x37, 0x04,
-						}),
-						Index: 0,
-					},
-					// Signature has length fiddled to
-					// fail parsing.
-					SignatureScript: []uint8{
-						txscript.OP_DATA_71,
-						0x30, 0x45, 0x02, 0x20, 0x4e,
-						0x45, 0xe1, 0x69, 0x32, 0xb8,
-						0xaf, 0x51, 0x49, 0x61, 0xa1,
-						0xd3, 0xa1, 0xa2, 0x5f, 0xdf,
-						0x3f, 0x4f, 0x77, 0x32, 0xe9,
-						0xd6, 0x24, 0xc6, 0xc6, 0x15,
-						0x48, 0xab, 0x5f, 0xb8, 0xcd,
-						0x41, 0x02, 0x20, 0x18, 0x15,
-						0x22, 0xec, 0x8e, 0xca, 0x07,
-						0xde, 0x48, 0x60, 0xa4, 0xac,
-						0xdd, 0x12, 0x90, 0x9d, 0x83,
-						0x1c, 0xc5, 0x6c, 0xbb, 0xac,
-						0x46, 0x22, 0x08, 0x22, 0x21,
-						0xa8, 0x76, 0x8d, 0x1d, 0x09,
-						0x01,
-					},
-
-					Sequence: 4294967295,
-				},
-			},
-			TxOut: []*wire.TxOut{
-				{
-					Value: 1000000000,
-					PkScript: []byte{
-						txscript.OP_DATA_65,
-						0x04, 0xae, 0x1a, 0x62, 0xfe,
-						0x09, 0xc5, 0xf5, 0x1b, 0x13,
-						0x90, 0x5f, 0x07, 0xf0, 0x6b,
-						0x99, 0xa2, 0xf7, 0x15, 0x9b,
-						0x22, 0x25, 0xf3, 0x74, 0xcd,
-						0x37, 0x8d, 0x71, 0x30, 0x2f,
-						0xa2, 0x84, 0x14, 0xe7, 0xaa,
-						0xb3, 0x73, 0x97, 0xf5, 0x54,
-						0xa7, 0xdf, 0x5f, 0x14, 0x2c,
-						0x21, 0xc1, 0xb7, 0x30, 0x3b,
-						0x8a, 0x06, 0x26, 0xf1, 0xba,
-						0xde, 0xd5, 0xc7, 0x2a, 0x70,
-						0x4f, 0x7e, 0x6c, 0xd8, 0x4c,
-						txscript.OP_CHECKSIG,
-					},
-				},
-				{
-					Value: 4000000000,
-					PkScript: []byte{
-						txscript.OP_DATA_65,
-						0x04, 0x11, 0xdb, 0x93, 0xe1,
-						0xdc, 0xdb, 0x8a, 0x01, 0x6b,
-						0x49, 0x84, 0x0f, 0x8c, 0x53,
-						0xbc, 0x1e, 0xb6, 0x8a, 0x38,
-						0x2e, 0x97, 0xb1, 0x48, 0x2e,
-						0xca, 0xd7, 0xb1, 0x48, 0xa6,
-						0x90, 0x9a, 0x5c, 0xb2, 0xe0,
-						0xea, 0xdd, 0xfb, 0x84, 0xcc,
-						0xf9, 0x74, 0x44, 0x64, 0xf8,
-						0x2e, 0x16, 0x0b, 0xfa, 0x9b,
-						0x8b, 0x64, 0xf9, 0xd4, 0xc0,
-						0x3f, 0x99, 0x9b, 0x86, 0x43,
-						0xf6, 0x56, 0xb4, 0x12, 0xa3,
-						txscript.OP_CHECKSIG,
-					},
-				},
-			},
-			LockTime: 0,
-		},
-		pkScript: []byte{
-			txscript.OP_DATA_65,
-			0x04, 0x11, 0xdb, 0x93, 0xe1, 0xdc, 0xdb, 0x8a, 0x01,
-			0x6b, 0x49, 0x84, 0x0f, 0x8c, 0x53, 0xbc, 0x1e, 0xb6,
-			0x8a, 0x38, 0x2e, 0x97, 0xb1, 0x48, 0x2e, 0xca, 0xd7,
-			0xb1, 0x48, 0xa6, 0x90, 0x9a, 0x5c, 0xb2, 0xe0, 0xea,
-			0xdd, 0xfb, 0x84, 0xcc, 0xf9, 0x74, 0x44, 0x64, 0xf8,
-			0x2e, 0x16, 0x0b, 0xfa, 0x9b, 0x8b, 0x64, 0xf9, 0xd4,
-			0xc0, 0x3f, 0x99, 0x9b, 0x86, 0x43, 0xf6, 0x56, 0xb4,
-			0x12, 0xa3, txscript.OP_CHECKSIG,
-		},
-		idx:        0,
-		shouldFail: true,
-		nSigOps:    1,
-		scriptInfo: txscript.ScriptInfo{
-			PkScriptClass:  txscript.PubKeyTy,
-			NumInputs:      1,
-			ExpectedInputs: 1,
-			SigOps:         1,
-		},
-	},
-	{
-		name: "CheckSig invalid pubkey",
-		tx: &wire.MsgTx{
-			Version: 1,
-			TxIn: []*wire.TxIn{
-				{
-					PreviousOutPoint: wire.OutPoint{
-						Hash: wire.ShaHash([32]byte{
-							0xc9, 0x97, 0xa5, 0xe5,
-							0x6e, 0x10, 0x41, 0x02,
-							0xfa, 0x20, 0x9c, 0x6a,
-							0x85, 0x2d, 0xd9, 0x06,
-							0x60, 0xa2, 0x0b, 0x2d,
-							0x9c, 0x35, 0x24, 0x23,
-							0xed, 0xce, 0x25, 0x85,
-							0x7f, 0xcd, 0x37, 0x04,
-						}),
-						Index: 0,
-					},
-					SignatureScript: []uint8{
-						txscript.OP_DATA_71,
-						0x30, 0x44, 0x02, 0x20, 0x4e,
-						0x45, 0xe1, 0x69, 0x32, 0xb8,
-						0xaf, 0x51, 0x49, 0x61, 0xa1,
-						0xd3, 0xa1, 0xa2, 0x5f, 0xdf,
-						0x3f, 0x4f, 0x77, 0x32, 0xe9,
-						0xd6, 0x24, 0xc6, 0xc6, 0x15,
-						0x48, 0xab, 0x5f, 0xb8, 0xcd,
-						0x41, 0x02, 0x20, 0x18, 0x15,
-						0x22, 0xec, 0x8e, 0xca, 0x07,
-						0xde, 0x48, 0x60, 0xa4, 0xac,
-						0xdd, 0x12, 0x90, 0x9d, 0x83,
-						0x1c, 0xc5, 0x6c, 0xbb, 0xac,
-						0x46, 0x22, 0x08, 0x22, 0x21,
-						0xa8, 0x76, 0x8d, 0x1d, 0x09,
-						0x01,
-					},
-
-					Sequence: 4294967295,
-				},
-			},
-			TxOut: []*wire.TxOut{
-				{
-					Value: 1000000000,
-					PkScript: []byte{
-						txscript.OP_DATA_65,
-						0x04, 0xae, 0x1a, 0x62, 0xfe,
-						0x09, 0xc5, 0xf5, 0x1b, 0x13,
-						0x90, 0x5f, 0x07, 0xf0, 0x6b,
-						0x99, 0xa2, 0xf7, 0x15, 0x9b,
-						0x22, 0x25, 0xf3, 0x74, 0xcd,
-						0x37, 0x8d, 0x71, 0x30, 0x2f,
-						0xa2, 0x84, 0x14, 0xe7, 0xaa,
-						0xb3, 0x73, 0x97, 0xf5, 0x54,
-						0xa7, 0xdf, 0x5f, 0x14, 0x2c,
-						0x21, 0xc1, 0xb7, 0x30, 0x3b,
-						0x8a, 0x06, 0x26, 0xf1, 0xba,
-						0xde, 0xd5, 0xc7, 0x2a, 0x70,
-						0x4f, 0x7e, 0x6c, 0xd8, 0x4c,
-						txscript.OP_CHECKSIG,
-					},
-				},
-				{
-					Value: 4000000000,
-					PkScript: []byte{
-						txscript.OP_DATA_65,
-						0x04, 0x11, 0xdb, 0x93, 0xe1,
-						0xdc, 0xdb, 0x8a, 0x01, 0x6b,
-						0x49, 0x84, 0x0f, 0x8c, 0x53,
-						0xbc, 0x1e, 0xb6, 0x8a, 0x38,
-						0x2e, 0x97, 0xb1, 0x48, 0x2e,
-						0xca, 0xd7, 0xb1, 0x48, 0xa6,
-						0x90, 0x9a, 0x5c, 0xb2, 0xe0,
-						0xea, 0xdd, 0xfb, 0x84, 0xcc,
-						0xf9, 0x74, 0x44, 0x64, 0xf8,
-						0x2e, 0x16, 0x0b, 0xfa, 0x9b,
-						0x8b, 0x64, 0xf9, 0xd4, 0xc0,
-						0x3f, 0x99, 0x9b, 0x86, 0x43,
-						0xf6, 0x56, 0xb4, 0x12, 0xa3,
-						txscript.OP_CHECKSIG,
-					},
-				},
-			},
-			LockTime: 0,
-		},
-		// pubkey header magic byte has been changed to parse wrong.
-		pkScript: []byte{
-			txscript.OP_DATA_65,
-			0x02, 0x11, 0xdb, 0x93, 0xe1, 0xdc, 0xdb, 0x8a, 0x01,
-			0x6b, 0x49, 0x84, 0x0f, 0x8c, 0x53, 0xbc, 0x1e, 0xb6,
-			0x8a, 0x38, 0x2e, 0x97, 0xb1, 0x48, 0x2e, 0xca, 0xd7,
-			0xb1, 0x48, 0xa6, 0x90, 0x9a, 0x5c, 0xb2, 0xe0, 0xea,
-			0xdd, 0xfb, 0x84, 0xcc, 0xf9, 0x74, 0x44, 0x64, 0xf8,
-			0x2e, 0x16, 0x0b, 0xfa, 0x9b, 0x8b, 0x64, 0xf9, 0xd4,
-			0xc0, 0x3f, 0x99, 0x9b, 0x86, 0x43, 0xf6, 0x56, 0xb4,
-			0x12, 0xa3, txscript.OP_CHECKSIG,
-		},
-		idx:        0,
-		shouldFail: true,
-		nSigOps:    1,
-		scriptInfo: txscript.ScriptInfo{
-			PkScriptClass:  txscript.PubKeyTy,
-			NumInputs:      1,
-			ExpectedInputs: 1,
-			SigOps:         1,
-		},
-	},
-	// tx 599e47a8114fe098103663029548811d2651991b62397e057f0c863c2bc9f9ea
-	// uses checksig with SigHashNone.
-	{
-		name: "CheckSigHashNone",
-		tx: &wire.MsgTx{
-			Version: 1,
-			TxIn: []*wire.TxIn{
-				{
-					PreviousOutPoint: wire.OutPoint{
-						Hash: wire.ShaHash([32]byte{
-							0x5f, 0x38, 0x6c, 0x8a,
-							0x38, 0x42, 0xc9, 0xa9,
-							0xdc, 0xfa, 0x9b, 0x78,
-							0xbe, 0x78, 0x5a, 0x40,
-							0xa7, 0xbd, 0xa0, 0x8b,
-							0x64, 0x64, 0x6b, 0xe3,
-							0x65, 0x43, 0x01, 0xea,
-							0xcc, 0xfc, 0x8d, 0x5e,
-						}),
-						Index: 1,
-					},
-					SignatureScript: []byte{
-						txscript.OP_DATA_71,
-						0x30, 0x44, 0x02, 0x20, 0xbb,
-						0x4f, 0xbc, 0x49, 0x5a, 0xa2,
-						0x3b, 0xab, 0xb2, 0xc2, 0xbe,
-						0x4e, 0x3f, 0xb4, 0xa5, 0xdf,
-						0xfe, 0xfe, 0x20, 0xc8, 0xef,
-						0xf5, 0x94, 0x0f, 0x13, 0x56,
-						0x49, 0xc3, 0xea, 0x96, 0x44,
-						0x4a, 0x02, 0x20, 0x04, 0xaf,
-						0xcd, 0xa9, 0x66, 0xc8, 0x07,
-						0xbb, 0x97, 0x62, 0x2d, 0x3e,
-						0xef, 0xea, 0x82, 0x8f, 0x62,
-						0x3a, 0xf3, 0x06, 0xef, 0x2b,
-						0x75, 0x67, 0x82, 0xee, 0x6f,
-						0x8a, 0x22, 0xa9, 0x59, 0xa2,
-						0x02,
-						txscript.OP_DATA_65,
-						0x04, 0xf1, 0x93, 0x9a, 0xe6,
-						0xb0, 0x1e, 0x84, 0x9b, 0xf0,
-						0x5d, 0x0e, 0xd5, 0x1f, 0xd5,
-						0xb9, 0x2b, 0x79, 0xa0, 0xe3,
-						0x13, 0xe3, 0xf3, 0x89, 0xc7,
-						0x26, 0xf1, 0x1f, 0xa3, 0xe1,
-						0x44, 0xd9, 0x22, 0x7b, 0x07,
-						0xe8, 0xa8, 0x7c, 0x0e, 0xe3,
-						0x63, 0x72, 0xe9, 0x67, 0xe0,
-						0x90, 0xd1, 0x1b, 0x77, 0x77,
-						0x07, 0xaa, 0x73, 0xef, 0xac,
-						0xab, 0xff, 0xff, 0xa2, 0x85,
-						0xc0, 0x0b, 0x36, 0x22, 0xd6,
-					},
-					Sequence: 4294967295,
-				},
-			},
-			TxOut: []*wire.TxOut{
-				{
-					Value: 1000000,
-					PkScript: []byte{
-						txscript.OP_DUP,
-						txscript.OP_HASH160,
-						txscript.OP_DATA_20,
-						0x66, 0x0d, 0x4e, 0xf3, 0xa7,
-						0x43, 0xe3, 0xe6, 0x96, 0xad,
-						0x99, 0x03, 0x64, 0xe5, 0x55,
-						0xc2, 0x71, 0xad, 0x50, 0x4b,
-						txscript.OP_EQUALVERIFY,
-						txscript.OP_CHECKSIG,
-					},
-				},
-				{
-					Value: 29913632,
-					PkScript: []byte{
-						txscript.OP_DUP,
-						txscript.OP_HASH160,
-						txscript.OP_DATA_20,
-						0x21, 0xc4, 0x3c, 0xe4, 0x00,
-						0x90, 0x13, 0x12, 0xa6, 0x03,
-						0xe4, 0x20, 0x7a, 0xad, 0xfd,
-						0x74, 0x2b, 0xe8, 0xe7, 0xda,
-						txscript.OP_EQUALVERIFY,
-						txscript.OP_CHECKSIG,
-					},
-				},
-			},
-			LockTime: 0,
-		},
-		pkScript: []byte{
-			txscript.OP_DUP,
-			txscript.OP_HASH160,
-			txscript.OP_DATA_20,
-			0x21, 0xc4, 0x3c, 0xe4, 0x00, 0x90, 0x13, 0x12, 0xa6,
-			0x03, 0xe4, 0x20, 0x7a, 0xad, 0xfd, 0x74, 0x2b, 0xe8,
-			0xe7, 0xda,
-			txscript.OP_EQUALVERIFY,
-			txscript.OP_CHECKSIG,
-		},
-		idx:     0,
-		bip16:   true, // after threshold
-		nSigOps: 1,
-		scriptInfo: txscript.ScriptInfo{
-			PkScriptClass:  txscript.PubKeyHashTy,
-			NumInputs:      2,
-			ExpectedInputs: 2,
-			SigOps:         1,
-		},
-	},
-	{
-		name: "Non-canonical signature: R value negative",
-		tx: &wire.MsgTx{
-			Version: 1,
-			TxIn: []*wire.TxIn{
-				{
-					PreviousOutPoint: wire.OutPoint{
-						Hash: wire.ShaHash([32]byte{
-							0xfe, 0x15, 0x62, 0xc4,
-							0x8b, 0x3a, 0xa6, 0x37,
-							0x3f, 0x42, 0xe9, 0x61,
-							0x51, 0x89, 0xcf, 0x73,
-							0x32, 0xd7, 0x33, 0x5c,
-							0xbe, 0xa7, 0x80, 0xbe,
-							0x69, 0x6a, 0xc6, 0xc6,
-							0x50, 0xfd, 0xda, 0x4a,
-						}),
-						Index: 1,
-					},
-					SignatureScript: []byte{
-						txscript.OP_DATA_71,
-						0x30, 0x44, 0x02, 0x20, 0xa0,
-						0x42, 0xde, 0xe5, 0x52, 0x6b,
-						0xf2, 0x29, 0x4d, 0x3f, 0x3e,
-						0xb9, 0x5a, 0xa7, 0x73, 0x19,
-						0xd3, 0xff, 0x56, 0x7b, 0xcf,
-						0x36, 0x46, 0x07, 0x0c, 0x81,
-						0x12, 0x33, 0x01, 0xca, 0xce,
-						0xa9, 0x02, 0x20, 0xea, 0x48,
-						0xae, 0x58, 0xf5, 0x54, 0x10,
-						0x96, 0x3f, 0xa7, 0x03, 0xdb,
-						0x56, 0xf0, 0xba, 0xb2, 0x70,
-						0xb1, 0x08, 0x22, 0xc5, 0x1c,
-						0x68, 0x02, 0x6a, 0x97, 0x5c,
-						0x7d, 0xae, 0x11, 0x2e, 0x4f,
-						0x01,
-						txscript.OP_DATA_65,
-						0x04, 0x49, 0x45, 0x33, 0x18,
-						0xbd, 0x5e, 0xcf, 0xea, 0x5f,
-						0x86, 0x32, 0x8c, 0x6d, 0x8e,
-						0xd4, 0x12, 0xb4, 0xde, 0x2c,
-						0xab, 0xd7, 0xb8, 0x56, 0x51,
-						0x2f, 0x8c, 0xb7, 0xfd, 0x25,
-						0xf6, 0x03, 0xb0, 0x55, 0xc5,
-						0xdf, 0xe6, 0x22, 0x4b, 0xc4,
-						0xfd, 0xbb, 0x6a, 0x7a, 0xa0,
-						0x58, 0xd7, 0x5d, 0xad, 0x92,
-						0x99, 0x45, 0x4f, 0x62, 0x1a,
-						0x95, 0xb4, 0xb0, 0x21, 0x0e,
-						0xc4, 0x09, 0x2b, 0xe5, 0x27,
-					},
-					Sequence: 4294967295,
-				},
-				{
-					PreviousOutPoint: wire.OutPoint{
-						Hash: wire.ShaHash([32]byte{
-							0x2a, 0xc7, 0xee, 0xf8,
-							0xa9, 0x62, 0x2d, 0xda,
-							0xec, 0x18, 0x3b, 0xba,
-							0xa9, 0x92, 0xb0, 0x7a,
-							0x70, 0x3b, 0x48, 0x86,
-							0x27, 0x9c, 0x46, 0xac,
-							0x25, 0xeb, 0x91, 0xec,
-							0x4c, 0x86, 0xd2, 0x9c,
-						}),
-						Index: 1,
-					},
-					SignatureScript: []byte{
-						txscript.OP_DATA_71,
-						0x30, 0x44, 0x02, 0x20, 0xc3,
-						0x02, 0x3b, 0xed, 0x85, 0x0d,
-						0x94, 0x27, 0x8e, 0x06, 0xd2,
-						0x37, 0x92, 0x21, 0x55, 0x28,
-						0xdd, 0xdb, 0x63, 0xa4, 0xb6,
-						0x88, 0x33, 0x92, 0x06, 0xdd,
-						0xf9, 0xee, 0x72, 0x97, 0xa3,
-						0x08, 0x02, 0x20, 0x25, 0x00,
-						0x42, 0x8b, 0x26, 0x36, 0x45,
-						0x54, 0xcb, 0x11, 0xd3, 0x3e,
-						0x85, 0x35, 0x23, 0x49, 0x65,
-						0x82, 0x8e, 0x33, 0x6e, 0x1a,
-						0x4a, 0x72, 0x73, 0xeb, 0x5b,
-						0x8d, 0x1d, 0xd7, 0x02, 0xcc,
-						0x01,
-						txscript.OP_DATA_65,
-						0x04, 0x49, 0x5c, 0x8f, 0x66,
-						0x90, 0x0d, 0xb7, 0x62, 0x69,
-						0x0b, 0x54, 0x49, 0xa1, 0xf4,
-						0xe7, 0xc2, 0xed, 0x1f, 0x4b,
-						0x34, 0x70, 0xfd, 0x42, 0x79,
-						0x68, 0xa1, 0x31, 0x76, 0x0c,
-						0x25, 0xf9, 0x12, 0x63, 0xad,
-						0x51, 0x73, 0x8e, 0x19, 0xb6,
-						0x07, 0xf5, 0xcf, 0x5f, 0x94,
-						0x27, 0x4a, 0x8b, 0xbc, 0x74,
-						0xba, 0x4b, 0x56, 0x0c, 0xe0,
-						0xb3, 0x08, 0x8f, 0x7f, 0x5c,
-						0x5f, 0xcf, 0xd6, 0xa0, 0x4b,
-					},
-					Sequence: 4294967295,
-				},
-			},
-			TxOut: []*wire.TxOut{
-				{
-					Value: 630320000,
-					PkScript: []byte{
-						txscript.OP_DUP,
-						txscript.OP_HASH160,
-						txscript.OP_DATA_20,
-						0x43, 0xdc, 0x32, 0x1b, 0x66,
-						0x00, 0x51, 0x1f, 0xe0, 0xa9,
-						0x6a, 0x97, 0xc2, 0x59, 0x3a,
-						0x90, 0x54, 0x29, 0x74, 0xd6,
-						txscript.OP_EQUALVERIFY,
-						txscript.OP_CHECKSIG,
-					},
-				},
-				{
-					Value: 100000181,
-					PkScript: []byte{
-						txscript.OP_DUP,
-						txscript.OP_HASH160,
-						txscript.OP_DATA_20,
-						0xa4, 0x05, 0xea, 0x18, 0x09,
-						0x14, 0xa9, 0x11, 0xd0, 0xb8,
-						0x07, 0x99, 0x19, 0x2b, 0x0b,
-						0x84, 0xae, 0x80, 0x1e, 0xbd,
-						txscript.OP_EQUALVERIFY,
-						txscript.OP_CHECKSIG,
-					},
-				},
-				{
-					Value: 596516343,
-					PkScript: []byte{
-						txscript.OP_DUP,
-						txscript.OP_HASH160,
-						txscript.OP_DATA_20,
-						0x24, 0x56, 0x76, 0x45, 0x4f,
-						0x6f, 0xff, 0x28, 0x88, 0x39,
-						0x47, 0xea, 0x70, 0x23, 0x86,
-						0x9b, 0x8a, 0x71, 0xa3, 0x05,
-						txscript.OP_EQUALVERIFY,
-						txscript.OP_CHECKSIG,
-					},
-				},
-			},
-			LockTime: 0,
-		},
-		// Test input 0
-		pkScript: []byte{
-			txscript.OP_DUP,
-			txscript.OP_HASH160,
-			txscript.OP_DATA_20,
-			0xfd, 0xf6, 0xea, 0xe7, 0x10,
-			0xa0, 0xc4, 0x49, 0x7a, 0x8d,
-			0x0f, 0xd2, 0x9a, 0xf6, 0x6b,
-			0xac, 0x94, 0xaf, 0x6c, 0x98,
-			txscript.OP_EQUALVERIFY,
-			txscript.OP_CHECKSIG,
-		},
-		idx:        0,
-		strictSigs: true,
-		shouldFail: true,
-		nSigOps:    1,
-		scriptInfo: txscript.ScriptInfo{
-			PkScriptClass:  txscript.PubKeyHashTy,
-			NumInputs:      2,
-			ExpectedInputs: 2,
-			SigOps:         1,
-		},
-	},
-
-	// tx 51bf528ecf3c161e7c021224197dbe84f9a8564212f6207baa014c01a1668e1e
-	// first instance of an AnyoneCanPay signature in the blockchain
-	{
-		name: "CheckSigHashAnyoneCanPay",
-		tx: &wire.MsgTx{
-			Version: 1,
-			TxIn: []*wire.TxIn{
-				{
-					PreviousOutPoint: wire.OutPoint{
-						Hash: wire.ShaHash([32]byte{
-							0xf6, 0x04, 0x4c, 0x0a,
-							0xd4, 0x85, 0xf6, 0x33,
-							0xb4, 0x1f, 0x97, 0xd0,
-							0xd7, 0x93, 0xeb, 0x28,
-							0x37, 0xae, 0x40, 0xf7,
-							0x38, 0xff, 0x6d, 0x5f,
-							0x50, 0xfd, 0xfd, 0x10,
-							0x52, 0x8c, 0x1d, 0x76,
-						}),
-						Index: 1,
-					},
-					SignatureScript: []byte{
-						txscript.OP_DATA_72,
-						0x30, 0x45, 0x02, 0x20, 0x58,
-						0x53, 0xc7, 0xf1, 0x39, 0x57,
-						0x85, 0xbf, 0xab, 0xb0, 0x3c,
-						0x57, 0xe9, 0x62, 0xeb, 0x07,
-						0x6f, 0xf2, 0x4d, 0x8e, 0x4e,
-						0x57, 0x3b, 0x04, 0xdb, 0x13,
-						0xb4, 0x5e, 0xd3, 0xed, 0x6e,
-						0xe2, 0x02, 0x21, 0x00, 0x9d,
-						0xc8, 0x2a, 0xe4, 0x3b, 0xe9,
-						0xd4, 0xb1, 0xfe, 0x28, 0x47,
-						0x75, 0x4e, 0x1d, 0x36, 0xda,
-						0xd4, 0x8b, 0xa8, 0x01, 0x81,
-						0x7d, 0x48, 0x5d, 0xc5, 0x29,
-						0xaf, 0xc5, 0x16, 0xc2, 0xdd,
-						0xb4, 0x81,
-						txscript.OP_DATA_33,
-						0x03, 0x05, 0x58, 0x49, 0x80,
-						0x36, 0x7b, 0x32, 0x1f, 0xad,
-						0x7f, 0x1c, 0x1f, 0x4d, 0x5d,
-						0x72, 0x3d, 0x0a, 0xc8, 0x0c,
-						0x1d, 0x80, 0xc8, 0xba, 0x12,
-						0x34, 0x39, 0x65, 0xb4, 0x83,
-						0x64, 0x53, 0x7a,
-					},
-					Sequence: 4294967295,
-				},
-				{
-					PreviousOutPoint: wire.OutPoint{
-						Hash: wire.ShaHash([32]byte{
-							0x9c, 0x6a, 0xf0, 0xdf,
-							0x66, 0x69, 0xbc, 0xde,
-							0xd1, 0x9e, 0x31, 0x7e,
-							0x25, 0xbe, 0xbc, 0x8c,
-							0x78, 0xe4, 0x8d, 0xf8,
-							0xae, 0x1f, 0xe0, 0x2a,
-							0x7f, 0x03, 0x08, 0x18,
-							0xe7, 0x1e, 0xcd, 0x40,
-						}),
-						Index: 1,
-					},
-					SignatureScript: []byte{
-						txscript.OP_DATA_73,
-						0x30, 0x46, 0x02, 0x21, 0x00,
-						0x82, 0x69, 0xc9, 0xd7, 0xba,
-						0x0a, 0x7e, 0x73, 0x0d, 0xd1,
-						0x6f, 0x40, 0x82, 0xd2, 0x9e,
-						0x36, 0x84, 0xfb, 0x74, 0x63,
-						0xba, 0x06, 0x4f, 0xd0, 0x93,
-						0xaf, 0xc1, 0x70, 0xad, 0x6e,
-						0x03, 0x88, 0x02, 0x21, 0x00,
-						0xbc, 0x6d, 0x76, 0x37, 0x39,
-						0x16, 0xa3, 0xff, 0x6e, 0xe4,
-						0x1b, 0x2c, 0x75, 0x20, 0x01,
-						0xfd, 0xa3, 0xc9, 0xe0, 0x48,
-						0xbc, 0xff, 0x0d, 0x81, 0xd0,
-						0x5b, 0x39, 0xff, 0x0f, 0x42,
-						0x17, 0xb2, 0x81,
-						txscript.OP_DATA_33,
-						0x03, 0xaa, 0xe3, 0x03, 0xd8,
-						0x25, 0x42, 0x15, 0x45, 0xc5,
-						0xbc, 0x7c, 0xcd, 0x5a, 0xc8,
-						0x7d, 0xd5, 0xad, 0xd3, 0xbc,
-						0xc3, 0xa4, 0x32, 0xba, 0x7a,
-						0xa2, 0xf2, 0x66, 0x16, 0x99,
-						0xf9, 0xf6, 0x59,
-					},
-					Sequence: 4294967295,
-				},
-			},
-			TxOut: []*wire.TxOut{
-				{
-					Value: 300000,
-					PkScript: []byte{
-						txscript.OP_DUP,
-						txscript.OP_HASH160,
-						txscript.OP_DATA_20,
-						0x5c, 0x11, 0xf9, 0x17, 0x88,
-						0x3b, 0x92, 0x7e, 0xef, 0x77,
-						0xdc, 0x57, 0x70, 0x7a, 0xeb,
-						0x85, 0x3f, 0x6d, 0x38, 0x94,
-						txscript.OP_EQUALVERIFY,
-						txscript.OP_CHECKSIG,
-					},
-				},
-			},
-			LockTime: 0,
-		},
-		pkScript: []byte{
-			txscript.OP_DUP,
-			txscript.OP_HASH160,
-			txscript.OP_DATA_20,
-			0x85, 0x51, 0xe4, 0x8a, 0x53, 0xde, 0xcd, 0x1c, 0xfc,
-			0x63, 0x07, 0x9a, 0x45, 0x81, 0xbc, 0xcc, 0xfa, 0xd1,
-			0xa9, 0x3c,
-			txscript.OP_EQUALVERIFY,
-			txscript.OP_CHECKSIG,
-		},
-		idx:     0,
-		bip16:   true, // after threshold
-		nSigOps: 1,
-		scriptInfo: txscript.ScriptInfo{
-			PkScriptClass:  txscript.PubKeyHashTy,
-			NumInputs:      2,
-			ExpectedInputs: 2,
-			SigOps:         1,
-		},
-	},
-	// tx 6d36bc17e947ce00bb6f12f8e7a56a1585c5a36188ffa2b05e10b4743273a74b
-	// Uses OP_CODESEPARATOR and OP_CHECKMULTISIG
-	{
-		name: "CheckMultiSig",
-		tx: &wire.MsgTx{
-			Version: 1,
-			TxIn: []*wire.TxIn{
-				{
-					PreviousOutPoint: wire.OutPoint{
-						Hash: wire.ShaHash([32]byte{
-							0x37, 0xb1, 0x7d, 0x76,
-							0x38, 0x51, 0xcd, 0x1a,
-							0xb0, 0x4a, 0x42, 0x44,
-							0x63, 0xd4, 0x13, 0xc4,
-							0xee, 0x5c, 0xf6, 0x13,
-							0x04, 0xc7, 0xfd, 0x76,
-							0x97, 0x7b, 0xea, 0x7f,
-							0xce, 0x07, 0x57, 0x05,
-						}),
-						Index: 0,
-					},
-					SignatureScript: []byte{
-						txscript.OP_DATA_71,
-						0x30, 0x44, 0x02, 0x20, 0x02,
-						0xdb, 0xe4, 0xb5, 0xa2, 0xfb,
-						0xb5, 0x21, 0xe4, 0xdc, 0x5f,
-						0xbe, 0xc7, 0x5f, 0xd9, 0x60,
-						0x65, 0x1a, 0x27, 0x54, 0xb0,
-						0x3d, 0x08, 0x71, 0xb8, 0xc9,
-						0x65, 0x46, 0x9b, 0xe5, 0x0f,
-						0xa7, 0x02, 0x20, 0x6d, 0x97,
-						0x42, 0x1f, 0xb7, 0xea, 0x93,
-						0x59, 0xb6, 0x3e, 0x48, 0xc2,
-						0x10, 0x82, 0x23, 0x28, 0x4b,
-						0x9a, 0x71, 0x56, 0x0b, 0xd8,
-						0x18, 0x24, 0x69, 0xb9, 0x03,
-						0x92, 0x28, 0xd7, 0xb3, 0xd7,
-						0x01, 0x21, 0x02, 0x95, 0xbf,
-						0x72, 0x71, 0x11, 0xac, 0xde,
-						0xab, 0x87, 0x78, 0x28, 0x4f,
-						0x02, 0xb7, 0x68, 0xd1, 0xe2,
-						0x1a, 0xcb, 0xcb, 0xae, 0x42,
-					},
-					Sequence: 4294967295,
-				},
-				{
-					PreviousOutPoint: wire.OutPoint{
-						Hash: wire.ShaHash([32]byte{
-							0x37, 0xb1, 0x7d, 0x76,
-							0x38, 0x51, 0xcd, 0x1a,
-							0xb0, 0x4a, 0x42, 0x44,
-							0x63, 0xd4, 0x13, 0xc4,
-							0xee, 0x5c, 0xf6, 0x13,
-							0x04, 0xc7, 0xfd, 0x76,
-							0x97, 0x7b, 0xea, 0x7f,
-							0xce, 0x07, 0x57, 0x05,
-						}),
-						Index: 1,
-					},
-					SignatureScript: []uint8{
-						txscript.OP_FALSE,
-						txscript.OP_DATA_72,
-						0x30, 0x45, 0x02, 0x20, 0x10,
-						0x6a, 0x3e, 0x4e, 0xf0, 0xb5,
-						0x1b, 0x76, 0x4a, 0x28, 0x87,
-						0x22, 0x62, 0xff, 0xef, 0x55,
-						0x84, 0x65, 0x14, 0xda, 0xcb,
-						0xdc, 0xbb, 0xdd, 0x65, 0x2c,
-						0x84, 0x9d, 0x39, 0x5b, 0x43,
-						0x84, 0x02, 0x21, 0x00, 0xe0,
-						0x3a, 0xe5, 0x54, 0xc3, 0xcb,
-						0xb4, 0x06, 0x00, 0xd3, 0x1d,
-						0xd4, 0x6f, 0xc3, 0x3f, 0x25,
-						0xe4, 0x7b, 0xf8, 0x52, 0x5b,
-						0x1f, 0xe0, 0x72, 0x82, 0xe3,
-						0xb6, 0xec, 0xb5, 0xf3, 0xbb,
-						0x28, 0x01,
-						txscript.OP_CODESEPARATOR,
-						txscript.OP_TRUE,
-						txscript.OP_DATA_33,
-						0x02, 0x32, 0xab, 0xdc, 0x89,
-						0x3e, 0x7f, 0x06, 0x31, 0x36,
-						0x4d, 0x7f, 0xd0, 0x1c, 0xb3,
-						0x3d, 0x24, 0xda, 0x45, 0x32,
-						0x9a, 0x00, 0x35, 0x7b, 0x3a,
-						0x78, 0x86, 0x21, 0x1a, 0xb4,
-						0x14, 0xd5, 0x5a,
-						txscript.OP_TRUE,
-						txscript.OP_CHECKMULTISIG,
-					},
-					Sequence: 4294967295,
-				},
-			},
-			TxOut: []*wire.TxOut{
-				{
-					Value: 4800000,
-					PkScript: []byte{
-						txscript.OP_DUP,
-						txscript.OP_HASH160,
-						txscript.OP_DATA_20,
-						0x0d, 0x77, 0x13, 0x64, 0x9f,
-						0x9a, 0x06, 0x78, 0xf4, 0xe8,
-						0x80, 0xb4, 0x0f, 0x86, 0xb9,
-						0x32, 0x89, 0xd1, 0xbb, 0x27,
-						txscript.OP_EQUALVERIFY,
-						txscript.OP_CHECKSIG,
-					},
-				},
-			},
-			LockTime: 0,
-		},
-		// This is a very weird script...
-		pkScript: []byte{
-			txscript.OP_DATA_20,
-			0x2a, 0x9b, 0xc5, 0x44, 0x7d, 0x66, 0x4c, 0x1d, 0x01,
-			0x41, 0x39, 0x2a, 0x84, 0x2d, 0x23, 0xdb, 0xa4, 0x5c,
-			0x4f, 0x13,
-			txscript.OP_NOP2, txscript.OP_DROP,
-		},
-		idx:           1,
-		bip16:         false,
-		nSigOps:       0, // multisig is in the pkScript!
-		scriptInfoErr: txscript.ErrStackNonPushOnly,
-	},
-	// same as previous but with one byte changed to make signature fail
-	{
-		name: "CheckMultiSig fail",
-		tx: &wire.MsgTx{
-			Version: 1,
-			TxIn: []*wire.TxIn{
-				{
-					PreviousOutPoint: wire.OutPoint{
-						Hash: wire.ShaHash([32]byte{
-							0x37, 0xb1, 0x7d, 0x76,
-							0x38, 0x51, 0xcd, 0x1a,
-							0xb0, 0x4a, 0x42, 0x44,
-							0x63, 0xd4, 0x13, 0xc4,
-							0xee, 0x5c, 0xf6, 0x13,
-							0x04, 0xc7, 0xfd, 0x76,
-							0x97, 0x7b, 0xea, 0x7f,
-							0xce, 0x07, 0x57, 0x05,
-						}),
-						Index: 0,
-					},
-					SignatureScript: []byte{
-						txscript.OP_DATA_71,
-						0x30, 0x44, 0x02, 0x20, 0x02,
-						0xdb, 0xe4, 0xb5, 0xa2, 0xfb,
-						0xb5, 0x21, 0xe4, 0xdc, 0x5f,
-						0xbe, 0xc7, 0x5f, 0xd9, 0x60,
-						0x65, 0x1a, 0x27, 0x54, 0xb0,
-						0x3d, 0x08, 0x71, 0xb8, 0xc9,
-						0x65, 0x46, 0x9b, 0xe5, 0x0f,
-						0xa7, 0x02, 0x20, 0x6d, 0x97,
-						0x42, 0x1f, 0xb7, 0xea, 0x93,
-						0x59, 0xb6, 0x3e, 0x48, 0xc2,
-						0x10, 0x82, 0x23, 0x28, 0x4b,
-						0x9a, 0x71, 0x56, 0x0b, 0xd8,
-						0x18, 0x24, 0x69, 0xb9, 0x03,
-						0x92, 0x28, 0xd7, 0xb3, 0xd7,
-						0x01, 0x21, 0x02, 0x95, 0xbf,
-						0x72, 0x71, 0x11, 0xac, 0xde,
-						0xab, 0x87, 0x78, 0x28, 0x4f,
-						0x02, 0xb7, 0x68, 0xd1, 0xe2,
-						0x1a, 0xcb, 0xcb, 0xae, 0x42,
-					},
-					Sequence: 4294967295,
-				},
-				{
-					PreviousOutPoint: wire.OutPoint{
-						Hash: wire.ShaHash([32]byte{
-							0x37, 0xb1, 0x7d, 0x76,
-							0x38, 0x51, 0xcd, 0x1a,
-							0xb0, 0x4a, 0x42, 0x44,
-							0x63, 0xd4, 0x13, 0xc4,
-							0xee, 0x5c, 0xf6, 0x13,
-							0x04, 0xc7, 0xfd, 0x76,
-							0x97, 0x7b, 0xea, 0x7f,
-							0xce, 0x07, 0x57, 0x05,
-						}),
-						Index: 1,
-					},
-					SignatureScript: []uint8{
-						txscript.OP_FALSE,
-						txscript.OP_DATA_72,
-						0x30, 0x45, 0x02, 0x20, 0x10,
-						0x6a, 0x3e, 0x4e, 0xf0, 0xb5,
-						0x1b, 0x76, 0x4a, 0x28, 0x87,
-						0x22, 0x62, 0xff, 0xef, 0x55,
-						0x84, 0x65, 0x14, 0xda, 0xcb,
-						0xdc, 0xbb, 0xdd, 0x65, 0x2c,
-						0x84, 0x9d, 0x39, 0x5b, 0x43,
-						0x84, 0x02, 0x21, 0x00, 0xe0,
-						0x3a, 0xe5, 0x54, 0xc3, 0xcb,
-						0xb4, 0x06, 0x00, 0xd3, 0x1d,
-						0xd4, 0x6f, 0xc3, 0x3f, 0x25,
-						0xe4, 0x7b, 0xf8, 0x52, 0x5b,
-						0x1f, 0xe0, 0x72, 0x82, 0xe3,
-						0xb6, 0xec, 0xb5, 0xf3, 0xbb,
-						0x28, 0x01,
-						txscript.OP_CODESEPARATOR,
-						txscript.OP_TRUE,
-						txscript.OP_DATA_33,
-						0x02, 0x32, 0xab, 0xdc, 0x89,
-						0x3e, 0x7f, 0x06, 0x31, 0x36,
-						0x4d, 0x7f, 0xd0, 0x1c, 0xb3,
-						0x3d, 0x24, 0xda, 0x45, 0x32,
-						0x9a, 0x00, 0x35, 0x7b, 0x3a,
-						0x78, 0x86, 0x21, 0x1a, 0xb4,
-						0x14, 0xd5, 0x5a,
-						txscript.OP_TRUE,
-						txscript.OP_CHECKMULTISIG,
-					},
-					Sequence: 4294967295,
-				},
-			},
-			TxOut: []*wire.TxOut{
-				{
-					Value: 5800000,
-					PkScript: []byte{
-						txscript.OP_DUP,
-						txscript.OP_HASH160,
-						txscript.OP_DATA_20,
-						0x0d, 0x77, 0x13, 0x64, 0x9f,
-						0x9a, 0x06, 0x78, 0xf4, 0xe8,
-						0x80, 0xb4, 0x0f, 0x86, 0xb9,
-						0x32, 0x89, 0xd1, 0xbb, 0x27,
-						txscript.OP_EQUALVERIFY,
-						txscript.OP_CHECKSIG,
-					},
-				},
-			},
-			LockTime: 0,
-		},
-		// This is a very weird script...
-		pkScript: []byte{
-			txscript.OP_DATA_20,
-			0x2a, 0x9b, 0xc5, 0x44, 0x7d, 0x66, 0x4c, 0x1d, 0x01,
-			0x41, 0x39, 0x2a, 0x84, 0x2d, 0x23, 0xdb, 0xa4, 0x5c,
-			0x4f, 0x13,
-			txscript.OP_NOP2, txscript.OP_DROP,
-		},
-		idx:           1,
-		bip16:         false,
-		err:           txscript.ErrStackScriptFailed,
-		nSigOps:       0, // multisig is in the pkScript!
-		scriptInfoErr: txscript.ErrStackNonPushOnly,
-	},
-	// taken from tx b2d93dfd0b2c1a380e55e76a8d9cb3075dec9f4474e9485be008c337fd62c1f7
-	// on testnet
-	// multisig with zero required signatures
-	{
-		name: "CheckMultiSig zero required signatures",
-		tx: &wire.MsgTx{
-			Version: 1,
-			TxIn: []*wire.TxIn{
-				{
-					PreviousOutPoint: wire.OutPoint{
-						Hash: wire.ShaHash([32]byte{
-							0x37, 0xb1, 0x7d, 0x76,
-							0x38, 0x51, 0xcd, 0x1a,
-							0xb0, 0x4a, 0x42, 0x44,
-							0x63, 0xd4, 0x13, 0xc4,
-							0xee, 0x5c, 0xf6, 0x13,
-							0x04, 0xc7, 0xfd, 0x76,
-							0x97, 0x7b, 0xea, 0x7f,
-							0xce, 0x07, 0x57, 0x05,
-						}),
-						Index: 0,
-					},
-					SignatureScript: []byte{
-						txscript.OP_0,
-						txscript.OP_DATA_37,
-						txscript.OP_0,
-						txscript.OP_DATA_33,
-						0x02, 0x4a, 0xb3, 0x3c, 0x3a,
-						0x54, 0x7a, 0x37, 0x29, 0x3e,
-						0xb8, 0x75, 0xb4, 0xbb, 0xdb,
-						0xd4, 0x73, 0xe9, 0xd4, 0xba,
-						0xfd, 0xf3, 0x56, 0x87, 0xe7,
-						0x97, 0x44, 0xdc, 0xd7, 0x0f,
-						0x6e, 0x4d, 0xe2,
-						txscript.OP_1,
-						txscript.OP_CHECKMULTISIG,
-					},
-					Sequence: 4294967295,
-				},
-			},
-			TxOut:    []*wire.TxOut{},
-			LockTime: 0,
-		},
-		pkScript: []byte{
-			txscript.OP_HASH160,
-			txscript.OP_DATA_20,
-			0x2c, 0x6b, 0x10, 0x7f, 0xdf, 0x10, 0x6f, 0x22, 0x6f,
-			0x3f, 0xa3, 0x27, 0xba, 0x36, 0xd6, 0xe3, 0xca, 0xc7,
-			0x3d, 0xf0,
-			txscript.OP_EQUAL,
-		},
-		idx:     0,
-		bip16:   true,
-		nSigOps: 1,
-		scriptInfo: txscript.ScriptInfo{
-			PkScriptClass:  txscript.ScriptHashTy,
-			NumInputs:      2,
-			ExpectedInputs: 2,
-			SigOps:         1,
-		},
-	},
-	// tx e5779b9e78f9650debc2893fd9636d827b26b4ddfa6a8172fe8708c924f5c39d
-	// First P2SH transaction in the blockchain
-	{
-		name: "P2SH",
-		tx: &wire.MsgTx{
-			Version: 1,
-			TxIn: []*wire.TxIn{
-				{
-					PreviousOutPoint: wire.OutPoint{
-						Hash: wire.ShaHash([32]byte{
-							0x6d, 0x58, 0xf8, 0xa3,
-							0xaa, 0x43, 0x0b, 0x84,
-							0x78, 0x52, 0x3a, 0x65,
-							0xc2, 0x03, 0xa2, 0x7b,
-							0xb8, 0x81, 0x17, 0x8c,
-							0xb1, 0x23, 0x13, 0xaf,
-							0xde, 0x29, 0xf9, 0x2e,
-							0xd7, 0x56, 0xaa, 0x7e,
-						}),
-						Index: 0,
-					},
-					SignatureScript: []byte{
-						txscript.OP_DATA_2,
-						// OP_3 OP_7
-						0x53, 0x57,
-					},
-					Sequence: 4294967295,
-				},
-			},
-			TxOut: []*wire.TxOut{
-				{
-					Value: 1000000,
-					PkScript: []byte{
-						txscript.OP_DUP,
-						txscript.OP_HASH160,
-						txscript.OP_DATA_20,
-						0x5b, 0x69, 0xd8, 0xb9, 0xdf,
-						0xa6, 0xe4, 0x12, 0x26, 0x47,
-						0xe1, 0x79, 0x4e, 0xaa, 0x3b,
-						0xfc, 0x11, 0x1f, 0x70, 0xef,
-						txscript.OP_EQUALVERIFY,
-						txscript.OP_CHECKSIG,
-					},
-				},
-			},
-			LockTime: 0,
-		},
-		pkScript: []byte{
-			txscript.OP_HASH160,
-			txscript.OP_DATA_20,
-			0x43, 0x3e, 0xc2, 0xac, 0x1f, 0xfa, 0x1b, 0x7b, 0x7d,
-			0x02, 0x7f, 0x56, 0x45, 0x29, 0xc5, 0x71, 0x97, 0xf9,
-			0xae, 0x88,
-			txscript.OP_EQUAL,
-		},
-		idx:     0,
-		bip16:   true,
-		nSigOps: 0, // no signature ops in the pushed script.
-		scriptInfo: txscript.ScriptInfo{
-			PkScriptClass:  txscript.ScriptHashTy,
-			NumInputs:      1,
-			ExpectedInputs: -1, // p2sh script is non standard
-			SigOps:         0,
-		},
-	},
-	// next few tests are modified versions of previous to hit p2sh error
-	// cases.
-	{
-		// sigscript changed so that pkscript hash will not match.
-		name: "P2SH - bad hash",
-		tx: &wire.MsgTx{
-			Version: 1,
-			TxIn: []*wire.TxIn{
-				{
-					PreviousOutPoint: wire.OutPoint{
-						Hash: wire.ShaHash([32]byte{
-							0x6d, 0x58, 0xf8, 0xa3,
-							0xaa, 0x43, 0x0b, 0x84,
-							0x78, 0x52, 0x3a, 0x65,
-							0xc2, 0x03, 0xa2, 0x7b,
-							0xb8, 0x81, 0x17, 0x8c,
-							0xb1, 0x23, 0x13, 0xaf,
-							0xde, 0x29, 0xf9, 0x2e,
-							0xd7, 0x56, 0xaa, 0x7e,
-						}),
-						Index: 0,
-					},
-					SignatureScript: []byte{
-						txscript.OP_DATA_2,
-						// OP_3 OP_8
-						0x53, 0x58,
-					},
-					Sequence: 4294967295,
-				},
-			},
-			TxOut: []*wire.TxOut{
-				{
-					Value: 1000000,
-					PkScript: []byte{
-						txscript.OP_DUP,
-						txscript.OP_HASH160,
-						txscript.OP_DATA_20,
-						0x5b, 0x69, 0xd8, 0xb9, 0xdf,
-						0xa6, 0xe4, 0x12, 0x26, 0x47,
-						0xe1, 0x79, 0x4e, 0xaa, 0x3b,
-						0xfc, 0x11, 0x1f, 0x70, 0xef,
-						txscript.OP_EQUALVERIFY,
-						txscript.OP_CHECKSIG,
-					},
-				},
-			},
-			LockTime: 0,
-		},
-		pkScript: []byte{
-			txscript.OP_HASH160,
-			txscript.OP_DATA_20,
-			0x43, 0x3e, 0xc2, 0xac, 0x1f, 0xfa, 0x1b, 0x7b, 0x7d,
-			0x02, 0x7f, 0x56, 0x45, 0x29, 0xc5, 0x71, 0x97, 0xf9,
-			0xae, 0x88,
-			txscript.OP_EQUAL,
-		},
-		idx:     0,
-		err:     txscript.ErrStackScriptFailed,
-		bip16:   true,
-		nSigOps: 0, // no signature ops in the pushed script.
-		scriptInfo: txscript.ScriptInfo{
-			PkScriptClass:  txscript.ScriptHashTy,
-			NumInputs:      1,
-			ExpectedInputs: -1, // p2sh script is non standard
-			SigOps:         0,
-		},
-	},
-	{
-		// sigscript changed so that pkscript hash will not match.
-		name: "P2SH - doesn't parse",
-		tx: &wire.MsgTx{
-			Version: 1,
-			TxIn: []*wire.TxIn{
-				{
-					PreviousOutPoint: wire.OutPoint{
-						Hash: wire.ShaHash([32]byte{
-							0x6d, 0x58, 0xf8, 0xa3,
-							0xaa, 0x43, 0x0b, 0x84,
-							0x78, 0x52, 0x3a, 0x65,
-							0xc2, 0x03, 0xa2, 0x7b,
-							0xb8, 0x81, 0x17, 0x8c,
-							0xb1, 0x23, 0x13, 0xaf,
-							0xde, 0x29, 0xf9, 0x2e,
-							0xd7, 0x56, 0xaa, 0x7e,
-						}),
-						Index: 0,
-					},
-					SignatureScript: []byte{
-						txscript.OP_DATA_2,
-						// pushed script.
-						txscript.OP_DATA_2, 0x1,
-					},
-					Sequence: 4294967295,
-				},
-			},
-			TxOut: []*wire.TxOut{
-				{
-					Value: 1000000,
-					PkScript: []byte{
-						txscript.OP_DUP,
-						txscript.OP_HASH160,
-						txscript.OP_DATA_20,
-						0x5b, 0x69, 0xd8, 0xb9, 0xdf,
-						0xa6, 0xe4, 0x12, 0x26, 0x47,
-						0xe1, 0x79, 0x4e, 0xaa, 0x3b,
-						0xfc, 0x11, 0x1f, 0x70, 0xef,
-						txscript.OP_EQUALVERIFY,
-						txscript.OP_CHECKSIG,
-					},
-				},
-			},
-			LockTime: 0,
-		},
-		pkScript: []byte{
-			txscript.OP_HASH160,
-			txscript.OP_DATA_20,
-			0xd4, 0x8c, 0xe8, 0x6c, 0x69, 0x8f, 0x24, 0x68, 0x29,
-			0x92, 0x1b, 0xa9, 0xfb, 0x2a, 0x84, 0x4a, 0xe2, 0xad,
-			0xba, 0x67,
-			txscript.OP_EQUAL,
-		},
-		idx:           0,
-		err:           txscript.ErrStackShortScript,
-		bip16:         true,
-		scriptInfoErr: txscript.ErrStackShortScript,
-	},
-	{
-		// sigscript changed so to be non pushonly.
-		name: "P2SH - non pushonly",
-		tx: &wire.MsgTx{
-			Version: 1,
-			TxIn: []*wire.TxIn{
-				{
-					PreviousOutPoint: wire.OutPoint{
-						Hash: wire.ShaHash([32]byte{
-							0x6d, 0x58, 0xf8, 0xa3,
-							0xaa, 0x43, 0x0b, 0x84,
-							0x78, 0x52, 0x3a, 0x65,
-							0xc2, 0x03, 0xa2, 0x7b,
-							0xb8, 0x81, 0x17, 0x8c,
-							0xb1, 0x23, 0x13, 0xaf,
-							0xde, 0x29, 0xf9, 0x2e,
-							0xd7, 0x56, 0xaa, 0x7e,
-						}),
-						Index: 0,
-					},
-					// doesn't have to match signature.
-					// will never run.
-					SignatureScript: []byte{
-
-						txscript.OP_DATA_2,
-						// pushed script.
-						txscript.OP_DATA_1, 0x1,
-						txscript.OP_DUP,
-					},
-					Sequence: 4294967295,
-				},
-			},
-			TxOut: []*wire.TxOut{
-				{
-					Value: 1000000,
-					PkScript: []byte{
-						txscript.OP_DUP,
-						txscript.OP_HASH160,
-						txscript.OP_DATA_20,
-						0x5b, 0x69, 0xd8, 0xb9, 0xdf,
-						0xa6, 0xe4, 0x12, 0x26, 0x47,
-						0xe1, 0x79, 0x4e, 0xaa, 0x3b,
-						0xfc, 0x11, 0x1f, 0x70, 0xef,
-						txscript.OP_EQUALVERIFY,
-						txscript.OP_CHECKSIG,
-					},
-				},
-			},
-			LockTime: 0,
-		},
-		pkScript: []byte{
-			txscript.OP_HASH160,
-			txscript.OP_DATA_20,
-			0x43, 0x3e, 0xc2, 0xac, 0x1f, 0xfa, 0x1b, 0x7b, 0x7d,
-			0x02, 0x7f, 0x56, 0x45, 0x29, 0xc5, 0x71, 0x97, 0xf9,
-			0xae, 0x88,
-			txscript.OP_EQUAL,
-		},
-		idx:           0,
-		parseErr:      txscript.ErrStackP2SHNonPushOnly,
-		bip16:         true,
-		nSigOps:       0, // no signature ops in the pushed script.
-		scriptInfoErr: txscript.ErrStackNonPushOnly,
-	},
-	{
-		// sigscript changed so to be non pushonly.
-		name: "empty pkScript",
-		tx: &wire.MsgTx{
-			Version: 1,
-			TxIn: []*wire.TxIn{
-				{
-					PreviousOutPoint: wire.OutPoint{
-						Hash: wire.ShaHash([32]byte{
-							0x6d, 0x58, 0xf8, 0xa3,
-							0xaa, 0x43, 0x0b, 0x84,
-							0x78, 0x52, 0x3a, 0x65,
-							0xc2, 0x03, 0xa2, 0x7b,
-							0xb8, 0x81, 0x17, 0x8c,
-							0xb1, 0x23, 0x13, 0xaf,
-							0xde, 0x29, 0xf9, 0x2e,
-							0xd7, 0x56, 0xaa, 0x7e,
-						}),
-						Index: 0,
-					},
-					// doesn't have to match signature.
-					// will never run.
-					SignatureScript: []byte{
-						txscript.OP_TRUE,
-					},
-					Sequence: 4294967295,
-				},
-			},
-			TxOut: []*wire.TxOut{
-				{
-					Value: 1000000,
-					PkScript: []byte{
-						txscript.OP_DUP,
-						txscript.OP_HASH160,
-						txscript.OP_DATA_20,
-						0x5b, 0x69, 0xd8, 0xb9, 0xdf,
-						0xa6, 0xe4, 0x12, 0x26, 0x47,
-						0xe1, 0x79, 0x4e, 0xaa, 0x3b,
-						0xfc, 0x11, 0x1f, 0x70, 0xef,
-						txscript.OP_EQUALVERIFY,
-						txscript.OP_CHECKSIG,
-					},
-				},
-			},
-			LockTime: 0,
-		},
-		pkScript: []byte{},
-		idx:      0,
-		bip16:    true,
-		nSigOps:  0, // no signature ops in the pushed script.
-		scriptInfo: txscript.ScriptInfo{
-			PkScriptClass:  txscript.NonStandardTy,
-			NumInputs:      1,
-			ExpectedInputs: -1,
-			SigOps:         0,
-		},
-	},
-}
-
-// Test a number of tx from the blockchain to test otherwise difficult to test
-// opcodes (i.e. those that involve signatures). Being from the blockchain,
-// these transactions are known good.
-// TODO(oga) For signatures we currently do not test SigHashSingle because
-// nothing in the blockchain that we have yet seen uses them, making it hard
-// to confirm we implemented the spec correctly.
-func testTx(t *testing.T, test txTest) {
-	var flags txscript.ScriptFlags
-	if test.bip16 {
-		flags |= txscript.ScriptBip16
-	}
-	if test.strictSigs {
-		flags |= txscript.ScriptVerifyDERSignatures
-	}
-	vm, err := txscript.NewEngine(test.pkScript, test.tx, test.idx,
-		flags)
-	if err != nil {
-		if err != test.parseErr {
-			t.Errorf("Failed to parse %s: got \"%v\" expected "+
-				"\"%v\"", test.name, err, test.parseErr)
-		}
-		return
-	}
-	if test.parseErr != nil {
-		t.Errorf("%s: parse succeeded when expecting \"%v\"", test.name,
-			test.parseErr)
-	}
-
-	err = vm.Execute()
-	if err != nil {
-		// failed means no specified error
-		if test.shouldFail == true {
-			return
-		}
-		if err != test.err {
-			t.Errorf("Failed to validate %s tx: %v expected %v",
-				test.name, err, test.err)
-		}
-		return
-	}
-	if test.err != nil || test.shouldFail == true {
-		t.Errorf("%s: expected failure: %v, succeeded", test.name,
-			test.err)
-	}
-}
-
-func TestTX(t *testing.T) {
+// TestGetPreciseSigOps ensures the more precise signature operation counting
+// mechanism which includes signatures in P2SH scripts works as expected.
+func TestGetPreciseSigOps(t *testing.T) {
 	t.Parallel()
 
-	for i := range txTests {
-		testTx(t, txTests[i])
-	}
-}
-
-func TestGetPreciseSignOps(t *testing.T) {
-	t.Parallel()
-
-	// First we go over the range of tests in testTx and count the sigops in
-	// them.
-	for _, test := range txTests {
-		count := txscript.GetPreciseSigOpCount(
-			test.tx.TxIn[test.idx].SignatureScript, test.pkScript,
-			test.bip16)
-		if count != test.nSigOps {
-			t.Errorf("%s: expected count of %d, got %d", test.name,
-				test.nSigOps, count)
-
-		}
-	}
-
-	// Now we go over a number of tests to hit the more awkward error
-	// conditions in the P2SH cases..
-
-	type psocTest struct {
+	tests := []struct {
 		name      string
 		scriptSig []byte
 		nSigOps   int
 		err       error
-	}
-	psocTests := []psocTest{
+	}{
 		{
 			name:      "scriptSig doesn't parse",
 			scriptSig: []byte{txscript.OP_PUSHDATA1, 2},
@@ -1709,7 +153,7 @@ func TestGetPreciseSignOps(t *testing.T) {
 		},
 		{
 			name:      "scriptSig length 0",
-			scriptSig: []byte{},
+			scriptSig: nil,
 			nSigOps:   0,
 		},
 		{
@@ -1718,7 +162,6 @@ func TestGetPreciseSignOps(t *testing.T) {
 			scriptSig: []byte{txscript.OP_1, txscript.OP_1},
 			nSigOps:   0,
 		},
-		// pushed script doesn't parse.
 		{
 			name: "pushed script doesn't parse",
 			scriptSig: []byte{txscript.OP_DATA_2,
@@ -1726,20 +169,15 @@ func TestGetPreciseSignOps(t *testing.T) {
 			err: txscript.ErrStackShortScript,
 		},
 	}
+
 	// The signature in the p2sh script is nonsensical for the tests since
-	// this script will never be executed. What matters is that it matches
+	// this script will never be executed.  What matters is that it matches
 	// the right pattern.
-	pkScript := []byte{
-		txscript.OP_HASH160,
-		txscript.OP_DATA_20,
-		0x43, 0x3e, 0xc2, 0xac, 0x1f, 0xfa, 0x1b, 0x7b, 0x7d,
-		0x02, 0x7f, 0x56, 0x45, 0x29, 0xc5, 0x71, 0x97, 0xf9,
-		0xae, 0x88,
-		txscript.OP_EQUAL,
-	}
-	for _, test := range psocTests {
-		count := txscript.GetPreciseSigOpCount(
-			test.scriptSig, pkScript, true)
+	pkScript := mustParseShortForm("HASH160 DATA_20 0x433ec2ac1ffa1b7b7d0" +
+		"27f564529c57197f9ae88 EQUAL")
+	for _, test := range tests {
+		count := txscript.GetPreciseSigOpCount(test.scriptSig, pkScript,
+			true)
 		if count != test.nSigOps {
 			t.Errorf("%s: expected count of %d, got %d", test.name,
 				test.nSigOps, count)
@@ -1748,236 +186,235 @@ func TestGetPreciseSignOps(t *testing.T) {
 	}
 }
 
-type removeOpcodeTest struct {
-	name   string
-	before []byte
-	remove byte
-	err    error
-	after  []byte
-}
-
-var removeOpcodeTests = []removeOpcodeTest{
-	// Nothing to remove.
-	{
-		name:   "nothing to remove",
-		before: []byte{txscript.OP_NOP},
-		remove: txscript.OP_CODESEPARATOR,
-		after:  []byte{txscript.OP_NOP},
-	},
-	// Test basic opcode removal
-	{
-		name: "codeseparator 1",
-		before: []byte{txscript.OP_NOP, txscript.OP_CODESEPARATOR,
-			txscript.OP_TRUE},
-		remove: txscript.OP_CODESEPARATOR,
-		after:  []byte{txscript.OP_NOP, txscript.OP_TRUE},
-	},
-	// The opcode in question is actually part of the data in a previous
-	// opcode
-	{
-		name: "codeseparator by coincidence",
-		before: []byte{txscript.OP_NOP, txscript.OP_DATA_1, txscript.OP_CODESEPARATOR,
-			txscript.OP_TRUE},
-		remove: txscript.OP_CODESEPARATOR,
-		after: []byte{txscript.OP_NOP, txscript.OP_DATA_1, txscript.OP_CODESEPARATOR,
-			txscript.OP_TRUE},
-	},
-	{
-		name:   "invalid opcode",
-		before: []byte{txscript.OP_UNKNOWN186},
-		remove: txscript.OP_CODESEPARATOR,
-		after:  []byte{txscript.OP_UNKNOWN186},
-	},
-	{
-		name:   "invalid length (insruction)",
-		before: []byte{txscript.OP_PUSHDATA1},
-		remove: txscript.OP_CODESEPARATOR,
-		err:    txscript.ErrStackShortScript,
-	},
-	{
-		name:   "invalid length (data)",
-		before: []byte{txscript.OP_PUSHDATA1, 255, 254},
-		remove: txscript.OP_CODESEPARATOR,
-		err:    txscript.ErrStackShortScript,
-	},
-}
-
-func testRemoveOpcode(t *testing.T, test *removeOpcodeTest) {
-	result, err := txscript.TstRemoveOpcode(test.before, test.remove)
-	if test.err != nil {
-		if err != test.err {
-			t.Errorf("%s: got unexpected error. exp: \"%v\" "+
-				"got: \"%v\"", test.name, test.err, err)
-		}
-		return
-	}
-	if err != nil {
-		t.Errorf("%s: unexpected failure: \"%v\"", test.name, err)
-		return
-	}
-	if !bytes.Equal(test.after, result) {
-		t.Errorf("%s: value does not equal expected: exp: \"%v\""+
-			" got: \"%v\"", test.name, test.after, result)
-	}
-}
-
+// TestRemoveOpcodes ensures that removing opcodes from scripts behaves as
+// expected.
 func TestRemoveOpcodes(t *testing.T) {
 	t.Parallel()
 
-	for i := range removeOpcodeTests {
-		testRemoveOpcode(t, &removeOpcodeTests[i])
+	tests := []struct {
+		name   string
+		before string
+		remove byte
+		err    error
+		after  string
+	}{
+		{
+			// Nothing to remove.
+			name:   "nothing to remove",
+			before: "NOP",
+			remove: txscript.OP_CODESEPARATOR,
+			after:  "NOP",
+		},
+		{
+			// Test basic opcode removal.
+			name:   "codeseparator 1",
+			before: "NOP CODESEPARATOR TRUE",
+			remove: txscript.OP_CODESEPARATOR,
+			after:  "NOP TRUE",
+		},
+		{
+			// The opcode in question is actually part of the data
+			// in a previous opcode.
+			name:   "codeseparator by coincidence",
+			before: "NOP DATA_1 CODESEPARATOR TRUE",
+			remove: txscript.OP_CODESEPARATOR,
+			after:  "NOP DATA_1 CODESEPARATOR TRUE",
+		},
+		{
+			name:   "invalid opcode",
+			before: "CAT",
+			remove: txscript.OP_CODESEPARATOR,
+			after:  "CAT",
+		},
+		{
+			name:   "invalid length (insruction)",
+			before: "PUSHDATA1",
+			remove: txscript.OP_CODESEPARATOR,
+			err:    txscript.ErrStackShortScript,
+		},
+		{
+			name:   "invalid length (data)",
+			before: "PUSHDATA1 0xff 0xfe",
+			remove: txscript.OP_CODESEPARATOR,
+			err:    txscript.ErrStackShortScript,
+		},
 	}
-}
 
-type removeOpcodeByDataTest struct {
-	name   string
-	before []byte
-	remove []byte
-	err    error
-	after  []byte
-}
-
-var removeOpcodeByDataTests = []removeOpcodeByDataTest{
-	{
-		name:   "nothing to do",
-		before: []byte{txscript.OP_NOP},
-		remove: []byte{1, 2, 3, 4},
-		after:  []byte{txscript.OP_NOP},
-	},
-	{
-		name:   "simple case",
-		before: []byte{txscript.OP_DATA_4, 1, 2, 3, 4},
-		remove: []byte{1, 2, 3, 4},
-		after:  []byte{},
-	},
-	{
-		name:   "simple case (miss)",
-		before: []byte{txscript.OP_DATA_4, 1, 2, 3, 4},
-		remove: []byte{1, 2, 3, 5},
-		after:  []byte{txscript.OP_DATA_4, 1, 2, 3, 4},
-	},
-	{
-		// padded to keep it canonical.
-		name: "simple case (pushdata1)",
-		before: append(append([]byte{txscript.OP_PUSHDATA1, 76},
-			bytes.Repeat([]byte{0}, 72)...), []byte{1, 2, 3, 4}...),
-		remove: []byte{1, 2, 3, 4},
-		after:  []byte{},
-	},
-	{
-		name: "simple case (pushdata1 miss)",
-		before: append(append([]byte{txscript.OP_PUSHDATA1, 76},
-			bytes.Repeat([]byte{0}, 72)...), []byte{1, 2, 3, 4}...),
-		remove: []byte{1, 2, 3, 5},
-		after: append(append([]byte{txscript.OP_PUSHDATA1, 76},
-			bytes.Repeat([]byte{0}, 72)...), []byte{1, 2, 3, 4}...),
-	},
-	{
-		name:   "simple case (pushdata1 miss noncanonical)",
-		before: []byte{txscript.OP_PUSHDATA1, 4, 1, 2, 3, 4},
-		remove: []byte{1, 2, 3, 4},
-		after:  []byte{txscript.OP_PUSHDATA1, 4, 1, 2, 3, 4},
-	},
-	{
-		name: "simple case (pushdata2)",
-		before: append(append([]byte{txscript.OP_PUSHDATA2, 0, 1},
-			bytes.Repeat([]byte{0}, 252)...), []byte{1, 2, 3, 4}...),
-		remove: []byte{1, 2, 3, 4},
-		after:  []byte{},
-	},
-	{
-		name: "simple case (pushdata2 miss)",
-		before: append(append([]byte{txscript.OP_PUSHDATA2, 0, 1},
-			bytes.Repeat([]byte{0}, 252)...), []byte{1, 2, 3, 4}...),
-		remove: []byte{1, 2, 3, 4, 5},
-		after: append(append([]byte{txscript.OP_PUSHDATA2, 0, 1},
-			bytes.Repeat([]byte{0}, 252)...), []byte{1, 2, 3, 4}...),
-	},
-	{
-		name:   "simple case (pushdata2 miss noncanonical)",
-		before: []byte{txscript.OP_PUSHDATA2, 4, 0, 1, 2, 3, 4},
-		remove: []byte{1, 2, 3, 4},
-		after:  []byte{txscript.OP_PUSHDATA2, 4, 0, 1, 2, 3, 4},
-	},
-	{
-		// This is padded to make the push canonical.
-		name: "simple case (pushdata4)",
-		before: append(append([]byte{txscript.OP_PUSHDATA4, 0, 0, 1, 0},
-			bytes.Repeat([]byte{0}, 65532)...), []byte{1, 2, 3, 4}...),
-		remove: []byte{1, 2, 3, 4},
-		after:  []byte{},
-	},
-	{
-		name:   "simple case (pushdata4 miss noncanonical)",
-		before: []byte{txscript.OP_PUSHDATA4, 4, 0, 0, 0, 1, 2, 3, 4},
-		remove: []byte{1, 2, 3, 4},
-		after:  []byte{txscript.OP_PUSHDATA4, 4, 0, 0, 0, 1, 2, 3, 4},
-	},
-	{
-		// This is padded to make the push canonical.
-		name: "simple case (pushdata4 miss)",
-		before: append(append([]byte{txscript.OP_PUSHDATA4, 0, 0, 1, 0},
-			bytes.Repeat([]byte{0}, 65532)...), []byte{1, 2, 3, 4}...),
-		remove: []byte{1, 2, 3, 4, 5},
-		after: append(append([]byte{txscript.OP_PUSHDATA4, 0, 0, 1, 0},
-			bytes.Repeat([]byte{0}, 65532)...), []byte{1, 2, 3, 4}...),
-	},
-	{
-		name:   "invalid opcode ",
-		before: []byte{txscript.OP_UNKNOWN187},
-		remove: []byte{1, 2, 3, 4},
-		after:  []byte{txscript.OP_UNKNOWN187},
-	},
-	{
-		name:   "invalid length (instruction)",
-		before: []byte{txscript.OP_PUSHDATA1},
-		remove: []byte{1, 2, 3, 4},
-		err:    txscript.ErrStackShortScript,
-	},
-	{
-		name:   "invalid length (data)",
-		before: []byte{txscript.OP_PUSHDATA1, 255, 254},
-		remove: []byte{1, 2, 3, 4},
-		err:    txscript.ErrStackShortScript,
-	},
-}
-
-func testRemoveOpcodeByData(t *testing.T, test *removeOpcodeByDataTest) {
-	result, err := txscript.TstRemoveOpcodeByData(test.before,
-		test.remove)
-	if test.err != nil {
-		if err != test.err {
-			t.Errorf("%s: got unexpected error. exp: \"%v\" "+
-				"got: \"%v\"", test.name, test.err, err)
+	for _, test := range tests {
+		before := mustParseShortForm(test.before)
+		after := mustParseShortForm(test.after)
+		result, err := txscript.TstRemoveOpcode(before, test.remove)
+		if test.err != nil {
+			if err != test.err {
+				t.Errorf("%s: got unexpected error. exp: \"%v\" "+
+					"got: \"%v\"", test.name, test.err, err)
+			}
+			return
 		}
-		return
-	}
-	if err != nil {
-		t.Errorf("%s: unexpected failure: \"%v\"", test.name, err)
-		return
-	}
-	if !bytes.Equal(test.after, result) {
-		t.Errorf("%s: value does not equal expected: exp: \"%v\""+
-			" got: \"%v\"", test.name, test.after, result)
+		if err != nil {
+			t.Errorf("%s: unexpected failure: \"%v\"", test.name, err)
+			return
+		}
+		if !bytes.Equal(after, result) {
+			t.Errorf("%s: value does not equal expected: exp: \"%v\""+
+				" got: \"%v\"", test.name, after, result)
+		}
 	}
 }
 
-func TestRemoveOpcodeByDatas(t *testing.T) {
+// TestRemoveOpcodeByData ensures that removing data carrying opcodes based on
+// the data they contain works as expected.
+func TestRemoveOpcodeByData(t *testing.T) {
 	t.Parallel()
 
-	for i := range removeOpcodeByDataTests {
-		testRemoveOpcodeByData(t, &removeOpcodeByDataTests[i])
+	tests := []struct {
+		name   string
+		before []byte
+		remove []byte
+		err    error
+		after  []byte
+	}{
+		{
+			name:   "nothing to do",
+			before: []byte{txscript.OP_NOP},
+			remove: []byte{1, 2, 3, 4},
+			after:  []byte{txscript.OP_NOP},
+		},
+		{
+			name:   "simple case",
+			before: []byte{txscript.OP_DATA_4, 1, 2, 3, 4},
+			remove: []byte{1, 2, 3, 4},
+			after:  nil,
+		},
+		{
+			name:   "simple case (miss)",
+			before: []byte{txscript.OP_DATA_4, 1, 2, 3, 4},
+			remove: []byte{1, 2, 3, 5},
+			after:  []byte{txscript.OP_DATA_4, 1, 2, 3, 4},
+		},
+		{
+			// padded to keep it canonical.
+			name: "simple case (pushdata1)",
+			before: append(append([]byte{txscript.OP_PUSHDATA1, 76},
+				bytes.Repeat([]byte{0}, 72)...),
+				[]byte{1, 2, 3, 4}...),
+			remove: []byte{1, 2, 3, 4},
+			after:  nil,
+		},
+		{
+			name: "simple case (pushdata1 miss)",
+			before: append(append([]byte{txscript.OP_PUSHDATA1, 76},
+				bytes.Repeat([]byte{0}, 72)...),
+				[]byte{1, 2, 3, 4}...),
+			remove: []byte{1, 2, 3, 5},
+			after: append(append([]byte{txscript.OP_PUSHDATA1, 76},
+				bytes.Repeat([]byte{0}, 72)...),
+				[]byte{1, 2, 3, 4}...),
+		},
+		{
+			name:   "simple case (pushdata1 miss noncanonical)",
+			before: []byte{txscript.OP_PUSHDATA1, 4, 1, 2, 3, 4},
+			remove: []byte{1, 2, 3, 4},
+			after:  []byte{txscript.OP_PUSHDATA1, 4, 1, 2, 3, 4},
+		},
+		{
+			name: "simple case (pushdata2)",
+			before: append(append([]byte{txscript.OP_PUSHDATA2, 0, 1},
+				bytes.Repeat([]byte{0}, 252)...),
+				[]byte{1, 2, 3, 4}...),
+			remove: []byte{1, 2, 3, 4},
+			after:  nil,
+		},
+		{
+			name: "simple case (pushdata2 miss)",
+			before: append(append([]byte{txscript.OP_PUSHDATA2, 0, 1},
+				bytes.Repeat([]byte{0}, 252)...),
+				[]byte{1, 2, 3, 4}...),
+			remove: []byte{1, 2, 3, 4, 5},
+			after: append(append([]byte{txscript.OP_PUSHDATA2, 0, 1},
+				bytes.Repeat([]byte{0}, 252)...),
+				[]byte{1, 2, 3, 4}...),
+		},
+		{
+			name:   "simple case (pushdata2 miss noncanonical)",
+			before: []byte{txscript.OP_PUSHDATA2, 4, 0, 1, 2, 3, 4},
+			remove: []byte{1, 2, 3, 4},
+			after:  []byte{txscript.OP_PUSHDATA2, 4, 0, 1, 2, 3, 4},
+		},
+		{
+			// This is padded to make the push canonical.
+			name: "simple case (pushdata4)",
+			before: append(append([]byte{txscript.OP_PUSHDATA4, 0, 0, 1, 0},
+				bytes.Repeat([]byte{0}, 65532)...),
+				[]byte{1, 2, 3, 4}...),
+			remove: []byte{1, 2, 3, 4},
+			after:  nil,
+		},
+		{
+			name:   "simple case (pushdata4 miss noncanonical)",
+			before: []byte{txscript.OP_PUSHDATA4, 4, 0, 0, 0, 1, 2, 3, 4},
+			remove: []byte{1, 2, 3, 4},
+			after:  []byte{txscript.OP_PUSHDATA4, 4, 0, 0, 0, 1, 2, 3, 4},
+		},
+		{
+			// This is padded to make the push canonical.
+			name: "simple case (pushdata4 miss)",
+			before: append(append([]byte{txscript.OP_PUSHDATA4, 0, 0, 1, 0},
+				bytes.Repeat([]byte{0}, 65532)...), []byte{1, 2, 3, 4}...),
+			remove: []byte{1, 2, 3, 4, 5},
+			after: append(append([]byte{txscript.OP_PUSHDATA4, 0, 0, 1, 0},
+				bytes.Repeat([]byte{0}, 65532)...), []byte{1, 2, 3, 4}...),
+		},
+		{
+			name:   "invalid opcode ",
+			before: []byte{txscript.OP_UNKNOWN187},
+			remove: []byte{1, 2, 3, 4},
+			after:  []byte{txscript.OP_UNKNOWN187},
+		},
+		{
+			name:   "invalid length (instruction)",
+			before: []byte{txscript.OP_PUSHDATA1},
+			remove: []byte{1, 2, 3, 4},
+			err:    txscript.ErrStackShortScript,
+		},
+		{
+			name:   "invalid length (data)",
+			before: []byte{txscript.OP_PUSHDATA1, 255, 254},
+			remove: []byte{1, 2, 3, 4},
+			err:    txscript.ErrStackShortScript,
+		},
+	}
+
+	for _, test := range tests {
+		result, err := txscript.TstRemoveOpcodeByData(test.before,
+			test.remove)
+		if test.err != nil {
+			if err != test.err {
+				t.Errorf("%s: got unexpected error. exp: \"%v\" "+
+					"got: \"%v\"", test.name, test.err, err)
+			}
+			return
+		}
+		if err != nil {
+			t.Errorf("%s: unexpected failure: \"%v\"", test.name, err)
+			return
+		}
+		if !bytes.Equal(test.after, result) {
+			t.Errorf("%s: value does not equal expected: exp: \"%v\""+
+				" got: \"%v\"", test.name, test.after, result)
+		}
 	}
 }
 
-// Tests for the script type logic
-
+// TestIsPayToScriptHash ensures the IsPayToScriptHash function returns the
+// expected results for all the scripts in scriptClassTests.
 func TestIsPayToScriptHash(t *testing.T) {
 	t.Parallel()
 
-	for _, test := range scriptTypeTests {
-		shouldBe := (test.scripttype == txscript.ScriptHashTy)
-		p2sh := txscript.IsPayToScriptHash(test.script)
+	for _, test := range scriptClassTests {
+		script := mustParseShortForm(test.script)
+		shouldBe := (test.class == txscript.ScriptHashTy)
+		p2sh := txscript.IsPayToScriptHash(script)
 		if p2sh != shouldBe {
 			t.Errorf("%s: epxected p2sh %v, got %v", test.name,
 				shouldBe, p2sh)
@@ -1985,50 +422,51 @@ func TestIsPayToScriptHash(t *testing.T) {
 	}
 }
 
+// TestHasCanonicalPushes ensures the canonicalPush function properly determines
+// what is considered a canonical push for the purposes of removeOpcodeByData.
 func TestHasCanonicalPushes(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
 		name     string
-		script   []byte
+		script   string
 		expected bool
 	}{
 		{
 			name: "does not parse",
-			script: []byte{
-				0x04, 0x67, 0x08, 0xaf, 0xdb, 0x0f, 0xe5, 0x54,
-				0x82, 0x71, 0x96, 0x7f, 0x1a, 0x67, 0x13, 0x0b,
-				0x71, 0x05, 0xcd, 0x6a, 0x82, 0x8e, 0x03, 0x90,
-				0x9a, 0x67, 0x96, 0x2e, 0x0e, 0xa1, 0xf6, 0x1d,
-			},
+			script: "0x046708afdb0fe5548271967f1a67130b7105cd6a82" +
+				"8e03909a67962e0ea1f61d",
 			expected: false,
 		},
 		{
 			name:     "non-canonical push",
-			script:   []byte{txscript.OP_PUSHDATA1, 4, 1, 2, 3, 4},
+			script:   "PUSHDATA1 0x04 0x01020304",
 			expected: false,
 		},
 	}
 
 	for i, test := range tests {
-		pops, err := txscript.TstParseScript(test.script)
+		script := mustParseShortForm(test.script)
+		pops, err := txscript.TstParseScript(script)
 		if err != nil {
 			if test.expected {
-				t.Errorf("StandardPushesTests #%d failed to TstParseScript: %v", i, err)
+				t.Errorf("TstParseScript #%d failed: %v", i, err)
 			}
 			continue
 		}
 		for _, pop := range pops {
 			if txscript.TstHasCanonicalPushes(pop) != test.expected {
-				t.Errorf("TstHasCanonicalPushes #%d (%s) wrong result\n"+
-					"got: %v\nwant: %v", i, test.name, true,
-					test.expected)
+				t.Errorf("TstHasCanonicalPushes: #%d (%s) "+
+					"wrong result\ngot: %v\nwant: %v", i,
+					test.name, true, test.expected)
 				break
 			}
 		}
 	}
 }
 
+// TestIsPushOnlyScript ensures the IsPushOnlyScript function returns the
+// expected results.
 func TestIsPushOnlyScript(t *testing.T) {
 	t.Parallel()
 
@@ -2038,66 +476,13 @@ func TestIsPushOnlyScript(t *testing.T) {
 		expected bool
 	}{
 		name: "does not parse",
-		script: []byte{
-			0x04, 0x67, 0x08, 0xaf, 0xdb, 0x0f, 0xe5, 0x54,
-			0x82, 0x71, 0x96, 0x7f, 0x1a, 0x67, 0x13, 0x0b,
-			0x71, 0x05, 0xcd, 0x6a, 0x82, 0x8e, 0x03, 0x90,
-			0x9a, 0x67, 0x96, 0x2e, 0x0e, 0xa1, 0xf6, 0x1d,
-		},
+		script: mustParseShortForm("0x046708afdb0fe5548271967f1a67130" +
+			"b7105cd6a828e03909a67962e0ea1f61d"),
 		expected: false,
 	}
 
 	if txscript.IsPushOnlyScript(test.script) != test.expected {
-		t.Errorf("IsPushOnlyScript (%s) wrong result\n"+
-			"got: %v\nwant: %v", test.name, true,
-			test.expected)
-	}
-}
-
-func TestInvalidFlagCombinations(t *testing.T) {
-	t.Parallel()
-
-	tests := []txscript.ScriptFlags{
-		txscript.ScriptVerifyCleanStack,
-	}
-
-	// tx with almost empty scripts.
-	tx := &wire.MsgTx{
-		Version: 1,
-		TxIn: []*wire.TxIn{
-			{
-				PreviousOutPoint: wire.OutPoint{
-					Hash: wire.ShaHash([32]byte{
-						0xc9, 0x97, 0xa5, 0xe5,
-						0x6e, 0x10, 0x41, 0x02,
-						0xfa, 0x20, 0x9c, 0x6a,
-						0x85, 0x2d, 0xd9, 0x06,
-						0x60, 0xa2, 0x0b, 0x2d,
-						0x9c, 0x35, 0x24, 0x23,
-						0xed, 0xce, 0x25, 0x85,
-						0x7f, 0xcd, 0x37, 0x04,
-					}),
-					Index: 0,
-				},
-				SignatureScript: []uint8{txscript.OP_NOP},
-				Sequence:        4294967295,
-			},
-		},
-		TxOut: []*wire.TxOut{
-			{
-				Value:    1000000000,
-				PkScript: []byte{},
-			},
-		},
-		LockTime: 0,
-	}
-	pkScript := []byte{txscript.OP_NOP}
-
-	for i, test := range tests {
-		_, err := txscript.NewEngine(pkScript, tx, 0, test)
-		if err != txscript.ErrInvalidFlags {
-			t.Fatalf("TestInvalidFlagCombinations #%d unexpected "+
-				"error: %v", i, err)
-		}
+		t.Errorf("IsPushOnlyScript (%s) wrong result\ngot: %v\nwant: "+
+			"%v", test.name, true, test.expected)
 	}
 }

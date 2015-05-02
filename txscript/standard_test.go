@@ -1,6 +1,7 @@
 // Copyright (c) 2013-2015 The btcsuite developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
+
 package txscript_test
 
 import (
@@ -25,6 +26,20 @@ func decodeHex(hexStr string) []byte {
 	}
 
 	return b
+}
+
+// mustParseShortForm parses the passed short form script and returns the
+// resulting bytes.  It panics if an error occurs.  This is only used in the
+// tests as a helper since the only way it can fail is if there is an error in
+// the test source code.
+func mustParseShortForm(script string) []byte {
+	s, err := parseShortForm(script)
+	if err != nil {
+		panic("invalid short form script in test source: err " +
+			err.Error() + ", script: " + script)
+	}
+
+	return s
 }
 
 // newAddressPubKey returns a new btcutil.AddressPubKey from the provided
@@ -71,6 +86,8 @@ func newAddressScriptHash(scriptHash []byte) btcutil.Address {
 // TestExtractPkScriptAddrs ensures that extracting the type, addresses, and
 // number of required signatures from PkScripts works as intended.
 func TestExtractPkScriptAddrs(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name    string
 		script  []byte
@@ -368,103 +385,48 @@ func TestExtractPkScriptAddrs(t *testing.T) {
 	}
 }
 
-type scriptInfoTest struct {
-	name          string
-	sigScript     []byte
-	pkScript      []byte
-	bip16         bool
-	scriptInfo    txscript.ScriptInfo
-	scriptInfoErr error
-}
-
-func TestScriptInfo(t *testing.T) {
+// TestCalcScriptInfo ensures the CalcScriptInfo provides the expected results
+// for various valid and invalid script pairs.
+func TestCalcScriptInfo(t *testing.T) {
 	t.Parallel()
 
-	for _, test := range txTests {
-		si, err := txscript.CalcScriptInfo(
-			test.tx.TxIn[test.idx].SignatureScript,
-			test.pkScript, test.bip16)
-		if err != nil {
-			if err != test.scriptInfoErr {
-				t.Errorf("scriptinfo test \"%s\": got \"%v\""+
-					"expected \"%v\"", test.name, err,
-					test.scriptInfoErr)
-			}
-			continue
-		}
-		if test.scriptInfoErr != nil {
-			t.Errorf("%s: succeeded when expecting \"%v\"",
-				test.name, test.scriptInfoErr)
-			continue
-		}
-		if *si != test.scriptInfo {
-			t.Errorf("%s: scriptinfo doesn't match expected. "+
-				"got: \"%v\" expected \"%v\"", test.name,
-				*si, test.scriptInfo)
-			continue
-		}
-	}
-
-	extraTests := []scriptInfoTest{
+	tests := []struct {
+		name          string
+		sigScript     string
+		pkScript      string
+		bip16         bool
+		scriptInfo    txscript.ScriptInfo
+		scriptInfoErr error
+	}{
 		{
 			// Invented scripts, the hashes do not match
+			// Truncated version of test below:
 			name: "pkscript doesn't parse",
-			sigScript: []byte{txscript.OP_TRUE,
-				txscript.OP_DATA_1, 81,
-				txscript.OP_DATA_8,
-				txscript.OP_2DUP, txscript.OP_EQUAL,
-				txscript.OP_NOT, txscript.OP_VERIFY,
-				txscript.OP_ABS, txscript.OP_SWAP,
-				txscript.OP_ABS, txscript.OP_EQUAL,
-			},
-			// truncated version of test below:
-			pkScript: []byte{txscript.OP_HASH160,
-				txscript.OP_DATA_20,
-				0xfe, 0x44, 0x10, 0x65, 0xb6, 0x53, 0x22, 0x31,
-				0xde, 0x2f, 0xac, 0x56, 0x31, 0x52, 0x20, 0x5e,
-				0xc4, 0xf5, 0x9c,
-			},
+			sigScript: "1 81 DATA_8 2DUP EQUAL NOT VERIFY ABS " +
+				"SWAP ABS EQUAL",
+			pkScript: "HASH160 DATA_20 0xfe441065b6532231de2fac56" +
+				"3152205ec4f59c",
 			bip16:         true,
 			scriptInfoErr: txscript.ErrStackShortScript,
 		},
 		{
 			name: "sigScript doesn't parse",
 			// Truncated version of p2sh script below.
-			sigScript: []byte{txscript.OP_TRUE,
-				txscript.OP_DATA_1, 81,
-				txscript.OP_DATA_8,
-				txscript.OP_2DUP, txscript.OP_EQUAL,
-				txscript.OP_NOT, txscript.OP_VERIFY,
-				txscript.OP_ABS, txscript.OP_SWAP,
-				txscript.OP_ABS,
-			},
-			pkScript: []byte{txscript.OP_HASH160,
-				txscript.OP_DATA_20,
-				0xfe, 0x44, 0x10, 0x65, 0xb6, 0x53, 0x22, 0x31,
-				0xde, 0x2f, 0xac, 0x56, 0x31, 0x52, 0x20, 0x5e,
-				0xc4, 0xf5, 0x9c, 0x74, txscript.OP_EQUAL,
-			},
+			sigScript: "1 81 DATA_8 2DUP EQUAL NOT VERIFY ABS " +
+				"SWAP ABS",
+			pkScript: "HASH160 DATA_20 0xfe441065b6532231de2fac56" +
+				"3152205ec4f59c74 EQUAL",
 			bip16:         true,
 			scriptInfoErr: txscript.ErrStackShortScript,
 		},
 		{
 			// Invented scripts, the hashes do not match
 			name: "p2sh standard script",
-			sigScript: []byte{txscript.OP_TRUE,
-				txscript.OP_DATA_1, 81,
-				txscript.OP_DATA_25,
-				txscript.OP_DUP, txscript.OP_HASH160,
-				txscript.OP_DATA_20, 0x1, 0x2, 0x3, 0x4, 0x5,
-				0x6, 0x7, 0x8, 0x9, 0xa, 0xb, 0xc, 0xd, 0xe,
-				0xf, 0x10, 0x11, 0x12, 0x13, 0x14,
-				txscript.OP_EQUALVERIFY, txscript.OP_CHECKSIG,
-			},
-			pkScript: []byte{txscript.OP_HASH160,
-				txscript.OP_DATA_20,
-				0xfe, 0x44, 0x10, 0x65, 0xb6, 0x53, 0x22, 0x31,
-				0xde, 0x2f, 0xac, 0x56, 0x31, 0x52, 0x20, 0x5e,
-				0xc4, 0xf5, 0x9c, 0x74, txscript.OP_EQUAL,
-			},
+			sigScript: "1 81 DATA_25 DUP HASH160 DATA_20 0x010203" +
+				"0405060708090a0b0c0d0e0f1011121314 EQUALVERIFY " +
+				"CHECKSIG",
+			pkScript: "HASH160 DATA_20 0xfe441065b6532231de2fac56" +
+				"3152205ec4f59c74 EQUAL",
 			bip16: true,
 			scriptInfo: txscript.ScriptInfo{
 				PkScriptClass:  txscript.ScriptHashTy,
@@ -477,20 +439,10 @@ func TestScriptInfo(t *testing.T) {
 			// from 567a53d1ce19ce3d07711885168484439965501536d0d0294c5d46d46c10e53b
 			// from the blockchain.
 			name: "p2sh nonstandard script",
-			sigScript: []byte{txscript.OP_TRUE,
-				txscript.OP_DATA_1, 81,
-				txscript.OP_DATA_8,
-				txscript.OP_2DUP, txscript.OP_EQUAL,
-				txscript.OP_NOT, txscript.OP_VERIFY,
-				txscript.OP_ABS, txscript.OP_SWAP,
-				txscript.OP_ABS, txscript.OP_EQUAL,
-			},
-			pkScript: []byte{txscript.OP_HASH160,
-				txscript.OP_DATA_20,
-				0xfe, 0x44, 0x10, 0x65, 0xb6, 0x53, 0x22, 0x31,
-				0xde, 0x2f, 0xac, 0x56, 0x31, 0x52, 0x20, 0x5e,
-				0xc4, 0xf5, 0x9c, 0x74, txscript.OP_EQUAL,
-			},
+			sigScript: "1 81 DATA_8 2DUP EQUAL NOT VERIFY ABS " +
+				"SWAP ABS EQUAL",
+			pkScript: "HASH160 DATA_20 0xfe441065b6532231de2fac56" +
+				"3152205ec4f59c74 EQUAL",
 			bip16: true,
 			scriptInfo: txscript.ScriptInfo{
 				PkScriptClass:  txscript.ScriptHashTy,
@@ -502,28 +454,15 @@ func TestScriptInfo(t *testing.T) {
 		{
 			// Script is invented, numbers all fake.
 			name: "multisig script",
-			sigScript: []byte{txscript.OP_TRUE,
-				txscript.OP_TRUE, txscript.OP_TRUE,
-				txscript.OP_0, // Extra arg for OP_CHECKMULTISIG bug
-			},
-			pkScript: []byte{
-				txscript.OP_3, txscript.OP_DATA_33,
-				0x1, 0x2, 0x3, 0x4, 0x5, 0x6, 0x7, 0x8, 0x9,
-				0xa, 0xb, 0xc, 0xd, 0xe, 0xf, 0x10, 0x11, 0x12,
-				0x13, 0x14, 0x15, 0x16, 0x17, 0x18, 0x19, 0x1a,
-				0x1b, 0x1c, 0x1d, 0x1e, 0x1f, 0x20, 0x21,
-				txscript.OP_DATA_33,
-				0x1, 0x2, 0x3, 0x4, 0x5, 0x6, 0x7, 0x8, 0x9,
-				0xa, 0xb, 0xc, 0xd, 0xe, 0xf, 0x10, 0x11, 0x12,
-				0x13, 0x14, 0x15, 0x16, 0x17, 0x18, 0x19, 0x1a,
-				0x1b, 0x1c, 0x1d, 0x1e, 0x1f, 0x20, 0x21,
-				txscript.OP_DATA_33,
-				0x1, 0x2, 0x3, 0x4, 0x5, 0x6, 0x7, 0x8, 0x9,
-				0xa, 0xb, 0xc, 0xd, 0xe, 0xf, 0x10, 0x11, 0x12,
-				0x13, 0x14, 0x15, 0x16, 0x17, 0x18, 0x19, 0x1a,
-				0x1b, 0x1c, 0x1d, 0x1e, 0x1f, 0x20, 0x21,
-				txscript.OP_3, txscript.OP_CHECKMULTISIG,
-			},
+			// Extra 0 arg on the end for OP_CHECKMULTISIG bug.
+			sigScript: "1 1 1 0",
+			pkScript: "3 " +
+				"DATA_33 0x0102030405060708090a0b0c0d0e0f1011" +
+				"12131415161718191a1b1c1d1e1f2021 DATA_33 " +
+				"0x0102030405060708090a0b0c0d0e0f101112131415" +
+				"161718191a1b1c1d1e1f2021 DATA_33 0x010203040" +
+				"5060708090a0b0c0d0e0f101112131415161718191a1" +
+				"b1c1d1e1f2021 3 CHECKMULTISIG",
 			bip16: true,
 			scriptInfo: txscript.ScriptInfo{
 				PkScriptClass:  txscript.MultiSigTy,
@@ -534,9 +473,11 @@ func TestScriptInfo(t *testing.T) {
 		},
 	}
 
-	for _, test := range extraTests {
-		si, err := txscript.CalcScriptInfo(test.sigScript,
-			test.pkScript, test.bip16)
+	for _, test := range tests {
+		sigScript := mustParseShortForm(test.sigScript)
+		pkScript := mustParseShortForm(test.pkScript)
+		si, err := txscript.CalcScriptInfo(sigScript, pkScript,
+			test.bip16)
 		if err != nil {
 			if err != test.scriptInfoErr {
 				t.Errorf("scriptinfo test \"%s\": got \"%v\""+
@@ -557,7 +498,6 @@ func TestScriptInfo(t *testing.T) {
 			continue
 		}
 	}
-
 }
 
 // bogusAddress implements the btcutil.Address interface so the tests can ensure
@@ -573,7 +513,7 @@ func (b *bogusAddress) EncodeAddress() string {
 // ScriptAddress simply returns an empty byte slice.  It exists to satsify the
 // btcutil.Address interface.
 func (b *bogusAddress) ScriptAddress() []byte {
-	return []byte{}
+	return nil
 }
 
 // IsForNet lies blatantly to satisfy the btcutil.Address interface.
@@ -587,14 +527,14 @@ func (b *bogusAddress) String() string {
 	return ""
 }
 
+// TestPayToAddrScript ensures the PayToAddrScript function generates the
+// correct scripts for the various types of addresses.
 func TestPayToAddrScript(t *testing.T) {
 	t.Parallel()
 
 	// 1MirQ9bwyQcGVJPwKUgapu5ouK2E2Ey4gX
-	p2pkhMain, err := btcutil.NewAddressPubKeyHash([]byte{
-		0xe3, 0x4c, 0xce, 0x70, 0xc8, 0x63, 0x73, 0x27, 0x3e, 0xfc,
-		0xc5, 0x4c, 0xe7, 0xd2, 0xa4, 0x91, 0xbb, 0x4a, 0x0e, 0x84,
-	}, &chaincfg.MainNetParams)
+	p2pkhMain, err := btcutil.NewAddressPubKeyHash(decodeHex("e34cce70c863"+
+		"73273efcc54ce7d2a491bb4a0e84"), &chaincfg.MainNetParams)
 	if err != nil {
 		t.Errorf("Unable to create public key hash address: %v", err)
 		return
@@ -602,45 +542,35 @@ func TestPayToAddrScript(t *testing.T) {
 
 	// Taken from transaction:
 	// b0539a45de13b3e0403909b8bd1a555b8cbe45fd4e3f3fda76f3a5f52835c29d
-	p2shMain, _ := btcutil.NewAddressScriptHashFromHash([]byte{
-		0xe8, 0xc3, 0x00, 0xc8, 0x79, 0x86, 0xef, 0xa8, 0x4c, 0x37,
-		0xc0, 0x51, 0x99, 0x29, 0x01, 0x9e, 0xf8, 0x6e, 0xb5, 0xb4,
-	}, &chaincfg.MainNetParams)
+	p2shMain, _ := btcutil.NewAddressScriptHashFromHash(decodeHex("e8c300"+
+		"c87986efa84c37c0519929019ef86eb5b4"), &chaincfg.MainNetParams)
 	if err != nil {
 		t.Errorf("Unable to create script hash address: %v", err)
 		return
 	}
 
 	//  mainnet p2pk 13CG6SJ3yHUXo4Cr2RY4THLLJrNFuG3gUg
-	p2pkCompressedMain, err := btcutil.NewAddressPubKey([]byte{
-		0x02, 0x19, 0x2d, 0x74, 0xd0, 0xcb, 0x94, 0x34, 0x4c, 0x95,
-		0x69, 0xc2, 0xe7, 0x79, 0x01, 0x57, 0x3d, 0x8d, 0x79, 0x03,
-		0xc3, 0xeb, 0xec, 0x3a, 0x95, 0x77, 0x24, 0x89, 0x5d, 0xca,
-		0x52, 0xc6, 0xb4}, &chaincfg.MainNetParams)
+	p2pkCompressedMain, err := btcutil.NewAddressPubKey(decodeHex("02192d74"+
+		"d0cb94344c9569c2e77901573d8d7903c3ebec3a957724895dca52c6b4"),
+		&chaincfg.MainNetParams)
 	if err != nil {
 		t.Errorf("Unable to create pubkey address (compressed): %v",
 			err)
 		return
 	}
-	p2pkCompressed2Main, err := btcutil.NewAddressPubKey([]byte{
-		0x03, 0xb0, 0xbd, 0x63, 0x42, 0x34, 0xab, 0xbb, 0x1b, 0xa1,
-		0xe9, 0x86, 0xe8, 0x84, 0x18, 0x5c, 0x61, 0xcf, 0x43, 0xe0,
-		0x01, 0xf9, 0x13, 0x7f, 0x23, 0xc2, 0xc4, 0x09, 0x27, 0x3e,
-		0xb1, 0x6e, 0x65}, &chaincfg.MainNetParams)
+	p2pkCompressed2Main, err := btcutil.NewAddressPubKey(decodeHex("03b0bd"+
+		"634234abbb1ba1e986e884185c61cf43e001f9137f23c2c409273eb16e65"),
+		&chaincfg.MainNetParams)
 	if err != nil {
 		t.Errorf("Unable to create pubkey address (compressed 2): %v",
 			err)
 		return
 	}
 
-	p2pkUncompressedMain, err := btcutil.NewAddressPubKey([]byte{
-		0x04, 0x11, 0xdb, 0x93, 0xe1, 0xdc, 0xdb, 0x8a, 0x01, 0x6b,
-		0x49, 0x84, 0x0f, 0x8c, 0x53, 0xbc, 0x1e, 0xb6, 0x8a, 0x38,
-		0x2e, 0x97, 0xb1, 0x48, 0x2e, 0xca, 0xd7, 0xb1, 0x48, 0xa6,
-		0x90, 0x9a, 0x5c, 0xb2, 0xe0, 0xea, 0xdd, 0xfb, 0x84, 0xcc,
-		0xf9, 0x74, 0x44, 0x64, 0xf8, 0x2e, 0x16, 0x0b, 0xfa, 0x9b,
-		0x8b, 0x64, 0xf9, 0xd4, 0xc0, 0x3f, 0x99, 0x9b, 0x86, 0x43,
-		0xf6, 0x56, 0xb4, 0x12, 0xa3}, &chaincfg.MainNetParams)
+	p2pkUncompressedMain, err := btcutil.NewAddressPubKey(decodeHex("0411db"+
+		"93e1dcdb8a016b49840f8c53bc1eb68a382e97b1482ecad7b148a6909a5cb2"+
+		"e0eaddfb84ccf9744464f82e160bfa9b8b64f9d4c03f999b8643f656b412a3"),
+		&chaincfg.MainNetParams)
 	if err != nil {
 		t.Errorf("Unable to create pubkey address (uncompressed): %v",
 			err)
@@ -649,81 +579,54 @@ func TestPayToAddrScript(t *testing.T) {
 
 	tests := []struct {
 		in       btcutil.Address
-		expected []byte
+		expected string
 		err      error
 	}{
 		// pay-to-pubkey-hash address on mainnet
 		{
 			p2pkhMain,
-			[]byte{
-				0x76, 0xa9, 0x14, 0xe3, 0x4c, 0xce, 0x70, 0xc8,
-				0x63, 0x73, 0x27, 0x3e, 0xfc, 0xc5, 0x4c, 0xe7,
-				0xd2, 0xa4, 0x91, 0xbb, 0x4a, 0x0e, 0x84, 0x88,
-				0xac,
-			},
+			"DUP HASH160 DATA_20 0xe34cce70c86373273efcc54ce7d2a4" +
+				"91bb4a0e8488 CHECKSIG",
 			nil,
 		},
 		// pay-to-script-hash address on mainnet
 		{
 			p2shMain,
-			[]byte{
-				0xa9, 0x14, 0xe8, 0xc3, 0x00, 0xc8, 0x79, 0x86,
-				0xef, 0xa8, 0x4c, 0x37, 0xc0, 0x51, 0x99, 0x29,
-				0x01, 0x9e, 0xf8, 0x6e, 0xb5, 0xb4, 0x87,
-			},
+			"HASH160 DATA_20 0xe8c300c87986efa84c37c0519929019ef8" +
+				"6eb5b4 EQUAL",
 			nil,
 		},
 		// pay-to-pubkey address on mainnet. compressed key.
 		{
 			p2pkCompressedMain,
-			[]byte{
-				txscript.OP_DATA_33,
-				0x02, 0x19, 0x2d, 0x74, 0xd0, 0xcb, 0x94, 0x34,
-				0x4c, 0x95, 0x69, 0xc2, 0xe7, 0x79, 0x01, 0x57,
-				0x3d, 0x8d, 0x79, 0x03, 0xc3, 0xeb, 0xec, 0x3a,
-				0x95, 0x77, 0x24, 0x89, 0x5d, 0xca, 0x52, 0xc6,
-				0xb4, txscript.OP_CHECKSIG,
-			},
+			"DATA_33 0x02192d74d0cb94344c9569c2e77901573d8d7903c3" +
+				"ebec3a957724895dca52c6b4 CHECKSIG",
 			nil,
 		},
 		// pay-to-pubkey address on mainnet. compressed key (other way).
 		{
 			p2pkCompressed2Main,
-			[]byte{
-				txscript.OP_DATA_33,
-				0x03, 0xb0, 0xbd, 0x63, 0x42, 0x34, 0xab, 0xbb,
-				0x1b, 0xa1, 0xe9, 0x86, 0xe8, 0x84, 0x18, 0x5c,
-				0x61, 0xcf, 0x43, 0xe0, 0x01, 0xf9, 0x13, 0x7f,
-				0x23, 0xc2, 0xc4, 0x09, 0x27, 0x3e, 0xb1, 0x6e,
-				0x65, txscript.OP_CHECKSIG,
-			},
+			"DATA_33 0x03b0bd634234abbb1ba1e986e884185c61cf43e001" +
+				"f9137f23c2c409273eb16e65 CHECKSIG",
 			nil,
 		},
 		// pay-to-pubkey address on mainnet. uncompressed key.
 		{
 			p2pkUncompressedMain,
-			[]byte{
-				txscript.OP_DATA_65,
-				0x04, 0x11, 0xdb, 0x93, 0xe1, 0xdc, 0xdb, 0x8a,
-				0x01, 0x6b, 0x49, 0x84, 0x0f, 0x8c, 0x53, 0xbc,
-				0x1e, 0xb6, 0x8a, 0x38, 0x2e, 0x97, 0xb1, 0x48,
-				0x2e, 0xca, 0xd7, 0xb1, 0x48, 0xa6, 0x90, 0x9a,
-				0x5c, 0xb2, 0xe0, 0xea, 0xdd, 0xfb, 0x84, 0xcc,
-				0xf9, 0x74, 0x44, 0x64, 0xf8, 0x2e, 0x16, 0x0b,
-				0xfa, 0x9b, 0x8b, 0x64, 0xf9, 0xd4, 0xc0, 0x3f,
-				0x99, 0x9b, 0x86, 0x43, 0xf6, 0x56, 0xb4, 0x12,
-				0xa3, txscript.OP_CHECKSIG,
-			},
+			"DATA_65 0x0411db93e1dcdb8a016b49840f8c53bc1eb68a382e" +
+				"97b1482ecad7b148a6909a5cb2e0eaddfb84ccf97444" +
+				"64f82e160bfa9b8b64f9d4c03f999b8643f656b412a3 " +
+				"CHECKSIG",
 			nil,
 		},
 
 		// Supported address types with nil pointers.
-		{(*btcutil.AddressPubKeyHash)(nil), []byte{}, txscript.ErrUnsupportedAddress},
-		{(*btcutil.AddressScriptHash)(nil), []byte{}, txscript.ErrUnsupportedAddress},
-		{(*btcutil.AddressPubKey)(nil), []byte{}, txscript.ErrUnsupportedAddress},
+		{(*btcutil.AddressPubKeyHash)(nil), "", txscript.ErrUnsupportedAddress},
+		{(*btcutil.AddressScriptHash)(nil), "", txscript.ErrUnsupportedAddress},
+		{(*btcutil.AddressPubKey)(nil), "", txscript.ErrUnsupportedAddress},
 
 		// Unsupported address type.
-		{&bogusAddress{}, []byte{}, txscript.ErrUnsupportedAddress},
+		{&bogusAddress{}, "", txscript.ErrUnsupportedAddress},
 	}
 
 	t.Logf("Running %d tests", len(tests))
@@ -735,47 +638,42 @@ func TestPayToAddrScript(t *testing.T) {
 			continue
 		}
 
-		if !bytes.Equal(pkScript, test.expected) {
+		expected := mustParseShortForm(test.expected)
+		if !bytes.Equal(pkScript, expected) {
 			t.Errorf("PayToAddrScript #%d got: %x\nwant: %x",
-				i, pkScript, test.expected)
+				i, pkScript, expected)
 			continue
 		}
 	}
 }
 
+// TestMultiSigScript ensures the MultiSigScript function returns the expected
+// scripts and errors.
 func TestMultiSigScript(t *testing.T) {
 	t.Parallel()
 
 	//  mainnet p2pk 13CG6SJ3yHUXo4Cr2RY4THLLJrNFuG3gUg
-	p2pkCompressedMain, err := btcutil.NewAddressPubKey([]byte{
-		0x02, 0x19, 0x2d, 0x74, 0xd0, 0xcb, 0x94, 0x34, 0x4c, 0x95,
-		0x69, 0xc2, 0xe7, 0x79, 0x01, 0x57, 0x3d, 0x8d, 0x79, 0x03,
-		0xc3, 0xeb, 0xec, 0x3a, 0x95, 0x77, 0x24, 0x89, 0x5d, 0xca,
-		0x52, 0xc6, 0xb4}, &chaincfg.MainNetParams)
+	p2pkCompressedMain, err := btcutil.NewAddressPubKey(decodeHex("02192d7"+
+		"4d0cb94344c9569c2e77901573d8d7903c3ebec3a957724895dca52c6b4"),
+		&chaincfg.MainNetParams)
 	if err != nil {
 		t.Errorf("Unable to create pubkey address (compressed): %v",
 			err)
 		return
 	}
-	p2pkCompressed2Main, err := btcutil.NewAddressPubKey([]byte{
-		0x03, 0xb0, 0xbd, 0x63, 0x42, 0x34, 0xab, 0xbb, 0x1b, 0xa1,
-		0xe9, 0x86, 0xe8, 0x84, 0x18, 0x5c, 0x61, 0xcf, 0x43, 0xe0,
-		0x01, 0xf9, 0x13, 0x7f, 0x23, 0xc2, 0xc4, 0x09, 0x27, 0x3e,
-		0xb1, 0x6e, 0x65}, &chaincfg.MainNetParams)
+	p2pkCompressed2Main, err := btcutil.NewAddressPubKey(decodeHex("03b0bd"+
+		"634234abbb1ba1e986e884185c61cf43e001f9137f23c2c409273eb16e65"),
+		&chaincfg.MainNetParams)
 	if err != nil {
 		t.Errorf("Unable to create pubkey address (compressed 2): %v",
 			err)
 		return
 	}
 
-	p2pkUncompressedMain, err := btcutil.NewAddressPubKey([]byte{
-		0x04, 0x11, 0xdb, 0x93, 0xe1, 0xdc, 0xdb, 0x8a, 0x01, 0x6b,
-		0x49, 0x84, 0x0f, 0x8c, 0x53, 0xbc, 0x1e, 0xb6, 0x8a, 0x38,
-		0x2e, 0x97, 0xb1, 0x48, 0x2e, 0xca, 0xd7, 0xb1, 0x48, 0xa6,
-		0x90, 0x9a, 0x5c, 0xb2, 0xe0, 0xea, 0xdd, 0xfb, 0x84, 0xcc,
-		0xf9, 0x74, 0x44, 0x64, 0xf8, 0x2e, 0x16, 0x0b, 0xfa, 0x9b,
-		0x8b, 0x64, 0xf9, 0xd4, 0xc0, 0x3f, 0x99, 0x9b, 0x86, 0x43,
-		0xf6, 0x56, 0xb4, 0x12, 0xa3}, &chaincfg.MainNetParams)
+	p2pkUncompressedMain, err := btcutil.NewAddressPubKey(decodeHex("0411d"+
+		"b93e1dcdb8a016b49840f8c53bc1eb68a382e97b1482ecad7b148a6909a5c"+
+		"b2e0eaddfb84ccf9744464f82e160bfa9b8b64f9d4c03f999b8643f656b41"+
+		"2a3"), &chaincfg.MainNetParams)
 	if err != nil {
 		t.Errorf("Unable to create pubkey address (uncompressed): %v",
 			err)
@@ -785,7 +683,7 @@ func TestMultiSigScript(t *testing.T) {
 	tests := []struct {
 		keys      []*btcutil.AddressPubKey
 		nrequired int
-		expected  []byte
+		expected  string
 		err       error
 	}{
 		{
@@ -794,22 +692,10 @@ func TestMultiSigScript(t *testing.T) {
 				p2pkCompressed2Main,
 			},
 			1,
-			[]byte{
-				txscript.OP_1,
-				txscript.OP_DATA_33,
-				0x02, 0x19, 0x2d, 0x74, 0xd0, 0xcb, 0x94, 0x34,
-				0x4c, 0x95, 0x69, 0xc2, 0xe7, 0x79, 0x01, 0x57,
-				0x3d, 0x8d, 0x79, 0x03, 0xc3, 0xeb, 0xec, 0x3a,
-				0x95, 0x77, 0x24, 0x89, 0x5d, 0xca, 0x52, 0xc6,
-				0xb4,
-				txscript.OP_DATA_33,
-				0x03, 0xb0, 0xbd, 0x63, 0x42, 0x34, 0xab, 0xbb,
-				0x1b, 0xa1, 0xe9, 0x86, 0xe8, 0x84, 0x18, 0x5c,
-				0x61, 0xcf, 0x43, 0xe0, 0x01, 0xf9, 0x13, 0x7f,
-				0x23, 0xc2, 0xc4, 0x09, 0x27, 0x3e, 0xb1, 0x6e,
-				0x65,
-				txscript.OP_2, txscript.OP_CHECKMULTISIG,
-			},
+			"1 DATA_33 0x02192d74d0cb94344c9569c2e77901573d8d7903c" +
+				"3ebec3a957724895dca52c6b4 DATA_33 0x03b0bd634" +
+				"234abbb1ba1e986e884185c61cf43e001f9137f23c2c4" +
+				"09273eb16e65 2 CHECKMULTISIG",
 			nil,
 		},
 		{
@@ -818,22 +704,10 @@ func TestMultiSigScript(t *testing.T) {
 				p2pkCompressed2Main,
 			},
 			2,
-			[]byte{
-				txscript.OP_2,
-				txscript.OP_DATA_33,
-				0x02, 0x19, 0x2d, 0x74, 0xd0, 0xcb, 0x94, 0x34,
-				0x4c, 0x95, 0x69, 0xc2, 0xe7, 0x79, 0x01, 0x57,
-				0x3d, 0x8d, 0x79, 0x03, 0xc3, 0xeb, 0xec, 0x3a,
-				0x95, 0x77, 0x24, 0x89, 0x5d, 0xca, 0x52, 0xc6,
-				0xb4,
-				txscript.OP_DATA_33,
-				0x03, 0xb0, 0xbd, 0x63, 0x42, 0x34, 0xab, 0xbb,
-				0x1b, 0xa1, 0xe9, 0x86, 0xe8, 0x84, 0x18, 0x5c,
-				0x61, 0xcf, 0x43, 0xe0, 0x01, 0xf9, 0x13, 0x7f,
-				0x23, 0xc2, 0xc4, 0x09, 0x27, 0x3e, 0xb1, 0x6e,
-				0x65,
-				txscript.OP_2, txscript.OP_CHECKMULTISIG,
-			},
+			"2 DATA_33 0x02192d74d0cb94344c9569c2e77901573d8d7903c" +
+				"3ebec3a957724895dca52c6b4 DATA_33 0x03b0bd634" +
+				"234abbb1ba1e986e884185c61cf43e001f9137f23c2c4" +
+				"09273eb16e65 2 CHECKMULTISIG",
 			nil,
 		},
 		{
@@ -842,7 +716,7 @@ func TestMultiSigScript(t *testing.T) {
 				p2pkCompressed2Main,
 			},
 			3,
-			[]byte{},
+			"",
 			txscript.ErrBadNumRequired,
 		},
 		{
@@ -850,19 +724,10 @@ func TestMultiSigScript(t *testing.T) {
 				p2pkUncompressedMain,
 			},
 			1,
-			[]byte{
-				txscript.OP_1, txscript.OP_DATA_65,
-				0x04, 0x11, 0xdb, 0x93, 0xe1, 0xdc, 0xdb, 0x8a,
-				0x01, 0x6b, 0x49, 0x84, 0x0f, 0x8c, 0x53, 0xbc,
-				0x1e, 0xb6, 0x8a, 0x38, 0x2e, 0x97, 0xb1, 0x48,
-				0x2e, 0xca, 0xd7, 0xb1, 0x48, 0xa6, 0x90, 0x9a,
-				0x5c, 0xb2, 0xe0, 0xea, 0xdd, 0xfb, 0x84, 0xcc,
-				0xf9, 0x74, 0x44, 0x64, 0xf8, 0x2e, 0x16, 0x0b,
-				0xfa, 0x9b, 0x8b, 0x64, 0xf9, 0xd4, 0xc0, 0x3f,
-				0x99, 0x9b, 0x86, 0x43, 0xf6, 0x56, 0xb4, 0x12,
-				0xa3,
-				txscript.OP_1, txscript.OP_CHECKMULTISIG,
-			},
+			"1 DATA_65 0x0411db93e1dcdb8a016b49840f8c53bc1eb68a382" +
+				"e97b1482ecad7b148a6909a5cb2e0eaddfb84ccf97444" +
+				"64f82e160bfa9b8b64f9d4c03f999b8643f656b412a3 " +
+				"1 CHECKMULTISIG",
 			nil,
 		},
 		{
@@ -870,7 +735,7 @@ func TestMultiSigScript(t *testing.T) {
 				p2pkUncompressedMain,
 			},
 			2,
-			[]byte{},
+			"",
 			txscript.ErrBadNumRequired,
 		},
 	}
@@ -885,379 +750,253 @@ func TestMultiSigScript(t *testing.T) {
 			continue
 		}
 
-		if !bytes.Equal(script, test.expected) {
+		expected := mustParseShortForm(test.expected)
+		if !bytes.Equal(script, expected) {
 			t.Errorf("MultiSigScript #%d got: %x\nwant: %x",
-				i, script, test.expected)
+				i, script, expected)
 			continue
 		}
 	}
 }
 
+// TestCalcMultiSigStats ensures the CalcMutliSigStats function returns the
+// expected errors.
 func TestCalcMultiSigStats(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name     string
-		script   []byte
-		expected error
+		name   string
+		script string
+		err    error
 	}{
 		{
 			name: "short script",
-			script: []byte{
-				0x04, 0x67, 0x08, 0xaf, 0xdb, 0x0f, 0xe5, 0x54,
-				0x82, 0x71, 0x96, 0x7f, 0x1a, 0x67, 0x13, 0x0b,
-				0x71, 0x05, 0xcd, 0x6a, 0x82, 0x8e, 0x03, 0x90,
-				0x9a, 0x67, 0x96, 0x2e, 0x0e, 0xa1, 0xf6, 0x1d,
-			},
-			expected: txscript.ErrStackShortScript,
+			script: "0x046708afdb0fe5548271967f1a67130b7105cd6a828" +
+				"e03909a67962e0ea1f61d",
+			err: txscript.ErrStackShortScript,
 		},
 		{
 			name: "stack underflow",
-			script: []byte{
-				txscript.OP_RETURN,
-				txscript.OP_PUSHDATA1,
-				0x29,
-				0x04, 0x67, 0x08, 0xaf, 0xdb, 0x0f, 0xe5, 0x54,
-				0x82, 0x71, 0x96, 0x7f, 0x1a, 0x67, 0x13, 0x0b,
-				0x71, 0x05, 0xcd, 0x6a, 0x82, 0x8e, 0x03, 0x90,
-				0x9a, 0x67, 0x96, 0x2e, 0x0e, 0xa1, 0xf6, 0x1d,
-				0xeb, 0x64, 0x9f, 0x6b, 0xc3, 0xf4, 0xce, 0xf3,
-				0x08,
-			},
-			expected: txscript.ErrStackUnderflow,
+			script: "RETURN DATA_41 0x046708afdb0fe5548271967f1a" +
+				"67130b7105cd6a828e03909a67962e0ea1f61deb649f6" +
+				"bc3f4cef308",
+			err: txscript.ErrStackUnderflow,
 		},
 		{
 			name: "multisig script",
-			script: []uint8{
-				txscript.OP_FALSE,
-				txscript.OP_DATA_72,
-				0x30, 0x45, 0x02, 0x20, 0x10,
-				0x6a, 0x3e, 0x4e, 0xf0, 0xb5,
-				0x1b, 0x76, 0x4a, 0x28, 0x87,
-				0x22, 0x62, 0xff, 0xef, 0x55,
-				0x84, 0x65, 0x14, 0xda, 0xcb,
-				0xdc, 0xbb, 0xdd, 0x65, 0x2c,
-				0x84, 0x9d, 0x39, 0x5b, 0x43,
-				0x84, 0x02, 0x21, 0x00, 0xe0,
-				0x3a, 0xe5, 0x54, 0xc3, 0xcb,
-				0xb4, 0x06, 0x00, 0xd3, 0x1d,
-				0xd4, 0x6f, 0xc3, 0x3f, 0x25,
-				0xe4, 0x7b, 0xf8, 0x52, 0x5b,
-				0x1f, 0xe0, 0x72, 0x82, 0xe3,
-				0xb6, 0xec, 0xb5, 0xf3, 0xbb,
-				0x28, 0x01,
-				txscript.OP_CODESEPARATOR,
-				txscript.OP_TRUE,
-				txscript.OP_DATA_33,
-				0x02, 0x32, 0xab, 0xdc, 0x89,
-				0x3e, 0x7f, 0x06, 0x31, 0x36,
-				0x4d, 0x7f, 0xd0, 0x1c, 0xb3,
-				0x3d, 0x24, 0xda, 0x45, 0x32,
-				0x9a, 0x00, 0x35, 0x7b, 0x3a,
-				0x78, 0x86, 0x21, 0x1a, 0xb4,
-				0x14, 0xd5, 0x5a,
-				txscript.OP_TRUE,
-				txscript.OP_CHECKMULTISIG,
-			},
-			expected: nil,
+			script: "0 DATA_72 0x30450220106a3e4ef0b51b764a2887226" +
+				"2ffef55846514dacbdcbbdd652c849d395b4384022100" +
+				"e03ae554c3cbb40600d31dd46fc33f25e47bf8525b1fe" +
+				"07282e3b6ecb5f3bb2801 CODESEPARATOR 1 DATA_33 " +
+				"0x0232abdc893e7f0631364d7fd01cb33d24da45329a0" +
+				"0357b3a7886211ab414d55a 1 CHECKMULTISIG",
+			err: nil,
 		},
 	}
 
 	for i, test := range tests {
-		if _, _, err := txscript.CalcMultiSigStats(test.script); err != test.expected {
-			t.Errorf("CalcMultiSigStats #%d (%s) wrong result\n"+
-				"got: %v\nwant: %v", i, test.name, err,
-				test.expected)
+		script := mustParseShortForm(test.script)
+		if _, _, err := txscript.CalcMultiSigStats(script); err != test.err {
+			t.Errorf("CalcMultiSigStats #%d (%s) unexpected "+
+				"error\ngot: %v\nwant: %v", i, test.name, err,
+				test.err)
 		}
 	}
 }
 
-type scriptTypeTest struct {
-	name       string
-	script     []byte
-	scripttype txscript.ScriptClass
+// scriptClassTest houses a test used to ensure various scripts have the
+// expected class.
+type scriptClassTest struct {
+	name   string
+	script string
+	class  txscript.ScriptClass
 }
 
-var scriptTypeTests = []scriptTypeTest{
-	// tx 0437cd7f8525ceed2324359c2d0ba26006d92d85.
+// scriptClassTests houses several test scripts used to ensure various class
+// determination is working as expected.  It's defined as a test global versus
+// inside a function scope since this spans both the standard tests and the
+// consensus tests (pay-to-script-hash is part of consensus).
+var scriptClassTests = []scriptClassTest{
 	{
 		name: "Pay Pubkey",
-		script: []byte{
-			txscript.OP_DATA_65,
-			0x04, 0x11, 0xdb, 0x93, 0xe1, 0xdc, 0xdb, 0x8a, 0x01,
-			0x6b, 0x49, 0x84, 0x0f, 0x8c, 0x53, 0xbc, 0x1e, 0xb6,
-			0x8a, 0x38, 0x2e, 0x97, 0xb1, 0x48, 0x2e, 0xca, 0xd7,
-			0xb1, 0x48, 0xa6, 0x90, 0x9a, 0x5c, 0xb2, 0xe0, 0xea,
-			0xdd, 0xfb, 0x84, 0xcc, 0xf9, 0x74, 0x44, 0x64, 0xf8,
-			0x2e, 0x16, 0x0b, 0xfa, 0x9b, 0x8b, 0x64, 0xf9, 0xd4,
-			0xc0, 0x3f, 0x99, 0x9b, 0x86, 0x43, 0xf6, 0x56, 0xb4,
-			0x12, 0xa3,
-			txscript.OP_CHECKSIG,
-		},
-		scripttype: txscript.PubKeyTy,
+		script: "DATA_65 0x0411db93e1dcdb8a016b49840f8c53bc1eb68a382e" +
+			"97b1482ecad7b148a6909a5cb2e0eaddfb84ccf9744464f82e16" +
+			"0bfa9b8b64f9d4c03f999b8643f656b412a3 CHECKSIG",
+		class: txscript.PubKeyTy,
 	},
 	// tx 599e47a8114fe098103663029548811d2651991b62397e057f0c863c2bc9f9ea
 	{
 		name: "Pay PubkeyHash",
-		script: []byte{
-			txscript.OP_DUP,
-			txscript.OP_HASH160,
-			txscript.OP_DATA_20,
-			0x66, 0x0d, 0x4e, 0xf3, 0xa7, 0x43, 0xe3, 0xe6, 0x96,
-			0xad, 0x99, 0x03, 0x64, 0xe5, 0x55, 0xc2, 0x71, 0xad,
-			0x50, 0x4b,
-			txscript.OP_EQUALVERIFY,
-			txscript.OP_CHECKSIG,
-		},
-		scripttype: txscript.PubKeyHashTy,
+		script: "DUP HASH160 DATA_20 0x660d4ef3a743e3e696ad990364e555" +
+			"c271ad504b EQUALVERIFY CHECKSIG",
+		class: txscript.PubKeyHashTy,
 	},
 	// part of tx 6d36bc17e947ce00bb6f12f8e7a56a1585c5a36188ffa2b05e10b4743273a74b
-	// codeseparator parts have been elided. (bitcoind's checks for multisig
-	// type doesn't have codesep etc either.
+	// codeseparator parts have been elided. (bitcoin core's checks for
+	// multisig type doesn't have codesep either).
 	{
 		name: "multisig",
-		script: []byte{
-			txscript.OP_TRUE,
-			txscript.OP_DATA_33,
-			0x02, 0x32, 0xab, 0xdc, 0x89, 0x3e, 0x7f, 0x06, 0x31,
-			0x36, 0x4d, 0x7f, 0xd0, 0x1c, 0xb3, 0x3d, 0x24, 0xda,
-			0x45, 0x32, 0x9a, 0x00, 0x35, 0x7b, 0x3a, 0x78, 0x86,
-			0x21, 0x1a, 0xb4, 0x14, 0xd5, 0x5a,
-			txscript.OP_TRUE,
-			txscript.OP_CHECKMULTISIG,
-		},
-		scripttype: txscript.MultiSigTy,
+		script: "1 DATA_33 0x0232abdc893e7f0631364d7fd01cb33d24da4" +
+			"5329a00357b3a7886211ab414d55a 1 CHECKMULTISIG",
+		class: txscript.MultiSigTy,
 	},
 	// tx e5779b9e78f9650debc2893fd9636d827b26b4ddfa6a8172fe8708c924f5c39d
-	// P2SH
 	{
 		name: "P2SH",
-		script: []byte{
-			txscript.OP_HASH160,
-			txscript.OP_DATA_20,
-			0x43, 0x3e, 0xc2, 0xac, 0x1f, 0xfa, 0x1b, 0x7b, 0x7d,
-			0x02, 0x7f, 0x56, 0x45, 0x29, 0xc5, 0x71, 0x97, 0xf9,
-			0xae, 0x88,
-			txscript.OP_EQUAL,
-		},
-		scripttype: txscript.ScriptHashTy,
+		script: "HASH160 DATA_20 0x433ec2ac1ffa1b7b7d027f564529c57197f" +
+			"9ae88 EQUAL",
+		class: txscript.ScriptHashTy,
 	},
-	// Nulldata with no data at all.
 	{
-		name: "nulldata",
-		script: []byte{
-			txscript.OP_RETURN,
-		},
-		scripttype: txscript.NullDataTy,
+		// Nulldata with no data at all.
+		name:   "nulldata",
+		script: "RETURN",
+		class:  txscript.NullDataTy,
 	},
-	// Nulldata with small data.
 	{
-		name: "nulldata2",
-		script: []byte{
-			txscript.OP_RETURN,
-			txscript.OP_DATA_8,
-			0x04, 0x67, 0x08, 0xaf, 0xdb, 0x0f, 0xe5, 0x54,
-		},
-		scripttype: txscript.NullDataTy,
+		// Nulldata with small data.
+		name:   "nulldata2",
+		script: "RETURN DATA_8 0x046708afdb0fe554",
+		class:  txscript.NullDataTy,
 	},
-	// Nulldata with max allowed data.
 	{
+		// Nulldata with max allowed data.
 		name: "nulldata3",
-		script: []byte{
-			txscript.OP_RETURN,
-			txscript.OP_PUSHDATA1,
-			0x50, // 80
-			0x04, 0x67, 0x08, 0xaf, 0xdb, 0x0f, 0xe5, 0x54,
-			0x82, 0x71, 0x96, 0x7f, 0x1a, 0x67, 0x13, 0x0b,
-			0x71, 0x05, 0xcd, 0x6a, 0x82, 0x8e, 0x03, 0x90,
-			0x9a, 0x67, 0x96, 0x2e, 0x0e, 0xa1, 0xf6, 0x1d,
-			0xeb, 0x64, 0x9f, 0x6b, 0xc3, 0xf4, 0xce, 0xf3,
-			0x04, 0x67, 0x08, 0xaf, 0xdb, 0x0f, 0xe5, 0x54,
-			0x82, 0x71, 0x96, 0x7f, 0x1a, 0x67, 0x13, 0x0b,
-			0x71, 0x05, 0xcd, 0x6a, 0x82, 0x8e, 0x03, 0x90,
-			0x9a, 0x67, 0x96, 0x2e, 0x0e, 0xa1, 0xf6, 0x1d,
-			0xeb, 0x64, 0x9f, 0x6b, 0xc3, 0xf4, 0xce, 0xf3,
-		},
-		scripttype: txscript.NullDataTy,
+		script: "RETURN PUSHDATA1 0x50 0x046708afdb0fe5548271967f1a67" +
+			"130b7105cd6a828e03909a67962e0ea1f61deb649f6bc3f4cef3" +
+			"046708afdb0fe5548271967f1a67130b7105cd6a828e03909a67" +
+			"962e0ea1f61deb649f6bc3f4cef3",
+		class: txscript.NullDataTy,
 	},
-	// Nulldata with more than max allowed data (so therefore nonstandard)
 	{
+		// Nulldata with more than max allowed data (so therefore
+		// nonstandard)
 		name: "nulldata4",
-		script: []byte{
-			txscript.OP_RETURN,
-			txscript.OP_PUSHDATA1,
-			0x51, // 81
-			0x04, 0x67, 0x08, 0xaf, 0xdb, 0x0f, 0xe5, 0x54,
-			0x82, 0x71, 0x96, 0x7f, 0x1a, 0x67, 0x13, 0x0b,
-			0x71, 0x05, 0xcd, 0x6a, 0x82, 0x8e, 0x03, 0x90,
-			0x9a, 0x67, 0x96, 0x2e, 0x0e, 0xa1, 0xf6, 0x1d,
-			0xeb, 0x64, 0x9f, 0x6b, 0xc3, 0xf4, 0xce, 0xf3,
-			0x04, 0x67, 0x08, 0xaf, 0xdb, 0x0f, 0xe5, 0x54,
-			0x82, 0x71, 0x96, 0x7f, 0x1a, 0x67, 0x13, 0x0b,
-			0x71, 0x05, 0xcd, 0x6a, 0x82, 0x8e, 0x03, 0x90,
-			0x9a, 0x67, 0x96, 0x2e, 0x0e, 0xa1, 0xf6, 0x1d,
-			0xeb, 0x64, 0x9f, 0x6b, 0xc3, 0xf4, 0xce, 0xf3,
-			0x08,
-		},
-		scripttype: txscript.NonStandardTy,
+		script: "RETURN PUSHDATA1 0x51 0x046708afdb0fe5548271967f1a67" +
+			"130b7105cd6a828e03909a67962e0ea1f61deb649f6bc3f4cef3" +
+			"046708afdb0fe5548271967f1a67130b7105cd6a828e03909a67" +
+			"962e0ea1f61deb649f6bc3f4cef308",
+		class: txscript.NonStandardTy,
 	},
-	// Almost nulldata, but add an additional opcode after the data to make
-	// it nonstandard.
 	{
-		name: "nulldata5",
-		script: []byte{
-			txscript.OP_RETURN,
-			txscript.OP_DATA_1,
-			0x04,
-			txscript.OP_TRUE,
-		},
-		scripttype: txscript.NonStandardTy,
-	}, // The next few are almost multisig (it is the more complex script type)
+		// Almost nulldata, but add an additional opcode after the data
+		// to make it nonstandard.
+		name:   "nulldata5",
+		script: "RETURN 4 TRUE",
+		class:  txscript.NonStandardTy,
+	},
+
+	// The next few are almost multisig (it is the more complex script type)
 	// but with various changes to make it fail.
 	{
-		// multisig but funny nsigs..
+		// Multisig but invalid nsigs.
 		name: "strange 1",
-		script: []byte{
-			txscript.OP_DUP,
-			txscript.OP_DATA_33,
-			0x02, 0x32, 0xab, 0xdc, 0x89, 0x3e, 0x7f, 0x06, 0x31,
-			0x36, 0x4d, 0x7f, 0xd0, 0x1c, 0xb3, 0x3d, 0x24, 0xda,
-			0x45, 0x32, 0x9a, 0x00, 0x35, 0x7b, 0x3a, 0x78, 0x86,
-			0x21, 0x1a, 0xb4, 0x14, 0xd5, 0x5a,
-			txscript.OP_TRUE,
-			txscript.OP_CHECKMULTISIG,
-		},
-		scripttype: txscript.NonStandardTy,
+		script: "DUP DATA_33 0x0232abdc893e7f0631364d7fd01cb33d24da45" +
+			"329a00357b3a7886211ab414d55a 1 CHECKMULTISIG",
+		class: txscript.NonStandardTy,
 	},
 	{
-		name: "strange 2",
-		// multisig but funny pubkey.
-		script: []byte{
-			txscript.OP_TRUE,
-			txscript.OP_TRUE,
-			txscript.OP_TRUE,
-			txscript.OP_CHECKMULTISIG,
-		},
-		scripttype: txscript.NonStandardTy,
+		// Multisig but invalid pubkey.
+		name:   "strange 2",
+		script: "1 1 1 CHECKMULTISIG",
+		class:  txscript.NonStandardTy,
 	},
 	{
+		// Multisig but no matching npubkeys opcode.
 		name: "strange 3",
-		// multisig but no matching npubkeys opcode.
-		script: []byte{
-			txscript.OP_TRUE,
-			txscript.OP_DATA_33,
-			0x02, 0x32, 0xab, 0xdc, 0x89, 0x3e, 0x7f, 0x06, 0x31,
-			0x36, 0x4d, 0x7f, 0xd0, 0x1c, 0xb3, 0x3d, 0x24, 0xda,
-			0x45, 0x32, 0x9a, 0x00, 0x35, 0x7b, 0x3a, 0x78, 0x86,
-			0x21, 0x1a, 0xb4, 0x14, 0xd5, 0x5a,
-			txscript.OP_DATA_33,
-			0x02, 0x32, 0xab, 0xdc, 0x89, 0x3e, 0x7f, 0x06, 0x31,
-			0x36, 0x4d, 0x7f, 0xd0, 0x1c, 0xb3, 0x3d, 0x24, 0xda,
-			0x45, 0x32, 0x9a, 0x00, 0x35, 0x7b, 0x3a, 0x78, 0x86,
-			0x21, 0x1a, 0xb4, 0x14, 0xd5, 0x5a,
-			// No number.
-			txscript.OP_CHECKMULTISIG,
-		},
-		scripttype: txscript.NonStandardTy,
+		script: "1 DATA_33 0x0232abdc893e7f0631364d7fd01cb33d24da4532" +
+			"9a00357b3a7886211ab414d55a DATA_33 0x0232abdc893e7f0" +
+			"631364d7fd01cb33d24da45329a00357b3a7886211ab414d55a " +
+			"CHECKMULTISIG",
+		class: txscript.NonStandardTy,
 	},
 	{
+		// Multisig but with multisigverify.
 		name: "strange 4",
-		// multisig but with multisigverify
-		script: []byte{
-			txscript.OP_TRUE,
-			txscript.OP_DATA_33,
-			0x02, 0x32, 0xab, 0xdc, 0x89, 0x3e, 0x7f, 0x06, 0x31,
-			0x36, 0x4d, 0x7f, 0xd0, 0x1c, 0xb3, 0x3d, 0x24, 0xda,
-			0x45, 0x32, 0x9a, 0x00, 0x35, 0x7b, 0x3a, 0x78, 0x86,
-			0x21, 0x1a, 0xb4, 0x14, 0xd5, 0x5a,
-			txscript.OP_TRUE,
-			txscript.OP_CHECKMULTISIGVERIFY,
-		},
-		scripttype: txscript.NonStandardTy,
+		script: "1 DATA_33 0x0232abdc893e7f0631364d7fd01cb33d24da4532" +
+			"9a00357b3a7886211ab414d55a 1 CHECKMULTISIGVERIFY",
+		class: txscript.NonStandardTy,
 	},
 	{
-		name: "strange 5",
-		// multisig but wrong length.
-		script: []byte{
-			txscript.OP_TRUE,
-			txscript.OP_CHECKMULTISIG,
-		},
-		scripttype: txscript.NonStandardTy,
+		// Multisig but wrong length.
+		name:   "strange 5",
+		script: "1 CHECKMULTISIG",
+		class:  txscript.NonStandardTy,
 	},
 	{
-		name: "doesn't parse",
-		script: []byte{
-			txscript.OP_DATA_5, 0x1, 0x2, 0x3, 0x4,
-		},
-		scripttype: txscript.NonStandardTy,
+		name:   "doesn't parse",
+		script: "DATA_5 0x01020304",
+		class:  txscript.NonStandardTy,
 	},
 }
 
-func testScriptType(t *testing.T, test *scriptTypeTest) {
-	scripttype := txscript.GetScriptClass(test.script)
-	if scripttype != test.scripttype {
-		t.Errorf("%s: expected %s got %s", test.name, test.scripttype,
-			scripttype)
-	}
-}
-
-func TestScriptTypes(t *testing.T) {
+// TestScriptClass ensures all the scripts in scriptClassTests have the expected
+// class.
+func TestScriptClass(t *testing.T) {
 	t.Parallel()
 
-	for i := range scriptTypeTests {
-		testScriptType(t, &scriptTypeTests[i])
+	for _, test := range scriptClassTests {
+		script := mustParseShortForm(test.script)
+		class := txscript.GetScriptClass(script)
+		if class != test.class {
+			t.Errorf("%s: expected %s got %s", test.name,
+				test.class, class)
+			return
+		}
 	}
 }
 
+// TestStringifyClass ensures the script class string returns the expected
+// string for each script class.
 func TestStringifyClass(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name        string
-		scriptclass txscript.ScriptClass
-		stringed    string
+		name     string
+		class    txscript.ScriptClass
+		stringed string
 	}{
 		{
-			name:        "nonstandardty",
-			scriptclass: txscript.NonStandardTy,
-			stringed:    "nonstandard",
+			name:     "nonstandardty",
+			class:    txscript.NonStandardTy,
+			stringed: "nonstandard",
 		},
 		{
-			name:        "pubkey",
-			scriptclass: txscript.PubKeyTy,
-			stringed:    "pubkey",
+			name:     "pubkey",
+			class:    txscript.PubKeyTy,
+			stringed: "pubkey",
 		},
 		{
-			name:        "pubkeyhash",
-			scriptclass: txscript.PubKeyHashTy,
-			stringed:    "pubkeyhash",
+			name:     "pubkeyhash",
+			class:    txscript.PubKeyHashTy,
+			stringed: "pubkeyhash",
 		},
 		{
-			name:        "scripthash",
-			scriptclass: txscript.ScriptHashTy,
-			stringed:    "scripthash",
+			name:     "scripthash",
+			class:    txscript.ScriptHashTy,
+			stringed: "scripthash",
 		},
 		{
-			name:        "multisigty",
-			scriptclass: txscript.MultiSigTy,
-			stringed:    "multisig",
+			name:     "multisigty",
+			class:    txscript.MultiSigTy,
+			stringed: "multisig",
 		},
 		{
-			name:        "nulldataty",
-			scriptclass: txscript.NullDataTy,
-			stringed:    "nulldata",
+			name:     "nulldataty",
+			class:    txscript.NullDataTy,
+			stringed: "nulldata",
 		},
 		{
-			name:        "broken",
-			scriptclass: txscript.ScriptClass(255),
-			stringed:    "Invalid",
+			name:     "broken",
+			class:    txscript.ScriptClass(255),
+			stringed: "Invalid",
 		},
 	}
 
 	for _, test := range tests {
-		typeString := test.scriptclass.String()
+		typeString := test.class.String()
 		if typeString != test.stringed {
-			t.Errorf("%s: got \"%s\" expected \"%s\"", test.name,
+			t.Errorf("%s: got %#q, want %#q", test.name,
 				typeString, test.stringed)
 		}
 	}
