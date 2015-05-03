@@ -1084,14 +1084,14 @@ func opcode2Swap(op *parsedOpcode, vm *Engine) error {
 // Stack transformation (x1==0): [... x1] -> [...]
 // Stack transformation (x1!=0): [... x1] -> [... x1]
 func opcodeIfDup(op *parsedOpcode, vm *Engine) error {
-	val, err := vm.dstack.PeekInt(0)
+	so, err := vm.dstack.PeekByteArray(0)
 	if err != nil {
 		return err
 	}
 
 	// Push copy of data iff it isn't zero
-	if val != 0 {
-		vm.dstack.PushInt(val)
+	if asBool(so) {
+		vm.dstack.PushByteArray(so)
 	}
 
 	return nil
