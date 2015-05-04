@@ -23,7 +23,7 @@ type GetBlockVerboseResult struct {
 	Bits          string        `json:"bits"`
 	Difficulty    float64       `json:"difficulty"`
 	PreviousHash  string        `json:"previousblockhash"`
-	NextHash      string        `json:"nextblockhash"`
+	NextHash      string        `json:"nextblockhash,omitempty"`
 }
 
 // CreateMultiSigResult models the data returned from the createmultisig

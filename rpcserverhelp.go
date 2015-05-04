@@ -163,7 +163,7 @@ var helpDescsEnUS = map[string]string{
 	"getblockverboseresult-bits":              "The bits which represent the block difficulty",
 	"getblockverboseresult-difficulty":        "The proof-of-work difficulty as a multiple of the minimum difficulty",
 	"getblockverboseresult-previousblockhash": "The hash of the previous block",
-	"getblockverboseresult-nextblockhash":     "The hash of the next block",
+	"getblockverboseresult-nextblockhash":     "The hash of the next block (only if there is one)",
 
 	// GetBlockCountCmd help.
 	"getblockcount--synopsis": "Returns the number of blocks in the longest block chain.",
