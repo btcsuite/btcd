@@ -911,7 +911,7 @@ func getDifficultyRatio(bits uint32) float64 {
 	target := blockchain.CompactToBig(bits)
 
 	difficulty := new(big.Rat).SetFrac(max, target)
-	outString := difficulty.FloatString(2)
+	outString := difficulty.FloatString(8)
 	diff, err := strconv.ParseFloat(outString, 64)
 	if err != nil {
 		rpcsLog.Errorf("Cannot get difficulty: %v", err)
