@@ -81,7 +81,8 @@ Application Options:
       --limitfreerelay=    Limit relay of transactions with no transaction fee
                            to the given amount in thousands of bytes per minute
                            (15)
-
+      --maxorphantx=       Max number of orphan transactions to keep in memory
+                           (1000)
       --generate=          Generate (mine) bitcoins using the CPU
       --miningaddr=        Add the specified payment address to the list of
                            addresses to use for generated blocks -- At least

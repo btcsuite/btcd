@@ -26,10 +26,8 @@ const (
 	mempoolHeight = 0x7fffffff
 
 	// maxOrphanTransactions is the maximum number of orphan transactions
-	// that can be queued.  At the time this comment was written, this
-	// equates to 10,000 transactions, but will increase if the max allowed
-	// block payload increases.
-	maxOrphanTransactions = wire.MaxBlockPayload / 100
+	// that can be queued.
+	maxOrphanTransactions = 1000
 
 	// maxOrphanTxSize is the maximum size allowed for orphan transactions.
 	// This helps prevent memory exhaustion attacks from sending a lot of
@@ -438,7 +436,7 @@ func (mp *txMemPool) RemoveOrphan(txHash *wire.ShaHash) {
 //
 // This function MUST be called with the mempool lock held (for writes).
 func (mp *txMemPool) limitNumOrphans() error {
-	if len(mp.orphans)+1 > maxOrphanTransactions {
+	if len(mp.orphans)+1 > cfg.MaxOrphanTxs && cfg.MaxOrphanTxs > 0 {
 		// Generate a cryptographically random hash.
 		randHashBytes := make([]byte, wire.HashSize)
 		_, err := rand.Read(randHashBytes)
@@ -503,8 +501,8 @@ func (mp *txMemPool) maybeAddOrphan(tx *btcutil.Tx) error {
 	//
 	// Note that the number of orphan transactions in the orphan pool is
 	// also limited, so this equates to a maximum memory used of
-	// maxOrphanTxSize * maxOrphanTransactions (which is 500MB as of the
-	// time this comment was written).
+	// maxOrphanTxSize * cfg.MaxOrphanTxs (which is ~5MB using the default
+	// values at the time this comment was written).
 	serializedLen := tx.MsgTx().SerializeSize()
 	if serializedLen > maxOrphanTxSize {
 		str := fmt.Sprintf("orphan transaction size of %d bytes is "+

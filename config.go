@@ -106,6 +106,7 @@ type config struct {
 	Upnp               bool          `long:"upnp" description:"Use UPnP to map our listening port outside of NAT"`
 	FreeTxRelayLimit   float64       `long:"limitfreerelay" description:"Limit relay of transactions with no transaction fee to the given amount in thousands of bytes per minute"`
 	NoRelayPriority    bool          `long:"norelaypriority" description:"Do not require free or low-fee transactions to have high priority for relaying"`
+	MaxOrphanTxs       int           `long:"maxorphantx" description:"Max number of orphan transactions to keep in memory"`
 	Generate           bool          `long:"generate" description:"Generate (mine) bitcoins using the CPU"`
 	MiningAddrs        []string      `long:"miningaddr" description:"Add the specified payment address to the list of addresses to use for generated blocks -- At least one address is required if the generate option is set"`
 	BlockMinSize       uint32        `long:"blockminsize" description:"Mininum block size in bytes to be used when creating a block"`
@@ -319,6 +320,7 @@ func loadConfig() (*config, []string, error) {
 		BlockMinSize:      defaultBlockMinSize,
 		BlockMaxSize:      defaultBlockMaxSize,
 		BlockPrioritySize: defaultBlockPrioritySize,
+		MaxOrphanTxs:      maxOrphanTransactions,
 		Generate:          defaultGenerate,
 		AddrIndex:         defaultAddrIndex,
 	}
@@ -595,6 +597,16 @@ func loadConfig() (*config, []string, error) {
 			"and %d -- parsed [%d]"
 		err := fmt.Errorf(str, funcName, blockMaxSizeMin,
 			blockMaxSizeMax, cfg.BlockMaxSize)
+		fmt.Fprintln(os.Stderr, err)
+		fmt.Fprintln(os.Stderr, usageMessage)
+		return nil, nil, err
+	}
+
+	// Limit the max orphan count to a sane vlue.
+	if cfg.MaxOrphanTxs < 0 {
+		str := "%s: The maxorphantx option may not be less than 0 " +
+			"-- parsed [%d]"
+		err := fmt.Errorf(str, funcName, cfg.MaxOrphanTxs)
 		fmt.Fprintln(os.Stderr, err)
 		fmt.Fprintln(os.Stderr, usageMessage)
 		return nil, nil, err
