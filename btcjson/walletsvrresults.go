@@ -5,12 +5,18 @@
 package btcjson
 
 // GetTransactionDetailsResult models the details data from the gettransaction command.
+//
+// This models the "short" version of the ListTransactionsResult type, which
+// excludes fields common to the transaction.  These common fields are instead
+// part of the GetTransactionResult.
 type GetTransactionDetailsResult struct {
-	Account  string  `json:"account"`
-	Address  string  `json:"address,omitempty"`
-	Category string  `json:"category"`
-	Amount   float64 `json:"amount"`
-	Fee      float64 `json:"fee,omitempty"`
+	Account           string   `json:"account"`
+	Address           string   `json:"address,omitempty"`
+	Amount            float64  `json:"amount"`
+	Category          string   `json:"category"`
+	InvolvesWatchOnly bool     `json:"involveswatchonly,omitempty"`
+	Fee               *float64 `json:"fee,omitempty"`
+	Vout              uint32   `json:"vout"`
 }
 
 // GetTransactionResult models the data from the gettransaction command.
@@ -52,22 +58,24 @@ type InfoWalletResult struct {
 
 // ListTransactionsResult models the data from the listtransactions command.
 type ListTransactionsResult struct {
-	Account         string   `json:"account"`
-	Address         string   `json:"address,omitempty"`
-	Category        string   `json:"category"`
-	Amount          float64  `json:"amount"`
-	Fee             float64  `json:"fee"`
-	Confirmations   int64    `json:"confirmations"`
-	Generated       bool     `json:"generated,omitempty"`
-	BlockHash       string   `json:"blockhash,omitempty"`
-	BlockIndex      int64    `json:"blockindex,omitempty"`
-	BlockTime       int64    `json:"blocktime,omitempty"`
-	TxID            string   `json:"txid"`
-	WalletConflicts []string `json:"walletconflicts"`
-	Time            int64    `json:"time"`
-	TimeReceived    int64    `json:"timereceived"`
-	Comment         string   `json:"comment,omitempty"`
-	OtherAccount    string   `json:"otheraccount"`
+	Account           string   `json:"account"`
+	Address           string   `json:"address,omitempty"`
+	Amount            float64  `json:"amount"`
+	BlockHash         string   `json:"blockhash,omitempty"`
+	BlockIndex        *int64   `json:"blockindex,omitempty"`
+	BlockTime         int64    `json:"blocktime,omitempty"`
+	Category          string   `json:"category"`
+	Confirmations     int64    `json:"confirmations"`
+	Fee               *float64 `json:"fee,omitempty"`
+	Generated         bool     `json:"generated,omitempty"`
+	InvolvesWatchOnly bool     `json:"involveswatchonly,omitempty"`
+	Time              int64    `json:"time"`
+	TimeReceived      int64    `json:"timereceived"`
+	TxID              string   `json:"txid"`
+	Vout              uint32   `json:"vout"`
+	WalletConflicts   []string `json:"walletconflicts"`
+	Comment           string   `json:"comment,omitempty"`
+	OtherAccount      string   `json:"otheraccount,omitempty"`
 }
 
 // ListReceivedByAccountResult models the data from the listreceivedbyaccount
