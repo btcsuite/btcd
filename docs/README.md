@@ -108,8 +108,8 @@ rpcpass=SomeDecentp4ssw0rd
 OR
 ```
 [Application Options]
-rpcuser=mylimituser
-rpcpass=Limitedp4ssw0rd
+rpclimituser=mylimituser
+rpclimitpass=Limitedp4ssw0rd
 ```
 For a list of available options, run: `$ btcctl --help`
 
