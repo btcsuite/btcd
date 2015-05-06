@@ -841,7 +841,7 @@ func opcodeInvalid(op *parsedOpcode, vm *Engine) error {
 // that 0, when encoded as a number according to the numeric encoding consensus
 // rules, is an empty array.
 func opcodeFalse(op *parsedOpcode, vm *Engine) error {
-	vm.dstack.PushByteArray([]byte(""))
+	vm.dstack.PushByteArray(nil)
 	return nil
 }
 
@@ -1784,7 +1784,7 @@ func opcodeCheckSig(op *parsedOpcode, vm *Engine) error {
 		return err
 	}
 
-	sigBytes, err := vm.dstack.PopByteArray()
+	fullSigBytes, err := vm.dstack.PopByteArray()
 	if err != nil {
 		return err
 	}
@@ -1792,7 +1792,7 @@ func opcodeCheckSig(op *parsedOpcode, vm *Engine) error {
 	// The signature actually needs needs to be longer than this, but at
 	// least 1 byte is needed for the hash type below.  The full length is
 	// checked depending on the script flags and upon parsing the signature.
-	if len(sigBytes) < 1 {
+	if len(fullSigBytes) < 1 {
 		vm.dstack.PushBool(false)
 		return nil
 	}
@@ -1809,8 +1809,8 @@ func opcodeCheckSig(op *parsedOpcode, vm *Engine) error {
 	// the data stack.  This is required because the more general script
 	// validation consensus rules do not have the new strict encoding
 	// requirements enabled by the flags.
-	hashType := SigHashType(sigBytes[len(sigBytes)-1])
-	sigBytes = sigBytes[:len(sigBytes)-1]
+	hashType := SigHashType(fullSigBytes[len(fullSigBytes)-1])
+	sigBytes := fullSigBytes[:len(fullSigBytes)-1]
 	if err := vm.checkHashTypeEncoding(hashType); err != nil {
 		return err
 	}
@@ -1826,7 +1826,7 @@ func opcodeCheckSig(op *parsedOpcode, vm *Engine) error {
 
 	// Remove the signature since there is no way for a signature to sign
 	// itself.
-	subScript = removeOpcodeByData(subScript, sigBytes)
+	subScript = removeOpcodeByData(subScript, fullSigBytes)
 
 	// Generate the signature hash based on the signature hash type.
 	hash := calcSignatureHash(subScript, hashType, &vm.tx, vm.txIdx)

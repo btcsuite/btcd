@@ -10,6 +10,10 @@ import "encoding/hex"
 func asBool(t []byte) bool {
 	for i := range t {
 		if t[i] != 0 {
+			// Negative 0 is also considered false.
+			if i == len(t)-1 && t[i] == 0x80 {
+				return false
+			}
 			return true
 		}
 	}
@@ -21,7 +25,7 @@ func fromBool(v bool) []byte {
 	if v {
 		return []byte{1}
 	}
-	return []byte{0}
+	return nil
 }
 
 // stack represents a stack of immutable objects to be used with bitcoin
@@ -334,6 +338,9 @@ func (s *stack) RollN(n int32) error {
 func (s *stack) String() string {
 	var result string
 	for _, stack := range s.stk {
+		if len(stack) == 0 {
+			result += "00000000  <empty>\n"
+		}
 		result += hex.Dump(stack)
 	}
 

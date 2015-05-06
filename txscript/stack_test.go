@@ -125,7 +125,7 @@ func TestStack(t *testing.T) {
 		},
 		{
 			"pop bool",
-			[][]byte{{0}},
+			[][]byte{nil},
 			func(s *stack) error {
 				val, err := s.PopBool()
 				if err != nil {
@@ -475,7 +475,7 @@ func TestStack(t *testing.T) {
 				return nil
 			},
 			nil,
-			[][]byte{{0}},
+			[][]byte{nil},
 		},
 		{
 			"PushBool PopBool",
@@ -867,7 +867,7 @@ func TestStack(t *testing.T) {
 		},
 		{
 			"Peek bool 2",
-			[][]byte{{0}},
+			[][]byte{nil},
 			func(s *stack) error {
 				// Peek bool is otherwise pretty well tested,
 				// just check it works.
@@ -881,7 +881,7 @@ func TestStack(t *testing.T) {
 				return nil
 			},
 			nil,
-			[][]byte{{0}},
+			[][]byte{nil},
 		},
 		{
 			"Peek int",
