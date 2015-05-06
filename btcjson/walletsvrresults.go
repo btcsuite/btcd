@@ -115,11 +115,22 @@ type ListUnspentResult struct {
 	Confirmations int64   `json:"confirmations"`
 }
 
+// SignRawTransactionError models the data that contains script verification
+// errors from the signrawtransaction request.
+type SignRawTransactionError struct {
+	TxID      string `json:"txid"`
+	Vout      uint32 `json:"vout"`
+	ScriptSig string `json:"hex"`
+	Sequence  uint32 `json:"sequence"`
+	Error     string `json:"error"`
+}
+
 // SignRawTransactionResult models the data from the signrawtransaction
 // command.
 type SignRawTransactionResult struct {
-	Hex      string `json:"hex"`
-	Complete bool   `json:"complete"`
+	Hex      string                     `json:"hex"`
+	Complete bool                       `json:"complete"`
+	Errors   []SignRawTransactionResult `json:"errors,omitempty"`
 }
 
 // ValidateAddressWalletResult models the data returned by the wallet server
