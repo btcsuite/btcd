@@ -120,7 +120,7 @@ type ListUnspentResult struct {
 type SignRawTransactionError struct {
 	TxID      string `json:"txid"`
 	Vout      uint32 `json:"vout"`
-	ScriptSig string `json:"hex"`
+	ScriptSig string `json:"scriptSig"`
 	Sequence  uint32 `json:"sequence"`
 	Error     string `json:"error"`
 }
