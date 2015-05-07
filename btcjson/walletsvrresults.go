@@ -130,7 +130,7 @@ type SignRawTransactionError struct {
 type SignRawTransactionResult struct {
 	Hex      string                     `json:"hex"`
 	Complete bool                       `json:"complete"`
-	Errors   []SignRawTransactionResult `json:"errors,omitempty"`
+	Errors   []SignRawTransactionError `json:"errors,omitempty"`
 }
 
 // ValidateAddressWalletResult models the data returned by the wallet server
