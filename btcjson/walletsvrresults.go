@@ -128,8 +128,8 @@ type SignRawTransactionError struct {
 // SignRawTransactionResult models the data from the signrawtransaction
 // command.
 type SignRawTransactionResult struct {
-	Hex      string                     `json:"hex"`
-	Complete bool                       `json:"complete"`
+	Hex      string                    `json:"hex"`
+	Complete bool                      `json:"complete"`
 	Errors   []SignRawTransactionError `json:"errors,omitempty"`
 }
 
