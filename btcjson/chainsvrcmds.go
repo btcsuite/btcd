@@ -434,6 +434,24 @@ func NewGetTxOutCmd(txHash string, vout uint32, includeMempool *bool) *GetTxOutC
 	}
 }
 
+// GetTxOutProofCmd defines the gettxoutproof JSON-RPC command.
+type GetTxOutProofCmd struct {
+	TxIDs     []string
+	BlockHash *string
+}
+
+// NewGetTxOutProofCmd returns a new instance which can be used to issue a
+// gettxoutproof JSON-RPC command.
+//
+// The parameters which are pointers indicate they are optional.  Passing nil
+// for optional parameters will use the default value.
+func NewGetTxOutProofCmd(txIDs []string, blockHash *string) *GetTxOutProofCmd {
+	return &GetTxOutProofCmd{
+		TxIDs:     txIDs,
+		BlockHash: blockHash,
+	}
+}
+
 // GetTxOutSetInfoCmd defines the gettxoutsetinfo JSON-RPC command.
 type GetTxOutSetInfoCmd struct{}
 
@@ -650,6 +668,19 @@ func NewVerifyMessageCmd(address, signature, message string) *VerifyMessageCmd {
 	}
 }
 
+// VerifyTxOutProofCmd defines the verifytxoutproof JSON-RPC command.
+type VerifyTxOutProofCmd struct {
+	Proof string
+}
+
+// NewVerifyTxOutProofCmd returns a new instance which can be used to issue a
+// verifytxoutproof JSON-RPC command.
+func NewVerifyTxOutProofCmd(proof string) *VerifyTxOutProofCmd {
+	return &VerifyTxOutProofCmd{
+		Proof: proof,
+	}
+}
+
 func init() {
 	// No special flags for commands in this file.
 	flags := UsageFlag(0)
@@ -680,6 +711,7 @@ func init() {
 	MustRegisterCmd("getrawmempool", (*GetRawMempoolCmd)(nil), flags)
 	MustRegisterCmd("getrawtransaction", (*GetRawTransactionCmd)(nil), flags)
 	MustRegisterCmd("gettxout", (*GetTxOutCmd)(nil), flags)
+	MustRegisterCmd("gettxoutproof", (*GetTxOutProofCmd)(nil), flags)
 	MustRegisterCmd("gettxoutsetinfo", (*GetTxOutSetInfoCmd)(nil), flags)
 	MustRegisterCmd("getwork", (*GetWorkCmd)(nil), flags)
 	MustRegisterCmd("help", (*HelpCmd)(nil), flags)
@@ -694,4 +726,5 @@ func init() {
 	MustRegisterCmd("validateaddress", (*ValidateAddressCmd)(nil), flags)
 	MustRegisterCmd("verifychain", (*VerifyChainCmd)(nil), flags)
 	MustRegisterCmd("verifymessage", (*VerifyMessageCmd)(nil), flags)
+	MustRegisterCmd("verifytxoutproof", (*VerifyTxOutProofCmd)(nil), flags)
 }

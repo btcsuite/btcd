@@ -530,6 +530,36 @@ func TestChainSvrCmds(t *testing.T) {
 			},
 		},
 		{
+			name: "gettxoutproof",
+			newCmd: func() (interface{}, error) {
+				return btcjson.NewCmd("gettxoutproof", []string{"123", "456"})
+			},
+			staticCmd: func() interface{} {
+				return btcjson.NewGetTxOutProofCmd([]string{"123", "456"}, nil)
+			},
+			marshalled: `{"jsonrpc":"1.0","method":"gettxoutproof","params":[["123","456"]],"id":1}`,
+			unmarshalled: &btcjson.GetTxOutProofCmd{
+				TxIDs: []string{"123", "456"},
+			},
+		},
+		{
+			name: "gettxoutproof optional",
+			newCmd: func() (interface{}, error) {
+				return btcjson.NewCmd("gettxoutproof", []string{"123", "456"},
+					btcjson.String("000000000000034a7dedef4a161fa058a2d67a173a90155f3a2fe6fc132e0ebf"))
+			},
+			staticCmd: func() interface{} {
+				return btcjson.NewGetTxOutProofCmd([]string{"123", "456"},
+					btcjson.String("000000000000034a7dedef4a161fa058a2d67a173a90155f3a2fe6fc132e0ebf"))
+			},
+			marshalled: `{"jsonrpc":"1.0","method":"gettxoutproof","params":[["123","456"],` +
+				`"000000000000034a7dedef4a161fa058a2d67a173a90155f3a2fe6fc132e0ebf"],"id":1}`,
+			unmarshalled: &btcjson.GetTxOutProofCmd{
+				TxIDs:     []string{"123", "456"},
+				BlockHash: btcjson.String("000000000000034a7dedef4a161fa058a2d67a173a90155f3a2fe6fc132e0ebf"),
+			},
+		},
+		{
 			name: "gettxoutsetinfo",
 			newCmd: func() (interface{}, error) {
 				return btcjson.NewCmd("gettxoutsetinfo")
@@ -864,6 +894,19 @@ func TestChainSvrCmds(t *testing.T) {
 				Address:   "1Address",
 				Signature: "301234",
 				Message:   "test",
+			},
+		},
+		{
+			name: "verifytxoutproof",
+			newCmd: func() (interface{}, error) {
+				return btcjson.NewCmd("verifytxoutproof", "test")
+			},
+			staticCmd: func() interface{} {
+				return btcjson.NewVerifyTxOutProofCmd("test")
+			},
+			marshalled: `{"jsonrpc":"1.0","method":"verifytxoutproof","params":["test"],"id":1}`,
+			unmarshalled: &btcjson.VerifyTxOutProofCmd{
+				Proof: "test",
 			},
 		},
 	}
