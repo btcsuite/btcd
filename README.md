@@ -89,11 +89,11 @@ Launch btcd from your Start menu.
 $ ./btcd
 ````
 
-## IRC server
+## IRC
 
-- irc.conformal.com:6697
-- ssl required
+- irc.freenode.net
 - channel #btcd
+- [webchat](https://webchat.freenode.net/?channels=btcd)
 
 ## Mailing lists
 

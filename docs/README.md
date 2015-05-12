@@ -178,7 +178,7 @@ information.
 
 <a name="ContactIRC" />
 **4.1 IRC**<br />
-* [irc.conformal.com](irc://irc.conformal.com:+6697), port 6697, tls, channel #btcd
+* [irc.freenode.net](irc://irc.freenode.net), channel #btcd
 
 <a name="MailingLists" />
 **4.2 Mailing Lists**<br />
