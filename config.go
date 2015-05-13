@@ -19,10 +19,10 @@ import (
 	"github.com/btcsuite/btcd/database"
 	_ "github.com/btcsuite/btcd/database/ldb"
 	_ "github.com/btcsuite/btcd/database/memdb"
+	"github.com/btcsuite/btcd/socks5"
 	"github.com/btcsuite/btcd/wire"
 	"github.com/btcsuite/btcutil"
 	flags "github.com/btcsuite/go-flags"
-	"github.com/btcsuite/go-socks/socks"
 )
 
 const (
@@ -91,6 +91,7 @@ type config struct {
 	Proxy              string        `long:"proxy" description:"Connect via SOCKS5 proxy (eg. 127.0.0.1:9050)"`
 	ProxyUser          string        `long:"proxyuser" description:"Username for proxy server"`
 	ProxyPass          string        `long:"proxypass" default-mask:"-" description:"Password for proxy server"`
+	ProxyRandomize     bool          `long:"proxyrandomize" description:"Randomize user credentials for each proxy connection. This enables Tor stream isolation"`
 	OnionProxy         string        `long:"onion" description:"Connect to tor hidden services via SOCKS5 proxy (eg. 127.0.0.1:9050)"`
 	OnionProxyUser     string        `long:"onionuser" description:"Username for onion proxy server"`
 	OnionProxyPass     string        `long:"onionpass" default-mask:"-" description:"Password for onion proxy server"`
@@ -726,11 +727,13 @@ func loadConfig() (*config, []string, error) {
 	cfg.dial = net.Dial
 	cfg.lookup = net.LookupIP
 	if cfg.Proxy != "" {
-		proxy := &socks.Proxy{
-			Addr:     cfg.Proxy,
-			Username: cfg.ProxyUser,
-			Password: cfg.ProxyPass,
+		proxy, err := socks5.New(cfg.Proxy, cfg.ProxyUser,
+			cfg.ProxyPass)
+		if err != nil {
+			return nil, nil, err
 		}
+		proxy.SetRandomized(cfg.ProxyRandomize)
+
 		cfg.dial = proxy.Dial
 		if !cfg.NoOnion {
 			cfg.lookup = func(host string) ([]net.IP, error) {
@@ -748,14 +751,14 @@ func loadConfig() (*config, []string, error) {
 	// This allows .onion address traffic to be routed through a different
 	// proxy than normal traffic.
 	if cfg.OnionProxy != "" {
-		cfg.oniondial = func(a, b string) (net.Conn, error) {
-			proxy := &socks.Proxy{
-				Addr:     cfg.OnionProxy,
-				Username: cfg.OnionProxyUser,
-				Password: cfg.OnionProxyPass,
-			}
-			return proxy.Dial(a, b)
+		onionProxy, err := socks5.New(cfg.OnionProxy,
+			cfg.OnionProxyUser, cfg.OnionProxyPass)
+		if err != nil {
+			return nil, nil, err
 		}
+		onionProxy.SetRandomized(cfg.ProxyRandomize)
+
+		cfg.oniondial = onionProxy.Dial
 		cfg.onionlookup = func(host string) ([]net.IP, error) {
 			return torLookupIP(host, cfg.OnionProxy)
 		}

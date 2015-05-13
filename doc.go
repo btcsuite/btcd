@@ -58,6 +58,7 @@ Application Options:
       --proxy=             Connect via SOCKS5 proxy (eg. 127.0.0.1:9050)
       --proxyuser=         Username for proxy server
       --proxypass=         Password for proxy server
+      --proxyrandomize     Randomize user credentials for each proxy connection. This enables Tor stream isolation
       --onion=             Connect to tor hidden services via SOCKS5 proxy (eg.
                            127.0.0.1:9050)
       --onionuser=         Username for onion proxy server
