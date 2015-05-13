@@ -95,6 +95,7 @@ type config struct {
 	OnionProxyUser     string        `long:"onionuser" description:"Username for onion proxy server"`
 	OnionProxyPass     string        `long:"onionpass" default-mask:"-" description:"Password for onion proxy server"`
 	NoOnion            bool          `long:"noonion" description:"Disable connecting to tor hidden services"`
+	TorIsolation       bool          `long:"torisolation" description:"Enable Tor stream isolation by randomizing user credentials for each connection."`
 	TestNet3           bool          `long:"testnet" description:"Use the test network"`
 	RegressionTest     bool          `long:"regtest" description:"Use the regression test network"`
 	SimNet             bool          `long:"simnet" description:"Use the simulation test network"`
@@ -717,6 +718,16 @@ func loadConfig() (*config, []string, error) {
 	cfg.ConnectPeers = normalizeAddresses(cfg.ConnectPeers,
 		activeNetParams.DefaultPort)
 
+	// Tor stream isolation requires either proxy or onion proxy to be set.
+	if cfg.TorIsolation && cfg.Proxy == "" && cfg.OnionProxy == "" {
+		str := "%s: Tor stream isolation requires either proxy or " +
+			"onionproxy to be set"
+		err := fmt.Errorf(str, funcName)
+		fmt.Fprintln(os.Stderr, err)
+		fmt.Fprintln(os.Stderr, usageMessage)
+		return nil, nil, err
+	}
+
 	// Setup dial and DNS resolution (lookup) functions depending on the
 	// specified options.  The default is to use the standard net.Dial
 	// function as well as the system DNS resolver.  When a proxy is
@@ -726,10 +737,26 @@ func loadConfig() (*config, []string, error) {
 	cfg.dial = net.Dial
 	cfg.lookup = net.LookupIP
 	if cfg.Proxy != "" {
+		_, _, err := net.SplitHostPort(cfg.Proxy)
+		if err != nil {
+			str := "%s: Proxy address '%s' is invalid: %v"
+			err := fmt.Errorf(str, funcName, cfg.Proxy, err)
+			fmt.Fprintln(os.Stderr, err)
+			fmt.Fprintln(os.Stderr, usageMessage)
+			return nil, nil, err
+		}
+
+		if cfg.TorIsolation &&
+			(cfg.ProxyUser != "" || cfg.ProxyPass != "") {
+			btcdLog.Warn("Tor isolation set -- overriding " +
+				"specified proxy user credentials")
+		}
+
 		proxy := &socks.Proxy{
-			Addr:     cfg.Proxy,
-			Username: cfg.ProxyUser,
-			Password: cfg.ProxyPass,
+			Addr:         cfg.Proxy,
+			Username:     cfg.ProxyUser,
+			Password:     cfg.ProxyPass,
+			TorIsolation: cfg.TorIsolation,
 		}
 		cfg.dial = proxy.Dial
 		if !cfg.NoOnion {
@@ -748,11 +775,27 @@ func loadConfig() (*config, []string, error) {
 	// This allows .onion address traffic to be routed through a different
 	// proxy than normal traffic.
 	if cfg.OnionProxy != "" {
+		_, _, err := net.SplitHostPort(cfg.OnionProxy)
+		if err != nil {
+			str := "%s: Onion proxy address '%s' is invalid: %v"
+			err := fmt.Errorf(str, funcName, cfg.OnionProxy, err)
+			fmt.Fprintln(os.Stderr, err)
+			fmt.Fprintln(os.Stderr, usageMessage)
+			return nil, nil, err
+		}
+
+		if cfg.TorIsolation &&
+			(cfg.OnionProxyUser != "" || cfg.OnionProxyPass != "") {
+			btcdLog.Warn("Tor isolation set -- overriding " +
+				"specified onionproxy user credentials ")
+		}
+
 		cfg.oniondial = func(a, b string) (net.Conn, error) {
 			proxy := &socks.Proxy{
-				Addr:     cfg.OnionProxy,
-				Username: cfg.OnionProxyUser,
-				Password: cfg.OnionProxyPass,
+				Addr:         cfg.OnionProxy,
+				Username:     cfg.OnionProxyUser,
+				Password:     cfg.OnionProxyPass,
+				TorIsolation: cfg.TorIsolation,
 			}
 			return proxy.Dial(a, b)
 		}

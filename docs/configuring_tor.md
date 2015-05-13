@@ -12,16 +12,21 @@
 4.1 [Description](#BridgeDescription)<br />
 4.2 [Command Line Example](#BridgeCLIExample)<br />
 4.3 [Config File Example](#BridgeConfigFileExample)<br />
+5. [Tor Stream Isolation](#TorStreamIsolation)<br />
+5.1 [Description](#TorStreamIsolationDescription)<br />
+5.2 [Command Line Example](#TorStreamIsolationCLIExample)<br />
+5.3 [Config File Example](#TorStreamIsolationFileExample)<br />
 
 <a name="Overview" />
 ### 1. Overview
 
 btcd provides full support for anonymous networking via the
 [Tor Project](https://www.torproject.org/), including [client-only](#Client)
-and [hidden service](#HiddenService) configurations.  In addition, btcd supports
-a hybrid, [bridge mode](#Bridge) which is not anonymous, but allows it to
-operate as a bridge between regular nodes and hidden service nodes without
-routing the regular connections through Tor.
+and [hidden service](#HiddenService) configurations along with
+[stream isolation](#TorStreamIsolation).  In addition, btcd supports a hybrid,
+[bridge mode](#Bridge) which is not anonymous, but allows it to operate as a
+bridge between regular nodes and hidden service nodes without routing the
+regular connections through Tor.
 
 While it is easier to only run as a client, it is more beneficial to the Bitcoin
 network to run as both a client and a server so others may connect to you to as
@@ -153,4 +158,33 @@ $ ./btcd --onion=127.0.0.1:9050 --externalip=fooanon.onion
 
 onion=127.0.0.1:9050
 externalip=fooanon.onion
+```
+
+<a name="TorStreamIsolation" />
+### 5. Tor Stream Isolation
+
+<a name="TorStreamIsolationDescription" />
+**5.1 Description**<br />
+
+Tor stream isolation forces Tor to build a new circuit for each connection
+making it harder to correlate connections.
+
+btcd provides support for Tor stream isolation by using the `--torisolation`
+flag.  This option requires --proxy or --onionproxy to be set.
+
+<a name="TorStreamIsolationCLIExample" />
+**5.2 Command Line Example**<br />
+
+```bash
+$ ./btcd --proxy=127.0.0.1:9050 --torisolation
+```
+
+<a name="TorStreamIsolationFileExample" />
+**5.3 Config File Example**<br />
+
+```text
+[Application Options]
+
+proxy=127.0.0.1:9050
+torisolation=1
 ```

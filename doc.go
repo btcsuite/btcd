@@ -63,7 +63,8 @@ Application Options:
       --onionuser=         Username for onion proxy server
       --onionpass=         Password for onion proxy server
       --noonion=           Disable connecting to tor hidden services
-      --tor=               Specifies the proxy server used is a Tor node
+      --torisolation       Enable Tor stream isolation by randomizing user
+                           credentials for each connection.
       --testnet=           Use the test network
       --regtest=           Use the regression test network
       --nocheckpoints=     Disable built-in checkpoints.  Don't do this unless
