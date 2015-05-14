@@ -5,7 +5,6 @@
 package main
 
 import (
-	"container/list"
 	"crypto/rand"
 	"encoding/binary"
 	"errors"
@@ -117,9 +116,9 @@ type server struct {
 }
 
 type peerState struct {
-	peers            *list.List
-	outboundPeers    *list.List
-	persistentPeers  *list.List
+	peers            map[*peer]struct{}
+	outboundPeers    map[*peer]struct{}
+	persistentPeers  map[*peer]struct{}
 	banned           map[string]time.Time
 	outboundGroups   map[string]int
 	maxOutboundPeers int
@@ -166,11 +165,11 @@ func (s *server) RemoveRebroadcastInventory(iv *wire.InvVect) {
 }
 
 func (p *peerState) Count() int {
-	return p.peers.Len() + p.outboundPeers.Len() + p.persistentPeers.Len()
+	return len(p.peers) + len(p.outboundPeers) + len(p.persistentPeers)
 }
 
 func (p *peerState) OutboundCount() int {
-	return p.outboundPeers.Len() + p.persistentPeers.Len()
+	return len(p.outboundPeers) + len(p.persistentPeers)
 }
 
 func (p *peerState) NeedMoreOutbound() bool {
@@ -181,19 +180,19 @@ func (p *peerState) NeedMoreOutbound() bool {
 // forAllOutboundPeers is a helper function that runs closure on all outbound
 // peers known to peerState.
 func (p *peerState) forAllOutboundPeers(closure func(p *peer)) {
-	for e := p.outboundPeers.Front(); e != nil; e = e.Next() {
-		closure(e.Value.(*peer))
+	for e := range p.outboundPeers {
+		closure(e)
 	}
-	for e := p.persistentPeers.Front(); e != nil; e = e.Next() {
-		closure(e.Value.(*peer))
+	for e := range p.persistentPeers {
+		closure(e)
 	}
 }
 
 // forAllPeers is a helper function that runs closure on all peers known to
 // peerState.
 func (p *peerState) forAllPeers(closure func(p *peer)) {
-	for e := p.peers.Front(); e != nil; e = e.Next() {
-		closure(e.Value.(*peer))
+	for e := range p.peers {
+		closure(e)
 	}
 	p.forAllOutboundPeers(closure)
 }
@@ -278,14 +277,14 @@ func (s *server) handleAddPeerMsg(state *peerState, p *peer) bool {
 	// Add the new peer and start it.
 	srvrLog.Debugf("New peer %s", p)
 	if p.inbound {
-		state.peers.PushBack(p)
+		state.peers[p] = struct{}{}
 		p.Start()
 	} else {
 		state.outboundGroups[addrmgr.GroupKey(p.na)]++
 		if p.persistent {
-			state.persistentPeers.PushBack(p)
+			state.persistentPeers[p] = struct{}{}
 		} else {
-			state.outboundPeers.PushBack(p)
+			state.outboundPeers[p] = struct{}{}
 		}
 	}
 
@@ -295,7 +294,7 @@ func (s *server) handleAddPeerMsg(state *peerState, p *peer) bool {
 // handleDonePeerMsg deals with peers that have signalled they are done.  It is
 // invoked from the peerHandler goroutine.
 func (s *server) handleDonePeerMsg(state *peerState, p *peer) {
-	var list *list.List
+	var list map[*peer]struct{}
 	if p.persistent {
 		list = state.persistentPeers
 	} else if p.inbound {
@@ -303,18 +302,18 @@ func (s *server) handleDonePeerMsg(state *peerState, p *peer) {
 	} else {
 		list = state.outboundPeers
 	}
-	for e := list.Front(); e != nil; e = e.Next() {
-		if e.Value == p {
+	for e := range list {
+		if e == p {
 			// Issue an asynchronous reconnect if the peer was a
 			// persistent outbound connection.
 			if !p.inbound && p.persistent && atomic.LoadInt32(&s.shutdown) == 0 {
-				e.Value = newOutboundPeer(s, p.addr, true, p.retryCount+1)
+				e = newOutboundPeer(s, p.addr, true, p.retryCount+1)
 				return
 			}
 			if !p.inbound {
 				state.outboundGroups[addrmgr.GroupKey(p.na)]--
 			}
-			list.Remove(e)
+			delete(list, e)
 			srvrLog.Debugf("Removed peer %s", p)
 			return
 		}
@@ -439,7 +438,7 @@ func (s *server) handleQuery(querymsg interface{}, state *peerState) {
 
 	case getPeerInfoMsg:
 		syncPeer := s.blockManager.SyncPeer()
-		infos := make([]*btcjson.GetPeerInfoResult, 0, state.peers.Len())
+		infos := make([]*btcjson.GetPeerInfoResult, 0, len(state.peers))
 		state.forAllPeers(func(p *peer) {
 			if !p.Connected() {
 				return
@@ -481,8 +480,7 @@ func (s *server) handleQuery(querymsg interface{}, state *peerState) {
 
 	case connectNodeMsg:
 		// XXX(oga) duplicate oneshots?
-		for e := state.persistentPeers.Front(); e != nil; e = e.Next() {
-			peer := e.Value.(*peer)
+		for peer := range state.persistentPeers {
 			if peer.addr == msg.addr {
 				if msg.permanent {
 					msg.reply <- errors.New("peer already connected")
@@ -515,9 +513,8 @@ func (s *server) handleQuery(querymsg interface{}, state *peerState) {
 	// Request a list of the persistent (added) peers.
 	case getAddedNodesMsg:
 		// Respond with a slice of the relavent peers.
-		peers := make([]*peer, 0, state.persistentPeers.Len())
-		for e := state.persistentPeers.Front(); e != nil; e = e.Next() {
-			peer := e.Value.(*peer)
+		peers := make([]*peer, 0, len(state.persistentPeers))
+		for peer := range state.persistentPeers {
 			peers = append(peers, peer)
 		}
 		msg.reply <- peers
@@ -560,9 +557,8 @@ func (s *server) handleQuery(querymsg interface{}, state *peerState) {
 // to be located. If the peer is found, and the passed callback: `whenFound'
 // isn't nil, we call it with the peer as the argument before it is removed
 // from the peerList, and is disconnected from the server.
-func disconnectPeer(peerList *list.List, compareFunc func(*peer) bool, whenFound func(*peer)) bool {
-	for e := peerList.Front(); e != nil; e = e.Next() {
-		peer := e.Value.(*peer)
+func disconnectPeer(peerList map[*peer]struct{}, compareFunc func(*peer) bool, whenFound func(*peer)) bool {
+	for peer := range peerList {
 		if compareFunc(peer) {
 			if whenFound != nil {
 				whenFound(peer)
@@ -570,7 +566,7 @@ func disconnectPeer(peerList *list.List, compareFunc func(*peer) bool, whenFound
 
 			// This is ok because we are not continuing
 			// to iterate so won't corrupt the loop.
-			peerList.Remove(e)
+			delete(peerList, peer)
 			peer.Disconnect()
 			return true
 		}
@@ -659,9 +655,9 @@ func (s *server) peerHandler() {
 
 	srvrLog.Tracef("Starting peer handler")
 	state := &peerState{
-		peers:            list.New(),
-		persistentPeers:  list.New(),
-		outboundPeers:    list.New(),
+		peers:            make(map[*peer]struct{}),
+		persistentPeers:  make(map[*peer]struct{}),
+		outboundPeers:    make(map[*peer]struct{}),
 		banned:           make(map[string]time.Time),
 		maxOutboundPeers: defaultMaxOutbound,
 		outboundGroups:   make(map[string]int),
