@@ -499,7 +499,7 @@ func (b *blockManager) handleTxMsg(tmsg *txMsg) {
 		// Convert the error into an appropriate reject message and
 		// send it.
 		code, reason := errToRejectErr(err)
-		tmsg.peer.PushRejectMsg(wire.CmdBlock, code, reason, txHash,
+		tmsg.peer.PushRejectMsg(wire.CmdTx, code, reason, txHash,
 			false)
 		return
 	}
