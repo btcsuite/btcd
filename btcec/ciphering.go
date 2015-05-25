@@ -178,7 +178,7 @@ func Decrypt(priv *PrivateKey, in []byte) ([]byte, error) {
 	hm := hmac.New(sha256.New, keyM)
 	hm.Write(in[:len(in)-sha256.Size]) // everything is hashed
 	expectedMAC := hm.Sum(nil)
-	if !bytes.Equal(messageMAC, expectedMAC) {
+	if !hmac.Equal(messageMAC, expectedMAC) {
 		return nil, ErrInvalidMAC
 	}
 
