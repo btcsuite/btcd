@@ -3,6 +3,40 @@ User visible changes for btcd
   A full-node bitcoin implementation written in Go
 ============================================================================
 
+Changes in 0.11.1 (Wed May 27 2015)
+  - Protocol and network related changes:
+    - Use correct sub-command in reject message for rejected transactions
+      (#436, #437)
+    - Add a new parameter --torisolation which forces new circuits for each
+      connection when using tor (#430)
+  - Transaction relay (memory pool) changes:
+    - Reduce the default number max number of allowed orphan transactions
+      to 1000 (#419)
+    - Add a new parameter --maxorphantx which allows the maximum number of
+      orphan transactions stored in the mempool to be specified (#419)
+  - RPC changes:
+    - Modify listtransactions result to include the 'involveswatchonly' and
+      'vout' fields (#427)
+    - Update getrawtransaction result to omit the 'confirmations' field
+      when it is 0 (#420, #422)
+    - Update signrawtransaction result to include errors (#423)
+  - btcctl utility changes:
+    - Add gettxoutproof command (#428)
+    - Add verifytxoutproof command (#428)
+  - Notable developer-related package changes:
+    - The btcec package now provides the ability to perform ECDH
+      encryption and decryption (#375)
+    - The block and header validation in the blockchain package has been
+      split to help pave the way toward concurrent downloads (#386)
+  - Misc changes:
+    - Minor peer optimization (#433)
+  - Contributors (alphabetical order):
+    - Dave Collins
+    - David Hill
+    - Federico Bond
+    - Ishbir Singh
+    - Josh Rickmar
+
 Changes in 0.11.0 (Wed May 06 2015)
   - Protocol and network related changes:
     - **IMPORTANT: Update is required due to the following point**
