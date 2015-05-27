@@ -74,6 +74,7 @@ type config struct {
 	DisableListen      bool          `long:"nolisten" description:"Disable listening for incoming connections -- NOTE: Listening is automatically disabled if the --connect or --proxy options are used without also specifying listen interfaces via --listen"`
 	Listeners          []string      `long:"listen" description:"Add an interface/port to listen for connections (default all interfaces port: 8333, testnet: 18333)"`
 	MaxPeers           int           `long:"maxpeers" description:"Max number of inbound and outbound peers"`
+	MaxOutboundPeers   int           `long:"maxoutboundpeers" description:"Max number of outbound peers"`
 	BanDuration        time.Duration `long:"banduration" description:"How long to ban misbehaving peers.  Valid time units are {s, m, h}.  Minimum 1 second"`
 	RPCUser            string        `short:"u" long:"rpcuser" description:"Username for RPC connections"`
 	RPCPass            string        `short:"P" long:"rpcpass" default-mask:"-" description:"Password for RPC connections"`
@@ -309,6 +310,7 @@ func loadConfig() (*config, []string, error) {
 		ConfigFile:        defaultConfigFile,
 		DebugLevel:        defaultLogLevel,
 		MaxPeers:          defaultMaxPeers,
+		MaxOutboundPeers:  defaultMaxOutbound,
 		BanDuration:       defaultBanDuration,
 		RPCMaxClients:     defaultMaxRPCClients,
 		RPCMaxWebsockets:  defaultMaxRPCWebsockets,
@@ -510,6 +512,23 @@ func loadConfig() (*config, []string, error) {
 			fmt.Fprintln(os.Stderr, usageMessage)
 			return nil, nil, err
 		}
+	}
+
+	if cfg.MaxPeers < 1 {
+		str := "%s: The maxpeers option must be at least 1: %d < 1"
+		err := fmt.Errorf(str, funcName, cfg.MaxPeers)
+		fmt.Fprintln(os.Stderr, err)
+		fmt.Fprintln(os.Stderr, usageMessage)
+		return nil, nil, err
+	}
+
+	if cfg.MaxOutboundPeers > cfg.MaxPeers {
+		str := "%s: The maxoutboundpeers option may not be greater than " +
+			"the maxpeers option: %d > %d"
+		err := fmt.Errorf(str, funcName, cfg.MaxOutboundPeers, cfg.MaxPeers)
+		fmt.Fprintln(os.Stderr, err)
+		fmt.Fprintln(os.Stderr, usageMessage)
+		return nil, nil, err
 	}
 
 	// Don't allow ban durations that are too short.
