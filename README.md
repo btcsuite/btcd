@@ -48,10 +48,21 @@ https://github.com/btcsuite/btcd/releases
 - Install Go according to the installation instructions here:
   http://golang.org/doc/install
 
+- Ensure Go was installed properly and is a supported version:
+
+```bash
+$ go version
+$ go env GOROOT GOPATH
+```
+
+NOTE: The `GOROOT` and `GOPATH` above must not be the same path.  It is
+recommended that `GOPATH` is set to a directory in your home directory such as
+`~/goprojects` to avoid write permission issues.
+
 - Run the following command to obtain btcd, all dependencies, and install it:
 
 ```bash
-$ go get github.com/btcsuite/btcd/...
+$ go get -u github.com/btcsuite/btcd/...
 ```
 
 - btcd (and utilities) will now be installed in either ```$GOROOT/bin``` or
