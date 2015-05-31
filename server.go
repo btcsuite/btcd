@@ -769,8 +769,7 @@ out:
 
 			// only allow recent nodes (10mins) after we failed 30
 			// times
-			if time.Now().After(addr.LastAttempt().Add(10*time.Minute)) &&
-				tries < 30 {
+			if tries < 30 && time.Now().Sub(addr.LastAttempt()) < 10*time.Minute {
 				continue
 			}
 
