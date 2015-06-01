@@ -269,12 +269,12 @@ func (r FutureListSinceBlockResult) Receive() (*btcjson.ListSinceBlockResult, er
 //
 // See ListSinceBlock for the blocking version and more details.
 func (c *Client) ListSinceBlockAsync(blockHash *wire.ShaHash) FutureListSinceBlockResult {
-	hash := ""
+	var hash *string
 	if blockHash != nil {
-		hash = blockHash.String()
+		hash = btcjson.String(blockHash.String())
 	}
 
-	cmd := btcjson.NewListSinceBlockCmd(&hash, nil, nil)
+	cmd := btcjson.NewListSinceBlockCmd(hash, nil, nil)
 	return c.sendCmd(cmd)
 }
 
@@ -293,12 +293,12 @@ func (c *Client) ListSinceBlock(blockHash *wire.ShaHash) (*btcjson.ListSinceBloc
 //
 // See ListSinceBlockMinConf for the blocking version and more details.
 func (c *Client) ListSinceBlockMinConfAsync(blockHash *wire.ShaHash, minConfirms int) FutureListSinceBlockResult {
-	hash := ""
+	var hash *string
 	if blockHash != nil {
-		hash = blockHash.String()
+		hash = btcjson.String(blockHash.String())
 	}
 
-	cmd := btcjson.NewListSinceBlockCmd(&hash, &minConfirms, nil)
+	cmd := btcjson.NewListSinceBlockCmd(hash, &minConfirms, nil)
 	return c.sendCmd(cmd)
 }
 
