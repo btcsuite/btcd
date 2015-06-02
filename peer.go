@@ -1012,6 +1012,11 @@ func (p *peer) handleGetBlocksMsg(msg *wire.MsgGetBlocks) {
 // handleGetHeadersMsg is invoked when a peer receives a getheaders bitcoin
 // message.
 func (p *peer) handleGetHeadersMsg(msg *wire.MsgGetHeaders) {
+	// Ignore getheaders requests if not in sync.
+	if !p.server.blockManager.IsCurrent() {
+		return
+	}
+
 	// Attempt to look up the height of the provided stop hash.
 	endIdx := database.AllShas
 	height, err := p.server.db.FetchBlockHeightBySha(&msg.HashStop)
