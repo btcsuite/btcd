@@ -834,7 +834,7 @@ func loadConfig() (*config, []string, error) {
 // one was specified, but will otherwise use the normal dial function (which
 // could itself use a proxy or not).
 func btcdDial(network, address string) (net.Conn, error) {
-	if strings.HasSuffix(address, ".onion") {
+	if strings.Contains(address, ".onion:") {
 		return cfg.oniondial(network, address)
 	}
 	return cfg.dial(network, address)
