@@ -1,4 +1,4 @@
-// Copyright (c) 2013-2014 The btcsuite developers
+// Copyright (c) 2013-2015 The btcsuite developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -48,33 +48,32 @@ func NewTLSCertPair(organization string, validUntil time.Time, extraHosts []stri
 		return nil, nil, fmt.Errorf("failed to generate serial number: %s", err)
 	}
 
-	template := x509.Certificate{
-		SerialNumber: serialNumber,
-		Subject: pkix.Name{
-			Organization: []string{organization},
-		},
-		NotBefore: now.Add(-time.Hour * 24),
-		NotAfter:  validUntil,
-
-		KeyUsage: x509.KeyUsageKeyEncipherment | x509.KeyUsageDigitalSignature |
-			x509.KeyUsageCertSign,
-		IsCA: true, // so can sign self.
-		BasicConstraintsValid: true,
-	}
-
 	host, err := os.Hostname()
 	if err != nil {
 		return nil, nil, err
 	}
 
-	// Use maps to prevent adding duplicates.
-	ipAddresses := map[string]net.IP{
-		"127.0.0.1": net.ParseIP("127.0.0.1"),
-		"::1":       net.ParseIP("::1"),
+	ipAddresses := []net.IP{net.ParseIP("127.0.0.1"), net.ParseIP("::1")}
+	dnsNames := []string{host}
+	if host != "localhost" {
+		dnsNames = append(dnsNames, "localhost")
 	}
-	dnsNames := map[string]bool{
-		host:        true,
-		"localhost": true,
+
+	addIP := func(ipAddr net.IP) {
+		for _, ip := range ipAddresses {
+			if bytes.Equal(ip, ipAddr) {
+				return
+			}
+		}
+		ipAddresses = append(ipAddresses, ipAddr)
+	}
+	addHost := func(host string) {
+		for _, dnsName := range dnsNames {
+			if host == dnsName {
+				return
+			}
+		}
+		dnsNames = append(dnsNames, host)
 	}
 
 	addrs, err := interfaceAddrs()
@@ -82,9 +81,9 @@ func NewTLSCertPair(organization string, validUntil time.Time, extraHosts []stri
 		return nil, nil, err
 	}
 	for _, a := range addrs {
-		ip, _, err := net.ParseCIDR(a.String())
+		ipAddr, _, err := net.ParseCIDR(a.String())
 		if err == nil {
-			ipAddresses[ip.String()] = ip
+			addIP(ipAddr)
 		}
 	}
 
@@ -94,19 +93,28 @@ func NewTLSCertPair(organization string, validUntil time.Time, extraHosts []stri
 			host = hostStr
 		}
 		if ip := net.ParseIP(host); ip != nil {
-			ipAddresses[ip.String()] = ip
+			addIP(ip)
 		} else {
-			dnsNames[host] = true
+			addHost(host)
 		}
 	}
 
-	template.DNSNames = make([]string, 0, len(dnsNames))
-	for dnsName := range dnsNames {
-		template.DNSNames = append(template.DNSNames, dnsName)
-	}
-	template.IPAddresses = make([]net.IP, 0, len(ipAddresses))
-	for _, ip := range ipAddresses {
-		template.IPAddresses = append(template.IPAddresses, ip)
+	template := x509.Certificate{
+		SerialNumber: serialNumber,
+		Subject: pkix.Name{
+			Organization: []string{organization},
+			CommonName:   host,
+		},
+		NotBefore: now.Add(-time.Hour * 24),
+		NotAfter:  validUntil,
+
+		KeyUsage: x509.KeyUsageKeyEncipherment | x509.KeyUsageDigitalSignature |
+			x509.KeyUsageCertSign,
+		IsCA: true, // so can sign self.
+		BasicConstraintsValid: true,
+
+		DNSNames:    dnsNames,
+		IPAddresses: ipAddresses,
 	}
 
 	derBytes, err := x509.CreateCertificate(rand.Reader, &template,
