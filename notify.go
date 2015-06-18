@@ -96,13 +96,13 @@ type NotificationHandlers struct {
 	// (best) chain.  It will only be invoked if a preceding call to
 	// NotifyBlocks has been made to register for the notification and the
 	// function is non-nil.
-	OnBlockConnected func(hash *wire.ShaHash, height int32)
+	OnBlockConnected func(hash *wire.ShaHash, height int32, t time.Time)
 
 	// OnBlockDisconnected is invoked when a block is disconnected from the
 	// longest (best) chain.  It will only be invoked if a preceding call to
 	// NotifyBlocks has been made to register for the notification and the
 	// function is non-nil.
-	OnBlockDisconnected func(hash *wire.ShaHash, height int32)
+	OnBlockDisconnected func(hash *wire.ShaHash, height int32, t time.Time)
 
 	// OnRecvTx is invoked when a transaction that receives funds to a
 	// registered address is received into the memory pool and also
@@ -194,14 +194,14 @@ func (c *Client) handleNotification(ntfn *rawNotification) {
 			return
 		}
 
-		blockSha, blockHeight, err := parseChainNtfnParams(ntfn.Params)
+		blockSha, blockHeight, blockTime, err := parseChainNtfnParams(ntfn.Params)
 		if err != nil {
 			log.Warnf("Received invalid block connected "+
 				"notification: %v", err)
 			return
 		}
 
-		c.ntfnHandlers.OnBlockConnected(blockSha, blockHeight)
+		c.ntfnHandlers.OnBlockConnected(blockSha, blockHeight, blockTime)
 
 	// OnBlockDisconnected
 	case btcjson.BlockDisconnectedNtfnMethod:
@@ -211,14 +211,14 @@ func (c *Client) handleNotification(ntfn *rawNotification) {
 			return
 		}
 
-		blockSha, blockHeight, err := parseChainNtfnParams(ntfn.Params)
+		blockSha, blockHeight, blockTime, err := parseChainNtfnParams(ntfn.Params)
 		if err != nil {
 			log.Warnf("Received invalid block connected "+
 				"notification: %v", err)
 			return
 		}
 
-		c.ntfnHandlers.OnBlockDisconnected(blockSha, blockHeight)
+		c.ntfnHandlers.OnBlockDisconnected(blockSha, blockHeight, blockTime)
 
 	// OnRecvTx
 	case btcjson.RecvTxNtfnMethod:
@@ -399,33 +399,43 @@ func (e wrongNumParams) Error() string {
 // parseChainNtfnParams parses out the block hash and height from the parameters
 // of blockconnected and blockdisconnected notifications.
 func parseChainNtfnParams(params []json.RawMessage) (*wire.ShaHash,
-	int32, error) {
+	int32, time.Time, error) {
 
-	if len(params) != 2 {
-		return nil, 0, wrongNumParams(len(params))
+	if len(params) != 3 {
+		return nil, 0, time.Time{}, wrongNumParams(len(params))
 	}
 
 	// Unmarshal first parameter as a string.
 	var blockShaStr string
 	err := json.Unmarshal(params[0], &blockShaStr)
 	if err != nil {
-		return nil, 0, err
+		return nil, 0, time.Time{}, err
 	}
 
 	// Unmarshal second parameter as an integer.
 	var blockHeight int32
 	err = json.Unmarshal(params[1], &blockHeight)
 	if err != nil {
-		return nil, 0, err
+		return nil, 0, time.Time{}, err
+	}
+
+	// Unmarshal third parameter as unix time.
+	var blockTimeUnix int64
+	err = json.Unmarshal(params[2], &blockTimeUnix)
+	if err != nil {
+		return nil, 0, time.Time{}, err
 	}
 
 	// Create ShaHash from block sha string.
 	blockSha, err := wire.NewShaHashFromStr(blockShaStr)
 	if err != nil {
-		return nil, 0, err
+		return nil, 0, time.Time{}, err
 	}
 
-	return blockSha, blockHeight, nil
+	// Create time.Time from unix time.
+	blockTime := time.Unix(blockTimeUnix, 0)
+
+	return blockSha, blockHeight, blockTime, nil
 }
 
 // parseChainTxNtfnParams parses out the transaction and optional details about
