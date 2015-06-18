@@ -31,29 +31,31 @@ func TestChainSvrWsNtfns(t *testing.T) {
 		{
 			name: "blockconnected",
 			newNtfn: func() (interface{}, error) {
-				return btcjson.NewCmd("blockconnected", "123", 100000)
+				return btcjson.NewCmd("blockconnected", "123", 100000, 123456789)
 			},
 			staticNtfn: func() interface{} {
-				return btcjson.NewBlockConnectedNtfn("123", 100000)
+				return btcjson.NewBlockConnectedNtfn("123", 100000, 123456789)
 			},
-			marshalled: `{"jsonrpc":"1.0","method":"blockconnected","params":["123",100000],"id":null}`,
+			marshalled: `{"jsonrpc":"1.0","method":"blockconnected","params":["123",100000,123456789],"id":null}`,
 			unmarshalled: &btcjson.BlockConnectedNtfn{
 				Hash:   "123",
 				Height: 100000,
+				Time:   123456789,
 			},
 		},
 		{
 			name: "blockdisconnected",
 			newNtfn: func() (interface{}, error) {
-				return btcjson.NewCmd("blockdisconnected", "123", 100000)
+				return btcjson.NewCmd("blockdisconnected", "123", 100000, 123456789)
 			},
 			staticNtfn: func() interface{} {
-				return btcjson.NewBlockDisconnectedNtfn("123", 100000)
+				return btcjson.NewBlockDisconnectedNtfn("123", 100000, 123456789)
 			},
-			marshalled: `{"jsonrpc":"1.0","method":"blockdisconnected","params":["123",100000],"id":null}`,
+			marshalled: `{"jsonrpc":"1.0","method":"blockdisconnected","params":["123",100000,123456789],"id":null}`,
 			unmarshalled: &btcjson.BlockDisconnectedNtfn{
 				Hash:   "123",
 				Height: 100000,
+				Time:   123456789,
 			},
 		},
 		{

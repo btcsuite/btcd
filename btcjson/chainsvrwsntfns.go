@@ -50,14 +50,16 @@ const (
 type BlockConnectedNtfn struct {
 	Hash   string
 	Height int32
+	Time   int64
 }
 
 // NewBlockConnectedNtfn returns a new instance which can be used to issue a
 // blockconnected JSON-RPC notification.
-func NewBlockConnectedNtfn(hash string, height int32) *BlockConnectedNtfn {
+func NewBlockConnectedNtfn(hash string, height int32, time int64) *BlockConnectedNtfn {
 	return &BlockConnectedNtfn{
 		Hash:   hash,
 		Height: height,
+		Time:   time,
 	}
 }
 
@@ -65,14 +67,16 @@ func NewBlockConnectedNtfn(hash string, height int32) *BlockConnectedNtfn {
 type BlockDisconnectedNtfn struct {
 	Hash   string
 	Height int32
+	Time   int64
 }
 
 // NewBlockDisconnectedNtfn returns a new instance which can be used to issue a
 // blockdisconnected JSON-RPC notification.
-func NewBlockDisconnectedNtfn(hash string, height int32) *BlockDisconnectedNtfn {
+func NewBlockDisconnectedNtfn(hash string, height int32, time int64) *BlockDisconnectedNtfn {
 	return &BlockDisconnectedNtfn{
 		Hash:   hash,
 		Height: height,
+		Time:   time,
 	}
 }
 

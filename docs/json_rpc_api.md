@@ -818,9 +818,9 @@ The following is an overview of the JSON-RPC notifications used for Websocket co
 |---|---|
 |Method|blockconnected|
 |Request|[notifyblocks](#notifyblocks)|
-|Parameters|1. BlockHash (string) hex-encoded bytes of the attached block hash<br />2. BlockHeight (numeric) height of the attached block|
+|Parameters|1. BlockHash (string) hex-encoded bytes of the attached block hash<br />2. BlockHeight (numeric) height of the attached block<br />3. BlockTime (numeric) unix time of the attached block|
 |Description|Notifies when a block has been added to the main chain.  Notification is sent to all connected clients.|
-|Example|Example blockconnected notification for mainnet block 280330 (newlines added for readability):<br />`{`<br />&nbsp;`"jsonrpc": "1.0",`<br />&nbsp;`"method": "blockconnected",`<br />&nbsp;`"params":`<br />&nbsp;&nbsp;`[`<br />&nbsp;&nbsp;&nbsp;`"000000000000000004cbdfe387f4df44b914e464ca79838a8ab777b3214dbffd",`<br />&nbsp;&nbsp;&nbsp;`280330`<br />&nbsp;&nbsp;`],`<br />&nbsp;`"id": null`<br />`}`|
+|Example|Example blockconnected notification for mainnet block 280330 (newlines added for readability):<br />`{`<br />&nbsp;`"jsonrpc": "1.0",`<br />&nbsp;`"method": "blockconnected",`<br />&nbsp;`"params":`<br />&nbsp;&nbsp;`[`<br />&nbsp;&nbsp;&nbsp;`"000000000000000004cbdfe387f4df44b914e464ca79838a8ab777b3214dbffd",`<br />&nbsp;&nbsp;&nbsp;`280330,`<br />&nbsp;&nbsp;&nbsp;`1389636265`<br />&nbsp;&nbsp;`],`<br />&nbsp;`"id": null`<br />`}`|
 [Return to Overview](#NotificationOverview)<br />
 
 ***
@@ -831,9 +831,9 @@ The following is an overview of the JSON-RPC notifications used for Websocket co
 |---|---|
 |Method|blockdisconnected|
 |Request|[notifyblocks](#notifyblocks)|
-|Parameters|1. BlockHash (string) hex-encoded bytes of the disconnected block hash<br />2. BlockHeight (numeric) height of the disconnected block|
+|Parameters|1. BlockHash (string) hex-encoded bytes of the disconnected block hash<br />2. BlockHeight (numeric) height of the disconnected block<br />3. BlockTime (numeric) unix time of the disconnected block|
 |Description|Notifies when a block has been removed from the main chain.  Notification is sent to all connected clients.|
-|Example|Example blockdisconnected notification for mainnet block 280330 (newlines added for readability):<br />`{`<br />&nbsp;`"jsonrpc": "1.0",`<br />&nbsp;`"method": "blockdisconnected",`<br />&nbsp;`"params":`<br />&nbsp;&nbsp;`[`<br />&nbsp;&nbsp;&nbsp;`"000000000000000004cbdfe387f4df44b914e464ca79838a8ab777b3214dbffd",`<br />&nbsp;&nbsp;&nbsp;`280330`<br />&nbsp;&nbsp;`],`<br />&nbsp;`"id": null`<br />`}`|
+|Example|Example blockdisconnected notification for mainnet block 280330 (newlines added for readability):<br />`{`<br />&nbsp;`"jsonrpc": "1.0",`<br />&nbsp;`"method": "blockdisconnected",`<br />&nbsp;`"params":`<br />&nbsp;&nbsp;`[`<br />&nbsp;&nbsp;&nbsp;`"000000000000000004cbdfe387f4df44b914e464ca79838a8ab777b3214dbffd",`<br />&nbsp;&nbsp;&nbsp;`280330,`<br />&nbsp;&nbsp;&nbsp;`1389636265`<br />&nbsp;&nbsp;`],`<br />&nbsp;`"id": null`<br />`}`|
 [Return to Overview](#NotificationOverview)<br />
 
 ***
