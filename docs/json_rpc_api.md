@@ -680,7 +680,7 @@ user.  Click the method name for further details such as parameter and return in
 |Method|notifyblocks|
 |Notifications|[blockconnected](#blockconnected) and [blockdisconnected](#blockdisconnected)|
 |Parameters|None|
-|Description|Request notifications for whenever a block is connected or disconnected from the main (best) chain.|
+|Description|Request notifications for whenever a block is connected or disconnected from the main (best) chain.<br />NOTE: If a client subscribes to both block and transaction (recvtx and redeemingtx) notifications, the blockconnected notification will be sent after all transaction notifications have been sent.  This allows clients to know when all relevant transactions for a block have been received.|
 |Returns|Nothing|
 [Return to Overview](#ExtensionRequestOverview)<br />
 

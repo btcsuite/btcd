@@ -293,20 +293,19 @@ out:
 			switch n := n.(type) {
 			case *notificationBlockConnected:
 				block := (*btcutil.Block)(n)
-				if len(blockNotifications) != 0 {
-					m.notifyBlockConnected(blockNotifications,
-						block)
-				}
 
 				// Skip iterating through all txs if no
 				// tx notification requests exist.
-				if len(watchedOutPoints) == 0 && len(watchedAddrs) == 0 {
-					continue
+				if len(watchedOutPoints) != 0 || len(watchedAddrs) != 0 {
+					for _, tx := range block.Transactions() {
+						m.notifyForTx(watchedOutPoints,
+							watchedAddrs, tx, block)
+					}
 				}
 
-				for _, tx := range block.Transactions() {
-					m.notifyForTx(watchedOutPoints,
-						watchedAddrs, tx, block)
+				if len(blockNotifications) != 0 {
+					m.notifyBlockConnected(blockNotifications,
+						block)
 				}
 
 			case *notificationBlockDisconnected:
