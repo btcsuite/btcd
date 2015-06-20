@@ -3303,6 +3303,10 @@ func (s *rpcServer) decrementClients() {
 // always false if the first is.
 func (s *rpcServer) checkAuth(r *http.Request, require bool) (bool, bool,
 	error) {
+	if cfg.DisableRPCAuth {
+		return true, true, nil
+	}
+
 	authhdr := r.Header["Authorization"]
 	if len(authhdr) <= 0 {
 		if require {
@@ -3646,12 +3650,12 @@ func newRPCServer(listenAddrs []string, s *server) (*rpcServer, error) {
 		helpCacher:   newHelpCacher(),
 		quit:         make(chan int),
 	}
-	if cfg.RPCUser != "" && cfg.RPCPass != "" {
+	if !cfg.DisableRPCAuth && cfg.RPCUser != "" && cfg.RPCPass != "" {
 		login := cfg.RPCUser + ":" + cfg.RPCPass
 		auth := "Basic " + base64.StdEncoding.EncodeToString([]byte(login))
 		rpc.authsha = fastsha256.Sum256([]byte(auth))
 	}
-	if cfg.RPCLimitUser != "" && cfg.RPCLimitPass != "" {
+	if !cfg.DisableRPCAuth && cfg.RPCLimitUser != "" && cfg.RPCLimitPass != "" {
 		login := cfg.RPCLimitUser + ":" + cfg.RPCLimitPass
 		auth := "Basic " + base64.StdEncoding.EncodeToString([]byte(login))
 		rpc.limitauthsha = fastsha256.Sum256([]byte(auth))
