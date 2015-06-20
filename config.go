@@ -84,6 +84,7 @@ type config struct {
 	RPCKey             string        `long:"rpckey" description:"File containing the certificate key"`
 	RPCMaxClients      int           `long:"rpcmaxclients" description:"Max number of RPC clients for standard connections"`
 	RPCMaxWebsockets   int           `long:"rpcmaxwebsockets" description:"Max number of RPC websocket connections"`
+	DisableRPCAuth     bool          `long:"norpcauth" description:"Disable RPC Authentication"`
 	DisableRPC         bool          `long:"norpc" description:"Disable built-in RPC server -- NOTE: The RPC server is disabled by default if no rpcuser/rpcpass or rpclimituser/rpclimitpass is specified"`
 	DisableTLS         bool          `long:"notls" description:"Disable TLS for the RPC server -- NOTE: This is only allowed if the RPC server is bound to localhost"`
 	DisableDNSSeed     bool          `long:"nodnsseed" description:"Disable DNS seeding for peers"`
@@ -571,8 +572,9 @@ func loadConfig() (*config, []string, error) {
 		return nil, nil, err
 	}
 
-	// The RPC server is disabled if no username or password is provided.
-	if (cfg.RPCUser == "" || cfg.RPCPass == "") &&
+	// The RPC server is disabled if no username or password is provided unless
+	// RPC authentication is disabled.
+	if !cfg.DisableRPCAuth && (cfg.RPCUser == "" || cfg.RPCPass == "") &&
 		(cfg.RPCLimitUser == "" || cfg.RPCLimitPass == "") {
 		cfg.DisableRPC = true
 	}
@@ -680,36 +682,6 @@ func loadConfig() (*config, []string, error) {
 	// duplicate addresses.
 	cfg.RPCListeners = normalizeAddresses(cfg.RPCListeners,
 		activeNetParams.rpcPort)
-
-	// Only allow TLS to be disabled if the RPC is bound to localhost
-	// addresses.
-	if !cfg.DisableRPC && cfg.DisableTLS {
-		allowedTLSListeners := map[string]struct{}{
-			"localhost": struct{}{},
-			"127.0.0.1": struct{}{},
-			"::1":       struct{}{},
-		}
-		for _, addr := range cfg.RPCListeners {
-			host, _, err := net.SplitHostPort(addr)
-			if err != nil {
-				str := "%s: RPC listen interface '%s' is " +
-					"invalid: %v"
-				err := fmt.Errorf(str, funcName, addr, err)
-				fmt.Fprintln(os.Stderr, err)
-				fmt.Fprintln(os.Stderr, usageMessage)
-				return nil, nil, err
-			}
-			if _, ok := allowedTLSListeners[host]; !ok {
-				str := "%s: the --notls option may not be used " +
-					"when binding RPC to non localhost " +
-					"addresses: %s"
-				err := fmt.Errorf(str, funcName, addr)
-				fmt.Fprintln(os.Stderr, err)
-				fmt.Fprintln(os.Stderr, usageMessage)
-				return nil, nil, err
-			}
-		}
-	}
 
 	// Add default port to all added peer addresses if needed and remove
 	// duplicate addresses.
