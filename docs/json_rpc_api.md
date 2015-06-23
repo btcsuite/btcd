@@ -162,21 +162,22 @@ the method name for further details such as parameter and return information.
 |12|[getgenerate](#getgenerate)|N|Return if the server is set to generate coins (mine) or not.|
 |13|[gethashespersec](#gethashespersec)|N|Returns a recent hashes per second performance measurement while generating coins (mining).|
 |14|[getinfo](#getinfo)|Y|Returns a JSON object containing various state info.|
-|15|[getmininginfo](#getmininginfo)|N|Returns a JSON object containing mining-related information.|
-|16|[getnettotals](#getnettotals)|Y|Returns a JSON object containing network traffic statistics.|
-|17|[getnetworkhashps](#getnetworkhashps)|Y|Returns the estimated network hashes per second for the block heights provided by the parameters.|
-|18|[getpeerinfo](#getpeerinfo)|N|Returns information about each connected network peer as an array of json objects.|
-|19|[getrawmempool](#getrawmempool)|Y|Returns an array of hashes for all of the transactions currently in the memory pool.|
-|20|[getrawtransaction](#getrawtransaction)|Y|Returns information about a transaction given its hash.|
-|21|[getwork](#getwork)|N|Returns formatted hash data to work on or checks and submits solved data.<br /><font color="orange">NOTE: Since btcd does not have the wallet integrated to provide payment addresses, btcd must be configured via the `--miningaddr` option to provide which payment addresses to pay created blocks to for this RPC to function.</font>|
-|22|[help](#help)|Y|Returns a list of all commands or help for a specified command.|
-|23|[ping](#ping)|N|Queues a ping to be sent to each connected peer.|
-|24|[sendrawtransaction](#sendrawtransaction)|Y|Submits the serialized, hex-encoded transaction to the local peer and relays it to the network.<br /><font color="orange">btcd does not yet implement the `allowhighfees` parameter, so it has no effect</font>|
-|25|[setgenerate](#setgenerate) |N|Set the server to generate coins (mine) or not.<br/>NOTE: Since btcd does not have the wallet integrated to provide payment addresses, btcd must be configured via the `--miningaddr` option to provide which payment addresses to pay created blocks to for this RPC to function.|
-|26|[stop](#stop)|N|Shutdown btcd.|
-|27|[submitblock](#submitblock)|Y|Attempts to submit a new serialized, hex-encoded block to the network.|
-|28|[validateaddress](#validateaddress)|Y|Verifies the given address is valid.  NOTE: Since btcd does not have a wallet integrated, btcd will only return whether the address is valid or not.|
-|29|[verifychain](#verifychain)|N|Verifies the block chain database.|
+|15|[getmempoolinfo](#getmempoolinfo)|N|Returns a JSON object containing mempool-related information.|
+|16|[getmininginfo](#getmininginfo)|N|Returns a JSON object containing mining-related information.|
+|17|[getnettotals](#getnettotals)|Y|Returns a JSON object containing network traffic statistics.|
+|18|[getnetworkhashps](#getnetworkhashps)|Y|Returns the estimated network hashes per second for the block heights provided by the parameters.|
+|19|[getpeerinfo](#getpeerinfo)|N|Returns information about each connected network peer as an array of json objects.|
+|20|[getrawmempool](#getrawmempool)|Y|Returns an array of hashes for all of the transactions currently in the memory pool.|
+|21|[getrawtransaction](#getrawtransaction)|Y|Returns information about a transaction given its hash.|
+|22|[getwork](#getwork)|N|Returns formatted hash data to work on or checks and submits solved data.<br /><font color="orange">NOTE: Since btcd does not have the wallet integrated to provide payment addresses, btcd must be configured via the `--miningaddr` option to provide which payment addresses to pay created blocks to for this RPC to function.</font>|
+|23|[help](#help)|Y|Returns a list of all commands or help for a specified command.|
+|24|[ping](#ping)|N|Queues a ping to be sent to each connected peer.|
+|25|[sendrawtransaction](#sendrawtransaction)|Y|Submits the serialized, hex-encoded transaction to the local peer and relays it to the network.<br /><font color="orange">btcd does not yet implement the `allowhighfees` parameter, so it has no effect</font>|
+|26|[setgenerate](#setgenerate) |N|Set the server to generate coins (mine) or not.<br/>NOTE: Since btcd does not have the wallet integrated to provide payment addresses, btcd must be configured via the `--miningaddr` option to provide which payment addresses to pay created blocks to for this RPC to function.|
+|27|[stop](#stop)|N|Shutdown btcd.|
+|28|[submitblock](#submitblock)|Y|Attempts to submit a new serialized, hex-encoded block to the network.|
+|29|[validateaddress](#validateaddress)|Y|Verifies the given address is valid.  NOTE: Since btcd does not have a wallet integrated, btcd will only return whether the address is valid or not.|
+|30|[verifychain](#verifychain)|N|Verifies the block chain database.|
 
 <a name="MethodDetails" />
 **5.2 Method Details**<br />
@@ -350,6 +351,18 @@ the method name for further details such as parameter and return information.
 |Notes|NOTE: Since btcd does NOT contain wallet functionality, wallet-related fields are not returned.  See getinfo in btcwallet for a version which includes that information.|
 |Returns|`{ (json object)`<br />&nbsp;&nbsp;`"version": n,  (numeric) the version of the server`<br />&nbsp;&nbsp;`"protocolversion": n,  (numeric) the latest supported protocol version`<br />&nbsp;&nbsp;`"blocks": n,  (numeric) the number of blocks processed`<br />&nbsp;&nbsp;`"timeoffset": n,  (numeric) the time offset`<br />&nbsp;&nbsp;`"connections": n,  (numeric) the number of connected peers`<br />&nbsp;&nbsp;`"proxy": "host:port",  (string) the proxy used by the server`<br />&nbsp;&nbsp;`"difficulty": n.nn,  (numeric) the current target difficulty`<br />&nbsp;&nbsp;`"testnet": true or false,  (boolean) whether or not server is using testnet`<br />&nbsp;&nbsp;`"relayfee": n.nn,  (numeric) the minimum relay fee for non-free transactions in BTC/KB`<br />`}`|
 |Example Return|`{`<br />&nbsp;&nbsp;`"version": 70000`<br />&nbsp;&nbsp;`"protocolversion": 70001,  `<br />&nbsp;&nbsp;`"blocks": 298963,`<br />&nbsp;&nbsp;`"timeoffset": 0,`<br />&nbsp;&nbsp;`"connections": 17,`<br />&nbsp;&nbsp;`"proxy": "",`<br />&nbsp;&nbsp;`"difficulty": 8000872135.97,`<br />&nbsp;&nbsp;`"testnet": false,`<br />&nbsp;&nbsp;`"relayfee": 0.00001,`<br />`}`|
+[Return to Overview](#MethodOverview)<br />
+
+***
+<a name="getmempoolinfo"/>
+
+|   |   |
+|---|---|
+|Method|getmempoolinfo|
+|Parameters|None|
+|Description|Returns a JSON object containing mempool-related information.|
+|Returns|`{ (json object)`<br />&nbsp;&nbsp;`"bytes": n,  (numeric) size in bytes of the mempool`<br />&nbsp;&nbsp;`"size": n,  (numeric) number of transactions in the mempool`<br />`}`|
+Example Return|`{`<br />&nbsp;&nbsp;`"bytes": 310768,`<br />&nbsp;&nbsp;`"size": 157,`<br />`}`|
 [Return to Overview](#MethodOverview)<br />
 
 ***

@@ -146,6 +146,7 @@ var rpcHandlersBeforeInit = map[string]commandHandler{
 	"getgenerate":           handleGetGenerate,
 	"gethashespersec":       handleGetHashesPerSec,
 	"getinfo":               handleGetInfo,
+	"getmempoolinfo":        handleGetMempoolInfo,
 	"getmininginfo":         handleGetMiningInfo,
 	"getnettotals":          handleGetNetTotals,
 	"getnetworkhashps":      handleGetNetworkHashPS,
@@ -1933,6 +1934,23 @@ func handleGetInfo(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (in
 		Difficulty:      getDifficultyRatio(blkHeader.Bits),
 		TestNet:         cfg.TestNet3,
 		RelayFee:        float64(minTxRelayFee) / btcutil.SatoshiPerBitcoin,
+	}
+
+	return ret, nil
+}
+
+// handleGetMempoolInfo implements the getmempoolinfo command.
+func handleGetMempoolInfo(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (interface{}, error) {
+	txD := s.server.txMemPool.TxDescs()
+
+	var numBytes int64
+	for _, desc := range txD {
+		numBytes += int64(desc.Tx.MsgTx().SerializeSize())
+	}
+
+	ret := &btcjson.GetMempoolInfoResult{
+		Size:  int64(len(txD)),
+		Bytes: numBytes,
 	}
 
 	return ret, nil

@@ -122,6 +122,13 @@ type GetBlockTemplateResult struct {
 	RejectReasion string   `json:"reject-reason,omitempty"`
 }
 
+// GetMempoolInfoResult models the data returned from the getmempoolinfo
+// command.
+type GetMempoolInfoResult struct {
+	Size  int64 `json:"size"`
+	Bytes int64 `json:"bytes"`
+}
+
 // GetNetworkInfoResult models the data returned from the getnetworkinfo
 // command.
 type GetNetworkInfoResult struct {
