@@ -383,6 +383,13 @@ var helpDescsEnUS = map[string]string{
 	// GetInfoCmd help.
 	"getinfo--synopsis": "Returns a JSON object containing various state info.",
 
+	// GetMempoolInfoCmd help.
+	"getmempoolinfo--synopsis": "Returns memory pool information",
+
+	// GetMempoolInfoResult help.
+	"getmempoolinforesult-bytes": "Size in bytes of the mempool",
+	"getmempoolinforesult-size":  "Number of transactions in the mempool",
+
 	// GetMiningInfoResult help.
 	"getmininginforesult-blocks":           "Height of the latest best block",
 	"getmininginforesult-currentblocksize": "Size of the latest best block",
@@ -773,6 +780,7 @@ var rpcResultTypes = map[string][]interface{}{
 	"getgenerate":           []interface{}{(*bool)(nil)},
 	"gethashespersec":       []interface{}{(*float64)(nil)},
 	"getinfo":               []interface{}{(*dcrjson.InfoChainResult)(nil)},
+	"getmempoolinfo":        []interface{}{(*dcrjson.GetMempoolInfoResult)(nil)},
 	"getmininginfo":         []interface{}{(*dcrjson.GetMiningInfoResult)(nil)},
 	"getnettotals":          []interface{}{(*dcrjson.GetNetTotalsResult)(nil)},
 	"getnetworkhashps":      []interface{}{(*int64)(nil)},
