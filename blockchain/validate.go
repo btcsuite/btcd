@@ -23,13 +23,6 @@ const (
 	// allowed for a block.  It is a fraction of the max block payload size.
 	MaxSigOpsPerBlock = wire.MaxBlockPayload / 50
 
-	// lockTimeThreshold is the number below which a lock time is
-	// interpreted to be a block number.  Since an average of one block
-	// is generated per 10 minutes, this allows blocks for about 9,512
-	// years.  However, if the field is interpreted as a timestamp, given
-	// the lock time is a uint32, the max is sometime around 2106.
-	lockTimeThreshold uint32 = 5e8 // Tue Nov 5 00:53:20 1985 UTC
-
 	// MaxTimeOffsetSeconds is the maximum number of seconds a block time
 	// is allowed to be ahead of the current time.  This is currently 2
 	// hours.
@@ -146,10 +139,10 @@ func IsFinalizedTransaction(tx *btcutil.Tx, blockHeight int64, blockTime time.Ti
 
 	// The lock time field of a transaction is either a block height at
 	// which the transaction is finalized or a timestamp depending on if the
-	// value is before the lockTimeThreshold.  When it is under the
+	// value is before the txscript.LockTimeThreshold.  When it is under the
 	// threshold it is a block height.
 	blockTimeOrHeight := int64(0)
-	if lockTime < lockTimeThreshold {
+	if lockTime < txscript.LockTimeThreshold {
 		blockTimeOrHeight = blockHeight
 	} else {
 		blockTimeOrHeight = blockTime.Unix()
