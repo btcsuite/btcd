@@ -127,41 +127,6 @@ func IsCoinBase(tx *btcutil.Tx) bool {
 	return IsCoinBaseTx(tx.MsgTx())
 }
 
-// IsFinalizedTransaction determines whether or not a transaction is finalized.
-func IsFinalizedTransaction(tx *btcutil.Tx, blockHeight int64, blockTime time.Time) bool {
-	msgTx := tx.MsgTx()
-
-	// Lock time of zero means the transaction is finalized.
-	lockTime := msgTx.LockTime
-	if lockTime == 0 {
-		return true
-	}
-
-	// The lock time field of a transaction is either a block height at
-	// which the transaction is finalized or a timestamp depending on if the
-	// value is before the txscript.LockTimeThreshold.  When it is under the
-	// threshold it is a block height.
-	blockTimeOrHeight := int64(0)
-	if lockTime < txscript.LockTimeThreshold {
-		blockTimeOrHeight = blockHeight
-	} else {
-		blockTimeOrHeight = blockTime.Unix()
-	}
-	if int64(lockTime) < blockTimeOrHeight {
-		return true
-	}
-
-	// At this point, the transaction's lock time hasn't occured yet, but
-	// the transaction might still be finalized if the sequence number
-	// for all transaction inputs is maxed out.
-	for _, txIn := range msgTx.TxIn {
-		if txIn.Sequence != math.MaxUint32 {
-			return false
-		}
-	}
-	return true
-}
-
 // isBIP0030Node returns whether or not the passed node represents one of the
 // two blocks that violate the BIP0030 rule which prevents transactions from
 // overwriting old ones.
@@ -707,7 +672,7 @@ func (b *BlockChain) checkBlockContext(block *btcutil.Block, prevNode *blockNode
 
 		// Ensure all transactions in the block are finalized.
 		for _, tx := range block.Transactions() {
-			if !IsFinalizedTransaction(tx, blockHeight,
+			if !txscript.IsFinalizedTransaction(tx.MsgTx(), blockHeight,
 				header.Timestamp) {
 
 				str := fmt.Sprintf("block contains unfinalized "+

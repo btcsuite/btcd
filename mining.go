@@ -446,7 +446,7 @@ mempoolLoop:
 			minrLog.Tracef("Skipping coinbase tx %s", tx.Sha())
 			continue
 		}
-		if !blockchain.IsFinalizedTransaction(tx, nextBlockHeight,
+		if !txscript.IsFinalizedTransaction(tx.MsgTx(), nextBlockHeight,
 			timeSource.AdjustedTime()) {
 
 			minrLog.Tracef("Skipping non-finalized tx %s", tx.Sha())
