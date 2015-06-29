@@ -237,7 +237,7 @@ func (mp *txMemPool) checkTransactionStandard(tx *btcutil.Tx, height int64) erro
 	// The transaction must be finalized to be standard and therefore
 	// considered for inclusion in a block.
 	adjustedTime := mp.server.timeSource.AdjustedTime()
-	if !txscript.IsFinalizedTransaction(tx.MsgTx(), height, adjustedTime) {
+	if !blockchain.IsFinalizedTransaction(tx, height, adjustedTime) {
 		return txRuleError(wire.RejectNonstandard,
 			"transaction is not finalized")
 	}
