@@ -683,7 +683,7 @@ user.  Click the method name for further details such as parameter and return in
 |Parameters|1. username (string, required)<br />2. passphrase (string, required)|
 |Description|Authenticate the connection against the username and password configured for the RPC server.<br />  Invoking any other method before authenticating with this command will close the connection.<br /><font color="orange">NOTE: This is only required if an HTTP Authorization header is not being used.</font>|
 |Returns|Success: Nothing<br />Failure: Nothing (websocket disconnected)|
-[Return to Overview](#ExtensionRequestOverview)<br />
+[Return to Overview](#WSExtMethodOverview)<br />
 
 ***
 
@@ -696,7 +696,7 @@ user.  Click the method name for further details such as parameter and return in
 |Parameters|None|
 |Description|Request notifications for whenever a block is connected or disconnected from the main (best) chain.<br />NOTE: If a client subscribes to both block and transaction (recvtx and redeemingtx) notifications, the blockconnected notification will be sent after all transaction notifications have been sent.  This allows clients to know when all relevant transactions for a block have been received.|
 |Returns|Nothing|
-[Return to Overview](#ExtensionRequestOverview)<br />
+[Return to Overview](#WSExtMethodOverview)<br />
 
 ***
 <a name="stopnotifyblocks"/>
@@ -708,7 +708,7 @@ user.  Click the method name for further details such as parameter and return in
 |Parameters|None|
 |Description|Cancel sending notifications for whenever a block is connected or disconnected from the main (best) chain.|
 |Returns|Nothing|
-[Return to Overview](#ExtensionRequestOverview)<br />
+[Return to Overview](#WSExtMethodOverview)<br />
 
 ***
 
@@ -721,7 +721,7 @@ user.  Click the method name for further details such as parameter and return in
 |Parameters|1. Addresses (JSON array, required)<br />&nbsp;`[ (json array of strings)`<br />&nbsp;&nbsp;`"decredaddress", (string) the decred address`<br />&nbsp;&nbsp;`...`<br />&nbsp;`]`|
 |Description|Send a recvtx notification when a transaction added to mempool or appears in a newly-attached block contains a txout pkScript sending to any of the passed addresses.  Matching outpoints are automatically registered for redeemingtx notifications.|
 |Returns|Nothing|
-[Return to Overview](#ExtensionRequestOverview)<br />
+[Return to Overview](#WSExtMethodOverview)<br />
 
 ***
 
@@ -734,7 +734,7 @@ user.  Click the method name for further details such as parameter and return in
 |Parameters|1. Addresses (JSON array, required)<br />&nbsp;`[ (json array of strings)`<br />&nbsp;&nbsp;`"decredaddress", (string) the decred address`<br />&nbsp;&nbsp;`...`<br />&nbsp;`]`|
 |Description|Cancel registered receive notifications for each passed address.|
 |Returns|Nothing|
-[Return to Overview](#ExtensionRequestOverview)<br />
+[Return to Overview](#WSExtMethodOverview)<br />
 
 ***
 
@@ -747,7 +747,7 @@ user.  Click the method name for further details such as parameter and return in
 |Parameters|1. Outpoints (JSON array, required)<br />&nbsp;`[ (JSON array)`<br />&nbsp;&nbsp;`{ (JSON object)`<br />&nbsp;&nbsp;&nbsp;`"hash":"data", (string) the hex-encoded bytes of the outpoint hash`<br />&nbsp;&nbsp;&nbsp;`"index":n (numeric) the txout index of the outpoint`<br />&nbsp;&nbsp;`},`<br />&nbsp;&nbsp;`...`<br />&nbsp;`]`|
 |Description|Send a redeemingtx notification when a transaction spending an outpoint appears in mempool (if relayed to this dcrd instance) and when such a transaction first appears in a newly-attached block.|
 |Returns|Nothing|
-[Return to Overview](#ExtensionRequestOverview)<br />
+[Return to Overview](#WSExtMethodOverview)<br />
 
 ***
 
@@ -760,7 +760,7 @@ user.  Click the method name for further details such as parameter and return in
 |Parameters|1. Outpoints (JSON array, required)<br />&nbsp;`[ (JSON array)`<br />&nbsp;&nbsp;`{ (JSON object)`<br />&nbsp;&nbsp;&nbsp;`"hash":"data", (string) the hex-encoded bytes of the outpoint hash`<br />&nbsp;&nbsp;&nbsp;`"index":n (numeric) the txout index of the outpoint`<br />&nbsp;&nbsp;`},`<br />&nbsp;&nbsp;`...`<br />&nbsp;`]`|
 |Description|Cancel registered spending notifications for each passed outpoint.|
 |Returns|Nothing|
-[Return to Overview](#ExtensionRequestOverview)<br />
+[Return to Overview](#WSExtMethodOverview)<br />
 
 ***
 
@@ -773,7 +773,7 @@ user.  Click the method name for further details such as parameter and return in
 |Parameters|1. BeginBlock (string, required) block hash to begin rescanning from<br />2. Addresses (JSON array, required)<br />&nbsp;`[ (json array of strings)`<br />&nbsp;&nbsp;`"decredaddress", (string) the decred address`<br />&nbsp;&nbsp;`...` <br />&nbsp;`]`<br />3. Outpoints (JSON array, required)<br />&nbsp;`[ (JSON array)`<br />&nbsp;&nbsp;`{ (JSON object)`<br />&nbsp;&nbsp;&nbsp;`"hash":"data", (string) the hex-encoded bytes of the outpoint hash`<br />&nbsp;&nbsp;&nbsp;`"index":n (numeric) the txout index of the outpoint`<br />&nbsp;&nbsp;`},`<br />&nbsp;&nbsp;`...`<br />&nbsp;`]`<br />4. EndBlock (string, optional) hash of final block to rescan|
 |Description|Rescan block chain for transactions to addresses, starting at block BeginBlock and ending at EndBlock.  The current known UTXO set for all passed addresses at height BeginBlock should included in the Outpoints argument.  If EndBlock is omitted, the rescan continues through the best block in the main chain.  Additionally, if no EndBlock is provided, the client is automatically registered for transaction notifications for all rescanned addresses and the final UTXO set.  Rescan results are sent as recvtx and redeemingtx notifications.  This call returns once the rescan completes.|
 |Returns|Nothing|
-[Return to Overview](#ExtensionRequestOverview)<br />
+[Return to Overview](#WSExtMethodOverview)<br />
 
 ***
 
@@ -786,7 +786,7 @@ user.  Click the method name for further details such as parameter and return in
 |Parameters|1. verbose (boolean, optional, default=false) - specifies which type of notification to receive.  If verbose is true, then the caller receives [txacceptedverbose](#txacceptedverbose), otherwise the caller receives [txaccepted](#txaccepted)|
 |Description|Send either a [txaccepted](#txaccepted) or a [txacceptedverbose](#txacceptedverbose) notification when a new transaction is accepted into the mempool.|
 |Returns|Nothing|
-[Return to Overview](#ExtensionRequestOverview)<br />
+[Return to Overview](#WSExtMethodOverview)<br />
 
 ***
 
@@ -813,6 +813,7 @@ user.  Click the method name for further details such as parameter and return in
 |Description|Return a JSON object with details regarding a websocket client's current connection to the RPC server.  This currently only includes the session ID, a random unsigned 64-bit integer that is created for each newly connected client.  Session IDs may be used to verify that the current connection was not lost and subsequently reestablished.|
 |Returns|`{ (json object)`<br />&nbsp;&nbsp;`"sessionid": n  (numeric) the session ID`<br />`}`|
 |Example Return|`{`<br />&nbsp;&nbsp;`"sessionid": 67089679842`<br />`}`|
+[Return to Overview](#WSExtMethodOverview)<br />
 
 
 <a name="Notifications" />
