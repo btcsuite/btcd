@@ -139,6 +139,7 @@ var rpcHandlersBeforeInit = map[string]commandHandler{
 	"getblock":              handleGetBlock,
 	"getblockcount":         handleGetBlockCount,
 	"getblockhash":          handleGetBlockHash,
+	"getblockheader":        handleGetBlockHeader,
 	"getblocktemplate":      handleGetBlockTemplate,
 	"getconnectioncount":    handleGetConnectionCount,
 	"getcurrentnet":         handleGetCurrentNet,
@@ -1087,6 +1088,71 @@ func handleGetBlockHash(s *rpcServer, cmd interface{}, closeChan <-chan struct{}
 	}
 
 	return sha.String(), nil
+}
+
+// handleGetBlockHeader implements the getblockheader command.
+func handleGetBlockHeader(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (interface{}, error) {
+	c := cmd.(*btcjson.GetBlockHeaderCmd)
+
+	sha, err := wire.NewShaHashFromStr(c.Hash)
+	if err != nil {
+		return nil, err
+	}
+
+	if c.Verbose == nil || *c.Verbose {
+		blk, err := s.server.db.FetchBlockBySha(sha)
+		if err != nil {
+			return nil, &btcjson.RPCError{
+				Code:    btcjson.ErrRPCInvalidAddressOrKey,
+				Message: "Invalid address or key: " + err.Error(),
+			}
+		}
+
+		_, maxIdx, err := s.server.db.NewestSha()
+		if err != nil {
+			context := "Failed to get newest hash"
+			return nil, internalRPCError(err.Error(), context)
+		}
+
+		var shaNextStr string
+		shaNext, err := s.server.db.FetchBlockShaByHeight(int64(blk.Height() + 1))
+		if err == nil {
+			shaNextStr = shaNext.String()
+		}
+
+		msgBlock := blk.MsgBlock()
+		blockHeaderReply := btcjson.GetBlockHeaderVerboseResult{
+			Hash:          c.Hash,
+			Confirmations: uint64(1 + maxIdx - blk.Height()),
+			Height:        int32(blk.Height()),
+			Version:       msgBlock.Header.Version,
+			MerkleRoot:    msgBlock.Header.MerkleRoot.String(),
+			NextHash:      shaNextStr,
+			PreviousHash:  msgBlock.Header.PrevBlock.String(),
+			Nonce:         uint64(msgBlock.Header.Nonce),
+			Time:          msgBlock.Header.Timestamp.Unix(),
+			Bits:          strconv.FormatInt(int64(msgBlock.Header.Bits), 16),
+			Difficulty:    getDifficultyRatio(msgBlock.Header.Bits),
+		}
+		return blockHeaderReply, nil
+	}
+
+	// Verbose disabled
+	blkHeader, err := s.server.db.FetchBlockHeaderBySha(sha)
+	if err != nil {
+		return nil, &btcjson.RPCError{
+			Code:    btcjson.ErrRPCInvalidAddressOrKey,
+			Message: "Invalid address or key: " + err.Error(),
+		}
+	}
+
+	buf := bytes.NewBuffer(make([]byte, 0, wire.MaxBlockHeaderPayload))
+	if err = blkHeader.BtcEncode(buf, maxProtocolVersion); err != nil {
+		errStr := fmt.Sprintf("Failed to serialize data: %v", err)
+		return nil, internalRPCError(errStr, "")
+	}
+
+	return hex.EncodeToString(buf.Bytes()), nil
 }
 
 // encodeTemplateID encodes the passed details into an ID that can be used to
