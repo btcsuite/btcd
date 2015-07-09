@@ -50,6 +50,7 @@ func TestBlockHeader(t *testing.T) {
 // protocol versions.
 func TestBlockHeaderWire(t *testing.T) {
 	nonce := uint32(123123) // 0x1e0f3
+	pver := uint32(70001)
 
 	// baseBlockHdr is used in the various tests as a baseline BlockHeader.
 	bits := uint32(0x1d00ffff)
@@ -140,6 +141,18 @@ func TestBlockHeaderWire(t *testing.T) {
 			continue
 		}
 
+		buf.Reset()
+		err = test.in.BtcEncode(&buf, pver)
+		if err != nil {
+			t.Errorf("BtcEncode #%d error %v", i, err)
+			continue
+		}
+		if !bytes.Equal(buf.Bytes(), test.buf) {
+			t.Errorf("BtcEncode #%d\n got: %s want: %s", i,
+				spew.Sdump(buf.Bytes()), spew.Sdump(test.buf))
+			continue
+		}
+
 		// Decode the block header from wire format.
 		var bh wire.BlockHeader
 		rbuf := bytes.NewReader(test.buf)
@@ -150,6 +163,18 @@ func TestBlockHeaderWire(t *testing.T) {
 		}
 		if !reflect.DeepEqual(&bh, test.out) {
 			t.Errorf("readBlockHeader #%d\n got: %s want: %s", i,
+				spew.Sdump(&bh), spew.Sdump(test.out))
+			continue
+		}
+
+		rbuf = bytes.NewReader(test.buf)
+		err = bh.BtcDecode(rbuf, pver)
+		if err != nil {
+			t.Errorf("BtcDecode #%d error %v", i, err)
+			continue
+		}
+		if !reflect.DeepEqual(&bh, test.out) {
+			t.Errorf("BtcDecode #%d\n got: %s want: %s", i,
 				spew.Sdump(&bh), spew.Sdump(test.out))
 			continue
 		}
