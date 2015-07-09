@@ -117,9 +117,3 @@ func TstReadBlockHeader(r io.Reader, pver uint32, bh *BlockHeader) error {
 func TstWriteBlockHeader(w io.Writer, pver uint32, bh *BlockHeader) error {
 	return writeBlockHeader(w, pver, bh)
 }
-
-// TstWriteBlockHeader makes the internal writeBlockHeader function available to
-// the test package.
-func TstBytesBlockHeader(bh *BlockHeader) ([]byte, error) {
-	return bh.Bytes()
-}
