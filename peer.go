@@ -53,6 +53,17 @@ const (
 	// pingTimeoutMinutes is the number of minutes since we last sent a
 	// message requiring a reply before we will ping a host.
 	pingTimeoutMinutes = 2
+
+	// connectionRetryInterval is the base amount of time to wait in between
+	// retries when connecting to persistent peers.  It is adjusted by the
+	// number of retries such that there is a retry backoff.
+	connectionRetryInterval = time.Second * 10
+
+	// maxConnectionRetryInterval is the max amount of time retrying of a
+	// persistent peer is allowed to grow to.  This is necessary since the
+	// retry logic uses a backoff mechanism which increases the interval
+	// base done the number of retries that have been done.
+	maxConnectionRetryInterval = time.Minute * 5
 )
 
 var (
@@ -2015,6 +2026,9 @@ func newOutboundPeer(s *server, addr string, persistent bool, retryCount int64) 
 		if p.retryCount > 0 {
 			scaledInterval := connectionRetryInterval.Nanoseconds() * p.retryCount / 2
 			scaledDuration := time.Duration(scaledInterval)
+			if scaledDuration > maxConnectionRetryInterval {
+				scaledDuration = maxConnectionRetryInterval
+			}
 			srvrLog.Debugf("Retrying connection to %s in %s", addr, scaledDuration)
 			time.Sleep(scaledDuration)
 		}
