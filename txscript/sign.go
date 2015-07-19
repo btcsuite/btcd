@@ -346,10 +346,10 @@ type KeyDB interface {
 	GetKey(btcutil.Address) (*btcec.PrivateKey, bool, error)
 }
 
-// KeyClosure implements ScriptDB with a closure
+// KeyClosure implements KeyDB with a closure.
 type KeyClosure func(btcutil.Address) (*btcec.PrivateKey, bool, error)
 
-// GetKey implements KeyDB by returning the result of calling the closure
+// GetKey implements KeyDB by returning the result of calling the closure.
 func (kc KeyClosure) GetKey(address btcutil.Address) (*btcec.PrivateKey,
 	bool, error) {
 	return kc(address)
@@ -361,10 +361,10 @@ type ScriptDB interface {
 	GetScript(btcutil.Address) ([]byte, error)
 }
 
-// ScriptClosure implements ScriptDB with a closure
+// ScriptClosure implements ScriptDB with a closure.
 type ScriptClosure func(btcutil.Address) ([]byte, error)
 
-// GetScript implements ScriptDB by returning the result of calling the closure
+// GetScript implements ScriptDB by returning the result of calling the closure.
 func (sc ScriptClosure) GetScript(address btcutil.Address) ([]byte, error) {
 	return sc(address)
 }
