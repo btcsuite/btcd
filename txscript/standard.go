@@ -10,9 +10,9 @@ import (
 )
 
 const (
-	// maxDataCarrierSize is the maximum number of bytes allowed in pushed
+	// MaxDataCarrierSize is the maximum number of bytes allowed in pushed
 	// data to be considered a nulldata transaction
-	maxDataCarrierSize = 80
+	MaxDataCarrierSize = 80
 
 	// StandardVerifyFlags are the script flags which are used when
 	// executing transaction scripts to enforce additional checks which
@@ -120,7 +120,7 @@ func isMultiSig(pops []parsedOpcode) bool {
 func isNullData(pops []parsedOpcode) bool {
 	// A nulldata transaction is either a single OP_RETURN or an
 	// OP_RETURN SMALLDATA (where SMALLDATA is a data push up to
-	// maxDataCarrierSize bytes).
+	// MaxDataCarrierSize bytes).
 	l := len(pops)
 	if l == 1 && pops[0].opcode.value == OP_RETURN {
 		return true
@@ -129,7 +129,7 @@ func isNullData(pops []parsedOpcode) bool {
 	return l == 2 &&
 		pops[0].opcode.value == OP_RETURN &&
 		pops[1].opcode.value <= OP_PUSHDATA4 &&
-		len(pops[1].data) <= maxDataCarrierSize
+		len(pops[1].data) <= MaxDataCarrierSize
 }
 
 // scriptType returns the type of the script being inspected from the known
