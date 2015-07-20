@@ -67,7 +67,7 @@ func round(f float64) Amount {
 // NewAmount creates an Amount from a floating point value representing
 // some value in bitcoin.  NewAmount errors if f is NaN or +-Infinity, but
 // does not check that the amount is within the total amount of bitcoin
-// producable as f may not refer to an amount at a single moment in time.
+// producible as f may not refer to an amount at a single moment in time.
 func NewAmount(f float64) (Amount, error) {
 	// The amount is only considered invalid if it cannot be represented
 	// as an integer type.  This may happen if f is NaN or +-Infinity.
