@@ -348,7 +348,7 @@ func TestTxWireErrors(t *testing.T) {
 		// Force error in transaction output pk script.
 		{multiTx, multiTxEncoded, pver, 63, io.ErrShortWrite, io.EOF},
 		// Force error in transaction output lock time.
-		{multiTx, multiTxEncoded, pver, 130, io.ErrShortWrite, io.EOF},
+		{multiTx, multiTxEncoded, pver, 206, io.ErrShortWrite, io.EOF},
 	}
 
 	t.Logf("Running %d tests", len(tests))
@@ -493,7 +493,7 @@ func TestTxSerializeErrors(t *testing.T) {
 		// Force error in transaction output pk script.
 		{multiTx, multiTxEncoded, 63, io.ErrShortWrite, io.EOF},
 		// Force error in transaction output lock time.
-		{multiTx, multiTxEncoded, 130, io.ErrShortWrite, io.EOF},
+		{multiTx, multiTxEncoded, 206, io.ErrShortWrite, io.EOF},
 	}
 
 	t.Logf("Running %d tests", len(tests))
