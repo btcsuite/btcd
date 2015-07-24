@@ -346,6 +346,17 @@ func TestWalletSvrCmds(t *testing.T) {
 			},
 		},
 		{
+			name: "getwalletinfo",
+			newCmd: func() (interface{}, error) {
+				return btcjson.NewCmd("getwalletinfo")
+			},
+			staticCmd: func() interface{} {
+				return btcjson.NewGetWalletInfoCmd()
+			},
+			marshalled:   `{"jsonrpc":"1.0","method":"getwalletinfo","params":[],"id":1}`,
+			unmarshalled: &btcjson.GetWalletInfoCmd{},
+		},
+		{
 			name: "importprivkey",
 			newCmd: func() (interface{}, error) {
 				return btcjson.NewCmd("importprivkey", "abc")
