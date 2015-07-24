@@ -201,9 +201,6 @@ information.
 	  robust and easy to use Websocket-enabled Bitcoin JSON-RPC client
     * [btcjson](https://github.com/btcsuite/btcjson) - Provides an extensive API
 	  for the underlying JSON-RPC command and return values
-    * [btcws](https://github.com/btcsuite/btcws) - Custom types for btcd
-	  websocket extension commands (registers the extension commands with
-	  [btcjson](https://github.com/btcsuite/btcjson))
     * [wire](https://github.com/btcsuite/btcd/tree/master/wire) - Implements the
 	  Bitcoin wire protocol
     * [blockchain](https://github.com/btcsuite/btcd/tree/master/blockchain) -
