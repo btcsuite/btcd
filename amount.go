@@ -68,6 +68,11 @@ func round(f float64) Amount {
 // some value in bitcoin.  NewAmount errors if f is NaN or +-Infinity, but
 // does not check that the amount is within the total amount of bitcoin
 // producible as f may not refer to an amount at a single moment in time.
+//
+// NewAmount is for specifically for converting BTC to Satoshi.
+// For creating a new Amount with an int64 value which denotes a quantity of Satoshi,
+// do a simple type conversion from type int64 to Amount.
+// See GoDoc for example: http://godoc.org/github.com/btcsuite/btcutil#example-Amount
 func NewAmount(f float64) (Amount, error) {
 	// The amount is only considered invalid if it cannot be represented
 	// as an integer type.  This may happen if f is NaN or +-Infinity.
