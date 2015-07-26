@@ -329,8 +329,6 @@ func TestTxWireErrors(t *testing.T) {
 		{multiTx, multiTxEncoded, pver, 4, io.ErrShortWrite, io.EOF},
 		// Force error in transaction input previous block hash.
 		{multiTx, multiTxEncoded, pver, 5, io.ErrShortWrite, io.EOF},
-		// Force error in transaction input previous block hash.
-		{multiTx, multiTxEncoded, pver, 5, io.ErrShortWrite, io.EOF},
 		// Force error in transaction input previous block output index.
 		{multiTx, multiTxEncoded, pver, 37, io.ErrShortWrite, io.EOF},
 		// Force error in transaction input signature script length.
@@ -472,8 +470,6 @@ func TestTxSerializeErrors(t *testing.T) {
 		{multiTx, multiTxEncoded, 0, io.ErrShortWrite, io.EOF},
 		// Force error in number of transaction inputs.
 		{multiTx, multiTxEncoded, 4, io.ErrShortWrite, io.EOF},
-		// Force error in transaction input previous block hash.
-		{multiTx, multiTxEncoded, 5, io.ErrShortWrite, io.EOF},
 		// Force error in transaction input previous block hash.
 		{multiTx, multiTxEncoded, 5, io.ErrShortWrite, io.EOF},
 		// Force error in transaction input previous block output index.
