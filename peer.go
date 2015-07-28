@@ -604,28 +604,8 @@ func (p *peer) pushMerkleBlockMsg(sha *chainhash.Hash, doneChan, waitChan chan s
 	}
 
 	// Generate a merkle block by filtering the requested block according
-	// to the filter for the peer and fetch any matched transactions from
-	// the database.
-	merkle, matchedHashes := bloom.NewMerkleBlock(blk, p.filter)
-	txList := p.server.db.FetchTxByShaList(matchedHashes)
-
-	// Warn on any missing transactions which should not happen since the
-	// matched transactions come from an existing block.  Also, find the
-	// final valid transaction index for later.
-	finalValidTxIndex := -1
-	for i, txR := range txList {
-		if txR.Err != nil || txR.Tx == nil {
-			warnMsg := fmt.Sprintf("Failed to fetch transaction "+
-				"%v which was matched by merkle block %v",
-				txR.Sha, sha)
-			if txR.Err != nil {
-				warnMsg += ": " + err.Error()
-			}
-			peerLog.Warnf(warnMsg)
-			continue
-		}
-		finalValidTxIndex = i
-	}
+	// to the filter for the peer.
+	merkle, matchedTxIndices := bloom.NewMerkleBlock(blk, p.filter)
 
 	// Once we have fetched data wait for any previous operation to finish.
 	if waitChan != nil {
@@ -635,20 +615,21 @@ func (p *peer) pushMerkleBlockMsg(sha *chainhash.Hash, doneChan, waitChan chan s
 	// Send the merkleblock.  Only send the done channel with this message
 	// if no transactions will be sent afterwards.
 	var dc chan struct{}
-	if finalValidTxIndex == -1 {
+	if len(matchedTxIndices) == 0 {
 		dc = doneChan
 	}
 	p.QueueMessage(merkle, dc)
 
 	// Finally, send any matched transactions.
-	for i, txR := range txList {
+	blkTransactions := blk.MsgBlock().Transactions
+	for i, txIndex := range matchedTxIndices {
 		// Only send the done channel on the final transaction.
 		var dc chan struct{}
-		if i == finalValidTxIndex {
+		if i == len(matchedTxIndices)-1 {
 			dc = doneChan
 		}
-		if txR.Err == nil && txR.Tx != nil {
-			p.QueueMessage(txR.Tx, dc)
+		if txIndex < uint32(len(blkTransactions)) {
+			p.QueueMessage(blkTransactions[txIndex], dc)
 		}
 	}
 
