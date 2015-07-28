@@ -615,10 +615,9 @@ func handleDebugLevel(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) 
 // createVinList returns a slice of JSON objects for the inputs of the passed
 // transaction.
 func createVinList(mtx *wire.MsgTx) []btcjson.Vin {
-	tx := btcutil.NewTx(mtx)
 	vinList := make([]btcjson.Vin, len(mtx.TxIn))
 	for i, v := range mtx.TxIn {
-		if blockchain.IsCoinBase(tx) {
+		if blockchain.IsCoinBaseTx(mtx) {
 			vinList[i].Coinbase = hex.EncodeToString(v.SignatureScript)
 		} else {
 			vinList[i].Txid = v.PreviousOutPoint.Hash.String()
@@ -644,7 +643,7 @@ func createVoutList(mtx *wire.MsgTx, chainParams *chaincfg.Params) []btcjson.Vou
 	voutList := make([]btcjson.Vout, len(mtx.TxOut))
 	for i, v := range mtx.TxOut {
 		voutList[i].N = uint32(i)
-		voutList[i].Value = float64(v.Value) / btcutil.SatoshiPerBitcoin
+		voutList[i].Value = btcutil.Amount(v.Value).ToBTC()
 
 		// The disassembled string will contain [error] inline if the
 		// script doesn't fully parse, so ignore the error here.
@@ -675,9 +674,9 @@ func createVoutList(mtx *wire.MsgTx, chainParams *chaincfg.Params) []btcjson.Vou
 
 // createTxRawResult converts the passed transaction and associated parameters
 // to a raw transaction JSON object.
-func createTxRawResult(chainParams *chaincfg.Params, txHash string,
-	mtx *wire.MsgTx, blk *btcutil.Block, maxIdx int64,
-	blkHash *wire.ShaHash) (*btcjson.TxRawResult, error) {
+func createTxRawResult(chainParams *chaincfg.Params, mtx *wire.MsgTx,
+	txHash string, blkHeader *wire.BlockHeader, blkHash string,
+	blkHeight int64, chainHeight int64) (*btcjson.TxRawResult, error) {
 
 	mtxHex, err := messageToHex(mtx)
 	if err != nil {
@@ -693,15 +692,12 @@ func createTxRawResult(chainParams *chaincfg.Params, txHash string,
 		LockTime: mtx.LockTime,
 	}
 
-	if blk != nil {
-		blockHeader := &blk.MsgBlock().Header
-		idx := blk.Height()
-
+	if blkHeader != nil {
 		// This is not a typo, they are identical in bitcoind as well.
-		txReply.Time = blockHeader.Timestamp.Unix()
-		txReply.Blocktime = blockHeader.Timestamp.Unix()
-		txReply.BlockHash = blkHash.String()
-		txReply.Confirmations = uint64(1 + maxIdx - idx)
+		txReply.Time = blkHeader.Timestamp.Unix()
+		txReply.Blocktime = blkHeader.Timestamp.Unix()
+		txReply.BlockHash = blkHash
+		txReply.Confirmations = uint64(1 + chainHeight - blkHeight)
 	}
 
 	return txReply, nil
@@ -1035,11 +1031,9 @@ func handleGetBlock(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (i
 		txns := blk.Transactions()
 		rawTxns := make([]btcjson.TxRawResult, len(txns))
 		for i, tx := range txns {
-			txHash := tx.Sha().String()
-			mtx := tx.MsgTx()
-
 			rawTxn, err := createTxRawResult(s.server.chainParams,
-				txHash, mtx, blk, maxIdx, sha)
+				tx.MsgTx(), tx.Sha().String(), blockHeader,
+				sha.String(), idx, maxIdx)
 			if err != nil {
 				return nil, err
 			}
@@ -2258,6 +2252,7 @@ func handleGetRawTransaction(s *rpcServer, cmd interface{}, closeChan <-chan str
 	// try the block database.
 	var mtx *wire.MsgTx
 	var blkHash *wire.ShaHash
+	var blkHeight int64
 	tx, err := s.server.txMemPool.FetchTransaction(txHash)
 	if err != nil {
 		txList, err := s.server.db.FetchTxBySha(txHash)
@@ -2268,10 +2263,10 @@ func handleGetRawTransaction(s *rpcServer, cmd interface{}, closeChan <-chan str
 			}
 		}
 
-		lastTx := len(txList) - 1
-		mtx = txList[lastTx].Tx
-
-		blkHash = txList[lastTx].BlkSha
+		lastTx := txList[len(txList)-1]
+		mtx = lastTx.Tx
+		blkHash = lastTx.BlkSha
+		blkHeight = lastTx.Height
 	} else {
 		mtx = tx.MsgTx()
 	}
@@ -2290,10 +2285,11 @@ func handleGetRawTransaction(s *rpcServer, cmd interface{}, closeChan <-chan str
 		return mtxHex, nil
 	}
 
-	var blk *btcutil.Block
-	var maxIdx int64
+	var blkHeader *wire.BlockHeader
+	var blkHashStr string
+	var chainHeight int64
 	if blkHash != nil {
-		blk, err = s.server.db.FetchBlockBySha(blkHash)
+		blkHeader, err = s.server.db.FetchBlockHeaderBySha(blkHash)
 		if err != nil {
 			rpcsLog.Errorf("Error fetching sha: %v", err)
 			return nil, &btcjson.RPCError{
@@ -2302,15 +2298,17 @@ func handleGetRawTransaction(s *rpcServer, cmd interface{}, closeChan <-chan str
 			}
 		}
 
-		_, maxIdx, err = s.server.db.NewestSha()
+		_, chainHeight, err = s.server.db.NewestSha()
 		if err != nil {
 			context := "Failed to get newest hash"
 			return nil, internalRPCError(err.Error(), context)
 		}
+
+		blkHashStr = blkHash.String()
 	}
 
-	rawTxn, err := createTxRawResult(s.server.chainParams, c.Txid, mtx, blk,
-		maxIdx, blkHash)
+	rawTxn, err := createTxRawResult(s.server.chainParams, mtx,
+		txHash.String(), blkHeader, blkHashStr, blkHeight, chainHeight)
 	if err != nil {
 		return nil, err
 	}
@@ -2946,9 +2944,11 @@ func handleSearchRawTransactions(s *rpcServer, cmd interface{}, closeChan <-chan
 		// within a block. So we conditionally fetch a txs
 		// embedded block here. This will be reflected in the
 		// final JSON output (mempool won't have confirmations).
-		var blk *btcutil.Block
+		var blkHeader *wire.BlockHeader
+		var blkHashStr string
+		var blkHeight int64
 		if txReply.BlkSha != nil {
-			blk, err = s.server.db.FetchBlockBySha(txReply.BlkSha)
+			blkHeader, err = s.server.db.FetchBlockHeaderBySha(txReply.BlkSha)
 			if err != nil {
 				rpcsLog.Errorf("Error fetching sha: %v", err)
 				return nil, &btcjson.RPCError{
@@ -2956,15 +2956,12 @@ func handleSearchRawTransactions(s *rpcServer, cmd interface{}, closeChan <-chan
 					Message: "Block not found",
 				}
 			}
+			blkHashStr = txReply.BlkSha.String()
+			blkHeight = txReply.Height
 		}
 
-		var blkHash *wire.ShaHash
-		if blk != nil {
-			blkHash = blk.Sha()
-		}
-
-		rawTxn, err := createTxRawResult(s.server.chainParams,
-			txHash, mtx, blk, maxIdx, blkHash)
+		rawTxn, err := createTxRawResult(s.server.chainParams, mtx,
+			txHash, blkHeader, blkHashStr, blkHeight, maxIdx)
 		if err != nil {
 			return nil, err
 		}
