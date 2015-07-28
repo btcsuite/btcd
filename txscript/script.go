@@ -300,9 +300,6 @@ func calcSignatureHash(script []parsedOpcode, hashType SigHashType, tx *wire.Msg
 	// inputs that are not currently being processed.
 	txCopy := tx.Copy()
 	for i := range txCopy.TxIn {
-		var txIn wire.TxIn
-		txIn = *txCopy.TxIn[i]
-		txCopy.TxIn[i] = &txIn
 		if i == idx {
 			// UnparseScript cannot fail here because removeOpcode
 			// above only returns a valid script.
@@ -311,13 +308,6 @@ func calcSignatureHash(script []parsedOpcode, hashType SigHashType, tx *wire.Msg
 		} else {
 			txCopy.TxIn[i].SignatureScript = nil
 		}
-	}
-
-	// Default behavior has all outputs set up.
-	for i := range txCopy.TxOut {
-		var txOut wire.TxOut
-		txOut = *txCopy.TxOut[i]
-		txCopy.TxOut[i] = &txOut
 	}
 
 	switch hashType & sigHashMask {
