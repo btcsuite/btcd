@@ -1596,8 +1596,8 @@ type rescanKeys struct {
 	fallbacks           map[string]struct{}
 	pubKeyHashes        map[[ripemd160.Size]byte]struct{}
 	scriptHashes        map[[ripemd160.Size]byte]struct{}
-	compressedPubkeys   map[[33]byte]struct{}
-	uncompressedPubkeys map[[65]byte]struct{}
+	compressedPubKeys   map[[33]byte]struct{}
+	uncompressedPubKeys map[[65]byte]struct{}
 	unspent             map[wire.OutPoint]struct{}
 }
 
@@ -1684,14 +1684,14 @@ func rescanBlock(wsc *wsClient, lookups *rescanKeys, blk *btcutil.Block) {
 					case 33: // Compressed
 						var key [33]byte
 						copy(key[:], sa)
-						if _, ok := lookups.compressedPubkeys[key]; ok {
+						if _, ok := lookups.compressedPubKeys[key]; ok {
 							found = true
 						}
 
 					case 65: // Uncompressed
 						var key [65]byte
 						copy(key[:], sa)
-						if _, ok := lookups.uncompressedPubkeys[key]; ok {
+						if _, ok := lookups.uncompressedPubKeys[key]; ok {
 							found = true
 						}
 
@@ -1839,8 +1839,8 @@ func handleRescan(wsc *wsClient, icmd interface{}) (interface{}, error) {
 		fallbacks:           map[string]struct{}{},
 		pubKeyHashes:        map[[ripemd160.Size]byte]struct{}{},
 		scriptHashes:        map[[ripemd160.Size]byte]struct{}{},
-		compressedPubkeys:   map[[33]byte]struct{}{},
-		uncompressedPubkeys: map[[65]byte]struct{}{},
+		compressedPubKeys:   map[[33]byte]struct{}{},
+		uncompressedPubKeys: map[[65]byte]struct{}{},
 		unspent:             map[wire.OutPoint]struct{}{},
 	}
 	var compressedPubkey [33]byte
@@ -1867,11 +1867,11 @@ func handleRescan(wsc *wsClient, icmd interface{}) (interface{}, error) {
 			switch len(pubkeyBytes) {
 			case 33: // Compressed
 				copy(compressedPubkey[:], pubkeyBytes)
-				lookups.compressedPubkeys[compressedPubkey] = struct{}{}
+				lookups.compressedPubKeys[compressedPubkey] = struct{}{}
 
 			case 65: // Uncompressed
 				copy(uncompressedPubkey[:], pubkeyBytes)
-				lookups.uncompressedPubkeys[uncompressedPubkey] = struct{}{}
+				lookups.uncompressedPubKeys[uncompressedPubkey] = struct{}{}
 
 			default:
 				jsonErr := btcjson.RPCError{
