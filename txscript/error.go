@@ -60,9 +60,9 @@ var (
 	// without and OP_ENDIF to correspond to a conditional expression.
 	ErrStackMissingEndif = fmt.Errorf("execute fail, in conditional execution")
 
-	// ErrStackTooManyPubkeys is returned if an OP_CHECKMULTISIG is
+	// ErrStackTooManyPubKeys is returned if an OP_CHECKMULTISIG is
 	// encountered with more than MaxPubKeysPerMultiSig pubkeys present.
-	ErrStackTooManyPubkeys = errors.New("Invalid pubkey count in OP_CHECKMULTISIG")
+	ErrStackTooManyPubKeys = errors.New("Invalid pubkey count in OP_CHECKMULTISIG")
 
 	// ErrStackTooManyOperations is returned if a script has more than
 	// MaxOpsPerScript opcodes that do not push data.
