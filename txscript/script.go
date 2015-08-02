@@ -27,6 +27,7 @@ const (
 	SigHashAll          SigHashType = 0x1
 	SigHashNone         SigHashType = 0x2
 	SigHashSingle       SigHashType = 0x3
+	SigHashNoInput      SigHashType = 0x40
 	SigHashAnyOneCanPay SigHashType = 0x80
 
 	// sigHashMask defines the number of bits of the hash type which is used
@@ -350,12 +351,27 @@ func calcSignatureHash(script []parsedOpcode, hashType SigHashType, tx *wire.Msg
 		idx = 0
 	}
 
+	if hashType&SigHashNoInput != 0 {
+		// Using SigHashNoInput indicates that the resulting signature
+		// should not cover any of the previous out points. So we
+		// replace all prevOut's with a "NULL" prevOut, thus leaving
+		// out input TXID's and vouts from the sigHash
+		for i := range txCopy.TxIn {
+			// 00000000000000000000000000000000:4294967295
+			var zeroHash wire.ShaHash
+			txCopy.TxIn[i].PreviousOutPoint.Hash = zeroHash
+			txCopy.TxIn[i].PreviousOutPoint.Index = (1 << 32) - 1
+		}
+	}
+
 	// The final hash is the double sha256 of both the serialized modified
 	// transaction and the hash type (encoded as a 4-byte little-endian
 	// value) appended.
 	var wbuf bytes.Buffer
 	txCopy.Serialize(&wbuf)
 	binary.Write(&wbuf, binary.LittleEndian, uint32(hashType))
+	// TODO(roasbeef): Ideally SigHashNoInput should always be used with
+	// SigHashWithInputValue to constrain risk of replay.
 	return wire.DoubleSha256(wbuf.Bytes())
 }
 
