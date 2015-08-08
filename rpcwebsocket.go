@@ -1759,7 +1759,7 @@ func rescanBlock(wsc *wsClient, lookups *rescanKeys, blk *btcutil.Block) {
 // verifies that the new range of blocks is on the same fork as a previous
 // range of blocks.  If this condition does not hold true, the JSON-RPC error
 // for an unrecoverable reorganize is returned.
-func recoverFromReorg(db database.Db, minBlock, maxBlock int64,
+func recoverFromReorg(db database.Db, minBlock, maxBlock int32,
 	lastBlock *wire.ShaHash) ([]wire.ShaHash, error) {
 
 	hashList, err := db.FetchHeightRange(minBlock, maxBlock)
@@ -2023,7 +2023,7 @@ fetchRange:
 				// A goto is used to branch executation back to
 				// before the range was evaluated, as it must be
 				// reevaluated for the new hashList.
-				minBlock += int64(i)
+				minBlock += int32(i)
 				hashList, err = recoverFromReorg(db, minBlock,
 					maxBlock, lastBlockHash)
 				if err != nil {
@@ -2083,7 +2083,7 @@ fetchRange:
 			}
 		}
 
-		minBlock += int64(len(hashList))
+		minBlock += int32(len(hashList))
 	}
 
 	// Notify websocket client of the finished rescan.  Due to how btcd

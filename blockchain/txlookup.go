@@ -17,7 +17,7 @@ import (
 type TxData struct {
 	Tx          *btcutil.Tx
 	Hash        *wire.ShaHash
-	BlockHeight int64
+	BlockHeight int32
 	Spent       []bool
 	Err         error
 }

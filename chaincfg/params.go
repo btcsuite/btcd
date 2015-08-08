@@ -44,7 +44,7 @@ var (
 // documentation for blockchain.IsCheckpointCandidate for details on the
 // selection criteria.
 type Checkpoint struct {
-	Height int64
+	Height int32
 	Hash   *wire.ShaHash
 }
 

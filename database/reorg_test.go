@@ -33,7 +33,7 @@ func testReorganization(t *testing.T, dbType string) {
 		t.Fatalf("Error loading file: %v", err)
 	}
 
-	for i := int64(0); i <= 2; i++ {
+	for i := int32(0); i <= 2; i++ {
 		_, err = db.InsertBlock(blocks[i])
 		if err != nil {
 			t.Fatalf("Error inserting block %d (%v): %v", i,
@@ -45,7 +45,7 @@ func testReorganization(t *testing.T, dbType string) {
 		}
 	}
 
-	for i := int64(1); i >= 0; i-- {
+	for i := int32(1); i >= 0; i-- {
 		blkHash := blocks[i].Sha()
 		err = db.DropAfterBlockBySha(blkHash)
 		if err != nil {
@@ -63,7 +63,7 @@ func testReorganization(t *testing.T, dbType string) {
 		}
 	}
 
-	for i := int64(3); i < int64(len(blocks)); i++ {
+	for i := int32(3); i < int32(len(blocks)); i++ {
 		blkHash := blocks[i].Sha()
 		if err != nil {
 			t.Fatalf("Error getting SHA for block %dA: %v", i-2, err)
@@ -79,7 +79,7 @@ func testReorganization(t *testing.T, dbType string) {
 		t.Fatalf("Error getting newest block info")
 	}
 
-	for i := int64(0); i <= maxHeight; i++ {
+	for i := int32(0); i <= maxHeight; i++ {
 		blkHash, err := db.FetchBlockShaByHeight(i)
 		if err != nil {
 			t.Fatalf("Error fetching SHA for block %d: %v", i, err)
@@ -126,7 +126,7 @@ func loadReorgBlocks(filename string) ([]*btcutil.Block, error) {
 	var block *btcutil.Block
 
 	err = nil
-	for height := int64(1); err == nil; height++ {
+	for height := int32(1); err == nil; height++ {
 		var rintbuf uint32
 		err = binary.Read(dr, binary.LittleEndian, &rintbuf)
 		if err == io.EOF {

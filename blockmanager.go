@@ -150,7 +150,7 @@ type pauseMsg struct {
 // headerNode is used as a node in a list of headers that are linked together
 // between checkpoints.
 type headerNode struct {
-	height int64
+	height int32
 	sha    *wire.ShaHash
 }
 
@@ -163,7 +163,7 @@ type headerNode struct {
 type chainState struct {
 	sync.Mutex
 	newestHash        *wire.ShaHash
-	newestHeight      int64
+	newestHeight      int32
 	pastMedianTime    time.Time
 	pastMedianTimeErr error
 }
@@ -172,7 +172,7 @@ type chainState struct {
 // chain.
 //
 // This function is safe for concurrent access.
-func (c *chainState) Best() (*wire.ShaHash, int64) {
+func (c *chainState) Best() (*wire.ShaHash, int32) {
 	c.Lock()
 	defer c.Unlock()
 
@@ -207,7 +207,7 @@ type blockManager struct {
 
 // resetHeaderState sets the headers-first mode state to values appropriate for
 // syncing from a new peer.
-func (b *blockManager) resetHeaderState(newestHash *wire.ShaHash, newestHeight int64) {
+func (b *blockManager) resetHeaderState(newestHash *wire.ShaHash, newestHeight int32) {
 	b.headersFirstMode = false
 	b.headerList.Init()
 	b.startHeader = nil
@@ -225,7 +225,7 @@ func (b *blockManager) resetHeaderState(newestHash *wire.ShaHash, newestHeight i
 // This allows fast access to chain information since btcchain is currently not
 // safe for concurrent access and the block manager is typically quite busy
 // processing block and inventory.
-func (b *blockManager) updateChainState(newestHash *wire.ShaHash, newestHeight int64) {
+func (b *blockManager) updateChainState(newestHash *wire.ShaHash, newestHeight int32) {
 	b.chainState.Lock()
 	defer b.chainState.Unlock()
 
@@ -243,7 +243,7 @@ func (b *blockManager) updateChainState(newestHash *wire.ShaHash, newestHeight i
 // It returns nil when there is not one either because the height is already
 // later than the final checkpoint or some other reason such as disabled
 // checkpoints.
-func (b *blockManager) findNextHeaderCheckpoint(height int64) *chaincfg.Checkpoint {
+func (b *blockManager) findNextHeaderCheckpoint(height int32) *chaincfg.Checkpoint {
 	// There is no next checkpoint if checkpoints are disabled or there are
 	// none for this current network.
 	if cfg.DisableCheckpoints {
@@ -524,7 +524,7 @@ func (b *blockManager) current() bool {
 	// TODO(oga) we can get chain to return the height of each block when we
 	// parse an orphan, which would allow us to update the height of peers
 	// from what it was at initial handshake.
-	if err != nil || height < int64(b.syncPeer.lastBlock) {
+	if err != nil || height < b.syncPeer.lastBlock {
 		return false
 	}
 	return true

@@ -32,7 +32,7 @@ var (
 // tTxInsertData holds information about the location and spent status of
 // a transaction.
 type tTxInsertData struct {
-	blockHeight int64
+	blockHeight int32
 	offset      int
 	spentBuf    []bool
 }
@@ -86,7 +86,7 @@ type MemDb struct {
 
 	// blocksBySha keeps track of block heights by hash.  The height can
 	// be used as an index into the blocks slice.
-	blocksBySha map[wire.ShaHash]int64
+	blocksBySha map[wire.ShaHash]int32
 
 	// txns holds information about transactions such as which their
 	// block height and spent status of all their outputs.
@@ -177,7 +177,7 @@ func (db *MemDb) DropAfterBlockBySha(sha *wire.ShaHash) error {
 	// backwards from the last block through the block just after the passed
 	// block.  While doing this unspend all transactions in each block and
 	// remove the block.
-	endHeight := int64(len(db.blocks) - 1)
+	endHeight := int32(len(db.blocks) - 1)
 	for i := endHeight; i > height; i-- {
 		// Unspend and remove each transaction in reverse order because
 		// later transactions in a block can reference earlier ones.
@@ -237,7 +237,7 @@ func (db *MemDb) FetchBlockBySha(sha *wire.ShaHash) (*btcutil.Block, error) {
 
 // FetchBlockHeightBySha returns the block height for the given hash.  This is
 // part of the database.Db interface implementation.
-func (db *MemDb) FetchBlockHeightBySha(sha *wire.ShaHash) (int64, error) {
+func (db *MemDb) FetchBlockHeightBySha(sha *wire.ShaHash) (int32, error) {
 	db.Lock()
 	defer db.Unlock()
 
@@ -275,7 +275,7 @@ func (db *MemDb) FetchBlockHeaderBySha(sha *wire.ShaHash) (*wire.BlockHeader, er
 
 // FetchBlockShaByHeight returns a block hash based on its height in the block
 // chain.  This is part of the database.Db interface implementation.
-func (db *MemDb) FetchBlockShaByHeight(height int64) (*wire.ShaHash, error) {
+func (db *MemDb) FetchBlockShaByHeight(height int32) (*wire.ShaHash, error) {
 	db.Lock()
 	defer db.Unlock()
 
@@ -283,7 +283,7 @@ func (db *MemDb) FetchBlockShaByHeight(height int64) (*wire.ShaHash, error) {
 		return nil, ErrDbClosed
 	}
 
-	numBlocks := int64(len(db.blocks))
+	numBlocks := int32(len(db.blocks))
 	if height < 0 || height > numBlocks-1 {
 		return nil, fmt.Errorf("unable to fetch block height %d since "+
 			"it is not within the valid range (%d-%d)", height, 0,
@@ -299,7 +299,7 @@ func (db *MemDb) FetchBlockShaByHeight(height int64) (*wire.ShaHash, error) {
 // Fetch is inclusive of the start height and exclusive of the ending height.
 // To fetch all hashes from the start height until no more are present, use the
 // special id `AllShas'.  This is part of the database.Db interface implementation.
-func (db *MemDb) FetchHeightRange(startHeight, endHeight int64) ([]wire.ShaHash, error) {
+func (db *MemDb) FetchHeightRange(startHeight, endHeight int32) ([]wire.ShaHash, error) {
 	db.Lock()
 	defer db.Unlock()
 
@@ -310,7 +310,7 @@ func (db *MemDb) FetchHeightRange(startHeight, endHeight int64) ([]wire.ShaHash,
 	// When the user passes the special AllShas id, adjust the end height
 	// accordingly.
 	if endHeight == database.AllShas {
-		endHeight = int64(len(db.blocks))
+		endHeight = int32(len(db.blocks))
 	}
 
 	// Ensure requested heights are sane.
@@ -325,7 +325,7 @@ func (db *MemDb) FetchHeightRange(startHeight, endHeight int64) ([]wire.ShaHash,
 	}
 
 	// Fetch as many as are availalbe within the specified range.
-	lastBlockIndex := int64(len(db.blocks) - 1)
+	lastBlockIndex := int32(len(db.blocks) - 1)
 	hashList := make([]wire.ShaHash, 0, endHeight-startHeight)
 	for i := startHeight; i < endHeight; i++ {
 		if i > lastBlockIndex {
@@ -515,7 +515,7 @@ func (db *MemDb) FetchUnSpentTxByShaList(txShaList []*wire.ShaHash) []*database.
 // genesis block.  Every subsequent block insert requires the referenced parent
 // block to already exist.  This is part of the database.Db interface
 // implementation.
-func (db *MemDb) InsertBlock(block *btcutil.Block) (int64, error) {
+func (db *MemDb) InsertBlock(block *btcutil.Block) (int32, error) {
 	db.Lock()
 	defer db.Unlock()
 
@@ -547,7 +547,7 @@ func (db *MemDb) InsertBlock(block *btcutil.Block) (int64, error) {
 	// Although these checks could could be done in the loop below, checking
 	// for error conditions up front means the code below doesn't have to
 	// deal with rollback on errors.
-	newHeight := int64(len(db.blocks))
+	newHeight := int32(len(db.blocks))
 	for i, tx := range transactions {
 		// Two old blocks contain duplicate transactions due to being
 		// mined by faulty miners and accepted by the origin Satoshi
@@ -656,7 +656,7 @@ func (db *MemDb) InsertBlock(block *btcutil.Block) (int64, error) {
 // the block chain.  It will return the zero hash, -1 for the block height, and
 // no error (nil) if there are not any blocks in the database yet.  This is part
 // of the database.Db interface implementation.
-func (db *MemDb) NewestSha() (*wire.ShaHash, int64, error) {
+func (db *MemDb) NewestSha() (*wire.ShaHash, int32, error) {
 	db.Lock()
 	defer db.Unlock()
 
@@ -672,18 +672,18 @@ func (db *MemDb) NewestSha() (*wire.ShaHash, int64, error) {
 	}
 
 	blockSha := db.blocks[numBlocks-1].BlockSha()
-	return &blockSha, int64(numBlocks - 1), nil
+	return &blockSha, int32(numBlocks - 1), nil
 }
 
 // FetchAddrIndexTip isn't currently implemented. This is a part of the
 // database.Db interface implementation.
-func (db *MemDb) FetchAddrIndexTip() (*wire.ShaHash, int64, error) {
+func (db *MemDb) FetchAddrIndexTip() (*wire.ShaHash, int32, error) {
 	return nil, 0, database.ErrNotImplemented
 }
 
 // UpdateAddrIndexForBlock isn't currently implemented. This is a part of the
 // database.Db interface implementation.
-func (db *MemDb) UpdateAddrIndexForBlock(*wire.ShaHash, int64,
+func (db *MemDb) UpdateAddrIndexForBlock(*wire.ShaHash, int32,
 	database.BlockAddrIndex) error {
 	return database.ErrNotImplemented
 }
@@ -737,7 +737,7 @@ func (db *MemDb) Sync() error {
 func newMemDb() *MemDb {
 	db := MemDb{
 		blocks:      make([]*wire.MsgBlock, 0, 200000),
-		blocksBySha: make(map[wire.ShaHash]int64),
+		blocksBySha: make(map[wire.ShaHash]int32),
 		txns:        make(map[wire.ShaHash][]*tTxInsertData),
 	}
 	return &db

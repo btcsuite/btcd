@@ -48,8 +48,8 @@ func (b *BlockChain) BlockLocatorFromHash(hash *wire.ShaHash) BlockLocator {
 	// Attempt to find the height of the block that corresponds to the
 	// passed hash, and if it's on a side chain, also find the height at
 	// which it forks from the main chain.
-	blockHeight := int64(-1)
-	forkHeight := int64(-1)
+	blockHeight := int32(-1)
+	forkHeight := int32(-1)
 	node, exists := b.index[*hash]
 	if !exists {
 		// Try to look up the height for passed block hash.  Assume an
@@ -80,7 +80,7 @@ func (b *BlockChain) BlockLocatorFromHash(hash *wire.ShaHash) BlockLocator {
 	// in the BlockLocator comment and make sure to leave room for the
 	// final genesis hash.
 	iterNode := node
-	increment := int64(1)
+	increment := int32(1)
 	for len(locator) < wire.MaxBlockLocatorsPerMsg-1 {
 		// Once there are 10 locators, exponentially increase the
 		// distance between each block locator.

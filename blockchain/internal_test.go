@@ -19,7 +19,7 @@ import (
 
 // TstSetCoinbaseMaturity makes the ability to set the coinbase maturity
 // available to the test package.
-func TstSetCoinbaseMaturity(maturity int64) {
+func TstSetCoinbaseMaturity(maturity int32) {
 	coinbaseMaturity = maturity
 }
 

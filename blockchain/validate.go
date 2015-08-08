@@ -55,7 +55,7 @@ var (
 	// coinbaseMaturity is the internal variable used for validating the
 	// spending of coinbase outputs.  A variable rather than the exported
 	// constant is used because the tests need the ability to modify it.
-	coinbaseMaturity = int64(CoinbaseMaturity)
+	coinbaseMaturity = int32(CoinbaseMaturity)
 
 	// zeroHash is the zero value for a wire.ShaHash and is defined as
 	// a package level variable to avoid the need to create a new instance
@@ -128,7 +128,7 @@ func IsCoinBase(tx *btcutil.Tx) bool {
 }
 
 // IsFinalizedTransaction determines whether or not a transaction is finalized.
-func IsFinalizedTransaction(tx *btcutil.Tx, blockHeight int64, blockTime time.Time) bool {
+func IsFinalizedTransaction(tx *btcutil.Tx, blockHeight int32, blockTime time.Time) bool {
 	msgTx := tx.MsgTx()
 
 	// Lock time of zero means the transaction is finalized.
@@ -143,7 +143,7 @@ func IsFinalizedTransaction(tx *btcutil.Tx, blockHeight int64, blockTime time.Ti
 	// threshold it is a block height.
 	blockTimeOrHeight := int64(0)
 	if lockTime < txscript.LockTimeThreshold {
-		blockTimeOrHeight = blockHeight
+		blockTimeOrHeight = int64(blockHeight)
 	} else {
 		blockTimeOrHeight = blockTime.Unix()
 	}
@@ -187,13 +187,13 @@ func isBIP0030Node(node *blockNode) bool {
 //
 // At the target block generation rate for the main network, this is
 // approximately every 4 years.
-func CalcBlockSubsidy(height int64, chainParams *chaincfg.Params) int64 {
+func CalcBlockSubsidy(height int32, chainParams *chaincfg.Params) int64 {
 	if chainParams.SubsidyHalvingInterval == 0 {
 		return baseSubsidy
 	}
 
 	// Equivalent to: baseSubsidy / 2^(height/subsidyHalvingInterval)
-	return baseSubsidy >> uint(height/int64(chainParams.SubsidyHalvingInterval))
+	return baseSubsidy >> uint(height/chainParams.SubsidyHalvingInterval)
 }
 
 // CheckTransactionSanity performs some preliminary checks on a transaction to
@@ -738,7 +738,7 @@ func (b *BlockChain) checkBlockContext(block *btcutil.Block, prevNode *blockNode
 // ExtractCoinbaseHeight attempts to extract the height of the block from the
 // scriptSig of a coinbase transaction.  Coinbase heights are only present in
 // blocks of version 2 or later.  This was added as part of BIP0034.
-func ExtractCoinbaseHeight(coinbaseTx *btcutil.Tx) (int64, error) {
+func ExtractCoinbaseHeight(coinbaseTx *btcutil.Tx) (int32, error) {
 	sigScript := coinbaseTx.MsgTx().TxIn[0].SignatureScript
 	if len(sigScript) < 1 {
 		str := "the coinbase signature script for blocks of " +
@@ -761,12 +761,12 @@ func ExtractCoinbaseHeight(coinbaseTx *btcutil.Tx) (int64, error) {
 	copy(serializedHeightBytes, sigScript[1:serializedLen+1])
 	serializedHeight := binary.LittleEndian.Uint64(serializedHeightBytes)
 
-	return int64(serializedHeight), nil
+	return int32(serializedHeight), nil
 }
 
 // checkSerializedHeight checks if the signature script in the passed
 // transaction starts with the serialized block height of wantHeight.
-func checkSerializedHeight(coinbaseTx *btcutil.Tx, wantHeight int64) error {
+func checkSerializedHeight(coinbaseTx *btcutil.Tx, wantHeight int32) error {
 	serializedHeight, err := ExtractCoinbaseHeight(coinbaseTx)
 	if err != nil {
 		return err
@@ -849,7 +849,7 @@ func (b *BlockChain) checkBIP0030(node *blockNode, block *btcutil.Block) error {
 // amount, and verifying the signatures to prove the spender was the owner of
 // the bitcoins and therefore allowed to spend them.  As it checks the inputs,
 // it also calculates the total fees for the transaction and returns that value.
-func CheckTransactionInputs(tx *btcutil.Tx, txHeight int64, txStore TxStore) (int64, error) {
+func CheckTransactionInputs(tx *btcutil.Tx, txHeight int32, txStore TxStore) (int64, error) {
 	// Coinbase transactions have no inputs.
 	if IsCoinBase(tx) {
 		return 0, nil

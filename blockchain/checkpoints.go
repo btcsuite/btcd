@@ -59,7 +59,7 @@ func (b *BlockChain) LatestCheckpoint() *chaincfg.Checkpoint {
 // verifyCheckpoint returns whether the passed block height and hash combination
 // match the hard-coded checkpoint data.  It also returns true if there is no
 // checkpoint data for the passed block height.
-func (b *BlockChain) verifyCheckpoint(height int64, hash *wire.ShaHash) bool {
+func (b *BlockChain) verifyCheckpoint(height int32, hash *wire.ShaHash) bool {
 	if b.noCheckpoints || len(b.chainParams.Checkpoints) == 0 {
 		return true
 	}

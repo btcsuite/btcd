@@ -167,7 +167,7 @@ var errBadShaPrefix = errors.New("invalid prefix")
 var errBadShaLen = errors.New("invalid len")
 var errBadShaChar = errors.New("invalid character")
 
-func parsesha(argstr string) (argtype int, height int64, psha *wire.ShaHash, err error) {
+func parsesha(argstr string) (argtype int, height int32, psha *wire.ShaHash, err error) {
 	var sha wire.ShaHash
 
 	var hashbuf string
@@ -189,7 +189,7 @@ func parsesha(argstr string) (argtype int, height int64, psha *wire.ShaHash, err
 			var h int
 			h, err = strconv.Atoi(argstr)
 			if err == nil {
-				height = int64(h)
+				height = int32(h)
 				return
 			}
 			log.Infof("Unable to parse height %v, err %v", height, err)

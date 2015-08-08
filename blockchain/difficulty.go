@@ -25,7 +25,7 @@ const (
 	// BlocksPerRetarget is the number of blocks between each difficulty
 	// retarget.  It is calculated based on the desired block generation
 	// rate.
-	BlocksPerRetarget = int64(targetTimespan / targetSpacing)
+	BlocksPerRetarget = int32(targetTimespan / targetSpacing)
 
 	// retargetAdjustmentFactor is the adjustment factor used to limit
 	// the minimum and maximum amount of adjustment that can occur between
@@ -295,7 +295,7 @@ func (b *BlockChain) calcNextRequiredDifficulty(lastNode *blockNode, newBlockTim
 	// Get the block node at the previous retarget (targetTimespan days
 	// worth of blocks).
 	firstNode := lastNode
-	for i := int64(0); i < BlocksPerRetarget-1 && firstNode != nil; i++ {
+	for i := int32(0); i < BlocksPerRetarget-1 && firstNode != nil; i++ {
 		// Get the previous block node.  This function is used over
 		// simply accessing firstNode.parent directly as it will
 		// dynamically create previous block nodes as needed.  This

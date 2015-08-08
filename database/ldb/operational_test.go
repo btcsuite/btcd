@@ -72,7 +72,7 @@ func TestOperational(t *testing.T) {
 
 // testAddrIndexOperations ensures that all normal operations concerning
 // the optional address index function correctly.
-func testAddrIndexOperations(t *testing.T, db database.Db, newestBlock *btcutil.Block, newestSha *wire.ShaHash, newestBlockIdx int64) {
+func testAddrIndexOperations(t *testing.T, db database.Db, newestBlock *btcutil.Block, newestSha *wire.ShaHash, newestBlockIdx int32) {
 	// Metadata about the current addr index state should be unset.
 	sha, height, err := db.FetchAddrIndexTip()
 	if err != database.ErrAddrIndexDoesNotExist {
@@ -188,7 +188,7 @@ func testAddrIndexOperations(t *testing.T, db database.Db, newestBlock *btcutil.
 
 }
 
-func assertAddrIndexTipIsUpdated(db database.Db, t *testing.T, newestSha *wire.ShaHash, newestBlockIdx int64) {
+func assertAddrIndexTipIsUpdated(db database.Db, t *testing.T, newestSha *wire.ShaHash, newestBlockIdx int32) {
 	// Safe to ignore error, since height will be < 0 in "error" case.
 	sha, height, _ := db.FetchAddrIndexTip()
 	if newestBlockIdx != height {
@@ -215,7 +215,7 @@ func testOperationalMode(t *testing.T) {
 	defer testDb.cleanUpFunc()
 	err = nil
 out:
-	for height := int64(0); height < int64(len(testDb.blocks)); height++ {
+	for height := int32(0); height < int32(len(testDb.blocks)); height++ {
 		block := testDb.blocks[height]
 		mblock := block.MsgBlock()
 		var txneededList []*wire.ShaHash
@@ -306,7 +306,7 @@ func testBackout(t *testing.T) {
 	}
 
 	err = nil
-	for height := int64(0); height < int64(len(testDb.blocks)); height++ {
+	for height := int32(0); height < int32(len(testDb.blocks)); height++ {
 		if height == 100 {
 			t.Logf("Syncing at block height 100")
 			testDb.db.Sync()
@@ -417,7 +417,7 @@ func loadBlocks(t *testing.T, file string) (blocks []*btcutil.Block, err error) 
 
 	var block *btcutil.Block
 	err = nil
-	for height := int64(1); err == nil; height++ {
+	for height := int32(1); err == nil; height++ {
 		var rintbuf uint32
 		err = binary.Read(dr, binary.LittleEndian, &rintbuf)
 		if err == io.EOF {
@@ -456,18 +456,18 @@ func loadBlocks(t *testing.T, file string) (blocks []*btcutil.Block, err error) 
 
 func testFetchHeightRange(t *testing.T, db database.Db, blocks []*btcutil.Block) {
 
-	var testincrement int64 = 50
-	var testcnt int64 = 100
+	var testincrement int32 = 50
+	var testcnt int32 = 100
 
 	shanames := make([]*wire.ShaHash, len(blocks))
 
-	nBlocks := int64(len(blocks))
+	nBlocks := int32(len(blocks))
 
 	for i := range blocks {
 		shanames[i] = blocks[i].Sha()
 	}
 
-	for startheight := int64(0); startheight < nBlocks; startheight += testincrement {
+	for startheight := int32(0); startheight < nBlocks; startheight += testincrement {
 		endheight := startheight + testcnt
 
 		if endheight > nBlocks {
@@ -480,20 +480,20 @@ func testFetchHeightRange(t *testing.T, db database.Db, blocks []*btcutil.Block)
 		}
 
 		if endheight == database.AllShas {
-			if int64(len(shalist)) != nBlocks-startheight {
+			if int32(len(shalist)) != nBlocks-startheight {
 				t.Errorf("FetchHeightRange: expected A %v shas, got %v", nBlocks-startheight, len(shalist))
 			}
 		} else {
-			if int64(len(shalist)) != testcnt {
+			if int32(len(shalist)) != testcnt {
 				t.Errorf("FetchHeightRange: expected %v shas, got %v", testcnt, len(shalist))
 			}
 		}
 
 		for i := range shalist {
-			sha0 := *shanames[int64(i)+startheight]
+			sha0 := *shanames[int32(i)+startheight]
 			sha1 := shalist[i]
 			if sha0 != sha1 {
-				t.Errorf("FetchHeightRange: mismatch sha at %v requested range %v %v: %v %v ", int64(i)+startheight, startheight, endheight, sha0, sha1)
+				t.Errorf("FetchHeightRange: mismatch sha at %v requested range %v %v: %v %v ", int32(i)+startheight, startheight, endheight, sha0, sha1)
 			}
 		}
 	}

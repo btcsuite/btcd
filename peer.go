@@ -928,7 +928,7 @@ func (p *peer) handleGetBlocksMsg(msg *wire.MsgGetBlocks) {
 	// provided locator are known.  This does mean the client will start
 	// over with the genesis block if unknown block locators are provided.
 	// This mirrors the behavior in the reference implementation.
-	startIdx := int64(1)
+	startIdx := int32(1)
 	for _, hash := range msg.BlockLocatorHashes {
 		height, err := p.server.db.FetchBlockHeightBySha(hash)
 		if err == nil {
@@ -972,7 +972,7 @@ func (p *peer) handleGetBlocksMsg(msg *wire.MsgGetBlocks) {
 			iv := wire.NewInvVect(wire.InvTypeBlock, &hashCopy)
 			invMsg.AddInvVect(iv)
 		}
-		start += int64(len(hashList))
+		start += int32(len(hashList))
 	}
 
 	// Send the inventory message if there is anything to send.
@@ -1034,7 +1034,7 @@ func (p *peer) handleGetHeadersMsg(msg *wire.MsgGetHeaders) {
 	// provided locator are known.  This does mean the client will start
 	// over with the genesis block if unknown block locators are provided.
 	// This mirrors the behavior in the reference implementation.
-	startIdx := int64(1)
+	startIdx := int32(1)
 	for _, hash := range msg.BlockLocatorHashes {
 		height, err := p.server.db.FetchBlockHeightBySha(hash)
 		if err == nil {
@@ -1083,7 +1083,7 @@ func (p *peer) handleGetHeadersMsg(msg *wire.MsgGetHeaders) {
 
 		// Start at the next block header after the latest one on the
 		// next loop iteration.
-		start += int64(len(hashList))
+		start += int32(len(hashList))
 	}
 	p.QueueMessage(headersMsg, nil)
 }

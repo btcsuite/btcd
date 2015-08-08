@@ -48,7 +48,7 @@ func Test_dupTx(t *testing.T) {
 	// Populate with the fisrt 256 blocks, so we have blocks to 'mess with'
 	err = nil
 out:
-	for height := int64(0); height < int64(len(blocks)); height++ {
+	for height := int32(0); height < int32(len(blocks)); height++ {
 		block := blocks[height]
 
 		// except for NoVerify which does not allow lookups check inputs

@@ -676,7 +676,7 @@ func createVoutList(mtx *wire.MsgTx, chainParams *chaincfg.Params) []btcjson.Vou
 // to a raw transaction JSON object.
 func createTxRawResult(chainParams *chaincfg.Params, mtx *wire.MsgTx,
 	txHash string, blkHeader *wire.BlockHeader, blkHash string,
-	blkHeight int64, chainHeight int64) (*btcjson.TxRawResult, error) {
+	blkHeight int32, chainHeight int32) (*btcjson.TxRawResult, error) {
 
 	mtxHex, err := messageToHex(mtx)
 	if err != nil {
@@ -1013,7 +1013,7 @@ func handleGetBlock(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (i
 		Nonce:         blockHeader.Nonce,
 		Time:          blockHeader.Timestamp.Unix(),
 		Confirmations: uint64(1 + maxIdx - idx),
-		Height:        idx,
+		Height:        int64(idx),
 		Size:          int32(len(buf)),
 		Bits:          strconv.FormatInt(int64(blockHeader.Bits), 16),
 		Difficulty:    getDifficultyRatio(blockHeader.Bits),
@@ -1045,7 +1045,7 @@ func handleGetBlock(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (i
 	// Get next block unless we are already at the top.
 	if idx < maxIdx {
 		var shaNext *wire.ShaHash
-		shaNext, err = s.server.db.FetchBlockShaByHeight(int64(idx + 1))
+		shaNext, err = s.server.db.FetchBlockShaByHeight(idx + 1)
 		if err != nil {
 			context := "No next block"
 			return nil, internalRPCError(err.Error(), context)
@@ -1073,7 +1073,7 @@ func handleGetBlockCount(s *rpcServer, cmd interface{}, closeChan <-chan struct{
 // handleGetBlockHash implements the getblockhash command.
 func handleGetBlockHash(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (interface{}, error) {
 	c := cmd.(*btcjson.GetBlockHashCmd)
-	sha, err := s.server.db.FetchBlockShaByHeight(c.Index)
+	sha, err := s.server.db.FetchBlockShaByHeight(int32(c.Index))
 	if err != nil {
 		return nil, &btcjson.RPCError{
 			Code:    btcjson.ErrRPCOutOfRange,
@@ -1109,7 +1109,7 @@ func handleGetBlockHeader(s *rpcServer, cmd interface{}, closeChan <-chan struct
 		}
 
 		var shaNextStr string
-		shaNext, err := s.server.db.FetchBlockShaByHeight(int64(blk.Height() + 1))
+		shaNext, err := s.server.db.FetchBlockShaByHeight(blk.Height() + 1)
 		if err == nil {
 			shaNextStr = shaNext.String()
 		}
@@ -1510,7 +1510,7 @@ func (state *gbtWorkState) blockTemplateResult(useCoinbaseValue bool, submitOld 
 	reply := btcjson.GetBlockTemplateResult{
 		Bits:         strconv.FormatInt(int64(header.Bits), 16),
 		CurTime:      header.Timestamp.Unix(),
-		Height:       template.height,
+		Height:       int64(template.height),
 		PreviousHash: header.PrevBlock.String(),
 		SigOpLimit:   blockchain.MaxSigOpsPerBlock,
 		SizeLimit:    wire.MaxBlockPayload,
@@ -2052,7 +2052,7 @@ func handleGetMiningInfo(s *rpcServer, cmd interface{}, closeChan <-chan struct{
 	}
 
 	result := btcjson.GetMiningInfoResult{
-		Blocks:           height,
+		Blocks:           int64(height),
 		CurrentBlockSize: uint64(len(blockBytes)),
 		CurrentBlockTx:   uint64(len(block.MsgBlock().Transactions)),
 		Difficulty:       getDifficultyRatio(block.MsgBlock().Header.Bits),
@@ -2095,9 +2095,9 @@ func handleGetNetworkHashPS(s *rpcServer, cmd interface{}, closeChan <-chan stru
 	// since we can't reasonably calculate the number of network hashes
 	// per second from invalid values.  When it's negative, use the current
 	// best block height.
-	endHeight := int64(-1)
+	endHeight := int32(-1)
 	if c.Height != nil {
-		endHeight = int64(*c.Height)
+		endHeight = int32(*c.Height)
 	}
 	if endHeight > newestHeight || endHeight == 0 {
 		return int64(0), nil
@@ -2110,11 +2110,11 @@ func handleGetNetworkHashPS(s *rpcServer, cmd interface{}, closeChan <-chan stru
 	// blocks.  When the passed value is negative, use the last block the
 	// difficulty changed as the starting height.  Also make sure the
 	// starting height is not before the beginning of the chain.
-	numBlocks := int64(120)
+	numBlocks := int32(120)
 	if c.Blocks != nil {
-		numBlocks = int64(*c.Blocks)
+		numBlocks = int32(*c.Blocks)
 	}
-	var startHeight int64
+	var startHeight int32
 	if numBlocks <= 0 {
 		startHeight = endHeight - ((endHeight % blockchain.BlocksPerRetarget) + 1)
 	} else {
@@ -2209,7 +2209,7 @@ func handleGetRawMempool(s *rpcServer, cmd interface{}, closeChan <-chan struct{
 				Size:             int32(desc.Tx.MsgTx().SerializeSize()),
 				Fee:              btcutil.Amount(desc.Fee).ToBTC(),
 				Time:             desc.Added.Unix(),
-				Height:           desc.Height,
+				Height:           int64(desc.Height),
 				StartingPriority: startingPriority,
 				CurrentPriority:  currentPriority,
 				Depends:          make([]string, 0),
@@ -2252,7 +2252,7 @@ func handleGetRawTransaction(s *rpcServer, cmd interface{}, closeChan <-chan str
 	// try the block database.
 	var mtx *wire.MsgTx
 	var blkHash *wire.ShaHash
-	var blkHeight int64
+	var blkHeight int32
 	tx, err := s.server.txMemPool.FetchTransaction(txHash)
 	if err != nil {
 		txList, err := s.server.db.FetchTxBySha(txHash)
@@ -2287,7 +2287,7 @@ func handleGetRawTransaction(s *rpcServer, cmd interface{}, closeChan <-chan str
 
 	var blkHeader *wire.BlockHeader
 	var blkHashStr string
-	var chainHeight int64
+	var chainHeight int32
 	if blkHash != nil {
 		blkHeader, err = s.server.db.FetchBlockHeaderBySha(blkHash)
 		if err != nil {
@@ -2364,7 +2364,7 @@ func handleGetTxOut(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (i
 	// from there, otherwise attempt to fetch from the block database.
 	var mtx *wire.MsgTx
 	var bestBlockSha string
-	var confirmations int64
+	var confirmations int32
 	var dbSpentInfo []bool
 	includeMempool := true
 	if c.IncludeMempool != nil {
@@ -2450,7 +2450,7 @@ func handleGetTxOut(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (i
 
 	txOutReply := &btcjson.GetTxOutResult{
 		BestBlock:     bestBlockSha,
-		Confirmations: confirmations,
+		Confirmations: int64(confirmations),
 		Value:         btcutil.Amount(txOut.Value).ToUnit(btcutil.AmountBTC),
 		Version:       mtx.Version,
 		ScriptPubKey: btcjson.ScriptPubKeyResult{
@@ -2946,7 +2946,7 @@ func handleSearchRawTransactions(s *rpcServer, cmd interface{}, closeChan <-chan
 		// final JSON output (mempool won't have confirmations).
 		var blkHeader *wire.BlockHeader
 		var blkHashStr string
-		var blkHeight int64
+		var blkHeight int32
 		if txReply.BlkSha != nil {
 			blkHeader, err = s.server.db.FetchBlockHeaderBySha(txReply.BlkSha)
 			if err != nil {
@@ -3128,7 +3128,7 @@ func verifyChain(db database.Db, level, depth int32, timeSource blockchain.Media
 
 	for height := curHeight; height > finishHeight; height-- {
 		// Level 0 just looks up the block.
-		sha, err := db.FetchBlockShaByHeight(int64(height))
+		sha, err := db.FetchBlockShaByHeight(height)
 		if err != nil {
 			rpcsLog.Errorf("Verify is unable to fetch block at "+
 				"height %d: %v", height, err)

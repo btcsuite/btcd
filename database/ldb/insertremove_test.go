@@ -63,7 +63,7 @@ func testUnspentInsert(t *testing.T) {
 
 	blocks := loadblocks(t)
 endtest:
-	for height := int64(0); height < int64(len(blocks)); height++ {
+	for height := int32(0); height < int32(len(blocks)); height++ {
 
 		block := blocks[height]
 		// look up inputs to this tx

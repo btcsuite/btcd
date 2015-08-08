@@ -82,7 +82,7 @@ func TestCheckSerializedHeight(t *testing.T) {
 
 	tests := []struct {
 		sigScript  []byte // Serialized data
-		wantHeight int64  // Expected height
+		wantHeight int32  // Expected height
 		err        error  // Expected error type
 	}{
 		// No serialized height length.
