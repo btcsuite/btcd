@@ -340,8 +340,8 @@ sigLoop:
 	return script
 }
 
-// KeyDB is an interface type provided to SignTxOutput, it encapsulates
-// any user state required to get the private keys for an address.
+// KeyDB is an interface type provided to SignTx, it encapsulates any user state
+// required to get the private keys for an address.
 type KeyDB interface {
 	GetKey(btcutil.Address) (*btcec.PrivateKey, bool, error)
 }
@@ -355,8 +355,8 @@ func (kc KeyClosure) GetKey(address btcutil.Address) (*btcec.PrivateKey,
 	return kc(address)
 }
 
-// ScriptDB is an interface type provided to SignTxOutput, it encapsulates any
-// user state required to get the scripts for an pay-to-script-hash address.
+// ScriptDB is an interface type provided to SignTx, it encapsulates any user
+// state required to get the scripts for an pay-to-script-hash address.
 type ScriptDB interface {
 	GetScript(btcutil.Address) ([]byte, error)
 }
@@ -369,26 +369,26 @@ func (sc ScriptClosure) GetScript(address btcutil.Address) ([]byte, error) {
 	return sc(address)
 }
 
-// SignTxOutput signs output idx of the given tx to resolve the script given in
-// pkScript with a signature type of hashType. Any keys required will be
-// looked up by calling getKey() with the string of the given address.
-// Any pay-to-script-hash signatures will be similarly looked up by calling
-// getScript. If previousScript is provided then the results in previousScript
-// will be merged in a type-dependant manner with the newly generated.
-// signature script.
-func SignTxOutput(chainParams *chaincfg.Params, tx *wire.MsgTx, idx int,
-	pkScript []byte, hashType SigHashType, kdb KeyDB, sdb ScriptDB,
+// SignTx signs tx and creates a signature script of type hashType to resolve
+// the script given in originPkScript. The returned signature script is to be
+// used for input inputIdx of tx. Any keys required will be looked up by calling
+// the GetKey() method of kdb. Any pay-to-script-hash signatures will be
+// similarly looked up by calling the GetScript() method of sdb. If
+// previousScript is provided then the results in previousScript will be merged
+// in a type-dependant manner with the newly generated signature script.
+func SignTx(chainParams *chaincfg.Params, tx *wire.MsgTx, inputIdx int,
+	originPkScript []byte, hashType SigHashType, kdb KeyDB, sdb ScriptDB,
 	previousScript []byte) ([]byte, error) {
 
 	sigScript, class, addresses, nrequired, err := sign(chainParams, tx,
-		idx, pkScript, hashType, kdb, sdb)
+		inputIdx, originPkScript, hashType, kdb, sdb)
 	if err != nil {
 		return nil, err
 	}
 
 	if class == ScriptHashTy {
 		// TODO keep the sub addressed and pass down to merge.
-		realSigScript, _, _, _, err := sign(chainParams, tx, idx,
+		realSigScript, _, _, _, err := sign(chainParams, tx, inputIdx,
 			sigScript, hashType, kdb, sdb)
 		if err != nil {
 			return nil, err
@@ -405,7 +405,7 @@ func SignTxOutput(chainParams *chaincfg.Params, tx *wire.MsgTx, idx int,
 	}
 
 	// Merge scripts. with any previous data, if any.
-	mergedScript := mergeScripts(chainParams, tx, idx, pkScript, class,
-		addresses, nrequired, sigScript, previousScript)
+	mergedScript := mergeScripts(chainParams, tx, inputIdx, originPkScript,
+		class, addresses, nrequired, sigScript, previousScript)
 	return mergedScript, nil
 }
