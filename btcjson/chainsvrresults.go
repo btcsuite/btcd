@@ -230,8 +230,8 @@ type ScriptSig struct {
 }
 
 type PrevOut struct {
-	Addresses []string   `json:"addresses,omitempty"`
-	Value     float64    `json:"value"`
+	Addresses []string `json:"addresses,omitempty"`
+	Value     float64  `json:"value"`
 }
 
 // Vin models parts of the tx data.  It is defined seperately since

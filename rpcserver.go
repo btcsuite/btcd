@@ -648,7 +648,7 @@ func createVinList(s *rpcServer, mtx *wire.MsgTx, chainParams *chaincfg.Params, 
 					// Ignore the error here since an error means the script
 					// couldn't parse and there is no additional information about
 					// it anyways.
-					_, addrs, _, _ := txscript.ExtractPkScriptAddrs( originTxOut.PkScript, chainParams)
+					_, addrs, _, _ := txscript.ExtractPkScriptAddrs(originTxOut.PkScript, chainParams)
 
 					if addrs == nil {
 						vinList[i].PrevOut.Addresses = nil

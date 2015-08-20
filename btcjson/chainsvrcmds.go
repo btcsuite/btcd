@@ -545,10 +545,10 @@ func NewReconsiderBlockCmd(blockHash string) *ReconsiderBlockCmd {
 
 // SearchRawTransactionsCmd defines the searchrawtransactions JSON-RPC command.
 type SearchRawTransactionsCmd struct {
-	Address string
-	Verbose *int `jsonrpcdefault:"1"`
-	Skip    *int `jsonrpcdefault:"0"`
-	Count   *int `jsonrpcdefault:"100"`
+	Address  string
+	Verbose  *int `jsonrpcdefault:"1"`
+	Skip     *int `jsonrpcdefault:"0"`
+	Count    *int `jsonrpcdefault:"100"`
 	VinExtra *int `jsonrpcdefault:"0"`
 }
 
@@ -559,10 +559,10 @@ type SearchRawTransactionsCmd struct {
 // for optional parameters will use the default value.
 func NewSearchRawTransactionsCmd(address string, verbose, skip, count *int, vinExtra *int) *SearchRawTransactionsCmd {
 	return &SearchRawTransactionsCmd{
-		Address: address,
-		Verbose: verbose,
-		Skip:    skip,
-		Count:   count,
+		Address:  address,
+		Verbose:  verbose,
+		Skip:     skip,
+		Count:    count,
 		VinExtra: vinExtra,
 	}
 }
