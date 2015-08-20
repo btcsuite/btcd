@@ -614,7 +614,7 @@ func handleDebugLevel(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) 
 
 // createVinList returns a slice of JSON objects for the inputs of the passed
 // transaction.
-func createVinList(mtx *wire.MsgTx, chainParams *chaincfg.Params) []btcjson.Vin {
+func createVinList(mtx *wire.MsgTx) []btcjson.Vin {
 	vinList := make([]btcjson.Vin, len(mtx.TxIn))
 	for i, v := range mtx.TxIn {
 		if blockchain.IsCoinBaseTx(mtx) {
@@ -773,7 +773,7 @@ func createTxRawResult(s *rpcServer, chainParams *chaincfg.Params, mtx *wire.Msg
 		Hex:      mtxHex,
 		Txid:     txHash,
 		Vout:     createVoutList(mtx, chainParams),
-		Vin:      createVinList(mtx, chainParams),
+		Vin:      createVinList(mtx),
 		Version:  mtx.Version,
 		LockTime: mtx.LockTime,
 	}
@@ -816,7 +816,7 @@ func handleDecodeRawTransaction(s *rpcServer, cmd interface{}, closeChan <-chan 
 		Txid:     mtx.TxSha().String(),
 		Version:  mtx.Version,
 		Locktime: mtx.LockTime,
-		Vin:      createVinList(&mtx, s.server.chainParams),
+		Vin:      createVinList(&mtx),
 		Vout:     createVoutList(&mtx, s.server.chainParams),
 	}
 	return txReply, nil
