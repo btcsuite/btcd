@@ -2929,7 +2929,7 @@ func handleSearchRawTransactions(s *rpcServer, cmd interface{}, closeChan <-chan
 			Message: "Address index must be enabled (--addrindex)",
 		}
 	}
-	if false && !s.server.addrIndexer.IsCaughtUp() {
+	if !s.server.addrIndexer.IsCaughtUp() {
 		return nil, &btcjson.RPCError{
 			Code: btcjson.ErrRPCMisc,
 			Message: "Address index has not yet caught up to the " +
