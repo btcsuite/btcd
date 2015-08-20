@@ -272,12 +272,13 @@ func (v *Vin) MarshalJSON() ([]byte, error) {
 	return json.Marshal(txStruct)
 }
 
+// PrevOut represents previous output for an input Vin.
 type PrevOut struct {
 	Addresses []string `json:"addresses,omitempty"`
 	Value     float64  `json:"value"`
 }
 
-// VinPrevout is like Vin except it includes PrevOut.  It is used by searchrawtransaction
+// VinPrevOut is like Vin except it includes PrevOut.  It is used by searchrawtransaction
 type VinPrevOut struct {
 	Coinbase  string     `json:"coinbase"`
 	Txid      string     `json:"txid"`
