@@ -62,12 +62,19 @@ var helpDescsEnUS = map[string]string{
 	"prevout-addresses": "previous output addresses",
 	"prevout-value":     "previous output value",
 
+	// VinPrevOut help.
+	"vinprevout-coinbase":  "The hex-encoded bytes of the signature script (coinbase txns only)",
+	"vinprevout-txid":      "The hash of the origin transaction (non-coinbase txns only)",
+	"vinprevout-vout":      "The index of the output being redeemed from the origin transaction (non-coinbase txns only)",
+	"vinprevout-scriptSig": "The signature script used to redeem the origin transaction as a JSON object (non-coinbase txns only)",
+	"vinprevout-prevOut":   "Data from the origin transaction output with index vout.",
+	"vinprevout-sequence":  "The script sequence number",
+
 	// Vin help.
 	"vin-coinbase":  "The hex-encoded bytes of the signature script (coinbase txns only)",
 	"vin-txid":      "The hash of the origin transaction (non-coinbase txns only)",
 	"vin-vout":      "The index of the output being redeemed from the origin transaction (non-coinbase txns only)",
 	"vin-scriptSig": "The signature script used to redeem the origin transaction as a JSON object (non-coinbase txns only)",
-	"vin-prevOut":   "Data from the origin transaction output with index vout.",
 	"vin-sequence":  "The script sequence number",
 
 	// ScriptPubKeyResult help.
@@ -159,6 +166,18 @@ var helpDescsEnUS = map[string]string{
 	"txrawresult-confirmations": "Number of confirmations of the block",
 	"txrawresult-time":          "Transaction time in seconds since 1 Jan 1970 GMT",
 	"txrawresult-blocktime":     "Block time in seconds since the 1 Jan 1970 GMT",
+
+	// SearchRawTransactionsResult help.
+	"searchrawtransactionsresult-hex":           "Hex-encoded transaction",
+	"searchrawtransactionsresult-txid":          "The hash of the transaction",
+	"searchrawtransactionsresult-version":       "The transaction version",
+	"searchrawtransactionsresult-locktime":      "The transaction lock time",
+	"searchrawtransactionsresult-vin":           "The transaction inputs as JSON objects",
+	"searchrawtransactionsresult-vout":          "The transaction outputs as JSON objects",
+	"searchrawtransactionsresult-blockhash":     "Hash of the block the transaction is part of",
+	"searchrawtransactionsresult-confirmations": "Number of confirmations of the block",
+	"searchrawtransactionsresult-time":          "Transaction time in seconds since 1 Jan 1970 GMT",
+	"searchrawtransactionsresult-blocktime":     "Block time in seconds since the 1 Jan 1970 GMT",
 
 	// GetBlockVerboseResult help.
 	"getblockverboseresult-hash":              "The hash of the block (same as provided)",
@@ -587,7 +606,7 @@ var rpcResultTypes = map[string][]interface{}{
 	"node":                  nil,
 	"help":                  []interface{}{(*string)(nil), (*string)(nil)},
 	"ping":                  nil,
-	"searchrawtransactions": []interface{}{(*string)(nil), (*[]btcjson.TxRawResult)(nil)},
+	"searchrawtransactions": []interface{}{(*string)(nil), (*[]btcjson.SearchRawTransactionsResult)(nil)},
 	"sendrawtransaction":    []interface{}{(*string)(nil)},
 	"setgenerate":           nil,
 	"stop":                  []interface{}{(*string)(nil)},

@@ -43,6 +43,31 @@ func TestChainSvrCustomResults(t *testing.T) {
 			},
 			expected: `{"txid":"123","vout":1,"scriptSig":{"asm":"0","hex":"00"},"sequence":4294967295}`,
 		},
+		{
+			name: "custom vinprevout marshal with coinbase",
+			result: &btcjson.VinPrevOut{
+				Coinbase: "021234",
+				Sequence: 4294967295,
+			},
+			expected: `{"coinbase":"021234","sequence":4294967295}`,
+		},
+		{
+			name: "custom vinprevout marshal without coinbase",
+			result: &btcjson.VinPrevOut{
+				Txid: "123",
+				Vout: 1,
+				ScriptSig: &btcjson.ScriptSig{
+					Asm: "0",
+					Hex: "00",
+				},
+				PrevOut: &btcjson.PrevOut{
+					Addresses: []string{"addr1"},
+					Value:     0,
+				},
+				Sequence: 4294967295,
+			},
+			expected: `{"txid":"123","vout":1,"scriptSig":{"asm":"0","hex":"00"},"prevOut":{"addresses":["addr1"],"value":0},"sequence":4294967295}`,
+		},
 	}
 
 	t.Logf("Running %d tests", len(tests))
