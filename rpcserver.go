@@ -760,7 +760,7 @@ func createSearchRawTransactionsResult(s *rpcServer, chainParams *chaincfg.Param
 
 // createTxRawResult converts the passed transaction and associated parameters
 // to a raw transaction JSON object.
-func createTxRawResult(s *rpcServer, chainParams *chaincfg.Params, mtx *wire.MsgTx,
+func createTxRawResult(chainParams *chaincfg.Params, mtx *wire.MsgTx,
 	txHash string, blkHeader *wire.BlockHeader, blkHash string,
 	blkHeight int32, chainHeight int32) (*btcjson.TxRawResult, error) {
 
@@ -1117,7 +1117,7 @@ func handleGetBlock(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (i
 		txns := blk.Transactions()
 		rawTxns := make([]btcjson.TxRawResult, len(txns))
 		for i, tx := range txns {
-			rawTxn, err := createTxRawResult(s, s.server.chainParams,
+			rawTxn, err := createTxRawResult(s.server.chainParams,
 				tx.MsgTx(), tx.Sha().String(), blockHeader,
 				sha.String(), idx, maxIdx)
 			if err != nil {
@@ -2393,7 +2393,7 @@ func handleGetRawTransaction(s *rpcServer, cmd interface{}, closeChan <-chan str
 		blkHashStr = blkHash.String()
 	}
 
-	rawTxn, err := createTxRawResult(s, s.server.chainParams, mtx,
+	rawTxn, err := createTxRawResult(s.server.chainParams, mtx,
 		txHash.String(), blkHeader, blkHashStr, blkHeight, chainHeight)
 	if err != nil {
 		return nil, err
