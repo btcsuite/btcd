@@ -749,7 +749,7 @@ func (mp *txMemPool) addTransactionToAddrIndex(tx *btcutil.Tx) error {
 //
 // This function MUST be called with the mempool lock held (for reads).
 func (mp *txMemPool) fetchReferencedOutputScripts(tx *btcutil.Tx) ([][]byte, error) {
-	txStore, err := mp.fetchInputTransactions(tx)
+	txStore, err := mp.fetchInputTransactions(tx, false)
 	if err != nil || len(txStore) == 0 {
 		return nil, err
 	}
@@ -919,8 +919,8 @@ func (mp *txMemPool) checkPoolDoubleSpend(tx *btcutil.Tx) error {
 // fetch any missing inputs from the transaction pool.
 //
 // This function MUST be called with the mempool lock held (for reads).
-func (mp *txMemPool) fetchInputTransactions(tx *btcutil.Tx) (blockchain.TxStore, error) {
-	txStore, err := mp.server.blockManager.blockChain.FetchTransactionStore(tx)
+func (mp *txMemPool) fetchInputTransactions(tx *btcutil.Tx, includeSpent bool) (blockchain.TxStore, error) {
+	txStore, err := mp.server.blockManager.blockChain.FetchTransactionStore(tx, includeSpent)
 	if err != nil {
 		return nil, err
 	}
@@ -1069,7 +1069,7 @@ func (mp *txMemPool) maybeAcceptTransaction(tx *btcutil.Tx, isNew, rateLimit boo
 	// transaction.  This function also attempts to fetch the transaction
 	// itself to be used for detecting a duplicate transaction without
 	// needing to do a separate lookup.
-	txStore, err := mp.fetchInputTransactions(tx)
+	txStore, err := mp.fetchInputTransactions(tx, false)
 	if err != nil {
 		if cerr, ok := err.(blockchain.RuleError); ok {
 			return nil, chainRuleError(cerr)

@@ -1119,7 +1119,7 @@ out:
 				}
 
 			case fetchTransactionStoreMsg:
-				txStore, err := b.blockChain.FetchTransactionStore(msg.tx)
+				txStore, err := b.blockChain.FetchTransactionStore(msg.tx, false)
 				msg.reply <- fetchTransactionStoreResponse{
 					TxStore: txStore,
 					err:     err,
