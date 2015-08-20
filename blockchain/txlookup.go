@@ -300,7 +300,7 @@ func (b *BlockChain) fetchInputTransactions(node *blockNode, block *btcutil.Bloc
 // passed transaction from the point of view of the end of the main chain.  It
 // also attempts to fetch the transaction itself so the returned TxStore can be
 // examined for duplicate transactions.
-func (b *BlockChain) FetchTransactionStore(tx *btcutil.Tx) (TxStore, error) {
+func (b *BlockChain) FetchTransactionStore(tx *btcutil.Tx, includeSpent bool) (TxStore, error) {
 	// Create a set of needed transactions from the transactions referenced
 	// by the inputs of the passed transaction.  Also, add the passed
 	// transaction itself as a way for the caller to detect duplicates.
@@ -314,6 +314,6 @@ func (b *BlockChain) FetchTransactionStore(tx *btcutil.Tx) (TxStore, error) {
 	// the main chain without including fully spent trasactions in the
 	// results.  Fully spent transactions are only needed for chain
 	// reorganization which does not apply here.
-	txStore := fetchTxStoreMain(b.db, txNeededSet, false)
+	txStore := fetchTxStoreMain(b.db, txNeededSet, includeSpent)
 	return txStore, nil
 }

@@ -229,6 +229,11 @@ type ScriptSig struct {
 	Hex string `json:"hex"`
 }
 
+type PrevOut struct {
+	Addresses []string   `json:"addresses,omitempty"`
+	Value     float64    `json:"value"`
+}
+
 // Vin models parts of the tx data.  It is defined seperately since
 // getrawtransaction, decoderawtransaction, and searchrawtransaction use the
 // same structure.
@@ -237,6 +242,7 @@ type Vin struct {
 	Txid      string     `json:"txid"`
 	Vout      uint32     `json:"vout"`
 	ScriptSig *ScriptSig `json:"scriptSig"`
+	PrevOut   *PrevOut   `json:"prevOut"`
 	Sequence  uint32     `json:"sequence"`
 }
 
@@ -262,11 +268,13 @@ func (v *Vin) MarshalJSON() ([]byte, error) {
 		Txid      string     `json:"txid"`
 		Vout      uint32     `json:"vout"`
 		ScriptSig *ScriptSig `json:"scriptSig"`
+		PrevOut   *PrevOut   `json:"prevOut,omitempty"`
 		Sequence  uint32     `json:"sequence"`
 	}{
 		Txid:      v.Txid,
 		Vout:      v.Vout,
 		ScriptSig: v.ScriptSig,
+		PrevOut:   v.PrevOut,
 		Sequence:  v.Sequence,
 	}
 	return json.Marshal(txStruct)

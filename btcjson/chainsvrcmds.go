@@ -549,6 +549,7 @@ type SearchRawTransactionsCmd struct {
 	Verbose *int `jsonrpcdefault:"1"`
 	Skip    *int `jsonrpcdefault:"0"`
 	Count   *int `jsonrpcdefault:"100"`
+	VinExtra *int `jsonrpcdefault:"0"`
 }
 
 // NewSearchRawTransactionsCmd returns a new instance which can be used to issue a
@@ -556,12 +557,13 @@ type SearchRawTransactionsCmd struct {
 //
 // The parameters which are pointers indicate they are optional.  Passing nil
 // for optional parameters will use the default value.
-func NewSearchRawTransactionsCmd(address string, verbose, skip, count *int) *SearchRawTransactionsCmd {
+func NewSearchRawTransactionsCmd(address string, verbose, skip, count *int, vinExtra *int) *SearchRawTransactionsCmd {
 	return &SearchRawTransactionsCmd{
 		Address: address,
 		Verbose: verbose,
 		Skip:    skip,
 		Count:   count,
+		VinExtra: vinExtra,
 	}
 }
 

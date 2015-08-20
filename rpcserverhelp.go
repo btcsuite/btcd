@@ -58,11 +58,16 @@ var helpDescsEnUS = map[string]string{
 	"scriptsig-asm": "Disassembly of the script",
 	"scriptsig-hex": "Hex-encoded bytes of the script",
 
+	// PrevOut help.
+	"prevout-addresses": "previous output addresses",
+	"prevout-value":     "previous output value",
+
 	// Vin help.
 	"vin-coinbase":  "The hex-encoded bytes of the signature script (coinbase txns only)",
 	"vin-txid":      "The hash of the origin transaction (non-coinbase txns only)",
 	"vin-vout":      "The index of the output being redeemed from the origin transaction (non-coinbase txns only)",
 	"vin-scriptSig": "The signature script used to redeem the origin transaction as a JSON object (non-coinbase txns only)",
+	"vin-prevOut":   "Data from the origin transaction output with index vout.",
 	"vin-sequence":  "The script sequence number",
 
 	// ScriptPubKeyResult help.
@@ -441,10 +446,11 @@ var helpDescsEnUS = map[string]string{
 		"Similarly, until the address index has caught up with the current best height, all requests will return an error response in order to avoid serving stale data.",
 	"searchrawtransactions-address":     "The Bitcoin address to search for",
 	"searchrawtransactions-verbose":     "Specifies the transaction is returned as a JSON object instead of hex-encoded string",
-	"searchrawtransactions-skip":        "The number of leading transactions to leave out of the final response",
-	"searchrawtransactions-count":       "The maximum number of transactions to return",
 	"searchrawtransactions--condition0": "verbose=0",
 	"searchrawtransactions--condition1": "verbose=1",
+	"searchrawtransactions-skip":        "The number of leading transactions to leave out of the final response",
+	"searchrawtransactions-count":       "The maximum number of transactions to return",
+	"searchrawtransactions-vinextra":    "Specify that extra data from previous output will be returned in vin",
 	"searchrawtransactions--result0":    "Hex-encoded serialized transaction",
 
 	// SendRawTransactionCmd help.
