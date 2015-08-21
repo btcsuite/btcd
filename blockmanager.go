@@ -1142,6 +1142,14 @@ out:
 				newestSha, newestHeight, _ := b.server.db.NewestSha()
 				b.updateChainState(newestSha, newestHeight)
 
+				// Allow any clients performing long polling via the
+				// getblocktemplate RPC to be notified when the new block causes
+				// their old block template to become stale.
+				rpcServer := b.server.rpcServer
+				if rpcServer != nil {
+					rpcServer.gbtWorkState.NotifyBlockConnected(msg.block.Sha())
+				}
+
 				msg.reply <- processBlockResponse{
 					isOrphan: isOrphan,
 					err:      nil,
