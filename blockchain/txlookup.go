@@ -312,7 +312,7 @@ func (b *BlockChain) FetchTransactionStore(tx *btcutil.Tx, includeSpent bool) (T
 
 	// Request the input transactions from the point of view of the end of
 	// the main chain with or without without including fully spent transactions
-    // in the results.
+	// in the results.
 	txStore := fetchTxStoreMain(b.db, txNeededSet, includeSpent)
 	return txStore, nil
 }
