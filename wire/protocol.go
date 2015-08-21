@@ -46,11 +46,23 @@ type ServiceFlag uint64
 const (
 	// SFNodeNetwork is a flag used to indicate a peer is a full node.
 	SFNodeNetwork ServiceFlag = 1 << iota
+
+	// SFNodeGetUTXO is a flag used to indicate a peer supports the
+	// getutxos and utxos commands (BIP0064).
+	SFNodeGetUTXO
 )
 
 // Map of service flags back to their constant names for pretty printing.
 var sfStrings = map[ServiceFlag]string{
 	SFNodeNetwork: "SFNodeNetwork",
+	SFNodeGetUTXO: "SFNodeGetUTXO",
+}
+
+// orderedSFStrings is an ordered list of service flags from highest to
+// lowest.
+var orderedSFStrings = []ServiceFlag{
+	SFNodeNetwork,
+	SFNodeGetUTXO,
 }
 
 // String returns the ServiceFlag in human-readable form.
@@ -62,9 +74,9 @@ func (f ServiceFlag) String() string {
 
 	// Add individual bit flags.
 	s := ""
-	for flag, name := range sfStrings {
+	for _, flag := range orderedSFStrings {
 		if f&flag == flag {
-			s += name + "|"
+			s += sfStrings[flag] + "|"
 			f -= flag
 		}
 	}
