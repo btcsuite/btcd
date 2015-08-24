@@ -116,6 +116,7 @@ type config struct {
 	GetWorkKeys        []string      `long:"getworkkey" description:"DEPRECATED -- Use the --miningaddr option instead"`
 	AddrIndex          bool          `long:"addrindex" description:"Build and maintain a full address index. Currently only supported by leveldb."`
 	DropAddrIndex      bool          `long:"dropaddrindex" description:"Deletes the address-based transaction index from the database on start up, and the exits."`
+	NoPeerBloomFilters bool          `long:"nopeerbloomfilters" description:"Disable bloom filtering support."`
 	onionlookup        func(string) ([]net.IP, error)
 	lookup             func(string) ([]net.IP, error)
 	oniondial          func(string, string) (net.Conn, error)

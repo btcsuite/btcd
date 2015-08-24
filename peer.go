@@ -28,7 +28,7 @@ import (
 
 const (
 	// maxProtocolVersion is the max protocol version the peer supports.
-	maxProtocolVersion = 70002
+	maxProtocolVersion = 70011
 
 	// outputBufferSize is the number of elements the output channels use.
 	outputBufferSize = 50
@@ -335,8 +335,8 @@ func (p *peer) pushVersionMsg() error {
 	//      by the remote peer in its version message
 	msg.AddrYou.Services = wire.SFNodeNetwork
 
-	// Advertise that we're a full node.
-	msg.Services = wire.SFNodeNetwork
+	// Advertise our supported services.
+	msg.Services = p.server.services
 
 	// Advertise our max supported protocol version.
 	msg.ProtocolVersion = maxProtocolVersion
@@ -1088,11 +1088,33 @@ func (p *peer) handleGetHeadersMsg(msg *wire.MsgGetHeaders) {
 	p.QueueMessage(headersMsg, nil)
 }
 
+// isValidBIP0111 is a helper function for the bloom filter commands to check
+// BIP0111 compliance.
+func (p *peer) isValidBIP0111(cmd string) bool {
+	if p.server.services&wire.SFNodeBloom != wire.SFNodeBloom {
+		if p.ProtocolVersion() >= wire.BIP0111Version {
+			peerLog.Debugf("%s sent an unsupported %s "+
+				"request -- disconnecting", p, cmd)
+			p.Disconnect()
+		} else {
+			peerLog.Debugf("Ignoring %s request from %s -- bloom "+
+				"support is disabled", cmd, p)
+		}
+		return false
+	}
+
+	return true
+}
+
 // handleFilterAddMsg is invoked when a peer receives a filteradd bitcoin
 // message and is used by remote peers to add data to an already loaded bloom
 // filter.  The peer will be disconnected if a filter is not loaded when this
 // message is received.
 func (p *peer) handleFilterAddMsg(msg *wire.MsgFilterAdd) {
+	if !p.isValidBIP0111(msg.Command()) {
+		return
+	}
+
 	if !p.filter.IsLoaded() {
 		peerLog.Debugf("%s sent a filteradd request with no filter "+
 			"loaded -- disconnecting", p)
@@ -1108,12 +1130,17 @@ func (p *peer) handleFilterAddMsg(msg *wire.MsgFilterAdd) {
 // The peer will be disconnected if a filter is not loaded when this message is
 // received.
 func (p *peer) handleFilterClearMsg(msg *wire.MsgFilterClear) {
+	if !p.isValidBIP0111(msg.Command()) {
+		return
+	}
+
 	if !p.filter.IsLoaded() {
 		peerLog.Debugf("%s sent a filterclear request with no "+
 			"filter loaded -- disconnecting", p)
 		p.Disconnect()
 		return
 	}
+
 	p.filter.Unload()
 }
 
@@ -1121,6 +1148,10 @@ func (p *peer) handleFilterClearMsg(msg *wire.MsgFilterClear) {
 // message and it used to load a bloom filter that should be used for delivering
 // merkle blocks and associated transactions that match the filter.
 func (p *peer) handleFilterLoadMsg(msg *wire.MsgFilterLoad) {
+	if !p.isValidBIP0111(msg.Command()) {
+		return
+	}
+
 	// Transaction relay is no longer disabled once a filterload message is
 	// received regardless of its original state.
 	p.relayMtx.Lock()
