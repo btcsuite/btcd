@@ -1,4 +1,4 @@
-// Copyright (c) 2013-2014 The btcsuite developers
+// Copyright (c) 2013-2015 The btcsuite developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -61,6 +61,8 @@ type Notification struct {
 // sendNotification sends a notification with the passed type and data if the
 // caller requested notifications by providing a callback function in the call
 // to New.
+//
+// This function MUST be called with the chain state lock held (for reads).
 func (b *BlockChain) sendNotification(typ NotificationType, data interface{}) {
 	// Ignore it if the caller didn't request notifications.
 	if b.notifications == nil {
