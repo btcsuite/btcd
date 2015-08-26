@@ -1,4 +1,4 @@
-// Copyright (c) 2014 The btcsuite developers
+// Copyright (c) 2014-2016 The btcsuite developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -11,7 +11,6 @@ import (
 	"time"
 
 	"github.com/btcsuite/btcd/blockchain"
-	"github.com/btcsuite/btcd/database"
 	"github.com/btcsuite/btcd/mining"
 	"github.com/btcsuite/btcd/txscript"
 	"github.com/btcsuite/btcd/wire"
@@ -182,16 +181,17 @@ type BlockTemplate struct {
 	ValidPayAddress bool
 }
 
-// mergeTxStore adds all of the transactions in txStoreB to txStoreA.  The
-// result is that txStoreA will contain all of its original transactions plus
-// all of the transactions in txStoreB.
-func mergeTxStore(txStoreA blockchain.TxStore, txStoreB blockchain.TxStore) {
-	for hash, txDataB := range txStoreB {
-		if txDataA, exists := txStoreA[hash]; !exists ||
-			(txDataA.Err == database.ErrTxShaMissing &&
-				txDataB.Err != database.ErrTxShaMissing) {
+// mergeUtxoView adds all of the entries in view to viewA.  The result is that
+// viewA will contain all of its original entries plus all of the entries
+// in viewB.  It will replace any entries in viewB which also exist in viewA
+// if the entry in viewA is fully spent.
+func mergeUtxoView(viewA *blockchain.UtxoViewpoint, viewB *blockchain.UtxoViewpoint) {
+	viewAEntries := viewA.Entries()
+	for hash, entryB := range viewB.Entries() {
+		if entryA, exists := viewAEntries[hash]; !exists ||
+			entryA == nil || entryA.IsFullySpent() {
 
-			txStoreA[hash] = txDataB
+			viewAEntries[hash] = entryB
 		}
 	}
 }
@@ -249,26 +249,20 @@ func createCoinbaseTx(coinbaseScript []byte, nextBlockHeight int32, addr btcutil
 	return btcutil.NewTx(tx), nil
 }
 
-// spendTransaction updates the passed transaction store by marking the inputs
-// to the passed transaction as spent.  It also adds the passed transaction to
-// the store at the provided height.
-func spendTransaction(txStore blockchain.TxStore, tx *btcutil.Tx, height int32) error {
+// spendTransaction updates the passed view by marking the inputs to the passed
+// transaction as spent.  It also adds all outputs in the passed transaction
+// which are not provably unspendable as available unspent transaction outputs.
+func spendTransaction(utxoView *blockchain.UtxoViewpoint, tx *btcutil.Tx, height int32) error {
 	for _, txIn := range tx.MsgTx().TxIn {
 		originHash := &txIn.PreviousOutPoint.Hash
 		originIndex := txIn.PreviousOutPoint.Index
-		if originTx, exists := txStore[*originHash]; exists {
-			originTx.Spent[originIndex] = true
+		entry := utxoView.LookupEntry(originHash)
+		if entry != nil {
+			entry.SpendOutput(originIndex)
 		}
 	}
 
-	txStore[*tx.Sha()] = &blockchain.TxData{
-		Tx:          tx,
-		Hash:        tx.Sha(),
-		BlockHeight: height,
-		Spent:       make([]bool, len(tx.MsgTx().TxOut)),
-		Err:         nil,
-	}
-
+	utxoView.AddTxOuts(tx, height)
 	return nil
 }
 
@@ -430,12 +424,12 @@ func NewBlockTemplate(policy *mining.Policy, server *server, payToAddress btcuti
 	priorityQueue := newTxPriorityQueue(len(sourceTxns), sortedByFee)
 
 	// Create a slice to hold the transactions to be included in the
-	// generated block with reserved space.  Also create a transaction
-	// store to house all of the input transactions so multiple lookups
-	// can be avoided.
+	// generated block with reserved space.  Also create a utxo view to
+	// house all of the input transactions so multiple lookups can be
+	// avoided.
 	blockTxns := make([]*btcutil.Tx, 0, len(sourceTxns))
 	blockTxns = append(blockTxns, coinbaseTx)
-	blockTxStore := make(blockchain.TxStore)
+	blockUtxos := blockchain.NewUtxoViewpoint()
 
 	// dependers is used to track transactions which depend on another
 	// transaction in the source pool.  This, in conjunction with the
@@ -474,15 +468,15 @@ mempoolLoop:
 			continue
 		}
 
-		// Fetch all of the transactions referenced by the inputs to
-		// this transaction.  NOTE: This intentionally does not fetch
-		// inputs from the mempool since a transaction which depends on
-		// other transactions in the mempool must come after those
+		// Fetch all of the utxos referenced by the this transaction.
+		// NOTE: This intentionally does not fetch inputs from the
+		// mempool since a transaction which depends on other
+		// transactions in the mempool must come after those
 		// dependencies in the final generated block.
-		txStore, err := blockManager.FetchTransactionStore(tx)
+		utxos, err := blockManager.chain.FetchUtxoView(tx)
 		if err != nil {
-			minrLog.Warnf("Unable to fetch transaction store for "+
-				"tx %s: %v", tx.Sha(), err)
+			minrLog.Warnf("Unable to fetch utxo view for tx %s: "+
+				"%v", tx.Sha(), err)
 			continue
 		}
 
@@ -493,13 +487,13 @@ mempoolLoop:
 		for _, txIn := range tx.MsgTx().TxIn {
 			originHash := &txIn.PreviousOutPoint.Hash
 			originIndex := txIn.PreviousOutPoint.Index
-			txData, exists := txStore[*originHash]
-			if !exists || txData.Err != nil || txData.Tx == nil {
+			utxoEntry := utxos.LookupEntry(originHash)
+			if utxoEntry == nil || utxoEntry.IsOutputSpent(originIndex) {
 				if !txSource.HaveTransaction(originHash) {
 					minrLog.Tracef("Skipping tx %s because "+
-						"it references tx %s which is "+
-						"not available", tx.Sha,
-						originHash)
+						"it references unspent output "+
+						"%s which is not available",
+						tx.Sha(), txIn.PreviousOutPoint)
 					continue mempoolLoop
 				}
 
@@ -522,23 +516,13 @@ mempoolLoop:
 				// referenced transaction is available.
 				continue
 			}
-
-			// Ensure the output index in the referenced transaction
-			// is available.
-			msgTx := txData.Tx.MsgTx()
-			if originIndex > uint32(len(msgTx.TxOut)) {
-				minrLog.Tracef("Skipping tx %s because "+
-					"it references output %d of tx %s "+
-					"which is out of bounds", tx.Sha,
-					originIndex, originHash)
-				continue mempoolLoop
-			}
 		}
 
 		// Calculate the final transaction priority using the input
 		// value age sum as well as the adjusted transaction size.  The
 		// formula is: sum(inputValue * inputAge) / adjustedTxSize
-		prioItem.priority = calcPriority(tx.MsgTx(), txStore, nextBlockHeight)
+		prioItem.priority = calcPriority(tx.MsgTx(), utxos,
+			nextBlockHeight)
 
 		// Calculate the fee in Satoshi/kB.
 		txSize := tx.MsgTx().SerializeSize()
@@ -551,10 +535,10 @@ mempoolLoop:
 			heap.Push(priorityQueue, prioItem)
 		}
 
-		// Merge the store which contains all of the input transactions
-		// for this transaction into the input transaction store.  This
-		// allows the code below to avoid a second lookup.
-		mergeTxStore(blockTxStore, txStore)
+		// Merge the referenced outputs from the input transactions to
+		// this transaction into the block utxo view.  This allows the
+		// code below to avoid a second lookup.
+		mergeUtxoView(blockUtxos, utxos)
 	}
 
 	minrLog.Tracef("Priority queue len %d, dependers len %d",
@@ -602,7 +586,7 @@ mempoolLoop:
 			continue
 		}
 		numP2SHSigOps, err := blockchain.CountP2SHSigOps(tx, false,
-			blockTxStore)
+			blockUtxos)
 		if err != nil {
 			minrLog.Tracef("Skipping tx %s due to error in "+
 				"CountP2SHSigOps: %v", tx.Sha(), err)
@@ -666,14 +650,14 @@ mempoolLoop:
 		// Ensure the transaction inputs pass all of the necessary
 		// preconditions before allowing it to be added to the block.
 		_, err = blockchain.CheckTransactionInputs(tx, nextBlockHeight,
-			blockTxStore)
+			blockUtxos)
 		if err != nil {
 			minrLog.Tracef("Skipping tx %s due to error in "+
 				"CheckTransactionInputs: %v", tx.Sha(), err)
 			logSkippedDeps(tx, deps)
 			continue
 		}
-		err = blockchain.ValidateTransactionScripts(tx, blockTxStore,
+		err = blockchain.ValidateTransactionScripts(tx, blockUtxos,
 			txscript.StandardVerifyFlags, server.sigCache)
 		if err != nil {
 			minrLog.Tracef("Skipping tx %s due to error in "+
@@ -682,11 +666,11 @@ mempoolLoop:
 			continue
 		}
 
-		// Spend the transaction inputs in the block transaction store
-		// and add an entry for it to ensure any transactions which
-		// reference this one have it available as an input and can
-		// ensure they aren't double spending.
-		spendTransaction(blockTxStore, tx, nextBlockHeight)
+		// Spend the transaction inputs in the block utxo view and add
+		// an entry for it to ensure any transactions which reference
+		// this one have it available as an input and can ensure they
+		// aren't double spending.
+		spendTransaction(blockUtxos, tx, nextBlockHeight)
 
 		// Add the transaction to the block, increment counters, and
 		// save the fees and signature operation counts to the block
@@ -733,7 +717,7 @@ mempoolLoop:
 	if err != nil {
 		return nil, err
 	}
-	requiredDifficulty, err := blockManager.CalcNextRequiredDifficulty(ts)
+	reqDifficulty, err := blockManager.chain.CalcNextRequiredDifficulty(ts)
 	if err != nil {
 		return nil, err
 	}
@@ -746,7 +730,7 @@ mempoolLoop:
 		PrevBlock:  *prevHash,
 		MerkleRoot: *merkles[len(merkles)-1],
 		Timestamp:  ts,
-		Bits:       requiredDifficulty,
+		Bits:       reqDifficulty,
 	}
 	for _, tx := range blockTxns {
 		if err := msgBlock.AddTransaction(tx.MsgTx()); err != nil {
@@ -759,7 +743,7 @@ mempoolLoop:
 	// chain with no issues.
 	block := btcutil.NewBlock(&msgBlock)
 	block.SetHeight(nextBlockHeight)
-	if err := blockManager.CheckConnectBlock(block); err != nil {
+	if err := blockManager.chain.CheckConnectBlock(block); err != nil {
 		return nil, err
 	}
 
@@ -797,7 +781,8 @@ func UpdateBlockTime(msgBlock *wire.MsgBlock, bManager *blockManager) error {
 	// If running on a network that requires recalculating the difficulty,
 	// do so now.
 	if activeNetParams.ResetMinDifficulty {
-		difficulty, err := bManager.CalcNextRequiredDifficulty(newTimestamp)
+		difficulty, err := bManager.chain.CalcNextRequiredDifficulty(
+			newTimestamp)
 		if err != nil {
 			return err
 		}

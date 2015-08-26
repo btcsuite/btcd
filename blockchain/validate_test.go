@@ -1,4 +1,4 @@
-// Copyright (c) 2013-2014 The btcsuite developers
+// Copyright (c) 2013-2016 The btcsuite developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -17,7 +17,7 @@ import (
 )
 
 // TestCheckConnectBlock tests the CheckConnectBlock function to ensure it
-// fails
+// fails.
 func TestCheckConnectBlock(t *testing.T) {
 	// Create a new database and chain instance to run tests against.
 	chain, teardownFunc, err := chainSetup("checkconnectblock")
@@ -27,13 +27,7 @@ func TestCheckConnectBlock(t *testing.T) {
 	}
 	defer teardownFunc()
 
-	err = chain.GenerateInitialIndex()
-	if err != nil {
-		t.Errorf("GenerateInitialIndex: %v", err)
-	}
-
-	// The genesis block should fail to connect since it's already
-	// inserted.
+	// The genesis block should fail to connect since it's already inserted.
 	genesisBlock := chaincfg.MainNetParams.GenesisBlock
 	err = chain.CheckConnectBlock(btcutil.NewBlock(genesisBlock))
 	if err == nil {
