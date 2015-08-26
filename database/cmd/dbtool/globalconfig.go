@@ -1,10 +1,11 @@
-// Copyright (c) 2013-2014 The btcsuite developers
+// Copyright (c) 2015 The btcsuite developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
 package main
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -14,36 +15,30 @@ import (
 	_ "github.com/btcsuite/btcd/database/ffldb"
 	"github.com/btcsuite/btcd/wire"
 	"github.com/btcsuite/btcutil"
-	flags "github.com/btcsuite/go-flags"
-)
-
-const (
-	defaultDbType   = "ffldb"
-	defaultDataFile = "bootstrap.dat"
-	defaultProgress = 10
 )
 
 var (
 	btcdHomeDir     = btcutil.AppDataDir("btcd", false)
-	defaultDataDir  = filepath.Join(btcdHomeDir, "data")
 	knownDbTypes    = database.SupportedDrivers()
 	activeNetParams = &chaincfg.MainNetParams
+
+	// Default global config.
+	cfg = &config{
+		DataDir: filepath.Join(btcdHomeDir, "data"),
+		DbType:  "ffldb",
+	}
 )
 
-// config defines the configuration options for findcheckpoint.
-//
-// See loadConfig for details on the configuration load process.
+// config defines the global configuration options.
 type config struct {
 	DataDir        string `short:"b" long:"datadir" description:"Location of the btcd data directory"`
 	DbType         string `long:"dbtype" description:"Database backend to use for the Block Chain"`
 	TestNet3       bool   `long:"testnet" description:"Use the test network"`
 	RegressionTest bool   `long:"regtest" description:"Use the regression test network"`
 	SimNet         bool   `long:"simnet" description:"Use the simulation test network"`
-	InFile         string `short:"i" long:"infile" description:"File containing the block(s)"`
-	Progress       int    `short:"p" long:"progress" description:"Show a progress message each time this number of seconds have passed -- Use 0 to disable progress announcements"`
 }
 
-// filesExists reports whether the named file or directory exists.
+// fileExists reports whether the named file or directory exists.
 func fileExists(name string) bool {
 	if _, err := os.Stat(name); err != nil {
 		if os.IsNotExist(err) {
@@ -82,31 +77,14 @@ func netName(chainParams *chaincfg.Params) string {
 	}
 }
 
-// loadConfig initializes and parses the config using command line options.
-func loadConfig() (*config, []string, error) {
-	// Default config.
-	cfg := config{
-		DataDir:  defaultDataDir,
-		DbType:   defaultDbType,
-		InFile:   defaultDataFile,
-		Progress: defaultProgress,
-	}
-
-	// Parse command line options.
-	parser := flags.NewParser(&cfg, flags.Default)
-	remainingArgs, err := parser.Parse()
-	if err != nil {
-		if e, ok := err.(*flags.Error); !ok || e.Type != flags.ErrHelp {
-			parser.WriteHelp(os.Stderr)
-		}
-		return nil, nil, err
-	}
-
+// setupGlobalConfig examine the global configuration options for any conditions
+// which are invalid as well as performs any addition setup necessary after the
+// initial parse.
+func setupGlobalConfig() error {
 	// Multiple networks can't be selected simultaneously.
-	funcName := "loadConfig"
-	numNets := 0
 	// Count number of network flags passed; assign active network params
 	// while we're at it
+	numNets := 0
 	if cfg.TestNet3 {
 		numNets++
 		activeNetParams = &chaincfg.TestNet3Params
@@ -120,22 +98,15 @@ func loadConfig() (*config, []string, error) {
 		activeNetParams = &chaincfg.SimNetParams
 	}
 	if numNets > 1 {
-		str := "%s: The testnet, regtest, and simnet params can't be " +
-			"used together -- choose one of the three"
-		err := fmt.Errorf(str, funcName)
-		fmt.Fprintln(os.Stderr, err)
-		parser.WriteHelp(os.Stderr)
-		return nil, nil, err
+		return errors.New("The testnet, regtest, and simnet params " +
+			"can't be used together -- choose one of the three")
 	}
 
 	// Validate database type.
 	if !validDbType(cfg.DbType) {
-		str := "%s: The specified database type [%v] is invalid -- " +
+		str := "The specified database type [%v] is invalid -- " +
 			"supported types %v"
-		err := fmt.Errorf(str, "loadConfig", cfg.DbType, knownDbTypes)
-		fmt.Fprintln(os.Stderr, err)
-		parser.WriteHelp(os.Stderr)
-		return nil, nil, err
+		return fmt.Errorf(str, cfg.DbType, knownDbTypes)
 	}
 
 	// Append the network type to the data directory so it is "namespaced"
@@ -146,14 +117,5 @@ func loadConfig() (*config, []string, error) {
 	// worry about changing names per network and such.
 	cfg.DataDir = filepath.Join(cfg.DataDir, netName(activeNetParams))
 
-	// Ensure the specified block file exists.
-	if !fileExists(cfg.InFile) {
-		str := "%s: The specified block file [%v] does not exist"
-		err := fmt.Errorf(str, "loadConfig", cfg.InFile)
-		fmt.Fprintln(os.Stderr, err)
-		parser.WriteHelp(os.Stderr)
-		return nil, nil, err
-	}
-
-	return &cfg, remainingArgs, nil
+	return nil
 }

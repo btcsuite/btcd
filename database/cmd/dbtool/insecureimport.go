@@ -1,4 +1,4 @@
-// Copyright (c) 2013-2014 The btcsuite developers
+// Copyright (c) 2015 The btcsuite developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -8,16 +8,32 @@ import (
 	"encoding/binary"
 	"fmt"
 	"io"
+	"os"
 	"sync"
 	"time"
 
-	"github.com/btcsuite/btcd/blockchain"
 	"github.com/btcsuite/btcd/database"
 	"github.com/btcsuite/btcd/wire"
 	"github.com/btcsuite/btcutil"
 )
 
-var zeroHash = wire.ShaHash{}
+// importCmd defines the configuration options for the insecureimport command.
+type importCmd struct {
+	InFile   string `short:"i" long:"infile" description:"File containing the block(s)"`
+	Progress int    `short:"p" long:"progress" description:"Show a progress message each time this number of seconds have passed -- Use 0 to disable progress announcements"`
+}
+
+var (
+	// importCfg defines the configuration options for the command.
+	importCfg = importCmd{
+		InFile:   "bootstrap.dat",
+		Progress: 10,
+	}
+
+	// zeroHash is a simply a hash with all zeros.  It is defined here to
+	// avoid creating it multiple times.
+	zeroHash = wire.ShaHash{}
+)
 
 // importResults houses the stats and result as an import operation.
 type importResults struct {
@@ -30,8 +46,6 @@ type importResults struct {
 // file to the block database.
 type blockImporter struct {
 	db                database.DB
-	chain             *blockchain.BlockChain
-	medianTime        blockchain.MedianTimeSource
 	r                 io.ReadSeeker
 	processQueue      chan []byte
 	doneChan          chan bool
@@ -87,10 +101,10 @@ func (bi *blockImporter) readBlock() ([]byte, error) {
 
 // processBlock potentially imports the block into the database.  It first
 // deserializes the raw block while checking for errors.  Already known blocks
-// are skipped and orphan blocks are considered errors.  Finally, it runs the
-// block through the chain rules to ensure it follows all rules and matches
-// up to the known checkpoint.  Returns whether the block was imported along
-// with any potential errors.
+// are skipped and orphan blocks are considered errors.  Returns whether the
+// block was imported along with any potential errors.
+//
+// NOTE: This is not a safe import as it does not verify chain rules.
 func (bi *blockImporter) processBlock(serializedBlock []byte) (bool, error) {
 	// Deserialize the block which includes checks for malformed blocks.
 	block, err := btcutil.NewBlockFromBytes(serializedBlock)
@@ -103,8 +117,14 @@ func (bi *blockImporter) processBlock(serializedBlock []byte) (bool, error) {
 	bi.receivedLogTx += int64(len(block.MsgBlock().Transactions))
 
 	// Skip blocks that already exist.
-	blockSha := block.Sha()
-	exists, err := bi.chain.HaveBlock(blockSha)
+	var exists bool
+	err = bi.db.View(func(tx database.Tx) error {
+		exists, err = tx.HasBlock(block.Sha())
+		if err != nil {
+			return err
+		}
+		return nil
+	})
 	if err != nil {
 		return false, err
 	}
@@ -115,7 +135,14 @@ func (bi *blockImporter) processBlock(serializedBlock []byte) (bool, error) {
 	// Don't bother trying to process orphans.
 	prevHash := &block.MsgBlock().Header.PrevBlock
 	if !prevHash.IsEqual(&zeroHash) {
-		exists, err := bi.chain.HaveBlock(prevHash)
+		var exists bool
+		err := bi.db.View(func(tx database.Tx) error {
+			exists, err = tx.HasBlock(prevHash)
+			if err != nil {
+				return err
+			}
+			return nil
+		})
 		if err != nil {
 			return false, err
 		}
@@ -126,16 +153,12 @@ func (bi *blockImporter) processBlock(serializedBlock []byte) (bool, error) {
 		}
 	}
 
-	// Ensure the blocks follows all of the chain rules and match up to the
-	// known checkpoints.
-	isOrphan, err := bi.chain.ProcessBlock(block, bi.medianTime,
-		blockchain.BFFastAdd)
+	// Put the blocks into the database with no checking of chain rules.
+	err = bi.db.Update(func(tx database.Tx) error {
+		return tx.StoreBlock(block)
+	})
 	if err != nil {
 		return false, err
-	}
-	if isOrphan {
-		return false, fmt.Errorf("import file contains an orphan "+
-			"block: %v", blockSha)
 	}
 
 	return true, nil
@@ -176,14 +199,14 @@ out:
 }
 
 // logProgress logs block progress as an information message.  In order to
-// prevent spam, it limits logging to one message every cfg.Progress seconds
-// with duration and totals included.
+// prevent spam, it limits logging to one message every importCfg.Progress
+// seconds with duration and totals included.
 func (bi *blockImporter) logProgress() {
 	bi.receivedLogBlocks++
 
 	now := time.Now()
 	duration := now.Sub(bi.lastLogTime)
-	if duration < time.Second*time.Duration(cfg.Progress) {
+	if duration < time.Second*time.Duration(importCfg.Progress) {
 		return
 	}
 
@@ -294,12 +317,7 @@ func (bi *blockImporter) Import() chan *importResults {
 
 // newBlockImporter returns a new importer for the provided file reader seeker
 // and database.
-func newBlockImporter(db database.DB, r io.ReadSeeker) (*blockImporter, error) {
-	chain, err := blockchain.New(db, activeNetParams, nil, nil)
-	if err != nil {
-		return nil, err
-	}
-
+func newBlockImporter(db database.DB, r io.ReadSeeker) *blockImporter {
 	return &blockImporter{
 		db:           db,
 		r:            r,
@@ -307,8 +325,77 @@ func newBlockImporter(db database.DB, r io.ReadSeeker) (*blockImporter, error) {
 		doneChan:     make(chan bool),
 		errChan:      make(chan error),
 		quit:         make(chan struct{}),
-		chain:        chain,
-		medianTime:   blockchain.NewMedianTime(),
 		lastLogTime:  time.Now(),
-	}, nil
+	}
+}
+
+// Execute is the main entry point for the command.  It's invoked by the parser.
+func (cmd *importCmd) Execute(args []string) error {
+	// Setup the global config options and ensure they are valid.
+	if err := setupGlobalConfig(); err != nil {
+		return err
+	}
+
+	// Ensure the specified block file exists.
+	if !fileExists(cmd.InFile) {
+		str := "The specified block file [%v] does not exist"
+		return fmt.Errorf(str, cmd.InFile)
+	}
+
+	// Load the block database.
+	db, err := loadBlockDB()
+	if err != nil {
+		return err
+	}
+	defer db.Close()
+
+	// Ensure the database is sync'd and closed on Ctrl+C.
+	addInterruptHandler(func() {
+		log.Infof("Gracefully shutting down the database...")
+		db.Close()
+	})
+
+	fi, err := os.Open(importCfg.InFile)
+	if err != nil {
+		return err
+	}
+	defer fi.Close()
+
+	// Create a block importer for the database and input file and start it.
+	// The results channel returned from start will contain an error if
+	// anything went wrong.
+	importer := newBlockImporter(db, fi)
+
+	// Perform the import asynchronously and signal the main goroutine when
+	// done.  This allows blocks to be processed and read in parallel.  The
+	// results channel returned from Import contains the statistics about
+	// the import including an error if something went wrong.  This is done
+	// in a separate goroutine rather than waiting directly so the main
+	// goroutine can be signaled for shutdown by either completion, error,
+	// or from the main interrupt handler.  This is necessary since the main
+	// goroutine must be kept running long enough for the interrupt handler
+	// goroutine to finish.
+	go func() {
+		log.Info("Starting import")
+		resultsChan := importer.Import()
+		results := <-resultsChan
+		if results.err != nil {
+			dbErr, ok := results.err.(database.Error)
+			if !ok || ok && dbErr.ErrorCode != database.ErrDbNotOpen {
+				shutdownChannel <- results.err
+				return
+			}
+		}
+
+		log.Infof("Processed a total of %d blocks (%d imported, %d "+
+			"already known)", results.blocksProcessed,
+			results.blocksImported,
+			results.blocksProcessed-results.blocksImported)
+		shutdownChannel <- nil
+	}()
+
+	// Wait for shutdown signal from either a normal completion or from the
+	// interrupt handler.
+	err = <-shutdownChannel
+	return err
 }

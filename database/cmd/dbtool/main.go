@@ -1,4 +1,4 @@
-// Copyright (c) 2013-2014 The btcsuite developers
+// Copyright (c) 2015 The btcsuite developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -8,11 +8,11 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 
-	"github.com/btcsuite/btcd/blockchain"
 	"github.com/btcsuite/btcd/database"
-	"github.com/btcsuite/btcd/limits"
 	"github.com/btcsuite/btclog"
+	flags "github.com/btcsuite/go-flags"
 )
 
 const (
@@ -21,8 +21,8 @@ const (
 )
 
 var (
-	cfg *config
-	log btclog.Logger
+	log             btclog.Logger
+	shutdownChannel = make(chan error)
 )
 
 // loadBlockDB opens the block database and returns a handle to it.
@@ -60,68 +60,54 @@ func loadBlockDB() (database.DB, error) {
 // realMain is the real main function for the utility.  It is necessary to work
 // around the fact that deferred functions do not run when os.Exit() is called.
 func realMain() error {
-	// Load configuration and parse command line.
-	tcfg, _, err := loadConfig()
-	if err != nil {
-		return err
-	}
-	cfg = tcfg
-
 	// Setup logging.
 	backendLogger := btclog.NewDefaultBackendLogger()
 	defer backendLogger.Flush()
 	log = btclog.NewSubsystemLogger(backendLogger, "")
-	database.UseLogger(btclog.NewSubsystemLogger(backendLogger, "BCDB: "))
-	blockchain.UseLogger(btclog.NewSubsystemLogger(backendLogger, "CHAN: "))
+	dbLog := btclog.NewSubsystemLogger(backendLogger, "BCDB: ")
+	dbLog.SetLevel(btclog.DebugLvl)
+	database.UseLogger(dbLog)
 
-	// Load the block database.
-	db, err := loadBlockDB()
-	if err != nil {
-		log.Errorf("Failed to load database: %v", err)
+	// Setup the parser options and commands.
+	appName := filepath.Base(os.Args[0])
+	appName = strings.TrimSuffix(appName, filepath.Ext(appName))
+	parserFlags := flags.Options(flags.HelpFlag | flags.PassDoubleDash)
+	parser := flags.NewNamedParser(appName, parserFlags)
+	parser.AddGroup("Global Options", "", cfg)
+	parser.AddCommand("insecureimport",
+		"Insecurely import bulk block data from bootstrap.dat",
+		"Insecurely import bulk block data from bootstrap.dat.  "+
+			"WARNING: This is NOT secure because it does NOT "+
+			"verify chain rules.  It is only provided for testing "+
+			"purposes.", &importCfg)
+	parser.AddCommand("loadheaders",
+		"Time how long to load headers for all blocks in the database",
+		"", &headersCfg)
+	parser.AddCommand("fetchblock",
+		"Fetch the specific block hash from the database", "",
+		&fetchBlockCfg)
+	parser.AddCommand("fetchblockregion",
+		"Fetch the specified block region from the database", "",
+		&blockRegionCfg)
+
+	// Parse command line and invoke the Execute function for the specified
+	// command.
+	if _, err := parser.Parse(); err != nil {
+		if e, ok := err.(*flags.Error); ok && e.Type == flags.ErrHelp {
+			parser.WriteHelp(os.Stderr)
+		} else {
+			log.Error(err)
+		}
+
 		return err
 	}
-	defer db.Close()
 
-	fi, err := os.Open(cfg.InFile)
-	if err != nil {
-		log.Errorf("Failed to open file %v: %v", cfg.InFile, err)
-		return err
-	}
-	defer fi.Close()
-
-	// Create a block importer for the database and input file and start it.
-	// The done channel returned from start will contain an error if
-	// anything went wrong.
-	importer, err := newBlockImporter(db, fi)
-	if err != nil {
-		log.Errorf("Failed create block importer: %v", err)
-		return err
-	}
-
-	// Perform the import asynchronously.  This allows blocks to be
-	// processed and read in parallel.  The results channel returned from
-	// Import contains the statistics about the import including an error
-	// if something went wrong.
-	log.Info("Starting import")
-	resultsChan := importer.Import()
-	results := <-resultsChan
-	if results.err != nil {
-		log.Errorf("%v", results.err)
-		return results.err
-	}
-
-	log.Infof("Processed a total of %d blocks (%d imported, %d already "+
-		"known)", results.blocksProcessed, results.blocksImported,
-		results.blocksProcessed-results.blocksImported)
 	return nil
 }
 
 func main() {
-	// Use all processor cores and up some limits.
+	// Use all processor cores.
 	runtime.GOMAXPROCS(runtime.NumCPU())
-	if err := limits.SetLimits(); err != nil {
-		os.Exit(1)
-	}
 
 	// Work around defer not working after os.Exit()
 	if err := realMain(); err != nil {
