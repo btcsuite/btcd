@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/decred/dcrd/blockchain/stake"
+	"github.com/decred/dcrd/chaincfg/chainhash"
 	"github.com/decred/dcrd/txscript"
 	"github.com/decred/dcrutil"
 )
@@ -172,6 +173,32 @@ func (b *BlockChain) checkBlockContext(block *dcrutil.Block, prevNode *blockNode
 	return nil
 }
 
+// ticketsSpentInBlock fetches a list of tickets that were spent in the
+// block.
+func ticketsSpentInBlock(bl *dcrutil.Block) []chainhash.Hash {
+	var tickets []chainhash.Hash
+	for _, stx := range bl.STransactions() {
+		if stake.DetermineTxType(stx) == stake.TxTypeSSGen {
+			tickets = append(tickets, stx.MsgTx().TxIn[1].PreviousOutPoint.Hash)
+		}
+	}
+
+	return tickets
+}
+
+// ticketsRevokedInBlock fetches a list of tickets that were revoked in the
+// block.
+func ticketsRevokedInBlock(bl *dcrutil.Block) []chainhash.Hash {
+	var tickets []chainhash.Hash
+	for _, stx := range bl.STransactions() {
+		if stake.DetermineTxType(stx) == stake.TxTypeSSRtx {
+			tickets = append(tickets, stx.MsgTx().TxIn[0].PreviousOutPoint.Hash)
+		}
+	}
+
+	return tickets
+}
+
 // maybeAcceptBlock potentially accepts a block into the memory block chain.
 // It performs several validation checks which depend on its position within
 // the block chain before adding it.  The block is expected to have already gone
@@ -209,9 +236,14 @@ func (b *BlockChain) maybeAcceptBlock(block *dcrutil.Block,
 		return false, err
 	}
 
-	// Prune block nodes which are no longer needed before creating
-	// a new node.
+	// Prune stake nodes and block nodes which are no longer needed before
+	// creating a new node.
 	if !dryRun {
+		err = b.pruneStakeNodes()
+		if err != nil {
+			return false, err
+		}
+
 		err = b.pruneBlockNodes()
 		if err != nil {
 			return false, err
@@ -221,19 +253,21 @@ func (b *BlockChain) maybeAcceptBlock(block *dcrutil.Block,
 	// Create a new block node for the block and add it to the in-memory
 	// block chain (could be either a side chain or the main chain).
 	blockHeader := &block.MsgBlock().Header
-	var voteBitsStake []uint16
-	for _, stx := range block.STransactions() {
-		if is, _ := stake.IsSSGen(stx); is {
-			vb := stake.SSGenVoteBits(stx)
-			voteBitsStake = append(voteBitsStake, vb)
-		}
-	}
-
-	newNode := newBlockNode(blockHeader, block.Sha(), blockHeight, voteBitsStake)
+	newNode := newBlockNode(blockHeader, block.Sha(), blockHeight, ticketsSpentInBlock(block), ticketsRevokedInBlock(block))
 	if prevNode != nil {
 		newNode.parent = prevNode
 		newNode.height = blockHeight
 		newNode.workSum.Add(prevNode.workSum, newNode.workSum)
+	}
+
+	// Fetching a stake node could enable a new DoS vector, so restrict
+	// this only to blocks that are recent in history.
+	if newNode.height < b.bestNode.height-minMemoryNodes {
+		newNode.stakeNode, err = b.fetchStakeNode(newNode)
+		if err != nil {
+			return false, err
+		}
+		newNode.stakeUndoData = newNode.stakeNode.UndoData()
 	}
 
 	// Connect the passed block to the chain while respecting proper chain

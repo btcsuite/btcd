@@ -719,6 +719,15 @@ func (p *Params) TotalSubsidyProportions() uint16 {
 	return p.WorkRewardProportion + p.StakeRewardProportion + p.BlockTaxProportion
 }
 
+// LatestCheckpointHeight is the height of the latest checkpoint block in the
+// parameters.
+func (p *Params) LatestCheckpointHeight() int64 {
+	if len(p.Checkpoints) == 0 {
+		return 0
+	}
+	return p.Checkpoints[len(p.Checkpoints)-1].Height
+}
+
 func init() {
 	// Register all default networks when the package is initialized.
 	mustRegister(&MainNetParams)

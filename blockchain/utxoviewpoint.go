@@ -1081,11 +1081,11 @@ func (b *BlockChain) FetchUtxoView(tx *dcrutil.Tx, treeValid bool) (*UtxoViewpoi
 	view := NewUtxoViewpoint()
 	if treeValid {
 		view.SetStakeViewpoint(ViewpointPrevValidRegular)
-		block, err := b.getBlockFromHash(b.bestNode.hash)
+		block, err := b.fetchBlockFromHash(&b.bestNode.hash)
 		if err != nil {
 			return nil, err
 		}
-		parent, err := b.getBlockFromHash(&b.bestNode.header.PrevBlock)
+		parent, err := b.fetchBlockFromHash(&b.bestNode.header.PrevBlock)
 		if err != nil {
 			return nil, err
 		}
@@ -1101,7 +1101,7 @@ func (b *BlockChain) FetchUtxoView(tx *dcrutil.Tx, treeValid bool) (*UtxoViewpoi
 			}
 		}
 	}
-	view.SetBestHash(b.bestNode.hash)
+	view.SetBestHash(&b.bestNode.hash)
 
 	// Create a set of needed transactions based on those referenced by the
 	// inputs of the passed transaction.  Also, add the passed transaction

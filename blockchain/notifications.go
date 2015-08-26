@@ -8,7 +8,6 @@ package blockchain
 import (
 	"fmt"
 
-	"github.com/decred/dcrd/blockchain/stake"
 	"github.com/decred/dcrd/chaincfg/chainhash"
 	"github.com/decred/dcrutil"
 )
@@ -89,7 +88,9 @@ type TicketNotificationsData struct {
 	Hash            chainhash.Hash
 	Height          int64
 	StakeDifficulty int64
-	TicketMap       stake.SStxMemMap
+	TicketsSpent    []chainhash.Hash
+	TicketsMissed   []chainhash.Hash
+	TicketsNew      []chainhash.Hash
 }
 
 // Notification defines notification that is sent to the caller via the callback

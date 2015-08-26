@@ -12,7 +12,6 @@ import (
 	"path/filepath"
 
 	"github.com/decred/dcrd/blockchain"
-	"github.com/decred/dcrd/blockchain/stake"
 	"github.com/decred/dcrd/chaincfg"
 	"github.com/decred/dcrd/database"
 	_ "github.com/decred/dcrd/database/ffldb"
@@ -40,15 +39,12 @@ func ExampleBlockChain_ProcessBlock() {
 	defer os.RemoveAll(dbPath)
 	defer db.Close()
 
-	var tmdb *stake.TicketDB
-
 	// Create a new BlockChain instance using the underlying database for
 	// the main bitcoin network.  This example does not demonstrate some
 	// of the other available configuration options such as specifying a
 	// notification callback and signature cache.
 	chain, err := blockchain.New(&blockchain.Config{
 		DB:          db,
-		TMDB:        tmdb,
 		ChainParams: &chaincfg.MainNetParams,
 	})
 	if err != nil {

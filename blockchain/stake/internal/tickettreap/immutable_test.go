@@ -8,8 +8,13 @@ package tickettreap
 import (
 	"bytes"
 	"crypto/sha256"
+	"math/rand"
 	"reflect"
+	"runtime"
 	"testing"
+
+	"github.com/decred/dcrd/chaincfg"
+	"github.com/decred/dcrd/chaincfg/chainhash"
 )
 
 // TestImmutableEmpty ensures calling functions on an empty immutable treap
@@ -497,5 +502,118 @@ func TestImmutableSnapshot(t *testing.T) {
 				"want %d", i, gotSize, expectedSize)
 		}
 		expectedSize -= (nodeFieldsSize + uint64(len(key)) + 4)
+	}
+}
+
+// randHash generates a "random" hash using a deterministic source.
+func randHash(r rand.Source) *chainhash.Hash {
+	hash := new(chainhash.Hash)
+	for i := 0; i < chainhash.HashSize/2; i++ {
+		random := uint64(r.Int63())
+		randByte1 := random % 255
+		randByte2 := (random >> 8) % 255
+		hash[i] = uint8(randByte1)
+		hash[i+1] = uint8(randByte2)
+	}
+
+	return hash
+}
+
+// pickRandWinners picks tickets per block many random "winners" and returns
+// their indexes.
+func pickRandWinners(sz int, r rand.Source) []int {
+	if sz == 0 {
+		panic("bad sz!")
+	}
+
+	perBlock := int(chaincfg.MainNetParams.TicketsPerBlock)
+	winners := make([]int, perBlock)
+	for i := 0; i < perBlock; i++ {
+		winners[i] = int(r.Int63() % int64(sz))
+	}
+
+	return winners
+}
+
+// TestImmutableMemory tests the memory for creating n many nodes cloned and
+// modified in the memory analogous to what is actually seen in the Decred
+// mainnet, then analyzes the relative memory usage with runtime stats.
+func TestImmutableMemory(t *testing.T) {
+	// Collect information about memory at the start.
+	runtime.GC()
+	memStats := new(runtime.MemStats)
+	runtime.ReadMemStats(memStats)
+	initAlloc := memStats.Alloc
+	initTotal := memStats.TotalAlloc
+
+	// Insert a bunch of sequential keys while checking several of the treap
+	// functions work as expected.
+	randSource := rand.NewSource(12345)
+	numItems := 40960
+	numNodes := 128
+	nodeTreaps := make([]*Immutable, numNodes)
+	testTreap := NewImmutable()
+
+	// Populate.
+	for i := 0; i < numItems; i++ {
+		randomHash := randHash(randSource)
+		testTreap = testTreap.Put(Key(*randomHash),
+			&Value{uint32(randSource.Int63()), false, true, false, true})
+	}
+	nodeTreaps[0] = testTreap
+
+	// Start populating the "nodes". Ignore expiring tickets for the
+	// sake of testing. For each node, remove 5 "random" tickets and
+	// insert 5 "random" tickets.
+	maxHeight := uint32(0xFFFFFFFF)
+	lastTreap := nodeTreaps[0]
+	lastTotal := initTotal
+	allocsPerNode := make([]uint64, numNodes)
+	for i := 1; i < numNodes; i++ {
+		treapCopy := lastTreap
+		sz := treapCopy.Len()
+		winnerIdxs := pickRandWinners(sz, randSource)
+		winners, _ := treapCopy.FetchWinnersAndExpired(winnerIdxs, maxHeight)
+		for _, k := range winners {
+			treapCopy = treapCopy.Delete(*k)
+		}
+
+		perBlock := int(chaincfg.MainNetParams.TicketsPerBlock)
+		for i := 0; i < perBlock; i++ {
+			randomHash := randHash(randSource)
+			treapCopy = treapCopy.Put(Key(*randomHash),
+				&Value{uint32(randSource.Int63()), false, true, false, true})
+		}
+
+		runtime.ReadMemStats(memStats)
+		finalTotal := memStats.TotalAlloc
+		allocsPerNode[i] = finalTotal - lastTotal
+		lastTotal = finalTotal
+
+		nodeTreaps[i] = treapCopy
+		lastTreap = treapCopy
+	}
+
+	avgUint64 := func(uis []uint64) uint64 {
+		var sum uint64
+		for i := range uis {
+			sum += uis[i]
+		}
+		return sum / uint64(len(uis))
+	}
+
+	runtime.GC()
+	runtime.ReadMemStats(memStats)
+	finalAlloc := memStats.Alloc
+	t.Logf("Ticket treaps for %v nodes allocated %v many bytes total after GC",
+		numNodes, finalAlloc-initAlloc)
+	t.Logf("Ticket treaps allocated an average of %v many bytes per node",
+		avgUint64(allocsPerNode))
+
+	// Keep all the treaps alive in memory so GC doesn't rm them in
+	// the previous step.
+	lenTest := nodeTreaps[0].count == nodeTreaps[0].Len()
+	if !lenTest {
+		t.Errorf("bad len test")
 	}
 }

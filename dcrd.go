@@ -17,7 +17,6 @@ import (
 	"time"
 
 	"github.com/decred/dcrd/blockchain/indexers"
-	"github.com/decred/dcrd/blockchain/stake"
 	"github.com/decred/dcrd/limits"
 )
 
@@ -111,12 +110,6 @@ func dcrdMain(serverChan chan<- *server) error {
 		return nil
 	}
 
-	// Perform upgrades to dcrd as new versions require it.
-	if err := doUpgrades(); err != nil {
-		dcrdLog.Errorf("%v", err)
-		return err
-	}
-
 	if interruptRequested(interrupted) {
 		return nil
 	}
@@ -167,42 +160,9 @@ func dcrdMain(serverChan chan<- *server) error {
 		return nil
 	}
 
-	// The ticket "DB" takes ages to load and serialize back out to a file.
-	// Load it asynchronously and if the process is interrupted during the
-	// load, discard the result since no cleanup is necessary.
-	lifetimeNotifier.notifyStartupEvent(lifetimeEventTicketDB)
-	type ticketDBResult struct {
-		ticketDB *stake.TicketDB
-		err      error
-	}
-	ticketDBResultChan := make(chan ticketDBResult)
-	go func() {
-		tmdb, err := loadTicketDB(db, activeNetParams.Params)
-		ticketDBResultChan <- ticketDBResult{tmdb, err}
-	}()
-	var tmdb *stake.TicketDB
-	select {
-	case <-interrupted:
-		return nil
-	case r := <-ticketDBResultChan:
-		if r.err != nil {
-			dcrdLog.Errorf("%v", r.err)
-			return r.err
-		}
-		tmdb = r.ticketDB
-	}
-	defer func() {
-		lifetimeNotifier.notifyShutdownEvent(lifetimeEventTicketDB)
-		tmdb.Close()
-		err := tmdb.Store(cfg.DataDir, "ticketdb.gob")
-		if err != nil {
-			dcrdLog.Errorf("Failed to store ticket database: %v", err.Error())
-		}
-	}()
-
 	// Create server and start it.
 	lifetimeNotifier.notifyStartupEvent(lifetimeEventP2PServer)
-	server, err := newServer(cfg.Listeners, db, tmdb, activeNetParams.Params)
+	server, err := newServer(cfg.Listeners, db, activeNetParams.Params)
 	if err != nil {
 		// TODO(oga) this logging could do with some beautifying.
 		dcrdLog.Errorf("Unable to start server on %v: %v",
@@ -242,7 +202,7 @@ func main() {
 	// limits the garbage collector from excessively overallocating during
 	// bursts.  This value was arrived at with the help of profiling live
 	// usage.
-	debug.SetGCPercent(10)
+	debug.SetGCPercent(20)
 
 	// Up some limits.
 	if err := limits.SetLimits(); err != nil {

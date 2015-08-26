@@ -847,7 +847,6 @@ func (idx *AddrIndex) ConnectBlock(dbTx database.Tx, block, parent *dcrutil.Bloc
 	// Add all of the index entries for each address.
 	stakeIdxsStart := len(parentTxLocs)
 	allTxLocs := append(parentTxLocs, blockStxLocs...)
-	//offsetStakeIdxStartBlock := len(block.Transactions())
 	addrIdxBucket := dbTx.Metadata().Bucket(addrIndexKey)
 	for addrKey, txIdxs := range addrsToTxns {
 		for _, txIdx := range txIdxs {

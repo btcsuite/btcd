@@ -3,7 +3,7 @@
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
-package indexers
+package progresslog
 
 import (
 	"sync"
@@ -14,10 +14,10 @@ import (
 	"github.com/decred/dcrutil"
 )
 
-// blockProgressLogger provides periodic logging for other services in order
+// BlockProgressLogger provides periodic logging for other services in order
 // to show users progress of certain "actions" involving some or all current
 // blocks. Ex: syncing to best chain, indexing all blocks, etc.
-type blockProgressLogger struct {
+type BlockProgressLogger struct {
 	receivedLogBlocks int64
 	receivedLogTx     int64
 	lastBlockLogTime  time.Time
@@ -27,12 +27,12 @@ type blockProgressLogger struct {
 	sync.Mutex
 }
 
-// newBlockProgressLogger returns a new block progress logger.
+// NewBlockProgressLogger returns a new block progress logger.
 // The progress message is templated as follows:
 //  {progressAction} {numProcessed} {blocks|block} in the last {timePeriod}
 //  ({numTxs}, height {lastBlockHeight}, {lastBlockTimeStamp})
-func newBlockProgressLogger(progressMessage string, logger btclog.Logger) *blockProgressLogger {
-	return &blockProgressLogger{
+func NewBlockProgressLogger(progressMessage string, logger btclog.Logger) *BlockProgressLogger {
+	return &BlockProgressLogger{
 		lastBlockLogTime: time.Now(),
 		progressAction:   progressMessage,
 		subsystemLogger:  logger,
@@ -42,7 +42,7 @@ func newBlockProgressLogger(progressMessage string, logger btclog.Logger) *block
 // LogBlockHeight logs a new block height as an information message to show
 // progress to the user. In order to prevent spam, it limits logging to one
 // message every 10 seconds with duration and totals included.
-func (b *blockProgressLogger) LogBlockHeight(block, parent *dcrutil.Block) {
+func (b *BlockProgressLogger) LogBlockHeight(block, parent *dcrutil.Block) {
 	b.Lock()
 	defer b.Unlock()
 	b.receivedLogBlocks++
@@ -73,8 +73,9 @@ func (b *blockProgressLogger) LogBlockHeight(block, parent *dcrutil.Block) {
 		txStr = "transaction"
 	}
 	b.subsystemLogger.Infof("%s %d %s in the last %s (%d %s, height %d, %s)",
-		b.progressAction, b.receivedLogBlocks, blockStr, tDuration, b.receivedLogTx,
-		txStr, block.Height(), block.MsgBlock().Header.Timestamp)
+		b.progressAction, b.receivedLogBlocks, blockStr, tDuration,
+		b.receivedLogTx, txStr, block.Height(),
+		block.MsgBlock().Header.Timestamp)
 
 	b.receivedLogBlocks = 0
 	b.receivedLogTx = 0

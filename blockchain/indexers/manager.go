@@ -10,6 +10,7 @@ import (
 	"fmt"
 
 	"github.com/decred/dcrd/blockchain"
+	"github.com/decred/dcrd/blockchain/internal/progresslog"
 	"github.com/decred/dcrd/blockchain/stake"
 	"github.com/decred/dcrd/chaincfg"
 	"github.com/decred/dcrd/chaincfg/chainhash"
@@ -392,7 +393,7 @@ func (m *Manager) Init(chain *blockchain.BlockChain) error {
 	}
 
 	// Create a progress logger for the indexing process below.
-	progressLogger := newBlockProgressLogger("Indexed", log)
+	progressLogger := progresslog.NewBlockProgressLogger("Indexed", log)
 
 	// At this point, one or more indexes are behind the current best chain
 	// tip and need to be caught up, so log the details and loop through

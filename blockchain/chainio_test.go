@@ -1030,22 +1030,22 @@ func TestDatabaseInfoSerialization(t *testing.T) {
 		{
 			name: "not upgrade",
 			info: databaseInfo{
-				version:        currentDatabaseVersion,
-				compVer:        currentCompressionVersion,
+				version:        2,
+				compVer:        1,
 				date:           time.Unix(int64(0x57acca95), 0),
 				upgradeStarted: false,
 			},
-			serialized: hexToBytes("010000000100000095caac57"),
+			serialized: hexToBytes("020000000100000095caac57"),
 		},
 		{
 			name: "upgrade",
 			info: databaseInfo{
-				version:        currentDatabaseVersion,
-				compVer:        currentCompressionVersion,
+				version:        2,
+				compVer:        1,
 				date:           time.Unix(int64(0x57acca95), 0),
 				upgradeStarted: true,
 			},
-			serialized: hexToBytes("010000800100000095caac57"),
+			serialized: hexToBytes("020000800100000095caac57"),
 		},
 	}
 

@@ -7,255 +7,63 @@ package blockchain
 
 import (
 	"fmt"
-	"sort"
 
-	"github.com/decred/dcrd/blockchain/stake"
 	"github.com/decred/dcrd/chaincfg/chainhash"
 	"github.com/decred/dcrd/database"
+	"github.com/decred/dcrd/txscript"
+	"github.com/decred/dcrutil"
 )
 
-// GetNextWinningTickets returns the next tickets eligible for spending as SSGen
-// on the top block. It also returns the ticket pool size.
-// This function is NOT safe for concurrent access.
-func (b *BlockChain) GetNextWinningTickets() ([]chainhash.Hash, int, [6]byte,
-	error) {
-	winningTickets, poolSize, finalState, _, err :=
-		b.getWinningTicketsWithStore(b.bestNode)
-	if err != nil {
-		return nil, 0, [6]byte{}, err
-	}
+// NextLotteryData returns the next tickets eligible for spending as SSGen
+// on the top block.  It also returns the ticket pool size and the PRNG
+// state checksum.
+//
+// This function is safe for concurrent access.
+func (b *BlockChain) NextLotteryData() ([]chainhash.Hash, int, [6]byte, error) {
+	b.chainLock.RLock()
+	defer b.chainLock.RUnlock()
 
-	return winningTickets, poolSize, finalState, nil
+	return b.bestNode.stakeNode.Winners(), b.bestNode.stakeNode.PoolSize(),
+		b.bestNode.stakeNode.FinalState(), nil
 }
 
-// getWinningTicketsWithStore is a helper function that returns winning tickets
-// along with the ticket pool size and transaction store for the given node.
-// Note that this function evaluates the lottery data predominantly for mining
-// purposes; that is, it retrieves the lottery data which needs to go into
-// the next block when mining on top of this block.
-// This function is NOT safe for concurrent access.
-func (b *BlockChain) getWinningTicketsWithStore(node *blockNode) ([]chainhash.Hash,
-	int, [6]byte, TicketStore, error) {
-	if node.height < b.chainParams.StakeEnabledHeight {
-		return []chainhash.Hash{}, 0, [6]byte{}, nil, nil
-	}
-
-	evalLotteryWinners := false
-	if node.height >= b.chainParams.StakeValidationHeight-1 {
-		evalLotteryWinners = true
-	}
-
-	block, err := b.getBlockFromHash(node.hash)
-	if err != nil {
-		return nil, 0, [6]byte{}, nil, err
-	}
-
-	headerB, err := node.header.Bytes()
-	if err != nil {
-		return nil, 0, [6]byte{}, nil, err
-	}
-
-	ticketStore, err := b.fetchTicketStore(node)
-	if err != nil {
-		return nil, 0, [6]byte{}, nil,
-			fmt.Errorf("Failed to generate ticket store for node %v; "+
-				"error given: %v", node.hash, err)
-	}
-
-	if ticketStore != nil {
-		view := NewUtxoViewpoint()
-		view.SetBestHash(node.hash)
-		view.SetStakeViewpoint(ViewpointPrevValidInitial)
-		parent, err := b.getBlockFromHash(&node.header.PrevBlock)
-		if err != nil {
-			return nil, 0, [6]byte{}, nil, err
-		}
-		err = view.fetchInputUtxos(b.db, block, parent)
-		if err != nil {
-			return nil, 0, [6]byte{}, nil, err
-		}
-	}
-
-	// Sort the entire list of tickets lexicographically by sorting
-	// each bucket and then appending it to the list.
-	tpdBucketMap := make(map[uint8][]*TicketPatchData)
-	for _, tpd := range ticketStore {
-		// Bucket does not exist.
-		if _, ok := tpdBucketMap[tpd.td.Prefix]; !ok {
-			tpdBucketMap[tpd.td.Prefix] = make([]*TicketPatchData, 1)
-			tpdBucketMap[tpd.td.Prefix][0] = tpd
-		} else {
-			// Bucket exists.
-			data := tpdBucketMap[tpd.td.Prefix]
-			tpdBucketMap[tpd.td.Prefix] = append(data, tpd)
-		}
-	}
-	totalTickets := 0
-	var sortedSlice []*stake.TicketData
-	for i := 0; i < stake.BucketsSize; i++ {
-		ltb, err := b.GenerateLiveTicketBucket(ticketStore, tpdBucketMap,
-			uint8(i))
-		if err != nil {
-			h := node.hash
-			str := fmt.Sprintf("Failed to generate a live ticket bucket "+
-				"to evaluate the lottery data for node %v, height %v! Error "+
-				"given: %v",
-				h,
-				node.height,
-				err.Error())
-			return nil, 0, [6]byte{}, nil, fmt.Errorf(str)
-		}
-		mapLen := len(ltb)
-
-		tempTdSlice := stake.NewTicketDataSlice(mapLen)
-		itr := 0 // Iterator
-		for _, td := range ltb {
-			tempTdSlice[itr] = td
-			itr++
-			totalTickets++
-		}
-		sort.Sort(tempTdSlice)
-		sortedSlice = append(sortedSlice, tempTdSlice...)
-	}
-
-	// Use the parent block's header to seed a PRNG that picks the
-	// lottery winners.
-	var winningTickets []chainhash.Hash
-	var finalState [6]byte
-	stateBuffer := make([]byte, 0,
-		(b.chainParams.TicketsPerBlock+1)*chainhash.HashSize)
-	if evalLotteryWinners {
-		ticketsPerBlock := int(b.chainParams.TicketsPerBlock)
-		prng := stake.NewHash256PRNG(headerB)
-		ts, err := stake.FindTicketIdxs(int64(totalTickets), ticketsPerBlock, prng)
-		if err != nil {
-			return nil, 0, [6]byte{}, nil, err
-		}
-		for _, idx := range ts {
-			winningTickets = append(winningTickets, sortedSlice[idx].SStxHash)
-			stateBuffer = append(stateBuffer, sortedSlice[idx].SStxHash[:]...)
-		}
-
-		lastHash := prng.StateHash()
-		stateBuffer = append(stateBuffer, lastHash[:]...)
-		copy(finalState[:], chainhash.HashFuncB(stateBuffer)[0:6])
-	}
-
-	return winningTickets, totalTickets, finalState, ticketStore, nil
-}
-
-// getWinningTicketsInclStore is a helper function for block validation that
-// returns winning tickets along with the ticket pool size and transaction
-// store for the given node.
-// Note that this function is used for finding the lottery data when
-// evaluating a block that builds on a tip, not for mining.
-// This function is NOT safe for concurrent access.
-func (b *BlockChain) getWinningTicketsInclStore(node *blockNode,
-	ticketStore TicketStore) ([]chainhash.Hash, int, [6]byte, error) {
+// lotteryDataForNode is a helper function that returns winning tickets
+// along with the ticket pool size and PRNG checksum for a given node.
+//
+// This function is NOT safe for concurrent access and MUST be called
+// with the chainLock held for writes.
+func (b *BlockChain) lotteryDataForNode(node *blockNode) ([]chainhash.Hash, int, [6]byte, error) {
 	if node.height < b.chainParams.StakeEnabledHeight {
 		return []chainhash.Hash{}, 0, [6]byte{}, nil
 	}
-
-	evalLotteryWinners := false
-	if node.height >= b.chainParams.StakeValidationHeight-1 {
-		evalLotteryWinners = true
-	}
-
-	parentHeaderB, err := node.parent.header.Bytes()
+	stakeNode, err := b.fetchStakeNode(node)
 	if err != nil {
-		return nil, 0, [6]byte{}, err
+		return []chainhash.Hash{}, 0, [6]byte{}, err
 	}
 
-	// Sort the entire list of tickets lexicographically by sorting
-	// each bucket and then appending it to the list.
-	tpdBucketMap := make(map[uint8][]*TicketPatchData)
-	for _, tpd := range ticketStore {
-		// Bucket does not exist.
-		if _, ok := tpdBucketMap[tpd.td.Prefix]; !ok {
-			tpdBucketMap[tpd.td.Prefix] = make([]*TicketPatchData, 1)
-			tpdBucketMap[tpd.td.Prefix][0] = tpd
-		} else {
-			// Bucket exists.
-			data := tpdBucketMap[tpd.td.Prefix]
-			tpdBucketMap[tpd.td.Prefix] = append(data, tpd)
-		}
-	}
-	totalTickets := 0
-	var sortedSlice []*stake.TicketData
-	for i := 0; i < stake.BucketsSize; i++ {
-		ltb, err := b.GenerateLiveTicketBucket(ticketStore, tpdBucketMap,
-			uint8(i))
-		if err != nil {
-			h := node.hash
-			str := fmt.Sprintf("Failed to generate a live ticket bucket "+
-				"to evaluate the lottery data for node %v, height %v! Error "+
-				"given: %v",
-				h,
-				node.height,
-				err.Error())
-			return nil, 0, [6]byte{}, fmt.Errorf(str)
-		}
-		mapLen := len(ltb)
-
-		tempTdSlice := stake.NewTicketDataSlice(mapLen)
-		itr := 0 // Iterator
-		for _, td := range ltb {
-			tempTdSlice[itr] = td
-			itr++
-			totalTickets++
-		}
-		sort.Sort(tempTdSlice)
-		sortedSlice = append(sortedSlice, tempTdSlice...)
-	}
-
-	// Use the parent block's header to seed a PRNG that picks the
-	// lottery winners.
-	var winningTickets []chainhash.Hash
-	var finalState [6]byte
-	stateBuffer := make([]byte, 0,
-		(b.chainParams.TicketsPerBlock+1)*chainhash.HashSize)
-	if evalLotteryWinners {
-		ticketsPerBlock := int(b.chainParams.TicketsPerBlock)
-		prng := stake.NewHash256PRNG(parentHeaderB)
-		ts, err := stake.FindTicketIdxs(int64(totalTickets), ticketsPerBlock, prng)
-		if err != nil {
-			return nil, 0, [6]byte{}, err
-		}
-		for _, idx := range ts {
-			winningTickets = append(winningTickets, sortedSlice[idx].SStxHash)
-			stateBuffer = append(stateBuffer, sortedSlice[idx].SStxHash[:]...)
-		}
-
-		lastHash := prng.StateHash()
-		stateBuffer = append(stateBuffer, lastHash[:]...)
-		copy(finalState[:], chainhash.HashFuncB(stateBuffer)[0:6])
-	}
-
-	return winningTickets, totalTickets, finalState, nil
+	return stakeNode.Winners(), b.bestNode.stakeNode.PoolSize(),
+		b.bestNode.stakeNode.FinalState(), nil
 }
 
-// GetWinningTickets takes a node block hash and returns the next tickets
-// eligible for spending as SSGen.
+// lotteryDataForBlock takes a node block hash and returns the next tickets
+// eligible for voting, the number of tickets in the ticket pool, and the
+// final state of the PRNG.
 //
-// This function is safe for concurrent access.
-func (b *BlockChain) GetWinningTickets(nodeHash chainhash.Hash) ([]chainhash.Hash,
-	int, [6]byte, error) {
-	b.chainLock.Lock()
-	defer b.chainLock.Unlock()
-
+// This function is NOT safe for concurrent access and must have the chainLock
+// held for write access.
+func (b *BlockChain) lotteryDataForBlock(hash *chainhash.Hash) ([]chainhash.Hash, int, [6]byte, error) {
 	var node *blockNode
-	if n, exists := b.index[nodeHash]; exists {
+	if n, exists := b.index[*hash]; exists {
 		node = n
 	} else {
-		node, _ = b.findNode(&nodeHash)
+		node, _ = b.findNode(hash)
 	}
 
 	if node == nil {
 		return nil, 0, [6]byte{}, fmt.Errorf("node doesn't exist")
 	}
 
-	winningTickets, poolSize, finalState, _, err :=
-		b.getWinningTicketsWithStore(node)
+	winningTickets, poolSize, finalState, err := b.lotteryDataForNode(node)
 	if err != nil {
 		return nil, 0, [6]byte{}, err
 	}
@@ -263,22 +71,162 @@ func (b *BlockChain) GetWinningTickets(nodeHash chainhash.Hash) ([]chainhash.Has
 	return winningTickets, poolSize, finalState, nil
 }
 
-// GetMissedTickets returns a list of currently missed tickets.
+// LotteryDataForBlock returns lottery data for a given block in the block
+// chain, including side chain blocks.
+//
+// It is safe for concurrent access.
+// TODO An optimization can be added that only calls the read lock if the
+//   block is not minMemoryStakeNodes blocks before the current best node.
+//   This is because all the data for these nodes can be assumed to be
+//   in memory.
+func (b *BlockChain) LotteryDataForBlock(hash *chainhash.Hash) ([]chainhash.Hash, int, [6]byte, error) {
+	b.chainLock.Lock()
+	defer b.chainLock.Unlock()
+
+	return b.lotteryDataForBlock(hash)
+}
+
+// LiveTickets returns all currently live tickets from the stake database.
 //
 // This function is NOT safe for concurrent access.
-func (b *BlockChain) GetMissedTickets() []chainhash.Hash {
-	missedTickets := b.tmdb.GetTicketHashesForMissed()
+func (b *BlockChain) LiveTickets() ([]chainhash.Hash, error) {
+	b.chainLock.RLock()
+	sn := b.bestNode.stakeNode
+	b.chainLock.RUnlock()
 
-	return missedTickets
+	return sn.LiveTickets(), nil
 }
 
-// DB passes the pointer to the database. It is only to be used by testing.
-func (b *BlockChain) DB() database.DB {
-	return b.db
+// MissedTickets returns all currently missed tickets from the stake database.
+//
+// This function is NOT safe for concurrent access.
+func (b *BlockChain) MissedTickets() ([]chainhash.Hash, error) {
+	b.chainLock.RLock()
+	sn := b.bestNode.stakeNode
+	b.chainLock.RUnlock()
+
+	return sn.MissedTickets(), nil
 }
 
-// TMDB passes the pointer to the ticket database. It is only to be used by
-// testing.
-func (b *BlockChain) TMDB() *stake.TicketDB {
-	return b.tmdb
+// TicketsWithAddress returns a slice of ticket hashes that are currently live
+// corresponding to the given address.
+//
+// This function is safe for concurrent access.
+func (b *BlockChain) TicketsWithAddress(address dcrutil.Address) ([]chainhash.Hash, error) {
+	b.chainLock.RLock()
+	sn := b.bestNode.stakeNode
+	b.chainLock.RUnlock()
+
+	tickets := sn.LiveTickets()
+
+	var ticketsWithAddr []chainhash.Hash
+	err := b.db.View(func(dbTx database.Tx) error {
+		var err error
+		for _, hash := range tickets {
+			utxo, err := dbFetchUtxoEntry(dbTx, &hash)
+			if err != nil {
+				return err
+			}
+
+			_, addrs, _, err :=
+				txscript.ExtractPkScriptAddrs(txscript.DefaultScriptVersion,
+					utxo.PkScriptByIndex(0), b.chainParams)
+			if addrs[0].EncodeAddress() == address.EncodeAddress() {
+				ticketsWithAddr = append(ticketsWithAddr, hash)
+			}
+		}
+		return err
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return ticketsWithAddr, nil
+}
+
+// CheckLiveTicket returns whether or not a ticket exists in the live ticket
+// treap of the best node.
+//
+// This function is safe for concurrent access.
+func (b *BlockChain) CheckLiveTicket(hash chainhash.Hash) bool {
+	b.chainLock.RLock()
+	sn := b.bestNode.stakeNode
+	b.chainLock.RUnlock()
+
+	return sn.ExistsLiveTicket(hash)
+}
+
+// CheckLiveTickets returns whether or not a slice of tickets exist in the live
+// ticket treap of the best node.
+//
+// This function is safe for concurrent access.
+func (b *BlockChain) CheckLiveTickets(hashes []chainhash.Hash) []bool {
+	b.chainLock.RLock()
+	sn := b.bestNode.stakeNode
+	b.chainLock.RUnlock()
+
+	existsSlice := make([]bool, len(hashes))
+	for i := range hashes {
+		existsSlice[i] = sn.ExistsLiveTicket(hashes[i])
+	}
+
+	return existsSlice
+}
+
+// CheckExpiredTicket returns whether or not a ticket was ever expired.
+//
+// This function is safe for concurrent access.
+func (b *BlockChain) CheckExpiredTicket(hash chainhash.Hash) bool {
+	b.chainLock.RLock()
+	sn := b.bestNode.stakeNode
+	b.chainLock.RUnlock()
+
+	return sn.ExistsExpiredTicket(hash)
+}
+
+// CheckExpiredTickets returns whether or not a ticket in a slice of
+// tickets was ever expired.
+//
+// This function is safe for concurrent access.
+func (b *BlockChain) CheckExpiredTickets(hashes []chainhash.Hash) []bool {
+	b.chainLock.RLock()
+	sn := b.bestNode.stakeNode
+	b.chainLock.RUnlock()
+
+	existsSlice := make([]bool, len(hashes))
+	for i := range hashes {
+		existsSlice[i] = sn.ExistsExpiredTicket(hashes[i])
+	}
+
+	return existsSlice
+}
+
+// TicketPoolValue returns the current value of all the locked funds in the
+// ticket pool.
+//
+// This function is safe for concurrent access.  All live tickets are at least
+// 256 blocks deep on mainnet, so the UTXO set should generally always have
+// the asked for transactions.
+func (b *BlockChain) TicketPoolValue() (dcrutil.Amount, error) {
+	b.chainLock.RLock()
+	sn := b.bestNode.stakeNode
+	b.chainLock.RUnlock()
+
+	var amt int64
+	err := b.db.View(func(dbTx database.Tx) error {
+		var err error
+		for _, hash := range sn.LiveTickets() {
+			utxo, err := dbFetchUtxoEntry(dbTx, &hash)
+			if err != nil {
+				return err
+			}
+
+			amt += utxo.sparseOutputs[0].amount
+		}
+		return err
+	})
+	if err != nil {
+		return 0, err
+	}
+	return dcrutil.Amount(amt), nil
 }

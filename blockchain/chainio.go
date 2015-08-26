@@ -11,7 +11,7 @@ import (
 	"sort"
 	"time"
 
-	"github.com/decred/dcrd/blockchain/dbnamespace"
+	"github.com/decred/dcrd/blockchain/internal/dbnamespace"
 	"github.com/decred/dcrd/blockchain/stake"
 	"github.com/decred/dcrd/chaincfg/chainhash"
 	"github.com/decred/dcrd/database"
@@ -27,7 +27,7 @@ const (
 
 	// currentDatabaseVersion indicates what the current database
 	// version is.
-	currentDatabaseVersion = 1
+	currentDatabaseVersion = 2
 )
 
 // errNotInMainChain signifies that a block hash or height that is not in the
@@ -1094,11 +1094,11 @@ func serializeDatabaseInfo(dbi *databaseInfo) []byte {
 // information.
 func dbPutDatabaseInfo(dbTx database.Tx, dbi *databaseInfo) error {
 	meta := dbTx.Metadata()
-	subsidyBucket := meta.Bucket(dbnamespace.BlockChainDbInfoBucketName)
+	bucket := meta.Bucket(dbnamespace.BlockChainDbInfoBucketName)
 	val := serializeDatabaseInfo(dbi)
 
 	// Store the current best chain state into the database.
-	return subsidyBucket.Put(dbnamespace.BlockChainDbInfoBucketName, val)
+	return bucket.Put(dbnamespace.BlockChainDbInfoBucketName, val)
 }
 
 // deserializeDatabaseInfo deserializes a database information struct.
@@ -1160,7 +1160,6 @@ func dbFetchDatabaseInfo(dbTx database.Tx) (*databaseInfo, error) {
 //   block height      uint32           4 bytes
 //   total txns        uint64           8 bytes
 //   total subsidy     int64            8 bytes
-//   ticket pool value int64            8 bytes
 //   work sum length   uint32           4 bytes
 //   work sum          big.Int          work sum length
 // -----------------------------------------------------------------------------
@@ -1271,12 +1270,13 @@ func (b *BlockChain) createChainState() error {
 	// Create a new node from the genesis block and set it as the best node.
 	genesisBlock := dcrutil.NewBlock(b.chainParams.GenesisBlock)
 	header := &genesisBlock.MsgBlock().Header
-	node := newBlockNode(header, genesisBlock.Sha(), 0, []uint16{})
+	node := newBlockNode(header, genesisBlock.Sha(), 0, []chainhash.Hash{},
+		[]chainhash.Hash{})
 	node.inMainChain = true
 	b.bestNode = node
 
 	// Add the new node to the index which is used for faster lookups.
-	b.index[*node.hash] = node
+	b.index[node.hash] = node
 
 	// Initialize the state related to the best block.
 	numTxns := uint64(len(genesisBlock.MsgBlock().Transactions))
@@ -1336,13 +1336,20 @@ func (b *BlockChain) createChainState() error {
 
 		// Add the genesis block hash to height and height to hash
 		// mappings to the index.
-		err = dbPutBlockIndex(dbTx, b.bestNode.hash, b.bestNode.height)
+		err = dbPutBlockIndex(dbTx, &b.bestNode.hash, b.bestNode.height)
 		if err != nil {
 			return err
 		}
 
 		// Store the current best chain state into the database.
 		err = dbPutBestState(dbTx, b.stateSnapshot, b.bestNode.workSum)
+		if err != nil {
+			return err
+		}
+
+		// Initialize the stake buckets in the database, along with
+		// the best state for the stake database.
+		b.bestNode.stakeNode, err = stake.InitDatabaseState(dbTx, b.chainParams)
 		if err != nil {
 			return err
 		}
@@ -1382,14 +1389,14 @@ func (b *BlockChain) initChainState() error {
 		// of the database. In the future we can add upgrade path before this
 		// to ensure that the database is upgraded to the current version
 		// before hitting this.
-		if dbInfo.version != currentDatabaseVersion {
+		if dbInfo.version > currentDatabaseVersion {
 			return fmt.Errorf("The blockchain database's version is %v "+
 				"but the current version of the software is %v",
 				dbInfo.version, currentDatabaseVersion)
 		}
 
 		// Die here if we're not on the current compression version, too.
-		if dbInfo.compVer != currentCompressionVersion {
+		if dbInfo.compVer > currentCompressionVersion {
 			return fmt.Errorf("The blockchain database's compression "+
 				"version is %v but the current version of the software is %v",
 				dbInfo.version, currentDatabaseVersion)
@@ -1424,18 +1431,32 @@ func (b *BlockChain) initChainState() error {
 
 		// Create a new node and set it as the best node.  The preceding
 		// nodes will be loaded on demand as needed.
-		// TODO CJ Get vote bits from db
 		header := &block.Header
 		node := newBlockNode(header, &state.hash, int64(state.height),
-			[]uint16{})
+			ticketsSpentInBlock(dcrutil.NewBlock(&block)),
+			ticketsRevokedInBlock(dcrutil.NewBlock(&block)))
 		node.inMainChain = true
 		node.workSum = state.workSum
+
+		// Exception for version 1 blockchains: skip loading the stake
+		// node, as the upgrade path handles ensuring this is correctly
+		// set.
+		if dbInfo.version >= 2 {
+			node.stakeNode, err = stake.LoadBestNode(dbTx, uint32(node.height),
+				node.hash, node.header, b.chainParams)
+			if err != nil {
+				return err
+			}
+			node.stakeUndoData = node.stakeNode.UndoData()
+			node.newTickets = node.stakeNode.NewTickets()
+		}
+
 		b.bestNode = node
 
 		// Add the new node to the indices for faster lookups.
-		prevHash := &node.header.PrevBlock
-		b.index[*node.hash] = node
-		b.depNodes[*prevHash] = append(b.depNodes[*prevHash], node)
+		prevHash := node.header.PrevBlock
+		b.index[node.hash] = node
+		b.depNodes[prevHash] = append(b.depNodes[prevHash], node)
 
 		// Initialize the state related to the best block.
 		blockSize := uint64(len(blockBytes))
@@ -1642,7 +1663,10 @@ func (b *BlockChain) BlockByHeight(blockHeight int64) (*dcrutil.Block, error) {
 //
 // This function is safe for concurrent access.
 func (b *BlockChain) BlockByHash(hash *chainhash.Hash) (*dcrutil.Block, error) {
-	return b.getBlockFromHash(hash)
+	b.chainLock.RLock()
+	defer b.chainLock.RUnlock()
+
+	return b.fetchBlockFromHash(hash)
 }
 
 // HeightRange returns a range of block hashes for the given start and end
@@ -1703,4 +1727,41 @@ func (b *BlockChain) HeightRange(startHeight, endHeight int64) ([]chainhash.Hash
 		return nil
 	})
 	return hashList, err
+}
+
+// DumpBlockChain dumps the blockchain to a map of height --> serialized bytes.
+// Mainly used for generating tests.
+func DumpBlockChain(db database.DB, height int64) (map[int64][]byte, error) {
+	blockchain := make(map[int64][]byte)
+	var hash chainhash.Hash
+	err := db.View(func(dbTx database.Tx) error {
+		for i := int64(0); i <= height; i++ {
+			// Fetch blocks and put them in the map
+			var serializedHeight [4]byte
+			dbnamespace.ByteOrder.PutUint32(serializedHeight[:], uint32(height))
+
+			meta := dbTx.Metadata()
+			heightIndex := meta.Bucket(dbnamespace.HeightIndexBucketName)
+			hashBytes := heightIndex.Get(serializedHeight[:])
+			if hashBytes == nil {
+				return fmt.Errorf("no block at height %d exists", height)
+			}
+			copy(hash[:], hashBytes)
+
+			blockBLocal, err := dbTx.FetchBlock(&hash)
+			if err != nil {
+				return err
+			}
+			blockB := make([]byte, len(blockBLocal))
+			copy(blockB, blockBLocal)
+			blockchain[i] = blockB
+		}
+
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return blockchain, err
 }

@@ -122,7 +122,7 @@ func (b *BlockChain) blockLocatorFromHash(hash *chainhash.Hash) BlockLocator {
 					iterNode = iterNode.parent
 				}
 				if iterNode != nil && iterNode.height == blockHeight {
-					locator = append(locator, iterNode.hash)
+					locator = append(locator, &iterNode.hash)
 				}
 				continue
 			}
@@ -174,7 +174,7 @@ func (b *BlockChain) BlockLocatorFromHash(hash *chainhash.Hash) BlockLocator {
 // This function is safe for concurrent access.
 func (b *BlockChain) LatestBlockLocator() (BlockLocator, error) {
 	b.chainLock.RLock()
-	locator := b.blockLocatorFromHash(b.bestNode.hash)
+	locator := b.blockLocatorFromHash(&b.bestNode.hash)
 	b.chainLock.RUnlock()
 	return locator, nil
 }

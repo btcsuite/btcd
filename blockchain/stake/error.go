@@ -147,6 +147,35 @@ const (
 	// ErrVerifyOutPkhs indicates that the recipient of the P2PKH or P2SH
 	// script was different from that indicated in the SStx input.
 	ErrVerifyOutPkhs
+
+	// ErrDatabaseCorrupt indicates a database inconsistency.
+	ErrDatabaseCorrupt
+
+	// ErrMissingDatabaseTx indicates that a node disconnection failed to
+	// pass a database transaction when attempted to remove a very old
+	// node.
+	ErrMissingDatabaseTx
+
+	// ErrMemoryCorruption indicates that memory has somehow become corrupt,
+	// for example invalid block header serialization from an in memory
+	// struct.
+	ErrMemoryCorruption
+
+	// ErrFindTicketIdxs indicates a failure to find the selected ticket
+	// indexes from the block header.
+	ErrFindTicketIdxs
+
+	// ErrMissingTicket indicates that a ticket was missing in one of the
+	// ticket treaps when it was attempted to be fetched.
+	ErrMissingTicket
+
+	// ErrDuplicateTicket indicates that a duplicate ticket was attempted
+	// to be inserted into a ticket treap or the database.
+	ErrDuplicateTicket
+
+	// ErrUnknownTicketSpent indicates that an unknown ticket was spent by
+	// the block.
+	ErrUnknownTicketSpent
 )
 
 // Map of ErrorCode values back to their constant names for pretty printing.
@@ -183,6 +212,13 @@ var errorCodeStrings = map[ErrorCode]string{
 	ErrVerifySpendTooMuch:   "ErrVerifySpendTooMuch",
 	ErrVerifyOutputAmt:      "ErrVerifyOutputAmt",
 	ErrVerifyOutPkhs:        "ErrVerifyOutPkhs",
+	ErrDatabaseCorrupt:      "ErrDatabaseCorrupt",
+	ErrMissingDatabaseTx:    "ErrMissingDatabaseTx",
+	ErrMemoryCorruption:     "ErrMemoryCorruption",
+	ErrFindTicketIdxs:       "ErrFindTicketIdxs",
+	ErrMissingTicket:        "ErrMissingTicket",
+	ErrDuplicateTicket:      "ErrDuplicateTicket",
+	ErrUnknownTicketSpent:   "ErrUnknownTicketSpent",
 }
 
 // String returns the ErrorCode as a human-readable name.

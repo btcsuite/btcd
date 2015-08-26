@@ -8,52 +8,54 @@ package stake_test
 import (
 	"testing"
 
-	"github.com/decred/dcrd/blockchain"
+	"github.com/decred/dcrd/blockchain/stake"
 )
 
 // TestErrorCodeStringer tests the stringized output for the ErrorCode type.
 func TestErrorCodeStringer(t *testing.T) {
 	tests := []struct {
-		in   blockchain.ErrorCode
+		in   stake.ErrorCode
 		want string
 	}{
-		{blockchain.ErrDuplicateBlock, "ErrDuplicateBlock"},
-		{blockchain.ErrBlockTooBig, "ErrBlockTooBig"},
-		{blockchain.ErrBlockVersionTooOld, "ErrBlockVersionTooOld"},
-		{blockchain.ErrInvalidTime, "ErrInvalidTime"},
-		{blockchain.ErrTimeTooOld, "ErrTimeTooOld"},
-		{blockchain.ErrTimeTooNew, "ErrTimeTooNew"},
-		{blockchain.ErrDifficultyTooLow, "ErrDifficultyTooLow"},
-		{blockchain.ErrUnexpectedDifficulty, "ErrUnexpectedDifficulty"},
-		{blockchain.ErrHighHash, "ErrHighHash"},
-		{blockchain.ErrBadMerkleRoot, "ErrBadMerkleRoot"},
-		{blockchain.ErrBadCheckpoint, "ErrBadCheckpoint"},
-		{blockchain.ErrForkTooOld, "ErrForkTooOld"},
-		{blockchain.ErrCheckpointTimeTooOld, "ErrCheckpointTimeTooOld"},
-		{blockchain.ErrNoTransactions, "ErrNoTransactions"},
-		{blockchain.ErrTooManyTransactions, "ErrTooManyTransactions"},
-		{blockchain.ErrNoTxInputs, "ErrNoTxInputs"},
-		{blockchain.ErrNoTxOutputs, "ErrNoTxOutputs"},
-		{blockchain.ErrTxTooBig, "ErrTxTooBig"},
-		{blockchain.ErrBadTxOutValue, "ErrBadTxOutValue"},
-		{blockchain.ErrDuplicateTxInputs, "ErrDuplicateTxInputs"},
-		{blockchain.ErrBadTxInput, "ErrBadTxInput"},
-		{blockchain.ErrBadCheckpoint, "ErrBadCheckpoint"},
-		{blockchain.ErrMissingTx, "ErrMissingTx"},
-		{blockchain.ErrUnfinalizedTx, "ErrUnfinalizedTx"},
-		{blockchain.ErrDuplicateTx, "ErrDuplicateTx"},
-		{blockchain.ErrOverwriteTx, "ErrOverwriteTx"},
-		{blockchain.ErrImmatureSpend, "ErrImmatureSpend"},
-		{blockchain.ErrDoubleSpend, "ErrDoubleSpend"},
-		{blockchain.ErrSpendTooHigh, "ErrSpendTooHigh"},
-		{blockchain.ErrBadFees, "ErrBadFees"},
-		{blockchain.ErrTooManySigOps, "ErrTooManySigOps"},
-		{blockchain.ErrFirstTxNotCoinbase, "ErrFirstTxNotCoinbase"},
-		{blockchain.ErrMultipleCoinbases, "ErrMultipleCoinbases"},
-		{blockchain.ErrBadCoinbaseScriptLen, "ErrBadCoinbaseScriptLen"},
-		{blockchain.ErrBadCoinbaseValue, "ErrBadCoinbaseValue"},
-		{blockchain.ErrScriptMalformed, "ErrScriptMalformed"},
-		{blockchain.ErrScriptValidation, "ErrScriptValidation"},
+		{stake.ErrSStxTooManyInputs, "ErrSStxTooManyInputs"},
+		{stake.ErrSStxTooManyOutputs, "ErrSStxTooManyOutputs"},
+		{stake.ErrSStxNoOutputs, "ErrSStxNoOutputs"},
+		{stake.ErrSStxInvalidInputs, "ErrSStxInvalidInputs"},
+		{stake.ErrSStxInvalidOutputs, "ErrSStxInvalidOutputs"},
+		{stake.ErrSStxInOutProportions, "ErrSStxInOutProportions"},
+		{stake.ErrSStxBadCommitAmount, "ErrSStxBadCommitAmount"},
+		{stake.ErrSStxBadChangeAmts, "ErrSStxBadChangeAmts"},
+		{stake.ErrSStxVerifyCalcAmts, "ErrSStxVerifyCalcAmts"},
+		{stake.ErrSSGenWrongNumInputs, "ErrSSGenWrongNumInputs"},
+		{stake.ErrSSGenTooManyOutputs, "ErrSSGenTooManyOutputs"},
+		{stake.ErrSSGenNoOutputs, "ErrSSGenNoOutputs"},
+		{stake.ErrSSGenWrongIndex, "ErrSSGenWrongIndex"},
+		{stake.ErrSSGenWrongTxTree, "ErrSSGenWrongTxTree"},
+		{stake.ErrSSGenNoStakebase, "ErrSSGenNoStakebase"},
+		{stake.ErrSSGenNoReference, "ErrSSGenNoReference"},
+		{stake.ErrSSGenBadReference, "ErrSSGenBadReference"},
+		{stake.ErrSSGenNoVotePush, "ErrSSGenNoVotePush"},
+		{stake.ErrSSGenBadVotePush, "ErrSSGenBadVotePush"},
+		{stake.ErrSSGenBadGenOuts, "ErrSSGenBadGenOuts"},
+		{stake.ErrSSRtxWrongNumInputs, "ErrSSRtxWrongNumInputs"},
+		{stake.ErrSSRtxTooManyOutputs, "ErrSSRtxTooManyOutputs"},
+		{stake.ErrSSRtxNoOutputs, "ErrSSRtxNoOutputs"},
+		{stake.ErrSSRtxWrongTxTree, "ErrSSRtxWrongTxTree"},
+		{stake.ErrSSRtxBadOuts, "ErrSSRtxBadOuts"},
+		{stake.ErrVerSStxAmts, "ErrVerSStxAmts"},
+		{stake.ErrVerifyInput, "ErrVerifyInput"},
+		{stake.ErrVerifyOutType, "ErrVerifyOutType"},
+		{stake.ErrVerifyTooMuchFees, "ErrVerifyTooMuchFees"},
+		{stake.ErrVerifySpendTooMuch, "ErrVerifySpendTooMuch"},
+		{stake.ErrVerifyOutputAmt, "ErrVerifyOutputAmt"},
+		{stake.ErrVerifyOutPkhs, "ErrVerifyOutPkhs"},
+		{stake.ErrDatabaseCorrupt, "ErrDatabaseCorrupt"},
+		{stake.ErrMissingDatabaseTx, "ErrMissingDatabaseTx"},
+		{stake.ErrMemoryCorruption, "ErrMemoryCorruption"},
+		{stake.ErrFindTicketIdxs, "ErrFindTicketIdxs"},
+		{stake.ErrMissingTicket, "ErrMissingTicket"},
+		{stake.ErrDuplicateTicket, "ErrDuplicateTicket"},
+		{stake.ErrUnknownTicketSpent, "ErrUnknownTicketSpent"},
 		{0xffff, "Unknown ErrorCode (65535)"},
 	}
 
@@ -71,15 +73,13 @@ func TestErrorCodeStringer(t *testing.T) {
 // TestRuleError tests the error output for the RuleError type.
 func TestRuleError(t *testing.T) {
 	tests := []struct {
-		in   blockchain.RuleError
+		in   stake.RuleError
 		want string
 	}{
-		{
-			blockchain.RuleError{Description: "duplicate block"},
+		{stake.RuleError{Description: "duplicate block"},
 			"duplicate block",
 		},
-		{
-			blockchain.RuleError{Description: "human-readable error"},
+		{stake.RuleError{Description: "human-readable error"},
 			"human-readable error",
 		},
 	}

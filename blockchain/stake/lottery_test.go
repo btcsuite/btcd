@@ -2,7 +2,7 @@
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
-package stake_test
+package stake
 
 import (
 	"bytes"
@@ -12,13 +12,13 @@ import (
 	"sort"
 	"testing"
 
-	"github.com/decred/dcrd/blockchain/stake"
+	"github.com/decred/dcrd/blockchain/stake/internal/tickettreap"
 	"github.com/decred/dcrd/chaincfg/chainhash"
 )
 
 func TestBasicPRNG(t *testing.T) {
 	seed := chainhash.HashFuncB([]byte{0x01})
-	prng := stake.NewHash256PRNG(seed)
+	prng := NewHash256PRNG(seed)
 	for i := 0; i < 100000; i++ {
 		prng.Hash256Rand()
 	}
@@ -55,7 +55,7 @@ func swap(s []byte) []byte {
 type TicketDataSlice []*TicketData
 
 func NewTicketDataSliceEmpty() TicketDataSlice {
-	slice := make([]*TicketData, 0)
+	var slice []*TicketData
 	return TicketDataSlice(slice)
 }
 
@@ -80,19 +80,19 @@ func (tds TicketDataSlice) Len() int { return len(tds) }
 func TestLotteryNumSelection(t *testing.T) {
 	// Test finding ticket indexes.
 	seed := chainhash.HashFuncB([]byte{0x01})
-	prng := stake.NewHash256PRNG(seed)
+	prng := NewHash256PRNG(seed)
 	ticketsInPool := int64(56789)
 	tooFewTickets := int64(4)
 	justEnoughTickets := int64(5)
 	ticketsPerBlock := 5
 
-	_, err := stake.FindTicketIdxs(tooFewTickets, ticketsPerBlock, prng)
+	_, err := FindTicketIdxs(tooFewTickets, ticketsPerBlock, prng)
 	if err == nil {
 		t.Errorf("got unexpected no error for FindTicketIdxs too few tickets " +
 			"test")
 	}
 
-	tickets, err := stake.FindTicketIdxs(ticketsInPool, ticketsPerBlock, prng)
+	tickets, err := FindTicketIdxs(ticketsInPool, ticketsPerBlock, prng)
 	if err != nil {
 		t.Errorf("got unexpected error for FindTicketIdxs 1 test")
 	}
@@ -104,7 +104,7 @@ func TestLotteryNumSelection(t *testing.T) {
 
 	// Ensure that it can find all suitable ticket numbers in a small
 	// bucket of tickets.
-	tickets, err = stake.FindTicketIdxs(justEnoughTickets, ticketsPerBlock, prng)
+	tickets, err = FindTicketIdxs(justEnoughTickets, ticketsPerBlock, prng)
 	if err != nil {
 		t.Errorf("got unexpected error for FindTicketIdxs 2 test")
 	}
@@ -119,6 +119,56 @@ func TestLotteryNumSelection(t *testing.T) {
 	lastHash := prng.StateHash()
 	if *lastHashExp != lastHash {
 		t.Errorf("expected final state of %v, got %v", lastHashExp, lastHash)
+	}
+}
+
+func TestLotteryNumErrors(t *testing.T) {
+	seed := chainhash.HashFuncB([]byte{0x01})
+	prng := NewHash256PRNG(seed)
+
+	// Too big pool.
+	_, err := FindTicketIdxs(1000000000000, 5, prng)
+	if err == nil {
+		t.Errorf("Expected pool size too big error")
+	}
+}
+
+func TestFetchWinnersErrors(t *testing.T) {
+	treap := new(tickettreap.Immutable)
+	for i := 0; i < 0xff; i++ {
+		h := chainhash.HashFuncH([]byte{byte(i)})
+		v := &tickettreap.Value{
+			Height:  uint32(i),
+			Missed:  i%2 == 0,
+			Revoked: i%2 != 0,
+			Spent:   i%2 == 0,
+			Expired: i%2 != 0,
+		}
+		treap = treap.Put(tickettreap.Key(h), v)
+	}
+
+	// No indexes.
+	_, err := fetchWinners(nil, treap)
+	if err == nil {
+		t.Errorf("Expected nil slice error")
+	}
+
+	// No treap.
+	_, err = fetchWinners([]int{1, 2, 3, 4, -1}, nil)
+	if err == nil {
+		t.Errorf("Expected nil treap error")
+	}
+
+	// Bad index too small.
+	_, err = fetchWinners([]int{1, 2, 3, 4, -1}, treap)
+	if err == nil {
+		t.Errorf("Expected index too small error")
+	}
+
+	// Bad index too big.
+	_, err = fetchWinners([]int{1, 2, 3, 4, 256}, treap)
+	if err == nil {
+		t.Errorf("Expected index too big error")
 	}
 }
 
@@ -188,7 +238,7 @@ func TestTicketSorting(t *testing.T) {
 
 func BenchmarkHashPRNG(b *testing.B) {
 	seed := chainhash.HashFuncB([]byte{0x01})
-	prng := stake.NewHash256PRNG(seed)
+	prng := NewHash256PRNG(seed)
 
 	for n := 0; n < b.N; n++ {
 		prng.Hash256Rand()

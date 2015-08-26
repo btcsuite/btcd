@@ -24,7 +24,6 @@ import (
 	"github.com/decred/dcrd/addrmgr"
 	"github.com/decred/dcrd/blockchain"
 	"github.com/decred/dcrd/blockchain/indexers"
-	"github.com/decred/dcrd/blockchain/stake"
 	"github.com/decred/dcrd/chaincfg"
 	"github.com/decred/dcrd/chaincfg/chainhash"
 	"github.com/decred/dcrd/database"
@@ -204,7 +203,6 @@ type server struct {
 	nat                  NAT
 	db                   database.DB
 	timeSource           blockchain.MedianTimeSource
-	tmdb                 *stake.TicketDB
 	services             wire.ServiceFlag
 
 	// The following fields are used for optional indexes.  They will be nil
@@ -1135,7 +1133,7 @@ func (s *server) pushTxMsg(sp *serverPeer, sha *chainhash.Hash, doneChan chan<- 
 // pushBlockMsg sends a block message for the provided block hash to the
 // connected peer.  An error is returned if the block hash is not known.
 func (s *server) pushBlockMsg(sp *serverPeer, hash *chainhash.Hash, doneChan chan<- struct{}, waitChan <-chan struct{}) error {
-	block, err := sp.server.blockManager.chain.GetBlockFromHash(hash)
+	block, err := sp.server.blockManager.chain.FetchBlockFromHash(hash)
 	if err != nil {
 		peerLog.Tracef("Unable to fetch requested block hash %v: %v",
 			hash, err)
@@ -2433,11 +2431,30 @@ out:
 // newServer returns a new dcrd server configured to listen on addr for the
 // decred network type specified by chainParams.  Use start to begin accepting
 // connections from peers.
-func newServer(listenAddrs []string, db database.DB, tmdb *stake.TicketDB, chainParams *chaincfg.Params) (*server, error) {
+func newServer(listenAddrs []string, db database.DB, chainParams *chaincfg.Params) (*server, error) {
 
 	services := defaultServices
 	if cfg.NoPeerBloomFilters {
 		services &^= wire.SFNodeBloom
+	}
+
+	s := server{
+		chainParams:          chainParams,
+		newPeers:             make(chan *serverPeer, cfg.MaxPeers),
+		donePeers:            make(chan *serverPeer, cfg.MaxPeers),
+		banPeers:             make(chan *serverPeer, cfg.MaxPeers),
+		retryPeers:           make(chan *serverPeer, cfg.MaxPeers),
+		wakeup:               make(chan struct{}),
+		query:                make(chan interface{}),
+		relayInv:             make(chan relayMsg, cfg.MaxPeers),
+		broadcast:            make(chan broadcastMsg, cfg.MaxPeers),
+		quit:                 make(chan struct{}),
+		modifyRebroadcastInv: make(chan interface{}),
+		peerHeightsUpdate:    make(chan updatePeerHeightsMsg),
+		db:                   db,
+		timeSource:           blockchain.NewMedianTime(),
+		services:             services,
+		sigCache:             txscript.NewSigCache(cfg.SigCacheMaxSize),
 	}
 
 	amgr := addrmgr.New(cfg.DataDir, dcrdLookup)
@@ -2565,29 +2582,9 @@ func newServer(listenAddrs []string, db database.DB, tmdb *stake.TicketDB, chain
 			return nil, errors.New("no valid listen address")
 		}
 	}
-
-	s := server{
-		listeners:            listeners,
-		chainParams:          chainParams,
-		addrManager:          amgr,
-		newPeers:             make(chan *serverPeer, cfg.MaxPeers),
-		donePeers:            make(chan *serverPeer, cfg.MaxPeers),
-		banPeers:             make(chan *serverPeer, cfg.MaxPeers),
-		retryPeers:           make(chan *serverPeer, cfg.MaxPeers),
-		wakeup:               make(chan struct{}),
-		query:                make(chan interface{}),
-		relayInv:             make(chan relayMsg, cfg.MaxPeers),
-		broadcast:            make(chan broadcastMsg, cfg.MaxPeers),
-		quit:                 make(chan struct{}),
-		modifyRebroadcastInv: make(chan interface{}),
-		peerHeightsUpdate:    make(chan updatePeerHeightsMsg),
-		nat:                  nat,
-		db:                   db,
-		tmdb:                 tmdb,
-		timeSource:           blockchain.NewMedianTime(),
-		services:             services,
-		sigCache:             txscript.NewSigCache(cfg.SigCacheMaxSize),
-	}
+	s.listeners = listeners
+	s.addrManager = amgr
+	s.nat = nat
 
 	// Create the transaction and address indexes if needed.
 	//

@@ -824,7 +824,7 @@ func (b *BlockChain) estimateNextStakeDifficulty(curNode *blockNode,
 			emptyHeader.FreshStake = freshStake
 
 			// Connect the header.
-			emptyHeader.PrevBlock = *topNode.hash
+			emptyHeader.PrevBlock = topNode.hash
 
 			// Make up a node hash.
 			hB, err := emptyHeader.Bytes()
@@ -835,7 +835,7 @@ func (b *BlockChain) estimateNextStakeDifficulty(curNode *blockNode,
 
 			thisNode := new(blockNode)
 			thisNode.header = *emptyHeader
-			thisNode.hash = &emptyHeaderHash
+			thisNode.hash = emptyHeaderHash
 			thisNode.height = i
 			thisNode.parent = topNode
 			topNode = thisNode

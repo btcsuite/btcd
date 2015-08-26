@@ -9,7 +9,10 @@ package stake
 import (
 	"encoding/binary"
 	"fmt"
+	"math"
+	"sort"
 
+	"github.com/decred/dcrd/blockchain/stake/internal/tickettreap"
 	"github.com/decred/dcrd/chaincfg/chainhash"
 )
 
@@ -27,11 +30,11 @@ type Hash256PRNG struct {
 // NewHash256PRNG creates a pointer to a newly created hash256PRNG.
 func NewHash256PRNG(seed []byte) *Hash256PRNG {
 	// idx and lastHash are automatically initialized
-	// as 0. We initialize the seed by appending a constant
+	// as 0.  We initialize the seed by appending a constant
 	// to it and hashing to give 32 bytes. This ensures
 	// that regardless of the input, the PRNG is always
 	// doing a short number of rounds because it only
-	// has to hash < 64 byte messages. The constant is
+	// has to hash < 64 byte messages.  The constant is
 	// derived from the hexadecimal representation of
 	// pi.
 	cst := []byte{0x24, 0x3F, 0x6A, 0x88,
@@ -127,8 +130,8 @@ func intInSlice(i int, sl []int) bool {
 	return false
 }
 
-// FindTicketIdxs finds n many unique index numbers for a list length size.
-func FindTicketIdxs(size int64, n int, prng *Hash256PRNG) ([]int, error) {
+// findTicketIdxs finds n many unique index numbers for a list length size.
+func findTicketIdxs(size int64, n int, prng *Hash256PRNG) ([]int, error) {
 	if size < int64(n) {
 		return nil, fmt.Errorf("list size too small")
 	}
@@ -149,4 +152,110 @@ func FindTicketIdxs(size int64, n int, prng *Hash256PRNG) ([]int, error) {
 	}
 
 	return list, nil
+}
+
+// FindTicketIdxs is the exported version of findTicketIdxs used for testing.
+func FindTicketIdxs(size int64, n int, prng *Hash256PRNG) ([]int, error) {
+	return findTicketIdxs(size, n, prng)
+}
+
+// fetchWinners is a ticket database specific function which iterates over the
+// entire treap and finds winners at selected indexes.  These are returned
+// as a slice of pointers to keys, which can be recast as []*chainhash.Hash.
+// Importantly, it maintains the list of winners in the same order as specified
+// in the original idxs passed to the function.
+func fetchWinners(idxs []int, t *tickettreap.Immutable) ([]*tickettreap.Key, error) {
+	if idxs == nil {
+		return nil, fmt.Errorf("empty idxs list")
+	}
+	if t == nil || t.Len() == 0 {
+		return nil, fmt.Errorf("missing or empty treap")
+	}
+
+	// maxInt returns the maximum integer from a list of integers.
+	maxInt := func(idxs []int) int {
+		max := math.MinInt32
+		for _, i := range idxs {
+			if i > max {
+				max = i
+			}
+		}
+		return max
+	}
+	max := maxInt(idxs)
+	if max >= t.Len() {
+		return nil, fmt.Errorf("idx %v out of bounds", max)
+	}
+
+	minInt := func(idxs []int) int {
+		min := math.MaxInt32
+		for _, i := range idxs {
+			if i < min {
+				min = i
+			}
+		}
+		return min
+	}
+	min := minInt(idxs)
+	if min < 0 {
+		return nil, fmt.Errorf("idx %v out of bounds", min)
+	}
+
+	originalIdxs := make([]int, len(idxs))
+	copy(originalIdxs[:], idxs[:])
+	sortedIdxs := sort.IntSlice(idxs)
+	sort.Sort(sortedIdxs)
+
+	// originalIdx returns the original index of the lucky
+	// number in the idxs slice, so that the order is correct.
+	originalIdx := func(idx int) int {
+		for i := range originalIdxs {
+			if idx == originalIdxs[i] {
+				return i
+			}
+		}
+
+		// This will cause a panic.  It should never, ever
+		// happen because the investigated index will always
+		// be in the original indexes.
+		return -1
+	}
+
+	idx := 0
+	winnerIdx := 0
+	winners := make([]*tickettreap.Key, len(idxs))
+	t.ForEach(func(k tickettreap.Key, v *tickettreap.Value) bool {
+		if idx > max {
+			return false
+		}
+
+		if idx == sortedIdxs[winnerIdx] {
+			winners[originalIdx(idx)] = &k
+			if winnerIdx+1 < len(sortedIdxs) {
+				winnerIdx++
+			}
+		}
+
+		idx++
+		return true
+	})
+
+	return winners, nil
+}
+
+// fetchExpired is a ticket database specific function which iterates over the
+// entire treap and finds tickets that are equal or less than the given height.
+// These are returned as a slice of pointers to keys, which can be recast as
+// []*chainhash.Hash.
+func fetchExpired(height uint32, t *tickettreap.Immutable) []*tickettreap.Key {
+	var expired []*tickettreap.Key
+	t.ForEach(func(k tickettreap.Key, v *tickettreap.Value) bool {
+		if v.Height <= height {
+			expired = append(expired, &k)
+		}
+
+		return true
+	})
+
+	return expired
 }

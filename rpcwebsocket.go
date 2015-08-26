@@ -728,19 +728,16 @@ func (*wsNotificationManager) notifySpentAndMissedTickets(
 
 	// Create a ticket map to export as JSON.
 	ticketMap := make(map[string]string)
-	for _, ticket := range tnd.TicketMap {
-		if ticket.Missed == true {
-			ticketMap[ticket.SStxHash.String()] = "missed"
-		} else {
-			ticketMap[ticket.SStxHash.String()] = "spent"
-		}
+	for _, ticket := range tnd.TicketsMissed {
+		ticketMap[ticket.String()] = "missed"
+	}
+	for _, ticket := range tnd.TicketsSpent {
+		ticketMap[ticket.String()] = "spent"
 	}
 
 	// Notify interested websocket clients about the connected block.
 	ntfn := dcrjson.NewSpentAndMissedTicketsNtfn(tnd.Hash.String(),
-		int32(tnd.Height),
-		tnd.StakeDifficulty,
-		ticketMap)
+		int32(tnd.Height), tnd.StakeDifficulty, ticketMap)
 
 	marshalledJSON, err := dcrjson.MarshalCmd(nil, ntfn)
 	if err != nil {
@@ -785,15 +782,13 @@ func (*wsNotificationManager) notifyNewTickets(clients map[chan struct{}]*wsClie
 
 	// Create a ticket map to export as JSON.
 	var tickets []string
-	for h := range tnd.TicketMap {
+	for _, h := range tnd.TicketsNew {
 		tickets = append(tickets, h.String())
 	}
 
 	// Notify interested websocket clients about the connected block.
-	ntfn := dcrjson.NewNewTicketsNtfn(tnd.Hash.String(),
-		int32(tnd.Height),
-		tnd.StakeDifficulty,
-		tickets)
+	ntfn := dcrjson.NewNewTicketsNtfn(tnd.Hash.String(), int32(tnd.Height),
+		tnd.StakeDifficulty, tickets)
 
 	marshalledJSON, err := dcrjson.MarshalCmd(nil, ntfn)
 	if err != nil {

@@ -7,7 +7,6 @@ package blockchain
 
 import (
 	"bytes"
-	"errors"
 	"fmt"
 	"math"
 	"math/big"
@@ -529,7 +528,7 @@ func checkBlockSanity(block *dcrutil.Block, timeSource MedianTimeSource,
 	}
 
 	// The number of votes must be the same as the number declared in the
-	// header. The same is true for tickets and revocations.
+	// header.  The same is true for tickets and revocations.
 
 	// Build merkle tree and ensure the calculated merkle root matches the
 	// entry in the block header.  This also has the effect of caching all
@@ -756,15 +755,13 @@ func (b *BlockChain) checkDupTxs(txSet []*dcrutil.Tx,
 }
 
 // CheckBlockStakeSanity performs a series of checks on a block to ensure that the
-// information from the block's header about stake is sane. For instance, the
+// information from the block's header about stake is sane.  For instance, the
 // number of SSGen tx must be equal to voters.
 // TODO: We can consider breaking this into two functions and making some of these
 // checks go through in processBlock, however if a block has demonstrable PoW it
 // seems unlikely that it will have stake errors (because the miner is then just
 // wasting hash power).
-func (b *BlockChain) CheckBlockStakeSanity(tixStore TicketStore,
-	stakeValidationHeight int64, node *blockNode, block *dcrutil.Block,
-	parent *dcrutil.Block, chainParams *chaincfg.Params) error {
+func (b *BlockChain) CheckBlockStakeSanity(stakeValidationHeight int64, node *blockNode, block *dcrutil.Block, parent *dcrutil.Block, chainParams *chaincfg.Params) error {
 
 	// Setup variables.
 	stakeTransactions := block.STransactions()
@@ -781,6 +778,11 @@ func (b *BlockChain) CheckBlockStakeSanity(tixStore TicketStore,
 		dcrutil.BlockValid)
 
 	stakeEnabledHeight := chainParams.StakeEnabledHeight
+
+	parentStakeNode, err := b.fetchStakeNode(node.parent)
+	if err != nil {
+		return err
+	}
 
 	// Do some preliminary checks on each stake transaction to ensure they
 	// are sane before continuing.
@@ -821,6 +823,21 @@ func (b *BlockChain) CheckBlockStakeSanity(tixStore TicketStore,
 		return ruleError(ErrInvalidEarlyStakeTx, errStr)
 	}
 
+	// Check the stake difficulty.
+	calcSBits, err := b.calcNextRequiredStakeDifficulty(node.parent)
+	if err != nil {
+		errStr := fmt.Sprintf("couldn't calculate stake difficulty for "+
+			"block node %v: %v",
+			node.hash, calcSBits)
+		return ruleError(ErrUnexpectedDifficulty, errStr)
+	}
+	if block.MsgBlock().Header.SBits != calcSBits {
+		errStr := fmt.Sprintf("block had unexpected stake difficulty "+
+			"(%v given, %v expected)",
+			block.MsgBlock().Header.SBits, calcSBits)
+		return ruleError(ErrUnexpectedDifficulty, errStr)
+	}
+
 	// ----------------------------------------------------------------------------
 	// SStx Tx Handling
 	// ----------------------------------------------------------------------------
@@ -851,9 +868,9 @@ func (b *BlockChain) CheckBlockStakeSanity(tixStore TicketStore,
 	}
 
 	// 2. Ensure the the number of SStx tx in the block is the same as FreshStake
-	//     in the header. This is also tested for in checkBlockSanity.
+	//     in the header.  This is also tested for in checkBlockSanity.
 
-	// 3. Check to make sure we haven't exceeded max number of new SStx. May not
+	// 3. Check to make sure we haven't exceeded max number of new SStx.  May not
 	// need this check, as the above one should fail if you overflow uint8.
 	if numSStxTx > int(chainParams.MaxFreshStakePerBlock) {
 		errStr := fmt.Sprintf("Error in stake consensus: the number of SStx tx "+
@@ -875,19 +892,12 @@ func (b *BlockChain) CheckBlockStakeSanity(tixStore TicketStore,
 		}
 
 		// Check the ticket pool size.
-		_, calcPoolSize, _, err := b.getWinningTicketsInclStore(node, tixStore)
-		if err != nil {
-			log.Tracef("failed to retrieve poolsize for stake "+
-				"consensus: %v", err.Error())
-			return err
-		}
-
-		if calcPoolSize != poolSize {
+		if parentStakeNode.PoolSize() != poolSize {
 			errStr := fmt.Sprintf("Error in stake consensus: the poolsize "+
 				"in block %v was %v, however we expected %v",
 				node.hash,
 				poolSize,
-				calcPoolSize)
+				parentStakeNode.PoolSize())
 			return ruleError(ErrPoolSize, errStr)
 		}
 
@@ -941,13 +951,9 @@ func (b *BlockChain) CheckBlockStakeSanity(tixStore TicketStore,
 	// 1. Retrieve an emulated ticket database of SStxMemMaps from both the
 	//     ticket database and the ticket store.
 	ticketsWhichCouldBeUsed := make(map[chainhash.Hash]struct{}, ticketsPerBlock)
-	ticketSlice, calcPoolSize, finalStateCalc, err :=
-		b.getWinningTicketsInclStore(node, tixStore)
-	if err != nil {
-		errStr := fmt.Sprintf("unexpected getWinningTicketsInclStore error: %v",
-			err.Error())
-		return errors.New(errStr)
-	}
+	ticketSlice := parentStakeNode.Winners()
+	calcPoolSize := parentStakeNode.PoolSize()
+	finalStateCalc := parentStakeNode.FinalState()
 
 	// 2. Obtain the tickets which could have been used on the block for votes
 	//     and then check below to make sure that these were indeed the tickets
@@ -1007,9 +1013,9 @@ func (b *BlockChain) CheckBlockStakeSanity(tixStore TicketStore,
 	}
 
 	// 4. Check and make sure that we have the same number of SSGen tx as we do
-	// votes. Already checked in checkBlockSanity.
+	// votes.  Already checked in checkBlockSanity.
 
-	// 5. Check for too many voters. Already checked in checkBlockSanity.
+	// 5. Check for too many voters.  Already checked in checkBlockSanity.
 
 	// 6. Determine if TxTreeRegular should be valid or not, and then check it
 	//     against what is provided in the block header.
@@ -1047,18 +1053,6 @@ func (b *BlockChain) CheckBlockStakeSanity(tixStore TicketStore,
 	//     revocations.
 	// 4. Check for revocation overflows.
 	numSSRtxTx := 0
-
-	missedTickets, err := b.GenerateMissedTickets(tixStore)
-	if err != nil {
-		h := block.Sha()
-		str := fmt.Sprintf("Failed to generate missed tickets data "+
-			"for block %v, height %v! Error given: %v",
-			h,
-			block.Height(),
-			err.Error())
-		return errors.New(str)
-	}
-
 	for _, staketx := range stakeTransactions {
 		if is, _ := stake.IsSSRtx(staketx); is {
 			numSSRtxTx++
@@ -1070,7 +1064,7 @@ func (b *BlockChain) CheckBlockStakeSanity(tixStore TicketStore,
 
 			ticketMissed := false
 
-			if _, exists := missedTickets[sstxHash]; exists {
+			if parentStakeNode.ExistsMissedTicket(sstxHash) {
 				ticketMissed = true
 			}
 
@@ -1084,9 +1078,9 @@ func (b *BlockChain) CheckBlockStakeSanity(tixStore TicketStore,
 	}
 
 	// 3. Check and make sure that we have the same number of SSRtx tx as we do
-	// revocations. Already checked in checkBlockSanity.
+	// revocations.  Already checked in checkBlockSanity.
 
-	// 4. Check for revocation overflows. Should be impossible given the above
+	// 4. Check for revocation overflows.  Should be impossible given the above
 	// check, but check anyway.
 	if numSSRtxTx > math.MaxUint8 {
 		errStr := fmt.Sprintf("Error in stake consensus: the number of SSRtx tx "+
@@ -1103,9 +1097,9 @@ func (b *BlockChain) CheckBlockStakeSanity(tixStore TicketStore,
 	// 2. Check and make sure that the ticketpool size is calculated correctly
 	//     after account for spent, missed, and expired tickets.
 
-	// 1. Ensure that all stake transactions are accounted for. If not, this
+	// 1. Ensure that all stake transactions are accounted for.  If not, this
 	//     indicates that there was some sort of non-standard stake tx present
-	//     in the block. This is already checked before, but check again here.
+	//     in the block.  This is already checked before, but check again here.
 	stakeTxSum := numSStxTx + numSSGenTx + numSSRtxTx
 
 	if stakeTxSum != len(stakeTransactions) {
@@ -1260,7 +1254,7 @@ func CheckTransactionInputs(subsidyCache *SubsidyCache, tx *dcrutil.Tx,
 		sstxHash := sstxIn.PreviousOutPoint.Hash
 
 		// Calculate the theoretical stake vote subsidy by extracting the vote
-		// height. Should be impossible because IsSSGen requires this byte string
+		// height.  Should be impossible because IsSSGen requires this byte string
 		// to be a certain number of bytes.
 		_, heightVotingOn, err := stake.SSGenBlockVotedOn(tx)
 		if err != nil {
@@ -1284,7 +1278,7 @@ func CheckTransactionInputs(subsidyCache *SubsidyCache, tx *dcrutil.Tx,
 		// to make sure that the reward has been calculated correctly from the
 		// subsidy and the inputs.
 		// We also need to make sure that the SSGen outputs that are P2PKH go
-		// to the addresses specified in the original SSTx. Check that too.
+		// to the addresses specified in the original SSTx.  Check that too.
 		utxoEntrySstx, exists := utxoView.entries[sstxHash]
 		if !exists || utxoEntrySstx == nil {
 			errStr := fmt.Sprintf("Unable to find input sstx transaction "+
@@ -1293,7 +1287,7 @@ func CheckTransactionInputs(subsidyCache *SubsidyCache, tx *dcrutil.Tx,
 		}
 
 		// While we're here, double check to make sure that the input is from an
-		// SStx. By doing so, you also ensure the first output is OP_SSTX tagged.
+		// SStx.  By doing so, you also ensure the first output is OP_SSTX tagged.
 		if utxoEntrySstx.TransactionType() != stake.TxTypeSStx {
 			errStr := fmt.Sprintf("Input transaction %v for SSGen was not "+
 				"an SStx tx (given input: %v)", txHash, sstxHash)
@@ -1424,7 +1418,7 @@ func CheckTransactionInputs(subsidyCache *SubsidyCache, tx *dcrutil.Tx,
 		}
 
 		// While we're here, double check to make sure that the input is from an
-		// SStx. By doing so, you also ensure the first output is OP_SSTX tagged.
+		// SStx.  By doing so, you also ensure the first output is OP_SSTX tagged.
 		if utxoEntrySstx.TransactionType() != stake.TxTypeSStx {
 			errStr := fmt.Sprintf("Input transaction %v for SSRtx %v was not"+
 				"an SStx tx", txHash, sstxHash)
@@ -1808,7 +1802,7 @@ func CountP2SHSigOps(tx *dcrutil.Tx, isCoinBaseTx bool, isStakeBaseTx bool,
 		return 0, nil
 	}
 
-	// Stakebase (SSGen) transactions have no P2SH inputs. Same with SSRtx,
+	// Stakebase (SSGen) transactions have no P2SH inputs.  Same with SSRtx,
 	// but they will still pass the checks below.
 	if isStakeBaseTx {
 		return 0, nil
@@ -1868,7 +1862,7 @@ func CountP2SHSigOps(tx *dcrutil.Tx, isCoinBaseTx bool, isStakeBaseTx bool,
 }
 
 // checkNumSigOps Checks the number of P2SH signature operations to make
-// sure they don't overflow the limits. It takes a cumulative number of sig
+// sure they don't overflow the limits.  It takes a cumulative number of sig
 // ops as an argument and increments will each call.
 // TxTree true == Regular, false == Stake
 func checkNumSigOps(tx *dcrutil.Tx, utxoView *UtxoViewpoint, index int,
@@ -1907,7 +1901,7 @@ func checkNumSigOps(tx *dcrutil.Tx, utxoView *UtxoViewpoint, index int,
 }
 
 // checkStakeBaseAmounts calculates the total amount given as subsidy from
-// single stakebase transactions (votes) within a block. This function skips a
+// single stakebase transactions (votes) within a block.  This function skips a
 // ton of checks already performed by CheckTransactionInputs.
 func checkStakeBaseAmounts(subsidyCache *SubsidyCache, height int64,
 	params *chaincfg.Params, txs []*dcrutil.Tx, utxoView *UtxoViewpoint) error {
@@ -1949,7 +1943,7 @@ func checkStakeBaseAmounts(subsidyCache *SubsidyCache, height int64,
 }
 
 // getStakeBaseAmounts calculates the total amount given as subsidy from
-// the collective stakebase transactions (votes) within a block. This
+// the collective stakebase transactions (votes) within a block.  This
 // function skips a ton of checks already performed by
 // CheckTransactionInputs.
 func getStakeBaseAmounts(txs []*dcrutil.Tx, utxoView *UtxoViewpoint) (int64, error) {
@@ -2200,7 +2194,7 @@ func (b *BlockChain) checkConnectBlock(node *blockNode, block *dcrutil.Block,
 	// allowed a block that is no longer valid.  However, since the
 	// implementation only currently uses memory for the side chain blocks,
 	// it isn't currently necessary.
-	parentBlock, err := b.getBlockFromHash(&node.header.PrevBlock)
+	parentBlock, err := b.fetchBlockFromHash(&node.header.PrevBlock)
 	if err != nil {
 		return ruleError(ErrMissingParent, err.Error())
 	}
@@ -2226,21 +2220,8 @@ func (b *BlockChain) checkConnectBlock(node *blockNode, block *dcrutil.Block,
 		return err
 	}
 
-	// Check to ensure consensus via the PoS ticketing system versus the
-	// informations stored in the header.
-	ticketStore, err := b.fetchTicketStore(node.parent)
-	if err != nil {
-		log.Tracef("Failed to generate ticket store for incoming "+
-			"node %v; error given: %v", node.hash, err)
-		return err
-	}
-
-	err = b.CheckBlockStakeSanity(ticketStore,
-		b.chainParams.StakeValidationHeight,
-		node,
-		block,
-		parentBlock,
-		b.chainParams)
+	err = b.CheckBlockStakeSanity(b.chainParams.StakeValidationHeight, node,
+		block, parentBlock, b.chainParams)
 	if err != nil {
 		log.Tracef("CheckBlockStakeSanity failed for incoming "+
 			"node %v; error given: %v", node.hash, err)
@@ -2393,7 +2374,7 @@ func (b *BlockChain) checkConnectBlock(node *blockNode, block *dcrutil.Block,
 
 	// Update the best hash for view to include this block since all of its
 	// transactions have been connected.
-	utxoView.SetBestHash(node.hash)
+	utxoView.SetBestHash(&node.hash)
 
 	return nil
 }
@@ -2408,15 +2389,17 @@ func (b *BlockChain) checkConnectBlock(node *blockNode, block *dcrutil.Block,
 //
 // This function is safe for concurrent access.
 func (b *BlockChain) CheckConnectBlock(block *dcrutil.Block) error {
+	b.chainLock.Lock()
+	defer b.chainLock.Unlock()
+
 	parentHash := block.MsgBlock().Header.PrevBlock
 	prevNode, err := b.findNode(&parentHash)
 	if err != nil {
 		return ruleError(ErrMissingParent, err.Error())
 	}
 
-	var voteBitsStake []uint16
 	newNode := newBlockNode(&block.MsgBlock().Header, block.Sha(),
-		block.Height(), voteBitsStake)
+		block.Height(), ticketsSpentInBlock(block), ticketsRevokedInBlock(block))
 	newNode.parent = prevNode
 	newNode.workSum.Add(prevNode.workSum, newNode.workSum)
 	if prevNode != nil {
@@ -2427,9 +2410,9 @@ func (b *BlockChain) CheckConnectBlock(block *dcrutil.Block) error {
 	// If we are extending the main (best) chain with a new block,
 	// just use the ticket database we already have.
 	if b.bestNode == nil || (prevNode != nil &&
-		prevNode.hash.IsEqual(b.bestNode.hash)) {
+		prevNode.hash == b.bestNode.hash) {
 		view := NewUtxoViewpoint()
-		view.SetBestHash(prevNode.hash)
+		view.SetBestHash(&prevNode.hash)
 		return b.checkConnectBlock(newNode, block, view, nil)
 	}
 
@@ -2438,23 +2421,23 @@ func (b *BlockChain) CheckConnectBlock(block *dcrutil.Block) error {
 	// transactions and spend information for the blocks which would be
 	// disconnected during a reorganize to the point of view of the
 	// node just before the requested node.
-	detachNodes, attachNodes := b.getReorganizeNodes(prevNode)
+	detachNodes, attachNodes, err := b.getReorganizeNodes(prevNode)
 	if err != nil {
 		return err
 	}
 
 	view := NewUtxoViewpoint()
-	view.SetBestHash(b.bestNode.hash)
+	view.SetBestHash(&b.bestNode.hash)
 	view.SetStakeViewpoint(ViewpointPrevValidInitial)
 	var stxos []spentTxOut
 	for e := detachNodes.Front(); e != nil; e = e.Next() {
 		n := e.Value.(*blockNode)
-		block, err := b.getBlockFromHash(n.hash)
+		block, err := b.fetchBlockFromHash(&n.hash)
 		if err != nil {
 			return err
 		}
 
-		parent, err := b.getBlockFromHash(&n.header.PrevBlock)
+		parent, err := b.fetchBlockFromHash(&n.header.PrevBlock)
 		if err != nil {
 			return err
 		}
@@ -2490,14 +2473,14 @@ func (b *BlockChain) CheckConnectBlock(block *dcrutil.Block) error {
 	// transactions and spend information from each of the nodes to attach.
 	for e := attachNodes.Front(); e != nil; e = e.Next() {
 		n := e.Value.(*blockNode)
-		block, exists := b.blockCache[*n.hash]
+		block, exists := b.blockCache[n.hash]
 		if !exists {
 			return fmt.Errorf("unable to find block %v in "+
 				"side chain cache for utxo view construction",
 				n.hash)
 		}
 
-		parent, err := b.getBlockFromHash(&n.header.PrevBlock)
+		parent, err := b.fetchBlockFromHash(&n.header.PrevBlock)
 		if err != nil {
 			return err
 		}

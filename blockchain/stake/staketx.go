@@ -26,7 +26,7 @@ import (
 // TxType indicates the type of tx (regular or stake type).
 type TxType int
 
-// Possible TxTypes. Statically declare these so that they might be used in
+// Possible TxTypes.  Statically declare these so that they might be used in
 // consensus code.
 const (
 	TxTypeRegular = 0
@@ -44,7 +44,7 @@ const (
 	MaxOutputsPerSStx = MaxInputsPerSStx*2 + 1
 
 	// NumInputsPerSSGen is the exact number of inputs for an SSGen
-	// (stakebase) tx. Inputs are a tagged SStx output and a stakebase (null)
+	// (stakebase) tx.  Inputs are a tagged SStx output and a stakebase (null)
 	// input.
 	NumInputsPerSSGen = 2 // SStx and stakebase
 
@@ -488,7 +488,7 @@ func TxSSRtxStakeOutputInfo(tx *dcrutil.Tx, params *chaincfg.Params) ([]bool,
 
 // SStxNullOutputAmounts takes an array of input amounts, change amounts, and a
 // ticket purchase amount, calculates the adjusted proportion from the purchase
-// amount, stores it in an array, then returns the array. That is, for any given
+// amount, stores it in an array, then returns the array.  That is, for any given
 // SStx, this function calculates the proportional outputs that any single user
 // should receive.
 // Returns: (1) Fees (2) Output Amounts (3) Error
@@ -511,7 +511,7 @@ func SStxNullOutputAmounts(amounts []int64,
 	contribAmounts := make([]int64, lengthAmounts)
 	sum := int64(0)
 
-	// Now we want to get the adjusted amounts. The algorithm is like this:
+	// Now we want to get the adjusted amounts.  The algorithm is like this:
 	// 1 foreach amount
 	// 2     subtract change from input, store
 	// 3     add this amount to sum
@@ -534,7 +534,7 @@ func SStxNullOutputAmounts(amounts []int64,
 
 // CalculateRewards takes a list of SStx adjusted output amounts, the amount used
 // to purchase that ticket, and the reward for an SSGen tx and subsequently
-// generates what the outputs should be in the SSGen tx. If used for calculating
+// generates what the outputs should be in the SSGen tx.  If used for calculating
 // the outputs for an SSRtx, pass 0 for subsidy.
 func CalculateRewards(amounts []int64, amountTicket int64,
 	subsidy int64) []int64 {
@@ -614,7 +614,7 @@ func VerifySStxAmounts(sstxAmts []int64, sstxCalcAmts []int64) error {
 // 5. ssSpendPkhs: A list of payee PKHs from OP_SSGEN tagged outputs of the SSGen
 //     or SSRtx.
 // 6. ssSpendCalcAmts: A list of payee amounts that was calculated based on
-//     the input SStx. These are the maximum possible amounts that can be
+//     the input SStx.  These are the maximum possible amounts that can be
 //     transacted from this output.
 // 7. isVote: Whether this is a vote (true) or revocation (false).
 // 8. spendRules: Spending rules for each output in terms of fees allowable
@@ -737,7 +737,7 @@ func VerifyStakingPkhsAndAmounts(
 // Stake Transaction Identification Functions
 // --------------------------------------------------------------------------------
 
-// IsSStx returns whether or not a transaction is an SStx. It does some
+// IsSStx returns whether or not a transaction is an SStx.  It does some
 // simple validation steps to make sure the number of inputs, number of
 // outputs, and the input/output scripts are valid.
 //
@@ -867,7 +867,7 @@ func IsSStx(tx *dcrutil.Tx) (bool, error) {
 	return true, nil
 }
 
-// IsSSGen returns whether or not a transaction is an SSGen tx. It does some
+// IsSSGen returns whether or not a transaction is an SSGen tx.  It does some
 // simple validation steps to make sure the number of inputs, number of
 // outputs, and the input/output scripts are valid.
 //
@@ -957,7 +957,7 @@ func IsSSGen(tx *dcrutil.Tx) (bool, error) {
 
 	// Ensure that the second input is an SStx tagged output.
 	// TODO: Do this in validate, as we don't want to actually lookup
-	// old tx here. This function is for more general sorting.
+	// old tx here.  This function is for more general sorting.
 
 	// Ensure that the first output is an OP_RETURN push.
 	zeroethOutputVersion := msgTx.TxOut[0].Version
@@ -1046,7 +1046,7 @@ func IsSSGen(tx *dcrutil.Tx) (bool, error) {
 	return true, nil
 }
 
-// IsSSRtx returns whether or not a transaction is an SSRtx. It does some
+// IsSSRtx returns whether or not a transaction is an SSRtx.  It does some
 // simple validation steps to make sure the number of inputs, number of
 // outputs, and the input/output scripts are valid.
 //

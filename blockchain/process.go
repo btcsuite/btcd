@@ -186,6 +186,7 @@ func (b *BlockChain) ProcessBlock(block *dcrutil.Block,
 				blockHeader.Timestamp, checkpointTime)
 			return false, false, ruleError(ErrCheckpointTimeTooOld, str)
 		}
+
 		if !fastAdd {
 			// Even though the checks prior to now have already ensured the
 			// proof of work exceeds the claimed amount, the claimed amount

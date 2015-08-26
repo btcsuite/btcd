@@ -15,7 +15,6 @@ import (
 	"strings"
 
 	"github.com/decred/dcrd/blockchain"
-	"github.com/decred/dcrd/blockchain/stake"
 	"github.com/decred/dcrd/chaincfg"
 	"github.com/decred/dcrd/chaincfg/chainhash"
 	"github.com/decred/dcrd/database"
@@ -68,8 +67,6 @@ func chainSetup(dbName string, params *chaincfg.Params) (*blockchain.BlockChain,
 	// Handle memory database specially since it doesn't need the disk
 	// specific handling.
 	var db database.DB
-	tmdb := new(stake.TicketDB)
-
 	var teardown func()
 	if testDbType == "memdb" {
 		ndb, err := database.Create(testDbType)
@@ -81,7 +78,6 @@ func chainSetup(dbName string, params *chaincfg.Params) (*blockchain.BlockChain,
 		// Setup a teardown function for cleaning up.  This function is
 		// returned to the caller to be invoked when it is done testing.
 		teardown = func() {
-			tmdb.Close()
 			db.Close()
 		}
 	} else {
@@ -106,7 +102,6 @@ func chainSetup(dbName string, params *chaincfg.Params) (*blockchain.BlockChain,
 		// Setup a teardown function for cleaning up.  This function is
 		// returned to the caller to be invoked when it is done testing.
 		teardown = func() {
-			tmdb.Close()
 			db.Close()
 			os.RemoveAll(dbPath)
 			os.RemoveAll(testDbRoot)
@@ -116,19 +111,12 @@ func chainSetup(dbName string, params *chaincfg.Params) (*blockchain.BlockChain,
 	// Create the main chain instance.
 	chain, err := blockchain.New(&blockchain.Config{
 		DB:          db,
-		TMDB:        tmdb,
 		ChainParams: params,
 	})
 
 	if err != nil {
 		teardown()
 		err := fmt.Errorf("failed to create chain instance: %v", err)
-		return nil, nil, err
-	}
-	// Start the ticket database.
-	tmdb.Initialize(params, db)
-	err = tmdb.RescanTicketDB()
-	if err != nil {
 		return nil, nil, err
 	}
 

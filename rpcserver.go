@@ -1758,7 +1758,7 @@ func handleExistsLiveTicket(s *rpcServer, cmd interface{},
 		}
 	}
 
-	return s.server.blockManager.ExistsLiveTicket(hash)
+	return s.server.blockManager.chain.CheckLiveTicket(*hash), nil
 }
 
 // handleExistsLiveTickets implements the existslivetickets command.
@@ -1785,9 +1785,9 @@ func handleExistsLiveTickets(s *rpcServer, cmd interface{},
 	}
 
 	hashesLen := len(txHashBlob) / 32
-	hashes := make([]*chainhash.Hash, hashesLen)
+	hashes := make([]chainhash.Hash, hashesLen)
 	for i := 0; i < hashesLen; i++ {
-		hashes[i], err = chainhash.NewHash(
+		newHash, err := chainhash.NewHash(
 			txHashBlob[i*chainhash.HashSize : (i+1)*chainhash.HashSize])
 		if err != nil {
 			return nil, &dcrjson.RPCError{
@@ -1796,12 +1796,10 @@ func handleExistsLiveTickets(s *rpcServer, cmd interface{},
 					err.Error()),
 			}
 		}
+		hashes[i] = *newHash
 	}
 
-	exists, err := s.server.blockManager.ExistsLiveTickets(hashes)
-	if err != nil {
-		return nil, err
-	}
+	exists := s.server.blockManager.chain.CheckLiveTickets(hashes)
 	if len(exists) != hashesLen {
 		return nil, &dcrjson.RPCError{
 			Code: dcrjson.ErrRPCDatabase,
@@ -4364,7 +4362,7 @@ func handleHelp(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (inter
 
 // handleLiveTickets implements the livetickets command.
 func handleLiveTickets(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (interface{}, error) {
-	lt, err := s.server.blockManager.LiveTickets()
+	lt, err := s.server.blockManager.chain.LiveTickets()
 	if err != nil {
 		return nil, err
 	}
@@ -4379,16 +4377,14 @@ func handleLiveTickets(s *rpcServer, cmd interface{}, closeChan <-chan struct{})
 
 // handleMissedTickets implements the missedtickets command.
 func handleMissedTickets(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (interface{}, error) {
-	mt, err := s.server.blockManager.MissedTickets()
+	mt, err := s.server.blockManager.chain.MissedTickets()
 	if err != nil {
 		return nil, err
 	}
 
 	mtString := make([]string, len(mt), len(mt))
-	itr := 0
-	for hash := range mt {
-		mtString[itr] = hash.String()
-		itr++
+	for i, hash := range mt {
+		mtString[i] = hash.String()
 	}
 
 	return dcrjson.MissedTicketsResult{Tickets: mtString}, nil
@@ -4410,7 +4406,7 @@ func handlePing(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (inter
 // handleRebroadcastMissed implements the rebroadcastmissed command.
 func handleRebroadcastMissed(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (interface{}, error) {
 	hash, height := s.server.blockManager.chainState.Best()
-	mt, err := s.server.blockManager.MissedTickets()
+	mt, err := s.server.blockManager.chain.MissedTickets()
 	if err != nil {
 		return nil, err
 	}
@@ -4424,7 +4420,9 @@ func handleRebroadcastMissed(s *rpcServer, cmd interface{}, closeChan <-chan str
 		Hash:            *hash,
 		Height:          height,
 		StakeDifficulty: stakeDiff,
-		TicketMap:       mt,
+		TicketsSpent:    []chainhash.Hash{},
+		TicketsMissed:   mt,
+		TicketsNew:      []chainhash.Hash{},
 	}
 
 	s.ntfnMgr.NotifySpentAndMissedTickets(missedTicketsNtfn)
@@ -4440,30 +4438,19 @@ func handleRebroadcastWinners(s *rpcServer, cmd interface{}, closeChan <-chan st
 		return nil, err
 	}
 
-	s.server.blockManager.blockLotteryDataCacheMutex.Lock()
-	defer s.server.blockManager.blockLotteryDataCacheMutex.Unlock()
-	for _, b := range blocks {
-		lotteryData := new(BlockLotteryData)
-		exists := false
-		_, exists = s.server.blockManager.blockLotteryDataCache[b]
-		if !exists {
-			winningTickets, poolSize, finalState, err :=
-				s.server.blockManager.GetLotteryData(b)
-			if err != nil {
-				return nil, err
-			}
-			lotteryData.finalState = finalState
-			lotteryData.poolSize = poolSize
-			lotteryData.ntfnData = &WinningTicketsNtfnData{
-				b,
-				height,
-				winningTickets}
-			s.server.blockManager.blockLotteryDataCache[b] = lotteryData
-		} else {
-			lotteryData, _ = s.server.blockManager.blockLotteryDataCache[b]
+	for i := range blocks {
+		winningTickets, _, _, err :=
+			s.server.blockManager.chain.LotteryDataForBlock(&blocks[i])
+		if err != nil {
+			return nil, err
+		}
+		ntfnData := &WinningTicketsNtfnData{
+			BlockHash:   *hash,
+			BlockHeight: height,
+			Tickets:     winningTickets,
 		}
 
-		s.ntfnMgr.NotifyWinningTickets(lotteryData.ntfnData)
+		s.ntfnMgr.NotifyWinningTickets(ntfnData)
 	}
 
 	return nil, nil
@@ -5408,7 +5395,7 @@ func handleTicketsForAddress(s *rpcServer, cmd interface{}, closeChan <-chan str
 		return nil, err
 	}
 
-	tickets, err := s.server.blockManager.TicketsForAddress(addr)
+	tickets, err := s.server.blockManager.chain.TicketsWithAddress(addr)
 	if err != nil {
 		return nil, err
 	}

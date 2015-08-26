@@ -75,6 +75,12 @@ type Key chainhash.Hash
 type Value struct {
 	// Height is the block height of the associated ticket.
 	Height uint32
+
+	// Flags defining the ticket state.
+	Missed  bool
+	Revoked bool
+	Spent   bool
+	Expired bool
 }
 
 // treapNode represents a node in the treap.
