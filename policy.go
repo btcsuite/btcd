@@ -57,9 +57,9 @@ const (
 func calcMinRequiredTxRelayFee(serializedSize int64, minRelayTxFee btcutil.Amount) int64 {
 	// Calculate the minimum fee for a transaction to be allowed into the
 	// mempool and relayed by scaling the base fee (which is the minimum
-	// free transaction relay fee). minTxRelayFee is in Satoshi/kB so
-	// multiply by serializedSize (which is in bytes) and divide by 1000 to get
-	// minimum Satoshis.
+	// free transaction relay fee).  minTxRelayFee is in Satoshi/kB so
+	// multiply by serializedSize (which is in bytes) and divide by 1000 to
+	// get minimum Satoshis.
 	minFee := (serializedSize * int64(minRelayTxFee)) / 1000
 
 	if minFee == 0 && minRelayTxFee > 0 {
@@ -79,7 +79,7 @@ func calcMinRequiredTxRelayFee(serializedSize int64, minRelayTxFee btcutil.Amoun
 // of each of its input values multiplied by their age (# of confirmations).
 // Thus, the final formula for the priority is:
 // sum(inputValue * inputAge) / adjustedTxSize
-func calcPriority(tx *wire.MsgTx, txStore blockchain.TxStore, nextBlockHeight int32) float64 {
+func calcPriority(tx *wire.MsgTx, utxoStore blockchain.UtxoStore, nextBlockHeight int32) float64 {
 	// In order to encourage spending multiple old unspent transaction
 	// outputs thereby reducing the total set, don't count the constant
 	// overhead for each input as well as enough bytes of the signature
@@ -111,7 +111,7 @@ func calcPriority(tx *wire.MsgTx, txStore blockchain.TxStore, nextBlockHeight in
 		return 0.0
 	}
 
-	inputValueAge := calcInputValueAge(tx, txStore, nextBlockHeight)
+	inputValueAge := calcInputValueAge(tx, utxoStore, nextBlockHeight)
 	return inputValueAge / float64(serializedTxSize-overhead)
 }
 
@@ -121,29 +121,29 @@ func calcPriority(tx *wire.MsgTx, txStore blockchain.TxStore, nextBlockHeight in
 // age is the sum of this value for each txin.  Any inputs to the transaction
 // which are currently in the mempool and hence not mined into a block yet,
 // contribute no additional input age to the transaction.
-func calcInputValueAge(tx *wire.MsgTx, txStore blockchain.TxStore, nextBlockHeight int32) float64 {
+func calcInputValueAge(tx *wire.MsgTx, utxoStore blockchain.UtxoStore, nextBlockHeight int32) float64 {
 	var totalInputAge float64
 	for _, txIn := range tx.TxIn {
+		// Don't attempt to accumulate the total input age if the
+		// referenced transaction output doesn't exist.
 		originHash := &txIn.PreviousOutPoint.Hash
 		originIndex := txIn.PreviousOutPoint.Index
-
-		// Don't attempt to accumulate the total input age if the txIn
-		// in question doesn't exist.
-		if txData, exists := txStore[*originHash]; exists && txData.Tx != nil {
+		txEntry := utxoStore.LookupEntry(originHash)
+		if txEntry != nil && !txEntry.IsOutputSpent(originIndex) {
 			// Inputs with dependencies currently in the mempool
 			// have their block height set to a special constant.
-			// Their input age should computed as zero since their
-			// parent hasn't made it into a block yet.
+			// Their input age should be computed as zero since
+			// their parent hasn't made it into a block yet.
 			var inputAge int32
-			if txData.BlockHeight == mempoolHeight {
+			originHeight := txEntry.BlockHeight()
+			if originHeight == mempoolHeight {
 				inputAge = 0
 			} else {
-				inputAge = nextBlockHeight - txData.BlockHeight
+				inputAge = nextBlockHeight - originHeight
 			}
 
 			// Sum the input value times age.
-			originTxOut := txData.Tx.MsgTx().TxOut[originIndex]
-			inputValue := originTxOut.Value
+			inputValue := txEntry.Amount(originIndex)
 			totalInputAge += float64(inputValue * int64(inputAge))
 		}
 	}
@@ -158,7 +158,7 @@ func calcInputValueAge(tx *wire.MsgTx, txStore blockchain.TxStore, nextBlockHeig
 // exhaustion attacks by "creative" use of scripts that are super expensive to
 // process like OP_DUP OP_CHECKSIG OP_DROP repeated a large number of times
 // followed by a final OP_TRUE.
-func checkInputsStandard(tx *btcutil.Tx, txStore blockchain.TxStore) error {
+func checkInputsStandard(tx *btcutil.Tx, utxoStore blockchain.UtxoStore) error {
 	// NOTE: The reference implementation also does a coinbase check here,
 	// but coinbases have already been rejected prior to calling this
 	// function so no need to recheck.
@@ -168,8 +168,8 @@ func checkInputsStandard(tx *btcutil.Tx, txStore blockchain.TxStore) error {
 		// they have already been checked prior to calling this
 		// function.
 		prevOut := txIn.PreviousOutPoint
-		originTx := txStore[prevOut.Hash].Tx.MsgTx()
-		originPkScript := originTx.TxOut[prevOut.Index].PkScript
+		entry := utxoStore.LookupEntry(&prevOut.Hash)
+		originPkScript := entry.PkScriptByIndex(prevOut.Index)
 
 		// Calculate stats for the script pair.
 		scriptInfo, err := txscript.CalcScriptInfo(txIn.SignatureScript,
