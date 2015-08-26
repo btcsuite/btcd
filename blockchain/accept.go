@@ -1,4 +1,4 @@
-// Copyright (c) 2013-2015 The btcsuite developers
+// Copyright (c) 2013-2016 The btcsuite developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -17,6 +17,8 @@ import "github.com/btcsuite/btcutil"
 //
 // The flags are also passed to checkBlockContext and connectBestChain.  See
 // their documentation for how the flags modify their behavior.
+//
+// This function MUST be called with the chain state lock held (for writes).
 func (b *BlockChain) maybeAcceptBlock(block *btcutil.Block, flags BehaviorFlags) error {
 	dryRun := flags&BFDryRun == BFDryRun
 
@@ -74,7 +76,9 @@ func (b *BlockChain) maybeAcceptBlock(block *btcutil.Block, flags BehaviorFlags)
 	// chain.  The caller would typically want to react by relaying the
 	// inventory to other peers.
 	if !dryRun {
+		b.chainLock.Unlock()
 		b.sendNotification(NTBlockAccepted, block)
+		b.chainLock.Lock()
 	}
 
 	return nil
