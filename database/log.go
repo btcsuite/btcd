@@ -1,4 +1,4 @@
-// Copyright (c) 2013-2014 The btcsuite developers
+// Copyright (c) 2013-2016 The btcsuite developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -32,6 +32,13 @@ func DisableLog() {
 // using btclog.
 func UseLogger(logger btclog.Logger) {
 	log = logger
+
+	// Update the logger for the registered drivers.
+	for _, drv := range drivers {
+		if drv.UseLogger != nil {
+			drv.UseLogger(logger)
+		}
+	}
 }
 
 // SetLogWriter uses a specified io.Writer to output package logging info.
@@ -55,9 +62,4 @@ func SetLogWriter(w io.Writer, level string) error {
 
 	UseLogger(l)
 	return nil
-}
-
-// GetLog returns the currently active logger.
-func GetLog() btclog.Logger {
-	return log
 }
