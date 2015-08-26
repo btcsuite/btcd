@@ -104,7 +104,6 @@ func (msg *MsgHeaders) BtcEncode(w io.Writer, pver uint32) error {
 		if err != nil {
 			return err
 		}
-
 	}
 
 	return nil

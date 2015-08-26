@@ -30,17 +30,17 @@ func TestCheckBlockScripts(t *testing.T) {
 	}
 
 	txStoreDataFile := fmt.Sprintf("%d.txstore.bz2", testBlockNum)
-	txStore, err := loadTxStore(txStoreDataFile)
+	utxoStore, err := loadUtxoStore(txStoreDataFile)
 	if err != nil {
 		t.Errorf("Error loading txstore: %v\n", err)
 		return
 	}
 
 	scriptFlags := txscript.ScriptBip16
-	err = blockchain.TstCheckBlockScripts(blocks[0], txStore, scriptFlags, nil)
+	err = blockchain.TstCheckBlockScripts(blocks[0], utxoStore, scriptFlags,
+		nil)
 	if err != nil {
-		t.Errorf("Transaction script validation failed: %v\n",
-			err)
+		t.Errorf("Transaction script validation failed: %v\n", err)
 		return
 	}
 }
