@@ -32,6 +32,13 @@ func DisableLog() {
 // using btclog.
 func UseLogger(logger btclog.Logger) {
 	log = logger
+
+	// Update the logger for the registered drivers.
+	for _, drv := range drivers {
+		if drv.UseLogger != nil {
+			drv.UseLogger(logger)
+		}
+	}
 }
 
 // SetLogWriter uses a specified io.Writer to output package logging info.
@@ -55,9 +62,4 @@ func SetLogWriter(w io.Writer, level string) error {
 
 	UseLogger(l)
 	return nil
-}
-
-// GetLog returns the currently active logger.
-func GetLog() btclog.Logger {
-	return log
 }
