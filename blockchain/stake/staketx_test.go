@@ -1,4 +1,4 @@
-// Copyright (c) 2015 The Decred developers
+// Copyright (c) 2015-2016 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -739,7 +739,7 @@ func TestGetSSGenBlockVotedOn(t *testing.T) {
 	ssgen.SetTree(dcrutil.TxTreeStake)
 	ssgen.SetIndex(0)
 
-	blocksha, height, err := stake.GetSSGenBlockVotedOn(ssgen)
+	blocksha, height, err := stake.SSGenBlockVotedOn(ssgen)
 
 	correctblocksha, _ := chainhash.NewHash(
 		[]byte{
@@ -793,7 +793,7 @@ func TestGetSStxStakeOutputInfo(t *testing.T) {
 	correctLimit := uint16(4)
 
 	typs, pkhs, amts, changeAmts, rules, limits :=
-		stake.GetSStxStakeOutputInfo(sstx)
+		stake.TxSStxStakeOutputInfo(sstx)
 
 	if typs[2] != correctTyp {
 		t.Errorf("Error thrown on TestGetSStxStakeOutputInfo: Looking for "+
@@ -842,7 +842,7 @@ func TestGetSSGenStakeOutputInfo(t *testing.T) {
 
 	correctamt := int64(0x2123e300)
 
-	typs, pkhs, amts, err := stake.GetSSGenStakeOutputInfo(ssgen,
+	typs, pkhs, amts, err := stake.TxSSGenStakeOutputInfo(ssgen,
 		&chaincfg.SimNetParams)
 	if err != nil {
 		t.Errorf("Got unexpected error: %v", err.Error())
@@ -871,7 +871,7 @@ func TestGetSSGenVoteBits(t *testing.T) {
 
 	correctvbs := uint16(0x8c94)
 
-	votebits := stake.GetSSGenVoteBits(ssgen)
+	votebits := stake.SSGenVoteBits(ssgen)
 
 	if correctvbs != votebits {
 		t.Errorf("Error thrown on TestGetSSGenVoteBits: Looking for "+
@@ -895,7 +895,7 @@ func TestGetSSRtxStakeOutputInfo(t *testing.T) {
 
 	correctAmt := int64(0x2122e300)
 
-	typs, pkhs, amts, err := stake.GetSSRtxStakeOutputInfo(ssrtx,
+	typs, pkhs, amts, err := stake.TxSSRtxStakeOutputInfo(ssrtx,
 		&chaincfg.SimNetParams)
 	if err != nil {
 		t.Errorf("Got unexpected error: %v", err.Error())
@@ -926,7 +926,7 @@ func TestGetSStxNullOutputAmounts(t *testing.T) {
 		int64(0x02300000)}
 	amtTicket := int64(0x9122e300)
 
-	_, _, err := stake.GetSStxNullOutputAmounts(
+	_, _, err := stake.SStxNullOutputAmounts(
 		[]int64{
 			int64(0x12000000),
 			int64(0x12300000),
@@ -942,7 +942,7 @@ func TestGetSStxNullOutputAmounts(t *testing.T) {
 	}
 
 	// too small amount to commit
-	_, _, err = stake.GetSStxNullOutputAmounts(
+	_, _, err = stake.SStxNullOutputAmounts(
 		commitAmts,
 		changeAmts,
 		int64(0x00000000))
@@ -956,7 +956,7 @@ func TestGetSStxNullOutputAmounts(t *testing.T) {
 		int64(0x02000000),
 		int64(0x12300001)}
 
-	_, _, err = stake.GetSStxNullOutputAmounts(
+	_, _, err = stake.SStxNullOutputAmounts(
 		commitAmts,
 		tooMuchChangeAmts,
 		int64(0x00000020))
@@ -965,7 +965,7 @@ func TestGetSStxNullOutputAmounts(t *testing.T) {
 		t.Errorf("TestGetSStxNullOutputAmounts unexpected error: %v", err)
 	}
 
-	fees, amts, err := stake.GetSStxNullOutputAmounts(commitAmts,
+	fees, amts, err := stake.SStxNullOutputAmounts(commitAmts,
 		changeAmts,
 		amtTicket)
 
@@ -1000,7 +1000,7 @@ func TestGetStakeRewards(t *testing.T) {
 	amountTicket := int64(42000000)
 	subsidy := int64(400000)
 
-	outAmts := stake.GetStakeRewards(amounts, amountTicket, subsidy)
+	outAmts := stake.CalculateRewards(amounts, amountTicket, subsidy)
 
 	// SSRtx example with 0 subsidy
 	expectedAmts := []int64{int64(21200000),
@@ -1317,7 +1317,7 @@ func TestVerifyRealTxs(t *testing.T) {
 	sstxMtx.FromBytes(hexSstx)
 	sstxTx := dcrutil.NewTx(sstxMtx)
 	sstxTypes, sstxAddrs, sstxAmts, _, sstxRules, sstxLimits :=
-		stake.GetSStxStakeOutputInfo(sstxTx)
+		stake.TxSStxStakeOutputInfo(sstxTx)
 
 	hexSsrtx, _ := hex.DecodeString("010000000147f4453f244f2589551aea7c714d" +
 		"771053b667c6612616e9c8fc0e68960a9a100000000001ffffffff0270d7210a00" +
@@ -1333,12 +1333,12 @@ func TestVerifyRealTxs(t *testing.T) {
 	ssrtxTx := dcrutil.NewTx(ssrtxMtx)
 
 	ssrtxTypes, ssrtxAddrs, ssrtxAmts, err :=
-		stake.GetSSRtxStakeOutputInfo(ssrtxTx, &chaincfg.TestNetParams)
+		stake.TxSSRtxStakeOutputInfo(ssrtxTx, &chaincfg.TestNetParams)
 	if err != nil {
 		t.Errorf("Unexpected GetSSRtxStakeOutputInfo error: %v", err.Error())
 	}
 
-	ssrtxCalcAmts := stake.GetStakeRewards(sstxAmts, sstxMtx.TxOut[0].Value,
+	ssrtxCalcAmts := stake.CalculateRewards(sstxAmts, sstxMtx.TxOut[0].Value,
 		int64(0))
 
 	// Here an error is thrown because the second output spends too much.
@@ -1366,13 +1366,13 @@ func TestVerifyRealTxs(t *testing.T) {
 	// Correct this and make sure it passes.
 	ssrtxTx.MsgTx().TxOut[1].Value = 47460913
 	sstxTypes, sstxAddrs, sstxAmts, _, sstxRules, sstxLimits =
-		stake.GetSStxStakeOutputInfo(sstxTx)
+		stake.TxSStxStakeOutputInfo(sstxTx)
 	ssrtxTypes, ssrtxAddrs, ssrtxAmts, err =
-		stake.GetSSRtxStakeOutputInfo(ssrtxTx, &chaincfg.TestNetParams)
+		stake.TxSSRtxStakeOutputInfo(ssrtxTx, &chaincfg.TestNetParams)
 	if err != nil {
 		t.Errorf("Unexpected GetSSRtxStakeOutputInfo error: %v", err.Error())
 	}
-	ssrtxCalcAmts = stake.GetStakeRewards(sstxAmts, sstxMtx.TxOut[0].Value,
+	ssrtxCalcAmts = stake.CalculateRewards(sstxAmts, sstxMtx.TxOut[0].Value,
 		int64(0))
 	err = stake.VerifyStakingPkhsAndAmounts(sstxTypes,
 		sstxAddrs,
@@ -1392,13 +1392,13 @@ func TestVerifyRealTxs(t *testing.T) {
 	// make sure it fails.
 	ssrtxTx.MsgTx().TxOut[0].Value = 0
 	sstxTypes, sstxAddrs, sstxAmts, _, sstxRules, sstxLimits =
-		stake.GetSStxStakeOutputInfo(sstxTx)
+		stake.TxSStxStakeOutputInfo(sstxTx)
 	ssrtxTypes, ssrtxAddrs, ssrtxAmts, err =
-		stake.GetSSRtxStakeOutputInfo(ssrtxTx, &chaincfg.TestNetParams)
+		stake.TxSSRtxStakeOutputInfo(ssrtxTx, &chaincfg.TestNetParams)
 	if err != nil {
 		t.Errorf("Unexpected GetSSRtxStakeOutputInfo error: %v", err.Error())
 	}
-	ssrtxCalcAmts = stake.GetStakeRewards(sstxAmts, sstxMtx.TxOut[0].Value,
+	ssrtxCalcAmts = stake.CalculateRewards(sstxAmts, sstxMtx.TxOut[0].Value,
 		int64(0))
 	err = stake.VerifyStakingPkhsAndAmounts(sstxTypes,
 		sstxAddrs,
@@ -1423,13 +1423,13 @@ func TestVerifyRealTxs(t *testing.T) {
 	ssrtxTx.MsgTx().TxOut[0].Value = 108730066
 	ssrtxTx.MsgTx().TxOut[1].Value = 108730066
 	sstxTypes, sstxAddrs, sstxAmts, _, sstxRules, sstxLimits =
-		stake.GetSStxStakeOutputInfo(sstxTx)
+		stake.TxSStxStakeOutputInfo(sstxTx)
 	ssrtxTypes, ssrtxAddrs, ssrtxAmts, err =
-		stake.GetSSRtxStakeOutputInfo(ssrtxTx, &chaincfg.TestNetParams)
+		stake.TxSSRtxStakeOutputInfo(ssrtxTx, &chaincfg.TestNetParams)
 	if err != nil {
 		t.Errorf("Unexpected GetSSRtxStakeOutputInfo error: %v", err.Error())
 	}
-	ssrtxCalcAmts = stake.GetStakeRewards(sstxAmts, sstxMtx.TxOut[0].Value,
+	ssrtxCalcAmts = stake.CalculateRewards(sstxAmts, sstxMtx.TxOut[0].Value,
 		int64(0))
 	err = stake.VerifyStakingPkhsAndAmounts(sstxTypes,
 		sstxAddrs,

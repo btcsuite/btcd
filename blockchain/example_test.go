@@ -1,5 +1,5 @@
-// Copyright (c) 2014 The btcsuite developers
-// Copyright (c) 2015 The Decred developers
+// Copyright (c) 2014-2016 The btcsuite developers
+// Copyright (c) 2015-2016 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -8,12 +8,15 @@ package blockchain_test
 import (
 	"fmt"
 	"math/big"
+	"os"
+	"path/filepath"
 
 	"github.com/decred/dcrd/blockchain"
 	"github.com/decred/dcrd/blockchain/stake"
 	"github.com/decred/dcrd/chaincfg"
-	"github.com/decred/dcrd/database"
 	_ "github.com/decred/dcrd/database/memdb"
+	database "github.com/decred/dcrd/database2"
+	_ "github.com/decred/dcrd/database2/ffldb"
 	"github.com/decred/dcrutil"
 )
 
@@ -24,31 +27,35 @@ import (
 // block to illustrate how an invalid block is handled.
 func ExampleBlockChain_ProcessBlock() {
 	// Create a new database to store the accepted blocks into.  Typically
-	// this would be opening an existing database and would not use memdb
-	// which is a memory-only database backend, but we create a new db
-	// here so this is a complete working example.
-	db, err := database.CreateDB("memdb")
+	// this would be opening an existing database and would not be deleting
+	// and creating a new database like this, but it is done here so this is
+	// a complete working example and does not leave temporary files laying
+	// around.
+	dbPath := filepath.Join(os.TempDir(), "exampleprocessblock")
+	_ = os.RemoveAll(dbPath)
+	db, err := database.Create("ffldb", dbPath, chaincfg.MainNetParams.Net)
 	if err != nil {
 		fmt.Printf("Failed to create database: %v\n", err)
 		return
 	}
+	defer os.RemoveAll(dbPath)
 	defer db.Close()
 
 	var tmdb *stake.TicketDB
-	// Insert the main network genesis block.  This is part of the initial
-	// database setup.  Like above, this typically would not be needed when
-	// opening an existing database.
-	genesisBlock := dcrutil.NewBlock(chaincfg.MainNetParams.GenesisBlock)
-	_, err = db.InsertBlock(genesisBlock)
+
+	// Create a new BlockChain instance using the underlying database for
+	// the main bitcoin network.  This example does not demonstrate some
+	// of the other available configuration options such as specifying a
+	// notification callback and signature cache.
+	chain, err := blockchain.New(&blockchain.Config{
+		DB:          db,
+		TMDB:        tmdb,
+		ChainParams: &chaincfg.MainNetParams,
+	})
 	if err != nil {
-		fmt.Printf("Failed to insert genesis block: %v\n", err)
+		fmt.Printf("Failed to create chain instance: %v\n", err)
 		return
 	}
-
-	// Create a new BlockChain instance without an initialized signature
-	// verification cache, using the underlying database for the main
-	// bitcoin network and ignore notifications.
-	chain := blockchain.New(db, tmdb, &chaincfg.MainNetParams, nil, nil)
 
 	// Create a new median time source that is required by the upcoming
 	// call to ProcessBlock.  Ordinarily this would also add time values
@@ -56,12 +63,14 @@ func ExampleBlockChain_ProcessBlock() {
 	// adjusted to be in agreement with other peers.
 	timeSource := blockchain.NewMedianTime()
 
-	// Process a block.  For this example, we are going to intentionally
-	// cause an error by trying to process the genesis block which already
-	// exists.
-	isOrphan, _, err := chain.ProcessBlock(genesisBlock, timeSource, blockchain.BFNone)
+	// Create a new BlockChain instance using the underlying database for
+	// the main bitcoin network.  This example does not demonstrate some
+	// of the other available configuration options such as specifying a
+	// notification callback and signature cache.
+	genesisBlock := dcrutil.NewBlock(chaincfg.MainNetParams.GenesisBlock)
+	_, isOrphan, err := chain.ProcessBlock(genesisBlock, timeSource, blockchain.BFNone)
 	if err != nil {
-		fmt.Printf("Failed to process block: %v\n", err)
+		fmt.Printf("Failed to create chain instance: %v\n", err)
 		return
 	}
 	fmt.Printf("Block accepted. Is it an orphan?: %v", isOrphan)

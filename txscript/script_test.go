@@ -1,5 +1,5 @@
 // Copyright (c) 2013-2015 The btcsuite developers
-// Copyright (c) 2015 The Decred developers
+// Copyright (c) 2015-2016 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -584,16 +584,28 @@ func TestIsUnspendable(t *testing.T) {
 
 	tests := []struct {
 		name     string
+		amount   int64
 		pkScript []byte
 		expected bool
 	}{
 		{
 			// Unspendable
+			amount:   100,
 			pkScript: []byte{0x6a, 0x04, 0x74, 0x65, 0x73, 0x74},
 			expected: true,
 		},
 		{
+			// Unspendable
+			amount: 0,
+			pkScript: []byte{0x76, 0xa9, 0x14, 0x29, 0x95, 0xa0,
+				0xfe, 0x68, 0x43, 0xfa, 0x9b, 0x95, 0x45,
+				0x97, 0xf0, 0xdc, 0xa7, 0xa4, 0x4d, 0xf6,
+				0xfa, 0x0b, 0x5c, 0x88, 0xac},
+			expected: true,
+		},
+		{
 			// Spendable
+			amount: 100,
 			pkScript: []byte{0x76, 0xa9, 0x14, 0x29, 0x95, 0xa0,
 				0xfe, 0x68, 0x43, 0xfa, 0x9b, 0x95, 0x45,
 				0x97, 0xf0, 0xdc, 0xa7, 0xa4, 0x4d, 0xf6,
@@ -603,7 +615,7 @@ func TestIsUnspendable(t *testing.T) {
 	}
 
 	for i, test := range tests {
-		res := txscript.IsUnspendable(test.pkScript)
+		res := txscript.IsUnspendable(test.amount, test.pkScript)
 		if res != test.expected {
 			t.Errorf("TestIsUnspendable #%d failed: got %v want %v",
 				i, res, test.expected)

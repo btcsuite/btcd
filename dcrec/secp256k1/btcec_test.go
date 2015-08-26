@@ -1,5 +1,5 @@
 // Copyright 2011 The Go Authors. All rights reserved.
-// Copyright (c) 2015 The Decred developers
+// Copyright (c) 2015-2016 The Decred developers
 // Copyright 2011 ThePiachu. All rights reserved.
 // Copyright 2013-2014 The btcsuite developers
 // Use of this source code is governed by an ISC

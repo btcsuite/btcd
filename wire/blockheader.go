@@ -1,5 +1,5 @@
 // Copyright (c) 2013-2015 The btcsuite developers
-// Copyright (c) 2015 The Decred developers
+// Copyright (c) 2015-2016 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -119,6 +119,12 @@ func (h *BlockHeader) Deserialize(r io.Reader) error {
 	// at protocol version 0 and the stable long-term storage format.  As
 	// a result, make use of readBlockHeader.
 	return readBlockHeader(r, 0, h)
+}
+
+// FromBytes deserializes a block header byte slice.
+func (h *BlockHeader) FromBytes(b []byte) error {
+	r := bytes.NewReader(b)
+	return h.Deserialize(r)
 }
 
 // Serialize encodes a block header from r into the receiver using a format

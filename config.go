@@ -1,4 +1,4 @@
-// Copyright (c) 2013-2014 The btcsuite developers
+// Copyright (c) 2013-2016 The btcsuite developers
 // Copyright (c) 2015-2016 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
@@ -23,9 +23,10 @@ import (
 
 	flags "github.com/btcsuite/go-flags"
 	"github.com/btcsuite/go-socks/socks"
-	"github.com/decred/dcrd/database"
 	_ "github.com/decred/dcrd/database/ldb"
 	_ "github.com/decred/dcrd/database/memdb"
+	database "github.com/decred/dcrd/database2"
+	_ "github.com/decred/dcrd/database2/ffldb"
 	"github.com/decred/dcrd/wire"
 	"github.com/decred/dcrutil"
 )
@@ -42,15 +43,15 @@ const (
 	defaultMaxRPCClients         = 10
 	defaultMaxRPCWebsockets      = 25
 	defaultVerifyEnabled         = false
-	defaultDbType                = "leveldb"
+	defaultDbType                = "ffldb"
 	defaultFreeTxRelayLimit      = 15.0
 	defaultBlockMinSize          = 0
 	defaultBlockMaxSize          = 375000
 	blockMaxSizeMin              = 1000
 	blockMaxSizeMax              = wire.MaxBlockPayload - 1000
 	defaultBlockPrioritySize     = 20000
-	defaultGenerate              = false
 	defaultAddrIndex             = false
+	defaultGenerate              = false
 	defaultNonAggressive         = false
 	defaultNoMiningStateSync     = false
 	defaultAllowOldVotes         = false
@@ -64,7 +65,7 @@ var (
 	dcrdHomeDir        = dcrutil.AppDataDir("dcrd", false)
 	defaultConfigFile  = filepath.Join(dcrdHomeDir, defaultConfigFilename)
 	defaultDataDir     = filepath.Join(dcrdHomeDir, defaultDataDirname)
-	knownDbTypes       = database.SupportedDBs()
+	knownDbTypes       = database.SupportedDrivers()
 	defaultRPCKeyFile  = filepath.Join(dcrdHomeDir, "rpc.key")
 	defaultRPCCertFile = filepath.Join(dcrdHomeDir, "rpc.cert")
 	defaultLogDir      = filepath.Join(dcrdHomeDir, defaultLogDirname)
@@ -142,7 +143,7 @@ type config struct {
 	BlockMaxSize       uint32        `long:"blockmaxsize" description:"Maximum block size in bytes to be used when creating a block"`
 	BlockPrioritySize  uint32        `long:"blockprioritysize" description:"Size in bytes for high-priority/low-fee transactions when creating a block"`
 	GetWorkKeys        []string      `long:"getworkkey" description:"DEPRECATED -- Use the --miningaddr option instead"`
-	DropAddrIndex      bool          `long:"dropaddrindex" description:"Deletes the address-based transaction index from the database on start up, and then exits."`
+	DropAddrIndex      bool          `long:"dropaddrindex" description:"Deletes the address-based transaction index from the database on start up and then exits."`
 	NonAggressive      bool          `long:"nonaggressive" description:"Disable mining off of the parent block of the blockchain if there aren't enough voters"`
 	NoMiningStateSync  bool          `long:"nominingstatesync" description:"Disable synchronizing the mining state with other nodes"`
 	AllowOldVotes      bool          `long:"allowoldvotes" description:"Enable the addition of very old votes to the mempool"`
@@ -538,14 +539,6 @@ func loadConfig() (*config, []string, error) {
 	if !cfg.NoAddrIndex && cfg.DropAddrIndex {
 		err := fmt.Errorf("addrindex and dropaddrindex cannot be " +
 			"activated at the same")
-		fmt.Fprintln(os.Stderr, err)
-		fmt.Fprintln(os.Stderr, usageMessage)
-		return nil, nil, err
-	}
-
-	// Memdb does not currently support the addrindex.
-	if cfg.DbType == "memdb" && !cfg.NoAddrIndex {
-		err := fmt.Errorf("memdb does not currently support the addrindex")
 		fmt.Fprintln(os.Stderr, err)
 		fmt.Fprintln(os.Stderr, usageMessage)
 		return nil, nil, err

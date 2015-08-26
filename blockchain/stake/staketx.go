@@ -1,4 +1,4 @@
-// Copyright (c) 2015 The Decred developers
+// Copyright (c) 2015-2016 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 //
@@ -26,12 +26,13 @@ import (
 // TxType indicates the type of tx (regular or stake type).
 type TxType int
 
-// Possible TxTypes
+// Possible TxTypes. Statically declare these so that they might be used in
+// consensus code.
 const (
-	TxTypeRegular = iota
-	TxTypeSStx
-	TxTypeSSGen
-	TxTypeSSRtx
+	TxTypeRegular = 0
+	TxTypeSStx    = 1
+	TxTypeSSGen   = 2
+	TxTypeSSRtx   = 3
 )
 
 const (
@@ -226,23 +227,45 @@ func IsStakeBase(tx *dcrutil.Tx) bool {
 	return true
 }
 
-// GetSStxStakeOutputInfo takes an SStx as input and scans through its outputs,
+// MinimalOutput is a struct encoding a minimally sized output for use in parsing
+// stake related information.
+type MinimalOutput struct {
+	PkScript []byte
+	Value    int64
+	Version  uint16
+}
+
+// ConvertToMinimalOutputs converts a transaction to its minimal outputs
+// derivative.
+func ConvertToMinimalOutputs(tx *dcrutil.Tx) []*MinimalOutput {
+	minOuts := make([]*MinimalOutput, len(tx.MsgTx().TxOut))
+	for i, txOut := range tx.MsgTx().TxOut {
+		minOuts[i] = &MinimalOutput{
+			PkScript: txOut.PkScript,
+			Value:    txOut.Value,
+			Version:  txOut.Version,
+		}
+	}
+
+	return minOuts
+}
+
+// SStxStakeOutputInfo takes an SStx as input and scans through its outputs,
 // returning the pubkeyhashs and amounts for any NullDataTy's (future
 // commitments to stake generation rewards).
-func GetSStxStakeOutputInfo(tx *dcrutil.Tx) ([]bool, [][]byte, []int64, []int64,
-	[][]bool, [][]uint16) {
-	msgTx := tx.MsgTx()
-
-	isP2SH := make([]bool, len(msgTx.TxIn))
-	addresses := make([][]byte, len(msgTx.TxIn))
-	amounts := make([]int64, len(msgTx.TxIn))
-	changeAmounts := make([]int64, len(msgTx.TxIn))
-	allSpendRules := make([][]bool, len(msgTx.TxIn))
-	allSpendLimits := make([][]uint16, len(msgTx.TxIn))
+func SStxStakeOutputInfo(outs []*MinimalOutput) ([]bool, [][]byte, []int64,
+	[]int64, [][]bool, [][]uint16) {
+	expectedInLen := len(outs) / 2
+	isP2SH := make([]bool, expectedInLen)
+	addresses := make([][]byte, expectedInLen)
+	amounts := make([]int64, expectedInLen)
+	changeAmounts := make([]int64, expectedInLen)
+	allSpendRules := make([][]bool, expectedInLen)
+	allSpendLimits := make([][]uint16, expectedInLen)
 
 	// Cycle through the inputs and pull the proportional amounts
 	// and commit to PKHs/SHs.
-	for idx, out := range msgTx.TxOut {
+	for idx, out := range outs {
 		// We only care about the outputs where we get proportional
 		// amounts and the PKHs/SHs to send rewards to, which is all
 		// the odd numbered output indexes.
@@ -287,6 +310,14 @@ func GetSStxStakeOutputInfo(tx *dcrutil.Tx) ([]bool, [][]byte, []int64, []int64,
 
 	return isP2SH, addresses, amounts, changeAmounts, allSpendRules,
 		allSpendLimits
+}
+
+// TxSStxStakeOutputInfo takes an SStx as input and scans through its outputs,
+// returning the pubkeyhashs and amounts for any NullDataTy's (future
+// commitments to stake generation rewards).
+func TxSStxStakeOutputInfo(tx *dcrutil.Tx) ([]bool, [][]byte, []int64, []int64,
+	[][]bool, [][]uint16) {
+	return SStxStakeOutputInfo(ConvertToMinimalOutputs(tx))
 }
 
 // AddrFromSStxPkScrCommitment extracts a P2SH or P2PKH address from a
@@ -336,10 +367,10 @@ func AmountFromSStxPkScrCommitment(pkScript []byte) (dcrutil.Amount, error) {
 	return dcrutil.Amount(binary.LittleEndian.Uint64(amtEncoded)), nil
 }
 
-// GetSSGenStakeOutputInfo takes an SSGen tx as input and scans through its
+// TxSSGenStakeOutputInfo takes an SSGen tx as input and scans through its
 // outputs, returning the amount of the output and the PKH or SH that it was
 // sent to.
-func GetSSGenStakeOutputInfo(tx *dcrutil.Tx, params *chaincfg.Params) ([]bool,
+func TxSSGenStakeOutputInfo(tx *dcrutil.Tx, params *chaincfg.Params) ([]bool,
 	[][]byte, []int64, error) {
 	msgTx := tx.MsgTx()
 	numOutputsInSSGen := len(msgTx.TxOut)
@@ -384,9 +415,9 @@ func GetSSGenStakeOutputInfo(tx *dcrutil.Tx, params *chaincfg.Params) ([]bool,
 	return isP2SH, addresses, amounts, nil
 }
 
-// GetSSGenBlockVotedOn takes an SSGen tx and returns the block voted on in the
+// SSGenBlockVotedOn takes an SSGen tx and returns the block voted on in the
 // first OP_RETURN by hash and height.
-func GetSSGenBlockVotedOn(tx *dcrutil.Tx) (chainhash.Hash, uint32, error) {
+func SSGenBlockVotedOn(tx *dcrutil.Tx) (chainhash.Hash, uint32, error) {
 	msgTx := tx.MsgTx()
 
 	// Get the block header hash.
@@ -401,9 +432,9 @@ func GetSSGenBlockVotedOn(tx *dcrutil.Tx) (chainhash.Hash, uint32, error) {
 	return *blockSha, height, nil
 }
 
-// GetSSGenVoteBits takes an SSGen tx as input and scans through its
+// SSGenVoteBits takes an SSGen tx as input and scans through its
 // outputs, returning the VoteBits of the index 1 output.
-func GetSSGenVoteBits(tx *dcrutil.Tx) uint16 {
+func SSGenVoteBits(tx *dcrutil.Tx) uint16 {
 	msgTx := tx.MsgTx()
 
 	votebits := binary.LittleEndian.Uint16(msgTx.TxOut[1].PkScript[2:4])
@@ -411,9 +442,9 @@ func GetSSGenVoteBits(tx *dcrutil.Tx) uint16 {
 	return votebits
 }
 
-// GetSSRtxStakeOutputInfo takes an SSRtx tx as input and scans through its
+// TxSSRtxStakeOutputInfo takes an SSRtx tx as input and scans through its
 // outputs, returning the amount of the output and the pkh that it was sent to.
-func GetSSRtxStakeOutputInfo(tx *dcrutil.Tx, params *chaincfg.Params) ([]bool,
+func TxSSRtxStakeOutputInfo(tx *dcrutil.Tx, params *chaincfg.Params) ([]bool,
 	[][]byte, []int64, error) {
 	msgTx := tx.MsgTx()
 	numOutputsInSSRtx := len(msgTx.TxOut)
@@ -455,13 +486,13 @@ func GetSSRtxStakeOutputInfo(tx *dcrutil.Tx, params *chaincfg.Params) ([]bool,
 	return isP2SH, addresses, amounts, nil
 }
 
-// GetSStxNullOutputAmounts takes an array of input amounts, change amounts, and a
+// SStxNullOutputAmounts takes an array of input amounts, change amounts, and a
 // ticket purchase amount, calculates the adjusted proportion from the purchase
 // amount, stores it in an array, then returns the array. That is, for any given
 // SStx, this function calculates the proportional outputs that any single user
 // should receive.
 // Returns: (1) Fees (2) Output Amounts (3) Error
-func GetSStxNullOutputAmounts(amounts []int64,
+func SStxNullOutputAmounts(amounts []int64,
 	changeAmounts []int64,
 	amountTicket int64) (int64, []int64, error) {
 	lengthAmounts := len(amounts)
@@ -501,14 +532,12 @@ func GetSStxNullOutputAmounts(amounts []int64,
 	return fees, contribAmounts, nil
 }
 
-// GetStakeRewards takes a list of SStx adjusted output amounts, the amount used
+// CalculateRewards takes a list of SStx adjusted output amounts, the amount used
 // to purchase that ticket, and the reward for an SSGen tx and subsequently
 // generates what the outputs should be in the SSGen tx. If used for calculating
 // the outputs for an SSRtx, pass 0 for subsidy.
-func GetStakeRewards(amounts []int64,
-	amountTicket int64,
+func CalculateRewards(amounts []int64, amountTicket int64,
 	subsidy int64) []int64 {
-
 	outputsAmounts := make([]int64, len(amounts))
 
 	// SSGen handling
@@ -567,7 +596,7 @@ func VerifySStxAmounts(sstxAmts []int64, sstxCalcAmts []int64) error {
 
 	for idx, amt := range sstxCalcAmts {
 		if !(amt == sstxAmts[idx]) {
-			errStr := fmt.Sprintf("SStx verify error: at index %v incongruent"+
+			errStr := fmt.Sprintf("SStx verify error: at index %v incongruent "+
 				"amt %v in SStx calculated reward and amt %v in "+
 				"SStx", idx, amt, sstxAmts[idx])
 			return stakeRuleError(ErrVerSStxAmts, errStr)

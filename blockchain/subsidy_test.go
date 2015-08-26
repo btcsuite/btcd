@@ -1,5 +1,5 @@
 // Copyright (c) 2013-2015 The btcsuite developers
-// Copyright (c) 2015 The Decred developers
+// Copyright (c) 2015-2016 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -14,6 +14,8 @@ import (
 
 func TestBlockSubsidy(t *testing.T) {
 	mainnet := &chaincfg.MainNetParams
+	subsidyCache := blockchain.NewSubsidyCache(0, mainnet)
+
 	totalSubsidy := mainnet.BlockOneSubsidy()
 	for i := int64(0); ; i++ {
 		// Genesis block or first block.
@@ -30,12 +32,12 @@ func TestBlockSubsidy(t *testing.T) {
 			}
 			height := i - numBlocks
 
-			work := blockchain.CalcBlockWorkSubsidy(height,
+			work := blockchain.CalcBlockWorkSubsidy(subsidyCache, height,
 				mainnet.TicketsPerBlock, mainnet)
-			stake := blockchain.CalcStakeVoteSubsidy(height, mainnet) *
-				int64(mainnet.TicketsPerBlock)
-			tax := blockchain.CalcBlockTaxSubsidy(height, mainnet.TicketsPerBlock,
-				mainnet)
+			stake := blockchain.CalcStakeVoteSubsidy(subsidyCache, height,
+				mainnet) * int64(mainnet.TicketsPerBlock)
+			tax := blockchain.CalcBlockTaxSubsidy(subsidyCache, height,
+				mainnet.TicketsPerBlock, mainnet)
 			if (work + stake + tax) == 0 {
 				break
 			}

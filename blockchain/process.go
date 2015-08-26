@@ -1,5 +1,5 @@
-// Copyright (c) 2013-2014 The btcsuite developers
-// Copyright (c) 2015 The Decred developers
+// Copyright (c) 2013-2016 The btcsuite developers
+// Copyright (c) 2015-2016 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/decred/dcrd/chaincfg/chainhash"
+	database "github.com/decred/dcrd/database2"
 	"github.com/decred/dcrutil"
 )
 
@@ -40,14 +41,22 @@ const (
 
 // blockExists determines whether a block with the given hash exists either in
 // the main chain or any side chains.
+//
+// This function MUST be called with the chain state lock held (for reads).
 func (b *BlockChain) blockExists(hash *chainhash.Hash) (bool, error) {
 	// Check memory chain first (could be main chain or side chain blocks).
 	if _, ok := b.index[*hash]; ok {
 		return true, nil
 	}
 
-	// Check in database (rest of main chain not in memory).
-	return b.db.ExistsSha(hash)
+	// Check in the database.
+	var exists bool
+	err := b.db.View(func(dbTx database.Tx) error {
+		var err error
+		exists, err = dbTx.HasBlock(hash)
+		return err
+	})
+	return exists, err
 }
 
 // processOrphans determines if there are any orphans which depend on the passed
@@ -57,6 +66,8 @@ func (b *BlockChain) blockExists(hash *chainhash.Hash) (bool, error) {
 //
 // The flags do not modify the behavior of this function directly, however they
 // are needed to pass along to maybeAcceptBlock.
+//
+// This function MUST be called with the chain state lock held (for writes).
 func (b *BlockChain) processOrphans(hash *chainhash.Hash, flags BehaviorFlags) error {
 	// Start with processing at least the passed hash.  Leave a little room
 	// for additional orphan blocks that need to be processed without
@@ -114,11 +125,12 @@ func (b *BlockChain) processOrphans(hash *chainhash.Hash, flags BehaviorFlags) e
 // It returns a first bool specifying whether or not the block is on on a fork
 // or on a side chain. True means it's on the main chain.
 //
-// It returns a second bool which indicates whether or not the block is an orphan
-// and any errors that occurred during processing.  The returned bool is only
-// valid when the error is nil.
+// This function is safe for concurrent access.
 func (b *BlockChain) ProcessBlock(block *dcrutil.Block,
 	timeSource MedianTimeSource, flags BehaviorFlags) (bool, bool, error) {
+	b.chainLock.Lock()
+	defer b.chainLock.Unlock()
+
 	fastAdd := flags&BFFastAdd == BFFastAdd
 	dryRun := flags&BFDryRun == BFDryRun
 

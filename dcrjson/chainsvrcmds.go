@@ -698,8 +698,8 @@ func NewValidateAddressCmd(address string) *ValidateAddressCmd {
 
 // VerifyChainCmd defines the verifychain JSON-RPC command.
 type VerifyChainCmd struct {
-	CheckLevel *int32 `jsonrpcdefault:"3"`
-	CheckDepth *int32 `jsonrpcdefault:"288"` // 0 = all
+	CheckLevel *int64 `jsonrpcdefault:"3"`
+	CheckDepth *int64 `jsonrpcdefault:"288"` // 0 = all
 }
 
 // NewVerifyChainCmd returns a new instance which can be used to issue a
@@ -707,7 +707,7 @@ type VerifyChainCmd struct {
 //
 // The parameters which are pointers indicate they are optional.  Passing nil
 // for optional parameters will use the default value.
-func NewVerifyChainCmd(checkLevel, checkDepth *int32) *VerifyChainCmd {
+func NewVerifyChainCmd(checkLevel, checkDepth *int64) *VerifyChainCmd {
 	return &VerifyChainCmd{
 		CheckLevel: checkLevel,
 		CheckDepth: checkDepth,

@@ -1,4 +1,4 @@
-// Copyright (c) 2015 The Decred developers
+// Copyright (c) 2015-2016 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -26,14 +26,15 @@ import (
 	"fmt"
 	"io/ioutil"
 	"math"
+	"math/big"
 	"path/filepath"
 	"sort"
 	"sync"
 
+	"github.com/decred/dcrd/blockchain/dbnamespace"
 	"github.com/decred/dcrd/chaincfg"
 	"github.com/decred/dcrd/chaincfg/chainhash"
-	"github.com/decred/dcrd/database"
-	"github.com/decred/dcrd/txscript"
+	database "github.com/decred/dcrd/database2"
 	"github.com/decred/dcrutil"
 )
 
@@ -230,9 +231,136 @@ func (tm *TicketMaps) GobDecode(buf []byte) error {
 type TicketDB struct {
 	mtx                sync.Mutex
 	maps               TicketMaps
-	database           database.Db
+	database           database.DB
 	chainParams        *chaincfg.Params
 	StakeEnabledHeight int64
+}
+
+// bestChainState represents the data to be stored the database for the current
+// best chain state.
+type bestChainState struct {
+	hash         chainhash.Hash
+	height       uint32
+	totalTxns    uint64
+	totalSubsidy int64
+	workSum      *big.Int
+}
+
+// deserializeBestChainState deserializes the passed serialized best chain
+// state.  This is data stored in the chain state bucket and is updated after
+// every block is connected or disconnected form the main chain.
+// block.
+func deserializeBestChainState(serializedData []byte) (bestChainState, error) {
+	// Ensure the serialized data has enough bytes to properly deserialize
+	// the hash, height, total transactions, total subsidy, current subsidy,
+	// and work sum length.
+	expectedMinLen := chainhash.HashSize + 4 + 8 + 8 + 4
+	if len(serializedData) < expectedMinLen {
+		return bestChainState{}, database.Error{
+			ErrorCode: database.ErrCorruption,
+			Description: fmt.Sprintf("corrupt best chain state size; min %v "+
+				"got %v", expectedMinLen, len(serializedData)),
+		}
+	}
+
+	state := bestChainState{}
+	copy(state.hash[:], serializedData[0:chainhash.HashSize])
+	offset := uint32(chainhash.HashSize)
+	state.height = dbnamespace.ByteOrder.Uint32(serializedData[offset : offset+4])
+	offset += 4
+	state.totalTxns = dbnamespace.ByteOrder.Uint64(
+		serializedData[offset : offset+8])
+	offset += 8
+	state.totalSubsidy = int64(dbnamespace.ByteOrder.Uint64(
+		serializedData[offset : offset+8]))
+	offset += 8
+	workSumBytesLen := dbnamespace.ByteOrder.Uint32(
+		serializedData[offset : offset+4])
+	offset += 4
+
+	// Ensure the serialized data has enough bytes to deserialize the work
+	// sum.
+	if uint32(len(serializedData[offset:])) < workSumBytesLen {
+		return bestChainState{}, database.Error{
+			ErrorCode: database.ErrCorruption,
+			Description: fmt.Sprintf("corrupt work sum size; want %v "+
+				"got %v", workSumBytesLen, uint32(len(serializedData[offset:]))),
+		}
+	}
+	workSumBytes := serializedData[offset : offset+workSumBytesLen]
+	state.workSum = new(big.Int).SetBytes(workSumBytes)
+
+	return state, nil
+}
+
+// NewestSha returns the newest hash and height as recorded in the database
+// of the blockchain.
+func (tmdb *TicketDB) NewestSha() (*chainhash.Hash, int64, error) {
+	var state bestChainState
+	err := tmdb.database.View(func(dbTx database.Tx) error {
+		// Fetch the stored chain state from the database metadata.
+		// When it doesn't exist, it means the database hasn't been
+		// initialized for use with chain yet, so break out now to allow
+		// that to happen under a writable database transaction.
+		serializedData := dbTx.Metadata().Get(dbnamespace.ChainStateKeyName)
+		if serializedData == nil {
+			return nil
+		}
+
+		var err error
+		state, err = deserializeBestChainState(serializedData)
+		if err != nil {
+			return err
+		}
+
+		return nil
+	})
+
+	return &state.hash, int64(state.height), err
+}
+
+// FetchBlockShaByHeight queries the blockchain's database to find a block's hash
+// for some height.
+func (tmdb *TicketDB) FetchBlockShaByHeight(height int64) (*chainhash.Hash, error) {
+	var hash chainhash.Hash
+	err := tmdb.database.View(func(dbTx database.Tx) error {
+		var serializedHeight [4]byte
+		dbnamespace.ByteOrder.PutUint32(serializedHeight[:], uint32(height))
+
+		meta := dbTx.Metadata()
+		heightIndex := meta.Bucket(dbnamespace.HeightIndexBucketName)
+		hashBytes := heightIndex.Get(serializedHeight[:])
+		if hashBytes == nil {
+			return fmt.Errorf("no block at height %d exists", height)
+		}
+
+		copy(hash[:], hashBytes)
+		return nil
+	})
+
+	return &hash, err
+}
+
+// FetchBlockBySha fetches a block from a given hash using the blockchain
+// database.
+func (tmdb *TicketDB) FetchBlockBySha(hash *chainhash.Hash) (*dcrutil.Block, error) {
+	var block *dcrutil.Block
+	err := tmdb.database.View(func(dbTx database.Tx) error {
+		rawBytes, err := dbTx.FetchBlock(hash)
+		if err != nil {
+			return err
+		}
+		block, err = dcrutil.NewBlockFromBytes(rawBytes)
+		if err != nil {
+			return err
+		}
+
+		return nil
+	})
+
+	block.SetHeight(int64(block.MsgBlock().Header.Height))
+
+	return block, err
 }
 
 // Initialize allocates buckets for each ticket number in ticketMap and buckets
@@ -242,7 +370,7 @@ type TicketDB struct {
 // WARNING: Height should be 0 for all non-debug uses.
 //
 // This function is safe for concurrent access.
-func (tmdb *TicketDB) Initialize(np *chaincfg.Params, db database.Db) {
+func (tmdb *TicketDB) Initialize(np *chaincfg.Params, db database.DB) error {
 	tmdb.mtx.Lock()
 	defer tmdb.mtx.Unlock()
 
@@ -255,10 +383,28 @@ func (tmdb *TicketDB) Initialize(np *chaincfg.Params, db database.Db) {
 
 	tmdb.StakeEnabledHeight = np.StakeEnabledHeight
 
-	// Fill in live ticket buckets
+	// Fill in live ticket buckets.
 	for i := 0; i < BucketsSize; i++ {
 		tmdb.maps.ticketMap[uint8(i)] = make(SStxMemMap)
 	}
+
+	// Get the latest block height from the db.
+	_, curHeight, err := tmdb.NewestSha()
+	if err != nil {
+		return err
+	}
+	log.Infof("Block ticket database initialized empty")
+
+	if curHeight > 0 {
+		log.Infof("Db non-empty, resyncing ticket DB")
+		err := tmdb.RescanTicketDB()
+
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 // maybeInsertBlock creates a new bucket in the spentTicketMap; this should be
@@ -317,7 +463,7 @@ func (tmdb *TicketDB) GetTopBlock() int64 {
 //
 // This function is safe for concurrent access.
 func (tmdb *TicketDB) LoadTicketDBs(tmsPath, tmsLoc string, np *chaincfg.Params,
-	db database.Db) error {
+	db database.DB) error {
 	tmdb.mtx.Lock()
 	defer tmdb.mtx.Unlock()
 
@@ -346,7 +492,7 @@ func (tmdb *TicketDB) LoadTicketDBs(tmsPath, tmsLoc string, np *chaincfg.Params,
 	tmdb.maps = loadedTicketMaps
 
 	// Get the latest block height from the database.
-	_, curHeight, err := tmdb.database.NewestSha()
+	_, curHeight, err := tmdb.NewestSha()
 	if err != nil {
 		return err
 	}
@@ -936,69 +1082,6 @@ func (tmdb *TicketDB) GetLiveTicketBucketData() map[int]int {
 	return ltbd
 }
 
-// GetLiveTicketsInBucketData creates a map indicating the ticket hash and the
-// owner's address for each bucket. Used for an RPC call.
-func (tmdb *TicketDB) GetLiveTicketsInBucketData(
-	bucket uint8) (map[chainhash.Hash]dcrutil.Address, error) {
-	tmdb.mtx.Lock()
-	defer tmdb.mtx.Unlock()
-
-	ltbd := make(map[chainhash.Hash]dcrutil.Address)
-	tickets := tmdb.maps.ticketMap[bucket]
-	for _, ticket := range tickets {
-		// Load the ticket from the database and find the address that it's
-		// going to.
-		txReply, err := tmdb.database.FetchTxBySha(&ticket.SStxHash)
-		if err != nil {
-			return nil, err
-		}
-
-		_, addr, _, err :=
-			txscript.ExtractPkScriptAddrs(txReply[0].Tx.TxOut[0].Version,
-				txReply[0].Tx.TxOut[0].PkScript, tmdb.chainParams)
-		if err != nil {
-			return nil, err
-		}
-		ltbd[ticket.SStxHash] = addr[0]
-	}
-
-	return ltbd, nil
-}
-
-// GetLiveTicketsForAddress gets all currently active tickets for a given
-// address.
-func (tmdb *TicketDB) GetLiveTicketsForAddress(
-	address dcrutil.Address) ([]chainhash.Hash, error) {
-	tmdb.mtx.Lock()
-	defer tmdb.mtx.Unlock()
-
-	var ltfa []chainhash.Hash
-	for i := 0; i < BucketsSize; i++ {
-		for _, ticket := range tmdb.maps.ticketMap[i] {
-			// Load the ticket from the database and find the address that it's
-			// going to.
-			txReply, err := tmdb.database.FetchTxBySha(&ticket.SStxHash)
-			if err != nil {
-				return nil, err
-			}
-
-			_, addr, _, err :=
-				txscript.ExtractPkScriptAddrs(txReply[0].Tx.TxOut[0].Version,
-					txReply[0].Tx.TxOut[0].PkScript, tmdb.chainParams)
-			if err != nil {
-				return nil, err
-			}
-
-			// Compare the HASH160 result and see if it's equal.
-			if bytes.Equal(addr[0].ScriptAddress(), address.ScriptAddress()) {
-				ltfa = append(ltfa, ticket.SStxHash)
-			}
-		}
-	}
-
-	return ltfa, nil
-}
-
 // spendTickets transfers tickets from the ticketMap to the spentTicketMap. Useful
 // when connecting blocks. Also pushes missed tickets to the missed ticket map.
 // usedtickets is a map that contains all tickets that were actually used in SSGen
@@ -1206,12 +1289,12 @@ func (tmdb *TicketDB) revokeTickets(
 // This function MUST be called with the tmdb lock held (for writes).
 func (tmdb *TicketDB) unrevokeTickets(height int64) (SStxMemMap, error) {
 	// Get the block of interest.
-	var hash, errHash = tmdb.database.FetchBlockShaByHeight(height)
+	var hash, errHash = tmdb.FetchBlockShaByHeight(height)
 	if errHash != nil {
 		return nil, errHash
 	}
 
-	var block, errBlock = tmdb.database.FetchBlockBySha(hash)
+	var block, errBlock = tmdb.FetchBlockBySha(hash)
 	if errBlock != nil {
 		return nil, errBlock
 	}
@@ -1319,12 +1402,12 @@ func (tmdb *TicketDB) getNewTicketsFromHeight(height int64) (SStxMemMap, error) 
 
 	matureHeight := height - int64(tmdb.chainParams.TicketMaturity)
 
-	var hash, errHash = tmdb.database.FetchBlockShaByHeight(matureHeight)
+	var hash, errHash = tmdb.FetchBlockShaByHeight(matureHeight)
 	if errHash != nil {
 		return nil, errHash
 	}
 
-	var block, errBlock = tmdb.database.FetchBlockBySha(hash)
+	var block, errBlock = tmdb.FetchBlockBySha(hash)
 	if errBlock != nil {
 		return nil, errBlock
 	}
@@ -1383,8 +1466,8 @@ func (tmdb *TicketDB) pushMatureTicketsAtHeight(height int64) (SStxMemMap, error
 // InsertBlock.  See the comment for InsertBlock for more details.
 //
 // This function MUST be called with the tmdb lock held (for writes).
-func (tmdb *TicketDB) insertBlock(block *dcrutil.Block) (SStxMemMap,
-	SStxMemMap, SStxMemMap, error) {
+func (tmdb *TicketDB) insertBlock(block *dcrutil.Block,
+	parent *dcrutil.Block) (SStxMemMap, SStxMemMap, SStxMemMap, error) {
 
 	height := block.Height()
 	if height < tmdb.StakeEnabledHeight {
@@ -1440,12 +1523,7 @@ func (tmdb *TicketDB) insertBlock(block *dcrutil.Block) (SStxMemMap,
 	}
 
 	// Spend or miss all the necessary tickets and do some sanity checks.
-	parentBlock, err := tmdb.database.FetchBlockBySha(
-		&block.MsgBlock().Header.PrevBlock)
-	if err != nil {
-		return nil, nil, nil, err
-	}
-	spentAndMissedTickets, err := tmdb.spendTickets(parentBlock,
+	spentAndMissedTickets, err := tmdb.spendTickets(parent,
 		usedTickets,
 		spendingHashes)
 	if err != nil {
@@ -1493,13 +1571,13 @@ func (tmdb *TicketDB) insertBlock(block *dcrutil.Block) (SStxMemMap,
 // a consensus failure somehow.
 //
 // This function is safe for concurrent access.
-func (tmdb *TicketDB) InsertBlock(block *dcrutil.Block) (SStxMemMap,
+func (tmdb *TicketDB) InsertBlock(block, parent *dcrutil.Block) (SStxMemMap,
 	SStxMemMap, SStxMemMap, error) {
 
 	tmdb.mtx.Lock()
 	defer tmdb.mtx.Unlock()
 
-	return tmdb.insertBlock(block)
+	return tmdb.insertBlock(block, parent)
 }
 
 // unpushMatureTicketsAtHeight unmatures tickets from TICKET_MATURITY blocks ago by
@@ -1536,8 +1614,9 @@ func (tmdb *TicketDB) unpushMatureTicketsAtHeight(height int64) (SStxMemMap,
 func (tmdb *TicketDB) removeBlockToHeight(height int64) (map[int64]SStxMemMap,
 	map[int64]SStxMemMap, map[int64]SStxMemMap, error) {
 	if height < tmdb.StakeEnabledHeight {
-		return nil, nil, nil, fmt.Errorf("TicketDB Error: tried to remove " +
-			"blocks to before minimum maturation height!")
+		return nil, nil, nil, fmt.Errorf("TicketDB Error: tried to remove "+
+			"blocks to before minimum maturation height (got %v, min %v)!",
+			height, tmdb.StakeEnabledHeight)
 	}
 
 	// Discover the current height
@@ -1601,7 +1680,7 @@ func (tmdb *TicketDB) RemoveBlockToHeight(height int64) (map[int64]SStxMemMap,
 // This function MUST be called with the tmdb lock held (for writes).
 func (tmdb *TicketDB) rescanTicketDB() error {
 	// Get the latest block height from the database.
-	_, height, err := tmdb.database.NewestSha()
+	_, height, err := tmdb.NewestSha()
 	if err != nil {
 		return err
 	}
@@ -1628,12 +1707,12 @@ func (tmdb *TicketDB) rescanTicketDB() error {
 			spendHashes[td.SpendHash] = struct{}{}
 		}
 
-		h, err := tmdb.database.FetchBlockShaByHeight(curTmdbHeight)
+		h, err := tmdb.FetchBlockShaByHeight(curTmdbHeight)
 		if err != nil {
 			return err
 		}
 
-		blCur, err := tmdb.database.FetchBlockBySha(h)
+		blCur, err := tmdb.FetchBlockBySha(h)
 		if err != nil {
 			return err
 		}
@@ -1649,14 +1728,19 @@ func (tmdb *TicketDB) rescanTicketDB() error {
 			}
 		}
 
+		// Handle empty chain exception.
+		if curTmdbHeight <= tmdb.chainParams.StakeEnabledHeight {
+			failedToFindBlock = true
+		}
+
 		// We found a matching block in the database at
 		// curTmdbHeight-1, so sync to it.
 		if !failedToFindBlock {
 			log.Infof("Found a previously good height %v in the old "+
-				"stake database, attempting to sync to tip from it",
-				curTmdbHeight)
+				"stake database, attempting to sync to tip height %v "+
+				"from it", curTmdbHeight, height)
 
-			// Remove the top block.
+			// Remove the top block if we can.
 			_, _, _, err = tmdb.removeBlockToHeight(curTmdbHeight - 1)
 			if err != nil {
 				return err
@@ -1665,17 +1749,22 @@ func (tmdb *TicketDB) rescanTicketDB() error {
 			// Reinsert the top block and sync to the best chain
 			// height.
 			for i := curTmdbHeight; i <= height; i++ {
-				h, err := tmdb.database.FetchBlockShaByHeight(i)
+				h, err := tmdb.FetchBlockShaByHeight(i)
 				if err != nil {
 					return err
 				}
 
-				bl, err := tmdb.database.FetchBlockBySha(h)
+				bl, err := tmdb.FetchBlockBySha(h)
 				if err != nil {
 					return err
 				}
 
-				_, _, _, err = tmdb.insertBlock(bl)
+				pa, err := tmdb.FetchBlockBySha(&bl.MsgBlock().Header.PrevBlock)
+				if err != nil {
+					return err
+				}
+
+				_, _, _, err = tmdb.insertBlock(bl, pa)
 				if err != nil {
 					return err
 				}
@@ -1704,17 +1793,23 @@ func (tmdb *TicketDB) rescanTicketDB() error {
 	for curHeight := tmdb.StakeEnabledHeight; curHeight <= height; curHeight++ {
 		// Go through the winners and votes for each block and use those to spend
 		// tickets in the ticket db.
-		hash, errHash := tmdb.database.FetchBlockShaByHeight(curHeight)
+		hash, errHash := tmdb.FetchBlockShaByHeight(curHeight)
 		if errHash != nil {
 			return errHash
 		}
 
-		block, errBlock := tmdb.database.FetchBlockBySha(hash)
+		block, errBlock := tmdb.FetchBlockBySha(hash)
 		if errBlock != nil {
 			return errBlock
 		}
 
-		_, _, _, err = tmdb.insertBlock(block)
+		parent, errBlock :=
+			tmdb.FetchBlockBySha(&block.MsgBlock().Header.PrevBlock)
+		if errBlock != nil {
+			return errBlock
+		}
+
+		_, _, _, err = tmdb.insertBlock(block, parent)
 		if err != nil {
 			return err
 		}

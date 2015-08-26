@@ -1,5 +1,5 @@
-// Copyright (c) 2013-2014 The btcsuite developers
-// Copyright (c) 2015 The Decred developers
+// Copyright (c) 2013-2016 The btcsuite developers
+// Copyright (c) 2015-2016 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -17,18 +17,23 @@ import (
 	"github.com/decred/dcrd/blockchain"
 	"github.com/decred/dcrd/blockchain/stake"
 	"github.com/decred/dcrd/chaincfg"
-	"github.com/decred/dcrd/database"
-	_ "github.com/decred/dcrd/database/ldb"
+	"github.com/decred/dcrd/chaincfg/chainhash"
 	_ "github.com/decred/dcrd/database/memdb"
+	database "github.com/decred/dcrd/database2"
+	_ "github.com/decred/dcrd/database2/ffldb"
 	"github.com/decred/dcrd/wire"
-	"github.com/decred/dcrutil"
 )
 
-// testDbType is the database backend type to use for the tests.
-const testDbType = "leveldb"
+const (
+	// testDbType is the database backend type to use for the tests.
+	testDbType = "ffldb"
 
-// testDbRoot is the root directory used to create all test databases.
-const testDbRoot = "testdbs"
+	// testDbRoot is the root directory used to create all test databases.
+	testDbRoot = "testdbs"
+
+	// blockDataNet is the expected network in the test block data.
+	blockDataNet = wire.MainNet
+)
 
 // filesExists returns whether or not the named file or directory exists.
 func fileExists(name string) bool {
@@ -43,9 +48,9 @@ func fileExists(name string) bool {
 // isSupportedDbType returns whether or not the passed database type is
 // currently supported.
 func isSupportedDbType(dbType string) bool {
-	supportedDBs := database.SupportedDBs()
-	for _, sDbType := range supportedDBs {
-		if dbType == sDbType {
+	supportedDrivers := database.SupportedDrivers()
+	for _, driver := range supportedDrivers {
+		if dbType == driver {
 			return true
 		}
 	}
@@ -63,12 +68,12 @@ func chainSetup(dbName string, params *chaincfg.Params) (*blockchain.BlockChain,
 
 	// Handle memory database specially since it doesn't need the disk
 	// specific handling.
-	var db database.Db
+	var db database.DB
 	tmdb := new(stake.TicketDB)
 
 	var teardown func()
 	if testDbType == "memdb" {
-		ndb, err := database.CreateDB(testDbType)
+		ndb, err := database.Create(testDbType)
 		if err != nil {
 			return nil, nil, fmt.Errorf("error creating db: %v", err)
 		}
@@ -93,7 +98,7 @@ func chainSetup(dbName string, params *chaincfg.Params) (*blockchain.BlockChain,
 		// Create a new database to store the accepted blocks into.
 		dbPath := filepath.Join(testDbRoot, dbName)
 		_ = os.RemoveAll(dbPath)
-		ndb, err := database.CreateDB(testDbType, dbPath)
+		ndb, err := database.Create(testDbType, dbPath, blockDataNet)
 		if err != nil {
 			return nil, nil, fmt.Errorf("error creating db: %v", err)
 		}
@@ -102,45 +107,44 @@ func chainSetup(dbName string, params *chaincfg.Params) (*blockchain.BlockChain,
 		// Setup a teardown function for cleaning up.  This function is
 		// returned to the caller to be invoked when it is done testing.
 		teardown = func() {
-			dbVersionPath := filepath.Join(testDbRoot, dbName+".ver")
 			tmdb.Close()
-			db.Sync()
 			db.Close()
 			os.RemoveAll(dbPath)
-			os.Remove(dbVersionPath)
 			os.RemoveAll(testDbRoot)
 		}
 	}
 
-	// Insert the main network genesis block.  This is part of the initial
-	// database setup.
-	genesisBlock := dcrutil.NewBlock(params.GenesisBlock)
-	genesisBlock.SetHeight(int64(0))
-	_, err := db.InsertBlock(genesisBlock)
+	// Create the main chain instance.
+	chain, err := blockchain.New(&blockchain.Config{
+		DB:          db,
+		TMDB:        tmdb,
+		ChainParams: params,
+	})
+
 	if err != nil {
 		teardown()
-		err := fmt.Errorf("failed to insert genesis block: %v", err)
+		err := fmt.Errorf("failed to create chain instance: %v", err)
+		return nil, nil, err
+	}
+	// Start the ticket database.
+	tmdb.Initialize(params, db)
+	err = tmdb.RescanTicketDB()
+	if err != nil {
 		return nil, nil, err
 	}
 
-	// Start the ticket database.
-	tmdb.Initialize(params, db)
-	tmdb.RescanTicketDB()
-
-	chain := blockchain.New(db, tmdb, params, nil, nil)
 	return chain, teardown, nil
 }
 
-// loadTxStore returns a transaction store loaded from a file.
-func loadTxStore(filename string) (blockchain.TxStore, error) {
-	// The txstore file format is:
-	// <num tx data entries> <tx length> <serialized tx> <blk height>
-	// <num spent bits> <spent bits>
+// loadUtxoView returns a utxo view loaded from a file.
+func loadUtxoView(filename string) (*blockchain.UtxoViewpoint, error) {
+	// The utxostore file format is:
+	// <tx hash><serialized utxo len><serialized utxo>
 	//
-	// All num and length fields are little-endian uint32s.  The spent bits
-	// field is padded to a byte boundary.
+	// The serialized utxo len is a little endian uint32 and the serialized
+	// utxo uses the format described in chainio.go.
 
-	filename = filepath.Join("testdata/", filename)
+	filename = filepath.Join("testdata", filename)
 	fi, err := os.Open(filename)
 	if err != nil {
 		return nil, err
@@ -155,80 +159,40 @@ func loadTxStore(filename string) (blockchain.TxStore, error) {
 	}
 	defer fi.Close()
 
-	// Num of transaction store objects.
-	var numItems uint32
-	if err := binary.Read(r, binary.LittleEndian, &numItems); err != nil {
-		return nil, err
-	}
-
-	txStore := make(blockchain.TxStore)
-	var uintBuf uint32
-	for height := uint32(0); height < numItems; height++ {
-		txD := blockchain.TxData{}
-
-		// Serialized transaction length.
-		err = binary.Read(r, binary.LittleEndian, &uintBuf)
+	view := blockchain.NewUtxoViewpoint()
+	for {
+		// Hash of the utxo entry.
+		var hash chainhash.Hash
+		_, err := io.ReadAtLeast(r, hash[:], len(hash[:]))
 		if err != nil {
-			return nil, err
-		}
-		serializedTxLen := uintBuf
-		if serializedTxLen > wire.MaxBlockPayload {
-			return nil, fmt.Errorf("Read serialized transaction "+
-				"length of %d is larger max allowed %d",
-				serializedTxLen, wire.MaxBlockPayload)
-		}
-
-		// Transaction.
-		var msgTx wire.MsgTx
-		err = msgTx.Deserialize(r)
-		if err != nil {
-			return nil, err
-		}
-		txD.Tx = dcrutil.NewTx(&msgTx)
-
-		// Transaction hash.
-		txHash := msgTx.TxSha()
-		txD.Hash = &txHash
-
-		// Block height the transaction came from.
-		err = binary.Read(r, binary.LittleEndian, &uintBuf)
-		if err != nil {
-			return nil, err
-		}
-		txD.BlockHeight = int64(uintBuf)
-
-		// Num spent bits.
-		err = binary.Read(r, binary.LittleEndian, &uintBuf)
-		if err != nil {
-			return nil, err
-		}
-		numSpentBits := uintBuf
-		numSpentBytes := numSpentBits / 8
-		if numSpentBits%8 != 0 {
-			numSpentBytes++
-		}
-
-		// Packed spent bytes.
-		spentBytes := make([]byte, numSpentBytes)
-		_, err = io.ReadFull(r, spentBytes)
-		if err != nil {
-			return nil, err
-		}
-
-		// Populate spent data based on spent bits.
-		txD.Spent = make([]bool, numSpentBits)
-		for byteNum, spentByte := range spentBytes {
-			for bit := 0; bit < 8; bit++ {
-				if uint32((byteNum*8)+bit) < numSpentBits {
-					if spentByte&(1<<uint(bit)) != 0 {
-						txD.Spent[(byteNum*8)+bit] = true
-					}
-				}
+			// Expected EOF at the right offset.
+			if err == io.EOF {
+				break
 			}
+			return nil, err
 		}
 
-		txStore[*txD.Hash] = &txD
+		// Num of serialize utxo entry bytes.
+		var numBytes uint32
+		err = binary.Read(r, binary.LittleEndian, &numBytes)
+		if err != nil {
+			return nil, err
+		}
+
+		// Serialized utxo entry.
+		serialized := make([]byte, numBytes)
+		_, err = io.ReadAtLeast(r, serialized, int(numBytes))
+		if err != nil {
+			return nil, err
+		}
+
+		// Deserialize it and add it to the view.
+		utxoEntry, err := blockchain.TstDeserializeUtxoEntry(serialized)
+		if err != nil {
+			return nil, err
+		}
+		view.Entries()[hash] = utxoEntry
 	}
 
-	return txStore, nil
+	return view, nil
 }

@@ -1,5 +1,5 @@
-// Copyright (c) 2013-2015 The btcsuite developers
-// Copyright (c) 2015 The Decred developers
+// Copyright (c) 2013-2016 The btcsuite developers
+// Copyright (c) 2015-2016 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -15,6 +15,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math"
 	"strconv"
 	"sync"
 	"time"
@@ -26,7 +27,7 @@ import (
 	"github.com/decred/dcrd/blockchain"
 	"github.com/decred/dcrd/blockchain/stake"
 	"github.com/decred/dcrd/chaincfg/chainhash"
-	"github.com/decred/dcrd/database"
+	database "github.com/decred/dcrd/database2"
 	"github.com/decred/dcrd/dcrjson"
 	"github.com/decred/dcrd/txscript"
 	"github.com/decred/dcrd/wire"
@@ -423,7 +424,7 @@ out:
 				// tx notification requests exist.
 				if len(watchedOutPoints) != 0 || len(watchedAddrs) != 0 {
 					if dcrutil.IsFlagSet16(votebits, dcrutil.BlockValid) {
-						prevblock, err := m.server.server.db.FetchBlockBySha(
+						prevblock, err := m.server.chain.BlockByHash(
 							&msgblock.Header.PrevBlock)
 						if err != nil {
 							rpcsLog.Error("Previous block could not be loaded "+
@@ -2259,10 +2260,10 @@ func rescanBlock(wsc *wsClient, lookups *rescanKeys, blk *dcrutil.Block,
 // verifies that the new range of blocks is on the same fork as a previous
 // range of blocks.  If this condition does not hold true, the JSON-RPC error
 // for an unrecoverable reorganize is returned.
-func recoverFromReorg(db database.Db, minBlock, maxBlock int64,
+func recoverFromReorg(chain *blockchain.BlockChain, minBlock, maxBlock int64,
 	lastBlock *dcrutil.Block) ([]chainhash.Hash, error) {
 
-	hashList, err := db.FetchHeightRange(minBlock, maxBlock)
+	hashList, err := chain.HeightRange(minBlock, maxBlock)
 	if err != nil {
 		rpcsLog.Errorf("Error looking up block range: %v", err)
 		return nil, &dcrjson.RPCError{
@@ -2273,7 +2274,8 @@ func recoverFromReorg(db database.Db, minBlock, maxBlock int64,
 	if lastBlock == nil || len(hashList) == 0 {
 		return hashList, nil
 	}
-	blk, err := db.FetchBlockBySha(&hashList[0])
+
+	blk, err := chain.BlockByHash(&hashList[0])
 	if err != nil {
 		rpcsLog.Errorf("Error looking up possibly reorged block: %v",
 			err)
@@ -2493,14 +2495,14 @@ func handleRescan(wsc *wsClient, icmd interface{}) (interface{}, error) {
 
 	outpoints := make([]*wire.OutPoint, 0, len(cmd.OutPoints))
 	for i := range cmd.OutPoints {
-		blockHash, err := chainhash.NewHashFromStr(cmd.OutPoints[i].Hash)
+		cmdOutpoint := &cmd.OutPoints[i]
+		blockHash, err := chainhash.NewHashFromStr(cmdOutpoint.Hash)
 		if err != nil {
-			return nil, rpcDecodeHexError(cmd.OutPoints[i].Hash)
+			return nil, rpcDecodeHexError(cmdOutpoint.Hash)
 		}
-		index := cmd.OutPoints[i].Index
-		tree := cmd.OutPoints[i].Tree
-		outpoints = append(outpoints, wire.NewOutPoint(blockHash, index,
-			tree)) // Decred TODO
+		outpoint := wire.NewOutPoint(blockHash, cmdOutpoint.Index,
+			cmdOutpoint.Tree)
+		outpoints = append(outpoints, outpoint)
 	}
 
 	numAddrs := len(cmd.Addresses)
@@ -2568,13 +2570,13 @@ func handleRescan(wsc *wsClient, icmd interface{}) (interface{}, error) {
 		lookups.unspent[*outpoint] = struct{}{}
 	}
 
-	db := wsc.server.server.db
+	chain := wsc.server.chain
 
-	minBlockSha, err := chainhash.NewHashFromStr(cmd.BeginBlock)
+	minBlockHash, err := chainhash.NewHashFromStr(cmd.BeginBlock)
 	if err != nil {
 		return nil, rpcDecodeHexError(cmd.BeginBlock)
 	}
-	minBlock, err := db.FetchBlockHeightBySha(minBlockSha)
+	minBlock, err := chain.BlockHeightByHash(minBlockHash)
 	if err != nil {
 		return nil, &dcrjson.RPCError{
 			Code:    dcrjson.ErrRPCBlockNotFound,
@@ -2582,13 +2584,13 @@ func handleRescan(wsc *wsClient, icmd interface{}) (interface{}, error) {
 		}
 	}
 
-	maxBlock := database.AllShas
+	maxBlock := int64(math.MaxInt64)
 	if cmd.EndBlock != nil {
-		maxBlockSha, err := chainhash.NewHashFromStr(*cmd.EndBlock)
+		maxBlockHash, err := chainhash.NewHashFromStr(*cmd.EndBlock)
 		if err != nil {
 			return nil, rpcDecodeHexError(*cmd.EndBlock)
 		}
-		maxBlock, err = db.FetchBlockHeightBySha(maxBlockSha)
+		maxBlock, err = chain.BlockHeightByHash(maxBlockHash)
 		if err != nil {
 			return nil, &dcrjson.RPCError{
 				Code:    dcrjson.ErrRPCBlockNotFound,
@@ -2600,12 +2602,22 @@ func handleRescan(wsc *wsClient, icmd interface{}) (interface{}, error) {
 	// lastBlock tracks the previously-rescanned block.
 	// It equals nil when no previous blocks have been rescanned.
 	var lastBlock *dcrutil.Block
+	var lastBlockHash *chainhash.Hash
 
-	// FetchHeightRange may not return a complete list of block shas for
-	// the given range, so fetch range as many times as necessary.
+	// Instead of fetching all block hashes at once, fetch in smaller chunks
+	// to ensure large rescans consume a limited amount of memory.
 fetchRange:
 	for minBlock < maxBlock {
-		hashList, err := db.FetchHeightRange(minBlock, maxBlock)
+		// Limit the max number of hashes to fetch at once to the
+		// maximum number of items allowed in a single inventory.
+		// This value could be higher since it's not creating inventory
+		// messages, but this mirrors the limiting logic used in the
+		// peer-to-peer protocol.
+		maxLoopBlock := maxBlock
+		if maxLoopBlock-minBlock > wire.MaxInvPerMsg {
+			maxLoopBlock = minBlock + wire.MaxInvPerMsg
+		}
+		hashList, err := chain.HeightRange(minBlock, maxLoopBlock)
 		if err != nil {
 			rpcsLog.Errorf("Error looking up block range: %v", err)
 			return nil, &dcrjson.RPCError{
@@ -2618,7 +2630,7 @@ fetchRange:
 			// The rescan is finished if no blocks hashes for this
 			// range were successfully fetched and a stop block
 			// was provided.
-			if maxBlock != database.AllShas {
+			if maxBlock != math.MaxInt32 {
 				break
 			}
 
@@ -2634,12 +2646,12 @@ fetchRange:
 			// continuous notifications if necessary.  Otherwise,
 			// continue the fetch loop again to rescan the new
 			// blocks (or error due to an irrecoverable reorganize).
-			pauseGuard := wsc.server.server.blockManager.Pause()
-			curHash, _, err := db.NewestSha()
+			blockManager := wsc.server.server.blockManager
+			pauseGuard := blockManager.Pause()
+			best := blockManager.chain.BestSnapshot()
+			curHash := best.Hash
 			again := true
-			lastBlockHash := lastBlock.Sha()
-			if err == nil && (lastBlockHash == nil ||
-				*lastBlockHash == *curHash) {
+			if lastBlockHash == nil || *lastBlockHash == *curHash {
 				again = false
 				n := wsc.server.ntfnMgr
 				n.RegisterSpentRequests(wsc, lookups.unspentSlice())
@@ -2663,11 +2675,13 @@ fetchRange:
 
 	loopHashList:
 		for i := range hashList {
-			blk, err := db.FetchBlockBySha(&hashList[i])
+			blk, err := chain.BlockByHash(&hashList[i])
 			if err != nil {
 				// Only handle reorgs if a block could not be
 				// found for the hash.
-				if err != database.ErrBlockShaMissing {
+				if dbErr, ok := err.(database.Error); !ok ||
+					dbErr.ErrorCode != database.ErrBlockNotFound {
+
 					rpcsLog.Errorf("Error looking up "+
 						"block: %v", err)
 					return nil, &dcrjson.RPCError{
@@ -2679,7 +2693,7 @@ fetchRange:
 
 				// If an absolute max block was specified, don't
 				// attempt to handle the reorg.
-				if maxBlock != database.AllShas {
+				if maxBlock != math.MaxInt64 {
 					rpcsLog.Errorf("Stopping rescan for "+
 						"reorged block %v",
 						cmd.EndBlock)
@@ -2697,8 +2711,8 @@ fetchRange:
 				// before the range was evaluated, as it must be
 				// reevaluated for the new hashList.
 				minBlock += int64(i)
-				hashList, err = recoverFromReorg(db, minBlock,
-					maxBlock, lastBlock)
+				hashList, err = recoverFromReorg(chain,
+					minBlock, maxBlock, lastBlock)
 				if err != nil {
 					return nil, err
 				}
@@ -2723,20 +2737,14 @@ fetchRange:
 
 			// No need to get a parent for the genesis block.
 			if !hashList[i].IsEqual(activeNetParams.GenesisHash) {
-				parent, err = db.FetchBlockBySha(
+				parent, err = wsc.server.chain.BlockByHash(
 					&blk.MsgBlock().Header.PrevBlock)
 			} else {
 				parent = nil
 				err = nil
 			}
 			if err != nil {
-				if err != database.ErrBlockShaMissing {
-					rpcsLog.Errorf("Error looking up "+
-						"block: %v", err)
-					return nil, err
-				}
-
-				if maxBlock != database.AllShas {
+				if maxBlock != math.MaxInt64 {
 					rpcsLog.Errorf("Stopping rescan for "+
 						"reorged block %v",
 						cmd.EndBlock)
@@ -2744,7 +2752,7 @@ fetchRange:
 				}
 
 				minBlock += int64(i)
-				hashList, err = recoverFromReorg(db, minBlock,
+				hashList, err = recoverFromReorg(wsc.server.chain, minBlock,
 					maxBlock, lastBlock)
 				if err != nil {
 					return nil, err
@@ -2811,9 +2819,9 @@ fetchRange:
 	// received before the rescan RPC returns.  Therefore, another method
 	// is needed to safely inform clients that all rescan notifications have
 	// been sent.
-	lastBlockHash := lastBlock.Sha()
+	lastBlockHash = lastBlock.Sha()
 	n := dcrjson.NewRescanFinishedNtfn(lastBlockHash.String(),
-		int32(lastBlock.Height()),
+		lastBlock.Height(),
 		lastBlock.MsgBlock().Header.Timestamp.Unix())
 	if mn, err := dcrjson.MarshalCmd(nil, n); err != nil {
 		rpcsLog.Errorf("Failed to marshal rescan finished "+

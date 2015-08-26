@@ -524,8 +524,12 @@ func GetPreciseSigOpCount(scriptSig, scriptPubKey []byte, bip16 bool) int {
 
 // IsUnspendable returns whether the passed public key script is unspendable, or
 // guaranteed to fail at execution.  This allows inputs to be pruned instantly
-// when entering the UTXO set.
-func IsUnspendable(pkScript []byte) bool {
+// when entering the UTXO set. In Decred, all zero value outputs are unspendable.
+func IsUnspendable(amount int64, pkScript []byte) bool {
+	if amount == 0 {
+		return true
+	}
+
 	pops, err := parseScript(pkScript)
 	if err != nil {
 		return true

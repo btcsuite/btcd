@@ -1,5 +1,5 @@
-// Copyright (c) 2013-2014 The btcsuite developers
-// Copyright (c) 2015 The Decred developers
+// Copyright (c) 2013-2016 The btcsuite developers
+// Copyright (c) 2015-2016 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -12,8 +12,8 @@ import (
 
 	"github.com/btcsuite/btclog"
 	"github.com/decred/dcrd/blockchain"
-	"github.com/decred/dcrd/database"
 	_ "github.com/decred/dcrd/database/ldb"
+	database "github.com/decred/dcrd/database2"
 	"github.com/decred/dcrd/limits"
 )
 
@@ -28,20 +28,19 @@ var (
 )
 
 // loadBlockDB opens the block database and returns a handle to it.
-func loadBlockDB() (database.Db, error) {
+func loadBlockDB() (database.DB, error) {
 	// The database name is based on the database type.
 	dbName := blockDbNamePrefix + "_" + cfg.DbType
-	if cfg.DbType == "sqlite" {
-		dbName = dbName + ".db"
-	}
 	dbPath := filepath.Join(cfg.DataDir, dbName)
 
 	log.Infof("Loading block database from '%s'", dbPath)
-	db, err := database.OpenDB(cfg.DbType, dbPath)
+	db, err := database.Open(cfg.DbType, dbPath, activeNetParams.Net)
 	if err != nil {
 		// Return the error if it's not because the database doesn't
 		// exist.
-		if err != database.ErrDbDoesNotExist {
+		if dbErr, ok := err.(database.Error); !ok || dbErr.ErrorCode !=
+			database.ErrDbDoesNotExist {
+
 			return nil, err
 		}
 
@@ -50,20 +49,13 @@ func loadBlockDB() (database.Db, error) {
 		if err != nil {
 			return nil, err
 		}
-		db, err = database.CreateDB(cfg.DbType, dbPath)
+		db, err = database.Create(cfg.DbType, dbPath, activeNetParams.Net)
 		if err != nil {
 			return nil, err
 		}
 	}
 
-	// Get the latest block height from the database.
-	_, height, err := db.NewestSha()
-	if err != nil {
-		db.Close()
-		return nil, err
-	}
-
-	log.Infof("Block database loaded with block height %d", height)
+	log.Info("Block database loaded")
 	return db, nil
 }
 
@@ -102,7 +94,11 @@ func realMain() error {
 	// Create a block importer for the database and input file and start it.
 	// The done channel returned from start will contain an error if
 	// anything went wrong.
-	importer := newBlockImporter(db, fi)
+	importer, err := newBlockImporter(db, fi)
+	if err != nil {
+		log.Errorf("Failed create block importer: %v", err)
+		return err
+	}
 
 	// Perform the import asynchronously.  This allows blocks to be
 	// processed and read in parallel.  The results channel returned from

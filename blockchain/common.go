@@ -16,7 +16,8 @@ import (
 
 // DebugBlockHeaderString dumps a verbose message containing information about
 // the block header of a block.
-func DebugBlockHeaderString(chainParams *chaincfg.Params, block *dcrutil.Block) string {
+func DebugBlockHeaderString(chainParams *chaincfg.Params,
+	block *dcrutil.Block) string {
 	bh := block.MsgBlock().Header
 
 	var buffer bytes.Buffer
@@ -150,7 +151,7 @@ func DebugMsgTxString(msgTx *wire.MsgTx) string {
 
 	if isSStx {
 		sstxType, sstxPkhs, sstxAmts, _, sstxRules, sstxLimits =
-			stake.GetSStxStakeOutputInfo(tx)
+			stake.TxSStxStakeOutputInfo(tx)
 	}
 
 	var buffer bytes.Buffer
@@ -257,14 +258,14 @@ func DebugMsgTxString(msgTx *wire.MsgTx) string {
 
 		// SSGen block/block height OP_RETURN.
 		if isSSGen && i == 0 {
-			blkHash, blkHeight, _ := stake.GetSSGenBlockVotedOn(tx)
+			blkHash, blkHeight, _ := stake.SSGenBlockVotedOn(tx)
 			str = fmt.Sprintf("SSGen block hash voted on: %v, height: %v\n",
 				blkHash, blkHeight)
 			buffer.WriteString(str)
 		}
 
 		if isSSGen && i == 1 {
-			vb := stake.GetSSGenVoteBits(tx)
+			vb := stake.SSGenVoteBits(tx)
 			str = fmt.Sprintf("SSGen vote bits: %v\n", vb)
 			buffer.WriteString(str)
 		}
@@ -308,7 +309,8 @@ func DebugTicketDataString(td *stake.TicketData) string {
 
 // DebugTicketDBLiveString prints out the number of tickets in each
 // bucket of the ticket database as a string.
-func DebugTicketDBLiveString(tmdb *stake.TicketDB, chainParams *chaincfg.Params) (string, error) {
+func DebugTicketDBLiveString(tmdb *stake.TicketDB,
+	chainParams *chaincfg.Params) (string, error) {
 	var buffer bytes.Buffer
 	buffer.WriteString("\n")
 
@@ -333,7 +335,8 @@ func DebugTicketDBLiveString(tmdb *stake.TicketDB, chainParams *chaincfg.Params)
 // DebugTicketDBLiveBucketString returns a string containing the ticket hashes
 // found in a specific bucket of the live ticket database. If the verbose flag
 // is called, it dumps the contents of the ticket data as well.
-func DebugTicketDBLiveBucketString(tmdb *stake.TicketDB, bucket uint8, verbose bool) (string, error) {
+func DebugTicketDBLiveBucketString(tmdb *stake.TicketDB, bucket uint8,
+	verbose bool) (string, error) {
 	var buffer bytes.Buffer
 
 	str := fmt.Sprintf("Contents of live ticket bucket %v:\n", bucket)
@@ -360,7 +363,8 @@ func DebugTicketDBLiveBucketString(tmdb *stake.TicketDB, bucket uint8, verbose b
 // DebugTicketDBSpentBucketString prints the contents of the spent tickets
 // database bucket indicated to a string that is returned. If the verbose
 // flag is indicated, the contents of each ticket are printed as well.
-func DebugTicketDBSpentBucketString(tmdb *stake.TicketDB, height int64, verbose bool) (string, error) {
+func DebugTicketDBSpentBucketString(tmdb *stake.TicketDB, height int64,
+	verbose bool) (string, error) {
 	var buffer bytes.Buffer
 
 	str := fmt.Sprintf("Contents of spent ticket bucket height %v:\n", height)
@@ -393,7 +397,8 @@ func DebugTicketDBSpentBucketString(tmdb *stake.TicketDB, height int64, verbose 
 // DebugTicketDBMissedString prints out the contents of the missed ticket
 // database to a string. If verbose is indicated, the ticket data itself
 // is printed along with the ticket hashes.
-func DebugTicketDBMissedString(tmdb *stake.TicketDB, verbose bool) (string, error) {
+func DebugTicketDBMissedString(tmdb *stake.TicketDB, verbose bool) (string,
+	error) {
 	var buffer bytes.Buffer
 
 	str := fmt.Sprintf("Contents of missed ticket database:\n")
@@ -443,27 +448,155 @@ func writeTicketDataToBuf(buf *bytes.Buffer, td *stake.TicketData) {
 	}
 }
 
-// DebugTxStoreData returns a string containing information about the data
-// stored in the given TxStore.
-func DebugTxStoreData(txs TxStore) string {
-	if txs == nil {
+// DebugUtxoEntryData returns a string containing information about the data
+// stored in the given UtxoEntry.
+func DebugUtxoEntryData(hash chainhash.Hash, utx *UtxoEntry) string {
+	var buffer bytes.Buffer
+	str := fmt.Sprintf("Hash: %v\n", hash)
+	buffer.WriteString(str)
+	if utx == nil {
+		str := fmt.Sprintf("MISSING\n\n")
+		buffer.WriteString(str)
+		return buffer.String()
+	}
+
+	str = fmt.Sprintf("Height: %v\n", utx.height)
+	buffer.WriteString(str)
+	str = fmt.Sprintf("Index: %v\n", utx.index)
+	buffer.WriteString(str)
+	str = fmt.Sprintf("TxVersion: %v\n", utx.txVersion)
+	buffer.WriteString(str)
+	str = fmt.Sprintf("TxType: %v\n", utx.txType)
+	buffer.WriteString(str)
+	str = fmt.Sprintf("IsCoinbase: %v\n", utx.isCoinBase)
+	buffer.WriteString(str)
+	str = fmt.Sprintf("HasExpiry: %v\n", utx.hasExpiry)
+	buffer.WriteString(str)
+	str = fmt.Sprintf("FullySpent: %v\n", utx.IsFullySpent())
+	buffer.WriteString(str)
+	str = fmt.Sprintf("StakeExtra: %x\n\n", utx.stakeExtra)
+	buffer.WriteString(str)
+
+	outputOrdered := make([]int, 0, len(utx.sparseOutputs))
+	for outputIndex := range utx.sparseOutputs {
+		outputOrdered = append(outputOrdered, int(outputIndex))
+	}
+	sort.Ints(outputOrdered)
+	for _, idx := range outputOrdered {
+		utxo := utx.sparseOutputs[uint32(idx)]
+		str = fmt.Sprintf("Output index: %v\n", idx)
+		buffer.WriteString(str)
+		str = fmt.Sprintf("Amount: %v\n", utxo.amount)
+		buffer.WriteString(str)
+		str = fmt.Sprintf("ScriptVersion: %v\n", utxo.scriptVersion)
+		buffer.WriteString(str)
+		str = fmt.Sprintf("Script: %x\n", utxo.pkScript)
+		buffer.WriteString(str)
+		str = fmt.Sprintf("Spent: %v\n", utxo.spent)
+		buffer.WriteString(str)
+	}
+	str = fmt.Sprintf("\n")
+	buffer.WriteString(str)
+
+	return buffer.String()
+}
+
+// DebugUtxoViewpointData returns a string containing information about the data
+// stored in the given UtxoView.
+func DebugUtxoViewpointData(uv *UtxoViewpoint) string {
+	if uv == nil {
 		return ""
 	}
 
 	var buffer bytes.Buffer
 
-	for _, txd := range txs {
-		str := fmt.Sprintf("Hash: %v\n", txd.Hash)
+	for hash, utx := range uv.entries {
+		buffer.WriteString(DebugUtxoEntryData(hash, utx))
+	}
+
+	return buffer.String()
+}
+
+// DebugStxoData returns a string containing information about the data
+// stored in the given STXO.
+func DebugStxoData(stx *spentTxOut) string {
+	if stx == nil {
+		return ""
+	}
+
+	var buffer bytes.Buffer
+
+	str := fmt.Sprintf("amount: %v\n", stx.amount)
+	buffer.WriteString(str)
+	str = fmt.Sprintf("scriptVersion: %v\n", stx.scriptVersion)
+	buffer.WriteString(str)
+	str = fmt.Sprintf("pkScript: %x\n", stx.pkScript)
+	buffer.WriteString(str)
+	str = fmt.Sprintf("compressed: %v\n", stx.compressed)
+	buffer.WriteString(str)
+	str = fmt.Sprintf("stakeExtra: %x\n", stx.stakeExtra)
+	buffer.WriteString(str)
+	str = fmt.Sprintf("txVersion: %v\n", stx.txVersion)
+	buffer.WriteString(str)
+	str = fmt.Sprintf("height: %v\n", stx.height)
+	buffer.WriteString(str)
+	str = fmt.Sprintf("index: %v\n", stx.index)
+	buffer.WriteString(str)
+	str = fmt.Sprintf("isCoinbase: %v\n", stx.isCoinBase)
+	buffer.WriteString(str)
+	str = fmt.Sprintf("hasExpiry: %v\n", stx.hasExpiry)
+	buffer.WriteString(str)
+	str = fmt.Sprintf("txType: %v\n", stx.txType)
+	buffer.WriteString(str)
+	str = fmt.Sprintf("fullySpent: %v\n", stx.txFullySpent)
+	buffer.WriteString(str)
+
+	str = fmt.Sprintf("\n")
+	buffer.WriteString(str)
+
+	return buffer.String()
+}
+
+// DebugStxosData returns a string containing information about the data
+// stored in the given slice of STXOs.
+func DebugStxosData(stxs []spentTxOut) string {
+	if stxs == nil {
+		return ""
+	}
+	var buffer bytes.Buffer
+
+	// Iterate backwards.
+	var str string
+	for i := len(stxs) - 1; i >= 0; i-- {
+		str = fmt.Sprintf("STX index %v\n", i)
 		buffer.WriteString(str)
-		str = fmt.Sprintf("Height: %v\n", txd.BlockHeight)
+		str = fmt.Sprintf("amount: %v\n", stxs[i].amount)
 		buffer.WriteString(str)
-		str = fmt.Sprintf("Tx: %v\n", txd.Tx)
+		str = fmt.Sprintf("scriptVersion: %v\n", stxs[i].scriptVersion)
 		buffer.WriteString(str)
-		str = fmt.Sprintf("Spent: %v\n", txd.Spent)
+		str = fmt.Sprintf("pkScript: %x\n", stxs[i].pkScript)
 		buffer.WriteString(str)
-		str = fmt.Sprintf("Err: %v\n\n", txd.Err)
+		str = fmt.Sprintf("compressed: %v\n", stxs[i].compressed)
+		buffer.WriteString(str)
+		str = fmt.Sprintf("stakeExtra: %x\n", stxs[i].stakeExtra)
+		buffer.WriteString(str)
+		str = fmt.Sprintf("txVersion: %v\n", stxs[i].txVersion)
+		buffer.WriteString(str)
+		str = fmt.Sprintf("height: %v\n", stxs[i].height)
+		buffer.WriteString(str)
+		str = fmt.Sprintf("index: %v\n", stxs[i].index)
+		buffer.WriteString(str)
+		str = fmt.Sprintf("isCoinbase: %v\n", stxs[i].isCoinBase)
+		buffer.WriteString(str)
+		str = fmt.Sprintf("hasExpiry: %v\n", stxs[i].hasExpiry)
+		buffer.WriteString(str)
+		str = fmt.Sprintf("txType: %v\n", stxs[i].txType)
+		buffer.WriteString(str)
+		str = fmt.Sprintf("fullySpent: %v\n\n", stxs[i].txFullySpent)
 		buffer.WriteString(str)
 	}
+	str = fmt.Sprintf("\n")
+	buffer.WriteString(str)
 
 	return buffer.String()
 }
@@ -476,7 +609,8 @@ func DebugTxStoreData(txs TxStore) string {
 // and (3) missed tickets.
 // Do NOT use on mainnet or in production. For debug use only! Make sure
 // the blockchain is frozen when you call this function.
-func TicketDbThumbprint(tmdb *stake.TicketDB, chainParams *chaincfg.Params) ([]*chainhash.Hash, error) {
+func TicketDbThumbprint(tmdb *stake.TicketDB,
+	chainParams *chaincfg.Params) ([]*chainhash.Hash, error) {
 	// Container for the three master hashes to go into.
 	dbThumbprints := make([]*chainhash.Hash, 3, 3)
 
@@ -561,84 +695,4 @@ func TicketDbThumbprint(tmdb *stake.TicketDB, chainParams *chaincfg.Params) ([]*
 	dbThumbprints[2] = missedThumbprint
 
 	return dbThumbprints, nil
-}
-
-// findWhereDoubleSpent determines where a tx was previously doublespent.
-// VERY INTENSIVE BLOCKCHAIN SCANNING, USE TO DEBUG SIMULATED BLOCKCHAINS
-// ONLY.
-func (b *BlockChain) findWhereDoubleSpent(block *dcrutil.Block) error {
-	height := int64(1)
-	heightEnd := block.Height()
-
-	hashes, err := b.db.FetchHeightRange(height, heightEnd)
-	if err != nil {
-		return err
-	}
-
-	var allTxs []*dcrutil.Tx
-	txs := block.Transactions()[1:]
-	stxs := block.STransactions()
-	allTxs = append(txs, stxs...)
-
-	for _, hash := range hashes {
-		curBlock, err := b.getBlockFromHash(&hash)
-		if err != nil {
-			return err
-		}
-		log.Errorf("Cur block %v", curBlock.Height())
-
-		for _, localTx := range allTxs {
-			for _, localTxIn := range localTx.MsgTx().TxIn {
-				for _, tx := range curBlock.Transactions()[1:] {
-					for _, txIn := range tx.MsgTx().TxIn {
-						if txIn.PreviousOutPoint == localTxIn.PreviousOutPoint {
-							log.Errorf("Double spend of {hash: %v, idx: %v,"+
-								" tree: %b}, previously found in tx %v "+
-								"of block %v txtree regular",
-								txIn.PreviousOutPoint.Hash,
-								txIn.PreviousOutPoint.Index,
-								txIn.PreviousOutPoint.Tree,
-								tx.Sha(),
-								hash)
-						}
-					}
-				}
-
-				for _, tx := range curBlock.STransactions() {
-					for _, txIn := range tx.MsgTx().TxIn {
-						if txIn.PreviousOutPoint == localTxIn.PreviousOutPoint {
-							log.Errorf("Double spend of {hash: %v, idx: %v,"+
-								" tree: %b}, previously found in tx %v "+
-								"of block %v txtree stake\n",
-								txIn.PreviousOutPoint.Hash,
-								txIn.PreviousOutPoint.Index,
-								txIn.PreviousOutPoint.Tree,
-								tx.Sha(),
-								hash)
-						}
-					}
-				}
-			}
-		}
-	}
-
-	for _, localTx := range stxs {
-		for _, localTxIn := range localTx.MsgTx().TxIn {
-			for _, tx := range txs {
-				for _, txIn := range tx.MsgTx().TxIn {
-					if txIn.PreviousOutPoint == localTxIn.PreviousOutPoint {
-						log.Errorf("Double spend of {hash: %v, idx: %v,"+
-							" tree: %b}, previously found in tx %v "+
-							"of cur block stake txtree\n",
-							txIn.PreviousOutPoint.Hash,
-							txIn.PreviousOutPoint.Index,
-							txIn.PreviousOutPoint.Tree,
-							tx.Sha())
-					}
-				}
-			}
-		}
-	}
-
-	return nil
 }

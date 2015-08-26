@@ -1,4 +1,4 @@
-// Copyright (c) 2015 The Decred developers
+// Copyright (c) 2015-2016 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -17,11 +17,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/decred/dcrd/blockchain"
 	"github.com/decred/dcrd/blockchain/stake"
 	"github.com/decred/dcrd/chaincfg"
 	"github.com/decred/dcrd/chaincfg/chainhash"
-	"github.com/decred/dcrd/database"
-	_ "github.com/decred/dcrd/database/ldb"
 	"github.com/decred/dcrd/wire"
 	"github.com/decred/dcrutil"
 )
@@ -62,15 +61,14 @@ func TestTicketDB(t *testing.T) {
 	// Declare some useful variables
 	testBCHeight := int64(168)
 
-	// Set up a DB
-	database, err := database.CreateDB("leveldb", "ticketdb_test")
+	// Set up a blockchain
+	chain, teardownFunc, err := chainSetup("ticketdbunittests",
+		simNetParams)
 	if err != nil {
-		t.Errorf("Db create error: %v", err.Error())
+		t.Errorf("Failed to setup chain instance: %v", err)
+		return
 	}
-
-	// Make a new tmdb to fill with dummy live and used tickets
-	var tmdb stake.TicketDB
-	tmdb.Initialize(simNetParams, database)
+	defer teardownFunc()
 
 	filename := filepath.Join("..", "/../blockchain/testdata", "blocks0to168.bz2")
 	fi, err := os.Open(filename)
@@ -83,29 +81,35 @@ func TestTicketDB(t *testing.T) {
 
 	// Create decoder from the buffer and a map to store the data
 	bcDecoder := gob.NewDecoder(bcBuf)
-	blockchain := make(map[int64][]byte)
+	testBlockchain := make(map[int64][]byte)
 
 	// Decode the blockchain into the map
-	if err := bcDecoder.Decode(&blockchain); err != nil {
+	if err := bcDecoder.Decode(&testBlockchain); err != nil {
 		t.Errorf("error decoding test blockchain")
 	}
 
+	timeSource := blockchain.NewMedianTime()
 	var CopyOfMapsAtBlock50, CopyOfMapsAtBlock168 stake.TicketMaps
 	var ticketsToSpendIn167 []chainhash.Hash
 	var sortedTickets167 []*stake.TicketData
 
 	for i := int64(0); i <= testBCHeight; i++ {
-		block, err := dcrutil.NewBlockFromBytes(blockchain[i])
+		if i == 0 {
+			continue
+		}
+		block, err := dcrutil.NewBlockFromBytes(testBlockchain[i])
 		if err != nil {
-			t.Errorf("block deserialization error on block %v", i)
+			t.Fatalf("block deserialization error on block %v", i)
 		}
 		block.SetHeight(i)
-		database.InsertBlock(block)
-		tmdb.InsertBlock(block)
+		_, _, err = chain.ProcessBlock(block, timeSource, blockchain.BFNone)
+		if err != nil {
+			t.Fatalf("failed to process block %v: %v", i, err)
+		}
 
 		if i == 50 {
 			// Create snapshot of tmdb at block 50
-			CopyOfMapsAtBlock50, err = cloneTicketDB(&tmdb)
+			CopyOfMapsAtBlock50, err = cloneTicketDB(chain.TMDB())
 			if err != nil {
 				t.Errorf("db cloning at block 50 failure! %v", err)
 			}
@@ -119,7 +123,7 @@ func TestTicketDB(t *testing.T) {
 			totalTickets := 0
 			sortedSlice := make([]*stake.TicketData, 0)
 			for i := 0; i < stake.BucketsSize; i++ {
-				tix, err := tmdb.DumpLiveTickets(uint8(i))
+				tix, err := chain.TMDB().DumpLiveTickets(uint8(i))
 				if err != nil {
 					t.Errorf("error dumping live tickets")
 				}
@@ -138,7 +142,7 @@ func TestTicketDB(t *testing.T) {
 		}
 
 		if i == 168 {
-			parentBlock, err := dcrutil.NewBlockFromBytes(blockchain[i-1])
+			parentBlock, err := dcrutil.NewBlockFromBytes(testBlockchain[i-1])
 			if err != nil {
 				t.Errorf("block deserialization error on block %v", i-1)
 			}
@@ -159,7 +163,7 @@ func TestTicketDB(t *testing.T) {
 
 			// Make sure that the tickets that were supposed to be spent or
 			// missed were.
-			spentTix, err := tmdb.DumpSpentTickets(i)
+			spentTix, err := chain.TMDB().DumpSpentTickets(i)
 			if err != nil {
 				t.Errorf("DumpSpentTickets failure")
 			}
@@ -171,7 +175,7 @@ func TestTicketDB(t *testing.T) {
 			}
 
 			// Create snapshot of tmdb at block 168
-			CopyOfMapsAtBlock168, err = cloneTicketDB(&tmdb)
+			CopyOfMapsAtBlock168, err = cloneTicketDB(chain.TMDB())
 			if err != nil {
 				t.Errorf("db cloning at block 168 failure! %v", err)
 			}
@@ -179,24 +183,35 @@ func TestTicketDB(t *testing.T) {
 	}
 
 	// Remove five blocks from HEAD~1
-	_, _, _, err = tmdb.RemoveBlockToHeight(50)
+	_, _, _, err = chain.TMDB().RemoveBlockToHeight(50)
 	if err != nil {
 		t.Errorf("error: %v", err)
 	}
 
 	// Test if the roll back was symmetric to the earlier snapshot
-	if !reflect.DeepEqual(tmdb.DumpMapsPointer(), CopyOfMapsAtBlock50) {
+	if !reflect.DeepEqual(chain.TMDB().DumpMapsPointer(), CopyOfMapsAtBlock50) {
 		t.Errorf("The td did not restore to a previous block height correctly!")
 	}
 
 	// Test rescanning a ticket db
-	err = tmdb.RescanTicketDB()
+	err = chain.TMDB().RescanTicketDB()
+	if err != nil {
+		t.Errorf("rescanticketdb err: %v", err.Error())
+	}
+
+	// Remove all blocks and rescan too
+	_, _, _, err =
+		chain.TMDB().RemoveBlockToHeight(simNetParams.StakeEnabledHeight)
+	if err != nil {
+		t.Errorf("error: %v", err)
+	}
+	err = chain.TMDB().RescanTicketDB()
 	if err != nil {
 		t.Errorf("rescanticketdb err: %v", err.Error())
 	}
 
 	// Test if the db file storage was symmetric to the earlier snapshot
-	if !reflect.DeepEqual(tmdb.DumpMapsPointer(), CopyOfMapsAtBlock168) {
+	if !reflect.DeepEqual(chain.TMDB().DumpMapsPointer(), CopyOfMapsAtBlock168) {
 		t.Errorf("The td did not rescan to HEAD correctly!")
 	}
 
@@ -206,19 +221,19 @@ func TestTicketDB(t *testing.T) {
 	}
 
 	// Store the ticket db to disk
-	err = tmdb.Store("testdata/", "testtmdb")
+	err = chain.TMDB().Store("testdata/", "testtmdb")
 	if err != nil {
 		t.Errorf("error: %v", err)
 	}
 
 	var tmdb2 stake.TicketDB
-	err = tmdb2.LoadTicketDBs("testdata/", "testtmdb", simNetParams, database)
+	err = tmdb2.LoadTicketDBs("testdata/", "testtmdb", simNetParams, chain.DB())
 	if err != nil {
 		t.Errorf("error: %v", err)
 	}
 
 	// Test if the db file storage was symmetric to previously rescanned one
-	if !reflect.DeepEqual(tmdb.DumpMapsPointer(), tmdb2.DumpMapsPointer()) {
+	if !reflect.DeepEqual(chain.TMDB().DumpMapsPointer(), tmdb2.DumpMapsPointer()) {
 		t.Errorf("The td did not rescan to a previous block height correctly!")
 	}
 
@@ -228,9 +243,9 @@ func TestTicketDB(t *testing.T) {
 	missedIn152, _ := chainhash.NewHashFromStr(
 		"84f7f866b0af1cc278cb8e0b2b76024a07542512c76487c83628c14c650de4fa")
 
-	tmdb.RemoveBlockToHeight(152)
+	chain.TMDB().RemoveBlockToHeight(152)
 
-	missedTix, err := tmdb.DumpMissedTickets()
+	missedTix, err := chain.TMDB().DumpMissedTickets()
 	if err != nil {
 		t.Errorf("err dumping missed tix: %v", err.Error())
 	}
@@ -240,12 +255,12 @@ func TestTicketDB(t *testing.T) {
 			missedIn152)
 	}
 
-	tmdb.RescanTicketDB()
+	chain.TMDB().RescanTicketDB()
 
 	// Make sure that the revoked map contains the revoked tx
 	revokedSlice := []*chainhash.Hash{missedIn152}
 
-	revokedTix, err := tmdb.DumpRevokedTickets()
+	revokedTix, err := chain.TMDB().DumpRevokedTickets()
 	if err != nil {
 		t.Errorf("err dumping missed tix: %v", err.Error())
 	}
@@ -261,9 +276,6 @@ func TestTicketDB(t *testing.T) {
 		t.Errorf("revoked ticket map did not include tickets missed in " +
 			"block 152 and later revoked")
 	}
-
-	database.Close()
-	tmdb.Close()
 
 	os.RemoveAll("ticketdb_test")
 	os.Remove("./ticketdb_test.ver")
@@ -298,6 +310,7 @@ var simNetParams = &chaincfg.Params{
 	PowLimitBits:             0x207fffff,
 	ResetMinDifficulty:       false,
 	GenerateSupported:        true,
+	MaximumBlockSize:         1000000,
 	TimePerBlock:             time.Second * 1,
 	WorkDiffAlpha:            1,
 	WorkDiffWindowSize:       8,
@@ -351,6 +364,7 @@ var simNetParams = &chaincfg.Params{
 	MaxFreshStakePerBlock: 40,            // 8*TicketsPerBlock
 	StakeEnabledHeight:    16 + 16,       // CoinbaseMaturity + TicketMaturity
 	StakeValidationHeight: 16 + (64 * 2), // CoinbaseMaturity + TicketPoolSize*2
+	StakeBaseSigScript:    []byte{0xDE, 0xAD, 0xBE, 0xEF},
 
 	// Decred organization related parameters
 	//

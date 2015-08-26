@@ -1,5 +1,5 @@
-// Copyright (c) 2013-2014 The btcsuite developers
-// Copyright (c) 2015 The Decred developers
+// Copyright (c) 2013-2016 The btcsuite developers
+// Copyright (c) 2015-2016 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -106,14 +106,17 @@ func dcrdMain(serverChan chan<- *server) error {
 	defer db.Close()
 
 	if cfg.DropAddrIndex {
-		dcrdLog.Info("Deleting entire addrindex.")
-		err := db.PurgeAddrIndex()
-		if err != nil {
-			dcrdLog.Errorf("Unable to delete the addrindex: %v", err)
-			return err
-		}
-		dcrdLog.Info("Successfully deleted addrindex, exiting")
-		return nil
+		/*
+			TODO New address index
+			dcrdLog.Info("Deleting entire addrindex.")
+			err := db.PurgeAddrIndex()
+			if err != nil {
+				dcrdLog.Errorf("Unable to delete the addrindex: %v", err)
+				return err
+			}
+			dcrdLog.Info("Successfully deleted addrindex, exiting")
+			return nil
+		*/
 	}
 
 	tmdb, err := loadTicketDB(db, activeNetParams.Params)
@@ -132,7 +135,7 @@ func dcrdMain(serverChan chan<- *server) error {
 	// Ensure the databases are sync'd and closed on Ctrl+C.
 	addInterruptHandler(func() {
 		dcrdLog.Infof("Gracefully shutting down the database...")
-		db.RollbackClose()
+		db.Close()
 	})
 
 	// Create server and start it.

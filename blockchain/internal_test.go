@@ -1,5 +1,5 @@
-// Copyright (c) 2013-2014 The btcsuite developers
-// Copyright (c) 2015 The Decred developers
+// Copyright (c) 2013-2016 The btcsuite developers
+// Copyright (c) 2015-2016 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -33,3 +33,7 @@ func TstSetMaxMedianTimeEntries(val int) {
 // TstCheckBlockScripts makes the internal checkBlockScripts function available
 // to the test package.
 var TstCheckBlockScripts = checkBlockScripts
+
+// TstDeserializeUtxoEntry makes the internal deserializeUtxoEntry function
+// available to the test package.
+var TstDeserializeUtxoEntry = deserializeUtxoEntry

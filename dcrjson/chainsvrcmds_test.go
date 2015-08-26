@@ -972,8 +972,8 @@ func TestChainSvrCmds(t *testing.T) {
 			},
 			marshalled: `{"jsonrpc":"1.0","method":"verifychain","params":[],"id":1}`,
 			unmarshalled: &dcrjson.VerifyChainCmd{
-				CheckLevel: dcrjson.Int32(3),
-				CheckDepth: dcrjson.Int32(288),
+				CheckLevel: dcrjson.Int64(3),
+				CheckDepth: dcrjson.Int64(288),
 			},
 		},
 		{
@@ -982,12 +982,12 @@ func TestChainSvrCmds(t *testing.T) {
 				return dcrjson.NewCmd("verifychain", 2)
 			},
 			staticCmd: func() interface{} {
-				return dcrjson.NewVerifyChainCmd(dcrjson.Int32(2), nil)
+				return dcrjson.NewVerifyChainCmd(dcrjson.Int64(2), nil)
 			},
 			marshalled: `{"jsonrpc":"1.0","method":"verifychain","params":[2],"id":1}`,
 			unmarshalled: &dcrjson.VerifyChainCmd{
-				CheckLevel: dcrjson.Int32(2),
-				CheckDepth: dcrjson.Int32(288),
+				CheckLevel: dcrjson.Int64(2),
+				CheckDepth: dcrjson.Int64(288),
 			},
 		},
 		{
@@ -996,12 +996,12 @@ func TestChainSvrCmds(t *testing.T) {
 				return dcrjson.NewCmd("verifychain", 2, 500)
 			},
 			staticCmd: func() interface{} {
-				return dcrjson.NewVerifyChainCmd(dcrjson.Int32(2), dcrjson.Int32(500))
+				return dcrjson.NewVerifyChainCmd(dcrjson.Int64(2), dcrjson.Int64(500))
 			},
 			marshalled: `{"jsonrpc":"1.0","method":"verifychain","params":[2,500],"id":1}`,
 			unmarshalled: &dcrjson.VerifyChainCmd{
-				CheckLevel: dcrjson.Int32(2),
-				CheckDepth: dcrjson.Int32(500),
+				CheckLevel: dcrjson.Int64(2),
+				CheckDepth: dcrjson.Int64(500),
 			},
 		},
 		{

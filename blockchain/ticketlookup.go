@@ -1,5 +1,5 @@
 // Copyright (c) 2013-2014 Conformal Systems LLC.
-// Copyright (c) 2015 The Decred developers
+// Copyright (c) 2015-2016 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -12,6 +12,7 @@ import (
 
 	"github.com/decred/dcrd/blockchain/stake"
 	"github.com/decred/dcrd/chaincfg/chainhash"
+	database "github.com/decred/dcrd/database2"
 	"github.com/decred/dcrutil"
 )
 
@@ -123,9 +124,8 @@ func (b *BlockChain) GenerateMissedTickets(tixStore TicketStore) (stake.SStxMemM
 // from the ticket pool that have been considered spent or missed in this block
 // according to the block header. Then, it connects all the newly mature tickets
 // to the passed map.
-func (b *BlockChain) connectTickets(tixStore TicketStore,
-	node *blockNode,
-	block *dcrutil.Block) error {
+func (b *BlockChain) connectTickets(tixStore TicketStore, node *blockNode,
+	block *dcrutil.Block, view *UtxoViewpoint) error {
 	if tixStore == nil {
 		return fmt.Errorf("nil ticket store")
 	}
@@ -136,7 +136,7 @@ func (b *BlockChain) connectTickets(tixStore TicketStore,
 		return nil
 	}
 
-	parentBlock, err := b.GetBlockFromHash(node.parentHash)
+	parentBlock, err := b.getBlockFromHash(&node.header.PrevBlock)
 	if err != nil {
 		return err
 	}
@@ -148,13 +148,6 @@ func (b *BlockChain) connectTickets(tixStore TicketStore,
 	// Skip a number of validation steps before we requiring chain
 	// voting.
 	if node.height >= b.chainParams.StakeValidationHeight {
-		regularTxTreeValid := dcrutil.IsFlagSet16(node.header.VoteBits,
-			dcrutil.BlockValid)
-		thisNodeStakeViewpoint := ViewpointPrevInvalidStake
-		if regularTxTreeValid {
-			thisNodeStakeViewpoint = ViewpointPrevValidStake
-		}
-
 		// We need the missed tickets bucket from the original perspective of
 		// the node.
 		missedTickets, err := b.GenerateMissedTickets(tixStore)
@@ -164,10 +157,20 @@ func (b *BlockChain) connectTickets(tixStore TicketStore,
 
 		// TxStore at blockchain HEAD + TxTreeRegular of prevBlock (if
 		// validated) for this node.
-		txInputStoreStake, err := b.fetchInputTransactions(node, block,
-			thisNodeStakeViewpoint)
+		parent, err := b.getBlockFromHash(&node.header.PrevBlock)
 		if err != nil {
-			errStr := fmt.Sprintf("fetchInputTransactions failed for incoming "+
+			return err
+		}
+		regularTxTreeValid := dcrutil.IsFlagSet16(node.header.VoteBits,
+			dcrutil.BlockValid)
+		thisNodeStakeViewpoint := ViewpointPrevInvalidStake
+		if regularTxTreeValid {
+			thisNodeStakeViewpoint = ViewpointPrevValidStake
+		}
+		view.SetStakeViewpoint(thisNodeStakeViewpoint)
+		err = view.fetchInputUtxos(b.db, block, parent)
+		if err != nil {
+			errStr := fmt.Sprintf("fetchInputUtxos failed for incoming "+
 				"node %v; error given: %v", node.hash, err)
 			return errors.New(errStr)
 		}
@@ -184,17 +187,16 @@ func (b *BlockChain) connectTickets(tixStore TicketStore,
 				sstxIn := msgTx.TxIn[1] // sstx input
 				sstxHash := sstxIn.PreviousOutPoint.Hash
 
-				originTx, exists := txInputStoreStake[sstxHash]
-				if !exists {
+				originUTXO := view.LookupEntry(&sstxHash)
+				if originUTXO == nil {
 					str := fmt.Sprintf("unable to find input transaction "+
 						"%v for transaction %v", sstxHash, staketx.Sha())
 					return ruleError(ErrMissingTx, str)
 				}
 
-				sstxHeight := originTx.BlockHeight
-
 				// Check maturity of ticket; we can only spend the ticket after it
 				// hits maturity at height + tM + 1.
+				sstxHeight := originUTXO.BlockHeight()
 				if (height - sstxHeight) < (tM + 1) {
 					blockSha := block.Sha()
 					errStr := fmt.Sprintf("Error: A ticket spend as an SSGen in "+
@@ -472,10 +474,8 @@ func (b *BlockChain) connectTickets(tixStore TicketStore,
 // This function should only ever have to disconnect transactions from the main
 // chain, so most of the calls are directly the the tmdb which contains all this
 // data in an organized bucket.
-func (b *BlockChain) disconnectTickets(tixStore TicketStore,
-	node *blockNode,
+func (b *BlockChain) disconnectTickets(tixStore TicketStore, node *blockNode,
 	block *dcrutil.Block) error {
-
 	tM := int64(b.chainParams.TicketMaturity)
 	height := node.height
 
@@ -581,8 +581,8 @@ func (b *BlockChain) fetchTicketStore(node *blockNode) (TicketStore, error) {
 	// If we haven't selected a best chain yet or we are extending the main
 	// (best) chain with a new block, just use the ticket database we already
 	// have.
-	if b.bestChain == nil || (prevNode != nil &&
-		prevNode.hash.IsEqual(b.bestChain.hash)) {
+	if b.bestNode == nil || (prevNode != nil &&
+		prevNode.hash.IsEqual(b.bestNode.hash)) {
 		return nil, nil
 	}
 
@@ -596,18 +596,41 @@ func (b *BlockChain) fetchTicketStore(node *blockNode) (TicketStore, error) {
 	// transactions and spend information for the blocks which would be
 	// disconnected during a reorganize to the point of view of the
 	// node just before the requested node.
-	detachNodes, attachNodes, err := b.getReorganizeNodes(prevNode)
+	detachNodes, attachNodes := b.getReorganizeNodes(node)
 	if err != nil {
 		return nil, err
 	}
 
+	view := NewUtxoViewpoint()
+	view.SetBestHash(b.bestNode.hash)
+	view.SetStakeViewpoint(ViewpointPrevValidInitial)
+
 	for e := detachNodes.Front(); e != nil; e = e.Next() {
 		n := e.Value.(*blockNode)
-		block, err := b.db.FetchBlockBySha(n.hash)
+		block, err := b.getBlockFromHash(n.hash)
 		if err != nil {
 			return nil, err
 		}
 
+		parent, err := b.getBlockFromHash(&n.header.PrevBlock)
+		if err != nil {
+			return nil, err
+		}
+
+		// Load all of the spent txos for the block from the spend
+		// journal.
+		var stxos []spentTxOut
+		err = b.db.View(func(dbTx database.Tx) error {
+			stxos, err = dbFetchSpendJournalEntry(dbTx, block, parent, view)
+			return err
+		})
+		if err != nil {
+			return nil, err
+		}
+		err = b.disconnectTransactions(view, block, parent, stxos)
+		if err != nil {
+			return nil, err
+		}
 		err = b.disconnectTickets(tixStore, n, block)
 		if err != nil {
 			return nil, err
@@ -636,10 +659,23 @@ func (b *BlockChain) fetchTicketStore(node *blockNode) (TicketStore, error) {
 		}
 
 		// The number of blocks below this block but above the root of the fork
-		err = b.connectTickets(tixStore, n, block)
+		err = b.connectTickets(tixStore, n, block, view)
 		if err != nil {
 			return nil, err
 		}
+
+		parent, err := b.getBlockFromHash(&n.header.PrevBlock)
+		if err != nil {
+			return nil, err
+		}
+
+		var stxos []spentTxOut
+		err = b.connectTransactions(view, block, parent, &stxos)
+		if err != nil {
+			return nil, err
+		}
+
+		view.SetBestHash(node.hash)
 	}
 
 	return tixStore, nil
