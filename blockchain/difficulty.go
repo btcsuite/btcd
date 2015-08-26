@@ -1,4 +1,4 @@
-// Copyright (c) 2013-2014 The btcsuite developers
+// Copyright (c) 2013-2015 The btcsuite developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -222,6 +222,8 @@ func (b *BlockChain) calcEasiestDifficulty(bits uint32, duration time.Duration) 
 
 // findPrevTestNetDifficulty returns the difficulty of the previous block which
 // did not have the special testnet minimum difficulty rule applied.
+//
+// This function MUST be called with the chain state lock held (for writes).
 func (b *BlockChain) findPrevTestNetDifficulty(startNode *blockNode) (uint32, error) {
 	// Search backwards through the chain for the last block without
 	// the special rule applied.
@@ -256,6 +258,8 @@ func (b *BlockChain) findPrevTestNetDifficulty(startNode *blockNode) (uint32, er
 // This function differs from the exported CalcNextRequiredDifficulty in that
 // the exported version uses the current best chain as the previous block node
 // while this function accepts any block node.
+//
+// This function MUST be called with the chain state lock held (for writes).
 func (b *BlockChain) calcNextRequiredDifficulty(lastNode *blockNode, newBlockTime time.Time) (uint32, error) {
 	// Genesis block.
 	if lastNode == nil {
@@ -355,7 +359,10 @@ func (b *BlockChain) calcNextRequiredDifficulty(lastNode *blockNode, newBlockTim
 // after the end of the current best chain based on the difficulty retarget
 // rules.
 //
-// This function is NOT safe for concurrent access.
+// This function is safe for concurrent access.
 func (b *BlockChain) CalcNextRequiredDifficulty(timestamp time.Time) (uint32, error) {
-	return b.calcNextRequiredDifficulty(b.bestChain, timestamp)
+	b.chainLock.Lock()
+	defer b.chainLock.Unlock()
+
+	return b.calcNextRequiredDifficulty(b.bestNode, timestamp)
 }

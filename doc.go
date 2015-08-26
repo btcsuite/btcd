@@ -70,8 +70,7 @@ Application Options:
       --simnet              Use the simulation test network
       --nocheckpoints       Disable built-in checkpoints.  Don't do this unless
                             you know what you're doing.
-      --dbtype=             Database backend to use for the Block Chain
-                            (leveldb)
+      --dbtype=             Database backend to use for the Block Chain (ffldb)
       --profile=            Enable HTTP profiling on given port -- NOTE port
                             must be between 1024 and 65536
       --cpuprofile=         Write CPU profile to the specified file
@@ -102,10 +101,6 @@ Application Options:
       --blockprioritysize=  Size in bytes for high-priority/low-fee transactions
                             when creating a block (50000)
       --getworkkey=         DEPRECATED -- Use the --miningaddr option instead
-      --addrindex           Build and maintain a full address index. Currently
-                            only supported by leveldb.
-      --dropaddrindex       Deletes the address-based transaction index from the
-                            database on start up, and the exits.
       --nopeerbloomfilters  Disable bloom filtering support.
       --sigcachemaxsize=    The maximum number of entries in the signature
                             verification cache.
