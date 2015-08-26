@@ -1,4 +1,4 @@
-// Copyright (c) 2013-2014 The btcsuite developers
+// Copyright (c) 2013-2016 The btcsuite developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -16,9 +16,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/btcsuite/btcd/database"
-	_ "github.com/btcsuite/btcd/database/ldb"
-	_ "github.com/btcsuite/btcd/database/memdb"
+	database "github.com/btcsuite/btcd/database2"
+	_ "github.com/btcsuite/btcd/database2/ffldb"
 	"github.com/btcsuite/btcd/wire"
 	"github.com/btcsuite/btcutil"
 	flags "github.com/btcsuite/go-flags"
@@ -37,7 +36,7 @@ const (
 	defaultMaxRPCClients     = 10
 	defaultMaxRPCWebsockets  = 25
 	defaultVerifyEnabled     = false
-	defaultDbType            = "leveldb"
+	defaultDbType            = "ffldb"
 	defaultFreeTxRelayLimit  = 15.0
 	defaultBlockMinSize      = 0
 	defaultBlockMaxSize      = 750000
@@ -45,7 +44,6 @@ const (
 	blockMaxSizeMax          = wire.MaxBlockPayload - 1000
 	defaultBlockPrioritySize = 50000
 	defaultGenerate          = false
-	defaultAddrIndex         = false
 	defaultSigCacheMaxSize   = 50000
 )
 
@@ -53,7 +51,7 @@ var (
 	btcdHomeDir        = btcutil.AppDataDir("btcd", false)
 	defaultConfigFile  = filepath.Join(btcdHomeDir, defaultConfigFilename)
 	defaultDataDir     = filepath.Join(btcdHomeDir, defaultDataDirname)
-	knownDbTypes       = database.SupportedDBs()
+	knownDbTypes       = database.SupportedDrivers()
 	defaultRPCKeyFile  = filepath.Join(btcdHomeDir, "rpc.key")
 	defaultRPCCertFile = filepath.Join(btcdHomeDir, "rpc.cert")
 	defaultLogDir      = filepath.Join(btcdHomeDir, defaultLogDirname)
@@ -128,8 +126,6 @@ type config struct {
 	BlockMaxSize       uint32        `long:"blockmaxsize" description:"Maximum block size in bytes to be used when creating a block"`
 	BlockPrioritySize  uint32        `long:"blockprioritysize" description:"Size in bytes for high-priority/low-fee transactions when creating a block"`
 	GetWorkKeys        []string      `long:"getworkkey" description:"DEPRECATED -- Use the --miningaddr option instead"`
-	AddrIndex          bool          `long:"addrindex" description:"Build and maintain a full address index. Currently only supported by leveldb."`
-	DropAddrIndex      bool          `long:"dropaddrindex" description:"Deletes the address-based transaction index from the database on start up, and then exits."`
 	NoPeerBloomFilters bool          `long:"nopeerbloomfilters" description:"Disable bloom filtering support."`
 	SigCacheMaxSize    uint          `long:"sigcachemaxsize" description:"The maximum number of entries in the signature verification cache."`
 	onionlookup        func(string) ([]net.IP, error)
@@ -343,7 +339,6 @@ func loadConfig() (*config, []string, error) {
 		SigCacheMaxSize:   defaultSigCacheMaxSize,
 		MaxOrphanTxs:      maxOrphanTransactions,
 		Generate:          defaultGenerate,
-		AddrIndex:         defaultAddrIndex,
 	}
 
 	// Service options which are only added on Windows.
@@ -499,22 +494,6 @@ func loadConfig() (*config, []string, error) {
 		str := "%s: The specified database type [%v] is invalid -- " +
 			"supported types %v"
 		err := fmt.Errorf(str, funcName, cfg.DbType, knownDbTypes)
-		fmt.Fprintln(os.Stderr, err)
-		fmt.Fprintln(os.Stderr, usageMessage)
-		return nil, nil, err
-	}
-
-	if cfg.AddrIndex && cfg.DropAddrIndex {
-		err := fmt.Errorf("addrindex and dropaddrindex cannot be " +
-			"activated at the same")
-		fmt.Fprintln(os.Stderr, err)
-		fmt.Fprintln(os.Stderr, usageMessage)
-		return nil, nil, err
-	}
-
-	// Memdb does not currently support the addrindex.
-	if cfg.DbType == "memdb" && cfg.AddrIndex {
-		err := fmt.Errorf("memdb does not currently support the addrindex")
 		fmt.Fprintln(os.Stderr, err)
 		fmt.Fprintln(os.Stderr, usageMessage)
 		return nil, nil, err
