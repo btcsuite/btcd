@@ -9,7 +9,7 @@ import (
 	"fmt"
 
 	"github.com/btcsuite/btcd/blockchain"
-	database "github.com/btcsuite/btcd/database2"
+	"github.com/btcsuite/btcd/database"
 	"github.com/btcsuite/btcd/wire"
 	"github.com/btcsuite/btcutil"
 )
