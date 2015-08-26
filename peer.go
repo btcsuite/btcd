@@ -1,4 +1,4 @@
-// Copyright (c) 2013-2014 The btcsuite developers
+// Copyright (c) 2013-2015 The btcsuite developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -9,6 +9,7 @@ import (
 	"container/list"
 	"fmt"
 	"io"
+	"math"
 	prand "math/rand"
 	"net"
 	"strconv"
@@ -18,7 +19,7 @@ import (
 
 	"github.com/btcsuite/btcd/addrmgr"
 	"github.com/btcsuite/btcd/blockchain"
-	"github.com/btcsuite/btcd/database"
+	database "github.com/btcsuite/btcd/database2"
 	"github.com/btcsuite/btcd/wire"
 	"github.com/btcsuite/btcutil"
 	"github.com/btcsuite/btcutil/bloom"
@@ -290,11 +291,6 @@ func (p *peer) RelayTxDisabled() bool {
 // pushVersionMsg sends a version message to the connected peer using the
 // current state.
 func (p *peer) pushVersionMsg() error {
-	_, blockNum, err := p.server.db.NewestSha()
-	if err != nil {
-		return err
-	}
-
 	theirNa := p.na
 
 	// If we are behind a proxy and the connection comes from the proxy then
@@ -312,9 +308,10 @@ func (p *peer) pushVersionMsg() error {
 	}
 
 	// Version message.
+	best := p.server.blockManager.chain.BestSnapshot()
 	msg := wire.NewMsgVersion(
 		p.server.addrManager.GetBestLocalAddress(p.na), theirNa,
-		p.server.nonce, int32(blockNum))
+		p.server.nonce, best.Height)
 	msg.AddUserAgent(userAgentName, userAgentVersion)
 
 	// XXX: bitcoind appears to always enable the full node services flag
@@ -533,11 +530,30 @@ func (p *peer) pushTxMsg(sha *wire.ShaHash, doneChan, waitChan chan struct{}) er
 
 // pushBlockMsg sends a block message for the provided block hash to the
 // connected peer.  An error is returned if the block hash is not known.
-func (p *peer) pushBlockMsg(sha *wire.ShaHash, doneChan, waitChan chan struct{}) error {
-	blk, err := p.server.db.FetchBlockBySha(sha)
+func (p *peer) pushBlockMsg(hash *wire.ShaHash, doneChan, waitChan chan struct{}) error {
+	// Fetch the raw block bytes from the database.
+	var blockBytes []byte
+	err := p.server.db.View(func(dbTx database.Tx) error {
+		var err error
+		blockBytes, err = dbTx.FetchBlock(hash)
+		return err
+	})
 	if err != nil {
-		peerLog.Tracef("Unable to fetch requested block sha %v: %v",
-			sha, err)
+		peerLog.Tracef("Unable to fetch requested block hash %v: %v",
+			hash, err)
+
+		if doneChan != nil {
+			doneChan <- struct{}{}
+		}
+		return err
+	}
+
+	// Deserialize the block.
+	var msgBlock wire.MsgBlock
+	err = msgBlock.Deserialize(bytes.NewReader(blockBytes))
+	if err != nil {
+		peerLog.Tracef("Unable to deserialize requested block hash "+
+			"%v: %v", hash, err)
 
 		if doneChan != nil {
 			doneChan <- struct{}{}
@@ -553,28 +569,24 @@ func (p *peer) pushBlockMsg(sha *wire.ShaHash, doneChan, waitChan chan struct{})
 	// We only send the channel for this message if we aren't sending
 	// an inv straight after.
 	var dc chan struct{}
-	sendInv := p.continueHash != nil && p.continueHash.IsEqual(sha)
+	sendInv := p.continueHash != nil && p.continueHash.IsEqual(hash)
 	if !sendInv {
 		dc = doneChan
 	}
-	p.QueueMessage(blk.MsgBlock(), dc)
+	p.QueueMessage(&msgBlock, dc)
 
 	// When the peer requests the final block that was advertised in
 	// response to a getblocks message which requested more blocks than
 	// would fit into a single message, send it a new inventory message
 	// to trigger it to issue another getblocks message for the next
 	// batch of inventory.
-	if p.continueHash != nil && p.continueHash.IsEqual(sha) {
-		hash, _, err := p.server.db.NewestSha()
-		if err == nil {
-			invMsg := wire.NewMsgInvSizeHint(1)
-			iv := wire.NewInvVect(wire.InvTypeBlock, hash)
-			invMsg.AddInvVect(iv)
-			p.QueueMessage(invMsg, doneChan)
-			p.continueHash = nil
-		} else if doneChan != nil {
-			doneChan <- struct{}{}
-		}
+	if p.continueHash != nil && p.continueHash.IsEqual(hash) {
+		best := p.server.blockManager.chain.BestSnapshot()
+		invMsg := wire.NewMsgInvSizeHint(1)
+		iv := wire.NewInvVect(wire.InvTypeBlock, best.Hash)
+		invMsg.AddInvVect(iv)
+		p.QueueMessage(invMsg, doneChan)
+		p.continueHash = nil
 	}
 	return nil
 }
@@ -583,7 +595,7 @@ func (p *peer) pushBlockMsg(sha *wire.ShaHash, doneChan, waitChan chan struct{})
 // the connected peer.  Since a merkle block requires the peer to have a filter
 // loaded, this call will simply be ignored if there is no filter loaded.  An
 // error is returned if the block hash is not known.
-func (p *peer) pushMerkleBlockMsg(sha *wire.ShaHash, doneChan, waitChan chan struct{}) error {
+func (p *peer) pushMerkleBlockMsg(hash *wire.ShaHash, doneChan, waitChan chan struct{}) error {
 	// Do not send a response if the peer doesn't have a filter loaded.
 	if !p.filter.IsLoaded() {
 		if doneChan != nil {
@@ -592,10 +604,11 @@ func (p *peer) pushMerkleBlockMsg(sha *wire.ShaHash, doneChan, waitChan chan str
 		return nil
 	}
 
-	blk, err := p.server.db.FetchBlockBySha(sha)
+	// Fetch the raw block bytes from the database.
+	blk, err := p.server.blockManager.chain.BlockByHash(hash)
 	if err != nil {
-		peerLog.Tracef("Unable to fetch requested block sha %v: %v",
-			sha, err)
+		peerLog.Tracef("Unable to fetch requested block hash %v: %v",
+			hash, err)
 
 		if doneChan != nil {
 			doneChan <- struct{}{}
@@ -915,9 +928,10 @@ func (p *peer) handleGetBlocksMsg(msg *wire.MsgGetBlocks) {
 	// Return all block hashes to the latest one (up to max per message) if
 	// no stop hash was specified.
 	// Attempt to find the ending index of the stop hash if specified.
-	endIdx := database.AllShas
+	chain := p.server.blockManager.chain
+	endIdx := int32(math.MaxInt32)
 	if !msg.HashStop.IsEqual(&zeroHash) {
-		height, err := p.server.db.FetchBlockHeightBySha(&msg.HashStop)
+		height, err := chain.BlockHeightByHash(&msg.HashStop)
 		if err == nil {
 			endIdx = height + 1
 		}
@@ -930,7 +944,7 @@ func (p *peer) handleGetBlocksMsg(msg *wire.MsgGetBlocks) {
 	// This mirrors the behavior in the reference implementation.
 	startIdx := int32(1)
 	for _, hash := range msg.BlockLocatorHashes {
-		height, err := p.server.db.FetchBlockHeightBySha(hash)
+		height, err := chain.BlockHeightByHash(hash)
 		if err == nil {
 			// Start with the next hash since we know this one.
 			startIdx = height + 1
@@ -945,34 +959,18 @@ func (p *peer) handleGetBlocksMsg(msg *wire.MsgGetBlocks) {
 		autoContinue = true
 	}
 
+	// Fetch the inventory from the block database.
+	hashList, err := chain.HeightRange(startIdx, endIdx)
+	if err != nil {
+		peerLog.Warnf("Block lookup failed: %v", err)
+		return
+	}
+
 	// Generate inventory message.
-	//
-	// The FetchBlockBySha call is limited to a maximum number of hashes
-	// per invocation.  Since the maximum number of inventory per message
-	// might be larger, call it multiple times with the appropriate indices
-	// as needed.
 	invMsg := wire.NewMsgInv()
-	for start := startIdx; start < endIdx; {
-		// Fetch the inventory from the block database.
-		hashList, err := p.server.db.FetchHeightRange(start, endIdx)
-		if err != nil {
-			peerLog.Warnf("Block lookup failed: %v", err)
-			return
-		}
-
-		// The database did not return any further hashes.  Break out of
-		// the loop now.
-		if len(hashList) == 0 {
-			break
-		}
-
-		// Add block inventory to the message.
-		for _, hash := range hashList {
-			hashCopy := hash
-			iv := wire.NewInvVect(wire.InvTypeBlock, &hashCopy)
-			invMsg.AddInvVect(iv)
-		}
-		start += int32(len(hashList))
+	for i := range hashList {
+		iv := wire.NewInvVect(wire.InvTypeBlock, &hashList[i])
+		invMsg.AddInvVect(iv)
 	}
 
 	// Send the inventory message if there is anything to send.
@@ -999,8 +997,9 @@ func (p *peer) handleGetHeadersMsg(msg *wire.MsgGetHeaders) {
 	}
 
 	// Attempt to look up the height of the provided stop hash.
-	endIdx := database.AllShas
-	height, err := p.server.db.FetchBlockHeightBySha(&msg.HashStop)
+	chain := p.server.blockManager.chain
+	endIdx := int32(math.MaxInt32)
+	height, err := chain.BlockHeightByHash(&msg.HashStop)
 	if err == nil {
 		endIdx = height + 1
 	}
@@ -1011,20 +1010,34 @@ func (p *peer) handleGetHeadersMsg(msg *wire.MsgGetHeaders) {
 		// No blocks with the stop hash were found so there is nothing
 		// to do.  Just return.  This behavior mirrors the reference
 		// implementation.
-		if endIdx == database.AllShas {
+		if endIdx == math.MaxInt32 {
 			return
 		}
 
-		// Fetch and send the requested block header.
-		header, err := p.server.db.FetchBlockHeaderBySha(&msg.HashStop)
+		// Fetch the raw block header bytes from the database.
+		var headerBytes []byte
+		err := p.server.db.View(func(dbTx database.Tx) error {
+			var err error
+			headerBytes, err = dbTx.FetchBlockHeader(&msg.HashStop)
+			return err
+		})
 		if err != nil {
 			peerLog.Warnf("Lookup of known block hash failed: %v",
 				err)
 			return
 		}
 
+		// Deserialize the block header.
+		var header wire.BlockHeader
+		err = header.Deserialize(bytes.NewReader(headerBytes))
+		if err != nil {
+			peerLog.Warnf("Block header deserialize failed: %v",
+				err)
+			return
+		}
+
 		headersMsg := wire.NewMsgHeaders()
-		headersMsg.AddBlockHeader(header)
+		headersMsg.AddBlockHeader(&header)
 		p.QueueMessage(headersMsg, nil)
 		return
 	}
@@ -1036,7 +1049,7 @@ func (p *peer) handleGetHeadersMsg(msg *wire.MsgGetHeaders) {
 	// This mirrors the behavior in the reference implementation.
 	startIdx := int32(1)
 	for _, hash := range msg.BlockLocatorHashes {
-		height, err := p.server.db.FetchBlockHeightBySha(hash)
+		height, err := chain.BlockHeightByHash(hash)
 		if err == nil {
 			// Start with the next hash since we know this one.
 			startIdx = height + 1
@@ -1049,42 +1062,37 @@ func (p *peer) handleGetHeadersMsg(msg *wire.MsgGetHeaders) {
 		endIdx = startIdx + wire.MaxBlockHeadersPerMsg
 	}
 
-	// Generate headers message and send it.
-	//
-	// The FetchHeightRange call is limited to a maximum number of hashes
-	// per invocation.  Since the maximum number of headers per message
-	// might be larger, call it multiple times with the appropriate indices
-	// as needed.
-	headersMsg := wire.NewMsgHeaders()
-	for start := startIdx; start < endIdx; {
-		// Fetch the inventory from the block database.
-		hashList, err := p.server.db.FetchHeightRange(start, endIdx)
-		if err != nil {
-			peerLog.Warnf("Header lookup failed: %v", err)
-			return
-		}
-
-		// The database did not return any further hashes.  Break out of
-		// the loop now.
-		if len(hashList) == 0 {
-			break
-		}
-
-		// Add headers to the message.
-		for _, hash := range hashList {
-			header, err := p.server.db.FetchBlockHeaderBySha(&hash)
-			if err != nil {
-				peerLog.Warnf("Lookup of known block hash "+
-					"failed: %v", err)
-				continue
-			}
-			headersMsg.AddBlockHeader(header)
-		}
-
-		// Start at the next block header after the latest one on the
-		// next loop iteration.
-		start += int32(len(hashList))
+	// Fetch the inventory from the block database.
+	hashList, err := chain.HeightRange(startIdx, endIdx)
+	if err != nil {
+		peerLog.Warnf("Header lookup failed: %v", err)
+		return
 	}
+
+	// Generate headers message and send it.
+	headersMsg := wire.NewMsgHeaders()
+	err = p.server.db.View(func(dbTx database.Tx) error {
+		for i := range hashList {
+			headerBytes, err := dbTx.FetchBlockHeader(&hashList[i])
+			if err != nil {
+				return err
+			}
+
+			var header wire.BlockHeader
+			err = header.Deserialize(bytes.NewReader(headerBytes))
+			if err != nil {
+				return err
+			}
+			headersMsg.AddBlockHeader(&header)
+		}
+
+		return nil
+	})
+	if err != nil {
+		peerLog.Warnf("Failed to build headers: %v", err)
+		return
+	}
+
 	p.QueueMessage(headersMsg, nil)
 }
 

@@ -10,8 +10,8 @@ import (
 	"path/filepath"
 
 	"github.com/btcsuite/btcd/chaincfg"
-	"github.com/btcsuite/btcd/database"
-	_ "github.com/btcsuite/btcd/database/ldb"
+	database "github.com/btcsuite/btcd/database2"
+	_ "github.com/btcsuite/btcd/database2/ffldb"
 	"github.com/btcsuite/btcd/wire"
 	"github.com/btcsuite/btcutil"
 	flags "github.com/btcsuite/go-flags"
@@ -21,13 +21,13 @@ const (
 	minCandidates        = 1
 	maxCandidates        = 20
 	defaultNumCandidates = 5
-	defaultDbType        = "leveldb"
+	defaultDbType        = "ffldb"
 )
 
 var (
 	btcdHomeDir     = btcutil.AppDataDir("btcd", false)
 	defaultDataDir  = filepath.Join(btcdHomeDir, "data")
-	knownDbTypes    = database.SupportedDBs()
+	knownDbTypes    = database.SupportedDrivers()
 	activeNetParams = &chaincfg.MainNetParams
 )
 

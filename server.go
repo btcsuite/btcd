@@ -1,4 +1,4 @@
-// Copyright (c) 2013-2014 The btcsuite developers
+// Copyright (c) 2013-2015 The btcsuite developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -22,7 +22,7 @@ import (
 	"github.com/btcsuite/btcd/blockchain"
 	"github.com/btcsuite/btcd/btcjson"
 	"github.com/btcsuite/btcd/chaincfg"
-	"github.com/btcsuite/btcd/database"
+	database "github.com/btcsuite/btcd/database2"
 	"github.com/btcsuite/btcd/txscript"
 	"github.com/btcsuite/btcd/wire"
 	"github.com/btcsuite/btcutil"
@@ -94,7 +94,6 @@ type server struct {
 	sigCache             *txscript.SigCache
 	rpcServer            *rpcServer
 	blockManager         *blockManager
-	addrIndexer          *addrIndexer
 	txMemPool            *txMemPool
 	cpuMiner             *CPUMiner
 	modifyRebroadcastInv chan interface{}
@@ -109,7 +108,7 @@ type server struct {
 	wg                   sync.WaitGroup
 	quit                 chan struct{}
 	nat                  NAT
-	db                   database.Db
+	db                   database.DB
 	timeSource           blockchain.MedianTimeSource
 	services             wire.ServiceFlag
 }
@@ -800,9 +799,6 @@ out:
 		}
 	}
 
-	if cfg.AddrIndex {
-		s.addrIndexer.Stop()
-	}
 	s.blockManager.Stop()
 	s.addrManager.Stop()
 	s.wg.Done()
@@ -1063,10 +1059,6 @@ func (s *server) Start() {
 	if cfg.Generate {
 		s.cpuMiner.Start()
 	}
-
-	if cfg.AddrIndex {
-		s.addrIndexer.Start()
-	}
 }
 
 // Stop gracefully shuts down the server by stopping and disconnecting all
@@ -1247,7 +1239,7 @@ out:
 // newServer returns a new btcd server configured to listen on addr for the
 // bitcoin network type specified by chainParams.  Use start to begin accepting
 // connections from peers.
-func newServer(listenAddrs []string, db database.Db, chainParams *chaincfg.Params) (*server, error) {
+func newServer(listenAddrs []string, db database.DB, chainParams *chaincfg.Params) (*server, error) {
 	nonce, err := wire.RandomUint64()
 	if err != nil {
 		return nil, err
@@ -1412,14 +1404,6 @@ func newServer(listenAddrs []string, db database.Db, chainParams *chaincfg.Param
 	s.blockManager = bm
 	s.txMemPool = newTxMemPool(&s)
 	s.cpuMiner = newCPUMiner(&s)
-
-	if cfg.AddrIndex {
-		ai, err := newAddrIndexer(&s)
-		if err != nil {
-			return nil, err
-		}
-		s.addrIndexer = ai
-	}
 
 	if !cfg.DisableRPC {
 		s.rpcServer, err = newRPCServer(cfg.RPCListeners, &s)
