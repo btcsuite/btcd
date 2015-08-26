@@ -1,4 +1,4 @@
-// Copyright (c) 2014 The btcsuite developers
+// Copyright (c) 2014-2016 The btcsuite developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -7,6 +7,16 @@ package blockchain
 import (
 	"fmt"
 )
+
+// AssertError identifies an error that indicates an internal code consistency
+// issue and should be treated as a critical and unrecoverable error.
+type AssertError string
+
+// Error returns the assertion error as a huma-readable string and satisfies
+// the error interface.
+func (e AssertError) Error() string {
+	return "assertion failed: " + string(e)
+}
 
 // ErrorCode identifies a kind of error.
 type ErrorCode int
