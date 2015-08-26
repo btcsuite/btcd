@@ -1,4 +1,4 @@
-// Copyright (c) 2013-2014 The btcsuite developers
+// Copyright (c) 2013-2015 The btcsuite developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -15,18 +15,22 @@ import (
 
 	"github.com/btcsuite/btcd/blockchain"
 	"github.com/btcsuite/btcd/chaincfg"
-	"github.com/btcsuite/btcd/database"
-	_ "github.com/btcsuite/btcd/database/ldb"
-	_ "github.com/btcsuite/btcd/database/memdb"
+	database "github.com/btcsuite/btcd/database2"
+	_ "github.com/btcsuite/btcd/database2/ffldb"
 	"github.com/btcsuite/btcd/wire"
 	"github.com/btcsuite/btcutil"
 )
 
-// testDbType is the database backend type to use for the tests.
-const testDbType = "memdb"
+const (
+	// testDbType is the database backend type to use for the tests.
+	testDbType = "ffldb"
 
-// testDbRoot is the root directory used to create all test databases.
-const testDbRoot = "testdbs"
+	// testDbRoot is the root directory used to create all test databases.
+	testDbRoot = "testdbs"
+
+	// blockDataNet is the expected network in the test block data.
+	blockDataNet = wire.MainNet
+)
 
 // filesExists returns whether or not the named file or directory exists.
 func fileExists(name string) bool {
@@ -41,9 +45,9 @@ func fileExists(name string) bool {
 // isSupportedDbType returns whether or not the passed database type is
 // currently supported.
 func isSupportedDbType(dbType string) bool {
-	supportedDBs := database.SupportedDBs()
-	for _, sDbType := range supportedDBs {
-		if dbType == sDbType {
+	supportedDrivers := database.SupportedDrivers()
+	for _, driver := range supportedDrivers {
+		if dbType == driver {
 			return true
 		}
 	}
@@ -61,10 +65,10 @@ func chainSetup(dbName string) (*blockchain.BlockChain, func(), error) {
 
 	// Handle memory database specially since it doesn't need the disk
 	// specific handling.
-	var db database.Db
+	var db database.DB
 	var teardown func()
 	if testDbType == "memdb" {
-		ndb, err := database.CreateDB(testDbType)
+		ndb, err := database.Create(testDbType)
 		if err != nil {
 			return nil, nil, fmt.Errorf("error creating db: %v", err)
 		}
@@ -88,7 +92,7 @@ func chainSetup(dbName string) (*blockchain.BlockChain, func(), error) {
 		// Create a new database to store the accepted blocks into.
 		dbPath := filepath.Join(testDbRoot, dbName)
 		_ = os.RemoveAll(dbPath)
-		ndb, err := database.CreateDB(testDbType, dbPath)
+		ndb, err := database.Create(testDbType, dbPath, blockDataNet)
 		if err != nil {
 			return nil, nil, fmt.Errorf("error creating db: %v", err)
 		}
@@ -97,31 +101,27 @@ func chainSetup(dbName string) (*blockchain.BlockChain, func(), error) {
 		// Setup a teardown function for cleaning up.  This function is
 		// returned to the caller to be invoked when it is done testing.
 		teardown = func() {
-			dbVersionPath := filepath.Join(testDbRoot, dbName+".ver")
-			db.Sync()
 			db.Close()
 			os.RemoveAll(dbPath)
-			os.Remove(dbVersionPath)
 			os.RemoveAll(testDbRoot)
 		}
 	}
 
-	// Insert the main network genesis block.  This is part of the initial
-	// database setup.
-	genesisBlock := btcutil.NewBlock(chaincfg.MainNetParams.GenesisBlock)
-	_, err := db.InsertBlock(genesisBlock)
+	// Create the main chain instance.
+	chain, err := blockchain.New(db, &chaincfg.MainNetParams, nil, nil)
 	if err != nil {
 		teardown()
-		err := fmt.Errorf("failed to insert genesis block: %v", err)
+		err := fmt.Errorf("failed to create chain instance: %v", err)
 		return nil, nil, err
 	}
-
-	chain := blockchain.New(db, &chaincfg.MainNetParams, nil, nil)
 	return chain, teardown, nil
 }
 
-// loadTxStore returns a transaction store loaded from a file.
-func loadTxStore(filename string) (blockchain.TxStore, error) {
+// loadUtxoView returns a utxo view loaded from a file.
+func loadUtxoView(filename string) (*blockchain.UtxoViewpoint, error) {
+	// TODO(davec): Once the the new utxo serialization format and code is
+	// done, this and the data file should be updated to use it instead.
+
 	// The txstore file format is:
 	// <num tx data entries> <tx length> <serialized tx> <blk height>
 	// <num spent bits> <spent bits>
@@ -150,11 +150,9 @@ func loadTxStore(filename string) (blockchain.TxStore, error) {
 		return nil, err
 	}
 
-	txStore := make(blockchain.TxStore)
+	utxoView := blockchain.NewUtxoViewpoint()
 	var uintBuf uint32
 	for height := uint32(0); height < numItems; height++ {
-		txD := blockchain.TxData{}
-
 		// Serialized transaction length.
 		err = binary.Read(r, binary.LittleEndian, &uintBuf)
 		if err != nil {
@@ -173,18 +171,15 @@ func loadTxStore(filename string) (blockchain.TxStore, error) {
 		if err != nil {
 			return nil, err
 		}
-		txD.Tx = btcutil.NewTx(&msgTx)
-
-		// Transaction hash.
-		txHash := msgTx.TxSha()
-		txD.Hash = &txHash
 
 		// Block height the transaction came from.
 		err = binary.Read(r, binary.LittleEndian, &uintBuf)
 		if err != nil {
 			return nil, err
 		}
-		txD.BlockHeight = int32(uintBuf)
+
+		// Add all of the transaction outputs as available.
+		utxoView.AddTxOuts(btcutil.NewTx(&msgTx), int32(uintBuf))
 
 		// Num spent bits.
 		err = binary.Read(r, binary.LittleEndian, &uintBuf)
@@ -204,20 +199,20 @@ func loadTxStore(filename string) (blockchain.TxStore, error) {
 			return nil, err
 		}
 
-		// Populate spent data based on spent bits.
-		txD.Spent = make([]bool, numSpentBits)
+		// Spend the outputs based on spent bits.
+		txHash := msgTx.TxSha()
+		entry := utxoView.LookupEntry(&txHash)
 		for byteNum, spentByte := range spentBytes {
 			for bit := 0; bit < 8; bit++ {
-				if uint32((byteNum*8)+bit) < numSpentBits {
+				outputIndex := uint32((byteNum * 8) + bit)
+				if outputIndex < numSpentBits {
 					if spentByte&(1<<uint(bit)) != 0 {
-						txD.Spent[(byteNum*8)+bit] = true
+						entry.SpendOutput(outputIndex)
 					}
 				}
 			}
 		}
-
-		txStore[*txD.Hash] = &txD
 	}
 
-	return txStore, nil
+	return utxoView, nil
 }
