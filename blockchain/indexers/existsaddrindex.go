@@ -10,7 +10,7 @@ import (
 	"github.com/decred/dcrd/blockchain"
 	"github.com/decred/dcrd/blockchain/stake"
 	"github.com/decred/dcrd/chaincfg"
-	database "github.com/decred/dcrd/database2"
+	"github.com/decred/dcrd/database"
 	"github.com/decred/dcrd/txscript"
 	"github.com/decred/dcrutil"
 )
@@ -294,7 +294,7 @@ func (idx *ExistsAddrIndex) ConnectBlock(dbTx database.Tx, block, parent *dcruti
 	// then remove them from the unconfirmed map drop
 	// dropping the old map and reassigning a new map.
 	idx.unconfirmedLock.Lock()
-	for k, _ := range idx.mpExistsAddr {
+	for k := range idx.mpExistsAddr {
 		usedAddrs[k] = struct{}{}
 	}
 	idx.mpExistsAddr = make(map[[addrKeySize]byte]struct{})
@@ -303,13 +303,13 @@ func (idx *ExistsAddrIndex) ConnectBlock(dbTx database.Tx, block, parent *dcruti
 	meta := dbTx.Metadata()
 	existsAddrIndex := meta.Bucket(existsAddrIndexKey)
 	newUsedAddrs := make(map[[addrKeySize]byte]struct{})
-	for k, _ := range usedAddrs {
+	for k := range usedAddrs {
 		if !idx.existsAddress(existsAddrIndex, k) {
 			newUsedAddrs[k] = struct{}{}
 		}
 	}
 
-	for k, _ := range newUsedAddrs {
+	for k := range newUsedAddrs {
 		err := dbPutExistsAddr(existsAddrIndex, k)
 		if err != nil {
 			return err

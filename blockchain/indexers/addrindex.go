@@ -15,7 +15,7 @@ import (
 	"github.com/decred/dcrd/chaincfg"
 	"github.com/decred/dcrd/chaincfg/chainec"
 	"github.com/decred/dcrd/chaincfg/chainhash"
-	database "github.com/decred/dcrd/database2"
+	"github.com/decred/dcrd/database"
 	"github.com/decred/dcrd/txscript"
 	"github.com/decred/dcrd/wire"
 	"github.com/decred/dcrutil"
@@ -734,12 +734,17 @@ func (idx *AddrIndex) indexBlock(data writeIndexData, block, parent *dcrutil.Blo
 					origin := &txIn.PreviousOutPoint
 					entry := view.LookupEntry(&origin.Hash)
 					if entry == nil {
+						log.Warnf("Missing input %v for tx %v while "+
+							"indexing block %v (height %v)\n", origin.Hash,
+							tx.Sha(), block.Sha(), block.Height())
 						continue
 					}
 
 					version := entry.ScriptVersionByIndex(origin.Index)
 					pkScript := entry.PkScriptByIndex(origin.Index)
-					idx.indexPkScript(data, version, pkScript, txIdx, false)
+					txType := entry.TransactionType()
+					idx.indexPkScript(data, version, pkScript, txIdx,
+						txType == stake.TxTypeSStx)
 				}
 			}
 
@@ -750,8 +755,10 @@ func (idx *AddrIndex) indexBlock(data writeIndexData, block, parent *dcrutil.Blo
 		}
 	}
 
-	stakeStartIdx := len(block.Transactions())
+	stakeStartIdx := len(parent.Transactions())
 	for txIdx, tx := range block.STransactions() {
+		thisTxOffset := txIdx + stakeStartIdx
+
 		isSSGen, _ := stake.IsSSGen(tx)
 		for i, txIn := range tx.MsgTx().TxIn {
 			// Skip stakebases.
@@ -765,19 +772,23 @@ func (idx *AddrIndex) indexBlock(data writeIndexData, block, parent *dcrutil.Blo
 			origin := &txIn.PreviousOutPoint
 			entry := view.LookupEntry(&origin.Hash)
 			if entry == nil {
+				log.Warnf("Missing input %v for tx %v while "+
+					"indexing block %v (height %v)\n", origin.Hash,
+					tx.Sha(), block.Sha(), block.Height())
 				continue
 			}
 
 			version := entry.ScriptVersionByIndex(origin.Index)
 			pkScript := entry.PkScriptByIndex(origin.Index)
-			idx.indexPkScript(data, version, pkScript, txIdx+stakeStartIdx,
-				entry.TransactionType() == stake.TxTypeSStx)
+			txType := entry.TransactionType()
+			idx.indexPkScript(data, version, pkScript, thisTxOffset,
+				txType == stake.TxTypeSStx)
 		}
 
 		isSStx, _ := stake.IsSStx(tx)
 		for _, txOut := range tx.MsgTx().TxOut {
 			idx.indexPkScript(data, txOut.Version, txOut.PkScript,
-				txIdx+stakeStartIdx, isSStx)
+				thisTxOffset, isSStx)
 		}
 	}
 }
@@ -833,26 +844,21 @@ func (idx *AddrIndex) ConnectBlock(dbTx database.Tx, block, parent *dcrutil.Bloc
 
 	// Add all of the index entries for each address.
 	stakeIdxsStart := len(parentTxLocs)
-	offsetStakeIdxStartBlock := len(block.Transactions())
+	allTxLocs := append(parentTxLocs, blockStxLocs...)
+	//offsetStakeIdxStartBlock := len(block.Transactions())
 	addrIdxBucket := dbTx.Metadata().Bucket(addrIndexKey)
 	for addrKey, txIdxs := range addrsToTxns {
 		for _, txIdx := range txIdxs {
 			// Switch to using the newest block ID for the stake transactions,
 			// since these are not from the parent. Offset the index to be
 			// correct for the location in this given block.
-			fmt.Printf("txIdx %v, stakeIdxsStart %v\n", txIdx, stakeIdxsStart)
 			blockIDToUse := parentBlockID
-			txLocsToUse := parentTxLocs
 			if txIdx >= stakeIdxsStart {
-				txIdx -= offsetStakeIdxStartBlock
-				txLocsToUse = blockStxLocs
 				blockIDToUse = blockID
 			}
-			fmt.Printf("blockIDToUse to use: %v, offsetStakeIdxStartBlock %v\n", blockIDToUse, offsetStakeIdxStartBlock)
-			fmt.Printf("tx index to use: %v, block height %v\n", txIdx, block.Height())
 
 			err := dbPutAddrIndexEntry(addrIdxBucket, addrKey,
-				blockIDToUse, txLocsToUse[txIdx])
+				blockIDToUse, allTxLocs[txIdx])
 			if err != nil {
 				return err
 			}

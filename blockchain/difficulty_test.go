@@ -14,7 +14,7 @@ import (
 	"github.com/decred/dcrd/blockchain"
 	//	"github.com/decred/dcrd/blockchain/stake"
 	//	"github.com/decred/dcrd/chaincfg"
-	//	database "github.com/decred/dcrd/database2"
+	//	"github.com/decred/dcrd/database"
 	//"github.com/decred/dcrutil"
 )
 

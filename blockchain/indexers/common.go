@@ -12,7 +12,7 @@ import (
 	"encoding/binary"
 
 	"github.com/decred/dcrd/blockchain"
-	database "github.com/decred/dcrd/database2"
+	"github.com/decred/dcrd/database"
 	"github.com/decred/dcrutil"
 )
 

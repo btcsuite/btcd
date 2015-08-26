@@ -1,97 +1,178 @@
-// Copyright (c) 2013-2014 The btcsuite developers
-// Copyright (c) 2015-2016 The Decred developers
+// Copyright (c) 2015-2016 The btcsuite developers
+// Copyright (c) 2016 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
 package database_test
 
 import (
+	"bytes"
 	"fmt"
+	"os"
+	"path/filepath"
 
 	"github.com/decred/dcrd/chaincfg"
 	"github.com/decred/dcrd/database"
-	_ "github.com/decred/dcrd/database/memdb"
+	_ "github.com/decred/dcrd/database/ffldb"
+	"github.com/decred/dcrd/wire"
 	"github.com/decred/dcrutil"
 )
 
-// This example demonstrates creating a new database and inserting the genesis
-// block into it.
-func ExampleCreateDB() {
-	// Notice in these example imports that the memdb driver is loaded.
-	// Ordinarily this would be whatever driver(s) your application
-	// requires.
+// This example demonstrates creating a new database.
+func ExampleCreate() {
+	// This example assumes the ffldb driver is imported.
+	//
 	// import (
-	//	"github.com/decred/dcrd/database"
-	// 	_ "github.com/decred/dcrd/database/memdb"
+	// 	"github.com/decred/dcrd/database2"
+	// 	_ "github.com/decred/dcrd/database/ffldb"
 	// )
 
-	// Create a database and schedule it to be closed on exit.  This example
-	// uses a memory-only database to avoid needing to write anything to
-	// the disk.  Typically, you would specify a persistent database driver
-	// such as "leveldb" and give it a database name as the second
-	// parameter.
-	db, err := database.CreateDB("memdb")
+	// Create a database and schedule it to be closed and removed on exit.
+	// Typically you wouldn't want to remove the database right away like
+	// this, nor put it in the temp directory, but it's done here to ensure
+	// the example cleans up after itself.
+	dbPath := filepath.Join(os.TempDir(), "examplecreate")
+	db, err := database.Create("ffldb", dbPath, wire.MainNet)
 	if err != nil {
 		fmt.Println(err)
 		return
 	}
+	defer os.RemoveAll(dbPath)
 	defer db.Close()
 
-	// Insert the main network genesis block.
-	genesis := dcrutil.NewBlock(chaincfg.TestNetParams.GenesisBlock)
-	genesis.SetHeight(0)
-	newHeight, err := db.InsertBlock(genesis)
-	if err != nil {
-		fmt.Println(err)
-		return
-	}
-
-	fmt.Println("New height:", newHeight)
-
 	// Output:
-	// New height: 0
 }
 
-// exampleLoadDB is used in the example to elide the setup code.
-func exampleLoadDB() (database.Db, error) {
-	db, err := database.CreateDB("memdb")
-	if err != nil {
-		return nil, err
-	}
+// This example demonstrates creating a new database and using a managed
+// read-write transaction to store and retrieve metadata.
+func Example_basicUsage() {
+	// This example assumes the ffldb driver is imported.
+	//
+	// import (
+	// 	"github.com/decred/dcrd/database2"
+	// 	_ "github.com/decred/dcrd/database/ffldb"
+	// )
 
-	// Insert the main network genesis block.
-	genesis := dcrutil.NewBlock(chaincfg.TestNetParams.GenesisBlock)
-	genesis.SetHeight(0)
-	_, err = db.InsertBlock(genesis)
-	if err != nil {
-		return nil, err
-	}
-
-	return db, err
-}
-
-// This example demonstrates querying the database for the most recent best
-// block height and hash.
-func ExampleDb_newestSha() {
-	// Load a database for the purposes of this example and schedule it to
-	// be closed on exit.  See the CreateDB example for more details on what
-	// this step is doing.
-	db, err := exampleLoadDB()
+	// Create a database and schedule it to be closed and removed on exit.
+	// Typically you wouldn't want to remove the database right away like
+	// this, nor put it in the temp directory, but it's done here to ensure
+	// the example cleans up after itself.
+	dbPath := filepath.Join(os.TempDir(), "exampleusage")
+	db, err := database.Create("ffldb", dbPath, wire.MainNet)
 	if err != nil {
 		fmt.Println(err)
 		return
 	}
+	defer os.RemoveAll(dbPath)
 	defer db.Close()
 
-	latestHash, latestHeight, err := db.NewestSha()
+	// Use the Update function of the database to perform a managed
+	// read-write transaction.  The transaction will automatically be rolled
+	// back if the supplied inner function returns a non-nil error.
+	err = db.Update(func(tx database.Tx) error {
+		// Store a key/value pair directly in the metadata bucket.
+		// Typically a nested bucket would be used for a given feature,
+		// but this example is using the metadata bucket directly for
+		// simplicity.
+		key := []byte("mykey")
+		value := []byte("myvalue")
+		if err := tx.Metadata().Put(key, value); err != nil {
+			return err
+		}
+
+		// Read the key back and ensure it matches.
+		if !bytes.Equal(tx.Metadata().Get(key), value) {
+			return fmt.Errorf("unexpected value for key '%s'", key)
+		}
+
+		// Create a new nested bucket under the metadata bucket.
+		nestedBucketKey := []byte("mybucket")
+		nestedBucket, err := tx.Metadata().CreateBucket(nestedBucketKey)
+		if err != nil {
+			return err
+		}
+
+		// The key from above that was set in the metadata bucket does
+		// not exist in this new nested bucket.
+		if nestedBucket.Get(key) != nil {
+			return fmt.Errorf("key '%s' is not expected nil", key)
+		}
+
+		return nil
+	})
 	if err != nil {
 		fmt.Println(err)
 		return
 	}
-	fmt.Println("Latest hash:", latestHash)
-	fmt.Println("Latest height:", latestHeight)
 
 	// Output:
-	// Latest hash: 5b7466edf6739adc9b32aaedc54e24bdc59a05f0ced855088835fe3cbe58375f
-	// Latest height: 0
+}
+
+// This example demonstrates creating a new database, using a managed read-write
+// transaction to store a block, and using a managed read-only transaction to
+// fetch the block.
+func Example_blockStorageAndRetrieval() {
+	// This example assumes the ffldb driver is imported.
+	//
+	// import (
+	// 	"github.com/decred/dcrd/database2"
+	// 	_ "github.com/decred/dcrd/database/ffldb"
+	// )
+
+	// Create a database and schedule it to be closed and removed on exit.
+	// Typically you wouldn't want to remove the database right away like
+	// this, nor put it in the temp directory, but it's done here to ensure
+	// the example cleans up after itself.
+	dbPath := filepath.Join(os.TempDir(), "exampleblkstorage")
+	db, err := database.Create("ffldb", dbPath, wire.MainNet)
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+	defer os.RemoveAll(dbPath)
+	defer db.Close()
+
+	// Use the Update function of the database to perform a managed
+	// read-write transaction and store a genesis block in the database as
+	// and example.
+	err = db.Update(func(tx database.Tx) error {
+		genesisBlock := chaincfg.MainNetParams.GenesisBlock
+		return tx.StoreBlock(dcrutil.NewBlock(genesisBlock))
+	})
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+
+	// Use the View function of the database to perform a managed read-only
+	// transaction and fetch the block stored above.
+	var loadedBlockBytes []byte
+	err = db.Update(func(tx database.Tx) error {
+		genesisHash := chaincfg.MainNetParams.GenesisHash
+		blockBytes, err := tx.FetchBlock(genesisHash)
+		if err != nil {
+			return err
+		}
+
+		// As documented, all data fetched from the database is only
+		// valid during a database transaction in order to support
+		// zero-copy backends.  Thus, make a copy of the data so it
+		// can be used outside of the transaction.
+		loadedBlockBytes = make([]byte, len(blockBytes))
+		copy(loadedBlockBytes, blockBytes)
+		return nil
+	})
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+
+	// Typically at this point, the block could be deserialized via the
+	// wire.MsgBlock.Deserialize function or used in its serialized form
+	// depending on need.  However, for this example, just display the
+	// number of serialized bytes to show it was loaded as expected.
+	fmt.Printf("Serialized block size: %d bytes\n", len(loadedBlockBytes))
+
+	// Output:
+	// Serialized block size: 300 bytes
 }

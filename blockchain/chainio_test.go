@@ -13,7 +13,7 @@ import (
 	"time"
 
 	"github.com/decred/dcrd/chaincfg/chainhash"
-	database "github.com/decred/dcrd/database2"
+	"github.com/decred/dcrd/database"
 	"github.com/decred/dcrd/wire"
 )
 

@@ -834,11 +834,17 @@ func handleTooFewVoters(subsidyCache *blockchain.SubsidyCache,
 				// same block and choose the same winners as before.
 				ens := cptCopy.getCoinbaseExtranonces()
 				ens[0]++
-				UpdateExtraNonce(cptCopy.Block, cptCopy.Height, ens)
+				err = UpdateExtraNonce(cptCopy.Block, cptCopy.Height, ens)
+				if err != nil {
+					return nil, err
+				}
 
 				// Update extranonce of the original template too, so
 				// we keep getting unique numbers.
-				UpdateExtraNonce(curTemplate.Block, curTemplate.Height, ens)
+				err = UpdateExtraNonce(curTemplate.Block, curTemplate.Height, ens)
+				if err != nil {
+					return nil, err
+				}
 
 				// Make sure the block validates.
 				block := dcrutil.NewBlockDeepCopyCoinbase(cptCopy.Block)
@@ -1600,7 +1606,12 @@ mempoolLoop:
 		// an entry for it to ensure any transactions which reference
 		// this one have it available as an input and can ensure they
 		// aren't double spending.
-		spendTransaction(blockUtxos, tx, nextBlockHeight)
+		err = spendTransaction(blockUtxos, tx, nextBlockHeight)
+		if err != nil {
+			minrLog.Warnf("Unable to spend transaction %v in the preliminary "+
+				"UTXO view for the block template: %v",
+				tx.Sha(), err)
+		}
 
 		// Add the transaction to the block, increment counters, and
 		// save the fees and signature operation counts to the block

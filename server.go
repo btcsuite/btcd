@@ -27,7 +27,7 @@ import (
 	"github.com/decred/dcrd/blockchain/stake"
 	"github.com/decred/dcrd/chaincfg"
 	"github.com/decred/dcrd/chaincfg/chainhash"
-	database "github.com/decred/dcrd/database2"
+	"github.com/decred/dcrd/database"
 	"github.com/decred/dcrd/mining"
 	"github.com/decred/dcrd/peer"
 	"github.com/decred/dcrd/txscript"
@@ -1108,7 +1108,10 @@ func (s *server) pushTxMsg(sp *serverPeer, sha *chainhash.Hash, doneChan chan<- 
 	// Attempt to fetch the requested transaction from the pool.  A
 	// call could be made to check for existence first, but simply trying
 	// to fetch a missing transaction results in the same behavior.
-	tx, err := s.txMemPool.FetchTransaction(sha)
+	// Do not allow peers to request transactions already in a block
+	// but are unconfirmed, as they may be expensive. Restrict that
+	// to the authenticated RPC only.
+	tx, err := s.txMemPool.FetchTransaction(sha, false)
 	if err != nil {
 		peerLog.Tracef("Unable to fetch tx %v from transaction "+
 			"pool: %v", sha, err)

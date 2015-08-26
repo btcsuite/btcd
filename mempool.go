@@ -860,14 +860,30 @@ func (mp *txMemPool) fetchInputUtxos(tx *dcrutil.Tx) (*blockchain.UtxoViewpoint,
 // orphans.
 //
 // This function is safe for concurrent access.
-func (mp *txMemPool) FetchTransaction(txHash *chainhash.Hash) (*dcrutil.Tx,
-	error) {
+func (mp *txMemPool) FetchTransaction(txHash *chainhash.Hash, includeRecentBlock bool) (*dcrutil.Tx, error) {
 	// Protect concurrent access.
 	mp.RLock()
 	defer mp.RUnlock()
 
 	if txDesc, exists := mp.pool[*txHash]; exists {
 		return txDesc.Tx, nil
+	}
+
+	// For Decred, the latest block is considered "unconfirmed"
+	// for the regular transaction tree. Search that if the
+	// user indicates too, as well.
+	if includeRecentBlock {
+		best := mp.cfg.Chain.BestSnapshot()
+		bl, err := mp.cfg.Chain.BlockByHash(best.Hash)
+		if err != nil {
+			return nil, err
+		}
+
+		for _, tx := range bl.Transactions() {
+			if tx.Sha().IsEqual(txHash) {
+				return tx, nil
+			}
+		}
 	}
 
 	return nil, fmt.Errorf("transaction is not in the pool")

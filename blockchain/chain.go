@@ -16,7 +16,7 @@ import (
 	"github.com/decred/dcrd/blockchain/stake"
 	"github.com/decred/dcrd/chaincfg"
 	"github.com/decred/dcrd/chaincfg/chainhash"
-	database "github.com/decred/dcrd/database2"
+	"github.com/decred/dcrd/database"
 	"github.com/decred/dcrd/txscript"
 	"github.com/decred/dcrd/wire"
 	"github.com/decred/dcrutil"
@@ -349,7 +349,7 @@ func (b *BlockChain) CheckLiveTickets(hashes []*chainhash.Hash) ([]bool, error) 
 	return existsSlice, nil
 }
 
-// TicketPoolValueExact returns the current value of all the locked funds in the
+// TicketPoolValue returns the current value of all the locked funds in the
 // ticket pool.
 //
 // This function is safe for concurrent access. All live tickets are at least

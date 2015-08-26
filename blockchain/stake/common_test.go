@@ -12,9 +12,8 @@ import (
 	"github.com/decred/dcrd/blockchain"
 	"github.com/decred/dcrd/blockchain/stake"
 	"github.com/decred/dcrd/chaincfg"
-	_ "github.com/decred/dcrd/database/memdb"
-	database "github.com/decred/dcrd/database2"
-	_ "github.com/decred/dcrd/database2/ffldb"
+	"github.com/decred/dcrd/database"
+	_ "github.com/decred/dcrd/database/ffldb"
 	"github.com/decred/dcrd/wire"
 )
 

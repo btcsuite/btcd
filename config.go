@@ -23,10 +23,8 @@ import (
 
 	flags "github.com/btcsuite/go-flags"
 	"github.com/btcsuite/go-socks/socks"
-	_ "github.com/decred/dcrd/database/ldb"
-	_ "github.com/decred/dcrd/database/memdb"
-	database "github.com/decred/dcrd/database2"
-	_ "github.com/decred/dcrd/database2/ffldb"
+	"github.com/decred/dcrd/database"
+	_ "github.com/decred/dcrd/database/ffldb"
 	"github.com/decred/dcrd/wire"
 	"github.com/decred/dcrutil"
 )
@@ -389,10 +387,10 @@ func loadConfig() (*config, []string, error) {
 	if err != nil {
 		if e, ok := err.(*flags.Error); ok && e.Type == flags.ErrHelp {
 			fmt.Fprintln(os.Stderr, err)
-			return nil, nil, err
 		} else {
 			fmt.Printf("Could not load configuration: %v\n", err.Error())
 		}
+		return nil, nil, err
 	}
 
 	// Show the version and exit if the version flag was specified.

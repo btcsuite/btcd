@@ -40,7 +40,7 @@ import (
 	"github.com/decred/dcrd/chaincfg"
 	"github.com/decred/dcrd/chaincfg/chainec"
 	"github.com/decred/dcrd/chaincfg/chainhash"
-	database "github.com/decred/dcrd/database2"
+	"github.com/decred/dcrd/database"
 	"github.com/decred/dcrd/dcrjson"
 	"github.com/decred/dcrd/mining"
 	"github.com/decred/dcrd/txscript"
@@ -2557,7 +2557,11 @@ func (state *gbtWorkState) updateBlockTemplate(s *rpcServer, useCoinbaseValue bo
 		// Update the time of the block template to the current time
 		// while accounting for the median time of the past several
 		// blocks per the chain consensus rules.
-		UpdateBlockTime(msgBlock, s.server.blockManager)
+		err := UpdateBlockTime(msgBlock, s.server.blockManager)
+		if err != nil {
+			context := "Failed to update timestamp"
+			return internalRPCError(err.Error(), context)
+		}
 		msgBlock.Header.Nonce = 0
 
 		rpcsLog.Debugf("Updated block template (timestamp %v, "+
@@ -3666,7 +3670,7 @@ func handleGetRawTransaction(s *rpcServer, cmd interface{}, closeChan <-chan str
 	var mtx *wire.MsgTx
 	var blkHash *chainhash.Hash
 	var blkHeight int64
-	tx, err := s.server.txMemPool.FetchTransaction(txHash)
+	tx, err := s.server.txMemPool.FetchTransaction(txHash, true)
 	if err != nil {
 		txIndex := s.server.txIndex
 		if txIndex == nil {
@@ -3874,15 +3878,15 @@ func handleGetTxOut(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (i
 	if c.IncludeMempool != nil {
 		includeMempool = *c.IncludeMempool
 	}
-	// TODO: This is racy.  It should attempt to fetch it directly and check
-	// the error.
-	if includeMempool && s.server.txMemPool.HaveTransaction(txHash) {
-		tx, err := s.server.txMemPool.FetchTransaction(txHash)
+	var txFromMempool *dcrutil.Tx
+	if includeMempool {
+		txFromMempool, err = s.server.txMemPool.FetchTransaction(txHash, true)
 		if err != nil {
 			return nil, rpcNoTxInfoError(txHash)
 		}
-
-		mtx := tx.MsgTx()
+	}
+	if txFromMempool != nil {
+		mtx := txFromMempool.MsgTx()
 		if c.Vout > uint32(len(mtx.TxOut)-1) {
 			return nil, &dcrjson.RPCError{
 				Code: dcrjson.ErrRPCInvalidTxVout,
@@ -4488,7 +4492,7 @@ func fetchInputTxos(s *rpcServer, tx *wire.MsgTx) (map[wire.OutPoint]wire.TxOut,
 		// Attempt to fetch and use the referenced transaction from the
 		// memory pool.
 		origin := &txIn.PreviousOutPoint
-		originTx, err := mp.FetchTransaction(&origin.Hash)
+		originTx, err := mp.FetchTransaction(&origin.Hash, true)
 		if err == nil {
 			txOuts := originTx.MsgTx().TxOut
 			if origin.Index >= uint32(len(txOuts)) {
@@ -5316,10 +5320,9 @@ func ticketFeeInfoForRange(s *rpcServer, start int64, end int64, txType stake.Tx
 func handleTicketFeeInfo(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (interface{}, error) {
 	c := cmd.(*dcrjson.TicketFeeInfoCmd)
 
-	cs := s.server.blockManager.chainState
-	cs.Lock()
-	bestHeight := cs.newestHeight
-	cs.Unlock()
+	s.server.blockManager.chainState.Lock()
+	bestHeight := s.server.blockManager.chainState.newestHeight
+	s.server.blockManager.chainState.Unlock()
 
 	// Memory pool first.
 	feeInfoMempool := feeInfoForMempool(s, stake.TxTypeSStx)
@@ -5490,10 +5493,9 @@ func handleTicketVWAP(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) 
 func handleTxFeeInfo(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (interface{}, error) {
 	c := cmd.(*dcrjson.TxFeeInfoCmd)
 
-	cs := s.server.blockManager.chainState
-	cs.Lock()
-	bestHeight := cs.newestHeight
-	cs.Unlock()
+	s.server.blockManager.chainState.Lock()
+	bestHeight := s.server.blockManager.chainState.newestHeight
+	s.server.blockManager.chainState.Unlock()
 
 	// Memory pool first.
 	feeInfoMempool := feeInfoForMempool(s, stake.TxTypeRegular)

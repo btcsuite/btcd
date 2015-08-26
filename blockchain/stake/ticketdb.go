@@ -34,7 +34,7 @@ import (
 	"github.com/decred/dcrd/blockchain/dbnamespace"
 	"github.com/decred/dcrd/chaincfg"
 	"github.com/decred/dcrd/chaincfg/chainhash"
-	database "github.com/decred/dcrd/database2"
+	"github.com/decred/dcrd/database"
 	"github.com/decred/dcrutil"
 )
 
@@ -397,7 +397,7 @@ func (tmdb *TicketDB) Initialize(np *chaincfg.Params, db database.DB) error {
 
 	if curHeight > 0 {
 		log.Infof("Db non-empty, resyncing ticket DB")
-		err := tmdb.RescanTicketDB()
+		err := tmdb.rescanTicketDB()
 
 		if err != nil {
 			return err

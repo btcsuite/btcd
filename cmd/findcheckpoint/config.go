@@ -12,9 +12,8 @@ import (
 
 	flags "github.com/btcsuite/go-flags"
 	"github.com/decred/dcrd/chaincfg"
-	_ "github.com/decred/dcrd/database/ldb"
-	database "github.com/decred/dcrd/database2"
-	_ "github.com/decred/dcrd/database2/ffldb"
+	"github.com/decred/dcrd/database"
+	_ "github.com/decred/dcrd/database/ffldb"
 	"github.com/decred/dcrd/wire"
 	"github.com/decred/dcrutil"
 )

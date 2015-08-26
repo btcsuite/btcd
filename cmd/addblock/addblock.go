@@ -12,8 +12,7 @@ import (
 
 	"github.com/btcsuite/btclog"
 	"github.com/decred/dcrd/blockchain"
-	_ "github.com/decred/dcrd/database/ldb"
-	database "github.com/decred/dcrd/database2"
+	"github.com/decred/dcrd/database"
 	"github.com/decred/dcrd/limits"
 )
 

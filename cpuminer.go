@@ -228,7 +228,12 @@ func (m *CPUMiner) solveBlock(msgBlock *wire.MsgBlock, ticker *time.Ticker,
 		// Update the extra nonce in the block template with the
 		// new value by regenerating the coinbase script and
 		// setting the merkle root to the new value.  The
-		UpdateExtraNonce(msgBlock, blockHeight, ens)
+		err := UpdateExtraNonce(msgBlock, blockHeight, ens)
+		if err != nil {
+			minrLog.Warnf("Unable to update CPU miner extranonce: %v",
+				err)
+			break
+		}
 
 		// Search through the entire nonce range for a solution while
 		// periodically checking for early quit and stale block
@@ -253,7 +258,12 @@ func (m *CPUMiner) solveBlock(msgBlock *wire.MsgBlock, ticker *time.Ticker,
 					return false
 				}
 
-				UpdateBlockTime(msgBlock, m.server.blockManager)
+				err = UpdateBlockTime(msgBlock, m.server.blockManager)
+				if err != nil {
+					minrLog.Warnf("CPU miner unable to update block template "+
+						"time: %v", err)
+					return false
+				}
 
 			default:
 				// Non-blocking select to fall through

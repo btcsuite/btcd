@@ -24,7 +24,7 @@ import (
 	"github.com/decred/dcrd/blockchain/stake"
 	"github.com/decred/dcrd/chaincfg"
 	"github.com/decred/dcrd/chaincfg/chainhash"
-	database "github.com/decred/dcrd/database2"
+	"github.com/decred/dcrd/database"
 	"github.com/decred/dcrd/wire"
 	"github.com/decred/dcrutil"
 )
@@ -730,13 +730,23 @@ func (b *blockManager) startSync(peers *list.List) {
 			best.Height < b.nextCheckpoint.Height &&
 			!cfg.DisableCheckpoints {
 
-			bestPeer.PushGetHeadersMsg(locator, b.nextCheckpoint.Hash)
+			err := bestPeer.PushGetHeadersMsg(locator, b.nextCheckpoint.Hash)
+			if err != nil {
+				bmgrLog.Errorf("Failed to push getheadermsg for the "+
+					"latest blocks: %v", err)
+				return
+			}
 			b.headersFirstMode = true
 			bmgrLog.Infof("Downloading headers for blocks %d to "+
 				"%d from peer %s", best.Height+1,
 				b.nextCheckpoint.Height, bestPeer.Addr())
 		} else {
-			bestPeer.PushGetBlocksMsg(locator, &zeroHash)
+			err := bestPeer.PushGetBlocksMsg(locator, &zeroHash)
+			if err != nil {
+				bmgrLog.Errorf("Failed to push getblocksmsg for the "+
+					"latest blocks: %v", err)
+				return
+			}
 		}
 		b.syncPeer = bestPeer
 	} else {
@@ -1266,7 +1276,11 @@ func (b *blockManager) handleBlockMsg(bmsg *blockMsg) {
 			bmgrLog.Warnf("Failed to get block locator for the "+
 				"latest block: %v", err)
 		} else {
-			bmsg.peer.PushGetBlocksMsg(locator, orphanRoot)
+			err = bmsg.peer.PushGetBlocksMsg(locator, orphanRoot)
+			if err != nil {
+				bmgrLog.Warnf("Failed to push getblocksmsg for the "+
+					"latest block: %v", err)
+			}
 		}
 	} else {
 		// When the block is not an orphan, log information about it and
@@ -1472,12 +1486,17 @@ func (b *blockManager) fetchHeaderBlocks() {
 			bmgrLog.Warnf("Unexpected failure when checking for "+
 				"existing inventory during header block "+
 				"fetch: %v", err)
+			continue
 		}
 		if !haveInv {
 			b.requestedBlocks[*node.sha] = struct{}{}
 			b.requestedEverBlocks[*node.sha] = 0
 			b.syncPeer.requestedBlocks[*node.sha] = struct{}{}
-			gdmsg.AddInvVect(iv)
+			err = gdmsg.AddInvVect(iv)
+			if err != nil {
+				bmgrLog.Warnf("Failed to add invvect while fetching "+
+					"block headers: %v", err)
+			}
 			numRequested++
 		}
 		b.startHeader = e.Next()
@@ -1726,7 +1745,11 @@ func (b *blockManager) handleInvMsg(imsg *invMsg) {
 						"%v", err)
 					continue
 				}
-				imsg.peer.PushGetBlocksMsg(locator, orphanRoot)
+				err = imsg.peer.PushGetBlocksMsg(locator, orphanRoot)
+				if err != nil {
+					bmgrLog.Errorf("PEER: Failed to push getblocksmsg "+
+						"for orphan chain: %v", err)
+				}
 				continue
 			}
 
@@ -1739,7 +1762,11 @@ func (b *blockManager) handleInvMsg(imsg *invMsg) {
 				// final one the remote peer knows about (zero
 				// stop hash).
 				locator := b.chain.BlockLocatorFromHash(&iv.Hash)
-				imsg.peer.PushGetBlocksMsg(locator, &zeroHash)
+				err = imsg.peer.PushGetBlocksMsg(locator, &zeroHash)
+				if err != nil {
+					bmgrLog.Errorf("PEER: Failed to push getblocksmsg: "+
+						"%v", err)
+				}
 			}
 		}
 	}
@@ -2935,7 +2962,7 @@ func newBlockManager(s *server, indexManager blockchain.IndexManager) (*blockMan
 	return &bm, nil
 }
 
-// dbPath returns the path to the block database given a database type.
+// blockDbPath returns the path to the block database given a database type.
 func blockDbPath(dbType string) string {
 	// The database name is based on the database type.
 	dbName := blockDbNamePrefix + "_" + dbType
@@ -3075,7 +3102,10 @@ func dumpBlockChain(height int64, db database.DB) error {
 	}
 
 	if cfg.DumpBlockchain != "" {
-		dumpBlockChain(height, db)
+		err = dumpBlockChain(height, db)
+		if err != nil {
+			return err
+		}
 		return errors.New("Block database dump to map completed, closing.")
 	}
 
