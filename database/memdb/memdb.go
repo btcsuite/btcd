@@ -690,7 +690,7 @@ func (db *MemDb) UpdateAddrIndexForBlock(*wire.ShaHash, int32,
 
 // FetchTxsForAddr isn't currently implemented. This is a part of the database.Db
 // interface implementation.
-func (db *MemDb) FetchTxsForAddr(btcutil.Address, int, int) ([]*database.TxListReply, int, error) {
+func (db *MemDb) FetchTxsForAddr(btcutil.Address, int, int, bool) ([]*database.TxListReply, int, error) {
 	return nil, 0, database.ErrNotImplemented
 }
 

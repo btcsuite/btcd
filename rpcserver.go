@@ -2948,7 +2948,7 @@ func handlePing(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (inter
 // getMempoolTxsForAddressRange looks up and returns all transactions from the
 // mempool related to the given address. The, `limit` parameter
 // should be the max number of transactions to be returned. Additionally, if the
-// caller wishes to seek forward in the results some amount, the 'seek'
+// caller wishes to seek forward in the results some amount, the 'skip' parameter
 // represents how many results to skip.
 // It will return the array of fetched transactions, along with the amount
 // of transactions that were actually skipped.
@@ -3025,23 +3025,41 @@ func handleSearchRawTransactions(s *rpcServer, cmd interface{}, closeChan <-chan
 		}
 	}
 
-	// While it's more efficient to check the mempool for relevant transactions
-	// first, we want to return results in order of occurrence/dependency so
-	// we'll check the mempool only if there aren't enough results returned
-	// by the database.
-	dbTxs, dbSkipped, err := s.server.db.FetchTxsForAddr(addr, numToSkip,
-		numRequested-len(addressTxs))
-	if err == nil {
-		skipped += dbSkipped
-		for _, txReply := range dbTxs {
-			addressTxs = append(addressTxs, txReply)
-		}
+	var reverse bool
+	if c.Reverse != nil {
+		reverse = *c.Reverse
 	}
 
+	// Add txs from mempool first if client asked for reverse order, otherwise
+	// add them last.
 	// This code (and txMemPool.FilterTransactionsByAddress()) doesn't sort by
 	// dependency. This might be something we want to do in the future when we
 	// return results for the client's convenience, or leave it to the client.
+	if reverse && len(addressTxs) < numRequested {
+		memPoolTxs, memPoolSkipped, err := getMempoolTxsForAddressRange(s, addr,
+			numToSkip-skipped, numRequested-len(addressTxs))
+		if err == nil {
+			skipped += memPoolSkipped
+			for _, txReply := range memPoolTxs {
+				addressTxs = append(addressTxs, txReply)
+			}
+		}
+	}
+
+	// Fetch transactions from the database in the desired order if we need more.
 	if len(addressTxs) < numRequested {
+		dbTxs, dbSkipped, err := s.server.db.FetchTxsForAddr(addr,
+			numToSkip-skipped, numRequested-len(addressTxs), reverse)
+		if err == nil {
+			skipped += dbSkipped
+			for _, txReply := range dbTxs {
+				addressTxs = append(addressTxs, txReply)
+			}
+		}
+	}
+
+	// Add txs from mempool last if the client didn't ask for reverse order.
+	if !reverse && len(addressTxs) < numRequested {
 		memPoolTxs, memPoolSkipped, err := getMempoolTxsForAddressRange(s, addr,
 			numToSkip-skipped, numRequested-len(addressTxs))
 		if err == nil {

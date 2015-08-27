@@ -91,12 +91,12 @@ func testAddrIndexOperations(t *testing.T, db database.Db, newestBlock *btcutil.
 
 	// Test enforcement of constraints for "limit" and "skip"
 	var fakeAddr btcutil.Address
-	_, _, err = db.FetchTxsForAddr(fakeAddr, -1, 0)
+	_, _, err = db.FetchTxsForAddr(fakeAddr, -1, 0, false)
 	if err == nil {
 		t.Fatalf("Negative value for skip passed, should return an error")
 	}
 
-	_, _, err = db.FetchTxsForAddr(fakeAddr, 0, -1)
+	_, _, err = db.FetchTxsForAddr(fakeAddr, 0, -1, false)
 	if err == nil {
 		t.Fatalf("Negative value for limit passed, should return an error")
 	}
@@ -136,7 +136,7 @@ func testAddrIndexOperations(t *testing.T, db database.Db, newestBlock *btcutil.
 	assertAddrIndexTipIsUpdated(db, t, newestSha, newestBlockIdx)
 
 	// Check index retrieval.
-	txReplies, _, err := db.FetchTxsForAddr(testAddrs[0], 0, 1000)
+	txReplies, _, err := db.FetchTxsForAddr(testAddrs[0], 0, 1000, false)
 	if err != nil {
 		t.Fatalf("FetchTxsForAddr failed to correctly fetch txs for an "+
 			"address, err %v", err)
@@ -171,7 +171,7 @@ func testAddrIndexOperations(t *testing.T, db database.Db, newestBlock *btcutil.
 	}
 
 	// Former index should no longer exist.
-	txReplies, _, err = db.FetchTxsForAddr(testAddrs[0], 0, 1000)
+	txReplies, _, err = db.FetchTxsForAddr(testAddrs[0], 0, 1000, false)
 	if err != nil {
 		t.Fatalf("Unable to fetch transactions for address: %v", err)
 	}
@@ -555,7 +555,7 @@ func TestLimitAndSkipFetchTxsForAddr(t *testing.T) {
 	}
 
 	// Try skipping the first 4 results, should get 6 in return.
-	txReply, txSkipped, err := testDb.db.FetchTxsForAddr(targetAddr, 4, 100000)
+	txReply, txSkipped, err := testDb.db.FetchTxsForAddr(targetAddr, 4, 100000, false)
 	if err != nil {
 		t.Fatalf("Unable to fetch transactions for address: %v", err)
 	}
@@ -569,7 +569,7 @@ func TestLimitAndSkipFetchTxsForAddr(t *testing.T) {
 	}
 
 	// Limit the number of results to 3.
-	txReply, txSkipped, err = testDb.db.FetchTxsForAddr(targetAddr, 0, 3)
+	txReply, txSkipped, err = testDb.db.FetchTxsForAddr(targetAddr, 0, 3, false)
 	if err != nil {
 		t.Fatalf("Unable to fetch transactions for address: %v", err)
 	}
@@ -583,7 +583,7 @@ func TestLimitAndSkipFetchTxsForAddr(t *testing.T) {
 	}
 
 	// Skip 1, limit 5.
-	txReply, txSkipped, err = testDb.db.FetchTxsForAddr(targetAddr, 1, 5)
+	txReply, txSkipped, err = testDb.db.FetchTxsForAddr(targetAddr, 1, 5, false)
 	if err != nil {
 		t.Fatalf("Unable to fetch transactions for address: %v", err)
 	}

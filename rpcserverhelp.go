@@ -470,6 +470,7 @@ var helpDescsEnUS = map[string]string{
 	"searchrawtransactions-skip":        "The number of leading transactions to leave out of the final response",
 	"searchrawtransactions-count":       "The maximum number of transactions to return",
 	"searchrawtransactions-vinextra":    "Specify that extra data from previous output will be returned in vin",
+	"searchrawtransactions-reverse":     "Specifies that the transactions should be returned in reverse chronological order",
 	"searchrawtransactions--result0":    "Hex-encoded serialized transaction",
 
 	// SendRawTransactionCmd help.
