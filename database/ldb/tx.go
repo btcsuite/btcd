@@ -430,16 +430,16 @@ func bytesPrefix(prefix []byte) *util.Range {
 // caller wishes to seek forward in the results some amount, the 'seek'
 // represents how many results to skip.
 func (db *LevelDb) FetchTxsForAddr(addr btcutil.Address, skip int,
-	limit int) ([]*database.TxListReply, error) {
+	limit int) ([]*database.TxListReply, int, error) {
 	db.dbLock.Lock()
 	defer db.dbLock.Unlock()
 
 	// Enforce constraints for skip and limit.
 	if skip < 0 {
-		return nil, errors.New("offset for skip must be positive")
+		return nil, 0, errors.New("offset for skip must be positive")
 	}
 	if limit < 0 {
-		return nil, errors.New("value for limit must be positive")
+		return nil, 0, errors.New("value for limit must be positive")
 	}
 
 	// Parse address type, bailing on an unknown type.
@@ -455,7 +455,7 @@ func (db *LevelDb) FetchTxsForAddr(addr btcutil.Address, skip int,
 		hash160 := addr.AddressPubKeyHash().Hash160()
 		addrKey = hash160[:]
 	default:
-		return nil, database.ErrUnsupportedAddressType
+		return nil, 0, database.ErrUnsupportedAddressType
 	}
 
 	// Create the prefix for our search.
@@ -464,8 +464,10 @@ func (db *LevelDb) FetchTxsForAddr(addr btcutil.Address, skip int,
 	copy(addrPrefix[3:23], addrKey)
 
 	iter := db.lDb.NewIterator(bytesPrefix(addrPrefix), nil)
+	skipped := 0
 	for skip != 0 && iter.Next() {
 		skip--
+		skipped++
 	}
 
 	// Iterate through all address indexes that match the targeted prefix.
@@ -491,10 +493,10 @@ func (db *LevelDb) FetchTxsForAddr(addr btcutil.Address, skip int,
 	}
 	iter.Release()
 	if err := iter.Error(); err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 
-	return replies, nil
+	return replies, skipped, nil
 }
 
 // UpdateAddrIndexForBlock updates the stored addrindex with passed
