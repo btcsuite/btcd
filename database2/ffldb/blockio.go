@@ -417,7 +417,7 @@ func (s *blockStore) writeBlock(rawBlock []byte) (blockLocation, error) {
 	wc := s.writeCursor
 	finalOffset := wc.curOffset + fullLen
 	if finalOffset < wc.curOffset || finalOffset > s.maxBlockFileSize {
-		// This is done under the write cursor lock since the fileNum
+		// This is done under the write cursor lock since the curFileNum
 		// field is accessed elsewhere by readers.
 		//
 		// Close the current write file to force a read-only reopen
@@ -481,14 +481,6 @@ func (s *blockStore) writeBlock(rawBlock []byte) (blockLocation, error) {
 	// Castagnoli CRC-32 as a checksum of all the previous.
 	if err := s.writeData(hasher.Sum(nil), "checksum"); err != nil {
 		return blockLocation{}, err
-	}
-
-	// Sync the file to disk.
-	if err := wc.curFile.file.Sync(); err != nil {
-		str := fmt.Sprintf("failed to sync file %d: %v", wc.curFileNum,
-			err)
-		return blockLocation{}, makeDbErr(database.ErrDriverSpecific,
-			str, err)
 	}
 
 	loc := blockLocation{
@@ -592,6 +584,36 @@ func (s *blockStore) readBlockRegion(loc blockLocation, offset, numBytes uint32)
 	}
 
 	return serializedData, nil
+}
+
+// syncBlocks performs a file system sync on the flat file associated with the
+// store's current write cursor.  It is safe to call even when there is not a
+// current write file in which case it will have no effect.
+//
+// This is used when flushing cached metadata updates to disk to ensure all the
+// block data is fully written before updating the metadata.  This ensures the
+// metadata and block data can be properly reconciled in failure scenarios.
+func (s *blockStore) syncBlocks() error {
+	wc := s.writeCursor
+	wc.RLock()
+	defer wc.RUnlock()
+
+	// Nothing to do if there is no current file associated with the write
+	// cursor.
+	wc.curFile.RLock()
+	defer wc.curFile.RUnlock()
+	if wc.curFile.file == nil {
+		return nil
+	}
+
+	// Sync the file to disk.
+	if err := wc.curFile.file.Sync(); err != nil {
+		str := fmt.Sprintf("failed to sync file %d: %v", wc.curFileNum,
+			err)
+		return makeDbErr(database.ErrDriverSpecific, str, err)
+	}
+
+	return nil
 }
 
 // handleRollback rolls the block files on disk back to the provided file number
