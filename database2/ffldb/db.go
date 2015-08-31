@@ -225,12 +225,12 @@ func (c *cursor) Delete() error {
 
 // skipPendingUpdates skips any keys at the current database iterator position
 // that are being updated by the transaction.  The forwards flag indicates the
-// direction the cursor is moving moved.
+// direction the cursor is moving.
 func (c *cursor) skipPendingUpdates(forwards bool) {
 	for c.dbIter.Valid() {
 		var skip bool
 		key := c.dbIter.Key()
-		if _, ok := c.bucket.tx.pendingRemove[string(key)]; ok {
+		if c.bucket.tx.pendingRemove.Has(key) {
 			skip = true
 		} else if c.bucket.tx.pendingKeys.Has(key) {
 			skip = true
@@ -249,7 +249,7 @@ func (c *cursor) skipPendingUpdates(forwards bool) {
 
 // chooseIterator first skips any entries in the database iterator that are
 // being updated by the transaction and sets the current iterator to the
-// appropriate iterator depending on their validatidy and the order they compare
+// appropriate iterator depending on their validity and the order they compare
 // in while taking into account the direction flag.  When the cursor is being
 // moved forwards and both iterators are valid, the iterator with the smaller
 // key is chosen and vice versa when the cursor is being moved backwards.
@@ -258,7 +258,7 @@ func (c *cursor) chooseIterator(forwards bool) bool {
 	// being updated by the transaction.
 	c.skipPendingUpdates(forwards)
 
-	// When bother iterators are exhausted, the cursor is exhausted too.
+	// When both iterators are exhausted, the cursor is exhausted too.
 	if !c.dbIter.Valid() && !c.pendingIter.Valid() {
 		c.currentIter = nil
 		return false
@@ -494,7 +494,7 @@ func newCursor(b *bucket, bucketID []byte, cursorTyp cursorType) *cursor {
 	switch cursorTyp {
 	case ctKeys:
 		keyRange := util.BytesPrefix(bucketID)
-		dbIter = b.tx.snapshot.NewIterator(keyRange, nil)
+		dbIter = b.tx.snapshot.NewIterator(keyRange)
 		pendingKeyIter := newLdbTreapIter(b.tx, keyRange)
 		pendingIter = pendingKeyIter
 
@@ -510,7 +510,7 @@ func newCursor(b *bucket, bucketID []byte, cursorTyp cursorType) *cursor {
 		copy(prefix[len(bucketIndexPrefix):], bucketID)
 		bucketRange := util.BytesPrefix(prefix)
 
-		dbIter = b.tx.snapshot.NewIterator(bucketRange, nil)
+		dbIter = b.tx.snapshot.NewIterator(bucketRange)
 		pendingBucketIter := newLdbTreapIter(b.tx, bucketRange)
 		pendingIter = pendingBucketIter
 
@@ -528,8 +528,8 @@ func newCursor(b *bucket, bucketID []byte, cursorTyp cursorType) *cursor {
 		// Since both keys and buckets are needed from the database,
 		// create an individual iterator for each prefix and then create
 		// a merged iterator from them.
-		dbKeyIter := b.tx.snapshot.NewIterator(keyRange, nil)
-		dbBucketIter := b.tx.snapshot.NewIterator(bucketRange, nil)
+		dbKeyIter := b.tx.snapshot.NewIterator(keyRange)
+		dbBucketIter := b.tx.snapshot.NewIterator(bucketRange)
 		iters := []iterator.Iterator{dbKeyIter, dbBucketIter}
 		dbIter = iterator.NewMergedIterator(iters,
 			comparer.DefaultComparer, true)
@@ -952,13 +952,13 @@ type pendingBlock struct {
 // read-write and implements the database.Bucket interface.  The transaction
 // provides a root bucket against which all read and writes occur.
 type transaction struct {
-	managed        bool              // Is the transaction managed?
-	closed         bool              // Is the transaction closed?
-	writable       bool              // Is the transaction writable?
-	db             *db               // DB instance the tx was created from.
-	snapshot       *leveldb.Snapshot // Underlying snapshot for txns.
-	metaBucket     *bucket           // The root metadata bucket.
-	blockIdxBucket *bucket           // The block index bucket.
+	managed        bool             // Is the transaction managed?
+	closed         bool             // Is the transaction closed?
+	writable       bool             // Is the transaction writable?
+	db             *db              // DB instance the tx was created from.
+	snapshot       *dbCacheSnapshot // Underlying snapshot for txns.
+	metaBucket     *bucket          // The root metadata bucket.
+	blockIdxBucket *bucket          // The block index bucket.
 
 	// Blocks that need to be stored on commit.  The pendingBlocks map is
 	// kept to allow quick lookups of pending data by block hash.
@@ -967,7 +967,7 @@ type transaction struct {
 
 	// Keys that need to be stored or deleted on commit.
 	pendingKeys   *treap.Mutable
-	pendingRemove map[string]struct{}
+	pendingRemove *treap.Mutable
 
 	// Active iterators that need to be notified when the pending keys have
 	// been updated so the cursors can properly handle updates to the
@@ -1030,7 +1030,7 @@ func (tx *transaction) hasKey(key []byte) bool {
 	// When the transaction is writable, check the pending transaction
 	// state first.
 	if tx.writable {
-		if _, ok := tx.pendingRemove[string(key)]; ok {
+		if tx.pendingRemove.Has(key) {
 			return false
 		}
 		if tx.pendingKeys.Has(key) {
@@ -1038,9 +1038,8 @@ func (tx *transaction) hasKey(key []byte) bool {
 		}
 	}
 
-	// Consult the database.
-	hasKey, _ := tx.snapshot.Has(key, nil)
-	return hasKey
+	// Consult the database cache and underlying database.
+	return tx.snapshot.Has(key)
 }
 
 // putKey adds the provided key to the list of keys to be updated in the
@@ -1051,7 +1050,7 @@ func (tx *transaction) hasKey(key []byte) bool {
 func (tx *transaction) putKey(key, value []byte) error {
 	// Prevent the key from being deleted if it was previously scheduled
 	// to be deleted on transaction commit.
-	delete(tx.pendingRemove, string(key))
+	tx.pendingRemove.Delete(key)
 
 	// Add the key/value pair to the list to be written on transaction
 	// commit.
@@ -1060,14 +1059,14 @@ func (tx *transaction) putKey(key, value []byte) error {
 	return nil
 }
 
-// fetchKey attempts to fetch the provided key from the database while taking
-// into account the current transaction state.  Returns nil if the key does not
-// exist.
+// fetchKey attempts to fetch the provided key from the database cache (and
+// hence underlying database) while taking into account the current transaction
+// state.  Returns nil if the key does not exist.
 func (tx *transaction) fetchKey(key []byte) []byte {
 	// When the transaction is writable, check the pending transaction
 	// state first.
 	if tx.writable {
-		if _, ok := tx.pendingRemove[string(key)]; ok {
+		if tx.pendingRemove.Has(key) {
 			return nil
 		}
 		if value := tx.pendingKeys.Get(key); value != nil {
@@ -1075,11 +1074,8 @@ func (tx *transaction) fetchKey(key []byte) []byte {
 		}
 	}
 
-	value, err := tx.snapshot.Get(key, nil)
-	if err != nil {
-		return nil
-	}
-	return value
+	// Consult the database cache and underlying database.
+	return tx.snapshot.Get(key)
 }
 
 // deleteKey adds the provided key to the list of keys to be deleted from the
@@ -1094,10 +1090,7 @@ func (tx *transaction) deleteKey(key []byte, notifyIterators bool) {
 	tx.pendingKeys.Delete(key)
 
 	// Add the key to the list to be deleted on transaction	commit.
-	if tx.pendingRemove == nil {
-		tx.pendingRemove = make(map[string]struct{})
-	}
-	tx.pendingRemove[string(key)] = struct{}{}
+	tx.pendingRemove.Put(key, nil)
 
 	// Notify the active iterators about the change if the flag is set.
 	if notifyIterators {
@@ -1644,7 +1637,7 @@ func (tx *transaction) close() {
 	tx.pendingBlockData = nil
 
 	// Clear pending keys that would have been written or deleted on commit.
-	tx.pendingKeys.Reset()
+	tx.pendingKeys = nil
 	tx.pendingRemove = nil
 
 	// Release the snapshot.
@@ -1677,7 +1670,7 @@ func serializeBlockRow(blockLoc blockLocation, blockHdr []byte) []byte {
 
 // writePendingAndCommit writes pending block data to the flat block files,
 // updates the metadata with their locations as well as the new current write
-// location, and commits the metadata to the underlying database.  It also
+// location, and commits the metadata to the memory database cache.  It also
 // properly handles rollback in the case of failures.
 //
 // This function MUST only be called when there is pending data to be written.
@@ -1728,25 +1721,17 @@ func (tx *transaction) writePendingAndCommit() error {
 		return convertErr("failed to store write cursor", err)
 	}
 
-	// Perform all leveldb update operations using a batch for atomicity.
-	batch := new(leveldb.Batch)
-	tx.pendingKeys.ForEach(func(k, v []byte) bool {
-		batch.Put(k, v)
-		return true
-	})
-	for k := range tx.pendingRemove {
-		batch.Delete([]byte(k))
-	}
-	if err := tx.db.ldb.Write(batch, nil); err != nil {
-		rollback()
-		return convertErr("failed to commit transaction", err)
-	}
-
-	return nil
+	// Atomically update the database cache.  The cache automatically
+	// handles flushing to the underlying persistent storage database.
+	return tx.db.cache.commitTx(tx)
 }
 
-// Commit commits all changes that have been made through the root bucket and
-// all of its sub-buckets to persistent storage.
+// Commit commits all changes that have been made to the root metadata bucket
+// and all of its sub-buckets to the database cache which is periodically synced
+// to persistent storage.  In addition, it commits all new blocks directly to
+// persistent storage bypassing the db cache.  Blocks can be rather large, so
+// this help increase the amount of cache available for the metadata updates and
+// is safe since blocks are immutable.
 //
 // This function is part of the database.Tx interface implementation.
 func (tx *transaction) Commit() error {
@@ -1802,8 +1787,8 @@ type db struct {
 	writeLock sync.Mutex   // Limit to one write transaction at a time.
 	closeLock sync.RWMutex // Make database close block while txns active.
 	closed    bool         // Is the database closed?
-	ldb       *leveldb.DB  // The underlying leveldb DB for metadata.
 	store     *blockStore  // Handles read/writing blocks to flat files.
+	cache     *dbCache     // Cache layer which wraps underlying leveldb DB.
 }
 
 // Enforce db implements the database.DB interface.
@@ -1846,24 +1831,26 @@ func (db *db) begin(writable bool) (*transaction, error) {
 			nil)
 	}
 
-	snapshot, err := db.ldb.GetSnapshot()
+	// Grab a snapshot of the database cache (which in turn also handles the
+	// underlying database).
+	snapshot, err := db.cache.Snapshot()
 	if err != nil {
 		db.closeLock.RUnlock()
 		if writable {
 			db.writeLock.Unlock()
 		}
 
-		str := "failed to open transaction"
-		return nil, convertErr(str, err)
+		return nil, err
 	}
 
 	// The metadata and block index buckets are internal-only buckets, so
 	// they have defined IDs.
 	tx := &transaction{
-		writable:    writable,
-		db:          db,
-		snapshot:    snapshot,
-		pendingKeys: treap.NewMutable(),
+		writable:      writable,
+		db:            db,
+		snapshot:      snapshot,
+		pendingKeys:   treap.NewMutable(),
+		pendingRemove: treap.NewMutable(),
 	}
 	tx.metaBucket = &bucket{tx: tx, id: metadataBucketID}
 	tx.blockIdxBucket = &bucket{tx: tx, id: blockIdxBucketID}
@@ -1968,10 +1955,9 @@ func (db *db) Update(fn func(database.Tx) error) error {
 	return tx.Commit()
 }
 
-// Close cleanly shuts down the database and syncs all data.  Any data in
-// database transactions which have not been committed will be lost, so it is
-// important to ensure all transactions are finalized prior to calling this
-// function if that data is intended to be stored.
+// Close cleanly shuts down the database and syncs all data.  It will block
+// until all database transactions have been finalized (rolled back or
+// committed).
 //
 // This function is part of the database.DB interface implementation.
 func (db *db) Close() error {
@@ -1984,6 +1970,15 @@ func (db *db) Close() error {
 		return makeDbErr(database.ErrDbNotOpen, errDbNotOpenStr, nil)
 	}
 	db.closed = true
+
+	// Close the database cache which will flush any existing entries to
+	// disk and close the underlying leveldb database.  Any error is saved
+	// and returned at the end after the remaining cleanup since the
+	// database will be marked closed even if this fails given there is no
+	// good way for the caller to recover from a failure here anyways.
+	db.writeLock.Lock()
+	closeErr := db.cache.Close()
+	db.writeLock.Unlock()
 
 	// NOTE: Since the above lock waits for all transactions to finish and
 	// prevents any new ones from being started, it is safe to clear all
@@ -2002,12 +1997,7 @@ func (db *db) Close() error {
 	db.store.openBlocksLRU.Init()
 	db.store.fileNumToLRUElem = nil
 
-	if err := db.ldb.Close(); err != nil {
-		str := "failed to close underlying leveldb database"
-		return convertErr(str, err)
-	}
-
-	return nil
+	return closeErr
 }
 
 // filesExists reports whether the named file or directory exists.
@@ -2082,9 +2072,12 @@ func openDB(dbPath string, network wire.BitcoinNet, create bool) (database.DB, e
 
 	// Create the block store which includes scanning the existing flat
 	// block files to find what the current write cursor position is
-	// according to the data that is actually on disk.
+	// according to the data that is actually on disk.  Also create the
+	// database cache which wraps the underlying leveldb database to provide
+	// write caching.
 	store := newBlockStore(dbPath, network)
-	pdb := &db{ldb: ldb, store: store}
+	cache := newDbCache(ldb, store, defaultCacheSize, defaultFlushSecs)
+	pdb := &db{store: store, cache: cache}
 
 	// Perform any reconciliation needed between the block and metadata as
 	// well as database initialization, if needed.

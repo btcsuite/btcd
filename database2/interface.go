@@ -392,8 +392,12 @@ type Tx interface {
 	// ******************************************************************
 
 	// Commit commits all changes that have been made to the metadata or
-	// block storage to persistent storage.  Calling this function on a
-	// managed transaction will result in a panic.
+	// block storage.  Depending on the backend implementation this could be
+	// to a cache that is periodically synced to persistent storage or
+	// directly to persistent storage.  In any case, all transactions which
+	// are started after the commit finishes will include all changes made
+	// by this transaction.  Calling this function on a managed transaction
+	// will result in a panic.
 	Commit() error
 
 	// Rollback undoes all changes that have been made to the metadata or
