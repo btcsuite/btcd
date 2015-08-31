@@ -214,14 +214,8 @@ func TestCornerCases(t *testing.T) {
 	}
 	_ = os.RemoveAll(filePath)
 
-	// Start a transaction and close the underlying leveldb database out
-	// from under it.
-	dbTx, err := idb.Begin(true)
-	if err != nil {
-		t.Errorf("Begin: unexpected error: %v", err)
-		return
-	}
-	ldb := idb.(*db).ldb
+	// Close the underlying leveldb database out from under the database.
+	ldb := idb.(*db).cache.ldb
 	ldb.Close()
 
 	// Ensure initilization errors in the underlying database work as
@@ -229,15 +223,6 @@ func TestCornerCases(t *testing.T) {
 	testName = "initDB: reinitialization"
 	wantErrCode = database.ErrDbNotOpen
 	err = initDB(ldb)
-	if !checkDbError(t, testName, err, wantErrCode) {
-		return
-	}
-
-	// Ensure errors in the underlying database during a transaction commit
-	// are handled properly.
-	testName = "Commit: underlying leveldb error"
-	wantErrCode = database.ErrDbNotOpen
-	err = dbTx.Commit()
 	if !checkDbError(t, testName, err, wantErrCode) {
 		return
 	}
@@ -325,16 +310,16 @@ func testWriteFailures(tc *testContext) bool {
 		return false
 	}
 
-	// Ensure file sync errors during writeBlock return the expected error.
+	// Ensure file sync errors during flush return the expected error.
 	store := tc.db.(*db).store
-	testName := "writeBlock: file sync failure"
+	testName := "flush: file sync failure"
 	store.writeCursor.Lock()
 	oldFile := store.writeCursor.curFile
 	store.writeCursor.curFile = &lockableFile{
 		file: &mockFile{forceSyncErr: true, maxSize: -1},
 	}
 	store.writeCursor.Unlock()
-	_, err := store.writeBlock([]byte{0x00})
+	err := tc.db.(*db).cache.flush()
 	if !checkDbError(tc.t, testName, err, database.ErrDriverSpecific) {
 		return false
 	}
