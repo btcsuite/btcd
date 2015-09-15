@@ -525,6 +525,10 @@ var helpDescsEnUS = map[string]string{
 
 	// -------- Websocket-specific help --------
 
+	// Session help.
+	"session--synopsis":       "Return details regarding a websocket client's current connection session.",
+	"sessionresult-sessionid": "The unique session ID for a client's websocket connection.",
+
 	// NotifyBlocksCmd help.
 	"notifyblocks--synopsis": "Request notifications for whenever a block is connected or disconnected from the main (best) chain.",
 
@@ -616,6 +620,7 @@ var rpcResultTypes = map[string][]interface{}{
 	"verifymessage":         []interface{}{(*bool)(nil)},
 
 	// Websocket commands.
+	"session":                   []interface{}{(*btcjson.SessionResult)(nil)},
 	"notifyblocks":              nil,
 	"stopnotifyblocks":          nil,
 	"notifynewtransactions":     nil,

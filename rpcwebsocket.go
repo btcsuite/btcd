@@ -54,6 +54,7 @@ var wsHandlersBeforeInit = map[string]wsCommandHandler{
 	"notifynewtransactions":     handleNotifyNewTransactions,
 	"notifyreceived":            handleNotifyReceived,
 	"notifyspent":               handleNotifySpent,
+	"session":                   handleSession,
 	"stopnotifyblocks":          handleStopNotifyBlocks,
 	"stopnotifynewtransactions": handleStopNotifyNewTransactions,
 	"stopnotifyspent":           handleStopNotifySpent,
@@ -94,7 +95,12 @@ func (s *rpcServer) WebsocketHandler(conn *websocket.Conn, remoteAddr string,
 	// Create a new websocket client to handle the new websocket connection
 	// and wait for it to shutdown.  Once it has shutdown (and hence
 	// disconnected), remove it and any notifications it registered for.
-	client := newWebsocketClient(s, conn, remoteAddr, authenticated, isAdmin)
+	client, err := newWebsocketClient(s, conn, remoteAddr, authenticated, isAdmin)
+	if err != nil {
+		rpcsLog.Errorf("Failed to serve client %s: %v", remoteAddr, err)
+		conn.Close()
+		return
+	}
 	s.ntfnMgr.AddClient(client)
 	client.Start()
 	client.WaitForShutdown()
@@ -869,6 +875,11 @@ type wsClient struct {
 	// false means its access is only to the limited set of RPC calls.
 	isAdmin bool
 
+	// sessionID is a random ID generated for each client when connected.
+	// These IDs may be queried by a client using the session RPC.  A change
+	// to the session ID indicates that the client reconnected.
+	sessionID uint64
+
 	// verboseTxUpdates specifies whether a client has requested verbose
 	// information about all new transactions.
 	verboseTxUpdates bool
@@ -1383,13 +1394,19 @@ func (c *wsClient) WaitForShutdown() {
 // incoming and outgoing messages in separate goroutines complete with queueing
 // and asynchrous handling for long-running operations.
 func newWebsocketClient(server *rpcServer, conn *websocket.Conn,
-	remoteAddr string, authenticated bool, isAdmin bool) *wsClient {
+	remoteAddr string, authenticated bool, isAdmin bool) (*wsClient, error) {
 
-	return &wsClient{
+	sessionID, err := wire.RandomUint64()
+	if err != nil {
+		return nil, err
+	}
+
+	client := &wsClient{
 		conn:          conn,
 		addr:          remoteAddr,
 		authenticated: authenticated,
 		isAdmin:       isAdmin,
+		sessionID:     sessionID,
 		server:        server,
 		addrRequests:  make(map[string]struct{}),
 		spentRequests: make(map[wire.OutPoint]struct{}),
@@ -1398,6 +1415,7 @@ func newWebsocketClient(server *rpcServer, conn *websocket.Conn,
 		sendChan:      make(chan wsResponse, websocketSendBufferSize),
 		quit:          make(chan struct{}),
 	}
+	return client, nil
 }
 
 // handleWebsocketHelp implements the help command for websocket connections.
@@ -1452,6 +1470,12 @@ func handleWebsocketHelp(wsc *wsClient, icmd interface{}) (interface{}, error) {
 func handleNotifyBlocks(wsc *wsClient, icmd interface{}) (interface{}, error) {
 	wsc.server.ntfnMgr.RegisterBlockUpdates(wsc)
 	return nil, nil
+}
+
+// handleSession implements the session command extension for websocket
+// connections.
+func handleSession(wsc *wsClient, icmd interface{}) (interface{}, error) {
+	return &btcjson.SessionResult{SessionID: wsc.sessionID}, nil
 }
 
 // handleStopNotifyBlocks implements the stopnotifyblocks command extension for

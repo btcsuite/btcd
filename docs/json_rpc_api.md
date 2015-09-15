@@ -685,6 +685,7 @@ user.  Click the method name for further details such as parameter and return in
 |8|[rescan](#rescan)|Rescan block chain for transactions to addresses and spent transaction outpoints.|[recvtx](#recvtx), [redeemingtx](#redeemingtx), [rescanprogress](#rescanprogress), and [rescanfinished](#rescanfinished) |
 |9|[notifynewtransactions](#notifynewtransactions)|Send notifications for all new transactions as they are accepted into the mempool.|[txaccepted](#txaccepted) or [txacceptedverbose](#txacceptedverbose)|
 |10|[stopnotifynewtransactions](#stopnotifynewtransactions)|Stop sending either a txaccepted or a txacceptedverbose notification when a new transaction is accepted into the mempool.|None|
+|11|[session](#session)|Return details regarding a websocket client's current connection.|None|
 
 <a name="WSExtMethodDetails" />
 **7.2 Method Details**<br />
@@ -813,6 +814,20 @@ user.  Click the method name for further details such as parameter and return in
 |Parameters|None|
 |Description|Stop sending either a [txaccepted](#txaccepted) or a [txacceptedverbose](#txacceptedverbose) notification when a new transaction is accepted into the mempool.|
 |Returns|Nothing|
+[Return to Overview](#WSExtMethodOverview)<br />
+
+***
+
+<a name="session"/>
+
+|   |   |
+|---|---|
+|Method|session|
+|Notifications|None|
+|Parameters|None|
+|Description|Return a JSON object with details regarding a websocket client's current connection to the RPC server.  This currently only includes the session ID, a random unsigned 64-bit integer that is created for each newly connected client.  Session IDs may be used to verify that the current connection was not lost and subsequently reestablished.|
+|Returns|`{ (json object)`<br />&nbsp;&nbsp;`"sessionid": n  (numeric) the session ID`<br />`}`|
+|Example Return|`{`<br />&nbsp;&nbsp;`"sessionid": 67089679842`<br />`}`|
 [Return to Overview](#WSExtMethodOverview)<br />
 
 
