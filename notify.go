@@ -19,12 +19,12 @@ import (
 )
 
 var (
-	// ErrNotificationsNotSupported is an error to describe the condition
-	// where the caller is trying to request notifications when they are
-	// not supported due to the client being configured to run in HTTP POST
-	// mode.
-	ErrNotificationsNotSupported = errors.New("notifications are not " +
-		"supported when running in HTTP POST mode")
+	// ErrWebsocketsRequired is an error to describe the condition where the
+	// caller is trying to use a websocket-only feature, such as requesting
+	// notifications or other websocket requests when the client is
+	// configured to run in HTTP POST mode.
+	ErrWebsocketsRequired = errors.New("a websocket connection is required " +
+		"to use this feature")
 )
 
 // notificationState is used to track the current state of successfuly
@@ -683,7 +683,7 @@ func (r FutureNotifyBlocksResult) Receive() error {
 func (c *Client) NotifyBlocksAsync() FutureNotifyBlocksResult {
 	// Not supported in HTTP POST mode.
 	if c.config.HTTPPostMode {
-		return newFutureError(ErrNotificationsNotSupported)
+		return newFutureError(ErrWebsocketsRequired)
 	}
 
 	// Ignore the notification if the client is not interested in
@@ -731,7 +731,7 @@ func (r FutureNotifySpentResult) Receive() error {
 func (c *Client) notifySpentInternal(outpoints []btcjson.OutPoint) FutureNotifySpentResult {
 	// Not supported in HTTP POST mode.
 	if c.config.HTTPPostMode {
-		return newFutureError(ErrNotificationsNotSupported)
+		return newFutureError(ErrWebsocketsRequired)
 	}
 
 	// Ignore the notification if the client is not interested in
@@ -763,7 +763,7 @@ func newOutPointFromWire(op *wire.OutPoint) btcjson.OutPoint {
 func (c *Client) NotifySpentAsync(outpoints []*wire.OutPoint) FutureNotifySpentResult {
 	// Not supported in HTTP POST mode.
 	if c.config.HTTPPostMode {
-		return newFutureError(ErrNotificationsNotSupported)
+		return newFutureError(ErrWebsocketsRequired)
 	}
 
 	// Ignore the notification if the client is not interested in
@@ -819,7 +819,7 @@ func (r FutureNotifyNewTransactionsResult) Receive() error {
 func (c *Client) NotifyNewTransactionsAsync(verbose bool) FutureNotifyNewTransactionsResult {
 	// Not supported in HTTP POST mode.
 	if c.config.HTTPPostMode {
-		return newFutureError(ErrNotificationsNotSupported)
+		return newFutureError(ErrWebsocketsRequired)
 	}
 
 	// Ignore the notification if the client is not interested in
@@ -868,7 +868,7 @@ func (r FutureNotifyReceivedResult) Receive() error {
 func (c *Client) notifyReceivedInternal(addresses []string) FutureNotifyReceivedResult {
 	// Not supported in HTTP POST mode.
 	if c.config.HTTPPostMode {
-		return newFutureError(ErrNotificationsNotSupported)
+		return newFutureError(ErrWebsocketsRequired)
 	}
 
 	// Ignore the notification if the client is not interested in
@@ -892,7 +892,7 @@ func (c *Client) notifyReceivedInternal(addresses []string) FutureNotifyReceived
 func (c *Client) NotifyReceivedAsync(addresses []btcutil.Address) FutureNotifyReceivedResult {
 	// Not supported in HTTP POST mode.
 	if c.config.HTTPPostMode {
-		return newFutureError(ErrNotificationsNotSupported)
+		return newFutureError(ErrWebsocketsRequired)
 	}
 
 	// Ignore the notification if the client is not interested in
@@ -965,7 +965,7 @@ func (c *Client) RescanAsync(startBlock *wire.ShaHash,
 
 	// Not supported in HTTP POST mode.
 	if c.config.HTTPPostMode {
-		return newFutureError(ErrNotificationsNotSupported)
+		return newFutureError(ErrWebsocketsRequired)
 	}
 
 	// Ignore the notification if the client is not interested in
@@ -1042,7 +1042,7 @@ func (c *Client) RescanEndBlockAsync(startBlock *wire.ShaHash,
 
 	// Not supported in HTTP POST mode.
 	if c.config.HTTPPostMode {
-		return newFutureError(ErrNotificationsNotSupported)
+		return newFutureError(ErrWebsocketsRequired)
 	}
 
 	// Ignore the notification if the client is not interested in

@@ -299,3 +299,51 @@ func (c *Client) ExportWatchingWalletAsync(account string) FutureExportWatchingW
 func (c *Client) ExportWatchingWallet(account string) ([]byte, []byte, error) {
 	return c.ExportWatchingWalletAsync(account).Receive()
 }
+
+// FutureSessionResult is a future promise to deliver the result of a
+// SessionAsync RPC invocation (or an applicable error).
+type FutureSessionResult chan *response
+
+// Receive waits for the response promised by the future and returns the
+// session result.
+func (r FutureSessionResult) Receive() (*btcjson.SessionResult, error) {
+	res, err := receiveFuture(r)
+	if err != nil {
+		return nil, err
+	}
+
+	// Unmarsal result as a session result object.
+	var session btcjson.SessionResult
+	err = json.Unmarshal(res, &session)
+	if err != nil {
+		return nil, err
+	}
+
+	return &session, nil
+}
+
+// SessionAsync returns an instance of a type that can be used to get the result
+// of the RPC at some future time by invoking the Receive function on the
+// returned instance.
+//
+// See Session for the blocking version and more details.
+//
+// NOTE: This is a btcsuite extension.
+func (c *Client) SessionAsync() FutureSessionResult {
+	// Not supported in HTTP POST mode.
+	if c.config.HTTPPostMode {
+		return newFutureError(ErrWebsocketsRequired)
+	}
+
+	cmd := btcjson.NewSessionCmd()
+	return c.sendCmd(cmd)
+}
+
+// Session returns details regarding a websocket client's current connection.
+//
+// This RPC requires the client to be running in websocket mode.
+//
+// NOTE: This is a btcsuite extension.
+func (c *Client) Session() (*btcjson.SessionResult, error) {
+	return c.SessionAsync().Receive()
+}
