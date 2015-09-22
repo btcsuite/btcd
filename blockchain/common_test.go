@@ -18,7 +18,6 @@ import (
 	database "github.com/btcsuite/btcd/database2"
 	_ "github.com/btcsuite/btcd/database2/ffldb"
 	"github.com/btcsuite/btcd/wire"
-	"github.com/btcsuite/btcutil"
 )
 
 const (
@@ -119,17 +118,13 @@ func chainSetup(dbName string) (*blockchain.BlockChain, func(), error) {
 
 // loadUtxoView returns a utxo view loaded from a file.
 func loadUtxoView(filename string) (*blockchain.UtxoViewpoint, error) {
-	// TODO(davec): Once the the new utxo serialization format and code is
-	// done, this and the data file should be updated to use it instead.
-
-	// The txstore file format is:
-	// <num tx data entries> <tx length> <serialized tx> <blk height>
-	// <num spent bits> <spent bits>
+	// The utxostore file format is:
+	// <tx hash><serialized utxo len><serialized utxo>
 	//
-	// All num and length fields are little-endian uint32s.  The spent bits
-	// field is padded to a byte boundary.
+	// The serialized utxo len is a little endian uint32 and the serialized
+	// utxo uses the format described in chainio.go.
 
-	filename = filepath.Join("testdata/", filename)
+	filename = filepath.Join("testdata", filename)
 	fi, err := os.Open(filename)
 	if err != nil {
 		return nil, err
@@ -144,75 +139,40 @@ func loadUtxoView(filename string) (*blockchain.UtxoViewpoint, error) {
 	}
 	defer fi.Close()
 
-	// Num of transaction store objects.
-	var numItems uint32
-	if err := binary.Read(r, binary.LittleEndian, &numItems); err != nil {
-		return nil, err
-	}
-
-	utxoView := blockchain.NewUtxoViewpoint()
-	var uintBuf uint32
-	for height := uint32(0); height < numItems; height++ {
-		// Serialized transaction length.
-		err = binary.Read(r, binary.LittleEndian, &uintBuf)
+	view := blockchain.NewUtxoViewpoint()
+	for {
+		// Hash of the utxo entry.
+		var hash wire.ShaHash
+		_, err := io.ReadAtLeast(r, hash[:], len(hash[:]))
 		if err != nil {
-			return nil, err
-		}
-		serializedTxLen := uintBuf
-		if serializedTxLen > wire.MaxBlockPayload {
-			return nil, fmt.Errorf("Read serialized transaction "+
-				"length of %d is larger max allowed %d",
-				serializedTxLen, wire.MaxBlockPayload)
-		}
-
-		// Transaction.
-		var msgTx wire.MsgTx
-		err = msgTx.Deserialize(r)
-		if err != nil {
-			return nil, err
-		}
-
-		// Block height the transaction came from.
-		err = binary.Read(r, binary.LittleEndian, &uintBuf)
-		if err != nil {
-			return nil, err
-		}
-
-		// Add all of the transaction outputs as available.
-		utxoView.AddTxOuts(btcutil.NewTx(&msgTx), int32(uintBuf))
-
-		// Num spent bits.
-		err = binary.Read(r, binary.LittleEndian, &uintBuf)
-		if err != nil {
-			return nil, err
-		}
-		numSpentBits := uintBuf
-		numSpentBytes := numSpentBits / 8
-		if numSpentBits%8 != 0 {
-			numSpentBytes++
-		}
-
-		// Packed spent bytes.
-		spentBytes := make([]byte, numSpentBytes)
-		_, err = io.ReadFull(r, spentBytes)
-		if err != nil {
-			return nil, err
-		}
-
-		// Spend the outputs based on spent bits.
-		txHash := msgTx.TxSha()
-		entry := utxoView.LookupEntry(&txHash)
-		for byteNum, spentByte := range spentBytes {
-			for bit := 0; bit < 8; bit++ {
-				outputIndex := uint32((byteNum * 8) + bit)
-				if outputIndex < numSpentBits {
-					if spentByte&(1<<uint(bit)) != 0 {
-						entry.SpendOutput(outputIndex)
-					}
-				}
+			// Expected EOF at the right offset.
+			if err == io.EOF {
+				break
 			}
+			return nil, err
 		}
+
+		// Num of serialize utxo entry bytes.
+		var numBytes uint32
+		err = binary.Read(r, binary.LittleEndian, &numBytes)
+		if err != nil {
+			return nil, err
+		}
+
+		// Serialized utxo entry.
+		serialized := make([]byte, numBytes)
+		_, err = io.ReadAtLeast(r, serialized, int(numBytes))
+		if err != nil {
+			return nil, err
+		}
+
+		// Deserialize it and add it to the view.
+		utxoEntry, err := blockchain.TstDeserializeUtxoEntry(serialized)
+		if err != nil {
+			return nil, err
+		}
+		view.Entries()[hash] = utxoEntry
 	}
 
-	return utxoView, nil
+	return view, nil
 }
