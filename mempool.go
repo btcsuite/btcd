@@ -398,13 +398,15 @@ func (mp *txMemPool) HaveTransaction(hash *wire.ShaHash) bool {
 // RemoveTransaction.  See the comment for RemoveTransaction for more details.
 //
 // This function MUST be called with the mempool lock held (for writes).
-func (mp *txMemPool) removeTransaction(tx *btcutil.Tx) {
-	// Remove any transactions which rely on this one.
+func (mp *txMemPool) removeTransaction(tx *btcutil.Tx, removeDepending bool) {
 	txHash := tx.Sha()
-	for i := uint32(0); i < uint32(len(tx.MsgTx().TxOut)); i++ {
-		outpoint := wire.NewOutPoint(txHash, i)
-		if txRedeemer, exists := mp.outpoints[*outpoint]; exists {
-			mp.removeTransaction(txRedeemer)
+	if removeDepending {
+		// Remove any transactions which rely on this one.
+		for i := uint32(0); i < uint32(len(tx.MsgTx().TxOut)); i++ {
+			outpoint := wire.NewOutPoint(txHash, i)
+			if txRedeemer, exists := mp.outpoints[*outpoint]; exists {
+				mp.removeTransaction(txRedeemer, true)
+			}
 		}
 	}
 
@@ -475,7 +477,21 @@ func (mp *txMemPool) RemoveTransaction(tx *btcutil.Tx) {
 	mp.Lock()
 	defer mp.Unlock()
 
-	mp.removeTransaction(tx)
+	mp.removeTransaction(tx, true)
+}
+
+// RemoveConfirmedTransaction removes the passed transaction from the memory
+// pool. Unlike RemoveTransaction, it does not remove transactions which
+// depend on it. It's inteded to be called when a transaction is confirmed in
+// the blockchain.
+//
+// This function is safe for concurrent access.
+func (mp *txMemPool) RemoveConfirmedTransaction(tx *btcutil.Tx) {
+	// Protect concurrent access.
+	mp.Lock()
+	defer mp.Unlock()
+
+	mp.removeTransaction(tx, false)
 }
 
 // RemoveDoubleSpends removes all transactions which spend outputs spent by the
@@ -493,7 +509,7 @@ func (mp *txMemPool) RemoveDoubleSpends(tx *btcutil.Tx) {
 	for _, txIn := range tx.MsgTx().TxIn {
 		if txRedeemer, ok := mp.outpoints[txIn.PreviousOutPoint]; ok {
 			if !txRedeemer.Sha().IsEqual(tx.Sha()) {
-				mp.removeTransaction(txRedeemer)
+				mp.removeTransaction(txRedeemer, true)
 			}
 		}
 	}
