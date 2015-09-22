@@ -42,3 +42,7 @@ func TstSetMaxMedianTimeEntries(val int) {
 // TstCheckBlockScripts makes the internal checkBlockScripts function available
 // to the test package.
 var TstCheckBlockScripts = checkBlockScripts
+
+// TstDeserializeUtxoEntry makes the internal deserializeUtxoEntry function
+// available to the test package.
+var TstDeserializeUtxoEntry = deserializeUtxoEntry

@@ -719,13 +719,26 @@ func (b *BlockChain) getReorganizeNodes(node *blockNode) (*list.List, *list.List
 // connectBlock handles connecting the passed node/block to the end of the main
 // (best) chain.
 //
+// This passed utxo view must have all referenced txos the block spends marked
+// as spent and all of the new txos the block creates added to it.  In addition,
+// the passed stxos slice must be populated with all of the information for the
+// spent txos.  This approach is used because the connection validation that
+// must happen prior to calling this function requires the same details, so
+// it would be inefficient to repeat it.
+//
 // This function MUST be called with the chain state lock held (for writes).
-func (b *BlockChain) connectBlock(node *blockNode, block *btcutil.Block) error {
+func (b *BlockChain) connectBlock(node *blockNode, block *btcutil.Block, view *UtxoViewpoint, stxos []spentTxOut) error {
 	// Make sure it's extending the end of the best chain.
 	prevHash := &block.MsgBlock().Header.PrevBlock
 	if !prevHash.IsEqual(b.bestNode.hash) {
 		return AssertError("connectBlock must be called with a block " +
 			"that extends the main chain")
+	}
+
+	// Sanity check the correct number of stxos are provided.
+	if len(stxos) != countSpentOutputs(block) {
+		return AssertError("connectBlock called with inconsistent " +
+			"spent transaction out information")
 	}
 
 	// Generate a new best state snapshot that will be used to update the
@@ -752,16 +765,28 @@ func (b *BlockChain) connectBlock(node *blockNode, block *btcutil.Block) error {
 			return err
 		}
 
-		// Add transaction index entries for all of the transactions in
-		// the block being connected.
-		err = dbAddTxIndexEntries(dbTx, block)
+		// Update the utxo set using the state of the utxo view.  This
+		// entails removing all of the utxos spent and adding the new
+		// ones created by the block.
+		err = dbPutUtxoView(dbTx, view)
 		if err != nil {
 			return err
 		}
 
-		// Mark all of the transactions that the transactions in the
-		// block being connected reference as spent.
-		err = dbSpendBlock(dbTx, block)
+		// Update the transaction spend journal by adding a record for
+		// the block that contains all txos spent by it.
+		err = dbPutSpendJournalEntry(dbTx, block.Sha(), stxos)
+		if err != nil {
+			return err
+		}
+
+		// TODO(davec): The transaction index is no longer required, but
+		// the rest of the code needs to be updated to make it optional,
+		// so continue maintaining it here for now.
+		//
+		// Add transaction index entries for all of the transactions in
+		// the block being connected.
+		err = dbAddTxIndexEntries(dbTx, block)
 		if err != nil {
 			return err
 		}
@@ -780,6 +805,10 @@ func (b *BlockChain) connectBlock(node *blockNode, block *btcutil.Block) error {
 	if err != nil {
 		return err
 	}
+
+	// Prune fully spent entries and mark all entries in the view unmodified
+	// now that the modifications have been commited to the database.
+	view.commit()
 
 	// Add the new node to the memory main chain indices for faster
 	// lookups.
@@ -813,7 +842,7 @@ func (b *BlockChain) connectBlock(node *blockNode, block *btcutil.Block) error {
 // the main (best) chain.
 //
 // This function MUST be called with the chain state lock held (for writes).
-func (b *BlockChain) disconnectBlock(node *blockNode, block *btcutil.Block) error {
+func (b *BlockChain) disconnectBlock(node *blockNode, block *btcutil.Block, view *UtxoViewpoint) error {
 	// Make sure the node being disconnected is the end of the best chain.
 	if !node.hash.IsEqual(b.bestNode.hash) {
 		return AssertError("disconnectBlock must be called with the " +
@@ -859,21 +888,30 @@ func (b *BlockChain) disconnectBlock(node *blockNode, block *btcutil.Block) erro
 
 		// Remove the block hash and height from the block index which
 		// tracks the main chain.
-		err = dbRemoveBlockIndex(dbTx, block.Sha(), block.Height())
+		err = dbRemoveBlockIndex(dbTx, block.Sha(), node.height)
 		if err != nil {
 			return err
 		}
 
-		// Undo all of the spends done by the transactions in the block
-		// being disconnected.  This is done before removing the
-		// transaction index entries since it's possible some of the
-		// transactions later in the block were spending ones earlier in
-		// the block.
-		err = dbRemoveBlockSpends(dbTx, block)
+		// Update the utxo set using the state of the utxo view.  This
+		// entails restoring all of the utxos spent and removing the new
+		// ones created by the block.
+		err = dbPutUtxoView(dbTx, view)
 		if err != nil {
 			return err
 		}
 
+		// Update the transaction spend journal by removing the record
+		// that contains all txos spent by the block .
+		err = dbRemoveSpendJournalEntry(dbTx, block.Sha())
+		if err != nil {
+			return err
+		}
+
+		// TODO(davec): The transaction index is no longer required, but
+		// the rest of the code needs to be updated to make it optional,
+		// so continue maintaining it here for now.
+		//
 		// Remove transaction index entries for all of the transactions
 		// in the block being disconnected.
 		err = dbRemoveTxIndexEntries(dbTx, block)
@@ -886,6 +924,10 @@ func (b *BlockChain) disconnectBlock(node *blockNode, block *btcutil.Block) erro
 	if err != nil {
 		return err
 	}
+
+	// Prune fully spent entries and mark all entries in the view unmodified
+	// now that the modifications have been commited to the database.
+	view.commit()
 
 	// Put block in the side chain cache.
 	node.inMainChain = false
@@ -913,6 +955,16 @@ func (b *BlockChain) disconnectBlock(node *blockNode, block *btcutil.Block) erro
 	return nil
 }
 
+// countSpentOutputs returns the number of utxos the passed block spends.
+func countSpentOutputs(block *btcutil.Block) int {
+	// Exclude the coinbase transaction since it can't spend anything.
+	var numSpent int
+	for _, tx := range block.Transactions()[1:] {
+		numSpent += len(tx.MsgTx().TxIn)
+	}
+	return numSpent
+}
+
 // reorganizeChain reorganizes the block chain by disconnecting the nodes in the
 // detachNodes list and connecting the nodes in the attach list.  It expects
 // that the lists are already in the correct order and are in sync with the
@@ -936,22 +988,74 @@ func (b *BlockChain) reorganizeChain(detachNodes, attachNodes *list.List, flags 
 		}
 	}
 
+	// All of the blocks to detach and related spend journal entries needed
+	// to unspend transaction outputs in the blocks being disconnected must
+	// be loaded from the database during the reorg check phase below and
+	// then they are needed again when doing the actual database updates.
+	// Rather than doing two loads, cache the loaded data into these slices.
+	detachBlocks := make([]*btcutil.Block, 0, detachNodes.Len())
+	detachSpentTxOuts := make([][]spentTxOut, 0, detachNodes.Len())
+
+	// Disconnect all of the blocks back to the point of the fork.  This
+	// entails loading the blocks and their associated spent txos from the
+	// database and using that information to unspend all of the spent txos
+	// and remove the utxos created by the blocks.
+	view := NewUtxoViewpoint()
+	for e := detachNodes.Front(); e != nil; e = e.Next() {
+		n := e.Value.(*blockNode)
+		var block *btcutil.Block
+		err := b.db.View(func(dbTx database.Tx) error {
+			var err error
+			block, err = dbFetchBlockByHash(dbTx, n.hash)
+			return err
+		})
+
+		// Load all of the utxos referenced by the block that aren't
+		// already in the view.
+		err = view.fetchInputUtxos(b.db, block)
+		if err != nil {
+			return err
+		}
+
+		// Load all of the spent txos for the block from the spend
+		// journal.
+		var stxos []spentTxOut
+		err = b.db.View(func(dbTx database.Tx) error {
+			stxos, err = dbFetchSpendJournalEntry(dbTx, block, view)
+			return err
+		})
+		if err != nil {
+			return err
+		}
+
+		// Store the loaded block and spend journal entry for later.
+		detachBlocks = append(detachBlocks, block)
+		detachSpentTxOuts = append(detachSpentTxOuts, stxos)
+
+		view.disconnectTransactions(block, stxos)
+	}
+
 	// Perform several checks to verify each block that needs to be attached
 	// to the main chain can be connected without violating any rules and
 	// without actually connecting the block.
 	//
-	// NOTE: bitcoind does these checks directly when it connects a block.
-	// The downside to that approach is that if any of these checks fail
-	// after disconnecting some blocks or attaching others, all of the
+	// NOTE: These checks could be done directly when connecting a block,
+	// however the downside to that approach is that if any of these checks
+	// fail after disconnecting some blocks or attaching others, all of the
 	// operations have to be rolled back to get the chain back into the
 	// state it was before the rule violation (or other failure).  There are
 	// at least a couple of ways accomplish that rollback, but both involve
-	// tweaking the chain.  This approach catches these issues before ever
-	// modifying the chain.
+	// tweaking the chain and/or database.  This approach catches these
+	// issues before ever modifying the chain.
 	for e := attachNodes.Front(); e != nil; e = e.Next() {
 		n := e.Value.(*blockNode)
 		block := b.blockCache[*n.hash]
-		err := b.checkConnectBlock(n, block)
+
+		// Notice the spent txout details are not requested here and
+		// thus will not be generated.  This is done because the state
+		// is not being immediately written to the database, so it is
+		// not needed.
+		err := b.checkConnectBlock(n, block, view, nil)
 		if err != nil {
 			return err
 		}
@@ -963,20 +1067,31 @@ func (b *BlockChain) reorganizeChain(detachNodes, attachNodes *list.List, flags 
 		return nil
 	}
 
+	// Reset the view for the actual connection code below.  This is
+	// required because the view was previously modified when checking if
+	// the reorg would be successful and the connection code requires the
+	// view to be valid from the viewpoint of each block being connected or
+	// disconnected.
+	view = NewUtxoViewpoint()
+
 	// Disconnect blocks from the main chain.
-	for e := detachNodes.Front(); e != nil; e = e.Next() {
+	for i, e := 0, detachNodes.Front(); e != nil; i, e = i+1, e.Next() {
 		n := e.Value.(*blockNode)
-		var block *btcutil.Block
-		err := b.db.View(func(dbTx database.Tx) error {
-			var err error
-			block, err = dbFetchBlockByHash(dbTx, n.hash)
-			return err
-		})
+		block := detachBlocks[i]
+
+		// Load all of the utxos referenced by the block that aren't
+		// already in the view.
+		err := view.fetchInputUtxos(b.db, block)
 		if err != nil {
 			return err
 		}
 
-		err = b.disconnectBlock(n, block)
+		// Update the view to unspend all of the spent txos and remove
+		// the utxos created by the block.
+		view.disconnectTransactions(block, detachSpentTxOuts[i])
+
+		// Update the database and chain state.
+		err = b.disconnectBlock(n, block, view)
 		if err != nil {
 			return err
 		}
@@ -986,7 +1101,26 @@ func (b *BlockChain) reorganizeChain(detachNodes, attachNodes *list.List, flags 
 	for e := attachNodes.Front(); e != nil; e = e.Next() {
 		n := e.Value.(*blockNode)
 		block := b.blockCache[*n.hash]
-		err := b.connectBlock(n, block)
+
+		// Load all of the utxos referenced by the block that aren't
+		// already in the view.
+		err := view.fetchInputUtxos(b.db, block)
+		if err != nil {
+			return err
+		}
+
+		// Update the view to mark all utxos referenced by the block
+		// as spent and add all transactions being created by this block
+		// to it.  Also, provide an stxo slice so the spent txout
+		// details are generated.
+		stxos := make([]spentTxOut, 0, countSpentOutputs(block))
+		err = view.connectTransactions(block, &stxos)
+		if err != nil {
+			return err
+		}
+
+		// Update the database and chain state.
+		err = b.connectBlock(n, block, view, stxos)
 		if err != nil {
 			return err
 		}
@@ -1017,14 +1151,14 @@ func (b *BlockChain) reorganizeChain(detachNodes, attachNodes *list.List, flags 
 // cumulatively has the most proof of work.
 //
 // The flags modify the behavior of this function as follows:
-//  - BFFastAdd: Avoids the call to checkConnectBlock which does several
-//    expensive transaction validation operations.
+//  - BFFastAdd: Avoids several expensive transaction validation operations.
+//    This is useful when using checkpoints.
 //  - BFDryRun: Prevents the block from being connected and avoids modifying the
 //    state of the memory chain index.  Also, any log messages related to
 //    modifying the state are avoided.
 //
 // This function MUST be called with the chain state lock held (for writes).
-func (b *BlockChain) connectBestChain(node *blockNode, block *btcutil.Block, flags BehaviorFlags) error {
+func (b *BlockChain) connectBestChain(node *blockNode, block *btcutil.Block, flags BehaviorFlags) (recoverErr error) {
 	fastAdd := flags&BFFastAdd == BFFastAdd
 	dryRun := flags&BFDryRun == BFDryRun
 
@@ -1032,12 +1166,12 @@ func (b *BlockChain) connectBestChain(node *blockNode, block *btcutil.Block, fla
 	// most common case.
 	if node.parent.hash.IsEqual(b.bestNode.hash) {
 		// Perform several checks to verify the block can be connected
-		// to the main chain (including whatever reorganization might
-		// be necessary to get this node to the main chain) without
-		// violating any rules and without actually connecting the
-		// block.
+		// to the main chain without violating any rules and without
+		// actually connecting the block.
+		view := NewUtxoViewpoint()
+		stxos := make([]spentTxOut, 0, countSpentOutputs(block))
 		if !fastAdd {
-			err := b.checkConnectBlock(node, block)
+			err := b.checkConnectBlock(node, block, view, &stxos)
 			if err != nil {
 				return err
 			}
@@ -1048,8 +1182,23 @@ func (b *BlockChain) connectBestChain(node *blockNode, block *btcutil.Block, fla
 			return nil
 		}
 
+		// In the fast add case the code to check the block connection
+		// was skipped, so the utxo view needs to load the referenced
+		// utxos, spend them, and add the new utxos being created by
+		// this block.
+		if fastAdd {
+			err := view.fetchInputUtxos(b.db, block)
+			if err != nil {
+				return err
+			}
+			err = view.connectTransactions(block, &stxos)
+			if err != nil {
+				return err
+			}
+		}
+
 		// Connect the block to the main chain.
-		err := b.connectBlock(node, block)
+		err := b.connectBlock(node, block, view, stxos)
 		if err != nil {
 			return err
 		}
