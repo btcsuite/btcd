@@ -503,7 +503,7 @@ func checkBlockSanity(block *btcutil.Block, powLimit *big.Int, timeSource Median
 	for i, tx := range transactions[1:] {
 		if IsCoinBase(tx) {
 			str := fmt.Sprintf("block contains second coinbase at "+
-				"index %d", i)
+				"index %d", i+1)
 			return ruleError(ErrMultipleCoinbases, str)
 		}
 	}
@@ -794,15 +794,14 @@ func (b *BlockChain) checkBlockContext(block *btcutil.Block, prevNode *blockNode
 // http://r6.ca/blog/20120206T005236Z.html.
 //
 // This function MUST be called with the chain state lock held (for reads).
-func (b *BlockChain) checkBIP0030(node *blockNode, block *btcutil.Block) error {
-	// Fetch utxo details for all of the transactions in this block from the
-	// point of view of the parent node.  Typically, there will not be any
-	// utxos for any of the transactions.
+func (b *BlockChain) checkBIP0030(node *blockNode, block *btcutil.Block, view *UtxoViewpoint) error {
+	// Fetch utxo details for all of the transactions in this block.
+	// Typically, there will not be any utxos for any of the transactions.
 	fetchSet := make(map[wire.ShaHash]struct{})
 	for _, tx := range block.Transactions() {
 		fetchSet[*tx.Sha()] = struct{}{}
 	}
-	utxoView, err := b.fetchUtxoView(node, fetchSet)
+	err := view.fetchUtxos(b.db, fetchSet)
 	if err != nil {
 		return err
 	}
@@ -810,7 +809,7 @@ func (b *BlockChain) checkBIP0030(node *blockNode, block *btcutil.Block) error {
 	// Duplicate transactions are only allowed if the previous transaction
 	// is fully spent.
 	for _, tx := range block.Transactions() {
-		txEntry := utxoView.LookupEntry(tx.Sha())
+		txEntry := view.LookupEntry(tx.Sha())
 		if txEntry != nil && !txEntry.IsFullySpent() {
 			str := fmt.Sprintf("tried to overwrite transaction %v "+
 				"at block height %d that is not fully spent",
@@ -830,6 +829,9 @@ func (b *BlockChain) checkBIP0030(node *blockNode, block *btcutil.Block) error {
 // amount, and verifying the signatures to prove the spender was the owner of
 // the bitcoins and therefore allowed to spend them.  As it checks the inputs,
 // it also calculates the total fees for the transaction and returns that value.
+//
+// NOTE: The transaction MUST have already been sanity checked with the
+// CheckTransactionSanity function prior to calling this function.
 func CheckTransactionInputs(tx *btcutil.Tx, txHeight int32, utxoView *UtxoViewpoint) (int64, error) {
 	// Coinbase transactions have no inputs.
 	if IsCoinBase(tx) {
@@ -907,9 +909,6 @@ func CheckTransactionInputs(tx *btcutil.Tx, txHeight int32, utxoView *UtxoViewpo
 				btcutil.MaxSatoshi)
 			return 0, ruleError(ErrBadTxOutValue, str)
 		}
-
-		// Mark the referenced output as spent.
-		utxoEntry.SpendOutput(originTxIndex)
 	}
 
 	// Calculate the total output amount for this transaction.  It is safe
@@ -936,8 +935,10 @@ func CheckTransactionInputs(tx *btcutil.Tx, txHeight int32, utxoView *UtxoViewpo
 }
 
 // checkConnectBlock performs several checks to confirm connecting the passed
-// block to the main chain (including whatever reorganization might be necessary
-// to get this node to the main chain) does not violate any rules.
+// block to the chain represented by the passed view does not violate any rules.
+// In addition, the passed view is updated to spend all of the referenced
+// outputs and add all of the new utxos created by block.  Thus, the view will
+// represent the state of the chain as if the block were actually connected.
 //
 // The CheckConnectBlock function makes use of this function to perform the
 // bulk of its work.  The only difference is this function accepts a node which
@@ -949,7 +950,7 @@ func CheckTransactionInputs(tx *btcutil.Tx, txHeight int32, utxoView *UtxoViewpo
 // checks performed by this function.
 //
 // This function MUST be called with the chain state lock held (for writes).
-func (b *BlockChain) checkConnectBlock(node *blockNode, block *btcutil.Block) error {
+func (b *BlockChain) checkConnectBlock(node *blockNode, block *btcutil.Block, view *UtxoViewpoint, stxos *[]spentTxOut) error {
 	// If the side chain blocks end up in the database, a call to
 	// CheckBlockSanity should be done here in case a previous version
 	// allowed a block that is no longer valid.  However, since the
@@ -973,17 +974,18 @@ func (b *BlockChain) checkConnectBlock(node *blockNode, block *btcutil.Block) er
 	// skipped.
 	enforceBIP0030 := !isBIP0030Node(node)
 	if enforceBIP0030 {
-		err := b.checkBIP0030(node, block)
+		err := b.checkBIP0030(node, block, view)
 		if err != nil {
 			return err
 		}
 	}
 
-	// Request an unspent transaction output view for all input transactions
-	// of the block from the point of view of its position within the block
-	// chain.  This information is needed for verification of things such as
+	// Load all of the utxos referenced by the inputs for all transactions
+	// in the block don't already exist in the utxo view from the database.
+	//
+	// These utxo entries are needed for verification of things such as
 	// transaction inputs, counting pay-to-script-hashes, and scripts.
-	utxos, err := b.fetchInputUtxos(node, block)
+	err := view.fetchInputUtxos(b.db, block)
 	if err != nil {
 		return err
 	}
@@ -992,10 +994,7 @@ func (b *BlockChain) checkConnectBlock(node *blockNode, block *btcutil.Block) er
 	// "standard" type.  The rules for this BIP only apply to transactions
 	// after the timestamp defined by txscript.Bip16Activation.  See
 	// https://en.bitcoin.it/wiki/BIP_0016 for more details.
-	enforceBIP0016 := false
-	if node.timestamp.After(txscript.Bip16Activation) {
-		enforceBIP0016 = true
-	}
+	enforceBIP0016 := node.timestamp.After(txscript.Bip16Activation)
 
 	// The number of signature operations must be less than the maximum
 	// allowed per block.  Note that the preliminary sanity checks on a
@@ -1014,7 +1013,7 @@ func (b *BlockChain) checkConnectBlock(node *blockNode, block *btcutil.Block) er
 			// countP2SHSigOps for whether or not the transaction is
 			// a coinbase transaction rather than having to do a
 			// full coinbase check again.
-			numP2SHSigOps, err := CountP2SHSigOps(tx, i == 0, utxos)
+			numP2SHSigOps, err := CountP2SHSigOps(tx, i == 0, view)
 			if err != nil {
 				return err
 			}
@@ -1042,7 +1041,7 @@ func (b *BlockChain) checkConnectBlock(node *blockNode, block *btcutil.Block) er
 	// bounds.
 	var totalFees int64
 	for _, tx := range transactions {
-		txFee, err := CheckTransactionInputs(tx, node.height, utxos)
+		txFee, err := CheckTransactionInputs(tx, node.height, view)
 		if err != nil {
 			return err
 		}
@@ -1054,6 +1053,15 @@ func (b *BlockChain) checkConnectBlock(node *blockNode, block *btcutil.Block) er
 		if totalFees < lastTotalFees {
 			return ruleError(ErrBadFees, "total fees for block "+
 				"overflows accumulator")
+		}
+
+		// Add all of the outputs for this transaction which are not
+		// provably unspendable as available utxos.  Also, the passed
+		// spent txos slice is updated to contain an entry for each
+		// spent txout in the order each transaction spends them.
+		err = view.connectTransaction(tx, node.height, stxos)
+		if err != nil {
+			return err
 		}
 	}
 
@@ -1100,7 +1108,7 @@ func (b *BlockChain) checkConnectBlock(node *blockNode, block *btcutil.Block) er
 	// Blocks created after the BIP0016 activation time need to have the
 	// pay-to-script-hash checks enabled.
 	var scriptFlags txscript.ScriptFlags
-	if block.MsgBlock().Header.Timestamp.After(txscript.Bip16Activation) {
+	if enforceBIP0016 {
 		scriptFlags |= txscript.ScriptBip16
 	}
 
@@ -1128,7 +1136,7 @@ func (b *BlockChain) checkConnectBlock(node *blockNode, block *btcutil.Block) er
 	// expensive ECDSA signature check scripts.  Doing this last helps
 	// prevent CPU exhaustion attacks.
 	if runScripts {
-		err := checkBlockScripts(block, utxos, scriptFlags, b.sigCache)
+		err := checkBlockScripts(block, view, scriptFlags, b.sigCache)
 		if err != nil {
 			return err
 		}
@@ -1158,5 +1166,8 @@ func (b *BlockChain) CheckConnectBlock(block *btcutil.Block) error {
 		newNode.workSum.Add(prevNode.workSum, newNode.workSum)
 	}
 
-	return b.checkConnectBlock(newNode, block)
+	// Leave the spent txouts entry nil in the state since the information
+	// is not needed and thus extra work can be avoided.
+	view := NewUtxoViewpoint()
+	return b.checkConnectBlock(newNode, block, view, nil)
 }
