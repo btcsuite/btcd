@@ -23,6 +23,7 @@ import (
 	"github.com/btcsuite/btcd/btcjson"
 	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/btcsuite/btcd/database"
+	"github.com/btcsuite/btcd/txscript"
 	"github.com/btcsuite/btcd/wire"
 	"github.com/btcsuite/btcutil"
 )
@@ -90,6 +91,7 @@ type server struct {
 	bytesReceived        uint64     // Total bytes received from all peers since start.
 	bytesSent            uint64     // Total bytes sent by all peers since start.
 	addrManager          *addrmgr.AddrManager
+	sigCache             *txscript.SigCache
 	rpcServer            *rpcServer
 	blockManager         *blockManager
 	addrIndexer          *addrIndexer
@@ -1401,6 +1403,7 @@ func newServer(listenAddrs []string, db database.Db, chainParams *chaincfg.Param
 		db:                   db,
 		timeSource:           blockchain.NewMedianTime(),
 		services:             services,
+		sigCache:             txscript.NewSigCache(cfg.SigCacheMaxSize),
 	}
 	bm, err := newBlockManager(&s)
 	if err != nil {

@@ -116,7 +116,7 @@ func chainSetup(dbName string) (*blockchain.BlockChain, func(), error) {
 		return nil, nil, err
 	}
 
-	chain := blockchain.New(db, &chaincfg.MainNetParams, nil)
+	chain := blockchain.New(db, &chaincfg.MainNetParams, nil, nil)
 	return chain, teardown, nil
 }
 

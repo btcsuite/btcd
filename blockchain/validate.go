@@ -1138,7 +1138,7 @@ func (b *BlockChain) checkConnectBlock(node *blockNode, block *btcutil.Block) er
 	// expensive ECDSA signature check scripts.  Doing this last helps
 	// prevent CPU exhaustion attacks.
 	if runScripts {
-		err := checkBlockScripts(block, txInputStore, scriptFlags)
+		err := checkBlockScripts(block, txInputStore, scriptFlags, b.sigCache)
 		if err != nil {
 			return err
 		}

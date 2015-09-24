@@ -1850,8 +1850,21 @@ func opcodeCheckSig(op *parsedOpcode, vm *Engine) error {
 		return nil
 	}
 
-	ok := signature.Verify(hash, pubKey)
-	vm.dstack.PushBool(ok)
+	var valid bool
+	if vm.sigCache != nil {
+		var sigHash wire.ShaHash
+		copy(sigHash[:], hash)
+
+		valid = vm.sigCache.Exists(sigHash, signature, pubKey)
+		if !valid && signature.Verify(hash, pubKey) {
+			vm.sigCache.Add(sigHash, signature, pubKey)
+			valid = true
+		}
+	} else {
+		valid = signature.Verify(hash, pubKey)
+	}
+
+	vm.dstack.PushBool(valid)
 	return nil
 }
 
@@ -2051,7 +2064,21 @@ func opcodeCheckMultiSig(op *parsedOpcode, vm *Engine) error {
 		// Generate the signature hash based on the signature hash type.
 		hash := calcSignatureHash(script, hashType, &vm.tx, vm.txIdx)
 
-		if parsedSig.Verify(hash, parsedPubKey) {
+		var valid bool
+		if vm.sigCache != nil {
+			var sigHash wire.ShaHash
+			copy(sigHash[:], hash)
+
+			valid = vm.sigCache.Exists(sigHash, parsedSig, parsedPubKey)
+			if !valid && parsedSig.Verify(hash, parsedPubKey) {
+				vm.sigCache.Add(sigHash, parsedSig, parsedPubKey)
+				valid = true
+			}
+		} else {
+			valid = parsedSig.Verify(hash, parsedPubKey)
+		}
+
+		if valid {
 			// PubKey verified, move on to the next signature.
 			signatureIdx++
 			numSignatures--

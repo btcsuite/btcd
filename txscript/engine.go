@@ -86,6 +86,7 @@ type Engine struct {
 	condStack       []int
 	numOps          int
 	flags           ScriptFlags
+	sigCache        *SigCache
 	bip16           bool     // treat execution as pay-to-script-hash
 	savedFirstStack [][]byte // stack from first script for bip16 scripts
 }
@@ -573,7 +574,7 @@ func (vm *Engine) SetAltStack(data [][]byte) {
 // NewEngine returns a new script engine for the provided public key script,
 // transaction, and input index.  The flags modify the behavior of the script
 // engine according to the description provided by each flag.
-func NewEngine(scriptPubKey []byte, tx *wire.MsgTx, txIdx int, flags ScriptFlags) (*Engine, error) {
+func NewEngine(scriptPubKey []byte, tx *wire.MsgTx, txIdx int, flags ScriptFlags, sigCache *SigCache) (*Engine, error) {
 	// The provided transaction input index must refer to a valid input.
 	if txIdx < 0 || txIdx >= len(tx.TxIn) {
 		return nil, ErrInvalidIndex
@@ -588,7 +589,7 @@ func NewEngine(scriptPubKey []byte, tx *wire.MsgTx, txIdx int, flags ScriptFlags
 	// allowing the clean stack flag without the P2SH flag would make it
 	// possible to have a situation where P2SH would not be a soft fork when
 	// it should be.
-	vm := Engine{flags: flags}
+	vm := Engine{flags: flags, sigCache: sigCache}
 	if vm.hasFlag(ScriptVerifyCleanStack) && !vm.hasFlag(ScriptBip16) {
 		return nil, ErrInvalidFlags
 	}
