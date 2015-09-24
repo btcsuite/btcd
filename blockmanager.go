@@ -657,7 +657,7 @@ func (b *blockManager) handleBlockMsg(bmsg *blockMsg) {
 		b.updateChainState(newestSha, newestHeight)
 
 		// Update this peer's latest block height, for future
-		// potential sync node candidancy.
+		// potential sync node candidacy.
 		heightUpdate = int32(newestHeight)
 		blkShaUpdate = newestSha
 
@@ -672,7 +672,7 @@ func (b *blockManager) handleBlockMsg(bmsg *blockMsg) {
 
 	// Update the block height for this peer. But only send a message to
 	// the server for updating peer heights if this is an orphan or our
-	// chain is "current". This avoid sending a spammy amount of messages
+	// chain is "current". This avoids sending a spammy amount of messages
 	// if we're syncing the chain from scratch.
 	if blkShaUpdate != nil && heightUpdate != 0 {
 		bmsg.peer.UpdateLastBlockHeight(heightUpdate)
@@ -922,7 +922,7 @@ func (b *blockManager) handleInvMsg(imsg *invMsg) {
 		}
 	}
 
-	// If this inv contains a block annoucement, and this isn't coming from
+	// If this inv contains a block announcement, and this isn't coming from
 	// our current sync peer or we're current, then update the last
 	// announced block for this peer. We'll use this information later to
 	// update the heights of peers based on blocks we've accepted that they
@@ -1235,7 +1235,7 @@ func (b *blockManager) handleNotifyMsg(notification *blockchain.Notification) {
 			r.ntfnMgr.NotifyBlockConnected(block)
 		}
 
-		// If we're maintaing the address index, and it is up to date
+		// If we're maintaining the address index, and it is up to date
 		// then update it based off this new block.
 		if cfg.AddrIndex && b.server.addrIndexer.IsCaughtUp() {
 			b.server.addrIndexer.UpdateAddressIndex(block)
