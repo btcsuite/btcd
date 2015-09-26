@@ -354,6 +354,62 @@ func TestVarIntWireErrors(t *testing.T) {
 	}
 }
 
+// TestVarIntNonCanonical ensures variable length integers that are not encoded
+// canonically return the expected error.
+func TestVarIntNonCanonical(t *testing.T) {
+	pver := wire.ProtocolVersion
+
+	tests := []struct {
+		name string // Test name for easier identification
+		in   []byte // Value to decode
+		pver uint32 // Protocol version for wire encoding
+	}{
+		{
+			"0 encoded with 3 bytes", []byte{0xfd, 0x00, 0x00},
+			pver,
+		},
+		{
+			"max single-byte value encoded with 3 bytes",
+			[]byte{0xfd, 0xfc, 0x00}, pver,
+		},
+		{
+			"0 encoded with 5 bytes",
+			[]byte{0xfe, 0x00, 0x00, 0x00, 0x00}, pver,
+		},
+		{
+			"max three-byte value encoded with 5 bytes",
+			[]byte{0xfe, 0xff, 0xff, 0x00, 0x00}, pver,
+		},
+		{
+			"0 encoded with 9 bytes",
+			[]byte{0xff, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00},
+			pver,
+		},
+		{
+			"max five-byte value encoded with 9 bytes",
+			[]byte{0xff, 0xff, 0xff, 0xff, 0xff, 0x00, 0x00, 0x00, 0x00},
+			pver,
+		},
+	}
+
+	t.Logf("Running %d tests", len(tests))
+	for i, test := range tests {
+		// Decode from wire format.
+		rbuf := bytes.NewReader(test.in)
+		val, err := wire.TstReadVarInt(rbuf, test.pver)
+		if _, ok := err.(*wire.MessageError); !ok {
+			t.Errorf("readVarInt #%d (%s) unexpected error %v", i,
+				test.name, err)
+			continue
+		}
+		if val != 0 {
+			t.Errorf("readVarInt #%d (%s)\n got: %d want: 0", i,
+				test.name, val)
+			continue
+		}
+	}
+}
+
 // TestVarIntWire tests the serialize size for variable length integers.
 func TestVarIntSerializeSize(t *testing.T) {
 	tests := []struct {

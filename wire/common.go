@@ -17,6 +17,11 @@ import (
 // Maximum payload size for a variable length integer.
 const MaxVarIntPayload = 9
 
+// errNonCanonicalVarInt is the common format string used for non-canonically
+// encoded variable length integer errors.
+var errNonCanonicalVarInt = "non-canonical varint %x - discriminant %x must " +
+	"encode a value greater than %x"
+
 // readElement reads the next sequence of bytes from r using little endian
 // depending on the concrete type of element pointed to.
 func readElement(r io.Reader, element interface{}) error {
@@ -336,6 +341,14 @@ func readVarInt(r io.Reader, pver uint32) (uint64, error) {
 		}
 		rv = binary.LittleEndian.Uint64(b[:])
 
+		// The encoding is not canonical if the value could have been
+		// encoded using fewer bytes.
+		min := uint64(0x100000000)
+		if rv < min {
+			return 0, messageError("readVarInt", fmt.Sprintf(
+				errNonCanonicalVarInt, rv, discriminant, min))
+		}
+
 	case 0xfe:
 		_, err := io.ReadFull(r, b[0:4])
 		if err != nil {
@@ -343,12 +356,28 @@ func readVarInt(r io.Reader, pver uint32) (uint64, error) {
 		}
 		rv = uint64(binary.LittleEndian.Uint32(b[:]))
 
+		// The encoding is not canonical if the value could have been
+		// encoded using fewer bytes.
+		min := uint64(0x10000)
+		if rv < min {
+			return 0, messageError("readVarInt", fmt.Sprintf(
+				errNonCanonicalVarInt, rv, discriminant, min))
+		}
+
 	case 0xfd:
 		_, err := io.ReadFull(r, b[0:2])
 		if err != nil {
 			return 0, err
 		}
 		rv = uint64(binary.LittleEndian.Uint16(b[:]))
+
+		// The encoding is not canonical if the value could have been
+		// encoded using fewer bytes.
+		min := uint64(0xfd)
+		if rv < min {
+			return 0, messageError("readVarInt", fmt.Sprintf(
+				errNonCanonicalVarInt, rv, discriminant, min))
+		}
 
 	default:
 		rv = uint64(discriminant)
