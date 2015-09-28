@@ -658,7 +658,7 @@ func (s *server) peerHandler() {
 		persistentPeers:  make(map[*peer]struct{}),
 		outboundPeers:    make(map[*peer]struct{}),
 		banned:           make(map[string]time.Time),
-		maxOutboundPeers: defaultMaxOutbound,
+		maxOutboundPeers: cfg.MaxOutboundPeers,
 		outboundGroups:   make(map[string]int),
 	}
 	if cfg.MaxPeers < state.maxOutboundPeers {
