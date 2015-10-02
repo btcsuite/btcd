@@ -76,6 +76,9 @@ const (
 	// changed and there have been changes to the available transactions
 	// in the memory pool.
 	gbtRegenerateSeconds = 60
+
+	// maxProtocolVersion is the max protocol version the server supports.
+	maxProtocolVersion = 70002
 )
 
 var (
@@ -415,7 +418,7 @@ func handleNode(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (inter
 				}
 			}
 		}
-		if err != nil && peerExists(s.server.PeerInfo(), addr, int32(nodeID)) {
+		if err != nil && peerExists(s.server.Peers(), addr, int32(nodeID)) {
 			return nil, &btcjson.RPCError{
 				Code:    btcjson.ErrRPCMisc,
 				Message: "can't disconnect a permanent peer, use remove",
@@ -438,7 +441,7 @@ func handleNode(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (inter
 				}
 			}
 		}
-		if err != nil && peerExists(s.server.PeerInfo(), addr, int32(nodeID)) {
+		if err != nil && peerExists(s.server.Peers(), addr, int32(nodeID)) {
 			return nil, &btcjson.RPCError{
 				Code:    btcjson.ErrRPCMisc,
 				Message: "can't remove a temporary peer, use disconnect",
@@ -483,9 +486,9 @@ func handleNode(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (inter
 // peerExists determines if a certain peer is currently connected given
 // information about all currently connected peers. Peer existence is
 // determined using either a target address or node id.
-func peerExists(peerInfos []*btcjson.GetPeerInfoResult, addr string, nodeID int32) bool {
-	for _, peerInfo := range peerInfos {
-		if peerInfo.ID == nodeID || peerInfo.Addr == addr {
+func peerExists(peers []*serverPeer, addr string, nodeID int32) bool {
+	for _, p := range peers {
+		if p.ID() == nodeID || p.Addr() == addr {
 			return true
 		}
 	}
@@ -945,7 +948,7 @@ func handleGetAddedNodeInfo(s *rpcServer, cmd interface{}, closeChan <-chan stru
 		node := *c.Node
 		found := false
 		for i, peer := range peers {
-			if peer.addr == node {
+			if peer.Addr() == node {
 				peers = peers[i : i+1]
 				found = true
 			}
@@ -963,7 +966,7 @@ func handleGetAddedNodeInfo(s *rpcServer, cmd interface{}, closeChan <-chan stru
 	if !c.DNS {
 		results := make([]string, 0, len(peers))
 		for _, peer := range peers {
-			results = append(results, peer.addr)
+			results = append(results, peer.Addr())
 		}
 		return results, nil
 	}
@@ -975,15 +978,15 @@ func handleGetAddedNodeInfo(s *rpcServer, cmd interface{}, closeChan <-chan stru
 		// Set the "address" of the peer which could be an ip address
 		// or a domain name.
 		var result btcjson.GetAddedNodeInfoResult
-		result.AddedNode = peer.addr
+		result.AddedNode = peer.Addr()
 		result.Connected = btcjson.Bool(peer.Connected())
 
 		// Split the address into host and port portions so we can do
 		// a DNS lookup against the host.  When no port is specified in
 		// the address, just use the address as the host.
-		host, _, err := net.SplitHostPort(peer.addr)
+		host, _, err := net.SplitHostPort(peer.Addr())
 		if err != nil {
-			host = peer.addr
+			host = peer.Addr()
 		}
 
 		// Do a DNS lookup for the address.  If the lookup fails, just
@@ -1007,7 +1010,7 @@ func handleGetAddedNodeInfo(s *rpcServer, cmd interface{}, closeChan <-chan stru
 			addr.Address = ip
 			addr.Connected = "false"
 			if ip == host && peer.Connected() {
-				addr.Connected = directionString(peer.inbound)
+				addr.Connected = directionString(peer.Inbound())
 			}
 			addrs = append(addrs, addr)
 		}
@@ -2282,7 +2285,38 @@ func handleGetNetworkHashPS(s *rpcServer, cmd interface{}, closeChan <-chan stru
 
 // handleGetPeerInfo implements the getpeerinfo command.
 func handleGetPeerInfo(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (interface{}, error) {
-	return s.server.PeerInfo(), nil
+	peers := s.server.Peers()
+	syncPeer := s.server.blockManager.SyncPeer()
+	infos := make([]*btcjson.GetPeerInfoResult, 0, len(peers))
+	for _, p := range peers {
+		statsSnap := p.StatsSnapshot()
+		info := &btcjson.GetPeerInfoResult{
+			ID:             statsSnap.ID,
+			Addr:           statsSnap.Addr,
+			Services:       fmt.Sprintf("%08d", uint64(statsSnap.Services)),
+			LastSend:       statsSnap.LastSend.Unix(),
+			LastRecv:       statsSnap.LastRecv.Unix(),
+			BytesSent:      statsSnap.BytesSent,
+			BytesRecv:      statsSnap.BytesRecv,
+			ConnTime:       statsSnap.ConnTime.Unix(),
+			PingTime:       float64(statsSnap.LastPingMicros),
+			TimeOffset:     statsSnap.TimeOffset,
+			Version:        statsSnap.Version,
+			SubVer:         statsSnap.UserAgent,
+			Inbound:        statsSnap.Inbound,
+			StartingHeight: statsSnap.StartingHeight,
+			CurrentHeight:  statsSnap.LastBlock,
+			BanScore:       0,
+			SyncNode:       p == syncPeer,
+		}
+		if p.LastPingNonce() != 0 {
+			wait := float64(time.Now().Sub(statsSnap.LastPingTime).Nanoseconds())
+			// We actually want microseconds.
+			info.PingWait = wait / 1000
+		}
+		infos = append(infos, info)
+	}
+	return infos, nil
 }
 
 // handleGetRawMempool implements the getrawmempool command.

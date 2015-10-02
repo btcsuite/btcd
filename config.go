@@ -62,6 +62,15 @@ var (
 // to parse and execute service commands specified via the -s flag.
 var runServiceCommand func(string) error
 
+// minUint32 is a helper function to return the minimum of two uint32s.
+// This avoids a math import and the need to cast to floats.
+func minUint32(a, b uint32) uint32 {
+	if a < b {
+		return a
+	}
+	return b
+}
+
 // config defines the configuration options for btcd.
 //
 // See loadConfig for details on the configuration load process.
