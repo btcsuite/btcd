@@ -400,9 +400,11 @@ out:
 		case indexJob := <-workChan:
 			addrIndex, err := a.indexBlockAddrs(indexJob.blk)
 			if err != nil {
-				adxrLog.Errorf("Unable to index transactions of"+
-					" block: %v", err)
-				a.server.Stop()
+				// Only log the error if we're not forcibly shutting down.
+				if atomic.LoadInt32(&a.shutdown) == 0 {
+					adxrLog.Errorf("Unable to index transactions of"+
+						" block: %v", err)
+				}
 				break out
 			}
 			a.writeRequests <- &writeIndexReq{blk: indexJob.blk,
