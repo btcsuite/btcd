@@ -139,6 +139,14 @@ type outMsg struct {
 	doneChan chan struct{}
 }
 
+// blockStallMsg is used to to house a message requesting the activation of the
+// blockStallTimer. Additionally it also contains a channel so the handler
+// can signal to the requester when the timer has been activated.
+type blockStallMsg struct {
+	timeout  time.Duration
+	doneChan chan struct{}
+}
+
 // peer provides a bitcoin peer for handling bitcoin communications.  The
 // overall data flow is split into 3 goroutines and a separate block manager.
 // Inbound messages are read via the inHandler goroutine and generally
@@ -188,7 +196,7 @@ type peer struct {
 	sendDoneQueue      chan struct{}
 	queueWg            sync.WaitGroup // TODO(oga) wg -> single use channel?
 	outputInvChan      chan *wire.InvVect
-	blockStallActivate chan time.Duration
+	blockStallActivate chan blockStallMsg
 	blockStallTimer    <-chan time.Time
 	blockStallMtx      sync.Mutex // protects access to blockStallCancel
 	blockStallCancel   chan struct{}
@@ -240,7 +248,11 @@ func (p *peer) isKnownInventory(invVect *wire.InvVect) bool {
 // passes before the peer receives a "block" response, then the peer will
 // disconnect itself.
 func (p *peer) SetBlockStallTimer(timeout time.Duration) {
-	p.blockStallActivate <- timeout
+	done := make(chan struct{}, 1)
+	bsmsg := blockStallMsg{timeout: timeout, doneChan: done}
+
+	p.blockStallActivate <- bsmsg
+	<-done
 }
 
 // UpdateLastBlockHeight updates the last known block for the peer. It is safe
@@ -1461,6 +1473,13 @@ func (p *peer) inHandler() {
 		}
 		p.Disconnect()
 	})
+	cancelBlockStall := func() {
+		p.blockStallMtx.Lock()
+		if p.blockStallCancel != nil {
+			close(p.blockStallCancel)
+		}
+		p.blockStallMtx.Unlock()
+	}
 out:
 	for atomic.LoadInt32(&p.disconnect) == 0 {
 		rmsg, buf, err := p.readMessage()
@@ -1575,17 +1594,17 @@ out:
 			p.handleTxMsg(msg)
 
 		case *wire.MsgBlock:
-			p.blockStallMtx.Lock()
-			if p.blockStallCancel != nil {
-				close(p.blockStallCancel)
-			}
-			p.blockStallMtx.Unlock()
+			cancelBlockStall()
 			p.handleBlockMsg(msg, buf)
 
 		case *wire.MsgInv:
+			if invContainsBlock(msg.InvList) {
+				cancelBlockStall()
+			}
 			p.handleInvMsg(msg)
 
 		case *wire.MsgHeaders:
+			cancelBlockStall()
 			p.handleHeadersMsg(msg)
 
 		case *wire.MsgNotFound:
@@ -1790,6 +1809,21 @@ func (p *peer) outHandler() {
 	})
 	var blockStallActive bool
 	var stallTimeout time.Duration
+	// Starts a blockStallTimer if one is not currently active started, then
+	// initialize the timer to fire off a read in blockStallTimeout seconds.
+	// Additionally, create a cancellation channel so the inHandler can
+	// signal us if a MsgBlock comes in time.
+	startBlockStallTimer := func() bool {
+		if blockStallActive && p.blockStallTimer == nil {
+			p.blockStallTimer = time.After(stallTimeout)
+
+			p.blockStallMtx.Lock()
+			p.blockStallCancel = make(chan struct{})
+			p.blockStallMtx.Unlock()
+			return true
+		}
+		return false
+	}
 out:
 	for {
 		select {
@@ -1826,23 +1860,33 @@ out:
 			case *wire.MsgGetData:
 				// Should get us block, tx, or not found.
 
-				// If the blockStallTimer has not already been
-				// started, then initialize the timer to fire
-				// off a read in blockStallTimeout seconds.
-				// Additionally, create a cancellation channel
-				// so the inHandler can signal us if a MsgBlock
-				// comes in time.
+				// If we're requesting any blocks in this
+				// MsgGetData, then we activate a block stall
+				// timer to be cancelled if we get a block
+				// message in time.
 				gdmsg := msg.msg.(*wire.MsgGetData)
-				if blockStallActive && p.blockStallTimer == nil &&
-					invContainsBlock(gdmsg.InvList) {
-					peerLog.Debugf("Starting block stall timer for: %v", p)
-					p.blockStallTimer = time.After(stallTimeout)
-					p.blockStallMtx.Lock()
-					p.blockStallCancel = make(chan struct{})
-					p.blockStallMtx.Unlock()
+				if invContainsBlock(gdmsg.InvList) {
+					if startBlockStallTimer() {
+						peerLog.Debugf("Starting block stall timer (getdata) for: %v", p)
+					}
 				}
 			case *wire.MsgGetHeaders:
-				// Should get us headers back.
+				// Should get us headers back. We'll activate a
+				// block stall timer (if one isn't already active)
+				// to disconnect this peer if we don't get a
+				// headers message back in time.
+				if startBlockStallTimer() {
+					peerLog.Debugf("Starting block stall timer (getheaders) for: %v", p)
+				}
+			case *wire.MsgGetBlocks:
+				// If a blockStallTimer isn't already active for
+				// this peer, then we start a timer which will
+				// disconnect this peer after `blockStallTimeout`
+				// seconds unless we receive an INV containing block
+				// hashes before the timeout interval has passed.
+				if startBlockStallTimer() {
+					peerLog.Debugf("Starting block stall timer (get blocks) for: %v", p)
+				}
 			default:
 				// Not one of the above, no sure reply.
 				// We want to ping if nothing else
@@ -1863,11 +1907,16 @@ out:
 			p.sendDoneQueue <- struct{}{}
 			peerLog.Tracef("%s: acked queuehandler", p)
 
-		case timeout := <-p.blockStallActivate:
+		case blockStallMsg := <-p.blockStallActivate:
 			peerLog.Debugf("Activating block stall timer (%v) "+
-				"for: %v", timeout, p)
+				"for: %v", blockStallMsg.timeout, p)
+
 			blockStallActive = true
-			stallTimeout = timeout
+			stallTimeout = blockStallMsg.timeout
+
+			if blockStallMsg.doneChan != nil {
+				blockStallMsg.doneChan <- struct{}{}
+			}
 		case <-p.blockStallCancel:
 			// The inHandler received a MsgBlock before
 			// blockStallTimeout seconds had elapsed. So we set the
@@ -1875,17 +1924,18 @@ out:
 			// select loop won't block on those cases in the future.
 			peerLog.Debugf("Stopping block stall timer for: %v", p)
 			p.blockStallTimer = nil
+
 			p.blockStallMtx.Lock()
 			p.blockStallCancel = nil
 			p.blockStallMtx.Unlock()
+
 			blockStallActive = false
 		case <-p.blockStallTimer:
 			// The inHandler didn't receive a MsgBlock before
 			// blockStallTimeout seconds had elapsed. So we
 			// disconnect the peer for stalling block download.
-			peerLog.Warnf("Peer %s is stalling initial "+
-				"block download, no block response for %v "+
-				"disconnecting", p, blockStallTimeout)
+			peerLog.Warnf("Peer %s is stalling block download, no "+
+				"block response for %v  disconnecting", p, blockStallTimeout)
 			p.Disconnect()
 		case <-p.quit:
 			break out
@@ -2040,7 +2090,7 @@ func newPeerBase(s *server, inbound bool) *peer {
 		sendQueue:          make(chan outMsg, 1),   // nonblocking sync
 		sendDoneQueue:      make(chan struct{}, 1), // nonblocking sync
 		outputInvChan:      make(chan *wire.InvVect, outputBufferSize),
-		blockStallActivate: make(chan time.Duration),
+		blockStallActivate: make(chan blockStallMsg, 1),
 		txProcessed:        make(chan struct{}, 1),
 		blockProcessed:     make(chan struct{}, 1),
 		quit:               make(chan struct{}),
