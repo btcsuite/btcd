@@ -1076,9 +1076,8 @@ func (b *blockManager) handleInvMsg(imsg *invMsg) {
 				imsg.peer.requestedBlocks[iv.Hash] = struct{}{}
 				gdmsg.AddInvVect(iv)
 				numRequested++
+				blocksRequested = true
 			}
-
-			blocksRequested = true
 
 		case wire.InvTypeTx:
 			// Request the transaction if there is not already a
