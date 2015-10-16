@@ -716,61 +716,6 @@ func createVinListPrevOut(s *rpcServer, mtx *wire.MsgTx, chainParams *chaincfg.P
 	return vinList
 }
 
-// createVinList returns a slice of JSON objects for the inputs of the passed
-// transaction.
-func createVinListPrevOut(s *rpcServer, mtx *wire.MsgTx, chainParams *chaincfg.Params, vinExtra int) []btcjson.VinPrevOut {
-	vinList := make([]btcjson.VinPrevOut, len(mtx.TxIn))
-	for i, v := range mtx.TxIn {
-		if blockchain.IsCoinBaseTx(mtx) {
-			vinList[i].Coinbase = hex.EncodeToString(v.SignatureScript)
-		} else {
-			vinList[i].Txid = v.PreviousOutPoint.Hash.String()
-			vinList[i].Vout = v.PreviousOutPoint.Index
-
-			// The disassembled string will contain [error] inline
-			// if the script doesn't fully parse, so ignore the
-			// error here.
-			disbuf, _ := txscript.DisasmString(v.SignatureScript)
-			vinList[i].ScriptSig = new(btcjson.ScriptSig)
-			vinList[i].ScriptSig.Asm = disbuf
-			vinList[i].ScriptSig.Hex = hex.EncodeToString(v.SignatureScript)
-
-			// If vinExtra flag is set then we grab extra data from the
-			// previous transaction output.
-			if vinExtra == 1 {
-
-				tx := btcutil.NewTx(mtx)
-				txStore, err := s.server.txMemPool.fetchInputTransactions(tx, true)
-				if err == nil && len(txStore) != 0 {
-
-					vinList[i].PrevOut = new(btcjson.PrevOut)
-
-					txData := txStore[v.PreviousOutPoint.Hash]
-					originTxOut := txData.Tx.MsgTx().TxOut[v.PreviousOutPoint.Index]
-					vinList[i].PrevOut.Value = btcutil.Amount(originTxOut.Value).ToBTC()
-
-					// Ignore the error here since an error means the script
-					// couldn't parse and there is no additional information about
-					// it anyways.
-					_, addrs, _, _ := txscript.ExtractPkScriptAddrs(originTxOut.PkScript, chainParams)
-
-					if addrs == nil {
-						vinList[i].PrevOut.Addresses = nil
-					} else {
-						vinList[i].PrevOut.Addresses = make([]string, len(addrs))
-						for j, addr := range addrs {
-							vinList[i].PrevOut.Addresses[j] = addr.EncodeAddress()
-						}
-					}
-				}
-			}
-		}
-		vinList[i].Sequence = v.Sequence
-	}
-
-	return vinList
-}
-
 // createVoutList returns a slice of JSON objects for the outputs of the passed
 // transaction.
 func createVoutList(mtx *wire.MsgTx, chainParams *chaincfg.Params) []btcjson.Vout {
