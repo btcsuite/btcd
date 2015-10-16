@@ -190,7 +190,7 @@ func BenchmarkReadVarInt9(b *testing.B) {
 func BenchmarkReadVarStr4(b *testing.B) {
 	buf := []byte{0x04, 't', 'e', 's', 't'}
 	for i := 0; i < b.N; i++ {
-		readVarString(bytes.NewReader(buf), 0)
+		ReadVarString(bytes.NewReader(buf), 0)
 	}
 }
 
@@ -199,7 +199,7 @@ func BenchmarkReadVarStr4(b *testing.B) {
 func BenchmarkReadVarStr10(b *testing.B) {
 	buf := []byte{0x0a, 't', 'e', 's', 't', '0', '1', '2', '3', '4', '5'}
 	for i := 0; i < b.N; i++ {
-		readVarString(bytes.NewReader(buf), 0)
+		ReadVarString(bytes.NewReader(buf), 0)
 	}
 }
 
@@ -207,7 +207,7 @@ func BenchmarkReadVarStr10(b *testing.B) {
 // four byte variable length string.
 func BenchmarkWriteVarStr4(b *testing.B) {
 	for i := 0; i < b.N; i++ {
-		writeVarString(ioutil.Discard, 0, "test")
+		WriteVarString(ioutil.Discard, 0, "test")
 	}
 }
 
@@ -215,7 +215,7 @@ func BenchmarkWriteVarStr4(b *testing.B) {
 // ten byte variable length string.
 func BenchmarkWriteVarStr10(b *testing.B) {
 	for i := 0; i < b.N; i++ {
-		writeVarString(ioutil.Discard, 0, "test012345")
+		WriteVarString(ioutil.Discard, 0, "test012345")
 	}
 }
 

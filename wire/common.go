@@ -457,14 +457,13 @@ func VarIntSerializeSize(val uint64) int {
 	return 9
 }
 
-// readVarString reads a variable length string from r and returns it as a Go
-// string.  A varString is encoded as a varInt containing the length of the
-// string, and the bytes that represent the string itself.  An error is returned
-// if the length is greater than the maximum block payload size, since it would
-// not be possible to put a varString of that size into a block anyways and it
-// also helps protect against memory exhaustion attacks and forced panics
-// through malformed messages.
-func readVarString(r io.Reader, pver uint32) (string, error) {
+// ReadVarString reads a variable length string from r and returns it as a Go
+// string.  A variable length string is encoded as a variable length integer
+// containing the length of the string followed by the bytes that represent the
+// string itself.  An error is returned if the length is greater than the
+// maximum block payload size since it helps protect against memory exhaustion
+// attacks and forced panics through malformed messages.
+func ReadVarString(r io.Reader, pver uint32) (string, error) {
 	count, err := readVarInt(r, pver)
 	if err != nil {
 		return "", err
@@ -476,7 +475,7 @@ func readVarString(r io.Reader, pver uint32) (string, error) {
 	if count > MaxMessagePayload {
 		str := fmt.Sprintf("variable length string is too long "+
 			"[count %d, max %d]", count, MaxMessagePayload)
-		return "", messageError("readVarString", str)
+		return "", messageError("ReadVarString", str)
 	}
 
 	buf := make([]byte, count)
@@ -487,9 +486,10 @@ func readVarString(r io.Reader, pver uint32) (string, error) {
 	return string(buf), nil
 }
 
-// writeVarString serializes str to w as a varInt containing the length of the
-// string followed by the bytes that represent the string itself.
-func writeVarString(w io.Writer, pver uint32, str string) error {
+// WriteVarString serializes str to w as a variable length integer containing
+// the length of the string followed by the bytes that represent the string
+// itself.
+func WriteVarString(w io.Writer, pver uint32, str string) error {
 	err := writeVarInt(w, pver, uint64(len(str)))
 	if err != nil {
 		return err
