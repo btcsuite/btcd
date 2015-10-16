@@ -303,7 +303,7 @@ func newBlockImporter(db database.Db, r io.ReadSeeker) *blockImporter {
 		doneChan:     make(chan bool),
 		errChan:      make(chan error),
 		quit:         make(chan struct{}),
-		chain:        blockchain.New(db, activeNetParams, nil),
+		chain:        blockchain.New(db, activeNetParams, nil, nil),
 		medianTime:   blockchain.NewMedianTime(),
 		lastLogTime:  time.Now(),
 	}

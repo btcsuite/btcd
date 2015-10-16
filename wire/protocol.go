@@ -12,7 +12,7 @@ import (
 
 const (
 	// ProtocolVersion is the latest protocol version this package supports.
-	ProtocolVersion uint32 = 70002
+	ProtocolVersion uint32 = 70011
 
 	// MultipleAddressVersion is the protocol version which added multiple
 	// addresses per message (pver >= MultipleAddressVersion).
@@ -35,6 +35,10 @@ const (
 	// with a relay flag (pver >= BIP0037Version).
 	BIP0037Version uint32 = 70001
 
+	// BIP0111Version is the protocol version which added the SFNodeBloom
+	// service flag.
+	BIP0111Version uint32 = 70011
+
 	// RejectVersion is the protocol version which added a new reject
 	// message.
 	RejectVersion uint32 = 70002
@@ -46,11 +50,29 @@ type ServiceFlag uint64
 const (
 	// SFNodeNetwork is a flag used to indicate a peer is a full node.
 	SFNodeNetwork ServiceFlag = 1 << iota
+
+	// SFNodeGetUTXO is a flag used to indicate a peer supports the
+	// getutxos and utxos commands (BIP0064).
+	SFNodeGetUTXO
+
+	// SFNodeBloom is a flag used to indiciate a peer supports bloom
+	// filtering.
+	SFNodeBloom
 )
 
 // Map of service flags back to their constant names for pretty printing.
 var sfStrings = map[ServiceFlag]string{
 	SFNodeNetwork: "SFNodeNetwork",
+	SFNodeGetUTXO: "SFNodeGetUTXO",
+	SFNodeBloom:   "SFNodeBloom",
+}
+
+// orderedSFStrings is an ordered list of service flags from highest to
+// lowest.
+var orderedSFStrings = []ServiceFlag{
+	SFNodeNetwork,
+	SFNodeGetUTXO,
+	SFNodeBloom,
 }
 
 // String returns the ServiceFlag in human-readable form.
@@ -62,9 +84,9 @@ func (f ServiceFlag) String() string {
 
 	// Add individual bit flags.
 	s := ""
-	for flag, name := range sfStrings {
+	for _, flag := range orderedSFStrings {
 		if f&flag == flag {
-			s += name + "|"
+			s += sfStrings[flag] + "|"
 			f -= flag
 		}
 	}

@@ -198,18 +198,19 @@ func unparseScript(pops []parsedOpcode) ([]byte, error) {
 // appended.  In addition, the reason the script failed to parse is returned
 // if the caller wants more information about the failure.
 func DisasmString(buf []byte) (string, error) {
-	disbuf := ""
+	var disbuf bytes.Buffer
 	opcodes, err := parseScript(buf)
 	for _, pop := range opcodes {
-		disbuf += pop.print(true) + " "
+		disbuf.WriteString(pop.print(true))
+		disbuf.WriteByte(' ')
 	}
-	if disbuf != "" {
-		disbuf = disbuf[:len(disbuf)-1]
+	if disbuf.Len() > 0 {
+		disbuf.Truncate(disbuf.Len() - 1)
 	}
 	if err != nil {
-		disbuf += "[error]"
+		disbuf.WriteString("[error]")
 	}
-	return disbuf, err
+	return disbuf.String(), err
 }
 
 // removeOpcode will remove any opcode matching ``opcode'' from the opcode

@@ -1,4 +1,4 @@
-// Copyright (c) 2014 The btcsuite developers
+// Copyright (c) 2014-2015 The btcsuite developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -54,6 +54,15 @@ func NewNotifyNewTransactionsCmd(verbose *bool) *NotifyNewTransactionsCmd {
 	return &NotifyNewTransactionsCmd{
 		Verbose: verbose,
 	}
+}
+
+// SessionCmd defines the session JSON-RPC command.
+type SessionCmd struct{}
+
+// NewSessionCmd returns a new instance which can be used to issue a session
+// JSON-RPC command.
+func NewSessionCmd() *SessionCmd {
+	return &SessionCmd{}
 }
 
 // StopNotifyNewTransactionsCmd defines the stopnotifynewtransactions JSON-RPC command.
@@ -158,6 +167,7 @@ func init() {
 	MustRegisterCmd("notifynewtransactions", (*NotifyNewTransactionsCmd)(nil), flags)
 	MustRegisterCmd("notifyreceived", (*NotifyReceivedCmd)(nil), flags)
 	MustRegisterCmd("notifyspent", (*NotifySpentCmd)(nil), flags)
+	MustRegisterCmd("session", (*SessionCmd)(nil), flags)
 	MustRegisterCmd("stopnotifyblocks", (*StopNotifyBlocksCmd)(nil), flags)
 	MustRegisterCmd("stopnotifynewtransactions", (*StopNotifyNewTransactionsCmd)(nil), flags)
 	MustRegisterCmd("stopnotifyspent", (*StopNotifySpentCmd)(nil), flags)

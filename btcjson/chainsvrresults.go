@@ -364,6 +364,7 @@ type InfoChainResult struct {
 	Difficulty      float64 `json:"difficulty"`
 	TestNet         bool    `json:"testnet"`
 	RelayFee        float64 `json:"relayfee"`
+	Errors          string  `json:"errors"`
 }
 
 // LocalAddressesResult models the localaddresses data from the getnetworkinfo

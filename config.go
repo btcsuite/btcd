@@ -45,6 +45,7 @@ const (
 	defaultBlockPrioritySize = 50000
 	defaultGenerate          = false
 	defaultAddrIndex         = false
+	defaultSigCacheMaxSize   = 50000
 )
 
 var (
@@ -116,6 +117,8 @@ type config struct {
 	GetWorkKeys        []string      `long:"getworkkey" description:"DEPRECATED -- Use the --miningaddr option instead"`
 	AddrIndex          bool          `long:"addrindex" description:"Build and maintain a full address index. Currently only supported by leveldb."`
 	DropAddrIndex      bool          `long:"dropaddrindex" description:"Deletes the address-based transaction index from the database on start up, and the exits."`
+	NoPeerBloomFilters bool          `long:"nopeerbloomfilters" description:"Disable bloom filtering support."`
+	SigCacheMaxSize    uint          `long:"sigcachemaxsize" description:"The maximum number of entries in the signature verification cache."`
 	onionlookup        func(string) ([]net.IP, error)
 	lookup             func(string) ([]net.IP, error)
 	oniondial          func(string, string) (net.Conn, error)
@@ -321,6 +324,7 @@ func loadConfig() (*config, []string, error) {
 		BlockMinSize:      defaultBlockMinSize,
 		BlockMaxSize:      defaultBlockMaxSize,
 		BlockPrioritySize: defaultBlockPrioritySize,
+		SigCacheMaxSize:   defaultSigCacheMaxSize,
 		MaxOrphanTxs:      maxOrphanTransactions,
 		Generate:          defaultGenerate,
 		AddrIndex:         defaultAddrIndex,

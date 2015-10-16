@@ -366,9 +366,9 @@ func medianAdjustedTime(chainState *chainState, timeSource blockchain.MedianTime
 //  |  transactions (while block size   |   |
 //  |  <= cfg.BlockMinSize)             |   |
 //   -----------------------------------  --
-func NewBlockTemplate(mempool *txMemPool, payToAddress btcutil.Address) (*BlockTemplate, error) {
-	blockManager := mempool.server.blockManager
-	timeSource := mempool.server.timeSource
+func NewBlockTemplate(server *server, payToAddress btcutil.Address) (*BlockTemplate, error) {
+	blockManager := server.blockManager
+	timeSource := server.timeSource
 	chainState := &blockManager.chainState
 
 	// Extend the most recently known best block.
@@ -404,7 +404,7 @@ func NewBlockTemplate(mempool *txMemPool, payToAddress btcutil.Address) (*BlockT
 	// Also, choose the initial sort order for the priority queue based on
 	// whether or not there is an area allocated for high-priority
 	// transactions.
-	mempoolTxns := mempool.TxDescs()
+	mempoolTxns := server.txMemPool.TxDescs()
 	sortedByFee := cfg.BlockPrioritySize == 0
 	priorityQueue := newTxPriorityQueue(len(mempoolTxns), sortedByFee)
 
@@ -474,7 +474,7 @@ mempoolLoop:
 			originIndex := txIn.PreviousOutPoint.Index
 			txData, exists := txStore[*originHash]
 			if !exists || txData.Err != nil || txData.Tx == nil {
-				if !mempool.HaveTransaction(originHash) {
+				if !server.txMemPool.HaveTransaction(originHash) {
 					minrLog.Tracef("Skipping tx %s because "+
 						"it references tx %s which is "+
 						"not available", tx.Sha,
@@ -656,7 +656,7 @@ mempoolLoop:
 			continue
 		}
 		err = blockchain.ValidateTransactionScripts(tx, blockTxStore,
-			txscript.StandardVerifyFlags)
+			txscript.StandardVerifyFlags, server.sigCache)
 		if err != nil {
 			minrLog.Tracef("Skipping tx %s due to error in "+
 				"ValidateTransactionScripts: %v", tx.Sha(), err)

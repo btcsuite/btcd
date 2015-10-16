@@ -14,6 +14,7 @@ import (
 	"github.com/btcsuite/btcutil"
 	"github.com/btcsuite/golangcrypto/ripemd160"
 	"github.com/btcsuite/goleveldb/leveldb"
+	"github.com/btcsuite/goleveldb/leveldb/iterator"
 	"github.com/btcsuite/goleveldb/leveldb/util"
 )
 
@@ -423,6 +424,13 @@ func bytesPrefix(prefix []byte) *util.Range {
 	return &util.Range{Start: prefix, Limit: limit}
 }
 
+func advanceIterator(iter iterator.IteratorSeeker, reverse bool) bool {
+	if reverse {
+		return iter.Prev()
+	}
+	return iter.Next()
+}
+
 // FetchTxsForAddr looks up and returns all transactions which either
 // spend from a previously created output of the passed address, or
 // create a new output locked to the passed address. The, `limit` parameter
@@ -430,16 +438,16 @@ func bytesPrefix(prefix []byte) *util.Range {
 // caller wishes to seek forward in the results some amount, the 'seek'
 // represents how many results to skip.
 func (db *LevelDb) FetchTxsForAddr(addr btcutil.Address, skip int,
-	limit int) ([]*database.TxListReply, error) {
+	limit int, reverse bool) ([]*database.TxListReply, int, error) {
 	db.dbLock.Lock()
 	defer db.dbLock.Unlock()
 
 	// Enforce constraints for skip and limit.
 	if skip < 0 {
-		return nil, errors.New("offset for skip must be positive")
+		return nil, 0, errors.New("offset for skip must be positive")
 	}
 	if limit < 0 {
-		return nil, errors.New("value for limit must be positive")
+		return nil, 0, errors.New("value for limit must be positive")
 	}
 
 	// Parse address type, bailing on an unknown type.
@@ -455,7 +463,7 @@ func (db *LevelDb) FetchTxsForAddr(addr btcutil.Address, skip int,
 		hash160 := addr.AddressPubKeyHash().Hash160()
 		addrKey = hash160[:]
 	default:
-		return nil, database.ErrUnsupportedAddressType
+		return nil, 0, database.ErrUnsupportedAddressType
 	}
 
 	// Create the prefix for our search.
@@ -464,14 +472,27 @@ func (db *LevelDb) FetchTxsForAddr(addr btcutil.Address, skip int,
 	copy(addrPrefix[3:23], addrKey)
 
 	iter := db.lDb.NewIterator(bytesPrefix(addrPrefix), nil)
-	for skip != 0 && iter.Next() {
+	skipped := 0
+
+	if reverse {
+		// Go to the last element if reverse iterating.
+		iter.Last()
+		// Skip "one past" the last element so the loops below don't
+		// miss the last element due to Prev() being called first.
+		// We can safely ignore iterator exhaustion since the loops
+		// below will see there's no keys anyway.
+		iter.Next()
+	}
+
+	for skip != 0 && advanceIterator(iter, reverse) {
 		skip--
+		skipped++
 	}
 
 	// Iterate through all address indexes that match the targeted prefix.
 	var replies []*database.TxListReply
 	var rawIndex [12]byte
-	for iter.Next() && limit != 0 {
+	for advanceIterator(iter, reverse) && limit != 0 {
 		copy(rawIndex[:], iter.Key()[23:35])
 		addrIndex := unpackTxIndex(rawIndex)
 
@@ -491,10 +512,10 @@ func (db *LevelDb) FetchTxsForAddr(addr btcutil.Address, skip int,
 	}
 	iter.Release()
 	if err := iter.Error(); err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 
-	return replies, nil
+	return replies, skipped, nil
 }
 
 // UpdateAddrIndexForBlock updates the stored addrindex with passed

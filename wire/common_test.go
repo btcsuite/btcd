@@ -354,6 +354,62 @@ func TestVarIntWireErrors(t *testing.T) {
 	}
 }
 
+// TestVarIntNonCanonical ensures variable length integers that are not encoded
+// canonically return the expected error.
+func TestVarIntNonCanonical(t *testing.T) {
+	pver := wire.ProtocolVersion
+
+	tests := []struct {
+		name string // Test name for easier identification
+		in   []byte // Value to decode
+		pver uint32 // Protocol version for wire encoding
+	}{
+		{
+			"0 encoded with 3 bytes", []byte{0xfd, 0x00, 0x00},
+			pver,
+		},
+		{
+			"max single-byte value encoded with 3 bytes",
+			[]byte{0xfd, 0xfc, 0x00}, pver,
+		},
+		{
+			"0 encoded with 5 bytes",
+			[]byte{0xfe, 0x00, 0x00, 0x00, 0x00}, pver,
+		},
+		{
+			"max three-byte value encoded with 5 bytes",
+			[]byte{0xfe, 0xff, 0xff, 0x00, 0x00}, pver,
+		},
+		{
+			"0 encoded with 9 bytes",
+			[]byte{0xff, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00},
+			pver,
+		},
+		{
+			"max five-byte value encoded with 9 bytes",
+			[]byte{0xff, 0xff, 0xff, 0xff, 0xff, 0x00, 0x00, 0x00, 0x00},
+			pver,
+		},
+	}
+
+	t.Logf("Running %d tests", len(tests))
+	for i, test := range tests {
+		// Decode from wire format.
+		rbuf := bytes.NewReader(test.in)
+		val, err := wire.TstReadVarInt(rbuf, test.pver)
+		if _, ok := err.(*wire.MessageError); !ok {
+			t.Errorf("readVarInt #%d (%s) unexpected error %v", i,
+				test.name, err)
+			continue
+		}
+		if val != 0 {
+			t.Errorf("readVarInt #%d (%s)\n got: %d want: 0", i,
+				test.name, val)
+			continue
+		}
+	}
+}
+
 // TestVarIntWire tests the serialize size for variable length integers.
 func TestVarIntSerializeSize(t *testing.T) {
 	tests := []struct {
@@ -415,26 +471,26 @@ func TestVarStringWire(t *testing.T) {
 	for i, test := range tests {
 		// Encode to wire format.
 		var buf bytes.Buffer
-		err := wire.TstWriteVarString(&buf, test.pver, test.in)
+		err := wire.WriteVarString(&buf, test.pver, test.in)
 		if err != nil {
-			t.Errorf("writeVarString #%d error %v", i, err)
+			t.Errorf("WriteVarString #%d error %v", i, err)
 			continue
 		}
 		if !bytes.Equal(buf.Bytes(), test.buf) {
-			t.Errorf("writeVarString #%d\n got: %s want: %s", i,
+			t.Errorf("WriteVarString #%d\n got: %s want: %s", i,
 				spew.Sdump(buf.Bytes()), spew.Sdump(test.buf))
 			continue
 		}
 
 		// Decode from wire format.
 		rbuf := bytes.NewReader(test.buf)
-		val, err := wire.TstReadVarString(rbuf, test.pver)
+		val, err := wire.ReadVarString(rbuf, test.pver)
 		if err != nil {
-			t.Errorf("readVarString #%d error %v", i, err)
+			t.Errorf("ReadVarString #%d error %v", i, err)
 			continue
 		}
 		if val != test.out {
-			t.Errorf("readVarString #%d\n got: %s want: %s", i,
+			t.Errorf("ReadVarString #%d\n got: %s want: %s", i,
 				val, test.out)
 			continue
 		}
@@ -470,18 +526,18 @@ func TestVarStringWireErrors(t *testing.T) {
 	for i, test := range tests {
 		// Encode to wire format.
 		w := newFixedWriter(test.max)
-		err := wire.TstWriteVarString(w, test.pver, test.in)
+		err := wire.WriteVarString(w, test.pver, test.in)
 		if err != test.writeErr {
-			t.Errorf("writeVarString #%d wrong error got: %v, want: %v",
+			t.Errorf("WriteVarString #%d wrong error got: %v, want: %v",
 				i, err, test.writeErr)
 			continue
 		}
 
 		// Decode from wire format.
 		r := newFixedReader(test.max, test.buf)
-		_, err = wire.TstReadVarString(r, test.pver)
+		_, err = wire.ReadVarString(r, test.pver)
 		if err != test.readErr {
-			t.Errorf("readVarString #%d wrong error got: %v, want: %v",
+			t.Errorf("ReadVarString #%d wrong error got: %v, want: %v",
 				i, err, test.readErr)
 			continue
 		}
@@ -510,9 +566,9 @@ func TestVarStringOverflowErrors(t *testing.T) {
 	for i, test := range tests {
 		// Decode from wire format.
 		rbuf := bytes.NewReader(test.buf)
-		_, err := wire.TstReadVarString(rbuf, test.pver)
+		_, err := wire.ReadVarString(rbuf, test.pver)
 		if reflect.TypeOf(err) != reflect.TypeOf(test.err) {
-			t.Errorf("readVarString #%d wrong error got: %v, "+
+			t.Errorf("ReadVarString #%d wrong error got: %v, "+
 				"want: %v", i, err, reflect.TypeOf(test.err))
 			continue
 		}

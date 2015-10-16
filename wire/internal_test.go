@@ -63,18 +63,6 @@ func TstWriteVarInt(w io.Writer, pver uint32, val uint64) error {
 	return writeVarInt(w, pver, val)
 }
 
-// TstReadVarString makes the internal readVarString function available to the
-// test package.
-func TstReadVarString(r io.Reader, pver uint32) (string, error) {
-	return readVarString(r, pver)
-}
-
-// TstWriteVarString makes the internal writeVarString function available to the
-// test package.
-func TstWriteVarString(w io.Writer, pver uint32, str string) error {
-	return writeVarString(w, pver, str)
-}
-
 // TstReadVarBytes makes the internal readVarBytes function available to the
 // test package.
 func TstReadVarBytes(r io.Reader, pver uint32, maxAllowed uint32, fieldName string) ([]byte, error) {

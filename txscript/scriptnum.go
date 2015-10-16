@@ -8,9 +8,9 @@ const (
 	maxInt32 = 1<<31 - 1
 	minInt32 = -1 << 31
 
-	// maxScriptNumLen is the maximum number of bytes data being interpreted
-	// as an integer may be.
-	maxScriptNumLen = 4
+	// defaultScriptNumLen is the default number of bytes
+	// data being interpreted as an integer may be.
+	defaultScriptNumLen = 4
 )
 
 // scriptNum represents a numeric value used in the scripting engine with
@@ -36,9 +36,9 @@ const (
 //
 // Then, whenever data is interpreted as an integer, it is converted to this
 // type by using the makeScriptNum function which will return an error if the
-// number is out of range (or not minimally encoded depending on a flag).  Since
-// all numeric opcodes involve pulling data from the stack and interpreting it
-// as an integer, it provides the required behavior.
+// number is out of range or not minimally encoded depending on parameters.
+// Since all numeric opcodes involve pulling data from the stack and
+// interpreting it as an integer, it provides the required behavior.
 type scriptNum int64
 
 // checkMinimalDataEncoding returns whether or not the passed byte array adheres
@@ -132,11 +132,12 @@ func (n scriptNum) Bytes() []byte {
 // and the consensus rules dictate numbers which are directly cast to ints
 // provide this behavior.
 //
-// In practice, the number should never really be out of range since it will
-// have been created with makeScriptNum which rejects them, but in case
-// something in the future ends up calling this function against the result
-// of some arithmetic, which IS allowed to be out of range before being
-// reinterpreted as an integer, this will provide the correct behavior.
+// In practice, for most opcodes, the number should never be out of range since
+// it will have been created with makeScriptNum using the defaultScriptLen
+// value, which rejects them.  In case something in the future ends up calling
+// this function against the result of some arithmetic, which IS allowed to be
+// out of range before being reinterpreted as an integer, this will provide the
+// correct behavior.
 func (n scriptNum) Int32() int32 {
 	if n > maxInt32 {
 		return maxInt32
@@ -152,10 +153,13 @@ func (n scriptNum) Int32() int32 {
 // makeScriptNum interprets the passed serialized bytes as an encoded integer
 // and returns the result as a script number.
 //
-// Since the consensus rules dictate the serialized bytes interpreted as ints
-// are only allowed to be in the range [-2^31 + 1, 2^31 - 1], an error will be
-// returned when the provided bytes would result in a number outside of that
-// range.
+// Since the consensus rules dictate that serialized bytes interpreted as ints
+// are only allowed to be in the range determined by a maximum number of bytes,
+// on a per opcode basis, an error will be returned when the provided bytes
+// would result in a number outside of that range.  In particular, the range for
+// the vast majority of opcodes dealing with numeric values are limited to 4
+// bytes and therefore will pass that value to this function resulting in an
+// allowed range of [-2^31 + 1, 2^31 - 1].
 //
 // The requireMinimal flag causes an error to be returned if additional checks
 // on the encoding determine it is not represented with the smallest possible
@@ -164,11 +168,18 @@ func (n scriptNum) Int32() int32 {
 // [0x7f 0x00 0x00 ...], etc.  All forms except [0x7f] will return an error with
 // requireMinimal enabled.
 //
+// The scriptNumLen is the maximum number of bytes the encoded value can be
+// before an ErrStackNumberTooBig is returned.  This effectively limits the
+// range of allowed values.
+// WARNING:  Great care should be taken if passing a value larger than
+// defaultScriptNumLen, which could lead to addition and multiplication
+// overflows.
+//
 // See the Bytes function documentation for example encodings.
-func makeScriptNum(v []byte, requireMinimal bool) (scriptNum, error) {
-	// Interpreting data as an integer requires that it is not larger than
-	// a 32-bit integer.
-	if len(v) > maxScriptNumLen {
+func makeScriptNum(v []byte, requireMinimal bool, scriptNumLen int) (scriptNum, error) {
+	// Interpreting data requires that it is not larger than
+	// the the passed scriptNumLen value.
+	if len(v) > scriptNumLen {
 		return 0, ErrStackNumberTooBig
 	}
 

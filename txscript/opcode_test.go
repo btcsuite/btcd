@@ -109,8 +109,13 @@ func TestOpcodeDisasm(t *testing.T) {
 
 		// OP_NOP1 through OP_NOP10.
 		case opcodeVal >= 0xb0 && opcodeVal <= 0xb9:
-			val := byte(opcodeVal - (0xb0 - 1))
-			expectedStr = "OP_NOP" + strconv.Itoa(int(val))
+			// OP_NOP2 is an alias of OP_CHECKLOCKTIMEVERIFY
+			if opcodeVal == 0xb1 {
+				expectedStr = "OP_CHECKLOCKTIMEVERIFY"
+			} else {
+				val := byte(opcodeVal - (0xb0 - 1))
+				expectedStr = "OP_NOP" + strconv.Itoa(int(val))
+			}
 
 		// OP_UNKNOWN#.
 		case opcodeVal >= 0xba && opcodeVal <= 0xf8 || opcodeVal == 0xfc:
@@ -166,8 +171,13 @@ func TestOpcodeDisasm(t *testing.T) {
 
 		// OP_NOP1 through OP_NOP10.
 		case opcodeVal >= 0xb0 && opcodeVal <= 0xb9:
-			val := byte(opcodeVal - (0xb0 - 1))
-			expectedStr = "OP_NOP" + strconv.Itoa(int(val))
+			// OP_NOP2 is an alias of OP_CHECKLOCKTIMEVERIFY
+			if opcodeVal == 0xb1 {
+				expectedStr = "OP_CHECKLOCKTIMEVERIFY"
+			} else {
+				val := byte(opcodeVal - (0xb0 - 1))
+				expectedStr = "OP_NOP" + strconv.Itoa(int(val))
+			}
 
 		// OP_UNKNOWN#.
 		case opcodeVal >= 0xba && opcodeVal <= 0xf8 || opcodeVal == 0xfc:

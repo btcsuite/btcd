@@ -165,7 +165,7 @@ func ExampleSignTxOutput() {
 		txscript.ScriptStrictMultiSig |
 		txscript.ScriptDiscourageUpgradableNops
 	vm, err := txscript.NewEngine(originTx.TxOut[0].PkScript, redeemTx, 0,
-		flags)
+		flags, nil)
 	if err != nil {
 		fmt.Println(err)
 		return

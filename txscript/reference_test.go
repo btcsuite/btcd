@@ -124,6 +124,8 @@ func parseScriptFlags(flagStr string) (ScriptFlags, error) {
 		switch flag {
 		case "":
 			// Nothing.
+		case "CHECKLOCKTIMEVERIFY":
+			flags |= ScriptVerifyCheckLockTimeVerify
 		case "CLEANSTACK":
 			flags |= ScriptVerifyCleanStack
 		case "DERSIG":
@@ -190,40 +192,51 @@ func TestScriptInvalidTests(t *testing.T) {
 			err)
 		return
 	}
-	for i, test := range tests {
-		// Skip comments
-		if len(test) == 1 {
-			continue
-		}
-		name, err := testName(test)
-		if err != nil {
-			t.Errorf("TestBitcoindInvalidTests: invalid test #%d",
-				i)
-			continue
-		}
-		scriptSig, err := parseShortForm(test[0])
-		if err != nil {
-			t.Errorf("%s: can't parse scriptSig; %v", name, err)
-			continue
-		}
-		scriptPubKey, err := parseShortForm(test[1])
-		if err != nil {
-			t.Errorf("%s: can't parse scriptPubkey; %v", name, err)
-			continue
-		}
-		flags, err := parseScriptFlags(test[2])
-		if err != nil {
-			t.Errorf("%s: %v", name, err)
-			continue
-		}
-		tx := createSpendingTx(scriptSig, scriptPubKey)
-		vm, err := NewEngine(scriptPubKey, tx, 0, flags)
-		if err == nil {
-			if err := vm.Execute(); err == nil {
-				t.Errorf("%s test succeeded when it "+
-					"should have failed\n", name)
+	sigCache := NewSigCache(10)
+	sigCacheToggle := []bool{true, false}
+	for _, useSigCache := range sigCacheToggle {
+		for i, test := range tests {
+			// Skip comments
+			if len(test) == 1 {
+				continue
 			}
-			continue
+			name, err := testName(test)
+			if err != nil {
+				t.Errorf("TestBitcoindInvalidTests: invalid test #%d",
+					i)
+				continue
+			}
+			scriptSig, err := parseShortForm(test[0])
+			if err != nil {
+				t.Errorf("%s: can't parse scriptSig; %v", name, err)
+				continue
+			}
+			scriptPubKey, err := parseShortForm(test[1])
+			if err != nil {
+				t.Errorf("%s: can't parse scriptPubkey; %v", name, err)
+				continue
+			}
+			flags, err := parseScriptFlags(test[2])
+			if err != nil {
+				t.Errorf("%s: %v", name, err)
+				continue
+			}
+			tx := createSpendingTx(scriptSig, scriptPubKey)
+
+			var vm *Engine
+			if useSigCache {
+				vm, err = NewEngine(scriptPubKey, tx, 0, flags, sigCache)
+			} else {
+				vm, err = NewEngine(scriptPubKey, tx, 0, flags, nil)
+			}
+
+			if err == nil {
+				if err := vm.Execute(); err == nil {
+					t.Errorf("%s test succeeded when it "+
+						"should have failed\n", name)
+				}
+				continue
+			}
 		}
 	}
 }
@@ -244,42 +257,53 @@ func TestScriptValidTests(t *testing.T) {
 			err)
 		return
 	}
-	for i, test := range tests {
-		// Skip comments
-		if len(test) == 1 {
-			continue
-		}
-		name, err := testName(test)
-		if err != nil {
-			t.Errorf("TestBitcoindValidTests: invalid test #%d",
-				i)
-			continue
-		}
-		scriptSig, err := parseShortForm(test[0])
-		if err != nil {
-			t.Errorf("%s: can't parse scriptSig; %v", name, err)
-			continue
-		}
-		scriptPubKey, err := parseShortForm(test[1])
-		if err != nil {
-			t.Errorf("%s: can't parse scriptPubkey; %v", name, err)
-			continue
-		}
-		flags, err := parseScriptFlags(test[2])
-		if err != nil {
-			t.Errorf("%s: %v", name, err)
-			continue
-		}
-		tx := createSpendingTx(scriptSig, scriptPubKey)
-		vm, err := NewEngine(scriptPubKey, tx, 0, flags)
-		if err != nil {
-			t.Errorf("%s failed to create script: %v", name, err)
-			continue
-		}
-		err = vm.Execute()
-		if err != nil {
-			t.Errorf("%s failed to execute: %v", name, err)
-			continue
+	sigCache := NewSigCache(10)
+	sigCacheToggle := []bool{true, false}
+	for _, useSigCache := range sigCacheToggle {
+		for i, test := range tests {
+			// Skip comments
+			if len(test) == 1 {
+				continue
+			}
+			name, err := testName(test)
+			if err != nil {
+				t.Errorf("TestBitcoindValidTests: invalid test #%d",
+					i)
+				continue
+			}
+			scriptSig, err := parseShortForm(test[0])
+			if err != nil {
+				t.Errorf("%s: can't parse scriptSig; %v", name, err)
+				continue
+			}
+			scriptPubKey, err := parseShortForm(test[1])
+			if err != nil {
+				t.Errorf("%s: can't parse scriptPubkey; %v", name, err)
+				continue
+			}
+			flags, err := parseScriptFlags(test[2])
+			if err != nil {
+				t.Errorf("%s: %v", name, err)
+				continue
+			}
+			tx := createSpendingTx(scriptSig, scriptPubKey)
+
+			var vm *Engine
+			if useSigCache {
+				vm, err = NewEngine(scriptPubKey, tx, 0, flags, sigCache)
+			} else {
+				vm, err = NewEngine(scriptPubKey, tx, 0, flags, nil)
+			}
+
+			if err != nil {
+				t.Errorf("%s failed to create script: %v", name, err)
+				continue
+			}
+			err = vm.Execute()
+			if err != nil {
+				t.Errorf("%s failed to execute: %v", name, err)
+				continue
+			}
 		}
 	}
 }
@@ -414,7 +438,7 @@ testloop:
 			// These are meant to fail, so as soon as the first
 			// input fails the transaction has failed. (some of the
 			// test txns have good inputs, too..
-			vm, err := NewEngine(pkScript, tx.MsgTx(), k, flags)
+			vm, err := NewEngine(pkScript, tx.MsgTx(), k, flags, nil)
 			if err != nil {
 				continue testloop
 			}
@@ -555,7 +579,7 @@ testloop:
 					k, i, test)
 				continue testloop
 			}
-			vm, err := NewEngine(pkScript, tx.MsgTx(), k, flags)
+			vm, err := NewEngine(pkScript, tx.MsgTx(), k, flags, nil)
 			if err != nil {
 				t.Errorf("test (%d:%v:%d) failed to create "+
 					"script: %v", i, test, k, err)

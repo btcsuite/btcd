@@ -53,7 +53,7 @@ func findCandidates(db database.Db, latestHash *wire.ShaHash) ([]*chaincfg.Check
 
 	// Setup chain and get the latest checkpoint.  Ignore notifications
 	// since they aren't needed for this util.
-	chain := blockchain.New(db, activeNetParams, nil)
+	chain := blockchain.New(db, activeNetParams, nil, nil)
 	latestCheckpoint := chain.LatestCheckpoint()
 	if latestCheckpoint == nil {
 		return nil, fmt.Errorf("unable to retrieve latest checkpoint")

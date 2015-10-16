@@ -83,7 +83,7 @@ func (s *stack) PopInt() (scriptNum, error) {
 		return 0, err
 	}
 
-	return makeScriptNum(so, s.verifyMinimalData)
+	return makeScriptNum(so, s.verifyMinimalData, defaultScriptNumLen)
 }
 
 // PopBool pops the value off the top of the stack, converts it into a bool, and
@@ -118,7 +118,7 @@ func (s *stack) PeekInt(idx int32) (scriptNum, error) {
 		return 0, err
 	}
 
-	return makeScriptNum(so, s.verifyMinimalData)
+	return makeScriptNum(so, s.verifyMinimalData, defaultScriptNumLen)
 }
 
 // PeekBool returns the Nth item on the stack as a bool without removing it.

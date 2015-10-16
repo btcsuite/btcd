@@ -188,7 +188,7 @@ func (alert *Alert) Serialize(w io.Writer, pver uint32) error {
 		return err
 	}
 	for i := 0; i < int(count); i++ {
-		err = writeVarString(w, pver, alert.SetSubVer[i])
+		err = WriteVarString(w, pver, alert.SetSubVer[i])
 		if err != nil {
 			return err
 		}
@@ -198,15 +198,15 @@ func (alert *Alert) Serialize(w io.Writer, pver uint32) error {
 	if err != nil {
 		return err
 	}
-	err = writeVarString(w, pver, alert.Comment)
+	err = WriteVarString(w, pver, alert.Comment)
 	if err != nil {
 		return err
 	}
-	err = writeVarString(w, pver, alert.StatusBar)
+	err = WriteVarString(w, pver, alert.StatusBar)
 	if err != nil {
 		return err
 	}
-	err = writeVarString(w, pver, alert.Reserved)
+	err = WriteVarString(w, pver, alert.Reserved)
 	if err != nil {
 		return err
 	}
@@ -260,7 +260,7 @@ func (alert *Alert) Deserialize(r io.Reader, pver uint32) error {
 	}
 	alert.SetSubVer = make([]string, count)
 	for i := 0; i < int(count); i++ {
-		alert.SetSubVer[i], err = readVarString(r, pver)
+		alert.SetSubVer[i], err = ReadVarString(r, pver)
 		if err != nil {
 			return err
 		}
@@ -270,15 +270,15 @@ func (alert *Alert) Deserialize(r io.Reader, pver uint32) error {
 	if err != nil {
 		return err
 	}
-	alert.Comment, err = readVarString(r, pver)
+	alert.Comment, err = ReadVarString(r, pver)
 	if err != nil {
 		return err
 	}
-	alert.StatusBar, err = readVarString(r, pver)
+	alert.StatusBar, err = ReadVarString(r, pver)
 	if err != nil {
 		return err
 	}
-	alert.Reserved, err = readVarString(r, pver)
+	alert.Reserved, err = ReadVarString(r, pver)
 	if err != nil {
 		return err
 	}

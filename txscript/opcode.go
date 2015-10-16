@@ -8,6 +8,7 @@ import (
 	"bytes"
 	"crypto/sha1"
 	"encoding/binary"
+	"errors"
 	"fmt"
 	"hash"
 
@@ -212,6 +213,7 @@ const (
 	OP_CHECKMULTISIGVERIFY = 0xaf // 175
 	OP_NOP1                = 0xb0 // 176
 	OP_NOP2                = 0xb1 // 177
+	OP_CHECKLOCKTIMEVERIFY = 0xb1 // 177 - AKA OP_NOP2
 	OP_NOP3                = 0xb2 // 178
 	OP_NOP4                = 0xb3 // 179
 	OP_NOP5                = 0xb4 // 180
@@ -403,16 +405,17 @@ var opcodeArray = [256]opcode{
 	OP_16:        {OP_16, "OP_16", 1, opcodeN},
 
 	// Control opcodes.
-	OP_NOP:      {OP_NOP, "OP_NOP", 1, opcodeNop},
-	OP_VER:      {OP_VER, "OP_VER", 1, opcodeReserved},
-	OP_IF:       {OP_IF, "OP_IF", 1, opcodeIf},
-	OP_NOTIF:    {OP_NOTIF, "OP_NOTIF", 1, opcodeNotIf},
-	OP_VERIF:    {OP_VERIF, "OP_VERIF", 1, opcodeReserved},
-	OP_VERNOTIF: {OP_VERNOTIF, "OP_VERNOTIF", 1, opcodeReserved},
-	OP_ELSE:     {OP_ELSE, "OP_ELSE", 1, opcodeElse},
-	OP_ENDIF:    {OP_ENDIF, "OP_ENDIF", 1, opcodeEndif},
-	OP_VERIFY:   {OP_VERIFY, "OP_VERIFY", 1, opcodeVerify},
-	OP_RETURN:   {OP_RETURN, "OP_RETURN", 1, opcodeReturn},
+	OP_NOP:                 {OP_NOP, "OP_NOP", 1, opcodeNop},
+	OP_VER:                 {OP_VER, "OP_VER", 1, opcodeReserved},
+	OP_IF:                  {OP_IF, "OP_IF", 1, opcodeIf},
+	OP_NOTIF:               {OP_NOTIF, "OP_NOTIF", 1, opcodeNotIf},
+	OP_VERIF:               {OP_VERIF, "OP_VERIF", 1, opcodeReserved},
+	OP_VERNOTIF:            {OP_VERNOTIF, "OP_VERNOTIF", 1, opcodeReserved},
+	OP_ELSE:                {OP_ELSE, "OP_ELSE", 1, opcodeElse},
+	OP_ENDIF:               {OP_ENDIF, "OP_ENDIF", 1, opcodeEndif},
+	OP_VERIFY:              {OP_VERIFY, "OP_VERIFY", 1, opcodeVerify},
+	OP_RETURN:              {OP_RETURN, "OP_RETURN", 1, opcodeReturn},
+	OP_CHECKLOCKTIMEVERIFY: {OP_CHECKLOCKTIMEVERIFY, "OP_CHECKLOCKTIMEVERIFY", 1, opcodeCheckLockTimeVerify},
 
 	// Stack opcodes.
 	OP_TOALTSTACK:   {OP_TOALTSTACK, "OP_TOALTSTACK", 1, opcodeToAltStack},
@@ -495,7 +498,6 @@ var opcodeArray = [256]opcode{
 
 	// Reserved opcodes.
 	OP_NOP1:  {OP_NOP1, "OP_NOP1", 1, opcodeNop},
-	OP_NOP2:  {OP_NOP2, "OP_NOP2", 1, opcodeNop},
 	OP_NOP3:  {OP_NOP3, "OP_NOP3", 1, opcodeNop},
 	OP_NOP4:  {OP_NOP4, "OP_NOP4", 1, opcodeNop},
 	OP_NOP5:  {OP_NOP5, "OP_NOP5", 1, opcodeNop},
@@ -873,7 +875,7 @@ func opcodeN(op *parsedOpcode, vm *Engine) error {
 // the flag to discourage use of NOPs is set for select opcodes.
 func opcodeNop(op *parsedOpcode, vm *Engine) error {
 	switch op.opcode.value {
-	case OP_NOP1, OP_NOP2, OP_NOP3, OP_NOP4, OP_NOP5,
+	case OP_NOP1, OP_NOP3, OP_NOP4, OP_NOP5,
 		OP_NOP6, OP_NOP7, OP_NOP8, OP_NOP9, OP_NOP10:
 		if vm.hasFlag(ScriptDiscourageUpgradableNops) {
 			return fmt.Errorf("OP_NOP%d reserved for soft-fork "+
@@ -1004,6 +1006,86 @@ func opcodeVerify(op *parsedOpcode, vm *Engine) error {
 // return early from a script.
 func opcodeReturn(op *parsedOpcode, vm *Engine) error {
 	return ErrStackEarlyReturn
+}
+
+// opcodeCheckLockTimeVerify compares the top item on the data stack to the
+// LockTime field of the transaction containing the script signature
+// validating if the transaction outputs are spendable yet.  If flag
+// ScriptVerifyCheckLockTimeVerify is not set, the code continues as if OP_NOP2
+// were executed.
+func opcodeCheckLockTimeVerify(op *parsedOpcode, vm *Engine) error {
+	// If the ScriptVerifyCheckLockTimeVerify script flag is not set, treat
+	// opcode as OP_NOP2 instead.
+	if !vm.hasFlag(ScriptVerifyCheckLockTimeVerify) {
+		if vm.hasFlag(ScriptDiscourageUpgradableNops) {
+			return errors.New("OP_NOP2 reserved for soft-fork " +
+				"upgrades")
+		}
+		return nil
+	}
+
+	// The current transaction locktime is a uint32 resulting in a maximum
+	// locktime of 2^32-1 (the year 2106).  However, scriptNums are signed
+	// and therefore a standard 4-byte scriptNum would only support up to a
+	// maximum of 2^31-1 (the year 2038).  Thus, a 5-byte scriptNum is used
+	// here since it will support up to 2^39-1 which allows dates beyond the
+	// current locktime limit.
+	//
+	// PeekByteArray is used here instead of PeekInt because we do not want
+	// to be limited to a 4-byte integer for reasons specified above.
+	so, err := vm.dstack.PeekByteArray(0)
+	if err != nil {
+		return err
+	}
+	lockTime, err := makeScriptNum(so, vm.dstack.verifyMinimalData, 5)
+	if err != nil {
+		return err
+	}
+
+	// In the rare event that the argument may be < 0 due to some arithmetic
+	// being done first, you can always use 0 OP_MAX OP_CHECKLOCKTIMEVERIFY.
+	if lockTime < 0 {
+		return fmt.Errorf("negative locktime: %d", lockTime)
+	}
+
+	// The lock time field of a transaction is either a block height at
+	// which the transaction is finalized or a timestamp depending on if the
+	// value is before the txscript.LockTimeThreshold.  When it is under the
+	// threshold it is a block height.
+	//
+	// The lockTimes in both the script and transaction must be of the same
+	// type.
+	if !((vm.tx.LockTime < LockTimeThreshold && int64(lockTime) < int64(LockTimeThreshold)) ||
+		(vm.tx.LockTime >= LockTimeThreshold && int64(lockTime) >= int64(LockTimeThreshold))) {
+		return fmt.Errorf("mismatched locktime types -- tx locktime %d, stack "+
+			"locktime %d", vm.tx.LockTime, lockTime)
+	}
+
+	if int64(lockTime) > int64(vm.tx.LockTime) {
+		str := "locktime requirement not satisfied -- locktime is " +
+			"greater than the transaction locktime: %d > %d"
+		return fmt.Errorf(str, lockTime, vm.tx.LockTime)
+	}
+
+	// The lock time feature can also be disabled, thereby bypassing
+	// OP_CHECKLOCKTIMEVERIFY, if every transaction input has been finalized by
+	// setting its sequence to the maximum value (wire.MaxTxInSequenceNum).  This
+	// condition would result in the transaction being allowed into the blockchain
+	// making the opcode ineffective.
+	//
+	// This condition is prevented by enforcing that the input being used by
+	// the opcode is unlocked (its sequence number is less than the max
+	// value).  This is sufficient to prove correctness without having to
+	// check every input.
+	//
+	// NOTE: This implies that even if the transaction is not finalized due to
+	// another input being unlocked, the opcode execution will still fail when the
+	// input being used by the opcode is locked.
+	if vm.tx.TxIn[vm.txIdx].Sequence == wire.MaxTxInSequenceNum {
+		return errors.New("transaction input is finalized")
+	}
+
+	return nil
 }
 
 // opcodeToAltStack removes the top item from the main data stack and pushes it
@@ -1850,8 +1932,21 @@ func opcodeCheckSig(op *parsedOpcode, vm *Engine) error {
 		return nil
 	}
 
-	ok := signature.Verify(hash, pubKey)
-	vm.dstack.PushBool(ok)
+	var valid bool
+	if vm.sigCache != nil {
+		var sigHash wire.ShaHash
+		copy(sigHash[:], hash)
+
+		valid = vm.sigCache.Exists(sigHash, signature, pubKey)
+		if !valid && signature.Verify(hash, pubKey) {
+			vm.sigCache.Add(sigHash, signature, pubKey)
+			valid = true
+		}
+	} else {
+		valid = signature.Verify(hash, pubKey)
+	}
+
+	vm.dstack.PushBool(valid)
 	return nil
 }
 
@@ -2051,7 +2146,21 @@ func opcodeCheckMultiSig(op *parsedOpcode, vm *Engine) error {
 		// Generate the signature hash based on the signature hash type.
 		hash := calcSignatureHash(script, hashType, &vm.tx, vm.txIdx)
 
-		if parsedSig.Verify(hash, parsedPubKey) {
+		var valid bool
+		if vm.sigCache != nil {
+			var sigHash wire.ShaHash
+			copy(sigHash[:], hash)
+
+			valid = vm.sigCache.Exists(sigHash, parsedSig, parsedPubKey)
+			if !valid && parsedSig.Verify(hash, parsedPubKey) {
+				vm.sigCache.Add(sigHash, parsedSig, parsedPubKey)
+				valid = true
+			}
+		} else {
+			valid = parsedSig.Verify(hash, parsedPubKey)
+		}
+
+		if valid {
 			// PubKey verified, move on to the next signature.
 			signatureIdx++
 			numSignatures--
@@ -2082,11 +2191,13 @@ var OpcodeByName = make(map[string]byte)
 
 func init() {
 	// Initialize the opcode name to value map using the contents of the
-	// opcode array.  Also add entries for "OP_FALSE" and "OP_TRUE" since
-	// they are aliases for "OP_0" and "OP_1", respectively.
+	// opcode array.  Also add entries for "OP_FALSE", "OP_TRUE", and
+	// "OP_NOP2" since they are aliases for "OP_0", "OP_1",
+	// and "OP_CHECKLOCKTIMEVERIFY" respectively.
 	for _, op := range opcodeArray {
 		OpcodeByName[op.name] = op.value
 	}
 	OpcodeByName["OP_FALSE"] = OP_FALSE
 	OpcodeByName["OP_TRUE"] = OP_TRUE
+	OpcodeByName["OP_NOP2"] = OP_CHECKLOCKTIMEVERIFY
 }

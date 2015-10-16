@@ -18,7 +18,7 @@ import (
 const MaxUserAgentLen = 2000
 
 // DefaultUserAgent for wire in the stack
-const DefaultUserAgent = "/btcwire:0.2.0/"
+const DefaultUserAgent = "/btcwire:0.3.0/"
 
 // MsgVersion implements the Message interface and represents a bitcoin version
 // message.  It is used for a peer to advertise itself as soon as an outbound
@@ -115,7 +115,7 @@ func (msg *MsgVersion) BtcDecode(r io.Reader, pver uint32) error {
 		}
 	}
 	if buf.Len() > 0 {
-		userAgent, err := readVarString(buf, pver)
+		userAgent, err := ReadVarString(buf, pver)
 		if err != nil {
 			return err
 		}
@@ -181,7 +181,7 @@ func (msg *MsgVersion) BtcEncode(w io.Writer, pver uint32) error {
 		return err
 	}
 
-	err = writeVarString(w, pver, msg.UserAgent)
+	err = WriteVarString(w, pver, msg.UserAgent)
 	if err != nil {
 		return err
 	}

@@ -470,6 +470,7 @@ var helpDescsEnUS = map[string]string{
 	"searchrawtransactions-skip":        "The number of leading transactions to leave out of the final response",
 	"searchrawtransactions-count":       "The maximum number of transactions to return",
 	"searchrawtransactions-vinextra":    "Specify that extra data from previous output will be returned in vin",
+	"searchrawtransactions-reverse":     "Specifies that the transactions should be returned in reverse chronological order",
 	"searchrawtransactions--result0":    "Hex-encoded serialized transaction",
 
 	// SendRawTransactionCmd help.
@@ -524,6 +525,10 @@ var helpDescsEnUS = map[string]string{
 	"verifymessage--result0":  "Whether or not the signature verified",
 
 	// -------- Websocket-specific help --------
+
+	// Session help.
+	"session--synopsis":       "Return details regarding a websocket client's current connection session.",
+	"sessionresult-sessionid": "The unique session ID for a client's websocket connection.",
 
 	// NotifyBlocksCmd help.
 	"notifyblocks--synopsis": "Request notifications for whenever a block is connected or disconnected from the main (best) chain.",
@@ -616,6 +621,7 @@ var rpcResultTypes = map[string][]interface{}{
 	"verifymessage":         []interface{}{(*bool)(nil)},
 
 	// Websocket commands.
+	"session":                   []interface{}{(*btcjson.SessionResult)(nil)},
 	"notifyblocks":              nil,
 	"stopnotifyblocks":          nil,
 	"notifynewtransactions":     nil,

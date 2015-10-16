@@ -37,7 +37,7 @@ func TestCheckBlockScripts(t *testing.T) {
 	}
 
 	scriptFlags := txscript.ScriptBip16
-	err = blockchain.TstCheckBlockScripts(blocks[0], txStore, scriptFlags)
+	err = blockchain.TstCheckBlockScripts(blocks[0], txStore, scriptFlags, nil)
 	if err != nil {
 		t.Errorf("Transaction script validation failed: %v\n",
 			err)
