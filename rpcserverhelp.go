@@ -472,6 +472,7 @@ var helpDescsEnUS = map[string]string{
 	"searchrawtransactions-count":       "The maximum number of transactions to return",
 	"searchrawtransactions-vinextra":    "Specify that extra data from previous output will be returned in vin",
 	"searchrawtransactions-reverse":     "Specifies that the transactions should be returned in reverse chronological order",
+	"searchrawtransactions-filteraddrs": "Address list.  Only inputs or outputs with matching address will be returned",
 	"searchrawtransactions--result0":    "Hex-encoded serialized transaction",
 
 	// SendRawTransactionCmd help.
