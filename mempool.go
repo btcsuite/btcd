@@ -68,12 +68,12 @@ const (
 	// considered standard.
 	maxStandardMultiSigKeys = 3
 
-	// minTxRelayFee is the minimum fee in satoshi that is required for a
-	// transaction to be treated as free for relay and mining purposes.  It
-	// is also used to help determine if a transaction is considered dust
-	// and as a base for calculating minimum required fees for larger
-	// transactions.  This value is in Satoshi/1000 bytes.
-	minTxRelayFee = 1000
+	// defaultMinRelayTxFee is the minimum fee in satoshi that is required
+	// for a transaction to be treated as free for relay and mining
+	// purposes.  It is also used to help determine if a transaction is
+	// considered dust and as a base for calculating minimum required fees
+	// for larger transactions.  This value is in Satoshi/1000 bytes.
+	defaultMinRelayTxFee = btcutil.Amount(1000)
 )
 
 // TxDesc is a descriptor containing a transaction in the mempool and the
@@ -168,7 +168,7 @@ func isDust(txOut *wire.TxOut) bool {
 	//
 	// The following is equivalent to (value/totalSize) * (1/3) * 1000
 	// without needing to do floating point math.
-	return txOut.Value*1000/(3*int64(totalSize)) < minTxRelayFee
+	return txOut.Value*1000/(3*int64(totalSize)) < int64(cfg.minRelayTxFee)
 }
 
 // checkPkScriptStandard performs a series of checks on a transaction ouput
@@ -377,11 +377,11 @@ func checkInputsStandard(tx *btcutil.Tx, txStore blockchain.TxStore) error {
 func calcMinRequiredTxRelayFee(serializedSize int64) int64 {
 	// Calculate the minimum fee for a transaction to be allowed into the
 	// mempool and relayed by scaling the base fee (which is the minimum
-	// free transaction relay fee).  minTxRelayFee is in Satoshi/KB, so
+	// free transaction relay fee).  cfg.minRelayTxFee is in Satoshi/KB, so
 	// divide the transaction size by 1000 to convert to kilobytes.  Also,
 	// integer division is used so fees only increase on full kilobyte
 	// boundaries.
-	minFee := (1 + serializedSize/1000) * minTxRelayFee
+	minFee := (1 + serializedSize/1000) * int64(cfg.minRelayTxFee)
 
 	// Set the minimum fee to the maximum possible value if the calculated
 	// fee is not in the valid range for monetary amounts.

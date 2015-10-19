@@ -2103,7 +2103,7 @@ func handleGetInfo(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (in
 		Proxy:           cfg.Proxy,
 		Difficulty:      getDifficultyRatio(blkHeader.Bits),
 		TestNet:         cfg.TestNet3,
-		RelayFee:        float64(minTxRelayFee) / btcutil.SatoshiPerBitcoin,
+		RelayFee:        cfg.minRelayTxFee.ToBTC(),
 	}
 
 	return ret, nil
