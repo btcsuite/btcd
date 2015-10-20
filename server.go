@@ -878,7 +878,7 @@ func (s *server) DisconnectNodeByAddr(addr string) error {
 // DisconnectNodeByID disconnects a peer by target node id. Both outbound and
 // inbound nodes will be searched for the target node. An error message will be
 // returned if the peer was not found.
-func (s *server) DisconnectNodeById(id int32) error {
+func (s *server) DisconnectNodeByID(id int32) error {
 	replyChan := make(chan error)
 
 	s.query <- disconnectNodeMsg{
@@ -902,9 +902,9 @@ func (s *server) RemoveNodeByAddr(addr string) error {
 	return <-replyChan
 }
 
-// RemoveNodeById removes a peer by node ID from the list of persistent peers
+// RemoveNodeByID removes a peer by node ID from the list of persistent peers
 // if present. An error will be returned if the peer was not found.
-func (s *server) RemoveNodeById(id int32) error {
+func (s *server) RemoveNodeByID(id int32) error {
 	replyChan := make(chan error)
 
 	s.query <- removeNodeMsg{
