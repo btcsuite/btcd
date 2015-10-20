@@ -32,6 +32,11 @@ const (
 	// database type is appended to this value to form the full block
 	// database name.
 	blockDbNamePrefix = "blocks"
+
+	// blockStallTimeout is the number of seconds we will wait for a
+	// "block" response after we send out a "getdata" for an announced
+	// block before we deem the peer inactive, and disconnect it.
+	blockStallTimeout = 10 * time.Second
 )
 
 // newPeerMsg signifies a newly connected peer to the block handler.
@@ -297,7 +302,7 @@ func (b *blockManager) startSync(peers *list.List) {
 
 		// Remove sync candidate peers that are no longer candidates due
 		// to passing their latest known block.  NOTE: The < is
-		// intentional as opposed to <=.  While techcnically the peer
+		// intentional as opposed to <=.  While technically the peer
 		// doesn't have a later block when it's equal, it will likely
 		// have one soon so it is a reasonable choice.  It also allows
 		// the case where both are at 0 such as during regression test.
@@ -343,12 +348,23 @@ func (b *blockManager) startSync(peers *list.List) {
 		if b.nextCheckpoint != nil && height < b.nextCheckpoint.Height &&
 			!cfg.RegressionTest && !cfg.DisableCheckpoints {
 
+			// Initialize a timer which will start ticking once the
+			// getheaders message is written out to the peer. The
+			// timer will disconnect the peer after blockStallTimeout
+			// seconds, unless we receive a headers response message
+			// before then.
+			bestPeer.SetBlockStallTimer(blockStallTimeout)
 			bestPeer.PushGetHeadersMsg(locator, b.nextCheckpoint.Hash)
 			b.headersFirstMode = true
 			bmgrLog.Infof("Downloading headers for blocks %d to "+
 				"%d from peer %s", height+1,
 				b.nextCheckpoint.Height, bestPeer.addr)
 		} else {
+			// Only set a block stall timer if we expect an inv
+			// response to our getblocks message.
+			if bestPeer.lastBlock > int32(height) {
+				bestPeer.SetBlockStallTimer(blockStallTimeout)
+			}
 			bestPeer.PushGetBlocksMsg(locator, &zeroHash)
 		}
 		b.syncPeer = bestPeer
@@ -643,6 +659,7 @@ func (b *blockManager) handleBlockMsg(bmsg *blockMsg) {
 			bmgrLog.Warnf("Failed to get block locator for the "+
 				"latest block: %v", err)
 		} else {
+			bmsg.peer.SetBlockStallTimer(blockStallTimeout)
 			bmsg.peer.PushGetBlocksMsg(locator, orphanRoot)
 		}
 	} else {
@@ -708,6 +725,7 @@ func (b *blockManager) handleBlockMsg(bmsg *blockMsg) {
 	b.nextCheckpoint = b.findNextHeaderCheckpoint(prevHeight)
 	if b.nextCheckpoint != nil {
 		locator := blockchain.BlockLocator([]*wire.ShaHash{prevHash})
+		bmsg.peer.SetBlockStallTimer(blockStallTimeout)
 		err := bmsg.peer.PushGetHeadersMsg(locator, b.nextCheckpoint.Hash)
 		if err != nil {
 			bmgrLog.Warnf("Failed to send getheaders message to "+
@@ -727,6 +745,7 @@ func (b *blockManager) handleBlockMsg(bmsg *blockMsg) {
 	b.headerList.Init()
 	bmgrLog.Infof("Reached the final checkpoint -- switching to normal mode")
 	locator := blockchain.BlockLocator([]*wire.ShaHash{blockSha})
+	bmsg.peer.SetBlockStallTimer(blockStallTimeout)
 	err = bmsg.peer.PushGetBlocksMsg(locator, &zeroHash)
 	if err != nil {
 		bmgrLog.Warnf("Failed to send getblocks message to peer %s: %v",
@@ -775,6 +794,12 @@ func (b *blockManager) fetchHeaderBlocks() {
 		}
 	}
 	if len(gdmsg.InvList) > 0 {
+		// In order to avoid unnecessarily stalling initial block
+		// download due to an unresponsive peer, we initialize a
+		// timer which will disconnect this peer after
+		// blockStallTimeout seconds, unless we receive a block before
+		// then.
+		b.syncPeer.SetBlockStallTimer(blockStallTimeout)
 		b.syncPeer.QueueMessage(gdmsg, nil)
 	}
 }
@@ -869,8 +894,10 @@ func (b *blockManager) handleHeadersMsg(hmsg *headersMsg) {
 
 	// This header is not a checkpoint, so request the next batch of
 	// headers starting from the latest known header and ending with the
-	// next checkpoint.
+	// next checkpoint. Additionally, start a stall timer which we be
+	// cancelled once we receive the next headers message.
 	locator := blockchain.BlockLocator([]*wire.ShaHash{finalHash})
+	hmsg.peer.SetBlockStallTimer(blockStallTimeout)
 	err := hmsg.peer.PushGetHeadersMsg(locator, b.nextCheckpoint.Hash)
 	if err != nil {
 		bmgrLog.Warnf("Failed to send getheaders message to "+
@@ -1009,6 +1036,7 @@ func (b *blockManager) handleInvMsg(imsg *invMsg) {
 						"%v", err)
 					continue
 				}
+				imsg.peer.SetBlockStallTimer(blockStallTimeout)
 				imsg.peer.PushGetBlocksMsg(locator, orphanRoot)
 				continue
 			}
@@ -1022,6 +1050,7 @@ func (b *blockManager) handleInvMsg(imsg *invMsg) {
 				// final one the remote peer knows about (zero
 				// stop hash).
 				locator := chain.BlockLocatorFromHash(&iv.Hash)
+				imsg.peer.SetBlockStallTimer(blockStallTimeout)
 				imsg.peer.PushGetBlocksMsg(locator, &zeroHash)
 			}
 		}
@@ -1032,6 +1061,7 @@ func (b *blockManager) handleInvMsg(imsg *invMsg) {
 	numRequested := 0
 	gdmsg := wire.NewMsgGetData()
 	requestQueue := imsg.peer.requestQueue
+	blocksRequested := false
 	for len(requestQueue) != 0 {
 		iv := requestQueue[0]
 		requestQueue[0] = nil
@@ -1046,6 +1076,7 @@ func (b *blockManager) handleInvMsg(imsg *invMsg) {
 				imsg.peer.requestedBlocks[iv.Hash] = struct{}{}
 				gdmsg.AddInvVect(iv)
 				numRequested++
+				blocksRequested = true
 			}
 
 		case wire.InvTypeTx:
@@ -1065,6 +1096,14 @@ func (b *blockManager) handleInvMsg(imsg *invMsg) {
 	}
 	imsg.peer.requestQueue = requestQueue
 	if len(gdmsg.InvList) > 0 {
+		if blocksRequested {
+			// In order to avoid unnecessarily stalling initial block
+			// download due to an unresponsive peer, we initialize a
+			// timer which will disconnect this peer after
+			// blockStallTimeout seconds unless we receive a block
+			// before the timeout.
+			imsg.peer.SetBlockStallTimer(blockStallTimeout)
+		}
 		imsg.peer.QueueMessage(gdmsg, nil)
 	}
 }
