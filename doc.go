@@ -82,7 +82,7 @@ Application Options:
                             to list available subsystems (info)
       --upnp                Use UPnP to map our listening port outside of NAT
       --minrelaytxfee=      The minimum transaction fee in BTC/kB to be
-                            considered a non-zero fee.
+                            considered a non-zero fee. (0.00005)
       --limitfreerelay=     Limit relay of transactions with no transaction fee
                             to the given amount in thousands of bytes per
                             minute (15)

@@ -73,7 +73,7 @@ const (
 	// purposes.  It is also used to help determine if a transaction is
 	// considered dust and as a base for calculating minimum required fees
 	// for larger transactions.  This value is in Satoshi/1000 bytes.
-	defaultMinRelayTxFee = btcutil.Amount(1000)
+	defaultMinRelayTxFee = btcutil.Amount(5000)
 )
 
 // TxDesc is a descriptor containing a transaction in the mempool and the
@@ -163,7 +163,7 @@ func isDust(txOut *wire.TxOut) bool {
 	//
 	// Using the typical values for a pay-to-pubkey-hash transaction from
 	// the breakdown above and the default minimum free transaction relay
-	// fee of 1000, this equates to values less than 546 satoshi being
+	// fee of 5000, this equates to values less than 2730 satoshi being
 	// considered dust.
 	//
 	// The following is equivalent to (value/totalSize) * (1/3) * 1000
