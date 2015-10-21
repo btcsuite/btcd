@@ -10,6 +10,8 @@ import (
 	"fmt"
 	"io"
 	"strconv"
+
+	"github.com/btcsuite/btcd/wire"
 )
 
 const (
@@ -589,3 +591,8 @@ func writeTxOut(w io.Writer, pver uint32, version int32, to *TxOut) error {
 	}
 	return nil
 }
+
+// input comparison, based on BIP LI01
+// https://github.com/kristovatlas/rfc/blob/master/bips/bip-li01.mediawiki
+// First sort based on input txid (reversed / stingified), then index
+type SortableInSlice []*wire.TxIn
