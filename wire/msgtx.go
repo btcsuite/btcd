@@ -593,44 +593,44 @@ func writeTxOut(w io.Writer, pver uint32, version int32, to *TxOut) error {
 
 // Sort sorts the inputs and outputs according to BIP LO01
 func (msg *MsgTx) Sort() {
-	SortInputs(msg.TxIn)
-	SortOutputs(msg.TxOut)
+	sortInputs(msg.TxIn)
+	sortOutputs(msg.TxOut)
 }
 
 // Transaction input and output sorting, based on BIP LI01
 // (https://github.com/kristovatlas/rfc/blob/master/bips/bip-li01.mediawiki)
-type SortableInputSlice []*TxIn
-type SortableOutputSlice []*TxOut
+type sortableInputSlice []*TxIn
+type sortableOutputSlice []*TxOut
 
-func SortInputs(ins []*TxIn) []*TxIn {
-	sort.Sort(SortableInputSlice(ins))
+func sortInputs(ins []*TxIn) []*TxIn {
+	sort.Sort(sortableInputSlice(ins))
 	return ins
 }
-func SortOutputs(outs []*TxOut) []*TxOut {
-	sort.Sort(SortableOutputSlice(outs))
+func sortOutputs(outs []*TxOut) []*TxOut {
+	sort.Sort(sortableOutputSlice(outs))
 	return outs
 }
 
 // for SortableInputSlice and SortableOutputSlice, three functions are needed
 // to make it sortable with sort.Sort() -- Len, Less, and Swap
 // Len and Swap are trivial.  Less is BIP LI01 specific.
-func (ins SortableInputSlice) Len() int {
+func (ins sortableInputSlice) Len() int {
 	return len(ins)
 }
-func (outs SortableOutputSlice) Len() int {
+func (outs sortableOutputSlice) Len() int {
 	return len(outs)
 }
 
-func (ins SortableInputSlice) Swap(i, j int) {
+func (ins sortableInputSlice) Swap(i, j int) {
 	ins[i], ins[j] = ins[j], ins[i]
 }
-func (outs SortableOutputSlice) Swap(i, j int) {
+func (outs sortableOutputSlice) Swap(i, j int) {
 	outs[i], outs[j] = outs[j], outs[i]
 }
 
 // Input comparison function.
 // First sort based on input txid (reversed / rpc-style), then index
-func (ins SortableInputSlice) Less(i, j int) bool {
+func (ins sortableInputSlice) Less(i, j int) bool {
 	ihash := ins[i].PreviousOutPoint.Hash
 	jhash := ins[j].PreviousOutPoint.Hash
 	for b := 0; b < HashSize/2; b++ {
@@ -647,7 +647,7 @@ func (ins SortableInputSlice) Less(i, j int) bool {
 
 // Output comparison function.
 // First sort based on amount (smallest first), then PkScript
-func (outs SortableOutputSlice) Less(i, j int) bool {
+func (outs sortableOutputSlice) Less(i, j int) bool {
 	if outs[i].Value == outs[j].Value {
 		return bytes.Compare(outs[i].PkScript, outs[j].PkScript) < 0
 	}
