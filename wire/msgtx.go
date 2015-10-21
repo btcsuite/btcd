@@ -591,7 +591,7 @@ func writeTxOut(w io.Writer, pver uint32, version int32, to *TxOut) error {
 	return nil
 }
 
-// Sort sorts the inputs and outputs according to BIP LO01
+// Sort sorts the inputs and outputs according to BIP LI01
 func (msg *MsgTx) Sort() {
 	sortInputs(msg.TxIn)
 	sortOutputs(msg.TxOut)
