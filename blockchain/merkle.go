@@ -1,4 +1,4 @@
-// Copyright (c) 2013-2014 Conformal Systems LLC.
+// Copyright (c) 2013-2014 The btcsuite developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -31,14 +31,11 @@ func nextPowerOfTwo(n int) int {
 func HashMerkleBranches(left *wire.ShaHash, right *wire.ShaHash) *wire.ShaHash {
 	// Concatenate the left and right nodes.
 	var sha [wire.HashSize * 2]byte
-	copy(sha[:wire.HashSize], left.Bytes())
-	copy(sha[wire.HashSize:], right.Bytes())
+	copy(sha[:wire.HashSize], left[:])
+	copy(sha[wire.HashSize:], right[:])
 
-	// Create a new sha hash from the double sha 256.  Ignore the error
-	// here since SetBytes can't fail here due to the fact DoubleSha256
-	// always returns a []byte of the right size regardless of input.
-	newSha, _ := wire.NewShaHash(wire.DoubleSha256(sha[:]))
-	return newSha
+	newSha := wire.DoubleSha256SH(sha[:])
+	return &newSha
 }
 
 // BuildMerkleTreeStore creates a merkle tree from a slice of transactions,

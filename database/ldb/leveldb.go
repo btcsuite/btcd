@@ -1,4 +1,4 @@
-// Copyright (c) 2013-2014 Conformal Systems LLC.
+// Copyright (c) 2013-2015 The btcsuite developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -29,7 +29,7 @@ var log = btclog.Disabled
 
 type tTxInsertData struct {
 	txsha   *wire.ShaHash
-	blockid int64
+	blockid int32
 	txoff   int
 	txlen   int
 	usedbuf []byte
@@ -47,14 +47,14 @@ type LevelDb struct {
 
 	lbatch *leveldb.Batch
 
-	nextBlock int64
+	nextBlock int32
 
 	lastBlkShaCached bool
 	lastBlkSha       wire.ShaHash
-	lastBlkIdx       int64
+	lastBlkIdx       int32
 
 	lastAddrIndexBlkSha wire.ShaHash
-	lastAddrIndexBlkIdx int64
+	lastAddrIndexBlkIdx int32
 
 	txUpdateMap      map[wire.ShaHash]*txUpdateObj
 	txSpentUpdateMap map[wire.ShaHash]*spentTxUpdate
@@ -98,9 +98,9 @@ func OpenDB(args ...interface{}) (database.Db, error) {
 	}
 
 	// Need to find last block and tx
-	var lastknownblock, nextunknownblock, testblock int64
+	var lastknownblock, nextunknownblock, testblock int32
 
-	increment := int64(100000)
+	increment := int32(100000)
 	ldb := db.(*LevelDb)
 
 	var lastSha *wire.ShaHash
@@ -345,9 +345,13 @@ func (db *LevelDb) DropAfterBlockBySha(sha *wire.ShaHash) (rerr error) {
 			db.txUpdateMap[*tx.Sha()] = &txUo
 		}
 		db.lBatch().Delete(shaBlkToKey(blksha))
-		db.lBatch().Delete(int64ToKey(height))
+		db.lBatch().Delete(int64ToKey(int64(height)))
 	}
 
+	// update the last block cache
+	db.lastBlkShaCached = true
+	db.lastBlkSha = *sha
+	db.lastBlkIdx = keepidx
 	db.nextBlock = keepidx + 1
 
 	return nil
@@ -357,7 +361,7 @@ func (db *LevelDb) DropAfterBlockBySha(sha *wire.ShaHash) (rerr error) {
 // database.  The first block inserted into the database will be treated as the
 // genesis block.  Every subsequent block insert requires the referenced parent
 // block to already exist.
-func (db *LevelDb) InsertBlock(block *btcutil.Block) (height int64, rerr error) {
+func (db *LevelDb) InsertBlock(block *btcutil.Block) (height int32, rerr error) {
 	db.dbLock.Lock()
 	defer db.dbLock.Unlock()
 	defer func() {
@@ -368,11 +372,7 @@ func (db *LevelDb) InsertBlock(block *btcutil.Block) (height int64, rerr error) 
 		}
 	}()
 
-	blocksha, err := block.Sha()
-	if err != nil {
-		log.Warnf("Failed to compute block sha %v", blocksha)
-		return 0, err
-	}
+	blocksha := block.Sha()
 	mblock := block.MsgBlock()
 	rawMsg, err := block.Bytes()
 	if err != nil {
@@ -546,10 +546,11 @@ func (db *LevelDb) setclearSpentData(txsha *wire.ShaHash, idx uint32, set bool) 
 			spentTxList[len(spentTxList)-1] = nil
 			if len(spentTxList) == 1 {
 				// write entry to delete tx from spent pool
-				// XXX
+				db.txSpentUpdateMap[*txsha] = &spentTxUpdate{delete: true}
 			} else {
-				spentTxList = spentTxList[:len(spentTxList)-1]
-				// XXX format sTxList and set update Table
+				// This code should never be hit - aakselrod
+				return fmt.Errorf("fully-spent tx %v does not have 1 record: "+
+					"%v", txsha, len(spentTxList))
 			}
 
 			// Create 'new' Tx update data.
@@ -636,8 +637,7 @@ func int64ToKey(keyint int64) []byte {
 }
 
 func shaBlkToKey(sha *wire.ShaHash) []byte {
-	shaB := sha.Bytes()
-	return shaB
+	return sha[:]
 }
 
 // These are used here and in tx.go's deleteOldAddrIndex() to prevent deletion
@@ -646,15 +646,17 @@ var recordSuffixTx = []byte{'t', 'x'}
 var recordSuffixSpentTx = []byte{'s', 'x'}
 
 func shaTxToKey(sha *wire.ShaHash) []byte {
-	shaB := sha.Bytes()
-	shaB = append(shaB, recordSuffixTx...)
-	return shaB
+	key := make([]byte, len(sha)+len(recordSuffixTx))
+	copy(key, sha[:])
+	copy(key[len(sha):], recordSuffixTx)
+	return key
 }
 
 func shaSpentTxToKey(sha *wire.ShaHash) []byte {
-	shaB := sha.Bytes()
-	shaB = append(shaB, recordSuffixSpentTx...)
-	return shaB
+	key := make([]byte, len(sha)+len(recordSuffixSpentTx))
+	copy(key, sha[:])
+	copy(key[len(sha):], recordSuffixSpentTx)
+	return key
 }
 
 func (db *LevelDb) lBatch() *leveldb.Batch {

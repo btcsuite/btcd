@@ -1,4 +1,4 @@
-// Copyright (c) 2013-2014 Conformal Systems LLC.
+// Copyright (c) 2013-2014 The btcsuite developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -15,6 +15,7 @@ import (
 
 	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/btcsuite/btcd/database"
+	"github.com/btcsuite/btcd/txscript"
 	"github.com/btcsuite/btcd/wire"
 	"github.com/btcsuite/btcutil"
 )
@@ -58,7 +59,7 @@ type blockNode struct {
 	parentHash *wire.ShaHash
 
 	// height is the position in the block chain.
-	height int64
+	height int32
 
 	// workSum is the total amount of work in the chain up to and including
 	// this node.
@@ -79,7 +80,7 @@ type blockNode struct {
 // completely disconnected from the chain and the workSum value is just the work
 // for the passed block.  The work sum is updated accordingly when the node is
 // inserted into a chain.
-func newBlockNode(blockHeader *wire.BlockHeader, blockSha *wire.ShaHash, height int64) *blockNode {
+func newBlockNode(blockHeader *wire.BlockHeader, blockSha *wire.ShaHash, height int32) *blockNode {
 	// Make a copy of the hash so the node doesn't keep a reference to part
 	// of the full block/block header preventing it from being garbage
 	// collected.
@@ -144,7 +145,7 @@ func removeChildNode(children []*blockNode, node *blockNode) []*blockNode {
 type BlockChain struct {
 	db                  database.Db
 	chainParams         *chaincfg.Params
-	checkpointsByHeight map[int64]*chaincfg.Checkpoint
+	checkpointsByHeight map[int32]*chaincfg.Checkpoint
 	notifications       NotificationCallback
 	root                *blockNode
 	bestChain           *blockNode
@@ -159,6 +160,7 @@ type BlockChain struct {
 	noCheckpoints       bool
 	nextCheckpoint      *chaincfg.Checkpoint
 	checkpointBlock     *btcutil.Block
+	sigCache            *txscript.SigCache
 }
 
 // DisableVerify provides a mechanism to disable transaction script validation
@@ -239,9 +241,8 @@ func (b *BlockChain) removeOrphanBlock(orphan *orphanBlock) {
 	b.orphanLock.Lock()
 	defer b.orphanLock.Unlock()
 
-	// Remove the orphan block from the orphan pool.  It's safe to ignore
-	// the error on Sha since it's cached.
-	orphanHash, _ := orphan.block.Sha()
+	// Remove the orphan block from the orphan pool.
+	orphanHash := orphan.block.Sha()
 	delete(b.orphans, *orphanHash)
 
 	// Remove the reference from the previous orphan index too.  An indexing
@@ -251,7 +252,7 @@ func (b *BlockChain) removeOrphanBlock(orphan *orphanBlock) {
 	prevHash := &orphan.block.MsgBlock().Header.PrevBlock
 	orphans := b.prevOrphans[*prevHash]
 	for i := 0; i < len(orphans); i++ {
-		hash, _ := orphans[i].block.Sha()
+		hash := orphans[i].block.Sha()
 		if hash.IsEqual(orphanHash) {
 			copy(orphans[i:], orphans[i+1:])
 			orphans[len(orphans)-1] = nil
@@ -296,10 +297,6 @@ func (b *BlockChain) addOrphanBlock(block *btcutil.Block) {
 		b.oldestOrphan = nil
 	}
 
-	// Get the block sha.  It is safe to ignore the error here since any
-	// errors would've been caught prior to calling this function.
-	blockSha, _ := block.Sha()
-
 	// Protect concurrent access.  This is intentionally done here instead
 	// of near the top since removeOrphanBlock does its own locking and
 	// the range iterator is not invalidated by removing map entries.
@@ -313,7 +310,7 @@ func (b *BlockChain) addOrphanBlock(block *btcutil.Block) {
 		block:      block,
 		expiration: expiration,
 	}
-	b.orphans[*blockSha] = oBlock
+	b.orphans[*block.Sha()] = oBlock
 
 	// Add to previous hash lookup index for faster dependency lookups.
 	prevHash := &block.MsgBlock().Header.PrevBlock
@@ -389,7 +386,7 @@ func (b *BlockChain) GenerateInitialIndex() error {
 
 		// Start at the next block after the latest one on the next loop
 		// iteration.
-		start += int64(len(hashList))
+		start += int32(len(hashList))
 	}
 
 	return nil
@@ -572,7 +569,7 @@ func (b *BlockChain) pruneBlockNodes() error {
 	// the latter loads the node and the goal is to find nodes still in
 	// memory that can be pruned.
 	newRootNode := b.bestChain
-	for i := int64(0); i < minMemoryNodes-1 && newRootNode != nil; i++ {
+	for i := int32(0); i < minMemoryNodes-1 && newRootNode != nil; i++ {
 		newRootNode = newRootNode.parent
 	}
 
@@ -951,8 +948,8 @@ func (b *BlockChain) connectBestChain(node *blockNode, block *btcutil.Block, fla
 		return nil
 	}
 	if fastAdd {
-		bsha, _ := block.Sha()
-		log.Warnf("fastAdd set in the side chain case? %v\n", bsha)
+		log.Warnf("fastAdd set in the side chain case? %v\n",
+			block.Sha())
 	}
 
 	// We're extending (or creating) a side chain which may or may not
@@ -1072,11 +1069,11 @@ func (b *BlockChain) IsCurrent(timeSource MedianTimeSource) bool {
 // Notification and NotificationType for details on the types and contents of
 // notifications.  The provided callback can be nil if the caller is not
 // interested in receiving notifications.
-func New(db database.Db, params *chaincfg.Params, c NotificationCallback) *BlockChain {
+func New(db database.Db, params *chaincfg.Params, c NotificationCallback, sigCache *txscript.SigCache) *BlockChain {
 	// Generate a checkpoint by height map from the provided checkpoints.
-	var checkpointsByHeight map[int64]*chaincfg.Checkpoint
+	var checkpointsByHeight map[int32]*chaincfg.Checkpoint
 	if len(params.Checkpoints) > 0 {
-		checkpointsByHeight = make(map[int64]*chaincfg.Checkpoint)
+		checkpointsByHeight = make(map[int32]*chaincfg.Checkpoint)
 		for i := range params.Checkpoints {
 			checkpoint := &params.Checkpoints[i]
 			checkpointsByHeight[checkpoint.Height] = checkpoint
@@ -1085,6 +1082,7 @@ func New(db database.Db, params *chaincfg.Params, c NotificationCallback) *Block
 
 	b := BlockChain{
 		db:                  db,
+		sigCache:            sigCache,
 		chainParams:         params,
 		checkpointsByHeight: checkpointsByHeight,
 		notifications:       c,

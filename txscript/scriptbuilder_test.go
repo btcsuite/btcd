@@ -1,4 +1,4 @@
-// Copyright (c) 2013-2015 Conformal Systems LLC.
+// Copyright (c) 2013-2015 The btcsuite developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -129,62 +129,6 @@ func TestScriptBuilderAddInt64(t *testing.T) {
 	}
 }
 
-// TestScriptBuilderAddUint64 tests that pushing unsigned integers to a script
-// via the ScriptBuilder API works as expected.
-func TestScriptBuilderAddUint64(t *testing.T) {
-	t.Parallel()
-
-	tests := []struct {
-		name     string
-		val      uint64
-		expected []byte
-	}{
-		{name: "push small int 0", val: 0, expected: []byte{txscript.OP_0}},
-		{name: "push small int 1", val: 1, expected: []byte{txscript.OP_1}},
-		{name: "push small int 2", val: 2, expected: []byte{txscript.OP_2}},
-		{name: "push small int 3", val: 3, expected: []byte{txscript.OP_3}},
-		{name: "push small int 4", val: 4, expected: []byte{txscript.OP_4}},
-		{name: "push small int 5", val: 5, expected: []byte{txscript.OP_5}},
-		{name: "push small int 6", val: 6, expected: []byte{txscript.OP_6}},
-		{name: "push small int 7", val: 7, expected: []byte{txscript.OP_7}},
-		{name: "push small int 8", val: 8, expected: []byte{txscript.OP_8}},
-		{name: "push small int 9", val: 9, expected: []byte{txscript.OP_9}},
-		{name: "push small int 10", val: 10, expected: []byte{txscript.OP_10}},
-		{name: "push small int 11", val: 11, expected: []byte{txscript.OP_11}},
-		{name: "push small int 12", val: 12, expected: []byte{txscript.OP_12}},
-		{name: "push small int 13", val: 13, expected: []byte{txscript.OP_13}},
-		{name: "push small int 14", val: 14, expected: []byte{txscript.OP_14}},
-		{name: "push small int 15", val: 15, expected: []byte{txscript.OP_15}},
-		{name: "push small int 16", val: 16, expected: []byte{txscript.OP_16}},
-		{name: "push 17", val: 17, expected: []byte{txscript.OP_DATA_1, 0x11}},
-		{name: "push 65", val: 65, expected: []byte{txscript.OP_DATA_1, 0x41}},
-		{name: "push 127", val: 127, expected: []byte{txscript.OP_DATA_1, 0x7f}},
-		{name: "push 128", val: 128, expected: []byte{txscript.OP_DATA_2, 0x80, 0}},
-		{name: "push 255", val: 255, expected: []byte{txscript.OP_DATA_2, 0xff, 0}},
-		{name: "push 256", val: 256, expected: []byte{txscript.OP_DATA_2, 0, 0x01}},
-		{name: "push 32767", val: 32767, expected: []byte{txscript.OP_DATA_2, 0xff, 0x7f}},
-		{name: "push 32768", val: 32768, expected: []byte{txscript.OP_DATA_3, 0, 0x80, 0}},
-	}
-
-	builder := txscript.NewScriptBuilder()
-	t.Logf("Running %d tests", len(tests))
-	for i, test := range tests {
-		builder.Reset().AddUint64(test.val)
-		result, err := builder.Script()
-		if err != nil {
-			t.Errorf("ScriptBuilder.AddUint64 #%d (%s) unexpected "+
-				"error: %v", i, test.name, err)
-			continue
-		}
-		if !bytes.Equal(result, test.expected) {
-			t.Errorf("ScriptBuilder.AddUint64 #%d (%s) wrong result\n"+
-				"got: %x\nwant: %x", i, test.name, result,
-				test.expected)
-			continue
-		}
-	}
-}
-
 // TestScriptBuilderAddData tests that pushing data to a script via the
 // ScriptBuilder API works as expected and conforms to BIP0062.
 func TestScriptBuilderAddData(t *testing.T) {
@@ -197,7 +141,7 @@ func TestScriptBuilderAddData(t *testing.T) {
 		useFull  bool // use AddFullData instead of AddData.
 	}{
 		// BIP0062: Pushing an empty byte sequence must use OP_0.
-		{name: "push empty byte sequence", data: []byte{}, expected: []byte{txscript.OP_0}},
+		{name: "push empty byte sequence", data: nil, expected: []byte{txscript.OP_0}},
 		{name: "push 1 byte 0x00", data: []byte{0x00}, expected: []byte{txscript.OP_0}},
 
 		// BIP0062: Pushing a 1-byte sequence of byte 0x01 through 0x10 must use OP_n.
@@ -269,17 +213,17 @@ func TestScriptBuilderAddData(t *testing.T) {
 		{
 			name:     "push data len 521",
 			data:     bytes.Repeat([]byte{0x49}, 521),
-			expected: []byte{},
+			expected: nil,
 		},
 		{
 			name:     "push data len 32767 (canonical)",
 			data:     bytes.Repeat([]byte{0x49}, 32767),
-			expected: []byte{},
+			expected: nil,
 		},
 		{
 			name:     "push data len 65536 (canonical)",
 			data:     bytes.Repeat([]byte{0x49}, 65536),
-			expected: []byte{},
+			expected: nil,
 		},
 
 		// Additional tests for the PushFullData function that
@@ -373,19 +317,6 @@ func TestExceedMaxScriptSize(t *testing.T) {
 		t.Fatalf("ScriptBuilder.AddInt64 unexpected modified script - "+
 			"got len %d, want len %d", len(script), len(origScript))
 	}
-
-	// Ensure adding an unsigned integer that would exceed the maximum size
-	// of the script does not add the data.
-	builder.Reset().AddFullData(make([]byte, maxScriptSize-3))
-	script, err = builder.AddUint64(0).Script()
-	if _, ok := err.(txscript.ErrScriptNotCanonical); !ok || err == nil {
-		t.Fatalf("ScriptBuilder.AddUint64 unexpected modified script - "+
-			"got len %d, want len %d", len(script), len(origScript))
-	}
-	if !bytes.Equal(script, origScript) {
-		t.Fatalf("ScriptBuilder.AddUint64 unexpected modified script - "+
-			"got len %d, want len %d", len(script), len(origScript))
-	}
 }
 
 // TestErroredScript ensures that all of the functions that can be used to add
@@ -454,17 +385,6 @@ func TestErroredScript(t *testing.T) {
 	}
 	if !bytes.Equal(script, origScript) {
 		t.Fatalf("ScriptBuilder.AddInt64 unexpected modified script - "+
-			"got len %d, want len %d", len(script), len(origScript))
-	}
-
-	// Ensure adding an unsigned integer to a script that has errored
-	// doesn't succeed.
-	script, err = builder.AddUint64(0).Script()
-	if _, ok := err.(txscript.ErrScriptNotCanonical); !ok || err == nil {
-		t.Fatal("ScriptBuilder.AddUint64 succeeded on errored script")
-	}
-	if !bytes.Equal(script, origScript) {
-		t.Fatalf("ScriptBuilder.AddUint64 unexpected modified script - "+
 			"got len %d, want len %d", len(script), len(origScript))
 	}
 

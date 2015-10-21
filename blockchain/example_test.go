@@ -1,4 +1,4 @@
-// Copyright (c) 2014 Conformal Systems LLC.
+// Copyright (c) 2014 The btcsuite developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -42,9 +42,10 @@ func ExampleBlockChain_ProcessBlock() {
 		return
 	}
 
-	// Create a new BlockChain instance using the underlying database for
-	// the main bitcoin network and ignore notifications.
-	chain := blockchain.New(db, &chaincfg.MainNetParams, nil)
+	// Create a new BlockChain instance without an initialized signature
+	// verification cache, using the underlying database for the main
+	// bitcoin network and ignore notifications.
+	chain := blockchain.New(db, &chaincfg.MainNetParams, nil, nil)
 
 	// Create a new median time source that is required by the upcoming
 	// call to ProcessBlock.  Ordinarily this would also add time values

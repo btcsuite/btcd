@@ -1,4 +1,4 @@
-// Copyright (c) 2013-2015 Conformal Systems LLC.
+// Copyright (c) 2013-2015 The btcsuite developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -61,18 +61,6 @@ func TstReadVarInt(r io.Reader, pver uint32) (uint64, error) {
 // test package.
 func TstWriteVarInt(w io.Writer, pver uint32, val uint64) error {
 	return writeVarInt(w, pver, val)
-}
-
-// TstReadVarString makes the internal readVarString function available to the
-// test package.
-func TstReadVarString(r io.Reader, pver uint32) (string, error) {
-	return readVarString(r, pver)
-}
-
-// TstWriteVarString makes the internal writeVarString function available to the
-// test package.
-func TstWriteVarString(w io.Writer, pver uint32, str string) error {
-	return writeVarString(w, pver, str)
 }
 
 // TstReadVarBytes makes the internal readVarBytes function available to the

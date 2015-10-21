@@ -1,4 +1,4 @@
-// Copyright (c) 2013-2015 Conformal Systems LLC.
+// Copyright (c) 2013-2015 The btcsuite developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -37,7 +37,7 @@ func TestCheckBlockScripts(t *testing.T) {
 	}
 
 	scriptFlags := txscript.ScriptBip16
-	err = blockchain.TstCheckBlockScripts(blocks[0], txStore, scriptFlags)
+	err = blockchain.TstCheckBlockScripts(blocks[0], txStore, scriptFlags, nil)
 	if err != nil {
 		t.Errorf("Transaction script validation failed: %v\n",
 			err)

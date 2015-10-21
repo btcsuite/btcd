@@ -1,4 +1,4 @@
-// Copyright (c) 2013-2014 Conformal Systems LLC.
+// Copyright (c) 2013-2014 The btcsuite developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -116,7 +116,7 @@ func chainSetup(dbName string) (*blockchain.BlockChain, func(), error) {
 		return nil, nil, err
 	}
 
-	chain := blockchain.New(db, &chaincfg.MainNetParams, nil)
+	chain := blockchain.New(db, &chaincfg.MainNetParams, nil, nil)
 	return chain, teardown, nil
 }
 
@@ -176,10 +176,7 @@ func loadTxStore(filename string) (blockchain.TxStore, error) {
 		txD.Tx = btcutil.NewTx(&msgTx)
 
 		// Transaction hash.
-		txHash, err := msgTx.TxSha()
-		if err != nil {
-			return nil, err
-		}
+		txHash := msgTx.TxSha()
 		txD.Hash = &txHash
 
 		// Block height the transaction came from.
@@ -187,7 +184,7 @@ func loadTxStore(filename string) (blockchain.TxStore, error) {
 		if err != nil {
 			return nil, err
 		}
-		txD.BlockHeight = int64(uintBuf)
+		txD.BlockHeight = int32(uintBuf)
 
 		// Num spent bits.
 		err = binary.Read(r, binary.LittleEndian, &uintBuf)

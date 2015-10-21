@@ -1,4 +1,4 @@
-// Copyright (c) 2013-2014 Conformal Systems LLC.
+// Copyright (c) 2013-2015 The btcsuite developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -174,6 +174,15 @@ func TestInterface(t *testing.T) {
 	for _, dbType := range database.SupportedDBs() {
 		if _, exists := ignoreDbTypes[dbType]; !exists {
 			testInterface(t, dbType)
+		}
+	}
+}
+
+// TestReorganization performs reorganization tests for each supported DB type
+func TestReorganization(t *testing.T) {
+	for _, dbType := range database.SupportedDBs() {
+		if _, exists := ignoreDbTypes[dbType]; !exists {
+			testReorganization(t, dbType)
 		}
 	}
 }

@@ -1,4 +1,4 @@
-// Copyright (c) 2013-2015 Conformal Systems LLC.
+// Copyright (c) 2013-2015 The btcsuite developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -101,10 +101,7 @@ func TestBlockSha(t *testing.T) {
 	}
 
 	// Ensure the hash produced is expected.
-	blockHash, err := blockOne.BlockSha()
-	if err != nil {
-		t.Errorf("BlockSha: %v", err)
-	}
+	blockHash := blockOne.BlockSha()
 	if !blockHash.IsEqual(wantHash) {
 		t.Errorf("BlockSha: wrong hash - got %v, want %v",
 			spew.Sprint(blockHash), spew.Sprint(wantHash))

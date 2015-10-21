@@ -1,4 +1,4 @@
-// Copyright (c) 2013-2015 Conformal Systems LLC.
+// Copyright (c) 2013-2015 The btcsuite developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -13,6 +13,7 @@ import (
 // BlockVersion is the current latest supported block version.
 const BlockVersion = 3
 
+// MaxBlockHeaderPayload is the maximum number of bytes a block header can be.
 // Version 4 bytes + Timestamp 4 bytes + Bits 4 bytes + Nonce 4 bytes +
 // PrevBlock and MerkleRoot hashes.
 const MaxBlockHeaderPayload = 16 + (HashSize * 2)
@@ -45,22 +46,31 @@ type BlockHeader struct {
 const blockHeaderLen = 80
 
 // BlockSha computes the block identifier hash for the given block header.
-func (h *BlockHeader) BlockSha() (ShaHash, error) {
-	// Encode the header and run double sha256 everything prior to the
-	// number of transactions.  Ignore the error returns since there is no
-	// way the encode could fail except being out of memory which would
-	// cause a run-time panic.  Also, SetBytes can't fail here due to the
-	// fact DoubleSha256 always returns a []byte of the right size
-	// regardless of input.
+func (h *BlockHeader) BlockSha() ShaHash {
+	// Encode the header and double sha256 everything prior to the number of
+	// transactions.  Ignore the error returns since there is no way the
+	// encode could fail except being out of memory which would cause a
+	// run-time panic.
 	var buf bytes.Buffer
-	var sha ShaHash
 	_ = writeBlockHeader(&buf, 0, h)
-	_ = sha.SetBytes(DoubleSha256(buf.Bytes()[0:blockHeaderLen]))
 
-	// Even though this function can't currently fail, it still returns
-	// a potential error to help future proof the API should a failure
-	// become possible.
-	return sha, nil
+	return DoubleSha256SH(buf.Bytes())
+}
+
+// BtcDecode decodes r using the bitcoin protocol encoding into the receiver.
+// This is part of the Message interface implementation.
+// See Deserialize for decoding block headers stored to disk, such as in a
+// database, as opposed to decoding block headers from the wire.
+func (h *BlockHeader) BtcDecode(r io.Reader, pver uint32) error {
+	return readBlockHeader(r, pver, h)
+}
+
+// BtcEncode encodes the receiver to w using the bitcoin protocol encoding.
+// This is part of the Message interface implementation.
+// See Serialize for encoding block headers to be stored to disk, such as in a
+// database, as opposed to encoding block headers for the wire.
+func (h *BlockHeader) BtcEncode(w io.Writer, pver uint32) error {
+	return writeBlockHeader(w, pver, h)
 }
 
 // Deserialize decodes a block header from r into the receiver using a format

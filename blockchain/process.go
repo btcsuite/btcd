@@ -1,4 +1,4 @@
-// Copyright (c) 2013-2014 Conformal Systems LLC.
+// Copyright (c) 2013-2014 The btcsuite developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -85,9 +85,7 @@ func (b *BlockChain) processOrphans(hash *wire.ShaHash, flags BehaviorFlags) err
 			}
 
 			// Remove the orphan from the orphan pool.
-			// It's safe to ignore the error on Sha since the hash
-			// is already cached.
-			orphanHash, _ := orphan.block.Sha()
+			orphanHash := orphan.block.Sha()
 			b.removeOrphanBlock(orphan)
 			i--
 
@@ -118,10 +116,7 @@ func (b *BlockChain) ProcessBlock(block *btcutil.Block, timeSource MedianTimeSou
 	fastAdd := flags&BFFastAdd == BFFastAdd
 	dryRun := flags&BFDryRun == BFDryRun
 
-	blockHash, err := block.Sha()
-	if err != nil {
-		return false, err
-	}
+	blockHash := block.Sha()
 	log.Tracef("Processing block %v", blockHash)
 
 	// The block must not already exist in the main chain or side chains.

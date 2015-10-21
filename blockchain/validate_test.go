@@ -1,4 +1,4 @@
-// Copyright (c) 2013-2014 Conformal Systems LLC.
+// Copyright (c) 2013-2014 The btcsuite developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -82,7 +82,7 @@ func TestCheckSerializedHeight(t *testing.T) {
 
 	tests := []struct {
 		sigScript  []byte // Serialized data
-		wantHeight int64  // Expected height
+		wantHeight int32  // Expected height
 		err        error  // Expected error type
 	}{
 		// No serialized height length.

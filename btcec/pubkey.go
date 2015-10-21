@@ -1,4 +1,4 @@
-// Copyright (c) 2013-2014 Conformal Systems LLC.
+// Copyright (c) 2013-2014 The btcsuite developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -107,7 +107,7 @@ func ParsePubKey(pubKeyStr []byte, curve *KoblitzCurve) (key *PublicKey, err err
 		return nil, fmt.Errorf("pubkey Y parameter is >= to P")
 	}
 	if !pubkey.Curve.IsOnCurve(pubkey.X, pubkey.Y) {
-		return nil, fmt.Errorf("pubkey isn't on secp265k1 curve")
+		return nil, fmt.Errorf("pubkey isn't on secp256k1 curve")
 	}
 	return &pubkey, nil
 }

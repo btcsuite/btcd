@@ -1,4 +1,4 @@
-// Copyright (c) 2013-2014 Conformal Systems LLC.
+// Copyright (c) 2013-2014 The btcsuite developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -48,15 +48,15 @@ func (ka *KnownAddress) chance() float64 {
 		lastAttempt = 0
 	}
 
-	c := 600.0 / (600.0 + lastSeen.Seconds())
+	c := 1.0
 
 	// Very recent attempts are less likely to be retried.
-	if lastAttempt > 10*time.Minute {
+	if lastAttempt < 10*time.Minute {
 		c *= 0.01
 	}
 
 	// Failed attempts deprioritise.
-	for i := ka.attempts; i < 0; i++ {
+	for i := ka.attempts; i > 0; i-- {
 		c /= 1.5
 	}
 
@@ -82,7 +82,7 @@ func (ka *KnownAddress) isBad() bool {
 	}
 
 	// Over a month old?
-	if ka.na.Timestamp.After(time.Now().Add(-1 * numMissingDays * time.Hour * 24)) {
+	if ka.na.Timestamp.Before(time.Now().Add(-1 * numMissingDays * time.Hour * 24)) {
 		return true
 	}
 

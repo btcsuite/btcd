@@ -1,4 +1,4 @@
-// Copyright (c) 2014 Conformal Systems LLC.
+// Copyright (c) 2014 The btcsuite developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -158,7 +158,7 @@ type BlockTemplate struct {
 	block           *wire.MsgBlock
 	fees            []int64
 	sigOpCounts     []int64
-	height          int64
+	height          int32
 	validPayAddress bool
 }
 
@@ -180,9 +180,10 @@ func mergeTxStore(txStoreA blockchain.TxStore, txStoreB blockchain.TxStore) {
 // signature script of the coinbase transaction of a new block.  In particular,
 // it starts with the block height that is required by version 2 blocks and adds
 // the extra nonce as well as additional coinbase flags.
-func standardCoinbaseScript(nextBlockHeight int64, extraNonce uint64) ([]byte, error) {
-	return txscript.NewScriptBuilder().AddInt64(nextBlockHeight).
-		AddUint64(extraNonce).AddData([]byte(coinbaseFlags)).Script()
+func standardCoinbaseScript(nextBlockHeight int32, extraNonce uint64) ([]byte, error) {
+	return txscript.NewScriptBuilder().AddInt64(int64(nextBlockHeight)).
+		AddInt64(int64(extraNonce)).AddData([]byte(coinbaseFlags)).
+		Script()
 }
 
 // createCoinbaseTx returns a coinbase transaction paying an appropriate subsidy
@@ -191,7 +192,7 @@ func standardCoinbaseScript(nextBlockHeight int64, extraNonce uint64) ([]byte, e
 //
 // See the comment for NewBlockTemplate for more information about why the nil
 // address handling is useful.
-func createCoinbaseTx(coinbaseScript []byte, nextBlockHeight int64, addr btcutil.Address) (*btcutil.Tx, error) {
+func createCoinbaseTx(coinbaseScript []byte, nextBlockHeight int32, addr btcutil.Address) (*btcutil.Tx, error) {
 	// Create the script to pay to the provided payment address if one was
 	// specified.  Otherwise create a script that allows the coinbase to be
 	// redeemable by anyone.
@@ -231,7 +232,7 @@ func createCoinbaseTx(coinbaseScript []byte, nextBlockHeight int64, addr btcutil
 // spendTransaction updates the passed transaction store by marking the inputs
 // to the passed transaction as spent.  It also adds the passed transaction to
 // the store at the provided height.
-func spendTransaction(txStore blockchain.TxStore, tx *btcutil.Tx, height int64) error {
+func spendTransaction(txStore blockchain.TxStore, tx *btcutil.Tx, height int32) error {
 	for _, txIn := range tx.MsgTx().TxIn {
 		originHash := &txIn.PreviousOutPoint.Hash
 		originIndex := txIn.PreviousOutPoint.Index
@@ -365,11 +366,10 @@ func medianAdjustedTime(chainState *chainState, timeSource blockchain.MedianTime
 //  |  transactions (while block size   |   |
 //  |  <= cfg.BlockMinSize)             |   |
 //   -----------------------------------  --
-func NewBlockTemplate(mempool *txMemPool, payToAddress btcutil.Address) (*BlockTemplate, error) {
-	blockManager := mempool.server.blockManager
-	timeSource := mempool.server.timeSource
+func NewBlockTemplate(server *server, payToAddress btcutil.Address) (*BlockTemplate, error) {
+	blockManager := server.blockManager
+	timeSource := server.timeSource
 	chainState := &blockManager.chainState
-	chain := blockManager.blockChain
 
 	// Extend the most recently known best block.
 	chainState.Lock()
@@ -404,7 +404,7 @@ func NewBlockTemplate(mempool *txMemPool, payToAddress btcutil.Address) (*BlockT
 	// Also, choose the initial sort order for the priority queue based on
 	// whether or not there is an area allocated for high-priority
 	// transactions.
-	mempoolTxns := mempool.TxDescs()
+	mempoolTxns := server.txMemPool.TxDescs()
 	sortedByFee := cfg.BlockPrioritySize == 0
 	priorityQueue := newTxPriorityQueue(len(mempoolTxns), sortedByFee)
 
@@ -458,7 +458,7 @@ mempoolLoop:
 		// inputs from the mempool since a transaction which depends on
 		// other transactions in the mempool must come after those
 		// dependencies in the final generated block.
-		txStore, err := chain.FetchTransactionStore(tx)
+		txStore, err := blockManager.FetchTransactionStore(tx)
 		if err != nil {
 			minrLog.Warnf("Unable to fetch transaction store for "+
 				"tx %s: %v", tx.Sha(), err)
@@ -474,7 +474,7 @@ mempoolLoop:
 			originIndex := txIn.PreviousOutPoint.Index
 			txData, exists := txStore[*originHash]
 			if !exists || txData.Err != nil || txData.Tx == nil {
-				if !mempool.HaveTransaction(originHash) {
+				if !server.txMemPool.HaveTransaction(originHash) {
 					minrLog.Tracef("Skipping tx %s because "+
 						"it references tx %s which is "+
 						"not available", tx.Sha,
@@ -604,13 +604,14 @@ mempoolLoop:
 
 		// Skip free transactions once the block is larger than the
 		// minimum block size.
-		if sortedByFee && prioItem.feePerKB < minTxRelayFee &&
+		if sortedByFee &&
+			prioItem.feePerKB < float64(cfg.minRelayTxFee) &&
 			blockPlusTxSize >= cfg.BlockMinSize {
 
 			minrLog.Tracef("Skipping tx %s with feePerKB %.2f "+
 				"< minTxRelayFee %d and block size %d >= "+
 				"minBlockSize %d", tx.Sha(), prioItem.feePerKB,
-				minTxRelayFee, blockPlusTxSize,
+				cfg.minRelayTxFee, blockPlusTxSize,
 				cfg.BlockMinSize)
 			logSkippedDeps(tx, deps)
 			continue
@@ -656,7 +657,7 @@ mempoolLoop:
 			continue
 		}
 		err = blockchain.ValidateTransactionScripts(tx, blockTxStore,
-			txscript.StandardVerifyFlags)
+			txscript.StandardVerifyFlags, server.sigCache)
 		if err != nil {
 			minrLog.Tracef("Skipping tx %s due to error in "+
 				"ValidateTransactionScripts: %v", tx.Sha(), err)
@@ -793,7 +794,7 @@ func UpdateBlockTime(msgBlock *wire.MsgBlock, bManager *blockManager) error {
 // block by regenerating the coinbase script with the passed value and block
 // height.  It also recalculates and updates the new merkle root that results
 // from changing the coinbase script.
-func UpdateExtraNonce(msgBlock *wire.MsgBlock, blockHeight int64, extraNonce uint64) error {
+func UpdateExtraNonce(msgBlock *wire.MsgBlock, blockHeight int32, extraNonce uint64) error {
 	coinbaseScript, err := standardCoinbaseScript(blockHeight, extraNonce)
 	if err != nil {
 		return err

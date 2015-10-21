@@ -1,4 +1,4 @@
-// Copyright (c) 2013-2014 Conformal Systems LLC.
+// Copyright (c) 2013-2014 The btcsuite developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -12,7 +12,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"math"
 	"math/rand"
 	"net"
 	"os"
@@ -104,7 +103,7 @@ const (
 
 	// triedBucketSize is the maximum number of addresses in each
 	// tried address bucket.
-	triedBucketSize = 64
+	triedBucketSize = 256
 
 	// triedBucketCount is the number of buckets we split tried
 	// addresses over.
@@ -116,19 +115,19 @@ const (
 
 	// newBucketCount is the number of buckets that we spread new addresses
 	// over.
-	newBucketCount = 256
+	newBucketCount = 1024
 
 	// triedBucketsPerGroup is the number of tried buckets over which an
 	// address group will be spread.
-	triedBucketsPerGroup = 4
+	triedBucketsPerGroup = 8
 
 	// newBucketsPerGroup is the number of new buckets over which an
 	// source address group will be spread.
-	newBucketsPerGroup = 32
+	newBucketsPerGroup = 64
 
 	// newBucketsPerAddress is the number of buckets a frequently seen new
 	// address may end up in.
-	newBucketsPerAddress = 4
+	newBucketsPerAddress = 8
 
 	// numMissingDays is the number of days before which we assume an
 	// address has vanished if we have not seen it announced  in that long.
@@ -741,7 +740,7 @@ func NetAddressKey(na *wire.NetAddress) string {
 // random one from the possible addresses with preference given to ones that
 // have not been used recently and should not pick 'close' addresses
 // consecutively.
-func (a *AddrManager) GetAddress(class string, newBias int) *KnownAddress {
+func (a *AddrManager) GetAddress(class string) *KnownAddress {
 	// Protect concurrent access.
 	a.mtx.Lock()
 	defer a.mtx.Unlock()
@@ -750,20 +749,8 @@ func (a *AddrManager) GetAddress(class string, newBias int) *KnownAddress {
 		return nil
 	}
 
-	if newBias > 100 {
-		newBias = 100
-	}
-	if newBias < 0 {
-		newBias = 0
-	}
-
-	// Bias between new and tried addresses.
-	triedCorrelation := math.Sqrt(float64(a.nTried)) *
-		(100.0 - float64(newBias))
-	newCorrelation := math.Sqrt(float64(a.nNew)) * float64(newBias)
-
-	if ((newCorrelation + triedCorrelation) * a.rand.Float64()) <
-		triedCorrelation {
+	// Use a 50% chance for choosing between tried and new table entries.
+	if a.nTried > 0 && (a.nNew == 0 || a.rand.Intn(2) == 0) {
 		// Tried entry.
 		large := 1 << 30
 		factor := 1.0
@@ -875,12 +862,12 @@ func (a *AddrManager) Good(addr *wire.NetAddress) {
 	if ka == nil {
 		return
 	}
+
+	// ka.Timestamp is not updated here to avoid leaking information
+	// about currently connected peers.
 	now := time.Now()
 	ka.lastsuccess = now
 	ka.lastattempt = now
-	naCopy := *ka.na
-	naCopy.Timestamp = time.Now()
-	ka.na = &naCopy
 	ka.attempts = 0
 
 	// move to tried set, optionally evicting other addresses if neeed.

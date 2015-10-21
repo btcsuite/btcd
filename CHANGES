@@ -3,6 +3,117 @@ User visible changes for btcd
   A full-node bitcoin implementation written in Go
 ============================================================================
 
+Changes in 0.11.1 (Wed May 27 2015)
+  - Protocol and network related changes:
+    - Use correct sub-command in reject message for rejected transactions
+      (#436, #437)
+    - Add a new parameter --torisolation which forces new circuits for each
+      connection when using tor (#430)
+  - Transaction relay (memory pool) changes:
+    - Reduce the default number max number of allowed orphan transactions
+      to 1000 (#419)
+    - Add a new parameter --maxorphantx which allows the maximum number of
+      orphan transactions stored in the mempool to be specified (#419)
+  - RPC changes:
+    - Modify listtransactions result to include the 'involveswatchonly' and
+      'vout' fields (#427)
+    - Update getrawtransaction result to omit the 'confirmations' field
+      when it is 0 (#420, #422)
+    - Update signrawtransaction result to include errors (#423)
+  - btcctl utility changes:
+    - Add gettxoutproof command (#428)
+    - Add verifytxoutproof command (#428)
+  - Notable developer-related package changes:
+    - The btcec package now provides the ability to perform ECDH
+      encryption and decryption (#375)
+    - The block and header validation in the blockchain package has been
+      split to help pave the way toward concurrent downloads (#386)
+  - Misc changes:
+    - Minor peer optimization (#433)
+  - Contributors (alphabetical order):
+    - Dave Collins
+    - David Hill
+    - Federico Bond
+    - Ishbir Singh
+    - Josh Rickmar
+
+Changes in 0.11.0 (Wed May 06 2015)
+  - Protocol and network related changes:
+    - **IMPORTANT: Update is required due to the following point**
+    - Correct a few corner cases in script handling which could result in
+      forking from the network on non-standard transactions (#425)
+    - Add a new checkpoint at block height 352940 (#418)
+    - Optimized script execution (#395, #400, #404, #409)
+    - Fix a case that could lead stalled syncs (#138, #296) 
+  - Network address manager changes:
+    - Implement eclipse attack countermeasures as proposed in
+      http://cs-people.bu.edu/heilman/eclipse (#370, #373)
+  - Optional address indexing changes:
+    - Fix an issue where a reorg could cause an orderly shutdown when the
+      address index is active (#340, #357)
+  - Transaction relay (memory pool) changes:
+    - Increase maximum allowed space for nulldata transactions to 80 bytes
+      (#331)
+    - Implement support for the following rules specified by BIP0062:
+      - The S value in ECDSA signature must be at most half the curve order
+        (rule 5) (#349)
+      - Script execution must result in a single non-zero value on the stack
+        (rule 6) (#347)
+      - NOTE: All 7 rules of BIP0062 are now implemented
+    - Use network adjusted time in finalized transaction checks to improve
+      consistency across nodes (#332)
+    - Process orphan transactions on acceptance of new transactions (#345)
+  - RPC changes:
+    - Add support for a limited RPC user which is not allowed admin level
+      operations on the server (#363)
+    - Implement node command for more unified control over connected peers
+      (#79, #341)
+    - Implement generate command for regtest/simnet to support
+      deterministically mining a specified number of blocks (#362, #407)
+    - Update searchrawtransactions to return the matching transactions in
+      order (#354)
+    - Correct an issue with searchrawtransactions where it could return
+      duplicates (#346, #354)
+    - Increase precision of 'difficulty' field in getblock result to 8
+      (#414, #415)
+    - Omit 'nextblockhash' field from getblock result when it is empty
+      (#416, #417)
+    - Add 'id' and 'timeoffset' fields to getpeerinfo result (#335)
+  - Websocket changes:
+    - Implement new commands stopnotifyspent, stopnotifyreceived,
+      stopnotifyblocks, and stopnotifynewtransactions to allow clients to
+      cancel notification registrations (#122, #342)
+  - btcctl utility changes:
+    - A single dash can now be used as an argument to cause that argument to
+      be read from stdin (#348)
+    - Add generate command
+  - Notable developer-related package changes:
+    - The new version 2 btcjson package has now replaced the deprecated
+      version 1 package (#368)
+    - The btcec package now performs all signing using RFC6979 deterministic
+      signatures (#358, #360)
+    - The txscript package has been significantly cleaned up and had a few
+      API changes (#387, #388, #389, #390, #391, #392, #393, #395, #396,
+      #400, #403, #404, #405, #406, #408, #409, #410, #412)
+    - A new PkScriptLocs function has been added to the wire package MsgTx
+      type which provides callers that deal with scripts optimization
+      opportunities (#343)
+  - Misc changes:
+    - Minor wire hashing optimizations (#366, #367)
+    - Other minor internal optimizations
+  - Contributors (alphabetical order):
+    - Alex Akselrod
+    - Arne Brutschy
+    - Chris Jepson
+    - Daniel Krawisz
+    - Dave Collins
+    - David Hill
+    - Jimmy Song
+    - Jonas Nick
+    - Josh Rickmar
+    - Olaoluwa Osuntokun
+    - Oleg Andreev
+
 Changes in 0.10.0 (Sun Mar 01 2015)
   - Protocol and network related changes:
     - Add a new checkpoint at block height 343185

@@ -1,4 +1,4 @@
-// Copyright (c) 2013-2014 Conformal Systems LLC.
+// Copyright (c) 2013-2014 The btcsuite developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -26,10 +26,8 @@ const (
 	mempoolHeight = 0x7fffffff
 
 	// maxOrphanTransactions is the maximum number of orphan transactions
-	// that can be queued.  At the time this comment was written, this
-	// equates to 10,000 transactions, but will increase if the max allowed
-	// block payload increases.
-	maxOrphanTransactions = wire.MaxBlockPayload / 100
+	// that can be queued.
+	maxOrphanTransactions = 1000
 
 	// maxOrphanTxSize is the maximum size allowed for orphan transactions.
 	// This helps prevent memory exhaustion attacks from sending a lot of
@@ -70,12 +68,12 @@ const (
 	// considered standard.
 	maxStandardMultiSigKeys = 3
 
-	// minTxRelayFee is the minimum fee in satoshi that is required for a
-	// transaction to be treated as free for relay and mining purposes.  It
-	// is also used to help determine if a transaction is considered dust
-	// and as a base for calculating minimum required fees for larger
-	// transactions.  This value is in Satoshi/1000 bytes.
-	minTxRelayFee = 1000
+	// defaultMinRelayTxFee is the minimum fee in satoshi that is required
+	// for a transaction to be treated as free for relay and mining
+	// purposes.  It is also used to help determine if a transaction is
+	// considered dust and as a base for calculating minimum required fees
+	// for larger transactions.  This value is in Satoshi/1000 bytes.
+	defaultMinRelayTxFee = btcutil.Amount(1000)
 )
 
 // TxDesc is a descriptor containing a transaction in the mempool and the
@@ -83,7 +81,7 @@ const (
 type TxDesc struct {
 	Tx               *btcutil.Tx // Transaction.
 	Added            time.Time   // Time when added to pool.
-	Height           int64       // Blockheight when added to pool.
+	Height           int32       // Blockheight when added to pool.
 	Fee              int64       // Transaction fees.
 	startingPriority float64     // Priority when added to the pool.
 }
@@ -109,6 +107,11 @@ type txMemPool struct {
 // relay fee.  In particular, if the cost to the network to spend coins is more
 // than 1/3 of the minimum transaction relay fee, it is considered dust.
 func isDust(txOut *wire.TxOut) bool {
+	// Unspendable outputs are considered dust.
+	if txscript.IsUnspendable(txOut.PkScript) {
+		return true
+	}
+
 	// The total serialized size consists of the output and the associated
 	// input script to redeem it.  Since there is no input script
 	// to redeem it yet, use the minimum size of a typical input script.
@@ -165,7 +168,7 @@ func isDust(txOut *wire.TxOut) bool {
 	//
 	// The following is equivalent to (value/totalSize) * (1/3) * 1000
 	// without needing to do floating point math.
-	return txOut.Value*1000/(3*int64(totalSize)) < minTxRelayFee
+	return txOut.Value*1000/(3*int64(totalSize)) < int64(cfg.minRelayTxFee)
 }
 
 // checkPkScriptStandard performs a series of checks on a transaction ouput
@@ -225,7 +228,7 @@ func checkPkScriptStandard(pkScript []byte, scriptClass txscript.ScriptClass) er
 // finalized, conforming to more stringent size constraints, having scripts
 // of recognized forms, and not containing "dust" outputs (those that are
 // so small it costs more to process them than they are worth).
-func (mp *txMemPool) checkTransactionStandard(tx *btcutil.Tx, height int64) error {
+func (mp *txMemPool) checkTransactionStandard(tx *btcutil.Tx, height int32) error {
 	msgTx := tx.MsgTx()
 
 	// The transaction must be a currently supported version.
@@ -374,11 +377,11 @@ func checkInputsStandard(tx *btcutil.Tx, txStore blockchain.TxStore) error {
 func calcMinRequiredTxRelayFee(serializedSize int64) int64 {
 	// Calculate the minimum fee for a transaction to be allowed into the
 	// mempool and relayed by scaling the base fee (which is the minimum
-	// free transaction relay fee).  minTxRelayFee is in Satoshi/KB, so
+	// free transaction relay fee).  cfg.minRelayTxFee is in Satoshi/KB, so
 	// divide the transaction size by 1000 to convert to kilobytes.  Also,
 	// integer division is used so fees only increase on full kilobyte
 	// boundaries.
-	minFee := (1 + serializedSize/1000) * minTxRelayFee
+	minFee := (1 + serializedSize/1000) * int64(cfg.minRelayTxFee)
 
 	// Set the minimum fee to the maximum possible value if the calculated
 	// fee is not in the valid range for monetary amounts.
@@ -438,7 +441,7 @@ func (mp *txMemPool) RemoveOrphan(txHash *wire.ShaHash) {
 //
 // This function MUST be called with the mempool lock held (for writes).
 func (mp *txMemPool) limitNumOrphans() error {
-	if len(mp.orphans)+1 > maxOrphanTransactions {
+	if len(mp.orphans)+1 > cfg.MaxOrphanTxs && cfg.MaxOrphanTxs > 0 {
 		// Generate a cryptographically random hash.
 		randHashBytes := make([]byte, wire.HashSize)
 		_, err := rand.Read(randHashBytes)
@@ -503,8 +506,8 @@ func (mp *txMemPool) maybeAddOrphan(tx *btcutil.Tx) error {
 	//
 	// Note that the number of orphan transactions in the orphan pool is
 	// also limited, so this equates to a maximum memory used of
-	// maxOrphanTxSize * maxOrphanTransactions (which is 500MB as of the
-	// time this comment was written).
+	// maxOrphanTxSize * cfg.MaxOrphanTxs (which is ~5MB using the default
+	// values at the time this comment was written).
 	serializedLen := tx.MsgTx().SerializeSize()
 	if serializedLen > maxOrphanTxSize {
 		str := fmt.Sprintf("orphan transaction size of %d bytes is "+
@@ -697,7 +700,7 @@ func (mp *txMemPool) RemoveDoubleSpends(tx *btcutil.Tx) {
 // helper for maybeAcceptTransaction.
 //
 // This function MUST be called with the mempool lock held (for writes).
-func (mp *txMemPool) addTransaction(tx *btcutil.Tx, height, fee int64) {
+func (mp *txMemPool) addTransaction(tx *btcutil.Tx, height int32, fee int64) {
 	// Add the transaction to the pool and mark the referenced outpoints
 	// as spent by the pool.
 	mp.pool[*tx.Sha()] = &TxDesc{
@@ -746,7 +749,7 @@ func (mp *txMemPool) addTransactionToAddrIndex(tx *btcutil.Tx) error {
 //
 // This function MUST be called with the mempool lock held (for reads).
 func (mp *txMemPool) fetchReferencedOutputScripts(tx *btcutil.Tx) ([][]byte, error) {
-	txStore, err := mp.fetchInputTransactions(tx)
+	txStore, err := mp.fetchInputTransactions(tx, false)
 	if err != nil || len(txStore) == 0 {
 		return nil, err
 	}
@@ -791,7 +794,7 @@ func (mp *txMemPool) indexScriptAddressToTx(pkScript []byte, tx *btcutil.Tx) err
 // age is the sum of this value for each txin.  Any inputs to the transaction
 // which are currently in the mempool and hence not mined into a block yet,
 // contribute no additional input age to the transaction.
-func calcInputValueAge(txDesc *TxDesc, txStore blockchain.TxStore, nextBlockHeight int64) float64 {
+func calcInputValueAge(txDesc *TxDesc, txStore blockchain.TxStore, nextBlockHeight int32) float64 {
 	var totalInputAge float64
 	for _, txIn := range txDesc.Tx.MsgTx().TxIn {
 		originHash := &txIn.PreviousOutPoint.Hash
@@ -804,7 +807,7 @@ func calcInputValueAge(txDesc *TxDesc, txStore blockchain.TxStore, nextBlockHeig
 			// have their block height set to a special constant.
 			// Their input age should computed as zero since their
 			// parent hasn't made it into a block yet.
-			var inputAge int64
+			var inputAge int32
 			if txData.BlockHeight == mempoolHeight {
 				inputAge = 0
 			} else {
@@ -814,7 +817,7 @@ func calcInputValueAge(txDesc *TxDesc, txStore blockchain.TxStore, nextBlockHeig
 			// Sum the input value times age.
 			originTxOut := txData.Tx.MsgTx().TxOut[originIndex]
 			inputValue := originTxOut.Value
-			totalInputAge += float64(inputValue * inputAge)
+			totalInputAge += float64(inputValue * int64(inputAge))
 		}
 	}
 
@@ -887,7 +890,7 @@ func (txD *TxDesc) StartingPriority(txStore blockchain.TxStore) float64 {
 
 // CurrentPriority calculates the current priority of this tx descriptor's
 // underlying transaction relative to the next block height.
-func (txD *TxDesc) CurrentPriority(txStore blockchain.TxStore, nextBlockHeight int64) float64 {
+func (txD *TxDesc) CurrentPriority(txStore blockchain.TxStore, nextBlockHeight int32) float64 {
 	inputAge := calcInputValueAge(txD, txStore, nextBlockHeight)
 	return calcPriority(txD.Tx, inputAge)
 }
@@ -916,8 +919,8 @@ func (mp *txMemPool) checkPoolDoubleSpend(tx *btcutil.Tx) error {
 // fetch any missing inputs from the transaction pool.
 //
 // This function MUST be called with the mempool lock held (for reads).
-func (mp *txMemPool) fetchInputTransactions(tx *btcutil.Tx) (blockchain.TxStore, error) {
-	txStore, err := mp.server.blockManager.blockChain.FetchTransactionStore(tx)
+func (mp *txMemPool) fetchInputTransactions(tx *btcutil.Tx, includeSpent bool) (blockchain.TxStore, error) {
+	txStore, err := mp.server.blockManager.blockChain.FetchTransactionStore(tx, includeSpent)
 	if err != nil {
 		return nil, err
 	}
@@ -1066,7 +1069,7 @@ func (mp *txMemPool) maybeAcceptTransaction(tx *btcutil.Tx, isNew, rateLimit boo
 	// transaction.  This function also attempts to fetch the transaction
 	// itself to be used for detecting a duplicate transaction without
 	// needing to do a separate lookup.
-	txStore, err := mp.fetchInputTransactions(tx)
+	txStore, err := mp.fetchInputTransactions(tx, false)
 	if err != nil {
 		if cerr, ok := err.(blockchain.RuleError); ok {
 			return nil, chainRuleError(cerr)
@@ -1220,7 +1223,7 @@ func (mp *txMemPool) maybeAcceptTransaction(tx *btcutil.Tx, isNew, rateLimit boo
 	// Verify crypto signatures for each input and reject the transaction if
 	// any don't verify.
 	err = blockchain.ValidateTransactionScripts(tx, txStore,
-		txscript.StandardVerifyFlags)
+		txscript.StandardVerifyFlags, mp.server.sigCache)
 	if err != nil {
 		if cerr, ok := err.(blockchain.RuleError); ok {
 			return nil, chainRuleError(cerr)

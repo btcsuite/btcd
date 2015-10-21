@@ -1,4 +1,4 @@
-// Copyright (c) 2013-2014 Conformal Systems LLC.
+// Copyright (c) 2013-2014 The btcsuite developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -19,7 +19,7 @@ import (
 
 // TstSetCoinbaseMaturity makes the ability to set the coinbase maturity
 // available to the test package.
-func TstSetCoinbaseMaturity(maturity int64) {
+func TstSetCoinbaseMaturity(maturity int32) {
 	coinbaseMaturity = maturity
 }
 

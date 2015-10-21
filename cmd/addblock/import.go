@@ -1,4 +1,4 @@
-// Copyright (c) 2013-2014 Conformal Systems LLC.
+// Copyright (c) 2013-2014 The btcsuite developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -99,16 +99,12 @@ func (bi *blockImporter) processBlock(serializedBlock []byte) (bool, error) {
 		return false, err
 	}
 
-	blockSha, err := block.Sha()
-	if err != nil {
-		return false, err
-	}
-
 	// update progress statistics
 	bi.lastBlockTime = block.MsgBlock().Header.Timestamp
 	bi.receivedLogTx += int64(len(block.MsgBlock().Transactions))
 
 	// Skip blocks that already exist.
+	blockSha := block.Sha()
 	exists, err := bi.db.ExistsSha(blockSha)
 	if err != nil {
 		return false, err
@@ -307,7 +303,7 @@ func newBlockImporter(db database.Db, r io.ReadSeeker) *blockImporter {
 		doneChan:     make(chan bool),
 		errChan:      make(chan error),
 		quit:         make(chan struct{}),
-		chain:        blockchain.New(db, activeNetParams, nil),
+		chain:        blockchain.New(db, activeNetParams, nil, nil),
 		medianTime:   blockchain.NewMedianTime(),
 		lastLogTime:  time.Now(),
 	}

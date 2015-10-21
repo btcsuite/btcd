@@ -7,10 +7,11 @@ options).  The configuration file takes one entry per line.
 A few things to note regarding the RPC server:
 * The RPC server will **not** be enabled unless the `rpcuser` and `rpcpass`
   options are specified.
-* When the `rpcuser` and `rpcpass` options are specified, the RPC server will
-  only listen on localhost IPv4 and IPv6 interfaces by default.  You will need
-  to override the RPC listen interfaces to include external interfaces if you
-  want to connect from a remote machine.
+* When the `rpcuser` and `rpcpass` and/or `rpclimituser` and `rpclimitpass`
+  options are specified, the RPC server will only listen on localhost IPv4 and
+  IPv6 interfaces by default.  You will need to override the RPC listen
+  interfaces to include external interfaces if you want to connect from a remote
+  machine.
 * The RPC server has TLS enabled by default, even for localhost.  You may use
   the `--notls` option to disable it, but only when all listeners are on
   localhost interfaces.

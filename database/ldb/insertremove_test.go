@@ -1,4 +1,4 @@
-// Copyright (c) 2013-2014 Conformal Systems LLC.
+// Copyright (c) 2013-2014 The btcsuite developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -63,7 +63,7 @@ func testUnspentInsert(t *testing.T) {
 
 	blocks := loadblocks(t)
 endtest:
-	for height := int64(0); height < int64(len(blocks)); height++ {
+	for height := int32(0); height < int32(len(blocks)); height++ {
 
 		block := blocks[height]
 		// look up inputs to this tx
@@ -91,7 +91,7 @@ endtest:
 					t.Errorf("referenced tx not found %v ", origintxsha)
 				}
 			}
-			txshaname, _ := tx.TxSha()
+			txshaname := tx.TxSha()
 			txlookupList = append(txlookupList, &txshaname)
 			txOutList = append(txOutList, &txshaname)
 		}
@@ -150,9 +150,8 @@ endtest:
 			continue
 		}
 		dropblock := blocks[height-1]
-		dropsha, _ := dropblock.Sha()
 
-		err = db.DropAfterBlockBySha(dropsha)
+		err = db.DropAfterBlockBySha(dropblock.Sha())
 		if err != nil {
 			t.Errorf("failed to drop block %v err %v", height, err)
 			break endtest

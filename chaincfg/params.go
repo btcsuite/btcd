@@ -1,4 +1,4 @@
-// Copyright (c) 2014 Conformal Systems LLC.
+// Copyright (c) 2014 The btcsuite developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -44,7 +44,7 @@ var (
 // documentation for blockchain.IsCheckpointCandidate for details on the
 // selection criteria.
 type Checkpoint struct {
-	Height int64
+	Height int32
 	Hash   *wire.ShaHash
 }
 
@@ -63,6 +63,7 @@ type Params struct {
 	PowLimitBits           uint32
 	SubsidyHalvingInterval int32
 	ResetMinDifficulty     bool
+	GenerateSupported      bool
 
 	// Checkpoints ordered from oldest to newest.
 	Checkpoints []Checkpoint
@@ -108,6 +109,7 @@ var MainNetParams = Params{
 	PowLimitBits:           0x1d00ffff,
 	SubsidyHalvingInterval: 210000,
 	ResetMinDifficulty:     false,
+	GenerateSupported:      false,
 
 	// Checkpoints ordered from oldest to newest.
 	Checkpoints: []Checkpoint{
@@ -127,6 +129,7 @@ var MainNetParams = Params{
 		{300255, newShaHashFromStr("0000000000000000162804527c6e9b9f0563a280525f9d08c12041def0a0f3b2")},
 		{319400, newShaHashFromStr("000000000000000021c6052e9becade189495d1c539aa37c58917305fd15f13b")},
 		{343185, newShaHashFromStr("0000000000000000072b8bf361d01a6ba7d445dd024203fafc78768ed4368554")},
+		{352940, newShaHashFromStr("000000000000000010755df42dba556bb72be6a32f3ce0b6941ce4430152c9ff")},
 	},
 
 	// Enforce current block version once majority of the network has
@@ -171,6 +174,7 @@ var RegressionNetParams = Params{
 	PowLimitBits:           0x207fffff,
 	SubsidyHalvingInterval: 150,
 	ResetMinDifficulty:     true,
+	GenerateSupported:      true,
 
 	// Checkpoints ordered from oldest to newest.
 	Checkpoints: nil,
@@ -217,6 +221,7 @@ var TestNet3Params = Params{
 	PowLimitBits:           0x1d00ffff,
 	SubsidyHalvingInterval: 210000,
 	ResetMinDifficulty:     true,
+	GenerateSupported:      false,
 
 	// Checkpoints ordered from oldest to newest.
 	Checkpoints: []Checkpoint{
@@ -269,6 +274,7 @@ var SimNetParams = Params{
 	PowLimitBits:           0x207fffff,
 	SubsidyHalvingInterval: 210000,
 	ResetMinDifficulty:     true,
+	GenerateSupported:      true,
 
 	// Checkpoints ordered from oldest to newest.
 	Checkpoints: nil,

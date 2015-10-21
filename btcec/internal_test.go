@@ -1,4 +1,4 @@
-// Copyright (c) 2013-2014 Conformal Systems LLC.
+// Copyright (c) 2013-2014 The btcsuite developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -68,4 +68,15 @@ func (curve *KoblitzCurve) TstDoubleJacobian(x1, y1, z1, x3, y3, z3 *fieldVal) {
 // the test package.
 func NewFieldVal() *fieldVal {
 	return new(fieldVal)
+}
+
+// TstNonceRFC6979 makes the nonceRFC6979 function available to the test package.
+func TstNonceRFC6979(privkey *big.Int, hash []byte) *big.Int {
+	return nonceRFC6979(privkey, hash)
+}
+
+// TstRemovePKCSPadding makes the internal removePKCSPadding function available
+// to the test package.
+func TstRemovePKCSPadding(src []byte) ([]byte, error) {
+	return removePKCSPadding(src)
 }

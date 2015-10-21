@@ -1,5 +1,5 @@
-// Copyright 2015 Conformal Systems LLC. All rights reserved.
-// Use of this source code is governed by a BSD-style
+// Copyright 2015 The btcsuite developers
+// Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
 // This file is ignored during the regular build due to the following build tag.
@@ -41,7 +41,7 @@ func main() {
 	encoded := make([]byte, base64.StdEncoding.EncodedLen(compressed.Len()))
 	base64.StdEncoding.Encode(encoded, compressed.Bytes())
 
-	fmt.Fprintln(fi, "// Copyright (c) 2015 Conformal Systems LLC.")
+	fmt.Fprintln(fi, "// Copyright (c) 2015 The btcsuite developers")
 	fmt.Fprintln(fi, "// Use of this source code is governed by an ISC")
 	fmt.Fprintln(fi, "// license that can be found in the LICENSE file.")
 	fmt.Fprintln(fi)

@@ -1,4 +1,4 @@
-// Copyright (c) 2013-2015 Conformal Systems LLC.
+// Copyright (c) 2013-2015 The btcsuite developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -18,7 +18,9 @@ func TestServiceFlagStringer(t *testing.T) {
 	}{
 		{0, "0x0"},
 		{wire.SFNodeNetwork, "SFNodeNetwork"},
-		{0xffffffff, "SFNodeNetwork|0xfffffffe"},
+		{wire.SFNodeGetUTXO, "SFNodeGetUTXO"},
+		{wire.SFNodeBloom, "SFNodeBloom"},
+		{0xffffffff, "SFNodeNetwork|SFNodeGetUTXO|SFNodeBloom|0xfffffff8"},
 	}
 
 	t.Logf("Running %d tests", len(tests))

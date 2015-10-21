@@ -1,4 +1,4 @@
-// Copyright (c) 2013-2014 Conformal Systems LLC.
+// Copyright (c) 2013-2014 The btcsuite developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -14,6 +14,7 @@ import (
 	"github.com/btcsuite/btcutil"
 	"github.com/btcsuite/golangcrypto/ripemd160"
 	"github.com/btcsuite/goleveldb/leveldb"
+	"github.com/btcsuite/goleveldb/leveldb/iterator"
 	"github.com/btcsuite/goleveldb/leveldb/util"
 )
 
@@ -46,7 +47,7 @@ var addrIndexVersionKey = []byte("addrindexversion")
 
 type txUpdateObj struct {
 	txSha     *wire.ShaHash
-	blkHeight int64
+	blkHeight int32
 	txoff     int
 	txlen     int
 	ntxout    int
@@ -55,7 +56,7 @@ type txUpdateObj struct {
 }
 
 type spentTx struct {
-	blkHeight int64
+	blkHeight int32
 	txoff     int
 	txlen     int
 	numTxO    int
@@ -68,13 +69,13 @@ type spentTxUpdate struct {
 
 type txAddrIndex struct {
 	hash160   [ripemd160.Size]byte
-	blkHeight int64
+	blkHeight int32
 	txoffset  int
 	txlen     int
 }
 
 // InsertTx inserts a tx hash and its associated data into the database.
-func (db *LevelDb) InsertTx(txsha *wire.ShaHash, height int64, txoff int, txlen int, spentbuf []byte) (err error) {
+func (db *LevelDb) InsertTx(txsha *wire.ShaHash, height int32, txoff int, txlen int, spentbuf []byte) (err error) {
 	db.dbLock.Lock()
 	defer db.dbLock.Unlock()
 
@@ -83,7 +84,7 @@ func (db *LevelDb) InsertTx(txsha *wire.ShaHash, height int64, txoff int, txlen 
 
 // insertTx inserts a tx hash and its associated data into the database.
 // Must be called with db lock held.
-func (db *LevelDb) insertTx(txSha *wire.ShaHash, height int64, txoff int, txlen int, spentbuf []byte) (err error) {
+func (db *LevelDb) insertTx(txSha *wire.ShaHash, height int32, txoff int, txlen int, spentbuf []byte) (err error) {
 	var txU txUpdateObj
 
 	txU.txSha = txSha
@@ -113,7 +114,7 @@ func (db *LevelDb) formatTx(txu *txUpdateObj) []byte {
 	return txW[:]
 }
 
-func (db *LevelDb) getTxData(txsha *wire.ShaHash) (int64, int, int, []byte, error) {
+func (db *LevelDb) getTxData(txsha *wire.ShaHash) (int32, int, int, []byte, error) {
 	key := shaTxToKey(txsha)
 	buf, err := db.lDb.Get(key, db.ro)
 	if err != nil {
@@ -127,7 +128,7 @@ func (db *LevelDb) getTxData(txsha *wire.ShaHash) (int64, int, int, []byte, erro
 	spentBuf := make([]byte, len(buf)-16)
 	copy(spentBuf, buf[16:])
 
-	return int64(blkHeight), int(txOff), int(txLen), spentBuf, nil
+	return int32(blkHeight), int(txOff), int(txLen), spentBuf, nil
 }
 
 func (db *LevelDb) getTxFullySpent(txsha *wire.ShaHash) ([]*spentTx, error) {
@@ -153,7 +154,7 @@ func (db *LevelDb) getTxFullySpent(txsha *wire.ShaHash) ([]*spentTx, error) {
 		numTxO := binary.LittleEndian.Uint32(buf[offset+16 : offset+20])
 
 		sTx := spentTx{
-			blkHeight: int64(blkHeight),
+			blkHeight: int32(blkHeight),
 			txoff:     int(txOff),
 			txlen:     int(txLen),
 			numTxO:    int(numTxO),
@@ -269,8 +270,8 @@ func (db *LevelDb) FetchUnSpentTxByShaList(txShaList []*wire.ShaHash) []*databas
 }
 
 // fetchTxDataBySha returns several pieces of data regarding the given sha.
-func (db *LevelDb) fetchTxDataBySha(txsha *wire.ShaHash) (rtx *wire.MsgTx, rblksha *wire.ShaHash, rheight int64, rtxspent []byte, err error) {
-	var blkHeight int64
+func (db *LevelDb) fetchTxDataBySha(txsha *wire.ShaHash) (rtx *wire.MsgTx, rblksha *wire.ShaHash, rheight int32, rtxspent []byte, err error) {
+	var blkHeight int32
 	var txspent []byte
 	var txOff, txLen int
 
@@ -286,7 +287,7 @@ func (db *LevelDb) fetchTxDataBySha(txsha *wire.ShaHash) (rtx *wire.MsgTx, rblks
 
 // fetchTxDataByLoc returns several pieces of data regarding the given tx
 // located by the block/offset/size location
-func (db *LevelDb) fetchTxDataByLoc(blkHeight int64, txOff int, txLen int, txspent []byte) (rtx *wire.MsgTx, rblksha *wire.ShaHash, rheight int64, rtxspent []byte, err error) {
+func (db *LevelDb) fetchTxDataByLoc(blkHeight int32, txOff int, txLen int, txspent []byte) (rtx *wire.MsgTx, rblksha *wire.ShaHash, rheight int32, rtxspent []byte, err error) {
 	var blksha *wire.ShaHash
 	var blkbuf []byte
 
@@ -401,7 +402,7 @@ func addrIndexToKey(index *txAddrIndex) []byte {
 // unpackTxIndex deserializes the raw bytes of a address tx index.
 func unpackTxIndex(rawIndex [12]byte) *txAddrIndex {
 	return &txAddrIndex{
-		blkHeight: int64(binary.BigEndian.Uint32(rawIndex[0:4])),
+		blkHeight: int32(binary.BigEndian.Uint32(rawIndex[0:4])),
 		txoffset:  int(binary.BigEndian.Uint32(rawIndex[4:8])),
 		txlen:     int(binary.BigEndian.Uint32(rawIndex[8:12])),
 	}
@@ -423,6 +424,13 @@ func bytesPrefix(prefix []byte) *util.Range {
 	return &util.Range{Start: prefix, Limit: limit}
 }
 
+func advanceIterator(iter iterator.IteratorSeeker, reverse bool) bool {
+	if reverse {
+		return iter.Prev()
+	}
+	return iter.Next()
+}
+
 // FetchTxsForAddr looks up and returns all transactions which either
 // spend from a previously created output of the passed address, or
 // create a new output locked to the passed address. The, `limit` parameter
@@ -430,16 +438,16 @@ func bytesPrefix(prefix []byte) *util.Range {
 // caller wishes to seek forward in the results some amount, the 'seek'
 // represents how many results to skip.
 func (db *LevelDb) FetchTxsForAddr(addr btcutil.Address, skip int,
-	limit int) ([]*database.TxListReply, error) {
+	limit int, reverse bool) ([]*database.TxListReply, int, error) {
 	db.dbLock.Lock()
 	defer db.dbLock.Unlock()
 
 	// Enforce constraints for skip and limit.
 	if skip < 0 {
-		return nil, errors.New("offset for skip must be positive")
+		return nil, 0, errors.New("offset for skip must be positive")
 	}
 	if limit < 0 {
-		return nil, errors.New("value for limit must be positive")
+		return nil, 0, errors.New("value for limit must be positive")
 	}
 
 	// Parse address type, bailing on an unknown type.
@@ -455,7 +463,7 @@ func (db *LevelDb) FetchTxsForAddr(addr btcutil.Address, skip int,
 		hash160 := addr.AddressPubKeyHash().Hash160()
 		addrKey = hash160[:]
 	default:
-		return nil, database.ErrUnsupportedAddressType
+		return nil, 0, database.ErrUnsupportedAddressType
 	}
 
 	// Create the prefix for our search.
@@ -464,14 +472,27 @@ func (db *LevelDb) FetchTxsForAddr(addr btcutil.Address, skip int,
 	copy(addrPrefix[3:23], addrKey)
 
 	iter := db.lDb.NewIterator(bytesPrefix(addrPrefix), nil)
-	for skip != 0 && iter.Next() {
+	skipped := 0
+
+	if reverse {
+		// Go to the last element if reverse iterating.
+		iter.Last()
+		// Skip "one past" the last element so the loops below don't
+		// miss the last element due to Prev() being called first.
+		// We can safely ignore iterator exhaustion since the loops
+		// below will see there's no keys anyway.
+		iter.Next()
+	}
+
+	for skip != 0 && advanceIterator(iter, reverse) {
 		skip--
+		skipped++
 	}
 
 	// Iterate through all address indexes that match the targeted prefix.
 	var replies []*database.TxListReply
 	var rawIndex [12]byte
-	for iter.Next() && limit != 0 {
+	for advanceIterator(iter, reverse) && limit != 0 {
 		copy(rawIndex[:], iter.Key()[23:35])
 		addrIndex := unpackTxIndex(rawIndex)
 
@@ -482,7 +503,7 @@ func (db *LevelDb) FetchTxsForAddr(addr btcutil.Address, skip int,
 			continue
 		}
 
-		txSha, _ := tx.TxSha()
+		txSha := tx.TxSha()
 		txReply := &database.TxListReply{Sha: &txSha, Tx: tx,
 			BlkSha: blkSha, Height: blkHeight, TxSpent: []bool{}, Err: err}
 
@@ -491,10 +512,10 @@ func (db *LevelDb) FetchTxsForAddr(addr btcutil.Address, skip int,
 	}
 	iter.Release()
 	if err := iter.Error(); err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 
-	return replies, nil
+	return replies, skipped, nil
 }
 
 // UpdateAddrIndexForBlock updates the stored addrindex with passed
@@ -511,7 +532,7 @@ func (db *LevelDb) FetchTxsForAddr(addr btcutil.Address, skip int,
 // append-only list for the stored value. However, this add unnecessary
 // overhead when storing and retrieving since the entire list must
 // be fetched each time.
-func (db *LevelDb) UpdateAddrIndexForBlock(blkSha *wire.ShaHash, blkHeight int64, addrIndex database.BlockAddrIndex) error {
+func (db *LevelDb) UpdateAddrIndexForBlock(blkSha *wire.ShaHash, blkHeight int32, addrIndex database.BlockAddrIndex) error {
 	db.dbLock.Lock()
 	defer db.dbLock.Unlock()
 
@@ -537,7 +558,7 @@ func (db *LevelDb) UpdateAddrIndexForBlock(blkSha *wire.ShaHash, blkHeight int64
 
 	// Update tip of addrindex.
 	newIndexTip := make([]byte, 40, 40)
-	copy(newIndexTip[0:32], blkSha.Bytes())
+	copy(newIndexTip[0:32], blkSha[:])
 	binary.LittleEndian.PutUint64(newIndexTip[32:40], uint64(blkHeight))
 	batch.Put(addrIndexMetaDataKey, newIndexTip)
 

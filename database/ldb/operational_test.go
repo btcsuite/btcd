@@ -1,4 +1,4 @@
-// Copyright (c) 2013-2014 Conformal Systems LLC.
+// Copyright (c) 2013-2014 The btcsuite developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -72,7 +72,7 @@ func TestOperational(t *testing.T) {
 
 // testAddrIndexOperations ensures that all normal operations concerning
 // the optional address index function correctly.
-func testAddrIndexOperations(t *testing.T, db database.Db, newestBlock *btcutil.Block, newestSha *wire.ShaHash, newestBlockIdx int64) {
+func testAddrIndexOperations(t *testing.T, db database.Db, newestBlock *btcutil.Block, newestSha *wire.ShaHash, newestBlockIdx int32) {
 	// Metadata about the current addr index state should be unset.
 	sha, height, err := db.FetchAddrIndexTip()
 	if err != database.ErrAddrIndexDoesNotExist {
@@ -91,12 +91,12 @@ func testAddrIndexOperations(t *testing.T, db database.Db, newestBlock *btcutil.
 
 	// Test enforcement of constraints for "limit" and "skip"
 	var fakeAddr btcutil.Address
-	_, err = db.FetchTxsForAddr(fakeAddr, -1, 0)
+	_, _, err = db.FetchTxsForAddr(fakeAddr, -1, 0, false)
 	if err == nil {
 		t.Fatalf("Negative value for skip passed, should return an error")
 	}
 
-	_, err = db.FetchTxsForAddr(fakeAddr, 0, -1)
+	_, _, err = db.FetchTxsForAddr(fakeAddr, 0, -1, false)
 	if err == nil {
 		t.Fatalf("Negative value for limit passed, should return an error")
 	}
@@ -136,7 +136,7 @@ func testAddrIndexOperations(t *testing.T, db database.Db, newestBlock *btcutil.
 	assertAddrIndexTipIsUpdated(db, t, newestSha, newestBlockIdx)
 
 	// Check index retrieval.
-	txReplies, err := db.FetchTxsForAddr(testAddrs[0], 0, 1000)
+	txReplies, _, err := db.FetchTxsForAddr(testAddrs[0], 0, 1000, false)
 	if err != nil {
 		t.Fatalf("FetchTxsForAddr failed to correctly fetch txs for an "+
 			"address, err %v", err)
@@ -171,7 +171,7 @@ func testAddrIndexOperations(t *testing.T, db database.Db, newestBlock *btcutil.
 	}
 
 	// Former index should no longer exist.
-	txReplies, err = db.FetchTxsForAddr(testAddrs[0], 0, 1000)
+	txReplies, _, err = db.FetchTxsForAddr(testAddrs[0], 0, 1000, false)
 	if err != nil {
 		t.Fatalf("Unable to fetch transactions for address: %v", err)
 	}
@@ -188,7 +188,7 @@ func testAddrIndexOperations(t *testing.T, db database.Db, newestBlock *btcutil.
 
 }
 
-func assertAddrIndexTipIsUpdated(db database.Db, t *testing.T, newestSha *wire.ShaHash, newestBlockIdx int64) {
+func assertAddrIndexTipIsUpdated(db database.Db, t *testing.T, newestSha *wire.ShaHash, newestBlockIdx int32) {
 	// Safe to ignore error, since height will be < 0 in "error" case.
 	sha, height, _ := db.FetchAddrIndexTip()
 	if newestBlockIdx != height {
@@ -215,7 +215,7 @@ func testOperationalMode(t *testing.T) {
 	defer testDb.cleanUpFunc()
 	err = nil
 out:
-	for height := int64(0); height < int64(len(testDb.blocks)); height++ {
+	for height := int32(0); height < int32(len(testDb.blocks)); height++ {
 		block := testDb.blocks[height]
 		mblock := block.MsgBlock()
 		var txneededList []*wire.ShaHash
@@ -268,7 +268,7 @@ out:
 			t.Errorf("height does not match latest block height %v %v %v", blkid, height, err)
 		}
 
-		blkSha, _ := block.Sha()
+		blkSha := block.Sha()
 		if *newSha != *blkSha {
 			t.Errorf("Newest block sha does not match freshly inserted one %v %v %v ", newSha, blkSha, err)
 		}
@@ -306,7 +306,7 @@ func testBackout(t *testing.T) {
 	}
 
 	err = nil
-	for height := int64(0); height < int64(len(testDb.blocks)); height++ {
+	for height := int32(0); height < int32(len(testDb.blocks)); height++ {
 		if height == 100 {
 			t.Logf("Syncing at block height 100")
 			testDb.db.Sync()
@@ -345,11 +345,7 @@ func testBackout(t *testing.T) {
 		}
 	}()
 
-	sha, err := testDb.blocks[99].Sha()
-	if err != nil {
-		t.Errorf("failed to get block 99 sha err %v", err)
-		return
-	}
+	sha := testDb.blocks[99].Sha()
 	if _, err := testDb.db.ExistsSha(sha); err != nil {
 		t.Errorf("ExistsSha: unexpected error: %v", err)
 	}
@@ -359,11 +355,7 @@ func testBackout(t *testing.T) {
 		return
 	}
 
-	sha, err = testDb.blocks[119].Sha()
-	if err != nil {
-		t.Errorf("failed to get block 110 sha err %v", err)
-		return
-	}
+	sha = testDb.blocks[119].Sha()
 	if _, err := testDb.db.ExistsSha(sha); err != nil {
 		t.Errorf("ExistsSha: unexpected error: %v", err)
 	}
@@ -375,7 +367,7 @@ func testBackout(t *testing.T) {
 
 	block := testDb.blocks[119]
 	mblock := block.MsgBlock()
-	txsha, err := mblock.Transactions[0].TxSha()
+	txsha := mblock.Transactions[0].TxSha()
 	exists, err := testDb.db.ExistsTxSha(&txsha)
 	if err != nil {
 		t.Errorf("ExistsTxSha: unexpected error %v ", err)
@@ -425,7 +417,7 @@ func loadBlocks(t *testing.T, file string) (blocks []*btcutil.Block, err error) 
 
 	var block *btcutil.Block
 	err = nil
-	for height := int64(1); err == nil; height++ {
+	for height := int32(1); err == nil; height++ {
 		var rintbuf uint32
 		err = binary.Read(dr, binary.LittleEndian, &rintbuf)
 		if err == io.EOF {
@@ -464,22 +456,18 @@ func loadBlocks(t *testing.T, file string) (blocks []*btcutil.Block, err error) 
 
 func testFetchHeightRange(t *testing.T, db database.Db, blocks []*btcutil.Block) {
 
-	var testincrement int64 = 50
-	var testcnt int64 = 100
+	var testincrement int32 = 50
+	var testcnt int32 = 100
 
 	shanames := make([]*wire.ShaHash, len(blocks))
 
-	nBlocks := int64(len(blocks))
+	nBlocks := int32(len(blocks))
 
 	for i := range blocks {
-		blockSha, err := blocks[i].Sha()
-		if err != nil {
-			t.Errorf("FetchHeightRange: unexpected failure computing block sah %v", err)
-		}
-		shanames[i] = blockSha
+		shanames[i] = blocks[i].Sha()
 	}
 
-	for startheight := int64(0); startheight < nBlocks; startheight += testincrement {
+	for startheight := int32(0); startheight < nBlocks; startheight += testincrement {
 		endheight := startheight + testcnt
 
 		if endheight > nBlocks {
@@ -492,20 +480,20 @@ func testFetchHeightRange(t *testing.T, db database.Db, blocks []*btcutil.Block)
 		}
 
 		if endheight == database.AllShas {
-			if int64(len(shalist)) != nBlocks-startheight {
+			if int32(len(shalist)) != nBlocks-startheight {
 				t.Errorf("FetchHeightRange: expected A %v shas, got %v", nBlocks-startheight, len(shalist))
 			}
 		} else {
-			if int64(len(shalist)) != testcnt {
+			if int32(len(shalist)) != testcnt {
 				t.Errorf("FetchHeightRange: expected %v shas, got %v", testcnt, len(shalist))
 			}
 		}
 
 		for i := range shalist {
-			sha0 := *shanames[int64(i)+startheight]
+			sha0 := *shanames[int32(i)+startheight]
 			sha1 := shalist[i]
 			if sha0 != sha1 {
-				t.Errorf("FetchHeightRange: mismatch sha at %v requested range %v %v: %v %v ", int64(i)+startheight, startheight, endheight, sha0, sha1)
+				t.Errorf("FetchHeightRange: mismatch sha at %v requested range %v %v: %v %v ", int32(i)+startheight, startheight, endheight, sha0, sha1)
 			}
 		}
 	}
@@ -557,7 +545,7 @@ func TestLimitAndSkipFetchTxsForAddr(t *testing.T) {
 		copy(hash160[:], scriptAddr[:])
 		index[hash160] = append(index[hash160], &txLoc[i])
 	}
-	blkSha, _ := testBlock.Sha()
+	blkSha := testBlock.Sha()
 	err = testDb.db.UpdateAddrIndexForBlock(blkSha, newheight, index)
 	if err != nil {
 		t.Fatalf("UpdateAddrIndexForBlock: failed to index"+
@@ -567,9 +555,13 @@ func TestLimitAndSkipFetchTxsForAddr(t *testing.T) {
 	}
 
 	// Try skipping the first 4 results, should get 6 in return.
-	txReply, err := testDb.db.FetchTxsForAddr(targetAddr, 4, 100000)
+	txReply, txSkipped, err := testDb.db.FetchTxsForAddr(targetAddr, 4, 100000, false)
 	if err != nil {
 		t.Fatalf("Unable to fetch transactions for address: %v", err)
+	}
+	if txSkipped != 4 {
+		t.Fatalf("Did not correctly return skipped amount"+
+			" got %v txs, expected %v", txSkipped, 4)
 	}
 	if len(txReply) != 6 {
 		t.Fatalf("Did not correctly skip forward in txs for address reply"+
@@ -577,9 +569,13 @@ func TestLimitAndSkipFetchTxsForAddr(t *testing.T) {
 	}
 
 	// Limit the number of results to 3.
-	txReply, err = testDb.db.FetchTxsForAddr(targetAddr, 0, 3)
+	txReply, txSkipped, err = testDb.db.FetchTxsForAddr(targetAddr, 0, 3, false)
 	if err != nil {
 		t.Fatalf("Unable to fetch transactions for address: %v", err)
+	}
+	if txSkipped != 0 {
+		t.Fatalf("Did not correctly return skipped amount"+
+			" got %v txs, expected %v", txSkipped, 0)
 	}
 	if len(txReply) != 3 {
 		t.Fatalf("Did not correctly limit in txs for address reply"+
@@ -587,9 +583,13 @@ func TestLimitAndSkipFetchTxsForAddr(t *testing.T) {
 	}
 
 	// Skip 1, limit 5.
-	txReply, err = testDb.db.FetchTxsForAddr(targetAddr, 1, 5)
+	txReply, txSkipped, err = testDb.db.FetchTxsForAddr(targetAddr, 1, 5, false)
 	if err != nil {
 		t.Fatalf("Unable to fetch transactions for address: %v", err)
+	}
+	if txSkipped != 1 {
+		t.Fatalf("Did not correctly return skipped amount"+
+			" got %v txs, expected %v", txSkipped, 1)
 	}
 	if len(txReply) != 5 {
 		t.Fatalf("Did not correctly limit in txs for address reply"+

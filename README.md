@@ -48,10 +48,21 @@ https://github.com/btcsuite/btcd/releases
 - Install Go according to the installation instructions here:
   http://golang.org/doc/install
 
+- Ensure Go was installed properly and is a supported version:
+
+```bash
+$ go version
+$ go env GOROOT GOPATH
+```
+
+NOTE: The `GOROOT` and `GOPATH` above must not be the same path.  It is
+recommended that `GOPATH` is set to a directory in your home directory such as
+`~/goprojects` to avoid write permission issues.
+
 - Run the following command to obtain btcd, all dependencies, and install it:
 
 ```bash
-$ go get github.com/btcsuite/btcd/...
+$ go get -u github.com/btcsuite/btcd/...
 ```
 
 - btcd (and utilities) will now be installed in either ```$GOROOT/bin``` or
@@ -89,11 +100,11 @@ Launch btcd from your Start menu.
 $ ./btcd
 ````
 
-## IRC server
+## IRC
 
-- irc.conformal.com:6697
-- ssl required
+- irc.freenode.net
 - channel #btcd
+- [webchat](https://webchat.freenode.net/?channels=btcd)
 
 ## Mailing lists
 
@@ -114,8 +125,8 @@ The documentation is a work-in-progress.  It is located in the [docs](https://gi
 ## GPG Verification Key
 
 All official release tags are signed by Conformal so users can ensure the code
-has not been tampered with and is coming from Conformal.  To verify the
-signature perform the following:
+has not been tampered with and is coming from the btcsuite developers.  To
+verify the signature perform the following:
 
 - Download the public key from the Conformal website at
   https://opensource.conformal.com/GIT-GPG-KEY-conformal.txt

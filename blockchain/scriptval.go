@@ -1,4 +1,4 @@
-// Copyright (c) 2013-2014 Conformal Systems LLC.
+// Copyright (c) 2013-2014 The btcsuite developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -30,6 +30,7 @@ type txValidator struct {
 	resultChan   chan error
 	txStore      TxStore
 	flags        txscript.ScriptFlags
+	sigCache     *txscript.SigCache
 }
 
 // sendResult sends the result of a script pair validation on the internal
@@ -83,8 +84,8 @@ out:
 			// Create a new script engine for the script pair.
 			sigScript := txIn.SignatureScript
 			pkScript := originMsgTx.TxOut[originTxIndex].PkScript
-			engine, err := txscript.NewScript(sigScript, pkScript,
-				txVI.txInIndex, txVI.tx.MsgTx(), v.flags)
+			vm, err := txscript.NewEngine(pkScript, txVI.tx.MsgTx(),
+				txVI.txInIndex, v.flags, v.sigCache)
 			if err != nil {
 				str := fmt.Sprintf("failed to parse input "+
 					"%s:%d which references output %s:%d - "+
@@ -98,7 +99,7 @@ out:
 			}
 
 			// Execute the script pair.
-			if err := engine.Execute(); err != nil {
+			if err := vm.Execute(); err != nil {
 				str := fmt.Sprintf("failed to validate input "+
 					"%s:%d which references output %s:%d - "+
 					"%v (input script bytes %x, prev output "+
@@ -179,19 +180,20 @@ func (v *txValidator) Validate(items []*txValidateItem) error {
 
 // newTxValidator returns a new instance of txValidator to be used for
 // validating transaction scripts asynchronously.
-func newTxValidator(txStore TxStore, flags txscript.ScriptFlags) *txValidator {
+func newTxValidator(txStore TxStore, flags txscript.ScriptFlags, sigCache *txscript.SigCache) *txValidator {
 	return &txValidator{
 		validateChan: make(chan *txValidateItem),
 		quitChan:     make(chan struct{}),
 		resultChan:   make(chan error),
 		txStore:      txStore,
+		sigCache:     sigCache,
 		flags:        flags,
 	}
 }
 
 // ValidateTransactionScripts validates the scripts for the passed transaction
 // using multiple goroutines.
-func ValidateTransactionScripts(tx *btcutil.Tx, txStore TxStore, flags txscript.ScriptFlags) error {
+func ValidateTransactionScripts(tx *btcutil.Tx, txStore TxStore, flags txscript.ScriptFlags, sigCache *txscript.SigCache) error {
 	// Collect all of the transaction inputs and required information for
 	// validation.
 	txIns := tx.MsgTx().TxIn
@@ -211,7 +213,7 @@ func ValidateTransactionScripts(tx *btcutil.Tx, txStore TxStore, flags txscript.
 	}
 
 	// Validate all of the inputs.
-	validator := newTxValidator(txStore, flags)
+	validator := newTxValidator(txStore, flags, sigCache)
 	if err := validator.Validate(txValItems); err != nil {
 		return err
 	}
@@ -222,7 +224,7 @@ func ValidateTransactionScripts(tx *btcutil.Tx, txStore TxStore, flags txscript.
 // checkBlockScripts executes and validates the scripts for all transactions in
 // the passed block.
 func checkBlockScripts(block *btcutil.Block, txStore TxStore,
-	scriptFlags txscript.ScriptFlags) error {
+	scriptFlags txscript.ScriptFlags, sigCache *txscript.SigCache) error {
 
 	// Collect all of the transaction inputs and required information for
 	// validation for all transactions in the block into a single slice.
@@ -248,7 +250,7 @@ func checkBlockScripts(block *btcutil.Block, txStore TxStore,
 	}
 
 	// Validate all of the inputs.
-	validator := newTxValidator(txStore, scriptFlags)
+	validator := newTxValidator(txStore, scriptFlags, sigCache)
 	if err := validator.Validate(txValItems); err != nil {
 		return err
 	}

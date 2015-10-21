@@ -18,7 +18,7 @@
 5. [Developer Resources](#DeveloperResources)
     1. [Code Contribution Guidelines](#ContributionGuidelines)
     2. [JSON-RPC Reference](#JSONRPCReference)
-    3. [Conformal Bitcoin-related Go Packages](#GoPackages)
+    3. [The btcsuite Bitcoin-related Go Packages](#GoPackages)
 
 <a name="About" />
 ### 1. About
@@ -89,13 +89,15 @@ options, which can be viewed by running: `$ btcd --help`.
 btcctl is a command line utility that can be used to both control and query btcd
 via [RPC](http://www.wikipedia.org/wiki/Remote_procedure_call).  btcd does
 **not** enable its RPC server by default;  You must configure at minimum both an
-RPC username and password:
+RPC username and password or both an RPC limited username and password:
 
 * btcd.conf configuration file
 ```
 [Application Options]
 rpcuser=myuser
 rpcpass=SomeDecentp4ssw0rd
+rpclimituser=mylimituser
+rpclimitpass=Limitedp4ssw0rd
 ```
 * btcctl.conf configuration file
 ```
@@ -103,12 +105,19 @@ rpcpass=SomeDecentp4ssw0rd
 rpcuser=myuser
 rpcpass=SomeDecentp4ssw0rd
 ```
+OR
+```
+[Application Options]
+rpclimituser=mylimituser
+rpclimitpass=Limitedp4ssw0rd
+```
 For a list of available options, run: `$ btcctl --help`
 
 <a name="Mining" />
 **2.4 Mining**<br />
 btcd supports both the `getwork` and `getblocktemplate` RPCs although the
-`getwork` RPC is deprecated and will likely be removed in a future release.<br />
+`getwork` RPC is deprecated and will likely be removed in a future release.
+The limited user cannot access these RPCs.<br />
 
 **1. Add the payment addresses with the `miningaddr` option.**<br />
 
@@ -169,7 +178,7 @@ information.
 
 <a name="ContactIRC" />
 **4.1 IRC**<br />
-* [irc.conformal.com](irc://irc.conformal.com:+6697), port 6697, tls, channel #btcd
+* [irc.freenode.net](irc://irc.freenode.net), channel #btcd
 
 <a name="MailingLists" />
 **4.2 Mailing Lists**<br />
@@ -187,14 +196,11 @@ information.
 * [JSON-RPC Reference](https://github.com/btcsuite/btcd/tree/master/docs/json_rpc_api.md)
     * [RPC Examples](https://github.com/btcsuite/btcd/tree/master/docs/json_rpc_api.md#ExampleCode)
 <a name="GoPackages" />
-* Conformal Bitcoin-related Go Packages:
+* The btcsuite Bitcoin-related Go Packages:
     * [btcrpcclient](https://github.com/btcsuite/btcrpcclient) - Implements a
 	  robust and easy to use Websocket-enabled Bitcoin JSON-RPC client
     * [btcjson](https://github.com/btcsuite/btcjson) - Provides an extensive API
 	  for the underlying JSON-RPC command and return values
-    * [btcws](https://github.com/btcsuite/btcws) - Custom types for btcd
-	  websocket extension commands (registers the extension commands with
-	  [btcjson](https://github.com/btcsuite/btcjson))
     * [wire](https://github.com/btcsuite/btcd/tree/master/wire) - Implements the
 	  Bitcoin wire protocol
     * [blockchain](https://github.com/btcsuite/btcd/tree/master/blockchain) -

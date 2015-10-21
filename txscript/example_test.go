@@ -1,4 +1,4 @@
-// Copyright (c) 2014-2015 Conformal Systems LLC.
+// Copyright (c) 2014-2015 The btcsuite developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -111,12 +111,7 @@ func ExampleSignTxOutput() {
 	}
 	txOut := wire.NewTxOut(100000000, pkScript)
 	originTx.AddTxOut(txOut)
-
-	originTxHash, err := originTx.TxSha()
-	if err != nil {
-		fmt.Println(err)
-		return
-	}
+	originTxHash := originTx.TxSha()
 
 	// Create the transaction to redeem the fake transaction.
 	redeemTx := wire.NewMsgTx()
@@ -169,13 +164,13 @@ func ExampleSignTxOutput() {
 	flags := txscript.ScriptBip16 | txscript.ScriptVerifyDERSignatures |
 		txscript.ScriptStrictMultiSig |
 		txscript.ScriptDiscourageUpgradableNops
-	s, err := txscript.NewScript(redeemTx.TxIn[0].SignatureScript,
-		originTx.TxOut[0].PkScript, 0, redeemTx, flags)
+	vm, err := txscript.NewEngine(originTx.TxOut[0].PkScript, redeemTx, 0,
+		flags, nil)
 	if err != nil {
 		fmt.Println(err)
 		return
 	}
-	if err := s.Execute(); err != nil {
+	if err := vm.Execute(); err != nil {
 		fmt.Println(err)
 		return
 	}

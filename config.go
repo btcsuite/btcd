@@ -1,4 +1,4 @@
-// Copyright (c) 2013-2014 Conformal Systems LLC.
+// Copyright (c) 2013-2014 The btcsuite developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -45,6 +45,7 @@ const (
 	defaultBlockPrioritySize = 50000
 	defaultGenerate          = false
 	defaultAddrIndex         = false
+	defaultSigCacheMaxSize   = 50000
 )
 
 var (
@@ -77,12 +78,14 @@ type config struct {
 	BanDuration        time.Duration `long:"banduration" description:"How long to ban misbehaving peers.  Valid time units are {s, m, h}.  Minimum 1 second"`
 	RPCUser            string        `short:"u" long:"rpcuser" description:"Username for RPC connections"`
 	RPCPass            string        `short:"P" long:"rpcpass" default-mask:"-" description:"Password for RPC connections"`
+	RPCLimitUser       string        `long:"rpclimituser" description:"Username for limited RPC connections"`
+	RPCLimitPass       string        `long:"rpclimitpass" default-mask:"-" description:"Password for limited RPC connections"`
 	RPCListeners       []string      `long:"rpclisten" description:"Add an interface/port to listen for RPC connections (default port: 8334, testnet: 18334)"`
 	RPCCert            string        `long:"rpccert" description:"File containing the certificate file"`
 	RPCKey             string        `long:"rpckey" description:"File containing the certificate key"`
 	RPCMaxClients      int           `long:"rpcmaxclients" description:"Max number of RPC clients for standard connections"`
 	RPCMaxWebsockets   int           `long:"rpcmaxwebsockets" description:"Max number of RPC websocket connections"`
-	DisableRPC         bool          `long:"norpc" description:"Disable built-in RPC server -- NOTE: The RPC server is disabled by default if no rpcuser/rpcpass is specified"`
+	DisableRPC         bool          `long:"norpc" description:"Disable built-in RPC server -- NOTE: The RPC server is disabled by default if no rpcuser/rpcpass or rpclimituser/rpclimitpass is specified"`
 	DisableTLS         bool          `long:"notls" description:"Disable TLS for the RPC server -- NOTE: This is only allowed if the RPC server is bound to localhost"`
 	DisableDNSSeed     bool          `long:"nodnsseed" description:"Disable DNS seeding for peers"`
 	ExternalIPs        []string      `long:"externalip" description:"Add an ip to the list of local addresses we claim to listen on to peers"`
@@ -93,6 +96,7 @@ type config struct {
 	OnionProxyUser     string        `long:"onionuser" description:"Username for onion proxy server"`
 	OnionProxyPass     string        `long:"onionpass" default-mask:"-" description:"Password for onion proxy server"`
 	NoOnion            bool          `long:"noonion" description:"Disable connecting to tor hidden services"`
+	TorIsolation       bool          `long:"torisolation" description:"Enable Tor stream isolation by randomizing user credentials for each connection."`
 	TestNet3           bool          `long:"testnet" description:"Use the test network"`
 	RegressionTest     bool          `long:"regtest" description:"Use the regression test network"`
 	SimNet             bool          `long:"simnet" description:"Use the simulation test network"`
@@ -102,8 +106,10 @@ type config struct {
 	CPUProfile         string        `long:"cpuprofile" description:"Write CPU profile to the specified file"`
 	DebugLevel         string        `short:"d" long:"debuglevel" description:"Logging level for all subsystems {trace, debug, info, warn, error, critical} -- You may also specify <subsystem>=<level>,<subsystem2>=<level>,... to set the log level for individual subsystems -- Use show to list available subsystems"`
 	Upnp               bool          `long:"upnp" description:"Use UPnP to map our listening port outside of NAT"`
+	MinRelayTxFee      float64       `long:"minrelaytxfee" description:"The minimum transaction fee in BTC/kB to be considered a non-zero fee."`
 	FreeTxRelayLimit   float64       `long:"limitfreerelay" description:"Limit relay of transactions with no transaction fee to the given amount in thousands of bytes per minute"`
 	NoRelayPriority    bool          `long:"norelaypriority" description:"Do not require free or low-fee transactions to have high priority for relaying"`
+	MaxOrphanTxs       int           `long:"maxorphantx" description:"Max number of orphan transactions to keep in memory"`
 	Generate           bool          `long:"generate" description:"Generate (mine) bitcoins using the CPU"`
 	MiningAddrs        []string      `long:"miningaddr" description:"Add the specified payment address to the list of addresses to use for generated blocks -- At least one address is required if the generate option is set"`
 	BlockMinSize       uint32        `long:"blockminsize" description:"Mininum block size in bytes to be used when creating a block"`
@@ -112,11 +118,14 @@ type config struct {
 	GetWorkKeys        []string      `long:"getworkkey" description:"DEPRECATED -- Use the --miningaddr option instead"`
 	AddrIndex          bool          `long:"addrindex" description:"Build and maintain a full address index. Currently only supported by leveldb."`
 	DropAddrIndex      bool          `long:"dropaddrindex" description:"Deletes the address-based transaction index from the database on start up, and the exits."`
+	NoPeerBloomFilters bool          `long:"nopeerbloomfilters" description:"Disable bloom filtering support."`
+	SigCacheMaxSize    uint          `long:"sigcachemaxsize" description:"The maximum number of entries in the signature verification cache."`
 	onionlookup        func(string) ([]net.IP, error)
 	lookup             func(string) ([]net.IP, error)
 	oniondial          func(string, string) (net.Conn, error)
 	dial               func(string, string) (net.Conn, error)
 	miningAddrs        []btcutil.Address
+	minRelayTxFee      btcutil.Amount
 }
 
 // serviceOptions defines the configuration options for btcd as a service on
@@ -313,10 +322,13 @@ func loadConfig() (*config, []string, error) {
 		DbType:            defaultDbType,
 		RPCKey:            defaultRPCKeyFile,
 		RPCCert:           defaultRPCCertFile,
+		MinRelayTxFee:     defaultMinRelayTxFee.ToBTC(),
 		FreeTxRelayLimit:  defaultFreeTxRelayLimit,
 		BlockMinSize:      defaultBlockMinSize,
 		BlockMaxSize:      defaultBlockMaxSize,
 		BlockPrioritySize: defaultBlockPrioritySize,
+		SigCacheMaxSize:   defaultSigCacheMaxSize,
+		MaxOrphanTxs:      maxOrphanTransactions,
 		Generate:          defaultGenerate,
 		AddrIndex:         defaultAddrIndex,
 	}
@@ -546,8 +558,29 @@ func loadConfig() (*config, []string, error) {
 		}
 	}
 
+	// Check to make sure limited and admin users don't have the same username
+	if cfg.RPCUser == cfg.RPCLimitUser && cfg.RPCUser != "" {
+		str := "%s: --rpcuser and --rpclimituser must not specify the " +
+			"same username"
+		err := fmt.Errorf(str, funcName)
+		fmt.Fprintln(os.Stderr, err)
+		fmt.Fprintln(os.Stderr, usageMessage)
+		return nil, nil, err
+	}
+
+	// Check to make sure limited and admin users don't have the same password
+	if cfg.RPCPass == cfg.RPCLimitPass && cfg.RPCPass != "" {
+		str := "%s: --rpcpass and --rpclimitpass must not specify the " +
+			"same password"
+		err := fmt.Errorf(str, funcName)
+		fmt.Fprintln(os.Stderr, err)
+		fmt.Fprintln(os.Stderr, usageMessage)
+		return nil, nil, err
+	}
+
 	// The RPC server is disabled if no username or password is provided.
-	if cfg.RPCUser == "" || cfg.RPCPass == "" {
+	if (cfg.RPCUser == "" || cfg.RPCPass == "") &&
+		(cfg.RPCLimitUser == "" || cfg.RPCLimitPass == "") {
 		cfg.DisableRPC = true
 	}
 
@@ -564,6 +597,16 @@ func loadConfig() (*config, []string, error) {
 		}
 	}
 
+	// Validate the the minrelaytxfee.
+	cfg.minRelayTxFee, err = btcutil.NewAmount(cfg.MinRelayTxFee)
+	if err != nil {
+		str := "%s: invalid minrelaytxfee: %v"
+		err := fmt.Errorf(str, funcName, err)
+		fmt.Fprintln(os.Stderr, err)
+		fmt.Fprintln(os.Stderr, usageMessage)
+		return nil, nil, err
+	}
+
 	// Limit the max block size to a sane value.
 	if cfg.BlockMaxSize < blockMaxSizeMin || cfg.BlockMaxSize >
 		blockMaxSizeMax {
@@ -572,6 +615,16 @@ func loadConfig() (*config, []string, error) {
 			"and %d -- parsed [%d]"
 		err := fmt.Errorf(str, funcName, blockMaxSizeMin,
 			blockMaxSizeMax, cfg.BlockMaxSize)
+		fmt.Fprintln(os.Stderr, err)
+		fmt.Fprintln(os.Stderr, usageMessage)
+		return nil, nil, err
+	}
+
+	// Limit the max orphan count to a sane vlue.
+	if cfg.MaxOrphanTxs < 0 {
+		str := "%s: The maxorphantx option may not be less than 0 " +
+			"-- parsed [%d]"
+		err := fmt.Errorf(str, funcName, cfg.MaxOrphanTxs)
 		fmt.Fprintln(os.Stderr, err)
 		fmt.Fprintln(os.Stderr, usageMessage)
 		return nil, nil, err
@@ -682,6 +735,16 @@ func loadConfig() (*config, []string, error) {
 	cfg.ConnectPeers = normalizeAddresses(cfg.ConnectPeers,
 		activeNetParams.DefaultPort)
 
+	// Tor stream isolation requires either proxy or onion proxy to be set.
+	if cfg.TorIsolation && cfg.Proxy == "" && cfg.OnionProxy == "" {
+		str := "%s: Tor stream isolation requires either proxy or " +
+			"onionproxy to be set"
+		err := fmt.Errorf(str, funcName)
+		fmt.Fprintln(os.Stderr, err)
+		fmt.Fprintln(os.Stderr, usageMessage)
+		return nil, nil, err
+	}
+
 	// Setup dial and DNS resolution (lookup) functions depending on the
 	// specified options.  The default is to use the standard net.Dial
 	// function as well as the system DNS resolver.  When a proxy is
@@ -691,10 +754,26 @@ func loadConfig() (*config, []string, error) {
 	cfg.dial = net.Dial
 	cfg.lookup = net.LookupIP
 	if cfg.Proxy != "" {
+		_, _, err := net.SplitHostPort(cfg.Proxy)
+		if err != nil {
+			str := "%s: Proxy address '%s' is invalid: %v"
+			err := fmt.Errorf(str, funcName, cfg.Proxy, err)
+			fmt.Fprintln(os.Stderr, err)
+			fmt.Fprintln(os.Stderr, usageMessage)
+			return nil, nil, err
+		}
+
+		if cfg.TorIsolation &&
+			(cfg.ProxyUser != "" || cfg.ProxyPass != "") {
+			btcdLog.Warn("Tor isolation set -- overriding " +
+				"specified proxy user credentials")
+		}
+
 		proxy := &socks.Proxy{
-			Addr:     cfg.Proxy,
-			Username: cfg.ProxyUser,
-			Password: cfg.ProxyPass,
+			Addr:         cfg.Proxy,
+			Username:     cfg.ProxyUser,
+			Password:     cfg.ProxyPass,
+			TorIsolation: cfg.TorIsolation,
 		}
 		cfg.dial = proxy.Dial
 		if !cfg.NoOnion {
@@ -713,11 +792,27 @@ func loadConfig() (*config, []string, error) {
 	// This allows .onion address traffic to be routed through a different
 	// proxy than normal traffic.
 	if cfg.OnionProxy != "" {
+		_, _, err := net.SplitHostPort(cfg.OnionProxy)
+		if err != nil {
+			str := "%s: Onion proxy address '%s' is invalid: %v"
+			err := fmt.Errorf(str, funcName, cfg.OnionProxy, err)
+			fmt.Fprintln(os.Stderr, err)
+			fmt.Fprintln(os.Stderr, usageMessage)
+			return nil, nil, err
+		}
+
+		if cfg.TorIsolation &&
+			(cfg.OnionProxyUser != "" || cfg.OnionProxyPass != "") {
+			btcdLog.Warn("Tor isolation set -- overriding " +
+				"specified onionproxy user credentials ")
+		}
+
 		cfg.oniondial = func(a, b string) (net.Conn, error) {
 			proxy := &socks.Proxy{
-				Addr:     cfg.OnionProxy,
-				Username: cfg.OnionProxyUser,
-				Password: cfg.OnionProxyPass,
+				Addr:         cfg.OnionProxy,
+				Username:     cfg.OnionProxyUser,
+				Password:     cfg.OnionProxyPass,
+				TorIsolation: cfg.TorIsolation,
 			}
 			return proxy.Dial(a, b)
 		}
@@ -756,7 +851,7 @@ func loadConfig() (*config, []string, error) {
 // one was specified, but will otherwise use the normal dial function (which
 // could itself use a proxy or not).
 func btcdDial(network, address string) (net.Conn, error) {
-	if strings.HasSuffix(address, ".onion") {
+	if strings.Contains(address, ".onion:") {
 		return cfg.oniondial(network, address)
 	}
 	return cfg.dial(network, address)

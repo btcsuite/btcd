@@ -1,4 +1,4 @@
-// Copyright (c) 2013-2014 Conformal Systems LLC.
+// Copyright (c) 2013-2014 The btcsuite developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -59,7 +59,7 @@ func (b *BlockChain) LatestCheckpoint() *chaincfg.Checkpoint {
 // verifyCheckpoint returns whether the passed block height and hash combination
 // match the hard-coded checkpoint data.  It also returns true if there is no
 // checkpoint data for the passed block height.
-func (b *BlockChain) verifyCheckpoint(height int64, hash *wire.ShaHash) bool {
+func (b *BlockChain) verifyCheckpoint(height int32, hash *wire.ShaHash) bool {
 	if b.noCheckpoints || len(b.chainParams.Checkpoints) == 0 {
 		return true
 	}
@@ -221,13 +221,8 @@ func (b *BlockChain) IsCheckpointCandidate(block *btcutil.Block) (bool, error) {
 		return false, fmt.Errorf("checkpoints are disabled")
 	}
 
-	blockHash, err := block.Sha()
-	if err != nil {
-		return false, err
-	}
-
 	// A checkpoint must be in the main chain.
-	exists, err := b.db.ExistsSha(blockHash)
+	exists, err := b.db.ExistsSha(block.Sha())
 	if err != nil {
 		return false, err
 	}

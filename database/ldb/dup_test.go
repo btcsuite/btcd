@@ -1,4 +1,4 @@
-// Copyright (c) 2013-2014 Conformal Systems LLC.
+// Copyright (c) 2013-2014 The btcsuite developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -48,7 +48,7 @@ func Test_dupTx(t *testing.T) {
 	// Populate with the fisrt 256 blocks, so we have blocks to 'mess with'
 	err = nil
 out:
-	for height := int64(0); height < int64(len(blocks)); height++ {
+	for height := int32(0); height < int32(len(blocks)); height++ {
 		block := blocks[height]
 
 		// except for NoVerify which does not allow lookups check inputs
@@ -103,7 +103,7 @@ out:
 			t.Errorf("height doe not match latest block height %v %v %v", blkid, height, err)
 		}
 
-		blkSha, _ := block.Sha()
+		blkSha := block.Sha()
 		if *newSha != *blkSha {
 			t.Errorf("Newest block sha does not match freshly inserted one %v %v %v ", newSha, blkSha, err)
 		}
@@ -169,7 +169,7 @@ out:
 		} else {
 			for _, lr := range txReply {
 				if lr.Err != nil {
-					fmt.Errorf("stx %v spent %v err %v\n", lr.Sha,
+					t.Errorf("stx %v spent %v err %v\n", lr.Sha,
 						lr.TxSpent, lr.Err)
 				}
 			}

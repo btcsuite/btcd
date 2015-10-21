@@ -1,4 +1,4 @@
-// Copyright (c) 2013-2015 Conformal Systems LLC.
+// Copyright (c) 2013-2015 The btcsuite developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -169,10 +169,7 @@ func TestTxSha(t *testing.T) {
 	msgTx.LockTime = 0
 
 	// Ensure the hash produced is expected.
-	txHash, err := msgTx.TxSha()
-	if err != nil {
-		t.Errorf("TxSha: %v", err)
-	}
+	txHash := msgTx.TxSha()
 	if !txHash.IsEqual(wantHash) {
 		t.Errorf("TxSha: wrong hash - got %v, want %v",
 			spew.Sprint(txHash), spew.Sprint(wantHash))
@@ -332,8 +329,6 @@ func TestTxWireErrors(t *testing.T) {
 		{multiTx, multiTxEncoded, pver, 4, io.ErrShortWrite, io.EOF},
 		// Force error in transaction input previous block hash.
 		{multiTx, multiTxEncoded, pver, 5, io.ErrShortWrite, io.EOF},
-		// Force error in transaction input previous block hash.
-		{multiTx, multiTxEncoded, pver, 5, io.ErrShortWrite, io.EOF},
 		// Force error in transaction input previous block output index.
 		{multiTx, multiTxEncoded, pver, 37, io.ErrShortWrite, io.EOF},
 		// Force error in transaction input signature script length.
@@ -351,7 +346,7 @@ func TestTxWireErrors(t *testing.T) {
 		// Force error in transaction output pk script.
 		{multiTx, multiTxEncoded, pver, 63, io.ErrShortWrite, io.EOF},
 		// Force error in transaction output lock time.
-		{multiTx, multiTxEncoded, pver, 130, io.ErrShortWrite, io.EOF},
+		{multiTx, multiTxEncoded, pver, 206, io.ErrShortWrite, io.EOF},
 	}
 
 	t.Logf("Running %d tests", len(tests))
@@ -477,8 +472,6 @@ func TestTxSerializeErrors(t *testing.T) {
 		{multiTx, multiTxEncoded, 4, io.ErrShortWrite, io.EOF},
 		// Force error in transaction input previous block hash.
 		{multiTx, multiTxEncoded, 5, io.ErrShortWrite, io.EOF},
-		// Force error in transaction input previous block hash.
-		{multiTx, multiTxEncoded, 5, io.ErrShortWrite, io.EOF},
 		// Force error in transaction input previous block output index.
 		{multiTx, multiTxEncoded, 37, io.ErrShortWrite, io.EOF},
 		// Force error in transaction input signature script length.
@@ -496,7 +489,7 @@ func TestTxSerializeErrors(t *testing.T) {
 		// Force error in transaction output pk script.
 		{multiTx, multiTxEncoded, 63, io.ErrShortWrite, io.EOF},
 		// Force error in transaction output lock time.
-		{multiTx, multiTxEncoded, 130, io.ErrShortWrite, io.EOF},
+		{multiTx, multiTxEncoded, 206, io.ErrShortWrite, io.EOF},
 	}
 
 	t.Logf("Running %d tests", len(tests))

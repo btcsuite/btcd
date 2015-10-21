@@ -1,4 +1,4 @@
-// Copyright (c) 2013-2015 Conformal Systems LLC.
+// Copyright (c) 2013-2015 The btcsuite developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -8,10 +8,9 @@ import (
 	"bytes"
 	"crypto/sha1"
 	"encoding/binary"
-	"encoding/hex"
+	"errors"
 	"fmt"
 	"hash"
-	"math/big"
 
 	"github.com/btcsuite/btcd/btcec"
 	"github.com/btcsuite/btcd/wire"
@@ -19,816 +18,569 @@ import (
 	"github.com/btcsuite/golangcrypto/ripemd160"
 )
 
-// An opcode defines the information related to a txscript opcode.
-// opfunc if present is the function to call to perform the opcode on
-// the script. The current script is passed in as a slice with the firs
-// member being the opcode itself.
+// An opcode defines the information related to a txscript opcode.  opfunc if
+// present is the function to call to perform the opcode on the script.  The
+// current script is passed in as a slice with the first member being the opcode
+// itself.
 type opcode struct {
-	value     byte
-	name      string
-	length    int
-	opfunc    func(*parsedOpcode, *Script) error
-	parsefunc func(*opcode, *Script, []byte) error
+	value  byte
+	name   string
+	length int
+	opfunc func(*parsedOpcode, *Engine) error
 }
 
-// These constants are the values of the official opcode used on the btc wiki,
-// in bitcoind and in most if not all other references and software related to
-// handling BTC scripts.
+// These constants are the values of the official opcodes used on the btc wiki,
+// in bitcoin core and in most if not all other references and software related
+// to handling BTC scripts.
 const (
-	OP_FALSE               = 0 // AKA OP_0
-	OP_0                   = 0
-	OP_DATA_1              = 1
-	OP_DATA_2              = 2
-	OP_DATA_3              = 3
-	OP_DATA_4              = 4
-	OP_DATA_5              = 5
-	OP_DATA_6              = 6
-	OP_DATA_7              = 7
-	OP_DATA_8              = 8
-	OP_DATA_9              = 9
-	OP_DATA_10             = 10
-	OP_DATA_11             = 11
-	OP_DATA_12             = 12
-	OP_DATA_13             = 13
-	OP_DATA_14             = 14
-	OP_DATA_15             = 15
-	OP_DATA_16             = 16
-	OP_DATA_17             = 17
-	OP_DATA_18             = 18
-	OP_DATA_19             = 19
-	OP_DATA_20             = 20
-	OP_DATA_21             = 21
-	OP_DATA_22             = 22
-	OP_DATA_23             = 23
-	OP_DATA_24             = 24
-	OP_DATA_25             = 25
-	OP_DATA_26             = 26
-	OP_DATA_27             = 27
-	OP_DATA_28             = 28
-	OP_DATA_29             = 29
-	OP_DATA_30             = 30
-	OP_DATA_31             = 31
-	OP_DATA_32             = 32
-	OP_DATA_33             = 33
-	OP_DATA_34             = 34
-	OP_DATA_35             = 35
-	OP_DATA_36             = 36
-	OP_DATA_37             = 37
-	OP_DATA_38             = 38
-	OP_DATA_39             = 39
-	OP_DATA_40             = 40
-	OP_DATA_41             = 41
-	OP_DATA_42             = 42
-	OP_DATA_43             = 43
-	OP_DATA_44             = 44
-	OP_DATA_45             = 45
-	OP_DATA_46             = 46
-	OP_DATA_47             = 47
-	OP_DATA_48             = 48
-	OP_DATA_49             = 49
-	OP_DATA_50             = 50
-	OP_DATA_51             = 51
-	OP_DATA_52             = 52
-	OP_DATA_53             = 53
-	OP_DATA_54             = 54
-	OP_DATA_55             = 55
-	OP_DATA_56             = 56
-	OP_DATA_57             = 57
-	OP_DATA_58             = 58
-	OP_DATA_59             = 59
-	OP_DATA_60             = 60
-	OP_DATA_61             = 61
-	OP_DATA_62             = 62
-	OP_DATA_63             = 63
-	OP_DATA_64             = 64
-	OP_DATA_65             = 65
-	OP_DATA_66             = 66
-	OP_DATA_67             = 67
-	OP_DATA_68             = 68
-	OP_DATA_69             = 69
-	OP_DATA_70             = 70
-	OP_DATA_71             = 71
-	OP_DATA_72             = 72
-	OP_DATA_73             = 73
-	OP_DATA_74             = 74
-	OP_DATA_75             = 75
-	OP_PUSHDATA1           = 76
-	OP_PUSHDATA2           = 77
-	OP_PUSHDATA4           = 78
-	OP_1NEGATE             = 79
-	OP_RESERVED            = 80
-	OP_1                   = 81 // AKA OP_TRUE
-	OP_TRUE                = 81
-	OP_2                   = 82
-	OP_3                   = 83
-	OP_4                   = 84
-	OP_5                   = 85
-	OP_6                   = 86
-	OP_7                   = 87
-	OP_8                   = 88
-	OP_9                   = 89
-	OP_10                  = 90
-	OP_11                  = 91
-	OP_12                  = 92
-	OP_13                  = 93
-	OP_14                  = 94
-	OP_15                  = 95
-	OP_16                  = 96
-	OP_NOP                 = 97
-	OP_VER                 = 98
-	OP_IF                  = 99
-	OP_NOTIF               = 100
-	OP_VERIF               = 101
-	OP_VERNOTIF            = 102
-	OP_ELSE                = 103
-	OP_ENDIF               = 104
-	OP_VERIFY              = 105
-	OP_RETURN              = 106
-	OP_TOALTSTACK          = 107
-	OP_FROMALTSTACK        = 108
-	OP_2DROP               = 109
-	OP_2DUP                = 110
-	OP_3DUP                = 111
-	OP_2OVER               = 112
-	OP_2ROT                = 113
-	OP_2SWAP               = 114
-	OP_IFDUP               = 115
-	OP_DEPTH               = 116
-	OP_DROP                = 117
-	OP_DUP                 = 118
-	OP_NIP                 = 119
-	OP_OVER                = 120
-	OP_PICK                = 121
-	OP_ROLL                = 122
-	OP_ROT                 = 123
-	OP_SWAP                = 124
-	OP_TUCK                = 125
-	OP_CAT                 = 126
-	OP_SUBSTR              = 127
-	OP_LEFT                = 128
-	OP_RIGHT               = 129
-	OP_SIZE                = 130
-	OP_INVERT              = 131
-	OP_AND                 = 132
-	OP_OR                  = 133
-	OP_XOR                 = 134
-	OP_EQUAL               = 135
-	OP_EQUALVERIFY         = 136
-	OP_RESERVED1           = 137
-	OP_RESERVED2           = 138
-	OP_1ADD                = 139
-	OP_1SUB                = 140
-	OP_2MUL                = 141
-	OP_2DIV                = 142
-	OP_NEGATE              = 143
-	OP_ABS                 = 144
-	OP_NOT                 = 145
-	OP_0NOTEQUAL           = 146
-	OP_ADD                 = 147
-	OP_SUB                 = 148
-	OP_MUL                 = 149
-	OP_DIV                 = 150
-	OP_MOD                 = 151
-	OP_LSHIFT              = 152
-	OP_RSHIFT              = 153
-	OP_BOOLAND             = 154
-	OP_BOOLOR              = 155
-	OP_NUMEQUAL            = 156
-	OP_NUMEQUALVERIFY      = 157
-	OP_NUMNOTEQUAL         = 158
-	OP_LESSTHAN            = 159
-	OP_GREATERTHAN         = 160
-	OP_LESSTHANOREQUAL     = 161
-	OP_GREATERTHANOREQUAL  = 162
-	OP_MIN                 = 163
-	OP_MAX                 = 164
-	OP_WITHIN              = 165
-	OP_RIPEMD160           = 166
-	OP_SHA1                = 167
-	OP_SHA256              = 168
-	OP_HASH160             = 169
-	OP_HASH256             = 170
-	OP_CODESEPARATOR       = 171
-	OP_CHECKSIG            = 172
-	OP_CHECKSIGVERIFY      = 173
-	OP_CHECKMULTISIG       = 174
-	OP_CHECKMULTISIGVERIFY = 175
-	OP_NOP1                = 176
-	OP_NOP2                = 177
-	OP_NOP3                = 178
-	OP_NOP4                = 179
-	OP_NOP5                = 180
-	OP_NOP6                = 181
-	OP_NOP7                = 182
-	OP_NOP8                = 183
-	OP_NOP9                = 184
-	OP_NOP10               = 185
-	OP_UNKNOWN186          = 186
-	OP_UNKNOWN187          = 187
-	OP_UNKNOWN188          = 188
-	OP_UNKNOWN189          = 189
-	OP_UNKNOWN190          = 190
-	OP_UNKNOWN191          = 191
-	OP_UNKNOWN192          = 192
-	OP_UNKNOWN193          = 193
-	OP_UNKNOWN194          = 194
-	OP_UNKNOWN195          = 195
-	OP_UNKNOWN196          = 196
-	OP_UNKNOWN197          = 197
-	OP_UNKNOWN198          = 198
-	OP_UNKNOWN199          = 199
-	OP_UNKNOWN200          = 200
-	OP_UNKNOWN201          = 201
-	OP_UNKNOWN202          = 202
-	OP_UNKNOWN203          = 203
-	OP_UNKNOWN204          = 204
-	OP_UNKNOWN205          = 205
-	OP_UNKNOWN206          = 206
-	OP_UNKNOWN207          = 207
-	OP_UNKNOWN208          = 208
-	OP_UNKNOWN209          = 209
-	OP_UNKNOWN210          = 210
-	OP_UNKNOWN211          = 211
-	OP_UNKNOWN212          = 212
-	OP_UNKNOWN213          = 213
-	OP_UNKNOWN214          = 214
-	OP_UNKNOWN215          = 215
-	OP_UNKNOWN216          = 216
-	OP_UNKNOWN217          = 217
-	OP_UNKNOWN218          = 218
-	OP_UNKNOWN219          = 219
-	OP_UNKNOWN220          = 220
-	OP_UNKNOWN221          = 221
-	OP_UNKNOWN222          = 222
-	OP_UNKNOWN223          = 223
-	OP_UNKNOWN224          = 224
-	OP_UNKNOWN225          = 225
-	OP_UNKNOWN226          = 226
-	OP_UNKNOWN227          = 227
-	OP_UNKNOWN228          = 228
-	OP_UNKNOWN229          = 229
-	OP_UNKNOWN230          = 230
-	OP_UNKNOWN231          = 231
-	OP_UNKNOWN232          = 232
-	OP_UNKNOWN233          = 233
-	OP_UNKNOWN234          = 234
-	OP_UNKNOWN235          = 235
-	OP_UNKNOWN236          = 236
-	OP_UNKNOWN237          = 237
-	OP_UNKNOWN238          = 238
-	OP_UNKNOWN239          = 239
-	OP_UNKNOWN240          = 240
-	OP_UNKNOWN241          = 241
-	OP_UNKNOWN242          = 242
-	OP_UNKNOWN243          = 243
-	OP_UNKNOWN244          = 244
-	OP_UNKNOWN245          = 245
-	OP_UNKNOWN246          = 246
-	OP_UNKNOWN247          = 247
-	OP_UNKNOWN248          = 248
-	OP_UNKNOWN249          = 249
-	OP_UNKNOWN250          = 250
-	OP_UNKNOWN251          = 251
-	OP_UNKNOWN252          = 252
-	OP_PUBKEYHASH          = 253 // bitcoind internal, for completeness
-	OP_PUBKEY              = 254 // bitcoind internal, for completeness
-	OP_INVALIDOPCODE       = 255 // bitcoind internal, for completeness
+	OP_0                   = 0x00 // 0
+	OP_FALSE               = 0x00 // 0 - AKA OP_0
+	OP_DATA_1              = 0x01 // 1
+	OP_DATA_2              = 0x02 // 2
+	OP_DATA_3              = 0x03 // 3
+	OP_DATA_4              = 0x04 // 4
+	OP_DATA_5              = 0x05 // 5
+	OP_DATA_6              = 0x06 // 6
+	OP_DATA_7              = 0x07 // 7
+	OP_DATA_8              = 0x08 // 8
+	OP_DATA_9              = 0x09 // 9
+	OP_DATA_10             = 0x0a // 10
+	OP_DATA_11             = 0x0b // 11
+	OP_DATA_12             = 0x0c // 12
+	OP_DATA_13             = 0x0d // 13
+	OP_DATA_14             = 0x0e // 14
+	OP_DATA_15             = 0x0f // 15
+	OP_DATA_16             = 0x10 // 16
+	OP_DATA_17             = 0x11 // 17
+	OP_DATA_18             = 0x12 // 18
+	OP_DATA_19             = 0x13 // 19
+	OP_DATA_20             = 0x14 // 20
+	OP_DATA_21             = 0x15 // 21
+	OP_DATA_22             = 0x16 // 22
+	OP_DATA_23             = 0x17 // 23
+	OP_DATA_24             = 0x18 // 24
+	OP_DATA_25             = 0x19 // 25
+	OP_DATA_26             = 0x1a // 26
+	OP_DATA_27             = 0x1b // 27
+	OP_DATA_28             = 0x1c // 28
+	OP_DATA_29             = 0x1d // 29
+	OP_DATA_30             = 0x1e // 30
+	OP_DATA_31             = 0x1f // 31
+	OP_DATA_32             = 0x20 // 32
+	OP_DATA_33             = 0x21 // 33
+	OP_DATA_34             = 0x22 // 34
+	OP_DATA_35             = 0x23 // 35
+	OP_DATA_36             = 0x24 // 36
+	OP_DATA_37             = 0x25 // 37
+	OP_DATA_38             = 0x26 // 38
+	OP_DATA_39             = 0x27 // 39
+	OP_DATA_40             = 0x28 // 40
+	OP_DATA_41             = 0x29 // 41
+	OP_DATA_42             = 0x2a // 42
+	OP_DATA_43             = 0x2b // 43
+	OP_DATA_44             = 0x2c // 44
+	OP_DATA_45             = 0x2d // 45
+	OP_DATA_46             = 0x2e // 46
+	OP_DATA_47             = 0x2f // 47
+	OP_DATA_48             = 0x30 // 48
+	OP_DATA_49             = 0x31 // 49
+	OP_DATA_50             = 0x32 // 50
+	OP_DATA_51             = 0x33 // 51
+	OP_DATA_52             = 0x34 // 52
+	OP_DATA_53             = 0x35 // 53
+	OP_DATA_54             = 0x36 // 54
+	OP_DATA_55             = 0x37 // 55
+	OP_DATA_56             = 0x38 // 56
+	OP_DATA_57             = 0x39 // 57
+	OP_DATA_58             = 0x3a // 58
+	OP_DATA_59             = 0x3b // 59
+	OP_DATA_60             = 0x3c // 60
+	OP_DATA_61             = 0x3d // 61
+	OP_DATA_62             = 0x3e // 62
+	OP_DATA_63             = 0x3f // 63
+	OP_DATA_64             = 0x40 // 64
+	OP_DATA_65             = 0x41 // 65
+	OP_DATA_66             = 0x42 // 66
+	OP_DATA_67             = 0x43 // 67
+	OP_DATA_68             = 0x44 // 68
+	OP_DATA_69             = 0x45 // 69
+	OP_DATA_70             = 0x46 // 70
+	OP_DATA_71             = 0x47 // 71
+	OP_DATA_72             = 0x48 // 72
+	OP_DATA_73             = 0x49 // 73
+	OP_DATA_74             = 0x4a // 74
+	OP_DATA_75             = 0x4b // 75
+	OP_PUSHDATA1           = 0x4c // 76
+	OP_PUSHDATA2           = 0x4d // 77
+	OP_PUSHDATA4           = 0x4e // 78
+	OP_1NEGATE             = 0x4f // 79
+	OP_RESERVED            = 0x50 // 80
+	OP_1                   = 0x51 // 81 - AKA OP_TRUE
+	OP_TRUE                = 0x51 // 81
+	OP_2                   = 0x52 // 82
+	OP_3                   = 0x53 // 83
+	OP_4                   = 0x54 // 84
+	OP_5                   = 0x55 // 85
+	OP_6                   = 0x56 // 86
+	OP_7                   = 0x57 // 87
+	OP_8                   = 0x58 // 88
+	OP_9                   = 0x59 // 89
+	OP_10                  = 0x5a // 90
+	OP_11                  = 0x5b // 91
+	OP_12                  = 0x5c // 92
+	OP_13                  = 0x5d // 93
+	OP_14                  = 0x5e // 94
+	OP_15                  = 0x5f // 95
+	OP_16                  = 0x60 // 96
+	OP_NOP                 = 0x61 // 97
+	OP_VER                 = 0x62 // 98
+	OP_IF                  = 0x63 // 99
+	OP_NOTIF               = 0x64 // 100
+	OP_VERIF               = 0x65 // 101
+	OP_VERNOTIF            = 0x66 // 102
+	OP_ELSE                = 0x67 // 103
+	OP_ENDIF               = 0x68 // 104
+	OP_VERIFY              = 0x69 // 105
+	OP_RETURN              = 0x6a // 106
+	OP_TOALTSTACK          = 0x6b // 107
+	OP_FROMALTSTACK        = 0x6c // 108
+	OP_2DROP               = 0x6d // 109
+	OP_2DUP                = 0x6e // 110
+	OP_3DUP                = 0x6f // 111
+	OP_2OVER               = 0x70 // 112
+	OP_2ROT                = 0x71 // 113
+	OP_2SWAP               = 0x72 // 114
+	OP_IFDUP               = 0x73 // 115
+	OP_DEPTH               = 0x74 // 116
+	OP_DROP                = 0x75 // 117
+	OP_DUP                 = 0x76 // 118
+	OP_NIP                 = 0x77 // 119
+	OP_OVER                = 0x78 // 120
+	OP_PICK                = 0x79 // 121
+	OP_ROLL                = 0x7a // 122
+	OP_ROT                 = 0x7b // 123
+	OP_SWAP                = 0x7c // 124
+	OP_TUCK                = 0x7d // 125
+	OP_CAT                 = 0x7e // 126
+	OP_SUBSTR              = 0x7f // 127
+	OP_LEFT                = 0x80 // 128
+	OP_RIGHT               = 0x81 // 129
+	OP_SIZE                = 0x82 // 130
+	OP_INVERT              = 0x83 // 131
+	OP_AND                 = 0x84 // 132
+	OP_OR                  = 0x85 // 133
+	OP_XOR                 = 0x86 // 134
+	OP_EQUAL               = 0x87 // 135
+	OP_EQUALVERIFY         = 0x88 // 136
+	OP_RESERVED1           = 0x89 // 137
+	OP_RESERVED2           = 0x8a // 138
+	OP_1ADD                = 0x8b // 139
+	OP_1SUB                = 0x8c // 140
+	OP_2MUL                = 0x8d // 141
+	OP_2DIV                = 0x8e // 142
+	OP_NEGATE              = 0x8f // 143
+	OP_ABS                 = 0x90 // 144
+	OP_NOT                 = 0x91 // 145
+	OP_0NOTEQUAL           = 0x92 // 146
+	OP_ADD                 = 0x93 // 147
+	OP_SUB                 = 0x94 // 148
+	OP_MUL                 = 0x95 // 149
+	OP_DIV                 = 0x96 // 150
+	OP_MOD                 = 0x97 // 151
+	OP_LSHIFT              = 0x98 // 152
+	OP_RSHIFT              = 0x99 // 153
+	OP_BOOLAND             = 0x9a // 154
+	OP_BOOLOR              = 0x9b // 155
+	OP_NUMEQUAL            = 0x9c // 156
+	OP_NUMEQUALVERIFY      = 0x9d // 157
+	OP_NUMNOTEQUAL         = 0x9e // 158
+	OP_LESSTHAN            = 0x9f // 159
+	OP_GREATERTHAN         = 0xa0 // 160
+	OP_LESSTHANOREQUAL     = 0xa1 // 161
+	OP_GREATERTHANOREQUAL  = 0xa2 // 162
+	OP_MIN                 = 0xa3 // 163
+	OP_MAX                 = 0xa4 // 164
+	OP_WITHIN              = 0xa5 // 165
+	OP_RIPEMD160           = 0xa6 // 166
+	OP_SHA1                = 0xa7 // 167
+	OP_SHA256              = 0xa8 // 168
+	OP_HASH160             = 0xa9 // 169
+	OP_HASH256             = 0xaa // 170
+	OP_CODESEPARATOR       = 0xab // 171
+	OP_CHECKSIG            = 0xac // 172
+	OP_CHECKSIGVERIFY      = 0xad // 173
+	OP_CHECKMULTISIG       = 0xae // 174
+	OP_CHECKMULTISIGVERIFY = 0xaf // 175
+	OP_NOP1                = 0xb0 // 176
+	OP_NOP2                = 0xb1 // 177
+	OP_CHECKLOCKTIMEVERIFY = 0xb1 // 177 - AKA OP_NOP2
+	OP_NOP3                = 0xb2 // 178
+	OP_NOP4                = 0xb3 // 179
+	OP_NOP5                = 0xb4 // 180
+	OP_NOP6                = 0xb5 // 181
+	OP_NOP7                = 0xb6 // 182
+	OP_NOP8                = 0xb7 // 183
+	OP_NOP9                = 0xb8 // 184
+	OP_NOP10               = 0xb9 // 185
+	OP_UNKNOWN186          = 0xba // 186
+	OP_UNKNOWN187          = 0xbb // 187
+	OP_UNKNOWN188          = 0xbc // 188
+	OP_UNKNOWN189          = 0xbd // 189
+	OP_UNKNOWN190          = 0xbe // 190
+	OP_UNKNOWN191          = 0xbf // 191
+	OP_UNKNOWN192          = 0xc0 // 192
+	OP_UNKNOWN193          = 0xc1 // 193
+	OP_UNKNOWN194          = 0xc2 // 194
+	OP_UNKNOWN195          = 0xc3 // 195
+	OP_UNKNOWN196          = 0xc4 // 196
+	OP_UNKNOWN197          = 0xc5 // 197
+	OP_UNKNOWN198          = 0xc6 // 198
+	OP_UNKNOWN199          = 0xc7 // 199
+	OP_UNKNOWN200          = 0xc8 // 200
+	OP_UNKNOWN201          = 0xc9 // 201
+	OP_UNKNOWN202          = 0xca // 202
+	OP_UNKNOWN203          = 0xcb // 203
+	OP_UNKNOWN204          = 0xcc // 204
+	OP_UNKNOWN205          = 0xcd // 205
+	OP_UNKNOWN206          = 0xce // 206
+	OP_UNKNOWN207          = 0xcf // 207
+	OP_UNKNOWN208          = 0xd0 // 208
+	OP_UNKNOWN209          = 0xd1 // 209
+	OP_UNKNOWN210          = 0xd2 // 210
+	OP_UNKNOWN211          = 0xd3 // 211
+	OP_UNKNOWN212          = 0xd4 // 212
+	OP_UNKNOWN213          = 0xd5 // 213
+	OP_UNKNOWN214          = 0xd6 // 214
+	OP_UNKNOWN215          = 0xd7 // 215
+	OP_UNKNOWN216          = 0xd8 // 216
+	OP_UNKNOWN217          = 0xd9 // 217
+	OP_UNKNOWN218          = 0xda // 218
+	OP_UNKNOWN219          = 0xdb // 219
+	OP_UNKNOWN220          = 0xdc // 220
+	OP_UNKNOWN221          = 0xdd // 221
+	OP_UNKNOWN222          = 0xde // 222
+	OP_UNKNOWN223          = 0xdf // 223
+	OP_UNKNOWN224          = 0xe0 // 224
+	OP_UNKNOWN225          = 0xe1 // 225
+	OP_UNKNOWN226          = 0xe2 // 226
+	OP_UNKNOWN227          = 0xe3 // 227
+	OP_UNKNOWN228          = 0xe4 // 228
+	OP_UNKNOWN229          = 0xe5 // 229
+	OP_UNKNOWN230          = 0xe6 // 230
+	OP_UNKNOWN231          = 0xe7 // 231
+	OP_UNKNOWN232          = 0xe8 // 232
+	OP_UNKNOWN233          = 0xe9 // 233
+	OP_UNKNOWN234          = 0xea // 234
+	OP_UNKNOWN235          = 0xeb // 235
+	OP_UNKNOWN236          = 0xec // 236
+	OP_UNKNOWN237          = 0xed // 237
+	OP_UNKNOWN238          = 0xee // 238
+	OP_UNKNOWN239          = 0xef // 239
+	OP_UNKNOWN240          = 0xf0 // 240
+	OP_UNKNOWN241          = 0xf1 // 241
+	OP_UNKNOWN242          = 0xf2 // 242
+	OP_UNKNOWN243          = 0xf3 // 243
+	OP_UNKNOWN244          = 0xf4 // 244
+	OP_UNKNOWN245          = 0xf5 // 245
+	OP_UNKNOWN246          = 0xf6 // 246
+	OP_UNKNOWN247          = 0xf7 // 247
+	OP_UNKNOWN248          = 0xf8 // 248
+	OP_SMALLDATA           = 0xf9 // 249 - bitcoin core internal
+	OP_SMALLINTEGER        = 0xfa // 250 - bitcoin core internal
+	OP_PUBKEYS             = 0xfb // 251 - bitcoin core internal
+	OP_UNKNOWN252          = 0xfc // 252
+	OP_PUBKEYHASH          = 0xfd // 253 - bitcoin core internal
+	OP_PUBKEY              = 0xfe // 254 - bitcoin core internal
+	OP_INVALIDOPCODE       = 0xff // 255 - bitcoin core internal
 )
 
-// conditional execution constants
+// Conditional execution constants.
 const (
 	OpCondFalse = 0
 	OpCondTrue  = 1
 	OpCondSkip  = 2
 )
 
-// Some of the functions in opcodemap call things that themselves then will
-// reference the opcodemap to make decisions (things like op_checksig which
-// needs to parse scripts to remove opcodes, for example).
-// The go compiler is very conservative in this matter and will think there
-// is an initialisation loop. In order to work around this we have the fake
-// ``prevariable'' opcodemapPreinit and then set the real variable to the
-// preinit in init()
-var opcodemap map[byte]*opcode
+// opcodeArray holds details about all possible opcodes such as how many bytes
+// the opcode and any associated data should take, its human-readable name, and
+// the handler function.
+var opcodeArray = [256]opcode{
+	// Data push opcodes.
+	OP_FALSE:     {OP_FALSE, "OP_0", 1, opcodeFalse},
+	OP_DATA_1:    {OP_DATA_1, "OP_DATA_1", 2, opcodePushData},
+	OP_DATA_2:    {OP_DATA_2, "OP_DATA_2", 3, opcodePushData},
+	OP_DATA_3:    {OP_DATA_3, "OP_DATA_3", 4, opcodePushData},
+	OP_DATA_4:    {OP_DATA_4, "OP_DATA_4", 5, opcodePushData},
+	OP_DATA_5:    {OP_DATA_5, "OP_DATA_5", 6, opcodePushData},
+	OP_DATA_6:    {OP_DATA_6, "OP_DATA_6", 7, opcodePushData},
+	OP_DATA_7:    {OP_DATA_7, "OP_DATA_7", 8, opcodePushData},
+	OP_DATA_8:    {OP_DATA_8, "OP_DATA_8", 9, opcodePushData},
+	OP_DATA_9:    {OP_DATA_9, "OP_DATA_9", 10, opcodePushData},
+	OP_DATA_10:   {OP_DATA_10, "OP_DATA_10", 11, opcodePushData},
+	OP_DATA_11:   {OP_DATA_11, "OP_DATA_11", 12, opcodePushData},
+	OP_DATA_12:   {OP_DATA_12, "OP_DATA_12", 13, opcodePushData},
+	OP_DATA_13:   {OP_DATA_13, "OP_DATA_13", 14, opcodePushData},
+	OP_DATA_14:   {OP_DATA_14, "OP_DATA_14", 15, opcodePushData},
+	OP_DATA_15:   {OP_DATA_15, "OP_DATA_15", 16, opcodePushData},
+	OP_DATA_16:   {OP_DATA_16, "OP_DATA_16", 17, opcodePushData},
+	OP_DATA_17:   {OP_DATA_17, "OP_DATA_17", 18, opcodePushData},
+	OP_DATA_18:   {OP_DATA_18, "OP_DATA_18", 19, opcodePushData},
+	OP_DATA_19:   {OP_DATA_19, "OP_DATA_19", 20, opcodePushData},
+	OP_DATA_20:   {OP_DATA_20, "OP_DATA_20", 21, opcodePushData},
+	OP_DATA_21:   {OP_DATA_21, "OP_DATA_21", 22, opcodePushData},
+	OP_DATA_22:   {OP_DATA_22, "OP_DATA_22", 23, opcodePushData},
+	OP_DATA_23:   {OP_DATA_23, "OP_DATA_23", 24, opcodePushData},
+	OP_DATA_24:   {OP_DATA_24, "OP_DATA_24", 25, opcodePushData},
+	OP_DATA_25:   {OP_DATA_25, "OP_DATA_25", 26, opcodePushData},
+	OP_DATA_26:   {OP_DATA_26, "OP_DATA_26", 27, opcodePushData},
+	OP_DATA_27:   {OP_DATA_27, "OP_DATA_27", 28, opcodePushData},
+	OP_DATA_28:   {OP_DATA_28, "OP_DATA_28", 29, opcodePushData},
+	OP_DATA_29:   {OP_DATA_29, "OP_DATA_29", 30, opcodePushData},
+	OP_DATA_30:   {OP_DATA_30, "OP_DATA_30", 31, opcodePushData},
+	OP_DATA_31:   {OP_DATA_31, "OP_DATA_31", 32, opcodePushData},
+	OP_DATA_32:   {OP_DATA_32, "OP_DATA_32", 33, opcodePushData},
+	OP_DATA_33:   {OP_DATA_33, "OP_DATA_33", 34, opcodePushData},
+	OP_DATA_34:   {OP_DATA_34, "OP_DATA_34", 35, opcodePushData},
+	OP_DATA_35:   {OP_DATA_35, "OP_DATA_35", 36, opcodePushData},
+	OP_DATA_36:   {OP_DATA_36, "OP_DATA_36", 37, opcodePushData},
+	OP_DATA_37:   {OP_DATA_37, "OP_DATA_37", 38, opcodePushData},
+	OP_DATA_38:   {OP_DATA_38, "OP_DATA_38", 39, opcodePushData},
+	OP_DATA_39:   {OP_DATA_39, "OP_DATA_39", 40, opcodePushData},
+	OP_DATA_40:   {OP_DATA_40, "OP_DATA_40", 41, opcodePushData},
+	OP_DATA_41:   {OP_DATA_41, "OP_DATA_41", 42, opcodePushData},
+	OP_DATA_42:   {OP_DATA_42, "OP_DATA_42", 43, opcodePushData},
+	OP_DATA_43:   {OP_DATA_43, "OP_DATA_43", 44, opcodePushData},
+	OP_DATA_44:   {OP_DATA_44, "OP_DATA_44", 45, opcodePushData},
+	OP_DATA_45:   {OP_DATA_45, "OP_DATA_45", 46, opcodePushData},
+	OP_DATA_46:   {OP_DATA_46, "OP_DATA_46", 47, opcodePushData},
+	OP_DATA_47:   {OP_DATA_47, "OP_DATA_47", 48, opcodePushData},
+	OP_DATA_48:   {OP_DATA_48, "OP_DATA_48", 49, opcodePushData},
+	OP_DATA_49:   {OP_DATA_49, "OP_DATA_49", 50, opcodePushData},
+	OP_DATA_50:   {OP_DATA_50, "OP_DATA_50", 51, opcodePushData},
+	OP_DATA_51:   {OP_DATA_51, "OP_DATA_51", 52, opcodePushData},
+	OP_DATA_52:   {OP_DATA_52, "OP_DATA_52", 53, opcodePushData},
+	OP_DATA_53:   {OP_DATA_53, "OP_DATA_53", 54, opcodePushData},
+	OP_DATA_54:   {OP_DATA_54, "OP_DATA_54", 55, opcodePushData},
+	OP_DATA_55:   {OP_DATA_55, "OP_DATA_55", 56, opcodePushData},
+	OP_DATA_56:   {OP_DATA_56, "OP_DATA_56", 57, opcodePushData},
+	OP_DATA_57:   {OP_DATA_57, "OP_DATA_57", 58, opcodePushData},
+	OP_DATA_58:   {OP_DATA_58, "OP_DATA_58", 59, opcodePushData},
+	OP_DATA_59:   {OP_DATA_59, "OP_DATA_59", 60, opcodePushData},
+	OP_DATA_60:   {OP_DATA_60, "OP_DATA_60", 61, opcodePushData},
+	OP_DATA_61:   {OP_DATA_61, "OP_DATA_61", 62, opcodePushData},
+	OP_DATA_62:   {OP_DATA_62, "OP_DATA_62", 63, opcodePushData},
+	OP_DATA_63:   {OP_DATA_63, "OP_DATA_63", 64, opcodePushData},
+	OP_DATA_64:   {OP_DATA_64, "OP_DATA_64", 65, opcodePushData},
+	OP_DATA_65:   {OP_DATA_65, "OP_DATA_65", 66, opcodePushData},
+	OP_DATA_66:   {OP_DATA_66, "OP_DATA_66", 67, opcodePushData},
+	OP_DATA_67:   {OP_DATA_67, "OP_DATA_67", 68, opcodePushData},
+	OP_DATA_68:   {OP_DATA_68, "OP_DATA_68", 69, opcodePushData},
+	OP_DATA_69:   {OP_DATA_69, "OP_DATA_69", 70, opcodePushData},
+	OP_DATA_70:   {OP_DATA_70, "OP_DATA_70", 71, opcodePushData},
+	OP_DATA_71:   {OP_DATA_71, "OP_DATA_71", 72, opcodePushData},
+	OP_DATA_72:   {OP_DATA_72, "OP_DATA_72", 73, opcodePushData},
+	OP_DATA_73:   {OP_DATA_73, "OP_DATA_73", 74, opcodePushData},
+	OP_DATA_74:   {OP_DATA_74, "OP_DATA_74", 75, opcodePushData},
+	OP_DATA_75:   {OP_DATA_75, "OP_DATA_75", 76, opcodePushData},
+	OP_PUSHDATA1: {OP_PUSHDATA1, "OP_PUSHDATA1", -1, opcodePushData},
+	OP_PUSHDATA2: {OP_PUSHDATA2, "OP_PUSHDATA2", -2, opcodePushData},
+	OP_PUSHDATA4: {OP_PUSHDATA4, "OP_PUSHDATA4", -4, opcodePushData},
+	OP_1NEGATE:   {OP_1NEGATE, "OP_1NEGATE", 1, opcode1Negate},
+	OP_RESERVED:  {OP_RESERVED, "OP_RESERVED", 1, opcodeReserved},
+	OP_TRUE:      {OP_TRUE, "OP_1", 1, opcodeN},
+	OP_2:         {OP_2, "OP_2", 1, opcodeN},
+	OP_3:         {OP_3, "OP_3", 1, opcodeN},
+	OP_4:         {OP_4, "OP_4", 1, opcodeN},
+	OP_5:         {OP_5, "OP_5", 1, opcodeN},
+	OP_6:         {OP_6, "OP_6", 1, opcodeN},
+	OP_7:         {OP_7, "OP_7", 1, opcodeN},
+	OP_8:         {OP_8, "OP_8", 1, opcodeN},
+	OP_9:         {OP_9, "OP_9", 1, opcodeN},
+	OP_10:        {OP_10, "OP_10", 1, opcodeN},
+	OP_11:        {OP_11, "OP_11", 1, opcodeN},
+	OP_12:        {OP_12, "OP_12", 1, opcodeN},
+	OP_13:        {OP_13, "OP_13", 1, opcodeN},
+	OP_14:        {OP_14, "OP_14", 1, opcodeN},
+	OP_15:        {OP_15, "OP_15", 1, opcodeN},
+	OP_16:        {OP_16, "OP_16", 1, opcodeN},
 
-func init() {
-	opcodemap = opcodemapPreinit
-}
+	// Control opcodes.
+	OP_NOP:                 {OP_NOP, "OP_NOP", 1, opcodeNop},
+	OP_VER:                 {OP_VER, "OP_VER", 1, opcodeReserved},
+	OP_IF:                  {OP_IF, "OP_IF", 1, opcodeIf},
+	OP_NOTIF:               {OP_NOTIF, "OP_NOTIF", 1, opcodeNotIf},
+	OP_VERIF:               {OP_VERIF, "OP_VERIF", 1, opcodeReserved},
+	OP_VERNOTIF:            {OP_VERNOTIF, "OP_VERNOTIF", 1, opcodeReserved},
+	OP_ELSE:                {OP_ELSE, "OP_ELSE", 1, opcodeElse},
+	OP_ENDIF:               {OP_ENDIF, "OP_ENDIF", 1, opcodeEndif},
+	OP_VERIFY:              {OP_VERIFY, "OP_VERIFY", 1, opcodeVerify},
+	OP_RETURN:              {OP_RETURN, "OP_RETURN", 1, opcodeReturn},
+	OP_CHECKLOCKTIMEVERIFY: {OP_CHECKLOCKTIMEVERIFY, "OP_CHECKLOCKTIMEVERIFY", 1, opcodeCheckLockTimeVerify},
 
-var opcodemapPreinit = map[byte]*opcode{
-	OP_FALSE: {value: OP_FALSE, name: "OP_0", length: 1,
-		opfunc: opcodeFalse},
-	OP_DATA_1: {value: OP_DATA_1, name: "OP_DATA_1", length: 2,
-		opfunc: opcodePushData},
-	OP_DATA_2: {value: OP_DATA_2, name: "OP_DATA_2", length: 3,
-		opfunc: opcodePushData},
-	OP_DATA_3: {value: OP_DATA_3, name: "OP_DATA_3", length: 4,
-		opfunc: opcodePushData},
-	OP_DATA_4: {value: OP_DATA_4, name: "OP_DATA_4", length: 5,
-		opfunc: opcodePushData},
-	OP_DATA_5: {value: OP_DATA_5, name: "OP_DATA_5", length: 6,
-		opfunc: opcodePushData},
-	OP_DATA_6: {value: OP_DATA_6, name: "OP_DATA_6", length: 7,
-		opfunc: opcodePushData},
-	OP_DATA_7: {value: OP_DATA_7, name: "OP_DATA_7", length: 8,
-		opfunc: opcodePushData},
-	OP_DATA_8: {value: OP_DATA_8, name: "OP_DATA_8", length: 9,
-		opfunc: opcodePushData},
-	OP_DATA_9: {value: OP_DATA_9, name: "OP_DATA_9", length: 10,
-		opfunc: opcodePushData},
-	OP_DATA_10: {value: OP_DATA_10, name: "OP_DATA_10", length: 11,
-		opfunc: opcodePushData},
-	OP_DATA_11: {value: OP_DATA_11, name: "OP_DATA_11", length: 12,
-		opfunc: opcodePushData},
-	OP_DATA_12: {value: OP_DATA_12, name: "OP_DATA_12", length: 13,
-		opfunc: opcodePushData},
-	OP_DATA_13: {value: OP_DATA_13, name: "OP_DATA_13", length: 14,
-		opfunc: opcodePushData},
-	OP_DATA_14: {value: OP_DATA_14, name: "OP_DATA_14", length: 15,
-		opfunc: opcodePushData},
-	OP_DATA_15: {value: OP_DATA_15, name: "OP_DATA_15", length: 16,
-		opfunc: opcodePushData},
-	OP_DATA_16: {value: OP_DATA_16, name: "OP_DATA_16", length: 17,
-		opfunc: opcodePushData},
-	OP_DATA_17: {value: OP_DATA_17, name: "OP_DATA_17", length: 18,
-		opfunc: opcodePushData},
-	OP_DATA_18: {value: OP_DATA_18, name: "OP_DATA_18", length: 19,
-		opfunc: opcodePushData},
-	OP_DATA_19: {value: OP_DATA_19, name: "OP_DATA_19", length: 20,
-		opfunc: opcodePushData},
-	OP_DATA_20: {value: OP_DATA_20, name: "OP_DATA_20", length: 21,
-		opfunc: opcodePushData},
-	OP_DATA_21: {value: OP_DATA_21, name: "OP_DATA_21", length: 22,
-		opfunc: opcodePushData},
-	OP_DATA_22: {value: OP_DATA_22, name: "OP_DATA_22", length: 23,
-		opfunc: opcodePushData},
-	OP_DATA_23: {value: OP_DATA_23, name: "OP_DATA_23", length: 24,
-		opfunc: opcodePushData},
-	OP_DATA_24: {value: OP_DATA_24, name: "OP_DATA_24", length: 25,
-		opfunc: opcodePushData},
-	OP_DATA_25: {value: OP_DATA_25, name: "OP_DATA_25", length: 26,
-		opfunc: opcodePushData},
-	OP_DATA_26: {value: OP_DATA_26, name: "OP_DATA_26", length: 27,
-		opfunc: opcodePushData},
-	OP_DATA_27: {value: OP_DATA_27, name: "OP_DATA_27", length: 28,
-		opfunc: opcodePushData},
-	OP_DATA_28: {value: OP_DATA_28, name: "OP_DATA_28", length: 29,
-		opfunc: opcodePushData},
-	OP_DATA_29: {value: OP_DATA_29, name: "OP_DATA_29", length: 30,
-		opfunc: opcodePushData},
-	OP_DATA_30: {value: OP_DATA_30, name: "OP_DATA_30", length: 31,
-		opfunc: opcodePushData},
-	OP_DATA_31: {value: OP_DATA_31, name: "OP_DATA_31", length: 32,
-		opfunc: opcodePushData},
-	OP_DATA_32: {value: OP_DATA_32, name: "OP_DATA_32", length: 33,
-		opfunc: opcodePushData},
-	OP_DATA_33: {value: OP_DATA_33, name: "OP_DATA_33", length: 34,
-		opfunc: opcodePushData},
-	OP_DATA_34: {value: OP_DATA_34, name: "OP_DATA_34", length: 35,
-		opfunc: opcodePushData},
-	OP_DATA_35: {value: OP_DATA_35, name: "OP_DATA_35", length: 36,
-		opfunc: opcodePushData},
-	OP_DATA_36: {value: OP_DATA_36, name: "OP_DATA_36", length: 37,
-		opfunc: opcodePushData},
-	OP_DATA_37: {value: OP_DATA_37, name: "OP_DATA_37", length: 38,
-		opfunc: opcodePushData},
-	OP_DATA_38: {value: OP_DATA_38, name: "OP_DATA_38", length: 39,
-		opfunc: opcodePushData},
-	OP_DATA_39: {value: OP_DATA_39, name: "OP_DATA_39", length: 40,
-		opfunc: opcodePushData},
-	OP_DATA_40: {value: OP_DATA_40, name: "OP_DATA_40", length: 41,
-		opfunc: opcodePushData},
-	OP_DATA_41: {value: OP_DATA_41, name: "OP_DATA_41", length: 42,
-		opfunc: opcodePushData},
-	OP_DATA_42: {value: OP_DATA_42, name: "OP_DATA_42", length: 43,
-		opfunc: opcodePushData},
-	OP_DATA_43: {value: OP_DATA_43, name: "OP_DATA_43", length: 44,
-		opfunc: opcodePushData},
-	OP_DATA_44: {value: OP_DATA_44, name: "OP_DATA_44", length: 45,
-		opfunc: opcodePushData},
-	OP_DATA_45: {value: OP_DATA_45, name: "OP_DATA_45", length: 46,
-		opfunc: opcodePushData},
-	OP_DATA_46: {value: OP_DATA_46, name: "OP_DATA_46", length: 47,
-		opfunc: opcodePushData},
-	OP_DATA_47: {value: OP_DATA_47, name: "OP_DATA_47", length: 48,
-		opfunc: opcodePushData},
-	OP_DATA_48: {value: OP_DATA_48, name: "OP_DATA_48", length: 49,
-		opfunc: opcodePushData},
-	OP_DATA_49: {value: OP_DATA_49, name: "OP_DATA_49", length: 50,
-		opfunc: opcodePushData},
-	OP_DATA_50: {value: OP_DATA_50, name: "OP_DATA_50", length: 51,
-		opfunc: opcodePushData},
-	OP_DATA_51: {value: OP_DATA_51, name: "OP_DATA_51", length: 52,
-		opfunc: opcodePushData},
-	OP_DATA_52: {value: OP_DATA_52, name: "OP_DATA_52", length: 53,
-		opfunc: opcodePushData},
-	OP_DATA_53: {value: OP_DATA_53, name: "OP_DATA_53", length: 54,
-		opfunc: opcodePushData},
-	OP_DATA_54: {value: OP_DATA_54, name: "OP_DATA_54", length: 55,
-		opfunc: opcodePushData},
-	OP_DATA_55: {value: OP_DATA_55, name: "OP_DATA_55", length: 56,
-		opfunc: opcodePushData},
-	OP_DATA_56: {value: OP_DATA_56, name: "OP_DATA_56", length: 57,
-		opfunc: opcodePushData},
-	OP_DATA_57: {value: OP_DATA_57, name: "OP_DATA_57", length: 58,
-		opfunc: opcodePushData},
-	OP_DATA_58: {value: OP_DATA_58, name: "OP_DATA_58", length: 59,
-		opfunc: opcodePushData},
-	OP_DATA_59: {value: OP_DATA_59, name: "OP_DATA_59", length: 60,
-		opfunc: opcodePushData},
-	OP_DATA_60: {value: OP_DATA_60, name: "OP_DATA_60", length: 61,
-		opfunc: opcodePushData},
-	OP_DATA_61: {value: OP_DATA_61, name: "OP_DATA_61", length: 62,
-		opfunc: opcodePushData},
-	OP_DATA_62: {value: OP_DATA_62, name: "OP_DATA_62", length: 63,
-		opfunc: opcodePushData},
-	OP_DATA_63: {value: OP_DATA_63, name: "OP_DATA_63", length: 64,
-		opfunc: opcodePushData},
-	OP_DATA_64: {value: OP_DATA_64, name: "OP_DATA_64", length: 65,
-		opfunc: opcodePushData},
-	OP_DATA_65: {value: OP_DATA_65, name: "OP_DATA_65", length: 66,
-		opfunc: opcodePushData},
-	OP_DATA_66: {value: OP_DATA_66, name: "OP_DATA_66", length: 67,
-		opfunc: opcodePushData},
-	OP_DATA_67: {value: OP_DATA_67, name: "OP_DATA_67", length: 68,
-		opfunc: opcodePushData},
-	OP_DATA_68: {value: OP_DATA_68, name: "OP_DATA_68", length: 69,
-		opfunc: opcodePushData},
-	OP_DATA_69: {value: OP_DATA_69, name: "OP_DATA_69", length: 70,
-		opfunc: opcodePushData},
-	OP_DATA_70: {value: OP_DATA_70, name: "OP_DATA_70", length: 71,
-		opfunc: opcodePushData},
-	OP_DATA_71: {value: OP_DATA_71, name: "OP_DATA_71", length: 72,
-		opfunc: opcodePushData},
-	OP_DATA_72: {value: OP_DATA_72, name: "OP_DATA_72", length: 73,
-		opfunc: opcodePushData},
-	OP_DATA_73: {value: OP_DATA_73, name: "OP_DATA_73", length: 74,
-		opfunc: opcodePushData},
-	OP_DATA_74: {value: OP_DATA_74, name: "OP_DATA_74", length: 75,
-		opfunc: opcodePushData},
-	OP_DATA_75: {value: OP_DATA_75, name: "OP_DATA_75", length: 76,
-		opfunc: opcodePushData},
-	OP_PUSHDATA1: {value: OP_PUSHDATA1, name: "OP_PUSHDATA1", length: -1,
-		opfunc: opcodePushData},
-	OP_PUSHDATA2: {value: OP_PUSHDATA2, name: "OP_PUSHDATA2", length: -2,
-		opfunc: opcodePushData},
-	OP_PUSHDATA4: {value: OP_PUSHDATA4, name: "OP_PUSHDATA4", length: -4,
-		opfunc: opcodePushData},
-	OP_1NEGATE: {value: OP_1NEGATE, name: "OP_1NEGATE", length: 1,
-		opfunc: opcode1Negate},
-	OP_RESERVED: {value: OP_RESERVED, name: "OP_RESERVED", length: 1,
-		opfunc: opcodeReserved},
-	OP_TRUE: {value: OP_TRUE, name: "OP_1", length: 1,
-		opfunc: opcodeN},
-	OP_2: {value: OP_2, name: "OP_2", length: 1,
-		opfunc: opcodeN},
-	OP_3: {value: OP_3, name: "OP_3", length: 1,
-		opfunc: opcodeN},
-	OP_4: {value: OP_4, name: "OP_4", length: 1,
-		opfunc: opcodeN},
-	OP_5: {value: OP_5, name: "OP_5", length: 1,
-		opfunc: opcodeN},
-	OP_6: {value: OP_6, name: "OP_6", length: 1,
-		opfunc: opcodeN},
-	OP_7: {value: OP_7, name: "OP_7", length: 1,
-		opfunc: opcodeN},
-	OP_8: {value: OP_8, name: "OP_8", length: 1,
-		opfunc: opcodeN},
-	OP_9: {value: OP_9, name: "OP_9", length: 1,
-		opfunc: opcodeN},
-	OP_10: {value: OP_10, name: "OP_10", length: 1,
-		opfunc: opcodeN},
-	OP_11: {value: OP_11, name: "OP_11", length: 1,
-		opfunc: opcodeN},
-	OP_12: {value: OP_12, name: "OP_12", length: 1,
-		opfunc: opcodeN},
-	OP_13: {value: OP_13, name: "OP_13", length: 1,
-		opfunc: opcodeN},
-	OP_14: {value: OP_14, name: "OP_14", length: 1,
-		opfunc: opcodeN},
-	OP_15: {value: OP_15, name: "OP_15", length: 1,
-		opfunc: opcodeN},
-	OP_16: {value: OP_16, name: "OP_16", length: 1,
-		opfunc: opcodeN},
-	OP_NOP: {value: OP_NOP, name: "OP_NOP", length: 1,
-		opfunc: opcodeNop},
-	OP_VER: {value: OP_VER, name: "OP_VER", length: 1,
-		opfunc: opcodeReserved},
-	OP_IF: {value: OP_IF, name: "OP_IF", length: 1,
-		opfunc: opcodeIf},
-	OP_NOTIF: {value: OP_NOTIF, name: "OP_NOTIF", length: 1,
-		opfunc: opcodeNotIf},
-	OP_VERIF: {value: OP_VERIF, name: "OP_VERIF", length: 1,
-		opfunc: opcodeReserved},
-	OP_VERNOTIF: {value: OP_VERNOTIF, name: "OP_VERNOTIF", length: 1,
-		opfunc: opcodeReserved},
-	OP_ELSE: {value: OP_ELSE, name: "OP_ELSE", length: 1,
-		opfunc: opcodeElse},
-	OP_ENDIF: {value: OP_ENDIF, name: "OP_ENDIF", length: 1,
-		opfunc: opcodeEndif},
-	OP_VERIFY: {value: OP_VERIFY, name: "OP_VERIFY", length: 1,
-		opfunc: opcodeVerify},
-	OP_RETURN: {value: OP_RETURN, name: "OP_RETURN", length: 1,
-		opfunc: opcodeReturn},
-	OP_TOALTSTACK: {value: OP_TOALTSTACK, name: "OP_TOALTSTACK", length: 1,
-		opfunc: opcodeToAltStack},
-	OP_FROMALTSTACK: {value: OP_FROMALTSTACK, name: "OP_FROMALTSTACK", length: 1,
-		opfunc: opcodeFromAltStack},
-	OP_2DROP: {value: OP_2DROP, name: "OP_2DROP", length: 1,
-		opfunc: opcode2Drop},
-	OP_2DUP: {value: OP_2DUP, name: "OP_2DUP", length: 1,
-		opfunc: opcode2Dup},
-	OP_3DUP: {value: OP_3DUP, name: "OP_3DUP", length: 1,
-		opfunc: opcode3Dup},
-	OP_2OVER: {value: OP_2OVER, name: "OP_2OVER", length: 1,
-		opfunc: opcode2Over},
-	OP_2ROT: {value: OP_2ROT, name: "OP_2ROT", length: 1,
-		opfunc: opcode2Rot},
-	OP_2SWAP: {value: OP_2SWAP, name: "OP_2SWAP", length: 1,
-		opfunc: opcode2Swap},
-	OP_IFDUP: {value: OP_IFDUP, name: "OP_IFDUP", length: 1,
-		opfunc: opcodeIfDup},
-	OP_DEPTH: {value: OP_DEPTH, name: "OP_DEPTH", length: 1,
-		opfunc: opcodeDepth},
-	OP_DROP: {value: OP_DROP, name: "OP_DROP", length: 1,
-		opfunc: opcodeDrop},
-	OP_DUP: {value: OP_DUP, name: "OP_DUP", length: 1,
-		opfunc: opcodeDup},
-	OP_NIP: {value: OP_NIP, name: "OP_NIP", length: 1,
-		opfunc: opcodeNip},
-	OP_OVER: {value: OP_OVER, name: "OP_OVER", length: 1,
-		opfunc: opcodeOver},
-	OP_PICK: {value: OP_PICK, name: "OP_PICK", length: 1,
-		opfunc: opcodePick},
-	OP_ROLL: {value: OP_ROLL, name: "OP_ROLL", length: 1,
-		opfunc: opcodeRoll},
-	OP_ROT: {value: OP_ROT, name: "OP_ROT", length: 1,
-		opfunc: opcodeRot},
-	OP_SWAP: {value: OP_SWAP, name: "OP_SWAP", length: 1,
-		opfunc: opcodeSwap},
-	OP_TUCK: {value: OP_TUCK, name: "OP_TUCK", length: 1,
-		opfunc: opcodeTuck},
-	OP_CAT: {value: OP_CAT, name: "OP_CAT", length: 1,
-		opfunc: opcodeDisabled},
-	OP_SUBSTR: {value: OP_SUBSTR, name: "OP_SUBSTR", length: 1,
-		opfunc: opcodeDisabled},
-	OP_LEFT: {value: OP_LEFT, name: "OP_LEFT", length: 1,
-		opfunc: opcodeDisabled},
-	OP_RIGHT: {value: OP_RIGHT, name: "OP_RIGHT", length: 1,
-		opfunc: opcodeDisabled},
-	OP_SIZE: {value: OP_SIZE, name: "OP_SIZE", length: 1,
-		opfunc: opcodeSize},
-	OP_INVERT: {value: OP_INVERT, name: "OP_INVERT", length: 1,
-		opfunc: opcodeDisabled},
-	OP_AND: {value: OP_AND, name: "OP_AND", length: 1,
-		opfunc: opcodeDisabled},
-	OP_OR: {value: OP_OR, name: "OP_OR", length: 1,
-		opfunc: opcodeDisabled},
-	OP_XOR: {value: OP_XOR, name: "OP_XOR", length: 1,
-		opfunc: opcodeDisabled},
-	OP_EQUAL: {value: OP_EQUAL, name: "OP_EQUAL", length: 1,
-		opfunc: opcodeEqual},
-	OP_EQUALVERIFY: {value: OP_EQUALVERIFY, name: "OP_EQUALVERIFY", length: 1,
-		opfunc: opcodeEqualVerify},
-	OP_RESERVED1: {value: OP_RESERVED1, name: "OP_RESERVED1", length: 1,
-		opfunc: opcodeReserved},
-	OP_RESERVED2: {value: OP_RESERVED2, name: "OP_RESERVED2", length: 1,
-		opfunc: opcodeReserved},
-	OP_1ADD: {value: OP_1ADD, name: "OP_1ADD", length: 1,
-		opfunc: opcode1Add},
-	OP_1SUB: {value: OP_1SUB, name: "OP_1SUB", length: 1,
-		opfunc: opcode1Sub},
-	OP_2MUL: {value: OP_2MUL, name: "OP_2MUL", length: 1,
-		opfunc: opcodeDisabled},
-	OP_2DIV: {value: OP_2DIV, name: "OP_2DIV", length: 1,
-		opfunc: opcodeDisabled},
-	OP_NEGATE: {value: OP_NEGATE, name: "OP_NEGATE", length: 1,
-		opfunc: opcodeNegate},
-	OP_ABS: {value: OP_ABS, name: "OP_ABS", length: 1,
-		opfunc: opcodeAbs},
-	OP_NOT: {value: OP_NOT, name: "OP_NOT", length: 1,
-		opfunc: opcodeNot},
-	OP_0NOTEQUAL: {value: OP_0NOTEQUAL, name: "OP_0NOTEQUAL", length: 1,
-		opfunc: opcode0NotEqual},
-	OP_ADD: {value: OP_ADD, name: "OP_ADD", length: 1,
-		opfunc: opcodeAdd},
-	OP_SUB: {value: OP_SUB, name: "OP_SUB", length: 1,
-		opfunc: opcodeSub},
-	OP_MUL: {value: OP_MUL, name: "OP_MUL", length: 1,
-		opfunc: opcodeDisabled},
-	OP_DIV: {value: OP_DIV, name: "OP_DIV", length: 1,
-		opfunc: opcodeDisabled},
-	OP_MOD: {value: OP_MOD, name: "OP_MOD", length: 1,
-		opfunc: opcodeDisabled},
-	OP_LSHIFT: {value: OP_LSHIFT, name: "OP_LSHIFT", length: 1,
-		opfunc: opcodeDisabled},
-	OP_RSHIFT: {value: OP_RSHIFT, name: "OP_RSHIFT", length: 1,
-		opfunc: opcodeDisabled},
-	OP_BOOLAND: {value: OP_BOOLAND, name: "OP_BOOLAND", length: 1,
-		opfunc: opcodeBoolAnd},
-	OP_BOOLOR: {value: OP_BOOLOR, name: "OP_BOOLOR", length: 1,
-		opfunc: opcodeBoolOr},
-	OP_NUMEQUAL: {value: OP_NUMEQUAL, name: "OP_NUMEQUAL", length: 1,
-		opfunc: opcodeNumEqual},
-	OP_NUMEQUALVERIFY: {value: OP_NUMEQUALVERIFY, name: "OP_NUMEQUALVERIFY", length: 1,
-		opfunc: opcodeNumEqualVerify},
-	OP_NUMNOTEQUAL: {value: OP_NUMNOTEQUAL, name: "OP_NUMNOTEQUAL", length: 1,
-		opfunc: opcodeNumNotEqual},
-	OP_LESSTHAN: {value: OP_LESSTHAN, name: "OP_LESSTHAN", length: 1,
-		opfunc: opcodeLessThan},
-	OP_GREATERTHAN: {value: OP_GREATERTHAN, name: "OP_GREATERTHAN", length: 1,
-		opfunc: opcodeGreaterThan},
-	OP_LESSTHANOREQUAL: {value: OP_LESSTHANOREQUAL, name: "OP_LESSTHANOREQUAL", length: 1,
-		opfunc: opcodeLessThanOrEqual},
-	OP_GREATERTHANOREQUAL: {value: OP_GREATERTHANOREQUAL, name: "OP_GREATERTHANOREQUAL", length: 1,
-		opfunc: opcodeGreaterThanOrEqual},
-	OP_MIN: {value: OP_MIN, name: "OP_MIN", length: 1,
-		opfunc: opcodeMin},
-	OP_MAX: {value: OP_MAX, name: "OP_MAX", length: 1,
-		opfunc: opcodeMax},
-	OP_WITHIN: {value: OP_WITHIN, name: "OP_WITHIN", length: 1,
-		opfunc: opcodeWithin},
-	OP_RIPEMD160: {value: OP_RIPEMD160, name: "OP_RIPEMD160", length: 1,
-		opfunc: opcodeRipemd160},
-	OP_SHA1: {value: OP_SHA1, name: "OP_SHA1", length: 1,
-		opfunc: opcodeSha1},
-	OP_SHA256: {value: OP_SHA256, name: "OP_SHA256", length: 1,
-		opfunc: opcodeSha256},
-	OP_HASH160: {value: OP_HASH160, name: "OP_HASH160", length: 1,
-		opfunc: opcodeHash160},
-	OP_HASH256: {value: OP_HASH256, name: "OP_HASH256", length: 1,
-		opfunc: opcodeHash256},
-	OP_CODESEPARATOR: {value: OP_CODESEPARATOR, name: "OP_CODESEPARATOR", length: 1,
-		opfunc: opcodeCodeSeparator},
-	OP_CHECKSIG: {value: OP_CHECKSIG, name: "OP_CHECKSIG", length: 1,
-		opfunc: opcodeCheckSig},
-	OP_CHECKSIGVERIFY: {value: OP_CHECKSIGVERIFY, name: "OP_CHECKSIGVERIFY", length: 1,
-		opfunc: opcodeCheckSigVerify},
-	OP_CHECKMULTISIG: {value: OP_CHECKMULTISIG, name: "OP_CHECKMULTISIG", length: 1,
-		opfunc: opcodeCheckMultiSig},
-	OP_CHECKMULTISIGVERIFY: {value: OP_CHECKMULTISIGVERIFY, name: "OP_CHECKMULTISIGVERIFY", length: 1,
+	// Stack opcodes.
+	OP_TOALTSTACK:   {OP_TOALTSTACK, "OP_TOALTSTACK", 1, opcodeToAltStack},
+	OP_FROMALTSTACK: {OP_FROMALTSTACK, "OP_FROMALTSTACK", 1, opcodeFromAltStack},
+	OP_2DROP:        {OP_2DROP, "OP_2DROP", 1, opcode2Drop},
+	OP_2DUP:         {OP_2DUP, "OP_2DUP", 1, opcode2Dup},
+	OP_3DUP:         {OP_3DUP, "OP_3DUP", 1, opcode3Dup},
+	OP_2OVER:        {OP_2OVER, "OP_2OVER", 1, opcode2Over},
+	OP_2ROT:         {OP_2ROT, "OP_2ROT", 1, opcode2Rot},
+	OP_2SWAP:        {OP_2SWAP, "OP_2SWAP", 1, opcode2Swap},
+	OP_IFDUP:        {OP_IFDUP, "OP_IFDUP", 1, opcodeIfDup},
+	OP_DEPTH:        {OP_DEPTH, "OP_DEPTH", 1, opcodeDepth},
+	OP_DROP:         {OP_DROP, "OP_DROP", 1, opcodeDrop},
+	OP_DUP:          {OP_DUP, "OP_DUP", 1, opcodeDup},
+	OP_NIP:          {OP_NIP, "OP_NIP", 1, opcodeNip},
+	OP_OVER:         {OP_OVER, "OP_OVER", 1, opcodeOver},
+	OP_PICK:         {OP_PICK, "OP_PICK", 1, opcodePick},
+	OP_ROLL:         {OP_ROLL, "OP_ROLL", 1, opcodeRoll},
+	OP_ROT:          {OP_ROT, "OP_ROT", 1, opcodeRot},
+	OP_SWAP:         {OP_SWAP, "OP_SWAP", 1, opcodeSwap},
+	OP_TUCK:         {OP_TUCK, "OP_TUCK", 1, opcodeTuck},
 
-		opfunc: opcodeCheckMultiSigVerify},
-	OP_NOP1: {value: OP_NOP1, name: "OP_NOP1", length: 1,
-		opfunc: opcodeNop},
-	OP_NOP2: {value: OP_NOP2, name: "OP_NOP2", length: 1,
-		opfunc: opcodeNop},
-	OP_NOP3: {value: OP_NOP3, name: "OP_NOP3", length: 1,
-		opfunc: opcodeNop},
-	OP_NOP4: {value: OP_NOP4, name: "OP_NOP4", length: 1,
-		opfunc: opcodeNop},
-	OP_NOP5: {value: OP_NOP5, name: "OP_NOP5", length: 1,
-		opfunc: opcodeNop},
-	OP_NOP6: {value: OP_NOP6, name: "OP_NOP6", length: 1,
-		opfunc: opcodeNop},
-	OP_NOP7: {value: OP_NOP7, name: "OP_NOP7", length: 1,
-		opfunc: opcodeNop},
-	OP_NOP8: {value: OP_NOP8, name: "OP_NOP8", length: 1,
-		opfunc: opcodeNop},
-	OP_NOP9: {value: OP_NOP9, name: "OP_NOP9", length: 1,
-		opfunc: opcodeNop},
-	OP_NOP10: {value: OP_NOP10, name: "OP_NOP10", length: 1,
-		opfunc: opcodeNop},
-	OP_UNKNOWN186: {value: OP_UNKNOWN186, name: "OP_UNKNOWN186", length: 1,
-		opfunc: opcodeInvalid},
-	OP_UNKNOWN187: {value: OP_UNKNOWN187, name: "OP_UNKNOWN187", length: 1,
-		opfunc: opcodeInvalid},
-	OP_UNKNOWN188: {value: OP_UNKNOWN188, name: "OP_UNKNOWN188", length: 1,
-		opfunc: opcodeInvalid},
-	OP_UNKNOWN189: {value: OP_UNKNOWN189, name: "OP_UNKNOWN189", length: 1,
-		opfunc: opcodeInvalid},
-	OP_UNKNOWN190: {value: OP_UNKNOWN190, name: "OP_UNKNOWN190", length: 1,
-		opfunc: opcodeInvalid},
-	OP_UNKNOWN191: {value: OP_UNKNOWN191, name: "OP_UNKNOWN191", length: 1,
-		opfunc: opcodeInvalid},
-	OP_UNKNOWN192: {value: OP_UNKNOWN192, name: "OP_UNKNOWN192", length: 1,
-		opfunc: opcodeInvalid},
-	OP_UNKNOWN193: {value: OP_UNKNOWN193, name: "OP_UNKNOWN193", length: 1,
-		opfunc: opcodeInvalid},
-	OP_UNKNOWN194: {value: OP_UNKNOWN194, name: "OP_UNKNOWN194", length: 1,
-		opfunc: opcodeInvalid},
-	OP_UNKNOWN195: {value: OP_UNKNOWN195, name: "OP_UNKNOWN195", length: 1,
-		opfunc: opcodeInvalid},
-	OP_UNKNOWN196: {value: OP_UNKNOWN196, name: "OP_UNKNOWN196", length: 1,
-		opfunc: opcodeInvalid},
-	OP_UNKNOWN197: {value: OP_UNKNOWN197, name: "OP_UNKNOWN197", length: 1,
-		opfunc: opcodeInvalid},
-	OP_UNKNOWN198: {value: OP_UNKNOWN198, name: "OP_UNKNOWN198", length: 1,
-		opfunc: opcodeInvalid},
-	OP_UNKNOWN199: {value: OP_UNKNOWN199, name: "OP_UNKNOWN199", length: 1,
-		opfunc: opcodeInvalid},
-	OP_UNKNOWN200: {value: OP_UNKNOWN200, name: "OP_UNKNOWN200", length: 1,
-		opfunc: opcodeInvalid},
-	OP_UNKNOWN201: {value: OP_UNKNOWN201, name: "OP_UNKNOWN201", length: 1,
-		opfunc: opcodeInvalid},
-	OP_UNKNOWN202: {value: OP_UNKNOWN202, name: "OP_UNKNOWN202", length: 1,
-		opfunc: opcodeInvalid},
-	OP_UNKNOWN203: {value: OP_UNKNOWN203, name: "OP_UNKNOWN203", length: 1,
-		opfunc: opcodeInvalid},
-	OP_UNKNOWN204: {value: OP_UNKNOWN204, name: "OP_UNKNOWN204", length: 1,
-		opfunc: opcodeInvalid},
-	OP_UNKNOWN205: {value: OP_UNKNOWN205, name: "OP_UNKNOWN205", length: 1,
-		opfunc: opcodeInvalid},
-	OP_UNKNOWN206: {value: OP_UNKNOWN206, name: "OP_UNKNOWN206", length: 1,
-		opfunc: opcodeInvalid},
-	OP_UNKNOWN207: {value: OP_UNKNOWN207, name: "OP_UNKNOWN207", length: 1,
-		opfunc: opcodeInvalid},
-	OP_UNKNOWN208: {value: OP_UNKNOWN208, name: "OP_UNKNOWN208", length: 1,
-		opfunc: opcodeInvalid},
-	OP_UNKNOWN209: {value: OP_UNKNOWN209, name: "OP_UNKNOWN209", length: 1,
-		opfunc: opcodeInvalid},
-	OP_UNKNOWN210: {value: OP_UNKNOWN210, name: "OP_UNKNOWN210", length: 1,
-		opfunc: opcodeInvalid},
-	OP_UNKNOWN211: {value: OP_UNKNOWN211, name: "OP_UNKNOWN211", length: 1,
-		opfunc: opcodeInvalid},
-	OP_UNKNOWN212: {value: OP_UNKNOWN212, name: "OP_UNKNOWN212", length: 1,
-		opfunc: opcodeInvalid},
-	OP_UNKNOWN213: {value: OP_UNKNOWN213, name: "OP_UNKNOWN213", length: 1,
-		opfunc: opcodeInvalid},
-	OP_UNKNOWN214: {value: OP_UNKNOWN214, name: "OP_UNKNOWN214", length: 1,
-		opfunc: opcodeInvalid},
-	OP_UNKNOWN215: {value: OP_UNKNOWN215, name: "OP_UNKNOWN215", length: 1,
-		opfunc: opcodeInvalid},
-	OP_UNKNOWN216: {value: OP_UNKNOWN216, name: "OP_UNKNOWN216", length: 1,
-		opfunc: opcodeInvalid},
-	OP_UNKNOWN217: {value: OP_UNKNOWN217, name: "OP_UNKNOWN217", length: 1,
-		opfunc: opcodeInvalid},
-	OP_UNKNOWN218: {value: OP_UNKNOWN218, name: "OP_UNKNOWN218", length: 1,
-		opfunc: opcodeInvalid},
-	OP_UNKNOWN219: {value: OP_UNKNOWN219, name: "OP_UNKNOWN219", length: 1,
-		opfunc: opcodeInvalid},
-	OP_UNKNOWN220: {value: OP_UNKNOWN220, name: "OP_UNKNOWN220", length: 1,
-		opfunc: opcodeInvalid},
-	OP_UNKNOWN221: {value: OP_UNKNOWN221, name: "OP_UNKNOWN221", length: 1,
-		opfunc: opcodeInvalid},
-	OP_UNKNOWN222: {value: OP_UNKNOWN222, name: "OP_UNKNOWN222", length: 1,
-		opfunc: opcodeInvalid},
-	OP_UNKNOWN223: {value: OP_UNKNOWN223, name: "OP_UNKNOWN223", length: 1,
-		opfunc: opcodeInvalid},
-	OP_UNKNOWN224: {value: OP_UNKNOWN224, name: "OP_UNKNOWN224", length: 1,
-		opfunc: opcodeInvalid},
-	OP_UNKNOWN225: {value: OP_UNKNOWN225, name: "OP_UNKNOWN225", length: 1,
-		opfunc: opcodeInvalid},
-	OP_UNKNOWN226: {value: OP_UNKNOWN226, name: "OP_UNKNOWN226", length: 1,
-		opfunc: opcodeInvalid},
-	OP_UNKNOWN227: {value: OP_UNKNOWN227, name: "OP_UNKNOWN227", length: 1,
-		opfunc: opcodeInvalid},
-	OP_UNKNOWN228: {value: OP_UNKNOWN228, name: "OP_UNKNOWN228", length: 1,
-		opfunc: opcodeInvalid},
-	OP_UNKNOWN229: {value: OP_UNKNOWN229, name: "OP_UNKNOWN229", length: 1,
-		opfunc: opcodeInvalid},
-	OP_UNKNOWN230: {value: OP_UNKNOWN230, name: "OP_UNKNOWN230", length: 1,
-		opfunc: opcodeInvalid},
-	OP_UNKNOWN231: {value: OP_UNKNOWN231, name: "OP_UNKNOWN231", length: 1,
-		opfunc: opcodeInvalid},
-	OP_UNKNOWN232: {value: OP_UNKNOWN232, name: "OP_UNKNOWN232", length: 1,
-		opfunc: opcodeInvalid},
-	OP_UNKNOWN233: {value: OP_UNKNOWN233, name: "OP_UNKNOWN233", length: 1,
-		opfunc: opcodeInvalid},
-	OP_UNKNOWN234: {value: OP_UNKNOWN234, name: "OP_UNKNOWN234", length: 1,
-		opfunc: opcodeInvalid},
-	OP_UNKNOWN235: {value: OP_UNKNOWN235, name: "OP_UNKNOWN235", length: 1,
-		opfunc: opcodeInvalid},
-	OP_UNKNOWN236: {value: OP_UNKNOWN236, name: "OP_UNKNOWN236", length: 1,
-		opfunc: opcodeInvalid},
-	OP_UNKNOWN237: {value: OP_UNKNOWN237, name: "OP_UNKNOWN237", length: 1,
-		opfunc: opcodeInvalid},
-	OP_UNKNOWN238: {value: OP_UNKNOWN238, name: "OP_UNKNOWN238", length: 1,
-		opfunc: opcodeInvalid},
-	OP_UNKNOWN239: {value: OP_UNKNOWN239, name: "OP_UNKNOWN239", length: 1,
-		opfunc: opcodeInvalid},
-	OP_UNKNOWN240: {value: OP_UNKNOWN240, name: "OP_UNKNOWN240", length: 1,
-		opfunc: opcodeInvalid},
-	OP_UNKNOWN241: {value: OP_UNKNOWN241, name: "OP_UNKNOWN241", length: 1,
-		opfunc: opcodeInvalid},
-	OP_UNKNOWN242: {value: OP_UNKNOWN242, name: "OP_UNKNOWN242", length: 1,
-		opfunc: opcodeInvalid},
-	OP_UNKNOWN243: {value: OP_UNKNOWN243, name: "OP_UNKNOWN243", length: 1,
-		opfunc: opcodeInvalid},
-	OP_UNKNOWN244: {value: OP_UNKNOWN244, name: "OP_UNKNOWN244", length: 1,
-		opfunc: opcodeInvalid},
-	OP_UNKNOWN245: {value: OP_UNKNOWN245, name: "OP_UNKNOWN245", length: 1,
-		opfunc: opcodeInvalid},
-	OP_UNKNOWN246: {value: OP_UNKNOWN246, name: "OP_UNKNOWN246", length: 1,
-		opfunc: opcodeInvalid},
-	OP_UNKNOWN247: {value: OP_UNKNOWN247, name: "OP_UNKNOWN247", length: 1,
-		opfunc: opcodeInvalid},
-	OP_UNKNOWN248: {value: OP_UNKNOWN248, name: "OP_UNKNOWN248", length: 1,
-		opfunc: opcodeInvalid},
-	OP_UNKNOWN249: {value: OP_UNKNOWN249, name: "OP_UNKNOWN249", length: 1,
-		opfunc: opcodeInvalid},
-	OP_UNKNOWN250: {value: OP_UNKNOWN250, name: "OP_UNKNOWN250", length: 1,
-		opfunc: opcodeInvalid},
-	OP_UNKNOWN251: {value: OP_UNKNOWN251, name: "OP_UNKNOWN251", length: 1,
-		opfunc: opcodeInvalid},
-	OP_UNKNOWN252: {value: OP_UNKNOWN252, name: "OP_UNKNOWN252", length: 1,
-		opfunc: opcodeInvalid},
-	OP_PUBKEYHASH: {value: OP_PUBKEYHASH, name: "OP_PUBKEYHASH", length: 1,
-		opfunc: opcodeInvalid},
-	OP_PUBKEY: {value: OP_PUBKEY, name: "OP_PUBKEY", length: 1,
-		opfunc: opcodeInvalid},
-	OP_INVALIDOPCODE: {value: OP_INVALIDOPCODE, name: "OP_INVALIDOPCODE", length: 1,
-		opfunc: opcodeInvalid},
+	// Splice opcodes.
+	OP_CAT:    {OP_CAT, "OP_CAT", 1, opcodeDisabled},
+	OP_SUBSTR: {OP_SUBSTR, "OP_SUBSTR", 1, opcodeDisabled},
+	OP_LEFT:   {OP_LEFT, "OP_LEFT", 1, opcodeDisabled},
+	OP_RIGHT:  {OP_RIGHT, "OP_RIGHT", 1, opcodeDisabled},
+	OP_SIZE:   {OP_SIZE, "OP_SIZE", 1, opcodeSize},
+
+	// Bitwise logic opcodes.
+	OP_INVERT:      {OP_INVERT, "OP_INVERT", 1, opcodeDisabled},
+	OP_AND:         {OP_AND, "OP_AND", 1, opcodeDisabled},
+	OP_OR:          {OP_OR, "OP_OR", 1, opcodeDisabled},
+	OP_XOR:         {OP_XOR, "OP_XOR", 1, opcodeDisabled},
+	OP_EQUAL:       {OP_EQUAL, "OP_EQUAL", 1, opcodeEqual},
+	OP_EQUALVERIFY: {OP_EQUALVERIFY, "OP_EQUALVERIFY", 1, opcodeEqualVerify},
+	OP_RESERVED1:   {OP_RESERVED1, "OP_RESERVED1", 1, opcodeReserved},
+	OP_RESERVED2:   {OP_RESERVED2, "OP_RESERVED2", 1, opcodeReserved},
+
+	// Numeric related opcodes.
+	OP_1ADD:               {OP_1ADD, "OP_1ADD", 1, opcode1Add},
+	OP_1SUB:               {OP_1SUB, "OP_1SUB", 1, opcode1Sub},
+	OP_2MUL:               {OP_2MUL, "OP_2MUL", 1, opcodeDisabled},
+	OP_2DIV:               {OP_2DIV, "OP_2DIV", 1, opcodeDisabled},
+	OP_NEGATE:             {OP_NEGATE, "OP_NEGATE", 1, opcodeNegate},
+	OP_ABS:                {OP_ABS, "OP_ABS", 1, opcodeAbs},
+	OP_NOT:                {OP_NOT, "OP_NOT", 1, opcodeNot},
+	OP_0NOTEQUAL:          {OP_0NOTEQUAL, "OP_0NOTEQUAL", 1, opcode0NotEqual},
+	OP_ADD:                {OP_ADD, "OP_ADD", 1, opcodeAdd},
+	OP_SUB:                {OP_SUB, "OP_SUB", 1, opcodeSub},
+	OP_MUL:                {OP_MUL, "OP_MUL", 1, opcodeDisabled},
+	OP_DIV:                {OP_DIV, "OP_DIV", 1, opcodeDisabled},
+	OP_MOD:                {OP_MOD, "OP_MOD", 1, opcodeDisabled},
+	OP_LSHIFT:             {OP_LSHIFT, "OP_LSHIFT", 1, opcodeDisabled},
+	OP_RSHIFT:             {OP_RSHIFT, "OP_RSHIFT", 1, opcodeDisabled},
+	OP_BOOLAND:            {OP_BOOLAND, "OP_BOOLAND", 1, opcodeBoolAnd},
+	OP_BOOLOR:             {OP_BOOLOR, "OP_BOOLOR", 1, opcodeBoolOr},
+	OP_NUMEQUAL:           {OP_NUMEQUAL, "OP_NUMEQUAL", 1, opcodeNumEqual},
+	OP_NUMEQUALVERIFY:     {OP_NUMEQUALVERIFY, "OP_NUMEQUALVERIFY", 1, opcodeNumEqualVerify},
+	OP_NUMNOTEQUAL:        {OP_NUMNOTEQUAL, "OP_NUMNOTEQUAL", 1, opcodeNumNotEqual},
+	OP_LESSTHAN:           {OP_LESSTHAN, "OP_LESSTHAN", 1, opcodeLessThan},
+	OP_GREATERTHAN:        {OP_GREATERTHAN, "OP_GREATERTHAN", 1, opcodeGreaterThan},
+	OP_LESSTHANOREQUAL:    {OP_LESSTHANOREQUAL, "OP_LESSTHANOREQUAL", 1, opcodeLessThanOrEqual},
+	OP_GREATERTHANOREQUAL: {OP_GREATERTHANOREQUAL, "OP_GREATERTHANOREQUAL", 1, opcodeGreaterThanOrEqual},
+	OP_MIN:                {OP_MIN, "OP_MIN", 1, opcodeMin},
+	OP_MAX:                {OP_MAX, "OP_MAX", 1, opcodeMax},
+	OP_WITHIN:             {OP_WITHIN, "OP_WITHIN", 1, opcodeWithin},
+
+	// Crypto opcodes.
+	OP_RIPEMD160:           {OP_RIPEMD160, "OP_RIPEMD160", 1, opcodeRipemd160},
+	OP_SHA1:                {OP_SHA1, "OP_SHA1", 1, opcodeSha1},
+	OP_SHA256:              {OP_SHA256, "OP_SHA256", 1, opcodeSha256},
+	OP_HASH160:             {OP_HASH160, "OP_HASH160", 1, opcodeHash160},
+	OP_HASH256:             {OP_HASH256, "OP_HASH256", 1, opcodeHash256},
+	OP_CODESEPARATOR:       {OP_CODESEPARATOR, "OP_CODESEPARATOR", 1, opcodeCodeSeparator},
+	OP_CHECKSIG:            {OP_CHECKSIG, "OP_CHECKSIG", 1, opcodeCheckSig},
+	OP_CHECKSIGVERIFY:      {OP_CHECKSIGVERIFY, "OP_CHECKSIGVERIFY", 1, opcodeCheckSigVerify},
+	OP_CHECKMULTISIG:       {OP_CHECKMULTISIG, "OP_CHECKMULTISIG", 1, opcodeCheckMultiSig},
+	OP_CHECKMULTISIGVERIFY: {OP_CHECKMULTISIGVERIFY, "OP_CHECKMULTISIGVERIFY", 1, opcodeCheckMultiSigVerify},
+
+	// Reserved opcodes.
+	OP_NOP1:  {OP_NOP1, "OP_NOP1", 1, opcodeNop},
+	OP_NOP3:  {OP_NOP3, "OP_NOP3", 1, opcodeNop},
+	OP_NOP4:  {OP_NOP4, "OP_NOP4", 1, opcodeNop},
+	OP_NOP5:  {OP_NOP5, "OP_NOP5", 1, opcodeNop},
+	OP_NOP6:  {OP_NOP6, "OP_NOP6", 1, opcodeNop},
+	OP_NOP7:  {OP_NOP7, "OP_NOP7", 1, opcodeNop},
+	OP_NOP8:  {OP_NOP8, "OP_NOP8", 1, opcodeNop},
+	OP_NOP9:  {OP_NOP9, "OP_NOP9", 1, opcodeNop},
+	OP_NOP10: {OP_NOP10, "OP_NOP10", 1, opcodeNop},
+
+	// Undefined opcodes.
+	OP_UNKNOWN186: {OP_UNKNOWN186, "OP_UNKNOWN186", 1, opcodeInvalid},
+	OP_UNKNOWN187: {OP_UNKNOWN187, "OP_UNKNOWN187", 1, opcodeInvalid},
+	OP_UNKNOWN188: {OP_UNKNOWN188, "OP_UNKNOWN188", 1, opcodeInvalid},
+	OP_UNKNOWN189: {OP_UNKNOWN189, "OP_UNKNOWN189", 1, opcodeInvalid},
+	OP_UNKNOWN190: {OP_UNKNOWN190, "OP_UNKNOWN190", 1, opcodeInvalid},
+	OP_UNKNOWN191: {OP_UNKNOWN191, "OP_UNKNOWN191", 1, opcodeInvalid},
+	OP_UNKNOWN192: {OP_UNKNOWN192, "OP_UNKNOWN192", 1, opcodeInvalid},
+	OP_UNKNOWN193: {OP_UNKNOWN193, "OP_UNKNOWN193", 1, opcodeInvalid},
+	OP_UNKNOWN194: {OP_UNKNOWN194, "OP_UNKNOWN194", 1, opcodeInvalid},
+	OP_UNKNOWN195: {OP_UNKNOWN195, "OP_UNKNOWN195", 1, opcodeInvalid},
+	OP_UNKNOWN196: {OP_UNKNOWN196, "OP_UNKNOWN196", 1, opcodeInvalid},
+	OP_UNKNOWN197: {OP_UNKNOWN197, "OP_UNKNOWN197", 1, opcodeInvalid},
+	OP_UNKNOWN198: {OP_UNKNOWN198, "OP_UNKNOWN198", 1, opcodeInvalid},
+	OP_UNKNOWN199: {OP_UNKNOWN199, "OP_UNKNOWN199", 1, opcodeInvalid},
+	OP_UNKNOWN200: {OP_UNKNOWN200, "OP_UNKNOWN200", 1, opcodeInvalid},
+	OP_UNKNOWN201: {OP_UNKNOWN201, "OP_UNKNOWN201", 1, opcodeInvalid},
+	OP_UNKNOWN202: {OP_UNKNOWN202, "OP_UNKNOWN202", 1, opcodeInvalid},
+	OP_UNKNOWN203: {OP_UNKNOWN203, "OP_UNKNOWN203", 1, opcodeInvalid},
+	OP_UNKNOWN204: {OP_UNKNOWN204, "OP_UNKNOWN204", 1, opcodeInvalid},
+	OP_UNKNOWN205: {OP_UNKNOWN205, "OP_UNKNOWN205", 1, opcodeInvalid},
+	OP_UNKNOWN206: {OP_UNKNOWN206, "OP_UNKNOWN206", 1, opcodeInvalid},
+	OP_UNKNOWN207: {OP_UNKNOWN207, "OP_UNKNOWN207", 1, opcodeInvalid},
+	OP_UNKNOWN208: {OP_UNKNOWN208, "OP_UNKNOWN208", 1, opcodeInvalid},
+	OP_UNKNOWN209: {OP_UNKNOWN209, "OP_UNKNOWN209", 1, opcodeInvalid},
+	OP_UNKNOWN210: {OP_UNKNOWN210, "OP_UNKNOWN210", 1, opcodeInvalid},
+	OP_UNKNOWN211: {OP_UNKNOWN211, "OP_UNKNOWN211", 1, opcodeInvalid},
+	OP_UNKNOWN212: {OP_UNKNOWN212, "OP_UNKNOWN212", 1, opcodeInvalid},
+	OP_UNKNOWN213: {OP_UNKNOWN213, "OP_UNKNOWN213", 1, opcodeInvalid},
+	OP_UNKNOWN214: {OP_UNKNOWN214, "OP_UNKNOWN214", 1, opcodeInvalid},
+	OP_UNKNOWN215: {OP_UNKNOWN215, "OP_UNKNOWN215", 1, opcodeInvalid},
+	OP_UNKNOWN216: {OP_UNKNOWN216, "OP_UNKNOWN216", 1, opcodeInvalid},
+	OP_UNKNOWN217: {OP_UNKNOWN217, "OP_UNKNOWN217", 1, opcodeInvalid},
+	OP_UNKNOWN218: {OP_UNKNOWN218, "OP_UNKNOWN218", 1, opcodeInvalid},
+	OP_UNKNOWN219: {OP_UNKNOWN219, "OP_UNKNOWN219", 1, opcodeInvalid},
+	OP_UNKNOWN220: {OP_UNKNOWN220, "OP_UNKNOWN220", 1, opcodeInvalid},
+	OP_UNKNOWN221: {OP_UNKNOWN221, "OP_UNKNOWN221", 1, opcodeInvalid},
+	OP_UNKNOWN222: {OP_UNKNOWN222, "OP_UNKNOWN222", 1, opcodeInvalid},
+	OP_UNKNOWN223: {OP_UNKNOWN223, "OP_UNKNOWN223", 1, opcodeInvalid},
+	OP_UNKNOWN224: {OP_UNKNOWN224, "OP_UNKNOWN224", 1, opcodeInvalid},
+	OP_UNKNOWN225: {OP_UNKNOWN225, "OP_UNKNOWN225", 1, opcodeInvalid},
+	OP_UNKNOWN226: {OP_UNKNOWN226, "OP_UNKNOWN226", 1, opcodeInvalid},
+	OP_UNKNOWN227: {OP_UNKNOWN227, "OP_UNKNOWN227", 1, opcodeInvalid},
+	OP_UNKNOWN228: {OP_UNKNOWN228, "OP_UNKNOWN228", 1, opcodeInvalid},
+	OP_UNKNOWN229: {OP_UNKNOWN229, "OP_UNKNOWN229", 1, opcodeInvalid},
+	OP_UNKNOWN230: {OP_UNKNOWN230, "OP_UNKNOWN230", 1, opcodeInvalid},
+	OP_UNKNOWN231: {OP_UNKNOWN231, "OP_UNKNOWN231", 1, opcodeInvalid},
+	OP_UNKNOWN232: {OP_UNKNOWN232, "OP_UNKNOWN232", 1, opcodeInvalid},
+	OP_UNKNOWN233: {OP_UNKNOWN233, "OP_UNKNOWN233", 1, opcodeInvalid},
+	OP_UNKNOWN234: {OP_UNKNOWN234, "OP_UNKNOWN234", 1, opcodeInvalid},
+	OP_UNKNOWN235: {OP_UNKNOWN235, "OP_UNKNOWN235", 1, opcodeInvalid},
+	OP_UNKNOWN236: {OP_UNKNOWN236, "OP_UNKNOWN236", 1, opcodeInvalid},
+	OP_UNKNOWN237: {OP_UNKNOWN237, "OP_UNKNOWN237", 1, opcodeInvalid},
+	OP_UNKNOWN238: {OP_UNKNOWN238, "OP_UNKNOWN238", 1, opcodeInvalid},
+	OP_UNKNOWN239: {OP_UNKNOWN239, "OP_UNKNOWN239", 1, opcodeInvalid},
+	OP_UNKNOWN240: {OP_UNKNOWN240, "OP_UNKNOWN240", 1, opcodeInvalid},
+	OP_UNKNOWN241: {OP_UNKNOWN241, "OP_UNKNOWN241", 1, opcodeInvalid},
+	OP_UNKNOWN242: {OP_UNKNOWN242, "OP_UNKNOWN242", 1, opcodeInvalid},
+	OP_UNKNOWN243: {OP_UNKNOWN243, "OP_UNKNOWN243", 1, opcodeInvalid},
+	OP_UNKNOWN244: {OP_UNKNOWN244, "OP_UNKNOWN244", 1, opcodeInvalid},
+	OP_UNKNOWN245: {OP_UNKNOWN245, "OP_UNKNOWN245", 1, opcodeInvalid},
+	OP_UNKNOWN246: {OP_UNKNOWN246, "OP_UNKNOWN246", 1, opcodeInvalid},
+	OP_UNKNOWN247: {OP_UNKNOWN247, "OP_UNKNOWN247", 1, opcodeInvalid},
+	OP_UNKNOWN248: {OP_UNKNOWN248, "OP_UNKNOWN248", 1, opcodeInvalid},
+
+	// Bitcoin Core internal use opcode.  Defined here for completeness.
+	OP_SMALLDATA:    {OP_SMALLDATA, "OP_SMALLDATA", 1, opcodeInvalid},
+	OP_SMALLINTEGER: {OP_SMALLINTEGER, "OP_SMALLINTEGER", 1, opcodeInvalid},
+	OP_PUBKEYS:      {OP_PUBKEYS, "OP_PUBKEYS", 1, opcodeInvalid},
+	OP_UNKNOWN252:   {OP_UNKNOWN252, "OP_UNKNOWN252", 1, opcodeInvalid},
+	OP_PUBKEYHASH:   {OP_PUBKEYHASH, "OP_PUBKEYHASH", 1, opcodeInvalid},
+	OP_PUBKEY:       {OP_PUBKEY, "OP_PUBKEY", 1, opcodeInvalid},
+
+	OP_INVALIDOPCODE: {OP_INVALIDOPCODE, "OP_INVALIDOPCODE", 1, opcodeInvalid},
 }
 
 // opcodeOnelineRepls defines opcode names which are replaced when doing a
@@ -856,15 +608,16 @@ var opcodeOnelineRepls = map[string]string{
 	"OP_16":      "16",
 }
 
+// parsedOpcode represents an opcode that has been parsed and includes any
+// potential data associated with it.
 type parsedOpcode struct {
 	opcode *opcode
 	data   []byte
-	opfunc func(op parsedOpcode, s Script) error
 }
 
-// The following opcodes are disabled and are thus always bad to see in the
-// instruction stream (even if turned off by a conditional).
-func (pop *parsedOpcode) disabled() bool {
+// isDisabled returns whether or not the opcode is disabled and thus is always
+// bad to see in the instruction stream (even if turned off by a conditional).
+func (pop *parsedOpcode) isDisabled() bool {
 	switch pop.opcode.value {
 	case OP_CAT:
 		return true
@@ -901,9 +654,9 @@ func (pop *parsedOpcode) disabled() bool {
 	}
 }
 
-// The following opcodes are always illegal when passed over by the program
-// counter even if in a non-executed branch. (it isn't a coincidence that they
-// are conditionals).
+// alwaysIllegal returns whether or not the opcode is always illegal when passed
+// over by the program counter even if in a non-executed branch (it isn't a
+// coincidence that they are conditionals).
 func (pop *parsedOpcode) alwaysIllegal() bool {
 	switch pop.opcode.value {
 	case OP_VERIF:
@@ -915,9 +668,9 @@ func (pop *parsedOpcode) alwaysIllegal() bool {
 	}
 }
 
-// The following opcode are conditional and thus change the conditional
-// execution stack state when passed.
-func (pop *parsedOpcode) conditional() bool {
+// isConditional returns whether or not the opcode is a conditional opcode which
+// changes the conditional execution stack when executed.
+func (pop *parsedOpcode) isConditional() bool {
 	switch pop.opcode.value {
 	case OP_IF:
 		return true
@@ -932,8 +685,11 @@ func (pop *parsedOpcode) conditional() bool {
 	}
 }
 
-// checkMinimalDataPush returns whether or not the current data
-// push uses the correct opcode.
+// checkMinimalDataPush returns whether or not the current data push uses the
+// smallest possible opcode to represent it.  For example, the value 15 could
+// be pushed with OP_DATA_1 15 (among other variations); however, OP_15 is a
+// single opcode that represents the same value and is only a single byte versus
+// two bytes.
 func (pop *parsedOpcode) checkMinimalDataPush() error {
 	data := pop.data
 	dataLen := len(data)
@@ -967,49 +723,8 @@ func (pop *parsedOpcode) checkMinimalDataPush() error {
 	return nil
 }
 
-// exec peforms execution on the opcode. It takes into account whether or not
-// it is hidden by conditionals, but some rules still must be tested in this
-// case.
-func (pop *parsedOpcode) exec(s *Script) error {
-	// Disabled opcodes are ``fail on program counter''.
-	if pop.disabled() {
-		return ErrStackOpDisabled
-	}
-
-	// Always-illegal opcodes are ``fail on program counter''.
-	if pop.alwaysIllegal() {
-		return ErrStackReservedOpcode
-	}
-
-	// Note that this includes OP_RESERVED which counts as a push operation.
-	if pop.opcode.value > OP_16 {
-		s.numOps++
-		if s.numOps > MaxOpsPerScript {
-			return ErrStackTooManyOperations
-		}
-
-	} else if len(pop.data) > MaxScriptElementSize {
-		return ErrStackElementTooBig
-	}
-
-	// If we are not a conditional opcode and we aren't executing, then
-	// we are done now.
-	if s.condStack[0] != OpCondTrue && !pop.conditional() {
-		return nil
-	}
-
-	// Ensure all executed data push opcodes use the minimal encoding when
-	// the minimal data verification is set.
-	if s.dstack.verifyMinimalData && s.condStack[0] == OpCondTrue &&
-		pop.opcode.value >= 0 && pop.opcode.value <= OP_PUSHDATA4 {
-		if err := pop.checkMinimalDataPush(); err != nil {
-			return err
-		}
-	}
-
-	return pop.opcode.opfunc(pop, s)
-}
-
+// print returns a human-readable string representation of the opcode for use
+// in script disassembly.
 func (pop *parsedOpcode) print(oneline bool) string {
 	// The reference implementation one-line disassembly replaces opcodes
 	// which represent values (e.g. OP_0 through OP_16 and OP_1NEGATE)
@@ -1021,29 +736,36 @@ func (pop *parsedOpcode) print(oneline bool) string {
 		if replName, ok := opcodeOnelineRepls[opcodeName]; ok {
 			opcodeName = replName
 		}
+
+		// Nothing more to do for non-data push opcodes.
+		if pop.opcode.length == 1 {
+			return opcodeName
+		}
+
+		return fmt.Sprintf("%x", pop.data)
 	}
 
-	retString := opcodeName
+	// Nothing more to do for non-data push opcodes.
 	if pop.opcode.length == 1 {
-		return retString
+		return opcodeName
 	}
-	if oneline {
-		retString = ""
+
+	// Add length for the OP_PUSHDATA# opcodes.
+	retString := opcodeName
+	switch pop.opcode.length {
+	case -1:
+		retString += fmt.Sprintf(" 0x%02x", len(pop.data))
+	case -2:
+		retString += fmt.Sprintf(" 0x%04x", len(pop.data))
+	case -4:
+		retString += fmt.Sprintf(" 0x%08x", len(pop.data))
 	}
-	if !oneline && pop.opcode.length < 0 {
-		//add length to the end of retString
-		retString += fmt.Sprintf(" 0x%0*x", 2*-pop.opcode.length,
-			len(pop.data))
-	}
-	for _, val := range pop.data {
-		if !oneline {
-			retString += " "
-		}
-		retString += fmt.Sprintf("%02x", val)
-	}
-	return retString
+
+	return fmt.Sprintf("%s 0x%02x", retString, pop.data)
 }
 
+// bytes returns any data associated with the opcode encoded as it would be in
+// a script.  This is used for unparsing scripts from parsed opcodes.
 func (pop *parsedOpcode) bytes() ([]byte, error) {
 	var retbytes []byte
 	if pop.opcode.length > 0 {
@@ -1091,136 +813,185 @@ func (pop *parsedOpcode) bytes() ([]byte, error) {
 	return retbytes, nil
 }
 
-// opcode implementation functions from here
+// *******************************************
+// Opcode implementation functions start here.
+// *******************************************
 
-func opcodeDisabled(op *parsedOpcode, s *Script) error {
+// opcodeDisabled is a common handler for disabled opcodes.  It returns an
+// appropriate error indicating the opcode is disabled.  While it would
+// ordinarily make more sense to detect if the script contains any disabled
+// opcodes before executing in an initial parse step, the consensus rules
+// dictate the script doesn't fail until the program counter passes over a
+// disabled opcode (even when they appear in a branch that is not executed).
+func opcodeDisabled(op *parsedOpcode, vm *Engine) error {
 	return ErrStackOpDisabled
 }
 
-func opcodeReserved(op *parsedOpcode, s *Script) error {
+// opcodeReserved is a common handler for all reserved opcodes.  It returns an
+// appropriate error indicating the opcode is reserved.
+func opcodeReserved(op *parsedOpcode, vm *Engine) error {
 	return ErrStackReservedOpcode
 }
 
-// Recognised opcode, but for bitcoind internal use only.
-func opcodeInvalid(op *parsedOpcode, s *Script) error {
+// opcodeReserved is a common handler for all invalid opcodes.  It returns an
+// appropriate error indicating the opcode is invalid.
+func opcodeInvalid(op *parsedOpcode, vm *Engine) error {
 	return ErrStackInvalidOpcode
 }
 
-func opcodeFalse(op *parsedOpcode, s *Script) error {
-	s.dstack.PushByteArray([]byte(""))
-
+// opcodeFalse pushes an empty array to the data stack to represent false.  Note
+// that 0, when encoded as a number according to the numeric encoding consensus
+// rules, is an empty array.
+func opcodeFalse(op *parsedOpcode, vm *Engine) error {
+	vm.dstack.PushByteArray(nil)
 	return nil
 }
 
-func opcodePushData(op *parsedOpcode, s *Script) error {
-	s.dstack.PushByteArray(op.data)
+// opcodePushData is a common handler for the vast majority of opcodes that push
+// raw data (bytes) to the data stack.
+func opcodePushData(op *parsedOpcode, vm *Engine) error {
+	vm.dstack.PushByteArray(op.data)
 	return nil
 }
 
-func opcode1Negate(op *parsedOpcode, s *Script) error {
-	s.dstack.PushInt(big.NewInt(-1))
+// opcode1Negate pushes -1, encoded as a number, to the data stack.
+func opcode1Negate(op *parsedOpcode, vm *Engine) error {
+	vm.dstack.PushInt(scriptNum(-1))
 	return nil
 }
 
-func opcodeN(op *parsedOpcode, s *Script) error {
-	// 16 consecutive opcodes add increasing numbers to the stack.
-	s.dstack.PushInt(big.NewInt(int64(op.opcode.value - (OP_1 - 1))))
+// opcodeN is a common handler for the small integer data push opcodes.  It
+// pushes the numeric value the opcode represents (which will be from 1 to 16)
+// onto the data stack.
+func opcodeN(op *parsedOpcode, vm *Engine) error {
+	// The opcodes are all defined consecutively, so the numeric value is
+	// the difference.
+	vm.dstack.PushInt(scriptNum((op.opcode.value - (OP_1 - 1))))
 	return nil
 }
 
-func opcodeNop(op *parsedOpcode, s *Script) error {
+// opcodeNop is a common handler for the NOP family of opcodes.  As the name
+// implies it generally does nothing, however, it will return an error when
+// the flag to discourage use of NOPs is set for select opcodes.
+func opcodeNop(op *parsedOpcode, vm *Engine) error {
 	switch op.opcode.value {
-	case OP_NOP1, OP_NOP2, OP_NOP3, OP_NOP4, OP_NOP5,
+	case OP_NOP1, OP_NOP3, OP_NOP4, OP_NOP5,
 		OP_NOP6, OP_NOP7, OP_NOP8, OP_NOP9, OP_NOP10:
-		if s.discourageUpgradableNops {
-			return fmt.Errorf("%s reserved for soft-fork upgrades", opcodemap[op.opcode.value].name)
+		if vm.hasFlag(ScriptDiscourageUpgradableNops) {
+			return fmt.Errorf("OP_NOP%d reserved for soft-fork "+
+				"upgrades", op.opcode.value-(OP_NOP1-1))
 		}
 	}
 	return nil
 }
 
-// opcodeIf computes true/false based on the value on the stack and pushes
-// the condition on the condStack (conditional execution stack)
-func opcodeIf(op *parsedOpcode, s *Script) error {
-	// opcodeIf will be executed even if it is on the non-execute side
-	// of the conditional, this is so proper nesting is maintained
-	var condval int
-	if s.condStack[0] == OpCondTrue {
-		ok, err := s.dstack.PopBool()
+// opcodeIf treats the top item on the data stack as a boolean and removes it.
+//
+// An appropriate entry is added to the conditional stack depending on whether
+// the boolean is true and whether this if is on an executing branch in order
+// to allow proper execution of further opcodes depending on the conditional
+// logic.  When the boolean is true, the first branch will be executed (unless
+// this opcode is nested in a non-executed branch).
+//
+// <expression> if [statements] [else [statements]] endif
+//
+// Note that, unlike for all non-conditional opcodes, this is executed even when
+// it is on a non-executing branch so proper nesting is maintained.
+//
+// Data stack transformation: [... bool] -> [...]
+// Conditional stack transformation: [...] -> [... OpCondValue]
+func opcodeIf(op *parsedOpcode, vm *Engine) error {
+	condVal := OpCondFalse
+	if vm.isBranchExecuting() {
+		ok, err := vm.dstack.PopBool()
 		if err != nil {
 			return err
 		}
 		if ok {
-			condval = OpCondTrue
+			condVal = OpCondTrue
 		}
 	} else {
-		condval = OpCondSkip
+		condVal = OpCondSkip
 	}
-	cond := []int{condval}
-	// push condition to the 'head' of the slice
-	s.condStack = append(cond, s.condStack...)
-	// TODO(drahn) check if a maximum condtitional stack limit exists
+	vm.condStack = append(vm.condStack, condVal)
 	return nil
 }
 
-// opcodeNotIf computes true/false based on the value on the stack and pushes
-// the (inverted) condition on the condStack (conditional execution stack)
-func opcodeNotIf(op *parsedOpcode, s *Script) error {
-	// opcodeIf will be executed even if it is on the non-execute side
-	// of the conditional, this is so proper nesting is maintained
-	var condval int
-	if s.condStack[0] == OpCondTrue {
-		ok, err := s.dstack.PopBool()
+// opcodeNotIf treats the top item on the data stack as a boolean and removes
+// it.
+//
+// An appropriate entry is added to the conditional stack depending on whether
+// the boolean is true and whether this if is on an executing branch in order
+// to allow proper execution of further opcodes depending on the conditional
+// logic.  When the boolean is false, the first branch will be executed (unless
+// this opcode is nested in a non-executed branch).
+//
+// <expression> notif [statements] [else [statements]] endif
+//
+// Note that, unlike for all non-conditional opcodes, this is executed even when
+// it is on a non-executing branch so proper nesting is maintained.
+//
+// Data stack transformation: [... bool] -> [...]
+// Conditional stack transformation: [...] -> [... OpCondValue]
+func opcodeNotIf(op *parsedOpcode, vm *Engine) error {
+	condVal := OpCondFalse
+	if vm.isBranchExecuting() {
+		ok, err := vm.dstack.PopBool()
 		if err != nil {
 			return err
 		}
 		if !ok {
-			condval = OpCondTrue
+			condVal = OpCondTrue
 		}
 	} else {
-		condval = OpCondSkip
+		condVal = OpCondSkip
 	}
-	cond := []int{condval}
-	// push condition to the 'head' of the slice
-	s.condStack = append(cond, s.condStack...)
-	// TODO(drahn) check if a maximum condtitional stack limit exists
+	vm.condStack = append(vm.condStack, condVal)
 	return nil
 }
 
-// opcodeElse inverts conditional execution for other half of if/else/endif
-func opcodeElse(op *parsedOpcode, s *Script) error {
-	if len(s.condStack) < 2 {
-		// intial true cannot be toggled, only pushed conditionals
+// opcodeElse inverts conditional execution for other half of if/else/endif.
+//
+// An error is returned if there has not already been a matching OP_IF.
+//
+// Conditional stack transformation: [... OpCondValue] -> [... !OpCondValue]
+func opcodeElse(op *parsedOpcode, vm *Engine) error {
+	if len(vm.condStack) == 0 {
 		return ErrStackNoIf
 	}
 
-	switch s.condStack[0] {
+	conditionalIdx := len(vm.condStack) - 1
+	switch vm.condStack[conditionalIdx] {
 	case OpCondTrue:
-		s.condStack[0] = OpCondFalse
+		vm.condStack[conditionalIdx] = OpCondFalse
 	case OpCondFalse:
-		s.condStack[0] = OpCondTrue
+		vm.condStack[conditionalIdx] = OpCondTrue
 	case OpCondSkip:
-		// value doesn't change in skip
+		// Value doesn't change in skip since it indicates this opcode
+		// is nested in a non-executed branch.
 	}
 	return nil
 }
 
-// opcodeEndif terminates a conditional block, removing the  value from the
+// opcodeEndif terminates a conditional block, removing the value from the
 // conditional execution stack.
-func opcodeEndif(op *parsedOpcode, s *Script) error {
-	if len(s.condStack) < 2 {
-		// intial true cannot be popped, only pushed conditionals
+//
+// An error is returned if there has not already been a matching OP_IF.
+//
+// Conditional stack transformation: [... OpCondValue] -> [...]
+func opcodeEndif(op *parsedOpcode, vm *Engine) error {
+	if len(vm.condStack) == 0 {
 		return ErrStackNoIf
 	}
 
-	stk := make([]int, len(s.condStack)-1, len(s.condStack)-1)
-	copy(stk, s.condStack[1:])
-	s.condStack = stk
+	vm.condStack = vm.condStack[:len(vm.condStack)-1]
 	return nil
 }
 
-func opcodeVerify(op *parsedOpcode, s *Script) error {
-	verified, err := s.dstack.PopBool()
+// opcodeVerify examines the top item on the data stack as a boolean value and
+// verifies it evaluates to true.  An error is returned if it does not.
+func opcodeVerify(op *parsedOpcode, vm *Engine) error {
+	verified, err := vm.dstack.PopBool()
 	if err != nil {
 		return err
 	}
@@ -1231,701 +1002,1024 @@ func opcodeVerify(op *parsedOpcode, s *Script) error {
 	return nil
 }
 
-func opcodeReturn(op *parsedOpcode, s *Script) error {
+// opcodeReturn returns an appropriate error since it is always an error to
+// return early from a script.
+func opcodeReturn(op *parsedOpcode, vm *Engine) error {
 	return ErrStackEarlyReturn
 }
 
-func opcodeToAltStack(op *parsedOpcode, s *Script) error {
-	so, err := s.dstack.PopByteArray()
+// opcodeCheckLockTimeVerify compares the top item on the data stack to the
+// LockTime field of the transaction containing the script signature
+// validating if the transaction outputs are spendable yet.  If flag
+// ScriptVerifyCheckLockTimeVerify is not set, the code continues as if OP_NOP2
+// were executed.
+func opcodeCheckLockTimeVerify(op *parsedOpcode, vm *Engine) error {
+	// If the ScriptVerifyCheckLockTimeVerify script flag is not set, treat
+	// opcode as OP_NOP2 instead.
+	if !vm.hasFlag(ScriptVerifyCheckLockTimeVerify) {
+		if vm.hasFlag(ScriptDiscourageUpgradableNops) {
+			return errors.New("OP_NOP2 reserved for soft-fork " +
+				"upgrades")
+		}
+		return nil
+	}
+
+	// The current transaction locktime is a uint32 resulting in a maximum
+	// locktime of 2^32-1 (the year 2106).  However, scriptNums are signed
+	// and therefore a standard 4-byte scriptNum would only support up to a
+	// maximum of 2^31-1 (the year 2038).  Thus, a 5-byte scriptNum is used
+	// here since it will support up to 2^39-1 which allows dates beyond the
+	// current locktime limit.
+	//
+	// PeekByteArray is used here instead of PeekInt because we do not want
+	// to be limited to a 4-byte integer for reasons specified above.
+	so, err := vm.dstack.PeekByteArray(0)
 	if err != nil {
 		return err
 	}
-	s.astack.PushByteArray(so)
+	lockTime, err := makeScriptNum(so, vm.dstack.verifyMinimalData, 5)
+	if err != nil {
+		return err
+	}
+
+	// In the rare event that the argument may be < 0 due to some arithmetic
+	// being done first, you can always use 0 OP_MAX OP_CHECKLOCKTIMEVERIFY.
+	if lockTime < 0 {
+		return fmt.Errorf("negative locktime: %d", lockTime)
+	}
+
+	// The lock time field of a transaction is either a block height at
+	// which the transaction is finalized or a timestamp depending on if the
+	// value is before the txscript.LockTimeThreshold.  When it is under the
+	// threshold it is a block height.
+	//
+	// The lockTimes in both the script and transaction must be of the same
+	// type.
+	if !((vm.tx.LockTime < LockTimeThreshold && int64(lockTime) < int64(LockTimeThreshold)) ||
+		(vm.tx.LockTime >= LockTimeThreshold && int64(lockTime) >= int64(LockTimeThreshold))) {
+		return fmt.Errorf("mismatched locktime types -- tx locktime %d, stack "+
+			"locktime %d", vm.tx.LockTime, lockTime)
+	}
+
+	if int64(lockTime) > int64(vm.tx.LockTime) {
+		str := "locktime requirement not satisfied -- locktime is " +
+			"greater than the transaction locktime: %d > %d"
+		return fmt.Errorf(str, lockTime, vm.tx.LockTime)
+	}
+
+	// The lock time feature can also be disabled, thereby bypassing
+	// OP_CHECKLOCKTIMEVERIFY, if every transaction input has been finalized by
+	// setting its sequence to the maximum value (wire.MaxTxInSequenceNum).  This
+	// condition would result in the transaction being allowed into the blockchain
+	// making the opcode ineffective.
+	//
+	// This condition is prevented by enforcing that the input being used by
+	// the opcode is unlocked (its sequence number is less than the max
+	// value).  This is sufficient to prove correctness without having to
+	// check every input.
+	//
+	// NOTE: This implies that even if the transaction is not finalized due to
+	// another input being unlocked, the opcode execution will still fail when the
+	// input being used by the opcode is locked.
+	if vm.tx.TxIn[vm.txIdx].Sequence == wire.MaxTxInSequenceNum {
+		return errors.New("transaction input is finalized")
+	}
 
 	return nil
 }
 
-func opcodeFromAltStack(op *parsedOpcode, s *Script) error {
-	so, err := s.astack.PopByteArray()
+// opcodeToAltStack removes the top item from the main data stack and pushes it
+// onto the alternate data stack.
+//
+// Main data stack transformation: [... x1 x2 x3] -> [... x1 x2]
+// Alt data stack transformation:  [... y1 y2 y3] -> [... y1 y2 y3 x3]
+func opcodeToAltStack(op *parsedOpcode, vm *Engine) error {
+	so, err := vm.dstack.PopByteArray()
 	if err != nil {
 		return err
 	}
-	s.dstack.PushByteArray(so)
+	vm.astack.PushByteArray(so)
 
 	return nil
 }
 
-func opcode2Drop(op *parsedOpcode, s *Script) error {
-	return s.dstack.DropN(2)
+// opcodeFromAltStack removes the top item from the alternate data stack and
+// pushes it onto the main data stack.
+//
+// Main data stack transformation: [... x1 x2 x3] -> [... x1 x2 x3 y1]
+// Alt data stack transformation:  [... y1 y2 y3] -> [... y1 y2]
+func opcodeFromAltStack(op *parsedOpcode, vm *Engine) error {
+	so, err := vm.astack.PopByteArray()
+	if err != nil {
+		return err
+	}
+	vm.dstack.PushByteArray(so)
+
+	return nil
 }
 
-func opcode2Dup(op *parsedOpcode, s *Script) error {
-	return s.dstack.DupN(2)
+// opcode2Drop removes the top 2 items from the data stack.
+//
+// Stack transformation: [... x1 x2 x3] -> [... x1]
+func opcode2Drop(op *parsedOpcode, vm *Engine) error {
+	return vm.dstack.DropN(2)
 }
 
-func opcode3Dup(op *parsedOpcode, s *Script) error {
-	return s.dstack.DupN(3)
+// opcode2Dup duplicates the top 2 items on the data stack.
+//
+// Stack transformation: [... x1 x2 x3] -> [... x1 x2 x3 x2 x3]
+func opcode2Dup(op *parsedOpcode, vm *Engine) error {
+	return vm.dstack.DupN(2)
 }
 
-func opcode2Over(op *parsedOpcode, s *Script) error {
-	return s.dstack.OverN(2)
+// opcode3Dup duplicates the top 3 items on the data stack.
+//
+// Stack transformation: [... x1 x2 x3] -> [... x1 x2 x3 x1 x2 x3]
+func opcode3Dup(op *parsedOpcode, vm *Engine) error {
+	return vm.dstack.DupN(3)
 }
 
-func opcode2Rot(op *parsedOpcode, s *Script) error {
-	return s.dstack.RotN(2)
+// opcode2Over duplicates the 2 items before the top 2 items on the data stack.
+//
+// Stack transformation: [... x1 x2 x3 x4] -> [... x1 x2 x3 x4 x1 x2]
+func opcode2Over(op *parsedOpcode, vm *Engine) error {
+	return vm.dstack.OverN(2)
 }
 
-func opcode2Swap(op *parsedOpcode, s *Script) error {
-	return s.dstack.SwapN(2)
+// opcode2Rot rotates the top 6 items on the data stack to the left twice.
+//
+// Stack transformation: [... x1 x2 x3 x4 x5 x6] -> [... x3 x4 x5 x6 x1 x2]
+func opcode2Rot(op *parsedOpcode, vm *Engine) error {
+	return vm.dstack.RotN(2)
 }
 
-func opcodeIfDup(op *parsedOpcode, s *Script) error {
-	val, err := s.dstack.PeekInt(0)
+// opcode2Swap swaps the top 2 items on the data stack with the 2 that come
+// before them.
+//
+// Stack transformation: [... x1 x2 x3 x4] -> [... x3 x4 x1 x2]
+func opcode2Swap(op *parsedOpcode, vm *Engine) error {
+	return vm.dstack.SwapN(2)
+}
+
+// opcodeIfDup duplicates the top item of the stack if it is not zero.
+//
+// Stack transformation (x1==0): [... x1] -> [...]
+// Stack transformation (x1!=0): [... x1] -> [... x1]
+func opcodeIfDup(op *parsedOpcode, vm *Engine) error {
+	so, err := vm.dstack.PeekByteArray(0)
 	if err != nil {
 		return err
 	}
 
 	// Push copy of data iff it isn't zero
-	if val.Sign() != 0 {
-		s.dstack.PushInt(val)
+	if asBool(so) {
+		vm.dstack.PushByteArray(so)
 	}
 
 	return nil
 }
 
-func opcodeDepth(op *parsedOpcode, s *Script) error {
-	s.dstack.PushInt(big.NewInt(int64(s.dstack.Depth())))
+// opcodeDepth pushes the depth of the data stack prior to executing this
+// opcode, encoded as a number, onto the data stack.
+//
+// Stack transformation: [...] -> [... <num of items on the stack>]
+// Example with 2 items: [x1 x2] -> [x1 x2 2]
+// Example with 3 items: [x1 x2 x3] -> [x1 x2 x3 3]
+func opcodeDepth(op *parsedOpcode, vm *Engine) error {
+	vm.dstack.PushInt(scriptNum(vm.dstack.Depth()))
 	return nil
 }
 
-func opcodeDrop(op *parsedOpcode, s *Script) error {
-	return s.dstack.DropN(1)
+// opcodeDrop removes the top item from the data stack.
+//
+// Stack transformation: [... x1 x2 x3] -> [... x1 x2]
+func opcodeDrop(op *parsedOpcode, vm *Engine) error {
+	return vm.dstack.DropN(1)
 }
 
-func opcodeDup(op *parsedOpcode, s *Script) error {
-	return s.dstack.DupN(1)
+// opcodeDup duplicates the top item on the data stack.
+//
+// Stack transformation: [... x1 x2 x3] -> [... x1 x2 x3 x3]
+func opcodeDup(op *parsedOpcode, vm *Engine) error {
+	return vm.dstack.DupN(1)
 }
 
-func opcodeNip(op *parsedOpcode, s *Script) error {
-	return s.dstack.NipN(1)
+// opcodeNip removes the item before the top item on the data stack.
+//
+// Stack transformation: [... x1 x2 x3] -> [... x1 x3]
+func opcodeNip(op *parsedOpcode, vm *Engine) error {
+	return vm.dstack.NipN(1)
 }
 
-func opcodeOver(op *parsedOpcode, s *Script) error {
-	return s.dstack.OverN(1)
+// opcodeOver duplicates the item before the top item on the data stack.
+//
+// Stack transformation: [... x1 x2 x3] -> [... x1 x2 x3 x2]
+func opcodeOver(op *parsedOpcode, vm *Engine) error {
+	return vm.dstack.OverN(1)
 }
 
-// Copy object N items back in the stack to the top. Where N is the value in
-// the top of the stack.
-func opcodePick(op *parsedOpcode, s *Script) error {
-	pidx, err := s.dstack.PopInt()
+// opcodePick treats the top item on the data stack as an integer and duplicates
+// the item on the stack that number of items back to the top.
+//
+// Stack transformation: [xn ... x2 x1 x0 n] -> [xn ... x2 x1 x0 xn]
+// Example with n=1: [x2 x1 x0 1] -> [x2 x1 x0 x1]
+// Example with n=2: [x2 x1 x0 2] -> [x2 x1 x0 x2]
+func opcodePick(op *parsedOpcode, vm *Engine) error {
+	val, err := vm.dstack.PopInt()
 	if err != nil {
 		return err
 	}
 
-	// PopInt promises that the int returned is 32 bit.
-	val := int(pidx.Int64())
-
-	return s.dstack.PickN(val)
+	return vm.dstack.PickN(val.Int32())
 }
 
-// Move object N items back in the stack to the top. Where N is the value in
-// the top of the stack.
-func opcodeRoll(op *parsedOpcode, s *Script) error {
-	ridx, err := s.dstack.PopInt()
+// opcodeRoll treats the top item on the data stack as an integer and moves
+// the item on the stack that number of items back to the top.
+//
+// Stack transformation: [xn ... x2 x1 x0 n] -> [... x2 x1 x0 xn]
+// Example with n=1: [x2 x1 x0 1] -> [x2 x0 x1]
+// Example with n=2: [x2 x1 x0 2] -> [x1 x0 x2]
+func opcodeRoll(op *parsedOpcode, vm *Engine) error {
+	val, err := vm.dstack.PopInt()
 	if err != nil {
 		return err
 	}
 
-	// PopInt promises that the int returned is 32 bit.
-	val := int(ridx.Int64())
-
-	return s.dstack.RollN(val)
+	return vm.dstack.RollN(val.Int32())
 }
 
-// Rotate top three items on the stack to the left.
-// e.g. 1,2,3 -> 2,3,1
-func opcodeRot(op *parsedOpcode, s *Script) error {
-	return s.dstack.RotN(1)
+// opcodeRot rotates the top 3 items on the data stack to the left.
+//
+// Stack transformation: [... x1 x2 x3] -> [... x2 x3 x1]
+func opcodeRot(op *parsedOpcode, vm *Engine) error {
+	return vm.dstack.RotN(1)
 }
 
-// Swap the top two items on the stack: 1,2 -> 2,1
-func opcodeSwap(op *parsedOpcode, s *Script) error {
-	return s.dstack.SwapN(1)
+// opcodeSwap swaps the top two items on the stack.
+//
+// Stack transformation: [... x1 x2] -> [... x2 x1]
+func opcodeSwap(op *parsedOpcode, vm *Engine) error {
+	return vm.dstack.SwapN(1)
 }
 
-// The item at the top of the stack is copied and inserted before the
-// second-to-top item. e.g.: 2,1, -> 2,1,2
-func opcodeTuck(op *parsedOpcode, s *Script) error {
-	return s.dstack.Tuck()
+// opcodeTuck inserts a duplicate of the top item of the data stack before the
+// second-to-top item.
+//
+// Stack transformation: [... x1 x2] -> [... x2 x1 x2]
+func opcodeTuck(op *parsedOpcode, vm *Engine) error {
+	return vm.dstack.Tuck()
 }
 
-// Push the size of the item on top of the stack onto the stack.
-func opcodeSize(op *parsedOpcode, s *Script) error {
-	i, err := s.dstack.PeekByteArray(0)
+// opcodeSize pushes the size of the top item of the data stack onto the data
+// stack.
+//
+// Stack transformation: [... x1] -> [... x1 len(x1)]
+func opcodeSize(op *parsedOpcode, vm *Engine) error {
+	so, err := vm.dstack.PeekByteArray(0)
 	if err != nil {
 		return err
 	}
 
-	s.dstack.PushInt(big.NewInt(int64(len(i))))
+	vm.dstack.PushInt(scriptNum(len(so)))
 	return nil
 }
 
-func opcodeEqual(op *parsedOpcode, s *Script) error {
-	a, err := s.dstack.PopByteArray()
+// opcodeEqual removes the top 2 items of the data stack, compares them as raw
+// bytes, and pushes the result, encoded as a boolean, back to the stack.
+//
+// Stack transformation: [... x1 x2] -> [... bool]
+func opcodeEqual(op *parsedOpcode, vm *Engine) error {
+	a, err := vm.dstack.PopByteArray()
 	if err != nil {
 		return err
 	}
-	b, err := s.dstack.PopByteArray()
+	b, err := vm.dstack.PopByteArray()
 	if err != nil {
 		return err
 	}
 
-	s.dstack.PushBool(bytes.Equal(a, b))
+	vm.dstack.PushBool(bytes.Equal(a, b))
 	return nil
 }
 
-func opcodeEqualVerify(op *parsedOpcode, s *Script) error {
-	err := opcodeEqual(op, s)
+// opcodeEqualVerify is a combination of opcodeEqual and opcodeVerify.
+// Specifically, it removes the top 2 items of the data stack, compares them,
+// and pushes the result, encoded as a boolean, back to the stack.  Then, it
+// examines the top item on the data stack as a boolean value and verifies it
+// evaluates to true.  An error is returned if it does not.
+//
+// Stack transformation: [... x1 x2] -> [... bool] -> [...]
+func opcodeEqualVerify(op *parsedOpcode, vm *Engine) error {
+	err := opcodeEqual(op, vm)
 	if err == nil {
-		err = opcodeVerify(op, s)
+		err = opcodeVerify(op, vm)
 	}
 	return err
 }
 
-func opcode1Add(op *parsedOpcode, s *Script) error {
-	m, err := s.dstack.PopInt()
+// opcode1Add treats the top item on the data stack as an integer and replaces
+// it with its incremented value (plus 1).
+//
+// Stack transformation: [... x1 x2] -> [... x1 x2+1]
+func opcode1Add(op *parsedOpcode, vm *Engine) error {
+	m, err := vm.dstack.PopInt()
 	if err != nil {
 		return err
 	}
 
-	s.dstack.PushInt(new(big.Int).Add(m, big.NewInt(1)))
+	vm.dstack.PushInt(m + 1)
+	return nil
+}
+
+// opcode1Sub treats the top item on the data stack as an integer and replaces
+// it with its decremented value (minus 1).
+//
+// Stack transformation: [... x1 x2] -> [... x1 x2-1]
+func opcode1Sub(op *parsedOpcode, vm *Engine) error {
+	m, err := vm.dstack.PopInt()
+	if err != nil {
+		return err
+	}
+	vm.dstack.PushInt(m - 1)
 
 	return nil
 }
 
-func opcode1Sub(op *parsedOpcode, s *Script) error {
-	m, err := s.dstack.PopInt()
+// opcodeNegate treats the top item on the data stack as an integer and replaces
+// it with its negation.
+//
+// Stack transformation: [... x1 x2] -> [... x1 -x2]
+func opcodeNegate(op *parsedOpcode, vm *Engine) error {
+	m, err := vm.dstack.PopInt()
 	if err != nil {
 		return err
 	}
-	s.dstack.PushInt(new(big.Int).Sub(m, big.NewInt(1)))
 
+	vm.dstack.PushInt(-m)
 	return nil
 }
 
-func opcodeNegate(op *parsedOpcode, s *Script) error {
-	// XXX when we remove types just flip the 0x80 bit of msb
-	m, err := s.dstack.PopInt()
+// opcodeAbs treats the top item on the data stack as an integer and replaces it
+// it with its absolute value.
+//
+// Stack transformation: [... x1 x2] -> [... x1 abs(x2)]
+func opcodeAbs(op *parsedOpcode, vm *Engine) error {
+	m, err := vm.dstack.PopInt()
 	if err != nil {
 		return err
 	}
 
-	s.dstack.PushInt(new(big.Int).Neg(m))
+	if m < 0 {
+		m = -m
+	}
+	vm.dstack.PushInt(m)
 	return nil
 }
 
-func opcodeAbs(op *parsedOpcode, s *Script) error {
-	// XXX when we remove types just &= ~0x80 on msb
-	m, err := s.dstack.PopInt()
+// opcodeNot treats the top item on the data stack as an integer and replaces
+// it with its "inverted" value (0 becomes 1, non-zero becomes 0).
+//
+// NOTE: While it would probably make more sense to treat the top item as a
+// boolean, and push the opposite, which is really what the intention of this
+// opcode is, it is extremely important that is not done because integers are
+// interpreted differently than booleans and the consensus rules for this opcode
+// dictate the item is interpreted as an integer.
+//
+// Stack transformation (x2==0): [... x1 0] -> [... x1 1]
+// Stack transformation (x2!=0): [... x1 1] -> [... x1 0]
+// Stack transformation (x2!=0): [... x1 17] -> [... x1 0]
+func opcodeNot(op *parsedOpcode, vm *Engine) error {
+	m, err := vm.dstack.PopInt()
 	if err != nil {
 		return err
 	}
 
-	s.dstack.PushInt(new(big.Int).Abs(m))
-
-	return nil
-}
-
-// If then input is 0 or 1, it is flipped. Otherwise the output will be 0.
-// (n.b. official client just has 1 is 0, else 0)
-func opcodeNot(op *parsedOpcode, s *Script) error {
-	m, err := s.dstack.PopInt()
-	if err != nil {
-		return err
-	}
-	if m.Sign() == 0 {
-		s.dstack.PushInt(big.NewInt(1))
+	if m == 0 {
+		vm.dstack.PushInt(scriptNum(1))
 	} else {
-		s.dstack.PushInt(big.NewInt(0))
+		vm.dstack.PushInt(scriptNum(0))
 	}
 	return nil
 }
 
-// opcode returns 0 if the input is 0, 1 otherwise.
-func opcode0NotEqual(op *parsedOpcode, s *Script) error {
-	m, err := s.dstack.PopInt()
+// opcode0NotEqual treats the top item on the data stack as an integer and
+// replaces it with either a 0 if it is zero, or a 1 if it is not zero.
+//
+// Stack transformation (x2==0): [... x1 0] -> [... x1 0]
+// Stack transformation (x2!=0): [... x1 1] -> [... x1 1]
+// Stack transformation (x2!=0): [... x1 17] -> [... x1 1]
+func opcode0NotEqual(op *parsedOpcode, vm *Engine) error {
+	m, err := vm.dstack.PopInt()
 	if err != nil {
 		return err
 	}
-	if m.Sign() != 0 {
-		m.SetInt64(1)
-	}
-	s.dstack.PushInt(m)
 
+	if m != 0 {
+		m = 1
+	}
+	vm.dstack.PushInt(m)
 	return nil
 }
 
-// Push result of adding top two entries on stack
-func opcodeAdd(op *parsedOpcode, s *Script) error {
-	v0, err := s.dstack.PopInt()
+// opcodeAdd treats the top two items on the data stack as integers and replaces
+// them with their sum.
+//
+// Stack transformation: [... x1 x2] -> [... x1+x2]
+func opcodeAdd(op *parsedOpcode, vm *Engine) error {
+	v0, err := vm.dstack.PopInt()
 	if err != nil {
 		return err
 	}
 
-	v1, err := s.dstack.PopInt()
+	v1, err := vm.dstack.PopInt()
 	if err != nil {
 		return err
 	}
 
-	s.dstack.PushInt(new(big.Int).Add(v0, v1))
+	vm.dstack.PushInt(v0 + v1)
 	return nil
 }
 
-// Push result of subtracting 2nd entry on stack from first.
-func opcodeSub(op *parsedOpcode, s *Script) error {
-	v0, err := s.dstack.PopInt()
+// opcodeSub treats the top two items on the data stack as integers and replaces
+// them with the result of subtracting the top entry from the second-to-top
+// entry.
+//
+// Stack transformation: [... x1 x2] -> [... x1-x2]
+func opcodeSub(op *parsedOpcode, vm *Engine) error {
+	v0, err := vm.dstack.PopInt()
 	if err != nil {
 		return err
 	}
 
-	v1, err := s.dstack.PopInt()
+	v1, err := vm.dstack.PopInt()
 	if err != nil {
 		return err
 	}
 
-	s.dstack.PushInt(new(big.Int).Sub(v1, v0))
+	vm.dstack.PushInt(v1 - v0)
 	return nil
 }
 
-// If both of the top two entries on the stack are not zero output is 1.
-// Otherwise, 0.
-func opcodeBoolAnd(op *parsedOpcode, s *Script) error {
-	v0, err := s.dstack.PopInt()
+// opcodeBoolAnd treats the top two items on the data stack as integers.  When
+// both of them are not zero, they are replaced with a 1, otherwise a 0.
+//
+// Stack transformation (x1==0, x2==0): [... 0 0] -> [... 0]
+// Stack transformation (x1!=0, x2==0): [... 5 0] -> [... 0]
+// Stack transformation (x1==0, x2!=0): [... 0 7] -> [... 0]
+// Stack transformation (x1!=0, x2!=0): [... 4 8] -> [... 1]
+func opcodeBoolAnd(op *parsedOpcode, vm *Engine) error {
+	v0, err := vm.dstack.PopInt()
 	if err != nil {
 		return err
 	}
 
-	v1, err := s.dstack.PopInt()
+	v1, err := vm.dstack.PopInt()
 	if err != nil {
 		return err
 	}
 
-	if v0.Sign() != 0 && v1.Sign() != 0 {
-		s.dstack.PushInt(big.NewInt(1))
+	if v0 != 0 && v1 != 0 {
+		vm.dstack.PushInt(scriptNum(1))
 	} else {
-		s.dstack.PushInt(big.NewInt(0))
+		vm.dstack.PushInt(scriptNum(0))
 	}
 
 	return nil
 }
 
-// If either of the top two entries on the stack are not zero output is 1.
-// Otherwise, 0.
-func opcodeBoolOr(op *parsedOpcode, s *Script) error {
-	v0, err := s.dstack.PopInt()
+// opcodeBoolOr treats the top two items on the data stack as integers.  When
+// either of them are not zero, they are replaced with a 1, otherwise a 0.
+//
+// Stack transformation (x1==0, x2==0): [... 0 0] -> [... 0]
+// Stack transformation (x1!=0, x2==0): [... 5 0] -> [... 1]
+// Stack transformation (x1==0, x2!=0): [... 0 7] -> [... 1]
+// Stack transformation (x1!=0, x2!=0): [... 4 8] -> [... 1]
+func opcodeBoolOr(op *parsedOpcode, vm *Engine) error {
+	v0, err := vm.dstack.PopInt()
 	if err != nil {
 		return err
 	}
 
-	v1, err := s.dstack.PopInt()
+	v1, err := vm.dstack.PopInt()
 	if err != nil {
 		return err
 	}
 
-	if v0.Sign() != 0 || v1.Sign() != 0 {
-		s.dstack.PushInt(big.NewInt(1))
+	if v0 != 0 || v1 != 0 {
+		vm.dstack.PushInt(scriptNum(1))
 	} else {
-		s.dstack.PushInt(big.NewInt(0))
+		vm.dstack.PushInt(scriptNum(0))
 	}
 
 	return nil
 }
 
-func opcodeNumEqual(op *parsedOpcode, s *Script) error {
-	v0, err := s.dstack.PopInt()
+// opcodeNumEqual treats the top two items on the data stack as integers.  When
+// they are equal, they are replaced with a 1, otherwise a 0.
+//
+// Stack transformation (x1==x2): [... 5 5] -> [... 1]
+// Stack transformation (x1!=x2): [... 5 7] -> [... 0]
+func opcodeNumEqual(op *parsedOpcode, vm *Engine) error {
+	v0, err := vm.dstack.PopInt()
 	if err != nil {
 		return err
 	}
 
-	v1, err := s.dstack.PopInt()
+	v1, err := vm.dstack.PopInt()
 	if err != nil {
 		return err
 	}
 
-	if v0.Cmp(v1) == 0 {
-		s.dstack.PushInt(big.NewInt(1))
+	if v0 == v1 {
+		vm.dstack.PushInt(scriptNum(1))
 	} else {
-		s.dstack.PushInt(big.NewInt(0))
+		vm.dstack.PushInt(scriptNum(0))
 	}
 
 	return nil
 }
 
-func opcodeNumEqualVerify(op *parsedOpcode, s *Script) error {
-	err := opcodeNumEqual(op, s)
+// opcodeNumEqualVerify is a combination of opcodeNumEqual and opcodeVerify.
+//
+// Specifically, treats the top two items on the data stack as integers.  When
+// they are equal, they are replaced with a 1, otherwise a 0.  Then, it examines
+// the top item on the data stack as a boolean value and verifies it evaluates
+// to true.  An error is returned if it does not.
+//
+// Stack transformation: [... x1 x2] -> [... bool] -> [...]
+func opcodeNumEqualVerify(op *parsedOpcode, vm *Engine) error {
+	err := opcodeNumEqual(op, vm)
 	if err == nil {
-		err = opcodeVerify(op, s)
+		err = opcodeVerify(op, vm)
 	}
 	return err
 }
 
-func opcodeNumNotEqual(op *parsedOpcode, s *Script) error {
-	v0, err := s.dstack.PopInt()
+// opcodeNumNotEqual treats the top two items on the data stack as integers.
+// When they are NOT equal, they are replaced with a 1, otherwise a 0.
+//
+// Stack transformation (x1==x2): [... 5 5] -> [... 0]
+// Stack transformation (x1!=x2): [... 5 7] -> [... 1]
+func opcodeNumNotEqual(op *parsedOpcode, vm *Engine) error {
+	v0, err := vm.dstack.PopInt()
 	if err != nil {
 		return err
 	}
 
-	v1, err := s.dstack.PopInt()
+	v1, err := vm.dstack.PopInt()
 	if err != nil {
 		return err
 	}
 
-	if v0.Cmp(v1) != 0 {
-		s.dstack.PushInt(big.NewInt(1))
+	if v0 != v1 {
+		vm.dstack.PushInt(scriptNum(1))
 	} else {
-		s.dstack.PushInt(big.NewInt(0))
+		vm.dstack.PushInt(scriptNum(0))
 	}
 
 	return nil
 }
 
-func opcodeLessThan(op *parsedOpcode, s *Script) error {
-	v0, err := s.dstack.PopInt()
+// opcodeLessThan treats the top two items on the data stack as integers.  When
+// the second-to-top item is less than the top item, they are replaced with a 1,
+// otherwise a 0.
+//
+// Stack transformation: [... x1 x2] -> [... bool]
+func opcodeLessThan(op *parsedOpcode, vm *Engine) error {
+	v0, err := vm.dstack.PopInt()
 	if err != nil {
 		return err
 	}
 
-	v1, err := s.dstack.PopInt()
+	v1, err := vm.dstack.PopInt()
 	if err != nil {
 		return err
 	}
 
-	if v1.Cmp(v0) == -1 {
-		s.dstack.PushInt(big.NewInt(1))
+	if v1 < v0 {
+		vm.dstack.PushInt(scriptNum(1))
 	} else {
-		s.dstack.PushInt(big.NewInt(0))
+		vm.dstack.PushInt(scriptNum(0))
 	}
 
 	return nil
 }
 
-func opcodeGreaterThan(op *parsedOpcode, s *Script) error {
-	v0, err := s.dstack.PopInt()
+// opcodeGreaterThan treats the top two items on the data stack as integers.
+// When the second-to-top item is greater than the top item, they are replaced
+// with a 1, otherwise a 0.
+//
+// Stack transformation: [... x1 x2] -> [... bool]
+func opcodeGreaterThan(op *parsedOpcode, vm *Engine) error {
+	v0, err := vm.dstack.PopInt()
 	if err != nil {
 		return err
 	}
 
-	v1, err := s.dstack.PopInt()
+	v1, err := vm.dstack.PopInt()
 	if err != nil {
 		return err
 	}
 
-	if v1.Cmp(v0) == 1 {
-		s.dstack.PushInt(big.NewInt(1))
+	if v1 > v0 {
+		vm.dstack.PushInt(scriptNum(1))
 	} else {
-		s.dstack.PushInt(big.NewInt(0))
+		vm.dstack.PushInt(scriptNum(0))
 	}
 	return nil
 }
 
-func opcodeLessThanOrEqual(op *parsedOpcode, s *Script) error {
-	v0, err := s.dstack.PopInt()
+// opcodeLessThanOrEqual treats the top two items on the data stack as integers.
+// When the second-to-top item is less than or equal to the top item, they are
+// replaced with a 1, otherwise a 0.
+//
+// Stack transformation: [... x1 x2] -> [... bool]
+func opcodeLessThanOrEqual(op *parsedOpcode, vm *Engine) error {
+	v0, err := vm.dstack.PopInt()
 	if err != nil {
 		return err
 	}
 
-	v1, err := s.dstack.PopInt()
+	v1, err := vm.dstack.PopInt()
 	if err != nil {
 		return err
 	}
 
-	if v1.Cmp(v0) <= 0 {
-		s.dstack.PushInt(big.NewInt(1))
+	if v1 <= v0 {
+		vm.dstack.PushInt(scriptNum(1))
 	} else {
-		s.dstack.PushInt(big.NewInt(0))
+		vm.dstack.PushInt(scriptNum(0))
 	}
 	return nil
 }
 
-func opcodeGreaterThanOrEqual(op *parsedOpcode, s *Script) error {
-	v0, err := s.dstack.PopInt()
+// opcodeGreaterThanOrEqual treats the top two items on the data stack as
+// integers.  When the second-to-top item is greater than or equal to the top
+// item, they are replaced with a 1, otherwise a 0.
+//
+// Stack transformation: [... x1 x2] -> [... bool]
+func opcodeGreaterThanOrEqual(op *parsedOpcode, vm *Engine) error {
+	v0, err := vm.dstack.PopInt()
 	if err != nil {
 		return err
 	}
 
-	v1, err := s.dstack.PopInt()
+	v1, err := vm.dstack.PopInt()
 	if err != nil {
 		return err
 	}
 
-	if v1.Cmp(v0) >= 0 {
-		s.dstack.PushInt(big.NewInt(1))
+	if v1 >= v0 {
+		vm.dstack.PushInt(scriptNum(1))
 	} else {
-		s.dstack.PushInt(big.NewInt(0))
-	}
-
-	return nil
-}
-
-func opcodeMin(op *parsedOpcode, s *Script) error {
-	v0, err := s.dstack.PopInt()
-	if err != nil {
-		return err
-	}
-
-	v1, err := s.dstack.PopInt()
-	if err != nil {
-		return err
-	}
-
-	if v1.Cmp(v0) == -1 {
-		s.dstack.PushInt(new(big.Int).Set(v1))
-	} else {
-		s.dstack.PushInt(new(big.Int).Set(v0))
+		vm.dstack.PushInt(scriptNum(0))
 	}
 
 	return nil
 }
 
-func opcodeMax(op *parsedOpcode, s *Script) error {
-	v0, err := s.dstack.PopInt()
+// opcodeMin treats the top two items on the data stack as integers and replaces
+// them with the minimum of the two.
+//
+// Stack transformation: [... x1 x2] -> [... min(x1, x2)]
+func opcodeMin(op *parsedOpcode, vm *Engine) error {
+	v0, err := vm.dstack.PopInt()
 	if err != nil {
 		return err
 	}
 
-	v1, err := s.dstack.PopInt()
+	v1, err := vm.dstack.PopInt()
 	if err != nil {
 		return err
 	}
 
-	if v1.Cmp(v0) == 1 {
-		s.dstack.PushInt(new(big.Int).Set(v1))
+	if v1 < v0 {
+		vm.dstack.PushInt(v1)
 	} else {
-		s.dstack.PushInt(new(big.Int).Set(v0))
+		vm.dstack.PushInt(v0)
 	}
 
 	return nil
 }
 
-// stack input: x, min, max. Returns 1 if x is within specified range
-// (left inclusive), 0 otherwise
-func opcodeWithin(op *parsedOpcode, s *Script) error {
-	maxVal, err := s.dstack.PopInt()
+// opcodeMax treats the top two items on the data stack as integers and replaces
+// them with the maximum of the two.
+//
+// Stack transformation: [... x1 x2] -> [... max(x1, x2)]
+func opcodeMax(op *parsedOpcode, vm *Engine) error {
+	v0, err := vm.dstack.PopInt()
 	if err != nil {
 		return err
 	}
 
-	minVal, err := s.dstack.PopInt()
+	v1, err := vm.dstack.PopInt()
 	if err != nil {
 		return err
 	}
 
-	x, err := s.dstack.PopInt()
-	if err != nil {
-		return err
-	}
-
-	if x.Cmp(minVal) >= 0 && x.Cmp(maxVal) == -1 {
-		s.dstack.PushInt(big.NewInt(1))
+	if v1 > v0 {
+		vm.dstack.PushInt(v1)
 	} else {
-		s.dstack.PushInt(big.NewInt(0))
+		vm.dstack.PushInt(v0)
+	}
+
+	return nil
+}
+
+// opcodeWithin treats the top 3 items on the data stack as integers.  When the
+// value to test is within the specified range (left inclusive), they are
+// replaced with a 1, otherwise a 0.
+//
+// The top item is the max value, the second-top-item is the minimum value, and
+// the third-to-top item is the value to test.
+//
+// Stack transformation: [... x1 min max] -> [... bool]
+func opcodeWithin(op *parsedOpcode, vm *Engine) error {
+	maxVal, err := vm.dstack.PopInt()
+	if err != nil {
+		return err
+	}
+
+	minVal, err := vm.dstack.PopInt()
+	if err != nil {
+		return err
+	}
+
+	x, err := vm.dstack.PopInt()
+	if err != nil {
+		return err
+	}
+
+	if x >= minVal && x < maxVal {
+		vm.dstack.PushInt(scriptNum(1))
+	} else {
+		vm.dstack.PushInt(scriptNum(0))
 	}
 	return nil
 }
 
-// Calculate the hash of hasher over buf.
+// calcHash calculates the hash of hasher over buf.
 func calcHash(buf []byte, hasher hash.Hash) []byte {
 	hasher.Write(buf)
 	return hasher.Sum(nil)
 }
 
-// calculate hash160 which is ripemd160(sha256(data))
-func calcHash160(buf []byte) []byte {
-	return calcHash(calcHash(buf, fastsha256.New()), ripemd160.New())
-}
-
-func opcodeRipemd160(op *parsedOpcode, s *Script) error {
-	buf, err := s.dstack.PopByteArray()
+// opcodeRipemd160 treats the top item of the data stack as raw bytes and
+// replaces it with ripemd160(data).
+//
+// Stack transformation: [... x1] -> [... ripemd160(x1)]
+func opcodeRipemd160(op *parsedOpcode, vm *Engine) error {
+	buf, err := vm.dstack.PopByteArray()
 	if err != nil {
 		return err
 	}
 
-	s.dstack.PushByteArray(calcHash(buf, ripemd160.New()))
+	vm.dstack.PushByteArray(calcHash(buf, ripemd160.New()))
 	return nil
 }
 
-func opcodeSha1(op *parsedOpcode, s *Script) error {
-	buf, err := s.dstack.PopByteArray()
+// opcodeSha1 treats the top item of the data stack as raw bytes and replaces it
+// with sha1(data).
+//
+// Stack transformation: [... x1] -> [... sha1(x1)]
+func opcodeSha1(op *parsedOpcode, vm *Engine) error {
+	buf, err := vm.dstack.PopByteArray()
 	if err != nil {
 		return err
 	}
 
-	s.dstack.PushByteArray(calcHash(buf, sha1.New()))
+	hash := sha1.Sum(buf)
+	vm.dstack.PushByteArray(hash[:])
 	return nil
 }
 
-func opcodeSha256(op *parsedOpcode, s *Script) error {
-	buf, err := s.dstack.PopByteArray()
+// opcodeSha256 treats the top item of the data stack as raw bytes and replaces
+// it with sha256(data).
+//
+// Stack transformation: [... x1] -> [... sha256(x1)]
+func opcodeSha256(op *parsedOpcode, vm *Engine) error {
+	buf, err := vm.dstack.PopByteArray()
 	if err != nil {
 		return err
 	}
 
-	s.dstack.PushByteArray(calcHash(buf, fastsha256.New()))
+	hash := fastsha256.Sum256(buf)
+	vm.dstack.PushByteArray(hash[:])
 	return nil
 }
 
-func opcodeHash160(op *parsedOpcode, s *Script) error {
-	buf, err := s.dstack.PopByteArray()
+// opcodeHash160 treats the top item of the data stack as raw bytes and replaces
+// it with ripemd160(sha256(data)).
+//
+// Stack transformation: [... x1] -> [... ripemd160(sha256(x1))]
+func opcodeHash160(op *parsedOpcode, vm *Engine) error {
+	buf, err := vm.dstack.PopByteArray()
 	if err != nil {
 		return err
 	}
 
-	s.dstack.PushByteArray(calcHash160(buf))
+	hash := fastsha256.Sum256(buf)
+	vm.dstack.PushByteArray(calcHash(hash[:], ripemd160.New()))
 	return nil
 }
 
-func opcodeHash256(op *parsedOpcode, s *Script) error {
-	buf, err := s.dstack.PopByteArray()
+// opcodeHash256 treats the top item of the data stack as raw bytes and replaces
+// it with sha256(sha256(data)).
+//
+// Stack transformation: [... x1] -> [... sha256(sha256(x1))]
+func opcodeHash256(op *parsedOpcode, vm *Engine) error {
+	buf, err := vm.dstack.PopByteArray()
 	if err != nil {
 		return err
 	}
 
-	s.dstack.PushByteArray(wire.DoubleSha256(buf))
+	vm.dstack.PushByteArray(wire.DoubleSha256(buf))
 	return nil
 }
 
-func opcodeCodeSeparator(op *parsedOpcode, s *Script) error {
-	s.lastcodesep = s.scriptoff
-
+// opcodeCodeSeparator stores the current script offset as the most recently
+// seen OP_CODESEPARATOR which is used during signature checking.
+//
+// This opcode does not change the contents of the data stack.
+func opcodeCodeSeparator(op *parsedOpcode, vm *Engine) error {
+	vm.lastCodeSep = vm.scriptOff
 	return nil
 }
 
-func opcodeCheckSig(op *parsedOpcode, s *Script) error {
-
-	pkStr, err := s.dstack.PopByteArray()
+// opcodeCheckSig treats the top 2 items on the stack as a public key and a
+// signature and replaces them with a bool which indicates if the signature was
+// successfully verified.
+//
+// The process of verifying a signature requires calculating a signature hash in
+// the same way the transaction signer did.  It involves hashing portions of the
+// transaction based on the hash type byte (which is the final byte of the
+// signature) and the portion of the script starting from the most recent
+// OP_CODESEPARATOR (or the beginning of the script if there are none) to the
+// end of the script (with any other OP_CODESEPARATORs removed).  Once this
+// "script hash" is calculated, the signature is checked using standard
+// cryptographic methods against the provided public key.
+//
+// Stack transformation: [... signature pubkey] -> [... bool]
+func opcodeCheckSig(op *parsedOpcode, vm *Engine) error {
+	pkBytes, err := vm.dstack.PopByteArray()
 	if err != nil {
 		return err
 	}
 
-	sigStr, err := s.dstack.PopByteArray()
+	fullSigBytes, err := vm.dstack.PopByteArray()
 	if err != nil {
 		return err
 	}
 
-	// Signature actually needs needs to be longer than this, but we need
-	// at least  1 byte for the below. btcec will check full length upon
-	// parsing the signature.
-	if len(sigStr) < 1 {
-		s.dstack.PushBool(false)
+	// The signature actually needs needs to be longer than this, but at
+	// least 1 byte is needed for the hash type below.  The full length is
+	// checked depending on the script flags and upon parsing the signature.
+	if len(fullSigBytes) < 1 {
+		vm.dstack.PushBool(false)
 		return nil
 	}
 
-	// Trim off hashtype from the signature string.
-	hashType := SigHashType(sigStr[len(sigStr)-1])
-	sigStr = sigStr[:len(sigStr)-1]
-
-	if err := s.checkHashTypeEncoding(hashType); err != nil {
+	// Trim off hashtype from the signature string and check if the
+	// signature and pubkey conform to the strict encoding requirements
+	// depending on the flags.
+	//
+	// NOTE: When the strict encoding flags are set, any errors in the
+	// signature or public encoding here result in an immediate script error
+	// (and thus no result bool is pushed to the data stack).  This differs
+	// from the logic below where any errors in parsing the signature is
+	// treated as the signature failure resulting in false being pushed to
+	// the data stack.  This is required because the more general script
+	// validation consensus rules do not have the new strict encoding
+	// requirements enabled by the flags.
+	hashType := SigHashType(fullSigBytes[len(fullSigBytes)-1])
+	sigBytes := fullSigBytes[:len(fullSigBytes)-1]
+	if err := vm.checkHashTypeEncoding(hashType); err != nil {
 		return err
 	}
-	if err := s.checkSignatureEncoding(sigStr); err != nil {
+	if err := vm.checkSignatureEncoding(sigBytes); err != nil {
 		return err
 	}
-	if err := s.checkPubKeyEncoding(pkStr); err != nil {
+	if err := vm.checkPubKeyEncoding(pkBytes); err != nil {
 		return err
 	}
 
-	// Get script from the last OP_CODESEPARATOR and without any subsequent
-	// OP_CODESEPARATORs
-	subScript := s.subScript()
+	// Get script starting from the most recent OP_CODESEPARATOR.
+	subScript := vm.subScript()
 
-	// Unlikely to hit any cases here, but remove the signature from
-	// the script if present.
-	subScript = removeOpcodeByData(subScript, sigStr)
+	// Remove the signature since there is no way for a signature to sign
+	// itself.
+	subScript = removeOpcodeByData(subScript, fullSigBytes)
 
-	hash := calcScriptHash(subScript, hashType, &s.tx, s.txidx)
+	// Generate the signature hash based on the signature hash type.
+	hash := calcSignatureHash(subScript, hashType, &vm.tx, vm.txIdx)
 
-	pubKey, err := btcec.ParsePubKey(pkStr, btcec.S256())
+	pubKey, err := btcec.ParsePubKey(pkBytes, btcec.S256())
 	if err != nil {
-		s.dstack.PushBool(false)
+		vm.dstack.PushBool(false)
 		return nil
 	}
 
 	var signature *btcec.Signature
-	if s.verifyStrictEncoding || s.verifyDERSignatures {
-		signature, err = btcec.ParseDERSignature(sigStr, btcec.S256())
+	if vm.hasFlag(ScriptVerifyStrictEncoding) ||
+		vm.hasFlag(ScriptVerifyDERSignatures) {
+
+		signature, err = btcec.ParseDERSignature(sigBytes, btcec.S256())
 	} else {
-		signature, err = btcec.ParseSignature(sigStr, btcec.S256())
+		signature, err = btcec.ParseSignature(sigBytes, btcec.S256())
 	}
 	if err != nil {
-		s.dstack.PushBool(false)
+		vm.dstack.PushBool(false)
 		return nil
 	}
 
-	log.Tracef("%v", newLogClosure(func() string {
-		return fmt.Sprintf("op_checksig\n"+
-			"pubKey:\n%v"+
-			"pubKey.X: %v\n"+
-			"pubKey.Y: %v\n"+
-			"signature.R: %v\n"+
-			"signature.S: %v\n"+
-			"checkScriptHash:\n%v",
-			hex.Dump(pkStr), pubKey.X, pubKey.Y,
-			signature.R, signature.S, hex.Dump(hash))
-	}))
-	ok := signature.Verify(hash, pubKey)
-	s.dstack.PushBool(ok)
+	var valid bool
+	if vm.sigCache != nil {
+		var sigHash wire.ShaHash
+		copy(sigHash[:], hash)
+
+		valid = vm.sigCache.Exists(sigHash, signature, pubKey)
+		if !valid && signature.Verify(hash, pubKey) {
+			vm.sigCache.Add(sigHash, signature, pubKey)
+			valid = true
+		}
+	} else {
+		valid = signature.Verify(hash, pubKey)
+	}
+
+	vm.dstack.PushBool(valid)
 	return nil
 }
 
-func opcodeCheckSigVerify(op *parsedOpcode, s *Script) error {
-	err := opcodeCheckSig(op, s)
+// opcodeCheckSigVerify is a combination of opcodeCheckSig and opcodeVerify.
+// The opcodeCheckSig function is invoked followed by opcodeVerify.  See the
+// documentation for each of those opcodes for more details.
+//
+// Stack transformation: signature pubkey] -> [... bool] -> [...]
+func opcodeCheckSigVerify(op *parsedOpcode, vm *Engine) error {
+	err := opcodeCheckSig(op, vm)
 	if err == nil {
-		err = opcodeVerify(op, s)
+		err = opcodeVerify(op, vm)
 	}
 	return err
 }
 
 // parsedSigInfo houses a raw signature along with its parsed form and a flag
 // for whether or not it has already been parsed.  It is used to prevent parsing
-// the same signature multiple times when verify an multisig.
+// the same signature multiple times when verify a multisig.
 type parsedSigInfo struct {
 	signature       []byte
 	parsedSignature *btcec.Signature
 	parsed          bool
 }
 
-// stack; sigs <numsigs> pubkeys <numpubkeys>
-func opcodeCheckMultiSig(op *parsedOpcode, s *Script) error {
-	numKeys, err := s.dstack.PopInt()
+// opcodeCheckMultiSig treats the top item on the stack as an integer number of
+// public keys, followed by that many entries as raw data representing the public
+// keys, followed by the integer number of signatures, followed by that many
+// entries as raw data representing the signatures.
+//
+// Due to a bug in the original Satoshi client implementation, an additional
+// dummy argument is also required by the consensus rules, although it is not
+// used.  The dummy value SHOULD be an OP_0, although that is not required by
+// the consensus rules.  When the ScriptStrictMultiSig flag is set, it must be
+// OP_0.
+//
+// All of the aforementioned stack items are replaced with a bool which
+// indicates if the requisite number of signatures were successfully verified.
+//
+// See the opcodeCheckSigVerify documentation for more details about the process
+// for verifying each signature.
+//
+// Stack transformation:
+// [... dummy [sig ...] numsigs [pubkey ...] numpubkeys] -> [... bool]
+func opcodeCheckMultiSig(op *parsedOpcode, vm *Engine) error {
+	numKeys, err := vm.dstack.PopInt()
 	if err != nil {
 		return err
 	}
 
-	// PopInt promises that the int returned is 32 bit.
-	numPubKeys := int(numKeys.Int64())
+	numPubKeys := int(numKeys.Int32())
 	if numPubKeys < 0 || numPubKeys > MaxPubKeysPerMultiSig {
-		return ErrStackTooManyPubkeys
+		return ErrStackTooManyPubKeys
 	}
-	s.numOps += numPubKeys
-	if s.numOps > MaxOpsPerScript {
+	vm.numOps += numPubKeys
+	if vm.numOps > MaxOpsPerScript {
 		return ErrStackTooManyOperations
 	}
 
 	pubKeys := make([][]byte, 0, numPubKeys)
 	for i := 0; i < numPubKeys; i++ {
-		pubKey, err := s.dstack.PopByteArray()
+		pubKey, err := vm.dstack.PopByteArray()
 		if err != nil {
 			return err
 		}
 		pubKeys = append(pubKeys, pubKey)
 	}
 
-	numSigs, err := s.dstack.PopInt()
+	numSigs, err := vm.dstack.PopInt()
 	if err != nil {
 		return err
 	}
-	// PopInt promises that the int returned is 32 bit.
-	numSignatures := int(numSigs.Int64())
+	numSignatures := int(numSigs.Int32())
 	if numSignatures < 0 {
 		return fmt.Errorf("number of signatures '%d' is less than 0",
 			numSignatures)
@@ -1937,7 +2031,7 @@ func opcodeCheckMultiSig(op *parsedOpcode, s *Script) error {
 
 	signatures := make([]*parsedSigInfo, 0, numSignatures)
 	for i := 0; i < numSignatures; i++ {
-		signature, err := s.dstack.PopByteArray()
+		signature, err := vm.dstack.PopByteArray()
 		if err != nil {
 			return err
 		}
@@ -1945,24 +2039,28 @@ func opcodeCheckMultiSig(op *parsedOpcode, s *Script) error {
 		signatures = append(signatures, sigInfo)
 	}
 
-	// bug in bitcoind means we pop one more stack value than should be
-	// used.
-	dummy, err := s.dstack.PopByteArray()
+	// A bug in the original Satoshi client implementation means one more
+	// stack value than should be used must be popped.  Unfortunately, this
+	// buggy behavior is now part of the consensus and a hard fork would be
+	// required to fix it.
+	dummy, err := vm.dstack.PopByteArray()
 	if err != nil {
 		return err
 	}
 
-	if s.strictMultiSig && len(dummy) != 0 {
+	// Since the dummy argument is otherwise not checked, it could be any
+	// value which unfortunately provides a source of malleability.  Thus,
+	// there is a script flag to force an error when the value is NOT 0.
+	if vm.hasFlag(ScriptStrictMultiSig) && len(dummy) != 0 {
 		return fmt.Errorf("multisig dummy argument is not zero length: %d",
 			len(dummy))
 	}
 
-	// Trim OP_CODESEPARATORs
-	script := s.subScript()
+	// Get script starting from the most recent OP_CODESEPARATOR.
+	script := vm.subScript()
 
-	// Remove any of the signatures that happen to be in the script.
-	// can't sign somthing containing the signature you're making, after
-	// all
+	// Remove any of the signatures since there is no way for a signature to
+	// sign itself.
 	for _, sigInfo := range signatures {
 		script = removeOpcodeByData(script, sigInfo.signature)
 	}
@@ -2002,16 +2100,18 @@ func opcodeCheckMultiSig(op *parsedOpcode, s *Script) error {
 		// Only parse and check the signature encoding once.
 		var parsedSig *btcec.Signature
 		if !sigInfo.parsed {
-			if err := s.checkHashTypeEncoding(hashType); err != nil {
+			if err := vm.checkHashTypeEncoding(hashType); err != nil {
 				return err
 			}
-			if err := s.checkSignatureEncoding(signature); err != nil {
+			if err := vm.checkSignatureEncoding(signature); err != nil {
 				return err
 			}
 
 			// Parse the signature.
 			var err error
-			if s.verifyStrictEncoding || s.verifyDERSignatures {
+			if vm.hasFlag(ScriptVerifyStrictEncoding) ||
+				vm.hasFlag(ScriptVerifyDERSignatures) {
+
 				parsedSig, err = btcec.ParseDERSignature(signature,
 					btcec.S256())
 			} else {
@@ -2033,7 +2133,7 @@ func opcodeCheckMultiSig(op *parsedOpcode, s *Script) error {
 			parsedSig = sigInfo.parsedSignature
 		}
 
-		if err := s.checkPubKeyEncoding(pubKey); err != nil {
+		if err := vm.checkPubKeyEncoding(pubKey); err != nil {
 			return err
 		}
 
@@ -2043,23 +2143,61 @@ func opcodeCheckMultiSig(op *parsedOpcode, s *Script) error {
 			continue
 		}
 
-		hash := calcScriptHash(script, hashType, &s.tx, s.txidx)
+		// Generate the signature hash based on the signature hash type.
+		hash := calcSignatureHash(script, hashType, &vm.tx, vm.txIdx)
 
-		if parsedSig.Verify(hash, parsedPubKey) {
+		var valid bool
+		if vm.sigCache != nil {
+			var sigHash wire.ShaHash
+			copy(sigHash[:], hash)
+
+			valid = vm.sigCache.Exists(sigHash, parsedSig, parsedPubKey)
+			if !valid && parsedSig.Verify(hash, parsedPubKey) {
+				vm.sigCache.Add(sigHash, parsedSig, parsedPubKey)
+				valid = true
+			}
+		} else {
+			valid = parsedSig.Verify(hash, parsedPubKey)
+		}
+
+		if valid {
 			// PubKey verified, move on to the next signature.
 			signatureIdx++
 			numSignatures--
 		}
 	}
 
-	s.dstack.PushBool(success)
+	vm.dstack.PushBool(success)
 	return nil
 }
 
-func opcodeCheckMultiSigVerify(op *parsedOpcode, s *Script) error {
-	err := opcodeCheckMultiSig(op, s)
+// opcodeCheckMultiSigVerify is a combination of opcodeCheckMultiSig and
+// opcodeVerify.  The opcodeCheckMultiSig is invoked followed by opcodeVerify.
+// See the documentation for each of those opcodes for more details.
+//
+// Stack transformation:
+// [... dummy [sig ...] numsigs [pubkey ...] numpubkeys] -> [... bool] -> [...]
+func opcodeCheckMultiSigVerify(op *parsedOpcode, vm *Engine) error {
+	err := opcodeCheckMultiSig(op, vm)
 	if err == nil {
-		err = opcodeVerify(op, s)
+		err = opcodeVerify(op, vm)
 	}
 	return err
+}
+
+// OpcodeByName is a map that can be used to lookup an opcode by its
+// human-readable name (OP_CHECKMULTISIG, OP_CHECKSIG, etc).
+var OpcodeByName = make(map[string]byte)
+
+func init() {
+	// Initialize the opcode name to value map using the contents of the
+	// opcode array.  Also add entries for "OP_FALSE", "OP_TRUE", and
+	// "OP_NOP2" since they are aliases for "OP_0", "OP_1",
+	// and "OP_CHECKLOCKTIMEVERIFY" respectively.
+	for _, op := range opcodeArray {
+		OpcodeByName[op.name] = op.value
+	}
+	OpcodeByName["OP_FALSE"] = OP_FALSE
+	OpcodeByName["OP_TRUE"] = OP_TRUE
+	OpcodeByName["OP_NOP2"] = OP_CHECKLOCKTIMEVERIFY
 }

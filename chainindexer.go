@@ -1,4 +1,4 @@
-// Copyright (c) 2013-2014 Conformal Systems LLC.
+// Copyright (c) 2013-2014 The btcsuite developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -69,8 +69,8 @@ type addrIndexer struct {
 	addrIndexJobs   chan *indexBlockMsg
 	writeRequests   chan *writeIndexReq
 	progressLogger  *blockProgressLogger
-	currentIndexTip int64
-	chainTip        int64
+	currentIndexTip int32
+	chainTip        int32
 	sync.Mutex
 }
 
@@ -368,7 +368,7 @@ out:
 	for {
 		select {
 		case nextWrite := <-minHeightWrite:
-			sha, _ := nextWrite.blk.Sha() // Can never fail.
+			sha := nextWrite.blk.Sha()
 			height := nextWrite.blk.Height()
 			err := a.server.db.UpdateAddrIndexForBlock(sha, height,
 				nextWrite.addrIndex)

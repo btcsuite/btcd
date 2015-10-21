@@ -1,4 +1,4 @@
-// Copyright (c) 2013-2014 Conformal Systems LLC.
+// Copyright (c) 2013-2014 The btcsuite developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -28,7 +28,7 @@ var (
 
 // AllShas is a special value that can be used as the final sha when requesting
 // a range of shas by height to request them all.
-const AllShas = int64(^uint64(0) >> 1)
+const AllShas = int32(^uint32(0) >> 1)
 
 // Db defines a generic interface that is used to request and insert data into
 // the bitcoin block chain.  This interface is intended to be agnostic to actual
@@ -53,7 +53,7 @@ type Db interface {
 	FetchBlockBySha(sha *wire.ShaHash) (blk *btcutil.Block, err error)
 
 	// FetchBlockHeightBySha returns the block height for the given hash.
-	FetchBlockHeightBySha(sha *wire.ShaHash) (height int64, err error)
+	FetchBlockHeightBySha(sha *wire.ShaHash) (height int32, err error)
 
 	// FetchBlockHeaderBySha returns a wire.BlockHeader for the given
 	// sha.  The implementation may cache the underlying data if desired.
@@ -61,13 +61,13 @@ type Db interface {
 
 	// FetchBlockShaByHeight returns a block hash based on its height in the
 	// block chain.
-	FetchBlockShaByHeight(height int64) (sha *wire.ShaHash, err error)
+	FetchBlockShaByHeight(height int32) (sha *wire.ShaHash, err error)
 
 	// FetchHeightRange looks up a range of blocks by the start and ending
 	// heights.  Fetch is inclusive of the start height and exclusive of the
 	// ending height. To fetch all hashes from the start height until no
 	// more are present, use the special id `AllShas'.
-	FetchHeightRange(startHeight, endHeight int64) (rshalist []wire.ShaHash, err error)
+	FetchHeightRange(startHeight, endHeight int32) (rshalist []wire.ShaHash, err error)
 
 	// ExistsTxSha returns whether or not the given tx hash is present in
 	// the database
@@ -103,19 +103,19 @@ type Db interface {
 	// into the database.  The first block inserted into the database
 	// will be treated as the genesis block.  Every subsequent block insert
 	// requires the referenced parent block to already exist.
-	InsertBlock(block *btcutil.Block) (height int64, err error)
+	InsertBlock(block *btcutil.Block) (height int32, err error)
 
 	// NewestSha returns the hash and block height of the most recent (end)
 	// block of the block chain.  It will return the zero hash, -1 for
 	// the block height, and no error (nil) if there are not any blocks in
 	// the database yet.
-	NewestSha() (sha *wire.ShaHash, height int64, err error)
+	NewestSha() (sha *wire.ShaHash, height int32, err error)
 
 	// FetchAddrIndexTip returns the hash and block height of the most recent
 	// block which has had its address index populated. It will return
 	// ErrAddrIndexDoesNotExist along with a zero hash, and -1 if the
 	// addrindex hasn't yet been built up.
-	FetchAddrIndexTip() (sha *wire.ShaHash, height int64, err error)
+	FetchAddrIndexTip() (sha *wire.ShaHash, height int32, err error)
 
 	// UpdateAddrIndexForBlock updates the stored addrindex with passed
 	// index information for a particular block height. Additionally, it
@@ -124,7 +124,7 @@ type Db interface {
 	// transaction which is commited before the function returns.
 	// Addresses are indexed by the raw bytes of their base58 decoded
 	// hash160.
-	UpdateAddrIndexForBlock(blkSha *wire.ShaHash, height int64,
+	UpdateAddrIndexForBlock(blkSha *wire.ShaHash, height int32,
 		addrIndex BlockAddrIndex) error
 
 	// FetchTxsForAddr looks up and returns all transactions which either
@@ -133,8 +133,12 @@ type Db interface {
 	// should be the max number of transactions to be returned.
 	// Additionally, if the caller wishes to skip forward in the results
 	// some amount, the 'seek' represents how many results to skip.
+	// The transactions are returned in chronological order by block height
+	// from old to new, or from new to old if `reverse` is set.
 	// NOTE: Values for both `seek` and `limit` MUST be positive.
-	FetchTxsForAddr(addr btcutil.Address, skip int, limit int) ([]*TxListReply, error)
+	// It will return the array of fetched transactions, along with the amount
+	// of transactions that were actually skipped.
+	FetchTxsForAddr(addr btcutil.Address, skip int, limit int, reverse bool) ([]*TxListReply, int, error)
 
 	// DeleteAddrIndex deletes the entire addrindex stored within the DB.
 	DeleteAddrIndex() error
@@ -162,7 +166,7 @@ type TxListReply struct {
 	Sha     *wire.ShaHash
 	Tx      *wire.MsgTx
 	BlkSha  *wire.ShaHash
-	Height  int64
+	Height  int32
 	TxSpent []bool
 	Err     error
 }

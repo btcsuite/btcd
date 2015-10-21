@@ -1,4 +1,4 @@
-// Copyright (c) 2013-2015 Conformal Systems LLC.
+// Copyright (c) 2013-2015 The btcsuite developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -7,7 +7,6 @@ package txscript
 import (
 	"encoding/binary"
 	"fmt"
-	"math/big"
 )
 
 const (
@@ -228,38 +227,7 @@ func (b *ScriptBuilder) AddInt64(val int64) *ScriptBuilder {
 		return b
 	}
 
-	return b.AddData(fromInt(new(big.Int).SetInt64(val)))
-}
-
-// AddUint64 pushes the passed integer to the end of the script.  The script
-// will not be modified if pushing the data would cause the script to
-// exceed the maximum allowed script engine size.
-func (b *ScriptBuilder) AddUint64(val uint64) *ScriptBuilder {
-	if b.err != nil {
-		return b
-	}
-
-	// Pushes that would cause the script to exceed the largest allowed
-	// script size would result in a non-canonical script.
-	if len(b.script)+1 > maxScriptSize {
-		str := fmt.Sprintf("adding an unsigned integer would exceed "+
-			"the maximum allow canonical script length of %d",
-			maxScriptSize)
-		b.err = ErrScriptNotCanonical(str)
-		return b
-	}
-
-	// Fast path for small integers.
-	if val == 0 {
-		b.script = append(b.script, OP_0)
-		return b
-	}
-	if val >= 1 && val <= 16 {
-		b.script = append(b.script, byte((OP_1-1)+val))
-		return b
-	}
-
-	return b.AddData(fromInt(new(big.Int).SetUint64(val)))
+	return b.AddData(scriptNum(val).Bytes())
 }
 
 // Reset resets the script so it has no content.

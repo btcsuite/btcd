@@ -1,4 +1,4 @@
-// Copyright (c) 2014 Conformal Systems LLC.
+// Copyright (c) 2014 The btcsuite developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -30,10 +30,7 @@ func TestGenesisBlock(t *testing.T) {
 	}
 
 	// Check hash of the block against expected hash.
-	hash, err := chaincfg.MainNetParams.GenesisBlock.BlockSha()
-	if err != nil {
-		t.Fatalf("BlockSha: %v", err)
-	}
+	hash := chaincfg.MainNetParams.GenesisBlock.BlockSha()
 	if !chaincfg.MainNetParams.GenesisHash.IsEqual(&hash) {
 		t.Fatalf("TestGenesisBlock: Genesis block hash does not "+
 			"appear valid - got %v, want %v", spew.Sdump(hash),
@@ -60,10 +57,7 @@ func TestRegTestGenesisBlock(t *testing.T) {
 	}
 
 	// Check hash of the block against expected hash.
-	hash, err := chaincfg.RegressionNetParams.GenesisBlock.BlockSha()
-	if err != nil {
-		t.Errorf("BlockSha: %v", err)
-	}
+	hash := chaincfg.RegressionNetParams.GenesisBlock.BlockSha()
 	if !chaincfg.RegressionNetParams.GenesisHash.IsEqual(&hash) {
 		t.Fatalf("TestRegTestGenesisBlock: Genesis block hash does "+
 			"not appear valid - got %v, want %v", spew.Sdump(hash),
@@ -90,10 +84,7 @@ func TestTestNet3GenesisBlock(t *testing.T) {
 	}
 
 	// Check hash of the block against expected hash.
-	hash, err := chaincfg.TestNet3Params.GenesisBlock.BlockSha()
-	if err != nil {
-		t.Fatalf("BlockSha: %v", err)
-	}
+	hash := chaincfg.TestNet3Params.GenesisBlock.BlockSha()
 	if !chaincfg.TestNet3Params.GenesisHash.IsEqual(&hash) {
 		t.Fatalf("TestTestNet3GenesisBlock: Genesis block hash does "+
 			"not appear valid - got %v, want %v", spew.Sdump(hash),
@@ -120,10 +111,7 @@ func TestSimNetGenesisBlock(t *testing.T) {
 	}
 
 	// Check hash of the block against expected hash.
-	hash, err := chaincfg.SimNetParams.GenesisBlock.BlockSha()
-	if err != nil {
-		t.Fatalf("BlockSha: %v", err)
-	}
+	hash := chaincfg.SimNetParams.GenesisBlock.BlockSha()
 	if !chaincfg.SimNetParams.GenesisHash.IsEqual(&hash) {
 		t.Fatalf("TestSimNetGenesisBlock: Genesis block hash does "+
 			"not appear valid - got %v, want %v", spew.Sdump(hash),

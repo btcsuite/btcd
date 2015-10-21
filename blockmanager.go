@@ -1,4 +1,4 @@
-// Copyright (c) 2013-2014 Conformal Systems LLC.
+// Copyright (c) 2013-2014 The btcsuite developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -107,6 +107,20 @@ type processBlockResponse struct {
 	err      error
 }
 
+// fetchTransactionStoreResponse is a response sent to the reply channel of a
+// fetchTransactionStoreMsg.
+type fetchTransactionStoreResponse struct {
+	TxStore blockchain.TxStore
+	err     error
+}
+
+// fetchTransactionStoreMsg is a message type to be sent across the message
+// channel fetching the tx input store for some Tx.
+type fetchTransactionStoreMsg struct {
+	tx    *btcutil.Tx
+	reply chan fetchTransactionStoreResponse
+}
+
 // processBlockMsg is a message type to be sent across the message channel
 // for requested a block is processed.  Note this call differs from blockMsg
 // above in that blockMsg is intended for blocks that came from peers and have
@@ -136,7 +150,7 @@ type pauseMsg struct {
 // headerNode is used as a node in a list of headers that are linked together
 // between checkpoints.
 type headerNode struct {
-	height int64
+	height int32
 	sha    *wire.ShaHash
 }
 
@@ -149,7 +163,7 @@ type headerNode struct {
 type chainState struct {
 	sync.Mutex
 	newestHash        *wire.ShaHash
-	newestHeight      int64
+	newestHeight      int32
 	pastMedianTime    time.Time
 	pastMedianTimeErr error
 }
@@ -158,7 +172,7 @@ type chainState struct {
 // chain.
 //
 // This function is safe for concurrent access.
-func (c *chainState) Best() (*wire.ShaHash, int64) {
+func (c *chainState) Best() (*wire.ShaHash, int32) {
 	c.Lock()
 	defer c.Unlock()
 
@@ -193,7 +207,7 @@ type blockManager struct {
 
 // resetHeaderState sets the headers-first mode state to values appropriate for
 // syncing from a new peer.
-func (b *blockManager) resetHeaderState(newestHash *wire.ShaHash, newestHeight int64) {
+func (b *blockManager) resetHeaderState(newestHash *wire.ShaHash, newestHeight int32) {
 	b.headersFirstMode = false
 	b.headerList.Init()
 	b.startHeader = nil
@@ -211,7 +225,7 @@ func (b *blockManager) resetHeaderState(newestHash *wire.ShaHash, newestHeight i
 // This allows fast access to chain information since btcchain is currently not
 // safe for concurrent access and the block manager is typically quite busy
 // processing block and inventory.
-func (b *blockManager) updateChainState(newestHash *wire.ShaHash, newestHeight int64) {
+func (b *blockManager) updateChainState(newestHash *wire.ShaHash, newestHeight int32) {
 	b.chainState.Lock()
 	defer b.chainState.Unlock()
 
@@ -229,7 +243,7 @@ func (b *blockManager) updateChainState(newestHash *wire.ShaHash, newestHeight i
 // It returns nil when there is not one either because the height is already
 // later than the final checkpoint or some other reason such as disabled
 // checkpoints.
-func (b *blockManager) findNextHeaderCheckpoint(height int64) *chaincfg.Checkpoint {
+func (b *blockManager) findNextHeaderCheckpoint(height int32) *chaincfg.Checkpoint {
 	// There is no next checkpoint if checkpoints are disabled or there are
 	// none for this current network.
 	if cfg.DisableCheckpoints {
@@ -449,7 +463,7 @@ func (b *blockManager) handleTxMsg(tmsg *txMsg) {
 	// NOTE:  BitcoinJ, and possibly other wallets, don't follow the spec of
 	// sending an inventory message and allowing the remote peer to decide
 	// whether or not they want to request the transaction via a getdata
-	// message.  Unfortuantely the reference implementation permits
+	// message.  Unfortunately, the reference implementation permits
 	// unrequested data, so it has allowed wallets that don't follow the
 	// spec to proliferate.  While this is not ideal, there is no check here
 	// to disconnect peers for sending unsolicited transactions to provide
@@ -457,7 +471,9 @@ func (b *blockManager) handleTxMsg(tmsg *txMsg) {
 
 	// Process the transaction to include validation, insertion in the
 	// memory pool, orphan handling, etc.
-	err := tmsg.peer.server.txMemPool.ProcessTransaction(tmsg.tx, true, true)
+	allowOrphans := cfg.MaxOrphanTxs > 0
+	err := tmsg.peer.server.txMemPool.ProcessTransaction(tmsg.tx,
+		allowOrphans, true)
 
 	// Remove transaction from request maps. Either the mempool/chain
 	// already knows about it and as such we shouldn't have any more
@@ -483,7 +499,7 @@ func (b *blockManager) handleTxMsg(tmsg *txMsg) {
 		// Convert the error into an appropriate reject message and
 		// send it.
 		code, reason := errToRejectErr(err)
-		tmsg.peer.PushRejectMsg(wire.CmdBlock, code, reason, txHash,
+		tmsg.peer.PushRejectMsg(wire.CmdTx, code, reason, txHash,
 			false)
 		return
 	}
@@ -508,7 +524,7 @@ func (b *blockManager) current() bool {
 	// TODO(oga) we can get chain to return the height of each block when we
 	// parse an orphan, which would allow us to update the height of peers
 	// from what it was at initial handshake.
-	if err != nil || height < int64(b.syncPeer.lastBlock) {
+	if err != nil || height < b.syncPeer.lastBlock {
 		return false
 	}
 	return true
@@ -517,7 +533,7 @@ func (b *blockManager) current() bool {
 // handleBlockMsg handles block messages from all peers.
 func (b *blockManager) handleBlockMsg(bmsg *blockMsg) {
 	// If we didn't ask for this block then the peer is misbehaving.
-	blockSha, _ := bmsg.block.Sha()
+	blockSha := bmsg.block.Sha()
 	if _, ok := bmsg.peer.requestedBlocks[*blockSha]; !ok {
 		// The regression test intentionally sends some blocks twice
 		// to test duplicate block insertion fails.  Don't disconnect
@@ -587,8 +603,40 @@ func (b *blockManager) handleBlockMsg(bmsg *blockMsg) {
 		return
 	}
 
+	// Meta-data about the new block this peer is reporting. We use this
+	// below to update this peer's lastest block height and the heights of
+	// other peers based on their last announced block sha. This allows us
+	// to dynamically update the block heights of peers, avoiding stale heights
+	// when looking for a new sync peer. Upon acceptance of a block or
+	// recognition of an orphan, we also use this information to update
+	// the block heights over other peers who's invs may have been ignored
+	// if we are actively syncing while the chain is not yet current or
+	// who may have lost the lock announcment race.
+	var heightUpdate int32
+	var blkShaUpdate *wire.ShaHash
+
 	// Request the parents for the orphan block from the peer that sent it.
 	if isOrphan {
+		// We've just received an orphan block from a peer. In order
+		// to update the height of the peer, we try to extract the
+		// block height from the scriptSig of the coinbase transaction.
+		// Extraction is only attempted if the block's version is
+		// high enough (ver 2+).
+		header := &bmsg.block.MsgBlock().Header
+		if blockchain.ShouldHaveSerializedBlockHeight(header) {
+			coinbaseTx := bmsg.block.Transactions()[0]
+			cbHeight, err := blockchain.ExtractCoinbaseHeight(coinbaseTx)
+			if err != nil {
+				bmgrLog.Warnf("Unable to extract height from "+
+					"coinbase tx: %v", err)
+			} else {
+				bmgrLog.Debugf("Extracted height of %v from "+
+					"orphan block", cbHeight)
+				heightUpdate = int32(cbHeight)
+				blkShaUpdate = blockSha
+			}
+		}
+
 		orphanRoot := b.blockChain.GetOrphanRoot(blockSha)
 		locator, err := b.blockChain.LatestBlockLocator()
 		if err != nil {
@@ -600,7 +648,6 @@ func (b *blockManager) handleBlockMsg(bmsg *blockMsg) {
 	} else {
 		// When the block is not an orphan, log information about it and
 		// update the chain state.
-
 		b.progressLogger.LogBlockHeight(bmsg.block)
 
 		// Query the db for the latest best block since the block
@@ -608,6 +655,11 @@ func (b *blockManager) handleBlockMsg(bmsg *blockMsg) {
 		// a reorg.
 		newestSha, newestHeight, _ := b.server.db.NewestSha()
 		b.updateChainState(newestSha, newestHeight)
+
+		// Update this peer's latest block height, for future
+		// potential sync node candidacy.
+		heightUpdate = int32(newestHeight)
+		blkShaUpdate = newestSha
 
 		// Allow any clients performing long polling via the
 		// getblocktemplate RPC to be notified when the new block causes
@@ -618,6 +670,16 @@ func (b *blockManager) handleBlockMsg(bmsg *blockMsg) {
 		}
 	}
 
+	// Update the block height for this peer. But only send a message to
+	// the server for updating peer heights if this is an orphan or our
+	// chain is "current". This avoids sending a spammy amount of messages
+	// if we're syncing the chain from scratch.
+	if blkShaUpdate != nil && heightUpdate != 0 {
+		bmsg.peer.UpdateLastBlockHeight(heightUpdate)
+		if isOrphan || b.current() {
+			go b.server.UpdatePeerHeights(blkShaUpdate, int32(heightUpdate), bmsg.peer)
+		}
+	}
 	// Sync the db to disk.
 	b.server.db.Sync()
 
@@ -739,14 +801,7 @@ func (b *blockManager) handleHeadersMsg(hmsg *headersMsg) {
 	receivedCheckpoint := false
 	var finalHash *wire.ShaHash
 	for _, blockHeader := range msg.Headers {
-		blockHash, err := blockHeader.BlockSha()
-		if err != nil {
-			bmgrLog.Warnf("Failed to compute hash of header "+
-				"received from peer %s -- disconnecting",
-				hmsg.peer.addr)
-			hmsg.peer.Disconnect()
-			return
-		}
+		blockHash := blockHeader.BlockSha()
 		finalHash = &blockHash
 
 		// Ensure there is a previous header to compare against.
@@ -856,12 +911,6 @@ func (b *blockManager) haveInventory(invVect *wire.InvVect) (bool, error) {
 // handleInvMsg handles inv messages from all peers.
 // We examine the inventory advertised by the remote peer and act accordingly.
 func (b *blockManager) handleInvMsg(imsg *invMsg) {
-	// Ignore invs from peers that aren't the sync if we are not current.
-	// Helps prevent fetching a mass of orphans.
-	if imsg.peer != b.syncPeer && !b.current() {
-		return
-	}
-
 	// Attempt to find the final block in the inventory list.  There may
 	// not be one.
 	lastBlock := -1
@@ -870,6 +919,36 @@ func (b *blockManager) handleInvMsg(imsg *invMsg) {
 		if invVects[i].Type == wire.InvTypeBlock {
 			lastBlock = i
 			break
+		}
+	}
+
+	// If this inv contains a block announcement, and this isn't coming from
+	// our current sync peer or we're current, then update the last
+	// announced block for this peer. We'll use this information later to
+	// update the heights of peers based on blocks we've accepted that they
+	// previously announced.
+	if lastBlock != -1 && (imsg.peer != b.syncPeer || b.current()) {
+		imsg.peer.UpdateLastAnnouncedBlock(&invVects[lastBlock].Hash)
+	}
+
+	// Ignore invs from peers that aren't the sync if we are not current.
+	// Helps prevent fetching a mass of orphans.
+	if imsg.peer != b.syncPeer && !b.current() {
+		return
+	}
+
+	// If our chain is current and a peer announces a block we already
+	// know of, then update their current block height.
+	if lastBlock != -1 && b.current() {
+		exists, err := b.server.db.ExistsSha(&invVects[lastBlock].Hash)
+		if err == nil && exists {
+			blkHeight, err := b.server.db.FetchBlockHeightBySha(&invVects[lastBlock].Hash)
+			if err != nil {
+				bmgrLog.Warnf("Unable to fetch block height for block (sha: %v), %v",
+					&invVects[lastBlock].Hash, err)
+			} else {
+				imsg.peer.UpdateLastBlockHeight(int32(blkHeight))
+			}
 		}
 	}
 
@@ -1039,6 +1118,13 @@ out:
 					err:        err,
 				}
 
+			case fetchTransactionStoreMsg:
+				txStore, err := b.blockChain.FetchTransactionStore(msg.tx, false)
+				msg.reply <- fetchTransactionStoreResponse{
+					TxStore: txStore,
+					err:     err,
+				}
+
 			case processBlockMsg:
 				isOrphan, err := b.blockChain.ProcessBlock(
 					msg.block, b.server.timeSource,
@@ -1055,6 +1141,14 @@ out:
 				// side chain or have caused a reorg.
 				newestSha, newestHeight, _ := b.server.db.NewestSha()
 				b.updateChainState(newestSha, newestHeight)
+
+				// Allow any clients performing long polling via the
+				// getblocktemplate RPC to be notified when the new block causes
+				// their old block template to become stale.
+				rpcServer := b.server.rpcServer
+				if rpcServer != nil {
+					rpcServer.gbtWorkState.NotifyBlockConnected(msg.block.Sha())
+				}
 
 				msg.reply <- processBlockResponse{
 					isOrphan: isOrphan,
@@ -1102,12 +1196,8 @@ func (b *blockManager) handleNotifyMsg(notification *blockchain.Notification) {
 			break
 		}
 
-		// It's ok to ignore the error here since the notification is
-		// coming from the chain code which has already cached the hash.
-		hash, _ := block.Sha()
-
 		// Generate the inventory vector and relay it.
-		iv := wire.NewInvVect(wire.InvTypeBlock, hash)
+		iv := wire.NewInvVect(wire.InvTypeBlock, block.Sha())
 		b.server.RelayInventory(iv, nil)
 
 	// A block has been connected to the main block chain.
@@ -1145,7 +1235,7 @@ func (b *blockManager) handleNotifyMsg(notification *blockchain.Notification) {
 			r.ntfnMgr.NotifyBlockConnected(block)
 		}
 
-		// If we're maintaing the address index, and it is up to date
+		// If we're maintaining the address index, and it is up to date
 		// then update it based off this new block.
 		if cfg.AddrIndex && b.server.addrIndexer.IsCaughtUp() {
 			b.server.addrIndexer.UpdateAddressIndex(block)
@@ -1301,6 +1391,15 @@ func (b *blockManager) CalcNextRequiredDifficulty(timestamp time.Time) (uint32, 
 	return response.difficulty, response.err
 }
 
+// FetchTransactionStore makes use of FetchTransactionStore on an internal
+// instance of a block chain. It is safe for concurrent access.
+func (b *blockManager) FetchTransactionStore(tx *btcutil.Tx) (blockchain.TxStore, error) {
+	reply := make(chan fetchTransactionStoreResponse, 1)
+	b.msgChan <- fetchTransactionStoreMsg{tx: tx, reply: reply}
+	response := <-reply
+	return response.TxStore, response.err
+}
+
 // ProcessBlock makes use of ProcessBlock on an internal instance of a block
 // chain.  It is funneled through the block manager since btcchain is not safe
 // for concurrent access.
@@ -1347,7 +1446,8 @@ func newBlockManager(s *server) (*blockManager, error) {
 		quit:            make(chan struct{}),
 	}
 	bm.progressLogger = newBlockProgressLogger("Processed", bmgrLog)
-	bm.blockChain = blockchain.New(s.db, s.chainParams, bm.handleNotifyMsg)
+	bm.blockChain = blockchain.New(s.db, s.chainParams, bm.handleNotifyMsg,
+		s.sigCache)
 	bm.blockChain.DisableCheckpoints(cfg.DisableCheckpoints)
 	if !cfg.DisableCheckpoints {
 		// Initialize the next checkpoint based on the current height.

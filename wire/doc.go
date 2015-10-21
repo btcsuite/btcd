@@ -1,4 +1,4 @@
-// Copyright (c) 2013-2015 Conformal Systems LLC.
+// Copyright (c) 2013-2015 The btcsuite developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -151,9 +151,10 @@ Bitcoin Improvement Proposals
 
 This package includes spec changes outlined by the following BIPs:
 
-		BIP0014 (https://en.bitcoin.it/wiki/BIP_0014)
-		BIP0031 (https://en.bitcoin.it/wiki/BIP_0031)
-		BIP0035 (https://en.bitcoin.it/wiki/BIP_0035)
-		BIP0037 (https://en.bitcoin.it/wiki/BIP_0037)
+	BIP0014 (https://github.com/bitcoin/bips/blob/master/bip-0014.mediawiki)
+	BIP0031 (https://github.com/bitcoin/bips/blob/master/bip-0031.mediawiki)
+	BIP0035 (https://github.com/bitcoin/bips/blob/master/bip-0035.mediawiki)
+	BIP0037 (https://github.com/bitcoin/bips/blob/master/bip-0037.mediawiki)
+	BIP0111	(https://github.com/bitcoin/bips/blob/master/bip-0111.mediawiki)
 */
 package wire

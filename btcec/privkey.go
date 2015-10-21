@@ -1,4 +1,4 @@
-// Copyright (c) 2013-2014 Conformal Systems LLC.
+// Copyright (c) 2013-2014 The btcsuite developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -53,14 +53,12 @@ func (p *PrivateKey) ToECDSA() *ecdsa.PrivateKey {
 	return (*ecdsa.PrivateKey)(p)
 }
 
-// Sign wraps ecdsa.Sign to sign the provided hash (which should be the result
-// of hashing a larger message) using the private key.
+// Sign generates an ECDSA signature for the provided hash (which should be the result
+// of hashing a larger message) using the private key. Produced signature
+// is deterministic (same message and same key yield the same signature) and canonical
+// in accordance with RFC6979 and BIP0062.
 func (p *PrivateKey) Sign(hash []byte) (*Signature, error) {
-	r, s, err := ecdsa.Sign(rand.Reader, p.ToECDSA(), hash)
-	if err != nil {
-		return nil, err
-	}
-	return &Signature{R: r, S: s}, nil
+	return signRFC6979(p, hash)
 }
 
 // PrivKeyBytesLen defines the length in bytes of a serialized private key.

@@ -7,12 +7,11 @@ btcjson
 
 Package btcjson implements concrete types for marshalling to and from the
 bitcoin JSON-RPC API.  A comprehensive suite of tests is provided to ensure
-proper functionality.  Package btcjson is licensed under the copyfree ISC
-license.
+proper functionality.
 
-Although this package was primarily written for btcd, it has intentionally been
-designed so it can be used as a standalone package for any projects needing to
-marshal to and from bitcoin JSON-RPC requests and responses.
+Although this package was primarily written for the btcsuite, it has
+intentionally been designed so it can be used as a standalone package for any
+projects needing to marshal to and from bitcoin JSON-RPC requests and responses.
 
 Note that although it's possible to use this package directly to implement an
 RPC client, it is not recommended since it is only intended as an infrastructure
@@ -22,42 +21,6 @@ a full blown RPC client with many features such as automatic connection
 management, websocket support, automatic notification re-registration on
 reconnect, and conversion from the raw underlying RPC types (strings, floats,
 ints, etc) to higher-level types with many nice and useful properties.
-
-## JSON RPC
-
-Bitcoin provides an extensive API call list to control the chain and wallet
-servers through JSON-RPC.  These can be used to get information from the server
-or to cause the server to perform some action.
-
-The general form of the commands are:
-
-```JSON
-	{"jsonrpc": "1.0", "id":"test", "method": "getinfo", "params": []}
-```
-
-btcjson provides code to easily create these commands from go (as some of the
-commands can be fairly complex), to send the commands to a running bitcoin RPC
-server, and to handle the replies (putting them in useful Go data structures).
-
-## Sample Use
-
-```Go
-	// Create a new command.
-	cmd, err := btcjson.NewGetBlockCountCmd()
-	if err != nil {
-		// Handle error
-	}
-
-	// Marshal the command to a JSON-RPC formatted byte slice.
-	marshalled, err := btcjson.MarshalCmd(id, cmd)
-	if err != nil {
-		// Handle error
-	}
-
-	// At this point marshalled contains the raw bytes that are ready to send
-	// to the RPC server to issue the command.
-	fmt.Printf("%s\n", marshalled)
-```
 
 ## Documentation
 
@@ -78,11 +41,31 @@ http://localhost:6060/pkg/github.com/btcsuite/btcd/btcjson
 $ go get github.com/btcsuite/btcd/btcjson
 ```
 
+## Examples
+
+* [Marshal Command]
+  (http://godoc.org/github.com/btcsuite/btcd/btcjson#example-MarshalCmd)  
+  Demonstrates how to create and marshal a command into a JSON-RPC request.
+
+* [Unmarshal Command]
+  (http://godoc.org/github.com/btcsuite/btcd/btcjson#example-UnmarshalCmd)  
+  Demonstrates how to unmarshal a JSON-RPC request and then unmarshal the
+  concrete request into a concrete command.
+
+* [Marshal Response]
+  (http://godoc.org/github.com/btcsuite/btcd/btcjson#example-MarshalResponse)  
+  Demonstrates how to marshal a JSON-RPC response.
+
+* [Unmarshal Response]
+  (http://godoc.org/github.com/btcsuite/btcd/btcjson#example-package--UnmarshalResponse)  
+  Demonstrates how to unmarshal a JSON-RPC response and then unmarshal the
+  result field in the response to a concrete type.
+
 ## GPG Verification Key
 
 All official release tags are signed by Conformal so users can ensure the code
-has not been tampered with and is coming from Conformal.  To verify the
-signature perform the following:
+has not been tampered with and is coming from the btcsuite developers.  To
+verify the signature perform the following:
 
 - Download the public key from the Conformal website at
   https://opensource.conformal.com/GIT-GPG-KEY-conformal.txt
