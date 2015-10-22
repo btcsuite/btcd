@@ -108,6 +108,13 @@ func isMultiSig(pops []parsedOpcode) bool {
 	if pops[l-1].opcode.value != OP_CHECKMULTISIG {
 		return false
 	}
+
+	// Verify the number of pubkeys specified matches the actual number
+	// of pubkeys provided.
+	if l-2-1 != asSmallInt(pops[l-2].opcode) {
+		return false
+	}
+
 	for _, pop := range pops[1 : l-2] {
 		// Valid pubkeys are either 33 or 65 bytes.
 		if len(pop.data) != 33 && len(pop.data) != 65 {
