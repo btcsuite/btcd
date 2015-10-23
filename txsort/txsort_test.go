@@ -110,5 +110,15 @@ func TestSort(t *testing.T) {
 				test.unsortedHash)
 			continue
 		}
+
+		// Now sort the transaction using the mutable version and ensure
+		// the resulting hash is the expected value.
+		txsort.InPlaceSort(&tx)
+		if got := tx.TxSha().String(); got != test.sortedHash {
+			t.Errorf("SortMutate (%s): sorted hash does not match "+
+				"expected - got %v, want %v", test.name, got,
+				test.sortedHash)
+			continue
+		}
 	}
 }
