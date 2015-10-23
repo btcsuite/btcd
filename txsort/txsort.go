@@ -2,6 +2,9 @@
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
+// Provides functions for sorting tx inputs and outputs according to BIP LI01
+// (https://github.com/kristovatlas/rfc/blob/master/bips/bip-li01.mediawiki)
+
 package txsort
 
 import (
@@ -11,13 +14,9 @@ import (
 	"github.com/btcsuite/btcd/wire"
 )
 
-// TxSort
-// Provides functions for sorting tx inputs and outputs according to BIP LI01
-// (https://github.com/kristovatlas/rfc/blob/master/bips/bip-li01.mediawiki)
-
-// Sort sorts the inputs and outputs of a tx based on BIP LI01
-// It does not modify the transaction given, but returns a new copy
-// which has been sorted and may have a different txid.
+// Sort returns a new transaction with the inputs and outputs sorted based on
+// BIP LI01.  The passed transaction is not modified and the new transaction
+// might have a different hash if any sorting was done.
 func Sort(tx *wire.MsgTx) *wire.MsgTx {
 	txCopy := tx.Copy()
 	sort.Sort(sortableInputSlice(txCopy.TxIn))
@@ -25,8 +24,8 @@ func Sort(tx *wire.MsgTx) *wire.MsgTx {
 	return txCopy
 }
 
-// IsSorted checks whether tx has inputs and outputs sorted according
-// to BIP LI01.
+// IsSorted checks whether tx has inputs and outputs sorted according to BIP
+// LI01.
 func IsSorted(tx *wire.MsgTx) bool {
 	if !sort.IsSorted(sortableInputSlice(tx.TxIn)) {
 		return false
@@ -40,45 +39,39 @@ func IsSorted(tx *wire.MsgTx) bool {
 type sortableInputSlice []*wire.TxIn
 type sortableOutputSlice []*wire.TxOut
 
-// for SortableInputSlice and SortableOutputSlice, three functions are needed
+// For SortableInputSlice and SortableOutputSlice, three functions are needed
 // to make it sortable with sort.Sort() -- Len, Less, and Swap
 // Len and Swap are trivial.  Less is BIP LI01 specific.
-func (ins sortableInputSlice) Len() int {
-	return len(ins)
-}
-func (outs sortableOutputSlice) Len() int {
-	return len(outs)
-}
-
-func (ins sortableInputSlice) Swap(i, j int) {
-	ins[i], ins[j] = ins[j], ins[i]
-}
-func (outs sortableOutputSlice) Swap(i, j int) {
-	outs[i], outs[j] = outs[j], outs[i]
-}
+func (s sortableInputSlice) Len() int       { return len(s) }
+func (s sortableOutputSlice) Len() int      { return len(s) }
+func (s sortableOutputSlice) Swap(i, j int) { s[i], s[j] = s[j], s[i] }
+func (s sortableInputSlice) Swap(i, j int)  { s[i], s[j] = s[j], s[i] }
 
 // Input comparison function.
-// First sort based on input txid (reversed / rpc-style), then index
-func (ins sortableInputSlice) Less(i, j int) bool {
-	ihash := ins[i].PreviousOutPoint.Hash
-	jhash := ins[j].PreviousOutPoint.Hash
-	for b := 0; b < wire.HashSize/2; b++ {
-		ihash[b], ihash[wire.HashSize-1-b] = ihash[wire.HashSize-1-b], ihash[b]
-		jhash[b], jhash[wire.HashSize-1-b] = jhash[wire.HashSize-1-b], jhash[b]
+// First sort based on input hash (reversed / rpc-style), then index.
+func (s sortableInputSlice) Less(i, j int) bool {
+	// Input hashes are the same, so compare the index.
+	ihash := s[i].PreviousOutPoint.Hash
+	jhash := s[j].PreviousOutPoint.Hash
+	if ihash == jhash {
+		return s[i].PreviousOutPoint.Index < s[j].PreviousOutPoint.Index
 	}
-	c := bytes.Compare(ihash[:], jhash[:])
-	if c == 0 {
-		// input txids are the same, compare index
-		return ins[i].PreviousOutPoint.Index < ins[j].PreviousOutPoint.Index
+
+	// At this point, the hashes are not equal, so reverse them to
+	// big-endian and return the result of the comparison.
+	const hashSize = wire.HashSize
+	for b := 0; b < hashSize/2; b++ {
+		ihash[b], ihash[hashSize-1-b] = ihash[hashSize-1-b], ihash[b]
+		jhash[b], jhash[hashSize-1-b] = jhash[hashSize-1-b], jhash[b]
 	}
-	return c == -1.
+	return bytes.Compare(ihash[:], jhash[:]) == -1
 }
 
 // Output comparison function.
-// First sort based on amount (smallest first), then PkScript
-func (outs sortableOutputSlice) Less(i, j int) bool {
-	if outs[i].Value == outs[j].Value {
-		return bytes.Compare(outs[i].PkScript, outs[j].PkScript) < 0
+// First sort based on amount (smallest first), then PkScript.
+func (s sortableOutputSlice) Less(i, j int) bool {
+	if s[i].Value == s[j].Value {
+		return bytes.Compare(s[i].PkScript, s[j].PkScript) < 0
 	}
-	return outs[i].Value < outs[j].Value
+	return s[i].Value < s[j].Value
 }
