@@ -1149,10 +1149,10 @@ func (p *Peer) readMessage() (wire.Message, []byte, error) {
 }
 
 // writeMessage sends a bitcoin message to the peer with logging.
-func (p *Peer) writeMessage(msg wire.Message) {
+func (p *Peer) writeMessage(msg wire.Message) error {
 	// Don't do anything if we're disconnecting.
 	if atomic.LoadInt32(&p.disconnect) != 0 {
-		return
+		return nil
 	}
 	if !p.VersionKnown() {
 		switch msg.(type) {
@@ -1163,7 +1163,7 @@ func (p *Peer) writeMessage(msg wire.Message) {
 		default:
 			// Drop all messages other than version and reject if
 			// the handshake has not already been done.
-			return
+			return nil
 		}
 	}
 
@@ -1200,11 +1200,7 @@ func (p *Peer) writeMessage(msg wire.Message) {
 	if p.cfg.Listeners.OnWrite != nil {
 		p.cfg.Listeners.OnWrite(p, n, msg, err)
 	}
-	if err != nil {
-		p.Disconnect()
-		log.Errorf("Can't send message to %s: %v", p, err)
-		return
-	}
+	return err
 }
 
 // isAllowedByRegression returns whether or not the passed error is allowed by
@@ -1806,6 +1802,26 @@ cleanup:
 	log.Tracef("Peer queue handler done for %s", p)
 }
 
+// shouldLogWriteError returns whether or not the passed error, which is
+// expected to have come from writing to the remote peer in the outHandler,
+// should be logged.
+func (p *Peer) shouldLogWriteError(err error) bool {
+	// No logging when the peer is being forcibly disconnected.
+	if atomic.LoadInt32(&p.disconnect) != 0 {
+		return false
+	}
+
+	// No logging when the remote peer has been disconnected.
+	if err == io.EOF {
+		return false
+	}
+	if opErr, ok := err.(*net.OpError); ok && !opErr.Temporary() {
+		return false
+	}
+
+	return true
+}
+
 // outHandler handles all outgoing messages for the peer.  It must be run as a
 // goroutine.  It uses a buffered channel to serialize output messages while
 // allowing the sender to continue running asynchronously.
@@ -1838,7 +1854,24 @@ out:
 			}
 
 			p.stallControl <- stallControlMsg{sccSendMessage, msg.msg}
-			p.writeMessage(msg.msg)
+			err := p.writeMessage(msg.msg)
+			if err != nil {
+				p.Disconnect()
+				if p.shouldLogWriteError(err) {
+					log.Errorf("Failed to send message to "+
+						"%s: %v", p, err)
+				}
+				if msg.doneChan != nil {
+					msg.doneChan <- struct{}{}
+				}
+				continue
+			}
+
+			// At this point, the message was successfully sent, so
+			// update the last send time, signal the sender of the
+			// message that it has been sent (if requested), and
+			// signal the send queue to the deliver the next queued
+			// message.
 			p.statsMtx.Lock()
 			p.lastSend = time.Now()
 			p.statsMtx.Unlock()
