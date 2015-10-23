@@ -24,14 +24,26 @@ const (
 	// MaxPrevOutIndex is the maximum index the index field of a previous
 	// outpoint can be.
 	MaxPrevOutIndex uint32 = 0xffffffff
-)
 
-const (
-	// defaultTxInOutAlloc is the default size used for the backing array
-	// for transaction inputs and outputs.  The array will dynamically grow
-	// as needed, but this figure is intended to provide enough space for
-	// the number of inputs and outputs in a typical transaction without
-	// needing to grow the backing array multiple times.
+	// SequenceLockTimeDisabled is a flag that if set on a transaction
+	// input's sequence number, the sequence number will not be interpreted
+	// as a relative locktime.
+	SequenceLockTimeDisabled = 1 << 31
+
+	// SequenceLockTimeIsSeconds is a flag that if set on a transaction
+	// input's sequence number, the relative locktime has units of 512
+	// seconds.
+	SequenceLockTimeIsSeconds = 1 << 22
+
+	// SequenceLockTimeMask is a mask that extracts the relative locktime
+	// when masked against the transaction input sequence number.
+	SequenceLockTimeMask = 0x0000ffff
+
+	// defaultTxInOutAlloc is the default size used for the backing array for
+	// transaction inputs and outputs.  The array will dynamically grow as needed,
+	// but this figure is intended to provide enough space for the number of
+	// inputs and outputs in a typical transaction without needing to grow the
+	// backing array multiple times.
 	defaultTxInOutAlloc = 15
 
 	// minTxInPayload is the minimum payload size for a transaction input.

@@ -216,6 +216,7 @@ const (
 	OP_NOP2                = 0xb1 // 177
 	OP_CHECKLOCKTIMEVERIFY = 0xb1 // 177 - AKA OP_NOP2
 	OP_NOP3                = 0xb2 // 178
+	OP_CHECKSEQUENCEVERIFY = 0xb2 // 178 - AKA OP_NOP3
 	OP_NOP4                = 0xb3 // 179
 	OP_NOP5                = 0xb4 // 180
 	OP_NOP6                = 0xb5 // 181
@@ -417,6 +418,7 @@ var opcodeArray = [256]opcode{
 	OP_VERIFY:              {OP_VERIFY, "OP_VERIFY", 1, opcodeVerify},
 	OP_RETURN:              {OP_RETURN, "OP_RETURN", 1, opcodeReturn},
 	OP_CHECKLOCKTIMEVERIFY: {OP_CHECKLOCKTIMEVERIFY, "OP_CHECKLOCKTIMEVERIFY", 1, opcodeCheckLockTimeVerify},
+	OP_CHECKSEQUENCEVERIFY: {OP_CHECKSEQUENCEVERIFY, "OP_CHECKSEQUENCEVERIFY", 1, opcodeCheckSequenceVerify},
 
 	// Stack opcodes.
 	OP_TOALTSTACK:   {OP_TOALTSTACK, "OP_TOALTSTACK", 1, opcodeToAltStack},
@@ -499,7 +501,6 @@ var opcodeArray = [256]opcode{
 
 	// Reserved opcodes.
 	OP_NOP1:  {OP_NOP1, "OP_NOP1", 1, opcodeNop},
-	OP_NOP3:  {OP_NOP3, "OP_NOP3", 1, opcodeNop},
 	OP_NOP4:  {OP_NOP4, "OP_NOP4", 1, opcodeNop},
 	OP_NOP5:  {OP_NOP5, "OP_NOP5", 1, opcodeNop},
 	OP_NOP6:  {OP_NOP6, "OP_NOP6", 1, opcodeNop},
@@ -876,7 +877,7 @@ func opcodeN(op *parsedOpcode, vm *Engine) error {
 // the flag to discourage use of NOPs is set for select opcodes.
 func opcodeNop(op *parsedOpcode, vm *Engine) error {
 	switch op.opcode.value {
-	case OP_NOP1, OP_NOP3, OP_NOP4, OP_NOP5,
+	case OP_NOP1, OP_NOP4, OP_NOP5,
 		OP_NOP6, OP_NOP7, OP_NOP8, OP_NOP9, OP_NOP10:
 		if vm.hasFlag(ScriptDiscourageUpgradableNops) {
 			return fmt.Errorf("OP_NOP%d reserved for soft-fork "+
@@ -1009,6 +1010,25 @@ func opcodeReturn(op *parsedOpcode, vm *Engine) error {
 	return ErrStackEarlyReturn
 }
 
+// verifyLockTime is a helper function used to validate locktimes.
+func verifyLockTime(txLockTime, threshold, lockTime int64) error {
+	// The lockTimes in both the script and transaction must be of the same
+	// type.
+	if !((txLockTime < threshold && lockTime < threshold) ||
+		(txLockTime >= threshold && lockTime >= threshold)) {
+		return fmt.Errorf("mismatched locktime types -- tx locktime %d, stack "+
+			"locktime %d", txLockTime, lockTime)
+	}
+
+	if lockTime > txLockTime {
+		str := "locktime requirement not satisfied -- locktime is " +
+			"greater than the transaction locktime: %d > %d"
+		return fmt.Errorf(str, lockTime, txLockTime)
+	}
+
+	return nil
+}
+
 // opcodeCheckLockTimeVerify compares the top item on the data stack to the
 // LockTime field of the transaction containing the script signature
 // validating if the transaction outputs are spendable yet.  If flag
@@ -1043,8 +1063,9 @@ func opcodeCheckLockTimeVerify(op *parsedOpcode, vm *Engine) error {
 		return err
 	}
 
-	// In the rare event that the argument may be < 0 due to some arithmetic
-	// being done first, you can always use 0 OP_MAX OP_CHECKLOCKTIMEVERIFY.
+	// In the rare event that the argument needs to be < 0 due to some
+	// arithmetic being done first, you can always use
+	// 0 OP_MAX OP_CHECKLOCKTIMEVERIFY.
 	if lockTime < 0 {
 		return fmt.Errorf("negative locktime: %d", lockTime)
 	}
@@ -1053,19 +1074,10 @@ func opcodeCheckLockTimeVerify(op *parsedOpcode, vm *Engine) error {
 	// which the transaction is finalized or a timestamp depending on if the
 	// value is before the txscript.LockTimeThreshold.  When it is under the
 	// threshold it is a block height.
-	//
-	// The lockTimes in both the script and transaction must be of the same
-	// type.
-	if !((vm.tx.LockTime < LockTimeThreshold && int64(lockTime) < int64(LockTimeThreshold)) ||
-		(vm.tx.LockTime >= LockTimeThreshold && int64(lockTime) >= int64(LockTimeThreshold))) {
-		return fmt.Errorf("mismatched locktime types -- tx locktime %d, stack "+
-			"locktime %d", vm.tx.LockTime, lockTime)
-	}
-
-	if int64(lockTime) > int64(vm.tx.LockTime) {
-		str := "locktime requirement not satisfied -- locktime is " +
-			"greater than the transaction locktime: %d > %d"
-		return fmt.Errorf(str, lockTime, vm.tx.LockTime)
+	err = verifyLockTime(int64(vm.tx.LockTime), LockTimeThreshold,
+		int64(lockTime))
+	if err != nil {
+		return err
 	}
 
 	// The lock time feature can also be disabled, thereby bypassing
@@ -1084,6 +1096,84 @@ func opcodeCheckLockTimeVerify(op *parsedOpcode, vm *Engine) error {
 	// input being used by the opcode is locked.
 	if vm.tx.TxIn[vm.txIdx].Sequence == wire.MaxTxInSequenceNum {
 		return errors.New("transaction input is finalized")
+	}
+
+	return nil
+}
+
+// opcodeCheckSequenceVerify compares the top item on the data stack to the
+// LockTime field of the transaction containing the script signature
+// validating if the transaction outputs are spendable yet.  If flag
+// ScriptVerifyCheckSequenceVerify is not set, the code continues as if OP_NOP3
+// were executed.
+func opcodeCheckSequenceVerify(op *parsedOpcode, vm *Engine) error {
+	// If the ScriptVerifyCheckSequenceVerify script flag is not set, treat
+	// opcode as OP_NOP3 instead.
+	if !vm.hasFlag(ScriptVerifyCheckSequenceVerify) {
+		if vm.hasFlag(ScriptDiscourageUpgradableNops) {
+			return errors.New("OP_NOP3 reserved for soft-fork " +
+				"upgrades")
+		}
+		return nil
+	}
+
+	if vm.tx.Version < 2 {
+		return fmt.Errorf("invalid transaction version: %d",
+			vm.tx.Version)
+	}
+
+	// The current transaction sequence is a uint32 resulting in a maximum
+	// sequence of 2^32-1.  However, scriptNums are signed and therefore a
+	// standard 4-byte scriptNum would only support up to a maximum of
+	// 2^31-1.  Thus, a 5-byte scriptNum is used here since it will support
+	// up to 2^39-1 which allows sequences beyond the current sequence
+	// limit.
+	//
+	// PeekByteArray is used here instead of PeekInt because we do not want
+	// to be limited to a 4-byte integer for reasons specified above.
+	so, err := vm.dstack.PeekByteArray(0)
+	if err != nil {
+		return err
+	}
+	stackSequence, err := makeScriptNum(so, vm.dstack.verifyMinimalData, 5)
+	if err != nil {
+		return err
+	}
+
+	// In the rare event that the argument needs to be < 0 due to some
+	// arithmetic being done first, you can always use
+	// 0 OP_MAX OP_CHECKSEQUENCEVERIFY.
+	if stackSequence < 0 {
+		return fmt.Errorf("negative sequence: %d", stackSequence)
+	}
+
+	sequence := int64(stackSequence)
+
+	// To provide for future soft-fork extensibility, if the
+	// operand has the disabled lock-time flag set,
+	// CHECKSEQUENCEVERIFY behaves as a NOP.
+	if sequence&int64(wire.SequenceLockTimeDisabled) != 0 {
+		return nil
+	}
+
+	// Sequence numbers with their most significant bit set are not
+	// consensus constrained. Testing that the transaction's sequence
+	// number does not have this bit set prevents using this property
+	// to get around a CHECKSEQUENCEVERIFY check.
+	txSequence := int64(vm.tx.TxIn[vm.txIdx].Sequence)
+	if txSequence&int64(wire.SequenceLockTimeDisabled) != 0 {
+		return fmt.Errorf("transaction sequence has sequence "+
+			"locktime disabled bit set: 0x%x", txSequence)
+	}
+
+	// Mask off non-consensus bits before doing comparisons.
+	lockTimeMask := int64(wire.SequenceLockTimeIsSeconds |
+		wire.SequenceLockTimeMask)
+	err = verifyLockTime(txSequence&lockTimeMask,
+		wire.SequenceLockTimeIsSeconds,
+		sequence&lockTimeMask)
+	if err != nil {
+		return err
 	}
 
 	return nil
@@ -2201,4 +2291,5 @@ func init() {
 	OpcodeByName["OP_FALSE"] = OP_FALSE
 	OpcodeByName["OP_TRUE"] = OP_TRUE
 	OpcodeByName["OP_NOP2"] = OP_CHECKLOCKTIMEVERIFY
+	OpcodeByName["OP_NOP3"] = OP_CHECKSEQUENCEVERIFY
 }
