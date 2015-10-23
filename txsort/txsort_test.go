@@ -2,7 +2,7 @@
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
-package btcutil_test
+package txsort_test
 
 import (
 	"bytes"
@@ -10,26 +10,11 @@ import (
 	"testing"
 
 	"github.com/btcsuite/btcd/wire"
-	"github.com/btcsuite/btcutil"
+	"github.com/btcsuite/btcutil/txsort"
 )
 
-// TestSortTx tests SortTx function
-func TestSortTx(t *testing.T) {
-	//	 Use block 100,000 transaction 1.  Already sorted.
-	testTx := Block100000.Transactions[1]
-	sortedTx := btcutil.TxSort(testTx)
-
-	testTxid := testTx.TxSha()
-	sortedTxid := sortedTx.TxSha()
-	if !testTxid.IsEqual(&sortedTxid) {
-		t.Errorf("Sorted TxSha mismatch - got %v, want %v",
-			testTxid.String(), sortedTxid.String())
-	}
-	if !btcutil.TxIsSorted(testTx) {
-		t.Errorf("testTx %v is sorted but reported as unsorted",
-			testTxid.String())
-	}
-
+// TestSort tests Sort function
+func TestSort(t *testing.T) {
 	// Example 1 0a6a357e2f7796444e02638749d9611c008b253fb55f5dc88b739b230ed0c4c3
 	// test transaction 0a6a357e... which is the first test case of BIPLI01
 	li01Tx1bytes, err := hex.DecodeString(LI01Hex1)
@@ -43,11 +28,11 @@ func TestSortTx(t *testing.T) {
 		t.Errorf("Failed to Deserialize li01Tx from byte slice")
 	}
 
-	if btcutil.TxIsSorted(&li01Tx1) {
+	if txsort.IsSorted(&li01Tx1) {
 		t.Errorf("LI01 Test Transaction 1 seen as sorted, but isn't")
 	}
 
-	li01Tx1Sorted := btcutil.TxSort(&li01Tx1)
+	li01Tx1Sorted := txsort.Sort(&li01Tx1)
 	// txid of 0a6a357e... becomes 839503c... when sorted
 	wantSha := newShaHashFromStr("839503cb611a3e3734bd521c608f881be2293ff77b7384057ab994c794fce623")
 
@@ -78,11 +63,11 @@ func TestSortTx(t *testing.T) {
 	if err != nil {
 		t.Errorf("Failed to Deserialize li01Tx from byte slice")
 	}
-	if !btcutil.TxIsSorted(&li01Tx2) {
+	if !txsort.IsSorted(&li01Tx2) {
 		t.Errorf("LI01 Test Transaction 2 seen as unsorted, but it is sorted")
 	}
 
-	li01Tx2Sorted := btcutil.TxSort(&li01Tx2)
+	li01Tx2Sorted := txsort.Sort(&li01Tx2)
 
 	// txid of 28204cad... stays the same when sorted
 	wantSha = newShaHashFromStr("28204cad1d7fc1d199e8ef4fa22f182de6258a3eaafe1bbe56ebdcacd3069a5f")
@@ -104,11 +89,11 @@ func TestSortTx(t *testing.T) {
 	if err != nil {
 		t.Errorf("Failed to Deserialize li01Tx3 from byte slice")
 	}
-	if btcutil.TxIsSorted(&li01Tx3) {
+	if txsort.IsSorted(&li01Tx3) {
 		t.Errorf("LI01 Test Transaction 3 seen as sorted, but isn't")
 	}
 
-	li01Tx3Sorted := btcutil.TxSort(&li01Tx3)
+	li01Tx3Sorted := txsort.Sort(&li01Tx3)
 
 	// txid of 8131ffb0... changes to 0a8c246... when sorted
 	wantSha = newShaHashFromStr("0a8c246c55f6b82f094d211f4f57167bf2ea4898741d218b09bdb2536fd8d13f")
@@ -130,11 +115,11 @@ func TestSortTx(t *testing.T) {
 	if err != nil {
 		t.Errorf("Failed to Deserialize li01Tx4 from byte slice")
 	}
-	if btcutil.TxIsSorted(&li01Tx4) {
+	if txsort.IsSorted(&li01Tx4) {
 		t.Errorf("LI01 Test Transaction 4 seen as sorted, but isn't")
 	}
 
-	li01Tx4Sorted := btcutil.TxSort(&li01Tx4)
+	li01Tx4Sorted := txsort.Sort(&li01Tx4)
 
 	// txid of 8131ffb0... changes to 0a8c246... when sorted
 	wantSha = newShaHashFromStr("a3196553b928b0b6154b002fa9a1ce875adabc486fedaaaf4c17430fd4486329")
@@ -156,11 +141,11 @@ func TestSortTx(t *testing.T) {
 	if err != nil {
 		t.Errorf("Failed to Deserialize li01Tx5 from byte slice")
 	}
-	if btcutil.TxIsSorted(&li01Tx5) {
+	if txsort.IsSorted(&li01Tx5) {
 		t.Errorf("LI01 Test Transaction 5 seen as sorted, but isn't")
 	}
 
-	li01Tx5Sorted := btcutil.TxSort(&li01Tx5)
+	li01Tx5Sorted := txsort.Sort(&li01Tx5)
 
 	// txid of ff85e8f... changes to 9a6c247... when sorted
 	wantSha = newShaHashFromStr("9a6c24746de024f77cac9b2138694f11101d1c66289261224ca52a25155a7c94")

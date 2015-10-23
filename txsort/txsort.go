@@ -2,7 +2,7 @@
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
-package btcutil
+package txsort
 
 import (
 	"bytes"
@@ -15,19 +15,19 @@ import (
 // Provides functions for sorting tx inputs and outputs according to BIP LI01
 // (https://github.com/kristovatlas/rfc/blob/master/bips/bip-li01.mediawiki)
 
-// TxSort sorts the inputs and outputs of a tx based on BIP LI01
+// Sort sorts the inputs and outputs of a tx based on BIP LI01
 // It does not modify the transaction given, but returns a new copy
 // which has been sorted and may have a different txid.
-func TxSort(tx *wire.MsgTx) *wire.MsgTx {
+func Sort(tx *wire.MsgTx) *wire.MsgTx {
 	txCopy := tx.Copy()
 	sort.Sort(sortableInputSlice(txCopy.TxIn))
 	sort.Sort(sortableOutputSlice(txCopy.TxOut))
 	return txCopy
 }
 
-// TxIsSorted checks whether tx has inputs and outputs sorted according
+// IsSorted checks whether tx has inputs and outputs sorted according
 // to BIP LI01.
-func TxIsSorted(tx *wire.MsgTx) bool {
+func IsSorted(tx *wire.MsgTx) bool {
 	if !sort.IsSorted(sortableInputSlice(tx.TxIn)) {
 		return false
 	}
