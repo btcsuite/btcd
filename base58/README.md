@@ -1,33 +1,22 @@
 base58
 ==========
 
-[![Build Status](https://travis-ci.org/btcsuite/btcutil.png?branch=master)]
-(https://travis-ci.org/btcsuite/btcutil)
+[![Build Status](http://img.shields.io/travis/btcsuite/btcutil.svg)]
+(https://travis-ci.org/btcsuite/btcutil) [![ISC License]
+(http://img.shields.io/badge/license-ISC-blue.svg)](http://copyfree.org)
+[![GoDoc](https://godoc.org/github.com/btcsuite/btcutil/base58?status.png)]
+(http://godoc.org/github.com/btcsuite/btcutil/base58)
 
 Package base58 provides an API for encoding and decoding to and from the
 modified base58 encoding.  It also provides an API to do Base58Check encoding,
 as described [here](https://en.bitcoin.it/wiki/Base58Check_encoding).
 
 A comprehensive suite of tests is provided to ensure proper functionality.
-Package base58 is licensed under the copyfree ISC license.
 
-## Documentation
-
-[![GoDoc](https://godoc.org/github.com/btcsuite/btcutil/base58?status.png)]
-(http://godoc.org/github.com/btcsuite/btcutil/base58)
-
-Full `go doc` style documentation for the project can be viewed online without
-installing this package by using the GoDoc site here:
-http://godoc.org/github.com/btcsuite/btcutil/base58
-
-You can also view the documentation locally once the package is installed with
-the `godoc` tool by running `godoc -http=":6060"` and pointing your browser to
-http://localhost:6060/pkg/github.com/btcsuite/btcutil/base58
-
-## Installation
+## Installation and Updating
 
 ```bash
-$ go get github.com/btcsuite/btcutil/base58
+$ go get -u github.com/btcsuite/btcutil/base58
 ```
 
 ## Examples

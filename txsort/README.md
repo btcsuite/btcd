@@ -4,6 +4,8 @@ txsort
 [![Build Status](http://img.shields.io/travis/btcsuite/btcutil.svg)]
 (https://travis-ci.org/btcsuite/btcutil) [![ISC License]
 (http://img.shields.io/badge/license-ISC-blue.svg)](http://copyfree.org)
+[![GoDoc](http://img.shields.io/badge/godoc-reference-blue.svg)]
+(http://godoc.org/github.com/btcsuite/btcutil/txsort)
 
 Package txsort provides the transaction sorting according to BIPLI01.
 
@@ -18,19 +20,6 @@ sorting on the amount and then on the raw public key script bytes as a tie
 breaker.
 
 A comprehensive suite of tests is provided to ensure proper functionality.
-
-## Documentation
-
-[![GoDoc](https://img.shields.io/badge/godoc-reference-blue.svg)]
-(http://godoc.org/github.com/btcsuite/btcutil/txsort)
-
-Full `go doc` style documentation for the project can be viewed online without
-installing this package by using the GoDoc site here:
-http://godoc.org/github.com/btcsuite/btcutil/txsort
-
-You can also view the documentation locally once the package is installed with
-the `godoc` tool by running `godoc -http=":6060"` and pointing your browser to
-http://localhost:6060/pkg/github.com/btcsuite/btcutil/txsort
 
 ## Installation and Updating
 
