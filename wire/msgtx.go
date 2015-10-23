@@ -1,4 +1,4 @@
-// Copyright (c) 2013-2015 The btcsuite developers
+// Copyright (c) 2013-2016 The btcsuite developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -23,16 +23,28 @@ const (
 	// MaxPrevOutIndex is the maximum index the index field of a previous
 	// outpoint can be.
 	MaxPrevOutIndex uint32 = 0xffffffff
-)
 
-// defaultTxInOutAlloc is the default size used for the backing array for
-// transaction inputs and outputs.  The array will dynamically grow as needed,
-// but this figure is intended to provide enough space for the number of
-// inputs and outputs in a typical transaction without needing to grow the
-// backing array multiple times.
-const defaultTxInOutAlloc = 15
+	// SequenceLockTimeDisabled is a flag that if set on a transaction
+	// input's sequence number, the sequence number will not be interpreted
+	// as a relative locktime.
+	SequenceLockTimeDisabled uint32 = 1 << 31
 
-const (
+	// SequenceLockTimeSeconds is a flag that if set on a transaction
+	// input's sequence number, the relative locktime has units of 512
+	// seconds.
+	SequenceLockTimeSeconds uint32 = 1 << 22
+
+	// SequenceLockTimeMask is a flag that extracts the relative locktime
+	// when masked against the transaction input sequence number.
+	SequenceLockTimeMask uint32 = 0x0000ffff
+
+	// defaultTxInOutAlloc is the default size used for the backing array for
+	// transaction inputs and outputs.  The array will dynamically grow as needed,
+	// but this figure is intended to provide enough space for the number of
+	// inputs and outputs in a typical transaction without needing to grow the
+	// backing array multiple times.
+	defaultTxInOutAlloc = 15
+
 	// minTxInPayload is the minimum payload size for a transaction input.
 	// PreviousOutPoint.Hash + PreviousOutPoint.Index 4 bytes + Varint for
 	// SignatureScript length 1 byte + Sequence 4 bytes.
