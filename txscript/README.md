@@ -2,11 +2,13 @@ txscript
 ========
 
 [![Build Status](https://travis-ci.org/btcsuite/btcd.png?branch=master)]
-(https://travis-ci.org/btcsuite/btcd)
+(https://travis-ci.org/btcsuite/btcd) [![ISC License]
+(http://img.shields.io/badge/license-ISC-blue.svg)](http://copyfree.org)
+[![GoDoc](https://godoc.org/github.com/btcsuite/btcd/txscript?status.png)]
+(http://godoc.org/github.com/btcsuite/btcd/txscript)
 
 Package txscript implements the bitcoin transaction script language.  There is
-a comprehensive test suite.  Package txscript is licensed under the liberal ISC
-license.
+a comprehensive test suite.
 
 This package has intentionally been designed so it can be used as a standalone
 package for any projects needing to use or validate bitcoin transaction scripts.
@@ -18,23 +20,10 @@ the bitcoin transactions.  This language is not turing complete
 although it is still fairly powerful.  A description of the language
 can be found at https://en.bitcoin.it/wiki/Script
 
-## Documentation
-
-[![GoDoc](https://godoc.org/github.com/btcsuite/btcd/txscript?status.png)]
-(http://godoc.org/github.com/btcsuite/btcd/txscript)
-
-Full `go doc` style documentation for the project can be viewed online without
-installing this package by using the GoDoc site
-[here](http://godoc.org/github.com/btcsuite/btcd/txscript).
-
-You can also view the documentation locally once the package is installed with
-the `godoc` tool by running `godoc -http=":6060"` and pointing your browser to
-http://localhost:6060/pkg/github.com/btcsuite/btcd/txscript
-
-## Installation
+## Installation and Updating
 
 ```bash
-$ go get github.com/btcsuite/btcd/txscript
+$ go get -u github.com/btcsuite/btcd/txscript
 ```
 
 ## Examples
@@ -75,4 +64,5 @@ verify the signature perform the following:
 
 ## License
 
-Package txscript is licensed under the liberal ISC License.
+Package txscript is licensed under the [copyfree](http://copyfree.org) ISC
+License.

@@ -4,6 +4,8 @@ database
 [![Build Status](http://img.shields.io/travis/btcsuite/btcd.svg)]
 (https://travis-ci.org/btcsuite/btcd)  [![ISC License]
 (http://img.shields.io/badge/license-ISC-blue.svg)](http://copyfree.org)
+[![GoDoc](https://img.shields.io/badge/godoc-reference-blue.svg)]
+(http://godoc.org/github.com/btcsuite/btcd/database)
 
 Package database provides a database interface for the bitcoin block chain and
 transactions.
@@ -18,23 +20,10 @@ likely want to use the [btcrpcclient](https://github.com/btcsuite/btcrpcclient)
 package which makes use of the [JSON-RPC API]
 (https://github.com/btcsuite/btcd/tree/master/docs/json_rpc_api.md).
 
-## Documentation
-
-[![GoDoc](https://img.shields.io/badge/godoc-reference-blue.svg)]
-(http://godoc.org/github.com/btcsuite/btcd/database)
-
-Full `go doc` style documentation for the project can be viewed online without
-installing this package by using the GoDoc site
-[here](http://godoc.org/github.com/btcsuite/btcd/database).
-
-You can also view the documentation locally once the package is installed with
-the `godoc` tool by running `godoc -http=":6060"` and pointing your browser to
-http://localhost:6060/pkg/github.com/btcsuite/btcd/database
-
-## Installation
+## Installation and Updating
 
 ```bash
-$ go get github.com/btcsuite/btcd/database
+$ go get -u github.com/btcsuite/btcd/database
 ```
 
 ## Examples

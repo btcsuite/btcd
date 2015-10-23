@@ -4,6 +4,8 @@ peer
 [![Build Status](http://img.shields.io/travis/btcsuite/btcd.svg)]
 (https://travis-ci.org/btcsuite/btcd) [![ISC License]
 (http://img.shields.io/badge/license-ISC-blue.svg)](http://copyfree.org)
+[![GoDoc](https://img.shields.io/badge/godoc-reference-blue.svg)]
+(http://godoc.org/github.com/btcsuite/btcd/peer)
 
 Package peer provides a common base for creating and managing bitcoin network
 peers.
@@ -54,19 +56,6 @@ A quick overview of the major features peer provides are as follows:
      filtering and address randomization
  - Ability to wait for shutdown/disconnect
  - Comprehensive test coverage
-
-## Documentation
-
-[![GoDoc](https://img.shields.io/badge/godoc-reference-blue.svg)]
-(http://godoc.org/github.com/btcsuite/btcd/peer)
-
-Full `go doc` style documentation for the project can be viewed online without
-installing this package by using the GoDoc site here:
-http://godoc.org/github.com/btcsuite/btcd/peer
-
-You can also view the documentation locally once the package is installed with
-the `godoc` tool by running `godoc -http=":6060"` and pointing your browser to
-http://localhost:6060/pkg/github.com/btcsuite/btcd/peer
 
 ## Installation and Updating
 
