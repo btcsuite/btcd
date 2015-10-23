@@ -25,7 +25,7 @@ func TestSort(t *testing.T) {
 		sortedHash   string
 	}{
 		{
-			name:         "first test case from BIPLI01 - sorts inputs only",
+			name:         "first test case from BIPLI01 - sorts inputs only, based on hash",
 			hexFile:      "li01-1.hex",
 			isSorted:     false,
 			unsortedHash: "0a6a357e2f7796444e02638749d9611c008b253fb55f5dc88b739b230ed0c4c3",
@@ -39,14 +39,14 @@ func TestSort(t *testing.T) {
 			sortedHash:   "28204cad1d7fc1d199e8ef4fa22f182de6258a3eaafe1bbe56ebdcacd3069a5f",
 		},
 		{
-			name:         "block 10001 tx[1] - sorts both inputs and outputs",
+			name:         "block 100001 tx[1] - sorts outputs only, based on amount",
 			hexFile:      "li01-3.hex",
 			isSorted:     false,
 			unsortedHash: "fbde5d03b027d2b9ba4cf5d4fecab9a99864df2637b25ea4cbcb1796ff6550ca",
 			sortedHash:   "0a8c246c55f6b82f094d211f4f57167bf2ea4898741d218b09bdb2536fd8d13f",
 		},
 		{
-			name:         "block 10001 tx[2] - sorts outputs only",
+			name:         "block 100001 tx[2] - sorts both inputs and outputs",
 			hexFile:      "li01-4.hex",
 			isSorted:     false,
 			unsortedHash: "8131ffb0a2c945ecaf9b9063e59558784f9c3a74741ce6ae2a18d0571dac15bb",
