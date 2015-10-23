@@ -189,8 +189,9 @@ type MessageListeners struct {
 type Config struct {
 	// NewestBlock specifies a callback which provides the newest block
 	// details to the peer as needed.  This can be nil in which case the
-	// peer will report a block height of 0.  Typically, only full nodes
-	// will need to specify this.
+	// peer will report a block height of 0, however it is good practice for
+	// peers to specify this so their currently best known is accurately
+	// reported.
 	NewestBlock ShaFunc
 
 	// BestLocalAddress returns the best local address for a given address.
@@ -200,8 +201,9 @@ type Config struct {
 	// nil in  which case the host will be parsed as an IP address.
 	HostToNetAddress HostToNetAddrFunc
 
-	// Proxy specifies a SOCKS5 proxy (eg. 127.0.0.1:9050) to use for
-	// connections.
+	// Proxy indicates a proxy is being used for connections.  The only
+	// effect this has is to prevent leaking the tor proxy address, so it
+	// only needs to specified if using a tor proxy.
 	Proxy string
 
 	// UserAgentName specifies the user agent name to advertise.  It is
