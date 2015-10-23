@@ -62,13 +62,14 @@ Inbound and Outbound Peers
 
 A peer can either be inbound or outbound.  The caller is responsible for
 establishing the connection to remote peers and listening for incoming peers.
-This provides high flexibility for things such as using proxies, acting as a
-proxy, creating bride peers, choosing whether to listen for inbound peers, etc.
+This provides high flexibility for things such as connecting via proxies, acting
+as a proxy, creating bridge peers, choosing whether to listen for inbound peers,
+etc.
 
 For outgoing peers, the NewOutboundPeer function must be used to specify the
 configuration followed by invoking Connect with the net.Conn instance.  This
-start all async I/O goroutines and initiate the initial negotiation process.
-Once that has been completed, the peer is fully functional.
+ will start all async I/O goroutines and initiate the initial negotiation
+process.  Once that has been completed, the peer is fully functional.
 
 For inbound peers, the NewInboundPeer function must be used to specify the
 configuration and net.Conn instance followed by invoking Start.  This will start
@@ -92,18 +93,18 @@ byte counts.
 
 It is often useful to use closures which encapsulate state when specifying the
 callback handlers.  This provides a clean method for accessing that state when
-callbacks are invoked.  TODO(davec): Provide example...
+callbacks are invoked.
 
 Queuing Messages and Inventory
 
 The QueueMessage function provides the fundamental means to send messages to the
 remote peer.  As the name implies, this employs a non-blocking queue.  A done
 channel which will be notified when the message is actually sent can optionally
-be specified.  There are certain message types which are better send using other
+be specified.  There are certain message types which are better sent using other
 functions which provide additional functionality.
 
 Of special interest are inventory messages.  Rather than manually sending MsgInv
-message via Queuemessage, the inventory vectors should be queued using the
+messages via Queuemessage, the inventory vectors should be queued using the
 QueueInventory function.  It employs batching and trickling along with
 intelligent known remote peer inventory detection and avoidance through the use
 of a most-recently used algorithm.
@@ -146,8 +147,7 @@ raw message bytes using a format similar to hexdump -C.
 
 Bitcoin Improvement Proposals
 
-This package supported all BIPS support by the
-[wire](https://godoc.org/github.com/btcsuite/btcd/wire#hdr-Bitcoin_Improvement_Proposals)
-package.
+This package supports all BIPS supported by the wire packge.
+(https://godoc.org/github.com/btcsuite/btcd/wire#hdr-Bitcoin_Improvement_Proposals)
 */
 package peer
