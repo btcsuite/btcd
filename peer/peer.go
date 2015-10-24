@@ -1261,6 +1261,11 @@ func (p *Peer) shouldHandleReadError(err error) bool {
 // response for the passed wire protocol command to the pending responses map.
 func (p *Peer) maybeAddDeadline(pendingResponses map[string]time.Time, msgCmd string) {
 	// Setup a deadline for each message being sent that expects a response.
+	//
+	// NOTE: Pings are intentionally ignored here since they are typically
+	// sent asynchronously and as a result of a long backlock of messages,
+	// such as is typical in the case of initial block download, the
+	// response won't be received in time.
 	deadline := time.Now().Add(stallResponseTimeout)
 	switch msgCmd {
 	case wire.CmdVersion:
@@ -1270,12 +1275,6 @@ func (p *Peer) maybeAddDeadline(pendingResponses map[string]time.Time, msgCmd st
 	case wire.CmdGetAddr:
 		// Expects an addr message.
 		pendingResponses[wire.CmdAddr] = deadline
-
-	case wire.CmdPing:
-		// Expects a pong message in later protocol versions.
-		if p.ProtocolVersion() > wire.BIP0031Version {
-			pendingResponses[wire.CmdPong] = deadline
-		}
 
 	case wire.CmdMemPool:
 		// Expects an inv message.
