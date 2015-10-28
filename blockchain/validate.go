@@ -653,6 +653,16 @@ func (b *BlockChain) checkBlockHeaderContext(header *wire.BlockHeader, prevNode 
 	}
 
 	if !fastAdd {
+		// Reject version 3 blocks once a majority of the network has
+		// upgraded.  This is part of BIP0065.
+		if header.Version < 4 && b.isMajorityVersion(4, prevNode,
+			b.chainParams.BlockRejectNumRequired) {
+
+			str := "new blocks with version %d are no longer valid"
+			str = fmt.Sprintf(str, header.Version)
+			return ruleError(ErrBlockVersionTooOld, str)
+		}
+
 		// Reject version 2 blocks once a majority of the network has
 		// upgraded.  This is part of BIP0066.
 		if header.Version < 3 && b.isMajorityVersion(3, prevNode,
@@ -1131,6 +1141,15 @@ func (b *BlockChain) checkConnectBlock(node *blockNode, block *btcutil.Block) er
 		b.chainParams.BlockEnforceNumRequired) {
 
 		scriptFlags |= txscript.ScriptVerifyDERSignatures
+	}
+
+	// Enforce CHECKLOCKTIMEVERIFY for block versions 4+ once the majority
+	// of the network has upgraded to the enforcement threshold.  This is
+	// part of BIP0065.
+	if blockHeader.Version >= 4 && b.isMajorityVersion(4, prevNode,
+		b.chainParams.BlockEnforceNumRequired) {
+
+		scriptFlags |= txscript.ScriptVerifyCheckLockTimeVerify
 	}
 
 	// Now that the inexpensive checks are done and have passed, verify the
