@@ -24,7 +24,7 @@ const (
 	// will require changes to the generated block.  Using the wire constant
 	// for generated block version could allow creation of invalid blocks
 	// for the updated version.
-	generatedBlockVersion = 3
+	generatedBlockVersion = 4
 
 	// minHighPriority is the minimum priority value that allows a
 	// transaction to be considered high priority.

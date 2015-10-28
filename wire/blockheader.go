@@ -11,7 +11,7 @@ import (
 )
 
 // BlockVersion is the current latest supported block version.
-const BlockVersion = 3
+const BlockVersion = 4
 
 // MaxBlockHeaderPayload is the maximum number of bytes a block header can be.
 // Version 4 bytes + Timestamp 4 bytes + Bits 4 bytes + Nonce 4 bytes +
