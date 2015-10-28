@@ -688,11 +688,8 @@ func createVinListPrevOut(s *rpcServer, mtx *wire.MsgTx, chainParams *chaincfg.P
 	for _, txIn := range mtx.TxIn {
 		var vinEntry btcjson.VinPrevOut
 
-		// reset filter flag for each vin.
-		passesFilter := true
-		if len(filterAddrs) > 0 {
-			passesFilter = false
-		}
+		// reset filter flag for each.
+		passesFilter := len(filterAddrs) == 0
 
 		// The disassembled string will contain [error] inline
 		// if the script doesn't fully parse, so ignore the
@@ -755,10 +752,9 @@ func createVoutList(mtx *wire.MsgTx, chainParams *chaincfg.Params, filterAddrs [
 	voutList := []btcjson.Vout{}
 	for i, v := range mtx.TxOut {
 		var vout btcjson.Vout
-		passesFilter := true
-		if len(filterAddrs) > 0 {
-			passesFilter = false
-		}
+
+		// reset filter flag for each.
+		passesFilter := len(filterAddrs) == 0
 
 		vout.N = uint32(i)
 		vout.Value = btcutil.Amount(v.Value).ToBTC()
