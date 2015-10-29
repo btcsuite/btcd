@@ -377,11 +377,10 @@ func checkInputsStandard(tx *btcutil.Tx, txStore blockchain.TxStore) error {
 func calcMinRequiredTxRelayFee(serializedSize int64) int64 {
 	// Calculate the minimum fee for a transaction to be allowed into the
 	// mempool and relayed by scaling the base fee (which is the minimum
-	// free transaction relay fee).  minTxRelayFee is in Satoshi/KB, so
-	// divide the transaction size by 1000 to convert to kilobytes.  Also,
-	// integer division is used so fees only increase on full kilobyte
-	// boundaries.
-	minFee := (1 + serializedSize/1000) * minTxRelayFee
+	// free transaction relay fee). minTxRelayFee is in Satoshi/KB so
+	// multiply by serializedSize (which is in KB) and divide by 1000 to get
+	// minimum Satoshis.
+	minFee := (serializedSize * minTxRelayFee) / 1000
 
 	// Set the minimum fee to the maximum possible value if the calculated
 	// fee is not in the valid range for monetary amounts.
