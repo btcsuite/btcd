@@ -605,13 +605,13 @@ mempoolLoop:
 		// Skip free transactions once the block is larger than the
 		// minimum block size.
 		if sortedByFee &&
-			prioItem.feePerKB < float64(cfg.minRelayTxFee) &&
+			prioItem.feePerKB < float64(cfg.relayTxFeeRate) &&
 			blockPlusTxSize >= cfg.BlockMinSize {
 
 			minrLog.Tracef("Skipping tx %s with feePerKB %.2f "+
 				"< minTxRelayFee %d and block size %d >= "+
 				"minBlockSize %d", tx.Sha(), prioItem.feePerKB,
-				cfg.minRelayTxFee, blockPlusTxSize,
+				cfg.relayTxFeeRate, blockPlusTxSize,
 				cfg.BlockMinSize)
 			logSkippedDeps(tx, deps)
 			continue

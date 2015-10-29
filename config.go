@@ -115,7 +115,8 @@ type config struct {
 	CPUProfile         string        `long:"cpuprofile" description:"Write CPU profile to the specified file"`
 	DebugLevel         string        `short:"d" long:"debuglevel" description:"Logging level for all subsystems {trace, debug, info, warn, error, critical} -- You may also specify <subsystem>=<level>,<subsystem2>=<level>,... to set the log level for individual subsystems -- Use show to list available subsystems"`
 	Upnp               bool          `long:"upnp" description:"Use UPnP to map our listening port outside of NAT"`
-	MinRelayTxFee      float64       `long:"minrelaytxfee" description:"The minimum transaction fee in BTC/kB to be considered a non-zero fee."`
+	MinRelayTxFee      float64       `long:"minrelaytxfee" description:"DEPRECATED -- Use the --relaytxfeerate"`
+	RelayTxFeeRate     float64       `long:"relaytxfeerate" description:"The minimum transaction fee in BTC/kB to be considered a non-zero fee."`
 	FreeTxRelayLimit   float64       `long:"limitfreerelay" description:"Limit relay of transactions with no transaction fee to the given amount in thousands of bytes per minute"`
 	NoRelayPriority    bool          `long:"norelaypriority" description:"Do not require free or low-fee transactions to have high priority for relaying"`
 	MaxOrphanTxs       int           `long:"maxorphantx" description:"Max number of orphan transactions to keep in memory"`
@@ -134,7 +135,7 @@ type config struct {
 	oniondial          func(string, string) (net.Conn, error)
 	dial               func(string, string) (net.Conn, error)
 	miningAddrs        []btcutil.Address
-	minRelayTxFee      btcutil.Amount
+	relayTxFeeRate     btcutil.Amount
 }
 
 // serviceOptions defines the configuration options for btcd as a service on
@@ -331,7 +332,8 @@ func loadConfig() (*config, []string, error) {
 		DbType:            defaultDbType,
 		RPCKey:            defaultRPCKeyFile,
 		RPCCert:           defaultRPCCertFile,
-		MinRelayTxFee:     defaultMinRelayTxFee.ToBTC(),
+		MinRelayTxFee:     defaultRelayTxFeeRate.ToBTC(),
+		RelayTxFeeRate:    defaultRelayTxFeeRate.ToBTC(),
 		FreeTxRelayLimit:  defaultFreeTxRelayLimit,
 		BlockMinSize:      defaultBlockMinSize,
 		BlockMaxSize:      defaultBlockMaxSize,
@@ -607,13 +609,27 @@ func loadConfig() (*config, []string, error) {
 	}
 
 	// Validate the the minrelaytxfee.
-	cfg.minRelayTxFee, err = btcutil.NewAmount(cfg.MinRelayTxFee)
+	cfg.relayTxFeeRate, err = btcutil.NewAmount(cfg.MinRelayTxFee)
 	if err != nil {
 		str := "%s: invalid minrelaytxfee: %v"
 		err := fmt.Errorf(str, funcName, err)
 		fmt.Fprintln(os.Stderr, err)
 		fmt.Fprintln(os.Stderr, usageMessage)
 		return nil, nil, err
+	}
+
+	// If RelayTxFeeRate is non-default we apply it over cfg.relayTxFeeRate
+	// However if it is default we shouldn't because its possible
+	// that the deprecated 'minRelayTxFee' is being used.
+	if cfg.RelayTxFeeRate != defaultRelayTxFeeRate.ToBTC() {
+		cfg.relayTxFeeRate, err = btcutil.NewAmount(cfg.RelayTxFeeRate)
+		if err != nil {
+			str := "%s: invalid relaytxfeerate: %v"
+			err := fmt.Errorf(str, funcName, err)
+			fmt.Fprintln(os.Stderr, err)
+			fmt.Fprintln(os.Stderr, usageMessage)
+			return nil, nil, err
+		}
 	}
 
 	// Limit the max block size to a sane value.

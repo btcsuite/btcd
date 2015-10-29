@@ -63,12 +63,12 @@ const (
 	// (1 + 15*74 + 3) + (15*34 + 3) + 23 = 1650
 	maxStandardSigScriptSize = 1650
 
-	// defaultMinRelayTxFee is the minimum fee in satoshi that is required
+	// defaultRelayTxFeeRate is the default fee in satoshi/kB that is required
 	// for a transaction to be treated as free for relay and mining
 	// purposes.  It is also used to help determine if a transaction is
 	// considered dust and as a base for calculating minimum required fees
 	// for larger transactions.  This value is in Satoshi/1000 bytes.
-	defaultMinRelayTxFee = btcutil.Amount(1000)
+	defaultRelayTxFeeRate = btcutil.Amount(1000)
 )
 
 // TxDesc is a descriptor containing a transaction in the mempool and the
@@ -179,7 +179,7 @@ func (mp *txMemPool) checkTransactionStandard(tx *btcutil.Tx, height int32) erro
 		// "dust".
 		if scriptClass == txscript.NullDataTy {
 			numNullDataOutputs++
-		} else if isDust(txOut, cfg.minRelayTxFee) {
+		} else if isDust(txOut, cfg.relayTxFeeRate) {
 			str := fmt.Sprintf("transaction output %d: payment "+
 				"of %d is dust", i, txOut.Value)
 			return txRuleError(wire.RejectDust, str)
@@ -888,7 +888,7 @@ func (mp *txMemPool) maybeAcceptTransaction(tx *btcutil.Tx, isNew, rateLimit boo
 	// transaction does not exceeed 1000 less than the reserved space for
 	// high-priority transactions, don't require a fee for it.
 	serializedSize := int64(tx.MsgTx().SerializeSize())
-	minFee := calcMinRequiredTxRelayFee(serializedSize, cfg.minRelayTxFee)
+	minFee := calcMinRequiredTxRelayFee(serializedSize, cfg.relayTxFeeRate)
 	if serializedSize >= (defaultBlockPrioritySize-1000) && txFee < minFee {
 		str := fmt.Sprintf("transaction %v has %d fees which is under "+
 			"the required amount of %d", txHash, txFee,
