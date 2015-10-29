@@ -203,6 +203,8 @@ information.
 	  for the underlying JSON-RPC command and return values
     * [wire](https://github.com/btcsuite/btcd/tree/master/wire) - Implements the
 	  Bitcoin wire protocol
+    * [peer](https://github.com/btcsuite/btcd/tree/master/peer) -
+	  Provides a common base for creating and managing Bitcoin network peers.
     * [blockchain](https://github.com/btcsuite/btcd/tree/master/blockchain) -
 	  Implements Bitcoin block handling and chain selection rules
     * [txscript](https://github.com/btcsuite/btcd/tree/master/txscript) -

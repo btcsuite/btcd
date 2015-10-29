@@ -33,6 +33,11 @@ const (
 	// executed.
 	ScriptDiscourageUpgradableNops
 
+	// ScriptVerifyCheckLockTimeVerify defines whether to verify that
+	// a transaction output is spendable based on the locktime.
+	// This is BIP0065.
+	ScriptVerifyCheckLockTimeVerify
+
 	// ScriptVerifyCleanStack defines that the stack must contain only
 	// one stack element after evaluation and that the element must be
 	// true if interpreted as a boolean.  This is rule 6 of BIP0062.

@@ -12,7 +12,7 @@ set -ex
 # Automatic checks
 test -z "$(gofmt -l -w . | tee /dev/stderr)"
 test -z "$(goimports -l -w . | tee /dev/stderr)"
-test -z "$(golint ./... | grep -v 'ALL_CAPS\|OP_\|NewFieldVal\|Id\|RpcCommand\|RpcRawCommand\|RpcSend\|Dns' | tee /dev/stderr)"
+test -z "$(golint ./... | grep -v 'ALL_CAPS\|OP_\|NewFieldVal\|RpcCommand\|RpcRawCommand\|RpcSend\|Dns' | tee /dev/stderr)"
 test -z "$(go tool vet . 2>&1 | grep -v 'Example\|newestSha' | tee /dev/stderr)"
 env GORACE="halt_on_error=1" go test -v -race ./...
 

@@ -79,7 +79,7 @@ func (msg *MsgReject) BtcDecode(r io.Reader, pver uint32) error {
 	}
 
 	// Command that was rejected.
-	cmd, err := readVarString(r, pver)
+	cmd, err := ReadVarString(r, pver)
 	if err != nil {
 		return err
 	}
@@ -93,7 +93,7 @@ func (msg *MsgReject) BtcDecode(r io.Reader, pver uint32) error {
 
 	// Human readable string with specific details (over and above the
 	// reject code above) about why the command was rejected.
-	reason, err := readVarString(r, pver)
+	reason, err := ReadVarString(r, pver)
 	if err != nil {
 		return err
 	}
@@ -121,7 +121,7 @@ func (msg *MsgReject) BtcEncode(w io.Writer, pver uint32) error {
 	}
 
 	// Command that was rejected.
-	err := writeVarString(w, pver, msg.Cmd)
+	err := WriteVarString(w, pver, msg.Cmd)
 	if err != nil {
 		return err
 	}
@@ -134,7 +134,7 @@ func (msg *MsgReject) BtcEncode(w io.Writer, pver uint32) error {
 
 	// Human readable string with specific details (over and above the
 	// reject code above) about why the command was rejected.
-	err = writeVarString(w, pver, msg.Reason)
+	err = WriteVarString(w, pver, msg.Reason)
 	if err != nil {
 		return err
 	}
