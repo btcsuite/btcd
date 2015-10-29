@@ -22,10 +22,12 @@ func TestCalcMinRequiredTxRelayFee(t *testing.T) {
 		want     int64          // Expected fee.
 	}{
 		{
-			"zero value with default minimum relay fee",
-			0,
-			defaultMinRelayTxFee,
-			0,
+			// Ensure combination of size and fee that are less than 1000
+			// produce a non-zero fee.
+			"250 bytes with relay fee of 3",
+			250,
+			3,
+			3,
 		},
 		{
 			"100 bytes with default minimum relay fee",
