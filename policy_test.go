@@ -37,7 +37,7 @@ func TestCalcMinRequiredTxRelayFee(t *testing.T) {
 			"max standard tx size with default minimum relay fee",
 			maxStandardTxSize,
 			defaultMinRelayTxFee,
-			101000,
+			100000,
 		},
 		{
 			"max standard tx size with max satoshi relay fee",
