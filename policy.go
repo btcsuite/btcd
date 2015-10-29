@@ -26,11 +26,10 @@ const (
 func calcMinRequiredTxRelayFee(serializedSize int64, minRelayTxFee btcutil.Amount) int64 {
 	// Calculate the minimum fee for a transaction to be allowed into the
 	// mempool and relayed by scaling the base fee (which is the minimum
-	// free transaction relay fee).  minRelayTxFee is in Satoshi/KB, so
-	// divide the transaction size by 1000 to convert to kilobytes.  Also,
-	// integer division is used so fees only increase on full kilobyte
-	// boundaries.
-	minFee := (1 + serializedSize/1000) * int64(minRelayTxFee)
+	// free transaction relay fee). minTxRelayFee is in Satoshi/KB so
+	// multiply by serializedSize (which is in KB) and divide by 1000 to get
+	// minimum Satoshis.
+	minFee := (serializedSize * int64(minRelayTxFee)) / 1000
 
 	// Set the minimum fee to the maximum possible value if the calculated
 	// fee is not in the valid range for monetary amounts.
