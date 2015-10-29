@@ -29,11 +29,7 @@ func calcMinRequiredTxRelayFee(serializedSize int64, minRelayTxFee btcutil.Amoun
 	// free transaction relay fee). minTxRelayFee is in Satoshi/KB so
 	// multiply by serializedSize (which is in KB) and divide by 1000 to get
 	// minimum Satoshis.
-	minFee := int64(minRelayTxFee)
-	// If we have more than 1KB calculate the new minFee
-	if serializedSize > 1000 {
-		minFee = (serializedSize * int64(minRelayTxFee)) / 1000
-	}
+	minFee := (serializedSize * int64(minRelayTxFee)) / 1000
 
 	// Set the minimum fee to the maximum possible value if the calculated
 	// fee is not in the valid range for monetary amounts.
