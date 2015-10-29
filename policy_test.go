@@ -22,28 +22,60 @@ func TestCalcMinRequiredTxRelayFee(t *testing.T) {
 		want     int64          // Expected fee.
 	}{
 		{
-			"zero value with default minimum relay fee",
-			0,
-			defaultMinRelayTxFee,
-			int64(defaultMinRelayTxFee),
+			// Ensure combination of size and fee that are less than 1000
+			// produce a non-zero fee.
+			"250 bytes with relay fee of 3",
+			250,
+			3,
+			3,
 		},
 		{
 			"100 bytes with default minimum relay fee",
 			100,
 			defaultMinRelayTxFee,
-			int64(defaultMinRelayTxFee),
+			100,
 		},
 		{
 			"max standard tx size with default minimum relay fee",
 			maxStandardTxSize,
 			defaultMinRelayTxFee,
-			101000,
+			100000,
 		},
 		{
 			"max standard tx size with max satoshi relay fee",
 			maxStandardTxSize,
 			btcutil.MaxSatoshi,
 			btcutil.MaxSatoshi,
+		},
+		{
+			"1500 bytes with 5000 relay fee",
+			1500,
+			5000,
+			7500,
+		},
+		{
+			"1500 bytes with 3000 relay fee",
+			1500,
+			3000,
+			4500,
+		},
+		{
+			"782 bytes with 5000 relay fee",
+			782,
+			5000,
+			3910,
+		},
+		{
+			"782 bytes with 3000 relay fee",
+			782,
+			3000,
+			2346,
+		},
+		{
+			"782 bytes with 2550 relay fee",
+			782,
+			2550,
+			1994,
 		},
 	}
 
