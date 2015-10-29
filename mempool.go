@@ -196,6 +196,77 @@ func (mp *txMemPool) checkTransactionStandard(tx *btcutil.Tx, height int32) erro
 	return nil
 }
 
+// checkInputsStandard performs a series of checks on a transaction's inputs
+// to ensure they are "standard".  A standard transaction input is one that
+// that consumes the expected number of elements from the stack and that number
+// is the same as the output script pushes.  This help prevent resource
+// exhaustion attacks by "creative" use of scripts that are super expensive to
+// process like OP_DUP OP_CHECKSIG OP_DROP repeated a large number of times
+// followed by a final OP_TRUE.
+func checkInputsStandard(tx *btcutil.Tx, txStore blockchain.TxStore) error {
+	// NOTE: The reference implementation also does a coinbase check here,
+	// but coinbases have already been rejected prior to calling this
+	// function so no need to recheck.
+
+	for i, txIn := range tx.MsgTx().TxIn {
+		// It is safe to elide existence and index checks here since
+		// they have already been checked prior to calling this
+		// function.
+		prevOut := txIn.PreviousOutPoint
+		originTx := txStore[prevOut.Hash].Tx.MsgTx()
+		originPkScript := originTx.TxOut[prevOut.Index].PkScript
+
+		// Calculate stats for the script pair.
+		scriptInfo, err := txscript.CalcScriptInfo(txIn.SignatureScript,
+			originPkScript, true)
+		if err != nil {
+			str := fmt.Sprintf("transaction input #%d script parse "+
+				"failure: %v", i, err)
+			return txRuleError(wire.RejectNonstandard, str)
+		}
+
+		// A negative value for expected inputs indicates the script is
+		// non-standard in some way.
+		if scriptInfo.ExpectedInputs < 0 {
+			str := fmt.Sprintf("transaction input #%d expects %d "+
+				"inputs", i, scriptInfo.ExpectedInputs)
+			return txRuleError(wire.RejectNonstandard, str)
+		}
+
+		// The script pair is non-standard if the number of available
+		// inputs does not match the number of expected inputs.
+		if scriptInfo.NumInputs != scriptInfo.ExpectedInputs {
+			str := fmt.Sprintf("transaction input #%d expects %d "+
+				"inputs, but referenced output script provides "+
+				"%d", i, scriptInfo.ExpectedInputs,
+				scriptInfo.NumInputs)
+			return txRuleError(wire.RejectNonstandard, str)
+		}
+	}
+
+	return nil
+}
+
+// calcMinRequiredTxRelayFee returns the minimum transaction fee required for a
+// transaction with the passed serialized size to be accepted into the memory
+// pool and relayed.
+func calcMinRequiredTxRelayFee(serializedSize int64) int64 {
+	// Calculate the minimum fee for a transaction to be allowed into the
+	// mempool and relayed by scaling the base fee (which is the minimum
+	// free transaction relay fee). minTxRelayFee is in Satoshi/KB so
+	// multiply by serializedSize (which is in KB) and divide by 1000 to get
+	// minimum Satoshis.
+	minFee := (serializedSize * minTxRelayFee) / 1000
+
+	// Set the minimum fee to the maximum possible value if the calculated
+	// fee is not in the valid range for monetary amounts.
+	if minFee < 0 || minFee > btcutil.MaxSatoshi {
+		minFee = btcutil.MaxSatoshi
+	}
+
+	return minFee
+}
+
 // removeOrphan is the internal function which implements the public
 // RemoveOrphan.  See the comment for RemoveOrphan for more details.
 //
