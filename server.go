@@ -14,6 +14,7 @@ import (
 	"net"
 	"runtime"
 	"strconv"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -2073,6 +2074,13 @@ func parseListeners(addrs []string) ([]string, []string, bool, error) {
 			ipv6ListenAddrs = append(ipv6ListenAddrs, addr)
 			haveWildcard = true
 			continue
+		}
+
+		// Strip IPv6 zone id if present since net.ParseIP does not
+		// handle it.
+		zoneIndex := strings.LastIndex(host, "%")
+		if zoneIndex > 0 {
+			host = host[:zoneIndex]
 		}
 
 		// Parse the IP.
