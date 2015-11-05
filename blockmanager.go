@@ -1215,11 +1215,11 @@ func (b *blockManager) handleNotifyMsg(notification *blockchain.Notification) {
 		// connected block from the transaction pool.  Secondly, remove any
 		// transactions which are now double spends as a result of these
 		// new transactions.  Finally, remove any transaction that is
-		// no longer an orphan.  Note that removing a transaction from
-		// pool also removes any transactions which depend on it,
-		// recursively.
+		// no longer an orphan. Transactions which depend on a confirmed
+		// transaction are NOT removed recursively because they are still
+		// valid.
 		for _, tx := range block.Transactions()[1:] {
-			b.server.txMemPool.RemoveTransaction(tx)
+			b.server.txMemPool.RemoveTransaction(tx, false)
 			b.server.txMemPool.RemoveDoubleSpends(tx)
 			b.server.txMemPool.RemoveOrphan(tx.Sha())
 			b.server.txMemPool.ProcessOrphans(tx.Sha())
@@ -1261,7 +1261,7 @@ func (b *blockManager) handleNotifyMsg(notification *blockchain.Notification) {
 				// Remove the transaction and all transactions
 				// that depend on it if it wasn't accepted into
 				// the transaction pool.
-				b.server.txMemPool.RemoveTransaction(tx)
+				b.server.txMemPool.RemoveTransaction(tx, true)
 			}
 		}
 
