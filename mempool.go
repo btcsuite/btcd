@@ -398,13 +398,15 @@ func (mp *txMemPool) HaveTransaction(hash *wire.ShaHash) bool {
 // RemoveTransaction.  See the comment for RemoveTransaction for more details.
 //
 // This function MUST be called with the mempool lock held (for writes).
-func (mp *txMemPool) removeTransaction(tx *btcutil.Tx) {
-	// Remove any transactions which rely on this one.
+func (mp *txMemPool) removeTransaction(tx *btcutil.Tx, removeDepending bool) {
 	txHash := tx.Sha()
-	for i := uint32(0); i < uint32(len(tx.MsgTx().TxOut)); i++ {
-		outpoint := wire.NewOutPoint(txHash, i)
-		if txRedeemer, exists := mp.outpoints[*outpoint]; exists {
-			mp.removeTransaction(txRedeemer)
+	if removeDepending {
+		// Remove any transactions which rely on this one.
+		for i := uint32(0); i < uint32(len(tx.MsgTx().TxOut)); i++ {
+			outpoint := wire.NewOutPoint(txHash, i)
+			if txRedeemer, exists := mp.outpoints[*outpoint]; exists {
+				mp.removeTransaction(txRedeemer, true)
+			}
 		}
 	}
 
@@ -466,16 +468,17 @@ func (mp *txMemPool) removeScriptFromAddrIndex(pkScript []byte, tx *btcutil.Tx) 
 	return nil
 }
 
-// RemoveTransaction removes the passed transaction and any transactions which
-// depend on it from the memory pool.
+// RemoveTransaction removes the passed transaction from the mempool. If
+// removeDepending flag is set, any transactions which depend on the
+// removed transaction will also be removed recursively from the mempool.
 //
 // This function is safe for concurrent access.
-func (mp *txMemPool) RemoveTransaction(tx *btcutil.Tx) {
+func (mp *txMemPool) RemoveTransaction(tx *btcutil.Tx, removeDepending bool) {
 	// Protect concurrent access.
 	mp.Lock()
 	defer mp.Unlock()
 
-	mp.removeTransaction(tx)
+	mp.removeTransaction(tx, removeDepending)
 }
 
 // RemoveDoubleSpends removes all transactions which spend outputs spent by the
@@ -493,7 +496,7 @@ func (mp *txMemPool) RemoveDoubleSpends(tx *btcutil.Tx) {
 	for _, txIn := range tx.MsgTx().TxIn {
 		if txRedeemer, ok := mp.outpoints[txIn.PreviousOutPoint]; ok {
 			if !txRedeemer.Sha().IsEqual(tx.Sha()) {
-				mp.removeTransaction(txRedeemer)
+				mp.removeTransaction(txRedeemer, true)
 			}
 		}
 	}
