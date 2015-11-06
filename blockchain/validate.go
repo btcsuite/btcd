@@ -240,13 +240,14 @@ func CheckTransactionSanity(tx *btcutil.Tx) error {
 			return ruleError(ErrBadTxOutValue, str)
 		}
 
-		// TODO(davec): No need to check < 0 here as satoshi is
-		// guaranteed to be positive per the above check.  Also need
-		// to add overflow checks.
+		// Two's complement int64 overflow guarantees that any overflow
+		// is detected and reported.  This is impossible for Bitcoin, but
+		// perhaps possible if an alt increases the total money supply.
 		totalSatoshi += satoshi
 		if totalSatoshi < 0 {
 			str := fmt.Sprintf("total value of all transaction "+
-				"outputs has negative value of %v", totalSatoshi)
+				"outputs exceeds max allowed value of %v",
+				btcutil.MaxSatoshi)
 			return ruleError(ErrBadTxOutValue, str)
 		}
 		if totalSatoshi > btcutil.MaxSatoshi {
