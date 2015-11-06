@@ -240,22 +240,17 @@ func CheckTransactionSanity(tx *btcutil.Tx) error {
 			return ruleError(ErrBadTxOutValue, str)
 		}
 
-		// TODO(davec): No need to check < 0 here as satoshi is
-		// guaranteed to be positive per the above check.  Also need
-		// to add overflow checks.
+		// Verify that the total sum of all output values does not
+		// exceed the maximum producible amount.  This check and the
+		// totalSatoshi increment below will not overflow or underflow
+		// an int64 due to the checks above.
+		if totalSatoshi-btcutil.MaxSatoshi+satoshi > 0 {
+			str := fmt.Sprintf("total value of all transaction "+
+				"outputs exceeds the maximum allowed value "+
+				"of %v", btcutil.MaxSatoshi)
+			return ruleError(ErrBadTxOutValue, str)
+		}
 		totalSatoshi += satoshi
-		if totalSatoshi < 0 {
-			str := fmt.Sprintf("total value of all transaction "+
-				"outputs has negative value of %v", totalSatoshi)
-			return ruleError(ErrBadTxOutValue, str)
-		}
-		if totalSatoshi > btcutil.MaxSatoshi {
-			str := fmt.Sprintf("total value of all transaction "+
-				"outputs is %v which is higher than max "+
-				"allowed value of %v", totalSatoshi,
-				btcutil.MaxSatoshi)
-			return ruleError(ErrBadTxOutValue, str)
-		}
 	}
 
 	// Check for duplicate transaction inputs.
