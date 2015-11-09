@@ -151,8 +151,11 @@ func testPeer(t *testing.T, p *peer.Peer, s peerStats) {
 		return
 	}
 
-	if p.TimeOffset() != s.wantTimeOffset {
-		t.Errorf("testPeer: wrong TimeOffset - got %v, want %v", p.TimeOffset(), s.wantTimeOffset)
+	// Allow for a deviation of 1s, as the second may tick when the message is
+	// in transit and the protocol doesn't support any further precision.
+	if p.TimeOffset() != s.wantTimeOffset && p.TimeOffset() != s.wantTimeOffset-1 {
+		t.Errorf("testPeer: wrong TimeOffset - got %v, want %v or %v", p.TimeOffset(),
+			s.wantTimeOffset, s.wantTimeOffset-1)
 		return
 	}
 
