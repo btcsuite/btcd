@@ -17,8 +17,7 @@ var activeNetParams = &mainNetParams
 // network and test networks.
 type params struct {
 	*chaincfg.Params
-	rpcPort  string
-	dnsSeeds []string
+	rpcPort string
 }
 
 // mainNetParams contains parameters specific to the main network
@@ -30,15 +29,6 @@ type params struct {
 var mainNetParams = params{
 	Params:  &chaincfg.MainNetParams,
 	rpcPort: "8334",
-	dnsSeeds: []string{
-		"seed.bitcoin.sipa.be",
-		"dnsseed.bluematt.me",
-		"dnsseed.bitcoin.dashjr.org",
-		"seed.bitcoinstats.com",
-		"seed.bitnodes.io",
-		"bitseed.xf2.org",
-		"seed.bitcoin.jonasschnelli.ch",
-	},
 }
 
 // regressionNetParams contains parameters specific to the regression test
@@ -46,9 +36,8 @@ var mainNetParams = params{
 // than the reference implementation - see the mainNetParams comment for
 // details.
 var regressionNetParams = params{
-	Params:   &chaincfg.RegressionNetParams,
-	rpcPort:  "18334",
-	dnsSeeds: []string{},
+	Params:  &chaincfg.RegressionNetParams,
+	rpcPort: "18334",
 }
 
 // testNet3Params contains parameters specific to the test network (version 3)
@@ -57,20 +46,13 @@ var regressionNetParams = params{
 var testNet3Params = params{
 	Params:  &chaincfg.TestNet3Params,
 	rpcPort: "18334",
-	dnsSeeds: []string{
-		"testnet-seed.alexykot.me",
-		"testnet-seed.bitcoin.schildbach.de",
-		"testnet-seed.bitcoin.petertodd.org",
-		"testnet-seed.bluematt.me",
-	},
 }
 
 // simNetParams contains parameters specific to the simulation test network
 // (wire.SimNet).
 var simNetParams = params{
-	Params:   &chaincfg.SimNetParams,
-	rpcPort:  "18556",
-	dnsSeeds: []string{}, // NOTE: There must NOT be any seeds.
+	Params:  &chaincfg.SimNetParams,
+	rpcPort: "18556",
 }
 
 // netName returns the name used when referring to a bitcoin network.  At the

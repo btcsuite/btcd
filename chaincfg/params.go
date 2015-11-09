@@ -55,6 +55,7 @@ type Params struct {
 	Name        string
 	Net         wire.BitcoinNet
 	DefaultPort string
+	DNSSeeds    []string
 
 	// Chain parameters
 	GenesisBlock           *wire.MsgBlock
@@ -101,6 +102,15 @@ var MainNetParams = Params{
 	Name:        "mainnet",
 	Net:         wire.MainNet,
 	DefaultPort: "8333",
+	DNSSeeds: []string{
+		"seed.bitcoin.sipa.be",
+		"dnsseed.bluematt.me",
+		"dnsseed.bitcoin.dashjr.org",
+		"seed.bitcoinstats.com",
+		"seed.bitnodes.io",
+		"bitseed.xf2.org",
+		"seed.bitcoin.jonasschnelli.ch",
+	},
 
 	// Chain parameters
 	GenesisBlock:           &genesisBlock,
@@ -166,6 +176,7 @@ var RegressionNetParams = Params{
 	Name:        "regtest",
 	Net:         wire.TestNet,
 	DefaultPort: "18444",
+	DNSSeeds:    []string{},
 
 	// Chain parameters
 	GenesisBlock:           &regTestGenesisBlock,
@@ -213,6 +224,12 @@ var TestNet3Params = Params{
 	Name:        "testnet3",
 	Net:         wire.TestNet3,
 	DefaultPort: "18333",
+	DNSSeeds: []string{
+		"testnet-seed.alexykot.me",
+		"testnet-seed.bitcoin.schildbach.de",
+		"testnet-seed.bitcoin.petertodd.org",
+		"testnet-seed.bluematt.me",
+	},
 
 	// Chain parameters
 	GenesisBlock:           &testNet3GenesisBlock,
@@ -266,6 +283,7 @@ var SimNetParams = Params{
 	Name:        "simnet",
 	Net:         wire.SimNet,
 	DefaultPort: "18555",
+	DNSSeeds:    []string{}, // NOTE: There must NOT be any seeds.
 
 	// Chain parameters
 	GenesisBlock:           &simNetGenesisBlock,

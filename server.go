@@ -1429,7 +1429,7 @@ func (s *server) seedFromDNS() {
 		return
 	}
 
-	for _, seeder := range activeNetParams.dnsSeeds {
+	for _, seeder := range activeNetParams.DNSSeeds {
 		go func(seeder string) {
 			randSource := mrand.New(mrand.NewSource(time.Now().UnixNano()))
 
