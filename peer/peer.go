@@ -1576,10 +1576,6 @@ out:
 			}
 
 		case *wire.MsgAlert:
-			// Note: The reference client currently bans peers that send alerts
-			// not signed with its key.  We could verify against their key, but
-			// since the reference client is currently unwilling to support
-			// other implementions' alert messages, we will not relay theirs.
 			if p.cfg.Listeners.OnAlert != nil {
 				p.cfg.Listeners.OnAlert(p, msg)
 			}
