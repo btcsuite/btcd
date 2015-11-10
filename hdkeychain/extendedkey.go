@@ -440,7 +440,7 @@ func (k *ExtendedKey) Zero() {
 // will derive to an unusable secret key.  The ErrUnusable error will be
 // returned if this should occur, so the caller must check for it and generate a
 // new seed accordingly.
-func NewMaster(seed []byte) (*ExtendedKey, error) {
+func NewMaster(seed []byte, net *chaincfg.Params) (*ExtendedKey, error) {
 	// Per [BIP32], the seed must be in range [MinSeedBytes, MaxSeedBytes].
 	if len(seed) < MinSeedBytes || len(seed) > MaxSeedBytes {
 		return nil, ErrInvalidSeedLen
@@ -465,8 +465,8 @@ func NewMaster(seed []byte) (*ExtendedKey, error) {
 	}
 
 	parentFP := []byte{0x00, 0x00, 0x00, 0x00}
-	return newExtendedKey(chaincfg.MainNetParams.HDPrivateKeyID[:], secretKey,
-		chainCode, parentFP, 0, 0, true), nil
+	return newExtendedKey(net.HDPrivateKeyID[:], secretKey, chainCode,
+		parentFP, 0, 0, true), nil
 }
 
 // NewKeyFromString returns a new extended key instance from a base58-encoded
