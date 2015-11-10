@@ -996,7 +996,7 @@ func (mp *txMemPool) MaybeAcceptTransaction(tx *btcutil.Tx, isNew, rateLimit boo
 // ProcessOrphans.  See the comment for ProcessOrphans for more details.
 //
 // This function MUST be called with the mempool lock held (for writes).
-func (mp *txMemPool) processOrphans(hash *wire.ShaHash) error {
+func (mp *txMemPool) processOrphans(hash *wire.ShaHash) {
 	// Start with processing at least the passed hash.
 	processHashes := list.New()
 	processHashes.PushBack(hash)
@@ -1041,7 +1041,9 @@ func (mp *txMemPool) processOrphans(hash *wire.ShaHash) error {
 			missingParents, err := mp.maybeAcceptTransaction(tx,
 				true, true)
 			if err != nil {
-				return err
+				txmpLog.Debugf("Failed to process "+
+					"transaction %v: %v", tx.Sha(), err)
+				continue
 			}
 
 			if len(missingParents) == 0 {
@@ -1074,8 +1076,6 @@ func (mp *txMemPool) processOrphans(hash *wire.ShaHash) error {
 			processHashes.PushBack(orphanHash)
 		}
 	}
-
-	return nil
 }
 
 // ProcessOrphans determines if there are any orphans which depend on the passed
@@ -1085,11 +1085,11 @@ func (mp *txMemPool) processOrphans(hash *wire.ShaHash) error {
 // orphans) until there are no more.
 //
 // This function is safe for concurrent access.
-func (mp *txMemPool) ProcessOrphans(hash *wire.ShaHash) error {
+func (mp *txMemPool) ProcessOrphans(hash *wire.ShaHash) {
 	mp.Lock()
 	defer mp.Unlock()
 
-	return mp.processOrphans(hash)
+	mp.processOrphans(hash)
 }
 
 // ProcessTransaction is the main workhorse for handling insertion of new
@@ -1120,10 +1120,7 @@ func (mp *txMemPool) ProcessTransaction(tx *btcutil.Tx, allowOrphan, rateLimit b
 		// transaction (they may no longer be orphans if all inputs
 		// are now available) and repeat for those accepted
 		// transactions until there are no more.
-		err := mp.processOrphans(tx.Sha())
-		if err != nil {
-			return err
-		}
+		mp.processOrphans(tx.Sha())
 	} else {
 		// The transaction is an orphan (has inputs missing).  Reject
 		// it if the flag to allow orphans is not set.
