@@ -279,7 +279,11 @@ func TestDust(t *testing.T) {
 // TestCheckTransactionStandard tests the checkTransactionStandard API.
 func TestCheckTransactionStandard(t *testing.T) {
 	// Create some dummy, but otherwise standard, data for transactions.
-	dummyPrevOut := wire.OutPoint{Hash: wire.ShaHash{0x01}, Index: 1}
+	prevOutHash, err := wire.NewShaHashFromStr("01")
+	if err != nil {
+		t.Fatalf("NewShaHashFromStr: unexpected error: %v", err)
+	}
+	dummyPrevOut := wire.OutPoint{Hash: *prevOutHash, Index: 1}
 	dummySigScript := bytes.Repeat([]byte{0x00}, 65)
 	dummyTxIn := wire.TxIn{
 		PreviousOutPoint: dummyPrevOut,
