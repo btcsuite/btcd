@@ -38,37 +38,6 @@ const (
 	// in a single transaction we will relay or mine.  It is a fraction
 	// of the max signature operations for a block.
 	maxSigOpsPerTx = blockchain.MaxSigOpsPerBlock / 5
-
-	// maxStandardTxSize is the maximum size allowed for transactions that
-	// are considered standard and will therefore be relayed and considered
-	// for mining.
-	maxStandardTxSize = 100000
-
-	// maxStandardSigScriptSize is the maximum size allowed for a
-	// transaction input signature script to be considered standard.  This
-	// value allows for a 15-of-15 CHECKMULTISIG pay-to-script-hash with
-	// compressed keys.
-	//
-	// The form of the overall script is: OP_0 <15 signatures> OP_PUSHDATA2
-	// <2 bytes len> [OP_15 <15 pubkeys> OP_15 OP_CHECKMULTISIG]
-	//
-	// For the p2sh script portion, each of the 15 compressed pubkeys are
-	// 33 bytes (plus one for the OP_DATA_33 opcode), and the thus it totals
-	// to (15*34)+3 = 513 bytes.  Next, each of the 15 signatures is a max
-	// of 73 bytes (plus one for the OP_DATA_73 opcode).  Also, there is one
-	// extra byte for the initial extra OP_0 push and 3 bytes for the
-	// OP_PUSHDATA2 needed to specify the 513 bytes for the script push.
-	// That brings the total to 1+(15*74)+3+513 = 1627.  This value also
-	// adds a few extra bytes to provide a little buffer.
-	// (1 + 15*74 + 3) + (15*34 + 3) + 23 = 1650
-	maxStandardSigScriptSize = 1650
-
-	// defaultMinRelayTxFee is the minimum fee in satoshi that is required
-	// for a transaction to be treated as free for relay and mining
-	// purposes.  It is also used to help determine if a transaction is
-	// considered dust and as a base for calculating minimum required fees
-	// for larger transactions.  This value is in Satoshi/1000 bytes.
-	defaultMinRelayTxFee = btcutil.Amount(1000)
 )
 
 // TxDesc is a descriptor containing a transaction in the mempool and the
@@ -95,105 +64,6 @@ type txMemPool struct {
 	lastUpdated   time.Time // last time pool was updated
 	pennyTotal    float64   // exponentially decaying total for penny spends.
 	lastPennyUnix int64     // unix time of last ``penny spend''
-}
-
-// checkTransactionStandard performs a series of checks on a transaction to
-// ensure it is a "standard" transaction.  A standard transaction is one that
-// conforms to several additional limiting cases over what is considered a
-// "sane" transaction such as having a version in the supported range, being
-// finalized, conforming to more stringent size constraints, having scripts
-// of recognized forms, and not containing "dust" outputs (those that are
-// so small it costs more to process them than they are worth).
-func (mp *txMemPool) checkTransactionStandard(tx *btcutil.Tx, height int32) error {
-	msgTx := tx.MsgTx()
-
-	// The transaction must be a currently supported version.
-	if msgTx.Version > wire.TxVersion || msgTx.Version < 1 {
-		str := fmt.Sprintf("transaction version %d is not in the "+
-			"valid range of %d-%d", msgTx.Version, 1,
-			wire.TxVersion)
-		return txRuleError(wire.RejectNonstandard, str)
-	}
-
-	// The transaction must be finalized to be standard and therefore
-	// considered for inclusion in a block.
-	adjustedTime := mp.server.timeSource.AdjustedTime()
-	if !blockchain.IsFinalizedTransaction(tx, height, adjustedTime) {
-		return txRuleError(wire.RejectNonstandard,
-			"transaction is not finalized")
-	}
-
-	// Since extremely large transactions with a lot of inputs can cost
-	// almost as much to process as the sender fees, limit the maximum
-	// size of a transaction.  This also helps mitigate CPU exhaustion
-	// attacks.
-	serializedLen := msgTx.SerializeSize()
-	if serializedLen > maxStandardTxSize {
-		str := fmt.Sprintf("transaction size of %v is larger than max "+
-			"allowed size of %v", serializedLen, maxStandardTxSize)
-		return txRuleError(wire.RejectNonstandard, str)
-	}
-
-	for i, txIn := range msgTx.TxIn {
-		// Each transaction input signature script must not exceed the
-		// maximum size allowed for a standard transaction.  See
-		// the comment on maxStandardSigScriptSize for more details.
-		sigScriptLen := len(txIn.SignatureScript)
-		if sigScriptLen > maxStandardSigScriptSize {
-			str := fmt.Sprintf("transaction input %d: signature "+
-				"script size of %d bytes is large than max "+
-				"allowed size of %d bytes", i, sigScriptLen,
-				maxStandardSigScriptSize)
-			return txRuleError(wire.RejectNonstandard, str)
-		}
-
-		// Each transaction input signature script must only contain
-		// opcodes which push data onto the stack.
-		if !txscript.IsPushOnlyScript(txIn.SignatureScript) {
-			str := fmt.Sprintf("transaction input %d: signature "+
-				"script is not push only", i)
-			return txRuleError(wire.RejectNonstandard, str)
-		}
-	}
-
-	// None of the output public key scripts can be a non-standard script or
-	// be "dust" (except when the script is a null data script).
-	numNullDataOutputs := 0
-	for i, txOut := range msgTx.TxOut {
-		scriptClass := txscript.GetScriptClass(txOut.PkScript)
-		err := checkPkScriptStandard(txOut.PkScript, scriptClass)
-		if err != nil {
-			// Attempt to extract a reject code from the error so
-			// it can be retained.  When not possible, fall back to
-			// a non standard error.
-			rejectCode, found := extractRejectCode(err)
-			if !found {
-				rejectCode = wire.RejectNonstandard
-			}
-			str := fmt.Sprintf("transaction output %d: %v", i, err)
-			return txRuleError(rejectCode, str)
-		}
-
-		// Accumulate the number of outputs which only carry data.  For
-		// all other script types, ensure the output value is not
-		// "dust".
-		if scriptClass == txscript.NullDataTy {
-			numNullDataOutputs++
-		} else if isDust(txOut, cfg.minRelayTxFee) {
-			str := fmt.Sprintf("transaction output %d: payment "+
-				"of %d is dust", i, txOut.Value)
-			return txRuleError(wire.RejectDust, str)
-		}
-	}
-
-	// A standard transaction must not have more than one output script that
-	// only carries data.
-	if numNullDataOutputs > 1 {
-		str := "more than one transaction output in a nulldata script"
-		return txRuleError(wire.RejectNonstandard, str)
-	}
-
-	return nil
 }
 
 // removeOrphan is the internal function which implements the public
@@ -761,7 +631,8 @@ func (mp *txMemPool) maybeAcceptTransaction(tx *btcutil.Tx, isNew, rateLimit boo
 	// Don't allow non-standard transactions if the network parameters
 	// forbid their relaying.
 	if !activeNetParams.RelayNonStdTxs {
-		err := mp.checkTransactionStandard(tx, nextBlockHeight)
+		err := checkTransactionStandard(tx, nextBlockHeight,
+			mp.server.timeSource, cfg.minRelayTxFee)
 		if err != nil {
 			// Attempt to extract a reject code from the error so
 			// it can be retained.  When not possible, fall back to
