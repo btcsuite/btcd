@@ -3207,7 +3207,7 @@ func handleSendRawTransaction(s *rpcServer, cmd interface{}, closeChan <-chan st
 	}
 
 	tx := btcutil.NewTx(msgtx)
-	err = s.server.txMemPool.ProcessTransaction(tx, false, false)
+	acceptedTxs, err := s.server.txMemPool.ProcessTransaction(tx, false, false)
 	if err != nil {
 		// When the error is a rule error, it means the transaction was
 		// simply rejected as opposed to something actually going wrong,
@@ -3226,6 +3226,14 @@ func handleSendRawTransaction(s *rpcServer, cmd interface{}, closeChan <-chan st
 			Code:    btcjson.ErrRPCDeserialization,
 			Message: "TX rejected: " + err.Error(),
 		}
+	}
+
+	// Generate and relay inventory vectors for all newly accepted
+	// transactions into the memory pool due to the original being
+	// accepted.
+	for _, tx := range acceptedTxs {
+		iv := wire.NewInvVect(wire.InvTypeTx, tx.Sha())
+		s.server.RelayInventory(iv, tx)
 	}
 
 	// Keep track of all the sendrawtransaction request txns so that they

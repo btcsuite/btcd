@@ -475,7 +475,7 @@ func (b *blockManager) handleTxMsg(tmsg *txMsg) {
 	// Process the transaction to include validation, insertion in the
 	// memory pool, orphan handling, etc.
 	allowOrphans := cfg.MaxOrphanTxs > 0
-	err := b.server.txMemPool.ProcessTransaction(tmsg.tx,
+	acceptedTxs, err := b.server.txMemPool.ProcessTransaction(tmsg.tx,
 		allowOrphans, true)
 
 	// Remove transaction from request maps. Either the mempool/chain
@@ -505,6 +505,15 @@ func (b *blockManager) handleTxMsg(tmsg *txMsg) {
 		tmsg.peer.PushRejectMsg(wire.CmdTx, code, reason, txHash,
 			false)
 		return
+	}
+
+	// Generate and relay inventory vectors for all newly accepted
+	// transactions into the memory pool due to the original being
+	// accepted.
+	for _, tx := range acceptedTxs {
+		// Generate the inventory vector and relay it.
+		iv := wire.NewInvVect(wire.InvTypeTx, tx.Sha())
+		b.server.RelayInventory(iv, tx)
 	}
 }
 
@@ -1222,7 +1231,11 @@ func (b *blockManager) handleNotifyMsg(notification *blockchain.Notification) {
 			b.server.txMemPool.RemoveTransaction(tx, false)
 			b.server.txMemPool.RemoveDoubleSpends(tx)
 			b.server.txMemPool.RemoveOrphan(tx.Sha())
-			b.server.txMemPool.ProcessOrphans(tx.Sha())
+			acceptedTxs := b.server.txMemPool.ProcessOrphans(tx.Sha())
+			for _, tx := range acceptedTxs {
+				iv := wire.NewInvVect(wire.InvTypeTx, tx.Sha())
+				b.server.RelayInventory(iv, tx)
+			}
 		}
 
 		if r := b.server.rpcServer; r != nil {

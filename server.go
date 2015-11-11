@@ -1730,8 +1730,8 @@ func (s *server) BanPeer(sp *serverPeer) {
 	s.banPeers <- sp
 }
 
-// RelayInventory relays the passed inventory to all connected peers that are
-// not already known to have it.
+// RelayInventory relays the passed inventory vector to all connected peers
+// that are not already known to have it.
 func (s *server) RelayInventory(invVect *wire.InvVect, data interface{}) {
 	s.relayInv <- relayMsg{invVect: invVect, data: data}
 }
