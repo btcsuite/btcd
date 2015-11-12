@@ -148,7 +148,7 @@ type txMemPool struct {
 	server        *server
 	pool          map[chainhash.Hash]*TxDesc
 	orphans       map[chainhash.Hash]*dcrutil.Tx
-	orphansByPrev map[chainhash.Hash]*list.List
+	orphansByPrev map[chainhash.Hash]map[chainhash.Hash]*dcrutil.Tx
 	addrindex     map[string]map[chainhash.Hash]struct{} // maps address to txs
 	outpoints     map[wire.OutPoint]*dcrutil.Tx
 
@@ -530,16 +530,11 @@ func (mp *txMemPool) removeOrphan(txHash *chainhash.Hash) {
 	for _, txIn := range tx.MsgTx().TxIn {
 		originTxHash := txIn.PreviousOutPoint.Hash
 		if orphans, exists := mp.orphansByPrev[originTxHash]; exists {
-			for e := orphans.Front(); e != nil; e = e.Next() {
-				if e.Value.(*dcrutil.Tx) == tx {
-					orphans.Remove(e)
-					break
-				}
-			}
+			delete(orphans, *tx.Sha())
 
 			// Remove the map entry altogether if there are no
 			// longer any orphans which depend on it.
-			if orphans.Len() == 0 {
+			if len(orphans) == 0 {
 				delete(mp.orphansByPrev, originTxHash)
 			}
 		}
@@ -607,10 +602,11 @@ func (mp *txMemPool) addOrphan(tx *dcrutil.Tx) {
 	mp.orphans[*tx.Sha()] = tx
 	for _, txIn := range tx.MsgTx().TxIn {
 		originTxHash := txIn.PreviousOutPoint.Hash
-		if mp.orphansByPrev[originTxHash] == nil {
-			mp.orphansByPrev[originTxHash] = list.New()
+		if _, exists := mp.orphansByPrev[originTxHash]; !exists {
+			mp.orphansByPrev[originTxHash] =
+				make(map[chainhash.Hash]*dcrutil.Tx)
 		}
-		mp.orphansByPrev[originTxHash].PushBack(tx)
+		mp.orphansByPrev[originTxHash][*tx.Sha()] = tx
 	}
 
 	txmpLog.Debugf("Stored orphan transaction %v (total: %d)", tx.Sha(),
@@ -1621,11 +1617,7 @@ func (mp *txMemPool) processOrphans(hash *chainhash.Hash) []*dcrutil.Tx {
 			continue
 		}
 
-		var enext *list.Element
-		for e := orphans.Front(); e != nil; e = enext {
-			enext = e.Next()
-			tx := e.Value.(*dcrutil.Tx)
-
+		for _, tx := range orphans {
 			// Remove the orphan from the orphan pool.  Current
 			// behavior requires that all saved orphans with
 			// a newly accepted parent are removed from the orphan
@@ -1907,7 +1899,7 @@ func newTxMemPool(server *server) *txMemPool {
 		server:        server,
 		pool:          make(map[chainhash.Hash]*TxDesc),
 		orphans:       make(map[chainhash.Hash]*dcrutil.Tx),
-		orphansByPrev: make(map[chainhash.Hash]*list.List),
+		orphansByPrev: make(map[chainhash.Hash]map[chainhash.Hash]*dcrutil.Tx),
 		outpoints:     make(map[wire.OutPoint]*dcrutil.Tx),
 		votes:         make(map[chainhash.Hash][]*VoteTx),
 	}
