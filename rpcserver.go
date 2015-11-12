@@ -791,27 +791,6 @@ func createVoutList(mtx *wire.MsgTx, chainParams *chaincfg.Params, filterAddrs [
 		vout.ScriptPubKey.ReqSigs = int32(reqSigs)
 
 		voutList = append(voutList, vout)
-
-		/*
-			if addrs == nil {
-				vout.ScriptPubKey.Addresses = nil
-			} else {
-				if len(filterAddrs) > 0 {
-					passesFilter = false
-				}
-				vout.ScriptPubKey.Addresses = make([]string, len(addrs))
-				for j, addr := range addrs {
-					addrString := addr.EncodeAddress()
-					vout.ScriptPubKey.Addresses[j] = addrString
-					if passesFilter == false && stringInSlice(addrString, filterAddrs) {
-						passesFilter = true
-					}
-				}
-			}
-			if passesFilter {
-				voutList = append(voutList, vout)
-			}
-		*/
 	}
 
 	return voutList
