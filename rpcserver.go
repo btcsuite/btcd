@@ -732,7 +732,7 @@ func createVinListPrevOut(s *rpcServer, mtx *wire.MsgTx, chainParams *chaincfg.P
 			Asm: disbuf,
 			Hex: hex.EncodeToString(txIn.SignatureScript),
 		}
-		
+
 		// Only populate previous output information if requested
 		if vinExtra != 0 {
 			vinEntry.PrevOut = &btcjson.PrevOut{
