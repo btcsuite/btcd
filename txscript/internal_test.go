@@ -25,6 +25,10 @@ var TstHasCanonicalPushes = canonicalPush
 // test package.
 var TstParseScript = parseScript
 
+// TstCalcSignatureHash makes the internal calcSignatureHash function available
+// to the test package.
+var TstCalcSignatureHash = calcSignatureHash
+
 // TstConcatRawScript makes the ability to add the pass script directly to
 // an existing script to the test package.  This differs from AddData since it
 // doesn't add a push data opcode.
