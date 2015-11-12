@@ -5,6 +5,7 @@
 package txscript_test
 
 import (
+	"bytes"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
@@ -592,6 +593,61 @@ testloop:
 					"%v", i, test, k, err)
 				continue
 			}
+		}
+	}
+}
+
+// TestCalcSignatureHash runs the Bitcoin Core signature hash calculation tests
+// in sighash.json.
+// https://github.com/bitcoin/bitcoin/blob/master/src/test/data/sighash.json
+func TestCalcSignatureHash(t *testing.T) {
+	file, err := ioutil.ReadFile("data/sighash.json")
+	if err != nil {
+		t.Errorf("TestCalcSignatureHash: %v\n", err)
+		return
+	}
+
+	var tests [][]interface{}
+	err = json.Unmarshal(file, &tests)
+	if err != nil {
+		t.Errorf("TestCalcSignatureHash couldn't Unmarshal: %v\n",
+			err)
+		return
+	}
+
+	for i, test := range tests {
+		if i == 0 {
+			// Skip first line -- contains comments only.
+			continue
+		}
+		if len(test) != 5 {
+			t.Fatalf("TestCalcSignatureHash: Test #%d has "+
+				"wrong length.", i)
+		}
+		tx := wire.NewMsgTx()
+		rawTx, _ := hex.DecodeString(test[0].(string))
+		err := tx.Deserialize(bytes.NewReader(rawTx))
+		if err != nil {
+			t.Errorf("TestCalcSignatureHash failed test #%d: "+
+				"Failed to parse transaction: %v", i, err)
+			continue
+		}
+
+		subScript, _ := hex.DecodeString(test[1].(string))
+		parsedScript, err := TstParseScript(subScript)
+		if err != nil {
+			t.Errorf("TestCalcSignatureHash failed test #%d: "+
+				"Failed to parse sub-script: %v", i, err)
+			continue
+		}
+		hash := TstCalcSignatureHash(parsedScript,
+			SigHashType(test[3].(float64)),
+			tx, int(test[2].(float64)))
+
+		expectedHash, _ := wire.NewShaHashFromStr(test[4].(string))
+		if !bytes.Equal(hash, expectedHash.Bytes()) {
+			t.Errorf("TestCalcSignatureHash failed test #%d: "+
+				"Signature hash mismatch.", i)
 		}
 	}
 }

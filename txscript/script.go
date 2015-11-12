@@ -19,7 +19,7 @@ import (
 var Bip16Activation = time.Unix(1333238400, 0)
 
 // SigHashType represents hash type bits at the end of a signature.
-type SigHashType byte
+type SigHashType uint32
 
 // Hash type bits from the end of a signature.
 const (
@@ -356,7 +356,7 @@ func calcSignatureHash(script []parsedOpcode, hashType SigHashType, tx *wire.Msg
 	// value) appended.
 	var wbuf bytes.Buffer
 	txCopy.Serialize(&wbuf)
-	binary.Write(&wbuf, binary.LittleEndian, uint32(hashType))
+	binary.Write(&wbuf, binary.LittleEndian, hashType)
 	return wire.DoubleSha256(wbuf.Bytes())
 }
 
