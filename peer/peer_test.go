@@ -569,7 +569,7 @@ func TestOutboundPeer(t *testing.T) {
 	// Test Queue Message
 	fakeMsg := wire.NewMsgVerAck()
 	p.QueueMessage(fakeMsg, nil)
-	done := make(chan struct{}, 5)
+	done := make(chan struct{})
 	p.QueueMessage(fakeMsg, done)
 	<-done
 	p.Shutdown()
@@ -584,12 +584,14 @@ func TestOutboundPeer(t *testing.T) {
 		return hash, 234439, nil
 	}
 	peerCfg.NewestBlock = newestBlock
+	r1, w1 := io.Pipe()
+	c1 := &conn{raddr: "10.0.0.1:8333", Writer: w1, Reader: r1}
 	p1, err := peer.NewOutboundPeer(peerCfg, "10.0.0.1:8333")
 	if err != nil {
 		t.Errorf("NewOutboundPeer: unexpected err - %v\n", err)
 		return
 	}
-	if err := p1.Connect(c); err != nil {
+	if err := p1.Connect(c1); err != nil {
 		t.Errorf("Connect: unexpected err %v\n", err)
 		return
 	}
@@ -615,12 +617,14 @@ func TestOutboundPeer(t *testing.T) {
 	// Test regression
 	peerCfg.ChainParams = &chaincfg.RegressionNetParams
 	peerCfg.Services = wire.SFNodeBloom
+	r2, w2 := io.Pipe()
+	c2 := &conn{raddr: "10.0.0.1:8333", Writer: w2, Reader: r2}
 	p2, err := peer.NewOutboundPeer(peerCfg, "10.0.0.1:8333")
 	if err != nil {
 		t.Errorf("NewOutboundPeer: unexpected err - %v\n", err)
 		return
 	}
-	if err := p2.Connect(c); err != nil {
+	if err := p2.Connect(c2); err != nil {
 		t.Errorf("Connect: unexpected err %v\n", err)
 		return
 	}
@@ -647,11 +651,11 @@ func TestOutboundPeer(t *testing.T) {
 	p2.PushRejectMsg("block", wire.RejectInvalid, "invalid", nil, false)
 
 	// Test Queue Messages
-	p2.QueueMessage(wire.NewMsgGetAddr(), done)
-	p2.QueueMessage(wire.NewMsgPing(1), done)
-	p2.QueueMessage(wire.NewMsgMemPool(), done)
-	p2.QueueMessage(wire.NewMsgGetData(), done)
-	p2.QueueMessage(wire.NewMsgGetHeaders(), done)
+	p2.QueueMessage(wire.NewMsgGetAddr(), nil)
+	p2.QueueMessage(wire.NewMsgPing(1), nil)
+	p2.QueueMessage(wire.NewMsgMemPool(), nil)
+	p2.QueueMessage(wire.NewMsgGetData(), nil)
+	p2.QueueMessage(wire.NewMsgGetHeaders(), nil)
 
 	p2.Shutdown()
 }
