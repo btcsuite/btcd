@@ -58,7 +58,7 @@ type txMemPool struct {
 	server        *server
 	pool          map[wire.ShaHash]*TxDesc
 	orphans       map[wire.ShaHash]*btcutil.Tx
-	orphansByPrev map[wire.ShaHash]*list.List
+	orphansByPrev map[wire.ShaHash]map[wire.ShaHash]*btcutil.Tx
 	addrindex     map[string]map[wire.ShaHash]struct{} // maps address to txs
 	outpoints     map[wire.OutPoint]*btcutil.Tx
 	lastUpdated   time.Time // last time pool was updated
@@ -81,16 +81,11 @@ func (mp *txMemPool) removeOrphan(txHash *wire.ShaHash) {
 	for _, txIn := range tx.MsgTx().TxIn {
 		originTxHash := txIn.PreviousOutPoint.Hash
 		if orphans, exists := mp.orphansByPrev[originTxHash]; exists {
-			for e := orphans.Front(); e != nil; e = e.Next() {
-				if e.Value.(*btcutil.Tx) == tx {
-					orphans.Remove(e)
-					break
-				}
-			}
+			delete(orphans, *tx.Sha())
 
 			// Remove the map entry altogether if there are no
 			// longer any orphans which depend on it.
-			if orphans.Len() == 0 {
+			if len(orphans) == 0 {
 				delete(mp.orphansByPrev, originTxHash)
 			}
 		}
@@ -158,10 +153,11 @@ func (mp *txMemPool) addOrphan(tx *btcutil.Tx) {
 	mp.orphans[*tx.Sha()] = tx
 	for _, txIn := range tx.MsgTx().TxIn {
 		originTxHash := txIn.PreviousOutPoint.Hash
-		if mp.orphansByPrev[originTxHash] == nil {
-			mp.orphansByPrev[originTxHash] = list.New()
+		if _, exists := mp.orphansByPrev[originTxHash]; !exists {
+			mp.orphansByPrev[originTxHash] =
+				make(map[wire.ShaHash]*btcutil.Tx)
 		}
-		mp.orphansByPrev[originTxHash].PushBack(tx)
+		mp.orphansByPrev[originTxHash][*tx.Sha()] = tx
 	}
 
 	txmpLog.Debugf("Stored orphan transaction %v (total: %d)", tx.Sha(),
@@ -886,11 +882,7 @@ func (mp *txMemPool) processOrphans(hash *wire.ShaHash) {
 			continue
 		}
 
-		var enext *list.Element
-		for e := orphans.Front(); e != nil; e = enext {
-			enext = e.Next()
-			tx := e.Value.(*btcutil.Tx)
-
+		for _, tx := range orphans {
 			// Remove the orphan from the orphan pool.  Current
 			// behavior requires that all saved orphans with
 			// a newly accepted parent are removed from the orphan
@@ -1087,7 +1079,7 @@ func newTxMemPool(server *server) *txMemPool {
 		server:        server,
 		pool:          make(map[wire.ShaHash]*TxDesc),
 		orphans:       make(map[wire.ShaHash]*btcutil.Tx),
-		orphansByPrev: make(map[wire.ShaHash]*list.List),
+		orphansByPrev: make(map[wire.ShaHash]map[wire.ShaHash]*btcutil.Tx),
 		outpoints:     make(map[wire.OutPoint]*btcutil.Tx),
 	}
 	if cfg.AddrIndex {
