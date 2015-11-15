@@ -240,13 +240,14 @@ func CheckTransactionSanity(tx *btcutil.Tx) error {
 			return ruleError(ErrBadTxOutValue, str)
 		}
 
-		// TODO(davec): No need to check < 0 here as satoshi is
-		// guaranteed to be positive per the above check.  Also need
-		// to add overflow checks.
+		// Two's complement int64 overflow guarantees that any overflow
+		// is detected and reported.  This is impossible for Bitcoin, but
+		// perhaps possible if an alt increases the total money supply.
 		totalSatoshi += satoshi
 		if totalSatoshi < 0 {
 			str := fmt.Sprintf("total value of all transaction "+
-				"outputs has negative value of %v", totalSatoshi)
+				"outputs exceeds max allowed value of %v",
+				btcutil.MaxSatoshi)
 			return ruleError(ErrBadTxOutValue, str)
 		}
 		if totalSatoshi > btcutil.MaxSatoshi {
@@ -653,6 +654,16 @@ func (b *BlockChain) checkBlockHeaderContext(header *wire.BlockHeader, prevNode 
 	}
 
 	if !fastAdd {
+		// Reject version 3 blocks once a majority of the network has
+		// upgraded.  This is part of BIP0065.
+		if header.Version < 4 && b.isMajorityVersion(4, prevNode,
+			b.chainParams.BlockRejectNumRequired) {
+
+			str := "new blocks with version %d are no longer valid"
+			str = fmt.Sprintf(str, header.Version)
+			return ruleError(ErrBlockVersionTooOld, str)
+		}
+
 		// Reject version 2 blocks once a majority of the network has
 		// upgraded.  This is part of BIP0066.
 		if header.Version < 3 && b.isMajorityVersion(3, prevNode,
@@ -1131,6 +1142,15 @@ func (b *BlockChain) checkConnectBlock(node *blockNode, block *btcutil.Block) er
 		b.chainParams.BlockEnforceNumRequired) {
 
 		scriptFlags |= txscript.ScriptVerifyDERSignatures
+	}
+
+	// Enforce CHECKLOCKTIMEVERIFY for block versions 4+ once the majority
+	// of the network has upgraded to the enforcement threshold.  This is
+	// part of BIP0065.
+	if blockHeader.Version >= 4 && b.isMajorityVersion(4, prevNode,
+		b.chainParams.BlockEnforceNumRequired) {
+
+		scriptFlags |= txscript.ScriptVerifyCheckLockTimeVerify
 	}
 
 	// Now that the inexpensive checks are done and have passed, verify the

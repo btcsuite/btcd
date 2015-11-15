@@ -9,7 +9,7 @@ import (
 	"fmt"
 )
 
-// Size of array used to store sha hashes.  See ShaHash.
+// HashSize is the array size used to store sha hashes.  See ShaHash.
 const HashSize = 32
 
 // MaxHashStringSize is the maximum length of a ShaHash hash string.

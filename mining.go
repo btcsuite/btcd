@@ -24,7 +24,7 @@ const (
 	// will require changes to the generated block.  Using the wire constant
 	// for generated block version could allow creation of invalid blocks
 	// for the updated version.
-	generatedBlockVersion = 3
+	generatedBlockVersion = 4
 
 	// minHighPriority is the minimum priority value that allows a
 	// transaction to be considered high priority.
@@ -604,13 +604,14 @@ mempoolLoop:
 
 		// Skip free transactions once the block is larger than the
 		// minimum block size.
-		if sortedByFee && prioItem.feePerKB < minTxRelayFee &&
+		if sortedByFee &&
+			prioItem.feePerKB < float64(cfg.minRelayTxFee) &&
 			blockPlusTxSize >= cfg.BlockMinSize {
 
 			minrLog.Tracef("Skipping tx %s with feePerKB %.2f "+
 				"< minTxRelayFee %d and block size %d >= "+
 				"minBlockSize %d", tx.Sha(), prioItem.feePerKB,
-				minTxRelayFee, blockPlusTxSize,
+				cfg.minRelayTxFee, blockPlusTxSize,
 				cfg.BlockMinSize)
 			logSkippedDeps(tx, deps)
 			continue

@@ -928,6 +928,18 @@ var scriptClassTests = []scriptClassTest{
 		script: "DATA_5 0x01020304",
 		class:  txscript.NonStandardTy,
 	},
+	{
+		name: "multisig script with wrong number of pubkeys",
+		script: "2 " +
+			"DATA_33 " +
+			"0x027adf5df7c965a2d46203c781bd4dd8" +
+			"21f11844136f6673af7cc5a4a05cd29380 " +
+			"DATA_33 " +
+			"0x02c08f3de8ee2de9be7bd770f4c10eb0" +
+			"d6ff1dd81ee96eedd3a9d4aeaf86695e80 " +
+			"3 CHECKMULTISIG",
+		class: txscript.NonStandardTy,
+	},
 }
 
 // TestScriptClass ensures all the scripts in scriptClassTests have the expected

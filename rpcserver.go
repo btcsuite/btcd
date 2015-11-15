@@ -76,6 +76,9 @@ const (
 	// changed and there have been changes to the available transactions
 	// in the memory pool.
 	gbtRegenerateSeconds = 60
+
+	// maxProtocolVersion is the max protocol version the server supports.
+	maxProtocolVersion = 70002
 )
 
 var (
@@ -395,15 +398,15 @@ func handleNode(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (inter
 	c := cmd.(*btcjson.NodeCmd)
 
 	var addr string
-	var nodeId uint64
+	var nodeID uint64
 	var errN, err error
 	switch c.SubCmd {
 	case "disconnect":
 		// If we have a valid uint disconnect by node id. Otherwise,
 		// attempt to disconnect by address, returning an error if a
 		// valid IP address is not supplied.
-		if nodeId, errN = strconv.ParseUint(c.Target, 10, 32); errN == nil {
-			err = s.server.DisconnectNodeById(int32(nodeId))
+		if nodeID, errN = strconv.ParseUint(c.Target, 10, 32); errN == nil {
+			err = s.server.DisconnectNodeByID(int32(nodeID))
 		} else {
 			if _, _, errP := net.SplitHostPort(c.Target); errP == nil || net.ParseIP(c.Target) != nil {
 				addr = normalizeAddress(c.Target, activeNetParams.DefaultPort)
@@ -415,7 +418,7 @@ func handleNode(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (inter
 				}
 			}
 		}
-		if err != nil && peerExists(s.server.PeerInfo(), addr, int32(nodeId)) {
+		if err != nil && peerExists(s.server.Peers(), addr, int32(nodeID)) {
 			return nil, &btcjson.RPCError{
 				Code:    btcjson.ErrRPCMisc,
 				Message: "can't disconnect a permanent peer, use remove",
@@ -425,8 +428,8 @@ func handleNode(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (inter
 		// If we have a valid uint disconnect by node id. Otherwise,
 		// attempt to disconnect by address, returning an error if a
 		// valid IP address is not supplied.
-		if nodeId, errN = strconv.ParseUint(c.Target, 10, 32); errN == nil {
-			err = s.server.RemoveNodeById(int32(nodeId))
+		if nodeID, errN = strconv.ParseUint(c.Target, 10, 32); errN == nil {
+			err = s.server.RemoveNodeByID(int32(nodeID))
 		} else {
 			if _, _, errP := net.SplitHostPort(c.Target); errP == nil || net.ParseIP(c.Target) != nil {
 				addr = normalizeAddress(c.Target, activeNetParams.DefaultPort)
@@ -438,7 +441,7 @@ func handleNode(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (inter
 				}
 			}
 		}
-		if err != nil && peerExists(s.server.PeerInfo(), addr, int32(nodeId)) {
+		if err != nil && peerExists(s.server.Peers(), addr, int32(nodeID)) {
 			return nil, &btcjson.RPCError{
 				Code:    btcjson.ErrRPCMisc,
 				Message: "can't remove a temporary peer, use disconnect",
@@ -483,9 +486,9 @@ func handleNode(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (inter
 // peerExists determines if a certain peer is currently connected given
 // information about all currently connected peers. Peer existence is
 // determined using either a target address or node id.
-func peerExists(peerInfos []*btcjson.GetPeerInfoResult, addr string, nodeId int32) bool {
-	for _, peerInfo := range peerInfos {
-		if peerInfo.ID == nodeId || peerInfo.Addr == addr {
+func peerExists(peers []*serverPeer, addr string, nodeID int32) bool {
+	for _, p := range peers {
+		if p.ID() == nodeID || p.Addr() == addr {
 			return true
 		}
 	}
@@ -508,6 +511,15 @@ func messageToHex(msg wire.Message) (string, error) {
 func handleCreateRawTransaction(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (interface{}, error) {
 	c := cmd.(*btcjson.CreateRawTransactionCmd)
 
+	// Validate the locktime, if given.
+	if c.LockTime != nil &&
+		(*c.LockTime < 0 || *c.LockTime > int64(wire.MaxTxInSequenceNum)) {
+		return nil, &btcjson.RPCError{
+			Code:    btcjson.ErrRPCInvalidParameter,
+			Message: "Locktime out of range",
+		}
+	}
+
 	// Add all transaction inputs to a new transaction after performing
 	// some validity checks.
 	mtx := wire.NewMsgTx()
@@ -519,6 +531,9 @@ func handleCreateRawTransaction(s *rpcServer, cmd interface{}, closeChan <-chan 
 
 		prevOut := wire.NewOutPoint(txHash, uint32(input.Vout))
 		txIn := wire.NewTxIn(prevOut, []byte{})
+		if c.LockTime != nil && *c.LockTime != 0 {
+			txIn.Sequence = wire.MaxTxInSequenceNum - 1
+		}
 		mtx.AddTxIn(txIn)
 	}
 
@@ -579,6 +594,11 @@ func handleCreateRawTransaction(s *rpcServer, cmd interface{}, closeChan <-chan 
 
 		txOut := wire.NewTxOut(int64(satoshi), pkScript)
 		mtx.AddTxOut(txOut)
+	}
+
+	// Set the Locktime, if given.
+	if c.LockTime != nil {
+		mtx.LockTime = uint32(*c.LockTime)
 	}
 
 	// Return the serialized and hex-encoded transaction.  Note that this
@@ -945,7 +965,7 @@ func handleGetAddedNodeInfo(s *rpcServer, cmd interface{}, closeChan <-chan stru
 		node := *c.Node
 		found := false
 		for i, peer := range peers {
-			if peer.addr == node {
+			if peer.Addr() == node {
 				peers = peers[i : i+1]
 				found = true
 			}
@@ -963,7 +983,7 @@ func handleGetAddedNodeInfo(s *rpcServer, cmd interface{}, closeChan <-chan stru
 	if !c.DNS {
 		results := make([]string, 0, len(peers))
 		for _, peer := range peers {
-			results = append(results, peer.addr)
+			results = append(results, peer.Addr())
 		}
 		return results, nil
 	}
@@ -975,15 +995,15 @@ func handleGetAddedNodeInfo(s *rpcServer, cmd interface{}, closeChan <-chan stru
 		// Set the "address" of the peer which could be an ip address
 		// or a domain name.
 		var result btcjson.GetAddedNodeInfoResult
-		result.AddedNode = peer.addr
+		result.AddedNode = peer.Addr()
 		result.Connected = btcjson.Bool(peer.Connected())
 
 		// Split the address into host and port portions so we can do
 		// a DNS lookup against the host.  When no port is specified in
 		// the address, just use the address as the host.
-		host, _, err := net.SplitHostPort(peer.addr)
+		host, _, err := net.SplitHostPort(peer.Addr())
 		if err != nil {
-			host = peer.addr
+			host = peer.Addr()
 		}
 
 		// Do a DNS lookup for the address.  If the lookup fails, just
@@ -1007,7 +1027,7 @@ func handleGetAddedNodeInfo(s *rpcServer, cmd interface{}, closeChan <-chan stru
 			addr.Address = ip
 			addr.Connected = "false"
 			if ip == host && peer.Connected() {
-				addr.Connected = directionString(peer.inbound)
+				addr.Connected = directionString(peer.Inbound())
 			}
 			addrs = append(addrs, addr)
 		}
@@ -2103,7 +2123,7 @@ func handleGetInfo(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (in
 		Proxy:           cfg.Proxy,
 		Difficulty:      getDifficultyRatio(blkHeader.Bits),
 		TestNet:         cfg.TestNet3,
-		RelayFee:        float64(minTxRelayFee) / btcutil.SatoshiPerBitcoin,
+		RelayFee:        cfg.minRelayTxFee.ToBTC(),
 	}
 
 	return ret, nil
@@ -2282,7 +2302,38 @@ func handleGetNetworkHashPS(s *rpcServer, cmd interface{}, closeChan <-chan stru
 
 // handleGetPeerInfo implements the getpeerinfo command.
 func handleGetPeerInfo(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (interface{}, error) {
-	return s.server.PeerInfo(), nil
+	peers := s.server.Peers()
+	syncPeer := s.server.blockManager.SyncPeer()
+	infos := make([]*btcjson.GetPeerInfoResult, 0, len(peers))
+	for _, p := range peers {
+		statsSnap := p.StatsSnapshot()
+		info := &btcjson.GetPeerInfoResult{
+			ID:             statsSnap.ID,
+			Addr:           statsSnap.Addr,
+			Services:       fmt.Sprintf("%08d", uint64(statsSnap.Services)),
+			LastSend:       statsSnap.LastSend.Unix(),
+			LastRecv:       statsSnap.LastRecv.Unix(),
+			BytesSent:      statsSnap.BytesSent,
+			BytesRecv:      statsSnap.BytesRecv,
+			ConnTime:       statsSnap.ConnTime.Unix(),
+			PingTime:       float64(statsSnap.LastPingMicros),
+			TimeOffset:     statsSnap.TimeOffset,
+			Version:        statsSnap.Version,
+			SubVer:         statsSnap.UserAgent,
+			Inbound:        statsSnap.Inbound,
+			StartingHeight: statsSnap.StartingHeight,
+			CurrentHeight:  statsSnap.LastBlock,
+			BanScore:       0,
+			SyncNode:       p == syncPeer,
+		}
+		if p.LastPingNonce() != 0 {
+			wait := float64(time.Now().Sub(statsSnap.LastPingTime).Nanoseconds())
+			// We actually want microseconds.
+			info.PingWait = wait / 1000
+		}
+		infos = append(infos, info)
+	}
+	return infos, nil
 }
 
 // handleGetRawMempool implements the getrawmempool command.
@@ -3372,8 +3423,12 @@ func handleVerifyMessage(s *rpcServer, cmd interface{}, closeChan <-chan struct{
 
 	// Validate the signature - this just shows that it was valid at all.
 	// we will compare it with the key next.
+	var buf bytes.Buffer
+	wire.WriteVarString(&buf, 0, "Bitcoin Signed Message:\n")
+	wire.WriteVarString(&buf, 0, c.Message)
+	expectedMessageHash := wire.DoubleSha256(buf.Bytes())
 	pk, wasCompressed, err := btcec.RecoverCompact(btcec.S256(), sig,
-		wire.DoubleSha256([]byte("Bitcoin Signed Message:\n"+c.Message)))
+		expectedMessageHash)
 	if err != nil {
 		// Mirror Bitcoin Core behavior, which treats error in
 		// RecoverCompact as invalid signature.

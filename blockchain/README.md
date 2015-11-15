@@ -4,6 +4,8 @@ blockchain
 [![Build Status](http://img.shields.io/travis/btcsuite/btcd.svg)]
 (https://travis-ci.org/btcsuite/btcd) [![ISC License]
 (http://img.shields.io/badge/license-ISC-blue.svg)](http://copyfree.org)
+[![GoDoc](https://img.shields.io/badge/godoc-reference-blue.svg)]
+(http://godoc.org/github.com/btcsuite/btcd/blockchain)
 
 Package blockchain implements bitcoin block handling and chain selection rules.
 The test coverage is currently only around 60%, but will be increasing over
@@ -18,23 +20,10 @@ This package has intentionally been designed so it can be used as a standalone
 package for any projects needing to handle processing of blocks into the bitcoin
 block chain.
 
-## Documentation
-
-[![GoDoc](https://img.shields.io/badge/godoc-reference-blue.svg)]
-(http://godoc.org/github.com/btcsuite/btcd/blockchain)
-
-Full `go doc` style documentation for the project can be viewed online without
-installing this package by using the GoDoc site here:
-http://godoc.org/github.com/btcsuite/btcd/blockchain
-
-You can also view the documentation locally once the package is installed with
-the `godoc` tool by running `godoc -http=":6060"` and pointing your browser to
-http://localhost:6060/pkg/github.com/btcsuite/btcd/blockchain
-
-## Installation
+## Installation and Updating
 
 ```bash
-$ go get github.com/btcsuite/btcd/blockchain
+$ go get -u github.com/btcsuite/btcd/blockchain
 ```
 
 ## Bitcoin Chain Processing Overview

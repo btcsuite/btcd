@@ -14,7 +14,7 @@ import (
 	"github.com/btcsuite/fastsha256"
 )
 
-// Maximum payload size for a variable length integer.
+// MaxVarIntPayload is the maximum payload size for a variable length integer.
 const MaxVarIntPayload = 9
 
 // errNonCanonicalVarInt is the common format string used for non-canonically

@@ -38,42 +38,6 @@ const (
 	// in a single transaction we will relay or mine.  It is a fraction
 	// of the max signature operations for a block.
 	maxSigOpsPerTx = blockchain.MaxSigOpsPerBlock / 5
-
-	// maxStandardTxSize is the maximum size allowed for transactions that
-	// are considered standard and will therefore be relayed and considered
-	// for mining.
-	maxStandardTxSize = 100000
-
-	// maxStandardSigScriptSize is the maximum size allowed for a
-	// transaction input signature script to be considered standard.  This
-	// value allows for a 15-of-15 CHECKMULTISIG pay-to-script-hash with
-	// compressed keys.
-	//
-	// The form of the overall script is: OP_0 <15 signatures> OP_PUSHDATA2
-	// <2 bytes len> [OP_15 <15 pubkeys> OP_15 OP_CHECKMULTISIG]
-	//
-	// For the p2sh script portion, each of the 15 compressed pubkeys are
-	// 33 bytes (plus one for the OP_DATA_33 opcode), and the thus it totals
-	// to (15*34)+3 = 513 bytes.  Next, each of the 15 signatures is a max
-	// of 73 bytes (plus one for the OP_DATA_73 opcode).  Also, there is one
-	// extra byte for the initial extra OP_0 push and 3 bytes for the
-	// OP_PUSHDATA2 needed to specify the 513 bytes for the script push.
-	// That brings the total to 1+(15*74)+3+513 = 1627.  This value also
-	// adds a few extra bytes to provide a little buffer.
-	// (1 + 15*74 + 3) + (15*34 + 3) + 23 = 1650
-	maxStandardSigScriptSize = 1650
-
-	// maxStandardMultiSigKeys is the maximum number of public keys allowed
-	// in a multi-signature transaction output script for it to be
-	// considered standard.
-	maxStandardMultiSigKeys = 3
-
-	// minTxRelayFee is the minimum fee in satoshi that is required for a
-	// transaction to be treated as free for relay and mining purposes.  It
-	// is also used to help determine if a transaction is considered dust
-	// and as a base for calculating minimum required fees for larger
-	// transactions.  This value is in Satoshi/1000 bytes.
-	minTxRelayFee = 1000
 )
 
 // TxDesc is a descriptor containing a transaction in the mempool and the
@@ -94,302 +58,12 @@ type txMemPool struct {
 	server        *server
 	pool          map[wire.ShaHash]*TxDesc
 	orphans       map[wire.ShaHash]*btcutil.Tx
-	orphansByPrev map[wire.ShaHash]*list.List
+	orphansByPrev map[wire.ShaHash]map[wire.ShaHash]*btcutil.Tx
 	addrindex     map[string]map[wire.ShaHash]struct{} // maps address to txs
 	outpoints     map[wire.OutPoint]*btcutil.Tx
 	lastUpdated   time.Time // last time pool was updated
 	pennyTotal    float64   // exponentially decaying total for penny spends.
 	lastPennyUnix int64     // unix time of last ``penny spend''
-}
-
-// isDust returns whether or not the passed transaction output amount is
-// considered dust or not.  Dust is defined in terms of the minimum transaction
-// relay fee.  In particular, if the cost to the network to spend coins is more
-// than 1/3 of the minimum transaction relay fee, it is considered dust.
-func isDust(txOut *wire.TxOut) bool {
-	// Unspendable outputs are considered dust.
-	if txscript.IsUnspendable(txOut.PkScript) {
-		return true
-	}
-
-	// The total serialized size consists of the output and the associated
-	// input script to redeem it.  Since there is no input script
-	// to redeem it yet, use the minimum size of a typical input script.
-	//
-	// Pay-to-pubkey-hash bytes breakdown:
-	//
-	//  Output to hash (34 bytes):
-	//   8 value, 1 script len, 25 script [1 OP_DUP, 1 OP_HASH_160,
-	//   1 OP_DATA_20, 20 hash, 1 OP_EQUALVERIFY, 1 OP_CHECKSIG]
-	//
-	//  Input with compressed pubkey (148 bytes):
-	//   36 prev outpoint, 1 script len, 107 script [1 OP_DATA_72, 72 sig,
-	//   1 OP_DATA_33, 33 compressed pubkey], 4 sequence
-	//
-	//  Input with uncompressed pubkey (180 bytes):
-	//   36 prev outpoint, 1 script len, 139 script [1 OP_DATA_72, 72 sig,
-	//   1 OP_DATA_65, 65 compressed pubkey], 4 sequence
-	//
-	// Pay-to-pubkey bytes breakdown:
-	//
-	//  Output to compressed pubkey (44 bytes):
-	//   8 value, 1 script len, 35 script [1 OP_DATA_33,
-	//   33 compressed pubkey, 1 OP_CHECKSIG]
-	//
-	//  Output to uncompressed pubkey (76 bytes):
-	//   8 value, 1 script len, 67 script [1 OP_DATA_65, 65 pubkey,
-	//   1 OP_CHECKSIG]
-	//
-	//  Input (114 bytes):
-	//   36 prev outpoint, 1 script len, 73 script [1 OP_DATA_72,
-	//   72 sig], 4 sequence
-	//
-	// Theoretically this could examine the script type of the output script
-	// and use a different size for the typical input script size for
-	// pay-to-pubkey vs pay-to-pubkey-hash inputs per the above breakdowns,
-	// but the only combinination which is less than the value chosen is
-	// a pay-to-pubkey script with a compressed pubkey, which is not very
-	// common.
-	//
-	// The most common scripts are pay-to-pubkey-hash, and as per the above
-	// breakdown, the minimum size of a p2pkh input script is 148 bytes.  So
-	// that figure is used.
-	totalSize := txOut.SerializeSize() + 148
-
-	// The output is considered dust if the cost to the network to spend the
-	// coins is more than 1/3 of the minimum free transaction relay fee.
-	// minFreeTxRelayFee is in Satoshi/KB, so multiply by 1000 to
-	// convert to bytes.
-	//
-	// Using the typical values for a pay-to-pubkey-hash transaction from
-	// the breakdown above and the default minimum free transaction relay
-	// fee of 1000, this equates to values less than 546 satoshi being
-	// considered dust.
-	//
-	// The following is equivalent to (value/totalSize) * (1/3) * 1000
-	// without needing to do floating point math.
-	return txOut.Value*1000/(3*int64(totalSize)) < minTxRelayFee
-}
-
-// checkPkScriptStandard performs a series of checks on a transaction ouput
-// script (public key script) to ensure it is a "standard" public key script.
-// A standard public key script is one that is a recognized form, and for
-// multi-signature scripts, only contains from 1 to maxStandardMultiSigKeys
-// public keys.
-func checkPkScriptStandard(pkScript []byte, scriptClass txscript.ScriptClass) error {
-	switch scriptClass {
-	case txscript.MultiSigTy:
-		numPubKeys, numSigs, err := txscript.CalcMultiSigStats(pkScript)
-		if err != nil {
-			str := fmt.Sprintf("multi-signature script parse "+
-				"failure: %v", err)
-			return txRuleError(wire.RejectNonstandard, str)
-		}
-
-		// A standard multi-signature public key script must contain
-		// from 1 to maxStandardMultiSigKeys public keys.
-		if numPubKeys < 1 {
-			str := "multi-signature script with no pubkeys"
-			return txRuleError(wire.RejectNonstandard, str)
-		}
-		if numPubKeys > maxStandardMultiSigKeys {
-			str := fmt.Sprintf("multi-signature script with %d "+
-				"public keys which is more than the allowed "+
-				"max of %d", numPubKeys, maxStandardMultiSigKeys)
-			return txRuleError(wire.RejectNonstandard, str)
-		}
-
-		// A standard multi-signature public key script must have at
-		// least 1 signature and no more signatures than available
-		// public keys.
-		if numSigs < 1 {
-			return txRuleError(wire.RejectNonstandard,
-				"multi-signature script with no signatures")
-		}
-		if numSigs > numPubKeys {
-			str := fmt.Sprintf("multi-signature script with %d "+
-				"signatures which is more than the available "+
-				"%d public keys", numSigs, numPubKeys)
-			return txRuleError(wire.RejectNonstandard, str)
-		}
-
-	case txscript.NonStandardTy:
-		return txRuleError(wire.RejectNonstandard,
-			"non-standard script form")
-	}
-
-	return nil
-}
-
-// checkTransactionStandard performs a series of checks on a transaction to
-// ensure it is a "standard" transaction.  A standard transaction is one that
-// conforms to several additional limiting cases over what is considered a
-// "sane" transaction such as having a version in the supported range, being
-// finalized, conforming to more stringent size constraints, having scripts
-// of recognized forms, and not containing "dust" outputs (those that are
-// so small it costs more to process them than they are worth).
-func (mp *txMemPool) checkTransactionStandard(tx *btcutil.Tx, height int32) error {
-	msgTx := tx.MsgTx()
-
-	// The transaction must be a currently supported version.
-	if msgTx.Version > wire.TxVersion || msgTx.Version < 1 {
-		str := fmt.Sprintf("transaction version %d is not in the "+
-			"valid range of %d-%d", msgTx.Version, 1,
-			wire.TxVersion)
-		return txRuleError(wire.RejectNonstandard, str)
-	}
-
-	// The transaction must be finalized to be standard and therefore
-	// considered for inclusion in a block.
-	adjustedTime := mp.server.timeSource.AdjustedTime()
-	if !blockchain.IsFinalizedTransaction(tx, height, adjustedTime) {
-		return txRuleError(wire.RejectNonstandard,
-			"transaction is not finalized")
-	}
-
-	// Since extremely large transactions with a lot of inputs can cost
-	// almost as much to process as the sender fees, limit the maximum
-	// size of a transaction.  This also helps mitigate CPU exhaustion
-	// attacks.
-	serializedLen := msgTx.SerializeSize()
-	if serializedLen > maxStandardTxSize {
-		str := fmt.Sprintf("transaction size of %v is larger than max "+
-			"allowed size of %v", serializedLen, maxStandardTxSize)
-		return txRuleError(wire.RejectNonstandard, str)
-	}
-
-	for i, txIn := range msgTx.TxIn {
-		// Each transaction input signature script must not exceed the
-		// maximum size allowed for a standard transaction.  See
-		// the comment on maxStandardSigScriptSize for more details.
-		sigScriptLen := len(txIn.SignatureScript)
-		if sigScriptLen > maxStandardSigScriptSize {
-			str := fmt.Sprintf("transaction input %d: signature "+
-				"script size of %d bytes is large than max "+
-				"allowed size of %d bytes", i, sigScriptLen,
-				maxStandardSigScriptSize)
-			return txRuleError(wire.RejectNonstandard, str)
-		}
-
-		// Each transaction input signature script must only contain
-		// opcodes which push data onto the stack.
-		if !txscript.IsPushOnlyScript(txIn.SignatureScript) {
-			str := fmt.Sprintf("transaction input %d: signature "+
-				"script is not push only", i)
-			return txRuleError(wire.RejectNonstandard, str)
-		}
-	}
-
-	// None of the output public key scripts can be a non-standard script or
-	// be "dust" (except when the script is a null data script).
-	numNullDataOutputs := 0
-	for i, txOut := range msgTx.TxOut {
-		scriptClass := txscript.GetScriptClass(txOut.PkScript)
-		err := checkPkScriptStandard(txOut.PkScript, scriptClass)
-		if err != nil {
-			// Attempt to extract a reject code from the error so
-			// it can be retained.  When not possible, fall back to
-			// a non standard error.
-			rejectCode, found := extractRejectCode(err)
-			if !found {
-				rejectCode = wire.RejectNonstandard
-			}
-			str := fmt.Sprintf("transaction output %d: %v", i, err)
-			return txRuleError(rejectCode, str)
-		}
-
-		// Accumulate the number of outputs which only carry data.  For
-		// all other script types, ensure the output value is not
-		// "dust".
-		if scriptClass == txscript.NullDataTy {
-			numNullDataOutputs++
-		} else if isDust(txOut) {
-			str := fmt.Sprintf("transaction output %d: payment "+
-				"of %d is dust", i, txOut.Value)
-			return txRuleError(wire.RejectDust, str)
-		}
-	}
-
-	// A standard transaction must not have more than one output script that
-	// only carries data.
-	if numNullDataOutputs > 1 {
-		str := "more than one transaction output in a nulldata script"
-		return txRuleError(wire.RejectNonstandard, str)
-	}
-
-	return nil
-}
-
-// checkInputsStandard performs a series of checks on a transaction's inputs
-// to ensure they are "standard".  A standard transaction input is one that
-// that consumes the expected number of elements from the stack and that number
-// is the same as the output script pushes.  This help prevent resource
-// exhaustion attacks by "creative" use of scripts that are super expensive to
-// process like OP_DUP OP_CHECKSIG OP_DROP repeated a large number of times
-// followed by a final OP_TRUE.
-func checkInputsStandard(tx *btcutil.Tx, txStore blockchain.TxStore) error {
-	// NOTE: The reference implementation also does a coinbase check here,
-	// but coinbases have already been rejected prior to calling this
-	// function so no need to recheck.
-
-	for i, txIn := range tx.MsgTx().TxIn {
-		// It is safe to elide existence and index checks here since
-		// they have already been checked prior to calling this
-		// function.
-		prevOut := txIn.PreviousOutPoint
-		originTx := txStore[prevOut.Hash].Tx.MsgTx()
-		originPkScript := originTx.TxOut[prevOut.Index].PkScript
-
-		// Calculate stats for the script pair.
-		scriptInfo, err := txscript.CalcScriptInfo(txIn.SignatureScript,
-			originPkScript, true)
-		if err != nil {
-			str := fmt.Sprintf("transaction input #%d script parse "+
-				"failure: %v", i, err)
-			return txRuleError(wire.RejectNonstandard, str)
-		}
-
-		// A negative value for expected inputs indicates the script is
-		// non-standard in some way.
-		if scriptInfo.ExpectedInputs < 0 {
-			str := fmt.Sprintf("transaction input #%d expects %d "+
-				"inputs", i, scriptInfo.ExpectedInputs)
-			return txRuleError(wire.RejectNonstandard, str)
-		}
-
-		// The script pair is non-standard if the number of available
-		// inputs does not match the number of expected inputs.
-		if scriptInfo.NumInputs != scriptInfo.ExpectedInputs {
-			str := fmt.Sprintf("transaction input #%d expects %d "+
-				"inputs, but referenced output script provides "+
-				"%d", i, scriptInfo.ExpectedInputs,
-				scriptInfo.NumInputs)
-			return txRuleError(wire.RejectNonstandard, str)
-		}
-	}
-
-	return nil
-}
-
-// calcMinRequiredTxRelayFee returns the minimum transaction fee required for a
-// transaction with the passed serialized size to be accepted into the memory
-// pool and relayed.
-func calcMinRequiredTxRelayFee(serializedSize int64) int64 {
-	// Calculate the minimum fee for a transaction to be allowed into the
-	// mempool and relayed by scaling the base fee (which is the minimum
-	// free transaction relay fee).  minTxRelayFee is in Satoshi/KB, so
-	// divide the transaction size by 1000 to convert to kilobytes.  Also,
-	// integer division is used so fees only increase on full kilobyte
-	// boundaries.
-	minFee := (1 + serializedSize/1000) * minTxRelayFee
-
-	// Set the minimum fee to the maximum possible value if the calculated
-	// fee is not in the valid range for monetary amounts.
-	if minFee < 0 || minFee > btcutil.MaxSatoshi {
-		minFee = btcutil.MaxSatoshi
-	}
-
-	return minFee
 }
 
 // removeOrphan is the internal function which implements the public
@@ -407,16 +81,11 @@ func (mp *txMemPool) removeOrphan(txHash *wire.ShaHash) {
 	for _, txIn := range tx.MsgTx().TxIn {
 		originTxHash := txIn.PreviousOutPoint.Hash
 		if orphans, exists := mp.orphansByPrev[originTxHash]; exists {
-			for e := orphans.Front(); e != nil; e = e.Next() {
-				if e.Value.(*btcutil.Tx) == tx {
-					orphans.Remove(e)
-					break
-				}
-			}
+			delete(orphans, *tx.Sha())
 
 			// Remove the map entry altogether if there are no
 			// longer any orphans which depend on it.
-			if orphans.Len() == 0 {
+			if len(orphans) == 0 {
 				delete(mp.orphansByPrev, originTxHash)
 			}
 		}
@@ -484,10 +153,11 @@ func (mp *txMemPool) addOrphan(tx *btcutil.Tx) {
 	mp.orphans[*tx.Sha()] = tx
 	for _, txIn := range tx.MsgTx().TxIn {
 		originTxHash := txIn.PreviousOutPoint.Hash
-		if mp.orphansByPrev[originTxHash] == nil {
-			mp.orphansByPrev[originTxHash] = list.New()
+		if _, exists := mp.orphansByPrev[originTxHash]; !exists {
+			mp.orphansByPrev[originTxHash] =
+				make(map[wire.ShaHash]*btcutil.Tx)
 		}
-		mp.orphansByPrev[originTxHash].PushBack(tx)
+		mp.orphansByPrev[originTxHash][*tx.Sha()] = tx
 	}
 
 	txmpLog.Debugf("Stored orphan transaction %v (total: %d)", tx.Sha(),
@@ -594,13 +264,15 @@ func (mp *txMemPool) HaveTransaction(hash *wire.ShaHash) bool {
 // RemoveTransaction.  See the comment for RemoveTransaction for more details.
 //
 // This function MUST be called with the mempool lock held (for writes).
-func (mp *txMemPool) removeTransaction(tx *btcutil.Tx) {
-	// Remove any transactions which rely on this one.
+func (mp *txMemPool) removeTransaction(tx *btcutil.Tx, removeRedeemers bool) {
 	txHash := tx.Sha()
-	for i := uint32(0); i < uint32(len(tx.MsgTx().TxOut)); i++ {
-		outpoint := wire.NewOutPoint(txHash, i)
-		if txRedeemer, exists := mp.outpoints[*outpoint]; exists {
-			mp.removeTransaction(txRedeemer)
+	if removeRedeemers {
+		// Remove any transactions which rely on this one.
+		for i := uint32(0); i < uint32(len(tx.MsgTx().TxOut)); i++ {
+			outpoint := wire.NewOutPoint(txHash, i)
+			if txRedeemer, exists := mp.outpoints[*outpoint]; exists {
+				mp.removeTransaction(txRedeemer, true)
+			}
 		}
 	}
 
@@ -662,16 +334,18 @@ func (mp *txMemPool) removeScriptFromAddrIndex(pkScript []byte, tx *btcutil.Tx) 
 	return nil
 }
 
-// RemoveTransaction removes the passed transaction and any transactions which
-// depend on it from the memory pool.
+// RemoveTransaction removes the passed transaction from the mempool. If
+// removeRedeemers flag is set, any transactions that redeem outputs from the
+// removed transaction will also be removed recursively from the mempool, as
+// they would otherwise become orphan.
 //
 // This function is safe for concurrent access.
-func (mp *txMemPool) RemoveTransaction(tx *btcutil.Tx) {
+func (mp *txMemPool) RemoveTransaction(tx *btcutil.Tx, removeRedeemers bool) {
 	// Protect concurrent access.
 	mp.Lock()
 	defer mp.Unlock()
 
-	mp.removeTransaction(tx)
+	mp.removeTransaction(tx, removeRedeemers)
 }
 
 // RemoveDoubleSpends removes all transactions which spend outputs spent by the
@@ -689,7 +363,7 @@ func (mp *txMemPool) RemoveDoubleSpends(tx *btcutil.Tx) {
 	for _, txIn := range tx.MsgTx().TxIn {
 		if txRedeemer, ok := mp.outpoints[txIn.PreviousOutPoint]; ok {
 			if !txRedeemer.Sha().IsEqual(tx.Sha()) {
-				mp.removeTransaction(txRedeemer)
+				mp.removeTransaction(txRedeemer, true)
 			}
 		}
 	}
@@ -786,90 +460,6 @@ func (mp *txMemPool) indexScriptAddressToTx(pkScript []byte, tx *btcutil.Tx) err
 	}
 
 	return nil
-}
-
-// calcInputValueAge is a helper function used to calculate the input age of
-// a transaction.  The input age for a txin is the number of confirmations
-// since the referenced txout multiplied by its output value.  The total input
-// age is the sum of this value for each txin.  Any inputs to the transaction
-// which are currently in the mempool and hence not mined into a block yet,
-// contribute no additional input age to the transaction.
-func calcInputValueAge(txDesc *TxDesc, txStore blockchain.TxStore, nextBlockHeight int32) float64 {
-	var totalInputAge float64
-	for _, txIn := range txDesc.Tx.MsgTx().TxIn {
-		originHash := &txIn.PreviousOutPoint.Hash
-		originIndex := txIn.PreviousOutPoint.Index
-
-		// Don't attempt to accumulate the total input age if the txIn
-		// in question doesn't exist.
-		if txData, exists := txStore[*originHash]; exists && txData.Tx != nil {
-			// Inputs with dependencies currently in the mempool
-			// have their block height set to a special constant.
-			// Their input age should computed as zero since their
-			// parent hasn't made it into a block yet.
-			var inputAge int32
-			if txData.BlockHeight == mempoolHeight {
-				inputAge = 0
-			} else {
-				inputAge = nextBlockHeight - txData.BlockHeight
-			}
-
-			// Sum the input value times age.
-			originTxOut := txData.Tx.MsgTx().TxOut[originIndex]
-			inputValue := originTxOut.Value
-			totalInputAge += float64(inputValue * int64(inputAge))
-		}
-	}
-
-	return totalInputAge
-}
-
-// minInt is a helper function to return the minimum of two ints.  This avoids
-// a math import and the need to cast to floats.
-func minInt(a, b int) int {
-	if a < b {
-		return a
-	}
-	return b
-}
-
-// calcPriority returns a transaction priority given a transaction and the sum
-// of each of its input values multiplied by their age (# of confirmations).
-// Thus, the final formula for the priority is:
-// sum(inputValue * inputAge) / adjustedTxSize
-func calcPriority(tx *btcutil.Tx, inputValueAge float64) float64 {
-	// In order to encourage spending multiple old unspent transaction
-	// outputs thereby reducing the total set, don't count the constant
-	// overhead for each input as well as enough bytes of the signature
-	// script to cover a pay-to-script-hash redemption with a compressed
-	// pubkey.  This makes additional inputs free by boosting the priority
-	// of the transaction accordingly.  No more incentive is given to avoid
-	// encouraging gaming future transactions through the use of junk
-	// outputs.  This is the same logic used in the reference
-	// implementation.
-	//
-	// The constant overhead for a txin is 41 bytes since the previous
-	// outpoint is 36 bytes + 4 bytes for the sequence + 1 byte the
-	// signature script length.
-	//
-	// A compressed pubkey pay-to-script-hash redemption with a maximum len
-	// signature is of the form:
-	// [OP_DATA_73 <73-byte sig> + OP_DATA_35 + {OP_DATA_33
-	// <33 byte compresed pubkey> + OP_CHECKSIG}]
-	//
-	// Thus 1 + 73 + 1 + 1 + 33 + 1 = 110
-	overhead := 0
-	for _, txIn := range tx.MsgTx().TxIn {
-		// Max inputs + size can't possibly overflow here.
-		overhead += 41 + minInt(110, len(txIn.SignatureScript))
-	}
-
-	serializedTxSize := tx.MsgTx().SerializeSize()
-	if overhead >= serializedTxSize {
-		return 0.0
-	}
-
-	return inputValueAge / float64(serializedTxSize-overhead)
 }
 
 // StartingPriority calculates the priority of this tx descriptor's underlying
@@ -1037,7 +627,8 @@ func (mp *txMemPool) maybeAcceptTransaction(tx *btcutil.Tx, isNew, rateLimit boo
 	// Don't allow non-standard transactions if the network parameters
 	// forbid their relaying.
 	if !activeNetParams.RelayNonStdTxs {
-		err := mp.checkTransactionStandard(tx, nextBlockHeight)
+		err := checkTransactionStandard(tx, nextBlockHeight,
+			mp.server.timeSource, cfg.minRelayTxFee)
 		if err != nil {
 			// Attempt to extract a reject code from the error so
 			// it can be retained.  When not possible, fall back to
@@ -1099,7 +690,7 @@ func (mp *txMemPool) maybeAcceptTransaction(tx *btcutil.Tx, isNew, rateLimit boo
 			missingParents = append(missingParents, txD.Hash)
 		}
 	}
-	if len(missingParents) != 0 {
+	if len(missingParents) > 0 {
 		return missingParents, nil
 	}
 
@@ -1168,7 +759,7 @@ func (mp *txMemPool) maybeAcceptTransaction(tx *btcutil.Tx, isNew, rateLimit boo
 	// transaction does not exceeed 1000 less than the reserved space for
 	// high-priority transactions, don't require a fee for it.
 	serializedSize := int64(tx.MsgTx().SerializeSize())
-	minFee := calcMinRequiredTxRelayFee(serializedSize)
+	minFee := calcMinRequiredTxRelayFee(serializedSize, cfg.minRelayTxFee)
 	if serializedSize >= (defaultBlockPrioritySize-1000) && txFee < minFee {
 		str := fmt.Sprintf("transaction %v has %d fees which is under "+
 			"the required amount of %d", txHash, txFee,
@@ -1272,7 +863,7 @@ func (mp *txMemPool) MaybeAcceptTransaction(tx *btcutil.Tx, isNew, rateLimit boo
 // ProcessOrphans.  See the comment for ProcessOrphans for more details.
 //
 // This function MUST be called with the mempool lock held (for writes).
-func (mp *txMemPool) processOrphans(hash *wire.ShaHash) error {
+func (mp *txMemPool) processOrphans(hash *wire.ShaHash) {
 	// Start with processing at least the passed hash.
 	processHashes := list.New()
 	processHashes.PushBack(hash)
@@ -1291,11 +882,7 @@ func (mp *txMemPool) processOrphans(hash *wire.ShaHash) error {
 			continue
 		}
 
-		var enext *list.Element
-		for e := orphans.Front(); e != nil; e = enext {
-			enext = e.Next()
-			tx := e.Value.(*btcutil.Tx)
-
+		for _, tx := range orphans {
 			// Remove the orphan from the orphan pool.  Current
 			// behavior requires that all saved orphans with
 			// a newly accepted parent are removed from the orphan
@@ -1317,22 +904,25 @@ func (mp *txMemPool) processOrphans(hash *wire.ShaHash) error {
 			missingParents, err := mp.maybeAcceptTransaction(tx,
 				true, true)
 			if err != nil {
-				return err
+				// TODO: Remove orphans that depend on this
+				// failed transaction.
+				txmpLog.Debugf("Unable to move "+
+					"orphan transaction %v to mempool: %v",
+					tx.Sha(), err)
+				continue
 			}
 
-			if len(missingParents) == 0 {
-				// Generate and relay the inventory vector for the
-				// newly accepted transaction.
-				iv := wire.NewInvVect(wire.InvTypeTx, tx.Sha())
-				mp.server.RelayInventory(iv, tx)
-			} else {
-				// Transaction is still an orphan.
-				// TODO(jrick): This removeOrphan call is
-				// likely unnecessary as it was unconditionally
-				// removed above and maybeAcceptTransaction won't
-				// add it back.
-				mp.removeOrphan(orphanHash)
+			if len(missingParents) > 0 {
+				// Transaction is still an orphan, so add it
+				// back.
+				mp.addOrphan(tx)
+				continue
 			}
+
+			// Generate and relay the inventory vector for the
+			// newly accepted transaction.
+			iv := wire.NewInvVect(wire.InvTypeTx, tx.Sha())
+			mp.server.RelayInventory(iv, tx)
 
 			// Add this transaction to the list of transactions to
 			// process so any orphans that depend on this one are
@@ -1350,8 +940,6 @@ func (mp *txMemPool) processOrphans(hash *wire.ShaHash) error {
 			processHashes.PushBack(orphanHash)
 		}
 	}
-
-	return nil
 }
 
 // ProcessOrphans determines if there are any orphans which depend on the passed
@@ -1361,11 +949,10 @@ func (mp *txMemPool) processOrphans(hash *wire.ShaHash) error {
 // orphans) until there are no more.
 //
 // This function is safe for concurrent access.
-func (mp *txMemPool) ProcessOrphans(hash *wire.ShaHash) error {
+func (mp *txMemPool) ProcessOrphans(hash *wire.ShaHash) {
 	mp.Lock()
-	defer mp.Unlock()
-
-	return mp.processOrphans(hash)
+	mp.processOrphans(hash)
+	mp.Unlock()
 }
 
 // ProcessTransaction is the main workhorse for handling insertion of new
@@ -1396,10 +983,7 @@ func (mp *txMemPool) ProcessTransaction(tx *btcutil.Tx, allowOrphan, rateLimit b
 		// transaction (they may no longer be orphans if all inputs
 		// are now available) and repeat for those accepted
 		// transactions until there are no more.
-		err := mp.processOrphans(tx.Sha())
-		if err != nil {
-			return err
-		}
+		mp.processOrphans(tx.Sha())
 	} else {
 		// The transaction is an orphan (has inputs missing).  Reject
 		// it if the flag to allow orphans is not set.
@@ -1495,7 +1079,7 @@ func newTxMemPool(server *server) *txMemPool {
 		server:        server,
 		pool:          make(map[wire.ShaHash]*TxDesc),
 		orphans:       make(map[wire.ShaHash]*btcutil.Tx),
-		orphansByPrev: make(map[wire.ShaHash]*list.List),
+		orphansByPrev: make(map[wire.ShaHash]map[wire.ShaHash]*btcutil.Tx),
 		outpoints:     make(map[wire.OutPoint]*btcutil.Tx),
 	}
 	if cfg.AddrIndex {
