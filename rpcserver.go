@@ -664,22 +664,41 @@ func createVinList(mtx *wire.MsgTx) []btcjson.Vin {
 	return vinList
 }
 
+// stringInSlice returns true if string a is found in array list.
+func stringInSlice(a string, list []string) bool {
+	for _, b := range list {
+		if b == a {
+			return true
+		}
+	}
+	return false
+}
+
 // createVinList returns a slice of JSON objects for the inputs of the passed
 // transaction.
-func createVinListPrevOut(s *rpcServer, mtx *wire.MsgTx, chainParams *chaincfg.Params, vinExtra int) []btcjson.VinPrevOut {
+func createVinListPrevOut(s *rpcServer, mtx *wire.MsgTx, chainParams *chaincfg.Params, vinExtra int, filterAddrMap map[string]struct{}) []btcjson.VinPrevOut {
+	// We use a dynamically sized list to accomodate address filter.
+	vinList := make([]btcjson.VinPrevOut, 0, len(mtx.TxIn))
+
 	// Coinbase transactions only have a single txin by definition.
-	vinList := make([]btcjson.VinPrevOut, len(mtx.TxIn))
 	if blockchain.IsCoinBaseTx(mtx) {
+		// include tx only if filterAddrMap is empty because coinbase has no address
+		// and so would never match a non-empty filter.
+		if len(filterAddrMap) != 0 {
+			return vinList
+		}
+		var vinEntry btcjson.VinPrevOut
 		txIn := mtx.TxIn[0]
-		vinList[0].Coinbase = hex.EncodeToString(txIn.SignatureScript)
-		vinList[0].Sequence = txIn.Sequence
+		vinEntry.Coinbase = hex.EncodeToString(txIn.SignatureScript)
+		vinEntry.Sequence = txIn.Sequence
+		vinList = append(vinList, vinEntry)
 		return vinList
 	}
 
 	// Lookup all of the referenced transactions needed to populate the
 	// previous output information if requested.
 	var txStore blockchain.TxStore
-	if vinExtra != 0 {
+	if vinExtra != 0 || len(filterAddrMap) > 0 {
 		tx := btcutil.NewTx(mtx)
 		txStoreNew, err := s.server.txMemPool.fetchInputTransactions(tx, true)
 		if err == nil {
@@ -687,26 +706,15 @@ func createVinListPrevOut(s *rpcServer, mtx *wire.MsgTx, chainParams *chaincfg.P
 		}
 	}
 
-	for i, txIn := range mtx.TxIn {
+	for _, txIn := range mtx.TxIn {
+		// reset filter flag for each.
+		passesFilter := len(filterAddrMap) == 0
+
 		// The disassembled string will contain [error] inline
 		// if the script doesn't fully parse, so ignore the
 		// error here.
 		disbuf, _ := txscript.DisasmString(txIn.SignatureScript)
 
-		vinEntry := &vinList[i]
-		vinEntry.Txid = txIn.PreviousOutPoint.Hash.String()
-		vinEntry.Vout = txIn.PreviousOutPoint.Index
-		vinEntry.Sequence = txIn.Sequence
-		vinEntry.ScriptSig = &btcjson.ScriptSig{
-			Asm: disbuf,
-			Hex: hex.EncodeToString(txIn.SignatureScript),
-		}
-
-		// Only populate previous output information if requested and
-		// available.
-		if vinExtra == 0 || len(txStore) == 0 {
-			continue
-		}
 		txData := txStore[txIn.PreviousOutPoint.Hash]
 		if txData == nil {
 			continue
@@ -717,20 +725,42 @@ func createVinListPrevOut(s *rpcServer, mtx *wire.MsgTx, chainParams *chaincfg.P
 		// Ignore the error here since an error means the script
 		// couldn't parse and there is no additional information about
 		// it anyways.
-		var strAddrs []string
 		_, addrs, _, _ := txscript.ExtractPkScriptAddrs(
 			originTxOut.PkScript, chainParams)
-		if addrs != nil {
-			strAddrs = make([]string, len(addrs))
-			for j, addr := range addrs {
-				strAddrs[j] = addr.EncodeAddress()
+
+		encodedAddrs := make([]string, len(addrs))
+		for j, addr := range addrs {
+			encodedAddrs[j] = addr.EncodeAddress()
+
+			if len(filterAddrMap) > 0 {
+				if _, exists := filterAddrMap[encodedAddrs[j]]; exists {
+					passesFilter = true
+				}
 			}
 		}
 
-		vinEntry.PrevOut = &btcjson.PrevOut{
-			Addresses: strAddrs,
-			Value:     btcutil.Amount(originTxOut.Value).ToBTC(),
+		if !passesFilter {
+			continue
 		}
+
+		var vinEntry btcjson.VinPrevOut
+		vinEntry.Txid = txIn.PreviousOutPoint.Hash.String()
+		vinEntry.Vout = txIn.PreviousOutPoint.Index
+		vinEntry.Sequence = txIn.Sequence
+		vinEntry.ScriptSig = &btcjson.ScriptSig{
+			Asm: disbuf,
+			Hex: hex.EncodeToString(txIn.SignatureScript),
+		}
+
+		// Only populate previous output information if requested
+		if vinExtra != 0 {
+			vinEntry.PrevOut = &btcjson.PrevOut{
+				Addresses: encodedAddrs,
+				Value:     btcutil.Amount(originTxOut.Value).ToBTC(),
+			}
+		}
+
+		vinList = append(vinList, vinEntry)
 	}
 
 	return vinList
@@ -738,34 +768,47 @@ func createVinListPrevOut(s *rpcServer, mtx *wire.MsgTx, chainParams *chaincfg.P
 
 // createVoutList returns a slice of JSON objects for the outputs of the passed
 // transaction.
-func createVoutList(mtx *wire.MsgTx, chainParams *chaincfg.Params) []btcjson.Vout {
-	voutList := make([]btcjson.Vout, len(mtx.TxOut))
+func createVoutList(mtx *wire.MsgTx, chainParams *chaincfg.Params, filterAddrMap map[string]struct{}) []btcjson.Vout {
+	voutList := make([]btcjson.Vout, 0, len(mtx.TxOut))
 	for i, v := range mtx.TxOut {
-		voutList[i].N = uint32(i)
-		voutList[i].Value = btcutil.Amount(v.Value).ToBTC()
+		// reset filter flag for each.
+		passesFilter := len(filterAddrMap) == 0
 
 		// The disassembled string will contain [error] inline if the
 		// script doesn't fully parse, so ignore the error here.
 		disbuf, _ := txscript.DisasmString(v.PkScript)
-		voutList[i].ScriptPubKey.Asm = disbuf
-		voutList[i].ScriptPubKey.Hex = hex.EncodeToString(v.PkScript)
 
 		// Ignore the error here since an error means the script
 		// couldn't parse and there is no additional information about
 		// it anyways.
 		scriptClass, addrs, reqSigs, _ := txscript.ExtractPkScriptAddrs(
 			v.PkScript, chainParams)
-		voutList[i].ScriptPubKey.Type = scriptClass.String()
-		voutList[i].ScriptPubKey.ReqSigs = int32(reqSigs)
 
-		if addrs == nil {
-			voutList[i].ScriptPubKey.Addresses = nil
-		} else {
-			voutList[i].ScriptPubKey.Addresses = make([]string, len(addrs))
-			for j, addr := range addrs {
-				voutList[i].ScriptPubKey.Addresses[j] = addr.EncodeAddress()
+		encodedAddrs := make([]string, len(addrs))
+		for j, addr := range addrs {
+			encodedAddrs[j] = addr.EncodeAddress()
+
+			if len(filterAddrMap) > 0 {
+				if _, exists := filterAddrMap[encodedAddrs[j]]; exists {
+					passesFilter = true
+				}
 			}
 		}
+
+		if !passesFilter {
+			continue
+		}
+
+		var vout btcjson.Vout
+		vout.N = uint32(i)
+		vout.Value = btcutil.Amount(v.Value).ToBTC()
+		vout.ScriptPubKey.Addresses = encodedAddrs
+		vout.ScriptPubKey.Asm = disbuf
+		vout.ScriptPubKey.Hex = hex.EncodeToString(v.PkScript)
+		vout.ScriptPubKey.Type = scriptClass.String()
+		vout.ScriptPubKey.ReqSigs = int32(reqSigs)
+
+		voutList = append(voutList, vout)
 	}
 
 	return voutList
@@ -775,18 +818,24 @@ func createVoutList(mtx *wire.MsgTx, chainParams *chaincfg.Params) []btcjson.Vou
 // to a raw transaction JSON object, possibly with vin.PrevOut section.
 func createSearchRawTransactionsResult(s *rpcServer, chainParams *chaincfg.Params, mtx *wire.MsgTx,
 	txHash string, blkHeader *wire.BlockHeader, blkHash string,
-	blkHeight int32, chainHeight int32, vinExtra int) (*btcjson.SearchRawTransactionsResult, error) {
+	blkHeight int32, chainHeight int32, vinExtra int, filterAddrMap map[string]struct{}) (*btcjson.SearchRawTransactionsResult, error) {
 
-	mtxHex, err := messageToHex(mtx)
-	if err != nil {
-		return nil, err
+	// omit hex if filterAddrMap are present.  When filtering, typically the
+	// goal is to reduce unnecessary bloat in the result.
+	var mtxHex string
+	if len(filterAddrMap) == 0 {
+		mtxHexTmp, err := messageToHex(mtx)
+		if err != nil {
+			return nil, err
+		}
+		mtxHex = mtxHexTmp
 	}
 
 	txReply := &btcjson.SearchRawTransactionsResult{
 		Hex:      mtxHex,
 		Txid:     txHash,
-		Vout:     createVoutList(mtx, chainParams),
-		Vin:      createVinListPrevOut(s, mtx, chainParams, vinExtra),
+		Vout:     createVoutList(mtx, chainParams, filterAddrMap),
+		Vin:      createVinListPrevOut(s, mtx, chainParams, vinExtra, filterAddrMap),
 		Version:  mtx.Version,
 		LockTime: mtx.LockTime,
 	}
@@ -816,7 +865,7 @@ func createTxRawResult(chainParams *chaincfg.Params, mtx *wire.MsgTx,
 	txReply := &btcjson.TxRawResult{
 		Hex:      mtxHex,
 		Txid:     txHash,
-		Vout:     createVoutList(mtx, chainParams),
+		Vout:     createVoutList(mtx, chainParams, nil),
 		Vin:      createVinList(mtx),
 		Version:  mtx.Version,
 		LockTime: mtx.LockTime,
@@ -861,7 +910,7 @@ func handleDecodeRawTransaction(s *rpcServer, cmd interface{}, closeChan <-chan 
 		Version:  mtx.Version,
 		Locktime: mtx.LockTime,
 		Vin:      createVinList(&mtx),
-		Vout:     createVoutList(&mtx, s.server.chainParams),
+		Vout:     createVoutList(&mtx, s.server.chainParams, nil),
 	}
 	return txReply, nil
 }
@@ -3175,8 +3224,17 @@ func handleSearchRawTransactions(s *rpcServer, cmd interface{}, closeChan <-chan
 			blkHeight = txReply.Height
 		}
 
+		// c.FilterAddrs can be nil, empty or non-empty.  Here we normalize that
+		// to a non-nil array (empty or non-empty) to avoid future nil checks.
+		filterAddrMap := make(map[string]struct{})
+		if c.FilterAddrs != nil && len(*c.FilterAddrs) > 0 {
+			for _, addr := range *c.FilterAddrs {
+				filterAddrMap[addr] = struct{}{}
+			}
+		}
+
 		rawTxn, err := createSearchRawTransactionsResult(s, s.server.chainParams, mtx,
-			txHash, blkHeader, blkHashStr, blkHeight, maxIdx, *c.VinExtra)
+			txHash, blkHeader, blkHashStr, blkHeight, maxIdx, *c.VinExtra, filterAddrMap)
 		if err != nil {
 			return nil, err
 		}
