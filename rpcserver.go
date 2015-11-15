@@ -656,7 +656,7 @@ func stringInSlice(a string, list []string) bool {
 
 // createVinList returns a slice of JSON objects for the inputs of the passed
 // transaction.
-func createVinListPrevOut(s *rpcServer, mtx *wire.MsgTx, chainParams *chaincfg.Params, vinExtra int, filterAddrs map[string]bool) []btcjson.VinPrevOut {
+func createVinListPrevOut(s *rpcServer, mtx *wire.MsgTx, chainParams *chaincfg.Params, vinExtra int, filterAddrs map[string]struct{}) []btcjson.VinPrevOut {
 	// We use a dynamically sized list to accomodate address filter.
 	vinList := make([]btcjson.VinPrevOut, 0, len(mtx.TxIn))
 
@@ -713,8 +713,7 @@ func createVinListPrevOut(s *rpcServer, mtx *wire.MsgTx, chainParams *chaincfg.P
 			encodedAddrs[j] = addr.EncodeAddress()
 
 			if len(filterAddrs) > 0 {
-				_, exists := filterAddrs[encodedAddrs[j]]
-				if exists {
+				if _, exists := filterAddrs[encodedAddrs[j]]; exists {
 					passesFilter = true
 				}
 			}
@@ -749,7 +748,7 @@ func createVinListPrevOut(s *rpcServer, mtx *wire.MsgTx, chainParams *chaincfg.P
 
 // createVoutList returns a slice of JSON objects for the outputs of the passed
 // transaction.
-func createVoutList(mtx *wire.MsgTx, chainParams *chaincfg.Params, filterAddrs map[string]bool) []btcjson.Vout {
+func createVoutList(mtx *wire.MsgTx, chainParams *chaincfg.Params, filterAddrs map[string]struct{}) []btcjson.Vout {
 	voutList := make([]btcjson.Vout, 0, len(mtx.TxOut))
 	for i, v := range mtx.TxOut {
 		// reset filter flag for each.
@@ -770,8 +769,7 @@ func createVoutList(mtx *wire.MsgTx, chainParams *chaincfg.Params, filterAddrs m
 			encodedAddrs[j] = addr.EncodeAddress()
 
 			if len(filterAddrs) > 0 {
-				_, exists := filterAddrs[encodedAddrs[j]]
-				if exists {
+				if _, exists := filterAddrs[encodedAddrs[j]]; exists {
 					passesFilter = true
 				}
 			}
@@ -800,7 +798,7 @@ func createVoutList(mtx *wire.MsgTx, chainParams *chaincfg.Params, filterAddrs m
 // to a raw transaction JSON object, possibly with vin.PrevOut section.
 func createSearchRawTransactionsResult(s *rpcServer, chainParams *chaincfg.Params, mtx *wire.MsgTx,
 	txHash string, blkHeader *wire.BlockHeader, blkHash string,
-	blkHeight int32, chainHeight int32, vinExtra int, filterAddrs map[string]bool) (*btcjson.SearchRawTransactionsResult, error) {
+	blkHeight int32, chainHeight int32, vinExtra int, filterAddrs map[string]struct{}) (*btcjson.SearchRawTransactionsResult, error) {
 
 	// omit hex if filterAddrs are present.  When filtering, typically the
 	// goal is to reduce unnecessary bloat in the result.
@@ -3177,10 +3175,10 @@ func handleSearchRawTransactions(s *rpcServer, cmd interface{}, closeChan <-chan
 
 		// c.FilterAddrs can be nil, empty or non-empty.  Here we normalize that
 		// to a non-nil array (empty or non-empty) to avoid future nil checks.
-		filterAddrs := make(map[string]bool)
+		filterAddrs := make(map[string]struct{})
 		if c.FilterAddrs != nil && len(*c.FilterAddrs) > 0 {
 			for _, addr := range *c.FilterAddrs {
-				filterAddrs[addr] = true
+				filterAddrs[addr] = struct{}{}
 			}
 		}
 
