@@ -322,23 +322,6 @@ type stallControlMsg struct {
 	message wire.Message
 }
 
-// stats is the collection of stats related to a peer.
-type stats struct {
-	statsMtx           sync.RWMutex // protects all statistics below here.
-	timeOffset         int64
-	timeConnected      time.Time
-	lastSend           time.Time
-	lastRecv           time.Time
-	bytesReceived      uint64
-	bytesSent          uint64
-	startingHeight     int32
-	lastBlock          int32
-	lastAnnouncedBlock *wire.ShaHash
-	lastPingNonce      uint64    // Set to nonce if we have a pending ping.
-	lastPingTime       time.Time // Time we sent last ping.
-	lastPingMicros     int64     // Time for last ping to return.
-}
-
 // StatsSnap is a snapshot of peer stats at a point in time.
 type StatsSnap struct {
 	ID             int32
@@ -428,6 +411,22 @@ type Peer struct {
 	prevGetHdrsBegin   *wire.ShaHash
 	prevGetHdrsStop    *wire.ShaHash
 
+	// These fields keep track of statistics for the peer and are protected
+	// by the statsMtx mutex.
+	statsMtx           sync.RWMutex
+	timeOffset         int64
+	timeConnected      time.Time
+	lastSend           time.Time
+	lastRecv           time.Time
+	bytesReceived      uint64
+	bytesSent          uint64
+	startingHeight     int32
+	lastBlock          int32
+	lastAnnouncedBlock *wire.ShaHash
+	lastPingNonce      uint64    // Set to nonce if we have a pending ping.
+	lastPingTime       time.Time // Time we sent last ping.
+	lastPingMicros     int64     // Time for last ping to return.
+
 	stallControl  chan stallControlMsg
 	outputQueue   chan outMsg
 	sendQueue     chan outMsg
@@ -437,8 +436,6 @@ type Peer struct {
 	queueQuit     chan struct{}
 	outQuit       chan struct{}
 	quit          chan struct{}
-
-	stats
 }
 
 // String returns the peer's address and directionality as a human-readable
@@ -2058,7 +2055,6 @@ func newPeerBase(cfg *Config, inbound bool) *Peer {
 		queueQuit:       make(chan struct{}),
 		outQuit:         make(chan struct{}),
 		quit:            make(chan struct{}),
-		stats:           stats{},
 		cfg:             *cfg, // Copy so caller can't mutate.
 		services:        cfg.Services,
 		protocolVersion: protocolVersion,
