@@ -1257,8 +1257,6 @@ func New(config *ConnConfig, ntfnHandlers *NotificationHandlers) (*Client, error
 			start = true
 		}
 	}
-	log.Infof("Established connection to RPC server %s",
-		config.Host)
 
 	client := &Client{
 		config:          config,
@@ -1276,6 +1274,8 @@ func New(config *ConnConfig, ntfnHandlers *NotificationHandlers) (*Client, error
 	}
 
 	if start {
+		log.Infof("Established connection to RPC server %s",
+			config.Host)
 		close(connEstablished)
 		client.start()
 		if !client.config.HTTPPostMode && !client.config.DisableAutoReconnect {
@@ -1328,6 +1328,8 @@ func (c *Client) Connect(tries int) error {
 		// Connection was established.  Set the websocket connection
 		// member of the client and start the goroutines necessary
 		// to run the client.
+		log.Infof("Established connection to RPC server %s",
+			c.config.Host)
 		c.wsConn = wsConn
 		close(c.connEstablished)
 		c.start()
