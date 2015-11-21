@@ -44,7 +44,7 @@ testLoop:
 		// limit and add all of the test inventory vectors.  This will
 		// cause evicition since there are more test inventory vectors
 		// than the limits.
-		mruInvMap := NewMruInventoryMap(uint(test.limit))
+		mruInvMap := newMruInventoryMap(uint(test.limit))
 		for j := 0; j < numInvVects; j++ {
 			mruInvMap.Add(invVects[j])
 		}
@@ -127,7 +127,7 @@ func TestMruInventoryMapStringer(t *testing.T) {
 	iv2 := wire.NewInvVect(wire.InvTypeBlock, hash2)
 
 	// Create new mru inventory map and add the inventory vectors.
-	mruInvMap := NewMruInventoryMap(uint(2))
+	mruInvMap := newMruInventoryMap(uint(2))
 	mruInvMap.Add(iv1)
 	mruInvMap.Add(iv2)
 
@@ -162,7 +162,7 @@ func BenchmarkMruInventoryList(b *testing.B) {
 
 	// Benchmark the add plus evicition code.
 	limit := 20000
-	mruInvMap := NewMruInventoryMap(uint(limit))
+	mruInvMap := newMruInventoryMap(uint(limit))
 	for i := 0; i < b.N; i++ {
 		mruInvMap.Add(invVects[i%numInvVects])
 	}
