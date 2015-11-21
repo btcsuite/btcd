@@ -180,6 +180,7 @@ type server struct {
 	addrIndexer          *addrIndexer
 	txMemPool            *txMemPool
 	cpuMiner             *CPUMiner
+	relayNtfnChan        chan *btcutil.Tx
 	modifyRebroadcastInv chan interface{}
 	pendingPeers         chan *serverPeer
 	newPeers             chan *serverPeer
@@ -1899,6 +1900,20 @@ func (s *server) rebroadcastHandler() {
 out:
 	for {
 		select {
+		case tx := <-s.relayNtfnChan:
+			// Generate an inv and relay it.
+			inv := wire.NewInvVect(wire.InvTypeTx, tx.Sha())
+			s.RelayInventory(inv, tx)
+
+			if s.rpcServer != nil {
+				// Notify websocket clients about mempool transactions.
+				s.rpcServer.ntfnMgr.NotifyMempoolTx(tx, true)
+
+				// Potentially notify any getblocktemplate long poll clients
+				// about stale block templates due to the new transaction.
+				s.rpcServer.gbtWorkState.NotifyMempoolTx(s.txMemPool.LastUpdated())
+			}
+
 		case riv := <-s.modifyRebroadcastInv:
 			switch msg := riv.(type) {
 			// Incoming InvVects are added to our map of RPC txs.
@@ -2322,6 +2337,7 @@ func newServer(listenAddrs []string, db database.Db, chainParams *chaincfg.Param
 		relayInv:             make(chan relayMsg, cfg.MaxPeers),
 		broadcast:            make(chan broadcastMsg, cfg.MaxPeers),
 		quit:                 make(chan struct{}),
+		relayNtfnChan:        make(chan *btcutil.Tx, cfg.MaxPeers),
 		modifyRebroadcastInv: make(chan interface{}),
 		peerHeightsUpdate:    make(chan updatePeerHeightsMsg),
 		nat:                  nat,
@@ -2335,7 +2351,6 @@ func newServer(listenAddrs []string, db database.Db, chainParams *chaincfg.Param
 		return nil, err
 	}
 	s.blockManager = bm
-	s.txMemPool = newTxMemPool(&s)
 
 	// Create the mining policy based on the configuration options.
 	policy := miningPolicy{
@@ -2345,6 +2360,20 @@ func newServer(listenAddrs []string, db database.Db, chainParams *chaincfg.Param
 		TxMinFreeFee:      cfg.minRelayTxFee,
 	}
 	s.cpuMiner = newCPUMiner(&policy, &s)
+
+	txC := mempoolConfig{
+		DisableRelayPriority:  cfg.NoRelayPriority,
+		EnableAddrIndex:       cfg.AddrIndex,
+		FetchTransactionStore: s.blockManager.blockChain.FetchTransactionStore,
+		FreeTxRelayLimit:      cfg.FreeTxRelayLimit,
+		MaxOrphanTxs:          cfg.MaxOrphanTxs,
+		MinRelayTxFee:         cfg.minRelayTxFee,
+		NewestSha:             s.db.NewestSha,
+		RelayNtfnChan:         s.relayNtfnChan,
+		SigCache:              s.sigCache,
+		TimeSource:            s.timeSource,
+	}
+	s.txMemPool = newTxMemPool(&txC)
 
 	if cfg.AddrIndex {
 		ai, err := newAddrIndexer(&s)
