@@ -3,6 +3,126 @@ User visible changes for btcd
   A full-node bitcoin implementation written in Go
 ============================================================================
 
+Changes in 0.12.0 (Fri Nov 20 2015)
+  - Protocol and network related changes:
+    - Add a new checkpoint at block height 382320 (#555)
+    - Implement BIP0065 which includes support for version 4 blocks, a new
+      consensus opcode (OP_CHECKLOCKTIMEVERIFY) that enforces transaction
+      lock times, and a double-threshold switchover mechanism (#535, #459,
+      #455)
+    - Implement BIP0111 which provides a new bloom filter service flag and
+      hence provides support for protocol version 70011 (#499)
+    - Add a new parameter --nopeerbloomfilters to allow disabling bloom
+      filter support (#499)
+    - Reject non-canonically encoded variable length integers (#507)
+    - Add mainnet peer discovery DNS seed (seed.bitcoin.jonasschnelli.ch)
+      (#496)
+    - Correct reconnect handling for persistent peers (#463, #464)
+    - Ignore requests for block headers if not fully synced (#444)
+    - Add CLI support for specifying the zone id on IPv6 addresses (#538)
+    - Fix a couple of issue where the initial block sync could stall (#518,
+      #229, #486)
+    - Fix an issue which prevented the --onion option from working as
+      intended (#446)
+  - Transaction relay (memory pool) changes:
+    - Require transactions to only include signatures encoded with the
+    canonical 'low-s' encoding (#512)
+    - Add a new parameter --minrelaytxfee to allow the minimum transaction
+      fee in BTC/kB to be overridden (#520)
+    - Retain memory pool transactions when they redeem another one that is
+      removed when a block is accepted (#539)
+    - Do not send reject messages for a transaction if it is valid but
+      causes an orphan transaction which depends on it to be determined
+      as invalid (#546)
+    - Refrain from attempting to add orphans to the memory pool multiple
+      times when the transaction they redeem is added (#551)
+    - Modify minimum transaction fee calculations to scale based on bytes
+      instead of full kilobyte boundaries (#521, #537)
+  - Implement signature cache:
+    - Provides a limited memory cache of validated signatures which is a
+      huge optimization when verifying blocks for transactions that are
+      already in the memory pool (#506)
+    - Add a new parameter '--sigcachemaxsize' which allows the size of the
+      new cache to be manually changed if desired (#506)
+  - Mining support changes:
+    - Notify getblocktemplate long polling clients when a block is pushed
+      via submitblock (#488)
+    - Speed up getblocktemplate by making use of the new signature cache
+      (#506)
+  - RPC changes:
+    - Implement getmempoolinfo command (#453)
+    - Implement getblockheader command (#461)
+    - Modify createrawtransaction command to accept a new optional parameter
+      'locktime' (#529)
+    - Modify listunspent result to include the 'spendable' field (#440)
+    - Modify getinfo command to include 'errors' field (#511)
+    - Add timestamps to blockconnected and blockdisconnected notifications
+      (#450)
+    - Several modifications to searchrawtranscations command:
+      - Accept a new optional parameter 'vinextra' which causes the results
+        to include information about the outputs referenced by a transaction
+        inputs (#485, #487)
+      - Skip entries in the mempool too (#495)
+      - Accept a new optional parameter 'reverse' to return the results in
+        reverse order (most recent to oldest) (#497)
+      - Accept a new optional parameter 'filteraddrs' which causes the
+        results to only include inputs and outputs which involve the
+        provided addresses (#516)
+    - Change the notification order to notify clients about mined
+      transactions (recvtx, redeemingtx) before the blockconnected
+      notification (#449)
+    - Update verifymessage RPC to use the standard algorithm so it is
+      compatible with other implementations (#515)
+    - Improve ping statistics by pinging on an interval (#517)
+  - Websocket changes:
+    - Implement session command which returns a per-session unique id (#500,
+      #503)
+  - btcctl utility changes:
+    - Add getmempoolinfo command (#453)
+    - Add getblockheader command (#461)
+    - Add getwalletinfo command (#471)
+  - Notable developer-related package changes:
+    - Introduce a new peer package which acts a common base for creating and
+      concurrently managing bitcoin network peers (#445)
+    - Various cleanup of the new peer package (#528, #531, #524, #534,
+      #549)
+    - Blocks heights now consistently use int32 everywhere (#481)
+    - The BlockHeader type in the wire package now provides the BtcDecode
+      and BtcEncode methods (#467)
+    - Update wire package to recognize BIP0064 (getutxo) service bit (#489)
+    - Export LockTimeThreshold constant from txscript package (#454)
+    - Export MaxDataCarrierSize constant from txscript package (#466)
+    - Provide new IsUnspendable function from the txscript package (#478)
+    - Export variable length string functions from the wire package (#514)
+    - Export DNS Seeds for each network from the chaincfg package (#544)
+    - Preliminary work towards separating the memory pool into a separate
+      package (#525, #548)
+  - Misc changes:
+    - Various documentation updates (#442, #462, #465, #460, #470, #473,
+      #505, #530, #545)
+    - Add installation instructions for gentoo (#542)
+    - Ensure an error is shown if OS limits can't be set at startup (#498)
+    - Tighten the standardness checks for multisig scripts (#526)
+    - Test coverage improvement (#468, #494, #527, #543, #550)
+    - Several optimizations (#457, #474, #475, #476, #508, #509)
+    - Minor code cleanup and refactoring (#472, #479, #482, #519, #540)
+  - Contributors (alphabetical order):
+    - Ben Echols
+    - Bruno Clermont
+    - danda
+    - Daniel Krawisz
+    - Dario Nieuwenhuis
+    - Dave Collins
+    - David Hill
+    - Javed Khan
+    - Jonathan Gillham
+    - Joseph Becher
+    - Josh Rickmar
+    - Justus Ranvier
+    - Mawuli Adzoe
+    - Olaoluwa Osuntokun
+    - Rune T. Aune
+
 Changes in 0.11.1 (Wed May 27 2015)
   - Protocol and network related changes:
     - Use correct sub-command in reject message for rejected transactions
