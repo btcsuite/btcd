@@ -48,7 +48,7 @@ const (
 	// connectionRetryInterval is the base amount of time to wait in between
 	// retries when connecting to persistent peers.  It is adjusted by the
 	// number of retries such that there is a retry backoff.
-	connectionRetryInterval = time.Second * 10
+	connectionRetryInterval = time.Second * 5
 
 	// maxConnectionRetryInterval is the max amount of time retrying of a
 	// persistent peer is allowed to grow to.  This is necessary since the
@@ -1124,7 +1124,7 @@ func (s *server) handleDonePeerMsg(state *peerState, sp *serverPeer) {
 			// Retry peer
 			sp = s.newOutboundPeer(sp.Addr(), sp.persistent)
 			if sp != nil {
-				go s.retryConn(sp, connectionRetryInterval/2)
+				go s.retryConn(sp, false)
 			}
 			list[sp.ID()] = sp
 			return
@@ -1480,7 +1480,7 @@ func (s *server) newOutboundPeer(addr string, persistent bool) *serverPeer {
 	sp := newServerPeer(s, persistent)
 	p, err := peer.NewOutboundPeer(newPeerConfig(sp), addr)
 	if err != nil {
-		srvrLog.Errorf("Cannot create outbound peer: %v", err)
+		srvrLog.Errorf("Cannot create outbound peer %s: %v", addr, err)
 		return nil
 	}
 	sp.Peer = p
@@ -1525,22 +1525,36 @@ func (s *server) establishConn(sp *serverPeer) error {
 	return nil
 }
 
-// retryConn retries connection to the peer after the given duration.
-func (s *server) retryConn(sp *serverPeer, retryDuration time.Duration) {
-	srvrLog.Debugf("Retrying connection to %s in %s", sp.Addr(), retryDuration)
-	select {
-	case <-time.After(retryDuration):
-		err := s.establishConn(sp)
-		if err != nil {
-			retryDuration += connectionRetryInterval / 2
-			if retryDuration > maxConnectionRetryInterval {
-				retryDuration = maxConnectionRetryInterval
+// retryConn retries connection to the peer after the given duration.  It must
+// be run as a goroutine.
+func (s *server) retryConn(sp *serverPeer, initialAttempt bool) {
+	retryDuration := connectionRetryInterval
+	for {
+		if initialAttempt {
+			retryDuration = 0
+			initialAttempt = false
+		} else {
+			srvrLog.Debugf("Retrying connection to %s in %s", sp.Addr(),
+				retryDuration)
+		}
+		select {
+		case <-time.After(retryDuration):
+			err := s.establishConn(sp)
+			if err != nil {
+				retryDuration += connectionRetryInterval
+				if retryDuration > maxConnectionRetryInterval {
+					retryDuration = maxConnectionRetryInterval
+				}
+				continue
 			}
-			go s.retryConn(sp, retryDuration)
+			return
+
+		case <-sp.quit:
+			return
+
+		case <-s.quit:
 			return
 		}
-	case <-sp.quit:
-	case <-s.quit:
 	}
 }
 
@@ -1581,7 +1595,7 @@ func (s *server) peerHandler() {
 	for _, addr := range permanentPeers {
 		sp := s.newOutboundPeer(addr, true)
 		if sp != nil {
-			go s.peerConnHandler(sp)
+			go s.retryConn(sp, true)
 		}
 	}
 
