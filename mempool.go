@@ -40,14 +40,14 @@ const (
 	maxSigOpsPerTx = blockchain.MaxSigOpsPerBlock / 5
 )
 
-// TxDesc is a descriptor containing a transaction in the mempool and the
-// metadata we store about it.
-type TxDesc struct {
-	Tx               *btcutil.Tx // Transaction.
-	Added            time.Time   // Time when added to pool.
-	Height           int32       // Blockheight when added to pool.
-	Fee              int64       // Transaction fees.
-	StartingPriority float64     // Priority when added to the pool.
+// mempoolTxDesc is a descriptor containing a transaction in the mempool along
+// with additional metadata.
+type mempoolTxDesc struct {
+	miningTxDesc
+
+	// StartingPriority is the priority of the transaction when it was added
+	// to the pool.
+	StartingPriority float64
 }
 
 // txMemPool is used as a source of transactions that need to be mined into
@@ -56,7 +56,7 @@ type TxDesc struct {
 type txMemPool struct {
 	sync.RWMutex
 	server        *server
-	pool          map[wire.ShaHash]*TxDesc
+	pool          map[wire.ShaHash]*mempoolTxDesc
 	orphans       map[wire.ShaHash]*btcutil.Tx
 	orphansByPrev map[wire.ShaHash]map[wire.ShaHash]*btcutil.Tx
 	addrindex     map[string]map[wire.ShaHash]struct{} // maps address to txs
@@ -65,6 +65,9 @@ type txMemPool struct {
 	pennyTotal    float64   // exponentially decaying total for penny spends.
 	lastPennyUnix int64     // unix time of last ``penny spend''
 }
+
+// Ensure the txMemPool type implements the mining.TxSource interface.
+var _ TxSource = (*txMemPool)(nil)
 
 // removeOrphan is the internal function which implements the public
 // RemoveOrphan.  See the comment for RemoveOrphan for more details.
@@ -377,11 +380,13 @@ func (mp *txMemPool) RemoveDoubleSpends(tx *btcutil.Tx) {
 func (mp *txMemPool) addTransaction(txStore blockchain.TxStore, tx *btcutil.Tx, height int32, fee int64) {
 	// Add the transaction to the pool and mark the referenced outpoints
 	// as spent by the pool.
-	mp.pool[*tx.Sha()] = &TxDesc{
-		Tx:               tx,
-		Added:            time.Now(),
-		Height:           height,
-		Fee:              fee,
+	mp.pool[*tx.Sha()] = &mempoolTxDesc{
+		miningTxDesc: miningTxDesc{
+			Tx:     tx,
+			Added:  time.Now(),
+			Height: height,
+			Fee:    fee,
+		},
 		StartingPriority: calcPriority(tx.MsgTx(), txStore, height),
 	}
 	for _, txIn := range tx.MsgTx().TxIn {
@@ -537,8 +542,8 @@ func (mp *txMemPool) FilterTransactionsByAddress(addr btcutil.Address) ([]*btcut
 	if txs, exists := mp.addrindex[addr.EncodeAddress()]; exists {
 		addressTxs := make([]*btcutil.Tx, 0, len(txs))
 		for txHash := range txs {
-			if tx, exists := mp.pool[txHash]; exists {
-				addressTxs = append(addressTxs, tx.Tx)
+			if txD, exists := mp.pool[txHash]; exists {
+				addressTxs = append(addressTxs, txD.Tx)
 			}
 		}
 		return addressTxs, nil
@@ -1020,14 +1025,33 @@ func (mp *txMemPool) TxShas() []*wire.ShaHash {
 // The descriptors are to be treated as read only.
 //
 // This function is safe for concurrent access.
-func (mp *txMemPool) TxDescs() []*TxDesc {
+func (mp *txMemPool) TxDescs() []*mempoolTxDesc {
 	mp.RLock()
 	defer mp.RUnlock()
 
-	descs := make([]*TxDesc, len(mp.pool))
+	descs := make([]*mempoolTxDesc, len(mp.pool))
 	i := 0
 	for _, desc := range mp.pool {
 		descs[i] = desc
+		i++
+	}
+
+	return descs
+}
+
+// MiningDescs returns a slice of mining descriptors for all the transactions
+// in the pool.
+//
+// This is part of the TxSource interface implementation and is safe for
+// concurrent access as required by the interface contract.
+func (mp *txMemPool) MiningDescs() []*miningTxDesc {
+	mp.RLock()
+	defer mp.RUnlock()
+
+	descs := make([]*miningTxDesc, len(mp.pool))
+	i := 0
+	for _, desc := range mp.pool {
+		descs[i] = &desc.miningTxDesc
 		i++
 	}
 
@@ -1050,7 +1074,7 @@ func (mp *txMemPool) LastUpdated() time.Time {
 func newTxMemPool(server *server) *txMemPool {
 	memPool := &txMemPool{
 		server:        server,
-		pool:          make(map[wire.ShaHash]*TxDesc),
+		pool:          make(map[wire.ShaHash]*mempoolTxDesc),
 		orphans:       make(map[wire.ShaHash]*btcutil.Tx),
 		orphansByPrev: make(map[wire.ShaHash]map[wire.ShaHash]*btcutil.Tx),
 		outpoints:     make(map[wire.OutPoint]*btcutil.Tx),

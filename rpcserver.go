@@ -2180,15 +2180,15 @@ func handleGetInfo(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (in
 
 // handleGetMempoolInfo implements the getmempoolinfo command.
 func handleGetMempoolInfo(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (interface{}, error) {
-	txD := s.server.txMemPool.TxDescs()
+	mempoolTxns := s.server.txMemPool.TxDescs()
 
 	var numBytes int64
-	for _, desc := range txD {
-		numBytes += int64(desc.Tx.MsgTx().SerializeSize())
+	for _, txD := range mempoolTxns {
+		numBytes += int64(txD.Tx.MsgTx().SerializeSize())
 	}
 
 	ret := &btcjson.GetMempoolInfoResult{
-		Size:  int64(len(txD)),
+		Size:  int64(len(mempoolTxns)),
 		Bytes: numBytes,
 	}
 
@@ -2416,7 +2416,7 @@ func handleGetRawMempool(s *rpcServer, cmd interface{}, closeChan <-chan struct{
 			}
 
 			mpd := &btcjson.GetRawMempoolVerboseResult{
-				Size:             int32(desc.Tx.MsgTx().SerializeSize()),
+				Size:             int32(tx.MsgTx().SerializeSize()),
 				Fee:              btcutil.Amount(desc.Fee).ToBTC(),
 				Time:             desc.Added.Unix(),
 				Height:           int64(desc.Height),
@@ -2424,7 +2424,7 @@ func handleGetRawMempool(s *rpcServer, cmd interface{}, closeChan <-chan struct{
 				CurrentPriority:  currentPriority,
 				Depends:          make([]string, 0),
 			}
-			for _, txIn := range desc.Tx.MsgTx().TxIn {
+			for _, txIn := range tx.MsgTx().TxIn {
 				hash := &txIn.PreviousOutPoint.Hash
 				if s.server.txMemPool.haveTransaction(hash) {
 					mpd.Depends = append(mpd.Depends,
@@ -2432,7 +2432,7 @@ func handleGetRawMempool(s *rpcServer, cmd interface{}, closeChan <-chan struct{
 				}
 			}
 
-			result[desc.Tx.Sha().String()] = mpd
+			result[tx.Sha().String()] = mpd
 		}
 
 		return result, nil
