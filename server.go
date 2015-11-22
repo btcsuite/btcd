@@ -1117,27 +1117,26 @@ func (s *server) handleDonePeerMsg(state *peerState, sp *serverPeer) {
 	} else {
 		list = state.outboundPeers
 	}
-	for id, e := range list {
-		if e == sp {
-			// Issue an asynchronous reconnect if the peer was a
-			// persistent outbound connection.
-			if !sp.Inbound() && sp.persistent && atomic.LoadInt32(&s.shutdown) == 0 {
-				// Retry peer
-				sp = s.newOutboundPeer(sp.Addr(), sp.persistent)
-				if sp != nil {
-					go s.retryConn(sp, connectionRetryInterval/2)
-				}
-				list[id] = sp
-				return
+	if _, ok := list[sp.ID()]; ok {
+		// Issue an asynchronous reconnect if the peer was a
+		// persistent outbound connection.
+		if !sp.Inbound() && sp.persistent && atomic.LoadInt32(&s.shutdown) == 0 {
+			// Retry peer
+			sp = s.newOutboundPeer(sp.Addr(), sp.persistent)
+			if sp != nil {
+				go s.retryConn(sp, connectionRetryInterval/2)
 			}
-			if !sp.Inbound() && sp.VersionKnown() {
-				state.outboundGroups[addrmgr.GroupKey(sp.NA())]--
-			}
-			delete(list, id)
-			srvrLog.Debugf("Removed peer %s", sp)
+			list[sp.ID()] = sp
 			return
 		}
+		if !sp.Inbound() && sp.VersionKnown() {
+			state.outboundGroups[addrmgr.GroupKey(sp.NA())]--
+		}
+		delete(list, sp.ID())
+		srvrLog.Debugf("Removed peer %s", sp)
+		return
 	}
+
 	// Update the address' last seen time if the peer has acknowledged
 	// our version and has sent us its version as well.
 	if sp.VerAckReceived() && sp.VersionKnown() && sp.NA() != nil {
