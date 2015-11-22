@@ -47,7 +47,7 @@ type txPrioItem struct {
 	tx       *btcutil.Tx
 	fee      int64
 	priority float64
-	feePerKB float64
+	feePerKB int64
 
 	// dependsOn holds a map of transaction hashes which this one depends
 	// on.  It will only be set when the transaction references other
@@ -519,13 +519,9 @@ mempoolLoop:
 		// formula is: sum(inputValue * inputAge) / adjustedTxSize
 		prioItem.priority = txDesc.CurrentPriority(txStore, nextBlockHeight)
 
-		// Calculate the fee in Satoshi/KB.
-		// NOTE: This is a more precise value than the one calculated
-		// during calcMinRelayFee which rounds up to the nearest full
-		// kilobyte boundary.  This is beneficial since it provides an
-		// incentive to create smaller transactions.
+		// Calculate the fee in Satoshi/kB.
 		txSize := tx.MsgTx().SerializeSize()
-		prioItem.feePerKB = float64(txDesc.Fee) / (float64(txSize) / 1000)
+		prioItem.feePerKB = (txDesc.Fee * 1000) / int64(txSize)
 		prioItem.fee = txDesc.Fee
 
 		// Add the transaction to the priority queue to mark it ready
@@ -605,7 +601,7 @@ mempoolLoop:
 		// Skip free transactions once the block is larger than the
 		// minimum block size.
 		if sortedByFee &&
-			prioItem.feePerKB < float64(cfg.minRelayTxFee) &&
+			prioItem.feePerKB < int64(cfg.minRelayTxFee) &&
 			blockPlusTxSize >= cfg.BlockMinSize {
 
 			minrLog.Tracef("Skipping tx %s with feePerKB %.2f "+
