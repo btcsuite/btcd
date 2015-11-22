@@ -1518,7 +1518,7 @@ func (state *gbtWorkState) updateBlockTemplate(s *rpcServer, useCoinbaseValue bo
 		// block template doesn't include the coinbase, so the caller
 		// will ultimately create their own coinbase which pays to the
 		// appropriate address(es).
-		blkTemplate, err := NewBlockTemplate(s.server, payAddr)
+		blkTemplate, err := NewBlockTemplate(s.policy, s.server, payAddr)
 		if err != nil {
 			return internalRPCError("Failed to create new block "+
 				"template: "+err.Error(), "")
@@ -2708,8 +2708,7 @@ func handleGetWorkRequest(s *rpcServer) (interface{}, error) {
 
 		// Choose a payment address at random.
 		payToAddr := cfg.miningAddrs[rand.Intn(len(cfg.miningAddrs))]
-
-		template, err := NewBlockTemplate(s.server, payToAddr)
+		template, err := NewBlockTemplate(s.policy, s.server, payToAddr)
 		if err != nil {
 			context := "Failed to create new block template"
 			return nil, internalRPCError(err.Error(), context)
@@ -3518,6 +3517,7 @@ func handleVerifyMessage(s *rpcServer, cmd interface{}, closeChan <-chan struct{
 type rpcServer struct {
 	started      int32
 	shutdown     int32
+	policy       *miningPolicy
 	server       *server
 	authsha      [fastsha256.Size]byte
 	limitauthsha [fastsha256.Size]byte
@@ -3995,8 +3995,9 @@ func genCertPair(certFile, keyFile string) error {
 }
 
 // newRPCServer returns a new instance of the rpcServer struct.
-func newRPCServer(listenAddrs []string, s *server) (*rpcServer, error) {
+func newRPCServer(listenAddrs []string, policy *miningPolicy, s *server) (*rpcServer, error) {
 	rpc := rpcServer{
+		policy:       policy,
 		server:       s,
 		statusLines:  make(map[int]string),
 		workState:    newWorkState(),

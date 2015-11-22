@@ -52,6 +52,7 @@ var (
 // system which is typically sufficient.
 type CPUMiner struct {
 	sync.Mutex
+	policy            *miningPolicy
 	server            *server
 	numWorkers        uint32
 	started           bool
@@ -302,7 +303,7 @@ out:
 		// Create a new block template using the available transactions
 		// in the memory pool as a source of transactions to potentially
 		// include in the block.
-		template, err := NewBlockTemplate(m.server, payToAddr)
+		template, err := NewBlockTemplate(m.policy, m.server, payToAddr)
 		m.submitBlockLock.Unlock()
 		if err != nil {
 			errStr := fmt.Sprintf("Failed to create new block "+
@@ -564,7 +565,7 @@ func (m *CPUMiner) GenerateNBlocks(n uint32) ([]*wire.ShaHash, error) {
 		// Create a new block template using the available transactions
 		// in the memory pool as a source of transactions to potentially
 		// include in the block.
-		template, err := NewBlockTemplate(m.server, payToAddr)
+		template, err := NewBlockTemplate(m.policy, m.server, payToAddr)
 		m.submitBlockLock.Unlock()
 		if err != nil {
 			errStr := fmt.Sprintf("Failed to create new block "+
@@ -599,8 +600,9 @@ func (m *CPUMiner) GenerateNBlocks(n uint32) ([]*wire.ShaHash, error) {
 // newCPUMiner returns a new instance of a CPU miner for the provided server.
 // Use Start to begin the mining process.  See the documentation for CPUMiner
 // type for more details.
-func newCPUMiner(s *server) *CPUMiner {
+func newCPUMiner(policy *miningPolicy, s *server) *CPUMiner {
 	return &CPUMiner{
+		policy:            policy,
 		server:            s,
 		numWorkers:        defaultNumWorkers,
 		updateNumWorkers:  make(chan struct{}),

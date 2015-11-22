@@ -2322,7 +2322,15 @@ func newServer(listenAddrs []string, db database.Db, chainParams *chaincfg.Param
 	}
 	s.blockManager = bm
 	s.txMemPool = newTxMemPool(&s)
-	s.cpuMiner = newCPUMiner(&s)
+
+	// Create the mining policy based on the configuration options.
+	policy := miningPolicy{
+		BlockMinSize:      cfg.BlockMinSize,
+		BlockMaxSize:      cfg.BlockMaxSize,
+		BlockPrioritySize: cfg.BlockPrioritySize,
+		TxMinFreeFee:      cfg.minRelayTxFee,
+	}
+	s.cpuMiner = newCPUMiner(&policy, &s)
 
 	if cfg.AddrIndex {
 		ai, err := newAddrIndexer(&s)
@@ -2333,7 +2341,7 @@ func newServer(listenAddrs []string, db database.Db, chainParams *chaincfg.Param
 	}
 
 	if !cfg.DisableRPC {
-		s.rpcServer, err = newRPCServer(cfg.RPCListeners, &s)
+		s.rpcServer, err = newRPCServer(cfg.RPCListeners, &policy, &s)
 		if err != nil {
 			return nil, err
 		}
