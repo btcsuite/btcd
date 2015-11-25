@@ -79,7 +79,7 @@ func calcMinRequiredTxRelayFee(serializedSize int64, minRelayTxFee btcutil.Amoun
 // of each of its input values multiplied by their age (# of confirmations).
 // Thus, the final formula for the priority is:
 // sum(inputValue * inputAge) / adjustedTxSize
-func calcPriority(tx *btcutil.Tx, inputValueAge float64) float64 {
+func calcPriority(tx *wire.MsgTx, txStore blockchain.TxStore, nextBlockHeight int32) float64 {
 	// In order to encourage spending multiple old unspent transaction
 	// outputs thereby reducing the total set, don't count the constant
 	// overhead for each input as well as enough bytes of the signature
@@ -101,16 +101,17 @@ func calcPriority(tx *btcutil.Tx, inputValueAge float64) float64 {
 	//
 	// Thus 1 + 73 + 1 + 1 + 33 + 1 = 110
 	overhead := 0
-	for _, txIn := range tx.MsgTx().TxIn {
+	for _, txIn := range tx.TxIn {
 		// Max inputs + size can't possibly overflow here.
 		overhead += 41 + minInt(110, len(txIn.SignatureScript))
 	}
 
-	serializedTxSize := tx.MsgTx().SerializeSize()
+	serializedTxSize := tx.SerializeSize()
 	if overhead >= serializedTxSize {
 		return 0.0
 	}
 
+	inputValueAge := calcInputValueAge(tx, txStore, nextBlockHeight)
 	return inputValueAge / float64(serializedTxSize-overhead)
 }
 
@@ -120,9 +121,9 @@ func calcPriority(tx *btcutil.Tx, inputValueAge float64) float64 {
 // age is the sum of this value for each txin.  Any inputs to the transaction
 // which are currently in the mempool and hence not mined into a block yet,
 // contribute no additional input age to the transaction.
-func calcInputValueAge(txDesc *TxDesc, txStore blockchain.TxStore, nextBlockHeight int32) float64 {
+func calcInputValueAge(tx *wire.MsgTx, txStore blockchain.TxStore, nextBlockHeight int32) float64 {
 	var totalInputAge float64
-	for _, txIn := range txDesc.Tx.MsgTx().TxIn {
+	for _, txIn := range tx.TxIn {
 		originHash := &txIn.PreviousOutPoint.Hash
 		originIndex := txIn.PreviousOutPoint.Index
 

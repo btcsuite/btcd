@@ -540,7 +540,7 @@ mempoolLoop:
 		// Calculate the final transaction priority using the input
 		// value age sum as well as the adjusted transaction size.  The
 		// formula is: sum(inputValue * inputAge) / adjustedTxSize
-		prioItem.priority = txDesc.CurrentPriority(txStore, nextBlockHeight)
+		prioItem.priority = calcPriority(tx.MsgTx(), txStore, nextBlockHeight)
 
 		// Calculate the fee in Satoshi/kB.
 		txSize := tx.MsgTx().SerializeSize()
