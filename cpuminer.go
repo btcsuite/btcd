@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/btcsuite/btcd/blockchain"
+	"github.com/btcsuite/btcd/mining"
 	"github.com/btcsuite/btcd/wire"
 	"github.com/btcsuite/btcutil"
 )
@@ -52,8 +53,8 @@ var (
 // system which is typically sufficient.
 type CPUMiner struct {
 	sync.Mutex
-	policy            *miningPolicy
-	txSource          TxSource
+	policy            *mining.Policy
+	txSource          mining.TxSource
 	server            *server
 	numWorkers        uint32
 	started           bool
@@ -601,7 +602,7 @@ func (m *CPUMiner) GenerateNBlocks(n uint32) ([]*wire.ShaHash, error) {
 // newCPUMiner returns a new instance of a CPU miner for the provided server.
 // Use Start to begin the mining process.  See the documentation for CPUMiner
 // type for more details.
-func newCPUMiner(policy *miningPolicy, s *server) *CPUMiner {
+func newCPUMiner(policy *mining.Policy, s *server) *CPUMiner {
 	return &CPUMiner{
 		policy:            policy,
 		txSource:          s.txMemPool,

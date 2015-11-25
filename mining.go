@@ -12,6 +12,7 @@ import (
 
 	"github.com/btcsuite/btcd/blockchain"
 	"github.com/btcsuite/btcd/database"
+	"github.com/btcsuite/btcd/mining"
 	"github.com/btcsuite/btcd/txscript"
 	"github.com/btcsuite/btcd/wire"
 	"github.com/btcsuite/btcutil"
@@ -39,64 +40,6 @@ const (
 	// generated via btcd.
 	coinbaseFlags = "/P2SH/btcd/"
 )
-
-// miningTxDesc is a descriptor about a transaction in a transaction source
-// along with additional metadata.
-type miningTxDesc struct {
-	// Tx is the transaction associated with the entry.
-	Tx *btcutil.Tx
-
-	// Added is the time when the entry was added to the source pool.
-	Added time.Time
-
-	// Height is the block height when the entry was added to the the source
-	// pool.
-	Height int32
-
-	// Fee is the total fee the transaction associated with the entry pays.
-	Fee int64
-}
-
-// TxSource represents a source of transactions to consider for inclusion in
-// new blocks.
-//
-// The interface contract requires that all of these methods are safe for
-// concurrent access with respect to the source.
-type TxSource interface {
-	// LastUpdated returns the last time a transaction was added to or
-	// removed from the source pool.
-	LastUpdated() time.Time
-
-	// MiningDescs returns a slice of mining descriptors for all the
-	// transactions in the source pool.
-	MiningDescs() []*miningTxDesc
-
-	// HaveTransaction returns whether or not the passed transaction hash
-	// exists in the source pool.
-	HaveTransaction(hash *wire.ShaHash) bool
-}
-
-// miningPolicy houses the policy (configuration parameters) which is used to
-// control the generation of block templates.  See the documentation for
-// NewBlockTemplate for more details on each of these parameters are used.
-type miningPolicy struct {
-	// BlockMinSize is the minimum block size in bytes to be used when
-	// generating a block template.
-	BlockMinSize uint32
-
-	// BlockMaxSize is the maximum block size in bytes to be used when
-	// generating a block template.
-	BlockMaxSize uint32
-
-	// BlockPrioritySize is the size in bytes for high-priority / low-fee
-	// transactions to be used when generating a block template.
-	BlockPrioritySize uint32
-
-	// TxMinFreeFee is the minimum fee in Satoshi/kB that is required for a
-	// transaction to be treated as free for mining purposes (block template
-	// generation).  This value is in Satoshi/1000 bytes.
-	TxMinFreeFee btcutil.Amount
-}
 
 // txPrioItem houses a transaction along with extra information that allows the
 // transaction to be prioritized and track dependencies on other transactions
@@ -425,8 +368,8 @@ func medianAdjustedTime(chainState *chainState, timeSource blockchain.MedianTime
 //  |  transactions (while block size   |   |
 //  |  <= policy.BlockMinSize)          |   |
 //   -----------------------------------  --
-func NewBlockTemplate(policy *miningPolicy, server *server, payToAddress btcutil.Address) (*BlockTemplate, error) {
-	var txSource TxSource = server.txMemPool
+func NewBlockTemplate(policy *mining.Policy, server *server, payToAddress btcutil.Address) (*BlockTemplate, error) {
+	var txSource mining.TxSource = server.txMemPool
 	blockManager := server.blockManager
 	timeSource := server.timeSource
 	chainState := &blockManager.chainState

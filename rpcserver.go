@@ -32,6 +32,7 @@ import (
 	"github.com/btcsuite/btcd/btcjson"
 	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/btcsuite/btcd/database"
+	"github.com/btcsuite/btcd/mining"
 	"github.com/btcsuite/btcd/txscript"
 	"github.com/btcsuite/btcd/wire"
 	"github.com/btcsuite/btcutil"
@@ -3517,7 +3518,7 @@ func handleVerifyMessage(s *rpcServer, cmd interface{}, closeChan <-chan struct{
 type rpcServer struct {
 	started      int32
 	shutdown     int32
-	policy       *miningPolicy
+	policy       *mining.Policy
 	server       *server
 	authsha      [fastsha256.Size]byte
 	limitauthsha [fastsha256.Size]byte
@@ -3995,7 +3996,7 @@ func genCertPair(certFile, keyFile string) error {
 }
 
 // newRPCServer returns a new instance of the rpcServer struct.
-func newRPCServer(listenAddrs []string, policy *miningPolicy, s *server) (*rpcServer, error) {
+func newRPCServer(listenAddrs []string, policy *mining.Policy, s *server) (*rpcServer, error) {
 	rpc := rpcServer{
 		policy:       policy,
 		server:       s,
