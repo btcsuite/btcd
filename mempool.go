@@ -15,6 +15,7 @@ import (
 
 	"github.com/btcsuite/btcd/blockchain"
 	"github.com/btcsuite/btcd/database"
+	"github.com/btcsuite/btcd/mining"
 	"github.com/btcsuite/btcd/txscript"
 	"github.com/btcsuite/btcd/wire"
 	"github.com/btcsuite/btcutil"
@@ -43,7 +44,7 @@ const (
 // mempoolTxDesc is a descriptor containing a transaction in the mempool along
 // with additional metadata.
 type mempoolTxDesc struct {
-	miningTxDesc
+	mining.TxDesc
 
 	// StartingPriority is the priority of the transaction when it was added
 	// to the pool.
@@ -106,7 +107,7 @@ type txMemPool struct {
 }
 
 // Ensure the txMemPool type implements the mining.TxSource interface.
-var _ TxSource = (*txMemPool)(nil)
+var _ mining.TxSource = (*txMemPool)(nil)
 
 // removeOrphan is the internal function which implements the public
 // RemoveOrphan.  See the comment for RemoveOrphan for more details.
@@ -420,7 +421,7 @@ func (mp *txMemPool) addTransaction(txStore blockchain.TxStore, tx *btcutil.Tx, 
 	// Add the transaction to the pool and mark the referenced outpoints
 	// as spent by the pool.
 	mp.pool[*tx.Sha()] = &mempoolTxDesc{
-		miningTxDesc: miningTxDesc{
+		TxDesc: mining.TxDesc{
 			Tx:     tx,
 			Added:  time.Now(),
 			Height: height,
@@ -1073,16 +1074,16 @@ func (mp *txMemPool) TxDescs() []*mempoolTxDesc {
 // MiningDescs returns a slice of mining descriptors for all the transactions
 // in the pool.
 //
-// This is part of the TxSource interface implementation and is safe for
+// This is part of the mining.TxSource interface implementation and is safe for
 // concurrent access as required by the interface contract.
-func (mp *txMemPool) MiningDescs() []*miningTxDesc {
+func (mp *txMemPool) MiningDescs() []*mining.TxDesc {
 	mp.RLock()
 	defer mp.RUnlock()
 
-	descs := make([]*miningTxDesc, len(mp.pool))
+	descs := make([]*mining.TxDesc, len(mp.pool))
 	i := 0
 	for _, desc := range mp.pool {
-		descs[i] = &desc.miningTxDesc
+		descs[i] = &desc.TxDesc
 		i++
 	}
 

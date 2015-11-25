@@ -23,6 +23,7 @@ import (
 	"github.com/btcsuite/btcd/blockchain"
 	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/btcsuite/btcd/database"
+	"github.com/btcsuite/btcd/mining"
 	"github.com/btcsuite/btcd/peer"
 	"github.com/btcsuite/btcd/txscript"
 	"github.com/btcsuite/btcd/wire"
@@ -2353,7 +2354,7 @@ func newServer(listenAddrs []string, db database.Db, chainParams *chaincfg.Param
 	s.blockManager = bm
 
 	// Create the mining policy based on the configuration options.
-	policy := miningPolicy{
+	policy := mining.Policy{
 		BlockMinSize:      cfg.BlockMinSize,
 		BlockMaxSize:      cfg.BlockMaxSize,
 		BlockPrioritySize: cfg.BlockPrioritySize,
