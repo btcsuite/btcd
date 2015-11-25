@@ -53,6 +53,7 @@ var (
 type CPUMiner struct {
 	sync.Mutex
 	policy            *miningPolicy
+	txSource          TxSource
 	server            *server
 	numWorkers        uint32
 	started           bool
@@ -184,7 +185,7 @@ func (m *CPUMiner) solveBlock(msgBlock *wire.MsgBlock, blockHeight int32,
 
 	// Initial state.
 	lastGenerated := time.Now()
-	lastTxUpdate := m.server.txMemPool.LastUpdated()
+	lastTxUpdate := m.txSource.LastUpdated()
 	hashesCompleted := uint64(0)
 
 	// Note that the entire extra nonce range is iterated and the offset is
@@ -219,7 +220,7 @@ func (m *CPUMiner) solveBlock(msgBlock *wire.MsgBlock, blockHeight int32,
 				// has been updated since the block template was
 				// generated and it has been at least one
 				// minute.
-				if lastTxUpdate != m.server.txMemPool.LastUpdated() &&
+				if lastTxUpdate != m.txSource.LastUpdated() &&
 					time.Now().After(lastGenerated.Add(time.Minute)) {
 
 					return false
@@ -603,6 +604,7 @@ func (m *CPUMiner) GenerateNBlocks(n uint32) ([]*wire.ShaHash, error) {
 func newCPUMiner(policy *miningPolicy, s *server) *CPUMiner {
 	return &CPUMiner{
 		policy:            policy,
+		txSource:          s.txMemPool,
 		server:            s,
 		numWorkers:        defaultNumWorkers,
 		updateNumWorkers:  make(chan struct{}),

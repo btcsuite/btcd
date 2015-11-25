@@ -40,6 +40,42 @@ const (
 	coinbaseFlags = "/P2SH/btcd/"
 )
 
+// miningTxDesc is a descriptor about a transaction in a transaction source
+// along with additional metadata.
+type miningTxDesc struct {
+	// Tx is the transaction associated with the entry.
+	Tx *btcutil.Tx
+
+	// Added is the time when the entry was added to the source pool.
+	Added time.Time
+
+	// Height is the block height when the entry was added to the the source
+	// pool.
+	Height int32
+
+	// Fee is the total fee the transaction associated with the entry pays.
+	Fee int64
+}
+
+// TxSource represents a source of transactions to consider for inclusion in
+// new blocks.
+//
+// The interface contract requires that all of these methods are safe for
+// concurrent access with respect to the source.
+type TxSource interface {
+	// LastUpdated returns the last time a transaction was added to or
+	// removed from the source pool.
+	LastUpdated() time.Time
+
+	// MiningDescs returns a slice of mining descriptors for all the
+	// transactions in the source pool.
+	MiningDescs() []*miningTxDesc
+
+	// HaveTransaction returns whether or not the passed transaction hash
+	// exists in the source pool.
+	HaveTransaction(hash *wire.ShaHash) bool
+}
+
 // miningPolicy houses the policy (configuration parameters) which is used to
 // control the generation of block templates.  See the documentation for
 // NewBlockTemplate for more details on each of these parameters are used.
@@ -73,7 +109,7 @@ type txPrioItem struct {
 
 	// dependsOn holds a map of transaction hashes which this one depends
 	// on.  It will only be set when the transaction references other
-	// transactions in the memory pool and hence must come after them in
+	// transactions in the source pool and hence must come after them in
 	// a block.
 	dependsOn map[wire.ShaHash]struct{}
 }
@@ -328,7 +364,7 @@ func medianAdjustedTime(chainState *chainState, timeSource blockchain.MedianTime
 }
 
 // NewBlockTemplate returns a new block template that is ready to be solved
-// using the transactions from the passed transaction memory pool and a coinbase
+// using the transactions from the passed transaction source pool and a coinbase
 // that either pays to the passed address if it is not nil, or a coinbase that
 // is redeemable by anyone if the passed address is nil.  The nil address
 // functionality is useful since there are cases such as the getblocktemplate
@@ -349,7 +385,7 @@ func medianAdjustedTime(chainState *chainState, timeSource blockchain.MedianTime
 // prioritizes based on the priority (then fee per kilobyte) or the fee per
 // kilobyte (then priority) depending on whether or not the BlockPrioritySize
 // policy setting allots space for high-priority transactions.  Transactions
-// which spend outputs from other transactions in the memory pool are added to a
+// which spend outputs from other transactions in the source pool are added to a
 // dependency map so they can be added to the priority queue once the
 // transactions they depend on have been included.
 //
@@ -390,6 +426,7 @@ func medianAdjustedTime(chainState *chainState, timeSource blockchain.MedianTime
 //  |  <= policy.BlockMinSize)          |   |
 //   -----------------------------------  --
 func NewBlockTemplate(policy *miningPolicy, server *server, payToAddress btcutil.Address) (*BlockTemplate, error) {
+	var txSource TxSource = server.txMemPool
 	blockManager := server.blockManager
 	timeSource := server.timeSource
 	chainState := &blockManager.chainState
@@ -420,27 +457,26 @@ func NewBlockTemplate(policy *miningPolicy, server *server, payToAddress btcutil
 	}
 	numCoinbaseSigOps := int64(blockchain.CountSigOps(coinbaseTx))
 
-	// Get the current memory pool transactions and create a priority queue
-	// to hold the transactions which are ready for inclusion into a block
+	// Get the current source transactions and create a priority queue to
+	// hold the transactions which are ready for inclusion into a block
 	// along with some priority related and fee metadata.  Reserve the same
-	// number of items that are in the memory pool for the priority queue.
-	// Also, choose the initial sort order for the priority queue based on
-	// whether or not there is an area allocated for high-priority
-	// transactions.
-	mempoolTxns := server.txMemPool.TxDescs()
+	// number of items that are available for the priority queue.  Also,
+	// choose the initial sort order for the priority queue based on whether
+	// or not there is an area allocated for high-priority transactions.
+	sourceTxns := txSource.MiningDescs()
 	sortedByFee := policy.BlockPrioritySize == 0
-	priorityQueue := newTxPriorityQueue(len(mempoolTxns), sortedByFee)
+	priorityQueue := newTxPriorityQueue(len(sourceTxns), sortedByFee)
 
 	// Create a slice to hold the transactions to be included in the
 	// generated block with reserved space.  Also create a transaction
 	// store to house all of the input transactions so multiple lookups
 	// can be avoided.
-	blockTxns := make([]*btcutil.Tx, 0, len(mempoolTxns))
+	blockTxns := make([]*btcutil.Tx, 0, len(sourceTxns))
 	blockTxns = append(blockTxns, coinbaseTx)
 	blockTxStore := make(blockchain.TxStore)
 
 	// dependers is used to track transactions which depend on another
-	// transaction in the memory pool.  This, in conjunction with the
+	// transaction in the source pool.  This, in conjunction with the
 	// dependsOn map kept with each dependent transaction helps quickly
 	// determine which dependent transactions are now eligible for inclusion
 	// in the block once each transaction has been included.
@@ -452,16 +488,16 @@ func NewBlockTemplate(policy *miningPolicy, server *server, payToAddress btcutil
 	// a transaction as it is selected for inclusion in the final block.
 	// However, since the total fees aren't known yet, use a dummy value for
 	// the coinbase fee which will be updated later.
-	txFees := make([]int64, 0, len(mempoolTxns))
-	txSigOpCounts := make([]int64, 0, len(mempoolTxns))
+	txFees := make([]int64, 0, len(sourceTxns))
+	txSigOpCounts := make([]int64, 0, len(sourceTxns))
 	txFees = append(txFees, -1) // Updated once known
 	txSigOpCounts = append(txSigOpCounts, numCoinbaseSigOps)
 
-	minrLog.Debugf("Considering %d mempool transactions for inclusion to "+
-		"new block", len(mempoolTxns))
+	minrLog.Debugf("Considering %d transactions for inclusion to new block",
+		len(sourceTxns))
 
 mempoolLoop:
-	for _, txDesc := range mempoolTxns {
+	for _, txDesc := range sourceTxns {
 		// A block can't have more than one coinbase or contain
 		// non-finalized transactions.
 		tx := txDesc.Tx
@@ -491,13 +527,13 @@ mempoolLoop:
 		// Setup dependencies for any transactions which reference
 		// other transactions in the mempool so they can be properly
 		// ordered below.
-		prioItem := &txPrioItem{tx: txDesc.Tx}
+		prioItem := &txPrioItem{tx: tx}
 		for _, txIn := range tx.MsgTx().TxIn {
 			originHash := &txIn.PreviousOutPoint.Hash
 			originIndex := txIn.PreviousOutPoint.Index
 			txData, exists := txStore[*originHash]
 			if !exists || txData.Err != nil || txData.Tx == nil {
-				if !server.txMemPool.HaveTransaction(originHash) {
+				if !txSource.HaveTransaction(originHash) {
 					minrLog.Tracef("Skipping tx %s because "+
 						"it references tx %s which is "+
 						"not available", tx.Sha,
@@ -506,7 +542,7 @@ mempoolLoop:
 				}
 
 				// The transaction is referencing another
-				// transaction in the memory pool, so setup an
+				// transaction in the source pool, so setup an
 				// ordering dependency.
 				depList, exists := dependers[*originHash]
 				if !exists {
