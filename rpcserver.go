@@ -678,16 +678,17 @@ func stringInSlice(a string, list []string) bool {
 // createVinList returns a slice of JSON objects for the inputs of the passed
 // transaction.
 func createVinListPrevOut(s *rpcServer, mtx *wire.MsgTx, chainParams *chaincfg.Params, vinExtra int, filterAddrMap map[string]struct{}) []btcjson.VinPrevOut {
-	// We use a dynamically sized list to accomodate address filter.
+	// Use a dynamically sized list to accomodate the address filter.
 	vinList := make([]btcjson.VinPrevOut, 0, len(mtx.TxIn))
 
 	// Coinbase transactions only have a single txin by definition.
 	if blockchain.IsCoinBaseTx(mtx) {
-		// include tx only if filterAddrMap is empty because coinbase has no address
-		// and so would never match a non-empty filter.
+		// Include tx only if filterAddrMap is empty because coinbase
+		// has no address and so would never match a non-empty filter.
 		if len(filterAddrMap) != 0 {
 			return vinList
 		}
+
 		var vinEntry btcjson.VinPrevOut
 		txIn := mtx.TxIn[0]
 		vinEntry.Coinbase = hex.EncodeToString(txIn.SignatureScript)
@@ -708,9 +709,6 @@ func createVinListPrevOut(s *rpcServer, mtx *wire.MsgTx, chainParams *chaincfg.P
 	}
 
 	for _, txIn := range mtx.TxIn {
-		// reset filter flag for each.
-		passesFilter := len(filterAddrMap) == 0
-
 		// The disassembled string will contain [error] inline
 		// if the script doesn't fully parse, so ignore the
 		// error here.
@@ -729,14 +727,21 @@ func createVinListPrevOut(s *rpcServer, mtx *wire.MsgTx, chainParams *chaincfg.P
 		_, addrs, _, _ := txscript.ExtractPkScriptAddrs(
 			originTxOut.PkScript, chainParams)
 
+		// Encode the addresses while checking if the address passes the
+		// filter when needed.
+		passesFilter := len(filterAddrMap) == 0
 		encodedAddrs := make([]string, len(addrs))
 		for j, addr := range addrs {
-			encodedAddrs[j] = addr.EncodeAddress()
+			encodedAddr := addr.EncodeAddress()
+			encodedAddrs[j] = encodedAddr
 
-			if len(filterAddrMap) > 0 {
-				if _, exists := filterAddrMap[encodedAddrs[j]]; exists {
-					passesFilter = true
-				}
+			// No need to check the map again if the filter already
+			// passes.
+			if passesFilter {
+				continue
+			}
+			if _, exists := filterAddrMap[encodedAddr]; exists {
+				passesFilter = true
 			}
 		}
 
@@ -772,9 +777,6 @@ func createVinListPrevOut(s *rpcServer, mtx *wire.MsgTx, chainParams *chaincfg.P
 func createVoutList(mtx *wire.MsgTx, chainParams *chaincfg.Params, filterAddrMap map[string]struct{}) []btcjson.Vout {
 	voutList := make([]btcjson.Vout, 0, len(mtx.TxOut))
 	for i, v := range mtx.TxOut {
-		// reset filter flag for each.
-		passesFilter := len(filterAddrMap) == 0
-
 		// The disassembled string will contain [error] inline if the
 		// script doesn't fully parse, so ignore the error here.
 		disbuf, _ := txscript.DisasmString(v.PkScript)
@@ -785,14 +787,21 @@ func createVoutList(mtx *wire.MsgTx, chainParams *chaincfg.Params, filterAddrMap
 		scriptClass, addrs, reqSigs, _ := txscript.ExtractPkScriptAddrs(
 			v.PkScript, chainParams)
 
+		// Encode the addresses while checking if the address passes the
+		// filter when needed.
+		passesFilter := len(filterAddrMap) == 0
 		encodedAddrs := make([]string, len(addrs))
 		for j, addr := range addrs {
-			encodedAddrs[j] = addr.EncodeAddress()
+			encodedAddr := addr.EncodeAddress()
+			encodedAddrs[j] = encodedAddr
 
-			if len(filterAddrMap) > 0 {
-				if _, exists := filterAddrMap[encodedAddrs[j]]; exists {
-					passesFilter = true
-				}
+			// No need to check the map again if the filter already
+			// passes.
+			if passesFilter {
+				continue
+			}
+			if _, exists := filterAddrMap[encodedAddr]; exists {
+				passesFilter = true
 			}
 		}
 
@@ -3199,6 +3208,15 @@ func handleSearchRawTransactions(s *rpcServer, cmd interface{}, closeChan <-chan
 		return nil, internalRPCError(err.Error(), context)
 	}
 
+	// Normalize the provided filter addresses (if any) to ensure there are
+	// no duplicates.
+	filterAddrMap := make(map[string]struct{})
+	if c.FilterAddrs != nil && len(*c.FilterAddrs) > 0 {
+		for _, addr := range *c.FilterAddrs {
+			filterAddrMap[addr] = struct{}{}
+		}
+	}
+
 	rawTxns := make([]btcjson.SearchRawTransactionsResult, len(addressTxs), len(addressTxs))
 	for i, txReply := range addressTxs {
 		txHash := txReply.Sha.String()
@@ -3222,15 +3240,6 @@ func handleSearchRawTransactions(s *rpcServer, cmd interface{}, closeChan <-chan
 			}
 			blkHashStr = txReply.BlkSha.String()
 			blkHeight = txReply.Height
-		}
-
-		// c.FilterAddrs can be nil, empty or non-empty.  Here we normalize that
-		// to a non-nil array (empty or non-empty) to avoid future nil checks.
-		filterAddrMap := make(map[string]struct{})
-		if c.FilterAddrs != nil && len(*c.FilterAddrs) > 0 {
-			for _, addr := range *c.FilterAddrs {
-				filterAddrMap[addr] = struct{}{}
-			}
 		}
 
 		rawTxn, err := createSearchRawTransactionsResult(s, s.server.chainParams, mtx,
