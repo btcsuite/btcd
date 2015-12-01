@@ -1,8 +1,8 @@
-// Copyright (c) 2014 The btcsuite developers
+// Copyright (c) 2014-2015 The btcsuite developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
-package main
+package policy
 
 import (
 	"github.com/btcsuite/btcd/blockchain"
@@ -27,41 +27,41 @@ func (e RuleError) Error() string {
 	return e.Err.Error()
 }
 
-// TxRuleError identifies a rule violation.  It is used to indicate that
+// txErr identifies a rule violation.  It is used to indicate that
 // processing of a transaction failed due to one of the many validation
 // rules.  The caller can use type assertions to determine if a failure was
 // specifically due to a rule violation and access the ErrorCode field to
 // ascertain the specific reason for the rule violation.
-type TxRuleError struct {
+type txErr struct {
 	RejectCode  wire.RejectCode // The code to send with reject messages
 	Description string          // Human readable description of the issue
 }
 
 // Error satisfies the error interface and prints human-readable errors.
-func (e TxRuleError) Error() string {
+func (e txErr) Error() string {
 	return e.Description
 }
 
-// txRuleError creates an underlying TxRuleError with the given a set of
+// TxRuleError creates an underlying TxRuleError with the given a set of
 // arguments and returns a RuleError that encapsulates it.
-func txRuleError(c wire.RejectCode, desc string) RuleError {
+func TxRuleError(c wire.RejectCode, desc string) RuleError {
 	return RuleError{
-		Err: TxRuleError{RejectCode: c, Description: desc},
+		Err: txErr{RejectCode: c, Description: desc},
 	}
 }
 
-// chainRuleError returns a RuleError that encapsulates the given
+// ChainRuleError returns a RuleError that encapsulates the given
 // blockchain.RuleError.
-func chainRuleError(chainErr blockchain.RuleError) RuleError {
+func ChainRuleError(chainErr blockchain.RuleError) RuleError {
 	return RuleError{
 		Err: chainErr,
 	}
 }
 
-// extractRejectCode attempts to return a relevant reject code for a given error
+// ExtractRejectCode attempts to return a relevant reject code for a given error
 // by examining the error for known types.  It will return true if a code
 // was successfully extracted.
-func extractRejectCode(err error) (wire.RejectCode, bool) {
+func ExtractRejectCode(err error) (wire.RejectCode, bool) {
 	// Pull the underlying error out of a RuleError.
 	if rerr, ok := err.(RuleError); ok {
 		err = rerr.Err
@@ -99,7 +99,7 @@ func extractRejectCode(err error) (wire.RejectCode, bool) {
 
 		return code, true
 
-	case TxRuleError:
+	case txErr:
 		return err.RejectCode, true
 
 	case nil:
@@ -109,12 +109,12 @@ func extractRejectCode(err error) (wire.RejectCode, bool) {
 	return wire.RejectInvalid, false
 }
 
-// errToRejectErr examines the underlying type of the error and returns a reject
+// ErrToRejectErr examines the underlying type of the error and returns a reject
 // code and string appropriate to be sent in a wire.MsgReject message.
-func errToRejectErr(err error) (wire.RejectCode, string) {
+func ErrToRejectErr(err error) (wire.RejectCode, string) {
 	// Return the reject code along with the error text if it can be
 	// extracted from the error.
-	rejectCode, found := extractRejectCode(err)
+	rejectCode, found := ExtractRejectCode(err)
 	if found {
 		return rejectCode, err.Error()
 	}

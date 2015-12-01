@@ -2,7 +2,7 @@
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
-package main
+package policy
 
 import (
 	"bytes"
@@ -35,18 +35,18 @@ func TestCalcMinRequiredTxRelayFee(t *testing.T) {
 		{
 			"100 bytes with default minimum relay fee",
 			100,
-			defaultMinRelayTxFee,
+			DefaultMinRelayTxFee,
 			100,
 		},
 		{
 			"max standard tx size with default minimum relay fee",
-			maxStandardTxSize,
-			defaultMinRelayTxFee,
+			MaxStandardTxSize,
+			DefaultMinRelayTxFee,
 			100000,
 		},
 		{
 			"max standard tx size with max satoshi relay fee",
-			maxStandardTxSize,
+			MaxStandardTxSize,
 			btcutil.MaxSatoshi,
 			btcutil.MaxSatoshi,
 		},
@@ -83,7 +83,7 @@ func TestCalcMinRequiredTxRelayFee(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		got := calcMinRequiredTxRelayFee(test.size, test.relayFee)
+		got := CalcMinRequiredTxRelayFee(test.size, test.relayFee)
 		if got != test.want {
 			t.Errorf("TestCalcMinRequiredTxRelayFee test '%s' "+
 				"failed: got %v want %v", test.name, got,
@@ -93,7 +93,7 @@ func TestCalcMinRequiredTxRelayFee(t *testing.T) {
 	}
 }
 
-// TestCheckPkScriptStandard tests the checkPkScriptStandard API.
+// TestCheckPkScriptStandard tests the CheckPkScriptStandard API.
 func TestCheckPkScriptStandard(t *testing.T) {
 	var pubKeys [][]byte
 	for i := 0; i < 4; i++ {
@@ -192,7 +192,7 @@ func TestCheckPkScriptStandard(t *testing.T) {
 			continue
 		}
 		scriptClass := txscript.GetScriptClass(script)
-		got := checkPkScriptStandard(script, scriptClass)
+		got := CheckPkScriptStandard(script, scriptClass)
 		if (test.isStandard && got != nil) ||
 			(!test.isStandard && got == nil) {
 
@@ -267,7 +267,7 @@ func TestDust(t *testing.T) {
 		},
 	}
 	for _, test := range tests {
-		res := isDust(&test.txOut, test.relayFee)
+		res := IsDust(&test.txOut, test.relayFee)
 		if res != test.isDust {
 			t.Fatalf("Dust test '%s' failed: want %v got %v",
 				test.name, test.isDust, res)
@@ -276,7 +276,7 @@ func TestDust(t *testing.T) {
 	}
 }
 
-// TestCheckTransactionStandard tests the checkTransactionStandard API.
+// TestCheckTransactionStandard tests the CheckTransactionStandard API.
 func TestCheckTransactionStandard(t *testing.T) {
 	// Create some dummy, but otherwise standard, data for transactions.
 	prevOutHash, err := wire.NewShaHashFromStr("01")
@@ -359,7 +359,7 @@ func TestCheckTransactionStandard(t *testing.T) {
 				TxOut: []*wire.TxOut{{
 					Value: 0,
 					PkScript: bytes.Repeat([]byte{0x00},
-						maxStandardTxSize+1),
+						MaxStandardTxSize+1),
 				}},
 				LockTime: 0,
 			},
@@ -374,7 +374,7 @@ func TestCheckTransactionStandard(t *testing.T) {
 				TxIn: []*wire.TxIn{{
 					PreviousOutPoint: dummyPrevOut,
 					SignatureScript: bytes.Repeat([]byte{0x00},
-						maxStandardSigScriptSize+1),
+						MaxStandardSigScriptSize+1),
 					Sequence: wire.MaxTxInSequenceNum,
 				}},
 				TxOut:    []*wire.TxOut{&dummyTxOut},
@@ -468,20 +468,20 @@ func TestCheckTransactionStandard(t *testing.T) {
 	timeSource := blockchain.NewMedianTime()
 	for _, test := range tests {
 		// Ensure standardness is as expected.
-		err := checkTransactionStandard(btcutil.NewTx(&test.tx),
-			test.height, timeSource, defaultMinRelayTxFee)
+		err := CheckTransactionStandard(btcutil.NewTx(&test.tx),
+			test.height, timeSource, DefaultMinRelayTxFee)
 		if err == nil && test.isStandard {
 			// Test passes since function returned standard for a
 			// transaction which is intended to be standard.
 			continue
 		}
 		if err == nil && !test.isStandard {
-			t.Errorf("checkTransactionStandard (%s): standard when "+
+			t.Errorf("CheckTransactionStandard (%s): standard when "+
 				"it should not be", test.name)
 			continue
 		}
 		if err != nil && test.isStandard {
-			t.Errorf("checkTransactionStandard (%s): nonstandard "+
+			t.Errorf("CheckTransactionStandard (%s): nonstandard "+
 				"when it should not be: %v", test.name, err)
 			continue
 		}
@@ -489,20 +489,20 @@ func TestCheckTransactionStandard(t *testing.T) {
 		// Ensure error type is a TxRuleError inside of a RuleError.
 		rerr, ok := err.(RuleError)
 		if !ok {
-			t.Errorf("checkTransactionStandard (%s): unexpected "+
+			t.Errorf("CheckTransactionStandard (%s): unexpected "+
 				"error type - got %T", test.name, err)
 			continue
 		}
-		txrerr, ok := rerr.Err.(TxRuleError)
+		txrerr, ok := rerr.Err.(txErr)
 		if !ok {
-			t.Errorf("checkTransactionStandard (%s): unexpected "+
+			t.Errorf("CheckTransactionStandard (%s): unexpected "+
 				"error type - got %T", test.name, rerr.Err)
 			continue
 		}
 
 		// Ensure the reject code is the expected one.
 		if txrerr.RejectCode != test.code {
-			t.Errorf("checkTransactionStandard (%s): unexpected "+
+			t.Errorf("CheckTransactionStandard (%s): unexpected "+
 				"error code - got %v, want %v", test.name,
 				txrerr.RejectCode, test.code)
 			continue
