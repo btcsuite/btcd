@@ -19,6 +19,7 @@ import (
 	"github.com/btcsuite/btcd/database"
 	_ "github.com/btcsuite/btcd/database/ldb"
 	_ "github.com/btcsuite/btcd/database/memdb"
+	"github.com/btcsuite/btcd/policy"
 	"github.com/btcsuite/btcd/wire"
 	"github.com/btcsuite/btcutil"
 	flags "github.com/btcsuite/go-flags"
@@ -331,7 +332,7 @@ func loadConfig() (*config, []string, error) {
 		DbType:            defaultDbType,
 		RPCKey:            defaultRPCKeyFile,
 		RPCCert:           defaultRPCCertFile,
-		MinRelayTxFee:     defaultMinRelayTxFee.ToBTC(),
+		MinRelayTxFee:     policy.DefaultMinRelayTxFee.ToBTC(),
 		FreeTxRelayLimit:  defaultFreeTxRelayLimit,
 		BlockMinSize:      defaultBlockMinSize,
 		BlockMaxSize:      defaultBlockMaxSize,

@@ -2,7 +2,7 @@
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
-package main
+package policy
 
 import (
 	"fmt"
@@ -14,12 +14,19 @@ import (
 )
 
 const (
-	// maxStandardTxSize is the maximum size allowed for transactions that
-	// are considered standard and will therefore be relayed and considered
-	// for mining.
-	maxStandardTxSize = 100000
+	// DefaultMinRelayTxFee is the minimum fee in satoshi that is required
+	// for a transaction to be treated as free for relay and mining
+	// purposes.  It is also used to help determine if a transaction is
+	// considered dust and as a base for calculating minimum required fees
+	// for larger transactions.  This value is in Satoshi/1000 bytes.
+	DefaultMinRelayTxFee = btcutil.Amount(1000)
 
-	// maxStandardSigScriptSize is the maximum size allowed for a
+	// MaxStandardMultiSigKeys is the maximum number of public keys allowed
+	// in a multi-signature transaction output script for it to be
+	// considered standard.
+	MaxStandardMultiSigKeys = 3
+
+	// MaxStandardSigScriptSize is the maximum size allowed for a
 	// transaction input signature script to be considered standard.  This
 	// value allows for a 15-of-15 CHECKMULTISIG pay-to-script-hash with
 	// compressed keys.
@@ -36,25 +43,22 @@ const (
 	// That brings the total to 1+(15*74)+3+513 = 1627.  This value also
 	// adds a few extra bytes to provide a little buffer.
 	// (1 + 15*74 + 3) + (15*34 + 3) + 23 = 1650
-	maxStandardSigScriptSize = 1650
+	MaxStandardSigScriptSize = 1650
 
-	// defaultMinRelayTxFee is the minimum fee in satoshi that is required
-	// for a transaction to be treated as free for relay and mining
-	// purposes.  It is also used to help determine if a transaction is
-	// considered dust and as a base for calculating minimum required fees
-	// for larger transactions.  This value is in Satoshi/1000 bytes.
-	defaultMinRelayTxFee = btcutil.Amount(1000)
+	// MaxStandardTxSize is the maximum size allowed for transactions that
+	// are considered standard and will therefore be relayed and considered
+	// for mining.
+	MaxStandardTxSize = 100000
 
-	// maxStandardMultiSigKeys is the maximum number of public keys allowed
-	// in a multi-signature transaction output script for it to be
-	// considered standard.
-	maxStandardMultiSigKeys = 3
+	// MempoolHeight is the height used for the "block" height field of the
+	// contextual transaction information provided in a transaction store.
+	MempoolHeight = 0x7fffffff
 )
 
-// calcMinRequiredTxRelayFee returns the minimum transaction fee required for a
+// CalcMinRequiredTxRelayFee returns the minimum transaction fee required for a
 // transaction with the passed serialized size to be accepted into the memory
 // pool and relayed.
-func calcMinRequiredTxRelayFee(serializedSize int64, minRelayTxFee btcutil.Amount) int64 {
+func CalcMinRequiredTxRelayFee(serializedSize int64, minRelayTxFee btcutil.Amount) int64 {
 	// Calculate the minimum fee for a transaction to be allowed into the
 	// mempool and relayed by scaling the base fee (which is the minimum
 	// free transaction relay fee). minTxRelayFee is in Satoshi/kB so
@@ -75,11 +79,11 @@ func calcMinRequiredTxRelayFee(serializedSize int64, minRelayTxFee btcutil.Amoun
 	return minFee
 }
 
-// calcPriority returns a transaction priority given a transaction and the sum
+// CalcPriority returns a transaction priority given a transaction and the sum
 // of each of its input values multiplied by their age (# of confirmations).
 // Thus, the final formula for the priority is:
 // sum(inputValue * inputAge) / adjustedTxSize
-func calcPriority(tx *wire.MsgTx, txStore blockchain.TxStore, nextBlockHeight int32) float64 {
+func CalcPriority(tx *wire.MsgTx, txStore blockchain.TxStore, nextBlockHeight int32) float64 {
 	// In order to encourage spending multiple old unspent transaction
 	// outputs thereby reducing the total set, don't count the constant
 	// overhead for each input as well as enough bytes of the signature
@@ -135,7 +139,7 @@ func calcInputValueAge(tx *wire.MsgTx, txStore blockchain.TxStore, nextBlockHeig
 			// Their input age should computed as zero since their
 			// parent hasn't made it into a block yet.
 			var inputAge int32
-			if txData.BlockHeight == mempoolHeight {
+			if txData.BlockHeight == MempoolHeight {
 				inputAge = 0
 			} else {
 				inputAge = nextBlockHeight - txData.BlockHeight
@@ -151,14 +155,14 @@ func calcInputValueAge(tx *wire.MsgTx, txStore blockchain.TxStore, nextBlockHeig
 	return totalInputAge
 }
 
-// checkInputsStandard performs a series of checks on a transaction's inputs
+// CheckInputsStandard performs a series of checks on a transaction's inputs
 // to ensure they are "standard".  A standard transaction input is one that
 // that consumes the expected number of elements from the stack and that number
 // is the same as the output script pushes.  This help prevent resource
 // exhaustion attacks by "creative" use of scripts that are super expensive to
 // process like OP_DUP OP_CHECKSIG OP_DROP repeated a large number of times
 // followed by a final OP_TRUE.
-func checkInputsStandard(tx *btcutil.Tx, txStore blockchain.TxStore) error {
+func CheckInputsStandard(tx *btcutil.Tx, txStore blockchain.TxStore) error {
 	// NOTE: The reference implementation also does a coinbase check here,
 	// but coinbases have already been rejected prior to calling this
 	// function so no need to recheck.
@@ -177,7 +181,7 @@ func checkInputsStandard(tx *btcutil.Tx, txStore blockchain.TxStore) error {
 		if err != nil {
 			str := fmt.Sprintf("transaction input #%d script parse "+
 				"failure: %v", i, err)
-			return txRuleError(wire.RejectNonstandard, str)
+			return TxRuleError(wire.RejectNonstandard, str)
 		}
 
 		// A negative value for expected inputs indicates the script is
@@ -185,7 +189,7 @@ func checkInputsStandard(tx *btcutil.Tx, txStore blockchain.TxStore) error {
 		if scriptInfo.ExpectedInputs < 0 {
 			str := fmt.Sprintf("transaction input #%d expects %d "+
 				"inputs", i, scriptInfo.ExpectedInputs)
-			return txRuleError(wire.RejectNonstandard, str)
+			return TxRuleError(wire.RejectNonstandard, str)
 		}
 
 		// The script pair is non-standard if the number of available
@@ -195,69 +199,69 @@ func checkInputsStandard(tx *btcutil.Tx, txStore blockchain.TxStore) error {
 				"inputs, but referenced output script provides "+
 				"%d", i, scriptInfo.ExpectedInputs,
 				scriptInfo.NumInputs)
-			return txRuleError(wire.RejectNonstandard, str)
+			return TxRuleError(wire.RejectNonstandard, str)
 		}
 	}
 
 	return nil
 }
 
-// checkPkScriptStandard performs a series of checks on a transaction ouput
+// CheckPkScriptStandard performs a series of checks on a transaction ouput
 // script (public key script) to ensure it is a "standard" public key script.
 // A standard public key script is one that is a recognized form, and for
-// multi-signature scripts, only contains from 1 to maxStandardMultiSigKeys
+// multi-signature scripts, only contains from 1 to MaxStandardMultiSigKeys
 // public keys.
-func checkPkScriptStandard(pkScript []byte, scriptClass txscript.ScriptClass) error {
+func CheckPkScriptStandard(pkScript []byte, scriptClass txscript.ScriptClass) error {
 	switch scriptClass {
 	case txscript.MultiSigTy:
 		numPubKeys, numSigs, err := txscript.CalcMultiSigStats(pkScript)
 		if err != nil {
 			str := fmt.Sprintf("multi-signature script parse "+
 				"failure: %v", err)
-			return txRuleError(wire.RejectNonstandard, str)
+			return TxRuleError(wire.RejectNonstandard, str)
 		}
 
 		// A standard multi-signature public key script must contain
-		// from 1 to maxStandardMultiSigKeys public keys.
+		// from 1 to MaxStandardMultiSigKeys public keys.
 		if numPubKeys < 1 {
 			str := "multi-signature script with no pubkeys"
-			return txRuleError(wire.RejectNonstandard, str)
+			return TxRuleError(wire.RejectNonstandard, str)
 		}
-		if numPubKeys > maxStandardMultiSigKeys {
+		if numPubKeys > MaxStandardMultiSigKeys {
 			str := fmt.Sprintf("multi-signature script with %d "+
 				"public keys which is more than the allowed "+
-				"max of %d", numPubKeys, maxStandardMultiSigKeys)
-			return txRuleError(wire.RejectNonstandard, str)
+				"max of %d", numPubKeys, MaxStandardMultiSigKeys)
+			return TxRuleError(wire.RejectNonstandard, str)
 		}
 
 		// A standard multi-signature public key script must have at
 		// least 1 signature and no more signatures than available
 		// public keys.
 		if numSigs < 1 {
-			return txRuleError(wire.RejectNonstandard,
+			return TxRuleError(wire.RejectNonstandard,
 				"multi-signature script with no signatures")
 		}
 		if numSigs > numPubKeys {
 			str := fmt.Sprintf("multi-signature script with %d "+
 				"signatures which is more than the available "+
 				"%d public keys", numSigs, numPubKeys)
-			return txRuleError(wire.RejectNonstandard, str)
+			return TxRuleError(wire.RejectNonstandard, str)
 		}
 
 	case txscript.NonStandardTy:
-		return txRuleError(wire.RejectNonstandard,
+		return TxRuleError(wire.RejectNonstandard,
 			"non-standard script form")
 	}
 
 	return nil
 }
 
-// isDust returns whether or not the passed transaction output amount is
+// IsDust returns whether or not the passed transaction output amount is
 // considered dust or not based on the passed minimum transaction relay fee.
 // Dust is defined in terms of the minimum transaction relay fee.  In
 // particular, if the cost to the network to spend coins is more than 1/3 of the
 // minimum transaction relay fee, it is considered dust.
-func isDust(txOut *wire.TxOut, minRelayTxFee btcutil.Amount) bool {
+func IsDust(txOut *wire.TxOut, minRelayTxFee btcutil.Amount) bool {
 	// Unspendable outputs are considered dust.
 	if txscript.IsUnspendable(txOut.PkScript) {
 		return true
@@ -322,28 +326,28 @@ func isDust(txOut *wire.TxOut, minRelayTxFee btcutil.Amount) bool {
 	return txOut.Value*1000/(3*int64(totalSize)) < int64(minRelayTxFee)
 }
 
-// checkTransactionStandard performs a series of checks on a transaction to
+// CheckTransactionStandard performs a series of checks on a transaction to
 // ensure it is a "standard" transaction.  A standard transaction is one that
 // conforms to several additional limiting cases over what is considered a
 // "sane" transaction such as having a version in the supported range, being
 // finalized, conforming to more stringent size constraints, having scripts
 // of recognized forms, and not containing "dust" outputs (those that are
 // so small it costs more to process them than they are worth).
-func checkTransactionStandard(tx *btcutil.Tx, height int32, timeSource blockchain.MedianTimeSource, minRelayTxFee btcutil.Amount) error {
+func CheckTransactionStandard(tx *btcutil.Tx, height int32, timeSource blockchain.MedianTimeSource, minRelayTxFee btcutil.Amount) error {
 	// The transaction must be a currently supported version.
 	msgTx := tx.MsgTx()
 	if msgTx.Version > wire.TxVersion || msgTx.Version < 1 {
 		str := fmt.Sprintf("transaction version %d is not in the "+
 			"valid range of %d-%d", msgTx.Version, 1,
 			wire.TxVersion)
-		return txRuleError(wire.RejectNonstandard, str)
+		return TxRuleError(wire.RejectNonstandard, str)
 	}
 
 	// The transaction must be finalized to be standard and therefore
 	// considered for inclusion in a block.
 	adjustedTime := timeSource.AdjustedTime()
 	if !blockchain.IsFinalizedTransaction(tx, height, adjustedTime) {
-		return txRuleError(wire.RejectNonstandard,
+		return TxRuleError(wire.RejectNonstandard,
 			"transaction is not finalized")
 	}
 
@@ -352,23 +356,23 @@ func checkTransactionStandard(tx *btcutil.Tx, height int32, timeSource blockchai
 	// size of a transaction.  This also helps mitigate CPU exhaustion
 	// attacks.
 	serializedLen := msgTx.SerializeSize()
-	if serializedLen > maxStandardTxSize {
+	if serializedLen > MaxStandardTxSize {
 		str := fmt.Sprintf("transaction size of %v is larger than max "+
-			"allowed size of %v", serializedLen, maxStandardTxSize)
-		return txRuleError(wire.RejectNonstandard, str)
+			"allowed size of %v", serializedLen, MaxStandardTxSize)
+		return TxRuleError(wire.RejectNonstandard, str)
 	}
 
 	for i, txIn := range msgTx.TxIn {
 		// Each transaction input signature script must not exceed the
 		// maximum size allowed for a standard transaction.  See
-		// the comment on maxStandardSigScriptSize for more details.
+		// the comment on MaxStandardSigScriptSize for more details.
 		sigScriptLen := len(txIn.SignatureScript)
-		if sigScriptLen > maxStandardSigScriptSize {
+		if sigScriptLen > MaxStandardSigScriptSize {
 			str := fmt.Sprintf("transaction input %d: signature "+
 				"script size of %d bytes is large than max "+
 				"allowed size of %d bytes", i, sigScriptLen,
-				maxStandardSigScriptSize)
-			return txRuleError(wire.RejectNonstandard, str)
+				MaxStandardSigScriptSize)
+			return TxRuleError(wire.RejectNonstandard, str)
 		}
 
 		// Each transaction input signature script must only contain
@@ -376,7 +380,7 @@ func checkTransactionStandard(tx *btcutil.Tx, height int32, timeSource blockchai
 		if !txscript.IsPushOnlyScript(txIn.SignatureScript) {
 			str := fmt.Sprintf("transaction input %d: signature "+
 				"script is not push only", i)
-			return txRuleError(wire.RejectNonstandard, str)
+			return TxRuleError(wire.RejectNonstandard, str)
 		}
 	}
 
@@ -385,17 +389,17 @@ func checkTransactionStandard(tx *btcutil.Tx, height int32, timeSource blockchai
 	numNullDataOutputs := 0
 	for i, txOut := range msgTx.TxOut {
 		scriptClass := txscript.GetScriptClass(txOut.PkScript)
-		err := checkPkScriptStandard(txOut.PkScript, scriptClass)
+		err := CheckPkScriptStandard(txOut.PkScript, scriptClass)
 		if err != nil {
 			// Attempt to extract a reject code from the error so
 			// it can be retained.  When not possible, fall back to
 			// a non standard error.
 			rejectCode := wire.RejectNonstandard
-			if rejCode, found := extractRejectCode(err); found {
+			if rejCode, found := ExtractRejectCode(err); found {
 				rejectCode = rejCode
 			}
 			str := fmt.Sprintf("transaction output %d: %v", i, err)
-			return txRuleError(rejectCode, str)
+			return TxRuleError(rejectCode, str)
 		}
 
 		// Accumulate the number of outputs which only carry data.  For
@@ -403,10 +407,10 @@ func checkTransactionStandard(tx *btcutil.Tx, height int32, timeSource blockchai
 		// "dust".
 		if scriptClass == txscript.NullDataTy {
 			numNullDataOutputs++
-		} else if isDust(txOut, minRelayTxFee) {
+		} else if IsDust(txOut, minRelayTxFee) {
 			str := fmt.Sprintf("transaction output %d: payment "+
 				"of %d is dust", i, txOut.Value)
-			return txRuleError(wire.RejectDust, str)
+			return TxRuleError(wire.RejectDust, str)
 		}
 	}
 
@@ -414,7 +418,7 @@ func checkTransactionStandard(tx *btcutil.Tx, height int32, timeSource blockchai
 	// only carries data.
 	if numNullDataOutputs > 1 {
 		str := "more than one transaction output in a nulldata script"
-		return txRuleError(wire.RejectNonstandard, str)
+		return TxRuleError(wire.RejectNonstandard, str)
 	}
 
 	return nil

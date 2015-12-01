@@ -16,16 +16,13 @@ import (
 	"github.com/btcsuite/btcd/blockchain"
 	"github.com/btcsuite/btcd/database"
 	"github.com/btcsuite/btcd/mining"
+	"github.com/btcsuite/btcd/policy"
 	"github.com/btcsuite/btcd/txscript"
 	"github.com/btcsuite/btcd/wire"
 	"github.com/btcsuite/btcutil"
 )
 
 const (
-	// mempoolHeight is the height used for the "block" height field of the
-	// contextual transaction information provided in a transaction store.
-	mempoolHeight = 0x7fffffff
-
 	// maxOrphanTransactions is the maximum number of orphan transactions
 	// that can be queued.
 	maxOrphanTransactions = 1000
@@ -226,7 +223,7 @@ func (mp *txMemPool) maybeAddOrphan(tx *btcutil.Tx) error {
 		str := fmt.Sprintf("orphan transaction size of %d bytes is "+
 			"larger than max allowed size of %d bytes",
 			serializedLen, maxOrphanTxSize)
-		return txRuleError(wire.RejectNonstandard, str)
+		return policy.TxRuleError(wire.RejectNonstandard, str)
 	}
 
 	// Add the orphan if the none of the above disqualified it.
@@ -427,7 +424,7 @@ func (mp *txMemPool) addTransaction(txStore blockchain.TxStore, tx *btcutil.Tx, 
 			Height: height,
 			Fee:    fee,
 		},
-		StartingPriority: calcPriority(tx.MsgTx(), txStore, height),
+		StartingPriority: policy.CalcPriority(tx.MsgTx(), txStore, height),
 	}
 	for _, txIn := range tx.MsgTx().TxIn {
 		mp.outpoints[txIn.PreviousOutPoint] = tx
@@ -520,7 +517,7 @@ func (mp *txMemPool) checkPoolDoubleSpend(tx *btcutil.Tx) error {
 			str := fmt.Sprintf("output %v already spent by "+
 				"transaction %v in the memory pool",
 				txIn.PreviousOutPoint, txR.Sha())
-			return txRuleError(wire.RejectDuplicate, str)
+			return policy.TxRuleError(wire.RejectDuplicate, str)
 		}
 	}
 
@@ -544,7 +541,7 @@ func (mp *txMemPool) fetchInputTransactions(tx *btcutil.Tx, includeSpent bool) (
 			if poolTxDesc, exists := mp.pool[*txD.Hash]; exists {
 				poolTx := poolTxDesc.Tx
 				txD.Tx = poolTx
-				txD.BlockHeight = mempoolHeight
+				txD.BlockHeight = policy.MempoolHeight
 				txD.Spent = make([]bool, len(poolTx.MsgTx().TxOut))
 				txD.Err = nil
 			}
@@ -605,7 +602,7 @@ func (mp *txMemPool) maybeAcceptTransaction(tx *btcutil.Tx, isNew, rateLimit boo
 	// be a quick check to weed out duplicates.
 	if mp.haveTransaction(txHash) {
 		str := fmt.Sprintf("already have transaction %v", txHash)
-		return nil, txRuleError(wire.RejectDuplicate, str)
+		return nil, policy.TxRuleError(wire.RejectDuplicate, str)
 	}
 
 	// Perform preliminary sanity checks on the transaction.  This makes
@@ -614,7 +611,7 @@ func (mp *txMemPool) maybeAcceptTransaction(tx *btcutil.Tx, isNew, rateLimit boo
 	err := blockchain.CheckTransactionSanity(tx)
 	if err != nil {
 		if cerr, ok := err.(blockchain.RuleError); ok {
-			return nil, chainRuleError(cerr)
+			return nil, policy.ChainRuleError(cerr)
 		}
 		return nil, err
 	}
@@ -623,7 +620,7 @@ func (mp *txMemPool) maybeAcceptTransaction(tx *btcutil.Tx, isNew, rateLimit boo
 	if blockchain.IsCoinBase(tx) {
 		str := fmt.Sprintf("transaction %v is an individual coinbase",
 			txHash)
-		return nil, txRuleError(wire.RejectInvalid, str)
+		return nil, policy.TxRuleError(wire.RejectInvalid, str)
 	}
 
 	// Don't accept transactions with a lock time after the maximum int32
@@ -633,7 +630,7 @@ func (mp *txMemPool) maybeAcceptTransaction(tx *btcutil.Tx, isNew, rateLimit boo
 	if tx.MsgTx().LockTime > math.MaxInt32 {
 		str := fmt.Sprintf("transaction %v has a lock time after "+
 			"2038 which is not accepted yet", txHash)
-		return nil, txRuleError(wire.RejectNonstandard, str)
+		return nil, policy.TxRuleError(wire.RejectNonstandard, str)
 	}
 
 	// Get the current height of the main chain.  A standalone transaction
@@ -650,19 +647,19 @@ func (mp *txMemPool) maybeAcceptTransaction(tx *btcutil.Tx, isNew, rateLimit boo
 	// Don't allow non-standard transactions if the network parameters
 	// forbid their relaying.
 	if !activeNetParams.RelayNonStdTxs {
-		err := checkTransactionStandard(tx, nextBlockHeight,
+		err := policy.CheckTransactionStandard(tx, nextBlockHeight,
 			mp.cfg.TimeSource, mp.cfg.MinRelayTxFee)
 		if err != nil {
 			// Attempt to extract a reject code from the error so
 			// it can be retained.  When not possible, fall back to
 			// a non standard error.
-			rejectCode, found := extractRejectCode(err)
+			rejectCode, found := policy.ExtractRejectCode(err)
 			if !found {
 				rejectCode = wire.RejectNonstandard
 			}
 			str := fmt.Sprintf("transaction %v is not standard: %v",
 				txHash, err)
-			return nil, txRuleError(rejectCode, str)
+			return nil, policy.TxRuleError(rejectCode, str)
 		}
 	}
 
@@ -686,7 +683,7 @@ func (mp *txMemPool) maybeAcceptTransaction(tx *btcutil.Tx, isNew, rateLimit boo
 	txStore, err := mp.fetchInputTransactions(tx, false)
 	if err != nil {
 		if cerr, ok := err.(blockchain.RuleError); ok {
-			return nil, chainRuleError(cerr)
+			return nil, policy.ChainRuleError(cerr)
 		}
 		return nil, err
 	}
@@ -696,7 +693,7 @@ func (mp *txMemPool) maybeAcceptTransaction(tx *btcutil.Tx, isNew, rateLimit boo
 	if txD, exists := txStore[*txHash]; exists && txD.Err == nil {
 		for _, isOutputSpent := range txD.Spent {
 			if !isOutputSpent {
-				return nil, txRuleError(wire.RejectDuplicate,
+				return nil, policy.TxRuleError(wire.RejectDuplicate,
 					"transaction already exists")
 			}
 		}
@@ -724,7 +721,7 @@ func (mp *txMemPool) maybeAcceptTransaction(tx *btcutil.Tx, isNew, rateLimit boo
 	txFee, err := blockchain.CheckTransactionInputs(tx, nextBlockHeight, txStore)
 	if err != nil {
 		if cerr, ok := err.(blockchain.RuleError); ok {
-			return nil, chainRuleError(cerr)
+			return nil, policy.ChainRuleError(cerr)
 		}
 		return nil, err
 	}
@@ -732,18 +729,18 @@ func (mp *txMemPool) maybeAcceptTransaction(tx *btcutil.Tx, isNew, rateLimit boo
 	// Don't allow transactions with non-standard inputs if the network
 	// parameters forbid their relaying.
 	if !activeNetParams.RelayNonStdTxs {
-		err := checkInputsStandard(tx, txStore)
+		err := policy.CheckInputsStandard(tx, txStore)
 		if err != nil {
 			// Attempt to extract a reject code from the error so
 			// it can be retained.  When not possible, fall back to
 			// a non standard error.
-			rejectCode, found := extractRejectCode(err)
+			rejectCode, found := policy.ExtractRejectCode(err)
 			if !found {
 				rejectCode = wire.RejectNonstandard
 			}
 			str := fmt.Sprintf("transaction %v has a non-standard "+
 				"input: %v", txHash, err)
-			return nil, txRuleError(rejectCode, str)
+			return nil, policy.TxRuleError(rejectCode, str)
 		}
 	}
 
@@ -759,7 +756,7 @@ func (mp *txMemPool) maybeAcceptTransaction(tx *btcutil.Tx, isNew, rateLimit boo
 	numSigOps, err := blockchain.CountP2SHSigOps(tx, false, txStore)
 	if err != nil {
 		if cerr, ok := err.(blockchain.RuleError); ok {
-			return nil, chainRuleError(cerr)
+			return nil, policy.ChainRuleError(cerr)
 		}
 		return nil, err
 	}
@@ -767,7 +764,7 @@ func (mp *txMemPool) maybeAcceptTransaction(tx *btcutil.Tx, isNew, rateLimit boo
 	if numSigOps > maxSigOpsPerTx {
 		str := fmt.Sprintf("transaction %v has too many sigops: %d > %d",
 			txHash, numSigOps, maxSigOpsPerTx)
-		return nil, txRuleError(wire.RejectNonstandard, str)
+		return nil, policy.TxRuleError(wire.RejectNonstandard, str)
 	}
 
 	// Don't allow transactions with fees too low to get into a mined block.
@@ -782,12 +779,13 @@ func (mp *txMemPool) maybeAcceptTransaction(tx *btcutil.Tx, isNew, rateLimit boo
 	// transaction does not exceeed 1000 less than the reserved space for
 	// high-priority transactions, don't require a fee for it.
 	serializedSize := int64(tx.MsgTx().SerializeSize())
-	minFee := calcMinRequiredTxRelayFee(serializedSize, mp.cfg.MinRelayTxFee)
+	minFee := policy.CalcMinRequiredTxRelayFee(serializedSize,
+		mp.cfg.MinRelayTxFee)
 	if serializedSize >= (defaultBlockPrioritySize-1000) && txFee < minFee {
 		str := fmt.Sprintf("transaction %v has %d fees which is under "+
 			"the required amount of %d", txHash, txFee,
 			minFee)
-		return nil, txRuleError(wire.RejectInsufficientFee, str)
+		return nil, policy.TxRuleError(wire.RejectInsufficientFee, str)
 	}
 
 	// Require that free transactions have sufficient priority to be mined
@@ -795,13 +793,13 @@ func (mp *txMemPool) maybeAcceptTransaction(tx *btcutil.Tx, isNew, rateLimit boo
 	// memory pool from blocks that have been disconnected during a reorg
 	// are exempted.
 	if isNew && !mp.cfg.DisableRelayPriority && txFee < minFee {
-		currentPriority := calcPriority(tx.MsgTx(), txStore,
+		currentPriority := policy.CalcPriority(tx.MsgTx(), txStore,
 			nextBlockHeight)
 		if currentPriority <= minHighPriority {
 			str := fmt.Sprintf("transaction %v has insufficient "+
 				"priority (%g <= %g)", txHash,
 				currentPriority, minHighPriority)
-			return nil, txRuleError(wire.RejectInsufficientFee, str)
+			return nil, policy.TxRuleError(wire.RejectInsufficientFee, str)
 		}
 	}
 
@@ -819,7 +817,7 @@ func (mp *txMemPool) maybeAcceptTransaction(tx *btcutil.Tx, isNew, rateLimit boo
 		if mp.pennyTotal >= mp.cfg.FreeTxRelayLimit*10*1000 {
 			str := fmt.Sprintf("transaction %v has been rejected "+
 				"by the rate limiter due to low fees", txHash)
-			return nil, txRuleError(wire.RejectInsufficientFee, str)
+			return nil, policy.TxRuleError(wire.RejectInsufficientFee, str)
 		}
 		oldTotal := mp.pennyTotal
 
@@ -835,7 +833,7 @@ func (mp *txMemPool) maybeAcceptTransaction(tx *btcutil.Tx, isNew, rateLimit boo
 		txscript.StandardVerifyFlags, mp.cfg.SigCache)
 	if err != nil {
 		if cerr, ok := err.(blockchain.RuleError); ok {
-			return nil, chainRuleError(cerr)
+			return nil, policy.ChainRuleError(cerr)
 		}
 		return nil, err
 	}
@@ -1010,7 +1008,7 @@ func (mp *txMemPool) ProcessTransaction(tx *btcutil.Tx, allowOrphan, rateLimit b
 			str := fmt.Sprintf("orphan transaction %v references "+
 				"outputs of unknown or fully-spent "+
 				"transaction %v", tx.Sha(), missingParents[0])
-			return txRuleError(wire.RejectDuplicate, str)
+			return policy.TxRuleError(wire.RejectDuplicate, str)
 		}
 
 		// Potentially add the orphan transaction to the orphan pool.

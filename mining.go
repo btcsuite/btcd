@@ -13,6 +13,7 @@ import (
 	"github.com/btcsuite/btcd/blockchain"
 	"github.com/btcsuite/btcd/database"
 	"github.com/btcsuite/btcd/mining"
+	"github.com/btcsuite/btcd/policy"
 	"github.com/btcsuite/btcd/txscript"
 	"github.com/btcsuite/btcd/wire"
 	"github.com/btcsuite/btcutil"
@@ -368,7 +369,7 @@ func medianAdjustedTime(chainState *chainState, timeSource blockchain.MedianTime
 //  |  transactions (while block size   |   |
 //  |  <= policy.BlockMinSize)          |   |
 //   -----------------------------------  --
-func NewBlockTemplate(policy *mining.Policy, server *server, payToAddress btcutil.Address) (*BlockTemplate, error) {
+func NewBlockTemplate(mpolicy *mining.Policy, server *server, payToAddress btcutil.Address) (*BlockTemplate, error) {
 	var txSource mining.TxSource = server.txMemPool
 	blockManager := server.blockManager
 	timeSource := server.timeSource
@@ -407,7 +408,7 @@ func NewBlockTemplate(policy *mining.Policy, server *server, payToAddress btcuti
 	// choose the initial sort order for the priority queue based on whether
 	// or not there is an area allocated for high-priority transactions.
 	sourceTxns := txSource.MiningDescs()
-	sortedByFee := policy.BlockPrioritySize == 0
+	sortedByFee := mpolicy.BlockPrioritySize == 0
 	priorityQueue := newTxPriorityQueue(len(sourceTxns), sortedByFee)
 
 	// Create a slice to hold the transactions to be included in the
@@ -519,7 +520,8 @@ mempoolLoop:
 		// Calculate the final transaction priority using the input
 		// value age sum as well as the adjusted transaction size.  The
 		// formula is: sum(inputValue * inputAge) / adjustedTxSize
-		prioItem.priority = calcPriority(tx.MsgTx(), txStore, nextBlockHeight)
+		prioItem.priority = policy.CalcPriority(tx.MsgTx(), txStore,
+			nextBlockHeight)
 
 		// Calculate the fee in Satoshi/kB.
 		txSize := tx.MsgTx().SerializeSize()
@@ -565,7 +567,7 @@ mempoolLoop:
 		// Enforce maximum block size.  Also check for overflow.
 		txSize := uint32(tx.MsgTx().SerializeSize())
 		blockPlusTxSize := blockSize + txSize
-		if blockPlusTxSize < blockSize || blockPlusTxSize >= policy.BlockMaxSize {
+		if blockPlusTxSize < blockSize || blockPlusTxSize >= mpolicy.BlockMaxSize {
 			minrLog.Tracef("Skipping tx %s because it would exceed "+
 				"the max block size", tx.Sha())
 			logSkippedDeps(tx, deps)
@@ -603,14 +605,14 @@ mempoolLoop:
 		// Skip free transactions once the block is larger than the
 		// minimum block size.
 		if sortedByFee &&
-			prioItem.feePerKB < int64(policy.TxMinFreeFee) &&
-			blockPlusTxSize >= policy.BlockMinSize {
+			prioItem.feePerKB < int64(mpolicy.TxMinFreeFee) &&
+			blockPlusTxSize >= mpolicy.BlockMinSize {
 
 			minrLog.Tracef("Skipping tx %s with feePerKB %.2f "+
 				"< TxMinFreeFee %d and block size %d >= "+
 				"minBlockSize %d", tx.Sha(), prioItem.feePerKB,
-				policy.TxMinFreeFee, blockPlusTxSize,
-				policy.BlockMinSize)
+				mpolicy.TxMinFreeFee, blockPlusTxSize,
+				mpolicy.BlockMinSize)
 			logSkippedDeps(tx, deps)
 			continue
 		}
@@ -618,13 +620,13 @@ mempoolLoop:
 		// Prioritize by fee per kilobyte once the block is larger than
 		// the priority size or there are no more high-priority
 		// transactions.
-		if !sortedByFee && (blockPlusTxSize >= policy.BlockPrioritySize ||
+		if !sortedByFee && (blockPlusTxSize >= mpolicy.BlockPrioritySize ||
 			prioItem.priority <= minHighPriority) {
 
 			minrLog.Tracef("Switching to sort by fees per "+
 				"kilobyte blockSize %d >= BlockPrioritySize "+
 				"%d || priority %.2f <= minHighPriority %.2f",
-				blockPlusTxSize, policy.BlockPrioritySize,
+				blockPlusTxSize, mpolicy.BlockPrioritySize,
 				prioItem.priority, minHighPriority)
 
 			sortedByFee = true
@@ -636,7 +638,7 @@ mempoolLoop:
 			// too low.  Otherwise this transaction will be the
 			// final one in the high-priority section, so just fall
 			// though to the code below so it is added now.
-			if blockPlusTxSize > policy.BlockPrioritySize ||
+			if blockPlusTxSize > mpolicy.BlockPrioritySize ||
 				prioItem.priority < minHighPriority {
 
 				heap.Push(priorityQueue, prioItem)

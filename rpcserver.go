@@ -33,6 +33,7 @@ import (
 	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/btcsuite/btcd/database"
 	"github.com/btcsuite/btcd/mining"
+	"github.com/btcsuite/btcd/policy"
 	"github.com/btcsuite/btcd/txscript"
 	"github.com/btcsuite/btcd/wire"
 	"github.com/btcsuite/btcutil"
@@ -1927,8 +1928,8 @@ func handleGetBlockTemplateRequest(s *rpcServer, request *btcjson.TemplateReques
 // which matches the reasons and format described in BIP0022 for rejection
 // reasons.
 func chainErrToGBTErrString(err error) string {
-	// When the passed error is not a RuleError, just return a generic
-	// rejected string with the error text.
+	// When the passed error is not a policy.RuleError, just return a
+	// generic rejected string with the error text.
 	ruleErr, ok := err.(blockchain.RuleError)
 	if !ok {
 		return "rejected: " + err.Error()
@@ -2412,7 +2413,7 @@ func handleGetRawMempool(s *rpcServer, cmd interface{}, closeChan <-chan struct{
 			var currentPriority float64
 			inputTxs, err := mp.fetchInputTransactions(tx, false)
 			if err == nil {
-				currentPriority = calcPriority(tx.MsgTx(),
+				currentPriority = policy.CalcPriority(tx.MsgTx(),
 					inputTxs, newestHeight+1)
 			}
 
@@ -3273,7 +3274,7 @@ func handleSendRawTransaction(s *rpcServer, cmd interface{}, closeChan <-chan st
 		// so log it as an actual error.  In both cases, a JSON-RPC
 		// error is returned to the client with the deserialization
 		// error code (to match bitcoind behavior).
-		if _, ok := err.(RuleError); ok {
+		if _, ok := err.(policy.RuleError); ok {
 			rpcsLog.Debugf("Rejected transaction %v: %v", tx.Sha(),
 				err)
 		} else {
