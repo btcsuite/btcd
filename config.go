@@ -26,27 +26,29 @@ import (
 )
 
 const (
-	defaultConfigFilename    = "btcd.conf"
-	defaultDataDirname       = "data"
-	defaultLogLevel          = "info"
-	defaultLogDirname        = "logs"
-	defaultLogFilename       = "btcd.log"
-	defaultMaxPeers          = 125
-	defaultBanDuration       = time.Hour * 24
-	defaultBanThreshold      = 100
-	defaultMaxRPCClients     = 10
-	defaultMaxRPCWebsockets  = 25
-	defaultVerifyEnabled     = false
-	defaultDbType            = "leveldb"
-	defaultFreeTxRelayLimit  = 15.0
-	defaultBlockMinSize      = 0
-	defaultBlockMaxSize      = 750000
-	blockMaxSizeMin          = 1000
-	blockMaxSizeMax          = wire.MaxBlockPayload - 1000
-	defaultBlockPrioritySize = 50000
-	defaultGenerate          = false
-	defaultAddrIndex         = false
-	defaultSigCacheMaxSize   = 50000
+	defaultConfigFilename        = "btcd.conf"
+	defaultDataDirname           = "data"
+	defaultLogLevel              = "info"
+	defaultLogDirname            = "logs"
+	defaultLogFilename           = "btcd.log"
+	defaultMaxPeers              = 125
+	defaultBanDuration           = time.Hour * 24
+	defaultBanThreshold          = 100
+	defaultMaxRPCClients         = 10
+	defaultMaxRPCWebsockets      = 25
+	defaultVerifyEnabled         = false
+	defaultDbType                = "leveldb"
+	defaultFreeTxRelayLimit      = 15.0
+	defaultBlockMinSize          = 0
+	defaultBlockMaxSize          = 750000
+	blockMaxSizeMin              = 1000
+	blockMaxSizeMax              = wire.MaxBlockPayload - 1000
+	defaultBlockPrioritySize     = 50000
+	defaultGenerate              = false
+	defaultAddrIndex             = false
+	defaultMaxOrphanTransactions = 1000
+	defaultMaxOrphanTxSize       = 5000
+	defaultSigCacheMaxSize       = 50000
 )
 
 var (
@@ -341,8 +343,8 @@ func loadConfig() (*config, []string, error) {
 		BlockMinSize:      defaultBlockMinSize,
 		BlockMaxSize:      defaultBlockMaxSize,
 		BlockPrioritySize: defaultBlockPrioritySize,
+		MaxOrphanTxs:      defaultMaxOrphanTransactions,
 		SigCacheMaxSize:   defaultSigCacheMaxSize,
-		MaxOrphanTxs:      maxOrphanTransactions,
 		Generate:          defaultGenerate,
 		AddrIndex:         defaultAddrIndex,
 	}
