@@ -108,7 +108,7 @@ func chainSetup(dbName string) (*blockchain.BlockChain, func(), error) {
 	}
 
 	// Create the main chain instance.
-	chain, err := blockchain.New(db, &chaincfg.MainNetParams, nil, nil)
+	chain, err := blockchain.New(db, &chaincfg.MainNetParams, nil, nil, nil)
 	if err != nil {
 		teardown()
 		err := fmt.Errorf("failed to create chain instance: %v", err)

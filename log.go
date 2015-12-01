@@ -10,9 +10,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/btcsuite/btcd/addrmgr"
 	"github.com/btcsuite/btcd/blockchain"
 	"github.com/btcsuite/btcd/database"
+	"github.com/btcsuite/btcd/index"
 	"github.com/btcsuite/btcd/peer"
 	"github.com/btcsuite/btcd/txscript"
 	"github.com/btcsuite/btcd/wire"
@@ -32,13 +32,13 @@ const (
 // function.
 var (
 	backendLog = seelog.Disabled
-	adxrLog    = btclog.Disabled
 	amgrLog    = btclog.Disabled
 	bcdbLog    = btclog.Disabled
 	bmgrLog    = btclog.Disabled
 	btcdLog    = btclog.Disabled
 	chanLog    = btclog.Disabled
 	discLog    = btclog.Disabled
+	indxLog    = btclog.Disabled
 	minrLog    = btclog.Disabled
 	peerLog    = btclog.Disabled
 	rpcsLog    = btclog.Disabled
@@ -49,13 +49,13 @@ var (
 
 // subsystemLoggers maps each subsystem identifier to its associated logger.
 var subsystemLoggers = map[string]btclog.Logger{
-	"ADXR": adxrLog,
 	"AMGR": amgrLog,
 	"BCDB": bcdbLog,
 	"BMGR": bmgrLog,
 	"BTCD": btcdLog,
 	"CHAN": chanLog,
 	"DISC": discLog,
+	"INDX": indxLog,
 	"MINR": minrLog,
 	"PEER": peerLog,
 	"RPCS": rpcsLog,
@@ -89,13 +89,6 @@ func useLogger(subsystemID string, logger btclog.Logger) {
 	subsystemLoggers[subsystemID] = logger
 
 	switch subsystemID {
-	case "ADXR":
-		adxrLog = logger
-
-	case "AMGR":
-		amgrLog = logger
-		addrmgr.UseLogger(logger)
-
 	case "BCDB":
 		bcdbLog = logger
 		database.UseLogger(logger)
@@ -112,6 +105,10 @@ func useLogger(subsystemID string, logger btclog.Logger) {
 
 	case "DISC":
 		discLog = logger
+
+	case "INDX":
+		indxLog = logger
+		index.UseLogger(logger)
 
 	case "MINR":
 		minrLog = logger

@@ -137,7 +137,7 @@ func main() {
 
 	// Setup chain.  Ignore notifications since they aren't needed for this
 	// util.
-	chain, err := blockchain.New(db, activeNetParams, nil, nil)
+	chain, err := blockchain.New(db, activeNetParams, nil, nil, nil)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "failed to initialize chain: %v\n", err)
 		return

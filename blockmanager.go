@@ -16,6 +16,7 @@ import (
 	"github.com/btcsuite/btcd/blockchain"
 	"github.com/btcsuite/btcd/chaincfg"
 	database "github.com/btcsuite/btcd/database2"
+	"github.com/btcsuite/btcd/index"
 	"github.com/btcsuite/btcd/wire"
 	"github.com/btcsuite/btcutil"
 )
@@ -1323,9 +1324,10 @@ func newBlockManager(s *server) (*blockManager, error) {
 		quit:            make(chan struct{}),
 	}
 
-	var err error
+	indexes, err := index.GetIndexes(cfg.EnableIndexes)
+
 	bm.chain, err = blockchain.New(s.db, s.chainParams, bm.handleNotifyMsg,
-		s.sigCache)
+		s.sigCache, indexes)
 	if err != nil {
 		return nil, err
 	}
@@ -1341,8 +1343,12 @@ func newBlockManager(s *server) (*blockManager, error) {
 		bmgrLog.Info("Checkpoints are disabled")
 	}
 
-	// Initialize the chain state now that the intial block node index has
-	// been generated.
+	// Create and catch up all registered indexers.
+	// This call does not return until catching up is finished, so
+	// everything else in the server is not started before then.
+	bm.chain.InitIndexes()
+
+	// Initialize the chain state.
 	bm.updateChainState(best.Hash, best.Height)
 
 	return &bm, nil
