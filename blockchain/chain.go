@@ -178,6 +178,7 @@ type BlockChain struct {
 	nextCheckpoint      *chaincfg.Checkpoint
 	checkpointBlock     *btcutil.Block
 	sigCache            *txscript.SigCache
+	indexes             []Index
 
 	// The state is used as a fairly efficient way to cache information
 	// about the current best chain state that is returned to callers when
@@ -797,7 +798,18 @@ func (b *BlockChain) connectBlock(node *blockNode, block *btcutil.Block, view *U
 			return err
 		}
 		if !hasBlock {
-			return dbTx.StoreBlock(block)
+			err := dbTx.StoreBlock(block)
+			if err != nil {
+				return err
+			}
+		}
+
+		// Run all indexes
+		for i := range b.indexes {
+			err = b.indexConnectBlock(dbTx, i, block)
+			if err != nil {
+				return err
+			}
 		}
 
 		return nil
@@ -880,6 +892,14 @@ func (b *BlockChain) disconnectBlock(node *blockNode, block *btcutil.Block, view
 	state := newBestState(prevNode, blockSize, numTxns, newTotalTxns)
 
 	err = b.db.Update(func(dbTx database.Tx) error {
+		// Run all indexes
+		for i := range b.indexes {
+			err = b.indexDisconnectBlock(dbTx, i, block)
+			if err != nil {
+				return err
+			}
+		}
+
 		// Update best block state.
 		err := dbPutBestState(dbTx, state, node.workSum)
 		if err != nil {
@@ -1338,13 +1358,23 @@ func (b *BlockChain) BestSnapshot() *BestState {
 	return snapshot
 }
 
+// Params returns the chain parameters in use for this BlockChain.
+func (b *BlockChain) Params() *chaincfg.Params {
+	return b.chainParams
+}
+
+// DB returns the database in use for this BlockChain.
+func (b *BlockChain) DB() database.DB {
+	return b.db
+}
+
 // New returns a BlockChain instance for the passed bitcoin network using the
 // provided backing database.  It accepts a callback on which notifications
 // will be sent when various events take place.  See the documentation for
 // Notification and NotificationType for details on the types and contents of
 // notifications.  The provided callback can be nil if the caller is not
 // interested in receiving notifications.
-func New(db database.DB, params *chaincfg.Params, c NotificationCallback, sigCache *txscript.SigCache) (*BlockChain, error) {
+func New(db database.DB, params *chaincfg.Params, c NotificationCallback, sigCache *txscript.SigCache, indexes []Index) (*BlockChain, error) {
 	// Generate a checkpoint by height map from the provided checkpoints.
 	var checkpointsByHeight map[int32]*chaincfg.Checkpoint
 	if len(params.Checkpoints) > 0 {
@@ -1368,6 +1398,7 @@ func New(db database.DB, params *chaincfg.Params, c NotificationCallback, sigCac
 		orphans:             make(map[wire.ShaHash]*orphanBlock),
 		prevOrphans:         make(map[wire.ShaHash][]*orphanBlock),
 		blockCache:          make(map[wire.ShaHash]*btcutil.Block),
+		indexes:             indexes,
 	}
 
 	// Initialize the chain state from the passed database.  When the db
@@ -1375,6 +1406,10 @@ func New(db database.DB, params *chaincfg.Params, c NotificationCallback, sigCac
 	// will be initialized to contain only the genesis block.
 	if err := b.initChainState(); err != nil {
 		return nil, err
+	}
+
+	for _, index := range indexes {
+		index.Init(&b)
 	}
 
 	log.Infof("Chain state (height %d, hash %v, totaltx %d, work %v)",

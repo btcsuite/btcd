@@ -1255,6 +1255,8 @@ func (b *BlockChain) createChainState() error {
 		}
 
 		// Create the bucket that houses the transaction index.
+		// TODO remove this once the txindex has been converted to a
+		// blockchain index.
 		_, err = meta.CreateBucket(txIndexBucketName)
 		if err != nil {
 			return err
@@ -1270,6 +1272,17 @@ func (b *BlockChain) createChainState() error {
 		// genesis block coinbase transaction is intentionally not
 		// inserted here since it is not spendable by consensus rules.
 		_, err = meta.CreateBucket(utxoSetBucketName)
+		if err != nil {
+			return err
+		}
+
+		// Create the bucket that houses the index buckets.
+		_, err = meta.CreateBucket(indexesBucketName)
+		if err != nil {
+			return err
+		}
+		// Create the bucket that houses the index tips.
+		_, err = meta.CreateBucket(indexTipsBucketName)
 		if err != nil {
 			return err
 		}
@@ -1465,8 +1478,17 @@ func (b *BlockChain) BlockHeightByHash(hash *wire.ShaHash) (int32, error) {
 // BlockHashByHeight returns the hash of the block at the given height in the
 // main chain.
 //
-// This function is safe for concurrent access.
-func (b *BlockChain) BlockHashByHeight(blockHeight int32) (*wire.ShaHash, error) {
+// The database transaction parameter can be nil in which case a a new one will
+// be used.
+//
+// This function is safe for concurrent access.  However, keep in mind that
+// database transactions can't be shared across threads.
+func (b *BlockChain) BlockHashByHeight(dbTx database.Tx, blockHeight int32) (*wire.ShaHash, error) {
+	// Use existing database transaction if provided.
+	if dbTx != nil {
+		return dbFetchHashByHeight(dbTx, blockHeight)
+	}
+
 	var hash *wire.ShaHash
 	err := b.db.View(func(dbTx database.Tx) error {
 		var err error
@@ -1501,6 +1523,26 @@ func (b *BlockChain) BlockByHash(hash *wire.ShaHash) (*btcutil.Block, error) {
 		return err
 	})
 	return block, err
+}
+
+// MainChainHasBlock returns whether or not the main chain contains the block
+// identified by the provided hash.
+//
+// The database transaction parameter can be nil in which case a a new one will
+// be used.
+//
+// This function is safe for concurrent access.
+func (b *BlockChain) MainChainHasBlock(dbTx database.Tx, hash *wire.ShaHash) (bool, error) {
+	if dbTx != nil {
+		return dbMainChainHasBlock(dbTx, hash), nil
+	}
+
+	var res bool
+	err := b.db.View(func(dbTx database.Tx) error {
+		res = dbMainChainHasBlock(dbTx, hash)
+		return nil
+	})
+	return res, err
 }
 
 // HeightRange returns a range of block hashes for the given start and end
@@ -1567,8 +1609,15 @@ func (b *BlockChain) HeightRange(startHeight, endHeight int32) ([]wire.ShaHash, 
 // raw transaction bytes.  When there is no entry for the provided hash, nil
 // will be returned for the both the entry and the error.
 //
+// The database transaction parameter can be nil in which case a a new one will
+// be used.
+//
 // This function is safe for concurrent access.
-func (b *BlockChain) TxBlockRegion(hash *wire.ShaHash) (*database.BlockRegion, error) {
+func (b *BlockChain) TxBlockRegion(dbTx database.Tx, hash *wire.ShaHash) (*database.BlockRegion, error) {
+	if dbTx != nil {
+		return dbFetchTxIndexEntry(dbTx, hash)
+	}
+
 	var region *database.BlockRegion
 	err := b.db.View(func(dbTx database.Tx) error {
 		var err error

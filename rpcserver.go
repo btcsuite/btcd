@@ -1036,7 +1036,7 @@ func handleGetBlock(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (i
 	// Get next block hash unless there are none.
 	var nextHashString string
 	if blockHeight < best.Height {
-		nextHash, err := s.chain.BlockHashByHeight(blockHeight + 1)
+		nextHash, err := s.chain.BlockHashByHeight(nil, blockHeight+1)
 		if err != nil {
 			context := "No next block"
 			return nil, internalRPCError(err.Error(), context)
@@ -1095,7 +1095,7 @@ func handleGetBlockCount(s *rpcServer, cmd interface{}, closeChan <-chan struct{
 // handleGetBlockHash implements the getblockhash command.
 func handleGetBlockHash(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (interface{}, error) {
 	c := cmd.(*btcjson.GetBlockHashCmd)
-	hash, err := s.chain.BlockHashByHeight(int32(c.Index))
+	hash, err := s.chain.BlockHashByHeight(nil, int32(c.Index))
 	if err != nil {
 		return nil, &btcjson.RPCError{
 			Code:    btcjson.ErrRPCOutOfRange,
@@ -1155,7 +1155,7 @@ func handleGetBlockHeader(s *rpcServer, cmd interface{}, closeChan <-chan struct
 	// Get next block hash unless there are none.
 	var nextHashString string
 	if blockHeight < best.Height {
-		nextHash, err := s.chain.BlockHashByHeight(blockHeight + 1)
+		nextHash, err := s.chain.BlockHashByHeight(nil, blockHeight+1)
 		if err != nil {
 			context := "No next block"
 			return nil, internalRPCError(err.Error(), context)
@@ -2115,7 +2115,7 @@ func handleGetNetworkHashPS(s *rpcServer, cmd interface{}, closeChan <-chan stru
 	var minTimestamp, maxTimestamp time.Time
 	totalWork := big.NewInt(0)
 	for curHeight := startHeight; curHeight <= endHeight; curHeight++ {
-		hash, err := s.chain.BlockHashByHeight(curHeight)
+		hash, err := s.chain.BlockHashByHeight(nil, curHeight)
 		if err != nil {
 			context := "Failed to fetch block hash"
 			return nil, internalRPCError(err.Error(), context)
@@ -2286,7 +2286,7 @@ func handleGetRawTransaction(s *rpcServer, cmd interface{}, closeChan <-chan str
 	tx, err := s.server.txMemPool.FetchTransaction(txHash)
 	if err != nil {
 		// Look up the location of the transaction.
-		blockRegion, err := s.chain.TxBlockRegion(txHash)
+		blockRegion, err := s.chain.TxBlockRegion(nil, txHash)
 		if err != nil {
 			context := "Failed to retrieve transaction location"
 			return nil, internalRPCError(err.Error(), context)

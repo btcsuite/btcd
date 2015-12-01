@@ -295,7 +295,7 @@ func (bi *blockImporter) Import() chan *importResults {
 // newBlockImporter returns a new importer for the provided file reader seeker
 // and database.
 func newBlockImporter(db database.DB, r io.ReadSeeker) (*blockImporter, error) {
-	chain, err := blockchain.New(db, activeNetParams, nil, nil)
+	chain, err := blockchain.New(db, activeNetParams, nil, nil, nil)
 	if err != nil {
 		return nil, err
 	}
