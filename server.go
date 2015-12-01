@@ -2362,19 +2362,24 @@ func newServer(listenAddrs []string, db database.Db, chainParams *chaincfg.Param
 	}
 	s.cpuMiner = newCPUMiner(&policy, &s)
 
+	txPolicy := mempoolPolicy{
+		DisableRelayPriority: cfg.NoRelayPriority,
+		FreeTxRelayLimit:     cfg.FreeTxRelayLimit,
+		MaxOrphanTxs:         cfg.MaxOrphanTxs,
+		MaxOrphanTxSize:      5000,
+		MaxSigOpsPerTx:       blockchain.MaxSigOpsPerBlock / 5,
+		MinRelayTxFee:        cfg.minRelayTxFee,
+	}
+
 	txC := mempoolConfig{
-		DisableRelayPriority:  cfg.NoRelayPriority,
 		EnableAddrIndex:       cfg.AddrIndex,
 		FetchTransactionStore: s.blockManager.blockChain.FetchTransactionStore,
-		FreeTxRelayLimit:      cfg.FreeTxRelayLimit,
-		MaxOrphanTxs:          cfg.MaxOrphanTxs,
-		MinRelayTxFee:         cfg.minRelayTxFee,
 		NewestSha:             s.db.NewestSha,
 		RelayNtfnChan:         s.relayNtfnChan,
 		SigCache:              s.sigCache,
 		TimeSource:            s.timeSource,
 	}
-	s.txMemPool = newTxMemPool(&txC)
+	s.txMemPool = newTxMemPool(&txPolicy, &txC)
 
 	if cfg.AddrIndex {
 		ai, err := newAddrIndexer(&s)

@@ -25,20 +25,6 @@ const (
 	// mempoolHeight is the height used for the "block" height field of the
 	// contextual transaction information provided in a transaction store.
 	mempoolHeight = 0x7fffffff
-
-	// maxOrphanTransactions is the maximum number of orphan transactions
-	// that can be queued.
-	maxOrphanTransactions = 1000
-
-	// maxOrphanTxSize is the maximum size allowed for orphan transactions.
-	// This helps prevent memory exhaustion attacks from sending a lot of
-	// of big orphans.
-	maxOrphanTxSize = 5000
-
-	// maxSigOpsPerTx is the maximum number of signature operations
-	// in a single transaction we will relay or mine.  It is a fraction
-	// of the max signature operations for a block.
-	maxSigOpsPerTx = blockchain.MaxSigOpsPerBlock / 5
 )
 
 // mempoolTxDesc is a descriptor containing a transaction in the mempool along
@@ -53,10 +39,6 @@ type mempoolTxDesc struct {
 
 // mempoolConfig is a descriptor containing the memory pool configuration.
 type mempoolConfig struct {
-	// DisableRelayPriority defines whether to relay free or low-fee
-	// transactions that do not have enough priority to be relayed.
-	DisableRelayPriority bool
-
 	// EnableAddrIndex defines whether the address index should be enabled.
 	EnableAddrIndex bool
 
@@ -64,20 +46,11 @@ type mempoolConfig struct {
 	// transacation information.
 	FetchTransactionStore func(*btcutil.Tx, bool) (blockchain.TxStore, error)
 
-	// FreeTxRelayLimit defines the given amount in thousands of bytes
-	// per minute that transactions with no fee are rate limited to.
-	FreeTxRelayLimit float64
-
-	// MaxOrphanTxs defines the maximum number of orphan transactions to
-	// keep in memory.
-	MaxOrphanTxs int
-
-	// MinRelayTxFee defines the minimum transaction fee in BTC/kB to be
-	// considered a non-zero fee.
-	MinRelayTxFee btcutil.Amount
-
 	// NewestSha defines the function to retrieve the newest sha
 	NewestSha func() (*wire.ShaHash, int32, error)
+
+	// Policy
+	Policy mempoolPolicy
 
 	// RelayNtfnChan defines the channel to send newly accepted transactions
 	// to.  If unset or set to nil, notifications will not be sent.
@@ -90,12 +63,43 @@ type mempoolConfig struct {
 	TimeSource blockchain.MedianTimeSource
 }
 
+// mempoolPolicy houses the policy (configuration parameters) which is used to
+// control the mempool.
+type mempoolPolicy struct {
+	// DisableRelayPriority defines whether to relay free or low-fee
+	// transactions that do not have enough priority to be relayed.
+	DisableRelayPriority bool
+
+	// FreeTxRelayLimit defines the given amount in thousands of bytes
+	// per minute that transactions with no fee are rate limited to.
+	FreeTxRelayLimit float64
+
+	// MaxOrphanTxs is the maximum number of orphan transactions
+	// that can be queued.
+	MaxOrphanTxs int
+
+	// MaxOrphanTxSize is the maximum size allowed for orphan transactions.
+	// This helps prevent memory exhaustion attacks from sending a lot of
+	// of big orphans.
+	MaxOrphanTxSize int
+
+	// MaxSigOpsPerTx is the maximum number of signature operations
+	// in a single transaction we will relay or mine.  It is a fraction
+	// of the max signature operations for a block.
+	MaxSigOpsPerTx int
+
+	// MinRelayTxFee defines the minimum transaction fee in BTC/kB to be
+	// considered a non-zero fee.
+	MinRelayTxFee btcutil.Amount
+}
+
 // txMemPool is used as a source of transactions that need to be mined into
 // blocks and relayed to other peers.  It is safe for concurrent access from
 // multiple peers.
 type txMemPool struct {
 	sync.RWMutex
 	cfg           mempoolConfig
+	policy        mempoolPolicy
 	pool          map[wire.ShaHash]*mempoolTxDesc
 	orphans       map[wire.ShaHash]*btcutil.Tx
 	orphansByPrev map[wire.ShaHash]map[wire.ShaHash]*btcutil.Tx
@@ -153,7 +157,9 @@ func (mp *txMemPool) RemoveOrphan(txHash *wire.ShaHash) {
 //
 // This function MUST be called with the mempool lock held (for writes).
 func (mp *txMemPool) limitNumOrphans() error {
-	if len(mp.orphans)+1 > mp.cfg.MaxOrphanTxs && mp.cfg.MaxOrphanTxs > 0 {
+	if len(mp.orphans)+1 > mp.policy.MaxOrphanTxs &&
+		mp.policy.MaxOrphanTxs > 0 {
+
 		// Generate a cryptographically random hash.
 		randHashBytes := make([]byte, wire.HashSize)
 		_, err := rand.Read(randHashBytes)
@@ -219,13 +225,13 @@ func (mp *txMemPool) maybeAddOrphan(tx *btcutil.Tx) error {
 	//
 	// Note that the number of orphan transactions in the orphan pool is
 	// also limited, so this equates to a maximum memory used of
-	// maxOrphanTxSize * mp.cfg.MaxOrphanTxs (which is ~5MB using the default
-	// values at the time this comment was written).
+	// mp.policy.MaxOrphanTxSize * mp.policy.MaxOrphanTxs (which is ~5MB
+	// using the default values at the time this comment was written).
 	serializedLen := tx.MsgTx().SerializeSize()
-	if serializedLen > maxOrphanTxSize {
+	if serializedLen > mp.policy.MaxOrphanTxSize {
 		str := fmt.Sprintf("orphan transaction size of %d bytes is "+
 			"larger than max allowed size of %d bytes",
-			serializedLen, maxOrphanTxSize)
+			serializedLen, mp.policy.MaxOrphanTxSize)
 		return txRuleError(wire.RejectNonstandard, str)
 	}
 
@@ -651,7 +657,7 @@ func (mp *txMemPool) maybeAcceptTransaction(tx *btcutil.Tx, isNew, rateLimit boo
 	// forbid their relaying.
 	if !activeNetParams.RelayNonStdTxs {
 		err := checkTransactionStandard(tx, nextBlockHeight,
-			mp.cfg.TimeSource, mp.cfg.MinRelayTxFee)
+			mp.cfg.TimeSource, mp.policy.MinRelayTxFee)
 		if err != nil {
 			// Attempt to extract a reject code from the error so
 			// it can be retained.  When not possible, fall back to
@@ -764,9 +770,9 @@ func (mp *txMemPool) maybeAcceptTransaction(tx *btcutil.Tx, isNew, rateLimit boo
 		return nil, err
 	}
 	numSigOps += blockchain.CountSigOps(tx)
-	if numSigOps > maxSigOpsPerTx {
+	if numSigOps > mp.policy.MaxSigOpsPerTx {
 		str := fmt.Sprintf("transaction %v has too many sigops: %d > %d",
-			txHash, numSigOps, maxSigOpsPerTx)
+			txHash, numSigOps, mp.policy.MaxSigOpsPerTx)
 		return nil, txRuleError(wire.RejectNonstandard, str)
 	}
 
@@ -782,7 +788,8 @@ func (mp *txMemPool) maybeAcceptTransaction(tx *btcutil.Tx, isNew, rateLimit boo
 	// transaction does not exceeed 1000 less than the reserved space for
 	// high-priority transactions, don't require a fee for it.
 	serializedSize := int64(tx.MsgTx().SerializeSize())
-	minFee := calcMinRequiredTxRelayFee(serializedSize, mp.cfg.MinRelayTxFee)
+	minFee := calcMinRequiredTxRelayFee(serializedSize,
+		mp.policy.MinRelayTxFee)
 	if serializedSize >= (defaultBlockPrioritySize-1000) && txFee < minFee {
 		str := fmt.Sprintf("transaction %v has %d fees which is under "+
 			"the required amount of %d", txHash, txFee,
@@ -794,7 +801,7 @@ func (mp *txMemPool) maybeAcceptTransaction(tx *btcutil.Tx, isNew, rateLimit boo
 	// in the next block.  Transactions which are being added back to the
 	// memory pool from blocks that have been disconnected during a reorg
 	// are exempted.
-	if isNew && !mp.cfg.DisableRelayPriority && txFee < minFee {
+	if isNew && !mp.policy.DisableRelayPriority && txFee < minFee {
 		currentPriority := calcPriority(tx.MsgTx(), txStore,
 			nextBlockHeight)
 		if currentPriority <= minHighPriority {
@@ -816,7 +823,7 @@ func (mp *txMemPool) maybeAcceptTransaction(tx *btcutil.Tx, isNew, rateLimit boo
 		mp.lastPennyUnix = nowUnix
 
 		// Are we still over the limit?
-		if mp.pennyTotal >= mp.cfg.FreeTxRelayLimit*10*1000 {
+		if mp.pennyTotal >= mp.policy.FreeTxRelayLimit*10*1000 {
 			str := fmt.Sprintf("transaction %v has been rejected "+
 				"by the rate limiter due to low fees", txHash)
 			return nil, txRuleError(wire.RejectInsufficientFee, str)
@@ -826,7 +833,7 @@ func (mp *txMemPool) maybeAcceptTransaction(tx *btcutil.Tx, isNew, rateLimit boo
 		mp.pennyTotal += float64(serializedSize)
 		txmpLog.Tracef("rate limit: curTotal %v, nextTotal: %v, "+
 			"limit %v", oldTotal, mp.pennyTotal,
-			mp.cfg.FreeTxRelayLimit*10*1000)
+			mp.policy.FreeTxRelayLimit*10*1000)
 	}
 
 	// Verify crypto signatures for each input and reject the transaction if
@@ -1103,9 +1110,10 @@ func (mp *txMemPool) LastUpdated() time.Time {
 
 // newTxMemPool returns a new memory pool for validating and storing standalone
 // transactions until they are mined into a block.
-func newTxMemPool(cfg *mempoolConfig) *txMemPool {
+func newTxMemPool(policy *mempoolPolicy, cfg *mempoolConfig) *txMemPool {
 	memPool := &txMemPool{
 		cfg:           *cfg,
+		policy:        *policy,
 		pool:          make(map[wire.ShaHash]*mempoolTxDesc),
 		orphans:       make(map[wire.ShaHash]*btcutil.Tx),
 		orphansByPrev: make(map[wire.ShaHash]map[wire.ShaHash]*btcutil.Tx),

@@ -337,7 +337,7 @@ func loadConfig() (*config, []string, error) {
 		BlockMaxSize:      defaultBlockMaxSize,
 		BlockPrioritySize: defaultBlockPrioritySize,
 		SigCacheMaxSize:   defaultSigCacheMaxSize,
-		MaxOrphanTxs:      maxOrphanTransactions,
+		MaxOrphanTxs:      1000,
 		Generate:          defaultGenerate,
 		AddrIndex:         defaultAddrIndex,
 	}
