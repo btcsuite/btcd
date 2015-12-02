@@ -1,4 +1,4 @@
-// Copyright (c) 2013-2015 The btcsuite developers
+// Copyright (c) 2013-2016 The btcsuite developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -156,5 +156,6 @@ This package includes spec changes outlined by the following BIPs:
 	BIP0035 (https://github.com/bitcoin/bips/blob/master/bip-0035.mediawiki)
 	BIP0037 (https://github.com/bitcoin/bips/blob/master/bip-0037.mediawiki)
 	BIP0111	(https://github.com/bitcoin/bips/blob/master/bip-0111.mediawiki)
+	BIP0130 (https://github.com/bitcoin/bips/blob/master/bip-0130.mediawiki)
 */
 package wire
