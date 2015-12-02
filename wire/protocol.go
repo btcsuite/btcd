@@ -1,4 +1,4 @@
-// Copyright (c) 2013-2015 The btcsuite developers
+// Copyright (c) 2013-2016 The btcsuite developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -12,7 +12,7 @@ import (
 
 const (
 	// ProtocolVersion is the latest protocol version this package supports.
-	ProtocolVersion uint32 = 70011
+	ProtocolVersion uint32 = 70012
 
 	// MultipleAddressVersion is the protocol version which added multiple
 	// addresses per message (pver >= MultipleAddressVersion).
@@ -42,6 +42,10 @@ const (
 	// RejectVersion is the protocol version which added a new reject
 	// message.
 	RejectVersion uint32 = 70002
+
+	// SendHeadersVersion is the protocol version which added a new
+	// sendheaders message.
+	SendHeadersVersion uint32 = 70012
 )
 
 // ServiceFlag identifies services supported by a bitcoin peer.
