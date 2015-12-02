@@ -47,6 +47,7 @@ const (
 	CmdFilterLoad  = "filterload"
 	CmdMerkleBlock = "merkleblock"
 	CmdReject      = "reject"
+	CmdSendHeaders = "sendheaders"
 )
 
 // Message is an interface that describes a bitcoin message.  A type that
