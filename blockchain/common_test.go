@@ -117,8 +117,8 @@ func chainSetup(dbName string) (*blockchain.BlockChain, func(), error) {
 	return chain, teardown, nil
 }
 
-// loadUtxoStore returns a utxo store loaded from a file.
-func loadUtxoStore(filename string) (blockchain.UtxoStore, error) {
+// loadUtxoView returns a utxo view loaded from a file.
+func loadUtxoView(filename string) (*blockchain.UtxoViewpoint, error) {
 	// TODO(davec): Once the the new utxo serialization format and code is
 	// done, this and the data file should be updated to use it instead.
 
@@ -150,7 +150,7 @@ func loadUtxoStore(filename string) (blockchain.UtxoStore, error) {
 		return nil, err
 	}
 
-	utxoStore := make(blockchain.UtxoStore)
+	utxoView := blockchain.NewUtxoViewpoint()
 	var uintBuf uint32
 	for height := uint32(0); height < numItems; height++ {
 		// Serialized transaction length.
@@ -179,7 +179,7 @@ func loadUtxoStore(filename string) (blockchain.UtxoStore, error) {
 		}
 
 		// Add all of the transaction outputs as available.
-		utxoStore.AddTxOuts(btcutil.NewTx(&msgTx), int32(uintBuf))
+		utxoView.AddTxOuts(btcutil.NewTx(&msgTx), int32(uintBuf))
 
 		// Num spent bits.
 		err = binary.Read(r, binary.LittleEndian, &uintBuf)
@@ -201,7 +201,7 @@ func loadUtxoStore(filename string) (blockchain.UtxoStore, error) {
 
 		// Spend the outputs based on spent bits.
 		txHash := msgTx.TxSha()
-		entry := utxoStore.LookupEntry(&txHash)
+		entry := utxoView.LookupEntry(&txHash)
 		for byteNum, spentByte := range spentBytes {
 			for bit := 0; bit < 8; bit++ {
 				outputIndex := uint32((byteNum * 8) + bit)
@@ -214,5 +214,5 @@ func loadUtxoStore(filename string) (blockchain.UtxoStore, error) {
 		}
 	}
 
-	return utxoStore, nil
+	return utxoView, nil
 }

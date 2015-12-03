@@ -2364,7 +2364,7 @@ func newServer(listenAddrs []string, db database.DB, chainParams *chaincfg.Param
 	txC := mempoolConfig{
 		DisableRelayPriority: cfg.NoRelayPriority,
 		EnableAddrIndex:      false,
-		FetchUtxoStore:       s.blockManager.chain.FetchUtxoStore,
+		FetchUtxoView:        s.blockManager.chain.FetchUtxoView,
 		FreeTxRelayLimit:     cfg.FreeTxRelayLimit,
 		MaxOrphanTxs:         cfg.MaxOrphanTxs,
 		MinRelayTxFee:        cfg.minRelayTxFee,

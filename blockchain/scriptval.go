@@ -28,7 +28,7 @@ type txValidator struct {
 	validateChan chan *txValidateItem
 	quitChan     chan struct{}
 	resultChan   chan error
-	utxoStore    UtxoStore
+	utxoView     *UtxoViewpoint
 	flags        txscript.ScriptFlags
 	sigCache     *txscript.SigCache
 }
@@ -56,7 +56,7 @@ out:
 			txIn := txVI.txIn
 			originTxHash := &txIn.PreviousOutPoint.Hash
 			originTxIndex := txIn.PreviousOutPoint.Index
-			txEntry := v.utxoStore.LookupEntry(originTxHash)
+			txEntry := v.utxoView.LookupEntry(originTxHash)
 			if txEntry == nil {
 				str := fmt.Sprintf("unable to find input "+
 					"transaction %v referenced from "+
@@ -179,12 +179,12 @@ func (v *txValidator) Validate(items []*txValidateItem) error {
 
 // newTxValidator returns a new instance of txValidator to be used for
 // validating transaction scripts asynchronously.
-func newTxValidator(utxoStore UtxoStore, flags txscript.ScriptFlags, sigCache *txscript.SigCache) *txValidator {
+func newTxValidator(utxoView *UtxoViewpoint, flags txscript.ScriptFlags, sigCache *txscript.SigCache) *txValidator {
 	return &txValidator{
 		validateChan: make(chan *txValidateItem),
 		quitChan:     make(chan struct{}),
 		resultChan:   make(chan error),
-		utxoStore:    utxoStore,
+		utxoView:     utxoView,
 		sigCache:     sigCache,
 		flags:        flags,
 	}
@@ -192,7 +192,7 @@ func newTxValidator(utxoStore UtxoStore, flags txscript.ScriptFlags, sigCache *t
 
 // ValidateTransactionScripts validates the scripts for the passed transaction
 // using multiple goroutines.
-func ValidateTransactionScripts(tx *btcutil.Tx, utxoStore UtxoStore, flags txscript.ScriptFlags, sigCache *txscript.SigCache) error {
+func ValidateTransactionScripts(tx *btcutil.Tx, utxoView *UtxoViewpoint, flags txscript.ScriptFlags, sigCache *txscript.SigCache) error {
 	// Collect all of the transaction inputs and required information for
 	// validation.
 	txIns := tx.MsgTx().TxIn
@@ -212,7 +212,7 @@ func ValidateTransactionScripts(tx *btcutil.Tx, utxoStore UtxoStore, flags txscr
 	}
 
 	// Validate all of the inputs.
-	validator := newTxValidator(utxoStore, flags, sigCache)
+	validator := newTxValidator(utxoView, flags, sigCache)
 	if err := validator.Validate(txValItems); err != nil {
 		return err
 	}
@@ -222,7 +222,7 @@ func ValidateTransactionScripts(tx *btcutil.Tx, utxoStore UtxoStore, flags txscr
 
 // checkBlockScripts executes and validates the scripts for all transactions in
 // the passed block using multiple goroutines.
-func checkBlockScripts(block *btcutil.Block, utxoStore UtxoStore, scriptFlags txscript.ScriptFlags, sigCache *txscript.SigCache) error {
+func checkBlockScripts(block *btcutil.Block, utxoView *UtxoViewpoint, scriptFlags txscript.ScriptFlags, sigCache *txscript.SigCache) error {
 	// Collect all of the transaction inputs and required information for
 	// validation for all transactions in the block into a single slice.
 	numInputs := 0
@@ -247,7 +247,7 @@ func checkBlockScripts(block *btcutil.Block, utxoStore UtxoStore, scriptFlags tx
 	}
 
 	// Validate all of the inputs.
-	validator := newTxValidator(utxoStore, scriptFlags, sigCache)
+	validator := newTxValidator(utxoView, scriptFlags, sigCache)
 	if err := validator.Validate(txValItems); err != nil {
 		return err
 	}

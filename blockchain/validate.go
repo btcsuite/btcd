@@ -368,7 +368,7 @@ func CountSigOps(tx *btcutil.Tx) int {
 // transactions which are of the pay-to-script-hash type.  This uses the
 // precise, signature operation counting mechanism from the script engine which
 // requires access to the input transaction scripts.
-func CountP2SHSigOps(tx *btcutil.Tx, isCoinBaseTx bool, utxoStore UtxoStore) (int, error) {
+func CountP2SHSigOps(tx *btcutil.Tx, isCoinBaseTx bool, utxoView *UtxoViewpoint) (int, error) {
 	// Coinbase transactions have no interesting inputs.
 	if isCoinBaseTx {
 		return 0, nil
@@ -382,7 +382,7 @@ func CountP2SHSigOps(tx *btcutil.Tx, isCoinBaseTx bool, utxoStore UtxoStore) (in
 		// Ensure the referenced input transaction is available.
 		originTxHash := &txIn.PreviousOutPoint.Hash
 		originTxIndex := txIn.PreviousOutPoint.Index
-		txEntry := utxoStore.LookupEntry(originTxHash)
+		txEntry := utxoView.LookupEntry(originTxHash)
 		if txEntry == nil || txEntry.IsOutputSpent(originTxIndex) {
 			str := fmt.Sprintf("unable to find unspent output "+
 				"%v referenced from transaction %s:%d",
@@ -802,7 +802,7 @@ func (b *BlockChain) checkBIP0030(node *blockNode, block *btcutil.Block) error {
 	for _, tx := range block.Transactions() {
 		fetchSet[*tx.Sha()] = struct{}{}
 	}
-	utxoStore, err := b.fetchUtxoStore(node, fetchSet)
+	utxoView, err := b.fetchUtxoView(node, fetchSet)
 	if err != nil {
 		return err
 	}
@@ -810,7 +810,7 @@ func (b *BlockChain) checkBIP0030(node *blockNode, block *btcutil.Block) error {
 	// Duplicate transactions are only allowed if the previous transaction
 	// is fully spent.
 	for _, tx := range block.Transactions() {
-		txEntry := utxoStore.LookupEntry(tx.Sha())
+		txEntry := utxoView.LookupEntry(tx.Sha())
 		if txEntry != nil && !txEntry.IsFullySpent() {
 			str := fmt.Sprintf("tried to overwrite transaction %v "+
 				"at block height %d that is not fully spent",
@@ -830,7 +830,7 @@ func (b *BlockChain) checkBIP0030(node *blockNode, block *btcutil.Block) error {
 // amount, and verifying the signatures to prove the spender was the owner of
 // the bitcoins and therefore allowed to spend them.  As it checks the inputs,
 // it also calculates the total fees for the transaction and returns that value.
-func CheckTransactionInputs(tx *btcutil.Tx, txHeight int32, utxoStore UtxoStore) (int64, error) {
+func CheckTransactionInputs(tx *btcutil.Tx, txHeight int32, utxoView *UtxoViewpoint) (int64, error) {
 	// Coinbase transactions have no inputs.
 	if IsCoinBase(tx) {
 		return 0, nil
@@ -841,7 +841,7 @@ func CheckTransactionInputs(tx *btcutil.Tx, txHeight int32, utxoStore UtxoStore)
 	for txInIndex, txIn := range tx.MsgTx().TxIn {
 		// Ensure the referenced input transaction is available.
 		originTxHash := &txIn.PreviousOutPoint.Hash
-		utxoEntry := utxoStore.LookupEntry(originTxHash)
+		utxoEntry := utxoView.LookupEntry(originTxHash)
 		if utxoEntry == nil {
 			str := fmt.Sprintf("unable to find unspent output "+
 				"%v referenced from transaction %s:%d",

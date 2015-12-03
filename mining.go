@@ -162,16 +162,17 @@ type BlockTemplate struct {
 	validPayAddress bool
 }
 
-// mergeUtxoStore adds all of the entries in storeB to storeA.  The result is
-// that storeA will contain all of its original entries plus all of the entries
-// in storeB.  It will replace any entries in storeB which also exist in storeA
-// if the entry in storeA is fully spent.
-func mergeUtxoStore(storeA blockchain.UtxoStore, storeB blockchain.UtxoStore) {
-	for hash, entryB := range storeB {
-		if entryA, exists := storeA[hash]; !exists || entryA == nil ||
-			entryA.IsFullySpent() {
+// mergeUtxoView adds all of the entries in view to viewA.  The result is that
+// viewA will contain all of its original entries plus all of the entries
+// in viewB.  It will replace any entries in viewB which also exist in viewA
+// if the entry in viewA is fully spent.
+func mergeUtxoView(viewA *blockchain.UtxoViewpoint, viewB *blockchain.UtxoViewpoint) {
+	viewAEntries := viewA.Entries()
+	for hash, entryB := range viewB.Entries() {
+		if entryA, exists := viewAEntries[hash]; !exists ||
+			entryA == nil || entryA.IsFullySpent() {
 
-			storeA[hash] = entryB
+			viewAEntries[hash] = entryB
 		}
 	}
 }
@@ -229,21 +230,20 @@ func createCoinbaseTx(coinbaseScript []byte, nextBlockHeight int32, addr btcutil
 	return btcutil.NewTx(tx), nil
 }
 
-// spendTransaction updates the passed utxo store by marking the inputs to the
-// passed transaction as spent.  It also adds all outputs in the passed
-// transaction which are not provably unspendable as available unspent
-// transaction outputs.
-func spendTransaction(utxoStore blockchain.UtxoStore, tx *btcutil.Tx, height int32) error {
+// spendTransaction updates the passed view by marking the inputs to the passed
+// transaction as spent.  It also adds all outputs in the passed transaction
+// which are not provably unspendable as available unspent transaction outputs.
+func spendTransaction(utxoView *blockchain.UtxoViewpoint, tx *btcutil.Tx, height int32) error {
 	for _, txIn := range tx.MsgTx().TxIn {
 		originHash := &txIn.PreviousOutPoint.Hash
 		originIndex := txIn.PreviousOutPoint.Index
-		entry := utxoStore.LookupEntry(originHash)
+		entry := utxoView.LookupEntry(originHash)
 		if entry != nil {
 			entry.SpendOutput(originIndex)
 		}
 	}
 
-	utxoStore.AddTxOuts(tx, height)
+	utxoView.AddTxOuts(tx, height)
 	return nil
 }
 
@@ -405,12 +405,12 @@ func NewBlockTemplate(policy *mining.Policy, server *server, payToAddress btcuti
 	priorityQueue := newTxPriorityQueue(len(sourceTxns), sortedByFee)
 
 	// Create a slice to hold the transactions to be included in the
-	// generated block with reserved space.  Also create a utxo store to
+	// generated block with reserved space.  Also create a utxo view to
 	// house all of the input transactions so multiple lookups can be
 	// avoided.
 	blockTxns := make([]*btcutil.Tx, 0, len(sourceTxns))
 	blockTxns = append(blockTxns, coinbaseTx)
-	blockUtxos := make(blockchain.UtxoStore)
+	blockUtxos := blockchain.NewUtxoViewpoint()
 
 	// dependers is used to track transactions which depend on another
 	// transaction in the source pool.  This, in conjunction with the
@@ -454,9 +454,9 @@ mempoolLoop:
 		// mempool since a transaction which depends on other
 		// transactions in the mempool must come after those
 		// dependencies in the final generated block.
-		utxos, err := blockManager.chain.FetchUtxoStore(tx)
+		utxos, err := blockManager.chain.FetchUtxoView(tx)
 		if err != nil {
-			minrLog.Warnf("Unable to fetch utxo store for tx %s: "+
+			minrLog.Warnf("Unable to fetch utxo view for tx %s: "+
 				"%v", tx.Sha(), err)
 			continue
 		}
@@ -517,9 +517,9 @@ mempoolLoop:
 		}
 
 		// Merge the referenced outputs from the input transactions to
-		// this transaction into the block utxo store.  This allows the
+		// this transaction into the block utxo view.  This allows the
 		// code below to avoid a second lookup.
-		mergeUtxoStore(blockUtxos, utxos)
+		mergeUtxoView(blockUtxos, utxos)
 	}
 
 	minrLog.Tracef("Priority queue len %d, dependers len %d",
@@ -647,7 +647,7 @@ mempoolLoop:
 			continue
 		}
 
-		// Spend the transaction inputs in the block utxo store and add
+		// Spend the transaction inputs in the block utxo view and add
 		// an entry for it to ensure any transactions which reference
 		// this one have it available as an input and can ensure they
 		// aren't double spending.

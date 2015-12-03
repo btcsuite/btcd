@@ -51,11 +51,11 @@ func (entry *UtxoEntry) BlockHeight() int32 {
 }
 
 // IsOutputSpent returns whether or not the provided output index has been
-// spent based upon the current state of the unspent transaction output store
+// spent based upon the current state of the unspent transaction output view
 // the entry was obtained from.
 //
 // Returns true if the output index references an output that does not exist
-// either due to it being invalid or because the output is not part of the store
+// either due to it being invalid or because the output is not part of the view
 // due to previously being spent/pruned.
 func (entry *UtxoEntry) IsOutputSpent(outputIndex uint32) bool {
 	packedIndex, ok := entry.sparseOutputs[outputIndex]
@@ -101,7 +101,7 @@ func (entry *UtxoEntry) IsFullySpent() bool {
 // Amount returns the amount of the provided output index.
 //
 // Returns 0 if the output index references an output that does not exist
-// either due to it being invalid or because the output is not part of the store
+// either due to it being invalid or because the output is not part of the view
 // due to previously being spent/pruned.
 func (entry *UtxoEntry) Amount(outputIndex uint32) int64 {
 	packedIndex, ok := entry.sparseOutputs[outputIndex]
@@ -115,7 +115,7 @@ func (entry *UtxoEntry) Amount(outputIndex uint32) int64 {
 // PkScriptByIndex returns the public key script for the provided output index.
 //
 // Returns nil if the output index references an output that does not exist
-// either due to it being invalid or because the output is not part of the store
+// either due to it being invalid or because the output is not part of the view
 // due to previously being spent/pruned.
 func (entry *UtxoEntry) PkScriptByIndex(outputIndex uint32) []byte {
 	packedIndex, ok := entry.sparseOutputs[outputIndex]
@@ -137,21 +137,24 @@ func newUtxoEntry(version int32, isCoinBase bool, blockHeight int32) *UtxoEntry 
 	}
 }
 
-// UtxoStore provides a subset of the set of unspent transaction outputs from a
-// specific point of view in the chain.  For example, it could be from the end
-// of the main chain, some point in the history of the main chain, or down a
-// side chain.
+// UtxoViewpoint represents a view into the set of unspent transaction outputs
+// from a specific point of view in the chain.  For example, it could be for
+// the end of the main chain, some point in the history of the main chain, or
+// down a side chain.
 //
 // The unspent outputs are needed by other transactions for things such as
 // script validation and double spend prevention.
-type UtxoStore map[wire.ShaHash]*UtxoEntry
+type UtxoViewpoint struct {
+	db      database.DB
+	entries map[wire.ShaHash]*UtxoEntry
+}
 
 // LookupEntry returns information about a given transaction according to the
-// current state of the store.  It will return nil if the passed transaction
-// hash does not exist in the store or is otherwise not available such as when
+// current state of the view.  It will return nil if the passed transaction
+// hash does not exist in the view or is otherwise not available such as when
 // it has been disconnected during a reorg.
-func (store UtxoStore) LookupEntry(txHash *wire.ShaHash) *UtxoEntry {
-	entry, ok := store[*txHash]
+func (view *UtxoViewpoint) LookupEntry(txHash *wire.ShaHash) *UtxoEntry {
+	entry, ok := view.entries[*txHash]
 	if !ok {
 		return nil
 	}
@@ -160,16 +163,16 @@ func (store UtxoStore) LookupEntry(txHash *wire.ShaHash) *UtxoEntry {
 }
 
 // addTxOuts adds all outputs in the passed transaction which are not provably
-// unspendable to the store.  This function only differs from AddTxOuts in that
-// it accepts an entry that has already been looked up in the store.  This allow
+// unspendable to the view.  This function only differs from AddTxOuts in that
+// it accepts an entry that has already been looked up in the view.  This allow
 // an extra extra map lookup to be avoided when connecting transactions.
-func (store UtxoStore) addTxOuts(entry *UtxoEntry, tx *btcutil.Tx, blockHeight int32) {
+func (view *UtxoViewpoint) addTxOuts(entry *UtxoEntry, tx *btcutil.Tx, blockHeight int32) {
 	// When there are not already any utxos associated with the transaction,
-	// add a new entry for it to the store.
+	// add a new entry for it to the view.
 	if entry == nil {
 		entry = newUtxoEntry(tx.MsgTx().Version, IsCoinBase(tx),
 			blockHeight)
-		store[*tx.Sha()] = entry
+		view.entries[*tx.Sha()] = entry
 	} else {
 		entry.blockHeight = blockHeight
 	}
@@ -208,42 +211,42 @@ func (store UtxoStore) addTxOuts(entry *UtxoEntry, tx *btcutil.Tx, blockHeight i
 }
 
 // AddTxOuts adds all outputs in the passed transaction which are not provably
-// unspendable to the store.  When the store already has entries for any of the
+// unspendable to the view.  When the view already has entries for any of the
 // outputs, they are simply marked unspent.  All fields will be updated for
 // existing entries since it's possible it has changed during a reorg.
-func (store UtxoStore) AddTxOuts(tx *btcutil.Tx, blockHeight int32) {
-	entry := store.LookupEntry(tx.Sha())
-	store.addTxOuts(entry, tx, blockHeight)
+func (view *UtxoViewpoint) AddTxOuts(tx *btcutil.Tx, blockHeight int32) {
+	entry := view.LookupEntry(tx.Sha())
+	view.addTxOuts(entry, tx, blockHeight)
 }
 
-// connectTransactions updates the utxo store by applying transaction and spend
+// connectTransactions updates the view by applying transaction and spend
 // information for all the transactions in the passed block.  Only transactions
-// already in the store are updated.
-func (store UtxoStore) connectTransactions(block *btcutil.Block) {
+// already in the view are updated.
+func (view *UtxoViewpoint) connectTransactions(block *btcutil.Block) {
 	// Loop through all of the transactions in the block to see if any of
-	// them are ones that need to be updated and spent based on the store.
+	// them are ones that need to be updated and spent based on the view.
 	for _, tx := range block.Transactions() {
 		// Add the transaction's outputs as available utxos if it's one
 		// of the requested transactions.
-		if entry, ok := store[*tx.Sha()]; ok {
-			store.addTxOuts(entry, tx, block.Height())
+		if entry, ok := view.entries[*tx.Sha()]; ok {
+			view.addTxOuts(entry, tx, block.Height())
 		}
 
 		// Spend the origin transaction outputs.
 		for _, txIn := range tx.MsgTx().TxIn {
 			originHash := &txIn.PreviousOutPoint.Hash
 			originIndex := txIn.PreviousOutPoint.Index
-			if entry := store.LookupEntry(originHash); entry != nil {
+			if entry := view.LookupEntry(originHash); entry != nil {
 				entry.SpendOutput(originIndex)
 			}
 		}
 	}
 }
 
-// disconnectTransactions updates the utxo store by undoing transaction and
-// spend information for all transactions in the passed block.  Only
-// transactions already in the store are updated.
-func (store UtxoStore) disconnectTransactions(block *btcutil.Block) error {
+// disconnectTransactions updates the view by undoing transaction and spend
+// information for all transactions in the passed block.  Only transactions
+// already in the view are updated.
+func (view *UtxoViewpoint) disconnectTransactions(block *btcutil.Block) error {
 	// Loop backwards through all transactions so everything is unspent in
 	// reverse order.  This is necessary since transactions later in a block
 	// can spend from previous ones.
@@ -251,12 +254,12 @@ func (store UtxoStore) disconnectTransactions(block *btcutil.Block) error {
 	for txIdx := len(transactions) - 1; txIdx > -1; txIdx-- {
 		tx := transactions[txIdx]
 
-		// Clear this transaction from the transaction store if needed.
-		// Only clear it rather than deleting it because the transaction
-		// connect code relies on its presence to decide whether or not
-		// to update the store and any transactions which exist on both
+		// Clear this transaction from the view if needed.  Only clear
+		// it rather than deleting it because the transaction connect
+		// code relies on its presence to decide whether or not to
+		// update the view and any transactions which exist on both
 		// sides of a fork would otherwise not be updated.
-		if entry := store.LookupEntry(tx.Sha()); entry != nil {
+		if entry := view.LookupEntry(tx.Sha()); entry != nil {
 			entry.modified = true
 			entry.sparseOutputs = nil
 			entry.outputs = nil
@@ -271,7 +274,7 @@ func (store UtxoStore) disconnectTransactions(block *btcutil.Block) error {
 		for _, txIn := range tx.MsgTx().TxIn {
 			originHash := &txIn.PreviousOutPoint.Hash
 			originIndex := txIn.PreviousOutPoint.Index
-			if entry, ok := store[*originHash]; ok {
+			if entry, ok := view.entries[*originHash]; ok {
 				// NOTE: Once the real pruned utxo set is
 				// implemented this will need to use a reorg
 				// journal to resurrect the entry if it doesn't
@@ -297,29 +300,41 @@ func (store UtxoStore) disconnectTransactions(block *btcutil.Block) error {
 	return nil
 }
 
+// Entries returns the underlying map that stores of all the utxo entries.
+func (view *UtxoViewpoint) Entries() map[wire.ShaHash]*UtxoEntry {
+	return view.entries
+}
+
+// NewUtxoViewpoint returns a new empty unspent transaction output view.
+func NewUtxoViewpoint() *UtxoViewpoint {
+	return &UtxoViewpoint{
+		entries: make(map[wire.ShaHash]*UtxoEntry),
+	}
+}
+
 // fetchUtxosMain fetches unspent transaction output data about the provided
 // set of transactions from the point of view of the end of the main chain at
 // the time of the call.
 //
-// There will be an entry in the returned store for each requested transaction.
+// There will be an entry in the returned view for each requested transaction.
 // Typically fully spent transactions, or those which otherwise don't exist,
-// will result in a nil entry in the store.  This is useful since it allows
+// will result in a nil entry in the view.  This is useful since it allows
 // spending and unspending to only have to deal with the specifically requested
 // transactions.
 //
 // This function MUST be called with the chain state lock held (for reads).
-func (b *BlockChain) fetchUtxosMain(txSet map[wire.ShaHash]struct{}) (UtxoStore, error) {
-	// Just return an empty store now if there are no requested hashes.
-	store := make(UtxoStore)
+func (b *BlockChain) fetchUtxosMain(txSet map[wire.ShaHash]struct{}) (*UtxoViewpoint, error) {
+	// Just return an empty view now if there are no requested hashes.
+	view := NewUtxoViewpoint()
 	if len(txSet) == 0 {
-		return store, nil
+		return view, nil
 	}
 
 	// Load the unspent transaction output information for the requested set
 	// of transactions from the point of view of the end of the main chain.
 	//
 	// NOTE: Missing entries are not considered an error here and instead
-	// will result in nil entries in the store.  This is intentionally done
+	// will result in nil entries in the view.  This is intentionally done
 	// since other code uses the presence of an entry in the store as a way
 	// to optimize spend and unspend updates to apply only to the specific
 	// utxos that the caller needs access to.
@@ -331,7 +346,7 @@ func (b *BlockChain) fetchUtxosMain(txSet map[wire.ShaHash]struct{}) (UtxoStore,
 				return err
 			}
 
-			store[hash] = entry
+			view.entries[hash] = entry
 		}
 
 		return nil
@@ -340,10 +355,10 @@ func (b *BlockChain) fetchUtxosMain(txSet map[wire.ShaHash]struct{}) (UtxoStore,
 		return nil, err
 	}
 
-	return store, nil
+	return view, nil
 }
 
-// fetchUtxoStore fetches utxo details about the provided set of transactions
+// fetchUtxoView fetches utxo details about the provided set of transactions
 // from the point of view of the given node.  For example, a given node might be
 // down a side chain where a transaction hasn't been spent from its point of
 // view even though it might have been spent in the main chain (or another side
@@ -352,7 +367,7 @@ func (b *BlockChain) fetchUtxosMain(txSet map[wire.ShaHash]struct{}) (UtxoStore,
 // before the block that contains the transaction on the main chain.
 //
 // This function MUST be called with the chain state lock held (for writes).
-func (b *BlockChain) fetchUtxoStore(node *blockNode, txSet map[wire.ShaHash]struct{}) (UtxoStore, error) {
+func (b *BlockChain) fetchUtxoView(node *blockNode, txSet map[wire.ShaHash]struct{}) (*UtxoViewpoint, error) {
 	// Get the previous block node.  This function is used over simply
 	// accessing node.parent directly as it will dynamically create previous
 	// block nodes as needed.  This helps allow only the pieces of the chain
@@ -364,7 +379,7 @@ func (b *BlockChain) fetchUtxoStore(node *blockNode, txSet map[wire.ShaHash]stru
 
 	// Fetch the requested set from the point of view of the end of the main
 	// (best) chain.
-	utxoStore, err := b.fetchUtxosMain(txSet)
+	view, err := b.fetchUtxosMain(txSet)
 	if err != nil {
 		return nil, err
 	}
@@ -372,7 +387,7 @@ func (b *BlockChain) fetchUtxoStore(node *blockNode, txSet map[wire.ShaHash]stru
 	// When the given node is extending the main (best) chain, there is
 	// nothing more to do since the point of view is already accurate.
 	if prevNode != nil && prevNode.hash.IsEqual(b.bestNode.hash) {
-		return utxoStore, nil
+		return view, nil
 	}
 
 	// The requested node is either on a side chain or is a node on the main
@@ -392,17 +407,17 @@ func (b *BlockChain) fetchUtxoStore(node *blockNode, txSet map[wire.ShaHash]stru
 			return nil, err
 		}
 
-		utxoStore.disconnectTransactions(block)
+		view.disconnectTransactions(block)
 	}
 
-	// The store is now accurate to either the node where the requested node
+	// The view is now accurate to either the node where the requested node
 	// forks off the main chain (in the case where the requested node is on
 	// a side chain), or the requested node itself if the requested node is
 	// an old node on the main chain.  Entries in the attachNodes list
 	// indicate the requested node is on a side chain, so if there are no
 	// nodes to attach, there is nothing left to do.
 	if attachNodes.Len() == 0 {
-		return utxoStore, nil
+		return view, nil
 	}
 
 	// The requested node is on a side chain, so connect all of the
@@ -416,10 +431,10 @@ func (b *BlockChain) fetchUtxoStore(node *blockNode, txSet map[wire.ShaHash]stru
 				n.hash)
 		}
 
-		utxoStore.connectTransactions(block)
+		view.connectTransactions(block)
 	}
 
-	return utxoStore, nil
+	return view, nil
 }
 
 // fetchInputUtxos loads utxo details about the input transactions referenced
@@ -427,7 +442,7 @@ func (b *BlockChain) fetchUtxoStore(node *blockNode, txSet map[wire.ShaHash]stru
 // for more details on what the point of view entails.
 //
 // This function MUST be called with the chain state lock held (for writes).
-func (b *BlockChain) fetchInputUtxos(node *blockNode, block *btcutil.Block) (UtxoStore, error) {
+func (b *BlockChain) fetchInputUtxos(node *blockNode, block *btcutil.Block) (*UtxoViewpoint, error) {
 	// Build a map of in-flight transactions because some of the inputs in
 	// this block could be referencing other transactions earlier in this
 	// block which are not yet in the chain.
@@ -441,7 +456,7 @@ func (b *BlockChain) fetchInputUtxos(node *blockNode, block *btcutil.Block) (Utx
 	// which has no inputs) collecting them into sets of what is needed and
 	// what is already known (in-flight).
 	txNeededSet := make(map[wire.ShaHash]struct{})
-	store := make(UtxoStore)
+	view := NewUtxoViewpoint()
 	for i, tx := range transactions[1:] {
 		for _, txIn := range tx.MsgTx().TxIn {
 			// It is acceptable for a transaction input to reference
@@ -460,7 +475,7 @@ func (b *BlockChain) fetchInputUtxos(node *blockNode, block *btcutil.Block) (Utx
 				i >= inFlightIndex {
 
 				originTx := transactions[inFlightIndex]
-				store.AddTxOuts(originTx, node.height)
+				view.AddTxOuts(originTx, node.height)
 			} else {
 				txNeededSet[*originHash] = struct{}{}
 			}
@@ -468,27 +483,27 @@ func (b *BlockChain) fetchInputUtxos(node *blockNode, block *btcutil.Block) (Utx
 	}
 
 	// Request the input utxos from the point of view of the node.
-	neededStore, err := b.fetchUtxoStore(node, txNeededSet)
+	neededView, err := b.fetchUtxoView(node, txNeededSet)
 	if err != nil {
 		return nil, err
 	}
 
 	// Merge the results of the requested utxos and the in-flight utxos.
-	for hash, entry := range neededStore {
-		store[hash] = entry
+	for hash, entry := range neededView.entries {
+		view.entries[hash] = entry
 	}
 
-	return store, nil
+	return view, nil
 }
 
-// FetchUtxoStore loads utxo details about the input transactions referenced by
+// FetchUtxoView loads utxo details about the input transactions referenced by
 // the passed transaction from the point of view of the end of the main chain.
 // It also attempts to fetch the utxo details for the transaction itself so the
-// returned store can be examined for duplicate unspent transaction outputs.
+// returned view can be examined for duplicate unspent transaction outputs.
 //
 // This function is safe for concurrent access however the returned UtxoStore is
 // NOT.
-func (b *BlockChain) FetchUtxoStore(tx *btcutil.Tx) (UtxoStore, error) {
+func (b *BlockChain) FetchUtxoView(tx *btcutil.Tx) (*UtxoViewpoint, error) {
 	b.chainLock.RLock()
 	defer b.chainLock.RUnlock()
 
