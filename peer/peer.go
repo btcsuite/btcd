@@ -235,6 +235,10 @@ type Config struct {
 	// peer.MaxProtocolVersion will be used.
 	ProtocolVersion uint32
 
+	// DisableRelayTx specifies if the remote peer should be informed to
+	// not send inv messages for transactions.
+	DisableRelayTx bool
+
 	// Listeners houses callback functions to be invoked on receiving peer
 	// messages.
 	Listeners MessageListeners
@@ -797,6 +801,9 @@ func (p *Peer) pushVersionMsg() error {
 
 	// Advertise our max supported protocol version.
 	msg.ProtocolVersion = int32(p.ProtocolVersion())
+
+	// Advertise if inv messages for transactions are desired.
+	msg.DisableRelayTx = p.cfg.DisableRelayTx
 
 	p.QueueMessage(msg, nil)
 	return nil
