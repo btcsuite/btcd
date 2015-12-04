@@ -129,6 +129,7 @@ type config struct {
 	DropAddrIndex      bool          `long:"dropaddrindex" description:"Deletes the address-based transaction index from the database on start up, and then exits."`
 	NoPeerBloomFilters bool          `long:"nopeerbloomfilters" description:"Disable bloom filtering support."`
 	SigCacheMaxSize    uint          `long:"sigcachemaxsize" description:"The maximum number of entries in the signature verification cache."`
+	BlocksOnly         bool          `long:"blocksonly" description:"Do not accept transactions from remote peers."`
 	onionlookup        func(string) ([]net.IP, error)
 	lookup             func(string) ([]net.IP, error)
 	oniondial          func(string, string) (net.Conn, error)

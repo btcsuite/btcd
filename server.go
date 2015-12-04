@@ -398,6 +398,12 @@ func (sp *serverPeer) OnMemPool(p *peer.Peer, msg *wire.MsgMemPool) {
 // handler this does not serialize all transactions through a single thread
 // transactions don't rely on the previous one in a linear fashion like blocks.
 func (sp *serverPeer) OnTx(p *peer.Peer, msg *wire.MsgTx) {
+	if cfg.BlocksOnly {
+		peerLog.Debugf("Ignoring tx %v from %v - blocksonly enabled",
+			msg.TxSha(), p)
+		return
+	}
+
 	// Add the transaction to the known inventory for the peer.
 	// Convert the raw MsgTx to a btcutil.Tx which provides some convenience
 	// methods and things such as hash caching.
@@ -445,7 +451,30 @@ func (sp *serverPeer) OnBlock(p *peer.Peer, msg *wire.MsgBlock, buf []byte) {
 // accordingly.  We pass the message down to blockmanager which will call
 // QueueMessage with any appropriate responses.
 func (sp *serverPeer) OnInv(p *peer.Peer, msg *wire.MsgInv) {
-	sp.server.blockManager.QueueInv(msg, sp)
+	if !cfg.BlocksOnly {
+		sp.server.blockManager.QueueInv(msg, sp)
+		return
+	}
+
+	newInv := wire.NewMsgInv()
+	for _, invVect := range msg.InvList {
+		if invVect.Type == wire.InvTypeTx {
+			peerLog.Debugf("Ignoring tx %v in inv from %v -- "+
+				"blocksonly enabled", invVect.Hash, p)
+			if p.ProtocolVersion() >= wire.BIP0037Version {
+				// Peer not following the protocol.
+				p.Disconnect()
+				return
+			}
+			continue
+		}
+		err := newInv.AddInvVect(invVect)
+		if err != nil {
+			peerLog.Errorf("OnInv AddInvVect error: %v", err)
+			return
+		}
+	}
+	sp.server.blockManager.QueueInv(newInv, sp)
 }
 
 // OnHeaders is invoked when a peer receives a headers bitcoin
@@ -1401,7 +1430,7 @@ func newPeerConfig(sp *serverPeer) *peer.Config {
 		UserAgentVersion: userAgentVersion,
 		ChainParams:      sp.server.chainParams,
 		Services:         sp.server.services,
-		DisableRelayTx:   false,
+		DisableRelayTx:   cfg.BlocksOnly,
 	}
 }
 

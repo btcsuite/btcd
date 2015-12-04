@@ -1646,8 +1646,8 @@ out:
 			}
 
 		default:
-			log.Debugf("Received unhandled message of type %v:",
-				rmsg.Command())
+			log.Debugf("Received unhandled message of type %v "+
+				"from %v", rmsg.Command(), p)
 		}
 		p.stallControl <- stallControlMsg{sccHandlerDone, rmsg}
 
