@@ -5,7 +5,6 @@
 package blockchain
 
 import (
-	"fmt"
 	"math/big"
 	"time"
 
@@ -313,7 +312,7 @@ func (b *BlockChain) calcNextRequiredDifficulty(lastNode *blockNode, newBlockTim
 	}
 
 	if firstNode == nil {
-		return 0, fmt.Errorf("unable to obtain previous retarget block")
+		return 0, AssertError("unable to obtain previous retarget block")
 	}
 
 	// Limit the amount of adjustment that can occur to the previous

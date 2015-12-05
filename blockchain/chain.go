@@ -414,7 +414,7 @@ func (b *BlockChain) loadBlockNode(dbTx database.Tx, hash *wire.ShaHash) (*block
 		// parent of another node.  This means an arbitrary orphan block
 		// is trying to be loaded which is not allowed.
 		str := "loadBlockNode: attempt to insert orphan block %v"
-		return nil, fmt.Errorf(str, hash)
+		return nil, AssertError(fmt.Sprintf(str, hash))
 	}
 
 	// Add the new node to the indices for faster lookups.
@@ -492,8 +492,9 @@ func (b *BlockChain) getPrevNodeFromNode(node *blockNode) (*blockNode, error) {
 // This function MUST be called with the chain state lock held (for writes).
 func (b *BlockChain) removeBlockNode(node *blockNode) error {
 	if node.parent != nil {
-		return fmt.Errorf("removeBlockNode must be called with a "+
-			" node at the front of the chain - node %v", node.hash)
+		return AssertError(fmt.Sprintf("removeBlockNode must be "+
+			"called with a node at the front of the chain - node %v",
+			node.hash))
 	}
 
 	// Remove the node from the node index.
@@ -723,7 +724,7 @@ func (b *BlockChain) connectBlock(node *blockNode, block *btcutil.Block) error {
 	// Make sure it's extending the end of the best chain.
 	prevHash := &block.MsgBlock().Header.PrevBlock
 	if b.bestNode != nil && !prevHash.IsEqual(b.bestNode.hash) {
-		return fmt.Errorf("connectBlock must be called with a block " +
+		return AssertError("connectBlock must be called with a block " +
 			"that extends the main chain")
 	}
 
@@ -815,7 +816,7 @@ func (b *BlockChain) connectBlock(node *blockNode, block *btcutil.Block) error {
 func (b *BlockChain) disconnectBlock(node *blockNode, block *btcutil.Block) error {
 	// Make sure the node being disconnected is the end of the best chain.
 	if !node.hash.IsEqual(b.bestNode.hash) {
-		return fmt.Errorf("disconnectBlock must be called with the " +
+		return AssertError("disconnectBlock must be called with the " +
 			"block at the end of the main chain")
 	}
 
@@ -930,8 +931,8 @@ func (b *BlockChain) reorganizeChain(detachNodes, attachNodes *list.List, flags 
 	for e := attachNodes.Front(); e != nil; e = e.Next() {
 		n := e.Value.(*blockNode)
 		if _, exists := b.blockCache[*n.hash]; !exists {
-			return fmt.Errorf("block %v is missing from the side "+
-				"chain block cache", n.hash)
+			return AssertError(fmt.Sprintf("block %v is missing "+
+				"from the side chain block cache", n.hash))
 		}
 	}
 
