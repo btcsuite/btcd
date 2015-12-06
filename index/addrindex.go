@@ -326,7 +326,7 @@ func dbFetchAddrIndexEntries(bucket database.Bucket, key *addrKey, numToSkip, nu
 // entries skipped since it could have been less in the case there are less
 // total entries than the requested number of entries to skip.
 func fetchAddrIndexEntries(chain *blockchain.BlockChain, dbTx database.Tx, key *addrKey, numToSkip, numRequested uint32, reverse bool) ([]database.BlockRegion, uint32, error) {
-	bucket := chain.GetIndexBucket(dbTx, addrIndexName)
+	bucket := chain.IndexBucket(dbTx, addrIndexName)
 	res, skipped, err := dbFetchAddrIndexEntries(bucket, key, numToSkip, numRequested, reverse)
 	if err != nil {
 		return nil, 0, err

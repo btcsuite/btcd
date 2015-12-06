@@ -40,7 +40,7 @@ func ExampleBlockChain_ProcessBlock() {
 
 	// Create a new BlockChain instance without an initialized signature
 	// verification cache, using the underlying database for the main
-	// bitcoin network and ignore notifications.
+	// bitcoin network, ignore notifications, and specify no indexes to enable.
 	chain, err := blockchain.New(db, &chaincfg.MainNetParams, nil, nil, nil)
 	if err != nil {
 		fmt.Printf("Failed to create chain instance: %v\n", err)

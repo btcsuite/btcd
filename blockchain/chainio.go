@@ -443,6 +443,8 @@ func (b *BlockChain) createChainState() error {
 		}
 
 		// Create the bucket that houses the transaction index.
+		// TODO remove this once the txindex has been converted to a
+		// blockchain index.
 		_, err = meta.CreateBucket(txIndexBucketName)
 		if err != nil {
 			return err

@@ -1324,7 +1324,7 @@ func newBlockManager(s *server) (*blockManager, error) {
 		quit:            make(chan struct{}),
 	}
 
-	indexes, err := index.GetIndexes(cfg.EnableIndexes)
+	indexes, err := index.IndexesByName(cfg.EnableIndexes)
 
 	bm.chain, err = blockchain.New(s.db, s.chainParams, bm.handleNotifyMsg,
 		s.sigCache, indexes)

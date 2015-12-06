@@ -84,7 +84,7 @@ func (b *BlockChain) indexUpdateTip(dbTx database.Tx, indexNum int, hash *wire.S
 // the chain tip to reflect the block has been indexed.
 func (b *BlockChain) indexConnectBlock(dbTx database.Tx, indexNum int, block *btcutil.Block) error {
 	// Fetch the index bucket
-	bucket := b.GetIndexBucket(dbTx, b.indexes[indexNum].Name())
+	bucket := b.IndexBucket(dbTx, b.indexes[indexNum].Name())
 
 	// Call callback on the index
 	err := b.indexes[indexNum].ConnectBlock(dbTx, bucket, block)
@@ -105,7 +105,7 @@ func (b *BlockChain) indexConnectBlock(dbTx database.Tx, indexNum int, block *bt
 // updates the chain tip to reflect the block has been de-indexed.
 func (b *BlockChain) indexDisconnectBlock(dbTx database.Tx, indexNum int, block *btcutil.Block) error {
 	// Fetch the index bucket
-	bucket := b.GetIndexBucket(dbTx, b.indexes[indexNum].Name())
+	bucket := b.IndexBucket(dbTx, b.indexes[indexNum].Name())
 
 	// Call callback on the index
 	err := b.indexes[indexNum].DisconnectBlock(dbTx, bucket, block)
@@ -121,9 +121,9 @@ func (b *BlockChain) indexDisconnectBlock(dbTx database.Tx, indexNum int, block 
 	return nil
 }
 
-// GetIndexBucket returns the index bucket for the given index name,
+// IndexBucket returns the index bucket for the given index name,
 // or nil if it does not exist.
-func (b *BlockChain) GetIndexBucket(dbTx database.Tx, indexName string) database.Bucket {
+func (b *BlockChain) IndexBucket(dbTx database.Tx, indexName string) database.Bucket {
 	return dbTx.Metadata().Bucket(indexesBucketName).Bucket([]byte(indexName))
 }
 

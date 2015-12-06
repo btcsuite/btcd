@@ -772,7 +772,10 @@ func (b *BlockChain) connectBlock(node *blockNode, block *btcutil.Block) error {
 			return err
 		}
 		if !hasBlock {
-			return dbTx.StoreBlock(block)
+			err := dbTx.StoreBlock(block)
+			if err != nil {
+				return err
+			}
 		}
 
 		// Run all indexes

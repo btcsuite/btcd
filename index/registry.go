@@ -1,3 +1,7 @@
+// Copyright (c) 2015 The btcsuite developers
+// Use of this source code is governed by an ISC
+// license that can be found in the LICENSE file.
+
 package index
 
 import (
@@ -7,9 +11,7 @@ import (
 )
 
 // indexes holds all of the registered indexes.
-var (
-	indexes = make(map[string]blockchain.Index)
-)
+var indexes = make(map[string]blockchain.Index)
 
 // RegisterIndex adds an index to the available indexes. An error will be
 // returned if an index with the same name is already registered.
@@ -22,10 +24,10 @@ func RegisterIndex(index blockchain.Index) error {
 	return nil
 }
 
-// GetIndexes returns a list of indexes by name. Duplicate index names will be
+// IndexesByName returns a list of indexes by name. Duplicate index names will be
 // ignored (the index will be returned only once). Will return an error if
 // at least one of the requested indexes does not exist.
-func GetIndexes(names []string) ([]blockchain.Index, error) {
+func IndexesByName(names []string) ([]blockchain.Index, error) {
 	var res []blockchain.Index
 	found := make(map[string]struct{})
 
