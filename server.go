@@ -2354,15 +2354,6 @@ func newServer(listenAddrs []string, db database.Db, chainParams *chaincfg.Param
 	}
 	s.blockManager = bm
 
-	// Create the mining policy based on the configuration options.
-	policy := mining.Policy{
-		BlockMinSize:      cfg.BlockMinSize,
-		BlockMaxSize:      cfg.BlockMaxSize,
-		BlockPrioritySize: cfg.BlockPrioritySize,
-		TxMinFreeFee:      cfg.minRelayTxFee,
-	}
-	s.cpuMiner = newCPUMiner(&policy, &s)
-
 	txC := mempoolConfig{
 		DisableRelayPriority:  cfg.NoRelayPriority,
 		EnableAddrIndex:       cfg.AddrIndex,
@@ -2376,6 +2367,17 @@ func newServer(listenAddrs []string, db database.Db, chainParams *chaincfg.Param
 		TimeSource:            s.timeSource,
 	}
 	s.txMemPool = newTxMemPool(&txC)
+
+	// Create the mining policy based on the configuration options.
+	// NOTE: The CPU miner relies on the mempool, so the mempool has to be
+	// created before calling the function to create the CPU miner.
+	policy := mining.Policy{
+		BlockMinSize:      cfg.BlockMinSize,
+		BlockMaxSize:      cfg.BlockMaxSize,
+		BlockPrioritySize: cfg.BlockPrioritySize,
+		TxMinFreeFee:      cfg.minRelayTxFee,
+	}
+	s.cpuMiner = newCPUMiner(&policy, &s)
 
 	if cfg.AddrIndex {
 		ai, err := newAddrIndexer(&s)
