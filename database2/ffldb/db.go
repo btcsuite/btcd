@@ -2065,6 +2065,7 @@ func openDB(dbPath string, network wire.BitcoinNet, create bool) (database.DB, e
 	opts := opt.Options{
 		ErrorIfExist: create,
 		Strict:       opt.DefaultStrict,
+		Compression:  opt.NoCompression,
 		Filter:       filter.NewBloomFilter(10),
 	}
 	ldb, err := leveldb.OpenFile(metadataDbPath, &opts)
