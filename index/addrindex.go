@@ -369,7 +369,7 @@ func (a *addrIndex) indexScriptPubKey(idx writeIndexData, scriptPubKey []byte, l
 
 // indexBlockAddrs returns a populated index of the all the transactions in the
 // passed block based on the addresses involved in each transaction.
-func (a *addrIndex) indexBlockAddrs(dbTx database.Tx, blk *btcutil.Block) (writeIndexData, error) {
+func (a *addrIndex) indexBlockAddrs(dbTx database.Tx, blk *btcutil.Block, view *blockchain.UtxoViewpoint) (writeIndexData, error) {
 	addrIndex := make(writeIndexData)
 	txLocs, err := blk.TxLoc()
 	if err != nil {
@@ -387,33 +387,42 @@ func (a *addrIndex) indexBlockAddrs(dbTx database.Tx, blk *btcutil.Block) (write
 				// Lookup and fetch the referenced output's tx.
 				prevOut := txIn.PreviousOutPoint
 
-				// Look up the location of the transaction.
-				blockRegion, err := a.chain.TxBlockRegion(dbTx, &prevOut.Hash)
-				if err != nil {
-					log.Errorf("Error fetching tx %v: %v",
-						prevOut.Hash, err)
-					return nil, err
+				var pkScript []byte
+				if view != nil {
+					// If we have an UtxoViewpoint, fetch the prevout from there.
+					// The UtxoViewpoint is guaranteed to have all the prevouts
+					// from the block being connected/disconnected in memory.
+					pkScript = view.LookupEntry(&prevOut.Hash).PkScriptByIndex(prevOut.Index)
+				} else {
+					// If not, look up the location of the transaction using
+					// the txindex.
+					blockRegion, err := a.chain.TxBlockRegion(dbTx, &prevOut.Hash)
+					if err != nil {
+						log.Errorf("Error fetching tx %v: %v",
+							prevOut.Hash, err)
+						return nil, err
+					}
+					if blockRegion == nil {
+						return nil, fmt.Errorf("transaction %v not found",
+							prevOut.Hash)
+					}
+
+					// Load the raw transaction bytes from the database.
+					txBytes, err := dbTx.FetchBlockRegion(blockRegion)
+					if err != nil {
+						log.Errorf("Error fetching tx %v: %v",
+							prevOut.Hash, err)
+						return nil, err
+					}
+
+					// Deserialize the transaction
+					var prevOutTx wire.MsgTx
+					err = prevOutTx.Deserialize(bytes.NewReader(txBytes))
+
+					inputOutPoint := prevOutTx.TxOut[prevOut.Index]
+					pkScript = inputOutPoint.PkScript
 				}
-				if blockRegion == nil {
-					return nil, fmt.Errorf("transaction %v not found",
-						prevOut.Hash)
-				}
-
-				// Load the raw transaction bytes from the database.
-				txBytes, err := dbTx.FetchBlockRegion(blockRegion)
-				if err != nil {
-					log.Errorf("Error fetching tx %v: %v",
-						prevOut.Hash, err)
-					return nil, err
-				}
-
-				// Deserialize the transaction
-				var prevOutTx wire.MsgTx
-				err = prevOutTx.Deserialize(bytes.NewReader(txBytes))
-
-				inputOutPoint := prevOutTx.TxOut[prevOut.Index]
-
-				a.indexScriptPubKey(addrIndex, inputOutPoint.PkScript, locInBlock)
+				a.indexScriptPubKey(addrIndex, pkScript, locInBlock)
 			}
 		}
 
@@ -477,8 +486,8 @@ func dbRemoveAddrIndexDataForBlock(bucket database.Bucket, blk *btcutil.Block, d
 
 // ConnectBlock indexes the given block using an existing database
 // transaction.
-func (a *addrIndex) ConnectBlock(dbTx database.Tx, bucket database.Bucket, block *btcutil.Block) error {
-	data, err := a.indexBlockAddrs(dbTx, block)
+func (a *addrIndex) ConnectBlock(dbTx database.Tx, bucket database.Bucket, block *btcutil.Block, view *blockchain.UtxoViewpoint) error {
+	data, err := a.indexBlockAddrs(dbTx, block, view)
 	if err != nil {
 		return err
 	}
@@ -488,8 +497,8 @@ func (a *addrIndex) ConnectBlock(dbTx database.Tx, bucket database.Bucket, block
 
 // DisconnectBlock de-indexes the given block using an existing database
 // transaction.
-func (a *addrIndex) DisconnectBlock(dbTx database.Tx, bucket database.Bucket, block *btcutil.Block) error {
-	data, err := a.indexBlockAddrs(dbTx, block)
+func (a *addrIndex) DisconnectBlock(dbTx database.Tx, bucket database.Bucket, block *btcutil.Block, view *blockchain.UtxoViewpoint) error {
+	data, err := a.indexBlockAddrs(dbTx, block, view)
 	if err != nil {
 		return err
 	}

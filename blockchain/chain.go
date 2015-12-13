@@ -806,7 +806,7 @@ func (b *BlockChain) connectBlock(node *blockNode, block *btcutil.Block, view *U
 
 		// Run all indexes
 		for i := range b.indexes {
-			err = b.indexConnectBlock(dbTx, i, block)
+			err = b.indexConnectBlock(dbTx, i, block, view)
 			if err != nil {
 				return err
 			}
@@ -894,7 +894,7 @@ func (b *BlockChain) disconnectBlock(node *blockNode, block *btcutil.Block, view
 	err = b.db.Update(func(dbTx database.Tx) error {
 		// Run all indexes
 		for i := range b.indexes {
-			err = b.indexDisconnectBlock(dbTx, i, block)
+			err = b.indexDisconnectBlock(dbTx, i, block, view)
 			if err != nil {
 				return err
 			}

@@ -29,12 +29,16 @@ type Index interface {
 	Create(dbTx database.Tx, bucket database.Bucket) error
 
 	// ConnectBlock indexes the given block using an existing database
-	// transaction.
-	ConnectBlock(dbTx database.Tx, bucket database.Bucket, block *btcutil.Block) error
+	// transaction. The UtxoViewpoint is only present if the block is being
+	// connected to the chain right now, otherwise (e.g during catchup) it
+	// is nil.
+	ConnectBlock(dbTx database.Tx, bucket database.Bucket, block *btcutil.Block, view *UtxoViewpoint) error
 
 	// DisconnectBlock de-indexes the given block using an existing database
-	// transaction.
-	DisconnectBlock(dbTx database.Tx, bucket database.Bucket, block *btcutil.Block) error
+	// transaction. The UtxoViewpoint is only present if the block is being
+	// disconnected from the chain right now, otherwise (e.g during catchup) it
+	// is nil.
+	DisconnectBlock(dbTx database.Tx, bucket database.Bucket, block *btcutil.Block, view *UtxoViewpoint) error
 }
 
 var (
@@ -82,12 +86,12 @@ func (b *BlockChain) indexUpdateTip(dbTx database.Tx, indexNum int, hash *wire.S
 
 // indexConnectBlock indexes the given block with the given index, and updates
 // the chain tip to reflect the block has been indexed.
-func (b *BlockChain) indexConnectBlock(dbTx database.Tx, indexNum int, block *btcutil.Block) error {
+func (b *BlockChain) indexConnectBlock(dbTx database.Tx, indexNum int, block *btcutil.Block, view *UtxoViewpoint) error {
 	// Fetch the index bucket
 	bucket := b.IndexBucket(dbTx, b.indexes[indexNum].Name())
 
 	// Call callback on the index
-	err := b.indexes[indexNum].ConnectBlock(dbTx, bucket, block)
+	err := b.indexes[indexNum].ConnectBlock(dbTx, bucket, block, view)
 	if err != nil {
 		return err
 	}
@@ -103,12 +107,12 @@ func (b *BlockChain) indexConnectBlock(dbTx database.Tx, indexNum int, block *bt
 
 // indexDisconnectBlock de-indexes the given block with the given index, and
 // updates the chain tip to reflect the block has been de-indexed.
-func (b *BlockChain) indexDisconnectBlock(dbTx database.Tx, indexNum int, block *btcutil.Block) error {
+func (b *BlockChain) indexDisconnectBlock(dbTx database.Tx, indexNum int, block *btcutil.Block, view *UtxoViewpoint) error {
 	// Fetch the index bucket
 	bucket := b.IndexBucket(dbTx, b.indexes[indexNum].Name())
 
 	// Call callback on the index
-	err := b.indexes[indexNum].DisconnectBlock(dbTx, bucket, block)
+	err := b.indexes[indexNum].DisconnectBlock(dbTx, bucket, block, view)
 	if err != nil {
 		return err
 	}
@@ -205,7 +209,7 @@ func (b *BlockChain) InitIndexes() error {
 				block.SetHeight(height)
 
 				// Remove the block.
-				err = b.indexDisconnectBlock(dbTx, i, block)
+				err = b.indexDisconnectBlock(dbTx, i, block, nil)
 				if err != nil {
 					return err
 				}
@@ -254,7 +258,7 @@ func (b *BlockChain) InitIndexes() error {
 		for i := range b.indexes {
 			if indexHeights[i] < height {
 				err := b.db.Update(func(dbTx database.Tx) error {
-					return b.indexConnectBlock(dbTx, i, block)
+					return b.indexConnectBlock(dbTx, i, block, nil)
 				})
 				if err != nil {
 					return err
