@@ -537,8 +537,7 @@ func NewUtxoViewpoint() *UtxoViewpoint {
 // It also attempts to fetch the utxo details for the transaction itself so the
 // returned view can be examined for duplicate unspent transaction outputs.
 //
-// This function is safe for concurrent access however the returned UtxoStore is
-// NOT.
+// This function is safe for concurrent access however the returned view is NOT.
 func (b *BlockChain) FetchUtxoView(tx *btcutil.Tx) (*UtxoViewpoint, error) {
 	b.chainLock.RLock()
 	defer b.chainLock.RUnlock()
