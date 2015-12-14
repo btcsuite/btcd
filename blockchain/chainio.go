@@ -360,15 +360,13 @@ func deserializeSpendJournalEntry(serialized []byte, txns []*wire.MsgTx, view *U
 			// described.
 			var txVersion int32
 			originHash := &txIn.PreviousOutPoint.Hash
-			if idx, ok := stxoInFlight[*originHash]; ok {
+			entry := view.LookupEntry(originHash)
+			if entry != nil {
+				txVersion = entry.Version()
+			} else if idx, ok := stxoInFlight[*originHash]; ok {
 				txVersion = stxos[idx].version
 			} else {
 				stxoInFlight[*originHash] = stxoIdx + 1
-
-				entry := view.LookupEntry(originHash)
-				if entry != nil {
-					txVersion = entry.Version()
-				}
 			}
 
 			n, err := decodeSpentTxOut(serialized[offset:], stxo,

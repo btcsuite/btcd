@@ -210,7 +210,7 @@ func TestSpendJournalSerialization(t *testing.T) {
 				LockTime: 0,
 			}, {
 				Version: 1,
-				TxIn: []*wire.TxIn{{ // Coinbase omitted.
+				TxIn: []*wire.TxIn{{
 					PreviousOutPoint: wire.OutPoint{
 						Hash:  *newShaHashFromStr("92fbe1d4be82f765dfabc9559d4620864b05cc897c4db0e29adac92d294e52b7"),
 						Index: 0,
@@ -242,6 +242,58 @@ func TestSpendJournalSerialization(t *testing.T) {
 				},
 			}},
 			serialized: hexToBytes("8b99700186c64700b2fb57eadf61e106a100a7445a8c3f67898841ec0091f20f006edbc6c4d31bae9f1ccc38538a114bf42de65e86"),
+		},
+		// Hand crafted.
+		{
+			name: "One tx, two inputs from same tx, neither spend last output",
+			entry: []spentTxOut{{
+				amount:   165125632,
+				pkScript: hexToBytes("51"),
+			}, {
+				amount:   154370000,
+				pkScript: hexToBytes("51"),
+			}},
+			blockTxns: []*wire.MsgTx{{ // Coinbase omitted.
+				Version: 1,
+				TxIn: []*wire.TxIn{{
+					PreviousOutPoint: wire.OutPoint{
+						Hash:  *newShaHashFromStr("c0ed017828e59ad5ed3cf70ee7c6fb0f426433047462477dc7a5d470f987a537"),
+						Index: 1,
+					},
+					SignatureScript: hexToBytes(""),
+					Sequence:        0xffffffff,
+				}, {
+					PreviousOutPoint: wire.OutPoint{
+						Hash:  *newShaHashFromStr("c0ed017828e59ad5ed3cf70ee7c6fb0f426433047462477dc7a5d470f987a537"),
+						Index: 2,
+					},
+					SignatureScript: hexToBytes(""),
+					Sequence:        0xffffffff,
+				}},
+				TxOut: []*wire.TxOut{{
+					Value:    165125632,
+					PkScript: hexToBytes("51"),
+				}, {
+					Value:    154370000,
+					PkScript: hexToBytes("51"),
+				}},
+				LockTime: 0,
+			}},
+			utxoView: &UtxoViewpoint{entries: map[wire.ShaHash]*UtxoEntry{
+				*newShaHashFromStr("c0ed017828e59ad5ed3cf70ee7c6fb0f426433047462477dc7a5d470f987a537"): &UtxoEntry{
+					version:     1,
+					isCoinBase:  false,
+					blockHeight: 100000,
+					sparseOutputs: map[uint32]uint32{
+						0: 0,
+					},
+					outputs: []utxoOutput{{
+						amount:   165712179,
+						pkScript: hexToBytes("51"),
+					}},
+				},
+			}},
+			serialized: hexToBytes("0087bc3707510084c3d19a790751"),
 		},
 	}
 
