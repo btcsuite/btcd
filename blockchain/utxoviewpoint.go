@@ -50,12 +50,11 @@ func (o *utxoOutput) maybeDecompress(version int32) {
 // as whether or not it is a coinbase transaction, which block it was found in,
 // and the spent status of its outputs.
 type UtxoEntry struct {
-	modified      bool              // Entry has been changed since load.
-	version       int32             // The version of this tx.
-	isCoinBase    bool              // Whether this entry is a coinbase tx.
-	blockHeight   int32             // Height the block containing the tx.
-	sparseOutputs map[uint32]uint32 // Sparse map of unspent output indices.
-	outputs       []utxoOutput      // Packed slice of unspent outputs.
+	modified      bool                   // Entry changed since load.
+	version       int32                  // The version of this tx.
+	isCoinBase    bool                   // Whether entry is a coinbase tx.
+	blockHeight   int32                  // Height of block containing tx.
+	sparseOutputs map[uint32]*utxoOutput // Sparse map of unspent outputs.
 }
 
 // Version returns the version of the transaction the utxo represents.
@@ -83,24 +82,23 @@ func (entry *UtxoEntry) BlockHeight() int32 {
 // either due to it being invalid or because the output is not part of the view
 // due to previously being spent/pruned.
 func (entry *UtxoEntry) IsOutputSpent(outputIndex uint32) bool {
-	packedIndex, ok := entry.sparseOutputs[outputIndex]
+	output, ok := entry.sparseOutputs[outputIndex]
 	if !ok {
 		return true
 	}
 
-	return entry.outputs[packedIndex].spent
+	return output.spent
 }
 
 // SpendOutput marks the output at the provided index as spent.  Specifying an
 // output index that does not exist will not have any effect.
 func (entry *UtxoEntry) SpendOutput(outputIndex uint32) {
-	packedIndex, ok := entry.sparseOutputs[outputIndex]
+	output, ok := entry.sparseOutputs[outputIndex]
 	if !ok {
 		return
 	}
 
 	// Nothing to do if the output is already spent.
-	output := &entry.outputs[packedIndex]
 	if output.spent {
 		return
 	}
@@ -114,7 +112,7 @@ func (entry *UtxoEntry) SpendOutput(outputIndex uint32) {
 // is fully spent.
 func (entry *UtxoEntry) IsFullySpent() bool {
 	// The entry is not fully spent if any of the outputs are unspent.
-	for _, output := range entry.outputs {
+	for _, output := range entry.sparseOutputs {
 		if !output.spent {
 			return false
 		}
@@ -129,13 +127,12 @@ func (entry *UtxoEntry) IsFullySpent() bool {
 // either due to it being invalid or because the output is not part of the view
 // due to previously being spent/pruned.
 func (entry *UtxoEntry) AmountByIndex(outputIndex uint32) int64 {
-	packedIndex, ok := entry.sparseOutputs[outputIndex]
+	output, ok := entry.sparseOutputs[outputIndex]
 	if !ok {
 		return 0
 	}
 
 	// Ensure the output is decompressed before returning the amount.
-	output := &entry.outputs[packedIndex]
 	output.maybeDecompress(entry.version)
 	return output.amount
 }
@@ -146,13 +143,12 @@ func (entry *UtxoEntry) AmountByIndex(outputIndex uint32) int64 {
 // either due to it being invalid or because the output is not part of the view
 // due to previously being spent/pruned.
 func (entry *UtxoEntry) PkScriptByIndex(outputIndex uint32) []byte {
-	packedIndex, ok := entry.sparseOutputs[outputIndex]
+	output, ok := entry.sparseOutputs[outputIndex]
 	if !ok {
 		return nil
 	}
 
 	// Ensure the output is decompressed before returning the script.
-	output := &entry.outputs[packedIndex]
 	output.maybeDecompress(entry.version)
 	return output.pkScript
 }
@@ -164,7 +160,7 @@ func newUtxoEntry(version int32, isCoinBase bool, blockHeight int32) *UtxoEntry 
 		version:       version,
 		isCoinBase:    isCoinBase,
 		blockHeight:   blockHeight,
-		sparseOutputs: make(map[uint32]uint32),
+		sparseOutputs: make(map[uint32]*utxoOutput),
 	}
 }
 
@@ -221,8 +217,7 @@ func (view *UtxoViewpoint) AddTxOuts(tx *btcutil.Tx, blockHeight int32) {
 		// entry is being replaced by a different transaction with the
 		// same hash.  This is allowed so long as the previous
 		// transaction is fully spent.
-		if packedIndex, ok := entry.sparseOutputs[uint32(txOutIdx)]; ok {
-			output := &entry.outputs[packedIndex]
+		if output, ok := entry.sparseOutputs[uint32(txOutIdx)]; ok {
 			output.spent = false
 			output.amount = txOut.Value
 			output.pkScript = txOut.PkScript
@@ -230,14 +225,12 @@ func (view *UtxoViewpoint) AddTxOuts(tx *btcutil.Tx, blockHeight int32) {
 		}
 
 		// Add the unspent transaction output.
-		packedIndex := uint32(len(entry.outputs))
-		entry.outputs = append(entry.outputs, utxoOutput{
+		entry.sparseOutputs[uint32(txOutIdx)] = &utxoOutput{
 			spent:      false,
 			compressed: false,
 			amount:     txOut.Value,
 			pkScript:   txOut.PkScript,
-		})
-		entry.sparseOutputs[uint32(txOutIdx)] = packedIndex
+		}
 	}
 	return
 }
@@ -344,8 +337,7 @@ func (view *UtxoViewpoint) disconnectTransactions(block *btcutil.Block, stxos []
 			view.entries[*tx.Sha()] = entry
 		}
 		entry.modified = true
-		entry.sparseOutputs = make(map[uint32]uint32)
-		entry.outputs = nil
+		entry.sparseOutputs = make(map[uint32]*utxoOutput)
 
 		// Loop backwards through all of the transaction inputs (except
 		// for the coinbase which has no inputs) and unspend the
@@ -380,23 +372,20 @@ func (view *UtxoViewpoint) disconnectTransactions(block *btcutil.Block, stxos []
 			// Restore the specific utxo using the stxo data from
 			// the spend journal if it doesn't already exist in the
 			// view.
-			packedIndex, ok := entry.sparseOutputs[originIndex]
+			output, ok := entry.sparseOutputs[originIndex]
 			if !ok {
 				// Add the unspent transaction output.
-				packedIndex = uint32(len(entry.outputs))
-				entry.outputs = append(entry.outputs, utxoOutput{
+				entry.sparseOutputs[originIndex] = &utxoOutput{
 					spent:      false,
 					compressed: stxo.compressed,
 					amount:     stxo.amount,
 					pkScript:   stxo.pkScript,
-				})
-				entry.sparseOutputs[originIndex] = packedIndex
+				}
 				continue
 			}
 
 			// Mark the existing referenced transaction output as
 			// unspent.
-			output := &entry.outputs[packedIndex]
 			output.spent = false
 		}
 	}
