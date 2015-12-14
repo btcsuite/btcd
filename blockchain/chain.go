@@ -1001,6 +1001,7 @@ func (b *BlockChain) reorganizeChain(detachNodes, attachNodes *list.List, flags 
 	// database and using that information to unspend all of the spent txos
 	// and remove the utxos created by the blocks.
 	view := NewUtxoViewpoint()
+	view.SetBestHash(b.bestNode.hash)
 	for e := detachNodes.Front(); e != nil; e = e.Next() {
 		n := e.Value.(*blockNode)
 		var block *btcutil.Block
@@ -1164,11 +1165,12 @@ func (b *BlockChain) connectBestChain(node *blockNode, block *btcutil.Block, fla
 
 	// We are extending the main (best) chain with a new block.  This is the
 	// most common case.
-	if node.parent.hash.IsEqual(b.bestNode.hash) {
+	if node.parentHash.IsEqual(b.bestNode.hash) {
 		// Perform several checks to verify the block can be connected
 		// to the main chain without violating any rules and without
 		// actually connecting the block.
 		view := NewUtxoViewpoint()
+		view.SetBestHash(node.parentHash)
 		stxos := make([]spentTxOut, 0, countSpentOutputs(block))
 		if !fastAdd {
 			err := b.checkConnectBlock(node, block, view, &stxos)

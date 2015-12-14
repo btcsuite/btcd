@@ -938,7 +938,8 @@ func CheckTransactionInputs(tx *btcutil.Tx, txHeight int32, utxoView *UtxoViewpo
 // block to the chain represented by the passed view does not violate any rules.
 // In addition, the passed view is updated to spend all of the referenced
 // outputs and add all of the new utxos created by block.  Thus, the view will
-// represent the state of the chain as if the block were actually connected.
+// represent the state of the chain as if the block were actually connected and
+// consequently the best hash for the view is also updated to passed block.
 //
 // The CheckConnectBlock function makes use of this function to perform the
 // bulk of its work.  The only difference is this function accepts a node which
@@ -962,6 +963,13 @@ func (b *BlockChain) checkConnectBlock(node *blockNode, block *btcutil.Block, vi
 	if node.hash.IsEqual(b.chainParams.GenesisHash) {
 		str := "the coinbase for the genesis block is not spendable"
 		return ruleError(ErrMissingTx, str)
+	}
+
+	// Ensure the view is for the node being checked.
+	if !view.BestHash().IsEqual(node.parentHash) {
+		return AssertError(fmt.Sprintf("inconsistent view when "+
+			"checking block connection: best hash is %v instead "+
+			"of expected %v", view.BestHash(), node.hash))
 	}
 
 	// BIP0030 added a rule to prevent blocks which contain duplicate
@@ -1142,6 +1150,10 @@ func (b *BlockChain) checkConnectBlock(node *blockNode, block *btcutil.Block, vi
 		}
 	}
 
+	// Update the best hash for view to include this block since all of its
+	// transactions have been connected.
+	view.SetBestHash(node.hash)
+
 	return nil
 }
 
@@ -1167,5 +1179,6 @@ func (b *BlockChain) CheckConnectBlock(block *btcutil.Block) error {
 	// Leave the spent txouts entry nil in the state since the information
 	// is not needed and thus extra work can be avoided.
 	view := NewUtxoViewpoint()
+	view.SetBestHash(prevNode.hash)
 	return b.checkConnectBlock(newNode, block, view, nil)
 }

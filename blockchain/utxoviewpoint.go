@@ -172,7 +172,20 @@ func newUtxoEntry(version int32, isCoinBase bool, blockHeight int32) *UtxoEntry 
 // The unspent outputs are needed by other transactions for things such as
 // script validation and double spend prevention.
 type UtxoViewpoint struct {
-	entries map[wire.ShaHash]*UtxoEntry
+	entries  map[wire.ShaHash]*UtxoEntry
+	bestHash wire.ShaHash
+}
+
+// BestHash returns the hash of the best block in the chain the view currently
+// respresents.
+func (view *UtxoViewpoint) BestHash() *wire.ShaHash {
+	return &view.bestHash
+}
+
+// SetBestHash sets the hash of the best block in the chain the view currently
+// respresents.
+func (view *UtxoViewpoint) SetBestHash(hash *wire.ShaHash) {
+	view.bestHash = *hash
 }
 
 // LookupEntry returns information about a given transaction according to the
@@ -293,9 +306,10 @@ func (view *UtxoViewpoint) connectTransaction(tx *btcutil.Tx, blockHeight int32,
 }
 
 // connectTransactions updates the view by adding all new utxos created by all
-// of the transactions in the passed block and marking all utxos the
-// transactions spend as spent.  In addition, when the 'stxos' argument is not
-// nil, it will be updated to append an entry for each spent txout.
+// of the transactions in the passed block, marking all utxos the transactions
+// spend as spent, and setting the best hash for the view to the passed block.
+// In addition, when the 'stxos' argument is not nil, it will be updated to
+// append an entry for each spent txout.
 func (view *UtxoViewpoint) connectTransactions(block *btcutil.Block, stxos *[]spentTxOut) error {
 	for _, tx := range block.Transactions() {
 		err := view.connectTransaction(tx, block.Height(), stxos)
@@ -304,12 +318,17 @@ func (view *UtxoViewpoint) connectTransactions(block *btcutil.Block, stxos *[]sp
 		}
 	}
 
+	// Update the best hash for view to include this block since all of its
+	// transactions have been connected.
+	view.SetBestHash(block.Sha())
+
 	return nil
 }
 
 // disconnectTransactions updates the view by removing all of the transactions
-// created by the passed block and restoring all utxos the transactions spend
-// by using the provided spent txo information.
+// created by the passed block, restoring all utxos the transactions spend by
+// using the provided spent txo information, and setting the best hash for the
+// view to the block before the passed block.
 func (view *UtxoViewpoint) disconnectTransactions(block *btcutil.Block, stxos []spentTxOut) error {
 	// Sanity check the correct number of stxos are provided.
 	if len(stxos) != countSpentOutputs(block) {
@@ -389,6 +408,10 @@ func (view *UtxoViewpoint) disconnectTransactions(block *btcutil.Block, stxos []
 			output.spent = false
 		}
 	}
+
+	// Update the best hash for view to the previous block since all of the
+	// transactions for the current block have been disconnected.
+	view.SetBestHash(&block.MsgBlock().Header.PrevBlock)
 
 	return nil
 }
