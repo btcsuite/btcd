@@ -469,6 +469,31 @@ func TestUtxoSerialization(t *testing.T) {
 			},
 			serialized: hexToBytes("0185f90b0a011200e2ccd6ec7c6e2e581349c77e067385fa8236bf8a800900b8025be1b3efc63b0ad48e7f9f10e87544528d58"),
 		},
+		// Adapted from tx in main blockchain:
+		// 4a16969aa4764dd7507fc1de7f0baa4850a246de90c45e59a3207f9a26b5036f
+		{
+			name: "outputs 0 and 2, not coinbase, output 2 compressed, packed indexes reversed",
+			entry: &UtxoEntry{
+				version:     1,
+				isCoinBase:  false,
+				blockHeight: 113931,
+				sparseOutputs: map[uint32]uint32{
+					0: 1,
+					2: 0,
+				},
+				outputs: []utxoOutput{{
+					// Uncompressed Amount: 15000000
+					// Uncompressed PkScript: 76a914b8025be1b3efc63b0ad48e7f9f10e87544528d5888ac
+					compressed: true,
+					amount:     137,
+					pkScript:   hexToBytes("00b8025be1b3efc63b0ad48e7f9f10e87544528d58"),
+				}, {
+					amount:   20000000,
+					pkScript: hexToBytes("76a914e2ccd6ec7c6e2e581349c77e067385fa8236bf8a88ac"),
+				}},
+			},
+			serialized: hexToBytes("0185f90b0a011200e2ccd6ec7c6e2e581349c77e067385fa8236bf8a800900b8025be1b3efc63b0ad48e7f9f10e87544528d58"),
+		},
 		// From tx in main blockchain:
 		// 0e3e2357e806b6cdb1f70b54c3a3a17b6714ee1f0e68bebb44a74b1efd512098
 		{

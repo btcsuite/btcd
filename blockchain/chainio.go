@@ -9,6 +9,7 @@ import (
 	"encoding/binary"
 	"fmt"
 	"math/big"
+	"sort"
 
 	database "github.com/btcsuite/btcd/database2"
 	"github.com/btcsuite/btcd/wire"
@@ -638,11 +639,25 @@ func serializeUtxoEntry(entry *UtxoEntry) ([]byte, error) {
 			"serialize")
 	}
 
+	// TODO(davec): The internals of the view should be reworked to make
+	// this unnecessary.
+	// Sort the outputs in order of output index.
+	outputIndexes := make([]int, 0, len(entry.sparseOutputs))
+	for outputIndex := range entry.sparseOutputs {
+		outputIndexes = append(outputIndexes, int(outputIndex))
+	}
+	sort.Ints(outputIndexes)
+	packedIndexes := make([]uint32, len(entry.sparseOutputs))
+	for i, outputIndex := range outputIndexes {
+		packedIndexes[i] = entry.sparseOutputs[uint32(outputIndex)]
+	}
+	outputIndexes = nil
+
 	// Calculate the size needed to serialize the entry.
 	size := serializeSizeVLQ(uint64(entry.version)) +
 		serializeSizeVLQ(uint64(entry.blockHeight)) +
 		serializeSizeVLQ(headerCode) + numBitmapBytes
-	for packedIndex := range entry.outputs {
+	for _, packedIndex := range packedIndexes {
 		out := &entry.outputs[packedIndex]
 		if out.spent {
 			continue
@@ -674,7 +689,7 @@ func serializeUtxoEntry(entry *UtxoEntry) ([]byte, error) {
 
 	// Serialize the compressed unspent transaction outputs.  Outputs that
 	// are already compressed are serialized without modifications.
-	for packedIndex := range entry.outputs {
+	for _, packedIndex := range packedIndexes {
 		out := &entry.outputs[packedIndex]
 		if out.spent {
 			continue
