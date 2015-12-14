@@ -1375,7 +1375,7 @@ func New(db database.DB, params *chaincfg.Params, c NotificationCallback, sigCac
 		return nil, err
 	}
 
-	log.Infof("Chain state (height %d, hash %v, totaltx=%d, work %v)",
+	log.Infof("Chain state (height %d, hash %v, totaltx %d, work %v)",
 		b.bestNode.height, b.bestNode.hash, b.stateSnapshot.TotalTxns,
 		b.bestNode.workSum)
 

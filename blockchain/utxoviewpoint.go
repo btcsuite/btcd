@@ -123,12 +123,12 @@ func (entry *UtxoEntry) IsFullySpent() bool {
 	return true
 }
 
-// Amount returns the amount of the provided output index.
+// AmountByIndex returns the amount of the provided output index.
 //
 // Returns 0 if the output index references an output that does not exist
 // either due to it being invalid or because the output is not part of the view
 // due to previously being spent/pruned.
-func (entry *UtxoEntry) Amount(outputIndex uint32) int64 {
+func (entry *UtxoEntry) AmountByIndex(outputIndex uint32) int64 {
 	packedIndex, ok := entry.sparseOutputs[outputIndex]
 	if !ok {
 		return 0
@@ -224,6 +224,7 @@ func (view *UtxoViewpoint) AddTxOuts(tx *btcutil.Tx, blockHeight int32) {
 		if packedIndex, ok := entry.sparseOutputs[uint32(txOutIdx)]; ok {
 			output := &entry.outputs[packedIndex]
 			output.spent = false
+			output.compressed = false
 			output.amount = txOut.Value
 			output.pkScript = txOut.PkScript
 			continue
@@ -281,7 +282,7 @@ func (view *UtxoViewpoint) connectTransaction(tx *btcutil.Tx, blockHeight int32,
 		// in the utxo set.
 		var stxo = spentTxOut{
 			compressed: false,
-			amount:     entry.Amount(originIndex),
+			amount:     entry.AmountByIndex(originIndex),
 			pkScript:   entry.PkScriptByIndex(originIndex),
 		}
 		if entry.IsFullySpent() {
@@ -548,8 +549,7 @@ func NewUtxoViewpoint() *UtxoViewpoint {
 // It also attempts to fetch the utxo details for the transaction itself so the
 // returned view can be examined for duplicate unspent transaction outputs.
 //
-// This function is safe for concurrent access however the returned UtxoStore is
-// NOT.
+// This function is safe for concurrent access however the returned view is NOT.
 func (b *BlockChain) FetchUtxoView(tx *btcutil.Tx) (*UtxoViewpoint, error) {
 	b.chainLock.RLock()
 	defer b.chainLock.RUnlock()

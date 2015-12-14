@@ -621,8 +621,8 @@ func TestUtxoSerialization(t *testing.T) {
 		// Ensure all of the amounts and scripts of the utxos in the
 		// deserialized entry match the ones in the test entry.
 		for outputIndex := range utxoEntry.sparseOutputs {
-			gotAmount := utxoEntry.Amount(outputIndex)
-			wantAmount := test.entry.Amount(outputIndex)
+			gotAmount := utxoEntry.AmountByIndex(outputIndex)
+			wantAmount := test.entry.AmountByIndex(outputIndex)
 			if gotAmount != wantAmount {
 				t.Errorf("deserializeUtxoEntry #%d (%s) "+
 					"output #%d: mismatched amounts: got "+
