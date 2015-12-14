@@ -2504,7 +2504,7 @@ func handleGetTxOut(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (i
 		bestBlockSha = best.Hash.String()
 		confirmations = 1 + best.Height - entry.BlockHeight()
 		txVersion = entry.Version()
-		value = entry.Amount(c.Vout)
+		value = entry.AmountByIndex(c.Vout)
 		pkScript = entry.PkScriptByIndex(c.Vout)
 		isCoinbase = entry.IsCoinBase()
 	}
