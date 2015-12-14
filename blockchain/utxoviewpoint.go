@@ -123,12 +123,12 @@ func (entry *UtxoEntry) IsFullySpent() bool {
 	return true
 }
 
-// Amount returns the amount of the provided output index.
+// AmountByIndex returns the amount of the provided output index.
 //
 // Returns 0 if the output index references an output that does not exist
 // either due to it being invalid or because the output is not part of the view
 // due to previously being spent/pruned.
-func (entry *UtxoEntry) Amount(outputIndex uint32) int64 {
+func (entry *UtxoEntry) AmountByIndex(outputIndex uint32) int64 {
 	packedIndex, ok := entry.sparseOutputs[outputIndex]
 	if !ok {
 		return 0
@@ -281,7 +281,7 @@ func (view *UtxoViewpoint) connectTransaction(tx *btcutil.Tx, blockHeight int32,
 		// in the utxo set.
 		var stxo = spentTxOut{
 			compressed: false,
-			amount:     entry.Amount(originIndex),
+			amount:     entry.AmountByIndex(originIndex),
 			pkScript:   entry.PkScriptByIndex(originIndex),
 		}
 		if entry.IsFullySpent() {
