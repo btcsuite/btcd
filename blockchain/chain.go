@@ -730,7 +730,7 @@ func (b *BlockChain) getReorganizeNodes(node *blockNode) (*list.List, *list.List
 func (b *BlockChain) connectBlock(node *blockNode, block *btcutil.Block, view *UtxoViewpoint, stxos []spentTxOut) error {
 	// Make sure it's extending the end of the best chain.
 	prevHash := &block.MsgBlock().Header.PrevBlock
-	if b.bestNode != nil && !prevHash.IsEqual(b.bestNode.hash) {
+	if !prevHash.IsEqual(b.bestNode.hash) {
 		return AssertError("connectBlock must be called with a block " +
 			"that extends the main chain")
 	}

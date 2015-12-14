@@ -1160,11 +1160,9 @@ func (b *BlockChain) CheckConnectBlock(block *btcutil.Block) error {
 
 	prevNode := b.bestNode
 	newNode := newBlockNode(&block.MsgBlock().Header, block.Sha(),
-		block.Height())
-	if prevNode != nil {
-		newNode.parent = prevNode
-		newNode.workSum.Add(prevNode.workSum, newNode.workSum)
-	}
+		prevNode.height+1)
+	newNode.parent = prevNode
+	newNode.workSum.Add(prevNode.workSum, newNode.workSum)
 
 	// Leave the spent txouts entry nil in the state since the information
 	// is not needed and thus extra work can be avoided.
