@@ -563,21 +563,7 @@ func dbRemoveSpendJournalEntry(dbTx database.Tx, blockHash *wire.ShaHash) error 
 // utxoEntryHeaderCode returns the calculated header code to be used when
 // serializing the provided utxo entry and the number of bytes needed to encode
 // the unspentness bitmap.
-func utxoEntryHeaderCode(entry *UtxoEntry) (uint64, int, error) {
-	// Find the highest unspent output in order to determine how many bytes
-	// the unspent bitmap needs to encode it.
-	var highestOutputIndex uint32
-	for outputIndex, packedIndex := range entry.sparseOutputs {
-		output := &entry.outputs[packedIndex]
-		if output.spent {
-			continue
-		}
-
-		if outputIndex > highestOutputIndex {
-			highestOutputIndex = outputIndex
-		}
-	}
-
+func utxoEntryHeaderCode(entry *UtxoEntry, highestOutputIndex uint32) (uint64, int, error) {
 	// The first two outputs are encoded separately, so offset the index
 	// accordingly to calculate the correct number of bytes needed to encode
 	// up to the highest unspent output index.
@@ -622,9 +608,17 @@ func serializeUtxoEntry(entry *UtxoEntry) ([]byte, error) {
 		return nil, nil
 	}
 
+	// Determine the output order by sorting the sparse output index keys.
+	outputOrder := make([]int, 0, len(entry.sparseOutputs))
+	for outputIndex := range entry.sparseOutputs {
+		outputOrder = append(outputOrder, int(outputIndex))
+	}
+	sort.Ints(outputOrder)
+
 	// Encode the header code and determine the number of bytes the
 	// unspentness bitmap needs.
-	headerCode, numBitmapBytes, err := utxoEntryHeaderCode(entry)
+	highIndex := uint32(outputOrder[len(outputOrder)-1])
+	headerCode, numBitmapBytes, err := utxoEntryHeaderCode(entry, highIndex)
 	if err != nil {
 		return nil, err
 	}
@@ -639,26 +633,12 @@ func serializeUtxoEntry(entry *UtxoEntry) ([]byte, error) {
 			"serialize")
 	}
 
-	// TODO(davec): The internals of the view should be reworked to make
-	// this unnecessary.
-	// Sort the outputs in order of output index.
-	outputIndexes := make([]int, 0, len(entry.sparseOutputs))
-	for outputIndex := range entry.sparseOutputs {
-		outputIndexes = append(outputIndexes, int(outputIndex))
-	}
-	sort.Ints(outputIndexes)
-	packedIndexes := make([]uint32, len(entry.sparseOutputs))
-	for i, outputIndex := range outputIndexes {
-		packedIndexes[i] = entry.sparseOutputs[uint32(outputIndex)]
-	}
-	outputIndexes = nil
-
 	// Calculate the size needed to serialize the entry.
 	size := serializeSizeVLQ(uint64(entry.version)) +
 		serializeSizeVLQ(uint64(entry.blockHeight)) +
 		serializeSizeVLQ(headerCode) + numBitmapBytes
-	for _, packedIndex := range packedIndexes {
-		out := &entry.outputs[packedIndex]
+	for _, outputIndex := range outputOrder {
+		out := entry.sparseOutputs[uint32(outputIndex)]
 		if out.spent {
 			continue
 		}
@@ -689,8 +669,8 @@ func serializeUtxoEntry(entry *UtxoEntry) ([]byte, error) {
 
 	// Serialize the compressed unspent transaction outputs.  Outputs that
 	// are already compressed are serialized without modifications.
-	for _, packedIndex := range packedIndexes {
-		out := &entry.outputs[packedIndex]
+	for _, outputIndex := range outputOrder {
+		out := entry.sparseOutputs[uint32(outputIndex)]
 		if out.spent {
 			continue
 		}
@@ -756,14 +736,12 @@ func deserializeUtxoEntry(serialized []byte) (*UtxoEntry, error) {
 
 	// Add sparse output for unspent outputs 0 and 1 as needed based on the
 	// details provided by the header code.
-	packedIndex := uint32(0)
+	var outputIndexes []uint32
 	if output0Unspent {
-		entry.sparseOutputs[0] = packedIndex
-		packedIndex++
+		outputIndexes = append(outputIndexes, 0)
 	}
 	if output1Unspent {
-		entry.sparseOutputs[1] = packedIndex
-		packedIndex++
+		outputIndexes = append(outputIndexes, 1)
 	}
 
 	// Decode the unspentness bitmap adding a sparse output for each unspent
@@ -776,8 +754,7 @@ func deserializeUtxoEntry(serialized []byte) (*UtxoEntry, error) {
 				// header code, so adjust the output number
 				// accordingly.
 				outputNum := 2 + i*8 + j
-				entry.sparseOutputs[outputNum] = packedIndex
-				packedIndex++
+				outputIndexes = append(outputIndexes, outputNum)
 			}
 			unspentBits >>= 1
 		}
@@ -785,7 +762,7 @@ func deserializeUtxoEntry(serialized []byte) (*UtxoEntry, error) {
 	}
 
 	// Decode and add all of the utxos.
-	for i := uint32(0); i < packedIndex; i++ {
+	for i, outputIndex := range outputIndexes {
 		// Decode the next utxo.  The script and amount fields of the
 		// utxo output are left compressed so decompression can be
 		// avoided on those that are not accessed.  This is done since
@@ -799,12 +776,12 @@ func deserializeUtxoEntry(serialized []byte) (*UtxoEntry, error) {
 		}
 		offset += bytesRead
 
-		entry.outputs = append(entry.outputs, utxoOutput{
+		entry.sparseOutputs[outputIndex] = &utxoOutput{
 			spent:      false,
 			compressed: true,
 			pkScript:   compScript,
 			amount:     int64(compAmount),
-		})
+		}
 	}
 
 	return entry, nil
