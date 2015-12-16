@@ -1630,7 +1630,7 @@ func (s *server) peerConnHandler(sp *serverPeer) {
 	err := s.establishConn(sp)
 	if err != nil {
 		srvrLog.Debugf("Failed to connect to %s: %v", sp.Addr(), err)
-		s.donePeers <- sp
+		sp.Disconnect()
 	}
 }
 
@@ -1852,6 +1852,23 @@ out:
 	}
 	s.blockManager.Stop()
 	s.addrManager.Stop()
+
+	// Drain channels before exiting so nothing is left waiting around
+	// to send.
+cleanup:
+	for {
+		select {
+		case <-s.newPeers:
+		case <-s.donePeers:
+		case <-s.peerHeightsUpdate:
+		case <-s.relayInv:
+		case <-s.broadcast:
+		case <-s.wakeup:
+		case <-s.query:
+		default:
+			break cleanup
+		}
+	}
 	s.wg.Done()
 	srvrLog.Tracef("Peer handler done")
 }
