@@ -2285,8 +2285,17 @@ func handleGetRawTransaction(s *rpcServer, cmd interface{}, closeChan <-chan str
 	var blkHeight int32
 	tx, err := s.server.txMemPool.FetchTransaction(txHash)
 	if err != nil {
+		if s.server.blockManager.txIndex == nil {
+			return nil, &btcjson.RPCError{
+				Code: btcjson.ErrRPCNoTxInfo,
+				Message: "No information available about transaction. " +
+					"You need to run btcd with tx index enabled to query txs " +
+					"from the blockchain (--index=txbyhash).",
+			}
+		}
+
 		// Look up the location of the transaction.
-		blockRegion, err := s.chain.TxBlockRegion(nil, txHash)
+		blockRegion, err := s.server.blockManager.txIndex.TxBlockRegion(nil, txHash)
 		if err != nil {
 			context := "Failed to retrieve transaction location"
 			return nil, internalRPCError(err.Error(), context)

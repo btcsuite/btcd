@@ -781,17 +781,6 @@ func (b *BlockChain) connectBlock(node *blockNode, block *btcutil.Block, view *U
 			return err
 		}
 
-		// TODO(davec): The transaction index is no longer required, but
-		// the rest of the code needs to be updated to make it optional,
-		// so continue maintaining it here for now.
-		//
-		// Add transaction index entries for all of the transactions in
-		// the block being connected.
-		err = dbAddTxIndexEntries(dbTx, block)
-		if err != nil {
-			return err
-		}
-
 		// Insert the block into the database if it's not already there.
 		hasBlock, err := dbTx.HasBlock(block.Sha())
 		if err != nil {
@@ -805,8 +794,8 @@ func (b *BlockChain) connectBlock(node *blockNode, block *btcutil.Block, view *U
 		}
 
 		// Run all indexes
-		for i := range b.indexes {
-			err = b.indexConnectBlock(dbTx, i, block, view)
+		for _, index := range b.indexes {
+			err = b.indexConnectBlock(dbTx, index, block, view)
 			if err != nil {
 				return err
 			}
@@ -893,8 +882,8 @@ func (b *BlockChain) disconnectBlock(node *blockNode, block *btcutil.Block, view
 
 	err = b.db.Update(func(dbTx database.Tx) error {
 		// Run all indexes
-		for i := range b.indexes {
-			err = b.indexDisconnectBlock(dbTx, i, block, view)
+		for _, index := range b.indexes {
+			err = b.indexDisconnectBlock(dbTx, index, block, view)
 			if err != nil {
 				return err
 			}
@@ -924,17 +913,6 @@ func (b *BlockChain) disconnectBlock(node *blockNode, block *btcutil.Block, view
 		// Update the transaction spend journal by removing the record
 		// that contains all txos spent by the block .
 		err = dbRemoveSpendJournalEntry(dbTx, block.Sha())
-		if err != nil {
-			return err
-		}
-
-		// TODO(davec): The transaction index is no longer required, but
-		// the rest of the code needs to be updated to make it optional,
-		// so continue maintaining it here for now.
-		//
-		// Remove transaction index entries for all of the transactions
-		// in the block being disconnected.
-		err = dbRemoveTxIndexEntries(dbTx, block)
 		if err != nil {
 			return err
 		}

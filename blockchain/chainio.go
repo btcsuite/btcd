@@ -33,10 +33,6 @@ var (
 	// chain state.
 	chainStateKeyName = []byte("chainstate")
 
-	// txIndexBucketName is the name of the db bucket used to house the
-	// transaction index.
-	txIndexBucketName = []byte("txidx")
-
 	// spendJournalBucketName is the name of the db bucket used to house
 	// transactions outputs that are spent in each block.
 	spendJournalBucketName = []byte("spendjournal")
@@ -872,160 +868,6 @@ func dbPutUtxoView(dbTx database.Tx, view *UtxoViewpoint) error {
 }
 
 // -----------------------------------------------------------------------------
-// The transaction index consists of an entry for every transaction in the main
-// chain.  Since it possible for multiple transactions to have the same hash as
-// long as the previous transaction with the same hash is fully spent, each
-// entry consists of one or more records.
-//
-// The serialized format is:
-//
-//   <num entries>[<block hash><start offset><tx length>,...]
-//
-//   Field           Type           Size
-//   num entries     uint8          1 byte
-//   block hash      wire.ShaHash   wire.HashSize
-//   start offset    uint32         4 bytes
-//   tx length       uint32         4 bytes
-// -----------------------------------------------------------------------------
-
-// dbHasTxIndexEntry uses an existing database transaction to return whether or
-// not the transaction index contains the provided hash.
-func dbHasTxIndexEntry(dbTx database.Tx, txHash *wire.ShaHash) bool {
-	txIndex := dbTx.Metadata().Bucket(txIndexBucketName)
-	return txIndex.Get(txHash[:]) != nil
-}
-
-// dbPutTxIndexEntry uses an existing database transaction to update the
-// transaction index given the provided values.
-func dbPutTxIndexEntry(dbTx database.Tx, txHash, blockHash *wire.ShaHash, txLoc wire.TxLoc) error {
-	txIndex := dbTx.Metadata().Bucket(txIndexBucketName)
-	existing := txIndex.Get(txHash[:])
-
-	// Since a new entry is being added, there will be one more than is
-	// already there (if any).
-	numEntries := uint8(0)
-	if len(existing) > 0 {
-		numEntries = existing[0]
-	}
-	numEntries++
-
-	// Serialize the entry.
-	serializedData := make([]byte, (uint32(numEntries)*(wire.HashSize+8))+1)
-	serializedData[0] = numEntries
-	offset := uint32(1)
-	if len(existing) > 0 {
-		copy(serializedData, existing[1:])
-		offset += uint32(len(existing) - 1)
-	}
-	copy(serializedData[offset:], blockHash[:])
-	offset += wire.HashSize
-	byteOrder.PutUint32(serializedData[offset:], uint32(txLoc.TxStart))
-	offset += 4
-	byteOrder.PutUint32(serializedData[offset:], uint32(txLoc.TxLen))
-
-	return txIndex.Put(txHash[:], serializedData)
-}
-
-// dbFetchTxIndexEntry uses an existing database transaction to fetch the block
-// region for the provided transaction hash from the transaction index.  When
-// there is no entry for the provided hash, nil will be returned for the both
-// the region and the error.  When there are multiple entries, the block region
-// for the latest one will be returned.
-func dbFetchTxIndexEntry(dbTx database.Tx, txHash *wire.ShaHash) (*database.BlockRegion, error) {
-	// Load the record from the database and return now if it doesn't exist.
-	txIndex := dbTx.Metadata().Bucket(txIndexBucketName)
-	serializedData := txIndex.Get(txHash[:])
-	if len(serializedData) == 0 {
-		return nil, nil
-	}
-
-	// Ensure the serialized data has enough bytes to properly deserialize.
-	numEntries := uint8(serializedData[0])
-	if len(serializedData) < (int(numEntries)*(wire.HashSize+8) + 1) {
-		return nil, database.Error{
-			ErrorCode: database.ErrCorruption,
-			Description: fmt.Sprintf("corrupt transaction index "+
-				"entry for %s", txHash),
-		}
-	}
-
-	// Deserialize the final entry.
-	region := database.BlockRegion{Hash: &wire.ShaHash{}}
-	offset := (uint32(numEntries)-1)*(wire.HashSize+8) + 1
-	copy(region.Hash[:], serializedData[offset:offset+wire.HashSize])
-	offset += wire.HashSize
-	region.Offset = byteOrder.Uint32(serializedData[offset : offset+4])
-	offset += 4
-	region.Len = byteOrder.Uint32(serializedData[offset : offset+4])
-
-	return &region, nil
-}
-
-// dbAddTxIndexEntries uses an existing database transaction to add a
-// transaction index entry for every transaction in the passed block.
-func dbAddTxIndexEntries(dbTx database.Tx, block *btcutil.Block) error {
-	txLocs, err := block.TxLoc()
-	if err != nil {
-		return err
-	}
-
-	for i, tx := range block.Transactions() {
-		err := dbPutTxIndexEntry(dbTx, tx.Sha(), block.Sha(), txLocs[i])
-		if err != nil {
-			return err
-		}
-	}
-
-	return nil
-}
-
-// dbRemoveTxIndexEntry uses an existing database transaction to remove the most
-// recent transaction index entry for the given hash.
-func dbRemoveTxIndexEntry(dbTx database.Tx, txHash *wire.ShaHash) error {
-	txIndex := dbTx.Metadata().Bucket(txIndexBucketName)
-	serializedData := txIndex.Get(txHash[:])
-	if len(serializedData) == 0 {
-		return fmt.Errorf("can't remove non-existent transaction %s "+
-			"from the transaction index", txHash)
-	}
-
-	// Remove the key altogether if there was only one entry.
-	numEntries := uint8(serializedData[0])
-	if numEntries == 1 {
-		return txIndex.Delete(txHash[:])
-	}
-
-	// Ensure the serialized data has enough bytes to properly deserialize.
-	if len(serializedData) < (int(numEntries)*(wire.HashSize+8) + 1) {
-		return database.Error{
-			ErrorCode: database.ErrCorruption,
-			Description: fmt.Sprintf("corrupt transaction index "+
-				"entry for %s", txHash),
-		}
-	}
-
-	// Remove the latest entry since there is more than one.
-	numEntries--
-	serializedData[0] = numEntries
-	offset := (numEntries-1)*(wire.HashSize+8) + 1
-	serializedData = serializedData[:offset]
-	return txIndex.Put(txHash[:], serializedData)
-}
-
-// dbRemoveTxIndexEntries uses an existing database transaction to remove the
-// latest transaction entry for every transaction in the passed block.
-func dbRemoveTxIndexEntries(dbTx database.Tx, block *btcutil.Block) error {
-	for _, tx := range block.Transactions() {
-		err := dbRemoveTxIndexEntry(dbTx, tx.Sha())
-		if err != nil {
-			return err
-		}
-	}
-
-	return nil
-}
-
-// -----------------------------------------------------------------------------
 // The block index consists of two buckets with an entry for every block in the
 // main chain.  One bucket is for the hash to height mapping and the other is
 // for the height to hash mapping.
@@ -1254,14 +1096,6 @@ func (b *BlockChain) createChainState() error {
 			return err
 		}
 
-		// Create the bucket that houses the transaction index.
-		// TODO remove this once the txindex has been converted to a
-		// blockchain index.
-		_, err = meta.CreateBucket(txIndexBucketName)
-		if err != nil {
-			return err
-		}
-
 		// Create the bucket that houses the spend journal data.
 		_, err = meta.CreateBucket(spendJournalBucketName)
 		if err != nil {
@@ -1278,11 +1112,6 @@ func (b *BlockChain) createChainState() error {
 
 		// Create the bucket that houses the index buckets.
 		_, err = meta.CreateBucket(indexesBucketName)
-		if err != nil {
-			return err
-		}
-		// Create the bucket that houses the index tips.
-		_, err = meta.CreateBucket(indexTipsBucketName)
 		if err != nil {
 			return err
 		}
@@ -1602,40 +1431,4 @@ func (b *BlockChain) HeightRange(startHeight, endHeight int32) ([]wire.ShaHash, 
 		return nil
 	})
 	return hashList, err
-}
-
-// TxBlockRegion returns the block region for the provided transaction hash
-// from the transaction index.  The block region can in turn be used to load the
-// raw transaction bytes.  When there is no entry for the provided hash, nil
-// will be returned for the both the entry and the error.
-//
-// The database transaction parameter can be nil in which case a a new one will
-// be used.
-//
-// This function is safe for concurrent access.
-func (b *BlockChain) TxBlockRegion(dbTx database.Tx, hash *wire.ShaHash) (*database.BlockRegion, error) {
-	if dbTx != nil {
-		return dbFetchTxIndexEntry(dbTx, hash)
-	}
-
-	var region *database.BlockRegion
-	err := b.db.View(func(dbTx database.Tx) error {
-		var err error
-		region, err = dbFetchTxIndexEntry(dbTx, hash)
-		return err
-	})
-	return region, err
-}
-
-// ExistsTx returns whether or not the provided transaction hash exists from the
-// viewpoint of the end of the main chain.
-//
-// This function is safe for concurrent access.
-func (b *BlockChain) ExistsTx(hash *wire.ShaHash) (bool, error) {
-	var exists bool
-	err := b.db.View(func(dbTx database.Tx) error {
-		exists = dbHasTxIndexEntry(dbTx, hash)
-		return nil
-	})
-	return exists, err
 }

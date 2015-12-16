@@ -171,6 +171,10 @@ type blockManager struct {
 	headerList       *list.List
 	startHeader      *list.Element
 	nextCheckpoint   *chaincfg.Checkpoint
+
+	// The following fields are index instances. They are nil if not enabled.
+	addrIndex *index.AddrIndex
+	txIndex   *index.TxIndex
 }
 
 // resetHeaderState sets the headers-first mode state to values appropriate for
@@ -847,9 +851,12 @@ func (b *blockManager) haveInventory(invVect *wire.InvVect) (bool, error) {
 			return true, nil
 		}
 
-		// Check if the transaction exists from the point of view of the
-		// end of the main chain.
-		return b.chain.ExistsTx(&invVect.Hash)
+		// Check the UTXO set.
+		entry, err := b.chain.FetchUtxoEntry(&invVect.Hash)
+		if err != nil {
+			return false, err
+		}
+		return entry != nil && !entry.IsFullySpent(), nil
 	}
 
 	// The requested inventory is is an unsupported type, so just claim
@@ -1324,8 +1331,33 @@ func newBlockManager(s *server) (*blockManager, error) {
 		quit:            make(chan struct{}),
 	}
 
-	indexes, err := index.IndexesByName(cfg.EnableIndexes)
+	var needsAddrIndex, needsTxIndex bool
+	var indexes []blockchain.Index
+	for _, indexName := range cfg.EnableIndexes {
+		switch indexName {
+		case "txbyaddr":
+			needsAddrIndex = true
+		case "txbyhash":
+			needsTxIndex = true
+		default:
+			bmgrLog.Warnf("Index name %s does not exist, ignoring.", indexName)
+		}
+	}
 
+	// Caution: the index needs to be first in the indexes array, because the
+	// addrindex uses data from the txindex during catchup. If the addrindex
+	// is run first, it may not have the transactions from the current block
+	// indexed.
+	if needsTxIndex {
+		bm.txIndex = index.NewTxIndex()
+		indexes = append(indexes, bm.txIndex)
+	}
+	if needsAddrIndex {
+		bm.addrIndex = index.NewAddrIndex(bm.txIndex)
+		indexes = append(indexes, bm.addrIndex)
+	}
+
+	var err error
 	bm.chain, err = blockchain.New(s.db, s.chainParams, bm.handleNotifyMsg,
 		s.sigCache, indexes)
 	if err != nil {
@@ -1343,10 +1375,18 @@ func newBlockManager(s *server) (*blockManager, error) {
 		bmgrLog.Info("Checkpoints are disabled")
 	}
 
+	// Drop the requested indexes.
+	// TODO
+	//bm.chain.DropIndex(OMG OMG OMG)
+
 	// Create and catch up all registered indexers.
 	// This call does not return until catching up is finished, so
 	// everything else in the server is not started before then.
-	bm.chain.InitIndexes()
+	err = bm.chain.InitIndexes()
+	if err != nil {
+		bmgrLog.Errorf("Error initializing indexes: %v", err)
+		return nil, err
+	}
 
 	// Initialize the chain state.
 	bm.updateChainState(best.Hash, best.Height)

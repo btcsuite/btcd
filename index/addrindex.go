@@ -351,10 +351,10 @@ type writeIndexData map[addrKey][]wire.TxLoc
 
 // indexScriptPubKey indexes the tx as relevant for all the addresses found in
 // the SPK.
-func (a *addrIndex) indexScriptPubKey(idx writeIndexData, scriptPubKey []byte, loc wire.TxLoc) error {
+func (i *AddrIndex) indexScriptPubKey(idx writeIndexData, scriptPubKey []byte, loc wire.TxLoc) error {
 	// Any errors are intentionally ignored: if the tx is non-standard, it
 	// simply won't be indexed
-	_, addrs, _, _ := txscript.ExtractPkScriptAddrs(scriptPubKey, a.chain.Params())
+	_, addrs, _, _ := txscript.ExtractPkScriptAddrs(scriptPubKey, i.chain.Params())
 
 	for _, addr := range addrs {
 		addrKey, err := addrToKey(addr)
@@ -369,7 +369,7 @@ func (a *addrIndex) indexScriptPubKey(idx writeIndexData, scriptPubKey []byte, l
 
 // indexBlockAddrs returns a populated index of the all the transactions in the
 // passed block based on the addresses involved in each transaction.
-func (a *addrIndex) indexBlockAddrs(dbTx database.Tx, blk *btcutil.Block, view *blockchain.UtxoViewpoint) (writeIndexData, error) {
+func (i *AddrIndex) indexBlockAddrs(dbTx database.Tx, blk *btcutil.Block, view *blockchain.UtxoViewpoint) (writeIndexData, error) {
 	addrIndex := make(writeIndexData)
 	txLocs, err := blk.TxLoc()
 	if err != nil {
@@ -394,9 +394,13 @@ func (a *addrIndex) indexBlockAddrs(dbTx database.Tx, blk *btcutil.Block, view *
 					// from the block being connected/disconnected in memory.
 					pkScript = view.LookupEntry(&prevOut.Hash).PkScriptByIndex(prevOut.Index)
 				} else {
+					if i.txIndex == nil {
+						return nil, fmt.Errorf("Transaction-by-address index does not support catchup without a transaction-by-hash index.")
+					}
+
 					// If not, look up the location of the transaction using
 					// the txindex.
-					blockRegion, err := a.chain.TxBlockRegion(dbTx, &prevOut.Hash)
+					blockRegion, err := i.txIndex.TxBlockRegion(dbTx, &prevOut.Hash)
 					if err != nil {
 						log.Errorf("Error fetching tx %v: %v",
 							prevOut.Hash, err)
@@ -422,35 +426,43 @@ func (a *addrIndex) indexBlockAddrs(dbTx database.Tx, blk *btcutil.Block, view *
 					inputOutPoint := prevOutTx.TxOut[prevOut.Index]
 					pkScript = inputOutPoint.PkScript
 				}
-				a.indexScriptPubKey(addrIndex, pkScript, locInBlock)
+				i.indexScriptPubKey(addrIndex, pkScript, locInBlock)
 			}
 		}
 
 		for _, txOut := range tx.MsgTx().TxOut {
-			a.indexScriptPubKey(addrIndex, txOut.PkScript, locInBlock)
+			i.indexScriptPubKey(addrIndex, txOut.PkScript, locInBlock)
 		}
 	}
 	return addrIndex, nil
 }
 
-type addrIndex struct {
-	chain *blockchain.BlockChain
+// AddrIndex indexes transactions by all the addresses appearing in them.
+type AddrIndex struct {
+	chain   *blockchain.BlockChain
+	txIndex *TxIndex
 }
 
-func (a *addrIndex) Init(b *blockchain.BlockChain) {
-	a.chain = b
+// Init initializes the AddrIndex with a given blockchain.
+func (i *AddrIndex) Init(b *blockchain.BlockChain) {
+	i.chain = b
 }
 
 // Name returns the index's name. It should be unique per index type.
 // It is used to identify
-func (a *addrIndex) Name() string {
+func (i *AddrIndex) Name() string {
 	return addrIndexName
+}
+
+// Version returns the index's version.
+func (i *AddrIndex) Version() int32 {
+	return 1
 }
 
 // Create initializes the necessary data structures for the index
 // in the database using an existing transaction. It creates buckets and
 // fills them with initial data as needed.
-func (a *addrIndex) Create(dbTx database.Tx, bucket database.Bucket) error {
+func (i *AddrIndex) Create(dbTx database.Tx, bucket database.Bucket) error {
 	// Nothing needs to be inserted.
 	return nil
 }
@@ -486,8 +498,8 @@ func dbRemoveAddrIndexDataForBlock(bucket database.Bucket, blk *btcutil.Block, d
 
 // ConnectBlock indexes the given block using an existing database
 // transaction.
-func (a *addrIndex) ConnectBlock(dbTx database.Tx, bucket database.Bucket, block *btcutil.Block, view *blockchain.UtxoViewpoint) error {
-	data, err := a.indexBlockAddrs(dbTx, block, view)
+func (i *AddrIndex) ConnectBlock(dbTx database.Tx, bucket database.Bucket, block *btcutil.Block, view *blockchain.UtxoViewpoint) error {
+	data, err := i.indexBlockAddrs(dbTx, block, view)
 	if err != nil {
 		return err
 	}
@@ -497,8 +509,8 @@ func (a *addrIndex) ConnectBlock(dbTx database.Tx, bucket database.Bucket, block
 
 // DisconnectBlock de-indexes the given block using an existing database
 // transaction.
-func (a *addrIndex) DisconnectBlock(dbTx database.Tx, bucket database.Bucket, block *btcutil.Block, view *blockchain.UtxoViewpoint) error {
-	data, err := a.indexBlockAddrs(dbTx, block, view)
+func (i *AddrIndex) DisconnectBlock(dbTx database.Tx, bucket database.Bucket, block *btcutil.Block, view *blockchain.UtxoViewpoint) error {
+	data, err := i.indexBlockAddrs(dbTx, block, view)
 	if err != nil {
 		return err
 	}
@@ -506,10 +518,13 @@ func (a *addrIndex) DisconnectBlock(dbTx database.Tx, bucket database.Bucket, bl
 	return dbRemoveAddrIndexDataForBlock(bucket, block, data)
 }
 
-func init() {
-	var index addrIndex
-	if err := RegisterIndex(&index); err != nil {
-		panic(fmt.Sprintf("Failed to register index '%s': %v",
-			index.Name(), err))
+var _ blockchain.Index = (*AddrIndex)(nil)
+
+// NewAddrIndex creates a new AddrIndex. The passed TxIndex will be used to
+// fetch transactions by hash during catchup phase. It may be nil, in that case
+// the returned AddrIndex will not support catchup.
+func NewAddrIndex(txIndex *TxIndex) *AddrIndex {
+	return &AddrIndex{
+		txIndex: txIndex,
 	}
 }
