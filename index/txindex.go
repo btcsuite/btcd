@@ -256,6 +256,7 @@ func (i *TxIndex) ExistsTx(dbTx database.Tx, hash *wire.ShaHash) (bool, error) {
 	return dbHasTxIndexEntry(bucket, hash), nil
 }
 
+// Ensure TxIndex implements blockchain.Index
 var _ blockchain.Index = (*TxIndex)(nil)
 
 // NewTxIndex creates a new TxIndex.

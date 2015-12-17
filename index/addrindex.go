@@ -255,7 +255,7 @@ type addrIndexResult struct {
 // This function returns block heights instead of hashes to avoid a dependency
 // on BlockChain. See fetchAddrIndexEntries below for a version that
 // returns block hashes.
-func dbFetchAddrIndexEntries(bucket database.Bucket, key *addrKey, numToSkip, numRequested uint32, reverse bool) ([]addrIndexResult, uint32, error) {
+func dbFetchAddrIndexEntries(bucket database.Bucket, key *addrKey, numToSkip, numRequested int, reverse bool) ([]addrIndexResult, int, error) {
 	// Load all
 	level := uint8(0)
 	var serializedData []byte
@@ -279,7 +279,7 @@ func dbFetchAddrIndexEntries(bucket database.Bucket, key *addrKey, numToSkip, nu
 	// When the requested number of entries to skip is larger than the
 	// number available, skip them all and return now with the actual number
 	// skipped.
-	numEntries := uint32(len(serializedData) / txEntrySize)
+	numEntries := len(serializedData) / txEntrySize
 	if numToSkip >= numEntries {
 		return nil, numEntries, nil
 	}
@@ -299,8 +299,8 @@ func dbFetchAddrIndexEntries(bucket database.Bucket, key *addrKey, numToSkip, nu
 	// Start the offset after all skipped entries and load the calculated
 	// number.
 	results := make([]addrIndexResult, numToLoad)
-	for i := uint32(0); i < numToLoad; i++ {
-		var offset uint32
+	for i := 0; i < numToLoad; i++ {
+		var offset int
 		// Calculate the offset we need to read from, according to the
 		// reverse flag.
 		if reverse {
@@ -322,28 +322,34 @@ func dbFetchAddrIndexEntries(bucket database.Bucket, key *addrKey, numToSkip, nu
 	return results, numToSkip, nil
 }
 
-// Returns block regions for all referenced transactions and the number of
-// entries skipped since it could have been less in the case there are less
-// total entries than the requested number of entries to skip.
-func fetchAddrIndexEntries(chain *blockchain.BlockChain, dbTx database.Tx, key *addrKey, numToSkip, numRequested uint32, reverse bool) ([]database.BlockRegion, uint32, error) {
-	bucket := chain.IndexBucket(dbTx, addrIndexName)
+// FetchBlockRegionsForAddr returns block regions and heights for transactions
+// involving the given addr. It also returns how many txs were actually skipped,
+// since it may be lower than numToSkip if there are not enough txs.
+func (idx *AddrIndex) FetchBlockRegionsForAddr(dbTx database.Tx, addr btcutil.Address, numToSkip, numRequested int, reverse bool) ([]database.BlockRegion, []int32, int, error) {
+	key, err := addrToKey(addr)
+	if err != nil {
+		return nil, nil, 0, err
+	}
+	bucket := idx.chain.IndexBucket(dbTx, addrIndexName)
 	res, skipped, err := dbFetchAddrIndexEntries(bucket, key, numToSkip, numRequested, reverse)
 	if err != nil {
-		return nil, 0, err
+		return nil, nil, 0, err
 	}
 
 	regions := make([]database.BlockRegion, len(res))
+	heights := make([]int32, len(res))
 	for i := 0; i < len(res); i++ {
 		// Fetch the hash associated with the height.
-		regions[i].Hash, err = chain.BlockHashByHeight(dbTx, res[i].Height)
+		regions[i].Hash, err = idx.chain.BlockHashByHeight(dbTx, res[i].Height)
 		if err != nil {
-			return nil, 0, err
+			return nil, nil, 0, err
 		}
 		regions[i].Len = res[i].Len
 		regions[i].Offset = res[i].Offset
+		heights[i] = res[i].Height
 	}
 
-	return regions, skipped, nil
+	return regions, heights, skipped, nil
 }
 
 // writeIndexData represents the address index data to be written from one block
@@ -351,10 +357,10 @@ type writeIndexData map[addrKey][]wire.TxLoc
 
 // indexScriptPubKey indexes the tx as relevant for all the addresses found in
 // the SPK.
-func (i *AddrIndex) indexScriptPubKey(idx writeIndexData, scriptPubKey []byte, loc wire.TxLoc) error {
+func (idx *AddrIndex) indexScriptPubKey(idxData writeIndexData, scriptPubKey []byte, loc wire.TxLoc) error {
 	// Any errors are intentionally ignored: if the tx is non-standard, it
 	// simply won't be indexed
-	_, addrs, _, _ := txscript.ExtractPkScriptAddrs(scriptPubKey, i.chain.Params())
+	_, addrs, _, _ := txscript.ExtractPkScriptAddrs(scriptPubKey, idx.chain.Params())
 
 	for _, addr := range addrs {
 		addrKey, err := addrToKey(addr)
@@ -362,14 +368,14 @@ func (i *AddrIndex) indexScriptPubKey(idx writeIndexData, scriptPubKey []byte, l
 			// If the address type is not supported, just ignore it.
 			continue
 		}
-		idx[*addrKey] = append(idx[*addrKey], loc)
+		idxData[*addrKey] = append(idxData[*addrKey], loc)
 	}
 	return nil
 }
 
 // indexBlockAddrs returns a populated index of the all the transactions in the
 // passed block based on the addresses involved in each transaction.
-func (i *AddrIndex) indexBlockAddrs(dbTx database.Tx, blk *btcutil.Block, view *blockchain.UtxoViewpoint) (writeIndexData, error) {
+func (idx *AddrIndex) indexBlockAddrs(dbTx database.Tx, blk *btcutil.Block, view *blockchain.UtxoViewpoint) (writeIndexData, error) {
 	addrIndex := make(writeIndexData)
 	txLocs, err := blk.TxLoc()
 	if err != nil {
@@ -394,13 +400,13 @@ func (i *AddrIndex) indexBlockAddrs(dbTx database.Tx, blk *btcutil.Block, view *
 					// from the block being connected/disconnected in memory.
 					pkScript = view.LookupEntry(&prevOut.Hash).PkScriptByIndex(prevOut.Index)
 				} else {
-					if i.txIndex == nil {
+					if idx.txIndex == nil {
 						return nil, fmt.Errorf("Transaction-by-address index does not support catchup without a transaction-by-hash index.")
 					}
 
 					// If not, look up the location of the transaction using
 					// the txindex.
-					blockRegion, err := i.txIndex.TxBlockRegion(dbTx, &prevOut.Hash)
+					blockRegion, err := idx.txIndex.TxBlockRegion(dbTx, &prevOut.Hash)
 					if err != nil {
 						log.Errorf("Error fetching tx %v: %v",
 							prevOut.Hash, err)
@@ -426,12 +432,12 @@ func (i *AddrIndex) indexBlockAddrs(dbTx database.Tx, blk *btcutil.Block, view *
 					inputOutPoint := prevOutTx.TxOut[prevOut.Index]
 					pkScript = inputOutPoint.PkScript
 				}
-				i.indexScriptPubKey(addrIndex, pkScript, locInBlock)
+				idx.indexScriptPubKey(addrIndex, pkScript, locInBlock)
 			}
 		}
 
 		for _, txOut := range tx.MsgTx().TxOut {
-			i.indexScriptPubKey(addrIndex, txOut.PkScript, locInBlock)
+			idx.indexScriptPubKey(addrIndex, txOut.PkScript, locInBlock)
 		}
 	}
 	return addrIndex, nil
@@ -444,25 +450,25 @@ type AddrIndex struct {
 }
 
 // Init initializes the AddrIndex with a given blockchain.
-func (i *AddrIndex) Init(b *blockchain.BlockChain) {
-	i.chain = b
+func (idx *AddrIndex) Init(b *blockchain.BlockChain) {
+	idx.chain = b
 }
 
 // Name returns the index's name. It should be unique per index type.
 // It is used to identify
-func (i *AddrIndex) Name() string {
+func (idx *AddrIndex) Name() string {
 	return addrIndexName
 }
 
 // Version returns the index's version.
-func (i *AddrIndex) Version() int32 {
+func (idx *AddrIndex) Version() int32 {
 	return 1
 }
 
 // Create initializes the necessary data structures for the index
 // in the database using an existing transaction. It creates buckets and
 // fills them with initial data as needed.
-func (i *AddrIndex) Create(dbTx database.Tx, bucket database.Bucket) error {
+func (idx *AddrIndex) Create(dbTx database.Tx, bucket database.Bucket) error {
 	// Nothing needs to be inserted.
 	return nil
 }
@@ -498,8 +504,8 @@ func dbRemoveAddrIndexDataForBlock(bucket database.Bucket, blk *btcutil.Block, d
 
 // ConnectBlock indexes the given block using an existing database
 // transaction.
-func (i *AddrIndex) ConnectBlock(dbTx database.Tx, bucket database.Bucket, block *btcutil.Block, view *blockchain.UtxoViewpoint) error {
-	data, err := i.indexBlockAddrs(dbTx, block, view)
+func (idx *AddrIndex) ConnectBlock(dbTx database.Tx, bucket database.Bucket, block *btcutil.Block, view *blockchain.UtxoViewpoint) error {
+	data, err := idx.indexBlockAddrs(dbTx, block, view)
 	if err != nil {
 		return err
 	}
@@ -509,8 +515,8 @@ func (i *AddrIndex) ConnectBlock(dbTx database.Tx, bucket database.Bucket, block
 
 // DisconnectBlock de-indexes the given block using an existing database
 // transaction.
-func (i *AddrIndex) DisconnectBlock(dbTx database.Tx, bucket database.Bucket, block *btcutil.Block, view *blockchain.UtxoViewpoint) error {
-	data, err := i.indexBlockAddrs(dbTx, block, view)
+func (idx *AddrIndex) DisconnectBlock(dbTx database.Tx, bucket database.Bucket, block *btcutil.Block, view *blockchain.UtxoViewpoint) error {
+	data, err := idx.indexBlockAddrs(dbTx, block, view)
 	if err != nil {
 		return err
 	}

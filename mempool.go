@@ -468,7 +468,7 @@ func (mp *txMemPool) FilterTransactionsByAddress(addr btcutil.Address) ([]*btcut
 		return addressTxs, nil
 	}
 
-	return nil, fmt.Errorf("address does not have any transactions in the pool")
+	return nil, nil
 }
 
 // maybeAcceptTransaction is the internal function which implements the public
