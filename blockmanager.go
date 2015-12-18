@@ -16,7 +16,6 @@ import (
 	"github.com/btcsuite/btcd/blockchain"
 	"github.com/btcsuite/btcd/chaincfg"
 	database "github.com/btcsuite/btcd/database2"
-	"github.com/btcsuite/btcd/index"
 	"github.com/btcsuite/btcd/wire"
 	"github.com/btcsuite/btcutil"
 )
@@ -171,10 +170,6 @@ type blockManager struct {
 	headerList       *list.List
 	startHeader      *list.Element
 	nextCheckpoint   *chaincfg.Checkpoint
-
-	// The following fields are index instances. They are nil if not enabled.
-	addrIndex *index.AddrIndex
-	txIndex   *index.TxIndex
 }
 
 // resetHeaderState sets the headers-first mode state to values appropriate for
@@ -1320,7 +1315,7 @@ func (b *blockManager) Pause() chan<- struct{} {
 
 // newBlockManager returns a new bitcoin block manager.
 // Use Start to begin processing asynchronous block and inv updates.
-func newBlockManager(s *server) (*blockManager, error) {
+func newBlockManager(s *server, indexes []blockchain.Index) (*blockManager, error) {
 	bm := blockManager{
 		server:          s,
 		requestedTxns:   make(map[wire.ShaHash]struct{}),
@@ -1329,32 +1324,6 @@ func newBlockManager(s *server) (*blockManager, error) {
 		msgChan:         make(chan interface{}, cfg.MaxPeers*3),
 		headerList:      list.New(),
 		quit:            make(chan struct{}),
-	}
-
-	var needsAddrIndex, needsTxIndex bool
-	var indexes []blockchain.Index
-	for _, indexName := range cfg.EnableIndexes {
-		switch indexName {
-		case "txbyaddr":
-			needsAddrIndex = true
-		case "txbyhash":
-			needsTxIndex = true
-		default:
-			bmgrLog.Warnf("Index name %s does not exist, ignoring.", indexName)
-		}
-	}
-
-	// Caution: the index needs to be first in the indexes array, because the
-	// addrindex uses data from the txindex during catchup. If the addrindex
-	// is run first, it may not have the transactions from the current block
-	// indexed.
-	if needsTxIndex {
-		bm.txIndex = index.NewTxIndex()
-		indexes = append(indexes, bm.txIndex)
-	}
-	if needsAddrIndex {
-		bm.addrIndex = index.NewAddrIndex(bm.txIndex)
-		indexes = append(indexes, bm.addrIndex)
 	}
 
 	var err error

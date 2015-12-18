@@ -2285,7 +2285,7 @@ func handleGetRawTransaction(s *rpcServer, cmd interface{}, closeChan <-chan str
 	var blkHeight int32
 	tx, err := s.server.txMemPool.FetchTransaction(txHash)
 	if err != nil {
-		if s.server.blockManager.txIndex == nil {
+		if s.server.txIndex == nil {
 			return nil, &btcjson.RPCError{
 				Code: btcjson.ErrRPCNoTxInfo,
 				Message: "No information available about transaction. " +
@@ -2295,7 +2295,7 @@ func handleGetRawTransaction(s *rpcServer, cmd interface{}, closeChan <-chan str
 		}
 
 		// Look up the location of the transaction.
-		blockRegion, err := s.server.blockManager.txIndex.TxBlockRegion(nil, txHash)
+		blockRegion, err := s.server.txIndex.TxBlockRegion(nil, txHash)
 		if err != nil {
 			context := "Failed to retrieve transaction location"
 			return nil, internalRPCError(err.Error(), context)
@@ -2957,7 +2957,7 @@ func createVinListPrevOut(s *rpcServer, mtx *wire.MsgTx, chainParams *chaincfg.P
 		} else {
 			var txBytes []byte
 			err = s.server.db.View(func(dbTx database.Tx) error {
-				txRegion, err := s.server.blockManager.txIndex.TxBlockRegion(dbTx, &txIn.PreviousOutPoint.Hash)
+				txRegion, err := s.server.txIndex.TxBlockRegion(dbTx, &txIn.PreviousOutPoint.Hash)
 				if err != nil {
 					return err
 				}
@@ -3067,7 +3067,7 @@ func createSearchRawTransactionsResult(s *rpcServer, chainParams *chaincfg.Param
 func getMempoolTxsForAddressRange(s *rpcServer, addr btcutil.Address, skip int,
 	limit int) ([]*btcutil.Tx, int, error) {
 
-	memPoolTxs, err := s.server.txMemPool.FilterTransactionsByAddress(addr)
+	memPoolTxs, err := s.server.addrIndex.FetchMempoolTxsForAddr(addr)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -3097,7 +3097,7 @@ type txWithInfo struct {
 
 // handleSearchRawTransaction implements the searchrawtransactions command.
 func handleSearchRawTransactions(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (interface{}, error) {
-	if s.server.blockManager.addrIndex == nil {
+	if s.server.addrIndex == nil {
 		return nil, &btcjson.RPCError{
 			Code:    btcjson.ErrRPCMisc,
 			Message: "Address index must be enabled (--index=txbyaddr)",
@@ -3165,7 +3165,7 @@ func handleSearchRawTransactions(s *rpcServer, cmd interface{}, closeChan <-chan
 
 		err := s.server.db.View(func(dbTx database.Tx) error {
 			var err error
-			regions, heights, dbSkipped, err = s.server.blockManager.addrIndex.FetchBlockRegionsForAddr(
+			regions, heights, dbSkipped, err = s.server.addrIndex.FetchBlockRegionsForAddr(
 				dbTx, addr, numToSkip-skipped, numRequested-len(addressTxs), reverse)
 			return err
 		})

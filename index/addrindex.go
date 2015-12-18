@@ -443,36 +443,6 @@ func (idx *AddrIndex) indexBlockAddrs(dbTx database.Tx, blk *btcutil.Block, view
 	return addrIndex, nil
 }
 
-// AddrIndex indexes transactions by all the addresses appearing in them.
-type AddrIndex struct {
-	chain   *blockchain.BlockChain
-	txIndex *TxIndex
-}
-
-// Init initializes the AddrIndex with a given blockchain.
-func (idx *AddrIndex) Init(b *blockchain.BlockChain) {
-	idx.chain = b
-}
-
-// Name returns the index's name. It should be unique per index type.
-// It is used to identify
-func (idx *AddrIndex) Name() string {
-	return addrIndexName
-}
-
-// Version returns the index's version.
-func (idx *AddrIndex) Version() int32 {
-	return 1
-}
-
-// Create initializes the necessary data structures for the index
-// in the database using an existing transaction. It creates buckets and
-// fills them with initial data as needed.
-func (idx *AddrIndex) Create(dbTx database.Tx, bucket database.Bucket) error {
-	// Nothing needs to be inserted.
-	return nil
-}
-
 // appendAddrIndexDataForBlock uses an existing database transaction to write
 // the addrindex data from one block to the database. The addrindex tip before
 // calling this function should be the block previous to the one being written.
@@ -502,6 +472,42 @@ func dbRemoveAddrIndexDataForBlock(bucket database.Bucket, blk *btcutil.Block, d
 	return nil
 }
 
+// AddrIndex indexes transactions by all the addresses appearing in them.
+type AddrIndex struct {
+	chain   *blockchain.BlockChain
+	txIndex *TxIndex
+
+	// mempool stores for each address a map of txhash to tx.
+	mempool map[addrKey]map[wire.ShaHash]*btcutil.Tx
+	// mempoolRemove stores for each txid the list of addresses it's indexed in.
+	// It's used for removing txs from the mempool index.
+	mempoolRemove map[wire.ShaHash]map[addrKey]struct{}
+}
+
+// Init initializes the AddrIndex with a given blockchain.
+func (idx *AddrIndex) Init(b *blockchain.BlockChain) {
+	idx.chain = b
+}
+
+// Name returns the index's name. It should be unique per index type.
+// It is used to identify
+func (idx *AddrIndex) Name() string {
+	return addrIndexName
+}
+
+// Version returns the index's version.
+func (idx *AddrIndex) Version() int32 {
+	return 1
+}
+
+// Create initializes the necessary data structures for the index
+// in the database using an existing transaction. It creates buckets and
+// fills them with initial data as needed.
+func (idx *AddrIndex) Create(dbTx database.Tx, bucket database.Bucket) error {
+	// Nothing needs to be inserted.
+	return nil
+}
+
 // ConnectBlock indexes the given block using an existing database
 // transaction.
 func (idx *AddrIndex) ConnectBlock(dbTx database.Tx, bucket database.Bucket, block *btcutil.Block, view *blockchain.UtxoViewpoint) error {
@@ -522,6 +528,73 @@ func (idx *AddrIndex) DisconnectBlock(dbTx database.Tx, bucket database.Bucket, 
 	}
 
 	return dbRemoveAddrIndexDataForBlock(bucket, block, data)
+}
+
+// FetchMempoolTxsForAddr returns all the transactions in the mempool that
+// involve the given address.
+func (idx *AddrIndex) FetchMempoolTxsForAddr(addr btcutil.Address) ([]*btcutil.Tx, error) {
+	return nil, nil
+}
+
+// AddMempoolTx is called when a tx is added to the mempool, it gets added
+// to the index data structures if needed.
+func (idx *AddrIndex) AddMempoolTx(tx *btcutil.Tx, utxoView *blockchain.UtxoViewpoint) error {
+	// Index addresses of all referenced previous output tx's.
+	for _, txIn := range tx.MsgTx().TxIn {
+		entry := utxoView.LookupEntry(&txIn.PreviousOutPoint.Hash)
+		pkScript := entry.PkScriptByIndex(txIn.PreviousOutPoint.Index)
+		idx.indexScriptAddressToTx(pkScript, tx)
+	}
+
+	// Index addresses of all created outputs.
+	for _, txOut := range tx.MsgTx().TxOut {
+		idx.indexScriptAddressToTx(txOut.PkScript, tx)
+	}
+	return nil
+}
+
+// indexScriptAddressToTx alters our address index by adding or removing the tx
+// from the mempool addr index.
+func (idx *AddrIndex) indexScriptAddressToTx(pkScript []byte, tx *btcutil.Tx) error {
+	// Any errors are intentionally ignored: if the tx is non-standard, it
+	// simply won't be indexed
+	_, addresses, _, _ := txscript.ExtractPkScriptAddrs(pkScript,
+		idx.chain.Params())
+
+	for _, addr := range addresses {
+		key, err := addrToKey(addr)
+		if err != nil {
+			// If the addr type is not supported, ignore it.
+			continue
+		}
+
+		if idx.mempool[*key] == nil {
+			idx.mempool[*key] = make(map[wire.ShaHash]*btcutil.Tx)
+		}
+		idx.mempool[*key][*tx.Sha()] = tx
+		if idx.mempoolRemove[*tx.Sha()] == nil {
+			idx.mempoolRemove[*tx.Sha()] = make(map[addrKey]struct{})
+		}
+		idx.mempoolRemove[*tx.Sha()][*key] = struct{}{}
+	}
+
+	return nil
+}
+
+// RemoveMempoolTx is called when a tx is removed from the mempool, it gets
+// removed from the index data structures if needed.
+func (idx *AddrIndex) RemoveMempoolTx(tx *btcutil.Tx) error {
+	// When adding txs from the mempool, we also store in idx.mempoolRemove the
+	// necessary info to undo the adding. This is because when removing a tx we
+	// can't have access to the utxoview.
+	for key := range idx.mempoolRemove[*tx.Sha()] {
+		delete(idx.mempool[key], *tx.Sha())
+		if len(idx.mempool[key]) == 0 {
+			delete(idx.mempool, key)
+		}
+	}
+	delete(idx.mempoolRemove, *tx.Sha())
+	return nil
 }
 
 var _ blockchain.Index = (*AddrIndex)(nil)

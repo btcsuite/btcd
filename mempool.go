@@ -40,6 +40,19 @@ const (
 	maxSigOpsPerTx = blockchain.MaxSigOpsPerBlock / 5
 )
 
+type mempoolIndex interface {
+	// Name returns the index's name.
+	Name() string
+
+	// AddMempoolTx is called when a tx is added to the mempool, it gets added
+	// to the index data structures if needed.
+	AddMempoolTx(tx *btcutil.Tx, utxoView *blockchain.UtxoViewpoint) error
+
+	// RemoveMempoolTx is called when a tx is removed from the mempool, it gets
+	// removed from the index data structures if needed.
+	RemoveMempoolTx(tx *btcutil.Tx) error
+}
+
 // mempoolTxDesc is a descriptor containing a transaction in the mempool along
 // with additional metadata.
 type mempoolTxDesc struct {
@@ -55,9 +68,6 @@ type mempoolConfig struct {
 	// DisableRelayPriority defines whether to relay free or low-fee
 	// transactions that do not have enough priority to be relayed.
 	DisableRelayPriority bool
-
-	// EnableAddrIndex defines whether the address index should be enabled.
-	EnableAddrIndex bool
 
 	// FetchUtxoView defines the function to use to fetch unspent
 	// transaction output information.
@@ -88,6 +98,9 @@ type mempoolConfig struct {
 
 	// TimeSource defines the timesource to use.
 	TimeSource blockchain.MedianTimeSource
+
+	// Indexes holds the indexes that need to be activated in this mempool.
+	Indexes []mempoolIndex
 }
 
 // txMemPool is used as a source of transactions that need to be mined into
@@ -99,7 +112,6 @@ type txMemPool struct {
 	pool          map[wire.ShaHash]*mempoolTxDesc
 	orphans       map[wire.ShaHash]*btcutil.Tx
 	orphansByPrev map[wire.ShaHash]map[wire.ShaHash]*btcutil.Tx
-	addrindex     map[string]map[wire.ShaHash]struct{} // maps address to txs
 	outpoints     map[wire.OutPoint]*btcutil.Tx
 	lastUpdated   time.Time // last time pool was updated
 	pennyTotal    float64   // exponentially decaying total for penny spends.
@@ -322,6 +334,14 @@ func (mp *txMemPool) removeTransaction(tx *btcutil.Tx, removeRedeemers bool) {
 	// Remove the transaction and mark the referenced outpoints as unspent
 	// by the pool.
 	if txDesc, exists := mp.pool[*txHash]; exists {
+		for _, index := range mp.cfg.Indexes {
+			err := index.RemoveMempoolTx(tx)
+			if err != nil {
+				txmpLog.Errorf("Failed to remove tx from mempool index %s: %s",
+					index.Name(), err.Error())
+			}
+		}
+
 		for _, txIn := range txDesc.Tx.MsgTx().TxIn {
 			delete(mp.outpoints, txIn.PreviousOutPoint)
 		}
@@ -387,6 +407,16 @@ func (mp *txMemPool) addTransaction(utxoView *blockchain.UtxoViewpoint, tx *btcu
 		mp.outpoints[txIn.PreviousOutPoint] = tx
 	}
 	mp.lastUpdated = time.Now()
+
+	for _, index := range mp.cfg.Indexes {
+		err := index.AddMempoolTx(tx, utxoView)
+		if err != nil {
+			if err != nil {
+				txmpLog.Errorf("Failed to add tx to mempool index %s: %s",
+					index.Name(), err.Error())
+			}
+		}
+	}
 }
 
 // checkPoolDoubleSpend checks whether or not the passed transaction is
@@ -448,27 +478,6 @@ func (mp *txMemPool) FetchTransaction(txHash *wire.ShaHash) (*btcutil.Tx, error)
 	}
 
 	return nil, fmt.Errorf("transaction is not in the pool")
-}
-
-// FilterTransactionsByAddress returns all transactions currently in the
-// mempool that either create an output to the passed address or spend a
-// previously created ouput to the address.
-func (mp *txMemPool) FilterTransactionsByAddress(addr btcutil.Address) ([]*btcutil.Tx, error) {
-	// Protect concurrent access.
-	mp.RLock()
-	defer mp.RUnlock()
-
-	if txs, exists := mp.addrindex[addr.EncodeAddress()]; exists {
-		addressTxs := make([]*btcutil.Tx, 0, len(txs))
-		for txHash := range txs {
-			if txD, exists := mp.pool[txHash]; exists {
-				addressTxs = append(addressTxs, txD.Tx)
-			}
-		}
-		return addressTxs, nil
-	}
-
-	return nil, nil
 }
 
 // maybeAcceptTransaction is the internal function which implements the public

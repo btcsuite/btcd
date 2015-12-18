@@ -24,6 +24,7 @@ import (
 	"github.com/btcsuite/btcd/blockchain"
 	"github.com/btcsuite/btcd/chaincfg"
 	database "github.com/btcsuite/btcd/database2"
+	"github.com/btcsuite/btcd/index"
 	"github.com/btcsuite/btcd/mining"
 	"github.com/btcsuite/btcd/peer"
 	"github.com/btcsuite/btcd/txscript"
@@ -199,6 +200,10 @@ type server struct {
 	db                   database.DB
 	timeSource           blockchain.MedianTimeSource
 	services             wire.ServiceFlag
+
+	// The following fields are index instances. They are nil if not enabled.
+	addrIndex *index.AddrIndex
+	txIndex   *index.TxIndex
 }
 
 // serverPeer extends the peer to maintain state shared by the server and
@@ -2355,7 +2360,37 @@ func newServer(listenAddrs []string, db database.DB, chainParams *chaincfg.Param
 		services:             services,
 		sigCache:             txscript.NewSigCache(cfg.SigCacheMaxSize),
 	}
-	bm, err := newBlockManager(&s)
+
+	// Create the indexes
+	var needsAddrIndex, needsTxIndex bool
+	var indexes []blockchain.Index
+	var mpIndexes []mempoolIndex
+	for _, indexName := range cfg.EnableIndexes {
+		switch indexName {
+		case "txbyaddr":
+			needsAddrIndex = true
+		case "txbyhash":
+			needsTxIndex = true
+		default:
+			bmgrLog.Warnf("Index name %s does not exist, ignoring.", indexName)
+		}
+	}
+
+	// Caution: the txindex needs to be first in the indexes array, because the
+	// addrindex uses data from the txindex during catchup. If the addrindex
+	// is run first, it may not have the transactions from the current block
+	// indexed.
+	if needsTxIndex {
+		s.txIndex = index.NewTxIndex()
+		indexes = append(indexes, s.txIndex)
+	}
+	if needsAddrIndex {
+		s.addrIndex = index.NewAddrIndex(s.txIndex)
+		indexes = append(indexes, s.addrIndex)
+		mpIndexes = append(mpIndexes, s.addrIndex)
+	}
+
+	bm, err := newBlockManager(&s, indexes)
 	if err != nil {
 		return nil, err
 	}
@@ -2363,7 +2398,6 @@ func newServer(listenAddrs []string, db database.DB, chainParams *chaincfg.Param
 
 	txC := mempoolConfig{
 		DisableRelayPriority: cfg.NoRelayPriority,
-		EnableAddrIndex:      false,
 		FetchUtxoView:        s.blockManager.chain.FetchUtxoView,
 		FreeTxRelayLimit:     cfg.FreeTxRelayLimit,
 		MaxOrphanTxs:         cfg.MaxOrphanTxs,
@@ -2372,6 +2406,7 @@ func newServer(listenAddrs []string, db database.DB, chainParams *chaincfg.Param
 		RelayNtfnChan:        s.relayNtfnChan,
 		SigCache:             s.sigCache,
 		TimeSource:           s.timeSource,
+		Indexes:              mpIndexes,
 	}
 	s.txMemPool = newTxMemPool(&txC)
 

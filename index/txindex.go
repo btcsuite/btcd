@@ -256,6 +256,18 @@ func (i *TxIndex) ExistsTx(dbTx database.Tx, hash *wire.ShaHash) (bool, error) {
 	return dbHasTxIndexEntry(bucket, hash), nil
 }
 
+// AddMempoolTx is called when a tx is added to the mempool, it gets added
+// to the index data structures if needed.
+func (i *TxIndex) AddMempoolTx(tx *btcutil.Tx) error {
+	return nil
+}
+
+// RemoveMempoolTx is called when a tx is removed from the mempool, it gets
+// removed from the index data structures if needed.
+func (i *TxIndex) RemoveMempoolTx(tx *btcutil.Tx) error {
+	return nil
+}
+
 // Ensure TxIndex implements blockchain.Index
 var _ blockchain.Index = (*TxIndex)(nil)
 
