@@ -37,11 +37,11 @@ func decodeHash(s string) *wire.ShaHash {
 
 type addrIndexTestCase struct {
 	key           *addrKey
-	numToSkip     uint32
-	numRequested  uint32
+	numToSkip     int
+	numRequested  int
 	reverse       bool
 	resultRegions []addrIndexResult
-	resultSkipped uint32
+	resultSkipped int
 }
 
 var errRunTestCaseFail = errors.New("runAddrIndexTestCases failure")
