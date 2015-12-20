@@ -232,6 +232,7 @@ func (view *UtxoViewpoint) AddTxOuts(tx *btcutil.Tx, blockHeight int32) {
 		// transaction is fully spent.
 		if output, ok := entry.sparseOutputs[uint32(txOutIdx)]; ok {
 			output.spent = false
+			output.compressed = false
 			output.amount = txOut.Value
 			output.pkScript = txOut.PkScript
 			continue
