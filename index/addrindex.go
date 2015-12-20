@@ -604,6 +604,8 @@ var _ blockchain.Index = (*AddrIndex)(nil)
 // the returned AddrIndex will not support catchup.
 func NewAddrIndex(txIndex *TxIndex) *AddrIndex {
 	return &AddrIndex{
-		txIndex: txIndex,
+		txIndex:       txIndex,
+		mempool:       make(map[addrKey]map[wire.ShaHash]*btcutil.Tx),
+		mempoolRemove: make(map[wire.ShaHash]map[addrKey]struct{}),
 	}
 }
