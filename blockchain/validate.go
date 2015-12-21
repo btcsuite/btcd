@@ -764,7 +764,7 @@ func ExtractCoinbaseHeight(coinbaseTx *btcutil.Tx) (int32, error) {
 		str := "the coinbase signature script for blocks of " +
 			"version %d or greater must start with the " +
 			"serialized block height"
-		str = fmt.Sprintf(str, serializedLen)
+		str = fmt.Sprintf(str, serializedHeightVersion)
 		return 0, ruleError(ErrMissingCoinbaseHeight, str)
 	}
 
