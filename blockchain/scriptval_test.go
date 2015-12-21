@@ -29,18 +29,18 @@ func TestCheckBlockScripts(t *testing.T) {
 		t.Errorf("The test block file must only have one block in it")
 	}
 
-	txStoreDataFile := fmt.Sprintf("%d.txstore.bz2", testBlockNum)
-	txStore, err := loadTxStore(txStoreDataFile)
+	storeDataFile := fmt.Sprintf("%d.utxostore.bz2", testBlockNum)
+	view, err := loadUtxoView(storeDataFile)
 	if err != nil {
 		t.Errorf("Error loading txstore: %v\n", err)
 		return
 	}
 
 	scriptFlags := txscript.ScriptBip16
-	err = blockchain.TstCheckBlockScripts(blocks[0], txStore, scriptFlags, nil)
+	err = blockchain.TstCheckBlockScripts(blocks[0], view, scriptFlags,
+		nil)
 	if err != nil {
-		t.Errorf("Transaction script validation failed: %v\n",
-			err)
+		t.Errorf("Transaction script validation failed: %v\n", err)
 		return
 	}
 }
