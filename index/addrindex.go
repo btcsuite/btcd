@@ -533,12 +533,26 @@ func (idx *AddrIndex) DisconnectBlock(dbTx database.Tx, bucket database.Bucket, 
 // FetchMempoolTxsForAddr returns all the transactions in the mempool that
 // involve the given address.
 func (idx *AddrIndex) FetchMempoolTxsForAddr(addr btcutil.Address) ([]*btcutil.Tx, error) {
-	return nil, nil
+	key, err := addrToKey(addr)
+	if err != nil {
+		// If the addr type is not supported, ignore it.
+		return nil, nil
+	}
+
+	txMap := idx.mempool[*key]
+	res := make([]*btcutil.Tx, len(txMap))
+	i := 0
+	for _, tx := range txMap {
+		res[i] = tx
+	}
+	return res, nil
 }
 
 // AddMempoolTx is called when a tx is added to the mempool, it gets added
 // to the index data structures if needed.
 func (idx *AddrIndex) AddMempoolTx(tx *btcutil.Tx, utxoView *blockchain.UtxoViewpoint) error {
+	log.Debugf("Indexed mempool tx %v", tx.Sha())
+
 	// Index addresses of all referenced previous output tx's.
 	for _, txIn := range tx.MsgTx().TxIn {
 		entry := utxoView.LookupEntry(&txIn.PreviousOutPoint.Hash)
@@ -562,6 +576,8 @@ func (idx *AddrIndex) indexScriptAddressToTx(pkScript []byte, tx *btcutil.Tx) er
 		idx.chain.Params())
 
 	for _, addr := range addresses {
+		log.Debugf("Indexed mempool tx %v to addr %s", tx.Sha(), addr.EncodeAddress())
+
 		key, err := addrToKey(addr)
 		if err != nil {
 			// If the addr type is not supported, ignore it.

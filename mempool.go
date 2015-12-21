@@ -411,10 +411,8 @@ func (mp *txMemPool) addTransaction(utxoView *blockchain.UtxoViewpoint, tx *btcu
 	for _, index := range mp.cfg.Indexes {
 		err := index.AddMempoolTx(tx, utxoView)
 		if err != nil {
-			if err != nil {
-				txmpLog.Errorf("Failed to add tx to mempool index %s: %s",
-					index.Name(), err.Error())
-			}
+			txmpLog.Errorf("Failed to add tx to mempool index %s: %s",
+				index.Name(), err.Error())
 		}
 	}
 }
