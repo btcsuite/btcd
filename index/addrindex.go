@@ -368,6 +368,14 @@ func (idx *AddrIndex) indexScriptPubKey(idxData writeIndexData, scriptPubKey []b
 			// If the address type is not supported, just ignore it.
 			continue
 		}
+
+		// Avoid inserting the tx twice. The txs are indexed serially: if an
+		// address appears multiple times in a tx, all the appearances will be
+		// indexed in a row, so checking the last txLoc indexed for equality is
+		// enough.
+		if len(idxData[*addrKey]) != 0 && idxData[*addrKey][len(idxData[*addrKey])-1] == loc {
+			continue
+		}
 		idxData[*addrKey] = append(idxData[*addrKey], loc)
 	}
 	return nil
