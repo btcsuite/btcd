@@ -1265,10 +1265,6 @@ func (p *Peer) maybeAddDeadline(pendingResponses map[string]time.Time, msgCmd st
 		// Expects a verack message.
 		pendingResponses[wire.CmdVerAck] = deadline
 
-	case wire.CmdGetAddr:
-		// Expects an addr message.
-		pendingResponses[wire.CmdAddr] = deadline
-
 	case wire.CmdMemPool:
 		// Expects an inv message.
 		pendingResponses[wire.CmdInv] = deadline
