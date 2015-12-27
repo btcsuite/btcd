@@ -1124,12 +1124,10 @@ func (s *server) handleDonePeerMsg(state *peerState, sp *serverPeer) {
 		// persistent outbound connection.
 		if !sp.Inbound() && sp.persistent && atomic.LoadInt32(&s.shutdown) == 0 {
 			// Retry peer
-			sp = s.newOutboundPeer(sp.Addr(), sp.persistent)
-			if sp != nil {
-				go s.retryConn(sp, false)
+			sp2 := s.newOutboundPeer(sp.Addr(), sp.persistent)
+			if sp2 != nil {
+				go s.retryConn(sp2, false)
 			}
-			list[sp.ID()] = sp
-			return
 		}
 		if !sp.Inbound() && sp.VersionKnown() {
 			state.outboundGroups[addrmgr.GroupKey(sp.NA())]--
