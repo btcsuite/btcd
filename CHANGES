@@ -20,7 +20,7 @@ Changes in 0.12.0 (Fri Nov 20 2015)
     - Correct reconnect handling for persistent peers (#463, #464)
     - Ignore requests for block headers if not fully synced (#444)
     - Add CLI support for specifying the zone id on IPv6 addresses (#538)
-    - Fix a couple of issue where the initial block sync could stall (#518,
+    - Fix a couple of issues where the initial block sync could stall (#518,
       #229, #486)
     - Fix an issue which prevented the --onion option from working as
       intended (#446)
@@ -60,7 +60,7 @@ Changes in 0.12.0 (Fri Nov 20 2015)
       (#450)
     - Several modifications to searchrawtranscations command:
       - Accept a new optional parameter 'vinextra' which causes the results
-        to include information about the outputs referenced by a transaction
+        to include information about the outputs referenced by a transaction's
         inputs (#485, #487)
       - Skip entries in the mempool too (#495)
       - Accept a new optional parameter 'reverse' to return the results in
@@ -164,7 +164,7 @@ Changes in 0.11.0 (Wed May 06 2015)
       forking from the network on non-standard transactions (#425)
     - Add a new checkpoint at block height 352940 (#418)
     - Optimized script execution (#395, #400, #404, #409)
-    - Fix a case that could lead stalled syncs (#138, #296) 
+    - Fix a case that could lead stalled syncs (#138, #296)
   - Network address manager changes:
     - Implement eclipse attack countermeasures as proposed in
       http://cs-people.bu.edu/heilman/eclipse (#370, #373)
@@ -633,7 +633,7 @@ Changes in 0.7.0 (Thu Feb 20 2014)
     - Add getnetworkhashps command
     - Add gettransaction command (wallet-specific)
     - Add signmessage command (wallet-specific)
-    - Update getwork command to accept 
+    - Update getwork command to accept
   - Continue cleanup and work on implementing the RPC API:
     - Implement getnettotals command
       (https://github.com/conformal/btcd/issues/84)
