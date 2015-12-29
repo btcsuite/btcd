@@ -552,6 +552,7 @@ func (idx *AddrIndex) FetchMempoolTxsForAddr(addr btcutil.Address) ([]*btcutil.T
 	i := 0
 	for _, tx := range txMap {
 		res[i] = tx
+		i++
 	}
 	return res, nil
 }
