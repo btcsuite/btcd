@@ -1,0 +1,57 @@
+hash: 9b8ff781a12daad991983e9a421a320e905eecc4e9ff0b0643e790f472bc78c8
+updated: 2016-05-06T10:10:16.348595-05:00
+imports:
+- name: github.com/btcsuite/btclog
+  version: f96df2375f37300305f329b8e5258764b4f19a7f
+- name: github.com/btcsuite/btcutil
+  version: 2c26dd81a59fd671a2218d63ad138a6dd4d693bd
+  subpackages:
+  - .
+  - bloom
+  - base58
+- name: github.com/btcsuite/fastsha256
+  version: 302ad4db268b46f9ebda3078f6f7397f96047735
+- name: github.com/btcsuite/go-flags
+  version: 6c288d648c1cc1befcb90cb5511dcacf64ae8e61
+- name: github.com/btcsuite/go-socks
+  version: cfe8b59e565c1a5bd4e2005d77cd9aa8b2e14524
+  subpackages:
+  - socks
+- name: github.com/btcsuite/golangcrypto
+  version: 53f62d9b43e87a6c56975cf862af7edf33a8d0df
+  subpackages:
+  - ripemd160
+- name: github.com/btcsuite/goleveldb
+  version: 7834afc9e8cd15233b6c3d97e12674a31ca24602
+  subpackages:
+  - leveldb
+  - leveldb/comparer
+  - leveldb/errors
+  - leveldb/filter
+  - leveldb/iterator
+  - leveldb/opt
+  - leveldb/util
+  - leveldb/cache
+  - leveldb/journal
+  - leveldb/memdb
+  - leveldb/storage
+  - leveldb/table
+- name: github.com/btcsuite/seelog
+  version: 313961b101eb55f65ae0f03ddd4e322731763b6c
+- name: github.com/btcsuite/snappy-go
+  version: 0bdef8d067237991ddaa1bb6072a740bc40601ba
+- name: github.com/btcsuite/websocket
+  version: 31079b6807923eb23992c421b114992b95131b55
+- name: github.com/btcsuite/winsvc
+  version: f8fb11f83f7e860e3769a08e6811d1b399a43722
+  subpackages:
+  - eventlog
+  - mgr
+  - svc
+  - registry
+  - winapi
+- name: github.com/davecgh/go-spew
+  version: 5215b55f46b2b919f50a1df0eaa5886afe4e3b3d
+  subpackages:
+  - spew
+devImports: []

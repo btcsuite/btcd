@@ -1,0 +1,35 @@
+package: github.com/btcsuite/btcd
+import:
+- package: github.com/btcsuite/btclog
+- package: github.com/btcsuite/btcutil
+  subpackages:
+  - .
+  - bloom
+  - base58
+- package: github.com/btcsuite/fastsha256
+- package: github.com/btcsuite/go-flags
+- package: github.com/btcsuite/go-socks
+  subpackages:
+  - socks
+- package: github.com/btcsuite/golangcrypto
+  subpackages:
+  - ripemd160
+- package: github.com/btcsuite/goleveldb
+  subpackages:
+  - leveldb
+  - leveldb/comparer
+  - leveldb/errors
+  - leveldb/filter
+  - leveldb/iterator
+  - leveldb/opt
+  - leveldb/util
+- package: github.com/btcsuite/seelog
+- package: github.com/btcsuite/websocket
+- package: github.com/btcsuite/winsvc
+  subpackages:
+  - eventlog
+  - mgr
+  - svc
+- package: github.com/davecgh/go-spew
+  subpackages:
+  - spew
