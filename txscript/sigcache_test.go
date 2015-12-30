@@ -88,7 +88,7 @@ func TestSigCacheAddEvictEntry(t *testing.T) {
 	}
 
 	// Add a new entry, this should cause eviction of a randomly chosen
-	// previously entry.
+	// previous entry.
 	msgNew, sigNew, keyNew, err := genRandomSig()
 	if err != nil {
 		t.Fatalf("unable to generate random signature test data")
