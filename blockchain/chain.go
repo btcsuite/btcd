@@ -158,26 +158,43 @@ func newBestState(node *blockNode, blockSize, numTxns, totalTxns uint64) *BestSt
 // follow all rules, orphan handling, checkpoint handling, and best chain
 // selection with reorganization.
 type BlockChain struct {
-	processLock         sync.Mutex
-	chainLock           sync.RWMutex
+	// The following fields are set when the instance is created and can't
+	// be changed afterwards, so there is no need to protect them with a
+	// separate mutex.
+	checkpointsByHeight map[int32]*chaincfg.Checkpoint
 	db                  database.DB
 	chainParams         *chaincfg.Params
-	checkpointsByHeight map[int32]*chaincfg.Checkpoint
 	notifications       NotificationCallback
-	root                *blockNode
-	bestNode            *blockNode
-	index               map[wire.ShaHash]*blockNode
-	depNodes            map[wire.ShaHash][]*blockNode
-	orphans             map[wire.ShaHash]*orphanBlock
-	prevOrphans         map[wire.ShaHash][]*orphanBlock
-	oldestOrphan        *orphanBlock
-	orphanLock          sync.RWMutex
-	blockCache          map[wire.ShaHash]*btcutil.Block
-	noVerify            bool
-	noCheckpoints       bool
-	nextCheckpoint      *chaincfg.Checkpoint
-	checkpointBlock     *btcutil.Block
 	sigCache            *txscript.SigCache
+
+	// chainLock protects concurrent access to the vast majority of the
+	// fields in this struct below this point.
+	chainLock sync.RWMutex
+
+	// These fields are configuration parameters that can be toggled at
+	// runtime.  They are protected by the chain lock.
+	noVerify      bool
+	noCheckpoints bool
+
+	// These fields are related to the memory block index.  They are
+	// protected by the chain lock.
+	root     *blockNode
+	bestNode *blockNode
+	index    map[wire.ShaHash]*blockNode
+	depNodes map[wire.ShaHash][]*blockNode
+
+	// These fields are related to handling of orphan blocks.  They are
+	// protected by a combination of the chain lock and the orphan lock.
+	orphanLock   sync.RWMutex
+	orphans      map[wire.ShaHash]*orphanBlock
+	prevOrphans  map[wire.ShaHash][]*orphanBlock
+	oldestOrphan *orphanBlock
+	blockCache   map[wire.ShaHash]*btcutil.Block
+
+	// These fields are related to checkpoint handling.  They are protected
+	// by the chain lock.
+	nextCheckpoint  *chaincfg.Checkpoint
+	checkpointBlock *btcutil.Block
 
 	// The state is used as a fairly efficient way to cache information
 	// about the current best chain state that is returned to callers when
@@ -1356,11 +1373,11 @@ func New(db database.DB, params *chaincfg.Params, c NotificationCallback, sigCac
 	}
 
 	b := BlockChain{
-		db:                  db,
-		sigCache:            sigCache,
-		chainParams:         params,
 		checkpointsByHeight: checkpointsByHeight,
+		db:                  db,
+		chainParams:         params,
 		notifications:       c,
+		sigCache:            sigCache,
 		root:                nil,
 		bestNode:            nil,
 		index:               make(map[wire.ShaHash]*blockNode),
