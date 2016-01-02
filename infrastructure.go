@@ -1182,7 +1182,7 @@ func dial(config *ConnConfig) (*websocket.Conn, error) {
 
 // New creates a new RPC client based on the provided connection configuration
 // details.  The notification handlers parameter may be nil if you are not
-// interested in receiving notifications and will be ignored when if the
+// interested in receiving notifications and will be ignored if the
 // configuration is set to run in HTTP POST mode.
 func New(config *ConnConfig, ntfnHandlers *NotificationHandlers) (*Client, error) {
 	// Either open a websocket connection or create an HTTP client depending
