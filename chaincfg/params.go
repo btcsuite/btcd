@@ -226,7 +226,6 @@ var TestNet3Params = Params{
 	Net:         wire.TestNet3,
 	DefaultPort: "18333",
 	DNSSeeds: []string{
-		"testnet-seed.alexykot.me",
 		"testnet-seed.bitcoin.schildbach.de",
 		"testnet-seed.bitcoin.petertodd.org",
 		"testnet-seed.bluematt.me",
