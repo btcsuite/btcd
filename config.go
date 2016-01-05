@@ -45,7 +45,7 @@ const (
 	defaultBlockPrioritySize = 50000
 	defaultGenerate          = false
 	defaultAddrIndex         = false
-	defaultSigCacheMaxSize   = 50000
+	defaultSigCacheMaxSize   = 100000
 )
 
 var (
