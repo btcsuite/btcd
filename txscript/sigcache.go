@@ -7,18 +7,31 @@ package txscript
 import (
 	"bytes"
 	"crypto/rand"
+	"crypto/sha256"
 	"sync"
 
 	"github.com/btcsuite/btcd/btcec"
 	"github.com/btcsuite/btcd/wire"
 )
 
-// sigInfo represents an entry in the SigCache. Entries in the sigcache are a
-// 3-tuple: (sigHash, sig, pubKey).
-type sigInfo struct {
-	sigHash wire.ShaHash
-	sig     string
-	pubKey  string
+// sigKey represents the lookup key of the signature cache.
+type sigKey [wire.HashSize]byte
+
+// newSigKey creates a new sigcache lookup key using the passed paramters. This
+// lookup key is is the result of: SHA-256(nonce || sigHash || signature || pubkey).
+func newSigKey(nonce [wire.HashSize]byte, sigHash wire.ShaHash,
+	sig *btcec.Signature, pubKey *btcec.PublicKey) sigKey {
+
+	hasher := sha256.New()
+	hasher.Write(nonce[:])
+	hasher.Write(sigHash[:])
+	hasher.Write(sig.Serialize())
+	hasher.Write(pubKey.SerializeCompressed())
+
+	var key sigKey
+	copy(key[:], hasher.Sum(nil))
+
+	return key
 }
 
 // SigCache implements an ECDSA signature verification cache with a randomized
@@ -33,8 +46,9 @@ type sigInfo struct {
 // if they've already been seen and verified within the mempool.
 type SigCache struct {
 	sync.RWMutex
-	validSigs  map[sigInfo]struct{}
+	validSigs  map[sigKey]struct{}
 	maxEntries uint
+	cacheNonce [wire.HashSize]byte
 }
 
 // NewSigCache creates and initializes a new instance of SigCache. Its sole
@@ -42,8 +56,19 @@ type SigCache struct {
 // exist in the SigCache at any particular moment. Random entries are evicted
 // to make room for new entries that would cause the number of entries in the
 // cache to exceed the max.
-func NewSigCache(maxEntries uint) *SigCache {
-	return &SigCache{validSigs: make(map[sigInfo]struct{}), maxEntries: maxEntries}
+func NewSigCache(maxEntries uint) (*SigCache, error) {
+	cache := &SigCache{
+		validSigs:  make(map[sigKey]struct{}),
+		maxEntries: maxEntries,
+	}
+
+	// Read a 32 byte nonce to use as a salt the SHA-256 invocations for
+	// each entry.
+	if _, err := rand.Read(cache.cacheNonce[:]); err != nil {
+		return nil, err
+	}
+
+	return cache, nil
 }
 
 // Exists returns true if an existing entry of 'sig' over 'sigHash' for public
@@ -52,11 +77,10 @@ func NewSigCache(maxEntries uint) *SigCache {
 // NOTE: This function is safe for concurrent access. Readers won't be blocked
 // unless there exists a writer, adding an entry to the SigCache.
 func (s *SigCache) Exists(sigHash wire.ShaHash, sig *btcec.Signature, pubKey *btcec.PublicKey) bool {
-	info := sigInfo{sigHash, string(sig.Serialize()),
-		string(pubKey.SerializeCompressed())}
+	key := newSigKey(s.cacheNonce, sigHash, sig, pubKey)
 
 	s.RLock()
-	_, ok := s.validSigs[info]
+	_, ok := s.validSigs[key]
 	s.RUnlock()
 	return ok
 }
@@ -94,12 +118,13 @@ func (s *SigCache) Add(sigHash wire.ShaHash, sig *btcec.Signature, pubKey *btcec
 		// to Go's range statement over maps) as a fall back if none of
 		// the hashes in the rejected transactions pool are larger than
 		// the random hash.
-		var foundEntry sigInfo
+		var foundEntry sigKey
+		var zeroEntry sigKey
 		for sigEntry := range s.validSigs {
-			if foundEntry.sig == "" {
+			if foundEntry == zeroEntry {
 				foundEntry = sigEntry
 			}
-			if bytes.Compare(sigEntry.sigHash.Bytes(), randHashBytes) > 0 {
+			if bytes.Compare(sigEntry[:], randHashBytes) > 0 {
 				foundEntry = sigEntry
 				break
 			}
@@ -107,7 +132,6 @@ func (s *SigCache) Add(sigHash wire.ShaHash, sig *btcec.Signature, pubKey *btcec
 		delete(s.validSigs, foundEntry)
 	}
 
-	info := sigInfo{sigHash, string(sig.Serialize()),
-		string(pubKey.SerializeCompressed())}
-	s.validSigs[info] = struct{}{}
+	key := newSigKey(s.cacheNonce, sigHash, sig, pubKey)
+	s.validSigs[key] = struct{}{}
 }

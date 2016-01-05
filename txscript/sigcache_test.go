@@ -37,7 +37,10 @@ func genRandomSig() (*wire.ShaHash, *btcec.Signature, *btcec.PublicKey, error) {
 // TestSigCacheAddExists tests the ability to add, and later check the
 // existence of a signature triplet in the signature cache.
 func TestSigCacheAddExists(t *testing.T) {
-	sigCache := NewSigCache(200)
+	sigCache, err := NewSigCache(200)
+	if err != nil {
+		t.Fatalf("unable to create sig cache: %v", err)
+	}
 
 	// Generate a random sigCache entry triplet.
 	msg1, sig1, key1, err := genRandomSig()
@@ -62,7 +65,10 @@ func TestSigCacheAddExists(t *testing.T) {
 func TestSigCacheAddEvictEntry(t *testing.T) {
 	// Create a sigcache that can hold up to 100 entries.
 	sigCacheSize := uint(100)
-	sigCache := NewSigCache(sigCacheSize)
+	sigCache, err := NewSigCache(sigCacheSize)
+	if err != nil {
+		t.Fatalf("unable to create sigcache: %v", err)
+	}
 
 	// Fill the sigcache up with some random sig triplets.
 	for i := uint(0); i < sigCacheSize; i++ {
@@ -113,7 +119,10 @@ func TestSigCacheAddEvictEntry(t *testing.T) {
 // with a max size <= 0, then no entries are added to the sigcache at all.
 func TestSigCacheAddMaxEntriesZeroOrNegative(t *testing.T) {
 	// Create a sigcache that can hold up to 0 entries.
-	sigCache := NewSigCache(0)
+	sigCache, err := NewSigCache(0)
+	if err != nil {
+		t.Fatalf("unable to create sigcache: %v", err)
+	}
 
 	// Generate a random sigCache entry triplet.
 	msg1, sig1, key1, err := genRandomSig()
