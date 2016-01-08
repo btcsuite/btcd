@@ -9,6 +9,7 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"sync"
 
 	"github.com/btcsuite/btcd/blockchain"
 	database "github.com/btcsuite/btcd/database2"
@@ -490,6 +491,7 @@ type AddrIndex struct {
 	// mempoolRemove stores for each txid the list of addresses it's indexed in.
 	// It's used for removing txs from the mempool index.
 	mempoolRemove map[wire.ShaHash]map[addrKey]struct{}
+	mpLock        sync.RWMutex
 }
 
 // Init initializes the AddrIndex with a given blockchain.
@@ -541,6 +543,9 @@ func (idx *AddrIndex) DisconnectBlock(dbTx database.Tx, bucket database.Bucket, 
 // FetchMempoolTxsForAddr returns all the transactions in the mempool that
 // involve the given address.
 func (idx *AddrIndex) FetchMempoolTxsForAddr(addr btcutil.Address) ([]*btcutil.Tx, error) {
+	idx.mpLock.RLock()
+	defer idx.mpLock.RUnlock()
+
 	key, err := addrToKey(addr)
 	if err != nil {
 		// If the addr type is not supported, ignore it.
@@ -560,6 +565,8 @@ func (idx *AddrIndex) FetchMempoolTxsForAddr(addr btcutil.Address) ([]*btcutil.T
 // AddMempoolTx is called when a tx is added to the mempool, it gets added
 // to the index data structures if needed.
 func (idx *AddrIndex) AddMempoolTx(tx *btcutil.Tx, utxoView *blockchain.UtxoViewpoint) error {
+	idx.mpLock.Lock()
+	defer idx.mpLock.Unlock()
 	log.Debugf("Indexed mempool tx %v", tx.Sha())
 
 	// Index addresses of all referenced previous output tx's.
@@ -609,6 +616,8 @@ func (idx *AddrIndex) indexScriptAddressToTx(pkScript []byte, tx *btcutil.Tx) er
 // RemoveMempoolTx is called when a tx is removed from the mempool, it gets
 // removed from the index data structures if needed.
 func (idx *AddrIndex) RemoveMempoolTx(tx *btcutil.Tx) error {
+	idx.mpLock.Lock()
+	defer idx.mpLock.Unlock()
 	// When adding txs from the mempool, we also store in idx.mempoolRemove the
 	// necessary info to undo the adding. This is because when removing a tx we
 	// can't have access to the utxoview.
