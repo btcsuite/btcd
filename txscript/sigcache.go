@@ -51,7 +51,7 @@ type SigCache struct {
 // cache to exceed the max.
 func NewSigCache(maxEntries uint) (*SigCache, error) {
 	cache := &SigCache{
-		validSigs:  make(map[wire.ShaHash]sigCacheEntry),
+		validSigs:  make(map[wire.ShaHash]sigCacheEntry, maxEntries),
 		maxEntries: maxEntries,
 	}
 
