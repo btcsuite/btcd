@@ -63,7 +63,7 @@ func TestChainSvrCmds(t *testing.T) {
 			name: "createrawtransaction optional",
 			newCmd: func() (interface{}, error) {
 				return btcjson.NewCmd("createrawtransaction", `[{"txid":"123","vout":1}]`,
-					`{"456":0.0123}`, 12312333333)
+					`{"456":0.0123}`, int64(12312333333))
 			},
 			staticCmd: func() interface{} {
 				txInputs := []btcjson.TransactionInput{
