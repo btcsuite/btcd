@@ -309,20 +309,31 @@ func TestScriptValidTests(t *testing.T) {
 	}
 }
 
+// testVecF64ToUint32 properly handles conversion of float64s read from the JSON
+// test data to unsigned 32-bit integers.  This is necessary because some of the
+// test data uses -1 as a shortcut to mean max uint32 and direct conversion of a
+// negative float to an unsigned int is implementation dependent and therefore
+// doesn't result in the expected value on all platforms.  This function woks
+// around that limitation by converting to a 32-bit signed integer first and
+// then to a 32-bit unsigned integer which results in the expected behavior on
+// all platforms.
+func testVecF64ToUint32(f float64) uint32 {
+	return uint32(int32(f))
+}
+
 // TestTxInvalidTests ensures all of the tests in tx_invalid.json fail as
 // expected.
 func TestTxInvalidTests(t *testing.T) {
 	file, err := ioutil.ReadFile("data/tx_invalid.json")
 	if err != nil {
-		t.Errorf("TestBitcoindInvalidTests: %v\n", err)
+		t.Errorf("TestTxInvalidTests: %v\n", err)
 		return
 	}
 
 	var tests [][]interface{}
 	err = json.Unmarshal(file, &tests)
 	if err != nil {
-		t.Errorf("TestBitcoindInvalidTests couldn't Unmarshal: %v\n",
-			err)
+		t.Errorf("TestTxInvalidTests couldn't Unmarshal: %v\n", err)
 		return
 	}
 
@@ -409,8 +420,7 @@ testloop:
 					"%d: %v", j, i, test)
 				continue testloop
 			}
-
-			idx := uint32(idxf) // (floor(idxf) == idxf?)
+			idx := testVecF64ToUint32(idxf)
 
 			oscript, ok := input[2].(string)
 			if !ok {
@@ -459,15 +469,14 @@ testloop:
 func TestTxValidTests(t *testing.T) {
 	file, err := ioutil.ReadFile("data/tx_valid.json")
 	if err != nil {
-		t.Errorf("TestBitcoindInvalidTests: %v\n", err)
+		t.Errorf("TestTxValidTests: %v\n", err)
 		return
 	}
 
 	var tests [][]interface{}
 	err = json.Unmarshal(file, &tests)
 	if err != nil {
-		t.Errorf("TestBitcoindInvalidTests couldn't Unmarshal: %v\n",
-			err)
+		t.Errorf("TestTxValidTests couldn't Unmarshal: %v\n", err)
 		return
 	}
 
@@ -553,8 +562,7 @@ testloop:
 					"%d: %v", j, i, test)
 				continue
 			}
-
-			idx := uint32(idxf) // (floor(idxf) == idxf?)
+			idx := testVecF64ToUint32(idxf)
 
 			oscript, ok := input[2].(string)
 			if !ok {
@@ -640,9 +648,10 @@ func TestCalcSignatureHash(t *testing.T) {
 				"Failed to parse sub-script: %v", i, err)
 			continue
 		}
-		hash := TstCalcSignatureHash(parsedScript,
-			SigHashType(test[3].(float64)),
-			tx, int(test[2].(float64)))
+
+		hashType := SigHashType(testVecF64ToUint32(test[3].(float64)))
+		hash := TstCalcSignatureHash(parsedScript, hashType, tx,
+			int(test[2].(float64)))
 
 		expectedHash, _ := wire.NewShaHashFromStr(test[4].(string))
 		if !bytes.Equal(hash, expectedHash.Bytes()) {
