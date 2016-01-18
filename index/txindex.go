@@ -59,7 +59,7 @@ func dbPutTxIndexEntry(bucket database.Bucket, txHash, blockHash *wire.ShaHash, 
 	serializedData[0] = numEntries
 	offset := uint32(1)
 	if len(existing) > 0 {
-		copy(serializedData, existing[1:])
+		copy(serializedData[1:], existing[1:])
 		offset += uint32(len(existing) - 1)
 	}
 	copy(serializedData[offset:], blockHash[:])
