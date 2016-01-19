@@ -1,4 +1,4 @@
-// Copyright (c) 2014 The btcsuite developers
+// Copyright (c) 2014-2016 The btcsuite developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -48,18 +48,20 @@ const (
 
 // BlockConnectedNtfn defines the blockconnected JSON-RPC notification.
 type BlockConnectedNtfn struct {
-	Hash   string
-	Height int32
-	Time   int64
+	Hash          string
+	Height        int32
+	Time          int64
+	SubscribedTxs []string
 }
 
 // NewBlockConnectedNtfn returns a new instance which can be used to issue a
 // blockconnected JSON-RPC notification.
-func NewBlockConnectedNtfn(hash string, height int32, time int64) *BlockConnectedNtfn {
+func NewBlockConnectedNtfn(hash string, height int32, time int64, subscribedTxs []string) *BlockConnectedNtfn {
 	return &BlockConnectedNtfn{
-		Hash:   hash,
-		Height: height,
-		Time:   time,
+		Hash:          hash,
+		Height:        height,
+		Time:          time,
+		SubscribedTxs: subscribedTxs,
 	}
 }
 
