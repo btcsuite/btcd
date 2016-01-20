@@ -1,4 +1,5 @@
 // Copyright (c) 2014-2015 The btcsuite developers
+// Copyright (c) 2015 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -16,7 +17,7 @@ const (
 	MaxFilterAddDataSize = 520
 )
 
-// MsgFilterAdd implements the Message interface and represents a bitcoin
+// MsgFilterAdd implements the Message interface and represents a decred
 // filteradd message.  It is used to add a data element to an existing Bloom
 // filter.
 //
@@ -25,15 +26,9 @@ type MsgFilterAdd struct {
 	Data []byte
 }
 
-// BtcDecode decodes r using the bitcoin protocol encoding into the receiver.
+// BtcDecode decodes r using the decred protocol encoding into the receiver.
 // This is part of the Message interface implementation.
 func (msg *MsgFilterAdd) BtcDecode(r io.Reader, pver uint32) error {
-	if pver < BIP0037Version {
-		str := fmt.Sprintf("filteradd message invalid for protocol "+
-			"version %d", pver)
-		return messageError("MsgFilterAdd.BtcDecode", str)
-	}
-
 	var err error
 	msg.Data, err = readVarBytes(r, pver, MaxFilterAddDataSize,
 		"filteradd data")
@@ -44,15 +39,9 @@ func (msg *MsgFilterAdd) BtcDecode(r io.Reader, pver uint32) error {
 	return nil
 }
 
-// BtcEncode encodes the receiver to w using the bitcoin protocol encoding.
+// BtcEncode encodes the receiver to w using the decred protocol encoding.
 // This is part of the Message interface implementation.
 func (msg *MsgFilterAdd) BtcEncode(w io.Writer, pver uint32) error {
-	if pver < BIP0037Version {
-		str := fmt.Sprintf("filteradd message invalid for protocol "+
-			"version %d", pver)
-		return messageError("MsgFilterAdd.BtcEncode", str)
-	}
-
 	size := len(msg.Data)
 	if size > MaxFilterAddDataSize {
 		str := fmt.Sprintf("filteradd size too large for message "+
@@ -81,7 +70,7 @@ func (msg *MsgFilterAdd) MaxPayloadLength(pver uint32) uint32 {
 		MaxFilterAddDataSize
 }
 
-// NewMsgFilterAdd returns a new bitcoin filteradd message that conforms to the
+// NewMsgFilterAdd returns a new decred filteradd message that conforms to the
 // Message interface.  See MsgFilterAdd for details.
 func NewMsgFilterAdd(data []byte) *MsgFilterAdd {
 	return &MsgFilterAdd{

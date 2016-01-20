@@ -1,4 +1,5 @@
 // Copyright (c) 2014 The btcsuite developers
+// Copyright (c) 2015 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -7,7 +8,7 @@ package blockchain_test
 import (
 	"testing"
 
-	"github.com/btcsuite/btcd/blockchain"
+	"github.com/decred/dcrd/blockchain"
 )
 
 // TestErrorCodeStringer tests the stringized output for the ErrorCode type.
@@ -51,8 +52,6 @@ func TestErrorCodeStringer(t *testing.T) {
 		{blockchain.ErrMultipleCoinbases, "ErrMultipleCoinbases"},
 		{blockchain.ErrBadCoinbaseScriptLen, "ErrBadCoinbaseScriptLen"},
 		{blockchain.ErrBadCoinbaseValue, "ErrBadCoinbaseValue"},
-		{blockchain.ErrMissingCoinbaseHeight, "ErrMissingCoinbaseHeight"},
-		{blockchain.ErrBadCoinbaseHeight, "ErrBadCoinbaseHeight"},
 		{blockchain.ErrScriptMalformed, "ErrScriptMalformed"},
 		{blockchain.ErrScriptValidation, "ErrScriptValidation"},
 		{0xffff, "Unknown ErrorCode (65535)"},

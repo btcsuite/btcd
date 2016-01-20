@@ -1,4 +1,5 @@
 // Copyright (c) 2014-2015 The btcsuite developers
+// Copyright (c) 2015 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -10,7 +11,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/btcsuite/btcd/wire"
+	"github.com/decred/dcrd/wire"
 )
 
 // TestFilterAddLatest tests the MsgFilterAdd API against the latest protocol
@@ -54,38 +55,6 @@ func TestFilterAddLatest(t *testing.T) {
 	return
 }
 
-// TestFilterAddCrossProtocol tests the MsgFilterAdd API when encoding with the
-// latest protocol version and decoding with BIP0031Version.
-func TestFilterAddCrossProtocol(t *testing.T) {
-	data := []byte{0x01, 0x02}
-	msg := wire.NewMsgFilterAdd(data)
-	if !bytes.Equal(msg.Data, data) {
-		t.Errorf("should get same data back out")
-	}
-
-	// Encode with latest protocol version.
-	var buf bytes.Buffer
-	err := msg.BtcEncode(&buf, wire.ProtocolVersion)
-	if err != nil {
-		t.Errorf("encode of MsgFilterAdd failed %v err <%v>", msg, err)
-	}
-
-	// Decode with old protocol version.
-	var readmsg wire.MsgFilterAdd
-	err = readmsg.BtcDecode(&buf, wire.BIP0031Version)
-	if err == nil {
-		t.Errorf("decode of MsgFilterAdd succeeded when it shouldn't "+
-			"have %v", msg)
-	}
-
-	// Since one of the protocol versions doesn't support the filteradd
-	// message, make sure the data didn't get encoded and decoded back out.
-	if bytes.Equal(msg.Data, readmsg.Data) {
-		t.Error("should not get same data for cross protocol")
-	}
-
-}
-
 // TestFilterAddMaxDataSize tests the MsgFilterAdd API maximum data size.
 func TestFilterAddMaxDataSize(t *testing.T) {
 	data := bytes.Repeat([]byte{0xff}, 521)
@@ -112,8 +81,6 @@ func TestFilterAddMaxDataSize(t *testing.T) {
 // of MsgFilterAdd to confirm error paths work correctly.
 func TestFilterAddWireErrors(t *testing.T) {
 	pver := wire.ProtocolVersion
-	pverNoFilterAdd := wire.BIP0037Version - 1
-	wireErr := &wire.MessageError{}
 
 	baseData := []byte{0x01, 0x02, 0x03, 0x04}
 	baseFilterAdd := wire.NewMsgFilterAdd(baseData)
@@ -137,11 +104,6 @@ func TestFilterAddWireErrors(t *testing.T) {
 		{
 			baseFilterAdd, baseFilterAddEncoded, pver, 1,
 			io.ErrShortWrite, io.EOF,
-		},
-		// Force error due to unsupported protocol version.
-		{
-			baseFilterAdd, baseFilterAddEncoded, pverNoFilterAdd, 5,
-			wireErr, wireErr,
 		},
 	}
 

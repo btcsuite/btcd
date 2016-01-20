@@ -1,4 +1,5 @@
 // Copyright (c) 2013 The btcsuite developers
+// Copyright (c) 2015 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -9,11 +10,11 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/btcsuite/btcd/blockchain"
-	"github.com/btcsuite/btcd/chaincfg"
-	"github.com/btcsuite/btcd/database"
-	_ "github.com/btcsuite/btcd/database/ldb"
-	"github.com/btcsuite/btcd/wire"
+	"github.com/decred/dcrd/blockchain"
+	"github.com/decred/dcrd/chaincfg"
+	"github.com/decred/dcrd/chaincfg/chainhash"
+	"github.com/decred/dcrd/database"
+	_ "github.com/decred/dcrd/database/ldb"
 )
 
 const blockDbNamePrefix = "blocks"
@@ -41,10 +42,10 @@ func loadBlockDB() (database.Db, error) {
 
 // findCandidates searches the chain backwards for checkpoint candidates and
 // returns a slice of found candidates, if any.  It also stops searching for
-// candidates at the last checkpoint that is already hard coded into btcchain
+// candidates at the last checkpoint that is already hard coded into chain
 // since there is no point in finding candidates before already existing
 // checkpoints.
-func findCandidates(db database.Db, latestHash *wire.ShaHash) ([]*chaincfg.Checkpoint, error) {
+func findCandidates(db database.Db, latestHash *chainhash.Hash) ([]*chaincfg.Checkpoint, error) {
 	// Start with the latest block of the main chain.
 	block, err := db.FetchBlockBySha(latestHash)
 	if err != nil {
@@ -53,7 +54,7 @@ func findCandidates(db database.Db, latestHash *wire.ShaHash) ([]*chaincfg.Check
 
 	// Setup chain and get the latest checkpoint.  Ignore notifications
 	// since they aren't needed for this util.
-	chain := blockchain.New(db, activeNetParams, nil)
+	chain := blockchain.New(db, nil, activeNetParams, nil)
 	latestCheckpoint := chain.LatestCheckpoint()
 	if latestCheckpoint == nil {
 		return nil, fmt.Errorf("unable to retrieve latest checkpoint")
@@ -114,7 +115,7 @@ func findCandidates(db database.Db, latestHash *wire.ShaHash) ([]*chaincfg.Check
 
 // showCandidate display a checkpoint candidate using and output format
 // determined by the configuration parameters.  The Go syntax output
-// uses the format the btcchain code expects for checkpoints added to the list.
+// uses the format the chain code expects for checkpoints added to the list.
 func showCandidate(candidateNum int, checkpoint *chaincfg.Checkpoint) {
 	if cfg.UseGoOutput {
 		fmt.Printf("Candidate %d -- {%d, newShaHashFromStr(\"%v\")},\n",

@@ -1,4 +1,5 @@
 // Copyright (c) 2013-2014 The btcsuite developers
+// Copyright (c) 2015 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -8,10 +9,11 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/btcsuite/btcd/database"
-	"github.com/btcsuite/btcd/wire"
-	"github.com/btcsuite/btcutil"
 	"github.com/davecgh/go-spew/spew"
+	"github.com/decred/dcrd/chaincfg/chainhash"
+	"github.com/decred/dcrd/database"
+	"github.com/decred/dcrd/wire"
+	"github.com/decred/dcrutil"
 )
 
 // testContext is used to store context information about a running test which
@@ -27,8 +29,8 @@ type testContext struct {
 	dbType      string
 	db          database.Db
 	blockHeight int64
-	blockHash   *wire.ShaHash
-	block       *btcutil.Block
+	blockHash   *chainhash.Hash
+	block       *dcrutil.Block
 	useSpends   bool
 }
 
@@ -235,55 +237,111 @@ func testFetchBlockShaByHeightErrors(tc *testContext) bool {
 
 // testExistsTxSha ensures ExistsTxSha conforms to the interface contract.
 func testExistsTxSha(tc *testContext) bool {
-	for i, tx := range tc.block.Transactions() {
-		// The transaction must exist in the database.
-		txHash := tx.Sha()
-		exists, err := tc.db.ExistsTxSha(txHash)
-		if err != nil {
-			tc.t.Errorf("ExistsTxSha (%s): block #%d (%s) tx #%d "+
-				"(%s) unexpected error: %v", tc.dbType,
-				tc.blockHeight, tc.blockHash, i, txHash, err)
-			return false
-		}
-		if !exists {
-			_, err := tc.db.FetchTxBySha(txHash)
-			if err != nil {
-				tc.t.Errorf("ExistsTxSha (%s): block #%d (%s) "+
-					"tx #%d (%s) does not exist", tc.dbType,
-					tc.blockHeight, tc.blockHash, i, txHash)
-			}
-			return false
+	var blockPrev *dcrutil.Block = nil
+	// Decred: WARNING. This function assumes that all block insertion calls have
+	// dcrutil.blocks passed to them with block.blockHeight set correctly. However,
+	// loading the genesis block in dcrd didn't do this (via block manager); pre-
+	// production it should be established that all calls to this function pass
+	// blocks with block.blockHeight set correctly.
+	if tc.block.Height() != 0 {
+		var errBlockPrev error
+		blockPrev, errBlockPrev = tc.db.FetchBlockBySha(&tc.block.MsgBlock().Header.PrevBlock)
+		if errBlockPrev != nil {
+			blockSha := tc.block.Sha()
+			tc.t.Errorf("Failed to fetch parent block of block %v", blockSha)
 		}
 	}
 
+	votebits := tc.block.MsgBlock().Header.VoteBits
+	if dcrutil.IsFlagSet16(votebits, dcrutil.BlockValid) && blockPrev != nil {
+		for i, tx := range blockPrev.Transactions() {
+			// The transaction must exist in the database.
+			txHash := tx.Sha()
+			exists, err := tc.db.ExistsTxSha(txHash)
+			if err != nil {
+				tc.t.Errorf("ExistsTxSha (%s): block #%d (%s) tx #%d "+
+					"(%s) unexpected error: %v", tc.dbType,
+					tc.blockHeight, tc.blockHash, i, txHash, err)
+				return false
+			}
+			if !exists {
+				_, err := tc.db.FetchTxBySha(txHash)
+				if err != nil {
+					tc.t.Errorf("ExistsTxSha (%s): block #%d (%s) "+
+						"tx #%d (%s) does not exist", tc.dbType,
+						tc.blockHeight, tc.blockHash, i, txHash)
+				}
+				return false
+			}
+		}
+	}
 	return true
 }
 
 // testFetchTxBySha ensures FetchTxBySha conforms to the interface contract.
 func testFetchTxBySha(tc *testContext) bool {
-	for i, tx := range tc.block.Transactions() {
-		txHash := tx.Sha()
-		txReplyList, err := tc.db.FetchTxBySha(txHash)
+	var blockPrev *dcrutil.Block = nil
+	if tc.block.Height() != 0 {
+		var errBlockPrev error
+		blockPrev, errBlockPrev = tc.db.FetchBlockBySha(&tc.block.MsgBlock().Header.PrevBlock)
+		if errBlockPrev != nil {
+			blockSha := tc.block.Sha()
+			tc.t.Errorf("Failed to fetch parent block of block %v", blockSha)
+		}
+	}
+
+	votebits := tc.block.MsgBlock().Header.VoteBits
+	if dcrutil.IsFlagSet16(votebits, dcrutil.BlockValid) && blockPrev != nil {
+		for i, tx := range blockPrev.Transactions() {
+			txHash := tx.Sha()
+			txReplyList, err := tc.db.FetchTxBySha(txHash)
+			if err != nil {
+				tc.t.Errorf("FetchTxBySha (%s): block #%d (%s) "+
+					"tx #%d (%s) err: %v", tc.dbType, tc.blockHeight,
+					tc.blockHash, i, txHash, err)
+				return false
+			}
+			if len(txReplyList) == 0 {
+				tc.t.Errorf("FetchTxBySha (%s): block #%d (%s) "+
+					"tx #%d (%s) did not return reply data",
+					tc.dbType, tc.blockHeight, tc.blockHash, i,
+					txHash)
+				return false
+			}
+			txFromDb := txReplyList[len(txReplyList)-1].Tx
+			if !reflect.DeepEqual(tx.MsgTx(), txFromDb) {
+				tc.t.Errorf("FetchTxBySha (%s): block #%d (%s) "+
+					"tx #%d (%s, %s) does not match stored tx\n"+
+					"got: %v\nwant: %v", tc.dbType, tc.blockHeight,
+					tc.blockHash, i, txHash, txFromDb.TxSha(), spew.Sdump(txFromDb),
+					spew.Sdump(tx.MsgTx()))
+				return false
+			}
+		}
+	}
+	for i, tx := range tc.block.MsgBlock().STransactions {
+		txHash := tx.TxSha()
+		txReplyList, err := tc.db.FetchTxBySha(&txHash)
 		if err != nil {
 			tc.t.Errorf("FetchTxBySha (%s): block #%d (%s) "+
-				"tx #%d (%s) err: %v", tc.dbType, tc.blockHeight,
+				"sstx #%d (%s) err: %v", tc.dbType, tc.blockHeight,
 				tc.blockHash, i, txHash, err)
 			return false
 		}
 		if len(txReplyList) == 0 {
 			tc.t.Errorf("FetchTxBySha (%s): block #%d (%s) "+
-				"tx #%d (%s) did not return reply data",
+				"sstx #%d (%s) did not return reply data",
 				tc.dbType, tc.blockHeight, tc.blockHash, i,
 				txHash)
 			return false
 		}
 		txFromDb := txReplyList[len(txReplyList)-1].Tx
-		if !reflect.DeepEqual(tx.MsgTx(), txFromDb) {
+		if !reflect.DeepEqual(tx, txFromDb) {
 			tc.t.Errorf("FetchTxBySha (%s): block #%d (%s) "+
-				"tx #%d (%s) does not match stored tx\n"+
+				"sstx #%d (%s) does not match stored sstx\n"+
 				"got: %v\nwant: %v", tc.dbType, tc.blockHeight,
 				tc.blockHash, i, txHash, spew.Sdump(txFromDb),
-				spew.Sdump(tx.MsgTx()))
+				spew.Sdump(tx))
 			return false
 		}
 	}
@@ -302,151 +360,512 @@ func testFetchTxBySha(tc *testContext) bool {
 // be spent yet.  However, on subsequent runs, all blocks have been inserted and
 // therefore some of the transaction outputs are spent.
 func expectedSpentBuf(tc *testContext, txNum int) []bool {
-	numTxOut := len(tc.block.MsgBlock().Transactions[txNum].TxOut)
+	var blah = []bool{false}
+	var blockPrev *dcrutil.Block = nil
+	if tc.block.Height() != 0 {
+		var errBlockPrev error
+		blockPrev, errBlockPrev = tc.db.FetchBlockBySha(&tc.block.MsgBlock().Header.PrevBlock)
+		if errBlockPrev != nil {
+			blockSha := tc.block.Sha()
+			tc.t.Errorf("Failed to fetch parent block of block %v", blockSha)
+			return blah
+		}
+	}
+	transactions := blockPrev.Transactions()
+	numTxOut := len(transactions[txNum].MsgTx().TxOut)
 	spentBuf := make([]bool, numTxOut)
 	if tc.useSpends {
-		if tc.blockHeight == 9 && txNum == 0 {
-			// Spent by block 170, tx 1, input 0.
-			// tx f4184fc596403b9d638783cf57adfe4c75c605f6356fbc91338530e9831e9e16
+		if tc.blockHeight >= 2 && tc.blockHeight <= 43 && txNum == 0 {
+			spentBuf[0] = false
+			spentBuf[1] = false
+			spentBuf[2] = true
+		}
+		if tc.blockHeight == 45 && txNum == 0 {
+			spentBuf[0] = false
+			spentBuf[1] = false
+			spentBuf[2] = true
+		}
+		if tc.blockHeight == 46 && txNum == 0 {
+			spentBuf[0] = false
+			spentBuf[1] = false
+			spentBuf[2] = true
+		}
+		if tc.blockHeight == 48 && txNum == 0 {
+			spentBuf[0] = false
+			spentBuf[1] = false
+			spentBuf[2] = true
+		}
+		if tc.blockHeight == 49 && txNum == 0 {
+			spentBuf[0] = false
+			spentBuf[1] = false
+			spentBuf[2] = true
+		}
+		if tc.blockHeight == 54 && txNum == 0 {
+			spentBuf[0] = false
+			spentBuf[1] = false
+			spentBuf[2] = true
+		}
+		if tc.blockHeight == 55 && txNum == 0 {
+			spentBuf[0] = false
+			spentBuf[1] = false
+			spentBuf[2] = true
+		}
+		if tc.blockHeight == 57 && txNum == 0 {
+			spentBuf[0] = false
+			spentBuf[1] = false
+			spentBuf[2] = true
+		}
+		if tc.blockHeight == 59 && txNum == 0 {
+			spentBuf[0] = false
+			spentBuf[1] = false
+			spentBuf[2] = true
+		}
+		if tc.blockHeight == 63 && txNum == 0 {
+			spentBuf[0] = false
+			spentBuf[1] = false
+			spentBuf[2] = true
+		}
+		if tc.blockHeight == 67 && txNum == 0 {
+			spentBuf[0] = false
+			spentBuf[1] = false
+			spentBuf[2] = true
+		}
+		if tc.blockHeight == 68 && txNum == 0 {
+			spentBuf[0] = false
+			spentBuf[1] = false
+			spentBuf[2] = true
+		}
+		if tc.blockHeight == 69 && txNum == 0 {
+			spentBuf[0] = false
+			spentBuf[1] = false
+			spentBuf[2] = true
+		}
+		if tc.blockHeight == 70 && txNum == 0 {
+			spentBuf[0] = false
+			spentBuf[1] = false
+			spentBuf[2] = true
+		}
+		if tc.blockHeight == 73 && txNum == 0 {
+			spentBuf[0] = false
+			spentBuf[1] = false
+			spentBuf[2] = true
+		}
+		if tc.blockHeight == 74 && txNum == 0 {
+			spentBuf[0] = false
+			spentBuf[1] = false
+			spentBuf[2] = true
+		}
+		if tc.blockHeight == 76 && txNum == 0 {
+			spentBuf[0] = false
+			spentBuf[1] = false
+			spentBuf[2] = true
+		}
+		if tc.blockHeight == 77 && txNum == 0 {
+			spentBuf[0] = false
+			spentBuf[1] = false
+			spentBuf[2] = true
+		}
+		if tc.blockHeight >= 105 && tc.blockHeight <= 120 && txNum == 0 {
+			spentBuf[0] = false
+			spentBuf[1] = false
+			spentBuf[2] = true
+		}
+		if tc.blockHeight == 122 && txNum == 0 {
+			spentBuf[0] = false
+			spentBuf[1] = false
+			spentBuf[2] = true
+		}
+		if tc.blockHeight == 125 && txNum == 0 {
+			spentBuf[0] = false
+			spentBuf[1] = false
+			spentBuf[2] = true
+		}
+		if tc.blockHeight == 127 && txNum == 0 {
+			spentBuf[0] = false
+			spentBuf[1] = false
+			spentBuf[2] = true
+		}
+		if tc.blockHeight == 131 && txNum == 0 {
+			spentBuf[0] = false
+			spentBuf[1] = false
+			spentBuf[2] = true
+		}
+		if tc.blockHeight == 132 && txNum == 0 {
+			spentBuf[0] = false
+			spentBuf[1] = false
+			spentBuf[2] = true
+		}
+		if tc.blockHeight == 134 && txNum == 0 {
+			spentBuf[0] = false
+			spentBuf[1] = false
+			spentBuf[2] = true
+		}
+		if tc.blockHeight == 44 && txNum == 1 {
 			spentBuf[0] = true
-		}
-
-		if tc.blockHeight == 170 && txNum == 1 {
-			// Spent by block 181, tx 1, input 0.
-			// tx a16f3ce4dd5deb92d98ef5cf8afeaf0775ebca408f708b2146c4fb42b41e14be
 			spentBuf[1] = true
+			spentBuf[2] = true
+			spentBuf[3] = true
+			spentBuf[4] = false
+			spentBuf[5] = true
 		}
-
-		if tc.blockHeight == 181 && txNum == 1 {
-			// Spent by block 182, tx 1, input 0.
-			// tx 591e91f809d716912ca1d4a9295e70c3e78bab077683f79350f101da64588073
+		if tc.blockHeight == 60 && txNum == 1 {
+			spentBuf[0] = false
 			spentBuf[1] = true
+			spentBuf[2] = false
+			spentBuf[3] = false
+			spentBuf[4] = false
+			spentBuf[5] = false
 		}
-
-		if tc.blockHeight == 182 && txNum == 1 {
-			// Spent by block 221, tx 1, input 0.
-			// tx 298ca2045d174f8a158961806ffc4ef96fad02d71a6b84d9fa0491813a776160
+		if tc.blockHeight == 75 && txNum == 1 {
+			spentBuf[0] = false
+			spentBuf[1] = false
+			spentBuf[2] = false
+			spentBuf[3] = false
+			spentBuf[4] = false
+			spentBuf[5] = true
+		}
+		if tc.blockHeight == 78 && txNum == 2 {
+			spentBuf[0] = false
+			spentBuf[1] = false
+			spentBuf[2] = false
+			spentBuf[3] = false
+			spentBuf[4] = false
+			spentBuf[5] = true
+		}
+		if tc.blockHeight == 79 && txNum == 1 {
+			spentBuf[0] = false
+			spentBuf[1] = true
+			spentBuf[2] = false
+			spentBuf[3] = false
+			spentBuf[4] = false
+			spentBuf[5] = false
+		}
+		if tc.blockHeight == 89 && txNum == 1 {
+			spentBuf[0] = false
+			spentBuf[1] = false
+			spentBuf[2] = true
+			spentBuf[3] = false
+			spentBuf[4] = false
+			spentBuf[5] = false
+		}
+		if tc.blockHeight == 90 && txNum == 1 {
+			spentBuf[0] = false
+			spentBuf[1] = false
+			spentBuf[2] = false
+			spentBuf[3] = false
+			spentBuf[4] = false
+			spentBuf[5] = true
+		}
+		if tc.blockHeight == 93 && txNum == 1 {
+			spentBuf[0] = false
+			spentBuf[1] = false
+			spentBuf[2] = false
+			spentBuf[3] = false
+			spentBuf[4] = false
+			spentBuf[5] = true
+		}
+		if tc.blockHeight == 95 && txNum == 1 {
+			spentBuf[0] = false
+			spentBuf[1] = false
+			spentBuf[2] = true
+			spentBuf[3] = false
+			spentBuf[4] = false
+			spentBuf[5] = false
+		}
+		if tc.blockHeight == 97 && txNum == 3 {
+			spentBuf[0] = false
+			spentBuf[1] = false
+			spentBuf[2] = false
+			spentBuf[3] = true
+			spentBuf[4] = false
+			spentBuf[5] = false
+		}
+		if tc.blockHeight == 99 && txNum == 1 {
+			spentBuf[0] = false
+			spentBuf[1] = false
+			spentBuf[2] = false
+			spentBuf[3] = true
+			spentBuf[4] = false
+			spentBuf[5] = false
+		}
+		if tc.blockHeight == 101 && txNum == 1 {
+			spentBuf[0] = false
+			spentBuf[1] = false
+			spentBuf[2] = false
+			spentBuf[3] = false
+			spentBuf[4] = false
+			spentBuf[5] = true
+		}
+		if tc.blockHeight == 103 && txNum == 1 {
 			spentBuf[0] = true
-
-			// Spent by block 183, tx 1, input 0.
-			// tx 12b5633bad1f9c167d523ad1aa1947b2732a865bf5414eab2f9e5ae5d5c191ba
-			spentBuf[1] = true
+			spentBuf[1] = false
+			spentBuf[2] = false
+			spentBuf[3] = false
+			spentBuf[4] = false
+			spentBuf[5] = false
 		}
-
-		if tc.blockHeight == 183 && txNum == 1 {
-			// Spent by block 187, tx 1, input 0.
-			// tx 4385fcf8b14497d0659adccfe06ae7e38e0b5dc95ff8a13d7c62035994a0cd79
+		if tc.blockHeight == 106 && txNum == 1 {
 			spentBuf[0] = true
-
-			// Spent by block 248, tx 1, input 0.
-			// tx 828ef3b079f9c23829c56fe86e85b4a69d9e06e5b54ea597eef5fb3ffef509fe
 			spentBuf[1] = true
+			spentBuf[2] = true
+			spentBuf[3] = true
+			spentBuf[4] = true
+			spentBuf[5] = false
+		}
+		if tc.blockHeight == 111 && txNum == 1 {
+			spentBuf[0] = false
+			spentBuf[1] = false
+			spentBuf[2] = false
+			spentBuf[3] = false
+			spentBuf[4] = false
+			spentBuf[5] = true
+		}
+		if tc.blockHeight == 113 && txNum == 1 {
+			spentBuf[0] = false
+			spentBuf[1] = false
+			spentBuf[2] = false
+			spentBuf[3] = false
+			spentBuf[4] = true
+			spentBuf[5] = false
+		}
+		if tc.blockHeight == 113 && txNum == 2 {
+			spentBuf[0] = true
+			spentBuf[1] = false
+			spentBuf[2] = false
+			spentBuf[3] = false
+			spentBuf[4] = false
+			spentBuf[5] = true
+		}
+		if tc.blockHeight == 117 && txNum == 1 {
+			spentBuf[0] = false
+			spentBuf[1] = false
+			spentBuf[2] = true
+			spentBuf[3] = false
+			spentBuf[4] = false
+			spentBuf[5] = false
+		}
+		if tc.blockHeight == 122 && txNum == 1 {
+			spentBuf[0] = true
+			spentBuf[1] = true
+			spentBuf[2] = true
+			spentBuf[3] = false
+			spentBuf[4] = true
+			spentBuf[5] = true
+		}
+		if tc.blockHeight == 131 && txNum == 1 {
+			spentBuf[0] = true
+			spentBuf[1] = false
+			spentBuf[2] = true
+			spentBuf[3] = true
+			spentBuf[4] = true
+			spentBuf[5] = true
+		}
+		if tc.blockHeight == 135 && txNum == 1 {
+			spentBuf[0] = true
+			spentBuf[1] = true
+			spentBuf[2] = true
+			spentBuf[3] = true
+			spentBuf[4] = true
+			spentBuf[5] = false
+		}
+		if tc.blockHeight == 141 && txNum == 1 {
+			spentBuf[0] = true
+			spentBuf[1] = true
+			spentBuf[2] = true
+			spentBuf[3] = true
+			spentBuf[4] = false
+			spentBuf[5] = true
+		}
+		if tc.blockHeight == 142 && txNum == 1 {
+			spentBuf[0] = true
+			spentBuf[1] = true
+			spentBuf[2] = false
+			spentBuf[3] = true
+			spentBuf[4] = true
+			spentBuf[5] = true
+		}
+		if tc.blockHeight == 145 && txNum == 1 {
+			spentBuf[0] = true
+			spentBuf[1] = false
+			spentBuf[2] = true
+			spentBuf[3] = true
+			spentBuf[4] = true
+			spentBuf[5] = true
+		}
+		if tc.blockHeight == 146 && txNum == 1 {
+			spentBuf[0] = true
+			spentBuf[1] = false
+			spentBuf[2] = false
+			spentBuf[3] = true
+			spentBuf[4] = false
+			spentBuf[5] = true
+		}
+		if tc.blockHeight == 146 && txNum == 2 {
+			spentBuf[0] = true
+			spentBuf[1] = true
+			spentBuf[2] = true
+			spentBuf[3] = true
+			spentBuf[4] = false
+			spentBuf[5] = true
+		}
+		if tc.blockHeight == 147 && txNum == 1 {
+			spentBuf[0] = false
+			spentBuf[1] = false
+			spentBuf[2] = true
+			spentBuf[3] = false
+			spentBuf[4] = true
+			spentBuf[5] = false
 		}
 	}
 
 	return spentBuf
 }
 
+// unspendStakeTxTree returns all outpoints spent before this one
+// in the block's tx tree stake. used for unspending the stake tx
+// tree to evaluate tx tree regular of prev block.
+func unspendStakeTxTree(block *dcrutil.Block) map[wire.OutPoint]struct{} {
+	unspentOps := make(map[wire.OutPoint]struct{})
+
+	for _, tx := range block.STransactions() {
+		for _, txIn := range tx.MsgTx().TxIn {
+			unspentOps[txIn.PreviousOutPoint] = struct{}{}
+		}
+	}
+
+	return unspentOps
+}
+
 func testFetchTxByShaListCommon(tc *testContext, includeSpent bool) bool {
-	fetchFunc := tc.db.FetchUnSpentTxByShaList
-	funcName := "FetchUnSpentTxByShaList"
-	if includeSpent {
-		fetchFunc = tc.db.FetchTxByShaList
-		funcName = "FetchTxByShaList"
-	}
-
-	transactions := tc.block.Transactions()
-	txHashes := make([]*wire.ShaHash, len(transactions))
-	for i, tx := range transactions {
-		txHashes[i] = tx.Sha()
-	}
-
-	txReplyList := fetchFunc(txHashes)
-	if len(txReplyList) != len(txHashes) {
-		tc.t.Errorf("%s (%s): block #%d (%s) tx reply list does not "+
-			" match expected length - got: %v, want: %v", funcName,
-			tc.dbType, tc.blockHeight, tc.blockHash,
-			len(txReplyList), len(txHashes))
-		return false
-	}
-	for i, tx := range transactions {
-		txHash := tx.Sha()
-		txD := txReplyList[i]
-
-		// The transaction hash in the reply must be the expected value.
-		if !txD.Sha.IsEqual(txHash) {
-			tc.t.Errorf("%s (%s): block #%d (%s) tx #%d (%s) "+
-				"hash does not match expected value - got %v",
-				funcName, tc.dbType, tc.blockHeight,
-				tc.blockHash, i, txHash, txD.Sha)
-			return false
-		}
-
-		// The reply must not indicate any errors.
-		if txD.Err != nil {
-			tc.t.Errorf("%s (%s): block #%d (%s) tx #%d (%s) "+
-				"returned unexpected error - got %v, want nil",
-				funcName, tc.dbType, tc.blockHeight,
-				tc.blockHash, i, txHash, txD.Err)
-			return false
-		}
-
-		// The transaction in the reply fetched from the database must
-		// be the same MsgTx that was stored.
-		if !reflect.DeepEqual(tx.MsgTx(), txD.Tx) {
-			tc.t.Errorf("%s (%s): block #%d (%s) tx #%d (%s) does "+
-				"not match stored tx\ngot: %v\nwant: %v",
-				funcName, tc.dbType, tc.blockHeight,
-				tc.blockHash, i, txHash, spew.Sdump(txD.Tx),
-				spew.Sdump(tx.MsgTx()))
-			return false
-		}
-
-		// The block hash in the reply from the database must be the
-		// expected value.
-		if txD.BlkSha == nil {
-			tc.t.Errorf("%s (%s): block #%d (%s) tx #%d (%s) "+
-				"returned nil block hash", funcName, tc.dbType,
-				tc.blockHeight, tc.blockHash, i, txHash)
-			return false
-		}
-		if !txD.BlkSha.IsEqual(tc.blockHash) {
-			tc.t.Errorf("%s (%s): block #%d (%s) tx #%d (%s)"+
-				"returned unexpected block hash - got %v",
-				funcName, tc.dbType, tc.blockHeight,
-				tc.blockHash, i, txHash, txD.BlkSha)
-			return false
-		}
-
-		// The block height in the reply from the database must be the
-		// expected value.
-		if txD.Height != tc.blockHeight {
-			tc.t.Errorf("%s (%s): block #%d (%s) tx #%d (%s) "+
-				"returned unexpected block height - got %v",
-				funcName, tc.dbType, tc.blockHeight,
-				tc.blockHash, i, txHash, txD.Height)
-			return false
-		}
-
-		// The spend data in the reply from the database must not
-		// indicate any of the transactions that were just inserted are
-		// spent.
-		if txD.TxSpent == nil {
-			tc.t.Errorf("%s (%s): block #%d (%s) tx #%d (%s) "+
-				"returned nil spend data", funcName, tc.dbType,
-				tc.blockHeight, tc.blockHash, i, txHash)
-			return false
-		}
-		spentBuf := expectedSpentBuf(tc, i)
-		if !reflect.DeepEqual(txD.TxSpent, spentBuf) {
-			tc.t.Errorf("%s (%s): block #%d (%s) tx #%d (%s) "+
-				"returned unexpected spend data - got %v, "+
-				"want %v", funcName, tc.dbType, tc.blockHeight,
-				tc.blockHash, i, txHash, txD.TxSpent, spentBuf)
-			return false
+	var blockPrev *dcrutil.Block = nil
+	if tc.block.Height() != 0 {
+		var errBlockPrev error
+		blockPrev, errBlockPrev = tc.db.FetchBlockBySha(&tc.block.MsgBlock().Header.PrevBlock)
+		if errBlockPrev != nil {
+			blockSha := tc.block.Sha()
+			tc.t.Errorf("Failed to fetch parent block of block %v", blockSha)
 		}
 	}
 
+	unspentFromTxTreeStake := unspendStakeTxTree(tc.block)
+
+	votebits := tc.block.MsgBlock().Header.VoteBits
+	if dcrutil.IsFlagSet16(votebits, dcrutil.BlockValid) && blockPrev != nil {
+		fetchFunc := tc.db.FetchUnSpentTxByShaList
+		funcName := "FetchUnSpentTxByShaList"
+		if includeSpent {
+			fetchFunc = tc.db.FetchTxByShaList
+			funcName = "FetchTxByShaList"
+		}
+
+		transactions := blockPrev.Transactions()
+		txHashes := make([]*chainhash.Hash, len(transactions))
+		for i, tx := range transactions {
+			txHashes[i] = tx.Sha()
+		}
+
+		txReplyList := fetchFunc(txHashes)
+		if len(txReplyList) != len(txHashes) {
+			tc.t.Errorf("%s (%s): block #%d (%s) tx reply list does not "+
+				" match expected length - got: %v, want: %v", funcName,
+				tc.dbType, tc.blockHeight, tc.blockHash,
+				len(txReplyList), len(txHashes))
+			return false
+		}
+		for i, tx := range transactions {
+			txHash := tx.Sha()
+			txD := txReplyList[i]
+
+			// The transaction hash in the reply must be the expected value.
+			if !txD.Sha.IsEqual(txHash) {
+				tc.t.Errorf("%s (%s): block #%d (%s) tx #%d (%s) "+
+					"hash does not match expected value - got %v",
+					funcName, tc.dbType, tc.blockHeight,
+					tc.blockHash, i, txHash, txD.Sha)
+				return false
+			}
+
+			// The reply must not indicate any errors.
+			if txD.Err != nil {
+				tc.t.Errorf("%s (%s): block #%d (%s) tx #%d (%s) "+
+					"returned unexpected error - got %v, want nil",
+					funcName, tc.dbType, tc.blockHeight,
+					tc.blockHash, i, txHash, txD.Err)
+				return false
+			}
+
+			// The transaction in the reply fetched from the database must
+			// be the same MsgTx that was stored.
+			if !reflect.DeepEqual(tx.MsgTx(), txD.Tx) {
+				tc.t.Errorf("%s (%s): block #%d (%s) tx #%d (%s) does "+
+					"not match stored tx\ngot: %v\nwant: %v",
+					funcName, tc.dbType, tc.blockHeight,
+					tc.blockHash, i, txHash, spew.Sdump(txD.Tx),
+					spew.Sdump(tx.MsgTx()))
+				return false
+			}
+
+			// The block hash in the reply from the database must be the
+			// expected value.
+			if txD.BlkSha == nil {
+				tc.t.Errorf("%s (%s): block #%d (%s) tx #%d (%s) "+
+					"returned nil block hash", funcName, tc.dbType,
+					tc.blockHeight, tc.blockHash, i, txHash)
+				return false
+			}
+			if !txD.BlkSha.IsEqual(&tc.block.MsgBlock().Header.PrevBlock) {
+				tc.t.Errorf("%s (%s): block #%d (%s) tx #%d (%s)"+
+					"returned unexpected block hash - got %v",
+					funcName, tc.dbType, tc.blockHeight,
+					tc.blockHash, i, txHash, txD.BlkSha)
+				return false
+			}
+
+			// The block height in the reply from the database must be the
+			// expected value.
+			if txD.Height != tc.blockHeight-1 {
+				tc.t.Errorf("%s (%s): block #%d (%s) tx #%d (%s) "+
+					"returned unexpected block height - got %v",
+					funcName, tc.dbType, tc.blockHeight,
+					tc.blockHash, i, txHash, txD.Height)
+				return false
+			}
+			// The spend data in the reply from the database must not
+			// indicate any of the transactions that were just inserted are
+			// spent.
+			if txD.TxSpent == nil {
+				tc.t.Errorf("%s (%s): block #%d (%s) tx #%d (%s) "+
+					"returned nil spend data", funcName, tc.dbType,
+					tc.blockHeight, tc.blockHash, i, txHash)
+				return false
+			}
+			spentBuf := expectedSpentBuf(tc, i)
+			if !reflect.DeepEqual(txD.TxSpent, spentBuf) {
+				stakeInChecksDontPass := false
+				for txoIdx, _ := range spentBuf {
+					if txD.TxSpent[txoIdx] != spentBuf[txoIdx] {
+						op := wire.OutPoint{
+							*txHash,
+							uint32(txoIdx),
+							dcrutil.TxTreeRegular,
+						}
+
+						if _, unspent := unspentFromTxTreeStake[op]; !unspent {
+							stakeInChecksDontPass = true
+						}
+					}
+				}
+
+				if stakeInChecksDontPass {
+					tc.t.Errorf("%s (%s): block #%d (%s) tx #%d (%s) "+
+						"returned unexpected spend data - got %v, "+
+						"want %v", funcName, tc.dbType, tc.blockHeight,
+						tc.blockHash, i, txHash, txD.TxSpent, spentBuf)
+					return false
+				}
+			}
+		}
+	}
 	return true
 }
 
@@ -545,7 +964,7 @@ func testInterface(t *testing.T, dbType string) {
 	context := testContext{t: t, dbType: dbType, db: db}
 
 	t.Logf("Loaded %d blocks for testing %s", len(blocks), dbType)
-	for height := int64(1); height < int64(len(blocks)); height++ {
+	for height := int64(0); height < int64(len(blocks)); height++ {
 		// Get the appropriate block and hash and update the test
 		// context accordingly.
 		block := blocks[height]
@@ -612,14 +1031,14 @@ func testInterface(t *testing.T, dbType string) {
 	   - Close()
 	   - DropAfterBlockBySha(*wire.ShaHash) (err error)
 	   x ExistsSha(sha *wire.ShaHash) (exists bool)
-	   x FetchBlockBySha(sha *wire.ShaHash) (blk *btcutil.Block, err error)
+	   x FetchBlockBySha(sha *wire.ShaHash) (blk *dcrutil.Block, err error)
 	   x FetchBlockShaByHeight(height int64) (sha *wire.ShaHash, err error)
 	   - FetchHeightRange(startHeight, endHeight int64) (rshalist []wire.ShaHash, err error)
 	   x ExistsTxSha(sha *wire.ShaHash) (exists bool)
 	   x FetchTxBySha(txsha *wire.ShaHash) ([]*TxListReply, error)
 	   x FetchTxByShaList(txShaList []*wire.ShaHash) []*TxListReply
 	   x FetchUnSpentTxByShaList(txShaList []*wire.ShaHash) []*TxListReply
-	   x InsertBlock(block *btcutil.Block) (height int64, err error)
+	   x InsertBlock(block *dcrutil.Block) (height int64, err error)
 	   x NewestSha() (sha *wire.ShaHash, height int64, err error)
 	   - RollbackClose()
 	   - Sync()

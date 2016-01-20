@@ -1,4 +1,5 @@
 // Copyright (c) 2013-2014 The btcsuite developers
+// Copyright (c) 2015 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -7,8 +8,8 @@ package blockchain
 import (
 	"math"
 
-	"github.com/btcsuite/btcd/wire"
-	"github.com/btcsuite/btcutil"
+	"github.com/decred/dcrd/chaincfg/chainhash"
+	"github.com/decred/dcrutil"
 )
 
 // nextPowerOfTwo returns the next highest power of two from a given number if
@@ -28,13 +29,13 @@ func nextPowerOfTwo(n int) int {
 // HashMerkleBranches takes two hashes, treated as the left and right tree
 // nodes, and returns the hash of their concatenation.  This is a helper
 // function used to aid in the generation of a merkle tree.
-func HashMerkleBranches(left *wire.ShaHash, right *wire.ShaHash) *wire.ShaHash {
+func HashMerkleBranches(left *chainhash.Hash, right *chainhash.Hash) *chainhash.Hash {
 	// Concatenate the left and right nodes.
-	var sha [wire.HashSize * 2]byte
-	copy(sha[:wire.HashSize], left[:])
-	copy(sha[wire.HashSize:], right[:])
+	var sha [chainhash.HashSize * 2]byte
+	copy(sha[:chainhash.HashSize], left[:])
+	copy(sha[chainhash.HashSize:], right[:])
 
-	newSha := wire.DoubleSha256SH(sha[:])
+	newSha := chainhash.HashFuncH(sha[:])
 	return &newSha
 }
 
@@ -45,7 +46,7 @@ func HashMerkleBranches(left *wire.ShaHash, right *wire.ShaHash) *wire.ShaHash {
 // is stored in a linear array.
 //
 // A merkle tree is a tree in which every non-leaf node is the hash of its
-// children nodes.  A diagram depicting how this works for bitcoin transactions
+// children nodes.  A diagram depicting how this works for decred transactions
 // where h(x) is a double sha256 follows:
 //
 //	         root = h1234 = h(h12 + h34)
@@ -66,16 +67,26 @@ func HashMerkleBranches(left *wire.ShaHash, right *wire.ShaHash) *wire.ShaHash {
 // are calculated by concatenating the left node with itself before hashing.
 // Since this function uses nodes that are pointers to the hashes, empty nodes
 // will be nil.
-func BuildMerkleTreeStore(transactions []*btcutil.Tx) []*wire.ShaHash {
+func BuildMerkleTreeStore(transactions []*dcrutil.Tx) []*chainhash.Hash {
+	// If there's an empty stake tree, return totally zeroed out merkle tree root
+	// only.
+	if len(transactions) == 0 {
+		merkles := make([]*chainhash.Hash, 1)
+		merkles[0] = &chainhash.Hash{}
+		return merkles
+	}
+
 	// Calculate how many entries are required to hold the binary merkle
 	// tree as a linear array and create an array of that size.
 	nextPoT := nextPowerOfTwo(len(transactions))
 	arraySize := nextPoT*2 - 1
-	merkles := make([]*wire.ShaHash, arraySize)
+	merkles := make([]*chainhash.Hash, arraySize)
 
 	// Create the base transaction shas and populate the array with them.
 	for i, tx := range transactions {
-		merkles[i] = tx.Sha()
+		msgTx := tx.MsgTx()
+		txShaFull := msgTx.TxShaFull()
+		merkles[i] = &txShaFull
 	}
 
 	// Start the array offset after the last transaction and adjusted to the

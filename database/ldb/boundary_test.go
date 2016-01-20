@@ -1,4 +1,5 @@
 // Copyright (c) 2013-2014 The btcsuite developers
+// Copyright (c) 2015 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -8,8 +9,8 @@ import (
 	"os"
 	"testing"
 
-	"github.com/btcsuite/btcd/database"
-	"github.com/btcsuite/btcd/wire"
+	"github.com/decred/dcrd/chaincfg/chainhash"
+	"github.com/decred/dcrd/database"
 )
 
 // we need to test for an empty database and make certain it returns the proper
@@ -30,7 +31,7 @@ func TestEmptyDB(t *testing.T) {
 	defer os.RemoveAll(dbnamever)
 
 	sha, height, err := db.NewestSha()
-	if !sha.IsEqual(&wire.ShaHash{}) {
+	if !sha.IsEqual(&chainhash.Hash{}) {
 		t.Errorf("sha not zero hash")
 	}
 	if height != -1 {
@@ -54,7 +55,7 @@ func TestEmptyDB(t *testing.T) {
 	}()
 
 	sha, height, err = db.NewestSha()
-	if !sha.IsEqual(&wire.ShaHash{}) {
+	if !sha.IsEqual(&chainhash.Hash{}) {
 		t.Errorf("sha not zero hash")
 	}
 	if height != -1 {

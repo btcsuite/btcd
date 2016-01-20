@@ -1,4 +1,5 @@
 // Copyright (c) 2013-2015 The btcsuite developers
+// Copyright (c) 2015 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -95,7 +96,7 @@ const maxCountSetCancel = (maxAlertSize - fixedAlertSize - MaxVarIntPayload + 1)
 // for caculating maximum number of subversions, set all other var sizes to 0
 // maxAlertSize = fixedAlertSize + (MaxVarIntPayload-1) + x*sizeOf(string)
 // x = (maxAlertSize - fixedAlertSize - MaxVarIntPayload + 1) / sizeOf(string)
-// subversion would typically be something like "/Satoshi:0.7.2/" (15 bytes)
+// subversion would typically be something like "/Dcrd:0.7.2/" (15 bytes)
 // so assuming < 255 bytes, sizeOf(string) = sizeOf(uint8) + 255 = 256
 const maxCountSetSubVer = (maxAlertSize - fixedAlertSize - MaxVarIntPayload + 1) / 256
 
@@ -319,7 +320,7 @@ func NewAlertFromPayload(serializedPayload []byte, pver uint32) (*Alert, error) 
 	return &alert, nil
 }
 
-// MsgAlert  implements the Message interface and defines a bitcoin alert
+// MsgAlert  implements the Message interface and defines a decred alert
 // message.
 //
 // This is a signed message that provides notifications that the client should
@@ -338,7 +339,7 @@ type MsgAlert struct {
 	Payload *Alert
 }
 
-// BtcDecode decodes r using the bitcoin protocol encoding into the receiver.
+// BtcDecode decodes r using the decred protocol encoding into the receiver.
 // This is part of the Message interface implementation.
 func (msg *MsgAlert) BtcDecode(r io.Reader, pver uint32) error {
 	var err error
@@ -363,7 +364,7 @@ func (msg *MsgAlert) BtcDecode(r io.Reader, pver uint32) error {
 	return nil
 }
 
-// BtcEncode encodes the receiver to w using the bitcoin protocol encoding.
+// BtcEncode encodes the receiver to w using the decred protocol encoding.
 // This is part of the Message interface implementation.
 func (msg *MsgAlert) BtcEncode(w io.Writer, pver uint32) error {
 	var err error
@@ -411,7 +412,7 @@ func (msg *MsgAlert) MaxPayloadLength(pver uint32) uint32 {
 	return MaxMessagePayload
 }
 
-// NewMsgAlert returns a new bitcoin alert message that conforms to the Message
+// NewMsgAlert returns a new decred alert message that conforms to the Message
 // interface.  See MsgAlert for details.
 func NewMsgAlert(serializedPayload []byte, signature []byte) *MsgAlert {
 	return &MsgAlert{

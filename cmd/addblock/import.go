@@ -1,4 +1,5 @@
 // Copyright (c) 2013-2014 The btcsuite developers
+// Copyright (c) 2015 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -11,14 +12,15 @@ import (
 	"sync"
 	"time"
 
-	"github.com/btcsuite/btcd/blockchain"
-	"github.com/btcsuite/btcd/database"
-	_ "github.com/btcsuite/btcd/database/ldb"
-	"github.com/btcsuite/btcd/wire"
-	"github.com/btcsuite/btcutil"
+	"github.com/decred/dcrd/blockchain"
+	"github.com/decred/dcrd/chaincfg/chainhash"
+	"github.com/decred/dcrd/database"
+	_ "github.com/decred/dcrd/database/ldb"
+	"github.com/decred/dcrd/wire"
+	"github.com/decred/dcrutil"
 )
 
-var zeroHash = wire.ShaHash{}
+var zeroHash = chainhash.Hash{}
 
 // importResults houses the stats and result as an import operation.
 type importResults struct {
@@ -94,7 +96,7 @@ func (bi *blockImporter) readBlock() ([]byte, error) {
 // with any potential errors.
 func (bi *blockImporter) processBlock(serializedBlock []byte) (bool, error) {
 	// Deserialize the block which includes checks for malformed blocks.
-	block, err := btcutil.NewBlockFromBytes(serializedBlock)
+	block, err := dcrutil.NewBlockFromBytes(serializedBlock)
 	if err != nil {
 		return false, err
 	}
@@ -129,7 +131,7 @@ func (bi *blockImporter) processBlock(serializedBlock []byte) (bool, error) {
 
 	// Ensure the blocks follows all of the chain rules and match up to the
 	// known checkpoints.
-	isOrphan, err := bi.chain.ProcessBlock(block, bi.medianTime,
+	_, isOrphan, err := bi.chain.ProcessBlock(block, bi.medianTime,
 		blockchain.BFFastAdd)
 	if err != nil {
 		return false, err
@@ -303,7 +305,7 @@ func newBlockImporter(db database.Db, r io.ReadSeeker) *blockImporter {
 		doneChan:     make(chan bool),
 		errChan:      make(chan error),
 		quit:         make(chan struct{}),
-		chain:        blockchain.New(db, activeNetParams, nil),
+		chain:        blockchain.New(db, nil, activeNetParams, nil),
 		medianTime:   blockchain.NewMedianTime(),
 		lastLogTime:  time.Now(),
 	}

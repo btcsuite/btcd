@@ -1,4 +1,5 @@
 // Copyright (c) 2013-2015 The btcsuite developers
+// Copyright (c) 2015 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -6,12 +7,14 @@ package wire_test
 
 import (
 	"bytes"
+	"encoding/hex"
 	"reflect"
 	"testing"
 	"time"
 
-	"github.com/btcsuite/btcd/wire"
 	"github.com/davecgh/go-spew/spew"
+	"github.com/decred/dcrd/chaincfg/chainhash"
+	"github.com/decred/dcrd/wire"
 )
 
 // TestBlockHeader tests the BlockHeader API.
@@ -24,8 +27,36 @@ func TestBlockHeader(t *testing.T) {
 
 	hash := mainNetGenesisHash
 	merkleHash := mainNetGenesisMerkleRoot
+	votebits := uint16(0x0000)
 	bits := uint32(0x1d00ffff)
-	bh := wire.NewBlockHeader(&hash, &merkleHash, bits, nonce)
+	finalState := [6]byte{0x00, 0x00, 0x00, 0x00, 0x00, 0x00}
+	voters := uint16(0x0000)
+	freshstake := uint8(0x00)
+	revocations := uint8(0x00)
+	poolsize := uint32(0)
+	sbits := int64(0x0000000000000000)
+	blockHeight := uint32(0)
+	blockSize := uint32(0)
+	extraData := [36]byte{}
+
+	bh := wire.NewBlockHeader(
+		1, // verision
+		&hash,
+		&merkleHash,
+		&merkleHash, // stakeRoot
+		votebits,
+		finalState,
+		voters,
+		freshstake,
+		revocations,
+		poolsize,
+		bits,
+		sbits,
+		blockHeight,
+		blockSize,
+		nonce,
+		extraData,
+	)
 
 	// Ensure we get the same data back out.
 	if !bh.PrevBlock.IsEqual(&hash) {
@@ -36,7 +67,39 @@ func TestBlockHeader(t *testing.T) {
 		t.Errorf("NewBlockHeader: wrong merkle root - got %v, want %v",
 			spew.Sprint(bh.MerkleRoot), spew.Sprint(merkleHash))
 	}
+	if !bh.StakeRoot.IsEqual(&merkleHash) {
+		t.Errorf("NewBlockHeader: wrong merkle root - got %v, want %v",
+			spew.Sprint(bh.MerkleRoot), spew.Sprint(merkleHash))
+	}
+	if bh.VoteBits != votebits {
+		t.Errorf("NewBlockHeader: wrong bits - got %v, want %v",
+			bh.Bits, bits)
+	}
+	if bh.FinalState != finalState {
+		t.Errorf("NewBlockHeader: wrong bits - got %v, want %v",
+			bh.Bits, bits)
+	}
+	if bh.Voters != voters {
+		t.Errorf("NewBlockHeader: wrong bits - got %v, want %v",
+			bh.Bits, bits)
+	}
+	if bh.FreshStake != freshstake {
+		t.Errorf("NewBlockHeader: wrong bits - got %v, want %v",
+			bh.Bits, bits)
+	}
+	if bh.Revocations != revocations {
+		t.Errorf("NewBlockHeader: wrong bits - got %v, want %v",
+			bh.Bits, bits)
+	}
+	if bh.PoolSize != poolsize {
+		t.Errorf("NewBlockHeader: wrong PoolSize - got %v, want %v",
+			bh.PoolSize, poolsize)
+	}
 	if bh.Bits != bits {
+		t.Errorf("NewBlockHeader: wrong bits - got %v, want %v",
+			bh.Bits, bits)
+	}
+	if bh.SBits != sbits {
 		t.Errorf("NewBlockHeader: wrong bits - got %v, want %v",
 			bh.Bits, bits)
 	}
@@ -51,15 +114,41 @@ func TestBlockHeader(t *testing.T) {
 func TestBlockHeaderWire(t *testing.T) {
 	nonce := uint32(123123) // 0x1e0f3
 
+	/*bh := dcrwire.NewBlockHeader(
+	&hash,
+	&merkleHash,
+	&merkleHash, // stakeRoot
+	votebits,
+	winner,
+	overflow,
+	voters,
+	freshstake,
+	revocations,
+	bits,
+	sbits,
+	nonce,
+	height,
+	size)*/
+
 	// baseBlockHdr is used in the various tests as a baseline BlockHeader.
 	bits := uint32(0x1d00ffff)
 	baseBlockHdr := &wire.BlockHeader{
-		Version:    1,
-		PrevBlock:  mainNetGenesisHash,
-		MerkleRoot: mainNetGenesisMerkleRoot,
-		Timestamp:  time.Unix(0x495fab29, 0), // 2009-01-03 12:15:05 -0600 CST
-		Bits:       bits,
-		Nonce:      nonce,
+		Version:     1,
+		PrevBlock:   mainNetGenesisHash,
+		MerkleRoot:  mainNetGenesisMerkleRoot,
+		StakeRoot:   mainNetGenesisMerkleRoot,
+		VoteBits:    uint16(0x0000),
+		FinalState:  [6]byte{0x00, 0x00, 0x00, 0x00, 0x00, 0x00},
+		Voters:      uint16(0x0000),
+		FreshStake:  uint8(0x00),
+		Revocations: uint8(0x00),
+		PoolSize:    uint32(0x00000000),
+		Timestamp:   time.Unix(0x495fab29, 0), // 2009-01-03 12:15:05 -0600 CST
+		Bits:        bits,
+		SBits:       int64(0x0000000000000000),
+		Nonce:       nonce,
+		Height:      uint32(0),
+		Size:        uint32(0),
 	}
 
 	// baseBlockHdrEncoded is the wire encoded bytes of baseBlockHdr.
@@ -73,9 +162,27 @@ func TestBlockHeaderWire(t *testing.T) {
 		0x7a, 0xc7, 0x2c, 0x3e, 0x67, 0x76, 0x8f, 0x61,
 		0x7f, 0xc8, 0x1b, 0xc3, 0x88, 0x8a, 0x51, 0x32,
 		0x3a, 0x9f, 0xb8, 0xaa, 0x4b, 0x1e, 0x5e, 0x4a, // MerkleRoot
-		0x29, 0xab, 0x5f, 0x49, // Timestamp
+		0x3b, 0xa3, 0xed, 0xfd, 0x7a, 0x7b, 0x12, 0xb2,
+		0x7a, 0xc7, 0x2c, 0x3e, 0x67, 0x76, 0x8f, 0x61,
+		0x7f, 0xc8, 0x1b, 0xc3, 0x88, 0x8a, 0x51, 0x32,
+		0x3a, 0x9f, 0xb8, 0xaa, 0x4b, 0x1e, 0x5e, 0x4a, // StakeRoot
+		0x00, 0x00, // VoteBits
+		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // FinalState
+		0x00, 0x00, // Voters
+		0x00,                   // FreshStake
+		0x00,                   // Revocations
+		0x00, 0x00, 0x00, 0x00, //Poolsize
 		0xff, 0xff, 0x00, 0x1d, // Bits
+		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // SBits
+		0x00, 0x00, 0x00, 0x00, // Height
+		0x00, 0x00, 0x00, 0x00, // Size
+		0x29, 0xab, 0x5f, 0x49, // Timestamp
 		0xf3, 0xe0, 0x01, 0x00, // Nonce
+		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // ExtraData
+		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+		0x00, 0x00, 0x00, 0x00,
 	}
 
 	tests := []struct {
@@ -91,43 +198,12 @@ func TestBlockHeaderWire(t *testing.T) {
 			baseBlockHdrEncoded,
 			wire.ProtocolVersion,
 		},
-
-		// Protocol version BIP0035Version.
-		{
-			baseBlockHdr,
-			baseBlockHdr,
-			baseBlockHdrEncoded,
-			wire.BIP0035Version,
-		},
-
-		// Protocol version BIP0031Version.
-		{
-			baseBlockHdr,
-			baseBlockHdr,
-			baseBlockHdrEncoded,
-			wire.BIP0031Version,
-		},
-
-		// Protocol version NetAddressTimeVersion.
-		{
-			baseBlockHdr,
-			baseBlockHdr,
-			baseBlockHdrEncoded,
-			wire.NetAddressTimeVersion,
-		},
-
-		// Protocol version MultipleAddressVersion.
-		{
-			baseBlockHdr,
-			baseBlockHdr,
-			baseBlockHdrEncoded,
-			wire.MultipleAddressVersion,
-		},
 	}
 
 	t.Logf("Running %d tests", len(tests))
 	for i, test := range tests {
 		// Encode to wire format.
+		// Former test (doesn't work because of capacity error)
 		var buf bytes.Buffer
 		err := wire.TstWriteBlockHeader(&buf, test.pver, test.in)
 		if err != nil {
@@ -137,6 +213,17 @@ func TestBlockHeaderWire(t *testing.T) {
 		if !bytes.Equal(buf.Bytes(), test.buf) {
 			t.Errorf("writeBlockHeader #%d\n got: %s want: %s", i,
 				spew.Sdump(buf.Bytes()), spew.Sdump(test.buf))
+			continue
+		}
+
+		b, err := wire.TstBytesBlockHeader(test.in)
+		if err != nil {
+			t.Errorf("writeBlockHeader #%d error %v", i, err)
+			continue
+		}
+		if !bytes.Equal(b, test.buf) {
+			t.Errorf("writeBlockHeader #%d\n got: %s want: %s", i,
+				spew.Sdump(b), spew.Sdump(test.buf))
 			continue
 		}
 
@@ -163,12 +250,21 @@ func TestBlockHeaderSerialize(t *testing.T) {
 	// baseBlockHdr is used in the various tests as a baseline BlockHeader.
 	bits := uint32(0x1d00ffff)
 	baseBlockHdr := &wire.BlockHeader{
-		Version:    1,
-		PrevBlock:  mainNetGenesisHash,
-		MerkleRoot: mainNetGenesisMerkleRoot,
-		Timestamp:  time.Unix(0x495fab29, 0), // 2009-01-03 12:15:05 -0600 CST
-		Bits:       bits,
-		Nonce:      nonce,
+		Version:     1,
+		PrevBlock:   mainNetGenesisHash,
+		MerkleRoot:  mainNetGenesisMerkleRoot,
+		StakeRoot:   mainNetGenesisMerkleRoot,
+		VoteBits:    uint16(0x0000),
+		FinalState:  [6]byte{0x00, 0x00, 0x00, 0x00, 0x00, 0x00},
+		Voters:      uint16(0x0000),
+		FreshStake:  uint8(0x00),
+		Revocations: uint8(0x00),
+		Timestamp:   time.Unix(0x495fab29, 0), // 2009-01-03 12:15:05 -0600 CST
+		Bits:        bits,
+		SBits:       int64(0x0000000000000000),
+		Nonce:       nonce,
+		Height:      uint32(0),
+		Size:        uint32(0),
 	}
 
 	// baseBlockHdrEncoded is the wire encoded bytes of baseBlockHdr.
@@ -182,9 +278,27 @@ func TestBlockHeaderSerialize(t *testing.T) {
 		0x7a, 0xc7, 0x2c, 0x3e, 0x67, 0x76, 0x8f, 0x61,
 		0x7f, 0xc8, 0x1b, 0xc3, 0x88, 0x8a, 0x51, 0x32,
 		0x3a, 0x9f, 0xb8, 0xaa, 0x4b, 0x1e, 0x5e, 0x4a, // MerkleRoot
-		0x29, 0xab, 0x5f, 0x49, // Timestamp
+		0x3b, 0xa3, 0xed, 0xfd, 0x7a, 0x7b, 0x12, 0xb2,
+		0x7a, 0xc7, 0x2c, 0x3e, 0x67, 0x76, 0x8f, 0x61,
+		0x7f, 0xc8, 0x1b, 0xc3, 0x88, 0x8a, 0x51, 0x32,
+		0x3a, 0x9f, 0xb8, 0xaa, 0x4b, 0x1e, 0x5e, 0x4a, // StakeRoot
+		0x00, 0x00, // VoteBits
+		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // FinalState
+		0x00, 0x00, // Voters
+		0x00,                   // FreshStake
+		0x00,                   // Revocations
+		0x00, 0x00, 0x00, 0x00, //Poolsize
 		0xff, 0xff, 0x00, 0x1d, // Bits
+		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // SBits
+		0x00, 0x00, 0x00, 0x00, // Height
+		0x00, 0x00, 0x00, 0x00, // Size
+		0x29, 0xab, 0x5f, 0x49, // Timestamp
 		0xf3, 0xe0, 0x01, 0x00, // Nonce
+		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // ExtraData
+		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+		0x00, 0x00, 0x00, 0x00,
 	}
 
 	tests := []struct {
@@ -227,5 +341,30 @@ func TestBlockHeaderSerialize(t *testing.T) {
 				spew.Sdump(&bh), spew.Sdump(test.out))
 			continue
 		}
+	}
+}
+
+func TestBlockHeaderHashing(t *testing.T) {
+	dummyHeader := "0000000049e0b48ade043f729d60095ed92642d96096fe6aba42f2eda" +
+		"632d461591a152267dc840ff27602ce1968a81eb30a43423517207617a0150b56c4f72" +
+		"b803e497f00000000000000000000000000000000000000000000000000000000000000" +
+		"00010000000000000000000000b7000000ffff7f20204e0000000000005800000060010" +
+		"0008b990956000000000000000000000000000000000000000000000000000000000000" +
+		"0000000000000000ABCD"
+	// This hash has reversed endianness compared to what chainhash spits out.
+	hashStr := "0d40d58703482d81d711be0ffc1b313788d3c3937e1617e4876661d33a8c4c41"
+	hashB, _ := hex.DecodeString(hashStr)
+	hash, _ := chainhash.NewHash(hashB)
+
+	vecH, _ := hex.DecodeString(dummyHeader)
+	r := bytes.NewReader(vecH)
+	var bh wire.BlockHeader
+	bh.Deserialize(r)
+	hash2 := bh.BlockSha()
+
+	if !hash2.IsEqual(hash) {
+		t.Errorf("wrong block sha returned (want %v, got %v)",
+			hash,
+			hash2)
 	}
 }

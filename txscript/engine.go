@@ -1,4 +1,5 @@
 // Copyright (c) 2013-2015 The btcsuite developers
+// Copyright (c) 2015 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -8,8 +9,8 @@ import (
 	"fmt"
 	"math/big"
 
-	"github.com/btcsuite/btcd/btcec"
-	"github.com/btcsuite/btcd/wire"
+	"github.com/decred/dcrd/chaincfg/chainec"
+	"github.com/decred/dcrd/wire"
 )
 
 // ScriptFlags is a bitmask defining additional operations or tests that will be
@@ -32,6 +33,11 @@ const (
 	// checks.  This flag is only applied when the above opcodes are
 	// executed.
 	ScriptDiscourageUpgradableNops
+
+	// ScriptVerifyCheckLockTimeVerify defines whether to verify that
+	// a transaction output is spendable based on the locktime.
+	// This is BIP0065.
+	ScriptVerifyCheckLockTimeVerify
 
 	// ScriptVerifyCleanStack defines that the stack must contain only
 	// one stack element after evaluation and that the element must be
@@ -64,17 +70,22 @@ const (
 const (
 	// maxStackSize is the maximum combined height of stack and alt stack
 	// during execution.
-	maxStackSize = 1000
+	maxStackSize = 1024
 
 	// maxScriptSize is the maximum allowed length of a raw script.
-	maxScriptSize = 10000
+	maxScriptSize = 16384
+
+	// defaultScriptVersion is the default scripting language version
+	// representing extended Decred script.
+	DefaultScriptVersion = uint16(0)
 )
 
 // halforder is used to tame ECDSA malleability (see BIP0062).
-var halfOrder = new(big.Int).Rsh(btcec.S256().N, 1)
+var halfOrder = new(big.Int).Rsh(chainec.Secp256k1.GetN(), 1)
 
 // Engine is the virtual machine that executes scripts.
 type Engine struct {
+	version         uint16
 	scripts         [][]parsedOpcode
 	scriptIdx       int
 	scriptOff       int
@@ -220,7 +231,6 @@ func (vm *Engine) CheckErrorCondition(finalScript bool) error {
 	}
 	if finalScript && vm.hasFlag(ScriptVerifyCleanStack) &&
 		vm.dstack.Depth() != 1 {
-
 		return ErrStackCleanStack
 	} else if vm.dstack.Depth() < 1 {
 		return ErrStackEmptyStack
@@ -311,7 +321,8 @@ func (vm *Engine) Step() (done bool, err error) {
 			vm.scriptIdx++
 		}
 		// there are zero length scripts in the wild
-		if vm.scriptIdx < len(vm.scripts) && vm.scriptOff >= len(vm.scripts[vm.scriptIdx]) {
+		if vm.scriptIdx < len(vm.scripts) &&
+			vm.scriptOff >= len(vm.scripts[vm.scriptIdx]) {
 			vm.scriptIdx++
 		}
 		vm.lastCodeSep = 0
@@ -325,6 +336,13 @@ func (vm *Engine) Step() (done bool, err error) {
 // Execute will execute all scripts in the script engine and return either nil
 // for successful validation or an error if one occurred.
 func (vm *Engine) Execute() (err error) {
+	// All non-default version scripts currently execute without issue,
+	// making all outputs to them anyone can pay. In the future this
+	// will allow for the addition of new scripting languages.
+	if vm.version != DefaultScriptVersion {
+		return nil
+	}
+
 	done := false
 	for done != true {
 		log.Tracef("%v", newLogClosure(func() string {
@@ -573,7 +591,8 @@ func (vm *Engine) SetAltStack(data [][]byte) {
 // NewEngine returns a new script engine for the provided public key script,
 // transaction, and input index.  The flags modify the behavior of the script
 // engine according to the description provided by each flag.
-func NewEngine(scriptPubKey []byte, tx *wire.MsgTx, txIdx int, flags ScriptFlags) (*Engine, error) {
+func NewEngine(scriptPubKey []byte, tx *wire.MsgTx, txIdx int,
+	flags ScriptFlags, scriptVersion uint16) (*Engine, error) {
 	// The provided transaction input index must refer to a valid input.
 	if txIdx < 0 || txIdx >= len(tx.TxIn) {
 		return nil, ErrInvalidIndex
@@ -588,7 +607,7 @@ func NewEngine(scriptPubKey []byte, tx *wire.MsgTx, txIdx int, flags ScriptFlags
 	// allowing the clean stack flag without the P2SH flag would make it
 	// possible to have a situation where P2SH would not be a soft fork when
 	// it should be.
-	vm := Engine{flags: flags}
+	vm := Engine{version: scriptVersion, flags: flags}
 	if vm.hasFlag(ScriptVerifyCleanStack) && !vm.hasFlag(ScriptBip16) {
 		return nil, ErrInvalidFlags
 	}
@@ -597,6 +616,16 @@ func NewEngine(scriptPubKey []byte, tx *wire.MsgTx, txIdx int, flags ScriptFlags
 	// associated flag is set.
 	if vm.hasFlag(ScriptVerifySigPushOnly) && !IsPushOnlyScript(scriptSig) {
 		return nil, ErrStackNonPushOnly
+	}
+
+	// Subscripts for pay to script hash outputs are not allowed
+	// to use any stake tag OP codes if the script version is 0.
+	if scriptVersion == DefaultScriptVersion {
+		err := HasP2SHScriptSigStakeOpCodes(scriptVersion, scriptSig,
+			scriptPubKey)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	// The engine stores the scripts in parsed form using a slice.  This
@@ -623,7 +652,7 @@ func NewEngine(scriptPubKey []byte, tx *wire.MsgTx, txIdx int, flags ScriptFlags
 		vm.scriptIdx++
 	}
 
-	if vm.hasFlag(ScriptBip16) && isScriptHash(vm.scripts[1]) {
+	if vm.hasFlag(ScriptBip16) && isAnyKindOfScriptHash(vm.scripts[1]) {
 		// Only accept input scripts that push data for P2SH.
 		if !isPushOnly(vm.scripts[0]) {
 			return nil, ErrStackP2SHNonPushOnly

@@ -1,4 +1,5 @@
 // Copyright (c) 2014 The btcsuite developers
+// Copyright (c) 2015 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -8,16 +9,17 @@ import (
 	"fmt"
 	"math/big"
 
-	"github.com/btcsuite/btcd/blockchain"
-	"github.com/btcsuite/btcd/chaincfg"
-	"github.com/btcsuite/btcd/database"
-	_ "github.com/btcsuite/btcd/database/memdb"
-	"github.com/btcsuite/btcutil"
+	"github.com/decred/dcrd/blockchain"
+	"github.com/decred/dcrd/blockchain/stake"
+	"github.com/decred/dcrd/chaincfg"
+	"github.com/decred/dcrd/database"
+	_ "github.com/decred/dcrd/database/memdb"
+	"github.com/decred/dcrutil"
 )
 
 // This example demonstrates how to create a new chain instance and use
 // ProcessBlock to attempt to attempt add a block to the chain.  As the package
-// overview documentation describes, this includes all of the Bitcoin consensus
+// overview documentation describes, this includes all of the Decred consensus
 // rules.  This example intentionally attempts to insert a duplicate genesis
 // block to illustrate how an invalid block is handled.
 func ExampleBlockChain_ProcessBlock() {
@@ -32,10 +34,11 @@ func ExampleBlockChain_ProcessBlock() {
 	}
 	defer db.Close()
 
+	var tmdb *stake.TicketDB
 	// Insert the main network genesis block.  This is part of the initial
 	// database setup.  Like above, this typically would not be needed when
 	// opening an existing database.
-	genesisBlock := btcutil.NewBlock(chaincfg.MainNetParams.GenesisBlock)
+	genesisBlock := dcrutil.NewBlock(chaincfg.MainNetParams.GenesisBlock)
 	_, err = db.InsertBlock(genesisBlock)
 	if err != nil {
 		fmt.Printf("Failed to insert genesis block: %v\n", err)
@@ -43,8 +46,8 @@ func ExampleBlockChain_ProcessBlock() {
 	}
 
 	// Create a new BlockChain instance using the underlying database for
-	// the main bitcoin network and ignore notifications.
-	chain := blockchain.New(db, &chaincfg.MainNetParams, nil)
+	// the main decred network and ignore notifications.
+	chain := blockchain.New(db, tmdb, &chaincfg.MainNetParams, nil)
 
 	// Create a new median time source that is required by the upcoming
 	// call to ProcessBlock.  Ordinarily this would also add time values
@@ -55,22 +58,24 @@ func ExampleBlockChain_ProcessBlock() {
 	// Process a block.  For this example, we are going to intentionally
 	// cause an error by trying to process the genesis block which already
 	// exists.
-	isOrphan, err := chain.ProcessBlock(genesisBlock, timeSource, blockchain.BFNone)
+	isOrphan, _, err := chain.ProcessBlock(genesisBlock, timeSource, blockchain.BFNone)
 	if err != nil {
 		fmt.Printf("Failed to process block: %v\n", err)
 		return
 	}
 	fmt.Printf("Block accepted. Is it an orphan?: %v", isOrphan)
 
+	// This output is dependent on the genesis block, and needs to be
+	// updated if the mainnet genesis block is updated.
 	// Output:
-	// Failed to process block: already have block 000000000019d6689c085ae165831e934ff763ae46a2a6c172b3f1b60a8ce26f
+	// Failed to process block: already have block 267a53b5ee86c24a48ec37aee4f4e7c0c4004892b7259e695e9f5b321f1ab9d2
 }
 
 // This example demonstrates how to convert the compact "bits" in a block header
 // which represent the target difficulty to a big integer and display it using
 // the typical hex notation.
 func ExampleCompactToBig() {
-	// Convert the bits from block 300000 in the main block chain.
+	// Convert the bits from block 300000 in the main Decred block chain.
 	bits := uint32(419465580)
 	targetDifficulty := blockchain.CompactToBig(bits)
 

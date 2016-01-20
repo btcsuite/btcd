@@ -1,4 +1,5 @@
 // Copyright (c) 2013-2015 The btcsuite developers
+// Copyright (c) 2015 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -11,12 +12,13 @@ import (
 	"strconv"
 	"sync"
 
-	"github.com/btcsuite/btcd/database"
-	"github.com/btcsuite/btcd/wire"
 	"github.com/btcsuite/btclog"
-	"github.com/btcsuite/btcutil"
 	"github.com/btcsuite/goleveldb/leveldb"
 	"github.com/btcsuite/goleveldb/leveldb/opt"
+	"github.com/decred/dcrd/chaincfg/chainhash"
+	"github.com/decred/dcrd/database"
+	"github.com/decred/dcrd/wire"
+	"github.com/decred/dcrutil"
 )
 
 const (
@@ -28,7 +30,7 @@ const (
 var log = btclog.Disabled
 
 type tTxInsertData struct {
-	txsha   *wire.ShaHash
+	txsha   *chainhash.Hash
 	blockid int64
 	txoff   int
 	txlen   int
@@ -50,14 +52,14 @@ type LevelDb struct {
 	nextBlock int64
 
 	lastBlkShaCached bool
-	lastBlkSha       wire.ShaHash
+	lastBlkSha       chainhash.Hash
 	lastBlkIdx       int64
 
-	lastAddrIndexBlkSha wire.ShaHash
+	lastAddrIndexBlkSha chainhash.Hash
 	lastAddrIndexBlkIdx int64
 
-	txUpdateMap      map[wire.ShaHash]*txUpdateObj
-	txSpentUpdateMap map[wire.ShaHash]*spentTxUpdate
+	txUpdateMap      map[chainhash.Hash]*txUpdateObj
+	txSpentUpdateMap map[chainhash.Hash]*spentTxUpdate
 }
 
 var self = database.DriverDB{DbType: "leveldb", CreateDB: CreateDB, OpenDB: OpenDB}
@@ -103,7 +105,7 @@ func OpenDB(args ...interface{}) (database.Db, error) {
 	increment := int64(100000)
 	ldb := db.(*LevelDb)
 
-	var lastSha *wire.ShaHash
+	var lastSha *chainhash.Hash
 	// forward scan
 blockforward:
 	for {
@@ -119,7 +121,7 @@ blockforward:
 				//no blocks in db, odd but ok.
 				lastknownblock = -1
 				nextunknownblock = 0
-				var emptysha wire.ShaHash
+				var emptysha chainhash.Hash
 				lastSha = &emptysha
 			} else {
 				nextunknownblock = testblock
@@ -144,18 +146,16 @@ blocknarrow:
 		}
 	}
 
-	log.Infof("Checking address index")
-
 	// Load the last block whose transactions have been indexed by address.
 	if sha, idx, err := ldb.fetchAddrIndexTip(); err == nil {
 		if err = ldb.checkAddrIndexVersion(); err == nil {
 			ldb.lastAddrIndexBlkSha = *sha
 			ldb.lastAddrIndexBlkIdx = idx
-			log.Infof("Address index good, continuing")
+			log.Infof("Address index synced and loaded to height %v", idx)
 		} else {
 			log.Infof("Address index in old, incompatible format, dropping...")
 			ldb.deleteOldAddrIndex()
-			ldb.DeleteAddrIndex()
+			ldb.PurgeAddrIndex()
 			log.Infof("Old, incompatible address index dropped and can now be rebuilt")
 		}
 	} else {
@@ -178,8 +178,8 @@ func openDB(dbpath string, create bool) (pbdb database.Db, err error) {
 		if err == nil {
 			db.lDb = tlDb
 
-			db.txUpdateMap = map[wire.ShaHash]*txUpdateObj{}
-			db.txSpentUpdateMap = make(map[wire.ShaHash]*spentTxUpdate)
+			db.txUpdateMap = map[chainhash.Hash]*txUpdateObj{}
+			db.txSpentUpdateMap = make(map[chainhash.Hash]*spentTxUpdate)
 
 			pbdb = &db
 		}
@@ -301,7 +301,7 @@ func (db *LevelDb) Close() error {
 
 // DropAfterBlockBySha will remove any blocks from the database after
 // the given block.
-func (db *LevelDb) DropAfterBlockBySha(sha *wire.ShaHash) (rerr error) {
+func (db *LevelDb) DropAfterBlockBySha(sha *chainhash.Hash) (rerr error) {
 	db.dbLock.Lock()
 	defer db.dbLock.Unlock()
 	defer func() {
@@ -322,28 +322,63 @@ func (db *LevelDb) DropAfterBlockBySha(sha *wire.ShaHash) (rerr error) {
 	}
 
 	for height := startheight; height > keepidx; height = height - 1 {
-		var blk *btcutil.Block
+		var blk *dcrutil.Block
 		blksha, buf, err := db.getBlkByHeight(height)
 		if err != nil {
 			return err
 		}
-		blk, err = btcutil.NewBlockFromBytes(buf)
+
+		blk, err = dcrutil.NewBlockFromBytes(buf)
 		if err != nil {
 			return err
 		}
 
-		for _, tx := range blk.MsgBlock().Transactions {
+		// Obtain previous block sha and buffer
+		var blkprev *dcrutil.Block
+		_, bufprev, errprev := db.getBlkByHeight(height - 1) // discard blkshaprev
+		if errprev != nil {
+			return errprev
+		}
+
+		// Do the same thing for the parent block
+		blkprev, errprev = dcrutil.NewBlockFromBytes(bufprev)
+		if errprev != nil {
+			return errprev
+		}
+
+		// Unspend the stake tx in the current block
+		for _, tx := range blk.MsgBlock().STransactions {
 			err = db.unSpend(tx)
 			if err != nil {
 				return err
 			}
 		}
 		// rather than iterate the list of tx backward, do it twice.
-		for _, tx := range blk.Transactions() {
+		for _, tx := range blk.STransactions() {
 			var txUo txUpdateObj
 			txUo.delete = true
 			db.txUpdateMap[*tx.Sha()] = &txUo
 		}
+
+		// Check to see if the regular txs of the parent were even included; if
+		// they are, unspend all of these regular tx too
+		votebits := blk.MsgBlock().Header.VoteBits
+		if dcrutil.IsFlagSet16(votebits, dcrutil.BlockValid) && height != 0 {
+			// Unspend the regular tx in the current block
+			for _, tx := range blkprev.MsgBlock().Transactions {
+				err = db.unSpend(tx)
+				if err != nil {
+					return err
+				}
+			}
+			// rather than iterate the list of tx backward, do it twice.
+			for _, tx := range blkprev.Transactions() {
+				var txUo txUpdateObj
+				txUo.delete = true
+				db.txUpdateMap[*tx.Sha()] = &txUo
+			}
+		}
+
 		db.lBatch().Delete(shaBlkToKey(blksha))
 		db.lBatch().Delete(int64ToKey(height))
 	}
@@ -361,7 +396,27 @@ func (db *LevelDb) DropAfterBlockBySha(sha *wire.ShaHash) (rerr error) {
 // database.  The first block inserted into the database will be treated as the
 // genesis block.  Every subsequent block insert requires the referenced parent
 // block to already exist.
-func (db *LevelDb) InsertBlock(block *btcutil.Block) (height int64, rerr error) {
+func (db *LevelDb) InsertBlock(block *dcrutil.Block) (height int64, rerr error) {
+	// Be careful with this function on syncs.  It contains decred changes.
+
+	// Obtain the previous block first so long as it's not the genesis block
+	var blockPrev *dcrutil.Block = nil
+
+	// Decred: WARNING. This function assumes that all block insertion calls have
+	// dcrutil.blocks passed to them with block.blockHeight set correctly. However,
+	// loading the genesis block in btcd didn't do this (via block manager); pre-
+	// production it should be established that all calls to this function pass
+	// blocks with block.blockHeight set correctly.
+	if block.Height() != 0 {
+		var errBlockPrev error
+		blockPrev, errBlockPrev = db.FetchBlockBySha(&block.MsgBlock().Header.PrevBlock)
+		if errBlockPrev != nil {
+			blockSha := block.Sha()
+			log.Warnf("Failed to fetch parent block of block %v", blockSha)
+			return 0, errBlockPrev
+		}
+	}
+
 	db.dbLock.Lock()
 	defer db.dbLock.Unlock()
 	defer func() {
@@ -379,9 +434,9 @@ func (db *LevelDb) InsertBlock(block *btcutil.Block) (height int64, rerr error) 
 		log.Warnf("Failed to obtain raw block sha %v", blocksha)
 		return 0, err
 	}
-	txloc, err := block.TxLoc()
+	_, sTxLoc, err := block.TxLoc()
 	if err != nil {
-		log.Warnf("Failed to obtain raw block sha %v", blocksha)
+		log.Warnf("Failed to obtain raw block sha %v, stxloc %v", blocksha, sTxLoc)
 		return 0, err
 	}
 
@@ -394,81 +449,94 @@ func (db *LevelDb) InsertBlock(block *btcutil.Block) (height int64, rerr error) 
 		return 0, err
 	}
 
-	// At least two blocks in the long past were generated by faulty
-	// miners, the sha of the transaction exists in a previous block,
-	// detect this condition and 'accept' the block.
-	for txidx, tx := range mblock.Transactions {
-		txsha, err := block.TxSha(txidx)
+	// Get data necessary to process regular tx tree of parent block if it's not
+	// the genesis block.
+	var mBlockPrev *wire.MsgBlock = nil
+	var txLoc []wire.TxLoc
+
+	if blockPrev != nil {
+		blockShaPrev := blockPrev.Sha()
+
+		mBlockPrev = blockPrev.MsgBlock()
+
+		txLoc, _, err = blockPrev.TxLoc()
 		if err != nil {
-			log.Warnf("failed to compute tx name block %v idx %v err %v", blocksha, txidx, err)
-			return 0, err
-		}
-		spentbuflen := (len(tx.TxOut) + 7) / 8
-		spentbuf := make([]byte, spentbuflen, spentbuflen)
-		if len(tx.TxOut)%8 != 0 {
-			for i := uint(len(tx.TxOut) % 8); i < 8; i++ {
-				spentbuf[spentbuflen-1] |= (byte(1) << i)
-			}
-		}
-
-		err = db.insertTx(txsha, newheight, txloc[txidx].TxStart, txloc[txidx].TxLen, spentbuf)
-		if err != nil {
-			log.Warnf("block %v idx %v failed to insert tx %v %v err %v", blocksha, newheight, &txsha, txidx, err)
-			return 0, err
-		}
-
-		// Some old blocks contain duplicate transactions
-		// Attempt to cleanly bypass this problem by marking the
-		// first as fully spent.
-		// http://blockexplorer.com/b/91812 dup in 91842
-		// http://blockexplorer.com/b/91722 dup in 91880
-		if newheight == 91812 {
-			dupsha, err := wire.NewShaHashFromStr("d5d27987d2a3dfc724e359870c6644b40e497bdc0589a033220fe15429d88599")
-			if err != nil {
-				panic("invalid sha string in source")
-			}
-			if txsha.IsEqual(dupsha) {
-				// marking TxOut[0] as spent
-				po := wire.NewOutPoint(dupsha, 0)
-				txI := wire.NewTxIn(po, []byte("garbage"))
-
-				var spendtx wire.MsgTx
-				spendtx.AddTxIn(txI)
-				err = db.doSpend(&spendtx)
-				if err != nil {
-					log.Warnf("block %v idx %v failed to spend tx %v %v err %v", blocksha, newheight, &txsha, txidx, err)
-				}
-			}
-		}
-		if newheight == 91722 {
-			dupsha, err := wire.NewShaHashFromStr("e3bf3d07d4b0375638d5f1db5255fe07ba2c4cb067cd81b84ee974b6585fb468")
-			if err != nil {
-				panic("invalid sha string in source")
-			}
-			if txsha.IsEqual(dupsha) {
-				// marking TxOut[0] as spent
-				po := wire.NewOutPoint(dupsha, 0)
-				txI := wire.NewTxIn(po, []byte("garbage"))
-
-				var spendtx wire.MsgTx
-				spendtx.AddTxIn(txI)
-				err = db.doSpend(&spendtx)
-				if err != nil {
-					log.Warnf("block %v idx %v failed to spend tx %v %v err %v", blocksha, newheight, &txsha, txidx, err)
-				}
-			}
-		}
-
-		err = db.doSpend(tx)
-		if err != nil {
-			log.Warnf("block %v idx %v failed to spend tx %v %v err %v", blocksha, newheight, txsha, txidx, err)
+			log.Warnf("Failed to obtain raw block sha %v, txloc %v", blockShaPrev, txLoc)
 			return 0, err
 		}
 	}
+
+	// Insert the regular tx of the parent block into the tx database if the vote
+	// bits enable it, and if it's not the genesis block.
+	votebits := mblock.Header.VoteBits
+	if dcrutil.IsFlagSet16(votebits, dcrutil.BlockValid) && blockPrev != nil {
+		for txidx, tx := range mBlockPrev.Transactions {
+			txsha, err := blockPrev.TxSha(txidx)
+
+			if err != nil {
+				log.Warnf("failed to compute tx name block %v idx %v err %v", blocksha, txidx, err)
+				return 0, err
+			}
+			spentbuflen := (len(tx.TxOut) + 7) / 8
+			spentbuf := make([]byte, spentbuflen, spentbuflen)
+			if len(tx.TxOut)%8 != 0 {
+				for i := uint(len(tx.TxOut) % 8); i < 8; i++ {
+					spentbuf[spentbuflen-1] |= (byte(1) << i)
+				}
+			}
+
+			// newheight-1 instead of newheight below, as the tx is actually found
+			// in the parent.
+			//fmt.Printf("insert tx %v into db at height %v\n", txsha, newheight)
+			err = db.insertTx(txsha, newheight-1, uint32(txidx), txLoc[txidx].TxStart, txLoc[txidx].TxLen, spentbuf)
+			if err != nil {
+				log.Warnf("block %v idx %v failed to insert tx %v %v err %v", blocksha, newheight-1, &txsha, txidx, err)
+				return 0, err
+			}
+
+			err = db.doSpend(tx)
+			if err != nil {
+				log.Warnf("block %v idx %v failed to spend tx %v %v err %v", blocksha, newheight, txsha, txidx, err)
+				return 0, err
+			}
+		}
+	}
+
+	// Insert the stake tx of the current block into the tx database.
+	if len(mblock.STransactions) != 0 {
+		for txidx, tx := range mblock.STransactions {
+			txsha, err := block.STxSha(txidx)
+
+			if err != nil {
+				log.Warnf("failed to compute stake tx name block %v idx %v err %v", blocksha, txidx, err)
+				return 0, err
+			}
+			spentbuflen := (len(tx.TxOut) + 7) / 8
+			spentbuf := make([]byte, spentbuflen, spentbuflen)
+			if len(tx.TxOut)%8 != 0 {
+				for i := uint(len(tx.TxOut) % 8); i < 8; i++ {
+					spentbuf[spentbuflen-1] |= (byte(1) << i)
+				}
+			}
+
+			err = db.insertTx(txsha, newheight, uint32(txidx), sTxLoc[txidx].TxStart, sTxLoc[txidx].TxLen, spentbuf)
+			if err != nil {
+				log.Warnf("block %v idx %v failed to insert stake tx %v %v err %v", blocksha, newheight, &txsha, txidx, err)
+				return 0, err
+			}
+
+			err = db.doSpend(tx)
+			if err != nil {
+				log.Warnf("block %v idx %v failed to spend stx %v %v err %v", blocksha, newheight, txsha, txidx, err)
+				return 0, err
+			}
+		}
+	}
+
 	return newheight, nil
 }
 
-// doSpend iterates all TxIn in a bitcoin transaction marking each associated
+// doSpend iterates all TxIn in a decred transaction marking each associated
 // TxOut as spent.
 func (db *LevelDb) doSpend(tx *wire.MsgTx) error {
 	for txinidx := range tx.TxIn {
@@ -481,8 +549,6 @@ func (db *LevelDb) doSpend(tx *wire.MsgTx) error {
 			continue
 		}
 
-		//log.Infof("spending %v %v",  &inTxSha, inTxidx)
-
 		err := db.setSpentData(&inTxSha, inTxidx)
 		if err != nil {
 			return err
@@ -491,7 +557,7 @@ func (db *LevelDb) doSpend(tx *wire.MsgTx) error {
 	return nil
 }
 
-// unSpend iterates all TxIn in a bitcoin transaction marking each associated
+// unSpend iterates all TxIn in a decred transaction marking each associated
 // TxOut as unspent.
 func (db *LevelDb) unSpend(tx *wire.MsgTx) error {
 	for txinidx := range tx.TxIn {
@@ -512,25 +578,39 @@ func (db *LevelDb) unSpend(tx *wire.MsgTx) error {
 	return nil
 }
 
-func (db *LevelDb) setSpentData(sha *wire.ShaHash, idx uint32) error {
+func (db *LevelDb) setSpentData(sha *chainhash.Hash, idx uint32) error {
 	return db.setclearSpentData(sha, idx, true)
 }
 
-func (db *LevelDb) clearSpentData(sha *wire.ShaHash, idx uint32) error {
+func (db *LevelDb) clearSpentData(sha *chainhash.Hash, idx uint32) error {
 	return db.setclearSpentData(sha, idx, false)
 }
 
-func (db *LevelDb) setclearSpentData(txsha *wire.ShaHash, idx uint32, set bool) error {
+func (db *LevelDb) setclearSpentData(txsha *chainhash.Hash, idx uint32, set bool) error {
 	var txUo *txUpdateObj
 	var ok bool
 
 	if txUo, ok = db.txUpdateMap[*txsha]; !ok {
 		// not cached, load from db
 		var txU txUpdateObj
-		blkHeight, txOff, txLen, spentData, err := db.getTxData(txsha)
+		blkHeight, blkIndex, txOff, txLen, spentData, err := db.getTxData(txsha)
 		if err != nil {
 			// setting a fully spent tx is an error.
 			if set == true {
+				log.Warnf("setclearSpentData attempted to set fully spent tx "+
+					"%v %v %v",
+					txsha,
+					idx,
+					set)
+
+				// if we are clearing a tx and it wasn't found
+				// in the tx table, it could be in the fully spent
+				// (duplicates) table.
+				_, err := db.getTxFullySpent(txsha)
+				if err != nil {
+					log.Warnf("getTxFullySpent couldn't find the tx either: %v",
+						err.Error())
+				}
 				return err
 			}
 			// if we are clearing a tx and it wasn't found
@@ -538,6 +618,12 @@ func (db *LevelDb) setclearSpentData(txsha *wire.ShaHash, idx uint32, set bool) 
 			// (duplicates) table.
 			spentTxList, err := db.getTxFullySpent(txsha)
 			if err != nil {
+				log.Warnf("encountered setclearSpentData error for tx hash %v "+
+					"idx %v set %v: getTxFullySpent returned %v",
+					txsha,
+					idx,
+					set,
+					err.Error())
 				return err
 			}
 
@@ -555,6 +641,7 @@ func (db *LevelDb) setclearSpentData(txsha *wire.ShaHash, idx uint32, set bool) 
 
 			// Create 'new' Tx update data.
 			blkHeight = sTx.blkHeight
+			blkIndex = sTx.blkIndex
 			txOff = sTx.txoff
 			txLen = sTx.txlen
 			spentbuflen := (sTx.numTxO + 7) / 8
@@ -566,6 +653,7 @@ func (db *LevelDb) setclearSpentData(txsha *wire.ShaHash, idx uint32, set bool) 
 
 		txU.txSha = txsha
 		txU.blkHeight = blkHeight
+		txU.blkIndex = blkIndex
 		txU.txoff = txOff
 		txU.txlen = txLen
 		txU.spentData = spentData
@@ -608,6 +696,7 @@ func (db *LevelDb) setclearSpentData(txsha *wire.ShaHash, idx uint32, set bool) 
 		// Fill in spentTx
 		var sTx spentTx
 		sTx.blkHeight = txUo.blkHeight
+		sTx.blkIndex = txUo.blkIndex
 		sTx.txoff = txUo.txoff
 		sTx.txlen = txUo.txlen
 		// XXX -- there is no way to comput the real TxOut
@@ -636,7 +725,7 @@ func int64ToKey(keyint int64) []byte {
 	return []byte(key)
 }
 
-func shaBlkToKey(sha *wire.ShaHash) []byte {
+func shaBlkToKey(sha *chainhash.Hash) []byte {
 	return sha[:]
 }
 
@@ -645,14 +734,14 @@ func shaBlkToKey(sha *wire.ShaHash) []byte {
 var recordSuffixTx = []byte{'t', 'x'}
 var recordSuffixSpentTx = []byte{'s', 'x'}
 
-func shaTxToKey(sha *wire.ShaHash) []byte {
+func shaTxToKey(sha *chainhash.Hash) []byte {
 	key := make([]byte, len(sha)+len(recordSuffixTx))
 	copy(key, sha[:])
 	copy(key[len(sha):], recordSuffixTx)
 	return key
 }
 
-func shaSpentTxToKey(sha *wire.ShaHash) []byte {
+func shaSpentTxToKey(sha *chainhash.Hash) []byte {
 	key := make([]byte, len(sha)+len(recordSuffixSpentTx))
 	copy(key, sha[:])
 	copy(key[len(sha):], recordSuffixSpentTx)
@@ -679,10 +768,10 @@ func (db *LevelDb) processBatches() error {
 		for txSha, txU := range db.txUpdateMap {
 			key := shaTxToKey(&txSha)
 			if txU.delete {
-				//log.Tracef("deleting tx %v", txSha)
+				log.Tracef("deleting tx %v", txSha)
 				db.lbatch.Delete(key)
 			} else {
-				//log.Tracef("inserting tx %v", txSha)
+				log.Tracef("inserting tx %v", txSha)
 				txdat := db.formatTx(txU)
 				db.lbatch.Put(key, txdat)
 			}
@@ -690,10 +779,10 @@ func (db *LevelDb) processBatches() error {
 		for txSha, txSu := range db.txSpentUpdateMap {
 			key := shaSpentTxToKey(&txSha)
 			if txSu.delete {
-				//log.Tracef("deleting tx %v", txSha)
+				log.Tracef("deleting tx %v", txSha)
 				db.lbatch.Delete(key)
 			} else {
-				//log.Tracef("inserting tx %v", txSha)
+				log.Tracef("inserting tx %v", txSha)
 				txdat := db.formatTxFullySpent(txSu.txl)
 				db.lbatch.Put(key, txdat)
 			}
@@ -704,8 +793,8 @@ func (db *LevelDb) processBatches() error {
 			log.Tracef("batch failed %v\n", err)
 			return err
 		}
-		db.txUpdateMap = map[wire.ShaHash]*txUpdateObj{}
-		db.txSpentUpdateMap = make(map[wire.ShaHash]*spentTxUpdate)
+		db.txUpdateMap = map[chainhash.Hash]*txUpdateObj{}
+		db.txSpentUpdateMap = make(map[chainhash.Hash]*spentTxUpdate)
 	}
 
 	return nil

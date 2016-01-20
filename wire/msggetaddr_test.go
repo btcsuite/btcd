@@ -1,4 +1,5 @@
 // Copyright (c) 2013-2015 The btcsuite developers
+// Copyright (c) 2015 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -9,8 +10,8 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/btcsuite/btcd/wire"
 	"github.com/davecgh/go-spew/spew"
+	"github.com/decred/dcrd/wire"
 )
 
 // TestGetAddr tests the MsgGetAddr API.
@@ -56,38 +57,6 @@ func TestGetAddrWire(t *testing.T) {
 			msgGetAddr,
 			msgGetAddrEncoded,
 			wire.ProtocolVersion,
-		},
-
-		// Protocol version BIP0035Version.
-		{
-			msgGetAddr,
-			msgGetAddr,
-			msgGetAddrEncoded,
-			wire.BIP0035Version,
-		},
-
-		// Protocol version BIP0031Version.
-		{
-			msgGetAddr,
-			msgGetAddr,
-			msgGetAddrEncoded,
-			wire.BIP0031Version,
-		},
-
-		// Protocol version NetAddressTimeVersion.
-		{
-			msgGetAddr,
-			msgGetAddr,
-			msgGetAddrEncoded,
-			wire.NetAddressTimeVersion,
-		},
-
-		// Protocol version MultipleAddressVersion.
-		{
-			msgGetAddr,
-			msgGetAddr,
-			msgGetAddrEncoded,
-			wire.MultipleAddressVersion,
 		},
 	}
 

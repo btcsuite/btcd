@@ -1,4 +1,5 @@
 // Copyright (c) 2013-2014 The btcsuite developers
+// Copyright (c) 2015 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -35,13 +36,13 @@ func mainInterruptHandler() {
 		case <-interruptChannel:
 			// Ignore more than one shutdown signal.
 			if isShutdown {
-				btcdLog.Infof("Received SIGINT (Ctrl+C).  " +
+				dcrdLog.Infof("Received SIGINT (Ctrl+C).  " +
 					"Already shutting down...")
 				continue
 			}
 
 			isShutdown = true
-			btcdLog.Infof("Received SIGINT (Ctrl+C).  Shutting down...")
+			dcrdLog.Infof("Received SIGINT (Ctrl+C).  Shutting down...")
 
 			// Run handlers in LIFO order.
 			for i := range interruptCallbacks {

@@ -1,4 +1,5 @@
 // Copyright (c) 2013-2015 The btcsuite developers
+// Copyright (c) 2015 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -12,13 +13,15 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/btcsuite/btcd/wire"
 	"github.com/davecgh/go-spew/spew"
+
+	"github.com/decred/dcrd/chaincfg/chainhash"
+	"github.com/decred/dcrd/wire"
 )
 
 // mainNetGenesisHash is the hash of the first block in the block chain for the
 // main network (genesis block).
-var mainNetGenesisHash = wire.ShaHash([wire.HashSize]byte{ // Make go vet happy.
+var mainNetGenesisHash = chainhash.Hash([chainhash.HashSize]byte{ // Make go vet happy.
 	0x6f, 0xe2, 0x8c, 0x0a, 0xb6, 0xf1, 0xb3, 0x72,
 	0xc1, 0xa6, 0xa2, 0x46, 0xae, 0x63, 0xf7, 0x4f,
 	0x93, 0x1e, 0x83, 0x65, 0xe1, 0x5a, 0x08, 0x9c,
@@ -27,7 +30,7 @@ var mainNetGenesisHash = wire.ShaHash([wire.HashSize]byte{ // Make go vet happy.
 
 // mainNetGenesisMerkleRoot is the hash of the first transaction in the genesis
 // block for the main network.
-var mainNetGenesisMerkleRoot = wire.ShaHash([wire.HashSize]byte{ // Make go vet happy.
+var mainNetGenesisMerkleRoot = chainhash.Hash([chainhash.HashSize]byte{ // Make go vet happy.
 	0x3b, 0xa3, 0xed, 0xfd, 0x7a, 0x7b, 0x12, 0xb2,
 	0x7a, 0xc7, 0x2c, 0x3e, 0x67, 0x76, 0x8f, 0x61,
 	0x7f, 0xc8, 0x1b, 0xc3, 0x88, 0x8a, 0x51, 0x32,
@@ -104,7 +107,7 @@ func TestElementWire(t *testing.T) {
 			},
 		},
 		{
-			(*wire.ShaHash)(&[wire.HashSize]byte{ // Make go vet happy.
+			(*chainhash.Hash)(&[chainhash.HashSize]byte{ // Make go vet happy.
 				0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08,
 				0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f, 0x10,
 				0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17, 0x18,
@@ -126,8 +129,8 @@ func TestElementWire(t *testing.T) {
 			[]byte{0x01, 0x00, 0x00, 0x00},
 		},
 		{
-			wire.BitcoinNet(wire.MainNet),
-			[]byte{0xf9, 0xbe, 0xb4, 0xd9},
+			wire.CurrencyNet(wire.MainNet),
+			[]byte{0xf9, 0x00, 0xb4, 0xd9},
 		},
 		// Type not supported by the "fast" path and requires reflection.
 		{
@@ -203,7 +206,7 @@ func TestElementWireErrors(t *testing.T) {
 			0, io.ErrShortWrite, io.EOF,
 		},
 		{
-			(*wire.ShaHash)(&[wire.HashSize]byte{ // Make go vet happy.
+			(*chainhash.Hash)(&[chainhash.HashSize]byte{ // Make go vet happy.
 				0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08,
 				0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f, 0x10,
 				0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17, 0x18,
@@ -213,7 +216,7 @@ func TestElementWireErrors(t *testing.T) {
 		},
 		{wire.ServiceFlag(wire.SFNodeNetwork), 0, io.ErrShortWrite, io.EOF},
 		{wire.InvType(wire.InvTypeTx), 0, io.ErrShortWrite, io.EOF},
-		{wire.BitcoinNet(wire.MainNet), 0, io.ErrShortWrite, io.EOF},
+		{wire.CurrencyNet(wire.MainNet), 0, io.ErrShortWrite, io.EOF},
 	}
 
 	t.Logf("Running %d tests", len(tests))
@@ -349,6 +352,62 @@ func TestVarIntWireErrors(t *testing.T) {
 		if err != test.readErr {
 			t.Errorf("readVarInt #%d wrong error got: %v, want: %v",
 				i, err, test.readErr)
+			continue
+		}
+	}
+}
+
+// TestVarIntNonCanonical ensures variable length integers that are not encoded
+// canonically return the expected error.
+func TestVarIntNonCanonical(t *testing.T) {
+	pver := wire.ProtocolVersion
+
+	tests := []struct {
+		name string // Test name for easier identification
+		in   []byte // Value to decode
+		pver uint32 // Protocol version for wire encoding
+	}{
+		{
+			"0 encoded with 3 bytes", []byte{0xfd, 0x00, 0x00},
+			pver,
+		},
+		{
+			"max single-byte value encoded with 3 bytes",
+			[]byte{0xfd, 0xfc, 0x00}, pver,
+		},
+		{
+			"0 encoded with 5 bytes",
+			[]byte{0xfe, 0x00, 0x00, 0x00, 0x00}, pver,
+		},
+		{
+			"max three-byte value encoded with 5 bytes",
+			[]byte{0xfe, 0xff, 0xff, 0x00, 0x00}, pver,
+		},
+		{
+			"0 encoded with 9 bytes",
+			[]byte{0xff, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00},
+			pver,
+		},
+		{
+			"max five-byte value encoded with 9 bytes",
+			[]byte{0xff, 0xff, 0xff, 0xff, 0xff, 0x00, 0x00, 0x00, 0x00},
+			pver,
+		},
+	}
+
+	t.Logf("Running %d tests", len(tests))
+	for i, test := range tests {
+		// Decode from wire format.
+		rbuf := bytes.NewReader(test.in)
+		val, err := wire.TstReadVarInt(rbuf, test.pver)
+		if _, ok := err.(*wire.MessageError); !ok {
+			t.Errorf("readVarInt #%d (%s) unexpected error %v", i,
+				test.name, err)
+			continue
+		}
+		if val != 0 {
+			t.Errorf("readVarInt #%d (%s)\n got: %d want: 0", i,
+				test.name, val)
 			continue
 		}
 	}

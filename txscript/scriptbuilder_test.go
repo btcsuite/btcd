@@ -1,4 +1,5 @@
 // Copyright (c) 2013-2015 The btcsuite developers
+// Copyright (c) 2015 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -8,7 +9,7 @@ import (
 	"bytes"
 	"testing"
 
-	"github.com/btcsuite/btcd/txscript"
+	"github.com/decred/dcrd/txscript"
 )
 
 // TestScriptBuilderAddOp tests that pushing opcodes to a script via the
@@ -212,7 +213,7 @@ func TestScriptBuilderAddData(t *testing.T) {
 		// other operators.
 		{
 			name:     "push data len 521",
-			data:     bytes.Repeat([]byte{0x49}, 521),
+			data:     bytes.Repeat([]byte{0x49}, 4097),
 			expected: nil,
 		},
 		{

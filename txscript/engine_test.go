@@ -1,4 +1,5 @@
 // Copyright (c) 2013-2015 The btcsuite developers
+// Copyright (c) 2015 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -7,8 +8,9 @@ package txscript_test
 import (
 	"testing"
 
-	"github.com/btcsuite/btcd/txscript"
-	"github.com/btcsuite/btcd/wire"
+	"github.com/decred/dcrd/chaincfg/chainhash"
+	"github.com/decred/dcrd/txscript"
+	"github.com/decred/dcrd/wire"
 )
 
 // TestBadPC sets the pc to a deliberately bad result then confirms that Step()
@@ -35,7 +37,7 @@ func TestBadPC(t *testing.T) {
 		TxIn: []*wire.TxIn{
 			{
 				PreviousOutPoint: wire.OutPoint{
-					Hash: wire.ShaHash([32]byte{
+					Hash: chainhash.Hash([32]byte{
 						0xc9, 0x97, 0xa5, 0xe5,
 						0x6e, 0x10, 0x41, 0x02,
 						0xfa, 0x20, 0x9c, 0x6a,
@@ -62,7 +64,7 @@ func TestBadPC(t *testing.T) {
 	pkScript := []byte{txscript.OP_NOP}
 
 	for _, test := range pcTests {
-		vm, err := txscript.NewEngine(pkScript, tx, 0, 0)
+		vm, err := txscript.NewEngine(pkScript, tx, 0, 0, 0)
 		if err != nil {
 			t.Errorf("Failed to create script: %v", err)
 		}
@@ -95,7 +97,7 @@ func TestCheckErrorCondition(t *testing.T) {
 		TxIn: []*wire.TxIn{
 			{
 				PreviousOutPoint: wire.OutPoint{
-					Hash: wire.ShaHash([32]byte{
+					Hash: chainhash.Hash([32]byte{
 						0xc9, 0x97, 0xa5, 0xe5,
 						0x6e, 0x10, 0x41, 0x02,
 						0xfa, 0x20, 0x9c, 0x6a,
@@ -133,7 +135,7 @@ func TestCheckErrorCondition(t *testing.T) {
 		txscript.OP_TRUE,
 	}
 
-	vm, err := txscript.NewEngine(pkScript, tx, 0, 0)
+	vm, err := txscript.NewEngine(pkScript, tx, 0, 0, 0)
 	if err != nil {
 		t.Errorf("failed to create script: %v", err)
 	}
@@ -187,7 +189,7 @@ func TestInvalidFlagCombinations(t *testing.T) {
 		TxIn: []*wire.TxIn{
 			{
 				PreviousOutPoint: wire.OutPoint{
-					Hash: wire.ShaHash([32]byte{
+					Hash: chainhash.Hash([32]byte{
 						0xc9, 0x97, 0xa5, 0xe5,
 						0x6e, 0x10, 0x41, 0x02,
 						0xfa, 0x20, 0x9c, 0x6a,
@@ -214,7 +216,7 @@ func TestInvalidFlagCombinations(t *testing.T) {
 	pkScript := []byte{txscript.OP_NOP}
 
 	for i, test := range tests {
-		_, err := txscript.NewEngine(pkScript, tx, 0, test)
+		_, err := txscript.NewEngine(pkScript, tx, 0, test, 0)
 		if err != txscript.ErrInvalidFlags {
 			t.Fatalf("TestInvalidFlagCombinations #%d unexpected "+
 				"error: %v", i, err)

@@ -1,4 +1,5 @@
 // Copyright (c) 2013-2015 The btcsuite developers
+// Copyright (c) 2015 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -7,15 +8,17 @@ package wire
 import (
 	"fmt"
 	"io"
+
+	"github.com/decred/dcrd/chaincfg/chainhash"
 )
 
 const (
 	// MaxInvPerMsg is the maximum number of inventory vectors that can be in a
-	// single bitcoin inv message.
+	// single decred inv message.
 	MaxInvPerMsg = 50000
 
 	// Maximum payload size for an inventory vector.
-	maxInvVectPayload = 4 + HashSize
+	maxInvVectPayload = 4 + chainhash.HashSize
 )
 
 // InvType represents the allowed types of inventory vectors.  See InvVect.
@@ -46,16 +49,16 @@ func (invtype InvType) String() string {
 	return fmt.Sprintf("Unknown InvType (%d)", uint32(invtype))
 }
 
-// InvVect defines a bitcoin inventory vector which is used to describe data,
+// InvVect defines a decred inventory vector which is used to describe data,
 // as specified by the Type field, that a peer wants, has, or does not have to
 // another peer.
 type InvVect struct {
-	Type InvType // Type of data
-	Hash ShaHash // Hash of the data
+	Type InvType        // Type of data
+	Hash chainhash.Hash // Hash of the data
 }
 
 // NewInvVect returns a new InvVect using the provided type and hash.
-func NewInvVect(typ InvType, hash *ShaHash) *InvVect {
+func NewInvVect(typ InvType, hash *chainhash.Hash) *InvVect {
 	return &InvVect{
 		Type: typ,
 		Hash: *hash,

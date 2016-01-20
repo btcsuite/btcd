@@ -1,20 +1,20 @@
 // Copyright (c) 2015 The btcsuite developers
+// Copyright (c) 2015 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
 package database_test
 
 import (
+	"bytes"
 	"compress/bzip2"
-	"encoding/binary"
-	"io"
+	"encoding/gob"
 	"os"
 	"path/filepath"
-	"strings"
 	"testing"
 
-	"github.com/btcsuite/btcd/wire"
-	"github.com/btcsuite/btcutil"
+	"github.com/decred/dcrd/chaincfg/chainhash"
+	"github.com/decred/dcrutil"
 )
 
 // testReorganization performs reorganization tests for the passed DB type.
@@ -28,47 +28,52 @@ func testReorganization(t *testing.T, dbType string) {
 	}
 	defer teardown()
 
-	blocks, err := loadReorgBlocks("reorgblocks.bz2")
+	blocks, err := loadReorgBlocks("reorgto179.bz2")
+	if err != nil {
+		t.Fatalf("Error loading file: %v", err)
+	}
+	blocksReorg, err := loadReorgBlocks("reorgto180.bz2")
 	if err != nil {
 		t.Fatalf("Error loading file: %v", err)
 	}
 
-	for i := int64(0); i <= 2; i++ {
-		_, err = db.InsertBlock(blocks[i])
-		if err != nil {
-			t.Fatalf("Error inserting block %d (%v): %v", i,
-				blocks[i].Sha(), err)
-		}
-		var txIDs []string
-		for _, tx := range blocks[i].Transactions() {
-			txIDs = append(txIDs, tx.Sha().String())
-		}
-	}
-
-	for i := int64(1); i >= 0; i-- {
-		blkHash := blocks[i].Sha()
-		err = db.DropAfterBlockBySha(blkHash)
-		if err != nil {
-			t.Fatalf("Error removing block %d for reorganization: %v", i, err)
-		}
-		// Exercise NewestSha() to make sure DropAfterBlockBySha() updates the
-		// info correctly
-		maxHash, blkHeight, err := db.NewestSha()
-		if err != nil {
-			t.Fatalf("Error getting newest block info")
-		}
-		if !maxHash.IsEqual(blkHash) || blkHeight != i {
-			t.Fatalf("NewestSha returned %v (%v), expected %v (%v)", blkHeight,
-				maxHash, i, blkHash)
+	// Find where chain forks
+	var forkHash chainhash.Hash
+	var forkHeight int64
+	for i, _ := range blocks {
+		if blocks[i].Sha().IsEqual(blocksReorg[i].Sha()) {
+			blkHash := blocks[i].Sha()
+			forkHash = *blkHash
+			forkHeight = int64(i)
 		}
 	}
 
-	for i := int64(3); i < int64(len(blocks)); i++ {
+	// Insert all blocks from chain 1
+	for i := int64(0); i < int64(len(blocks)); i++ {
 		blkHash := blocks[i].Sha()
 		if err != nil {
 			t.Fatalf("Error getting SHA for block %dA: %v", i-2, err)
 		}
+
 		_, err = db.InsertBlock(blocks[i])
+		if err != nil {
+			t.Fatalf("Error inserting block %dA (%v): %v", i-2, blkHash, err)
+		}
+	}
+
+	// Remove blocks to fork point
+	db.DropAfterBlockBySha(&forkHash)
+	if err != nil {
+		t.Errorf("couldn't DropAfterBlockBySha: %v", err.Error())
+	}
+
+	// Insert blocks from the other chain to simulate a reorg
+	for i := forkHeight + 1; i < int64(len(blocksReorg)); i++ {
+		blkHash := blocksReorg[i].Sha()
+		if err != nil {
+			t.Fatalf("Error getting SHA for block %dA: %v", i-2, err)
+		}
+		_, err = db.InsertBlock(blocksReorg[i])
 		if err != nil {
 			t.Fatalf("Error inserting block %dA (%v): %v", i-2, blkHash, err)
 		}
@@ -88,7 +93,18 @@ func testReorganization(t *testing.T, dbType string) {
 		if err != nil {
 			t.Fatalf("Error fetching block %d (%v): %v", i, blkHash, err)
 		}
-		for _, tx := range block.Transactions() {
+		prevBlockSha := block.MsgBlock().Header.PrevBlock
+		prevBlock, _ := db.FetchBlockBySha(&prevBlockSha)
+		votebits := blocksReorg[i].MsgBlock().Header.VoteBits
+		if dcrutil.IsFlagSet16(votebits, dcrutil.BlockValid) && prevBlock != nil {
+			for _, tx := range prevBlock.Transactions() {
+				_, err := db.FetchTxBySha(tx.Sha())
+				if err != nil {
+					t.Fatalf("Error fetching transaction %v: %v", tx.Sha(), err)
+				}
+			}
+		}
+		for _, tx := range block.STransactions() {
 			_, err := db.FetchTxBySha(tx.Sha())
 			if err != nil {
 				t.Fatalf("Error fetching transaction %v: %v", tx.Sha(), err)
@@ -97,71 +113,41 @@ func testReorganization(t *testing.T, dbType string) {
 	}
 }
 
-// loadReorgBlocks reads files containing bitcoin block data (bzipped but
+// loadReorgBlocks reads files containing decred block data (bzipped but
 // otherwise in the format bitcoind writes) from disk and returns them as an
-// array of btcutil.Block. This is copied from the blockchain package, which
+// array of dcrutil.Block. This is copied from the blockchain package, which
 // itself largely borrowed it from the test code in this package.
-func loadReorgBlocks(filename string) ([]*btcutil.Block, error) {
-	filename = filepath.Join("testdata/", filename)
-
-	var blocks []*btcutil.Block
-	var err error
-
-	var network = wire.SimNet
-	var dr io.Reader
-	var fi io.ReadCloser
-
-	fi, err = os.Open(filename)
+func loadReorgBlocks(filename string) ([]*dcrutil.Block, error) {
+	filename = filepath.Join("../blockchain/testdata/", filename)
+	fi, err := os.Open(filename)
 	if err != nil {
-		return blocks, err
+		return nil, err
 	}
-
-	if strings.HasSuffix(filename, ".bz2") {
-		dr = bzip2.NewReader(fi)
-	} else {
-		dr = fi
-	}
+	bcStream := bzip2.NewReader(fi)
 	defer fi.Close()
 
-	var block *btcutil.Block
+	// Create a buffer of the read file
+	bcBuf := new(bytes.Buffer)
+	bcBuf.ReadFrom(bcStream)
 
-	err = nil
-	for height := int64(1); err == nil; height++ {
-		var rintbuf uint32
-		err = binary.Read(dr, binary.LittleEndian, &rintbuf)
-		if err == io.EOF {
-			// hit end of file at expected offset: no warning
-			height--
-			err = nil
-			break
-		}
-		if err != nil {
-			break
-		}
-		if rintbuf != uint32(network) {
-			break
-		}
-		err = binary.Read(dr, binary.LittleEndian, &rintbuf)
-		if err != nil {
-			return blocks, err
-		}
-		blocklen := rintbuf
+	// Create decoder from the buffer and a map to store the data
+	bcDecoder := gob.NewDecoder(bcBuf)
+	blockchain := make(map[int64][]byte)
 
-		rbytes := make([]byte, blocklen)
+	// Decode the blockchain into the map
+	if err := bcDecoder.Decode(&blockchain); err != nil {
+		return nil, err
+	}
 
-		// read block
-		numbytes, err := dr.Read(rbytes)
+	var block *dcrutil.Block
+
+	blocks := make([]*dcrutil.Block, 0, len(blockchain))
+	for height := int64(0); height < int64(len(blockchain)); height++ {
+		block, err = dcrutil.NewBlockFromBytes(blockchain[height])
 		if err != nil {
 			return blocks, err
 		}
-		if uint32(numbytes) != blocklen {
-			return blocks, io.ErrUnexpectedEOF
-		}
-
-		block, err = btcutil.NewBlockFromBytes(rbytes)
-		if err != nil {
-			return blocks, err
-		}
+		block.SetHeight(height)
 		blocks = append(blocks, block)
 	}
 

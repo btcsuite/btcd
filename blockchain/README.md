@@ -1,11 +1,10 @@
 blockchain
 ==========
 
-[![Build Status](http://img.shields.io/travis/btcsuite/btcd.svg)]
-(https://travis-ci.org/btcsuite/btcd) [![ISC License]
+[![ISC License]
 (http://img.shields.io/badge/license-ISC-blue.svg)](http://copyfree.org)
 
-Package blockchain implements bitcoin block handling and chain selection rules.
+Package blockchain implements decred block handling and chain selection rules.
 The test coverage is currently only around 60%, but will be increasing over
 time. See `test_coverage.txt` for the gocov coverage report.  Alternatively, if
 you are running a POSIX OS, you can run the `cov_report.sh` script for a
@@ -15,29 +14,29 @@ There is an associated blog post about the release of this package
 [here](https://blog.conformal.com/btcchain-the-bitcoin-chain-package-from-bctd/).
 
 This package has intentionally been designed so it can be used as a standalone
-package for any projects needing to handle processing of blocks into the bitcoin
+package for any projects needing to handle processing of blocks into the decred
 block chain.
 
 ## Documentation
 
 [![GoDoc](https://img.shields.io/badge/godoc-reference-blue.svg)]
-(http://godoc.org/github.com/btcsuite/btcd/blockchain)
+(http://godoc.org/github.com/decred/dcrd/blockchain)
 
 Full `go doc` style documentation for the project can be viewed online without
 installing this package by using the GoDoc site here:
-http://godoc.org/github.com/btcsuite/btcd/blockchain
+http://godoc.org/github.com/decred/dcrd/blockchain
 
 You can also view the documentation locally once the package is installed with
 the `godoc` tool by running `godoc -http=":6060"` and pointing your browser to
-http://localhost:6060/pkg/github.com/btcsuite/btcd/blockchain
+http://localhost:6060/pkg/github.com/decred/dcrd/blockchain
 
 ## Installation
 
 ```bash
-$ go get github.com/btcsuite/btcd/blockchain
+$ go get github.com/decred/dcrd/blockchain
 ```
 
-## Bitcoin Chain Processing Overview
+## Decred Chain Processing Overview
 
 Before a block is allowed into the block chain, it must go through an intensive
 series of validation rules.  The following list serves as a general outline of
@@ -75,42 +74,22 @@ is by no means exhaustive:
 ## Examples
 
 * [ProcessBlock Example]
-  (http://godoc.org/github.com/btcsuite/btcd/blockchain#example-BlockChain-ProcessBlock)  
+  (http://godoc.org/github.com/decred/dcrd/blockchain#example-BlockChain-ProcessBlock)  
   Demonstrates how to create a new chain instance and use ProcessBlock to
   attempt to attempt add a block to the chain.  This example intentionally
   attempts to insert a duplicate genesis block to illustrate how an invalid
   block is handled.
 
 * [CompactToBig Example]
-  (http://godoc.org/github.com/btcsuite/btcd/blockchain#example-CompactToBig)  
+  (http://godoc.org/github.com/decred/dcrd/blockchain#example-CompactToBig)  
   Demonstrates how to convert the compact "bits" in a block header which
   represent the target difficulty to a big integer and display it using the
   typical hex notation.
 
 * [BigToCompact Example]
-  (http://godoc.org/github.com/btcsuite/btcd/blockchain#example-BigToCompact)  
+  (http://godoc.org/github.com/decred/dcrd/blockchain#example-BigToCompact)  
   Demonstrates how to convert how to convert a target difficulty into the
   compact "bits" in a block header which represent that target difficulty.
-
-## GPG Verification Key
-
-All official release tags are signed by Conformal so users can ensure the code
-has not been tampered with and is coming from the btcsuite developers.  To
-verify the signature perform the following:
-
-- Download the public key from the Conformal website at
-  https://opensource.conformal.com/GIT-GPG-KEY-conformal.txt
-
-- Import the public key into your GPG keyring:
-  ```bash
-  gpg --import GIT-GPG-KEY-conformal.txt
-  ```
-
-- Verify the release tag with the following command where `TAG_NAME` is a
-  placeholder for the specific tag:
-  ```bash
-  git tag -v TAG_NAME
-  ```
 
 ## License
 

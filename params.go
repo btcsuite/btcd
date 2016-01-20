@@ -1,16 +1,17 @@
 // Copyright (c) 2013-2014 The btcsuite developers
+// Copyright (c) 2015 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
 package main
 
 import (
-	"github.com/btcsuite/btcd/chaincfg"
-	"github.com/btcsuite/btcd/wire"
+	"github.com/decred/dcrd/chaincfg"
+	"github.com/decred/dcrd/wire"
 )
 
 // activeNetParams is a pointer to the parameters specific to the
-// currently active bitcoin network.
+// currently active decred network.
 var activeNetParams = &mainNetParams
 
 // params is used to group parameters for various networks such as the main
@@ -23,45 +24,32 @@ type params struct {
 
 // mainNetParams contains parameters specific to the main network
 // (wire.MainNet).  NOTE: The RPC port is intentionally different than the
-// reference implementation because btcd does not handle wallet requests.  The
+// reference implementation because dcrd does not handle wallet requests.  The
 // separate wallet process listens on the well-known port and forwards requests
-// it does not handle on to btcd.  This approach allows the wallet process
+// it does not handle on to dcrd.  This approach allows the wallet process
 // to emulate the full reference implementation RPC API.
 var mainNetParams = params{
 	Params:  &chaincfg.MainNetParams,
-	rpcPort: "8334",
+	rpcPort: "9109",
 	dnsSeeds: []string{
-		"seed.bitcoin.sipa.be",
-		"dnsseed.bluematt.me",
-		"dnsseed.bitcoin.dashjr.org",
-		"seed.bitcoinstats.com",
-		"seed.bitnodes.io",
-		"bitseed.xf2.org",
-		"seeds.bitcoin.open-nodes.org",
+		"mainnet-seed.decred.mindcry.org",
+		"mainnet-seed.decred.netpurgatory.com",
+		"mainnet.decredseed.org",
+		"mainnet-seed.decred.org",
 	},
 }
 
-// regressionNetParams contains parameters specific to the regression test
-// network (wire.TestNet).  NOTE: The RPC port is intentionally different
-// than the reference implementation - see the mainNetParams comment for
-// details.
-var regressionNetParams = params{
-	Params:   &chaincfg.RegressionNetParams,
-	rpcPort:  "18334",
-	dnsSeeds: []string{},
-}
-
-// testNet3Params contains parameters specific to the test network (version 3)
-// (wire.TestNet3).  NOTE: The RPC port is intentionally different than the
+// testNetParams contains parameters specific to the test network (version 0)
+// (wire.TestNet).  NOTE: The RPC port is intentionally different than the
 // reference implementation - see the mainNetParams comment for details.
-var testNet3Params = params{
-	Params:  &chaincfg.TestNet3Params,
-	rpcPort: "18334",
+var testNetParams = params{
+	Params:  &chaincfg.TestNetParams,
+	rpcPort: "19109",
 	dnsSeeds: []string{
-		"testnet-seed.alexykot.me",
-		"testnet-seed.bitcoin.schildbach.de",
-		"testnet-seed.bitcoin.petertodd.org",
-		"testnet-seed.bluematt.me",
+		"testnet-seed.decred.mindcry.org",
+		"testnet-seed.decred.netpurgatory.com",
+		"testnet.decredseed.org",
+		"testnet-seed.decred.org",
 	},
 }
 
@@ -69,22 +57,22 @@ var testNet3Params = params{
 // (wire.SimNet).
 var simNetParams = params{
 	Params:   &chaincfg.SimNetParams,
-	rpcPort:  "18556",
+	rpcPort:  "19556",
 	dnsSeeds: []string{}, // NOTE: There must NOT be any seeds.
 }
 
-// netName returns the name used when referring to a bitcoin network.  At the
-// time of writing, btcd currently places blocks for testnet version 3 in the
+// netName returns the name used when referring to a decred network.  At the
+// time of writing, dcrd currently places blocks for testnet version 0 in the
 // data and log directory "testnet", which does not match the Name field of the
-// chaincfg parameters.  This function can be used to override this directory
-// name as "testnet" when the passed active network matches wire.TestNet3.
+// chaincfg parameters.  This function can be used to override this directory name
+// as "testnet" when the passed active network matches wire.TestNet.
 //
 // A proper upgrade to move the data and log directories for this network to
-// "testnet3" is planned for the future, at which point this function can be
+// "testnet" is planned for the future, at which point this function can be
 // removed and the network parameter's name used instead.
 func netName(chainParams *params) string {
 	switch chainParams.Net {
-	case wire.TestNet3:
+	case wire.TestNet:
 		return "testnet"
 	default:
 		return chainParams.Name

@@ -1,4 +1,5 @@
 // Copyright (c) 2013-2014 The btcsuite developers
+// Copyright (c) 2015 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -7,14 +8,17 @@ package database
 import (
 	"errors"
 
-	"github.com/btcsuite/btcd/wire"
-	"github.com/btcsuite/btcutil"
+	"github.com/decred/dcrd/chaincfg/chainhash"
+	"github.com/decred/dcrd/wire"
+	"github.com/decred/dcrutil"
+
 	"github.com/btcsuite/golangcrypto/ripemd160"
 )
 
 // Errors that the various database functions may return.
 var (
-	ErrAddrIndexDoesNotExist  = errors.New("address index hasn't been built or is an older version")
+	ErrAddrIndexDoesNotExist = errors.New("address index hasn't been built " +
+		"or is an older version")
 	ErrUnsupportedAddressType = errors.New("address type is not supported " +
 		"by the address-index")
 	ErrPrevShaMissing  = errors.New("previous sha missing from database")
@@ -23,6 +27,7 @@ var (
 	ErrDuplicateSha    = errors.New("duplicate insert attempted")
 	ErrDbDoesNotExist  = errors.New("non-existent database")
 	ErrDbUnknownType   = errors.New("non-existent database type")
+	ErrDbInconsistency = errors.New("inconsistent database")
 	ErrNotImplemented  = errors.New("method has not yet been implemented")
 )
 
@@ -31,7 +36,7 @@ var (
 const AllShas = int64(^uint64(0) >> 1)
 
 // Db defines a generic interface that is used to request and insert data into
-// the bitcoin block chain.  This interface is intended to be agnostic to actual
+// the decred block chain.  This interface is intended to be agnostic to actual
 // mechanism used for backend data storage.  The AddDBDriver function can be
 // used to add a new backend data storage method.
 type Db interface {
@@ -42,40 +47,40 @@ type Db interface {
 	// the given block.  It terminates any existing transaction and performs
 	// its operations in an atomic transaction which is commited before
 	// the function returns.
-	DropAfterBlockBySha(*wire.ShaHash) (err error)
+	DropAfterBlockBySha(*chainhash.Hash) (err error)
 
 	// ExistsSha returns whether or not the given block hash is present in
 	// the database.
-	ExistsSha(sha *wire.ShaHash) (exists bool, err error)
+	ExistsSha(sha *chainhash.Hash) (exists bool, err error)
 
-	// FetchBlockBySha returns a btcutil Block.  The implementation may
+	// FetchBlockBySha returns a dcrutil Block.  The implementation may
 	// cache the underlying data if desired.
-	FetchBlockBySha(sha *wire.ShaHash) (blk *btcutil.Block, err error)
+	FetchBlockBySha(sha *chainhash.Hash) (blk *dcrutil.Block, err error)
 
 	// FetchBlockHeightBySha returns the block height for the given hash.
-	FetchBlockHeightBySha(sha *wire.ShaHash) (height int64, err error)
+	FetchBlockHeightBySha(sha *chainhash.Hash) (height int64, err error)
 
 	// FetchBlockHeaderBySha returns a wire.BlockHeader for the given
 	// sha.  The implementation may cache the underlying data if desired.
-	FetchBlockHeaderBySha(sha *wire.ShaHash) (bh *wire.BlockHeader, err error)
+	FetchBlockHeaderBySha(sha *chainhash.Hash) (bh *wire.BlockHeader, err error)
 
 	// FetchBlockShaByHeight returns a block hash based on its height in the
 	// block chain.
-	FetchBlockShaByHeight(height int64) (sha *wire.ShaHash, err error)
+	FetchBlockShaByHeight(height int64) (sha *chainhash.Hash, err error)
 
 	// FetchHeightRange looks up a range of blocks by the start and ending
 	// heights.  Fetch is inclusive of the start height and exclusive of the
 	// ending height. To fetch all hashes from the start height until no
 	// more are present, use the special id `AllShas'.
-	FetchHeightRange(startHeight, endHeight int64) (rshalist []wire.ShaHash, err error)
+	FetchHeightRange(startHeight, endHeight int64) (rshalist []chainhash.Hash, err error)
 
 	// ExistsTxSha returns whether or not the given tx hash is present in
 	// the database
-	ExistsTxSha(sha *wire.ShaHash) (exists bool, err error)
+	ExistsTxSha(sha *chainhash.Hash) (exists bool, err error)
 
 	// FetchTxBySha returns some data for the given transaction hash. The
 	// implementation may cache the underlying data if desired.
-	FetchTxBySha(txsha *wire.ShaHash) ([]*TxListReply, error)
+	FetchTxBySha(txsha *chainhash.Hash) ([]*TxListReply, error)
 
 	// FetchTxByShaList returns a TxListReply given an array of transaction
 	// hashes.  The implementation may cache the underlying data if desired.
@@ -86,7 +91,7 @@ type Db interface {
 	// return at least one TxListReply instance for each requested
 	// transaction.  Each TxListReply instance then contains an Err field
 	// which can be used to detect errors.
-	FetchTxByShaList(txShaList []*wire.ShaHash) []*TxListReply
+	FetchTxByShaList(txShaList []*chainhash.Hash) []*TxListReply
 
 	// FetchUnSpentTxByShaList returns a TxListReply given an array of
 	// transaction hashes.  The implementation may cache the underlying
@@ -97,25 +102,25 @@ type Db interface {
 	// return at least one TxListReply instance for each requested
 	// transaction.  Each TxListReply instance then contains an Err field
 	// which can be used to detect errors.
-	FetchUnSpentTxByShaList(txShaList []*wire.ShaHash) []*TxListReply
+	FetchUnSpentTxByShaList(txShaList []*chainhash.Hash) []*TxListReply
 
 	// InsertBlock inserts raw block and transaction data from a block
 	// into the database.  The first block inserted into the database
 	// will be treated as the genesis block.  Every subsequent block insert
 	// requires the referenced parent block to already exist.
-	InsertBlock(block *btcutil.Block) (height int64, err error)
+	InsertBlock(block *dcrutil.Block) (height int64, err error)
 
 	// NewestSha returns the hash and block height of the most recent (end)
 	// block of the block chain.  It will return the zero hash, -1 for
 	// the block height, and no error (nil) if there are not any blocks in
 	// the database yet.
-	NewestSha() (sha *wire.ShaHash, height int64, err error)
+	NewestSha() (sha *chainhash.Hash, height int64, err error)
 
 	// FetchAddrIndexTip returns the hash and block height of the most recent
 	// block which has had its address index populated. It will return
 	// ErrAddrIndexDoesNotExist along with a zero hash, and -1 if the
 	// addrindex hasn't yet been built up.
-	FetchAddrIndexTip() (sha *wire.ShaHash, height int64, err error)
+	FetchAddrIndexTip() (sha *chainhash.Hash, height int64, err error)
 
 	// UpdateAddrIndexForBlock updates the stored addrindex with passed
 	// index information for a particular block height. Additionally, it
@@ -124,7 +129,12 @@ type Db interface {
 	// transaction which is commited before the function returns.
 	// Addresses are indexed by the raw bytes of their base58 decoded
 	// hash160.
-	UpdateAddrIndexForBlock(blkSha *wire.ShaHash, height int64,
+	UpdateAddrIndexForBlock(blkSha *chainhash.Hash, height int64,
+		addrIndex BlockAddrIndex) error
+
+	// DropAddrIndexForBlock removes all passed address indexes and sets
+	// the current block index below the previous HEAD.
+	DropAddrIndexForBlock(blkSha *chainhash.Hash, height int64,
 		addrIndex BlockAddrIndex) error
 
 	// FetchTxsForAddr looks up and returns all transactions which either
@@ -134,10 +144,11 @@ type Db interface {
 	// Additionally, if the caller wishes to skip forward in the results
 	// some amount, the 'seek' represents how many results to skip.
 	// NOTE: Values for both `seek` and `limit` MUST be positive.
-	FetchTxsForAddr(addr btcutil.Address, skip int, limit int) ([]*TxListReply, error)
+	FetchTxsForAddr(addr dcrutil.Address, skip int,
+		limit int) ([]*TxListReply, error)
 
-	// DeleteAddrIndex deletes the entire addrindex stored within the DB.
-	DeleteAddrIndex() error
+	// PurgeAddrIndex deletes the entire addrindex stored within the DB.
+	PurgeAddrIndex() error
 
 	// RollbackClose discards the recent database changes to the previously
 	// saved data at last Sync and closes the database.
@@ -159,21 +170,36 @@ type DriverDB struct {
 // TxListReply is used to return individual transaction information when
 // data about multiple transactions is requested in a single call.
 type TxListReply struct {
-	Sha     *wire.ShaHash
+	Sha     *chainhash.Hash
 	Tx      *wire.MsgTx
-	BlkSha  *wire.ShaHash
+	BlkSha  *chainhash.Hash
 	Height  int64
+	Index   uint32
 	TxSpent []bool
 	Err     error
 }
 
+// TxAddrIndex is the location of a transaction containing an address or script
+// hash reference inside a transaction, as given by the block it is found in.
+type TxAddrIndex struct {
+	Hash160  [ripemd160.Size]byte
+	Height   uint32
+	TxOffset uint32
+	TxLen    uint32
+}
+
 // AddrIndexKeySize is the number of bytes used by keys into the BlockAddrIndex.
-const AddrIndexKeySize = ripemd160.Size
+// 3 byte prefix ([]byte("a+-"))
+// 20 byte RIPEMD160 hash
+// 4 byte block height
+// 4 byte txoffset
+// 4 byte txlen
+const AddrIndexKeySize = 3 + ripemd160.Size + 4 + 4 + 4
 
 // BlockAddrIndex represents the indexing structure for addresses.
 // It maps a hash160 to a list of transaction locations within a block that
 // either pays to or spends from the passed UTXO for the hash160.
-type BlockAddrIndex map[[AddrIndexKeySize]byte][]*wire.TxLoc
+type BlockAddrIndex []*TxAddrIndex
 
 // driverList holds all of the registered database backends.
 var driverList []DriverDB

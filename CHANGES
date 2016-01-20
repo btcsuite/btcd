@@ -393,7 +393,7 @@ Changes in 0.8.0-beta (Sun May 25 2014)
     - Reduce max bytes allowed for a standard nulldata transaction to 40 for
       compatibility with the reference client
     - Introduce a new btcnet package which houses all of the network params
-      for each network (mainnet, testnet3, regtest) to ultimately enable
+      for each network (mainnet, testnet, regtest) to ultimately enable
       easier addition and tweaking of networks without needing to change
       several packages
     - Fix several script discrepancies found by reference client test data
@@ -410,7 +410,7 @@ Changes in 0.8.0-beta (Sun May 25 2014)
     - Provide options to control block template creation settings
     - Support the getwork RPC
     - Allow address identifiers to apply to more than one network since both
-      testnet3 and the regression test network unfortunately use the same
+      testnet and the regression test network unfortunately use the same
       identifier
   - RPC changes:
     - Set the content type for HTTP POST RPC connections to application/json

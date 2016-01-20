@@ -1,4 +1,5 @@
 // Copyright (c) 2013-2015 The btcsuite developers
+// Copyright (c) 2015 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -88,7 +89,7 @@ func (msg *MsgAddr) BtcEncode(w io.Writer, pver uint32) error {
 	// Protocol versions before MultipleAddressVersion only allowed 1 address
 	// per message.
 	count := len(msg.AddrList)
-	if pver < MultipleAddressVersion && count > 1 {
+	if pver < ProtocolVersion && count > 1 {
 		str := fmt.Sprintf("too many addresses for message of "+
 			"protocol version %v [count %v, max 1]", pver, count)
 		return messageError("MsgAddr.BtcEncode", str)
@@ -124,7 +125,7 @@ func (msg *MsgAddr) Command() string {
 // MaxPayloadLength returns the maximum length the payload can be for the
 // receiver.  This is part of the Message interface implementation.
 func (msg *MsgAddr) MaxPayloadLength(pver uint32) uint32 {
-	if pver < MultipleAddressVersion {
+	if pver < ProtocolVersion {
 		// Num addresses (varInt) + a single net addresses.
 		return MaxVarIntPayload + maxNetAddressPayload(pver)
 	}

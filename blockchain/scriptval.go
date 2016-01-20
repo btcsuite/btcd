@@ -1,4 +1,5 @@
 // Copyright (c) 2013-2014 The btcsuite developers
+// Copyright (c) 2015 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -9,16 +10,16 @@ import (
 	"math"
 	"runtime"
 
-	"github.com/btcsuite/btcd/txscript"
-	"github.com/btcsuite/btcd/wire"
-	"github.com/btcsuite/btcutil"
+	"github.com/decred/dcrd/txscript"
+	"github.com/decred/dcrd/wire"
+	"github.com/decred/dcrutil"
 )
 
 // txValidateItem holds a transaction along with which input to validate.
 type txValidateItem struct {
 	txInIndex int
 	txIn      *wire.TxIn
-	tx        *btcutil.Tx
+	tx        *dcrutil.Tx
 }
 
 // txValidator provides a type which asynchronously validates transaction
@@ -83,8 +84,10 @@ out:
 			// Create a new script engine for the script pair.
 			sigScript := txIn.SignatureScript
 			pkScript := originMsgTx.TxOut[originTxIndex].PkScript
+			version := originMsgTx.TxOut[originTxIndex].Version
+
 			vm, err := txscript.NewEngine(pkScript, txVI.tx.MsgTx(),
-				txVI.txInIndex, v.flags)
+				txVI.txInIndex, v.flags, version)
 			if err != nil {
 				str := fmt.Sprintf("failed to parse input "+
 					"%s:%d which references output %s:%d - "+
@@ -191,7 +194,8 @@ func newTxValidator(txStore TxStore, flags txscript.ScriptFlags) *txValidator {
 
 // ValidateTransactionScripts validates the scripts for the passed transaction
 // using multiple goroutines.
-func ValidateTransactionScripts(tx *btcutil.Tx, txStore TxStore, flags txscript.ScriptFlags) error {
+func ValidateTransactionScripts(tx *dcrutil.Tx, txStore TxStore,
+	flags txscript.ScriptFlags) error {
 	// Collect all of the transaction inputs and required information for
 	// validation.
 	txIns := tx.MsgTx().TxIn
@@ -217,21 +221,32 @@ func ValidateTransactionScripts(tx *btcutil.Tx, txStore TxStore, flags txscript.
 	}
 
 	return nil
+
 }
 
 // checkBlockScripts executes and validates the scripts for all transactions in
 // the passed block.
-func checkBlockScripts(block *btcutil.Block, txStore TxStore,
+// txTree = true is TxTreeRegular, txTree = false is TxTreeStake.
+func checkBlockScripts(block *dcrutil.Block, txStore TxStore, txTree bool,
 	scriptFlags txscript.ScriptFlags) error {
 
 	// Collect all of the transaction inputs and required information for
 	// validation for all transactions in the block into a single slice.
 	numInputs := 0
-	for _, tx := range block.Transactions() {
+	var txs []*dcrutil.Tx
+
+	// TxTreeRegular handling.
+	if txTree {
+		txs = block.Transactions()
+	} else { // TxTreeStake
+		txs = block.STransactions()
+	}
+
+	for _, tx := range txs {
 		numInputs += len(tx.MsgTx().TxIn)
 	}
 	txValItems := make([]*txValidateItem, 0, numInputs)
-	for _, tx := range block.Transactions() {
+	for _, tx := range txs {
 		for txInIdx, txIn := range tx.MsgTx().TxIn {
 			// Skip coinbases.
 			if txIn.PreviousOutPoint.Index == math.MaxUint32 {

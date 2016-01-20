@@ -1,4 +1,5 @@
 // Copyright (c) 2013-2015 The btcsuite developers
+// Copyright (c) 2015 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -12,35 +13,10 @@ import (
 
 const (
 	// ProtocolVersion is the latest protocol version this package supports.
-	ProtocolVersion uint32 = 70002
-
-	// MultipleAddressVersion is the protocol version which added multiple
-	// addresses per message (pver >= MultipleAddressVersion).
-	MultipleAddressVersion uint32 = 209
-
-	// NetAddressTimeVersion is the protocol version which added the
-	// timestamp field (pver >= NetAddressTimeVersion).
-	NetAddressTimeVersion uint32 = 31402
-
-	// BIP0031Version is the protocol version AFTER which a pong message
-	// and nonce field in ping were added (pver > BIP0031Version).
-	BIP0031Version uint32 = 60000
-
-	// BIP0035Version is the protocol version which added the mempool
-	// message (pver >= BIP0035Version).
-	BIP0035Version uint32 = 60002
-
-	// BIP0037Version is the protocol version which added new connection
-	// bloom filtering related messages and extended the version message
-	// with a relay flag (pver >= BIP0037Version).
-	BIP0037Version uint32 = 70001
-
-	// RejectVersion is the protocol version which added a new reject
-	// message.
-	RejectVersion uint32 = 70002
+	ProtocolVersion uint32 = 1
 )
 
-// ServiceFlag identifies services supported by a bitcoin peer.
+// ServiceFlag identifies services supported by a decred peer.
 type ServiceFlag uint64
 
 const (
@@ -78,41 +54,41 @@ func (f ServiceFlag) String() string {
 	return s
 }
 
-// BitcoinNet represents which bitcoin network a message belongs to.
-type BitcoinNet uint32
+// CurrencyNet represents which decred network a message belongs to.
+type CurrencyNet uint32
 
-// Constants used to indicate the message bitcoin network.  They can also be
+// Constants used to indicate the message decred network.  They can also be
 // used to seek to the next message when a stream's state is unknown, but
 // this package does not provide that functionality since it's generally a
 // better idea to simply disconnect clients that are misbehaving over TCP.
 const (
-	// MainNet represents the main bitcoin network.
-	MainNet BitcoinNet = 0xd9b4bef9
+	// MainNet represents the main decred network.
+	MainNet CurrencyNet = 0xd9b400f9
 
 	// TestNet represents the regression test network.
-	TestNet BitcoinNet = 0xdab5bffa
+	RegTest CurrencyNet = 0xdab500fa
 
-	// TestNet3 represents the test network (version 3).
-	TestNet3 BitcoinNet = 0x0709110b
+	// TestNet represents the test network (version 3).
+	TestNet CurrencyNet = 0x0709000b
 
 	// SimNet represents the simulation test network.
-	SimNet BitcoinNet = 0x12141c16
+	SimNet CurrencyNet = 0x12141c16
 )
 
-// bnStrings is a map of bitcoin networks back to their constant names for
+// bnStrings is a map of decred networks back to their constant names for
 // pretty printing.
-var bnStrings = map[BitcoinNet]string{
-	MainNet:  "MainNet",
-	TestNet:  "TestNet",
-	TestNet3: "TestNet3",
-	SimNet:   "SimNet",
+var bnStrings = map[CurrencyNet]string{
+	MainNet: "MainNet",
+	TestNet: "TestNet",
+	RegTest: "RegNet",
+	SimNet:  "SimNet",
 }
 
-// String returns the BitcoinNet in human-readable form.
-func (n BitcoinNet) String() string {
+// String returns the CurrencyNet in human-readable form.
+func (n CurrencyNet) String() string {
 	if s, ok := bnStrings[n]; ok {
 		return s
 	}
 
-	return fmt.Sprintf("Unknown BitcoinNet (%d)", uint32(n))
+	return fmt.Sprintf("Unknown CurrencyNet (%d)", uint32(n))
 }

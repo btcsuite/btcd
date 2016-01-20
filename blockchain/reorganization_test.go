@@ -1,134 +1,135 @@
 // Copyright (c) 2013-2014 The btcsuite developers
+// Copyright (c) 2015 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
 package blockchain_test
 
 import (
+	"bytes"
 	"compress/bzip2"
-	"encoding/binary"
-	"io"
+	"encoding/gob"
 	"os"
 	"path/filepath"
-	"strings"
 	"testing"
 
-	"github.com/btcsuite/btcd/blockchain"
-	"github.com/btcsuite/btcd/wire"
-	"github.com/btcsuite/btcutil"
+	"github.com/decred/dcrd/blockchain"
+	"github.com/decred/dcrd/chaincfg/chainhash"
+	"github.com/decred/dcrutil"
 )
 
 // TestReorganization loads a set of test blocks which force a chain
 // reorganization to test the block chain handling code.
-// The test blocks were originally from a post on the bitcoin talk forums:
-// https://bitcointalk.org/index.php?topic=46370.msg577556#msg577556
 func TestReorganization(t *testing.T) {
-	// Intentionally load the side chain blocks out of order to ensure
-	// orphans are handled properly along with chain reorganization.
-	testFiles := []string{
-		"blk_0_to_4.dat.bz2",
-		"blk_4A.dat.bz2",
-		"blk_5A.dat.bz2",
-		"blk_3A.dat.bz2",
-	}
-
-	var blocks []*btcutil.Block
-	for _, file := range testFiles {
-		blockTmp, err := loadBlocks(file)
-		if err != nil {
-			t.Errorf("Error loading file: %v\n", err)
-		}
-		for _, block := range blockTmp {
-			blocks = append(blocks, block)
-		}
-	}
-
-	t.Logf("Number of blocks: %v\n", len(blocks))
-
 	// Create a new database and chain instance to run tests against.
-	chain, teardownFunc, err := chainSetup("reorg")
+	chain, teardownFunc, err := chainSetup("reorgunittest",
+		simNetParams)
 	if err != nil {
 		t.Errorf("Failed to setup chain instance: %v", err)
 		return
 	}
 	defer teardownFunc()
 
-	// Since we're not dealing with the real block chain, disable
-	// checkpoints and set the coinbase maturity to 1.
-	chain.DisableCheckpoints(true)
-	blockchain.TstSetCoinbaseMaturity(1)
-
-	timeSource := blockchain.NewMedianTime()
-	expectedOrphans := map[int]struct{}{5: struct{}{}, 6: struct{}{}}
-	for i := 1; i < len(blocks); i++ {
-		isOrphan, err := chain.ProcessBlock(blocks[i], timeSource, blockchain.BFNone)
-		if err != nil {
-			t.Errorf("ProcessBlock fail on block %v: %v\n", i, err)
-			return
-		}
-		if _, ok := expectedOrphans[i]; !ok && isOrphan {
-			t.Errorf("ProcessBlock incorrectly returned block %v "+
-				"is an orphan\n", i)
-		}
-	}
-
-	return
-}
-
-// loadBlocks reads files containing bitcoin block data (gzipped but otherwise
-// in the format bitcoind writes) from disk and returns them as an array of
-// btcutil.Block.  This is largely borrowed from the test code in btcdb.
-func loadBlocks(filename string) (blocks []*btcutil.Block, err error) {
-	filename = filepath.Join("testdata/", filename)
-
-	var network = wire.MainNet
-	var dr io.Reader
-	var fi io.ReadCloser
-
-	fi, err = os.Open(filename)
+	err = chain.GenerateInitialIndex()
 	if err != nil {
-		return
+		t.Errorf("GenerateInitialIndex: %v", err)
 	}
 
-	if strings.HasSuffix(filename, ".bz2") {
-		dr = bzip2.NewReader(fi)
-	} else {
-		dr = fi
+	// The genesis block should fail to connect since it's already
+	// inserted.
+	genesisBlock := simNetParams.GenesisBlock
+	err = chain.CheckConnectBlock(dcrutil.NewBlock(genesisBlock))
+	if err == nil {
+		t.Errorf("CheckConnectBlock: Did not receive expected error")
 	}
+
+	// Load up the rest of the blocks up to HEAD.
+	filename := filepath.Join("testdata/", "reorgto179.bz2")
+	fi, err := os.Open(filename)
+	bcStream := bzip2.NewReader(fi)
 	defer fi.Close()
 
-	var block *btcutil.Block
+	// Create a buffer of the read file
+	bcBuf := new(bytes.Buffer)
+	bcBuf.ReadFrom(bcStream)
 
-	err = nil
-	for height := int64(1); err == nil; height++ {
-		var rintbuf uint32
-		err = binary.Read(dr, binary.LittleEndian, &rintbuf)
-		if err == io.EOF {
-			// hit end of file at expected offset: no warning
-			height--
-			err = nil
-			break
-		}
-		if err != nil {
-			break
-		}
-		if rintbuf != uint32(network) {
-			break
-		}
-		err = binary.Read(dr, binary.LittleEndian, &rintbuf)
-		blocklen := rintbuf
+	// Create decoder from the buffer and a map to store the data
+	bcDecoder := gob.NewDecoder(bcBuf)
+	blockChain := make(map[int64][]byte)
 
-		rbytes := make([]byte, blocklen)
-
-		// read block
-		dr.Read(rbytes)
-
-		block, err = btcutil.NewBlockFromBytes(rbytes)
-		if err != nil {
-			return
-		}
-		blocks = append(blocks, block)
+	// Decode the blockchain into the map
+	if err := bcDecoder.Decode(&blockChain); err != nil {
+		t.Errorf("error decoding test blockchain: %v", err.Error())
 	}
 
+	// Load up the short chain
+	timeSource := blockchain.NewMedianTime()
+	finalIdx1 := 179
+	for i := 1; i < finalIdx1+1; i++ {
+		bl, err := dcrutil.NewBlockFromBytes(blockChain[int64(i)])
+		if err != nil {
+			t.Errorf("NewBlockFromBytes error: %v", err.Error())
+		}
+		bl.SetHeight(int64(i))
+
+		_, _, err = chain.ProcessBlock(bl, timeSource, blockchain.BFNone)
+		if err != nil {
+			t.Errorf("ProcessBlock error: %v", err.Error())
+		}
+	}
+
+	// Load the long chain and begin loading blocks from that too,
+	// forcing a reorganization
+	// Load up the rest of the blocks up to HEAD.
+	filename = filepath.Join("testdata/", "reorgto180.bz2")
+	fi, err = os.Open(filename)
+	bcStream = bzip2.NewReader(fi)
+	defer fi.Close()
+
+	// Create a buffer of the read file
+	bcBuf = new(bytes.Buffer)
+	bcBuf.ReadFrom(bcStream)
+
+	// Create decoder from the buffer and a map to store the data
+	bcDecoder = gob.NewDecoder(bcBuf)
+	blockChain = make(map[int64][]byte)
+
+	// Decode the blockchain into the map
+	if err := bcDecoder.Decode(&blockChain); err != nil {
+		t.Errorf("error decoding test blockchain: %v", err.Error())
+	}
+
+	forkPoint := 131
+	finalIdx2 := 180
+	for i := forkPoint; i < finalIdx2+1; i++ {
+		bl, err := dcrutil.NewBlockFromBytes(blockChain[int64(i)])
+		if err != nil {
+			t.Errorf("NewBlockFromBytes error: %v", err.Error())
+		}
+		bl.SetHeight(int64(i))
+
+		_, _, err = chain.ProcessBlock(bl, timeSource, blockchain.BFNone)
+		if err != nil {
+			t.Errorf("ProcessBlock error: %v", err.Error())
+		}
+	}
+
+	// Ensure our blockchain is at the correct best tip
+	topBlock, _ := chain.GetTopBlock()
+	tipHash := topBlock.Sha()
+	expected, _ := chainhash.NewHashFromStr("5ab969d0afd8295b6cd1506f2a310d" +
+		"259322015c8bd5633f283a163ce0e50594")
+	if *tipHash != *expected {
+		t.Errorf("Failed to correctly reorg; expected tip %v, got tip %v",
+			expected, tipHash)
+	}
+	have, err := chain.HaveBlock(expected)
+	if !have {
+		t.Errorf("missing tip block after reorganization test")
+	}
+	if err != nil {
+		t.Errorf("unexpected error testing for presence of new tip block "+
+			"after reorg test: %v", err)
+	}
 	return
 }

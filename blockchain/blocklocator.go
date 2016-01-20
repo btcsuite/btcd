@@ -1,11 +1,13 @@
 // Copyright (c) 2013-2014 The btcsuite developers
+// Copyright (c) 2015 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
 package blockchain
 
 import (
-	"github.com/btcsuite/btcd/wire"
+	"github.com/decred/dcrd/chaincfg/chainhash"
+	"github.com/decred/dcrd/wire"
 )
 
 // BlockLocator is used to help locate a specific block.  The algorithm for
@@ -23,7 +25,7 @@ import (
 //
 // The block locator for block 17a would be the hashes of blocks:
 // [17a 16a 15 14 13 12 11 10 9 8 6 2 genesis]
-type BlockLocator []*wire.ShaHash
+type BlockLocator []*chainhash.Hash
 
 // BlockLocatorFromHash returns a block locator for the passed block hash.
 // See BlockLocator for details on the algotirhm used to create a block locator.
@@ -35,7 +37,7 @@ type BlockLocator []*wire.ShaHash
 //    therefore the block locator will only consist of the genesis hash
 //  - If the passed hash is not currently known, the block locator will only
 //    consist of the passed hash
-func (b *BlockChain) BlockLocatorFromHash(hash *wire.ShaHash) BlockLocator {
+func (b *BlockChain) BlockLocatorFromHash(hash *chainhash.Hash) BlockLocator {
 	// The locator contains the requested hash at the very least.
 	locator := make(BlockLocator, 0, wire.MaxBlockLocatorsPerMsg)
 	locator = append(locator, hash)

@@ -1,4 +1,5 @@
 // Copyright (c) 2014-2015 The btcsuite developers
+// Copyright (c) 2015 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -38,7 +39,7 @@ const (
 	MaxFilterLoadFilterSize = 36000
 )
 
-// MsgFilterLoad implements the Message interface and represents a bitcoin
+// MsgFilterLoad implements the Message interface and represents a decred
 // filterload message which is used to reset a Bloom filter.
 //
 // This message was not added until protocol version BIP0037Version.
@@ -49,15 +50,9 @@ type MsgFilterLoad struct {
 	Flags     BloomUpdateType
 }
 
-// BtcDecode decodes r using the bitcoin protocol encoding into the receiver.
+// BtcDecode decodes r using the decred protocol encoding into the receiver.
 // This is part of the Message interface implementation.
 func (msg *MsgFilterLoad) BtcDecode(r io.Reader, pver uint32) error {
-	if pver < BIP0037Version {
-		str := fmt.Sprintf("filterload message invalid for protocol "+
-			"version %d", pver)
-		return messageError("MsgFilterLoad.BtcDecode", str)
-	}
-
 	var err error
 	msg.Filter, err = readVarBytes(r, pver, MaxFilterLoadFilterSize,
 		"filterload filter size")
@@ -79,15 +74,9 @@ func (msg *MsgFilterLoad) BtcDecode(r io.Reader, pver uint32) error {
 	return nil
 }
 
-// BtcEncode encodes the receiver to w using the bitcoin protocol encoding.
+// BtcEncode encodes the receiver to w using the decred protocol encoding.
 // This is part of the Message interface implementation.
 func (msg *MsgFilterLoad) BtcEncode(w io.Writer, pver uint32) error {
-	if pver < BIP0037Version {
-		str := fmt.Sprintf("filterload message invalid for protocol "+
-			"version %d", pver)
-		return messageError("MsgFilterLoad.BtcEncode", str)
-	}
-
 	size := len(msg.Filter)
 	if size > MaxFilterLoadFilterSize {
 		str := fmt.Sprintf("filterload filter size too large for message "+
@@ -129,7 +118,7 @@ func (msg *MsgFilterLoad) MaxPayloadLength(pver uint32) uint32 {
 		MaxFilterLoadFilterSize + 9
 }
 
-// NewMsgFilterLoad returns a new bitcoin filterload message that conforms to
+// NewMsgFilterLoad returns a new decred filterload message that conforms to
 // the Message interface.  See MsgFilterLoad for details.
 func NewMsgFilterLoad(filter []byte, hashFuncs uint32, tweak uint32, flags BloomUpdateType) *MsgFilterLoad {
 	return &MsgFilterLoad{

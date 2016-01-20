@@ -1,4 +1,5 @@
 // Copyright (c) 2013-2014 The btcsuite developers
+// Copyright (c) 2015 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -22,11 +23,12 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/btcsuite/btcd/wire"
+	"github.com/decred/dcrd/chaincfg/chainhash"
+	"github.com/decred/dcrd/wire"
 )
 
 // AddrManager provides a concurrency safe address manager for caching potential
-// peers on the bitcoin network.
+// peers on the decred network.
 type AddrManager struct {
 	mtx            sync.Mutex
 	peersFile      string
@@ -293,13 +295,14 @@ func (a *AddrManager) pickTried(bucket int) *list.Element {
 
 func (a *AddrManager) getNewBucket(netAddr, srcAddr *wire.NetAddress) int {
 	// bitcoind:
-	// doublesha256(key + sourcegroup + int64(doublesha256(key + group + sourcegroup))%bucket_per_source_group) % num_new_buckets
+	// doublesha256(key + sourcegroup + int64(doublesha256(key + group
+	// + sourcegroup))%bucket_per_source_group) % num_new_buckets
 
 	data1 := []byte{}
 	data1 = append(data1, a.key[:]...)
 	data1 = append(data1, []byte(GroupKey(netAddr))...)
 	data1 = append(data1, []byte(GroupKey(srcAddr))...)
-	hash1 := wire.DoubleSha256(data1)
+	hash1 := chainhash.HashFuncB(data1)
 	hash64 := binary.LittleEndian.Uint64(hash1)
 	hash64 %= newBucketsPerGroup
 	var hashbuf [8]byte
@@ -309,17 +312,18 @@ func (a *AddrManager) getNewBucket(netAddr, srcAddr *wire.NetAddress) int {
 	data2 = append(data2, GroupKey(srcAddr)...)
 	data2 = append(data2, hashbuf[:]...)
 
-	hash2 := wire.DoubleSha256(data2)
+	hash2 := chainhash.HashFuncB(data2)
 	return int(binary.LittleEndian.Uint64(hash2) % newBucketCount)
 }
 
 func (a *AddrManager) getTriedBucket(netAddr *wire.NetAddress) int {
 	// bitcoind hashes this as:
-	// doublesha256(key + group + truncate_to_64bits(doublesha256(key)) % buckets_per_group) % num_buckets
+	// doublesha256(key + group + truncate_to_64bits(doublesha256(key))
+	// % buckets_per_group) % num_buckets
 	data1 := []byte{}
 	data1 = append(data1, a.key[:]...)
 	data1 = append(data1, []byte(NetAddressKey(netAddr))...)
-	hash1 := wire.DoubleSha256(data1)
+	hash1 := chainhash.HashFuncB(data1)
 	hash64 := binary.LittleEndian.Uint64(hash1)
 	hash64 %= triedBucketsPerGroup
 	var hashbuf [8]byte
@@ -329,7 +333,7 @@ func (a *AddrManager) getTriedBucket(netAddr *wire.NetAddress) int {
 	data2 = append(data2, GroupKey(netAddr)...)
 	data2 = append(data2, hashbuf[:]...)
 
-	hash2 := wire.DoubleSha256(data2)
+	hash2 := chainhash.HashFuncB(data2)
 	return int(binary.LittleEndian.Uint64(hash2) % triedBucketCount)
 }
 
@@ -1085,7 +1089,7 @@ func (a *AddrManager) GetBestLocalAddress(remoteAddr *wire.NetAddress) *wire.Net
 	return bestAddress
 }
 
-// New returns a new bitcoin address manager.
+// New returns a new decred address manager.
 // Use Start to begin processing asynchronous address updates.
 func New(dataDir string, lookupFunc func(string) ([]net.IP, error)) *AddrManager {
 	am := AddrManager{

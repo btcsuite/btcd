@@ -1,14 +1,17 @@
+// Copyright (c) 2015 The Decred developers
+// Use of this source code is governed by an ISC
+// license that can be found in the LICENSE file.
+
 package chaincfg
 
 import (
+	"github.com/decred/dcrd/chaincfg/chainhash"
 	"testing"
 )
 
 func TestInvalidShaStr(t *testing.T) {
-	defer func() {
-		if r := recover(); r == nil {
-			t.Errorf("Expected panic for invalid sha string, got nil")
-		}
-	}()
-	newShaHashFromStr("banana")
+	_, err := chainhash.NewHashFromStr("banana")
+	if err == nil {
+		t.Error("Invalid string should fail.")
+	}
 }

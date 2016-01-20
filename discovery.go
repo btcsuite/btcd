@@ -1,4 +1,5 @@
 // Copyright (c) 2013-2014 The btcsuite developers
+// Copyright (c) 2015 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -135,7 +136,7 @@ func torLookupIP(host, proxy string) ([]net.IP, error) {
 // seeders. If proxy is not "" then it is used as a tor proxy for the
 // resolution.
 func dnsDiscover(seeder string) ([]net.IP, error) {
-	peers, err := btcdLookup(seeder)
+	peers, err := dcrdLookup(seeder)
 	if err != nil {
 		return nil, err
 	}

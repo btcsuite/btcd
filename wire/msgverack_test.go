@@ -1,4 +1,5 @@
 // Copyright (c) 2013-2015 The btcsuite developers
+// Copyright (c) 2015 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -9,8 +10,8 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/btcsuite/btcd/wire"
 	"github.com/davecgh/go-spew/spew"
+	"github.com/decred/dcrd/wire"
 )
 
 // TestVerAck tests the MsgVerAck API.
@@ -55,38 +56,6 @@ func TestVerAckWire(t *testing.T) {
 			msgVerAck,
 			msgVerAckEncoded,
 			wire.ProtocolVersion,
-		},
-
-		// Protocol version BIP0035Version.
-		{
-			msgVerAck,
-			msgVerAck,
-			msgVerAckEncoded,
-			wire.BIP0035Version,
-		},
-
-		// Protocol version BIP0031Version.
-		{
-			msgVerAck,
-			msgVerAck,
-			msgVerAckEncoded,
-			wire.BIP0031Version,
-		},
-
-		// Protocol version NetAddressTimeVersion.
-		{
-			msgVerAck,
-			msgVerAck,
-			msgVerAckEncoded,
-			wire.NetAddressTimeVersion,
-		},
-
-		// Protocol version MultipleAddressVersion.
-		{
-			msgVerAck,
-			msgVerAck,
-			msgVerAckEncoded,
-			wire.MultipleAddressVersion,
 		},
 	}
 

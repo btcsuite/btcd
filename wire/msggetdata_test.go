@@ -1,4 +1,5 @@
 // Copyright (c) 2013-2015 The btcsuite developers
+// Copyright (c) 2015 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -10,8 +11,10 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/btcsuite/btcd/wire"
 	"github.com/davecgh/go-spew/spew"
+
+	"github.com/decred/dcrd/chaincfg/chainhash"
+	"github.com/decred/dcrd/wire"
 )
 
 // TestGetData tests the MsgGetData API.
@@ -37,7 +40,7 @@ func TestGetData(t *testing.T) {
 	}
 
 	// Ensure inventory vectors are added properly.
-	hash := wire.ShaHash{}
+	hash := chainhash.Hash{}
 	iv := wire.NewInvVect(wire.InvTypeBlock, &hash)
 	err := msg.AddInvVect(iv)
 	if err != nil {
@@ -75,14 +78,14 @@ func TestGetData(t *testing.T) {
 func TestGetDataWire(t *testing.T) {
 	// Block 203707 hash.
 	hashStr := "3264bc2ac36a60840790ba1d475d01367e7c723da941069e9dc"
-	blockHash, err := wire.NewShaHashFromStr(hashStr)
+	blockHash, err := chainhash.NewHashFromStr(hashStr)
 	if err != nil {
 		t.Errorf("NewShaHashFromStr: %v", err)
 	}
 
 	// Transation 1 of Block 203707 hash.
 	hashStr = "d28a3dc7392bf00a9855ee93dd9a81eff82a2c4fe57fbd42cfe71b487accfaf0"
-	txHash, err := wire.NewShaHashFromStr(hashStr)
+	txHash, err := chainhash.NewHashFromStr(hashStr)
 	if err != nil {
 		t.Errorf("NewShaHashFromStr: %v", err)
 	}
@@ -135,70 +138,6 @@ func TestGetDataWire(t *testing.T) {
 			MultiInvEncoded,
 			wire.ProtocolVersion,
 		},
-
-		// Protocol version BIP0035Version no inv vectors.
-		{
-			NoInv,
-			NoInv,
-			NoInvEncoded,
-			wire.BIP0035Version,
-		},
-
-		// Protocol version BIP0035Version with multiple inv vectors.
-		{
-			MultiInv,
-			MultiInv,
-			MultiInvEncoded,
-			wire.BIP0035Version,
-		},
-
-		// Protocol version BIP0031Version no inv vectors.
-		{
-			NoInv,
-			NoInv,
-			NoInvEncoded,
-			wire.BIP0031Version,
-		},
-
-		// Protocol version BIP0031Version with multiple inv vectors.
-		{
-			MultiInv,
-			MultiInv,
-			MultiInvEncoded,
-			wire.BIP0031Version,
-		},
-
-		// Protocol version NetAddressTimeVersion no inv vectors.
-		{
-			NoInv,
-			NoInv,
-			NoInvEncoded,
-			wire.NetAddressTimeVersion,
-		},
-
-		// Protocol version NetAddressTimeVersion with multiple inv vectors.
-		{
-			MultiInv,
-			MultiInv,
-			MultiInvEncoded,
-			wire.NetAddressTimeVersion,
-		},
-
-		// Protocol version MultipleAddressVersion no inv vectors.
-		{
-			NoInv,
-			NoInv,
-			NoInvEncoded,
-			wire.MultipleAddressVersion,
-		},
-
-		// Protocol version MultipleAddressVersion with multiple inv vectors.
-		{
-			MultiInv,
-			MultiInv,
-			MultiInvEncoded,
-			wire.MultipleAddressVersion,
-		},
 	}
 
 	t.Logf("Running %d tests", len(tests))
@@ -240,7 +179,7 @@ func TestGetDataWireErrors(t *testing.T) {
 
 	// Block 203707 hash.
 	hashStr := "3264bc2ac36a60840790ba1d475d01367e7c723da941069e9dc"
-	blockHash, err := wire.NewShaHashFromStr(hashStr)
+	blockHash, err := chainhash.NewHashFromStr(hashStr)
 	if err != nil {
 		t.Errorf("NewShaHashFromStr: %v", err)
 	}

@@ -1,4 +1,5 @@
 // Copyright (c) 2013-2015 The btcsuite developers
+// Copyright (c) 2015 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -6,10 +7,13 @@ package txscript_test
 
 import (
 	"bytes"
+	"encoding/hex"
 	"reflect"
 	"testing"
 
-	"github.com/btcsuite/btcd/txscript"
+	"github.com/decred/dcrd/chaincfg/chainhash"
+	"github.com/decred/dcrd/txscript"
+	"github.com/decred/dcrd/wire"
 )
 
 // TestPushedData ensured the PushedData function extracts the expected data out
@@ -292,6 +296,24 @@ func TestRemoveOpcodeByData(t *testing.T) {
 			remove: []byte{1, 2, 3, 5},
 			after:  []byte{txscript.OP_DATA_4, 1, 2, 3, 4},
 		},
+		// fix to allow for decred tests too
+		/*
+			{
+				name:        "stakesubmission",
+				scriptclass: txscript.StakeSubmissionTy,
+				stringed:    "stakesubmission",
+			},
+			{
+				name:        "stakegen",
+				scriptclass: txscript.StakeGenTy,
+				stringed:    "stakegen",
+			},
+			{
+				name:        "stakerevoke",
+				scriptclass: txscript.StakeRevocationTy,
+				stringed:    "stakerevoke",
+			},
+		*/
 		{
 			// padded to keep it canonical.
 			name: "simple case (pushdata1)",
@@ -367,9 +389,9 @@ func TestRemoveOpcodeByData(t *testing.T) {
 		},
 		{
 			name:   "invalid opcode ",
-			before: []byte{txscript.OP_UNKNOWN187},
+			before: []byte{txscript.OP_UNKNOWN192},
 			remove: []byte{1, 2, 3, 4},
-			after:  []byte{txscript.OP_UNKNOWN187},
+			after:  []byte{txscript.OP_UNKNOWN192},
 		},
 		{
 			name:   "invalid length (instruction)",
@@ -484,5 +506,73 @@ func TestIsPushOnlyScript(t *testing.T) {
 	if txscript.IsPushOnlyScript(test.script) != test.expected {
 		t.Errorf("IsPushOnlyScript (%s) wrong result\ngot: %v\nwant: "+
 			"%v", test.name, true, test.expected)
+	}
+}
+
+// TestCalcSignatureHash does some rudimentary testing of msg hash calculation.
+func TestCalcSignatureHash(t *testing.T) {
+	tx := new(wire.MsgTx)
+	for i := 0; i < 3; i++ {
+		txIn := new(wire.TxIn)
+		txIn.Sequence = 0xFFFFFFFF
+		txIn.PreviousOutPoint.Hash = chainhash.HashFuncH([]byte{byte(i)})
+		txIn.PreviousOutPoint.Index = uint32(i)
+		txIn.PreviousOutPoint.Tree = int8(0)
+		tx.AddTxIn(txIn)
+	}
+	for i := 0; i < 2; i++ {
+		txOut := new(wire.TxOut)
+		txOut.PkScript = []byte{0x01, 0x01, 0x02, 0x03}
+		txOut.Value = 0x0000FF00FF00FF00
+		tx.AddTxOut(txOut)
+	}
+
+	want, _ := hex.DecodeString("d09285b6f60c71329323bc2e76c48" +
+		"a462cde4e1032aa8f59c55823f1722c7f4a")
+	pops, _ := txscript.ParseScript([]byte{0x01, 0x01, 0x02, 0x03})
+
+	// Test prefix caching.
+	msg1, err := txscript.CalcSignatureHash(pops, txscript.SigHashAll, tx, 0, nil)
+	if err != nil {
+		t.Fatalf("unexpected error %v", err.Error())
+	}
+
+	prefixHash := tx.TxSha()
+	msg2, err := txscript.CalcSignatureHash(pops, txscript.SigHashAll, tx, 0,
+		&prefixHash)
+	if err != nil {
+		t.Fatalf("unexpected error %v", err.Error())
+	}
+
+	if !bytes.Equal(msg1, want) {
+		t.Errorf("for sighash all sig noncached wrong msg %x given, want %x",
+			msg1,
+			want)
+	}
+	if !bytes.Equal(msg2, want) {
+		t.Errorf("for sighash all sig cached wrong msg %x given, want %x",
+			msg1,
+			want)
+	}
+	if !bytes.Equal(msg1, msg2) {
+		t.Errorf("for sighash all sig non-equivalent msgs %x and %x were "+
+			"returned when using a cached prefix",
+			msg1,
+			msg2)
+	}
+
+	// Move the index and make sure that we get a whole new hash, despite
+	// using the same TxOuts.
+	msg3, err := txscript.CalcSignatureHash(pops, txscript.SigHashAll, tx, 1,
+		&prefixHash)
+	if err != nil {
+		t.Fatalf("unexpected error %v", err.Error())
+	}
+
+	if bytes.Equal(msg1, msg3) {
+		t.Errorf("for sighash all sig equivalent msgs %x and %x were "+
+			"returned when using a cached prefix but different indices",
+			msg1,
+			msg3)
 	}
 }

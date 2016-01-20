@@ -1,4 +1,5 @@
 // Copyright (c) 2014 The btcsuite developers
+// Copyright (c) 2015 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -8,13 +9,14 @@ import (
 	"errors"
 	"fmt"
 	"math/rand"
-	"runtime"
 	"sync"
 	"time"
 
-	"github.com/btcsuite/btcd/blockchain"
-	"github.com/btcsuite/btcd/wire"
-	"github.com/btcsuite/btcutil"
+	"github.com/decred/dcrd/blockchain"
+	"github.com/decred/dcrd/chaincfg"
+	"github.com/decred/dcrd/chaincfg/chainhash"
+	"github.com/decred/dcrd/wire"
+	"github.com/decred/dcrutil"
 )
 
 const (
@@ -35,13 +37,18 @@ const (
 	// reduce the amount of syncs between the workers that must be done to
 	// keep track of the hashes per second.
 	hashUpdateSecs = 15
+
+	// maxSimnetToMine is the maximum number of blocks to mine on HEAD~1
+	// for simnet so that you don't run out of memory if tickets for
+	// some reason run out during simulations.
+	maxSimnetToMine uint8 = 4
 )
 
 var (
 	// defaultNumWorkers is the default number of workers to use for mining
 	// and is based on the number of processor cores.  This helps ensure the
 	// system stays reasonably responsive under heavy load.
-	defaultNumWorkers = uint32(runtime.NumCPU())
+	defaultNumWorkers = uint32(chaincfg.CPUMinerThreads)
 )
 
 // CPUMiner provides facilities for solving blocks (mining) using the CPU in
@@ -64,6 +71,13 @@ type CPUMiner struct {
 	updateHashes      chan uint64
 	speedMonitorQuit  chan struct{}
 	quit              chan struct{}
+
+	// This is a map that keeps track of how many blocks have
+	// been mined on each parent by the CPUMiner. It is only
+	// for use in simulation networks, to diminish memory
+	// exhaustion. It should not race because it's only
+	// accessed in a single threaded loop below.
+	minedOnParents map[chainhash.Hash]uint8
 }
 
 // speedMonitor handles tracking the number of hashes per second the mining
@@ -112,47 +126,60 @@ out:
 
 // submitBlock submits the passed block to network after ensuring it passes all
 // of the consensus validation rules.
-func (m *CPUMiner) submitBlock(block *btcutil.Block) bool {
+func (m *CPUMiner) submitBlock(block *dcrutil.Block) bool {
 	m.submitBlockLock.Lock()
 	defer m.submitBlockLock.Unlock()
 
-	// Ensure the block is not stale since a new block could have shown up
-	// while the solution was being found.  Typically that condition is
-	// detected and all work on the stale block is halted to start work on
-	// a new block, but the check only happens periodically, so it is
-	// possible a block was found and submitted in between.
-	latestHash, _ := m.server.blockManager.chainState.Best()
-	msgBlock := block.MsgBlock()
-	if !msgBlock.Header.PrevBlock.IsEqual(latestHash) {
-		minrLog.Debugf("Block submitted via CPU miner with previous "+
-			"block %s is stale", msgBlock.Header.PrevBlock)
-		return false
-	}
+	_, latestHeight := m.server.blockManager.chainState.Best()
+
+	// Be sure to set this so ProcessBlock doesn't fail! - Decred
+	block.SetHeight(latestHeight + 1)
 
 	// Process this block using the same rules as blocks coming from other
-	// nodes.  This will in turn relay it to the network like normal.
+	// nodes. This will in turn relay it to the network like normal.
 	isOrphan, err := m.server.blockManager.ProcessBlock(block, blockchain.BFNone)
 	if err != nil {
 		// Anything other than a rule violation is an unexpected error,
 		// so log that error as an internal error.
-		if _, ok := err.(blockchain.RuleError); !ok {
+		if rErr, ok := err.(blockchain.RuleError); !ok {
 			minrLog.Errorf("Unexpected error while processing "+
 				"block submitted via CPU miner: %v", err)
 			return false
+		} else {
+			// Occasionally errors are given out for timing errors with
+			// ResetMinDifficulty and high block works that is above
+			// the target. Feed these to debug.
+			if m.server.chainParams.ResetMinDifficulty &&
+				rErr.ErrorCode == blockchain.ErrHighHash {
+				minrLog.Debugf("Block submitted via CPU miner rejected "+
+					"because of ResetMinDifficulty time sync failure: %v",
+					err)
+				return false
+			} else {
+				// Other rule errors should be reported.
+				minrLog.Errorf("Block submitted via CPU miner rejected: %v", err)
+				return false
+			}
 		}
 
-		minrLog.Debugf("Block submitted via CPU miner rejected: %v", err)
-		return false
 	}
 	if isOrphan {
-		minrLog.Debugf("Block submitted via CPU miner is an orphan")
+		minrLog.Errorf("Block submitted via CPU miner is an orphan building "+
+			"on parent %v", block.MsgBlock().Header.PrevBlock)
 		return false
 	}
 
 	// The block was accepted.
-	coinbaseTx := block.MsgBlock().Transactions[0].TxOut[0]
+	coinbaseTxOuts := block.MsgBlock().Transactions[0].TxOut
+	coinbaseTxGenerated := int64(0)
+	for _, out := range coinbaseTxOuts {
+		coinbaseTxGenerated += out.Value
+	}
 	minrLog.Infof("Block submitted via CPU miner accepted (hash %s, "+
-		"amount %v)", block.Sha(), btcutil.Amount(coinbaseTx.Value))
+		"height %v, amount %v)",
+		block.Sha(),
+		block.Height(),
+		dcrutil.Amount(coinbaseTxGenerated))
 	return true
 }
 
@@ -165,8 +192,10 @@ func (m *CPUMiner) submitBlock(block *btcutil.Block) bool {
 // This function will return early with false when conditions that trigger a
 // stale block such as a new block showing up or periodically when there are
 // new transactions and enough time has elapsed without finding a solution.
-func (m *CPUMiner) solveBlock(msgBlock *wire.MsgBlock, blockHeight int64,
-	ticker *time.Ticker, quit chan struct{}) bool {
+func (m *CPUMiner) solveBlock(msgBlock *wire.MsgBlock, ticker *time.Ticker,
+	quit chan struct{}) bool {
+
+	blockHeight := int64(msgBlock.Header.Height)
 
 	// Choose a random extra nonce offset for this block template and
 	// worker.
@@ -190,10 +219,14 @@ func (m *CPUMiner) solveBlock(msgBlock *wire.MsgBlock, blockHeight int64,
 	// added relying on the fact that overflow will wrap around 0 as
 	// provided by the Go spec.
 	for extraNonce := uint64(0); extraNonce < maxExtraNonce; extraNonce++ {
+		// Get the old nonce values.
+		ens := getCoinbaseExtranonces(msgBlock)
+		ens[2] = extraNonce + enOffset
+
 		// Update the extra nonce in the block template with the
 		// new value by regenerating the coinbase script and
 		// setting the merkle root to the new value.  The
-		UpdateExtraNonce(msgBlock, blockHeight, extraNonce+enOffset)
+		UpdateExtraNonce(msgBlock, blockHeight, ens)
 
 		// Search through the entire nonce range for a solution while
 		// periodically checking for early quit and stale block
@@ -207,20 +240,13 @@ func (m *CPUMiner) solveBlock(msgBlock *wire.MsgBlock, blockHeight int64,
 				m.updateHashes <- hashesCompleted
 				hashesCompleted = 0
 
-				// The current block is stale if the best block
-				// has changed.
-				bestHash, _ := m.server.blockManager.chainState.Best()
-				if !header.PrevBlock.IsEqual(bestHash) {
-					return false
-				}
-
 				// The current block is stale if the memory pool
 				// has been updated since the block template was
-				// generated and it has been at least one
-				// minute.
-				if lastTxUpdate != m.server.txMemPool.LastUpdated() &&
-					time.Now().After(lastGenerated.Add(time.Minute)) {
-
+				// generated and it has been at least 3 seconds,
+				// or if it's been one minute.
+				if (lastTxUpdate != m.server.txMemPool.LastUpdated() &&
+					time.Now().After(lastGenerated.Add(3*time.Second))) ||
+					time.Now().After(lastGenerated.Add(60*time.Second)) {
 					return false
 				}
 
@@ -230,13 +256,10 @@ func (m *CPUMiner) solveBlock(msgBlock *wire.MsgBlock, blockHeight int64,
 				// Non-blocking select to fall through
 			}
 
-			// Update the nonce and hash the block header.  Each
-			// hash is actually a double sha256 (two hashes), so
-			// increment the number of hashes completed for each
-			// attempt accordingly.
+			// Update the nonce and hash the block header.
 			header.Nonce = i
 			hash := header.BlockSha()
-			hashesCompleted += 2
+			hashesCompleted += 1
 
 			// The block is solved when the new block hash is less
 			// than the target difficulty.  Yay!
@@ -262,8 +285,9 @@ func (m *CPUMiner) generateBlocks(quit chan struct{}) {
 
 	// Start a ticker which is used to signal checks for stale work and
 	// updates to the speed monitor.
-	ticker := time.NewTicker(time.Second * hashUpdateSecs)
+	ticker := time.NewTicker(333 * time.Millisecond)
 	defer ticker.Stop()
+
 out:
 	for {
 		// Quit when the miner is stopped.
@@ -274,25 +298,26 @@ out:
 			// Non-blocking select to fall through
 		}
 
-		// Wait until there is a connection to at least one other peer
-		// since there is no way to relay a found block or receive
-		// transactions to work on when there are no connected peers.
-		if m.server.ConnectedCount() == 0 {
-			time.Sleep(time.Second)
-			continue
-		}
-
 		// No point in searching for a solution before the chain is
 		// synced.  Also, grab the same lock as used for block
 		// submission, since the current block will be changing and
 		// this would otherwise end up building a new block template on
 		// a block that is in the process of becoming stale.
 		m.submitBlockLock.Lock()
-		_, curHeight := m.server.blockManager.chainState.Best()
-		if curHeight != 0 && !m.server.blockManager.IsCurrent() {
-			m.submitBlockLock.Unlock()
-			time.Sleep(time.Second)
-			continue
+		time.Sleep(100 * time.Millisecond)
+
+		// Hacks to make dcr work with Decred PoC (simnet only)
+		// TODO Remove before production.
+		if cfg.SimNet {
+			_, curHeight := m.server.blockManager.chainState.Best()
+
+			if curHeight == 1 {
+				time.Sleep(5500 * time.Millisecond) // let wallet reconn
+			} else if curHeight > 100 && curHeight < 201 { // slow down to i
+				time.Sleep(10 * time.Millisecond) // 2500
+			} else { // burn through the first pile of blocks
+				time.Sleep(10 * time.Millisecond)
+			}
 		}
 
 		// Choose a payment address at random.
@@ -311,13 +336,31 @@ out:
 			continue
 		}
 
+		// Not enough voters.
+		if template == nil {
+			continue
+		}
+
+		// This prevents you from causing memory exhaustion issues
+		// when mining aggressively in a simulation network.
+		if cfg.SimNet {
+			if m.minedOnParents[template.block.Header.PrevBlock] >=
+				maxSimnetToMine {
+				minrLog.Tracef("too many blocks mined on parent, stopping " +
+					"until there are enough votes on these to make a new " +
+					"block")
+				continue
+			}
+		}
+
 		// Attempt to solve the block.  The function will exit early
 		// with false when conditions that trigger a stale block, so
 		// a new block template can be generated.  When the return is
 		// true a solution was found, so submit the solved block.
-		if m.solveBlock(template.block, curHeight+1, ticker, quit) {
-			block := btcutil.NewBlock(template.block)
+		if m.solveBlock(template.block, ticker, quit) {
+			block := dcrutil.NewBlock(template.block)
 			m.submitBlock(block)
+			m.minedOnParents[template.block.Header.PrevBlock]++
 		}
 	}
 
@@ -505,7 +548,7 @@ func (m *CPUMiner) NumWorkers() int32 {
 // detecting when it is performing stale work and reacting accordingly by
 // generating a new block template.  When a block is solved, it is submitted.
 // The function returns a list of the hashes of generated blocks.
-func (m *CPUMiner) GenerateNBlocks(n uint32) ([]*wire.ShaHash, error) {
+func (m *CPUMiner) GenerateNBlocks(n uint32) ([]*chainhash.Hash, error) {
 	m.Lock()
 
 	// Respond with an error if there's virtually 0 chance of CPU-mining a block.
@@ -535,7 +578,7 @@ func (m *CPUMiner) GenerateNBlocks(n uint32) ([]*wire.ShaHash, error) {
 	minrLog.Tracef("Generating %d blocks", n)
 
 	i := uint32(0)
-	blockHashes := make([]*wire.ShaHash, n, n)
+	blockHashes := make([]*chainhash.Hash, n, n)
 
 	// Start a ticker which is used to signal checks for stale work and
 	// updates to the speed monitor.
@@ -555,7 +598,6 @@ func (m *CPUMiner) GenerateNBlocks(n uint32) ([]*wire.ShaHash, error) {
 		// be changing and this would otherwise end up building a new block
 		// template on a block that is in the process of becoming stale.
 		m.submitBlockLock.Lock()
-		_, curHeight := m.server.blockManager.chainState.Best()
 
 		// Choose a payment address at random.
 		rand.Seed(time.Now().UnixNano())
@@ -572,13 +614,19 @@ func (m *CPUMiner) GenerateNBlocks(n uint32) ([]*wire.ShaHash, error) {
 			minrLog.Errorf(errStr)
 			continue
 		}
+		if template == nil {
+			errStr := fmt.Sprintf("Not enough voters on parent block " +
+				"and failed to pull parent template")
+			minrLog.Debugf(errStr)
+			continue
+		}
 
 		// Attempt to solve the block.  The function will exit early
 		// with false when conditions that trigger a stale block, so
 		// a new block template can be generated.  When the return is
 		// true a solution was found, so submit the solved block.
-		if m.solveBlock(template.block, curHeight+1, ticker, nil) {
-			block := btcutil.NewBlock(template.block)
+		if m.solveBlock(template.block, ticker, nil) {
+			block := dcrutil.NewBlock(template.block)
 			m.submitBlock(block)
 			blockHashes[i] = block.Sha()
 			i++
@@ -606,5 +654,6 @@ func newCPUMiner(s *server) *CPUMiner {
 		updateNumWorkers:  make(chan struct{}),
 		queryHashesPerSec: make(chan float64),
 		updateHashes:      make(chan uint64),
+		minedOnParents:    make(map[chainhash.Hash]uint8),
 	}
 }

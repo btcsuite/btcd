@@ -1,49 +1,22 @@
 // Copyright (c) 2013-2014 The btcsuite developers
+// Copyright (c) 2015 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
 package blockchain
 
 import (
-	"fmt"
 	"math/big"
 	"time"
 
-	"github.com/btcsuite/btcd/wire"
-)
-
-const (
-	// targetTimespan is the desired amount of time that should elapse
-	// before block difficulty requirement is examined to determine how
-	// it should be changed in order to maintain the desired block
-	// generation rate.
-	targetTimespan = time.Hour * 24 * 14
-
-	// targetSpacing is the desired amount of time to generate each block.
-	targetSpacing = time.Minute * 10
-
-	// BlocksPerRetarget is the number of blocks between each difficulty
-	// retarget.  It is calculated based on the desired block generation
-	// rate.
-	BlocksPerRetarget = int64(targetTimespan / targetSpacing)
-
-	// retargetAdjustmentFactor is the adjustment factor used to limit
-	// the minimum and maximum amount of adjustment that can occur between
-	// difficulty retargets.
-	retargetAdjustmentFactor = 4
-
-	// minRetargetTimespan is the minimum amount of adjustment that can
-	// occur between difficulty retargets.  It equates to 25% of the
-	// previous difficulty.
-	minRetargetTimespan = int64(targetTimespan / retargetAdjustmentFactor)
-
-	// maxRetargetTimespan is the maximum amount of adjustment that can
-	// occur between difficulty retargets.  It equates to 400% of the
-	// previous difficulty.
-	maxRetargetTimespan = int64(targetTimespan * retargetAdjustmentFactor)
+	"github.com/decred/dcrd/chaincfg/chainhash"
 )
 
 var (
+	// bigZero is 0 represented as a big.Int.  It is defined here to avoid
+	// the overhead of creating it multiple times.
+	bigZero = big.NewInt(0)
+
 	// bigOne is 1 represented as a big.Int.  It is defined here to avoid
 	// the overhead of creating it multiple times.
 	bigOne = big.NewInt(1)
@@ -51,11 +24,15 @@ var (
 	// oneLsh256 is 1 shifted left 256 bits.  It is defined here to avoid
 	// the overhead of creating it multiple times.
 	oneLsh256 = new(big.Int).Lsh(bigOne, 256)
+
+	// maxShift is the maximum shift for a difficulty that resets (e.g.
+	// testnet difficulty).
+	maxShift = uint(256)
 )
 
 // ShaHashToBig converts a wire.ShaHash into a big.Int that can be used to
 // perform math comparisons.
-func ShaHashToBig(hash *wire.ShaHash) *big.Int {
+func ShaHashToBig(hash *chainhash.Hash) *big.Int {
 	// A ShaHash is in little-endian, but the big package wants the bytes
 	// in big-endian, so reverse them.
 	buf := *hash
@@ -87,7 +64,7 @@ func ShaHashToBig(hash *wire.ShaHash) *big.Int {
 // The formula to calculate N is:
 // 	N = (-1^sign) * mantissa * 256^(exponent-3)
 //
-// This compact form is only used in bitcoin to encode unsigned 256-bit numbers
+// This compact form is only used in decred to encode unsigned 256-bit numbers
 // which represent difficulty targets, thus there really is not a need for a
 // sign bit, but it is implemented here to stay consistent with bitcoind.
 func CompactToBig(compact uint32) *big.Int {
@@ -160,7 +137,7 @@ func BigToCompact(n *big.Int) uint32 {
 	return compact
 }
 
-// CalcWork calculates a work value from difficulty bits.  Bitcoin increases
+// CalcWork calculates a work value from difficulty bits.  Decred increases
 // the difficulty for generating a block by decreasing the value which the
 // generated hash must be less than.  This difficulty target is stored in each
 // block header using a compact representation as described in the documenation
@@ -188,16 +165,19 @@ func CalcWork(bits uint32) *big.Int {
 // can have given starting difficulty bits and a duration.  It is mainly used to
 // verify that claimed proof of work by a block is sane as compared to a
 // known good checkpoint.
-func (b *BlockChain) calcEasiestDifficulty(bits uint32, duration time.Duration) uint32 {
+func (b *BlockChain) calcEasiestDifficulty(bits uint32,
+	duration time.Duration) uint32 {
 	// Convert types used in the calculations below.
 	durationVal := int64(duration)
-	adjustmentFactor := big.NewInt(retargetAdjustmentFactor)
+	adjustmentFactor := big.NewInt(b.chainParams.RetargetAdjustmentFactor)
+	maxRetargetTimespan := int64(b.chainParams.TargetTimespan) *
+		b.chainParams.RetargetAdjustmentFactor
 
 	// The test network rules allow minimum difficulty blocks after more
 	// than twice the desired amount of time needed to generate a block has
 	// elapsed.
 	if b.chainParams.ResetMinDifficulty {
-		if durationVal > int64(targetSpacing)*2 {
+		if durationVal > int64(b.chainParams.TimePerBlock)*2 {
 			return b.chainParams.PowLimitBits
 		}
 	}
@@ -222,11 +202,14 @@ func (b *BlockChain) calcEasiestDifficulty(bits uint32, duration time.Duration) 
 
 // findPrevTestNetDifficulty returns the difficulty of the previous block which
 // did not have the special testnet minimum difficulty rule applied.
-func (b *BlockChain) findPrevTestNetDifficulty(startNode *blockNode) (uint32, error) {
+func (b *BlockChain) findPrevTestNetDifficulty(startNode *blockNode) (uint32,
+	error) {
 	// Search backwards through the chain for the last block without
 	// the special rule applied.
+	blocksPerRetarget := b.chainParams.WorkDiffWindowSize *
+		b.chainParams.WorkDiffWindows
 	iterNode := startNode
-	for iterNode != nil && iterNode.height%BlocksPerRetarget != 0 &&
+	for iterNode != nil && iterNode.height%blocksPerRetarget != 0 &&
 		iterNode.bits == b.chainParams.PowLimitBits {
 
 		// Get the previous block node.  This function is used over
@@ -256,15 +239,20 @@ func (b *BlockChain) findPrevTestNetDifficulty(startNode *blockNode) (uint32, er
 // This function differs from the exported CalcNextRequiredDifficulty in that
 // the exported version uses the current best chain as the previous block node
 // while this function accepts any block node.
-func (b *BlockChain) calcNextRequiredDifficulty(lastNode *blockNode, newBlockTime time.Time) (uint32, error) {
+func (b *BlockChain) calcNextRequiredDifficulty(curNode *blockNode,
+	newBlockTime time.Time) (uint32, error) {
 	// Genesis block.
-	if lastNode == nil {
+	if curNode == nil {
 		return b.chainParams.PowLimitBits, nil
 	}
 
-	// Return the previous block's difficulty requirements if this block
-	// is not at a difficulty retarget interval.
-	if (lastNode.height+1)%BlocksPerRetarget != 0 {
+	// Get the old difficulty; if we aren't at a block height where it changes,
+	// just return this.
+	oldDiff := curNode.header.Bits
+	oldDiffBig := CompactToBig(curNode.header.Bits)
+
+	// We're not at a retarget point, return the oldDiff.
+	if (curNode.height+1)%b.chainParams.WorkDiffWindowSize != 0 {
 		// The test network rules allow minimum difficulty blocks after
 		// more than twice the desired amount of time needed to generate
 		// a block has elapsed.
@@ -272,83 +260,185 @@ func (b *BlockChain) calcNextRequiredDifficulty(lastNode *blockNode, newBlockTim
 			// Return minimum difficulty when more than twice the
 			// desired amount of time needed to generate a block has
 			// elapsed.
-			allowMinTime := lastNode.timestamp.Add(targetSpacing * 2)
+			allowMinTime := curNode.timestamp.Add(b.chainParams.TimePerBlock *
+				b.chainParams.MinDiffResetTimeFactor)
+
+			// For every extra target timespan that passes, we halve the
+			// difficulty.
 			if newBlockTime.After(allowMinTime) {
-				return b.chainParams.PowLimitBits, nil
+				timePassed := newBlockTime.Sub(curNode.timestamp)
+				timePassed -= (b.chainParams.TimePerBlock *
+					b.chainParams.MinDiffResetTimeFactor)
+				shifts := uint((timePassed / b.chainParams.TimePerBlock) + 1)
+
+				// Scale the difficulty with time passed.
+				oldTarget := CompactToBig(curNode.header.Bits)
+				newTarget := new(big.Int)
+				if shifts < maxShift {
+					newTarget.Lsh(oldTarget, shifts)
+				} else {
+					newTarget.Set(oneLsh256)
+				}
+
+				// Limit new value to the proof of work limit.
+				if newTarget.Cmp(b.chainParams.PowLimit) > 0 {
+					newTarget.Set(b.chainParams.PowLimit)
+				}
+
+				return BigToCompact(newTarget), nil
 			}
 
 			// The block was mined within the desired timeframe, so
 			// return the difficulty for the last block which did
 			// not have the special minimum difficulty rule applied.
-			prevBits, err := b.findPrevTestNetDifficulty(lastNode)
+			prevBits, err := b.findPrevTestNetDifficulty(curNode)
 			if err != nil {
 				return 0, err
 			}
 			return prevBits, nil
 		}
 
-		// For the main network (or any unrecognized networks), simply
-		// return the previous block's difficulty requirements.
-		return lastNode.bits, nil
+		return oldDiff, nil
 	}
 
-	// Get the block node at the previous retarget (targetTimespan days
-	// worth of blocks).
-	firstNode := lastNode
-	for i := int64(0); i < BlocksPerRetarget-1 && firstNode != nil; i++ {
-		// Get the previous block node.  This function is used over
-		// simply accessing firstNode.parent directly as it will
-		// dynamically create previous block nodes as needed.  This
-		// helps allow only the pieces of the chain that are needed
-		// to remain in memory.
+	// Declare some useful variables.
+	RAFBig := big.NewInt(b.chainParams.RetargetAdjustmentFactor)
+	nextDiffBigMin := CompactToBig(curNode.header.Bits)
+	nextDiffBigMin.Div(nextDiffBigMin, RAFBig)
+	nextDiffBigMax := CompactToBig(curNode.header.Bits)
+	nextDiffBigMax.Mul(nextDiffBigMax, RAFBig)
+
+	alpha := b.chainParams.WorkDiffAlpha
+
+	// Number of nodes to traverse while calculating difficulty.
+	nodesToTraverse := (b.chainParams.WorkDiffWindowSize *
+		b.chainParams.WorkDiffWindows)
+
+	// Initialize bigInt slice for the percentage changes for each window period
+	// above or below the target.
+	windowChanges := make([]*big.Int, b.chainParams.WorkDiffWindows)
+
+	// Regress through all of the previous blocks and store the percent changes
+	// per window period; use bigInts to emulate 64.32 bit fixed point.
+	oldNode := curNode
+	windowPeriod := int64(0)
+	weights := uint64(0)
+	recentTime := curNode.header.Timestamp.UnixNano()
+	olderTime := int64(0)
+
+	for i := int64(0); ; i++ {
+		// Store and reset after reaching the end of every window period.
+		if i%b.chainParams.WorkDiffWindowSize == 0 && i != 0 {
+			olderTime = oldNode.header.Timestamp.UnixNano()
+			timeDifference := recentTime - olderTime
+
+			// Just assume we're at the target (no change) if we've
+			// gone all the way back to the genesis block.
+			if oldNode.height == 0 {
+				timeDifference = int64(b.chainParams.TargetTimespan)
+			}
+
+			timeDifBig := big.NewInt(timeDifference)
+			timeDifBig.Lsh(timeDifBig, 32) // Add padding
+			targetTemp := big.NewInt(int64(b.chainParams.TargetTimespan))
+
+			windowAdjusted := targetTemp.Div(timeDifBig, targetTemp)
+
+			// Weight it exponentially. Be aware that this could at some point
+			// overflow if alpha or the number of blocks used is really large.
+			windowAdjusted = windowAdjusted.Lsh(windowAdjusted,
+				uint((b.chainParams.WorkDiffWindows-windowPeriod)*alpha))
+
+			// Sum up all the different weights incrementally.
+			weights += 1 << uint64((b.chainParams.WorkDiffWindows-windowPeriod)*
+				alpha)
+
+			// Store it in the slice.
+			windowChanges[windowPeriod] = windowAdjusted
+
+			windowPeriod++
+
+			recentTime = olderTime
+		}
+
+		if i == nodesToTraverse {
+			break // Exit for loop when we hit the end.
+		}
+
+		// Get the previous block node.
 		var err error
-		firstNode, err = b.getPrevNodeFromNode(firstNode)
+		tempNode := oldNode
+		oldNode, err = b.getPrevNodeFromNode(oldNode)
 		if err != nil {
 			return 0, err
 		}
+
+		// If we're at the genesis block, reset the oldNode
+		// so that it stays at the genesis block.
+		if oldNode == nil {
+			oldNode = tempNode
+		}
 	}
 
-	if firstNode == nil {
-		return 0, fmt.Errorf("unable to obtain previous retarget block")
+	// Sum up the weighted window periods.
+	weightedSum := big.NewInt(0)
+	for i := int64(0); i < b.chainParams.WorkDiffWindows; i++ {
+		weightedSum.Add(weightedSum, windowChanges[i])
 	}
 
-	// Limit the amount of adjustment that can occur to the previous
-	// difficulty.
-	actualTimespan := lastNode.timestamp.UnixNano() - firstNode.timestamp.UnixNano()
-	adjustedTimespan := actualTimespan
-	if actualTimespan < minRetargetTimespan {
-		adjustedTimespan = minRetargetTimespan
-	} else if actualTimespan > maxRetargetTimespan {
-		adjustedTimespan = maxRetargetTimespan
-	}
+	// Divide by the sum of all weights.
+	weightsBig := big.NewInt(int64(weights))
+	weightedSumDiv := weightedSum.Div(weightedSum, weightsBig)
 
-	// Calculate new target difficulty as:
-	//  currentDifficulty * (adjustedTimespan / targetTimespan)
-	// The result uses integer division which means it will be slightly
-	// rounded down.  Bitcoind also uses integer division to calculate this
-	// result.
-	oldTarget := CompactToBig(lastNode.bits)
-	newTarget := new(big.Int).Mul(oldTarget, big.NewInt(adjustedTimespan))
-	newTarget.Div(newTarget, big.NewInt(int64(targetTimespan)))
+	// Multiply by the old diff.
+	nextDiffBig := weightedSumDiv.Mul(weightedSumDiv, oldDiffBig)
+
+	// Right shift to restore the original padding (restore non-fixed point).
+	nextDiffBig = nextDiffBig.Rsh(nextDiffBig, 32)
+
+	// Check to see if we're over the limits for the maximum allowable retarget;
+	// if we are, return the maximum or minimum except in the case that oldDiff
+	// is zero.
+	if oldDiffBig.Cmp(bigZero) == 0 { // This should never really happen,
+		nextDiffBig.Set(nextDiffBig) // but in case it does...
+	} else if nextDiffBig.Cmp(bigZero) == 0 {
+		nextDiffBig.Set(b.chainParams.PowLimit)
+	} else if nextDiffBig.Cmp(nextDiffBigMax) == 1 {
+		nextDiffBig.Set(nextDiffBigMax)
+	} else if nextDiffBig.Cmp(nextDiffBigMin) == -1 {
+		nextDiffBig.Set(nextDiffBigMin)
+	}
 
 	// Limit new value to the proof of work limit.
-	if newTarget.Cmp(b.chainParams.PowLimit) > 0 {
-		newTarget.Set(b.chainParams.PowLimit)
+	if nextDiffBig.Cmp(b.chainParams.PowLimit) > 0 {
+		nextDiffBig.Set(b.chainParams.PowLimit)
 	}
 
 	// Log new target difficulty and return it.  The new target logging is
 	// intentionally converting the bits back to a number instead of using
 	// newTarget since conversion to the compact representation loses
 	// precision.
-	newTargetBits := BigToCompact(newTarget)
-	log.Debugf("Difficulty retarget at block height %d", lastNode.height+1)
-	log.Debugf("Old target %08x (%064x)", lastNode.bits, oldTarget)
-	log.Debugf("New target %08x (%064x)", newTargetBits, CompactToBig(newTargetBits))
-	log.Debugf("Actual timespan %v, adjusted timespan %v, target timespan %v",
-		time.Duration(actualTimespan), time.Duration(adjustedTimespan),
-		targetTimespan)
+	nextDiffBits := BigToCompact(nextDiffBig)
+	log.Debugf("Difficulty retarget at block height %d", curNode.height+1)
+	log.Debugf("Old target %08x (%064x)", curNode.header.Bits, oldDiffBig)
+	log.Debugf("New target %08x (%064x)", nextDiffBits, CompactToBig(nextDiffBits))
 
-	return newTargetBits, nil
+	return nextDiffBits, nil
+}
+
+// CalcNextRequiredDiffFromNode calculates the required difficulty for the block
+// given with the passed hash along with the given timestamp.
+//
+// This function is NOT safe for concurrent access.
+func (b *BlockChain) CalcNextRequiredDiffFromNode(hash *chainhash.Hash,
+	timestamp time.Time) (uint32, error) {
+	// Fetch the block to get the difficulty for.
+	node, err := b.findNode(hash)
+	if err != nil {
+		return 0, err
+	}
+
+	return b.calcNextRequiredDifficulty(node, timestamp)
 }
 
 // CalcNextRequiredDifficulty calculates the required difficulty for the block
@@ -356,6 +446,297 @@ func (b *BlockChain) calcNextRequiredDifficulty(lastNode *blockNode, newBlockTim
 // rules.
 //
 // This function is NOT safe for concurrent access.
-func (b *BlockChain) CalcNextRequiredDifficulty(timestamp time.Time) (uint32, error) {
+func (b *BlockChain) CalcNextRequiredDifficulty(timestamp time.Time) (uint32,
+	error) {
 	return b.calcNextRequiredDifficulty(b.bestChain, timestamp)
+}
+
+// mergeDifficulty takes an original stake difficulty and two new, scaled
+// stake difficulties, merges the new difficulties, and outputs a new
+// merged stake difficulty.
+func mergeDifficulty(oldDiff int64, newDiff1 int64, newDiff2 int64) int64 {
+	newDiff1Big := big.NewInt(newDiff1)
+	newDiff2Big := big.NewInt(newDiff2)
+	newDiff2Big.Lsh(newDiff2Big, 32)
+
+	oldDiffBig := big.NewInt(oldDiff)
+	oldDiffBigLSH := big.NewInt(oldDiff)
+	oldDiffBigLSH.Lsh(oldDiffBig, 32)
+
+	newDiff1Big.Div(oldDiffBigLSH, newDiff1Big)
+	newDiff2Big.Div(newDiff2Big, oldDiffBig)
+
+	// Combine the two changes in difficulty.
+	summedChange := big.NewInt(0)
+	summedChange.Set(newDiff2Big)
+	summedChange.Lsh(summedChange, 32)
+	summedChange.Div(summedChange, newDiff1Big)
+	summedChange.Mul(summedChange, oldDiffBig)
+	summedChange.Rsh(summedChange, 32)
+
+	return summedChange.Int64()
+}
+
+// calcNextRequiredStakeDifficulty calculates the exponentially weighted average
+// and then uses it to determine the next stake difficulty.
+// TODO: You can combine the first and second for loops below for a speed up
+// if you'd like, I'm not sure how much it matters.
+func (b *BlockChain) calcNextRequiredStakeDifficulty(curNode *blockNode) (int64,
+	error) {
+	alpha := b.chainParams.StakeDiffAlpha
+	stakeDiffStartHeight := int64(b.chainParams.CoinbaseMaturity) +
+		1
+	maxRetarget := int64(b.chainParams.RetargetAdjustmentFactor)
+	TicketPoolWeight := int64(b.chainParams.TicketPoolSizeWeight)
+
+	// Number of nodes to traverse while calculating difficulty.
+	nodesToTraverse := (b.chainParams.StakeDiffWindowSize *
+		b.chainParams.StakeDiffWindows)
+
+	// Genesis block. Block at height 1 has these parameters.
+	// Additionally, if we're before the time when people generally begin
+	// purchasing tickets, just use the MinimumStakeDiff.
+	// This is sort of sloppy and coded with the hopes that generally by
+	// stakeDiffStartHeight people will be submitting lots of SStx over the
+	// past nodesToTraverse many nodes. It should be okay with the default
+	// Decred parameters, but might do weird things if you use custom
+	// parameters.
+	if curNode == nil ||
+		curNode.height < stakeDiffStartHeight {
+		return b.chainParams.MinimumStakeDiff, nil
+	}
+
+	// Get the old difficulty; if we aren't at a block height where it changes,
+	// just return this.
+	oldDiff := curNode.header.SBits
+	if (curNode.height+1)%b.chainParams.StakeDiffWindowSize != 0 {
+		return oldDiff, nil
+	}
+
+	// The target size of the ticketPool in live tickets. Recast these as int64
+	// to avoid possible overflows for large sizes of either variable in
+	// params.
+	targetForTicketPool := int64(b.chainParams.TicketsPerBlock) *
+		int64(b.chainParams.TicketPoolSize)
+
+	// Initialize bigInt slice for the percentage changes for each window period
+	// above or below the target.
+	windowChanges := make([]*big.Int, b.chainParams.StakeDiffWindows)
+
+	// Regress through all of the previous blocks and store the percent changes
+	// per window period; use bigInts to emulate 64.32 bit fixed point.
+	oldNode := curNode
+	windowPeriod := int64(0)
+	weights := uint64(0)
+
+	for i := int64(0); ; i++ {
+		// Store and reset after reaching the end of every window period.
+		if (i+1)%b.chainParams.StakeDiffWindowSize == 0 {
+			// First adjust based on ticketPoolSize. Skew the difference
+			// in ticketPoolSize by max adjustment factor to help
+			// weight ticket pool size versus tickets per block.
+			poolSizeSkew := (int64(oldNode.header.PoolSize)-
+				targetForTicketPool)*TicketPoolWeight + targetForTicketPool
+
+			// Don't let this be negative or zero.
+			if poolSizeSkew <= 0 {
+				poolSizeSkew = 1
+			}
+
+			curPoolSizeTemp := big.NewInt(poolSizeSkew)
+			curPoolSizeTemp.Lsh(curPoolSizeTemp, 32) // Add padding
+			targetTemp := big.NewInt(targetForTicketPool)
+
+			windowAdjusted := curPoolSizeTemp.Div(curPoolSizeTemp, targetTemp)
+
+			// Weight it exponentially. Be aware that this could at some point
+			// overflow if alpha or the number of blocks used is really large.
+			windowAdjusted = windowAdjusted.Lsh(windowAdjusted,
+				uint((b.chainParams.StakeDiffWindows-windowPeriod)*alpha))
+
+			// Sum up all the different weights incrementally.
+			weights += 1 << uint64((b.chainParams.StakeDiffWindows-windowPeriod)*
+				alpha)
+
+			// Store it in the slice.
+			windowChanges[windowPeriod] = windowAdjusted
+
+			// windowFreshStake = 0
+			windowPeriod++
+		}
+
+		if (i + 1) == nodesToTraverse {
+			break // Exit for loop when we hit the end.
+		}
+
+		// Get the previous block node.
+		var err error
+		tempNode := oldNode
+		oldNode, err = b.getPrevNodeFromNode(oldNode)
+		if err != nil {
+			return 0, err
+		}
+
+		// If we're at the genesis block, reset the oldNode
+		// so that it stays at the genesis block.
+		if oldNode == nil {
+			oldNode = tempNode
+		}
+	}
+
+	// Sum up the weighted window periods.
+	weightedSum := big.NewInt(0)
+	for i := int64(0); i < b.chainParams.StakeDiffWindows; i++ {
+		weightedSum.Add(weightedSum, windowChanges[i])
+	}
+
+	// Divide by the sum of all weights.
+	weightsBig := big.NewInt(int64(weights))
+	weightedSumDiv := weightedSum.Div(weightedSum, weightsBig)
+
+	// Multiply by the old stake diff.
+	oldDiffBig := big.NewInt(oldDiff)
+	nextDiffBig := weightedSumDiv.Mul(weightedSumDiv, oldDiffBig)
+
+	// Right shift to restore the original padding (restore non-fixed point).
+	nextDiffBig = nextDiffBig.Rsh(nextDiffBig, 32)
+	nextDiffTicketPool := nextDiffBig.Int64()
+
+	// Check to see if we're over the limits for the maximum allowable retarget;
+	// if we are, return the maximum or minimum except in the case that oldDiff
+	// is zero.
+	if oldDiff == 0 { // This should never really happen, but in case it does...
+		return nextDiffTicketPool, nil
+	} else if nextDiffTicketPool == 0 {
+		nextDiffTicketPool = oldDiff / maxRetarget
+	} else if (nextDiffTicketPool / oldDiff) > (maxRetarget - 1) {
+		nextDiffTicketPool = oldDiff * maxRetarget
+	} else if (oldDiff / nextDiffTicketPool) > (maxRetarget - 1) {
+		nextDiffTicketPool = oldDiff / maxRetarget
+	}
+
+	// The target number of new SStx per block for any given window period.
+	targetForWindow := b.chainParams.StakeDiffWindowSize *
+		int64(b.chainParams.TicketsPerBlock)
+
+	// Regress through all of the previous blocks and store the percent changes
+	// per window period; use bigInts to emulate 64.32 bit fixed point.
+	oldNode = curNode
+	windowFreshStake := int64(0)
+	windowPeriod = int64(0)
+	weights = uint64(0)
+
+	for i := int64(0); ; i++ {
+		// Add the fresh stake into the store for this window period.
+		windowFreshStake += int64(oldNode.header.FreshStake)
+
+		// Store and reset after reaching the end of every window period.
+		if (i+1)%b.chainParams.StakeDiffWindowSize == 0 {
+			// Don't let fresh stake be zero.
+			if windowFreshStake <= 0 {
+				windowFreshStake = 1
+			}
+
+			freshTemp := big.NewInt(windowFreshStake)
+			freshTemp.Lsh(freshTemp, 32) // Add padding
+			targetTemp := big.NewInt(targetForWindow)
+
+			// Get the percentage change.
+			windowAdjusted := freshTemp.Div(freshTemp, targetTemp)
+
+			// Weight it exponentially. Be aware that this could at some point
+			// overflow if alpha or the number of blocks used is really large.
+			windowAdjusted = windowAdjusted.Lsh(windowAdjusted,
+				uint((b.chainParams.StakeDiffWindows-windowPeriod)*alpha))
+
+			// Sum up all the different weights incrementally.
+			weights += 1 <<
+				uint64((b.chainParams.StakeDiffWindows-windowPeriod)*alpha)
+
+			// Store it in the slice.
+			windowChanges[windowPeriod] = windowAdjusted
+
+			windowFreshStake = 0
+			windowPeriod++
+		}
+
+		if (i + 1) == nodesToTraverse {
+			break // Exit for loop when we hit the end.
+		}
+
+		// Get the previous block node.
+		var err error
+		tempNode := oldNode
+		oldNode, err = b.getPrevNodeFromNode(oldNode)
+		if err != nil {
+			return 0, err
+		}
+
+		// If we're at the genesis block, reset the oldNode
+		// so that it stays at the genesis block.
+		if oldNode == nil {
+			oldNode = tempNode
+		}
+	}
+
+	// Sum up the weighted window periods.
+	weightedSum = big.NewInt(0)
+	for i := int64(0); i < b.chainParams.StakeDiffWindows; i++ {
+		weightedSum.Add(weightedSum, windowChanges[i])
+	}
+
+	// Divide by the sum of all weights.
+	weightsBig = big.NewInt(int64(weights))
+	weightedSumDiv = weightedSum.Div(weightedSum, weightsBig)
+
+	// Multiply by the old stake diff.
+	oldDiffBig = big.NewInt(oldDiff)
+	nextDiffBig = weightedSumDiv.Mul(weightedSumDiv, oldDiffBig)
+
+	// Right shift to restore the original padding (restore non-fixed point).
+	nextDiffBig = nextDiffBig.Rsh(nextDiffBig, 32)
+	nextDiffFreshStake := nextDiffBig.Int64()
+
+	// Check to see if we're over the limits for the maximum allowable retarget;
+	// if we are, return the maximum or minimum except in the case that oldDiff
+	// is zero.
+	if oldDiff == 0 { // This should never really happen, but in case it does...
+		return nextDiffFreshStake, nil
+	} else if nextDiffFreshStake == 0 {
+		nextDiffFreshStake = oldDiff / maxRetarget
+	} else if (nextDiffFreshStake / oldDiff) > (maxRetarget - 1) {
+		nextDiffFreshStake = oldDiff * maxRetarget
+	} else if (oldDiff / nextDiffFreshStake) > (maxRetarget - 1) {
+		nextDiffFreshStake = oldDiff / maxRetarget
+	}
+
+	// Average the two differences using scaled multiplication.
+	nextDiff := mergeDifficulty(oldDiff, nextDiffTicketPool, nextDiffFreshStake)
+
+	// Check to see if we're over the limits for the maximum allowable retarget;
+	// if we are, return the maximum or minimum except in the case that oldDiff
+	// is zero.
+	if oldDiff == 0 { // This should never really happen, but in case it does...
+		return oldDiff, nil
+	} else if nextDiff == 0 {
+		nextDiff = oldDiff / maxRetarget
+	} else if (nextDiff / oldDiff) > (maxRetarget - 1) {
+		nextDiff = oldDiff * maxRetarget
+	} else if (oldDiff / nextDiff) > (maxRetarget - 1) {
+		nextDiff = oldDiff / maxRetarget
+	}
+
+	// If the next diff is below the network minimum, set the required stake
+	// difficulty to the minimum.
+	if nextDiff < b.chainParams.MinimumStakeDiff {
+		return b.chainParams.MinimumStakeDiff, nil
+	}
+
+	return nextDiff, nil
+}
+
+// CalcNextRequiredStakeDifficulty is the exported version of the above function.
+// This function is NOT safe for concurrent access.
+func (b *BlockChain) CalcNextRequiredStakeDifficulty() (int64, error) {
+	return b.calcNextRequiredStakeDifficulty(b.bestChain)
 }

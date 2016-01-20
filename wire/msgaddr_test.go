@@ -1,4 +1,5 @@
 // Copyright (c) 2013-2015 The btcsuite developers
+// Copyright (c) 2015 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -12,8 +13,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/btcsuite/btcd/wire"
 	"github.com/davecgh/go-spew/spew"
+	"github.com/decred/dcrd/wire"
 )
 
 // TestAddr tests the MsgAddr API.
@@ -74,30 +75,6 @@ func TestAddr(t *testing.T) {
 	if err == nil {
 		t.Errorf("AddAddresses: expected error on too many addresses " +
 			"not received")
-	}
-
-	// Ensure max payload is expected value for protocol versions before
-	// timestamp was added to NetAddress.
-	// Num addresses (varInt) + max allowed addresses.
-	pver = wire.NetAddressTimeVersion - 1
-	wantPayload = uint32(26009)
-	maxPayload = msg.MaxPayloadLength(pver)
-	if maxPayload != wantPayload {
-		t.Errorf("MaxPayloadLength: wrong max payload length for "+
-			"protocol version %d - got %v, want %v", pver,
-			maxPayload, wantPayload)
-	}
-
-	// Ensure max payload is expected value for protocol versions before
-	// multiple addresses were allowed.
-	// Num addresses (varInt) + a single net addresses.
-	pver = wire.MultipleAddressVersion - 1
-	wantPayload = uint32(35)
-	maxPayload = msg.MaxPayloadLength(pver)
-	if maxPayload != wantPayload {
-		t.Errorf("MaxPayloadLength: wrong max payload length for "+
-			"protocol version %d - got %v, want %v", pver,
-			maxPayload, wantPayload)
 	}
 
 	return
@@ -165,14 +142,6 @@ func TestAddrWire(t *testing.T) {
 			multiAddrEncoded,
 			wire.ProtocolVersion,
 		},
-
-		// Protocol version MultipleAddressVersion-1 with no addresses.
-		{
-			noAddr,
-			noAddr,
-			noAddrEncoded,
-			wire.MultipleAddressVersion - 1,
-		},
 	}
 
 	t.Logf("Running %d tests", len(tests))
@@ -210,7 +179,6 @@ func TestAddrWire(t *testing.T) {
 // of MsgAddr to confirm error paths work correctly.
 func TestAddrWireErrors(t *testing.T) {
 	pver := wire.ProtocolVersion
-	pverMA := wire.MultipleAddressVersion
 	wireErr := &wire.MessageError{}
 
 	// A couple of NetAddresses to use for testing.
@@ -271,9 +239,6 @@ func TestAddrWireErrors(t *testing.T) {
 		{baseAddr, baseAddrEncoded, pver, 1, io.ErrShortWrite, io.EOF},
 		// Force error with greater than max inventory vectors.
 		{maxAddr, maxAddrEncoded, pver, 3, wireErr, wireErr},
-		// Force error with greater than max inventory vectors for
-		// protocol versions before multiple addresses were allowed.
-		{maxAddr, maxAddrEncoded, pverMA - 1, 3, wireErr, wireErr},
 	}
 
 	t.Logf("Running %d tests", len(tests))

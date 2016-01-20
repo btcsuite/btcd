@@ -1,4 +1,5 @@
 // Copyright (c) 2013-2015 The btcsuite developers
+// Copyright (c) 2015 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -14,9 +15,10 @@ import (
 	"strings"
 	"testing"
 
-	. "github.com/btcsuite/btcd/txscript"
-	"github.com/btcsuite/btcd/wire"
-	"github.com/btcsuite/btcutil"
+	"github.com/decred/dcrd/chaincfg/chainhash"
+	. "github.com/decred/dcrd/txscript"
+	"github.com/decred/dcrd/wire"
+	"github.com/decred/dcrutil"
 )
 
 // testName returns a descriptive test name for the given reference test data.
@@ -124,6 +126,8 @@ func parseScriptFlags(flagStr string) (ScriptFlags, error) {
 		switch flag {
 		case "":
 			// Nothing.
+		case "CHECKLOCKTIMEVERIFY":
+			flags |= ScriptVerifyCheckLockTimeVerify
 		case "CLEANSTACK":
 			flags |= ScriptVerifyCleanStack
 		case "DERSIG":
@@ -136,8 +140,6 @@ func parseScriptFlags(flagStr string) (ScriptFlags, error) {
 			flags |= ScriptVerifyMinimalData
 		case "NONE":
 			// Nothing.
-		case "NULLDUMMY":
-			flags |= ScriptStrictMultiSig
 		case "P2SH":
 			flags |= ScriptBip16
 		case "SIGPUSHONLY":
@@ -156,7 +158,8 @@ func parseScriptFlags(flagStr string) (ScriptFlags, error) {
 func createSpendingTx(sigScript, pkScript []byte) *wire.MsgTx {
 	coinbaseTx := wire.NewMsgTx()
 
-	outPoint := wire.NewOutPoint(&wire.ShaHash{}, ^uint32(0))
+	outPoint := wire.NewOutPoint(&chainhash.Hash{}, ^uint32(0),
+		dcrutil.TxTreeRegular)
 	txIn := wire.NewTxIn(outPoint, []byte{OP_0, OP_0})
 	txOut := wire.NewTxOut(0, pkScript)
 	coinbaseTx.AddTxIn(txIn)
@@ -164,7 +167,8 @@ func createSpendingTx(sigScript, pkScript []byte) *wire.MsgTx {
 
 	spendingTx := wire.NewMsgTx()
 	coinbaseTxSha := coinbaseTx.TxSha()
-	outPoint = wire.NewOutPoint(&coinbaseTxSha, 0)
+	outPoint = wire.NewOutPoint(&coinbaseTxSha, 0,
+		dcrutil.TxTreeRegular)
 	txIn = wire.NewTxIn(outPoint, sigScript)
 	txOut = wire.NewTxOut(0, nil)
 
@@ -176,6 +180,10 @@ func createSpendingTx(sigScript, pkScript []byte) *wire.MsgTx {
 
 // TestScriptInvalidTests ensures all of the tests in script_invalid.json fail
 // as expected.
+// TODO These tests need to be completely regenerated and should really be
+// dynamically created. Most of them are failing because they use Bitcoin's
+// sighash algorithm to create their signatures, and thus fail for completely
+// wrong reasons compared to what they're supposed to test.
 func TestScriptInvalidTests(t *testing.T) {
 	file, err := ioutil.ReadFile("data/script_invalid.json")
 	if err != nil {
@@ -217,7 +225,7 @@ func TestScriptInvalidTests(t *testing.T) {
 			continue
 		}
 		tx := createSpendingTx(scriptSig, scriptPubKey)
-		vm, err := NewEngine(scriptPubKey, tx, 0, flags)
+		vm, err := NewEngine(scriptPubKey, tx, 0, flags, 0)
 		if err == nil {
 			if err := vm.Execute(); err == nil {
 				t.Errorf("%s test succeeded when it "+
@@ -271,14 +279,14 @@ func TestScriptValidTests(t *testing.T) {
 			continue
 		}
 		tx := createSpendingTx(scriptSig, scriptPubKey)
-		vm, err := NewEngine(scriptPubKey, tx, 0, flags)
+		vm, err := NewEngine(scriptPubKey, tx, 0, flags, 0)
 		if err != nil {
 			t.Errorf("%s failed to create script: %v", name, err)
 			continue
 		}
 		err = vm.Execute()
 		if err != nil {
-			t.Errorf("%s failed to execute: %v", name, err)
+			t.Errorf("test %v:%s failed to execute: %v", i, name, err)
 			continue
 		}
 	}
@@ -330,7 +338,7 @@ testloop:
 			continue
 		}
 
-		tx, err := btcutil.NewTxFromBytes(serializedTx)
+		tx, err := dcrutil.NewTxFromBytesLegacy(serializedTx)
 		if err != nil {
 			t.Errorf("bad test (arg 2 not msgtx %v) %d: %v", err,
 				i, test)
@@ -371,7 +379,7 @@ testloop:
 				continue testloop
 			}
 
-			prevhash, err := wire.NewShaHashFromStr(previoustx)
+			prevhash, err := chainhash.NewHashFromStr(previoustx)
 			if err != nil {
 				t.Errorf("bad test (%dth input sha not sha %v)"+
 					"%d: %v", j, err, i, test)
@@ -401,7 +409,7 @@ testloop:
 				continue testloop
 			}
 
-			prevOuts[*wire.NewOutPoint(prevhash, idx)] = script
+			prevOuts[*wire.NewOutPoint(prevhash, idx, dcrutil.TxTreeRegular)] = script
 		}
 
 		for k, txin := range tx.MsgTx().TxIn {
@@ -414,7 +422,7 @@ testloop:
 			// These are meant to fail, so as soon as the first
 			// input fails the transaction has failed. (some of the
 			// test txns have good inputs, too..
-			vm, err := NewEngine(pkScript, tx.MsgTx(), k, flags)
+			vm, err := NewEngine(pkScript, tx.MsgTx(), k, flags, 0)
 			if err != nil {
 				continue testloop
 			}
@@ -474,7 +482,7 @@ testloop:
 			continue
 		}
 
-		tx, err := btcutil.NewTxFromBytes(serializedTx)
+		tx, err := dcrutil.NewTxFromBytesLegacy(serializedTx)
 		if err != nil {
 			t.Errorf("bad test (arg 2 not msgtx %v) %d: %v", err,
 				i, test)
@@ -515,7 +523,7 @@ testloop:
 				continue
 			}
 
-			prevhash, err := wire.NewShaHashFromStr(previoustx)
+			prevhash, err := chainhash.NewHashFromStr(previoustx)
 			if err != nil {
 				t.Errorf("bad test (%dth input sha not sha %v)"+
 					"%d: %v", j, err, i, test)
@@ -545,7 +553,7 @@ testloop:
 				continue
 			}
 
-			prevOuts[*wire.NewOutPoint(prevhash, idx)] = script
+			prevOuts[*wire.NewOutPoint(prevhash, idx, dcrutil.TxTreeRegular)] = script
 		}
 
 		for k, txin := range tx.MsgTx().TxIn {
@@ -555,7 +563,7 @@ testloop:
 					k, i, test)
 				continue testloop
 			}
-			vm, err := NewEngine(pkScript, tx.MsgTx(), k, flags)
+			vm, err := NewEngine(pkScript, tx.MsgTx(), k, flags, 0)
 			if err != nil {
 				t.Errorf("test (%d:%v:%d) failed to create "+
 					"script: %v", i, test, k, err)

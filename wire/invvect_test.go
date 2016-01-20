@@ -1,4 +1,5 @@
 // Copyright (c) 2013-2015 The btcsuite developers
+// Copyright (c) 2015 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -9,8 +10,10 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/btcsuite/btcd/wire"
 	"github.com/davecgh/go-spew/spew"
+
+	"github.com/decred/dcrd/chaincfg/chainhash"
+	"github.com/decred/dcrd/wire"
 )
 
 // TestInvVectStringer tests the stringized output for inventory vector types.
@@ -40,7 +43,7 @@ func TestInvTypeStringer(t *testing.T) {
 // TestInvVect tests the InvVect API.
 func TestInvVect(t *testing.T) {
 	ivType := wire.InvTypeBlock
-	hash := wire.ShaHash{}
+	hash := chainhash.Hash{}
 
 	// Ensure we get the same payload and signature back out.
 	iv := wire.NewInvVect(ivType, &hash)
@@ -60,7 +63,7 @@ func TestInvVect(t *testing.T) {
 func TestInvVectWire(t *testing.T) {
 	// Block 203707 hash.
 	hashStr := "3264bc2ac36a60840790ba1d475d01367e7c723da941069e9dc"
-	baseHash, err := wire.NewShaHashFromStr(hashStr)
+	baseHash, err := chainhash.NewHashFromStr(hashStr)
 	if err != nil {
 		t.Errorf("NewShaHashFromStr: %v", err)
 	}
@@ -68,7 +71,7 @@ func TestInvVectWire(t *testing.T) {
 	// errInvVect is an inventory vector with an error.
 	errInvVect := wire.InvVect{
 		Type: wire.InvTypeError,
-		Hash: wire.ShaHash{},
+		Hash: chainhash.Hash{},
 	}
 
 	// errInvVectEncoded is the wire encoded bytes of errInvVect.
@@ -138,102 +141,6 @@ func TestInvVectWire(t *testing.T) {
 			blockInvVect,
 			blockInvVectEncoded,
 			wire.ProtocolVersion,
-		},
-
-		// Protocol version BIP0035Version error inventory vector.
-		{
-			errInvVect,
-			errInvVect,
-			errInvVectEncoded,
-			wire.BIP0035Version,
-		},
-
-		// Protocol version BIP0035Version tx inventory vector.
-		{
-			txInvVect,
-			txInvVect,
-			txInvVectEncoded,
-			wire.BIP0035Version,
-		},
-
-		// Protocol version BIP0035Version block inventory vector.
-		{
-			blockInvVect,
-			blockInvVect,
-			blockInvVectEncoded,
-			wire.BIP0035Version,
-		},
-
-		// Protocol version BIP0031Version error inventory vector.
-		{
-			errInvVect,
-			errInvVect,
-			errInvVectEncoded,
-			wire.BIP0031Version,
-		},
-
-		// Protocol version BIP0031Version tx inventory vector.
-		{
-			txInvVect,
-			txInvVect,
-			txInvVectEncoded,
-			wire.BIP0031Version,
-		},
-
-		// Protocol version BIP0031Version block inventory vector.
-		{
-			blockInvVect,
-			blockInvVect,
-			blockInvVectEncoded,
-			wire.BIP0031Version,
-		},
-
-		// Protocol version NetAddressTimeVersion error inventory vector.
-		{
-			errInvVect,
-			errInvVect,
-			errInvVectEncoded,
-			wire.NetAddressTimeVersion,
-		},
-
-		// Protocol version NetAddressTimeVersion tx inventory vector.
-		{
-			txInvVect,
-			txInvVect,
-			txInvVectEncoded,
-			wire.NetAddressTimeVersion,
-		},
-
-		// Protocol version NetAddressTimeVersion block inventory vector.
-		{
-			blockInvVect,
-			blockInvVect,
-			blockInvVectEncoded,
-			wire.NetAddressTimeVersion,
-		},
-
-		// Protocol version MultipleAddressVersion error inventory vector.
-		{
-			errInvVect,
-			errInvVect,
-			errInvVectEncoded,
-			wire.MultipleAddressVersion,
-		},
-
-		// Protocol version MultipleAddressVersion tx inventory vector.
-		{
-			txInvVect,
-			txInvVect,
-			txInvVectEncoded,
-			wire.MultipleAddressVersion,
-		},
-
-		// Protocol version MultipleAddressVersion block inventory vector.
-		{
-			blockInvVect,
-			blockInvVect,
-			blockInvVectEncoded,
-			wire.MultipleAddressVersion,
 		},
 	}
 

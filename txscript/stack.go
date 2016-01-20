@@ -1,4 +1,5 @@
 // Copyright (c) 2013-2015 The btcsuite developers
+// Copyright (c) 2015 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -28,7 +29,7 @@ func fromBool(v bool) []byte {
 	return nil
 }
 
-// stack represents a stack of immutable objects to be used with bitcoin
+// stack represents a stack of immutable objects to be used with decred
 // scripts.  Objects may be shared, therefore in usage if a value is to be
 // changed it *must* be deep-copied first to avoid changing other values on the
 // stack.
@@ -77,13 +78,13 @@ func (s *stack) PopByteArray() ([]byte, error) {
 // consensus rules imposed on data interpreted as numbers.
 //
 // Stack transformation: [... x1 x2 x3] -> [... x1 x2]
-func (s *stack) PopInt() (scriptNum, error) {
+func (s *stack) PopInt(maxLen int) (scriptNum, error) {
 	so, err := s.PopByteArray()
 	if err != nil {
 		return 0, err
 	}
 
-	return makeScriptNum(so, s.verifyMinimalData)
+	return makeScriptNum(so, s.verifyMinimalData, maxLen)
 }
 
 // PopBool pops the value off the top of the stack, converts it into a bool, and
@@ -118,7 +119,7 @@ func (s *stack) PeekInt(idx int32) (scriptNum, error) {
 		return 0, err
 	}
 
-	return makeScriptNum(so, s.verifyMinimalData)
+	return makeScriptNum(so, s.verifyMinimalData, mathOpCodeMaxScriptNumLen)
 }
 
 // PeekBool returns the Nth item on the stack as a bool without removing it.

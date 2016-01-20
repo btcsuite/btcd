@@ -1,4 +1,5 @@
 // Copyright (c) 2013-2015 The btcsuite developers
+// Copyright (c) 2015 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -9,6 +10,7 @@ import (
 	"fmt"
 )
 
+// Engine execution errors.
 var (
 	// ErrStackShortScript is returned if the script has an opcode that is
 	// too long for the length of the script.
@@ -135,6 +137,7 @@ var (
 	ErrStackMinimalData = errors.New("non-minimally encoded script number")
 )
 
+// Engine script errors.
 var (
 	// ErrInvalidFlags is returned when the passed flags to NewScript
 	// contain an invalid combination.
@@ -145,10 +148,45 @@ var (
 	ErrInvalidIndex = errors.New("invalid input index")
 
 	// ErrUnsupportedAddress is returned when a concrete type that
-	// implements a btcutil.Address is not a supported type.
+	// implements a dcrutil.Address is not a supported type.
 	ErrUnsupportedAddress = errors.New("unsupported address type")
 
 	// ErrBadNumRequired is returned from MultiSigScript when nrequired is
 	// larger than the number of provided public keys.
 	ErrBadNumRequired = errors.New("more signatures required than keys present")
+
+	// ErrSighashSingleIdx
+	ErrSighashSingleIdx = errors.New("invalid SIGHASH_SINGLE script index")
+
+	// ErrSubstrIndexNegative indicates that the substring index was negative
+	// and thus invalid.
+	ErrSubstrIdxNegative = errors.New("negative number given for substring " +
+		"index")
+
+	// ErrSubstrIdxOutOfBounds indicates that the substring index was too large
+	// and thus invalid.
+	ErrSubstrIdxOutOfBounds = errors.New("out of bounds number given for " +
+		"substring index")
+
+	// ErrNegativeRotation indicates that too low of a rotation depth was given
+	// for a uint32 bit rotation.
+	ErrNegativeRotation = errors.New("rotation depth negative")
+
+	// ErrRotationOverflow indicates that too high of a rotation depth was given
+	// for a uint32 bit rotation.
+	ErrRotationOverflow = errors.New("rotation depth out of bounds")
+
+	// ErrNegativeRotation indicates that too low of a shift depth was given
+	// for a uint32 bit shift.
+	ErrNegativeShift = errors.New("shift depth negative")
+
+	// ErrShiftOverflow indicates that too high of a shift depth was given
+	// for a uint32 bit shift.
+	ErrShiftOverflow = errors.New("shift depth out of bounds")
+
+	// ErrDivideByZero indicates that a user attempted to divide by zero.
+	ErrDivideByZero = errors.New("division by zero")
+
+	// ErrP2SHStakeOpCodes indicates a P2SH script contained stake op codes.
+	ErrP2SHStakeOpCodes = errors.New("stake opcodes were found in a p2sh script")
 )

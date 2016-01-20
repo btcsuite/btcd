@@ -1,4 +1,5 @@
 // Copyright (c) 2014-2015 The btcsuite developers
+// Copyright (c) 2015 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -10,8 +11,8 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/btcsuite/btcd/wire"
 	"github.com/davecgh/go-spew/spew"
+	"github.com/decred/dcrd/wire"
 )
 
 // TestRejectCodeStringer tests the stringized output for the reject code type.
@@ -119,109 +120,6 @@ func TestRejectLatest(t *testing.T) {
 	}
 }
 
-// TestRejectBeforeAdded tests the MsgReject API against a protocol version
-// before the version which introduced it (RejectVersion).
-func TestRejectBeforeAdded(t *testing.T) {
-	// Use the protocol version just prior to RejectVersion.
-	pver := wire.RejectVersion - 1
-
-	// Create reject message data.
-	rejCommand := (&wire.MsgBlock{}).Command()
-	rejCode := wire.RejectDuplicate
-	rejReason := "duplicate block"
-	rejHash := mainNetGenesisHash
-
-	msg := wire.NewMsgReject(rejCommand, rejCode, rejReason)
-	msg.Hash = rejHash
-
-	// Ensure max payload is expected value for old protocol version.
-	size := msg.MaxPayloadLength(pver)
-	if size != 0 {
-		t.Errorf("Max length should be 0 for reject protocol version %d.",
-			pver)
-	}
-
-	// Test encode with old protocol version.
-	var buf bytes.Buffer
-	err := msg.BtcEncode(&buf, pver)
-	if err == nil {
-		t.Errorf("encode of MsgReject succeeded when it shouldn't "+
-			"have %v", msg)
-	}
-
-	//	// Test decode with old protocol version.
-	readMsg := wire.MsgReject{}
-	err = readMsg.BtcDecode(&buf, pver)
-	if err == nil {
-		t.Errorf("decode of MsgReject succeeded when it shouldn't "+
-			"have %v", spew.Sdump(buf.Bytes()))
-	}
-
-	// Since this protocol version doesn't support reject, make sure various
-	// fields didn't get encoded and decoded back out.
-	if msg.Cmd == readMsg.Cmd {
-		t.Errorf("Should not get same reject command for protocol "+
-			"version %d", pver)
-	}
-	if msg.Code == readMsg.Code {
-		t.Errorf("Should not get same reject code for protocol "+
-			"version %d", pver)
-	}
-	if msg.Reason == readMsg.Reason {
-		t.Errorf("Should not get same reject reason for protocol "+
-			"version %d", pver)
-	}
-	if msg.Hash == readMsg.Hash {
-		t.Errorf("Should not get same reject hash for protocol "+
-			"version %d", pver)
-	}
-}
-
-// TestRejectCrossProtocol tests the MsgReject API when encoding with the latest
-// protocol version and decoded with a version before the version which
-// introduced it (RejectVersion).
-func TestRejectCrossProtocol(t *testing.T) {
-	// Create reject message data.
-	rejCommand := (&wire.MsgBlock{}).Command()
-	rejCode := wire.RejectDuplicate
-	rejReason := "duplicate block"
-	rejHash := mainNetGenesisHash
-
-	msg := wire.NewMsgReject(rejCommand, rejCode, rejReason)
-	msg.Hash = rejHash
-
-	// Encode with latest protocol version.
-	var buf bytes.Buffer
-	err := msg.BtcEncode(&buf, wire.ProtocolVersion)
-	if err != nil {
-		t.Errorf("encode of MsgReject failed %v err <%v>", msg, err)
-	}
-
-	// Decode with old protocol version.
-	readMsg := wire.MsgReject{}
-	err = readMsg.BtcDecode(&buf, wire.RejectVersion-1)
-	if err == nil {
-		t.Errorf("encode of MsgReject succeeded when it shouldn't "+
-			"have %v", msg)
-	}
-
-	// Since one of the protocol versions doesn't support the reject
-	// message, make sure the various fields didn't get encoded and decoded
-	// back out.
-	if msg.Cmd == readMsg.Cmd {
-		t.Errorf("Should not get same reject command for cross protocol")
-	}
-	if msg.Code == readMsg.Code {
-		t.Errorf("Should not get same reject code for cross protocol")
-	}
-	if msg.Reason == readMsg.Reason {
-		t.Errorf("Should not get same reject reason for cross protocol")
-	}
-	if msg.Hash == readMsg.Hash {
-		t.Errorf("Should not get same reject hash for cross protocol")
-	}
-}
-
 // TestRejectWire tests the MsgReject wire encode and decode for various
 // protocol versions.
 func TestRejectWire(t *testing.T) {
@@ -303,8 +201,6 @@ func TestRejectWire(t *testing.T) {
 // of MsgReject to confirm error paths work correctly.
 func TestRejectWireErrors(t *testing.T) {
 	pver := wire.ProtocolVersion
-	pverNoReject := wire.RejectVersion - 1
-	wireErr := &wire.MessageError{}
 
 	baseReject := wire.NewMsgReject("block", wire.RejectDuplicate,
 		"duplicate block")
@@ -337,8 +233,6 @@ func TestRejectWireErrors(t *testing.T) {
 		{baseReject, baseRejectEncoded, pver, 7, io.ErrShortWrite, io.EOF},
 		// Force error in reject hash.
 		{baseReject, baseRejectEncoded, pver, 23, io.ErrShortWrite, io.EOF},
-		// Force error due to unsupported protocol version.
-		{baseReject, baseRejectEncoded, pverNoReject, 6, wireErr, wireErr},
 	}
 
 	t.Logf("Running %d tests", len(tests))

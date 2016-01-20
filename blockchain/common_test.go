@@ -1,4 +1,5 @@
 // Copyright (c) 2013-2014 The btcsuite developers
+// Copyright (c) 2015 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -13,17 +14,18 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/btcsuite/btcd/blockchain"
-	"github.com/btcsuite/btcd/chaincfg"
-	"github.com/btcsuite/btcd/database"
-	_ "github.com/btcsuite/btcd/database/ldb"
-	_ "github.com/btcsuite/btcd/database/memdb"
-	"github.com/btcsuite/btcd/wire"
-	"github.com/btcsuite/btcutil"
+	"github.com/decred/dcrd/blockchain"
+	"github.com/decred/dcrd/blockchain/stake"
+	"github.com/decred/dcrd/chaincfg"
+	"github.com/decred/dcrd/database"
+	_ "github.com/decred/dcrd/database/ldb"
+	_ "github.com/decred/dcrd/database/memdb"
+	"github.com/decred/dcrd/wire"
+	"github.com/decred/dcrutil"
 )
 
 // testDbType is the database backend type to use for the tests.
-const testDbType = "memdb"
+const testDbType = "leveldb"
 
 // testDbRoot is the root directory used to create all test databases.
 const testDbRoot = "testdbs"
@@ -54,7 +56,7 @@ func isSupportedDbType(dbType string) bool {
 // chainSetup is used to create a new db and chain instance with the genesis
 // block already inserted.  In addition to the new chain instnce, it returns
 // a teardown function the caller should invoke when done testing to clean up.
-func chainSetup(dbName string) (*blockchain.BlockChain, func(), error) {
+func chainSetup(dbName string, params *chaincfg.Params) (*blockchain.BlockChain, func(), error) {
 	if !isSupportedDbType(testDbType) {
 		return nil, nil, fmt.Errorf("unsupported db type %v", testDbType)
 	}
@@ -62,6 +64,8 @@ func chainSetup(dbName string) (*blockchain.BlockChain, func(), error) {
 	// Handle memory database specially since it doesn't need the disk
 	// specific handling.
 	var db database.Db
+	tmdb := new(stake.TicketDB)
+
 	var teardown func()
 	if testDbType == "memdb" {
 		ndb, err := database.CreateDB(testDbType)
@@ -73,6 +77,7 @@ func chainSetup(dbName string) (*blockchain.BlockChain, func(), error) {
 		// Setup a teardown function for cleaning up.  This function is
 		// returned to the caller to be invoked when it is done testing.
 		teardown = func() {
+			tmdb.Close()
 			db.Close()
 		}
 	} else {
@@ -98,6 +103,7 @@ func chainSetup(dbName string) (*blockchain.BlockChain, func(), error) {
 		// returned to the caller to be invoked when it is done testing.
 		teardown = func() {
 			dbVersionPath := filepath.Join(testDbRoot, dbName+".ver")
+			tmdb.Close()
 			db.Sync()
 			db.Close()
 			os.RemoveAll(dbPath)
@@ -108,7 +114,8 @@ func chainSetup(dbName string) (*blockchain.BlockChain, func(), error) {
 
 	// Insert the main network genesis block.  This is part of the initial
 	// database setup.
-	genesisBlock := btcutil.NewBlock(chaincfg.MainNetParams.GenesisBlock)
+	genesisBlock := dcrutil.NewBlock(params.GenesisBlock)
+	genesisBlock.SetHeight(int64(0))
 	_, err := db.InsertBlock(genesisBlock)
 	if err != nil {
 		teardown()
@@ -116,7 +123,11 @@ func chainSetup(dbName string) (*blockchain.BlockChain, func(), error) {
 		return nil, nil, err
 	}
 
-	chain := blockchain.New(db, &chaincfg.MainNetParams, nil)
+	// Start the ticket database.
+	tmdb.Initialize(params, db)
+	tmdb.RescanTicketDB()
+
+	chain := blockchain.New(db, tmdb, params, nil)
 	return chain, teardown, nil
 }
 
@@ -173,7 +184,7 @@ func loadTxStore(filename string) (blockchain.TxStore, error) {
 		if err != nil {
 			return nil, err
 		}
-		txD.Tx = btcutil.NewTx(&msgTx)
+		txD.Tx = dcrutil.NewTx(&msgTx)
 
 		// Transaction hash.
 		txHash := msgTx.TxSha()

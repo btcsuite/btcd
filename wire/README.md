@@ -1,72 +1,71 @@
 wire
 ====
 
-[![Build Status](http://img.shields.io/travis/btcsuite/btcd.svg)]
-(https://travis-ci.org/btcsuite/btcd) [![ISC License]
+[![ISC License]
 (http://img.shields.io/badge/license-ISC-blue.svg)](http://copyfree.org)
 
-Package wire implements the bitcoin wire protocol.  A comprehensive suite of
+Package wire implements the decred wire protocol.  A comprehensive suite of
 tests with 100% test coverage is provided to ensure proper functionality.
 
 There is an associated blog post about the release of this package
-[here](https://blog.conformal.com/btcwire-the-bitcoin-wire-protocol-package-from-btcd/).
+[here](https://blog.conformal.com/btcwire-the-bitcoin-wire-protocol-package-from-dcrd/).
 
 This package has intentionally been designed so it can be used as a standalone
-package for any projects needing to interface with bitcoin peers at the wire
+package for any projects needing to interface with decred peers at the wire
 protocol level.
 
 ## Documentation
 
 [![GoDoc](https://img.shields.io/badge/godoc-reference-blue.svg)]
-(http://godoc.org/github.com/btcsuite/btcd/wire)
+(http://godoc.org/github.com/decred/dcrd/wire)
 
 Full `go doc` style documentation for the project can be viewed online without
 installing this package by using the GoDoc site here:
-http://godoc.org/github.com/btcsuite/btcd/wire
+http://godoc.org/github.com/decred/dcrd/wire
 
 You can also view the documentation locally once the package is installed with
 the `godoc` tool by running `godoc -http=":6060"` and pointing your browser to
-http://localhost:6060/pkg/github.com/btcsuite/btcd/wire
+http://localhost:6060/pkg/github.com/decred/dcrd/wire
 
 ## Installation
 
 ```bash
-$ go get github.com/btcsuite/btcd/wire
+$ go get github.com/decred/dcrd/wire
 ```
 
-## Bitcoin Message Overview
+## Decred Message Overview
 
-The bitcoin protocol consists of exchanging messages between peers. Each message
+The decred protocol consists of exchanging messages between peers. Each message
 is preceded by a header which identifies information about it such as which
-bitcoin network it is a part of, its type, how big it is, and a checksum to
+decred network it is a part of, its type, how big it is, and a checksum to
 verify validity. All encoding and decoding of message headers is handled by this
 package.
 
-To accomplish this, there is a generic interface for bitcoin messages named
+To accomplish this, there is a generic interface for decred messages named
 `Message` which allows messages of any type to be read, written, or passed
 around through channels, functions, etc. In addition, concrete implementations
-of most of the currently supported bitcoin messages are provided. For these
+of most of the currently supported decred messages are provided. For these
 supported messages, all of the details of marshalling and unmarshalling to and
-from the wire using bitcoin encoding are handled so the caller doesn't have to
+from the wire using decred encoding are handled so the caller doesn't have to
 concern themselves with the specifics.
 
 ## Reading Messages Example
 
-In order to unmarshal bitcoin messages from the wire, use the `ReadMessage`
+In order to unmarshal decred messages from the wire, use the `ReadMessage`
 function. It accepts any `io.Reader`, but typically this will be a `net.Conn`
-to a remote node running a bitcoin peer.  Example syntax is:
+to a remote node running a decred peer.  Example syntax is:
 
 ```Go
 	// Use the most recent protocol version supported by the package and the
-	// main bitcoin network.
+	// main decred network.
 	pver := wire.ProtocolVersion
-	btcnet := wire.MainNet
+	dcrnet := wire.MainNet
 
-	// Reads and validates the next bitcoin message from conn using the
-	// protocol version pver and the bitcoin network btcnet.  The returns
+	// Reads and validates the next decred message from conn using the
+	// protocol version pver and the decred network dcrnet.  The returns
 	// are a wire.Message, a []byte which contains the unmarshalled
 	// raw payload, and a possible error.
-	msg, rawPayload, err := wire.ReadMessage(conn, pver, btcnet)
+	msg, rawPayload, err := wire.ReadMessage(conn, pver, dcrnet)
 	if err != nil {
 		// Log and handle the error
 	}
@@ -76,48 +75,28 @@ See the package documentation for details on determining the message type.
 
 ## Writing Messages Example
 
-In order to marshal bitcoin messages to the wire, use the `WriteMessage`
+In order to marshal decred messages to the wire, use the `WriteMessage`
 function. It accepts any `io.Writer`, but typically this will be a `net.Conn`
-to a remote node running a bitcoin peer. Example syntax to request addresses
+to a remote node running a decred peer. Example syntax to request addresses
 from a remote peer is:
 
 ```Go
 	// Use the most recent protocol version supported by the package and the
-	// main bitcoin network.
+	// main decred network.
 	pver := wire.ProtocolVersion
-	btcnet := wire.MainNet
+	dcrnet := wire.MainNet
 
-	// Create a new getaddr bitcoin message.
+	// Create a new getaddr decred message.
 	msg := wire.NewMsgGetAddr()
 
-	// Writes a bitcoin message msg to conn using the protocol version
-	// pver, and the bitcoin network btcnet.  The return is a possible
+	// Writes a decred message msg to conn using the protocol version
+	// pver, and the decred network dcrnet.  The return is a possible
 	// error.
-	err := wire.WriteMessage(conn, msg, pver, btcnet)
+	err := wire.WriteMessage(conn, msg, pver, dcrnet)
 	if err != nil {
 		// Log and handle the error
 	}
 ```
-
-## GPG Verification Key
-
-All official release tags are signed by Conformal so users can ensure the code
-has not been tampered with and is coming from the btcsuite developers.  To
-verify the signature perform the following:
-
-- Download the public key from the Conformal website at
-  https://opensource.conformal.com/GIT-GPG-KEY-conformal.txt
-
-- Import the public key into your GPG keyring:
-  ```bash
-  gpg --import GIT-GPG-KEY-conformal.txt
-  ```
-
-- Verify the release tag with the following command where `TAG_NAME` is a
-  placeholder for the specific tag:
-  ```bash
-  git tag -v TAG_NAME
-  ```
 
 ## License
 

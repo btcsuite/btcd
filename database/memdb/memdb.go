@@ -1,4 +1,5 @@
 // Copyright (c) 2013-2014 The btcsuite developers
+// Copyright (c) 2015 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -10,9 +11,10 @@ import (
 	"math"
 	"sync"
 
-	"github.com/btcsuite/btcd/database"
-	"github.com/btcsuite/btcd/wire"
-	"github.com/btcsuite/btcutil"
+	"github.com/decred/dcrd/chaincfg/chainhash"
+	"github.com/decred/dcrd/database"
+	"github.com/decred/dcrd/wire"
+	"github.com/decred/dcrutil"
 )
 
 // Errors that the various database functions may return.
@@ -21,17 +23,13 @@ var (
 )
 
 var (
-	zeroHash = wire.ShaHash{}
-
-	// The following two hashes are ones that must be specially handled.
-	// See the comments where they're used for more details.
-	dupTxHash91842 = newShaHashFromStr("d5d27987d2a3dfc724e359870c6644b40e497bdc0589a033220fe15429d88599")
-	dupTxHash91880 = newShaHashFromStr("e3bf3d07d4b0375638d5f1db5255fe07ba2c4cb067cd81b84ee974b6585fb468")
+	zeroHash = chainhash.Hash{}
 )
 
 // tTxInsertData holds information about the location and spent status of
 // a transaction.
 type tTxInsertData struct {
+	tree        int8
 	blockHeight int64
 	offset      int
 	spentBuf    []bool
@@ -41,8 +39,8 @@ type tTxInsertData struct {
 // wire.ShaHash.  It only differs from the one available in wire in that it
 // ignores the error since it will only (and must only) be called with
 // hard-coded, and therefore known good, hashes.
-func newShaHashFromStr(hexStr string) *wire.ShaHash {
-	sha, _ := wire.NewShaHashFromStr(hexStr)
+func newShaHashFromStr(hexStr string) *chainhash.Hash {
+	sha, _ := chainhash.NewHashFromStr(hexStr)
 	return sha
 }
 
@@ -80,17 +78,17 @@ type MemDb struct {
 	// Embed a mutex for safe concurrent access.
 	sync.Mutex
 
-	// blocks holds all of the bitcoin blocks that will be in the memory
+	// blocks holds all of the decred blocks that will be in the memory
 	// database.
 	blocks []*wire.MsgBlock
 
 	// blocksBySha keeps track of block heights by hash.  The height can
 	// be used as an index into the blocks slice.
-	blocksBySha map[wire.ShaHash]int64
+	blocksBySha map[chainhash.Hash]int64
 
 	// txns holds information about transactions such as which their
 	// block height and spent status of all their outputs.
-	txns map[wire.ShaHash][]*tTxInsertData
+	txns map[chainhash.Hash][]*tTxInsertData
 
 	// closed indicates whether or not the database has been closed and is
 	// therefore invalidated.
@@ -98,7 +96,7 @@ type MemDb struct {
 }
 
 // removeTx removes the passed transaction including unspending it.
-func (db *MemDb) removeTx(msgTx *wire.MsgTx, txHash *wire.ShaHash) {
+func (db *MemDb) removeTx(msgTx *wire.MsgTx, txHash *chainhash.Hash) {
 	// Undo all of the spends for the transaction.
 	for _, txIn := range msgTx.TxIn {
 		if isCoinbaseInput(txIn) {
@@ -157,7 +155,7 @@ func (db *MemDb) Close() error {
 // block.  This is different than a simple truncate since the spend information
 // for each block must also be unwound.  This is part of the database.Db interface
 // implementation.
-func (db *MemDb) DropAfterBlockBySha(sha *wire.ShaHash) error {
+func (db *MemDb) DropAfterBlockBySha(sha *chainhash.Hash) error {
 	db.Lock()
 	defer db.Unlock()
 
@@ -179,25 +177,35 @@ func (db *MemDb) DropAfterBlockBySha(sha *wire.ShaHash) error {
 	// remove the block.
 	endHeight := int64(len(db.blocks) - 1)
 	for i := endHeight; i > height; i-- {
-		// Unspend and remove each transaction in reverse order because
-		// later transactions in a block can reference earlier ones.
-		transactions := db.blocks[i].Transactions
-		for j := len(transactions) - 1; j >= 0; j-- {
-			tx := transactions[j]
-			txHash := tx.TxSha()
-			db.removeTx(tx, &txHash)
+
+		blk := db.blocks[i]
+		blkprev := db.blocks[i-1]
+		// Unspend the stake tx in the current block
+		for _, tx := range blk.STransactions {
+			txSha := tx.TxSha()
+			db.removeTx(tx, &txSha)
+		}
+
+		// Check to see if the regular txs of the parent were even included; if
+		// they are, unspend all of these regular tx too
+		votebits := blk.Header.VoteBits
+		if dcrutil.IsFlagSet16(votebits, dcrutil.BlockValid) && height != 0 {
+			// Unspend the regular tx in the previous block
+			for _, tx := range blkprev.Transactions {
+				txSha := tx.TxSha()
+				db.removeTx(tx, &txSha)
+			}
 		}
 
 		db.blocks[i] = nil
 		db.blocks = db.blocks[:i]
 	}
-
 	return nil
 }
 
 // ExistsSha returns whether or not the given block hash is present in the
 // database.  This is part of the database.Db interface implementation.
-func (db *MemDb) ExistsSha(sha *wire.ShaHash) (bool, error) {
+func (db *MemDb) ExistsSha(sha *chainhash.Hash) (bool, error) {
 	db.Lock()
 	defer db.Unlock()
 
@@ -212,22 +220,24 @@ func (db *MemDb) ExistsSha(sha *wire.ShaHash) (bool, error) {
 	return false, nil
 }
 
-// FetchBlockBySha returns a btcutil.Block.  The implementation may cache the
+// FetchBlockBySha returns a dcrutil.Block.  The implementation may cache the
 // underlying data if desired.  This is part of the database.Db interface
 // implementation.
 //
 // This implementation does not use any additional cache since the entire
 // database is already in memory.
-func (db *MemDb) FetchBlockBySha(sha *wire.ShaHash) (*btcutil.Block, error) {
+func (db *MemDb) FetchBlockBySha(sha *chainhash.Hash) (*dcrutil.Block, error) {
 	db.Lock()
 	defer db.Unlock()
+	return db.fetchBlockBySha(sha)
+}
 
+func (db *MemDb) fetchBlockBySha(sha *chainhash.Hash) (*dcrutil.Block, error) {
 	if db.closed {
 		return nil, ErrDbClosed
 	}
-
 	if blockHeight, exists := db.blocksBySha[*sha]; exists {
-		block := btcutil.NewBlock(db.blocks[int(blockHeight)])
+		block := dcrutil.NewBlock(db.blocks[int(blockHeight)])
 		block.SetHeight(blockHeight)
 		return block, nil
 	}
@@ -237,7 +247,7 @@ func (db *MemDb) FetchBlockBySha(sha *wire.ShaHash) (*btcutil.Block, error) {
 
 // FetchBlockHeightBySha returns the block height for the given hash.  This is
 // part of the database.Db interface implementation.
-func (db *MemDb) FetchBlockHeightBySha(sha *wire.ShaHash) (int64, error) {
+func (db *MemDb) FetchBlockHeightBySha(sha *chainhash.Hash) (int64, error) {
 	db.Lock()
 	defer db.Unlock()
 
@@ -258,7 +268,7 @@ func (db *MemDb) FetchBlockHeightBySha(sha *wire.ShaHash) (int64, error) {
 //
 // This implementation does not use any additional cache since the entire
 // database is already in memory.
-func (db *MemDb) FetchBlockHeaderBySha(sha *wire.ShaHash) (*wire.BlockHeader, error) {
+func (db *MemDb) FetchBlockHeaderBySha(sha *chainhash.Hash) (*wire.BlockHeader, error) {
 	db.Lock()
 	defer db.Unlock()
 
@@ -275,7 +285,7 @@ func (db *MemDb) FetchBlockHeaderBySha(sha *wire.ShaHash) (*wire.BlockHeader, er
 
 // FetchBlockShaByHeight returns a block hash based on its height in the block
 // chain.  This is part of the database.Db interface implementation.
-func (db *MemDb) FetchBlockShaByHeight(height int64) (*wire.ShaHash, error) {
+func (db *MemDb) FetchBlockShaByHeight(height int64) (*chainhash.Hash, error) {
 	db.Lock()
 	defer db.Unlock()
 
@@ -299,7 +309,7 @@ func (db *MemDb) FetchBlockShaByHeight(height int64) (*wire.ShaHash, error) {
 // Fetch is inclusive of the start height and exclusive of the ending height.
 // To fetch all hashes from the start height until no more are present, use the
 // special id `AllShas'.  This is part of the database.Db interface implementation.
-func (db *MemDb) FetchHeightRange(startHeight, endHeight int64) ([]wire.ShaHash, error) {
+func (db *MemDb) FetchHeightRange(startHeight, endHeight int64) ([]chainhash.Hash, error) {
 	db.Lock()
 	defer db.Unlock()
 
@@ -326,7 +336,7 @@ func (db *MemDb) FetchHeightRange(startHeight, endHeight int64) ([]wire.ShaHash,
 
 	// Fetch as many as are availalbe within the specified range.
 	lastBlockIndex := int64(len(db.blocks) - 1)
-	hashList := make([]wire.ShaHash, 0, endHeight-startHeight)
+	hashList := make([]chainhash.Hash, 0, endHeight-startHeight)
 	for i := startHeight; i < endHeight; i++ {
 		if i > lastBlockIndex {
 			break
@@ -343,7 +353,7 @@ func (db *MemDb) FetchHeightRange(startHeight, endHeight int64) ([]wire.ShaHash,
 // ExistsTxSha returns whether or not the given transaction hash is present in
 // the database and is not fully spent.  This is part of the database.Db interface
 // implementation.
-func (db *MemDb) ExistsTxSha(sha *wire.ShaHash) (bool, error) {
+func (db *MemDb) ExistsTxSha(sha *chainhash.Hash) (bool, error) {
 	db.Lock()
 	defer db.Unlock()
 
@@ -364,14 +374,13 @@ func (db *MemDb) ExistsTxSha(sha *wire.ShaHash) (bool, error) {
 //
 // This implementation does not use any additional cache since the entire
 // database is already in memory.
-func (db *MemDb) FetchTxBySha(txHash *wire.ShaHash) ([]*database.TxListReply, error) {
+func (db *MemDb) FetchTxBySha(txHash *chainhash.Hash) ([]*database.TxListReply, error) {
 	db.Lock()
 	defer db.Unlock()
 
 	if db.closed {
 		return nil, ErrDbClosed
 	}
-
 	txns, exists := db.txns[*txHash]
 	if !exists {
 		log.Warnf("FetchTxBySha: requested hash of %s does not exist",
@@ -387,17 +396,28 @@ func (db *MemDb) FetchTxBySha(txHash *wire.ShaHash) ([]*database.TxListReply, er
 
 		spentBuf := make([]bool, len(txD.spentBuf))
 		copy(spentBuf, txD.spentBuf)
-		reply := database.TxListReply{
-			Sha:     &txHashCopy,
-			Tx:      msgBlock.Transactions[txD.offset],
-			BlkSha:  &blockSha,
-			Height:  txD.blockHeight,
-			TxSpent: spentBuf,
-			Err:     nil,
+		if txD.tree == dcrutil.TxTreeRegular {
+			reply := database.TxListReply{
+				Sha:     &txHashCopy,
+				Tx:      msgBlock.Transactions[txD.offset],
+				BlkSha:  &blockSha,
+				Height:  txD.blockHeight,
+				TxSpent: spentBuf,
+				Err:     nil,
+			}
+			replyList[i] = &reply
+		} else if txD.tree == dcrutil.TxTreeStake {
+			reply := database.TxListReply{
+				Sha:     &txHashCopy,
+				Tx:      msgBlock.STransactions[txD.offset],
+				BlkSha:  &blockSha,
+				Height:  txD.blockHeight,
+				TxSpent: spentBuf,
+				Err:     nil,
+			}
+			replyList[i] = &reply
 		}
-		replyList[i] = &reply
 	}
-
 	return replyList, nil
 }
 
@@ -412,7 +432,7 @@ func (db *MemDb) FetchTxBySha(txHash *wire.ShaHash) ([]*database.TxListReply, er
 // will indicate the transaction does not exist.
 //
 // This function must be called with the db lock held.
-func (db *MemDb) fetchTxByShaList(txShaList []*wire.ShaHash, includeSpent bool) []*database.TxListReply {
+func (db *MemDb) fetchTxByShaList(txShaList []*chainhash.Hash, includeSpent bool) []*database.TxListReply {
 	replyList := make([]*database.TxListReply, 0, len(txShaList))
 	for i, hash := range txShaList {
 		// Every requested entry needs a response, so start with nothing
@@ -453,6 +473,11 @@ func (db *MemDb) fetchTxByShaList(txShaList []*wire.ShaHash, includeSpent bool) 
 			copy(spentBuf, txD.spentBuf)
 
 			// Populate the reply.
+			if txD.tree == dcrutil.TxTreeRegular {
+				reply.Tx = msgBlock.Transactions[txD.offset]
+			} else if txD.tree == dcrutil.TxTreeStake {
+				reply.Tx = msgBlock.STransactions[txD.offset]
+			}
 			reply.Tx = msgBlock.Transactions[txD.offset]
 			reply.BlkSha = &blockSha
 			reply.Height = txD.blockHeight
@@ -484,7 +509,7 @@ func (db *MemDb) fetchTxByShaList(txShaList []*wire.ShaHash, includeSpent bool) 
 //
 // This implementation does not use any additional cache since the entire
 // database is already in memory.
-func (db *MemDb) FetchTxByShaList(txShaList []*wire.ShaHash) []*database.TxListReply {
+func (db *MemDb) FetchTxByShaList(txShaList []*chainhash.Hash) []*database.TxListReply {
 	db.Lock()
 	defer db.Unlock()
 
@@ -503,7 +528,7 @@ func (db *MemDb) FetchTxByShaList(txShaList []*wire.ShaHash) []*database.TxListR
 //
 // This implementation does not use any additional cache since the entire
 // database is already in memory.
-func (db *MemDb) FetchUnSpentTxByShaList(txShaList []*wire.ShaHash) []*database.TxListReply {
+func (db *MemDb) FetchUnSpentTxByShaList(txShaList []*chainhash.Hash) []*database.TxListReply {
 	db.Lock()
 	defer db.Unlock()
 
@@ -515,7 +540,7 @@ func (db *MemDb) FetchUnSpentTxByShaList(txShaList []*wire.ShaHash) []*database.
 // genesis block.  Every subsequent block insert requires the referenced parent
 // block to already exist.  This is part of the database.Db interface
 // implementation.
-func (db *MemDb) InsertBlock(block *btcutil.Block) (int64, error) {
+func (db *MemDb) InsertBlock(block *dcrutil.Block) (int64, error) {
 	db.Lock()
 	defer db.Unlock()
 
@@ -532,102 +557,128 @@ func (db *MemDb) InsertBlock(block *btcutil.Block) (int64, error) {
 			return 0, database.ErrPrevShaMissing
 		}
 	}
+	var blockPrev *dcrutil.Block = nil
+	// Decred: WARNING. This function assumes that all block insertion calls have
+	// dcrutil.blocks passed to them with block.blockHeight set correctly. However,
+	// loading the genesis block in dcrd didn't do this (via block manager); pre-
+	// production it should be established that all calls to this function pass
+	// blocks with block.blockHeight set correctly.
+	if len(db.blocks) > 0 {
+		var errBlockPrev error
+		blockPrev, errBlockPrev = db.fetchBlockBySha(&msgBlock.Header.PrevBlock)
+		if errBlockPrev != nil {
+			blockSha := block.Sha()
+			log.Warnf("Failed to fetch parent block of block %v", blockSha)
+			return 0, errBlockPrev
+		}
+	}
 
 	// Build a map of in-flight transactions because some of the inputs in
 	// this block could be referencing other transactions earlier in this
 	// block which are not yet in the chain.
-	txInFlight := map[wire.ShaHash]int{}
-	transactions := block.Transactions()
-	for i, tx := range transactions {
-		txInFlight[*tx.Sha()] = i
-	}
-
+	newHeight := int64(len(db.blocks))
+	txInFlight := map[chainhash.Hash]int{}
 	// Loop through all transactions and inputs to ensure there are no error
 	// conditions that would prevent them from be inserted into the db.
 	// Although these checks could could be done in the loop below, checking
 	// for error conditions up front means the code below doesn't have to
 	// deal with rollback on errors.
-	newHeight := int64(len(db.blocks))
-	for i, tx := range transactions {
-		// Two old blocks contain duplicate transactions due to being
-		// mined by faulty miners and accepted by the origin Satoshi
-		// client.  Rules have since been added to the ensure this
-		// problem can no longer happen, but the two duplicate
-		// transactions which were originally accepted are forever in
-		// the block chain history and must be dealth with specially.
-		// http://blockexplorer.com/b/91842
-		// http://blockexplorer.com/b/91880
-		if newHeight == 91842 && tx.Sha().IsEqual(dupTxHash91842) {
-			continue
+	votebits := block.MsgBlock().Header.VoteBits
+	if dcrutil.IsFlagSet16(votebits, dcrutil.BlockValid) && blockPrev != nil {
+		transactions := blockPrev.Transactions()
+		for i, tx := range transactions {
+			txInFlight[*tx.Sha()] = i
 		}
-
-		if newHeight == 91880 && tx.Sha().IsEqual(dupTxHash91880) {
-			continue
-		}
-
-		for _, txIn := range tx.MsgTx().TxIn {
-			if isCoinbaseInput(txIn) {
-				continue
-			}
-
-			// It is acceptable for a transaction input to reference
-			// the output of another transaction in this block only
-			// if the referenced transaction comes before the
-			// current one in this block.
-			prevOut := &txIn.PreviousOutPoint
-			if inFlightIndex, ok := txInFlight[prevOut.Hash]; ok {
-				if i <= inFlightIndex {
-					log.Warnf("InsertBlock: requested hash "+
-						" of %s does not exist in-flight",
-						tx.Sha())
-					return 0, database.ErrTxShaMissing
+		for i, tx := range transactions {
+			for _, txIn := range tx.MsgTx().TxIn {
+				if isCoinbaseInput(txIn) {
+					continue
 				}
-			} else {
-				originTxns, exists := db.txns[prevOut.Hash]
-				if !exists {
-					log.Warnf("InsertBlock: requested hash "+
-						"of %s by %s does not exist",
-						prevOut.Hash, tx.Sha())
-					return 0, database.ErrTxShaMissing
-				}
-				originTxD := originTxns[len(originTxns)-1]
-				if prevOut.Index > uint32(len(originTxD.spentBuf)) {
-					log.Warnf("InsertBlock: requested hash "+
-						"of %s with index %d does not "+
-						"exist", tx.Sha(), prevOut.Index)
-					return 0, database.ErrTxShaMissing
+
+				// It is acceptable for a transaction input to reference
+				// the output of another transaction in this block only
+				// if the referenced transaction comes before the
+				// current one in this block.
+				prevOut := &txIn.PreviousOutPoint
+				if inFlightIndex, ok := txInFlight[prevOut.Hash]; ok {
+					if i <= inFlightIndex {
+						log.Warnf("InsertBlock: requested hash "+
+							" of %s does not exist in-flight",
+							tx.Sha())
+						return 0, database.ErrTxShaMissing
+					}
+				} else {
+					originTxns, exists := db.txns[prevOut.Hash]
+					if !exists {
+						log.Warnf("InsertBlock: requested hash "+
+							"of %s by %s does not exist",
+							prevOut.Hash, tx.Sha())
+						return 0, database.ErrTxShaMissing
+					}
+					originTxD := originTxns[len(originTxns)-1]
+					if prevOut.Index > uint32(len(originTxD.spentBuf)) {
+						log.Warnf("InsertBlock: requested hash "+
+							"of %s with index %d does not "+
+							"exist", tx.Sha(), prevOut.Index)
+						return 0, database.ErrTxShaMissing
+					}
 				}
 			}
-		}
 
-		// Prevent duplicate transactions in the same block.
-		if inFlightIndex, exists := txInFlight[*tx.Sha()]; exists &&
-			inFlightIndex < i {
-			log.Warnf("Block contains duplicate transaction %s",
-				tx.Sha())
-			return 0, database.ErrDuplicateSha
-		}
-
-		// Prevent duplicate transactions unless the old one is fully
-		// spent.
-		if txns, exists := db.txns[*tx.Sha()]; exists {
-			txD := txns[len(txns)-1]
-			if !isFullySpent(txD) {
-				log.Warnf("Attempt to insert duplicate "+
-					"transaction %s", tx.Sha())
+			// Prevent duplicate transactions in the same block.
+			if inFlightIndex, exists := txInFlight[*tx.Sha()]; exists &&
+				inFlightIndex < i {
+				log.Warnf("Block contains duplicate transaction %s",
+					tx.Sha())
 				return 0, database.ErrDuplicateSha
+			}
+
+			// Prevent duplicate transactions unless the old one is fully
+			// spent.
+			if txns, exists := db.txns[*tx.Sha()]; exists {
+				txD := txns[len(txns)-1]
+				if !isFullySpent(txD) {
+					log.Warnf("Attempt to insert duplicate "+
+						"transaction %s", tx.Sha())
+					return 0, database.ErrDuplicateSha
+				}
 			}
 		}
 	}
 
 	db.blocks = append(db.blocks, msgBlock)
-	db.blocksBySha[*block.Sha()] = newHeight
+	db.blocksBySha[msgBlock.Header.BlockSha()] = newHeight
+	if dcrutil.IsFlagSet16(votebits, dcrutil.BlockValid) && blockPrev != nil {
+		// Insert information about eacj transaction and spend all of the
+		// outputs referenced by the inputs to the transactions.
+		for i, tx := range blockPrev.Transactions() {
+			// Insert the transaction data.
+			txD := tTxInsertData{
+				tree:        dcrutil.TxTreeRegular,
+				blockHeight: newHeight - 1,
+				offset:      i,
+				spentBuf:    make([]bool, len(tx.MsgTx().TxOut)),
+			}
+			db.txns[*tx.Sha()] = append(db.txns[*tx.Sha()], &txD)
+			// Spend all of the inputs.
+			for _, txIn := range tx.MsgTx().TxIn {
+				// Coinbase transaction has no inputs.
+				if isCoinbaseInput(txIn) {
+					continue
+				}
 
-	// Insert information about eacj transaction and spend all of the
-	// outputs referenced by the inputs to the transactions.
-	for i, tx := range block.Transactions() {
+				// Already checked for existing and valid ranges above.
+				prevOut := &txIn.PreviousOutPoint
+				originTxns := db.txns[prevOut.Hash]
+				originTxD := originTxns[len(originTxns)-1]
+				originTxD.spentBuf[prevOut.Index] = true
+			}
+		}
+	}
+	for i, tx := range block.STransactions() {
 		// Insert the transaction data.
 		txD := tTxInsertData{
+			tree:        dcrutil.TxTreeStake,
 			blockHeight: newHeight,
 			offset:      i,
 			spentBuf:    make([]bool, len(tx.MsgTx().TxOut)),
@@ -647,8 +698,8 @@ func (db *MemDb) InsertBlock(block *btcutil.Block) (int64, error) {
 			originTxD := originTxns[len(originTxns)-1]
 			originTxD.spentBuf[prevOut.Index] = true
 		}
-	}
 
+	}
 	return newHeight, nil
 }
 
@@ -656,7 +707,7 @@ func (db *MemDb) InsertBlock(block *btcutil.Block) (int64, error) {
 // the block chain.  It will return the zero hash, -1 for the block height, and
 // no error (nil) if there are not any blocks in the database yet.  This is part
 // of the database.Db interface implementation.
-func (db *MemDb) NewestSha() (*wire.ShaHash, int64, error) {
+func (db *MemDb) NewestSha() (*chainhash.Hash, int64, error) {
 	db.Lock()
 	defer db.Unlock()
 
@@ -677,26 +728,33 @@ func (db *MemDb) NewestSha() (*wire.ShaHash, int64, error) {
 
 // FetchAddrIndexTip isn't currently implemented. This is a part of the
 // database.Db interface implementation.
-func (db *MemDb) FetchAddrIndexTip() (*wire.ShaHash, int64, error) {
+func (db *MemDb) FetchAddrIndexTip() (*chainhash.Hash, int64, error) {
 	return nil, 0, database.ErrNotImplemented
 }
 
 // UpdateAddrIndexForBlock isn't currently implemented. This is a part of the
 // database.Db interface implementation.
-func (db *MemDb) UpdateAddrIndexForBlock(*wire.ShaHash, int64,
+func (db *MemDb) UpdateAddrIndexForBlock(*chainhash.Hash, int64,
+	database.BlockAddrIndex) error {
+	return database.ErrNotImplemented
+}
+
+// DropAddrIndexForBlock isn't currently implemented. This is a part of the
+// database.Db interface implementation.
+func (db *MemDb) DropAddrIndexForBlock(*chainhash.Hash, int64,
 	database.BlockAddrIndex) error {
 	return database.ErrNotImplemented
 }
 
 // FetchTxsForAddr isn't currently implemented. This is a part of the database.Db
 // interface implementation.
-func (db *MemDb) FetchTxsForAddr(btcutil.Address, int, int) ([]*database.TxListReply, error) {
+func (db *MemDb) FetchTxsForAddr(dcrutil.Address, int, int) ([]*database.TxListReply, error) {
 	return nil, database.ErrNotImplemented
 }
 
-// DeleteAddrIndex isn't currently implemented. This is a part of the database.Db
+// PurgeAddrIndex isn't currently implemented. This is a part of the database.Db
 // interface implementation.
-func (db *MemDb) DeleteAddrIndex() error {
+func (db *MemDb) PurgeAddrIndex() error {
 	return database.ErrNotImplemented
 }
 
@@ -737,8 +795,8 @@ func (db *MemDb) Sync() error {
 func newMemDb() *MemDb {
 	db := MemDb{
 		blocks:      make([]*wire.MsgBlock, 0, 200000),
-		blocksBySha: make(map[wire.ShaHash]int64),
-		txns:        make(map[wire.ShaHash][]*tTxInsertData),
+		blocksBySha: make(map[chainhash.Hash]int64),
+		txns:        make(map[chainhash.Hash][]*tTxInsertData),
 	}
 	return &db
 }

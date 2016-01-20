@@ -1,4 +1,5 @@
 // Copyright (c) 2013-2014 The btcsuite developers
+// Copyright (c) 2015 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -6,6 +7,10 @@ package blockchain
 
 import (
 	"fmt"
+
+	"github.com/decred/dcrd/blockchain/stake"
+	"github.com/decred/dcrd/chaincfg/chainhash"
+	"github.com/decred/dcrutil"
 )
 
 // NotificationType represents the type of a notification message.
@@ -29,14 +34,29 @@ const (
 	// NTBlockDisconnected indicates the associated block was disconnected
 	// from the main chain.
 	NTBlockDisconnected
+
+	// NTReorganization indicates that a blockchain reorganization is in
+	// progress.
+	NTReorganization
+
+	// NTSpentAndMissedTickets indicates spent or missed tickets from a newly
+	// accepted block.
+	NTSpentAndMissedTickets
+
+	// NTSpentAndMissedTickets indicates newly maturing tickets from a newly
+	// accepted block.
+	NTNewTickets
 )
 
 // notificationTypeStrings is a map of notification types back to their constant
 // names for pretty printing.
 var notificationTypeStrings = map[NotificationType]string{
-	NTBlockAccepted:     "NTBlockAccepted",
-	NTBlockConnected:    "NTBlockConnected",
-	NTBlockDisconnected: "NTBlockDisconnected",
+	NTBlockAccepted:         "NTBlockAccepted",
+	NTBlockConnected:        "NTBlockConnected",
+	NTBlockDisconnected:     "NTBlockDisconnected",
+	NTReorganization:        "NTReorganization",
+	NTSpentAndMissedTickets: "NTSpentAndMissedTickets",
+	NTNewTickets:            "NTNewTickets",
 }
 
 // String returns the NotificationType in human-readable form.
@@ -47,12 +67,40 @@ func (n NotificationType) String() string {
 	return fmt.Sprintf("Unknown Notification Type (%d)", int(n))
 }
 
+// BlockAcceptedNtfnsData is the structure for data indicating information
+// about a block being accepted.
+type BlockAcceptedNtfnsData struct {
+	OnMainChain bool
+	Block       *dcrutil.Block
+}
+
+// ReorganizationNtfnsData is the structure for data indicating information
+// about a reorganization.
+type ReorganizationNtfnsData struct {
+	OldHash   chainhash.Hash
+	OldHeight int64
+	NewHash   chainhash.Hash
+	NewHeight int64
+}
+
+// TicketNotificationsData is the structure for new/spent/missed ticket
+// notifications at blockchain HEAD that are outgoing from chain.
+type TicketNotificationsData struct {
+	Hash            chainhash.Hash
+	Height          int64
+	StakeDifficulty int64
+	TicketMap       stake.SStxMemMap
+}
+
 // Notification defines notification that is sent to the caller via the callback
 // function provided during the call to New and consists of a notification type
 // as well as associated data that depends on the type as follows:
-// 	- NTBlockAccepted:     *btcutil.Block
-// 	- NTBlockConnected:    *btcutil.Block
-// 	- NTBlockDisconnected: *btcutil.Block
+// 	- NTBlockAccepted:         *BlockAcceptedNtfnsData
+// 	- NTBlockConnected:        []*dcrutil.Block of len 2
+// 	- NTBlockDisconnected:     []*dcrutil.Block of len 2
+//  - NTReorganization:        *ReorganizationNtfnsData
+//  - NTSpentAndMissedTickets: *TicketNotificationsData
+//  - NTNewTickets:            *TicketNotificationsData
 type Notification struct {
 	Type NotificationType
 	Data interface{}

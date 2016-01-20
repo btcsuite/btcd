@@ -1,4 +1,5 @@
 // Copyright (c) 2013 The btcsuite developers
+// Copyright (c) 2015 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -11,27 +12,28 @@ import (
 	"path/filepath"
 	"strconv"
 
-	"github.com/btcsuite/btcd/chaincfg"
-	"github.com/btcsuite/btcd/database"
-	_ "github.com/btcsuite/btcd/database/ldb"
-	"github.com/btcsuite/btcd/wire"
 	"github.com/btcsuite/btclog"
-	"github.com/btcsuite/btcutil"
 	flags "github.com/btcsuite/go-flags"
+
+	"github.com/decred/dcrd/chaincfg"
+	"github.com/decred/dcrd/chaincfg/chainhash"
+	"github.com/decred/dcrd/database"
+	_ "github.com/decred/dcrd/database/ldb"
+	"github.com/decred/dcrd/wire"
+	"github.com/decred/dcrutil"
 )
 
 type config struct {
-	DataDir        string `short:"b" long:"datadir" description:"Directory to store data"`
-	DbType         string `long:"dbtype" description:"Database backend"`
-	TestNet3       bool   `long:"testnet" description:"Use the test network"`
-	RegressionTest bool   `long:"regtest" description:"Use the regression test network"`
-	SimNet         bool   `long:"simnet" description:"Use the simulation test network"`
-	ShaString      string `short:"s" description:"Block SHA to process" required:"true"`
+	DataDir   string `short:"b" long:"datadir" description:"Directory to store data"`
+	DbType    string `long:"dbtype" description:"Database backend"`
+	TestNet   bool   `long:"testnet" description:"Use the test network"`
+	SimNet    bool   `long:"simnet" description:"Use the simulation test network"`
+	ShaString string `short:"s" description:"Block SHA to process" required:"true"`
 }
 
 var (
-	btcdHomeDir     = btcutil.AppDataDir("btcd", false)
-	defaultDataDir  = filepath.Join(btcdHomeDir, "data")
+	dcrdHomeDir     = dcrutil.AppDataDir("dcrd", false)
+	defaultDataDir  = filepath.Join(dcrdHomeDir, "data")
 	log             btclog.Logger
 	activeNetParams = &chaincfg.MainNetParams
 )
@@ -41,18 +43,18 @@ const (
 	argHeight
 )
 
-// netName returns the name used when referring to a bitcoin network.  At the
-// time of writing, btcd currently places blocks for testnet version 3 in the
+// netName returns the name used when referring to a decred network.  At the
+// time of writing, dcrd currently places blocks for testnet version 0 in the
 // data and log directory "testnet", which does not match the Name field of the
 // chaincfg parameters.  This function can be used to override this directory name
-// as "testnet" when the passed active network matches wire.TestNet3.
+// as "testnet" when the passed active network matches wire.TestNet.
 //
 // A proper upgrade to move the data and log directories for this network to
-// "testnet3" is planned for the future, at which point this function can be
+// "testnet" is planned for the future, at which point this function can be
 // removed and the network parameter's name used instead.
 func netName(chainParams *chaincfg.Params) string {
 	switch chainParams.Net {
-	case wire.TestNet3:
+	case wire.TestNet:
 		return "testnet"
 	default:
 		return chainParams.Name
@@ -83,13 +85,9 @@ func main() {
 	numNets := 0
 	// Count number of network flags passed; assign active network params
 	// while we're at it
-	if cfg.TestNet3 {
+	if cfg.TestNet {
 		numNets++
-		activeNetParams = &chaincfg.TestNet3Params
-	}
-	if cfg.RegressionTest {
-		numNets++
-		activeNetParams = &chaincfg.RegressionNetParams
+		activeNetParams = &chaincfg.TestNetParams
 	}
 	if cfg.SimNet {
 		numNets++
@@ -137,11 +135,11 @@ func main() {
 
 }
 
-func getSha(db database.Db, str string) (wire.ShaHash, error) {
+func getSha(db database.Db, str string) (chainhash.Hash, error) {
 	argtype, idx, sha, err := parsesha(str)
 	if err != nil {
 		log.Warnf("unable to decode [%v] %v", str, err)
-		return wire.ShaHash{}, err
+		return chainhash.Hash{}, err
 	}
 
 	switch argtype {
@@ -150,7 +148,7 @@ func getSha(db database.Db, str string) (wire.ShaHash, error) {
 	case argHeight:
 		sha, err = db.FetchBlockShaByHeight(idx)
 		if err != nil {
-			return wire.ShaHash{}, err
+			return chainhash.Hash{}, err
 		}
 	}
 	if sha == nil {
@@ -167,8 +165,8 @@ var errBadShaPrefix = errors.New("invalid prefix")
 var errBadShaLen = errors.New("invalid len")
 var errBadShaChar = errors.New("invalid character")
 
-func parsesha(argstr string) (argtype int, height int64, psha *wire.ShaHash, err error) {
-	var sha wire.ShaHash
+func parsesha(argstr string) (argtype int, height int64, psha *chainhash.Hash, err error) {
+	var sha chainhash.Hash
 
 	var hashbuf string
 

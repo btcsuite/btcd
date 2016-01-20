@@ -1,11 +1,12 @@
 // Copyright (c) 2013-2014 The btcsuite developers
+// Copyright (c) 2015 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
 /*
-Package database provides a database interface for the Bitcoin block chain.
+Package database provides a database interface for the Decred block chain.
 
-As of July 2014, there are over 309,000 blocks in the Bitcoin block chain and
+As of July 2014, there are over 309,000 blocks in the Decred block chain and
 and over 42 million transactions (which turns out to be over 21GB of data).
 This package provides a database layer to store and retrieve this data in a
 fairly simple and efficient manner.  The use of this should not require specific

@@ -1,4 +1,5 @@
 // Copyright (c) 2013-2015 The btcsuite developers
+// Copyright (c) 2015 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -2906,33 +2907,33 @@ func TestUnparsingInvalidOpcodes(t *testing.T) {
 			expectedErr: ErrStackInvalidOpcode,
 		},
 		{
-			name: "OP_RESERVED1",
+			name: "OP_ROTR",
 			pop: &parsedOpcode{
-				opcode: &opcodeArray[OP_RESERVED1],
+				opcode: &opcodeArray[OP_ROTR],
 				data:   nil,
 			},
 			expectedErr: nil,
 		},
 		{
-			name: "OP_RESERVED1 long",
+			name: "OP_ROTR long",
 			pop: &parsedOpcode{
-				opcode: &opcodeArray[OP_RESERVED1],
+				opcode: &opcodeArray[OP_ROTR],
 				data:   make([]byte, 1),
 			},
 			expectedErr: ErrStackInvalidOpcode,
 		},
 		{
-			name: "OP_RESERVED2",
+			name: "OP_ROTL",
 			pop: &parsedOpcode{
-				opcode: &opcodeArray[OP_RESERVED2],
+				opcode: &opcodeArray[OP_ROTL],
 				data:   nil,
 			},
 			expectedErr: nil,
 		},
 		{
-			name: "OP_RESERVED2 long",
+			name: "OP_ROTL long",
 			pop: &parsedOpcode{
-				opcode: &opcodeArray[OP_RESERVED2],
+				opcode: &opcodeArray[OP_ROTL],
 				data:   make([]byte, 1),
 			},
 			expectedErr: ErrStackInvalidOpcode,

@@ -1,4 +1,5 @@
 // Copyright (c) 2015 The btcsuite developers
+// Copyright (c) 2015-2016 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -177,7 +178,8 @@ func TestMakeScriptNum(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		gotNum, err := makeScriptNum(test.serialized, test.minimalEncoding)
+		gotNum, err := makeScriptNum(test.serialized, test.minimalEncoding,
+			mathOpCodeMaxScriptNumLen)
 		if err != test.err {
 			t.Errorf("makeScriptNum: did not received expected "+
 				"error for %x - got %v, want %v",

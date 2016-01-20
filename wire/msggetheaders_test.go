@@ -1,4 +1,5 @@
 // Copyright (c) 2013-2015 The btcsuite developers
+// Copyright (c) 2015 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -10,8 +11,10 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/btcsuite/btcd/wire"
 	"github.com/davecgh/go-spew/spew"
+
+	"github.com/decred/dcrd/chaincfg/chainhash"
+	"github.com/decred/dcrd/wire"
 )
 
 // TestGetHeaders tests the MsgGetHeader API.
@@ -20,7 +23,7 @@ func TestGetHeaders(t *testing.T) {
 
 	// Block 99500 hash.
 	hashStr := "000000000002e7ad7b9eef9479e4aabc65cb831269cc20d2632c13684406dee0"
-	locatorHash, err := wire.NewShaHashFromStr(hashStr)
+	locatorHash, err := chainhash.NewHashFromStr(hashStr)
 	if err != nil {
 		t.Errorf("NewShaHashFromStr: %v", err)
 	}
@@ -79,21 +82,21 @@ func TestGetHeadersWire(t *testing.T) {
 
 	// Block 99499 hash.
 	hashStr := "2710f40c87ec93d010a6fd95f42c59a2cbacc60b18cf6b7957535"
-	hashLocator, err := wire.NewShaHashFromStr(hashStr)
+	hashLocator, err := chainhash.NewHashFromStr(hashStr)
 	if err != nil {
 		t.Errorf("NewShaHashFromStr: %v", err)
 	}
 
 	// Block 99500 hash.
 	hashStr = "2e7ad7b9eef9479e4aabc65cb831269cc20d2632c13684406dee0"
-	hashLocator2, err := wire.NewShaHashFromStr(hashStr)
+	hashLocator2, err := chainhash.NewHashFromStr(hashStr)
 	if err != nil {
 		t.Errorf("NewShaHashFromStr: %v", err)
 	}
 
 	// Block 100000 hash.
 	hashStr = "3ba27aa200b1cecaad478d2b00432346c3f1f3986da1afd33e506"
-	hashStop, err := wire.NewShaHashFromStr(hashStr)
+	hashStop, err := chainhash.NewHashFromStr(hashStr)
 	if err != nil {
 		t.Errorf("NewShaHashFromStr: %v", err)
 	}
@@ -154,70 +157,6 @@ func TestGetHeadersWire(t *testing.T) {
 			multiLocatorsEncoded,
 			wire.ProtocolVersion,
 		},
-
-		// Protocol version BIP0035Version with no block locators.
-		{
-			noLocators,
-			noLocators,
-			noLocatorsEncoded,
-			wire.BIP0035Version,
-		},
-
-		// Protocol version BIP0035Version with multiple block locators.
-		{
-			multiLocators,
-			multiLocators,
-			multiLocatorsEncoded,
-			wire.BIP0035Version,
-		},
-
-		// Protocol version BIP0031Version with no block locators.
-		{
-			noLocators,
-			noLocators,
-			noLocatorsEncoded,
-			wire.BIP0031Version,
-		},
-
-		// Protocol version BIP0031Versionwith multiple block locators.
-		{
-			multiLocators,
-			multiLocators,
-			multiLocatorsEncoded,
-			wire.BIP0031Version,
-		},
-
-		// Protocol version NetAddressTimeVersion with no block locators.
-		{
-			noLocators,
-			noLocators,
-			noLocatorsEncoded,
-			wire.NetAddressTimeVersion,
-		},
-
-		// Protocol version NetAddressTimeVersion multiple block locators.
-		{
-			multiLocators,
-			multiLocators,
-			multiLocatorsEncoded,
-			wire.NetAddressTimeVersion,
-		},
-
-		// Protocol version MultipleAddressVersion with no block locators.
-		{
-			noLocators,
-			noLocators,
-			noLocatorsEncoded,
-			wire.MultipleAddressVersion,
-		},
-
-		// Protocol version MultipleAddressVersion multiple block locators.
-		{
-			multiLocators,
-			multiLocators,
-			multiLocatorsEncoded,
-			wire.MultipleAddressVersion,
-		},
 	}
 
 	t.Logf("Running %d tests", len(tests))
@@ -262,21 +201,21 @@ func TestGetHeadersWireErrors(t *testing.T) {
 
 	// Block 99499 hash.
 	hashStr := "2710f40c87ec93d010a6fd95f42c59a2cbacc60b18cf6b7957535"
-	hashLocator, err := wire.NewShaHashFromStr(hashStr)
+	hashLocator, err := chainhash.NewHashFromStr(hashStr)
 	if err != nil {
 		t.Errorf("NewShaHashFromStr: %v", err)
 	}
 
 	// Block 99500 hash.
 	hashStr = "2e7ad7b9eef9479e4aabc65cb831269cc20d2632c13684406dee0"
-	hashLocator2, err := wire.NewShaHashFromStr(hashStr)
+	hashLocator2, err := chainhash.NewHashFromStr(hashStr)
 	if err != nil {
 		t.Errorf("NewShaHashFromStr: %v", err)
 	}
 
 	// Block 100000 hash.
 	hashStr = "3ba27aa200b1cecaad478d2b00432346c3f1f3986da1afd33e506"
-	hashStop, err := wire.NewShaHashFromStr(hashStr)
+	hashStop, err := chainhash.NewHashFromStr(hashStr)
 	if err != nil {
 		t.Errorf("NewShaHashFromStr: %v", err)
 	}

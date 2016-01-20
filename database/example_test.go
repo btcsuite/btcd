@@ -1,4 +1,5 @@
 // Copyright (c) 2013-2014 The btcsuite developers
+// Copyright (c) 2015 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -7,10 +8,10 @@ package database_test
 import (
 	"fmt"
 
-	"github.com/btcsuite/btcd/chaincfg"
-	"github.com/btcsuite/btcd/database"
-	_ "github.com/btcsuite/btcd/database/memdb"
-	"github.com/btcsuite/btcutil"
+	"github.com/decred/dcrd/chaincfg"
+	"github.com/decred/dcrd/database"
+	_ "github.com/decred/dcrd/database/memdb"
+	"github.com/decred/dcrutil"
 )
 
 // This example demonstrates creating a new database and inserting the genesis
@@ -20,8 +21,8 @@ func ExampleCreateDB() {
 	// Ordinarily this would be whatever driver(s) your application
 	// requires.
 	// import (
-	//	"github.com/btcsuite/btcd/database"
-	// 	_ "github.com/btcsuite/btcd/database/memdb"
+	//	"github.com/decred/dcrd/database"
+	// 	_ "github.com/decred/dcrd/database/memdb"
 	// )
 
 	// Create a database and schedule it to be closed on exit.  This example
@@ -37,7 +38,8 @@ func ExampleCreateDB() {
 	defer db.Close()
 
 	// Insert the main network genesis block.
-	genesis := btcutil.NewBlock(chaincfg.MainNetParams.GenesisBlock)
+	genesis := dcrutil.NewBlock(chaincfg.TestNetParams.GenesisBlock)
+	genesis.SetHeight(0)
 	newHeight, err := db.InsertBlock(genesis)
 	if err != nil {
 		fmt.Println(err)
@@ -58,7 +60,8 @@ func exampleLoadDB() (database.Db, error) {
 	}
 
 	// Insert the main network genesis block.
-	genesis := btcutil.NewBlock(chaincfg.MainNetParams.GenesisBlock)
+	genesis := dcrutil.NewBlock(chaincfg.TestNetParams.GenesisBlock)
+	genesis.SetHeight(0)
 	_, err = db.InsertBlock(genesis)
 	if err != nil {
 		return nil, err
@@ -89,6 +92,6 @@ func ExampleDb_newestSha() {
 	fmt.Println("Latest height:", latestHeight)
 
 	// Output:
-	// Latest hash: 000000000019d6689c085ae165831e934ff763ae46a2a6c172b3f1b60a8ce26f
+	// Latest hash: 5b7466edf6739adc9b32aaedc54e24bdc59a05f0ced855088835fe3cbe58375f
 	// Latest height: 0
 }

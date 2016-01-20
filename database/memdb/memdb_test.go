@@ -1,4 +1,5 @@
 // Copyright (c) 2013-2014 The btcsuite developers
+// Copyright (c) 2015 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -8,11 +9,11 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/btcsuite/btcd/chaincfg"
-	"github.com/btcsuite/btcd/database"
-	"github.com/btcsuite/btcd/database/memdb"
-	"github.com/btcsuite/btcd/wire"
-	"github.com/btcsuite/btcutil"
+	"github.com/decred/dcrd/chaincfg"
+	"github.com/decred/dcrd/chaincfg/chainhash"
+	"github.com/decred/dcrd/database"
+	"github.com/decred/dcrd/database/memdb"
+	"github.com/decred/dcrutil"
 )
 
 // TestClosed ensure calling the interface functions on a closed database
@@ -25,7 +26,7 @@ func TestClosed(t *testing.T) {
 		t.Errorf("Failed to open test database %v", err)
 		return
 	}
-	_, err = db.InsertBlock(btcutil.NewBlock(chaincfg.MainNetParams.GenesisBlock))
+	_, err = db.InsertBlock(dcrutil.NewBlock(chaincfg.MainNetParams.GenesisBlock))
 	if err != nil {
 		t.Errorf("InsertBlock: %v", err)
 	}
@@ -64,7 +65,7 @@ func TestClosed(t *testing.T) {
 		t.Errorf("FetchTxBySha: unexpected error %v", err)
 	}
 
-	requestHashes := []*wire.ShaHash{genesisHash}
+	requestHashes := []*chainhash.Hash{genesisHash}
 	reply := db.FetchTxByShaList(requestHashes)
 	if len(reply) != len(requestHashes) {
 		t.Errorf("FetchUnSpentTxByShaList unexpected number of replies "+

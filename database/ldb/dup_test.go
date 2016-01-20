@@ -1,4 +1,5 @@
 // Copyright (c) 2013-2014 The btcsuite developers
+// Copyright (c) 2015 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -10,10 +11,23 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/btcsuite/btcd/database"
-	"github.com/btcsuite/btcd/wire"
-	"github.com/btcsuite/btcutil"
+	//"github.com/decred/dcrd/blockchain"
+	"github.com/decred/dcrd/chaincfg/chainhash"
+	"github.com/decred/dcrd/database"
+	"github.com/decred/dcrd/wire"
+	"github.com/decred/dcrutil"
 )
+
+func existsInOwnBlockRegTree(block *wire.MsgBlock, hash chainhash.Hash) bool {
+	for _, tx := range block.Transactions {
+		txH := tx.TxSha()
+		if txH == hash {
+			return true
+		}
+	}
+
+	return false
+}
 
 func Test_dupTx(t *testing.T) {
 
@@ -35,7 +49,7 @@ func Test_dupTx(t *testing.T) {
 		}
 	}()
 
-	testdatafile := filepath.Join("testdata", "blocks1-256.bz2")
+	testdatafile := filepath.Join("../", "../blockchain/testdata", "blocks0to168.bz2")
 	blocks, err := loadBlocks(t, testdatafile)
 	if err != nil {
 		t.Errorf("Unable to load blocks from test data for: %v",
@@ -43,47 +57,99 @@ func Test_dupTx(t *testing.T) {
 		return
 	}
 
-	var lastSha *wire.ShaHash
+	var lastSha *chainhash.Hash
 
 	// Populate with the fisrt 256 blocks, so we have blocks to 'mess with'
 	err = nil
 out:
 	for height := int64(0); height < int64(len(blocks)); height++ {
 		block := blocks[height]
+		if height != 0 {
+			// except for NoVerify which does not allow lookups check inputs
+			mblock := block.MsgBlock()
+			//t.Errorf("%v", blockchain.DebugBlockString(block))
+			parentBlock := blocks[height-1]
+			mParentBlock := parentBlock.MsgBlock()
+			var txneededList []*chainhash.Hash
+			opSpentInBlock := make(map[wire.OutPoint]struct{})
+			if dcrutil.IsFlagSet16(dcrutil.BlockValid, mParentBlock.Header.VoteBits) {
+				for _, tx := range mParentBlock.Transactions {
+					for _, txin := range tx.TxIn {
+						if txin.PreviousOutPoint.Index == uint32(4294967295) {
+							continue
+						}
 
-		// except for NoVerify which does not allow lookups check inputs
-		mblock := block.MsgBlock()
-		var txneededList []*wire.ShaHash
-		for _, tx := range mblock.Transactions {
-			for _, txin := range tx.TxIn {
-				if txin.PreviousOutPoint.Index == uint32(4294967295) {
-					continue
-				}
-				origintxsha := &txin.PreviousOutPoint.Hash
-				txneededList = append(txneededList, origintxsha)
+						if existsInOwnBlockRegTree(mParentBlock, txin.PreviousOutPoint.Hash) {
+							_, used := opSpentInBlock[txin.PreviousOutPoint]
+							if !used {
+								// Origin tx is in the block and so hasn't been
+								// added yet, continue
+								opSpentInBlock[txin.PreviousOutPoint] = struct{}{}
+								continue
+							} else {
+								t.Errorf("output ref %v attempted double spend of previously spend output", txin.PreviousOutPoint)
+							}
+						}
 
-				exists, err := db.ExistsTxSha(origintxsha)
-				if err != nil {
-					t.Errorf("ExistsTxSha: unexpected error %v ", err)
-				}
-				if !exists {
-					t.Errorf("referenced tx not found %v ", origintxsha)
-				}
+						origintxsha := &txin.PreviousOutPoint.Hash
+						txneededList = append(txneededList, origintxsha)
+						exists, err := db.ExistsTxSha(origintxsha)
+						if err != nil {
+							t.Errorf("ExistsTxSha: unexpected error %v ", err)
+						}
+						if !exists {
+							t.Errorf("referenced tx not found %v (height %v)", origintxsha, height)
+						}
 
-				_, err = db.FetchTxBySha(origintxsha)
-				if err != nil {
-					t.Errorf("referenced tx not found %v err %v ", origintxsha, err)
+						_, err = db.FetchTxBySha(origintxsha)
+						if err != nil {
+							t.Errorf("referenced tx not found %v err %v ", origintxsha, err)
+						}
+					}
+				}
+			}
+			for _, stx := range mblock.STransactions {
+				for _, txin := range stx.TxIn {
+					if txin.PreviousOutPoint.Index == uint32(4294967295) {
+						continue
+					}
+					if existsInOwnBlockRegTree(mParentBlock, txin.PreviousOutPoint.Hash) {
+						_, used := opSpentInBlock[txin.PreviousOutPoint]
+						if !used {
+							// Origin tx is in the block and so hasn't been
+							// added yet, continue
+							opSpentInBlock[txin.PreviousOutPoint] = struct{}{}
+							continue
+						} else {
+							t.Errorf("output ref %v attempted double spend of previously spend output", txin.PreviousOutPoint)
+						}
+					}
+
+					origintxsha := &txin.PreviousOutPoint.Hash
+					txneededList = append(txneededList, origintxsha)
+
+					exists, err := db.ExistsTxSha(origintxsha)
+					if err != nil {
+						t.Errorf("ExistsTxSha: unexpected error %v ", err)
+					}
+					if !exists {
+						t.Errorf("referenced tx not found %v", origintxsha)
+					}
+
+					_, err = db.FetchTxBySha(origintxsha)
+					if err != nil {
+						t.Errorf("referenced tx not found %v err %v ", origintxsha, err)
+					}
+				}
+			}
+			txlist := db.FetchUnSpentTxByShaList(txneededList)
+			for _, txe := range txlist {
+				if txe.Err != nil {
+					t.Errorf("tx list fetch failed %v err %v ", txe.Sha, txe.Err)
+					break out
 				}
 			}
 		}
-		txlist := db.FetchUnSpentTxByShaList(txneededList)
-		for _, txe := range txlist {
-			if txe.Err != nil {
-				t.Errorf("tx list fetch failed %v err %v ", txe.Sha, txe.Err)
-				break out
-			}
-		}
-
 		newheight, err := db.InsertBlock(block)
 		if err != nil {
 			t.Errorf("failed to insert block %v err %v", height, err)
@@ -116,15 +182,15 @@ out:
 
 	var bh wire.BlockHeader
 
-	bh.Version = 2
+	bh.Version = 0
 	bh.PrevBlock = *lastSha
 	// Bits, Nonce are not filled in
 
 	mblk := wire.NewMsgBlock(&bh)
 
-	hash, _ := wire.NewShaHashFromStr("df2b060fa2e5e9c8ed5eaf6a45c13753ec8c63282b2688322eba40cd98ea067a")
+	hash, _ := chainhash.NewHashFromStr("c23953c56cb2ef8e4698e3ed3b0fc4c837754d3cd16485192d893e35f32626b4")
 
-	po := wire.NewOutPoint(hash, 0)
+	po := wire.NewOutPoint(hash, 0, dcrutil.TxTreeRegular)
 	txI := wire.NewTxIn(po, []byte("garbage"))
 	txO := wire.NewTxOut(50000000, []byte("garbageout"))
 
@@ -134,9 +200,9 @@ out:
 
 	mblk.AddTransaction(&tx)
 
-	blk := btcutil.NewBlock(mblk)
+	blk := dcrutil.NewBlock(mblk)
 
-	fetchList := []*wire.ShaHash{hash}
+	fetchList := []*chainhash.Hash{hash}
 	listReply := db.FetchUnSpentTxByShaList(fetchList)
 	for _, lr := range listReply {
 		if lr.Err != nil {
@@ -154,7 +220,7 @@ out:
 
 	listReply = db.FetchUnSpentTxByShaList(fetchList)
 	for _, lr := range listReply {
-		if lr.Err != database.ErrTxShaMissing {
+		if lr.Err != nil && lr.Err != database.ErrTxShaMissing {
 			t.Errorf("sha %v spent %v err %v\n", lr.Sha,
 				lr.TxSpent, lr.Err)
 		}
@@ -175,8 +241,6 @@ out:
 			}
 		}
 	}
-
-	t.Logf("Dropping block")
 
 	err = db.DropAfterBlockBySha(lastSha)
 	if err != nil {

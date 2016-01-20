@@ -1,42 +1,42 @@
 // Copyright (c) 2013-2014 The btcsuite developers
+// Copyright (c) 2015 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
 package database_test
 
 import (
+	"bytes"
 	"compress/bzip2"
-	"encoding/binary"
+	"encoding/gob"
 	"fmt"
-	"io"
 	"os"
 	"path/filepath"
-	"strings"
 	"testing"
 
-	"github.com/btcsuite/btcd/chaincfg"
-	"github.com/btcsuite/btcd/database"
-	_ "github.com/btcsuite/btcd/database/ldb"
-	_ "github.com/btcsuite/btcd/database/memdb"
-	"github.com/btcsuite/btcd/wire"
-	"github.com/btcsuite/btcutil"
+	"github.com/decred/dcrd/chaincfg/chainhash"
+	"github.com/decred/dcrd/database"
+	_ "github.com/decred/dcrd/database/ldb"
+	_ "github.com/decred/dcrd/database/memdb"
+	"github.com/decred/dcrd/wire"
+	"github.com/decred/dcrutil"
 )
 
 var (
-	// network is the expected bitcoin network in the test block data.
-	network = wire.MainNet
+	// network is the expected decred network in the test block data.
+	network = wire.SimNet
 
 	// savedBlocks is used to store blocks loaded from the blockDataFile
 	// so multiple invocations to loadBlocks from the various test functions
 	// do not have to reload them from disk.
-	savedBlocks []*btcutil.Block
+	savedBlocks []*dcrutil.Block
 
-	// blockDataFile is the path to a file containing the first 256 blocks
-	// of the block chain.
-	blockDataFile = filepath.Join("testdata", "blocks1-256.bz2")
+	// blockDataFile is the path to a file containing the first 168 blocks
+	// of a simulated blockchain designed to abuse network rules.
+	blockDataFile = filepath.Join("../blockchain/testdata", "blocks0to168.bz2")
 )
 
-var zeroHash = wire.ShaHash{}
+var zeroHash = chainhash.Hash{}
 
 // testDbRoot is the root directory used to create all test databases.
 const testDbRoot = "testdbs"
@@ -137,82 +137,45 @@ func setupDB(dbType, dbName string) (database.Db, func(), error) {
 	if err != nil {
 		return nil, nil, err
 	}
-
-	// Insert the main network genesis block.  This is part of the initial
-	// database setup.
-	genesisBlock := btcutil.NewBlock(chaincfg.MainNetParams.GenesisBlock)
-	_, err = db.InsertBlock(genesisBlock)
-	if err != nil {
-		teardown()
-		err := fmt.Errorf("failed to insert genesis block: %v", err)
-		return nil, nil, err
-	}
-
 	return db, teardown, nil
 }
 
 // loadBlocks loads the blocks contained in the testdata directory and returns
 // a slice of them.
-func loadBlocks(t *testing.T) ([]*btcutil.Block, error) {
+func loadBlocks(t *testing.T) ([]*dcrutil.Block, error) {
 	if len(savedBlocks) != 0 {
 		return savedBlocks, nil
 	}
 
-	var dr io.Reader
 	fi, err := os.Open(blockDataFile)
 	if err != nil {
 		t.Errorf("failed to open file %v, err %v", blockDataFile, err)
 		return nil, err
 	}
-	if strings.HasSuffix(blockDataFile, ".bz2") {
-		z := bzip2.NewReader(fi)
-		dr = z
-	} else {
-		dr = fi
+	bcStream := bzip2.NewReader(fi)
+	defer fi.Close()
+
+	// Create a buffer of the read file
+	bcBuf := new(bytes.Buffer)
+	bcBuf.ReadFrom(bcStream)
+
+	// Create decoder from the buffer and a map to store the data
+	bcDecoder := gob.NewDecoder(bcBuf)
+	blockchain := make(map[int64][]byte)
+
+	// Decode the blockchain into the map
+	if err := bcDecoder.Decode(&blockchain); err != nil {
+		t.Errorf("error decoding test blockchain")
 	}
 
-	defer func() {
-		if err := fi.Close(); err != nil {
-			t.Errorf("failed to close file %v %v", blockDataFile, err)
-		}
-	}()
-
-	// Set the first block as the genesis block.
-	blocks := make([]*btcutil.Block, 0, 256)
-	genesis := btcutil.NewBlock(chaincfg.MainNetParams.GenesisBlock)
-	blocks = append(blocks, genesis)
-
-	for height := int64(1); err == nil; height++ {
-		var rintbuf uint32
-		err := binary.Read(dr, binary.LittleEndian, &rintbuf)
-		if err == io.EOF {
-			// hit end of file at expected offset: no warning
-			height--
-			err = nil
-			break
-		}
-		if err != nil {
-			t.Errorf("failed to load network type, err %v", err)
-			break
-		}
-		if rintbuf != uint32(network) {
-			t.Errorf("Block doesn't match network: %v expects %v",
-				rintbuf, network)
-			break
-		}
-		err = binary.Read(dr, binary.LittleEndian, &rintbuf)
-		blocklen := rintbuf
-
-		rbytes := make([]byte, blocklen)
-
-		// read block
-		dr.Read(rbytes)
-
-		block, err := btcutil.NewBlockFromBytes(rbytes)
+	blocks := make([]*dcrutil.Block, 0, len(blockchain))
+	for height := int64(1); height < int64(len(blockchain)); height++ {
+		block, err := dcrutil.NewBlockFromBytes(blockchain[height])
 		if err != nil {
 			t.Errorf("failed to parse block %v", height)
 			return nil, err
 		}
+		block.SetHeight(height - 1)
 		blocks = append(blocks, block)
 	}
 

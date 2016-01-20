@@ -1,4 +1,5 @@
 // Copyright (c) 2013-2015 The btcsuite developers
+// Copyright (c) 2015 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -11,21 +12,25 @@ import (
 	"io"
 	"math"
 
-	"github.com/btcsuite/fastsha256"
+	"github.com/decred/dcrd/chaincfg/chainhash"
 )
 
 // Maximum payload size for a variable length integer.
 const MaxVarIntPayload = 9
 
+// errNonCanonicalVarInt is the common format string used for non-canonically
+// encoded variable length integer errors.
+var errNonCanonicalVarInt = "non-canonical varint %x - discriminant %x must " +
+	"encode a value greater than %x"
+
 // readElement reads the next sequence of bytes from r using little endian
 // depending on the concrete type of element pointed to.
 func readElement(r io.Reader, element interface{}) error {
-	var scratch [8]byte
-
 	// Attempt to read the element based on the concrete type via fast
 	// type assertions first.
 	switch e := element.(type) {
 	case *int32:
+		var scratch [4]byte
 		b := scratch[0:4]
 		_, err := io.ReadFull(r, b)
 		if err != nil {
@@ -35,6 +40,7 @@ func readElement(r io.Reader, element interface{}) error {
 		return nil
 
 	case *uint32:
+		var scratch [4]byte
 		b := scratch[0:4]
 		_, err := io.ReadFull(r, b)
 		if err != nil {
@@ -44,6 +50,7 @@ func readElement(r io.Reader, element interface{}) error {
 		return nil
 
 	case *int64:
+		var scratch [8]byte
 		b := scratch[0:8]
 		_, err := io.ReadFull(r, b)
 		if err != nil {
@@ -53,6 +60,7 @@ func readElement(r io.Reader, element interface{}) error {
 		return nil
 
 	case *uint64:
+		var scratch [8]byte
 		b := scratch[0:8]
 		_, err := io.ReadFull(r, b)
 		if err != nil {
@@ -62,6 +70,7 @@ func readElement(r io.Reader, element interface{}) error {
 		return nil
 
 	case *bool:
+		var scratch [1]byte
 		b := scratch[0:1]
 		_, err := io.ReadFull(r, b)
 		if err != nil {
@@ -98,7 +107,7 @@ func readElement(r io.Reader, element interface{}) error {
 		}
 		return nil
 
-	case *ShaHash:
+	case *chainhash.Hash:
 		_, err := io.ReadFull(r, e[:])
 		if err != nil {
 			return err
@@ -106,6 +115,7 @@ func readElement(r io.Reader, element interface{}) error {
 		return nil
 
 	case *ServiceFlag:
+		var scratch [8]byte
 		b := scratch[0:8]
 		_, err := io.ReadFull(r, b)
 		if err != nil {
@@ -115,6 +125,7 @@ func readElement(r io.Reader, element interface{}) error {
 		return nil
 
 	case *InvType:
+		var scratch [4]byte
 		b := scratch[0:4]
 		_, err := io.ReadFull(r, b)
 		if err != nil {
@@ -123,16 +134,18 @@ func readElement(r io.Reader, element interface{}) error {
 		*e = InvType(binary.LittleEndian.Uint32(b))
 		return nil
 
-	case *BitcoinNet:
+	case *CurrencyNet:
+		var scratch [4]byte
 		b := scratch[0:4]
 		_, err := io.ReadFull(r, b)
 		if err != nil {
 			return err
 		}
-		*e = BitcoinNet(binary.LittleEndian.Uint32(b))
+		*e = CurrencyNet(binary.LittleEndian.Uint32(b))
 		return nil
 
 	case *BloomUpdateType:
+		var scratch [1]byte
 		b := scratch[0:1]
 		_, err := io.ReadFull(r, b)
 		if err != nil {
@@ -142,6 +155,7 @@ func readElement(r io.Reader, element interface{}) error {
 		return nil
 
 	case *RejectCode:
+		var scratch [1]byte
 		b := scratch[0:1]
 		_, err := io.ReadFull(r, b)
 		if err != nil {
@@ -170,12 +184,11 @@ func readElements(r io.Reader, elements ...interface{}) error {
 
 // writeElement writes the little endian representation of element to w.
 func writeElement(w io.Writer, element interface{}) error {
-	var scratch [8]byte
-
 	// Attempt to write the element based on the concrete type via fast
 	// type assertions first.
 	switch e := element.(type) {
 	case int32:
+		var scratch [4]byte
 		b := scratch[0:4]
 		binary.LittleEndian.PutUint32(b, uint32(e))
 		_, err := w.Write(b)
@@ -185,6 +198,7 @@ func writeElement(w io.Writer, element interface{}) error {
 		return nil
 
 	case uint32:
+		var scratch [4]byte
 		b := scratch[0:4]
 		binary.LittleEndian.PutUint32(b, e)
 		_, err := w.Write(b)
@@ -194,6 +208,7 @@ func writeElement(w io.Writer, element interface{}) error {
 		return nil
 
 	case int64:
+		var scratch [8]byte
 		b := scratch[0:8]
 		binary.LittleEndian.PutUint64(b, uint64(e))
 		_, err := w.Write(b)
@@ -203,6 +218,7 @@ func writeElement(w io.Writer, element interface{}) error {
 		return nil
 
 	case uint64:
+		var scratch [8]byte
 		b := scratch[0:8]
 		binary.LittleEndian.PutUint64(b, e)
 		_, err := w.Write(b)
@@ -212,6 +228,7 @@ func writeElement(w io.Writer, element interface{}) error {
 		return nil
 
 	case bool:
+		var scratch [1]byte
 		b := scratch[0:1]
 		if e == true {
 			b[0] = 0x01
@@ -248,7 +265,7 @@ func writeElement(w io.Writer, element interface{}) error {
 		}
 		return nil
 
-	case *ShaHash:
+	case *chainhash.Hash:
 		_, err := w.Write(e[:])
 		if err != nil {
 			return err
@@ -256,6 +273,7 @@ func writeElement(w io.Writer, element interface{}) error {
 		return nil
 
 	case ServiceFlag:
+		var scratch [8]byte
 		b := scratch[0:8]
 		binary.LittleEndian.PutUint64(b, uint64(e))
 		_, err := w.Write(b)
@@ -265,6 +283,7 @@ func writeElement(w io.Writer, element interface{}) error {
 		return nil
 
 	case InvType:
+		var scratch [4]byte
 		b := scratch[0:4]
 		binary.LittleEndian.PutUint32(b, uint32(e))
 		_, err := w.Write(b)
@@ -273,7 +292,8 @@ func writeElement(w io.Writer, element interface{}) error {
 		}
 		return nil
 
-	case BitcoinNet:
+	case CurrencyNet:
+		var scratch [4]byte
 		b := scratch[0:4]
 		binary.LittleEndian.PutUint32(b, uint32(e))
 		_, err := w.Write(b)
@@ -283,6 +303,7 @@ func writeElement(w io.Writer, element interface{}) error {
 		return nil
 
 	case BloomUpdateType:
+		var scratch [1]byte
 		b := scratch[0:1]
 		b[0] = uint8(e)
 		_, err := w.Write(b)
@@ -292,6 +313,7 @@ func writeElement(w io.Writer, element interface{}) error {
 		return nil
 
 	case RejectCode:
+		var scratch [1]byte
 		b := scratch[0:1]
 		b[0] = uint8(e)
 		_, err := w.Write(b)
@@ -336,6 +358,14 @@ func readVarInt(r io.Reader, pver uint32) (uint64, error) {
 		}
 		rv = binary.LittleEndian.Uint64(b[:])
 
+		// The encoding is not canonical if the value could have been
+		// encoded using fewer bytes.
+		min := uint64(0x100000000)
+		if rv < min {
+			return 0, messageError("readVarInt", fmt.Sprintf(
+				errNonCanonicalVarInt, rv, discriminant, min))
+		}
+
 	case 0xfe:
 		_, err := io.ReadFull(r, b[0:4])
 		if err != nil {
@@ -343,12 +373,28 @@ func readVarInt(r io.Reader, pver uint32) (uint64, error) {
 		}
 		rv = uint64(binary.LittleEndian.Uint32(b[:]))
 
+		// The encoding is not canonical if the value could have been
+		// encoded using fewer bytes.
+		min := uint64(0x10000)
+		if rv < min {
+			return 0, messageError("readVarInt", fmt.Sprintf(
+				errNonCanonicalVarInt, rv, discriminant, min))
+		}
+
 	case 0xfd:
 		_, err := io.ReadFull(r, b[0:2])
 		if err != nil {
 			return 0, err
 		}
 		rv = uint64(binary.LittleEndian.Uint16(b[:]))
+
+		// The encoding is not canonical if the value could have been
+		// encoded using fewer bytes.
+		min := uint64(0xfd)
+		if rv < min {
+			return 0, messageError("readVarInt", fmt.Sprintf(
+				errNonCanonicalVarInt, rv, discriminant, min))
+		}
 
 	default:
 		rv = uint64(discriminant)
@@ -518,18 +564,4 @@ func randomUint64(r io.Reader) (uint64, error) {
 // RandomUint64 returns a cryptographically random uint64 value.
 func RandomUint64() (uint64, error) {
 	return randomUint64(rand.Reader)
-}
-
-// DoubleSha256 calculates sha256(sha256(b)) and returns the resulting bytes.
-func DoubleSha256(b []byte) []byte {
-	first := fastsha256.Sum256(b)
-	second := fastsha256.Sum256(first[:])
-	return second[:]
-}
-
-// DoubleSha256SH calculates sha256(sha256(b)) and returns the resulting bytes
-// as a ShaHash.
-func DoubleSha256SH(b []byte) ShaHash {
-	first := fastsha256.Sum256(b)
-	return ShaHash(fastsha256.Sum256(first[:]))
 }

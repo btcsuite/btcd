@@ -1,4 +1,5 @@
 // Copyright (c) 2013-2014 The btcsuite developers
+// Copyright (c) 2015 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -18,13 +19,15 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/btcsuite/btcd/addrmgr"
-	"github.com/btcsuite/btcd/blockchain"
-	"github.com/btcsuite/btcd/btcjson"
-	"github.com/btcsuite/btcd/chaincfg"
-	"github.com/btcsuite/btcd/database"
-	"github.com/btcsuite/btcd/wire"
-	"github.com/btcsuite/btcutil"
+	"github.com/decred/dcrd/addrmgr"
+	"github.com/decred/dcrd/blockchain"
+	"github.com/decred/dcrd/blockchain/stake"
+	"github.com/decred/dcrd/chaincfg"
+	"github.com/decred/dcrd/chaincfg/chainhash"
+	"github.com/decred/dcrd/database"
+	"github.com/decred/dcrd/dcrjson"
+	"github.com/decred/dcrd/wire"
+	"github.com/decred/dcrutil"
 )
 
 const (
@@ -44,10 +47,10 @@ const (
 	connectionRetryInterval = time.Second * 10
 
 	// defaultMaxOutbound is the default number of max outbound peers.
-	defaultMaxOutbound = 8
+	defaultMaxOutbound = 3
 )
 
-// broadcastMsg provides the ability to house a bitcoin message to be broadcast
+// broadcastMsg provides the ability to house a decred message to be broadcast
 // to all connected peers except specified excluded peers.
 type broadcastMsg struct {
 	message      wire.Message
@@ -76,13 +79,13 @@ type relayMsg struct {
 // updates, peer heights will be kept up to date, allowing for fresh data when
 // selecting sync peer candidacy.
 type updatePeerHeightsMsg struct {
-	newSha     *wire.ShaHash
+	newSha     *chainhash.Hash
 	newHeight  int32
 	originPeer *peer
 }
 
-// server provides a bitcoin server for handling communications to and from
-// bitcoin peers.
+// server provides a decred server for handling communications to and from
+// decred peers.
 type server struct {
 	nonce                uint64
 	listeners            []net.Listener
@@ -113,6 +116,7 @@ type server struct {
 	nat                  NAT
 	db                   database.Db
 	timeSource           blockchain.MedianTimeSource
+	tmdb                 *stake.TicketDB
 }
 
 type peerState struct {
@@ -355,7 +359,7 @@ func (s *server) handleRelayInvMsg(state *peerState, msg relayMsg) {
 			// Don't relay the transaction if there is a bloom
 			// filter loaded and the transaction doesn't match it.
 			if p.filter.IsLoaded() {
-				tx, ok := msg.data.(*btcutil.Tx)
+				tx, ok := msg.data.(*dcrutil.Tx)
 				if !ok {
 					peerLog.Warnf("Underlying data for tx" +
 						" inv relay is not a transaction")
@@ -400,7 +404,7 @@ type getConnCountMsg struct {
 }
 
 type getPeerInfoMsg struct {
-	reply chan []*btcjson.GetPeerInfoResult
+	reply chan []*dcrjson.GetPeerInfoResult
 }
 
 type getAddedNodesMsg struct {
@@ -438,7 +442,7 @@ func (s *server) handleQuery(querymsg interface{}, state *peerState) {
 
 	case getPeerInfoMsg:
 		syncPeer := s.blockManager.SyncPeer()
-		infos := make([]*btcjson.GetPeerInfoResult, 0, len(state.peers))
+		infos := make([]*dcrjson.GetPeerInfoResult, 0, len(state.peers))
 		state.forAllPeers(func(p *peer) {
 			if !p.Connected() {
 				return
@@ -449,7 +453,7 @@ func (s *server) handleQuery(querymsg interface{}, state *peerState) {
 			// and we don't really care if they are raced to get the new
 			// version.
 			p.StatsMtx.Lock()
-			info := &btcjson.GetPeerInfoResult{
+			info := &dcrjson.GetPeerInfoResult{
 				ID:             p.id,
 				Addr:           p.addr,
 				Services:       fmt.Sprintf("%08d", p.services),
@@ -771,8 +775,7 @@ out:
 
 			// only allow recent nodes (10mins) after we failed 30
 			// times
-			if time.Now().After(addr.LastAttempt().Add(10*time.Minute)) &&
-				tries < 30 {
+			if tries < 30 && time.Now().Sub(addr.LastAttempt()) < 10*time.Minute {
 				continue
 			}
 
@@ -800,7 +803,7 @@ out:
 		}
 	}
 
-	if cfg.AddrIndex {
+	if !cfg.NoAddrIndex {
 		s.addrIndexer.Stop()
 	}
 	s.blockManager.Stop()
@@ -843,7 +846,7 @@ func (s *server) ConnectedCount() int32 {
 	return <-replyChan
 }
 
-// AddedNodeInfo returns an array of btcjson.GetAddedNodeInfoResult structures
+// AddedNodeInfo returns an array of dcrjson.GetAddedNodeInfoResult structures
 // describing the persistent (added) nodes.
 func (s *server) AddedNodeInfo() []*peer {
 	replyChan := make(chan []*peer)
@@ -853,8 +856,8 @@ func (s *server) AddedNodeInfo() []*peer {
 
 // PeerInfo returns an array of PeerInfo structures describing all connected
 // peers.
-func (s *server) PeerInfo() []*btcjson.GetPeerInfoResult {
-	replyChan := make(chan []*btcjson.GetPeerInfoResult)
+func (s *server) PeerInfo() []*dcrjson.GetPeerInfoResult {
+	replyChan := make(chan []*dcrjson.GetPeerInfoResult)
 
 	s.query <- getPeerInfoMsg{reply: replyChan}
 
@@ -957,7 +960,7 @@ func (s *server) NetTotals() (uint64, uint64) {
 // the latest connected main chain block, or a recognized orphan. These height
 // updates allow us to dynamically refresh peer heights, ensuring sync peer
 // selection has access to the latest block heights for each peer.
-func (s *server) UpdatePeerHeights(latestBlkSha *wire.ShaHash, latestHeight int32, updateSource *peer) {
+func (s *server) UpdatePeerHeights(latestBlkSha *chainhash.Hash, latestHeight int32, updateSource *peer) {
 	s.peerHeightsUpdate <- updatePeerHeightsMsg{
 		newSha:     latestBlkSha,
 		newHeight:  latestHeight,
@@ -1064,7 +1067,7 @@ func (s *server) Start() {
 		s.cpuMiner.Start()
 	}
 
-	if cfg.AddrIndex {
+	if !cfg.NoAddrIndex {
 		s.addrIndexer.Start()
 	}
 }
@@ -1206,7 +1209,7 @@ out:
 			// listen port?
 			// XXX this assumes timeout is in seconds.
 			listenPort, err := s.nat.AddPortMapping("tcp", int(lport), int(lport),
-				"btcd listen port", 20*60)
+				"dcrd listen port", 20*60)
 			if err != nil {
 				srvrLog.Warnf("can't add UPnP port mapping: %v", err)
 			}
@@ -1244,16 +1247,20 @@ out:
 	s.wg.Done()
 }
 
-// newServer returns a new btcd server configured to listen on addr for the
-// bitcoin network type specified by chainParams.  Use start to begin accepting
+// newServer returns a new dcrd server configured to listen on addr for the
+// decred network type specified by chainParams.  Use start to begin accepting
 // connections from peers.
-func newServer(listenAddrs []string, db database.Db, chainParams *chaincfg.Params) (*server, error) {
+func newServer(listenAddrs []string,
+	database database.Db,
+	tmdb *stake.TicketDB,
+	chainParams *chaincfg.Params) (*server, error) {
+
 	nonce, err := wire.RandomUint64()
 	if err != nil {
 		return nil, err
 	}
 
-	amgr := addrmgr.New(cfg.DataDir, btcdLookup)
+	amgr := addrmgr.New(cfg.DataDir, dcrdLookup)
 
 	var listeners []net.Listener
 	var nat NAT
@@ -1395,7 +1402,8 @@ func newServer(listenAddrs []string, db database.Db, chainParams *chaincfg.Param
 		modifyRebroadcastInv: make(chan interface{}),
 		peerHeightsUpdate:    make(chan updatePeerHeightsMsg),
 		nat:                  nat,
-		db:                   db,
+		db:                   database,
+		tmdb:                 tmdb,
 		timeSource:           blockchain.NewMedianTime(),
 	}
 	bm, err := newBlockManager(&s)
@@ -1406,7 +1414,7 @@ func newServer(listenAddrs []string, db database.Db, chainParams *chaincfg.Param
 	s.txMemPool = newTxMemPool(&s)
 	s.cpuMiner = newCPUMiner(&s)
 
-	if cfg.AddrIndex {
+	if !cfg.NoAddrIndex {
 		ai, err := newAddrIndexer(&s)
 		if err != nil {
 			return nil, err

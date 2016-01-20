@@ -1,4 +1,5 @@
 // Copyright (c) 2013-2015 The btcsuite developers
+// Copyright (c) 2015 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -16,9 +17,9 @@ import (
 )
 
 const (
-	// MaxTxPerBlock makes the internal maxTxPerBlock constant available to
+	// MaxTxPerBlock makes the internal maxTxPerTxTree constant available to
 	// the test package.
-	MaxTxPerBlock = maxTxPerBlock
+	MaxTxPerBlock = MaxTxPerTxTree
 
 	// MaxFlagsPerMerkleBlock makes the internal maxFlagsPerMerkleBlock
 	// constant available to the test package.
@@ -127,4 +128,10 @@ func TstReadBlockHeader(r io.Reader, pver uint32, bh *BlockHeader) error {
 // the test package.
 func TstWriteBlockHeader(w io.Writer, pver uint32, bh *BlockHeader) error {
 	return writeBlockHeader(w, pver, bh)
+}
+
+// TstWriteBlockHeader makes the internal writeBlockHeader function available to
+// the test package.
+func TstBytesBlockHeader(bh *BlockHeader) ([]byte, error) {
+	return bh.Bytes()
 }

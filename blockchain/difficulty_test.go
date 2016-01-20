@@ -1,4 +1,5 @@
 // Copyright (c) 2014 The btcsuite developers
+// Copyright (c) 2015 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -7,8 +8,13 @@ package blockchain_test
 import (
 	"math/big"
 	"testing"
+	"time"
 
-	"github.com/btcsuite/btcd/blockchain"
+	"github.com/decred/dcrd/blockchain"
+	"github.com/decred/dcrd/blockchain/stake"
+	"github.com/decred/dcrd/chaincfg"
+	"github.com/decred/dcrd/database"
+	"github.com/decred/dcrutil"
 )
 
 func TestBigToCompact(t *testing.T) {
@@ -68,4 +74,60 @@ func TestCalcWork(t *testing.T) {
 			return
 		}
 	}
+}
+
+// TODO Make more elaborate tests for difficulty. The difficulty algorithms
+// have already been tested to death in simnet/testnet/mainnet simulations,
+// but we should really have a unit test for them that includes tests for
+// edge cases.
+func TestDiff(t *testing.T) {
+	db, err := database.CreateDB("memdb")
+	if err != nil {
+		t.Errorf("Failed to create database: %v\n", err)
+		return
+	}
+	defer db.Close()
+
+	var tmdb *stake.TicketDB
+
+	genesisBlock := dcrutil.NewBlock(chaincfg.MainNetParams.GenesisBlock)
+	_, err = db.InsertBlock(genesisBlock)
+	if err != nil {
+		t.Errorf("Failed to insert genesis block: %v\n", err)
+		return
+	}
+
+	chain := blockchain.New(db, tmdb, &chaincfg.MainNetParams, nil)
+
+	//timeSource := blockchain.NewMedianTime()
+
+	// Grab some blocks
+
+	// Build fake blockchain
+
+	// Calc new difficulty
+
+	ts := time.Now()
+
+	d, err := chain.CalcNextRequiredDifficulty(ts)
+	if err != nil {
+		t.Errorf("Failed to get difficulty: %v\n", err)
+		return
+	}
+	if d != 486604799 { // This is hardcoded in genesis block but not exported anywhere.
+		t.Error("Failed to get initial difficulty.")
+	}
+
+	sd, err := chain.CalcNextRequiredStakeDifficulty()
+	if err != nil {
+		t.Errorf("Failed to get stake difficulty: %v\n", err)
+		return
+	}
+	if sd != chaincfg.MainNetParams.MinimumStakeDiff {
+		t.Error("Incorrect initial stake difficulty.")
+	}
+
+	// Compare
+
+	// Repeat for a few more
 }

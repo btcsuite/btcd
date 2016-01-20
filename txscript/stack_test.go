@@ -1,4 +1,5 @@
 // Copyright (c) 2013-2015 The btcsuite developers
+// Copyright (c) 2015 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -175,7 +176,7 @@ func TestStack(t *testing.T) {
 			"popInt 0",
 			[][]byte{{0x0}},
 			func(s *stack) error {
-				v, err := s.PopInt()
+				v, err := s.PopInt(mathOpCodeMaxScriptNumLen)
 				if err != nil {
 					return err
 				}
@@ -191,7 +192,7 @@ func TestStack(t *testing.T) {
 			"popInt -0",
 			[][]byte{{0x80}},
 			func(s *stack) error {
-				v, err := s.PopInt()
+				v, err := s.PopInt(mathOpCodeMaxScriptNumLen)
 				if err != nil {
 					return err
 				}
@@ -207,7 +208,7 @@ func TestStack(t *testing.T) {
 			"popInt 1",
 			[][]byte{{0x01}},
 			func(s *stack) error {
-				v, err := s.PopInt()
+				v, err := s.PopInt(mathOpCodeMaxScriptNumLen)
 				if err != nil {
 					return err
 				}
@@ -223,7 +224,7 @@ func TestStack(t *testing.T) {
 			"popInt 1 leading 0",
 			[][]byte{{0x01, 0x00, 0x00, 0x00}},
 			func(s *stack) error {
-				v, err := s.PopInt()
+				v, err := s.PopInt(mathOpCodeMaxScriptNumLen)
 				if err != nil {
 					return err
 				}
@@ -240,7 +241,7 @@ func TestStack(t *testing.T) {
 			"popInt -1",
 			[][]byte{{0x81}},
 			func(s *stack) error {
-				v, err := s.PopInt()
+				v, err := s.PopInt(mathOpCodeMaxScriptNumLen)
 				if err != nil {
 					return err
 				}
@@ -256,7 +257,7 @@ func TestStack(t *testing.T) {
 			"popInt -1 leading 0",
 			[][]byte{{0x01, 0x00, 0x00, 0x80}},
 			func(s *stack) error {
-				v, err := s.PopInt()
+				v, err := s.PopInt(mathOpCodeMaxScriptNumLen)
 				if err != nil {
 					return err
 				}
@@ -274,7 +275,7 @@ func TestStack(t *testing.T) {
 			"popInt -513",
 			[][]byte{{0x1, 0x82}},
 			func(s *stack) error {
-				v, err := s.PopInt()
+				v, err := s.PopInt(mathOpCodeMaxScriptNumLen)
 				if err != nil {
 					return err
 				}
@@ -926,7 +927,7 @@ func TestStack(t *testing.T) {
 				s.PushInt(scriptNum(1))
 				// Peek int is otherwise pretty well tested,
 				// just check it works.
-				val, err := s.PopInt()
+				val, err := s.PopInt(mathOpCodeMaxScriptNumLen)
 				if err != nil {
 					return err
 				}
@@ -944,7 +945,7 @@ func TestStack(t *testing.T) {
 			func(s *stack) error {
 				// Peek int is otherwise pretty well tested,
 				// just check it works.
-				_, err := s.PopInt()
+				_, err := s.PopInt(mathOpCodeMaxScriptNumLen)
 				return err
 			},
 			ErrStackUnderflow,

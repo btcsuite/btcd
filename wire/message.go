@@ -1,4 +1,5 @@
 // Copyright (c) 2013-2015 The btcsuite developers
+// Copyright (c) 2015 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -9,14 +10,16 @@ import (
 	"fmt"
 	"io"
 	"unicode/utf8"
+
+	"github.com/decred/dcrd/chaincfg/chainhash"
 )
 
-// MessageHeaderSize is the number of bytes in a bitcoin message header.
-// Bitcoin network (magic) 4 bytes + command 12 bytes + payload length 4 bytes +
+// MessageHeaderSize is the number of bytes in a decred message header.
+// Decred network (magic) 4 bytes + command 12 bytes + payload length 4 bytes +
 // checksum 4 bytes.
 const MessageHeaderSize = 24
 
-// CommandSize is the fixed size of all commands in the common bitcoin message
+// CommandSize is the fixed size of all commands in the common decred message
 // header.  Shorter commands must be zero padded.
 const CommandSize = 12
 
@@ -24,32 +27,34 @@ const CommandSize = 12
 // individual limits imposed by messages themselves.
 const MaxMessagePayload = (1024 * 1024 * 32) // 32MB
 
-// Commands used in bitcoin message headers which describe the type of message.
+// Commands used in message headers which describe the type of message.
 const (
-	CmdVersion     = "version"
-	CmdVerAck      = "verack"
-	CmdGetAddr     = "getaddr"
-	CmdAddr        = "addr"
-	CmdGetBlocks   = "getblocks"
-	CmdInv         = "inv"
-	CmdGetData     = "getdata"
-	CmdNotFound    = "notfound"
-	CmdBlock       = "block"
-	CmdTx          = "tx"
-	CmdGetHeaders  = "getheaders"
-	CmdHeaders     = "headers"
-	CmdPing        = "ping"
-	CmdPong        = "pong"
-	CmdAlert       = "alert"
-	CmdMemPool     = "mempool"
-	CmdFilterAdd   = "filteradd"
-	CmdFilterClear = "filterclear"
-	CmdFilterLoad  = "filterload"
-	CmdMerkleBlock = "merkleblock"
-	CmdReject      = "reject"
+	CmdVersion        = "version"
+	CmdVerAck         = "verack"
+	CmdGetAddr        = "getaddr"
+	CmdAddr           = "addr"
+	CmdGetBlocks      = "getblocks"
+	CmdInv            = "inv"
+	CmdGetData        = "getdata"
+	CmdNotFound       = "notfound"
+	CmdBlock          = "block"
+	CmdTx             = "tx"
+	CmdGetHeaders     = "getheaders"
+	CmdHeaders        = "headers"
+	CmdPing           = "ping"
+	CmdPong           = "pong"
+	CmdAlert          = "alert"
+	CmdMemPool        = "mempool"
+	CmdMiningState    = "miningstate"
+	CmdGetMiningState = "getminings"
+	CmdFilterAdd      = "filteradd"
+	CmdFilterClear    = "filterclear"
+	CmdFilterLoad     = "filterload"
+	CmdMerkleBlock    = "merkleblock"
+	CmdReject         = "reject"
 )
 
-// Message is an interface that describes a bitcoin message.  A type that
+// Message is an interface that describes a decred message.  A type that
 // implements Message has complete control over the representation of its data
 // and may therefore contain additional or fewer fields than those which
 // are used directly in the protocol encoded message.
@@ -113,6 +118,12 @@ func makeEmptyMessage(command string) (Message, error) {
 	case CmdMemPool:
 		msg = &MsgMemPool{}
 
+	case CmdMiningState:
+		msg = &MsgMiningState{}
+
+	case CmdGetMiningState:
+		msg = &MsgGetMiningState{}
+
 	case CmdFilterAdd:
 		msg = &MsgFilterAdd{}
 
@@ -134,15 +145,15 @@ func makeEmptyMessage(command string) (Message, error) {
 	return msg, nil
 }
 
-// messageHeader defines the header structure for all bitcoin protocol messages.
+// messageHeader defines the header structure for all decred protocol messages.
 type messageHeader struct {
-	magic    BitcoinNet // 4 bytes
-	command  string     // 12 bytes
-	length   uint32     // 4 bytes
-	checksum [4]byte    // 4 bytes
+	magic    CurrencyNet // 4 bytes
+	command  string      // 12 bytes
+	length   uint32      // 4 bytes
+	checksum [4]byte     // 4 bytes
 }
 
-// readMessageHeader reads a bitcoin message header from r.
+// readMessageHeader reads a decred message header from r.
 func readMessageHeader(r io.Reader) (int, *messageHeader, error) {
 	// Since readElements doesn't return the amount of bytes read, attempt
 	// to read the entire header into a buffer first in case there is a
@@ -186,10 +197,10 @@ func discardInput(r io.Reader, n uint32) {
 	}
 }
 
-// WriteMessageN writes a bitcoin Message to w including the necessary header
+// WriteMessageN writes a decred Message to w including the necessary header
 // information and returns the number of bytes written.    This function is the
 // same as WriteMessage except it also returns the number of bytes written.
-func WriteMessageN(w io.Writer, msg Message, pver uint32, btcnet BitcoinNet) (int, error) {
+func WriteMessageN(w io.Writer, msg Message, pver uint32, dcrnet CurrencyNet) (int, error) {
 	totalBytes := 0
 
 	// Enforce max command size.
@@ -230,10 +241,10 @@ func WriteMessageN(w io.Writer, msg Message, pver uint32, btcnet BitcoinNet) (in
 
 	// Create header for the message.
 	hdr := messageHeader{}
-	hdr.magic = btcnet
+	hdr.magic = dcrnet
 	hdr.command = cmd
 	hdr.length = uint32(lenp)
-	copy(hdr.checksum[:], DoubleSha256(payload)[0:4])
+	copy(hdr.checksum[:], chainhash.HashFuncB(payload)[0:4])
 
 	// Encode the header for the message.  This is done to a buffer
 	// rather than directly to the writer since writeElements doesn't
@@ -260,22 +271,22 @@ func WriteMessageN(w io.Writer, msg Message, pver uint32, btcnet BitcoinNet) (in
 	return totalBytes, nil
 }
 
-// WriteMessage writes a bitcoin Message to w including the necessary header
+// WriteMessage writes a decred Message to w including the necessary header
 // information.  This function is the same as WriteMessageN except it doesn't
 // doesn't return the number of bytes written.  This function is mainly provided
 // for backwards compatibility with the original API, but it's also useful for
 // callers that don't care about byte counts.
-func WriteMessage(w io.Writer, msg Message, pver uint32, btcnet BitcoinNet) error {
-	_, err := WriteMessageN(w, msg, pver, btcnet)
+func WriteMessage(w io.Writer, msg Message, pver uint32, dcrnet CurrencyNet) error {
+	_, err := WriteMessageN(w, msg, pver, dcrnet)
 	return err
 }
 
-// ReadMessageN reads, validates, and parses the next bitcoin Message from r for
-// the provided protocol version and bitcoin network.  It returns the number of
+// ReadMessageN reads, validates, and parses the next decred Message from r for
+// the provided protocol version and decred network.  It returns the number of
 // bytes read in addition to the parsed Message and raw bytes which comprise the
 // message.  This function is the same as ReadMessage except it also returns the
 // number of bytes read.
-func ReadMessageN(r io.Reader, pver uint32, btcnet BitcoinNet) (int, Message, []byte, error) {
+func ReadMessageN(r io.Reader, pver uint32, dcrnet CurrencyNet) (int, Message, []byte, error) {
 	totalBytes := 0
 	n, hdr, err := readMessageHeader(r)
 	if err != nil {
@@ -293,8 +304,8 @@ func ReadMessageN(r io.Reader, pver uint32, btcnet BitcoinNet) (int, Message, []
 
 	}
 
-	// Check for messages from the wrong bitcoin network.
-	if hdr.magic != btcnet {
+	// Check for messages from the wrong decred network.
+	if hdr.magic != dcrnet {
 		discardInput(r, hdr.length)
 		str := fmt.Sprintf("message from other network [%v]", hdr.magic)
 		return totalBytes, nil, nil, messageError("ReadMessage", str)
@@ -338,7 +349,7 @@ func ReadMessageN(r io.Reader, pver uint32, btcnet BitcoinNet) (int, Message, []
 	totalBytes += n
 
 	// Test checksum.
-	checksum := DoubleSha256(payload)[0:4]
+	checksum := chainhash.HashFuncB(payload)[0:4]
 	if !bytes.Equal(checksum[:], hdr.checksum[:]) {
 		str := fmt.Sprintf("payload checksum failed - header "+
 			"indicates %v, but actual checksum is %v.",
@@ -357,13 +368,13 @@ func ReadMessageN(r io.Reader, pver uint32, btcnet BitcoinNet) (int, Message, []
 	return totalBytes, msg, payload, nil
 }
 
-// ReadMessage reads, validates, and parses the next bitcoin Message from r for
-// the provided protocol version and bitcoin network.  It returns the parsed
+// ReadMessage reads, validates, and parses the next decred Message from r for
+// the provided protocol version and decred network.  It returns the parsed
 // Message and raw bytes which comprise the message.  This function only differs
 // from ReadMessageN in that it doesn't return the number of bytes read.  This
 // function is mainly provided for backwards compatibility with the original
 // API, but it's also useful for callers that don't care about byte counts.
-func ReadMessage(r io.Reader, pver uint32, btcnet BitcoinNet) (Message, []byte, error) {
-	_, msg, buf, err := ReadMessageN(r, pver, btcnet)
+func ReadMessage(r io.Reader, pver uint32, dcrnet CurrencyNet) (Message, []byte, error) {
+	_, msg, buf, err := ReadMessageN(r, pver, dcrnet)
 	return msg, buf, err
 }

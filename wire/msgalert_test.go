@@ -1,4 +1,5 @@
 // Copyright (c) 2013-2015 The btcsuite developers
+// Copyright (c) 2015 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -10,8 +11,8 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/btcsuite/btcd/wire"
 	"github.com/davecgh/go-spew/spew"
+	"github.com/decred/dcrd/wire"
 )
 
 // TestMsgAlert tests the MsgAlert API.
@@ -106,38 +107,6 @@ func TestMsgAlertWire(t *testing.T) {
 			baseMsgAlert,
 			baseMsgAlertEncoded,
 			wire.ProtocolVersion,
-		},
-
-		// Protocol version BIP0035Version.
-		{
-			baseMsgAlert,
-			baseMsgAlert,
-			baseMsgAlertEncoded,
-			wire.BIP0035Version,
-		},
-
-		// Protocol version BIP0031Version.
-		{
-			baseMsgAlert,
-			baseMsgAlert,
-			baseMsgAlertEncoded,
-			wire.BIP0031Version,
-		},
-
-		// Protocol version NetAddressTimeVersion.
-		{
-			baseMsgAlert,
-			baseMsgAlert,
-			baseMsgAlertEncoded,
-			wire.NetAddressTimeVersion,
-		},
-
-		// Protocol version MultipleAddressVersion.
-		{
-			baseMsgAlert,
-			baseMsgAlert,
-			baseMsgAlertEncoded,
-			wire.MultipleAddressVersion,
 		},
 	}
 

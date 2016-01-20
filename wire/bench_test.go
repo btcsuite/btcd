@@ -1,4 +1,5 @@
 // Copyright (c) 2013-2015 The btcsuite developers
+// Copyright (c) 2015 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -9,6 +10,8 @@ import (
 	"io/ioutil"
 	"testing"
 	"time"
+
+	"github.com/decred/dcrd/chaincfg/chainhash"
 )
 
 // genesisCoinbaseTx is the coinbase transaction for the genesis blocks for
@@ -18,7 +21,7 @@ var genesisCoinbaseTx = MsgTx{
 	TxIn: []*TxIn{
 		{
 			PreviousOutPoint: OutPoint{
-				Hash:  ShaHash{},
+				Hash:  chainhash.Hash{},
 				Index: 0xffffffff,
 			},
 			SignatureScript: []byte{
@@ -59,13 +62,13 @@ var genesisCoinbaseTx = MsgTx{
 var blockOne = MsgBlock{
 	Header: BlockHeader{
 		Version: 1,
-		PrevBlock: ShaHash([HashSize]byte{ // Make go vet happy.
+		PrevBlock: chainhash.Hash([chainhash.HashSize]byte{ // Make go vet happy.
 			0x6f, 0xe2, 0x8c, 0x0a, 0xb6, 0xf1, 0xb3, 0x72,
 			0xc1, 0xa6, 0xa2, 0x46, 0xae, 0x63, 0xf7, 0x4f,
 			0x93, 0x1e, 0x83, 0x65, 0xe1, 0x5a, 0x08, 0x9c,
 			0x68, 0xd6, 0x19, 0x00, 0x00, 0x00, 0x00, 0x00,
 		}),
-		MerkleRoot: ShaHash([HashSize]byte{ // Make go vet happy.
+		MerkleRoot: chainhash.Hash([chainhash.HashSize]byte{ // Make go vet happy.
 			0x98, 0x20, 0x51, 0xfd, 0x1e, 0x4b, 0xa7, 0x44,
 			0xbb, 0xbe, 0x68, 0x0e, 0x1f, 0xee, 0x14, 0x67,
 			0x7b, 0xa1, 0xa3, 0xc3, 0x54, 0x0b, 0xf7, 0xb1,
@@ -82,7 +85,7 @@ var blockOne = MsgBlock{
 			TxIn: []*TxIn{
 				{
 					PreviousOutPoint: OutPoint{
-						Hash:  ShaHash{},
+						Hash:  chainhash.Hash{},
 						Index: 0xffffffff,
 					},
 					SignatureScript: []byte{
@@ -228,7 +231,7 @@ func BenchmarkReadOutPoint(b *testing.B) {
 	}
 	var op OutPoint
 	for i := 0; i < b.N; i++ {
-		readOutPoint(bytes.NewReader(buf), 0, 0, &op)
+		ReadOutPoint(bytes.NewReader(buf), 0, 0, &op)
 	}
 }
 
@@ -236,11 +239,11 @@ func BenchmarkReadOutPoint(b *testing.B) {
 // transaction output point.
 func BenchmarkWriteOutPoint(b *testing.B) {
 	op := &OutPoint{
-		Hash:  ShaHash{},
+		Hash:  chainhash.Hash{},
 		Index: 0,
 	}
 	for i := 0; i < b.N; i++ {
-		writeOutPoint(ioutil.Discard, 0, 0, op)
+		WriteOutPoint(ioutil.Discard, 0, 0, op)
 	}
 }
 
@@ -292,7 +295,7 @@ func BenchmarkReadTxIn(b *testing.B) {
 	}
 	var txIn TxIn
 	for i := 0; i < b.N; i++ {
-		readTxIn(bytes.NewReader(buf), 0, 0, &txIn)
+		readTxInPrefix(bytes.NewReader(buf), 0, 0, &txIn)
 	}
 }
 
@@ -301,7 +304,7 @@ func BenchmarkReadTxIn(b *testing.B) {
 func BenchmarkWriteTxIn(b *testing.B) {
 	txIn := blockOne.Transactions[0].TxIn[0]
 	for i := 0; i < b.N; i++ {
-		writeTxIn(ioutil.Discard, 0, 0, txIn)
+		writeTxInPrefix(ioutil.Discard, 0, 0, txIn)
 	}
 }
 
@@ -393,9 +396,9 @@ func BenchmarkTxSha(b *testing.B) {
 	}
 }
 
-// BenchmarkDoubleSha256 performs a benchmark on how long it takes to perform a
-// double sha 256 returning a byte slice.
-func BenchmarkDoubleSha256(b *testing.B) {
+// BenchmarkHashFuncB performs a benchmark on how long it takes to perform a
+// hash returning a byte slice.
+func BenchmarkHashFuncB(b *testing.B) {
 	b.StopTimer()
 	var buf bytes.Buffer
 	if err := genesisCoinbaseTx.Serialize(&buf); err != nil {
@@ -406,13 +409,13 @@ func BenchmarkDoubleSha256(b *testing.B) {
 	b.StartTimer()
 
 	for i := 0; i < b.N; i++ {
-		_ = DoubleSha256(txBytes)
+		_ = chainhash.HashFuncB(txBytes)
 	}
 }
 
-// BenchmarkDoubleSha256SH performs a benchmark on how long it takes to perform
-// a double sha 256 returning a ShaHash.
-func BenchmarkDoubleSha256SH(b *testing.B) {
+// BenchmarkHashFuncH performs a benchmark on how long it takes to perform
+// a hash returning a Hash.
+func BenchmarkHashFuncH(b *testing.B) {
 	b.StopTimer()
 	var buf bytes.Buffer
 	if err := genesisCoinbaseTx.Serialize(&buf); err != nil {
@@ -423,6 +426,6 @@ func BenchmarkDoubleSha256SH(b *testing.B) {
 	b.StartTimer()
 
 	for i := 0; i < b.N; i++ {
-		_ = DoubleSha256SH(txBytes)
+		_ = chainhash.HashFuncH(txBytes)
 	}
 }

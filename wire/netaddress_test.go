@@ -1,4 +1,5 @@
 // Copyright (c) 2013-2015 The btcsuite developers
+// Copyright (c) 2015 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -12,8 +13,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/btcsuite/btcd/wire"
 	"github.com/davecgh/go-spew/spew"
+	"github.com/decred/dcrd/wire"
 )
 
 // TestNetAddress tests the NetAddress API.
@@ -61,17 +62,6 @@ func TestNetAddress(t *testing.T) {
 	pver := wire.ProtocolVersion
 	wantPayload := uint32(30)
 	maxPayload := wire.TstMaxNetAddressPayload(wire.ProtocolVersion)
-	if maxPayload != wantPayload {
-		t.Errorf("maxNetAddressPayload: wrong max payload length for "+
-			"protocol version %d - got %v, want %v", pver,
-			maxPayload, wantPayload)
-	}
-
-	// Protocol version before NetAddressTimeVersion when timestamp was
-	// added.  Ensure max payload is expected value for it.
-	pver = wire.NetAddressTimeVersion - 1
-	wantPayload = 26
-	maxPayload = wire.TstMaxNetAddressPayload(pver)
 	if maxPayload != wantPayload {
 		t.Errorf("maxNetAddressPayload: wrong max payload length for "+
 			"protocol version %d - got %v, want %v", pver,
@@ -144,45 +134,6 @@ func TestNetAddressWire(t *testing.T) {
 			baseNetAddrEncoded,
 			wire.ProtocolVersion,
 		},
-
-		// Protocol version NetAddressTimeVersion without ts flag.
-		{
-			baseNetAddr,
-			baseNetAddrNoTS,
-			false,
-			baseNetAddrNoTSEncoded,
-			wire.NetAddressTimeVersion,
-		},
-
-		// Protocol version NetAddressTimeVersion with ts flag.
-		{
-			baseNetAddr,
-			baseNetAddr,
-			true,
-			baseNetAddrEncoded,
-			wire.NetAddressTimeVersion,
-		},
-
-		// Protocol version NetAddressTimeVersion-1 without ts flag.
-		{
-			baseNetAddr,
-			baseNetAddrNoTS,
-			false,
-			baseNetAddrNoTSEncoded,
-			wire.NetAddressTimeVersion - 1,
-		},
-
-		// Protocol version NetAddressTimeVersion-1 with timestamp.
-		// Even though the timestamp flag is set, this shouldn't have a
-		// timestamp since it is a protocol version before it was
-		// added.
-		{
-			baseNetAddr,
-			baseNetAddrNoTS,
-			true,
-			baseNetAddrNoTSEncoded,
-			wire.NetAddressTimeVersion - 1,
-		},
 	}
 
 	t.Logf("Running %d tests", len(tests))
@@ -220,7 +171,6 @@ func TestNetAddressWire(t *testing.T) {
 // decode NetAddress to confirm error paths work correctly.
 func TestNetAddressWireErrors(t *testing.T) {
 	pver := wire.ProtocolVersion
-	pverNAT := wire.NetAddressTimeVersion - 1
 
 	// baseNetAddr is used in the various tests as a baseline NetAddress.
 	baseNetAddr := wire.NetAddress{
@@ -258,16 +208,6 @@ func TestNetAddressWireErrors(t *testing.T) {
 		{&baseNetAddr, []byte{}, pver, false, 8, io.ErrShortWrite, io.EOF},
 		// Force errors on port.
 		{&baseNetAddr, []byte{}, pver, false, 24, io.ErrShortWrite, io.EOF},
-
-		// Protocol version before NetAddressTimeVersion with timestamp
-		// flag set (should not have timestamp due to old protocol
-		// version) and  intentional read/write errors.
-		// Force errors on services.
-		{&baseNetAddr, []byte{}, pverNAT, true, 0, io.ErrShortWrite, io.EOF},
-		// Force errors on ip.
-		{&baseNetAddr, []byte{}, pverNAT, true, 8, io.ErrShortWrite, io.EOF},
-		// Force errors on port.
-		{&baseNetAddr, []byte{}, pverNAT, true, 24, io.ErrShortWrite, io.EOF},
 	}
 
 	t.Logf("Running %d tests", len(tests))

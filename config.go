@@ -1,4 +1,5 @@
 // Copyright (c) 2013-2014 The btcsuite developers
+// Copyright (c) 2015 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -16,21 +17,21 @@ import (
 	"strings"
 	"time"
 
-	"github.com/btcsuite/btcd/database"
-	_ "github.com/btcsuite/btcd/database/ldb"
-	_ "github.com/btcsuite/btcd/database/memdb"
-	"github.com/btcsuite/btcd/wire"
-	"github.com/btcsuite/btcutil"
 	flags "github.com/btcsuite/go-flags"
 	"github.com/btcsuite/go-socks/socks"
+	"github.com/decred/dcrd/database"
+	_ "github.com/decred/dcrd/database/ldb"
+	_ "github.com/decred/dcrd/database/memdb"
+	"github.com/decred/dcrd/wire"
+	"github.com/decred/dcrutil"
 )
 
 const (
-	defaultConfigFilename    = "btcd.conf"
+	defaultConfigFilename    = "dcrd.conf"
 	defaultDataDirname       = "data"
 	defaultLogLevel          = "info"
 	defaultLogDirname        = "logs"
-	defaultLogFilename       = "btcd.log"
+	defaultLogFilename       = "dcrd.log"
 	defaultMaxPeers          = 125
 	defaultBanDuration       = time.Hour * 24
 	defaultMaxRPCClients     = 10
@@ -39,29 +40,31 @@ const (
 	defaultDbType            = "leveldb"
 	defaultFreeTxRelayLimit  = 15.0
 	defaultBlockMinSize      = 0
-	defaultBlockMaxSize      = 750000
+	defaultBlockMaxSize      = 375000
 	blockMaxSizeMin          = 1000
 	blockMaxSizeMax          = wire.MaxBlockPayload - 1000
 	defaultBlockPrioritySize = 50000
 	defaultGenerate          = false
 	defaultAddrIndex         = false
+	defaultNonAggressive     = false
+	defaultNoMiningStateSync = false
 )
 
 var (
-	btcdHomeDir        = btcutil.AppDataDir("btcd", false)
-	defaultConfigFile  = filepath.Join(btcdHomeDir, defaultConfigFilename)
-	defaultDataDir     = filepath.Join(btcdHomeDir, defaultDataDirname)
+	dcrdHomeDir        = dcrutil.AppDataDir("dcrd", false)
+	defaultConfigFile  = filepath.Join(dcrdHomeDir, defaultConfigFilename)
+	defaultDataDir     = filepath.Join(dcrdHomeDir, defaultDataDirname)
 	knownDbTypes       = database.SupportedDBs()
-	defaultRPCKeyFile  = filepath.Join(btcdHomeDir, "rpc.key")
-	defaultRPCCertFile = filepath.Join(btcdHomeDir, "rpc.cert")
-	defaultLogDir      = filepath.Join(btcdHomeDir, defaultLogDirname)
+	defaultRPCKeyFile  = filepath.Join(dcrdHomeDir, "rpc.key")
+	defaultRPCCertFile = filepath.Join(dcrdHomeDir, "rpc.cert")
+	defaultLogDir      = filepath.Join(dcrdHomeDir, defaultLogDirname)
 )
 
 // runServiceCommand is only set to a real function on Windows.  It is used
 // to parse and execute service commands specified via the -s flag.
 var runServiceCommand func(string) error
 
-// config defines the configuration options for btcd.
+// config defines the configuration options for dcrd.
 //
 // See loadConfig for details on the configuration load process.
 type config struct {
@@ -72,14 +75,14 @@ type config struct {
 	AddPeers           []string      `short:"a" long:"addpeer" description:"Add a peer to connect with at startup"`
 	ConnectPeers       []string      `long:"connect" description:"Connect only to the specified peers at startup"`
 	DisableListen      bool          `long:"nolisten" description:"Disable listening for incoming connections -- NOTE: Listening is automatically disabled if the --connect or --proxy options are used without also specifying listen interfaces via --listen"`
-	Listeners          []string      `long:"listen" description:"Add an interface/port to listen for connections (default all interfaces port: 8333, testnet: 18333)"`
+	Listeners          []string      `long:"listen" description:"Add an interface/port to listen for connections (default all interfaces port: 9108, testnet: 19108)"`
 	MaxPeers           int           `long:"maxpeers" description:"Max number of inbound and outbound peers"`
 	BanDuration        time.Duration `long:"banduration" description:"How long to ban misbehaving peers.  Valid time units are {s, m, h}.  Minimum 1 second"`
 	RPCUser            string        `short:"u" long:"rpcuser" description:"Username for RPC connections"`
 	RPCPass            string        `short:"P" long:"rpcpass" default-mask:"-" description:"Password for RPC connections"`
 	RPCLimitUser       string        `long:"rpclimituser" description:"Username for limited RPC connections"`
 	RPCLimitPass       string        `long:"rpclimitpass" default-mask:"-" description:"Password for limited RPC connections"`
-	RPCListeners       []string      `long:"rpclisten" description:"Add an interface/port to listen for RPC connections (default port: 8334, testnet: 18334)"`
+	RPCListeners       []string      `long:"rpclisten" description:"Add an interface/port to listen for RPC connections (default port: 9109, testnet: 19109)"`
 	RPCCert            string        `long:"rpccert" description:"File containing the certificate file"`
 	RPCKey             string        `long:"rpckey" description:"File containing the certificate key"`
 	RPCMaxClients      int           `long:"rpcmaxclients" description:"Max number of RPC clients for standard connections"`
@@ -96,34 +99,38 @@ type config struct {
 	OnionProxyPass     string        `long:"onionpass" default-mask:"-" description:"Password for onion proxy server"`
 	NoOnion            bool          `long:"noonion" description:"Disable connecting to tor hidden services"`
 	TorIsolation       bool          `long:"torisolation" description:"Enable Tor stream isolation by randomizing user credentials for each connection."`
-	TestNet3           bool          `long:"testnet" description:"Use the test network"`
-	RegressionTest     bool          `long:"regtest" description:"Use the regression test network"`
+	TestNet            bool          `long:"testnet" description:"Use the test network"`
 	SimNet             bool          `long:"simnet" description:"Use the simulation test network"`
 	DisableCheckpoints bool          `long:"nocheckpoints" description:"Disable built-in checkpoints.  Don't do this unless you know what you're doing."`
 	DbType             string        `long:"dbtype" description:"Database backend to use for the Block Chain"`
 	Profile            string        `long:"profile" description:"Enable HTTP profiling on given port -- NOTE port must be between 1024 and 65536"`
 	CPUProfile         string        `long:"cpuprofile" description:"Write CPU profile to the specified file"`
+	MemProfile         string        `long:"memprofile" description:"Write mem profile to the specified file"`
+	DumpBlockchain     string        `long:"dumpblockchain" description:"Write blockchain as a gob-encoded map to the specified file"`
+	MiningTimeOffset   int           `long:"miningtimeoffset" description:"Offset the mining timestamp of a block by this many seconds (positive values are in the past)"`
 	DebugLevel         string        `short:"d" long:"debuglevel" description:"Logging level for all subsystems {trace, debug, info, warn, error, critical} -- You may also specify <subsystem>=<level>,<subsystem2>=<level>,... to set the log level for individual subsystems -- Use show to list available subsystems"`
 	Upnp               bool          `long:"upnp" description:"Use UPnP to map our listening port outside of NAT"`
 	FreeTxRelayLimit   float64       `long:"limitfreerelay" description:"Limit relay of transactions with no transaction fee to the given amount in thousands of bytes per minute"`
 	NoRelayPriority    bool          `long:"norelaypriority" description:"Do not require free or low-fee transactions to have high priority for relaying"`
 	MaxOrphanTxs       int           `long:"maxorphantx" description:"Max number of orphan transactions to keep in memory"`
-	Generate           bool          `long:"generate" description:"Generate (mine) bitcoins using the CPU"`
+	Generate           bool          `long:"generate" description:"Generate (mine) coins using the CPU"`
 	MiningAddrs        []string      `long:"miningaddr" description:"Add the specified payment address to the list of addresses to use for generated blocks -- At least one address is required if the generate option is set"`
 	BlockMinSize       uint32        `long:"blockminsize" description:"Mininum block size in bytes to be used when creating a block"`
 	BlockMaxSize       uint32        `long:"blockmaxsize" description:"Maximum block size in bytes to be used when creating a block"`
 	BlockPrioritySize  uint32        `long:"blockprioritysize" description:"Size in bytes for high-priority/low-fee transactions when creating a block"`
 	GetWorkKeys        []string      `long:"getworkkey" description:"DEPRECATED -- Use the --miningaddr option instead"`
-	AddrIndex          bool          `long:"addrindex" description:"Build and maintain a full address index. Currently only supported by leveldb."`
+	NoAddrIndex        bool          `long:"addrindex" description:"Disable building and maintaining a full address index. Currently only supported by leveldb. Will prevent wallet resyncing from seed."`
 	DropAddrIndex      bool          `long:"dropaddrindex" description:"Deletes the address-based transaction index from the database on start up, and the exits."`
+	NonAggressive      bool          `long:"nonaggressive" description:"Disable mining off of the parent block of the blockchain if there aren't enough voters"`
+	NoMiningStateSync  bool          `long:"nominingstatesync" description:"Disable synchronizing the mining state with other nodes"`
 	onionlookup        func(string) ([]net.IP, error)
 	lookup             func(string) ([]net.IP, error)
 	oniondial          func(string, string) (net.Conn, error)
 	dial               func(string, string) (net.Conn, error)
-	miningAddrs        []btcutil.Address
+	miningAddrs        []dcrutil.Address
 }
 
-// serviceOptions defines the configuration options for btcd as a service on
+// serviceOptions defines the configuration options for the daemon as a service on
 // Windows.
 type serviceOptions struct {
 	ServiceCommand string `short:"s" long:"service" description:"Service command {install, remove, start, stop}"`
@@ -134,7 +141,7 @@ type serviceOptions struct {
 func cleanAndExpandPath(path string) string {
 	// Expand initial ~ to OS specific home directory.
 	if strings.HasPrefix(path, "~") {
-		homeDir := filepath.Dir(btcdHomeDir)
+		homeDir := filepath.Dir(dcrdHomeDir)
 		path = strings.Replace(path, "~", homeDir, 1)
 	}
 
@@ -300,7 +307,7 @@ func newConfigParser(cfg *config, so *serviceOptions, options flags.Options) *fl
 // 	3) Load configuration file overwriting defaults with any specified options
 // 	4) Parse CLI options and overwrite/add any specified options
 //
-// The above results in btcd functioning properly without any config settings
+// The above results in daemon functioning properly without any config settings
 // while still allowing the user to override settings with config files and
 // command line options.  Command line options always take precedence.
 func loadConfig() (*config, []string, error) {
@@ -323,7 +330,8 @@ func loadConfig() (*config, []string, error) {
 		BlockPrioritySize: defaultBlockPrioritySize,
 		MaxOrphanTxs:      maxOrphanTransactions,
 		Generate:          defaultGenerate,
-		AddrIndex:         defaultAddrIndex,
+		NoAddrIndex:       defaultAddrIndex,
+		NoMiningStateSync: defaultNoMiningStateSync,
 	}
 
 	// Service options which are only added on Windows.
@@ -366,7 +374,7 @@ func loadConfig() (*config, []string, error) {
 	// Load additional config from file.
 	var configFileError error
 	parser := newConfigParser(&cfg, &serviceOpts, flags.Default)
-	if !(preCfg.RegressionTest || preCfg.SimNet) || preCfg.ConfigFile !=
+	if !(preCfg.SimNet) || preCfg.ConfigFile !=
 		defaultConfigFile {
 
 		err := flags.NewIniParser(parser).ParseFile(preCfg.ConfigFile)
@@ -381,11 +389,6 @@ func loadConfig() (*config, []string, error) {
 		}
 	}
 
-	// Don't add peers from the config file when in regression test mode.
-	if preCfg.RegressionTest && len(cfg.AddPeers) > 0 {
-		cfg.AddPeers = nil
-	}
-
 	// Parse command line options again to ensure they take precedence.
 	remainingArgs, err := parser.Parse()
 	if err != nil {
@@ -397,7 +400,7 @@ func loadConfig() (*config, []string, error) {
 
 	// Create the home directory if it doesn't already exist.
 	funcName := "loadConfig"
-	err = os.MkdirAll(btcdHomeDir, 0700)
+	err = os.MkdirAll(dcrdHomeDir, 0700)
 	if err != nil {
 		// Show a nicer error message if it's because a symlink is
 		// linked to a directory that does not exist (probably because
@@ -417,15 +420,12 @@ func loadConfig() (*config, []string, error) {
 
 	// Multiple networks can't be selected simultaneously.
 	numNets := 0
+
 	// Count number of network flags passed; assign active network params
 	// while we're at it
-	if cfg.TestNet3 {
+	if cfg.TestNet {
 		numNets++
-		activeNetParams = &testNet3Params
-	}
-	if cfg.RegressionTest {
-		numNets++
-		activeNetParams = &regressionNetParams
+		activeNetParams = &testNetParams
 	}
 	if cfg.SimNet {
 		numNets++
@@ -434,7 +434,7 @@ func loadConfig() (*config, []string, error) {
 		cfg.DisableDNSSeed = true
 	}
 	if numNets > 1 {
-		str := "%s: The testnet, regtest, and simnet params can't be " +
+		str := "%s: The testnet and simnet params can't be " +
 			"used together -- choose one of the three"
 		err := fmt.Errorf(str, funcName)
 		fmt.Fprintln(os.Stderr, err)
@@ -484,7 +484,7 @@ func loadConfig() (*config, []string, error) {
 		return nil, nil, err
 	}
 
-	if cfg.AddrIndex && cfg.DropAddrIndex {
+	if !cfg.NoAddrIndex && cfg.DropAddrIndex {
 		err := fmt.Errorf("addrindex and dropaddrindex cannot be " +
 			"activated at the same")
 		fmt.Fprintln(os.Stderr, err)
@@ -493,7 +493,7 @@ func loadConfig() (*config, []string, error) {
 	}
 
 	// Memdb does not currently support the addrindex.
-	if cfg.DbType == "memdb" && cfg.AddrIndex {
+	if cfg.DbType == "memdb" && !cfg.NoAddrIndex {
 		err := fmt.Errorf("memdb does not currently support the addrindex")
 		fmt.Fprintln(os.Stderr, err)
 		fmt.Fprintln(os.Stderr, usageMessage)
@@ -618,10 +618,10 @@ func loadConfig() (*config, []string, error) {
 	cfg.BlockMinSize = minUint32(cfg.BlockMinSize, cfg.BlockMaxSize)
 
 	// Check getwork keys are valid and saved parsed versions.
-	cfg.miningAddrs = make([]btcutil.Address, 0, len(cfg.GetWorkKeys)+
+	cfg.miningAddrs = make([]dcrutil.Address, 0, len(cfg.GetWorkKeys)+
 		len(cfg.MiningAddrs))
 	for _, strAddr := range cfg.GetWorkKeys {
-		addr, err := btcutil.DecodeAddress(strAddr,
+		addr, err := dcrutil.DecodeAddress(strAddr,
 			activeNetParams.Params)
 		if err != nil {
 			str := "%s: getworkkey '%s' failed to decode: %v"
@@ -642,7 +642,7 @@ func loadConfig() (*config, []string, error) {
 
 	// Check mining addresses are valid and saved parsed versions.
 	for _, strAddr := range cfg.MiningAddrs {
-		addr, err := btcutil.DecodeAddress(strAddr, activeNetParams.Params)
+		addr, err := dcrutil.DecodeAddress(strAddr, activeNetParams.Params)
 		if err != nil {
 			str := "%s: mining address '%s' failed to decode: %v"
 			err := fmt.Errorf(str, funcName, strAddr, err)
@@ -748,7 +748,7 @@ func loadConfig() (*config, []string, error) {
 
 		if cfg.TorIsolation &&
 			(cfg.ProxyUser != "" || cfg.ProxyPass != "") {
-			btcdLog.Warn("Tor isolation set -- overriding " +
+			dcrdLog.Warn("Tor isolation set -- overriding " +
 				"specified proxy user credentials")
 		}
 
@@ -786,7 +786,7 @@ func loadConfig() (*config, []string, error) {
 
 		if cfg.TorIsolation &&
 			(cfg.OnionProxyUser != "" || cfg.OnionProxyPass != "") {
-			btcdLog.Warn("Tor isolation set -- overriding " +
+			dcrdLog.Warn("Tor isolation set -- overriding " +
 				"specified onionproxy user credentials ")
 		}
 
@@ -822,32 +822,32 @@ func loadConfig() (*config, []string, error) {
 	// done.  This prevents the warning on help messages and invalid
 	// options.  Note this should go directly before the return.
 	if configFileError != nil {
-		btcdLog.Warnf("%v", configFileError)
+		dcrdLog.Warnf("%v", configFileError)
 	}
 
 	return &cfg, remainingArgs, nil
 }
 
-// btcdDial connects to the address on the named network using the appropriate
+// dcrdDial connects to the address on the named network using the appropriate
 // dial function depending on the address and configuration options.  For
 // example, .onion addresses will be dialed using the onion specific proxy if
 // one was specified, but will otherwise use the normal dial function (which
 // could itself use a proxy or not).
-func btcdDial(network, address string) (net.Conn, error) {
-	if strings.Contains(address, ".onion:") {
+func dcrdDial(network, address string) (net.Conn, error) {
+	if strings.HasSuffix(address, ".onion") {
 		return cfg.oniondial(network, address)
 	}
 	return cfg.dial(network, address)
 }
 
-// btcdLookup returns the correct DNS lookup function to use depending on the
+// dcrdLookup returns the correct DNS lookup function to use depending on the
 // passed host and configuration options.  For example, .onion addresses will be
 // resolved using the onion specific proxy if one was specified, but will
 // otherwise treat the normal proxy as tor unless --noonion was specified in
 // which case the lookup will fail.  Meanwhile, normal IP addresses will be
 // resolved using tor if a proxy was specified unless --noonion was also
 // specified in which case the normal system DNS resolver will be used.
-func btcdLookup(host string) ([]net.IP, error) {
+func dcrdLookup(host string) ([]net.IP, error) {
 	if strings.HasSuffix(host, ".onion") {
 		return cfg.onionlookup(host)
 	}

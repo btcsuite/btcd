@@ -1,4 +1,5 @@
 // Copyright (c) 2014 The btcsuite developers
+// Copyright (c) 2015 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -10,7 +11,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/btcsuite/btcd/wire"
+	"github.com/decred/dcrd/wire"
 )
 
 // TestFilterCLearLatest tests the MsgFilterLoad API against the latest protocol
@@ -54,35 +55,12 @@ func TestFilterLoadLatest(t *testing.T) {
 	return
 }
 
-// TestFilterLoadCrossProtocol tests the MsgFilterLoad API when encoding with
-// the latest protocol version and decoding with BIP0031Version.
-func TestFilterLoadCrossProtocol(t *testing.T) {
-	data := []byte{0x01, 0x02}
-	msg := wire.NewMsgFilterLoad(data, 10, 0, 0)
-
-	// Encode with latest protocol version.
-	var buf bytes.Buffer
-	err := msg.BtcEncode(&buf, wire.ProtocolVersion)
-	if err != nil {
-		t.Errorf("encode of NewMsgFilterLoad failed %v err <%v>", msg,
-			err)
-	}
-
-	// Decode with old protocol version.
-	var readmsg wire.MsgFilterLoad
-	err = readmsg.BtcDecode(&buf, wire.BIP0031Version)
-	if err == nil {
-		t.Errorf("decode of MsgFilterLoad succeeded when it shouldn't have %v",
-			msg)
-	}
-}
-
 // TestFilterLoadMaxFilterSize tests the MsgFilterLoad API maximum filter size.
 func TestFilterLoadMaxFilterSize(t *testing.T) {
 	data := bytes.Repeat([]byte{0xff}, 36001)
 	msg := wire.NewMsgFilterLoad(data, 10, 0, 0)
 
-	// Encode with latest protocol version.
+	// Encode with latest protocol version.;
 	var buf bytes.Buffer
 	err := msg.BtcEncode(&buf, wire.ProtocolVersion)
 	if err == nil {
@@ -132,8 +110,6 @@ func TestFilterLoadMaxHashFuncsSize(t *testing.T) {
 // of MsgFilterLoad to confirm error paths work correctly.
 func TestFilterLoadWireErrors(t *testing.T) {
 	pver := wire.ProtocolVersion
-	pverNoFilterLoad := wire.BIP0037Version - 1
-	wireErr := &wire.MessageError{}
 
 	baseFilter := []byte{0x01, 0x02, 0x03, 0x04}
 	baseFilterLoad := wire.NewMsgFilterLoad(baseFilter, 10, 0,
@@ -177,11 +153,6 @@ func TestFilterLoadWireErrors(t *testing.T) {
 		{
 			baseFilterLoad, baseFilterLoadEncoded, pver, 13,
 			io.ErrShortWrite, io.EOF,
-		},
-		// Force error due to unsupported protocol version.
-		{
-			baseFilterLoad, baseFilterLoadEncoded, pverNoFilterLoad,
-			10, wireErr, wireErr,
 		},
 	}
 

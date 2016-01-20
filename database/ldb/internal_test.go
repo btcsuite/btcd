@@ -1,4 +1,5 @@
 // Copyright (c) 2013-2014 The btcsuite developers
+// Copyright (c) 2015 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -9,44 +10,46 @@ import (
 
 	"testing"
 
-	"github.com/btcsuite/btcutil"
+	"github.com/decred/dcrd/database"
+	"github.com/decred/dcrutil"
+
 	"github.com/btcsuite/golangcrypto/ripemd160"
 )
 
 func TestAddrIndexKeySerialization(t *testing.T) {
 	var hash160Bytes [ripemd160.Size]byte
-	var packedIndex [12]byte
+	var packedIndex [35]byte
 
-	fakeHash160 := btcutil.Hash160([]byte("testing"))
+	fakeHash160 := dcrutil.Hash160([]byte("testing"))
 	copy(fakeHash160, hash160Bytes[:])
 
-	fakeIndex := txAddrIndex{
-		hash160:   hash160Bytes,
-		blkHeight: 1,
-		txoffset:  5,
-		txlen:     360,
+	fakeIndex := database.TxAddrIndex{
+		Hash160:  hash160Bytes,
+		Height:   1,
+		TxOffset: 5,
+		TxLen:    360,
 	}
 
 	serializedKey := addrIndexToKey(&fakeIndex)
-	copy(packedIndex[:], serializedKey[23:35])
+	copy(packedIndex[:], serializedKey[0:35])
 	unpackedIndex := unpackTxIndex(packedIndex)
 
-	if unpackedIndex.blkHeight != fakeIndex.blkHeight {
+	if unpackedIndex.Height != fakeIndex.Height {
 		t.Errorf("Incorrect block height. Unpack addr index key"+
 			"serialization failed. Expected %d, received %d",
-			1, unpackedIndex.blkHeight)
+			1, unpackedIndex.Height)
 	}
 
-	if unpackedIndex.txoffset != fakeIndex.txoffset {
+	if unpackedIndex.TxOffset != fakeIndex.TxOffset {
 		t.Errorf("Incorrect tx offset. Unpack addr index key"+
 			"serialization failed. Expected %d, received %d",
-			5, unpackedIndex.txoffset)
+			5, unpackedIndex.TxOffset)
 	}
 
-	if unpackedIndex.txlen != fakeIndex.txlen {
+	if unpackedIndex.TxLen != fakeIndex.TxLen {
 		t.Errorf("Incorrect tx len. Unpack addr index key"+
 			"serialization failed. Expected %d, received %d",
-			360, unpackedIndex.txlen)
+			360, unpackedIndex.TxLen)
 	}
 }
 

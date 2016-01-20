@@ -1,4 +1,5 @@
 // Copyright (c) 2013-2014 The btcsuite developers
+// Copyright (c) 2015 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -7,19 +8,20 @@ package ldb_test
 import (
 	"bytes"
 	"compress/bzip2"
-	"encoding/binary"
-	"io"
+	"encoding/gob"
 	"os"
 	"path/filepath"
-	"strings"
 	"testing"
 
-	"github.com/btcsuite/btcd/chaincfg"
-	"github.com/btcsuite/btcd/database"
-	"github.com/btcsuite/btcd/txscript"
-	"github.com/btcsuite/btcd/wire"
-	"github.com/btcsuite/btcutil"
+	"github.com/decred/dcrd/chaincfg"
+	"github.com/decred/dcrd/chaincfg/chainhash"
+	"github.com/decred/dcrd/database"
+	"github.com/decred/dcrd/txscript"
+	"github.com/decred/dcrd/wire"
+	"github.com/decred/dcrutil"
+
 	"github.com/btcsuite/golangcrypto/ripemd160"
+	//	"github.com/davecgh/go-spew/spew"
 )
 
 var network = wire.MainNet
@@ -29,7 +31,7 @@ var network = wire.MainNet
 // consistency across tests.
 type testDb struct {
 	db          database.Db
-	blocks      []*btcutil.Block
+	blocks      []*dcrutil.Block
 	dbName      string
 	dbNameVer   string
 	cleanUpFunc func()
@@ -45,7 +47,7 @@ func setUpTestDb(t *testing.T, dbname string) (*testDb, error) {
 		return nil, err
 	}
 
-	testdatafile := filepath.Join("..", "testdata", "blocks1-256.bz2")
+	testdatafile := filepath.Join("..", "/../blockchain/testdata", "blocks0to168.bz2")
 	blocks, err := loadBlocks(t, testdatafile)
 	if err != nil {
 		return nil, err
@@ -72,14 +74,14 @@ func TestOperational(t *testing.T) {
 
 // testAddrIndexOperations ensures that all normal operations concerning
 // the optional address index function correctly.
-func testAddrIndexOperations(t *testing.T, db database.Db, newestBlock *btcutil.Block, newestSha *wire.ShaHash, newestBlockIdx int64) {
+func testAddrIndexOperations(t *testing.T, db database.Db, newestBlock *dcrutil.Block, newestSha *chainhash.Hash, newestBlockIdx int64) {
 	// Metadata about the current addr index state should be unset.
 	sha, height, err := db.FetchAddrIndexTip()
 	if err != database.ErrAddrIndexDoesNotExist {
 		t.Fatalf("Address index metadata shouldn't be in db, hasn't been built up yet.")
 	}
 
-	var zeroHash wire.ShaHash
+	var zeroHash chainhash.Hash
 	if !sha.IsEqual(&zeroHash) {
 		t.Fatalf("AddrIndexTip wrong hash got: %s, want %s", sha, &zeroHash)
 
@@ -90,7 +92,7 @@ func testAddrIndexOperations(t *testing.T, db database.Db, newestBlock *btcutil.
 	}
 
 	// Test enforcement of constraints for "limit" and "skip"
-	var fakeAddr btcutil.Address
+	var fakeAddr dcrutil.Address
 	_, err = db.FetchTxsForAddr(fakeAddr, -1, 0)
 	if err == nil {
 		t.Fatalf("Negative value for skip passed, should return an error")
@@ -102,7 +104,7 @@ func testAddrIndexOperations(t *testing.T, db database.Db, newestBlock *btcutil.
 	}
 
 	// Simple test to index outputs(s) of the first tx.
-	testIndex := make(database.BlockAddrIndex)
+	testIndex := make(database.BlockAddrIndex, database.AddrIndexKeySize)
 	testTx, err := newestBlock.Tx(0)
 	if err != nil {
 		t.Fatalf("Block has no transactions, unable to test addr "+
@@ -110,19 +112,26 @@ func testAddrIndexOperations(t *testing.T, db database.Db, newestBlock *btcutil.
 	}
 
 	// Extract the dest addr from the tx.
-	_, testAddrs, _, err := txscript.ExtractPkScriptAddrs(testTx.MsgTx().TxOut[0].PkScript, &chaincfg.MainNetParams)
+	_, testAddrs, _, err := txscript.ExtractPkScriptAddrs(testTx.MsgTx().TxOut[0].Version, testTx.MsgTx().TxOut[0].PkScript, &chaincfg.MainNetParams)
 	if err != nil {
 		t.Fatalf("Unable to decode tx output, err %v", err)
 	}
 
 	// Extract the hash160 from the output script.
 	var hash160Bytes [ripemd160.Size]byte
-	testHash160 := testAddrs[0].(*btcutil.AddressPubKey).AddressPubKeyHash().ScriptAddress()
+	testHash160 := testAddrs[0].(*dcrutil.AddressScriptHash).Hash160()
 	copy(hash160Bytes[:], testHash160[:])
 
 	// Create a fake index.
-	blktxLoc, _ := newestBlock.TxLoc()
-	testIndex[hash160Bytes] = []*wire.TxLoc{&blktxLoc[0]}
+	blktxLoc, _, _ := newestBlock.TxLoc()
+	testIndex = []*database.TxAddrIndex{
+		&database.TxAddrIndex{
+			hash160Bytes,
+			uint32(newestBlockIdx),
+			uint32(blktxLoc[0].TxStart),
+			uint32(blktxLoc[0].TxLen),
+		},
+	}
 
 	// Insert our test addr index into the DB.
 	err = db.UpdateAddrIndexForBlock(newestSha, newestBlockIdx, testIndex)
@@ -165,7 +174,7 @@ func testAddrIndexOperations(t *testing.T, db database.Db, newestBlock *btcutil.
 	assertAddrIndexTipIsUpdated(db, t, newestSha, newestBlockIdx)
 
 	// Delete the entire index.
-	err = db.DeleteAddrIndex()
+	err = db.PurgeAddrIndex()
 	if err != nil {
 		t.Fatalf("Couldn't delete address index, err %v", err)
 	}
@@ -188,7 +197,7 @@ func testAddrIndexOperations(t *testing.T, db database.Db, newestBlock *btcutil.
 
 }
 
-func assertAddrIndexTipIsUpdated(db database.Db, t *testing.T, newestSha *wire.ShaHash, newestBlockIdx int64) {
+func assertAddrIndexTipIsUpdated(db database.Db, t *testing.T, newestSha *chainhash.Hash, newestBlockIdx int64) {
 	// Safe to ignore error, since height will be < 0 in "error" case.
 	sha, height, _ := db.FetchAddrIndexTip()
 	if newestBlockIdx != height {
@@ -217,38 +226,92 @@ func testOperationalMode(t *testing.T) {
 out:
 	for height := int64(0); height < int64(len(testDb.blocks)); height++ {
 		block := testDb.blocks[height]
-		mblock := block.MsgBlock()
-		var txneededList []*wire.ShaHash
-		for _, tx := range mblock.Transactions {
-			for _, txin := range tx.TxIn {
-				if txin.PreviousOutPoint.Index == uint32(4294967295) {
-					continue
-				}
-				origintxsha := &txin.PreviousOutPoint.Hash
-				txneededList = append(txneededList, origintxsha)
+		if height != 0 {
+			// except for NoVerify which does not allow lookups check inputs
+			mblock := block.MsgBlock()
+			//t.Errorf("%v", blockchain.DebugBlockString(block))
+			parentBlock := testDb.blocks[height-1]
+			mParentBlock := parentBlock.MsgBlock()
+			var txneededList []*chainhash.Hash
+			opSpentInBlock := make(map[wire.OutPoint]struct{})
+			if dcrutil.IsFlagSet16(dcrutil.BlockValid, mParentBlock.Header.VoteBits) {
+				for _, tx := range mParentBlock.Transactions {
+					for _, txin := range tx.TxIn {
+						if txin.PreviousOutPoint.Index == uint32(4294967295) {
+							continue
+						}
 
-				exists, err := testDb.db.ExistsTxSha(origintxsha)
-				if err != nil {
-					t.Errorf("ExistsTxSha: unexpected error %v ", err)
-				}
-				if !exists {
-					t.Errorf("referenced tx not found %v ", origintxsha)
-				}
+						if existsInOwnBlockRegTree(mParentBlock, txin.PreviousOutPoint.Hash) {
+							_, used := opSpentInBlock[txin.PreviousOutPoint]
+							if !used {
+								// Origin tx is in the block and so hasn't been
+								// added yet, continue
+								opSpentInBlock[txin.PreviousOutPoint] = struct{}{}
+								continue
+							} else {
+								t.Errorf("output ref %v attempted double spend of previously spend output", txin.PreviousOutPoint)
+							}
+						}
 
-				_, err = testDb.db.FetchTxBySha(origintxsha)
-				if err != nil {
-					t.Errorf("referenced tx not found %v err %v ", origintxsha, err)
+						origintxsha := &txin.PreviousOutPoint.Hash
+						txneededList = append(txneededList, origintxsha)
+						exists, err := testDb.db.ExistsTxSha(origintxsha)
+						if err != nil {
+							t.Errorf("ExistsTxSha: unexpected error %v ", err)
+						}
+						if !exists {
+							t.Errorf("referenced tx not found %v (height %v)", origintxsha, height)
+						}
+
+						_, err = testDb.db.FetchTxBySha(origintxsha)
+						if err != nil {
+							t.Errorf("referenced tx not found %v err %v ", origintxsha, err)
+						}
+					}
+				}
+			}
+			for _, stx := range mblock.STransactions {
+				for _, txin := range stx.TxIn {
+					if txin.PreviousOutPoint.Index == uint32(4294967295) {
+						continue
+					}
+					if existsInOwnBlockRegTree(mParentBlock, txin.PreviousOutPoint.Hash) {
+						_, used := opSpentInBlock[txin.PreviousOutPoint]
+						if !used {
+							// Origin tx is in the block and so hasn't been
+							// added yet, continue
+							opSpentInBlock[txin.PreviousOutPoint] = struct{}{}
+							continue
+						} else {
+							t.Errorf("output ref %v attempted double spend of previously spend output", txin.PreviousOutPoint)
+						}
+					}
+
+					origintxsha := &txin.PreviousOutPoint.Hash
+					txneededList = append(txneededList, origintxsha)
+
+					exists, err := testDb.db.ExistsTxSha(origintxsha)
+					if err != nil {
+						t.Errorf("ExistsTxSha: unexpected error %v ", err)
+					}
+					if !exists {
+						t.Errorf("referenced tx not found %v", origintxsha)
+					}
+
+					_, err = testDb.db.FetchTxBySha(origintxsha)
+					if err != nil {
+						t.Errorf("referenced tx not found %v err %v ", origintxsha, err)
+					}
+				}
+			}
+			txlist := testDb.db.FetchUnSpentTxByShaList(txneededList)
+			for _, txe := range txlist {
+				if txe.Err != nil {
+					t.Errorf("tx list fetch failed %v err %v ", txe.Sha, txe.Err)
+					break out
 				}
 			}
 		}
-		txlist := testDb.db.FetchUnSpentTxByShaList(txneededList)
-		for _, txe := range txlist {
-			if txe.Err != nil {
-				t.Errorf("tx list fetch failed %v err %v ", txe.Sha, txe.Err)
-				break out
-			}
-		}
-
 		newheight, err := testDb.db.InsertBlock(block)
 		if err != nil {
 			t.Errorf("failed to insert block %v err %v", height, err)
@@ -308,11 +371,9 @@ func testBackout(t *testing.T) {
 	err = nil
 	for height := int64(0); height < int64(len(testDb.blocks)); height++ {
 		if height == 100 {
-			t.Logf("Syncing at block height 100")
 			testDb.db.Sync()
 		}
 		if height == 120 {
-			t.Logf("Simulating unexpected application quit")
 			// Simulate unexpected application quit
 			testDb.db.RollbackClose()
 			break
@@ -365,7 +426,8 @@ func testBackout(t *testing.T) {
 		return
 	}
 
-	block := testDb.blocks[119]
+	// pick block 118 since tx for block 119 wont be inserted until block 120 is seen to be valid
+	block := testDb.blocks[118]
 	mblock := block.MsgBlock()
 	txsha := mblock.Transactions[0].TxSha()
 	exists, err := testDb.db.ExistsTxSha(&txsha)
@@ -383,83 +445,47 @@ func testBackout(t *testing.T) {
 	}
 }
 
-var savedblocks []*btcutil.Block
-
-func loadBlocks(t *testing.T, file string) (blocks []*btcutil.Block, err error) {
-	if len(savedblocks) != 0 {
-		blocks = savedblocks
-		return
-	}
-	testdatafile := filepath.Join("..", "testdata", "blocks1-256.bz2")
-	var dr io.Reader
-	var fi io.ReadCloser
-	fi, err = os.Open(testdatafile)
+func loadBlocks(t *testing.T, file string) (blocks []*dcrutil.Block, err error) {
+	fi, err := os.Open(file)
 	if err != nil {
-		t.Errorf("failed to open file %v, err %v", testdatafile, err)
-		return
+		t.Errorf("failed to open file %v, err %v", file, err)
+		return nil, err
 	}
-	if strings.HasSuffix(testdatafile, ".bz2") {
-		z := bzip2.NewReader(fi)
-		dr = z
-	} else {
-		dr = fi
+	bcStream := bzip2.NewReader(fi)
+	defer fi.Close()
+
+	// Create a buffer of the read file
+	bcBuf := new(bytes.Buffer)
+	bcBuf.ReadFrom(bcStream)
+
+	// Create decoder from the buffer and a map to store the data
+	bcDecoder := gob.NewDecoder(bcBuf)
+	blockchain := make(map[int64][]byte)
+
+	// Decode the blockchain into the map
+	if err := bcDecoder.Decode(&blockchain); err != nil {
+		t.Errorf("error decoding test blockchain")
 	}
-
-	defer func() {
-		if err := fi.Close(); err != nil {
-			t.Errorf("failed to close file %v %v", testdatafile, err)
-		}
-	}()
-
-	// Set the first block as the genesis block.
-	genesis := btcutil.NewBlock(chaincfg.MainNetParams.GenesisBlock)
-	blocks = append(blocks, genesis)
-
-	var block *btcutil.Block
-	err = nil
-	for height := int64(1); err == nil; height++ {
-		var rintbuf uint32
-		err = binary.Read(dr, binary.LittleEndian, &rintbuf)
-		if err == io.EOF {
-			// hit end of file at expected offset: no warning
-			height--
-			err = nil
-			break
-		}
-		if err != nil {
-			t.Errorf("failed to load network type, err %v", err)
-			break
-		}
-		if rintbuf != uint32(network) {
-			t.Errorf("Block doesn't match network: %v expects %v",
-				rintbuf, network)
-			break
-		}
-		err = binary.Read(dr, binary.LittleEndian, &rintbuf)
-		blocklen := rintbuf
-
-		rbytes := make([]byte, blocklen)
-
-		// read block
-		dr.Read(rbytes)
-
-		block, err = btcutil.NewBlockFromBytes(rbytes)
+	blocks = make([]*dcrutil.Block, 0, len(blockchain))
+	for height := int64(1); height < int64(len(blockchain)); height++ {
+		block, err := dcrutil.NewBlockFromBytes(blockchain[height])
 		if err != nil {
 			t.Errorf("failed to parse block %v", height)
-			return
+			return nil, err
 		}
+		block.SetHeight(height - 1)
 		blocks = append(blocks, block)
 	}
-	savedblocks = blocks
+
 	return
 }
 
-func testFetchHeightRange(t *testing.T, db database.Db, blocks []*btcutil.Block) {
+func testFetchHeightRange(t *testing.T, db database.Db, blocks []*dcrutil.Block) {
 
 	var testincrement int64 = 50
 	var testcnt int64 = 100
 
-	shanames := make([]*wire.ShaHash, len(blocks))
+	shanames := make([]*chainhash.Hash, len(blocks))
 
 	nBlocks := int64(len(blocks))
 
@@ -507,11 +533,14 @@ func TestLimitAndSkipFetchTxsForAddr(t *testing.T) {
 		return
 	}
 	defer testDb.cleanUpFunc()
-
+	_, err = testDb.db.InsertBlock(testDb.blocks[0])
+	if err != nil {
+		t.Fatalf("failed to insert initial block")
+	}
 	// Insert a block with some fake test transactions. The block will have
 	// 10 copies of a fake transaction involving same address.
-	addrString := "1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa"
-	targetAddr, err := btcutil.DecodeAddress(addrString, &chaincfg.MainNetParams)
+	addrString := "DsZEAobx6qJ7K2qaHZBA2vBn66Nor8KYAKk"
+	targetAddr, err := dcrutil.DecodeAddress(addrString, &chaincfg.MainNetParams)
 	if err != nil {
 		t.Fatalf("Unable to decode test address: %v", err)
 	}
@@ -520,30 +549,38 @@ func TestLimitAndSkipFetchTxsForAddr(t *testing.T) {
 		t.Fatalf("Unable make test pkScript %v", err)
 	}
 	fakeTxOut := wire.NewTxOut(10, outputScript)
-	var emptyHash wire.ShaHash
-	fakeHeader := wire.NewBlockHeader(&emptyHash, &emptyHash, 1, 1)
+	var emptyHash chainhash.Hash
+	fakeHeader := wire.NewBlockHeader(0, &emptyHash, &emptyHash, &emptyHash, 1, [6]byte{}, 1, 1, 1, 1, 1, 1, 1, 1, 1, [36]byte{})
 	msgBlock := wire.NewMsgBlock(fakeHeader)
 	for i := 0; i < 10; i++ {
 		mtx := wire.NewMsgTx()
 		mtx.AddTxOut(fakeTxOut)
 		msgBlock.AddTransaction(mtx)
 	}
-
+	lastBlock := testDb.blocks[0]
+	msgBlock.Header.PrevBlock = *lastBlock.Sha()
 	// Insert the test block into the DB.
-	testBlock := btcutil.NewBlock(msgBlock)
+	testBlock := dcrutil.NewBlock(msgBlock)
 	newheight, err := testDb.db.InsertBlock(testBlock)
 	if err != nil {
 		t.Fatalf("Unable to insert block into db: %v", err)
 	}
 
 	// Create and insert an address index for out test addr.
-	txLoc, _ := testBlock.TxLoc()
-	index := make(database.BlockAddrIndex)
+	txLoc, _, _ := testBlock.TxLoc()
+	index := make(database.BlockAddrIndex, len(txLoc))
 	for i := range testBlock.Transactions() {
 		var hash160 [ripemd160.Size]byte
 		scriptAddr := targetAddr.ScriptAddress()
 		copy(hash160[:], scriptAddr[:])
-		index[hash160] = append(index[hash160], &txLoc[i])
+		txAddrIndex := &database.TxAddrIndex{
+			hash160,
+			uint32(newheight),
+			uint32(txLoc[i].TxStart),
+			uint32(txLoc[i].TxLen),
+		}
+
+		index[i] = txAddrIndex
 	}
 	blkSha := testBlock.Sha()
 	err = testDb.db.UpdateAddrIndexForBlock(blkSha, newheight, index)

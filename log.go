@@ -1,4 +1,5 @@
 // Copyright (c) 2013-2014 The btcsuite developers
+// Copyright (c) 2015 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -10,24 +11,19 @@ import (
 	"strings"
 	"time"
 
-	"github.com/btcsuite/btcd/addrmgr"
-
-	"github.com/btcsuite/btcd/blockchain"
-	"github.com/btcsuite/btcd/database"
-	"github.com/btcsuite/btcd/txscript"
-	"github.com/btcsuite/btcd/wire"
 	"github.com/btcsuite/btclog"
 	"github.com/btcsuite/seelog"
+
+	"github.com/decred/dcrd/addrmgr"
+	"github.com/decred/dcrd/blockchain"
+	"github.com/decred/dcrd/blockchain/stake"
+	"github.com/decred/dcrd/chaincfg/chainhash"
+	"github.com/decred/dcrd/database"
+	"github.com/decred/dcrd/txscript"
+	"github.com/decred/dcrd/wire"
 )
 
 const (
-	// lockTimeThreshold is the number below which a lock time is
-	// interpreted to be a block number.  Since an average of one block
-	// is generated per 10 minutes, this allows blocks for about 9,512
-	// years.  However, if the field is interpreted as a timestamp, given
-	// the lock time is a uint32, the max is sometime around 2106.
-	lockTimeThreshold uint32 = 5e8 // Tue Nov 5 00:53:20 1985 UTC
-
 	// maxRejectReasonLen is the maximum length of a sanitized reject reason
 	// that will be logged.
 	maxRejectReasonLen = 250
@@ -43,7 +39,7 @@ var (
 	amgrLog    = btclog.Disabled
 	bcdbLog    = btclog.Disabled
 	bmgrLog    = btclog.Disabled
-	btcdLog    = btclog.Disabled
+	dcrdLog    = btclog.Disabled
 	chanLog    = btclog.Disabled
 	discLog    = btclog.Disabled
 	minrLog    = btclog.Disabled
@@ -51,6 +47,7 @@ var (
 	rpcsLog    = btclog.Disabled
 	scrpLog    = btclog.Disabled
 	srvrLog    = btclog.Disabled
+	stkeLog    = btclog.Disabled
 	txmpLog    = btclog.Disabled
 )
 
@@ -60,7 +57,7 @@ var subsystemLoggers = map[string]btclog.Logger{
 	"AMGR": amgrLog,
 	"BCDB": bcdbLog,
 	"BMGR": bmgrLog,
-	"BTCD": btcdLog,
+	"DCRD": dcrdLog,
 	"CHAN": chanLog,
 	"DISC": discLog,
 	"MINR": minrLog,
@@ -68,6 +65,7 @@ var subsystemLoggers = map[string]btclog.Logger{
 	"RPCS": rpcsLog,
 	"SCRP": scrpLog,
 	"SRVR": srvrLog,
+	"STKE": stkeLog,
 	"TXMP": txmpLog,
 }
 
@@ -110,8 +108,8 @@ func useLogger(subsystemID string, logger btclog.Logger) {
 	case "BMGR":
 		bmgrLog = logger
 
-	case "BTCD":
-		btcdLog = logger
+	case "DCRD":
+		dcrdLog = logger
 
 	case "CHAN":
 		chanLog = logger
@@ -135,6 +133,10 @@ func useLogger(subsystemID string, logger btclog.Logger) {
 
 	case "SRVR":
 		srvrLog = logger
+
+	case "STKE":
+		stkeLog = logger
+		stake.UseLogger(logger)
 
 	case "TXMP":
 		txmpLog = logger
@@ -214,9 +216,9 @@ func directionString(inbound bool) string {
 func formatLockTime(lockTime uint32) string {
 	// The lock time field of a transaction is either a block height at
 	// which the transaction is finalized or a timestamp depending on if the
-	// value is before the lockTimeThreshold.  When it is under the
+	// value is before the txscript.LockTimeThreshold.  When it is under the
 	// threshold it is a block height.
-	if lockTime < lockTimeThreshold {
+	if lockTime < txscript.LockTimeThreshold {
 		return fmt.Sprintf("height %d", lockTime)
 	}
 
@@ -251,7 +253,7 @@ func invSummary(invList []*wire.InvVect) string {
 }
 
 // locatorSummary returns a block locator as a human-readable string.
-func locatorSummary(locator []*wire.ShaHash, stopHash *wire.ShaHash) string {
+func locatorSummary(locator []*chainhash.Hash, stopHash *chainhash.Hash) string {
 	if len(locator) > 0 {
 		return fmt.Sprintf("locator %s, stop %s", locator[0], stopHash)
 	}
@@ -358,4 +360,11 @@ func messageSummary(msg wire.Message) string {
 
 	// No summary for other messages.
 	return ""
+}
+
+// fatalf logs a string, then cleanly exits.
+func fatalf(str string) {
+	dcrdLog.Errorf("Unable to create profiler: %v", str)
+	backendLog.Flush()
+	os.Exit(1)
 }

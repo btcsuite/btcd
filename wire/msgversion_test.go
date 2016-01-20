@@ -1,4 +1,5 @@
 // Copyright (c) 2013-2015 The btcsuite developers
+// Copyright (c) 2015 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -13,8 +14,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/btcsuite/btcd/wire"
 	"github.com/davecgh/go-spew/spew"
+	"github.com/decred/dcrd/wire"
 )
 
 // TestVersion tests the MsgVersion API.
@@ -199,56 +200,6 @@ func TestVersionWire(t *testing.T) {
 			baseVersionBIP0037Encoded,
 			wire.ProtocolVersion,
 		},
-
-		// Protocol version BIP0037Version with relay transactions field
-		// true.
-		{
-			baseVersionBIP0037,
-			baseVersionBIP0037,
-			baseVersionBIP0037Encoded,
-			wire.BIP0037Version,
-		},
-
-		// Protocol version BIP0037Version with relay transactions field
-		// false.
-		{
-			verRelayTxFalse,
-			verRelayTxFalse,
-			verRelayTxFalseEncoded,
-			wire.BIP0037Version,
-		},
-
-		// Protocol version BIP0035Version.
-		{
-			baseVersion,
-			baseVersion,
-			baseVersionEncoded,
-			wire.BIP0035Version,
-		},
-
-		// Protocol version BIP0031Version.
-		{
-			baseVersion,
-			baseVersion,
-			baseVersionEncoded,
-			wire.BIP0031Version,
-		},
-
-		// Protocol version NetAddressTimeVersion.
-		{
-			baseVersion,
-			baseVersion,
-			baseVersionEncoded,
-			wire.NetAddressTimeVersion,
-		},
-
-		// Protocol version MultipleAddressVersion.
-		{
-			baseVersion,
-			baseVersion,
-			baseVersionEncoded,
-			wire.MultipleAddressVersion,
-		},
 	}
 
 	t.Logf("Running %d tests", len(tests))
@@ -349,12 +300,6 @@ func TestVersionWireErrors(t *testing.T) {
 		{baseVersion, baseVersionEncoded, pver, 82, io.ErrShortWrite, io.ErrUnexpectedEOF},
 		// Force error in last block.
 		{baseVersion, baseVersionEncoded, pver, 98, io.ErrShortWrite, io.ErrUnexpectedEOF},
-		// Force error in relay tx - no read error should happen since
-		// it's optional.
-		{
-			baseVersionBIP0037, baseVersionBIP0037Encoded,
-			wire.BIP0037Version, 101, io.ErrShortWrite, nil,
-		},
 		// Force error due to user agent too big
 		{exceedUAVer, exceedUAVerEncoded, pver, newLen, wireErr, wireErr},
 	}
@@ -443,7 +388,7 @@ func TestVersionOptionalFields(t *testing.T) {
 	// uaVersion is a version message that contains all fields through
 	// the UserAgent field.
 	uaVersion := nonceVersion
-	uaVersion.UserAgent = "/btcdtest:0.0.1/"
+	uaVersion.UserAgent = "/dcrdtest:0.0.1/"
 	uaVersionEncoded := make([]byte, len(baseVersionEncoded)-4)
 	copy(uaVersionEncoded, baseVersionEncoded)
 
@@ -521,7 +466,7 @@ var baseVersion = &wire.MsgVersion{
 		Port:      8333,
 	},
 	Nonce:     123123, // 0x1e0f3
-	UserAgent: "/btcdtest:0.0.1/",
+	UserAgent: "/dcrdtest:0.0.1/",
 	LastBlock: 234234, // 0x392fa
 }
 
@@ -543,7 +488,7 @@ var baseVersionEncoded = []byte{
 	0x20, 0x8d, // Port 8333 in big-endian
 	0xf3, 0xe0, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, // Nonce
 	0x10, // Varint for user agent length
-	0x2f, 0x62, 0x74, 0x63, 0x64, 0x74, 0x65, 0x73,
+	0x2f, 0x64, 0x63, 0x72, 0x64, 0x74, 0x65, 0x73,
 	0x74, 0x3a, 0x30, 0x2e, 0x30, 0x2e, 0x31, 0x2f, // User agent
 	0xfa, 0x92, 0x03, 0x00, // Last block
 }
@@ -567,7 +512,7 @@ var baseVersionBIP0037 = &wire.MsgVersion{
 		Port:      8333,
 	},
 	Nonce:     123123, // 0x1e0f3
-	UserAgent: "/btcdtest:0.0.1/",
+	UserAgent: "/dcrdtest:0.0.1/",
 	LastBlock: 234234, // 0x392fa
 }
 
@@ -589,7 +534,7 @@ var baseVersionBIP0037Encoded = []byte{
 	0x20, 0x8d, // Port 8333 in big-endian
 	0xf3, 0xe0, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, // Nonce
 	0x10, // Varint for user agent length
-	0x2f, 0x62, 0x74, 0x63, 0x64, 0x74, 0x65, 0x73,
+	0x2f, 0x64, 0x63, 0x72, 0x64, 0x74, 0x65, 0x73,
 	0x74, 0x3a, 0x30, 0x2e, 0x30, 0x2e, 0x31, 0x2f, // User agent
 	0xfa, 0x92, 0x03, 0x00, // Last block
 	0x01, // Relay tx

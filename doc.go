@@ -1,24 +1,25 @@
 // Copyright (c) 2013-2014 The btcsuite developers
+// Copyright (c) 2015 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
 /*
-btcd is a full-node bitcoin implementation written in Go.
+dcrd is a full-node decred implementation written in Go.
 
-The default options are sane for most users.  This means btcd will work 'out of
+The default options are sane for most users.  This means dcrd will work 'out of
 the box' for most users.  However, there are also a wide variety of flags that
 can be used to control it.
 
 The following section provides a usage overview which enumerates the flags.  An
 interesting point to note is that the long form of all of these options
 (except -C) can be specified in a configuration file that is automatically
-parsed when btcd starts up.  By default, the configuration file is located at
-~/.btcd/btcd.conf on POSIX-style operating systems and %LOCALAPPDATA%\btcd\btcd.conf
+parsed when dcrd starts up.  By default, the configuration file is located at
+~/.dcrd/dcrd.conf on POSIX-style operating systems and %LOCALAPPDATA%\dcrd\dcrd.conf
 on Windows.  The -C (--configfile) flag, as shown below, can be used to override
 this location.
 
 Usage:
-  btcd [OPTIONS]
+  dcrd [OPTIONS]
 
 Application Options:
   -V, --version            Display version information and exit
@@ -31,7 +32,7 @@ Application Options:
                            or --proxy options are used without also specifying
                            listen interfaces via --listen
       --listen=            Add an interface/port to listen for connections
-                           (default all interfaces port: 8333, testnet: 18333)
+                           (default all interfaces port: 9108, testnet: 19108)
       --maxpeers=          Max number of inbound and outbound peers (125)
       --banduration=       How long to ban misbehaving peers.  Valid time units
                            are {s, m, h}.  Minimum 1 second (24h0m0s)
@@ -84,7 +85,7 @@ Application Options:
                            (15)
       --maxorphantx=       Max number of orphan transactions to keep in memory
                            (1000)
-      --generate=          Generate (mine) bitcoins using the CPU
+      --generate=          Generate (mine) decreds using the CPU
       --miningaddr=        Add the specified payment address to the list of
                            addresses to use for generated blocks -- At least
                            one address is required if the generate option is set

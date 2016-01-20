@@ -1,4 +1,5 @@
 // Copyright (c) 2014-2015 The btcsuite developers
+// Copyright (c) 2015 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -8,23 +9,28 @@ import (
 	"encoding/hex"
 	"fmt"
 
-	"github.com/btcsuite/btcd/btcec"
-	"github.com/btcsuite/btcd/chaincfg"
-	"github.com/btcsuite/btcd/txscript"
-	"github.com/btcsuite/btcd/wire"
-	"github.com/btcsuite/btcutil"
+	"github.com/decred/dcrd/chaincfg"
+	"github.com/decred/dcrd/chaincfg/chainec"
+	"github.com/decred/dcrd/chaincfg/chainhash"
+	"github.com/decred/dcrd/txscript"
+	"github.com/decred/dcrd/wire"
+	"github.com/decred/dcrutil"
 )
 
-// This example demonstrates creating a script which pays to a bitcoin address.
+var secp = 0
+var edwards = 1
+var secSchnorr = 2
+
+// This example demonstrates creating a script which pays to a decred address.
 // It also prints the created script hex and uses the DisasmString function to
 // display the disassembled script.
 func ExamplePayToAddrScript() {
-	// Parse the address to send the coins to into a btcutil.Address
+	// Parse the address to send the coins to into a dcrutil.Address
 	// which is useful to ensure the accuracy of the address and determine
 	// the address type.  It is also required for the upcoming call to
 	// PayToAddrScript.
-	addressStr := "12gpXQVcCL2qhTNQgyLVdCFG2Qs2px98nV"
-	address, err := btcutil.DecodeAddress(addressStr, &chaincfg.MainNetParams)
+	addressStr := "DsSej1qR3Fyc8kV176DCh9n9cY9nqf9Quxk"
+	address, err := dcrutil.DecodeAddress(addressStr, &chaincfg.MainNetParams)
 	if err != nil {
 		fmt.Println(err)
 		return
@@ -63,7 +69,7 @@ func ExampleExtractPkScriptAddrs() {
 
 	// Extract and print details from the script.
 	scriptClass, addresses, reqSigs, err := txscript.ExtractPkScriptAddrs(
-		script, &chaincfg.MainNetParams)
+		txscript.DefaultScriptVersion, script, &chaincfg.MainNetParams)
 	if err != nil {
 		fmt.Println(err)
 		return
@@ -74,7 +80,7 @@ func ExampleExtractPkScriptAddrs() {
 
 	// Output:
 	// Script Class: pubkeyhash
-	// Addresses: [12gpXQVcCL2qhTNQgyLVdCFG2Qs2px98nV]
+	// Addresses: [DsSej1qR3Fyc8kV176DCh9n9cY9nqf9Quxk]
 	// Required Signatures: 1
 }
 
@@ -88,10 +94,10 @@ func ExampleSignTxOutput() {
 		fmt.Println(err)
 		return
 	}
-	privKey, pubKey := btcec.PrivKeyFromBytes(btcec.S256(), privKeyBytes)
-	pubKeyHash := btcutil.Hash160(pubKey.SerializeCompressed())
-	addr, err := btcutil.NewAddressPubKeyHash(pubKeyHash,
-		&chaincfg.MainNetParams)
+	privKey, pubKey := chainec.Secp256k1.PrivKeyFromBytes(privKeyBytes)
+	pubKeyHash := dcrutil.Hash160(pubKey.SerializeCompressed())
+	addr, err := dcrutil.NewAddressPubKeyHash(pubKeyHash,
+		&chaincfg.MainNetParams, chainec.ECTypeSecp256k1)
 	if err != nil {
 		fmt.Println(err)
 		return
@@ -99,9 +105,9 @@ func ExampleSignTxOutput() {
 
 	// For this example, create a fake transaction that represents what
 	// would ordinarily be the real transaction that is being spent.  It
-	// contains a single output that pays to address in the amount of 1 BTC.
+	// contains a single output that pays to address in the amount of 1 DCR.
 	originTx := wire.NewMsgTx()
-	prevOut := wire.NewOutPoint(&wire.ShaHash{}, ^uint32(0))
+	prevOut := wire.NewOutPoint(&chainhash.Hash{}, ^uint32(0), dcrutil.TxTreeRegular)
 	txIn := wire.NewTxIn(prevOut, []byte{txscript.OP_0, txscript.OP_0})
 	originTx.AddTxIn(txIn)
 	pkScript, err := txscript.PayToAddrScript(addr)
@@ -119,7 +125,7 @@ func ExampleSignTxOutput() {
 	// Add the input(s) the redeeming transaction will spend.  There is no
 	// signature script at this point since it hasn't been created or signed
 	// yet, hence nil is provided for it.
-	prevOut = wire.NewOutPoint(&originTxHash, 0)
+	prevOut = wire.NewOutPoint(&originTxHash, 0, dcrutil.TxTreeRegular)
 	txIn = wire.NewTxIn(prevOut, nil)
 	redeemTx.AddTxIn(txIn)
 
@@ -129,7 +135,7 @@ func ExampleSignTxOutput() {
 	redeemTx.AddTxOut(txOut)
 
 	// Sign the redeeming transaction.
-	lookupKey := func(a btcutil.Address) (*btcec.PrivateKey, bool, error) {
+	lookupKey := func(a dcrutil.Address) (chainec.PrivateKey, bool, error) {
 		// Ordinarily this function would involve looking up the private
 		// key for the provided address, but since the only thing being
 		// signed in this example uses the address associated with the
@@ -152,7 +158,7 @@ func ExampleSignTxOutput() {
 	// being signed.
 	sigScript, err := txscript.SignTxOutput(&chaincfg.MainNetParams,
 		redeemTx, 0, originTx.TxOut[0].PkScript, txscript.SigHashAll,
-		txscript.KeyClosure(lookupKey), nil, nil)
+		txscript.KeyClosure(lookupKey), nil, nil, secp)
 	if err != nil {
 		fmt.Println(err)
 		return
@@ -162,10 +168,9 @@ func ExampleSignTxOutput() {
 	// Prove that the transaction has been validly signed by executing the
 	// script pair.
 	flags := txscript.ScriptBip16 | txscript.ScriptVerifyDERSignatures |
-		txscript.ScriptStrictMultiSig |
 		txscript.ScriptDiscourageUpgradableNops
 	vm, err := txscript.NewEngine(originTx.TxOut[0].PkScript, redeemTx, 0,
-		flags)
+		flags, 0)
 	if err != nil {
 		fmt.Println(err)
 		return
