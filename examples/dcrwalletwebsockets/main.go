@@ -1,4 +1,5 @@
 // Copyright (c) 2014-2015 The btcsuite developers
+// Copyright (c) 2015-2016 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -10,37 +11,37 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/btcsuite/btcrpcclient"
-	"github.com/btcsuite/btcutil"
 	"github.com/davecgh/go-spew/spew"
+	"github.com/decred/dcrrpcclient"
+	"github.com/decred/dcrutil"
 )
 
 func main() {
 	// Only override the handlers for notifications you care about.
 	// Also note most of the handlers will only be called if you register
-	// for notifications.  See the documentation of the btcrpcclient
+	// for notifications.  See the documentation of the dcrrpcclient
 	// NotificationHandlers type for more details about each handler.
-	ntfnHandlers := btcrpcclient.NotificationHandlers{
-		OnAccountBalance: func(account string, balance btcutil.Amount, confirmed bool) {
+	ntfnHandlers := dcrrpcclient.NotificationHandlers{
+		OnAccountBalance: func(account string, balance dcrutil.Amount, confirmed bool) {
 			log.Printf("New balance for account %s: %v", account,
 				balance)
 		},
 	}
 
-	// Connect to local btcwallet RPC server using websockets.
-	certHomeDir := btcutil.AppDataDir("btcwallet", false)
+	// Connect to local dcrwallet RPC server using websockets.
+	certHomeDir := dcrutil.AppDataDir("dcrwallet", false)
 	certs, err := ioutil.ReadFile(filepath.Join(certHomeDir, "rpc.cert"))
 	if err != nil {
 		log.Fatal(err)
 	}
-	connCfg := &btcrpcclient.ConnConfig{
+	connCfg := &dcrrpcclient.ConnConfig{
 		Host:         "localhost:18332",
 		Endpoint:     "ws",
 		User:         "yourrpcuser",
 		Pass:         "yourrpcpass",
 		Certificates: certs,
 	}
-	client, err := btcrpcclient.New(connCfg, &ntfnHandlers)
+	client, err := dcrrpcclient.New(connCfg, &ntfnHandlers)
 	if err != nil {
 		log.Fatal(err)
 	}

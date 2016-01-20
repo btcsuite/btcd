@@ -1,4 +1,5 @@
 // Copyright (c) 2014-2015 The btcsuite developers
+// Copyright (c) 2015-2016 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -10,39 +11,39 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/btcsuite/btcd/wire"
-	"github.com/btcsuite/btcrpcclient"
-	"github.com/btcsuite/btcutil"
+	"github.com/decred/dcrd/chaincfg/chainhash"
+	"github.com/decred/dcrrpcclient"
+	"github.com/decred/dcrutil"
 )
 
 func main() {
 	// Only override the handlers for notifications you care about.
 	// Also note most of these handlers will only be called if you register
-	// for notifications.  See the documentation of the btcrpcclient
+	// for notifications.  See the documentation of the dcrrpcclient
 	// NotificationHandlers type for more details about each handler.
-	ntfnHandlers := btcrpcclient.NotificationHandlers{
-		OnBlockConnected: func(hash *wire.ShaHash, height int32, time time.Time) {
-			log.Printf("Block connected: %v (%d) %v", hash, height, time)
+	ntfnHandlers := dcrrpcclient.NotificationHandlers{
+		OnBlockConnected: func(hash *chainhash.Hash, height int32, time time.Time, vb uint16) {
+			log.Printf("Block connected: %v (%d) %v %v", hash, height, time, vb)
 		},
-		OnBlockDisconnected: func(hash *wire.ShaHash, height int32, time time.Time) {
-			log.Printf("Block disconnected: %v (%d) %v", hash, height, time)
+		OnBlockDisconnected: func(hash *chainhash.Hash, height int32, time time.Time, vb uint16) {
+			log.Printf("Block disconnected: %v (%d) %v %v", hash, height, time, vb)
 		},
 	}
 
-	// Connect to local btcd RPC server using websockets.
-	btcdHomeDir := btcutil.AppDataDir("btcd", false)
-	certs, err := ioutil.ReadFile(filepath.Join(btcdHomeDir, "rpc.cert"))
+	// Connect to local dcrd RPC server using websockets.
+	dcrdHomeDir := dcrutil.AppDataDir("dcrd", false)
+	certs, err := ioutil.ReadFile(filepath.Join(dcrdHomeDir, "rpc.cert"))
 	if err != nil {
 		log.Fatal(err)
 	}
-	connCfg := &btcrpcclient.ConnConfig{
+	connCfg := &dcrrpcclient.ConnConfig{
 		Host:         "localhost:8334",
 		Endpoint:     "ws",
 		User:         "yourrpcuser",
 		Pass:         "yourrpcpass",
 		Certificates: certs,
 	}
-	client, err := btcrpcclient.New(connCfg, &ntfnHandlers)
+	client, err := dcrrpcclient.New(connCfg, &ntfnHandlers)
 	if err != nil {
 		log.Fatal(err)
 	}

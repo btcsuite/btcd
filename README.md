@@ -1,15 +1,13 @@
-btcrpcclient
+Dcrrpcclient
 ============
 
-[![Build Status](https://travis-ci.org/btcsuite/btcrpcclient.png?branch=master)]
-(https://travis-ci.org/btcsuite/btcrpcclient)
-[![GoDoc](https://godoc.org/github.com/btcsuite/btcrpcclient?status.png)]
-(http://godoc.org/github.com/btcsuite/btcrpcclient)
+[![GoDoc](https://godoc.org/github.com/decred/dcrrpcclient?status.png)]
+(http://godoc.org/github.com/decred/dcrrpcclient)
 
-btcrpcclient implements a Websocket-enabled Bitcoin JSON-RPC client package
+dcrrpcclient implements a Websocket-enabled Decred JSON-RPC client package
 written in [Go](http://golang.org/).  It provides a robust and easy to use
-client for interfacing with a Bitcoin RPC server that uses a btcd/bitcoin core
-compatible Bitcoin JSON-RPC API.
+client for interfacing with a Decred RPC server that uses a
+dcrd/bitcoin core-like compatible Decred JSON-RPC API.
 
 ## Status
 
@@ -19,24 +17,21 @@ implement and the API is not stable yet.
 
 ## Documentation
 
-* [API Reference](http://godoc.org/github.com/btcsuite/btcrpcclient)
-* [btcd Websockets Example](https://github.com/btcsuite/btcrpcclient/blob/master/examples/btcdwebsockets)  
-  Connects to a btcd RPC server using TLS-secured websockets, registers for
+* [API Reference](http://godoc.org/github.com/decred/dcrrpcclient)
+* [dcrd Websockets Example](https://github.com/decred/dcrrpcclient/blob/master/examples/dcrdwebsockets)  
+  Connects to a dcrd RPC server using TLS-secured websockets, registers for
   block connected and block disconnected notifications, and gets the current
   block count
-* [btcwallet Websockets Example](https://github.com/btcsuite/btcrpcclient/blob/master/examples/btcwalletwebsockets)  
-  Connects to a btcwallet RPC server using TLS-secured websockets, registers for
+* [dcrwallet Websockets Example](https://github.com/decred/dcrrpcclient/blob/master/examples/dcrwalletwebsockets)  
+  Connects to a dcrwallet RPC server using TLS-secured websockets, registers for
   notifications about changes to account balances, and gets a list of unspent
   transaction outputs (utxos) the wallet can sign
-* [Bitcoin Core HTTP POST Example](https://github.com/btcsuite/btcrpcclient/blob/master/examples/bitcoincorehttp)  
-  Connects to a bitcoin core RPC server using HTTP POST mode with TLS disabled
-  and gets the current block count
 
 ## Major Features
 
-* Supports Websockets (btcd/btcwallet) and HTTP POST mode (bitcoin core)
-* Provides callback and registration functions for btcd/btcwallet notifications
-* Supports btcd extensions
+* Supports Websockets (dcrd/dcrwallet) and HTTP POST mode (bitcoin core-like)
+* Provides callback and registration functions for dcrd/dcrwallet notifications
+* Supports dcrd extensions
 * Translates to and from higher-level and easier to use Go types
 * Offers a synchronous (blocking) and asynchronous API
 * When running in Websockets mode (the default):
@@ -48,10 +43,10 @@ implement and the API is not stable yet.
 ## Installation
 
 ```bash
-$ go get github.com/btcsuite/btcrpcclient
+$ go get github.com/decred/dcrrpcclient
 ```
 
 ## License
 
-Package btcrpcclient is licensed under the [copyfree](http://copyfree.org) ISC
+Package dcrrpcclient is licensed under the [copyfree](http://copyfree.org) ISC
 License.

@@ -1,17 +1,19 @@
 // Copyright (c) 2014-2015 The btcsuite developers
+// Copyright (c) 2015-2016 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
-package btcrpcclient
+package dcrrpcclient
 
 import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
 
-	"github.com/btcsuite/btcd/btcjson"
-	"github.com/btcsuite/btcd/wire"
-	"github.com/btcsuite/btcutil"
+	"github.com/decred/dcrd/chaincfg/chainhash"
+	"github.com/decred/dcrd/dcrjson"
+	"github.com/decred/dcrd/wire"
+	"github.com/decred/dcrutil"
 )
 
 // FutureDebugLevelResult is a future promise to deliver the result of a
@@ -42,9 +44,9 @@ func (r FutureDebugLevelResult) Receive() (string, error) {
 //
 // See DebugLevel for the blocking version and more details.
 //
-// NOTE: This is a btcd extension.
+// NOTE: This is a dcrd extension.
 func (c *Client) DebugLevelAsync(levelSpec string) FutureDebugLevelResult {
-	cmd := btcjson.NewDebugLevelCmd(levelSpec)
+	cmd := dcrjson.NewDebugLevelCmd(levelSpec)
 	return c.sendCmd(cmd)
 }
 
@@ -57,7 +59,7 @@ func (c *Client) DebugLevelAsync(levelSpec string) FutureDebugLevelResult {
 // Additionally, the special keyword 'show' can be used to get a list of the
 // available subsystems.
 //
-// NOTE: This is a btcd extension.
+// NOTE: This is a dcrd extension.
 func (c *Client) DebugLevel(levelSpec string) (string, error) {
 	return c.DebugLevelAsync(levelSpec).Receive()
 }
@@ -78,22 +80,59 @@ func (r FutureCreateEncryptedWalletResult) Receive() error {
 //
 // See CreateEncryptedWallet for the blocking version and more details.
 //
-// NOTE: This is a btcwallet extension.
+// NOTE: This is a dcrwallet extension.
 func (c *Client) CreateEncryptedWalletAsync(passphrase string) FutureCreateEncryptedWalletResult {
-	cmd := btcjson.NewCreateEncryptedWalletCmd(passphrase)
+	cmd := dcrjson.NewCreateEncryptedWalletCmd(passphrase)
 	return c.sendCmd(cmd)
 }
 
 // CreateEncryptedWallet requests the creation of an encrypted wallet.  Wallets
-// managed by btcwallet are only written to disk with encrypted private keys,
+// managed by dcrwallet are only written to disk with encrypted private keys,
 // and generating wallets on the fly is impossible as it requires user input for
 // the encryption passphrase.  This RPC specifies the passphrase and instructs
 // the wallet creation.  This may error if a wallet is already opened, or the
 // new wallet cannot be written to disk.
 //
-// NOTE: This is a btcwallet extension.
+// NOTE: This is a dcrwallet extension.
 func (c *Client) CreateEncryptedWallet(passphrase string) error {
 	return c.CreateEncryptedWalletAsync(passphrase).Receive()
+}
+
+// FutureExistsAddressResult is a future promise to deliver the result
+// of a FutureExistsAddressResultAsync RPC invocation (or an applicable error).
+type FutureExistsAddressResult chan *response
+
+// Receive waits for the response promised by the future and returns information
+// about all transactions associated with the provided addresses.
+func (r FutureExistsAddressResult) Receive() (dcrjson.ExistsAddressResult, error) {
+	res, err := receiveFuture(r)
+	if err != nil {
+		return dcrjson.ExistsAddressResult{}, err
+	}
+
+	// Unmarshal the result as an array of existsaddress object.
+	var exists dcrjson.ExistsAddressResult
+	err = json.Unmarshal(res, &exists)
+	if err != nil {
+		return dcrjson.ExistsAddressResult{}, err
+	}
+	return exists, nil
+}
+
+// ExistsAddressAsync returns an instance of a type that can be used to get the
+// result of the RPC at some future time by invoking the Receive function on the
+// returned instance.
+func (c *Client) ExistsAddressAsync(address dcrutil.Address) FutureExistsAddressResult {
+	cmd := dcrjson.NewExistsAddressCmd(address.EncodeAddress())
+	return c.sendCmd(cmd)
+}
+
+// ExistsAddress returns information about whether or not an address has been
+// used on the main chain.
+//
+// NOTE: This is a dcrd extension.
+func (c *Client) ExistsAddress(address dcrutil.Address) (dcrjson.ExistsAddressResult, error) {
+	return c.ExistsAddressAsync(address).Receive()
 }
 
 // FutureListAddressTransactionsResult is a future promise to deliver the result
@@ -102,14 +141,14 @@ type FutureListAddressTransactionsResult chan *response
 
 // Receive waits for the response promised by the future and returns information
 // about all transactions associated with the provided addresses.
-func (r FutureListAddressTransactionsResult) Receive() ([]btcjson.ListTransactionsResult, error) {
+func (r FutureListAddressTransactionsResult) Receive() ([]dcrjson.ListTransactionsResult, error) {
 	res, err := receiveFuture(r)
 	if err != nil {
 		return nil, err
 	}
 
 	// Unmarshal the result as an array of listtransactions objects.
-	var transactions []btcjson.ListTransactionsResult
+	var transactions []dcrjson.ListTransactionsResult
 	err = json.Unmarshal(res, &transactions)
 	if err != nil {
 		return nil, err
@@ -123,22 +162,22 @@ func (r FutureListAddressTransactionsResult) Receive() ([]btcjson.ListTransactio
 //
 // See ListAddressTransactions for the blocking version and more details.
 //
-// NOTE: This is a btcd extension.
-func (c *Client) ListAddressTransactionsAsync(addresses []btcutil.Address, account string) FutureListAddressTransactionsResult {
+// NOTE: This is a dcrd extension.
+func (c *Client) ListAddressTransactionsAsync(addresses []dcrutil.Address, account string) FutureListAddressTransactionsResult {
 	// Convert addresses to strings.
 	addrs := make([]string, 0, len(addresses))
 	for _, addr := range addresses {
 		addrs = append(addrs, addr.EncodeAddress())
 	}
-	cmd := btcjson.NewListAddressTransactionsCmd(addrs, &account)
+	cmd := dcrjson.NewListAddressTransactionsCmd(addrs, &account)
 	return c.sendCmd(cmd)
 }
 
 // ListAddressTransactions returns information about all transactions associated
 // with the provided addresses.
 //
-// NOTE: This is a btcwallet extension.
-func (c *Client) ListAddressTransactions(addresses []btcutil.Address, account string) ([]btcjson.ListTransactionsResult, error) {
+// NOTE: This is a dcrwallet extension.
+func (c *Client) ListAddressTransactions(addresses []dcrutil.Address, account string) ([]dcrjson.ListTransactionsResult, error) {
 	return c.ListAddressTransactionsAsync(addresses, account).Receive()
 }
 
@@ -148,21 +187,22 @@ type FutureGetBestBlockResult chan *response
 
 // Receive waits for the response promised by the future and returns the hash
 // and height of the block in the longest (best) chain.
-func (r FutureGetBestBlockResult) Receive() (*wire.ShaHash, int32, error) {
+func (r FutureGetBestBlockResult) Receive() (*chainhash.Hash, int32, error) {
 	res, err := receiveFuture(r)
 	if err != nil {
 		return nil, 0, err
 	}
 
 	// Unmarsal result as a getbestblock result object.
-	var bestBlock btcjson.GetBestBlockResult
+	var bestBlock dcrjson.GetBestBlockResult
+
 	err = json.Unmarshal(res, &bestBlock)
 	if err != nil {
 		return nil, 0, err
 	}
 
 	// Convert hash string.
-	hash, err := wire.NewShaHashFromStr(bestBlock.Hash)
+	hash, err := chainhash.NewHashFromStr(bestBlock.Hash)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -176,17 +216,17 @@ func (r FutureGetBestBlockResult) Receive() (*wire.ShaHash, int32, error) {
 //
 // See GetBestBlock for the blocking version and more details.
 //
-// NOTE: This is a btcd extension.
+// NOTE: This is a dcrd extension.
 func (c *Client) GetBestBlockAsync() FutureGetBestBlockResult {
-	cmd := btcjson.NewGetBestBlockCmd()
+	cmd := dcrjson.NewGetBestBlockCmd()
 	return c.sendCmd(cmd)
 }
 
 // GetBestBlock returns the hash and height of the block in the longest (best)
 // chain.
 //
-// NOTE: This is a btcd extension.
-func (c *Client) GetBestBlock() (*wire.ShaHash, int32, error) {
+// NOTE: This is a dcrd extension.
+func (c *Client) GetBestBlock() (*chainhash.Hash, int32, error) {
 	return c.GetBestBlockAsync().Receive()
 }
 
@@ -196,7 +236,7 @@ type FutureGetCurrentNetResult chan *response
 
 // Receive waits for the response promised by the future and returns the network
 // the server is running on.
-func (r FutureGetCurrentNetResult) Receive() (wire.BitcoinNet, error) {
+func (r FutureGetCurrentNetResult) Receive() (wire.CurrencyNet, error) {
 	res, err := receiveFuture(r)
 	if err != nil {
 		return 0, err
@@ -209,7 +249,7 @@ func (r FutureGetCurrentNetResult) Receive() (wire.BitcoinNet, error) {
 		return 0, err
 	}
 
-	return wire.BitcoinNet(net), nil
+	return wire.CurrencyNet(net), nil
 }
 
 // GetCurrentNetAsync returns an instance of a type that can be used to get the
@@ -218,16 +258,16 @@ func (r FutureGetCurrentNetResult) Receive() (wire.BitcoinNet, error) {
 //
 // See GetCurrentNet for the blocking version and more details.
 //
-// NOTE: This is a btcd extension.
+// NOTE: This is a dcrd extension.
 func (c *Client) GetCurrentNetAsync() FutureGetCurrentNetResult {
-	cmd := btcjson.NewGetCurrentNetCmd()
+	cmd := dcrjson.NewGetCurrentNetCmd()
 	return c.sendCmd(cmd)
 }
 
 // GetCurrentNet returns the network the server is running on.
 //
-// NOTE: This is a btcd extension.
-func (c *Client) GetCurrentNet() (wire.BitcoinNet, error) {
+// NOTE: This is a dcrd extension.
+func (c *Client) GetCurrentNet() (wire.CurrencyNet, error) {
 	return c.GetCurrentNetAsync().Receive()
 }
 
@@ -284,18 +324,66 @@ func (r FutureExportWatchingWalletResult) Receive() ([]byte, []byte, error) {
 //
 // See ExportWatchingWallet for the blocking version and more details.
 //
-// NOTE: This is a btcwallet extension.
+// NOTE: This is a dcrwallet extension.
 func (c *Client) ExportWatchingWalletAsync(account string) FutureExportWatchingWalletResult {
-	cmd := btcjson.NewExportWatchingWalletCmd(&account, btcjson.Bool(true))
+	cmd := dcrjson.NewExportWatchingWalletCmd(&account, dcrjson.Bool(true))
 	return c.sendCmd(cmd)
 }
 
 // ExportWatchingWallet returns the raw bytes for a watching-only version of
 // wallet.bin and tx.bin, respectively, for the specified account that can be
-// used by btcwallet to enable a wallet which does not have the private keys
+// used by dcrwallet to enable a wallet which does not have the private keys
 // necessary to spend funds.
 //
-// NOTE: This is a btcwallet extension.
+// NOTE: This is a dcrwallet extension.
 func (c *Client) ExportWatchingWallet(account string) ([]byte, []byte, error) {
 	return c.ExportWatchingWalletAsync(account).Receive()
+}
+
+// FutureSessionResult is a future promise to deliver the result of a
+// SessionAsync RPC invocation (or an applicable error).
+type FutureSessionResult chan *response
+
+// Receive waits for the response promised by the future and returns the
+// session result.
+func (r FutureSessionResult) Receive() (*dcrjson.SessionResult, error) {
+	res, err := receiveFuture(r)
+	if err != nil {
+		return nil, err
+	}
+
+	// Unmarsal result as a session result object.
+	var session dcrjson.SessionResult
+	err = json.Unmarshal(res, &session)
+	if err != nil {
+		return nil, err
+	}
+
+	return &session, nil
+}
+
+// SessionAsync returns an instance of a type that can be used to get the result
+// of the RPC at some future time by invoking the Receive function on the
+// returned instance.
+//
+// See Session for the blocking version and more details.
+//
+// NOTE: This is a decred extension.
+func (c *Client) SessionAsync() FutureSessionResult {
+	// Not supported in HTTP POST mode.
+	if c.config.HTTPPostMode {
+		return newFutureError(ErrWebsocketsRequired)
+	}
+
+	cmd := dcrjson.NewSessionCmd()
+	return c.sendCmd(cmd)
+}
+
+// Session returns details regarding a websocket client's current connection.
+//
+// This RPC requires the client to be running in websocket mode.
+//
+// NOTE: This is a decred extension.
+func (c *Client) Session() (*dcrjson.SessionResult, error) {
+	return c.SessionAsync().Receive()
 }

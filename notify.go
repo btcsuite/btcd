@@ -1,8 +1,9 @@
 // Copyright (c) 2014-2015 The btcsuite developers
+// Copyright (c) 2015 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
-package btcrpcclient
+package dcrrpcclient
 
 import (
 	"bytes"
@@ -10,21 +11,23 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strconv"
 	"sync"
 	"time"
 
-	"github.com/btcsuite/btcd/btcjson"
-	"github.com/btcsuite/btcd/wire"
-	"github.com/btcsuite/btcutil"
+	"github.com/decred/dcrd/chaincfg/chainhash"
+	"github.com/decred/dcrd/dcrjson"
+	"github.com/decred/dcrd/wire"
+	"github.com/decred/dcrutil"
 )
 
 var (
-	// ErrNotificationsNotSupported is an error to describe the condition
-	// where the caller is trying to request notifications when they are
-	// not supported due to the client being configured to run in HTTP POST
-	// mode.
-	ErrNotificationsNotSupported = errors.New("notifications are not " +
-		"supported when running in HTTP POST mode")
+	// ErrWebsocketsRequired is an error to describe the condition where the
+	// caller is trying to use a websocket-only feature, such as requesting
+	// notifications or other websocket requests when the client is
+	// configured to run in HTTP POST mode.
+	ErrWebsocketsRequired = errors.New("a websocket connection is required " +
+		"to use this feature")
 )
 
 // notificationState is used to track the current state of successfuly
@@ -32,11 +35,15 @@ var (
 // reconnect.
 type notificationState struct {
 	sync.Mutex
-	notifyBlocks       bool
-	notifyNewTx        bool
-	notifyNewTxVerbose bool
-	notifyReceived     map[string]struct{}
-	notifySpent        map[btcjson.OutPoint]struct{}
+	notifyBlocks                bool
+	notifyWinningTickets        bool
+	notifySpentAndMissedTickets bool
+	notifyNewTickets            bool
+	notifyStakeDifficulty       bool
+	notifyNewTx                 bool
+	notifyNewTxVerbose          bool
+	notifyReceived              map[string]struct{}
+	notifySpent                 map[dcrjson.OutPoint]struct{}
 }
 
 // Copy returns a deep copy of the receiver.
@@ -51,7 +58,7 @@ func (s *notificationState) Copy() *notificationState {
 	for addr := range s.notifyReceived {
 		stateCopy.notifyReceived[addr] = struct{}{}
 	}
-	stateCopy.notifySpent = make(map[btcjson.OutPoint]struct{})
+	stateCopy.notifySpent = make(map[dcrjson.OutPoint]struct{})
 	for op := range s.notifySpent {
 		stateCopy.notifySpent[op] = struct{}{}
 	}
@@ -63,7 +70,7 @@ func (s *notificationState) Copy() *notificationState {
 func newNotificationState() *notificationState {
 	return &notificationState{
 		notifyReceived: make(map[string]struct{}),
-		notifySpent:    make(map[btcjson.OutPoint]struct{}),
+		notifySpent:    make(map[dcrjson.OutPoint]struct{}),
 	}
 }
 
@@ -96,20 +103,62 @@ type NotificationHandlers struct {
 	// (best) chain.  It will only be invoked if a preceding call to
 	// NotifyBlocks has been made to register for the notification and the
 	// function is non-nil.
-	OnBlockConnected func(hash *wire.ShaHash, height int32, t time.Time)
+	OnBlockConnected func(hash *chainhash.Hash, height int32, t time.Time,
+		vb uint16)
 
 	// OnBlockDisconnected is invoked when a block is disconnected from the
 	// longest (best) chain.  It will only be invoked if a preceding call to
 	// NotifyBlocks has been made to register for the notification and the
 	// function is non-nil.
-	OnBlockDisconnected func(hash *wire.ShaHash, height int32, t time.Time)
+	OnBlockDisconnected func(hash *chainhash.Hash, height int32, t time.Time,
+		vb uint16)
+
+	// OnReorganization is invoked when the blockchain begins reorganizing.
+	// It will only be invoked if a preceding call to NotifyBlocks has been
+	// made to register for the notification and the function is non-nil.
+	OnReorganization func(oldHash *chainhash.Hash, oldHeight int32,
+		newHash *chainhash.Hash, newHeight int32)
+
+	// OnWinningTickets is invoked when a block is connected and eligible tickets
+	// to be voted on for this chain are given.  It will only be invoked if a
+	// preceding call to NotifyWinningTickets has been made to register for the
+	// notification and the function is non-nil.
+	OnWinningTickets func(blockHash *chainhash.Hash,
+		blockHeight int64,
+		tickets []*chainhash.Hash)
+
+	// OnSpentAndMissedTickets is invoked when a block is connected to the
+	// longest (best) chain and tickets are spent or missed.  It will only be
+	// invoked if a preceding call to NotifySpentAndMissedTickets has been made to
+	// register for the notification and the function is non-nil.
+	OnSpentAndMissedTickets func(hash *chainhash.Hash,
+		height int64,
+		stakeDiff int64,
+		tickets map[chainhash.Hash]bool)
+
+	// OnNewTickets is invoked when a block is connected to the longest (best)
+	// chain and tickets have matured to become active.  It will only be invoked
+	// if a preceding call to NotifyNewTickets has been made to register for the
+	// notification and the function is non-nil.
+	OnNewTickets func(hash *chainhash.Hash,
+		height int64,
+		stakeDiff int64,
+		tickets map[chainhash.Hash]chainhash.Hash)
+
+	// OnStakeDifficulty is invoked when a block is connected to the longest
+	// (best) chain and a new stake difficulty is calculated.  It will only
+	// be invoked if a preceding call to NotifyStakeDifficulty has been
+	// made to register for the notification and the function is non-nil.
+	OnStakeDifficulty func(hash *chainhash.Hash,
+		height int64,
+		stakeDiff int64)
 
 	// OnRecvTx is invoked when a transaction that receives funds to a
 	// registered address is received into the memory pool and also
 	// connected to the longest (best) chain.  It will only be invoked if a
 	// preceding call to NotifyReceived, Rescan, or RescanEndHeight has been
 	// made to register for the notification and the function is non-nil.
-	OnRecvTx func(transaction *btcutil.Tx, details *btcjson.BlockDetails)
+	OnRecvTx func(transaction *dcrutil.Tx, details *dcrjson.BlockDetails)
 
 	// OnRedeemingTx is invoked when a transaction that spends a registered
 	// outpoint is received into the memory pool and also connected to the
@@ -121,50 +170,73 @@ type NotificationHandlers struct {
 	// for the outpoints that are now "owned" as a result of receiving
 	// funds to the registered addresses.  This means it is possible for
 	// this to invoked indirectly as the result of a NotifyReceived call.
-	OnRedeemingTx func(transaction *btcutil.Tx, details *btcjson.BlockDetails)
+	OnRedeemingTx func(transaction *dcrutil.Tx, details *dcrjson.BlockDetails)
 
 	// OnRescanFinished is invoked after a rescan finishes due to a previous
 	// call to Rescan or RescanEndHeight.  Finished rescans should be
 	// signaled on this notification, rather than relying on the return
-	// result of a rescan request, due to how btcd may send various rescan
+	// result of a rescan request, due to how dcrd may send various rescan
 	// notifications after the rescan request has already returned.
-	OnRescanFinished func(hash *wire.ShaHash, height int32, blkTime time.Time)
+	OnRescanFinished func(hash *chainhash.Hash, height int32, blkTime time.Time)
 
 	// OnRescanProgress is invoked periodically when a rescan is underway.
 	// It will only be invoked if a preceding call to Rescan or
 	// RescanEndHeight has been made and the function is non-nil.
-	OnRescanProgress func(hash *wire.ShaHash, height int32, blkTime time.Time)
+	OnRescanProgress func(hash *chainhash.Hash, height int32, blkTime time.Time)
 
 	// OnTxAccepted is invoked when a transaction is accepted into the
 	// memory pool.  It will only be invoked if a preceding call to
 	// NotifyNewTransactions with the verbose flag set to false has been
 	// made to register for the notification and the function is non-nil.
-	OnTxAccepted func(hash *wire.ShaHash, amount btcutil.Amount)
+	OnTxAccepted func(hash *chainhash.Hash, amount dcrutil.Amount)
 
 	// OnTxAccepted is invoked when a transaction is accepted into the
 	// memory pool.  It will only be invoked if a preceding call to
 	// NotifyNewTransactions with the verbose flag set to true has been
 	// made to register for the notification and the function is non-nil.
-	OnTxAcceptedVerbose func(txDetails *btcjson.TxRawResult)
+	OnTxAcceptedVerbose func(txDetails *dcrjson.TxRawResult)
 
 	// OnBtcdConnected is invoked when a wallet connects or disconnects from
-	// btcd.
+	// dcrd.
 	//
 	// This will only be available when client is connected to a wallet
-	// server such as btcwallet.
+	// server such as dcrwallet.
 	OnBtcdConnected func(connected bool)
 
 	// OnAccountBalance is invoked with account balance updates.
 	//
 	// This will only be available when speaking to a wallet server
-	// such as btcwallet.
-	OnAccountBalance func(account string, balance btcutil.Amount, confirmed bool)
+	// such as dcrwallet.
+	OnAccountBalance func(account string, balance dcrutil.Amount, confirmed bool)
 
 	// OnWalletLockState is invoked when a wallet is locked or unlocked.
 	//
 	// This will only be available when client is connected to a wallet
-	// server such as btcwallet.
+	// server such as dcrwallet.
 	OnWalletLockState func(locked bool)
+
+	// OnTicketsPurchased is invoked when a wallet purchases an SStx.
+	//
+	// This will only be available when client is connected to a wallet
+	// server such as dcrwallet.
+	OnTicketsPurchased func(TxHash *chainhash.Hash, amount dcrutil.Amount)
+
+	// OnVotesCreated is invoked when a wallet generates an SSGen.
+	//
+	// This will only be available when client is connected to a wallet
+	// server such as dcrwallet.
+	OnVotesCreated func(txHash *chainhash.Hash,
+		blockHash *chainhash.Hash,
+		height int32,
+		sstxIn *chainhash.Hash,
+		voteBits uint16)
+
+	// OnRevocationsCreated is invoked when a wallet generates an SSRtx.
+	//
+	// This will only be available when client is connected to a wallet
+	// server such as dcrwallet.
+	OnRevocationsCreated func(txHash *chainhash.Hash,
+		sstxIn *chainhash.Hash)
 
 	// OnUnknownNotification is invoked when an unrecognized notification
 	// is received.  This typically means the notification handling code
@@ -187,41 +259,144 @@ func (c *Client) handleNotification(ntfn *rawNotification) {
 
 	switch ntfn.Method {
 	// OnBlockConnected
-	case btcjson.BlockConnectedNtfnMethod:
+	case dcrjson.BlockConnectedNtfnMethod:
 		// Ignore the notification if the client is not interested in
 		// it.
 		if c.ntfnHandlers.OnBlockConnected == nil {
 			return
 		}
 
-		blockSha, blockHeight, blockTime, err := parseChainNtfnParams(ntfn.Params)
+		blockSha, blockHeight, blockTime, voteBits, err :=
+			parseChainNtfnParams(ntfn.Params)
 		if err != nil {
 			log.Warnf("Received invalid block connected "+
 				"notification: %v", err)
 			return
 		}
 
-		c.ntfnHandlers.OnBlockConnected(blockSha, blockHeight, blockTime)
+		c.ntfnHandlers.OnBlockConnected(blockSha, blockHeight, blockTime,
+			voteBits)
 
 	// OnBlockDisconnected
-	case btcjson.BlockDisconnectedNtfnMethod:
+	case dcrjson.BlockDisconnectedNtfnMethod:
 		// Ignore the notification if the client is not interested in
 		// it.
 		if c.ntfnHandlers.OnBlockDisconnected == nil {
 			return
 		}
 
-		blockSha, blockHeight, blockTime, err := parseChainNtfnParams(ntfn.Params)
+		blockSha, blockHeight, blockTime, voteBits, err :=
+			parseChainNtfnParams(ntfn.Params)
 		if err != nil {
 			log.Warnf("Received invalid block connected "+
 				"notification: %v", err)
 			return
 		}
 
-		c.ntfnHandlers.OnBlockDisconnected(blockSha, blockHeight, blockTime)
+		c.ntfnHandlers.OnBlockDisconnected(blockSha, blockHeight, blockTime,
+			voteBits)
+
+	case dcrjson.ReorganizationNtfnMethod:
+		// Ignore the notification if the client is not interested in
+		// it.
+		if c.ntfnHandlers.OnReorganization == nil {
+			return
+		}
+
+		oldHash, oldHeight, newHash, newHeight, err :=
+			parseReorganizationNtfnParams(ntfn.Params)
+		if err != nil {
+			log.Warnf("Received invalid reorganization "+
+				"notification: %v", err)
+			return
+		}
+
+		c.ntfnHandlers.OnReorganization(oldHash, oldHeight, newHash, newHeight)
+
+	// OnWinningTickets
+	case dcrjson.WinningTicketsNtfnMethod:
+		// Ignore the notification if the client is not interested in
+		// it.
+		if c.ntfnHandlers.OnWinningTickets == nil {
+			return
+		}
+
+		blockHash, blockHeight, tickets, err :=
+			parseWinningTicketsNtfnParams(ntfn.Params)
+		if err != nil {
+			log.Warnf("Received invalid winning tickets "+
+				"notification: %v", err)
+			return
+		}
+
+		c.ntfnHandlers.OnWinningTickets(blockHash,
+			blockHeight,
+			tickets)
+
+	// OnSpentAndMissedTickets
+	case dcrjson.SpentAndMissedTicketsNtfnMethod:
+		// Ignore the notification if the client is not interested in
+		// it.
+		if c.ntfnHandlers.OnSpentAndMissedTickets == nil {
+			return
+		}
+
+		blockSha, blockHeight, stakeDifficulty, tickets, err :=
+			parseSpentAndMissedTicketsNtfnParams(ntfn.Params)
+		if err != nil {
+			log.Warnf("Received invalid spend and missed tickets "+
+				"notification: %v", err)
+			return
+		}
+
+		c.ntfnHandlers.OnSpentAndMissedTickets(blockSha,
+			blockHeight,
+			stakeDifficulty,
+			tickets)
+
+	// OnNewTickets
+	case dcrjson.NewTicketsNtfnMethod:
+		// Ignore the notification if the client is not interested in
+		// it.
+		if c.ntfnHandlers.OnNewTickets == nil {
+			return
+		}
+
+		blockSha, blockHeight, stakeDifficulty, tickets, err :=
+			parseNewTicketsNtfnParams(ntfn.Params)
+		if err != nil {
+			log.Warnf("Received invalid new tickets "+
+				"notification: %v", err)
+			return
+		}
+
+		c.ntfnHandlers.OnNewTickets(blockSha,
+			blockHeight,
+			stakeDifficulty,
+			tickets)
+
+	// OnStakeDifficulty
+	case dcrjson.StakeDifficultyNtfnMethod:
+		// Ignore the notification if the client is not interested in
+		// it.
+		if c.ntfnHandlers.OnStakeDifficulty == nil {
+			return
+		}
+
+		blockSha, blockHeight, stakeDiff,
+			err := parseStakeDifficultyNtfnParams(ntfn.Params)
+		if err != nil {
+			log.Warnf("Received invalid stake difficulty "+
+				"notification: %v", err)
+			return
+		}
+
+		c.ntfnHandlers.OnStakeDifficulty(blockSha,
+			blockHeight,
+			stakeDiff)
 
 	// OnRecvTx
-	case btcjson.RecvTxNtfnMethod:
+	case dcrjson.RecvTxNtfnMethod:
 		// Ignore the notification if the client is not interested in
 		// it.
 		if c.ntfnHandlers.OnRecvTx == nil {
@@ -238,7 +413,7 @@ func (c *Client) handleNotification(ntfn *rawNotification) {
 		c.ntfnHandlers.OnRecvTx(tx, block)
 
 	// OnRedeemingTx
-	case btcjson.RedeemingTxNtfnMethod:
+	case dcrjson.RedeemingTxNtfnMethod:
 		// Ignore the notification if the client is not interested in
 		// it.
 		if c.ntfnHandlers.OnRedeemingTx == nil {
@@ -255,7 +430,7 @@ func (c *Client) handleNotification(ntfn *rawNotification) {
 		c.ntfnHandlers.OnRedeemingTx(tx, block)
 
 	// OnRescanFinished
-	case btcjson.RescanFinishedNtfnMethod:
+	case dcrjson.RescanFinishedNtfnMethod:
 		// Ignore the notification if the client is not interested in
 		// it.
 		if c.ntfnHandlers.OnRescanFinished == nil {
@@ -272,7 +447,7 @@ func (c *Client) handleNotification(ntfn *rawNotification) {
 		c.ntfnHandlers.OnRescanFinished(hash, height, blkTime)
 
 	// OnRescanProgress
-	case btcjson.RescanProgressNtfnMethod:
+	case dcrjson.RescanProgressNtfnMethod:
 		// Ignore the notification if the client is not interested in
 		// it.
 		if c.ntfnHandlers.OnRescanProgress == nil {
@@ -289,7 +464,7 @@ func (c *Client) handleNotification(ntfn *rawNotification) {
 		c.ntfnHandlers.OnRescanProgress(hash, height, blkTime)
 
 	// OnTxAccepted
-	case btcjson.TxAcceptedNtfnMethod:
+	case dcrjson.TxAcceptedNtfnMethod:
 		// Ignore the notification if the client is not interested in
 		// it.
 		if c.ntfnHandlers.OnTxAccepted == nil {
@@ -306,7 +481,7 @@ func (c *Client) handleNotification(ntfn *rawNotification) {
 		c.ntfnHandlers.OnTxAccepted(hash, amt)
 
 	// OnTxAcceptedVerbose
-	case btcjson.TxAcceptedVerboseNtfnMethod:
+	case dcrjson.TxAcceptedVerboseNtfnMethod:
 		// Ignore the notification if the client is not interested in
 		// it.
 		if c.ntfnHandlers.OnTxAcceptedVerbose == nil {
@@ -323,7 +498,7 @@ func (c *Client) handleNotification(ntfn *rawNotification) {
 		c.ntfnHandlers.OnTxAcceptedVerbose(rawTx)
 
 	// OnBtcdConnected
-	case btcjson.BtcdConnectedNtfnMethod:
+	case dcrjson.BtcdConnectedNtfnMethod:
 		// Ignore the notification if the client is not interested in
 		// it.
 		if c.ntfnHandlers.OnBtcdConnected == nil {
@@ -332,7 +507,7 @@ func (c *Client) handleNotification(ntfn *rawNotification) {
 
 		connected, err := parseBtcdConnectedNtfnParams(ntfn.Params)
 		if err != nil {
-			log.Warnf("Received invalid btcd connected "+
+			log.Warnf("Received invalid dcrd connected "+
 				"notification: %v", err)
 			return
 		}
@@ -340,7 +515,7 @@ func (c *Client) handleNotification(ntfn *rawNotification) {
 		c.ntfnHandlers.OnBtcdConnected(connected)
 
 	// OnAccountBalance
-	case btcjson.AccountBalanceNtfnMethod:
+	case dcrjson.AccountBalanceNtfnMethod:
 		// Ignore the notification if the client is not interested in
 		// it.
 		if c.ntfnHandlers.OnAccountBalance == nil {
@@ -356,8 +531,60 @@ func (c *Client) handleNotification(ntfn *rawNotification) {
 
 		c.ntfnHandlers.OnAccountBalance(account, bal, conf)
 
+	// OnTicketPurchased:
+	case dcrjson.TicketPurchasedNtfnMethod:
+		// Ignore the notification if the client is not interested in
+		// it.
+		if c.ntfnHandlers.OnTicketsPurchased == nil {
+			return
+		}
+
+		txHash, amount, err := parseTicketPurchasedNtfnParams(ntfn.Params)
+		if err != nil {
+			log.Warnf("Received invalid ticket purchased "+
+				"notification: %v", err)
+			return
+		}
+
+		c.ntfnHandlers.OnTicketsPurchased(txHash, amount)
+
+	// OnVotesCreated:
+	case dcrjson.VoteCreatedNtfnMethod:
+		// Ignore the notification if the client is not interested in
+		// it.
+		if c.ntfnHandlers.OnVotesCreated == nil {
+			return
+		}
+
+		txHash, blockHash, height, sstxIn, voteBits, err :=
+			parseVoteCreatedNtfnParams(ntfn.Params)
+		if err != nil {
+			log.Warnf("Received invalid vote created "+
+				"notification: %v", err)
+			return
+		}
+
+		c.ntfnHandlers.OnVotesCreated(txHash, blockHash, height, sstxIn, voteBits)
+
+	// OnRevocationsCreated:
+	case dcrjson.RevocationCreatedNtfnMethod:
+		// Ignore the notification if the client is not interested in
+		// it.
+		if c.ntfnHandlers.OnRevocationsCreated == nil {
+			return
+		}
+
+		txHash, sstxIn, err := parseRevocationCreatedNtfnParams(ntfn.Params)
+		if err != nil {
+			log.Warnf("Received invalid revocation created "+
+				"notification: %v", err)
+			return
+		}
+
+		c.ntfnHandlers.OnRevocationsCreated(txHash, sstxIn)
+
 	// OnWalletLockState
-	case btcjson.WalletLockStateNtfnMethod:
+	case dcrjson.WalletLockStateNtfnMethod:
 		// Ignore the notification if the client is not interested in
 		// it.
 		if c.ntfnHandlers.OnWalletLockState == nil {
@@ -398,51 +625,348 @@ func (e wrongNumParams) Error() string {
 
 // parseChainNtfnParams parses out the block hash and height from the parameters
 // of blockconnected and blockdisconnected notifications.
-func parseChainNtfnParams(params []json.RawMessage) (*wire.ShaHash,
-	int32, time.Time, error) {
+func parseChainNtfnParams(params []json.RawMessage) (*chainhash.Hash,
+	int32, time.Time, uint16, error) {
 
-	if len(params) != 3 {
-		return nil, 0, time.Time{}, wrongNumParams(len(params))
+	if len(params) != 4 {
+		return nil, 0, time.Time{}, 0, wrongNumParams(len(params))
 	}
 
 	// Unmarshal first parameter as a string.
 	var blockShaStr string
 	err := json.Unmarshal(params[0], &blockShaStr)
 	if err != nil {
-		return nil, 0, time.Time{}, err
+		return nil, 0, time.Time{}, 0, err
 	}
 
 	// Unmarshal second parameter as an integer.
 	var blockHeight int32
 	err = json.Unmarshal(params[1], &blockHeight)
 	if err != nil {
-		return nil, 0, time.Time{}, err
+		return nil, 0, time.Time{}, 0, err
 	}
 
 	// Unmarshal third parameter as unix time.
 	var blockTimeUnix int64
 	err = json.Unmarshal(params[2], &blockTimeUnix)
 	if err != nil {
-		return nil, 0, time.Time{}, err
+		return nil, 0, time.Time{}, 0, err
+	}
+
+	// Unmarshal fourth parameter as votebits (uint16).
+	var voteBits uint16
+	err = json.Unmarshal(params[3], &voteBits)
+	if err != nil {
+		return nil, 0, time.Time{}, 0, err
 	}
 
 	// Create ShaHash from block sha string.
-	blockSha, err := wire.NewShaHashFromStr(blockShaStr)
+	blockSha, err := chainhash.NewHashFromStr(blockShaStr)
 	if err != nil {
-		return nil, 0, time.Time{}, err
+		return nil, 0, time.Time{}, 0, err
 	}
 
 	// Create time.Time from unix time.
 	blockTime := time.Unix(blockTimeUnix, 0)
 
-	return blockSha, blockHeight, blockTime, nil
+	return blockSha, blockHeight, blockTime, voteBits, nil
+}
+
+func parseReorganizationNtfnParams(params []json.RawMessage) (*chainhash.Hash,
+	int32, *chainhash.Hash, int32, error) {
+	errorOut := func(err error) (*chainhash.Hash, int32, *chainhash.Hash,
+		int32, error) {
+		return nil, 0, nil, 0, err
+	}
+
+	if len(params) != 4 {
+		return errorOut(wrongNumParams(len(params)))
+	}
+
+	// Unmarshal first parameter as a string.
+	var oldHashStr string
+	err := json.Unmarshal(params[0], &oldHashStr)
+	if err != nil {
+		return errorOut(err)
+	}
+
+	// Unmarshal second parameter as an integer.
+	var oldHeight int32
+	err = json.Unmarshal(params[1], &oldHeight)
+	if err != nil {
+		return errorOut(err)
+	}
+
+	// Unmarshal first parameter as a string.
+	var newHashStr string
+	err = json.Unmarshal(params[2], &newHashStr)
+	if err != nil {
+		return errorOut(err)
+	}
+
+	// Unmarshal second parameter as an integer.
+	var newHeight int32
+	err = json.Unmarshal(params[3], &newHeight)
+	if err != nil {
+		return errorOut(err)
+	}
+
+	// Create hash from block sha string.
+	oldHash, err := chainhash.NewHashFromStr(oldHashStr)
+	if err != nil {
+		return errorOut(err)
+	}
+
+	// Create hash from block sha string.
+	newHash, err := chainhash.NewHashFromStr(newHashStr)
+	if err != nil {
+		return errorOut(err)
+	}
+
+	return oldHash, oldHeight, newHash, newHeight, nil
+}
+
+// parseWinningTicketsNtfnParams parses out the list of eligible tickets, block
+// hash, and block height from a WinningTickets notification.
+func parseWinningTicketsNtfnParams(params []json.RawMessage) (
+	*chainhash.Hash,
+	int64,
+	[]*chainhash.Hash,
+	error) {
+
+	if len(params) != 3 {
+		return nil, 0, nil, wrongNumParams(len(params))
+	}
+
+	// Unmarshal first parameter as a string.
+	var blockHashStr string
+	err := json.Unmarshal(params[0], &blockHashStr)
+	if err != nil {
+		return nil, 0, nil, err
+	}
+
+	// Create ShaHash from block sha string.
+	bHash, err := chainhash.NewHashFromStr(blockHashStr)
+	if err != nil {
+		return nil, 0, nil, err
+	}
+
+	// Unmarshal second parameter as an integer.
+	var blockHeight int32
+	err = json.Unmarshal(params[1], &blockHeight)
+	if err != nil {
+		return nil, 0, nil, err
+	}
+	bHeight := int64(blockHeight)
+
+	// Unmarshal third parameter as a slice.
+	tickets := make(map[string]string)
+	err = json.Unmarshal(params[2], &tickets)
+	if err != nil {
+		return nil, 0, nil, err
+	}
+	t := make([]*chainhash.Hash, len(tickets))
+
+	for i, ticketHashStr := range tickets {
+		// Create and cache Hash from tx hash.
+		ticketHash, err := chainhash.NewHashFromStr(ticketHashStr)
+		if err != nil {
+			return nil, 0, nil, err
+		}
+
+		itr, err := strconv.Atoi(i)
+		if err != nil {
+			return nil, 0, nil, err
+		}
+
+		t[itr] = ticketHash
+	}
+
+	return bHash, bHeight, t, nil
+}
+
+// parseSpentAndMissedTicketsNtfnParams parses out the block header hash, height,
+// winner number, and ticket map from a SpentAndMissedTickets notification.
+func parseSpentAndMissedTicketsNtfnParams(params []json.RawMessage) (
+	*chainhash.Hash,
+	int64,
+	int64,
+	map[chainhash.Hash]bool,
+	error) {
+
+	if len(params) != 4 {
+		return nil, 0, 0, nil, wrongNumParams(len(params))
+	}
+
+	// Unmarshal first parameter as a string.
+	var blockShaStr string
+	err := json.Unmarshal(params[0], &blockShaStr)
+	if err != nil {
+		return nil, 0, 0, nil, err
+	}
+
+	// Create ShaHash from block sha string.
+	sha, err := chainhash.NewHashFromStr(blockShaStr)
+	if err != nil {
+		return nil, 0, 0, nil, err
+	}
+
+	// Unmarshal second parameter as an integer.
+	var blockHeight int32
+	err = json.Unmarshal(params[1], &blockHeight)
+	if err != nil {
+		return nil, 0, 0, nil, err
+	}
+	bh := int64(blockHeight)
+
+	// Unmarshal third parameter as an integer.
+	var stakeDiff int64
+	err = json.Unmarshal(params[2], &stakeDiff)
+	if err != nil {
+		return nil, 0, 0, nil, err
+	}
+
+	// Unmarshal fourth parameter as a map[*hash]bool.
+	tickets := make(map[string]string)
+	err = json.Unmarshal(params[3], &tickets)
+	if err != nil {
+		return nil, 0, 0, nil, err
+	}
+	t := make(map[chainhash.Hash]bool)
+
+	for hashStr, spentStr := range tickets {
+		isSpent := false
+		if spentStr == "spent" {
+			isSpent = true
+		}
+
+		// Create and cache ShaHash from tx hash.
+		ticketSha, err := chainhash.NewHashFromStr(hashStr)
+		if err != nil {
+			return nil, 0, 0, nil, err
+		}
+
+		t[*ticketSha] = isSpent
+	}
+
+	return sha, bh, stakeDiff, t, nil
+}
+
+// parseNewTicketsNtfnParams parses out the block header hash, height,
+// winner number, overflow, and ticket map from a NewTickets notification.
+func parseNewTicketsNtfnParams(params []json.RawMessage) (*chainhash.Hash,
+	int64,
+	int64,
+	map[chainhash.Hash]chainhash.Hash,
+	error) {
+
+	if len(params) != 4 {
+		return nil, 0, 0, nil, wrongNumParams(len(params))
+	}
+
+	// Unmarshal first parameter as a string.
+	var blockShaStr string
+	err := json.Unmarshal(params[0], &blockShaStr)
+	if err != nil {
+		return nil, 0, 0, nil, err
+	}
+
+	// Create ShaHash from block sha string.
+	sha, err := chainhash.NewHashFromStr(blockShaStr)
+	if err != nil {
+		return nil, 0, 0, nil, err
+	}
+
+	// Unmarshal second parameter as an integer.
+	var blockHeight int32
+	err = json.Unmarshal(params[1], &blockHeight)
+	if err != nil {
+		return nil, 0, 0, nil, err
+	}
+	bh := int64(blockHeight)
+
+	// Unmarshal third parameter as an integer.
+	var stakeDiff int64
+	err = json.Unmarshal(params[2], &stakeDiff)
+	if err != nil {
+		return nil, 0, 0, nil, err
+	}
+
+	// Unmarshal fourth parameter as a map[hash]hash.
+	tickets := make(map[string]string)
+	err = json.Unmarshal(params[3], &tickets)
+	if err != nil {
+		return nil, 0, 0, nil, err
+	}
+	t := make(map[chainhash.Hash]chainhash.Hash)
+
+	for hashStr, ticketNH := range tickets {
+		// Create and cache ShaHash from tx hash.
+		ticketSha, err := chainhash.NewHashFromStr(hashStr)
+		if err != nil {
+			return nil, 0, 0, nil, err
+		}
+
+		// Convert the numberData to a big int.
+		numberHash, err := chainhash.NewHashFromStr(ticketNH)
+		if err != nil {
+			return nil, 0, 0, nil, err
+		}
+
+		t[*ticketSha] = *numberHash
+	}
+
+	return sha, bh, stakeDiff, t, nil
+}
+
+// parseStakeDifficultyNtfnParams parses out the list of block hash, block
+// height, and stake difficulty from a WinningTickets notification.
+func parseStakeDifficultyNtfnParams(params []json.RawMessage) (
+	*chainhash.Hash,
+	int64,
+	int64,
+	error) {
+
+	if len(params) != 3 {
+		return nil, 0, 0, wrongNumParams(len(params))
+	}
+
+	// Unmarshal first parameter as a string.
+	var blockHashStr string
+	err := json.Unmarshal(params[0], &blockHashStr)
+	if err != nil {
+		return nil, 0, 0, err
+	}
+
+	// Create ShaHash from block sha string.
+	bHash, err := chainhash.NewHashFromStr(blockHashStr)
+	if err != nil {
+		return nil, 0, 0, err
+	}
+
+	// Unmarshal second parameter as an integer.
+	var blockHeight int32
+	err = json.Unmarshal(params[1], &blockHeight)
+	if err != nil {
+		return nil, 0, 0, err
+	}
+	bHeight := int64(blockHeight)
+
+	// Unmarshal third parameter as an integer.
+	var stakeDiff int64
+	err = json.Unmarshal(params[2], &stakeDiff)
+	if err != nil {
+		return nil, 0, 0, err
+	}
+
+	return bHash, bHeight, stakeDiff, nil
 }
 
 // parseChainTxNtfnParams parses out the transaction and optional details about
 // the block it's mined in from the parameters of recvtx and redeemingtx
 // notifications.
-func parseChainTxNtfnParams(params []json.RawMessage) (*btcutil.Tx,
-	*btcjson.BlockDetails, error) {
+func parseChainTxNtfnParams(params []json.RawMessage) (*dcrutil.Tx,
+	*dcrjson.BlockDetails, error) {
 
 	if len(params) == 0 || len(params) > 2 {
 		return nil, nil, wrongNumParams(len(params))
@@ -457,7 +981,7 @@ func parseChainTxNtfnParams(params []json.RawMessage) (*btcutil.Tx,
 
 	// If present, unmarshal second optional parameter as the block details
 	// JSON object.
-	var block *btcjson.BlockDetails
+	var block *dcrjson.BlockDetails
 	if len(params) > 1 {
 		err = json.Unmarshal(params[1], &block)
 		if err != nil {
@@ -478,13 +1002,13 @@ func parseChainTxNtfnParams(params []json.RawMessage) (*btcutil.Tx,
 
 	// TODO: Change recvtx and redeemingtx callback signatures to use
 	// nicer types for details about the block (block sha as a
-	// wire.ShaHash, block time as a time.Time, etc.).
-	return btcutil.NewTx(&msgTx), block, nil
+	// dcrwire.ShaHash, block time as a time.Time, etc.).
+	return dcrutil.NewTx(&msgTx), block, nil
 }
 
 // parseRescanProgressParams parses out the height of the last rescanned block
 // from the parameters of rescanfinished and rescanprogress notifications.
-func parseRescanProgressParams(params []json.RawMessage) (*wire.ShaHash, int32, time.Time, error) {
+func parseRescanProgressParams(params []json.RawMessage) (*chainhash.Hash, int32, time.Time, error) {
 	if len(params) != 3 {
 		return nil, 0, time.Time{}, wrongNumParams(len(params))
 	}
@@ -511,7 +1035,7 @@ func parseRescanProgressParams(params []json.RawMessage) (*wire.ShaHash, int32, 
 	}
 
 	// Decode string encoding of block hash.
-	hash, err := wire.NewShaHashFromStr(hashStr)
+	hash, err := chainhash.NewHashFromStr(hashStr)
 	if err != nil {
 		return nil, 0, time.Time{}, err
 	}
@@ -521,8 +1045,8 @@ func parseRescanProgressParams(params []json.RawMessage) (*wire.ShaHash, int32, 
 
 // parseTxAcceptedNtfnParams parses out the transaction hash and total amount
 // from the parameters of a txaccepted notification.
-func parseTxAcceptedNtfnParams(params []json.RawMessage) (*wire.ShaHash,
-	btcutil.Amount, error) {
+func parseTxAcceptedNtfnParams(params []json.RawMessage) (*chainhash.Hash,
+	dcrutil.Amount, error) {
 
 	if len(params) != 2 {
 		return nil, 0, wrongNumParams(len(params))
@@ -543,23 +1067,23 @@ func parseTxAcceptedNtfnParams(params []json.RawMessage) (*wire.ShaHash,
 	}
 
 	// Bounds check amount.
-	amt, err := btcutil.NewAmount(famt)
+	amt, err := dcrutil.NewAmount(famt)
 	if err != nil {
 		return nil, 0, err
 	}
 
 	// Decode string encoding of transaction sha.
-	txSha, err := wire.NewShaHashFromStr(txShaStr)
+	txSha, err := chainhash.NewHashFromStr(txShaStr)
 	if err != nil {
 		return nil, 0, err
 	}
 
-	return txSha, btcutil.Amount(amt), nil
+	return txSha, dcrutil.Amount(amt), nil
 }
 
 // parseTxAcceptedVerboseNtfnParams parses out details about a raw transaction
 // from the parameters of a txacceptedverbose notification.
-func parseTxAcceptedVerboseNtfnParams(params []json.RawMessage) (*btcjson.TxRawResult,
+func parseTxAcceptedVerboseNtfnParams(params []json.RawMessage) (*dcrjson.TxRawResult,
 	error) {
 
 	if len(params) != 1 {
@@ -567,7 +1091,7 @@ func parseTxAcceptedVerboseNtfnParams(params []json.RawMessage) (*btcjson.TxRawR
 	}
 
 	// Unmarshal first parameter as a raw transaction result object.
-	var rawTx btcjson.TxRawResult
+	var rawTx dcrjson.TxRawResult
 	err := json.Unmarshal(params[0], &rawTx)
 	if err != nil {
 		return nil, err
@@ -579,8 +1103,8 @@ func parseTxAcceptedVerboseNtfnParams(params []json.RawMessage) (*btcjson.TxRawR
 	return &rawTx, nil
 }
 
-// parseBtcdConnectedNtfnParams parses out the connection status of btcd
-// and btcwallet from the parameters of a btcdconnected notification.
+// parseBtcdConnectedNtfnParams parses out the connection status of dcrd
+// and dcrwallet from the parameters of a btcdconnected notification.
 func parseBtcdConnectedNtfnParams(params []json.RawMessage) (bool, error) {
 	if len(params) != 1 {
 		return false, wrongNumParams(len(params))
@@ -600,7 +1124,7 @@ func parseBtcdConnectedNtfnParams(params []json.RawMessage) (bool, error) {
 // and whether or not the balance is confirmed or unconfirmed from the
 // parameters of an accountbalance notification.
 func parseAccountBalanceNtfnParams(params []json.RawMessage) (account string,
-	balance btcutil.Amount, confirmed bool, err error) {
+	balance dcrutil.Amount, confirmed bool, err error) {
 
 	if len(params) != 3 {
 		return "", 0, false, wrongNumParams(len(params))
@@ -626,12 +1150,140 @@ func parseAccountBalanceNtfnParams(params []json.RawMessage) (account string,
 	}
 
 	// Bounds check amount.
-	bal, err := btcutil.NewAmount(fbal)
+	bal, err := dcrutil.NewAmount(fbal)
 	if err != nil {
 		return "", 0, false, err
 	}
 
-	return account, btcutil.Amount(bal), confirmed, nil
+	return account, dcrutil.Amount(bal), confirmed, nil
+}
+
+// parseTicketPurchasedNtfnParams parses out the ticket hash and amount
+// from a recent ticket purchase in the wallet.
+func parseTicketPurchasedNtfnParams(params []json.RawMessage) (txHash *chainhash.Hash,
+	amount dcrutil.Amount, err error) {
+
+	if len(params) != 2 {
+		return nil, 0, wrongNumParams(len(params))
+	}
+
+	// Unmarshal first parameter as a string and convert to hash.
+	var th string
+	err = json.Unmarshal(params[0], &th)
+	if err != nil {
+		return nil, 0, err
+	}
+	thHash, err := chainhash.NewHashFromStr(th)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	// Unmarshal second parameter as an int64.
+	var amt int64
+	err = json.Unmarshal(params[1], &amt)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	return thHash, dcrutil.Amount(amt), nil
+}
+
+// parseVoteCreatedNtfnParams parses out the hash, block hash, block height,
+// ticket input hash, and votebits from a newly created SSGen in wallet.
+// from a recent ticket purchase in the wallet.
+func parseVoteCreatedNtfnParams(params []json.RawMessage) (txHash *chainhash.Hash,
+	blockHash *chainhash.Hash,
+	height int32,
+	sstxIn *chainhash.Hash,
+	voteBits uint16,
+	err error) {
+
+	if len(params) != 5 {
+		return nil, nil, 0, nil, 0, wrongNumParams(len(params))
+	}
+
+	// Unmarshal first parameter as a string and convert to hash.
+	var th string
+	err = json.Unmarshal(params[0], &th)
+	if err != nil {
+		return nil, nil, 0, nil, 0, err
+	}
+	thHash, err := chainhash.NewHashFromStr(th)
+	if err != nil {
+		return nil, nil, 0, nil, 0, err
+	}
+
+	// Unmarshal second parameter as a string and convert to hash.
+	var bh string
+	err = json.Unmarshal(params[1], &bh)
+	if err != nil {
+		return nil, nil, 0, nil, 0, err
+	}
+	bhHash, err := chainhash.NewHashFromStr(bh)
+	if err != nil {
+		return nil, nil, 0, nil, 0, err
+	}
+
+	// Unmarshal third parameter as an int32.
+	var h int32
+	err = json.Unmarshal(params[2], &h)
+	if err != nil {
+		return nil, nil, 0, nil, 0, err
+	}
+
+	// Unmarshal fourth parameter as a string and convert to hash.
+	var ss string
+	err = json.Unmarshal(params[3], &ss)
+	if err != nil {
+		return nil, nil, 0, nil, 0, err
+	}
+	ssHash, err := chainhash.NewHashFromStr(ss)
+	if err != nil {
+		return nil, nil, 0, nil, 0, err
+	}
+
+	// Unmarshal fifth parameter as a uint16.
+	var vb uint16
+	err = json.Unmarshal(params[4], &vb)
+	if err != nil {
+		return nil, nil, 0, nil, 0, err
+	}
+
+	return thHash, bhHash, h, ssHash, vb, nil
+}
+
+// parseRevocationCreatedNtfnParams parses out the hash and ticket input hash
+// from a newly created SSGen in wallet.
+func parseRevocationCreatedNtfnParams(params []json.RawMessage) (txHash *chainhash.Hash,
+	sstxIn *chainhash.Hash, err error) {
+
+	if len(params) != 2 {
+		return nil, nil, wrongNumParams(len(params))
+	}
+
+	// Unmarshal first parameter as a string and convert to hash.
+	var th string
+	err = json.Unmarshal(params[0], &th)
+	if err != nil {
+		return nil, nil, err
+	}
+	thHash, err := chainhash.NewHashFromStr(th)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	// Unmarshal second parameter as a string and convert to hash.
+	var ss string
+	err = json.Unmarshal(params[1], &ss)
+	if err != nil {
+		return nil, nil, err
+	}
+	ssHash, err := chainhash.NewHashFromStr(ss)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return thHash, ssHash, nil
 }
 
 // parseWalletLockStateNtfnParams parses out the account name and locked
@@ -679,11 +1331,11 @@ func (r FutureNotifyBlocksResult) Receive() error {
 //
 // See NotifyBlocks for the blocking version and more details.
 //
-// NOTE: This is a btcd extension and requires a websocket connection.
+// NOTE: This is a dcrd extension and requires a websocket connection.
 func (c *Client) NotifyBlocksAsync() FutureNotifyBlocksResult {
 	// Not supported in HTTP POST mode.
 	if c.config.HTTPPostMode {
-		return newFutureError(ErrNotificationsNotSupported)
+		return newFutureError(ErrWebsocketsRequired)
 	}
 
 	// Ignore the notification if the client is not interested in
@@ -692,7 +1344,7 @@ func (c *Client) NotifyBlocksAsync() FutureNotifyBlocksResult {
 		return newNilFutureResult()
 	}
 
-	cmd := btcjson.NewNotifyBlocksCmd()
+	cmd := dcrjson.NewNotifyBlocksCmd()
 	return c.sendCmd(cmd)
 }
 
@@ -705,9 +1357,223 @@ func (c *Client) NotifyBlocksAsync() FutureNotifyBlocksResult {
 // The notifications delivered as a result of this call will be via one of
 // OnBlockConnected or OnBlockDisconnected.
 //
-// NOTE: This is a btcd extension and requires a websocket connection.
+// NOTE: This is a dcrd extension and requires a websocket connection.
 func (c *Client) NotifyBlocks() error {
 	return c.NotifyBlocksAsync().Receive()
+}
+
+// FutureNotifyWinningTicketsResult is a future promise to deliver the result of a
+// NotifyWinningTicketsAsync RPC invocation (or an applicable error).
+type FutureNotifyWinningTicketsResult chan *response
+
+// Receive waits for the response promised by the future and returns an error
+// if the registration was not successful.
+func (r FutureNotifyWinningTicketsResult) Receive() error {
+	_, err := receiveFuture(r)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// NotifyWinningTicketsAsync returns an instance of a type that can be used
+// to  get the result of the RPC at some future time by invoking the Receive
+// function on the returned instance.
+//
+// See NotifyWinningTickets for the blocking version and more details.
+//
+// NOTE: This is a dcrd extension and requires a websocket connection.
+func (c *Client) NotifyWinningTicketsAsync() FutureNotifyWinningTicketsResult {
+	// Not supported in HTTP POST mode.
+	if c.config.HTTPPostMode {
+		return newFutureError(ErrWebsocketsRequired)
+	}
+
+	// Ignore the notification if the client is not interested in
+	// notifications.
+	if c.ntfnHandlers == nil {
+		return newNilFutureResult()
+	}
+
+	cmd := dcrjson.NewNotifyWinningTicketsCmd()
+
+	return c.sendCmd(cmd)
+}
+
+// NotifyWinningTickets registers the client to receive notifications when
+// blocks are connected to the main chain and tickets are spent or missed.  The
+// notifications are delivered to the notification handlers associated with the
+// client.  Calling this function has no effect if there are no notification
+// handlers and will result in an error if the client is configured to run in HTTP
+// POST mode.
+//
+// The notifications delivered as a result of this call will be those from
+// OnWinningTickets.
+//
+// NOTE: This is a dcrd extension and requires a websocket connection.
+func (c *Client) NotifyWinningTickets() error {
+	return c.NotifyWinningTicketsAsync().Receive()
+}
+
+// FutureNotifySpentAndMissedTicketsResult is a future promise to deliver the result of a
+// NotifySpentAndMissedTicketsAsync RPC invocation (or an applicable error).
+type FutureNotifySpentAndMissedTicketsResult chan *response
+
+// Receive waits for the response promised by the future and returns an error
+// if the registration was not successful.
+func (r FutureNotifySpentAndMissedTicketsResult) Receive() error {
+	_, err := receiveFuture(r)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// NotifySpentAndMissedTicketsAsync returns an instance of a type that can be used
+// to  get the result of the RPC at some future time by invoking the Receive
+// function on the returned instance.
+//
+// See NotifySpentAndMissedTickets for the blocking version and more details.
+//
+// NOTE: This is a dcrd extension and requires a websocket connection.
+func (c *Client) NotifySpentAndMissedTicketsAsync() FutureNotifySpentAndMissedTicketsResult {
+	// Not supported in HTTP POST mode.
+	if c.config.HTTPPostMode {
+		return newFutureError(ErrWebsocketsRequired)
+	}
+
+	// Ignore the notification if the client is not interested in
+	// notifications.
+	if c.ntfnHandlers == nil {
+		return newNilFutureResult()
+	}
+
+	cmd := dcrjson.NewNotifySpentAndMissedTicketsCmd()
+
+	return c.sendCmd(cmd)
+}
+
+// NotifySpentAndMissedTickets registers the client to receive notifications when
+// blocks are connected to the main chain and tickets are spent or missed.  The
+// notifications are delivered to the notification handlers associated with the
+// client.  Calling this function has no effect if there are no notification
+// handlers and will result in an error if the client is configured to run in HTTP
+// POST mode.
+//
+// The notifications delivered as a result of this call will be those from
+// OnSpentAndMissedTickets.
+//
+// NOTE: This is a dcrd extension and requires a websocket connection.
+func (c *Client) NotifySpentAndMissedTickets() error {
+	return c.NotifySpentAndMissedTicketsAsync().Receive()
+}
+
+// FutureNotifyNewTicketsResult is a future promise to deliver the result of a
+// NotifyNewTicketsAsync RPC invocation (or an applicable error).
+type FutureNotifyNewTicketsResult chan *response
+
+// Receive waits for the response promised by the future and returns an error
+// if the registration was not successful.
+func (r FutureNotifyNewTicketsResult) Receive() error {
+	_, err := receiveFuture(r)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// NotifyNewTicketsAsync returns an instance of a type that can be used to get the
+// result of the RPC at some future time by invoking the Receive function on
+// the returned instance.
+//
+// See NotifyNewTickets for the blocking version and more details.
+//
+// NOTE: This is a dcrd extension and requires a websocket connection.
+func (c *Client) NotifyNewTicketsAsync() FutureNotifyNewTicketsResult {
+	// Not supported in HTTP POST mode.
+	if c.config.HTTPPostMode {
+		return newFutureError(ErrWebsocketsRequired)
+	}
+
+	// Ignore the notification if the client is not interested in
+	// notifications.
+	if c.ntfnHandlers == nil {
+		return newNilFutureResult()
+	}
+
+	cmd := dcrjson.NewNotifyNewTicketsCmd()
+
+	return c.sendCmd(cmd)
+}
+
+// NotifyNewTickets registers the client to receive notifications when blocks are
+// connected to the main chain and new tickets have matured.  The notifications are
+// delivered to the notification handlers associated with the client.  Calling
+// this function has no effect if there are no notification handlers and will
+// result in an error if the client is configured to run in HTTP POST mode.
+//
+// The notifications delivered as a result of this call will be via OnNewTickets.
+//
+// NOTE: This is a dcrd extension and requires a websocket connection.
+func (c *Client) NotifyNewTickets() error {
+	return c.NotifyNewTicketsAsync().Receive()
+}
+
+// FutureNotifyStakeDifficultyResult is a future promise to deliver the result of a
+// NotifyStakeDifficultyAsync RPC invocation (or an applicable error).
+type FutureNotifyStakeDifficultyResult chan *response
+
+// Receive waits for the response promised by the future and returns an error
+// if the registration was not successful.
+func (r FutureNotifyStakeDifficultyResult) Receive() error {
+	_, err := receiveFuture(r)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// NotifyStakeDifficultyAsync returns an instance of a type that can be used to get the
+// result of the RPC at some future time by invoking the Receive function on
+// the returned instance.
+//
+// See NotifyStakeDifficulty for the blocking version and more details.
+//
+// NOTE: This is a dcrd extension and requires a websocket connection.
+func (c *Client) NotifyStakeDifficultyAsync() FutureNotifyStakeDifficultyResult {
+	// Not supported in HTTP POST mode.
+	if c.config.HTTPPostMode {
+		return newFutureError(ErrWebsocketsRequired)
+	}
+
+	// Ignore the notification if the client is not interested in
+	// notifications.
+	if c.ntfnHandlers == nil {
+		return newNilFutureResult()
+	}
+
+	cmd := dcrjson.NewNotifyStakeDifficultyCmd()
+
+	return c.sendCmd(cmd)
+}
+
+// NotifyStakeDifficulty registers the client to receive notifications when
+// blocks are connected to the main chain and stake difficulty is updated.  The
+// notifications are delivered to the notification handlers associated with the
+// client.  Calling this function has no effect if there are no notification
+// handlers and will result in an error if the client is configured to run in
+// HTTP POST mode.
+//
+// The notifications delivered as a result of this call will be via
+// OnStakeDifficulty.
+//
+// NOTE: This is a dcrd extension and requires a websocket connection.
+func (c *Client) NotifyStakeDifficulty() error {
+	return c.NotifyStakeDifficultyAsync().Receive()
 }
 
 // FutureNotifySpentResult is a future promise to deliver the result of a
@@ -728,10 +1594,10 @@ func (r FutureNotifySpentResult) Receive() error {
 // notifySpentInternal is the same as notifySpentAsync except it accepts
 // the converted outpoints as a parameter so the client can more efficiently
 // recreate the previous notification state on reconnect.
-func (c *Client) notifySpentInternal(outpoints []btcjson.OutPoint) FutureNotifySpentResult {
+func (c *Client) notifySpentInternal(outpoints []dcrjson.OutPoint) FutureNotifySpentResult {
 	// Not supported in HTTP POST mode.
 	if c.config.HTTPPostMode {
-		return newFutureError(ErrNotificationsNotSupported)
+		return newFutureError(ErrWebsocketsRequired)
 	}
 
 	// Ignore the notification if the client is not interested in
@@ -740,14 +1606,14 @@ func (c *Client) notifySpentInternal(outpoints []btcjson.OutPoint) FutureNotifyS
 		return newNilFutureResult()
 	}
 
-	cmd := btcjson.NewNotifySpentCmd(outpoints)
+	cmd := dcrjson.NewNotifySpentCmd(outpoints)
 	return c.sendCmd(cmd)
 }
 
 // newOutPointFromWire constructs the btcjson representation of a transaction
 // outpoint from the wire type.
-func newOutPointFromWire(op *wire.OutPoint) btcjson.OutPoint {
-	return btcjson.OutPoint{
+func newOutPointFromWire(op *wire.OutPoint) dcrjson.OutPoint {
+	return dcrjson.OutPoint{
 		Hash:  op.Hash.String(),
 		Index: op.Index,
 	}
@@ -759,11 +1625,11 @@ func newOutPointFromWire(op *wire.OutPoint) btcjson.OutPoint {
 //
 // See NotifySpent for the blocking version and more details.
 //
-// NOTE: This is a btcd extension and requires a websocket connection.
+// NOTE: This is a dcrd extension and requires a websocket connection.
 func (c *Client) NotifySpentAsync(outpoints []*wire.OutPoint) FutureNotifySpentResult {
 	// Not supported in HTTP POST mode.
 	if c.config.HTTPPostMode {
-		return newFutureError(ErrNotificationsNotSupported)
+		return newFutureError(ErrWebsocketsRequired)
 	}
 
 	// Ignore the notification if the client is not interested in
@@ -772,11 +1638,11 @@ func (c *Client) NotifySpentAsync(outpoints []*wire.OutPoint) FutureNotifySpentR
 		return newNilFutureResult()
 	}
 
-	ops := make([]btcjson.OutPoint, 0, len(outpoints))
+	ops := make([]dcrjson.OutPoint, 0, len(outpoints))
 	for _, outpoint := range outpoints {
 		ops = append(ops, newOutPointFromWire(outpoint))
 	}
-	cmd := btcjson.NewNotifySpentCmd(ops)
+	cmd := dcrjson.NewNotifySpentCmd(ops)
 	return c.sendCmd(cmd)
 }
 
@@ -789,7 +1655,7 @@ func (c *Client) NotifySpentAsync(outpoints []*wire.OutPoint) FutureNotifySpentR
 // The notifications delivered as a result of this call will be via
 // OnRedeemingTx.
 //
-// NOTE: This is a btcd extension and requires a websocket connection.
+// NOTE: This is a dcrd extension and requires a websocket connection.
 func (c *Client) NotifySpent(outpoints []*wire.OutPoint) error {
 	return c.NotifySpentAsync(outpoints).Receive()
 }
@@ -815,11 +1681,11 @@ func (r FutureNotifyNewTransactionsResult) Receive() error {
 //
 // See NotifyNewTransactionsAsync for the blocking version and more details.
 //
-// NOTE: This is a btcd extension and requires a websocket connection.
+// NOTE: This is a dcrd extension and requires a websocket connection.
 func (c *Client) NotifyNewTransactionsAsync(verbose bool) FutureNotifyNewTransactionsResult {
 	// Not supported in HTTP POST mode.
 	if c.config.HTTPPostMode {
-		return newFutureError(ErrNotificationsNotSupported)
+		return newFutureError(ErrWebsocketsRequired)
 	}
 
 	// Ignore the notification if the client is not interested in
@@ -828,7 +1694,7 @@ func (c *Client) NotifyNewTransactionsAsync(verbose bool) FutureNotifyNewTransac
 		return newNilFutureResult()
 	}
 
-	cmd := btcjson.NewNotifyNewTransactionsCmd(&verbose)
+	cmd := dcrjson.NewNotifyNewTransactionsCmd(&verbose)
 	return c.sendCmd(cmd)
 }
 
@@ -842,7 +1708,7 @@ func (c *Client) NotifyNewTransactionsAsync(verbose bool) FutureNotifyNewTransac
 // OnTxAccepted (when verbose is false) or OnTxAcceptedVerbose (when verbose is
 // true).
 //
-// NOTE: This is a btcd extension and requires a websocket connection.
+// NOTE: This is a dcrd extension and requires a websocket connection.
 func (c *Client) NotifyNewTransactions(verbose bool) error {
 	return c.NotifyNewTransactionsAsync(verbose).Receive()
 }
@@ -868,7 +1734,7 @@ func (r FutureNotifyReceivedResult) Receive() error {
 func (c *Client) notifyReceivedInternal(addresses []string) FutureNotifyReceivedResult {
 	// Not supported in HTTP POST mode.
 	if c.config.HTTPPostMode {
-		return newFutureError(ErrNotificationsNotSupported)
+		return newFutureError(ErrWebsocketsRequired)
 	}
 
 	// Ignore the notification if the client is not interested in
@@ -878,7 +1744,7 @@ func (c *Client) notifyReceivedInternal(addresses []string) FutureNotifyReceived
 	}
 
 	// Convert addresses to strings.
-	cmd := btcjson.NewNotifyReceivedCmd(addresses)
+	cmd := dcrjson.NewNotifyReceivedCmd(addresses)
 	return c.sendCmd(cmd)
 }
 
@@ -888,11 +1754,11 @@ func (c *Client) notifyReceivedInternal(addresses []string) FutureNotifyReceived
 //
 // See NotifyReceived for the blocking version and more details.
 //
-// NOTE: This is a btcd extension and requires a websocket connection.
-func (c *Client) NotifyReceivedAsync(addresses []btcutil.Address) FutureNotifyReceivedResult {
+// NOTE: This is a dcrd extension and requires a websocket connection.
+func (c *Client) NotifyReceivedAsync(addresses []dcrutil.Address) FutureNotifyReceivedResult {
 	// Not supported in HTTP POST mode.
 	if c.config.HTTPPostMode {
-		return newFutureError(ErrNotificationsNotSupported)
+		return newFutureError(ErrWebsocketsRequired)
 	}
 
 	// Ignore the notification if the client is not interested in
@@ -906,7 +1772,8 @@ func (c *Client) NotifyReceivedAsync(addresses []btcutil.Address) FutureNotifyRe
 	for _, addr := range addresses {
 		addrs = append(addrs, addr.String())
 	}
-	cmd := btcjson.NewNotifyReceivedCmd(addrs)
+
+	cmd := dcrjson.NewNotifyReceivedCmd(addrs)
 	return c.sendCmd(cmd)
 }
 
@@ -926,8 +1793,8 @@ func (c *Client) NotifyReceivedAsync(addresses []btcutil.Address) FutureNotifyRe
 // of the outpoints which are automatically registered upon receipt of funds to
 // the address).
 //
-// NOTE: This is a btcd extension and requires a websocket connection.
-func (c *Client) NotifyReceived(addresses []btcutil.Address) error {
+// NOTE: This is a dcrd extension and requires a websocket connection.
+func (c *Client) NotifyReceived(addresses []dcrutil.Address) error {
 	return c.NotifyReceivedAsync(addresses).Receive()
 }
 
@@ -958,14 +1825,14 @@ func (r FutureRescanResult) Receive() error {
 // callback for a good callsite to reissue rescan requests on connect and
 // reconnect.
 //
-// NOTE: This is a btcd extension and requires a websocket connection.
-func (c *Client) RescanAsync(startBlock *wire.ShaHash,
-	addresses []btcutil.Address,
+// NOTE: This is a dcrd extension and requires a websocket connection.
+func (c *Client) RescanAsync(startBlock *chainhash.Hash,
+	addresses []dcrutil.Address,
 	outpoints []*wire.OutPoint) FutureRescanResult {
 
 	// Not supported in HTTP POST mode.
 	if c.config.HTTPPostMode {
-		return newFutureError(ErrNotificationsNotSupported)
+		return newFutureError(ErrWebsocketsRequired)
 	}
 
 	// Ignore the notification if the client is not interested in
@@ -987,12 +1854,12 @@ func (c *Client) RescanAsync(startBlock *wire.ShaHash,
 	}
 
 	// Convert outpoints.
-	ops := make([]btcjson.OutPoint, 0, len(outpoints))
+	ops := make([]dcrjson.OutPoint, 0, len(outpoints))
 	for _, op := range outpoints {
 		ops = append(ops, newOutPointFromWire(op))
 	}
 
-	cmd := btcjson.NewRescanCmd(startBlockShaStr, addrs, ops, nil)
+	cmd := dcrjson.NewRescanCmd(startBlockShaStr, addrs, ops, nil)
 	return c.sendCmd(cmd)
 }
 
@@ -1021,9 +1888,9 @@ func (c *Client) RescanAsync(startBlock *wire.ShaHash,
 // callback for a good callsite to reissue rescan requests on connect and
 // reconnect.
 //
-// NOTE: This is a btcd extension and requires a websocket connection.
-func (c *Client) Rescan(startBlock *wire.ShaHash,
-	addresses []btcutil.Address,
+// NOTE: This is a dcrd extension and requires a websocket connection.
+func (c *Client) Rescan(startBlock *chainhash.Hash,
+	addresses []dcrutil.Address,
 	outpoints []*wire.OutPoint) error {
 
 	return c.RescanAsync(startBlock, addresses, outpoints).Receive()
@@ -1035,14 +1902,14 @@ func (c *Client) Rescan(startBlock *wire.ShaHash,
 //
 // See RescanEndBlock for the blocking version and more details.
 //
-// NOTE: This is a btcd extension and requires a websocket connection.
-func (c *Client) RescanEndBlockAsync(startBlock *wire.ShaHash,
-	addresses []btcutil.Address, outpoints []*wire.OutPoint,
-	endBlock *wire.ShaHash) FutureRescanResult {
+// NOTE: This is a dcrd extension and requires a websocket connection.
+func (c *Client) RescanEndBlockAsync(startBlock *chainhash.Hash,
+	addresses []dcrutil.Address, outpoints []*wire.OutPoint,
+	endBlock *chainhash.Hash) FutureRescanResult {
 
 	// Not supported in HTTP POST mode.
 	if c.config.HTTPPostMode {
-		return newFutureError(ErrNotificationsNotSupported)
+		return newFutureError(ErrWebsocketsRequired)
 	}
 
 	// Ignore the notification if the client is not interested in
@@ -1067,12 +1934,12 @@ func (c *Client) RescanEndBlockAsync(startBlock *wire.ShaHash,
 	}
 
 	// Convert outpoints.
-	ops := make([]btcjson.OutPoint, 0, len(outpoints))
+	ops := make([]dcrjson.OutPoint, 0, len(outpoints))
 	for _, op := range outpoints {
 		ops = append(ops, newOutPointFromWire(op))
 	}
 
-	cmd := btcjson.NewRescanCmd(startBlockShaStr, addrs, ops,
+	cmd := dcrjson.NewRescanCmd(startBlockShaStr, addrs, ops,
 		&endBlockShaStr)
 	return c.sendCmd(cmd)
 }
@@ -1095,10 +1962,10 @@ func (c *Client) RescanEndBlockAsync(startBlock *wire.ShaHash,
 //
 // See Rescan to also perform a rescan through current end of the longest chain.
 //
-// NOTE: This is a btcd extension and requires a websocket connection.
-func (c *Client) RescanEndHeight(startBlock *wire.ShaHash,
-	addresses []btcutil.Address, outpoints []*wire.OutPoint,
-	endBlock *wire.ShaHash) error {
+// NOTE: This is a dcrd extension and requires a websocket connection.
+func (c *Client) RescanEndHeight(startBlock *chainhash.Hash,
+	addresses []dcrutil.Address, outpoints []*wire.OutPoint,
+	endBlock *chainhash.Hash) error {
 
 	return c.RescanEndBlockAsync(startBlock, addresses, outpoints,
 		endBlock).Receive()

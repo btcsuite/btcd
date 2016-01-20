@@ -1,17 +1,19 @@
 // Copyright (c) 2014-2015 The btcsuite developers
+// Copyright (c) 2015 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
-package btcrpcclient
+package dcrrpcclient
 
 import (
 	"bytes"
 	"encoding/hex"
 	"encoding/json"
 
-	"github.com/btcsuite/btcd/btcjson"
-	"github.com/btcsuite/btcd/wire"
-	"github.com/btcsuite/btcutil"
+	"github.com/decred/dcrd/chaincfg/chainhash"
+	"github.com/decred/dcrd/dcrjson"
+	"github.com/decred/dcrd/wire"
+	"github.com/decred/dcrutil"
 )
 
 // FutureGetBestBlockHashResult is a future promise to deliver the result of a
@@ -20,7 +22,7 @@ type FutureGetBestBlockHashResult chan *response
 
 // Receive waits for the response promised by the future and returns the hash of
 // the best block in the longest block chain.
-func (r FutureGetBestBlockHashResult) Receive() (*wire.ShaHash, error) {
+func (r FutureGetBestBlockHashResult) Receive() (*chainhash.Hash, error) {
 	res, err := receiveFuture(r)
 	if err != nil {
 		return nil, err
@@ -32,7 +34,7 @@ func (r FutureGetBestBlockHashResult) Receive() (*wire.ShaHash, error) {
 	if err != nil {
 		return nil, err
 	}
-	return wire.NewShaHashFromStr(txHashStr)
+	return chainhash.NewHashFromStr(txHashStr)
 }
 
 // GetBestBlockHashAsync returns an instance of a type that can be used to get
@@ -41,13 +43,13 @@ func (r FutureGetBestBlockHashResult) Receive() (*wire.ShaHash, error) {
 //
 // See GetBestBlockHash for the blocking version and more details.
 func (c *Client) GetBestBlockHashAsync() FutureGetBestBlockHashResult {
-	cmd := btcjson.NewGetBestBlockHashCmd()
+	cmd := dcrjson.NewGetBestBlockHashCmd()
 	return c.sendCmd(cmd)
 }
 
 // GetBestBlockHash returns the hash of the best block in the longest block
 // chain.
-func (c *Client) GetBestBlockHash() (*wire.ShaHash, error) {
+func (c *Client) GetBestBlockHash() (*chainhash.Hash, error) {
 	return c.GetBestBlockHashAsync().Receive()
 }
 
@@ -57,7 +59,7 @@ type FutureGetBlockResult chan *response
 
 // Receive waits for the response promised by the future and returns the raw
 // block requested from the server given its hash.
-func (r FutureGetBlockResult) Receive() (*btcutil.Block, error) {
+func (r FutureGetBlockResult) Receive() (*dcrutil.Block, error) {
 	res, err := receiveFuture(r)
 	if err != nil {
 		return nil, err
@@ -82,7 +84,7 @@ func (r FutureGetBlockResult) Receive() (*btcutil.Block, error) {
 	if err != nil {
 		return nil, err
 	}
-	return btcutil.NewBlock(&msgBlock), nil
+	return dcrutil.NewBlock(&msgBlock), nil
 }
 
 // GetBlockAsync returns an instance of a type that can be used to get the
@@ -90,13 +92,13 @@ func (r FutureGetBlockResult) Receive() (*btcutil.Block, error) {
 // returned instance.
 //
 // See GetBlock for the blocking version and more details.
-func (c *Client) GetBlockAsync(blockHash *wire.ShaHash) FutureGetBlockResult {
+func (c *Client) GetBlockAsync(blockHash *chainhash.Hash) FutureGetBlockResult {
 	hash := ""
 	if blockHash != nil {
 		hash = blockHash.String()
 	}
 
-	cmd := btcjson.NewGetBlockCmd(hash, btcjson.Bool(false), nil)
+	cmd := dcrjson.NewGetBlockCmd(hash, dcrjson.Bool(false), nil)
 	return c.sendCmd(cmd)
 }
 
@@ -104,7 +106,7 @@ func (c *Client) GetBlockAsync(blockHash *wire.ShaHash) FutureGetBlockResult {
 //
 // See GetBlockVerbose to retrieve a data structure with information about the
 // block instead.
-func (c *Client) GetBlock(blockHash *wire.ShaHash) (*btcutil.Block, error) {
+func (c *Client) GetBlock(blockHash *chainhash.Hash) (*dcrutil.Block, error) {
 	return c.GetBlockAsync(blockHash).Receive()
 }
 
@@ -114,14 +116,14 @@ type FutureGetBlockVerboseResult chan *response
 
 // Receive waits for the response promised by the future and returns the data
 // structure from the server with information about the requested block.
-func (r FutureGetBlockVerboseResult) Receive() (*btcjson.GetBlockVerboseResult, error) {
+func (r FutureGetBlockVerboseResult) Receive() (*dcrjson.GetBlockVerboseResult, error) {
 	res, err := receiveFuture(r)
 	if err != nil {
 		return nil, err
 	}
 
 	// Unmarshal the raw result into a BlockResult.
-	var blockResult btcjson.GetBlockVerboseResult
+	var blockResult dcrjson.GetBlockVerboseResult
 	err = json.Unmarshal(res, &blockResult)
 	if err != nil {
 		return nil, err
@@ -134,13 +136,13 @@ func (r FutureGetBlockVerboseResult) Receive() (*btcjson.GetBlockVerboseResult, 
 // the returned instance.
 //
 // See GetBlockVerbose for the blocking version and more details.
-func (c *Client) GetBlockVerboseAsync(blockHash *wire.ShaHash, verboseTx bool) FutureGetBlockVerboseResult {
+func (c *Client) GetBlockVerboseAsync(blockHash *chainhash.Hash, verboseTx bool) FutureGetBlockVerboseResult {
 	hash := ""
 	if blockHash != nil {
 		hash = blockHash.String()
 	}
 
-	cmd := btcjson.NewGetBlockCmd(hash, btcjson.Bool(true), &verboseTx)
+	cmd := dcrjson.NewGetBlockCmd(hash, dcrjson.Bool(true), &verboseTx)
 	return c.sendCmd(cmd)
 }
 
@@ -148,7 +150,7 @@ func (c *Client) GetBlockVerboseAsync(blockHash *wire.ShaHash, verboseTx bool) F
 // about a block given its hash.
 //
 // See GetBlock to retrieve a raw block instead.
-func (c *Client) GetBlockVerbose(blockHash *wire.ShaHash, verboseTx bool) (*btcjson.GetBlockVerboseResult, error) {
+func (c *Client) GetBlockVerbose(blockHash *chainhash.Hash, verboseTx bool) (*dcrjson.GetBlockVerboseResult, error) {
 	return c.GetBlockVerboseAsync(blockHash, verboseTx).Receive()
 }
 
@@ -179,7 +181,7 @@ func (r FutureGetBlockCountResult) Receive() (int64, error) {
 //
 // See GetBlockCount for the blocking version and more details.
 func (c *Client) GetBlockCountAsync() FutureGetBlockCountResult {
-	cmd := btcjson.NewGetBlockCountCmd()
+	cmd := dcrjson.NewGetBlockCountCmd()
 	return c.sendCmd(cmd)
 }
 
@@ -215,7 +217,7 @@ func (r FutureGetDifficultyResult) Receive() (float64, error) {
 //
 // See GetDifficulty for the blocking version and more details.
 func (c *Client) GetDifficultyAsync() FutureGetDifficultyResult {
-	cmd := btcjson.NewGetDifficultyCmd()
+	cmd := dcrjson.NewGetDifficultyCmd()
 	return c.sendCmd(cmd)
 }
 
@@ -231,7 +233,7 @@ type FutureGetBlockHashResult chan *response
 
 // Receive waits for the response promised by the future and returns the hash of
 // the block in the best block chain at the given height.
-func (r FutureGetBlockHashResult) Receive() (*wire.ShaHash, error) {
+func (r FutureGetBlockHashResult) Receive() (*chainhash.Hash, error) {
 	res, err := receiveFuture(r)
 	if err != nil {
 		return nil, err
@@ -243,7 +245,7 @@ func (r FutureGetBlockHashResult) Receive() (*wire.ShaHash, error) {
 	if err != nil {
 		return nil, err
 	}
-	return wire.NewShaHashFromStr(txHashStr)
+	return chainhash.NewHashFromStr(txHashStr)
 }
 
 // GetBlockHashAsync returns an instance of a type that can be used to get the
@@ -252,13 +254,13 @@ func (r FutureGetBlockHashResult) Receive() (*wire.ShaHash, error) {
 //
 // See GetBlockHash for the blocking version and more details.
 func (c *Client) GetBlockHashAsync(blockHeight int64) FutureGetBlockHashResult {
-	cmd := btcjson.NewGetBlockHashCmd(blockHeight)
+	cmd := dcrjson.NewGetBlockHashCmd(blockHeight)
 	return c.sendCmd(cmd)
 }
 
 // GetBlockHash returns the hash of the block in the best block chain at the
 // given height.
-func (c *Client) GetBlockHash(blockHeight int64) (*wire.ShaHash, error) {
+func (c *Client) GetBlockHash(blockHeight int64) (*chainhash.Hash, error) {
 	return c.GetBlockHashAsync(blockHeight).Receive()
 }
 
@@ -268,7 +270,7 @@ type FutureGetRawMempoolResult chan *response
 
 // Receive waits for the response promised by the future and returns the hashes
 // of all transactions in the memory pool.
-func (r FutureGetRawMempoolResult) Receive() ([]*wire.ShaHash, error) {
+func (r FutureGetRawMempoolResult) Receive() ([]*chainhash.Hash, error) {
 	res, err := receiveFuture(r)
 	if err != nil {
 		return nil, err
@@ -282,9 +284,9 @@ func (r FutureGetRawMempoolResult) Receive() ([]*wire.ShaHash, error) {
 	}
 
 	// Create a slice of ShaHash arrays from the string slice.
-	txHashes := make([]*wire.ShaHash, 0, len(txHashStrs))
+	txHashes := make([]*chainhash.Hash, 0, len(txHashStrs))
 	for _, hashStr := range txHashStrs {
-		txHash, err := wire.NewShaHashFromStr(hashStr)
+		txHash, err := chainhash.NewHashFromStr(hashStr)
 		if err != nil {
 			return nil, err
 		}
@@ -300,7 +302,7 @@ func (r FutureGetRawMempoolResult) Receive() ([]*wire.ShaHash, error) {
 //
 // See GetRawMempool for the blocking version and more details.
 func (c *Client) GetRawMempoolAsync() FutureGetRawMempoolResult {
-	cmd := btcjson.NewGetRawMempoolCmd(btcjson.Bool(false))
+	cmd := dcrjson.NewGetRawMempoolCmd(dcrjson.Bool(false))
 	return c.sendCmd(cmd)
 }
 
@@ -308,7 +310,7 @@ func (c *Client) GetRawMempoolAsync() FutureGetRawMempoolResult {
 //
 // See GetRawMempoolVerbose to retrieve data structures with information about
 // the transactions instead.
-func (c *Client) GetRawMempool() ([]*wire.ShaHash, error) {
+func (c *Client) GetRawMempool() ([]*chainhash.Hash, error) {
 	return c.GetRawMempoolAsync().Receive()
 }
 
@@ -319,7 +321,7 @@ type FutureGetRawMempoolVerboseResult chan *response
 // Receive waits for the response promised by the future and returns a map of
 // transaction hashes to an associated data structure with information about the
 // transaction for all transactions in the memory pool.
-func (r FutureGetRawMempoolVerboseResult) Receive() (map[string]btcjson.GetRawMempoolVerboseResult, error) {
+func (r FutureGetRawMempoolVerboseResult) Receive() (map[string]dcrjson.GetRawMempoolVerboseResult, error) {
 	res, err := receiveFuture(r)
 	if err != nil {
 		return nil, err
@@ -327,7 +329,7 @@ func (r FutureGetRawMempoolVerboseResult) Receive() (map[string]btcjson.GetRawMe
 
 	// Unmarshal the result as a map of strings (tx shas) to their detailed
 	// results.
-	var mempoolItems map[string]btcjson.GetRawMempoolVerboseResult
+	var mempoolItems map[string]dcrjson.GetRawMempoolVerboseResult
 	err = json.Unmarshal(res, &mempoolItems)
 	if err != nil {
 		return nil, err
@@ -341,7 +343,7 @@ func (r FutureGetRawMempoolVerboseResult) Receive() (map[string]btcjson.GetRawMe
 //
 // See GetRawMempoolVerbose for the blocking version and more details.
 func (c *Client) GetRawMempoolVerboseAsync() FutureGetRawMempoolVerboseResult {
-	cmd := btcjson.NewGetRawMempoolCmd(btcjson.Bool(true))
+	cmd := dcrjson.NewGetRawMempoolCmd(dcrjson.Bool(true))
 	return c.sendCmd(cmd)
 }
 
@@ -350,7 +352,7 @@ func (c *Client) GetRawMempoolVerboseAsync() FutureGetRawMempoolVerboseResult {
 // the memory pool.
 //
 // See GetRawMempool to retrieve only the transaction hashes instead.
-func (c *Client) GetRawMempoolVerbose() (map[string]btcjson.GetRawMempoolVerboseResult, error) {
+func (c *Client) GetRawMempoolVerbose() (map[string]dcrjson.GetRawMempoolVerboseResult, error) {
 	return c.GetRawMempoolVerboseAsync().Receive()
 }
 
@@ -383,7 +385,7 @@ func (r FutureVerifyChainResult) Receive() (bool, error) {
 //
 // See VerifyChain for the blocking version and more details.
 func (c *Client) VerifyChainAsync() FutureVerifyChainResult {
-	cmd := btcjson.NewVerifyChainCmd(nil, nil)
+	cmd := dcrjson.NewVerifyChainCmd(nil, nil)
 	return c.sendCmd(cmd)
 }
 
@@ -401,7 +403,7 @@ func (c *Client) VerifyChain() (bool, error) {
 //
 // See VerifyChainLevel for the blocking version and more details.
 func (c *Client) VerifyChainLevelAsync(checkLevel int32) FutureVerifyChainResult {
-	cmd := btcjson.NewVerifyChainCmd(&checkLevel, nil)
+	cmd := dcrjson.NewVerifyChainCmd(&checkLevel, nil)
 	return c.sendCmd(cmd)
 }
 
@@ -424,7 +426,7 @@ func (c *Client) VerifyChainLevel(checkLevel int32) (bool, error) {
 //
 // See VerifyChainBlocks for the blocking version and more details.
 func (c *Client) VerifyChainBlocksAsync(checkLevel, numBlocks int32) FutureVerifyChainResult {
-	cmd := btcjson.NewVerifyChainCmd(&checkLevel, &numBlocks)
+	cmd := dcrjson.NewVerifyChainCmd(&checkLevel, &numBlocks)
 	return c.sendCmd(cmd)
 }
 
@@ -449,7 +451,7 @@ type FutureGetTxOutResult chan *response
 
 // Receive waits for the response promised by the future and returns a
 // transaction given its hash.
-func (r FutureGetTxOutResult) Receive() (*btcjson.GetTxOutResult, error) {
+func (r FutureGetTxOutResult) Receive() (*dcrjson.GetTxOutResult, error) {
 	res, err := receiveFuture(r)
 	if err != nil {
 		return nil, err
@@ -462,7 +464,7 @@ func (r FutureGetTxOutResult) Receive() (*btcjson.GetTxOutResult, error) {
 	}
 
 	// Unmarshal result as an gettxout result object.
-	var txOutInfo *btcjson.GetTxOutResult
+	var txOutInfo *dcrjson.GetTxOutResult
 	err = json.Unmarshal(res, &txOutInfo)
 	if err != nil {
 		return nil, err
@@ -476,18 +478,18 @@ func (r FutureGetTxOutResult) Receive() (*btcjson.GetTxOutResult, error) {
 // the returned instance.
 //
 // See GetTxOut for the blocking version and more details.
-func (c *Client) GetTxOutAsync(txHash *wire.ShaHash, index uint32, mempool bool) FutureGetTxOutResult {
+func (c *Client) GetTxOutAsync(txHash *chainhash.Hash, index uint32, mempool bool) FutureGetTxOutResult {
 	hash := ""
 	if txHash != nil {
 		hash = txHash.String()
 	}
 
-	cmd := btcjson.NewGetTxOutCmd(hash, index, &mempool)
+	cmd := dcrjson.NewGetTxOutCmd(hash, index, &mempool)
 	return c.sendCmd(cmd)
 }
 
 // GetTxOut returns the transaction output info if it's unspent and
 // nil, otherwise.
-func (c *Client) GetTxOut(txHash *wire.ShaHash, index uint32, mempool bool) (*btcjson.GetTxOutResult, error) {
+func (c *Client) GetTxOut(txHash *chainhash.Hash, index uint32, mempool bool) (*dcrjson.GetTxOutResult, error) {
 	return c.GetTxOutAsync(txHash, index, mempool).Receive()
 }

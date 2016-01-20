@@ -1,14 +1,15 @@
 // Copyright (c) 2014-2015 The btcsuite developers
+// Copyright (c) 2015 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
-package btcrpcclient
+package dcrrpcclient
 
 import (
 	"encoding/json"
 	"errors"
 
-	"github.com/btcsuite/btcd/btcjson"
+	"github.com/decred/dcrd/dcrjson"
 )
 
 // FutureRawResult is a future promise to deliver the result of a RawRequest RPC
@@ -40,10 +41,10 @@ func (c *Client) RawRequestAsync(method string, params []json.RawMessage) Future
 
 	// Create a raw JSON-RPC request using the provided method and params
 	// and marshal it.  This is done rather than using the sendCmd function
-	// since that relies on marshalling registered btcjson commands rather
+	// since that relies on marshalling registered dcrjson commands rather
 	// than custom commands.
 	id := c.NextID()
-	rawRequest := &btcjson.Request{
+	rawRequest := &dcrjson.Request{
 		Jsonrpc: "1.0",
 		ID:      id,
 		Method:  method,
