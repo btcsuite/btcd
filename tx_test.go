@@ -1,8 +1,9 @@
 // Copyright (c) 2013-2014 The btcsuite developers
+// Copyright (c) 2015 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
-package btcutil_test
+package dcrutil_test
 
 import (
 	"bytes"
@@ -10,15 +11,15 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/btcsuite/btcd/wire"
-	"github.com/btcsuite/btcutil"
 	"github.com/davecgh/go-spew/spew"
+	"github.com/decred/dcrd/chaincfg/chainhash"
+	"github.com/decred/dcrutil"
 )
 
 // TestTx tests the API for Tx.
 func TestTx(t *testing.T) {
 	testTx := Block100000.Transactions[0]
-	tx := btcutil.NewTx(testTx)
+	tx := dcrutil.NewTx(testTx)
 
 	// Ensure we get the same data back out.
 	if msgTx := tx.MsgTx(); !reflect.DeepEqual(msgTx, testTx) {
@@ -34,9 +35,33 @@ func TestTx(t *testing.T) {
 			gotIndex, wantIndex)
 	}
 
+	// Ensure tree type set and get work properly.
+	wantTree := int8(0)
+	tx.SetTree(0)
+	if gotTree := tx.Tree(); gotTree != wantTree {
+		t.Errorf("Index: mismatched index - got %v, want %v",
+			gotTree, wantTree)
+	}
+
+	// Ensure stake transaction index set and get work properly.
+	wantIndex = 0
+	tx.SetIndex(0)
+	if gotIndex := tx.Index(); gotIndex != wantIndex {
+		t.Errorf("Index: mismatched index - got %v, want %v",
+			gotIndex, wantIndex)
+	}
+
+	// Ensure tree type set and get work properly.
+	wantTree = int8(1)
+	tx.SetTree(1)
+	if gotTree := tx.Tree(); gotTree != wantTree {
+		t.Errorf("Index: mismatched index - got %v, want %v",
+			gotTree, wantTree)
+	}
+
 	// Hash for block 100,000 transaction 0.
-	wantShaStr := "8c14f0db3df150123e6f3dbbf30f8b955a8249b62ac1d1ff16284aefa3d06d87"
-	wantSha, err := wire.NewShaHashFromStr(wantShaStr)
+	wantShaStr := "1cbd9fe1a143a265cc819ff9d8132a7cbc4ca48eb68c0de39cfdf7ecf42cbbd1"
+	wantSha, err := chainhash.NewHashFromStr(wantShaStr)
 	if err != nil {
 		t.Errorf("NewShaHashFromStr: %v", err)
 	}
@@ -63,7 +88,7 @@ func TestNewTxFromBytes(t *testing.T) {
 	testTxBytes := testTxBuf.Bytes()
 
 	// Create a new transaction from the serialized bytes.
-	tx, err := btcutil.NewTxFromBytes(testTxBytes)
+	tx, err := dcrutil.NewTxFromBytes(testTxBytes)
 	if err != nil {
 		t.Errorf("NewTxFromBytes: %v", err)
 		return
@@ -89,7 +114,7 @@ func TestTxErrors(t *testing.T) {
 
 	// Truncate the transaction byte buffer to force errors.
 	shortBytes := testTxBytes[:4]
-	_, err = btcutil.NewTxFromBytes(shortBytes)
+	_, err = dcrutil.NewTxFromBytes(shortBytes)
 	if err != io.EOF {
 		t.Errorf("NewTxFromBytes: did not get expected error - "+
 			"got %v, want %v", err, io.EOF)

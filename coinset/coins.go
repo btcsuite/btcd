@@ -1,3 +1,8 @@
+// Copyright (c) 2014-2015 The btcsuite developers
+// Copyright (c) 2015 The Decred developers
+// Use of this source code is governed by an ISC
+// license that can be found in the LICENSE file.
+
 package coinset
 
 import (
@@ -5,15 +10,16 @@ import (
 	"errors"
 	"sort"
 
-	"github.com/btcsuite/btcd/wire"
-	"github.com/btcsuite/btcutil"
+	"github.com/decred/dcrd/chaincfg/chainhash"
+	"github.com/decred/dcrd/wire"
+	"github.com/decred/dcrutil"
 )
 
 // Coin represents a spendable transaction outpoint
 type Coin interface {
-	Hash() *wire.ShaHash
+	Hash() *chainhash.Hash
 	Index() uint32
-	Value() btcutil.Amount
+	Value() dcrutil.Amount
 	PkScript() []byte
 	NumConfs() int64
 	ValueAge() int64
@@ -34,7 +40,7 @@ type Coins interface {
 // the CoinSet, otherwise the cached values will be incorrect.
 type CoinSet struct {
 	coinList      *list.List
-	totalValue    btcutil.Amount
+	totalValue    dcrutil.Amount
 	totalValueAge int64
 }
 
@@ -65,7 +71,7 @@ func (cs *CoinSet) Coins() []Coin {
 }
 
 // TotalValue returns the total value of the coins in the set.
-func (cs *CoinSet) TotalValue() (value btcutil.Amount) {
+func (cs *CoinSet) TotalValue() (value dcrutil.Amount) {
 	return cs.totalValue
 }
 
@@ -144,7 +150,7 @@ var (
 
 // satisfiesTargetValue checks that the totalValue is either exactly the targetValue
 // or is greater than the targetValue by at least the minChange amount.
-func satisfiesTargetValue(targetValue, minChange, totalValue btcutil.Amount) bool {
+func satisfiesTargetValue(targetValue, minChange, totalValue dcrutil.Amount) bool {
 	return (totalValue == targetValue || totalValue >= targetValue+minChange)
 }
 
@@ -160,7 +166,7 @@ func satisfiesTargetValue(targetValue, minChange, totalValue btcutil.Amount) boo
 // It is important to note that the Coins being used as inputs need to have
 // a constant ValueAge() during the execution of CoinSelect.
 type CoinSelector interface {
-	CoinSelect(targetValue btcutil.Amount, coins []Coin) (Coins, error)
+	CoinSelect(targetValue dcrutil.Amount, coins []Coin) (Coins, error)
 }
 
 // MinIndexCoinSelector is a CoinSelector that attempts to construct a
@@ -168,12 +174,12 @@ type CoinSelector interface {
 // any number of lower indexes (as in the ordered array) over higher ones.
 type MinIndexCoinSelector struct {
 	MaxInputs       int
-	MinChangeAmount btcutil.Amount
+	MinChangeAmount dcrutil.Amount
 }
 
 // CoinSelect will attempt to select coins using the algorithm described
 // in the MinIndexCoinSelector struct.
-func (s MinIndexCoinSelector) CoinSelect(targetValue btcutil.Amount, coins []Coin) (Coins, error) {
+func (s MinIndexCoinSelector) CoinSelect(targetValue dcrutil.Amount, coins []Coin) (Coins, error) {
 	cs := NewCoinSet(nil)
 	for n := 0; n < len(coins) && n < s.MaxInputs; n++ {
 		cs.PushCoin(coins[n])
@@ -189,12 +195,12 @@ func (s MinIndexCoinSelector) CoinSelect(targetValue btcutil.Amount, coins []Coi
 // that uses as few of the inputs as possible.
 type MinNumberCoinSelector struct {
 	MaxInputs       int
-	MinChangeAmount btcutil.Amount
+	MinChangeAmount dcrutil.Amount
 }
 
 // CoinSelect will attempt to select coins using the algorithm described
 // in the MinNumberCoinSelector struct.
-func (s MinNumberCoinSelector) CoinSelect(targetValue btcutil.Amount, coins []Coin) (Coins, error) {
+func (s MinNumberCoinSelector) CoinSelect(targetValue dcrutil.Amount, coins []Coin) (Coins, error) {
 	sortedCoins := make([]Coin, 0, len(coins))
 	sortedCoins = append(sortedCoins, coins...)
 	sort.Sort(sort.Reverse(byAmount(sortedCoins)))
@@ -213,12 +219,12 @@ func (s MinNumberCoinSelector) CoinSelect(targetValue btcutil.Amount, coins []Co
 // block.
 type MaxValueAgeCoinSelector struct {
 	MaxInputs       int
-	MinChangeAmount btcutil.Amount
+	MinChangeAmount dcrutil.Amount
 }
 
 // CoinSelect will attempt to select coins using the algorithm described
 // in the MaxValueAgeCoinSelector struct.
-func (s MaxValueAgeCoinSelector) CoinSelect(targetValue btcutil.Amount, coins []Coin) (Coins, error) {
+func (s MaxValueAgeCoinSelector) CoinSelect(targetValue dcrutil.Amount, coins []Coin) (Coins, error) {
 	sortedCoins := make([]Coin, 0, len(coins))
 	sortedCoins = append(sortedCoins, coins...)
 	sort.Sort(sort.Reverse(byValueAge(sortedCoins)))
@@ -240,13 +246,13 @@ func (s MaxValueAgeCoinSelector) CoinSelect(targetValue btcutil.Amount, coins []
 //
 type MinPriorityCoinSelector struct {
 	MaxInputs              int
-	MinChangeAmount        btcutil.Amount
+	MinChangeAmount        dcrutil.Amount
 	MinAvgValueAgePerInput int64
 }
 
 // CoinSelect will attempt to select coins using the algorithm described
 // in the MinPriorityCoinSelector struct.
-func (s MinPriorityCoinSelector) CoinSelect(targetValue btcutil.Amount, coins []Coin) (Coins, error) {
+func (s MinPriorityCoinSelector) CoinSelect(targetValue dcrutil.Amount, coins []Coin) (Coins, error) {
 	possibleCoins := make([]Coin, 0, len(coins))
 	possibleCoins = append(possibleCoins, coins...)
 
@@ -345,7 +351,7 @@ func (a byAmount) Less(i, j int) bool { return a[i].Value() < a[j].Value() }
 // btcutil.Tx, a specific outpoint index, and the number of confirmations
 // that transaction has had.
 type SimpleCoin struct {
-	Tx         *btcutil.Tx
+	Tx         *dcrutil.Tx
 	TxIndex    uint32
 	TxNumConfs int64
 }
@@ -354,7 +360,7 @@ type SimpleCoin struct {
 var _ Coin = &SimpleCoin{}
 
 // Hash returns the hash value of the transaction on which the Coin is an output
-func (c *SimpleCoin) Hash() *wire.ShaHash {
+func (c *SimpleCoin) Hash() *chainhash.Hash {
 	return c.Tx.Sha()
 }
 
@@ -369,8 +375,8 @@ func (c *SimpleCoin) txOut() *wire.TxOut {
 }
 
 // Value returns the value of the Coin
-func (c *SimpleCoin) Value() btcutil.Amount {
-	return btcutil.Amount(c.txOut().Value)
+func (c *SimpleCoin) Value() dcrutil.Amount {
+	return dcrutil.Amount(c.txOut().Value)
 }
 
 // PkScript returns the outpoint script of the Coin.

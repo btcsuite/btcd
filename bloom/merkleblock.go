@@ -1,21 +1,23 @@
 // Copyright (c) 2013, 2014 The btcsuite developers
+// Copyright (c) 2015 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
 package bloom
 
 import (
-	"github.com/btcsuite/btcd/blockchain"
-	"github.com/btcsuite/btcd/wire"
-	"github.com/btcsuite/btcutil"
+	"github.com/decred/dcrd/blockchain"
+	"github.com/decred/dcrd/chaincfg/chainhash"
+	"github.com/decred/dcrd/wire"
+	"github.com/decred/dcrutil"
 )
 
 // merkleBlock is used to house intermediate information needed to generate a
 // wire.MsgMerkleBlock according to a filter.
 type merkleBlock struct {
 	numTx       uint32
-	allHashes   []*wire.ShaHash
-	finalHashes []*wire.ShaHash
+	allHashes   []*chainhash.Hash
+	finalHashes []*chainhash.Hash
 	matchedBits []byte
 	bits        []byte
 }
@@ -28,12 +30,12 @@ func (m *merkleBlock) calcTreeWidth(height uint32) uint32 {
 
 // calcHash returns the hash for a sub-tree given a depth-first height and
 // node position.
-func (m *merkleBlock) calcHash(height, pos uint32) *wire.ShaHash {
+func (m *merkleBlock) calcHash(height, pos uint32) *chainhash.Hash {
 	if height == 0 {
 		return m.allHashes[pos]
 	}
 
-	var right *wire.ShaHash
+	var right *chainhash.Hash
 	left := m.calcHash(height-1, pos*2)
 	if pos*2+1 < m.calcTreeWidth(height-1) {
 		right = m.calcHash(height-1, pos*2+1)
@@ -78,16 +80,16 @@ func (m *merkleBlock) traverseAndBuild(height, pos uint32) {
 
 // NewMerkleBlock returns a new *wire.MsgMerkleBlock and an array of the matched
 // transaction hashes based on the passed block and filter.
-func NewMerkleBlock(block *btcutil.Block, filter *Filter) (*wire.MsgMerkleBlock, []*wire.ShaHash) {
+func NewMerkleBlock(block *dcrutil.Block, filter *Filter) (*wire.MsgMerkleBlock, []*chainhash.Hash) {
 	numTx := uint32(len(block.Transactions()))
 	mBlock := merkleBlock{
 		numTx:       numTx,
-		allHashes:   make([]*wire.ShaHash, 0, numTx),
+		allHashes:   make([]*chainhash.Hash, 0, numTx),
 		matchedBits: make([]byte, 0, numTx),
 	}
 
 	// Find and keep track of any transactions that match the filter.
-	var matchedHashes []*wire.ShaHash
+	var matchedHashes []*chainhash.Hash
 	for _, tx := range block.Transactions() {
 		if filter.MatchTxAndUpdate(tx) {
 			mBlock.matchedBits = append(mBlock.matchedBits, 0x01)
@@ -111,7 +113,7 @@ func NewMerkleBlock(block *btcutil.Block, filter *Filter) (*wire.MsgMerkleBlock,
 	msgMerkleBlock := wire.MsgMerkleBlock{
 		Header:       block.MsgBlock().Header,
 		Transactions: uint32(mBlock.numTx),
-		Hashes:       make([]*wire.ShaHash, 0, len(mBlock.finalHashes)),
+		Hashes:       make([]*chainhash.Hash, 0, len(mBlock.finalHashes)),
 		Flags:        make([]byte, (len(mBlock.bits)+7)/8),
 	}
 	for _, sha := range mBlock.finalHashes {

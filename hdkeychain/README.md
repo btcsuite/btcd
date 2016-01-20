@@ -1,11 +1,11 @@
 hdkeychain
 ==========
 
-[![Build Status](https://travis-ci.org/btcsuite/btcutil.png?branch=master)]
-(https://travis-ci.org/btcsuite/btcutil)
+[![Build Status](https://travis-ci.org/decred/dcrutil.png?branch=master)]
+(https://travis-ci.org/decred/dcrutil)
 
-Package hdkeychain provides an API for bitcoin hierarchical deterministic
-extended keys (BIP0032).
+Package hdkeychain provides an API for Decred hierarchical deterministic
+extended keys (based on BIP0032).
 
 A comprehensive suite of tests is provided to ensure proper functionality.  See
 `test_coverage.txt` for the gocov coverage report.  Alternatively, if you are
@@ -22,8 +22,8 @@ report.  Package hdkeychain is licensed under the liberal ISC license.
 - Easy serialization and deserialization for both private and public extended
   keys
 - Support for custom networks by registering them with chaincfg
-- Obtaining the underlying EC pubkeys, EC privkeys, and associated bitcoin
-  addresses ties in seamlessly with existing btcec and btcutil types which
+- Obtaining the underlying EC pubkeys, EC privkeys, and associated decred
+  addresses ties in seamlessly with existing btcec and dcrutil types which
   provide powerful tools for working with them to do things like sign
   transations and generate payment scripts
 - Uses the btcec package which is highly optimized for secp256k1
@@ -37,35 +37,35 @@ report.  Package hdkeychain is licensed under the liberal ISC license.
 
 ## Documentation
 
-[![GoDoc](https://godoc.org/github.com/btcsuite/btcutil/hdkeychain?status.png)]
-(http://godoc.org/github.com/btcsuite/btcutil/hdkeychain)
+[![GoDoc](https://godoc.org/github.com/decred/dcrutil/hdkeychain?status.png)]
+(http://godoc.org/github.com/decred/dcrutil/hdkeychain)
 
 Full `go doc` style documentation for the project can be viewed online without
 installing this package by using the GoDoc site here:
-http://godoc.org/github.com/btcsuite/btcutil/hdkeychain
+http://godoc.org/github.com/decred/dcrutil/hdkeychain
 
 You can also view the documentation locally once the package is installed with
 the `godoc` tool by running `godoc -http=":6060"` and pointing your browser to
-http://localhost:6060/pkg/github.com/btcsuite/btcutil/hdkeychain
+http://localhost:6060/pkg/github.com/decred/dcrutil/hdkeychain
 
 ## Installation
 
 ```bash
-$ go get github.com/btcsuite/btcutil/hdkeychain
+$ go get github.com/decred/dcrutil/hdkeychain
 ```
 
 ## Examples
 
 * [NewMaster Example]
-  (http://godoc.org/github.com/btcsuite/btcutil/hdkeychain#example-NewMaster)  
+  (http://godoc.org/github.com/decred/dcrutil/hdkeychain#example-NewMaster)  
   Demonstrates how to generate a cryptographically random seed then use it to
   create a new master node (extended key).
 * [Default Wallet Layout Example]
-  (http://godoc.org/github.com/btcsuite/btcutil/hdkeychain#example-package--DefaultWalletLayout)  
+  (http://godoc.org/github.com/decred/dcrutil/hdkeychain#example-package--DefaultWalletLayout)  
   Demonstrates the default hierarchical deterministic wallet layout as described
   in BIP0032.
 * [Audits Use Case Example]
-  (http://godoc.org/github.com/btcsuite/btcutil/hdkeychain#example-package--Audits)  
+  (http://godoc.org/github.com/decred/dcrutil/hdkeychain#example-package--Audits)  
   Demonstrates the audits use case in BIP0032.
 
 ## License

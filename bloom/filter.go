@@ -1,4 +1,5 @@
 // Copyright (c) 2014 The btcsuite developers
+// Copyright (c) 2015 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -9,9 +10,10 @@ import (
 	"math"
 	"sync"
 
-	"github.com/btcsuite/btcd/txscript"
-	"github.com/btcsuite/btcd/wire"
-	"github.com/btcsuite/btcutil"
+	"github.com/decred/dcrd/chaincfg/chainhash"
+	"github.com/decred/dcrd/txscript"
+	"github.com/decred/dcrd/wire"
+	"github.com/decred/dcrutil"
 )
 
 // ln2Squared is simply the square of the natural log of 2.
@@ -26,7 +28,7 @@ func minUint32(a, b uint32) uint32 {
 	return b
 }
 
-// Filter defines a bitcoin bloom filter that provides easy manipulation of raw
+// Filter defines a bloom filter that provides easy manipulation of raw
 // filter data.
 type Filter struct {
 	mtx           sync.Mutex
@@ -166,9 +168,9 @@ func (bf *Filter) Matches(data []byte) bool {
 // This function MUST be called with the filter lock held.
 func (bf *Filter) matchesOutPoint(outpoint *wire.OutPoint) bool {
 	// Serialize
-	var buf [wire.HashSize + 4]byte
+	var buf [chainhash.HashSize + 4]byte
 	copy(buf[:], outpoint.Hash.Bytes())
-	binary.LittleEndian.PutUint32(buf[wire.HashSize:], outpoint.Index)
+	binary.LittleEndian.PutUint32(buf[chainhash.HashSize:], outpoint.Index)
 
 	return bf.matches(buf[:])
 }
@@ -214,10 +216,10 @@ func (bf *Filter) Add(data []byte) {
 	bf.mtx.Unlock()
 }
 
-// AddShaHash adds the passed wire.ShaHash to the Filter.
+// AddShaHash adds the passed chainhash.Hash to the Filter.
 //
 // This function is safe for concurrent access.
-func (bf *Filter) AddShaHash(sha *wire.ShaHash) {
+func (bf *Filter) AddShaHash(sha *chainhash.Hash) {
 	bf.mtx.Lock()
 	bf.add(sha.Bytes())
 	bf.mtx.Unlock()
@@ -228,9 +230,9 @@ func (bf *Filter) AddShaHash(sha *wire.ShaHash) {
 // This function MUST be called with the filter lock held.
 func (bf *Filter) addOutPoint(outpoint *wire.OutPoint) {
 	// Serialize
-	var buf [wire.HashSize + 4]byte
+	var buf [chainhash.HashSize + 4]byte
 	copy(buf[:], outpoint.Hash.Bytes())
-	binary.LittleEndian.PutUint32(buf[wire.HashSize:], outpoint.Index)
+	binary.LittleEndian.PutUint32(buf[chainhash.HashSize:], outpoint.Index)
 
 	bf.add(buf[:])
 }
@@ -249,15 +251,16 @@ func (bf *Filter) AddOutPoint(outpoint *wire.OutPoint) {
 // script.
 //
 // This function MUST be called with the filter lock held.
-func (bf *Filter) maybeAddOutpoint(pkScript []byte, outHash *wire.ShaHash, outIdx uint32) {
+func (bf *Filter) maybeAddOutpoint(pkScrVer uint16, pkScript []byte,
+	outHash *chainhash.Hash, outIdx uint32, outTree int8) {
 	switch bf.msgFilterLoad.Flags {
 	case wire.BloomUpdateAll:
-		outpoint := wire.NewOutPoint(outHash, outIdx)
+		outpoint := wire.NewOutPoint(outHash, outIdx, outTree)
 		bf.addOutPoint(outpoint)
 	case wire.BloomUpdateP2PubkeyOnly:
-		class := txscript.GetScriptClass(pkScript)
+		class := txscript.GetScriptClass(pkScrVer, pkScript)
 		if class == txscript.PubKeyTy || class == txscript.MultiSigTy {
-			outpoint := wire.NewOutPoint(outHash, outIdx)
+			outpoint := wire.NewOutPoint(outHash, outIdx, outTree)
 			bf.addOutPoint(outpoint)
 		}
 	}
@@ -269,7 +272,7 @@ func (bf *Filter) maybeAddOutpoint(pkScript []byte, outHash *wire.ShaHash, outId
 // update flags set via the loaded filter if needed.
 //
 // This function MUST be called with the filter lock held.
-func (bf *Filter) matchTxAndUpdate(tx *btcutil.Tx) bool {
+func (bf *Filter) matchTxAndUpdate(tx *dcrutil.Tx) bool {
 	// Check if the filter matches the hash of the transaction.
 	// This is useful for finding transactions when they appear in a block.
 	matched := bf.matches(tx.Sha().Bytes())
@@ -294,7 +297,8 @@ func (bf *Filter) matchTxAndUpdate(tx *btcutil.Tx) bool {
 			}
 
 			matched = true
-			bf.maybeAddOutpoint(txOut.PkScript, tx.Sha(), uint32(i))
+			bf.maybeAddOutpoint(txOut.Version, txOut.PkScript, tx.Sha(),
+				uint32(i), tx.Tree())
 			break
 		}
 	}
@@ -334,7 +338,7 @@ func (bf *Filter) matchTxAndUpdate(tx *btcutil.Tx) bool {
 // update flags set via the loaded filter if needed.
 //
 // This function is safe for concurrent access.
-func (bf *Filter) MatchTxAndUpdate(tx *btcutil.Tx) bool {
+func (bf *Filter) MatchTxAndUpdate(tx *dcrutil.Tx) bool {
 	bf.mtx.Lock()
 	match := bf.matchTxAndUpdate(tx)
 	bf.mtx.Unlock()

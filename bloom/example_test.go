@@ -1,4 +1,5 @@
 // Copyright (c) 2014 The btcsuite developers
+// Copyright (c) 2015 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -9,8 +10,9 @@ import (
 	"math/rand"
 	"time"
 
-	"github.com/btcsuite/btcd/wire"
-	"github.com/btcsuite/btcutil/bloom"
+	"github.com/decred/dcrd/chaincfg/chainhash"
+	"github.com/decred/dcrd/wire"
+	"github.com/decred/dcrutil/bloom"
 )
 
 // This example demonstrates how to create a new bloom filter, add a transaction
@@ -28,7 +30,7 @@ func ExampleNewFilter() {
 	// trasaction is the first transaction in block 310,000 of the main
 	// bitcoin block chain.
 	txHashStr := "fd611c56ca0d378cdcd16244b45c2ba9588da3adac367c4ef43e808b280b8a45"
-	txHash, err := wire.NewShaHashFromStr(txHashStr)
+	txHash, err := chainhash.NewHashFromStr(txHashStr)
 	if err != nil {
 		fmt.Println(err)
 		return

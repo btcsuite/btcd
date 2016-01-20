@@ -1,8 +1,9 @@
 // Copyright (c) 2013-2014 The btcsuite developers
+// Copyright (c) 2015 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
-package btcutil_test
+package dcrutil_test
 
 import (
 	"bytes"
@@ -11,14 +12,15 @@ import (
 	"testing"
 	"time"
 
-	"github.com/btcsuite/btcd/wire"
-	"github.com/btcsuite/btcutil"
 	"github.com/davecgh/go-spew/spew"
+	"github.com/decred/dcrd/chaincfg/chainhash"
+	"github.com/decred/dcrd/wire"
+	"github.com/decred/dcrutil"
 )
 
 // TestBlock tests the API for Block.
 func TestBlock(t *testing.T) {
-	b := btcutil.NewBlock(&Block100000)
+	b := dcrutil.NewBlock(&Block100000)
 
 	// Ensure we get the same data back out.
 	if msgBlock := b.MsgBlock(); !reflect.DeepEqual(msgBlock, &Block100000) {
@@ -35,8 +37,8 @@ func TestBlock(t *testing.T) {
 	}
 
 	// Hash for block 100,000.
-	wantShaStr := "3ba27aa200b1cecaad478d2b00432346c3f1f3986da1afd33e506"
-	wantSha, err := wire.NewShaHashFromStr(wantShaStr)
+	wantShaStr := "85457e2420d265386a84fc48aaee4f6dc98bac015dcc8d536ead20e2faf66a9d"
+	wantSha, err := chainhash.NewHashFromStr(wantShaStr)
 	if err != nil {
 		t.Errorf("NewShaHashFromStr: %v", err)
 	}
@@ -52,18 +54,18 @@ func TestBlock(t *testing.T) {
 
 	// Shas for the transactions in Block100000.
 	wantTxShas := []string{
-		"8c14f0db3df150123e6f3dbbf30f8b955a8249b62ac1d1ff16284aefa3d06d87",
-		"fff2525b8931402dd09222c50775608f75787bd2b87e56995a7bdd30f79702c4",
-		"6359f0868171b1d194cbee1af2f16ea598ae8fad666d9b012c8ed2b79a236ec4",
-		"e9a66845e05d5abc0ad04ec80f774a7e585c6e8db975962d069a522137b80c1d",
+		"1cbd9fe1a143a265cc819ff9d8132a7cbc4ca48eb68c0de39cfdf7ecf42cbbd1",
+		"f3f9bc9473b6fe18d66e3ac2a1a95b6317b280f4e6687a074075b56aebf1eb53",
+		"ba2ed6210a561a4dab34ec8668ad61ec97f126826dae893719dff7383b9d6928",
+		"c5dde35b55b856cf73b2d85737c68b0dcfdaad01d0271ee509f3a7efacc025b3",
 	}
 
 	// Create a new block to nuke all cached data.
-	b = btcutil.NewBlock(&Block100000)
+	b = dcrutil.NewBlock(&Block100000)
 
 	// Request sha for all transactions one at a time via Tx.
 	for i, txSha := range wantTxShas {
-		wantSha, err := wire.NewShaHashFromStr(txSha)
+		wantSha, err := chainhash.NewHashFromStr(txSha)
 		if err != nil {
 			t.Errorf("NewShaHashFromStr: %v", err)
 		}
@@ -86,7 +88,7 @@ func TestBlock(t *testing.T) {
 	}
 
 	// Create a new block to nuke all cached data.
-	b = btcutil.NewBlock(&Block100000)
+	b = dcrutil.NewBlock(&Block100000)
 
 	// Request slice of all transactions multiple times to test generation
 	// and caching.
@@ -103,7 +105,7 @@ func TestBlock(t *testing.T) {
 
 		// Ensure all of the shas match.
 		for j, tx := range transactions {
-			wantSha, err := wire.NewShaHashFromStr(wantTxShas[j])
+			wantSha, err := chainhash.NewHashFromStr(wantTxShas[j])
 			if err != nil {
 				t.Errorf("NewShaHashFromStr: %v", err)
 			}
@@ -143,14 +145,14 @@ func TestBlock(t *testing.T) {
 
 	// Transaction offsets and length for the transaction in Block100000.
 	wantTxLocs := []wire.TxLoc{
-		{TxStart: 81, TxLen: 135},
-		{TxStart: 216, TxLen: 259},
-		{TxStart: 475, TxLen: 257},
-		{TxStart: 732, TxLen: 225},
+		{TxStart: 181, TxLen: 159},
+		{TxStart: 340, TxLen: 285},
+		{TxStart: 625, TxLen: 283},
+		{TxStart: 908, TxLen: 249},
 	}
 
 	// Ensure the transaction location information is accurate.
-	txLocs, err := b.TxLoc()
+	txLocs, _, err := b.TxLoc()
 	if err != nil {
 		t.Errorf("TxLoc: %v", err)
 		return
@@ -173,7 +175,7 @@ func TestNewBlockFromBytes(t *testing.T) {
 	block100000Bytes := block100000Buf.Bytes()
 
 	// Create a new block from the serialized bytes.
-	b, err := btcutil.NewBlockFromBytes(block100000Bytes)
+	b, err := dcrutil.NewBlockFromBytes(block100000Bytes)
 	if err != nil {
 		t.Errorf("NewBlockFromBytes: %v", err)
 		return
@@ -210,7 +212,7 @@ func TestNewBlockFromBlockAndBytes(t *testing.T) {
 	block100000Bytes := block100000Buf.Bytes()
 
 	// Create a new block from the serialized bytes.
-	b := btcutil.NewBlockFromBlockAndBytes(&Block100000, block100000Bytes)
+	b := dcrutil.NewBlockFromBlockAndBytes(&Block100000, block100000Bytes)
 
 	// Ensure we get the same data back out.
 	serializedBytes, err := b.Bytes()
@@ -233,7 +235,7 @@ func TestNewBlockFromBlockAndBytes(t *testing.T) {
 func TestBlockErrors(t *testing.T) {
 	// Ensure out of range errors are as expected.
 	wantErr := "transaction index -1 is out of range - max 3"
-	testErr := btcutil.OutOfRangeError(wantErr)
+	testErr := dcrutil.OutOfRangeError(wantErr)
 	if testErr.Error() != wantErr {
 		t.Errorf("OutOfRangeError: wrong error - got %v, want %v",
 			testErr.Error(), wantErr)
@@ -248,15 +250,15 @@ func TestBlockErrors(t *testing.T) {
 	block100000Bytes := block100000Buf.Bytes()
 
 	// Create a new block from the serialized bytes.
-	b, err := btcutil.NewBlockFromBytes(block100000Bytes)
+	b, err := dcrutil.NewBlockFromBytes(block100000Bytes)
 	if err != nil {
 		t.Errorf("NewBlockFromBytes: %v", err)
 		return
 	}
 
 	// Truncate the block byte buffer to force errors.
-	shortBytes := block100000Bytes[:80]
-	_, err = btcutil.NewBlockFromBytes(shortBytes)
+	shortBytes := block100000Bytes[:100]
+	_, err = dcrutil.NewBlockFromBytes(shortBytes)
 	if err != io.EOF {
 		t.Errorf("NewBlockFromBytes: did not get expected error - "+
 			"got %v, want %v", err, io.EOF)
@@ -264,33 +266,33 @@ func TestBlockErrors(t *testing.T) {
 
 	// Ensure TxSha returns expected error on invalid indices.
 	_, err = b.TxSha(-1)
-	if _, ok := err.(btcutil.OutOfRangeError); !ok {
+	if _, ok := err.(dcrutil.OutOfRangeError); !ok {
 		t.Errorf("TxSha: wrong error - got: %v <%T>, "+
-			"want: <%T>", err, err, btcutil.OutOfRangeError(""))
+			"want: <%T>", err, err, dcrutil.OutOfRangeError(""))
 	}
 	_, err = b.TxSha(len(Block100000.Transactions) + 1)
-	if _, ok := err.(btcutil.OutOfRangeError); !ok {
+	if _, ok := err.(dcrutil.OutOfRangeError); !ok {
 		t.Errorf("TxSha: wrong error - got: %v <%T>, "+
-			"want: <%T>", err, err, btcutil.OutOfRangeError(""))
+			"want: <%T>", err, err, dcrutil.OutOfRangeError(""))
 	}
 
 	// Ensure Tx returns expected error on invalid indices.
 	_, err = b.Tx(-1)
-	if _, ok := err.(btcutil.OutOfRangeError); !ok {
+	if _, ok := err.(dcrutil.OutOfRangeError); !ok {
 		t.Errorf("Tx: wrong error - got: %v <%T>, "+
-			"want: <%T>", err, err, btcutil.OutOfRangeError(""))
+			"want: <%T>", err, err, dcrutil.OutOfRangeError(""))
 	}
 	_, err = b.Tx(len(Block100000.Transactions) + 1)
-	if _, ok := err.(btcutil.OutOfRangeError); !ok {
+	if _, ok := err.(dcrutil.OutOfRangeError); !ok {
 		t.Errorf("Tx: wrong error - got: %v <%T>, "+
-			"want: <%T>", err, err, btcutil.OutOfRangeError(""))
+			"want: <%T>", err, err, dcrutil.OutOfRangeError(""))
 	}
 
 	// Ensure TxLoc returns expected error with short byte buffer.
 	// This makes use of the test package only function, SetBlockBytes, to
 	// inject a short byte buffer.
 	b.SetBlockBytes(shortBytes)
-	_, err = b.TxLoc()
+	_, _, err = b.TxLoc()
 	if err != io.EOF {
 		t.Errorf("TxLoc: did not get expected error - "+
 			"got %v, want %v", err, io.EOF)
@@ -302,13 +304,13 @@ func TestBlockErrors(t *testing.T) {
 var Block100000 = wire.MsgBlock{
 	Header: wire.BlockHeader{
 		Version: 1,
-		PrevBlock: wire.ShaHash([32]byte{ // Make go vet happy.
+		PrevBlock: chainhash.Hash([32]byte{ // Make go vet happy.
 			0x50, 0x12, 0x01, 0x19, 0x17, 0x2a, 0x61, 0x04,
 			0x21, 0xa6, 0xc3, 0x01, 0x1d, 0xd3, 0x30, 0xd9,
 			0xdf, 0x07, 0xb6, 0x36, 0x16, 0xc2, 0xcc, 0x1f,
 			0x1c, 0xd0, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00,
 		}), // 000000000002d01c1fccc21636b607dfd930d31d01c3a62104612a1719011250
-		MerkleRoot: wire.ShaHash([32]byte{ // Make go vet happy.
+		MerkleRoot: chainhash.Hash([32]byte{ // Make go vet happy.
 			0x66, 0x57, 0xa9, 0x25, 0x2a, 0xac, 0xd5, 0xc0,
 			0xb2, 0x94, 0x09, 0x96, 0xec, 0xff, 0x95, 0x22,
 			0x28, 0xc3, 0x06, 0x7c, 0xc3, 0x8d, 0x48, 0x85,
@@ -324,7 +326,7 @@ var Block100000 = wire.MsgBlock{
 			TxIn: []*wire.TxIn{
 				{
 					PreviousOutPoint: wire.OutPoint{
-						Hash:  wire.ShaHash{},
+						Hash:  chainhash.Hash{},
 						Index: 0xffffffff,
 					},
 					SignatureScript: []byte{
@@ -358,7 +360,7 @@ var Block100000 = wire.MsgBlock{
 			TxIn: []*wire.TxIn{
 				{
 					PreviousOutPoint: wire.OutPoint{
-						Hash: wire.ShaHash([32]byte{ // Make go vet happy.
+						Hash: chainhash.Hash([32]byte{ // Make go vet happy.
 							0x03, 0x2e, 0x38, 0xe9, 0xc0, 0xa8, 0x4c, 0x60,
 							0x46, 0xd6, 0x87, 0xd1, 0x05, 0x56, 0xdc, 0xac,
 							0xc4, 0x1d, 0x27, 0x5e, 0xc5, 0x5f, 0xc0, 0x07,
@@ -427,7 +429,7 @@ var Block100000 = wire.MsgBlock{
 			TxIn: []*wire.TxIn{
 				{
 					PreviousOutPoint: wire.OutPoint{
-						Hash: wire.ShaHash([32]byte{ // Make go vet happy.
+						Hash: chainhash.Hash([32]byte{ // Make go vet happy.
 							0xc3, 0x3e, 0xbf, 0xf2, 0xa7, 0x09, 0xf1, 0x3d,
 							0x9f, 0x9a, 0x75, 0x69, 0xab, 0x16, 0xa3, 0x27,
 							0x86, 0xaf, 0x7d, 0x7e, 0x2d, 0xe0, 0x92, 0x65,
@@ -495,7 +497,7 @@ var Block100000 = wire.MsgBlock{
 			TxIn: []*wire.TxIn{
 				{
 					PreviousOutPoint: wire.OutPoint{
-						Hash: wire.ShaHash([32]byte{ // Make go vet happy.
+						Hash: chainhash.Hash([32]byte{ // Make go vet happy.
 							0x0b, 0x60, 0x72, 0xb3, 0x86, 0xd4, 0xa7, 0x73,
 							0x23, 0x52, 0x37, 0xf6, 0x4c, 0x11, 0x26, 0xac,
 							0x3b, 0x24, 0x0c, 0x84, 0xb9, 0x17, 0xa3, 0x90,
@@ -547,4 +549,5 @@ var Block100000 = wire.MsgBlock{
 			LockTime: 0,
 		},
 	},
+	STransactions: []*wire.MsgTx{},
 }

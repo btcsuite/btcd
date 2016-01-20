@@ -1,4 +1,5 @@
 // Copyright (c) 2013-2014 The btcsuite developers
+// Copyright (c) 2015 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -9,11 +10,12 @@ cases which are either not possible or can't reliably be tested via the public
 interface. The functions are only exported while the tests are being run.
 */
 
-package btcutil
+package dcrutil
 
 import (
-	"github.com/btcsuite/btcd/btcec"
-	"github.com/btcsuite/btcutil/base58"
+	"github.com/decred/dcrd/chaincfg/chainec"
+	"github.com/decred/dcrutil/base58"
+
 	"github.com/btcsuite/golangcrypto/ripemd160"
 )
 
@@ -33,7 +35,7 @@ func TstAppDataDir(goos, appName string, roaming bool) string {
 // TstAddressPubKeyHash makes an AddressPubKeyHash, setting the
 // unexported fields with the parameters hash and netID.
 func TstAddressPubKeyHash(hash [ripemd160.Size]byte,
-	netID byte) *AddressPubKeyHash {
+	netID [2]byte) *AddressPubKeyHash {
 
 	return &AddressPubKeyHash{
 		hash:  hash,
@@ -44,7 +46,7 @@ func TstAddressPubKeyHash(hash [ripemd160.Size]byte,
 // TstAddressScriptHash makes an AddressScriptHash, setting the
 // unexported fields with the parameters hash and netID.
 func TstAddressScriptHash(hash [ripemd160.Size]byte,
-	netID byte) *AddressScriptHash {
+	netID [2]byte) *AddressScriptHash {
 
 	return &AddressScriptHash{
 		hash:  hash,
@@ -55,18 +57,18 @@ func TstAddressScriptHash(hash [ripemd160.Size]byte,
 // TstAddressPubKey makes an AddressPubKey, setting the unexported fields with
 // the parameters.
 func TstAddressPubKey(serializedPubKey []byte, pubKeyFormat PubKeyFormat,
-	netID byte) *AddressPubKey {
+	netID [2]byte) *AddressSecpPubKey {
 
-	pubKey, _ := btcec.ParsePubKey(serializedPubKey, btcec.S256())
-	return &AddressPubKey{
+	pubKey, _ := chainec.Secp256k1.ParsePubKey(serializedPubKey)
+	return &AddressSecpPubKey{
 		pubKeyFormat: pubKeyFormat,
-		pubKey:       (*btcec.PublicKey)(pubKey),
+		pubKey:       chainec.PublicKey(pubKey),
 		pubKeyHashID: netID,
 	}
 }
 
 // TstAddressSAddr returns the expected script address bytes for
-// P2PKH and P2SH bitcoin addresses.
+// P2PKH and P2SH decred addresses.
 func TstAddressSAddr(addr string) []byte {
 	decoded := base58.Decode(addr)
 	return decoded[1 : 1+ripemd160.Size]

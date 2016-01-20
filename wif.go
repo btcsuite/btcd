@@ -1,17 +1,18 @@
 // Copyright (c) 2013, 2014 The btcsuite developers
+// Copyright (c) 2015 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
-package btcutil
+package dcrutil
 
 import (
 	"bytes"
 	"errors"
 
-	"github.com/btcsuite/btcd/btcec"
-	"github.com/btcsuite/btcd/chaincfg"
-	"github.com/btcsuite/btcd/wire"
-	"github.com/btcsuite/btcutil/base58"
+	"github.com/decred/dcrd/chaincfg"
+	"github.com/decred/dcrd/chaincfg/chainec"
+	"github.com/decred/dcrd/chaincfg/chainhash"
+	"github.com/decred/dcrutil/base58"
 )
 
 // ErrMalformedPrivateKey describes an error where a WIF-encoded private
@@ -20,10 +21,6 @@ import (
 // encountered.
 var ErrMalformedPrivateKey = errors.New("malformed private key")
 
-// compressMagic is the magic byte used to identify a WIF encoding for
-// an address created from a compressed serialized public key.
-const compressMagic byte = 0x01
-
 // WIF contains the individual components described by the Wallet Import Format
 // (WIF).  A WIF string is typically used to represent a private key and its
 // associated address in a way that  may be easily copied and imported into or
@@ -31,33 +28,31 @@ const compressMagic byte = 0x01
 // structure by calling DecodeWIF or created with a user-provided private key
 // by calling NewWIF.
 type WIF struct {
+	// ecType is the type of ECDSA used.
+	ecType int
+
 	// PrivKey is the private key being imported or exported.
-	PrivKey *btcec.PrivateKey
+	PrivKey chainec.PrivateKey
 
-	// CompressPubKey specifies whether the address controlled by the
-	// imported or exported private key was created by hashing a
-	// compressed (33-byte) serialized public key, rather than an
-	// uncompressed (65-byte) one.
-	CompressPubKey bool
-
-	// netID is the bitcoin network identifier byte used when
+	// netID is the network identifier byte used when
 	// WIF encoding the private key.
-	netID byte
+	netID [2]byte
 }
 
 // NewWIF creates a new WIF structure to export an address and its private key
 // as a string encoded in the Wallet Import Format.  The compress argument
 // specifies whether the address intended to be imported or exported was created
 // by serializing the public key compressed rather than uncompressed.
-func NewWIF(privKey *btcec.PrivateKey, net *chaincfg.Params, compress bool) (*WIF, error) {
+func NewWIF(privKey chainec.PrivateKey, net *chaincfg.Params, ecType int) (*WIF,
+	error) {
 	if net == nil {
 		return nil, errors.New("no network")
 	}
-	return &WIF{privKey, compress, net.PrivateKeyID}, nil
+	return &WIF{ecType, privKey, net.PrivateKeyID}, nil
 }
 
 // IsForNet returns whether or not the decoded WIF structure is associated
-// with the passed bitcoin network.
+// with the passed network.
 func (w *WIF) IsForNet(net *chaincfg.Params) bool {
 	return w.netID == net.PrivateKeyID
 }
@@ -68,57 +63,52 @@ func (w *WIF) IsForNet(net *chaincfg.Params) bool {
 // The WIF string must be a base58-encoded string of the following byte
 // sequence:
 //
-//  * 1 byte to identify the network, must be 0x80 for mainnet or 0xef for
-//    either testnet3 or the regression test network
+//  * 2 bytes to identify the network, must be 0x80 for mainnet or 0xef for testnet
+//  * 1 byte for ECDSA type
 //  * 32 bytes of a binary-encoded, big-endian, zero-padded private key
-//  * Optional 1 byte (equal to 0x01) if the address being imported or exported
-//    was created by taking the RIPEMD160 after SHA256 hash of a serialized
-//    compressed (33-byte) public key
 //  * 4 bytes of checksum, must equal the first four bytes of the double SHA256
 //    of every byte before the checksum in this sequence
 //
 // If the base58-decoded byte sequence does not match this, DecodeWIF will
 // return a non-nil error.  ErrMalformedPrivateKey is returned when the WIF
-// is of an impossible length or the expected compressed pubkey magic number
-// does not equal the expected value of 0x01.  ErrChecksumMismatch is returned
-// if the expected WIF checksum does not match the calculated checksum.
+// is of an impossible length.  ErrChecksumMismatch is returned if the
+// expected WIF checksum does not match the calculated checksum.
 func DecodeWIF(wif string) (*WIF, error) {
 	decoded := base58.Decode(wif)
 	decodedLen := len(decoded)
-	var compress bool
 
-	// Length of base58 decoded WIF must be 32 bytes + an optional 1 byte
-	// (0x01) if compressed, plus 1 byte for netID + 4 bytes of checksum.
-	switch decodedLen {
-	case 1 + btcec.PrivKeyBytesLen + 1 + 4:
-		if decoded[33] != compressMagic {
-			return nil, ErrMalformedPrivateKey
-		}
-		compress = true
-	case 1 + btcec.PrivKeyBytesLen + 4:
-		compress = false
-	default:
+	if decodedLen != 39 {
 		return nil, ErrMalformedPrivateKey
 	}
 
-	// Checksum is first four bytes of double SHA256 of the identifier byte
+	// Checksum is first four bytes of hash of the identifier byte
 	// and privKey.  Verify this matches the final 4 bytes of the decoded
 	// private key.
-	var tosum []byte
-	if compress {
-		tosum = decoded[:1+btcec.PrivKeyBytesLen+1]
-	} else {
-		tosum = decoded[:1+btcec.PrivKeyBytesLen]
-	}
-	cksum := wire.DoubleSha256(tosum)[:4]
-	if !bytes.Equal(cksum, decoded[decodedLen-4:]) {
+	cksum := chainhash.HashFuncB(decoded[:decodedLen-4])
+	if !bytes.Equal(cksum[:4], decoded[decodedLen-4:]) {
 		return nil, ErrChecksumMismatch
 	}
 
-	netID := decoded[0]
-	privKeyBytes := decoded[1 : 1+btcec.PrivKeyBytesLen]
-	privKey, _ := btcec.PrivKeyFromBytes(btcec.S256(), privKeyBytes)
-	return &WIF{privKey, compress, netID}, nil
+	netID := [2]byte{decoded[0], decoded[1]}
+	var privKey chainec.PrivateKey
+
+	ecType := 0
+	switch int(decoded[2]) {
+	case chainec.ECTypeSecp256k1:
+		privKeyBytes := decoded[3 : 3+chainec.Secp256k1.PrivKeyBytesLen()]
+		privKey, _ = chainec.Secp256k1.PrivKeyFromScalar(privKeyBytes)
+		ecType = chainec.ECTypeSecp256k1
+	case chainec.ECTypeEdwards:
+		privKeyBytes := decoded[3 : 3+32]
+		privKey, _ = chainec.Edwards.PrivKeyFromScalar(privKeyBytes)
+		ecType = chainec.ECTypeEdwards
+	case chainec.ECTypeSecSchnorr:
+		privKeyBytes := decoded[3 : 3+chainec.SecSchnorr.PrivKeyBytesLen()]
+		privKey, _ = chainec.SecSchnorr.PrivKeyFromScalar(privKeyBytes)
+		ecType = chainec.ECTypeSecSchnorr
+	}
+
+	return &WIF{ecType, privKey, netID}, nil
 }
 
 // String creates the Wallet Import Format string encoding of a WIF structure.
@@ -126,36 +116,42 @@ func DecodeWIF(wif string) (*WIF, error) {
 // a valid WIF string.
 func (w *WIF) String() string {
 	// Precalculate size.  Maximum number of bytes before base58 encoding
-	// is one byte for the network, 32 bytes of private key, possibly one
-	// extra byte if the pubkey is to be compressed, and finally four
-	// bytes of checksum.
-	encodeLen := 1 + btcec.PrivKeyBytesLen + 4
-	if w.CompressPubKey {
-		encodeLen++
-	}
+	// is two bytes for the network, one byte for the ECDSA type, 32 bytes
+	// of private key and finally four bytes of checksum.
+	encodeLen := 2 + 1 + 32 + 4
 
 	a := make([]byte, 0, encodeLen)
-	a = append(a, w.netID)
-	// Pad and append bytes manually, instead of using Serialize, to
-	// avoid another call to make.
-	a = paddedAppend(btcec.PrivKeyBytesLen, a, w.PrivKey.D.Bytes())
-	if w.CompressPubKey {
-		a = append(a, compressMagic)
-	}
-	cksum := wire.DoubleSha256(a)[:4]
-	a = append(a, cksum...)
+	a = append(a, w.netID[:]...)
+	a = append(a, byte(w.ecType))
+	a = append(a, w.PrivKey.Serialize()...)
+
+	cksum := chainhash.HashFuncB(a)
+	a = append(a, cksum[:4]...)
 	return base58.Encode(a)
 }
 
 // SerializePubKey serializes the associated public key of the imported or
-// exported private key in either a compressed or uncompressed format.  The
-// serialization format chosen depends on the value of w.CompressPubKey.
+// exported private key in compressed format.  The serialization format
+// chosen depends on the value of w.ecType.
 func (w *WIF) SerializePubKey() []byte {
-	pk := (*btcec.PublicKey)(&w.PrivKey.PublicKey)
-	if w.CompressPubKey {
-		return pk.SerializeCompressed()
+	pkx, pky := w.PrivKey.Public()
+	var pk chainec.PublicKey
+
+	switch w.ecType {
+	case chainec.ECTypeSecp256k1:
+		pk = chainec.Secp256k1.NewPublicKey(pkx, pky)
+	case chainec.ECTypeEdwards:
+		pk = chainec.Edwards.NewPublicKey(pkx, pky)
+	case chainec.ECTypeSecSchnorr:
+		pk = chainec.SecSchnorr.NewPublicKey(pkx, pky)
 	}
-	return pk.SerializeUncompressed()
+
+	return pk.SerializeCompressed()
+}
+
+// DSA returns the ECDSA type for the private key.
+func (w *WIF) DSA() int {
+	return w.ecType
 }
 
 // paddedAppend appends the src byte slice to dst, returning the new slice.

@@ -1,10 +1,10 @@
 coinset
 =======
 
-[![Build Status](https://travis-ci.org/btcsuite/btcutil.png?branch=master)]
-(https://travis-ci.org/btcsuite/btcutil)
+[![Build Status](https://travis-ci.org/decred/dcrutil.png?branch=master)]
+(https://travis-ci.org/decred/dcrutil)
 
-Package coinset provides bitcoin-specific convenience functions for selecting
+Package coinset provides decred-specific convenience functions for selecting
 from and managing sets of unspent transaction outpoints (UTXOs).
 
 A comprehensive suite of tests is provided to ensure proper functionality.  See
@@ -14,21 +14,21 @@ report.  Package coinset is licensed under the liberal ISC license.
 
 ## Documentation
 
-[![GoDoc](https://godoc.org/github.com/btcsuite/btcutil/coinset?status.png)]
-(http://godoc.org/github.com/btcsuite/btcutil/coinset)
+[![GoDoc](https://godoc.org/github.com/decred/dcrutil/coinset?status.png)]
+(http://godoc.org/github.com/decred/dcrutil/coinset)
 
 Full `go doc` style documentation for the project can be viewed online without
 installing this package by using the GoDoc site here:
-http://godoc.org/github.com/btcsuite/btcutil/coinset
+http://godoc.org/github.com/decred/dcrutil/coinset
 
 You can also view the documentation locally once the package is installed with
 the `godoc` tool by running `godoc -http=":6060"` and pointing your browser to
-http://localhost:6060/pkg/github.com/btcsuite/btcutil/coinset
+http://localhost:6060/pkg/github.com/decred/dcrutil/coinset
 
 ## Installation
 
 ```bash
-$ go get github.com/btcsuite/btcutil/coinset
+$ go get github.com/decred/dcrutil/coinset
 ```
 
 ## Usage
@@ -36,7 +36,7 @@ $ go get github.com/btcsuite/btcutil/coinset
 Each unspent transaction outpoint is represented by the Coin interface.  An
 example of a concrete type that implements Coin is coinset.SimpleCoin.
 
-The typical use case for this library is for creating raw bitcoin transactions
+The typical use case for this library is for creating raw decred transactions
 given a set of Coins that may be spent by the user, for example as below:
 
 ```Go
