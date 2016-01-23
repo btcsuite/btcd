@@ -1,4 +1,4 @@
-// Copyright (c) 2013-2015 The btcsuite developers
+// Copyright (c) 2013-2016 The btcsuite developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -10,7 +10,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	prand "math/rand"
+	"math/rand"
 	"net"
 	"strconv"
 	"sync"
@@ -814,36 +814,34 @@ func (p *Peer) pushVersionMsg() error {
 // addresses.  This function is useful over manually sending the message via
 // QueueMessage since it automatically limits the addresses to the maximum
 // number allowed by the message and randomizes the chosen addresses when there
-// are too many.  No message will be sent if there are no entries in the
-// provided addresses slice.
-// It is safe for concurrent access.
+// are too many.  It returns the addresses that were actually sent and no
+// message will be sent if there are no entries in the provided addresses slice.
+//
+// This function is safe for concurrent access.
 func (p *Peer) PushAddrMsg(addresses []*wire.NetAddress) ([]*wire.NetAddress, error) {
+
 	// Nothing to send.
 	if len(addresses) == 0 {
 		return nil, nil
 	}
 
-	r := prand.New(prand.NewSource(time.Now().UnixNano()))
-	numAdded := 0
 	msg := wire.NewMsgAddr()
-	for _, na := range addresses {
-		// Randomize the list with the remaining addresses when the
-		// max addresses limit has been reached.
-		if numAdded == wire.MaxAddrPerMsg {
-			msg.AddrList[r.Intn(wire.MaxAddrPerMsg)] = na
-			continue
+	msg.AddrList = make([]*wire.NetAddress, len(addresses))
+	copy(msg.AddrList, addresses)
+
+	// Randomize the addresses sent if there are more than the maximum allowed.
+	if len(msg.AddrList) > wire.MaxAddrPerMsg {
+		// Shuffle the address list.
+		for i := range msg.AddrList {
+			j := rand.Intn(i + 1)
+			msg.AddrList[i], msg.AddrList[j] = msg.AddrList[j], msg.AddrList[i]
 		}
 
-		// Add the address to the message.
-		err := msg.AddAddress(na)
-		if err != nil {
-			return nil, err
-		}
-		numAdded++
+		// Truncate it to the maximum size.
+		msg.AddrList = msg.AddrList[:wire.MaxAddrPerMsg]
 	}
-	if numAdded > 0 {
-		p.QueueMessage(msg, nil)
-	}
+
+	p.QueueMessage(msg, nil)
 	return msg.AddrList, nil
 }
 
@@ -2098,4 +2096,8 @@ func NewOutboundPeer(cfg *Config, addr string) (*Peer, error) {
 	}
 
 	return p, nil
+}
+
+func init() {
+	rand.Seed(time.Now().UnixNano())
 }
