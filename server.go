@@ -290,28 +290,37 @@ func (sp *serverPeer) pushAddrMsg(addresses []*wire.NetAddress) {
 	sp.addKnownAddresses(known)
 }
 
-// Score increases the persistent and decaying ban score fields by the
-// values passed as parameters. If the resulting score is exceeds half of the
+// addBanScore increases the persistent and decaying ban score fields by the
+// values passed as parameters. If the resulting score exceeds half of the ban
 // threshold, a warning is logged including the reason provided. Further, if
-// the score is above the ban threshold and banningis enabled, the peer will be
-// banned and disconnected.
+// the score is above the ban threshold, the peer will be banned and
+// disconnected.
 func (sp *serverPeer) addBanScore(persistent, transient uint32, reason string) {
-	score := sp.banScore.Increase(persistent, transient)
-	if score > cfg.BanThreshold>>1 {
-		if transient != 0 || persistent != 0 {
-			peerLog.Warnf("Misbehaving peer %s: %s -- "+
-				"ban score increased to %d", sp, reason, score)
+	if cfg.EnableBanning {
+		warnThreshold := cfg.BanThreshold >> 1
+		if transient == 0 && persistent == 0 {
+			// The score is not being increased, but a warning message is still
+			// logged if the score is above the warn threshold.
+			score := sp.banScore.Int()
+			if score > warnThreshold {
+				peerLog.Warnf("Misbehaving peer %s: %s -- ban score is %d, "+
+					"it was not increased this time", sp, reason, score)
+			}
 		} else {
-			peerLog.Warnf("Misbehaving peer %s: %s -- "+
-				"ban score is %d, not increasing this time", sp, reason, score)
-		}
-		if cfg.EnableBanning && score > cfg.BanThreshold {
-			peerLog.Warnf("Misbehaving peer %s -- banning and disconnecting",
-				sp)
-			sp.server.BanPeer(sp)
-			sp.Disconnect()
+			score := sp.banScore.Increase(persistent, transient)
+			if score > warnThreshold {
+				peerLog.Warnf("Misbehaving peer %s: %s -- "+
+					"ban score increased to %d", sp, reason, score)
+				if score > cfg.BanThreshold {
+					peerLog.Warnf("Misbehaving peer %s -- "+
+						"banning and disconnecting", sp)
+					sp.server.BanPeer(sp)
+					sp.Disconnect()
+				}
+			}
 		}
 	}
+	// No warning is logged and no score is calculated if banning is disabled.
 }
 
 // OnVersion is invoked when a peer receives a version bitcoin message
