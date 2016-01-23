@@ -216,8 +216,8 @@ type serverPeer struct {
 	requestedBlocks map[wire.ShaHash]struct{}
 	filter          *bloom.Filter
 	knownAddresses  map[string]struct{}
+	banScore        dynamicBanScore
 	quit            chan struct{}
-
 	// The following chans are used to sync blockmanager and server.
 	txProcessed    chan struct{}
 	blockProcessed chan struct{}
@@ -290,6 +290,30 @@ func (sp *serverPeer) pushAddrMsg(addresses []*wire.NetAddress) {
 	sp.addKnownAddresses(known)
 }
 
+// addBanScore increases the persistent and decaying ban score fields by the
+// values passed as parameters. If the resulting score is above the warning
+// threshold, a warning is logged including the reason provided. Further, if
+// the score is above the ban threshold, the peer will be banned and
+// disconnected.
+func (sp *serverPeer) addBanScore(persistent, transient uint32, reason string) {
+	score := sp.banScore.Increase(persistent, transient)
+	if score > WarnThreshold {
+		if transient != 0 || persistent != 0 {
+			peerLog.Warnf("Misbehaving peer %s: %s -- "+
+				"ban score increased to %d", sp, reason, score)
+		} else {
+			peerLog.Warnf("Misbehaving peer %s: %s -- "+
+				"ban score is %d, not increased this time", sp, reason, score)
+		}
+		if cfg.EnableBanning && score > BanThreshold {
+			peerLog.Warnf("Misbehaving peer %s -- banning and disconnecting",
+				sp)
+			sp.server.BanPeer(sp)
+			sp.Disconnect()
+		}
+	}
+}
+
 // OnVersion is invoked when a peer receives a version bitcoin message
 // and is used to negotiate the protocol version details as well as kick start
 // the communications.
@@ -358,9 +382,15 @@ func (sp *serverPeer) OnVersion(p *peer.Peer, msg *wire.MsgVersion) {
 // pool up to the maximum inventory allowed per message.  When the peer has a
 // bloom filter loaded, the contents are filtered accordingly.
 func (sp *serverPeer) OnMemPool(p *peer.Peer, msg *wire.MsgMemPool) {
+	// A decaying ban score increase is applied to prevent flooding.
+	// The ban score accumulates and passes the ban threshold if a burst of
+	// mempool messages comes from a peer. The score decays each minute to
+	// half of it's value.
+	sp.addBanScore(0, 33, "mempool")
+
 	// Generate inventory message with the available transactions in the
 	// transaction memory pool.  Limit it to the max allowed inventory
-	// per message.  The the NewMsgInvSizeHint function automatically limits
+	// per message.  The NewMsgInvSizeHint function automatically limits
 	// the passed hint to the maximum allowed, so it's safe to pass it
 	// without double checking it here.
 	txMemPool := sp.server.txMemPool
@@ -460,6 +490,14 @@ func (sp *serverPeer) OnGetData(p *peer.Peer, msg *wire.MsgGetData) {
 	numAdded := 0
 	notFound := wire.NewMsgNotFound()
 
+	length := len(msg.InvList)
+	// A decaying ban score increase is applied to prevent flooding.
+	// Requesting more than the maximum inventory vector length within a short
+	// period of time yields a score above the default ban threshold. Sustained
+	// bursts of small request also yield high ban score.
+	// This incremental score decays each minute to half of it's value.
+	sp.addBanScore(0, uint32(1+length*100/wire.MaxInvPerMsg), "getdata")
+
 	// We wait on this wait channel periodically to prevent queueing
 	// far more data than we can send in a reasonable time, wasting memory.
 	// The waiting occurs after the database fetch for the next one to
@@ -470,7 +508,7 @@ func (sp *serverPeer) OnGetData(p *peer.Peer, msg *wire.MsgGetData) {
 	for i, iv := range msg.InvList {
 		var c chan struct{}
 		// If this will be the last message we send.
-		if i == len(msg.InvList)-1 && len(notFound.InvList) == 0 {
+		if i == length-1 && len(notFound.InvList) == 0 {
 			c = doneChan
 		} else if (i+1)%3 == 0 {
 			// Buffered so as to not make the send goroutine block.

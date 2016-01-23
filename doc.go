@@ -34,6 +34,7 @@ Application Options:
       --listen=             Add an interface/port to listen for connections
                             (default all interfaces port: 8333, testnet: 18333)
       --maxpeers=           Max number of inbound and outbound peers (125)
+      --enablebanning       Enable banning of misbehaving peers
       --banduration=        How long to ban misbehaving peers.  Valid time units
                             are {s, m, h}.  Minimum 1 second (24h0m0s)
   -u, --rpcuser=            Username for RPC connections
