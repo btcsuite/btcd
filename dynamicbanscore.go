@@ -1,3 +1,7 @@
+// Copyright (c) 2016 The btcsuite developers
+// Use of this source code is governed by an ISC
+// license that can be found in the LICENSE file.
+
 package main
 
 import (
@@ -15,12 +19,6 @@ const (
 	// Lifetime defines the maximum age of the transient part of the ban
 	// score to be considered a non-zero score (in seconds).
 	Lifetime = 1800
-	// BanThreshold defines the maximum allowed ban score before
-	// disconnecting and banning misbehaving peers.
-	BanThreshold = 100
-	// WarnThreshold defines the ban score threshold after which warning
-	// messages are emitted whenever the peer misbehaves.
-	WarnThreshold = BanThreshold / 2
 )
 
 // dynamicBanScore provides dynamic ban scores consisting of a persistent and a

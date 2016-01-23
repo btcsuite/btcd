@@ -290,22 +290,22 @@ func (sp *serverPeer) pushAddrMsg(addresses []*wire.NetAddress) {
 	sp.addKnownAddresses(known)
 }
 
-// addBanScore increases the persistent and decaying ban score fields by the
-// values passed as parameters. If the resulting score is above the warning
+// Score increases the persistent and decaying ban score fields by the
+// values passed as parameters. If the resulting score is exceeds half of the
 // threshold, a warning is logged including the reason provided. Further, if
-// the score is above the ban threshold, the peer will be banned and
-// disconnected.
+// the score is above the ban threshold and banningis enabled, the peer will be
+// banned and disconnected.
 func (sp *serverPeer) addBanScore(persistent, transient uint32, reason string) {
 	score := sp.banScore.Increase(persistent, transient)
-	if score > WarnThreshold {
+	if score > cfg.BanThreshold>>1 {
 		if transient != 0 || persistent != 0 {
 			peerLog.Warnf("Misbehaving peer %s: %s -- "+
 				"ban score increased to %d", sp, reason, score)
 		} else {
 			peerLog.Warnf("Misbehaving peer %s: %s -- "+
-				"ban score is %d, not increased this time", sp, reason, score)
+				"ban score is %d, not increasing this time", sp, reason, score)
 		}
-		if cfg.EnableBanning && score > BanThreshold {
+		if cfg.EnableBanning && score > cfg.BanThreshold {
 			peerLog.Warnf("Misbehaving peer %s -- banning and disconnecting",
 				sp)
 			sp.server.BanPeer(sp)
@@ -496,7 +496,7 @@ func (sp *serverPeer) OnGetData(p *peer.Peer, msg *wire.MsgGetData) {
 	// period of time yields a score above the default ban threshold. Sustained
 	// bursts of small request also yield high ban score.
 	// This incremental score decays each minute to half of it's value.
-	sp.addBanScore(0, uint32(1+length*100/wire.MaxInvPerMsg), "getdata")
+	sp.addBanScore(0, 1+uint32(length)*100/wire.MaxInvPerMsg, "getdata")
 
 	// We wait on this wait channel periodically to prevent queueing
 	// far more data than we can send in a reasonable time, wasting memory.

@@ -33,6 +33,7 @@ const (
 	defaultLogFilename       = "btcd.log"
 	defaultMaxPeers          = 125
 	defaultBanDuration       = time.Hour * 24
+	defaultBanThreshold      = 100
 	defaultMaxRPCClients     = 10
 	defaultMaxRPCWebsockets  = 25
 	defaultVerifyEnabled     = false
@@ -86,6 +87,7 @@ type config struct {
 	MaxPeers           int           `long:"maxpeers" description:"Max number of inbound and outbound peers"`
 	EnableBanning      bool          `long:"enablebanning" description:"Enable banning of misbehaving peers"`
 	BanDuration        time.Duration `long:"banduration" description:"How long to ban misbehaving peers.  Valid time units are {s, m, h}.  Minimum 1 second"`
+	BanThreshold       uint32        `long:"banthreshold" description:"Maximum allowed ban score before disconnecting and banning misbehaving peers."`
 	RPCUser            string        `short:"u" long:"rpcuser" description:"Username for RPC connections"`
 	RPCPass            string        `short:"P" long:"rpcpass" default-mask:"-" description:"Password for RPC connections"`
 	RPCLimitUser       string        `long:"rpclimituser" description:"Username for limited RPC connections"`
@@ -325,6 +327,7 @@ func loadConfig() (*config, []string, error) {
 		DebugLevel:        defaultLogLevel,
 		MaxPeers:          defaultMaxPeers,
 		BanDuration:       defaultBanDuration,
+		BanThreshold:      defaultBanThreshold,
 		RPCMaxClients:     defaultMaxRPCClients,
 		RPCMaxWebsockets:  defaultMaxRPCWebsockets,
 		DataDir:           defaultDataDir,
