@@ -1,4 +1,4 @@
-// Copyright (c) 2013-2015 The btcsuite developers
+// Copyright (c) 2013-2016 The btcsuite developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -61,10 +61,7 @@ type MsgVersion struct {
 // HasService returns whether the specified service is supported by the peer
 // that generated the message.
 func (msg *MsgVersion) HasService(service ServiceFlag) bool {
-	if msg.Services&service == service {
-		return true
-	}
-	return false
+	return msg.Services&service == service
 }
 
 // AddService adds service as a supported service by the peer generating the
