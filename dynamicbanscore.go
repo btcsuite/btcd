@@ -19,11 +19,34 @@ const (
 	// Lifetime defines the maximum age of the transient part of the ban
 	// score to be considered a non-zero score (in seconds).
 	Lifetime = 1800
+	// precomputedLen defines the amount of decay factors (one per second) that
+	// should be precomputed at initialization.
+	precomputedLen = 64
 )
+
+// precomputedFactor stores precomputed exponential decay factors for the first
+// 'precomputedLen' seconds starting from t == 0.
+var precomputedFactor [precomputedLen]float64
+
+// init precomputes decay factors.
+func init() {
+	for i := range precomputedFactor {
+		precomputedFactor[i] = math.Exp(-1.0 * float64(i) * lambda)
+	}
+}
+
+// decayFactor returns the decay factor at t seconds, using precalculated values
+// if available, or calculating the factor if needed.
+func decayFactor(t int64) float64 {
+	if t < precomputedLen {
+		return precomputedFactor[t]
+	}
+	return math.Exp(-1.0 * float64(t) * lambda)
+}
 
 // dynamicBanScore provides dynamic ban scores consisting of a persistent and a
 // decaying component. The persistent score can be utilized to create simple
-// additive banning policies typically found in other bitcoin node 
+// additive banning policies typically found in other bitcoin node
 // implementations, such as increasing ban score on invalid messages.
 //
 // The decaying score enables the creation of evasive logic which handles
@@ -46,7 +69,7 @@ func (s *dynamicBanScore) String() string {
 		s.persistent, s.transient, s.lastUnix, s.Int())
 }
 
-// Int return the current ban score, the sum of the persistent and decaying
+// Int returns the current ban score, the sum of the persistent and decaying
 // scores.
 //
 // This function is safe for concurrent access.
@@ -75,7 +98,7 @@ func (s *dynamicBanScore) Reset() {
 	s.Unlock()
 }
 
-// int return the ban score, the sum of the persistent and decaying scores at a 
+// int returns the ban score, the sum of the persistent and decaying scores at a
 // given point in time.
 //
 // This function is safe for concurrent access. It is intended to be used
@@ -83,21 +106,19 @@ func (s *dynamicBanScore) Reset() {
 func (s *dynamicBanScore) int(t time.Time) uint32 {
 	// reduce the amount of time the lock is held
 	s.Lock()
-	last := s.lastUnix
-	tran := s.transient
-	pers := s.persistent
+	last, tran, pers := s.lastUnix, s.transient, s.persistent
 	s.Unlock()
 
 	dt := t.Unix() - last
-	if tran < 1 || 0 > dt || Lifetime < dt {
+	if tran < 1 || dt < 0 || Lifetime < dt {
 		return pers
 	}
-	return pers + uint32(tran*math.Exp(-1.0*float64(dt)*lambda))
+	return pers + uint32(tran*decayFactor(dt))
 }
 
 // increase increases the persistent, the decaying or both scores by the values
-// passed as parameters. The resulting score is calculated as if the action was 
-// carreid out at the point time represented by the third paramter. The 
+// passed as parameters. The resulting score is calculated as if the action was
+// carreid out at the point time represented by the third paramter. The
 // resulting score is returned.
 //
 // This function is not safe for concurrent access.
@@ -109,8 +130,8 @@ func (s *dynamicBanScore) increase(persistent, transient uint32, t time.Time) ui
 	if transient > 0 {
 		if Lifetime < dt {
 			s.transient = 0
-		} else if s.transient > 1 && 0 < dt {
-			s.transient *= math.Exp(-1.0 * float64(dt) * lambda)
+		} else if s.transient > 1 && dt > 0 {
+			s.transient *= decayFactor(dt)
 		}
 		s.transient += float64(transient)
 		s.lastUnix = tu
