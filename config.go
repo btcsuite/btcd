@@ -881,13 +881,13 @@ func createDefaultConfigFile(destinationPath string) error {
 	if err != nil {
 		return err
 	}
-	generatedRpcUser := base64.StdEncoding.EncodeToString(randomBytes)
+	generatedRPCUser := base64.StdEncoding.EncodeToString(randomBytes)
 
 	_, err = rand.Read(randomBytes)
 	if err != nil {
 		return err
 	}
-	generatedRpcPass := base64.StdEncoding.EncodeToString(randomBytes)
+	generatedRPCPass := base64.StdEncoding.EncodeToString(randomBytes)
 
 	src, err := os.Open(sampleConfigPath)
 	if err != nil {
@@ -912,9 +912,9 @@ func createDefaultConfigFile(destinationPath string) error {
 		}
 
 		if strings.Contains(line, "rpcuser=") {
-			line = "  rpcuser=" + string(generatedRpcUser)
+			line = "  rpcuser=" + string(generatedRPCUser)
 		} else if strings.Contains(line, "rpcpass=") {
-			line = "  rpcpass=" + string(generatedRpcPass)
+			line = "  rpcpass=" + string(generatedRPCPass)
 		}
 
 		if _, err := dest.WriteString(line + "\n"); err != nil {
