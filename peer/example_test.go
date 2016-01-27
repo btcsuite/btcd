@@ -6,6 +6,7 @@ package peer_test
 
 import (
 	"fmt"
+	"log"
 	"net"
 	"time"
 
@@ -38,10 +39,8 @@ func mockRemotePeer() error {
 		}
 
 		// Create and start the inbound peer.
-		p := peer.NewInboundPeer(peerCfg, conn)
-		if err := p.Start(); err != nil {
-			fmt.Printf("Start: error %v\n", err)
-			return
+		if _, err := peer.NewInboundPeer(peerCfg, conn); err != nil {
+			log.Fatal(err)
 		}
 	}()
 
@@ -66,7 +65,7 @@ func Example_newOutboundPeer() {
 	// that offers no services and has listeners for the version and verack
 	// messages.  The verack listener is used here to signal the code below
 	// when the handshake has been finished by signalling a channel.
-	verack := make(chan struct{})
+	verack := make(chan struct{}, 1)
 	peerCfg := &peer.Config{
 		UserAgentName:    "peer",  // User agent name to advertise.
 		UserAgentVersion: "1.0.0", // User agent version to advertise.
@@ -81,20 +80,16 @@ func Example_newOutboundPeer() {
 			},
 		},
 	}
-	p, err := peer.NewOutboundPeer(peerCfg, "127.0.0.1:18555")
-	if err != nil {
-		fmt.Printf("NewOutboundPeer: error %v\n", err)
-		return
-	}
 
 	// Establish the connection to the peer address and mark it connected.
-	conn, err := net.Dial("tcp", p.Addr())
+	conn, err := net.Dial("tcp", "127.0.0.1:18555")
 	if err != nil {
 		fmt.Printf("net.Dial: error %v\n", err)
 		return
 	}
-	if err := p.Connect(conn); err != nil {
-		fmt.Printf("Connect: error %v\n", err)
+	p, err := peer.NewOutboundPeer(peerCfg, conn, "127.0.0.1:18555")
+	if err != nil {
+		fmt.Printf("NewOutboundPeer: error %v\n", err)
 		return
 	}
 
@@ -105,8 +100,8 @@ func Example_newOutboundPeer() {
 		fmt.Printf("Example_peerConnection: verack timeout")
 	}
 
-	// Shutdown the peer.
-	p.Shutdown()
+	// Disconnect the peer.
+	p.Disconnect()
 
 	// Output:
 	// outbound: received version
