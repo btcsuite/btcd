@@ -84,6 +84,13 @@ var (
 	allowSelfConns bool
 )
 
+var (
+	ErrInventoryExists  = errors.New("inventory exists")
+	ErrDisconnected     = errors.New("disconnected")
+	ErrDuplicateMessage = errors.New("duplicate message")
+	ErrShutdown         = errors.New("shutdown")
+)
+
 // MessageListeners defines callback function pointers to invoke with message
 // listeners for a peer. Any listener which is not set to a concrete callback
 // during peer initialization is ignored. Execution of multiple message
@@ -203,14 +210,10 @@ type Config struct {
 	// BestLocalAddress returns the best local address for a given address.
 	BestLocalAddress AddrFunc
 
-	// HostToNetAddress returns the netaddress for the given host. This can be
-	// nil in  which case the host will be parsed as an IP address.
-	HostToNetAddress HostToNetAddrFunc
-
 	// Proxy indicates a proxy is being used for connections.  The only
 	// effect this has is to prevent leaking the tor proxy address, so it
 	// only needs to specified if using a tor proxy.
-	Proxy string
+	Proxy net.Addr
 
 	// UserAgentName specifies the user agent name to advertise.  It is
 	// highly recommended to specify this value.
@@ -243,15 +246,6 @@ type Config struct {
 	// Listeners houses callback functions to be invoked on receiving peer
 	// messages.
 	Listeners MessageListeners
-}
-
-// minUint32 is a helper function to return the minimum of two uint32s.
-// This avoids a math import and the need to cast to floats.
-func minUint32(a, b uint32) uint32 {
-	if a < b {
-		return a
-	}
-	return b
 }
 
 // newNetAddress attempts to extract the IP address and port from the passed
@@ -293,44 +287,26 @@ func newNetAddress(addr net.Addr, services wire.ServiceFlag) (*wire.NetAddress, 
 	return na, nil
 }
 
-// outMsg is used to house a message to be sent along with a channel to signal
-// when the message has been sent (or won't be sent due to things such as
-// shutdown)
-type outMsg struct {
-	msg      wire.Message
-	doneChan chan struct{}
+type writeMsg struct {
+	msg wire.Message
+	err chan<- error
 }
 
-// stallControlCmd represents the command of a stall control message.
-type stallControlCmd uint8
+type writeInvVect struct {
+	invVect *wire.InvVect
+	err     chan<- error
+}
 
-// Constants for the command of a stall control message.
-const (
-	// sccSendMessage indicates a message is being sent to the remote peer.
-	sccSendMessage stallControlCmd = iota
-
-	// sccReceiveMessage indicates a message has been received from the
-	// remote peer.
-	sccReceiveMessage
-
-	// sccHandlerStart indicates a callback handler is about to be invoked.
-	sccHandlerStart
-
-	// sccHandlerStart indicates a callback handler has completed.
-	sccHandlerDone
-)
-
-// stallControlMsg is used to signal the stall handler about specific events
-// so it can properly detect and handle stalled remote peers.
-type stallControlMsg struct {
-	command stallControlCmd
-	message wire.Message
+type readMsg struct {
+	msg wire.Message
+	buf []byte
+	err error
 }
 
 // StatsSnap is a snapshot of peer stats at a point in time.
 type StatsSnap struct {
 	ID             int32
-	Addr           string
+	Addr           net.Addr
 	Services       wire.ServiceFlag
 	LastSend       time.Time
 	LastRecv       time.Time
@@ -387,34 +363,30 @@ type HostToNetAddrFunc func(host string, port uint16,
 // of specific types that typically require common special handling are
 // provided as a convenience.
 type Peer struct {
-	started    int32
-	connected  int32
-	disconnect int32 // only to be used atomically
-	conn       net.Conn
+	conn net.Conn
 
 	// These fields are set at creation time and never modified, so they are
 	// safe to read from concurrently without a mutex.
-	addr    string
+	addr    net.Addr
 	cfg     Config
 	inbound bool
 
-	flagsMtx        sync.Mutex // protects the peer flags below
-	na              *wire.NetAddress
+	flagsMtx        sync.Mutex // Protects the peer flags below.
 	id              int32
+	netAddress      *wire.NetAddress
 	userAgent       string
 	services        wire.ServiceFlag
-	versionKnown    bool
 	protocolVersion uint32
-	versionSent     bool
-	verAckReceived  bool
 
-	knownInventory     *mruInventoryMap
+	knownInventory *mruInventoryMap
+
 	prevGetBlocksMtx   sync.Mutex
 	prevGetBlocksBegin *wire.ShaHash
 	prevGetBlocksStop  *wire.ShaHash
-	prevGetHdrsMtx     sync.Mutex
-	prevGetHdrsBegin   *wire.ShaHash
-	prevGetHdrsStop    *wire.ShaHash
+
+	prevGetHdrsMtx   sync.Mutex
+	prevGetHdrsBegin *wire.ShaHash
+	prevGetHdrsStop  *wire.ShaHash
 
 	// These fields keep track of statistics for the peer and are protected
 	// by the statsMtx mutex.
@@ -432,15 +404,15 @@ type Peer struct {
 	lastPingTime       time.Time // Time we sent last ping.
 	lastPingMicros     int64     // Time for last ping to return.
 
-	stallControl  chan stallControlMsg
-	outputQueue   chan outMsg
-	sendQueue     chan outMsg
-	sendDoneQueue chan struct{}
-	outputInvChan chan *wire.InvVect
-	inQuit        chan struct{}
-	queueQuit     chan struct{}
-	outQuit       chan struct{}
-	quit          chan struct{}
+	shutdownWaitGroup sync.WaitGroup
+	shutdown          chan struct{}
+
+	write             chan writeMsg
+	writeMsgQueue     chan writeMsg
+	writeInvVectQueue chan writeInvVect
+
+	responseDeadlinesMtx sync.Mutex
+	responseDeadlines    map[string]func()
 }
 
 // String returns the peer's address and directionality as a human-readable
@@ -491,7 +463,6 @@ func (p *Peer) StatsSnapshot() *StatsSnap {
 
 	p.flagsMtx.Lock()
 	id := p.id
-	addr := p.addr
 	userAgent := p.userAgent
 	services := p.services
 	protocolVersion := p.protocolVersion
@@ -500,7 +471,7 @@ func (p *Peer) StatsSnapshot() *StatsSnap {
 	// Get a copy of all relevant flags and stats.
 	return &StatsSnap{
 		ID:             id,
-		Addr:           addr,
+		Addr:           p.addr,
 		UserAgent:      userAgent,
 		Services:       services,
 		LastSend:       p.lastSend,
@@ -532,17 +503,17 @@ func (p *Peer) ID() int32 {
 // NA returns the peer network address.
 //
 // This function is safe for concurrent access.
-func (p *Peer) NA() *wire.NetAddress {
+func (p *Peer) NetAddress() *wire.NetAddress {
 	p.flagsMtx.Lock()
 	defer p.flagsMtx.Unlock()
 
-	return p.na
+	return p.netAddress
 }
 
 // Addr returns the peer address.
 //
 // This function is safe for concurrent access.
-func (p *Peer) Addr() string {
+func (p *Peer) Addr() net.Addr {
 	// The address doesn't change after initialization, therefore it is not
 	// protected by a mutex.
 	return p.addr
@@ -613,28 +584,6 @@ func (p *Peer) LastPingMicros() int64 {
 	defer p.statsMtx.RUnlock()
 
 	return p.lastPingMicros
-}
-
-// VersionKnown returns the whether or not the version of a peer is known
-// locally.
-//
-// This function is safe for concurrent access.
-func (p *Peer) VersionKnown() bool {
-	p.flagsMtx.Lock()
-	defer p.flagsMtx.Unlock()
-
-	return p.versionKnown
-}
-
-// VerAckReceived returns whether or not a verack message was received by the
-// peer.
-//
-// This function is safe for concurrent access.
-func (p *Peer) VerAckReceived() bool {
-	p.flagsMtx.Lock()
-	defer p.flagsMtx.Unlock()
-
-	return p.verAckReceived
 }
 
 // ProtocolVersion returns the peer protocol version.
@@ -730,27 +679,23 @@ func (p *Peer) StartingHeight() int32 {
 	return p.startingHeight
 }
 
-// pushVersionMsg sends a version message to the connected peer using the
-// current state.
-func (p *Peer) pushVersionMsg() error {
+func (p *Peer) localMsgVersion() (*wire.MsgVersion, error) {
 	var blockNum int32
 	if p.cfg.NewestBlock != nil {
 		var err error
 		_, blockNum, err = p.cfg.NewestBlock()
 		if err != nil {
-			return err
+			return nil, err
 		}
 	}
 
-	theirNA := p.na
+	theirNA := p.netAddress
 
 	// If we are behind a proxy and the connection comes from the proxy then
 	// we return an unroutable address as their address. This is to prevent
 	// leaking the tor proxy address.
-	if p.cfg.Proxy != "" {
-		proxyaddress, _, err := net.SplitHostPort(p.cfg.Proxy)
-		// invalid proxy means poorly configured, be on the safe side.
-		if err != nil || p.na.IP.String() == proxyaddress {
+	if p.cfg.Proxy != nil {
+		if p.cfg.Proxy.String() == p.conn.RemoteAddr().String() {
 			theirNA = &wire.NetAddress{
 				Timestamp: time.Now(),
 				IP:        net.IP([]byte{0, 0, 0, 0}),
@@ -760,9 +705,9 @@ func (p *Peer) pushVersionMsg() error {
 
 	// TODO(tuxcanfly): In case BestLocalAddress is nil, ourNA defaults to
 	// remote NA, which is wrong. Need to fix this.
-	ourNA := p.na
+	ourNA := p.netAddress
 	if p.cfg.BestLocalAddress != nil {
-		ourNA = p.cfg.BestLocalAddress(p.na)
+		ourNA = p.cfg.BestLocalAddress(p.netAddress)
 	}
 
 	// Generate a unique nonce for this peer so self connections can be
@@ -770,8 +715,7 @@ func (p *Peer) pushVersionMsg() error {
 	// recently seen nonces.
 	nonce, err := wire.RandomUint64()
 	if err != nil {
-		fmt.Println(err)
-		return err
+		return nil, err
 	}
 	sentNonces.Add(nonce)
 
@@ -806,8 +750,7 @@ func (p *Peer) pushVersionMsg() error {
 	// Advertise if inv messages for transactions are desired.
 	msg.DisableRelayTx = p.cfg.DisableRelayTx
 
-	p.QueueMessage(msg, nil)
-	return nil
+	return msg, nil
 }
 
 // PushAddrMsg sends an addr message to the connected peer using the provided
@@ -818,11 +761,14 @@ func (p *Peer) pushVersionMsg() error {
 // message will be sent if there are no entries in the provided addresses slice.
 //
 // This function is safe for concurrent access.
-func (p *Peer) PushAddrMsg(addresses []*wire.NetAddress) ([]*wire.NetAddress, error) {
+func (p *Peer) PushAddrMsg(addresses []*wire.NetAddress) ([]*wire.NetAddress, <-chan error) {
 
 	// Nothing to send.
 	if len(addresses) == 0 {
-		return nil, nil
+		errChan := make(chan error, 1)
+		errChan <- nil
+		close(errChan)
+		return nil, errChan
 	}
 
 	msg := wire.NewMsgAddr()
@@ -841,15 +787,14 @@ func (p *Peer) PushAddrMsg(addresses []*wire.NetAddress) ([]*wire.NetAddress, er
 		msg.AddrList = msg.AddrList[:wire.MaxAddrPerMsg]
 	}
 
-	p.QueueMessage(msg, nil)
-	return msg.AddrList, nil
+	return msg.AddrList, p.QueueMessage(msg)
 }
 
 // PushGetBlocksMsg sends a getblocks message for the provided block locator
 // and stop hash.  It will ignore back-to-back duplicate requests.
 //
 // This function is safe for concurrent access.
-func (p *Peer) PushGetBlocksMsg(locator blockchain.BlockLocator, stopHash *wire.ShaHash) error {
+func (p *Peer) PushGetBlocksMsg(locator blockchain.BlockLocator, stopHash *wire.ShaHash) <-chan error {
 	// Extract the begin hash from the block locator, if one was specified,
 	// to use for filtering duplicate getblocks requests.
 	var beginHash *wire.ShaHash
@@ -865,20 +810,25 @@ func (p *Peer) PushGetBlocksMsg(locator blockchain.BlockLocator, stopHash *wire.
 	p.prevGetBlocksMtx.Unlock()
 
 	if isDuplicate {
-		log.Tracef("Filtering duplicate [getblocks] with begin "+
-			"hash %v, stop hash %v", beginHash, stopHash)
-		return nil
+		log.Tracef(
+			"Filtering duplicate [getblocks] with begin hash %v, stop hash %v",
+			beginHash, stopHash)
+		errChan := make(chan error, 1)
+		errChan <- ErrDuplicateMessage
+		close(errChan)
+		return errChan
 	}
 
 	// Construct the getblocks request and queue it to be sent.
 	msg := wire.NewMsgGetBlocks(stopHash)
 	for _, hash := range locator {
-		err := msg.AddBlockLocatorHash(hash)
-		if err != nil {
-			return err
+		if err := msg.AddBlockLocatorHash(hash); err != nil {
+			errChan := make(chan error, 1)
+			errChan <- err
+			close(errChan)
+			return errChan
 		}
 	}
-	p.QueueMessage(msg, nil)
 
 	// Update the previous getblocks request information for filtering
 	// duplicates.
@@ -886,14 +836,14 @@ func (p *Peer) PushGetBlocksMsg(locator blockchain.BlockLocator, stopHash *wire.
 	p.prevGetBlocksBegin = beginHash
 	p.prevGetBlocksStop = stopHash
 	p.prevGetBlocksMtx.Unlock()
-	return nil
+	return p.QueueMessage(msg)
 }
 
 // PushGetHeadersMsg sends a getblocks message for the provided block locator
 // and stop hash.  It will ignore back-to-back duplicate requests.
 //
 // This function is safe for concurrent access.
-func (p *Peer) PushGetHeadersMsg(locator blockchain.BlockLocator, stopHash *wire.ShaHash) error {
+func (p *Peer) PushGetHeadersMsg(locator blockchain.BlockLocator, stopHash *wire.ShaHash) <-chan error {
 	// Extract the begin hash from the block locator, if one was specified,
 	// to use for filtering duplicate getheaders requests.
 	var beginHash *wire.ShaHash
@@ -909,21 +859,25 @@ func (p *Peer) PushGetHeadersMsg(locator blockchain.BlockLocator, stopHash *wire
 	p.prevGetHdrsMtx.Unlock()
 
 	if isDuplicate {
-		log.Tracef("Filtering duplicate [getheaders] with begin "+
-			"hash %v", beginHash)
-		return nil
+		log.Tracef("Filtering duplicate [getheaders] with begin hash %v",
+			beginHash)
+		errChan := make(chan error, 1)
+		errChan <- ErrDuplicateMessage
+		close(errChan)
+		return errChan
 	}
 
 	// Construct the getheaders request and queue it to be sent.
 	msg := wire.NewMsgGetHeaders()
 	msg.HashStop = *stopHash
 	for _, hash := range locator {
-		err := msg.AddBlockLocatorHash(hash)
-		if err != nil {
-			return err
+		if err := msg.AddBlockLocatorHash(hash); err != nil {
+			errChan := make(chan error, 1)
+			errChan <- err
+			close(errChan)
+			return errChan
 		}
 	}
-	p.QueueMessage(msg, nil)
 
 	// Update the previous getheaders request information for filtering
 	// duplicates.
@@ -931,7 +885,7 @@ func (p *Peer) PushGetHeadersMsg(locator blockchain.BlockLocator, stopHash *wire
 	p.prevGetHdrsBegin = beginHash
 	p.prevGetHdrsStop = stopHash
 	p.prevGetHdrsMtx.Unlock()
-	return nil
+	return p.QueueMessage(msg)
 }
 
 // PushRejectMsg sends a reject message for the provided command, reject code,
@@ -940,11 +894,14 @@ func (p *Peer) PushGetHeadersMsg(locator blockchain.BlockLocator, stopHash *wire
 // function to block until the reject message has actually been sent.
 //
 // This function is safe for concurrent access.
-func (p *Peer) PushRejectMsg(command string, code wire.RejectCode, reason string, hash *wire.ShaHash, wait bool) {
+func (p *Peer) PushRejectMsg(command string, code wire.RejectCode, reason string, hash *wire.ShaHash) <-chan error {
 	// Don't bother sending the reject message if the protocol version
 	// is too low.
-	if p.VersionKnown() && p.ProtocolVersion() < wire.RejectVersion {
-		return
+	if p.ProtocolVersion() < wire.RejectVersion {
+		errChan := make(chan error, 1)
+		errChan <- nil
+		close(errChan)
+		return errChan
 	}
 
 	msg := wire.NewMsgReject(command, code, reason)
@@ -958,16 +915,7 @@ func (p *Peer) PushRejectMsg(command string, code wire.RejectCode, reason string
 		msg.Hash = *hash
 	}
 
-	// Send the message without waiting if the caller has not requested it.
-	if !wait {
-		p.QueueMessage(msg, nil)
-		return
-	}
-
-	// Send the message and block until it has been sent before returning.
-	doneChan := make(chan struct{}, 1)
-	p.QueueMessage(msg, doneChan)
-	<-doneChan
+	return p.QueueMessage(msg)
 }
 
 // handleVersionMsg is invoked when a peer receives a version bitcoin message
@@ -987,21 +935,10 @@ func (p *Peer) handleVersionMsg(msg *wire.MsgVersion) error {
 		// disconnecting.
 		reason := fmt.Sprintf("protocol version must be %d or greater",
 			wire.MultipleAddressVersion)
-		p.PushRejectMsg(msg.Command(), wire.RejectObsolete, reason,
-			nil, true)
-		return errors.New(reason)
-	}
 
-	// Limit to one version message per peer.
-	// No read lock is necessary because versionKnown is not written to in any
-	// other goroutine
-	if p.versionKnown {
-		// Send an reject message indicating the version message was
-		// incorrectly sent twice and wait for the message to be sent
-		// before disconnecting.
-		p.PushRejectMsg(msg.Command(), wire.RejectDuplicate,
-			"duplicate version message", nil, true)
-		return errors.New("only one version message per peer is allowed")
+		// Ignore error.
+		<-p.PushRejectMsg(msg.Command(), wire.RejectObsolete, reason, nil)
+		return errors.New(reason)
 	}
 
 	// Updating a bunch of stats.
@@ -1014,8 +951,12 @@ func (p *Peer) handleVersionMsg(msg *wire.MsgVersion) error {
 
 	// Negotiate the protocol version.
 	p.flagsMtx.Lock()
-	p.protocolVersion = minUint32(p.protocolVersion, uint32(msg.ProtocolVersion))
-	p.versionKnown = true
+
+	if uint32(msg.ProtocolVersion) < p.protocolVersion {
+		p.protocolVersion = uint32(msg.ProtocolVersion)
+	}
+
+	//p.versionKnown = true
 	log.Debugf("Negotiated protocol version %d for peer %s",
 		p.protocolVersion, p)
 	// Set the peer's ID.
@@ -1024,29 +965,10 @@ func (p *Peer) handleVersionMsg(msg *wire.MsgVersion) error {
 	// advertised.
 	p.services = msg.Services
 	// Set the remote peer's user agent.
+	// Change this to remote useragent.
 	p.userAgent = msg.UserAgent
 	p.flagsMtx.Unlock()
 
-	// Inbound connections.
-	if p.inbound {
-		// Set up a NetAddress for the peer to be used with AddrManager.
-		// We only do this inbound because outbound set this up
-		// at connection time and no point recomputing.
-		na, err := newNetAddress(p.conn.RemoteAddr(), p.services)
-		if err != nil {
-			return err
-		}
-		p.na = na
-
-		// Send version.
-		err = p.pushVersionMsg()
-		if err != nil {
-			return err
-		}
-	}
-
-	// Send verack.
-	p.QueueMessage(wire.NewMsgVerAck(), nil)
 	return nil
 }
 
@@ -1055,16 +977,16 @@ func (p *Peer) handleVersionMsg(msg *wire.MsgVersion) error {
 func (p *Peer) isValidBIP0111(cmd string) bool {
 	if p.Services()&wire.SFNodeBloom != wire.SFNodeBloom {
 		if p.ProtocolVersion() >= wire.BIP0111Version {
-			log.Debugf("%s sent an unsupported %s "+
-				"request -- disconnecting", p, cmd)
-			p.Disconnect()
+			log.Debugf("%s sent an unsupported %s request -- disconnecting",
+				p, cmd)
+			p.Shutdown()
 		} else {
-			log.Debugf("Ignoring %s request from %s -- bloom "+
-				"support is disabled", cmd, p)
+			log.Debugf(
+				"Ignoring %s request from %s -- bloom support is disabled",
+				cmd, p)
 		}
 		return false
 	}
-
 	return true
 }
 
@@ -1076,7 +998,8 @@ func (p *Peer) handlePingMsg(msg *wire.MsgPing) {
 	// Only reply with pong if the message is from a new enough client.
 	if p.ProtocolVersion() > wire.BIP0031Version {
 		// Include nonce from ping so pong can be identified.
-		p.QueueMessage(wire.NewMsgPong(msg.Nonce), nil)
+		// Ignore errors.
+		p.QueueMessage(wire.NewMsgPong(msg.Nonce))
 	}
 }
 
@@ -1141,25 +1064,9 @@ func (p *Peer) readMessage() (wire.Message, []byte, error) {
 
 // writeMessage sends a bitcoin message to the peer with logging.
 func (p *Peer) writeMessage(msg wire.Message) error {
-	// Don't do anything if we're disconnecting.
-	if atomic.LoadInt32(&p.disconnect) != 0 {
-		return nil
-	}
-	if !p.VersionKnown() {
-		switch msg.(type) {
-		case *wire.MsgVersion:
-			// This is OK.
-		case *wire.MsgReject:
-			// This is OK.
-		default:
-			// Drop all messages other than version and reject if
-			// the handshake has not already been done.
-			return nil
-		}
-	}
 
-	// Use closures to log expensive operations so they are only run when
-	// the logging level requires it.
+	// Use closures to log expensive operations so they are only run when the
+	// logging level requires it.
 	log.Debugf("%v", newLogClosure(func() string {
 		// Debug summary of message.
 		summary := messageSummary(msg)
@@ -1207,12 +1114,9 @@ func (p *Peer) isAllowedByRegression(err error) bool {
 
 	// Don't allow the error if it's not coming from localhost or the
 	// hostname can't be determined for some reason.
-	host, _, err := net.SplitHostPort(p.addr)
-	if err != nil {
+	if host, _, err := net.SplitHostPort(p.addr.String()); err != nil {
 		return false
-	}
-
-	if host != "127.0.0.1" && host != "localhost" {
+	} else if host != "127.0.0.1" && host != "localhost" {
 		return false
 	}
 
@@ -1230,564 +1134,372 @@ func (p *Peer) isRegTestNetwork() bool {
 // expected to have come from reading from the remote peer in the inHandler,
 // should be logged and responded to with a reject message.
 func (p *Peer) shouldHandleReadError(err error) bool {
-	// No logging or reject message when the peer is being forcibly
+	// No logging of reject message when the peer is being forcibly
 	// disconnected.
-	if atomic.LoadInt32(&p.disconnect) != 0 {
+	if !p.Connected() {
 		return false
 	}
 
-	// No logging or reject message when the remote peer has been
-	// disconnected.
+	// No logging or reject message when the remote peer has been disconnected.
 	if err == io.EOF {
 		return false
 	}
 	if opErr, ok := err.(*net.OpError); ok && !opErr.Temporary() {
 		return false
 	}
-
 	return true
 }
 
+// cmdData is a surrogate for getdata which can return a tx, block or notfound
+// message.
+const cmdData = "peer:data"
+
 // maybeAddDeadline potentially adds a deadline for the appropriate expected
 // response for the passed wire protocol command to the pending responses map.
-func (p *Peer) maybeAddDeadline(pendingResponses map[string]time.Time, msgCmd string) {
+func (p *Peer) maybeAddDeadline(msg wire.Message) {
 	// Setup a deadline for each message being sent that expects a response.
 	//
-	// NOTE: Pings are intentionally ignored here since they are typically
-	// sent asynchronously and as a result of a long backlock of messages,
-	// such as is typical in the case of initial block download, the
-	// response won't be received in time.
-	deadline := time.Now().Add(stallResponseTimeout)
-	switch msgCmd {
-	case wire.CmdVersion:
-		// Expects a verack message.
-		pendingResponses[wire.CmdVerAck] = deadline
+	// NOTE: Pings are intentionally ignored here since they are typically sent
+	// asynchronously and as a result of a long backlock of messages, such as
+	// is typical in the case of initial block download, the response won't be
+	// received in time.
 
-	case wire.CmdMemPool:
-		// Expects an inv message.
-		pendingResponses[wire.CmdInv] = deadline
+	deadline := stallResponseTimeout
 
-	case wire.CmdGetBlocks:
-		// Expects an inv message.
-		pendingResponses[wire.CmdInv] = deadline
-
+	// The message commands that we expect a response by.
+	responseCmd := ""
+	switch msg.Command() {
+	case wire.CmdVersion, wire.CmdMemPool, wire.CmdGetBlocks:
+		responseCmd = wire.CmdInv
 	case wire.CmdGetData:
-		// Expects a block, tx, or notfound message.
-		pendingResponses[wire.CmdBlock] = deadline
-		pendingResponses[wire.CmdTx] = deadline
-		pendingResponses[wire.CmdNotFound] = deadline
-
+		// Expects a block, tx, or notfound message message so use the cmdData
+		// surrogate to encompass them all.
+		responseCmd = cmdData
 	case wire.CmdGetHeaders:
 		// Expects a headers message.  Use a longer deadline since it
 		// can take a while for the remote peer to load all of the
 		// headers.
-		deadline = time.Now().Add(stallResponseTimeout * 3)
-		pendingResponses[wire.CmdHeaders] = deadline
+		deadline = deadline * 3
+		responseCmd = wire.CmdHeaders
 	}
-}
 
-// stallHandler handles stall detection for the peer.  This entails keeping
-// track of expected responses and assigning them deadlines while accounting for
-// the time spent in callbacks.  It must be run as a goroutine.
-func (p *Peer) stallHandler() {
-	// These variables are used to adjust the deadline times forward by the
-	// time it takes callbacks to execute.  This is done because new
-	// messages aren't read until the previous one is finished processing
-	// (which includes callbacks), so the deadline for receiving a response
-	// for a given message must account for the processing time as well.
-	var handlerActive bool
-	var handlersStartTime time.Time
-	var deadlineOffset time.Duration
+	// Maybe the sent message is not expecting a response by a certain time.
+	if responseCmd == "" {
+		return
+	}
 
-	// pendingResponses tracks the expected response deadline times.
-	pendingResponses := make(map[string]time.Time)
+	p.responseDeadlinesMtx.Lock()
+	if _, ok := p.responseDeadlines[responseCmd]; !ok {
 
-	// stallTicker is used to periodically check pending responses that have
-	// exceeded the expected deadline and disconnect the peer due to
-	// stalling.
-	stallTicker := time.NewTicker(stallTickInterval)
-	defer stallTicker.Stop()
-
-	// ioStopped is used to detect when both the input and output handler
-	// goroutines are done.
-	var ioStopped bool
-out:
-	for {
-		select {
-		case msg := <-p.stallControl:
-			switch msg.command {
-			case sccSendMessage:
-				// Add a deadline for the expected response
-				// message if needed.
-				p.maybeAddDeadline(pendingResponses,
-					msg.message.Command())
-
-			case sccReceiveMessage:
-				// Remove received messages from the expected
-				// reponse map.  Since certain commands expect
-				// one of a group of responses, remove everyting
-				// in the expected group accordingly.
-				switch msgCmd := msg.message.Command(); msgCmd {
-				case wire.CmdBlock:
-					fallthrough
-				case wire.CmdTx:
-					fallthrough
-				case wire.CmdNotFound:
-					delete(pendingResponses, wire.CmdBlock)
-					delete(pendingResponses, wire.CmdTx)
-					delete(pendingResponses, wire.CmdNotFound)
-
-				default:
-					delete(pendingResponses, msgCmd)
-				}
-
-			case sccHandlerStart:
-				// Warn on unbalanced callback signalling.
-				if handlerActive {
-					log.Warn("Received handler start " +
-						"control command while a " +
-						"handler is already active")
-					continue
-				}
-
-				handlerActive = true
-				handlersStartTime = time.Now()
-
-			case sccHandlerDone:
-				// Warn on unbalanced callback signalling.
-				if !handlerActive {
-					log.Warn("Received handler done " +
-						"control command when a " +
-						"handler is not already active")
-					continue
-				}
-
-				// Extend active deadlines by the time it took
-				// to execute the callback.
-				duration := time.Now().Sub(handlersStartTime)
-				deadlineOffset += duration
-				handlerActive = false
-
-			default:
-				log.Warnf("Unsupported message command %v",
-					msg.command)
+		// Add a cancellable timer to disconnect the peer if required.
+		t := time.NewTimer(deadline)
+		stop := make(chan struct{})
+		go func() {
+			select {
+			case <-t.C:
+				// TODO: Disconnect peer if here.
+				log.Debugf("Timeout waiting for %v in response to %v.",
+					responseCmd, msg.Command())
+			case <-stop:
+				t.Stop()
 			}
+			// TODO: Add disconnect here.
+		}()
 
-		case <-stallTicker.C:
-			// Calculate the offset to apply to the deadline based
-			// on how long the handlers have taken to execute since
-			// the last tick.
-			now := time.Now()
-			offset := deadlineOffset
-			if handlerActive {
-				offset += now.Sub(handlersStartTime)
-			}
-
-			// Disconnect the peer if any of the pending responses
-			// don't arrive by their adjusted deadline.
-			for command, deadline := range pendingResponses {
-				if now.Before(deadline.Add(offset)) {
-					continue
-				}
-
-				log.Debugf("Peer %s appears to be stalled or "+
-					"misbehaving, %s timeout -- "+
-					"disconnecting", p, command)
-				p.Disconnect()
-				break
-			}
-
-			// Reset the deadline offset for the next tick.
-			deadlineOffset = 0
-
-		case <-p.inQuit:
-			// The stall handler can exit once both the input and
-			// output handler goroutines are done.
-			if ioStopped {
-				break out
-			}
-			ioStopped = true
-
-		case <-p.outQuit:
-			// The stall handler can exit once both the input and
-			// output handler goroutines are done.
-			if ioStopped {
-				break out
-			}
-			ioStopped = true
+		p.responseDeadlines[responseCmd] = func() {
+			close(stop)
+			delete(p.responseDeadlines, responseCmd)
 		}
 	}
-
-	// Drain any wait channels before going away so there is nothing left
-	// waiting on this goroutine.
-cleanup:
-	for {
-		select {
-		case <-p.stallControl:
-		default:
-			break cleanup
-		}
-	}
-	log.Tracef("Peer stall handler done for %s", p)
+	p.responseDeadlinesMtx.Unlock()
 }
 
-// inHandler handles all incoming messages for the peer.  It must be run as a
-// goroutine.
-func (p *Peer) inHandler() {
-	// Peers must complete the initial version negotiation within a shorter
-	// timeframe than a general idle timeout.  The timer is then reset below
-	// to idleTimeout for all future messages.
-	idleTimer := time.AfterFunc(negotiateTimeout, func() {
-		if p.VersionKnown() {
+func (p *Peer) maybeRemoveDeadline(msg wire.Message) {
+	responseCmd := msg.Command()
+	switch msg.Command() {
+	case wire.CmdBlock, wire.CmdTx, wire.CmdNotFound:
+		// Use the surrogate cmdData to represent these message types.
+		responseCmd = cmdData
+	}
+
+	p.responseDeadlinesMtx.Lock()
+	if cancel, ok := p.responseDeadlines[responseCmd]; ok {
+		cancel()
+	}
+	p.responseDeadlinesMtx.Unlock()
+}
+
+func (p *Peer) readHandler() {
+	p.shutdownWaitGroup.Add(1)
+	defer p.shutdownWaitGroup.Done()
+
+	for {
+		read := make(chan readMsg)
+		go func() {
+			msg, buf, err := p.readMessage()
+			read <- readMsg{msg, buf, err}
+			close(read)
+		}()
+
+		select {
+		case <-p.shutdown:
+			return
+		case rm := <-read:
+			// Process message.
+			if err := p.handleReadMsg(rm); err != nil {
+				// TODO: Disconnect.
+				fmt.Println("handleReadMsg error - TODO: disconnect", err)
+
+			}
+		case <-time.After(idleTimeout):
+			// Deal with timeout.
 			log.Warnf("Peer %s no answer for %s -- disconnecting",
 				p, idleTimeout)
-		} else {
-			log.Debugf("Peer %s no valid version message for %s -- "+
-				"disconnecting", p, negotiateTimeout)
+			// TODO: Disconnect.
 		}
-		p.Disconnect()
-	})
-
-out:
-	for atomic.LoadInt32(&p.disconnect) == 0 {
-		// Read a message and stop the idle timer as soon as the read
-		// is done.  The timer is reset below for the next iteration if
-		// needed.
-		rmsg, buf, err := p.readMessage()
-		idleTimer.Stop()
-		if err != nil {
-			// In order to allow regression tests with malformed
-			// messages, don't disconnect the peer when we're in
-			// regression test mode and the error is one of the
-			// allowed errors.
-			if p.isRegTestNetwork() && p.isAllowedByRegression(err) {
-				log.Errorf("Allowed regression test error "+
-					"from %s: %v", p, err)
-				idleTimer.Reset(idleTimeout)
-				continue
-			}
-
-			// Only log the error and send reject message if the
-			// local peer is not forcibly disconnecting and the
-			// remote peer has not disconnected.
-			if p.shouldHandleReadError(err) {
-				errMsg := fmt.Sprintf("Can't read message "+
-					"from %s: %v", p, err)
-				log.Errorf(errMsg)
-
-				// Push a reject message for the malformed
-				// message and wait for the message to be sent
-				// before disconnecting.
-				//
-				// NOTE: Ideally this would include the command
-				// in the header if at least that much of the
-				// message was valid, but that is not currently
-				// exposed by wire, so just used malformed for
-				// the command.
-				p.PushRejectMsg("malformed",
-					wire.RejectMalformed, errMsg, nil, true)
-			}
-			break out
-		}
-		p.statsMtx.Lock()
-		p.lastRecv = time.Now()
-		p.statsMtx.Unlock()
-		p.stallControl <- stallControlMsg{sccReceiveMessage, rmsg}
-
-		// Ensure version message comes first.
-		if vmsg, ok := rmsg.(*wire.MsgVersion); !ok && !p.VersionKnown() {
-			errStr := "A version message must precede all others"
-			log.Errorf(errStr)
-
-			// Push a reject message and wait for the message to be
-			// sent before disconnecting.
-			p.PushRejectMsg(vmsg.Command(), wire.RejectMalformed,
-				errStr, nil, true)
-			break out
-		}
-
-		// Handle each supported message type.
-		p.stallControl <- stallControlMsg{sccHandlerStart, rmsg}
-		switch msg := rmsg.(type) {
-		case *wire.MsgVersion:
-			err := p.handleVersionMsg(msg)
-			if err != nil {
-				log.Debugf("New peer %v - error negotiating protocol: %v",
-					p, err)
-				p.Disconnect()
-				break out
-			}
-			if p.cfg.Listeners.OnVersion != nil {
-				p.cfg.Listeners.OnVersion(p, msg)
-			}
-
-		case *wire.MsgVerAck:
-			p.flagsMtx.Lock()
-			versionSent := p.versionSent
-			p.flagsMtx.Unlock()
-			if !versionSent {
-				log.Infof("Received 'verack' from peer %v "+
-					"before version was sent -- "+
-					"disconnecting", p)
-				break out
-			}
-
-			// No read lock is necessary because verAckReceived is
-			// not written to in any other goroutine.
-			if p.verAckReceived {
-				log.Infof("Already received 'verack' from "+
-					"peer %v -- disconnecting", p)
-				break out
-			}
-			p.flagsMtx.Lock()
-			p.verAckReceived = true
-			p.flagsMtx.Unlock()
-			if p.cfg.Listeners.OnVerAck != nil {
-				p.cfg.Listeners.OnVerAck(p, msg)
-			}
-
-		case *wire.MsgGetAddr:
-			if p.cfg.Listeners.OnGetAddr != nil {
-				p.cfg.Listeners.OnGetAddr(p, msg)
-			}
-
-		case *wire.MsgAddr:
-			if p.cfg.Listeners.OnAddr != nil {
-				p.cfg.Listeners.OnAddr(p, msg)
-			}
-
-		case *wire.MsgPing:
-			p.handlePingMsg(msg)
-			if p.cfg.Listeners.OnPing != nil {
-				p.cfg.Listeners.OnPing(p, msg)
-			}
-
-		case *wire.MsgPong:
-			p.handlePongMsg(msg)
-			if p.cfg.Listeners.OnPong != nil {
-				p.cfg.Listeners.OnPong(p, msg)
-			}
-
-		case *wire.MsgAlert:
-			if p.cfg.Listeners.OnAlert != nil {
-				p.cfg.Listeners.OnAlert(p, msg)
-			}
-
-		case *wire.MsgMemPool:
-			if p.cfg.Listeners.OnMemPool != nil {
-				p.cfg.Listeners.OnMemPool(p, msg)
-			}
-
-		case *wire.MsgTx:
-			if p.cfg.Listeners.OnTx != nil {
-				p.cfg.Listeners.OnTx(p, msg)
-			}
-
-		case *wire.MsgBlock:
-			if p.cfg.Listeners.OnBlock != nil {
-				p.cfg.Listeners.OnBlock(p, msg, buf)
-			}
-
-		case *wire.MsgInv:
-			if p.cfg.Listeners.OnInv != nil {
-				p.cfg.Listeners.OnInv(p, msg)
-			}
-
-		case *wire.MsgHeaders:
-			if p.cfg.Listeners.OnHeaders != nil {
-				p.cfg.Listeners.OnHeaders(p, msg)
-			}
-
-		case *wire.MsgNotFound:
-			if p.cfg.Listeners.OnNotFound != nil {
-				p.cfg.Listeners.OnNotFound(p, msg)
-			}
-
-		case *wire.MsgGetData:
-			if p.cfg.Listeners.OnGetData != nil {
-				p.cfg.Listeners.OnGetData(p, msg)
-			}
-
-		case *wire.MsgGetBlocks:
-			if p.cfg.Listeners.OnGetBlocks != nil {
-				p.cfg.Listeners.OnGetBlocks(p, msg)
-			}
-
-		case *wire.MsgGetHeaders:
-			if p.cfg.Listeners.OnGetHeaders != nil {
-				p.cfg.Listeners.OnGetHeaders(p, msg)
-			}
-
-		case *wire.MsgFilterAdd:
-			if p.isValidBIP0111(msg.Command()) && p.cfg.Listeners.OnFilterAdd != nil {
-				p.cfg.Listeners.OnFilterAdd(p, msg)
-			}
-
-		case *wire.MsgFilterClear:
-			if p.isValidBIP0111(msg.Command()) && p.cfg.Listeners.OnFilterClear != nil {
-				p.cfg.Listeners.OnFilterClear(p, msg)
-			}
-
-		case *wire.MsgFilterLoad:
-			if p.isValidBIP0111(msg.Command()) && p.cfg.Listeners.OnFilterLoad != nil {
-				p.cfg.Listeners.OnFilterLoad(p, msg)
-			}
-
-		case *wire.MsgMerkleBlock:
-			if p.cfg.Listeners.OnMerkleBlock != nil {
-				p.cfg.Listeners.OnMerkleBlock(p, msg)
-			}
-
-		case *wire.MsgReject:
-			if p.cfg.Listeners.OnReject != nil {
-				p.cfg.Listeners.OnReject(p, msg)
-			}
-
-		default:
-			log.Debugf("Received unhandled message of type %v:",
-				rmsg.Command())
-		}
-		p.stallControl <- stallControlMsg{sccHandlerDone, rmsg}
-
-		// A message was received so reset the idle timer.
-		idleTimer.Reset(idleTimeout)
 	}
-
-	// Ensure the idle timer is stopped to avoid leaking the resource.
-	idleTimer.Stop()
-
-	// Ensure connection is closed.
-	p.Disconnect()
-
-	close(p.inQuit)
-	log.Tracef("Peer input handler done for %s", p)
 }
 
-// queueHandler handles the queueing of outgoing data for the peer. This runs
-// as a muxer for various sources of input so we can ensure that server and
-// peer handlers will not block on us sending a message.
-// We then pass the data on to outHandler to be actually written.
-func (p *Peer) queueHandler() {
+func (p *Peer) handleReadMsg(rm readMsg) error {
+	if rm.err != nil {
+		// In order to allow regression tests with malformed
+		// messages, don't disconnect the peer when we're in
+		// regression test mode and the error is one of the
+		// allowed errors.
+		if p.isRegTestNetwork() && p.isAllowedByRegression(rm.err) {
+			log.Errorf("Allowed regression test error from %s: %v", p, rm.err)
+			return nil
+		}
+
+		// Only log the error and send reject message if the
+		// local peer is not forcibly disconnecting and the
+		// remote peer has not disconnected.
+		if p.shouldHandleReadError(rm.err) {
+			errStr := fmt.Sprintf("Cannot read message from %s: %v", p, rm.err)
+			log.Errorf(errStr)
+
+			// Push a reject message for the malformed
+			// message and wait for the message to be sent
+			// before disconnecting.
+			//
+			// NOTE: Ideally this would include the command
+			// in the header if at least that much of the
+			// message was valid, but that is not currently
+			// exposed by wire, so just used malformed for
+			// the command.
+			<-p.PushRejectMsg("malformed", wire.RejectMalformed, errStr, nil)
+			//TODO: Maybe disconnect here.
+		}
+		return rm.err
+	}
+	p.statsMtx.Lock()
+	p.lastRecv = time.Now()
+	p.statsMtx.Unlock()
+
+	p.maybeRemoveDeadline(rm.msg)
+
+	// Handle each supported message type.
+	switch msg := rm.msg.(type) {
+	case *wire.MsgVersion:
+		return errors.New("version already received")
+	case *wire.MsgVerAck:
+		return errors.New("verack already received")
+	case *wire.MsgGetAddr:
+		if p.cfg.Listeners.OnGetAddr != nil {
+			p.cfg.Listeners.OnGetAddr(p, msg)
+		}
+	case *wire.MsgAddr:
+		if p.cfg.Listeners.OnAddr != nil {
+			p.cfg.Listeners.OnAddr(p, msg)
+		}
+	case *wire.MsgPing:
+		p.handlePingMsg(msg)
+		if p.cfg.Listeners.OnPing != nil {
+			p.cfg.Listeners.OnPing(p, msg)
+		}
+	case *wire.MsgPong:
+		p.handlePongMsg(msg)
+		if p.cfg.Listeners.OnPong != nil {
+			p.cfg.Listeners.OnPong(p, msg)
+		}
+	case *wire.MsgAlert:
+		if p.cfg.Listeners.OnAlert != nil {
+			p.cfg.Listeners.OnAlert(p, msg)
+		}
+	case *wire.MsgMemPool:
+		if p.cfg.Listeners.OnMemPool != nil {
+			p.cfg.Listeners.OnMemPool(p, msg)
+		}
+	case *wire.MsgTx:
+		if p.cfg.Listeners.OnTx != nil {
+			p.cfg.Listeners.OnTx(p, msg)
+		}
+	case *wire.MsgBlock:
+		if p.cfg.Listeners.OnBlock != nil {
+			p.cfg.Listeners.OnBlock(p, msg, rm.buf)
+		}
+	case *wire.MsgInv:
+		if p.cfg.Listeners.OnInv != nil {
+			p.cfg.Listeners.OnInv(p, msg)
+		}
+	case *wire.MsgHeaders:
+		if p.cfg.Listeners.OnHeaders != nil {
+			p.cfg.Listeners.OnHeaders(p, msg)
+		}
+	case *wire.MsgNotFound:
+		if p.cfg.Listeners.OnNotFound != nil {
+			p.cfg.Listeners.OnNotFound(p, msg)
+		}
+	case *wire.MsgGetData:
+		if p.cfg.Listeners.OnGetData != nil {
+			p.cfg.Listeners.OnGetData(p, msg)
+		}
+	case *wire.MsgGetBlocks:
+		if p.cfg.Listeners.OnGetBlocks != nil {
+			p.cfg.Listeners.OnGetBlocks(p, msg)
+		}
+	case *wire.MsgGetHeaders:
+		if p.cfg.Listeners.OnGetHeaders != nil {
+			p.cfg.Listeners.OnGetHeaders(p, msg)
+		}
+	case *wire.MsgFilterAdd:
+		if p.isValidBIP0111(
+			msg.Command()) && p.cfg.Listeners.OnFilterAdd != nil {
+			p.cfg.Listeners.OnFilterAdd(p, msg)
+		}
+	case *wire.MsgFilterClear:
+		if p.isValidBIP0111(
+			msg.Command()) && p.cfg.Listeners.OnFilterClear != nil {
+			p.cfg.Listeners.OnFilterClear(p, msg)
+		}
+	case *wire.MsgFilterLoad:
+		if p.isValidBIP0111(
+			msg.Command()) && p.cfg.Listeners.OnFilterLoad != nil {
+			p.cfg.Listeners.OnFilterLoad(p, msg)
+		}
+	case *wire.MsgMerkleBlock:
+		if p.cfg.Listeners.OnMerkleBlock != nil {
+			p.cfg.Listeners.OnMerkleBlock(p, msg)
+		}
+	case *wire.MsgReject:
+		if p.cfg.Listeners.OnReject != nil {
+			p.cfg.Listeners.OnReject(p, msg)
+		}
+	default:
+		return fmt.Errorf("unexpected message %v", msg.Command())
+	}
+	return nil
+}
+
+func (p *Peer) writeMsgQueueHandler() {
+	p.shutdownWaitGroup.Add(1)
+	defer p.shutdownWaitGroup.Done()
+
 	pendingMsgs := list.New()
-	invSendQueue := list.New()
+	for {
+		for {
+			elem := pendingMsgs.Front()
+			if elem == nil {
+				break
+			}
+			select {
+			case <-p.shutdown:
+				return
+			case p.write <- elem.Value.(writeMsg):
+				pendingMsgs.Remove(elem)
+			default:
+				break
+			}
+		}
+
+		select {
+		case <-p.shutdown:
+			return
+		case writeMsg := <-p.writeMsgQueue:
+			pendingMsgs.PushBack(writeMsg)
+		}
+	}
+}
+
+func (p *Peer) writeInvVectQueueHandler() {
+	p.shutdownWaitGroup.Add(1)
+	defer p.shutdownWaitGroup.Done()
+
 	trickleTicker := time.NewTicker(trickleTimeout)
 	defer trickleTicker.Stop()
-
-	// We keep the waiting flag so that we know if we have a message queued
-	// to the outHandler or not.  We could use the presence of a head of
-	// the list for this but then we have rather racy concerns about whether
-	// it has gotten it at cleanup time - and thus who sends on the
-	// message's done channel.  To avoid such confusion we keep a different
-	// flag and pendingMsgs only contains messages that we have not yet
-	// passed to outHandler.
-	waiting := false
-
-	// To avoid duplication below.
-	queuePacket := func(msg outMsg, list *list.List, waiting bool) bool {
-		if !waiting {
-			p.sendQueue <- msg
-		} else {
-			list.PushBack(msg)
+	queueInvMsg := func(invMsg *wire.MsgInv, invMsgErrs []chan<- error) {
+		err := <-p.QueueMessage(invMsg)
+		for _, errChan := range invMsgErrs {
+			errChan <- err
+			close(errChan)
 		}
-		// we are always waiting now.
-		return true
 	}
-out:
+
+	writeInvVects := []writeInvVect{}
 	for {
 		select {
-		case msg := <-p.outputQueue:
-			waiting = queuePacket(msg, pendingMsgs, waiting)
-
-		// This channel is notified when a message has been sent across
-		// the network socket.
-		case <-p.sendDoneQueue:
-			// No longer waiting if there are no more messages
-			// in the pending messages queue.
-			next := pendingMsgs.Front()
-			if next == nil {
-				waiting = false
-				continue
-			}
-
-			// Notify the outHandler about the next item to
-			// asynchronously send.
-			val := pendingMsgs.Remove(next)
-			p.sendQueue <- val.(outMsg)
-
-		case iv := <-p.outputInvChan:
-			// No handshake?  They'll find out soon enough.
-			if p.VersionKnown() {
-				invSendQueue.PushBack(iv)
-			}
-
+		case <-p.shutdown:
+			return
+		case writeInvVect := <-p.writeInvVectQueue:
+			writeInvVects = append(writeInvVects, writeInvVect)
 		case <-trickleTicker.C:
-			// Don't send anything if we're disconnecting or there
-			// is no queued inventory.
-			// version is known if send queue has any entries.
-			if atomic.LoadInt32(&p.disconnect) != 0 ||
-				invSendQueue.Len() == 0 {
-				continue
-			}
 
-			// Create and send as many inv messages as needed to
-			// drain the inventory send queue.
-			invMsg := wire.NewMsgInvSizeHint(uint(invSendQueue.Len()))
-			for e := invSendQueue.Front(); e != nil; e = invSendQueue.Front() {
-				iv := invSendQueue.Remove(e).(*wire.InvVect)
-
-				// Don't send inventory that became known after
-				// the initial check.
-				if p.knownInventory.Exists(iv) {
+			invMsg := wire.NewMsgInvSizeHint(uint(len(writeInvVects)))
+			invMsgErrs := make([]chan<- error, 0, len(writeInvVects))
+			for _, writeInvVect := range writeInvVects {
+				if p.knownInventory.Exists(writeInvVect.invVect) {
+					writeInvVect.err <- ErrInventoryExists
+					close(writeInvVect.err)
 					continue
 				}
 
-				invMsg.AddInvVect(iv)
+				invMsg.AddInvVect(writeInvVect.invVect)
+				invMsgErrs = append(invMsgErrs, writeInvVect.err)
 				if len(invMsg.InvList) >= maxInvTrickleSize {
-					waiting = queuePacket(
-						outMsg{msg: invMsg},
-						pendingMsgs, waiting)
-					invMsg = wire.NewMsgInvSizeHint(uint(invSendQueue.Len()))
+					go queueInvMsg(invMsg, invMsgErrs)
+
+					invMsg = wire.NewMsgInvSizeHint(uint(len(writeInvVects)))
+					invMsgErrs = make([]chan<- error, 0, len(writeInvVects))
 				}
-
-				// Add the inventory that is being relayed to
-				// the known inventory for the peer.
-				p.AddKnownInventory(iv)
+				p.AddKnownInventory(writeInvVect.invVect)
 			}
+
 			if len(invMsg.InvList) > 0 {
-				waiting = queuePacket(outMsg{msg: invMsg},
-					pendingMsgs, waiting)
+				go queueInvMsg(invMsg, invMsgErrs)
 			}
-
-		case <-p.quit:
-			break out
 		}
 	}
+}
 
-	// Drain any wait channels before we go away so we don't leave something
-	// waiting for us.
-	for e := pendingMsgs.Front(); e != nil; e = pendingMsgs.Front() {
-		val := pendingMsgs.Remove(e)
-		msg := val.(outMsg)
-		if msg.doneChan != nil {
-			msg.doneChan <- struct{}{}
-		}
-	}
-cleanup:
-	for {
-		select {
-		case msg := <-p.outputQueue:
-			if msg.doneChan != nil {
-				msg.doneChan <- struct{}{}
+func (p *Peer) writeHandler() {
+	p.shutdownWaitGroup.Add(1)
+	defer p.shutdownWaitGroup.Done()
+
+	for writeMsg := range p.write {
+
+		switch m := writeMsg.msg.(type) {
+		case *wire.MsgPing:
+			if p.ProtocolVersion() > wire.BIP0031Version {
+				p.statsMtx.Lock()
+				p.lastPingNonce = m.Nonce
+				p.lastPingTime = time.Now()
+				p.statsMtx.Unlock()
 			}
-		case <-p.outputInvChan:
-			// Just drain channel
-		// sendDoneQueue is buffered so doesn't need draining.
-		default:
-			break cleanup
 		}
+
+		err := p.writeMessage(writeMsg.msg)
+		writeMsg.err <- err
+		close(writeMsg.err)
+		if err != nil {
+			if p.shouldLogWriteError(err) {
+				log.Errorf("Failed to send message to %s: %v.", p, err)
+			}
+			// TODO exit here.
+			return
+		}
+
+		p.maybeAddDeadline(writeMsg.msg)
 	}
-	close(p.queueQuit)
-	log.Tracef("Peer queue handler done for %s", p)
 }
 
 // shouldLogWriteError returns whether or not the passed error, which is
@@ -1795,7 +1507,7 @@ cleanup:
 // should be logged.
 func (p *Peer) shouldLogWriteError(err error) bool {
 	// No logging when the peer is being forcibly disconnected.
-	if atomic.LoadInt32(&p.disconnect) != 0 {
+	if !p.Connected() {
 		return false
 	}
 
@@ -1810,115 +1522,46 @@ func (p *Peer) shouldLogWriteError(err error) bool {
 	return true
 }
 
-// outHandler handles all outgoing messages for the peer.  It must be run as a
-// goroutine.  It uses a buffered channel to serialize output messages while
-// allowing the sender to continue running asynchronously.
-func (p *Peer) outHandler() {
-	// pingTicker is used to periodically send pings to the remote peer.
+func (p *Peer) pingTicker() {
+	p.shutdownWaitGroup.Add(1)
+	defer p.shutdownWaitGroup.Done()
+
 	pingTicker := time.NewTicker(pingInterval)
+	// TODO: Add stop on close peer.
 	defer pingTicker.Stop()
 
-out:
 	for {
 		select {
-		case msg := <-p.sendQueue:
-			switch m := msg.msg.(type) {
-			case *wire.MsgVersion:
-				// Set the flag which indicates the version has
-				// been sent.
-				p.flagsMtx.Lock()
-				p.versionSent = true
-				p.flagsMtx.Unlock()
-
-			case *wire.MsgPing:
-				// Only expects a pong message in later protocol
-				// versions.  Also set up statistics.
-				if p.ProtocolVersion() > wire.BIP0031Version {
-					p.statsMtx.Lock()
-					p.lastPingNonce = m.Nonce
-					p.lastPingTime = time.Now()
-					p.statsMtx.Unlock()
-				}
-			}
-
-			p.stallControl <- stallControlMsg{sccSendMessage, msg.msg}
-			err := p.writeMessage(msg.msg)
-			if err != nil {
-				p.Disconnect()
-				if p.shouldLogWriteError(err) {
-					log.Errorf("Failed to send message to "+
-						"%s: %v", p, err)
-				}
-				if msg.doneChan != nil {
-					msg.doneChan <- struct{}{}
-				}
-				continue
-			}
-
-			// At this point, the message was successfully sent, so
-			// update the last send time, signal the sender of the
-			// message that it has been sent (if requested), and
-			// signal the send queue to the deliver the next queued
-			// message.
-			p.statsMtx.Lock()
-			p.lastSend = time.Now()
-			p.statsMtx.Unlock()
-			if msg.doneChan != nil {
-				msg.doneChan <- struct{}{}
-			}
-			p.sendDoneQueue <- struct{}{}
-
+		case <-p.shutdown:
+			return
 		case <-pingTicker.C:
 			nonce, err := wire.RandomUint64()
 			if err != nil {
-				log.Errorf("Not sending ping to %s: %v", p, err)
-				continue
+				log.Errorf("Not sending ping to %s: %v.", p, err)
+				return
 			}
-			p.QueueMessage(wire.NewMsgPing(nonce), nil)
-
-		case <-p.quit:
-			break out
+			if err := <-p.QueueMessage(wire.NewMsgPing(nonce)); err != nil {
+				log.Errorf("Not sending ping to %s: %v.", p, err)
+				return
+			}
 		}
 	}
-
-	<-p.queueQuit
-
-	// Drain any wait channels before we go away so we don't leave something
-	// waiting for us. We have waited on queueQuit and thus we can be sure
-	// that we will not miss anything sent on sendQueue.
-cleanup:
-	for {
-		select {
-		case msg := <-p.sendQueue:
-			if msg.doneChan != nil {
-				msg.doneChan <- struct{}{}
-			}
-			// no need to send on sendDoneQueue since queueHandler
-			// has been waited on and already exited.
-		default:
-			break cleanup
-		}
-	}
-	close(p.outQuit)
-	log.Tracef("Peer output handler done for %s", p)
 }
 
 // QueueMessage adds the passed bitcoin message to the peer send queue.
 //
 // This function is safe for concurrent access.
-func (p *Peer) QueueMessage(msg wire.Message, doneChan chan struct{}) {
-	// Avoid risk of deadlock if goroutine already exited.  The goroutine
-	// we will be sending to hangs around until it knows for a fact that
-	// it is marked as disconnected and *then* it drains the channels.
+func (p *Peer) QueueMessage(msg wire.Message) <-chan error {
+	// Buffered with one space so that the write queue doesn't block if a caller
+	// doesn't bother to drain the channel.
+	err := make(chan error, 1)
 	if !p.Connected() {
-		if doneChan != nil {
-			go func() {
-				doneChan <- struct{}{}
-			}()
-		}
-		return
+		err <- ErrDisconnected
+		close(err)
+		return err
 	}
-	p.outputQueue <- outMsg{msg: msg, doneChan: doneChan}
+	p.writeMsgQueue <- writeMsg{msg, err}
+	return err
 }
 
 // QueueInventory adds the passed inventory to the inventory send queue which
@@ -1926,101 +1569,55 @@ func (p *Peer) QueueMessage(msg wire.Message, doneChan chan struct{}) {
 // Inventory that the peer is already known to have is ignored.
 //
 // This function is safe for concurrent access.
-func (p *Peer) QueueInventory(invVect *wire.InvVect) {
-	// Don't add the inventory to the send queue if the peer is already
-	// known to have it.
-	if p.knownInventory.Exists(invVect) {
-		return
-	}
+func (p *Peer) QueueInventory(invVect *wire.InvVect) <-chan error {
+	err := make(chan error, 1)
 
-	// Avoid risk of deadlock if goroutine already exited.  The goroutine
-	// we will be sending to hangs around until it knows for a fact that
-	// it is marked as disconnected and *then* it drains the channels.
 	if !p.Connected() {
-		return
+		err <- ErrDisconnected
+		close(err)
+		return err
 	}
 
-	p.outputInvChan <- invVect
-}
-
-// Connect uses the given conn to connect to the peer. Calling this function when
-// the peer is already connected  will have no effect.
-func (p *Peer) Connect(conn net.Conn) error {
-	// Already connected?
-	if atomic.LoadInt32(&p.connected) != 0 {
-		return nil
+	if p.knownInventory.Exists(invVect) {
+		err <- ErrInventoryExists
+		close(err)
+		return err
 	}
 
-	p.conn = conn
-	p.timeConnected = time.Now()
-
-	atomic.AddInt32(&p.connected, 1)
-	return p.Start()
+	p.writeInvVectQueue <- writeInvVect{invVect, err}
+	return err
 }
 
 // Connected returns whether or not the peer is currently connected.
 //
 // This function is safe for concurrent access.
 func (p *Peer) Connected() bool {
-	return atomic.LoadInt32(&p.connected) != 0 &&
-		atomic.LoadInt32(&p.disconnect) == 0
-}
-
-// Disconnect disconnects the peer by closing the connection.  Calling this
-// function when the peer is already disconnected or in the process of
-// disconnecting will have no effect.
-func (p *Peer) Disconnect() {
-	if atomic.AddInt32(&p.disconnect, 1) != 1 {
-		return
+	select {
+	case <-p.shutdown:
+		return false
+	default:
+		return true
 	}
-
-	log.Tracef("Disconnecting %s", p)
-	if atomic.LoadInt32(&p.connected) != 0 {
-		p.conn.Close()
-	}
-	close(p.quit)
-}
-
-// Start begins processing input and output messages.  It also sends the initial
-// version message for outbound connections to start the negotiation process.
-func (p *Peer) Start() error {
-	// Already started?
-	if atomic.AddInt32(&p.started, 1) != 1 {
-		return nil
-	}
-
-	log.Tracef("Starting peer %s", p)
-
-	// Send an initial version message if this is an outbound connection.
-	if !p.inbound {
-		err := p.pushVersionMsg()
-		if err != nil {
-			log.Errorf("Can't send outbound version message %v", err)
-			p.Disconnect()
-			return err
-		}
-	}
-
-	// Start processing input and output.
-	go p.stallHandler()
-	go p.inHandler()
-	go p.queueHandler()
-	go p.outHandler()
-
-	return nil
 }
 
 // Shutdown gracefully shuts down the peer by disconnecting it.
-func (p *Peer) Shutdown() {
-	log.Tracef("Shutdown peer %s", p)
-	p.Disconnect()
+func (p *Peer) Shutdown() error {
+	close(p.shutdown)
+	close(p.write)
+
+	p.responseDeadlinesMtx.Lock()
+	for _, cancel := range p.responseDeadlines {
+		cancel()
+	}
+	p.responseDeadlinesMtx.Unlock()
+	return p.conn.Close()
 }
 
-// WaitForShutdown waits until the peer has completely shutdown.  This will
+// WaitForShutdown waits until the peer has completely shutdown. This will
 // happen if either the local or remote side has been disconnected or the peer
 // is forcibly shutdown via Shutdown.
 func (p *Peer) WaitForShutdown() {
-	<-p.quit
+	p.shutdownWaitGroup.Wait()
 }
 
 // newPeerBase returns a new base bitcoin peer based on the inbound flag.  This
@@ -2039,61 +1636,168 @@ func newPeerBase(cfg *Config, inbound bool) *Peer {
 		cfg.ChainParams = &chaincfg.TestNet3Params
 	}
 
-	p := Peer{
+	return &Peer{
 		inbound:         inbound,
 		knownInventory:  newMruInventoryMap(maxKnownInventory),
-		stallControl:    make(chan stallControlMsg, 1), // nonblocking sync
-		outputQueue:     make(chan outMsg, outputBufferSize),
-		sendQueue:       make(chan outMsg, 1),   // nonblocking sync
-		sendDoneQueue:   make(chan struct{}, 1), // nonblocking sync
-		outputInvChan:   make(chan *wire.InvVect, outputBufferSize),
-		inQuit:          make(chan struct{}),
-		queueQuit:       make(chan struct{}),
-		outQuit:         make(chan struct{}),
-		quit:            make(chan struct{}),
+		shutdown:        make(chan struct{}),
 		cfg:             *cfg, // Copy so caller can't mutate.
 		services:        cfg.Services,
 		protocolVersion: protocolVersion,
+
+		write:             make(chan writeMsg),
+		writeMsgQueue:     make(chan writeMsg),
+		writeInvVectQueue: make(chan writeInvVect),
+
+		responseDeadlines: make(map[string]func()),
 	}
-	return &p
+}
+
+func (p *Peer) negotiateInboundVersion() error {
+
+	// Wait for the remote's version.
+	msg, _, err := p.readMessage()
+	if err != nil {
+		return err
+	}
+
+	verMsg, ok := msg.(*wire.MsgVersion)
+	if !ok {
+		return fmt.Errorf("unexpected message %T", msg)
+	}
+
+	// Handle remote version message.
+	if err := p.handleVersionMsg(verMsg); err != nil {
+		return err
+	}
+
+	if p.cfg.Listeners.OnVersion != nil {
+		p.cfg.Listeners.OnVersion(p, verMsg)
+	}
+
+	// Send our version information.
+	verMsg, err = p.localMsgVersion()
+	if err != nil {
+		return err
+	}
+	if err := p.writeMessage(verMsg); err != nil {
+		return err
+	}
+
+	// Now wait for their acknowledgment.
+	msg, _, err = p.readMessage()
+	if err != nil {
+		return err
+	}
+	verAckMsg, ok := msg.(*wire.MsgVerAck)
+	if !ok {
+		return fmt.Errorf("unexpected message %T", msg)
+	}
+
+	if p.cfg.Listeners.OnVerAck != nil {
+		p.cfg.Listeners.OnVerAck(p, verAckMsg)
+	}
+
+	// Send our version acknowledgement.
+	return p.writeMessage(wire.NewMsgVerAck())
 }
 
 // NewInboundPeer returns a new inbound bitcoin peer. Use Start to begin
 // processing incoming and outgoing messages.
-func NewInboundPeer(cfg *Config, conn net.Conn) *Peer {
+func NewInboundPeer(cfg *Config, conn net.Conn) (*Peer, error) {
 	p := newPeerBase(cfg, true)
-	p.conn = conn
-	p.addr = conn.RemoteAddr().String()
-	p.timeConnected = time.Now()
-	atomic.AddInt32(&p.connected, 1)
-	return p
+	return startPeer(p, conn, p.negotiateInboundVersion)
+}
+
+func (p *Peer) negotiateOutboundVersion() error {
+
+	// Send our version information.
+	verMsg, err := p.localMsgVersion()
+	if err != nil {
+		return err
+	}
+	if err := p.writeMessage(verMsg); err != nil {
+		return err
+	}
+
+	// Wait for their version response.
+	msg, _, err := p.readMessage()
+	if err != nil {
+		return err
+	}
+
+	verMsg, ok := msg.(*wire.MsgVersion)
+	if !ok {
+		return fmt.Errorf("unexpected message %T", msg)
+	}
+
+	// Check to see if we are compatible with their version.
+	if err := p.handleVersionMsg(verMsg); err != nil {
+		return err
+	}
+
+	if p.cfg.Listeners.OnVersion != nil {
+		p.cfg.Listeners.OnVersion(p, verMsg)
+	}
+
+	// Send our version acknowledgement.
+	if err := p.writeMessage(wire.NewMsgVerAck()); err != nil {
+		return err
+	}
+
+	// Now wait for their acknowledgment.
+	msg, _, err = p.readMessage()
+	if err != nil {
+		return err
+	}
+	verAckMsg, ok := msg.(*wire.MsgVerAck)
+	if !ok {
+		return fmt.Errorf("unexpected message %T", msg)
+	}
+
+	if p.cfg.Listeners.OnVerAck != nil {
+		p.cfg.Listeners.OnVerAck(p, verAckMsg)
+	}
+	return nil
 }
 
 // NewOutboundPeer returns a new outbound bitcoin peer.
-func NewOutboundPeer(cfg *Config, addr string) (*Peer, error) {
+func NewOutboundPeer(cfg *Config, conn net.Conn) (*Peer, error) {
 	p := newPeerBase(cfg, false)
-	p.addr = addr
+	return startPeer(p, conn, p.negotiateOutboundVersion)
+}
 
-	host, portStr, err := net.SplitHostPort(addr)
+func startPeer(p *Peer, conn net.Conn, negotiator func() error) (*Peer, error) {
+	p.conn = conn
+	p.addr = conn.RemoteAddr()
+	p.timeConnected = time.Now()
+
+	netAddress, err := newNetAddress(conn.RemoteAddr(), p.cfg.Services)
 	if err != nil {
 		return nil, err
 	}
+	p.netAddress = netAddress
 
-	port, err := strconv.ParseUint(portStr, 10, 16)
-	if err != nil {
-		return nil, err
-	}
-
-	if cfg.HostToNetAddress != nil {
-		na, err := cfg.HostToNetAddress(host, uint16(port), cfg.Services)
+	negotiateErr := make(chan error)
+	go func() {
+		negotiateErr <- negotiator()
+		close(negotiateErr)
+	}()
+	select {
+	case err := <-negotiateErr:
 		if err != nil {
 			return nil, err
 		}
-		p.na = na
-	} else {
-		p.na = wire.NewNetAddressIPPort(net.ParseIP(host), uint16(port),
-			cfg.Services)
+	case <-time.After(negotiateTimeout):
+		return nil, errors.New("protocol negotiation timeout")
 	}
+
+	// The protocol has been negotiated successfully so start fully duplexed
+	// communication with the node.
+	go p.writeHandler()
+	go p.writeMsgQueueHandler()
+	go p.writeInvVectQueueHandler()
+	go p.readHandler()
+	go p.pingTicker()
 
 	return p, nil
 }
