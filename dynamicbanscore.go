@@ -40,9 +40,8 @@ func init() {
 func decayFactor(t int64) float64 {
 	if t < precomputedLen {
 		return precomputedFactor[t]
-	} else {
-		return math.Exp(-1.0 * float64(t) * lambda)
 	}
+	return math.Exp(-1.0 * float64(t) * lambda)
 }
 
 // dynamicBanScore provides dynamic ban scores consisting of a persistent and a
