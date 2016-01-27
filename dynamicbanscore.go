@@ -65,8 +65,11 @@ type dynamicBanScore struct {
 
 // String returns the ban score as a human-readable string.
 func (s *dynamicBanScore) String() string {
-	return fmt.Sprintf("persistent %v + transient %v at %v = %v as of now",
+	s.Lock()
+	r := fmt.Sprintf("persistent %v + transient %v at %v = %v as of now",
 		s.persistent, s.transient, s.lastUnix, s.Int())
+	s.Unlock()
+	return r
 }
 
 // Int returns the current ban score, the sum of the persistent and decaying
@@ -74,7 +77,10 @@ func (s *dynamicBanScore) String() string {
 //
 // This function is safe for concurrent access.
 func (s *dynamicBanScore) Int() uint32 {
-	return s.int(time.Now())
+	s.Lock()
+	r := s.int(time.Now())
+	s.Unlock()
+	return r
 }
 
 // Increase increases both the persistent and decaying scores by the values
@@ -83,8 +89,9 @@ func (s *dynamicBanScore) Int() uint32 {
 // This function is safe for concurrent access.
 func (s *dynamicBanScore) Increase(persistent, transient uint32) uint32 {
 	s.Lock()
-	defer s.Unlock()
-	return s.increase(persistent, transient, time.Now())
+	r := s.increase(persistent, transient, time.Now())
+	s.Unlock()
+	return r
 }
 
 // Reset set both persistent and decaying scores to zero.
@@ -101,19 +108,14 @@ func (s *dynamicBanScore) Reset() {
 // int returns the ban score, the sum of the persistent and decaying scores at a
 // given point in time.
 //
-// This function is safe for concurrent access. It is intended to be used
+// This function is not safe for concurrent access. It is intended to be used
 // internally and during testing.
 func (s *dynamicBanScore) int(t time.Time) uint32 {
-	// reduce the amount of time the lock is held
-	s.Lock()
-	last, tran, pers := s.lastUnix, s.transient, s.persistent
-	s.Unlock()
-
-	dt := t.Unix() - last
-	if tran < 1 || dt < 0 || Lifetime < dt {
-		return pers
+	dt := t.Unix() - s.lastUnix
+	if s.transient < 1 || dt < 0 || Lifetime < dt {
+		return s.persistent
 	}
-	return pers + uint32(tran*decayFactor(dt))
+	return s.persistent + uint32(s.transient*decayFactor(dt))
 }
 
 // increase increases the persistent, the decaying or both scores by the values

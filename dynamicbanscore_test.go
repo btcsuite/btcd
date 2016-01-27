@@ -10,15 +10,11 @@ import (
 	"time"
 )
 
-// TestDynamicBanScore tests dynamicBanScore.
-func TestDynamicBanScore(t *testing.T) {
+// TestDynamicBanScoreDecay tests the exponential decay implemented in
+// dynamicBanScore.
+func TestDynamicBanScoreDecay(t *testing.T) {
 	var bs dynamicBanScore
 	base := time.Now()
-	bs.increase(100, 0, base)
-	bs.Reset()
-	if bs.Int() != 0 {
-		t.Errorf("Failed to reset ban score.")
-	}
 
 	r := bs.increase(100, 50, base)
 	if r != 150 {
@@ -34,9 +30,15 @@ func TestDynamicBanScore(t *testing.T) {
 	if r != 100 {
 		t.Errorf("Decay after 7m - %d instead of 100", r)
 	}
+}
 
-	bs.Reset()
-	r = bs.increase(0, math.MaxUint32, base)
+// TestDynamicBanScoreLifetime tests that dynamicBanScore properly yields zero
+// once the maximum age is reached.
+func TestDynamicBanScoreLifetime(t *testing.T) {
+	var bs dynamicBanScore
+	base := time.Now()
+
+	r := bs.increase(0, math.MaxUint32, base)
 	r = bs.int(base.Add(Lifetime * time.Second))
 	if r != 3 { // 3, not 4 due to precision loss and truncating 3.999...
 		t.Errorf("Pre max age check with MaxUint32 failed - %d", r)
@@ -44,5 +46,23 @@ func TestDynamicBanScore(t *testing.T) {
 	r = bs.int(base.Add((Lifetime + 1) * time.Second))
 	if r != 0 {
 		t.Errorf("Zero after max age check failed - %d instead of 0", r)
+	}
+}
+
+// TestDynamicBanScore tests exported function of dynamicBanScore. Exponential
+// decay or other time based behavior is tested on other functions.
+func TestDynamicBanScoreReset(t *testing.T) {
+	var bs dynamicBanScore
+	if bs.Int() != 0 {
+		t.Errorf("Initial state is not zero.")
+	}
+	bs.Increase(100, 0)
+	r := bs.Int()
+	if r < 99 || r > 100 {
+		t.Errorf("Unexpected result %d after ban score increase.", r)
+	}
+	bs.Reset()
+	if bs.Int() != 0 {
+		t.Errorf("Failed to reset ban score.")
 	}
 }
