@@ -15,7 +15,8 @@ const (
 	// Halflife defines the time (in seconds) by which the transient part
 	// of the ban score decays to one half of it's original value.
 	Halflife = 60
-	lambda   = math.Ln2 / Halflife
+	// lambda is the decaying constant.
+	lambda = math.Ln2 / Halflife
 	// Lifetime defines the maximum age of the transient part of the ban
 	// score to be considered a non-zero score (in seconds).
 	Lifetime = 1800

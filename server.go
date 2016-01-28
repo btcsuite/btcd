@@ -296,7 +296,7 @@ func (sp *serverPeer) pushAddrMsg(addresses []*wire.NetAddress) {
 // the score is above the ban threshold, the peer will be banned and
 // disconnected.
 func (sp *serverPeer) addBanScore(persistent, transient uint32, reason string) {
-	if cfg.EnableBanning {
+	if !cfg.DisableBanning {
 		warnThreshold := cfg.BanThreshold >> 1
 		if transient == 0 && persistent == 0 {
 			// The score is not being increased, but a warning message is still

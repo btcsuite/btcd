@@ -34,7 +34,7 @@ Application Options:
       --listen=             Add an interface/port to listen for connections
                             (default all interfaces port: 8333, testnet: 18333)
       --maxpeers=           Max number of inbound and outbound peers (125)
-      --enablebanning       Enable banning of misbehaving peers
+      --nobanning           Disable banning of misbehaving peers
       --banthreshold=       Maximum allowed ban score before disconnecting and
                             banning misbehaving peers.
       --banduration=        How long to ban misbehaving peers.  Valid time units
