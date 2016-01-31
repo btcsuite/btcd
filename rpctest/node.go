@@ -15,7 +15,7 @@ import (
 	"strings"
 	"time"
 
-	"li.lan/labs/testnet-L/wire"
+	"github.com/btcsuite/btcd/wire"
 
 	rpc "github.com/btcsuite/btcrpcclient"
 	"github.com/btcsuite/btcutil"
