@@ -1,25 +1,27 @@
-// Copyright (c) 2015 Conformal Systems LLC.
+// Copyright (c) 2016 The btcsuite developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
 package rpctest
 
 import (
-	"bytes"
+	"fmt"
 	"net"
 	"os"
 	"path/filepath"
 	"strconv"
 	"sync"
+	"time"
 
+	"github.com/btcsuite/btcd/blockchain"
 	"github.com/btcsuite/btcd/btcec"
 	"github.com/btcsuite/btcd/chaincfg"
-	"github.com/btcsuite/btcd/txscript"
 	"github.com/btcsuite/btcd/wire"
 	rpc "github.com/btcsuite/btcrpcclient"
-	"github.com/btcsuite/btcsim/simnode"
 	"github.com/btcsuite/btcutil"
-	"github.com/btcsuite/btcutil/coinset"
+	"github.com/btcsuite/btcwallet/chain"
+	"github.com/btcsuite/btcwallet/waddrmgr"
+	"github.com/btcsuite/btcwallet/wallet"
 )
 
 var (
@@ -36,26 +38,34 @@ var (
 	testCreationLock sync.Mutex
 )
 
+var testInstances []*Harness
+
+// TODO(roasbeef): global slice with list of all active states.
+
 // RpcTestState represents an instance of the rpc test harness.
-type RpcTestState struct {
-	*simnode.Node
+type Harness struct {
+	node *node
 
-	minedBlocks []*btcutil.Block
-	currentTip  *btcutil.Block
+	Node     *rpc.Client
+	handlers *rpc.NotificationHandlers
 
-	matureCoinbases []coinset.Coin
-	utxoSelector    *coinset.MinNumberCoinSelector
-	testNodeDir     string
+	Wallet       *wallet.Wallet
+	chainClient  *chain.RPCClient
+	coinbaseKey  *btcec.PrivateKey
+	coinbaseAddr btcutil.Address
+
+	testNodeDir    string
+	maxConnRetries int
 }
 
-// NewRpcTestState creates and initializes new instance of the rpc test harness.
+// New creates and initializes new instance of the rpc test harness.
 // Optionally, websocket handlers and a specified configuration may be passed.
 // In the case that a nil config is passed, a default configuration will be used.
-func New(handlers *rpc.NotificationHandlers, config *simnode.BtcdArgs) (*RpcTestState, error) {
+func New(handlers *rpc.NotificationHandlers, extraArgs []string) (*Harness, error) {
 	testCreationLock.Lock()
 	defer testCreationLock.Unlock()
 
-	nodeTestData := tempDataDir + strconv.Itoa(numTestInstances)
+	nodeTestData := tempDataDir + strconv.Itoa(int(numTestInstances))
 	certFile := filepath.Join(nodeTestData, "rpc.cert")
 	keyFile := filepath.Join(nodeTestData, "rpc.key")
 
@@ -65,248 +75,205 @@ func New(handlers *rpc.NotificationHandlers, config *simnode.BtcdArgs) (*RpcTest
 	}
 
 	// Generate the default config if needed.
-	// TODO(roasbeef): Intelligent merge of configs. Would only really mess
-	// with addrindex stuff?
-	var c *simnode.BtcdArgs
-	if config == nil {
-		if err := simnode.GenCertPair(certFile, keyFile); err != nil {
-			return nil, err
-		}
+	if err := genCertPair(certFile, keyFile); err != nil {
+		return nil, err
+	}
 
-		args, err := simnode.NewBtcdArgs("rpctest", certFile, keyFile)
-		if err != nil {
-			return nil, err
-		}
-		c = args
-	} else {
-		c = config
+	// Since this btcd process which will eventually be created by this
+	// Harness is running in simnet mode, we'll be able to easily generate
+	// blocks. So we generate a fresh private key to use for our coinbase
+	// payouts. This private key will also be imported into the wallet so
+	// tests are able to move coins around at will.
+	coinbaseAddr, coinbaseKey, err := generateCoinbasePayout()
+	if err != nil {
+		return nil, err
+	}
+	miningAddr := fmt.Sprintf("--miningaddr=%s", coinbaseAddr)
+	extraArgs = append(extraArgs, miningAddr)
+
+	config, err := newConfig("rpctest", certFile, keyFile, extraArgs)
+	if err != nil {
+		return nil, err
 	}
 
 	// Generate p2p+rpc listening addresses.
 	p2p, rpc := generateListeningAddresses()
-	c.Listen = p2p
-	c.RPCListen = rpc
+	config.listen = p2p
+	config.rpcListen = rpc
 
 	// Create the testing node bounded to the simnet.
-	node, err := simnode.NewNodeFromArgs(c, handlers, nil, 20, nodeTestData)
+	node, err := newNode(config, nodeTestData)
 	if err != nil {
 		return nil, err
 	}
 
 	numTestInstances++
 
-	var blks []*btcutil.Block
-	var mOuts []coinset.Coin
-	return &RpcTestState{
-		Node:            node,
-		minedBlocks:     blks,
-		currentTip:      nil,
-		matureCoinbases: mOuts,
-		// TODO(roasbeef): PR to change readme to correct.
-		utxoSelector: &coinset.MinNumberCoinSelector{
-			MaxInputs:       10,
-			MinChangeAmount: 10000,
-		},
-		testNodeDir: nodeTestData,
-	}, nil
-}
+	// TODO(Roasbeef):
+	//  * joinNodes(joinType)
+	//  * syncBLocks + syncMempools?
+	//  * connectAllNodes?
 
-// TearDown stops the running rpc test instance. All created processes are
-// killed, and temporary directories removed.
-func (r *RpcTestState) TearDown() error {
-	if r.Client != nil {
-		r.Client.Shutdown()
+	h := &Harness{
+		handlers:       handlers,
+		node:           node,
+		maxConnRetries: 20,
+		testNodeDir:    nodeTestData,
+		coinbaseKey:    coinbaseKey,
+		coinbaseAddr:   coinbaseAddr,
 	}
 
-	if err := r.Stop(); err != nil {
-		return err
-	}
+	testInstances = append(testInstances, h)
 
-	if err := r.Cleanup(); err != nil {
-		return err
-	}
-
-	if err := os.RemoveAll(r.testNodeDir); err != nil {
-		return err
-	}
-	return nil
+	return h, nil
 }
 
 // SetUp initializes the rpc test state. Initialization includes: starting up a
 // simnet node, creating a websocket client and connecting to the started node,
-// and finally: optionally generating and submitting a testchain with 25 mature
-// coinbase outputs.
-func (r *RpcTestState) SetUp(createTestChain bool) error {
-	if err := r.Start(); err != nil {
+// and finally: optionally generating and submitting a testchain with a configurable
+// number of mature coinbase outputs coinbase outputs.
+func (h *Harness) SetUp(createTestChain bool, numMatureOutputs uint32) error {
+	var err error
+
+	// Start the btcd node itself. This spawns a new process which will be
+	// managed
+	if err = h.node.start(); err != nil {
+		return err
+	}
+	if err := h.connectRPCClient(); err != nil {
 		return err
 	}
 
-	if err := r.Connect(); err != nil {
-		return err
-	}
-
-	// Create a test chain with 25 mature coinbase outputs.
+	// Create a test chain with the desired number of mature coinbase
+	// outputs.
 	if createTestChain {
-		// Grab info about the genesis block.
-		genHash, err := r.Client.GetBestBlockHash()
+		numToGenerate := blockchain.CoinbaseMaturity + numMatureOutputs
+		_, err := h.Node.Generate(numToGenerate)
 		if err != nil {
-			return nil
+			return err
 		}
-		prevBlock, err := r.Client.GetBlock(genHash)
-		if err != nil {
-			return nil
+	}
+
+	netDir := filepath.Join(h.testNodeDir, chaincfg.SimNetParams.Name)
+	walletLoader := wallet.NewLoader(&chaincfg.SimNetParams, netDir)
+
+	h.Wallet, err = walletLoader.CreateNewWallet([]byte("pub"),
+		[]byte("password"), nil)
+	if err != nil {
+		return err
+	}
+	if err := h.Wallet.Manager.Unlock([]byte("password")); err != nil {
+		return err
+	}
+
+	rpcConf := h.node.config.rpcConnConfig()
+	rpcc, err := chain.NewRPCClient(&chaincfg.SimNetParams,
+		rpcConf.Host, rpcConf.User, rpcConf.Pass,
+		rpcConf.Certificates, false, 20)
+	if err != nil {
+		return err
+	}
+
+	// Start the goroutines in the underlying wallet.
+	h.chainClient = rpcc
+	if err := h.chainClient.Start(); err != nil {
+		return err
+	}
+	h.Wallet.Start()
+
+	// Encode our coinbase private key in WIF format, then import it into
+	// the wallet so we'll be able to generate spends, and update the
+	// balance of the wallet as blocks are generated.
+	wif, err := btcutil.NewWIF(h.coinbaseKey, &chaincfg.SimNetParams, true)
+	if err != nil {
+		return err
+	}
+	if _, err := h.Wallet.ImportPrivateKey(wif, nil, false); err != nil {
+		return err
+	}
+
+	h.Wallet.SynchronizeRPC(rpcc)
+
+	// Wait for the wallet to sync up to the current height.
+	ticker := time.NewTicker(time.Millisecond * 100)
+out:
+	// TODO(roasbeef): use wallet's notification server here instead?
+	for {
+		select {
+		case <-ticker.C:
+			if h.Wallet.Manager.SyncedTo().Height == 125 {
+				break out
+			}
 		}
+	}
+	ticker.Stop()
 
-		// Create a chain of length 125, this'll give us 25 mature
-		// coinbase outputs for spending.
-		chainLength := 0
-		for chainLength < 125 {
-			newBlock, err := createBlock(prevBlock, nil)
-			if err != nil {
-				return err
-			}
-
-			if err := r.Client.SubmitBlock(newBlock, nil); err != nil {
-				return err
-			}
-
-			r.incrementCbConfirmations()
-
-			r.currentTip = newBlock
-			r.minedBlocks = append(r.minedBlocks, newBlock)
-
-			chainLength++
-			// Once the chain length is greater than 100, begin
-			// storing mature coinbase tx's for later use.
-			if chainLength > 100 {
-				cbTx := r.minedBlocks[chainLength-100].Transactions()[0]
-				cbCoin := &coinset.SimpleCoin{
-					Tx:         cbTx,
-					TxIndex:    0,
-					TxNumConfs: 100,
-				}
-				r.matureCoinbases = append(r.matureCoinbases,
-					coinset.Coin(cbCoin))
-			}
-
-			prevBlock = newBlock
-		}
+	// Now that the wallet has synced up, submit a re-scan, blocking until
+	// it's finished.
+	if err := h.Wallet.Rescan([]btcutil.Address{h.coinbaseAddr}, nil); err != nil {
+		return err
 	}
 
 	return nil
 }
 
-// GenerateAndSubmitBlock creates a block whose contents include the passed
-// transactions and submits it to the running simnet node. For generating
-// blocks with only a coinbase tx, callers can simply pass nil instead of
-// transactions to be mined.
-func (r *RpcTestState) GenerateAndSubmitBlock(txs []*btcutil.Tx) (*btcutil.Block, error) {
-	// Create a new block including the specified transactions.
-	newBlock, err := createBlock(r.currentTip, txs)
-	if err != nil {
-		return nil, err
+// TearDown stops the running rpc test instance. All created processes are
+// killed, and temporary directories removed.
+func (h *Harness) TearDown() error {
+	if h.Node != nil {
+		h.Node.Shutdown()
 	}
 
-	// Submit the block to the simnet node.
-	if err := r.Client.SubmitBlock(newBlock, nil); err != nil {
-		return nil, err
+	if h.Wallet != nil {
+		h.Wallet.Stop()
 	}
-	r.incrementCbConfirmations()
-
-	// Update current block state.
-	r.currentTip = newBlock
-	r.minedBlocks = append(r.minedBlocks, newBlock)
-
-	// Add the coinbase output 100 blocks back to the mature output set.
-	cbTx := r.minedBlocks[r.currentTip.Height()-100].Transactions()[0]
-	cbCoin := &coinset.SimpleCoin{
-		Tx:         cbTx,
-		TxIndex:    0,
-		TxNumConfs: 100,
+	if h.chainClient != nil {
+		h.chainClient.Shutdown()
 	}
-	r.matureCoinbases = append(r.matureCoinbases, coinset.Coin(cbCoin))
 
-	// Add newly mined ouputs we can spend.
-	for _, tx := range txs {
-		for outIdx, txOut := range tx.MsgTx().TxOut {
-			if bytes.Equal(txOut.PkScript, miningPkScript) {
-				r.matureCoinbases = append(r.matureCoinbases,
-					coinset.Coin(&coinset.SimpleCoin{
-						Tx:         tx,
-						TxIndex:    uint32(outIdx),
-						TxNumConfs: 0,
-					}))
+	if err := h.node.shutdown(); err != nil {
+		return err
+	}
 
-			}
+	if err := os.RemoveAll(h.testNodeDir); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// connectRPCClient attempts to establish an RPC connection to the created
+// btcd process belonging to this Harness instance. If the initial connection
+// attempt fails, this function will retry h.maxConnRetries times, backing off
+// the time between subsequent attempts. If after h.maxConnRetries attempts,
+// we're not able to establish a connection, this function returns with an error.
+func (h *Harness) connectRPCClient() error {
+	var client *rpc.Client
+	var err error
+
+	rpcConf := h.node.config.rpcConnConfig()
+	for i := 0; i < h.maxConnRetries; i++ {
+		if client, err = rpc.New(&rpcConf, h.handlers); err != nil {
+			time.Sleep(time.Duration(i) * 50 * time.Millisecond)
+			continue
 		}
+		break
 	}
 
-	return newBlock, nil
+	if client == nil {
+		return fmt.Errorf("connection timedout")
+	}
+
+	h.Node = client
+	return nil
 }
 
-// incrementCbConfirmations increments the number of confirmations for each
-// stored mature coinbase tx by 1.
-func (r *RpcTestState) incrementCbConfirmations() {
-	for _, cb := range r.matureCoinbases {
-		cb.(*coinset.SimpleCoin).TxNumConfs++
-	}
-}
-
-// CraftCoinbaseSpend returns a signed transaction spending selected coinbase
-// ouputs which satisfy the value spending requirements of the passed tx outputs.
-// Selected coinbase outputs are removed from the pool of mature coinbase outputs.
-// Callers are expected to provide proper change outputs, if needed.
-func (r *RpcTestState) CraftCoinbaseSpend(outputs []*wire.TxOut) (*wire.MsgTx, error) {
-	total := int64(0)
-	for _, txOut := range outputs {
-		total += txOut.Value
-	}
-
-	selectedCoins, err := r.utxoSelector.CoinSelect(btcutil.Amount(total),
-		r.matureCoinbases)
-	if err != nil {
-		return nil, err
-	}
-
-	// Remove selected coins.
-	for _, coin := range selectedCoins.Coins() {
-		for idx, cb := range r.matureCoinbases {
-			if bytes.Equal(cb.Hash()[:], coin.Hash()[:]) {
-				s := r.matureCoinbases
-				s = append(s[:idx], s[idx+1:]...)
-				r.matureCoinbases = s
-				break
-			}
-		}
-	}
-
-	mtx := coinset.NewMsgTxWithInputCoins(selectedCoins)
-	mtx.TxOut = outputs
-
-	scriptSig, err := genScriptSig(mtx)
-	for _, txin := range mtx.TxIn {
-		txin.SignatureScript = scriptSig
-	}
-
-	return mtx, nil
-}
-
-// genScriptSig generates a valid scriptSig for spending a created coinbase
-// output. The input transactions of 'redeemTx' must only reference coinbase
-// outputs created by the test harness.
-func genScriptSig(redeemTx *wire.MsgTx) ([]byte, error) {
-	lookup := func(a btcutil.Address) (*btcec.PrivateKey, bool, error) {
-		return miningPriv.PrivKey, true, nil
-	}
-
-	scriptSig, err := txscript.SignTxOutput(&chaincfg.SimNetParams,
-		redeemTx, 0, miningPkScript, txscript.SigHashAll,
-		txscript.KeyClosure(lookup), nil, nil)
-	if err != nil {
-		return nil, err
-	}
-
-	return scriptSig, nil
+// CoinbaseSpend creates, signs, and finally broadcasts a transaction spending
+// the harness' available mature coinbase outputs creating new outputs according
+// to targetOutputs. targetOutputs maps a string encoding of a Bitcoin address,
+// to the amount of coins which should be created for that output.
+func (h *Harness) CoinbaseSpend(targetOutputs map[string]btcutil.Amount) (*wire.ShaHash, error) {
+	return h.Wallet.SendPairs(targetOutputs, waddrmgr.ImportedAddrAccount, 1)
 }
 
 // generateListeningAddresses returns two strings representing listening
@@ -321,9 +288,29 @@ func generateListeningAddresses() (string, string) {
 		p2p = net.JoinHostPort(localhost, strconv.Itoa(defaultP2pPort))
 		rpc = net.JoinHostPort(localhost, strconv.Itoa(defaultRpcPort))
 	} else {
-		p2p = net.JoinHostPort(localhost, strconv.Itoa(defaultP2pPort+numTestInstances))
-		rpc = net.JoinHostPort(localhost, strconv.Itoa(defaultRpcPort+numTestInstances))
+		p2p = net.JoinHostPort(localhost,
+			strconv.Itoa(defaultP2pPort+numTestInstances))
+		rpc = net.JoinHostPort(localhost,
+			strconv.Itoa(defaultRpcPort+numTestInstances))
 	}
 
 	return p2p, rpc
+}
+
+// generateCoinbasePayout generates a fresh private key, and the corresponding
+// p2pkh address for use within all coinbase outputs produced for an instance
+// of the test harness.
+func generateCoinbasePayout() (btcutil.Address, *btcec.PrivateKey, error) {
+	privKey, err := btcec.NewPrivateKey(btcec.S256())
+	if err != nil {
+		return nil, nil, err
+	}
+
+	addr, err := btcutil.NewAddressPubKey(privKey.PubKey().SerializeCompressed(),
+		&chaincfg.SimNetParams)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return addr.AddressPubKeyHash(), privKey, nil
 }
