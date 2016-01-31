@@ -19,7 +19,6 @@ import (
 
 	rpc "github.com/btcsuite/btcrpcclient"
 	"github.com/btcsuite/btcutil"
-	_ "github.com/btcsuite/btcwallet/walletdb/bdb"
 )
 
 // nodeConfig contains all the args, and data required to launch a btcd process
@@ -161,10 +160,10 @@ func (n *nodeConfig) String() string {
 }
 
 // cleanup removes the tmp data and log directories.
-func (a *nodeConfig) cleanup() error {
+func (n *nodeConfig) cleanup() error {
 	dirs := []string{
-		a.logDir,
-		a.dataDir,
+		n.logDir,
+		n.dataDir,
 	}
 	var err error
 	for _, dir := range dirs {

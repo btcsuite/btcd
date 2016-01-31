@@ -22,6 +22,7 @@ import (
 	"github.com/btcsuite/btcwallet/chain"
 	"github.com/btcsuite/btcwallet/waddrmgr"
 	"github.com/btcsuite/btcwallet/wallet"
+	_ "github.com/btcsuite/btcwallet/walletdb/bdb" // Required to register boltdb.
 )
 
 var (
@@ -32,7 +33,7 @@ var (
 	numTestInstances = 0
 
 	defaultP2pPort = 18555
-	defaultRpcPort = 18556
+	defaultRPCPort = 18556
 
 	// Used to protest concurrent access to above declared variables.
 	testCreationLock sync.Mutex
@@ -42,7 +43,7 @@ var testInstances []*Harness
 
 // TODO(roasbeef): global slice with list of all active states.
 
-// RpcTestState represents an instance of the rpc test harness.
+// Harness ...
 type Harness struct {
 	node *node
 
@@ -286,12 +287,12 @@ func generateListeningAddresses() (string, string) {
 	localhost := "127.0.0.1"
 	if numTestInstances == 0 {
 		p2p = net.JoinHostPort(localhost, strconv.Itoa(defaultP2pPort))
-		rpc = net.JoinHostPort(localhost, strconv.Itoa(defaultRpcPort))
+		rpc = net.JoinHostPort(localhost, strconv.Itoa(defaultRPCPort))
 	} else {
 		p2p = net.JoinHostPort(localhost,
 			strconv.Itoa(defaultP2pPort+numTestInstances))
 		rpc = net.JoinHostPort(localhost,
-			strconv.Itoa(defaultRpcPort+numTestInstances))
+			strconv.Itoa(defaultRPCPort+numTestInstances))
 	}
 
 	return p2p, rpc
