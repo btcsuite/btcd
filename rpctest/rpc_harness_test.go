@@ -1,13 +1,16 @@
+// Copyright (c) 2016 The btcsuite developers
+// Use of this source code is governed by an ISC
+// license that can be found in the LICENSE file.
 package rpctest
 
 import (
 	"bytes"
+	"math"
 	"os"
 	"testing"
 
-	"github.com/btcsuite/btcd/wire"
 	"github.com/btcsuite/btcutil"
-	"github.com/btcsuite/btcutil/coinset"
+	"github.com/btcsuite/btcwallet/waddrmgr"
 )
 
 func TestSetUp(t *testing.T) {
@@ -16,33 +19,33 @@ func TestSetUp(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer nodeTest.TearDown()
 
 	// Initiate setup, generated a chain of length 125.
-	if err := nodeTest.SetUp(true); err != nil {
-		t.Fatalf("Unable to complete rpctest setup: ", err)
+	if err := nodeTest.SetUp(true, 25); err != nil {
+		t.Fatalf("unable to complete rpctest setup: %v", err)
 	}
 
-	// Chain length is 125, we should have 25 mature coinbase outputs.
-	if len(nodeTest.matureCoinbases) != 25 {
+	// Chain length is 125, we should have 26 mature coinbase outputs.
+	maxConfs := int32(math.MaxInt32)
+	unspentOutputs, err := nodeTest.Wallet.ListUnspent(0, maxConfs, nil)
+	if err != nil {
+		t.Fatalf("unable to retrieve unspent outputs from the wallet: %v",
+			err)
+	}
+	if len(unspentOutputs) != 26 {
 		t.Fatalf("incorrect number of mature coinbases, have %v, should be %v",
-			len(nodeTest.matureCoinbases), 24)
-	}
-
-	// Ensure outputs have correct number of confirmations.
-	expectedConfs := int64(124)
-	for _, cb := range nodeTest.matureCoinbases {
-		numConfs := cb.(*coinset.SimpleCoin).TxNumConfs
-		if numConfs != expectedConfs {
-			t.Errorf("confirmations for coinbased was not updated. Has "+
-				"%v confs should have %v", numConfs, expectedConfs)
-		}
-		expectedConfs--
+			len(unspentOutputs), 26)
 	}
 
 	// Current tip should be at height 124.
-	if nodeTest.currentTip.Height() != 124 {
+	nodeInfo, err := nodeTest.Node.GetInfo()
+	if err != nil {
+		t.Fatalf("unable to execute getinfo on node: %v", err)
+	}
+	if nodeInfo.Blocks != 125 {
 		t.Errorf("Chain height is %v, should be %v",
-			nodeTest.currentTip.Height(), 124)
+			nodeInfo.Blocks, 125)
 	}
 
 	nodeTest.TearDown()
@@ -53,78 +56,48 @@ func TestSetUp(t *testing.T) {
 	}
 }
 
-func TestGenerateBlock(t *testing.T) {
+func TestCoinbaseSpend(t *testing.T) {
 	// Create a new test instance.
 	nodeTest, err := New(nil, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer nodeTest.TearDown()
-	if err := nodeTest.SetUp(true); err != nil {
-		t.Fatalf("Unable to complete rpctest setup: ", err)
+
+	// Initiate setup, generated a chain of length 125.
+	if err := nodeTest.SetUp(true, 25); err != nil {
+		t.Fatalf("unable to complete rpctest setup: %v", err)
 	}
 
-	prevBlockHeight := nodeTest.currentTip.Height()
-
-	newBlock, err := nodeTest.GenerateAndSubmitBlock(nil)
+	// Grab a fresh address from the wallet.
+	addr, err := nodeTest.Wallet.NewAddress(waddrmgr.DefaultAccountNum)
 	if err != nil {
-		t.Errorf("Unable to generate block: ", err)
+		t.Fatalf("unable to get new address: %v", err)
 	}
 
-	// New block should have the proper height.
-	if newBlock.Height() != prevBlockHeight+1 {
-		t.Errorf("Generated block has incorrect height: ", err)
-	}
-
-	// We should have one more mature coinbase to spend.
-	if len(nodeTest.matureCoinbases) != 26 {
-		t.Fatalf("incorrect number of mature coinbases, have %v, should be %v",
-			len(nodeTest.matureCoinbases), 24)
-	}
-
-	// Confirmations should have been updated.
-	numConfsYoungestCb := nodeTest.matureCoinbases[24].(*coinset.SimpleCoin).TxNumConfs
-	if numConfsYoungestCb != 101 {
-		t.Errorf("confirmations for coinbased was not updated. Has "+
-			"%v confs should have %v", numConfsYoungestCb, 101)
-	}
-}
-
-func TestCraftCoinbaseSpend(t *testing.T) {
-	// Create a new test instance.
-	nodeTest, err := New(nil, nil)
+	// Next, send 5 BTC to this address, spending from one of our mature
+	// coinbase outputs.
+	outputs := map[string]btcutil.Amount{addr.String(): 5e8}
+	txid, err := nodeTest.CoinbaseSpend(outputs)
 	if err != nil {
-		t.Fatal(err)
-	}
-	defer nodeTest.TearDown()
-	if err := nodeTest.SetUp(true); err != nil {
-		t.Fatalf("Unable to complete rpctest setup: ", err)
+		t.Fatalf("coinbase spend failed: %v", err)
 	}
 
-	// Create a signed tx with a 100k satoshi (1BTC) output.
-	var z []byte
-	signedTx, err := nodeTest.CraftCoinbaseSpend([]*wire.TxOut{
-		wire.NewTxOut(100000000, z),
-	})
+	// Generate a single block, the transaction the wallet created should
+	// be found in this block.
+	blockHashes, err := nodeTest.Node.Generate(1)
 	if err != nil {
-		t.Fatalf("Unable to create coinbase spend: %v", err)
+		t.Fatalf("unable to generate single block: %v", err)
 	}
 
-	minedBlock, err := nodeTest.GenerateAndSubmitBlock([]*btcutil.Tx{btcutil.NewTx(signedTx)})
+	block, err := nodeTest.Node.GetBlock(blockHashes[0])
 	if err != nil {
-		t.Fatalf("Unable to mine block: %v", err)
+		t.Fatalf("unable to get block: %v", err)
 	}
 
-	// Block should contain our tx.
-	sha, _ := signedTx.TxSha()
-	if !bytes.Equal(minedBlock.Transactions()[1].Sha()[:], sha.Bytes()) {
-		t.Fatalf("Sha doesn't match %v vs %v", sha, minedBlock.Transactions()[1].Sha())
-	}
-
-	// Coinbase output should have been removed.
-	for _, cbOut := range nodeTest.matureCoinbases {
-		if bytes.Equal(cbOut.Hash()[:], signedTx.TxIn[0].PreviousOutPoint.Hash[:]) {
-			t.Fatalf("spent coinbase was not removed")
-		}
+	minedTx := block.Transactions()[1]
+	txSha := minedTx.Sha()
+	if !bytes.Equal(txid[:], txSha.Bytes()[:]) {
+		t.Fatalf("txid's don't match, %v vs %v", txSha, txid)
 	}
 }
