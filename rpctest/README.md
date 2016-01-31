@@ -5,7 +5,7 @@ rpctest
 (https://travis-ci.org/btcsuite/btcd)
 
 Package rpctests provides a btcd-specific RPC testing harness for excersing 
-regressions in the RPC interface.
+regressions via the RPC interface.
 ...TODO
 
 ## Documentation
