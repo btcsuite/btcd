@@ -12,7 +12,7 @@ import (
 func testGetBestBlock(r *rpctest.Harness, t *testing.T) {
 	_, prevbestHeight, err := r.Node.GetBestBlock()
 	if err != nil {
-		t.Fatalf("Call to `getbestblock` failed: ", err)
+		t.Fatalf("Call to `getbestblock` failed: %v", err)
 	}
 
 	// Create a new block connecting to the current tip.
@@ -23,7 +23,7 @@ func testGetBestBlock(r *rpctest.Harness, t *testing.T) {
 
 	bestHash, bestHeight, err := r.Node.GetBestBlock()
 	if err != nil {
-		t.Fatalf("Call to `getbestblock` failed: ", err)
+		t.Fatalf("Call to `getbestblock` failed: %v", err)
 	}
 
 	// Hash should be the same as the newly submitted block.
@@ -43,7 +43,7 @@ func testGetBlockCount(r *rpctest.Harness, t *testing.T) {
 	// Save the current count.
 	currentCount, err := r.Node.GetBlockCount()
 	if err != nil {
-		t.Fatalf("Unable to get block count: ", err)
+		t.Fatalf("Unable to get block count: %v", err)
 	}
 
 	if _, err := r.Node.Generate(1); err != nil {
@@ -53,7 +53,7 @@ func testGetBlockCount(r *rpctest.Harness, t *testing.T) {
 	// Count should have increased by one.
 	newCount, err := r.Node.GetBlockCount()
 	if err != nil {
-		t.Fatalf("Unable to get block count: ", err)
+		t.Fatalf("Unable to get block count: %v", err)
 	}
 	if newCount != currentCount+1 {
 		t.Fatalf("Block count incorrect. Got %v should be %v",
@@ -99,19 +99,19 @@ func TestMain(m *testing.M) {
 	var err error
 	primaryHarness, err = rpctest.New(nil, nil)
 	if err != nil {
-		fmt.Println("unable to create primary harness: %v", err)
+		fmt.Println("unable to create primary harness: ", err)
 		os.Exit(1)
 	}
 
 	if err = primaryHarness.SetUp(true, 25); err != nil {
-		fmt.Println("unable to setup test chain: %v", err)
+		fmt.Println("unable to setup test chain: ", err)
 		os.Exit(1)
 	}
 
 	exitCode := m.Run()
 
 	if err := primaryHarness.TearDown(); err != nil {
-		fmt.Println("unable to setup test chain: %v", err)
+		fmt.Println("unable to setup test chain: ", err)
 		os.Exit(1)
 	}
 
