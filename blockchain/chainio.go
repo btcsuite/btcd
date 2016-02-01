@@ -914,7 +914,7 @@ func dbPutTxIndexEntry(dbTx database.Tx, txHash, blockHash *wire.ShaHash, txLoc 
 	serializedData[0] = numEntries
 	offset := uint32(1)
 	if len(existing) > 0 {
-		copy(serializedData, existing[1:])
+		copy(serializedData[1:], existing[1:])
 		offset += uint32(len(existing) - 1)
 	}
 	copy(serializedData[offset:], blockHash[:])
