@@ -1068,12 +1068,8 @@ func (tx *transaction) fetchKey(key []byte) []byte {
 		if tx.pendingRemove.Has(key) {
 			return nil
 		}
-		// TODO(davec): Avoid the double lookup.  This will likely
-		// require returning an additional flag from Get since the value
-		// is allowed to be nil, it can't be used to check for
-		// existence.
-		if tx.pendingKeys.Has(key) {
-			return tx.pendingKeys.Get(key)
+		if value := tx.pendingKeys.Get(key); value != nil {
+			return value
 		}
 	}
 

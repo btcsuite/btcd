@@ -318,12 +318,8 @@ func (snap *dbCacheSnapshot) Get(key []byte) []byte {
 	if snap.pendingRemove.Has(key) {
 		return nil
 	}
-	// TODO(davec): Avoid the double lookup.  This will likely
-	// require returning an additional flag from Get since the value
-	// is allowed to be nil, it can't be used to check for
-	// existence.
-	if snap.pendingKeys.Has(key) {
-		return snap.pendingKeys.Get(key)
+	if value := snap.pendingKeys.Get(key); value != nil {
+		return value
 	}
 
 	// Consult the database.

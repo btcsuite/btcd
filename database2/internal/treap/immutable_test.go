@@ -367,6 +367,30 @@ func TestImmutableDuplicatePut(t *testing.T) {
 	}
 }
 
+// TestImmutableNilValue ensures that putting a nil value into an immutable
+// treap results in a key being added with an empty byte slice.
+func TestImmutableNilValue(t *testing.T) {
+	t.Parallel()
+
+	key := serializeUint32(0)
+
+	// Put the key with a nil value.
+	testTreap := NewImmutable()
+	testTreap = testTreap.Put(key, nil)
+
+	// Ensure the key exists and is an empty byte slice.
+	if gotVal := testTreap.Has(key); gotVal != true {
+		t.Fatalf("Has: unexpected result - got %v, want false", gotVal)
+	}
+	if gotVal := testTreap.Get(key); gotVal == nil {
+		t.Fatalf("Get: unexpected result - got nil, want empty slice")
+	}
+	if gotVal := testTreap.Get(key); len(gotVal) != 0 {
+		t.Fatalf("Get: unexpected result - got %x, want empty slice",
+			gotVal)
+	}
+}
+
 // TestImmutableForEachStopIterator ensures that returning false from the ForEach
 // callback on an immutable treap stops iteration early.
 func TestImmutableForEachStopIterator(t *testing.T) {

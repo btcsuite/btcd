@@ -97,10 +97,6 @@ func (t *Immutable) Has(key []byte) bool {
 
 // Get returns the value for the passed key.  The function will return nil when
 // the key does not exist.
-//
-// NOTE: It is acceptable to add keys with nil values, so do not rely on a nil
-// return value to indicate that a key does not exist.  Use the Has function for
-// that purpose instead.
 func (t *Immutable) Get(key []byte) []byte {
 	if node := t.get(key); node != nil {
 		return node.value
@@ -110,6 +106,13 @@ func (t *Immutable) Get(key []byte) []byte {
 
 // Put inserts the passed key/value pair.
 func (t *Immutable) Put(key, value []byte) *Immutable {
+	// Use an empty byte slice for the value when none was provided.  This
+	// ultimately allows key existence to be determined from the value since
+	// an empty byte slice is distinguishable from nil.
+	if value == nil {
+		value = make([]byte, 0)
+	}
+
 	// The node is the root of the tree if there isn't already one.
 	if t.root == nil {
 		root := newTreapNode(key, value, rand.Int())

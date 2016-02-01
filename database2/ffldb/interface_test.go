@@ -144,29 +144,43 @@ type testContext struct {
 // keyPair houses a key/value pair.  It is used over maps so ordering can be
 // maintained.
 type keyPair struct {
-	key   string
-	value string
+	key   []byte
+	value []byte
 }
 
 // lookupKey is a convenience method to lookup the requested key from the
 // provided keypair slice along with whether or not the key was found.
-func lookupKey(key string, values []keyPair) (string, bool) {
+func lookupKey(key []byte, values []keyPair) ([]byte, bool) {
 	for _, item := range values {
-		if item.key == key {
+		if bytes.Equal(item.key, key) {
 			return item.value, true
 		}
 	}
 
-	return "", false
+	return nil, false
+}
+
+// toGetValues returns a copy of the provided keypairs with all of the nil
+// values set to an empty byte slice.  This is used to ensure that keys set to
+// nil values result in empty byte slices when retrieved instead of nil.
+func toGetValues(values []keyPair) []keyPair {
+	ret := make([]keyPair, len(values))
+	copy(ret, values)
+	for i := range ret {
+		if ret[i].value == nil {
+			ret[i].value = make([]byte, 0)
+		}
+	}
+	return ret
 }
 
 // rollbackValues returns a copy of the provided keypairs with all values set to
-// an empty string.  This is used to test that values are properly rolled back.
+// nil.  This is used to test that values are properly rolled back.
 func rollbackValues(values []keyPair) []keyPair {
 	ret := make([]keyPair, len(values))
 	copy(ret, values)
 	for i := range ret {
-		ret[i].value = ""
+		ret[i].value = nil
 	}
 	return ret
 }
@@ -182,18 +196,16 @@ func testCursorKeyPair(tc *testContext, k, v []byte, index int, values []keyPair
 	}
 
 	pair := &values[index]
-	kString := string(k)
-	if kString != pair.key {
+	if !bytes.Equal(k, pair.key) {
 		tc.t.Errorf("Mismatched cursor key: index %d does not match "+
-			"the expected key - got %q, want %q", index, kString,
+			"the expected key - got %q, want %q", index, k,
 			pair.key)
 		return false
 	}
-	vString := string(v)
-	if vString != pair.value {
+	if !bytes.Equal(v, pair.value) {
 		tc.t.Errorf("Mismatched cursor value: index %d does not match "+
-			"the expected value - got %q, want %q", index,
-			vString, pair.value)
+			"the expected value - got %q, want %q", index, v,
+			pair.value)
 		return false
 	}
 
@@ -205,15 +217,10 @@ func testCursorKeyPair(tc *testContext, k, v []byte, index int, values []keyPair
 // values.
 func testGetValues(tc *testContext, bucket database.Bucket, values []keyPair) bool {
 	for _, item := range values {
-		var vBytes []byte
-		if item.value != "" {
-			vBytes = []byte(item.value)
-		}
-
-		gotValue := bucket.Get([]byte(item.key))
-		if !reflect.DeepEqual(gotValue, vBytes) {
-			tc.t.Errorf("Get: unexpected value - got %s, want %s",
-				gotValue, vBytes)
+		gotValue := bucket.Get(item.key)
+		if !reflect.DeepEqual(gotValue, item.value) {
+			tc.t.Errorf("Get: unexpected value for %q - got %q, "+
+				"want %q", item.key, gotValue, item.value)
 			return false
 		}
 	}
@@ -225,11 +232,7 @@ func testGetValues(tc *testContext, bucket database.Bucket, values []keyPair) bo
 // bucket while checking for errors.
 func testPutValues(tc *testContext, bucket database.Bucket, values []keyPair) bool {
 	for _, item := range values {
-		var vBytes []byte
-		if item.value != "" {
-			vBytes = []byte(item.value)
-		}
-		if err := bucket.Put([]byte(item.key), vBytes); err != nil {
+		if err := bucket.Put(item.key, item.value); err != nil {
 			tc.t.Errorf("Put: unexpected error: %v", err)
 			return false
 		}
@@ -242,7 +245,7 @@ func testPutValues(tc *testContext, bucket database.Bucket, values []keyPair) bo
 // provided bucket.
 func testDeleteValues(tc *testContext, bucket database.Bucket, values []keyPair) bool {
 	for _, item := range values {
-		if err := bucket.Delete([]byte(item.key)); err != nil {
+		if err := bucket.Delete(item.key); err != nil {
 			tc.t.Errorf("Delete: unexpected error: %v", err)
 			return false
 		}
@@ -270,14 +273,16 @@ func testCursorInterface(tc *testContext, bucket database.Bucket) bool {
 
 	if tc.isWritable {
 		unsortedValues := []keyPair{
-			{"cursor", "val1"},
-			{"abcd", "val1"},
-			{"bcd", "val1"},
+			{[]byte("cursor"), []byte("val1")},
+			{[]byte("abcd"), []byte("val2")},
+			{[]byte("bcd"), []byte("val3")},
+			{[]byte("defg"), nil},
 		}
 		sortedValues := []keyPair{
-			{"abcd", "val1"},
-			{"bcd", "val1"},
-			{"cursor", "val1"},
+			{[]byte("abcd"), []byte("val2")},
+			{[]byte("bcd"), []byte("val3")},
+			{[]byte("cursor"), []byte("val1")},
+			{[]byte("defg"), nil},
 		}
 
 		// Store the values to be used in the cursor tests in unsorted
@@ -285,7 +290,7 @@ func testCursorInterface(tc *testContext, bucket database.Bucket) bool {
 		if !testPutValues(tc, bucket, unsortedValues) {
 			return false
 		}
-		if !testGetValues(tc, bucket, unsortedValues) {
+		if !testGetValues(tc, bucket, toGetValues(unsortedValues)) {
 			return false
 		}
 
@@ -325,7 +330,7 @@ func testCursorInterface(tc *testContext, bucket database.Bucket) bool {
 
 		// Ensure foward iteration works as expected after seeking.
 		middleIdx := (len(sortedValues) - 1) / 2
-		seekKey := []byte(sortedValues[middleIdx].key)
+		seekKey := sortedValues[middleIdx].key
 		curIdx = middleIdx
 		for ok := cursor.Seek(seekKey); ok; ok = cursor.Next() {
 			k, v := cursor.Key(), cursor.Value()
@@ -408,16 +413,18 @@ func testBucketInterface(tc *testContext, bucket database.Bucket) bool {
 	if tc.isWritable {
 		// keyValues holds the keys and values to use when putting
 		// values into the bucket.
-		var keyValues = []keyPair{
-			{"bucketkey1", "foo1"},
-			{"bucketkey2", "foo2"},
-			{"bucketkey3", "foo3"},
+		keyValues := []keyPair{
+			{[]byte("bucketkey1"), []byte("foo1")},
+			{[]byte("bucketkey2"), []byte("foo2")},
+			{[]byte("bucketkey3"), []byte("foo3")},
+			{[]byte("bucketkey4"), nil},
 		}
+		expectedKeyValues := toGetValues(keyValues)
 		if !testPutValues(tc, bucket, keyValues) {
 			return false
 		}
 
-		if !testGetValues(tc, bucket, keyValues) {
+		if !testGetValues(tc, bucket, expectedKeyValues) {
 			return false
 		}
 
@@ -437,20 +444,19 @@ func testBucketInterface(tc *testContext, bucket database.Bucket) bool {
 		// stored values are the expected values.
 		keysFound := make(map[string]struct{}, len(keyValues))
 		err = bucket.ForEach(func(k, v []byte) error {
-			kString := string(k)
-			wantV, found := lookupKey(kString, keyValues)
+			wantV, found := lookupKey(k, expectedKeyValues)
 			if !found {
 				return fmt.Errorf("ForEach: key '%s' should "+
-					"exist", kString)
+					"exist", k)
 			}
 
-			if !reflect.DeepEqual(v, []byte(wantV)) {
+			if !reflect.DeepEqual(v, wantV) {
 				return fmt.Errorf("ForEach: value for key '%s' "+
-					"does not match - got %s, want %s",
-					kString, v, wantV)
+					"does not match - got %s, want %s", k,
+					v, wantV)
 			}
 
-			keysFound[kString] = struct{}{}
+			keysFound[string(k)] = struct{}{}
 			return nil
 		})
 		if err != nil {
@@ -460,7 +466,7 @@ func testBucketInterface(tc *testContext, bucket database.Bucket) bool {
 
 		// Ensure all keys were iterated.
 		for _, item := range keyValues {
-			if _, ok := keysFound[item.key]; !ok {
+			if _, ok := keysFound[string(item.key)]; !ok {
 				tc.t.Errorf("ForEach: key '%s' was not iterated "+
 					"when it should have been", item.key)
 				return false
@@ -789,9 +795,10 @@ func testMetadataManualTxInterface(tc *testContext) bool {
 	// keyValues holds the keys and values to use when putting values into a
 	// bucket.
 	var keyValues = []keyPair{
-		{"umtxkey1", "foo1"},
-		{"umtxkey2", "foo2"},
-		{"umtxkey3", "foo3"},
+		{[]byte("umtxkey1"), []byte("foo1")},
+		{[]byte("umtxkey2"), []byte("foo2")},
+		{[]byte("umtxkey3"), []byte("foo3")},
+		{[]byte("umtxkey4"), nil},
 	}
 
 	// Ensure that attempting populating the values using a read-only
@@ -817,7 +824,7 @@ func testMetadataManualTxInterface(tc *testContext) bool {
 	if !populateValues(true, false, keyValues) {
 		return false
 	}
-	if !checkValues(keyValues) {
+	if !checkValues(toGetValues(keyValues)) {
 		return false
 	}
 
@@ -920,10 +927,11 @@ func testMetadataTxInterface(tc *testContext) bool {
 
 	// keyValues holds the keys and values to use when putting values
 	// into a bucket.
-	var keyValues = []keyPair{
-		{"mtxkey1", "foo1"},
-		{"mtxkey2", "foo2"},
-		{"mtxkey3", "foo3"},
+	keyValues := []keyPair{
+		{[]byte("mtxkey1"), []byte("foo1")},
+		{[]byte("mtxkey2"), []byte("foo2")},
+		{[]byte("mtxkey3"), []byte("foo3")},
+		{[]byte("mtxkey4"), nil},
 	}
 
 	// Test the bucket interface via a managed read-only transaction.
@@ -1059,7 +1067,7 @@ func testMetadataTxInterface(tc *testContext) bool {
 			return fmt.Errorf("Bucket1: unexpected nil bucket")
 		}
 
-		if !testGetValues(tc, bucket1, keyValues) {
+		if !testGetValues(tc, bucket1, toGetValues(keyValues)) {
 			return errSubTestFail
 		}
 
