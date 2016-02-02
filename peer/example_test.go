@@ -8,11 +8,9 @@ import (
 	"fmt"
 	"log"
 	"net"
-	"time"
 
 	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/btcsuite/btcd/peer"
-	"github.com/btcsuite/btcd/wire"
 )
 
 // mockRemotePeer creates a basic inbound peer listening on the simnet port for
@@ -62,23 +60,12 @@ func Example_newOutboundPeer() {
 	}
 
 	// Create an outbound peer that is configured to act as a simnet node
-	// that offers no services and has listeners for the version and verack
-	// messages.  The verack listener is used here to signal the code below
-	// when the handshake has been finished by signalling a channel.
-	verack := make(chan struct{}, 1)
+	// that offers no services.
 	peerCfg := &peer.Config{
 		UserAgentName:    "peer",  // User agent name to advertise.
 		UserAgentVersion: "1.0.0", // User agent version to advertise.
 		ChainParams:      &chaincfg.SimNetParams,
 		Services:         0,
-		Listeners: peer.MessageListeners{
-			OnVersion: func(p *peer.Peer, msg *wire.MsgVersion) {
-				fmt.Println("outbound: received version")
-			},
-			OnVerAck: func(p *peer.Peer, msg *wire.MsgVerAck) {
-				verack <- struct{}{}
-			},
-		},
 	}
 
 	// Establish the connection to the peer address and mark it connected.
@@ -93,16 +80,6 @@ func Example_newOutboundPeer() {
 		return
 	}
 
-	// Wait for the verack message or timeout in case of failure.
-	select {
-	case <-verack:
-	case <-time.After(time.Second * 1):
-		fmt.Printf("Example_peerConnection: verack timeout")
-	}
-
 	// Disconnect the peer.
 	p.Disconnect()
-
-	// Output:
-	// outbound: received version
 }

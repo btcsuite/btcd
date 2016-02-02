@@ -313,7 +313,6 @@ func TestPeerConnection(t *testing.T) {
 
 // TestPeerListeners tests that the peer listeners are called as expected.
 func TestPeerListeners(t *testing.T) {
-	verack := make(chan struct{}, 2)
 	ok := make(chan wire.Message, 20)
 	inPeerCfg := peer.Config{
 		Listeners: peer.MessageListeners{
@@ -371,12 +370,6 @@ func TestPeerListeners(t *testing.T) {
 			OnMerkleBlock: func(p *peer.Peer, msg *wire.MsgMerkleBlock) {
 				ok <- msg
 			},
-			OnVersion: func(p *peer.Peer, msg *wire.MsgVersion) {
-				ok <- msg
-			},
-			OnVerAck: func(p *peer.Peer, msg *wire.MsgVerAck) {
-				verack <- struct{}{}
-			},
 			OnReject: func(p *peer.Peer, msg *wire.MsgReject) {
 				ok <- msg
 			},
@@ -409,11 +402,6 @@ func TestPeerListeners(t *testing.T) {
 	}()
 
 	outPeerCfg := inPeerCfg
-	outPeerCfg.Listeners = peer.MessageListeners{
-		OnVerAck: func(p *peer.Peer, msg *wire.MsgVerAck) {
-			verack <- struct{}{}
-		},
-	}
 	go func() {
 		outPeer, outPeerErr = peer.NewOutboundPeer(&outPeerCfg, outConn,
 			outConn.RemoteAddr().String())
@@ -423,14 +411,6 @@ func TestPeerListeners(t *testing.T) {
 
 	if inPeerErr != nil || outPeerErr != nil {
 		t.Fatalf("In err: %v, out err: %v", inPeerErr, outPeerErr)
-	}
-
-	for i := 0; i < 2; i++ {
-		select {
-		case <-verack:
-		case <-time.After(time.Second * 1):
-			t.Fatalf("TestPeerListeners: verack timeout\n")
-		}
 	}
 
 	tests := []struct {

@@ -166,12 +166,6 @@ type MessageListeners struct {
 	// message.
 	OnMerkleBlock func(p *Peer, msg *wire.MsgMerkleBlock)
 
-	// OnVersion is invoked when a peer receives a version bitcoin message.
-	OnVersion func(p *Peer, msg *wire.MsgVersion)
-
-	// OnVerAck is invoked when a peer receives a verack bitcoin message.
-	OnVerAck func(p *Peer, msg *wire.MsgVerAck)
-
 	// OnReject is invoked when a peer receives a reject bitcoin message.
 	OnReject func(p *Peer, msg *wire.MsgReject)
 
@@ -1690,10 +1684,6 @@ func (p *Peer) negotiateInboundVersion() error {
 		return err
 	}
 
-	if p.cfg.Listeners.OnVersion != nil {
-		p.cfg.Listeners.OnVersion(p, verMsg)
-	}
-
 	// Send our version information.
 	verMsg, err = p.localMsgVersion()
 	if err != nil {
@@ -1708,13 +1698,8 @@ func (p *Peer) negotiateInboundVersion() error {
 	if err != nil {
 		return err
 	}
-	verAckMsg, ok := msg.(*wire.MsgVerAck)
-	if !ok {
+	if _, ok := msg.(*wire.MsgVerAck); !ok {
 		return fmt.Errorf("unexpected message %T", msg)
-	}
-
-	if p.cfg.Listeners.OnVerAck != nil {
-		p.cfg.Listeners.OnVerAck(p, verAckMsg)
 	}
 
 	// Send our version acknowledgement.
@@ -1766,10 +1751,6 @@ func (p *Peer) negotiateOutboundVersion() error {
 		return err
 	}
 
-	if p.cfg.Listeners.OnVersion != nil {
-		p.cfg.Listeners.OnVersion(p, verMsg)
-	}
-
 	// Send our version acknowledgement.
 	if err := p.writeMessage(wire.NewMsgVerAck()); err != nil {
 		return err
@@ -1780,13 +1761,8 @@ func (p *Peer) negotiateOutboundVersion() error {
 	if err != nil {
 		return err
 	}
-	verAckMsg, ok := msg.(*wire.MsgVerAck)
-	if !ok {
+	if _, ok := msg.(*wire.MsgVerAck); !ok {
 		return fmt.Errorf("unexpected message %T", msg)
-	}
-
-	if p.cfg.Listeners.OnVerAck != nil {
-		p.cfg.Listeners.OnVerAck(p, verAckMsg)
 	}
 	return nil
 }
