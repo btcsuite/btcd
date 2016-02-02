@@ -1570,7 +1570,7 @@ func (p *Peer) pingTicker() {
 // QueueMessage adds the passed bitcoin message to the peer send queue.
 //
 // This function is safe for concurrent access.
-func (p *Peer) QueueMessage(msg wire.Message, done chan struct{}) {
+func (p *Peer) QueueMessage(msg wire.Message, done chan<- struct{}) {
 	if !p.Connected() {
 		if done != nil {
 			go func() {
