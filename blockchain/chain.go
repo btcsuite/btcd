@@ -220,9 +220,8 @@ type BlockChain struct {
 // This function is safe for concurrent access.
 func (b *BlockChain) DisableVerify(disable bool) {
 	b.chainLock.Lock()
-	defer b.chainLock.Unlock()
-
 	b.noVerify = disable
+	b.chainLock.Unlock()
 }
 
 // HaveBlock returns whether or not the chain instance has the block represented
@@ -1050,7 +1049,10 @@ func (b *BlockChain) reorganizeChain(detachNodes, attachNodes *list.List, flags 
 		detachBlocks = append(detachBlocks, block)
 		detachSpentTxOuts = append(detachSpentTxOuts, stxos)
 
-		view.disconnectTransactions(block, stxos)
+		err = view.disconnectTransactions(block, stxos)
+		if err != nil {
+			return err
+		}
 	}
 
 	// Perform several checks to verify each block that needs to be attached
@@ -1091,6 +1093,7 @@ func (b *BlockChain) reorganizeChain(detachNodes, attachNodes *list.List, flags 
 	// view to be valid from the viewpoint of each block being connected or
 	// disconnected.
 	view = NewUtxoViewpoint()
+	view.SetBestHash(b.bestNode.hash)
 
 	// Disconnect blocks from the main chain.
 	for i, e := 0, detachNodes.Front(); e != nil; i, e = i+1, e.Next() {
@@ -1106,7 +1109,10 @@ func (b *BlockChain) reorganizeChain(detachNodes, attachNodes *list.List, flags 
 
 		// Update the view to unspend all of the spent txos and remove
 		// the utxos created by the block.
-		view.disconnectTransactions(block, detachSpentTxOuts[i])
+		err = view.disconnectTransactions(block, detachSpentTxOuts[i])
+		if err != nil {
+			return err
+		}
 
 		// Update the database and chain state.
 		err = b.disconnectBlock(n, block, view)
@@ -1176,7 +1182,7 @@ func (b *BlockChain) reorganizeChain(detachNodes, attachNodes *list.List, flags 
 //    modifying the state are avoided.
 //
 // This function MUST be called with the chain state lock held (for writes).
-func (b *BlockChain) connectBestChain(node *blockNode, block *btcutil.Block, flags BehaviorFlags) (recoverErr error) {
+func (b *BlockChain) connectBestChain(node *blockNode, block *btcutil.Block, flags BehaviorFlags) error {
 	fastAdd := flags&BFFastAdd == BFFastAdd
 	dryRun := flags&BFDryRun == BFDryRun
 

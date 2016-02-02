@@ -288,13 +288,13 @@ func (view *UtxoViewpoint) connectTransaction(tx *btcutil.Tx, blockHeight int32,
 		// in the utxo set.
 		var stxo = spentTxOut{
 			compressed: false,
+			version:    entry.Version(),
 			amount:     entry.AmountByIndex(originIndex),
 			pkScript:   entry.PkScriptByIndex(originIndex),
 		}
 		if entry.IsFullySpent() {
 			stxo.height = entry.BlockHeight()
 			stxo.isCoinBase = entry.IsCoinBase()
-			stxo.version = entry.Version()
 		}
 
 		// Append the entry to the provided spent txouts slice.
@@ -322,12 +322,11 @@ func (view *UtxoViewpoint) connectTransactions(block *btcutil.Block, stxos *[]sp
 	// Update the best hash for view to include this block since all of its
 	// transactions have been connected.
 	view.SetBestHash(block.Sha())
-
 	return nil
 }
 
 // disconnectTransactions updates the view by removing all of the transactions
-// created by the passed block, restoring all utxos the transactions spend by
+// created by the passed block, restoring all utxos the transactions spent by
 // using the provided spent txo information, and setting the best hash for the
 // view to the block before the passed block.
 func (view *UtxoViewpoint) disconnectTransactions(block *btcutil.Block, stxos []spentTxOut) error {
@@ -413,7 +412,6 @@ func (view *UtxoViewpoint) disconnectTransactions(block *btcutil.Block, stxos []
 	// Update the best hash for view to the previous block since all of the
 	// transactions for the current block have been disconnected.
 	view.SetBestHash(&block.MsgBlock().Header.PrevBlock)
-
 	return nil
 }
 

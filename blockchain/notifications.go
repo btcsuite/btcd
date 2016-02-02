@@ -61,8 +61,6 @@ type Notification struct {
 // sendNotification sends a notification with the passed type and data if the
 // caller requested notifications by providing a callback function in the call
 // to New.
-//
-// This function MUST be called with the chain state lock held (for reads).
 func (b *BlockChain) sendNotification(typ NotificationType, data interface{}) {
 	// Ignore it if the caller didn't request notifications.
 	if b.notifications == nil {

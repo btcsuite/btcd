@@ -174,13 +174,13 @@ func isDeserializeErr(err error) bool {
 // transaction.
 type spentTxOut struct {
 	compressed bool   // The amount and public key script are compressed.
+	version    int32  // The version of creating tx.
 	amount     int64  // The amount of the output.
 	pkScript   []byte // The public key script for the output.
 
 	// These fields are only set when this is spending the final output of
 	// the creating tx.
 	height     int32 // Height of the the block containing the creating tx.
-	version    int32 // The version of creating tx.
 	isCoinBase bool  // Whether creating tx is a coinbase.
 }
 
@@ -249,7 +249,7 @@ func decodeSpentTxOut(serialized []byte, stxo *spentTxOut, txVersion int32) (int
 
 	// Deserialize the header code.
 	code, offset := deserializeVLQ(serialized)
-	if offset > len(serialized) {
+	if offset >= len(serialized) {
 		return offset, errDeserialize("unexpected end of data after " +
 			"header code")
 	}
@@ -258,11 +258,11 @@ func decodeSpentTxOut(serialized []byte, stxo *spentTxOut, txVersion int32) (int
 	// version if needed.
 	//
 	// Bit 0 indicates containing transaction is a coinbase.
-	// Bits 1-x encodes height of containing transaction.
+	// Bits 1-x encode height of containing transaction.
 	if code != 0 {
 		version, bytesRead := deserializeVLQ(serialized[offset:])
 		offset += bytesRead
-		if offset > len(serialized) {
+		if offset >= len(serialized) {
 			return offset, errDeserialize("unexpected end of data " +
 				"after version")
 		}
@@ -270,7 +270,6 @@ func decodeSpentTxOut(serialized []byte, stxo *spentTxOut, txVersion int32) (int
 		stxo.isCoinBase = code&0x01 != 0
 		stxo.height = int32(code >> 1)
 		stxo.version = int32(version)
-		txVersion = int32(version)
 	} else {
 		// Ensure a tx version was specified if the stxo did not encode
 		// it.  This should never happen unless there is database
@@ -282,11 +281,12 @@ func decodeSpentTxOut(serialized []byte, stxo *spentTxOut, txVersion int32) (int
 				"serialized stxo that does not encode the " +
 				"version")
 		}
+		stxo.version = txVersion
 	}
 
 	// Decode the compressed txout.
 	compAmount, compScript, bytesRead, err := decodeCompressedTxOut(
-		serialized[offset:], txVersion)
+		serialized[offset:], stxo.version)
 	offset += bytesRead
 	if err != nil {
 		return offset, errDeserialize(fmt.Sprintf("unable to decode "+
@@ -398,7 +398,7 @@ func serializeSpendJournalEntry(stxos []spentTxOut) []byte {
 	}
 	serialized := make([]byte, size)
 
-	// Serialize each individual stxo directly into the slice one in reverse
+	// Serialize each individual stxo directly into the slice in reverse
 	// order one after the other.
 	var offset int
 	for i := len(stxos) - 1; i > -1; i-- {
@@ -690,21 +690,21 @@ func deserializeUtxoEntry(serialized []byte) (*UtxoEntry, error) {
 	// Deserialize the version.
 	version, bytesRead := deserializeVLQ(serialized)
 	offset := bytesRead
-	if offset > len(serialized) {
+	if offset >= len(serialized) {
 		return nil, errDeserialize("unexpected end of data after version")
 	}
 
 	// Deserialize the block height.
 	blockHeight, bytesRead := deserializeVLQ(serialized[offset:])
 	offset += bytesRead
-	if offset > len(serialized) {
+	if offset >= len(serialized) {
 		return nil, errDeserialize("unexpected end of data after height")
 	}
 
 	// Deserialize the header code.
 	code, bytesRead := deserializeVLQ(serialized[offset:])
 	offset += bytesRead
-	if offset > len(serialized) {
+	if offset >= len(serialized) {
 		return nil, errDeserialize("unexpected end of data after header")
 	}
 
@@ -1276,10 +1276,16 @@ func (b *BlockChain) createChainState() error {
 
 		// Add the genesis block hash to height and height to hash
 		// mappings to the index.
-		dbPutBlockIndex(dbTx, b.bestNode.hash, b.bestNode.height)
+		err = dbPutBlockIndex(dbTx, b.bestNode.hash, b.bestNode.height)
+		if err != nil {
+			return err
+		}
 
 		// Store the current best chain state into the database.
-		dbPutBestState(dbTx, b.stateSnapshot, b.bestNode.workSum)
+		err = dbPutBestState(dbTx, b.stateSnapshot, b.bestNode.workSum)
+		if err != nil {
+			return err
+		}
 
 		// Store the genesis block into the database.
 		return dbTx.StoreBlock(genesisBlock)
@@ -1441,11 +1447,7 @@ func dbFetchBlockByHeight(dbTx database.Tx, height int32) (*btcutil.Block, error
 // or not the main chain contains the block identified by the provided hash.
 func dbMainChainHasBlock(dbTx database.Tx, hash *wire.ShaHash) bool {
 	hashIndex := dbTx.Metadata().Bucket(hashIndexBucketName)
-	if hashIndex.Get(hash[:]) == nil {
-		return false
-	}
-
-	return true
+	return hashIndex.Get(hash[:]) != nil
 }
 
 // BlockHeightByHash returns the height of the block with the given hash in the

@@ -582,7 +582,7 @@ func decodeCompressedTxOut(serialized []byte, version int32) (uint64, []byte, in
 	// Deserialize the compressed amount and ensure there are bytes
 	// remaining for the compressed script.
 	compressedAmount, bytesRead := deserializeVLQ(serialized)
-	if len(serialized[bytesRead:]) < 1 {
+	if bytesRead >= len(serialized) {
 		return 0, nil, bytesRead, errDeserialize("unexpected end of " +
 			"data after compressed amount")
 	}

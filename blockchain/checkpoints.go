@@ -34,9 +34,8 @@ func newShaHashFromStr(hexStr string) *wire.ShaHash {
 // This function is safe for concurrent access.
 func (b *BlockChain) DisableCheckpoints(disable bool) {
 	b.chainLock.Lock()
-	defer b.chainLock.Unlock()
-
 	b.noCheckpoints = disable
+	b.chainLock.Unlock()
 }
 
 // Checkpoints returns a slice of checkpoints (regardless of whether they are
@@ -76,9 +75,9 @@ func (b *BlockChain) latestCheckpoint() *chaincfg.Checkpoint {
 // This function is safe for concurrent access.
 func (b *BlockChain) LatestCheckpoint() *chaincfg.Checkpoint {
 	b.chainLock.RLock()
-	defer b.chainLock.RUnlock()
-
-	return b.latestCheckpoint()
+	checkpoint := b.latestCheckpoint()
+	b.chainLock.RUnlock()
+	return checkpoint
 }
 
 // verifyCheckpoint returns whether the passed block height and hash combination
