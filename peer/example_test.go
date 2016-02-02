@@ -6,12 +6,11 @@ package peer_test
 
 import (
 	"fmt"
+	"log"
 	"net"
-	"time"
 
 	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/btcsuite/btcd/peer"
-	"github.com/btcsuite/btcd/wire"
 )
 
 // mockRemotePeer creates a basic inbound peer listening on the simnet port for
@@ -38,10 +37,8 @@ func mockRemotePeer() error {
 		}
 
 		// Create and start the inbound peer.
-		p := peer.NewInboundPeer(peerCfg, conn)
-		if err := p.Start(); err != nil {
-			fmt.Printf("Start: error %v\n", err)
-			return
+		if _, err := peer.NewInboundPeer(peerCfg, conn); err != nil {
+			log.Fatal(err)
 		}
 	}()
 
@@ -63,51 +60,26 @@ func Example_newOutboundPeer() {
 	}
 
 	// Create an outbound peer that is configured to act as a simnet node
-	// that offers no services and has listeners for the version and verack
-	// messages.  The verack listener is used here to signal the code below
-	// when the handshake has been finished by signalling a channel.
-	verack := make(chan struct{})
+	// that offers no services.
 	peerCfg := &peer.Config{
 		UserAgentName:    "peer",  // User agent name to advertise.
 		UserAgentVersion: "1.0.0", // User agent version to advertise.
 		ChainParams:      &chaincfg.SimNetParams,
 		Services:         0,
-		Listeners: peer.MessageListeners{
-			OnVersion: func(p *peer.Peer, msg *wire.MsgVersion) {
-				fmt.Println("outbound: received version")
-			},
-			OnVerAck: func(p *peer.Peer, msg *wire.MsgVerAck) {
-				verack <- struct{}{}
-			},
-		},
 	}
-	p, err := peer.NewOutboundPeer(peerCfg, "127.0.0.1:18555")
+
+	// Establish the connection to the peer address and mark it connected.
+	conn, err := net.Dial("tcp", "127.0.0.1:18555")
+	if err != nil {
+		fmt.Printf("net.Dial: error %v\n", err)
+		return
+	}
+	p, err := peer.NewOutboundPeer(peerCfg, conn, "127.0.0.1:18555")
 	if err != nil {
 		fmt.Printf("NewOutboundPeer: error %v\n", err)
 		return
 	}
 
-	// Establish the connection to the peer address and mark it connected.
-	conn, err := net.Dial("tcp", p.Addr())
-	if err != nil {
-		fmt.Printf("net.Dial: error %v\n", err)
-		return
-	}
-	if err := p.Connect(conn); err != nil {
-		fmt.Printf("Connect: error %v\n", err)
-		return
-	}
-
-	// Wait for the verack message or timeout in case of failure.
-	select {
-	case <-verack:
-	case <-time.After(time.Second * 1):
-		fmt.Printf("Example_peerConnection: verack timeout")
-	}
-
-	// Shutdown the peer.
-	p.Shutdown()
-
-	// Output:
-	// outbound: received version
+	// Disconnect the peer.
+	p.Disconnect()
 }

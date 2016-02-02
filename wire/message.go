@@ -248,6 +248,11 @@ func WriteMessageN(w io.Writer, msg Message, pver uint32, btcnet BitcoinNet) (in
 		return totalBytes, err
 	}
 
+	// Short circuit a redundant write.
+	if len(payload) == 0 {
+		return totalBytes, nil
+	}
+
 	// Write payload.
 	n, err = w.Write(payload)
 	totalBytes += n

@@ -105,7 +105,6 @@ type updatePeerHeightsMsg struct {
 // peerState maintains state of inbound, persistent, outbound peers as well
 // as banned peers and outbound groups.
 type peerState struct {
-	pendingPeers     map[string]*serverPeer
 	peers            map[int32]*serverPeer
 	outboundPeers    map[int32]*serverPeer
 	persistentPeers  map[int32]*serverPeer
@@ -132,7 +131,7 @@ func (ps *peerState) NeedMoreOutbound() bool {
 
 // NeedMoreTries returns true if more outbound peer attempts can be tried.
 func (ps *peerState) NeedMoreTries() bool {
-	return len(ps.pendingPeers) < 2*(ps.maxOutboundPeers-ps.OutboundCount())
+	return ps.OutboundCount() < ps.maxOutboundPeers
 }
 
 // forAllOutboundPeers is a helper function that runs closure on all outbound
@@ -142,14 +141,6 @@ func (ps *peerState) forAllOutboundPeers(closure func(sp *serverPeer)) {
 		closure(e)
 	}
 	for _, e := range ps.persistentPeers {
-		closure(e)
-	}
-}
-
-// forPendingPeers is a helper function that runs closure on all pending peers
-// known to peerState.
-func (ps *peerState) forPendingPeers(closure func(sp *serverPeer)) {
-	for _, e := range ps.pendingPeers {
 		closure(e)
 	}
 }
@@ -183,7 +174,6 @@ type server struct {
 	cpuMiner             *CPUMiner
 	relayNtfnChan        chan *btcutil.Tx
 	modifyRebroadcastInv chan interface{}
-	pendingPeers         chan *serverPeer
 	newPeers             chan *serverPeer
 	donePeers            chan *serverPeer
 	banPeers             chan *serverPeer
@@ -290,20 +280,22 @@ func (sp *serverPeer) pushAddrMsg(addresses []*wire.NetAddress) {
 	sp.addKnownAddresses(known)
 }
 
-// OnVersion is invoked when a peer receives a version bitcoin message
-// and is used to negotiate the protocol version details as well as kick start
-// the communications.
-func (sp *serverPeer) OnVersion(p *peer.Peer, msg *wire.MsgVersion) {
+// addPeer adds a peer to the serverPeer struct.  It performs housekeeping
+// functions when a new peer is created to ensure that the time source, block
+// manager, address manager and server are aware of this new peer. It also kicks
+// off a goroutine to ensure everything is cleaned up again when the peer exits.
+func (sp *serverPeer) addPeer(p *peer.Peer) {
+	sp.Peer = p
 	// Add the remote peer time as a sample for creating an offset against
 	// the local clock to keep the network time in sync.
-	sp.server.timeSource.AddTimeSample(p.Addr(), msg.Timestamp)
+	sp.server.timeSource.AddTimeSample(p.Addr(), p.Version().Timestamp)
 
 	// Signal the block manager this peer is a new sync candidate.
 	sp.server.blockManager.NewPeer(sp)
 
 	// Choose whether or not to relay transactions before a filter command
 	// is received.
-	sp.setDisableRelayTx(msg.DisableRelayTx)
+	sp.setDisableRelayTx(p.Version().DisableRelayTx)
 
 	// Update the address manager and request known addresses from the
 	// remote peer for outbound connections.  This is skipped when running
@@ -342,7 +334,8 @@ func (sp *serverPeer) OnVersion(p *peer.Peer, msg *wire.MsgVersion) {
 			// actually connected from.  One example of why this can happen
 			// is with NAT.  Only add the address to the address manager if
 			// the addresses agree.
-			if addrmgr.NetAddressKey(&msg.AddrMe) == addrmgr.NetAddressKey(p.NA()) {
+			addrMe := p.Version().AddrMe
+			if addrmgr.NetAddressKey(&addrMe) == addrmgr.NetAddressKey(p.NA()) {
 				addrManager.AddAddress(p.NA(), p.NA())
 				addrManager.Good(p.NA())
 			}
@@ -351,6 +344,8 @@ func (sp *serverPeer) OnVersion(p *peer.Peer, msg *wire.MsgVersion) {
 
 	// Add valid peer to the server.
 	sp.server.AddPeer(sp)
+
+	go sp.server.peerDoneHandler(sp)
 }
 
 // OnMemPool is invoked when a peer receives a mempool bitcoin message.
@@ -1039,7 +1034,7 @@ func (s *server) handleAddPeerMsg(state *peerState, sp *serverPeer) bool {
 	if atomic.LoadInt32(&s.shutdown) != 0 {
 		srvrLog.Infof("New peer %s ignored - server is shutting "+
 			"down", sp)
-		sp.Shutdown()
+		sp.Disconnect()
 		return false
 	}
 
@@ -1047,14 +1042,14 @@ func (s *server) handleAddPeerMsg(state *peerState, sp *serverPeer) bool {
 	host, _, err := net.SplitHostPort(sp.Addr())
 	if err != nil {
 		srvrLog.Debugf("can't split hostport %v", err)
-		sp.Shutdown()
+		sp.Disconnect()
 		return false
 	}
 	if banEnd, ok := state.banned[host]; ok {
 		if time.Now().Before(banEnd) {
 			srvrLog.Debugf("Peer %s is banned for another %v - "+
 				"disconnecting", host, banEnd.Sub(time.Now()))
-			sp.Shutdown()
+			sp.Disconnect()
 			return false
 		}
 
@@ -1065,20 +1060,18 @@ func (s *server) handleAddPeerMsg(state *peerState, sp *serverPeer) bool {
 	// TODO: Check for max peers from a single IP.
 
 	// Limit max outbound peers.
-	if _, ok := state.pendingPeers[sp.Addr()]; ok {
-		if state.OutboundCount() >= state.maxOutboundPeers {
-			srvrLog.Infof("Max outbound peers reached [%d] - disconnecting "+
-				"peer %s", state.maxOutboundPeers, sp)
-			sp.Shutdown()
-			return false
-		}
+	if state.OutboundCount() >= state.maxOutboundPeers {
+		srvrLog.Infof("Max outbound peers reached [%d] - disconnecting "+
+			"peer %s", state.maxOutboundPeers, sp)
+		sp.Disconnect()
+		return false
 	}
 
 	// Limit max number of total peers.
 	if state.Count() >= cfg.MaxPeers {
 		srvrLog.Infof("Max peers reached [%d] - disconnecting "+
 			"peer %s", cfg.MaxPeers, sp)
-		sp.Shutdown()
+		sp.Disconnect()
 		// TODO(oga) how to handle permanent peers here?
 		// they should be rescheduled.
 		return false
@@ -1095,8 +1088,6 @@ func (s *server) handleAddPeerMsg(state *peerState, sp *serverPeer) bool {
 		} else {
 			state.outboundPeers[sp.ID()] = sp
 		}
-		// Remove from pending peers.
-		delete(state.pendingPeers, sp.Addr())
 	}
 
 	return true
@@ -1105,11 +1096,9 @@ func (s *server) handleAddPeerMsg(state *peerState, sp *serverPeer) bool {
 // handleDonePeerMsg deals with peers that have signalled they are done.  It is
 // invoked from the peerHandler goroutine.
 func (s *server) handleDonePeerMsg(state *peerState, sp *serverPeer) {
-	if _, ok := state.pendingPeers[sp.Addr()]; ok {
-		delete(state.pendingPeers, sp.Addr())
-		srvrLog.Debugf("Removed pending peer %s", sp)
-		return
-	}
+
+	// Update the address' last seen time.
+	s.addrManager.Connected(sp.NA())
 
 	var list map[int32]*serverPeer
 	if sp.persistent {
@@ -1119,32 +1108,28 @@ func (s *server) handleDonePeerMsg(state *peerState, sp *serverPeer) {
 	} else {
 		list = state.outboundPeers
 	}
-	if _, ok := list[sp.ID()]; ok {
-		// Issue an asynchronous reconnect if the peer was a
-		// persistent outbound connection.
-		if !sp.Inbound() && sp.persistent && atomic.LoadInt32(&s.shutdown) == 0 {
-			// Retry peer
-			sp2 := s.newOutboundPeer(sp.Addr(), sp.persistent)
-			if sp2 != nil {
-				go s.retryConn(sp2, false)
-			}
-		}
-		if !sp.Inbound() && sp.VersionKnown() {
-			state.outboundGroups[addrmgr.GroupKey(sp.NA())]--
-		}
-		delete(list, sp.ID())
-		srvrLog.Debugf("Removed peer %s", sp)
+
+	if _, ok := list[sp.ID()]; !ok {
+		// If we get here it means that either we didn't know about the peer
+		// or we purposefully deleted it.
 		return
 	}
 
-	// Update the address' last seen time if the peer has acknowledged
-	// our version and has sent us its version as well.
-	if sp.VerAckReceived() && sp.VersionKnown() && sp.NA() != nil {
-		s.addrManager.Connected(sp.NA())
-	}
+	// Delete the peer from our list.
+	delete(list, sp.ID())
 
-	// If we get here it means that either we didn't know about the peer
-	// or we purposefully deleted it.
+	// Issue an asynchronous reconnect if the peer was a persistent outbound
+	//connection.
+	if !sp.Inbound() && sp.persistent && atomic.LoadInt32(&s.shutdown) == 0 {
+		// Retry peer
+		go s.retryConn(sp.Addr(), false)
+	}
+	if !sp.Inbound() {
+		state.outboundGroups[addrmgr.GroupKey(sp.NA())]--
+	}
+	delete(list, sp.ID())
+	srvrLog.Debugf("Removed peer %s", sp)
+
 }
 
 // handleBanPeerMsg deals with banning peers.  It is invoked from the
@@ -1283,11 +1268,7 @@ func (s *server) handleQuery(state *peerState, querymsg interface{}) {
 		}
 
 		// TODO(oga) if too many, nuke a non-perm peer.
-		sp := s.newOutboundPeer(msg.addr, msg.permanent)
-		if sp != nil {
-			go s.peerConnHandler(sp)
-			msg.reply <- nil
-		} else {
+		if err := s.newOutboundPeer(msg.addr, msg.permanent); err != nil {
 			msg.reply <- errors.New("failed to add peer")
 		}
 	case removeNodeMsg:
@@ -1370,7 +1351,6 @@ func disconnectPeer(peerList map[int32]*serverPeer, compareFunc func(*serverPeer
 func newPeerConfig(sp *serverPeer) *peer.Config {
 	return &peer.Config{
 		Listeners: peer.MessageListeners{
-			OnVersion:     sp.OnVersion,
 			OnMemPool:     sp.OnMemPool,
 			OnTx:          sp.OnTx,
 			OnBlock:       sp.OnBlock,
@@ -1414,15 +1394,18 @@ func (s *server) listenHandler(listener net.Listener) {
 		if err != nil {
 			// Only log the error if we're not forcibly shutting down.
 			if atomic.LoadInt32(&s.shutdown) == 0 {
-				srvrLog.Errorf("can't accept connection: %v",
-					err)
+				srvrLog.Errorf("can't accept connection: %v", err)
 			}
 			continue
 		}
 		sp := newServerPeer(s, false)
-		sp.Peer = peer.NewInboundPeer(newPeerConfig(sp), conn)
-		sp.Start()
-		go s.peerDoneHandler(sp)
+		p, err := peer.NewInboundPeer(newPeerConfig(sp), conn)
+		if err != nil {
+			srvrLog.Errorf("Inbound peer %v failed to connect: %v",
+				conn.RemoteAddr(), err)
+			continue
+		}
+		sp.addPeer(p)
 	}
 	s.wg.Done()
 	srvrLog.Tracef("Listener handler done for %s", listener.Addr())
@@ -1477,40 +1460,38 @@ func (s *server) seedFromDNS() {
 
 // newOutboundPeer initializes a new outbound peer and setups the message
 // listeners.
-func (s *server) newOutboundPeer(addr string, persistent bool) *serverPeer {
-	sp := newServerPeer(s, persistent)
-	p, err := peer.NewOutboundPeer(newPeerConfig(sp), addr)
+func (s *server) newOutboundPeer(addr string, persistent bool) error {
+	srvrLog.Debugf("Attempting to connect to %s", addr)
+	conn, err := btcdDial("tcp", addr)
 	if err != nil {
-		srvrLog.Errorf("Cannot create outbound peer %s: %v", addr, err)
-		return nil
+		return err
 	}
-	sp.Peer = p
-	go s.peerDoneHandler(sp)
-	return sp
-}
+	srvrLog.Debugf("Connected to %s", addr)
 
-// peerConnHandler handles peer connections. It must be run in a goroutine.
-func (s *server) peerConnHandler(sp *serverPeer) {
-	err := s.establishConn(sp)
+	sp := newServerPeer(s, persistent)
+
+	p, err := peer.NewOutboundPeer(newPeerConfig(sp), conn, addr)
 	if err != nil {
-		srvrLog.Debugf("Failed to connect to %s: %v", sp.Addr(), err)
-		sp.Disconnect()
+		srvrLog.Errorf("Cannot negotiate protocol with peer %s: %v", addr, err)
+		return err
 	}
+	sp.addPeer(p)
+	s.addrManager.Attempt(sp.NA())
+	return nil
 }
 
 // peerDoneHandler handles peer disconnects by notifiying the server that it's
 // done.
 func (s *server) peerDoneHandler(sp *serverPeer) {
-	sp.WaitForShutdown()
+	sp.WaitForDisconnect()
 	s.donePeers <- sp
 
-	// Only tell block manager we are gone if we ever told it we existed.
-	if sp.VersionKnown() {
-		s.blockManager.DonePeer(sp)
-	}
+	s.blockManager.DonePeer(sp)
+
 	close(sp.quit)
 }
 
+/*
 // establishConn establishes a connection to the peer.
 func (s *server) establishConn(sp *serverPeer) error {
 	srvrLog.Debugf("Attempting to connect to %s", sp.Addr())
@@ -1525,32 +1506,30 @@ func (s *server) establishConn(sp *serverPeer) error {
 	s.addrManager.Attempt(sp.NA())
 	return nil
 }
+*/
 
 // retryConn retries connection to the peer after the given duration.  It must
 // be run as a goroutine.
-func (s *server) retryConn(sp *serverPeer, initialAttempt bool) {
+func (s *server) retryConn(addr string, initialAttempt bool) {
 	retryDuration := connectionRetryInterval
 	for {
 		if initialAttempt {
 			retryDuration = 0
 			initialAttempt = false
 		} else {
-			srvrLog.Debugf("Retrying connection to %s in %s", sp.Addr(),
+			srvrLog.Debugf("Retrying connection to %s in %s", addr,
 				retryDuration)
 		}
 		select {
 		case <-time.After(retryDuration):
-			err := s.establishConn(sp)
-			if err != nil {
+
+			if err := s.newOutboundPeer(addr, true); err != nil {
 				retryDuration += connectionRetryInterval
 				if retryDuration > maxConnectionRetryInterval {
 					retryDuration = maxConnectionRetryInterval
 				}
 				continue
 			}
-			return
-
-		case <-sp.quit:
 			return
 
 		case <-s.quit:
@@ -1574,7 +1553,6 @@ func (s *server) peerHandler() {
 	srvrLog.Tracef("Starting peer handler")
 
 	state := &peerState{
-		pendingPeers:     make(map[string]*serverPeer),
 		peers:            make(map[int32]*serverPeer),
 		persistentPeers:  make(map[int32]*serverPeer),
 		outboundPeers:    make(map[int32]*serverPeer),
@@ -1594,10 +1572,7 @@ func (s *server) peerHandler() {
 		permanentPeers = cfg.AddPeers
 	}
 	for _, addr := range permanentPeers {
-		sp := s.newOutboundPeer(addr, true)
-		if sp != nil {
-			go s.retryConn(sp, true)
-		}
+		go s.retryConn(addr, true)
 	}
 
 	// if nothing else happens, wake us up soon.
@@ -1638,11 +1613,11 @@ out:
 		case qmsg := <-s.query:
 			s.handleQuery(state, qmsg)
 
-		// Shutdown the peer handler.
+		// Disconnect the peer handler.
 		case <-s.quit:
-			// Shutdown peers.
+			// Disconnect peers.
 			state.forAllPeers(func(sp *serverPeer) {
-				sp.Shutdown()
+				sp.Disconnect()
 			})
 			break out
 		}
@@ -1658,9 +1633,6 @@ out:
 		// Only try connect to more peers if we actually need more.
 		if !state.NeedMoreOutbound() || len(cfg.ConnectPeers) > 0 ||
 			atomic.LoadInt32(&s.shutdown) != 0 {
-			state.forPendingPeers(func(sp *serverPeer) {
-				sp.Shutdown()
-			})
 			continue
 		}
 		tries := 0
@@ -1680,12 +1652,6 @@ out:
 			// others.
 			if state.outboundGroups[key] != 0 {
 				break
-			}
-
-			// Check that we don't have a pending connection to this addr.
-			addrStr := addrmgr.NetAddressKey(addr.NetAddress())
-			if _, ok := state.pendingPeers[addrStr]; ok {
-				continue
 			}
 
 			tries++
@@ -1709,12 +1675,12 @@ out:
 				continue
 			}
 
-			tries = 0
-			sp := s.newOutboundPeer(addrStr, false)
-			if sp != nil {
-				go s.peerConnHandler(sp)
-				state.pendingPeers[sp.Addr()] = sp
+			addrStr := addrmgr.NetAddressKey(addr.NetAddress())
+			if err := s.newOutboundPeer(addrStr, false); err != nil {
+				srvrLog.Debugf("Unable to connect to eer %s.", addrStr)
+				continue
 			}
+			tries = 0
 		}
 
 		// We need more peers, wake up in ten seconds and try again.
