@@ -21,9 +21,25 @@ func (f *fieldVal) TstRawInts() [10]uint32 {
 	return f.n
 }
 
+// TstNfieldRawInts allows the test package to get the integers from the internal
+// field representation for ensuring correctness.  It is only available during
+// the tests.
+func (f *nfieldVal) TstNfieldRawInts() [10]uint32 {
+	return f.n
+}
+
 // TstSetRawInts allows the test package to directly set the integers used by
 // the internal field representation.  It is only available during the tests.
 func (f *fieldVal) TstSetRawInts(raw [10]uint32) *fieldVal {
+	for i := 0; i < len(raw); i++ {
+		f.n[i] = raw[i]
+	}
+	return f
+}
+
+// TstNfieldSetRawInts allows the test package to directly set the integers used by
+// the internal field representation.  It is only available during the tests.
+func (f *nfieldVal) TstNfieldSetRawInts(raw [10]uint32) *nfieldVal {
 	for i := 0; i < len(raw); i++ {
 		f.n[i] = raw[i]
 	}
@@ -70,8 +86,14 @@ func NewFieldVal() *fieldVal {
 	return new(fieldVal)
 }
 
+// NewNfieldVal returns a new nfield value set to 0.  This is only available to
+// the test package.
+func NewNfieldVal() *nfieldVal {
+	return new(nfieldVal)
+}
+
 // TstNonceRFC6979 makes the nonceRFC6979 function available to the test package.
-func TstNonceRFC6979(privkey *big.Int, hash []byte) *big.Int {
+func TstNonceRFC6979(privkey *big.Int, hash []byte) *nfieldVal {
 	return nonceRFC6979(privkey, hash)
 }
 
@@ -79,4 +101,8 @@ func TstNonceRFC6979(privkey *big.Int, hash []byte) *big.Int {
 // to the test package.
 func TstRemovePKCSPadding(src []byte) ([]byte, error) {
 	return removePKCSPadding(src)
+}
+
+func (curve *KoblitzCurve) TstSplitK(k []byte) ([]byte, []byte, int, int) {
+	return curve.splitK(k)
 }

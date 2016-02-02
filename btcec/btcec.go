@@ -50,7 +50,7 @@ type KoblitzCurve struct {
 	// optimizations in ScalarMult.
 
 	// lambda must fulfill lambda^3 = 1 mod N where N is the order of G.
-	lambda *big.Int
+	lambda *nfieldVal
 
 	// beta must fulfill beta^3 = 1 mod P where P is the prime field of the
 	// curve.
@@ -58,10 +58,11 @@ type KoblitzCurve struct {
 
 	// See the EndomorphismVectors in gensecp256k1.go to see how these are
 	// derived.
-	a1 *big.Int
-	b1 *big.Int
-	a2 *big.Int
-	b2 *big.Int
+	a1    *nfieldVal
+	b1    *nfieldVal
+	a2    *nfieldVal
+	b2    *nfieldVal
+	halfn *nfieldVal
 }
 
 // Params returns the parameters for the curve.
@@ -625,38 +626,53 @@ func (curve *KoblitzCurve) Double(x1, y1 *big.Int) (*big.Int, *big.Int) {
 //
 // c1 and c2 are chosen to minimize the max(k1,k2).
 func (curve *KoblitzCurve) splitK(k []byte) ([]byte, []byte, int, int) {
-	// All math here is done with big.Int, which is slow.
-	// At some point, it might be useful to write something similar to
-	// fieldVal but for N instead of P as the prime field if this ends up
-	// being a bottleneck.
-	bigIntK := new(big.Int)
-	c1, c2 := new(big.Int), new(big.Int)
-	tmp1, tmp2 := new(big.Int), new(big.Int)
-	k1, k2 := new(big.Int), new(big.Int)
+	nfieldK := new(nfieldVal)
+	c1, c2 := new(nfieldVal), new(nfieldVal)
+	tmp1, tmp2 := new(nfieldVal), new(nfieldVal)
+	k1, k2 := new(nfieldVal), new(nfieldVal)
+	k1Sign := 0
+	k2Sign := 0
 
-	bigIntK.SetBytes(k)
+	nfieldK.SetByteSlice(k)
 	// c1 = round(b2 * k / n) from step 4.
 	// Rounding isn't really necessary and costs too much, hence skipped
-	c1.Mul(curve.b2, bigIntK)
-	c1.Div(c1, curve.N)
+	c1.Magnitude(curve.b2, nfieldK)
 	// c2 = round(b1 * k / n) from step 4 (sign reversed to optimize one step)
 	// Rounding isn't really necessary and costs too much, hence skipped
-	c2.Mul(curve.b1, bigIntK)
-	c2.Div(c2, curve.N)
-	// k1 = k - c1 * a1 - c2 * a2 from step 5 (note c2's sign is reversed)
-	tmp1.Mul(c1, curve.a1)
-	tmp2.Mul(c2, curve.a2)
-	k1.Sub(bigIntK, tmp1)
-	k1.Add(k1, tmp2)
+	c2.Magnitude(curve.b1, nfieldK)
+	c2.n[0] += 1
+	// k1 = k - c1 * a1 - c2 * a2 from step 5
+	tmp1.Mul2(c1, curve.a1).Normalize()
+	tmp2.Mul2(c2, curve.a2).Normalize()
+	tmp1.Negate()
+	k1.Add2(nfieldK, tmp1)
+	tmp2.Negate().Normalize()
+	k1.Add(tmp2)
+	k1.Normalize().Normalize()
+	if k1.Cmp(curve.halfn) == 1 {
+		k1Sign = -1
+		k1.Negate()
+	} else {
+		k1Sign = 1
+	}
+
 	// k2 = - c1 * b1 - c2 * b2 from step 5 (note c2's sign is reversed)
-	tmp1.Mul(c1, curve.b1)
-	tmp2.Mul(c2, curve.b2)
-	k2.Sub(tmp2, tmp1)
+	tmp1.Mul2(c1, curve.b1)
+	tmp2.Mul2(c2, curve.b2)
+	tmp2.Negate()
+	k2.Add2(tmp2, tmp1)
+
+	if k2.Cmp(curve.halfn) == 1 {
+		k2Sign = -1
+		k2.Negate()
+	} else {
+		k2Sign = 1
+	}
 
 	// Note Bytes() throws out the sign of k1 and k2. This matters
 	// since k1 and/or k2 can be negative. Hence, we pass that
 	// back separately.
-	return k1.Bytes(), k2.Bytes(), k1.Sign(), k2.Sign()
+	return k1.Bytes()[:], k2.Bytes()[:], k1Sign, k2Sign
 }
 
 // moduloReduce reduces k from more than 32 bytes to 32 bytes and under.  This
@@ -906,11 +922,26 @@ func fromHex(s string) *big.Int {
 func initS256() {
 	// Curve parameters taken from [SECG] section 2.4.1.
 	secp256k1.CurveParams = new(elliptic.CurveParams)
-	secp256k1.P = fromHex("FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEFFFFFC2F")
-	secp256k1.N = fromHex("FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141")
-	secp256k1.B = fromHex("0000000000000000000000000000000000000000000000000000000000000007")
-	secp256k1.Gx = fromHex("79BE667EF9DCBBAC55A06295CE870B07029BFCDB2DCE28D959F2815B16F81798")
-	secp256k1.Gy = fromHex("483ADA7726A3C4655DA4FBFC0E1108A8FD17B448A68554199C47D08FFB10D4B8")
+	p := "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEFFFFFC2F"
+	n := "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141"
+	b := "0000000000000000000000000000000000000000000000000000000000000007"
+	gx := "79BE667EF9DCBBAC55A06295CE870B07029BFCDB2DCE28D959F2815B16F81798"
+	gy := "483ADA7726A3C4655DA4FBFC0E1108A8FD17B448A68554199C47D08FFB10D4B8"
+	lambda := "5363AD4CC05C30E0A5261C028812645A122E22EA20816678DF02967C1B23BD72"
+	beta := "7AE96A2B657C07106E64479EAC3434E99CF0497512F58995C1396C28719501EE"
+	a1 := "3086D221A7D46BCDE86C90E49284EB15"
+	b1 := "E4437ED6010E88286F547FA90ABFE4C3"
+	a2 := "114CA50F7A8E2F3F657C1108D9D44CFD8"
+	b2 := "3086D221A7D46BCDE86C90E49284EB15"
+	halfn := "7FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF5D576E7357A4501DDFE92F46681B20A0"
+
+	// bigInt versions
+	secp256k1.P = fromHex(p)
+	secp256k1.N = fromHex(n)
+	secp256k1.B = fromHex(b)
+	secp256k1.Gx = fromHex(gx)
+	secp256k1.Gy = fromHex(gy)
+
 	secp256k1.BitSize = 256
 	secp256k1.H = 1
 	secp256k1.q = new(big.Int).Div(new(big.Int).Add(secp256k1.P,
@@ -932,12 +963,14 @@ func initS256() {
 	//
 	// They have also been independently derived from the code in the
 	// EndomorphismVectors function in gensecp256k1.go.
-	secp256k1.lambda = fromHex("5363AD4CC05C30E0A5261C028812645A122E22EA20816678DF02967C1B23BD72")
-	secp256k1.beta = new(fieldVal).SetHex("7AE96A2B657C07106E64479EAC3434E99CF0497512F58995C1396C28719501EE")
-	secp256k1.a1 = fromHex("3086D221A7D46BCDE86C90E49284EB15")
-	secp256k1.b1 = fromHex("-E4437ED6010E88286F547FA90ABFE4C3")
-	secp256k1.a2 = fromHex("114CA50F7A8E2F3F657C1108D9D44CFD8")
-	secp256k1.b2 = fromHex("3086D221A7D46BCDE86C90E49284EB15")
+
+	secp256k1.lambda = new(nfieldVal).SetHex(lambda)
+	secp256k1.beta = new(fieldVal).SetHex(beta)
+	secp256k1.a1 = new(nfieldVal).SetHex(a1)
+	secp256k1.b1 = new(nfieldVal).SetHex(b1)
+	secp256k1.a2 = new(nfieldVal).SetHex(a2)
+	secp256k1.b2 = new(nfieldVal).SetHex(b2)
+	secp256k1.halfn = new(nfieldVal).SetHex(halfn)
 
 	// Alternatively, we can use the parameters below, however, they seem
 	//  to be about 8% slower.

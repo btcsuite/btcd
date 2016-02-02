@@ -596,10 +596,81 @@ func TestScalarMult(t *testing.T) {
 		exponent.Mul(exponent, new(big.Int).SetBytes(data))
 		xWant, yWant := s256.ScalarBaseMult(exponent.Bytes())
 		if x.Cmp(xWant) != 0 || y.Cmp(yWant) != 0 {
-			t.Fatalf("%d: bad output for %X: got (%X, %X), want (%X, %X)", i, data, x, y, xWant, yWant)
+			t.Fatalf("%d: bad output for %x: got (%x, %x), want (%x, %x)", i, data, x, y, xWant, yWant)
 			break
 		}
 	}
+}
+
+type splitKTest struct {
+	k      string
+	k1, k2 string
+	s1, s2 int
+}
+
+var s256SplitKTests = []splitKTest{
+	{
+		"6DF2B5D30854069CCDEC40AE022F5C948936324A4E9EBED8EB82CFD5A6B6D766",
+		"00000000000000000000000000000000B776E53FB55F6B006A270D42D64EC2B1",
+		"00000000000000000000000000000000D6CC32C857F1174B604EEFC544F0C7F7",
+		-1, -1,
+	},
+	{
+		"6CA00A8F10632170ACCC1B3BAF2A118FA5725F41473F8959F34B8F860C47D88D",
+		"0000000000000000000000000000000007B21976C1795723C1BFBFA511E95B84",
+		"00000000000000000000000000000000D8D2D5F9D20FC64FD2CF9BDA09A5BF90",
+		1, -1,
+	},
+	{
+		"B2EDA8AB31B259032D39CBC2A234AF17FCEE89C863A8917B2740B67568166289",
+		"00000000000000000000000000000000507D930FECDA7414FC4A523B95EF3C8C",
+		"00000000000000000000000000000000F65FFB179DF189675338C6185CB839BE",
+		-1, -1,
+	},
+	{
+		"F6F00E44F179936F2BEFC7442721B0633F6BAFDF7161C167FFC6F7751980E3A0",
+		"0000000000000000000000000000000008D0264F10BCDCD97DA3FAA38F85308D",
+		"0000000000000000000000000000000065FED1506EB6605A899A54E155665F79",
+		-1, -1,
+	},
+	{
+		"8679085AB081DC92CDD23091CE3EE998F6B320E419C3475FAE6B5B7D3081996E",
+		"0000000000000000000000000000000089FBF24FBAA5C3C137B4F1CEDC51D975",
+		"00000000000000000000000000000000D38AA615BD6754D6F4D51CCDAF529FEA",
+		-1, -1,
+	},
+	{
+		"6B1247BB7931DFCAE5B5603C8B5AE22CE94D670138C51872225BEAE6BBA8CDB3",
+		"000000000000000000000000000000008ACC2A521B21B17CFB002C83BE62F55D",
+		"0000000000000000000000000000000035F0EFF4D7430950ECB2D94193DEDC79",
+		-1, -1,
+	},
+}
+
+func TestSplitK(t *testing.T) {
+	s256 := btcec.S256()
+	for i, e := range s256SplitKTests {
+		k, ok := new(big.Int).SetString(e.k, 16)
+		if !ok {
+			t.Errorf("%d: bad value for k: %s", i, e.k)
+		}
+		k1, k2, k1Sign, k2Sign := s256.TstSplitK(k.Bytes())
+		k1str := fmt.Sprintf("%X", k1)
+		if e.k1 != k1str {
+			t.Errorf("%d: bad k1: got %v, want %v", i, k1str, e.k1)
+		}
+		k2str := fmt.Sprintf("%X", k2)
+		if e.k2 != k2str {
+			t.Errorf("%d: bad k2: got %v, want %v", i, k2str, e.k2)
+		}
+		if e.s1 != k1Sign {
+			t.Errorf("%d: bad k1 sign: got %d, want %d", i, k1Sign, e.s1)
+		}
+		if e.s2 != k2Sign {
+			t.Errorf("%d: bad k2 sign: got %d, want %d", i, k2Sign, e.s2)
+		}
+	}
+
 }
 
 // Test this curve's usage with the ecdsa package.
@@ -836,7 +907,9 @@ func TestVectors(t *testing.T) {
 		sha.Reset()
 		sha.Write(msg)
 		hashed := sha.Sum(nil)
-		sig := btcec.Signature{R: fromHex(test.r), S: fromHex(test.s)}
+		sig := btcec.Signature{
+			R: btcec.NewNfieldVal().SetHex(test.r),
+			S: btcec.NewNfieldVal().SetHex(test.s)}
 		if fuck := sig.Verify(hashed, &pub); fuck != test.ok {
 			//t.Errorf("%d: bad result %v %v", i, pub, hashed)
 			t.Errorf("%d: bad result %v instead of %v", i, fuck,

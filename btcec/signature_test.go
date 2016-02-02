@@ -9,7 +9,6 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"fmt"
-	"math/big"
 	"testing"
 
 	"github.com/btcsuite/btcd/btcec"
@@ -17,10 +16,11 @@ import (
 )
 
 type signatureTest struct {
-	name    string
-	sig     []byte
-	der     bool
-	isValid bool
+	name        string
+	sig         []byte
+	der         bool
+	isValid     bool
+	hasTrailing bool
 }
 
 // decodeHex decodes the passed hex string and returns the resulting bytes.  It
@@ -188,7 +188,8 @@ var signatureTests = []signatureTest{
 		// bytes before the hashtype. So ParseSignature was fixed to
 		// permit buffers with trailing nonsense after the actual
 		// signature.
-		isValid: true,
+		isValid:     true,
+		hasTrailing: true,
 	},
 	{
 		name: "X == N ",
@@ -331,10 +332,11 @@ var signatureTests = []signatureTest{
 func TestSignatures(t *testing.T) {
 	for _, test := range signatureTests {
 		var err error
+		var s *btcec.Signature
 		if test.der {
-			_, err = btcec.ParseDERSignature(test.sig, btcec.S256())
+			s, err = btcec.ParseDERSignature(test.sig, btcec.S256())
 		} else {
-			_, err = btcec.ParseSignature(test.sig, btcec.S256())
+			s, err = btcec.ParseSignature(test.sig, btcec.S256())
 		}
 		if err != nil {
 			if test.isValid {
@@ -348,6 +350,9 @@ func TestSignatures(t *testing.T) {
 		if !test.isValid {
 			t.Errorf("%s counted as valid when it should fail",
 				test.name)
+		}
+		if !test.hasTrailing && !bytes.Equal(s.Serialize(), test.sig) {
+			t.Errorf("%s reserialization didn't work: got %x, want %x", test.name, s.Serialize(), test.sig)
 		}
 	}
 }
@@ -364,8 +369,8 @@ func TestSignatureSerialize(t *testing.T) {
 		{
 			"valid 1 - r and s most significant bits are zero",
 			&btcec.Signature{
-				R: fromHex("4e45e16932b8af514961a1d3a1a25fdf3f4f7732e9d624c6c61548ab5fb8cd41"),
-				S: fromHex("181522ec8eca07de4860a4acdd12909d831cc56cbbac4622082221a8768d1d09"),
+				R: btcec.NewNfieldVal().SetHex("4e45e16932b8af514961a1d3a1a25fdf3f4f7732e9d624c6c61548ab5fb8cd41"),
+				S: btcec.NewNfieldVal().SetHex("181522ec8eca07de4860a4acdd12909d831cc56cbbac4622082221a8768d1d09"),
 			},
 			[]byte{
 				0x30, 0x44, 0x02, 0x20, 0x4e, 0x45, 0xe1, 0x69,
@@ -384,8 +389,8 @@ func TestSignatureSerialize(t *testing.T) {
 		{
 			"valid 2 - r most significant bit is one",
 			&btcec.Signature{
-				R: fromHex("0082235e21a2300022738dabb8e1bbd9d19cfb1e7ab8c30a23b0afbb8d178abcf3"),
-				S: fromHex("24bf68e256c534ddfaf966bf908deb944305596f7bdcc38d69acad7f9c868724"),
+				R: btcec.NewNfieldVal().SetHex("82235e21a2300022738dabb8e1bbd9d19cfb1e7ab8c30a23b0afbb8d178abcf3"),
+				S: btcec.NewNfieldVal().SetHex("24bf68e256c534ddfaf966bf908deb944305596f7bdcc38d69acad7f9c868724"),
 			},
 			[]byte{
 				0x30, 0x45, 0x02, 0x21, 0x00, 0x82, 0x23, 0x5e,
@@ -404,8 +409,9 @@ func TestSignatureSerialize(t *testing.T) {
 		{
 			"valid 3 - s most significant bit is one",
 			&btcec.Signature{
-				R: fromHex("1cadddc2838598fee7dc35a12b340c6bde8b389f7bfd19a1252a17c4b5ed2d71"),
-				S: new(big.Int).Add(fromHex("00c1a251bbecb14b058a8bd77f65de87e51c47e95904f4c0e9d52eddc21c1415ac"), btcec.S256().N),
+				R:       btcec.NewNfieldVal().SetHex("1cadddc2838598fee7dc35a12b340c6bde8b389f7bfd19a1252a17c4b5ed2d71"),
+				S:       btcec.NewNfieldVal().SetHex("c1a251bbecb14b058a8bd77f65de87e51c47e95904f4c0e9d52eddc21c1415ac"),
+				SNegPad: true,
 			},
 			[]byte{
 				0x30, 0x45, 0x02, 0x20, 0x1c, 0xad, 0xdd, 0xc2,
@@ -422,8 +428,8 @@ func TestSignatureSerialize(t *testing.T) {
 		{
 			"zero signature",
 			&btcec.Signature{
-				R: big.NewInt(0),
-				S: big.NewInt(0),
+				R: btcec.NewNfieldVal(),
+				S: btcec.NewNfieldVal(),
 			},
 			[]byte{0x30, 0x06, 0x02, 0x01, 0x00, 0x02, 0x01, 0x00},
 		},
@@ -562,7 +568,7 @@ func TestRFC6979(t *testing.T) {
 		hash := fastsha256.Sum256([]byte(test.msg))
 
 		// Ensure deterministically generated nonce is the expected value.
-		gotNonce := btcec.TstNonceRFC6979(privKey.D, hash[:]).Bytes()
+		gotNonce := btcec.TstNonceRFC6979(privKey.D, hash[:]).Bytes()[:]
 		wantNonce := decodeHex(test.nonce)
 		if !bytes.Equal(gotNonce, wantNonce) {
 			t.Errorf("NonceRFC6979 #%d (%s): Nonce is incorrect: "+

@@ -6,7 +6,6 @@ package btcec
 
 import (
 	"bytes"
-	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/hmac"
 	"errors"
@@ -21,22 +20,17 @@ import (
 var (
 	errNegativeValue          = errors.New("value may be interpreted as negative")
 	errExcessivelyPaddedValue = errors.New("value is excessively padded")
+	one                       = big.NewInt(1)
 )
 
 // Signature is a type representing an ecdsa signature.
 type Signature struct {
-	R *big.Int
-	S *big.Int
+	R       *nfieldVal
+	S       *nfieldVal
+	SNegPad bool
 }
 
 var (
-	// Curve order and halforder, used to tame ECDSA malleability (see BIP-0062)
-	order     = new(big.Int).Set(S256().N)
-	halforder = new(big.Int).Rsh(order, 1)
-
-	// Used in RFC6979 implementation when testing the nonce for correctness
-	one = big.NewInt(1)
-
 	// oneInitializer is used to fill a byte slice with byte 0x01.  It is provided
 	// here to avoid the need to create it multiple times.
 	oneInitializer = []byte{0x01}
@@ -52,8 +46,8 @@ var (
 func (sig *Signature) Serialize() []byte {
 	// low 'S' malleability breaker
 	sigS := sig.S
-	if sigS.Cmp(halforder) == 1 {
-		sigS = new(big.Int).Sub(order, sigS)
+	if sigS.Cmp(S256().halfn) == 1 && !sig.SNegPad {
+		sigS.Negate()
 	}
 	// Ensure the encoded bytes for the r and s values are canonical and
 	// thus suitable for DER encoding.
@@ -76,10 +70,28 @@ func (sig *Signature) Serialize() []byte {
 	return b
 }
 
-// Verify calls ecdsa.Verify to verify the signature of hash using the public
-// key.  It returns true if the signature is valid, false otherwise.
 func (sig *Signature) Verify(hash []byte, pubKey *PublicKey) bool {
-	return ecdsa.Verify(pubKey.ToECDSA(), hash, sig.R, sig.S)
+	zero := new(nfieldVal)
+	if sig.S.Cmp(zero) == 0 || sig.R.Cmp(zero) == 0 {
+		return false
+	}
+	c := pubKey.Curve
+	tmp := hashToInt(hash, c)
+	e := new(nfieldVal).SetByteSlice(tmp.Bytes())
+	w := sig.S.Inverse()
+	u1 := new(nfieldVal).Mul2(e, w)
+	u2 := new(nfieldVal).Mul2(sig.R, w)
+
+	x1, y1 := c.ScalarBaseMult(u1.Bytes()[:])
+	x2, y2 := c.ScalarMult(pubKey.X, pubKey.Y, u2.Bytes()[:])
+	x, y := c.Add(x1, y1, x2, y2)
+
+	if x.Sign() == 0 && y.Sign() == 0 {
+		return false
+	}
+
+	xN := new(nfieldVal).SetByteSlice(x.Bytes())
+	return xN.Cmp(sig.R) == 0
 }
 
 func parseSig(sigStr []byte, curve elliptic.Curve, der bool) (*Signature, error) {
@@ -141,7 +153,15 @@ func parseSig(sigStr []byte, curve elliptic.Curve, der bool) (*Signature, error)
 			return nil, errors.New("signature R is excessively padded")
 		}
 	}
-	signature.R = new(big.Int).SetBytes(rBytes)
+	tmp := new(big.Int).SetBytes(rBytes)
+	if tmp.Cmp(curve.Params().N) >= 0 {
+		return nil, errors.New("signature R is >= curve.N")
+	}
+	if len(rBytes) > 1 && rBytes[0] == 0 {
+		signature.R = new(nfieldVal).SetByteSlice(rBytes[1:])
+	} else {
+		signature.R = new(nfieldVal).SetByteSlice(rBytes)
+	}
 	index += rLen
 	// 0x02. length already checked in previous if.
 	if sigStr[index] != 0x02 {
@@ -167,7 +187,16 @@ func parseSig(sigStr []byte, curve elliptic.Curve, der bool) (*Signature, error)
 			return nil, errors.New("signature S is excessively padded")
 		}
 	}
-	signature.S = new(big.Int).SetBytes(sBytes)
+	tmp = new(big.Int).SetBytes(sBytes)
+	if tmp.Cmp(curve.Params().N) >= 0 {
+		return nil, errors.New("signature S is >= curve.N")
+	}
+	if len(sBytes) > 1 && sBytes[0] == 0 {
+		signature.SNegPad = true
+		signature.S = new(nfieldVal).SetByteSlice(sBytes[1:])
+	} else {
+		signature.S = new(nfieldVal).SetByteSlice(sBytes)
+	}
 	index += sLen
 
 	// sanity check length parsing
@@ -176,21 +205,13 @@ func parseSig(sigStr []byte, curve elliptic.Curve, der bool) (*Signature, error)
 			index, len(sigStr))
 	}
 
-	// Verify also checks this, but we can be more sure that we parsed
-	// correctly if we verify here too.
-	// FWIW the ecdsa spec states that R and S must be | 1, N - 1 |
-	// but crypto/ecdsa only checks for Sign != 0. Mirror that.
-	if signature.R.Sign() != 1 {
+	zero := new(nfieldVal)
+
+	if signature.R.Cmp(zero) != 1 {
 		return nil, errors.New("signature R isn't 1 or more")
 	}
-	if signature.S.Sign() != 1 {
+	if signature.S.Cmp(zero) != 1 {
 		return nil, errors.New("signature S isn't 1 or more")
-	}
-	if signature.R.Cmp(curve.Params().N) >= 0 {
-		return nil, errors.New("signature R is >= curve.N")
-	}
-	if signature.S.Cmp(curve.Params().N) >= 0 {
-		return nil, errors.New("signature S is >= curve.N")
 	}
 
 	return signature, nil
@@ -210,14 +231,24 @@ func ParseDERSignature(sigStr []byte, curve elliptic.Curve) (*Signature, error) 
 	return parseSig(sigStr, curve, true)
 }
 
-// canonicalizeInt returns the bytes for the passed big integer adjusted as
+// canonicalizeInt returns the bytes for the passed nfieldVal adjusted as
 // necessary to ensure that a big-endian encoded integer can't possibly be
 // misinterpreted as a negative number.  This can happen when the most
 // significant bit is set, so it is padded by a leading zero byte in this case.
 // Also, the returned bytes will have at least a single byte when the passed
 // value is 0.  This is required for DER encoding.
-func canonicalizeInt(val *big.Int) []byte {
-	b := val.Bytes()
+func canonicalizeInt(val *nfieldVal) []byte {
+	full := val.Bytes()
+	b := full[:]
+	// remove the left-padding of 0's
+	for i, word := range full {
+		if word == 0 {
+			b = full[i:]
+		} else {
+			break
+		}
+	}
+
 	if len(b) == 0 {
 		b = []byte{0x00}
 	}
@@ -278,7 +309,9 @@ func recoverKeyFromSignature(curve *KoblitzCurve, sig *Signature, msg []byte,
 	// 1.1 x = (n * i) + r
 	Rx := new(big.Int).Mul(curve.Params().N,
 		new(big.Int).SetInt64(int64(iter/2)))
-	Rx.Add(Rx, sig.R)
+	sigR := new(big.Int).SetBytes(sig.R.Bytes()[:])
+	sigS := new(big.Int).SetBytes(sig.S.Bytes()[:])
+	Rx.Add(Rx, sigR)
 	if Rx.Cmp(curve.Params().P) != -1 {
 		return nil, errors.New("calculated Rx is larger than curve P")
 	}
@@ -307,10 +340,10 @@ func recoverKeyFromSignature(curve *KoblitzCurve, sig *Signature, msg []byte,
 	// We calculate the two terms sR and eG separately multiplied by the
 	// inverse of r (from the signature). We then add them to calculate
 	// Q = r^-1(sR-eG)
-	invr := new(big.Int).ModInverse(sig.R, curve.Params().N)
+	invr := new(big.Int).ModInverse(sigR, curve.Params().N)
 
 	// first term.
-	invrS := new(big.Int).Mul(invr, sig.S)
+	invrS := new(big.Int).Mul(invr, sigS)
 	invrS.Mod(invrS, curve.Params().N)
 	sRx, sRy := curve.ScalarMult(Rx, Ry, invrS.Bytes())
 
@@ -366,14 +399,14 @@ func SignCompact(curve *KoblitzCurve, key *PrivateKey,
 				result = append(result,
 					make([]byte, curvelen-bytelen)...)
 			}
-			result = append(result, sig.R.Bytes()...)
+			result = append(result, sig.R.Bytes()[:]...)
 
 			bytelen = (sig.S.BitLen() + 7) / 8
 			if bytelen < curvelen {
 				result = append(result,
 					make([]byte, curvelen-bytelen)...)
 			}
-			result = append(result, sig.S.Bytes()...)
+			result = append(result, sig.S.Bytes()[:]...)
 
 			return result, nil
 		}
@@ -397,8 +430,8 @@ func RecoverCompact(curve *KoblitzCurve, signature,
 
 	// format is <header byte><bitlen R><bitlen S>
 	sig := &Signature{
-		R: new(big.Int).SetBytes(signature[1 : bitlen+1]),
-		S: new(big.Int).SetBytes(signature[bitlen+1:]),
+		R: new(nfieldVal).SetByteSlice(signature[1 : bitlen+1]),
+		S: new(nfieldVal).SetByteSlice(signature[bitlen+1:]),
 	}
 	// The iteration used here was encoded
 	key, err := recoverKeyFromSignature(curve, sig, hash, iteration, false)
@@ -411,38 +444,30 @@ func RecoverCompact(curve *KoblitzCurve, signature,
 
 // signRFC6979 generates a deterministic ECDSA signature according to RFC 6979 and BIP 62.
 func signRFC6979(privateKey *PrivateKey, hash []byte) (*Signature, error) {
+	curve := S256()
 
 	privkey := privateKey.ToECDSA()
-	N := order
 	k := nonceRFC6979(privkey.D, hash)
-	inv := new(big.Int).ModInverse(k, N)
-	r, _ := privkey.Curve.ScalarBaseMult(k.Bytes())
-	if r.Cmp(N) == 1 {
-		r.Sub(r, N)
-	}
+	inv := new(nfieldVal).Set(k).Inverse()
+	tmp, _ := privkey.Curve.ScalarBaseMult(k.Bytes()[:])
+	r := new(nfieldVal).SetByteSlice(tmp.Bytes())
 
-	if r.Sign() == 0 {
-		return nil, errors.New("calculated R is zero")
-	}
+	tmp = hashToInt(hash, privkey.Curve)
+	e := new(nfieldVal).SetByteSlice(tmp.Bytes())
+	tmp2 := new(nfieldVal).SetByteSlice(privkey.D.Bytes())
+	s := new(nfieldVal).Mul2(tmp2, r)
+	s.Add(e)
+	s.Mul(inv)
 
-	e := hashToInt(hash, privkey.Curve)
-	s := new(big.Int).Mul(privkey.D, r)
-	s.Add(s, e)
-	s.Mul(s, inv)
-	s.Mod(s, N)
-
-	if s.Cmp(halforder) == 1 {
-		s.Sub(N, s)
-	}
-	if s.Sign() == 0 {
-		return nil, errors.New("calculated S is zero")
+	if s.Cmp(curve.halfn) == 1 {
+		s.Negate()
 	}
 	return &Signature{R: r, S: s}, nil
 }
 
 // nonceRFC6979 generates an ECDSA nonce (`k`) deterministically according to RFC 6979.
 // It takes a 32-byte hash as an input and returns 32-byte nonce to be used in ECDSA algorithm.
-func nonceRFC6979(privkey *big.Int, hash []byte) *big.Int {
+func nonceRFC6979(privkey *big.Int, hash []byte) *nfieldVal {
 
 	curve := S256()
 	q := curve.Params().N
@@ -486,7 +511,7 @@ func nonceRFC6979(privkey *big.Int, hash []byte) *big.Int {
 		// Step H3
 		secret := hashToInt(t, curve)
 		if secret.Cmp(one) >= 0 && secret.Cmp(q) < 0 {
-			return secret
+			return new(nfieldVal).SetByteSlice(secret.Bytes())
 		}
 		k = mac(alg, k, append(v, 0x00))
 		v = mac(alg, k, v)
