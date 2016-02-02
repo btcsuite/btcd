@@ -356,24 +356,13 @@ type AddrFunc func(remoteAddr *wire.NetAddress) *wire.NetAddress
 type HostToNetAddrFunc func(host string, port uint16,
 	services wire.ServiceFlag) (*wire.NetAddress, error)
 
-// NOTE: The overall data flow of a peer is split into 3 goroutines.  Inbound
-// messages are read via the inHandler goroutine and generally dispatched to
-// their own handler.  For inbound data-related messages such as blocks,
-// transactions, and inventory, the data is handled by the corresponding
-// message handlers.  The data flow for outbound messages is split into 2
-// goroutines, queueHandler and outHandler.  The first, queueHandler, is used
-// as a way for external entities to queue messages, by way of the QueueMessage
-// function, quickly regardless of whether the peer is currently sending or not.
-// It acts as the traffic cop between the external world and the actual
-// goroutine which writes to the network socket.
-
 // Peer provides a basic concurrent safe bitcoin peer for handling bitcoin
-// communications via the peer-to-peer protocol.  It provides full duplex
-// reading and writing, automatic handling of the initial handshake process,
-// querying of usage statistics and other information about the remote peer such
-// as its address, user agent, and protocol version, output message queueing,
-// inventory trickling, and the ability to dynamically register and unregister
-// callbacks for handling bitcoin protocol messages.
+// communications via the peer-to-peer protocol.  It negotiates an acceptable
+// protocol and then provides full duplex reading and writing, querying of usage
+// statistics and other information about the remote peer such as its address,
+// user agent, and protocol version, output message queueing, inventory
+// trickling, and the ability to dynamically register and unregister callbacks
+// for handling bitcoin protocol messages.
 //
 // Outbound messages are typically queued via QueueMessage or QueueInventory.
 // QueueMessage is intended for all messages, including responses to data such
@@ -397,6 +386,9 @@ type Peer struct {
 	services        wire.ServiceFlag
 	protocolVersion uint32
 	version         *wire.MsgVersion
+	timeOffset      int64
+	timeConnected   time.Time
+	startingHeight  int32
 
 	knownInventory *mruInventoryMap
 
@@ -408,16 +400,13 @@ type Peer struct {
 	prevGetHdrsBegin *wire.ShaHash
 	prevGetHdrsStop  *wire.ShaHash
 
-	// These fields keep track of statistics for the peer and are protected
-	// by the statsMtx mutex.
+	// These fields keep track of statistics for the peer and are protected by
+	// the statsMtx mutex.
 	statsMtx           sync.RWMutex
-	timeOffset         int64
-	timeConnected      time.Time
 	lastSend           time.Time
 	lastRecv           time.Time
 	bytesReceived      uint64
 	bytesSent          uint64
-	startingHeight     int32
 	lastBlock          int32
 	lastAnnouncedBlock *wire.ShaHash
 	lastPingNonce      uint64    // Set to nonce if we have a pending ping.
@@ -673,9 +662,6 @@ func (p *Peer) TimeConnected() time.Time {
 //
 // This function is safe for concurrent access.
 func (p *Peer) TimeOffset() int64 {
-	p.statsMtx.RLock()
-	defer p.statsMtx.RUnlock()
-
 	return p.timeOffset
 }
 
@@ -684,9 +670,6 @@ func (p *Peer) TimeOffset() int64 {
 //
 // This function is safe for concurrent access.
 func (p *Peer) StartingHeight() int32 {
-	p.statsMtx.RLock()
-	defer p.statsMtx.RUnlock()
-
 	return p.startingHeight
 }
 
@@ -1135,9 +1118,8 @@ func (p *Peer) isRegTestNetwork() bool {
 	return p.cfg.ChainParams.Net == wire.TestNet
 }
 
-// shouldHandleReadError returns whether or not the passed error, which is
-// expected to have come from reading from the remote peer in the inHandler,
-// should be logged and responded to with a reject message.
+// shouldHandleReadError returns whether or not the passed error, from reading
+// the remote peer, should be logged and responded to with a reject message.
 func (p *Peer) shouldHandleReadError(err error) bool {
 	// No logging of reject message when the peer is being forcibly
 	// disconnected.
@@ -1249,6 +1231,10 @@ func (p *Peer) unpauseDeadlines() {
 	p.responseDeadlinesMtx.Unlock()
 }
 
+// readHandler is the only place we read messages from the peer after protocol
+// negotiation.  It passes off the message to handleReadMsg and is responsible
+// for disconnecting if there are no messages within idleTimeout.  It runs in
+// its own goroutine.
 func (p *Peer) readHandler() {
 	defer p.disconnectWaitGroup.Done()
 
@@ -1267,16 +1253,27 @@ func (p *Peer) readHandler() {
 			// Process message.
 			if err := p.handleReadMsg(rm); err != nil {
 				p.Disconnect()
+				return
 			}
+
+			p.statsMtx.Lock()
+			p.lastRecv = time.Now()
+			p.statsMtx.Unlock()
 		case <-time.After(idleTimeout):
 			// Deal with timeout.
 			log.Warnf("Peer %s no answer for %s -- disconnecting",
 				p, idleTimeout)
 			p.Disconnect()
+			return
 		}
 	}
 }
 
+// handleReadMsg handles all allowed message types received from the peer. It
+// calls the appropriate listener or returns an error if cannot understand the
+// message.  It is also responsible for cancelling deadlines created by
+// writeHandler.  Note that deadline expiries are paused while listeners are
+// executing.
 func (p *Peer) handleReadMsg(rm readMsg) error {
 	if rm.err != nil {
 		// In order to allow regression tests with malformed
@@ -1419,6 +1416,13 @@ func (p *Peer) handleReadMsg(rm readMsg) error {
 	return nil
 }
 
+// writeMsgQueueHandler runs in its own goroutine.  It's sole job is to buffer
+// messages from clients of this package to the peer.  It tries to send messages
+// down the write channel.  However if the write channel, which is unbuffered,
+// blocks then it stores the message in pendingMsgs for later dispatch.  A
+// simpler way might  be to use a buffered write channel but then it would be
+// bound by our initial size of channel which would take up potentially
+// unnecessary memory.  writeMsgQueueHandler runs in its own goroutine.
 func (p *Peer) writeMsgQueueHandler() {
 	defer p.disconnectWaitGroup.Done()
 
@@ -1448,6 +1452,10 @@ func (p *Peer) writeMsgQueueHandler() {
 	}
 }
 
+// writeInvVectQueueHandler collects *wire.InvVect messages from the
+// writeInvVectQueue.  Every trickleTimeout it combines all these messages into
+// a *wire.MsgInv which it sends for delivery to the peer.
+// writeInvVectQueueHandler runs in its own goroutine.
 func (p *Peer) writeInvVectQueueHandler() {
 	defer p.disconnectWaitGroup.Done()
 
@@ -1485,6 +1493,11 @@ func (p *Peer) writeInvVectQueueHandler() {
 	}
 }
 
+// writeHandler is solely responsible for sending messages to the peer after
+// initial protocol negotiation. It takes messages from the write channel,
+// updates stats if necessary.  A response is expected from the peer for some
+// messages such as getdata.  writeHandler calls maybeAddDeadline if
+// necessary.  writeHandler runs in its own goroutine.
 func (p *Peer) writeHandler() {
 	defer p.disconnectWaitGroup.Done()
 
@@ -1514,6 +1527,10 @@ func (p *Peer) writeHandler() {
 				p.Disconnect()
 				return
 			}
+
+			p.statsMtx.Lock()
+			p.lastSend = time.Now()
+			p.statsMtx.Unlock()
 
 			p.maybeAddDeadline(writeMsg.msg)
 		}
@@ -1706,8 +1723,10 @@ func (p *Peer) negotiateInboundVersion() error {
 	return p.writeMessage(wire.NewMsgVerAck())
 }
 
-// NewInboundPeer returns a new inbound bitcoin peer. Use Start to begin
-// processing incoming and outgoing messages.
+// NewInboundPeer returns a new inbound bitcoin peer. It blocks until the
+// protocol has been negotiated or negotiation has timed out.  An error will be
+// returned if the peer connection and/or protocol negotiation has been
+// unsuccessful.
 func NewInboundPeer(cfg *Config, conn net.Conn) (*Peer, error) {
 	p := newPeerBase(cfg, true)
 	p.addr = conn.RemoteAddr().String()
@@ -1767,7 +1786,9 @@ func (p *Peer) negotiateOutboundVersion() error {
 	return nil
 }
 
-// NewOutboundPeer returns a new outbound bitcoin peer.
+// NewOutboundPeer returns a new outbound bitcoin peer.  It blocks until the
+// protocol has been negotiated or the negotiation has timed out.  An error is
+// returned if the connection and/or protocol negotiation is unsuccessful.
 func NewOutboundPeer(cfg *Config, conn net.Conn, addr string) (*Peer, error) {
 	p := newPeerBase(cfg, false)
 	p.addr = addr
