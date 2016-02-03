@@ -198,12 +198,13 @@ func (h *Harness) SetUp(createTestChain bool, numMatureOutputs uint32) error {
 
 	// Wait for the wallet to sync up to the current height.
 	ticker := time.NewTicker(time.Millisecond * 100)
+	desiredHeight := int32(numMatureOutputs + blockchain.CoinbaseMaturity)
 out:
 	// TODO(roasbeef): use wallet's notification server here instead?
 	for {
 		select {
 		case <-ticker.C:
-			if h.Wallet.Manager.SyncedTo().Height == 125 {
+			if h.Wallet.Manager.SyncedTo().Height == desiredHeight {
 				break out
 			}
 		}
