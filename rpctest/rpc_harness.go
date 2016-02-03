@@ -45,9 +45,10 @@ var testInstances []*Harness
 
 // Harness ...
 type Harness struct {
-	node *node
+	ActiveNet *chaincfg.Params
 
 	Node     *rpc.Client
+	node     *node
 	handlers *rpc.NotificationHandlers
 
 	Wallet       *wallet.Wallet
@@ -57,8 +58,6 @@ type Harness struct {
 
 	testNodeDir    string
 	maxConnRetries int
-
-	net *chaincfg.Params
 }
 
 // New creates and initializes new instance of the rpc test harness.
@@ -124,7 +123,7 @@ func New(activeNet *chaincfg.Params, handlers *rpc.NotificationHandlers, extraAr
 		testNodeDir:    nodeTestData,
 		coinbaseKey:    coinbaseKey,
 		coinbaseAddr:   coinbaseAddr,
-		net:            activeNet,
+		ActiveNet:      activeNet,
 	}
 
 	testInstances = append(testInstances, h)
@@ -158,8 +157,8 @@ func (h *Harness) SetUp(createTestChain bool, numMatureOutputs uint32) error {
 		}
 	}
 
-	netDir := filepath.Join(h.testNodeDir, h.net.Name)
-	walletLoader := wallet.NewLoader(h.net, netDir)
+	netDir := filepath.Join(h.testNodeDir, h.ActiveNet.Name)
+	walletLoader := wallet.NewLoader(h.ActiveNet, netDir)
 
 	h.Wallet, err = walletLoader.CreateNewWallet([]byte("pub"),
 		[]byte("password"), nil)
@@ -171,7 +170,7 @@ func (h *Harness) SetUp(createTestChain bool, numMatureOutputs uint32) error {
 	}
 
 	rpcConf := h.node.config.rpcConnConfig()
-	rpcc, err := chain.NewRPCClient(h.net, rpcConf.Host, rpcConf.User,
+	rpcc, err := chain.NewRPCClient(h.ActiveNet, rpcConf.Host, rpcConf.User,
 		rpcConf.Pass, rpcConf.Certificates, false, 20)
 	if err != nil {
 		return err
@@ -187,7 +186,7 @@ func (h *Harness) SetUp(createTestChain bool, numMatureOutputs uint32) error {
 	// Encode our coinbase private key in WIF format, then import it into
 	// the wallet so we'll be able to generate spends, and update the
 	// balance of the wallet as blocks are generated.
-	wif, err := btcutil.NewWIF(h.coinbaseKey, h.net, true)
+	wif, err := btcutil.NewWIF(h.coinbaseKey, h.ActiveNet, true)
 	if err != nil {
 		return err
 	}
