@@ -57,12 +57,14 @@ type Harness struct {
 
 	testNodeDir    string
 	maxConnRetries int
+
+	net *chaincfg.Params
 }
 
 // New creates and initializes new instance of the rpc test harness.
 // Optionally, websocket handlers and a specified configuration may be passed.
 // In the case that a nil config is passed, a default configuration will be used.
-func New(handlers *rpc.NotificationHandlers, extraArgs []string) (*Harness, error) {
+func New(activeNet *chaincfg.Params, handlers *rpc.NotificationHandlers, extraArgs []string) (*Harness, error) {
 	testCreationLock.Lock()
 	defer testCreationLock.Unlock()
 
@@ -85,7 +87,7 @@ func New(handlers *rpc.NotificationHandlers, extraArgs []string) (*Harness, erro
 	// blocks. So we generate a fresh private key to use for our coinbase
 	// payouts. This private key will also be imported into the wallet so
 	// tests are able to move coins around at will.
-	coinbaseAddr, coinbaseKey, err := generateCoinbasePayout()
+	coinbaseAddr, coinbaseKey, err := generateCoinbasePayout(activeNet)
 	if err != nil {
 		return nil, err
 	}
@@ -122,6 +124,7 @@ func New(handlers *rpc.NotificationHandlers, extraArgs []string) (*Harness, erro
 		testNodeDir:    nodeTestData,
 		coinbaseKey:    coinbaseKey,
 		coinbaseAddr:   coinbaseAddr,
+		net:            activeNet,
 	}
 
 	testInstances = append(testInstances, h)
@@ -155,8 +158,8 @@ func (h *Harness) SetUp(createTestChain bool, numMatureOutputs uint32) error {
 		}
 	}
 
-	netDir := filepath.Join(h.testNodeDir, chaincfg.SimNetParams.Name)
-	walletLoader := wallet.NewLoader(&chaincfg.SimNetParams, netDir)
+	netDir := filepath.Join(h.testNodeDir, h.net.Name)
+	walletLoader := wallet.NewLoader(h.net, netDir)
 
 	h.Wallet, err = walletLoader.CreateNewWallet([]byte("pub"),
 		[]byte("password"), nil)
@@ -168,9 +171,8 @@ func (h *Harness) SetUp(createTestChain bool, numMatureOutputs uint32) error {
 	}
 
 	rpcConf := h.node.config.rpcConnConfig()
-	rpcc, err := chain.NewRPCClient(&chaincfg.SimNetParams,
-		rpcConf.Host, rpcConf.User, rpcConf.Pass,
-		rpcConf.Certificates, false, 20)
+	rpcc, err := chain.NewRPCClient(h.net, rpcConf.Host, rpcConf.User,
+		rpcConf.Pass, rpcConf.Certificates, false, 20)
 	if err != nil {
 		return err
 	}
@@ -185,7 +187,7 @@ func (h *Harness) SetUp(createTestChain bool, numMatureOutputs uint32) error {
 	// Encode our coinbase private key in WIF format, then import it into
 	// the wallet so we'll be able to generate spends, and update the
 	// balance of the wallet as blocks are generated.
-	wif, err := btcutil.NewWIF(h.coinbaseKey, &chaincfg.SimNetParams, true)
+	wif, err := btcutil.NewWIF(h.coinbaseKey, h.net, true)
 	if err != nil {
 		return err
 	}
@@ -301,14 +303,14 @@ func generateListeningAddresses() (string, string) {
 // generateCoinbasePayout generates a fresh private key, and the corresponding
 // p2pkh address for use within all coinbase outputs produced for an instance
 // of the test harness.
-func generateCoinbasePayout() (btcutil.Address, *btcec.PrivateKey, error) {
+func generateCoinbasePayout(net *chaincfg.Params) (btcutil.Address, *btcec.PrivateKey, error) {
 	privKey, err := btcec.NewPrivateKey(btcec.S256())
 	if err != nil {
 		return nil, nil, err
 	}
 
 	addr, err := btcutil.NewAddressPubKey(privKey.PubKey().SerializeCompressed(),
-		&chaincfg.SimNetParams)
+		net)
 	if err != nil {
 		return nil, nil, err
 	}

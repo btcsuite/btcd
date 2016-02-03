@@ -9,13 +9,14 @@ import (
 	"os"
 	"testing"
 
+	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/btcsuite/btcutil"
 	"github.com/btcsuite/btcwallet/waddrmgr"
 )
 
 func TestSetUp(t *testing.T) {
 	// Create a new test instance.
-	nodeTest, err := New(nil, nil)
+	nodeTest, err := New(&chaincfg.SimNetParams, nil, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -58,7 +59,7 @@ func TestSetUp(t *testing.T) {
 
 func TestCoinbaseSpend(t *testing.T) {
 	// Create a new test instance.
-	nodeTest, err := New(nil, nil)
+	nodeTest, err := New(&chaincfg.SimNetParams, nil, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

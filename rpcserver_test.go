@@ -6,6 +6,7 @@ import (
 	"os"
 	"testing"
 
+	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/btcsuite/btcd/rpctest"
 )
 
@@ -97,7 +98,7 @@ var primaryHarness *rpctest.Harness
 
 func TestMain(m *testing.M) {
 	var err error
-	primaryHarness, err = rpctest.New(nil, nil)
+	primaryHarness, err = rpctest.New(&chaincfg.SimNetParams, nil, nil)
 	if err != nil {
 		fmt.Println("unable to create primary harness: ", err)
 		os.Exit(1)
