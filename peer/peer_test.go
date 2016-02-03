@@ -1,4 +1,4 @@
-// Copyright (c) 2015 The btcsuite developers
+// Copyright (c) 2015-2016 The btcsuite developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -244,9 +244,8 @@ func TestPeerConnection(t *testing.T) {
 					&conn{raddr: "10.0.0.1:8333"},
 					&conn{raddr: "10.0.0.2:8333"},
 				)
-				inPeer := peer.NewInboundPeer(peerCfg, inConn)
-				err := inPeer.Start()
-				if err != nil {
+				inPeer := peer.NewInboundPeer(peerCfg)
+				if err := inPeer.Connect(inConn); err != nil {
 					return nil, nil, err
 				}
 				outPeer, err := peer.NewOutboundPeer(peerCfg, "10.0.0.2:8333")
@@ -256,6 +255,7 @@ func TestPeerConnection(t *testing.T) {
 				if err := outPeer.Connect(outConn); err != nil {
 					return nil, nil, err
 				}
+
 				for i := 0; i < 2; i++ {
 					select {
 					case <-verack:
@@ -273,9 +273,8 @@ func TestPeerConnection(t *testing.T) {
 					&conn{raddr: "10.0.0.1:8333", proxy: true},
 					&conn{raddr: "10.0.0.2:8333"},
 				)
-				inPeer := peer.NewInboundPeer(peerCfg, inConn)
-				err := inPeer.Start()
-				if err != nil {
+				inPeer := peer.NewInboundPeer(peerCfg)
+				if err := inPeer.Connect(inConn); err != nil {
 					return nil, nil, err
 				}
 				outPeer, err := peer.NewOutboundPeer(peerCfg, "10.0.0.2:8333")
@@ -306,8 +305,8 @@ func TestPeerConnection(t *testing.T) {
 		testPeer(t, inPeer, wantStats)
 		testPeer(t, outPeer, wantStats)
 
-		inPeer.Shutdown()
-		outPeer.Shutdown()
+		inPeer.Disconnect()
+		outPeer.Disconnect()
 	}
 }
 
@@ -390,9 +389,8 @@ func TestPeerListeners(t *testing.T) {
 		&conn{raddr: "10.0.0.1:8333"},
 		&conn{raddr: "10.0.0.2:8333"},
 	)
-	inPeer := peer.NewInboundPeer(peerCfg, inConn)
-	err := inPeer.Start()
-	if err != nil {
+	inPeer := peer.NewInboundPeer(peerCfg)
+	if err := inPeer.Connect(inConn); err != nil {
 		t.Errorf("TestPeerListeners: unexpected err %v\n", err)
 		return
 	}
@@ -513,8 +511,8 @@ func TestPeerListeners(t *testing.T) {
 			return
 		}
 	}
-	inPeer.Shutdown()
-	outPeer.Shutdown()
+	inPeer.Disconnect()
+	outPeer.Disconnect()
 }
 
 // TestOutboundPeer tests that the outbound peer works as expected.
@@ -542,20 +540,15 @@ func TestOutboundPeer(t *testing.T) {
 		return
 	}
 
-	// Test Connect err
 	wantErr := errBlockNotFound
 	if err := p.Connect(c); err != wantErr {
 		t.Errorf("Connect: expected err %v, got %v\n", wantErr, err)
 		return
 	}
-	// Test already connected
+
+	// Test already connected.
 	if err := p.Connect(c); err != nil {
 		t.Errorf("Connect: unexpected err %v\n", err)
-		return
-	}
-	// Test already started
-	if err := p.Start(); err != nil {
-		t.Errorf("Start: unexpected err %v\n", err)
 		return
 	}
 
@@ -572,7 +565,7 @@ func TestOutboundPeer(t *testing.T) {
 	done := make(chan struct{})
 	p.QueueMessage(fakeMsg, done)
 	<-done
-	p.Shutdown()
+	p.Disconnect()
 
 	// Test NewestBlock
 	var newestBlock = func() (*wire.ShaHash, int32, error) {
@@ -612,7 +605,7 @@ func TestOutboundPeer(t *testing.T) {
 
 	// Test Queue Inv after connection
 	p1.QueueInventory(fakeInv)
-	p1.Shutdown()
+	p1.Disconnect()
 
 	// Test regression
 	peerCfg.ChainParams = &chaincfg.RegressionNetParams
@@ -657,7 +650,7 @@ func TestOutboundPeer(t *testing.T) {
 	p2.QueueMessage(wire.NewMsgGetData(), nil)
 	p2.QueueMessage(wire.NewMsgGetHeaders(), nil)
 
-	p2.Shutdown()
+	p2.Disconnect()
 }
 
 func init() {

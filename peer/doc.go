@@ -1,4 +1,4 @@
-// Copyright (c) 2015 The btcsuite developers
+// Copyright (c) 2015-2016 The btcsuite developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -66,15 +66,12 @@ This provides high flexibility for things such as connecting via proxies, acting
 as a proxy, creating bridge peers, choosing whether to listen for inbound peers,
 etc.
 
-For outgoing peers, the NewOutboundPeer function must be used to specify the
-configuration followed by invoking Connect with the net.Conn instance.  This
- will start all async I/O goroutines and initiate the initial negotiation
-process.  Once that has been completed, the peer is fully functional.
-
-For inbound peers, the NewInboundPeer function must be used to specify the
-configuration and net.Conn instance followed by invoking Start.  This will start
-all async I/O goroutines and listen for the initial negotiation process.  Once
-that has been completed, the peer is fully functional.
+NewOutboundPeer and NewInboundPeer functions must be followed by calling Connect
+with a net.Conn instance to the peer.  This will start all async I/O goroutines
+and initiate the protocol negotiation process.  Once finished with the peer call
+Disconnect to disconnect from the peer and clean up all resources.
+WaitForDisconnect can be used to block until peer disconnection and resource
+cleanup has completed.
 
 Callbacks
 

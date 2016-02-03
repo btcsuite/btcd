@@ -1,4 +1,4 @@
-// Copyright (c) 2015 The btcsuite developers
+// Copyright (c) 2015-2016 The btcsuite developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -38,9 +38,9 @@ func mockRemotePeer() error {
 		}
 
 		// Create and start the inbound peer.
-		p := peer.NewInboundPeer(peerCfg, conn)
-		if err := p.Start(); err != nil {
-			fmt.Printf("Start: error %v\n", err)
+		p := peer.NewInboundPeer(peerCfg)
+		if err := p.Connect(conn); err != nil {
+			fmt.Printf("Connect: error %v\n", err)
 			return
 		}
 	}()
@@ -105,8 +105,9 @@ func Example_newOutboundPeer() {
 		fmt.Printf("Example_peerConnection: verack timeout")
 	}
 
-	// Shutdown the peer.
-	p.Shutdown()
+	// Disconnect the peer.
+	p.Disconnect()
+	p.WaitForDisconnect()
 
 	// Output:
 	// outbound: received version

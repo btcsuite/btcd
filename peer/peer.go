@@ -387,8 +387,7 @@ type HostToNetAddrFunc func(host string, port uint16,
 // of specific types that typically require common special handling are
 // provided as a convenience.
 type Peer struct {
-	// The following variables must only be used atomically
-	started       int32
+	// The following variables must only be used atomically.
 	connected     int32
 	disconnect    int32
 	bytesReceived uint64
@@ -1943,11 +1942,14 @@ func (p *Peer) Connect(conn net.Conn) error {
 		return nil
 	}
 
+	if p.inbound {
+		p.addr = conn.RemoteAddr().String()
+	}
 	p.conn = conn
 	p.timeConnected = time.Now()
 
 	atomic.AddInt32(&p.connected, 1)
-	return p.Start()
+	return p.start()
 }
 
 // Connected returns whether or not the peer is currently connected.
@@ -1975,18 +1977,12 @@ func (p *Peer) Disconnect() {
 
 // Start begins processing input and output messages.  It also sends the initial
 // version message for outbound connections to start the negotiation process.
-func (p *Peer) Start() error {
-	// Already started?
-	if atomic.AddInt32(&p.started, 1) != 1 {
-		return nil
-	}
-
+func (p *Peer) start() error {
 	log.Tracef("Starting peer %s", p)
 
 	// Send an initial version message if this is an outbound connection.
 	if !p.inbound {
-		err := p.pushVersionMsg()
-		if err != nil {
+		if err := p.pushVersionMsg(); err != nil {
 			log.Errorf("Can't send outbound version message %v", err)
 			p.Disconnect()
 			return err
@@ -2002,16 +1998,11 @@ func (p *Peer) Start() error {
 	return nil
 }
 
-// Shutdown gracefully shuts down the peer by disconnecting it.
-func (p *Peer) Shutdown() {
-	log.Tracef("Shutdown peer %s", p)
-	p.Disconnect()
-}
-
-// WaitForShutdown waits until the peer has completely shutdown.  This will
-// happen if either the local or remote side has been disconnected or the peer
-// is forcibly shutdown via Shutdown.
-func (p *Peer) WaitForShutdown() {
+// WaitForDisconnect waits until the peer has completely disconnected and all
+// resources are cleaned up.  This will happen if either the local or remote
+// side has been disconnected or the peer is forcibly disconnected via
+// Disconnect.
+func (p *Peer) WaitForDisconnect() {
 	<-p.quit
 }
 
@@ -2052,13 +2043,8 @@ func newPeerBase(cfg *Config, inbound bool) *Peer {
 
 // NewInboundPeer returns a new inbound bitcoin peer. Use Start to begin
 // processing incoming and outgoing messages.
-func NewInboundPeer(cfg *Config, conn net.Conn) *Peer {
-	p := newPeerBase(cfg, true)
-	p.conn = conn
-	p.addr = conn.RemoteAddr().String()
-	p.timeConnected = time.Now()
-	atomic.AddInt32(&p.connected, 1)
-	return p
+func NewInboundPeer(cfg *Config) *Peer {
+	return newPeerBase(cfg, true)
 }
 
 // NewOutboundPeer returns a new outbound bitcoin peer.
