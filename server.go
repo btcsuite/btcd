@@ -1037,9 +1037,8 @@ func (s *server) handleAddPeerMsg(state *peerState, sp *serverPeer) bool {
 
 	// Ignore new peers if we're shutting down.
 	if atomic.LoadInt32(&s.shutdown) != 0 {
-		srvrLog.Infof("New peer %s ignored - server is shutting "+
-			"down", sp)
-		sp.Shutdown()
+		srvrLog.Infof("New peer %s ignored - server is shutting down", sp)
+		sp.Disconnect()
 		return false
 	}
 
@@ -1047,14 +1046,14 @@ func (s *server) handleAddPeerMsg(state *peerState, sp *serverPeer) bool {
 	host, _, err := net.SplitHostPort(sp.Addr())
 	if err != nil {
 		srvrLog.Debugf("can't split hostport %v", err)
-		sp.Shutdown()
+		sp.Disconnect()
 		return false
 	}
 	if banEnd, ok := state.banned[host]; ok {
 		if time.Now().Before(banEnd) {
-			srvrLog.Debugf("Peer %s is banned for another %v - "+
-				"disconnecting", host, banEnd.Sub(time.Now()))
-			sp.Shutdown()
+			srvrLog.Debugf("Peer %s is banned for another %v - disconnecting",
+				host, banEnd.Sub(time.Now()))
+			sp.Disconnect()
 			return false
 		}
 
@@ -1067,18 +1066,19 @@ func (s *server) handleAddPeerMsg(state *peerState, sp *serverPeer) bool {
 	// Limit max outbound peers.
 	if _, ok := state.pendingPeers[sp.Addr()]; ok {
 		if state.OutboundCount() >= state.maxOutboundPeers {
-			srvrLog.Infof("Max outbound peers reached [%d] - disconnecting "+
-				"peer %s", state.maxOutboundPeers, sp)
-			sp.Shutdown()
+			srvrLog.Infof(
+				"Max outbound peers reached [%d] - disconnecting peer %s",
+				state.maxOutboundPeers, sp)
+			sp.Disconnect()
 			return false
 		}
 	}
 
 	// Limit max number of total peers.
 	if state.Count() >= cfg.MaxPeers {
-		srvrLog.Infof("Max peers reached [%d] - disconnecting "+
-			"peer %s", cfg.MaxPeers, sp)
-		sp.Shutdown()
+		srvrLog.Infof("Max peers reached [%d] - disconnecting peer %s",
+			cfg.MaxPeers, sp)
+		sp.Disconnect()
 		// TODO(oga) how to handle permanent peers here?
 		// they should be rescheduled.
 		return false
@@ -1414,15 +1414,19 @@ func (s *server) listenHandler(listener net.Listener) {
 		if err != nil {
 			// Only log the error if we're not forcibly shutting down.
 			if atomic.LoadInt32(&s.shutdown) == 0 {
-				srvrLog.Errorf("can't accept connection: %v",
-					err)
+				srvrLog.Errorf("Can't accept connection: %v", err)
 			}
 			continue
 		}
 		sp := newServerPeer(s, false)
-		sp.Peer = peer.NewInboundPeer(newPeerConfig(sp), conn)
-		sp.Start()
+		sp.Peer = peer.NewInboundPeer(newPeerConfig(sp))
 		go s.peerDoneHandler(sp)
+		if err := sp.Connect(conn); err != nil {
+			if atomic.LoadInt32(&s.shutdown) == 0 {
+				srvrLog.Errorf("Can't accept connection: %v", err)
+			}
+			continue
+		}
 	}
 	s.wg.Done()
 	srvrLog.Tracef("Listener handler done for %s", listener.Addr())
@@ -1501,7 +1505,7 @@ func (s *server) peerConnHandler(sp *serverPeer) {
 // peerDoneHandler handles peer disconnects by notifiying the server that it's
 // done.
 func (s *server) peerDoneHandler(sp *serverPeer) {
-	sp.WaitForShutdown()
+	sp.WaitForDisconnect()
 	s.donePeers <- sp
 
 	// Only tell block manager we are gone if we ever told it we existed.
@@ -1638,11 +1642,11 @@ out:
 		case qmsg := <-s.query:
 			s.handleQuery(state, qmsg)
 
-		// Shutdown the peer handler.
+		// Disconnect the peer handler.
 		case <-s.quit:
-			// Shutdown peers.
+			// Disconnect peers.
 			state.forAllPeers(func(sp *serverPeer) {
-				sp.Shutdown()
+				sp.Disconnect()
 			})
 			break out
 		}
@@ -1659,7 +1663,7 @@ out:
 		if !state.NeedMoreOutbound() || len(cfg.ConnectPeers) > 0 ||
 			atomic.LoadInt32(&s.shutdown) != 0 {
 			state.forPendingPeers(func(sp *serverPeer) {
-				sp.Shutdown()
+				sp.Disconnect()
 			})
 			continue
 		}
