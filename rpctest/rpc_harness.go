@@ -279,6 +279,11 @@ func (h *Harness) CoinbaseSpend(targetOutputs map[string]btcutil.Amount) (*wire.
 	return h.Wallet.SendPairs(targetOutputs, waddrmgr.ImportedAddrAccount, 1)
 }
 
+// RPCConfig ...
+func (h *Harness) RPCConfig() rpc.ConnConfig {
+	return h.node.config.rpcConnConfig()
+}
+
 // generateListeningAddresses returns two strings representing listening
 // addresses designated for the current rpc test. If there haven't been any
 // test instances created, the default ports are used. Otherwise, in order to
