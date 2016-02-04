@@ -1642,10 +1642,10 @@ out:
 		case qmsg := <-s.query:
 			s.handleQuery(state, qmsg)
 
-		// Disconnect the peer handler.
 		case <-s.quit:
-			// Disconnect peers.
+			// Disconnect all peers on server shutdown.
 			state.forAllPeers(func(sp *serverPeer) {
+				srvrLog.Tracef("Shutdown peer %s", sp.Peer)
 				sp.Disconnect()
 			})
 			break out
@@ -1663,6 +1663,7 @@ out:
 		if !state.NeedMoreOutbound() || len(cfg.ConnectPeers) > 0 ||
 			atomic.LoadInt32(&s.shutdown) != 0 {
 			state.forPendingPeers(func(sp *serverPeer) {
+				srvrLog.Tracef("Shutdown peer %s", sp.Peer)
 				sp.Disconnect()
 			})
 			continue
