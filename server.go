@@ -1403,6 +1403,7 @@ func newPeerConfig(sp *serverPeer) *peer.Config {
 		ChainParams:      sp.server.chainParams,
 		Services:         sp.server.services,
 		DisableRelayTx:   false,
+		ProtocolVersion:  70011,
 	}
 }
 
