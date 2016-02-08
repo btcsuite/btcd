@@ -455,7 +455,7 @@ func expectedInputs(pops []parsedOpcode, class ScriptClass,
 		// the original bitcoind bug where OP_CHECKMULTISIG pops an
 		// additional item from the stack, add an extra expected input
 		// for the extra push that is required to compensate.
-		return asSmallInt(pops[0].opcode) + 1
+		return asSmallInt(pops[0].opcode)
 
 	case NullDataTy:
 		fallthrough
