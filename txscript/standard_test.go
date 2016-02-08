@@ -469,7 +469,7 @@ func TestCalcScriptInfo(t *testing.T) {
 			scriptInfo: txscript.ScriptInfo{
 				PkScriptClass:  txscript.MultiSigTy,
 				NumInputs:      4,
-				ExpectedInputs: 4,
+				ExpectedInputs: 3,
 				SigOps:         3,
 			},
 		},
