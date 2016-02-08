@@ -16,7 +16,7 @@ import (
 // over the secp256k1 curve using SHA256 as the hash function.
 var Sha256VersionStringRFC6979 = []byte("Schnorr+SHA256  ")
 
-// Sha256VersionStringRFC6979 is the RFC6979 nonce version for a Schnorr signature
+// BlakeVersionStringRFC6979 is the RFC6979 nonce version for a Schnorr signature
 // over the secp256k1 curve using BLAKE256 as the hash function.
 var BlakeVersionStringRFC6979 = []byte("Schnorr+BLAKE256")
 
@@ -167,7 +167,7 @@ func schnorrPartialSign(curve *secp256k1.KoblitzCurve, msg []byte, priv []byte,
 		pubSum.GetY(), hashFunc)
 }
 
-// schnorrCombineSigs is the generalized and exported version of
+// SchnorrPartialSign is the generalized and exported version of
 // schnorrPartialSign.
 func SchnorrPartialSign(curve *secp256k1.KoblitzCurve, msg []byte,
 	priv *secp256k1.PrivateKey, privNonce *secp256k1.PrivateKey,
@@ -210,7 +210,7 @@ func schnorrCombineSigs(curve *secp256k1.KoblitzCurve, sigss [][]byte) (*big.Int
 	return combinedSigS, nil
 }
 
-// schnorrCombineSigs is the generalized and exported version of
+// SchnorrCombineSigs is the generalized and exported version of
 // generateNoncePair.
 func SchnorrCombineSigs(curve *secp256k1.KoblitzCurve,
 	sigs []*Signature) (*Signature, error) {

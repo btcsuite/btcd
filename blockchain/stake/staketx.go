@@ -25,6 +25,7 @@ import (
 // TxType indicates the type of tx (regular or stake type).
 type TxType int
 
+// Possible TxTypes
 const (
 	TxTypeRegular = iota
 	TxTypeSStx
@@ -45,7 +46,7 @@ const (
 	// input.
 	NumInputsPerSSGen = 2 // SStx and stakebase
 
-	// MaxOutputsPerSSgen is the maximum number of outputs in an SSGen tx,
+	// MaxOutputsPerSSGen is the maximum number of outputs in an SSGen tx,
 	// which are all outputs to the addresses specified in the OP_RETURNs of
 	// the original SStx referenced as input plus reference and vote
 	// OP_RETURN outputs in the zeroeth and first position.
@@ -77,11 +78,11 @@ const (
 	// in an SSGen.
 	SSGenVoteBitsOutputMinSize = 4
 
-	// SSGenVoteBitsOutputMinSize is the maximum size for a VoteBits push
+	// SSGenVoteBitsOutputMaxSize is the maximum size for a VoteBits push
 	// in an SSGen.
 	SSGenVoteBitsOutputMaxSize = 77
 
-	// maxSingleBytePushLength is the largest maximum push for an
+	// MaxSingleBytePushLength is the largest maximum push for an
 	// SStx commitment or VoteBits push.
 	MaxSingleBytePushLength = 75
 
@@ -223,9 +224,9 @@ func IsStakeBase(tx *dcrutil.Tx) bool {
 	return true
 }
 
-// GetSStxStakeOutputsInfo takes an SStx as input and scans through its outputs,
-// returning the pubkeyhashs and amounts for any NullDataTy's (future commitments
-// to stake generation rewards).
+// GetSStxStakeOutputInfo takes an SStx as input and scans through its outputs,
+// returning the pubkeyhashs and amounts for any NullDataTy's (future
+// commitments to stake generation rewards).
 func GetSStxStakeOutputInfo(tx *dcrutil.Tx) ([]bool, [][]byte, []int64, []int64,
 	[][]bool, [][]uint16) {
 	msgTx := tx.MsgTx()
@@ -967,7 +968,7 @@ func IsSSGen(tx *dcrutil.Tx) (bool, error) {
 	return true, nil
 }
 
-// IsSSGen returns whether or not a transaction is an SSRtx. It does some
+// IsSSRtx returns whether or not a transaction is an SSRtx. It does some
 // simple validation steps to make sure the number of inputs, number of
 // outputs, and the input/output scripts are valid.
 //

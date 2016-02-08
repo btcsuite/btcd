@@ -677,8 +677,9 @@ func CheckBlockSanity(block *dcrutil.Block, timeSource MedianTimeSource,
 	return checkBlockSanity(block, timeSource, BFNone, chainParams)
 }
 
-// CheckBlockSanity performs some preliminary checks on a block to ensure it is
-// sane before continuing with block processing.  These checks are context free.
+// CheckWorklessBlockSanity performs some preliminary checks on a block to
+// ensure it is sane before continuing with block processing.  These checks are
+// context free.
 func CheckWorklessBlockSanity(block *dcrutil.Block, timeSource MedianTimeSource,
 	chainParams *chaincfg.Params) error {
 	return checkBlockSanity(block, timeSource, BFNoPoWCheck, chainParams)

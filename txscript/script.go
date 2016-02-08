@@ -87,6 +87,8 @@ func IsPushOnlyScript(script []byte) bool {
 	return isPushOnly(pops)
 }
 
+// HasP2SHScriptSigStakeOpCodes returns an error is the p2sh script has either
+// stake opcodes or if the pkscript cannot be retrieved.
 func HasP2SHScriptSigStakeOpCodes(version uint16, scriptSig,
 	scriptPubKey []byte) error {
 	class := GetScriptClass(version, scriptPubKey)

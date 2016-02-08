@@ -75,7 +75,7 @@ const (
 	// maxScriptSize is the maximum allowed length of a raw script.
 	maxScriptSize = 16384
 
-	// defaultScriptVersion is the default scripting language version
+	// DefaultScriptVersion is the default scripting language version
 	// representing extended Decred script.
 	DefaultScriptVersion = uint16(0)
 )

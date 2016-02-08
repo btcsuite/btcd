@@ -4,7 +4,7 @@
 // license that can be found in the LICENSE file.
 
 /*
-Package dcrec implements support for the elliptic curves needed for decred.
+Package secp256k1 implements support for the elliptic curves needed for decred.
 
 Decred uses elliptic curve cryptography using koblitz curves
 (specifically secp256k1) for cryptographic functions.  See

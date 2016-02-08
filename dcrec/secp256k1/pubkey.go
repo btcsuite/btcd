@@ -130,7 +130,7 @@ func (p PublicKey) ToECDSA() *ecdsa.PublicKey {
 	return &ecpk
 }
 
-// SerializeUncompressed serializes a public key in a 33-byte compressed format.
+// Serialize serializes a public key in a 33-byte compressed format.
 // It is the default serialization method.
 func (p PublicKey) Serialize() []byte {
 	return p.SerializeCompressed()

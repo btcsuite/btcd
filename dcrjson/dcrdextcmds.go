@@ -23,7 +23,7 @@ func NewExistsAddressCmd(address string) *ExistsAddressCmd {
 	}
 }
 
-// GetStakeDifficultyCmdis a type handling custom marshaling and
+// GetStakeDifficultyCmd is a type handling custom marshaling and
 // unmarshaling of getstakedifficulty JSON RPC commands.
 type GetStakeDifficultyCmd struct{}
 

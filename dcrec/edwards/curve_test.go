@@ -89,7 +89,7 @@ func TestAdd(t *testing.T) {
 	curve.InitParam25519()
 	tpcv := testPointConversionVectors()
 
-	for i, _ := range tpcv {
+	for i := range tpcv {
 		if i == 0 {
 			continue
 		}
@@ -170,7 +170,7 @@ type ScalarMultVector struct {
 
 func testVectorsScalarMult() []ScalarMultVector {
 	tvsmh := testVectorsScalarMultHex()
-	tvsms := make([]ScalarMultVector, 0)
+	var tvsms []ScalarMultVector
 	for _, v := range tvsmh {
 		bIn, _ := hex.DecodeString(v.bIn)
 		s, _ := hex.DecodeString(v.s)

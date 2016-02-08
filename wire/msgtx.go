@@ -31,7 +31,7 @@ const (
 	// has no expiry.
 	NoExpiryValue uint32 = 0
 
-	// NullValue is a null value for an input witness.
+	// NullValueIn is a null value for an input witness.
 	NullValueIn int64 = -1
 
 	// NullBlockHeight is the null value for an input witness. It references
@@ -94,6 +94,7 @@ const (
 //  }
 type TxSerializeType uint16
 
+// The differente possible values for TxSerializeType.
 const (
 	TxSerializeFull = TxSerializeType(iota)
 	TxSerializeNoWitness
@@ -103,6 +104,7 @@ const (
 )
 
 // TODO replace all these with predeclared int32 or [4]byte cj
+
 // DefaultMsgTxVersion returns the default version int32 (serialize the tx
 // fully, version number 1).
 func DefaultMsgTxVersion() int32 {
@@ -1004,7 +1006,7 @@ func (msg *MsgTx) encodeWitnessValueSigning(w io.Writer, pver uint32) error {
 	return nil
 }
 
-// Encode encodes the receiver to w using the Decred protocol encoding.
+// BtcEncode encodes the receiver to w using the Decred protocol encoding.
 // This is part of the Message interface implementation.
 // See Serialize for encoding transactions to be stored to disk, such as in a
 // database, as opposed to encoding transactions for the wire.
@@ -1060,7 +1062,7 @@ func (msg *MsgTx) BtcEncode(w io.Writer, pver uint32) error {
 	return nil
 }
 
-// Encode encodes the receiver to w using the Decred protocol encoding.
+// LegacyBtcEncode encodes the receiver to w using the Decred protocol encoding.
 // This is for transactions encoded in the legacy encoding, for compatibility.
 func (msg *MsgTx) LegacyBtcEncode(w io.Writer, pver uint32) error {
 	var buf [4]byte
@@ -1148,7 +1150,7 @@ func (msg *MsgTx) Bytes() ([]byte, error) {
 	return w.Bytes(), nil
 }
 
-// Bytes returns the serialized form of the transaction prefix in bytes.
+// BytesPrefix returns the serialized form of the transaction prefix in bytes.
 func (msg *MsgTx) BytesPrefix() ([]byte, error) {
 	mtxCopy := msg.shallowCopyForSerializing(NoWitnessMsgTxVersion())
 
@@ -1160,7 +1162,7 @@ func (msg *MsgTx) BytesPrefix() ([]byte, error) {
 	return w.Bytes(), nil
 }
 
-// Bytes returns the serialized form of the transaction prefix in bytes.
+// BytesWitness returns the serialized form of the transaction prefix in bytes.
 func (msg *MsgTx) BytesWitness() ([]byte, error) {
 	mtxCopy := msg.shallowCopyForSerializing(WitnessOnlyMsgTxVersion())
 
@@ -1244,7 +1246,7 @@ func (msg *MsgTx) SerializeSize() int {
 	return n
 }
 
-// SerializeSize returns the number of bytes it would take to serialize the
+// LegacySerializeSize returns the number of bytes it would take to serialize
 // the transaction.
 func (msg *MsgTx) LegacySerializeSize() int {
 	// Version 4 bytes + LockTime 4 bytes + Expiry 4 bytes + Serialized
@@ -1782,7 +1784,7 @@ func legacyWriteTxOut(w io.Writer, pver uint32, version int32, to *TxOut) error 
 	return nil
 }
 
-// IsSupportedVersion returns if a transaction version is supported or not.
+// IsSupportedMsgTxVersion returns if a transaction version is supported or not.
 // Currently, inclusion into the memory pool (and thus blocks) only supports
 // the DefaultMsgTxVersion.
 func IsSupportedMsgTxVersion(msgTx *MsgTx) bool {

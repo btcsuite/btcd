@@ -585,6 +585,7 @@ func (db *LevelDb) UpdateAddrIndexForBlock(blkSha *chainhash.Hash,
 	return nil
 }
 
+// DropAddrIndexForBlock drops the address index db for a given block/height.
 func (db *LevelDb) DropAddrIndexForBlock(blkSha *chainhash.Hash,
 	blkHeight int64, addrIndexes database.BlockAddrIndex) (rerr error) {
 	db.dbLock.Lock()

@@ -23,6 +23,7 @@ import (
 // ticket db by SSRtx.
 type TicketStatus int
 
+// Possible values for TicketStatus
 const (
 	TiNonexisting = iota
 	TiSpent
@@ -126,7 +127,7 @@ func (b *BlockChain) connectTickets(tixStore TicketStore,
 	node *blockNode,
 	block *dcrutil.Block) error {
 	if tixStore == nil {
-		return fmt.Errorf("nil ticket store!")
+		return fmt.Errorf("nil ticket store")
 	}
 
 	// Nothing to do if tickets haven't yet possibly matured.

@@ -28,13 +28,13 @@ type GetSeedResult struct {
 	Seed string `json:"seed"`
 }
 
-// GetSeedResult models the data returned from the getseed
+// GetMasterPubkeyResult models the data returned from the getmasterpubkey
 // command.
 type GetMasterPubkeyResult struct {
 	MasterPubkey string `json:"key"`
 }
 
-// GetTicketsResult models the data returned from the getticketmaxprice
+// GetTicketMaxPriceResult models the data returned from the getticketmaxprice
 // command.
 type GetTicketMaxPriceResult struct {
 	Price float64 `json:"price"`
@@ -46,7 +46,7 @@ type GetTicketsResult struct {
 	Hashes []string `json:"hashes"`
 }
 
-// GetWalletFee models the data returned from the getwalletfee command
+// GetWalletFeeResult models the data returned from the getwalletfee command
 type GetWalletFeeResult struct {
 	Fee float64 `json:"fee"`
 }

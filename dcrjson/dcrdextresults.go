@@ -17,7 +17,7 @@ type GetStakeDifficultyResult struct {
 	Difficulty float64 `json:"difficulty"`
 }
 
-// ExistsAddressResult models the data returned from the missedtickets
+// MissedTicketsResult models the data returned from the missedtickets
 // command.
 type MissedTicketsResult struct {
 	Tickets []string `json:"tickets"`

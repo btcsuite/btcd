@@ -15,7 +15,7 @@ import (
 	"github.com/decred/dcrd/chaincfg/chainhash"
 )
 
-// Maximum payload size for a variable length integer.
+// MaxVarIntPayload payload size for a variable length integer.
 const MaxVarIntPayload = 9
 
 // errNonCanonicalVarInt is the common format string used for non-canonically

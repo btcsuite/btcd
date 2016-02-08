@@ -94,7 +94,7 @@ type SchorrSigningTestVector struct {
 }
 
 func GetSigningTestVectors() []*SchorrSigningTestVector {
-	tvs := make([]*SchorrSigningTestVector, 0)
+	var tvs []*SchorrSigningTestVector
 	for _, v := range schnorrSigningTestVectors {
 		msg, _ := hex.DecodeString(v.msg)
 		nonce, _ := hex.DecodeString(v.nonce)

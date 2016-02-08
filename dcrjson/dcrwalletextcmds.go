@@ -16,7 +16,7 @@ type SStxInput struct {
 	Amt  int64  `json:"amt"`
 }
 
-// SStxOutput represents the output to an SStx transaction. Specifically a
+// SStxCommitOut represents the output to an SStx transaction. Specifically a
 // a commitment address and amount, and a change address and amount.
 type SStxCommitOut struct {
 	Addr       string `json:"addr"`
@@ -90,7 +90,7 @@ func NewGetMultisigOutInfoCmd(hash string, index uint32) *GetMultisigOutInfoCmd 
 type GetMasterPubkeyCmd struct {
 }
 
-// NewGetSeedCmd creates a new GetSeedCmd.
+// NewGetMasterPubkeyCmd creates a new GetMasterPubkeyCmd.
 func NewGetMasterPubkeyCmd() *GetMasterPubkeyCmd {
 	return &GetMasterPubkeyCmd{}
 }
@@ -139,14 +139,13 @@ func NewGetTicketsCmd(includeImmature bool) *GetTicketsCmd {
 	return &GetTicketsCmd{includeImmature}
 }
 
-// GetMultisigOutInfoCmd is a type handling custom marshaling and
-// unmarshaling of getmultisigoutinfo JSON websocket extension
-// commands.
+// ImportScriptCmd is a type for handling custom marshaling and
+// unmarshaling of importscript JSON wallet extension commands.
 type ImportScriptCmd struct {
 	Hex string
 }
 
-// NewGetMultisigOutInfoCmd creates a new GetMultisigOutInfoCmd.
+// NewImportScriptCmd creates a new GetImportScriptCmd.
 func NewImportScriptCmd(hex string) *ImportScriptCmd {
 	return &ImportScriptCmd{hex}
 }
@@ -245,7 +244,7 @@ type RedeemMultiSigOutsCmd struct {
 	Number         *int
 }
 
-// NewRedeemMultiSigOutCmd creates a new RedeemMultiSigOutCmd.
+// NewRedeemMultiSigOutsCmd creates a new RedeemMultiSigOutsCmd.
 func NewRedeemMultiSigOutsCmd(from string, to *string,
 	number *int) *RedeemMultiSigOutsCmd {
 	return &RedeemMultiSigOutsCmd{
@@ -255,7 +254,7 @@ func NewRedeemMultiSigOutsCmd(from string, to *string,
 	}
 }
 
-// SendToMultisigCmd is a type handling custom marshaling and
+// SendToMultiSigCmd is a type handling custom marshaling and
 // unmarshaling of sendtomultisig JSON RPC commands.
 type SendToMultiSigCmd struct {
 	FromAccount string
@@ -305,6 +304,7 @@ func NewSendToSStxCmd(fromaccount string, amounts map[string]int64,
 	}
 }
 
+// SendToSSGenCmd models the data needed for sendtossgen.
 type SendToSSGenCmd struct {
 	FromAccount string
 	TicketHash  string
@@ -353,6 +353,8 @@ type SetTicketMaxPriceCmd struct {
 	Max float64
 }
 
+// NewSetTicketMaxPriceCmd creates a new instance of the setticketmaxprice
+// command.
 func NewSetTicketMaxPriceCmd(max float64) *SetTicketMaxPriceCmd {
 	return &SetTicketMaxPriceCmd{
 		Max: max,
@@ -365,7 +367,7 @@ type SignRawTransactionsCmd struct {
 	Send   *bool `jsonrpcdefault:"true"`
 }
 
-// NewSignRawTransactionCmd returns a new instance which can be used to issue a
+// NewSignRawTransactionsCmd returns a new instance which can be used to issue a
 // signrawtransactions JSON-RPC command.
 func NewSignRawTransactionsCmd(hexEncodedTxs []string,
 	send *bool) *SignRawTransactionsCmd {

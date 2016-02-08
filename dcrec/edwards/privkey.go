@@ -38,8 +38,8 @@ func NewPrivateKey(curve *TwistedEdwardsCurve, d *big.Int) *PrivateKey {
 	return priv
 }
 
-// NewPrivateKey is a wrapper for ecdsa.GenerateKey that returns a PrivateKey
-// instead of the normal ecdsa.PrivateKey.
+// GeneratePrivateKey is a wrapper for ecdsa.GenerateKey that returns a
+// PrivateKey instead of the normal ecdsa.PrivateKey.
 func GeneratePrivateKey(curve *TwistedEdwardsCurve) (*PrivateKey, error) {
 	key, err := ecdsa.GenerateKey(curve, rand.Reader)
 	if err != nil {
@@ -118,7 +118,7 @@ func PrivKeyFromSecret(curve *TwistedEdwardsCurve, s []byte) (*PrivateKey,
 	return PrivKeyFromBytes(curve, pk[:])
 }
 
-// PrivKeyFromSecret returns a private and public key for `curve' based on the
+// PrivKeyFromScalar returns a private and public key for `curve' based on the
 // 32-byte private scalar passed as an argument as a byte slice (encoded big
 // endian int).
 func PrivKeyFromScalar(curve *TwistedEdwardsCurve, p []byte) (*PrivateKey,

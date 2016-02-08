@@ -5,7 +5,5 @@
 
 package blockchain_test
 
-import ()
-
 // TODO Make benchmarking tests for various functions, such as sidechain
 // evaluation.

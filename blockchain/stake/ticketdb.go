@@ -37,10 +37,10 @@ import (
 	"github.com/decred/dcrutil"
 )
 
-// bucketSize is the number of pre-sort buckets for the in memory database of
-// live tickets. This allows an approximately 1.5x-2.5x increase in sorting speed
-// and easier/more efficient handling of new block insertion and evaluation
-// of reorgs.
+// BucketsSize is the number of pre-sort buckets for the in memory database of
+// live tickets. This allows an approximately 1.5x-2.5x increase in sorting
+// speed and easier/more efficient handling of new block insertion and
+// evaluation of reorgs.
 // TODO Storing the size of the buckets somewhere would make evaluation of
 // blocks being added to HEAD extremely fast and should eventually be implemented.
 // For example, when finding the tickets to use you can cycle through a struct
@@ -50,7 +50,7 @@ import (
 // Optimizations for reorganize are possible.
 const BucketsSize = math.MaxUint8 + 1
 
-// TickerData contains contextual information about tickets as indicated
+// TicketData contains contextual information about tickets as indicated
 // below.
 // TODO Replace Missed/Expired bool with single byte bitflags.
 type TicketData struct {
@@ -62,6 +62,7 @@ type TicketData struct {
 	Expired     bool  // Whether or not the ticket expired
 }
 
+// NewTicketData returns the a filled in new TicketData structure.
 func NewTicketData(sstxHash chainhash.Hash,
 	prefix uint8,
 	spendHash chainhash.Hash,
@@ -76,7 +77,7 @@ func NewTicketData(sstxHash chainhash.Hash,
 		expired}
 }
 
-// td.GobEncode serializes the TicketData struct into a gob for use in storage.
+// GobEncode serializes the TicketData struct into a gob for use in storage.
 //
 // This function is safe for concurrent access.
 func (td *TicketData) GobEncode() ([]byte, error) {
@@ -110,7 +111,7 @@ func (td *TicketData) GobEncode() ([]byte, error) {
 	return w.Bytes(), nil
 }
 
-// td.GobDecode deserializes the TicketData struct into a gob for use in retrieval
+// GobDecode deserializes the TicketData struct into a gob for use in retrieval
 // from storage.
 func (td *TicketData) GobDecode(buf []byte) error {
 	r := bytes.NewBuffer(buf)
@@ -177,7 +178,7 @@ type TicketMaps struct {
 	revokedTicketMap SStxMemMap
 }
 
-// tm.GobEncode serializes the TicketMaps struct into a gob for use in storage.
+// GobEncode serializes the TicketMaps struct into a gob for use in storage.
 func (tm *TicketMaps) GobEncode() ([]byte, error) {
 	w := new(bytes.Buffer)
 	encoder := gob.NewEncoder(w)
@@ -201,7 +202,7 @@ func (tm *TicketMaps) GobEncode() ([]byte, error) {
 	return w.Bytes(), nil
 }
 
-// tm.GobDecode deserializes the TicketMaps struct into a gob for use in retrieval
+// GobDecode deserializes the TicketMaps struct into a gob for use in retrieval
 // from storage.
 func (tm *TicketMaps) GobDecode(buf []byte) error {
 	r := bytes.NewBuffer(buf)
@@ -231,10 +232,10 @@ type TicketDB struct {
 	StakeEnabledHeight int64
 }
 
-// initialize allocates buckets for each ticket number in ticketMap and buckets for
-// each height up to the declared height from 0. This should be called only when no
-// suitable files exist to load the TicketDB from or when rescanTicketDB() is
-// called.
+// Initialize allocates buckets for each ticket number in ticketMap and buckets
+// for each height up to the declared height from 0. This should be called only
+// when no suitable files exist to load the TicketDB from or when
+// rescanTicketDB() is called.
 // WARNING: Height should be 0 for all non-debug uses.
 //
 // This function is safe for concurrent access.

@@ -50,7 +50,7 @@ func PrivKeyFromScalar(curve *KoblitzCurve, s []byte) (*PrivateKey,
 	return PrivKeyFromBytes(curve, s)
 }
 
-// NewPrivateKey is a wrapper for ecdsa.GenerateKey that returns a PrivateKey
+// GeneratePrivateKey is a wrapper for ecdsa.GenerateKey that returns a PrivateKey
 // instead of the normal ecdsa.PrivateKey.
 func GeneratePrivateKey(curve *KoblitzCurve) (*PrivateKey, error) {
 	key, err := ecdsa.GenerateKey(curve, rand.Reader)
@@ -72,7 +72,7 @@ func GenerateKey(curve *KoblitzCurve, rand io.Reader) (priv []byte, x,
 	return
 }
 
-// PubKey returns the PublicKey corresponding to this private key.
+// Public returns the PublicKey corresponding to this private key.
 func (p PrivateKey) Public() (*big.Int, *big.Int) {
 	return p.PublicKey.X, p.PublicKey.Y
 }

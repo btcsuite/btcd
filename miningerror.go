@@ -91,7 +91,7 @@ func (e MiningErrorCode) String() string {
 	return fmt.Sprintf("Unknown MiningErrorCode (%d)", int(e))
 }
 
-// RuleError identifies a rule violation.  It is used to indicate that
+// MiningRuleError identifies a rule violation.  It is used to indicate that
 // processing of a block or transaction failed due to one of the many validation
 // rules.  The caller can use type assertions to determine if a failure was
 // specifically due to a rule violation and access the MiningErrorCode field to
@@ -106,12 +106,12 @@ func (e MiningRuleError) Error() string {
 	return e.Description
 }
 
-// Error satisfies the error interface and prints human-readable errors.
+// GetCode satisfies the error interface and prints human-readable errors.
 func (e MiningRuleError) GetCode() MiningErrorCode {
 	return e.ErrorCode
 }
 
-// ruleError creates an RuleError given a set of arguments.
+// miningRuleError creates an RuleError given a set of arguments.
 func miningRuleError(c MiningErrorCode, desc string) MiningRuleError {
 	return MiningRuleError{ErrorCode: c, Description: desc}
 }

@@ -1,4 +1,3 @@
-// common.go
 package blockchain
 
 import (

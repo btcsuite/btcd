@@ -106,7 +106,7 @@ func TestSchnorrThreshold(t *testing.T) {
 		// Partial signature generation.
 		publicNonceSum := CombinePubkeys(curve, pubNoncesToUse)
 		assert.NotNil(t, publicNonceSum)
-		for j, _ := range keysToUse {
+		for j := range keysToUse {
 			r, s, err := schnorrPartialSign(curve, msg, keysToUse[j].Serialize(),
 				allPksSum.Serialize(), privNoncesToUse[j].Serialize(),
 				publicNonceSum.Serialize())
@@ -189,7 +189,7 @@ func TestSchnorrThreshold(t *testing.T) {
 			pubNoncesToUse[randItem].GetX().SetBytes(pubXCorrupt[:])
 		}
 
-		for j, _ := range keysToUse {
+		for j := range keysToUse {
 			thisPubNonce := pubNoncesToUse[j]
 			localPubNonces := make([]*PublicKey, numKeysForTest-1,
 				numKeysForTest-1)

@@ -193,7 +193,7 @@ func (e ErrorCode) String() string {
 	return fmt.Sprintf("Unknown ErrorCode (%d)", int(e))
 }
 
-// RuleError identifies a rule violation.  It is used to indicate that
+// StakeRuleError identifies a rule violation.  It is used to indicate that
 // processing of a block or transaction failed due to one of the many validation
 // rules.  The caller can use type assertions to determine if a failure was
 // specifically due to a rule violation and access the ErrorCode field to
@@ -208,12 +208,12 @@ func (e StakeRuleError) Error() string {
 	return e.Description
 }
 
-// Error satisfies the error interface and prints human-readable errors.
+// GetCode satisfies the error interface and prints human-readable errors.
 func (e StakeRuleError) GetCode() ErrorCode {
 	return e.ErrorCode
 }
 
-// ruleError creates an RuleError given a set of arguments.
+// stakeRuleError creates an RuleError given a set of arguments.
 func stakeRuleError(c ErrorCode, desc string) StakeRuleError {
 	return StakeRuleError{ErrorCode: c, Description: desc}
 }

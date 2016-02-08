@@ -318,7 +318,7 @@ func (m *wsNotificationManager) NotifyMempoolTx(tx *dcrutil.Tx, isNew bool) {
 	}
 }
 
-// WinningTicketNtfnData is the data that is used to generate
+// WinningTicketsNtfnData is the data that is used to generate
 // winning ticket notifications (which indicate a block and
 // the tickets eligible to vote on it).
 type WinningTicketsNtfnData struct {

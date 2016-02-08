@@ -521,7 +521,7 @@ func TestForVMFailure(t *testing.T) {
 	for i := 0; i < numTests; i++ {
 		tests := randByteSliceSlice(65536, bsLength, i)
 
-		for j, _ := range tests {
+		for j := range tests {
 			if j == 0 {
 				continue
 			}

@@ -98,7 +98,7 @@ func (e SchnorrError) Error() string {
 	return e.Description
 }
 
-// Error satisfies the error interface and prints human-readable errors.
+// GetCode satisfies the error interface and prints human-readable errors.
 func (e SchnorrError) GetCode() ErrorCode {
 	return e.ErrorCode
 }

@@ -26,6 +26,7 @@ import (
 	"github.com/decred/dcrutil"
 )
 
+// Hash is a block hash.
 type Hash chainhash.Hash
 
 type config struct {
@@ -49,6 +50,7 @@ var (
 	activeNetParams = &chaincfg.MainNetParams
 )
 
+// Arguments to use for picking block, either sha or height.
 const (
 	ArgSha = iota
 	ArgHeight
@@ -199,6 +201,7 @@ func getHeight(database database.Db, str string) (int64, error) {
 	return idx, nil
 }
 
+// DumpBlock dumps the specified block.
 func DumpBlock(database database.Db, height int64, fo io.Writer, rflag bool, fflag bool, tflag bool) error {
 	sha, err := database.FetchBlockShaByHeight(height)
 
@@ -244,8 +247,13 @@ var ntxcnt int64
 var txspendcnt int64
 var txgivecnt int64
 
+// ErrBadShaPrefix is the error for an invalid prefix in a sha.
 var ErrBadShaPrefix = errors.New("invalid prefix")
+
+// ErrBadShaLen is the error for an invalid length sha.
 var ErrBadShaLen = errors.New("invalid len")
+
+// ErrBadShaChar is the error for an invalid character in a sha.
 var ErrBadShaChar = errors.New("invalid character")
 
 func parsesha(argstr string) (argtype int, height int64, psha *chainhash.Hash, err error) {

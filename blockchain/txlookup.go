@@ -16,28 +16,29 @@ import (
 )
 
 // There are five potential viewpoints we need to worry about.
-// ViewpointPrevValidInitial: Viewpoint from the perspective of the
+
+// ViewpointPrevValidInitial is the viewpoint from the perspective of the
 // everything up the the previous block's TxTreeRegular, used to validate
 // that tx tree regular.
 const ViewpointPrevValidInitial = int8(0)
 
-// ViewpointPrevValidStake: Viewpoint from the perspective of the
+// ViewpointPrevValidStake is the viewpoint from the perspective of the
 // everything up the the previous block's TxTreeRegular plus the
 // contents of the TxTreeRegular, to validate TxTreeStake.
 const ViewpointPrevValidStake = int8(1)
 
-// ViewpointPrevInvalidStake: Viewpoint from the perspective of the
+// ViewpointPrevInvalidStake is the viewpoint from the perspective of the
 // everything up the the previous block's TxTreeRegular but without the
 // contents of the TxTreeRegular, to validate TxTreeStake.
 const ViewpointPrevInvalidStake = int8(2)
 
-// ViewpointPrevValidRegular: Viewpoint from the perspective of the
+// ViewpointPrevValidRegular is the viewpoint from the perspective of the
 // everything up the the previous block's TxTreeRegular plus the
 // contents of the TxTreeRegular and TxTreeStake of current block,
 // to validate TxTreeRegular of the current block.
 const ViewpointPrevValidRegular = int8(3)
 
-// ViewpointPrevInvalidRegular: Viewpoint from the perspective of the
+// ViewpointPrevInvalidRegular is the viewpoint from the perspective of the
 // everything up the the previous block's TxTreeRegular minus the
 // contents of the TxTreeRegular and TxTreeStake of current block,
 // to validate TxTreeRegular of the current block.
@@ -516,7 +517,7 @@ func (b *BlockChain) fetchInputTransactions(node *blockNode, block *dcrutil.Bloc
 	// Verify we have the same node as we do block.
 	blockHash := block.Sha()
 	if !node.hash.IsEqual(blockHash) {
-		return nil, fmt.Errorf("node and block hash are different!")
+		return nil, fmt.Errorf("node and block hash are different")
 	}
 
 	// If we need the previous block, grab it.

@@ -13,6 +13,7 @@ import (
 	"github.com/decred/dcrd/chaincfg/chainhash"
 )
 
+// MaxBlockHeaderPayload is the max size of the header which comes from:
 // Version 4 bytes + Bits 4 bytes + PrevBlock and MerkleRoot hashes + 32 StakeRoot
 // bytes + 2 VoteBits bytes + 6 FinalState bytes + 2 Voters bytes +
 // 1 FreshStake byte + 1 Revocations byte + 8 SBits bytes + 4 PoolSize bytes +

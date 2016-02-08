@@ -85,7 +85,7 @@ func ParseDERSignature(curve *TwistedEdwardsCurve, sigStr []byte) (*Signature,
 	return parseSig(curve, sigStr, false)
 }
 
-// RecoverCompact, which uses a signature and a hash to recover is private
+// RecoverCompact uses a signature and a hash to recover is private
 // key, is not yet implemented.
 // TODO: Implement.
 func RecoverCompact(signature, hash []byte) (*PublicKey, bool, error) {

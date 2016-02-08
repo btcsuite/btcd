@@ -289,7 +289,7 @@ func FieldElementToBigInt(fe *edwards25519.FieldElement) *big.Int {
 	return aBI
 }
 
-// FieldElementToBigInt converts a 40 byte field element into a 32 byte
+// FieldElementToEncodedBytes converts a 40 byte field element into a 32 byte
 // little endian integer.
 func FieldElementToEncodedBytes(fe *edwards25519.FieldElement) *[32]byte {
 	s := new([32]byte)

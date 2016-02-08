@@ -177,7 +177,7 @@ func schnorrPartialSign(curve *TwistedEdwardsCurve, msg []byte, priv []byte,
 		privNonceDecoded, pubNonceSumDecoded)
 }
 
-// schnorrCombineSigs is the generalized and exported version of
+// SchnorrPartialSign is the generalized and exported version of
 // schnorrPartialSign.
 func SchnorrPartialSign(curve *TwistedEdwardsCurve, msg []byte,
 	priv *PrivateKey, groupPub *PublicKey, privNonce *PrivateKey,
@@ -220,7 +220,7 @@ func schnorrCombineSigs(curve *TwistedEdwardsCurve, sigss [][]byte) (*big.Int,
 	return combinedSigS, nil
 }
 
-// schnorrCombineSigs is the generalized and exported version of
+// SchnorrCombineSigs is the generalized and exported version of
 // generateNoncePair.
 func SchnorrCombineSigs(curve *TwistedEdwardsCurve,
 	sigs []*Signature) (*Signature, error) {

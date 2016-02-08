@@ -13,6 +13,7 @@ import (
 	"math/big"
 
 	"crypto/sha512"
+
 	"github.com/btcsuite/fastsha256"
 	"github.com/decred/ed25519"
 	"github.com/decred/ed25519/edwards25519"
@@ -53,7 +54,7 @@ func GenerateKey(curve *TwistedEdwardsCurve, rand io.Reader) (priv []byte, x,
 	return
 }
 
-// Sign signs a message 'hash' using the given private key priv. It doesn't
+// SignFromSecret signs a message 'hash' using the given private key priv. It doesn't
 // actually user the random reader (the lib is maybe deterministic???).
 func SignFromSecret(rand io.Reader, priv *PrivateKey, hash []byte) (r, s *big.Int,
 	err error) {
@@ -62,8 +63,8 @@ func SignFromSecret(rand io.Reader, priv *PrivateKey, hash []byte) (r, s *big.In
 	return
 }
 
-// Sign signs a message 'hash' using the given private key priv. It doesn't
-// actually user the random reader.
+// SignFromSecretNoReader signs a message 'hash' using the given private key
+// priv. It doesn't actually user the random reader.
 func SignFromSecretNoReader(priv *PrivateKey, hash []byte) (r, s *big.Int,
 	err error) {
 	privBytes := priv.SerializeSecret()

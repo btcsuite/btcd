@@ -226,7 +226,7 @@ func IsMultisigScript(script []byte) (bool, error) {
 	return isMultiSig(pops), nil
 }
 
-// IsMultisigScript takes a script, parses it, then returns whether or
+// IsMultisigSigScript takes a script, parses it, then returns whether or
 // not it is a multisignature script.
 func IsMultisigSigScript(script []byte) bool {
 	if len(script) == 0 || script == nil {
@@ -939,7 +939,7 @@ func PayToSSRtxPKHDirect(pkh []byte) ([]byte, error) {
 		AddOp(OP_CHECKSIG).Script()
 }
 
-// PayToSSRtxDirect creates a new script to pay a transaction output to a
+// PayToSSRtxSHDirect creates a new script to pay a transaction output to a
 // script hash, but tags the output with OP_SSRTX. For use in constructing
 // valid SSRtx. Unlike PayToSSRtx, this function directly uses the HASH160
 // script hash (instead of an address).

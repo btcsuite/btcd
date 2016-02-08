@@ -34,7 +34,7 @@ func Marshal(curve TwistedEdwardsCurve, x, y *big.Int) []byte {
 	return BigIntPointToEncodedBytes(x, y)[:]
 }
 
-// Unmarshall converts a point into the 32 byte encoded Ed25519 form.
+// Unmarshal converts a point into the 32 byte encoded Ed25519 form.
 func Unmarshal(curve *TwistedEdwardsCurve, data []byte) (x, y *big.Int) {
 	var err error
 	x, y, err = curve.EncodedBytesToBigIntPoint(copyBytes(data))

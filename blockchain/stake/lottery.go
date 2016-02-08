@@ -62,7 +62,7 @@ func (hp *Hash256PRNG) StateHash() chainhash.Hash {
 	return chainhash.HashFuncH(finalState)
 }
 
-// hash256Rand returns a uint32 random number using the pseudorandom number
+// Hash256Rand returns a uint32 random number using the pseudorandom number
 // generator and updates the state.
 func (hp *Hash256PRNG) Hash256Rand() uint32 {
 	r := binary.BigEndian.Uint32(hp.lastHash[hp.hashIdx*4 : hp.hashIdx*4+4])

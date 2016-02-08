@@ -180,7 +180,7 @@ type ThresholdTestVector struct {
 func GetThresholdTestVectors() []*ThresholdTestVector {
 	curve := secp256k1.S256()
 
-	tvs := make([]*ThresholdTestVector, 0)
+	var tvs []*ThresholdTestVector
 	for _, v := range thresholdTestVectorsHex {
 		msg, _ := hex.DecodeString(v.msg)
 		combSig, _ := hex.DecodeString(v.combinedSignature)
@@ -318,7 +318,7 @@ func TestSchnorrThreshold(t *testing.T) {
 		partialSignatures := make([]*Signature, numKeysForTest, numKeysForTest)
 
 		// Partial signature generation.
-		for j, _ := range keysToUse {
+		for j := range keysToUse {
 			thisPubNonce := pubNoncesToUse[j]
 			localPubNonces := make([]*secp256k1.PublicKey, numKeysForTest-1,
 				numKeysForTest-1)
@@ -395,7 +395,7 @@ func TestSchnorrThreshold(t *testing.T) {
 			pubNoncesToUse[randItem].GetX().SetBytes(pubXCorrupt[:])
 		}
 
-		for j, _ := range keysToUse {
+		for j := range keysToUse {
 			thisPubNonce := pubNoncesToUse[j]
 			localPubNonces := make([]*secp256k1.PublicKey, numKeysForTest-1,
 				numKeysForTest-1)

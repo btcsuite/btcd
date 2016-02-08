@@ -627,11 +627,15 @@ func IsPubKeyHashAddrID(id [2]byte) bool {
 	return ok
 }
 
+// IsPKHEdwardsAddrID returns whether the id is an identifier know to prefix a
+// pay-to-pubkey-hash Edwards address.
 func IsPKHEdwardsAddrID(id [2]byte) bool {
 	_, ok := pkhEdwardsAddrIDs[id]
 	return ok
 }
 
+// IsPKHSchnorrAddrID returns whether the id is an identifier know to prefix a
+// pay-to-pubkey-hash secp256k1 Schnorr address.
 func IsPKHSchnorrAddrID(id [2]byte) bool {
 	_, ok := pkhSchnorrAddrIDs[id]
 	return ok
@@ -700,6 +704,8 @@ func (p *Params) BlockOneSubsidy() int64 {
 	return sum
 }
 
+// TotalSubsidyProportions is the sum of WorkReward, StakeReward, and BlockTax
+// proportions.
 func (p *Params) TotalSubsidyProportions() uint16 {
 	return p.WorkRewardProportion + p.StakeRewardProportion + p.BlockTaxProportion
 }

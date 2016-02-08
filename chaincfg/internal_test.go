@@ -5,8 +5,9 @@
 package chaincfg
 
 import (
-	"github.com/decred/dcrd/chaincfg/chainhash"
 	"testing"
+
+	"github.com/decred/dcrd/chaincfg/chainhash"
 )
 
 func TestInvalidShaStr(t *testing.T) {

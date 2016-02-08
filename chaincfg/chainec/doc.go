@@ -12,5 +12,4 @@ to make it easier to go from btcec (btcd) to ed25519 (decred) for example
 without changing the main body of the code.
 
 */
-
 package chainec

@@ -530,7 +530,7 @@ func (e RuleError) Error() string {
 	return e.Description
 }
 
-// Error satisfies the error interface and prints human-readable errors.
+// GetCode satisfies the error interface and prints human-readable errors.
 func (e RuleError) GetCode() ErrorCode {
 	return e.ErrorCode
 }
