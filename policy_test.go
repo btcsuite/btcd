@@ -220,40 +220,40 @@ func TestDust(t *testing.T) {
 		{
 			// Any value is allowed with a zero relay fee.
 			"zero value with zero relay fee",
-			wire.TxOut{0, pkScript},
+			wire.TxOut{Value: 0, PkScript: pkScript},
 			0,
 			false,
 		},
 		{
 			// Zero value is dust with any relay fee"
 			"zero value with very small tx fee",
-			wire.TxOut{0, pkScript},
+			wire.TxOut{Value: 0, PkScript: pkScript},
 			1,
 			true,
 		},
 		{
 			"38 byte public key script with value 584",
-			wire.TxOut{584, pkScript},
+			wire.TxOut{Value: 584, PkScript: pkScript},
 			1000,
 			true,
 		},
 		{
 			"38 byte public key script with value 585",
-			wire.TxOut{585, pkScript},
+			wire.TxOut{Value: 585, PkScript: pkScript},
 			1000,
 			false,
 		},
 		{
 			// Maximum allowed value is never dust.
 			"max satoshi amount is never dust",
-			wire.TxOut{btcutil.MaxSatoshi, pkScript},
+			wire.TxOut{Value: btcutil.MaxSatoshi, PkScript: pkScript},
 			btcutil.MaxSatoshi,
 			false,
 		},
 		{
 			// Maximum int64 value causes overflow.
 			"maximum int64 value",
-			wire.TxOut{1<<63 - 1, pkScript},
+			wire.TxOut{Value: 1<<63 - 1, PkScript: pkScript},
 			1<<63 - 1,
 			true,
 		},
@@ -261,7 +261,7 @@ func TestDust(t *testing.T) {
 			// Unspendable pkScript due to an invalid public key
 			// script.
 			"unspendable pkScript",
-			wire.TxOut{5000, []byte{0x01}},
+			wire.TxOut{Value: 5000, PkScript: []byte{0x01}},
 			0, // no relay fee
 			true,
 		},
