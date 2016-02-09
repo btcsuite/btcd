@@ -78,22 +78,6 @@ func TestStack(t *testing.T) {
 			[][]byte{{1}, {2}, {3}, {4}},
 		},
 		{
-			"pop",
-			[][]byte{{1}, {2}, {3}, {4}, {5}},
-			func(s *stack) error {
-				val, err := s.PopByteArray()
-				if err != nil {
-					return err
-				}
-				if !bytes.Equal(val, []byte{5}) {
-					return errors.New("not equal")
-				}
-				return err
-			},
-			nil,
-			[][]byte{{1}, {2}, {3}, {4}},
-		},
-		{
 			"pop everything",
 			[][]byte{{1}, {2}, {3}, {4}, {5}},
 			func(s *stack) error {
@@ -442,20 +426,6 @@ func TestStack(t *testing.T) {
 			nil,
 		},
 		{
-			"dup-1",
-			[][]byte{{1}},
-			func(s *stack) error {
-				err := s.DupN(-1)
-				if err != nil {
-					return err
-				}
-
-				return nil
-			},
-			ErrStackInvalidArgs,
-			nil,
-		},
-		{
 			"PushBool true",
 			nil,
 			func(s *stack) error {
@@ -523,24 +493,6 @@ func TestStack(t *testing.T) {
 					return err
 				}
 				if val != true {
-					return errors.New("unexpected value")
-				}
-
-				return nil
-			},
-			nil,
-			nil,
-		},
-		{
-			"PushInt PopBool 2",
-			nil,
-			func(s *stack) error {
-				s.PushInt(scriptNum(0))
-				val, err := s.PopBool()
-				if err != nil {
-					return err
-				}
-				if val != false {
 					return errors.New("unexpected value")
 				}
 
