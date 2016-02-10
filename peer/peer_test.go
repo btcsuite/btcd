@@ -204,12 +204,15 @@ func testPeer(t *testing.T, p *peer.Peer, s peerStats) {
 
 // TestPeerConnection tests connection between inbound and outbound peers.
 func TestPeerConnection(t *testing.T) {
-	verack := make(chan struct{}, 1)
+	verack := make(chan struct{})
 	peerCfg := &peer.Config{
 		Listeners: peer.MessageListeners{
-			OnWrite: func(p *peer.Peer, bytesWritten int, msg wire.Message, err error) {
-				switch msg.(type) {
-				case *wire.MsgVerAck:
+			OnVerAck: func(p *peer.Peer, msg *wire.MsgVerAck) {
+				verack <- struct{}{}
+			},
+			OnWrite: func(p *peer.Peer, bytesWritten int, msg wire.Message,
+				err error) {
+				if _, ok := msg.(*wire.MsgVerAck); ok {
 					verack <- struct{}{}
 				}
 			},
@@ -253,10 +256,10 @@ func TestPeerConnection(t *testing.T) {
 				}
 				outPeer.Connect(outConn)
 
-				for i := 0; i < 2; i++ {
+				for i := 0; i < 4; i++ {
 					select {
 					case <-verack:
-					case <-time.After(time.Second * 1):
+					case <-time.After(time.Second):
 						return nil, nil, errors.New("verack timeout")
 					}
 				}
@@ -279,10 +282,10 @@ func TestPeerConnection(t *testing.T) {
 				}
 				outPeer.Connect(outConn)
 
-				for i := 0; i < 2; i++ {
+				for i := 0; i < 4; i++ {
 					select {
 					case <-verack:
-					case <-time.After(time.Second * 1):
+					case <-time.After(time.Second):
 						return nil, nil, errors.New("verack timeout")
 					}
 				}
@@ -294,7 +297,7 @@ func TestPeerConnection(t *testing.T) {
 	for i, test := range tests {
 		inPeer, outPeer, err := test.setup()
 		if err != nil {
-			t.Errorf("TestPeerConnection setup #%d: unexpected err %v\n", i, err)
+			t.Errorf("TestPeerConnection setup #%d: unexpected err %v", i, err)
 			return
 		}
 		testPeer(t, inPeer, wantStats)
@@ -302,6 +305,8 @@ func TestPeerConnection(t *testing.T) {
 
 		inPeer.Disconnect()
 		outPeer.Disconnect()
+		inPeer.WaitForDisconnect()
+		outPeer.WaitForDisconnect()
 	}
 }
 
@@ -547,6 +552,7 @@ func TestOutboundPeer(t *testing.T) {
 
 	select {
 	case <-disconnected:
+		close(disconnected)
 	case <-time.After(time.Second):
 		t.Fatal("Peer did not automatically disconnect.")
 	}
@@ -580,6 +586,7 @@ func TestOutboundPeer(t *testing.T) {
 		}
 		return hash, 234439, nil
 	}
+
 	peerCfg.NewestBlock = newestBlock
 	r1, w1 := io.Pipe()
 	c1 := &conn{raddr: "10.0.0.1:8333", Writer: w1, Reader: r1}
@@ -638,7 +645,8 @@ func TestOutboundPeer(t *testing.T) {
 		t.Errorf("PushGetHeadersMsg: unexpected err %v\n", err)
 		return
 	}
-	p2.PushRejectMsg("block", wire.RejectMalformed, "malformed", nil, true)
+
+	p2.PushRejectMsg("block", wire.RejectMalformed, "malformed", nil, false)
 	p2.PushRejectMsg("block", wire.RejectInvalid, "invalid", nil, false)
 
 	// Test Queue Messages
