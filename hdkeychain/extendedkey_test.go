@@ -250,8 +250,8 @@ tests:
 // other private keys works as intended.
 func TestPrivateDerivation(t *testing.T) {
 	// The private extended keys for test vectors in [BIP32].
-	testVec1MasterPrivKey := "xprv9s21ZrQH143K3QTDL4LXw2F7HEK3wJUD2nW2nRk4stbPy6cq3jPPqjiChkVvvNKmPGJxWUtg6LnF5kejMRNNU3TGtRBeJgk33yuGBxrMPHi"
-	testVec2MasterPrivKey := "xprv9s21ZrQH143K31xYSDQpPDxsXRTUcvj2iNHm5NUtrGiGG5e2DtALGdso3pGz6ssrdK4PFmM8NSpSBHNqPqm55Qn3LqFtT2emdEXVYsCzC2U"
+	testVec1MasterPrivKey := "dprv3hCznBesA6jBucms1ZhyGeFfvJfBSwfs7ZFrxS8tdYzbjDZe2UwSaL7EbYo1qa88DmtyyG5cL9tdGxHkD89JmeZTbz5sVYU4Dgtijiio4Sc"
+	testVec2MasterPrivKey := "dprv3hCznBesA6jBtPKJbQTxRZAKG2gyj8tZKEPaCsV4e9YYFBAgRP2eTSPAeu4r8dTMt9q51j2Vdt5zNqj7jbtovvocrP1qLj6WUTLF9xYQt4y"
 
 	tests := []struct {
 		name     string
@@ -264,37 +264,37 @@ func TestPrivateDerivation(t *testing.T) {
 			name:     "test vector 1 chain m",
 			master:   testVec1MasterPrivKey,
 			path:     []uint32{},
-			wantPriv: "xprv9s21ZrQH143K3QTDL4LXw2F7HEK3wJUD2nW2nRk4stbPy6cq3jPPqjiChkVvvNKmPGJxWUtg6LnF5kejMRNNU3TGtRBeJgk33yuGBxrMPHi",
+			wantPriv: "dprv3hCznBesA6jBucms1ZhyGeFfvJfBSwfs7ZFrxS8tdYzbjDZe2UwSaL7EbYo1qa88DmtyyG5cL9tdGxHkD89JmeZTbz5sVYU4Dgtijiio4Sc",
 		},
 		{
 			name:     "test vector 1 chain m/0",
 			master:   testVec1MasterPrivKey,
 			path:     []uint32{0},
-			wantPriv: "xprv9uHRZZhbkedL37eZEnyrNsQPFZYRAvjy5rt6M1nbEkLSo378x1CQQLo2xxBvREwiK6kqf7GRNvsNEchwibzXaV6i5GcsgyjBeRguXhKsi4R",
+			wantPriv: "dprv3jFfEhxvVxy6NJWopujhfg7syQL71xCRgNoGUpQTtjTpCwzigwtCwssQGbRQsby7PBs1Yp8Wu7isu396qeNof13EZuxbCTJVF1xkoFAQHWj",
 		},
 		{
 			name:     "test vector 1 chain m/0/1",
 			master:   testVec1MasterPrivKey,
 			path:     []uint32{0, 1},
-			wantPriv: "xprv9ww7sMFLzJMzy7bV1qs7nGBxgKYrgcm3HcJvGb4yvNhT9vxXC7eX7WVULzCfxucFEn2TsVvJw25hH9d4mchywguGQCZvRgsiRaTY1HCqN8G",
+			wantPriv: "dprv3mWLns1v1fdLhxStaJHh3BqxmTi14RHHeWdNU6oU8sSkTDmAr54yK6La2APy3rAZr9ZJAdm5asTJaqBZ3vBYVSPHqyL8kbcCp5jgqfxBs4x",
 		},
 		{
 			name:     "test vector 1 chain m/0/1/2",
 			master:   testVec1MasterPrivKey,
 			path:     []uint32{0, 1, 2},
-			wantPriv: "xprv9xrdP7iD2L1YZCgR9AecDgpDMZSTzP5KCfUykGXgjBxLgp1VFHsEeL3conzGAkbc1MigG1o8YqmfEA2jtkPdf4vwMaGJC2YSDbBTPAjfRUi",
+			wantPriv: "dprv3oDxSziXR1rQVWwWWBRKgCQU3vN6dnR3ekzHzvZRdgfVvrYSE35saJh8UdfSxCgtMn7pnbeMXWbyBbwxoncC9LMrnuH1AoJSB259c4XgmnN",
 		},
 		{
 			name:     "test vector 1 chain m/0/1/2/2",
 			master:   testVec1MasterPrivKey,
 			path:     []uint32{0, 1, 2, 2},
-			wantPriv: "xprvA2J8Hq4eiP7xCEBP7gzRJGJnd9CHTkEU6eTNMrZ6YR7H5boik8daFtDZxmJDfdMSKHwroCfAfsBKWWidRfBQjpegy6kzXSkQGGoMdWKz5Xh",
+			wantPriv: "dprv3rYHNih25i8MqeRjhFq8mLnK4a3J63a9zkYTCFJd8kaJuNc5aDAAuG1XopkU7h93HvfbNvQaWdQLtwFmUEbDN3GCZ2Mxw6tq5ZSh8d1Chyw",
 		},
 		{
 			name:     "test vector 1 chain m/0/1/2/2/1000000000",
 			master:   testVec1MasterPrivKey,
 			path:     []uint32{0, 1, 2, 2, 1000000000},
-			wantPriv: "xprvA3XhazxncJqJsQcG85Gg61qwPQKiobAnWjuPpjKhExprZjfse6nErRwTMwGe6uGWXPSykZSTiYb2TXAm7Qhwj8KgRd2XaD21Styu6h6AwFz",
+			wantPriv: "dprv3tKkzgLFKaX2VcQTir9JeNHWxikiKokSJtdyj7sYoiDkU3np2rc3DGYPRVmDhb2FFaAk98fnqRotQYTVCRaoyAZiHaoyNoPCFeYA9pEshBT",
 		},
 
 		// Test vector 2
@@ -302,46 +302,46 @@ func TestPrivateDerivation(t *testing.T) {
 			name:     "test vector 2 chain m",
 			master:   testVec2MasterPrivKey,
 			path:     []uint32{},
-			wantPriv: "xprv9s21ZrQH143K31xYSDQpPDxsXRTUcvj2iNHm5NUtrGiGG5e2DtALGdso3pGz6ssrdK4PFmM8NSpSBHNqPqm55Qn3LqFtT2emdEXVYsCzC2U",
+			wantPriv: "dprv3hCznBesA6jBtPKJbQTxRZAKG2gyj8tZKEPaCsV4e9YYFBAgRP2eTSPAeu4r8dTMt9q51j2Vdt5zNqj7jbtovvocrP1qLj6WUTLF9xYQt4y",
 		},
 		{
 			name:     "test vector 2 chain m/0",
 			master:   testVec2MasterPrivKey,
 			path:     []uint32{0},
-			wantPriv: "xprv9vHkqa6EV4sPZHYqZznhT2NPtPCjKuDKGY38FBWLvgaDx45zo9WQRUT3dKYnjwih2yJD9mkrocEZXo1ex8G81dwSM1fwqWpWkeS3v86pgKt",
+			wantPriv: "dprv3jMy45BuuDETfxi59P8NTSjHPrNVq4wPRfLgRd57923L2hosj5NUEqiLYQ4i7fJtUpiXZLr2wUeToJY2Tm5sCpAJdajEHDmieVJiPQNXwu9",
 		},
 		{
 			name:     "test vector 2 chain m/0/2147483647",
 			master:   testVec2MasterPrivKey,
 			path:     []uint32{0, 2147483647},
-			wantPriv: "xprv9wSp6B7cXJWXZRpDbxkFg3ry2fuSyUfvboJ5Yi6YNw7i1bXmq9QwQ7EwMpeG4cK2pnMqEx1cLYD7cSGSCtruGSXC6ZSVDHugMsZgbuY62m6",
+			wantPriv: "dprv3mgHPRgAnNboAb9edL4RPscKYrNLG77BhPvFe3eiTGPSiigDeXct3WeiZ2QqRrm9TiseBuYWGEG79xkBzazpBGfym1vRXjcEo5KUi4rbhZ1",
 		},
 		{
 			name:     "test vector 2 chain m/0/2147483647/1",
 			master:   testVec2MasterPrivKey,
 			path:     []uint32{0, 2147483647, 1},
-			wantPriv: "xprv9ysS5br6UbWCRCJcggvpUNMyhVWgD7NypY9gsVTMYmuRtZg8izyYC5Ey4T931WgWbfJwRDwfVFqV3b29gqHDbuEpGcbzf16pdomk54NXkSm",
+			wantPriv: "dprv3onqUUAjN1xQUAW1BzwiBa5wisDCE8hX8YcAEgVe1DPvbgHVLauDt2NsZPQX6tJs6ozcQSU9GdsffhueTbxTxFMPEMPxM2iHiooMz2oQHWS",
 		},
 		{
 			name:     "test vector 2 chain m/0/2147483647/1/2147483646",
 			master:   testVec2MasterPrivKey,
 			path:     []uint32{0, 2147483647, 1, 2147483646},
-			wantPriv: "xprvA2LfeWWwRCxh4iqigcDMnUf2E3nVUFkntc93nmUYBtb9rpSPYWa8MY3x9ZHSLZkg4G84UefrDruVK3FhMLSJsGtBx883iddHNuH1LNpRrEp",
+			wantPriv: "dprv3r8NTJgGzAjY5cU7sLo5rhT8o2wdco2iqjks6nJoiDACTucrPMcsciccv9skwGMX69uRa8EaZofskV7YyzBDbVi6v4RXbJ4DyeZ6JpUgdUi",
 		},
 		{
 			name:     "test vector 2 chain m/0/2147483647/1/2147483646/2",
 			master:   testVec2MasterPrivKey,
 			path:     []uint32{0, 2147483647, 1, 2147483646, 2},
-			wantPriv: "xprvA48ALo8BDjcRET68R5RsPzF3H7WeyYYtHcyUeLRGBPHXu6CJSGjwW7dWoeUWTEzT7LG3qk6Eg6x2ZoqD8gtyEFZecpAyvchksfLyg3Zbqam",
+			wantPriv: "dprv3sp4xvFP9mL9UUEddSZUxrtNnhe5UcHs5wrpxdZVEFCXoT4EpYeHZJjCDhvVEQFK2KfSHXFmew6MeBuvtrJfQv1BnkiSV7xxUji66uvWasp",
 		},
 
 		// Custom tests to trigger specific conditions.
 		{
 			// Seed 000000000000000000000000000000da.
 			name:     "Derived privkey with zero high byte m/0",
-			master:   "xprv9s21ZrQH143K4FR6rNeqEK4EBhRgLjWLWhA3pw8iqgAKk82ypz58PXbrzU19opYcxw8JDJQF4id55PwTsN1Zv8Xt6SKvbr2KNU5y8jN8djz",
+			master:   "dprv3jFfEhxvVxy6NJWopujhfg7syQL71xCRgNoGUpQTtjTpCwzigwtCwssQGbRQsby7PBs1Yp8Wu7isu396qeNof13EZuxbCTJVF1xkoFAQHWj",
 			path:     []uint32{0},
-			wantPriv: "xprv9uC5JqtViMmgcAMUxcsBCBFA7oYCNs4bozPbyvLfddjHou4rMiGEHipz94xNaPb1e4f18TRoPXfiXx4C3cDAcADqxCSRSSWLvMBRWPctSN9",
+			wantPriv: "dprv3mWLns1v1fdLfeu5DKTA6NWQHLF6pFsPSwKCS6q4h4nkjm2DfuH5X2iDnW15jhHTGa3rzxSpvskuXugcbBcUUVWCETKKzjW7ja4V2jL4aw4",
 		},
 	}
 
@@ -364,7 +364,7 @@ tests:
 			}
 		}
 
-		privStr := extKey.String()
+		privStr, _ := extKey.String()
 		if privStr != test.wantPriv {
 			t.Errorf("Child #%d (%s): mismatched serialized "+
 				"private extended key -- got: %s, want: %s", i,
