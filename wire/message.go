@@ -252,6 +252,12 @@ func WriteMessageN(w io.Writer, msg Message, pver uint32, btcnet BitcoinNet) (in
 		return totalBytes, err
 	}
 
+	// Short circuit writing a zero sized payload.  This is necessary to work
+	// around a io.PipeWrite.Write bug which is experienced in some unit tests.
+	if len(payload) == 0 {
+		return totalBytes, nil
+	}
+
 	// Write payload.
 	n, err = w.Write(payload)
 	totalBytes += n
