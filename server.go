@@ -1573,12 +1573,7 @@ func (s *server) listenHandler(listener net.Listener) {
 		sp := newServerPeer(s, false)
 		sp.Peer = peer.NewInboundPeer(newPeerConfig(sp))
 		go s.peerDoneHandler(sp)
-		if err := sp.Connect(conn); err != nil {
-			if atomic.LoadInt32(&s.shutdown) == 0 {
-				srvrLog.Errorf("Can't accept connection: %v", err)
-			}
-			continue
-		}
+		sp.Connect(conn)
 	}
 	s.wg.Done()
 	srvrLog.Tracef("Listener handler done for %s", listener.Addr())
@@ -1674,9 +1669,7 @@ func (s *server) establishConn(sp *serverPeer) error {
 	if err != nil {
 		return err
 	}
-	if err := sp.Connect(conn); err != nil {
-		return err
-	}
+	sp.Connect(conn)
 	srvrLog.Debugf("Connected to %s", sp.Addr())
 	s.addrManager.Attempt(sp.NA())
 	return nil

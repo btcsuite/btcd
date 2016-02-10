@@ -775,7 +775,6 @@ func (p *Peer) pushVersionMsg() error {
 	// recently seen nonces.
 	nonce, err := wire.RandomUint64()
 	if err != nil {
-		fmt.Println(err)
 		return err
 	}
 	sentNonces.Add(nonce)
@@ -1951,10 +1950,10 @@ func (p *Peer) QueueInventory(invVect *wire.InvVect) {
 
 // Connect uses the given conn to connect to the peer. Calling this function when
 // the peer is already connected  will have no effect.
-func (p *Peer) Connect(conn net.Conn) error {
+func (p *Peer) Connect(conn net.Conn) {
 	// Already connected?
 	if !atomic.CompareAndSwapInt32(&p.connected, 0, 1) {
-		return nil
+		return
 	}
 
 	if p.inbound {
@@ -1963,7 +1962,11 @@ func (p *Peer) Connect(conn net.Conn) error {
 	p.conn = conn
 	p.timeConnected = time.Now()
 
-	return p.start()
+	go func() {
+		if err := p.start(); err != nil {
+			log.Errorf("Cannot start peer %v: %v", p, err)
+		}
+	}()
 }
 
 // Connected returns whether or not the peer is currently connected.
