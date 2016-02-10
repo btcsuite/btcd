@@ -1953,7 +1953,7 @@ func (p *Peer) QueueInventory(invVect *wire.InvVect) {
 // the peer is already connected  will have no effect.
 func (p *Peer) Connect(conn net.Conn) error {
 	// Already connected?
-	if atomic.LoadInt32(&p.connected) != 0 {
+	if !atomic.CompareAndSwapInt32(&p.connected, 0, 1) {
 		return nil
 	}
 
@@ -1963,7 +1963,6 @@ func (p *Peer) Connect(conn net.Conn) error {
 	p.conn = conn
 	p.timeConnected = time.Now()
 
-	atomic.AddInt32(&p.connected, 1)
 	return p.start()
 }
 
