@@ -5,14 +5,10 @@
 package txscript
 
 import (
-	"bytes"
-	"crypto/rand"
-	"encoding/binary"
 	"sync"
 
 	"github.com/btcsuite/btcd/btcec"
 	"github.com/btcsuite/btcd/wire"
-	"github.com/lazybeaver/xorshift"
 )
 
 // sigCacheEntry represents an entry in the SigCache. Entries within the
@@ -40,8 +36,6 @@ type SigCache struct {
 	sync.RWMutex
 	validSigs  map[wire.ShaHash]sigCacheEntry
 	maxEntries uint
-
-	xorShift xorshift.XorShift
 }
 
 // NewSigCache creates and initializes a new instance of SigCache. Its sole
@@ -50,20 +44,10 @@ type SigCache struct {
 // to make room for new entries that would cause the number of entries in the
 // cache to exceed the max.
 func NewSigCache(maxEntries uint) (*SigCache, error) {
-	cache := &SigCache{
+	return &SigCache{
 		validSigs:  make(map[wire.ShaHash]sigCacheEntry, maxEntries),
 		maxEntries: maxEntries,
-	}
-
-	var seed [8]byte
-	if _, err := rand.Read(seed[:]); err != nil {
-		return nil, err
-	}
-
-	randSeed := binary.BigEndian.Uint64(seed[:])
-	cache.xorShift = xorshift.NewXorShift128Plus(randSeed)
-
-	return cache, nil
+	}, nil
 }
 
 // Exists returns true if an existing entry of 'sig' over 'sigHash' for public
@@ -100,30 +84,10 @@ func (s *SigCache) Add(sigHash wire.ShaHash, sig *btcec.Signature, pubKey *btcec
 	// If adding this new entry will put us over the max number of allowed
 	// entries, then evict an entry.
 	if uint(len(s.validSigs)+1) > s.maxEntries {
-		// Generate a random hash.
-		var randHashBytes [wire.HashSize]byte
-		for i := 0; i < 4; i++ {
-			randInt := s.xorShift.Next()
-			binary.BigEndian.PutUint64(randHashBytes[i*8:], randInt)
-		}
-
-		// Try to find the first entry that is greater than the random
-		// hash. Use the first entry (which is already pseudo random due
-		// to Go's range statement over maps) as a fall back if none of
-		// the hashes in the rejected transactions pool are larger than
-		// the random hash.
-		var foundEntry wire.ShaHash
-		var zeroEntry wire.ShaHash
 		for sigEntry := range s.validSigs {
-			if foundEntry == zeroEntry {
-				foundEntry = sigEntry
-			}
-			if bytes.Compare(sigEntry[:], randHashBytes[:]) > 0 {
-				foundEntry = sigEntry
-				break
-			}
+			delete(s.validSigs, sigEntry)
+			break
 		}
-		delete(s.validSigs, foundEntry)
 	}
 
 	s.validSigs[sigHash] = sigCacheEntry{sig, pubKey}
