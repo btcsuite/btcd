@@ -124,6 +124,16 @@ type GetTicketsCmd struct {
 	IncludeImmature bool
 }
 
+// GetWalletFeeCmd defines the getwalletfee JSON-RPC command.
+type GetWalletFeeCmd struct{}
+
+// NewGetWalletFeeCmd returns a new instance which can be used to issue a
+// getwalletfee JSON-RPC command.
+//
+func NewGetWalletFeeCmd() *GetWalletFeeCmd {
+	return &GetWalletFeeCmd{}
+}
+
 // NewGetTicketsCmd creates a new GetTicketsCmd.
 func NewGetTicketsCmd(includeImmature bool) *GetTicketsCmd {
 	return &GetTicketsCmd{includeImmature}
