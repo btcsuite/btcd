@@ -1645,7 +1645,7 @@ out:
 		case <-s.quit:
 			// Disconnect all peers on server shutdown.
 			state.forAllPeers(func(sp *serverPeer) {
-				srvrLog.Tracef("Shutdown peer %s", sp.Peer)
+				srvrLog.Tracef("Shutdown peer %s", sp)
 				sp.Disconnect()
 			})
 			break out
@@ -1663,7 +1663,7 @@ out:
 		if !state.NeedMoreOutbound() || len(cfg.ConnectPeers) > 0 ||
 			atomic.LoadInt32(&s.shutdown) != 0 {
 			state.forPendingPeers(func(sp *serverPeer) {
-				srvrLog.Tracef("Shutdown peer %s", sp.Peer)
+				srvrLog.Tracef("Shutdown peer %s", sp)
 				sp.Disconnect()
 			})
 			continue
