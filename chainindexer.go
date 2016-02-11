@@ -203,7 +203,7 @@ func convertToAddrIndex(scrVersion uint16, scr []byte, height int64,
 	class, addrs, _, err := txscript.ExtractPkScriptAddrs(scrVersion, scr,
 		activeNetParams.Params)
 	if err != nil {
-		return nil, fmt.Errorf("script conversion error")
+		return nil, fmt.Errorf("script conversion error: %v", err.Error())
 	}
 	knownType := false
 	for _, addr := range addrs {
@@ -353,9 +353,9 @@ func (a *addrIndexer) indexBlockAddrs(blk *dcrutil.Block,
 					toAppend, err := convertToAddrIndex(inputOutPoint.Version,
 						inputOutPoint.PkScript, parent.Height(), locInBlock)
 					if err != nil {
-						adxrLog.Errorf("Error converting tx %v: %v",
+						adxrLog.Tracef("Error converting tx txin %v: %v",
 							txIn.PreviousOutPoint.Hash, err)
-						return nil, err
+						continue
 					}
 					addrIndex = append(addrIndex, toAppend...)
 				}
@@ -365,9 +365,9 @@ func (a *addrIndexer) indexBlockAddrs(blk *dcrutil.Block,
 				toAppend, err := convertToAddrIndex(txOut.Version, txOut.PkScript,
 					parent.Height(), locInBlock)
 				if err != nil {
-					adxrLog.Errorf("Error converting tx %v: %v",
+					adxrLog.Tracef("Error converting tx txout %v: %v",
 						tx.MsgTx().TxSha(), err)
-					return nil, err
+					continue
 				}
 				addrIndex = append(addrIndex, toAppend...)
 			}
@@ -399,9 +399,9 @@ func (a *addrIndexer) indexBlockAddrs(blk *dcrutil.Block,
 			toAppend, err := convertToAddrIndex(inputOutPoint.Version,
 				inputOutPoint.PkScript, blk.Height(), locInBlock)
 			if err != nil {
-				adxrLog.Errorf("Error converting stx %v: %v",
+				adxrLog.Tracef("Error converting stx txin %v: %v",
 					txIn.PreviousOutPoint.Hash, err)
-				return nil, err
+				continue
 			}
 			addrIndex = append(addrIndex, toAppend...)
 		}
@@ -410,9 +410,9 @@ func (a *addrIndexer) indexBlockAddrs(blk *dcrutil.Block,
 			toAppend, err := convertToAddrIndex(txOut.Version, txOut.PkScript,
 				blk.Height(), locInBlock)
 			if err != nil {
-				adxrLog.Errorf("Error converting stx %v: %v",
+				adxrLog.Tracef("Error converting stx txout %v: %v",
 					stx.MsgTx().TxSha(), err)
-				return nil, err
+				continue
 			}
 			addrIndex = append(addrIndex, toAppend...)
 		}
