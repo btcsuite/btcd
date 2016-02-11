@@ -818,7 +818,7 @@ func opcodeReserved(op *parsedOpcode, vm *Engine) error {
 	return ErrStackReservedOpcode
 }
 
-// opcodeReserved is a common handler for all invalid opcodes.  It returns an
+// opcodeInvalid is a common handler for all invalid opcodes.  It returns an
 // appropriate error indicating the opcode is invalid.
 func opcodeInvalid(op *parsedOpcode, vm *Engine) error {
 	return ErrStackInvalidOpcode
