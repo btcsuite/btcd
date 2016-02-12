@@ -1589,8 +1589,8 @@ func (mp *txMemPool) maybeAcceptTransaction(tx *dcrutil.Tx, isNew,
 	minFee := calcMinRequiredTxRelayFee(serializedSize, mp.server.chainParams)
 	if txType == stake.TxTypeRegular { // Non-stake only
 		if serializedSize >= (defaultBlockPrioritySize-1000) && txFee < minFee {
-			str := fmt.Sprintf("transaction %v has %d fees which is under "+
-				"the required amount of %d", txHash, txFee,
+			str := fmt.Sprintf("transaction %v has %v fees which is under "+
+				"the required amount of %v", txHash, txFee,
 				minFee)
 			return nil, txRuleError(wire.RejectInsufficientFee, str)
 		}
