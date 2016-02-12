@@ -616,9 +616,9 @@ func deepCopyBlockTemplate(blockTemplate *BlockTemplate) *BlockTemplate {
 	}
 
 	msgBlockCopy := &wire.MsgBlock{
-		headerCopy,
-		transactionsCopy,
-		sTransactionsCopy,
+		Header:        headerCopy,
+		Transactions:  transactionsCopy,
+		STransactions: sTransactionsCopy,
 	}
 
 	fees := make([]int64, len(blockTemplate.fees), len(blockTemplate.fees))
@@ -701,7 +701,7 @@ func handleTooFewVoters(nextHeight int64,
 				// than the previous extranonce, so we don't remine the
 				// same block and choose the same winners as before.
 				ens := cptCopy.getCoinbaseExtranonces()
-				ens[0] += 1
+				ens[0]++
 				UpdateExtraNonce(cptCopy.block, cptCopy.height, ens)
 
 				// Update extranonce of the original template too, so
@@ -1052,10 +1052,9 @@ func NewBlockTemplate(mempool *txMemPool,
 					"recycling a parent block to mine on")
 				return handleTooFewVoters(nextBlockHeight, payToAddress,
 					mempool.server.blockManager)
-			} else {
-				minrLog.Errorf("unexpected error while sorting eligible "+
-					"parents: %v", err.Error())
 			}
+			minrLog.Errorf("unexpected error while sorting eligible "+
+				"parents: %v", err.Error())
 			return nil, err
 		}
 
@@ -1563,7 +1562,7 @@ mempoolLoop:
 
 	// Get the block votes (SSGen tx) and store them and their number.
 	voters := 0
-	voteBitsVoters := make([]uint16, 0)
+	var voteBitsVoters []uint16
 
 	for _, tx := range blockTxns {
 		if nextBlockHeight < stakeValidationHeight {

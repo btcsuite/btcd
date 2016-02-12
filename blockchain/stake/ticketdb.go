@@ -143,11 +143,14 @@ func (td *TicketData) GobDecode(buf []byte) error {
 // TicketDataSlice is a sortable data structure of pointers to TicketData.
 type TicketDataSlice []*TicketData
 
+// NewTicketDataSliceEmpty creates and returns a new, empty slice of
+// TIcketData.
 func NewTicketDataSliceEmpty() TicketDataSlice {
-	slice := make([]*TicketData, 0)
+	var slice []*TicketData
 	return TicketDataSlice(slice)
 }
 
+// NewTicketDataSlice creates and returns TicketData of the requested size.
 func NewTicketDataSlice(size int) TicketDataSlice {
 	slice := make([]*TicketData, size)
 	return TicketDataSlice(slice)
@@ -584,7 +587,7 @@ func (tmdb *TicketDB) removeSpentTicket(spendHeight int64, ticket *TicketData) e
 	// Make sure the ticket itself exists
 	if tmdb.maps.spentTicketMap[spendHeight][ticket.SStxHash] == nil {
 		return fmt.Errorf("TicketDB err @ removeSpentTicket: ticket to "+
-			"delete does not exist!", ticket.SStxHash)
+			"delete does not exist! %v", ticket.SStxHash)
 	}
 
 	// Make sure that the tickets are indentical in the unlikely case of a hash
@@ -610,7 +613,7 @@ func (tmdb *TicketDB) removeMissedTicket(ticket *TicketData) error {
 	// Make sure the ticket exists
 	if tmdb.maps.missedTicketMap[ticket.SStxHash] == nil {
 		return fmt.Errorf("TicketDB err @ removeMissedTicket: ticket to "+
-			"delete does not exist!", ticket.SStxHash)
+			"delete does not exist! %v", ticket.SStxHash)
 	}
 
 	// Make sure that the tickets are indentical in the unlikely case of a hash
@@ -637,7 +640,7 @@ func (tmdb *TicketDB) removeRevokedTicket(ticket *TicketData) error {
 	// Make sure the ticket exists.
 	if tmdb.maps.revokedTicketMap[ticket.SStxHash] == nil {
 		return fmt.Errorf("TicketDB err @ removeRevokedTicket: ticket to "+
-			"delete does not exist!", ticket.SStxHash)
+			"delete does not exist! %v", ticket.SStxHash)
 	}
 
 	// Make sure that the tickets are indentical in the unlikely case of a hash
@@ -658,7 +661,7 @@ func (tmdb *TicketDB) removeSpentHeight(height int64) error {
 	// Make sure the height exists
 	if tmdb.maps.spentTicketMap[height] == nil {
 		return fmt.Errorf("TicketDB err @ removeSpentHeight: height to "+
-			"delete does not exist!", height)
+			"delete does not exist! %v", height)
 	}
 
 	delete(tmdb.maps.spentTicketMap, height)
@@ -994,7 +997,7 @@ func (tmdb *TicketDB) spendTickets(parentBlock *dcrutil.Block,
 	// Sort the entire list of tickets lexicographically by sorting
 	// each bucket and then appending it to the list.
 	totalTickets := 0
-	sortedSlice := make([]*TicketData, 0)
+	var sortedSlice []*TicketData
 	for i := 0; i < BucketsSize; i++ {
 		mapLen := len(tmdb.maps.ticketMap[i])
 		totalTickets += mapLen
@@ -1148,7 +1151,7 @@ func (tmdb *TicketDB) revokeTickets(
 
 	revokedTickets := make(SStxMemMap)
 
-	for hash, _ := range revocations {
+	for hash := range revocations {
 		ticket := tmdb.maps.missedTicketMap[hash]
 
 		if ticket == nil {
@@ -1201,7 +1204,7 @@ func (tmdb *TicketDB) unrevokeTickets(height int64) (SStxMemMap, error) {
 
 	unrevokedTickets := make(SStxMemMap)
 
-	for hash, _ := range revocations {
+	for hash := range revocations {
 		ticket := tmdb.maps.revokedTicketMap[hash]
 
 		if ticket == nil {
@@ -1633,7 +1636,7 @@ func (tmdb *TicketDB) GetTicketHashesForMissed() []chainhash.Hash {
 	missedTickets := make([]chainhash.Hash, len(tmdb.maps.missedTicketMap))
 
 	itr := 0
-	for hash, _ := range tmdb.maps.missedTicketMap {
+	for hash := range tmdb.maps.missedTicketMap {
 		missedTickets[itr] = hash
 		itr++
 	}

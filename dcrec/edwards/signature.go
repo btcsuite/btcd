@@ -94,16 +94,16 @@ func RecoverCompact(signature, hash []byte) (*PublicKey, bool, error) {
 }
 
 // GetR satisfies the chainec Signature interface.
-func (s Signature) GetR() *big.Int {
-	return s.R
+func (sig Signature) GetR() *big.Int {
+	return sig.R
 }
 
 // GetS satisfies the chainec Signature interface.
-func (s Signature) GetS() *big.Int {
-	return s.S
+func (sig Signature) GetS() *big.Int {
+	return sig.S
 }
 
 // GetType satisfies the chainec Signature interface.
-func (s Signature) GetType() int {
+func (sig Signature) GetType() int {
 	return ecTypeEdwards
 }

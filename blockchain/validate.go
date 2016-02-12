@@ -1254,7 +1254,7 @@ func (b *BlockChain) CheckBlockStakeSanity(tixStore TicketStore,
 	if err != nil {
 		h := block.Sha()
 		str := fmt.Sprintf("Failed to generate missed tickets data "+
-			"for block %v, height %v! Error given: ",
+			"for block %v, height %v! Error given: %v",
 			h,
 			block.Height(),
 			err.Error())
@@ -1508,14 +1508,14 @@ func CheckTransactionInputs(tx *dcrutil.Tx, txHeight int64, txStore TxStore,
 		// While we're here, double check to make sure that the input is from an
 		// SStx. By doing so, you also ensure the first output is OP_SSTX tagged.
 		if isSStx, _ := stake.IsSStx(originTx.Tx); !isSStx {
-			errStr := fmt.Sprintf("Input transaction %v for SSGen %v was not"+
+			errStr := fmt.Sprintf("Input transaction %v for SSGen was not"+
 				"an SStx tx (given input: %v)", txHash, sstxHash)
 			return 0, ruleError(ErrInvalidSSGenInput, errStr)
 		}
 
 		// Make sure it's using the 0th output.
 		if sstxIn.PreviousOutPoint.Index != 0 {
-			errStr := fmt.Sprintf("Input transaction %v for SSGen %v did not"+
+			errStr := fmt.Sprintf("Input transaction %v for SSGen did not"+
 				"reference the first output (given idx %v)", txHash,
 				sstxIn.PreviousOutPoint.Index)
 			return 0, ruleError(ErrInvalidSSGenInput, errStr)
@@ -2641,7 +2641,7 @@ func (b *BlockChain) CheckConnectBlock(block *dcrutil.Block) error {
 		return ruleError(ErrMissingParent, err.Error())
 	}
 
-	voteBitsStake := make([]uint16, 0)
+	var voteBitsStake []uint16
 	for _, stx := range block.STransactions() {
 		if is, _ := stake.IsSSGen(stx); is {
 			vb := stake.GetSSGenVoteBits(stx)

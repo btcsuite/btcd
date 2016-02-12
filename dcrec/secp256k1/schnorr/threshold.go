@@ -63,9 +63,9 @@ func nonceRFC6979(privkey []byte, hash []byte, extra []byte,
 	version []byte) []byte {
 	pkD := new(big.Int).SetBytes(privkey)
 	defer pkD.SetInt64(0)
-	kBig := secp256k1.NonceRFC6979(pkD, hash, extra, version)
-	defer kBig.SetInt64(0)
-	k := BigIntToEncodedBytes(kBig)
+	bigK := secp256k1.NonceRFC6979(pkD, hash, extra, version)
+	defer bigK.SetInt64(0)
+	k := BigIntToEncodedBytes(bigK)
 	return k[:]
 }
 
@@ -76,18 +76,18 @@ func generateNoncePair(curve *secp256k1.KoblitzCurve, msg []byte, priv []byte,
 	nonceFunction func([]byte, []byte, []byte, []byte) []byte, extra []byte,
 	version []byte) ([]byte, *secp256k1.PublicKey, error) {
 	k := nonceFunction(priv, msg, extra, version)
-	kBig := new(big.Int).SetBytes(k)
+	bigK := new(big.Int).SetBytes(k)
 
 	// k scalar sanity checks.
-	if kBig.Cmp(bigZero) == 0 {
+	if bigK.Cmp(bigZero) == 0 {
 		str := fmt.Sprintf("k scalar is zero")
 		return nil, nil, schnorrError(ErrBadNonce, str)
 	}
-	if kBig.Cmp(curve.N) >= 0 {
+	if bigK.Cmp(curve.N) >= 0 {
 		str := fmt.Sprintf("k scalar is >= curve.N")
 		return nil, nil, schnorrError(ErrBadNonce, str)
 	}
-	kBig.SetInt64(0)
+	bigK.SetInt64(0)
 
 	pubx, puby := curve.ScalarBaseMult(k)
 	pubnonce := secp256k1.NewPublicKey(curve, pubx, puby)
@@ -167,9 +167,9 @@ func schnorrPartialSign(curve *secp256k1.KoblitzCurve, msg []byte, priv []byte,
 		pubSum.GetY(), hashFunc)
 }
 
-// SchnorrPartialSign is the generalized and exported version of
+// PartialSign is the generalized and exported version of
 // schnorrPartialSign.
-func SchnorrPartialSign(curve *secp256k1.KoblitzCurve, msg []byte,
+func PartialSign(curve *secp256k1.KoblitzCurve, msg []byte,
 	priv *secp256k1.PrivateKey, privNonce *secp256k1.PrivateKey,
 	pubSum *secp256k1.PublicKey) (*Signature, error) {
 	privBytes := priv.Serialize()
@@ -203,16 +203,16 @@ func schnorrCombineSigs(curve *secp256k1.KoblitzCurve, sigss [][]byte) (*big.Int
 	}
 
 	if combinedSigS.Cmp(bigZero) == 0 {
-		str := fmt.Sprintf("combined sig s %v is zero")
+		str := fmt.Sprintf("combined sig s %v is zero", combinedSigS)
 		return nil, schnorrError(ErrZeroSigS, str)
 	}
 
 	return combinedSigS, nil
 }
 
-// SchnorrCombineSigs is the generalized and exported version of
+// CombineSigs is the generalized and exported version of
 // generateNoncePair.
-func SchnorrCombineSigs(curve *secp256k1.KoblitzCurve,
+func CombineSigs(curve *secp256k1.KoblitzCurve,
 	sigs []*Signature) (*Signature, error) {
 	sigss := make([][]byte, len(sigs), len(sigs))
 	for i, sig := range sigs {

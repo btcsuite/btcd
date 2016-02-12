@@ -141,26 +141,25 @@ func (m *CPUMiner) submitBlock(block *dcrutil.Block) bool {
 	if err != nil {
 		// Anything other than a rule violation is an unexpected error,
 		// so log that error as an internal error.
-		if rErr, ok := err.(blockchain.RuleError); !ok {
+		rErr, ok := err.(blockchain.RuleError)
+		if !ok {
 			minrLog.Errorf("Unexpected error while processing "+
 				"block submitted via CPU miner: %v", err)
 			return false
-		} else {
-			// Occasionally errors are given out for timing errors with
-			// ResetMinDifficulty and high block works that is above
-			// the target. Feed these to debug.
-			if m.server.chainParams.ResetMinDifficulty &&
-				rErr.ErrorCode == blockchain.ErrHighHash {
-				minrLog.Debugf("Block submitted via CPU miner rejected "+
-					"because of ResetMinDifficulty time sync failure: %v",
-					err)
-				return false
-			} else {
-				// Other rule errors should be reported.
-				minrLog.Errorf("Block submitted via CPU miner rejected: %v", err)
-				return false
-			}
 		}
+		// Occasionally errors are given out for timing errors with
+		// ResetMinDifficulty and high block works that is above
+		// the target. Feed these to debug.
+		if m.server.chainParams.ResetMinDifficulty &&
+			rErr.ErrorCode == blockchain.ErrHighHash {
+			minrLog.Debugf("Block submitted via CPU miner rejected "+
+				"because of ResetMinDifficulty time sync failure: %v",
+				err)
+			return false
+		}
+		// Other rule errors should be reported.
+		minrLog.Errorf("Block submitted via CPU miner rejected: %v", err)
+		return false
 
 	}
 	if isOrphan {
@@ -259,7 +258,7 @@ func (m *CPUMiner) solveBlock(msgBlock *wire.MsgBlock, ticker *time.Ticker,
 			// Update the nonce and hash the block header.
 			header.Nonce = i
 			hash := header.BlockSha()
-			hashesCompleted += 1
+			hashesCompleted++
 
 			// The block is solved when the new block hash is less
 			// than the target difficulty.  Yay!

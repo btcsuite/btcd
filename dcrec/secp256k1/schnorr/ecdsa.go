@@ -22,7 +22,7 @@ var (
 	bigZero = new(big.Int).SetInt64(0)
 
 	// ecTypeSecSchnorr is the ECDSA type for the chainec interface.
-	ecTypeSecSchnorr int = 2
+	ecTypeSecSchnorr = 2
 )
 
 // zeroArray zeroes the memory of a scalar array.
@@ -76,7 +76,7 @@ func schnorrSign(curve *secp256k1.KoblitzCurve, msg []byte, ps []byte, k []byte,
 	}
 
 	psBig := new(big.Int).SetBytes(ps)
-	kBig := new(big.Int).SetBytes(k)
+	bigK := new(big.Int).SetBytes(k)
 
 	if psBig.Cmp(bigZero) == 0 {
 		str := fmt.Sprintf("secret scalar is zero")
@@ -86,11 +86,11 @@ func schnorrSign(curve *secp256k1.KoblitzCurve, msg []byte, ps []byte, k []byte,
 		str := fmt.Sprintf("secret scalar is out of bounds")
 		return nil, schnorrError(ErrInputValue, str)
 	}
-	if kBig.Cmp(bigZero) == 0 {
+	if bigK.Cmp(bigZero) == 0 {
 		str := fmt.Sprintf("k scalar is zero")
 		return nil, schnorrError(ErrInputValue, str)
 	}
-	if kBig.Cmp(curve.N) >= 0 {
+	if bigK.Cmp(curve.N) >= 0 {
 		str := fmt.Sprintf("k scalar is out of bounds")
 		return nil, schnorrError(ErrInputValue, str)
 	}
@@ -106,8 +106,8 @@ func schnorrSign(curve *secp256k1.KoblitzCurve, msg []byte, ps []byte, k []byte,
 	// Check if the field element that would be represented by Y is odd.
 	// If it is, just keep k in the group order.
 	if Rpy.Bit(0) == 1 {
-		kBig.Mod(kBig, curve.N)
-		kBig.Sub(curve.N, kBig)
+		bigK.Mod(bigK, curve.N)
+		bigK.Sub(curve.N, bigK)
 	}
 
 	// h = Hash(r || m)
@@ -133,16 +133,16 @@ func schnorrSign(curve *secp256k1.KoblitzCurve, msg []byte, ps []byte, k []byte,
 	// implementation will fix this.
 	sBig := new(big.Int)
 	sBig.Mul(hBig, psBig)
-	sBig.Sub(kBig, sBig)
+	sBig.Sub(bigK, sBig)
 	sBig.Mod(sBig, curve.N)
 
 	if sBig.Cmp(bigZero) == 0 {
-		str := fmt.Sprintf("sig s %v is zero")
+		str := fmt.Sprintf("sig s %v is zero", sBig)
 		return nil, schnorrError(ErrZeroSigS, str)
 	}
 
 	// Zero out the private key and nonce when we're done with it.
-	kBig.SetInt64(0)
+	bigK.SetInt64(0)
 	zeroSlice(k)
 	psBig.SetInt64(0)
 	zeroSlice(ps)
@@ -171,7 +171,7 @@ func Sign(curve *secp256k1.KoblitzCurve, priv *secp256k1.PrivateKey,
 			break
 		}
 
-		errTyped, ok := err.(SchnorrError)
+		errTyped, ok := err.(Error)
 		if !ok {
 			return nil, nil, fmt.Errorf("unknown error type")
 		}

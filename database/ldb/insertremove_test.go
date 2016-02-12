@@ -166,7 +166,7 @@ endtest:
 		txlist = db.FetchTxByShaList(txlookupList)
 		for _, txe := range txlist {
 			if txe.Err != nil {
-				t.Errorf("tx list fetch failed %v err %v ", txe.Sha, txe.Err, height)
+				t.Errorf("tx list fetch failed %v err %v ", txe.Sha, txe.Err)
 				break endtest
 			}
 			txlookupmap[*txe.Sha] = txe
@@ -437,7 +437,11 @@ endtest:
 			for i, spent := range itxe.TxSpent {
 				if spent == true {
 					// If this was spent in flight, skip
-					thisOP := wire.OutPoint{*txo, uint32(i), dcrutil.TxTreeRegular}
+					thisOP := wire.OutPoint{
+						Hash:  *txo,
+						Index: uint32(i),
+						Tree:  dcrutil.TxTreeRegular,
+					}
 					_, alreadySpent := alreadySpentOps[thisOP]
 					if alreadySpent {
 						continue

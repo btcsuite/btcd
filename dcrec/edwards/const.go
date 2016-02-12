@@ -84,19 +84,19 @@ var feI = edwards25519.FieldElement{
 // feExtBasePoint is the base point of the curve represented
 // in projective extended format with field elements.
 var feExtBasePoint = edwards25519.ExtendedGroupElement{
-	edwards25519.FieldElement{
+	X: edwards25519.FieldElement{
 		25485296, 5318399, 8791791, -8299916, -14349720,
 		6939349, -3324311, -7717049, 7287234, -6577708,
 	},
-	edwards25519.FieldElement{
+	Y: edwards25519.FieldElement{
 		-758052, -1832720, 13046421, -4857925, 6576754,
 		14371947, -13139572, 6845540, -2198883, -4003719,
 	},
-	edwards25519.FieldElement{
+	Z: edwards25519.FieldElement{
 		-947565, 6097708, -469190, 10704810, -8556274,
 		-15589498, -16424464, -16608899, 14028613, -5004649,
 	},
-	edwards25519.FieldElement{
+	T: edwards25519.FieldElement{
 		6966464, -2456167, 7033433, 6781840, 28785542,
 		12262365, -2659449, 13959020, -21013759, -5262166,
 	},

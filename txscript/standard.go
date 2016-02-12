@@ -513,7 +513,7 @@ func GetStakeOutSubclass(pkScript []byte) (ScriptClass, error) {
 
 	subClass := ScriptClass(0)
 	if isStake {
-		stakeSubscript := make([]parsedOpcode, 0)
+		var stakeSubscript []parsedOpcode
 		for _, pop := range pkPops {
 			if pop.opcode.value >= 186 && pop.opcode.value <= 189 {
 				continue

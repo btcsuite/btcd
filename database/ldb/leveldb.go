@@ -400,7 +400,7 @@ func (db *LevelDb) InsertBlock(block *dcrutil.Block) (height int64, rerr error) 
 	// Be careful with this function on syncs.  It contains decred changes.
 
 	// Obtain the previous block first so long as it's not the genesis block
-	var blockPrev *dcrutil.Block = nil
+	var blockPrev *dcrutil.Block
 
 	// Decred: WARNING. This function assumes that all block insertion calls have
 	// dcrutil.blocks passed to them with block.blockHeight set correctly. However,
@@ -451,7 +451,7 @@ func (db *LevelDb) InsertBlock(block *dcrutil.Block) (height int64, rerr error) 
 
 	// Get data necessary to process regular tx tree of parent block if it's not
 	// the genesis block.
-	var mBlockPrev *wire.MsgBlock = nil
+	var mBlockPrev *wire.MsgBlock
 	var txLoc []wire.TxLoc
 
 	if blockPrev != nil {

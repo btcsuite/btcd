@@ -1466,9 +1466,9 @@ func handleExistsAddress(s *rpcServer, cmd interface{},
 	// Check the blockchain for the relevant address usage.
 	tlr, err := s.server.db.FetchTxsForAddr(addr, numToSkip, numRequested)
 	if err == nil && tlr != nil {
-		return &dcrjson.ExistsAddressResult{true}, nil
+		return &dcrjson.ExistsAddressResult{Exists: true}, nil
 	}
-	return &dcrjson.ExistsAddressResult{false}, nil
+	return &dcrjson.ExistsAddressResult{Exists: false}, nil
 }
 
 // handleGenerate handles generate commands.
@@ -3259,7 +3259,7 @@ func handleGetStakeDifficulty(s *rpcServer, cmd interface{}, closeChan <-chan st
 	}
 	sDiff := dcrutil.Amount(blockHeader.SBits)
 
-	return &dcrjson.GetStakeDifficultyResult{sDiff.ToCoin()}, nil
+	return &dcrjson.GetStakeDifficultyResult{Difficulty: sDiff.ToCoin()}, nil
 }
 
 // bigToLEUint256 returns the passed big integer as an unsigned 256-bit integer
@@ -3803,12 +3803,12 @@ func handleMissedTickets(s *rpcServer, cmd interface{}, closeChan <-chan struct{
 
 	mtString := make([]string, len(mt), len(mt))
 	itr := 0
-	for hash, _ := range mt {
+	for hash := range mt {
 		mtString[itr] = hash.String()
 		itr++
 	}
 
-	return dcrjson.MissedTicketsResult{mtString}, nil
+	return dcrjson.MissedTicketsResult{Tickets: mtString}, nil
 }
 
 // handlePing implements the ping command.
@@ -3837,10 +3837,10 @@ func handleRebroadcastMissed(s *rpcServer, cmd interface{}, closeChan <-chan str
 	}
 
 	missedTicketsNtfn := &blockchain.TicketNotificationsData{
-		*hash,
-		height,
-		stakeDiff,
-		mt,
+		Hash:            *hash,
+		Height:          height,
+		StakeDifficulty: stakeDiff,
+		TicketMap:       mt,
 	}
 
 	s.ntfnMgr.NotifySpentAndMissedTickets(missedTicketsNtfn)

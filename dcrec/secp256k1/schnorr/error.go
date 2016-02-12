@@ -87,23 +87,23 @@ func (e ErrorCode) String() string {
 	return fmt.Sprintf("Unknown ErrorCode (%d)", int(e))
 }
 
-// SchnorrError identifies a violation.
-type SchnorrError struct {
+// Error identifies a violation.
+type Error struct {
 	ErrorCode   ErrorCode // Describes the kind of error
 	Description string    // Human readable description of the issue
 }
 
 // Error satisfies the error interface and prints human-readable errors.
-func (e SchnorrError) Error() string {
+func (e Error) Error() string {
 	return e.Description
 }
 
 // GetCode satisfies the error interface and prints human-readable errors.
-func (e SchnorrError) GetCode() ErrorCode {
+func (e Error) GetCode() ErrorCode {
 	return e.ErrorCode
 }
 
-// schnorrError creates a SchnorrError given a set of arguments.
-func schnorrError(c ErrorCode, desc string) SchnorrError {
-	return SchnorrError{ErrorCode: c, Description: desc}
+// schnorrError creates a Error given a set of arguments.
+func schnorrError(c ErrorCode, desc string) Error {
+	return Error{ErrorCode: c, Description: desc}
 }

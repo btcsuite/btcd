@@ -126,10 +126,10 @@ func testAddrIndexOperations(t *testing.T, db database.Db, newestBlock *dcrutil.
 	blktxLoc, _, _ := newestBlock.TxLoc()
 	testIndex = []*database.TxAddrIndex{
 		&database.TxAddrIndex{
-			hash160Bytes,
-			uint32(newestBlockIdx),
-			uint32(blktxLoc[0].TxStart),
-			uint32(blktxLoc[0].TxLen),
+			Hash160:  hash160Bytes,
+			Height:   uint32(newestBlockIdx),
+			TxOffset: uint32(blktxLoc[0].TxStart),
+			TxLen:    uint32(blktxLoc[0].TxLen),
 		},
 	}
 
@@ -574,10 +574,10 @@ func TestLimitAndSkipFetchTxsForAddr(t *testing.T) {
 		scriptAddr := targetAddr.ScriptAddress()
 		copy(hash160[:], scriptAddr[:])
 		txAddrIndex := &database.TxAddrIndex{
-			hash160,
-			uint32(newheight),
-			uint32(txLoc[i].TxStart),
-			uint32(txLoc[i].TxLen),
+			Hash160:  hash160,
+			Height:   uint32(newheight),
+			TxOffset: uint32(txLoc[i].TxStart),
+			TxLen:    uint32(txLoc[i].TxLen),
 		}
 
 		index[i] = txAddrIndex

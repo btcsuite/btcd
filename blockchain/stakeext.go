@@ -85,7 +85,7 @@ func (b *BlockChain) getWinningTicketsWithStore(node *blockNode) ([]chainhash.Ha
 		}
 	}
 	totalTickets := 0
-	sortedSlice := make([]*stake.TicketData, 0)
+	var sortedSlice []*stake.TicketData
 	for i := 0; i < stake.BucketsSize; i++ {
 		ltb, err := b.GenerateLiveTicketBucket(ticketStore, tpdBucketMap,
 			uint8(i))
@@ -114,7 +114,7 @@ func (b *BlockChain) getWinningTicketsWithStore(node *blockNode) ([]chainhash.Ha
 
 	// Use the parent block's header to seed a PRNG that picks the
 	// lottery winners.
-	winningTickets := make([]chainhash.Hash, 0)
+	var winningTickets []chainhash.Hash
 	var finalState [6]byte
 	stateBuffer := make([]byte, 0,
 		(b.chainParams.TicketsPerBlock+1)*chainhash.HashSize)
@@ -175,7 +175,7 @@ func (b *BlockChain) getWinningTicketsInclStore(node *blockNode,
 		}
 	}
 	totalTickets := 0
-	sortedSlice := make([]*stake.TicketData, 0)
+	var sortedSlice []*stake.TicketData
 	for i := 0; i < stake.BucketsSize; i++ {
 		ltb, err := b.GenerateLiveTicketBucket(ticketStore, tpdBucketMap, uint8(i))
 		if err != nil {
@@ -203,7 +203,7 @@ func (b *BlockChain) getWinningTicketsInclStore(node *blockNode,
 
 	// Use the parent block's header to seed a PRNG that picks the
 	// lottery winners.
-	winningTickets := make([]chainhash.Hash, 0)
+	var winningTickets []chainhash.Hash
 	var finalState [6]byte
 	stateBuffer := make([]byte, 0,
 		(b.chainParams.TicketsPerBlock+1)*chainhash.HashSize)

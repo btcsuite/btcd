@@ -231,7 +231,7 @@ func (mp *txMemPool) InsertVote(ssgen *dcrutil.Tx) error {
 // some block on the blockchain.
 func (mp *txMemPool) getVoteHashesForBlock(block chainhash.Hash) ([]chainhash.Hash,
 	error) {
-	hashes := make([]chainhash.Hash, 0)
+	var hashes []chainhash.Hash
 	vts, exists := mp.votes[block]
 	if !exists {
 		return nil, fmt.Errorf("couldn't find block requested in mp.votes")
@@ -1155,25 +1155,25 @@ func calcPriority(tx *dcrutil.Tx, inputValueAge float64) float64 {
 // StartingPriority calculates the priority of this tx descriptor's underlying
 // transaction relative to when it was first added to the mempool.  The result
 // is lazily computed and then cached for subsequent function calls.
-func (txD *TxDesc) StartingPriority(txStore blockchain.TxStore) float64 {
+func (td *TxDesc) StartingPriority(txStore blockchain.TxStore) float64 {
 	// Return our cached result.
-	if txD.startingPriority != float64(0) {
-		return txD.startingPriority
+	if td.startingPriority != float64(0) {
+		return td.startingPriority
 	}
 
 	// Compute our starting priority caching the result.
-	inputAge := calcInputValueAge(txD, txStore, txD.Height)
-	txD.startingPriority = calcPriority(txD.Tx, inputAge)
+	inputAge := calcInputValueAge(td, txStore, td.Height)
+	td.startingPriority = calcPriority(td.Tx, inputAge)
 
-	return txD.startingPriority
+	return td.startingPriority
 }
 
 // CurrentPriority calculates the current priority of this tx descriptor's
 // underlying transaction relative to the next block height.
-func (txD *TxDesc) CurrentPriority(txStore blockchain.TxStore,
+func (td *TxDesc) CurrentPriority(txStore blockchain.TxStore,
 	nextBlockHeight int64) float64 {
-	inputAge := calcInputValueAge(txD, txStore, nextBlockHeight)
-	return calcPriority(txD.Tx, inputAge)
+	inputAge := calcInputValueAge(td, txStore, nextBlockHeight)
+	return calcPriority(td.Tx, inputAge)
 }
 
 // checkPoolDoubleSpend checks whether or not the passed transaction is
@@ -1612,7 +1612,7 @@ func (mp *txMemPool) maybeAcceptTransaction(tx *dcrutil.Tx, isNew,
 	feePerKB := float64(txFee) / (float64(serializedSize) / 1000.0)
 	if (float64(feePerKB) < float64(feeThreshold)) &&
 		txType != stake.TxTypeSSGen {
-		str := fmt.Sprintf("transaction %v has %d fees per kb which "+
+		str := fmt.Sprintf("transaction %v has %v fees per kb which "+
 			"is under the required threshold amount of %d", txHash, feePerKB,
 			feeThreshold)
 		return nil, txRuleError(wire.RejectInsufficientFee, str)

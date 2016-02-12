@@ -60,17 +60,17 @@ func generateNoncePair(curve *TwistedEdwardsCurve, msg []byte, priv []byte,
 	nonceFunction func(*TwistedEdwardsCurve, []byte, []byte, []byte,
 		[]byte) []byte, extra []byte, version []byte) ([]byte, *PublicKey, error) {
 	k := nonceFunction(curve, priv, msg, extra, version)
-	kBig := new(big.Int).SetBytes(k)
-	kBig.Mod(kBig, curve.N)
+	bigK := new(big.Int).SetBytes(k)
+	bigK.Mod(bigK, curve.N)
 
 	// k scalar sanity checks.
-	if kBig.Cmp(zero) == 0 {
+	if bigK.Cmp(zero) == 0 {
 		return nil, nil, fmt.Errorf("k scalar is zero")
 	}
-	if kBig.Cmp(curve.N) >= 0 {
+	if bigK.Cmp(curve.N) >= 0 {
 		return nil, nil, fmt.Errorf("k scalar is >= curve.N")
 	}
-	kBig.SetInt64(0)
+	bigK.SetInt64(0)
 
 	pubx, puby := curve.ScalarBaseMult(k)
 	pubnonce := NewPublicKey(curve, pubx, puby)
@@ -213,7 +213,7 @@ func schnorrCombineSigs(curve *TwistedEdwardsCurve, sigss [][]byte) (*big.Int,
 	}
 
 	if combinedSigS.Cmp(zero) == 0 {
-		str := fmt.Sprintf("combined sig s %v is zero")
+		str := fmt.Sprintf("combined sig s %v is zero", combinedSigS)
 		return nil, fmt.Errorf("%v", str)
 	}
 

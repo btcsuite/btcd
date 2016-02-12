@@ -750,7 +750,7 @@ func TestBlockValidationRules(t *testing.T) {
 	b153test.SetHeight(int64(testsIdx1))
 	_, _, err = chain.ProcessBlock(b153test, timeSource, blockchain.BFNone)
 	if err != nil {
-		t.Errorf("Got unexpected error processing block 153", err)
+		t.Errorf("Got unexpected error processing block 153 %v", err)
 	}
 	block154Bytes := blockChain[int64(testsIdx2)]
 	block154MsgBlock := new(wire.MsgBlock)
@@ -2110,9 +2110,9 @@ var simNetParams = &chaincfg.Params{
 // network. See below under "Decred organization related parameters" for
 // information on how to spend these outputs.
 var BlockOneLedgerSimNet = []*chaincfg.TokenPayout{
-	&chaincfg.TokenPayout{"Sshw6S86G2bV6W32cbc7EhtFy8f93rU6pae", 100000 * 1e8},
-	&chaincfg.TokenPayout{"SsjXRK6Xz6CFuBt6PugBvrkdAa4xGbcZ18w", 100000 * 1e8},
-	&chaincfg.TokenPayout{"SsfXiYkYkCoo31CuVQw428N6wWKus2ZEw5X", 100000 * 1e8},
+	&chaincfg.TokenPayout{Address: "Sshw6S86G2bV6W32cbc7EhtFy8f93rU6pae", Amount: 100000 * 1e8},
+	&chaincfg.TokenPayout{Address: "SsjXRK6Xz6CFuBt6PugBvrkdAa4xGbcZ18w", Amount: 100000 * 1e8},
+	&chaincfg.TokenPayout{Address: "SsfXiYkYkCoo31CuVQw428N6wWKus2ZEw5X", Amount: 100000 * 1e8},
 }
 
 var bigOne = new(big.Int).SetInt64(1)

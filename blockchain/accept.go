@@ -219,7 +219,7 @@ func (b *BlockChain) maybeAcceptBlock(block *dcrutil.Block,
 	// Create a new block node for the block and add it to the in-memory
 	// block chain (could be either a side chain or the main chain).
 	blockHeader := &block.MsgBlock().Header
-	voteBitsStake := make([]uint16, 0)
+	var voteBitsStake []uint16
 	for _, stx := range block.STransactions() {
 		if is, _ := stake.IsSSGen(stx); is {
 			vb := stake.GetSSGenVoteBits(stx)

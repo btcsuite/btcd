@@ -234,7 +234,7 @@ func (b *BlockChain) connectTickets(tixStore TicketStore,
 			}
 		}
 		totalTickets := 0
-		sortedSlice := make([]*stake.TicketData, 0)
+		var sortedSlice []*stake.TicketData
 		for i := 0; i < stake.BucketsSize; i++ {
 			ltb, err := b.GenerateLiveTicketBucket(tixStore, tpdBucketMap,
 				uint8(i))
@@ -394,7 +394,7 @@ func (b *BlockChain) connectTickets(tixStore TicketStore,
 		// modify the patch data so that it doesn't exist.
 		// Otherwise, just modify load the missed ticket data from
 		// the ticket db and create patch data based on that.
-		for hash, _ := range revocationsFromBlock {
+		for hash := range revocationsFromBlock {
 			ticketWasMissed := false
 			if td, is := missedTickets[hash]; is {
 				maturedHeight := td.BlockHeight

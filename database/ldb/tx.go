@@ -415,10 +415,10 @@ func unpackTxIndex(rawIndex [database.AddrIndexKeySize]byte) *database.TxAddrInd
 	var addr [ripemd160.Size]byte
 	copy(addr[:], rawIndex[3:23])
 	return &database.TxAddrIndex{
-		addr,
-		binary.BigEndian.Uint32(rawIndex[23:27]),
-		binary.BigEndian.Uint32(rawIndex[27:31]),
-		binary.BigEndian.Uint32(rawIndex[31:35]),
+		Hash160:  addr,
+		Height:   binary.BigEndian.Uint32(rawIndex[23:27]),
+		TxOffset: binary.BigEndian.Uint32(rawIndex[27:31]),
+		TxLen:    binary.BigEndian.Uint32(rawIndex[31:35]),
 	}
 }
 

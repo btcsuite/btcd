@@ -845,9 +845,9 @@ func testFetchTxByShaListCommon(tc *testContext, includeSpent bool) bool {
 				for txoIdx, _ := range spentBuf {
 					if txD.TxSpent[txoIdx] != spentBuf[txoIdx] {
 						op := wire.OutPoint{
-							*txHash,
-							uint32(txoIdx),
-							dcrutil.TxTreeRegular,
+							Hash:  *txHash,
+							Index: uint32(txoIdx),
+							Tree:  dcrutil.TxTreeRegular,
 						}
 
 						if _, unspent := unspentFromTxTreeStake[op]; !unspent {

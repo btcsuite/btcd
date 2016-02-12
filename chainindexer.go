@@ -230,10 +230,10 @@ func convertToAddrIndex(scrVersion uint16, scr []byte, height int64,
 			copy(indexKey[:], addr.ScriptAddress()[:])
 		}
 		tai := &database.TxAddrIndex{
-			indexKey,
-			uint32(height),
-			uint32(locInBlock.TxStart),
-			uint32(locInBlock.TxLen),
+			Hash160:  indexKey,
+			Height:   uint32(height),
+			TxOffset: uint32(locInBlock.TxStart),
+			TxLen:    uint32(locInBlock.TxLen),
 		}
 
 		tais = append(tais, tai)
@@ -243,10 +243,10 @@ func convertToAddrIndex(scrVersion uint16, scr []byte, height int64,
 	if !knownType {
 		copy(indexKey[:], dcrutil.Hash160(scr))
 		tai := &database.TxAddrIndex{
-			indexKey,
-			uint32(height),
-			uint32(locInBlock.TxStart),
-			uint32(locInBlock.TxLen),
+			Hash160:  indexKey,
+			Height:   uint32(height),
+			TxOffset: uint32(locInBlock.TxStart),
+			TxLen:    uint32(locInBlock.TxLen),
 		}
 
 		tais = append(tais, tai)

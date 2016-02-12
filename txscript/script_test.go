@@ -529,7 +529,7 @@ func TestCalcSignatureHash(t *testing.T) {
 
 	want, _ := hex.DecodeString("d09285b6f60c71329323bc2e76c48" +
 		"a462cde4e1032aa8f59c55823f1722c7f4a")
-	pops, _ := txscript.ParseScript([]byte{0x01, 0x01, 0x02, 0x03})
+	pops, _ := txscript.TstParseScript([]byte{0x01, 0x01, 0x02, 0x03})
 
 	// Test prefix caching.
 	msg1, err := txscript.CalcSignatureHash(pops, txscript.SigHashAll, tx, 0, nil)

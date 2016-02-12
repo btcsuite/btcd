@@ -33,7 +33,7 @@ var (
 	oneInitializer = []byte{0x01}
 
 	// ecTypeEdwards is the ECDSA type for the chainec interface.
-	ecTypeEdwards int = 1
+	ecTypeEdwards = 1
 )
 
 // GenerateKey generates a key using a random number generator, returning
@@ -89,9 +89,9 @@ func nonceRFC6979(curve *TwistedEdwardsCurve, privkey []byte, hash []byte,
 	extra []byte, version []byte) []byte {
 	pkD := new(big.Int).SetBytes(privkey)
 	defer pkD.SetInt64(0)
-	kBig := NonceRFC6979(curve, pkD, hash, extra, version)
-	defer kBig.SetInt64(0)
-	k := BigIntToEncodedBytesNoReverse(kBig)
+	bigK := NonceRFC6979(curve, pkD, hash, extra, version)
+	defer bigK.SetInt64(0)
+	k := BigIntToEncodedBytesNoReverse(bigK)
 	return k[:]
 }
 

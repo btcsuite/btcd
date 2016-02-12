@@ -496,7 +496,7 @@ func (b *BlockChain) loadBlockNode(hash *chainhash.Hash) (*blockNode, error) {
 	}
 
 	// Create the new block node for the block and set the work.
-	voteBitsStake := make([]uint16, 0)
+	var voteBitsStake []uint16
 	for _, stx := range block.STransactions() {
 		if is, _ := stake.IsSSGen(stx); is {
 			vb := stake.GetSSGenVoteBits(stx)

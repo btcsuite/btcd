@@ -557,7 +557,7 @@ func (db *MemDb) InsertBlock(block *dcrutil.Block) (int64, error) {
 			return 0, database.ErrPrevShaMissing
 		}
 	}
-	var blockPrev *dcrutil.Block = nil
+	var blockPrev *dcrutil.Block
 	// Decred: WARNING. This function assumes that all block insertion calls have
 	// dcrutil.blocks passed to them with block.blockHeight set correctly. However,
 	// loading the genesis block in dcrd didn't do this (via block manager); pre-

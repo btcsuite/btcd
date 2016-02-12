@@ -580,7 +580,7 @@ func VerifyStakingPkhsAndAmounts(
 	for idx, typ := range sstxTypes {
 		if typ != ssSpendTypes[idx] {
 			errStr := fmt.Sprintf("SStx in/SS*** out verify error: at index %v "+
-				"non-equivalent type %x in SStx and type %x in SS***", idx, typ,
+				"non-equivalent type %v in SStx and type %v in SS***", idx, typ,
 				ssSpendTypes[idx])
 			return stakeRuleError(ErrVerifyOutType, errStr)
 		}

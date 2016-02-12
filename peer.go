@@ -865,10 +865,9 @@ func (p *peer) handleGetMiningStateMsg(msg *wire.MsgGetMiningState) {
 		// We couldn't find enough voters for any block, so just return now.
 		if err.(MiningRuleError).GetCode() == ErrNotEnoughVoters {
 			return
-		} else {
-			peerLog.Warnf("unexpected mempool error while sorting eligible "+
-				"parents for mining state request: %v", err.Error())
 		}
+		peerLog.Warnf("unexpected mempool error while sorting eligible "+
+			"parents for mining state request: %v", err.Error())
 		return
 	}
 

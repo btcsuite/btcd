@@ -902,7 +902,7 @@ func (b *blockManager) current() bool {
 // adds these votes to the cached parent block template.
 //
 // This is UNSAFE for concurrent access.
-func (bm *blockManager) checkBlockForHiddenVotes(block *dcrutil.Block) {
+func (b *blockManager) checkBlockForHiddenVotes(block *dcrutil.Block) {
 	var votesFromBlock []*dcrutil.Tx
 
 	for _, stx := range block.STransactions() {
@@ -917,17 +917,17 @@ func (bm *blockManager) checkBlockForHiddenVotes(block *dcrutil.Block) {
 	// need to use the current template.
 	var template *BlockTemplate
 
-	if bm.cachedCurrentTemplate != nil {
-		if bm.cachedCurrentTemplate.height ==
+	if b.cachedCurrentTemplate != nil {
+		if b.cachedCurrentTemplate.height ==
 			block.Height() {
-			template = bm.cachedCurrentTemplate
+			template = b.cachedCurrentTemplate
 		}
 	}
 	if template == nil &&
-		bm.cachedParentTemplate != nil {
-		if bm.cachedParentTemplate.height ==
+		b.cachedParentTemplate != nil {
+		if b.cachedParentTemplate.height ==
 			block.Height() {
-			template = bm.cachedParentTemplate
+			template = b.cachedParentTemplate
 		}
 	}
 
@@ -991,7 +991,7 @@ func (bm *blockManager) checkBlockForHiddenVotes(block *dcrutil.Block) {
 		int64(template.block.Header.Height),
 		cfg.miningAddrs[rand.Intn(len(cfg.miningAddrs))],
 		uint16(numVotes),
-		bm.server.chainParams)
+		b.server.chainParams)
 	if err != nil {
 		bmgrLog.Warnf("failed to create coinbase while generating " +
 			"block with extra found voters")
@@ -2934,16 +2934,15 @@ func loadTicketDB(db dcrdb.Db,
 			}
 		}
 		return &tmdb, nil
-	} else {
-		dcrdLog.Infof("Loading ticket database from disk")
-		err := tmdb.LoadTicketDBs(path,
-			"ticketdb.gob",
-			chainParams,
-			db)
+	}
+	dcrdLog.Infof("Loading ticket database from disk")
+	err := tmdb.LoadTicketDBs(path,
+		"ticketdb.gob",
+		chainParams,
+		db)
 
-		if err != nil {
-			return nil, err
-		}
+	if err != nil {
+		return nil, err
 	}
 	dcrdLog.Infof("Ticket DB loaded with top block height %v",
 		tmdb.GetTopBlock())

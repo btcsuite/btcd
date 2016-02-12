@@ -257,7 +257,7 @@ func TestSchnorrThresholdRef(t *testing.T) {
 		}
 
 		// Combine signatures.
-		combinedSignature, err := SchnorrCombineSigs(curve, partialSignatures)
+		combinedSignature, err := CombineSigs(curve, partialSignatures)
 		assert.NoError(t, err)
 		assert.Equal(t, combinedSignature.Serialize(), tv.combinedSignature)
 
@@ -341,7 +341,7 @@ func TestSchnorrThreshold(t *testing.T) {
 		}
 
 		// Combine signatures.
-		combinedSignature, err := SchnorrCombineSigs(curve, partialSignatures)
+		combinedSignature, err := CombineSigs(curve, partialSignatures)
 		assert.NoError(t, err)
 
 		// Combine pubkeys.
@@ -417,7 +417,7 @@ func TestSchnorrThreshold(t *testing.T) {
 		}
 
 		// Combine signatures.
-		combinedSignature, _ = SchnorrCombineSigs(curve, partialSignatures)
+		combinedSignature, _ = CombineSigs(curve, partialSignatures)
 
 		// Combine pubkeys.
 		allPubkeys = make([]*secp256k1.PublicKey, numKeysForTest,

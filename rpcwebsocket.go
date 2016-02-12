@@ -783,8 +783,8 @@ func (*wsNotificationManager) notifyNewTickets(clients map[chan struct{}]*wsClie
 	tnd *blockchain.TicketNotificationsData) {
 
 	// Create a ticket map to export as JSON.
-	tickets := make([]string, 0)
-	for h, _ := range tnd.TicketMap {
+	var tickets []string
+	for h := range tnd.TicketMap {
 		tickets = append(tickets, h.String())
 	}
 
@@ -2078,7 +2078,7 @@ func rescanBlock(wsc *wsClient, lookups *rescanKeys, blk *dcrutil.Block,
 		return
 	}
 
-	allTransactions := make([]*dcrutil.Tx, 0)
+	var allTransactions []*dcrutil.Tx
 
 	if txTreeRegularValid {
 		allTransactions = append(allTransactions, parent.Transactions()...)

@@ -61,80 +61,80 @@ var (
 
 // Boilerplate exported functions to make the struct interact with the interface.
 // Constants
-func (s secp256k1DSA) GetP() *big.Int {
-	return s.getP()
+func (sp secp256k1DSA) GetP() *big.Int {
+	return sp.getP()
 }
-func (s secp256k1DSA) GetN() *big.Int {
-	return s.getN()
+func (sp secp256k1DSA) GetN() *big.Int {
+	return sp.getN()
 }
 
 // EC Math
-func (s secp256k1DSA) Add(x1, y1, x2, y2 *big.Int) (*big.Int, *big.Int) {
-	return s.add(x1, y1, x2, y2)
+func (sp secp256k1DSA) Add(x1, y1, x2, y2 *big.Int) (*big.Int, *big.Int) {
+	return sp.add(x1, y1, x2, y2)
 }
-func (s secp256k1DSA) IsOnCurve(x, y *big.Int) bool {
-	return s.isOnCurve(x, y)
+func (sp secp256k1DSA) IsOnCurve(x, y *big.Int) bool {
+	return sp.isOnCurve(x, y)
 }
-func (s secp256k1DSA) ScalarMult(x, y *big.Int, k []byte) (*big.Int, *big.Int) {
-	return s.scalarMult(x, y, k)
+func (sp secp256k1DSA) ScalarMult(x, y *big.Int, k []byte) (*big.Int, *big.Int) {
+	return sp.scalarMult(x, y, k)
 }
-func (s secp256k1DSA) ScalarBaseMult(k []byte) (*big.Int, *big.Int) {
-	return s.scalarBaseMult(k)
+func (sp secp256k1DSA) ScalarBaseMult(k []byte) (*big.Int, *big.Int) {
+	return sp.scalarBaseMult(k)
 }
 
 // Private keys
-func (s secp256k1DSA) NewPrivateKey(d *big.Int) PrivateKey {
-	return s.newPrivateKey(d)
+func (sp secp256k1DSA) NewPrivateKey(d *big.Int) PrivateKey {
+	return sp.newPrivateKey(d)
 }
-func (s secp256k1DSA) PrivKeyFromBytes(pk []byte) (PrivateKey, PublicKey) {
-	return s.privKeyFromBytes(pk)
+func (sp secp256k1DSA) PrivKeyFromBytes(pk []byte) (PrivateKey, PublicKey) {
+	return sp.privKeyFromBytes(pk)
 }
-func (s secp256k1DSA) PrivKeyFromScalar(pk []byte) (PrivateKey, PublicKey) {
-	return s.privKeyFromScalar(pk)
+func (sp secp256k1DSA) PrivKeyFromScalar(pk []byte) (PrivateKey, PublicKey) {
+	return sp.privKeyFromScalar(pk)
 }
-func (s secp256k1DSA) PrivKeyBytesLen() int {
-	return s.privKeyBytesLen()
+func (sp secp256k1DSA) PrivKeyBytesLen() int {
+	return sp.privKeyBytesLen()
 }
 
 // Public keys
-func (s secp256k1DSA) NewPublicKey(x *big.Int, y *big.Int) PublicKey {
-	return s.newPublicKey(x, y)
+func (sp secp256k1DSA) NewPublicKey(x *big.Int, y *big.Int) PublicKey {
+	return sp.newPublicKey(x, y)
 }
-func (s secp256k1DSA) ParsePubKey(pubKeyStr []byte) (PublicKey, error) {
-	return s.parsePubKey(pubKeyStr)
+func (sp secp256k1DSA) ParsePubKey(pubKeyStr []byte) (PublicKey, error) {
+	return sp.parsePubKey(pubKeyStr)
 }
-func (s secp256k1DSA) PubKeyBytesLen() int {
-	return s.pubKeyBytesLen()
+func (sp secp256k1DSA) PubKeyBytesLen() int {
+	return sp.pubKeyBytesLen()
 }
-func (s secp256k1DSA) PubKeyBytesLenUncompressed() int {
-	return s.pubKeyBytesLenUncompressed()
+func (sp secp256k1DSA) PubKeyBytesLenUncompressed() int {
+	return sp.pubKeyBytesLenUncompressed()
 }
-func (s secp256k1DSA) PubKeyBytesLenCompressed() int {
-	return s.pubKeyBytesLenCompressed()
+func (sp secp256k1DSA) PubKeyBytesLenCompressed() int {
+	return sp.pubKeyBytesLenCompressed()
 }
-func (s secp256k1DSA) PubKeyBytesLenHybrid() int {
-	return s.pubKeyBytesLenCompressed()
+func (sp secp256k1DSA) PubKeyBytesLenHybrid() int {
+	return sp.pubKeyBytesLenCompressed()
 }
 
 // Signatures
 func (sp secp256k1DSA) NewSignature(r, s *big.Int) Signature {
 	return sp.newSignature(r, s)
 }
-func (s secp256k1DSA) ParseDERSignature(sigStr []byte) (Signature, error) {
-	return s.parseDERSignature(sigStr)
+func (sp secp256k1DSA) ParseDERSignature(sigStr []byte) (Signature, error) {
+	return sp.parseDERSignature(sigStr)
 }
-func (s secp256k1DSA) ParseSignature(sigStr []byte) (Signature, error) {
-	return s.parseSignature(sigStr)
+func (sp secp256k1DSA) ParseSignature(sigStr []byte) (Signature, error) {
+	return sp.parseSignature(sigStr)
 }
-func (s secp256k1DSA) RecoverCompact(signature, hash []byte) (PublicKey, bool,
+func (sp secp256k1DSA) RecoverCompact(signature, hash []byte) (PublicKey, bool,
 	error) {
-	return s.recoverCompact(signature, hash)
+	return sp.recoverCompact(signature, hash)
 }
 
 // ECDSA
-func (s secp256k1DSA) GenerateKey(rand io.Reader) ([]byte, *big.Int, *big.Int,
+func (sp secp256k1DSA) GenerateKey(rand io.Reader) ([]byte, *big.Int, *big.Int,
 	error) {
-	return s.generateKey(rand)
+	return sp.generateKey(rand)
 }
 func (sp secp256k1DSA) Sign(priv PrivateKey, hash []byte) (r, s *big.Int,
 	err error) {
@@ -146,16 +146,16 @@ func (sp secp256k1DSA) Verify(pub PublicKey, hash []byte, r, s *big.Int) bool {
 }
 
 // Symmetric cipher encryption
-func (s secp256k1DSA) GenerateSharedSecret(privkey []byte, x, y *big.Int) []byte {
-	return s.generateSharedSecret(privkey, x, y)
+func (sp secp256k1DSA) GenerateSharedSecret(privkey []byte, x, y *big.Int) []byte {
+	return sp.generateSharedSecret(privkey, x, y)
 }
-func (s secp256k1DSA) Encrypt(x, y *big.Int, in []byte) ([]byte,
+func (sp secp256k1DSA) Encrypt(x, y *big.Int, in []byte) ([]byte,
 	error) {
-	return s.encrypt(x, y, in)
+	return sp.encrypt(x, y, in)
 }
-func (s secp256k1DSA) Decrypt(privkey []byte, in []byte) ([]byte,
+func (sp secp256k1DSA) Decrypt(privkey []byte, in []byte) ([]byte,
 	error) {
-	return s.decrypt(privkey, in)
+	return sp.decrypt(privkey, in)
 }
 
 // newSecp256k1DSA instatiates a function DSA subsystem over the secp256k1

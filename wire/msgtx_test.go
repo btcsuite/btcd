@@ -388,7 +388,7 @@ func TestTxSerialize(t *testing.T) {
 		sz := test.in.SerializeSize()
 		actualSz := len(buf.Bytes())
 		if sz != actualSz {
-			t.Errorf("Wrong serialize size #%d\n got: %s want: %s", i,
+			t.Errorf("Wrong serialize size #%d\n got: %d want: %d", i,
 				sz, actualSz)
 		}
 
@@ -481,7 +481,7 @@ func TestTxSerializePrefix(t *testing.T) {
 		sz := test.in.SerializeSize()
 		actualSz := len(buf.Bytes())
 		if sz != actualSz {
-			t.Errorf("Wrong serialize size #%d\n got: %s want: %s", i,
+			t.Errorf("Wrong serialize size #%d\n got: %d want: %d", i,
 				sz, actualSz)
 		}
 
@@ -571,7 +571,7 @@ func TestTxSerializeWitness(t *testing.T) {
 		sz := test.in.SerializeSize()
 		actualSz := len(buf.Bytes())
 		if sz != actualSz {
-			t.Errorf("Wrong serialize size #%d\n got: %s want: %s", i,
+			t.Errorf("Wrong serialize size #%d\n got: %d want: %d", i,
 				sz, actualSz)
 		}
 
@@ -661,7 +661,7 @@ func TestTxSerializeWitnessSigning(t *testing.T) {
 		sz := test.in.SerializeSize()
 		actualSz := len(buf.Bytes())
 		if sz != actualSz {
-			t.Errorf("Wrong serialize size #%d\n got: %s want: %s", i,
+			t.Errorf("Wrong serialize size #%d\n got: %d want: %d", i,
 				sz, actualSz)
 		}
 
@@ -751,7 +751,7 @@ func TestTxSerializeWitnessValueSigning(t *testing.T) {
 		sz := test.in.SerializeSize()
 		actualSz := len(buf.Bytes())
 		if sz != actualSz {
-			t.Errorf("Wrong serialize size #%d\n got: %s want: %s", i,
+			t.Errorf("Wrong serialize size #%d\n got: %d want: %d", i,
 				sz, actualSz)
 		}
 
