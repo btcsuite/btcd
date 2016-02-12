@@ -1,4 +1,4 @@
-// Copyright (c) 2013-2014 The btcsuite developers
+// Copyright (c) 2013-2016 The btcsuite developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -11,6 +11,7 @@ import (
 	"math"
 	"math/big"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/btcsuite/btcd/blockchain"
@@ -94,6 +95,9 @@ type mempoolConfig struct {
 // blocks and relayed to other peers.  It is safe for concurrent access from
 // multiple peers.
 type txMemPool struct {
+	// The following variables must only be used atomically.
+	lastUpdated int64 // last time pool was updated
+
 	sync.RWMutex
 	cfg           mempoolConfig
 	pool          map[wire.ShaHash]*mempoolTxDesc
@@ -101,9 +105,8 @@ type txMemPool struct {
 	orphansByPrev map[wire.ShaHash]map[wire.ShaHash]*btcutil.Tx
 	addrindex     map[string]map[wire.ShaHash]struct{} // maps address to txs
 	outpoints     map[wire.OutPoint]*btcutil.Tx
-	lastUpdated   time.Time // last time pool was updated
-	pennyTotal    float64   // exponentially decaying total for penny spends.
-	lastPennyUnix int64     // unix time of last ``penny spend''
+	pennyTotal    float64 // exponentially decaying total for penny spends.
+	lastPennyUnix int64   // unix time of last ``penny spend''
 }
 
 // Ensure the txMemPool type implements the mining.TxSource interface.
@@ -330,7 +333,7 @@ func (mp *txMemPool) removeTransaction(tx *btcutil.Tx, removeRedeemers bool) {
 			delete(mp.outpoints, txIn.PreviousOutPoint)
 		}
 		delete(mp.pool, *txHash)
-		mp.lastUpdated = time.Now()
+		atomic.StoreInt64(&mp.lastUpdated, time.Now().Unix())
 	}
 
 }
@@ -432,7 +435,7 @@ func (mp *txMemPool) addTransaction(txStore blockchain.TxStore, tx *btcutil.Tx, 
 	for _, txIn := range tx.MsgTx().TxIn {
 		mp.outpoints[txIn.PreviousOutPoint] = tx
 	}
-	mp.lastUpdated = time.Now()
+	atomic.StoreInt64(&mp.lastUpdated, time.Now().Unix())
 
 	if mp.cfg.EnableAddrIndex {
 		mp.addTransactionToAddrIndex(tx)
@@ -1095,10 +1098,7 @@ func (mp *txMemPool) MiningDescs() []*mining.TxDesc {
 //
 // This function is safe for concurrent access.
 func (mp *txMemPool) LastUpdated() time.Time {
-	mp.RLock()
-	defer mp.RUnlock()
-
-	return mp.lastUpdated
+	return time.Unix(atomic.LoadInt64(&mp.lastUpdated), 0)
 }
 
 // newTxMemPool returns a new memory pool for validating and storing standalone
