@@ -79,11 +79,19 @@ const (
 	// is also used to help determine if a transaction is considered dust
 	// and as a base for calculating minimum required fees for larger
 	// transactions.  This value is in Atom/1000 bytes.
-	minTxRelayFeeMainNet = 5e6
+	minTxRelayFeeMainNet = 1e5
 
 	// minTxRelayFeeTestNet is the minimum relay fee for the Test and Simulation
 	// networks.
 	minTxRelayFeeTestNet = 1e3
+
+	// minTxFeeForMempoolMainNet is the minimum fee in atoms that is required
+	// for a transaction to enter the mempool on MainNet.
+	minTxFeeForMempoolMainNet = 1e6
+
+	// minTxFeeForMempoolMainNet is the minimum fee in atoms that is required
+	// for a transaction to enter the mempool on TestNet or SimNet.
+	minTxFeeForMempoolTestNet = 1e3
 
 	// maxSSGensDoubleSpends is the maximum number of SSGen double spends
 	// allowed in the pool.
@@ -396,31 +404,36 @@ func isDust(txOut *wire.TxOut, params *chaincfg.Params) bool {
 	//
 	// Pay-to-pubkey-hash bytes breakdown:
 	//
-	//  Output to hash (34 bytes):
-	//   8 value, 1 script len, 25 script [1 OP_DUP, 1 OP_HASH_160,
-	//   1 OP_DATA_20, 20 hash, 1 OP_EQUALVERIFY, 1 OP_CHECKSIG]
+	//  Output to hash (38 bytes):
+	//   2 script version, 8 value, 1 script len, 25 script
+	//   [1 OP_DUP, 1 OP_HASH_160, 1 OP_DATA_20, 20 hash,
+	//   1 OP_EQUALVERIFY, 1 OP_CHECKSIG]
 	//
-	//  Input with compressed pubkey (148 bytes):
-	//   36 prev outpoint, 1 script len, 107 script [1 OP_DATA_72, 72 sig,
-	//   1 OP_DATA_33, 33 compressed pubkey], 4 sequence
+	//  Input with compressed pubkey (165 bytes):
+	//   37 prev outpoint, 16 fraud proof, 1 script len,
+	//   107 script [1 OP_DATA_72, 72 sig, 1 OP_DATA_33,
+	//   33 compressed pubkey], 4 sequence
 	//
-	//  Input with uncompressed pubkey (180 bytes):
-	//   36 prev outpoint, 1 script len, 139 script [1 OP_DATA_72, 72 sig,
-	//   1 OP_DATA_65, 65 compressed pubkey], 4 sequence
+	//  Input with uncompressed pubkey (198 bytes):
+	//   37 prev outpoint,  16 fraud proof, 1 script len,
+	//   139 script [1 OP_DATA_72, 72 sig, 1 OP_DATA_65,
+	//   65 compressed pubkey], 4 sequence, 1 witness
+	//   append
 	//
 	// Pay-to-pubkey bytes breakdown:
 	//
-	//  Output to compressed pubkey (44 bytes):
-	//   8 value, 1 script len, 35 script [1 OP_DATA_33,
-	//   33 compressed pubkey, 1 OP_CHECKSIG]
+	//  Output to compressed pubkey (46 bytes):
+	//   2 script version, 8 value, 1 script len, 35 script
+	//   [1 OP_DATA_33, 33 compressed pubkey, 1 OP_CHECKSIG]
 	//
 	//  Output to uncompressed pubkey (76 bytes):
-	//   8 value, 1 script len, 67 script [1 OP_DATA_65, 65 pubkey,
-	//   1 OP_CHECKSIG]
+	//   2 script version, 8 value, 1 script len, 67 script
+	//   [1 OP_DATA_65, 65 pubkey, 1 OP_CHECKSIG]
 	//
-	//  Input (114 bytes):
-	//   36 prev outpoint, 1 script len, 73 script [1 OP_DATA_72,
-	//   72 sig], 4 sequence
+	//  Input (133 bytes):
+	//   37 prev outpoint, 16 fraud proof, 1 script len, 73
+	//   script [1 OP_DATA_72, 72 sig], 4 sequence, 1 witness
+	//   append
 	//
 	// Theoretically this could examine the script type of the output script
 	// and use a different size for the typical input script size for
@@ -430,9 +443,9 @@ func isDust(txOut *wire.TxOut, params *chaincfg.Params) bool {
 	// common.
 	//
 	// The most common scripts are pay-to-pubkey-hash, and as per the above
-	// breakdown, the minimum size of a p2pkh input script is 148 bytes.  So
+	// breakdown, the minimum size of a p2pkh input script is 165 bytes.  So
 	// that figure is used.
-	totalSize := txOut.SerializeSize() + 148
+	totalSize := txOut.SerializeSize() + 165
 
 	// The output is considered dust if the cost to the network to spend the
 	// coins is more than 1/3 of the minimum free transaction relay fee.
@@ -441,7 +454,7 @@ func isDust(txOut *wire.TxOut, params *chaincfg.Params) bool {
 	//
 	// Using the typical values for a pay-to-pubkey-hash transaction from
 	// the breakdown above and the default minimum free transaction relay
-	// fee of 1000, this equates to values less than 546 atoms being
+	// fee of 5000000, this equates to values less than 546 atoms being
 	// considered dust.
 	//
 	// The following is equivalent to (value/totalSize) * (1/3) * 1000
@@ -1581,6 +1594,28 @@ func (mp *txMemPool) maybeAcceptTransaction(tx *dcrutil.Tx, isNew,
 				minFee)
 			return nil, txRuleError(wire.RejectInsufficientFee, str)
 		}
+	}
+
+	// Set an absolute threshold for rejection and obey it. This prevents
+	// unnecessary transaction spam. We only enforce this for transactions
+	// we expect to have fees. Votes are mandatory, so we skip the check
+	// on them.
+	var feeThreshold int64
+	switch {
+	case mp.server.chainParams == &chaincfg.MainNetParams:
+		feeThreshold = minTxFeeForMempoolMainNet
+	case mp.server.chainParams == &chaincfg.TestNetParams:
+		feeThreshold = minTxFeeForMempoolTestNet
+	default:
+		feeThreshold = minTxFeeForMempoolTestNet
+	}
+	feePerKB := float64(txFee) / (float64(serializedSize) / 1000.0)
+	if (float64(feePerKB) < float64(feeThreshold)) &&
+		txType != stake.TxTypeSSGen {
+		str := fmt.Sprintf("transaction %v has %d fees per kb which "+
+			"is under the required threshold amount of %d", txHash, feePerKB,
+			feeThreshold)
+		return nil, txRuleError(wire.RejectInsufficientFee, str)
 	}
 
 	// Require that free transactions have sufficient priority to be mined
