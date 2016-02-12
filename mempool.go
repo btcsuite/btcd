@@ -91,7 +91,7 @@ const (
 
 	// minTxFeeForMempoolMainNet is the minimum fee in atoms that is required
 	// for a transaction to enter the mempool on TestNet or SimNet.
-	minTxFeeForMempoolTestNet = 1e3
+	minTxFeeForMempoolTestNet = 1e2
 
 	// maxSSGensDoubleSpends is the maximum number of SSGen double spends
 	// allowed in the pool.
