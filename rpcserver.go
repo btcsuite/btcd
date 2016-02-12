@@ -2373,7 +2373,7 @@ func handleGetPeerInfo(s *rpcServer, cmd interface{}, closeChan <-chan struct{})
 			Inbound:        statsSnap.Inbound,
 			StartingHeight: statsSnap.StartingHeight,
 			CurrentHeight:  statsSnap.LastBlock,
-			BanScore:       p.banScore.Int(),
+			BanScore:       int32(p.banScore.Int()),
 			SyncNode:       p == syncPeer,
 		}
 		if p.LastPingNonce() != 0 {

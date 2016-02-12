@@ -296,31 +296,32 @@ func (sp *serverPeer) pushAddrMsg(addresses []*wire.NetAddress) {
 // the score is above the ban threshold, the peer will be banned and
 // disconnected.
 func (sp *serverPeer) addBanScore(persistent, transient uint32, reason string) {
-	if !cfg.DisableBanning {
-		warnThreshold := cfg.BanThreshold >> 1
-		if transient == 0 && persistent == 0 {
-			// The score is not being increased, but a warning message is still
-			// logged if the score is above the warn threshold.
-			score := sp.banScore.Int()
-			if score > warnThreshold {
-				peerLog.Warnf("Misbehaving peer %s: %s -- ban score is %d, "+
-					"it was not increased this time", sp, reason, score)
-			}
-		} else {
-			score := sp.banScore.Increase(persistent, transient)
-			if score > warnThreshold {
-				peerLog.Warnf("Misbehaving peer %s: %s -- "+
-					"ban score increased to %d", sp, reason, score)
-				if score > cfg.BanThreshold {
-					peerLog.Warnf("Misbehaving peer %s -- "+
-						"banning and disconnecting", sp)
-					sp.server.BanPeer(sp)
-					sp.Disconnect()
-				}
-			}
+	// No warning is logged and no score is calculated if banning is disabled.
+	if cfg.DisableBanning {
+		return
+	}
+	warnThreshold := cfg.BanThreshold >> 1
+	if transient == 0 && persistent == 0 {
+		// The score is not being increased, but a warning message is still
+		// logged if the score is above the warn threshold.
+		score := sp.banScore.Int()
+		if score > warnThreshold {
+			peerLog.Warnf("Misbehaving peer %s: %s -- ban score is %d, "+
+				"it was not increased this time", sp, reason, score)
+		}
+		return
+	}
+	score := sp.banScore.Increase(persistent, transient)
+	if score > warnThreshold {
+		peerLog.Warnf("Misbehaving peer %s: %s -- ban score increased to %d",
+			sp, reason, score)
+		if score > cfg.BanThreshold {
+			peerLog.Warnf("Misbehaving peer %s -- banning and disconnecting",
+				sp)
+			sp.server.BanPeer(sp)
+			sp.Disconnect()
 		}
 	}
-	// No warning is logged and no score is calculated if banning is disabled.
 }
 
 // OnVersion is invoked when a peer receives a version bitcoin message
@@ -394,7 +395,7 @@ func (sp *serverPeer) OnMemPool(p *peer.Peer, msg *wire.MsgMemPool) {
 	// A decaying ban score increase is applied to prevent flooding.
 	// The ban score accumulates and passes the ban threshold if a burst of
 	// mempool messages comes from a peer. The score decays each minute to
-	// half of it's value.
+	// half of its value.
 	sp.addBanScore(0, 33, "mempool")
 
 	// Generate inventory message with the available transactions in the
@@ -504,8 +505,8 @@ func (sp *serverPeer) OnGetData(p *peer.Peer, msg *wire.MsgGetData) {
 	// Requesting more than the maximum inventory vector length within a short
 	// period of time yields a score above the default ban threshold. Sustained
 	// bursts of small request also yield high ban score.
-	// This incremental score decays each minute to half of it's value.
-	sp.addBanScore(0, 1+uint32(length)*100/wire.MaxInvPerMsg, "getdata")
+	// This incremental score decays each minute to half of its value.
+	sp.addBanScore(0, 1+uint32(length)*99/wire.MaxInvPerMsg, "getdata")
 
 	// We wait on this wait channel periodically to prevent queueing
 	// far more data than we can send in a reasonable time, wasting memory.
