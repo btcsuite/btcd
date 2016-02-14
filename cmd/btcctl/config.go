@@ -326,10 +326,7 @@ func createDefaultConfigFile(destinationPath string) error {
 	}
 	defer dest.Close()
 
-	dest.WriteString(fmt.Sprintf(`[Application Options]
-  rpcuser=%s
-  rpcpass=%s
-`, string(userSubmatches[1]), string(passSubmatches[1])))
+	dest.WriteString(fmt.Sprintf("rpcuser=%s\nrpcpass=%s", string(userSubmatches[1]), string(passSubmatches[1])))
 
 	return nil
 }
