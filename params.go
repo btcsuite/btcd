@@ -47,7 +47,7 @@ var testNetParams = params{
 	rpcPort: "19109",
 	dnsSeeds: []string{
 		"testnet-seed.decred.mindcry.org",
-		"testnet-seed.decred.netpurgatory.com",
+		"testnet-seed.decred.netpurgatory.org",
 		"testnet.decredseed.org",
 		"testnet-seed.decred.org",
 	},
