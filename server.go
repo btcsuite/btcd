@@ -501,12 +501,14 @@ func (sp *serverPeer) OnGetData(p *peer.Peer, msg *wire.MsgGetData) {
 	notFound := wire.NewMsgNotFound()
 
 	length := len(msg.InvList)
-	// A decaying ban score increase is applied to prevent flooding.
+	// A decaying ban score increase is applied to prevent exhausting resources
+	// with unusually large inventory queries.
 	// Requesting more than the maximum inventory vector length within a short
 	// period of time yields a score above the default ban threshold. Sustained
-	// bursts of small request also yield high ban score.
+	// bursts of small requests are not penalized as that would potentially ban
+	// peers performing IBD.
 	// This incremental score decays each minute to half of its value.
-	sp.addBanScore(0, 1+uint32(length)*99/wire.MaxInvPerMsg, "getdata")
+	sp.addBanScore(0, uint32(length)*99/wire.MaxInvPerMsg, "getdata")
 
 	// We wait on this wait channel periodically to prevent queueing
 	// far more data than we can send in a reasonable time, wasting memory.
