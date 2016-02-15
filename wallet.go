@@ -2721,6 +2721,78 @@ func (c *Client) GetInfo() (*dcrjson.InfoWalletResult, error) {
 	return c.GetInfoAsync().Receive()
 }
 
+// FutureGetTicketVoteBitsResult is a future promise to deliver the result of a
+// GetTicketVoteBitsAsync RPC invocation (or an applicable error).
+type FutureGetTicketVoteBitsResult chan *response
+
+// Receive waits for the response promised by the future and returns the info
+// provided by the server.
+func (r FutureGetTicketVoteBitsResult) Receive() (*dcrjson.GetTicketVoteBitsResult, error) {
+	res, err := receiveFuture(r)
+	if err != nil {
+		return nil, err
+	}
+
+	// Unmarshal result as a ticketsforaddress result object.
+	var infoRes dcrjson.GetTicketVoteBitsResult
+	err = json.Unmarshal(res, &infoRes)
+	if err != nil {
+		return nil, err
+	}
+
+	return &infoRes, nil
+}
+
+// GetTicketVoteBitsAsync returns an instance of a type that can be used to
+// get the result of the RPC at some future time by invoking the Receive
+// function on the returned instance.
+//
+// See GetTicketVoteBits for the blocking version and more details.
+func (c *Client) GetTicketVoteBitsAsync(hash *chainhash.Hash) FutureGetTicketVoteBitsResult {
+	cmd := dcrjson.NewGetTicketVoteBitsCmd(hash.String())
+	return c.sendCmd(cmd)
+}
+
+// GetTicketVoteBits returns a the currently set voteBits for a given ticket.
+// If the daemon server is queried, it returns a search of tickets in the
+// live ticket pool. If the wallet server is queried, it searches all tickets
+// owned by the wallet.
+func (c *Client) GetTicketVoteBits(hash *chainhash.Hash) (*dcrjson.GetTicketVoteBitsResult, error) {
+	return c.GetTicketVoteBitsAsync(hash).Receive()
+}
+
+// FutureSetTicketVoteBitsResult is a future promise to deliver the result of a
+// SetTicketVoteBitsAsync RPC invocation (or an applicable error).
+type FutureSetTicketVoteBitsResult chan *response
+
+// Receive waits for the response promised by the future and returns the info
+// provided by the server.
+func (r FutureSetTicketVoteBitsResult) Receive() error {
+	_, err := receiveFuture(r)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// SetTicketVoteBitsAsync returns an instance of a type that can be used to
+// get the result of the RPC at some future time by invoking the Receive
+// function on the returned instance.
+//
+// See SetTicketVoteBits for the blocking version and more details.
+func (c *Client) SetTicketVoteBitsAsync(hash *chainhash.Hash, voteBits uint16) FutureSetTicketVoteBitsResult {
+	emptyStr := ""
+	cmd := dcrjson.NewSetTicketVoteBitsCmd(hash.String(), voteBits, &emptyStr)
+	return c.sendCmd(cmd)
+}
+
+// SetTicketVoteBits sets the voteBits field for a given ticket, so that these
+// bits are used in the future for a vote.
+func (c *Client) SetTicketVoteBits(hash *chainhash.Hash, voteBits uint16) error {
+	return c.SetTicketVoteBitsAsync(hash, voteBits).Receive()
+}
+
 // FutureTicketsForAddressResult is a future promise to deliver the result of a
 // GetInfoAsync RPC invocation (or an applicable error).
 type FutureTicketsForAddressResult chan *response
