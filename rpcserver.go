@@ -157,6 +157,7 @@ var rpcHandlersBeforeInit = map[string]commandHandler{
 	"getblockcount":         handleGetBlockCount,
 	"getblockhash":          handleGetBlockHash,
 	"getblocktemplate":      handleGetBlockTemplate,
+	"getcoinsupply":         handleGetCoinSupply,
 	"getconnectioncount":    handleGetConnectionCount,
 	"getcurrentnet":         handleGetCurrentNet,
 	"getdifficulty":         handleGetDifficulty,
@@ -2821,6 +2822,62 @@ func handleGetBlockTemplate(s *rpcServer, cmd interface{}, closeChan <-chan stru
 		Code:    dcrjson.ErrRPCInvalidParameter,
 		Message: "Invalid mode",
 	}
+}
+
+// handleGetCoinSupply implements the getcoinsupply command.
+func handleGetCoinSupply(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (interface{}, error) {
+	var supply int64
+	params := s.server.chainParams
+	base := params.BaseSubsidy
+	_, tipHeight, err := s.server.db.NewestSha()
+	if err != nil {
+		return nil, &dcrjson.RPCError{
+			Code:    dcrjson.ErrRPCBestBlockHash,
+			Message: "Error getting best block hash",
+		}
+	}
+	for i := 0; int64(i) < tipHeight+1; i++ {
+		if i == 0 {
+			continue
+		}
+		if i == 1 {
+			supply += params.BlockOneSubsidy()
+			continue
+		}
+
+		if i%int(params.ReductionInterval) == 0 {
+			base *= params.MulSubsidy
+			base /= params.DivSubsidy
+		}
+		blockSha, err := s.server.db.FetchBlockShaByHeight(int64(i))
+		if err != nil {
+			context := "Failed to get block sha by height"
+			return nil, internalRPCError(err.Error(), context)
+		}
+		bh, err := s.server.db.FetchBlockHeaderBySha(blockSha)
+		if err != nil {
+			context := "Failed to get blockheader by hash"
+			return nil, internalRPCError(err.Error(), context)
+		}
+		voters := int64(bh.Voters)
+		work := ((base * int64(params.WorkRewardProportion)) /
+			int64(params.TotalSubsidyProportions()))
+		stake := ((base * int64(params.StakeRewardProportion)) /
+			(int64(params.TicketsPerBlock) * int64(params.TotalSubsidyProportions()))) *
+			voters
+		tax := ((base * int64(params.BlockTaxProportion)) /
+			int64(params.TotalSubsidyProportions()))
+
+		if int64(i) < params.StakeValidationHeight {
+			supply += (work + tax)
+		} else {
+			supply += (work + stake + tax)
+		}
+	}
+	ret := &dcrjson.GetCoinSupplyResult{
+		CoinSupply: supply,
+	}
+	return ret, nil
 }
 
 // handleGetConnectionCount implements the getconnectioncount command.

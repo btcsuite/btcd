@@ -639,6 +639,10 @@ var helpDescsEnUS = map[string]string{
 	// MissedTickets help.
 	"missedtickets--synopsis":     "Reguest tickets the client missed",
 	"missedticketsresult-tickets": "List of missed tickets",
+
+	// GetCoinSupply help
+	"getcoinsupply--synopsis":        "Returns current total coin supply in atoms",
+	"getcoinsupplyresult-coinsupply": "Current coin supply in atoms",
 }
 
 // rpcResultTypes specifies the result types that each RPC command can return.
@@ -678,6 +682,7 @@ var rpcResultTypes = map[string][]interface{}{
 	"getrawtransaction":     []interface{}{(*string)(nil), (*dcrjson.TxRawResult)(nil)},
 	"gettxout":              []interface{}{(*dcrjson.GetTxOutResult)(nil)},
 	"getwork":               []interface{}{(*dcrjson.GetWorkResult)(nil), (*bool)(nil)},
+	"getcoinsupply":         []interface{}{(*dcrjson.GetCoinSupplyResult)(nil)},
 	"missedtickets":         []interface{}{(*dcrjson.MissedTicketsResult)(nil)},
 	"node":                  nil,
 	"help":                  []interface{}{(*string)(nil), (*string)(nil)},

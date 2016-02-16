@@ -23,6 +23,15 @@ func NewExistsAddressCmd(address string) *ExistsAddressCmd {
 	}
 }
 
+// GetCoinSupplyCmd defines the getcoinsupply JSON-RPC command.
+type GetCoinSupplyCmd struct{}
+
+// NewGetCoinSupplyCmd returns a new instance which can be used to issue a
+// getcoinsupply JSON-RPC command.
+func NewGetCoinSupplyCmd() *GetCoinSupplyCmd {
+	return &GetCoinSupplyCmd{}
+}
+
 // GetStakeDifficultyCmd is a type handling custom marshaling and
 // unmarshaling of getstakedifficulty JSON RPC commands.
 type GetStakeDifficultyCmd struct{}
@@ -79,6 +88,7 @@ func init() {
 	flags := UsageFlag(0)
 
 	MustRegisterCmd("existsaddress", (*ExistsAddressCmd)(nil), flags)
+	MustRegisterCmd("getcoinsupply", (*GetCoinSupplyCmd)(nil), flags)
 	MustRegisterCmd("getstakedifficulty", (*GetStakeDifficultyCmd)(nil), flags)
 	MustRegisterCmd("missedtickets", (*MissedTicketsCmd)(nil), flags)
 	MustRegisterCmd("rebroadcastmissed", (*RebroadcastMissedCmd)(nil), flags)

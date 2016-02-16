@@ -11,6 +11,12 @@ type ExistsAddressResult struct {
 	Exists bool `json:"exists"`
 }
 
+// GetCoinSupplyResult models the data returned from the getcoinsupply
+// command.
+type GetCoinSupplyResult struct {
+	CoinSupply int64 `json:"coinsupply"`
+}
+
 // GetStakeDifficultyResult models the data returned from the getstakedifficulty
 // command.
 type GetStakeDifficultyResult struct {
