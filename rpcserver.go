@@ -2836,6 +2836,15 @@ func handleGetCoinSupply(s *rpcServer, cmd interface{}, closeChan <-chan struct{
 			Message: "Error getting best block hash",
 		}
 	}
+
+	s.coinSupplyMtx.Lock()
+	defer s.coinSupplyMtx.Unlock()
+
+	// Return the cached value if the block height hasn't changed.
+	if s.coinSupplyHeight == tipHeight {
+		return s.coinSupplyTotal, nil
+	}
+
 	for i := 0; int64(i) < tipHeight+1; i++ {
 		if i == 0 {
 			continue
@@ -2874,6 +2883,10 @@ func handleGetCoinSupply(s *rpcServer, cmd interface{}, closeChan <-chan struct{
 			supply += (work + stake + tax)
 		}
 	}
+
+	s.coinSupplyHeight = tipHeight
+	s.coinSupplyTotal = supply
+
 	return supply, nil
 }
 
@@ -4400,6 +4413,11 @@ type rpcServer struct {
 	templatePool map[chainhash.Hash]*workStateBlockInfo
 	helpCacher   *helpCacher
 	quit         chan int
+
+	// coin supply caching values
+	coinSupplyMtx    sync.Mutex
+	coinSupplyHeight int64
+	coinSupplyTotal  int64
 }
 
 // httpStatusLine returns a response Status-Line (RFC 2616 Section 6.1)
