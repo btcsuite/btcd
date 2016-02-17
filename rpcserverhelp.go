@@ -145,9 +145,7 @@ var helpDescsEnUS = map[string]string{
 	// ExistsAddressCmd help.
 	"existsaddress--synopsis": "Test for the existance of the provided address",
 	"existsaddress-address":   "The address to check",
-
-	// ExistsAddressResult help.
-	"existsaddressresult-exists": "Bool showing if address exists or not",
+	"existsaddress--result0":  "Bool showing if address exists or not",
 
 	// GenerateCmd help
 	"generate--synopsis": "Generates a set number of blocks (simnet or regtest only) and returns a JSON\n" +
@@ -318,8 +316,8 @@ var helpDescsEnUS = map[string]string{
 	"getdifficulty--result0":  "The difficulty",
 
 	// GetStakeDifficultyCmd help.
-	"getstakedifficulty--synopsis":        "Returns the proof-of-stake difficulty.",
-	"getstakedifficultyresult-difficulty": "The stake difficulty",
+	"getstakedifficulty--synopsis": "Returns the proof-of-stake difficulty.",
+	"getstakedifficulty--result0":  "The stake difficulty",
 
 	// GetGenerateCmd help.
 	"getgenerate--synopsis": "Returns if the server is set to generate coins (mine) or not.",
@@ -641,8 +639,8 @@ var helpDescsEnUS = map[string]string{
 	"missedticketsresult-tickets": "List of missed tickets",
 
 	// GetCoinSupply help
-	"getcoinsupply--synopsis":        "Returns current total coin supply in atoms",
-	"getcoinsupplyresult-coinsupply": "Current coin supply in atoms",
+	"getcoinsupply--synopsis": "Returns current total coin supply in atoms",
+	"getcoinsupply--result0":  "Current coin supply in atoms",
 }
 
 // rpcResultTypes specifies the result types that each RPC command can return.
@@ -658,7 +656,7 @@ var rpcResultTypes = map[string][]interface{}{
 	"decoderawtransaction":  []interface{}{(*dcrjson.TxRawDecodeResult)(nil)},
 	"decodescript":          []interface{}{(*dcrjson.DecodeScriptResult)(nil)},
 	"estimatefee":           []interface{}{(*float64)(nil)},
-	"existsaddress":         []interface{}{(*dcrjson.ExistsAddressResult)(nil)},
+	"existsaddress":         []interface{}{(*bool)(nil)},
 	"getaddednodeinfo":      []interface{}{(*[]string)(nil), (*[]dcrjson.GetAddedNodeInfoResult)(nil)},
 	"getbestblock":          []interface{}{(*dcrjson.GetBestBlockResult)(nil)},
 	"generate":              []interface{}{(*[]string)(nil)},
@@ -670,7 +668,7 @@ var rpcResultTypes = map[string][]interface{}{
 	"getconnectioncount":    []interface{}{(*int32)(nil)},
 	"getcurrentnet":         []interface{}{(*uint32)(nil)},
 	"getdifficulty":         []interface{}{(*float64)(nil)},
-	"getstakedifficulty":    []interface{}{(*dcrjson.GetStakeDifficultyResult)(nil)},
+	"getstakedifficulty":    []interface{}{(*float64)(nil)},
 	"getgenerate":           []interface{}{(*bool)(nil)},
 	"gethashespersec":       []interface{}{(*float64)(nil)},
 	"getinfo":               []interface{}{(*dcrjson.InfoChainResult)(nil)},
@@ -682,7 +680,7 @@ var rpcResultTypes = map[string][]interface{}{
 	"getrawtransaction":     []interface{}{(*string)(nil), (*dcrjson.TxRawResult)(nil)},
 	"gettxout":              []interface{}{(*dcrjson.GetTxOutResult)(nil)},
 	"getwork":               []interface{}{(*dcrjson.GetWorkResult)(nil), (*bool)(nil)},
-	"getcoinsupply":         []interface{}{(*dcrjson.GetCoinSupplyResult)(nil)},
+	"getcoinsupply":         []interface{}{(*int64)(nil)},
 	"missedtickets":         []interface{}{(*dcrjson.MissedTicketsResult)(nil)},
 	"node":                  nil,
 	"help":                  []interface{}{(*string)(nil), (*string)(nil)},

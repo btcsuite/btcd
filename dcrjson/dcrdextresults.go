@@ -5,24 +5,6 @@
 
 package dcrjson
 
-// ExistsAddressResult models the data returned from the existsaddress
-// command.
-type ExistsAddressResult struct {
-	Exists bool `json:"exists"`
-}
-
-// GetCoinSupplyResult models the data returned from the getcoinsupply
-// command.
-type GetCoinSupplyResult struct {
-	CoinSupply int64 `json:"coinsupply"`
-}
-
-// GetStakeDifficultyResult models the data returned from the getstakedifficulty
-// command.
-type GetStakeDifficultyResult struct {
-	Difficulty float64 `json:"difficulty"`
-}
-
 // MissedTicketsResult models the data returned from the missedtickets
 // command.
 type MissedTicketsResult struct {

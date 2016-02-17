@@ -22,24 +22,6 @@ type GetMultisigOutInfoResult struct {
 	Amount       float64  `json:"amount"`
 }
 
-// GetSeedResult models the data returned from the getseed
-// command.
-type GetSeedResult struct {
-	Seed string `json:"seed"`
-}
-
-// GetMasterPubkeyResult models the data returned from the getmasterpubkey
-// command.
-type GetMasterPubkeyResult struct {
-	MasterPubkey string `json:"key"`
-}
-
-// GetTicketMaxPriceResult models the data returned from the getticketmaxprice
-// command.
-type GetTicketMaxPriceResult struct {
-	Price float64 `json:"price"`
-}
-
 // GetTicketsResult models the data returned from the gettickets
 // command.
 type GetTicketsResult struct {
@@ -51,11 +33,6 @@ type GetTicketsResult struct {
 type GetTicketVoteBitsResult struct {
 	VoteBits    uint16 `json:"votebits"`
 	VoteBitsExt string `json:"votebitsext"`
-}
-
-// GetWalletFeeResult models the data returned from the getwalletfee command
-type GetWalletFeeResult struct {
-	Fee float64 `json:"fee"`
 }
 
 // RedeemMultiSigOutResult models the data returned from the redeemmultisigout

@@ -1467,9 +1467,9 @@ func handleExistsAddress(s *rpcServer, cmd interface{},
 	// Check the blockchain for the relevant address usage.
 	tlr, err := s.server.db.FetchTxsForAddr(addr, numToSkip, numRequested)
 	if err == nil && tlr != nil {
-		return &dcrjson.ExistsAddressResult{Exists: true}, nil
+		return true, nil
 	}
-	return &dcrjson.ExistsAddressResult{Exists: false}, nil
+	return false, nil
 }
 
 // handleGenerate handles generate commands.
@@ -2874,10 +2874,7 @@ func handleGetCoinSupply(s *rpcServer, cmd interface{}, closeChan <-chan struct{
 			supply += (work + stake + tax)
 		}
 	}
-	ret := &dcrjson.GetCoinSupplyResult{
-		CoinSupply: supply,
-	}
-	return ret, nil
+	return supply, nil
 }
 
 // handleGetConnectionCount implements the getconnectioncount command.
@@ -3316,7 +3313,7 @@ func handleGetStakeDifficulty(s *rpcServer, cmd interface{}, closeChan <-chan st
 	}
 	sDiff := dcrutil.Amount(blockHeader.SBits)
 
-	return &dcrjson.GetStakeDifficultyResult{Difficulty: sDiff.ToCoin()}, nil
+	return sDiff.ToCoin(), nil
 }
 
 // bigToLEUint256 returns the passed big integer as an unsigned 256-bit integer
