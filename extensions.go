@@ -104,17 +104,17 @@ type FutureExistsAddressResult chan *response
 
 // Receive waits for the response promised by the future and returns information
 // about all transactions associated with the provided addresses.
-func (r FutureExistsAddressResult) Receive() (dcrjson.ExistsAddressResult, error) {
+func (r FutureExistsAddressResult) Receive() (bool, error) {
 	res, err := receiveFuture(r)
 	if err != nil {
-		return dcrjson.ExistsAddressResult{}, err
+		return false, err
 	}
 
 	// Unmarshal the result as an array of existsaddress object.
-	var exists dcrjson.ExistsAddressResult
+	var exists bool
 	err = json.Unmarshal(res, &exists)
 	if err != nil {
-		return dcrjson.ExistsAddressResult{}, err
+		return false, err
 	}
 	return exists, nil
 }
@@ -131,7 +131,7 @@ func (c *Client) ExistsAddressAsync(address dcrutil.Address) FutureExistsAddress
 // used on the main chain.
 //
 // NOTE: This is a dcrd extension.
-func (c *Client) ExistsAddress(address dcrutil.Address) (dcrjson.ExistsAddressResult, error) {
+func (c *Client) ExistsAddress(address dcrutil.Address) (bool, error) {
 	return c.ExistsAddressAsync(address).Receive()
 }
 
