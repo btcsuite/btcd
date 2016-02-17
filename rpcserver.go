@@ -1469,6 +1469,13 @@ func handleExistsAddress(s *rpcServer, cmd interface{},
 	if err == nil && tlr != nil {
 		return true, nil
 	}
+
+	// Check the mempool as well.
+	txs := s.server.txMemPool.FindTxForAddr(addr)
+	if len(txs) > 0 {
+		return true, nil
+	}
+
 	return false, nil
 }
 

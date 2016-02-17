@@ -957,6 +957,9 @@ func (mp *txMemPool) removeTransaction(tx *dcrutil.Tx, removeRedeemers bool) {
 		delete(mp.pool, *txHash)
 		mp.lastUpdated = time.Now()
 	}
+
+	// Remove the transaction and its addresses from the address index.
+	mp.pruneTxFromAddrIndex(tx)
 }
 
 // RemoveTransaction removes the passed transaction from the mempool. If
@@ -1052,7 +1055,7 @@ func (mp *txMemPool) indexScriptAddressToTx(pkVersion uint16, pkScript []byte,
 	_, addresses, _, err := txscript.ExtractPkScriptAddrs(pkVersion, pkScript,
 		activeNetParams.Params)
 	if err != nil {
-		txmpLog.Errorf("Unable to extract encoded addresses from script "+
+		txmpLog.Tracef("Unable to extract encoded addresses from script "+
 			"for addrindex: %v", err)
 		return err
 	}
@@ -1065,6 +1068,76 @@ func (mp *txMemPool) indexScriptAddressToTx(pkVersion uint16, pkScript []byte,
 	}
 
 	return nil
+}
+
+// pruneTxFromAddrIndex deletes references to the transaction in the address
+// index by searching first for the address from an output and second for the
+// transaction itself.
+//
+// This function MUST be called with the mempool lock held (for writes).
+func (mp *txMemPool) pruneTxFromAddrIndex(tx *dcrutil.Tx) {
+	txHash := tx.Sha()
+
+	for _, txOut := range tx.MsgTx().TxOut {
+		_, addresses, _, err := txscript.ExtractPkScriptAddrs(txOut.Version,
+			txOut.PkScript, activeNetParams.Params)
+		if err != nil {
+			// If we couldn't extract addresses, skip this output.
+			continue
+		}
+
+		for _, addr := range addresses {
+			if mp.addrindex[addr.EncodeAddress()] != nil {
+				// First remove all references to the transaction hash.
+				for thisTxHash := range mp.addrindex[addr.EncodeAddress()] {
+					if thisTxHash == *txHash {
+						delete(mp.addrindex[addr.EncodeAddress()], thisTxHash)
+					}
+				}
+
+				// Then, if the address has no transactions referenced,
+				// remove it too.
+				if len(mp.addrindex[addr.EncodeAddress()]) == 0 {
+					delete(mp.addrindex, addr.EncodeAddress())
+				}
+			}
+		}
+	}
+}
+
+// findTxForAddr searches for all referenced transactions for a given address
+// that are currently stored in the mempool.
+//
+// This function is safe for concurrent access.
+func (mp *txMemPool) findTxForAddr(addr dcrutil.Address) []*dcrutil.Tx {
+	var txs []*dcrutil.Tx
+	if mp.addrindex[addr.EncodeAddress()] != nil {
+		// Lookup all relevant transactions and append them.
+		for thisTxHash := range mp.addrindex[addr.EncodeAddress()] {
+			txDesc, exists := mp.pool[thisTxHash]
+			if !exists {
+				txmpLog.Warnf("Failed to find transaction %v in mempool "+
+					"that was referenced in the mempool addrIndex",
+					thisTxHash)
+				continue
+			}
+
+			txs = append(txs, txDesc.Tx)
+		}
+	}
+
+	return txs
+}
+
+// FindTxForAddr is the exported and concurrency safe version of findTxForAddr.
+//
+// This function is safe for concurrent access.
+func (mp *txMemPool) FindTxForAddr(addr dcrutil.Address) []*dcrutil.Tx {
+	// Protect concurrent access.
+	mp.Lock()
+	defer mp.Unlock()
+
+	return mp.findTxForAddr(addr)
 }
 
 // calcInputValueAge is a helper function used to calculate the input age of
@@ -1684,6 +1757,13 @@ func (mp *txMemPool) maybeAcceptTransaction(tx *dcrutil.Tx, isNew,
 		if err != nil {
 			return nil, err
 		}
+	}
+
+	// Insert the address into the mempool address index.
+	for _, txOut := range tx.MsgTx().TxOut {
+		// This function returns an error, but we don't really care
+		// if the script was non-standard or otherwise malformed.
+		mp.indexScriptAddressToTx(txOut.Version, txOut.PkScript, tx)
 	}
 
 	txmpLog.Debugf("Accepted transaction %v (pool size: %v)", txHash,
