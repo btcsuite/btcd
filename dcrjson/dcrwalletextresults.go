@@ -22,6 +22,23 @@ type GetMultisigOutInfoResult struct {
 	Amount       float64  `json:"amount"`
 }
 
+// GetStakeInfoResult models the data returned from the getstakeinfo
+// command.
+type GetStakeInfoResult struct {
+	PoolSize         uint32  `json:"poolsize"`
+	Difficulty       float64 `json:"difficulty"`
+	AllMempoolTix    uint32  `json:"allmempooltix"`
+	OwnMempoolTix    uint32  `json:"ownmempooltix"`
+	Immature         uint32  `json:"immature"`
+	Live             uint32  `json:"live"`
+	ProportionLive   float64 `json:"proportionlive"`
+	Voted            uint32  `json:"voted"`
+	TotalSubsidy     float64 `json:"totalsubsidy"`
+	Missed           uint32  `json:"missed"`
+	ProportionMissed float64 `json:"proportionmissed"`
+	Revoked          uint32  `json:"revoked"`
+}
+
 // GetTicketsResult models the data returned from the gettickets
 // command.
 type GetTicketsResult struct {

@@ -14,12 +14,22 @@ type ExistsAddressCmd struct {
 
 // NewExistsAddressCmd returns a new instance which can be used to issue a
 // existsaddress JSON-RPC command.
-//
-// The parameters which are pointers indicate they are optional.  Passing nil
-// for optional parameters will use the default value.
 func NewExistsAddressCmd(address string) *ExistsAddressCmd {
 	return &ExistsAddressCmd{
 		Address: address,
+	}
+}
+
+// ExistsLiveTicketCmd defines the existsliveticket JSON-RPC command.
+type ExistsLiveTicketCmd struct {
+	TxHash string
+}
+
+// NewExistsLiveTicketCmd returns a new instance which can be used to issue an
+// existsliveticket JSON-RPC command.
+func NewExistsLiveTicketCmd(txHash string) *ExistsLiveTicketCmd {
+	return &ExistsLiveTicketCmd{
+		TxHash: txHash,
 	}
 }
 
@@ -88,6 +98,7 @@ func init() {
 	flags := UsageFlag(0)
 
 	MustRegisterCmd("existsaddress", (*ExistsAddressCmd)(nil), flags)
+	MustRegisterCmd("existsliveticket", (*ExistsLiveTicketCmd)(nil), flags)
 	MustRegisterCmd("getcoinsupply", (*GetCoinSupplyCmd)(nil), flags)
 	MustRegisterCmd("getstakedifficulty", (*GetStakeDifficultyCmd)(nil), flags)
 	MustRegisterCmd("missedtickets", (*MissedTicketsCmd)(nil), flags)

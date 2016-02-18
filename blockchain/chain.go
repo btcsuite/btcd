@@ -224,6 +224,14 @@ func (b *BlockChain) TicketsWithAddress(address dcrutil.Address) ([]chainhash.Ha
 	return b.tmdb.GetLiveTicketsForAddress(address)
 }
 
+// CheckLiveTicket returns whether or not a ticket exists in the live ticket
+// map of the stake database.
+//
+// This function is NOT safe for concurrent access.
+func (b *BlockChain) CheckLiveTicket(hash *chainhash.Hash) (bool, error) {
+	return b.tmdb.CheckLiveTicket(*hash)
+}
+
 // HaveBlock returns whether or not the chain instance has the block represented
 // by the passed hash.  This includes checking the various places a block can
 // be like part of the main chain, on a side chain, or in the orphan pool.

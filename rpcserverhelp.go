@@ -147,6 +147,11 @@ var helpDescsEnUS = map[string]string{
 	"existsaddress-address":   "The address to check",
 	"existsaddress--result0":  "Bool showing if address exists or not",
 
+	// ExistsLiveTicketCmd help.
+	"existsliveticket--synopsis": "Test for the existance of the provided address",
+	"existsliveticket-txhash":    "The ticket hash to check",
+	"existsliveticket--result0":  "Bool showing if address exists in the live ticket database or not",
+
 	// GenerateCmd help
 	"generate--synopsis": "Generates a set number of blocks (simnet or regtest only) and returns a JSON\n" +
 		" array of their hashes.",
@@ -657,6 +662,7 @@ var rpcResultTypes = map[string][]interface{}{
 	"decodescript":          []interface{}{(*dcrjson.DecodeScriptResult)(nil)},
 	"estimatefee":           []interface{}{(*float64)(nil)},
 	"existsaddress":         []interface{}{(*bool)(nil)},
+	"existsliveticket":      []interface{}{(*bool)(nil)},
 	"getaddednodeinfo":      []interface{}{(*[]string)(nil), (*[]dcrjson.GetAddedNodeInfoResult)(nil)},
 	"getbestblock":          []interface{}{(*dcrjson.GetBestBlockResult)(nil)},
 	"generate":              []interface{}{(*[]string)(nil)},

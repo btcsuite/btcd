@@ -149,6 +149,7 @@ var rpcHandlersBeforeInit = map[string]commandHandler{
 	"decodescript":          handleDecodeScript,
 	"estimatefee":           handleEstimateFee,
 	"existsaddress":         handleExistsAddress,
+	"existsliveticket":      handleExistsLiveTicket,
 	"generate":              handleGenerate,
 	"getaddednodeinfo":      handleGetAddedNodeInfo,
 	"getbestblock":          handleGetBestBlock,
@@ -1477,6 +1478,22 @@ func handleExistsAddress(s *rpcServer, cmd interface{},
 	}
 
 	return false, nil
+}
+
+// handleExistsLiveTicket implements the existsliveticket command.
+func handleExistsLiveTicket(s *rpcServer, cmd interface{},
+	closeChan <-chan struct{}) (interface{}, error) {
+	c := cmd.(*dcrjson.ExistsLiveTicketCmd)
+
+	hash, err := chainhash.NewHashFromStr(c.TxHash)
+	if err != nil {
+		return nil, &dcrjson.RPCError{
+			Code:    dcrjson.ErrRPCDecodeHexString,
+			Message: "bad transaction hash",
+		}
+	}
+
+	return s.server.blockManager.ExistsLiveTicket(hash)
 }
 
 // handleGenerate handles generate commands.
