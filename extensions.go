@@ -102,15 +102,15 @@ func (c *Client) CreateEncryptedWallet(passphrase string) error {
 // of a FutureExistsAddressResultAsync RPC invocation (or an applicable error).
 type FutureExistsAddressResult chan *response
 
-// Receive waits for the response promised by the future and returns information
-// about all transactions associated with the provided addresses.
+// Receive waits for the response promised by the future and returns whether or
+// not an address exists in the blockchain or mempool.
 func (r FutureExistsAddressResult) Receive() (bool, error) {
 	res, err := receiveFuture(r)
 	if err != nil {
 		return false, err
 	}
 
-	// Unmarshal the result as an array of existsaddress object.
+	// Unmarshal the result as a bool.
 	var exists bool
 	err = json.Unmarshal(res, &exists)
 	if err != nil {
@@ -128,11 +128,96 @@ func (c *Client) ExistsAddressAsync(address dcrutil.Address) FutureExistsAddress
 }
 
 // ExistsAddress returns information about whether or not an address has been
-// used on the main chain.
+// used on the main chain or in mempool.
 //
 // NOTE: This is a dcrd extension.
 func (c *Client) ExistsAddress(address dcrutil.Address) (bool, error) {
 	return c.ExistsAddressAsync(address).Receive()
+}
+
+// FutureExistsLiveTicketResult is a future promise to deliver the result
+// of a FutureExistsLiveTicketResultAsync RPC invocation (or an
+// applicable error).
+type FutureExistsLiveTicketResult chan *response
+
+// Receive waits for the response promised by the future and returns whether
+// or not the ticket exists in the live ticket database.
+func (r FutureExistsLiveTicketResult) Receive() (bool, error) {
+	res, err := receiveFuture(r)
+	if err != nil {
+		return false, err
+	}
+
+	// Unmarshal the result as a bool.
+	var exists bool
+	err = json.Unmarshal(res, &exists)
+	if err != nil {
+		return false, err
+	}
+	return exists, nil
+}
+
+// ExistsLiveTicketAsync returns an instance of a type that can be used to get the
+// result of the RPC at some future time by invoking the Receive function on the
+// returned instance.
+func (c *Client) ExistsLiveTicketAsync(hash *chainhash.Hash) FutureExistsLiveTicketResult {
+	cmd := dcrjson.NewExistsLiveTicketCmd(hash.String())
+	return c.sendCmd(cmd)
+}
+
+// ExistsLiveTicket returns information about whether or not a ticket hash exists
+// in the live ticket database.
+//
+// NOTE: This is a dcrd extension.
+func (c *Client) ExistsLiveTicket(hash *chainhash.Hash) (bool, error) {
+	return c.ExistsLiveTicketAsync(hash).Receive()
+}
+
+// FutureMissedTicketsResult is a future promise to deliver the result
+// of a FutureMissedTicketsResultAsync RPC invocation (or an applicable error).
+type FutureMissedTicketsResult chan *response
+
+// Receive waits for the response promised by the future and returns all
+// currently missed tickets from the missed ticket database.
+func (r FutureMissedTicketsResult) Receive() ([]*chainhash.Hash, error) {
+	res, err := receiveFuture(r)
+	if err != nil {
+		return nil, err
+	}
+
+	// Unmarshal the result as a bool.
+	var container dcrjson.MissedTicketsResult
+	err = json.Unmarshal(res, &container)
+	if err != nil {
+		return nil, err
+	}
+
+	missedTickets := make([]*chainhash.Hash, 0, len(container.Tickets))
+	for _, ticketStr := range container.Tickets {
+		h, err := chainhash.NewHashFromStr(ticketStr)
+		if err != nil {
+			return nil, err
+		}
+		missedTickets = append(missedTickets, h)
+	}
+
+	return missedTickets, nil
+}
+
+// MissedTicketsAsync returns an instance of a type that can be used to get the
+// result of the RPC at some future time by invoking the Receive function on the
+// returned instance.
+func (c *Client) MissedTicketsAsync() FutureMissedTicketsResult {
+	cmd := dcrjson.NewMissedTicketsCmd()
+	return c.sendCmd(cmd)
+}
+
+// MissedTickets returns all currently missed tickets from the missed
+// ticket database in the daemon.
+//
+// NOTE: This is a dcrd extension.
+func (c *Client) MissedTickets() ([]*chainhash.Hash, error) {
+	return c.MissedTicketsAsync().Receive()
 }
 
 // FutureListAddressTransactionsResult is a future promise to deliver the result

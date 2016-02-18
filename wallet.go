@@ -2721,6 +2721,44 @@ func (c *Client) GetInfo() (*dcrjson.InfoWalletResult, error) {
 	return c.GetInfoAsync().Receive()
 }
 
+// FutureGetStakeInfoResult is a future promise to deliver the result of a
+// GetStakeInfoAsync RPC invocation (or an applicable error).
+type FutureGetStakeInfoResult chan *response
+
+// Receive waits for the response promised by the future and returns the stake
+// info provided by the server.
+func (r FutureGetStakeInfoResult) Receive() (*dcrjson.GetStakeInfoResult, error) {
+	res, err := receiveFuture(r)
+	if err != nil {
+		return nil, err
+	}
+
+	// Unmarshal result as a getstakeinfo result object.
+	var infoRes dcrjson.GetStakeInfoResult
+	err = json.Unmarshal(res, &infoRes)
+	if err != nil {
+		return nil, err
+	}
+
+	return &infoRes, nil
+}
+
+// GetStakeInfoAsync returns an instance of a type that can be used to get
+// the result of the RPC at some future time by invoking the Receive function
+// on the returned instance.
+//
+// See GetStakeInfo for the blocking version and more details.
+func (c *Client) GetStakeInfoAsync() FutureGetStakeInfoResult {
+	cmd := dcrjson.NewGetStakeInfoCmd()
+	return c.sendCmd(cmd)
+}
+
+// GetStakeInfo returns stake mining info from a given wallet. This includes
+// various statistics on tickets it owns and votes it has produced.
+func (c *Client) GetStakeInfo() (*dcrjson.GetStakeInfoResult, error) {
+	return c.GetStakeInfoAsync().Receive()
+}
+
 // FutureGetTicketVoteBitsResult is a future promise to deliver the result of a
 // GetTicketVoteBitsAsync RPC invocation (or an applicable error).
 type FutureGetTicketVoteBitsResult chan *response
