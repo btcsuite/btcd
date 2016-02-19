@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/btcsuite/btcd/blockchain"
+	"github.com/btcsuite/btcd/blockchain/indexers"
 	"github.com/btcsuite/btcd/mining"
 	"github.com/btcsuite/btcd/txscript"
 	"github.com/btcsuite/btcd/wire"
@@ -60,6 +61,11 @@ type mempoolConfig struct {
 
 	// TimeSource defines the timesource to use.
 	TimeSource blockchain.MedianTimeSource
+
+	// AddrIndex defines the optional address index instance to use for
+	// indexing the unconfirmed transactions in the memory pool.
+	// This can be nil if the address index is not enabled.
+	AddrIndex *indexers.AddrIndex
 }
 
 // mempoolPolicy houses the policy (configuration parameters) which is used to
@@ -324,16 +330,21 @@ func (mp *txMemPool) removeTransaction(tx *btcutil.Tx, removeRedeemers bool) {
 		}
 	}
 
-	// Remove the transaction and mark the referenced outpoints as unspent
-	// by the pool.
+	// Remove the transaction if needed.
 	if txDesc, exists := mp.pool[*txHash]; exists {
+		// Remove unconfirmed address index entries associated with the
+		// transaction if enabled.
+		if mp.cfg.AddrIndex != nil {
+			mp.cfg.AddrIndex.RemoveUnconfirmedTx(txHash)
+		}
+
+		// Mark the referenced outpoints as unspent by the pool.
 		for _, txIn := range txDesc.Tx.MsgTx().TxIn {
 			delete(mp.outpoints, txIn.PreviousOutPoint)
 		}
 		delete(mp.pool, *txHash)
 		atomic.StoreInt64(&mp.lastUpdated, time.Now().Unix())
 	}
-
 }
 
 // RemoveTransaction removes the passed transaction from the mempool. When the
@@ -354,7 +365,7 @@ func (mp *txMemPool) RemoveTransaction(tx *btcutil.Tx, removeRedeemers bool) {
 // passed transaction from the memory pool.  Removing those transactions then
 // leads to removing all transactions which rely on them, recursively.  This is
 // necessary when a block is connected to the main chain because the block may
-// contain transactions which were previously unknown to the memory pool
+// contain transactions which were previously unknown to the memory pool.
 //
 // This function is safe for concurrent access.
 func (mp *txMemPool) RemoveDoubleSpends(tx *btcutil.Tx) {
@@ -392,6 +403,12 @@ func (mp *txMemPool) addTransaction(utxoView *blockchain.UtxoViewpoint, tx *btcu
 		mp.outpoints[txIn.PreviousOutPoint] = tx
 	}
 	atomic.StoreInt64(&mp.lastUpdated, time.Now().Unix())
+
+	// Add unconfirmed address index entries associated with the transaction
+	// if enabled.
+	if mp.cfg.AddrIndex != nil {
+		mp.cfg.AddrIndex.AddUnconfirmedTx(tx, utxoView)
+	}
 }
 
 // checkPoolDoubleSpend checks whether or not the passed transaction is

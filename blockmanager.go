@@ -576,6 +576,10 @@ func (b *blockManager) handleBlockMsg(bmsg *blockMsg) {
 			bmgrLog.Errorf("Failed to process block %v: %v",
 				blockSha, err)
 		}
+		if dbErr, ok := err.(database.Error); ok && dbErr.ErrorCode ==
+			database.ErrCorruption {
+			panic(dbErr)
+		}
 
 		// Convert the error into an appropriate reject message and
 		// send it.
@@ -1172,7 +1176,6 @@ func (b *blockManager) handleNotifyMsg(notification *blockchain.Notification) {
 	case blockchain.NTBlockAccepted:
 		// Don't relay if we are not current. Other peers that are
 		// current should already know about it.
-
 		if !b.current() {
 			return
 		}
@@ -1379,7 +1382,7 @@ func (b *blockManager) Pause() chan<- struct{} {
 
 // newBlockManager returns a new bitcoin block manager.
 // Use Start to begin processing asynchronous block and inv updates.
-func newBlockManager(s *server) (*blockManager, error) {
+func newBlockManager(s *server, indexManager blockchain.IndexManager) (*blockManager, error) {
 	bm := blockManager{
 		server:          s,
 		rejectedTxns:    make(map[wire.ShaHash]struct{}),
@@ -1398,6 +1401,7 @@ func newBlockManager(s *server) (*blockManager, error) {
 		ChainParams:   s.chainParams,
 		Notifications: bm.handleNotifyMsg,
 		SigCache:      s.sigCache,
+		IndexManager:  indexManager,
 	})
 	if err != nil {
 		return nil, err

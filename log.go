@@ -12,6 +12,7 @@ import (
 
 	"github.com/btcsuite/btcd/addrmgr"
 	"github.com/btcsuite/btcd/blockchain"
+	"github.com/btcsuite/btcd/blockchain/indexers"
 	database "github.com/btcsuite/btcd/database2"
 	"github.com/btcsuite/btcd/peer"
 	"github.com/btcsuite/btcd/txscript"
@@ -39,6 +40,7 @@ var (
 	btcdLog    = btclog.Disabled
 	chanLog    = btclog.Disabled
 	discLog    = btclog.Disabled
+	indxLog    = btclog.Disabled
 	minrLog    = btclog.Disabled
 	peerLog    = btclog.Disabled
 	rpcsLog    = btclog.Disabled
@@ -56,6 +58,7 @@ var subsystemLoggers = map[string]btclog.Logger{
 	"BTCD": btcdLog,
 	"CHAN": chanLog,
 	"DISC": discLog,
+	"INDX": indxLog,
 	"MINR": minrLog,
 	"PEER": peerLog,
 	"RPCS": rpcsLog,
@@ -112,6 +115,10 @@ func useLogger(subsystemID string, logger btclog.Logger) {
 
 	case "DISC":
 		discLog = logger
+
+	case "INDX":
+		indxLog = logger
+		indexers.UseLogger(logger)
 
 	case "MINR":
 		minrLog = logger
