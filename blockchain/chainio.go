@@ -1286,6 +1286,19 @@ func dbMainChainHasBlock(dbTx database.Tx, hash *wire.ShaHash) bool {
 	return hashIndex.Get(hash[:]) != nil
 }
 
+// MainChainHasBlock returns whether or not the block with the given hash is in
+// the main chain.
+//
+// This function is safe for concurrent access.
+func (b *BlockChain) MainChainHasBlock(hash *wire.ShaHash) (bool, error) {
+	var exists bool
+	err := b.db.View(func(dbTx database.Tx) error {
+		exists = dbMainChainHasBlock(dbTx, hash)
+		return nil
+	})
+	return exists, err
+}
+
 // BlockHeightByHash returns the height of the block with the given hash in the
 // main chain.
 //
