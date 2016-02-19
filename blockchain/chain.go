@@ -166,6 +166,7 @@ type BlockChain struct {
 	chainParams         *chaincfg.Params
 	notifications       NotificationCallback
 	sigCache            *txscript.SigCache
+	indexManager        IndexManager
 
 	// chainLock protects concurrent access to the vast majority of the
 	// fields in this struct below this point.
@@ -732,6 +733,20 @@ func (b *BlockChain) getReorganizeNodes(node *blockNode) (*list.List, *list.List
 	return detachNodes, attachNodes
 }
 
+// dbMaybeStoreBlock stores the provided block in the database if it's not
+// already there.
+func dbMaybeStoreBlock(dbTx database.Tx, block *btcutil.Block) error {
+	hasBlock, err := dbTx.HasBlock(block.Sha())
+	if err != nil {
+		return err
+	}
+	if hasBlock {
+		return nil
+	}
+
+	return dbTx.StoreBlock(block)
+}
+
 // connectBlock handles connecting the passed node/block to the end of the main
 // (best) chain.
 //
@@ -797,12 +812,19 @@ func (b *BlockChain) connectBlock(node *blockNode, block *btcutil.Block, view *U
 		}
 
 		// Insert the block into the database if it's not already there.
-		hasBlock, err := dbTx.HasBlock(block.Sha())
+		err = dbMaybeStoreBlock(dbTx, block)
 		if err != nil {
 			return err
 		}
-		if !hasBlock {
-			return dbTx.StoreBlock(block)
+
+		// Allow the index manager to call each of the currently active
+		// optional indexes with the block being connected so they can
+		// update themselves accordingly.
+		if b.indexManager != nil {
+			err := b.indexManager.ConnectBlock(dbTx, block, view)
+			if err != nil {
+				return err
+			}
 		}
 
 		return nil
@@ -911,6 +933,16 @@ func (b *BlockChain) disconnectBlock(node *blockNode, block *btcutil.Block, view
 		err = dbRemoveSpendJournalEntry(dbTx, block.Sha())
 		if err != nil {
 			return err
+		}
+
+		// Allow the index manager to call each of the currently active
+		// optional indexes with the block being disconnected so they
+		// can update themselves accordingly.
+		if b.indexManager != nil {
+			err := b.indexManager.DisconnectBlock(dbTx, block, view)
+			if err != nil {
+				return err
+			}
 		}
 
 		return nil
@@ -1339,6 +1371,23 @@ func (b *BlockChain) BestSnapshot() *BestState {
 	return snapshot
 }
 
+// IndexManager provides a generic interface that the is called when blocks are
+// connected and disconnected to and from the tip of the main chain for the
+// purpose of supporting optional indexes.
+type IndexManager interface {
+	// Init is invoked during chain initialize in order to allow the index
+	// manager to initialize itself and any indexes it is managing.
+	Init(*BlockChain) error
+
+	// ConnectBlock is invoked when a new block has been connected to the
+	// main chain.
+	ConnectBlock(database.Tx, *btcutil.Block, *UtxoViewpoint) error
+
+	// DisconnectBlock is invoked when a block has been disconnected from
+	// the main chain.
+	DisconnectBlock(database.Tx, *btcutil.Block, *UtxoViewpoint) error
+}
+
 // Config is a descriptor which specifies the blockchain instance configuration.
 type Config struct {
 	// DB defines the database which houses the blocks and will be used to
@@ -1370,6 +1419,13 @@ type Config struct {
 	// This field can be nil if the caller is not interested in using a
 	// signature cache.
 	SigCache *txscript.SigCache
+
+	// IndexManager defines an index manager to use when initializing the
+	// chain and connecting and disconnecting blocks.
+	//
+	// This field can be nil if the caller does not wish to make use of an
+	// index manager.
+	IndexManager IndexManager
 }
 
 // New returns a BlockChain instance using the provided configuration details.
@@ -1399,6 +1455,7 @@ func New(config *Config) (*BlockChain, error) {
 		chainParams:         params,
 		notifications:       config.Notifications,
 		sigCache:            config.SigCache,
+		indexManager:        config.IndexManager,
 		root:                nil,
 		bestNode:            nil,
 		index:               make(map[wire.ShaHash]*blockNode),
@@ -1413,6 +1470,14 @@ func New(config *Config) (*BlockChain, error) {
 	// will be initialized to contain only the genesis block.
 	if err := b.initChainState(); err != nil {
 		return nil, err
+	}
+
+	// Initialize and catch up all of the currently active optional indexes
+	// as needed.
+	if config.IndexManager != nil {
+		if err := config.IndexManager.Init(&b); err != nil {
+			return nil, err
+		}
 	}
 
 	log.Infof("Chain state (height %d, hash %v, totaltx %d, work %v)",
