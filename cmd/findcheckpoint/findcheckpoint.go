@@ -56,7 +56,12 @@ func findCandidates(db database.Db, latestHash *wire.ShaHash) ([]*chaincfg.Check
 	chain := blockchain.New(db, activeNetParams, nil, nil)
 	latestCheckpoint := chain.LatestCheckpoint()
 	if latestCheckpoint == nil {
-		return nil, fmt.Errorf("unable to retrieve latest checkpoint")
+		// Set the latest checkpoint to the genesis block if there isn't
+		// already one.
+		latestCheckpoint = &chaincfg.Checkpoint{
+			Hash:   activeNetParams.GenesisHash,
+			Height: 0,
+		}
 	}
 
 	// The latest known block must be at least the last known checkpoint
@@ -69,6 +74,13 @@ func findCandidates(db database.Db, latestHash *wire.ShaHash) ([]*chaincfg.Check
 			"of %d plus required confirmations of %d",
 			block.Height(), latestCheckpoint.Height,
 			checkpointConfirmations)
+	}
+
+	// For the first checkpoint, the required height is any block after the
+	// genesis block, so long as the chain has at least the required number
+	// of confirmations (which is enforced above).
+	if len(activeNetParams.Checkpoints) == 0 {
+		requiredHeight = 1
 	}
 
 	// Indeterminate progress setup.
@@ -138,7 +150,7 @@ func main() {
 	// Load the block database.
 	db, err := loadBlockDB()
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "failed to load database: %v\n", err)
+		fmt.Fprintln(os.Stderr, "failed to load database:", err)
 		return
 	}
 	defer db.Close()
@@ -155,7 +167,7 @@ func main() {
 	// Find checkpoint candidates.
 	candidates, err := findCandidates(db, latestHash)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Unable to identify candidates: %v", err)
+		fmt.Fprintln(os.Stderr, "Unable to identify candidates:", err)
 		return
 	}
 
