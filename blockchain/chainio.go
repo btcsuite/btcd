@@ -1579,6 +1579,11 @@ func dbMainChainHasBlock(dbTx database.Tx, hash *chainhash.Hash) bool {
 	return hashIndex.Get(hash[:]) != nil
 }
 
+// DBMainChainHasBlock is the exported version of dbMainChainHasBlock.
+func DBMainChainHasBlock(dbTx database.Tx, hash *chainhash.Hash) bool {
+	return dbMainChainHasBlock(dbTx, hash)
+}
+
 // MainChainHasBlock returns whether or not the block with the given hash is in
 // the main chain.
 //

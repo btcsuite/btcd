@@ -450,7 +450,7 @@ type TxRawResult struct {
 	Vout          []Vout `json:"vout"`
 	BlockHash     string `json:"blockhash,omitempty"`
 	BlockHeight   int64  `json:"blockheight"`
-	BlockIndex    uint32 `json:"blockindex"`
+	BlockIndex    uint32 `json:"blockindex,omitempty"`
 	Confirmations uint64 `json:"confirmations,omitempty"`
 	Time          int64  `json:"time,omitempty"`
 	Blocktime     int64  `json:"blocktime,omitempty"`

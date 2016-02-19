@@ -45,6 +45,13 @@ var (
 // This feature is considered EXPERIMENTAL, enable at your own risk!
 var SigHashOptimization = false
 
+// CheckForDuplicateHashes checks for duplicate hashes when validating blocks.
+// Because of the rule inserting the height into the second (nonce) txOut, there
+// should never be a duplicate transaction hash that overwrites another. However,
+// because there is a 2^128 chance of a collision, the paranoid user may wish to
+// turn this feature on.
+var CheckForDuplicateHashes = false
+
 // CPUMinerThreads is the default number of threads to utilize with the
 // CPUMiner when mining.
 var CPUMinerThreads = 1

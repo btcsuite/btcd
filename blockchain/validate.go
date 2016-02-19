@@ -725,6 +725,10 @@ func (b *BlockChain) checkBlockHeaderContext(header *wire.BlockHeader, prevNode 
 // too.
 func (b *BlockChain) checkDupTxs(txSet []*dcrutil.Tx,
 	view *UtxoViewpoint) error {
+	if !chaincfg.CheckForDuplicateHashes {
+		return nil
+	}
+
 	// Fetch utxo details for all of the transactions in this block.
 	// Typically, there will not be any utxos for any of the transactions.
 	fetchSet := make(map[chainhash.Hash]struct{})
@@ -2221,15 +2225,6 @@ func (b *BlockChain) checkConnectBlock(node *blockNode, block *dcrutil.Block,
 	if err != nil {
 		return err
 	}
-
-	/* TODO REMOVE AND CHECK INDIVIDUALLY
-	err = b.checkDupTxs(node, parent, block, parentBlock)
-	if err != nil {
-		errStr := fmt.Sprintf("checkDupTxs failed for incoming "+
-			"node %v; error given: %v", node.hash, err)
-		return ruleError(ErrBIP0030, errStr)
-	}
-	*/
 
 	// Check to ensure consensus via the PoS ticketing system versus the
 	// informations stored in the header.

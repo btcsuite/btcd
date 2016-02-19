@@ -23,6 +23,7 @@ import (
 
 	"github.com/decred/dcrd/addrmgr"
 	"github.com/decred/dcrd/blockchain"
+	"github.com/decred/dcrd/blockchain/indexers"
 	"github.com/decred/dcrd/blockchain/stake"
 	"github.com/decred/dcrd/chaincfg"
 	"github.com/decred/dcrd/chaincfg/chainhash"
@@ -205,6 +206,14 @@ type server struct {
 	timeSource           blockchain.MedianTimeSource
 	tmdb                 *stake.TicketDB
 	services             wire.ServiceFlag
+
+	// The following fields are used for optional indexes.  They will be nil
+	// if the associated index is not enabled.  These fields are set during
+	// initial creation of the server and never changed afterwards, so they
+	// do not need to be protected for concurrent access.
+	txIndex         *indexers.TxIndex
+	addrIndex       *indexers.AddrIndex
+	existsAddrIndex *indexers.ExistsAddrIndex
 }
 
 // serverPeer extends the peer to maintain state shared by the server and
@@ -1946,11 +1955,6 @@ out:
 		}
 	}
 
-	/* TODO addrindex
-	if !cfg.NoAddrIndex {
-		s.addrIndexer.Stop()
-	}
-	*/
 	s.blockManager.Stop()
 	s.addrManager.Stop()
 
@@ -2219,12 +2223,6 @@ func (s *server) Start() {
 	if cfg.Generate {
 		s.cpuMiner.Start()
 	}
-
-	/* TODO addrindex
-	if !cfg.NoAddrIndex {
-		s.addrIndexer.Start()
-	}
-	*/
 }
 
 // Stop gracefully shuts down the server by stopping and disconnecting all
@@ -2567,7 +2565,45 @@ func newServer(listenAddrs []string, db database.DB, tmdb *stake.TicketDB, chain
 		services:             services,
 		sigCache:             txscript.NewSigCache(cfg.SigCacheMaxSize),
 	}
-	bm, err := newBlockManager(&s)
+
+	// Create the transaction and address indexes if needed.
+	//
+	// CAUTION: the txindex needs to be first in the indexes array because
+	// the addrindex uses data from the txindex during catchup.  If the
+	// addrindex is run first, it may not have the transactions from the
+	// current block indexed.
+	var indexes []indexers.Indexer
+	if cfg.TxIndex || cfg.AddrIndex {
+		// Enable transaction index if address index is enabled since it
+		// requires it.
+		if !cfg.TxIndex {
+			indxLog.Infof("Transaction index enabled because it " +
+				"is required by the address index")
+			cfg.TxIndex = true
+		} else {
+			indxLog.Info("Transaction index is enabled")
+		}
+
+		s.txIndex = indexers.NewTxIndex(db)
+		indexes = append(indexes, s.txIndex)
+	}
+	if cfg.AddrIndex {
+		indxLog.Info("Address index is enabled")
+		s.addrIndex = indexers.NewAddrIndex(db, chainParams)
+		indexes = append(indexes, s.addrIndex)
+	}
+	if !cfg.NoExistsAddrIndex {
+		indxLog.Info("Exists address index is enabled")
+		s.existsAddrIndex = indexers.NewExistsAddrIndex(db, chainParams)
+		indexes = append(indexes, s.existsAddrIndex)
+	}
+
+	// Create an index manager if any of the optional indexes are enabled.
+	var indexManager blockchain.IndexManager
+	if len(indexes) > 0 {
+		indexManager = indexers.NewManager(db, indexes, chainParams)
+	}
+	bm, err := newBlockManager(&s, indexManager)
 	if err != nil {
 		return nil, err
 	}
@@ -2598,10 +2634,12 @@ func newServer(listenAddrs []string, db database.DB, tmdb *stake.TicketDB, chain
 			MaxSigOpsPerTx:       blockchain.MaxSigOpsPerBlock / 5,
 			MinRelayTxFee:        cfg.minRelayTxFee,
 		},
-		FetchUtxoView: s.blockManager.chain.FetchUtxoView,
-		Chain:         s.blockManager.chain,
-		SigCache:      s.sigCache,
-		TimeSource:    s.timeSource,
+		FetchUtxoView:   s.blockManager.chain.FetchUtxoView,
+		Chain:           s.blockManager.chain,
+		SigCache:        s.sigCache,
+		TimeSource:      s.timeSource,
+		AddrIndex:       s.addrIndex,
+		ExistsAddrIndex: s.existsAddrIndex,
 	}
 	s.txMemPool = newTxMemPool(&txC)
 
@@ -2615,16 +2653,6 @@ func newServer(listenAddrs []string, db database.DB, tmdb *stake.TicketDB, chain
 		TxMinFreeFee:      cfg.minRelayTxFee,
 	}
 	s.cpuMiner = newCPUMiner(&policy, &s)
-
-	/* TODO new addrindex
-	if !cfg.NoAddrIndex {
-		ai, err := newAddrIndexer(&s)
-		if err != nil {
-			return nil, err
-		}
-		s.addrIndexer = ai
-	}
-	*/
 
 	if !cfg.DisableRPC {
 		s.rpcServer, err = newRPCServer(cfg.RPCListeners, &policy, &s)

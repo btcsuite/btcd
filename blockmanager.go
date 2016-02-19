@@ -1223,6 +1223,10 @@ func (b *blockManager) handleBlockMsg(bmsg *blockMsg) {
 			bmgrLog.Errorf("Failed to process block %v: %v",
 				blockSha, err)
 		}
+		if dbErr, ok := err.(database.Error); ok && dbErr.ErrorCode ==
+			database.ErrCorruption {
+			panic(dbErr)
+		}
 
 		// Convert the error into an appropriate reject message and
 		// send it.
@@ -2318,16 +2322,6 @@ func (b *blockManager) handleNotifyMsg(notification *blockchain.Notification) {
 			r.ntfnMgr.NotifyBlockConnected(block)
 		}
 
-		/*
-			TODO Merge in new address indexer
-			if !cfg.NoAddrIndex && b.server.addrIndexer.IsCaughtUp() {
-				err := b.server.addrIndexer.InsertBlock(block, parentBlock)
-				if err != nil {
-					bmgrLog.Errorf("AddrIndexManager error: %v", err.Error())
-				}
-			}
-		*/
-
 	// Stake tickets are spent or missed from the most recently connected block.
 	case blockchain.NTSpentAndMissedTickets:
 		tnd, ok := notification.Data.(*blockchain.TicketNotificationsData)
@@ -2411,18 +2405,6 @@ func (b *blockManager) handleNotifyMsg(notification *blockchain.Notification) {
 		if r := b.server.rpcServer; r != nil {
 			r.ntfnMgr.NotifyBlockDisconnected(block)
 		}
-
-		/*
-			TODO Merge in new address indexer
-			// If we're maintaing the address index, and it is up to date
-			// then update it based off this removed block.
-			if !cfg.NoAddrIndex && b.server.addrIndexer.IsCaughtUp() {
-				err := b.server.addrIndexer.RemoveBlock(block, parentBlock)
-				if err != nil {
-					bmgrLog.Errorf("AddrIndexManager error: %v", err.Error())
-				}
-			}
-		*/
 
 	// The blockchain is reorganizing.
 	case blockchain.NTReorganization:
@@ -2878,7 +2860,7 @@ func (b *blockManager) SetParentTemplate(bt *BlockTemplate) {
 
 // newBlockManager returns a new decred block manager.
 // Use Start to begin processing asynchronous block and inv updates.
-func newBlockManager(s *server) (*blockManager, error) {
+func newBlockManager(s *server, indexManager blockchain.IndexManager) (*blockManager, error) {
 	bm := blockManager{
 		server:              s,
 		rejectedTxns:        make(map[chainhash.Hash]struct{}),
@@ -2902,6 +2884,7 @@ func newBlockManager(s *server) (*blockManager, error) {
 		ChainParams:   s.chainParams,
 		Notifications: bm.handleNotifyMsg,
 		SigCache:      s.sigCache,
+		IndexManager:  indexManager,
 	})
 	if err != nil {
 		return nil, err

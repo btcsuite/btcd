@@ -1973,18 +1973,16 @@ func (db *db) Close() error {
 	}
 	db.closed = true
 
+	// NOTE: Since the above lock waits for all transactions to finish and
+	// prevents any new ones from being started, it is safe to flush the
+	// cache and clear all state without the individual locks.
+
 	// Close the database cache which will flush any existing entries to
 	// disk and close the underlying leveldb database.  Any error is saved
 	// and returned at the end after the remaining cleanup since the
 	// database will be marked closed even if this fails given there is no
 	// good way for the caller to recover from a failure here anyways.
-	db.writeLock.Lock()
 	closeErr := db.cache.Close()
-	db.writeLock.Unlock()
-
-	// NOTE: Since the above lock waits for all transactions to finish and
-	// prevents any new ones from being started, it is safe to clear all
-	// state without the individual locks.
 
 	// Close any open flat files that house the blocks.
 	wc := db.store.writeCursor
