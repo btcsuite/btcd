@@ -1903,6 +1903,29 @@ func (c *Client) GetBalanceMinConf(account string, minConfirms int) (dcrutil.Amo
 	return c.GetBalanceMinConfAsync(account, minConfirms).Receive()
 }
 
+// GetBalanceMinConfTypeAsync returns an instance of a type that can be used to get
+// the result of the RPC at some future time by invoking the Receive function on
+// the returned instance.
+//
+// See GetBalanceMinConfType for the blocking version and more details.
+func (c *Client) GetBalanceMinConfTypeAsync(account string, minConfirms int, balanceType string) FutureGetBalanceResult {
+	cmd := dcrjson.NewGetBalanceCmd(&account, &minConfirms, &balanceType)
+	return c.sendCmd(cmd)
+}
+
+// GetBalanceMinConfType returns the available balance from the server for the
+// specified account using the specified number of minimum confirmations and
+// balance type.  The account may be "*" for all accounts.
+//
+// See GetBalanceMinConf to use the default balance type.
+func (c *Client) GetBalanceMinConfType(account string, minConfirms int, balanceType string) (dcrutil.Amount, error) {
+	if c.config.EnableBCInfoHacks {
+		response := c.GetBalanceMinConfAsync(account, minConfirms)
+		return FutureGetBalanceParseResult(response).Receive()
+	}
+	return c.GetBalanceMinConfTypeAsync(account, minConfirms, balanceType).Receive()
+}
+
 // FutureGetReceivedByAccountResult is a future promise to deliver the result of
 // a GetReceivedByAccountAsync or GetReceivedByAccountMinConfAsync RPC
 // invocation (or an applicable error).
