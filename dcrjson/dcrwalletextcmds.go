@@ -130,7 +130,7 @@ func NewGetTicketsCmd(includeImmature bool) *GetTicketsCmd {
 	return &GetTicketsCmd{includeImmature}
 }
 
-// GetTicketVotesBitsCmd defines the getticketsvotebits JSON-RPC command.
+// GetTicketVoteBitsCmd defines the getticketsvotebits JSON-RPC command.
 type GetTicketVoteBitsCmd struct {
 	TxHash string
 }
