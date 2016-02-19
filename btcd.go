@@ -13,6 +13,7 @@ import (
 	"runtime"
 	"runtime/pprof"
 
+	"github.com/btcsuite/btcd/blockchain/indexers"
 	"github.com/btcsuite/btcd/limits"
 )
 
@@ -86,6 +87,27 @@ func btcdMain(serverChan chan<- *server) error {
 		btcdLog.Infof("Gracefully shutting down the database...")
 		db.Close()
 	})
+
+	// Drop indexes and exit if requested.
+	//
+	// NOTE: The order is important here because dropping the tx index also
+	// drops the address index since it relies on it.
+	if cfg.DropAddrIndex {
+		if err := indexers.DropAddrIndex(db); err != nil {
+			btcdLog.Errorf("%v", err)
+			return err
+		}
+
+		return nil
+	}
+	if cfg.DropTxIndex {
+		if err := indexers.DropTxIndex(db); err != nil {
+			btcdLog.Errorf("%v", err)
+			return err
+		}
+
+		return nil
+	}
 
 	// Create server and start it.
 	server, err := newServer(cfg.Listeners, db, activeNetParams.Params)
