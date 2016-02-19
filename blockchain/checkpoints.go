@@ -16,7 +16,7 @@ import (
 
 // CheckpointConfirmations is the number of blocks before the end of the current
 // best block chain that a good checkpoint candidate must be.
-const CheckpointConfirmations = 2016
+const CheckpointConfirmations = 4096
 
 // newShaHashFromStr converts the passed big-endian hex string into a
 // wire.ShaHash.  It only differs from the one available in wire in that
