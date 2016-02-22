@@ -367,7 +367,7 @@ func (tmdb *TicketDB) LoadTicketDBs(tmsPath, tmsLoc string, np *chaincfg.Params,
 	// The ticket db chain is shorter than the database chain, resync.
 	if stmHeight < curHeight {
 		log.Debugf("current height: %v, stm height %v", curHeight, stmHeight)
-		log.Errorf("Accessory ticket database is desynced, " +
+		log.Warnf("Accessory ticket database is desynced, " +
 			"resyncing now")
 
 		err := tmdb.rescanTicketDB()
