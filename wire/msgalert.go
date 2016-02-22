@@ -161,7 +161,7 @@ func (alert *Alert) Serialize(w io.Writer, pver uint32) error {
 			"[count %v, max %v]", count, maxCountSetCancel)
 		return messageError("Alert.Serialize", str)
 	}
-	err = writeVarInt(w, pver, uint64(count))
+	err = WriteVarInt(w, pver, uint64(count))
 	if err != nil {
 		return err
 	}
@@ -183,7 +183,7 @@ func (alert *Alert) Serialize(w io.Writer, pver uint32) error {
 			"[count %v, max %v]", count, maxCountSetSubVer)
 		return messageError("Alert.Serialize", str)
 	}
-	err = writeVarInt(w, pver, uint64(count))
+	err = WriteVarInt(w, pver, uint64(count))
 	if err != nil {
 		return err
 	}
@@ -225,7 +225,7 @@ func (alert *Alert) Deserialize(r io.Reader, pver uint32) error {
 	// SetCancel: first read a VarInt that contains
 	// count - the number of Cancel IDs, then
 	// iterate count times and read them
-	count, err := readVarInt(r, pver)
+	count, err := ReadVarInt(r, pver)
 	if err != nil {
 		return err
 	}
@@ -249,7 +249,7 @@ func (alert *Alert) Deserialize(r io.Reader, pver uint32) error {
 
 	// SetSubVer: similar to SetCancel
 	// but read count number of sub-version strings
-	count, err = readVarInt(r, pver)
+	count, err = ReadVarInt(r, pver)
 	if err != nil {
 		return err
 	}
@@ -343,7 +343,7 @@ type MsgAlert struct {
 func (msg *MsgAlert) BtcDecode(r io.Reader, pver uint32) error {
 	var err error
 
-	msg.SerializedPayload, err = readVarBytes(r, pver, MaxMessagePayload,
+	msg.SerializedPayload, err = ReadVarBytes(r, pver, MaxMessagePayload,
 		"alert serialized payload")
 	if err != nil {
 		return err
@@ -354,7 +354,7 @@ func (msg *MsgAlert) BtcDecode(r io.Reader, pver uint32) error {
 		msg.Payload = nil
 	}
 
-	msg.Signature, err = readVarBytes(r, pver, MaxMessagePayload,
+	msg.Signature, err = ReadVarBytes(r, pver, MaxMessagePayload,
 		"alert signature")
 	if err != nil {
 		return err
@@ -386,11 +386,11 @@ func (msg *MsgAlert) BtcEncode(w io.Writer, pver uint32) error {
 	if slen == 0 {
 		return messageError("MsgAlert.BtcEncode", "empty serialized payload")
 	}
-	err = writeVarBytes(w, pver, serializedpayload)
+	err = WriteVarBytes(w, pver, serializedpayload)
 	if err != nil {
 		return err
 	}
-	err = writeVarBytes(w, pver, msg.Signature)
+	err = WriteVarBytes(w, pver, msg.Signature)
 	if err != nil {
 		return err
 	}

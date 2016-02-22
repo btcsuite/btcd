@@ -285,11 +285,11 @@ func TestVarIntWire(t *testing.T) {
 		var buf bytes.Buffer
 		err := wire.TstWriteVarInt(&buf, test.pver, test.in)
 		if err != nil {
-			t.Errorf("writeVarInt #%d error %v", i, err)
+			t.Errorf("WriteVarInt #%d error %v", i, err)
 			continue
 		}
 		if !bytes.Equal(buf.Bytes(), test.buf) {
-			t.Errorf("writeVarInt #%d\n got: %s want: %s", i,
+			t.Errorf("WriteVarInt #%d\n got: %s want: %s", i,
 				spew.Sdump(buf.Bytes()), spew.Sdump(test.buf))
 			continue
 		}
@@ -298,11 +298,11 @@ func TestVarIntWire(t *testing.T) {
 		rbuf := bytes.NewReader(test.buf)
 		val, err := wire.TstReadVarInt(rbuf, test.pver)
 		if err != nil {
-			t.Errorf("readVarInt #%d error %v", i, err)
+			t.Errorf("ReadVarInt #%d error %v", i, err)
 			continue
 		}
 		if val != test.out {
-			t.Errorf("readVarInt #%d\n got: %d want: %d", i,
+			t.Errorf("ReadVarInt #%d\n got: %d want: %d", i,
 				val, test.out)
 			continue
 		}
@@ -338,7 +338,7 @@ func TestVarIntWireErrors(t *testing.T) {
 		w := newFixedWriter(test.max)
 		err := wire.TstWriteVarInt(w, test.pver, test.in)
 		if err != test.writeErr {
-			t.Errorf("writeVarInt #%d wrong error got: %v, want: %v",
+			t.Errorf("WriteVarInt #%d wrong error got: %v, want: %v",
 				i, err, test.writeErr)
 			continue
 		}
@@ -347,7 +347,7 @@ func TestVarIntWireErrors(t *testing.T) {
 		r := newFixedReader(test.max, test.buf)
 		_, err = wire.TstReadVarInt(r, test.pver)
 		if err != test.readErr {
-			t.Errorf("readVarInt #%d wrong error got: %v, want: %v",
+			t.Errorf("ReadVarInt #%d wrong error got: %v, want: %v",
 				i, err, test.readErr)
 			continue
 		}
@@ -398,12 +398,12 @@ func TestVarIntNonCanonical(t *testing.T) {
 		rbuf := bytes.NewReader(test.in)
 		val, err := wire.TstReadVarInt(rbuf, test.pver)
 		if _, ok := err.(*wire.MessageError); !ok {
-			t.Errorf("readVarInt #%d (%s) unexpected error %v", i,
+			t.Errorf("ReadVarInt #%d (%s) unexpected error %v", i,
 				test.name, err)
 			continue
 		}
 		if val != 0 {
-			t.Errorf("readVarInt #%d (%s)\n got: %d want: 0", i,
+			t.Errorf("ReadVarInt #%d (%s)\n got: %d want: 0", i,
 				test.name, val)
 			continue
 		}
@@ -603,11 +603,11 @@ func TestVarBytesWire(t *testing.T) {
 		var buf bytes.Buffer
 		err := wire.TstWriteVarBytes(&buf, test.pver, test.in)
 		if err != nil {
-			t.Errorf("writeVarBytes #%d error %v", i, err)
+			t.Errorf("WriteVarBytes #%d error %v", i, err)
 			continue
 		}
 		if !bytes.Equal(buf.Bytes(), test.buf) {
-			t.Errorf("writeVarBytes #%d\n got: %s want: %s", i,
+			t.Errorf("WriteVarBytes #%d\n got: %s want: %s", i,
 				spew.Sdump(buf.Bytes()), spew.Sdump(test.buf))
 			continue
 		}
@@ -617,11 +617,11 @@ func TestVarBytesWire(t *testing.T) {
 		val, err := wire.TstReadVarBytes(rbuf, test.pver,
 			wire.MaxMessagePayload, "test payload")
 		if err != nil {
-			t.Errorf("readVarBytes #%d error %v", i, err)
+			t.Errorf("ReadVarBytes #%d error %v", i, err)
 			continue
 		}
 		if !bytes.Equal(buf.Bytes(), test.buf) {
-			t.Errorf("readVarBytes #%d\n got: %s want: %s", i,
+			t.Errorf("ReadVarBytes #%d\n got: %s want: %s", i,
 				val, test.buf)
 			continue
 		}
@@ -659,7 +659,7 @@ func TestVarBytesWireErrors(t *testing.T) {
 		w := newFixedWriter(test.max)
 		err := wire.TstWriteVarBytes(w, test.pver, test.in)
 		if err != test.writeErr {
-			t.Errorf("writeVarBytes #%d wrong error got: %v, want: %v",
+			t.Errorf("WriteVarBytes #%d wrong error got: %v, want: %v",
 				i, err, test.writeErr)
 			continue
 		}
@@ -669,7 +669,7 @@ func TestVarBytesWireErrors(t *testing.T) {
 		_, err = wire.TstReadVarBytes(r, test.pver,
 			wire.MaxMessagePayload, "test payload")
 		if err != test.readErr {
-			t.Errorf("readVarBytes #%d wrong error got: %v, want: %v",
+			t.Errorf("ReadVarBytes #%d wrong error got: %v, want: %v",
 				i, err, test.readErr)
 			continue
 		}
@@ -701,7 +701,7 @@ func TestVarBytesOverflowErrors(t *testing.T) {
 		_, err := wire.TstReadVarBytes(rbuf, test.pver,
 			wire.MaxMessagePayload, "test payload")
 		if reflect.TypeOf(err) != reflect.TypeOf(test.err) {
-			t.Errorf("readVarBytes #%d wrong error got: %v, "+
+			t.Errorf("ReadVarBytes #%d wrong error got: %v, "+
 				"want: %v", i, err, reflect.TypeOf(test.err))
 			continue
 		}

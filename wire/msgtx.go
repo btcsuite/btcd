@@ -250,7 +250,7 @@ func (msg *MsgTx) BtcDecode(r io.Reader, pver uint32) error {
 	}
 	msg.Version = int32(binary.LittleEndian.Uint32(buf[:]))
 
-	count, err := readVarInt(r, pver)
+	count, err := ReadVarInt(r, pver)
 	if err != nil {
 		return err
 	}
@@ -275,7 +275,7 @@ func (msg *MsgTx) BtcDecode(r io.Reader, pver uint32) error {
 		msg.TxIn[i] = &ti
 	}
 
-	count, err = readVarInt(r, pver)
+	count, err = ReadVarInt(r, pver)
 	if err != nil {
 		return err
 	}
@@ -339,7 +339,7 @@ func (msg *MsgTx) BtcEncode(w io.Writer, pver uint32) error {
 	}
 
 	count := uint64(len(msg.TxIn))
-	err = writeVarInt(w, pver, count)
+	err = WriteVarInt(w, pver, count)
 	if err != nil {
 		return err
 	}
@@ -352,7 +352,7 @@ func (msg *MsgTx) BtcEncode(w io.Writer, pver uint32) error {
 	}
 
 	count = uint64(len(msg.TxOut))
-	err = writeVarInt(w, pver, count)
+	err = WriteVarInt(w, pver, count)
 	if err != nil {
 		return err
 	}
@@ -515,7 +515,7 @@ func readTxIn(r io.Reader, pver uint32, version int32, ti *TxIn) error {
 	}
 	ti.PreviousOutPoint = op
 
-	ti.SignatureScript, err = readVarBytes(r, pver, MaxMessagePayload,
+	ti.SignatureScript, err = ReadVarBytes(r, pver, MaxMessagePayload,
 		"transaction input signature script")
 	if err != nil {
 		return err
@@ -539,7 +539,7 @@ func writeTxIn(w io.Writer, pver uint32, version int32, ti *TxIn) error {
 		return err
 	}
 
-	err = writeVarBytes(w, pver, ti.SignatureScript)
+	err = WriteVarBytes(w, pver, ti.SignatureScript)
 	if err != nil {
 		return err
 	}
@@ -564,7 +564,7 @@ func readTxOut(r io.Reader, pver uint32, version int32, to *TxOut) error {
 	}
 	to.Value = int64(binary.LittleEndian.Uint64(buf[:]))
 
-	to.PkScript, err = readVarBytes(r, pver, MaxMessagePayload,
+	to.PkScript, err = ReadVarBytes(r, pver, MaxMessagePayload,
 		"transaction output public key script")
 	if err != nil {
 		return err
@@ -583,7 +583,7 @@ func writeTxOut(w io.Writer, pver uint32, version int32, to *TxOut) error {
 		return err
 	}
 
-	err = writeVarBytes(w, pver, to.PkScript)
+	err = WriteVarBytes(w, pver, to.PkScript)
 	if err != nil {
 		return err
 	}

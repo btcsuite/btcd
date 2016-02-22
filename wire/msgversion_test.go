@@ -309,7 +309,7 @@ func TestVersionWireErrors(t *testing.T) {
 	var newUAVarIntBuf bytes.Buffer
 	err := wire.TstWriteVarInt(&newUAVarIntBuf, pver, uint64(len(newUA)))
 	if err != nil {
-		t.Errorf("writeVarInt: error %v", err)
+		t.Errorf("WriteVarInt: error %v", err)
 	}
 
 	// Make a new buffer big enough to hold the base version plus the new

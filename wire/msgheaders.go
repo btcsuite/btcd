@@ -37,7 +37,7 @@ func (msg *MsgHeaders) AddBlockHeader(bh *BlockHeader) error {
 // BtcDecode decodes r using the bitcoin protocol encoding into the receiver.
 // This is part of the Message interface implementation.
 func (msg *MsgHeaders) BtcDecode(r io.Reader, pver uint32) error {
-	count, err := readVarInt(r, pver)
+	count, err := ReadVarInt(r, pver)
 	if err != nil {
 		return err
 	}
@@ -57,7 +57,7 @@ func (msg *MsgHeaders) BtcDecode(r io.Reader, pver uint32) error {
 			return err
 		}
 
-		txCount, err := readVarInt(r, pver)
+		txCount, err := ReadVarInt(r, pver)
 		if err != nil {
 			return err
 		}
@@ -85,7 +85,7 @@ func (msg *MsgHeaders) BtcEncode(w io.Writer, pver uint32) error {
 		return messageError("MsgHeaders.BtcEncode", str)
 	}
 
-	err := writeVarInt(w, pver, uint64(count))
+	err := WriteVarInt(w, pver, uint64(count))
 	if err != nil {
 		return err
 	}
@@ -100,7 +100,7 @@ func (msg *MsgHeaders) BtcEncode(w io.Writer, pver uint32) error {
 		// of transactions on header messages.  This is really just an
 		// artifact of the way the original implementation serializes
 		// block headers, but it is required.
-		err = writeVarInt(w, pver, 0)
+		err = WriteVarInt(w, pver, 0)
 		if err != nil {
 			return err
 		}
