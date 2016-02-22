@@ -48,7 +48,7 @@ const (
 	connectionRetryInterval = time.Second * 10
 
 	// defaultMaxOutbound is the default number of max outbound peers.
-	defaultMaxOutbound = 3
+	defaultMaxOutbound = 8
 )
 
 // broadcastMsg provides the ability to house a decred message to be broadcast
