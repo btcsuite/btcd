@@ -130,7 +130,7 @@ func findCandidates(db database.Db, latestHash *chainhash.Hash) ([]*chaincfg.Che
 // uses the format the chain code expects for checkpoints added to the list.
 func showCandidate(candidateNum int, checkpoint *chaincfg.Checkpoint) {
 	if cfg.UseGoOutput {
-		fmt.Printf("Candidate %d -- {%d, newShaHashFromStr(\"%v\")},\n",
+		fmt.Printf("Candidate %d -- {%d, newHashFromStr(\"%v\")},\n",
 			candidateNum, checkpoint.Height, checkpoint.Hash)
 		return
 	}
