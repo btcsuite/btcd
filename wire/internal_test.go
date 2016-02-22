@@ -51,28 +51,28 @@ func TstWriteElement(w io.Writer, element interface{}) error {
 	return writeElement(w, element)
 }
 
-// TstReadVarInt makes the internal readVarInt function available to the
+// TstReadVarInt makes the internal ReadVarInt function available to the
 // test package.
 func TstReadVarInt(r io.Reader, pver uint32) (uint64, error) {
-	return readVarInt(r, pver)
+	return ReadVarInt(r, pver)
 }
 
-// TstWriteVarInt makes the internal writeVarInt function available to the
+// TstWriteVarInt makes the internal WriteVarInt function available to the
 // test package.
 func TstWriteVarInt(w io.Writer, pver uint32, val uint64) error {
-	return writeVarInt(w, pver, val)
+	return WriteVarInt(w, pver, val)
 }
 
-// TstReadVarBytes makes the internal readVarBytes function available to the
+// TstReadVarBytes makes the internal ReadVarBytes function available to the
 // test package.
 func TstReadVarBytes(r io.Reader, pver uint32, maxAllowed uint32, fieldName string) ([]byte, error) {
-	return readVarBytes(r, pver, maxAllowed, fieldName)
+	return ReadVarBytes(r, pver, maxAllowed, fieldName)
 }
 
-// TstWriteVarBytes makes the internal writeVarBytes function available to the
+// TstWriteVarBytes makes the internal WriteVarBytes function available to the
 // test package.
 func TstWriteVarBytes(w io.Writer, pver uint32, bytes []byte) error {
-	return writeVarBytes(w, pver, bytes)
+	return WriteVarBytes(w, pver, bytes)
 }
 
 // TstReadNetAddress makes the internal readNetAddress function available to

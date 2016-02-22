@@ -35,7 +35,7 @@ func (msg *MsgFilterAdd) BtcDecode(r io.Reader, pver uint32) error {
 	}
 
 	var err error
-	msg.Data, err = readVarBytes(r, pver, MaxFilterAddDataSize,
+	msg.Data, err = ReadVarBytes(r, pver, MaxFilterAddDataSize,
 		"filteradd data")
 	if err != nil {
 		return err
@@ -60,7 +60,7 @@ func (msg *MsgFilterAdd) BtcEncode(w io.Writer, pver uint32) error {
 		return messageError("MsgFilterAdd.BtcEncode", str)
 	}
 
-	err := writeVarBytes(w, pver, msg.Data)
+	err := WriteVarBytes(w, pver, msg.Data)
 	if err != nil {
 		return err
 	}
