@@ -350,6 +350,21 @@ type existsLiveTicketResponse struct {
 	err    error
 }
 
+// existsLiveTicketsMsg handles a request for obtaining whether or not a ticket
+// from a slice of tickets exists in the live tickets map of the blockchain stake
+// database.
+type existsLiveTicketsMsg struct {
+	hashes []*chainhash.Hash
+	reply  chan existsLiveTicketsResponse
+}
+
+// existsLiveTicketsResponse is a response to the reply channel of a
+// existsLiveTicketsMsg.
+type existsLiveTicketsResponse struct {
+	Exists []bool
+	err    error
+}
+
 // getCurrentTemplateMsg handles a request for the current mining block template.
 type getCurrentTemplateMsg struct {
 	reply chan getCurrentTemplateResponse
@@ -1985,6 +2000,13 @@ out:
 					err:    err,
 				}
 
+			case existsLiveTicketsMsg:
+				exists, err := b.blockChain.CheckLiveTickets(msg.hashes)
+				msg.reply <- existsLiveTicketsResponse{
+					Exists: exists,
+					err:    err,
+				}
+
 			case getCurrentTemplateMsg:
 				cur := deepCopyBlockTemplate(b.cachedCurrentTemplate)
 				msg.reply <- getCurrentTemplateResponse{
@@ -2653,6 +2675,15 @@ func (b *blockManager) TicketsForAddress(address dcrutil.Address) (
 func (b *blockManager) ExistsLiveTicket(hash *chainhash.Hash) (bool, error) {
 	reply := make(chan existsLiveTicketResponse)
 	b.msgChan <- existsLiveTicketMsg{hash: hash, reply: reply}
+	response := <-reply
+	return response.Exists, response.err
+}
+
+// ExistsLiveTickets returns whether or not tickets in a slice of tickets exist
+// in the live tickets database.
+func (b *blockManager) ExistsLiveTickets(hashes []*chainhash.Hash) ([]bool, error) {
+	reply := make(chan existsLiveTicketsResponse)
+	b.msgChan <- existsLiveTicketsMsg{hashes: hashes, reply: reply}
 	response := <-reply
 	return response.Exists, response.err
 }

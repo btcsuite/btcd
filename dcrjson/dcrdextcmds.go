@@ -33,6 +33,19 @@ func NewExistsLiveTicketCmd(txHash string) *ExistsLiveTicketCmd {
 	}
 }
 
+// ExistsLiveTicketsCmd defines the existslivetickets JSON-RPC command.
+type ExistsLiveTicketsCmd struct {
+	TxHashBlob string
+}
+
+// NewExistsLiveTicketsCmd returns a new instance which can be used to issue an
+// existslivetickets JSON-RPC command.
+func NewExistsLiveTicketsCmd(txHashBlob string) *ExistsLiveTicketsCmd {
+	return &ExistsLiveTicketsCmd{
+		TxHashBlob: txHashBlob,
+	}
+}
+
 // GetCoinSupplyCmd defines the getcoinsupply JSON-RPC command.
 type GetCoinSupplyCmd struct{}
 
@@ -99,6 +112,7 @@ func init() {
 
 	MustRegisterCmd("existsaddress", (*ExistsAddressCmd)(nil), flags)
 	MustRegisterCmd("existsliveticket", (*ExistsLiveTicketCmd)(nil), flags)
+	MustRegisterCmd("existslivetickets", (*ExistsLiveTicketsCmd)(nil), flags)
 	MustRegisterCmd("getcoinsupply", (*GetCoinSupplyCmd)(nil), flags)
 	MustRegisterCmd("getstakedifficulty", (*GetStakeDifficultyCmd)(nil), flags)
 	MustRegisterCmd("missedtickets", (*MissedTicketsCmd)(nil), flags)

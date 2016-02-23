@@ -452,7 +452,7 @@ func TestChainSvrCmds(t *testing.T) {
 				return dcrjson.NewCmd("getrawmempool")
 			},
 			staticCmd: func() interface{} {
-				return dcrjson.NewGetRawMempoolCmd(nil)
+				return dcrjson.NewGetRawMempoolCmd(nil, nil)
 			},
 			marshalled: `{"jsonrpc":"1.0","method":"getrawmempool","params":[],"id":1}`,
 			unmarshalled: &dcrjson.GetRawMempoolCmd{
@@ -465,11 +465,25 @@ func TestChainSvrCmds(t *testing.T) {
 				return dcrjson.NewCmd("getrawmempool", false)
 			},
 			staticCmd: func() interface{} {
-				return dcrjson.NewGetRawMempoolCmd(dcrjson.Bool(false))
+				return dcrjson.NewGetRawMempoolCmd(dcrjson.Bool(false), nil)
 			},
 			marshalled: `{"jsonrpc":"1.0","method":"getrawmempool","params":[false],"id":1}`,
 			unmarshalled: &dcrjson.GetRawMempoolCmd{
 				Verbose: dcrjson.Bool(false),
+			},
+		},
+		{
+			name: "getrawmempool optional 2",
+			newCmd: func() (interface{}, error) {
+				return dcrjson.NewCmd("getrawmempool", false, "all")
+			},
+			staticCmd: func() interface{} {
+				return dcrjson.NewGetRawMempoolCmd(dcrjson.Bool(false), dcrjson.String("all"))
+			},
+			marshalled: `{"jsonrpc":"1.0","method":"getrawmempool","params":[false,"all"],"id":1}`,
+			unmarshalled: &dcrjson.GetRawMempoolCmd{
+				Verbose: dcrjson.Bool(false),
+				TxType:  dcrjson.String("all"),
 			},
 		},
 		{

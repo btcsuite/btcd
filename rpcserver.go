@@ -31,6 +31,8 @@ import (
 	"github.com/btcsuite/fastsha256"
 	"github.com/btcsuite/websocket"
 
+	"github.com/decred/bitset"
+
 	"github.com/decred/dcrd/blockchain"
 	"github.com/decred/dcrd/blockchain/stake"
 	"github.com/decred/dcrd/chaincfg"
@@ -40,6 +42,7 @@ import (
 	"github.com/decred/dcrd/dcrjson"
 	"github.com/decred/dcrd/txscript"
 	"github.com/decred/dcrd/wire"
+
 	"github.com/decred/dcrutil"
 )
 
@@ -150,6 +153,7 @@ var rpcHandlersBeforeInit = map[string]commandHandler{
 	"estimatefee":           handleEstimateFee,
 	"existsaddress":         handleExistsAddress,
 	"existsliveticket":      handleExistsLiveTicket,
+	"existslivetickets":     handleExistsLiveTickets,
 	"generate":              handleGenerate,
 	"getaddednodeinfo":      handleGetAddedNodeInfo,
 	"getbestblock":          handleGetBestBlock,
@@ -1494,6 +1498,56 @@ func handleExistsLiveTicket(s *rpcServer, cmd interface{},
 	}
 
 	return s.server.blockManager.ExistsLiveTicket(hash)
+}
+
+// handleExistsLiveTickets implements the existslivetickets command.
+func handleExistsLiveTickets(s *rpcServer, cmd interface{},
+	closeChan <-chan struct{}) (interface{}, error) {
+	c := cmd.(*dcrjson.ExistsLiveTicketsCmd)
+
+	txHashBlob, err := hex.DecodeString(c.TxHashBlob)
+	if err != nil {
+		return nil, &dcrjson.RPCError{
+			Code:    dcrjson.ErrRPCDecodeHexString,
+			Message: "bad transaction hash blob (unparseable)",
+		}
+	}
+
+	// It needs to be an exact number of hashes.
+	if len(txHashBlob)%32 != 0 {
+		return nil, &dcrjson.RPCError{
+			Code:    dcrjson.ErrRPCDecodeHexString,
+			Message: "bad transaction hash blob (bad length)",
+		}
+	}
+
+	hashesLen := len(txHashBlob) / 32
+	hashes := make([]*chainhash.Hash, hashesLen)
+	for i := 0; i < hashesLen; i++ {
+		hashes[i], err = chainhash.NewHash(
+			txHashBlob[i*chainhash.HashSize : (i+1)*chainhash.HashSize])
+	}
+
+	exists, err := s.server.blockManager.ExistsLiveTickets(hashes)
+	if err != nil {
+		return nil, err
+	}
+	if len(exists) != hashesLen {
+		return nil, &dcrjson.RPCError{
+			Code:    dcrjson.ErrRPCDatabase,
+			Message: "output of ExistsLiveTickets wrong size",
+		}
+	}
+
+	// Convert the slice of bools into a compacted set of bit flags.
+	set := bitset.NewBytes(hashesLen)
+	for i := range exists {
+		if exists[i] {
+			set.Set(i)
+		}
+	}
+
+	return hex.EncodeToString([]byte(set)), nil
 }
 
 // handleGenerate handles generate commands.
@@ -3179,6 +3233,32 @@ func handleGetRawMempool(s *rpcServer, cmd interface{}, closeChan <-chan struct{
 		mp.RLock()
 		defer mp.RUnlock()
 		for _, desc := range descs {
+			// If we're interested in a specific transaction type,
+			// skip all the transactions which are not this type.
+			if c.TxType != nil {
+				switch *c.TxType {
+				case string(dcrjson.GRMRegular):
+					if desc.Type != stake.TxTypeRegular {
+						continue
+					}
+				case string(dcrjson.GRMTickets):
+					if desc.Type != stake.TxTypeSStx {
+						continue
+					}
+				case string(dcrjson.GRMVotes):
+					if desc.Type != stake.TxTypeSSGen {
+						continue
+					}
+				case string(dcrjson.GRMRevocations):
+					if desc.Type != stake.TxTypeSSRtx {
+						continue
+					}
+				case string(dcrjson.GRMAll):
+					fallthrough
+				default:
+				}
+			}
+
 			// Calculate the starting and current priority from the
 			// the tx's inputs.  Use zeros if one or more of the
 			// input transactions can't be found for some reason.
@@ -3215,9 +3295,34 @@ func handleGetRawMempool(s *rpcServer, cmd interface{}, closeChan <-chan struct{
 
 	// The response is simply an array of the transaction hashes if the
 	// verbose flag is not set.
-	hashStrings := make([]string, len(descs))
-	for i := range hashStrings {
-		hashStrings[i] = descs[i].Tx.Sha().String()
+	descsLen := len(descs)
+	hashStrings := make([]string, 0, descsLen)
+	for i := 0; i < descsLen; i++ {
+		if c.TxType != nil {
+			switch *c.TxType {
+			case string(dcrjson.GRMRegular):
+				if descs[i].Type != stake.TxTypeRegular {
+					continue
+				}
+			case string(dcrjson.GRMTickets):
+				if descs[i].Type != stake.TxTypeSStx {
+					continue
+				}
+			case string(dcrjson.GRMVotes):
+				if descs[i].Type != stake.TxTypeSSGen {
+					continue
+				}
+			case string(dcrjson.GRMRevocations):
+				if descs[i].Type != stake.TxTypeSSRtx {
+					continue
+				}
+			case string(dcrjson.GRMAll):
+				fallthrough
+			default:
+			}
+		}
+
+		hashStrings = append(hashStrings, descs[i].Tx.Sha().String())
 	}
 
 	return hashStrings, nil
