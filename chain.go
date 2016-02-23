@@ -301,17 +301,19 @@ func (r FutureGetRawMempoolResult) Receive() ([]*chainhash.Hash, error) {
 // returned instance.
 //
 // See GetRawMempool for the blocking version and more details.
-func (c *Client) GetRawMempoolAsync() FutureGetRawMempoolResult {
-	cmd := dcrjson.NewGetRawMempoolCmd(dcrjson.Bool(false))
+func (c *Client) GetRawMempoolAsync(txType dcrjson.GetRawMempoolTxTypeCmd) FutureGetRawMempoolResult {
+	cmd := dcrjson.NewGetRawMempoolCmd(dcrjson.Bool(false),
+		dcrjson.String(string(txType)))
 	return c.sendCmd(cmd)
 }
 
-// GetRawMempool returns the hashes of all transactions in the memory pool.
+// GetRawMempool returns the hashes of all transactions in the memory pool for
+// the given txType.
 //
 // See GetRawMempoolVerbose to retrieve data structures with information about
 // the transactions instead.
-func (c *Client) GetRawMempool() ([]*chainhash.Hash, error) {
-	return c.GetRawMempoolAsync().Receive()
+func (c *Client) GetRawMempool(txType dcrjson.GetRawMempoolTxTypeCmd) ([]*chainhash.Hash, error) {
+	return c.GetRawMempoolAsync(txType).Receive()
 }
 
 // FutureGetRawMempoolVerboseResult is a future promise to deliver the result of
@@ -342,8 +344,9 @@ func (r FutureGetRawMempoolVerboseResult) Receive() (map[string]dcrjson.GetRawMe
 // function on the returned instance.
 //
 // See GetRawMempoolVerbose for the blocking version and more details.
-func (c *Client) GetRawMempoolVerboseAsync() FutureGetRawMempoolVerboseResult {
-	cmd := dcrjson.NewGetRawMempoolCmd(dcrjson.Bool(true))
+func (c *Client) GetRawMempoolVerboseAsync(txType dcrjson.GetRawMempoolTxTypeCmd) FutureGetRawMempoolVerboseResult {
+	cmd := dcrjson.NewGetRawMempoolCmd(dcrjson.Bool(true),
+		dcrjson.String(string(txType)))
 	return c.sendCmd(cmd)
 }
 
@@ -352,8 +355,8 @@ func (c *Client) GetRawMempoolVerboseAsync() FutureGetRawMempoolVerboseResult {
 // the memory pool.
 //
 // See GetRawMempool to retrieve only the transaction hashes instead.
-func (c *Client) GetRawMempoolVerbose() (map[string]dcrjson.GetRawMempoolVerboseResult, error) {
-	return c.GetRawMempoolVerboseAsync().Receive()
+func (c *Client) GetRawMempoolVerbose(txType dcrjson.GetRawMempoolTxTypeCmd) (map[string]dcrjson.GetRawMempoolVerboseResult, error) {
+	return c.GetRawMempoolVerboseAsync(txType).Receive()
 }
 
 // FutureVerifyChainResult is a future promise to deliver the result of a

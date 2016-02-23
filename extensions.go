@@ -7,6 +7,7 @@ package dcrrpcclient
 
 import (
 	"encoding/base64"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 
@@ -171,6 +172,49 @@ func (c *Client) ExistsLiveTicketAsync(hash *chainhash.Hash) FutureExistsLiveTic
 // NOTE: This is a dcrd extension.
 func (c *Client) ExistsLiveTicket(hash *chainhash.Hash) (bool, error) {
 	return c.ExistsLiveTicketAsync(hash).Receive()
+}
+
+// FutureExistsLiveTicketsResult is a future promise to deliver the result
+// of a FutureExistsLiveTicketsResultAsync RPC invocation (or an
+// applicable error).
+type FutureExistsLiveTicketsResult chan *response
+
+// Receive waits for the response promised by the future and returns whether
+// or not the ticket exists in the live ticket database.
+func (r FutureExistsLiveTicketsResult) Receive() (string, error) {
+	res, err := receiveFuture(r)
+	if err != nil {
+		return "", err
+	}
+
+	// Unmarshal the result as a string.
+	var exists string
+	err = json.Unmarshal(res, &exists)
+	if err != nil {
+		return "", err
+	}
+	return exists, nil
+}
+
+// ExistsLiveTicketsAsync returns an instance of a type that can be used to get the
+// result of the RPC at some future time by invoking the Receive function on the
+// returned instance.
+func (c *Client) ExistsLiveTicketsAsync(hashes []*chainhash.Hash) FutureExistsLiveTicketsResult {
+	hashBlob := make([]byte, len(hashes)*chainhash.HashSize)
+	for i, hash := range hashes {
+		copy(hashBlob[i*chainhash.HashSize:(i+1)*chainhash.HashSize],
+			hash[:])
+	}
+	cmd := dcrjson.NewExistsLiveTicketsCmd(hex.EncodeToString(hashBlob))
+	return c.sendCmd(cmd)
+}
+
+// ExistsLiveTickets returns information about whether or not a ticket hash exists
+// in the live ticket database.
+//
+// NOTE: This is a dcrd extension.
+func (c *Client) ExistsLiveTickets(hashes []*chainhash.Hash) (string, error) {
+	return c.ExistsLiveTicketsAsync(hashes).Receive()
 }
 
 // FutureMissedTicketsResult is a future promise to deliver the result
