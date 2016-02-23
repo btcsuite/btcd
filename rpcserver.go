@@ -85,6 +85,9 @@ const (
 	// changed and there have been changes to the available transactions
 	// in the memory pool.
 	gbtRegenerateSeconds = 60
+
+	// merkleRootPairSize
+	merkleRootPairSize = 64
 )
 
 var (
@@ -3741,13 +3744,19 @@ func handleGetWorkRequest(s *rpcServer) (interface{}, error) {
 	// submission, is used to rebuild the block before checking the
 	// submitted solution.
 	coinbaseTx := msgBlock.Transactions[0]
+
+	// Create the new merkleRootPair key which is MerkleRoot + StakeRoot
+	var merkleRootPair [merkleRootPairSize]byte
+	copy(merkleRootPair[:chainhash.HashSize], msgBlock.Header.MerkleRoot[:])
+	copy(merkleRootPair[chainhash.HashSize:], msgBlock.Header.StakeRoot[:])
+
 	if msgBlock.Header.Height > 1 {
-		s.templatePool[msgBlock.Header.MerkleRoot] = &workStateBlockInfo{
+		s.templatePool[merkleRootPair] = &workStateBlockInfo{
 			msgBlock: msgBlock,
 			pkScript: coinbaseTx.TxOut[1].PkScript,
 		}
 	} else {
-		s.templatePool[msgBlock.Header.MerkleRoot] = &workStateBlockInfo{
+		s.templatePool[merkleRootPair] = &workStateBlockInfo{
 			msgBlock: msgBlock,
 		}
 	}
@@ -3826,10 +3835,15 @@ func handleGetWorkSubmission(s *rpcServer, hexData string) (interface{}, error) 
 		}
 	}
 
+	// Create the new merkleRootPair key which is MerkleRoot + StakeRoot
+	var merkleRootPair [merkleRootPairSize]byte
+	copy(merkleRootPair[:chainhash.HashSize], submittedHeader.MerkleRoot[:])
+	copy(merkleRootPair[chainhash.HashSize:], submittedHeader.StakeRoot[:])
+
 	// Look up the full block for the provided data based on the
 	// merkle root.  Return false to indicate the solve failed if
 	// it's not available.
-	blockInfo, ok := s.templatePool[submittedHeader.MerkleRoot]
+	blockInfo, ok := s.templatePool[merkleRootPair]
 	if !ok {
 		rpcsLog.Errorf("Block submitted via getwork has no matching "+
 			"template for merkle root %s",
@@ -4539,7 +4553,7 @@ type rpcServer struct {
 	listeners    []net.Listener
 	workState    *workState
 	gbtWorkState *gbtWorkState
-	templatePool map[chainhash.Hash]*workStateBlockInfo
+	templatePool map[[merkleRootPairSize]byte]*workStateBlockInfo
 	helpCacher   *helpCacher
 	quit         chan int
 
@@ -5016,7 +5030,7 @@ func newRPCServer(listenAddrs []string, s *server) (*rpcServer, error) {
 		server:       s,
 		statusLines:  make(map[int]string),
 		workState:    newWorkState(),
-		templatePool: make(map[chainhash.Hash]*workStateBlockInfo),
+		templatePool: make(map[[merkleRootPairSize]byte]*workStateBlockInfo),
 		gbtWorkState: newGbtWorkState(s.timeSource),
 		helpCacher:   newHelpCacher(),
 		quit:         make(chan int),
