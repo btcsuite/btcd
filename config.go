@@ -435,6 +435,18 @@ func loadConfig() (*config, []string, error) {
 		return nil, nil, err
 	}
 
+	// If an alternate data directory was specified, and paths with defaults
+	// relative to the data dir are unchanged, modify each path to be
+	// relative to the new data dir.
+	if cfg.DataDir != defaultDataDir {
+		if cfg.RPCKey == defaultRPCKeyFile {
+			cfg.RPCKey = filepath.Join(cfg.DataDir, "rpc.key")
+		}
+		if cfg.RPCCert == defaultRPCCertFile {
+			cfg.RPCCert = filepath.Join(cfg.DataDir, "rpc.cert")
+		}
+	}
+
 	// Multiple networks can't be selected simultaneously.
 	numNets := 0
 	// Count number of network flags passed; assign active network params
