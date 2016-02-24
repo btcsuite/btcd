@@ -52,6 +52,20 @@ type GetTicketVoteBitsResult struct {
 	VoteBitsExt string `json:"votebitsext"`
 }
 
+// ScriptInfo is the structure representing a redeem script, its hash,
+// and its address.
+type ScriptInfo struct {
+	Hash160      string `json:"hash160"`
+	Address      string `json:"address"`
+	RedeemScript string `json:"redeemscript"`
+}
+
+// ListScriptsResult models the data returned from the listscripts
+// command.
+type ListScriptsResult struct {
+	Scripts []ScriptInfo `json:"scripts"`
+}
+
 // RedeemMultiSigOutResult models the data returned from the redeemmultisigout
 // command.
 type RedeemMultiSigOutResult struct {

@@ -172,6 +172,17 @@ func NewImportScriptCmd(hex string) *ImportScriptCmd {
 	return &ImportScriptCmd{hex}
 }
 
+// ListScriptsCmd is a type for handling custom marshaling and
+// unmarshaling of listscripts JSON wallet extension commands.
+type ListScriptsCmd struct {
+}
+
+// NewListScriptsCmd returns a new instance which can be used to issue a
+// listscripts JSON-RPC command.
+func NewListScriptsCmd() *ListScriptsCmd {
+	return &ListScriptsCmd{}
+}
+
 // NotifyWinningTicketsCmd is a type handling custom marshaling and
 // unmarshaling of notifywinningtickets JSON websocket extension
 // commands.
@@ -433,6 +444,7 @@ func init() {
 	MustRegisterCmd("gettickets", (*GetTicketsCmd)(nil), flags)
 	MustRegisterCmd("getticketvotebits", (*GetTicketVoteBitsCmd)(nil), flags)
 	MustRegisterCmd("importscript", (*ImportScriptCmd)(nil), flags)
+	MustRegisterCmd("listscripts", (*ListScriptsCmd)(nil), flags)
 	MustRegisterCmd("notifynewtickets", (*NotifyNewTicketsCmd)(nil), flags)
 	MustRegisterCmd("notifyspentandmissedtickets",
 		(*NotifySpentAndMissedTicketsCmd)(nil), flags)
