@@ -2961,6 +2961,9 @@ func handleGetCoinSupply(s *rpcServer, cmd interface{}, closeChan <-chan struct{
 		if int64(i) < params.StakeValidationHeight {
 			supply += (work + tax)
 		} else {
+			// Make sure to reduce work and tax subsidy based on number of voters
+			work = work * voters / int64(params.TicketsPerBlock)
+			tax = tax * voters / int64(params.TicketsPerBlock)
 			supply += (work + stake + tax)
 		}
 	}
