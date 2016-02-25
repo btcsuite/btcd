@@ -338,22 +338,22 @@ var (
 
 var (
 	registeredNets = map[wire.BitcoinNet]struct{}{
-		MainNetParams.Net:       struct{}{},
-		TestNet3Params.Net:      struct{}{},
-		RegressionNetParams.Net: struct{}{},
-		SimNetParams.Net:        struct{}{},
+		MainNetParams.Net:       {},
+		TestNet3Params.Net:      {},
+		RegressionNetParams.Net: {},
+		SimNetParams.Net:        {},
 	}
 
 	pubKeyHashAddrIDs = map[byte]struct{}{
-		MainNetParams.PubKeyHashAddrID:  struct{}{},
-		TestNet3Params.PubKeyHashAddrID: struct{}{}, // shared with regtest
-		SimNetParams.PubKeyHashAddrID:   struct{}{},
+		MainNetParams.PubKeyHashAddrID:  {},
+		TestNet3Params.PubKeyHashAddrID: {}, // shared with regtest
+		SimNetParams.PubKeyHashAddrID:   {},
 	}
 
 	scriptHashAddrIDs = map[byte]struct{}{
-		MainNetParams.ScriptHashAddrID:  struct{}{},
-		TestNet3Params.ScriptHashAddrID: struct{}{}, // shared with regtest
-		SimNetParams.ScriptHashAddrID:   struct{}{},
+		MainNetParams.ScriptHashAddrID:  {},
+		TestNet3Params.ScriptHashAddrID: {}, // shared with regtest
+		SimNetParams.ScriptHashAddrID:   {},
 	}
 
 	// Testnet is shared with regtest.

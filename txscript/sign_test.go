@@ -104,21 +104,21 @@ func TestSignTxOutput(t *testing.T) {
 	tx := &wire.MsgTx{
 		Version: 1,
 		TxIn: []*wire.TxIn{
-			&wire.TxIn{
+			{
 				PreviousOutPoint: wire.OutPoint{
 					Hash:  wire.ShaHash{},
 					Index: 0,
 				},
 				Sequence: 4294967295,
 			},
-			&wire.TxIn{
+			{
 				PreviousOutPoint: wire.OutPoint{
 					Hash:  wire.ShaHash{},
 					Index: 1,
 				},
 				Sequence: 4294967295,
 			},
-			&wire.TxIn{
+			{
 				PreviousOutPoint: wire.OutPoint{
 					Hash:  wire.ShaHash{},
 					Index: 2,
@@ -127,13 +127,13 @@ func TestSignTxOutput(t *testing.T) {
 			},
 		},
 		TxOut: []*wire.TxOut{
-			&wire.TxOut{
+			{
 				Value: 1,
 			},
-			&wire.TxOut{
+			{
 				Value: 2,
 			},
-			&wire.TxOut{
+			{
 				Value: 3,
 			},
 		},
@@ -1642,7 +1642,7 @@ nexttest:
 		output := wire.NewTxOut(500, []byte{txscript.OP_RETURN})
 		tx.AddTxOut(output)
 
-		for _ = range sigScriptTests[i].inputs {
+		for range sigScriptTests[i].inputs {
 			txin := wire.NewTxIn(coinbaseOutPoint, nil)
 			tx.AddTxIn(txin)
 		}
