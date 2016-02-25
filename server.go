@@ -449,7 +449,7 @@ func (sp *serverPeer) OnTx(p *peer.Peer, msg *wire.MsgTx) {
 	// Queue the transaction up to be handled by the block manager and
 	// intentionally block further receives until the transaction is fully
 	// processed and known good or bad.  This helps prevent a malicious peer
-	// from queueing up a bunch of bad transactions before disconnecting (or
+	// from queuing up a bunch of bad transactions before disconnecting (or
 	// being disconnected) and wasting memory.
 	sp.server.blockManager.QueueTx(tx, sp)
 	<-sp.txProcessed
@@ -470,7 +470,7 @@ func (sp *serverPeer) OnBlock(p *peer.Peer, msg *wire.MsgBlock, buf []byte) {
 	// manager and intentionally block further receives
 	// until the bitcoin block is fully processed and known
 	// good or bad.  This helps prevent a malicious peer
-	// from queueing up a bunch of bad blocks before
+	// from queuing up a bunch of bad blocks before
 	// disconnecting (or being disconnected) and wasting
 	// memory.  Additionally, this behavior is depended on
 	// by at least the block acceptance test tool as the
@@ -511,7 +511,7 @@ func (sp *serverPeer) OnGetData(p *peer.Peer, msg *wire.MsgGetData) {
 	// This incremental score decays each minute to half of its value.
 	sp.addBanScore(0, uint32(length)*99/wire.MaxInvPerMsg, "getdata")
 
-	// We wait on this wait channel periodically to prevent queueing
+	// We wait on this wait channel periodically to prevent queuing
 	// far more data than we can send in a reasonable time, wasting memory.
 	// The waiting occurs after the database fetch for the next one to
 	// provide a little pipelining.
@@ -1440,7 +1440,7 @@ func newPeerConfig(sp *serverPeer) *peer.Config {
 			// Note: The reference client currently bans peers that send alerts
 			// not signed with its key.  We could verify against their key, but
 			// since the reference client is currently unwilling to support
-			// other implementions' alert messages, we will not relay theirs.
+			// other implementations' alert messages, we will not relay theirs.
 			OnAlert: nil,
 		},
 		NewestBlock:      sp.server.db.NewestSha,

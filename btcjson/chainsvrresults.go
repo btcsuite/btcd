@@ -221,7 +221,7 @@ type GetNetTotalsResult struct {
 	TimeMillis     int64  `json:"timemillis"`
 }
 
-// ScriptSig models a signature script.  It is defined seperately since it only
+// ScriptSig models a signature script.  It is defined separately since it only
 // applies to non-coinbase.  Therefore the field in the Vin structure needs
 // to be a pointer.
 type ScriptSig struct {
@@ -229,7 +229,7 @@ type ScriptSig struct {
 	Hex string `json:"hex"`
 }
 
-// Vin models parts of the tx data.  It is defined seperately since
+// Vin models parts of the tx data.  It is defined separately since
 // getrawtransaction, decoderawtransaction, and searchrawtransaction use the
 // same structure.
 type Vin struct {
@@ -322,7 +322,7 @@ func (v *VinPrevOut) MarshalJSON() ([]byte, error) {
 	return json.Marshal(txStruct)
 }
 
-// Vout models parts of the tx data.  It is defined seperately since both
+// Vout models parts of the tx data.  It is defined separately since both
 // getrawtransaction and decoderawtransaction use the same structure.
 type Vout struct {
 	Value        float64            `json:"value"`

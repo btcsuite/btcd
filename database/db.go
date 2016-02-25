@@ -40,7 +40,7 @@ type Db interface {
 
 	// DropAfterBlockBySha will remove any blocks from the database after
 	// the given block.  It terminates any existing transaction and performs
-	// its operations in an atomic transaction which is commited before
+	// its operations in an atomic transaction which is committed before
 	// the function returns.
 	DropAfterBlockBySha(*wire.ShaHash) (err error)
 
@@ -121,7 +121,7 @@ type Db interface {
 	// index information for a particular block height. Additionally, it
 	// will update the stored meta-data related to the curent tip of the
 	// addr index. These two operations are performed in an atomic
-	// transaction which is commited before the function returns.
+	// transaction which is committed before the function returns.
 	// Addresses are indexed by the raw bytes of their base58 decoded
 	// hash160.
 	UpdateAddrIndexForBlock(blkSha *wire.ShaHash, height int32,
@@ -194,7 +194,7 @@ func AddDBDriver(instance DriverDB) {
 	driverList = append(driverList, instance)
 }
 
-// CreateDB intializes and opens a database.
+// CreateDB initializes and opens a database.
 func CreateDB(dbtype string, args ...interface{}) (pbdb Db, err error) {
 	for _, drv := range driverList {
 		if drv.DbType == dbtype {

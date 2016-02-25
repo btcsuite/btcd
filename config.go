@@ -188,7 +188,7 @@ func supportedSubsystems() []string {
 		subsystems = append(subsystems, subsysID)
 	}
 
-	// Sort the subsytems for stable display.
+	// Sort the subsystems for stable display.
 	sort.Strings(subsystems)
 	return subsystems
 }

@@ -386,7 +386,7 @@ func getSigOpCount(pops []parsedOpcode, precise bool) int {
 			fallthrough
 		case OP_CHECKMULTISIGVERIFY:
 			// If we are being precise then look for familiar
-			// patterns for multisig, for now all we recognise is
+			// patterns for multisig, for now all we recognize is
 			// OP_1 - OP_16 to signify the number of pubkeys.
 			// Otherwise, we use the max of 20.
 			if precise && i > 0 &&

@@ -34,7 +34,7 @@ func TstTimeSorter(times []time.Time) sort.Interface {
 var TstCheckSerializedHeight = checkSerializedHeight
 
 // TstSetMaxMedianTimeEntries makes the ability to set the maximum number of
-// median tiem entries available to the test package.
+// median time entries available to the test package.
 func TstSetMaxMedianTimeEntries(val int) {
 	maxMedianTimeEntries = val
 }

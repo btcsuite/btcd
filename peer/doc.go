@@ -21,7 +21,7 @@ A quick overview of the major features peer provides are as follows:
  - Full duplex reading and writing of bitcoin protocol messages
  - Automatic handling of the initial handshake process including protocol
    version negotiation
- - Asynchronous message queueing of outbound messages with optional channel for
+ - Asynchronous message queuing of outbound messages with optional channel for
    notification when the message is actually sent
  - Flexible peer configuration
    - Caller is responsible for creating outgoing connections and listening for
@@ -144,7 +144,7 @@ raw message bytes using a format similar to hexdump -C.
 
 Bitcoin Improvement Proposals
 
-This package supports all BIPS supported by the wire packge.
+This package supports all BIPS supported by the wire package.
 (https://godoc.org/github.com/btcsuite/btcd/wire#hdr-Bitcoin_Improvement_Proposals)
 */
 package peer

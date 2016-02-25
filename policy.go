@@ -202,7 +202,7 @@ func checkInputsStandard(tx *btcutil.Tx, txStore blockchain.TxStore) error {
 	return nil
 }
 
-// checkPkScriptStandard performs a series of checks on a transaction ouput
+// checkPkScriptStandard performs a series of checks on a transaction output
 // script (public key script) to ensure it is a "standard" public key script.
 // A standard public key script is one that is a recognized form, and for
 // multi-signature scripts, only contains from 1 to maxStandardMultiSigKeys

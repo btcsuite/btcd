@@ -122,7 +122,7 @@ func errToRejectErr(err error) (wire.RejectCode, string) {
 	// Return a generic rejected string if there is no error.  This really
 	// should not happen unless the code elsewhere is not setting an error
 	// as it should be, but it's best to be safe and simply return a generic
-	// string rather than allowing the following code that derferences the
+	// string rather than allowing the following code that dereferences the
 	// err to panic.
 	if err == nil {
 		return wire.RejectInvalid, "rejected"

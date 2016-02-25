@@ -31,7 +31,7 @@ func (w *fixedWriter) Write(p []byte) (n int, err error) {
 	return
 }
 
-// Bytes returns the bytes alreayd written to the fixed writer.
+// Bytes returns the bytes already written to the fixed writer.
 func (w *fixedWriter) Bytes() []byte {
 	return w.b
 }

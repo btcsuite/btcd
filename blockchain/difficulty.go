@@ -163,7 +163,7 @@ func BigToCompact(n *big.Int) uint32 {
 // CalcWork calculates a work value from difficulty bits.  Bitcoin increases
 // the difficulty for generating a block by decreasing the value which the
 // generated hash must be less than.  This difficulty target is stored in each
-// block header using a compact representation as described in the documenation
+// block header using a compact representation as described in the documentation
 // for CompactToBig.  The main chain is selected by choosing the chain that has
 // the most proof of work (highest difficulty).  Since a lower target difficulty
 // value equates to higher actual difficulty, the work value which will be

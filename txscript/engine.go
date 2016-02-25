@@ -17,7 +17,7 @@ import (
 type ScriptFlags uint32
 
 const (
-	// ScriptBip16 defines whether the bip16 threshhold has passed and thus
+	// ScriptBip16 defines whether the bip16 threshold has passed and thus
 	// pay-to-script hash transactions will be fully validated.
 	ScriptBip16 ScriptFlags = 1 << iota
 

@@ -31,9 +31,9 @@ const (
 	// When in "CatchUp" mode, incoming requests to index newly solved
 	// blocks are backed up for later processing. Once we've finished
 	// catching up, we process these queued jobs, and then enter into
-	// "maintainence" mode.
+	// "maintenance" mode.
 	indexCatchUp indexState = iota
-	// When in "maintainence" mode, we have a single worker serially
+	// When in "maintenance" mode, we have a single worker serially
 	// processing incoming jobs to index newly solved blocks.
 	indexMaintain
 )
