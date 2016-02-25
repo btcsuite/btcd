@@ -522,7 +522,7 @@ func (db *LevelDb) FetchTxsForAddr(addr btcutil.Address, skip int,
 // index information for a particular block height. Additionally, it
 // will update the stored meta-data related to the curent tip of the
 // addr index. These two operations are performed in an atomic
-// transaction which is commited before the function returns.
+// transaction which is committed before the function returns.
 // Transactions indexed by address are stored with the following format:
 //   * prefix || hash160 || blockHeight || txoffset || txlen
 // Indexes are stored purely in the key, with blank data for the actual value

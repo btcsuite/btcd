@@ -1469,7 +1469,7 @@ func newBlockManager(s *server) (*blockManager, error) {
 	}
 	bmgrLog.Infof("Block index generation complete")
 
-	// Initialize the chain state now that the intial block node index has
+	// Initialize the chain state now that the initial block node index has
 	// been generated.
 	bm.updateChainState(newestHash, height)
 
@@ -1479,7 +1479,7 @@ func newBlockManager(s *server) (*blockManager, error) {
 // removeRegressionDB removes the existing regression test database if running
 // in regression test mode and it already exists.
 func removeRegressionDB(dbPath string) error {
-	// Dont do anything if not in regression test mode.
+	// Don't do anything if not in regression test mode.
 	if !cfg.RegressionTest {
 		return nil
 	}

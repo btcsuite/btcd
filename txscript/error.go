@@ -71,7 +71,7 @@ var (
 	ErrStackElementTooBig = errors.New("element in script too large")
 
 	// ErrStackUnknownAddress is returned when ScriptToAddrHash does not
-	// recognise the pattern of the script and thus can not find the address
+	// recognize the pattern of the script and thus can not find the address
 	// for payment.
 	ErrStackUnknownAddress = errors.New("non-recognised address")
 

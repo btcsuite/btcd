@@ -65,8 +65,8 @@ func GenerateSharedSecret(privkey *PrivateKey, pubkey *PublicKey) []byte {
 //		HMAC [32]byte
 //	}
 //
-// The primary aim is to ensure byte compatibility with Pyelliptic. Additionaly,
-// refer to section 5.8.1 of ANSI X9.63 for rationale on this format.
+// The primary aim is to ensure byte compatibility with Pyelliptic.  Also, refer
+// to section 5.8.1 of ANSI X9.63 for rationale on this format.
 func Encrypt(pubkey *PublicKey, in []byte) ([]byte, error) {
 	ephemeral, err := NewPrivateKey(S256())
 	if err != nil {

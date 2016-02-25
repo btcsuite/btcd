@@ -124,7 +124,7 @@ func (s *dynamicBanScore) int(t time.Time) uint32 {
 
 // increase increases the persistent, the decaying or both scores by the values
 // passed as parameters. The resulting score is calculated as if the action was
-// carried out at the point time represented by the third paramter. The
+// carried out at the point time represented by the third parameter. The
 // resulting score is returned.
 //
 // This function is not safe for concurrent access.

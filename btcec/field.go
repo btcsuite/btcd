@@ -41,7 +41,7 @@ package btcec
 // 3) Since we're dealing with 32-bit values, 64-bits of overflow is a
 //    reasonable choice for #2
 // 4) Given the need for 256-bits of precision and the properties stated in #1,
-//    #2, and #3, the representation which best accomodates this is 10 uint32s
+//    #2, and #3, the representation which best accommodates this is 10 uint32s
 //    with base 2^26 (26 bits * 10 = 260 bits, so the final word only needs 22
 //    bits) which leaves the desired 64 bits (32 * 10 = 320, 320 - 256 = 64) for
 //    overflow

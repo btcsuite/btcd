@@ -253,7 +253,7 @@ func TestRegisteredCmdMethods(t *testing.T) {
 		t.Fatal("RegisteredCmdMethods: no methods")
 	}
 
-	// Ensure the returnd methods are sorted.
+	// Ensure the returned methods are sorted.
 	sortedMethods := make([]string, len(methods))
 	copy(sortedMethods, methods)
 	sort.Sort(sort.StringSlice(sortedMethods))

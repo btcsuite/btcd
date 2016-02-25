@@ -576,7 +576,7 @@ func (mp *txMemPool) FetchTransaction(txHash *wire.ShaHash) (*btcutil.Tx, error)
 
 // FilterTransactionsByAddress returns all transactions currently in the
 // mempool that either create an output to the passed address or spend a
-// previously created ouput to the address.
+// previously created output to the address.
 func (mp *txMemPool) FilterTransactionsByAddress(addr btcutil.Address) ([]*btcutil.Tx, error) {
 	// Protect concurrent access.
 	mp.RLock()

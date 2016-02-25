@@ -26,7 +26,7 @@ const (
 	maxRejectReasonLen = 250
 )
 
-// Loggers per subsytem.  Note that backendLog is a seelog logger that all of
+// Loggers per subsystem.  Note that backendLog is a seelog logger that all of
 // the subsystem loggers route their messages to.  When adding new subsystems,
 // add a reference here, to the subsystemLoggers map, and the useLogger
 // function.
@@ -136,7 +136,7 @@ func useLogger(subsystemID string, logger btclog.Logger) {
 }
 
 // initSeelogLogger initializes a new seelog logger that is used as the backend
-// for all logging subsytems.
+// for all logging subsystems.
 func initSeelogLogger(logFile string) {
 	config := `
 	<seelog type="adaptive" mininterval="2000000" maxinterval="100000000"

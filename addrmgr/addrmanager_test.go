@@ -16,7 +16,7 @@ import (
 	"github.com/btcsuite/btcd/wire"
 )
 
-// naTest is used to describe a test to be perfomed against the NetAddressKey
+// naTest is used to describe a test to be performed against the NetAddressKey
 // method.
 type naTest struct {
 	in   wire.NetAddress

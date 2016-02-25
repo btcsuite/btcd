@@ -882,7 +882,7 @@ func (a *AddrManager) Good(addr *wire.NetAddress) {
 	addrKey := NetAddressKey(addr)
 	oldBucket := -1
 	for i := range a.addrNew {
-		// we check for existance so we can record the first one
+		// we check for existence so we can record the first one
 		if _, ok := a.addrNew[i][addrKey]; ok {
 			delete(a.addrNew[i], addrKey)
 			ka.refs--

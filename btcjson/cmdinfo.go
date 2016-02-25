@@ -65,7 +65,7 @@ func subStructUsage(structType reflect.Type) string {
 		}
 
 		// Create the name/value entry for the field while considering
-		// the type of the field.  Not all possibile types are covered
+		// the type of the field.  Not all possible types are covered
 		// here and when one of the types not specifically covered is
 		// encountered, the field name is simply reused for the value.
 		fieldName := strings.ToLower(rtf.Name)
