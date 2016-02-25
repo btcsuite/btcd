@@ -217,6 +217,7 @@ var rpcAskWallet = map[string]struct{}{
 	"getrawchangeaddress":    struct{}{},
 	"getreceivedbyaccount":   struct{}{},
 	"getreceivedbyaddress":   struct{}{},
+	"getstakeinfo":           struct{}{},
 	"gettransaction":         struct{}{},
 	"gettxoutsetinfo":        struct{}{},
 	"getunconfirmedbalance":  struct{}{},
