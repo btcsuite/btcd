@@ -59,7 +59,7 @@ func TestReorganization(t *testing.T) {
 	blockchain.TstSetCoinbaseMaturity(1)
 
 	timeSource := blockchain.NewMedianTime()
-	expectedOrphans := map[int]struct{}{5: struct{}{}, 6: struct{}{}}
+	expectedOrphans := map[int]struct{}{5: {}, 6: {}}
 	for i := 1; i < len(blocks); i++ {
 		isOrphan, err := chain.ProcessBlock(blocks[i], timeSource, blockchain.BFNone)
 		if err != nil {
