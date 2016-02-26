@@ -433,6 +433,9 @@ type Peer struct {
 	lastPingTime       time.Time // Time we sent last ping.
 	lastPingMicros     int64     // Time for last ping to return.
 
+	pingTickerTimerMtx sync.Mutex
+	pingTickerTimer    *time.Timer
+
 	stallControl  chan stallControlMsg
 	outputQueue   chan outMsg
 	sendQueue     chan outMsg
@@ -1717,10 +1720,6 @@ func (p *Peer) shouldLogWriteError(err error) bool {
 // goroutine.  It uses a buffered channel to serialize output messages while
 // allowing the sender to continue running asynchronously.
 func (p *Peer) outHandler() {
-	// pingTicker is used to periodically send pings to the remote peer.
-	pingTicker := time.NewTicker(pingInterval)
-	defer pingTicker.Stop()
-
 out:
 	for {
 		select {
@@ -1763,14 +1762,6 @@ out:
 			}
 			p.sendDoneQueue <- struct{}{}
 
-		case <-pingTicker.C:
-			nonce, err := wire.RandomUint64()
-			if err != nil {
-				log.Errorf("Not sending ping to %s: %v", p, err)
-				continue
-			}
-			p.QueueMessage(wire.NewMsgPing(nonce), nil)
-
 		case <-p.quit:
 			break out
 		}
@@ -1796,6 +1787,22 @@ cleanup:
 	}
 	close(p.outQuit)
 	log.Tracef("Peer output handler done for %s", p)
+}
+
+// pingTicker is used to periodically send pings to the remote peer.
+func (p *Peer) pingTicker() {
+	if nonce, err := wire.RandomUint64(); err != nil {
+		log.Errorf("Not sending ping to %s: %v", p, err)
+	} else {
+		p.QueueMessage(wire.NewMsgPing(nonce), nil)
+	}
+
+	// Reset the pingTicker to fire again after pingInterval.
+	p.pingTickerTimerMtx.Lock()
+	if p.pingTickerTimer != nil {
+		p.pingTickerTimer.Reset(pingInterval)
+	}
+	p.pingTickerTimerMtx.Unlock()
 }
 
 // QueueMessage adds the passed bitcoin message to the peer send queue.
@@ -1892,6 +1899,18 @@ func (p *Peer) Disconnect() {
 	if atomic.LoadInt32(&p.connected) != 0 {
 		p.conn.Close()
 	}
+
+	// Stop the pingTickerTimer.
+	p.pingTickerTimerMtx.Lock()
+	if p.pingTickerTimer != nil {
+		p.pingTickerTimer.Stop()
+
+		// It is important to set pingTickerTimer to nil here in order to
+		// prevent a race if pingTicker happens to be concurrently executing.
+		p.pingTickerTimer = nil
+	}
+	p.pingTickerTimerMtx.Unlock()
+
 	close(p.quit)
 }
 
@@ -1925,6 +1944,10 @@ func (p *Peer) start() error {
 	go p.inHandler()
 	go p.queueHandler()
 	go p.outHandler()
+
+	p.pingTickerTimerMtx.Lock()
+	p.pingTickerTimer = time.AfterFunc(pingInterval, p.pingTicker)
+	p.pingTickerTimerMtx.Unlock()
 
 	// Send our verack message now that the IO processing machinery has started.
 	p.QueueMessage(wire.NewMsgVerAck(), nil)
