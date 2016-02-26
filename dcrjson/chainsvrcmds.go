@@ -398,7 +398,7 @@ type GetRawMempoolTxTypeCmd string
 
 const (
 	// GRMAll indicates any type of transaction should be returned.
-	GRMAll GetRawMempoolTxTypeCmd = "add"
+	GRMAll GetRawMempoolTxTypeCmd = "all"
 
 	// GRMRegular indicates only regular transactions should be returned.
 	GRMRegular GetRawMempoolTxTypeCmd = "regular"
