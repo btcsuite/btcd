@@ -1,4 +1,4 @@
-// Copyright (c) 2013, 2014 The btcsuite developers
+// Copyright (c) 2013, 2014, 2016 The btcsuite developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -92,6 +92,66 @@ func TestFilterInsert(t *testing.T) {
 		t.Errorf("TestFilterInsert failure: got %v want %v\n",
 			got.Bytes(), want)
 		return
+	}
+}
+
+// TestFilterFPRange checks that new filters made with out of range
+// false positive targets result in either max or min false positive rates.
+func TestFilterFPRange(t *testing.T) {
+	tests := []struct {
+		name   string
+		hash   string
+		want   string
+		filter *bloom.Filter
+	}{
+		{
+			name:   "fprates > 1 should be clipped at 1",
+			hash:   "02981fa052f0481dbc5868f4fc2166035a10f27a03cfd2de67326471df5bc041",
+			want:   "00000000000000000001",
+			filter: bloom.NewFilter(1, 0, 20.9999999769, wire.BloomUpdateAll),
+		},
+		{
+			name:   "fprates less than 1e-9 should be clipped at min",
+			hash:   "02981fa052f0481dbc5868f4fc2166035a10f27a03cfd2de67326471df5bc041",
+			want:   "0566d97a91a91b0000000000000001",
+			filter: bloom.NewFilter(1, 0, 0, wire.BloomUpdateAll),
+		},
+		{
+			name:   "negative fprates should be clipped at min",
+			hash:   "02981fa052f0481dbc5868f4fc2166035a10f27a03cfd2de67326471df5bc041",
+			want:   "0566d97a91a91b0000000000000001",
+			filter: bloom.NewFilter(1, 0, -1, wire.BloomUpdateAll),
+		},
+	}
+
+	for _, test := range tests {
+		// Convert test input to appropriate types.
+		hash, err := wire.NewShaHashFromStr(test.hash)
+		if err != nil {
+			t.Errorf("NewShaHashFromStr unexpected error: %v", err)
+			continue
+		}
+		want, err := hex.DecodeString(test.want)
+		if err != nil {
+			t.Errorf("DecodeString unexpected error: %v\n", err)
+			continue
+		}
+
+		// Add the test hash to the bloom filter and ensure the
+		// filter serializes to the expected bytes.
+		f := test.filter
+		f.AddShaHash(hash)
+		got := bytes.NewBuffer(nil)
+		err = f.MsgFilterLoad().BtcEncode(got, wire.ProtocolVersion)
+		if err != nil {
+			t.Errorf("BtcDecode unexpected error: %v\n", err)
+			continue
+		}
+		if !bytes.Equal(got.Bytes(), want) {
+			t.Errorf("serialized filter mismatch: got %x want %x\n",
+				got.Bytes(), want)
+			continue
+		}
 	}
 }
 
