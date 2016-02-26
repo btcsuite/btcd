@@ -719,7 +719,8 @@ func handleTooFewVoters(nextHeight int64,
 				}
 
 				if err := bm.CheckConnectBlock(block); err != nil {
-					minrLog.Errorf("failed to check template: %v", err.Error())
+					minrLog.Errorf("failed to check template while "+
+						"duplicating a parent: %v", err.Error())
 					return nil, miningRuleError(ErrCheckConnectBlock,
 						err.Error())
 				}
@@ -840,15 +841,16 @@ func handleTooFewVoters(nextHeight int64,
 				if err := blockchain.CheckWorklessBlockSanity(btBlock,
 					bm.server.timeSource,
 					bm.server.chainParams); err != nil {
-					str := fmt.Sprintf("failed to check sanity of template: %v",
+					str := fmt.Sprintf("failed to check sanity of template "+
+						"while constructing a new parent: %v",
 						err.Error())
 					return nil, miningRuleError(ErrCheckConnectBlock,
 						str)
 				}
 
 				if err := bm.CheckConnectBlock(btBlock); err != nil {
-					str := fmt.Sprintf("failed to check template: %v",
-						err.Error())
+					str := fmt.Sprintf("failed to check template: %v while "+
+						"constructing a new parent", err.Error())
 					return nil, miningRuleError(ErrCheckConnectBlock,
 						str)
 				}
