@@ -106,7 +106,7 @@ type updatePeerHeightsMsg struct {
 // as banned peers and outbound groups.
 type peerState struct {
 	pendingPeers     map[string]*serverPeer
-	peers            map[int32]*serverPeer
+	inboundPeers     map[int32]*serverPeer
 	outboundPeers    map[int32]*serverPeer
 	persistentPeers  map[int32]*serverPeer
 	banned           map[string]time.Time
@@ -116,7 +116,8 @@ type peerState struct {
 
 // Count returns the count of all known peers.
 func (ps *peerState) Count() int {
-	return len(ps.peers) + len(ps.outboundPeers) + len(ps.persistentPeers)
+	return len(ps.inboundPeers) + len(ps.outboundPeers) +
+		len(ps.persistentPeers)
 }
 
 // OutboundCount returns the count of known outbound peers.
@@ -157,7 +158,7 @@ func (ps *peerState) forPendingPeers(closure func(sp *serverPeer)) {
 // forAllPeers is a helper function that runs closure on all peers known to
 // peerState.
 func (ps *peerState) forAllPeers(closure func(sp *serverPeer)) {
-	for _, e := range ps.peers {
+	for _, e := range ps.inboundPeers {
 		closure(e)
 	}
 	ps.forAllOutboundPeers(closure)
@@ -1137,7 +1138,7 @@ func (s *server) handleAddPeerMsg(state *peerState, sp *serverPeer) bool {
 	// Add the new peer and start it.
 	srvrLog.Debugf("New peer %s", sp)
 	if sp.Inbound() {
-		state.peers[sp.ID()] = sp
+		state.inboundPeers[sp.ID()] = sp
 	} else {
 		state.outboundGroups[addrmgr.GroupKey(sp.NA())]++
 		if sp.persistent {
@@ -1165,7 +1166,7 @@ func (s *server) handleDonePeerMsg(state *peerState, sp *serverPeer) {
 	if sp.persistent {
 		list = state.persistentPeers
 	} else if sp.Inbound() {
-		list = state.peers
+		list = state.inboundPeers
 	} else {
 		list = state.outboundPeers
 	}
@@ -1363,7 +1364,7 @@ func (s *server) handleQuery(state *peerState, querymsg interface{}) {
 	case disconnectNodeMsg:
 		// Check inbound peers. We pass a nil callback since we don't
 		// require any additional actions on disconnect for inbound peers.
-		found := disconnectPeer(state.peers, msg.cmp, nil)
+		found := disconnectPeer(state.inboundPeers, msg.cmp, nil)
 		if found {
 			msg.reply <- nil
 			return
@@ -1629,7 +1630,7 @@ func (s *server) peerHandler() {
 
 	state := &peerState{
 		pendingPeers:     make(map[string]*serverPeer),
-		peers:            make(map[int32]*serverPeer),
+		inboundPeers:     make(map[int32]*serverPeer),
 		persistentPeers:  make(map[int32]*serverPeer),
 		outboundPeers:    make(map[int32]*serverPeer),
 		banned:           make(map[string]time.Time),
