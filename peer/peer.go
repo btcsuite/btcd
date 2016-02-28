@@ -436,11 +436,14 @@ type Peer struct {
 	pingTickerTimerMtx sync.Mutex
 	pingTickerTimer    *time.Timer
 
+	invVects                chan *wire.InvVect
+	trickleInvVectsTimerMtx sync.Mutex
+	trickleInvVectsTimer    *time.Timer
+
 	stallControl  chan stallControlMsg
 	outputQueue   chan outMsg
 	sendQueue     chan outMsg
 	sendDoneQueue chan struct{}
-	outputInvChan chan *wire.InvVect
 	inQuit        chan struct{}
 	queueQuit     chan struct{}
 	outQuit       chan struct{}
@@ -1575,9 +1578,6 @@ out:
 // to outHandler to be actually written.
 func (p *Peer) queueHandler() {
 	pendingMsgs := list.New()
-	invSendQueue := list.New()
-	trickleTicker := time.NewTicker(trickleTimeout)
-	defer trickleTicker.Stop()
 
 	// We keep the waiting flag so that we know if we have a message queued
 	// to the outHandler or not.  We could use the presence of a head of
@@ -1587,22 +1587,16 @@ func (p *Peer) queueHandler() {
 	// flag and pendingMsgs only contains messages that we have not yet
 	// passed to outHandler.
 	waiting := false
-
-	// To avoid duplication below.
-	queuePacket := func(msg outMsg, list *list.List, waiting bool) bool {
-		if !waiting {
-			p.sendQueue <- msg
-		} else {
-			list.PushBack(msg)
-		}
-		// we are always waiting now.
-		return true
-	}
 out:
 	for {
 		select {
 		case msg := <-p.outputQueue:
-			waiting = queuePacket(msg, pendingMsgs, waiting)
+			if waiting {
+				pendingMsgs.PushBack(msg)
+			} else {
+				p.sendQueue <- msg
+			}
+			waiting = true
 
 		// This channel is notified when a message has been sent across
 		// the network socket.
@@ -1619,50 +1613,6 @@ out:
 			// asynchronously send.
 			val := pendingMsgs.Remove(next)
 			p.sendQueue <- val.(outMsg)
-
-		case iv := <-p.outputInvChan:
-			// No handshake?  They'll find out soon enough.
-			if p.VersionKnown() {
-				invSendQueue.PushBack(iv)
-			}
-
-		case <-trickleTicker.C:
-			// Don't send anything if we're disconnecting or there
-			// is no queued inventory.
-			// version is known if send queue has any entries.
-			if atomic.LoadInt32(&p.disconnect) != 0 ||
-				invSendQueue.Len() == 0 {
-				continue
-			}
-
-			// Create and send as many inv messages as needed to
-			// drain the inventory send queue.
-			invMsg := wire.NewMsgInvSizeHint(uint(invSendQueue.Len()))
-			for e := invSendQueue.Front(); e != nil; e = invSendQueue.Front() {
-				iv := invSendQueue.Remove(e).(*wire.InvVect)
-
-				// Don't send inventory that became known after
-				// the initial check.
-				if p.knownInventory.Exists(iv) {
-					continue
-				}
-
-				invMsg.AddInvVect(iv)
-				if len(invMsg.InvList) >= maxInvTrickleSize {
-					waiting = queuePacket(
-						outMsg{msg: invMsg},
-						pendingMsgs, waiting)
-					invMsg = wire.NewMsgInvSizeHint(uint(invSendQueue.Len()))
-				}
-
-				// Add the inventory that is being relayed to
-				// the known inventory for the peer.
-				p.AddKnownInventory(iv)
-			}
-			if len(invMsg.InvList) > 0 {
-				waiting = queuePacket(outMsg{msg: invMsg},
-					pendingMsgs, waiting)
-			}
 
 		case <-p.quit:
 			break out
@@ -1685,15 +1635,49 @@ cleanup:
 			if msg.doneChan != nil {
 				msg.doneChan <- struct{}{}
 			}
-		case <-p.outputInvChan:
-			// Just drain channel
-		// sendDoneQueue is buffered so doesn't need draining.
 		default:
 			break cleanup
 		}
 	}
 	close(p.queueQuit)
 	log.Tracef("Peer queue handler done for %s", p)
+}
+
+// trickleInvVects gathers all the pending inventory vectors into one or more
+// inv messages and then queues them to be sent to the remote peer.  This method
+// is called periodically via a timer.
+func (p *Peer) trickleInvVects() {
+
+	// Ensure this trickleInvVects method is called again after trickleTimeout
+	// interval.
+	defer func() {
+		p.trickleInvVectsTimerMtx.Lock()
+		if p.trickleInvVectsTimer != nil {
+			p.trickleInvVectsTimer.Reset(trickleTimeout)
+		}
+		p.trickleInvVectsTimerMtx.Unlock()
+	}()
+
+	invMsg := wire.NewMsgInvSizeHint(uint(len(p.invVects)))
+	for {
+		select {
+		case invVect := <-p.invVects:
+			if p.knownInventory.Exists(invVect) {
+				break
+			}
+			invMsg.AddInvVect(invVect)
+			if len(invMsg.InvList) >= maxInvTrickleSize {
+				p.QueueMessage(invMsg, nil)
+				invMsg = wire.NewMsgInvSizeHint(uint(len(p.invVects)))
+			}
+			p.AddKnownInventory(invVect)
+		default:
+			if len(invMsg.InvList) > 0 {
+				p.QueueMessage(invMsg, nil)
+			}
+			return
+		}
+	}
 }
 
 // shouldLogWriteError returns whether or not the passed error, which is
@@ -1842,7 +1826,7 @@ func (p *Peer) QueueInventory(invVect *wire.InvVect) {
 		return
 	}
 
-	p.outputInvChan <- invVect
+	p.invVects <- invVect
 }
 
 // Connect uses the given conn to connect to the peer. Calling this function when
@@ -1900,16 +1884,21 @@ func (p *Peer) Disconnect() {
 		p.conn.Close()
 	}
 
-	// Stop the pingTickerTimer.
+	// It is important to set the ping and invVects timers to nil in order to
+	// prevent a race if the timer functions are concurrently executing.
 	p.pingTickerTimerMtx.Lock()
 	if p.pingTickerTimer != nil {
 		p.pingTickerTimer.Stop()
-
-		// It is important to set pingTickerTimer to nil here in order to
-		// prevent a race if pingTicker happens to be concurrently executing.
 		p.pingTickerTimer = nil
 	}
 	p.pingTickerTimerMtx.Unlock()
+
+	p.trickleInvVectsTimerMtx.Lock()
+	if p.trickleInvVectsTimer != nil {
+		p.trickleInvVectsTimer.Stop()
+		p.trickleInvVectsTimer = nil
+	}
+	p.trickleInvVectsTimerMtx.Unlock()
 
 	close(p.quit)
 }
@@ -1947,6 +1936,10 @@ func (p *Peer) start() error {
 	p.pingTickerTimerMtx.Lock()
 	p.pingTickerTimer = time.AfterFunc(pingInterval, p.pingTicker)
 	p.pingTickerTimerMtx.Unlock()
+
+	p.trickleInvVectsTimerMtx.Lock()
+	p.trickleInvVectsTimer = time.AfterFunc(trickleTimeout, p.trickleInvVects)
+	p.trickleInvVectsTimerMtx.Unlock()
 
 	// Send our verack message now that the IO processing machinery has started.
 	p.QueueMessage(wire.NewMsgVerAck(), nil)
@@ -2053,11 +2046,11 @@ func newPeerBase(cfg *Config, inbound bool) *Peer {
 	p := Peer{
 		inbound:         inbound,
 		knownInventory:  newMruInventoryMap(maxKnownInventory),
+		invVects:        make(chan *wire.InvVect, outputBufferSize),
 		stallControl:    make(chan stallControlMsg, 1), // nonblocking sync
 		outputQueue:     make(chan outMsg, outputBufferSize),
 		sendQueue:       make(chan outMsg, 1),   // nonblocking sync
 		sendDoneQueue:   make(chan struct{}, 1), // nonblocking sync
-		outputInvChan:   make(chan *wire.InvVect, outputBufferSize),
 		inQuit:          make(chan struct{}),
 		queueQuit:       make(chan struct{}),
 		outQuit:         make(chan struct{}),
