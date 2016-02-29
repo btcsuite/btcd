@@ -946,7 +946,6 @@ func (b *blockManager) checkBlockForHiddenVotes(block *dcrutil.Block) {
 	// the parent template hasn't yet been updated, so we may
 	// need to use the current template.
 	var template *BlockTemplate
-
 	if b.cachedCurrentTemplate != nil {
 		if b.cachedCurrentTemplate.height ==
 			block.Height() {
@@ -959,6 +958,11 @@ func (b *blockManager) checkBlockForHiddenVotes(block *dcrutil.Block) {
 			block.Height() {
 			template = b.cachedParentTemplate
 		}
+	}
+
+	// No template to alter.
+	if template == nil {
+		return
 	}
 
 	// Make sure that the template has the same parent
@@ -1011,9 +1015,6 @@ func (b *blockManager) checkBlockForHiddenVotes(block *dcrutil.Block) {
 				newVotes = append(newVotes, vote)
 			}
 		}
-	} else {
-		// We have no template, so nothing to update.
-		return
 	}
 
 	// Check the length of the reconstructed voter list for
