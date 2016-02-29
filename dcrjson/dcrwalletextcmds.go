@@ -116,6 +116,17 @@ func NewGetStakeInfoCmd() *GetStakeInfoCmd {
 	return &GetStakeInfoCmd{}
 }
 
+// GetTicketFeeCmd is a type handling custom marshaling and
+// unmarshaling of getticketfee JSON wallet extension
+// commands.
+type GetTicketFeeCmd struct {
+}
+
+// NewGetTicketFeeCmd creates a new GetTicketFeeCmd.
+func NewGetTicketFeeCmd() *GetTicketFeeCmd {
+	return &GetTicketFeeCmd{}
+}
+
 // GetTicketMaxPriceCmd is a type handling custom marshaling and
 // unmarshaling of getticketmaxprice JSON wallet extension
 // commands.
@@ -380,6 +391,20 @@ func NewSendToSSRtxCmd(fromaccount string, tickethash string,
 	}
 }
 
+// SetTicketFeeCmd is a type handling custom marshaling and
+// unmarshaling of setticketfee JSON RPC commands.
+type SetTicketFeeCmd struct {
+	Fee float64
+}
+
+// NewSetTicketFeeCmd creates a new instance of the setticketfee
+// command.
+func NewSetTicketFeeCmd(fee float64) *SetTicketFeeCmd {
+	return &SetTicketFeeCmd{
+		Fee: fee,
+	}
+}
+
 // SetTicketMaxPriceCmd is a type handling custom marshaling and
 // unmarshaling of setticketmaxprice JSON RPC commands.
 type SetTicketMaxPriceCmd struct {
@@ -440,6 +465,7 @@ func init() {
 	MustRegisterCmd("getmasterpubkey", (*GetMasterPubkeyCmd)(nil), flags)
 	MustRegisterCmd("getseed", (*GetSeedCmd)(nil), flags)
 	MustRegisterCmd("getstakeinfo", (*GetStakeInfoCmd)(nil), flags)
+	MustRegisterCmd("getticketfee", (*GetTicketFeeCmd)(nil), flags)
 	MustRegisterCmd("getticketmaxprice", (*GetTicketMaxPriceCmd)(nil), flags)
 	MustRegisterCmd("gettickets", (*GetTicketsCmd)(nil), flags)
 	MustRegisterCmd("getticketvotebits", (*GetTicketVoteBitsCmd)(nil), flags)
@@ -459,6 +485,7 @@ func init() {
 	MustRegisterCmd("sendtosstx", (*SendToSStxCmd)(nil), flags)
 	MustRegisterCmd("sendtossgen", (*SendToSSGenCmd)(nil), flags)
 	MustRegisterCmd("sendtossrtx", (*SendToSSRtxCmd)(nil), flags)
+	MustRegisterCmd("setticketfee", (*SetTicketFeeCmd)(nil), flags)
 	MustRegisterCmd("setticketmaxprice", (*SetTicketMaxPriceCmd)(nil), flags)
 	MustRegisterCmd("setticketvotebits", (*SetTicketVoteBitsCmd)(nil), flags)
 	MustRegisterCmd("signrawtransactions", (*SignRawTransactionsCmd)(nil), flags)
