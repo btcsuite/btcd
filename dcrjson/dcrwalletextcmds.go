@@ -151,7 +151,7 @@ func NewGetTicketsCmd(includeImmature bool) *GetTicketsCmd {
 	return &GetTicketsCmd{includeImmature}
 }
 
-// GetTicketVoteBitsCmd defines the getticketsvotebits JSON-RPC command.
+// GetTicketVoteBitsCmd defines the getticketvotebits JSON-RPC command.
 type GetTicketVoteBitsCmd struct {
 	TxHash string
 }
@@ -160,6 +160,17 @@ type GetTicketVoteBitsCmd struct {
 // a getticketvotebits JSON-RPC command.
 func NewGetTicketVoteBitsCmd(txHash string) *GetTicketVoteBitsCmd {
 	return &GetTicketVoteBitsCmd{TxHash: txHash}
+}
+
+// GetTicketsVoteBitsCmd defines the getticketsvotebits JSON-RPC command.
+type GetTicketsVoteBitsCmd struct {
+	TxHashes []string
+}
+
+// NewGetTicketsVoteBitsCmd returns a new instance which can be used to issue
+// a getticketsvotebits JSON-RPC command.
+func NewGetTicketsVoteBitsCmd(txHashes []string) *GetTicketsVoteBitsCmd {
+	return &GetTicketsVoteBitsCmd{TxHashes: txHashes}
 }
 
 // GetWalletFeeCmd defines the getwalletfee JSON-RPC command.
@@ -469,6 +480,7 @@ func init() {
 	MustRegisterCmd("getticketmaxprice", (*GetTicketMaxPriceCmd)(nil), flags)
 	MustRegisterCmd("gettickets", (*GetTicketsCmd)(nil), flags)
 	MustRegisterCmd("getticketvotebits", (*GetTicketVoteBitsCmd)(nil), flags)
+	MustRegisterCmd("getticketsvotebits", (*GetTicketsVoteBitsCmd)(nil), flags)
 	MustRegisterCmd("importscript", (*ImportScriptCmd)(nil), flags)
 	MustRegisterCmd("listscripts", (*ListScriptsCmd)(nil), flags)
 	MustRegisterCmd("notifynewtickets", (*NotifyNewTicketsCmd)(nil), flags)
