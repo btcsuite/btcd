@@ -25,7 +25,7 @@ var assertBlockImmutability = false
 // BlockHeightUnknown is the value returned for a block height that is unknown.
 // This is typically because the block has not been inserted into the main chain
 // yet.
-const BlockHeightUnknown = int64(-1)
+const BlockHeightUnknown = int32(-1)
 
 // Error satisfies the error interface and prints human-readable errors.
 func (e OutOfRangeError) Error() string {
@@ -40,7 +40,7 @@ type Block struct {
 	msgBlock        *wire.MsgBlock // Underlying MsgBlock
 	serializedBlock []byte         // Serialized bytes for the block
 	hash            chainhash.Hash // Cached block hash
-	blockHeight     int64          // Height in the main block chain
+	blockHeight     int32          // Height in the main block chain
 	transactions    []*Tx          // Transactions
 	sTransactions   []*Tx          // Stake transactions
 	txnsGenerated   bool           // ALL wrapped transactions generated
@@ -298,12 +298,12 @@ func (b *Block) TxLoc() ([]wire.TxLoc, []wire.TxLoc, error) {
 
 // Height returns the saved height of the block in the block chain.  This value
 // will be BlockHeightUnknown if it hasn't already explicitly been set.
-func (b *Block) Height() int64 {
+func (b *Block) Height() int32 {
 	return b.blockHeight
 }
 
 // SetHeight sets the height of the block in the block chain.
-func (b *Block) SetHeight(height int64) {
+func (b *Block) SetHeight(height int32) {
 	b.blockHeight = height
 }
 
@@ -343,7 +343,7 @@ func NewBlockDeepCopyCoinbase(msgBlock *wire.MsgBlock) *Block {
 		NewTxDeep(msgBlockCopy.Transactions[0]).MsgTx()
 
 	bl := &Block{
-		blockHeight: int64(msgBlockCopy.Header.Height),
+		blockHeight: int32(msgBlockCopy.Header.Height),
 		msgBlock:    msgBlockCopy,
 	}
 	bl.hash = msgBlock.BlockSha()
@@ -373,7 +373,7 @@ func NewBlockDeepCopy(msgBlock *wire.MsgBlock) *Block {
 	msgBlockCopy.Header = msgBlock.Header
 
 	bl := &Block{
-		blockHeight: int64(msgBlockCopy.Header.Height),
+		blockHeight: int32(msgBlockCopy.Header.Height),
 		msgBlock:    msgBlockCopy,
 	}
 	bl.hash = msgBlock.BlockSha()

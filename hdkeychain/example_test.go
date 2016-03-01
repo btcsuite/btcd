@@ -56,7 +56,7 @@ func Example_defaultWalletLayout() {
 
 	// Ordinarily this would either be read from some encrypted source
 	// and be decrypted or generated as the NewMaster example shows, but
-	// for the purposes of this example, the private exteded key for the
+	// for the purposes of this example, the private extended key for the
 	// master node is being hard coded here.
 	master := "dprv3hCznBesA6jBushjx7y9NrfheE4ZshnaKYtsoLXefmLPzrXgEiXkd" +
 		"RMD6UngnmBYZzgNhdEd4K3PidxcaCiR6HC9hmpj8FcrP4Cv7zBwELA"
@@ -152,7 +152,7 @@ func Example_audits() {
 
 	// Ordinarily this would either be read from some encrypted source
 	// and be decrypted or generated as the NewMaster example shows, but
-	// for the purposes of this example, the private exteded key for the
+	// for the purposes of this example, the private extended key for the
 	// master node is being hard coded here.
 	master := "dprv3hCznBesA6jBushjx7y9NrfheE4ZshnaKYtsoLXefmLPzrXgEiXkd" +
 		"RMD6UngnmBYZzgNhdEd4K3PidxcaCiR6HC9hmpj8FcrP4Cv7zBwELA"

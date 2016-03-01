@@ -29,7 +29,7 @@ func TestBlock(t *testing.T) {
 	}
 
 	// Ensure block height set and get work properly.
-	wantHeight := int64(100000)
+	wantHeight := int32(100000)
 	b.SetHeight(wantHeight)
 	if gotHeight := b.Height(); gotHeight != wantHeight {
 		t.Errorf("Height: mismatched height - got %v, want %v",
