@@ -2822,6 +2822,51 @@ func (c *Client) GetTicketVoteBits(hash *chainhash.Hash) (*dcrjson.GetTicketVote
 	return c.GetTicketVoteBitsAsync(hash).Receive()
 }
 
+// FutureGetTicketsVoteBitsResult is a future promise to deliver the result of a
+// GetTicketsVoteBitsAsync RPC invocation (or an applicable error).
+type FutureGetTicketsVoteBitsResult chan *response
+
+// Receive waits for the response promised by the future and returns the info
+// provided by the server.
+func (r FutureGetTicketsVoteBitsResult) Receive() (*dcrjson.GetTicketsVoteBitsResult, error) {
+	res, err := receiveFuture(r)
+	if err != nil {
+		return nil, err
+	}
+
+	// Unmarshal result as a ticketsforaddress result object.
+	var infoRes dcrjson.GetTicketsVoteBitsResult
+	err = json.Unmarshal(res, &infoRes)
+	if err != nil {
+		return nil, err
+	}
+
+	return &infoRes, nil
+}
+
+// GetTicketsVoteBitsAsync returns an instance of a type that can be used to
+// get the result of the RPC at some future time by invoking the Receive
+// function on the returned instance.
+//
+// See GetTicketsVoteBits for the blocking version and more details.
+func (c *Client) GetTicketsVoteBitsAsync(hashes []*chainhash.Hash) FutureGetTicketsVoteBitsResult {
+	hashesStr := make([]string, 0, len(hashes))
+	for _, h := range hashes {
+		hashesStr = append(hashesStr, h.String())
+	}
+
+	cmd := dcrjson.NewGetTicketsVoteBitsCmd(hashesStr)
+	return c.sendCmd(cmd)
+}
+
+// GetTicketsVoteBits returns a the currently set voteBits for a given ticket.
+// If the daemon server is queried, it returns a search of tickets in the
+// live ticket pool. If the wallet server is queried, it searches all tickets
+// owned by the wallet.
+func (c *Client) GetTicketsVoteBits(hashes []*chainhash.Hash) (*dcrjson.GetTicketsVoteBitsResult, error) {
+	return c.GetTicketsVoteBitsAsync(hashes).Receive()
+}
+
 // FutureSetTicketVoteBitsResult is a future promise to deliver the result of a
 // SetTicketVoteBitsAsync RPC invocation (or an applicable error).
 type FutureSetTicketVoteBitsResult chan *response
