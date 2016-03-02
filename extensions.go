@@ -217,6 +217,49 @@ func (c *Client) ExistsLiveTickets(hashes []*chainhash.Hash) (string, error) {
 	return c.ExistsLiveTicketsAsync(hashes).Receive()
 }
 
+// FutureExistsMempoolTxsResult is a future promise to deliver the result
+// of a FutureExistsMempoolTxsResultAsync RPC invocation (or an
+// applicable error).
+type FutureExistsMempoolTxsResult chan *response
+
+// Receive waits for the response promised by the future and returns whether
+// or not the ticket exists in the mempool.
+func (r FutureExistsMempoolTxsResult) Receive() (string, error) {
+	res, err := receiveFuture(r)
+	if err != nil {
+		return "", err
+	}
+
+	// Unmarshal the result as a string.
+	var exists string
+	err = json.Unmarshal(res, &exists)
+	if err != nil {
+		return "", err
+	}
+	return exists, nil
+}
+
+// ExistsMempoolTxsAsync returns an instance of a type that can be used to get the
+// result of the RPC at some future time by invoking the Receive function on the
+// returned instance.
+func (c *Client) ExistsMempoolTxsAsync(hashes []*chainhash.Hash) FutureExistsMempoolTxsResult {
+	hashBlob := make([]byte, len(hashes)*chainhash.HashSize)
+	for i, hash := range hashes {
+		copy(hashBlob[i*chainhash.HashSize:(i+1)*chainhash.HashSize],
+			hash[:])
+	}
+	cmd := dcrjson.NewExistsMempoolTxsCmd(hex.EncodeToString(hashBlob))
+	return c.sendCmd(cmd)
+}
+
+// ExistsMempoolTxs returns information about whether or not a ticket hash exists
+// in the live ticket database.
+//
+// NOTE: This is a dcrd extension.
+func (c *Client) ExistsMempoolTxs(hashes []*chainhash.Hash) (string, error) {
+	return c.ExistsMempoolTxsAsync(hashes).Receive()
+}
+
 // FutureMissedTicketsResult is a future promise to deliver the result
 // of a FutureMissedTicketsResultAsync RPC invocation (or an applicable error).
 type FutureMissedTicketsResult chan *response
