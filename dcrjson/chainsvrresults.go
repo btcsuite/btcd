@@ -12,7 +12,7 @@ import "encoding/json"
 // returns a hex-encoded string.
 type GetBlockHeaderVerboseResult struct {
 	Hash          string  `json:"hash"`
-	Confirmations uint64  `json:"confirmations"`
+	Confirmations uint32  `json:"confirmations"`
 	Height        int32   `json:"height"`
 	Version       int32   `json:"version"`
 	MerkleRoot    string  `json:"merkleroot"`
@@ -29,9 +29,9 @@ type GetBlockHeaderVerboseResult struct {
 // hex-encoded string.  Contains Decred additions.
 type GetBlockVerboseResult struct {
 	Hash          string        `json:"hash"`
-	Confirmations uint64        `json:"confirmations"`
+	Confirmations uint32        `json:"confirmations"`
 	Size          int32         `json:"size"`
-	Height        int64         `json:"height"`
+	Height        int32         `json:"height"`
 	Version       int32         `json:"version"`
 	MerkleRoot    string        `json:"merkleroot"`
 	StakeRoot     string        `json:"stakeroot"`
@@ -201,7 +201,7 @@ type GetRawMempoolVerboseResult struct {
 	Size             int32    `json:"size"`
 	Fee              float64  `json:"fee"`
 	Time             int64    `json:"time"`
-	Height           int64    `json:"height"`
+	Height           int32    `json:"height"`
 	StartingPriority float64  `json:"startingpriority"`
 	CurrentPriority  float64  `json:"currentpriority"`
 	Depends          []string `json:"depends"`
@@ -375,7 +375,7 @@ type TxRawResult struct {
 	Vin           []Vin  `json:"vin"`
 	Vout          []Vout `json:"vout"`
 	BlockHash     string `json:"blockhash,omitempty"`
-	BlockHeight   int64  `json:"blockheight"`
+	BlockHeight   int32  `json:"blockheight"`
 	BlockIndex    uint32 `json:"blockindex"`
 	Confirmations uint64 `json:"confirmations,omitempty"`
 	Time          int64  `json:"time,omitempty"`

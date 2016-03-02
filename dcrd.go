@@ -118,15 +118,17 @@ func dcrdMain(serverChan chan<- *server) error {
 		dcrdLog.Errorf("%v", err)
 		return err
 	}
+	defer func() {
+		err := tmdb.Store(cfg.DataDir, "ticketdb.gob")
+		if err != nil {
+			dcrdLog.Errorf("Failed to store ticket database: %v", err.Error())
+		}
+	}()
 	defer tmdb.Close()
 
 	// Ensure the databases are sync'd and closed on Ctrl+C.
 	addInterruptHandler(func() {
 		dcrdLog.Infof("Gracefully shutting down the database...")
-		err := tmdb.Store(cfg.DataDir, "ticketdb.gob")
-		if err != nil {
-			dcrdLog.Errorf("Failed to store ticket database: %v", err.Error())
-		}
 		db.RollbackClose()
 	})
 

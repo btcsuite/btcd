@@ -193,7 +193,7 @@ func (m *CPUMiner) submitBlock(block *dcrutil.Block) bool {
 // new transactions and enough time has elapsed without finding a solution.
 func (m *CPUMiner) solveBlock(msgBlock *wire.MsgBlock, ticker *time.Ticker,
 	quit chan struct{}) bool {
-
+	blockHeight := int32(msgBlock.Header.Height)
 	// Choose a random extra nonce offset for this block template and
 	// worker.
 	enOffset, err := wire.RandomUint64()

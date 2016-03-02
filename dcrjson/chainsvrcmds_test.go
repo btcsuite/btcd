@@ -1,4 +1,4 @@
-// Copyright (c) 2014 The btcsuite developers
+// Copyright (c) 2014 The dcrsuite developers
 // Copyright (c) 2015 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
@@ -203,15 +203,15 @@ func TestChainSvrCmds(t *testing.T) {
 		{
 			name: "getblockheader",
 			newCmd: func() (interface{}, error) {
-				return btcjson.NewCmd("getblockheader", "123")
+				return dcrjson.NewCmd("getblockheader", "123")
 			},
 			staticCmd: func() interface{} {
-				return btcjson.NewGetBlockHeaderCmd("123", nil)
+				return dcrjson.NewGetBlockHeaderCmd("123", nil)
 			},
 			marshalled: `{"jsonrpc":"1.0","method":"getblockheader","params":["123"],"id":1}`,
-			unmarshalled: &btcjson.GetBlockHeaderCmd{
+			unmarshalled: &dcrjson.GetBlockHeaderCmd{
 				Hash:    "123",
-				Verbose: btcjson.Bool(true),
+				Verbose: dcrjson.Bool(true),
 			},
 		},
 		{

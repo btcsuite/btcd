@@ -360,7 +360,7 @@ func DebugTicketDBLiveBucketString(tmdb *stake.TicketDB, bucket uint8, verbose b
 // DebugTicketDBSpentBucketString prints the contents of the spent tickets
 // database bucket indicated to a string that is returned. If the verbose
 // flag is indicated, the contents of each ticket are printed as well.
-func DebugTicketDBSpentBucketString(tmdb *stake.TicketDB, height int64, verbose bool) (string, error) {
+func DebugTicketDBSpentBucketString(tmdb *stake.TicketDB, height int32, verbose bool) (string, error) {
 	var buffer bytes.Buffer
 
 	str := fmt.Sprintf("Contents of spent ticket bucket height %v:\n", height)
@@ -514,7 +514,7 @@ func TicketDbThumbprint(tmdb *stake.TicketDB, chainParams *chaincfg.Params) ([]*
 	height := tmdb.GetTopBlock()
 
 	allSpentTickets := stake.NewTicketDataSliceEmpty()
-	for i := int64(chainParams.StakeEnabledHeight); i <= height; i++ {
+	for i := int32(chainParams.StakeEnabledHeight); i <= height; i++ {
 		bucketTickets, err := tmdb.DumpSpentTickets(i)
 		if err != nil {
 			return nil, err
@@ -567,7 +567,7 @@ func TicketDbThumbprint(tmdb *stake.TicketDB, chainParams *chaincfg.Params) ([]*
 // VERY INTENSIVE BLOCKCHAIN SCANNING, USE TO DEBUG SIMULATED BLOCKCHAINS
 // ONLY.
 func (b *BlockChain) findWhereDoubleSpent(block *dcrutil.Block) error {
-	height := int64(1)
+	height := int32(1)
 	heightEnd := block.Height()
 
 	hashes, err := b.db.FetchHeightRange(height, heightEnd)

@@ -15,7 +15,7 @@ import (
 func TestBlockSubsidy(t *testing.T) {
 	mainnet := &chaincfg.MainNetParams
 	totalSubsidy := mainnet.BlockOneSubsidy()
-	for i := int64(0); ; i++ {
+	for i := int32(0); ; i++ {
 		// Genesis block or first block.
 		if i == 0 || i == 1 {
 			continue
@@ -39,12 +39,12 @@ func TestBlockSubsidy(t *testing.T) {
 			if (work + stake + tax) == 0 {
 				break
 			}
-			totalSubsidy += ((work + stake + tax) * numBlocks)
+			totalSubsidy += ((work + stake + tax) * int64(numBlocks))
 
 			// First reduction internal, subtract the stake subsidy for
 			// blocks before the staking system is enabled.
 			if i == mainnet.ReductionInterval {
-				totalSubsidy -= stake * (mainnet.StakeValidationHeight - 2)
+				totalSubsidy -= stake * int64(mainnet.StakeValidationHeight-2)
 			}
 		}
 	}

@@ -116,7 +116,7 @@ type Params struct {
 
 	// WorkDiffWindowSize is the number of windows (intervals) used for calculation
 	// of the exponentially weighted average.
-	WorkDiffWindowSize int64
+	WorkDiffWindowSize int32
 
 	// WorkDiffWindows is the number of windows (intervals) used for calculation
 	// of the exponentially weighted average.
@@ -153,7 +153,7 @@ type Params struct {
 	DivSubsidy int64
 
 	// Reduction interval in blocks.
-	ReductionInterval int64
+	ReductionInterval int32
 
 	// WorkRewardProportion is the comparative amount of the subsidy given for
 	// creating a block.
@@ -231,7 +231,7 @@ type Params struct {
 
 	// StakeDiffWindowSize is the number of blocks used for each interval in
 	// exponentially weighted average.
-	StakeDiffWindowSize int64
+	StakeDiffWindowSize int32
 
 	// StakeDiffWindows is the number of windows (intervals) used for calculation
 	// of the exponentially weighted average.
@@ -243,12 +243,12 @@ type Params struct {
 
 	// StakeEnabledHeight is the height in which the first ticket could possibly
 	// mature.
-	StakeEnabledHeight int64
+	StakeEnabledHeight int32
 
 	// StakeValidationHeight is the height at which votes (SSGen) are required
 	// to add a new block to the top of the blockchain. This height is the
 	// first block that will be voted on, but will include in itself no votes.
-	StakeValidationHeight int64
+	StakeValidationHeight int32
 
 	// StakeBaseSigScript is the consensus stakebase signature script for all
 	// votes on the network. This isn't signed in any way, so without forcing

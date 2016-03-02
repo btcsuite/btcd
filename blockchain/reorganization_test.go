@@ -55,7 +55,7 @@ func TestReorganization(t *testing.T) {
 
 	// Create decoder from the buffer and a map to store the data
 	bcDecoder := gob.NewDecoder(bcBuf)
-	blockChain := make(map[int64][]byte)
+	blockChain := make(map[int32][]byte)
 
 	// Decode the blockchain into the map
 	if err := bcDecoder.Decode(&blockChain); err != nil {
@@ -66,11 +66,11 @@ func TestReorganization(t *testing.T) {
 	timeSource := blockchain.NewMedianTime()
 	finalIdx1 := 179
 	for i := 1; i < finalIdx1+1; i++ {
-		bl, err := dcrutil.NewBlockFromBytes(blockChain[int64(i)])
+		bl, err := dcrutil.NewBlockFromBytes(blockChain[int32(i)])
 		if err != nil {
 			t.Errorf("NewBlockFromBytes error: %v", err.Error())
 		}
-		bl.SetHeight(int64(i))
+		bl.SetHeight(int32(i))
 
 		_, _, err = chain.ProcessBlock(bl, timeSource, blockchain.BFNone)
 		if err != nil {
@@ -92,7 +92,7 @@ func TestReorganization(t *testing.T) {
 
 	// Create decoder from the buffer and a map to store the data
 	bcDecoder = gob.NewDecoder(bcBuf)
-	blockChain = make(map[int64][]byte)
+	blockChain = make(map[int32][]byte)
 
 	// Decode the blockchain into the map
 	if err := bcDecoder.Decode(&blockChain); err != nil {
@@ -102,11 +102,11 @@ func TestReorganization(t *testing.T) {
 	forkPoint := 131
 	finalIdx2 := 180
 	for i := forkPoint; i < finalIdx2+1; i++ {
-		bl, err := dcrutil.NewBlockFromBytes(blockChain[int64(i)])
+		bl, err := dcrutil.NewBlockFromBytes(blockChain[int32(i)])
 		if err != nil {
 			t.Errorf("NewBlockFromBytes error: %v", err.Error())
 		}
-		bl.SetHeight(int64(i))
+		bl.SetHeight(int32(i))
 
 		_, _, err = chain.ProcessBlock(bl, timeSource, blockchain.BFNone)
 		if err != nil {

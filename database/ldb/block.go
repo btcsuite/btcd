@@ -222,7 +222,6 @@ func (db *LevelDb) FetchBlockShaByHeight(height int32) (sha *chainhash.Hash, err
 // block chain.
 func (db *LevelDb) fetchBlockShaByHeight(height int32) (rsha *chainhash.Hash, err error) {
 	key := int64ToKey(int64(height))
-	key := int64ToKey(int64(height))
 
 	blkVal, err := db.lDb.Get(key, db.ro)
 	if err != nil {

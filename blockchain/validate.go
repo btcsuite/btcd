@@ -48,11 +48,6 @@ const (
 )
 
 var (
-	// coinbaseMaturity is the internal variable used for validating the
-	// spending of coinbase outputs.  A variable rather than the exported
-	// constant is used because the tests need the ability to modify it.
-	coinbaseMaturity = int32(CoinbaseMaturity)
-
 	// zeroHash is the zero value for a wire.ShaHash and is defined as
 	// a package level variable to avoid the need to create a new instance
 	// every time a check is needed.
@@ -116,75 +111,6 @@ func IsCoinBaseTx(msgTx *wire.MsgTx) bool {
 // level util transaction as opposed to a raw wire transaction.
 func IsCoinBase(tx *dcrutil.Tx) bool {
 	return IsCoinBaseTx(tx.MsgTx())
-}
-
-// IsFinalizedTransaction determines whether or not a transaction is finalized.
-func IsFinalizedTransaction(tx *dcrutil.Tx, blockHeight int32, blockTime time.Time) bool {
-	msgTx := tx.MsgTx()
-
-	// Lock time of zero means the transaction is finalized.
-	lockTime := msgTx.LockTime
-	if lockTime == 0 {
-		return true
-	}
-
-	// The lock time field of a transaction is either a block height at
-	// which the transaction is finalized or a timestamp depending on if the
-	// value is before the txscript.LockTimeThreshold.  When it is under the
-	// threshold it is a block height.
-	blockTimeOrHeight := int64(0)
-	if lockTime < txscript.LockTimeThreshold {
-		blockTimeOrHeight = int64(blockHeight)
-	} else {
-		blockTimeOrHeight = blockTime.Unix()
-	}
-	if int64(lockTime) < blockTimeOrHeight {
-		return true
-	}
-
-	// At this point, the transaction's lock time hasn't occured yet, but
-	// the transaction might still be finalized if the sequence number
-	// for all transaction inputs is maxed out.
-	for _, txIn := range msgTx.TxIn {
-		if txIn.Sequence != math.MaxUint32 {
-			return false
-		}
-	}
-	return true
-}
-
-// isBIP0030Node returns whether or not the passed node represents one of the
-// two blocks that violate the BIP0030 rule which prevents transactions from
-// overwriting old ones.
-func isBIP0030Node(node *blockNode) bool {
-	if node.height == 91842 && node.hash.IsEqual(block91842Hash) {
-		return true
-	}
-
-	if node.height == 91880 && node.hash.IsEqual(block91880Hash) {
-		return true
-	}
-
-	return false
-}
-
-// CalcBlockSubsidy returns the subsidy amount a block at the provided height
-// should have. This is mainly used for determining how much the coinbase for
-// newly generated blocks awards as well as validating the coinbase for blocks
-// has the expected value.
-//
-// The subsidy is halved every SubsidyHalvingInterval blocks.  Mathematically
-// this is: baseSubsidy / 2^(height/subsidyHalvingInterval)
-//
-// At the target block generation rate for the main network, this is
-// approximately every 4 years.
-func CalcBlockSubsidy(height int32, chainParams *chaincfg.Params) int64 {
-	if chainParams.SubsidyHalvingInterval == 0 {
-		return baseSubsidy
-	}
-
-	// Equivalent to: baseSubsidy / 2^(height/subsidyHalvingInterval)
-	return baseSubsidy >> uint(height/chainParams.SubsidyHalvingInterval)
 }
 
 // CheckTransactionSanity performs some preliminary checks on a transaction to
@@ -731,7 +657,7 @@ func checkBlockSanity(block *dcrutil.Block, timeSource MedianTimeSource,
 
 	// Blocks before stake validation height may only have 0x0001
 	// as their VoteBits in the header.
-	if int64(header.Height) < chainParams.StakeValidationHeight {
+	if int32(header.Height) < chainParams.StakeValidationHeight {
 		if header.VoteBits != earlyVoteBitsValue {
 			str := fmt.Sprintf("pre stake validation height block %v "+
 				"contained an invalid votebits value (expected %v, "+
@@ -844,110 +770,6 @@ func (b *BlockChain) checkBlockHeaderContext(header *wire.BlockHeader,
 		}
 	}
 
-	return nil
-}
-
-// checkBlockContext peforms several validation checks on the block which depend
-// on its position within the block chain.
-//
-// The flags modify the behavior of this function as follows:
-//  - BFFastAdd: The transaction are not checked to see if they are finalized
-//    and the somewhat expensive BIP0034 validation is not performed.
-//
-// The flags are also passed to checkBlockHeaderContext.  See its documentation
-// for how the flags modify its behavior.
-func (b *BlockChain) checkBlockContext(block *dcrutil.Block, prevNode *blockNode, flags BehaviorFlags) error {
-	// The genesis block is valid by definition.
-	if prevNode == nil {
-		return nil
-	}
-
-	// Perform all block header related validation checks.
-	header := &block.MsgBlock().Header
-	err := b.checkBlockHeaderContext(header, prevNode, flags)
-	if err != nil {
-		return err
-	}
-
-	fastAdd := flags&BFFastAdd == BFFastAdd
-	if !fastAdd {
-		// The height of this block is one more than the referenced
-		// previous block.
-		blockHeight := prevNode.height + 1
-
-		// Ensure all transactions in the block are finalized.
-		for _, tx := range block.Transactions() {
-			if !IsFinalizedTransaction(tx, blockHeight,
-				header.Timestamp) {
-
-				str := fmt.Sprintf("block contains unfinalized "+
-					"transaction %v", tx.Sha())
-				return ruleError(ErrUnfinalizedTx, str)
-			}
-		}
-
-		// Ensure coinbase starts with serialized block heights for
-		// blocks whose version is the serializedHeightVersion or newer
-		// once a majority of the network has upgraded.  This is part of
-		// BIP0034.
-		if ShouldHaveSerializedBlockHeight(header) &&
-			b.isMajorityVersion(serializedHeightVersion, prevNode,
-				b.chainParams.BlockEnforceNumRequired) {
-
-			coinbaseTx := block.Transactions()[0]
-			err := checkSerializedHeight(coinbaseTx, blockHeight)
-			if err != nil {
-				return err
-			}
-		}
-	}
-
-	return nil
-}
-
-// ExtractCoinbaseHeight attempts to extract the height of the block from the
-// scriptSig of a coinbase transaction.  Coinbase heights are only present in
-// blocks of version 2 or later.  This was added as part of BIP0034.
-func ExtractCoinbaseHeight(coinbaseTx *dcrutil.Tx) (int32, error) {
-	sigScript := coinbaseTx.MsgTx().TxIn[0].SignatureScript
-	if len(sigScript) < 1 {
-		str := "the coinbase signature script for blocks of " +
-			"version %d or greater must start with the " +
-			"length of the serialized block height"
-		str = fmt.Sprintf(str, serializedHeightVersion)
-		return 0, ruleError(ErrMissingCoinbaseHeight, str)
-	}
-
-	serializedLen := int(sigScript[0])
-	if len(sigScript[1:]) < serializedLen {
-		str := "the coinbase signature script for blocks of " +
-			"version %d or greater must start with the " +
-			"serialized block height"
-		str = fmt.Sprintf(str, serializedLen)
-		return 0, ruleError(ErrMissingCoinbaseHeight, str)
-	}
-
-	serializedHeightBytes := make([]byte, 8, 8)
-	copy(serializedHeightBytes, sigScript[1:serializedLen+1])
-	serializedHeight := binary.LittleEndian.Uint64(serializedHeightBytes)
-
-	return int32(serializedHeight), nil
-}
-
-// checkSerializedHeight checks if the signature script in the passed
-// transaction starts with the serialized block height of wantHeight.
-func checkSerializedHeight(coinbaseTx *dcrutil.Tx, wantHeight int32) error {
-	serializedHeight, err := ExtractCoinbaseHeight(coinbaseTx)
-	if err != nil {
-		return err
-	}
-
-	if serializedHeight != wantHeight {
-		str := fmt.Sprintf("the coinbase signature script serialized "+
-			"block height is %d when %d was expected",
-			serializedHeight, wantHeight)
-		return ruleError(ErrBadCoinbaseHeight, str)
-	}
 	return nil
 }
 
@@ -1104,7 +926,7 @@ func (b *BlockChain) checkDupTxs(node *blockNode, parentNode *blockNode,
 // seems unlikely that it will have stake errors (because the miner is then just
 // wasting hash power).
 func (b *BlockChain) CheckBlockStakeSanity(tixStore TicketStore,
-	stakeValidationHeight int64, node *blockNode, block *dcrutil.Block,
+	stakeValidationHeight int32, node *blockNode, block *dcrutil.Block,
 	parent *dcrutil.Block, chainParams *chaincfg.Params) error {
 
 	// Setup variables.
@@ -1526,14 +1348,14 @@ func CheckTransactionInputs(tx *dcrutil.Tx, txHeight int32, txStore TxStore,
 	checkFraudProof bool, chainParams *chaincfg.Params) (int64, error) {
 	// Expired transactions are not allowed.
 	if tx.MsgTx().Expiry != wire.NoExpiryValue {
-		if txHeight >= int64(tx.MsgTx().Expiry) {
+		if txHeight >= int32(tx.MsgTx().Expiry) {
 			errStr := fmt.Sprintf("Transaction indicated an expiry of %v"+
 				" while the current height is %v", tx.MsgTx().Expiry, txHeight)
 			return 0, ruleError(ErrExpiredTx, errStr)
 		}
 	}
 
-	ticketMaturity := int64(chainParams.TicketMaturity)
+	ticketMaturity := int32(chainParams.TicketMaturity)
 	stakeEnabledHeight := chainParams.StakeEnabledHeight
 	txHash := tx.Sha()
 	var totalAtomIn int64
@@ -1661,7 +1483,7 @@ func CheckTransactionInputs(tx *dcrutil.Tx, txHeight int32, txStore TxStore,
 			return 0, ruleError(ErrUnparseableSSGen, errStr)
 		}
 
-		stakeVoteSubsidy := CalcStakeVoteSubsidy(int64(heightVotingOn),
+		stakeVoteSubsidy := CalcStakeVoteSubsidy(int32(heightVotingOn),
 			chainParams)
 
 		// AmountIn for the input should be equal to the stake subsidy.
@@ -1922,7 +1744,7 @@ func CheckTransactionInputs(tx *dcrutil.Tx, txHeight int32, txStore TxStore,
 		if isSSGen && idx == 0 {
 			// However, do add the reward amount.
 			_, heightVotingOn, _ := stake.GetSSGenBlockVotedOn(tx)
-			stakeVoteSubsidy := CalcStakeVoteSubsidy(int64(heightVotingOn),
+			stakeVoteSubsidy := CalcStakeVoteSubsidy(int32(heightVotingOn),
 				chainParams)
 			totalAtomIn += stakeVoteSubsidy
 			continue
@@ -1956,7 +1778,7 @@ func CheckTransactionInputs(tx *dcrutil.Tx, txHeight int32, txStore TxStore,
 				return 0, ruleError(ErrFraudAmountIn, str)
 			}
 
-			if int64(txIn.BlockHeight) != originTx.BlockHeight {
+			if int32(txIn.BlockHeight) != originTx.BlockHeight {
 				str := fmt.Sprintf("bad fraud check block height (expected %v, "+
 					"given %v) for txIn %v", originTx.BlockHeight,
 					txIn.BlockHeight, idx)
@@ -1973,7 +1795,7 @@ func CheckTransactionInputs(tx *dcrutil.Tx, txHeight int32, txStore TxStore,
 
 		// Ensure the transaction is not spending coins which have not
 		// yet reached the required coinbase maturity.
-		coinbaseMaturity := int64(chainParams.CoinbaseMaturity)
+		coinbaseMaturity := int32(chainParams.CoinbaseMaturity)
 		if IsCoinBase(originTx.Tx) {
 			originHeight := originTx.BlockHeight
 			blocksSincePrev := txHeight - originHeight
@@ -2067,7 +1889,7 @@ func CheckTransactionInputs(tx *dcrutil.Tx, txHeight int32, txStore TxStore,
 
 			originHeight := originTx.BlockHeight
 			blocksSincePrev := txHeight - originHeight
-			if blocksSincePrev < int64(chainParams.SStxChangeMaturity) {
+			if blocksSincePrev < int32(chainParams.SStxChangeMaturity) {
 				str := fmt.Sprintf("tried to spend OP_SSGEN or "+
 					"OP_SSRTX output from tx %v from height %v at "+
 					"height %v before required maturity "+
@@ -2082,7 +1904,7 @@ func CheckTransactionInputs(tx *dcrutil.Tx, txHeight int32, txStore TxStore,
 		if scriptClass == txscript.StakeSubChangeTy {
 			originHeight := originTx.BlockHeight
 			blocksSincePrev := txHeight - originHeight
-			if blocksSincePrev < int64(chainParams.SStxChangeMaturity) {
+			if blocksSincePrev < int32(chainParams.SStxChangeMaturity) {
 				str := fmt.Sprintf("tried to spend SStx change "+
 					"output from tx %v from height %v at "+
 					"height %v before required maturity "+
@@ -2224,7 +2046,7 @@ func checkP2SHNumSigOps(txs []*dcrutil.Tx, txInputStore TxStore,
 // checkStakeBaseAmounts calculates the total amount given as subsidy from
 // single stakebase transactions (votes) within a block. This function skips a
 // ton of checks already performed by CheckTransactionInputs.
-func checkStakeBaseAmounts(height int64, params *chaincfg.Params,
+func checkStakeBaseAmounts(height int32, params *chaincfg.Params,
 	txs []*dcrutil.Tx, txStore TxStore) error {
 	for _, tx := range txs {
 		if is, _ := stake.IsSSGen(tx); is {
@@ -2299,7 +2121,7 @@ func getStakeBaseAmounts(txs []*dcrutil.Tx, txStore TxStore) (int64, error) {
 
 // getStakeTreeFees determines the amount of fees for in the stake tx tree
 // of some node given a transaction store.
-func getStakeTreeFees(height int64, params *chaincfg.Params,
+func getStakeTreeFees(height int32, params *chaincfg.Params,
 	txs []*dcrutil.Tx, txStore TxStore) (dcrutil.Amount, error) {
 	totalInputs := int64(0)
 	totalOutputs := int64(0)

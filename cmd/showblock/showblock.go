@@ -75,7 +75,7 @@ func netName(netParams *chaincfg.Params) string {
 }
 
 func main() {
-	end := int64(-1)
+	end := int32(-1)
 
 	cfg := config{
 		DbType:  "leveldb",
@@ -165,7 +165,7 @@ func main() {
 	}
 
 	for ; height < end; height++ {
-		if cfg.Progress && height%int64(1) == 0 {
+		if cfg.Progress && height%int32(1) == 0 {
 			log.Infof("Processing block %v", height)
 		}
 		err = DumpBlock(database, height, fo, cfg.RawBlock, cfg.FmtBlock, cfg.ShowTx)
@@ -179,7 +179,7 @@ func main() {
 	}
 }
 
-func getHeight(database database.Db, str string) (int64, error) {
+func getHeight(database database.Db, str string) (int32, error) {
 	argtype, idx, sha, err := parsesha(str)
 	if err != nil {
 		log.Warnf("unable to decode [%v] %v", str, err)
@@ -202,7 +202,7 @@ func getHeight(database database.Db, str string) (int64, error) {
 }
 
 // DumpBlock dumps the specified block.
-func DumpBlock(database database.Db, height int64, fo io.Writer, rflag bool, fflag bool, tflag bool) error {
+func DumpBlock(database database.Db, height int32, fo io.Writer, rflag bool, fflag bool, tflag bool) error {
 	sha, err := database.FetchBlockShaByHeight(height)
 
 	if err != nil {
@@ -256,7 +256,7 @@ var ErrBadShaLen = errors.New("invalid len")
 // ErrBadShaChar is the error for an invalid character in a sha.
 var ErrBadShaChar = errors.New("invalid character")
 
-func parsesha(argstr string) (argtype int, height int64, psha *chainhash.Hash, err error) {
+func parsesha(argstr string) (argtype int, height int32, psha *chainhash.Hash, err error) {
 	var sha chainhash.Hash
 
 	var hashbuf string
@@ -278,7 +278,7 @@ func parsesha(argstr string) (argtype int, height int64, psha *chainhash.Hash, e
 			var h int
 			h, err = strconv.Atoi(argstr)
 			if err == nil {
-				height = int64(h)
+				height = int32(h)
 				return
 			}
 			log.Infof("Unable to parse height %v, err %v", height, err)

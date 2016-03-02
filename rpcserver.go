@@ -157,6 +157,7 @@ var rpcHandlersBeforeInit = map[string]commandHandler{
 	"existsaddress":         handleExistsAddress,
 	"existsliveticket":      handleExistsLiveTicket,
 	"existslivetickets":     handleExistsLiveTickets,
+	"existsmempooltxs":      handleExistsMempoolTxs,
 	"generate":              handleGenerate,
 	"getaddednodeinfo":      handleGetAddedNodeInfo,
 	"getbestblock":          handleGetBestBlock,
@@ -1255,7 +1256,6 @@ func handleDebugLevel(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) 
 // createVinList returns a slice of JSON objects for the inputs of the passed
 // transaction.
 func createVinList(mtx *wire.MsgTx) []dcrjson.Vin {
-	tx := dcrutil.NewTx(mtx)
 	vinList := make([]dcrjson.Vin, len(mtx.TxIn))
 	for i, v := range mtx.TxIn {
 		if blockchain.IsCoinBaseTx(mtx) {
@@ -1288,7 +1288,7 @@ func createVoutList(mtx *wire.MsgTx, chainParams *chaincfg.Params) []dcrjson.Vou
 	voutList := make([]dcrjson.Vout, len(mtx.TxOut))
 	for i, v := range mtx.TxOut {
 		voutList[i].N = uint32(i)
-		voutList[i].Value = dcrutil.Amount(v.Value), ToCoin()
+		voutList[i].Value = dcrutil.Amount(v.Value).ToCoin()
 		voutList[i].Version = v.Version
 
 		// The disassembled string will contain [error] inline if the
@@ -1513,16 +1513,18 @@ func handleExistsLiveTickets(s *rpcServer, cmd interface{},
 	txHashBlob, err := hex.DecodeString(c.TxHashBlob)
 	if err != nil {
 		return nil, &dcrjson.RPCError{
-			Code:    dcrjson.ErrRPCDecodeHexString,
-			Message: "bad transaction hash blob (unparseable)",
+			Code: dcrjson.ErrRPCDecodeHexString,
+			Message: fmt.Sprintf("bad ticket hash blob (unparseable): %v",
+				err.Error()),
 		}
 	}
 
 	// It needs to be an exact number of hashes.
 	if len(txHashBlob)%32 != 0 {
 		return nil, &dcrjson.RPCError{
-			Code:    dcrjson.ErrRPCDecodeHexString,
-			Message: "bad transaction hash blob (bad length)",
+			Code: dcrjson.ErrRPCDecodeHexString,
+			Message: fmt.Sprintf("bad ticket hash blob (bad length): %v",
+				len(txHashBlob)),
 		}
 	}
 
@@ -1531,6 +1533,13 @@ func handleExistsLiveTickets(s *rpcServer, cmd interface{},
 	for i := 0; i < hashesLen; i++ {
 		hashes[i], err = chainhash.NewHash(
 			txHashBlob[i*chainhash.HashSize : (i+1)*chainhash.HashSize])
+		if err != nil {
+			return nil, &dcrjson.RPCError{
+				Code: dcrjson.ErrRPCDecodeHexString,
+				Message: fmt.Sprintf("bad ticket hash: %v",
+					err.Error()),
+			}
+		}
 	}
 
 	exists, err := s.server.blockManager.ExistsLiveTickets(hashes)
@@ -1539,8 +1548,66 @@ func handleExistsLiveTickets(s *rpcServer, cmd interface{},
 	}
 	if len(exists) != hashesLen {
 		return nil, &dcrjson.RPCError{
-			Code:    dcrjson.ErrRPCDatabase,
-			Message: "output of ExistsLiveTickets wrong size",
+			Code: dcrjson.ErrRPCDatabase,
+			Message: fmt.Sprintf("output of ExistsLiveTickets wrong size "+
+				"(want %v, got %v)", hashesLen, len(exists)),
+		}
+	}
+
+	// Convert the slice of bools into a compacted set of bit flags.
+	set := bitset.NewBytes(hashesLen)
+	for i := range exists {
+		if exists[i] {
+			set.Set(i)
+		}
+	}
+
+	return hex.EncodeToString([]byte(set)), nil
+}
+
+// handleExistsMempoolTxs implements the existsmempooltxs command.
+func handleExistsMempoolTxs(s *rpcServer, cmd interface{},
+	closeChan <-chan struct{}) (interface{}, error) {
+	c := cmd.(*dcrjson.ExistsMempoolTxsCmd)
+
+	txHashBlob, err := hex.DecodeString(c.TxHashBlob)
+	if err != nil {
+		return nil, &dcrjson.RPCError{
+			Code: dcrjson.ErrRPCDecodeHexString,
+			Message: fmt.Sprintf("bad transaction hash blob (unparseable): %v",
+				err.Error()),
+		}
+	}
+
+	// It needs to be an exact number of hashes.
+	if len(txHashBlob)%32 != 0 {
+		return nil, &dcrjson.RPCError{
+			Code: dcrjson.ErrRPCDecodeHexString,
+			Message: fmt.Sprintf("bad transaction hash blob (bad length): %v",
+				len(txHashBlob)),
+		}
+	}
+
+	hashesLen := len(txHashBlob) / 32
+	hashes := make([]*chainhash.Hash, hashesLen)
+	for i := 0; i < hashesLen; i++ {
+		hashes[i], err = chainhash.NewHash(
+			txHashBlob[i*chainhash.HashSize : (i+1)*chainhash.HashSize])
+		if err != nil {
+			return nil, &dcrjson.RPCError{
+				Code: dcrjson.ErrRPCDecodeHexString,
+				Message: fmt.Sprintf("bad transaction hash: %v",
+					err.Error()),
+			}
+		}
+	}
+
+	exists := s.server.txMemPool.HaveTransactions(hashes)
+	if len(exists) != hashesLen {
+		return nil, &dcrjson.RPCError{
+			Code: dcrjson.ErrRPCDatabase,
+			Message: fmt.Sprintf("output of ExistsMempoolTxs wrong size "+
+				"(want %v, got %v)", hashesLen, len(exists)),
 		}
 	}
 
@@ -1803,8 +1870,8 @@ func handleGetBlock(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (i
 		Revocations:   blockHeader.Revocations,
 		PoolSize:      blockHeader.PoolSize,
 		Time:          blockHeader.Timestamp.Unix(),
-		Confirmations: uint64(1 + maxIdx - idx),
-		Height:        int64(idx),
+		Confirmations: uint32(1 + maxIdx - idx),
+		Height:        int32(idx),
 		Size:          int32(len(buf)),
 		Bits:          strconv.FormatInt(int64(blockHeader.Bits), 16),
 		SBits:         sbitsFloat,
@@ -1845,11 +1912,10 @@ func handleGetBlock(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (i
 		stxns := blk.STransactions()
 		rawSTxns := make([]dcrjson.TxRawResult, len(stxns))
 		for i, tx := range stxns {
-			txHash := tx.Sha().String()
-			mtx := tx.MsgTx()
-
 			rawSTxn, err := createTxRawResult(s.server.chainParams,
-				txHash, mtx, blk, maxIdx, sha, blk.Height(), uint32(i))
+				tx.MsgTx(), tx.Sha().String(), blockHeader,
+				sha.String(), idx, uint32(i), maxIdx)
+
 			if err != nil {
 				return nil, err
 			}
@@ -1902,9 +1968,9 @@ func handleGetBlockHash(s *rpcServer, cmd interface{}, closeChan <-chan struct{}
 
 // handleGetBlockHeader implements the getblockheader command.
 func handleGetBlockHeader(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (interface{}, error) {
-	c := cmd.(*btcjson.GetBlockHeaderCmd)
+	c := cmd.(*dcrjson.GetBlockHeaderCmd)
 
-	sha, err := wire.NewShaHashFromStr(c.Hash)
+	sha, err := chainhash.NewHashFromStr(c.Hash)
 	if err != nil {
 		return nil, err
 	}
@@ -1912,8 +1978,8 @@ func handleGetBlockHeader(s *rpcServer, cmd interface{}, closeChan <-chan struct
 	if c.Verbose == nil || *c.Verbose {
 		blk, err := s.server.db.FetchBlockBySha(sha)
 		if err != nil {
-			return nil, &btcjson.RPCError{
-				Code:    btcjson.ErrRPCInvalidAddressOrKey,
+			return nil, &dcrjson.RPCError{
+				Code:    dcrjson.ErrRPCInvalidAddressOrKey,
 				Message: "Invalid address or key: " + err.Error(),
 			}
 		}
@@ -1931,9 +1997,9 @@ func handleGetBlockHeader(s *rpcServer, cmd interface{}, closeChan <-chan struct
 		}
 
 		msgBlock := blk.MsgBlock()
-		blockHeaderReply := btcjson.GetBlockHeaderVerboseResult{
+		blockHeaderReply := dcrjson.GetBlockHeaderVerboseResult{
 			Hash:          c.Hash,
-			Confirmations: uint64(1 + maxIdx - blk.Height()),
+			Confirmations: uint32(1 + maxIdx - blk.Height()),
 			Height:        int32(blk.Height()),
 			Version:       msgBlock.Header.Version,
 			MerkleRoot:    msgBlock.Header.MerkleRoot.String(),
@@ -1950,8 +2016,8 @@ func handleGetBlockHeader(s *rpcServer, cmd interface{}, closeChan <-chan struct
 	// Verbose disabled
 	blkHeader, err := s.server.db.FetchBlockHeaderBySha(sha)
 	if err != nil {
-		return nil, &btcjson.RPCError{
-			Code:    btcjson.ErrRPCInvalidAddressOrKey,
+		return nil, &dcrjson.RPCError{
+			Code:    dcrjson.ErrRPCInvalidAddressOrKey,
 			Message: "Invalid address or key: " + err.Error(),
 		}
 	}
@@ -2370,7 +2436,7 @@ func (state *gbtWorkState) blockTemplateResult(bm *blockManager,
 			}
 
 			fee, err = blockchain.CheckTransactionInputs(txU,
-				int64(template.block.Header.Height),
+				int32(template.block.Header.Height),
 				store,
 				true, // Ensure fraud proofs are correct
 				bm.server.chainParams)
@@ -2485,7 +2551,7 @@ func (state *gbtWorkState) blockTemplateResult(bm *blockManager,
 			}
 
 			fee, err = blockchain.CheckTransactionInputs(txU,
-				int64(template.block.Header.Height),
+				int32(template.block.Header.Height),
 				store,
 				true, // Ensure fraud proofs are correct
 				bm.server.chainParams)
@@ -2991,7 +3057,7 @@ func handleGetCoinSupply(s *rpcServer, cmd interface{}, closeChan <-chan struct{
 		return s.coinSupplyTotal, nil
 	}
 
-	for i := 0; int64(i) < tipHeight+1; i++ {
+	for i := 0; int32(i) < tipHeight+1; i++ {
 		if i == 0 {
 			continue
 		}
@@ -3004,7 +3070,7 @@ func handleGetCoinSupply(s *rpcServer, cmd interface{}, closeChan <-chan struct{
 			base *= params.MulSubsidy
 			base /= params.DivSubsidy
 		}
-		blockSha, err := s.server.db.FetchBlockShaByHeight(int64(i))
+		blockSha, err := s.server.db.FetchBlockShaByHeight(int32(i))
 		if err != nil {
 			context := "Failed to get block sha by height"
 			return nil, internalRPCError(err.Error(), context)
@@ -3023,7 +3089,7 @@ func handleGetCoinSupply(s *rpcServer, cmd interface{}, closeChan <-chan struct{
 		tax := ((base * int64(params.BlockTaxProportion)) /
 			int64(params.TotalSubsidyProportions()))
 
-		if int64(i) < params.StakeValidationHeight {
+		if int32(i) < params.StakeValidationHeight {
 			supply += (work + tax)
 		} else {
 			// Make sure to reduce work and tax subsidy based on number of voters
@@ -3128,7 +3194,7 @@ func handleGetMempoolInfo(s *rpcServer, cmd interface{}, closeChan <-chan struct
 		numBytes += int64(desc.Tx.MsgTx().SerializeSize())
 	}
 
-	ret := &btcjson.GetMempoolInfoResult{
+	ret := &dcrjson.GetMempoolInfoResult{
 		Size:  int64(len(txD)),
 		Bytes: numBytes,
 	}
@@ -3233,7 +3299,7 @@ func handleGetNetworkHashPS(s *rpcServer, cmd interface{}, closeChan <-chan stru
 	// starting height is not before the beginning of the chain.
 
 	// Decred TODO: Make sure this blocksPerRetarget value is accurate
-	blocksPerRetarget := int64(s.server.chainParams.TargetTimespan /
+	blocksPerRetarget := int32(s.server.chainParams.TargetTimespan /
 		s.server.chainParams.TimePerBlock)
 
 	numBlocks := int32(120)
@@ -3362,7 +3428,7 @@ func handleGetRawMempool(s *rpcServer, cmd interface{}, closeChan <-chan struct{
 				Size:             int32(desc.Tx.MsgTx().SerializeSize()),
 				Fee:              dcrutil.Amount(desc.Fee).ToCoin(),
 				Time:             desc.Added.Unix(),
-				Height:           int64(desc.Height),
+				Height:           int32(desc.Height),
 				StartingPriority: startingPriority,
 				CurrentPriority:  currentPriority,
 				Depends:          make([]string, 0),
@@ -3428,13 +3494,11 @@ func handleGetRawTransaction(s *rpcServer, cmd interface{}, closeChan <-chan str
 
 	// Try to fetch the transaction from the memory pool and if that fails,
 	// try the block database.
-	var maxIdx int64
 	var mtx *wire.MsgTx
 	var blkHash *chainhash.Hash
 	var blkHeight int32
 	var blkIndex uint32
 	var tip *dcrutil.Block
-	needsVotes := false
 	tx, err := s.server.txMemPool.FetchTransaction(txHash)
 	if err != nil {
 		// Search the database.
@@ -3456,7 +3520,6 @@ func handleGetRawTransaction(s *rpcServer, cmd interface{}, closeChan <-chan str
 						blkHash = tip.Sha()
 						blkHeight = tip.Height()
 						blkIndex = uint32(i)
-						needsVotes = true
 					}
 				}
 
@@ -3477,12 +3540,6 @@ func handleGetRawTransaction(s *rpcServer, cmd interface{}, closeChan <-chan str
 		}
 	} else {
 		mtx = tx.MsgTx()
-	}
-
-	_, maxIdx, err = s.server.db.NewestSha()
-	if err != nil {
-		context := "Failed to get newest hash"
-		return nil, internalRPCError(err.Error(), context)
 	}
 
 	// When the verbose flag isn't set, simply return the network-serialized
@@ -3506,8 +3563,8 @@ func handleGetRawTransaction(s *rpcServer, cmd interface{}, closeChan <-chan str
 		blkHeader, err = s.server.db.FetchBlockHeaderBySha(blkHash)
 		if err != nil {
 			rpcsLog.Errorf("Error fetching sha: %v", err)
-			return nil, &btcjson.RPCError{
-				Code:    btcjson.ErrRPCBlockNotFound,
+			return nil, &dcrjson.RPCError{
+				Code:    dcrjson.ErrRPCBlockNotFound,
 				Message: "Block not found: " + err.Error(),
 			}
 		}
@@ -3704,10 +3761,10 @@ func handleGetTxOut(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (i
 
 // pruneOldBlockTemplates prunes all old block templates from the templatePool
 // map. Must be called with the RPC workstate locked to avoid races to the map.
-func pruneOldBlockTemplates(s *rpcServer, bestHeight int64) {
+func pruneOldBlockTemplates(s *rpcServer, bestHeight int32) {
 	pool := s.templatePool
 	for rootHash, blkData := range pool {
-		height := int64(blkData.msgBlock.Header.Height)
+		height := int32(blkData.msgBlock.Header.Height)
 		if height < bestHeight-getworkExpirationDiff {
 			delete(pool, rootHash)
 		}
@@ -4313,8 +4370,6 @@ func handleSearchRawTransactions(s *rpcServer, cmd interface{},
 			blkHeight = txReply.Height
 		}
 
-		var blkHash *chainhash.Hash
-		var blkHeight int64
 		var blkIndex uint32
 		blk, err := s.server.db.FetchBlockBySha(txReply.BlkSha)
 		if err != nil {
@@ -4661,7 +4716,7 @@ type rpcServer struct {
 
 	// coin supply caching values
 	coinSupplyMtx    sync.Mutex
-	coinSupplyHeight int64
+	coinSupplyHeight int32
 	coinSupplyTotal  int64
 }
 

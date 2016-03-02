@@ -502,7 +502,7 @@ func (db *LevelDb) FetchTxsForAddr(addr dcrutil.Address, skip int,
 		addrIndex := unpackTxIndex(rawIndex)
 
 		tx, blkSha, blkHeight, _, err := db.fetchTxDataByLoc(
-			int64(addrIndex.Height),
+			int32(addrIndex.Height),
 			int(addrIndex.TxOffset),
 			int(addrIndex.TxLen),
 			[]byte{})
@@ -587,7 +587,7 @@ func (db *LevelDb) UpdateAddrIndexForBlock(blkSha *chainhash.Hash,
 
 // DropAddrIndexForBlock drops the address index db for a given block/height.
 func (db *LevelDb) DropAddrIndexForBlock(blkSha *chainhash.Hash,
-	blkHeight int64, addrIndexes database.BlockAddrIndex) (rerr error) {
+	blkHeight int32, addrIndexes database.BlockAddrIndex) (rerr error) {
 	db.dbLock.Lock()
 	defer db.dbLock.Unlock()
 	defer db.lbatch.Reset()

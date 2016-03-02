@@ -78,16 +78,16 @@ type BlockAcceptedNtfnsData struct {
 // about a reorganization.
 type ReorganizationNtfnsData struct {
 	OldHash   chainhash.Hash
-	OldHeight int64
+	OldHeight int32
 	NewHash   chainhash.Hash
-	NewHeight int64
+	NewHeight int32
 }
 
 // TicketNotificationsData is the structure for new/spent/missed ticket
 // notifications at blockchain HEAD that are outgoing from chain.
 type TicketNotificationsData struct {
 	Hash            chainhash.Hash
-	Height          int64
+	Height          int32
 	StakeDifficulty int64
 	TicketMap       stake.SStxMemMap
 }

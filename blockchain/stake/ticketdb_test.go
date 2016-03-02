@@ -60,7 +60,7 @@ func hashInSlice(h *chainhash.Hash, list []*chainhash.Hash) bool {
 
 func TestTicketDB(t *testing.T) {
 	// Declare some useful variables
-	testBCHeight := int64(168)
+	testBCHeight := int32(168)
 
 	// Set up a DB
 	database, err := database.CreateDB("leveldb", "ticketdb_test")
@@ -83,7 +83,7 @@ func TestTicketDB(t *testing.T) {
 
 	// Create decoder from the buffer and a map to store the data
 	bcDecoder := gob.NewDecoder(bcBuf)
-	blockchain := make(map[int64][]byte)
+	blockchain := make(map[int32][]byte)
 
 	// Decode the blockchain into the map
 	if err := bcDecoder.Decode(&blockchain); err != nil {
@@ -94,7 +94,7 @@ func TestTicketDB(t *testing.T) {
 	var ticketsToSpendIn167 []chainhash.Hash
 	var sortedTickets167 []*stake.TicketData
 
-	for i := int64(0); i <= testBCHeight; i++ {
+	for i := int32(0); i <= testBCHeight; i++ {
 		block, err := dcrutil.NewBlockFromBytes(blockchain[i])
 		if err != nil {
 			t.Errorf("block deserialization error on block %v", i)

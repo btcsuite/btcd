@@ -188,7 +188,7 @@ func (a *addrIndexer) initialize() error {
 // passed SPK and returns a TxAddrIndex with the given data. Our "address"
 // index is actually a hash160 index, where in the ideal case the data push
 // is either the hash160 of a publicKey (P2PKH) or a Script (P2SH).
-func convertToAddrIndex(scrVersion uint16, scr []byte, height int64,
+func convertToAddrIndex(scrVersion uint16, scr []byte, height int32,
 	locInBlock *wire.TxLoc) ([]*database.TxAddrIndex, error) {
 	var tais []*database.TxAddrIndex
 

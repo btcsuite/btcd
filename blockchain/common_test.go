@@ -115,7 +115,7 @@ func chainSetup(dbName string, params *chaincfg.Params) (*blockchain.BlockChain,
 	// Insert the main network genesis block.  This is part of the initial
 	// database setup.
 	genesisBlock := dcrutil.NewBlock(params.GenesisBlock)
-	genesisBlock.SetHeight(int64(0))
+	genesisBlock.SetHeight(int32(0))
 	_, err := db.InsertBlock(genesisBlock)
 	if err != nil {
 		teardown()

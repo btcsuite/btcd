@@ -143,7 +143,7 @@ func (b *BlockChain) connectTickets(tixStore TicketStore,
 
 	revocations := node.header.Revocations
 
-	tM := int64(b.chainParams.TicketMaturity)
+	tM := int32(b.chainParams.TicketMaturity)
 
 	// Skip a number of validation steps before we requiring chain
 	// voting.
@@ -337,8 +337,8 @@ func (b *BlockChain) connectTickets(tixStore TicketStore,
 				tpdBucketMap[tpd.td.Prefix] = append(data, tpd)
 			}
 		}
-		toExpireHeight := node.height - int64(b.chainParams.TicketExpiry)
-		if !(toExpireHeight < int64(b.chainParams.StakeEnabledHeight)) {
+		toExpireHeight := node.height - int32(b.chainParams.TicketExpiry)
+		if !(toExpireHeight < int32(b.chainParams.StakeEnabledHeight)) {
 			for i := 0; i < stake.BucketsSize; i++ {
 				// Generate the live ticket bucket.
 				ltb, err := b.GenerateLiveTicketBucket(tixStore,
@@ -476,7 +476,7 @@ func (b *BlockChain) disconnectTickets(tixStore TicketStore,
 	node *blockNode,
 	block *dcrutil.Block) error {
 
-	tM := int64(b.chainParams.TicketMaturity)
+	tM := int32(b.chainParams.TicketMaturity)
 	height := node.height
 
 	// Nothing to do if tickets haven't yet possibly matured.

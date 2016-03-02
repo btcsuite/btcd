@@ -153,9 +153,14 @@ var helpDescsEnUS = map[string]string{
 	"existsliveticket--result0":  "Bool showing if address exists in the live ticket database or not",
 
 	// ExistsLiveTicketsCmd help.
-	"existslivetickets--synopsis":  "Test for the existance of the provided tickets",
+	"existslivetickets--synopsis":  "Test for the existance of the provided tickets in the live ticket map",
 	"existslivetickets-txhashblob": "Blob containing the hashes to check",
-	"existslivetickets--result0":   "Bool showing if address exists in the live ticket database or not",
+	"existslivetickets--result0":   "Bool blob showing if ticket exists in the live ticket database or not",
+
+	// ExistsMempoolTxsCmd help.
+	"existsmempooltxs--synopsis":  "Test for the existance of the provided txs in the mempool",
+	"existsmempooltxs-txhashblob": "Blob containing the hashes to check",
+	"existsmempooltxs--result0":   "Bool blob showing if txs exist in the mempool or not",
 
 	// GenerateCmd help
 	"generate--synopsis": "Generates a set number of blocks (simnet or regtest only) and returns a JSON\n" +
@@ -697,7 +702,8 @@ var rpcResultTypes = map[string][]interface{}{
 	"estimatefee":           []interface{}{(*float64)(nil)},
 	"existsaddress":         []interface{}{(*bool)(nil)},
 	"existsliveticket":      []interface{}{(*bool)(nil)},
-	"existslivetickets":     []interface{}{(*bool)(nil)},
+	"existslivetickets":     []interface{}{(*string)(nil)},
+	"existsmempooltxs":      []interface{}{(*string)(nil)},
 	"getaddednodeinfo":      []interface{}{(*[]string)(nil), (*[]dcrjson.GetAddedNodeInfoResult)(nil)},
 	"getbestblock":          []interface{}{(*dcrjson.GetBestBlockResult)(nil)},
 	"generate":              []interface{}{(*[]string)(nil)},

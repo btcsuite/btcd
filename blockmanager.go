@@ -428,7 +428,7 @@ type headerNode struct {
 type chainState struct {
 	sync.Mutex
 	newestHash        *chainhash.Hash
-	newestHeight      int64
+	newestHeight      int32
 	nextFinalState    [6]byte
 	nextPoolSize      uint32
 	winningTickets    []chainhash.Hash
@@ -1070,7 +1070,7 @@ func (b *blockManager) checkBlockForHiddenVotes(block *dcrutil.Block) {
 	coinbase, err := createCoinbaseTx(
 		template.block.Transactions[0].TxIn[0].SignatureScript,
 		opReturnPkScript,
-		int64(template.block.Header.Height),
+		int32(template.block.Header.Height),
 		cfg.miningAddrs[rand.Intn(len(cfg.miningAddrs))],
 		uint16(votesTotal),
 		b.server.chainParams)
@@ -1235,7 +1235,7 @@ func (b *blockManager) handleBlockMsg(bmsg *blockMsg) {
 		if !exists {
 			winningTickets, poolSize, finalState, err :=
 				b.blockChain.GetWinningTickets(*blockSha)
-			if err != nil && int64(bmsg.block.MsgBlock().Header.Height) >=
+			if err != nil && int32(bmsg.block.MsgBlock().Header.Height) >=
 				b.server.chainParams.StakeValidationHeight-1 {
 				bmgrLog.Errorf("Failed to get next winning tickets: %v", err)
 
@@ -1248,7 +1248,7 @@ func (b *blockManager) handleBlockMsg(bmsg *blockMsg) {
 
 			winningTicketsNtfn := &WinningTicketsNtfnData{
 				*blockSha,
-				int64(bmsg.block.MsgBlock().Header.Height),
+				int32(bmsg.block.MsgBlock().Header.Height),
 				winningTickets}
 			lotteryData = &BlockLotteryData{
 				winningTicketsNtfn,
@@ -1937,7 +1937,7 @@ out:
 				if !exists {
 					winningTickets, poolSize, finalState, err :=
 						b.blockChain.GetWinningTickets(*msg.block.Sha())
-					if err != nil && int64(msg.block.MsgBlock().Header.Height) >=
+					if err != nil && int32(msg.block.MsgBlock().Header.Height) >=
 						b.server.chainParams.StakeValidationHeight-1 {
 						bmgrLog.Warnf("Stake failure in lottery tickets "+
 							"calculation: %v", err)
@@ -1953,7 +1953,7 @@ out:
 					lotteryData.finalState = finalState
 					lotteryData.ntfnData = &WinningTicketsNtfnData{
 						*msg.block.Sha(),
-						int64(msg.block.MsgBlock().Header.Height),
+						int32(msg.block.MsgBlock().Header.Height),
 						winningTickets}
 					b.blockLotteryDataCache[*msg.block.Sha()] = lotteryData
 					broadcastWinners = true
@@ -2143,7 +2143,7 @@ func (b *blockManager) handleNotifyMsg(notification *blockchain.Notification) {
 
 					lotteryData.ntfnData = &WinningTicketsNtfnData{
 						*hash,
-						int64(block.MsgBlock().Header.Height),
+						int32(block.MsgBlock().Header.Height),
 						wt}
 					b.blockLotteryDataCache[*hash] = lotteryData
 
@@ -2938,9 +2938,9 @@ func setupBlockDB() (dcrdb.Db, error) {
 }
 
 // dumpBlockChain dumps a map of the blockchain blocks as serialized bytes.
-func dumpBlockChain(height int64, db dcrdb.Db) error {
-	blockchain := make(map[int64][]byte)
-	for i := int64(0); i <= height; i++ {
+func dumpBlockChain(height int32, db dcrdb.Db) error {
+	blockchain := make(map[int32][]byte)
+	for i := int32(0); i <= height; i++ {
 		// Fetch blocks and put them in the map
 		sha, err := db.FetchBlockShaByHeight(i)
 		if err != nil {
@@ -2993,7 +2993,7 @@ func loadBlockDB() (dcrdb.Db, error) {
 	// connected to if needed.
 	if height == -1 {
 		genesis := dcrutil.NewBlock(activeNetParams.GenesisBlock)
-		genesis.SetHeight(int64(0))
+		genesis.SetHeight(int32(0))
 		_, err := db.InsertBlock(genesis)
 		if err != nil {
 			db.Close()

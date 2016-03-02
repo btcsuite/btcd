@@ -323,7 +323,7 @@ func (m *wsNotificationManager) NotifyMempoolTx(tx *dcrutil.Tx, isNew bool) {
 // the tickets eligible to vote on it).
 type WinningTicketsNtfnData struct {
 	BlockHash   chainhash.Hash
-	BlockHeight int64
+	BlockHeight int32
 	Tickets     []chainhash.Hash
 }
 
@@ -331,7 +331,7 @@ type WinningTicketsNtfnData struct {
 // stake difficulty notifications.
 type StakeDifficultyNtfnData struct {
 	BlockHash       chainhash.Hash
-	BlockHeight     int64
+	BlockHeight     int32
 	StakeDifficulty int64
 }
 
@@ -2392,14 +2392,14 @@ func scanMempool(wsc *wsClient, lookups *rescanKeys) {
 					case 33: // Compressed
 						var key [33]byte
 						copy(key[:], sa)
-						if _, ok := lookups.compressedPubkeys[key]; ok {
+						if _, ok := lookups.compressedPubKeys[key]; ok {
 							found = true
 						}
 
 					case 65: // Uncompressed
 						var key [65]byte
 						copy(key[:], sa)
-						if _, ok := lookups.uncompressedPubkeys[key]; ok {
+						if _, ok := lookups.uncompressedPubKeys[key]; ok {
 							found = true
 						}
 
@@ -2744,7 +2744,7 @@ fetchRange:
 					return nil, &ErrRescanReorg
 				}
 
-				minBlock += int64(i)
+				minBlock += int32(i)
 				hashList, err = recoverFromReorg(db, minBlock,
 					maxBlock, lastBlock)
 				if err != nil {

@@ -161,7 +161,7 @@ func loadBlocks(t *testing.T) ([]*dcrutil.Block, error) {
 
 	// Create decoder from the buffer and a map to store the data
 	bcDecoder := gob.NewDecoder(bcBuf)
-	blockchain := make(map[int64][]byte)
+	blockchain := make(map[int32][]byte)
 
 	// Decode the blockchain into the map
 	if err := bcDecoder.Decode(&blockchain); err != nil {
@@ -169,7 +169,7 @@ func loadBlocks(t *testing.T) ([]*dcrutil.Block, error) {
 	}
 
 	blocks := make([]*dcrutil.Block, 0, len(blockchain))
-	for height := int64(1); height < int64(len(blockchain)); height++ {
+	for height := int32(1); height < int32(len(blockchain)); height++ {
 		block, err := dcrutil.NewBlockFromBytes(blockchain[height])
 		if err != nil {
 			t.Errorf("failed to parse block %v", height)

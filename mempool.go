@@ -95,7 +95,7 @@ const (
 
 	// maxSSGensDoubleSpends is the maximum number of SSGen double spends
 	// allowed in the pool.
-	maxSSGensDoubleSpends = 64
+	maxSSGensDoubleSpends = 5
 
 	// heightDiffToPruneTicket is the number of blocks to pass by in terms
 	// of height before old tickets are pruned.
@@ -928,6 +928,30 @@ func (mp *txMemPool) HaveTransaction(hash *chainhash.Hash) bool {
 	defer mp.RUnlock()
 
 	return mp.haveTransaction(hash)
+}
+
+// haveTransactions returns whether or not the passed transactions already exist
+// in the main pool or in the orphan pool.
+//
+// This function MUST be called with the mempool lock held (for reads).
+func (mp *txMemPool) haveTransactions(hashes []*chainhash.Hash) []bool {
+	have := make([]bool, len(hashes))
+	for i := range hashes {
+		have[i] = mp.haveTransaction(hashes[i])
+	}
+	return have
+}
+
+// HaveTransactions returns whether or not the passed transactions already exist
+// in the main pool or in the orphan pool.
+//
+// This function is safe for concurrent access.
+func (mp *txMemPool) HaveTransactions(hashes []*chainhash.Hash) []bool {
+	// Protect concurrent access.
+	mp.RLock()
+	defer mp.RUnlock()
+
+	return mp.haveTransactions(hashes)
 }
 
 // removeTransaction is the internal function which implements the public
@@ -1895,7 +1919,7 @@ func (mp *txMemPool) processOrphans(hash *chainhash.Hash) {
 // stake difficulty is below the current required stake difficulty should be
 // pruned from mempool since they will never be mined.  The same idea stands
 // for SSGen and SSRtx
-func (mp *txMemPool) PruneStakeTx(requiredStakeDifficulty, height int64) {
+func (mp *txMemPool) PruneStakeTx(requiredStakeDifficulty int64, height int32) {
 	// Protect concurrent access.
 	mp.Lock()
 	defer mp.Unlock()
@@ -1903,11 +1927,11 @@ func (mp *txMemPool) PruneStakeTx(requiredStakeDifficulty, height int64) {
 	mp.pruneStakeTx(requiredStakeDifficulty, height)
 }
 
-func (mp *txMemPool) pruneStakeTx(requiredStakeDifficulty, height int64) {
+func (mp *txMemPool) pruneStakeTx(requiredStakeDifficulty int64, height int32) {
 	for _, tx := range mp.pool {
 		txType := detectTxType(tx.Tx)
 		if txType == stake.TxTypeSStx &&
-			tx.Height+int64(heightDiffToPruneTicket) < height {
+			tx.Height+int32(heightDiffToPruneTicket) < height {
 			mp.removeTransaction(tx.Tx, true)
 		}
 		if txType == stake.TxTypeSStx &&
@@ -1915,7 +1939,7 @@ func (mp *txMemPool) pruneStakeTx(requiredStakeDifficulty, height int64) {
 			mp.removeTransaction(tx.Tx, true)
 		}
 		if (txType == stake.TxTypeSSRtx || txType == stake.TxTypeSSGen) &&
-			tx.Height+int64(heightDiffToPruneVotes) < height {
+			tx.Height+int32(heightDiffToPruneVotes) < height {
 			mp.removeTransaction(tx.Tx, true)
 		}
 	}
@@ -1923,7 +1947,7 @@ func (mp *txMemPool) pruneStakeTx(requiredStakeDifficulty, height int64) {
 
 // PruneExpiredTx prunes expired transactions from the mempool that may no longer
 // be able to be included into a block.
-func (mp *txMemPool) PruneExpiredTx(height int64) {
+func (mp *txMemPool) PruneExpiredTx(height int32) {
 	// Protect concurrent access.
 	mp.Lock()
 	defer mp.Unlock()
@@ -1931,10 +1955,10 @@ func (mp *txMemPool) PruneExpiredTx(height int64) {
 	mp.pruneExpiredTx(height)
 }
 
-func (mp *txMemPool) pruneExpiredTx(height int64) {
+func (mp *txMemPool) pruneExpiredTx(height int32) {
 	for _, tx := range mp.pool {
 		if tx.Tx.MsgTx().Expiry != 0 {
-			if height >= int64(tx.Tx.MsgTx().Expiry) {
+			if height >= int32(tx.Tx.MsgTx().Expiry) {
 				txmpLog.Debugf("Pruning expired transaction %v from the "+
 					"mempool", tx.Tx.Sha())
 				mp.removeTransaction(tx.Tx, true)

@@ -1,4 +1,4 @@
-// Copyright (c) 2014 The btcsuite developers
+// Copyright (c) 2014 The dcrsuite developers
 // Copyright (c) 2015 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
@@ -353,13 +353,13 @@ func TestWalletSvrCmds(t *testing.T) {
 		{
 			name: "getwalletinfo",
 			newCmd: func() (interface{}, error) {
-				return btcjson.NewCmd("getwalletinfo")
+				return dcrjson.NewCmd("getwalletinfo")
 			},
 			staticCmd: func() interface{} {
-				return btcjson.NewGetWalletInfoCmd()
+				return dcrjson.NewGetWalletInfoCmd()
 			},
 			marshalled:   `{"jsonrpc":"1.0","method":"getwalletinfo","params":[],"id":1}`,
-			unmarshalled: &btcjson.GetWalletInfoCmd{},
+			unmarshalled: &dcrjson.GetWalletInfoCmd{},
 		},
 		{
 			name: "importprivkey",

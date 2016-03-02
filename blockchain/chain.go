@@ -169,9 +169,9 @@ type BlockChain struct {
 	chainParams           *chaincfg.Params
 	checkpointsByHeight   map[int32]*chaincfg.Checkpoint
 	notifications         NotificationCallback
-	minMemoryNodes        int64
+	minMemoryNodes        int32
 	blocksPerRetarget     int64
-	stakeValidationHeight int64
+	stakeValidationHeight int32
 	root                  *blockNode
 	bestChain             *blockNode
 	index                 map[chainhash.Hash]*blockNode
@@ -190,7 +190,7 @@ type BlockChain struct {
 
 // StakeValidationHeight returns the height at which proof of stake validation
 // begins for proof of work block headers.
-func (b *BlockChain) StakeValidationHeight() int64 {
+func (b *BlockChain) StakeValidationHeight() int32 {
 	return b.stakeValidationHeight
 }
 
@@ -529,7 +529,7 @@ func (b *BlockChain) loadBlockNode(hash *chainhash.Hash) (*blockNode, error) {
 		}
 	}
 	node := newBlockNode(&block.MsgBlock().Header, hash,
-		int64(block.MsgBlock().Header.Height), voteBitsStake)
+		int32(block.MsgBlock().Header.Height), voteBitsStake)
 	node.inMainChain = true
 	prevHash := &block.MsgBlock().Header.PrevBlock
 
@@ -696,7 +696,7 @@ func (b *BlockChain) getPrevNodeFromNode(node *blockNode) (*blockNode, error) {
 // the node with a desired block height; it returns this block. The benefit is
 // this works for both the main chain and the side chain.
 func (b *BlockChain) getNodeAtHeightFromTopNode(node *blockNode,
-	toTraverse int64) (*blockNode, error) {
+	toTraverse int32) (*blockNode, error) {
 	oldNode := node
 	var err error
 
@@ -1089,8 +1089,8 @@ func (b *BlockChain) disconnectBlock(node *blockNode, block *dcrutil.Block) erro
 
 	// Insert block into ticket database if we're the point where tickets begin to
 	// mature.
-	maturityHeight := int64(b.chainParams.TicketMaturity) +
-		int64(b.chainParams.CoinbaseMaturity)
+	maturityHeight := int32(b.chainParams.TicketMaturity) +
+		int32(b.chainParams.CoinbaseMaturity)
 
 	// Remove from ticket database.
 	if node.height-1 >= maturityHeight {
@@ -1563,10 +1563,10 @@ func New(db database.Db, tmdb *stake.TicketDB, params *chaincfg.Params,
 	// BlocksPerRetarget is the number of blocks between each difficulty
 	// retarget.  It is calculated based on the retargeting window sizes
 	// in blocks for both PoW and PoS.
-	blocksPerRetargetPoW := int64(params.WorkDiffWindowSize *
-		params.WorkDiffWindows)
-	blocksPerRetargetPoS := int64(params.StakeDiffWindowSize *
-		params.StakeDiffWindows)
+	blocksPerRetargetPoW := int64(params.WorkDiffWindowSize) *
+		params.WorkDiffWindows
+	blocksPerRetargetPoS := int64(params.StakeDiffWindowSize) *
+		params.StakeDiffWindows
 	blocksPerRetarget := maxInt64(blocksPerRetargetPoW, blocksPerRetargetPoS)
 
 	b := BlockChain{

@@ -26,7 +26,7 @@ import (
 // 2     subsidy /= DivSubsidy
 //
 // Safe for concurrent access.
-func calcBlockSubsidy(height int64, params *chaincfg.Params) int64 {
+func calcBlockSubsidy(height int32, params *chaincfg.Params) int64 {
 	// Block height 1 subsidy is 'special' and used to
 	// distribute initial tokens, if any.
 	if height == 1 {
@@ -42,7 +42,7 @@ func calcBlockSubsidy(height int64, params *chaincfg.Params) int64 {
 	// use is storing the total subsidy in a block node and do the
 	// multiplication and division when needed when adding a block.
 	if iterations > 0 {
-		for i := int64(0); i < iterations; i++ {
+		for i := int32(0); i < iterations; i++ {
 			subsidy *= params.MulSubsidy
 			subsidy /= params.DivSubsidy
 		}
@@ -53,7 +53,7 @@ func calcBlockSubsidy(height int64, params *chaincfg.Params) int64 {
 
 // CalcBlockWorkSubsidy calculates the proof of work subsidy for a block as a
 // proportion of the total subsidy.
-func CalcBlockWorkSubsidy(height int64, voters uint16,
+func CalcBlockWorkSubsidy(height int32, voters uint16,
 	params *chaincfg.Params) int64 {
 	subsidy := calcBlockSubsidy(height, params)
 	proportionWork := int64(params.WorkRewardProportion)
@@ -84,7 +84,7 @@ func CalcBlockWorkSubsidy(height int64, voters uint16,
 // of its input SStx.
 //
 // Safe for concurrent access.
-func CalcStakeVoteSubsidy(height int64, params *chaincfg.Params) int64 {
+func CalcStakeVoteSubsidy(height int32, params *chaincfg.Params) int64 {
 	// Calculate the actual reward for this block, then further reduce reward
 	// proportional to StakeRewardProportion.
 	// Note that voters/potential voters is 1, so that vote reward is calculated
@@ -102,13 +102,13 @@ func CalcStakeVoteSubsidy(height int64, params *chaincfg.Params) int64 {
 // coinbase.
 //
 // Safe for concurrent access.
-func CalcBlockTaxSubsidy(height int64, voters uint16,
+func CalcBlockTaxSubsidy(height int32, voters uint16,
 	params *chaincfg.Params) int64 {
 	if params.BlockTaxProportion == 0 {
 		return 0
 	}
 
-	subsidy := calcBlockSubsidy(int64(height), params)
+	subsidy := calcBlockSubsidy(int32(height), params)
 	proportionTax := int64(params.BlockTaxProportion)
 	proportions := int64(params.TotalSubsidyProportions())
 	subsidy *= proportionTax
@@ -265,7 +265,7 @@ func CoinbasePaysTax(tx *dcrutil.Tx, height uint32, voters uint16,
 
 	// Get the amount of subsidy that should have been paid out to
 	// the organization, then check it.
-	orgSubsidy := CalcBlockTaxSubsidy(int64(height), voters, params)
+	orgSubsidy := CalcBlockTaxSubsidy(int32(height), voters, params)
 	amountFound := tx.MsgTx().TxOut[0].Value
 	if orgSubsidy != amountFound {
 		errStr := fmt.Sprintf("amount in output 0 has non matching org "+

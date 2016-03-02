@@ -57,7 +57,7 @@ type TicketData struct {
 	SStxHash    chainhash.Hash
 	Prefix      uint8 // Ticket hash prefix for pre-sort
 	SpendHash   chainhash.Hash
-	BlockHeight int64 // Block for where the original sstx was located
+	BlockHeight int32 // Block for where the original sstx was located
 	Missed      bool  // Whether or not the ticket was spent
 	Expired     bool  // Whether or not the ticket expired
 }
@@ -66,7 +66,7 @@ type TicketData struct {
 func NewTicketData(sstxHash chainhash.Hash,
 	prefix uint8,
 	spendHash chainhash.Hash,
-	blockHeight int64,
+	blockHeight int32,
 	missed bool,
 	expired bool) *TicketData {
 	return &TicketData{sstxHash,
@@ -176,7 +176,7 @@ type SStxMemMap map[chainhash.Hash]*TicketData
 // ticket in-memory database.
 type TicketMaps struct {
 	ticketMap        []SStxMemMap
-	spentTicketMap   map[int64]SStxMemMap
+	spentTicketMap   map[int32]SStxMemMap
 	missedTicketMap  SStxMemMap
 	revokedTicketMap SStxMemMap
 }
@@ -232,7 +232,7 @@ type TicketDB struct {
 	maps               TicketMaps
 	database           database.Db
 	chainParams        *chaincfg.Params
-	StakeEnabledHeight int64
+	StakeEnabledHeight int32
 }
 
 // Initialize allocates buckets for each ticket number in ticketMap and buckets
@@ -249,7 +249,7 @@ func (tmdb *TicketDB) Initialize(np *chaincfg.Params, db database.Db) {
 	tmdb.chainParams = np
 	tmdb.database = db
 	tmdb.maps.ticketMap = make([]SStxMemMap, BucketsSize, BucketsSize)
-	tmdb.maps.spentTicketMap = make(map[int64]SStxMemMap)
+	tmdb.maps.spentTicketMap = make(map[int32]SStxMemMap)
 	tmdb.maps.missedTicketMap = make(SStxMemMap)
 	tmdb.maps.revokedTicketMap = make(SStxMemMap)
 
@@ -266,7 +266,7 @@ func (tmdb *TicketDB) Initialize(np *chaincfg.Params, db database.Db) {
 // a lot of redundant calls, but I don't think they're expensive.
 //
 // This function MUST be called with the tmdb lock held (for writes).
-func (tmdb *TicketDB) maybeInsertBlock(height int64) {
+func (tmdb *TicketDB) maybeInsertBlock(height int32) {
 	// Check if the bucket exists for the given height.
 	if tmdb.maps.spentTicketMap[height] != nil {
 		return
@@ -281,7 +281,7 @@ func (tmdb *TicketDB) maybeInsertBlock(height int64) {
 // GetTopBlock.  See the comment for GetTopBlock for more details.
 //
 // This function MUST be called with the tmdb lock held (for writes).
-func (tmdb *TicketDB) getTopBlock() int64 {
+func (tmdb *TicketDB) getTopBlock() int32 {
 	// Discover the current height.
 	topHeight := tmdb.StakeEnabledHeight
 	for {
@@ -294,7 +294,7 @@ func (tmdb *TicketDB) getTopBlock() int64 {
 
 	// If we aren't yet at a stake mature blockchain.
 	if topHeight == (tmdb.StakeEnabledHeight - 1) {
-		return int64(-1)
+		return int32(-1)
 	}
 	return topHeight
 }
@@ -302,7 +302,7 @@ func (tmdb *TicketDB) getTopBlock() int64 {
 // GetTopBlock returns the top (current) block from a TicketDB.
 //
 // This function is safe for concurrent access.
-func (tmdb *TicketDB) GetTopBlock() int64 {
+func (tmdb *TicketDB) GetTopBlock() int32 {
 	tmdb.mtx.Lock()
 	defer tmdb.mtx.Unlock()
 
@@ -393,7 +393,7 @@ func (tmdb *TicketDB) LoadTicketDBs(tmsPath, tmsLoc string, np *chaincfg.Params,
 	}
 
 	if tmdb.maps.spentTicketMap == nil {
-		tmdb.maps.spentTicketMap = make(map[int64]SStxMemMap)
+		tmdb.maps.spentTicketMap = make(map[int32]SStxMemMap)
 	}
 
 	if tmdb.maps.missedTicketMap == nil {
@@ -483,7 +483,7 @@ func (tmdb *TicketDB) pushLiveTicket(ticket *TicketData) error {
 // pushSpentTicket pushes a used ticket into the spentTicketMap.
 //
 // This function MUST be called with the tmdb lock held (for writes).
-func (tmdb *TicketDB) pushSpentTicket(spendHeight int64, ticket *TicketData) error {
+func (tmdb *TicketDB) pushSpentTicket(spendHeight int32, ticket *TicketData) error {
 	// Make sure there's a bucket in the map for used tickets
 	tmdb.maybeInsertBlock(spendHeight)
 
@@ -576,7 +576,7 @@ func (tmdb *TicketDB) removeLiveTicket(ticket *TicketData) error {
 // removeSpentTicket removes spent tickets that were added to the spentTicketMap.
 //
 // This function MUST be called with the tmdb lock held (for writes).
-func (tmdb *TicketDB) removeSpentTicket(spendHeight int64, ticket *TicketData) error {
+func (tmdb *TicketDB) removeSpentTicket(spendHeight int32, ticket *TicketData) error {
 	// Make sure the height bucket exists; if it doesn't something has gone wrong
 	// with the initialization
 	if tmdb.maps.spentTicketMap[spendHeight] == nil {
@@ -657,7 +657,7 @@ func (tmdb *TicketDB) removeRevokedTicket(ticket *TicketData) error {
 // removeSpentHeight removes a height bucket from the SpentTicketMap.
 //
 // This function MUST be called with the tmdb lock held (for writes).
-func (tmdb *TicketDB) removeSpentHeight(height int64) error {
+func (tmdb *TicketDB) removeSpentHeight(height int32) error {
 	// Make sure the height exists
 	if tmdb.maps.spentTicketMap[height] == nil {
 		return fmt.Errorf("TicketDB err @ removeSpentHeight: height to "+
@@ -780,7 +780,7 @@ func (tmdb *TicketDB) DumpLiveTickets(bucket uint8) (SStxMemMap, error) {
 // spentTicketMap and returns them to the user.
 //
 // This function is safe for concurrent access.
-func (tmdb *TicketDB) DumpSpentTickets(height int64) (SStxMemMap, error) {
+func (tmdb *TicketDB) DumpSpentTickets(height int32) (SStxMemMap, error) {
 	tmdb.mtx.Lock()
 	defer tmdb.mtx.Unlock()
 
@@ -1109,9 +1109,9 @@ func (tmdb *TicketDB) spendTickets(parentBlock *dcrutil.Block,
 // tickets map.
 //
 // This function MUST be called with the tmdb lock held (for writes).
-func (tmdb *TicketDB) expireTickets(height int64) (SStxMemMap, error) {
-	toExpireHeight := height - int64(tmdb.chainParams.TicketExpiry)
-	if toExpireHeight < int64(tmdb.StakeEnabledHeight) {
+func (tmdb *TicketDB) expireTickets(height int32) (SStxMemMap, error) {
+	toExpireHeight := height - int32(tmdb.chainParams.TicketExpiry)
+	if toExpireHeight < int32(tmdb.StakeEnabledHeight) {
 		return nil, nil
 	}
 
@@ -1178,7 +1178,7 @@ func (tmdb *TicketDB) revokeTickets(
 // the missedTicketMap, then returns all these tickets in a map.
 //
 // This function MUST be called with the tmdb lock held (for writes).
-func (tmdb *TicketDB) unrevokeTickets(height int64) (SStxMemMap, error) {
+func (tmdb *TicketDB) unrevokeTickets(height int32) (SStxMemMap, error) {
 	// Get the block of interest.
 	var hash, errHash = tmdb.database.FetchBlockShaByHeight(height)
 	if errHash != nil {
@@ -1233,7 +1233,7 @@ func (tmdb *TicketDB) unrevokeTickets(height int64) (SStxMemMap, error) {
 // encountering and validating a fork.
 //
 // This function MUST be called with the tmdb lock held (for writes).
-func (tmdb *TicketDB) unspendTickets(height int64) (SStxMemMap, error) {
+func (tmdb *TicketDB) unspendTickets(height int32) (SStxMemMap, error) {
 	tempTickets := make(SStxMemMap)
 
 	for _, ticket := range tmdb.maps.spentTicketMap[height] {
@@ -1284,14 +1284,14 @@ func (tmdb *TicketDB) unspendTickets(height int64) (SStxMemMap, error) {
 // SIDE CHAIN evaluation should be instantiated in package:chain.
 //
 // This function MUST be called with the tmdb lock held (for reads).
-func (tmdb *TicketDB) getNewTicketsFromHeight(height int64) (SStxMemMap, error) {
+func (tmdb *TicketDB) getNewTicketsFromHeight(height int32) (SStxMemMap, error) {
 	if height < tmdb.StakeEnabledHeight {
 		errStr := fmt.Sprintf("Tried to generate tickets for immature blockchain"+
 			" at height %v", height)
 		return nil, errors.New(errStr)
 	}
 
-	matureHeight := height - int64(tmdb.chainParams.TicketMaturity)
+	matureHeight := height - int32(tmdb.chainParams.TicketMaturity)
 
 	var hash, errHash = tmdb.database.FetchBlockShaByHeight(matureHeight)
 	if errHash != nil {
@@ -1333,7 +1333,7 @@ func (tmdb *TicketDB) getNewTicketsFromHeight(height int64) (SStxMemMap, error) 
 // looking them up in the database.
 //
 // This function MUST be called with the tmdb lock held (for writes).
-func (tmdb *TicketDB) pushMatureTicketsAtHeight(height int64) (SStxMemMap, error) {
+func (tmdb *TicketDB) pushMatureTicketsAtHeight(height int32) (SStxMemMap, error) {
 	tempTickets := make(SStxMemMap)
 
 	tickets, err := tmdb.getNewTicketsFromHeight(height)
@@ -1480,7 +1480,7 @@ func (tmdb *TicketDB) InsertBlock(block *dcrutil.Block) (SStxMemMap,
 // looking them up in the database.
 //
 // Safe for concurrent access (does not use TicketDB maps directly).
-func (tmdb *TicketDB) unpushMatureTicketsAtHeight(height int64) (SStxMemMap,
+func (tmdb *TicketDB) unpushMatureTicketsAtHeight(height int32) (SStxMemMap,
 	error) {
 
 	tempTickets := make(SStxMemMap)
@@ -1507,8 +1507,8 @@ func (tmdb *TicketDB) unpushMatureTicketsAtHeight(height int64) (SStxMemMap,
 // height.
 //
 // This function is safe for concurrent access.
-func (tmdb *TicketDB) RemoveBlockToHeight(height int64) (map[int64]SStxMemMap,
-	map[int64]SStxMemMap, map[int64]SStxMemMap, error) {
+func (tmdb *TicketDB) RemoveBlockToHeight(height int32) (map[int32]SStxMemMap,
+	map[int32]SStxMemMap, map[int32]SStxMemMap, error) {
 
 	tmdb.mtx.Lock()
 	defer tmdb.mtx.Unlock()
@@ -1527,9 +1527,9 @@ func (tmdb *TicketDB) RemoveBlockToHeight(height int64) (map[int64]SStxMemMap,
 	}
 
 	// Create pseudo-DB maps of all the changes we're making
-	unmaturedTicketMap := make(map[int64]SStxMemMap)
-	unspentTicketMap := make(map[int64]SStxMemMap)
-	unrevokedTicketMap := make(map[int64]SStxMemMap)
+	unmaturedTicketMap := make(map[int32]SStxMemMap)
+	unspentTicketMap := make(map[int32]SStxMemMap)
+	unrevokedTicketMap := make(map[int32]SStxMemMap)
 
 	// Iterates down from the top block, removing all changes that were made to
 	// the stake db at that block, until it reaches the height specified.
@@ -1579,7 +1579,7 @@ func (tmdb *TicketDB) rescanTicketDB() error {
 
 	var freshTms TicketMaps
 	freshTms.ticketMap = make([]SStxMemMap, BucketsSize, BucketsSize)
-	freshTms.spentTicketMap = make(map[int64]SStxMemMap)
+	freshTms.spentTicketMap = make(map[int32]SStxMemMap)
 	freshTms.missedTicketMap = make(SStxMemMap)
 	freshTms.revokedTicketMap = make(SStxMemMap)
 
