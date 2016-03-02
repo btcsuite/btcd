@@ -925,6 +925,30 @@ func (mp *txMemPool) HaveTransaction(hash *chainhash.Hash) bool {
 	return mp.haveTransaction(hash)
 }
 
+// haveTransactions returns whether or not the passed transactions already exist
+// in the main pool or in the orphan pool.
+//
+// This function MUST be called with the mempool lock held (for reads).
+func (mp *txMemPool) haveTransactions(hashes []*chainhash.Hash) []bool {
+	have := make([]bool, len(hashes))
+	for i := range hashes {
+		have[i] = mp.haveTransaction(hashes[i])
+	}
+	return have
+}
+
+// HaveTransactions returns whether or not the passed transactions already exist
+// in the main pool or in the orphan pool.
+//
+// This function is safe for concurrent access.
+func (mp *txMemPool) HaveTransactions(hashes []*chainhash.Hash) []bool {
+	// Protect concurrent access.
+	mp.RLock()
+	defer mp.RUnlock()
+
+	return mp.haveTransactions(hashes)
+}
+
 // removeTransaction is the internal function which implements the public
 // RemoveTransaction.  See the comment for RemoveTransaction for more details.
 //

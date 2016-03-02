@@ -157,6 +157,7 @@ var rpcHandlersBeforeInit = map[string]commandHandler{
 	"existsaddress":         handleExistsAddress,
 	"existsliveticket":      handleExistsLiveTicket,
 	"existslivetickets":     handleExistsLiveTickets,
+	"existsmempooltxs":      handleExistsMempoolTxs,
 	"generate":              handleGenerate,
 	"getaddednodeinfo":      handleGetAddedNodeInfo,
 	"getbestblock":          handleGetBestBlock,
@@ -1515,16 +1516,18 @@ func handleExistsLiveTickets(s *rpcServer, cmd interface{},
 	txHashBlob, err := hex.DecodeString(c.TxHashBlob)
 	if err != nil {
 		return nil, &dcrjson.RPCError{
-			Code:    dcrjson.ErrRPCDecodeHexString,
-			Message: "bad transaction hash blob (unparseable)",
+			Code: dcrjson.ErrRPCDecodeHexString,
+			Message: fmt.Sprintf("bad ticket hash blob (unparseable): %v",
+				err.Error()),
 		}
 	}
 
 	// It needs to be an exact number of hashes.
 	if len(txHashBlob)%32 != 0 {
 		return nil, &dcrjson.RPCError{
-			Code:    dcrjson.ErrRPCDecodeHexString,
-			Message: "bad transaction hash blob (bad length)",
+			Code: dcrjson.ErrRPCDecodeHexString,
+			Message: fmt.Sprintf("bad ticket hash blob (bad length): %v",
+				len(txHashBlob)),
 		}
 	}
 
@@ -1533,6 +1536,13 @@ func handleExistsLiveTickets(s *rpcServer, cmd interface{},
 	for i := 0; i < hashesLen; i++ {
 		hashes[i], err = chainhash.NewHash(
 			txHashBlob[i*chainhash.HashSize : (i+1)*chainhash.HashSize])
+		if err != nil {
+			return nil, &dcrjson.RPCError{
+				Code: dcrjson.ErrRPCDecodeHexString,
+				Message: fmt.Sprintf("bad ticket hash: %v",
+					err.Error()),
+			}
+		}
 	}
 
 	exists, err := s.server.blockManager.ExistsLiveTickets(hashes)
@@ -1541,8 +1551,66 @@ func handleExistsLiveTickets(s *rpcServer, cmd interface{},
 	}
 	if len(exists) != hashesLen {
 		return nil, &dcrjson.RPCError{
-			Code:    dcrjson.ErrRPCDatabase,
-			Message: "output of ExistsLiveTickets wrong size",
+			Code: dcrjson.ErrRPCDatabase,
+			Message: fmt.Sprintf("output of ExistsLiveTickets wrong size "+
+				"(want %v, got %v)", hashesLen, len(exists)),
+		}
+	}
+
+	// Convert the slice of bools into a compacted set of bit flags.
+	set := bitset.NewBytes(hashesLen)
+	for i := range exists {
+		if exists[i] {
+			set.Set(i)
+		}
+	}
+
+	return hex.EncodeToString([]byte(set)), nil
+}
+
+// handleExistsMempoolTxs implements the existsmempooltxs command.
+func handleExistsMempoolTxs(s *rpcServer, cmd interface{},
+	closeChan <-chan struct{}) (interface{}, error) {
+	c := cmd.(*dcrjson.ExistsMempoolTxsCmd)
+
+	txHashBlob, err := hex.DecodeString(c.TxHashBlob)
+	if err != nil {
+		return nil, &dcrjson.RPCError{
+			Code: dcrjson.ErrRPCDecodeHexString,
+			Message: fmt.Sprintf("bad transaction hash blob (unparseable): %v",
+				err.Error()),
+		}
+	}
+
+	// It needs to be an exact number of hashes.
+	if len(txHashBlob)%32 != 0 {
+		return nil, &dcrjson.RPCError{
+			Code: dcrjson.ErrRPCDecodeHexString,
+			Message: fmt.Sprintf("bad transaction hash blob (bad length): %v",
+				len(txHashBlob)),
+		}
+	}
+
+	hashesLen := len(txHashBlob) / 32
+	hashes := make([]*chainhash.Hash, hashesLen)
+	for i := 0; i < hashesLen; i++ {
+		hashes[i], err = chainhash.NewHash(
+			txHashBlob[i*chainhash.HashSize : (i+1)*chainhash.HashSize])
+		if err != nil {
+			return nil, &dcrjson.RPCError{
+				Code: dcrjson.ErrRPCDecodeHexString,
+				Message: fmt.Sprintf("bad transaction hash: %v",
+					err.Error()),
+			}
+		}
+	}
+
+	exists := s.server.txMemPool.HaveTransactions(hashes)
+	if len(exists) != hashesLen {
+		return nil, &dcrjson.RPCError{
+			Code: dcrjson.ErrRPCDatabase,
+			Message: fmt.Sprintf("output of ExistsMempoolTxs wrong size "+
+				"(want %v, got %v)", hashesLen, len(exists)),
 		}
 	}
 
