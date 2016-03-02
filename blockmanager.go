@@ -1030,45 +1030,55 @@ func (b *blockManager) handleInvMsg(imsg *invMsg) {
 		}
 	}
 
-	// Request as much as possible at once.  Anything that won't fit into
-	// the request will be requested on the next inv message.
-	numRequested := 0
-	gdmsg := wire.NewMsgGetData()
-	requestQueue := imsg.peer.requestQueue
-	for len(requestQueue) != 0 {
-		iv := requestQueue[0]
-		requestQueue[0] = nil
-		requestQueue = requestQueue[1:]
+	// Request the required inventory.
+
+	// Avoid new allocations by reusing the requestQueue's slice to filter only
+	// the invvects we need to send.
+	requiredInvVects := imsg.peer.requestQueue[:0]
+
+	for _, iv := range imsg.peer.requestQueue {
 
 		switch iv.Type {
 		case wire.InvTypeBlock:
-			// Request the block if there is not already a pending
-			// request.
+			// Request block if there is not already a pending request.
 			if _, exists := b.requestedBlocks[iv.Hash]; !exists {
 				b.requestedBlocks[iv.Hash] = struct{}{}
 				imsg.peer.requestedBlocks[iv.Hash] = struct{}{}
-				gdmsg.AddInvVect(iv)
-				numRequested++
+
+				requiredInvVects = append(requiredInvVects, iv)
 			}
 
 		case wire.InvTypeTx:
-			// Request the transaction if there is not already a
-			// pending request.
+			// Request transaction if there is not already a pending request.
 			if _, exists := b.requestedTxns[iv.Hash]; !exists {
 				b.requestedTxns[iv.Hash] = struct{}{}
 				imsg.peer.requestedTxns[iv.Hash] = struct{}{}
-				gdmsg.AddInvVect(iv)
-				numRequested++
+
+				requiredInvVects = append(requiredInvVects, iv)
 			}
 		}
-
-		if numRequested >= wire.MaxInvPerMsg {
-			break
-		}
 	}
-	imsg.peer.requestQueue = requestQueue
-	if len(gdmsg.InvList) > 0 {
-		imsg.peer.QueueMessage(gdmsg, nil)
+
+	// The request queue is now empty so allow it to be garbage collected.
+	imsg.peer.requestQueue = nil
+
+	// msgCount is the number of getdata messages that will need to be sent in
+	// order to request all the inventory.
+	msgCount := (len(requiredInvVects)-1)/wire.MaxInvPerMsg + 1
+
+	// Slice the required inv vects into chunks no bigger than the maximum size
+	// allowed per getdata message and queue them for sending.
+	for i := 0; i < msgCount; i++ {
+		lo := i * wire.MaxInvPerMsg
+		hi := (i + 1) * wire.MaxInvPerMsg
+		if hi > len(requiredInvVects) {
+			hi = len(requiredInvVects)
+		}
+
+		msg := &wire.MsgGetData{
+			InvList: requiredInvVects[lo:hi],
+		}
+		imsg.peer.QueueMessage(msg, nil)
 	}
 }
 
