@@ -1954,14 +1954,10 @@ func (s *server) UpdatePeerHeights(latestBlkSha *wire.ShaHash, latestHeight int3
 	}
 }
 
-// rebroadcastHandler keeps track of user submitted inventories that we have
-// sent out but have not yet made it into a block. We periodically rebroadcast
-// them in case our peers restarted or otherwise lost track of them.
-func (s *server) rebroadcastHandler() {
-	// Wait 5 min before first tx rebroadcast.
-	timer := time.NewTimer(5 * time.Minute)
-	pendingInvs := make(map[wire.InvVect]interface{})
-
+// relayTransactionsHandler relays transactions sent on relayNtfnChan to other
+// peers and to the RPC infrastructure if necessary.  It must be run as a
+// goroutine.
+func (s *server) relayTransactionsHandler() {
 out:
 	for {
 		select {
@@ -1976,9 +1972,28 @@ out:
 
 				// Potentially notify any getblocktemplate long poll clients
 				// about stale block templates due to the new transaction.
-				s.rpcServer.gbtWorkState.NotifyMempoolTx(s.txMemPool.LastUpdated())
+				s.rpcServer.gbtWorkState.NotifyMempoolTx(
+					s.txMemPool.LastUpdated())
 			}
 
+		case <-s.quit:
+			break out
+		}
+	}
+	s.wg.Done()
+}
+
+// rebroadcastHandler keeps track of user submitted inventories that we have
+// sent out but have not yet made it into a block. We periodically rebroadcast
+// them in case our peers restarted or otherwise lost track of them.
+func (s *server) rebroadcastHandler() {
+	// Wait 5 min before first tx rebroadcast.
+	timer := time.NewTimer(5 * time.Minute)
+	pendingInvs := make(map[wire.InvVect]interface{})
+
+out:
+	for {
+		select {
 		case riv := <-s.modifyRebroadcastInv:
 			switch msg := riv.(type) {
 			// Incoming InvVects are added to our map of RPC txs.
@@ -2046,6 +2061,9 @@ func (s *server) Start() {
 	// managers.
 	s.wg.Add(1)
 	go s.peerHandler()
+
+	s.wg.Add(1)
+	go s.relayTransactionsHandler()
 
 	if s.nat != nil {
 		s.wg.Add(1)
