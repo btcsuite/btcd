@@ -183,7 +183,7 @@ type server struct {
 	addrIndexer          *addrIndexer
 	txMemPool            *txMemPool
 	cpuMiner             *CPUMiner
-	relayNtfnChan        chan *btcutil.Tx
+	relayTxChan          chan *btcutil.Tx
 	modifyRebroadcastInv chan interface{}
 	pendingPeers         chan *serverPeer
 	newPeers             chan *serverPeer
@@ -1954,6 +1954,38 @@ func (s *server) UpdatePeerHeights(latestBlkSha *wire.ShaHash, latestHeight int3
 	}
 }
 
+// relayTransactionsHandler relays transactions sent on relayTxChan to other
+// peers and to the RPC infrastructure if necessary.  It must be run as a
+// goroutine.
+func (s *server) relayTransactionsHandler() {
+
+	defer func() {
+		s.wg.Done()
+	}()
+
+	for {
+		select {
+		case tx := <-s.relayTxChan:
+			// Generate an inv and relay it.
+			inv := wire.NewInvVect(wire.InvTypeTx, tx.Sha())
+			s.RelayInventory(inv, tx)
+
+			if s.rpcServer != nil {
+				// Notify websocket clients about mempool transactions.
+				s.rpcServer.ntfnMgr.NotifyMempoolTx(tx, true)
+
+				// Potentially notify any getblocktemplate long poll clients
+				// about stale block templates due to the new transaction.
+				s.rpcServer.gbtWorkState.NotifyMempoolTx(
+					s.txMemPool.LastUpdated())
+			}
+
+		case <-s.quit:
+			return
+		}
+	}
+}
+
 // rebroadcastHandler keeps track of user submitted inventories that we have
 // sent out but have not yet made it into a block. We periodically rebroadcast
 // them in case our peers restarted or otherwise lost track of them.
@@ -1965,20 +1997,6 @@ func (s *server) rebroadcastHandler() {
 out:
 	for {
 		select {
-		case tx := <-s.relayNtfnChan:
-			// Generate an inv and relay it.
-			inv := wire.NewInvVect(wire.InvTypeTx, tx.Sha())
-			s.RelayInventory(inv, tx)
-
-			if s.rpcServer != nil {
-				// Notify websocket clients about mempool transactions.
-				s.rpcServer.ntfnMgr.NotifyMempoolTx(tx, true)
-
-				// Potentially notify any getblocktemplate long poll clients
-				// about stale block templates due to the new transaction.
-				s.rpcServer.gbtWorkState.NotifyMempoolTx(s.txMemPool.LastUpdated())
-			}
-
 		case riv := <-s.modifyRebroadcastInv:
 			switch msg := riv.(type) {
 			// Incoming InvVects are added to our map of RPC txs.
@@ -2046,6 +2064,9 @@ func (s *server) Start() {
 	// managers.
 	s.wg.Add(1)
 	go s.peerHandler()
+
+	s.wg.Add(1)
+	go s.relayTransactionsHandler()
 
 	if s.nat != nil {
 		s.wg.Add(1)
@@ -2402,7 +2423,7 @@ func newServer(listenAddrs []string, db database.Db, chainParams *chaincfg.Param
 		relayInv:             make(chan relayMsg, cfg.MaxPeers),
 		broadcast:            make(chan broadcastMsg, cfg.MaxPeers),
 		quit:                 make(chan struct{}),
-		relayNtfnChan:        make(chan *btcutil.Tx, cfg.MaxPeers),
+		relayTxChan:          make(chan *btcutil.Tx, cfg.MaxPeers),
 		modifyRebroadcastInv: make(chan interface{}),
 		peerHeightsUpdate:    make(chan updatePeerHeightsMsg),
 		nat:                  nat,
@@ -2425,7 +2446,7 @@ func newServer(listenAddrs []string, db database.Db, chainParams *chaincfg.Param
 		MaxOrphanTxs:          cfg.MaxOrphanTxs,
 		MinRelayTxFee:         cfg.minRelayTxFee,
 		NewestSha:             s.db.NewestSha,
-		RelayNtfnChan:         s.relayNtfnChan,
+		RelayTxChan:           s.relayTxChan,
 		SigCache:              s.sigCache,
 		TimeSource:            s.timeSource,
 	}

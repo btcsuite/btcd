@@ -80,9 +80,8 @@ type mempoolConfig struct {
 	// NewestSha defines the function to retrieve the newest sha
 	NewestSha func() (*wire.ShaHash, int32, error)
 
-	// RelayNtfnChan defines the channel to send newly accepted transactions
-	// to.  If unset or set to nil, notifications will not be sent.
-	RelayNtfnChan chan *btcutil.Tx
+	// RelayTxChan defines the channel to send newly accepted transactions to.
+	RelayTxChan chan *btcutil.Tx
 
 	// SigCache defines a signature cache to use.
 	SigCache *txscript.SigCache
@@ -932,8 +931,8 @@ func (mp *txMemPool) processOrphans(hash *wire.ShaHash) {
 			}
 
 			// Notify the caller of the new tx added to mempool.
-			if mp.cfg.RelayNtfnChan != nil {
-				mp.cfg.RelayNtfnChan <- tx
+			if mp.cfg.RelayTxChan != nil {
+				mp.cfg.RelayTxChan <- tx
 			}
 
 			// Add this transaction to the list of transactions to
@@ -988,8 +987,8 @@ func (mp *txMemPool) ProcessTransaction(tx *btcutil.Tx, allowOrphan, rateLimit b
 
 	if len(missingParents) == 0 {
 		// Notify the caller that the tx was added to the mempool.
-		if mp.cfg.RelayNtfnChan != nil {
-			mp.cfg.RelayNtfnChan <- tx
+		if mp.cfg.RelayTxChan != nil {
+			mp.cfg.RelayTxChan <- tx
 		}
 
 		// Accept any orphan transactions that depend on this
