@@ -95,7 +95,7 @@ const (
 
 	// maxSSGensDoubleSpends is the maximum number of SSGen double spends
 	// allowed in the pool.
-	maxSSGensDoubleSpends = 64
+	maxSSGensDoubleSpends = 5
 
 	// heightDiffToPruneTicket is the number of blocks to pass by in terms
 	// of height before old tickets are pruned.
