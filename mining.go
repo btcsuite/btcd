@@ -42,6 +42,7 @@ const (
 // which have not been mined into a block yet.
 type txPrioItem struct {
 	tx       *dcrutil.Tx
+	txType   stake.TxType
 	fee      int64
 	priority float64
 	feePerKB float64
@@ -1158,23 +1159,10 @@ mempoolLoop:
 			continue
 		}
 
-		// Fetch all of the transactions referenced by the inputs to
-		// this transaction.  NOTE: This intentionally does not fetch
-		// inputs from the mempool since a transaction which depends on
-		// other transactions in the mempool must come after those
-		// dependencies in the final generated block.
-		txStore, err := blockManager.FetchTransactionStore(tx, treeValid)
-		if err != nil {
-			minrLog.Warnf("Unable to fetch transaction store for "+
-				"tx %s: %v", tx.Sha(), err)
-			continue
-		}
-
 		// Need this for a check below for stake base input, and to check
 		// the ticket number.
-		isSSGen, _ := stake.IsSSGen(tx)
-
-		if isSSGen, _ := stake.IsSSGen(tx); isSSGen {
+		isSSGen := txDesc.Type == stake.TxTypeSSGen
+		if isSSGen {
 			blockHash, blockHeight, err := stake.GetSSGenBlockVotedOn(tx)
 			if err != nil { // Should theoretically never fail.
 				minrLog.Tracef("Skipping ssgen tx %s because of failure "+
@@ -1190,6 +1178,18 @@ mempoolLoop:
 			}
 		}
 
+		// Fetch all of the transactions referenced by the inputs to
+		// this transaction.  NOTE: This intentionally does not fetch
+		// inputs from the mempool since a transaction which depends on
+		// other transactions in the mempool must come after those
+		// dependencies in the final generated block.
+		txStore, err := blockManager.FetchTransactionStore(tx, treeValid)
+		if err != nil {
+			minrLog.Warnf("Unable to fetch transaction store for "+
+				"tx %s: %v", tx.Sha(), err)
+			continue
+		}
+
 		// Calculate the input value age sum for the transaction.  This
 		// is comprised of the sum all of input amounts multiplied by
 		// their respective age (number of confirmations since the
@@ -1197,7 +1197,7 @@ mempoolLoop:
 		// setup dependencies for any transactions which reference other
 		// transactions in the mempool so they can be properly ordered
 		// below.
-		prioItem := &txPrioItem{tx: txDesc.Tx}
+		prioItem := &txPrioItem{tx: txDesc.Tx, txType: txDesc.Type}
 		inputValueAge := float64(0.0)
 		for i, txIn := range tx.MsgTx().TxIn {
 			// Evaluate if this is a stakebase input or not. If it is, continue
@@ -1344,13 +1344,13 @@ mempoolLoop:
 		tx := prioItem.tx
 
 		// Store if this is an SStx or not.
-		isSStx, err := stake.IsSStx(tx)
+		isSStx := prioItem.txType == stake.TxTypeSStx
 
 		// Store if this is an SSGen or not.
-		isSSGen, err := stake.IsSSGen(tx)
+		isSSGen := prioItem.txType == stake.TxTypeSSGen
 
 		// Store if this is an SSRtx or not.
-		isSSRtx, err := stake.IsSSRtx(tx)
+		isSSRtx := prioItem.txType == stake.TxTypeSSRtx
 
 		// Grab the list of transactions which depend on this one (if
 		// any) and remove the entry for this transaction as it will
