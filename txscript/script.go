@@ -381,9 +381,9 @@ func calcSignatureHash(script []parsedOpcode, hashType SigHashType,
 	}
 
 	// The final hash (message to sign) is the hash of:
-	// 1) hash of the prefix ||
-	// 2) hash of the witness for signing ||
-	// 3) the hash type (encoded as a 4-byte little-endian value)
+	// 1) the hash type (encoded as a 4-byte little-endian value) ||
+	// 2) hash of the prefix ||
+	// 3) hash of the witness for signing
 	var wbuf bytes.Buffer
 	binary.Write(&wbuf, binary.LittleEndian, uint32(hashType))
 
