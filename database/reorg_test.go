@@ -39,7 +39,7 @@ func testReorganization(t *testing.T, dbType string) {
 
 	// Find where chain forks
 	var forkHash chainhash.Hash
-	var forkHeight int64
+	var forkHeight int32
 	for i, _ := range blocks {
 		if blocks[i].Sha().IsEqual(blocksReorg[i].Sha()) {
 			blkHash := blocks[i].Sha()
@@ -49,7 +49,7 @@ func testReorganization(t *testing.T, dbType string) {
 	}
 
 	// Insert all blocks from chain 1
-	for i := int64(0); i < int64(len(blocks)); i++ {
+	for i := int32(0); i < int32(len(blocks)); i++ {
 		blkHash := blocks[i].Sha()
 		if err != nil {
 			t.Fatalf("Error getting SHA for block %dA: %v", i-2, err)
@@ -68,7 +68,7 @@ func testReorganization(t *testing.T, dbType string) {
 	}
 
 	// Insert blocks from the other chain to simulate a reorg
-	for i := forkHeight + 1; i < int64(len(blocksReorg)); i++ {
+	for i := forkHeight + 1; i < intu32(len(blocksReorg)); i++ {
 		blkHash := blocksReorg[i].Sha()
 		if err != nil {
 			t.Fatalf("Error getting SHA for block %dA: %v", i-2, err)
@@ -84,7 +84,7 @@ func testReorganization(t *testing.T, dbType string) {
 		t.Fatalf("Error getting newest block info")
 	}
 
-	for i := int64(0); i <= maxHeight; i++ {
+	for i := int32(0); i <= maxHeight; i++ {
 		blkHash, err := db.FetchBlockShaByHeight(i)
 		if err != nil {
 			t.Fatalf("Error fetching SHA for block %d: %v", i, err)

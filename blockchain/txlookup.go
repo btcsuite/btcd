@@ -49,7 +49,7 @@ const ViewpointPrevInvalidRegular = int8(4)
 type TxData struct {
 	Tx          *dcrutil.Tx
 	Hash        *chainhash.Hash
-	BlockHeight int64
+	BlockHeight int32
 	BlockIndex  uint32
 	Spent       []bool
 	Err         error

@@ -31,7 +31,7 @@ var log = btclog.Disabled
 
 type tTxInsertData struct {
 	txsha   *chainhash.Hash
-	blockid int64
+	blockid int32
 	txoff   int
 	txlen   int
 	usedbuf []byte
@@ -49,14 +49,14 @@ type LevelDb struct {
 
 	lbatch *leveldb.Batch
 
-	nextBlock int64
+	nextBlock int32
 
 	lastBlkShaCached bool
 	lastBlkSha       chainhash.Hash
-	lastBlkIdx       int64
+	lastBlkIdx       int32
 
 	lastAddrIndexBlkSha chainhash.Hash
-	lastAddrIndexBlkIdx int64
+	lastAddrIndexBlkIdx int32
 
 	txUpdateMap      map[chainhash.Hash]*txUpdateObj
 	txSpentUpdateMap map[chainhash.Hash]*spentTxUpdate
@@ -100,9 +100,9 @@ func OpenDB(args ...interface{}) (database.Db, error) {
 	}
 
 	// Need to find last block and tx
-	var lastknownblock, nextunknownblock, testblock int64
+	var lastknownblock, nextunknownblock, testblock int32
 
-	increment := int64(100000)
+	increment := int32(100000)
 	ldb := db.(*LevelDb)
 
 	var lastSha *chainhash.Hash
@@ -380,7 +380,7 @@ func (db *LevelDb) DropAfterBlockBySha(sha *chainhash.Hash) (rerr error) {
 		}
 
 		db.lBatch().Delete(shaBlkToKey(blksha))
-		db.lBatch().Delete(int64ToKey(height))
+		db.lBatch().Delete(int64ToKey(int64(height)))
 	}
 
 	// update the last block cache
@@ -396,7 +396,7 @@ func (db *LevelDb) DropAfterBlockBySha(sha *chainhash.Hash) (rerr error) {
 // database.  The first block inserted into the database will be treated as the
 // genesis block.  Every subsequent block insert requires the referenced parent
 // block to already exist.
-func (db *LevelDb) InsertBlock(block *dcrutil.Block) (height int64, rerr error) {
+func (db *LevelDb) InsertBlock(block *dcrutil.Block) (height int32, rerr error) {
 	// Be careful with this function on syncs.  It contains decred changes.
 
 	// Obtain the previous block first so long as it's not the genesis block

@@ -2455,7 +2455,7 @@ func opcodeCheckMultiSig(op *parsedOpcode, vm *Engine) error {
 
 	numPubKeys := int(numKeys.Int32())
 	if numPubKeys < 0 || numPubKeys > MaxPubKeysPerMultiSig {
-		return ErrStackTooManyPubkeys
+		return ErrStackTooManyPubKeys
 	}
 	vm.numOps += numPubKeys
 	if vm.numOps > MaxOpsPerScript {

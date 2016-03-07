@@ -195,7 +195,7 @@ func loadTxStore(filename string) (blockchain.TxStore, error) {
 		if err != nil {
 			return nil, err
 		}
-		txD.BlockHeight = int64(uintBuf)
+		txD.BlockHeight = int32(uintBuf)
 
 		// Num spent bits.
 		err = binary.Read(r, binary.LittleEndian, &uintBuf)

@@ -233,6 +233,15 @@ func NewGetTransactionCmd(txHash string, includeWatchOnly *bool) *GetTransaction
 	}
 }
 
+// GetWalletInfoCmd defines the getwalletinfo JSON-RPC command.
+type GetWalletInfoCmd struct{}
+
+// NewGetWalletInfoCmd returns a new instance which can be used to issue a
+// getwalletinfo JSON-RPC command.
+func NewGetWalletInfoCmd() *GetWalletInfoCmd {
+	return &GetWalletInfoCmd{}
+}
+
 // ImportPrivKeyCmd defines the importprivkey JSON-RPC command.
 type ImportPrivKeyCmd struct {
 	PrivKey string
@@ -647,6 +656,7 @@ func init() {
 	MustRegisterCmd("getreceivedbyaddress", (*GetReceivedByAddressCmd)(nil), flags)
 	MustRegisterCmd("gettransaction", (*GetTransactionCmd)(nil), flags)
 	MustRegisterCmd("getwalletfee", (*GetWalletFeeCmd)(nil), flags)
+	MustRegisterCmd("getwalletinfo", (*GetWalletInfoCmd)(nil), flags)
 	MustRegisterCmd("importprivkey", (*ImportPrivKeyCmd)(nil), flags)
 	MustRegisterCmd("keypoolrefill", (*KeyPoolRefillCmd)(nil), flags)
 	MustRegisterCmd("listaccounts", (*ListAccountsCmd)(nil), flags)

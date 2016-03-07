@@ -48,8 +48,8 @@ type addrIndexer struct {
 	shutdown        int32
 	state           indexState
 	progressLogger  *blockProgressLogger
-	currentIndexTip int64
-	chainTip        int64
+	currentIndexTip int32
+	chainTip        int32
 	sync.Mutex
 }
 

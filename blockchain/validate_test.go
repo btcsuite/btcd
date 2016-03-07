@@ -91,7 +91,7 @@ func TestBlockValidationRules(t *testing.T) {
 
 	// Create decoder from the buffer and a map to store the data
 	bcDecoder := gob.NewDecoder(bcBuf)
-	blockChain := make(map[int64][]byte)
+	blockChain := make(map[int32][]byte)
 
 	// Decode the blockchain into the map
 	if err := bcDecoder.Decode(&blockChain); err != nil {
@@ -100,7 +100,7 @@ func TestBlockValidationRules(t *testing.T) {
 
 	// Insert blocks 1 to 142 and perform various test. Block 1 has
 	// special properties, so make sure those validate correctly first.
-	block1Bytes := blockChain[int64(1)]
+	block1Bytes := blockChain[int32(1)]
 	timeSource := blockchain.NewMedianTime()
 
 	// ----------------------------------------------------------------------------
@@ -118,7 +118,7 @@ func TestBlockValidationRules(t *testing.T) {
 
 	recalculateMsgBlockMerkleRootsSize(noCoinbaseOuts1)
 	b1test := dcrutil.NewBlock(noCoinbaseOuts1)
-	b1test.SetHeight(int64(1))
+	b1test.SetHeight(int32(1))
 
 	err = blockchain.CheckWorklessBlockSanity(b1test, timeSource, simNetParams)
 	if err != nil {
@@ -141,7 +141,7 @@ func TestBlockValidationRules(t *testing.T) {
 
 	recalculateMsgBlockMerkleRootsSize(noCoinbaseOuts1)
 	b1test = dcrutil.NewBlock(noCoinbaseOuts1)
-	b1test.SetHeight(int64(1))
+	b1test.SetHeight(int32(1))
 
 	err = blockchain.CheckWorklessBlockSanity(b1test, timeSource, simNetParams)
 	if err != nil {
@@ -164,7 +164,7 @@ func TestBlockValidationRules(t *testing.T) {
 
 	recalculateMsgBlockMerkleRootsSize(noCoinbaseOuts1)
 	b1test = dcrutil.NewBlock(noCoinbaseOuts1)
-	b1test.SetHeight(int64(1))
+	b1test.SetHeight(int32(1))
 
 	err = blockchain.CheckWorklessBlockSanity(b1test, timeSource, simNetParams)
 	if err != nil {
@@ -182,11 +182,11 @@ func TestBlockValidationRules(t *testing.T) {
 	// Add the rest of the blocks up to the stake early test block.
 	stakeEarlyTest := 142
 	for i := 1; i < stakeEarlyTest; i++ {
-		bl, err := dcrutil.NewBlockFromBytes(blockChain[int64(i)])
+		bl, err := dcrutil.NewBlockFromBytes(blockChain[int32(i)])
 		if err != nil {
 			t.Errorf("NewBlockFromBytes error: %v", err.Error())
 		}
-		bl.SetHeight(int64(i))
+		bl.SetHeight(int32(i))
 
 		_, _, err = chain.ProcessBlock(bl, timeSource, blockchain.BFNone)
 		if err != nil {
@@ -197,7 +197,7 @@ func TestBlockValidationRules(t *testing.T) {
 	// ----------------------------------------------------------------------------
 	// ErrInvalidEarlyStakeTx
 	// There are multiple paths to this error, but here we try an early SSGen.
-	block142Bytes := blockChain[int64(stakeEarlyTest)]
+	block142Bytes := blockChain[int32(stakeEarlyTest)]
 	earlySSGen142 := new(wire.MsgBlock)
 	earlySSGen142.FromBytes(block142Bytes)
 
@@ -217,7 +217,7 @@ func TestBlockValidationRules(t *testing.T) {
 	earlySSGen142.AddSTransaction(mtxFromB)
 	recalculateMsgBlockMerkleRootsSize(earlySSGen142)
 	b142test := dcrutil.NewBlock(earlySSGen142)
-	b142test.SetHeight(int64(stakeEarlyTest))
+	b142test.SetHeight(int32(stakeEarlyTest))
 
 	err = blockchain.CheckWorklessBlockSanity(b142test, timeSource, simNetParams)
 	if err == nil {
@@ -238,7 +238,7 @@ func TestBlockValidationRules(t *testing.T) {
 	earlyBadVoteBits42.FromBytes(block142Bytes)
 	earlyBadVoteBits42.Header.VoteBits ^= 0x80
 	b142test = dcrutil.NewBlock(earlyBadVoteBits42)
-	b142test.SetHeight(int64(stakeEarlyTest))
+	b142test.SetHeight(int32(stakeEarlyTest))
 
 	err = blockchain.CheckWorklessBlockSanity(b142test, timeSource, simNetParams)
 	if err == nil || err.(blockchain.RuleError).GetCode() !=
@@ -259,11 +259,11 @@ func TestBlockValidationRules(t *testing.T) {
 	testsIdx2 := 154
 	testsIdx3 := 166
 	for i := stakeEarlyTest; i < testsIdx1; i++ {
-		bl, err := dcrutil.NewBlockFromBytes(blockChain[int64(i)])
+		bl, err := dcrutil.NewBlockFromBytes(blockChain[int32(i)])
 		if err != nil {
 			t.Errorf("NewBlockFromBytes error: %v", err.Error())
 		}
-		bl.SetHeight(int64(i))
+		bl.SetHeight(int32(i))
 
 		_, _, err = chain.ProcessBlock(bl, timeSource, blockchain.BFNone)
 		if err != nil {
@@ -272,16 +272,16 @@ func TestBlockValidationRules(t *testing.T) {
 	}
 
 	// Make sure the last block validates.
-	block153, err := dcrutil.NewBlockFromBytes(blockChain[int64(testsIdx1)])
+	block153, err := dcrutil.NewBlockFromBytes(blockChain[int32(testsIdx1)])
 	if err != nil {
 		t.Errorf("NewBlockFromBytes error: %v", err.Error())
 	}
-	block153.SetHeight(int64(testsIdx1))
+	block153.SetHeight(int32(testsIdx1))
 	err = chain.CheckConnectBlock(block153)
 	if err != nil {
 		t.Errorf("CheckConnectBlock error: %v", err.Error())
 	}
-	block153Bytes := blockChain[int64(testsIdx1)]
+	block153Bytes := blockChain[int32(testsIdx1)]
 
 	// ----------------------------------------------------------------------------
 	// ErrBadMerkleRoot 1
@@ -290,7 +290,7 @@ func TestBlockValidationRules(t *testing.T) {
 	badMerkleRoot153.FromBytes(block153Bytes)
 	badMerkleRoot153.Header.MerkleRoot[0] ^= 0x01
 	b153test := dcrutil.NewBlock(badMerkleRoot153)
-	b153test.SetHeight(int64(testsIdx1))
+	b153test.SetHeight(int32(testsIdx1))
 
 	err = blockchain.CheckWorklessBlockSanity(b153test, timeSource, simNetParams)
 	if err == nil || err.(blockchain.RuleError).GetCode() !=
@@ -313,7 +313,7 @@ func TestBlockValidationRules(t *testing.T) {
 	badMerkleRoot153.FromBytes(block153Bytes)
 	badMerkleRoot153.Header.StakeRoot[0] ^= 0x01
 	b153test = dcrutil.NewBlock(badMerkleRoot153)
-	b153test.SetHeight(int64(testsIdx1))
+	b153test.SetHeight(int32(testsIdx1))
 
 	err = blockchain.CheckWorklessBlockSanity(b153test, timeSource, simNetParams)
 	if err == nil || err.(blockchain.RuleError).GetCode() !=
@@ -335,7 +335,7 @@ func TestBlockValidationRules(t *testing.T) {
 	badDifficulty153.FromBytes(block153Bytes)
 	badDifficulty153.Header.Bits = 0x207ffffe
 	b153test = dcrutil.NewBlock(badDifficulty153)
-	b153test.SetHeight(int64(testsIdx1))
+	b153test.SetHeight(int32(testsIdx1))
 
 	_, _, err = chain.ProcessBlock(b153test, timeSource, blockchain.BFNone)
 	if err == nil || err.(blockchain.RuleError).GetCode() !=
@@ -350,7 +350,7 @@ func TestBlockValidationRules(t *testing.T) {
 	badBlockSize153.FromBytes(block153Bytes)
 	badBlockSize153.Header.Size = 0x20ffff71
 	b153test = dcrutil.NewBlock(badBlockSize153)
-	b153test.SetHeight(int64(testsIdx1))
+	b153test.SetHeight(int32(testsIdx1))
 
 	_, _, err = chain.ProcessBlock(b153test, timeSource, blockchain.BFNoPoWCheck)
 	if err == nil || err.(blockchain.RuleError).GetCode() !=
@@ -365,7 +365,7 @@ func TestBlockValidationRules(t *testing.T) {
 	badHash153.FromBytes(block153Bytes)
 	badHash153.Header.Size = 0x20ffff70
 	b153test = dcrutil.NewBlock(badHash153)
-	b153test.SetHeight(int64(testsIdx1))
+	b153test.SetHeight(int32(testsIdx1))
 
 	_, _, err = chain.ProcessBlock(b153test, timeSource, blockchain.BFNone)
 	if err == nil || err.(blockchain.RuleError).GetCode() !=
@@ -380,7 +380,7 @@ func TestBlockValidationRules(t *testing.T) {
 	missingParent153.FromBytes(block153Bytes)
 	missingParent153.Header.PrevBlock[8] ^= 0x01
 	b153test = dcrutil.NewBlock(missingParent153)
-	b153test.SetHeight(int64(testsIdx1))
+	b153test.SetHeight(int32(testsIdx1))
 
 	err = blockchain.CheckWorklessBlockSanity(b153test, timeSource, simNetParams)
 	if err != nil {
@@ -401,7 +401,7 @@ func TestBlockValidationRules(t *testing.T) {
 	badSubsidy153.Transactions[0].TxOut[2].Value++
 	recalculateMsgBlockMerkleRootsSize(badSubsidy153)
 	b153test = dcrutil.NewBlock(badSubsidy153)
-	b153test.SetHeight(int64(testsIdx1))
+	b153test.SetHeight(int32(testsIdx1))
 
 	err = blockchain.CheckWorklessBlockSanity(b153test, timeSource, simNetParams)
 	if err != nil {
@@ -424,7 +424,7 @@ func TestBlockValidationRules(t *testing.T) {
 	badCBOutpoint153.Transactions[0].TxIn[0].PreviousOutPoint.Hash[0] ^= 0x01
 	recalculateMsgBlockMerkleRootsSize(badCBOutpoint153)
 	b153test = dcrutil.NewBlock(badCBOutpoint153)
-	b153test.SetHeight(int64(testsIdx1))
+	b153test.SetHeight(int32(testsIdx1))
 
 	err = blockchain.CheckWorklessBlockSanity(b153test, timeSource, simNetParams)
 	if err == nil || err.(blockchain.RuleError).GetCode() !=
@@ -445,7 +445,7 @@ func TestBlockValidationRules(t *testing.T) {
 	badCBFraudProof153.Transactions[0].TxIn[0].BlockHeight = 0x12345678
 	recalculateMsgBlockMerkleRootsSize(badCBFraudProof153)
 	b153test = dcrutil.NewBlock(badCBFraudProof153)
-	b153test.SetHeight(int64(testsIdx1))
+	b153test.SetHeight(int32(testsIdx1))
 
 	err = blockchain.CheckWorklessBlockSanity(b153test, timeSource, simNetParams)
 	if err == nil || err.(blockchain.RuleError).GetCode() !=
@@ -467,7 +467,7 @@ func TestBlockValidationRules(t *testing.T) {
 	badCBAmountIn153.Transactions[0].TxIn[0].ValueIn = 0x1234567890123456
 	recalculateMsgBlockMerkleRootsSize(badCBAmountIn153)
 	b153test = dcrutil.NewBlock(badCBAmountIn153)
-	b153test.SetHeight(int64(testsIdx1))
+	b153test.SetHeight(int32(testsIdx1))
 
 	err = blockchain.CheckWorklessBlockSanity(b153test, timeSource, simNetParams)
 	if err != nil {
@@ -489,7 +489,7 @@ func TestBlockValidationRules(t *testing.T) {
 	badSBAmountIn153.STransactions[0].TxIn[0].ValueIn = 0x1234567890123456
 	recalculateMsgBlockMerkleRootsSize(badSBAmountIn153)
 	b153test = dcrutil.NewBlock(badSBAmountIn153)
-	b153test.SetHeight(int64(testsIdx1))
+	b153test.SetHeight(int32(testsIdx1))
 
 	err = blockchain.CheckWorklessBlockSanity(b153test, timeSource, simNetParams)
 	if err != nil {
@@ -516,7 +516,7 @@ func TestBlockValidationRules(t *testing.T) {
 	recalculateMsgBlockMerkleRootsSize(badStakebaseOutpoint153)
 	badStakebaseOutpoint153.Header.Voters--
 	b153test = dcrutil.NewBlock(badStakebaseOutpoint153)
-	b153test.SetHeight(int64(testsIdx1))
+	b153test.SetHeight(int32(testsIdx1))
 
 	err = blockchain.CheckWorklessBlockSanity(b153test, timeSource, simNetParams)
 	if err == nil || err.(blockchain.RuleError).GetCode() !=
@@ -542,7 +542,7 @@ func TestBlockValidationRules(t *testing.T) {
 
 	recalculateMsgBlockMerkleRootsSize(ssgenInRegular153)
 	b153test = dcrutil.NewBlock(ssgenInRegular153)
-	b153test.SetHeight(int64(testsIdx1))
+	b153test.SetHeight(int32(testsIdx1))
 
 	err = blockchain.CheckWorklessBlockSanity(b153test, timeSource, simNetParams)
 	if err == nil || err.(blockchain.RuleError).GetCode() !=
@@ -566,7 +566,7 @@ func TestBlockValidationRules(t *testing.T) {
 		badStakebaseSS
 	recalculateMsgBlockMerkleRootsSize(badStakebaseSS153)
 	b153test = dcrutil.NewBlock(badStakebaseSS153)
-	b153test.SetHeight(int64(testsIdx1))
+	b153test.SetHeight(int32(testsIdx1))
 
 	err = blockchain.CheckWorklessBlockSanity(b153test, timeSource, simNetParams)
 	if err == nil || err.(blockchain.RuleError).GetCode() !=
@@ -589,7 +589,7 @@ func TestBlockValidationRules(t *testing.T) {
 	badStakebaseScr153.STransactions[0].TxIn[0].SignatureScript[0] ^= 0x01
 	recalculateMsgBlockMerkleRootsSize(badStakebaseScr153)
 	b153test = dcrutil.NewBlock(badStakebaseScr153)
-	b153test.SetHeight(int64(testsIdx1))
+	b153test.SetHeight(int32(testsIdx1))
 
 	err = blockchain.CheckWorklessBlockSanity(b153test, timeSource, simNetParams)
 	if err == nil || err.(blockchain.RuleError).GetCode() !=
@@ -612,7 +612,7 @@ func TestBlockValidationRules(t *testing.T) {
 	badSSRtxNum153.Header.Revocations = 2
 
 	b153test = dcrutil.NewBlock(badSSRtxNum153)
-	b153test.SetHeight(int64(testsIdx1))
+	b153test.SetHeight(int32(testsIdx1))
 
 	err = blockchain.CheckWorklessBlockSanity(b153test, timeSource, simNetParams)
 	if err != nil {
@@ -639,7 +639,7 @@ func TestBlockValidationRules(t *testing.T) {
 
 	recalculateMsgBlockMerkleRootsSize(ssrtxPayeesMismatch153)
 	b153test = dcrutil.NewBlock(ssrtxPayeesMismatch153)
-	b153test.SetHeight(int64(testsIdx1))
+	b153test.SetHeight(int32(testsIdx1))
 
 	err = blockchain.CheckWorklessBlockSanity(b153test, timeSource, simNetParams)
 	if err != nil {
@@ -664,7 +664,7 @@ func TestBlockValidationRules(t *testing.T) {
 
 	recalculateMsgBlockMerkleRootsSize(badSSRtxPayee153)
 	b153test = dcrutil.NewBlock(badSSRtxPayee153)
-	b153test.SetHeight(int64(testsIdx1))
+	b153test.SetHeight(int32(testsIdx1))
 
 	err = blockchain.CheckWorklessBlockSanity(b153test, timeSource, simNetParams)
 	if err != nil {
@@ -691,7 +691,7 @@ func TestBlockValidationRules(t *testing.T) {
 
 	recalculateMsgBlockMerkleRootsSize(badSSRtxPayee153)
 	b153test = dcrutil.NewBlock(badSSRtxPayee153)
-	b153test.SetHeight(int64(testsIdx1))
+	b153test.SetHeight(int32(testsIdx1))
 
 	err = blockchain.CheckWorklessBlockSanity(b153test, timeSource, simNetParams)
 	if err != nil {
@@ -726,7 +726,7 @@ func TestBlockValidationRules(t *testing.T) {
 
 	recalculateMsgBlockMerkleRootsSize(badSSRtx153)
 	b153test = dcrutil.NewBlock(badSSRtx153)
-	b153test.SetHeight(int64(testsIdx1))
+	b153test.SetHeight(int32(testsIdx1))
 
 	err = blockchain.CheckWorklessBlockSanity(b153test, timeSource, simNetParams)
 	if err != nil {
@@ -747,16 +747,16 @@ func TestBlockValidationRules(t *testing.T) {
 	block153MsgBlock := new(wire.MsgBlock)
 	block153MsgBlock.FromBytes(block153Bytes)
 	b153test = dcrutil.NewBlock(block153MsgBlock)
-	b153test.SetHeight(int64(testsIdx1))
+	b153test.SetHeight(int32(testsIdx1))
 	_, _, err = chain.ProcessBlock(b153test, timeSource, blockchain.BFNone)
 	if err != nil {
 		t.Errorf("Got unexpected error processing block 153 %v", err)
 	}
-	block154Bytes := blockChain[int64(testsIdx2)]
+	block154Bytes := blockChain[int32(testsIdx2)]
 	block154MsgBlock := new(wire.MsgBlock)
 	block154MsgBlock.FromBytes(block154Bytes)
 	b154test := dcrutil.NewBlock(block154MsgBlock)
-	b154test.SetHeight(int64(testsIdx2))
+	b154test.SetHeight(int32(testsIdx2))
 
 	// The incoming block should pass fine.
 	err = blockchain.CheckWorklessBlockSanity(b154test, timeSource, simNetParams)
@@ -777,7 +777,7 @@ func TestBlockValidationRules(t *testing.T) {
 	notEnoughStake154.AddSTransaction(mtxFromB)
 	recalculateMsgBlockMerkleRootsSize(notEnoughStake154)
 	b154test = dcrutil.NewBlock(notEnoughStake154)
-	b154test.SetHeight(int64(testsIdx2))
+	b154test.SetHeight(int32(testsIdx2))
 
 	// This fails both checks.
 	err = blockchain.CheckWorklessBlockSanity(b154test, timeSource, simNetParams)
@@ -800,7 +800,7 @@ func TestBlockValidationRules(t *testing.T) {
 	badFreshStake154.Header.FreshStake++
 	recalculateMsgBlockMerkleRootsSize(badFreshStake154)
 	b154test = dcrutil.NewBlock(badFreshStake154)
-	b154test.SetHeight(int64(testsIdx2))
+	b154test.SetHeight(int32(testsIdx2))
 
 	// This passes.
 	err = blockchain.CheckWorklessBlockSanity(b154test, timeSource, simNetParams)
@@ -829,7 +829,7 @@ func TestBlockValidationRules(t *testing.T) {
 	notEnoughVotes154.STransactions = notEnoughVotes154.STransactions[0:2]
 	recalculateMsgBlockMerkleRootsSize(notEnoughVotes154)
 	b154test = dcrutil.NewBlock(notEnoughVotes154)
-	b154test.SetHeight(int64(testsIdx2))
+	b154test.SetHeight(int32(testsIdx2))
 
 	err = blockchain.CheckWorklessBlockSanity(b154test, timeSource, simNetParams)
 	if err != nil {
@@ -868,7 +868,7 @@ func TestBlockValidationRules(t *testing.T) {
 
 	recalculateMsgBlockMerkleRootsSize(tooManyVotes154)
 	b154test = dcrutil.NewBlock(tooManyVotes154)
-	b154test.SetHeight(int64(testsIdx2))
+	b154test.SetHeight(int32(testsIdx2))
 
 	// Fails tax amount test.
 	err = blockchain.CheckWorklessBlockSanity(b154test, timeSource, simNetParams)
@@ -892,7 +892,7 @@ func TestBlockValidationRules(t *testing.T) {
 
 	recalculateMsgBlockMerkleRootsSize(nonChosenTicket154)
 	b154test = dcrutil.NewBlock(nonChosenTicket154)
-	b154test.SetHeight(int64(testsIdx2))
+	b154test.SetHeight(int32(testsIdx2))
 
 	err = blockchain.CheckWorklessBlockSanity(b154test, timeSource, simNetParams)
 	if err != nil {
@@ -919,7 +919,7 @@ func TestBlockValidationRules(t *testing.T) {
 
 	recalculateMsgBlockMerkleRootsSize(wrongBlockVote154)
 	b154test = dcrutil.NewBlock(wrongBlockVote154)
-	b154test.SetHeight(int64(testsIdx2))
+	b154test.SetHeight(int32(testsIdx2))
 
 	err = blockchain.CheckWorklessBlockSanity(b154test, timeSource, simNetParams)
 	if err != nil {
@@ -945,7 +945,7 @@ func TestBlockValidationRules(t *testing.T) {
 		sstxsIn154...)
 	recalculateMsgBlockMerkleRootsSize(votesMismatch154)
 	b154test = dcrutil.NewBlock(votesMismatch154)
-	b154test.SetHeight(int64(testsIdx2))
+	b154test.SetHeight(int32(testsIdx2))
 
 	err = blockchain.CheckWorklessBlockSanity(b154test, timeSource, simNetParams)
 	if err != nil {
@@ -968,7 +968,7 @@ func TestBlockValidationRules(t *testing.T) {
 	badVoteBit154.FromBytes(block154Bytes)
 	badVoteBit154.Header.VoteBits &= 0xFFFE // Zero critical voteBit
 	b154test = dcrutil.NewBlock(badVoteBit154)
-	b154test.SetHeight(int64(testsIdx2))
+	b154test.SetHeight(int32(testsIdx2))
 
 	err = blockchain.CheckWorklessBlockSanity(b154test, timeSource, simNetParams)
 	if err != nil {
@@ -998,7 +998,7 @@ func TestBlockValidationRules(t *testing.T) {
 	}
 	recalculateMsgBlockMerkleRootsSize(badVoteBit154)
 	b154test = dcrutil.NewBlock(badVoteBit154)
-	b154test.SetHeight(int64(testsIdx2))
+	b154test.SetHeight(int32(testsIdx2))
 
 	err = blockchain.CheckWorklessBlockSanity(b154test, timeSource, simNetParams)
 	if err != nil {
@@ -1028,7 +1028,7 @@ func TestBlockValidationRules(t *testing.T) {
 	}
 	recalculateMsgBlockMerkleRootsSize(badVoteBit154)
 	b154test = dcrutil.NewBlock(badVoteBit154)
-	b154test.SetHeight(int64(testsIdx2))
+	b154test.SetHeight(int32(testsIdx2))
 
 	err = blockchain.CheckWorklessBlockSanity(b154test, timeSource, simNetParams)
 	if err != nil {
@@ -1058,7 +1058,7 @@ func TestBlockValidationRules(t *testing.T) {
 	}
 	recalculateMsgBlockMerkleRootsSize(badVoteBit154)
 	b154test = dcrutil.NewBlock(badVoteBit154)
-	b154test.SetHeight(int64(testsIdx2))
+	b154test.SetHeight(int32(testsIdx2))
 
 	err = blockchain.CheckWorklessBlockSanity(b154test, timeSource, simNetParams)
 	if err != nil {
@@ -1093,7 +1093,7 @@ func TestBlockValidationRules(t *testing.T) {
 	}
 	recalculateMsgBlockMerkleRootsSize(badVoteBit154)
 	b154test = dcrutil.NewBlock(badVoteBit154)
-	b154test.SetHeight(int64(testsIdx2))
+	b154test.SetHeight(int32(testsIdx2))
 
 	err = blockchain.CheckWorklessBlockSanity(b154test, timeSource, simNetParams)
 	if err != nil {
@@ -1128,7 +1128,7 @@ func TestBlockValidationRules(t *testing.T) {
 	}
 	recalculateMsgBlockMerkleRootsSize(badVoteBit154)
 	b154test = dcrutil.NewBlock(badVoteBit154)
-	b154test.SetHeight(int64(testsIdx2))
+	b154test.SetHeight(int32(testsIdx2))
 
 	err = blockchain.CheckWorklessBlockSanity(b154test, timeSource, simNetParams)
 	if err != nil {
@@ -1163,7 +1163,7 @@ func TestBlockValidationRules(t *testing.T) {
 	}
 	recalculateMsgBlockMerkleRootsSize(badVoteBit154)
 	b154test = dcrutil.NewBlock(badVoteBit154)
-	b154test.SetHeight(int64(testsIdx2))
+	b154test.SetHeight(int32(testsIdx2))
 
 	err = blockchain.CheckWorklessBlockSanity(b154test, timeSource, simNetParams)
 	if err != nil {
@@ -1190,7 +1190,7 @@ func TestBlockValidationRules(t *testing.T) {
 
 	recalculateMsgBlockMerkleRootsSize(badSStxCommit154)
 	b154test = dcrutil.NewBlock(badSStxCommit154)
-	b154test.SetHeight(int64(testsIdx2))
+	b154test.SetHeight(int32(testsIdx2))
 
 	err = blockchain.CheckWorklessBlockSanity(b154test, timeSource, simNetParams)
 	if err != nil {
@@ -1224,7 +1224,7 @@ func TestBlockValidationRules(t *testing.T) {
 
 	recalculateMsgBlockMerkleRootsSize(badSSGenPayee154)
 	b154test = dcrutil.NewBlock(badSSGenPayee154)
-	b154test.SetHeight(int64(testsIdx2))
+	b154test.SetHeight(int32(testsIdx2))
 
 	err = blockchain.CheckWorklessBlockSanity(b154test, timeSource, simNetParams)
 	if err != nil {
@@ -1249,7 +1249,7 @@ func TestBlockValidationRules(t *testing.T) {
 
 	recalculateMsgBlockMerkleRootsSize(badSSGenPayee154)
 	b154test = dcrutil.NewBlock(badSSGenPayee154)
-	b154test.SetHeight(int64(testsIdx2))
+	b154test.SetHeight(int32(testsIdx2))
 
 	err = blockchain.CheckWorklessBlockSanity(b154test, timeSource, simNetParams)
 	if err != nil {
@@ -1311,7 +1311,7 @@ func TestBlockValidationRules(t *testing.T) {
 	spendTaggedIn154.Transactions[11] = mtxFromB
 	recalculateMsgBlockMerkleRootsSize(spendTaggedIn154)
 	b154test = dcrutil.NewBlock(spendTaggedIn154)
-	b154test.SetHeight(int64(testsIdx2))
+	b154test.SetHeight(int32(testsIdx2))
 
 	err = blockchain.CheckWorklessBlockSanity(b154test, timeSource, simNetParams)
 	if err != nil {
@@ -1340,7 +1340,7 @@ func TestBlockValidationRules(t *testing.T) {
 	spendTaggedOut154.Transactions[11] = mtxFromB
 	recalculateMsgBlockMerkleRootsSize(spendTaggedOut154)
 	b154test = dcrutil.NewBlock(spendTaggedOut154)
-	b154test.SetHeight(int64(testsIdx2))
+	b154test.SetHeight(int32(testsIdx2))
 
 	err = blockchain.CheckWorklessBlockSanity(b154test, timeSource, simNetParams)
 	if err != nil {
@@ -1362,7 +1362,7 @@ func TestBlockValidationRules(t *testing.T) {
 	badFinalState154.FromBytes(block154Bytes)
 	badFinalState154.Header.FinalState[0] ^= 0x01
 	b154test = dcrutil.NewBlock(badFinalState154)
-	b154test.SetHeight(int64(testsIdx2))
+	b154test.SetHeight(int32(testsIdx2))
 
 	err = blockchain.CheckWorklessBlockSanity(b154test, timeSource, simNetParams)
 	if err != nil {
@@ -1384,7 +1384,7 @@ func TestBlockValidationRules(t *testing.T) {
 	badPoolSize154.FromBytes(block154Bytes)
 	badPoolSize154.Header.PoolSize++
 	b154test = dcrutil.NewBlock(badPoolSize154)
-	b154test.SetHeight(int64(testsIdx2))
+	b154test.SetHeight(int32(testsIdx2))
 
 	err = blockchain.CheckWorklessBlockSanity(b154test, timeSource, simNetParams)
 	if err != nil {
@@ -1416,7 +1416,7 @@ func TestBlockValidationRules(t *testing.T) {
 	errTxTreeIn154.Transactions[11] = mtxFromB
 	recalculateMsgBlockMerkleRootsSize(errTxTreeIn154)
 	b154test = dcrutil.NewBlock(errTxTreeIn154)
-	b154test.SetHeight(int64(testsIdx2))
+	b154test.SetHeight(int32(testsIdx2))
 
 	err = blockchain.CheckWorklessBlockSanity(b154test, timeSource, simNetParams)
 	if err != nil {
@@ -1444,7 +1444,7 @@ func TestBlockValidationRules(t *testing.T) {
 	badBlockHeight154.FromBytes(block154Bytes)
 	badBlockHeight154.Header.Height++
 	b154test = dcrutil.NewBlock(badBlockHeight154)
-	b154test.SetHeight(int64(testsIdx2))
+	b154test.SetHeight(int32(testsIdx2))
 
 	// Throws ProcessBlock error through checkBlockContext.
 	_, _, err = chain.ProcessBlock(b154test, timeSource, blockchain.BFNoPoWCheck)
@@ -1463,7 +1463,7 @@ func TestBlockValidationRules(t *testing.T) {
 
 	recalculateMsgBlockMerkleRootsSize(taxMissing154)
 	b154test = dcrutil.NewBlock(taxMissing154)
-	b154test.SetHeight(int64(testsIdx2))
+	b154test.SetHeight(int32(testsIdx2))
 
 	err = blockchain.CheckWorklessBlockSanity(b154test, timeSource, simNetParams)
 	if err == nil || err.(blockchain.RuleError).GetCode() !=
@@ -1485,7 +1485,7 @@ func TestBlockValidationRules(t *testing.T) {
 
 	recalculateMsgBlockMerkleRootsSize(taxMissing154)
 	b154test = dcrutil.NewBlock(taxMissing154)
-	b154test.SetHeight(int64(testsIdx2))
+	b154test.SetHeight(int32(testsIdx2))
 
 	err = blockchain.CheckWorklessBlockSanity(b154test, timeSource, simNetParams)
 	if err == nil || err.(blockchain.RuleError).GetCode() !=
@@ -1507,7 +1507,7 @@ func TestBlockValidationRules(t *testing.T) {
 
 	recalculateMsgBlockMerkleRootsSize(taxMissing154)
 	b154test = dcrutil.NewBlock(taxMissing154)
-	b154test.SetHeight(int64(testsIdx2))
+	b154test.SetHeight(int32(testsIdx2))
 
 	err = blockchain.CheckWorklessBlockSanity(b154test, timeSource, simNetParams)
 	if err == nil || err.(blockchain.RuleError).GetCode() !=
@@ -1532,7 +1532,7 @@ func TestBlockValidationRules(t *testing.T) {
 	expiredTx154.AddTransaction(mtxFromB)
 	recalculateMsgBlockMerkleRootsSize(expiredTx154)
 	b154test = dcrutil.NewBlock(expiredTx154)
-	b154test.SetHeight(int64(testsIdx2))
+	b154test.SetHeight(int32(testsIdx2))
 
 	err = blockchain.CheckWorklessBlockSanity(b154test, timeSource, simNetParams)
 	if err != nil {
@@ -1559,7 +1559,7 @@ func TestBlockValidationRules(t *testing.T) {
 	badValueIn154.Transactions[11] = mtxFromB
 	recalculateMsgBlockMerkleRootsSize(badValueIn154)
 	b154test = dcrutil.NewBlock(badValueIn154)
-	b154test.SetHeight(int64(testsIdx2))
+	b154test.SetHeight(int32(testsIdx2))
 
 	err = blockchain.CheckWorklessBlockSanity(b154test, timeSource, simNetParams)
 	if err != nil {
@@ -1586,7 +1586,7 @@ func TestBlockValidationRules(t *testing.T) {
 	badHeightProof154.Transactions[11] = mtxFromB
 	recalculateMsgBlockMerkleRootsSize(badHeightProof154)
 	b154test = dcrutil.NewBlock(badHeightProof154)
-	b154test.SetHeight(int64(testsIdx2))
+	b154test.SetHeight(int32(testsIdx2))
 
 	err = blockchain.CheckWorklessBlockSanity(b154test, timeSource, simNetParams)
 	if err != nil {
@@ -1613,7 +1613,7 @@ func TestBlockValidationRules(t *testing.T) {
 	badIndexProof154.Transactions[11] = mtxFromB
 	recalculateMsgBlockMerkleRootsSize(badIndexProof154)
 	b154test = dcrutil.NewBlock(badIndexProof154)
-	b154test.SetHeight(int64(testsIdx2))
+	b154test.SetHeight(int32(testsIdx2))
 
 	err = blockchain.CheckWorklessBlockSanity(b154test, timeSource, simNetParams)
 	if err != nil {
@@ -1640,7 +1640,7 @@ func TestBlockValidationRules(t *testing.T) {
 	badScrVal154.Transactions[11] = mtxFromB
 	recalculateMsgBlockMerkleRootsSize(badScrVal154)
 	b154test = dcrutil.NewBlock(badScrVal154)
-	b154test.SetHeight(int64(testsIdx2))
+	b154test.SetHeight(int32(testsIdx2))
 
 	err = blockchain.CheckWorklessBlockSanity(b154test, timeSource, simNetParams)
 	if err != nil {
@@ -1663,7 +1663,7 @@ func TestBlockValidationRules(t *testing.T) {
 	badScrValS154.STransactions[5].TxIn[0].SignatureScript[6] ^= 0x01
 	recalculateMsgBlockMerkleRootsSize(badScrValS154)
 	b154test = dcrutil.NewBlock(badScrValS154)
-	b154test.SetHeight(int64(testsIdx2))
+	b154test.SetHeight(int32(testsIdx2))
 
 	err = blockchain.CheckWorklessBlockSanity(b154test, timeSource, simNetParams)
 	if err != nil {
@@ -1693,7 +1693,7 @@ func TestBlockValidationRules(t *testing.T) {
 
 	recalculateMsgBlockMerkleRootsSize(invalMissingInsS154)
 	b154test = dcrutil.NewBlock(invalMissingInsS154)
-	b154test.SetHeight(int64(testsIdx2))
+	b154test.SetHeight(int32(testsIdx2))
 
 	err = blockchain.CheckWorklessBlockSanity(b154test, timeSource, simNetParams)
 	if err != nil {
@@ -1720,7 +1720,7 @@ func TestBlockValidationRules(t *testing.T) {
 	malformedScr154.Transactions[11] = mtxFromB
 	recalculateMsgBlockMerkleRootsSize(malformedScr154)
 	b154test = dcrutil.NewBlock(malformedScr154)
-	b154test.SetHeight(int64(testsIdx2))
+	b154test.SetHeight(int32(testsIdx2))
 
 	err = blockchain.CheckWorklessBlockSanity(b154test, timeSource, simNetParams)
 	if err != nil {
@@ -1759,7 +1759,7 @@ func TestBlockValidationRules(t *testing.T) {
 
 	recalculateMsgBlockMerkleRootsSize(spendZeroValueIn154)
 	b154test = dcrutil.NewBlock(spendZeroValueIn154)
-	b154test.SetHeight(int64(testsIdx2))
+	b154test.SetHeight(int32(testsIdx2))
 
 	err = blockchain.CheckWorklessBlockSanity(b154test, timeSource, simNetParams)
 	if err != nil {
@@ -1781,11 +1781,11 @@ func TestBlockValidationRules(t *testing.T) {
 	// Load up to block 166. 165 invalidates its previous tx tree, making
 	// it good for testing.
 	for i := testsIdx2; i < testsIdx3; i++ {
-		bl, err := dcrutil.NewBlockFromBytes(blockChain[int64(i)])
+		bl, err := dcrutil.NewBlockFromBytes(blockChain[int32(i)])
 		if err != nil {
 			t.Errorf("NewBlockFromBytes error: %v", err.Error())
 		}
-		bl.SetHeight(int64(i))
+		bl.SetHeight(int32(i))
 
 		// Double check and ensure there's no cross tree spending in
 		// block 164.
@@ -1809,7 +1809,7 @@ func TestBlockValidationRules(t *testing.T) {
 			t.Errorf("ProcessBlock error: %v", err.Error())
 		}
 	}
-	block166Bytes := blockChain[int64(testsIdx3)]
+	block166Bytes := blockChain[int32(testsIdx3)]
 
 	// ----------------------------------------------------------------------------
 	// Attempt to spend from TxTreeRegular of block 164, which should never
@@ -1826,7 +1826,7 @@ func TestBlockValidationRules(t *testing.T) {
 
 	recalculateMsgBlockMerkleRootsSize(spendInvalid166)
 	b166test := dcrutil.NewBlock(spendInvalid166)
-	b166test.SetHeight(int64(testsIdx3))
+	b166test.SetHeight(int32(testsIdx3))
 
 	err = blockchain.CheckWorklessBlockSanity(b166test, timeSource, simNetParams)
 	if err != nil {
@@ -1874,7 +1874,7 @@ func TestBlockValidationRules(t *testing.T) {
 
 	recalculateMsgBlockMerkleRootsSize(sstxSpendInvalid166)
 	b166test = dcrutil.NewBlock(sstxSpendInvalid166)
-	b166test.SetHeight(int64(testsIdx3))
+	b166test.SetHeight(int32(testsIdx3))
 
 	err = blockchain.CheckWorklessBlockSanity(b166test, timeSource, simNetParams)
 	if err != nil {
@@ -1917,7 +1917,7 @@ func TestBlockValidationRules(t *testing.T) {
 
 	recalculateMsgBlockMerkleRootsSize(sstxSpend2Invalid166)
 	b166test = dcrutil.NewBlock(sstxSpend2Invalid166)
-	b166test.SetHeight(int64(testsIdx3))
+	b166test.SetHeight(int32(testsIdx3))
 
 	err = blockchain.CheckWorklessBlockSanity(b166test, timeSource, simNetParams)
 	if err != nil {
@@ -1950,7 +1950,7 @@ func TestBlockValidationRules(t *testing.T) {
 
 	recalculateMsgBlockMerkleRootsSize(sstxSpend3Invalid166)
 	b166test = dcrutil.NewBlock(sstxSpend3Invalid166)
-	b166test.SetHeight(int64(testsIdx3))
+	b166test.SetHeight(int32(testsIdx3))
 
 	err = blockchain.CheckWorklessBlockSanity(b166test, timeSource, simNetParams)
 	if err != nil {
@@ -1976,7 +1976,7 @@ func TestBlockValidationRules(t *testing.T) {
 
 	recalculateMsgBlockMerkleRootsSize(regTxSpendStakeIn166)
 	b166test = dcrutil.NewBlock(regTxSpendStakeIn166)
-	b166test.SetHeight(int64(testsIdx3))
+	b166test.SetHeight(int32(testsIdx3))
 
 	err = blockchain.CheckWorklessBlockSanity(b166test, timeSource, simNetParams)
 	if err != nil {

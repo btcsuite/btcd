@@ -545,10 +545,10 @@ type KeyDB interface {
 }
 
 // KeyClosure implements ScriptDB with a closure
-type KeyClosure func(dcrutil.Address) (chainec.PrivateKey, bool, error)
+type KeyClosure func(dcrutil.Address) (*chainec.PrivateKey, bool, error)
 
 // GetKey implements KeyDB by returning the result of calling the closure
-func (kc KeyClosure) GetKey(address dcrutil.Address) (chainec.PrivateKey,
+func (kc KeyClosure) GetKey(address dcrutil.Address) (*chainec.PrivateKey,
 	bool, error) {
 	return kc(address)
 }

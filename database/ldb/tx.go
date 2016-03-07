@@ -50,7 +50,7 @@ var addrIndexVersionKey = []byte("addrindexversion")
 
 type txUpdateObj struct {
 	txSha     *chainhash.Hash
-	blkHeight int64
+	blkHeight int32
 	blkIndex  uint32
 	txoff     int
 	txlen     int
@@ -60,7 +60,7 @@ type txUpdateObj struct {
 }
 
 type spentTx struct {
-	blkHeight int64
+	blkHeight int32
 	blkIndex  uint32
 	txoff     int
 	txlen     int
@@ -73,7 +73,7 @@ type spentTxUpdate struct {
 }
 
 // InsertTx inserts a tx hash and its associated data into the database.
-func (db *LevelDb) InsertTx(txsha *chainhash.Hash, height int64, idx uint32, txoff int, txlen int, spentbuf []byte) (err error) {
+func (db *LevelDb) InsertTx(txsha *chainhash.Hash, height int32, idx uint32, txoff int, txlen int, spentbuf []byte) (err error) {
 	db.dbLock.Lock()
 	defer db.dbLock.Unlock()
 
@@ -82,7 +82,7 @@ func (db *LevelDb) InsertTx(txsha *chainhash.Hash, height int64, idx uint32, txo
 
 // insertTx inserts a tx hash and its associated data into the database.
 // Must be called with db lock held.
-func (db *LevelDb) insertTx(txSha *chainhash.Hash, height int64, idx uint32, txoff int, txlen int, spentbuf []byte) (err error) {
+func (db *LevelDb) insertTx(txSha *chainhash.Hash, height int32, idx uint32, txoff int, txlen int, spentbuf []byte) (err error) {
 	var txU txUpdateObj
 
 	txU.txSha = txSha
@@ -115,7 +115,7 @@ func (db *LevelDb) formatTx(txu *txUpdateObj) []byte {
 	return txW[:]
 }
 
-func (db *LevelDb) getTxData(txsha *chainhash.Hash) (int64, uint32, int, int, []byte, error) {
+func (db *LevelDb) getTxData(txsha *chainhash.Hash) (int32, uint32, int, int, []byte, error) {
 	key := shaTxToKey(txsha)
 	buf, err := db.lDb.Get(key, db.ro)
 	if err != nil {
@@ -130,7 +130,7 @@ func (db *LevelDb) getTxData(txsha *chainhash.Hash) (int64, uint32, int, int, []
 	spentBuf := make([]byte, len(buf)-20)
 	copy(spentBuf, buf[20:])
 
-	return int64(blkHeight), blkIndex, int(txOff), int(txLen), spentBuf, nil
+	return int32(blkHeight), blkIndex, int(txOff), int(txLen), spentBuf, nil
 }
 
 func (db *LevelDb) getTxFullySpent(txsha *chainhash.Hash) ([]*spentTx, error) {
@@ -157,7 +157,7 @@ func (db *LevelDb) getTxFullySpent(txsha *chainhash.Hash) ([]*spentTx, error) {
 		numTxO := binary.LittleEndian.Uint32(buf[offset+20 : offset+24])
 
 		sTx := spentTx{
-			blkHeight: int64(blkHeight),
+			blkHeight: int32(blkHeight),
 			blkIndex:  blkIndex,
 			txoff:     int(txOff),
 			txlen:     int(txLen),
@@ -278,8 +278,8 @@ func (db *LevelDb) FetchUnSpentTxByShaList(txShaList []*chainhash.Hash) []*datab
 }
 
 // fetchTxDataBySha returns several pieces of data regarding the given sha.
-func (db *LevelDb) fetchTxDataBySha(txsha *chainhash.Hash) (rtx *wire.MsgTx, rblksha *chainhash.Hash, rheight int64, ridx uint32, rtxspent []byte, err error) {
-	var blkHeight int64
+func (db *LevelDb) fetchTxDataBySha(txsha *chainhash.Hash) (rtx *wire.MsgTx, rblksha *chainhash.Hash, rheight int32, ridx uint32, rtxspent []byte, err error) {
+	var blkHeight int32
 	var blkIndex uint32
 	var txspent []byte
 	var txOff, txLen int
@@ -298,7 +298,7 @@ func (db *LevelDb) fetchTxDataBySha(txsha *chainhash.Hash) (rtx *wire.MsgTx, rbl
 
 // fetchTxDataByLoc returns several pieces of data regarding the given tx
 // located by the block/offset/size location
-func (db *LevelDb) fetchTxDataByLoc(blkHeight int64, txOff int, txLen int, txspent []byte) (rtx *wire.MsgTx, rblksha *chainhash.Hash, rheight int64, rtxspent []byte, err error) {
+func (db *LevelDb) fetchTxDataByLoc(blkHeight int32, txOff int, txLen int, txspent []byte) (rtx *wire.MsgTx, rblksha *chainhash.Hash, rheight int32, rtxspent []byte, err error) {
 	var blksha *chainhash.Hash
 	var blkbuf []byte
 
@@ -547,7 +547,7 @@ func (db *LevelDb) FetchTxsForAddr(addr dcrutil.Address, skip int,
 // overhead when storing and retrieving since the entire list must
 // be fetched each time.
 func (db *LevelDb) UpdateAddrIndexForBlock(blkSha *chainhash.Hash,
-	blkHeight int64, addrIndexes database.BlockAddrIndex) error {
+	blkHeight int32, addrIndexes database.BlockAddrIndex) error {
 	db.dbLock.Lock()
 	defer db.dbLock.Unlock()
 

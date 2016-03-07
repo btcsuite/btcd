@@ -43,10 +43,6 @@ const (
 	// server.
 	supportedServices = wire.SFNodeNetwork
 
-	// connectionRetryInterval is the amount of time to wait in between
-	// retries when connecting to persistent peers.
-	connectionRetryInterval = time.Second * 10
-
 	// defaultMaxOutbound is the default number of max outbound peers.
 	defaultMaxOutbound = 8
 )
@@ -312,7 +308,9 @@ func (s *server) handleDonePeerMsg(state *peerState, p *peer) {
 			// Issue an asynchronous reconnect if the peer was a
 			// persistent outbound connection.
 			if !p.inbound && p.persistent && atomic.LoadInt32(&s.shutdown) == 0 {
+				delete(list, e)
 				e = newOutboundPeer(s, p.addr, true, p.retryCount+1)
+				list[e] = struct{}{}
 				return
 			}
 			if !p.inbound {

@@ -28,7 +28,7 @@ type testContext struct {
 	t           *testing.T
 	dbType      string
 	db          database.Db
-	blockHeight int64
+	blockHeight int32
 	blockHash   *chainhash.Hash
 	block       *dcrutil.Block
 	useSpends   bool
@@ -215,7 +215,7 @@ func testFetchBlockShaByHeight(tc *testContext) bool {
 
 func testFetchBlockShaByHeightErrors(tc *testContext) bool {
 	// Invalid heights must error and return a nil hash.
-	tests := []int64{-1, tc.blockHeight + 1, tc.blockHeight + 2}
+	tests := []int32{-1, tc.blockHeight + 1, tc.blockHeight + 2}
 	for i, wantHeight := range tests {
 		hashFromDb, err := tc.db.FetchBlockShaByHeight(wantHeight)
 		if err == nil {
@@ -964,7 +964,7 @@ func testInterface(t *testing.T, dbType string) {
 	context := testContext{t: t, dbType: dbType, db: db}
 
 	t.Logf("Loaded %d blocks for testing %s", len(blocks), dbType)
-	for height := int64(0); height < int64(len(blocks)); height++ {
+	for height := int32(0); height < int32(len(blocks)); height++ {
 		// Get the appropriate block and hash and update the test
 		// context accordingly.
 		block := blocks[height]
@@ -1000,7 +1000,7 @@ func testInterface(t *testing.T, dbType string) {
 	// Run the data integrity tests again after all blocks have been
 	// inserted to ensure the spend tracking  is working properly.
 	context.useSpends = true
-	for height := int64(0); height < int64(len(blocks)); height++ {
+	for height := int32(0); height < int32(len(blocks)); height++ {
 		// Get the appropriate block and hash and update the
 		// test context accordingly.
 		block := blocks[height]
@@ -1032,14 +1032,14 @@ func testInterface(t *testing.T, dbType string) {
 	   - DropAfterBlockBySha(*wire.ShaHash) (err error)
 	   x ExistsSha(sha *wire.ShaHash) (exists bool)
 	   x FetchBlockBySha(sha *wire.ShaHash) (blk *dcrutil.Block, err error)
-	   x FetchBlockShaByHeight(height int64) (sha *wire.ShaHash, err error)
+	   x FetchBlockShaByHeight(height int32) (sha *wire.ShaHash, err error)
 	   - FetchHeightRange(startHeight, endHeight int64) (rshalist []wire.ShaHash, err error)
 	   x ExistsTxSha(sha *wire.ShaHash) (exists bool)
 	   x FetchTxBySha(txsha *wire.ShaHash) ([]*TxListReply, error)
 	   x FetchTxByShaList(txShaList []*wire.ShaHash) []*TxListReply
 	   x FetchUnSpentTxByShaList(txShaList []*wire.ShaHash) []*TxListReply
-	   x InsertBlock(block *dcrutil.Block) (height int64, err error)
-	   x NewestSha() (sha *wire.ShaHash, height int64, err error)
+	   x InsertBlock(block *dcrutil.Block) (height int32, err error)
+	   x NewestSha() (sha *wire.ShaHash, height int32, err error)
 	   - RollbackClose()
 	   - Sync()
 	*/

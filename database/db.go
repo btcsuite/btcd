@@ -33,7 +33,7 @@ var (
 
 // AllShas is a special value that can be used as the final sha when requesting
 // a range of shas by height to request them all.
-const AllShas = int64(^uint64(0) >> 1)
+const AllShas = int32(^uint32(0) >> 1)
 
 // Db defines a generic interface that is used to request and insert data into
 // the decred block chain.  This interface is intended to be agnostic to actual
@@ -58,7 +58,7 @@ type Db interface {
 	FetchBlockBySha(sha *chainhash.Hash) (blk *dcrutil.Block, err error)
 
 	// FetchBlockHeightBySha returns the block height for the given hash.
-	FetchBlockHeightBySha(sha *chainhash.Hash) (height int64, err error)
+	FetchBlockHeightBySha(sha *chainhash.Hash) (height int32, err error)
 
 	// FetchBlockHeaderBySha returns a wire.BlockHeader for the given
 	// sha.  The implementation may cache the underlying data if desired.
@@ -66,13 +66,13 @@ type Db interface {
 
 	// FetchBlockShaByHeight returns a block hash based on its height in the
 	// block chain.
-	FetchBlockShaByHeight(height int64) (sha *chainhash.Hash, err error)
+	FetchBlockShaByHeight(height int32) (sha *chainhash.Hash, err error)
 
 	// FetchHeightRange looks up a range of blocks by the start and ending
 	// heights.  Fetch is inclusive of the start height and exclusive of the
 	// ending height. To fetch all hashes from the start height until no
 	// more are present, use the special id `AllShas'.
-	FetchHeightRange(startHeight, endHeight int64) (rshalist []chainhash.Hash, err error)
+	FetchHeightRange(startHeight, endHeight int32) (rshalist []chainhash.Hash, err error)
 
 	// ExistsTxSha returns whether or not the given tx hash is present in
 	// the database
@@ -108,19 +108,19 @@ type Db interface {
 	// into the database.  The first block inserted into the database
 	// will be treated as the genesis block.  Every subsequent block insert
 	// requires the referenced parent block to already exist.
-	InsertBlock(block *dcrutil.Block) (height int64, err error)
+	InsertBlock(block *dcrutil.Block) (height int32, err error)
 
 	// NewestSha returns the hash and block height of the most recent (end)
 	// block of the block chain.  It will return the zero hash, -1 for
 	// the block height, and no error (nil) if there are not any blocks in
 	// the database yet.
-	NewestSha() (sha *chainhash.Hash, height int64, err error)
+	NewestSha() (sha *chainhash.Hash, height int32, err error)
 
 	// FetchAddrIndexTip returns the hash and block height of the most recent
 	// block which has had its address index populated. It will return
 	// ErrAddrIndexDoesNotExist along with a zero hash, and -1 if the
 	// addrindex hasn't yet been built up.
-	FetchAddrIndexTip() (sha *chainhash.Hash, height int64, err error)
+	FetchAddrIndexTip() (sha *chainhash.Hash, height int32, err error)
 
 	// UpdateAddrIndexForBlock updates the stored addrindex with passed
 	// index information for a particular block height. Additionally, it
@@ -129,12 +129,12 @@ type Db interface {
 	// transaction which is commited before the function returns.
 	// Addresses are indexed by the raw bytes of their base58 decoded
 	// hash160.
-	UpdateAddrIndexForBlock(blkSha *chainhash.Hash, height int64,
+	UpdateAddrIndexForBlock(blkSha *chainhash.Hash, height int32,
 		addrIndex BlockAddrIndex) error
 
 	// DropAddrIndexForBlock removes all passed address indexes and sets
 	// the current block index below the previous HEAD.
-	DropAddrIndexForBlock(blkSha *chainhash.Hash, height int64,
+	DropAddrIndexForBlock(blkSha *chainhash.Hash, height int32,
 		addrIndex BlockAddrIndex) error
 
 	// FetchTxsForAddr looks up and returns all transactions which either
@@ -173,7 +173,7 @@ type TxListReply struct {
 	Sha     *chainhash.Hash
 	Tx      *wire.MsgTx
 	BlkSha  *chainhash.Hash
-	Height  int64
+	Height  int32
 	Index   uint32
 	TxSpent []bool
 	Err     error

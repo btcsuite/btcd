@@ -30,11 +30,11 @@ var (
 
 	// ErrStackOpDisabled is returned when a disabled opcode is encountered
 	// in the script.
-	ErrStackOpDisabled = errors.New("Disabled Opcode")
+	ErrStackOpDisabled = errors.New("disabled opcode")
 
 	// ErrStackVerifyFailed is returned when one of the OP_VERIFY or
 	// OP_*VERIFY instructions is executed and the conditions fails.
-	ErrStackVerifyFailed = errors.New("Verify failed")
+	ErrStackVerifyFailed = errors.New("verify failed")
 
 	// ErrStackNumberTooBig is returned when the argument for an opcode that
 	// should be an offset is obviously far too large.
@@ -42,15 +42,15 @@ var (
 
 	// ErrStackInvalidOpcode is returned when an opcode marked as invalid or
 	// a completely undefined opcode is encountered.
-	ErrStackInvalidOpcode = errors.New("Invalid Opcode")
+	ErrStackInvalidOpcode = errors.New("invalid opcode")
 
 	// ErrStackReservedOpcode is returned when an opcode marked as reserved
 	// is encountered.
-	ErrStackReservedOpcode = errors.New("Reserved Opcode")
+	ErrStackReservedOpcode = errors.New("reserved opcode")
 
 	// ErrStackEarlyReturn is returned when OP_RETURN is executed in the
 	// script.
-	ErrStackEarlyReturn = errors.New("Script returned early")
+	ErrStackEarlyReturn = errors.New("script returned early")
 
 	// ErrStackNoIf is returned if an OP_ELSE or OP_ENDIF is encountered
 	// without first having an OP_IF or OP_NOTIF in the script.
@@ -60,17 +60,17 @@ var (
 	// without and OP_ENDIF to correspond to a conditional expression.
 	ErrStackMissingEndif = fmt.Errorf("execute fail, in conditional execution")
 
-	// ErrStackTooManyPubkeys is returned if an OP_CHECKMULTISIG is
+	// ErrStackTooManyPubKeys is returned if an OP_CHECKMULTISIG is
 	// encountered with more than MaxPubKeysPerMultiSig pubkeys present.
-	ErrStackTooManyPubkeys = errors.New("Invalid pubkey count in OP_CHECKMULTISIG")
+	ErrStackTooManyPubKeys = errors.New("invalid pubkey count in OP_CHECKMULTISIG")
 
 	// ErrStackTooManyOperations is returned if a script has more than
 	// MaxOpsPerScript opcodes that do not push data.
-	ErrStackTooManyOperations = errors.New("Too many operations in script")
+	ErrStackTooManyOperations = errors.New("too many operations in script")
 
 	// ErrStackElementTooBig is returned if the size of an element to be
 	// pushed to the stack is over MaxScriptElementSize.
-	ErrStackElementTooBig = errors.New("Element in script too large")
+	ErrStackElementTooBig = errors.New("element in script too large")
 
 	// ErrStackUnknownAddress is returned when ScriptToAddrHash does not
 	// recognise the pattern of the script and thus can not find the address
@@ -84,12 +84,12 @@ var (
 
 	// ErrStackScriptUnfinished is returned when CheckErrorCondition is
 	// called on a script that has not finished executing.
-	ErrStackScriptUnfinished = errors.New("Error check when script unfinished")
+	ErrStackScriptUnfinished = errors.New("error check when script unfinished")
 
 	// ErrStackEmptyStack is returned when the stack is empty at the end of
 	// execution. Normal operation requires that a boolean is on top of the
 	// stack when the scripts have finished executing.
-	ErrStackEmptyStack = errors.New("Stack empty at end of execution")
+	ErrStackEmptyStack = errors.New("stack empty at end of execution")
 
 	// ErrStackP2SHNonPushOnly is returned when a Pay-to-Script-Hash
 	// transaction is encountered and the ScriptSig does operations other
@@ -107,7 +107,7 @@ var (
 
 	// ErrStackInvalidIndex is returned when an out-of-bounds index was
 	// passed to a function.
-	ErrStackInvalidIndex = errors.New("Invalid script index")
+	ErrStackInvalidIndex = errors.New("invalid script index")
 
 	// ErrStackNonPushOnly is returned when ScriptInfo is called with a
 	// pkScript that peforms operations other that pushing data to the stack.
@@ -115,7 +115,7 @@ var (
 
 	// ErrStackOverflow is returned when stack and altstack combined depth
 	// is over the limit.
-	ErrStackOverflow = errors.New("Stacks overflowed")
+	ErrStackOverflow = errors.New("stack overflow")
 
 	// ErrStackInvalidLowSSignature is returned when the ScriptVerifyLowS
 	// flag is set and the script contains any signatures whose S values

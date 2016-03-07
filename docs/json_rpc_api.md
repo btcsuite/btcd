@@ -294,6 +294,20 @@ the method name for further details such as parameter and return information.
 [Return to Overview](#MethodOverview)<br />
 
 ***
+<a name="getblockheader"/>
+
+|   |   |
+|---|---|
+|Method|getblockheader|
+|Parameters|1. block hash (string, required) - the hash of the block<br />2. verbose (boolean, optional, default=true) - specifies the block header is returned as a JSON object instead of a hex-encoded string|
+|Description|Returns hex-encoded bytes of the serialized block header.|
+|Returns (verbose=false)|`"data" (string) hex-encoded bytes of the serialized block`|
+|Returns (verbose=true)|`{ (json object)`<br />&nbsp;&nbsp;`"hash": "blockhash", (string) the hash of the block (same as provided)`<br />&nbsp;&nbsp;`"confirmations": n,  (numeric) the number of confirmations`<br />&nbsp;&nbsp;`"height": n, (numeric) the height of the block in the block chain`<br />&nbsp;&nbsp;`"version": n,  (numeric) the block version`<br />&nbsp;&nbsp;`"merkleroot": "hash",  (string) root hash of the merkle tree`<br />&nbsp;&nbsp;`"time": n,  (numeric) the block time in seconds since 1 Jan 1970 GMT`<br />&nbsp;&nbsp;`"nonce": n,  (numeric) the block nonce`<br />&nbsp;&nbsp;`"bits": n,  (numeric) the bits which represent the block difficulty`<br />&nbsp;&nbsp;`"difficulty": n.nn,  (numeric) the proof-of-work difficulty as a multiple of the minimum difficulty`<br />&nbsp;&nbsp;`"previousblockhash": "hash",  (string) the hash of the previous block`<br />&nbsp;&nbsp;`"nextblockhash": "hash",  (string) the hash of the next block (only if there is one)`<br />`}`|
+|Example Return (verbose=false)|`"0200000035ab154183570282ce9afc0b494c9fc6a3cfea05aa8c1add2ecc564900000000`<br />`38ba3d78e4500a5a7570dbe61960398add4410d278b21cd9708e6d9743f374d544fc0552`<br />`27f1001c29c1ea3b"`<br /><font color="orange">**Newlines added for display purposes.  The actual return does not contain newlines.**</font>|
+|Example Return (verbose=true)|`{`<br />&nbsp;&nbsp;`"hash": "00000000009e2958c15ff9290d571bf9459e93b19765c6801ddeccadbb160a1e",`<br />&nbsp;&nbsp;`"confirmations": 392076,`<br />&nbsp;&nbsp;`"height": 100000,`<br />&nbsp;&nbsp;`"version": 2,`<br />&nbsp;&nbsp;`"merkleroot": "d574f343976d8e70d91cb278d21044dd8a396019e6db70755a0a50e4783dba38",`<br />&nbsp;&nbsp;`"time": 1376123972,`<br />&nbsp;&nbsp;`"nonce": 1005240617,`<br />&nbsp;&nbsp;`"bits": "1c00f127",`<br />&nbsp;&nbsp;`"difficulty": 271.75767393,`<br />&nbsp;&nbsp;`"previousblockhash": "000000004956cc2edd1a8caa05eacfa3c69f4c490bfc9ace820257834115ab35",`<br />&nbsp;&nbsp;`"nextblockhash": "0000000000629d100db387f37d0f37c51118f250fb0946310a8c37316cbc4028"`<br />`}`|
+[Return to Overview](#MethodOverview)<br />
+
+***
 <a name="getconnectioncount"/>
 
 |   |   |
@@ -350,6 +364,18 @@ the method name for further details such as parameter and return information.
 |Notes|NOTE: Since dcrd does NOT contain wallet functionality, wallet-related fields are not returned.  See getinfo in dcrwallet for a version which includes that information.|
 |Returns|`{ (json object)`<br />&nbsp;&nbsp;`"version": n,  (numeric) the version of the server`<br />&nbsp;&nbsp;`"protocolversion": n,  (numeric) the latest supported protocol version`<br />&nbsp;&nbsp;`"blocks": n,  (numeric) the number of blocks processed`<br />&nbsp;&nbsp;`"timeoffset": n,  (numeric) the time offset`<br />&nbsp;&nbsp;`"connections": n,  (numeric) the number of connected peers`<br />&nbsp;&nbsp;`"proxy": "host:port",  (string) the proxy used by the server`<br />&nbsp;&nbsp;`"difficulty": n.nn,  (numeric) the current target difficulty`<br />&nbsp;&nbsp;`"testnet": true or false,  (boolean) whether or not server is using testnet`<br />&nbsp;&nbsp;`"relayfee": n.nn,  (numeric) the minimum relay fee for non-free transactions in DCR/KB`<br />`}`|
 |Example Return|`{`<br />&nbsp;&nbsp;`"version": 70000`<br />&nbsp;&nbsp;`"protocolversion": 70001,  `<br />&nbsp;&nbsp;`"blocks": 298963,`<br />&nbsp;&nbsp;`"timeoffset": 0,`<br />&nbsp;&nbsp;`"connections": 17,`<br />&nbsp;&nbsp;`"proxy": "",`<br />&nbsp;&nbsp;`"difficulty": 8000872135.97,`<br />&nbsp;&nbsp;`"testnet": false,`<br />&nbsp;&nbsp;`"relayfee": 0.00001,`<br />`}`|
+[Return to Overview](#MethodOverview)<br />
+
+***
+<a name="getmempoolinfo"/>
+
+|   |   |
+|---|---|
+|Method|getmempoolinfo|
+|Parameters|None|
+|Description|Returns a JSON object containing mempool-related information.|
+|Returns|`{ (json object)`<br />&nbsp;&nbsp;`"bytes": n,  (numeric) size in bytes of the mempool`<br />&nbsp;&nbsp;`"size": n,  (numeric) number of transactions in the mempool`<br />`}`|
+Example Return|`{`<br />&nbsp;&nbsp;`"bytes": 310768,`<br />&nbsp;&nbsp;`"size": 157,`<br />`}`|
 [Return to Overview](#MethodOverview)<br />
 
 ***
@@ -670,7 +696,7 @@ user.  Click the method name for further details such as parameter and return in
 |Parameters|1. username (string, required)<br />2. passphrase (string, required)|
 |Description|Authenticate the connection against the username and password configured for the RPC server.<br />  Invoking any other method before authenticating with this command will close the connection.<br /><font color="orange">NOTE: This is only required if an HTTP Authorization header is not being used.</font>|
 |Returns|Success: Nothing<br />Failure: Nothing (websocket disconnected)|
-[Return to Overview](#ExtensionRequestOverview)<br />
+[Return to Overview](#WSExtMethodOverview)<br />
 
 ***
 
@@ -683,7 +709,7 @@ user.  Click the method name for further details such as parameter and return in
 |Parameters|None|
 |Description|Request notifications for whenever a block is connected or disconnected from the main (best) chain.<br />NOTE: If a client subscribes to both block and transaction (recvtx and redeemingtx) notifications, the blockconnected notification will be sent after all transaction notifications have been sent.  This allows clients to know when all relevant transactions for a block have been received.|
 |Returns|Nothing|
-[Return to Overview](#ExtensionRequestOverview)<br />
+[Return to Overview](#WSExtMethodOverview)<br />
 
 ***
 <a name="stopnotifyblocks"/>
@@ -695,7 +721,7 @@ user.  Click the method name for further details such as parameter and return in
 |Parameters|None|
 |Description|Cancel sending notifications for whenever a block is connected or disconnected from the main (best) chain.|
 |Returns|Nothing|
-[Return to Overview](#ExtensionRequestOverview)<br />
+[Return to Overview](#WSExtMethodOverview)<br />
 
 ***
 
@@ -708,7 +734,7 @@ user.  Click the method name for further details such as parameter and return in
 |Parameters|1. Addresses (JSON array, required)<br />&nbsp;`[ (json array of strings)`<br />&nbsp;&nbsp;`"decredaddress", (string) the decred address`<br />&nbsp;&nbsp;`...`<br />&nbsp;`]`|
 |Description|Send a recvtx notification when a transaction added to mempool or appears in a newly-attached block contains a txout pkScript sending to any of the passed addresses.  Matching outpoints are automatically registered for redeemingtx notifications.|
 |Returns|Nothing|
-[Return to Overview](#ExtensionRequestOverview)<br />
+[Return to Overview](#WSExtMethodOverview)<br />
 
 ***
 
@@ -721,7 +747,7 @@ user.  Click the method name for further details such as parameter and return in
 |Parameters|1. Addresses (JSON array, required)<br />&nbsp;`[ (json array of strings)`<br />&nbsp;&nbsp;`"decredaddress", (string) the decred address`<br />&nbsp;&nbsp;`...`<br />&nbsp;`]`|
 |Description|Cancel registered receive notifications for each passed address.|
 |Returns|Nothing|
-[Return to Overview](#ExtensionRequestOverview)<br />
+[Return to Overview](#WSExtMethodOverview)<br />
 
 ***
 
@@ -734,7 +760,7 @@ user.  Click the method name for further details such as parameter and return in
 |Parameters|1. Outpoints (JSON array, required)<br />&nbsp;`[ (JSON array)`<br />&nbsp;&nbsp;`{ (JSON object)`<br />&nbsp;&nbsp;&nbsp;`"hash":"data", (string) the hex-encoded bytes of the outpoint hash`<br />&nbsp;&nbsp;&nbsp;`"index":n (numeric) the txout index of the outpoint`<br />&nbsp;&nbsp;`},`<br />&nbsp;&nbsp;`...`<br />&nbsp;`]`|
 |Description|Send a redeemingtx notification when a transaction spending an outpoint appears in mempool (if relayed to this dcrd instance) and when such a transaction first appears in a newly-attached block.|
 |Returns|Nothing|
-[Return to Overview](#ExtensionRequestOverview)<br />
+[Return to Overview](#WSExtMethodOverview)<br />
 
 ***
 
@@ -747,7 +773,7 @@ user.  Click the method name for further details such as parameter and return in
 |Parameters|1. Outpoints (JSON array, required)<br />&nbsp;`[ (JSON array)`<br />&nbsp;&nbsp;`{ (JSON object)`<br />&nbsp;&nbsp;&nbsp;`"hash":"data", (string) the hex-encoded bytes of the outpoint hash`<br />&nbsp;&nbsp;&nbsp;`"index":n (numeric) the txout index of the outpoint`<br />&nbsp;&nbsp;`},`<br />&nbsp;&nbsp;`...`<br />&nbsp;`]`|
 |Description|Cancel registered spending notifications for each passed outpoint.|
 |Returns|Nothing|
-[Return to Overview](#ExtensionRequestOverview)<br />
+[Return to Overview](#WSExtMethodOverview)<br />
 
 ***
 
@@ -760,7 +786,7 @@ user.  Click the method name for further details such as parameter and return in
 |Parameters|1. BeginBlock (string, required) block hash to begin rescanning from<br />2. Addresses (JSON array, required)<br />&nbsp;`[ (json array of strings)`<br />&nbsp;&nbsp;`"decredaddress", (string) the decred address`<br />&nbsp;&nbsp;`...` <br />&nbsp;`]`<br />3. Outpoints (JSON array, required)<br />&nbsp;`[ (JSON array)`<br />&nbsp;&nbsp;`{ (JSON object)`<br />&nbsp;&nbsp;&nbsp;`"hash":"data", (string) the hex-encoded bytes of the outpoint hash`<br />&nbsp;&nbsp;&nbsp;`"index":n (numeric) the txout index of the outpoint`<br />&nbsp;&nbsp;`},`<br />&nbsp;&nbsp;`...`<br />&nbsp;`]`<br />4. EndBlock (string, optional) hash of final block to rescan|
 |Description|Rescan block chain for transactions to addresses, starting at block BeginBlock and ending at EndBlock.  The current known UTXO set for all passed addresses at height BeginBlock should included in the Outpoints argument.  If EndBlock is omitted, the rescan continues through the best block in the main chain.  Additionally, if no EndBlock is provided, the client is automatically registered for transaction notifications for all rescanned addresses and the final UTXO set.  Rescan results are sent as recvtx and redeemingtx notifications.  This call returns once the rescan completes.|
 |Returns|Nothing|
-[Return to Overview](#ExtensionRequestOverview)<br />
+[Return to Overview](#WSExtMethodOverview)<br />
 
 ***
 
@@ -773,7 +799,7 @@ user.  Click the method name for further details such as parameter and return in
 |Parameters|1. verbose (boolean, optional, default=false) - specifies which type of notification to receive.  If verbose is true, then the caller receives [txacceptedverbose](#txacceptedverbose), otherwise the caller receives [txaccepted](#txaccepted)|
 |Description|Send either a [txaccepted](#txaccepted) or a [txacceptedverbose](#txacceptedverbose) notification when a new transaction is accepted into the mempool.|
 |Returns|Nothing|
-[Return to Overview](#ExtensionRequestOverview)<br />
+[Return to Overview](#WSExtMethodOverview)<br />
 
 ***
 

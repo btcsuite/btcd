@@ -113,6 +113,7 @@ func TestBlockHeader(t *testing.T) {
 // protocol versions.
 func TestBlockHeaderWire(t *testing.T) {
 	nonce := uint32(123123) // 0x1e0f3
+	pver := uint32(70001)
 
 	/*bh := dcrwire.NewBlockHeader(
 	&hash,
@@ -216,14 +217,15 @@ func TestBlockHeaderWire(t *testing.T) {
 			continue
 		}
 
-		b, err := wire.TstBytesBlockHeader(test.in)
+		buf.Reset()
+		err = test.in.BtcEncode(&buf, pver)
 		if err != nil {
-			t.Errorf("writeBlockHeader #%d error %v", i, err)
+			t.Errorf("BtcEncode #%d error %v", i, err)
 			continue
 		}
-		if !bytes.Equal(b, test.buf) {
-			t.Errorf("writeBlockHeader #%d\n got: %s want: %s", i,
-				spew.Sdump(b), spew.Sdump(test.buf))
+		if !bytes.Equal(buf.Bytes(), test.buf) {
+			t.Errorf("BtcEncode #%d\n got: %s want: %s", i,
+				spew.Sdump(buf.Bytes()), spew.Sdump(test.buf))
 			continue
 		}
 
@@ -237,6 +239,18 @@ func TestBlockHeaderWire(t *testing.T) {
 		}
 		if !reflect.DeepEqual(&bh, test.out) {
 			t.Errorf("readBlockHeader #%d\n got: %s want: %s", i,
+				spew.Sdump(&bh), spew.Sdump(test.out))
+			continue
+		}
+
+		rbuf = bytes.NewReader(test.buf)
+		err = bh.BtcDecode(rbuf, pver)
+		if err != nil {
+			t.Errorf("BtcDecode #%d error %v", i, err)
+			continue
+		}
+		if !reflect.DeepEqual(&bh, test.out) {
+			t.Errorf("BtcDecode #%d\n got: %s want: %s", i,
 				spew.Sdump(&bh), spew.Sdump(test.out))
 			continue
 		}

@@ -65,7 +65,7 @@ type blockNode struct {
 	parentHash *chainhash.Hash
 
 	// height is the position in the block chain.
-	height int64
+	height int32
 
 	// workSum is the total amount of work in the chain up to and including
 	// this node.
@@ -100,7 +100,7 @@ type blockNode struct {
 // for the passed block.  The work sum is updated accordingly when the node is
 // inserted into a chain.
 func newBlockNode(blockHeader *wire.BlockHeader, blockSha *chainhash.Hash,
-	height int64, voteBits []uint16) *blockNode {
+	height int32, voteBits []uint16) *blockNode {
 	// Make a copy of the hash so the node doesn't keep a reference to part
 	// of the full block/block header preventing it from being garbage
 	// collected.
@@ -167,7 +167,7 @@ type BlockChain struct {
 	db                    database.Db
 	tmdb                  *stake.TicketDB
 	chainParams           *chaincfg.Params
-	checkpointsByHeight   map[int64]*chaincfg.Checkpoint
+	checkpointsByHeight   map[int32]*chaincfg.Checkpoint
 	notifications         NotificationCallback
 	minMemoryNodes        int64
 	blocksPerRetarget     int64
@@ -504,7 +504,7 @@ func (b *BlockChain) GenerateInitialIndex() error {
 
 		// Start at the next block after the latest one on the next loop
 		// iteration.
-		start += int64(len(hashList))
+		start += int32(len(hashList))
 	}
 
 	return nil
@@ -812,7 +812,7 @@ func (b *BlockChain) pruneBlockNodes() error {
 	// the latter loads the node and the goal is to find nodes still in
 	// memory that can be pruned.
 	newRootNode := b.bestChain
-	for i := int64(0); i < b.minMemoryNodes-1 && newRootNode != nil; i++ {
+	for i := int32(0); i < b.minMemoryNodes-1 && newRootNode != nil; i++ {
 		newRootNode = newRootNode.parent
 	}
 
@@ -1551,9 +1551,9 @@ func maxInt64(a, b int64) int64 {
 func New(db database.Db, tmdb *stake.TicketDB, params *chaincfg.Params,
 	c NotificationCallback) *BlockChain {
 	// Generate a checkpoint by height map from the provided checkpoints.
-	var checkpointsByHeight map[int64]*chaincfg.Checkpoint
+	var checkpointsByHeight map[int32]*chaincfg.Checkpoint
 	if len(params.Checkpoints) > 0 {
-		checkpointsByHeight = make(map[int64]*chaincfg.Checkpoint)
+		checkpointsByHeight = make(map[int32]*chaincfg.Checkpoint)
 		for i := range params.Checkpoints {
 			checkpoint := &params.Checkpoints[i]
 			checkpointsByHeight[checkpoint.Height] = checkpoint

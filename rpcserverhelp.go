@@ -153,14 +153,9 @@ var helpDescsEnUS = map[string]string{
 	"existsliveticket--result0":  "Bool showing if address exists in the live ticket database or not",
 
 	// ExistsLiveTicketsCmd help.
-	"existslivetickets--synopsis":  "Test for the existance of the provided tickets in the live ticket map",
+	"existslivetickets--synopsis":  "Test for the existance of the provided tickets",
 	"existslivetickets-txhashblob": "Blob containing the hashes to check",
-	"existslivetickets--result0":   "Bool blob showing if ticket exists in the live ticket database or not",
-
-	// ExistsMempoolTxsCmd help.
-	"existsmempooltxs--synopsis":  "Test for the existance of the provided txs in the mempool",
-	"existsmempooltxs-txhashblob": "Blob containing the hashes to check",
-	"existsmempooltxs--result0":   "Bool blob showing if txs exist in the mempool or not",
+	"existslivetickets--result0":   "Bool showing if address exists in the live ticket database or not",
 
 	// GenerateCmd help
 	"generate--synopsis": "Generates a set number of blocks (simnet or regtest only) and returns a JSON\n" +
@@ -259,6 +254,27 @@ var helpDescsEnUS = map[string]string{
 	"getblockhash--synopsis": "Returns hash of the block in best block chain at the given height.",
 	"getblockhash-index":     "The block height",
 	"getblockhash--result0":  "The block hash",
+
+	// GetBlockHeaderCmd help.
+	"getblockheader--synopsis":   "Returns information about a block header given its hash.",
+	"getblockheader-hash":        "The hash of the block",
+	"getblockheader-verbose":     "Specifies the block header is returned as a JSON object instead of hex-encoded string",
+	"getblockheader--condition0": "verbose=false",
+	"getblockheader--condition1": "verbose=true",
+	"getblockheader--result0":    "The block header hash",
+
+	// GetBlockHeaderVerboseResult help.
+	"getblockheaderverboseresult-hash":              "The hash of the block (same as provided)",
+	"getblockheaderverboseresult-confirmations":     "The number of confirmations",
+	"getblockheaderverboseresult-height":            "The height of the block in the block chain",
+	"getblockheaderverboseresult-version":           "The block version",
+	"getblockheaderverboseresult-merkleroot":        "Root hash of the merkle tree",
+	"getblockheaderverboseresult-time":              "The block time in seconds since 1 Jan 1970 GMT",
+	"getblockheaderverboseresult-nonce":             "The block nonce",
+	"getblockheaderverboseresult-bits":              "The bits which represent the block difficulty",
+	"getblockheaderverboseresult-difficulty":        "The proof-of-work difficulty as a multiple of the minimum difficulty",
+	"getblockheaderverboseresult-previousblockhash": "The hash of the previous block",
+	"getblockheaderverboseresult-nextblockhash":     "The hash of the next block (only if there is one)",
 
 	// TemplateRequest help.
 	"templaterequest-mode":         "This is 'template', 'proposal', or omitted",
@@ -374,6 +390,13 @@ var helpDescsEnUS = map[string]string{
 
 	// GetInfoCmd help.
 	"getinfo--synopsis": "Returns a JSON object containing various state info.",
+
+	// GetMempoolInfoCmd help.
+	"getmempoolinfo--synopsis": "Returns memory pool information",
+
+	// GetMempoolInfoResult help.
+	"getmempoolinforesult-bytes": "Size in bytes of the mempool",
+	"getmempoolinforesult-size":  "Number of transactions in the mempool",
 
 	// GetMiningInfoResult help.
 	"getmininginforesult-blocks":           "Height of the latest best block",
@@ -674,8 +697,7 @@ var rpcResultTypes = map[string][]interface{}{
 	"estimatefee":           []interface{}{(*float64)(nil)},
 	"existsaddress":         []interface{}{(*bool)(nil)},
 	"existsliveticket":      []interface{}{(*bool)(nil)},
-	"existslivetickets":     []interface{}{(*string)(nil)},
-	"existsmempooltxs":      []interface{}{(*string)(nil)},
+	"existslivetickets":     []interface{}{(*bool)(nil)},
 	"getaddednodeinfo":      []interface{}{(*[]string)(nil), (*[]dcrjson.GetAddedNodeInfoResult)(nil)},
 	"getbestblock":          []interface{}{(*dcrjson.GetBestBlockResult)(nil)},
 	"generate":              []interface{}{(*[]string)(nil)},
@@ -683,6 +705,7 @@ var rpcResultTypes = map[string][]interface{}{
 	"getblock":              []interface{}{(*string)(nil), (*dcrjson.GetBlockVerboseResult)(nil)},
 	"getblockcount":         []interface{}{(*int64)(nil)},
 	"getblockhash":          []interface{}{(*string)(nil)},
+	"getblockheader":        []interface{}{(*string)(nil), (*dcrjson.GetBlockHeaderVerboseResult)(nil)},
 	"getblocktemplate":      []interface{}{(*dcrjson.GetBlockTemplateResult)(nil), (*string)(nil), nil},
 	"getconnectioncount":    []interface{}{(*int32)(nil)},
 	"getcurrentnet":         []interface{}{(*uint32)(nil)},
@@ -691,6 +714,7 @@ var rpcResultTypes = map[string][]interface{}{
 	"getgenerate":           []interface{}{(*bool)(nil)},
 	"gethashespersec":       []interface{}{(*float64)(nil)},
 	"getinfo":               []interface{}{(*dcrjson.InfoChainResult)(nil)},
+	"getmempoolinfo":        []interface{}{(*dcrjson.GetMempoolInfoResult)(nil)},
 	"getmininginfo":         []interface{}{(*dcrjson.GetMiningInfoResult)(nil)},
 	"getnettotals":          []interface{}{(*dcrjson.GetNetTotalsResult)(nil)},
 	"getnetworkhashps":      []interface{}{(*int64)(nil)},

@@ -42,7 +42,6 @@ const (
 // which have not been mined into a block yet.
 type txPrioItem struct {
 	tx       *dcrutil.Tx
-	txType   stake.TxType
 	fee      int64
 	priority float64
 	feePerKB float64
@@ -170,7 +169,7 @@ type BlockTemplate struct {
 	block           *wire.MsgBlock
 	fees            []int64
 	sigOpCounts     []int64
-	height          int64
+	height          int32
 	validPayAddress bool
 }
 
@@ -286,7 +285,7 @@ func getCoinbaseExtranonces(msgBlock *wire.MsgBlock) []uint64 {
 // block by regenerating the coinbase script with the passed value and block
 // height.  It also recalculates and updates the new merkle root that results
 // from changing the coinbase script.
-func UpdateExtraNonce(msgBlock *wire.MsgBlock, blockHeight int64,
+func UpdateExtraNonce(msgBlock *wire.MsgBlock, blockHeight int32,
 	extraNonces []uint64) error {
 	// First block has no extranonce.
 	if blockHeight == 1 {
@@ -322,7 +321,7 @@ func UpdateExtraNonce(msgBlock *wire.MsgBlock, blockHeight int64,
 // address handling is useful.
 func createCoinbaseTx(coinbaseScript []byte,
 	opReturnPkScript []byte,
-	nextBlockHeight int64,
+	nextBlockHeight int32,
 	addr dcrutil.Address,
 	voters uint16,
 	params *chaincfg.Params) (*dcrutil.Tx, error) {
@@ -443,7 +442,7 @@ func createCoinbaseTx(coinbaseScript []byte,
 // to the passed transaction as spent.  It also adds the passed transaction to
 // the store at the provided height.
 func spendTransaction(txStore blockchain.TxStore, tx *dcrutil.Tx,
-	height int64) error {
+	height int32) error {
 	for _, txIn := range tx.MsgTx().TxIn {
 		originHash := &txIn.PreviousOutPoint.Hash
 		originIndex := txIn.PreviousOutPoint.Index
@@ -1159,10 +1158,23 @@ mempoolLoop:
 			continue
 		}
 
+		// Fetch all of the transactions referenced by the inputs to
+		// this transaction.  NOTE: This intentionally does not fetch
+		// inputs from the mempool since a transaction which depends on
+		// other transactions in the mempool must come after those
+		// dependencies in the final generated block.
+		txStore, err := blockManager.FetchTransactionStore(tx, treeValid)
+		if err != nil {
+			minrLog.Warnf("Unable to fetch transaction store for "+
+				"tx %s: %v", tx.Sha(), err)
+			continue
+		}
+
 		// Need this for a check below for stake base input, and to check
 		// the ticket number.
-		isSSGen := txDesc.Type == stake.TxTypeSSGen
-		if isSSGen {
+		isSSGen, _ := stake.IsSSGen(tx)
+
+		if isSSGen, _ := stake.IsSSGen(tx); isSSGen {
 			blockHash, blockHeight, err := stake.GetSSGenBlockVotedOn(tx)
 			if err != nil { // Should theoretically never fail.
 				minrLog.Tracef("Skipping ssgen tx %s because of failure "+
@@ -1178,18 +1190,6 @@ mempoolLoop:
 			}
 		}
 
-		// Fetch all of the transactions referenced by the inputs to
-		// this transaction.  NOTE: This intentionally does not fetch
-		// inputs from the mempool since a transaction which depends on
-		// other transactions in the mempool must come after those
-		// dependencies in the final generated block.
-		txStore, err := blockManager.FetchTransactionStore(tx, treeValid)
-		if err != nil {
-			minrLog.Warnf("Unable to fetch transaction store for "+
-				"tx %s: %v", tx.Sha(), err)
-			continue
-		}
-
 		// Calculate the input value age sum for the transaction.  This
 		// is comprised of the sum all of input amounts multiplied by
 		// their respective age (number of confirmations since the
@@ -1197,7 +1197,7 @@ mempoolLoop:
 		// setup dependencies for any transactions which reference other
 		// transactions in the mempool so they can be properly ordered
 		// below.
-		prioItem := &txPrioItem{tx: txDesc.Tx, txType: txDesc.Type}
+		prioItem := &txPrioItem{tx: txDesc.Tx}
 		inputValueAge := float64(0.0)
 		for i, txIn := range tx.MsgTx().TxIn {
 			// Evaluate if this is a stakebase input or not. If it is, continue
@@ -1344,13 +1344,13 @@ mempoolLoop:
 		tx := prioItem.tx
 
 		// Store if this is an SStx or not.
-		isSStx := prioItem.txType == stake.TxTypeSStx
+		isSStx, err := stake.IsSStx(tx)
 
 		// Store if this is an SSGen or not.
-		isSSGen := prioItem.txType == stake.TxTypeSSGen
+		isSSGen, err := stake.IsSSGen(tx)
 
 		// Store if this is an SSRtx or not.
-		isSSRtx := prioItem.txType == stake.TxTypeSSRtx
+		isSSRtx, err := stake.IsSSRtx(tx)
 
 		// Grab the list of transactions which depend on this one (if
 		// any) and remove the entry for this transaction as it will
@@ -2027,5 +2027,33 @@ func UpdateBlockTime(msgBlock *wire.MsgBlock, bManager *blockManager) error {
 		msgBlock.Header.Bits = difficulty
 	}
 
+	return nil
+}
+
+// UpdateExtraNonce updates the extra nonce in the coinbase script of the passed
+// block by regenerating the coinbase script with the passed value and block
+// height.  It also recalculates and updates the new merkle root that results
+// from changing the coinbase script.
+func UpdateExtraNonce(msgBlock *wire.MsgBlock, blockHeight int32, extraNonce uint64) error {
+	coinbaseScript, err := standardCoinbaseScript(blockHeight, extraNonce)
+	if err != nil {
+		return err
+	}
+	if len(coinbaseScript) > blockchain.MaxCoinbaseScriptLen {
+		return fmt.Errorf("coinbase transaction script length "+
+			"of %d is out of range (min: %d, max: %d)",
+			len(coinbaseScript), blockchain.MinCoinbaseScriptLen,
+			blockchain.MaxCoinbaseScriptLen)
+	}
+	msgBlock.Transactions[0].TxIn[0].SignatureScript = coinbaseScript
+
+	// TODO(davec): A dcrutil.Block should use saved in the state to avoid
+	// recalculating all of the other transaction hashes.
+	// block.Transactions[0].InvalidateCache()
+
+	// Recalculate the merkle root with the updated extra nonce.
+	block := dcrutil.NewBlock(msgBlock)
+	merkles := blockchain.BuildMerkleTreeStore(block.Transactions())
+	msgBlock.Header.MerkleRoot = *merkles[len(merkles)-1]
 	return nil
 }

@@ -44,7 +44,7 @@ func (db *LevelDb) fetchBlockBySha(sha *chainhash.Hash) (blk *dcrutil.Block, err
 
 // FetchBlockHeightBySha returns the block height for the given hash.  This is
 // part of the database.Db interface implementation.
-func (db *LevelDb) FetchBlockHeightBySha(sha *chainhash.Hash) (int64, error) {
+func (db *LevelDb) FetchBlockHeightBySha(sha *chainhash.Hash) (int32, error) {
 	db.dbLock.Lock()
 	defer db.dbLock.Unlock()
 
@@ -74,7 +74,7 @@ func (db *LevelDb) FetchBlockHeaderBySha(sha *chainhash.Hash) (bh *wire.BlockHea
 	return bh, err
 }
 
-func (db *LevelDb) getBlkLoc(sha *chainhash.Hash) (int64, error) {
+func (db *LevelDb) getBlkLoc(sha *chainhash.Hash) (int32, error) {
 	key := shaBlkToKey(sha)
 
 	data, err := db.lDb.Get(key, db.ro)
@@ -88,13 +88,13 @@ func (db *LevelDb) getBlkLoc(sha *chainhash.Hash) (int64, error) {
 	// deserialize
 	blkHeight := binary.LittleEndian.Uint64(data)
 
-	return int64(blkHeight), nil
+	return int32(blkHeight), nil
 }
 
-func (db *LevelDb) getBlkByHeight(blkHeight int64) (rsha *chainhash.Hash, rbuf []byte, err error) {
+func (db *LevelDb) getBlkByHeight(blkHeight int32) (rsha *chainhash.Hash, rbuf []byte, err error) {
 	var blkVal []byte
 
-	key := int64ToKey(blkHeight)
+	key := int64ToKey(int64(blkHeight))
 
 	blkVal, err = db.lDb.Get(key, db.ro)
 	if err != nil {
@@ -112,8 +112,8 @@ func (db *LevelDb) getBlkByHeight(blkHeight int64) (rsha *chainhash.Hash, rbuf [
 	return &sha, blockdata, nil
 }
 
-func (db *LevelDb) getBlk(sha *chainhash.Hash) (rblkHeight int64, rbuf []byte, err error) {
-	var blkHeight int64
+func (db *LevelDb) getBlk(sha *chainhash.Hash) (rblkHeight int32, rbuf []byte, err error) {
+	var blkHeight int32
 
 	blkHeight, err = db.getBlkLoc(sha)
 	if err != nil {
@@ -129,13 +129,13 @@ func (db *LevelDb) getBlk(sha *chainhash.Hash) (rblkHeight int64, rbuf []byte, e
 	return blkHeight, buf, nil
 }
 
-func (db *LevelDb) setBlk(sha *chainhash.Hash, blkHeight int64, buf []byte) {
+func (db *LevelDb) setBlk(sha *chainhash.Hash, blkHeight int32, buf []byte) {
 	// serialize
 	var lw [8]byte
 	binary.LittleEndian.PutUint64(lw[0:8], uint64(blkHeight))
 
 	shaKey := shaBlkToKey(sha)
-	blkKey := int64ToKey(blkHeight)
+	blkKey := int64ToKey(int64(blkHeight))
 
 	blkVal := make([]byte, len(sha)+len(buf))
 	copy(blkVal[0:], sha[:])
@@ -148,7 +148,7 @@ func (db *LevelDb) setBlk(sha *chainhash.Hash, blkHeight int64, buf []byte) {
 // insertSha stores a block hash and its associated data block with a
 // previous sha of `prevSha'.
 // insertSha shall be called with db lock held
-func (db *LevelDb) insertBlockData(sha *chainhash.Hash, prevSha *chainhash.Hash, buf []byte) (int64, error) {
+func (db *LevelDb) insertBlockData(sha *chainhash.Hash, prevSha *chainhash.Hash, buf []byte) (int32, error) {
 	oBlkHeight, err := db.getBlkLoc(prevSha)
 	if err != nil {
 		// check current block count
@@ -178,8 +178,8 @@ func (db *LevelDb) insertBlockData(sha *chainhash.Hash, prevSha *chainhash.Hash,
 
 // fetchSha returns the datablock for the given ShaHash.
 func (db *LevelDb) fetchSha(sha *chainhash.Hash) (rbuf []byte,
-	rblkHeight int64, err error) {
-	var blkHeight int64
+	rblkHeight int32, err error) {
+	var blkHeight int32
 	var buf []byte
 
 	blkHeight, buf, err = db.getBlk(sha)
@@ -211,7 +211,7 @@ func (db *LevelDb) blkExistsSha(sha *chainhash.Hash) (bool, error) {
 
 // FetchBlockShaByHeight returns a block hash based on its height in the
 // block chain.
-func (db *LevelDb) FetchBlockShaByHeight(height int64) (sha *chainhash.Hash, err error) {
+func (db *LevelDb) FetchBlockShaByHeight(height int32) (sha *chainhash.Hash, err error) {
 	db.dbLock.Lock()
 	defer db.dbLock.Unlock()
 
@@ -220,8 +220,9 @@ func (db *LevelDb) FetchBlockShaByHeight(height int64) (sha *chainhash.Hash, err
 
 // fetchBlockShaByHeight returns a block hash based on its height in the
 // block chain.
-func (db *LevelDb) fetchBlockShaByHeight(height int64) (rsha *chainhash.Hash, err error) {
-	key := int64ToKey(height)
+func (db *LevelDb) fetchBlockShaByHeight(height int32) (rsha *chainhash.Hash, err error) {
+	key := int64ToKey(int64(height))
+	key := int64ToKey(int64(height))
 
 	blkVal, err := db.lDb.Get(key, db.ro)
 	if err != nil {
@@ -239,11 +240,11 @@ func (db *LevelDb) fetchBlockShaByHeight(height int64) (rsha *chainhash.Hash, er
 // heights.  Fetch is inclusive of the start height and exclusive of the
 // ending height. To fetch all hashes from the start height until no
 // more are present, use the special id `AllShas'.
-func (db *LevelDb) FetchHeightRange(startHeight, endHeight int64) (rshalist []chainhash.Hash, err error) {
+func (db *LevelDb) FetchHeightRange(startHeight, endHeight int32) (rshalist []chainhash.Hash, err error) {
 	db.dbLock.Lock()
 	defer db.dbLock.Unlock()
 
-	var endidx int64
+	var endidx int32
 	if endHeight == database.AllShas {
 		endidx = startHeight + 500
 	} else {
@@ -254,7 +255,7 @@ func (db *LevelDb) FetchHeightRange(startHeight, endHeight int64) (rshalist []ch
 	for height := startHeight; height < endidx; height++ {
 		// TODO(drahn) fix blkFile from height
 
-		key := int64ToKey(height)
+		key := int64ToKey(int64(height))
 		blkVal, lerr := db.lDb.Get(key, db.ro)
 		if lerr != nil {
 			break
@@ -276,7 +277,7 @@ func (db *LevelDb) FetchHeightRange(startHeight, endHeight int64) (rshalist []ch
 // NewestSha returns the hash and block height of the most recent (end) block of
 // the block chain.  It will return the zero hash, -1 for the block height, and
 // no error (nil) if there are not any blocks in the database yet.
-func (db *LevelDb) NewestSha() (rsha *chainhash.Hash, rblkid int64, err error) {
+func (db *LevelDb) NewestSha() (rsha *chainhash.Hash, rblkid int32, err error) {
 	db.dbLock.Lock()
 	defer db.dbLock.Unlock()
 
@@ -315,7 +316,7 @@ func (db *LevelDb) checkAddrIndexVersion() error {
 // updated accordingly by functions that modify the state. This function is
 // used on start up to load the info into memory. Callers will use the public
 // version of this function below, which returns our cached copy.
-func (db *LevelDb) fetchAddrIndexTip() (*chainhash.Hash, int64, error) {
+func (db *LevelDb) fetchAddrIndexTip() (*chainhash.Hash, int32, error) {
 	db.dbLock.Lock()
 	defer db.dbLock.Unlock()
 
@@ -329,14 +330,14 @@ func (db *LevelDb) fetchAddrIndexTip() (*chainhash.Hash, int64, error) {
 
 	blkHeight := binary.LittleEndian.Uint64(data[32:])
 
-	return &blkSha, int64(blkHeight), nil
+	return &blkSha, int32(blkHeight), nil
 }
 
 // FetchAddrIndexTip returns the hash and block height of the most recent
 // block whose transactions have been indexed by address. It will return
 // ErrAddrIndexDoesNotExist along with a zero hash, and -1 if the
 // addrindex hasn't yet been built up.
-func (db *LevelDb) FetchAddrIndexTip() (*chainhash.Hash, int64, error) {
+func (db *LevelDb) FetchAddrIndexTip() (*chainhash.Hash, int32, error) {
 	db.dbLock.Lock()
 	defer db.dbLock.Unlock()
 

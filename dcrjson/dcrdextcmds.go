@@ -46,19 +46,6 @@ func NewExistsLiveTicketsCmd(txHashBlob string) *ExistsLiveTicketsCmd {
 	}
 }
 
-// ExistsMempoolTxsCmd defines the existsmempooltxs JSON-RPC command.
-type ExistsMempoolTxsCmd struct {
-	TxHashBlob string
-}
-
-// NewExistsMempoolTxsCmd returns a new instance which can be used to issue an
-// existslivetickets JSON-RPC command.
-func NewExistsMempoolTxsCmd(txHashBlob string) *ExistsMempoolTxsCmd {
-	return &ExistsMempoolTxsCmd{
-		TxHashBlob: txHashBlob,
-	}
-}
-
 // GetCoinSupplyCmd defines the getcoinsupply JSON-RPC command.
 type GetCoinSupplyCmd struct{}
 
@@ -126,7 +113,6 @@ func init() {
 	MustRegisterCmd("existsaddress", (*ExistsAddressCmd)(nil), flags)
 	MustRegisterCmd("existsliveticket", (*ExistsLiveTicketCmd)(nil), flags)
 	MustRegisterCmd("existslivetickets", (*ExistsLiveTicketsCmd)(nil), flags)
-	MustRegisterCmd("existsmempooltxs", (*ExistsMempoolTxsCmd)(nil), flags)
 	MustRegisterCmd("getcoinsupply", (*GetCoinSupplyCmd)(nil), flags)
 	MustRegisterCmd("getstakedifficulty", (*GetStakeDifficultyCmd)(nil), flags)
 	MustRegisterCmd("missedtickets", (*MissedTicketsCmd)(nil), flags)

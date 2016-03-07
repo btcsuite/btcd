@@ -7,6 +7,23 @@ package dcrjson
 
 import "encoding/json"
 
+// GetBlockHeaderVerboseResult models the data from the getblockheader command when
+// the verbose flag is set.  When the verbose flag is not set, getblockheader
+// returns a hex-encoded string.
+type GetBlockHeaderVerboseResult struct {
+	Hash          string  `json:"hash"`
+	Confirmations uint64  `json:"confirmations"`
+	Height        int32   `json:"height"`
+	Version       int32   `json:"version"`
+	MerkleRoot    string  `json:"merkleroot"`
+	Time          int64   `json:"time"`
+	Nonce         uint64  `json:"nonce"`
+	Bits          string  `json:"bits"`
+	Difficulty    float64 `json:"difficulty"`
+	PreviousHash  string  `json:"previousblockhash,omitempty"`
+	NextHash      string  `json:"nextblockhash,omitempty"`
+}
+
 // GetBlockVerboseResult models the data from the getblock command when the
 // verbose flag is set.  When the verbose flag is not set, getblock returns a
 // hex-encoded string.  Contains Decred additions.
@@ -133,6 +150,13 @@ type GetBlockTemplateResult struct {
 	// Block proposal from BIP 0023.
 	Capabilities  []string `json:"capabilities,omitempty"`
 	RejectReasion string   `json:"reject-reason,omitempty"`
+}
+
+// GetMempoolInfoResult models the data returned from the getmempoolinfo
+// command.
+type GetMempoolInfoResult struct {
+	Size  int64 `json:"size"`
+	Bytes int64 `json:"bytes"`
 }
 
 // GetNetworkInfoResult models the data returned from the getnetworkinfo

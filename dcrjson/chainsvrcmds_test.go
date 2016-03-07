@@ -201,6 +201,20 @@ func TestChainSvrCmds(t *testing.T) {
 			unmarshalled: &dcrjson.GetBlockHashCmd{Index: 123},
 		},
 		{
+			name: "getblockheader",
+			newCmd: func() (interface{}, error) {
+				return btcjson.NewCmd("getblockheader", "123")
+			},
+			staticCmd: func() interface{} {
+				return btcjson.NewGetBlockHeaderCmd("123", nil)
+			},
+			marshalled: `{"jsonrpc":"1.0","method":"getblockheader","params":["123"],"id":1}`,
+			unmarshalled: &btcjson.GetBlockHeaderCmd{
+				Hash:    "123",
+				Verbose: btcjson.Bool(true),
+			},
+		},
+		{
 			name: "getblocktemplate",
 			newCmd: func() (interface{}, error) {
 				return dcrjson.NewCmd("getblocktemplate")
@@ -941,6 +955,7 @@ func TestChainSvrCmds(t *testing.T) {
 			t.Errorf("Test #%d (%s) unexpected marshalled data - "+
 				"got %s, want %s", i, test.name, marshalled,
 				test.marshalled)
+			t.Errorf("\n%s\n%s", marshalled, test.marshalled)
 			continue
 		}
 

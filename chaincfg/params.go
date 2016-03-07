@@ -57,7 +57,7 @@ var CPUMinerThreads = 1
 // documentation for chain.IsCheckpointCandidate for details on the selection
 // criteria.
 type Checkpoint struct {
-	Height int64
+	Height int32
 	Hash   *chainhash.Hash
 }
 

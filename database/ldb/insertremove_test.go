@@ -66,7 +66,7 @@ func testUnspentInsertStakeTree(t *testing.T) {
 	}()
 	blocks := loadblocks(t)
 endtest:
-	for height := int64(0); height < int64(len(blocks))-1; height++ {
+	for height := int32(0); height < int32(len(blocks))-1; height++ {
 		block := blocks[height]
 
 		var txneededList []*chainhash.Hash

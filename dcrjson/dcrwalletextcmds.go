@@ -7,19 +7,6 @@
 
 package dcrjson
 
-// ConsolidateCmd is a type handling custom marshaling and
-// unmarshaling of consolidate JSON wallet extension
-// commands.
-type ConsolidateCmd struct {
-	Inputs  int `json:"inputs"`
-	Account *string
-}
-
-// NewConsolidateCmd creates a new ConsolidateCmd.
-func NewConsolidateCmd(inputs int, acct *string) *ConsolidateCmd {
-	return &ConsolidateCmd{Inputs: inputs, Account: acct}
-}
-
 // SStxInput represents the inputs to an SStx transaction. Specifically a
 // transactionsha and output number pair, along with the output amounts.
 type SStxInput struct {
@@ -482,7 +469,6 @@ func init() {
 	// server.
 	flags := UFWalletOnly
 
-	MustRegisterCmd("consolidate", (*ConsolidateCmd)(nil), flags)
 	MustRegisterCmd("createrawsstx", (*CreateRawSStxCmd)(nil), flags)
 	MustRegisterCmd("createrawssgentx", (*CreateRawSSGenTxCmd)(nil), flags)
 	MustRegisterCmd("createrawssrtx", (*CreateRawSSRtxCmd)(nil), flags)
