@@ -79,8 +79,8 @@ func (m *merkleBlock) traverseAndBuild(height, pos uint32) {
 }
 
 // NewMerkleBlock returns a new *wire.MsgMerkleBlock and an array of the matched
-// transaction index numbers hashes based on the passed block and filter.
-func NewMerkleBlock(block *dcrutil.Block, filter *Filter) (*wire.MsgMerkleBlock, []uint32) {
+// transaction hashes based on the passed block and filter.
+func NewMerkleBlock(block *dcrutil.Block, filter *Filter) (*wire.MsgMerkleBlock, []*chainhash.Hash) {
 	numTx := uint32(len(block.Transactions()))
 	mBlock := merkleBlock{
 		numTx:       numTx,
@@ -89,11 +89,11 @@ func NewMerkleBlock(block *dcrutil.Block, filter *Filter) (*wire.MsgMerkleBlock,
 	}
 
 	// Find and keep track of any transactions that match the filter.
-	var matchedIndices []uint32
-	for txIndex, tx := range block.Transactions() {
+	var matchedHashes []*chainhash.Hash
+	for _, tx := range block.Transactions() {
 		if filter.MatchTxAndUpdate(tx) {
 			mBlock.matchedBits = append(mBlock.matchedBits, 0x01)
-			matchedIndices = append(matchedIndices, uint32(txIndex))
+			matchedHashes = append(matchedHashes, tx.Sha())
 		} else {
 			mBlock.matchedBits = append(mBlock.matchedBits, 0x00)
 		}
@@ -122,5 +122,5 @@ func NewMerkleBlock(block *dcrutil.Block, filter *Filter) (*wire.MsgMerkleBlock,
 	for i := uint32(0); i < uint32(len(mBlock.bits)); i++ {
 		msgMerkleBlock.Flags[i/8] |= mBlock.bits[i] << (i % 8)
 	}
-	return &msgMerkleBlock, matchedIndices
+	return &msgMerkleBlock, matchedHashes
 }
