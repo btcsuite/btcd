@@ -606,7 +606,7 @@ func CalcScriptInfo(sigScript, pkScript []byte, bip16 bool) (*ScriptInfo, error)
 	si.NumInputs = len(sigPops)
 
 	// Count sigops taking into account pay-to-script-hash.
-	if si.PkScriptClass == ScriptHashTy && bip16 {
+	if (si.PkScriptClass == ScriptHashTy || subClass == ScriptHashTy) && bip16 {
 		// The pay-to-hash-script is the final data push of the
 		// signature script.
 		script := sigPops[len(sigPops)-1].data
