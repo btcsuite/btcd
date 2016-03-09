@@ -249,6 +249,52 @@ func (b *BlockChain) CheckLiveTickets(hashes []*chainhash.Hash) ([]bool, error) 
 	return existsSlice, nil
 }
 
+// TicketPoolValue returns the current value of all the locked funds in the
+// ticket pool.
+//
+// This function is NOT safe for concurrent access.
+func (b *BlockChain) TicketPoolValue() (dcrutil.Amount, error) {
+	tickets, err := b.tmdb.DumpAllLiveTicketHashes()
+	if err != nil {
+		return 0, err
+	}
+
+	// Make batches of tickets and retrieve them from the
+	// db, adding their commitment amounts each time.
+	ticketsLen := len(tickets)
+	batchSize := 250
+	batches := (ticketsLen / batchSize) + 1
+	lastBatchSize := 0
+	if ticketsLen%250 != 0 {
+		lastBatchSize = ticketsLen - ((batches - 1) * batchSize)
+	}
+
+	var amt int64
+	for i := 0; i < batches; i++ {
+		// Set up the cursor positions.
+		start := i * batchSize
+		end := (i + 1) * batchSize
+		if i == batches-1 {
+			// Nothing to do because last batch empty.
+			if lastBatchSize == 0 {
+				break
+			}
+			end = i*batchSize + lastBatchSize
+		}
+
+		txReplyList := b.db.FetchTxByShaList(tickets[start:end])
+		for _, txr := range txReplyList {
+			if txr.Err != nil {
+				return 0, txr.Err
+			}
+
+			amt += txr.Tx.TxOut[0].Value
+		}
+	}
+
+	return dcrutil.Amount(amt), nil
+}
+
 // HaveBlock returns whether or not the chain instance has the block represented
 // by the passed hash.  This includes checking the various places a block can
 // be like part of the main chain, on a side chain, or in the orphan pool.

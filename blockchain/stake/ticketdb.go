@@ -776,6 +776,32 @@ func (tmdb *TicketDB) DumpLiveTickets(bucket uint8) (SStxMemMap, error) {
 	return tickets, nil
 }
 
+// DumpLiveTickets duplicates the contents of a ticket bucket from the databases's
+// ticketMap and returns them to the user.
+//
+// This function is safe for concurrent access.
+func (tmdb *TicketDB) DumpAllLiveTicketHashes() ([]*chainhash.Hash, error) {
+	tmdb.mtx.Lock()
+	defer tmdb.mtx.Unlock()
+
+	var tickets []*chainhash.Hash
+
+	for i := 0; i < BucketsSize; i++ {
+		// Make sure the ticket bucket exists; if it doesn't something
+		// has gone wrong with the initialization
+		if tmdb.maps.ticketMap[i] == nil {
+			return nil, fmt.Errorf("TicketDB err @ DumpLiveTickets: bucket for "+
+				"tickets numbered %v missing", i)
+		}
+
+		for _, v := range tmdb.maps.ticketMap[i] {
+			tickets = append(tickets, &v.SStxHash)
+		}
+	}
+
+	return tickets, nil
+}
+
 // DumpSpentTickets duplicates the contents of a ticket bucket from the databases's
 // spentTicketMap and returns them to the user.
 //

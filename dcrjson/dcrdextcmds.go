@@ -78,6 +78,15 @@ func NewGetStakeDifficultyCmd() *GetStakeDifficultyCmd {
 	return &GetStakeDifficultyCmd{}
 }
 
+// GetTicketPoolValueCmd defines the getticketpoolvalue JSON-RPC command.
+type GetTicketPoolValueCmd struct{}
+
+// NewGetTicketPoolValueCmd returns a new instance which can be used to issue a
+// getticketpoolvalue JSON-RPC command.
+func NewGetTicketPoolValueCmd() *GetTicketPoolValueCmd {
+	return &GetTicketPoolValueCmd{}
+}
+
 // MissedTicketsCmd is a type handling custom marshaling and
 // unmarshaling of missedtickets JSON RPC commands.
 type MissedTicketsCmd struct{}
@@ -129,6 +138,7 @@ func init() {
 	MustRegisterCmd("existsmempooltxs", (*ExistsMempoolTxsCmd)(nil), flags)
 	MustRegisterCmd("getcoinsupply", (*GetCoinSupplyCmd)(nil), flags)
 	MustRegisterCmd("getstakedifficulty", (*GetStakeDifficultyCmd)(nil), flags)
+	MustRegisterCmd("getticketpoolvalue", (*GetTicketPoolValueCmd)(nil), flags)
 	MustRegisterCmd("missedtickets", (*MissedTicketsCmd)(nil), flags)
 	MustRegisterCmd("rebroadcastmissed", (*RebroadcastMissedCmd)(nil), flags)
 	MustRegisterCmd("rebroadcastwinners", (*RebroadcastWinnersCmd)(nil), flags)

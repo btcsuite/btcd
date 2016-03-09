@@ -180,6 +180,7 @@ var rpcHandlersBeforeInit = map[string]commandHandler{
 	"getrawmempool":         handleGetRawMempool,
 	"getrawtransaction":     handleGetRawTransaction,
 	"getstakedifficulty":    handleGetStakeDifficulty,
+	"getticketpoolvalue":    handleGetTicketPoolValue,
 	"gettxout":              handleGetTxOut,
 	"getwork":               handleGetWork,
 	"help":                  handleHelp,
@@ -3534,6 +3535,16 @@ func handleGetStakeDifficulty(s *rpcServer, cmd interface{}, closeChan <-chan st
 	sDiff := dcrutil.Amount(blockHeader.SBits)
 
 	return sDiff.ToCoin(), nil
+}
+
+// handleGetTicketPoolValue implements the getticketpoolvalue command.
+func handleGetTicketPoolValue(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (interface{}, error) {
+	amt, err := s.server.blockManager.TicketPoolValue()
+	if err != nil {
+		return nil, err
+	}
+
+	return amt.ToCoin(), nil
 }
 
 // bigToLEUint256 returns the passed big integer as an unsigned 256-bit integer
