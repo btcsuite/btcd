@@ -207,7 +207,7 @@ func (b *BlockChain) findPrevTestNetDifficulty(startNode *blockNode) (uint32,
 	// Search backwards through the chain for the last block without
 	// the special rule applied.
 	blocksPerRetarget := b.chainParams.WorkDiffWindowSize *
-		int32(b.chainParams.WorkDiffWindows)
+		b.chainParams.WorkDiffWindows
 	iterNode := startNode
 	for iterNode != nil && iterNode.height%blocksPerRetarget != 0 &&
 		iterNode.bits == b.chainParams.PowLimitBits {
@@ -311,8 +311,8 @@ func (b *BlockChain) calcNextRequiredDifficulty(curNode *blockNode,
 	alpha := b.chainParams.WorkDiffAlpha
 
 	// Number of nodes to traverse while calculating difficulty.
-	nodesToTraverse := b.chainParams.WorkDiffWindowSize *
-		int32(b.chainParams.WorkDiffWindows)
+	nodesToTraverse := (b.chainParams.WorkDiffWindowSize *
+		b.chainParams.WorkDiffWindows)
 
 	// Initialize bigInt slice for the percentage changes for each window period
 	// above or below the target.
@@ -326,7 +326,7 @@ func (b *BlockChain) calcNextRequiredDifficulty(curNode *blockNode,
 	recentTime := curNode.header.Timestamp.UnixNano()
 	olderTime := int64(0)
 
-	for i := int32(0); ; i++ {
+	for i := int64(0); ; i++ {
 		// Store and reset after reaching the end of every window period.
 		if i%b.chainParams.WorkDiffWindowSize == 0 && i != 0 {
 			olderTime = oldNode.header.Timestamp.UnixNano()
@@ -484,14 +484,14 @@ func mergeDifficulty(oldDiff int64, newDiff1 int64, newDiff2 int64) int64 {
 func (b *BlockChain) calcNextRequiredStakeDifficulty(curNode *blockNode) (int64,
 	error) {
 	alpha := b.chainParams.StakeDiffAlpha
-	stakeDiffStartHeight := int32(b.chainParams.CoinbaseMaturity) +
+	stakeDiffStartHeight := int64(b.chainParams.CoinbaseMaturity) +
 		1
 	maxRetarget := int64(b.chainParams.RetargetAdjustmentFactor)
 	TicketPoolWeight := int64(b.chainParams.TicketPoolSizeWeight)
 
 	// Number of nodes to traverse while calculating difficulty.
-	nodesToTraverse := b.chainParams.StakeDiffWindowSize *
-		int32(b.chainParams.StakeDiffWindows)
+	nodesToTraverse := (b.chainParams.StakeDiffWindowSize *
+		b.chainParams.StakeDiffWindows)
 
 	// Genesis block. Block at height 1 has these parameters.
 	// Additionally, if we're before the time when people generally begin
@@ -529,7 +529,7 @@ func (b *BlockChain) calcNextRequiredStakeDifficulty(curNode *blockNode) (int64,
 	windowPeriod := int64(0)
 	weights := uint64(0)
 
-	for i := int32(0); ; i++ {
+	for i := int64(0); ; i++ {
 		// Store and reset after reaching the end of every window period.
 		if (i+1)%b.chainParams.StakeDiffWindowSize == 0 {
 			// First adjust based on ticketPoolSize. Skew the difference
@@ -617,7 +617,7 @@ func (b *BlockChain) calcNextRequiredStakeDifficulty(curNode *blockNode) (int64,
 
 	// The target number of new SStx per block for any given window period.
 	targetForWindow := b.chainParams.StakeDiffWindowSize *
-		int32(b.chainParams.TicketsPerBlock)
+		int64(b.chainParams.TicketsPerBlock)
 
 	// Regress through all of the previous blocks and store the percent changes
 	// per window period; use bigInts to emulate 64.32 bit fixed point.
@@ -626,7 +626,7 @@ func (b *BlockChain) calcNextRequiredStakeDifficulty(curNode *blockNode) (int64,
 	windowPeriod = int64(0)
 	weights = uint64(0)
 
-	for i := int32(0); ; i++ {
+	for i := int64(0); ; i++ {
 		// Add the fresh stake into the store for this window period.
 		windowFreshStake += int64(oldNode.header.FreshStake)
 
@@ -639,7 +639,7 @@ func (b *BlockChain) calcNextRequiredStakeDifficulty(curNode *blockNode) (int64,
 
 			freshTemp := big.NewInt(windowFreshStake)
 			freshTemp.Lsh(freshTemp, 32) // Add padding
-			targetTemp := big.NewInt(int64(targetForWindow))
+			targetTemp := big.NewInt(targetForWindow)
 
 			// Get the percentage change.
 			windowAdjusted := freshTemp.Div(freshTemp, targetTemp)

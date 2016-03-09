@@ -115,7 +115,7 @@ func chainSetup(dbName string, params *chaincfg.Params) (*blockchain.BlockChain,
 	// Insert the main network genesis block.  This is part of the initial
 	// database setup.
 	genesisBlock := dcrutil.NewBlock(params.GenesisBlock)
-	genesisBlock.SetHeight(int32(0))
+	genesisBlock.SetHeight(int64(0))
 	_, err := db.InsertBlock(genesisBlock)
 	if err != nil {
 		teardown()
@@ -195,7 +195,7 @@ func loadTxStore(filename string) (blockchain.TxStore, error) {
 		if err != nil {
 			return nil, err
 		}
-		txD.BlockHeight = int32(uintBuf)
+		txD.BlockHeight = int64(uintBuf)
 
 		// Num spent bits.
 		err = binary.Read(r, binary.LittleEndian, &uintBuf)

@@ -328,6 +328,9 @@ func calcSignatureHash(script []parsedOpcode, hashType SigHashType,
 	// inputs that are not currently being processed.
 	txCopy := tx.Copy()
 	for i := range txCopy.TxIn {
+		var txIn wire.TxIn
+		txIn = *txCopy.TxIn[i]
+		txCopy.TxIn[i] = &txIn
 		if i == idx {
 			// UnparseScript cannot fail here because removeOpcode
 			// above only returns a valid script.
@@ -336,6 +339,13 @@ func calcSignatureHash(script []parsedOpcode, hashType SigHashType,
 		} else {
 			txCopy.TxIn[i].SignatureScript = nil
 		}
+	}
+
+	// Default behavior has all outputs set up.
+	for i := range txCopy.TxOut {
+		var txOut wire.TxOut
+		txOut = *txCopy.TxOut[i]
+		txCopy.TxOut[i] = &txOut
 	}
 
 	switch hashType & sigHashMask {
@@ -381,9 +391,9 @@ func calcSignatureHash(script []parsedOpcode, hashType SigHashType,
 	}
 
 	// The final hash (message to sign) is the hash of:
-	// 1) the hash type (encoded as a 4-byte little-endian value) ||
-	// 2) hash of the prefix ||
-	// 3) hash of the witness for signing
+	// 1) hash of the prefix ||
+	// 2) hash of the witness for signing ||
+	// 3) the hash type (encoded as a 4-byte little-endian value)
 	var wbuf bytes.Buffer
 	binary.Write(&wbuf, binary.LittleEndian, uint32(hashType))
 
@@ -519,16 +529,4 @@ func GetPreciseSigOpCount(scriptSig, scriptPubKey []byte, bip16 bool) int {
 	// failure.
 	shPops, _ := parseScript(shScript)
 	return getSigOpCount(shPops, true)
-}
-
-// IsUnspendable returns whether the passed public key script is unspendable, or
-// guaranteed to fail at execution.  This allows inputs to be pruned instantly
-// when entering the UTXO set.
-func IsUnspendable(pkScript []byte) bool {
-	pops, err := parseScript(pkScript)
-	if err != nil {
-		return true
-	}
-
-	return len(pops) > 0 && pops[0].opcode.value == OP_RETURN
 }

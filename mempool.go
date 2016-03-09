@@ -117,7 +117,7 @@ type TxDesc struct {
 	Tx               *dcrutil.Tx  // Transaction.
 	Type             stake.TxType // Transcation type.
 	Added            time.Time    // Time when added to pool.
-	Height           int32        // Blockheight when added to pool.
+	Height           int64        // Blockheight when added to pool.
 	Fee              int64        // Transaction fees.
 	startingPriority float64      // Priority when added to the pool.
 }
@@ -398,11 +398,6 @@ func (mp *txMemPool) SortParentsByVotes(currentTopBlock chainhash.Hash,
 // relay fee.  In particular, if the cost to the network to spend coins is more
 // than 1/3 of the minimum transaction relay fee, it is considered dust.
 func isDust(txOut *wire.TxOut, params *chaincfg.Params) bool {
-	// Unspendable outputs are considered dust.
-	if txscript.IsUnspendable(txOut.PkScript) {
-		return true
-	}
-
 	// The total serialized size consists of the output and the associated
 	// input script to redeem it.  Since there is no input script
 	// to redeem it yet, use the minimum size of a typical input script.
@@ -544,7 +539,7 @@ func checkPkScriptStandard(version uint16, pkScript []byte,
 // of recognized forms, and not containing "dust" outputs (those that are
 // so small it costs more to process them than they are worth).
 func (mp *txMemPool) checkTransactionStandard(tx *dcrutil.Tx, txType stake.TxType,
-	height int32) error {
+	height int64) error {
 	msgTx := tx.MsgTx()
 
 	// The transaction must be a currently supported version.
@@ -1034,7 +1029,7 @@ func (mp *txMemPool) RemoveDoubleSpends(tx *dcrutil.Tx) {
 func (mp *txMemPool) addTransaction(
 	tx *dcrutil.Tx,
 	txType stake.TxType,
-	height int32,
+	height,
 	fee int64) {
 	// Add the transaction to the pool and mark the referenced outpoints
 	// as spent by the pool.
@@ -1176,7 +1171,7 @@ func (mp *txMemPool) FindTxForAddr(addr dcrutil.Address) []*dcrutil.Tx {
 // which are currently in the mempool and hence not mined into a block yet,
 // contribute no additional input age to the transaction.
 func calcInputValueAge(txDesc *TxDesc, txStore blockchain.TxStore,
-	nextBlockHeight int32) float64 {
+	nextBlockHeight int64) float64 {
 	var totalInputAge float64
 	for _, txIn := range txDesc.Tx.MsgTx().TxIn {
 		originHash := &txIn.PreviousOutPoint.Hash
@@ -1189,7 +1184,7 @@ func calcInputValueAge(txDesc *TxDesc, txStore blockchain.TxStore,
 			// have their block height set to a special constant.
 			// Their input age should computed as zero since their
 			// parent hasn't made it into a block yet.
-			var inputAge int32
+			var inputAge int64
 			if txData.BlockHeight == mempoolHeight {
 				inputAge = 0
 			} else {
@@ -1199,7 +1194,7 @@ func calcInputValueAge(txDesc *TxDesc, txStore blockchain.TxStore,
 			// Sum the input value times age.
 			originTxOut := txData.Tx.MsgTx().TxOut[originIndex]
 			inputValue := originTxOut.Value
-			totalInputAge += float64(inputValue * int64(inputAge))
+			totalInputAge += float64(inputValue * inputAge)
 		}
 	}
 
@@ -1273,7 +1268,7 @@ func (td *TxDesc) StartingPriority(txStore blockchain.TxStore) float64 {
 // CurrentPriority calculates the current priority of this tx descriptor's
 // underlying transaction relative to the next block height.
 func (td *TxDesc) CurrentPriority(txStore blockchain.TxStore,
-	nextBlockHeight int32) float64 {
+	nextBlockHeight int64) float64 {
 	inputAge := calcInputValueAge(td, txStore, nextBlockHeight)
 	return calcPriority(td.Tx, inputAge)
 }
@@ -1919,7 +1914,7 @@ func (mp *txMemPool) processOrphans(hash *chainhash.Hash) {
 // stake difficulty is below the current required stake difficulty should be
 // pruned from mempool since they will never be mined.  The same idea stands
 // for SSGen and SSRtx
-func (mp *txMemPool) PruneStakeTx(requiredStakeDifficulty int64, height int32) {
+func (mp *txMemPool) PruneStakeTx(requiredStakeDifficulty, height int64) {
 	// Protect concurrent access.
 	mp.Lock()
 	defer mp.Unlock()
@@ -1927,11 +1922,11 @@ func (mp *txMemPool) PruneStakeTx(requiredStakeDifficulty int64, height int32) {
 	mp.pruneStakeTx(requiredStakeDifficulty, height)
 }
 
-func (mp *txMemPool) pruneStakeTx(requiredStakeDifficulty int64, height int32) {
+func (mp *txMemPool) pruneStakeTx(requiredStakeDifficulty, height int64) {
 	for _, tx := range mp.pool {
 		txType := detectTxType(tx.Tx)
 		if txType == stake.TxTypeSStx &&
-			tx.Height+int32(heightDiffToPruneTicket) < height {
+			tx.Height+int64(heightDiffToPruneTicket) < height {
 			mp.removeTransaction(tx.Tx, true)
 		}
 		if txType == stake.TxTypeSStx &&
@@ -1939,7 +1934,7 @@ func (mp *txMemPool) pruneStakeTx(requiredStakeDifficulty int64, height int32) {
 			mp.removeTransaction(tx.Tx, true)
 		}
 		if (txType == stake.TxTypeSSRtx || txType == stake.TxTypeSSGen) &&
-			tx.Height+int32(heightDiffToPruneVotes) < height {
+			tx.Height+int64(heightDiffToPruneVotes) < height {
 			mp.removeTransaction(tx.Tx, true)
 		}
 	}
@@ -1947,7 +1942,7 @@ func (mp *txMemPool) pruneStakeTx(requiredStakeDifficulty int64, height int32) {
 
 // PruneExpiredTx prunes expired transactions from the mempool that may no longer
 // be able to be included into a block.
-func (mp *txMemPool) PruneExpiredTx(height int32) {
+func (mp *txMemPool) PruneExpiredTx(height int64) {
 	// Protect concurrent access.
 	mp.Lock()
 	defer mp.Unlock()
@@ -1955,10 +1950,10 @@ func (mp *txMemPool) PruneExpiredTx(height int32) {
 	mp.pruneExpiredTx(height)
 }
 
-func (mp *txMemPool) pruneExpiredTx(height int32) {
+func (mp *txMemPool) pruneExpiredTx(height int64) {
 	for _, tx := range mp.pool {
 		if tx.Tx.MsgTx().Expiry != 0 {
-			if height >= int32(tx.Tx.MsgTx().Expiry) {
+			if height >= int64(tx.Tx.MsgTx().Expiry) {
 				txmpLog.Debugf("Pruning expired transaction %v from the "+
 					"mempool", tx.Tx.Sha())
 				mp.removeTransaction(tx.Tx, true)

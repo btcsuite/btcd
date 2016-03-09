@@ -57,7 +57,7 @@ var CPUMinerThreads = 1
 // documentation for chain.IsCheckpointCandidate for details on the selection
 // criteria.
 type Checkpoint struct {
-	Height int32
+	Height int64
 	Hash   *chainhash.Hash
 }
 
@@ -116,7 +116,7 @@ type Params struct {
 
 	// WorkDiffWindowSize is the number of windows (intervals) used for calculation
 	// of the exponentially weighted average.
-	WorkDiffWindowSize int32
+	WorkDiffWindowSize int64
 
 	// WorkDiffWindows is the number of windows (intervals) used for calculation
 	// of the exponentially weighted average.
@@ -153,7 +153,7 @@ type Params struct {
 	DivSubsidy int64
 
 	// Reduction interval in blocks.
-	ReductionInterval int32
+	ReductionInterval int64
 
 	// WorkRewardProportion is the comparative amount of the subsidy given for
 	// creating a block.
@@ -231,7 +231,7 @@ type Params struct {
 
 	// StakeDiffWindowSize is the number of blocks used for each interval in
 	// exponentially weighted average.
-	StakeDiffWindowSize int32
+	StakeDiffWindowSize int64
 
 	// StakeDiffWindows is the number of windows (intervals) used for calculation
 	// of the exponentially weighted average.
@@ -243,12 +243,12 @@ type Params struct {
 
 	// StakeEnabledHeight is the height in which the first ticket could possibly
 	// mature.
-	StakeEnabledHeight int32
+	StakeEnabledHeight int64
 
 	// StakeValidationHeight is the height at which votes (SSGen) are required
 	// to add a new block to the top of the blockchain. This height is the
 	// first block that will be voted on, but will include in itself no votes.
-	StakeValidationHeight int32
+	StakeValidationHeight int64
 
 	// StakeBaseSigScript is the consensus stakebase signature script for all
 	// votes on the network. This isn't signed in any way, so without forcing

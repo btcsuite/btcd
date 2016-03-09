@@ -49,7 +49,7 @@ const ViewpointPrevInvalidRegular = int8(4)
 type TxData struct {
 	Tx          *dcrutil.Tx
 	Hash        *chainhash.Hash
-	BlockHeight int32
+	BlockHeight int64
 	BlockIndex  uint32
 	Spent       []bool
 	Err         error
@@ -199,7 +199,7 @@ func disconnectTransactions(txStore TxStore, block *dcrutil.Block, parent *dcrut
 		// sides of a fork would otherwise not be updated.
 		if txD, exists := txStore[*tx.Sha()]; exists {
 			txD.Tx = nil
-			txD.BlockHeight = int32(wire.NullBlockHeight)
+			txD.BlockHeight = int64(wire.NullBlockHeight)
 			txD.BlockIndex = wire.NullBlockIndex
 			txD.Spent = nil
 			txD.Err = database.ErrTxShaMissing
@@ -244,7 +244,7 @@ func disconnectTransactions(txStore TxStore, block *dcrutil.Block, parent *dcrut
 				// sides of a fork would otherwise not be updated.
 				if txD, exists := txStore[*tx.Sha()]; exists {
 					txD.Tx = nil
-					txD.BlockHeight = int32(wire.NullBlockHeight)
+					txD.BlockHeight = int64(wire.NullBlockHeight)
 					txD.BlockIndex = wire.NullBlockIndex
 					txD.Spent = nil
 					txD.Err = database.ErrTxShaMissing

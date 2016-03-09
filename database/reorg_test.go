@@ -39,17 +39,17 @@ func testReorganization(t *testing.T, dbType string) {
 
 	// Find where chain forks
 	var forkHash chainhash.Hash
-	var forkHeight int32
+	var forkHeight int64
 	for i, _ := range blocks {
 		if blocks[i].Sha().IsEqual(blocksReorg[i].Sha()) {
 			blkHash := blocks[i].Sha()
 			forkHash = *blkHash
-			forkHeight = int32(i)
+			forkHeight = int64(i)
 		}
 	}
 
 	// Insert all blocks from chain 1
-	for i := int32(0); i < int32(len(blocks)); i++ {
+	for i := int64(0); i < int64(len(blocks)); i++ {
 		blkHash := blocks[i].Sha()
 		if err != nil {
 			t.Fatalf("Error getting SHA for block %dA: %v", i-2, err)
@@ -68,7 +68,7 @@ func testReorganization(t *testing.T, dbType string) {
 	}
 
 	// Insert blocks from the other chain to simulate a reorg
-	for i := forkHeight + 1; i < int32(len(blocksReorg)); i++ {
+	for i := forkHeight + 1; i < int64(len(blocksReorg)); i++ {
 		blkHash := blocksReorg[i].Sha()
 		if err != nil {
 			t.Fatalf("Error getting SHA for block %dA: %v", i-2, err)
@@ -84,7 +84,7 @@ func testReorganization(t *testing.T, dbType string) {
 		t.Fatalf("Error getting newest block info")
 	}
 
-	for i := int32(0); i <= maxHeight; i++ {
+	for i := int64(0); i <= maxHeight; i++ {
 		blkHash, err := db.FetchBlockShaByHeight(i)
 		if err != nil {
 			t.Fatalf("Error fetching SHA for block %d: %v", i, err)
@@ -132,7 +132,7 @@ func loadReorgBlocks(filename string) ([]*dcrutil.Block, error) {
 
 	// Create decoder from the buffer and a map to store the data
 	bcDecoder := gob.NewDecoder(bcBuf)
-	blockchain := make(map[int32][]byte)
+	blockchain := make(map[int64][]byte)
 
 	// Decode the blockchain into the map
 	if err := bcDecoder.Decode(&blockchain); err != nil {
@@ -142,7 +142,7 @@ func loadReorgBlocks(filename string) ([]*dcrutil.Block, error) {
 	var block *dcrutil.Block
 
 	blocks := make([]*dcrutil.Block, 0, len(blockchain))
-	for height := int32(0); height < int32(len(blockchain)); height++ {
+	for height := int64(0); height < int64(len(blockchain)); height++ {
 		block, err = dcrutil.NewBlockFromBytes(blockchain[height])
 		if err != nil {
 			return blocks, err

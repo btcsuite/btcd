@@ -1,4 +1,4 @@
-// Copyright (c) 2014 The dcrsuite developers
+// Copyright (c) 2014 The btcsuite developers
 // Copyright (c) 2015 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
@@ -199,20 +199,6 @@ func TestChainSvrCmds(t *testing.T) {
 			},
 			marshalled:   `{"jsonrpc":"1.0","method":"getblockhash","params":[123],"id":1}`,
 			unmarshalled: &dcrjson.GetBlockHashCmd{Index: 123},
-		},
-		{
-			name: "getblockheader",
-			newCmd: func() (interface{}, error) {
-				return dcrjson.NewCmd("getblockheader", "123")
-			},
-			staticCmd: func() interface{} {
-				return dcrjson.NewGetBlockHeaderCmd("123", nil)
-			},
-			marshalled: `{"jsonrpc":"1.0","method":"getblockheader","params":["123"],"id":1}`,
-			unmarshalled: &dcrjson.GetBlockHeaderCmd{
-				Hash:    "123",
-				Verbose: dcrjson.Bool(true),
-			},
 		},
 		{
 			name: "getblocktemplate",
@@ -955,7 +941,6 @@ func TestChainSvrCmds(t *testing.T) {
 			t.Errorf("Test #%d (%s) unexpected marshalled data - "+
 				"got %s, want %s", i, test.name, marshalled,
 				test.marshalled)
-			t.Errorf("\n%s\n%s", marshalled, test.marshalled)
 			continue
 		}
 

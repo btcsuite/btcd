@@ -60,17 +60,6 @@ const (
 
 	// queueEmptyFrequency is the frequency for the emptying of the queue.
 	queueEmptyFrequency = 500 * time.Millisecond
-
-	// connectionRetryInterval is the base amount of time to wait in between
-	// retries when connecting to persistent peers.  It is adjusted by the
-	// number of retries such that there is a retry backoff.
-	connectionRetryInterval = time.Second * 10
-
-	// maxConnectionRetryInterval is the max amount of time retrying of a
-	// persistent peer is allowed to grow to.  This is necessary since the
-	// retry logic uses a backoff mechanism which increases the interval
-	// base done the number of retries that have been done.
-	maxConnectionRetryInterval = time.Minute * 5
 )
 
 var (
@@ -606,8 +595,28 @@ func (p *peer) pushMerkleBlockMsg(sha *chainhash.Hash, doneChan, waitChan chan s
 	}
 
 	// Generate a merkle block by filtering the requested block according
-	// to the filter for the peer.
-	merkle, matchedTxIndices := bloom.NewMerkleBlock(blk, p.filter)
+	// to the filter for the peer and fetch any matched transactions from
+	// the database.
+	merkle, matchedHashes := bloom.NewMerkleBlock(blk, p.filter)
+	txList := p.server.db.FetchTxByShaList(matchedHashes)
+
+	// Warn on any missing transactions which should not happen since the
+	// matched transactions come from an existing block.  Also, find the
+	// final valid transaction index for later.
+	finalValidTxIndex := -1
+	for i, txR := range txList {
+		if txR.Err != nil || txR.Tx == nil {
+			warnMsg := fmt.Sprintf("Failed to fetch transaction "+
+				"%v which was matched by merkle block %v",
+				txR.Sha, sha)
+			if txR.Err != nil {
+				warnMsg += ": " + err.Error()
+			}
+			peerLog.Warnf(warnMsg)
+			continue
+		}
+		finalValidTxIndex = i
+	}
 
 	// Once we have fetched data wait for any previous operation to finish.
 	if waitChan != nil {
@@ -617,21 +626,20 @@ func (p *peer) pushMerkleBlockMsg(sha *chainhash.Hash, doneChan, waitChan chan s
 	// Send the merkleblock.  Only send the done channel with this message
 	// if no transactions will be sent afterwards.
 	var dc chan struct{}
-	if len(matchedTxIndices) == 0 {
+	if finalValidTxIndex == -1 {
 		dc = doneChan
 	}
 	p.QueueMessage(merkle, dc)
 
 	// Finally, send any matched transactions.
-	blkTransactions := blk.MsgBlock().Transactions
-	for i, txIndex := range matchedTxIndices {
+	for i, txR := range txList {
 		// Only send the done channel on the final transaction.
 		var dc chan struct{}
-		if i == len(matchedTxIndices)-1 {
+		if i == finalValidTxIndex {
 			dc = doneChan
 		}
-		if txIndex < uint32(len(blkTransactions)) {
-			p.QueueMessage(blkTransactions[txIndex], dc)
+		if txR.Err == nil && txR.Tx != nil {
+			p.QueueMessage(txR.Tx, dc)
 		}
 	}
 
@@ -1066,7 +1074,7 @@ func (p *peer) handleGetBlocksMsg(msg *wire.MsgGetBlocks) {
 	// provided locator are known.  This does mean the client will start
 	// over with the genesis block if unknown block locators are provided.
 	// This mirrors the behavior in the reference implementation.
-	startIdx := int32(1)
+	startIdx := int64(1)
 	for _, hash := range msg.BlockLocatorHashes {
 		height, err := p.server.db.FetchBlockHeightBySha(hash)
 		if err == nil {
@@ -1110,7 +1118,7 @@ func (p *peer) handleGetBlocksMsg(msg *wire.MsgGetBlocks) {
 			iv := wire.NewInvVect(wire.InvTypeBlock, &hashCopy)
 			invMsg.AddInvVect(iv)
 		}
-		start += int32(len(hashList))
+		start += int64(len(hashList))
 	}
 
 	// Send the inventory message if there is anything to send.
@@ -1131,11 +1139,6 @@ func (p *peer) handleGetBlocksMsg(msg *wire.MsgGetBlocks) {
 // handleGetHeadersMsg is invoked when a peer receives a getheaders decred
 // message.
 func (p *peer) handleGetHeadersMsg(msg *wire.MsgGetHeaders) {
-	// Ignore getheaders requests if not in sync.
-	if !p.server.blockManager.IsCurrent() {
-		return
-	}
-
 	// Attempt to look up the height of the provided stop hash.
 	endIdx := database.AllShas
 	height, err := p.server.db.FetchBlockHeightBySha(&msg.HashStop)
@@ -1172,7 +1175,7 @@ func (p *peer) handleGetHeadersMsg(msg *wire.MsgGetHeaders) {
 	// provided locator are known.  This does mean the client will start
 	// over with the genesis block if unknown block locators are provided.
 	// This mirrors the behavior in the reference implementation.
-	startIdx := int32(1)
+	startIdx := int64(1)
 	for _, hash := range msg.BlockLocatorHashes {
 		height, err := p.server.db.FetchBlockHeightBySha(hash)
 		if err == nil {
@@ -1221,7 +1224,7 @@ func (p *peer) handleGetHeadersMsg(msg *wire.MsgGetHeaders) {
 
 		// Start at the next block header after the latest one on the
 		// next loop iteration.
-		start += int32(len(hashList))
+		start += int64(len(hashList))
 	}
 	p.QueueMessage(headersMsg, nil)
 }
@@ -1771,7 +1774,7 @@ out:
 
 			// Create and send as many inv messages as needed to
 			// drain the inventory send queue.
-			invMsg := wire.NewMsgInvSizeHint(uint(invSendQueue.Len()))
+			invMsg := wire.NewMsgInv()
 			for e := invSendQueue.Front(); e != nil; e = invSendQueue.Front() {
 				iv := invSendQueue.Remove(e).(*wire.InvVect)
 
@@ -1786,7 +1789,7 @@ out:
 					waiting = queuePacket(
 						outMsg{msg: invMsg},
 						pendingMsgs, waiting)
-					invMsg = wire.NewMsgInvSizeHint(uint(invSendQueue.Len()))
+					invMsg = wire.NewMsgInv()
 				}
 
 				// Add the inventory that is being relayed to
@@ -2114,9 +2117,6 @@ func newOutboundPeer(s *server, addr string, persistent bool, retryCount int64) 
 		if p.retryCount > 0 {
 			scaledInterval := connectionRetryInterval.Nanoseconds() * p.retryCount / 2
 			scaledDuration := time.Duration(scaledInterval)
-			if scaledDuration > maxConnectionRetryInterval {
-				scaledDuration = maxConnectionRetryInterval
-			}
 			srvrLog.Debugf("Retrying connection to %s in %s", addr, scaledDuration)
 			time.Sleep(scaledDuration)
 		}

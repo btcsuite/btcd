@@ -249,7 +249,7 @@ func IsMultisigSigScript(script []byte) bool {
 func isNullData(pops []parsedOpcode) bool {
 	// A nulldata transaction is either a single OP_RETURN or an
 	// OP_RETURN SMALLDATA (where SMALLDATA is a data push up to
-	// MaxDataCarrierSize bytes).
+	// maxDataCarrierSize bytes).
 	l := len(pops)
 	if l == 1 && pops[0].opcode.value == OP_RETURN {
 		return true

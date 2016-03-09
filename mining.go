@@ -170,7 +170,7 @@ type BlockTemplate struct {
 	block           *wire.MsgBlock
 	fees            []int64
 	sigOpCounts     []int64
-	height          int32
+	height          int64
 	validPayAddress bool
 }
 
@@ -286,7 +286,7 @@ func getCoinbaseExtranonces(msgBlock *wire.MsgBlock) []uint64 {
 // block by regenerating the coinbase script with the passed value and block
 // height.  It also recalculates and updates the new merkle root that results
 // from changing the coinbase script.
-func UpdateExtraNonce(msgBlock *wire.MsgBlock, blockHeight int32,
+func UpdateExtraNonce(msgBlock *wire.MsgBlock, blockHeight int64,
 	extraNonces []uint64) error {
 	// First block has no extranonce.
 	if blockHeight == 1 {
@@ -322,7 +322,7 @@ func UpdateExtraNonce(msgBlock *wire.MsgBlock, blockHeight int32,
 // address handling is useful.
 func createCoinbaseTx(coinbaseScript []byte,
 	opReturnPkScript []byte,
-	nextBlockHeight int32,
+	nextBlockHeight int64,
 	addr dcrutil.Address,
 	voters uint16,
 	params *chaincfg.Params) (*dcrutil.Tx, error) {
@@ -443,7 +443,7 @@ func createCoinbaseTx(coinbaseScript []byte,
 // to the passed transaction as spent.  It also adds the passed transaction to
 // the store at the provided height.
 func spendTransaction(txStore blockchain.TxStore, tx *dcrutil.Tx,
-	height int32) error {
+	height int64) error {
 	for _, txIn := range tx.MsgTx().TxIn {
 		originHash := &txIn.PreviousOutPoint.Hash
 		originIndex := txIn.PreviousOutPoint.Index
@@ -647,7 +647,7 @@ func deepCopyBlockTemplate(blockTemplate *BlockTemplate) *BlockTemplate {
 // work off of is present, it will return a copy of that template to pass to the
 // miner.
 // Safe for concurrent access.
-func handleTooFewVoters(nextHeight int32,
+func handleTooFewVoters(nextHeight int64,
 	miningAddress dcrutil.Address,
 	bm *blockManager) (*BlockTemplate, error) {
 	timeSource := bm.server.timeSource
@@ -822,7 +822,7 @@ func handleTooFewVoters(nextHeight int32,
 					block:           btMsgBlock,
 					fees:            []int64{0},
 					sigOpCounts:     []int64{0},
-					height:          int32(topBlock.MsgBlock().Header.Height),
+					height:          int64(topBlock.MsgBlock().Header.Height),
 					validPayAddress: miningAddress != nil,
 				}
 
@@ -1171,7 +1171,7 @@ mempoolLoop:
 			}
 
 			if !((blockHash == *prevHash) &&
-				(int32(blockHeight) == nextBlockHeight-1)) {
+				(int64(blockHeight) == nextBlockHeight-1)) {
 				minrLog.Tracef("Skipping ssgen tx %s because it does "+
 					"not vote on the correct block", tx.Sha())
 				continue
@@ -1255,7 +1255,7 @@ mempoolLoop:
 			originTxOut := txData.Tx.MsgTx().TxOut[originIndex]
 			inputValue := originTxOut.Value
 			inputAge := nextBlockHeight - txData.BlockHeight
-			inputValueAge += float64(inputValue * int64(inputAge))
+			inputValueAge += float64(inputValue * inputAge)
 		}
 
 		// Calculate the final transaction priority using the input

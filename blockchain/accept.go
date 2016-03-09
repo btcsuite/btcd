@@ -19,7 +19,7 @@ import (
 // checkCoinbaseUniqueHeight checks to ensure that for all blocks height > 1
 // that the coinbase contains the height encoding to make coinbase hash collisions
 // impossible.
-func checkCoinbaseUniqueHeight(blockHeight int32, block *dcrutil.Block) error {
+func checkCoinbaseUniqueHeight(blockHeight int64, block *dcrutil.Block) error {
 	if !(len(block.MsgBlock().Transactions) > 0) {
 		str := fmt.Sprintf("block %v has no coinbase", block.Sha())
 		return ruleError(ErrNoTransactions, str)
@@ -67,7 +67,7 @@ func checkCoinbaseUniqueHeight(blockHeight int32, block *dcrutil.Block) error {
 }
 
 // IsFinalizedTransaction determines whether or not a transaction is finalized.
-func IsFinalizedTransaction(tx *dcrutil.Tx, blockHeight int32,
+func IsFinalizedTransaction(tx *dcrutil.Tx, blockHeight int64,
 	blockTime time.Time) bool {
 	msgTx := tx.MsgTx()
 
@@ -83,7 +83,7 @@ func IsFinalizedTransaction(tx *dcrutil.Tx, blockHeight int32,
 	// threshold it is a block height.
 	blockTimeOrHeight := int64(0)
 	if lockTime < txscript.LockTimeThreshold {
-		blockTimeOrHeight = int64(blockHeight)
+		blockTimeOrHeight = blockHeight
 	} else {
 		blockTimeOrHeight = blockTime.Unix()
 	}
@@ -153,7 +153,7 @@ func (b *BlockChain) checkBlockContext(block *dcrutil.Block, prevNode *blockNode
 
 		// Check that the node is at the correct height in the blockchain,
 		// as specified in the block header.
-		if blockHeight != int32(block.MsgBlock().Header.Height) {
+		if blockHeight != int64(block.MsgBlock().Header.Height) {
 			errStr := fmt.Sprintf("Block header height invalid; expected %v"+
 				" but %v was found", blockHeight, header.Height)
 			return ruleError(ErrBadBlockHeight, errStr)
@@ -194,7 +194,7 @@ func (b *BlockChain) maybeAcceptBlock(block *dcrutil.Block,
 
 	// The height of this block is one more than the referenced previous
 	// block.
-	blockHeight := int32(0)
+	blockHeight := int64(0)
 	if prevNode != nil {
 		blockHeight = prevNode.height + 1
 	}

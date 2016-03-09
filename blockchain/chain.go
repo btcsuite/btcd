@@ -65,7 +65,7 @@ type blockNode struct {
 	parentHash *chainhash.Hash
 
 	// height is the position in the block chain.
-	height int32
+	height int64
 
 	// workSum is the total amount of work in the chain up to and including
 	// this node.
@@ -100,7 +100,7 @@ type blockNode struct {
 // for the passed block.  The work sum is updated accordingly when the node is
 // inserted into a chain.
 func newBlockNode(blockHeader *wire.BlockHeader, blockSha *chainhash.Hash,
-	height int32, voteBits []uint16) *blockNode {
+	height int64, voteBits []uint16) *blockNode {
 	// Make a copy of the hash so the node doesn't keep a reference to part
 	// of the full block/block header preventing it from being garbage
 	// collected.
@@ -167,11 +167,11 @@ type BlockChain struct {
 	db                    database.Db
 	tmdb                  *stake.TicketDB
 	chainParams           *chaincfg.Params
-	checkpointsByHeight   map[int32]*chaincfg.Checkpoint
+	checkpointsByHeight   map[int64]*chaincfg.Checkpoint
 	notifications         NotificationCallback
-	minMemoryNodes        int32
+	minMemoryNodes        int64
 	blocksPerRetarget     int64
-	stakeValidationHeight int32
+	stakeValidationHeight int64
 	root                  *blockNode
 	bestChain             *blockNode
 	index                 map[chainhash.Hash]*blockNode
@@ -190,7 +190,7 @@ type BlockChain struct {
 
 // StakeValidationHeight returns the height at which proof of stake validation
 // begins for proof of work block headers.
-func (b *BlockChain) StakeValidationHeight() int32 {
+func (b *BlockChain) StakeValidationHeight() int64 {
 	return b.stakeValidationHeight
 }
 
@@ -504,7 +504,7 @@ func (b *BlockChain) GenerateInitialIndex() error {
 
 		// Start at the next block after the latest one on the next loop
 		// iteration.
-		start += int32(len(hashList))
+		start += int64(len(hashList))
 	}
 
 	return nil
@@ -529,7 +529,7 @@ func (b *BlockChain) loadBlockNode(hash *chainhash.Hash) (*blockNode, error) {
 		}
 	}
 	node := newBlockNode(&block.MsgBlock().Header, hash,
-		int32(block.MsgBlock().Header.Height), voteBitsStake)
+		int64(block.MsgBlock().Header.Height), voteBitsStake)
 	node.inMainChain = true
 	prevHash := &block.MsgBlock().Header.PrevBlock
 
@@ -696,7 +696,7 @@ func (b *BlockChain) getPrevNodeFromNode(node *blockNode) (*blockNode, error) {
 // the node with a desired block height; it returns this block. The benefit is
 // this works for both the main chain and the side chain.
 func (b *BlockChain) getNodeAtHeightFromTopNode(node *blockNode,
-	toTraverse int32) (*blockNode, error) {
+	toTraverse int64) (*blockNode, error) {
 	oldNode := node
 	var err error
 
@@ -812,7 +812,7 @@ func (b *BlockChain) pruneBlockNodes() error {
 	// the latter loads the node and the goal is to find nodes still in
 	// memory that can be pruned.
 	newRootNode := b.bestChain
-	for i := int32(0); i < b.minMemoryNodes-1 && newRootNode != nil; i++ {
+	for i := int64(0); i < b.minMemoryNodes-1 && newRootNode != nil; i++ {
 		newRootNode = newRootNode.parent
 	}
 
@@ -1089,8 +1089,8 @@ func (b *BlockChain) disconnectBlock(node *blockNode, block *dcrutil.Block) erro
 
 	// Insert block into ticket database if we're the point where tickets begin to
 	// mature.
-	maturityHeight := int32(b.chainParams.TicketMaturity) +
-		int32(b.chainParams.CoinbaseMaturity)
+	maturityHeight := int64(b.chainParams.TicketMaturity) +
+		int64(b.chainParams.CoinbaseMaturity)
 
 	// Remove from ticket database.
 	if node.height-1 >= maturityHeight {
@@ -1551,9 +1551,9 @@ func maxInt64(a, b int64) int64 {
 func New(db database.Db, tmdb *stake.TicketDB, params *chaincfg.Params,
 	c NotificationCallback) *BlockChain {
 	// Generate a checkpoint by height map from the provided checkpoints.
-	var checkpointsByHeight map[int32]*chaincfg.Checkpoint
+	var checkpointsByHeight map[int64]*chaincfg.Checkpoint
 	if len(params.Checkpoints) > 0 {
-		checkpointsByHeight = make(map[int32]*chaincfg.Checkpoint)
+		checkpointsByHeight = make(map[int64]*chaincfg.Checkpoint)
 		for i := range params.Checkpoints {
 			checkpoint := &params.Checkpoints[i]
 			checkpointsByHeight[checkpoint.Height] = checkpoint
@@ -1563,10 +1563,10 @@ func New(db database.Db, tmdb *stake.TicketDB, params *chaincfg.Params,
 	// BlocksPerRetarget is the number of blocks between each difficulty
 	// retarget.  It is calculated based on the retargeting window sizes
 	// in blocks for both PoW and PoS.
-	blocksPerRetargetPoW := int64(params.WorkDiffWindowSize) *
-		params.WorkDiffWindows
-	blocksPerRetargetPoS := int64(params.StakeDiffWindowSize) *
-		params.StakeDiffWindows
+	blocksPerRetargetPoW := int64(params.WorkDiffWindowSize *
+		params.WorkDiffWindows)
+	blocksPerRetargetPoS := int64(params.StakeDiffWindowSize *
+		params.StakeDiffWindows)
 	blocksPerRetarget := maxInt64(blocksPerRetargetPoW, blocksPerRetargetPoS)
 
 	b := BlockChain{

@@ -657,7 +657,7 @@ func checkBlockSanity(block *dcrutil.Block, timeSource MedianTimeSource,
 
 	// Blocks before stake validation height may only have 0x0001
 	// as their VoteBits in the header.
-	if int32(header.Height) < chainParams.StakeValidationHeight {
+	if int64(header.Height) < chainParams.StakeValidationHeight {
 		if header.VoteBits != earlyVoteBitsValue {
 			str := fmt.Sprintf("pre stake validation height block %v "+
 				"contained an invalid votebits value (expected %v, "+
@@ -926,7 +926,7 @@ func (b *BlockChain) checkDupTxs(node *blockNode, parentNode *blockNode,
 // seems unlikely that it will have stake errors (because the miner is then just
 // wasting hash power).
 func (b *BlockChain) CheckBlockStakeSanity(tixStore TicketStore,
-	stakeValidationHeight int32, node *blockNode, block *dcrutil.Block,
+	stakeValidationHeight int64, node *blockNode, block *dcrutil.Block,
 	parent *dcrutil.Block, chainParams *chaincfg.Params) error {
 
 	// Setup variables.
@@ -1344,18 +1344,18 @@ func (b *BlockChain) CheckBlockStakeSanity(tixStore TicketStore,
 // amount, and verifying the signatures to prove the spender was the owner of
 // the decred and therefore allowed to spend them.  As it checks the inputs,
 // it also calculates the total fees for the transaction and returns that value.
-func CheckTransactionInputs(tx *dcrutil.Tx, txHeight int32, txStore TxStore,
+func CheckTransactionInputs(tx *dcrutil.Tx, txHeight int64, txStore TxStore,
 	checkFraudProof bool, chainParams *chaincfg.Params) (int64, error) {
 	// Expired transactions are not allowed.
 	if tx.MsgTx().Expiry != wire.NoExpiryValue {
-		if txHeight >= int32(tx.MsgTx().Expiry) {
+		if txHeight >= int64(tx.MsgTx().Expiry) {
 			errStr := fmt.Sprintf("Transaction indicated an expiry of %v"+
 				" while the current height is %v", tx.MsgTx().Expiry, txHeight)
 			return 0, ruleError(ErrExpiredTx, errStr)
 		}
 	}
 
-	ticketMaturity := int32(chainParams.TicketMaturity)
+	ticketMaturity := int64(chainParams.TicketMaturity)
 	stakeEnabledHeight := chainParams.StakeEnabledHeight
 	txHash := tx.Sha()
 	var totalAtomIn int64
@@ -1483,7 +1483,7 @@ func CheckTransactionInputs(tx *dcrutil.Tx, txHeight int32, txStore TxStore,
 			return 0, ruleError(ErrUnparseableSSGen, errStr)
 		}
 
-		stakeVoteSubsidy := CalcStakeVoteSubsidy(int32(heightVotingOn),
+		stakeVoteSubsidy := CalcStakeVoteSubsidy(int64(heightVotingOn),
 			chainParams)
 
 		// AmountIn for the input should be equal to the stake subsidy.
@@ -1744,7 +1744,7 @@ func CheckTransactionInputs(tx *dcrutil.Tx, txHeight int32, txStore TxStore,
 		if isSSGen && idx == 0 {
 			// However, do add the reward amount.
 			_, heightVotingOn, _ := stake.GetSSGenBlockVotedOn(tx)
-			stakeVoteSubsidy := CalcStakeVoteSubsidy(int32(heightVotingOn),
+			stakeVoteSubsidy := CalcStakeVoteSubsidy(int64(heightVotingOn),
 				chainParams)
 			totalAtomIn += stakeVoteSubsidy
 			continue
@@ -1778,7 +1778,7 @@ func CheckTransactionInputs(tx *dcrutil.Tx, txHeight int32, txStore TxStore,
 				return 0, ruleError(ErrFraudAmountIn, str)
 			}
 
-			if int32(txIn.BlockHeight) != originTx.BlockHeight {
+			if int64(txIn.BlockHeight) != originTx.BlockHeight {
 				str := fmt.Sprintf("bad fraud check block height (expected %v, "+
 					"given %v) for txIn %v", originTx.BlockHeight,
 					txIn.BlockHeight, idx)
@@ -1795,7 +1795,7 @@ func CheckTransactionInputs(tx *dcrutil.Tx, txHeight int32, txStore TxStore,
 
 		// Ensure the transaction is not spending coins which have not
 		// yet reached the required coinbase maturity.
-		coinbaseMaturity := int32(chainParams.CoinbaseMaturity)
+		coinbaseMaturity := int64(chainParams.CoinbaseMaturity)
 		if IsCoinBase(originTx.Tx) {
 			originHeight := originTx.BlockHeight
 			blocksSincePrev := txHeight - originHeight
@@ -1889,7 +1889,7 @@ func CheckTransactionInputs(tx *dcrutil.Tx, txHeight int32, txStore TxStore,
 
 			originHeight := originTx.BlockHeight
 			blocksSincePrev := txHeight - originHeight
-			if blocksSincePrev < int32(chainParams.SStxChangeMaturity) {
+			if blocksSincePrev < int64(chainParams.SStxChangeMaturity) {
 				str := fmt.Sprintf("tried to spend OP_SSGEN or "+
 					"OP_SSRTX output from tx %v from height %v at "+
 					"height %v before required maturity "+
@@ -1904,7 +1904,7 @@ func CheckTransactionInputs(tx *dcrutil.Tx, txHeight int32, txStore TxStore,
 		if scriptClass == txscript.StakeSubChangeTy {
 			originHeight := originTx.BlockHeight
 			blocksSincePrev := txHeight - originHeight
-			if blocksSincePrev < int32(chainParams.SStxChangeMaturity) {
+			if blocksSincePrev < int64(chainParams.SStxChangeMaturity) {
 				str := fmt.Sprintf("tried to spend SStx change "+
 					"output from tx %v from height %v at "+
 					"height %v before required maturity "+
@@ -2046,7 +2046,7 @@ func checkP2SHNumSigOps(txs []*dcrutil.Tx, txInputStore TxStore,
 // checkStakeBaseAmounts calculates the total amount given as subsidy from
 // single stakebase transactions (votes) within a block. This function skips a
 // ton of checks already performed by CheckTransactionInputs.
-func checkStakeBaseAmounts(height int32, params *chaincfg.Params,
+func checkStakeBaseAmounts(height int64, params *chaincfg.Params,
 	txs []*dcrutil.Tx, txStore TxStore) error {
 	for _, tx := range txs {
 		if is, _ := stake.IsSSGen(tx); is {
@@ -2121,7 +2121,7 @@ func getStakeBaseAmounts(txs []*dcrutil.Tx, txStore TxStore) (int64, error) {
 
 // getStakeTreeFees determines the amount of fees for in the stake tx tree
 // of some node given a transaction store.
-func getStakeTreeFees(height int32, params *chaincfg.Params,
+func getStakeTreeFees(height int64, params *chaincfg.Params,
 	txs []*dcrutil.Tx, txStore TxStore) (dcrutil.Amount, error) {
 	totalInputs := int64(0)
 	totalOutputs := int64(0)
