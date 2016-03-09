@@ -36,7 +36,6 @@ func TstAppDataDir(goos, appName string, roaming bool) string {
 // unexported fields with the parameters hash and netID.
 func TstAddressPubKeyHash(hash [ripemd160.Size]byte,
 	netID [2]byte) *AddressPubKeyHash {
-
 	return &AddressPubKeyHash{
 		hash:  hash,
 		netID: netID,
@@ -71,5 +70,5 @@ func TstAddressPubKey(serializedPubKey []byte, pubKeyFormat PubKeyFormat,
 // P2PKH and P2SH decred addresses.
 func TstAddressSAddr(addr string) []byte {
 	decoded := base58.Decode(addr)
-	return decoded[1 : 1+ripemd160.Size]
+	return decoded[2 : 2+ripemd160.Size]
 }

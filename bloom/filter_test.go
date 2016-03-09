@@ -185,19 +185,16 @@ func TestFilterInsertKey(t *testing.T) {
 }
 
 func TestFilterBloomMatch(t *testing.T) {
-	str := "0100000001cd24a3a215761757d2b565994b5f544be8cc7996e7835a0b326" +
-		"feed9f8a3072802000000016a47304402200d1f455ff952f3fae2f9b3d5c" +
-		"471371ba9d09789abb5cd80f01c6576c6d760e70220283aaa6e18a043a3b" +
-		"5d105d6fccaca8edf31b705b75d82488414366ca48bdda60121030e233e9" +
-		"6e98d98336bd2b3f4ec23aaa3c9b5c9b57de6d408490a9ce36c9d4326fff" +
-		"fffff0600ca9a3b000000001976a914e6719fd3749c5ed40f193928e8b2a" +
-		"d0dd163efe588acf82f357a0a0000001976a91468447782004ae8718618f" +
-		"d752f1d02e285f897d488ac00ca9a3b000000001976a9148d2b19f048851" +
-		"857afd872acde7ccf93bf16f5d488ac00ca9a3b000000001976a914e5aaf" +
-		"268a042555daabf1e33030f12f61d663ea088ac00ca9a3b000000001976a" +
-		"914f02e3cb22c39d3e6e0179241e52f21df097b17ae88ac00ca9a3b00000" +
-		"0001976a9142ea99ce64965bf8cfb40e8e1b7bf4d2cea89db1988ac00000" +
-		"000"
+	// tx 2 from blk 10000
+	str := "0100000001a4fbbbca2416ba4c10c94be9f4a650d37fc4f9a1a4ecded9cc2" +
+		"714aa0a529a750000000000ffffffff02c2d0b32f0000000000001976a91" +
+		"499678d10a90c8df40e4c9af742aa6ebc7764a60e88acbe01611c0000000" +
+		"000001976a9147701528df10cf0c14f9e53925031bd398796c1f988ac000" +
+		"000000000000001e0b52b4c0000000003270000020000006b48304502210" +
+		"08003ce072e4b67f9a98129ac2f58e3de6e06f47a15e248d4375d19dfb52" +
+		"7a02d02204ab0a0dfe7c69024ae8e524e01d1c45183efda945a0d411e4e9" +
+		"4b69be21efbe601210270c906c3ba64ba5eb3943cc012a3b142ef169f066" +
+		"002515bf9ec1bd9b7e27f0d"
 	strBytes, err := hex.DecodeString(str)
 	if err != nil {
 		t.Errorf("TestFilterBloomMatch DecodeString failure: %v", err)
@@ -208,36 +205,20 @@ func TestFilterBloomMatch(t *testing.T) {
 		t.Errorf("TestFilterBloomMatch NewTxFromBytes failure: %v", err)
 		return
 	}
-	spendingTxBytes := []byte{0x01, 0x00, 0x00, 0x00, 0x01, 0x6b, 0xff, 0x7f,
-		0xcd, 0x4f, 0x85, 0x65, 0xef, 0x40, 0x6d, 0xd5, 0xd6,
-		0x3d, 0x4f, 0xf9, 0x4f, 0x31, 0x8f, 0xe8, 0x20, 0x27,
-		0xfd, 0x4d, 0xc4, 0x51, 0xb0, 0x44, 0x74, 0x01, 0x9f,
-		0x74, 0xb4, 0x00, 0x00, 0x00, 0x00, 0x8c, 0x49, 0x30,
-		0x46, 0x02, 0x21, 0x00, 0xda, 0x0d, 0xc6, 0xae, 0xce,
-		0xfe, 0x1e, 0x06, 0xef, 0xdf, 0x05, 0x77, 0x37, 0x57,
-		0xde, 0xb1, 0x68, 0x82, 0x09, 0x30, 0xe3, 0xb0, 0xd0,
-		0x3f, 0x46, 0xf5, 0xfc, 0xf1, 0x50, 0xbf, 0x99, 0x0c,
-		0x02, 0x21, 0x00, 0xd2, 0x5b, 0x5c, 0x87, 0x04, 0x00,
-		0x76, 0xe4, 0xf2, 0x53, 0xf8, 0x26, 0x2e, 0x76, 0x3e,
-		0x2d, 0xd5, 0x1e, 0x7f, 0xf0, 0xbe, 0x15, 0x77, 0x27,
-		0xc4, 0xbc, 0x42, 0x80, 0x7f, 0x17, 0xbd, 0x39, 0x01,
-		0x41, 0x04, 0xe6, 0xc2, 0x6e, 0xf6, 0x7d, 0xc6, 0x10,
-		0xd2, 0xcd, 0x19, 0x24, 0x84, 0x78, 0x9a, 0x6c, 0xf9,
-		0xae, 0xa9, 0x93, 0x0b, 0x94, 0x4b, 0x7e, 0x2d, 0xb5,
-		0x34, 0x2b, 0x9d, 0x9e, 0x5b, 0x9f, 0xf7, 0x9a, 0xff,
-		0x9a, 0x2e, 0xe1, 0x97, 0x8d, 0xd7, 0xfd, 0x01, 0xdf,
-		0xc5, 0x22, 0xee, 0x02, 0x28, 0x3d, 0x3b, 0x06, 0xa9,
-		0xd0, 0x3a, 0xcf, 0x80, 0x96, 0x96, 0x8d, 0x7d, 0xbb,
-		0x0f, 0x91, 0x78, 0xff, 0xff, 0xff, 0xff, 0x02, 0x8b,
-		0xa7, 0x94, 0x0e, 0x00, 0x00, 0x00, 0x00, 0x19, 0x76,
-		0xa9, 0x14, 0xba, 0xde, 0xec, 0xfd, 0xef, 0x05, 0x07,
-		0x24, 0x7f, 0xc8, 0xf7, 0x42, 0x41, 0xd7, 0x3b, 0xc0,
-		0x39, 0x97, 0x2d, 0x7b, 0x88, 0xac, 0x40, 0x94, 0xa8,
-		0x02, 0x00, 0x00, 0x00, 0x00, 0x19, 0x76, 0xa9, 0x14,
-		0xc1, 0x09, 0x32, 0x48, 0x3f, 0xec, 0x93, 0xed, 0x51,
-		0xf5, 0xfe, 0x95, 0xe7, 0x25, 0x59, 0xf2, 0xcc, 0x70,
-		0x43, 0xf9, 0x88, 0xac, 0x00, 0x00, 0x00, 0x00, 0x00}
-
+	spendingStr := "01000000018c5e1f62f83d750a0ee228c228731eae241e6b483e5b63be199" +
+		"12846eb2d11500000000000ffffffff02ed44871d0000000000001976a91" +
+		"461788151a27fad1a9c609fa29a2bd43886e2dd4088ac75a815120000000" +
+		"000001976a91483419547ee3db5c0ee29f347740ff7f448e8ab2c88ac000" +
+		"000000000000001c2d0b32f0000000010270000010000006b48304502210" +
+		"0aca38b780893b6be3287efa908ace8bb8b91af0477ab433f101889b86bb" +
+		"d9c2d0220789a177956f91c75141ea527573294a20f6fc0ea8bd5cc33550" +
+		"4a0654ae197e30121025516815b900e10e51824ea1f451fd197fb11209af" +
+		"60c5c52f9a8cf3edad5dc09"
+	spendingTxBytes, err := hex.DecodeString(spendingStr)
+	if err != nil {
+		t.Errorf("TestFilterBloomMatch DecodeString failure: %v", err)
+		return
+	}
 	spendingTx, err := dcrutil.NewTxFromBytes(spendingTxBytes)
 	if err != nil {
 		t.Errorf("TestFilterBloomMatch NewTxFromBytes failure: %v", err)
@@ -245,7 +226,8 @@ func TestFilterBloomMatch(t *testing.T) {
 	}
 
 	f := bloom.NewFilter(10, 0, 0.000001, wire.BloomUpdateAll)
-	inputStr := "b4749f017444b051c44dfd2720e88f314ff94f3dd6d56d40ef65854fcd7fff6b"
+	inputStr := "50112deb46289119be635b3e486b1e24ae1e7328c228e20e0a753df8621f5e8c"
+	//2a94d783a177460fd00c633ce3011f0e172a721097887ab2de983d741dc8d8f5"
 	sha, err := chainhash.NewHashFromStr(inputStr)
 	if err != nil {
 		t.Errorf("TestFilterBloomMatch NewShaHashFromStr failed: %v\n", err)
@@ -257,7 +239,7 @@ func TestFilterBloomMatch(t *testing.T) {
 	}
 
 	f = bloom.NewFilter(10, 0, 0.000001, wire.BloomUpdateAll)
-	inputStr = "6bff7fcd4f8565ef406dd5d63d4ff94f318fe82027fd4dc451b04474019f74b4"
+	inputStr = "8c5e1f62f83d750a0ee228c228731eae241e6b483e5b63be19912846eb2d1150"
 	shaBytes, err := hex.DecodeString(inputStr)
 	if err != nil {
 		t.Errorf("TestFilterBloomMatch DecodeString failed: %v\n", err)
@@ -269,9 +251,9 @@ func TestFilterBloomMatch(t *testing.T) {
 	}
 
 	f = bloom.NewFilter(10, 0, 0.000001, wire.BloomUpdateAll)
-	inputStr = "30450220070aca44506c5cef3a16ed519d7c3c39f8aab192c4e1c90d065" +
-		"f37b8a4af6141022100a8e160b856c2d43d27d8fba71e5aef6405b8643" +
-		"ac4cb7cb3c462aced7f14711a01"
+	inputStr = "30450221008003ce072e4b67f9a98129ac2f58e3de6e06f47a15e248d43" +
+		"75d19dfb527a02d02204ab0a0dfe7c69024ae8e524e01d1c45183efda945a0" +
+		"d411e4e94b69be21efbe601"
 	shaBytes, err = hex.DecodeString(inputStr)
 	if err != nil {
 		t.Errorf("TestFilterBloomMatch DecodeString failed: %v\n", err)
@@ -283,9 +265,7 @@ func TestFilterBloomMatch(t *testing.T) {
 	}
 
 	f = bloom.NewFilter(10, 0, 0.000001, wire.BloomUpdateAll)
-	inputStr = "046d11fee51b0e60666d5049a9101a72741df480b96ee26488a4d3466b95" +
-		"c9a40ac5eeef87e10a5cd336c19a84565f80fa6c547957b7700ff4dfbdefe" +
-		"76036c339"
+	inputStr = "0270c906c3ba64ba5eb3943cc012a3b142ef169f066002515bf9ec1bd9b7e27f0d"
 	shaBytes, err = hex.DecodeString(inputStr)
 	if err != nil {
 		t.Errorf("TestFilterBloomMatch DecodeString failed: %v\n", err)
@@ -297,12 +277,13 @@ func TestFilterBloomMatch(t *testing.T) {
 	}
 
 	f = bloom.NewFilter(10, 0, 0.000001, wire.BloomUpdateAll)
-	inputStr = "04943fdd508053c75000106d3bc6e2754dbcff19"
+	inputStr = "99678d10a90c8df40e4c9af742aa6ebc7764a60e"
 	shaBytes, err = hex.DecodeString(inputStr)
 	if err != nil {
 		t.Errorf("TestFilterBloomMatch DecodeString failed: %v\n", err)
 		return
 	}
+
 	f.Add(shaBytes)
 	if !f.MatchTxAndUpdate(tx) {
 		t.Errorf("TestFilterBloomMatch didn't match output address %s", inputStr)
@@ -312,7 +293,7 @@ func TestFilterBloomMatch(t *testing.T) {
 	}
 
 	f = bloom.NewFilter(10, 0, 0.000001, wire.BloomUpdateAll)
-	inputStr = "a266436d2965547608b9e15d9032a7b9d64fa431"
+	inputStr = "7701528df10cf0c14f9e53925031bd398796c1f9"
 	shaBytes, err = hex.DecodeString(inputStr)
 	if err != nil {
 		t.Errorf("TestFilterBloomMatch DecodeString failed: %v\n", err)
@@ -324,7 +305,7 @@ func TestFilterBloomMatch(t *testing.T) {
 	}
 
 	f = bloom.NewFilter(10, 0, 0.000001, wire.BloomUpdateAll)
-	inputStr = "90c122d70786e899529d71dbeba91ba216982fb6ba58f3bdaab65e73b7e9260b"
+	inputStr = "759a520aaa1427ccd9deeca4a1f9c47fd350a6f4e94bc9104cba1624cabbfba4"
 	sha, err = chainhash.NewHashFromStr(inputStr)
 	if err != nil {
 		t.Errorf("TestFilterBloomMatch NewShaHashFromStr failed: %v\n", err)
@@ -335,7 +316,7 @@ func TestFilterBloomMatch(t *testing.T) {
 	if !f.MatchTxAndUpdate(tx) {
 		t.Errorf("TestFilterBloomMatch didn't match outpoint %s", inputStr)
 	}
-
+	// XXX unchanged from btcd
 	f = bloom.NewFilter(10, 0, 0.000001, wire.BloomUpdateAll)
 	inputStr = "00000009e784f32f62ef849763d4f45b98e07ba658647343b915ff832b110436"
 	sha, err = chainhash.NewHashFromStr(inputStr)
@@ -348,6 +329,7 @@ func TestFilterBloomMatch(t *testing.T) {
 		t.Errorf("TestFilterBloomMatch matched sha %s", inputStr)
 	}
 
+	// XXX unchanged from btcd
 	f = bloom.NewFilter(10, 0, 0.000001, wire.BloomUpdateAll)
 	inputStr = "0000006d2965547608b9e15d9032a7b9d64fa431"
 	shaBytes, err = hex.DecodeString(inputStr)
@@ -361,7 +343,7 @@ func TestFilterBloomMatch(t *testing.T) {
 	}
 
 	f = bloom.NewFilter(10, 0, 0.000001, wire.BloomUpdateAll)
-	inputStr = "90c122d70786e899529d71dbeba91ba216982fb6ba58f3bdaab65e73b7e9260b"
+	inputStr = "759a520aaa1427ccd9deeca4a1f9c47fd350a6f4e94bc9104cba1624cabbfba4"
 	sha, err = chainhash.NewHashFromStr(inputStr)
 	if err != nil {
 		t.Errorf("TestFilterBloomMatch NewShaHashFromStr failed: %v\n", err)
@@ -373,6 +355,7 @@ func TestFilterBloomMatch(t *testing.T) {
 		t.Errorf("TestFilterBloomMatch matched outpoint %s", inputStr)
 	}
 
+	// XXX unchanged from btcd
 	f = bloom.NewFilter(10, 0, 0.000001, wire.BloomUpdateAll)
 	inputStr = "000000d70786e899529d71dbeba91ba216982fb6ba58f3bdaab65e73b7e9260b"
 	sha, err = chainhash.NewHashFromStr(inputStr)
@@ -391,9 +374,7 @@ func TestFilterInsertUpdateNone(t *testing.T) {
 	f := bloom.NewFilter(10, 0, 0.000001, wire.BloomUpdateNone)
 
 	// Add the generation pubkey
-	inputStr := "04eaafc2314def4ca98ac970241bcab022b9c1e1f4ea423a20f134c" +
-		"876f2c01ec0f0dd5b2e86e7168cefe0d81113c3807420ce13ad1357231a" +
-		"2252247d97a46a91"
+	inputStr := "0270c906c3ba64ba5eb3943cc012a3b142ef169f066002515bf9ec1bd9b7e27f0d"
 	inputBytes, err := hex.DecodeString(inputStr)
 	if err != nil {
 		t.Errorf("TestFilterInsertUpdateNone DecodeString failed: %v", err)
@@ -437,48 +418,111 @@ func TestFilterInsertUpdateNone(t *testing.T) {
 	}
 }
 
+/*  XXX This test is commented out because we don't have a pay to pubkey tx to use
 func TestFilterInsertP2PubKeyOnly(t *testing.T) {
-	blockStr := "000000004ad131bae9cb9f74b8bcd928" +
-		"a60dfe4dadabeb31b1e79403385f9ac4" +
-		"ccc28b7400429e56f7df2872aaaa0c16" +
-		"221cb09059bd3ea897de156ff51202ff" +
-		"72b2cd8d000000000000000000000000" +
-		"00000000000000000000000000000000" +
-		"00000000010000000000000000000000" +
-		"22000000ffff7f20002d310100000000" +
-		"640000007601000063a0815601000000" +
-		"00000000000000000000000000000000" +
-		"00000000000000000000000000000000" +
-		"00000000010100000001000000000000" +
-		"00000000000000000000000000000000" +
-		"00000000000000000000ffffffff00ff" +
-		"ffffff0380b2e60e00000000000017a9" +
-		"144fa6cbd0dbe5ec407fe4c8ad374e66" +
-		"7771fa0d448700000000000000000000" +
-		"226a2000000000000000000000000000" +
-		"0000009e0453a6ab10610e17a7a5fadc" +
-		"f6c34f002f68590000000000001976a9" +
-		"141b79e6496226f89ad4e049667c1344" +
-		"c16a75815188ac000000000000000001" +
-		"000000000000000000000000ffffffff" +
-		"04deadbeef00"
+	blockStr := "0100000010e21dfb17cb74db95913afb88178fc0f807e1dbdc103d7d951e000" +
+		"000000000d77800ef9ca953feda5dfbc2732080a36f5bef139f5e6967ed70eb2e66" +
+		"2db6158d773a15b0be63cb6d2c9ae2624327cc23cd048c80a378bcdf99882d006e1" +
+		"656010057025082b9fe0500010086a50000a9483b1a3b60bd550000000010270000" +
+		"460b00008d58e556d105d8d10d00000002883001e30003ed0000000000000000000" +
+		"0000000000000000000000000000003010000000100000000000000000000000000" +
+		"00000000000000000000000000000000000000ffffffff00ffffffff03c2f968120" +
+		"0000000000017a914f5916158e3e2c4551c1796708db8367207ed13bb8700000000" +
+		"000000000000266a241027000000000000000000000000000000000000000000000" +
+		"000000033c029e4037975438fecef6e0000000000001976a914a53c75f1b00401d1" +
+		"f6b99378b42a510fba047cf488ac00000000000000000151d4de800000000000000" +
+		"000ffffffff0800002f646372642f0100000001a4fbbbca2416ba4c10c94be9f4a6" +
+		"50d37fc4f9a1a4ecded9cc2714aa0a529a750000000000ffffffff02c2d0b32f000" +
+		"0000000001976a91499678d10a90c8df40e4c9af742aa6ebc7764a60e88acbe0161" +
+		"1c0000000000001976a9147701528df10cf0c14f9e53925031bd398796c1f988ac0" +
+		"00000000000000001e0b52b4c0000000003270000020000006b4830450221008003" +
+		"ce072e4b67f9a98129ac2f58e3de6e06f47a15e248d4375d19dfb527a02d02204ab" +
+		"0a0dfe7c69024ae8e524e01d1c45183efda945a0d411e4e94b69be21efbe6012102" +
+		"70c906c3ba64ba5eb3943cc012a3b142ef169f066002515bf9ec1bd9b7e27f0d010" +
+		"00000012255285989c87ae46390d6f9264b0caec6a5dcd0b617ab91751abd2c7399" +
+		"96f00000000000ffffffff02c68c7c3b0000000000001976a9140bda096c8d1dbff" +
+		"2f8d8cbb1128d75a583757d7888aca1b4a61d0000000000001976a9147dbb01c8a8" +
+		"4270cb216b9876116be20f3a50842988ac000000000000000001c7243a590000000" +
+		"00e270000010000006b483045022100b8dd3bfe1f2615a49c1e036fd96c0317bbde" +
+		"b6969ef2ef5e3b76cf08e2a9ded80220445a7784234e22345b1eba645064de19c06" +
+		"a4aca2bab900bae73e9db3a2d0714012102d2e8fce341baf5ca38a4a1b326d83e88" +
+		"2351bb636a27ae8254c5f3a7522a894d06010000000200000000000000000000000" +
+		"00000000000000000000000000000000000000000ffffffff00fffffffffc791ced" +
+		"ee5775a758b8e6e923229ee8e95a10ea3d3a67664534d347fa3953450000000001f" +
+		"fffffff0300000000000000000000266a2410e21dfb17cb74db95913afb88178fc0" +
+		"f807e1dbdc103d7d951e0000000000000f27000000000000000000000000046a020" +
+		"1000e8bf7160000000000001abb76a914f663ba38f4dd832c44fb2f542ede4c2666" +
+		"363d1888ac0000000000000000020ec90b0b0000000000000000ffffffff0200000" +
+		"0c2eb0b000000001a010000100000006b483045022100e8e6e72446fa2dc3b7a7bf" +
+		"0b4432c80a4e22f210ae189a0072ba4b969ce55eab02207d8cc45ddaa162fee8140" +
+		"eb6e022e0e51254460f09bfbe5376b41b6e3f791c7d01210347deaf15765d2beafa" +
+		"dbe889e0f54c166e373d999c257c5f7179976ed9b70d6c010000000200000000000" +
+		"00000000000000000000000000000000000000000000000000000ffffffff00ffff" +
+		"ffff495a0ed5592ba2b26b0acfb7b9e325dca51fa1a93bf6336492a4267c7182c27" +
+		"80000000001ffffffff0300000000000000000000266a2410e21dfb17cb74db9591" +
+		"3afb88178fc0f807e1dbdc103d7d951e0000000000000f270000000000000000000" +
+		"00000046a0201000e8bf7160000000000001abb76a914b3653f61256f0370d9c46c" +
+		"beaf2678098ecaae8c88ac0000000000000000020ec90b0b0000000000000000fff" +
+		"fffff02000000c2eb0b00000000ff030000120000006b483045022100de2129a98d" +
+		"10632cdc8131b77b88cf8fcdc68104b1c31578d1f07c372b6bb37f02204f692b1bf" +
+		"326d120f462ae786fd054259269e95f83dcd43bf37f3f359766848c012102a997b5" +
+		"3a4deee42ca96822adcbb5b63980c08187257eb7138c5f5967ea9b5e84010000000" +
+		"20000000000000000000000000000000000000000000000000000000000000000ff" +
+		"ffffff00ffffffff636c0e52ed7d6afea4828e7147600ce778557ef424028b150ca" +
+		"b895516cb36450000000001ffffffff0300000000000000000000266a2410e21dfb" +
+		"17cb74db95913afb88178fc0f807e1dbdc103d7d951e0000000000000f270000000" +
+		"00000000000000000046a020100f3a93b310000000000001abb76a9144f93a2c1b4" +
+		"09e6aa399d37e4a435f0086b87c43088ac0000000000000000020ec90b0b0000000" +
+		"000000000ffffffff020000e5e02f2600000000ab1f00000f0000006b4830450221" +
+		"00a121c61f6b5d5012de930614a84ca6e7f798889069e3b8a92ebe5fbcd94c2d1d0" +
+		"2205f5e8a42269dab2f10b6c5a528265355156ff4d2eba6620c262c1a73e1ce2838" +
+		"012102553f2256d720656e16dc2cecb1bbd0ea94280f78617090b53e37534c4afaf" +
+		"12b0100000002000000000000000000000000000000000000000000000000000000" +
+		"0000000000ffffffff00ffffffff7df80e77cb5de63fb8626c8026f7cc4b59247f3" +
+		"cb57ba80d7509775e3bf6347a0000000001ffffffff030000000000000000000026" +
+		"6a2410e21dfb17cb74db95913afb88178fc0f807e1dbdc103d7d951e00000000000" +
+		"00f27000000000000000000000000046a0201000e8bf7160000000000001abb76a9" +
+		"14ca61454827fa8ec70c0b50932146a3c06b40fd9788ac0000000000000000020ec" +
+		"90b0b0000000000000000ffffffff02000000c2eb0b000000001513000005000000" +
+		"6a47304402200d73da1175b966c1cf79589cd6d0e0ecac74e7c34f83977924de127" +
+		"b1224260a02202861be0cb6287ed56cf9b82f6612dd63413fecb9ad10c5961ada87" +
+		"602125d5a4012102db8c515901c9a241d3fec1d5ece0a3bb8f86801b1fd71e24a42" +
+		"b2c09e72a0dd6010000000200000000000000000000000000000000000000000000" +
+		"00000000000000000000ffffffff00ffffffff2835a038696cad2553a3971acd220" +
+		"a30be80aedb7d0a3aeb5357c9a7a666cdb70000000001ffffffff03000000000000" +
+		"00000000266a2410e21dfb17cb74db95913afb88178fc0f807e1dbdc103d7d951e0" +
+		"000000000000f27000000000000000000000000046a0201000e8bf7160000000000" +
+		"001abb76a9140d7fc0368c66be6431599ee1e677fc37d142b1c788ac00000000000" +
+		"00000020ec90b0b0000000000000000ffffffff02000000c2eb0b00000000770300" +
+		"00090000006a47304402203bdf3e84676c6049c17149c581f8a0a8d64173dde8bbd" +
+		"77f139f5896bab9f77702203287ee60b18d564aedd5223e886b88f0fb62813a577c" +
+		"7e68ed4661880428846001210302a52bbbe12b2f66d3d98bf6d680aaa99256d88c4" +
+		"fda136084f182221a24e8c001000000013fa4b56a1b8656d3168195c90977bb7466" +
+		"3c6afdb240a964362c10a18f3e63d90200000001ffffffff033b60bd55000000000" +
+		"0001aba76a914842aafd3611db1dcee0f277675590b4763dbd03a88ac0000000000" +
+		"0000000000206a1e1c7603e2af492e7b721a330ae80e6858c2faf0cb7bab0956000" +
+		"000000058c1f38f4f0000000000001abd76a914c41686ff7f20728574b4203e0c64" +
+		"ab835383155788ac0000000000000000013c9f99a5000000000f270000060000006" +
+		"b483045022100dbbff39a1e8dad70505aaf800c22c3f63322905a5604e4e23d514a" +
+		"36f7367f9102203a5689ce4eb8dfc08c09d71fd288504b36accc5ac92a0372f7bef" +
+		"0ed4fee1d0c012102f1cc83e3cac89e660b4a7d3c217b4ec78a47d982b6cddbbcf0" +
+		"6860d2d522a386"
 	blockBytes, err := hex.DecodeString(blockStr)
 	if err != nil {
 		t.Errorf("TestFilterInsertP2PubKeyOnly DecodeString failed: %v", err)
 		return
 	}
+	fmt.Println(blockStr)
 	block, err := dcrutil.NewBlockFromBytes(blockBytes)
 	if err != nil {
 		t.Errorf("TestFilterInsertP2PubKeyOnly NewBlockFromBytes failed: %v", err)
 		return
 	}
-
+	spew.Dump(block)
 	f := bloom.NewFilter(10, 0, 0.000001, wire.BloomUpdateP2PubkeyOnly)
 
 	// Generation pubkey
-	inputStr := "04eaafc2314def4ca98ac970241bcab022b9c1e1f4ea423a20f134c" +
-		"876f2c01ec0f0dd5b2e86e7168cefe0d81113c3807420ce13ad1357231a" +
-		"2252247d97a46a91"
+	inputStr := "0270c906c3ba64ba5eb3943cc012a3b142ef169f066002515bf9ec1bd9b7e27f0d"
 	inputBytes, err := hex.DecodeString(inputStr)
 	if err != nil {
 		t.Errorf("TestFilterInsertP2PubKeyOnly DecodeString failed: %v", err)
@@ -486,8 +530,8 @@ func TestFilterInsertP2PubKeyOnly(t *testing.T) {
 	}
 	f.Add(inputBytes)
 
-	// Output address of 4th transaction
-	inputStr = "b6efd80d99179f4f4ff6f4dd0a007d018c385d21"
+	// Output address of 2nd transaction
+	inputStr = "99678d10a90c8df40e4c9af742aa6ebc7764a60e"
 	inputBytes, err = hex.DecodeString(inputStr)
 	if err != nil {
 		t.Errorf("TestFilterInsertP2PubKeyOnly DecodeString failed: %v", err)
@@ -499,7 +543,7 @@ func TestFilterInsertP2PubKeyOnly(t *testing.T) {
 	_, _ = bloom.NewMerkleBlock(block, f)
 
 	// We should match the generation pubkey
-	inputStr = "147caa76786596590baa4e98f5d9f48b86c7765e489f7a6ff3360fe5c674360b"
+	inputStr = "391fb1bf339518e41c5a6d124590e776db1d35fffa9205e31dd9a30b60633d79"
 	sha, err := chainhash.NewHashFromStr(inputStr)
 	if err != nil {
 		t.Errorf("TestMerkleBlockP2PubKeyOnly NewShaHashFromStr failed: %v", err)
@@ -513,7 +557,7 @@ func TestFilterInsertP2PubKeyOnly(t *testing.T) {
 	}
 
 	// We should not match the 4th transaction, which is not p2pk
-	inputStr = "02981fa052f0481dbc5868f4fc2166035a10f27a03cfd2de67326471df5bc041"
+	inputStr = "391fb1bf339518e41c5a6d124590e776db1d35fffa9205e31dd9a30b60633d79"
 	sha, err = chainhash.NewHashFromStr(inputStr)
 	if err != nil {
 		t.Errorf("TestMerkleBlockP2PubKeyOnly NewShaHashFromStr failed: %v", err)
@@ -525,7 +569,7 @@ func TestFilterInsertP2PubKeyOnly(t *testing.T) {
 		return
 	}
 }
-
+*/
 func TestFilterReload(t *testing.T) {
 	f := bloom.NewFilter(10, 0, 0.000001, wire.BloomUpdateAll)
 

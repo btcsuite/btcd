@@ -33,6 +33,11 @@ var (
 	// than assuming or defaulting to one or the other, this error is
 	// returned and the caller must decide how to decode the address.
 	ErrAddressCollision = errors.New("address collision")
+
+	// ErrMissingDefaultNet describes an error in DecodeAddress that
+	// attempts to decode an address without defining which network to decode
+	// for.
+	ErrMissingDefaultNet = errors.New("default net not defined")
 )
 
 // encodeAddress returns a human-readable payment address given a ripemd160 hash
@@ -131,6 +136,9 @@ func DecodeAddress(addr string, defaultNet *chaincfg.Params) (Address, error) {
 		}
 		return nil, fmt.Errorf("decoded address is of unknown format: %v",
 			err.Error())
+	}
+	if defaultNet == nil {
+		return nil, ErrMissingDefaultNet
 	}
 	switch netID {
 	case defaultNet.PubKeyAddrID:
@@ -248,7 +256,6 @@ func NewAddressPubKeyHash(pkHash []byte, net *chaincfg.Params,
 		return nil, err
 	}
 	apkh.net = net
-
 	return apkh, nil
 }
 
@@ -263,7 +270,6 @@ func newAddressPubKeyHash(pkHash []byte, netID [2]byte) (*AddressPubKeyHash,
 	if len(pkHash) != ripemd160.Size {
 		return nil, errors.New("pkHash must be 20 bytes")
 	}
-
 	addr := &AddressPubKeyHash{netID: netID}
 	copy(addr.hash[:], pkHash)
 	return addr, nil
