@@ -28,7 +28,7 @@ and [hidden service](#HiddenService) configurations along with
 bridge between regular nodes and hidden service nodes without routing the
 regular connections through Tor.
 
-While it is easier to only run as a client, it is more beneficial to the Bitcoin
+While it is easier to only run as a client, it is more beneficial to the Decred
 network to run as both a client and a server so others may connect to you to as
 you are connecting to them.  We recommend you take the time to setup a Tor
 hidden service for this reason.
