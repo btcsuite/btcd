@@ -1616,6 +1616,7 @@ func newOutPointFromWire(op *wire.OutPoint) dcrjson.OutPoint {
 	return dcrjson.OutPoint{
 		Hash:  op.Hash.String(),
 		Index: op.Index,
+		Tree:  op.Tree,
 	}
 }
 
