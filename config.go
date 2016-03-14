@@ -892,6 +892,11 @@ func loadConfig() (*config, []string, error) {
 		return cfg.lookup(host)
 	}
 	connmgr.ChainParams = activeNetParams.Params
+	permanentPeers := cfg.ConnectPeers
+	if len(permanentPeers) == 0 {
+		permanentPeers = cfg.AddPeers
+	}
+	connmgr.PermanentPeers = permanentPeers
 
 	return &cfg, remainingArgs, nil
 }
