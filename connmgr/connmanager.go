@@ -24,6 +24,9 @@ var (
 
 	// ChainParams identifies the chain params to use.
 	ChainParams *chaincfg.Params = &chaincfg.MainNetParams
+
+	// PermanentPeers is a list of peers to maintain permanent connections.
+	PermanentPeers []string
 )
 
 // ConnManager provides a generic connection manager for the bitcoin network.
@@ -76,6 +79,7 @@ func (cm *ConnManager) seedFromDNS(DNSSeeds []string) {
 func (cm *ConnManager) Start() {
 	cm.AddrManager.Start()
 	cm.seedFromDNS(ChainParams.DNSSeeds)
+	// TODO: Connect PermanentPeers
 }
 
 // New returns a new bitcoin connection manager.
