@@ -16,6 +16,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/btcsuite/btcd/connmgr"
 	"github.com/btcsuite/btcd/database"
 	_ "github.com/btcsuite/btcd/database/ffldb"
 	"github.com/btcsuite/btcd/wire"
@@ -813,7 +814,7 @@ func loadConfig() (*config, []string, error) {
 		cfg.dial = proxy.Dial
 		if !cfg.NoOnion {
 			cfg.lookup = func(host string) ([]net.IP, error) {
-				return torLookupIP(host, cfg.Proxy)
+				return connmgr.TorLookupIP(host, cfg.Proxy)
 			}
 		}
 	}
@@ -852,7 +853,7 @@ func loadConfig() (*config, []string, error) {
 			return proxy.Dial(a, b)
 		}
 		cfg.onionlookup = func(host string) ([]net.IP, error) {
-			return torLookupIP(host, cfg.OnionProxy)
+			return connmgr.TorLookupIP(host, cfg.OnionProxy)
 		}
 	} else {
 		cfg.oniondial = cfg.dial
@@ -877,31 +878,20 @@ func loadConfig() (*config, []string, error) {
 		btcdLog.Warnf("%v", configFileError)
 	}
 
+	// Provide custom dial and lookup funcs to connmgr.
+	connmgr.Dial = func(network, address string) (net.Conn, error) {
+		if strings.Contains(address, ".onion:") {
+			return cfg.oniondial(network, address)
+		}
+		return cfg.dial(network, address)
+	}
+
+	connmgr.Lookup = func(host string) ([]net.IP, error) {
+		if strings.HasSuffix(host, ".onion") {
+			return cfg.onionlookup(host)
+		}
+		return cfg.lookup(host)
+	}
+
 	return &cfg, remainingArgs, nil
-}
-
-// btcdDial connects to the address on the named network using the appropriate
-// dial function depending on the address and configuration options.  For
-// example, .onion addresses will be dialed using the onion specific proxy if
-// one was specified, but will otherwise use the normal dial function (which
-// could itself use a proxy or not).
-func btcdDial(network, address string) (net.Conn, error) {
-	if strings.Contains(address, ".onion:") {
-		return cfg.oniondial(network, address)
-	}
-	return cfg.dial(network, address)
-}
-
-// btcdLookup returns the correct DNS lookup function to use depending on the
-// passed host and configuration options.  For example, .onion addresses will be
-// resolved using the onion specific proxy if one was specified, but will
-// otherwise treat the normal proxy as tor unless --noonion was specified in
-// which case the lookup will fail.  Meanwhile, normal IP addresses will be
-// resolved using tor if a proxy was specified unless --noonion was also
-// specified in which case the normal system DNS resolver will be used.
-func btcdLookup(host string) ([]net.IP, error) {
-	if strings.HasSuffix(host, ".onion") {
-		return cfg.onionlookup(host)
-	}
-	return cfg.lookup(host)
 }
