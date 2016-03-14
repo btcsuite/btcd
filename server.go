@@ -132,6 +132,7 @@ type server struct {
 
 	listeners            []net.Listener
 	chainParams          *chaincfg.Params
+	addrManager          *addrmgr.AddrManager
 	sigCache             *txscript.SigCache
 	rpcServer            *rpcServer
 	connManager          *connmgr.ConnManager
@@ -193,6 +194,20 @@ func newServerPeer(s *server, isPersistent bool) *serverPeer {
 	}
 }
 
+// addKnownAddresses adds the given addresses to the set of known addreses to
+// the peer to prevent sending duplicate addresses.
+func (sp *serverPeer) addKnownAddresses(addresses []*wire.NetAddress) {
+	for _, na := range addresses {
+		sp.knownAddresses[addrmgr.NetAddressKey(na)] = struct{}{}
+	}
+}
+
+// addressKnown true if the given address is already known to the peer.
+func (sp *serverPeer) addressKnown(na *wire.NetAddress) bool {
+	_, exists := sp.knownAddresses[addrmgr.NetAddressKey(na)]
+	return exists
+}
+
 // setDisableRelayTx toggles relaying of transactions for the given peer.
 // It is safe for concurrent access.
 func (sp *serverPeer) setDisableRelayTx(disable bool) {
@@ -214,6 +229,20 @@ func (sp *serverPeer) relayTxDisabled() bool {
 // pushAddrMsg sends an addr message to the connected peer using the provided
 // addresses.
 func (sp *serverPeer) pushAddrMsg(addresses []*wire.NetAddress) {
+	// Filter addresses already known to the peer.
+	addrs := make([]*wire.NetAddress, 0, len(addresses))
+	for _, addr := range addresses {
+		if !sp.addressKnown(addr) {
+			addrs = append(addrs, addr)
+		}
+	}
+	known, err := sp.PushAddrMsg(addrs)
+	if err != nil {
+		peerLog.Errorf("Can't push address message to %s: %v", sp.Peer, err)
+		sp.Disconnect()
+		return
+	}
+	sp.addKnownAddresses(known)
 }
 
 // OnVersion is invoked when a peer receives a version bitcoin message
@@ -230,6 +259,50 @@ func (sp *serverPeer) OnVersion(p *peer.Peer, msg *wire.MsgVersion) {
 	// Choose whether or not to relay transactions before a filter command
 	// is received.
 	sp.setDisableRelayTx(msg.DisableRelayTx)
+
+	// Update the address manager and request known addresses from the
+	// remote peer for outbound connections.  This is skipped when running
+	// on the simulation test network since it is only intended to connect
+	// to specified peers and actively avoids advertising and connecting to
+	// discovered peers.
+	if !cfg.SimNet {
+		addrManager := sp.server.addrManager
+		// Outbound connections.
+		if !p.Inbound() {
+			// TODO(davec): Only do this if not doing the initial block
+			// download and the local address is routable.
+			if !cfg.DisableListen /* && isCurrent? */ {
+				// Get address that best matches.
+				lna := addrManager.GetBestLocalAddress(p.NA())
+				if addrmgr.IsRoutable(lna) {
+					// Filter addresses the peer already knows about.
+					addresses := []*wire.NetAddress{lna}
+					sp.pushAddrMsg(addresses)
+				}
+			}
+
+			// Request known addresses if the server address manager needs
+			// more and the peer has a protocol version new enough to
+			// include a timestamp with addresses.
+			hasTimestamp := p.ProtocolVersion() >=
+				wire.NetAddressTimeVersion
+			if addrManager.NeedMoreAddresses() && hasTimestamp {
+				p.QueueMessage(wire.NewMsgGetAddr(), nil)
+			}
+
+			// Mark the address as a known good address.
+			addrManager.Good(p.NA())
+		} else {
+			// A peer might not be advertising the same address that it
+			// actually connected from.  One example of why this can happen
+			// is with NAT.  Only add the address to the address manager if
+			// the addresses agree.
+			if addrmgr.NetAddressKey(&msg.AddrMe) == addrmgr.NetAddressKey(p.NA()) {
+				addrManager.AddAddress(p.NA(), p.NA())
+				addrManager.Good(p.NA())
+			}
+		}
+	}
 
 	// Add valid peer to the server.
 	sp.server.AddPeer(sp)
@@ -641,6 +714,12 @@ func (sp *serverPeer) OnGetAddr(p *peer.Peer, msg *wire.MsgGetAddr) {
 	if !p.Inbound() {
 		return
 	}
+
+	// Get the current known addresses from the address manager.
+	addrCache := sp.server.addrManager.AddressCache()
+
+	// Push the addresses.
+	sp.pushAddrMsg(addrCache)
 }
 
 // OnAddr is invoked when a peer receives an addr bitcoin message and is
@@ -680,7 +759,17 @@ func (sp *serverPeer) OnAddr(p *peer.Peer, msg *wire.MsgAddr) {
 		if na.Timestamp.After(now.Add(time.Minute * 10)) {
 			na.Timestamp = now.Add(-1 * time.Hour * 24 * 5)
 		}
+
+		// Add address to known addresses for this peer.
+		sp.addKnownAddresses([]*wire.NetAddress{na})
 	}
+
+	// Add addresses to server address manager.  The address manager handles
+	// the details of things such as preventing duplicate addresses, max
+	// addresses, and last seen updates.
+	// XXX bitcoind gives a 2 hour time penalty here, do we want to do the
+	// same?
+	sp.server.addrManager.AddAddresses(msg.AddrList, p.NA())
 }
 
 // OnRead is invoked when a peer receives a message and it is used to update
@@ -952,6 +1041,12 @@ func (s *server) handleDonePeerMsg(state *peerState, sp *serverPeer) {
 		return
 	}
 
+	// Update the address' last seen time if the peer has acknowledged
+	// our version and has sent us its version as well.
+	if sp.VerAckReceived() && sp.VersionKnown() && sp.NA() != nil {
+		s.addrManager.Connected(sp.NA())
+	}
+
 	// If we get here it means that either we didn't know about the peer
 	// or we purposefully deleted it.
 }
@@ -1185,6 +1280,8 @@ func newPeerConfig(sp *serverPeer) *peer.Config {
 			OnAlert: nil,
 		},
 		NewestBlock:      sp.server.db.NewestSha,
+		BestLocalAddress: sp.server.addrManager.GetBestLocalAddress,
+		HostToNetAddress: sp.server.addrManager.HostToNetAddress,
 		Proxy:            cfg.Proxy,
 		UserAgentName:    userAgentName,
 		UserAgentVersion: userAgentVersion,
@@ -1931,6 +2028,7 @@ func newServer(listenAddrs []string, db database.Db, chainParams *chaincfg.Param
 	s := server{
 		listeners:            listeners,
 		chainParams:          chainParams,
+		addrManager:          amgr,
 		newPeers:             make(chan *serverPeer, cfg.MaxPeers),
 		donePeers:            make(chan *serverPeer, cfg.MaxPeers),
 		wakeup:               make(chan struct{}),
