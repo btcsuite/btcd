@@ -1838,7 +1838,11 @@ out:
 				}
 				na := wire.NewNetAddressIPPort(externalip, uint16(listenPort),
 					s.services)
-				srvrLog.Infof("na: %v", na)
+				err = s.connManager.AddrManager.AddLocalAddress(na, addrmgr.UpnpPrio)
+				if err != nil {
+					// XXX DeletePortMapping?
+				}
+				srvrLog.Warnf("Successfully bound via UPnP to %s", addrmgr.NetAddressKey(na))
 				first = false
 			}
 			timer.Reset(time.Minute * 15)
@@ -1866,6 +1870,12 @@ func newServer(listenAddrs []string, db database.DB, chainParams *chaincfg.Param
 	if cfg.NoPeerBloomFilters {
 		services &^= wire.SFNodeBloom
 	}
+
+	cm, err := connmgr.New(cfg.DataDir)
+	if err != nil {
+		return nil, err
+	}
+	amgr := cm.AddrManager
 
 	var listeners []net.Listener
 	var nat NAT
@@ -1902,7 +1912,18 @@ func newServer(listenAddrs []string, db database.DB, chainParams *chaincfg.Param
 					}
 					eport = uint16(port)
 				}
-				srvrLog.Infof("host: %v", host)
+				na, err := amgr.HostToNetAddress(host, eport,
+					services)
+				if err != nil {
+					srvrLog.Warnf("Not adding %s as "+
+						"externalip: %v", sip, err)
+					continue
+				}
+
+				err = amgr.AddLocalAddress(na, addrmgr.ManualPrio)
+				if err != nil {
+					amgrLog.Warnf("Skipping specified external IP: %v", err)
+				}
 			}
 		} else if discover && cfg.Upnp {
 			nat, err = Discover()
@@ -1929,8 +1950,11 @@ func newServer(listenAddrs []string, db database.DB, chainParams *chaincfg.Param
 				}
 				na := wire.NewNetAddressIPPort(ip,
 					uint16(port), services)
-				srvrLog.Infof("na: %v", na)
 				if discover {
+					err = amgr.AddLocalAddress(na, addrmgr.InterfacePrio)
+					if err != nil {
+						amgrLog.Debugf("Skipping local address: %v", err)
+					}
 				}
 			}
 		}
@@ -1946,6 +1970,12 @@ func newServer(listenAddrs []string, db database.DB, chainParams *chaincfg.Param
 			listeners = append(listeners, listener)
 
 			if discover {
+				if na, err := amgr.DeserializeNetAddress(addr); err == nil {
+					err = amgr.AddLocalAddress(na, addrmgr.BoundPrio)
+					if err != nil {
+						amgrLog.Warnf("Skipping bound address: %v", err)
+					}
+				}
 			}
 		}
 
@@ -1958,6 +1988,12 @@ func newServer(listenAddrs []string, db database.DB, chainParams *chaincfg.Param
 			}
 			listeners = append(listeners, listener)
 			if discover {
+				if na, err := amgr.DeserializeNetAddress(addr); err == nil {
+					err = amgr.AddLocalAddress(na, addrmgr.BoundPrio)
+					if err != nil {
+						amgrLog.Warnf("Skipping bound address: %v", err)
+					}
+				}
 			}
 		}
 
@@ -2022,10 +2058,6 @@ func newServer(listenAddrs []string, db database.DB, chainParams *chaincfg.Param
 		return nil, err
 	}
 	s.blockManager = bm
-	cm, err := connmgr.New(cfg.DataDir)
-	if err != nil {
-		return nil, err
-	}
 	s.connManager = cm
 
 	txC := mempoolConfig{
