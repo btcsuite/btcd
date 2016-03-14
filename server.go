@@ -20,6 +20,7 @@ import (
 
 	"github.com/btcsuite/btcd/blockchain"
 	"github.com/btcsuite/btcd/chaincfg"
+	"github.com/btcsuite/btcd/connmgr"
 	"github.com/btcsuite/btcd/database"
 	"github.com/btcsuite/btcd/mining"
 	"github.com/btcsuite/btcd/peer"
@@ -139,6 +140,7 @@ type server struct {
 	chainParams          *chaincfg.Params
 	sigCache             *txscript.SigCache
 	rpcServer            *rpcServer
+	connManager          *connmgr.ConnManager
 	blockManager         *blockManager
 	addrIndexer          *addrIndexer
 	txMemPool            *txMemPool
@@ -1256,10 +1258,12 @@ func (s *server) peerDoneHandler(sp *serverPeer) {
 // peers to and from the server, banning peers, and broadcasting messages to
 // peers.  It must be run in a goroutine.
 func (s *server) peerHandler() {
-	// Start the block manager, which is needed by peers.  This is done here
-	// since their lifecycle is closely tied to this handler and rather than
-	// adding more channels to sychronize things, it's easier and slightly
-	// faster to simply start and stop them in this handler.
+	// Start the connection manager and block manager, both of which are needed
+	// by peers.  This is done here since their lifecycle is closely tied to
+	// this handler and rather than adding more channels to sychronize things,
+	// it's easier and slightly faster to simply start and stop them in this
+	// handler.
+	s.connManager.Start()
 	s.blockManager.Start()
 
 	srvrLog.Tracef("Starting peer handler")
@@ -1918,6 +1922,11 @@ func newServer(listenAddrs []string, db database.Db, chainParams *chaincfg.Param
 		return nil, err
 	}
 	s.blockManager = bm
+	cm, err := connmgr.New(cfg.DataDir)
+	if err != nil {
+		return nil, err
+	}
+	s.connManager = cm
 
 	txC := mempoolConfig{
 		DisableRelayPriority:  cfg.NoRelayPriority,
