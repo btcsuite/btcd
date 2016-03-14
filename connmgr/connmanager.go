@@ -5,8 +5,14 @@
 package connmgr
 
 import (
-	"github.com/btcsuite/btcd/addrmgr"
+	mrand "math/rand"
 	"net"
+	"strconv"
+	"time"
+
+	"github.com/btcsuite/btcd/addrmgr"
+	"github.com/btcsuite/btcd/chaincfg"
+	"github.com/btcsuite/btcd/wire"
 )
 
 var (
@@ -15,15 +21,61 @@ var (
 
 	// Dial connects to the address on the named network.
 	Dial func(string, string) (net.Conn, error) = net.Dial
+
+	// ChainParams identifies the chain params to use.
+	ChainParams *chaincfg.Params = &chaincfg.MainNetParams
 )
 
 // ConnManager provides a generic connection manager for the bitcoin network.
 type ConnManager struct {
-	addrManager *addrmgr.AddrManager
+	AddrManager *addrmgr.AddrManager
+}
+
+// seedFromDNS uses DNS seeding to populate the address manager with peers.
+func (cm *ConnManager) seedFromDNS(DNSSeeds []string) {
+	for _, seeder := range DNSSeeds {
+		go func(seeder string) {
+			randSource := mrand.New(mrand.NewSource(time.Now().UnixNano()))
+
+			seedpeers, err := DnsDiscover(seeder)
+			if err != nil {
+				log.Infof("DNS discovery failed on seed %s: %v", seeder, err)
+				return
+			}
+			numPeers := len(seedpeers)
+
+			log.Infof("%d addresses found from DNS seed %s", numPeers, seeder)
+
+			if numPeers == 0 {
+				return
+			}
+			addresses := make([]*wire.NetAddress, len(seedpeers))
+			// if this errors then we have *real* problems
+			intPort, _ := strconv.Atoi(ChainParams.DefaultPort)
+			for i, peer := range seedpeers {
+				addresses[i] = new(wire.NetAddress)
+				addresses[i].SetAddress(peer, uint16(intPort))
+				// bitcoind seeds with addresses from
+				// a time randomly selected between 3
+				// and 7 days ago.
+				addresses[i].Timestamp = time.Now().Add(-1 *
+					time.Second * time.Duration(secondsIn3Days+
+					randSource.Int31n(secondsIn4Days)))
+			}
+
+			// Bitcoind uses a lookup of the dns seeder here. This
+			// is rather strange since the values looked up by the
+			// DNS seed lookups will vary quite a lot.
+			// to replicate this behaviour we put all addresses as
+			// having come from the first one.
+			cm.AddrManager.AddAddresses(addresses, addresses[0])
+		}(seeder)
+	}
 }
 
 func (cm *ConnManager) Start() {
-	cm.addrManager.Start()
+	cm.AddrManager.Start()
+	cm.seedFromDNS(ChainParams.DNSSeeds)
 }
 
 // New returns a new bitcoin connection manager.
@@ -31,7 +83,7 @@ func (cm *ConnManager) Start() {
 func New(DataDir string) (*ConnManager, error) {
 	amgr := addrmgr.New(DataDir, Lookup)
 	cm := ConnManager{
-		addrManager: amgr,
+		AddrManager: amgr,
 	}
 	return &cm, nil
 }

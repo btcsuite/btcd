@@ -31,13 +31,6 @@ import (
 )
 
 const (
-	// These constants are used by the DNS seed code to pick a random last
-	// seen time.
-	secondsIn3Days int32 = 24 * 60 * 60 * 3
-	secondsIn4Days int32 = 24 * 60 * 60 * 4
-)
-
-const (
 	// defaultServices describes the default services that are supported by
 	// the server.
 	defaultServices = wire.SFNodeNetwork | wire.SFNodeBloom
