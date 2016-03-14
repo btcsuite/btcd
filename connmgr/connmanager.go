@@ -22,12 +22,16 @@ type ConnManager struct {
 	addrManager *addrmgr.AddrManager
 }
 
+func (cm *ConnManager) Start() {
+	cm.addrManager.Start()
+}
+
 // New returns a new bitcoin connection manager.
 // Use Start to begin processing asynchronous connection management.
-func New(DataDir string) *ConnManager {
+func New(DataDir string) (*ConnManager, error) {
 	amgr := addrmgr.New(DataDir, Lookup)
 	cm := ConnManager{
 		addrManager: amgr,
 	}
-	return &cm
+	return &cm, nil
 }
