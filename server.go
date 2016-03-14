@@ -10,7 +10,6 @@ import (
 	"errors"
 	"fmt"
 	"math"
-	mrand "math/rand"
 	"net"
 	"runtime"
 	"strconv"
@@ -19,7 +18,6 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/btcsuite/btcd/addrmgr"
 	"github.com/btcsuite/btcd/blockchain"
 	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/btcsuite/btcd/database"
@@ -42,20 +40,6 @@ const (
 	// defaultServices describes the default services that are supported by
 	// the server.
 	defaultServices = wire.SFNodeNetwork | wire.SFNodeBloom
-
-	// defaultMaxOutbound is the default number of max outbound peers.
-	defaultMaxOutbound = 8
-
-	// connectionRetryInterval is the base amount of time to wait in between
-	// retries when connecting to persistent peers.  It is adjusted by the
-	// number of retries such that there is a retry backoff.
-	connectionRetryInterval = time.Second * 5
-
-	// maxConnectionRetryInterval is the max amount of time retrying of a
-	// persistent peer is allowed to grow to.  This is necessary since the
-	// retry logic uses a backoff mechanism which increases the interval
-	// base done the number of retries that have been done.
-	maxConnectionRetryInterval = time.Minute * 5
 )
 
 var (
@@ -105,13 +89,9 @@ type updatePeerHeightsMsg struct {
 // peerState maintains state of inbound, persistent, outbound peers as well
 // as banned peers and outbound groups.
 type peerState struct {
-	pendingPeers     map[string]*serverPeer
-	inboundPeers     map[int32]*serverPeer
-	outboundPeers    map[int32]*serverPeer
-	persistentPeers  map[int32]*serverPeer
-	banned           map[string]time.Time
-	outboundGroups   map[string]int
-	maxOutboundPeers int
+	inboundPeers    map[int32]*serverPeer
+	outboundPeers   map[int32]*serverPeer
+	persistentPeers map[int32]*serverPeer
 }
 
 // Count returns the count of all known peers.
@@ -125,17 +105,6 @@ func (ps *peerState) OutboundCount() int {
 	return len(ps.outboundPeers) + len(ps.persistentPeers)
 }
 
-// NeedMoreOutbound returns true if more outbound peers are required.
-func (ps *peerState) NeedMoreOutbound() bool {
-	return ps.OutboundCount() < ps.maxOutboundPeers &&
-		ps.Count() < cfg.MaxPeers
-}
-
-// NeedMoreTries returns true if more outbound peer attempts can be tried.
-func (ps *peerState) NeedMoreTries() bool {
-	return len(ps.pendingPeers) < 2*(ps.maxOutboundPeers-ps.OutboundCount())
-}
-
 // forAllOutboundPeers is a helper function that runs closure on all outbound
 // peers known to peerState.
 func (ps *peerState) forAllOutboundPeers(closure func(sp *serverPeer)) {
@@ -143,14 +112,6 @@ func (ps *peerState) forAllOutboundPeers(closure func(sp *serverPeer)) {
 		closure(e)
 	}
 	for _, e := range ps.persistentPeers {
-		closure(e)
-	}
-}
-
-// forPendingPeers is a helper function that runs closure on all pending peers
-// known to peerState.
-func (ps *peerState) forPendingPeers(closure func(sp *serverPeer)) {
-	for _, e := range ps.pendingPeers {
 		closure(e)
 	}
 }
@@ -176,7 +137,6 @@ type server struct {
 
 	listeners            []net.Listener
 	chainParams          *chaincfg.Params
-	addrManager          *addrmgr.AddrManager
 	sigCache             *txscript.SigCache
 	rpcServer            *rpcServer
 	blockManager         *blockManager
@@ -185,11 +145,8 @@ type server struct {
 	cpuMiner             *CPUMiner
 	relayNtfnChan        chan *btcutil.Tx
 	modifyRebroadcastInv chan interface{}
-	pendingPeers         chan *serverPeer
 	newPeers             chan *serverPeer
 	donePeers            chan *serverPeer
-	banPeers             chan *serverPeer
-	retryPeers           chan *serverPeer
 	wakeup               chan struct{}
 	query                chan interface{}
 	relayInv             chan relayMsg
@@ -218,7 +175,6 @@ type serverPeer struct {
 	requestedBlocks map[wire.ShaHash]struct{}
 	filter          *bloom.Filter
 	knownAddresses  map[string]struct{}
-	banScore        dynamicBanScore
 	quit            chan struct{}
 	// The following chans are used to sync blockmanager and server.
 	txProcessed    chan struct{}
@@ -239,20 +195,6 @@ func newServerPeer(s *server, isPersistent bool) *serverPeer {
 		txProcessed:     make(chan struct{}, 1),
 		blockProcessed:  make(chan struct{}, 1),
 	}
-}
-
-// addKnownAddresses adds the given addresses to the set of known addreses to
-// the peer to prevent sending duplicate addresses.
-func (sp *serverPeer) addKnownAddresses(addresses []*wire.NetAddress) {
-	for _, na := range addresses {
-		sp.knownAddresses[addrmgr.NetAddressKey(na)] = struct{}{}
-	}
-}
-
-// addressKnown true if the given address is already known to the peer.
-func (sp *serverPeer) addressKnown(na *wire.NetAddress) bool {
-	_, exists := sp.knownAddresses[addrmgr.NetAddressKey(na)]
-	return exists
 }
 
 // setDisableRelayTx toggles relaying of transactions for the given peer.
@@ -276,54 +218,6 @@ func (sp *serverPeer) relayTxDisabled() bool {
 // pushAddrMsg sends an addr message to the connected peer using the provided
 // addresses.
 func (sp *serverPeer) pushAddrMsg(addresses []*wire.NetAddress) {
-	// Filter addresses already known to the peer.
-	addrs := make([]*wire.NetAddress, 0, len(addresses))
-	for _, addr := range addresses {
-		if !sp.addressKnown(addr) {
-			addrs = append(addrs, addr)
-		}
-	}
-	known, err := sp.PushAddrMsg(addrs)
-	if err != nil {
-		peerLog.Errorf("Can't push address message to %s: %v", sp.Peer, err)
-		sp.Disconnect()
-		return
-	}
-	sp.addKnownAddresses(known)
-}
-
-// addBanScore increases the persistent and decaying ban score fields by the
-// values passed as parameters. If the resulting score exceeds half of the ban
-// threshold, a warning is logged including the reason provided. Further, if
-// the score is above the ban threshold, the peer will be banned and
-// disconnected.
-func (sp *serverPeer) addBanScore(persistent, transient uint32, reason string) {
-	// No warning is logged and no score is calculated if banning is disabled.
-	if cfg.DisableBanning {
-		return
-	}
-	warnThreshold := cfg.BanThreshold >> 1
-	if transient == 0 && persistent == 0 {
-		// The score is not being increased, but a warning message is still
-		// logged if the score is above the warn threshold.
-		score := sp.banScore.Int()
-		if score > warnThreshold {
-			peerLog.Warnf("Misbehaving peer %s: %s -- ban score is %d, "+
-				"it was not increased this time", sp, reason, score)
-		}
-		return
-	}
-	score := sp.banScore.Increase(persistent, transient)
-	if score > warnThreshold {
-		peerLog.Warnf("Misbehaving peer %s: %s -- ban score increased to %d",
-			sp, reason, score)
-		if score > cfg.BanThreshold {
-			peerLog.Warnf("Misbehaving peer %s -- banning and disconnecting",
-				sp)
-			sp.server.BanPeer(sp)
-			sp.Disconnect()
-		}
-	}
 }
 
 // OnVersion is invoked when a peer receives a version bitcoin message
@@ -341,50 +235,6 @@ func (sp *serverPeer) OnVersion(p *peer.Peer, msg *wire.MsgVersion) {
 	// is received.
 	sp.setDisableRelayTx(msg.DisableRelayTx)
 
-	// Update the address manager and request known addresses from the
-	// remote peer for outbound connections.  This is skipped when running
-	// on the simulation test network since it is only intended to connect
-	// to specified peers and actively avoids advertising and connecting to
-	// discovered peers.
-	if !cfg.SimNet {
-		addrManager := sp.server.addrManager
-		// Outbound connections.
-		if !p.Inbound() {
-			// TODO(davec): Only do this if not doing the initial block
-			// download and the local address is routable.
-			if !cfg.DisableListen /* && isCurrent? */ {
-				// Get address that best matches.
-				lna := addrManager.GetBestLocalAddress(p.NA())
-				if addrmgr.IsRoutable(lna) {
-					// Filter addresses the peer already knows about.
-					addresses := []*wire.NetAddress{lna}
-					sp.pushAddrMsg(addresses)
-				}
-			}
-
-			// Request known addresses if the server address manager needs
-			// more and the peer has a protocol version new enough to
-			// include a timestamp with addresses.
-			hasTimestamp := p.ProtocolVersion() >=
-				wire.NetAddressTimeVersion
-			if addrManager.NeedMoreAddresses() && hasTimestamp {
-				p.QueueMessage(wire.NewMsgGetAddr(), nil)
-			}
-
-			// Mark the address as a known good address.
-			addrManager.Good(p.NA())
-		} else {
-			// A peer might not be advertising the same address that it
-			// actually connected from.  One example of why this can happen
-			// is with NAT.  Only add the address to the address manager if
-			// the addresses agree.
-			if addrmgr.NetAddressKey(&msg.AddrMe) == addrmgr.NetAddressKey(p.NA()) {
-				addrManager.AddAddress(p.NA(), p.NA())
-				addrManager.Good(p.NA())
-			}
-		}
-	}
-
 	// Add valid peer to the server.
 	sp.server.AddPeer(sp)
 }
@@ -394,12 +244,6 @@ func (sp *serverPeer) OnVersion(p *peer.Peer, msg *wire.MsgVersion) {
 // pool up to the maximum inventory allowed per message.  When the peer has a
 // bloom filter loaded, the contents are filtered accordingly.
 func (sp *serverPeer) OnMemPool(p *peer.Peer, msg *wire.MsgMemPool) {
-	// A decaying ban score increase is applied to prevent flooding.
-	// The ban score accumulates and passes the ban threshold if a burst of
-	// mempool messages comes from a peer. The score decays each minute to
-	// half of its value.
-	sp.addBanScore(0, 33, "mempool")
-
 	// Generate inventory message with the available transactions in the
 	// transaction memory pool.  Limit it to the max allowed inventory
 	// per message.  The NewMsgInvSizeHint function automatically limits
@@ -503,14 +347,6 @@ func (sp *serverPeer) OnGetData(p *peer.Peer, msg *wire.MsgGetData) {
 	notFound := wire.NewMsgNotFound()
 
 	length := len(msg.InvList)
-	// A decaying ban score increase is applied to prevent exhausting resources
-	// with unusually large inventory queries.
-	// Requesting more than the maximum inventory vector length within a short
-	// period of time yields a score above the default ban threshold. Sustained
-	// bursts of small requests are not penalized as that would potentially ban
-	// peers performing IBD.
-	// This incremental score decays each minute to half of its value.
-	sp.addBanScore(0, uint32(length)*99/wire.MaxInvPerMsg, "getdata")
 
 	// We wait on this wait channel periodically to prevent queuing
 	// far more data than we can send in a reasonable time, wasting memory.
@@ -809,12 +645,6 @@ func (sp *serverPeer) OnGetAddr(p *peer.Peer, msg *wire.MsgGetAddr) {
 	if !p.Inbound() {
 		return
 	}
-
-	// Get the current known addresses from the address manager.
-	addrCache := sp.server.addrManager.AddressCache()
-
-	// Push the addresses.
-	sp.pushAddrMsg(addrCache)
 }
 
 // OnAddr is invoked when a peer receives an addr bitcoin message and is
@@ -854,17 +684,7 @@ func (sp *serverPeer) OnAddr(p *peer.Peer, msg *wire.MsgAddr) {
 		if na.Timestamp.After(now.Add(time.Minute * 10)) {
 			na.Timestamp = now.Add(-1 * time.Hour * 24 * 5)
 		}
-
-		// Add address to known addresses for this peer.
-		sp.addKnownAddresses([]*wire.NetAddress{na})
 	}
-
-	// Add addresses to server address manager.  The address manager handles
-	// the details of things such as preventing duplicate addresses, max
-	// addresses, and last seen updates.
-	// XXX bitcoind gives a 2 hour time penalty here, do we want to do the
-	// same?
-	sp.server.addrManager.AddAddresses(msg.AddrList, p.NA())
 }
 
 // OnRead is invoked when a peer receives a message and it is used to update
@@ -1094,60 +914,18 @@ func (s *server) handleAddPeerMsg(state *peerState, sp *serverPeer) bool {
 		return false
 	}
 
-	// Disconnect banned peers.
-	host, _, err := net.SplitHostPort(sp.Addr())
-	if err != nil {
-		srvrLog.Debugf("can't split hostport %v", err)
-		sp.Disconnect()
-		return false
-	}
-	if banEnd, ok := state.banned[host]; ok {
-		if time.Now().Before(banEnd) {
-			srvrLog.Debugf("Peer %s is banned for another %v - disconnecting",
-				host, banEnd.Sub(time.Now()))
-			sp.Disconnect()
-			return false
-		}
-
-		srvrLog.Infof("Peer %s is no longer banned", host)
-		delete(state.banned, host)
-	}
-
 	// TODO: Check for max peers from a single IP.
-
-	// Limit max outbound peers.
-	if _, ok := state.pendingPeers[sp.Addr()]; ok {
-		if state.OutboundCount() >= state.maxOutboundPeers {
-			srvrLog.Infof("Max outbound peers reached [%d] - disconnecting "+
-				"peer %s", state.maxOutboundPeers, sp)
-			sp.Disconnect()
-			return false
-		}
-	}
-
-	// Limit max number of total peers.
-	if state.Count() >= cfg.MaxPeers {
-		srvrLog.Infof("Max peers reached [%d] - disconnecting peer %s",
-			cfg.MaxPeers, sp)
-		sp.Disconnect()
-		// TODO(oga) how to handle permanent peers here?
-		// they should be rescheduled.
-		return false
-	}
 
 	// Add the new peer and start it.
 	srvrLog.Debugf("New peer %s", sp)
 	if sp.Inbound() {
 		state.inboundPeers[sp.ID()] = sp
 	} else {
-		state.outboundGroups[addrmgr.GroupKey(sp.NA())]++
 		if sp.persistent {
 			state.persistentPeers[sp.ID()] = sp
 		} else {
 			state.outboundPeers[sp.ID()] = sp
 		}
-		// Remove from pending peers.
-		delete(state.pendingPeers, sp.Addr())
 	}
 
 	return true
@@ -1156,12 +934,6 @@ func (s *server) handleAddPeerMsg(state *peerState, sp *serverPeer) bool {
 // handleDonePeerMsg deals with peers that have signalled they are done.  It is
 // invoked from the peerHandler goroutine.
 func (s *server) handleDonePeerMsg(state *peerState, sp *serverPeer) {
-	if _, ok := state.pendingPeers[sp.Addr()]; ok {
-		delete(state.pendingPeers, sp.Addr())
-		srvrLog.Debugf("Removed pending peer %s", sp)
-		return
-	}
-
 	var list map[int32]*serverPeer
 	if sp.persistent {
 		list = state.persistentPeers
@@ -1177,39 +949,15 @@ func (s *server) handleDonePeerMsg(state *peerState, sp *serverPeer) {
 			// Retry peer
 			sp2 := s.newOutboundPeer(sp.Addr(), sp.persistent)
 			if sp2 != nil {
-				go s.retryConn(sp2, false)
 			}
-		}
-		if !sp.Inbound() && sp.VersionKnown() {
-			state.outboundGroups[addrmgr.GroupKey(sp.NA())]--
 		}
 		delete(list, sp.ID())
 		srvrLog.Debugf("Removed peer %s", sp)
 		return
 	}
 
-	// Update the address' last seen time if the peer has acknowledged
-	// our version and has sent us its version as well.
-	if sp.VerAckReceived() && sp.VersionKnown() && sp.NA() != nil {
-		s.addrManager.Connected(sp.NA())
-	}
-
 	// If we get here it means that either we didn't know about the peer
 	// or we purposefully deleted it.
-}
-
-// handleBanPeerMsg deals with banning peers.  It is invoked from the
-// peerHandler goroutine.
-func (s *server) handleBanPeerMsg(state *peerState, sp *serverPeer) {
-	host, _, err := net.SplitHostPort(sp.Addr())
-	if err != nil {
-		srvrLog.Debugf("can't split ban peer %s %v", sp.Addr(), err)
-		return
-	}
-	direction := directionString(sp.Inbound())
-	srvrLog.Infof("Banned peer %s (%s) for %v", host, direction,
-		cfg.BanDuration)
-	state.banned[host] = time.Now().Add(cfg.BanDuration)
 }
 
 // handleRelayInvMsg deals with relaying inventory to peers that are not already
@@ -1336,7 +1084,6 @@ func (s *server) handleQuery(state *peerState, querymsg interface{}) {
 		// TODO(oga) if too many, nuke a non-perm peer.
 		sp := s.newOutboundPeer(msg.addr, msg.permanent)
 		if sp != nil {
-			go s.peerConnHandler(sp)
 			msg.reply <- nil
 		} else {
 			msg.reply <- errors.New("failed to add peer")
@@ -1345,7 +1092,6 @@ func (s *server) handleQuery(state *peerState, querymsg interface{}) {
 		found := disconnectPeer(state.persistentPeers, msg.cmp, func(sp *serverPeer) {
 			// Keep group counts ok since we remove from
 			// the list now.
-			state.outboundGroups[addrmgr.GroupKey(sp.NA())]--
 		})
 
 		if found {
@@ -1374,7 +1120,6 @@ func (s *server) handleQuery(state *peerState, querymsg interface{}) {
 		found = disconnectPeer(state.outboundPeers, msg.cmp, func(sp *serverPeer) {
 			// Keep group counts ok since we remove from
 			// the list now.
-			state.outboundGroups[addrmgr.GroupKey(sp.NA())]--
 		})
 		if found {
 			// If there are multiple outbound connections to the same
@@ -1382,7 +1127,6 @@ func (s *server) handleQuery(state *peerState, querymsg interface{}) {
 			// peers are found.
 			for found {
 				found = disconnectPeer(state.outboundPeers, msg.cmp, func(sp *serverPeer) {
-					state.outboundGroups[addrmgr.GroupKey(sp.NA())]--
 				})
 			}
 			msg.reply <- nil
@@ -1445,8 +1189,6 @@ func newPeerConfig(sp *serverPeer) *peer.Config {
 			OnAlert: nil,
 		},
 		NewestBlock:      sp.server.db.NewestSha,
-		BestLocalAddress: sp.server.addrManager.GetBestLocalAddress,
-		HostToNetAddress: sp.server.addrManager.HostToNetAddress,
 		Proxy:            cfg.Proxy,
 		UserAgentName:    userAgentName,
 		UserAgentVersion: userAgentVersion,
@@ -1483,53 +1225,6 @@ func (s *server) listenHandler(listener net.Listener) {
 	srvrLog.Tracef("Listener handler done for %s", listener.Addr())
 }
 
-// seedFromDNS uses DNS seeding to populate the address manager with peers.
-func (s *server) seedFromDNS() {
-	// Nothing to do if DNS seeding is disabled.
-	if cfg.DisableDNSSeed {
-		return
-	}
-
-	for _, seeder := range activeNetParams.DNSSeeds {
-		go func(seeder string) {
-			randSource := mrand.New(mrand.NewSource(time.Now().UnixNano()))
-
-			seedpeers, err := dnsDiscover(seeder)
-			if err != nil {
-				discLog.Infof("DNS discovery failed on seed %s: %v", seeder, err)
-				return
-			}
-			numPeers := len(seedpeers)
-
-			discLog.Infof("%d addresses found from DNS seed %s", numPeers, seeder)
-
-			if numPeers == 0 {
-				return
-			}
-			addresses := make([]*wire.NetAddress, len(seedpeers))
-			// if this errors then we have *real* problems
-			intPort, _ := strconv.Atoi(activeNetParams.DefaultPort)
-			for i, peer := range seedpeers {
-				addresses[i] = new(wire.NetAddress)
-				addresses[i].SetAddress(peer, uint16(intPort))
-				// bitcoind seeds with addresses from
-				// a time randomly selected between 3
-				// and 7 days ago.
-				addresses[i].Timestamp = time.Now().Add(-1 *
-					time.Second * time.Duration(secondsIn3Days+
-					randSource.Int31n(secondsIn4Days)))
-			}
-
-			// Bitcoind uses a lookup of the dns seeder here. This
-			// is rather strange since the values looked up by the
-			// DNS seed lookups will vary quite a lot.
-			// to replicate this behaviour we put all addresses as
-			// having come from the first one.
-			s.addrManager.AddAddresses(addresses, addresses[0])
-		}(seeder)
-	}
-}
-
 // newOutboundPeer initializes a new outbound peer and setups the message
 // listeners.
 func (s *server) newOutboundPeer(addr string, persistent bool) *serverPeer {
@@ -1542,15 +1237,6 @@ func (s *server) newOutboundPeer(addr string, persistent bool) *serverPeer {
 	sp.Peer = p
 	go s.peerDoneHandler(sp)
 	return sp
-}
-
-// peerConnHandler handles peer connections. It must be run in a goroutine.
-func (s *server) peerConnHandler(sp *serverPeer) {
-	err := s.establishConn(sp)
-	if err != nil {
-		srvrLog.Debugf("Failed to connect to %s: %v", sp.Addr(), err)
-		sp.Disconnect()
-	}
 }
 
 // peerDoneHandler handles peer disconnects by notifiying the server that it's
@@ -1566,93 +1252,22 @@ func (s *server) peerDoneHandler(sp *serverPeer) {
 	close(sp.quit)
 }
 
-// establishConn establishes a connection to the peer.
-func (s *server) establishConn(sp *serverPeer) error {
-	srvrLog.Debugf("Attempting to connect to %s", sp.Addr())
-	conn, err := btcdDial("tcp", sp.Addr())
-	if err != nil {
-		return err
-	}
-	if err := sp.Connect(conn); err != nil {
-		return err
-	}
-	srvrLog.Debugf("Connected to %s", sp.Addr())
-	s.addrManager.Attempt(sp.NA())
-	return nil
-}
-
-// retryConn retries connection to the peer after the given duration.  It must
-// be run as a goroutine.
-func (s *server) retryConn(sp *serverPeer, initialAttempt bool) {
-	retryDuration := connectionRetryInterval
-	for {
-		if initialAttempt {
-			retryDuration = 0
-			initialAttempt = false
-		} else {
-			srvrLog.Debugf("Retrying connection to %s in %s", sp.Addr(),
-				retryDuration)
-		}
-		select {
-		case <-time.After(retryDuration):
-			err := s.establishConn(sp)
-			if err != nil {
-				retryDuration += connectionRetryInterval
-				if retryDuration > maxConnectionRetryInterval {
-					retryDuration = maxConnectionRetryInterval
-				}
-				continue
-			}
-			return
-
-		case <-sp.quit:
-			return
-
-		case <-s.quit:
-			return
-		}
-	}
-}
-
 // peerHandler is used to handle peer operations such as adding and removing
 // peers to and from the server, banning peers, and broadcasting messages to
 // peers.  It must be run in a goroutine.
 func (s *server) peerHandler() {
-	// Start the address manager and block manager, both of which are needed
-	// by peers.  This is done here since their lifecycle is closely tied
-	// to this handler and rather than adding more channels to sychronize
-	// things, it's easier and slightly faster to simply start and stop them
-	// in this handler.
-	s.addrManager.Start()
+	// Start the block manager, which is needed by peers.  This is done here
+	// since their lifecycle is closely tied to this handler and rather than
+	// adding more channels to sychronize things, it's easier and slightly
+	// faster to simply start and stop them in this handler.
 	s.blockManager.Start()
 
 	srvrLog.Tracef("Starting peer handler")
 
 	state := &peerState{
-		pendingPeers:     make(map[string]*serverPeer),
-		inboundPeers:     make(map[int32]*serverPeer),
-		persistentPeers:  make(map[int32]*serverPeer),
-		outboundPeers:    make(map[int32]*serverPeer),
-		banned:           make(map[string]time.Time),
-		maxOutboundPeers: defaultMaxOutbound,
-		outboundGroups:   make(map[string]int),
-	}
-	if cfg.MaxPeers < state.maxOutboundPeers {
-		state.maxOutboundPeers = cfg.MaxPeers
-	}
-	// Add peers discovered through DNS to the address manager.
-	s.seedFromDNS()
-
-	// Start up persistent peers.
-	permanentPeers := cfg.ConnectPeers
-	if len(permanentPeers) == 0 {
-		permanentPeers = cfg.AddPeers
-	}
-	for _, addr := range permanentPeers {
-		sp := s.newOutboundPeer(addr, true)
-		if sp != nil {
-			go s.retryConn(sp, true)
-		}
+		inboundPeers:    make(map[int32]*serverPeer),
+		persistentPeers: make(map[int32]*serverPeer),
+		outboundPeers:   make(map[int32]*serverPeer),
 	}
 
 	// if nothing else happens, wake us up soon.
@@ -1672,10 +1287,6 @@ out:
 		// Block accepted in mainchain or orphan, update peer height.
 		case umsg := <-s.peerHeightsUpdate:
 			s.handleUpdatePeerHeights(state, umsg)
-
-		// Peer to ban.
-		case p := <-s.banPeers:
-			s.handleBanPeerMsg(state, p)
 
 		// New inventory to potentially be relayed to other peers.
 		case invMsg := <-s.relayInv:
@@ -1710,82 +1321,12 @@ out:
 			continue
 		}
 
-		// Only try connect to more peers if we actually need more.
-		if !state.NeedMoreOutbound() || len(cfg.ConnectPeers) > 0 ||
-			atomic.LoadInt32(&s.shutdown) != 0 {
-			state.forPendingPeers(func(sp *serverPeer) {
-				srvrLog.Tracef("Shutdown peer %s", sp)
-				sp.Disconnect()
-			})
-			continue
-		}
-		tries := 0
-		for state.NeedMoreOutbound() &&
-			state.NeedMoreTries() &&
-			atomic.LoadInt32(&s.shutdown) == 0 {
-			addr := s.addrManager.GetAddress("any")
-			if addr == nil {
-				break
-			}
-			key := addrmgr.GroupKey(addr.NetAddress())
-			// Address will not be invalid, local or unroutable
-			// because addrmanager rejects those on addition.
-			// Just check that we don't already have an address
-			// in the same group so that we are not connecting
-			// to the same network segment at the expense of
-			// others.
-			if state.outboundGroups[key] != 0 {
-				break
-			}
-
-			// Check that we don't have a pending connection to this addr.
-			addrStr := addrmgr.NetAddressKey(addr.NetAddress())
-			if _, ok := state.pendingPeers[addrStr]; ok {
-				continue
-			}
-
-			tries++
-			// After 100 bad tries exit the loop and we'll try again
-			// later.
-			if tries > 100 {
-				break
-			}
-
-			// XXX if we have limited that address skip
-
-			// only allow recent nodes (10mins) after we failed 30
-			// times
-			if tries < 30 && time.Now().Sub(addr.LastAttempt()) < 10*time.Minute {
-				continue
-			}
-
-			// allow nondefault ports after 50 failed tries.
-			if fmt.Sprintf("%d", addr.NetAddress().Port) !=
-				activeNetParams.DefaultPort && tries < 50 {
-				continue
-			}
-
-			tries = 0
-			sp := s.newOutboundPeer(addrStr, false)
-			if sp != nil {
-				go s.peerConnHandler(sp)
-				state.pendingPeers[sp.Addr()] = sp
-			}
-		}
-
-		// We need more peers, wake up in ten seconds and try again.
-		if state.NeedMoreOutbound() {
-			time.AfterFunc(10*time.Second, func() {
-				s.wakeup <- struct{}{}
-			})
-		}
 	}
 
 	if cfg.AddrIndex {
 		s.addrIndexer.Stop()
 	}
 	s.blockManager.Stop()
-	s.addrManager.Stop()
 
 	// Drain channels before exiting so nothing is left waiting around
 	// to send.
@@ -1810,11 +1351,6 @@ cleanup:
 // AddPeer adds a new peer that has already been connected to the server.
 func (s *server) AddPeer(sp *serverPeer) {
 	s.newPeers <- sp
-}
-
-// BanPeer bans a peer that has already been connected to the server by ip.
-func (s *server) BanPeer(sp *serverPeer) {
-	s.banPeers <- sp
 }
 
 // RelayInventory relays the passed inventory to all connected peers that are
@@ -2230,11 +1766,7 @@ out:
 				}
 				na := wire.NewNetAddressIPPort(externalip, uint16(listenPort),
 					s.services)
-				err = s.addrManager.AddLocalAddress(na, addrmgr.UpnpPrio)
-				if err != nil {
-					// XXX DeletePortMapping?
-				}
-				srvrLog.Warnf("Successfully bound via UPnP to %s", addrmgr.NetAddressKey(na))
+				srvrLog.Infof("na: %v", na)
 				first = false
 			}
 			timer.Reset(time.Minute * 15)
@@ -2263,8 +1795,6 @@ func newServer(listenAddrs []string, db database.Db, chainParams *chaincfg.Param
 		services &^= wire.SFNodeBloom
 	}
 
-	amgr := addrmgr.New(cfg.DataDir, btcdLookup)
-
 	var listeners []net.Listener
 	var nat NAT
 	if !cfg.DisableListen {
@@ -2283,6 +1813,7 @@ func newServer(listenAddrs []string, db database.Db, chainParams *chaincfg.Param
 
 			for _, sip := range cfg.ExternalIPs {
 				eport := uint16(port)
+				srvrLog.Infof("eport: %v", eport)
 				host, portstr, err := net.SplitHostPort(sip)
 				if err != nil {
 					// no port, use default.
@@ -2299,18 +1830,7 @@ func newServer(listenAddrs []string, db database.Db, chainParams *chaincfg.Param
 					}
 					eport = uint16(port)
 				}
-				na, err := amgr.HostToNetAddress(host, eport,
-					services)
-				if err != nil {
-					srvrLog.Warnf("Not adding %s as "+
-						"externalip: %v", sip, err)
-					continue
-				}
-
-				err = amgr.AddLocalAddress(na, addrmgr.ManualPrio)
-				if err != nil {
-					amgrLog.Warnf("Skipping specified external IP: %v", err)
-				}
+				srvrLog.Infof("host: %v", host)
 			}
 		} else if discover && cfg.Upnp {
 			nat, err = Discover()
@@ -2337,11 +1857,8 @@ func newServer(listenAddrs []string, db database.Db, chainParams *chaincfg.Param
 				}
 				na := wire.NewNetAddressIPPort(ip,
 					uint16(port), services)
+				srvrLog.Infof("na: %v", na)
 				if discover {
-					err = amgr.AddLocalAddress(na, addrmgr.InterfacePrio)
-					if err != nil {
-						amgrLog.Debugf("Skipping local address: %v", err)
-					}
 				}
 			}
 		}
@@ -2357,12 +1874,6 @@ func newServer(listenAddrs []string, db database.Db, chainParams *chaincfg.Param
 			listeners = append(listeners, listener)
 
 			if discover {
-				if na, err := amgr.DeserializeNetAddress(addr); err == nil {
-					err = amgr.AddLocalAddress(na, addrmgr.BoundPrio)
-					if err != nil {
-						amgrLog.Warnf("Skipping bound address: %v", err)
-					}
-				}
 			}
 		}
 
@@ -2375,12 +1886,6 @@ func newServer(listenAddrs []string, db database.Db, chainParams *chaincfg.Param
 			}
 			listeners = append(listeners, listener)
 			if discover {
-				if na, err := amgr.DeserializeNetAddress(addr); err == nil {
-					err = amgr.AddLocalAddress(na, addrmgr.BoundPrio)
-					if err != nil {
-						amgrLog.Debugf("Skipping bound address: %v", err)
-					}
-				}
 			}
 		}
 
@@ -2392,11 +1897,8 @@ func newServer(listenAddrs []string, db database.Db, chainParams *chaincfg.Param
 	s := server{
 		listeners:            listeners,
 		chainParams:          chainParams,
-		addrManager:          amgr,
 		newPeers:             make(chan *serverPeer, cfg.MaxPeers),
 		donePeers:            make(chan *serverPeer, cfg.MaxPeers),
-		banPeers:             make(chan *serverPeer, cfg.MaxPeers),
-		retryPeers:           make(chan *serverPeer, cfg.MaxPeers),
 		wakeup:               make(chan struct{}),
 		query:                make(chan interface{}),
 		relayInv:             make(chan relayMsg, cfg.MaxPeers),
