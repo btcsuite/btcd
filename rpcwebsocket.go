@@ -460,12 +460,8 @@ func (m *wsNotificationManager) notifyBlockConnected(clients map[chan struct{}]*
 	block *btcutil.Block) {
 
 	// Notify interested websocket clients about the connected block.
-	ntfn := btcjson.BlockConnectedNtfn{
-		Hash:          block.Sha().String(),
-		Height:        int32(block.Height()),
-		Time:          block.MsgBlock().Header.Timestamp.Unix(),
-		SubscribedTxs: nil, // Set for each client
-	}
+	ntfn := btcjson.NewBlockConnectedNtfn(block.Sha().String(), block.Height(),
+		block.MsgBlock().Header.Timestamp.Unix(), nil)
 
 	// Search for relevant txs for each client and save them serialized in
 	// hex encoding for the notification.
@@ -490,7 +486,7 @@ func (m *wsNotificationManager) notifyBlockConnected(clients map[chan struct{}]*
 		// Marshal notification.
 		marshalledJSON, err := btcjson.MarshalCmd(nil, ntfn)
 		if err != nil {
-			rpcsLog.Error("Failed to marshal block connected "+
+			rpcsLog.Errorf("Failed to marshal block connected "+
 				"notification: %v", err)
 			continue
 		}
