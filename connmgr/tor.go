@@ -2,7 +2,7 @@
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
-package main
+package connmgr
 
 import (
 	"encoding/binary"
@@ -48,10 +48,10 @@ var (
 	}
 )
 
-// torLookupIP uses Tor to resolve DNS via the SOCKS extension they provide for
+// TorLookupIP uses Tor to resolve DNS via the SOCKS extension they provide for
 // resolution over the Tor network. Tor itself doesn't support ipv6 so this
 // doesn't either.
-func torLookupIP(host, proxy string) ([]net.IP, error) {
+func TorLookupIP(host, proxy string) ([]net.IP, error) {
 	conn, err := net.Dial("tcp", proxy)
 	if err != nil {
 		return nil, err
@@ -131,11 +131,11 @@ func torLookupIP(host, proxy string) ([]net.IP, error) {
 	return addr, nil
 }
 
-// dnsDiscover looks up the list of peers resolved by DNS for all hosts in
+// DnsDiscover looks up the list of peers resolved by DNS for all hosts in
 // seeders. If proxy is not "" then it is used as a tor proxy for the
 // resolution.
-func dnsDiscover(seeder string) ([]net.IP, error) {
-	peers, err := btcdLookup(seeder)
+func DnsDiscover(seeder string) ([]net.IP, error) {
+	peers, err := Lookup(seeder)
 	if err != nil {
 		return nil, err
 	}
