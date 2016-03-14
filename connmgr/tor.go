@@ -130,15 +130,3 @@ func TorLookupIP(host, proxy string) ([]net.IP, error) {
 
 	return addr, nil
 }
-
-// DnsDiscover looks up the list of peers resolved by DNS for all hosts in
-// seeders. If proxy is not "" then it is used as a tor proxy for the
-// resolution.
-func DnsDiscover(seeder string) ([]net.IP, error) {
-	peers, err := Lookup(seeder)
-	if err != nil {
-		return nil, err
-	}
-
-	return peers, nil
-}
