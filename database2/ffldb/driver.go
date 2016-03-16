@@ -1,4 +1,5 @@
 // Copyright (c) 2015-2016 The btcsuite developers
+// Copyright (c) 2016 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -7,9 +8,9 @@ package ffldb
 import (
 	"fmt"
 
-	database "github.com/btcsuite/btcd/database2"
-	"github.com/btcsuite/btcd/wire"
 	"github.com/btcsuite/btclog"
+	database "github.com/decred/dcrd/database2"
+	"github.com/decred/dcrd/wire"
 )
 
 var log = btclog.Disabled
@@ -19,7 +20,7 @@ const (
 )
 
 // parseArgs parses the arguments from the database Open/Create methods.
-func parseArgs(funcName string, args ...interface{}) (string, wire.BitcoinNet, error) {
+func parseArgs(funcName string, args ...interface{}) (string, wire.CurrencyNet, error) {
 	if len(args) != 2 {
 		return "", 0, fmt.Errorf("invalid arguments to %s.%s -- "+
 			"expected database path and block network", dbType,
@@ -32,7 +33,7 @@ func parseArgs(funcName string, args ...interface{}) (string, wire.BitcoinNet, e
 			"expected database path string", dbType, funcName)
 	}
 
-	network, ok := args[1].(wire.BitcoinNet)
+	network, ok := args[1].(wire.CurrencyNet)
 	if !ok {
 		return "", 0, fmt.Errorf("second argument to %s.%s is invalid -- "+
 			"expected block network", dbType, funcName)

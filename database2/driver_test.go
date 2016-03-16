@@ -1,4 +1,5 @@
 // Copyright (c) 2015-2016 The btcsuite developers
+// Copyright (c) 2016 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -8,8 +9,8 @@ import (
 	"fmt"
 	"testing"
 
-	database "github.com/btcsuite/btcd/database2"
-	_ "github.com/btcsuite/btcd/database2/ffldb"
+	database "github.com/decred/dcrd/database2"
+	_ "github.com/decred/dcrd/database2/ffldb"
 )
 
 var (

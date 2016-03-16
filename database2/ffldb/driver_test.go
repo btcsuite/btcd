@@ -1,4 +1,5 @@
 // Copyright (c) 2015-2016 The btcsuite developers
+// Copyright (c) 2016 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -12,10 +13,10 @@ import (
 	"runtime"
 	"testing"
 
-	"github.com/btcsuite/btcd/chaincfg"
-	database "github.com/btcsuite/btcd/database2"
-	"github.com/btcsuite/btcd/database2/ffldb"
-	"github.com/btcsuite/btcutil"
+	"github.com/decred/dcrd/chaincfg"
+	database "github.com/decred/dcrd/database2"
+	"github.com/decred/dcrd/database2/ffldb"
+	"github.com/decred/dcrutil"
 )
 
 // dbType is the database type name for this driver.
@@ -171,7 +172,7 @@ func TestPersistence(t *testing.T) {
 		"b1key2": "foo2",
 		"b1key3": "foo3",
 	}
-	genesisBlock := btcutil.NewBlock(chaincfg.MainNetParams.GenesisBlock)
+	genesisBlock := dcrutil.NewBlock(chaincfg.MainNetParams.GenesisBlock)
 	genesisHash := chaincfg.MainNetParams.GenesisHash
 	err = db.Update(func(tx database.Tx) error {
 		metadataBucket := tx.Metadata()

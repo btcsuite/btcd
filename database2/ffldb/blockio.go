@@ -1,4 +1,5 @@
 // Copyright (c) 2015-2016 The btcsuite developers
+// Copyright (c) 2016 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -17,14 +18,17 @@ import (
 	"path/filepath"
 	"sync"
 
-	database "github.com/btcsuite/btcd/database2"
-	"github.com/btcsuite/btcd/wire"
+	"github.com/decred/dcrd/chaincfg/chainhash"
+	database "github.com/decred/dcrd/database2"
+	"github.com/decred/dcrd/wire"
 )
 
 const (
-	// The Bitcoin protocol encodes block height as int32, so max number of
-	// blocks is 2^31.  Max block size per the protocol is 32MiB per block.
-	// So the theoretical max at the time this comment was written is 64PiB
+	// blockFilenameTemplate is the pattern used for naming block files.
+	//
+	// The protocol encodes block height as int32, so max number of blocks
+	// is 2^31.  Max block size per the protocol is 32MiB per block.  So the
+	// theoretical max at the time this comment was written is 64PiB
 	// (pebibytes).  With files @ 512MiB each, this would require a maximum
 	// of 134,217,728 files.  Thus, choose 9 digits of precision for the
 	// filenames.  An additional benefit is 9 digits provides 10^9 files @
@@ -58,7 +62,8 @@ const (
 )
 
 var (
-	// castagnoli houses the Catagnoli polynomial used for CRC-32 checksums.
+	// castagnoli houses the Castagnoli polynomial used for CRC-32
+	// checksums.
 	castagnoli = crc32.MakeTable(crc32.Castagnoli)
 )
 
@@ -105,7 +110,7 @@ type writeCursor struct {
 type blockStore struct {
 	// network is the specific network to use in the flat files for each
 	// block.
-	network wire.BitcoinNet
+	network wire.CurrencyNet
 
 	// basePath is the base path used for the flat block files and metadata.
 	basePath string
@@ -455,7 +460,7 @@ func (s *blockStore) writeBlock(rawBlock []byte) (blockLocation, error) {
 		wc.curFile.file = file
 	}
 
-	// Bitcoin network.
+	// Currency network.
 	origOffset := wc.curOffset
 	hasher := crc32.New(castagnoli)
 	var scratch [4]byte
@@ -504,7 +509,7 @@ func (s *blockStore) writeBlock(rawBlock []byte) (blockLocation, error) {
 // read from the file.
 //
 // Format: <network><block length><serialized block><checksum>
-func (s *blockStore) readBlock(hash *wire.ShaHash, loc blockLocation) ([]byte, error) {
+func (s *blockStore) readBlock(hash *chainhash.Hash, loc blockLocation) ([]byte, error) {
 	// Get the referenced block file handle opening the file as needed.  The
 	// function also handles closing files as needed to avoid going over the
 	// max allowed open files.
@@ -738,7 +743,7 @@ func scanBlockFiles(dbPath string) (int, uint32) {
 
 // newBlockStore returns a new block store with the current block file number
 // and offset set and all fields initialized.
-func newBlockStore(basePath string, network wire.BitcoinNet) *blockStore {
+func newBlockStore(basePath string, network wire.CurrencyNet) *blockStore {
 	// Look for the end of the latest block to file to determine what the
 	// write cursor position is from the viewpoing of the block files on
 	// disk.

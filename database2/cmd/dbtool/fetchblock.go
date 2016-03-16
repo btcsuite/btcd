@@ -1,4 +1,5 @@
 // Copyright (c) 2015-2016 The btcsuite developers
+// Copyright (c) 2016 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -9,8 +10,8 @@ import (
 	"errors"
 	"time"
 
-	database "github.com/btcsuite/btcd/database2"
-	"github.com/btcsuite/btcd/wire"
+	"github.com/decred/dcrd/chaincfg/chainhash"
+	database "github.com/decred/dcrd/database2"
 )
 
 // fetchBlockCmd defines the configuration options for the fetchblock command.
@@ -31,7 +32,7 @@ func (cmd *fetchBlockCmd) Execute(args []string) error {
 	if len(args) < 1 {
 		return errors.New("required block hash parameter not specified")
 	}
-	blockHash, err := wire.NewShaHashFromStr(args[0])
+	blockHash, err := chainhash.NewHashFromStr(args[0])
 	if err != nil {
 		return err
 	}

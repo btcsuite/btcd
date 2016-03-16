@@ -1,4 +1,5 @@
 // Copyright (c) 2015-2016 The btcsuite developers
+// Copyright (c) 2016 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -25,10 +26,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/btcsuite/btcd/chaincfg"
-	database "github.com/btcsuite/btcd/database2"
-	"github.com/btcsuite/btcd/wire"
-	"github.com/btcsuite/btcutil"
+	"github.com/decred/dcrd/chaincfg"
+	"github.com/decred/dcrd/chaincfg/chainhash"
+	database "github.com/decred/dcrd/database2"
+	"github.com/decred/dcrd/wire"
+	"github.com/decred/dcrutil"
 )
 
 var (
@@ -45,7 +47,7 @@ var (
 
 // loadBlocks loads the blocks contained in the testdata directory and returns
 // a slice of them.
-func loadBlocks(t *testing.T, dataFile string, network wire.BitcoinNet) ([]*btcutil.Block, error) {
+func loadBlocks(t *testing.T, dataFile string, network wire.CurrencyNet) ([]*dcrutil.Block, error) {
 	// Open the file that contains the blocks for reading.
 	fi, err := os.Open(dataFile)
 	if err != nil {
@@ -61,8 +63,8 @@ func loadBlocks(t *testing.T, dataFile string, network wire.BitcoinNet) ([]*btcu
 	dr := bzip2.NewReader(fi)
 
 	// Set the first block as the genesis block.
-	blocks := make([]*btcutil.Block, 0, 256)
-	genesis := btcutil.NewBlock(chaincfg.MainNetParams.GenesisBlock)
+	blocks := make([]*dcrutil.Block, 0, 256)
+	genesis := dcrutil.NewBlock(chaincfg.MainNetParams.GenesisBlock)
 	blocks = append(blocks, genesis)
 
 	// Load the remaining blocks.
@@ -101,7 +103,7 @@ func loadBlocks(t *testing.T, dataFile string, network wire.BitcoinNet) ([]*btcu
 		}
 
 		// Deserialize and store the block.
-		block, err := btcutil.NewBlockFromBytes(blockBytes)
+		block, err := dcrutil.NewBlockFromBytes(blockBytes)
 		if err != nil {
 			t.Errorf("Failed to parse block %v: %v", height, err)
 			return nil, err
@@ -138,7 +140,7 @@ type testContext struct {
 	db          database.DB
 	bucketDepth int
 	isWritable  bool
-	blocks      []*btcutil.Block
+	blocks      []*dcrutil.Block
 }
 
 // keyPair houses a key/value pair.  It is used over maps so ordering can be
@@ -1120,13 +1122,13 @@ func testFetchBlockIOMissing(tc *testContext, tx database.Tx) bool {
 	// Test the individual block APIs one block at a time to ensure they
 	// return the expected error.  Also, build the data needed to test the
 	// bulk APIs below while looping.
-	allBlockHashes := make([]wire.ShaHash, len(tc.blocks))
+	allBlockHashes := make([]chainhash.Hash, len(tc.blocks))
 	allBlockRegions := make([]database.BlockRegion, len(tc.blocks))
 	for i, block := range tc.blocks {
 		blockHash := block.Sha()
 		allBlockHashes[i] = *blockHash
 
-		txLocs, err := block.TxLoc()
+		txLocs, _, err := block.TxLoc()
 		if err != nil {
 			tc.t.Errorf("block.TxLoc(%d): unexpected error: %v", i,
 				err)
@@ -1225,7 +1227,7 @@ func testFetchBlockIO(tc *testContext, tx database.Tx) bool {
 
 	// Test the individual block APIs one block at a time.  Also, build the
 	// data needed to test the bulk APIs below while looping.
-	allBlockHashes := make([]wire.ShaHash, len(tc.blocks))
+	allBlockHashes := make([]chainhash.Hash, len(tc.blocks))
 	allBlockBytes := make([][]byte, len(tc.blocks))
 	allBlockTxLocs := make([][]wire.TxLoc, len(tc.blocks))
 	allBlockRegions := make([]database.BlockRegion, len(tc.blocks))
@@ -1241,7 +1243,7 @@ func testFetchBlockIO(tc *testContext, tx database.Tx) bool {
 		}
 		allBlockBytes[i] = blockBytes
 
-		txLocs, err := block.TxLoc()
+		txLocs, _, err := block.TxLoc()
 		if err != nil {
 			tc.t.Errorf("block.TxLoc(%d): unexpected error: %v", i,
 				err)
@@ -1322,7 +1324,7 @@ func testFetchBlockIO(tc *testContext, tx database.Tx) bool {
 
 		// Ensure fetching a block that doesn't exist returns the
 		// expected error.
-		badBlockHash := &wire.ShaHash{}
+		badBlockHash := &chainhash.Hash{}
 		testName := fmt.Sprintf("FetchBlock(%s) invalid block",
 			badBlockHash)
 		wantErrCode := database.ErrBlockNotFound
@@ -1465,9 +1467,9 @@ func testFetchBlockIO(tc *testContext, tx database.Tx) bool {
 	// Ensure fetching blocks for which one doesn't exist returns the
 	// expected error.
 	testName := "FetchBlocks invalid hash"
-	badBlockHashes := make([]wire.ShaHash, len(allBlockHashes)+1)
+	badBlockHashes := make([]chainhash.Hash, len(allBlockHashes)+1)
 	copy(badBlockHashes, allBlockHashes)
-	badBlockHashes[len(badBlockHashes)-1] = wire.ShaHash{}
+	badBlockHashes[len(badBlockHashes)-1] = chainhash.Hash{}
 	wantErrCode := database.ErrBlockNotFound
 	_, err = tx.FetchBlocks(badBlockHashes)
 	if !checkDbError(tc.t, testName, err, wantErrCode) {
@@ -1487,7 +1489,7 @@ func testFetchBlockIO(tc *testContext, tx database.Tx) bool {
 	testName = "FetchBlockRegions invalid hash"
 	badBlockRegions := make([]database.BlockRegion, len(allBlockRegions)+1)
 	copy(badBlockRegions, allBlockRegions)
-	badBlockRegions[len(badBlockRegions)-1].Hash = &wire.ShaHash{}
+	badBlockRegions[len(badBlockRegions)-1].Hash = &chainhash.Hash{}
 	wantErrCode = database.ErrBlockNotFound
 	_, err = tx.FetchBlockRegions(badBlockRegions)
 	if !checkDbError(tc.t, testName, err, wantErrCode) {
@@ -1843,13 +1845,13 @@ func testClosedTxInterface(tc *testContext, tx database.Tx) bool {
 	// Test the individual block APIs one block at a time to ensure they
 	// return the expected error.  Also, build the data needed to test the
 	// bulk APIs below while looping.
-	allBlockHashes := make([]wire.ShaHash, len(tc.blocks))
+	allBlockHashes := make([]chainhash.Hash, len(tc.blocks))
 	allBlockRegions := make([]database.BlockRegion, len(tc.blocks))
 	for i, block := range tc.blocks {
 		blockHash := block.Sha()
 		allBlockHashes[i] = *blockHash
 
-		txLocs, err := block.TxLoc()
+		txLocs, _, err := block.TxLoc()
 		if err != nil {
 			tc.t.Errorf("block.TxLoc(%d): unexpected error: %v", i,
 				err)

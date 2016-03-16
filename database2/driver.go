@@ -1,4 +1,5 @@
 // Copyright (c) 2015-2016 The btcsuite developers
+// Copyright (c) 2016 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -10,7 +11,7 @@ import (
 	"github.com/btcsuite/btclog"
 )
 
-// Driver defines a structure for backend drivers to use when they registered
+// Driver defines a structure for backend drivers to use when they register
 // themselves as a backend which implements the DB interface.
 type Driver struct {
 	// DbType is the identifier used to uniquely identify a specific

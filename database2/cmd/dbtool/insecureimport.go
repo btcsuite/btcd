@@ -1,4 +1,5 @@
 // Copyright (c) 2015-2016 The btcsuite developers
+// Copyright (c) 2016 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -12,9 +13,10 @@ import (
 	"sync"
 	"time"
 
-	database "github.com/btcsuite/btcd/database2"
-	"github.com/btcsuite/btcd/wire"
-	"github.com/btcsuite/btcutil"
+	"github.com/decred/dcrd/chaincfg/chainhash"
+	database "github.com/decred/dcrd/database2"
+	"github.com/decred/dcrd/wire"
+	"github.com/decred/dcrutil"
 )
 
 // importCmd defines the configuration options for the insecureimport command.
@@ -32,7 +34,7 @@ var (
 
 	// zeroHash is a simply a hash with all zeros.  It is defined here to
 	// avoid creating it multiple times.
-	zeroHash = wire.ShaHash{}
+	zeroHash = chainhash.Hash{}
 )
 
 // importResults houses the stats and result as an import operation.
@@ -107,7 +109,7 @@ func (bi *blockImporter) readBlock() ([]byte, error) {
 // NOTE: This is not a safe import as it does not verify chain rules.
 func (bi *blockImporter) processBlock(serializedBlock []byte) (bool, error) {
 	// Deserialize the block which includes checks for malformed blocks.
-	block, err := btcutil.NewBlockFromBytes(serializedBlock)
+	block, err := dcrutil.NewBlockFromBytes(serializedBlock)
 	if err != nil {
 		return false, err
 	}

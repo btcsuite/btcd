@@ -1,4 +1,5 @@
 // Copyright (c) 2015-2016 The btcsuite developers
+// Copyright (c) 2016 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -7,10 +8,8 @@ Package database2 provides a block and metadata storage database.
 
 Overview
 
-As of July 2015, there are over 365,000 blocks in the Bitcoin block chain and
-and over 76 million transactions (which turns out to be over 35GB of data).
-This package provides a database layer to store and retrieve this data in a
-simple and efficient manner.
+This package provides a database layer to store and retrieve block data and
+arbitrary metadata in a simple and efficient manner.
 
 The default backend, ffldb, has a strong focus on speed, efficiency, and
 robustness.  It makes use leveldb for the metadata, flat files for block
@@ -19,7 +18,7 @@ storage, and strict checksums in key areas to ensure data integrity.
 A quick overview of the features database provides are as follows:
 
  - Key/value metadata store
- - Bitcoin block storage
+ - Decred block storage
  - Efficient retrieval of block headers and regions (transactions, scripts, etc)
  - Read-only and read-write transactions with both manual and managed modes
  - Nested buckets

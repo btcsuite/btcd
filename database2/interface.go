@@ -1,4 +1,5 @@
 // Copyright (c) 2015-2016 The btcsuite developers
+// Copyright (c) 2016 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -8,8 +9,8 @@
 package database2
 
 import (
-	"github.com/btcsuite/btcd/wire"
-	"github.com/btcsuite/btcutil"
+	"github.com/decred/dcrd/chaincfg/chainhash"
+	"github.com/decred/dcrutil"
 )
 
 // Cursor represents a cursor over key/value pairs and nested buckets of a
@@ -196,7 +197,7 @@ type Bucket interface {
 // BlockRegion specifies a particular region of a block identified by the
 // specified hash, given an offset and length.
 type BlockRegion struct {
-	Hash   *wire.ShaHash
+	Hash   *chainhash.Hash
 	Offset uint32
 	Len    uint32
 }
@@ -225,7 +226,7 @@ type Tx interface {
 	//   - ErrTxClosed if the transaction has already been closed
 	//
 	// Other errors are possible depending on the implementation.
-	StoreBlock(block *btcutil.Block) error
+	StoreBlock(block *dcrutil.Block) error
 
 	// HasBlock returns whether or not a block with the given hash exists
 	// in the database.
@@ -235,7 +236,7 @@ type Tx interface {
 	//   - ErrTxClosed if the transaction has already been closed
 	//
 	// Other errors are possible depending on the implementation.
-	HasBlock(hash *wire.ShaHash) (bool, error)
+	HasBlock(hash *chainhash.Hash) (bool, error)
 
 	// HasBlocks returns whether or not the blocks with the provided hashes
 	// exist in the database.
@@ -245,7 +246,7 @@ type Tx interface {
 	//   - ErrTxClosed if the transaction has already been closed
 	//
 	// Other errors are possible depending on the implementation.
-	HasBlocks(hashes []wire.ShaHash) ([]bool, error)
+	HasBlocks(hashes []chainhash.Hash) ([]bool, error)
 
 	// FetchBlockHeader returns the raw serialized bytes for the block
 	// header identified by the given hash.  The raw bytes are in the format
@@ -268,7 +269,7 @@ type Tx interface {
 	// has ended results in undefined behavior.  This constraint prevents
 	// additional data copies and allows support for memory-mapped database
 	// implementations.
-	FetchBlockHeader(hash *wire.ShaHash) ([]byte, error)
+	FetchBlockHeader(hash *chainhash.Hash) ([]byte, error)
 
 	// FetchBlockHeaders returns the raw serialized bytes for the block
 	// headers identified by the given hashes.  The raw bytes are in the
@@ -295,7 +296,7 @@ type Tx interface {
 	// has ended results in undefined behavior.  This constraint prevents
 	// additional data copies and allows support for memory-mapped database
 	// implementations.
-	FetchBlockHeaders(hashes []wire.ShaHash) ([][]byte, error)
+	FetchBlockHeaders(hashes []chainhash.Hash) ([][]byte, error)
 
 	// FetchBlock returns the raw serialized bytes for the block identified
 	// by the given hash.  The raw bytes are in the format returned by
@@ -312,7 +313,7 @@ type Tx interface {
 	// has ended results in undefined behavior.  This constraint prevents
 	// additional data copies and allows support for memory-mapped database
 	// implementations.
-	FetchBlock(hash *wire.ShaHash) ([]byte, error)
+	FetchBlock(hash *chainhash.Hash) ([]byte, error)
 
 	// FetchBlocks returns the raw serialized bytes for the blocks
 	// identified by the given hashes.  The raw bytes are in the format
@@ -330,15 +331,15 @@ type Tx interface {
 	// has ended results in undefined behavior.  This constraint prevents
 	// additional data copies and allows support for memory-mapped database
 	// implementations.
-	FetchBlocks(hashes []wire.ShaHash) ([][]byte, error)
+	FetchBlocks(hashes []chainhash.Hash) ([][]byte, error)
 
 	// FetchBlockRegion returns the raw serialized bytes for the given
 	// block region.
 	//
-	// For example, it is possible to directly extract Bitcoin transactions
-	// and/or scripts from a block with this function.  Depending on the
-	// backend implementation, this can provide significant savings by
-	// avoiding the need to load entire blocks.
+	// For example, it is possible to directly extract transactions and/or
+	// scripts from a block with this function.  Depending on the backend
+	// implementation, this can provide significant savings by avoiding the
+	// need to load entire blocks.
 	//
 	// The raw bytes are in the format returned by Serialize on a
 	// wire.MsgBlock and the Offset field in the provided BlockRegion is
@@ -362,9 +363,9 @@ type Tx interface {
 	// FetchBlockRegions returns the raw serialized bytes for the given
 	// block regions.
 	//
-	// For example, it is possible to directly extract Bitcoin transactions
-	// and/or scripts from various blocks with this function.  Depending on
-	// the backend implementation, this can provide significant savings by
+	// For example, it is possible to directly extract transactions and/or
+	// scripts from various blocks with this function.  Depending on the
+	// backend implementation, this can provide significant savings by
 	// avoiding the need to load entire blocks.
 	//
 	// The raw bytes are in the format returned by Serialize on a
@@ -406,10 +407,10 @@ type Tx interface {
 	Rollback() error
 }
 
-// DB provides a generic interface that is used to store bitcoin blocks and
-// related metadata.  This interface is intended to be agnostic to the actual
-// mechanism used for backend data storage.  The RegisterDriver function can be
-// used to add a new backend data storage method.
+// DB provides a generic interface that is used to store blocks and related
+// metadata.  This interface is intended to be agnostic to the actual mechanism
+// used for backend data storage.  The RegisterDriver function can be used to
+// add a new backend data storage method.
 //
 // This interface is divided into two distinct categories of functionality.
 //

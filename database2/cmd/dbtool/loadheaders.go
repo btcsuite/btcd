@@ -1,4 +1,5 @@
 // Copyright (c) 2015-2016 The btcsuite developers
+// Copyright (c) 2016 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -7,8 +8,8 @@ package main
 import (
 	"time"
 
-	database "github.com/btcsuite/btcd/database2"
-	"github.com/btcsuite/btcd/wire"
+	"github.com/decred/dcrd/chaincfg/chainhash"
+	database "github.com/decred/dcrd/database2"
 )
 
 // headersCmd defines the configuration options for the loadheaders command.
@@ -52,7 +53,7 @@ func (cmd *headersCmd) Execute(args []string) error {
 			numLoaded := 0
 			startTime := time.Now()
 			blockIdxBucket.ForEach(func(k, v []byte) error {
-				var hash wire.ShaHash
+				var hash chainhash.Hash
 				copy(hash[:], k)
 				_, err := tx.FetchBlockHeader(&hash)
 				if err != nil {
@@ -75,9 +76,9 @@ func (cmd *headersCmd) Execute(args []string) error {
 	// Bulk load headers.
 	err = db.View(func(tx database.Tx) error {
 		blockIdxBucket := tx.Metadata().Bucket(blockIdxName)
-		hashes := make([]wire.ShaHash, 0, 500000)
+		hashes := make([]chainhash.Hash, 0, 500000)
 		blockIdxBucket.ForEach(func(k, v []byte) error {
-			var hash wire.ShaHash
+			var hash chainhash.Hash
 			copy(hash[:], k)
 			hashes = append(hashes, hash)
 			return nil
