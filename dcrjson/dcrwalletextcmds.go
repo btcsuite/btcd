@@ -85,6 +85,17 @@ func NewCreateRawSSRtxCmd(inputs []TransactionInput) *CreateRawSSRtxCmd {
 	}
 }
 
+// GetBalanceToMaintainCmd is a type handling custom marshaling and
+// unmarshaling of getbalancetomaintain JSON wallet extension
+// commands.
+type GetBalanceToMaintainCmd struct {
+}
+
+// NewGetBalanceToMaintainCmd creates a new GetBalanceToMaintainCmd.
+func NewGetBalanceToMaintainCmd() *GetBalanceToMaintainCmd {
+	return &GetBalanceToMaintainCmd{}
+}
+
 // GetMultisigOutInfoCmd is a type handling custom marshaling and
 // unmarshaling of getmultisigoutinfo JSON websocket extension
 // commands.
@@ -415,6 +426,20 @@ func NewSendToSSRtxCmd(fromaccount string, tickethash string,
 	}
 }
 
+// SetBalanceToMaintainCmd is a type handling custom marshaling and
+// unmarshaling of setbalancetomaintain JSON RPC commands.
+type SetBalanceToMaintainCmd struct {
+	Balance float64
+}
+
+// NewSetBalanceToMaintainCmd creates a new instance of the setticketfee
+// command.
+func NewSetBalanceToMaintainCmd(balance float64) *SetBalanceToMaintainCmd {
+	return &SetBalanceToMaintainCmd{
+		Balance: balance,
+	}
+}
+
 // SetTicketFeeCmd is a type handling custom marshaling and
 // unmarshaling of setticketfee JSON RPC commands.
 type SetTicketFeeCmd struct {
@@ -486,6 +511,7 @@ func init() {
 	MustRegisterCmd("createrawsstx", (*CreateRawSStxCmd)(nil), flags)
 	MustRegisterCmd("createrawssgentx", (*CreateRawSSGenTxCmd)(nil), flags)
 	MustRegisterCmd("createrawssrtx", (*CreateRawSSRtxCmd)(nil), flags)
+	MustRegisterCmd("getbalancetomaintain", (*GetBalanceToMaintainCmd)(nil), flags)
 	MustRegisterCmd("getmultisigoutinfo", (*GetMultisigOutInfoCmd)(nil), flags)
 	MustRegisterCmd("getmasterpubkey", (*GetMasterPubkeyCmd)(nil), flags)
 	MustRegisterCmd("getseed", (*GetSeedCmd)(nil), flags)
@@ -511,6 +537,7 @@ func init() {
 	MustRegisterCmd("sendtosstx", (*SendToSStxCmd)(nil), flags)
 	MustRegisterCmd("sendtossgen", (*SendToSSGenCmd)(nil), flags)
 	MustRegisterCmd("sendtossrtx", (*SendToSSRtxCmd)(nil), flags)
+	MustRegisterCmd("setbalancetomaintain", (*SetBalanceToMaintainCmd)(nil), flags)
 	MustRegisterCmd("setticketfee", (*SetTicketFeeCmd)(nil), flags)
 	MustRegisterCmd("setticketmaxprice", (*SetTicketMaxPriceCmd)(nil), flags)
 	MustRegisterCmd("setticketvotebits", (*SetTicketVoteBitsCmd)(nil), flags)
