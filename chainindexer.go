@@ -189,7 +189,7 @@ func (a *addrIndexer) initialize() error {
 // index is actually a hash160 index, where in the ideal case the data push
 // is either the hash160 of a publicKey (P2PKH) or a Script (P2SH).
 func convertToAddrIndex(scrVersion uint16, scr []byte, height int64,
-	locInBlock *wire.TxLoc) ([]*database.TxAddrIndex, error) {
+	locInBlock *wire.TxLoc, txType stake.TxType) ([]*database.TxAddrIndex, error) {
 	var tais []*database.TxAddrIndex
 
 	if scr == nil || locInBlock == nil {
@@ -229,6 +229,7 @@ func convertToAddrIndex(scrVersion uint16, scr []byte, height int64,
 		case class == txscript.ScriptHashTy:
 			copy(indexKey[:], addr.ScriptAddress()[:])
 		}
+
 		tai := &database.TxAddrIndex{
 			Hash160:  indexKey,
 			Height:   uint32(height),
@@ -240,7 +241,27 @@ func convertToAddrIndex(scrVersion uint16, scr []byte, height int64,
 		knownType = true
 	}
 
-	if !knownType {
+	// This is a commitment for a future vote or
+	// revocation. Extract the address data from
+	// it and store it in the addrIndex.
+	if txType == stake.TxTypeSStx && class == txscript.NullDataTy {
+		addr, err := stake.AddrFromSStxPkScrCommitment(scr,
+			activeNetParams.Params)
+		if err != nil {
+			return nil, fmt.Errorf("ticket commit pkscr conversion error: %v",
+				err.Error())
+		}
+
+		copy(indexKey[:], addr.ScriptAddress()[:])
+		tai := &database.TxAddrIndex{
+			Hash160:  indexKey,
+			Height:   uint32(height),
+			TxOffset: uint32(locInBlock.TxStart),
+			TxLen:    uint32(locInBlock.TxLen),
+		}
+
+		tais = append(tais, tai)
+	} else if !knownType {
 		copy(indexKey[:], dcrutil.Hash160(scr))
 		tai := &database.TxAddrIndex{
 			Hash160:  indexKey,
@@ -351,7 +372,8 @@ func (a *addrIndexer) indexBlockAddrs(blk *dcrutil.Block,
 					inputOutPoint := prevOutTx.TxOut[txIn.PreviousOutPoint.Index]
 
 					toAppend, err := convertToAddrIndex(inputOutPoint.Version,
-						inputOutPoint.PkScript, parent.Height(), locInBlock)
+						inputOutPoint.PkScript, parent.Height(), locInBlock,
+						stake.TxTypeRegular)
 					if err != nil {
 						adxrLog.Tracef("Error converting tx txin %v: %v",
 							txIn.PreviousOutPoint.Hash, err)
@@ -363,7 +385,7 @@ func (a *addrIndexer) indexBlockAddrs(blk *dcrutil.Block,
 
 			for _, txOut := range tx.MsgTx().TxOut {
 				toAppend, err := convertToAddrIndex(txOut.Version, txOut.PkScript,
-					parent.Height(), locInBlock)
+					parent.Height(), locInBlock, stake.TxTypeRegular)
 				if err != nil {
 					adxrLog.Tracef("Error converting tx txout %v: %v",
 						tx.MsgTx().TxSha(), err)
@@ -379,13 +401,13 @@ func (a *addrIndexer) indexBlockAddrs(blk *dcrutil.Block,
 		// Tx's offset and length in the block.
 		locInBlock := &stxLocs[stxIdx]
 
-		isSSGen, _ := stake.IsSSGen(stx)
+		txType := stake.DetermineTxType(stx)
 
 		// Index the SPK's of each input's previous outpoint
 		// transaction.
 		for i, txIn := range stx.MsgTx().TxIn {
 			// Stakebases don't have any inputs.
-			if isSSGen && i == 0 {
+			if txType == stake.TxTypeSSGen && i == 0 {
 				continue
 			}
 
@@ -397,7 +419,8 @@ func (a *addrIndexer) indexBlockAddrs(blk *dcrutil.Block,
 			inputOutPoint := prevOutTx.TxOut[txIn.PreviousOutPoint.Index]
 
 			toAppend, err := convertToAddrIndex(inputOutPoint.Version,
-				inputOutPoint.PkScript, blk.Height(), locInBlock)
+				inputOutPoint.PkScript, blk.Height(), locInBlock,
+				txType)
 			if err != nil {
 				adxrLog.Tracef("Error converting stx txin %v: %v",
 					txIn.PreviousOutPoint.Hash, err)
@@ -408,7 +431,7 @@ func (a *addrIndexer) indexBlockAddrs(blk *dcrutil.Block,
 
 		for _, txOut := range stx.MsgTx().TxOut {
 			toAppend, err := convertToAddrIndex(txOut.Version, txOut.PkScript,
-				blk.Height(), locInBlock)
+				blk.Height(), locInBlock, txType)
 			if err != nil {
 				adxrLog.Tracef("Error converting stx txout %v: %v",
 					stx.MsgTx().TxSha(), err)

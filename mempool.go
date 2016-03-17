@@ -957,9 +957,10 @@ func (mp *txMemPool) removeTransaction(tx *dcrutil.Tx, removeRedeemers bool) {
 	txmpLog.Tracef("Removing transaction %v", tx.Sha())
 
 	txHash := tx.Sha()
+	var txType stake.TxType
 	if removeRedeemers {
 		// Remove any transactions which rely on this one.
-		txType := stake.DetermineTxType(tx)
+		txType = stake.DetermineTxType(tx)
 		tree := dcrutil.TxTreeRegular
 		if txType != stake.TxTypeRegular {
 			tree = dcrutil.TxTreeStake
@@ -983,7 +984,7 @@ func (mp *txMemPool) removeTransaction(tx *dcrutil.Tx, removeRedeemers bool) {
 	}
 
 	// Remove the transaction and its addresses from the address index.
-	mp.pruneTxFromAddrIndex(tx)
+	mp.pruneTxFromAddrIndex(tx, txType)
 }
 
 // RemoveTransaction removes the passed transaction from the mempool. If
@@ -1075,13 +1076,26 @@ func (mp *txMemPool) fetchReferencedOutputScripts(tx *dcrutil.Tx) ([][]byte,
 //
 // This function MUST be called with the mempool lock held (for writes).
 func (mp *txMemPool) indexScriptAddressToTx(pkVersion uint16, pkScript []byte,
-	tx *dcrutil.Tx) error {
-	_, addresses, _, err := txscript.ExtractPkScriptAddrs(pkVersion, pkScript,
+	tx *dcrutil.Tx, txType stake.TxType) error {
+	class, addresses, _, err := txscript.ExtractPkScriptAddrs(pkVersion, pkScript,
 		activeNetParams.Params)
 	if err != nil {
 		txmpLog.Tracef("Unable to extract encoded addresses from script "+
 			"for addrindex: %v", err)
 		return err
+	}
+
+	// An exception is SStx commitments. Handle these manually.
+	if txType == stake.TxTypeSStx && class == txscript.NullDataTy {
+		addr, err := stake.AddrFromSStxPkScrCommitment(pkScript,
+			mp.server.chainParams)
+		if err != nil {
+			txmpLog.Tracef("Unable to extract encoded addresses "+
+				"from sstx commitment script for addrindex: %v", err)
+			return err
+		}
+
+		addresses = []dcrutil.Address{addr}
 	}
 
 	for _, addr := range addresses {
@@ -1099,15 +1113,27 @@ func (mp *txMemPool) indexScriptAddressToTx(pkVersion uint16, pkScript []byte,
 // transaction itself.
 //
 // This function MUST be called with the mempool lock held (for writes).
-func (mp *txMemPool) pruneTxFromAddrIndex(tx *dcrutil.Tx) {
+func (mp *txMemPool) pruneTxFromAddrIndex(tx *dcrutil.Tx, txType stake.TxType) {
 	txHash := tx.Sha()
 
 	for _, txOut := range tx.MsgTx().TxOut {
-		_, addresses, _, err := txscript.ExtractPkScriptAddrs(txOut.Version,
+		class, addresses, _, err := txscript.ExtractPkScriptAddrs(txOut.Version,
 			txOut.PkScript, activeNetParams.Params)
 		if err != nil {
 			// If we couldn't extract addresses, skip this output.
 			continue
+		}
+
+		// An exception is SStx commitments. Handle these manually.
+		if txType == stake.TxTypeSStx && class == txscript.NullDataTy {
+			addr, err := stake.AddrFromSStxPkScrCommitment(txOut.PkScript,
+				mp.server.chainParams)
+			if err != nil {
+				// If we couldn't extract addresses, skip this output.
+				continue
+			}
+
+			addresses = []dcrutil.Address{addr}
 		}
 
 		for _, addr := range addresses {
@@ -1787,7 +1813,7 @@ func (mp *txMemPool) maybeAcceptTransaction(tx *dcrutil.Tx, isNew,
 	for _, txOut := range tx.MsgTx().TxOut {
 		// This function returns an error, but we don't really care
 		// if the script was non-standard or otherwise malformed.
-		mp.indexScriptAddressToTx(txOut.Version, txOut.PkScript, tx)
+		mp.indexScriptAddressToTx(txOut.Version, txOut.PkScript, tx, txType)
 	}
 
 	txmpLog.Debugf("Accepted transaction %v (pool size: %v)", txHash,

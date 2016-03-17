@@ -16,6 +16,7 @@ import (
 	"math/big"
 
 	"github.com/decred/dcrd/chaincfg"
+	"github.com/decred/dcrd/chaincfg/chainec"
 	"github.com/decred/dcrd/chaincfg/chainhash"
 	"github.com/decred/dcrd/txscript"
 	"github.com/decred/dcrd/wire"
@@ -64,6 +65,7 @@ const (
 
 	// SStxPKHMinOutSize is the minimum size of of an OP_RETURN commitment output
 	// for an SStx tx.
+	// 20 bytes P2SH/P2PKH + 8 byte amount + 4 byte fee range limits
 	SStxPKHMinOutSize = 32
 
 	// SStxPKHMaxOutSize is the maximum size of of an OP_RETURN commitment output
@@ -285,6 +287,36 @@ func GetSStxStakeOutputInfo(tx *dcrutil.Tx) ([]bool, [][]byte, []int64, []int64,
 
 	return isP2SH, addresses, amounts, changeAmounts, allSpendRules,
 		allSpendLimits
+}
+
+// AddrFromSStxPkScrCommitment extracts a P2SH or P2PKH address from a
+// ticket commitment pkScript.
+func AddrFromSStxPkScrCommitment(pkScript []byte,
+	params *chaincfg.Params) (dcrutil.Address, error) {
+	if len(pkScript) < SStxPKHMinOutSize {
+		return nil, stakeRuleError(ErrSStxBadCommitAmount, "short read "+
+			"of sstx commit pkscript")
+	}
+
+	// The MSB (sign), not used ever normally, encodes whether
+	// or not it is a P2PKH or P2SH for the input.
+	amtEncoded := make([]byte, 8, 8)
+	copy(amtEncoded, pkScript[22:30])
+	isP2SH := !(amtEncoded[7]&(1<<7) == 0) // MSB set?
+
+	// The 20 byte PKH or SH.
+	hashBytes := pkScript[2:22]
+
+	var err error
+	var addr dcrutil.Address
+	if isP2SH {
+		addr, err = dcrutil.NewAddressScriptHashFromHash(hashBytes, params)
+	} else {
+		addr, err = dcrutil.NewAddressPubKeyHash(hashBytes, params,
+			chainec.ECTypeSecp256k1)
+	}
+
+	return addr, err
 }
 
 // GetSSGenStakeOutputInfo takes an SSGen tx as input and scans through its
