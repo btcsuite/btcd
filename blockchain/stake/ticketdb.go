@@ -776,8 +776,8 @@ func (tmdb *TicketDB) DumpLiveTickets(bucket uint8) (SStxMemMap, error) {
 	return tickets, nil
 }
 
-// DumpLiveTickets duplicates the contents of a ticket bucket from the databases's
-// ticketMap and returns them to the user.
+// DumpAllLiveTicketHashes duplicates the contents of a ticket bucket from the
+// databases's ticketMap and returns them to the user.
 //
 // This function is safe for concurrent access.
 func (tmdb *TicketDB) DumpAllLiveTicketHashes() ([]*chainhash.Hash, error) {

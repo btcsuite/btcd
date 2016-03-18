@@ -455,6 +455,10 @@ var helpDescsEnUS = map[string]string{
 	"getrawtransaction--condition1": "verbose=true",
 	"getrawtransaction--result0":    "Hex-encoded bytes of the serialized transaction",
 
+	// GetTicketPoolValue help.
+	"getticketpoolvalue--synopsis": "Return the current value of all locked funds in the ticket pool",
+	"getticketpoolvalue--result0":  "Total value of ticket pool",
+
 	// GetTxOutResult help.
 	"gettxoutresult-bestblock":     "The block hash that contains the transaction output",
 	"gettxoutresult-confirmations": "The number of confirmations",
@@ -697,6 +701,7 @@ var rpcResultTypes = map[string][]interface{}{
 	"getpeerinfo":           []interface{}{(*[]dcrjson.GetPeerInfoResult)(nil)},
 	"getrawmempool":         []interface{}{(*[]string)(nil), (*dcrjson.GetRawMempoolVerboseResult)(nil)},
 	"getrawtransaction":     []interface{}{(*string)(nil), (*dcrjson.TxRawResult)(nil)},
+	"getticketpoolvalue":    []interface{}{(*float64)(nil)},
 	"gettxout":              []interface{}{(*dcrjson.GetTxOutResult)(nil)},
 	"getwork":               []interface{}{(*dcrjson.GetWorkResult)(nil), (*bool)(nil)},
 	"getcoinsupply":         []interface{}{(*int64)(nil)},
