@@ -299,10 +299,10 @@ func (h *Harness) connectRPCClient() error {
 // the harness' available mature coinbase outputs creating new outputs according
 // to targetOutputs. targetOutputs maps a string encoding of a Bitcoin address,
 // to the amount of coins which should be created for that output.
-func (h *Harness) CoinbaseSpend(targetOutputs map[string]btcutil.Amount) (*wire.ShaHash,
+func (h *Harness) CoinbaseSpend(targetOutputs []*wire.TxOut) (*wire.ShaHash,
 	error) {
 
-	return h.Wallet.SendPairs(targetOutputs, waddrmgr.ImportedAddrAccount, 1)
+	return h.Wallet.SendOutputs(targetOutputs, waddrmgr.ImportedAddrAccount, 1)
 }
 
 // RPCConfig returns the harnesses current rpc configuration. This allows other

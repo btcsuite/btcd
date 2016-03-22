@@ -13,7 +13,8 @@ import (
 	"time"
 
 	"github.com/btcsuite/btcd/chaincfg"
-	"github.com/btcsuite/btcutil"
+	"github.com/btcsuite/btcd/txscript"
+	"github.com/btcsuite/btcd/wire"
 	"github.com/btcsuite/btcwallet/waddrmgr"
 )
 
@@ -80,8 +81,12 @@ func TestCoinbaseSpend(t *testing.T) {
 
 	// Next, send 5 BTC to this address, spending from one of our mature
 	// coinbase outputs.
-	outputs := map[string]btcutil.Amount{addr.String(): 5e8}
-	txid, err := nodeTest.CoinbaseSpend(outputs)
+	addrScript, err := txscript.PayToAddrScript(addr)
+	if err != nil {
+		t.Fatalf("unable to generate pkscript to addr: %v", err)
+	}
+	output := wire.NewTxOut(5e8, addrScript)
+	txid, err := nodeTest.CoinbaseSpend([]*wire.TxOut{output})
 	if err != nil {
 		t.Fatalf("coinbase spend failed: %v", err)
 	}
@@ -248,12 +253,12 @@ func TestJoinMempools(t *testing.T) {
 	// Generate a coinbase spend to a new address within harness1's
 	// mempool.
 	addr, err := harness1.Wallet.NewAddress(waddrmgr.DefaultAccountNum)
+	addrScript, err := txscript.PayToAddrScript(addr)
 	if err != nil {
-		t.Fatalf("unable to get new address: %v", err)
+		t.Fatalf("unable to generate pkscript to addr: %v", err)
 	}
-	outputs := map[string]btcutil.Amount{addr.String(): 5e8}
-	_, err = harness1.CoinbaseSpend(outputs)
-	if err != nil {
+	output := wire.NewTxOut(5e8, addrScript)
+	if _, err = harness1.CoinbaseSpend([]*wire.TxOut{output}); err != nil {
 		t.Fatalf("coinbase spend failed: %v", err)
 	}
 
