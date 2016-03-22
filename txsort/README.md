@@ -7,9 +7,9 @@ txsort
 [![GoDoc](http://img.shields.io/badge/godoc-reference-blue.svg)]
 (http://godoc.org/github.com/btcsuite/btcutil/txsort)
 
-Package txsort provides the transaction sorting according to BIPLI01.
+Package txsort provides the transaction sorting according to [BIP 69](https://github.com/bitcoin/bips/blob/master/bip-0069.mediawiki).
 
-BIPLI01 defines a standard lexicographical sort order of transaction inputs and
+BIP 69 defines a standard lexicographical sort order of transaction inputs and
 outputs.  This is useful to standardize transactions for faster multi-party
 agreement as well as preventing information leaks in a single-party use case.
 

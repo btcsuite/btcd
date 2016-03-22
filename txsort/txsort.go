@@ -2,8 +2,8 @@
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
-// Provides functions for sorting tx inputs and outputs according to BIP LI01
-// (https://github.com/kristovatlas/rfc/blob/master/bips/bip-li01.mediawiki)
+// Provides functions for sorting tx inputs and outputs according to BIP 69
+// (https://github.com/bitcoin/bips/blob/master/bip-0069.mediawiki)
 
 package txsort
 
@@ -15,7 +15,7 @@ import (
 )
 
 // InPlaceSort modifies the passed transaction inputs and outputs to be sorted
-// based on BIP LI01.
+// based on BIP 69.
 //
 // WARNING: This function must NOT be called with published transactions since
 // it will mutate the transaction if it's not already sorted.  This can cause
@@ -32,7 +32,7 @@ func InPlaceSort(tx *wire.MsgTx) {
 }
 
 // Sort returns a new transaction with the inputs and outputs sorted based on
-// BIP LI01.  The passed transaction is not modified and the new transaction
+// BIP 69.  The passed transaction is not modified and the new transaction
 // might have a different hash if any sorting was done.
 func Sort(tx *wire.MsgTx) *wire.MsgTx {
 	txCopy := tx.Copy()
@@ -42,7 +42,7 @@ func Sort(tx *wire.MsgTx) *wire.MsgTx {
 }
 
 // IsSorted checks whether tx has inputs and outputs sorted according to BIP
-// LI01.
+// 69.
 func IsSorted(tx *wire.MsgTx) bool {
 	if !sort.IsSorted(sortableInputSlice(tx.TxIn)) {
 		return false
@@ -58,7 +58,7 @@ type sortableOutputSlice []*wire.TxOut
 
 // For SortableInputSlice and SortableOutputSlice, three functions are needed
 // to make it sortable with sort.Sort() -- Len, Less, and Swap
-// Len and Swap are trivial.  Less is BIP LI01 specific.
+// Len and Swap are trivial.  Less is BIP 69 specific.
 func (s sortableInputSlice) Len() int       { return len(s) }
 func (s sortableOutputSlice) Len() int      { return len(s) }
 func (s sortableOutputSlice) Swap(i, j int) { s[i], s[j] = s[j], s[i] }

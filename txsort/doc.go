@@ -3,11 +3,11 @@
 // license that can be found in the LICENSE file.
 
 /*
-Package txsort provides the transaction sorting according to BIPLI01.
+Package txsort provides the transaction sorting according to BIP 69.
 
 Overview
 
-BIPLI01 defines a standard lexicographical sort order of transaction inputs and
+BIP 69 defines a standard lexicographical sort order of transaction inputs and
 outputs.  This is useful to standardize transactions for faster multi-party
 agreement as well as preventing information leaks in a single-party use case.
 
