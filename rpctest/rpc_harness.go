@@ -53,8 +53,16 @@ var (
 	harnessStateMtx sync.RWMutex
 )
 
-
-// Harness ...
+// Harness fully encapsulates an active btcd process, along with an embdedded
+// btcwallet in order to provide a unified platform for creating rpc driven
+// integration tests involving btcd. The active btcd node will typically be
+// run in simnet mode in order to allow for easy generation of test blockchains.
+// Additionally, a special method is provided which allows on to easily generate
+// coinbase spends. The active btcd process if fully managed by Harness, which
+// handles the necessary initialization, and teardown of the process along with
+// any temporary directories created as a result. Multiple Harness instances may
+// be run concurrently, in order to allow for testing complex scenarios involving
+// multuple nodes.
 type Harness struct {
 	ActiveNet *chaincfg.Params
 
@@ -75,9 +83,10 @@ type Harness struct {
 // New creates and initializes new instance of the rpc test harness.
 // Optionally, websocket handlers and a specified configuration may be passed.
 // In the case that a nil config is passed, a default configuration will be used.
-func New(activeNet *chaincfg.Params, handlers *rpc.NotificationHandlers, extraArgs []string) (*Harness, error) {
-	testCreationLock.Lock()
-	defer testCreationLock.Unlock()
+//
+// NOTE: This function is safe for concurrent access.
+func New(activeNet *chaincfg.Params, handlers *rpc.NotificationHandlers,
+	extraArgs []string) (*Harness, error) {
 
 	harnessStateMtx.Lock()
 	defer harnessStateMtx.Unlock()
@@ -290,11 +299,15 @@ func (h *Harness) connectRPCClient() error {
 // the harness' available mature coinbase outputs creating new outputs according
 // to targetOutputs. targetOutputs maps a string encoding of a Bitcoin address,
 // to the amount of coins which should be created for that output.
-func (h *Harness) CoinbaseSpend(targetOutputs map[string]btcutil.Amount) (*wire.ShaHash, error) {
+func (h *Harness) CoinbaseSpend(targetOutputs map[string]btcutil.Amount) (*wire.ShaHash,
+	error) {
+
 	return h.Wallet.SendPairs(targetOutputs, waddrmgr.ImportedAddrAccount, 1)
 }
 
-// RPCConfig ...
+// RPCConfig returns the harnesses current rpc configuration. This allows other
+// potential RPC clients created within tests to connect to a given test harness
+// instance.
 func (h *Harness) RPCConfig() rpc.ConnConfig {
 	return h.node.config.rpcConnConfig()
 }
@@ -324,7 +337,9 @@ func generateListeningAddresses() (string, string) {
 // generateCoinbasePayout generates a fresh private key, and the corresponding
 // p2pkh address for use within all coinbase outputs produced for an instance
 // of the test harness.
-func generateCoinbasePayout(net *chaincfg.Params) (btcutil.Address, *btcec.PrivateKey, error) {
+func generateCoinbasePayout(net *chaincfg.Params) (btcutil.Address,
+	*btcec.PrivateKey, error) {
+
 	privKey, err := btcec.NewPrivateKey(btcec.S256())
 	if err != nil {
 		return nil, nil, err

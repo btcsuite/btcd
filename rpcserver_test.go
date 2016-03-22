@@ -104,6 +104,9 @@ func TestMain(m *testing.M) {
 		os.Exit(1)
 	}
 
+	// Initialize the primary mining node with a chain of length 125,
+	// providing 25 mature coinbases to allow spending from for testing
+	// purposes.
 	if err = primaryHarness.SetUp(true, 25); err != nil {
 		fmt.Println("unable to setup test chain: ", err)
 		os.Exit(1)
@@ -111,6 +114,8 @@ func TestMain(m *testing.M) {
 
 	exitCode := m.Run()
 
+	// Clean up the primary harness created above. This includes removing
+	// all temporary directories, and shutting down any created processes.
 	if err := primaryHarness.TearDown(); err != nil {
 		fmt.Println("unable to setup test chain: ", err)
 		os.Exit(1)
