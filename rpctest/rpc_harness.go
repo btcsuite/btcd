@@ -35,13 +35,15 @@ var (
 	defaultP2pPort = 18555
 	defaultRPCPort = 18556
 
+	// testInstances is a private package-level slice used to keep track of
+	// allvactive test harnesses. This global can be used to perform various
+	// "joins", shutdown several active harnesses after a test, etc.
+	testInstances map[string]*Harness
+
 	// Used to protest concurrent access to above declared variables.
 	testCreationLock sync.Mutex
 )
 
-var testInstances []*Harness
-
-// TODO(roasbeef): global slice with list of all active states.
 
 // Harness ...
 type Harness struct {
@@ -321,4 +323,9 @@ func generateCoinbasePayout(net *chaincfg.Params) (btcutil.Address, *btcec.Priva
 	}
 
 	return addr.AddressPubKeyHash(), privKey, nil
+}
+
+func init() {
+	// Create the testInstances map once the package has been imported.
+	testInstances = make(map[string]*Harness)
 }
