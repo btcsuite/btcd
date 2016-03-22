@@ -194,6 +194,8 @@ func TestTearDownAll(t *testing.T) {
 }
 
 func TestActiveHarnesses(t *testing.T) {
+	numInitialHarnesses := len(ActiveHarnesses())
+
 	// Create a single test harness.
 	harness1, err := New(&chaincfg.SimNetParams, nil, nil)
 	if err != nil {
@@ -204,9 +206,9 @@ func TestActiveHarnesses(t *testing.T) {
 	// With the harness created above, a single harness should be detected
 	// as active.
 	numActiveHarnesses := len(ActiveHarnesses())
-	if numActiveHarnesses != 1 {
-		t.Fatalf("ActiveHarnesses not updated, should have length %v, "+
-			"is instead %v", 1, numActiveHarnesses)
+	if !(numActiveHarnesses > numInitialHarnesses) {
+		t.Fatalf("ActiveHarnesses not updated, should have an " +
+			"additional test harness listed.")
 	}
 
 	harness2, err := New(&chaincfg.SimNetParams, nil, nil)
@@ -218,9 +220,9 @@ func TestActiveHarnesses(t *testing.T) {
 	// With the second harness created above, two harnesses should now be
 	// considered active.
 	numActiveHarnesses = len(ActiveHarnesses())
-	if numActiveHarnesses != 2 {
-		t.Fatalf("ActiveHarnesses not updated, should have length %v, "+
-			"is instead %v", 2, numActiveHarnesses)
+	if !(numActiveHarnesses > (numInitialHarnesses + 1)) {
+		t.Fatalf("ActiveHarnesses not updated, should have two " +
+			"additional test harnesses listed.")
 	}
 }
 
