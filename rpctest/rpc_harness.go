@@ -91,8 +91,8 @@ func New(activeNet *chaincfg.Params, handlers *rpc.NotificationHandlers,
 	harnessStateMtx.Lock()
 	defer harnessStateMtx.Unlock()
 
-	harnessId := strconv.Itoa(int(numTestInstances))
-	nodeTestData, err := ioutil.TempDir("", "rpctest-"+harnessId)
+	harnessID := strconv.Itoa(int(numTestInstances))
+	nodeTestData, err := ioutil.TempDir("", "rpctest-"+harnessID)
 	if err != nil {
 		return nil, err
 	}
