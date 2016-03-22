@@ -29,6 +29,12 @@ var (
 	PermanentPeers []string
 )
 
+// ConnResult handles the result of an Connect request.
+type ConnResult struct {
+	Conn net.Conn
+	Err  error
+}
+
 // ConnManager provides a generic connection manager for the bitcoin network.
 type ConnManager struct {
 	AddrManager *addrmgr.AddrManager
@@ -80,6 +86,21 @@ func (cm *ConnManager) Start() {
 	cm.AddrManager.Start()
 	cm.seedFromDNS(ChainParams.DNSSeeds)
 	// TODO: Connect PermanentPeers
+}
+
+// Connect handles a connection request to the given addr and
+// returns a chan with the connection result.
+func (cm *ConnManager) Connect(addr string) <-chan *ConnResult {
+	c := make(chan *ConnResult)
+	go func() {
+		conn, err := Dial("tcp", addr)
+		result := &ConnResult{
+			Conn: conn,
+			Err:  err,
+		}
+		c <- result
+	}()
+	return c
 }
 
 // New returns a new bitcoin connection manager.
