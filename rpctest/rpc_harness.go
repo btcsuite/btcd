@@ -32,7 +32,18 @@ var (
 	// current number of active test nodes.
 	numTestInstances = 0
 
+	// defaultP2pPort is the initial p2p port which will be used by the
+	// first created rpc harnesses to listen on for incoming p2p connections.
+	// Subsequent allocated ports for future rpc harness instances will be
+	// monotonically increasing odd numbers calculated as such:
+	// defaultP2pPort + (2 * harness.nodeNum).
 	defaultP2pPort = 18555
+
+	// defaultRPCPort is the initial rpc port which will be used by the first created
+	// rpc harnesses to listen on for incoming rpc connections. Subsequent
+	// allocated ports for future rpc harness instances will be monotonically
+	// increasing even numbers calculated as such:
+	// defaultP2pPort + (2 * harness.nodeNum).
 	defaultRPCPort = 18556
 
 	// testInstances is a private package-level slice used to keep track of
@@ -111,12 +122,8 @@ func New(activeNet *chaincfg.Params, handlers *rpc.NotificationHandlers, extraAr
 		return nil, err
 	}
 
+	nodeNum := numTestInstances
 	numTestInstances++
-
-	// TODO(Roasbeef):
-	//  * joinNodes(joinType)
-	//  * syncBLocks + syncMempools?
-	//  * connectAllNodes?
 
 	h := &Harness{
 		handlers:       handlers,
@@ -126,6 +133,7 @@ func New(activeNet *chaincfg.Params, handlers *rpc.NotificationHandlers, extraAr
 		coinbaseKey:    coinbaseKey,
 		coinbaseAddr:   coinbaseAddr,
 		ActiveNet:      activeNet,
+		nodeNum:        nodeNum,
 	}
 
 	testInstances = append(testInstances, h)
@@ -299,9 +307,9 @@ func generateListeningAddresses() (string, string) {
 		rpc = net.JoinHostPort(localhost, strconv.Itoa(defaultRPCPort))
 	} else {
 		p2p = net.JoinHostPort(localhost,
-			strconv.Itoa(defaultP2pPort+numTestInstances))
+			strconv.Itoa(defaultP2pPort+(2*numTestInstances)))
 		rpc = net.JoinHostPort(localhost,
-			strconv.Itoa(defaultRPCPort+numTestInstances))
+			strconv.Itoa(defaultRPCPort+(2*numTestInstances)))
 	}
 
 	return p2p, rpc
