@@ -24,6 +24,7 @@ func TestSetUp(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer nodeTest.TearDown()
 
 	// Initiate setup, generated a chain of length 125.
 	if err := nodeTest.SetUp(true, 25); err != nil {
