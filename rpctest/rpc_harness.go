@@ -6,6 +6,7 @@ package rpctest
 
 import (
 	"fmt"
+	"io/ioutil"
 	"net"
 	"os"
 	"path/filepath"
@@ -26,9 +27,6 @@ import (
 )
 
 var (
-	// tempDataDir is the name of the temporary directory used by the test harness.
-	tempDataDir = "testnode"
-
 	// current number of active test nodes.
 	numTestInstances = 0
 
@@ -52,7 +50,7 @@ var (
 	testInstances map[string]*Harness
 
 	// Used to protest concurrent access to above declared variables.
-	testCreationLock sync.Mutex
+	harnessStateMtx sync.RWMutex
 )
 
 
@@ -71,6 +69,7 @@ type Harness struct {
 
 	testNodeDir    string
 	maxConnRetries int
+	nodeNum        int
 }
 
 // New creates and initializes new instance of the rpc test harness.
@@ -80,14 +79,17 @@ func New(activeNet *chaincfg.Params, handlers *rpc.NotificationHandlers, extraAr
 	testCreationLock.Lock()
 	defer testCreationLock.Unlock()
 
-	nodeTestData := tempDataDir + strconv.Itoa(int(numTestInstances))
-	certFile := filepath.Join(nodeTestData, "rpc.cert")
-	keyFile := filepath.Join(nodeTestData, "rpc.key")
+	harnessStateMtx.Lock()
+	defer harnessStateMtx.Unlock()
 
-	// Create folder to store our tls info.
-	if err := os.Mkdir(nodeTestData, 0700); err != nil {
+	harnessId := strconv.Itoa(int(numTestInstances))
+	nodeTestData, err := ioutil.TempDir("", "rpctest-"+harnessId)
+	if err != nil {
 		return nil, err
 	}
+
+	certFile := filepath.Join(nodeTestData, "rpc.cert")
+	keyFile := filepath.Join(nodeTestData, "rpc.key")
 
 	// Generate the default config if needed.
 	if err := genCertPair(certFile, keyFile); err != nil {
@@ -302,6 +304,7 @@ func (h *Harness) RPCConfig() rpc.ConnConfig {
 func generateListeningAddresses() (string, string) {
 	var p2p, rpc string
 	localhost := "127.0.0.1"
+
 	if numTestInstances == 0 {
 		p2p = net.JoinHostPort(localhost, strconv.Itoa(defaultP2pPort))
 		rpc = net.JoinHostPort(localhost, strconv.Itoa(defaultRPCPort))
