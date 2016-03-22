@@ -138,7 +138,9 @@ func New(activeNet *chaincfg.Params, handlers *rpc.NotificationHandlers, extraAr
 		nodeNum:        nodeNum,
 	}
 
-	testInstances = append(testInstances, h)
+	// Track this newly created test instance within the package level
+	// global map of all active test instances.
+	testInstances[h.testNodeDir] = h
 
 	return h, nil
 }
@@ -212,7 +214,6 @@ func (h *Harness) SetUp(createTestChain bool, numMatureOutputs uint32) error {
 	ticker := time.NewTicker(time.Millisecond * 100)
 	desiredHeight := int32(numMatureOutputs + blockchain.CoinbaseMaturity)
 out:
-	// TODO(roasbeef): use wallet's notification server here instead?
 	for {
 		select {
 		case <-ticker.C:
@@ -253,6 +254,8 @@ func (h *Harness) TearDown() error {
 	if err := os.RemoveAll(h.testNodeDir); err != nil {
 		return err
 	}
+
+	delete(testInstances, h.testNodeDir)
 
 	return nil
 }
