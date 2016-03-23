@@ -26,10 +26,8 @@
 btcd is a full node bitcoin implementation written in [Go](http://golang.org),
 licensed under the [copyfree](http://www.copyfree.org) ISC License.
 
-This project is currently under active development and is in a Beta state. It is
-extremely stable and has been in production use for over 6 months as of May
-2014, however there are still a couple of major features we want to add before
-we come out of beta.
+This project is currently under active development and is in a Beta state.  It
+is extremely stable and has been in production use since October 2013.
 
 It currently properly downloads, validates, and serves the block chain using the
 exact rules (including bugs) for block acceptance as the reference
@@ -45,14 +43,14 @@ required into the block chain and also includes the vast majority of the more
 strict checks which filter transactions based on miner requirements ("standard"
 transactions).
 
-One key difference between btcd and bitcoind is that btcd does NOT include
-wallet functionality and this was a very intentional design decision. See the
-[blog entry](https://blog.conformal.com/btcd-not-your-moms-bitcoin-daemon) for
-more details. This means you can't actually make or receive payments directly
-with btcd. That functionality is provided by the
+One key difference between btcd and Bitcoin Core is that btcd does *NOT* include
+wallet functionality and this was a very intentional design decision.  See the
+blog entry [here](https://blog.conformal.com/btcd-not-your-moms-bitcoin-daemon)
+for more details.  This means you can't actually make or receive payments
+directly with btcd.  That functionality is provided by the
 [btcwallet](https://github.com/btcsuite/btcwallet) and
-[btcgui](https://github.com/btcsuite/btcgui) projects which are both under
-active development.
+[Paymetheus](https://github.com/btcsuite/Paymetheus) (Windows-only) projects
+which are both under active development.
 
 <a name="GettingStarted" />
 ### 2. Getting Started
