@@ -16,6 +16,9 @@ import (
 )
 
 var (
+	// MaxConnections is the number of max connections.
+	MaxConnections = 125
+
 	// Lookup looks up the host using the local resolver.
 	Lookup func(string) ([]net.IP, error) = net.LookupIP
 
@@ -37,6 +40,9 @@ type ConnResult struct {
 
 // ConnManager provides a generic connection manager for the bitcoin network.
 type ConnManager struct {
+	newConnections chan *ConnResult
+
+	Connections map[addr]net.Conn
 	AddrManager *addrmgr.AddrManager
 }
 
@@ -82,10 +88,34 @@ func (cm *ConnManager) seedFromDNS(DNSSeeds []string) {
 	}
 }
 
+func (cm *ConnManager) AddConnection(addr string, c net.Conn) {
+	cm.newConnections <- c
+}
+
+func (cm *ConnManager) ConnectionHandler() {
+	for {
+		select {
+		case c := <-s.newConnections:
+			cm.handleNewConnection(c)
+		}
+	}
+}
+
 func (cm *ConnManager) Start() {
 	cm.AddrManager.Start()
 	cm.seedFromDNS(ChainParams.DNSSeeds)
-	// TODO: Connect PermanentPeers
+	go cm.ConnectionHandler()
+
+	for _, addr := range permanentPeers {
+		pc := cm.Connect(addr)
+		go func() {
+			c, err := <-pc
+			if err != nil {
+				log.Errorf("error connecting to %s: %v", addr, err)
+			}
+			cm.AddConnection(addr, c)
+		}()
+	}
 }
 
 // Connect handles a connection request to the given addr and
@@ -108,6 +138,7 @@ func (cm *ConnManager) Connect(addr string) <-chan *ConnResult {
 func New(DataDir string) (*ConnManager, error) {
 	amgr := addrmgr.New(DataDir, Lookup)
 	cm := ConnManager{
+		Connections: make(map[addr]net.Conn, MaxConnections),
 		AddrManager: amgr,
 	}
 	return &cm, nil
