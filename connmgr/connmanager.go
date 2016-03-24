@@ -34,15 +34,17 @@ var (
 
 // ConnResult handles the result of an Connect request.
 type ConnResult struct {
+	Addr string
 	Conn net.Conn
 	Err  error
 }
 
 // ConnManager provides a generic connection manager for the bitcoin network.
 type ConnManager struct {
-	newConnections chan *ConnResult
+	newConnections   chan *ConnResult
+	closeConnections chan string
 
-	Connections map[addr]net.Conn
+	Connections map[string]net.Conn
 	AddrManager *addrmgr.AddrManager
 }
 
@@ -88,15 +90,16 @@ func (cm *ConnManager) seedFromDNS(DNSSeeds []string) {
 	}
 }
 
-func (cm *ConnManager) AddConnection(addr string, c net.Conn) {
-	cm.newConnections <- c
-}
-
 func (cm *ConnManager) ConnectionHandler() {
 	for {
 		select {
-		case c := <-s.newConnections:
-			cm.handleNewConnection(c)
+		case cr := <-cm.newConnections:
+			cm.Connections[cr.Addr] = cr.Conn
+
+		case addr := <-cm.closeConnections:
+			c := cm.Connections[addr]
+			// TODO: handle err
+			c.Close()
 		}
 	}
 }
@@ -106,14 +109,19 @@ func (cm *ConnManager) Start() {
 	cm.seedFromDNS(ChainParams.DNSSeeds)
 	go cm.ConnectionHandler()
 
-	for _, addr := range permanentPeers {
+	for _, addr := range PermanentPeers {
 		pc := cm.Connect(addr)
 		go func() {
-			c, err := <-pc
-			if err != nil {
-				log.Errorf("error connecting to %s: %v", addr, err)
+			cr, ok := <-pc
+			if !ok {
+				log.Errorf("error connecting to %s", addr)
+				return
 			}
-			cm.AddConnection(addr, c)
+			if cr.Err != nil {
+				log.Errorf("error connecting to %s: %v", addr, cr.Err)
+				return
+			}
+			cm.AddConnection(cr)
 		}()
 	}
 }
@@ -125,6 +133,7 @@ func (cm *ConnManager) Connect(addr string) <-chan *ConnResult {
 	go func() {
 		conn, err := Dial("tcp", addr)
 		result := &ConnResult{
+			Addr: addr,
 			Conn: conn,
 			Err:  err,
 		}
@@ -133,12 +142,22 @@ func (cm *ConnManager) Connect(addr string) <-chan *ConnResult {
 	return c
 }
 
+// AddConnection adds the addr connection to the list of known connections.
+func (cm *ConnManager) AddConnection(cr *ConnResult) {
+	cm.newConnections <- cr
+}
+
+// Disconnect disconnects the given connection.
+func (cm *ConnManager) Disconnect(addr string) {
+	cm.closeConnections <- addr
+}
+
 // New returns a new bitcoin connection manager.
 // Use Start to begin processing asynchronous connection management.
 func New(DataDir string) (*ConnManager, error) {
 	amgr := addrmgr.New(DataDir, Lookup)
 	cm := ConnManager{
-		Connections: make(map[addr]net.Conn, MaxConnections),
+		Connections: make(map[string]net.Conn, MaxConnections),
 		AddrManager: amgr,
 	}
 	return &cm, nil
