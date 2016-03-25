@@ -90,6 +90,9 @@ func (cm *ConnManager) seedFromDNS(DNSSeeds []string) {
 	}
 }
 
+// ConnectionHandler is a service that monitors requests for new
+// connections or closed connections and maps addresses to their
+// respective connections.
 func (cm *ConnManager) ConnectionHandler() {
 	for {
 		select {
@@ -104,6 +107,7 @@ func (cm *ConnManager) ConnectionHandler() {
 	}
 }
 
+// Start launches the connection manager.
 func (cm *ConnManager) Start() {
 	cm.AddrManager.Start()
 	cm.seedFromDNS(ChainParams.DNSSeeds)
