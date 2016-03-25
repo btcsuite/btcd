@@ -41,6 +41,7 @@ type ConnResult struct {
 
 // ConnManager provides a generic connection manager for the bitcoin network.
 type ConnManager struct {
+	wg               sync.WaitGroup
 	newConnections   chan *ConnResult
 	closeConnections chan string
 
@@ -105,12 +106,15 @@ func (cm *ConnManager) ConnectionHandler() {
 			c.Close()
 		}
 	}
+	cm.wg.Done()
 }
 
 // Start launches the connection manager.
 func (cm *ConnManager) Start() {
 	cm.AddrManager.Start()
 	cm.seedFromDNS(ChainParams.DNSSeeds)
+
+	cm.wg.Add(1)
 	go cm.ConnectionHandler()
 
 	for _, addr := range PermanentPeers {
@@ -128,6 +132,11 @@ func (cm *ConnManager) Start() {
 			cm.AddConnection(cr)
 		}()
 	}
+}
+
+// WaitForShutdown blocks until the connection handlers are stopped.
+func (cm *ConnManager) WaitForShutdown() {
+	cm.wg.Wait()
 }
 
 // Connect handles a connection request to the given addr and
