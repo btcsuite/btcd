@@ -57,7 +57,7 @@ func TestMerkleBlock3(t *testing.T) {
 
 	if !bytes.Equal(want, got.Bytes()) {
 		t.Errorf("TestMerkleBlock3 failed merkle block comparison: "+
-			"got %v want %v", got.Bytes, want)
+			"got %v want %v", got.Bytes(), want)
 		return
 	}
 }
