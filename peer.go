@@ -365,10 +365,8 @@ func (p *peer) updateAddresses(msg *wire.MsgVersion) {
 		}
 
 		// Request known addresses if the server address manager needs
-		// more and the peer has a protocol version new enough to
-		// include a timestamp with addresses.
-		hasTimestamp := true
-		if p.server.addrManager.NeedMoreAddresses() && hasTimestamp {
+		// more.
+		if p.server.addrManager.NeedMoreAddresses() {
 			p.QueueMessage(wire.NewMsgGetAddr(), nil)
 		}
 
