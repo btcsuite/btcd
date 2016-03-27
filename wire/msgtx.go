@@ -199,6 +199,20 @@ func (msg *MsgTx) TxSha() ShaHash {
 	return DoubleSha256SH(buf.Bytes())
 }
 
+// WTxSha generates the ShaHash of the transaction serialized according to the
+// new witness serialization defined in BIP0141. The final output is used within
+// the Segregated Witness commitment of all the witnesses within a block. If a
+// transaction has no witness data, then the witness sha, is the same as its txid.
+func (msg *MsgTx) WitnessSha() ShaHash {
+	if len(msg.TxIn[0].Witness) == 0 {
+		return msg.TxSha()
+	} else {
+		buf := bytes.NewBuffer(make([]byte, 0, msg.SerializeSizeWitness()))
+		_ = msg.SerializeWitness(buf)
+		return DoubleSha256SH(buf.Bytes())
+	}
+}
+
 // Copy creates a deep copy of a transaction so that the original does not get
 // modified when the copy is manipulated.
 func (msg *MsgTx) Copy() *MsgTx {
