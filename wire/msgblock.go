@@ -235,6 +235,20 @@ func (msg *MsgBlock) SerializeSize() int {
 	return n
 }
 
+// SerializeWitness returns the number of bytes it would take to serialize the
+// block, including any witness data (if any).
+func (msg *MsgBlock) SerializeSizeWitness() int {
+	// Block header bytes + Serialized varint size for the number of
+	// transactions.
+	n := blockHeaderLen + VarIntSerializeSize(uint64(len(msg.Transactions)))
+
+	for _, tx := range msg.Transactions {
+		n += tx.SerializeSizeWitness()
+	}
+
+	return n
+}
+
 // Command returns the protocol command string for the message.  This is part
 // of the Message interface implementation.
 func (msg *MsgBlock) Command() string {
