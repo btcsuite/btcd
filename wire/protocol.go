@@ -43,6 +43,10 @@ const (
 	// sendheaders message.
 	SendHeadersVersion uint32 = 70012
 
+	// WitnessVersion is the protocol version which added the new witness
+	// inventory types.
+	WitnessVersion uint32 = 70012
+
 	// RejectVersion is the protocol version which added a new reject
 	// message.
 	RejectVersion uint32 = 70002
@@ -64,7 +68,7 @@ const (
 	SFNodeBloom
 
 	// SFNodeWitness is a flag used to indicate a peer supports blocks
-	// and transactions including witness data (BIP0144)
+	// and transactions including witness data (BIP0144).
 	SFNodeWitness
 )
 
