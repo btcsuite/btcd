@@ -555,6 +555,24 @@ func (msg *MsgTx) SerializeSize() int {
 	return n
 }
 
+// VirtualSize calculates the "virtual size" of a transaction. A transaction's
+// virtual size is used when determining if a block's total composite size is
+// below the current maximum block size.
+// TODO(roasbeef): move to func in blockchain instead: TxCost(..)
+//  * cost = (size * 3) + witSize
+// hmm, but also:
+//  * virtSize = (cost(tx) + 3) / 4
+func (msg *MsgTx) VirtualSize() int {
+	witnessSize := msg.SerializeSizeWitness()
+	baseSize := msg.SerializeSize()
+	// TODO(roasbeef): make these things consts somewhere?
+	//  * yes, a const in blockchain perhaps?
+
+	// *3 is to make old txs count the same as before (norm 3 + wit 1 = 4)
+	// the +3 at the end is to always round up
+	return ((baseSize*3 + witnessSize) + 3) / 4
+}
+
 // SerializeSizeWitness returns the number of bytes it would take to serialize
 // the *witness* transaction.
 func (msg *MsgTx) SerializeSizeWitness() int {
