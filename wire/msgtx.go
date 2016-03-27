@@ -555,6 +555,24 @@ func (msg *MsgTx) SerializeSize() int {
 	return n
 }
 
+// SerializeSizeWitness returns the number of bytes it would take to serialize
+// the *witness* transaction.
+func (msg *MsgTx) SerializeSizeWitness() int {
+	n := msg.SerializeSize()
+
+	if msg.TxIn[0].Witness != nil {
+		// The marker, and flag fields take up two additional bytes.
+		n += 2
+
+		// Additionally, factor in the serialized size of each of the
+		// witnesses for each txin.
+		for _, txin := range msg.TxIn {
+			n += txin.Witness.SerializeSize()
+		}
+	}
+	return n
+}
+
 // Command returns the protocol command string for the message.  This is part
 // of the Message interface implementation.
 func (msg *MsgTx) Command() string {
