@@ -108,6 +108,17 @@ func (msg *MsgBlock) Deserialize(r io.Reader) error {
 	return msg.BtcDecode(r, 0)
 }
 
+// DeserializeWitness decodes a block from r into the receiver similar to
+// Deserialize, however DeserializeWitness is capable of properly deserializing
+// a block containing transactions with inputs that contains witness data
+// (if any).
+func (msg *MsgBlock) DeserializeWitness(r io.Reader) error {
+	// Passing a pver of WitnessVersion to BtcEncode for indicates
+	// that the transactions within the block are expected to be serialized
+	// according to the new serialization structure defined in BIP0141.
+	return msg.BtcDecode(r, WitnessVersion)
+}
+
 // DeserializeTxLoc decodes r in the same manner Deserialize does, but it takes
 // a byte buffer instead of a generic reader and returns a slice containing the
 // start and length of each transaction within the raw data that is being
@@ -144,6 +155,7 @@ func (msg *MsgBlock) DeserializeTxLoc(r *bytes.Buffer) ([]TxLoc, error) {
 	for i := uint64(0); i < txCount; i++ {
 		txLocs[i].TxStart = fullLen - r.Len()
 		tx := MsgTx{}
+		// TODO(roasbeef): witness bool?
 		err := tx.Deserialize(r)
 		if err != nil {
 			return nil, err
@@ -193,11 +205,24 @@ func (msg *MsgBlock) Serialize(w io.Writer) error {
 	// At the current time, there is no difference between the wire encoding
 	// at protocol version 0 and the stable long-term storage format.  As
 	// a result, make use of BtcEncode.
+	// TODO(roasbeef): or since on disk, just always encode with witnesses?
 	return msg.BtcEncode(w, 0)
 }
 
+// SerializeWitness encodes a block to w using an identical format to Serialize,
+// with the addition of encoding the witness data for each transaction found
+// within the block. This method is provided in additon to the regular
+// Serialize, in order to allow one to selectively encode transaction witness
+// data to upgraded peers that are able to process the new encoding.
+func (msg *MsgBlock) SerializeWitness(w io.Writer) error {
+	// Passing a WitnessVersion as the pver here indicates that each of the
+	// transactions should be serialized using the witness serialization
+	// structure defined in BIP0141.
+	return msg.BtcEncode(w, WitnessVersion)
+}
+
 // SerializeSize returns the number of bytes it would take to serialize the
-// the block.
+// "base" byte within the block.
 func (msg *MsgBlock) SerializeSize() int {
 	// Block header bytes + Serialized varint size for the number of
 	// transactions.
