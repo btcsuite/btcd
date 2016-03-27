@@ -21,7 +21,8 @@ const defaultTransactionAlloc = 2048
 const MaxBlocksPerMsg = 500
 
 // MaxBlockPayload is the maximum bytes a block message can be in bytes.
-const MaxBlockPayload = 1000000 // Not actually 1MB which would be 1024 * 1024
+// After Segregated Witness, the max block payload has been raised to 4MB.
+const MaxBlockPayload = 4000000
 
 // maxTxPerBlock is the maximum number of transactions that could
 // possibly fit into a block.
