@@ -27,9 +27,6 @@ var (
 
 	// ChainParams identifies the chain params to use.
 	ChainParams *chaincfg.Params = &chaincfg.MainNetParams
-
-	// PermanentPeers is a list of peers to maintain permanent connections.
-	PermanentPeers []string
 )
 
 // ConnResult handles the result of an Connect request.
