@@ -8,6 +8,7 @@ import (
 	mrand "math/rand"
 	"net"
 	"strconv"
+	"sync"
 	"time"
 
 	"github.com/btcsuite/btcd/addrmgr"
@@ -116,22 +117,6 @@ func (cm *ConnManager) Start() {
 
 	cm.wg.Add(1)
 	go cm.ConnectionHandler()
-
-	for _, addr := range PermanentPeers {
-		pc := cm.Connect(addr)
-		go func() {
-			cr, ok := <-pc
-			if !ok {
-				log.Errorf("error connecting to %s", addr)
-				return
-			}
-			if cr.Err != nil {
-				log.Errorf("error connecting to %s: %v", addr, cr.Err)
-				return
-			}
-			cm.AddConnection(cr)
-		}()
-	}
 }
 
 // WaitForShutdown blocks until the connection handlers are stopped.
