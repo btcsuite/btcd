@@ -11,7 +11,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/btcsuite/btcd/addrmgr"
 	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/btcsuite/btcd/wire"
 )
@@ -46,8 +45,7 @@ type ConnManager struct {
 	newConnections   chan *ConnResult
 	closeConnections chan string
 
-	Connections map[string]net.Conn
-	AddrManager *addrmgr.AddrManager
+	connections map[string]net.Conn
 }
 
 // seedFromDNS uses DNS seeding to populate the address manager with peers.
@@ -87,7 +85,7 @@ func (cm *ConnManager) seedFromDNS(DNSSeeds []string) {
 			// DNS seed lookups will vary quite a lot.
 			// to replicate this behaviour we put all addresses as
 			// having come from the first one.
-			cm.AddrManager.AddAddresses(addresses, addresses[0])
+			// cm.AddrManager.AddAddresses(addresses, addresses[0])
 		}(seeder)
 	}
 }
@@ -99,10 +97,10 @@ func (cm *ConnManager) ConnectionHandler() {
 	for {
 		select {
 		case cr := <-cm.newConnections:
-			cm.Connections[cr.Addr] = cr.Conn
+			cm.connections[cr.Addr] = cr.Conn
 
 		case addr := <-cm.closeConnections:
-			c := cm.Connections[addr]
+			c := cm.connections[addr]
 			// TODO: handle err
 			c.Close()
 		}
@@ -112,7 +110,6 @@ func (cm *ConnManager) ConnectionHandler() {
 
 // Start launches the connection manager.
 func (cm *ConnManager) Start() {
-	cm.AddrManager.Start()
 	cm.seedFromDNS(ChainParams.DNSSeeds)
 
 	cm.wg.Add(1)
@@ -152,11 +149,9 @@ func (cm *ConnManager) Disconnect(addr string) {
 
 // New returns a new bitcoin connection manager.
 // Use Start to begin processing asynchronous connection management.
-func New(DataDir string) (*ConnManager, error) {
-	amgr := addrmgr.New(DataDir, Lookup)
+func New() (*ConnManager, error) {
 	cm := ConnManager{
-		Connections: make(map[string]net.Conn, MaxConnections),
-		AddrManager: amgr,
+		connections: make(map[string]net.Conn, MaxConnections),
 	}
 	return &cm, nil
 }
