@@ -1861,7 +1861,7 @@ out:
 				}
 				na := wire.NewNetAddressIPPort(externalip, uint16(listenPort),
 					s.services)
-				err = s.connManager.AddrManager.AddLocalAddress(na, addrmgr.UpnpPrio)
+				err = s.addrManager.AddLocalAddress(na, addrmgr.UpnpPrio)
 				if err != nil {
 					// XXX DeletePortMapping?
 				}
@@ -1894,11 +1894,11 @@ func newServer(listenAddrs []string, db database.Db, chainParams *chaincfg.Param
 		services &^= wire.SFNodeBloom
 	}
 
-	cm, err := connmgr.New(cfg.DataDir)
+	amgr := addrmgr.New(cfg.DataDir, connmgr.Lookup)
+	cm, err := connmgr.New()
 	if err != nil {
 		return nil, err
 	}
-	amgr := cm.AddrManager
 
 	var listeners []net.Listener
 	var nat NAT
