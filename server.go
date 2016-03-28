@@ -1101,28 +1101,6 @@ func (s *server) handleAddPeerMsg(state *peerState, sp *serverPeer) bool {
 // handleDonePeerMsg deals with peers that have signalled they are done.  It is
 // invoked from the peerHandler goroutine.
 func (s *server) handleDonePeerMsg(state *peerState, sp *serverPeer) {
-	var list map[int32]*serverPeer
-	if sp.persistent {
-		list = state.persistentPeers
-	} else if sp.Inbound() {
-		list = state.inboundPeers
-	} else {
-		list = state.outboundPeers
-	}
-	if _, ok := list[sp.ID()]; ok {
-		// Issue an asynchronous reconnect if the peer was a
-		// persistent outbound connection.
-		if !sp.Inbound() && sp.persistent && atomic.LoadInt32(&s.shutdown) == 0 {
-			// Retry peer
-			sp2 := s.newOutboundPeer(sp.Addr(), sp.persistent)
-			if sp2 != nil {
-			}
-		}
-		delete(list, sp.ID())
-		srvrLog.Debugf("Removed peer %s", sp)
-		return
-	}
-
 	// Update the address' last seen time if the peer has acknowledged
 	// our version and has sent us its version as well.
 	if sp.VerAckReceived() && sp.VersionKnown() && sp.NA() != nil {
@@ -1255,6 +1233,17 @@ func (s *server) handleQuery(state *peerState, querymsg interface{}) {
 		// TODO(oga) if too many, nuke a non-perm peer.
 		sp := s.newOutboundPeer(msg.addr, msg.permanent)
 		if sp != nil {
+			go func() {
+				cr := <-s.connManager.Connect(msg.addr, msg.permanent)
+				if err := cr.Err; err != nil {
+					srvrLog.Errorf("Error connecting to %s: %v", msg.addr, err)
+					return
+				}
+				if err := sp.Connect(cr.Conn); err != nil {
+					srvrLog.Errorf("Error connecting to %s: %v", msg.addr, err)
+					return
+				}
+			}()
 			msg.reply <- nil
 		} else {
 			msg.reply <- errors.New("failed to add peer")
