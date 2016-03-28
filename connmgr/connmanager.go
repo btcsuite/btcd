@@ -140,7 +140,7 @@ func (cm *ConnManager) Connect(addr string, permanent bool) <-chan *ConnResult {
 	return c
 }
 
-// Disconnect disconnects the given connection.
+// Disconnect disconnects the given address.
 func (cm *ConnManager) Disconnect(addr string) {
 	cm.closeConnections <- addr
 }
