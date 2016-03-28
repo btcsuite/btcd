@@ -34,9 +34,10 @@ var (
 
 // ConnResult handles the result of an Connect request.
 type ConnResult struct {
-	Addr string
-	Conn net.Conn
-	Err  error
+	Addr      string
+	Permanent bool
+	Conn      net.Conn
+	Err       error
 }
 
 // ConnManager provides a generic connection manager for the bitcoin network.
@@ -90,10 +91,10 @@ func (cm *ConnManager) seedFromDNS(DNSSeeds []string) {
 	}
 }
 
-// ConnectionHandler is a service that monitors requests for new
+// connectionHandler is a service that monitors requests for new
 // connections or closed connections and maps addresses to their
 // respective connections.
-func (cm *ConnManager) ConnectionHandler() {
+func (cm *ConnManager) connectionHandler() {
 	for {
 		select {
 		case cr := <-cm.newConnections:
@@ -113,7 +114,7 @@ func (cm *ConnManager) Start() {
 	cm.seedFromDNS(ChainParams.DNSSeeds)
 
 	cm.wg.Add(1)
-	go cm.ConnectionHandler()
+	go cm.connectionHandler()
 }
 
 // WaitForShutdown blocks until the connection handlers are stopped.
@@ -123,23 +124,20 @@ func (cm *ConnManager) WaitForShutdown() {
 
 // Connect handles a connection request to the given addr and
 // returns a chan with the connection result.
-func (cm *ConnManager) Connect(addr string) <-chan *ConnResult {
+func (cm *ConnManager) Connect(addr string, permanent bool) <-chan *ConnResult {
 	c := make(chan *ConnResult)
 	go func() {
 		conn, err := Dial("tcp", addr)
 		result := &ConnResult{
-			Addr: addr,
-			Conn: conn,
-			Err:  err,
+			Addr:      addr,
+			Permanent: permanent,
+			Conn:      conn,
+			Err:       err,
 		}
+		cm.newConnections <- result
 		c <- result
 	}()
 	return c
-}
-
-// AddConnection adds the addr connection to the list of known connections.
-func (cm *ConnManager) AddConnection(cr *ConnResult) {
-	cm.newConnections <- cr
 }
 
 // Disconnect disconnects the given connection.
