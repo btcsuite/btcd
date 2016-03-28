@@ -99,8 +99,11 @@ func (cm *ConnManager) connectionHandler() {
 
 		case addr := <-cm.closeConnections:
 			c := cm.connections[addr]
-			// TODO: handle err
-			c.Close()
+			err := c.Close()
+			if err != nil {
+				log.Infof("Error closing connection %s: %v", addr, err)
+			}
+			delete(cm.connections, addr)
 		}
 	}
 	cm.wg.Done()
