@@ -260,7 +260,7 @@ func (m *Manager) Init(chain *blockchain.BlockChain) error {
 	// Rollback indexes to the main chain if their tip is an orphaned fork.
 	// This is fairly unlikely, but it can happen if the chain is
 	// reorganized while the index is disabled.  This has to be done in
-	// reverse order because indexes can depend on others.
+	// reverse order because later indexes can depend on earlier ones.
 	for i := len(m.enabledIndexes); i > 0; i-- {
 		indexer := m.enabledIndexes[i-1]
 
