@@ -279,6 +279,11 @@ func (m *Manager) Init(chain *blockchain.BlockChain) error {
 			return err
 		}
 
+		// Nothing to do if the index does not have any entries yet.
+		if height == -1 {
+			continue
+		}
+
 		// Loop until the tip is a block that exists in the main chain.
 		initialHeight := height
 		for {
