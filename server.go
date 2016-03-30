@@ -1243,6 +1243,8 @@ func (s *server) handleQuery(state *peerState, querymsg interface{}) {
 					srvrLog.Errorf("Error connecting to %s: %v", msg.addr, err)
 					return
 				}
+				srvrLog.Debugf("Connected to %s", sp.Addr())
+				s.addrManager.Attempt(sp.NA())
 			}()
 			msg.reply <- nil
 		} else {
@@ -1428,6 +1430,31 @@ func (s *server) peerHandler() {
 	s.blockManager.Start()
 
 	srvrLog.Tracef("Starting peer handler")
+
+	// Start up persistent peers.
+	permanentPeers := cfg.ConnectPeers
+	if len(permanentPeers) == 0 {
+		permanentPeers = cfg.AddPeers
+	}
+	for _, addr := range permanentPeers {
+		sp := s.newOutboundPeer(addr, true)
+		c := s.connManager.Connect(addr, true)
+		if sp != nil {
+			go func() {
+				cr := <-c
+				if err := cr.Err; err != nil {
+					srvrLog.Errorf("Error connecting to %s: %v", addr, err)
+					return
+				}
+				if err := sp.Connect(cr.Conn); err != nil {
+					srvrLog.Errorf("Error connecting to %s: %v", addr, err)
+					return
+				}
+				srvrLog.Debugf("Connected to %s", sp.Addr())
+				s.addrManager.Attempt(sp.NA())
+			}()
+		}
+	}
 
 	state := &peerState{
 		inboundPeers:    make(map[int32]*serverPeer),

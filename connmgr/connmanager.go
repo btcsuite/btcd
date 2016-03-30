@@ -149,6 +149,9 @@ func (cm *ConnManager) Disconnect(addr string) {
 // Use Start to begin processing asynchronous connection management.
 func New() (*ConnManager, error) {
 	cm := ConnManager{
+		newConnections:   make(chan *ConnResult, MaxConnections),
+		closeConnections: make(chan string, MaxConnections),
+
 		connections: make(map[string]net.Conn, MaxConnections),
 	}
 	return &cm, nil
