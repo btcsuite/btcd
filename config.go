@@ -654,6 +654,18 @@ func loadConfig() (*config, []string, error) {
 		return nil, nil, err
 	}
 
+	// --addrindex and --droptxindex do not mix.
+	if cfg.AddrIndex && cfg.DropTxIndex {
+		err := fmt.Errorf("%s: the --addrindex and --droptxindex "+
+			"options may not be activated at the same time "+
+			"because the address index relies on the transaction "+
+			"index",
+			funcName)
+		fmt.Fprintln(os.Stderr, err)
+		fmt.Fprintln(os.Stderr, usageMessage)
+		return nil, nil, err
+	}
+
 	// Check getwork keys are valid and saved parsed versions.
 	cfg.miningAddrs = make([]btcutil.Address, 0, len(cfg.GetWorkKeys)+
 		len(cfg.MiningAddrs))
