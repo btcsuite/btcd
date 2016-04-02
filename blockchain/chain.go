@@ -128,23 +128,25 @@ func removeChildNode(children []*blockNode, node *blockNode) []*blockNode {
 // However, the returned snapshot must be treated as immutable since it is
 // shared by all callers.
 type BestState struct {
-	Hash      *chainhash.Hash // The hash of the block.
-	Height    int32           // The height of the block.
-	Bits      uint32          // The difficulty bits of the block.
-	BlockSize uint64          // The size of the block.
-	NumTxns   uint64          // The number of txns in the block.
-	TotalTxns uint64          // The total number of txns in the chain.
+	Hash       *chainhash.Hash // The hash of the block.
+	Height     int32           // The height of the block.
+	Bits       uint32          // The difficulty bits of the block.
+	BlockSize  uint64          // The size of the block.
+	NumTxns    uint64          // The number of txns in the block.
+	TotalTxns  uint64          // The total number of txns in the chain.
+	MedianTime time.Time       // Median time as per CalcPastMedianTime.
 }
 
 // newBestState returns a new best stats instance for the given parameters.
-func newBestState(node *blockNode, blockSize, numTxns, totalTxns uint64) *BestState {
+func newBestState(node *blockNode, blockSize, numTxns, totalTxns uint64, medianTime time.Time) *BestState {
 	return &BestState{
-		Hash:      node.hash,
-		Height:    node.height,
-		Bits:      node.bits,
-		BlockSize: blockSize,
-		NumTxns:   numTxns,
-		TotalTxns: totalTxns,
+		Hash:       node.hash,
+		Height:     node.height,
+		Bits:       node.bits,
+		BlockSize:  blockSize,
+		NumTxns:    numTxns,
+		TotalTxns:  totalTxns,
+		MedianTime: medianTime,
 	}
 }
 
@@ -779,6 +781,12 @@ func (b *BlockChain) connectBlock(node *blockNode, block *btcutil.Block, view *U
 			"spent transaction out information")
 	}
 
+	// Calculate the median time for the block.
+	medianTime, err := b.calcPastMedianTime(node)
+	if err != nil {
+		return err
+	}
+
 	// Generate a new best state snapshot that will be used to update the
 	// database and later memory if all database updates are successful.
 	b.stateLock.RLock()
@@ -786,10 +794,11 @@ func (b *BlockChain) connectBlock(node *blockNode, block *btcutil.Block, view *U
 	b.stateLock.RUnlock()
 	numTxns := uint64(len(block.MsgBlock().Transactions))
 	blockSize := uint64(block.MsgBlock().SerializeSize())
-	state := newBestState(node, blockSize, numTxns, curTotalTxns+numTxns)
+	state := newBestState(node, blockSize, numTxns, curTotalTxns+numTxns,
+		medianTime)
 
 	// Atomically insert info into the database.
-	err := b.db.Update(func(dbTx database.Tx) error {
+	err = b.db.Update(func(dbTx database.Tx) error {
 		// Update best block state.
 		err := dbPutBestState(dbTx, state, node.workSum)
 		if err != nil {
@@ -892,6 +901,12 @@ func (b *BlockChain) disconnectBlock(node *blockNode, block *btcutil.Block, view
 		return err
 	}
 
+	// Calculate the median time for the previous block.
+	medianTime, err := b.calcPastMedianTime(prevNode)
+	if err != nil {
+		return err
+	}
+
 	// Load the previous block since some details for it are needed below.
 	var prevBlock *btcutil.Block
 	err = b.db.View(func(dbTx database.Tx) error {
@@ -911,7 +926,8 @@ func (b *BlockChain) disconnectBlock(node *blockNode, block *btcutil.Block, view
 	numTxns := uint64(len(prevBlock.MsgBlock().Transactions))
 	blockSize := uint64(prevBlock.MsgBlock().SerializeSize())
 	newTotalTxns := curTotalTxns - uint64(len(block.MsgBlock().Transactions))
-	state := newBestState(prevNode, blockSize, numTxns, newTotalTxns)
+	state := newBestState(prevNode, blockSize, numTxns, newTotalTxns,
+		medianTime)
 
 	err = b.db.Update(func(dbTx database.Tx) error {
 		// Update best block state.
