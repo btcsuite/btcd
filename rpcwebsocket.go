@@ -656,7 +656,7 @@ func (m *wsNotificationManager) subscribedClients(tx *btcutil.Tx,
 
 	for i, output := range msgTx.TxOut {
 		_, addrs, _, err := txscript.ExtractPkScriptAddrs(
-			output.PkScript, m.server.server.chainParams)
+			output.PkScript, m.server.cfg.ChainParams)
 		if err != nil {
 			// Clients are not able to subscribe to
 			// nonstandard or non-address outputs.
@@ -846,7 +846,7 @@ func (m *wsNotificationManager) notifyForNewTx(clients map[chan struct{}]*wsClie
 				continue
 			}
 
-			net := m.server.server.chainParams
+			net := m.server.cfg.ChainParams
 			rawTx, err := createTxRawResult(net, mtx, txHashStr, nil,
 				"", 0, 0)
 			if err != nil {
@@ -983,7 +983,7 @@ func (m *wsNotificationManager) notifyForTxOuts(ops map[wire.OutPoint]map[chan s
 	wscNotified := make(map[chan struct{}]struct{})
 	for i, txOut := range tx.MsgTx().TxOut {
 		_, txAddrs, _, err := txscript.ExtractPkScriptAddrs(
-			txOut.PkScript, m.server.server.chainParams)
+			txOut.PkScript, m.server.cfg.ChainParams)
 		if err != nil {
 			continue
 		}
@@ -2029,7 +2029,7 @@ func rescanBlock(wsc *wsClient, lookups *rescanKeys, blk *btcutil.Block) {
 
 		for txOutIdx, txout := range tx.MsgTx().TxOut {
 			_, addrs, _, _ := txscript.ExtractPkScriptAddrs(
-				txout.PkScript, wsc.server.server.chainParams)
+				txout.PkScript, wsc.server.cfg.ChainParams)
 
 			for _, addr := range addrs {
 				switch a := addr.(type) {
@@ -2218,7 +2218,7 @@ func handleRescanBlocks(wsc *wsClient, icmd interface{}) (interface{}, error) {
 
 	// Iterate over each block in the request and rescan.  When a block
 	// contains relevant transactions, add it to the response.
-	bc := wsc.server.server.blockManager.chain
+	bc := wsc.server.cfg.Chain
 	var lastBlockHash *chainhash.Hash
 	for i := range blockHashes {
 		block, err := bc.BlockByHash(blockHashes[i])
@@ -2389,7 +2389,7 @@ func handleRescan(wsc *wsClient, icmd interface{}) (interface{}, error) {
 		lookups.unspent[*outpoint] = struct{}{}
 	}
 
-	chain := wsc.server.chain
+	chain := wsc.server.cfg.Chain
 
 	minBlockHash, err := chainhash.NewHashFromStr(cmd.BeginBlock)
 	if err != nil {
@@ -2469,9 +2469,8 @@ fetchRange:
 			// continuous notifications if necessary.  Otherwise,
 			// continue the fetch loop again to rescan the new
 			// blocks (or error due to an irrecoverable reorganize).
-			blockManager := wsc.server.server.blockManager
-			pauseGuard := blockManager.Pause()
-			best := blockManager.chain.BestSnapshot()
+			pauseGuard := wsc.server.cfg.SyncMgr.Pause()
+			best := wsc.server.cfg.Chain.BestSnapshot()
 			curHash := &best.Hash
 			again := true
 			if lastBlockHash == nil || *lastBlockHash == *curHash {

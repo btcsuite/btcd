@@ -1072,28 +1072,28 @@ func (s *server) RemoveRebroadcastInventory(iv *wire.InvVect) {
 	s.modifyRebroadcastInv <- broadcastInventoryDel(iv)
 }
 
+// relayTransactions generates and relays inventory vectors for all of the
+// passed transactions to all connected peers.
+func (s *server) relayTransactions(txns []*mempool.TxDesc) {
+	for _, txD := range txns {
+		iv := wire.NewInvVect(wire.InvTypeTx, txD.Tx.Hash())
+		s.RelayInventory(iv, txD)
+	}
+}
+
 // AnnounceNewTransactions generates and relays inventory vectors and notifies
 // both websocket and getblocktemplate long poll clients of the passed
 // transactions.  This function should be called whenever new transactions
 // are added to the mempool.
-func (s *server) AnnounceNewTransactions(newTxs []*mempool.TxDesc) {
+func (s *server) AnnounceNewTransactions(txns []*mempool.TxDesc) {
 	// Generate and relay inventory vectors for all newly accepted
-	// transactions into the memory pool due to the original being
-	// accepted.
-	for _, txD := range newTxs {
-		// Generate the inventory vector and relay it.
-		iv := wire.NewInvVect(wire.InvTypeTx, txD.Tx.Hash())
-		s.RelayInventory(iv, txD)
+	// transactions.
+	s.relayTransactions(txns)
 
-		if s.rpcServer != nil {
-			// Notify websocket clients about mempool transactions.
-			s.rpcServer.ntfnMgr.NotifyMempoolTx(txD.Tx, true)
-
-			// Potentially notify any getblocktemplate long poll clients
-			// about stale block templates due to the new transaction.
-			s.rpcServer.gbtWorkState.NotifyMempoolTx(
-				s.txMemPool.LastUpdated())
-		}
+	// Notify both websocket and getblocktemplate long poll clients of all
+	// newly accepted transactions.
+	if s.rpcServer != nil {
+		s.rpcServer.NotifyNewTransactions(txns)
 	}
 }
 
@@ -1892,88 +1892,6 @@ func (s *server) OutboundGroupCount(key string) int {
 	return <-replyChan
 }
 
-// AddedNodeInfo returns an array of btcjson.GetAddedNodeInfoResult structures
-// describing the persistent (added) nodes.
-func (s *server) AddedNodeInfo() []*serverPeer {
-	replyChan := make(chan []*serverPeer)
-	s.query <- getAddedNodesMsg{reply: replyChan}
-	return <-replyChan
-}
-
-// Peers returns an array of all connected peers.
-func (s *server) Peers() []*serverPeer {
-	replyChan := make(chan []*serverPeer)
-
-	s.query <- getPeersMsg{reply: replyChan}
-
-	return <-replyChan
-}
-
-// DisconnectNodeByAddr disconnects a peer by target address. Both outbound and
-// inbound nodes will be searched for the target node. An error message will
-// be returned if the peer was not found.
-func (s *server) DisconnectNodeByAddr(addr string) error {
-	replyChan := make(chan error)
-
-	s.query <- disconnectNodeMsg{
-		cmp:   func(sp *serverPeer) bool { return sp.Addr() == addr },
-		reply: replyChan,
-	}
-
-	return <-replyChan
-}
-
-// DisconnectNodeByID disconnects a peer by target node id. Both outbound and
-// inbound nodes will be searched for the target node. An error message will be
-// returned if the peer was not found.
-func (s *server) DisconnectNodeByID(id int32) error {
-	replyChan := make(chan error)
-
-	s.query <- disconnectNodeMsg{
-		cmp:   func(sp *serverPeer) bool { return sp.ID() == id },
-		reply: replyChan,
-	}
-
-	return <-replyChan
-}
-
-// RemoveNodeByAddr removes a peer from the list of persistent peers if
-// present. An error will be returned if the peer was not found.
-func (s *server) RemoveNodeByAddr(addr string) error {
-	replyChan := make(chan error)
-
-	s.query <- removeNodeMsg{
-		cmp:   func(sp *serverPeer) bool { return sp.Addr() == addr },
-		reply: replyChan,
-	}
-
-	return <-replyChan
-}
-
-// RemoveNodeByID removes a peer by node ID from the list of persistent peers
-// if present. An error will be returned if the peer was not found.
-func (s *server) RemoveNodeByID(id int32) error {
-	replyChan := make(chan error)
-
-	s.query <- removeNodeMsg{
-		cmp:   func(sp *serverPeer) bool { return sp.ID() == id },
-		reply: replyChan,
-	}
-
-	return <-replyChan
-}
-
-// ConnectNode adds `addr' as a new outbound peer. If permanent is true then the
-// peer will be persistent and reconnect if the connection is lost.
-// It is an error to call this with an already existing peer.
-func (s *server) ConnectNode(addr string, permanent bool) error {
-	replyChan := make(chan error)
-
-	s.query <- connectNodeMsg{addr: addr, permanent: permanent, reply: replyChan}
-
-	return <-replyChan
-}
-
 // AddBytesSent adds the passed number of bytes to the total bytes sent counter
 // for the server.  It is safe for concurrent access.
 func (s *server) AddBytesSent(bytesSent uint64) {
@@ -2625,8 +2543,21 @@ func newServer(listenAddrs []string, db database.DB, chainParams *chaincfg.Param
 	}
 
 	if !cfg.DisableRPC {
-		s.rpcServer, err = newRPCServer(cfg.RPCListeners,
-			blockTemplateGenerator, &s)
+		s.rpcServer, err = newRPCServer(&rpcserverConfig{
+			ListenAddrs: cfg.RPCListeners,
+			StartupTime: s.startupTime,
+			ConnMgr:     &rpcConnManager{&s},
+			SyncMgr:     &rpcSyncMgr{&s, s.blockManager},
+			TimeSource:  s.timeSource,
+			Chain:       s.blockManager.chain,
+			ChainParams: chainParams,
+			DB:          db,
+			TxMemPool:   s.txMemPool,
+			Generator:   blockTemplateGenerator,
+			CPUMiner:    s.cpuMiner,
+			TxIndex:     s.txIndex,
+			AddrIndex:   s.addrIndex,
+		})
 		if err != nil {
 			return nil, err
 		}
