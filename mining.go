@@ -280,26 +280,14 @@ func logSkippedDeps(tx *btcutil.Tx, deps map[chainhash.Hash]*txPrioItem) {
 // on the end of the current best chain.  In particular, it is one second after
 // the median timestamp of the last several blocks per the chain consensus
 // rules.
-func minimumMedianTime(chainState *chainState) (time.Time, error) {
-	chainState.Lock()
-	defer chainState.Unlock()
-	if chainState.pastMedianTimeErr != nil {
-		return time.Time{}, chainState.pastMedianTimeErr
-	}
-
-	return chainState.pastMedianTime.Add(time.Second), nil
+func minimumMedianTime(chainState *blockchain.BestState) time.Time {
+	return chainState.MedianTime.Add(time.Second)
 }
 
 // medianAdjustedTime returns the current time adjusted to ensure it is at least
 // one second after the median timestamp of the last several blocks per the
 // chain consensus rules.
-func medianAdjustedTime(chainState *chainState, timeSource blockchain.MedianTimeSource) (time.Time, error) {
-	chainState.Lock()
-	defer chainState.Unlock()
-	if chainState.pastMedianTimeErr != nil {
-		return time.Time{}, chainState.pastMedianTimeErr
-	}
-
+func medianAdjustedTime(chainState *blockchain.BestState, timeSource blockchain.MedianTimeSource) time.Time {
 	// The timestamp for the block must not be before the median timestamp
 	// of the last several blocks.  Thus, choose the maximum between the
 	// current time and one second after the past median time.  The current
@@ -307,12 +295,12 @@ func medianAdjustedTime(chainState *chainState, timeSource blockchain.MedianTime
 	// block timestamp does not supported a precision greater than one
 	// second.
 	newTimestamp := timeSource.AdjustedTime()
-	minTimestamp := chainState.pastMedianTime.Add(time.Second)
+	minTimestamp := minimumMedianTime(chainState)
 	if newTimestamp.Before(minTimestamp) {
 		newTimestamp = minTimestamp
 	}
 
-	return newTimestamp, nil
+	return newTimestamp
 }
 
 // NewBlockTemplate returns a new block template that is ready to be solved
@@ -381,13 +369,11 @@ func NewBlockTemplate(policy *mining.Policy, server *server, payToAddress btcuti
 	var txSource mining.TxSource = server.txMemPool
 	blockManager := server.blockManager
 	timeSource := server.timeSource
-	chainState := &blockManager.chainState
 
 	// Extend the most recently known best block.
-	chainState.Lock()
-	prevHash := chainState.newestHash
-	nextBlockHeight := chainState.newestHeight + 1
-	chainState.Unlock()
+	best := blockManager.chain.BestSnapshot()
+	prevHash := best.Hash
+	nextBlockHeight := best.Height + 1
 
 	// Create a standard coinbase transaction paying to the provided
 	// address.  NOTE: The coinbase value will be updated to include the
@@ -701,10 +687,7 @@ mempoolLoop:
 	// Calculate the required difficulty for the block.  The timestamp
 	// is potentially adjusted to ensure it comes after the median time of
 	// the last several blocks per the chain consensus rules.
-	ts, err := medianAdjustedTime(chainState, timeSource)
-	if err != nil {
-		return nil, err
-	}
+	ts := medianAdjustedTime(best, timeSource)
 	reqDifficulty, err := blockManager.chain.CalcNextRequiredDifficulty(ts)
 	if err != nil {
 		return nil, err
@@ -759,11 +742,8 @@ func UpdateBlockTime(msgBlock *wire.MsgBlock, bManager *blockManager) error {
 	// The new timestamp is potentially adjusted to ensure it comes after
 	// the median time of the last several blocks per the chain consensus
 	// rules.
-	newTimestamp, err := medianAdjustedTime(&bManager.chainState,
-		bManager.server.timeSource)
-	if err != nil {
-		return err
-	}
+	best := bManager.chain.BestSnapshot()
+	newTimestamp := medianAdjustedTime(best, bManager.server.timeSource)
 	msgBlock.Header.Timestamp = newTimestamp
 
 	// If running on a network that requires recalculating the difficulty,
