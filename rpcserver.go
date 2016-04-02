@@ -1534,7 +1534,7 @@ func (state *gbtWorkState) updateBlockTemplate(s *rpcServer, useCoinbaseValue bo
 				"template: "+err.Error(), "")
 		}
 		template = blkTemplate
-		msgBlock = template.block
+		msgBlock = template.Block
 		targetDifficulty = fmt.Sprintf("%064x",
 			blockchain.CompactToBig(msgBlock.Header.Bits))
 
@@ -1577,7 +1577,7 @@ func (state *gbtWorkState) updateBlockTemplate(s *rpcServer, useCoinbaseValue bo
 		// template if it doesn't already have one.  Since this requires
 		// mining addresses to be specified via the config, an error is
 		// returned if none have been specified.
-		if !useCoinbaseValue && !template.validPayAddress {
+		if !useCoinbaseValue && !template.ValidPayAddress {
 			// Choose a payment address at random.
 			payToAddr := cfg.miningAddrs[rand.Intn(len(cfg.miningAddrs))]
 
@@ -1588,17 +1588,17 @@ func (state *gbtWorkState) updateBlockTemplate(s *rpcServer, useCoinbaseValue bo
 				context := "Failed to create pay-to-addr script"
 				return internalRPCError(err.Error(), context)
 			}
-			template.block.Transactions[0].TxOut[0].PkScript = pkScript
-			template.validPayAddress = true
+			template.Block.Transactions[0].TxOut[0].PkScript = pkScript
+			template.ValidPayAddress = true
 
 			// Update the merkle root.
-			block := btcutil.NewBlock(template.block)
+			block := btcutil.NewBlock(template.Block)
 			merkles := blockchain.BuildMerkleTreeStore(block.Transactions())
-			template.block.Header.MerkleRoot = *merkles[len(merkles)-1]
+			template.Block.Header.MerkleRoot = *merkles[len(merkles)-1]
 		}
 
 		// Set locals for convenience.
-		msgBlock = template.block
+		msgBlock = template.Block
 		targetDifficulty = fmt.Sprintf("%064x",
 			blockchain.CompactToBig(msgBlock.Header.Bits))
 
@@ -1627,7 +1627,7 @@ func (state *gbtWorkState) blockTemplateResult(useCoinbaseValue bool, submitOld 
 	// after the template is generated, but it's important to avoid serving
 	// invalid block templates.
 	template := state.template
-	msgBlock := template.block
+	msgBlock := template.Block
 	header := &msgBlock.Header
 	adjustedTime := state.timeSource.AdjustedTime()
 	maxTime := adjustedTime.Add(time.Second * blockchain.MaxTimeOffsetSeconds)
@@ -1684,8 +1684,8 @@ func (state *gbtWorkState) blockTemplateResult(useCoinbaseValue bool, submitOld 
 			Data:    hex.EncodeToString(txBuf.Bytes()),
 			Hash:    txHash.String(),
 			Depends: depends,
-			Fee:     template.fees[i],
-			SigOps:  template.sigOpCounts[i],
+			Fee:     template.Fees[i],
+			SigOps:  template.SigOpCounts[i],
 		}
 		transactions = append(transactions, resultTx)
 	}
@@ -1699,7 +1699,7 @@ func (state *gbtWorkState) blockTemplateResult(useCoinbaseValue bool, submitOld 
 	reply := btcjson.GetBlockTemplateResult{
 		Bits:         strconv.FormatInt(int64(header.Bits), 16),
 		CurTime:      header.Timestamp.Unix(),
-		Height:       int64(template.height),
+		Height:       int64(template.Height),
 		PreviousHash: header.PrevBlock.String(),
 		SigOpLimit:   blockchain.MaxSigOpsPerBlock,
 		SizeLimit:    wire.MaxBlockPayload,
@@ -1720,7 +1720,7 @@ func (state *gbtWorkState) blockTemplateResult(useCoinbaseValue bool, submitOld 
 	} else {
 		// Ensure the template has a valid payment address associated
 		// with it when a full coinbase is requested.
-		if !template.validPayAddress {
+		if !template.ValidPayAddress {
 			return nil, &btcjson.RPCError{
 				Code: btcjson.ErrRPCInternal.Code,
 				Message: "A coinbase transaction has been " +
@@ -1742,8 +1742,8 @@ func (state *gbtWorkState) blockTemplateResult(useCoinbaseValue bool, submitOld 
 			Data:    hex.EncodeToString(txBuf.Bytes()),
 			Hash:    tx.TxSha().String(),
 			Depends: []int64{},
-			Fee:     template.fees[0],
-			SigOps:  template.sigOpCounts[0],
+			Fee:     template.Fees[0],
+			SigOps:  template.SigOpCounts[0],
 		}
 
 		reply.CoinbaseTxn = &resultTx
@@ -1791,7 +1791,7 @@ func handleGetBlockTemplateLongPoll(s *rpcServer, longPollID string, useCoinbase
 	// Return the block template now if the specific block template
 	// identified by the long poll ID no longer matches the current block
 	// template as this means the provided template is stale.
-	prevTemplateHash := &state.template.block.Header.PrevBlock
+	prevTemplateHash := &state.template.Block.Header.PrevBlock
 	if !prevHash.IsEqual(prevTemplateHash) ||
 		lastGenerated != state.lastGenerated.Unix() {
 
@@ -1839,7 +1839,7 @@ func handleGetBlockTemplateLongPoll(s *rpcServer, longPollID string, useCoinbase
 	// Include whether or not it is valid to submit work against the old
 	// block template depending on whether or not a solution has already
 	// been found and added to the block chain.
-	submitOld := prevHash.IsEqual(&state.template.block.Header.PrevBlock)
+	submitOld := prevHash.IsEqual(&state.template.Block.Header.PrevBlock)
 	result, err := state.blockTemplateResult(useCoinbaseValue, &submitOld)
 	if err != nil {
 		return nil, err
@@ -2723,7 +2723,7 @@ func handleGetWorkRequest(s *rpcServer) (interface{}, error) {
 			context := "Failed to create new block template"
 			return nil, internalRPCError(err.Error(), context)
 		}
-		msgBlock = template.block
+		msgBlock = template.Block
 
 		// Update work state to ensure another block template isn't
 		// generated until needed.
