@@ -18,9 +18,6 @@ import (
 )
 
 var (
-	// NetParams is the default active chain params.
-	NetParams *chaincfg.Params = &chaincfg.MainNetParams
-
 	//MaxOutboundPeers is the number of max outbound connections.
 	MaxOutboundPeers = 8
 
@@ -139,7 +136,7 @@ func (cm *ConnManager) connectionHandler() {
 
 			// allow nondefault ports after 50 failed tries.
 			if fmt.Sprintf("%d", addr.NetAddress().Port) !=
-				NetParams.DefaultPort {
+				ChainParams.DefaultPort {
 				continue
 			}
 
