@@ -5,17 +5,25 @@
 package connmgr
 
 import (
+	"fmt"
 	mrand "math/rand"
 	"net"
 	"strconv"
 	"sync"
 	"time"
 
+	"github.com/btcsuite/btcd/addrmgr"
 	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/btcsuite/btcd/wire"
 )
 
 var (
+	// NetParams is the default active chain params.
+	NetParams *chaincfg.Params = &chaincfg.MainNetParams
+
+	//MaxOutboundPeers is the number of max outbound connections.
+	MaxOutboundPeers = 8
+
 	// MaxConnections is the number of max connections.
 	MaxConnections = 125
 
@@ -43,7 +51,11 @@ type ConnManager struct {
 	newConnections   chan *ConnResult
 	closeConnections chan string
 
-	connections map[string]net.Conn
+	amgr           *addrmgr.AddrManager
+	connections    map[string]net.Conn
+	outboundGroups map[string]int
+
+	NewConnectionHandler func(<-chan *ConnResult)
 }
 
 // seedFromDNS uses DNS seeding to populate the address manager with peers.
@@ -83,14 +95,15 @@ func (cm *ConnManager) seedFromDNS(DNSSeeds []string) {
 			// DNS seed lookups will vary quite a lot.
 			// to replicate this behaviour we put all addresses as
 			// having come from the first one.
-			// cm.AddrManager.AddAddresses(addresses, addresses[0])
+			cm.amgr.AddAddresses(addresses, addresses[0])
 		}(seeder)
 	}
 }
 
 // connectionHandler is a service that monitors requests for new
 // connections or closed connections and maps addresses to their
-// respective connections.
+// respective connections. It also maintains a fixed number of
+// outbound connections.
 func (cm *ConnManager) connectionHandler() {
 	for {
 		select {
@@ -105,6 +118,35 @@ func (cm *ConnManager) connectionHandler() {
 			}
 			delete(cm.connections, addr)
 		}
+
+		if len(cm.connections) < MaxOutboundPeers {
+			addr := cm.amgr.GetAddress("any")
+			if addr == nil {
+				break
+			}
+			key := addrmgr.GroupKey(addr.NetAddress())
+			// Address will not be invalid, local or unroutable
+			// because addrmanager rejects those on addition.
+			// Just check that we don't already have an address
+			// in the same group so that we are not connecting
+			// to the same network segment at the expense of
+			// others.
+			if cm.outboundGroups[key] != 0 {
+				break
+			}
+
+			addrStr := addrmgr.NetAddressKey(addr.NetAddress())
+
+			// allow nondefault ports after 50 failed tries.
+			if fmt.Sprintf("%d", addr.NetAddress().Port) !=
+				NetParams.DefaultPort {
+				continue
+			}
+
+			cr := cm.Connect(addrStr, false)
+			go cm.NewConnectionHandler(cr)
+		}
+
 	}
 	cm.wg.Done()
 }
@@ -147,12 +189,14 @@ func (cm *ConnManager) Disconnect(addr string) {
 
 // New returns a new bitcoin connection manager.
 // Use Start to begin processing asynchronous connection management.
-func New() (*ConnManager, error) {
+func New(amgr *addrmgr.AddrManager) (*ConnManager, error) {
 	cm := ConnManager{
 		newConnections:   make(chan *ConnResult, MaxConnections),
 		closeConnections: make(chan string, MaxConnections),
 
-		connections: make(map[string]net.Conn, MaxConnections),
+		amgr:           amgr,
+		connections:    make(map[string]net.Conn, MaxConnections),
+		outboundGroups: make(map[string]int),
 	}
 	return &cm, nil
 }
