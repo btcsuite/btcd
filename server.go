@@ -1911,10 +1911,6 @@ func newServer(listenAddrs []string, db database.Db, chainParams *chaincfg.Param
 	}
 
 	amgr := addrmgr.New(cfg.DataDir, connmgr.Lookup)
-	cm, err := connmgr.New(amgr)
-	if err != nil {
-		return nil, err
-	}
 
 	var listeners []net.Listener
 	var nat NAT
@@ -2066,6 +2062,25 @@ func newServer(listenAddrs []string, db database.Db, chainParams *chaincfg.Param
 		return nil, err
 	}
 	s.blockManager = bm
+
+	connHandler := func(cr <-chan *connmgr.ConnResult) {
+		c := <-cr
+		if c.Err != nil {
+			srvrLog.Errorf("Error connecting to %s: %v", c.Addr, c.Err)
+			return
+		}
+		sp := s.newOutboundPeer(c.Addr, true)
+		if err := sp.Connect(c.Conn); err != nil {
+			srvrLog.Errorf("Error connecting to %s: %v", c.Addr, err)
+			return
+		}
+		srvrLog.Debugf("Connected to %s", sp.Addr())
+	}
+	cm, err := connmgr.New(amgr, connHandler)
+	if err != nil {
+		return nil, err
+	}
+
 	s.connManager = cm
 
 	txC := mempoolConfig{
