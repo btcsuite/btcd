@@ -25,13 +25,13 @@ var (
 	MaxConnections = 125
 
 	// Lookup looks up the host using the local resolver.
-	Lookup func(string) ([]net.IP, error) = net.LookupIP
+	Lookup = net.LookupIP
 
 	// Dial connects to the address on the named network.
-	Dial func(string, string) (net.Conn, error) = net.Dial
+	Dial = net.Dial
 
 	// ChainParams identifies the chain params to use.
-	ChainParams *chaincfg.Params = &chaincfg.MainNetParams
+	ChainParams = &chaincfg.MainNetParams
 )
 
 // ConnResult handles the result of an Connect request.
