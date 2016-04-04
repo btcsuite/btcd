@@ -1971,7 +1971,7 @@ func newServer(listenAddrs []string, db database.DB, chainParams *chaincfg.Param
 	}
 
 	amgr := addrmgr.New(cfg.DataDir, connmgr.Lookup)
-	cm, err := connmgr.New()
+	cm, err := connmgr.New(amgr)
 	if err != nil {
 		return nil, err
 	}
