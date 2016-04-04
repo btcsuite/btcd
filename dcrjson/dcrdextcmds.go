@@ -20,6 +20,19 @@ func NewExistsAddressCmd(address string) *ExistsAddressCmd {
 	}
 }
 
+// ExistsAddressesCmd defines the existsaddresses JSON-RPC command.
+type ExistsAddressesCmd struct {
+	Addresses []string
+}
+
+// NewExistsAddressesCmd returns a new instance which can be used to issue an
+// existsaddresses JSON-RPC command.
+func NewExistsAddressesCmd(addresses []string) *ExistsAddressesCmd {
+	return &ExistsAddressesCmd{
+		Addresses: addresses,
+	}
+}
+
 // ExistsLiveTicketCmd defines the existsliveticket JSON-RPC command.
 type ExistsLiveTicketCmd struct {
 	TxHash string
@@ -87,6 +100,16 @@ func NewGetTicketPoolValueCmd() *GetTicketPoolValueCmd {
 	return &GetTicketPoolValueCmd{}
 }
 
+// LiveTicketsCmd is a type handling custom marshaling and
+// unmarshaling of livetickets JSON RPC commands.
+type LiveTicketsCmd struct{}
+
+// NewLiveTicketsCmd returns a new instance which can be used to issue a JSON-RPC
+// livetickets command.
+func NewLiveTicketsCmd() *LiveTicketsCmd {
+	return &LiveTicketsCmd{}
+}
+
 // MissedTicketsCmd is a type handling custom marshaling and
 // unmarshaling of missedtickets JSON RPC commands.
 type MissedTicketsCmd struct{}
@@ -133,12 +156,14 @@ func init() {
 	flags := UsageFlag(0)
 
 	MustRegisterCmd("existsaddress", (*ExistsAddressCmd)(nil), flags)
+	MustRegisterCmd("existsaddresses", (*ExistsAddressesCmd)(nil), flags)
 	MustRegisterCmd("existsliveticket", (*ExistsLiveTicketCmd)(nil), flags)
 	MustRegisterCmd("existslivetickets", (*ExistsLiveTicketsCmd)(nil), flags)
 	MustRegisterCmd("existsmempooltxs", (*ExistsMempoolTxsCmd)(nil), flags)
 	MustRegisterCmd("getcoinsupply", (*GetCoinSupplyCmd)(nil), flags)
 	MustRegisterCmd("getstakedifficulty", (*GetStakeDifficultyCmd)(nil), flags)
 	MustRegisterCmd("getticketpoolvalue", (*GetTicketPoolValueCmd)(nil), flags)
+	MustRegisterCmd("livetickets", (*LiveTicketsCmd)(nil), flags)
 	MustRegisterCmd("missedtickets", (*MissedTicketsCmd)(nil), flags)
 	MustRegisterCmd("rebroadcastmissed", (*RebroadcastMissedCmd)(nil), flags)
 	MustRegisterCmd("rebroadcastwinners", (*RebroadcastWinnersCmd)(nil), flags)

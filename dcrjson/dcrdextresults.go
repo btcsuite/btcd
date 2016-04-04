@@ -5,6 +5,12 @@
 
 package dcrjson
 
+// LiveTicketsResult models the data returned from the livetickets
+// command.
+type LiveTicketsResult struct {
+	Tickets []string `json:"tickets"`
+}
+
 // MissedTicketsResult models the data returned from the missedtickets
 // command.
 type MissedTicketsResult struct {

@@ -203,6 +203,18 @@ func (b *BlockChain) DisableVerify(disable bool) {
 	b.noVerify = disable
 }
 
+// LiveTickets returns all currently live tickets from the stake database.
+//
+// This function is NOT safe for concurrent access.
+func (b *BlockChain) LiveTickets() ([]*chainhash.Hash, error) {
+	live, err := b.tmdb.DumpAllLiveTicketHashes()
+	if err != nil {
+		return nil, err
+	}
+
+	return live, nil
+}
+
 // MissedTickets returns all currently missed tickets from the stake database.
 //
 // This function is NOT safe for concurrent access.

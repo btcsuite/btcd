@@ -7,6 +7,49 @@
 
 package dcrjson
 
+// AccountAddressIndexCmd is a type handling custom marshaling and
+// unmarshaling of accountaddressindex JSON wallet extension
+// commands.
+type AccountAddressIndexCmd struct {
+	Account string `json:"account"`
+	Branch  int    `json:"branch"`
+}
+
+// NewAccountAddressIndexCmd creates a new AccountAddressIndexCmd.
+func NewAccountAddressIndexCmd(acct string) *AccountAddressIndexCmd {
+	return &AccountAddressIndexCmd{Account: acct}
+}
+
+// AccountFetchAddressesCmd is a type handling custom marshaling and
+// unmarshaling of accountfetchaddresses JSON wallet extension
+// commands.
+type AccountFetchAddressesCmd struct {
+	Account string `json:"account"`
+	Branch  int    `json:"branch"`
+	Start   int    `json:"start"`
+	End     int    `json:"end"`
+}
+
+// NewAccountFetchAddressesCmd creates a new AccountFetchAddressesCmd.
+func NewAccountFetchAddressesCmd(acct string) *AccountAddressIndexCmd {
+	return &AccountAddressIndexCmd{Account: acct}
+}
+
+// AccountSyncAddressIndexCmd is a type handling custom marshaling and
+// unmarshaling of accountsyncaddressindex JSON wallet extension
+// commands.
+type AccountSyncAddressIndexCmd struct {
+	Account string `json:"account"`
+	Branch  int    `json:"branch"`
+	Index   int    `json:"index"`
+}
+
+// NewAccountSyncAddressIndexCmd creates a new AccountSyncAddressIndexCmd.
+func NewAccountSyncAddressIndexCmd(acct string,
+	idx int) *AccountSyncAddressIndexCmd {
+	return &AccountSyncAddressIndexCmd{Account: acct, Index: idx}
+}
+
 // ConsolidateCmd is a type handling custom marshaling and
 // unmarshaling of consolidate JSON wallet extension
 // commands.
@@ -112,11 +155,12 @@ func NewGetMultisigOutInfoCmd(hash string, index uint32) *GetMultisigOutInfoCmd 
 // GetMasterPubkeyCmd is a type handling custom marshaling and unmarshaling of
 // getmasterpubkey JSON wallet extension commands.
 type GetMasterPubkeyCmd struct {
+	Account *string
 }
 
 // NewGetMasterPubkeyCmd creates a new GetMasterPubkeyCmd.
-func NewGetMasterPubkeyCmd() *GetMasterPubkeyCmd {
-	return &GetMasterPubkeyCmd{}
+func NewGetMasterPubkeyCmd(acct *string) *GetMasterPubkeyCmd {
+	return &GetMasterPubkeyCmd{Account: acct}
 }
 
 // GetSeedCmd is a type handling custom marshaling and
@@ -502,11 +546,24 @@ func NewSignRawTransactionsCmd(hexEncodedTxs []string,
 	}
 }
 
+// WalletInfoCmd defines the walletinfo JSON-RPC command.
+type WalletInfoCmd struct {
+}
+
+// NewWalletInfoCmd returns a new instance which can be used to issue a
+// walletinfo JSON-RPC command.
+func NewWalletInfoCmd() *WalletInfoCmd {
+	return &WalletInfoCmd{}
+}
+
 func init() {
 	// The commands in this file are only usable with a wallet
 	// server.
 	flags := UFWalletOnly
 
+	MustRegisterCmd("accountaddressindex", (*AccountAddressIndexCmd)(nil), flags)
+	MustRegisterCmd("accountfetchaddresses", (*AccountFetchAddressesCmd)(nil), flags)
+	MustRegisterCmd("accountsyncaddressindex", (*AccountSyncAddressIndexCmd)(nil), flags)
 	MustRegisterCmd("consolidate", (*ConsolidateCmd)(nil), flags)
 	MustRegisterCmd("createrawsstx", (*CreateRawSStxCmd)(nil), flags)
 	MustRegisterCmd("createrawssgentx", (*CreateRawSSGenTxCmd)(nil), flags)
@@ -542,4 +599,5 @@ func init() {
 	MustRegisterCmd("setticketmaxprice", (*SetTicketMaxPriceCmd)(nil), flags)
 	MustRegisterCmd("setticketvotebits", (*SetTicketVoteBitsCmd)(nil), flags)
 	MustRegisterCmd("signrawtransactions", (*SignRawTransactionsCmd)(nil), flags)
+	MustRegisterCmd("walletinfo", (*WalletInfoCmd)(nil), flags)
 }

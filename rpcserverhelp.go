@@ -147,6 +147,11 @@ var helpDescsEnUS = map[string]string{
 	"existsaddress-address":   "The address to check",
 	"existsaddress--result0":  "Bool showing if address exists or not",
 
+	// ExistsAddressesCmd help.
+	"existsaddresses--synopsis": "Test for the existance of the provided addresses in the blockchain or memory pool",
+	"existsaddresses-addresses": "The addresses to check",
+	"existsaddresses--result0":  "Bitset of bools showing if addresses exist or not",
+
 	// ExistsLiveTicketCmd help.
 	"existsliveticket--synopsis": "Test for the existance of the provided ticket",
 	"existsliveticket-txhash":    "The ticket hash to check",
@@ -654,6 +659,10 @@ var helpDescsEnUS = map[string]string{
 	"ticket-owner":                   "Address owning the ticket.",
 	"ticket-hash":                    "Hash of the ticket.",
 
+	// LiveTickets help.
+	"livetickets--synopsis":     "Reguest tickets the live ticket hashes from the ticket database",
+	"liveticketsresult-tickets": "List of live tickets",
+
 	// MissedTickets help.
 	"missedtickets--synopsis":     "Reguest tickets the client missed",
 	"missedticketsresult-tickets": "List of missed tickets",
@@ -677,6 +686,7 @@ var rpcResultTypes = map[string][]interface{}{
 	"decodescript":          []interface{}{(*dcrjson.DecodeScriptResult)(nil)},
 	"estimatefee":           []interface{}{(*float64)(nil)},
 	"existsaddress":         []interface{}{(*bool)(nil)},
+	"existsaddresses":       []interface{}{(*string)(nil)},
 	"existsliveticket":      []interface{}{(*bool)(nil)},
 	"existslivetickets":     []interface{}{(*string)(nil)},
 	"existsmempooltxs":      []interface{}{(*string)(nil)},
@@ -705,9 +715,10 @@ var rpcResultTypes = map[string][]interface{}{
 	"gettxout":              []interface{}{(*dcrjson.GetTxOutResult)(nil)},
 	"getwork":               []interface{}{(*dcrjson.GetWorkResult)(nil), (*bool)(nil)},
 	"getcoinsupply":         []interface{}{(*int64)(nil)},
+	"help":                  []interface{}{(*string)(nil), (*string)(nil)},
+	"livetickets":           []interface{}{(*dcrjson.LiveTicketsResult)(nil)},
 	"missedtickets":         []interface{}{(*dcrjson.MissedTicketsResult)(nil)},
 	"node":                  nil,
-	"help":                  []interface{}{(*string)(nil), (*string)(nil)},
 	"ping":                  nil,
 	"rebroadcastmissed":     nil,
 	"rebroadcastwinners":    nil,

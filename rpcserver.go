@@ -155,6 +155,7 @@ var rpcHandlersBeforeInit = map[string]commandHandler{
 	"decodescript":          handleDecodeScript,
 	"estimatefee":           handleEstimateFee,
 	"existsaddress":         handleExistsAddress,
+	"existsaddresses":       handleExistsAddresses,
 	"existsliveticket":      handleExistsLiveTicket,
 	"existslivetickets":     handleExistsLiveTickets,
 	"existsmempooltxs":      handleExistsMempoolTxs,
@@ -184,6 +185,7 @@ var rpcHandlersBeforeInit = map[string]commandHandler{
 	"gettxout":              handleGetTxOut,
 	"getwork":               handleGetWork,
 	"help":                  handleHelp,
+	"livetickets":           handleLiveTickets,
 	"missedtickets":         handleMissedTickets,
 	"node":                  handleNode,
 	"ping":                  handlePing,
@@ -204,52 +206,56 @@ var rpcHandlersBeforeInit = map[string]commandHandler{
 // it lacks support for wallet functionality. For these commands the user
 // should ask a connected instance of dcrwallet.
 var rpcAskWallet = map[string]struct{}{
-	"addmultisigaddress":     struct{}{},
-	"backupwallet":           struct{}{},
-	"createencryptedwallet":  struct{}{},
-	"createmultisig":         struct{}{},
-	"dumpprivkey":            struct{}{},
-	"dumpwallet":             struct{}{},
-	"encryptwallet":          struct{}{},
-	"getaccount":             struct{}{},
-	"getaccountaddress":      struct{}{},
-	"getaddressesbyaccount":  struct{}{},
-	"getbalance":             struct{}{},
-	"getnewaddress":          struct{}{},
-	"getrawchangeaddress":    struct{}{},
-	"getreceivedbyaccount":   struct{}{},
-	"getreceivedbyaddress":   struct{}{},
-	"getstakeinfo":           struct{}{},
-	"getticketvotebits":      struct{}{},
-	"getticketsvotebits":     struct{}{},
-	"gettransaction":         struct{}{},
-	"gettxoutsetinfo":        struct{}{},
-	"getunconfirmedbalance":  struct{}{},
-	"getwalletinfo":          struct{}{},
-	"importprivkey":          struct{}{},
-	"importwallet":           struct{}{},
-	"keypoolrefill":          struct{}{},
-	"listaccounts":           struct{}{},
-	"listaddressgroupings":   struct{}{},
-	"listlockunspent":        struct{}{},
-	"listreceivedbyaccount":  struct{}{},
-	"listreceivedbyaddress":  struct{}{},
-	"listsinceblock":         struct{}{},
-	"listtransactions":       struct{}{},
-	"listunspent":            struct{}{},
-	"lockunspent":            struct{}{},
-	"move":                   struct{}{},
-	"sendfrom":               struct{}{},
-	"sendmany":               struct{}{},
-	"sendtoaddress":          struct{}{},
-	"setaccount":             struct{}{},
-	"setticketvotebits":      struct{}{},
-	"settxfee":               struct{}{},
-	"signmessage":            struct{}{},
-	"signrawtransaction":     struct{}{},
-	"walletlock":             struct{}{},
-	"walletpassphrase":       struct{}{},
-	"walletpassphrasechange": struct{}{},
+	"accountaddressindex":     struct{}{},
+	"accountfetchaddresses":   struct{}{},
+	"accountsyncaddressindex": struct{}{},
+	"addmultisigaddress":      struct{}{},
+	"backupwallet":            struct{}{},
+	"createencryptedwallet":   struct{}{},
+	"createmultisig":          struct{}{},
+	"dumpprivkey":             struct{}{},
+	"dumpwallet":              struct{}{},
+	"encryptwallet":           struct{}{},
+	"getaccount":              struct{}{},
+	"getaccountaddress":       struct{}{},
+	"getaddressesbyaccount":   struct{}{},
+	"getbalance":              struct{}{},
+	"getnewaddress":           struct{}{},
+	"getrawchangeaddress":     struct{}{},
+	"getreceivedbyaccount":    struct{}{},
+	"getreceivedbyaddress":    struct{}{},
+	"getstakeinfo":            struct{}{},
+	"getticketvotebits":       struct{}{},
+	"getticketsvotebits":      struct{}{},
+	"gettransaction":          struct{}{},
+	"gettxoutsetinfo":         struct{}{},
+	"getunconfirmedbalance":   struct{}{},
+	"getwalletinfo":           struct{}{},
+	"importprivkey":           struct{}{},
+	"importwallet":            struct{}{},
+	"keypoolrefill":           struct{}{},
+	"listaccounts":            struct{}{},
+	"listaddressgroupings":    struct{}{},
+	"listlockunspent":         struct{}{},
+	"listreceivedbyaccount":   struct{}{},
+	"listreceivedbyaddress":   struct{}{},
+	"listsinceblock":          struct{}{},
+	"listtransactions":        struct{}{},
+	"listunspent":             struct{}{},
+	"lockunspent":             struct{}{},
+	"move":                    struct{}{},
+	"sendfrom":                struct{}{},
+	"sendmany":                struct{}{},
+	"sendtoaddress":           struct{}{},
+	"setaccount":              struct{}{},
+	"setticketvotebits":       struct{}{},
+	"settxfee":                struct{}{},
+	"signmessage":             struct{}{},
+	"signrawtransaction":      struct{}{},
+	"walletinfo":              struct{}{},
+	"walletlock":              struct{}{},
+	"walletpassphrase":        struct{}{},
+	"walletpassphrasechange":  struct{}{},
 }
 
 // Commands that are currently unimplemented, but should ultimately be.
@@ -1491,6 +1497,66 @@ func handleExistsAddress(s *rpcServer, cmd interface{},
 	}
 
 	return false, nil
+}
+
+// handleExistsAddresses implements the existsaddresses command.
+func handleExistsAddresses(s *rpcServer, cmd interface{},
+	closeChan <-chan struct{}) (interface{}, error) {
+	if cfg.NoAddrIndex {
+		return nil, &dcrjson.RPCError{
+			Code:    dcrjson.ErrRPCMisc,
+			Message: "Address indexing must be enabled",
+		}
+	}
+	if !s.server.addrIndexer.IsCaughtUp() {
+		return nil, &dcrjson.RPCError{
+			Code: dcrjson.ErrRPCMisc,
+			Message: "Address index has not yet caught up to the " +
+				"current best height",
+		}
+	}
+
+	c := cmd.(*dcrjson.ExistsAddressesCmd)
+	addrsLen := len(c.Addresses)
+	exists := make([]bool, addrsLen)
+	for i := range c.Addresses {
+		exists[i] = false
+
+		// Attempt to decode the supplied address.
+		addr, err := dcrutil.DecodeAddress(c.Addresses[i], s.server.chainParams)
+		if err != nil {
+			return nil, &dcrjson.RPCError{
+				Code:    dcrjson.ErrRPCInvalidAddressOrKey,
+				Message: "Invalid address or key: " + err.Error(),
+			}
+		}
+
+		var numRequested, numToSkip int
+		numToSkip = 0
+		numRequested = 1
+
+		// Check the blockchain for the relevant address usage.
+		tlr, err := s.server.db.FetchTxsForAddr(addr, numToSkip, numRequested)
+		if err == nil && tlr != nil {
+			exists[i] = true
+		}
+
+		// Check the mempool as well.
+		txs := s.server.txMemPool.FindTxForAddr(addr)
+		if len(txs) > 0 {
+			exists[i] = true
+		}
+	}
+
+	// Convert the slice of bools into a compacted set of bit flags.
+	set := bitset.NewBytes(addrsLen)
+	for i := range exists {
+		if exists[i] {
+			set.Set(i)
+		}
+	}
+
+	return hex.EncodeToString([]byte(set)), nil
 }
 
 // handleExistsLiveTicket implements the existsliveticket command.
@@ -4091,6 +4157,22 @@ func handleHelp(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (inter
 	return help, nil
 }
 
+// handleLiveTickets implements the livetickets command.
+func handleLiveTickets(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (interface{}, error) {
+	lt, err := s.server.blockManager.LiveTickets()
+	if err != nil {
+		return nil, err
+	}
+
+	ltString := make([]string, len(lt), len(lt))
+	for i := range lt {
+		ltString[i] = lt[i].String()
+	}
+
+	return dcrjson.LiveTicketsResult{Tickets: ltString}, nil
+}
+
+// handleMissedTickets implements the missedtickets command.
 func handleMissedTickets(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (interface{}, error) {
 	mt, err := s.server.blockManager.MissedTickets()
 	if err != nil {
@@ -4120,6 +4202,7 @@ func handlePing(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (inter
 	return nil, nil
 }
 
+// handleRebroadcastMissed implements the rebroadcastmissed command.
 func handleRebroadcastMissed(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (interface{}, error) {
 	hash, height := s.server.blockManager.chainState.Best()
 	mt, err := s.server.blockManager.MissedTickets()
