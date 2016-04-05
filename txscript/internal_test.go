@@ -11,7 +11,14 @@ interface.  The functions are only exported while the tests are being run.
 
 package txscript
 
-import "testing"
+import (
+	"bytes"
+	"encoding/hex"
+	"testing"
+
+	"github.com/btcsuite/btcd/wire"
+	"github.com/btcsuite/btcutil"
+)
 
 // TstMaxScriptSize makes the internal maxScriptSize constant available to the
 // test package.
@@ -3749,5 +3756,58 @@ func TestUnparsingInvalidOpcodes(t *testing.T) {
 			t.Errorf("Parsed Opcode test '%s' failed", test.name)
 			t.Error(err, test.expectedErr)
 		}
+	}
+}
+
+// TestWitnessSigHash tests that calcWitnessSignatureHash returns the same
+// sigHash as the example tx on BIP0143.
+func TestWitnessSigHash(t *testing.T) {
+	// Decode the serialized, unsigned transaction used within the BIP as
+	// an example.
+	bip143TxEncodedUnsigned := "0100000002fff7f7881a8099afa6940d42d1e7f6362bec38171ea3edf433541db4e4ad969f0000000000eeffffffef51e1b804cc89d182d279655c3aa89e815b1b309fe287d9b2b55d57b90ec68a0100000000ffffffff02202cb206000000001976a9148280b37df378db99f66f85c95a783a76ac7a6d5988ac9093510d000000001976a9143bde42dbee7e4dbe6a21b2d50ce2f0167faa815988ac11000000"
+	txRaw, err := hex.DecodeString(bip143TxEncodedUnsigned)
+	if err != nil {
+		t.Fatalf("unable to decode tx: %v", err)
+	}
+	r := bytes.NewReader(txRaw)
+
+	// Although the above encoded transaction is missing the flag, and
+	// marker bytes, decode it as a segwit tx anyway.
+	tx := wire.NewMsgTx()
+	if err := tx.DeserializeWitness(r); err != nil {
+		t.Fatalf("unable to decode: %v", err)
+	}
+
+	// Create a new HashCache adding the intermediate sigHashes of this
+	// tx to it.
+	hashCache := NewHashCache(90)
+	hashCache.AddSigHashes(tx)
+	txSigHashes, found := hashCache.GetSigHashes(tx)
+	if !found {
+		t.Fatalf("unable to find sighashes")
+	}
+
+	// We'll be generating the sighash for the second input, using sighash
+	// all, the proper input amount, and with the corresponding pkScript.
+	idx := 1
+	shType := SigHashAll
+	amt := btcutil.Amount(6e8)
+	pkScriptEncoded := "00141d0f172a0ecb48aee1be1f2687d2963ae33f71a1"
+	decodedScript, err := hex.DecodeString(pkScriptEncoded)
+	if err != nil {
+		t.Fatalf("unable to decode script")
+	}
+	opCodes, err := parseScript(decodedScript)
+	if err != nil {
+		t.Fatalf("unable to decode script: %v", err)
+	}
+
+	// Finally, calculate the sigHash. This should exactly match the
+	// sigHash as shown at the end of the example.
+	sigHash := calcWitnessSignatureHash(opCodes, txSigHashes, shType, tx, idx, int64(amt))
+	expectedHash := "c37af31116d1b27caf68aae9e3ac82f1477929014d5b917657d0eb49478cb670"
+	if hex.EncodeToString(sigHash) != expectedHash {
+		t.Fatalf("sig hashes don't match, expected %v, got %v",
+			expectedHash, sigHash)
 	}
 }
