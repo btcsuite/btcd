@@ -1164,7 +1164,7 @@ func (tx *transaction) StoreBlock(block *btcutil.Block) error {
 		return makeDbErr(database.ErrBlockExists, str, nil)
 	}
 
-	blockBytes, err := block.Bytes()
+	blockBytes, err := block.WitnessBytes()
 	if err != nil {
 		str := fmt.Sprintf("failed to get serialized bytes for block %s",
 			blockHash)
