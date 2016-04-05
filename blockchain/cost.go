@@ -36,18 +36,24 @@ const (
 	WitnessScaleFactor = 4
 )
 
-// TODO(roasbeef): fin module contents
-
-// TxVirtualSize...
+// TxVirtualSize computes the virtual size of a given transaction. A
+// transaction's virtual is based off it's cost, creating a discount
+// for any witness data it contains, proportional to the current
+// WitnessScaleFactor value.
 func GetTxVirtualSize(tx *btcutil.Tx) int64 {
 	// vSize := (cost(tx) + 3) / 4
-	//       := (((baseSize * 3) + totalSize) + 4) / 4
+	//       := (((baseSize * 3) + totalSize) + 3) / 4
+	// We add 3 here as a way to compute the ceiling of the prior arithmetic
+	// to 4. The division by 4 creates a discount for wit witness data.
 	return (GetTransactionCost(tx) + (WitnessScaleFactor - 1)) /
 		WitnessScaleFactor
 }
 
-// GetBlockCost...
-func GetCost(blk *btcutil.Block) int64 {
+// GetBlockCost computes the value of the cost metric for a given block.
+// Currently the cost metric is simply the sum of the block's serialized size
+// without any witness data scaled proportionally by the WitnessScaleFactor,
+// and the block's serialized size including any witness data.
+func GetBlockCost(blk *btcutil.Block) int64 {
 	msgBlock := blk.MsgBlock()
 
 	baseSize := msgBlock.SerializeSize()
@@ -57,7 +63,11 @@ func GetCost(blk *btcutil.Block) int64 {
 	return int64((baseSize * (WitnessScaleFactor - 1)) + totalSize)
 }
 
-// GetTransactionCost...
+// GetTransactionCost computes the value of the cost metric for a given
+// transaction. Currently the cost metric is simply the sum of the
+// transactions's serialized size without any witness data scaled proportionally
+// by the WitnessScaleFactor, and the transaction's serialized size including
+// any witness data.
 func GetTransactionCost(tx *btcutil.Tx) int64 {
 	msgTx := tx.MsgTx()
 
@@ -68,12 +78,16 @@ func GetTransactionCost(tx *btcutil.Tx) int64 {
 	return int64((baseSize * (WitnessScaleFactor - 1)) + totalSize)
 }
 
-// GetSigOpCost...
+// GetSigOpCost returns the unified sig op cost for the passed transaction
+// respecting current active soft-forks which modified sig op cost counting.
+// The unified sig op cost for a transaction is computed as the sum of: the
+// legacy sig op count scaled according to the WitnessScaleFactor, the sig op
+// count for all p2sh inputs scaled by the WitnessScaleFactor, and finally the
+// unscaled sig op count for any inputs spending witness programs.
 func GetSigOpCost(tx *btcutil.Tx, isCoinBaseTx bool, utxoView *UtxoViewpoint,
 	bip16, segWit bool) (int, error) {
 
 	numSigOps := CountSigOps(tx) * WitnessScaleFactor
-
 	if bip16 {
 		numP2SHSigOps, err := CountP2SHSigOps(tx, isCoinBaseTx, utxoView)
 		if err != nil {
@@ -82,7 +96,7 @@ func GetSigOpCost(tx *btcutil.Tx, isCoinBaseTx bool, utxoView *UtxoViewpoint,
 		numSigOps += (numP2SHSigOps * WitnessScaleFactor)
 	}
 
-	if segWit {
+	if segWit && !isCoinBaseTx {
 		msgTx := tx.MsgTx()
 		for txInIndex, txIn := range msgTx.TxIn {
 			// Ensure the referenced input transaction is available.
