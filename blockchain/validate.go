@@ -548,13 +548,24 @@ func checkBlockSanity(block *btcutil.Block, powLimit *big.Int, timeSource Median
 	// checks.  Bitcoind builds the tree here and checks the merkle root
 	// after the following checks, but there is no reason not to check the
 	// merkle root matches here.
-	merkles := BuildMerkleTreeStore(block.Transactions())
+	merkles := BuildMerkleTreeStore(block.Transactions(), false)
 	calculatedMerkleRoot := merkles[len(merkles)-1]
 	if !header.MerkleRoot.IsEqual(calculatedMerkleRoot) {
 		str := fmt.Sprintf("block merkle root is invalid - block "+
 			"header indicates %v, but calculated value is %v",
 			header.MerkleRoot, calculatedMerkleRoot)
 		return ruleError(ErrBadMerkleRoot, str)
+	}
+
+	// Next, validate the witness commitment (if any) within the block.
+	// This involves asserting that if the coinbase contains the special
+	// commitment output, then this merkle root matches a computed merkle
+	// root of all the wtxid's of the transactions within the block. In
+	// addition, various other checks against the coinbase's witness stack.
+	// TODO(roasbeef): only perform this check if we expect block to have a
+	// witness commitment
+	if err := ValidateWitnessCommitment(block); err != nil {
+		return err
 	}
 
 	// Check for duplicate transactions.  This check will be fairly quick
