@@ -18,10 +18,6 @@ import (
 )
 
 const (
-	// MaxSigOpsPerBlock is the maximum number of signature operations
-	// allowed for a block.  It is a fraction of the max block payload size.
-	MaxSigOpsPerBlock = wire.MaxBlockPayload / 50
-
 	// MaxTimeOffsetSeconds is the maximum number of seconds a block time
 	// is allowed to be ahead of the current time.  This is currently 2
 	// hours.
@@ -237,9 +233,9 @@ func CheckTransactionSanity(tx *btcutil.Tx) error {
 	// A transaction must not exceed the maximum allowed block payload when
 	// serialized.
 	serializedTxSize := tx.MsgTx().SerializeSize()
-	if serializedTxSize > wire.MaxBlockPayload {
+	if serializedTxSize > MaxBlockBaseSize {
 		str := fmt.Sprintf("serialized transaction is too big - got "+
-			"%d, max %d", serializedTxSize, wire.MaxBlockPayload)
+			"%d, max %d", serializedTxSize, MaxBlockBaseSize)
 		return ruleError(ErrTxTooBig, str)
 	}
 
@@ -511,7 +507,7 @@ func checkBlockSanity(block *btcutil.Block, powLimit *big.Int, timeSource Median
 	// A block must not exceed the maximum allowed block payload when
 	// serialized.
 	serializedSize := msgBlock.SerializeSize()
-	if serializedSize > wire.MaxBlockPayload {
+	if serializedSize > MaxBlockBaseSize {
 		str := fmt.Sprintf("serialized block is too big - got %d, "+
 			"max %d", serializedSize, wire.MaxBlockPayload)
 		return ruleError(ErrBlockTooBig, str)
@@ -589,13 +585,23 @@ func checkBlockSanity(block *btcutil.Block, powLimit *big.Int, timeSource Median
 		// We could potentially overflow the accumulator so check for
 		// overflow.
 		lastSigOps := totalSigOps
-		totalSigOps += CountSigOps(tx)
-		if totalSigOps < lastSigOps || totalSigOps > MaxSigOpsPerBlock {
+		totalSigOps += (CountSigOps(tx) * WitnessScaleFactor)
+		if totalSigOps < lastSigOps || totalSigOps > MaxBlockSigOpsCost {
 			str := fmt.Sprintf("block contains too many signature "+
 				"operations - got %v, max %v", totalSigOps,
-				MaxSigOpsPerBlock)
+				MaxBlockSigOpsCost)
 			return ruleError(ErrTooManySigOps, str)
 		}
+	}
+
+	// Once the witness commitment, witness nonce, and sig op cost have
+	// been validated, we can finally assert that the block's cost doesn't
+	// exceed the current consensus paramter.
+	blockCost := GetBlockCost(block)
+	if blockCost > MaxBlockCost {
+		str := fmt.Sprintf("block's cost metric is too high - got %v, max %v",
+			blockCost, MaxBlockCost)
+		return ruleError(ErrBlockVersionTooOld, str)
 	}
 
 	return nil
@@ -1039,6 +1045,8 @@ func (b *BlockChain) checkConnectBlock(node *blockNode, block *btcutil.Block, vi
 	// after the timestamp defined by txscript.Bip16Activation.  See
 	// https://en.bitcoin.it/wiki/BIP_0016 for more details.
 	enforceBIP0016 := node.timestamp.After(txscript.Bip16Activation)
+	// TODO(roasbeef): should check flag, consult bip 9 log etc
+	enforceSegWit := true
 
 	// The number of signature operations must be less than the maximum
 	// allowed per block.  Note that the preliminary sanity checks on a
@@ -1047,31 +1055,29 @@ func (b *BlockChain) checkConnectBlock(node *blockNode, block *btcutil.Block, vi
 	// signature operations in each of the input transaction public key
 	// scripts.
 	transactions := block.Transactions()
-	totalSigOps := 0
+	totalSigOpCost := 0
 	for i, tx := range transactions {
-		numsigOps := CountSigOps(tx)
-		if enforceBIP0016 {
-			// Since the first (and only the first) transaction has
-			// already been verified to be a coinbase transaction,
-			// use i == 0 as an optimization for the flag to
-			// countP2SHSigOps for whether or not the transaction is
-			// a coinbase transaction rather than having to do a
-			// full coinbase check again.
-			numP2SHSigOps, err := CountP2SHSigOps(tx, i == 0, view)
-			if err != nil {
-				return err
-			}
-			numsigOps += numP2SHSigOps
+		// Since the first (and only the first) transaction has
+		// already been verified to be a coinbase transaction,
+		// use i == 0 as an optimization for the flag to
+		// countP2SHSigOps for whether or not the transaction is
+		// a coinbase transaction rather than having to do a
+		// full coinbase check again.
+		sigOpCost, err := GetSigOpCost(tx, i == 0, view, enforceBIP0016,
+			enforceSegWit)
+		if err != nil {
+			return err
 		}
 
 		// Check for overflow or going over the limits.  We have to do
 		// this on every loop iteration to avoid overflow.
-		lastSigops := totalSigOps
-		totalSigOps += numsigOps
-		if totalSigOps < lastSigops || totalSigOps > MaxSigOpsPerBlock {
+		lastSigOpCost := totalSigOpCost
+		totalSigOpCost += sigOpCost
+		if totalSigOpCost < lastSigOpCost || totalSigOpCost > MaxBlockSigOpsCost {
+			// TODO(roasbeef): modify error
 			str := fmt.Sprintf("block contains too many "+
 				"signature operations - got %v, max %v",
-				totalSigOps, MaxSigOpsPerBlock)
+				totalSigOpCost, MaxBlockSigOpsCost)
 			return ruleError(ErrTooManySigOps, str)
 		}
 	}
@@ -1174,6 +1180,8 @@ func (b *BlockChain) checkConnectBlock(node *blockNode, block *btcutil.Block, vi
 
 		scriptFlags |= txscript.ScriptVerifyCheckLockTimeVerify
 	}
+
+	// TODO(roasbeef): check bip9 for segwit here, others also
 
 	// Now that the inexpensive checks are done and have passed, verify the
 	// transactions are actually allowed to spend the coins by running the

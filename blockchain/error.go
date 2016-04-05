@@ -31,6 +31,10 @@ const (
 	// maximum allowed size.
 	ErrBlockTooBig
 
+	// ErrBlockCostTooHigh indicates that the block's computed cost metric
+	// exceeds the maximum allowed value.
+	ErrBlockCostTooHigh
+
 	// ErrBlockVersionTooOld indicates the block version is too old and is
 	// no longer accepted since the majority of the network has upgraded
 	// to a newer version.
@@ -240,6 +244,7 @@ var errorCodeStrings = map[ErrorCode]string{
 	ErrUnexpectedWitness:         "ErrUnexpectedWitness",
 	ErrInvalidWitnessCommitment:  "ErrInvalidWitnessCommitment",
 	ErrWitnessCommitmentMismatch: "ErrWitnessCommitmentMismatch",
+	ErrBlockCostTooHigh:          "ErrBlockCostTooHigh",
 }
 
 // String returns the ErrorCode as a human-readable name.
