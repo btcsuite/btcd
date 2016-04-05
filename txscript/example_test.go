@@ -78,6 +78,8 @@ func ExampleExtractPkScriptAddrs() {
 	// Required Signatures: 1
 }
 
+// TODO(roasbeef): segwit sign exxample
+
 // This example demonstrates manually creating and signing a redeem transaction.
 func ExampleSignTxOutput() {
 	// Ordinarily the private key would come from whatever storage mechanism
@@ -102,7 +104,7 @@ func ExampleSignTxOutput() {
 	// contains a single output that pays to address in the amount of 1 BTC.
 	originTx := wire.NewMsgTx()
 	prevOut := wire.NewOutPoint(&wire.ShaHash{}, ^uint32(0))
-	txIn := wire.NewTxIn(prevOut, []byte{txscript.OP_0, txscript.OP_0})
+	txIn := wire.NewTxIn(prevOut, []byte{txscript.OP_0, txscript.OP_0}, nil)
 	originTx.AddTxIn(txIn)
 	pkScript, err := txscript.PayToAddrScript(addr)
 	if err != nil {
@@ -120,7 +122,7 @@ func ExampleSignTxOutput() {
 	// signature script at this point since it hasn't been created or signed
 	// yet, hence nil is provided for it.
 	prevOut = wire.NewOutPoint(&originTxHash, 0)
-	txIn = wire.NewTxIn(prevOut, nil)
+	txIn = wire.NewTxIn(prevOut, nil, nil)
 	redeemTx.AddTxIn(txIn)
 
 	// Ordinarily this would contain that actual destination of the funds,
