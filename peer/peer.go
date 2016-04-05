@@ -1934,6 +1934,16 @@ cleanup:
 //
 // This function is safe for concurrent access.
 func (p *Peer) QueueMessage(msg wire.Message, doneChan chan<- struct{}) {
+	p.QueueMessageWithEncoding(msg, doneChan, wire.BaseEncoding)
+}
+
+// QueueMessage adds the passed bitcoin message to the peer send queue.
+// TODO(roasbeef): this function is identical to....
+//
+// This function is safe for concurrent access.
+func (p *Peer) QueueMessageWithEncoding(msg wire.Message, doneChan chan<- struct{},
+	encoding wire.MessageEncoding) {
+
 	// Avoid risk of deadlock if goroutine already exited.  The goroutine
 	// we will be sending to hangs around until it knows for a fact that
 	// it is marked as disconnected and *then* it drains the channels.
