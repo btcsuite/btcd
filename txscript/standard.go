@@ -24,6 +24,8 @@ const (
 	//
 	// TODO: This definition does not belong here.  It belongs in a policy
 	// package.
+	// TODO(rosabeef): need to add lock time flags, and also switch over
+	// logic
 	StandardVerifyFlags = ScriptBip16 |
 		ScriptVerifyDERSignatures |
 		ScriptVerifyStrictEncoding |
@@ -32,7 +34,9 @@ const (
 		ScriptDiscourageUpgradableNops |
 		ScriptVerifyCleanStack |
 		ScriptVerifyCheckLockTimeVerify |
-		ScriptVerifyLowS
+		ScriptVerifyLowS |
+		ScriptVerifyWitness |
+		ScriptVerifyDiscourageUpgradeableWitnessProgram
 )
 
 // ScriptClass is an enumeration for the list of standard types of script.
