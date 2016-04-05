@@ -44,10 +44,11 @@ func TestVerAckWire(t *testing.T) {
 	msgVerAckEncoded := []byte{}
 
 	tests := []struct {
-		in   *wire.MsgVerAck // Message to encode
-		out  *wire.MsgVerAck // Expected decoded message
-		buf  []byte          // Wire encoding
-		pver uint32          // Protocol version for wire encoding
+		in   *wire.MsgVerAck      // Message to encode
+		out  *wire.MsgVerAck      // Expected decoded message
+		buf  []byte               // Wire encoding
+		pver uint32               // Protocol version for wire encoding
+		enc  wire.MessageEncoding // Message encoding format
 	}{
 		// Latest protocol version.
 		{
@@ -55,6 +56,7 @@ func TestVerAckWire(t *testing.T) {
 			msgVerAck,
 			msgVerAckEncoded,
 			wire.ProtocolVersion,
+			wire.BaseEncoding,
 		},
 
 		// Protocol version BIP0035Version.
@@ -63,6 +65,7 @@ func TestVerAckWire(t *testing.T) {
 			msgVerAck,
 			msgVerAckEncoded,
 			wire.BIP0035Version,
+			wire.BaseEncoding,
 		},
 
 		// Protocol version BIP0031Version.
@@ -71,6 +74,7 @@ func TestVerAckWire(t *testing.T) {
 			msgVerAck,
 			msgVerAckEncoded,
 			wire.BIP0031Version,
+			wire.BaseEncoding,
 		},
 
 		// Protocol version NetAddressTimeVersion.
@@ -79,6 +83,7 @@ func TestVerAckWire(t *testing.T) {
 			msgVerAck,
 			msgVerAckEncoded,
 			wire.NetAddressTimeVersion,
+			wire.BaseEncoding,
 		},
 
 		// Protocol version MultipleAddressVersion.
@@ -87,6 +92,7 @@ func TestVerAckWire(t *testing.T) {
 			msgVerAck,
 			msgVerAckEncoded,
 			wire.MultipleAddressVersion,
+			wire.BaseEncoding,
 		},
 	}
 
@@ -94,7 +100,7 @@ func TestVerAckWire(t *testing.T) {
 	for i, test := range tests {
 		// Encode the message to wire format.
 		var buf bytes.Buffer
-		err := test.in.BtcEncode(&buf, test.pver)
+		err := test.in.BtcEncode(&buf, test.pver, test.enc)
 		if err != nil {
 			t.Errorf("BtcEncode #%d error %v", i, err)
 			continue
@@ -108,7 +114,7 @@ func TestVerAckWire(t *testing.T) {
 		// Decode the message from wire format.
 		var msg wire.MsgVerAck
 		rbuf := bytes.NewReader(test.buf)
-		err = msg.BtcDecode(rbuf, test.pver)
+		err = msg.BtcDecode(rbuf, test.pver, test.enc)
 		if err != nil {
 			t.Errorf("BtcDecode #%d error %v", i, err)
 			continue

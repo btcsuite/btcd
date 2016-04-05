@@ -106,10 +106,11 @@ func TestNotFoundWire(t *testing.T) {
 	}
 
 	tests := []struct {
-		in   *wire.MsgNotFound // Message to encode
-		out  *wire.MsgNotFound // Expected decoded message
-		buf  []byte            // Wire encoding
-		pver uint32            // Protocol version for wire encoding
+		in   *wire.MsgNotFound    // Message to encode
+		out  *wire.MsgNotFound    // Expected decoded message
+		buf  []byte               // Wire encoding
+		pver uint32               // Protocol version for wire encoding
+		enc  wire.MessageEncoding // Message encoding format
 	}{
 		// Latest protocol version with no inv vectors.
 		{
@@ -117,6 +118,7 @@ func TestNotFoundWire(t *testing.T) {
 			NoInv,
 			NoInvEncoded,
 			wire.ProtocolVersion,
+			wire.BaseEncoding,
 		},
 
 		// Latest protocol version with multiple inv vectors.
@@ -125,6 +127,7 @@ func TestNotFoundWire(t *testing.T) {
 			MultiInv,
 			MultiInvEncoded,
 			wire.ProtocolVersion,
+			wire.BaseEncoding,
 		},
 
 		// Protocol version BIP0035Version no inv vectors.
@@ -133,6 +136,7 @@ func TestNotFoundWire(t *testing.T) {
 			NoInv,
 			NoInvEncoded,
 			wire.BIP0035Version,
+			wire.BaseEncoding,
 		},
 
 		// Protocol version BIP0035Version with multiple inv vectors.
@@ -141,6 +145,7 @@ func TestNotFoundWire(t *testing.T) {
 			MultiInv,
 			MultiInvEncoded,
 			wire.BIP0035Version,
+			wire.BaseEncoding,
 		},
 
 		// Protocol version BIP0031Version no inv vectors.
@@ -149,6 +154,7 @@ func TestNotFoundWire(t *testing.T) {
 			NoInv,
 			NoInvEncoded,
 			wire.BIP0031Version,
+			wire.BaseEncoding,
 		},
 
 		// Protocol version BIP0031Version with multiple inv vectors.
@@ -157,6 +163,7 @@ func TestNotFoundWire(t *testing.T) {
 			MultiInv,
 			MultiInvEncoded,
 			wire.BIP0031Version,
+			wire.BaseEncoding,
 		},
 
 		// Protocol version NetAddressTimeVersion no inv vectors.
@@ -165,6 +172,7 @@ func TestNotFoundWire(t *testing.T) {
 			NoInv,
 			NoInvEncoded,
 			wire.NetAddressTimeVersion,
+			wire.BaseEncoding,
 		},
 
 		// Protocol version NetAddressTimeVersion with multiple inv vectors.
@@ -173,6 +181,7 @@ func TestNotFoundWire(t *testing.T) {
 			MultiInv,
 			MultiInvEncoded,
 			wire.NetAddressTimeVersion,
+			wire.BaseEncoding,
 		},
 
 		// Protocol version MultipleAddressVersion no inv vectors.
@@ -181,6 +190,7 @@ func TestNotFoundWire(t *testing.T) {
 			NoInv,
 			NoInvEncoded,
 			wire.MultipleAddressVersion,
+			wire.BaseEncoding,
 		},
 
 		// Protocol version MultipleAddressVersion with multiple inv vectors.
@@ -189,6 +199,7 @@ func TestNotFoundWire(t *testing.T) {
 			MultiInv,
 			MultiInvEncoded,
 			wire.MultipleAddressVersion,
+			wire.BaseEncoding,
 		},
 	}
 
@@ -196,7 +207,7 @@ func TestNotFoundWire(t *testing.T) {
 	for i, test := range tests {
 		// Encode the message to wire format.
 		var buf bytes.Buffer
-		err := test.in.BtcEncode(&buf, test.pver)
+		err := test.in.BtcEncode(&buf, test.pver, test.enc)
 		if err != nil {
 			t.Errorf("BtcEncode #%d error %v", i, err)
 			continue
@@ -210,7 +221,7 @@ func TestNotFoundWire(t *testing.T) {
 		// Decode the message from wire format.
 		var msg wire.MsgNotFound
 		rbuf := bytes.NewReader(test.buf)
-		err = msg.BtcDecode(rbuf, test.pver)
+		err = msg.BtcDecode(rbuf, test.pver, test.enc)
 		if err != nil {
 			t.Errorf("BtcDecode #%d error %v", i, err)
 			continue
@@ -262,26 +273,27 @@ func TestNotFoundWireErrors(t *testing.T) {
 	}
 
 	tests := []struct {
-		in       *wire.MsgNotFound // Value to encode
-		buf      []byte            // Wire encoding
-		pver     uint32            // Protocol version for wire encoding
-		max      int               // Max size of fixed buffer to induce errors
-		writeErr error             // Expected write error
-		readErr  error             // Expected read error
+		in       *wire.MsgNotFound    // Value to encode
+		buf      []byte               // Wire encoding
+		pver     uint32               // Protocol version for wire encoding
+		enc      wire.MessageEncoding // Message encoding format
+		max      int                  // Max size of fixed buffer to induce errors
+		writeErr error                // Expected write error
+		readErr  error                // Expected read error
 	}{
 		// Force error in inventory vector count
-		{baseNotFound, baseNotFoundEncoded, pver, 0, io.ErrShortWrite, io.EOF},
+		{baseNotFound, baseNotFoundEncoded, pver, wire.BaseEncoding, 0, io.ErrShortWrite, io.EOF},
 		// Force error in inventory list.
-		{baseNotFound, baseNotFoundEncoded, pver, 1, io.ErrShortWrite, io.EOF},
+		{baseNotFound, baseNotFoundEncoded, pver, wire.BaseEncoding, 1, io.ErrShortWrite, io.EOF},
 		// Force error with greater than max inventory vectors.
-		{maxNotFound, maxNotFoundEncoded, pver, 3, wireErr, wireErr},
+		{maxNotFound, maxNotFoundEncoded, pver, wire.BaseEncoding, 3, wireErr, wireErr},
 	}
 
 	t.Logf("Running %d tests", len(tests))
 	for i, test := range tests {
 		// Encode to wire format.
 		w := newFixedWriter(test.max)
-		err := test.in.BtcEncode(w, test.pver)
+		err := test.in.BtcEncode(w, test.pver, test.enc)
 		if reflect.TypeOf(err) != reflect.TypeOf(test.writeErr) {
 			t.Errorf("BtcEncode #%d wrong error got: %v, want: %v",
 				i, err, test.writeErr)
@@ -301,7 +313,7 @@ func TestNotFoundWireErrors(t *testing.T) {
 		// Decode from wire format.
 		var msg wire.MsgNotFound
 		r := newFixedReader(test.max, test.buf)
-		err = msg.BtcDecode(r, test.pver)
+		err = msg.BtcDecode(r, test.pver, test.enc)
 		if reflect.TypeOf(err) != reflect.TypeOf(test.readErr) {
 			t.Errorf("BtcDecode #%d wrong error got: %v, want: %v",
 				i, err, test.readErr)
