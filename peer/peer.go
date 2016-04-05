@@ -1528,6 +1528,17 @@ out:
 				p.cfg.Listeners.OnVersion(p, msg)
 			}
 
+			// Once the version message has been exchanged, we're
+			// able to determine if this peer knows how to encode
+			// witness data over the wire protocol. If so, then
+			// we'll switch to a decoding mode which is prepared
+			// for the new transactino format introduced as part of
+			// BIP0144.
+			if p.ProtocolVersion() >= wire.WitnessVersion &&
+				p.Services()&wire.SFNodeWitness == wire.SFNodeWitness {
+				encoding = wire.WitnessEncoding
+			}
+
 		case *wire.MsgVerAck:
 			p.flagsMtx.Lock()
 			versionSent := p.versionSent
