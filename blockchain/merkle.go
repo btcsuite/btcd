@@ -5,10 +5,28 @@
 package blockchain
 
 import (
+	"bytes"
+	"crypto/sha256"
+	"fmt"
 	"math"
 
+	"github.com/btcsuite/btcd/txscript"
 	"github.com/btcsuite/btcd/wire"
 	"github.com/btcsuite/btcutil"
+)
+
+var (
+	// WitnessMagicBytes is the prefix marker within a public key script to
+	// indicate that this output holds the witness commitment for a block.
+	// The prefix breaks down down: OP_RETURN OP_DATA_36
+	WitnessMagicBytes = []byte{
+		txscript.OP_RETURN,
+		txscript.OP_DATA_36,
+		0xaa,
+		0x21,
+		0xa9,
+		0xed,
+	}
 )
 
 // nextPowerOfTwo returns the next highest power of two from a given number if
@@ -66,7 +84,12 @@ func HashMerkleBranches(left *wire.ShaHash, right *wire.ShaHash) *wire.ShaHash {
 // are calculated by concatenating the left node with itself before hashing.
 // Since this function uses nodes that are pointers to the hashes, empty nodes
 // will be nil.
-func BuildMerkleTreeStore(transactions []*btcutil.Tx) []*wire.ShaHash {
+//
+// The additional bool parameter indicates if we are generating the merkle tree
+// using witness transaction id's rather than regular transaction id's. This
+// also presents an additional case wherein the wtxid of the coinbase transaction
+// is the zeroHash.
+func BuildMerkleTreeStore(transactions []*btcutil.Tx, witness bool) []*wire.ShaHash {
 	// Calculate how many entries are required to hold the binary merkle
 	// tree as a linear array and create an array of that size.
 	nextPoT := nextPowerOfTwo(len(transactions))
@@ -75,7 +98,21 @@ func BuildMerkleTreeStore(transactions []*btcutil.Tx) []*wire.ShaHash {
 
 	// Create the base transaction shas and populate the array with them.
 	for i, tx := range transactions {
-		merkles[i] = tx.Sha()
+		// If we're computing a witness merkle root, instead of the
+		// regular txid, we use the modified wtxid which includes a
+		// transaction's witness data within the digest. Additionally,
+		// the coinbase's wtxid is all zeroes.
+		switch {
+		case witness && i == 0:
+			var zeroHash wire.ShaHash
+			merkles[i] = &zeroHash
+		case witness:
+			// TODO(roasbeef): cache this in btcutil too
+			wSha := tx.MsgTx().WitnessSha()
+			merkles[i] = &wSha
+		default:
+			merkles[i] = tx.Sha()
+		}
 	}
 
 	// Start the array offset after the last transaction and adjusted to the
