@@ -12,7 +12,116 @@ import (
 	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/btcsuite/btcd/wire"
 	"github.com/btcsuite/btcutil"
+	"github.com/btcsuite/fastsha256"
 )
+
+// SigningMode...
+type signingMode uint8
+
+const (
+	signNormal signingMode = 1 << iota
+	signSegWit
+)
+
+// RawTxInWitnessSignature is RawTxInSignature but witnessified.
+// just swaps out calcSignatureHash for calcWitnessSignatureHash
+func RawTxInWitnessSignature(tx *wire.MsgTx, sigHashes *TxSigHashes, idx int,
+	amt int64, subScript []byte, hashType SigHashType,
+	key *btcec.PrivateKey) ([]byte, error) {
+
+	parsedScript, err := parseScript(subScript)
+	if err != nil {
+		return nil, fmt.Errorf("cannot parse output script: %v", err)
+	}
+
+	hash := calcWitnessSignatureHash(parsedScript, sigHashes, hashType, tx,
+		idx, amt)
+	signature, err := key.Sign(hash)
+	if err != nil {
+		return nil, fmt.Errorf("cannot sign tx input: %s", err)
+	}
+
+	return append(signature.Serialize(), byte(hashType)), nil
+}
+
+// WitnessSignatureScript is SignatureScript but witnessified.
+// just swaps out RawTxInSignature for RawTxInWitnessSignature.
+// also you need to tell the amount you're signing off
+// the point of SegWit's new sighash modes is to cache the 3 partial hashes
+// so you compute once per tx, not once per txin.  Lets do that.
+func WitnessScript(tx *wire.MsgTx, sigHashes *TxSigHashes, idx int, amt int64,
+	subscript []byte, hashType SigHashType,
+	privKey *btcec.PrivateKey, compress bool) ([][]byte, error) {
+
+	sig, err := RawTxInWitnessSignature(tx, sigHashes, idx, amt, subscript,
+		hashType, privKey)
+	if err != nil {
+		return nil, err
+	}
+
+	pk := (*btcec.PublicKey)(&privKey.PublicKey)
+	var pkData []byte
+	if compress {
+		pkData = pk.SerializeCompressed()
+	} else {
+		pkData = pk.SerializeUncompressed()
+	}
+
+	// A witness script is actually a stack, so we return an array of byte
+	// slices here, rather than a single byte slice.
+	return append([][]byte{sig}, pkData), nil
+}
+
+// RedeemP2SHSquaredOutput...
+// TODO(roasbeef): fin
+func RedeemP2SHSquaredOutput(chainParams *chaincfg.Params, tx *wire.MsgTx,
+	idx int, inputAmt int64, pkScript []byte, hashType SigHashType,
+	privKey *btcec.PrivateKey) ([][]byte, []byte, error) {
+
+	// First we'll generate the scriptSig which is simply the sha256 of the
+	// original script turned into a version 0 script hash witness progrma.
+	// This will serve as the pre-image for the outer 20-byte p2sh.
+	scriptHash256 := fastsha256.Sum256(pkScript)
+	scriptSig, err := payToWitnessScriptHashScript(scriptHash256[:])
+	if err != nil {
+		return nil, nil, err
+	}
+
+	keyDB := func(a btcutil.Address) (*btcec.PrivateKey, bool, error) {
+		return privKey, true, nil
+	}
+
+	// Next we need to generate the witness stack itself, which will be
+	// evaluated after ensuring the hash160 of the scriptSig generated
+	// above matches the 20-byte data push in the p2sh output.
+	// TODO(roasbeef): this doesn't use segwit sighash yet
+	regularScriptSig, _, _, _, err := sign(chainParams, tx,
+		idx, pkScript, hashType, signSegWit, inputAmt, KeyClosure(keyDB), nil)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	// TODO(roasbeef): merge scripts
+
+	scriptPops, err := parseScript(regularScriptSig)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	// Finally combine the scriptSig, and the original pkscript into a
+	// witness stack used for segwit script validation.
+	var witnessStack [][]byte
+	for _, pop := range scriptPops {
+		popBytes, err := pop.bytes()
+		if err != nil {
+			return nil, nil, err
+		}
+		witnessStack = append(witnessStack, popBytes)
+	}
+	witnessStack = append(witnessStack, pkScript)
+
+	return witnessStack, scriptSig, nil
+}
 
 // RawTxInSignature returns the serialized ECDSA signature for the input idx of
 // the given transaction, with hashType appended to it.
@@ -40,7 +149,9 @@ func RawTxInSignature(tx *wire.MsgTx, idx int, subScript []byte,
 // as the idx'th input. privKey is serialized in either a compressed or
 // uncompressed format based on compress. This format must match the same format
 // used to generate the payment address, or the script validation will fail.
-func SignatureScript(tx *wire.MsgTx, idx int, subscript []byte, hashType SigHashType, privKey *btcec.PrivateKey, compress bool) ([]byte, error) {
+func SignatureScript(tx *wire.MsgTx, idx int, subscript []byte,
+	hashType SigHashType, privKey *btcec.PrivateKey, compress bool) ([]byte, error) {
+
 	sig, err := RawTxInSignature(tx, idx, subscript, hashType, privKey)
 	if err != nil {
 		return nil, err
@@ -57,7 +168,9 @@ func SignatureScript(tx *wire.MsgTx, idx int, subscript []byte, hashType SigHash
 	return NewScriptBuilder().AddData(sig).AddData(pkData).Script()
 }
 
-func p2pkSignatureScript(tx *wire.MsgTx, idx int, subScript []byte, hashType SigHashType, privKey *btcec.PrivateKey) ([]byte, error) {
+func p2pkSignatureScript(tx *wire.MsgTx, idx int, subScript []byte,
+	hashType SigHashType, privKey *btcec.PrivateKey) ([]byte, error) {
+
 	sig, err := RawTxInSignature(tx, idx, subScript, hashType, privKey)
 	if err != nil {
 		return nil, err
@@ -100,8 +213,9 @@ func signMultiSig(tx *wire.MsgTx, idx int, subScript []byte, hashType SigHashTyp
 }
 
 func sign(chainParams *chaincfg.Params, tx *wire.MsgTx, idx int,
-	subScript []byte, hashType SigHashType, kdb KeyDB, sdb ScriptDB) ([]byte,
-	ScriptClass, []btcutil.Address, int, error) {
+	subScript []byte, hashType SigHashType, signType signingMode,
+	inputAmt int64, kdb KeyDB,
+	sdb ScriptDB) ([]byte, ScriptClass, []btcutil.Address, int, error) {
 
 	class, addresses, nrequired, err := ExtractPkScriptAddrs(subScript,
 		chainParams)
@@ -376,12 +490,14 @@ func (sc ScriptClosure) GetScript(address btcutil.Address) ([]byte, error) {
 // getScript. If previousScript is provided then the results in previousScript
 // will be merged in a type-dependent manner with the newly generated.
 // signature script.
+// TODO(roasbeef): equiv for sign witness output
+//  * fin, json script tests
 func SignTxOutput(chainParams *chaincfg.Params, tx *wire.MsgTx, idx int,
 	pkScript []byte, hashType SigHashType, kdb KeyDB, sdb ScriptDB,
 	previousScript []byte) ([]byte, error) {
 
 	sigScript, class, addresses, nrequired, err := sign(chainParams, tx,
-		idx, pkScript, hashType, kdb, sdb)
+		idx, pkScript, hashType, signNormal, -1, kdb, sdb)
 	if err != nil {
 		return nil, err
 	}
@@ -389,7 +505,7 @@ func SignTxOutput(chainParams *chaincfg.Params, tx *wire.MsgTx, idx int,
 	if class == ScriptHashTy {
 		// TODO keep the sub addressed and pass down to merge.
 		realSigScript, _, _, _, err := sign(chainParams, tx, idx,
-			sigScript, hashType, kdb, sdb)
+			sigScript, hashType, signNormal, -1, kdb, sdb)
 		if err != nil {
 			return nil, err
 		}
