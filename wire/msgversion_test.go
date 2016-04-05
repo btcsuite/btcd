@@ -187,10 +187,11 @@ func TestVersionWire(t *testing.T) {
 	verRelayTxFalseEncoded[len(verRelayTxFalseEncoded)-1] = 0
 
 	tests := []struct {
-		in   *wire.MsgVersion // Message to encode
-		out  *wire.MsgVersion // Expected decoded message
-		buf  []byte           // Wire encoding
-		pver uint32           // Protocol version for wire encoding
+		in   *wire.MsgVersion     // Message to encode
+		out  *wire.MsgVersion     // Expected decoded message
+		buf  []byte               // Wire encoding
+		pver uint32               // Protocol version for wire encoding
+		enc  wire.MessageEncoding // Message encoding format
 	}{
 		// Latest protocol version.
 		{
@@ -198,6 +199,7 @@ func TestVersionWire(t *testing.T) {
 			baseVersionBIP0037,
 			baseVersionBIP0037Encoded,
 			wire.ProtocolVersion,
+			wire.BaseEncoding,
 		},
 
 		// Protocol version BIP0037Version with relay transactions field
@@ -207,6 +209,7 @@ func TestVersionWire(t *testing.T) {
 			baseVersionBIP0037,
 			baseVersionBIP0037Encoded,
 			wire.BIP0037Version,
+			wire.BaseEncoding,
 		},
 
 		// Protocol version BIP0037Version with relay transactions field
@@ -216,6 +219,7 @@ func TestVersionWire(t *testing.T) {
 			verRelayTxFalse,
 			verRelayTxFalseEncoded,
 			wire.BIP0037Version,
+			wire.BaseEncoding,
 		},
 
 		// Protocol version BIP0035Version.
@@ -224,6 +228,7 @@ func TestVersionWire(t *testing.T) {
 			baseVersion,
 			baseVersionEncoded,
 			wire.BIP0035Version,
+			wire.BaseEncoding,
 		},
 
 		// Protocol version BIP0031Version.
@@ -232,6 +237,7 @@ func TestVersionWire(t *testing.T) {
 			baseVersion,
 			baseVersionEncoded,
 			wire.BIP0031Version,
+			wire.BaseEncoding,
 		},
 
 		// Protocol version NetAddressTimeVersion.
@@ -240,6 +246,7 @@ func TestVersionWire(t *testing.T) {
 			baseVersion,
 			baseVersionEncoded,
 			wire.NetAddressTimeVersion,
+			wire.BaseEncoding,
 		},
 
 		// Protocol version MultipleAddressVersion.
@@ -248,6 +255,7 @@ func TestVersionWire(t *testing.T) {
 			baseVersion,
 			baseVersionEncoded,
 			wire.MultipleAddressVersion,
+			wire.BaseEncoding,
 		},
 	}
 
@@ -255,7 +263,7 @@ func TestVersionWire(t *testing.T) {
 	for i, test := range tests {
 		// Encode the message to wire format.
 		var buf bytes.Buffer
-		err := test.in.BtcEncode(&buf, test.pver)
+		err := test.in.BtcEncode(&buf, test.pver, test.enc)
 		if err != nil {
 			t.Errorf("BtcEncode #%d error %v", i, err)
 			continue
@@ -269,7 +277,7 @@ func TestVersionWire(t *testing.T) {
 		// Decode the message from wire format.
 		var msg wire.MsgVersion
 		rbuf := bytes.NewBuffer(test.buf)
-		err = msg.BtcDecode(rbuf, test.pver)
+		err = msg.BtcDecode(rbuf, test.pver, test.enc)
 		if err != nil {
 			t.Errorf("BtcDecode #%d error %v", i, err)
 			continue
@@ -289,12 +297,13 @@ func TestVersionWireErrors(t *testing.T) {
 	// because the test data is using bytes encoded with that protocol
 	// version.
 	pver := uint32(60002)
+	enc := wire.BaseEncoding
 	wireErr := &wire.MessageError{}
 
 	// Ensure calling MsgVersion.BtcDecode with a non *bytes.Buffer returns
 	// error.
 	fr := newFixedReader(0, []byte{})
-	if err := baseVersion.BtcDecode(fr, pver); err == nil {
+	if err := baseVersion.BtcDecode(fr, pver, enc); err == nil {
 		t.Errorf("Did not received error when calling " +
 			"MsgVersion.BtcDecode with non *bytes.Buffer")
 	}
@@ -324,46 +333,47 @@ func TestVersionWireErrors(t *testing.T) {
 	copy(exceedUAVerEncoded[83+len(newUA):], baseVersionEncoded[97:100])
 
 	tests := []struct {
-		in       *wire.MsgVersion // Value to encode
-		buf      []byte           // Wire encoding
-		pver     uint32           // Protocol version for wire encoding
-		max      int              // Max size of fixed buffer to induce errors
-		writeErr error            // Expected write error
-		readErr  error            // Expected read error
+		in       *wire.MsgVersion     // Value to encode
+		buf      []byte               // Wire encoding
+		pver     uint32               // Protocol version for wire encoding
+		enc      wire.MessageEncoding // Message encoding format
+		max      int                  // Max size of fixed buffer to induce errors
+		writeErr error                // Expected write error
+		readErr  error                // Expected read error
 	}{
 		// Force error in protocol version.
-		{baseVersion, baseVersionEncoded, pver, 0, io.ErrShortWrite, io.EOF},
+		{baseVersion, baseVersionEncoded, pver, wire.BaseEncoding, 0, io.ErrShortWrite, io.EOF},
 		// Force error in services.
-		{baseVersion, baseVersionEncoded, pver, 4, io.ErrShortWrite, io.EOF},
+		{baseVersion, baseVersionEncoded, pver, wire.BaseEncoding, 4, io.ErrShortWrite, io.EOF},
 		// Force error in timestamp.
-		{baseVersion, baseVersionEncoded, pver, 12, io.ErrShortWrite, io.EOF},
+		{baseVersion, baseVersionEncoded, pver, wire.BaseEncoding, 12, io.ErrShortWrite, io.EOF},
 		// Force error in remote address.
-		{baseVersion, baseVersionEncoded, pver, 20, io.ErrShortWrite, io.EOF},
+		{baseVersion, baseVersionEncoded, pver, wire.BaseEncoding, 20, io.ErrShortWrite, io.EOF},
 		// Force error in local address.
-		{baseVersion, baseVersionEncoded, pver, 47, io.ErrShortWrite, io.ErrUnexpectedEOF},
+		{baseVersion, baseVersionEncoded, pver, wire.BaseEncoding, 47, io.ErrShortWrite, io.ErrUnexpectedEOF},
 		// Force error in nonce.
-		{baseVersion, baseVersionEncoded, pver, 73, io.ErrShortWrite, io.ErrUnexpectedEOF},
+		{baseVersion, baseVersionEncoded, pver, wire.BaseEncoding, 73, io.ErrShortWrite, io.ErrUnexpectedEOF},
 		// Force error in user agent length.
-		{baseVersion, baseVersionEncoded, pver, 81, io.ErrShortWrite, io.EOF},
+		{baseVersion, baseVersionEncoded, pver, wire.BaseEncoding, 81, io.ErrShortWrite, io.EOF},
 		// Force error in user agent.
-		{baseVersion, baseVersionEncoded, pver, 82, io.ErrShortWrite, io.ErrUnexpectedEOF},
+		{baseVersion, baseVersionEncoded, pver, wire.BaseEncoding, 82, io.ErrShortWrite, io.ErrUnexpectedEOF},
 		// Force error in last block.
-		{baseVersion, baseVersionEncoded, pver, 98, io.ErrShortWrite, io.ErrUnexpectedEOF},
+		{baseVersion, baseVersionEncoded, pver, wire.BaseEncoding, 98, io.ErrShortWrite, io.ErrUnexpectedEOF},
 		// Force error in relay tx - no read error should happen since
 		// it's optional.
 		{
 			baseVersionBIP0037, baseVersionBIP0037Encoded,
-			wire.BIP0037Version, 101, io.ErrShortWrite, nil,
+			wire.BIP0037Version, wire.BaseEncoding, 101, io.ErrShortWrite, nil,
 		},
 		// Force error due to user agent too big
-		{exceedUAVer, exceedUAVerEncoded, pver, newLen, wireErr, wireErr},
+		{exceedUAVer, exceedUAVerEncoded, pver, wire.BaseEncoding, newLen, wireErr, wireErr},
 	}
 
 	t.Logf("Running %d tests", len(tests))
 	for i, test := range tests {
 		// Encode to wire format.
 		w := newFixedWriter(test.max)
-		err := test.in.BtcEncode(w, test.pver)
+		err := test.in.BtcEncode(w, test.pver, test.enc)
 		if reflect.TypeOf(err) != reflect.TypeOf(test.writeErr) {
 			t.Errorf("BtcEncode #%d wrong error got: %v, want: %v",
 				i, err, test.writeErr)
@@ -383,7 +393,7 @@ func TestVersionWireErrors(t *testing.T) {
 		// Decode from wire format.
 		var msg wire.MsgVersion
 		buf := bytes.NewBuffer(test.buf[0:test.max])
-		err = msg.BtcDecode(buf, test.pver)
+		err = msg.BtcDecode(buf, test.pver, test.enc)
 		if reflect.TypeOf(err) != reflect.TypeOf(test.readErr) {
 			t.Errorf("BtcDecode #%d wrong error got: %v, want: %v",
 				i, err, test.readErr)
@@ -455,34 +465,40 @@ func TestVersionOptionalFields(t *testing.T) {
 	copy(lastBlockVersionEncoded, baseVersionEncoded)
 
 	tests := []struct {
-		msg  *wire.MsgVersion // Expected message
-		buf  []byte           // Wire encoding
-		pver uint32           // Protocol version for wire encoding
+		msg  *wire.MsgVersion     // Expected message
+		buf  []byte               // Wire encoding
+		pver uint32               // Protocol version for wire encoding
+		enc  wire.MessageEncoding // Message encoding format
 	}{
 		{
 			&onlyRequiredVersion,
 			onlyRequiredVersionEncoded,
 			wire.ProtocolVersion,
+			wire.BaseEncoding,
 		},
 		{
 			&addrMeVersion,
 			addrMeVersionEncoded,
 			wire.ProtocolVersion,
+			wire.BaseEncoding,
 		},
 		{
 			&nonceVersion,
 			nonceVersionEncoded,
 			wire.ProtocolVersion,
+			wire.BaseEncoding,
 		},
 		{
 			&uaVersion,
 			uaVersionEncoded,
 			wire.ProtocolVersion,
+			wire.BaseEncoding,
 		},
 		{
 			&lastBlockVersion,
 			lastBlockVersionEncoded,
 			wire.ProtocolVersion,
+			wire.BaseEncoding,
 		},
 	}
 
@@ -490,7 +506,7 @@ func TestVersionOptionalFields(t *testing.T) {
 		// Decode the message from wire format.
 		var msg wire.MsgVersion
 		rbuf := bytes.NewBuffer(test.buf)
-		err := msg.BtcDecode(rbuf, test.pver)
+		err := msg.BtcDecode(rbuf, test.pver, test.enc)
 		if err != nil {
 			t.Errorf("BtcDecode #%d error %v", i, err)
 			continue
