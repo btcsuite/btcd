@@ -590,12 +590,18 @@ func (sp *serverPeer) OnGetData(p *peer.Peer, msg *wire.MsgGetData) {
 		}
 		var err error
 		switch iv.Type {
+		case wire.InvTypeWitnessTx:
+			err = sp.server.pushTxMsg(sp, &iv.Hash, c, waitChan, wire.WitnessEncoding)
 		case wire.InvTypeTx:
-			err = sp.server.pushTxMsg(sp, &iv.Hash, c, waitChan)
+			err = sp.server.pushTxMsg(sp, &iv.Hash, c, waitChan, wire.BaseEncoding)
+		case wire.InvTypeWitnessBlock:
+			err = sp.server.pushBlockMsg(sp, &iv.Hash, c, waitChan, wire.WitnessEncoding)
 		case wire.InvTypeBlock:
-			err = sp.server.pushBlockMsg(sp, &iv.Hash, c, waitChan)
+			err = sp.server.pushBlockMsg(sp, &iv.Hash, c, waitChan, wire.BaseEncoding)
+		case wire.InvTypeFilteredWitnessBlock:
+			err = sp.server.pushMerkleBlockMsg(sp, &iv.Hash, c, waitChan, wire.WitnessEncoding)
 		case wire.InvTypeFilteredBlock:
-			err = sp.server.pushMerkleBlockMsg(sp, &iv.Hash, c, waitChan)
+			err = sp.server.pushMerkleBlockMsg(sp, &iv.Hash, c, waitChan, wire.BaseEncoding)
 		default:
 			peerLog.Warnf("Unknown type in inventory request %d",
 				iv.Type)
@@ -972,7 +978,9 @@ func (s *server) RemoveRebroadcastInventory(iv *wire.InvVect) {
 
 // pushTxMsg sends a tx message for the provided transaction hash to the
 // connected peer.  An error is returned if the transaction hash is not known.
-func (s *server) pushTxMsg(sp *serverPeer, sha *wire.ShaHash, doneChan chan<- struct{}, waitChan <-chan struct{}) error {
+func (s *server) pushTxMsg(sp *serverPeer, sha *wire.ShaHash, doneChan,
+	waitChan chan struct{}, encoding wire.MessageEncoding) error {
+
 	// Attempt to fetch the requested transaction from the pool.  A
 	// call could be made to check for existence first, but simply trying
 	// to fetch a missing transaction results in the same behavior.
@@ -992,14 +1000,16 @@ func (s *server) pushTxMsg(sp *serverPeer, sha *wire.ShaHash, doneChan chan<- st
 		<-waitChan
 	}
 
-	sp.QueueMessage(tx.MsgTx(), doneChan)
+	sp.QueueMessageWithEncoding(tx.MsgTx(), doneChan, encoding)
 
 	return nil
 }
 
 // pushBlockMsg sends a block message for the provided block hash to the
 // connected peer.  An error is returned if the block hash is not known.
-func (s *server) pushBlockMsg(sp *serverPeer, hash *wire.ShaHash, doneChan chan<- struct{}, waitChan <-chan struct{}) error {
+func (s *server) pushBlockMsg(sp *serverPeer, hash *wire.ShaHash, doneChan,
+	waitChan chan struct{}, encoding wire.MessageEncoding) error {
+
 	// Fetch the raw block bytes from the database.
 	var blockBytes []byte
 	err := sp.server.db.View(func(dbTx database.Tx) error {
@@ -1019,7 +1029,7 @@ func (s *server) pushBlockMsg(sp *serverPeer, hash *wire.ShaHash, doneChan chan<
 
 	// Deserialize the block.
 	var msgBlock wire.MsgBlock
-	err = msgBlock.Deserialize(bytes.NewReader(blockBytes))
+	err = msgBlock.DeserializeWitness(bytes.NewReader(blockBytes))
 	if err != nil {
 		peerLog.Tracef("Unable to deserialize requested block hash "+
 			"%v: %v", hash, err)
@@ -1043,7 +1053,7 @@ func (s *server) pushBlockMsg(sp *serverPeer, hash *wire.ShaHash, doneChan chan<
 	if !sendInv {
 		dc = doneChan
 	}
-	sp.QueueMessage(&msgBlock, dc)
+	sp.QueueMessageWithEncoding(&msgBlock, dc, encoding)
 
 	// When the peer requests the final block that was advertised in
 	// response to a getblocks message which requested more blocks than
@@ -1065,7 +1075,9 @@ func (s *server) pushBlockMsg(sp *serverPeer, hash *wire.ShaHash, doneChan chan<
 // the connected peer.  Since a merkle block requires the peer to have a filter
 // loaded, this call will simply be ignored if there is no filter loaded.  An
 // error is returned if the block hash is not known.
-func (s *server) pushMerkleBlockMsg(sp *serverPeer, hash *wire.ShaHash, doneChan chan<- struct{}, waitChan <-chan struct{}) error {
+func (s *server) pushMerkleBlockMsg(sp *serverPeer, hash *wire.ShaHash, doneChan,
+	waitChan chan struct{}, encoding wire.MessageEncoding) error {
+
 	// Do not send a response if the peer doesn't have a filter loaded.
 	if !sp.filter.IsLoaded() {
 		if doneChan != nil {
@@ -1112,7 +1124,8 @@ func (s *server) pushMerkleBlockMsg(sp *serverPeer, hash *wire.ShaHash, doneChan
 			dc = doneChan
 		}
 		if txIndex < uint32(len(blkTransactions)) {
-			sp.QueueMessage(blkTransactions[txIndex], dc)
+			sp.QueueMessageWithEncoding(blkTransactions[txIndex], dc,
+				encoding)
 		}
 	}
 
