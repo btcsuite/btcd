@@ -338,6 +338,8 @@ func (b *blockManager) isSyncCandidate(sp *serverPeer) bool {
 		}
 	} else {
 		// The peer is not a candidate for sync if it's not a full node.
+		// TODO(roasbeef): should also include SFNodeWitness after
+		// segwit soft-fork activation
 		if sp.Services()&wire.SFNodeNetwork != wire.SFNodeNetwork {
 			return false
 		}
@@ -718,6 +720,13 @@ func (b *blockManager) fetchHeaderBlocks() {
 		if !haveInv {
 			b.requestedBlocks[*node.sha] = struct{}{}
 			b.syncPeer.requestedBlocks[*node.sha] = struct{}{}
+
+			// TODO(roasbeef):
+			//  * sync peer must be witness?
+			if b.syncPeer.witnessEnabled {
+				iv.Type = wire.InvTypeWitnessBlock
+			}
+
 			gdmsg.AddInvVect(iv)
 			numRequested++
 		}
@@ -838,11 +847,15 @@ func (b *blockManager) handleHeadersMsg(hmsg *headersMsg) {
 // are in the memory pool (either the main pool or orphan pool).
 func (b *blockManager) haveInventory(invVect *wire.InvVect) (bool, error) {
 	switch invVect.Type {
+	case wire.InvTypeWitnessBlock:
+		fallthrough
 	case wire.InvTypeBlock:
 		// Ask chain if the block is known to it in any form (main
 		// chain, side chain, or orphan).
 		return b.chain.HaveBlock(&invVect.Hash)
 
+	case wire.InvTypeWitnessTx:
+		fallthrough
 	case wire.InvTypeTx:
 		// Ask the transaction memory pool if the transaction is known
 		// to it in any form (main pool or orphan).
@@ -993,6 +1006,13 @@ func (b *blockManager) handleInvMsg(imsg *invMsg) {
 			if _, exists := b.requestedBlocks[iv.Hash]; !exists {
 				b.requestedBlocks[iv.Hash] = struct{}{}
 				imsg.peer.requestedBlocks[iv.Hash] = struct{}{}
+
+				// If the peer is capable, request the block
+				// including all witness data.
+				if imsg.peer.witnessEnabled {
+					iv.Type = wire.InvTypeWitnessBlock
+				}
+
 				gdmsg.AddInvVect(iv)
 				numRequested++
 			}
@@ -1003,6 +1023,13 @@ func (b *blockManager) handleInvMsg(imsg *invMsg) {
 			if _, exists := b.requestedTxns[iv.Hash]; !exists {
 				b.requestedTxns[iv.Hash] = struct{}{}
 				imsg.peer.requestedTxns[iv.Hash] = struct{}{}
+
+				// If the peer is capable, request the txn
+				// including all witness data.
+				if imsg.peer.witnessEnabled {
+					iv.Type = wire.InvTypeWitnessTx
+				}
+
 				gdmsg.AddInvVect(iv)
 				numRequested++
 			}
@@ -1338,6 +1365,7 @@ func newBlockManager(s *server, indexManager blockchain.IndexManager) (*blockMan
 		Notifications: bm.handleNotifyMsg,
 		SigCache:      s.sigCache,
 		IndexManager:  indexManager,
+		HashCache:     s.hashCache,
 	})
 	if err != nil {
 		return nil, err
