@@ -72,6 +72,31 @@ var (
 	block91880Hash = newShaHashFromStr("00000000000743f190a18c5577a3c2d2a1f610ae9601ac046a38084ccb7cd721")
 )
 
+// CalculateBlockCost...
+// TODO(roasbeef): fin
+//  * comments, tests
+func CalculateBlockCost(blk *btcutil.Block) int64 {
+	msgBlock := blk.MsgBlock()
+
+	baseCost := msgBlock.SerializeSize() * (WitnessScaleFactor - 1)
+	witCost := msgBlock.SerializeSizeWitness()
+
+	//  cost = (size * 3) + witSize
+	return int64(baseCost + witCost)
+}
+
+// CalculateTransactionCost...
+// TODO(roasbeef): fin
+//  * comments, tests
+func CalculateTransactionCost(tx *btcutil.Tx) int64 {
+	msgTx := tx.MsgTx()
+
+	baseCost := msgTx.SerializeSize() * (WitnessScaleFactor - 1)
+	witCost := msgTx.SerializeSizeWitness()
+
+	return int64(baseCost + witCost)
+}
+
 // isNullOutpoint determines whether or not a previous transaction output point
 // is set.
 func isNullOutpoint(outpoint *wire.OutPoint) bool {
