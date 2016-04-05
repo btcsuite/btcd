@@ -940,6 +940,20 @@ var scriptClassTests = []scriptClassTest{
 			"3 CHECKMULTISIG",
 		class: txscript.NonStandardTy,
 	},
+
+	// New standard segwit script templates.
+	{
+		// A pay to witness pub key hash pk script.
+		name:   "Pay To Witness PubkeyHash",
+		script: "0 DATA_20 0x1d0f172a0ecb48aee1be1f2687d2963ae33f71a1",
+		class:  txscript.WitnessPubKeyHashTy,
+	},
+	{
+		// A pay to witness scripthash pk script.
+		name:   "Pay To Witness Scripthash",
+		script: "0 DATA_32 0x9f96ade4b41d5433f4eda31e1738ec2b36f6e7d1420d94a6af99801a88f7f7ff",
+		class:  txscript.WitnessScriptHashTy,
+	},
 }
 
 // TestScriptClass ensures all the scripts in scriptClassTests have the expected
@@ -984,9 +998,19 @@ func TestStringifyClass(t *testing.T) {
 			stringed: "pubkeyhash",
 		},
 		{
+			name:     "witnesspubkeyhash",
+			class:    txscript.WitnessPubKeyHashTy,
+			stringed: "witnesspubkeyhash",
+		},
+		{
 			name:     "scripthash",
 			class:    txscript.ScriptHashTy,
 			stringed: "scripthash",
+		},
+		{
+			name:     "witnessscripthash",
+			class:    txscript.WitnessScriptHashTy,
+			stringed: "witnessscripthash",
 		},
 		{
 			name:     "multisigty",

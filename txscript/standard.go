@@ -7,6 +7,7 @@ package txscript
 import (
 	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/btcsuite/btcutil"
+	"github.com/btcsuite/fastsha256"
 )
 
 const (
@@ -44,23 +45,27 @@ type ScriptClass byte
 
 // Classes of script payment known about in the blockchain.
 const (
-	NonStandardTy ScriptClass = iota // None of the recognized forms.
-	PubKeyTy                         // Pay pubkey.
-	PubKeyHashTy                     // Pay pubkey hash.
-	ScriptHashTy                     // Pay to script hash.
-	MultiSigTy                       // Multi signature.
-	NullDataTy                       // Empty data-only (provably prunable).
+	NonStandardTy       ScriptClass = iota // None of the recognized forms.
+	PubKeyTy                               // Pay pubkey.
+	PubKeyHashTy                           // Pay pubkey hash.
+	WitnessPubKeyHashTy                    // Pay witness pubkey hash.
+	ScriptHashTy                           // Pay to script hash.
+	WitnessScriptHashTy                    // Pay to witness script hash.
+	MultiSigTy                             // Multi signature.
+	NullDataTy                             // Empty data-only (provably prunable).
 )
 
 // scriptClassToName houses the human-readable strings which describe each
 // script class.
 var scriptClassToName = []string{
-	NonStandardTy: "nonstandard",
-	PubKeyTy:      "pubkey",
-	PubKeyHashTy:  "pubkeyhash",
-	ScriptHashTy:  "scripthash",
-	MultiSigTy:    "multisig",
-	NullDataTy:    "nulldata",
+	NonStandardTy:       "nonstandard",
+	PubKeyTy:            "pubkey",
+	PubKeyHashTy:        "pubkeyhash",
+	WitnessPubKeyHashTy: "witnesspubkeyhash",
+	ScriptHashTy:        "scripthash",
+	WitnessScriptHashTy: "witnessscripthash",
+	MultiSigTy:          "multisig",
+	NullDataTy:          "nulldata",
 }
 
 // String implements the Stringer interface by returning the name of
@@ -152,8 +157,12 @@ func typeOfScript(pops []parsedOpcode) ScriptClass {
 		return PubKeyTy
 	} else if isPubkeyHash(pops) {
 		return PubKeyHashTy
+	} else if isWitnessPubKeyHash(pops) {
+		return WitnessPubKeyHashTy
 	} else if isScriptHash(pops) {
 		return ScriptHashTy
+	} else if isWitnessScriptHash(pops) {
+		return WitnessScriptHashTy
 	} else if isMultiSig(pops) {
 		return MultiSigTy
 	} else if isNullData(pops) {
@@ -186,7 +195,14 @@ func expectedInputs(pops []parsedOpcode, class ScriptClass) int {
 	case PubKeyHashTy:
 		return 2
 
+	case WitnessPubKeyHashTy:
+		return 2
+
 	case ScriptHashTy:
+		// Not including script.  That is handled by the caller.
+		return 1
+
+	case WitnessScriptHashTy:
 		// Not including script.  That is handled by the caller.
 		return 1
 
@@ -230,6 +246,7 @@ type ScriptInfo struct {
 // pair.  It will error if the pair is in someway invalid such that they can not
 // be analysed, i.e. if they do not parse or the pkScript is not a push-only
 // script
+// TODO(roasbeef): testzz
 func CalcScriptInfo(sigScript, pkScript []byte, bip16 bool) (*ScriptInfo, error) {
 	sigPops, err := parseScript(sigScript)
 	if err != nil {
@@ -245,7 +262,7 @@ func CalcScriptInfo(sigScript, pkScript []byte, bip16 bool) (*ScriptInfo, error)
 	si := new(ScriptInfo)
 	si.PkScriptClass = typeOfScript(pkPops)
 
-	// Can't have a pkScript that doesn't just push data.
+	// Can't have a sigScript that doesn't just push data.
 	if !isPushOnly(sigPops) {
 		return nil, ErrStackNonPushOnly
 	}
@@ -272,6 +289,7 @@ func CalcScriptInfo(sigScript, pkScript []byte, bip16 bool) (*ScriptInfo, error)
 			si.ExpectedInputs += shInputs
 		}
 		si.SigOps = getSigOpCount(shPops, true)
+		// TODO(roasbeef): segwit sig op counting
 	} else {
 		si.SigOps = getSigOpCount(pkPops, true)
 	}
@@ -313,11 +331,23 @@ func payToPubKeyHashScript(pubKeyHash []byte) ([]byte, error) {
 		Script()
 }
 
+// payToWitnessPubKeyHashScript creates a new script to pay to a version 0
+// pubkey hash witness program. The passed hash is expected to be valid.
+func payToWitnessPubKeyHashScript(pubKeyHash []byte) ([]byte, error) {
+	return NewScriptBuilder().AddOp(OP_0).AddData(pubKeyHash).Script()
+}
+
 // payToScriptHashScript creates a new script to pay a transaction output to a
 // script hash. It is expected that the input is a valid hash.
 func payToScriptHashScript(scriptHash []byte) ([]byte, error) {
 	return NewScriptBuilder().AddOp(OP_HASH160).AddData(scriptHash).
 		AddOp(OP_EQUAL).Script()
+}
+
+// payToWitnessPubKeyHashScript creates a new script to pay to a version 0
+// script hash witness program. The passed hash is expected to be valid.
+func payToWitnessScriptHashScript(scriptHash []byte) ([]byte, error) {
+	return NewScriptBuilder().AddOp(OP_0).AddData(scriptHash).Script()
 }
 
 // payToPubkeyScript creates a new script to pay a transaction output to a
@@ -348,10 +378,55 @@ func PayToAddrScript(addr btcutil.Address) ([]byte, error) {
 			return nil, ErrUnsupportedAddress
 		}
 		return payToPubKeyScript(addr.ScriptAddress())
+
+	case *btcutil.AddressWitnessPubKeyHash:
+		if addr == nil {
+			return nil, ErrUnsupportedAddress
+		}
+		return payToWitnessPubKeyHashScript(addr.ScriptAddress())
+	case *btcutil.AddressWitnessScriptHash:
+		if addr == nil {
+			return nil, ErrUnsupportedAddress
+		}
+		return payToWitnessScriptHashScript(addr.ScriptAddress())
 	}
 
 	return nil, ErrUnsupportedAddress
 }
+
+// PayToScriptHashSquaredScript returns a public key script which serves as
+// backwards compatible bridge to witness program public key scripts via a
+// nested p2sh structure. A p2sh^2 output is generated by taking an existing
+// pkScript, generating a version 0 witness script hash program from it, then
+// treating the serialized version 0 witness program as the pre-image to a
+// regular p2sh output. Validation of a spend from this hybrid output proceeds
+// as normal by verifying the scriptSig hashes to the 20-byte p2sh data push,
+// then enters an additional stage wherein the witness program is evalulated
+// as normal via the provided witness stack within the input.
+func PayToScriptHashSquaredScript(script []byte) ([]byte, error) {
+	// First generate the actual version 0 witness script hash program
+	// paying to the passed script.
+	scriptHash256 := fastsha256.Sum256(script)
+	witnessProgram, err := payToWitnessScriptHashScript(scriptHash256[:])
+	if err != nil {
+		return nil, err
+	}
+
+	// Next generate a nested p2sh output who's hash pre-image is the
+	// serialized witness program generated above.
+	scriptHash160 := btcutil.Hash160(witnessProgram)
+	pkScriptHash, err := payToScriptHashScript(scriptHash160)
+	if err != nil {
+		return nil, err
+	}
+
+	// The final pkscript is a regular p2sh output spendable by knowledge
+	// of the pre-image, which is the original version 0 witness program,
+	// followed by further execution using the witness stack.
+	return pkScriptHash, nil
+}
+
+// TODO(roasbeef): function to spend above
 
 // MultiSigScript returns a valid script for a multisignature redemption where
 // nrequired of the keys in pubkeys are required to have signed the transaction
@@ -395,6 +470,7 @@ func PushedData(script []byte) ([][]byte, error) {
 // signatures associated with the passed PkScript.  Note that it only works for
 // 'standard' transaction script types.  Any data such as public keys which are
 // invalid are omitted from the results.
+// TODO(roasbeef): test
 func ExtractPkScriptAddrs(pkScript []byte, chainParams *chaincfg.Params) (ScriptClass, []btcutil.Address, int, error) {
 	var addrs []btcutil.Address
 	var requiredSigs int
@@ -420,6 +496,18 @@ func ExtractPkScriptAddrs(pkScript []byte, chainParams *chaincfg.Params) (Script
 			addrs = append(addrs, addr)
 		}
 
+	case WitnessPubKeyHashTy:
+		// A pay-to-witness-pubkey-hash script is of thw form:
+		//  OP_0 <20-byte hash>
+		// Therefore, the pubkey hash is the second item on the stack.
+		// Skip the pubkey hash if it's invalid for some reason.
+		requiredSigs = 1
+		addr, err := btcutil.NewAddressWitnessPubKeyHash(pops[1].data,
+			chainParams)
+		if err == nil {
+			addrs = append(addrs, addr)
+		}
+
 	case PubKeyTy:
 		// A pay-to-pubkey script is of the form:
 		//  <pubkey> OP_CHECKSIG
@@ -438,6 +526,18 @@ func ExtractPkScriptAddrs(pkScript []byte, chainParams *chaincfg.Params) (Script
 		// Skip the script hash if it's invalid for some reason.
 		requiredSigs = 1
 		addr, err := btcutil.NewAddressScriptHashFromHash(pops[1].data,
+			chainParams)
+		if err == nil {
+			addrs = append(addrs, addr)
+		}
+
+	case WitnessScriptHashTy:
+		// A pay-to-witness-script-hash script is of the form:
+		//  OP_0 <32-byte hash>
+		// Therefore, the script hash is the second item on the stack.
+		// Skip the script hash if it's invalid for some reason.
+		requiredSigs = 1
+		addr, err := btcutil.NewAddressWitnessScriptHashFromHash(pops[1].data,
 			chainParams)
 		if err == nil {
 			addrs = append(addrs, addr)
