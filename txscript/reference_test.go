@@ -28,6 +28,7 @@ func testName(test []string) (string, error) {
 		return name, fmt.Errorf("invalid test length %d", len(test))
 	}
 
+	// TODO(roasbeef): alter if
 	if len(test) == 4 {
 		name = fmt.Sprintf("test (%s)", test[3])
 	} else {
@@ -227,9 +228,9 @@ func TestScriptInvalidTests(t *testing.T) {
 
 			var vm *Engine
 			if useSigCache {
-				vm, err = NewEngine(scriptPubKey, tx, 0, flags, sigCache)
+				vm, err = NewEngine(scriptPubKey, tx, 0, flags, sigCache, nil, 0)
 			} else {
-				vm, err = NewEngine(scriptPubKey, tx, 0, flags, nil)
+				vm, err = NewEngine(scriptPubKey, tx, 0, flags, nil, nil, 0)
 			}
 
 			if err == nil {
@@ -293,9 +294,9 @@ func TestScriptValidTests(t *testing.T) {
 
 			var vm *Engine
 			if useSigCache {
-				vm, err = NewEngine(scriptPubKey, tx, 0, flags, sigCache)
+				vm, err = NewEngine(scriptPubKey, tx, 0, flags, sigCache, nil, 0)
 			} else {
-				vm, err = NewEngine(scriptPubKey, tx, 0, flags, nil)
+				vm, err = NewEngine(scriptPubKey, tx, 0, flags, nil, nil, 0)
 			}
 
 			if err != nil {
@@ -451,7 +452,7 @@ testloop:
 			// These are meant to fail, so as soon as the first
 			// input fails the transaction has failed. (some of the
 			// test txns have good inputs, too..
-			vm, err := NewEngine(pkScript, tx.MsgTx(), k, flags, nil)
+			vm, err := NewEngine(pkScript, tx.MsgTx(), k, flags, nil, nil, 0)
 			if err != nil {
 				continue testloop
 			}
@@ -590,7 +591,7 @@ testloop:
 					k, i, test)
 				continue testloop
 			}
-			vm, err := NewEngine(pkScript, tx.MsgTx(), k, flags, nil)
+			vm, err := NewEngine(pkScript, tx.MsgTx(), k, flags, nil, nil, 0)
 			if err != nil {
 				t.Errorf("test (%d:%v:%d) failed to create "+
 					"script: %v", i, test, k, err)

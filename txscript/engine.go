@@ -5,11 +5,13 @@
 package txscript
 
 import (
+	"bytes"
 	"fmt"
 	"math/big"
 
 	"github.com/btcsuite/btcd/btcec"
 	"github.com/btcsuite/btcd/wire"
+	"github.com/btcsuite/fastsha256"
 )
 
 // ScriptFlags is a bitmask defining additional operations or tests that will be
@@ -100,8 +102,13 @@ type Engine struct {
 	numOps          int
 	flags           ScriptFlags
 	sigCache        *SigCache
+	hashCache       *HashCache
 	bip16           bool     // treat execution as pay-to-script-hash
 	savedFirstStack [][]byte // stack from first script for bip16 scripts
+	witness         bool     // treat execution as a witness program
+	witnessVersion  int
+	witnessProgram  []byte
+	inputAmount     int64
 }
 
 // hasFlag returns whether the script engine instance has the passed flag set.
@@ -197,6 +204,8 @@ func (vm *Engine) curPC() (script int, off int, err error) {
 	}
 	return vm.scriptIdx, vm.scriptOff, nil
 }
+
+//func (vm *Engine) verifyWitnessProgram(uint version, wi
 
 // DisasmPC returns the string for the disassembly of the opcode that will be
 // next to execute when Step() is called.
@@ -321,6 +330,72 @@ func (vm *Engine) Step() (done bool, err error) {
 			// Set stack to be the stack from first script minus the
 			// script itself
 			vm.SetStack(vm.savedFirstStack[:len(vm.savedFirstStack)-1])
+		} else if (vm.scriptIdx == 1 && vm.witness) ||
+			(vm.witness && vm.bip16 && vm.scriptIdx == 2) { // Nested P2SH.
+			// TODO(roasbeef): check that sigscript is just a push
+			vm.scriptIdx++
+
+			witness := vm.tx.TxIn[vm.txIdx].Witness
+			if vm.witnessVersion == 0 {
+				switch len(vm.witnessProgram) {
+				case 20: // P2WKH
+					// The witness stack should consist of exactly two
+					// items: the signature, and the pubkey.
+					if len(witness) != 2 {
+						// TODO(roasbeef): actual error
+						return false, fmt.Errorf("invalid witness for p2wkh")
+					}
+
+					// Now we'll resume execution as if it were a
+					// regular p2pkh transaction.
+					pkScript, err := payToPubKeyHashScript(vm.witnessProgram)
+					if err != nil {
+						return false, err
+					}
+					pops, err := parseScript(pkScript)
+					if err != nil {
+						return false, err
+					}
+
+					// Set the stack to the provided witness
+					// stack, then append the pkScript
+					// generated above as the next script to execute.
+					vm.scripts = append(vm.scripts, pops)
+					vm.SetStack(witness)
+				case 32: // P2WSH
+					// The witness stack MUST NOT be empty at this point.
+					if len(witness) == 0 {
+						return false, fmt.Errorf("witness program empty")
+					}
+
+					// Ensure that the serialized pkScript
+					// at the end of the witness stack
+					// matches the witness program.
+					pkScript := witness[len(witness)-1]
+					witnessHash := fastsha256.Sum256(pkScript)
+					if !bytes.Equal(witnessHash[:], vm.witnessProgram) {
+						return false, fmt.Errorf("witness program mismatch")
+					}
+
+					pops, err := parseScript(pkScript)
+					if err != nil {
+						return false, err
+					}
+
+					// The hash matched successfully, so
+					// use the witness as the stack, and
+					// set the pkScript to be the next script
+					// executed.
+					vm.scripts = append(vm.scripts, pops)
+					vm.SetStack(witness[:len(witness)-1])
+				default:
+					return false, fmt.Errorf("invalid witness program length")
+				}
+			} else if vm.hasFlag(ScriptVerifyDiscourageUpgradeableWitnessProgram) {
+				return false, fmt.Errorf("new witness program versions invalid")
+			} else {
+				return true, nil
+			}
 		} else {
 			vm.scriptIdx++
 		}
@@ -587,7 +662,9 @@ func (vm *Engine) SetAltStack(data [][]byte) {
 // NewEngine returns a new script engine for the provided public key script,
 // transaction, and input index.  The flags modify the behavior of the script
 // engine according to the description provided by each flag.
-func NewEngine(scriptPubKey []byte, tx *wire.MsgTx, txIdx int, flags ScriptFlags, sigCache *SigCache) (*Engine, error) {
+func NewEngine(scriptPubKey []byte, tx *wire.MsgTx, txIdx int, flags ScriptFlags,
+	sigCache *SigCache, hashCache *HashCache, inputAmount int64) (*Engine, error) {
+
 	// The provided transaction input index must refer to a valid input.
 	if txIdx < 0 || txIdx >= len(tx.TxIn) {
 		return nil, ErrInvalidIndex
@@ -602,7 +679,8 @@ func NewEngine(scriptPubKey []byte, tx *wire.MsgTx, txIdx int, flags ScriptFlags
 	// allowing the clean stack flag without the P2SH flag would make it
 	// possible to have a situation where P2SH would not be a soft fork when
 	// it should be.
-	vm := Engine{flags: flags, sigCache: sigCache}
+	vm := Engine{flags: flags, sigCache: sigCache, hashCache: hashCache,
+		inputAmount: inputAmount}
 	if vm.hasFlag(ScriptVerifyCleanStack) && !vm.hasFlag(ScriptBip16) {
 		return nil, ErrInvalidFlags
 	}
@@ -643,7 +721,38 @@ func NewEngine(scriptPubKey []byte, tx *wire.MsgTx, txIdx int, flags ScriptFlags
 			return nil, ErrStackP2SHNonPushOnly
 		}
 		vm.bip16 = true
+
 	}
+
+	// Check to see if we should execute in witness verification mode
+	// according to the set flags. We check both the pkScript, and sigScript
+	// here since in the case of nested p2sh, the scriptSig will be a valid
+	// witness program. For nested p2sh, all the bytes after the first data
+	// push should *exactly* match the witness program template.
+	if vm.hasFlag(ScriptVerifyWitness) {
+		var err error
+		var witProgram []byte
+
+		switch {
+		case IsWitnessProgram(scriptPubKey):
+			if len(scriptSig) != 0 {
+				// TODO(roasbeef): real errors
+				return nil, fmt.Errorf("sigScript must be empty for witness program")
+			}
+			witProgram = scriptPubKey
+		case len(scriptSig) > 1 && IsWitnessProgram(scriptSig[1:]):
+			witProgram = scriptSig[1:]
+		}
+
+		if witProgram != nil {
+			vm.witness = true
+			vm.witnessVersion, vm.witnessProgram, err = ExtractWitnessProgramInfo(witProgram)
+			if err != nil {
+				return nil, err
+			}
+		}
+	}
+
 	if vm.hasFlag(ScriptVerifyMinimalData) {
 		vm.dstack.verifyMinimalData = true
 		vm.astack.verifyMinimalData = true
