@@ -1061,7 +1061,8 @@ func (b *BlockChain) createChainState() error {
 
 	// Initialize the state related to the best block.
 	numTxns := uint64(len(genesisBlock.MsgBlock().Transactions))
-	blockSize := uint64(genesisBlock.MsgBlock().SerializeSize())
+	// TODO(roasbeef): add block cost into best state, or just replace?
+	blockSize := uint64(genesisBlock.MsgBlock().SerializeSizeWitness())
 	b.stateSnapshot = newBestState(b.bestNode, blockSize, numTxns, numTxns)
 
 	// Create the initial the database chain state including creating the
@@ -1230,6 +1231,8 @@ func dbFetchBlockByHash(dbTx database.Tx, hash *wire.ShaHash) (*btcutil.Block, e
 	}
 
 	// Create the encapsulated block and set the height appropriately.
+	// TODO(roasbeef): need to default this to witness
+	//  * or just make use witness des always internally?
 	block, err := btcutil.NewBlockFromBytes(blockBytes)
 	if err != nil {
 		return nil, err
