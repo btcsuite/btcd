@@ -1438,6 +1438,7 @@ out:
 		s.addrIndexer.Stop()
 	}
 	s.blockManager.Stop()
+	s.connManager.Stop()
 
 	// Drain channels before exiting so nothing is left waiting around
 	// to send.

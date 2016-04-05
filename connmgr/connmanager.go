@@ -47,11 +47,12 @@ type ConnManager struct {
 	wg               sync.WaitGroup
 	newConnections   chan *ConnResult
 	closeConnections chan string
+	wakeup           chan struct{}
+	quit             chan struct{}
 
 	amgr           *addrmgr.AddrManager
 	connections    map[string]net.Conn
 	outboundGroups map[string]int
-	wakeup         chan struct{}
 
 	NewConnectionHandler func(<-chan *ConnResult)
 }
@@ -101,6 +102,7 @@ func (cm *ConnManager) seedFromDNS(DNSSeeds []string) {
 // connectionManager manages a fixed number of outbound connections.
 func (cm *ConnManager) connectionManager() {
 	time.AfterFunc(10*time.Second, func() { cm.wakeup <- struct{}{} })
+out:
 	for {
 		select {
 		case <-cm.wakeup:
@@ -132,6 +134,9 @@ func (cm *ConnManager) connectionManager() {
 				go cm.NewConnectionHandler(cr)
 			}
 			time.AfterFunc(10*time.Second, func() { cm.wakeup <- struct{}{} })
+
+		case <-cm.quit:
+			break out
 		}
 	}
 	cm.wg.Done()
@@ -141,6 +146,7 @@ func (cm *ConnManager) connectionManager() {
 // connections or closed connections and maps addresses to their
 // respective connections.
 func (cm *ConnManager) connectionHandler() {
+out:
 	for {
 		select {
 		case cr := <-cm.newConnections:
@@ -153,6 +159,9 @@ func (cm *ConnManager) connectionHandler() {
 				log.Infof("Error closing connection %s: %v", addr, err)
 			}
 			delete(cm.connections, addr)
+
+		case <-cm.quit:
+			break out
 		}
 	}
 	cm.wg.Done()
@@ -170,6 +179,13 @@ func (cm *ConnManager) Start() {
 // WaitForShutdown blocks until the connection handlers are stopped.
 func (cm *ConnManager) WaitForShutdown() {
 	cm.wg.Wait()
+}
+
+// Stop gracefully shuts down the connection manager.
+func (cm *ConnManager) Stop() {
+	log.Warnf("Connection Manager shutting down")
+	close(cm.quit)
+	return
 }
 
 // Connect handles a connection request to the given addr and
@@ -202,6 +218,7 @@ func New(amgr *addrmgr.AddrManager, connHandler func(<-chan *ConnResult)) (*Conn
 		newConnections:   make(chan *ConnResult, MaxConnections),
 		closeConnections: make(chan string, MaxConnections),
 
+		quit:                 make(chan struct{}),
 		wakeup:               make(chan struct{}),
 		amgr:                 amgr,
 		connections:          make(map[string]net.Conn, MaxConnections),
