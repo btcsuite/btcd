@@ -64,6 +64,14 @@ const (
 	// ScriptVerifyStrictEncoding defines that signature scripts and
 	// public keys must follow the strict encoding requirements.
 	ScriptVerifyStrictEncoding
+
+	// ScriptVerifyWitness defines whether or not to verify a transaction
+	// output using a witness program template.
+	ScriptVerifyWitness
+
+	// ScriptVerifyDiscourageUpgradeableWitnessProgram makes witness
+	// program with versions 2-16 non-standard.
+	ScriptVerifyDiscourageUpgradeableWitnessProgram
 )
 
 const (
