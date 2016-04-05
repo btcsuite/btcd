@@ -303,6 +303,7 @@ func newNetAddress(addr net.Addr, services wire.ServiceFlag) (*wire.NetAddress, 
 type outMsg struct {
 	msg      wire.Message
 	doneChan chan<- struct{}
+	encoding wire.MessageEncoding
 }
 
 // stallControlCmd represents the command of a stall control message.
@@ -1116,9 +1117,9 @@ func (p *Peer) handlePongMsg(msg *wire.MsgPong) {
 }
 
 // readMessage reads the next bitcoin message from the peer with logging.
-func (p *Peer) readMessage() (wire.Message, []byte, error) {
-	n, msg, buf, err := wire.ReadMessageN(p.conn, p.ProtocolVersion(),
-		p.cfg.ChainParams.Net)
+func (p *Peer) readMessage(encoding wire.MessageEncoding) (wire.Message, []byte, error) {
+	n, msg, buf, err := wire.ReadMessageWithEncodingN(p.conn,
+		p.ProtocolVersion(), p.cfg.ChainParams.Net, encoding)
 	atomic.AddUint64(&p.bytesReceived, uint64(n))
 	if p.cfg.Listeners.OnRead != nil {
 		p.cfg.Listeners.OnRead(p, n, msg, err)
@@ -1149,7 +1150,7 @@ func (p *Peer) readMessage() (wire.Message, []byte, error) {
 }
 
 // writeMessage sends a bitcoin message to the peer with logging.
-func (p *Peer) writeMessage(msg wire.Message) error {
+func (p *Peer) writeMessage(msg wire.Message, enc wire.MessageEncoding) error {
 	// Don't do anything if we're disconnecting.
 	if atomic.LoadInt32(&p.disconnect) != 0 {
 		return nil
@@ -1192,8 +1193,8 @@ func (p *Peer) writeMessage(msg wire.Message) error {
 	}))
 
 	// Write the message to the peer.
-	n, err := wire.WriteMessageN(p.conn, msg, p.ProtocolVersion(),
-		p.cfg.ChainParams.Net)
+	n, err := wire.WriteMessageWithEncodingN(p.conn, msg,
+		p.ProtocolVersion(), p.cfg.ChainParams.Net, enc)
 	atomic.AddUint64(&p.bytesSent, uint64(n))
 	if p.cfg.Listeners.OnWrite != nil {
 		p.cfg.Listeners.OnWrite(p, n, msg, err)
@@ -1455,12 +1456,13 @@ func (p *Peer) inHandler() {
 		p.Disconnect()
 	})
 
+	encoding := wire.BaseEncoding
 out:
 	for atomic.LoadInt32(&p.disconnect) == 0 {
 		// Read a message and stop the idle timer as soon as the read
 		// is done.  The timer is reset below for the next iteration if
 		// needed.
-		rmsg, buf, err := p.readMessage()
+		rmsg, buf, err := p.readMessage(encoding)
 		idleTimer.Stop()
 		if err != nil {
 			// In order to allow regression tests with malformed
@@ -1869,7 +1871,7 @@ out:
 			}
 
 			p.stallControl <- stallControlMsg{sccSendMessage, msg.msg}
-			err := p.writeMessage(msg.msg)
+			err := p.writeMessage(msg.msg, msg.encoding)
 			if err != nil {
 				p.Disconnect()
 				if p.shouldLogWriteError(err) {
@@ -1955,7 +1957,7 @@ func (p *Peer) QueueMessageWithEncoding(msg wire.Message, doneChan chan<- struct
 		}
 		return
 	}
-	p.outputQueue <- outMsg{msg: msg, doneChan: doneChan}
+	p.outputQueue <- outMsg{msg: msg, encoding: encoding, doneChan: doneChan}
 }
 
 // QueueInventory adds the passed inventory to the inventory send queue which
