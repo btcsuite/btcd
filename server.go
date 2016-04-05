@@ -2497,6 +2497,8 @@ func newServer(listenAddrs []string, db database.DB, chainParams *chaincfg.Param
 		timeSource:           blockchain.NewMedianTime(),
 		services:             services,
 		sigCache:             txscript.NewSigCache(cfg.SigCacheMaxSize),
+		// TODO(roasbeef): actually make a paramter
+		hashCache: txscript.NewHashCache(cfg.SigCacheMaxSize),
 	}
 
 	// Create the transaction and address indexes if needed.
@@ -2546,6 +2548,7 @@ func newServer(listenAddrs []string, db database.DB, chainParams *chaincfg.Param
 		Chain:                s.blockManager.chain,
 		RelayNtfnChan:        s.relayNtfnChan,
 		SigCache:             s.sigCache,
+		HashCache:            s.hashCache,
 		TimeSource:           s.timeSource,
 		AddrIndex:            s.addrIndex,
 	}
