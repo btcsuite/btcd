@@ -9,6 +9,8 @@ import (
 	"fmt"
 )
 
+// TODO(roasbeef): new segwitty errors
+
 var (
 	// ErrStackShortScript is returned if the script has an opcode that is
 	// too long for the length of the script.
