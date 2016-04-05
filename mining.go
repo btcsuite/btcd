@@ -577,9 +577,10 @@ mempoolLoop:
 
 		// Enforce maximum signature operations per block.  Also check
 		// for overflow.
-		numSigOps := int64(blockchain.CountSigOps(tx))
+		// TODO(roasbeef): actual sig op counting
+		numSigOps := int64(blockchain.CountSigOps(tx)) * blockchain.WitnessScaleFactor
 		if blockSigOps+numSigOps < blockSigOps ||
-			blockSigOps+numSigOps > blockchain.MaxSigOpsPerBlock {
+			blockSigOps+numSigOps > blockchain.MaxBlockSigOpsCost {
 			minrLog.Tracef("Skipping tx %s because it would "+
 				"exceed the maximum sigops per block", tx.Sha())
 			logSkippedDeps(tx, deps)
@@ -593,9 +594,9 @@ mempoolLoop:
 			logSkippedDeps(tx, deps)
 			continue
 		}
-		numSigOps += int64(numP2SHSigOps)
+		numSigOps += int64(numP2SHSigOps) * blockchain.WitnessScaleFactor
 		if blockSigOps+numSigOps < blockSigOps ||
-			blockSigOps+numSigOps > blockchain.MaxSigOpsPerBlock {
+			blockSigOps+numSigOps > blockchain.MaxBlockSigOpsCost {
 			minrLog.Tracef("Skipping tx %s because it would "+
 				"exceed the maximum sigops per block (p2sh)",
 				tx.Sha())
@@ -658,7 +659,8 @@ mempoolLoop:
 			continue
 		}
 		err = blockchain.ValidateTransactionScripts(tx, blockUtxos,
-			txscript.StandardVerifyFlags, server.sigCache)
+			txscript.StandardVerifyFlags, server.sigCache,
+			server.hashCache)
 		if err != nil {
 			minrLog.Tracef("Skipping tx %s due to error in "+
 				"ValidateTransactionScripts: %v", tx.Sha(), err)
@@ -723,7 +725,7 @@ mempoolLoop:
 	}
 
 	// Create a new block ready to be solved.
-	merkles := blockchain.BuildMerkleTreeStore(blockTxns)
+	merkles := blockchain.BuildMerkleTreeStore(blockTxns, false)
 	var msgBlock wire.MsgBlock
 	msgBlock.Header = wire.BlockHeader{
 		Version:    generatedBlockVersion,
@@ -813,9 +815,11 @@ func UpdateExtraNonce(msgBlock *wire.MsgBlock, blockHeight int32, extraNonce uin
 	// recalculating all of the other transaction hashes.
 	// block.Transactions[0].InvalidateCache()
 
+	// TODO(roasbeef): factor in witness nonce
+
 	// Recalculate the merkle root with the updated extra nonce.
 	block := btcutil.NewBlock(msgBlock)
-	merkles := blockchain.BuildMerkleTreeStore(block.Transactions())
+	merkles := blockchain.BuildMerkleTreeStore(block.Transactions(), false)
 	msgBlock.Header.MerkleRoot = *merkles[len(merkles)-1]
 	return nil
 }
