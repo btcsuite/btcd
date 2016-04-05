@@ -509,7 +509,7 @@ func peerExists(peers []*serverPeer, addr string, nodeID int32) bool {
 // latest protocol version and returns a hex-encoded string of the result.
 func messageToHex(msg wire.Message) (string, error) {
 	var buf bytes.Buffer
-	if err := msg.BtcEncode(&buf, maxProtocolVersion); err != nil {
+	if err := msg.BtcEncode(&buf, maxProtocolVersion, wire.LatestEncoding); err != nil {
 		context := fmt.Sprintf("Failed to encode msg of type %T", msg)
 		return "", internalRPCError(err.Error(), context)
 	}
@@ -540,7 +540,7 @@ func handleCreateRawTransaction(s *rpcServer, cmd interface{}, closeChan <-chan 
 		}
 
 		prevOut := wire.NewOutPoint(txHash, uint32(input.Vout))
-		txIn := wire.NewTxIn(prevOut, []byte{})
+		txIn := wire.NewTxIn(prevOut, []byte{}, nil)
 		if c.LockTime != nil && *c.LockTime != 0 {
 			txIn.Sequence = wire.MaxTxInSequenceNum - 1
 		}
@@ -1447,7 +1447,7 @@ func (state *gbtWorkState) updateBlockTemplate(s *rpcServer, useCoinbaseValue bo
 
 			// Update the merkle root.
 			block := btcutil.NewBlock(template.block)
-			merkles := blockchain.BuildMerkleTreeStore(block.Transactions())
+			merkles := blockchain.BuildMerkleTreeStore(block.Transactions(), false)
 			template.block.Header.MerkleRoot = *merkles[len(merkles)-1]
 		}
 
@@ -1555,7 +1555,8 @@ func (state *gbtWorkState) blockTemplateResult(useCoinbaseValue bool, submitOld 
 		CurTime:      header.Timestamp.Unix(),
 		Height:       int64(template.height),
 		PreviousHash: header.PrevBlock.String(),
-		SigOpLimit:   blockchain.MaxSigOpsPerBlock,
+		// TODO(roasbeef): fix should be cost now
+		//SigOpLimit:   blockchain.MaxSigOpsPerBlock,
 		SizeLimit:    wire.MaxBlockPayload,
 		Transactions: transactions,
 		Version:      header.Version,
@@ -2770,12 +2771,13 @@ func handleGetWorkSubmission(s *rpcServer, hexData string) (interface{}, error) 
 	}
 
 	// Reconstruct the block using the submitted header stored block info.
+	// TODO(roasbeef): make the witness root, witnonce nonce, etc
 	msgBlock := blockInfo.msgBlock
 	block := btcutil.NewBlock(msgBlock)
 	msgBlock.Header.Timestamp = submittedHeader.Timestamp
 	msgBlock.Header.Nonce = submittedHeader.Nonce
 	msgBlock.Transactions[0].TxIn[0].SignatureScript = blockInfo.signatureScript
-	merkles := blockchain.BuildMerkleTreeStore(block.Transactions())
+	merkles := blockchain.BuildMerkleTreeStore(block.Transactions(), false)
 	msgBlock.Header.MerkleRoot = *merkles[len(merkles)-1]
 
 	// Ensure the submitted block hash is less than the target difficulty.
