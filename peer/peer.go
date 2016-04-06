@@ -298,7 +298,7 @@ func newNetAddress(addr net.Addr, services wire.ServiceFlag) (*wire.NetAddress, 
 // shutdown)
 type outMsg struct {
 	msg      wire.Message
-	doneChan chan struct{}
+	doneChan chan<- struct{}
 }
 
 // stallControlCmd represents the command of a stall control message.
@@ -1897,7 +1897,7 @@ cleanup:
 // QueueMessage adds the passed bitcoin message to the peer send queue.
 //
 // This function is safe for concurrent access.
-func (p *Peer) QueueMessage(msg wire.Message, doneChan chan struct{}) {
+func (p *Peer) QueueMessage(msg wire.Message, doneChan chan<- struct{}) {
 	// Avoid risk of deadlock if goroutine already exited.  The goroutine
 	// we will be sending to hangs around until it knows for a fact that
 	// it is marked as disconnected and *then* it drains the channels.

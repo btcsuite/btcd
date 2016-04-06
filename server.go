@@ -921,7 +921,7 @@ func (s *server) RemoveRebroadcastInventory(iv *wire.InvVect) {
 
 // pushTxMsg sends a tx message for the provided transaction hash to the
 // connected peer.  An error is returned if the transaction hash is not known.
-func (s *server) pushTxMsg(sp *serverPeer, sha *wire.ShaHash, doneChan, waitChan chan struct{}) error {
+func (s *server) pushTxMsg(sp *serverPeer, sha *wire.ShaHash, doneChan chan<- struct{}, waitChan <-chan struct{}) error {
 	// Attempt to fetch the requested transaction from the pool.  A
 	// call could be made to check for existence first, but simply trying
 	// to fetch a missing transaction results in the same behavior.
@@ -948,7 +948,7 @@ func (s *server) pushTxMsg(sp *serverPeer, sha *wire.ShaHash, doneChan, waitChan
 
 // pushBlockMsg sends a block message for the provided block hash to the
 // connected peer.  An error is returned if the block hash is not known.
-func (s *server) pushBlockMsg(sp *serverPeer, sha *wire.ShaHash, doneChan, waitChan chan struct{}) error {
+func (s *server) pushBlockMsg(sp *serverPeer, sha *wire.ShaHash, doneChan chan<- struct{}, waitChan <-chan struct{}) error {
 	blk, err := s.db.FetchBlockBySha(sha)
 	if err != nil {
 		peerLog.Tracef("Unable to fetch requested block sha %v: %v",
@@ -967,7 +967,7 @@ func (s *server) pushBlockMsg(sp *serverPeer, sha *wire.ShaHash, doneChan, waitC
 
 	// We only send the channel for this message if we aren't sending
 	// an inv straight after.
-	var dc chan struct{}
+	var dc chan<- struct{}
 	continueHash := sp.continueHash
 	sendInv := continueHash != nil && continueHash.IsEqual(sha)
 	if !sendInv {
@@ -999,7 +999,7 @@ func (s *server) pushBlockMsg(sp *serverPeer, sha *wire.ShaHash, doneChan, waitC
 // the connected peer.  Since a merkle block requires the peer to have a filter
 // loaded, this call will simply be ignored if there is no filter loaded.  An
 // error is returned if the block hash is not known.
-func (s *server) pushMerkleBlockMsg(sp *serverPeer, sha *wire.ShaHash, doneChan, waitChan chan struct{}) error {
+func (s *server) pushMerkleBlockMsg(sp *serverPeer, sha *wire.ShaHash, doneChan chan<- struct{}, waitChan <-chan struct{}) error {
 	// Do not send a response if the peer doesn't have a filter loaded.
 	if !sp.filter.IsLoaded() {
 		if doneChan != nil {
@@ -1030,7 +1030,7 @@ func (s *server) pushMerkleBlockMsg(sp *serverPeer, sha *wire.ShaHash, doneChan,
 
 	// Send the merkleblock.  Only send the done channel with this message
 	// if no transactions will be sent afterwards.
-	var dc chan struct{}
+	var dc chan<- struct{}
 	if len(matchedTxIndices) == 0 {
 		dc = doneChan
 	}
@@ -1040,7 +1040,7 @@ func (s *server) pushMerkleBlockMsg(sp *serverPeer, sha *wire.ShaHash, doneChan,
 	blkTransactions := blk.MsgBlock().Transactions
 	for i, txIndex := range matchedTxIndices {
 		// Only send the done channel on the final transaction.
-		var dc chan struct{}
+		var dc chan<- struct{}
 		if i == len(matchedTxIndices)-1 {
 			dc = doneChan
 		}
