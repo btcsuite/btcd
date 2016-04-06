@@ -121,6 +121,9 @@ const (
 	// TestNet3 represents the test network (version 3).
 	TestNet3 BitcoinNet = 0x0709110b
 
+	// SegNet4 represents the segregated witness test network (version 4).
+	SegNet4 BitcoinNet = 0xc4a1abdc
+
 	// SimNet represents the simulation test network.
 	SimNet BitcoinNet = 0x12141c16
 )
@@ -132,6 +135,7 @@ var bnStrings = map[BitcoinNet]string{
 	TestNet:  "TestNet",
 	TestNet3: "TestNet3",
 	SimNet:   "SimNet",
+	SegNet4:  "SegNet4",
 }
 
 // String returns the BitcoinNet in human-readable form.
