@@ -26,7 +26,7 @@ import (
 
 const (
 	// MaxProtocolVersion is the max protocol version the peer supports.
-	MaxProtocolVersion = 70011
+	MaxProtocolVersion = wire.SendHeadersVersion
 
 	// outputBufferSize is the number of elements the output channels use.
 	outputBufferSize = 50
@@ -174,6 +174,10 @@ type MessageListeners struct {
 
 	// OnReject is invoked when a peer receives a reject bitcoin message.
 	OnReject func(p *Peer, msg *wire.MsgReject)
+
+	// OnSendHeaders is invoked when a peer receives a sendheaders bitcoin
+	// message.
+	OnSendHeaders func(p *Peer, msg *wire.MsgSendHeaders)
 
 	// OnRead is invoked when a peer receives a bitcoin message.  It
 	// consists of the number of bytes read, the message, and whether or not
@@ -401,15 +405,16 @@ type Peer struct {
 	cfg     Config
 	inbound bool
 
-	flagsMtx        sync.Mutex // protects the peer flags below
-	na              *wire.NetAddress
-	id              int32
-	userAgent       string
-	services        wire.ServiceFlag
-	versionKnown    bool
-	protocolVersion uint32
-	versionSent     bool
-	verAckReceived  bool
+	flagsMtx             sync.Mutex // protects the peer flags below
+	na                   *wire.NetAddress
+	id                   int32
+	userAgent            string
+	services             wire.ServiceFlag
+	versionKnown         bool
+	protocolVersion      uint32
+	sendHeadersPreferred bool // peer sent a sendheaders message
+	versionSent          bool
+	verAckReceived       bool
 
 	knownInventory     *mruInventoryMap
 	prevGetBlocksMtx   sync.Mutex
@@ -723,6 +728,17 @@ func (p *Peer) StartingHeight() int32 {
 	defer p.statsMtx.RUnlock()
 
 	return p.startingHeight
+}
+
+// WantsHeaders returns if the peer wants header messages instead of
+// inventory vectors for blocks.
+//
+// This function is safe for concurrent access.
+func (p *Peer) WantsHeaders() bool {
+	p.flagsMtx.Lock()
+	defer p.flagsMtx.Unlock()
+
+	return p.sendHeadersPreferred
 }
 
 // pushVersionMsg sends a version message to the connected peer using the
@@ -1632,6 +1648,15 @@ out:
 		case *wire.MsgReject:
 			if p.cfg.Listeners.OnReject != nil {
 				p.cfg.Listeners.OnReject(p, msg)
+			}
+
+		case *wire.MsgSendHeaders:
+			p.flagsMtx.Lock()
+			p.sendHeadersPreferred = true
+			p.flagsMtx.Unlock()
+
+			if p.cfg.Listeners.OnSendHeaders != nil {
+				p.cfg.Listeners.OnSendHeaders(p, msg)
 			}
 
 		default:
