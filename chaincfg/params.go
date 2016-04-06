@@ -34,6 +34,10 @@ var (
 	// simNetPowLimit is the highest proof of work value a Bitcoin block
 	// can have for the simulation test network.  It is the value 2^255 - 1.
 	simNetPowLimit = new(big.Int).Sub(new(big.Int).Lsh(bigOne, 255), bigOne)
+
+	// segnet4 has a pow limit of 1e01ffff which is 19 0-bits in front, I think
+	// TODO(roasbeef): comment fixes
+	segnet4PowLimit = new(big.Int).Sub(new(big.Int).Lsh(bigOne, 233), bigOne)
 )
 
 // Checkpoint identifies a known good point in the block chain.  Using
@@ -272,6 +276,57 @@ var TestNet3Params = Params{
 	HDCoinType: 1,
 }
 
+// SegNet4Params defines the network parameters for the test Bitcoin network
+// (version 4).  Not to be confused with the regression test network, this
+// network is sometimes simply called "testnet".
+var SegNet4Params = Params{
+	Name:        "segnet",
+	Net:         wire.SegNet4,
+	DefaultPort: "28901",
+	DNSSeeds:    []string{"37.34.48.17"},
+
+	// Chain parameters
+	GenesisBlock:           &segNetGenesisBlock,
+	GenesisHash:            &segNetGenesisHash,
+	PowLimit:               segnet4PowLimit,
+	PowLimitBits:           0x1e01ffff,
+	SubsidyHalvingInterval: 210000,
+	ResetMinDifficulty:     true,
+	GenerateSupported:      false,
+
+	// Checkpoints ordered from oldest to newest.
+	// no checkpoints for segnet yet
+	Checkpoints: []Checkpoint{},
+
+	// Enforce current block version once majority of the network has
+	// upgraded.
+	// 70% (7 / 10)
+	// Reject previous block versions once a majority of the network has
+	// upgraded.
+	// 90% (9 / 10)
+	BlockEnforceNumRequired: 7,
+	BlockRejectNumRequired:  9,
+	BlockUpgradeNumToCheck:  10,
+
+	// Mempool parameters
+	RelayNonStdTxs: true,
+
+	// Address encoding magics
+	PubKeyHashAddrID:        0x1e, // starts with D
+	ScriptHashAddrID:        0x32, // starts with ?
+	PrivateKeyID:            0x9e, // starts with ?
+	WitnessPubKeyHashAddrID: 0x02, // starts with Gg
+	WitnessScriptHashAddrID: 0x27, // starts with ?
+
+	// BIP32 hierarchical deterministic extended key magics
+	HDPrivateKeyID: [4]byte{0x05, 0x35, 0x83, 0x94}, // starts with sprv
+	HDPublicKeyID:  [4]byte{0x05, 0x35, 0x87, 0xcf}, // starts with spub
+
+	// BIP44 coin type used in the hierarchical deterministic path for
+	// address generation.
+	HDCoinType: 1,
+}
+
 // SimNetParams defines the network parameters for the simulation test Bitcoin
 // network.  This network is similar to the normal test network except it is
 // intended for private use within a group of individuals doing simulation
@@ -342,18 +397,21 @@ var (
 		TestNet3Params.Net:      {},
 		RegressionNetParams.Net: {},
 		SimNetParams.Net:        {},
+		SegNet4Params.Net:       {},
 	}
 
 	pubKeyHashAddrIDs = map[byte]struct{}{
 		MainNetParams.PubKeyHashAddrID:  {},
 		TestNet3Params.PubKeyHashAddrID: {}, // shared with regtest
 		SimNetParams.PubKeyHashAddrID:   {},
+		SegNet4Params.PubKeyHashAddrID:  {},
 	}
 
 	scriptHashAddrIDs = map[byte]struct{}{
 		MainNetParams.ScriptHashAddrID:  {},
 		TestNet3Params.ScriptHashAddrID: {}, // shared with regtest
 		SimNetParams.ScriptHashAddrID:   {},
+		SegNet4Params.ScriptHashAddrID:  {},
 	}
 
 	// Testnet is shared with regtest.
@@ -361,6 +419,7 @@ var (
 		MainNetParams.HDPrivateKeyID:  MainNetParams.HDPublicKeyID[:],
 		TestNet3Params.HDPrivateKeyID: TestNet3Params.HDPublicKeyID[:],
 		SimNetParams.HDPrivateKeyID:   SimNetParams.HDPublicKeyID[:],
+		SegNet4Params.HDPrivateKeyID:  SegNet4Params.HDPublicKeyID[:],
 	}
 )
 
