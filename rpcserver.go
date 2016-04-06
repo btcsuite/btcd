@@ -31,7 +31,6 @@ import (
 	"github.com/btcsuite/btcd/btcec"
 	"github.com/btcsuite/btcd/btcjson"
 	"github.com/btcsuite/btcd/chaincfg"
-	"github.com/btcsuite/btcd/connmgr"
 	"github.com/btcsuite/btcd/database"
 	"github.com/btcsuite/btcd/mining"
 	"github.com/btcsuite/btcd/txscript"
@@ -934,7 +933,7 @@ func handleGetAddedNodeInfo(s *rpcServer, cmd interface{}, closeChan <-chan stru
 		// Do a DNS lookup for the address.  If the lookup fails, just
 		// use the host.
 		var ipList []string
-		ips, err := connmgr.Lookup(host)
+		ips, err := cfg.lookup(host)
 		if err == nil {
 			ipList = make([]string, 0, len(ips))
 			for _, ip := range ips {

@@ -17,22 +17,29 @@ import (
 	"github.com/btcsuite/btcd/wire"
 )
 
-var (
-	//MaxOutboundPeers is the number of max outbound connections.
-	MaxOutboundPeers = 8
+// LookupFunc defines a function that looks up the host.
+type LookupFunc func(string) ([]net.IP, error)
+
+// DialFunc defines a function that dials a connection.
+type DialFunc func(string, string) (net.Conn, error)
+
+// Config holds the configuration options related to the connection manager.
+type Config struct {
+	// MaxOutboundPeers is the number of max outbound connections.
+	MaxOutboundPeers int
 
 	// MaxConnections is the number of max connections.
-	MaxConnections = 125
+	MaxConnections int
 
 	// Lookup looks up the host using the local resolver.
-	Lookup = net.LookupIP
+	Lookup LookupFunc
 
 	// Dial connects to the address on the named network.
-	Dial = net.Dial
+	Dial DialFunc
 
 	// ChainParams identifies the chain params to use.
-	ChainParams = &chaincfg.MainNetParams
-)
+	ChainParams *chaincfg.Params
+}
 
 // ConnResult handles the result of an Connect request.
 type ConnResult struct {
@@ -44,26 +51,27 @@ type ConnResult struct {
 
 // ConnManager provides a generic connection manager for the bitcoin network.
 type ConnManager struct {
-	wg               sync.WaitGroup
-	newConnections   chan *ConnResult
-	closeConnections chan string
-	wakeup           chan struct{}
-	quit             chan struct{}
+	cfg  *Config
+	amgr *addrmgr.AddrManager
 
-	amgr           *addrmgr.AddrManager
-	connections    map[string]net.Conn
-	outboundGroups map[string]int
+	wg     sync.WaitGroup
+	wakeup chan struct{}
+	quit   chan struct{}
 
+	newConnections       chan *ConnResult
+	closeConnections     chan string
+	connections          map[string]net.Conn
+	outboundGroups       map[string]int
 	NewConnectionHandler func(<-chan *ConnResult)
 }
 
 // seedFromDNS uses DNS seeding to populate the address manager with peers.
-func (cm *ConnManager) seedFromDNS(DNSSeeds []string) {
-	for _, seeder := range DNSSeeds {
+func (cm *ConnManager) seedFromDNS() {
+	for _, seeder := range cm.cfg.ChainParams.DNSSeeds {
 		go func(seeder string) {
 			randSource := mrand.New(mrand.NewSource(time.Now().UnixNano()))
 
-			seedpeers, err := DnsDiscover(seeder)
+			seedpeers, err := DnsDiscover(seeder, cm.cfg.Lookup)
 			if err != nil {
 				log.Infof("DNS discovery failed on seed %s: %v", seeder, err)
 				return
@@ -77,7 +85,7 @@ func (cm *ConnManager) seedFromDNS(DNSSeeds []string) {
 			}
 			addresses := make([]*wire.NetAddress, len(seedpeers))
 			// if this errors then we have *real* problems
-			intPort, _ := strconv.Atoi(ChainParams.DefaultPort)
+			intPort, _ := strconv.Atoi(cm.cfg.ChainParams.DefaultPort)
 			for i, peer := range seedpeers {
 				addresses[i] = new(wire.NetAddress)
 				addresses[i].SetAddress(peer, uint16(intPort))
@@ -106,7 +114,7 @@ out:
 	for {
 		select {
 		case <-cm.wakeup:
-			if len(cm.connections) < MaxOutboundPeers {
+			if len(cm.connections) < cm.cfg.MaxOutboundPeers {
 				addr := cm.amgr.GetAddress("any")
 				if addr == nil {
 					break
@@ -126,7 +134,7 @@ out:
 
 				// allow nondefault ports after 50 failed tries.
 				if fmt.Sprintf("%d", addr.NetAddress().Port) !=
-					ChainParams.DefaultPort {
+					cm.cfg.ChainParams.DefaultPort {
 					continue
 				}
 
@@ -169,7 +177,7 @@ out:
 
 // Start launches the connection manager.
 func (cm *ConnManager) Start() {
-	cm.seedFromDNS(ChainParams.DNSSeeds)
+	cm.seedFromDNS()
 
 	cm.wg.Add(2)
 	go cm.connectionHandler()
@@ -185,7 +193,6 @@ func (cm *ConnManager) WaitForShutdown() {
 func (cm *ConnManager) Stop() {
 	log.Warnf("Connection Manager shutting down")
 	close(cm.quit)
-	return
 }
 
 // Connect handles a connection request to the given addr and
@@ -193,7 +200,7 @@ func (cm *ConnManager) Stop() {
 func (cm *ConnManager) Connect(addr string, permanent bool) <-chan *ConnResult {
 	c := make(chan *ConnResult)
 	go func() {
-		conn, err := Dial("tcp", addr)
+		conn, err := cm.cfg.Dial("tcp", addr)
 		result := &ConnResult{
 			Addr:      addr,
 			Permanent: permanent,
@@ -213,15 +220,15 @@ func (cm *ConnManager) Disconnect(addr string) {
 
 // New returns a new bitcoin connection manager.
 // Use Start to begin processing asynchronous connection management.
-func New(amgr *addrmgr.AddrManager, connHandler func(<-chan *ConnResult)) (*ConnManager, error) {
+func New(cfg *Config, amgr *addrmgr.AddrManager, connHandler func(<-chan *ConnResult)) (*ConnManager, error) {
 	cm := ConnManager{
-		newConnections:   make(chan *ConnResult, MaxConnections),
-		closeConnections: make(chan string, MaxConnections),
+		newConnections:   make(chan *ConnResult, cfg.MaxConnections),
+		closeConnections: make(chan string, cfg.MaxConnections),
 
 		quit:                 make(chan struct{}),
 		wakeup:               make(chan struct{}),
 		amgr:                 amgr,
-		connections:          make(map[string]net.Conn, MaxConnections),
+		connections:          make(map[string]net.Conn, cfg.MaxConnections),
 		outboundGroups:       make(map[string]int),
 		NewConnectionHandler: connHandler,
 	}
