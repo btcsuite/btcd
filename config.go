@@ -878,20 +878,5 @@ func loadConfig() (*config, []string, error) {
 		btcdLog.Warnf("%v", configFileError)
 	}
 
-	// Provide connection manager config
-	connmgr.Dial = func(network, address string) (net.Conn, error) {
-		if strings.Contains(address, ".onion:") {
-			return cfg.oniondial(network, address)
-		}
-		return cfg.dial(network, address)
-	}
-	connmgr.Lookup = func(host string) ([]net.IP, error) {
-		if strings.HasSuffix(host, ".onion") {
-			return cfg.onionlookup(host)
-		}
-		return cfg.lookup(host)
-	}
-	connmgr.ChainParams = activeNetParams.Params
-
 	return &cfg, remainingArgs, nil
 }

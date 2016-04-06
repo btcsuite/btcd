@@ -1971,7 +1971,7 @@ func newServer(listenAddrs []string, db database.DB, chainParams *chaincfg.Param
 		services &^= wire.SFNodeBloom
 	}
 
-	amgr := addrmgr.New(cfg.DataDir, connmgr.Lookup)
+	amgr := addrmgr.New(cfg.DataDir, cfg.lookup)
 
 	var listeners []net.Listener
 	var nat NAT
@@ -2169,7 +2169,27 @@ func newServer(listenAddrs []string, db database.DB, chainParams *chaincfg.Param
 		}
 		srvrLog.Debugf("Connected to %s", sp.Addr())
 	}
-	cm, err := connmgr.New(amgr, connHandler)
+
+	// Provide connection manager config
+	connmgrCfg := &connmgr.Config{
+		MaxOutboundPeers: 8,
+		MaxConnections:   125,
+		ChainParams:      activeNetParams.Params,
+		Dial: func(network, address string) (net.Conn, error) {
+			if strings.Contains(address, ".onion:") {
+				return cfg.oniondial(network, address)
+			}
+			return cfg.dial(network, address)
+		},
+		Lookup: func(host string) ([]net.IP, error) {
+			if strings.HasSuffix(host, ".onion") {
+				return cfg.onionlookup(host)
+			}
+			return cfg.lookup(host)
+		},
+	}
+
+	cm, err := connmgr.New(connmgrCfg, amgr, connHandler)
 	if err != nil {
 		return nil, err
 	}
