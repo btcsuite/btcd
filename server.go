@@ -1253,19 +1253,17 @@ func (s *server) handleRelayInvMsg(state *peerState, msg relayMsg) {
 // from the peerHandler goroutine.
 func (s *server) handleBroadcastMsg(state *peerState, bmsg *broadcastMsg) {
 	state.forAllPeers(func(sp *serverPeer) {
-		excluded := false
+		if !sp.Connected() {
+			return
+		}
+
 		for _, ep := range bmsg.excludePeers {
 			if sp == ep {
-				excluded = true
+				return
 			}
 		}
-		// Don't broadcast to still connecting outbound peers .
-		if !sp.Connected() {
-			excluded = true
-		}
-		if !excluded {
-			sp.QueueMessage(bmsg.message, nil)
-		}
+
+		sp.QueueMessage(bmsg.message, nil)
 	})
 }
 
