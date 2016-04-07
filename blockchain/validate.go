@@ -1182,6 +1182,7 @@ func (b *BlockChain) checkConnectBlock(node *blockNode, block *btcutil.Block, vi
 	}
 
 	// TODO(roasbeef): check bip9 for segwit here, others also
+	scriptFlags |= txscript.ScriptVerifyWitness
 
 	// Now that the inexpensive checks are done and have passed, verify the
 	// transactions are actually allowed to spend the coins by running the
