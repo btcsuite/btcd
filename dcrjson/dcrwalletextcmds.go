@@ -16,8 +16,11 @@ type AccountAddressIndexCmd struct {
 }
 
 // NewAccountAddressIndexCmd creates a new AccountAddressIndexCmd.
-func NewAccountAddressIndexCmd(acct string) *AccountAddressIndexCmd {
-	return &AccountAddressIndexCmd{Account: acct}
+func NewAccountAddressIndexCmd(acct string, branch int) *AccountAddressIndexCmd {
+	return &AccountAddressIndexCmd{
+		Account: acct,
+		Branch:  branch,
+	}
 }
 
 // AccountFetchAddressesCmd is a type handling custom marshaling and
@@ -31,8 +34,14 @@ type AccountFetchAddressesCmd struct {
 }
 
 // NewAccountFetchAddressesCmd creates a new AccountFetchAddressesCmd.
-func NewAccountFetchAddressesCmd(acct string) *AccountAddressIndexCmd {
-	return &AccountAddressIndexCmd{Account: acct}
+func NewAccountFetchAddressesCmd(acct string, branch int, start int,
+	end int) *AccountFetchAddressesCmd {
+	return &AccountFetchAddressesCmd{
+		Account: acct,
+		Branch:  branch,
+		Start:   start,
+		End:     end,
+	}
 }
 
 // AccountSyncAddressIndexCmd is a type handling custom marshaling and
@@ -45,9 +54,13 @@ type AccountSyncAddressIndexCmd struct {
 }
 
 // NewAccountSyncAddressIndexCmd creates a new AccountSyncAddressIndexCmd.
-func NewAccountSyncAddressIndexCmd(acct string,
+func NewAccountSyncAddressIndexCmd(acct string, branch int,
 	idx int) *AccountSyncAddressIndexCmd {
-	return &AccountSyncAddressIndexCmd{Account: acct, Index: idx}
+	return &AccountSyncAddressIndexCmd{
+		Account: acct,
+		Branch:  branch,
+		Index:   idx,
+	}
 }
 
 // ConsolidateCmd is a type handling custom marshaling and
