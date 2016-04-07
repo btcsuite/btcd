@@ -10,6 +10,7 @@ import (
 	"net"
 	"strconv"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/btcsuite/btcd/addrmgr"
@@ -26,10 +27,10 @@ type DialFunc func(string, string) (net.Conn, error)
 // Config holds the configuration options related to the connection manager.
 type Config struct {
 	// MaxOutboundPeers is the number of max outbound connections.
-	MaxOutboundPeers int
+	MaxOutboundPeers uint32
 
 	// MaxConnections is the number of max connections.
-	MaxConnections int
+	MaxConnections uint32
 
 	// Lookup looks up the host using the local resolver.
 	Lookup LookupFunc
@@ -58,9 +59,10 @@ type ConnManager struct {
 	wakeup chan struct{}
 	quit   chan struct{}
 
+	connectionCount      uint32
 	newConnections       chan *ConnResult
-	closeConnections     chan string
-	connections          map[string]net.Conn
+	closeConnections     chan uint32
+	connections          map[uint32]net.Conn
 	outboundGroups       map[string]int
 	NewConnectionHandler func(<-chan *ConnResult)
 }
@@ -114,7 +116,7 @@ out:
 	for {
 		select {
 		case <-cm.wakeup:
-			if len(cm.connections) < cm.cfg.MaxOutboundPeers {
+			if cm.connectionCount < cm.cfg.MaxOutboundPeers {
 				addr := cm.amgr.GetAddress("any")
 				if addr == nil {
 					break
@@ -158,15 +160,16 @@ out:
 	for {
 		select {
 		case cr := <-cm.newConnections:
-			cm.connections[cr.Addr] = cr.Conn
+			connectionID := atomic.AddUint32(&cm.connectionCount, 1)
+			cm.connections[connectionID] = cr.Conn
 
-		case addr := <-cm.closeConnections:
-			c := cm.connections[addr]
+		case connectionID := <-cm.closeConnections:
+			c := cm.connections[connectionID]
 			err := c.Close()
 			if err != nil {
-				log.Infof("Error closing connection %s: %v", addr, err)
+				log.Infof("Error closing connection: %v", err)
 			}
-			delete(cm.connections, addr)
+			delete(cm.connections, connectionID)
 
 		case <-cm.quit:
 			break out
@@ -214,8 +217,8 @@ func (cm *ConnManager) Connect(addr string, permanent bool) <-chan *ConnResult {
 }
 
 // Disconnect disconnects the given address.
-func (cm *ConnManager) Disconnect(addr string) {
-	cm.closeConnections <- addr
+func (cm *ConnManager) Disconnect(connectionID uint32) {
+	cm.closeConnections <- connectionID
 }
 
 // New returns a new bitcoin connection manager.
@@ -223,12 +226,12 @@ func (cm *ConnManager) Disconnect(addr string) {
 func New(cfg *Config, amgr *addrmgr.AddrManager, connHandler func(<-chan *ConnResult)) (*ConnManager, error) {
 	cm := ConnManager{
 		newConnections:   make(chan *ConnResult, cfg.MaxConnections),
-		closeConnections: make(chan string, cfg.MaxConnections),
+		closeConnections: make(chan uint32, cfg.MaxConnections),
 
 		quit:                 make(chan struct{}),
 		wakeup:               make(chan struct{}),
 		amgr:                 amgr,
-		connections:          make(map[string]net.Conn, cfg.MaxConnections),
+		connections:          make(map[uint32]net.Conn, cfg.MaxConnections),
 		outboundGroups:       make(map[string]int),
 		NewConnectionHandler: connHandler,
 	}
