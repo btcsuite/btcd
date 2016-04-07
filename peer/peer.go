@@ -1184,8 +1184,8 @@ func (p *Peer) writeMessage(msg wire.Message, enc wire.MessageEncoding) error {
 	}))
 	log.Tracef("%v", newLogClosure(func() string {
 		var buf bytes.Buffer
-		err := wire.WriteMessage(&buf, msg, p.ProtocolVersion(),
-			p.cfg.ChainParams.Net)
+		_, err := wire.WriteMessageWithEncodingN(&buf, msg, p.ProtocolVersion(),
+			p.cfg.ChainParams.Net, enc)
 		if err != nil {
 			return err.Error()
 		}
