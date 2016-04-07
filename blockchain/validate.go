@@ -626,6 +626,12 @@ func ExtractCoinbaseHeight(coinbaseTx *btcutil.Tx) (int32, error) {
 		return 0, ruleError(ErrMissingCoinbaseHeight, str)
 	}
 
+	// For heights below 16, the height is encoded using the Script
+	// smaller integer rather than the full scriptNum encoding.
+	if sigScript[0] >= txscript.OP_1 && sigScript[0] <= txscript.OP_16 {
+		return int32(sigScript[0] - (txscript.OP_1 - 1)), nil
+	}
+
 	serializedLen := int(sigScript[0])
 	if len(sigScript[1:]) < serializedLen {
 		str := "the coinbase signature script for blocks of " +
