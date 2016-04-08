@@ -269,6 +269,12 @@ func (b *blockManager) startSync(peers *list.List) {
 		enext = e.Next()
 		sp := e.Value.(*serverPeer)
 
+		// TODO(roasbeef): only do this after soft-fork switch over
+		if !sp.witnessEnabled {
+			bmgrLog.Infof("peer %v not witness enabled, skipping", sp)
+			continue
+		}
+
 		// Remove sync candidate peers that are no longer candidates due
 		// to passing their latest known block.  NOTE: The < is
 		// intentional as opposed to <=.  While techcnically the peer
@@ -758,8 +764,6 @@ func (b *blockManager) fetchHeaderBlocks() {
 			b.requestedBlocks[*node.sha] = struct{}{}
 			b.syncPeer.requestedBlocks[*node.sha] = struct{}{}
 
-			// TODO(roasbeef):
-			//  * sync peer must be witness?
 			if b.syncPeer.witnessEnabled {
 				iv.Type = wire.InvTypeWitnessBlock
 			}
@@ -1053,6 +1057,8 @@ func (b *blockManager) handleInvMsg(imsg *invMsg) {
 				b.limitMap(b.requestedBlocks, maxRequestedBlocks)
 				imsg.peer.requestedBlocks[iv.Hash] = struct{}{}
 
+				// TODO(roasbeef): only get witness blocks
+				// after switch over
 				// If the peer is capable, request the block
 				// including all witness data.
 				if imsg.peer.witnessEnabled {
