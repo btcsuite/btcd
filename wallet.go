@@ -2702,6 +2702,123 @@ func (c *Client) ImportScript(script []byte) error {
 // Miscellaneous Functions
 // ***********************
 
+// FutureAccountAddressIndexResult is a future promise to deliver the result of a
+// AccountAddressIndexAsync RPC invocation (or an applicable error).
+type FutureAccountAddressIndexResult chan *response
+
+// Receive waits for the response promised by the future and returns the info
+// provided by the server.
+func (r FutureAccountAddressIndexResult) Receive() (int, error) {
+	res, err := receiveFuture(r)
+	if err != nil {
+		return 0, err
+	}
+
+	// Unmarshal result as a getinfo result object.
+	var index int
+	err = json.Unmarshal(res, &index)
+	if err != nil {
+		return 0, err
+	}
+
+	return index, nil
+}
+
+// AccountAddressIndexAsync returns an instance of a type that can be used
+// to get the result of the RPC at some future time by invoking the Receive
+// function on the returned instance.
+//
+// See AccountAddressIndex for the blocking version and more details.
+func (c *Client) AccountAddressIndexAsync(account string, branch uint32) FutureAccountAddressIndexResult {
+	cmd := dcrjson.NewAccountAddressIndexCmd(account, int(branch))
+	return c.sendCmd(cmd)
+}
+
+// AccountAddressIndex returns the address index for a given account's branch.
+func (c *Client) AccountAddressIndex(account string, branch uint32) (int, error) {
+	return c.AccountAddressIndexAsync(account, branch).Receive()
+}
+
+// FutureAccountFetchAddressesResult is a future promise to deliver the result of
+// an AccountFetchAddressesAsync RPC invocation (or an applicable error).
+type FutureAccountFetchAddressesResult chan *response
+
+// Receive waits for the response promised by the future and returns the info
+// provided by the server.
+func (r FutureAccountFetchAddressesResult) Receive() ([]dcrutil.Address, error) {
+	res, err := receiveFuture(r)
+	if err != nil {
+		return nil, err
+	}
+
+	// Unmarshal result as a slice of strings.
+	var addrsStr []string
+	err = json.Unmarshal(res, &addrsStr)
+	if err != nil {
+		return nil, err
+	}
+
+	// Convert the strings into addresses.
+	addrs := make([]dcrutil.Address, len(addrsStr))
+	for i := range addrsStr {
+		addr, err := dcrutil.DecodeNetworkAddress(addrsStr[i])
+		if err != nil {
+			return nil, err
+		}
+		addrs[i] = addr
+	}
+
+	return addrs, nil
+}
+
+// AccountFetchAddressesAsync returns an instance of a type that can be used
+// to get the result of the RPC at some future time by invoking the Receive
+// function on the returned instance.
+//
+// See AccountFetchAddresses for the blocking version and more details.
+func (c *Client) AccountFetchAddressesAsync(account string, branch uint32, start int, end int) FutureAccountFetchAddressesResult {
+	cmd := dcrjson.NewAccountFetchAddressesCmd(account, int(branch), start, end)
+	return c.sendCmd(cmd)
+}
+
+// AccountFetchAddresses returns a list of addresses from [start,end) for a
+// given account's branch.
+func (c *Client) AccountFetchAddresses(account string, branch uint32, start int, end int) ([]dcrutil.Address, error) {
+	return c.AccountFetchAddressesAsync(account, branch, start, end).Receive()
+}
+
+// FutureAccountSyncAddressIndexResult is a future promise to deliver the
+// result of an AccountSyncAddressIndexAsync RPC invocation (or an
+// applicable error).
+type FutureAccountSyncAddressIndexResult chan *response
+
+// Receive waits for the response promised by the future and returns the info
+// provided by the server.
+func (r FutureAccountSyncAddressIndexResult) Receive() error {
+	_, err := receiveFuture(r)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// AccountSyncAddressIndexAsync returns an instance of a type that can be used
+// to get the result of the RPC at some future time by invoking the Receive
+// function on the returned instance.
+//
+// See AccountSyncAddressIndex for the blocking version and more details.
+func (c *Client) AccountSyncAddressIndexAsync(account string, branch uint32, index int) FutureAccountSyncAddressIndexResult {
+	cmd := dcrjson.NewAccountSyncAddressIndexCmd(account, int(branch), index)
+	return c.sendCmd(cmd)
+}
+
+// AccountSyncAddressIndex synchronizes an account branch to the passed address
+// index.
+func (c *Client) AccountSyncAddressIndex(account string, branch uint32, index int) error {
+	return c.AccountSyncAddressIndexAsync(account, branch, index).Receive()
+}
+
 // NOTE: While getinfo is implemented here (in wallet.go), a dcrd chain server
 // will respond to getinfo requests as well, excluding any wallet information.
 
@@ -2867,6 +2984,56 @@ func (c *Client) GetTicketsVoteBits(hashes []*chainhash.Hash) (*dcrjson.GetTicke
 	return c.GetTicketsVoteBitsAsync(hashes).Receive()
 }
 
+// FutureListScriptsResult is a future promise to deliver the result of a
+// ListScriptsAsync RPC invocation (or an applicable error).
+type FutureListScriptsResult chan *response
+
+// Receive waits for the response promised by the future and returns the info
+// provided by the server.
+func (r FutureListScriptsResult) Receive() ([][]byte, error) {
+	res, err := receiveFuture(r)
+	if err != nil {
+		return nil, err
+	}
+
+	// Unmarshal result as a listscripts result object.
+	var resScr dcrjson.ListScriptsResult
+	err = json.Unmarshal(res, &resScr)
+	if err != nil {
+		return nil, err
+	}
+
+	// Convert the redeemscripts into byte slices and
+	// store them.
+	redeemScripts := make([][]byte, len(resScr.Scripts))
+	for i := range resScr.Scripts {
+		rs := resScr.Scripts[i].RedeemScript
+		rsB, err := hex.DecodeString(rs)
+		if err != nil {
+			return nil, err
+		}
+		redeemScripts[i] = rsB
+	}
+
+	return redeemScripts, nil
+}
+
+// ListScriptsAsync returns an instance of a type that can be used to
+// get the result of the RPC at some future time by invoking the Receive
+// function on the returned instance.
+//
+// See ListScripts for the blocking version and more details.
+func (c *Client) ListScriptsAsync() FutureListScriptsResult {
+	cmd := dcrjson.NewListScriptsCmd()
+	return c.sendCmd(cmd)
+}
+
+// ListScripts returns a list of the currently known redeemscripts from the
+// wallet as a slice of byte slices.
+func (c *Client) ListScripts() ([][]byte, error) {
+	return c.ListScriptsAsync().Receive()
+}
+
 // FutureSetTicketVoteBitsResult is a future promise to deliver the result of a
 // SetTicketVoteBitsAsync RPC invocation (or an applicable error).
 type FutureSetTicketVoteBitsResult chan *response
@@ -2937,6 +3104,43 @@ func (c *Client) TicketsForAddressAsync(addr dcrutil.Address) FutureTicketsForAd
 // owned by the wallet.
 func (c *Client) TicketsForAddress(addr dcrutil.Address) (*dcrjson.TicketsForAddressResult, error) {
 	return c.TicketsForAddressAsync(addr).Receive()
+}
+
+// FutureWalletInfoResult is a future promise to deliver the result of a
+// WalletInfoAsync RPC invocation (or an applicable error).
+type FutureWalletInfoResult chan *response
+
+// Receive waits for the response promised by the future and returns the stake
+// info provided by the server.
+func (r FutureWalletInfoResult) Receive() (*dcrjson.WalletInfoResult, error) {
+	res, err := receiveFuture(r)
+	if err != nil {
+		return nil, err
+	}
+
+	// Unmarshal result as a walletinfo result object.
+	var infoRes dcrjson.WalletInfoResult
+	err = json.Unmarshal(res, &infoRes)
+	if err != nil {
+		return nil, err
+	}
+
+	return &infoRes, nil
+}
+
+// WalletInfoAsync returns an instance of a type that can be used to get
+// the result of the RPC at some future time by invoking the Receive function
+// on the returned instance.
+//
+// See WalletInfo for the blocking version and more details.
+func (c *Client) WalletInfoAsync() FutureWalletInfoResult {
+	cmd := dcrjson.NewWalletInfoCmd()
+	return c.sendCmd(cmd)
+}
+
+// WalletInfo returns wallet global state info for a given wallet.
+func (c *Client) WalletInfo() (*dcrjson.WalletInfoResult, error) {
+	return c.WalletInfoAsync().Receive()
 }
 
 // TODO(davec): Implement

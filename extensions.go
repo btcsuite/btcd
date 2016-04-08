@@ -136,6 +136,49 @@ func (c *Client) ExistsAddress(address dcrutil.Address) (bool, error) {
 	return c.ExistsAddressAsync(address).Receive()
 }
 
+// FutureExistsAddressesResult is a future promise to deliver the result
+// of a FutureExistsAddressesResultAsync RPC invocation (or an
+// applicable error).
+type FutureExistsAddressesResult chan *response
+
+// Receive waits for the response promised by the future and returns whether
+// or not the addresses exist.
+func (r FutureExistsAddressesResult) Receive() (string, error) {
+	res, err := receiveFuture(r)
+	if err != nil {
+		return "", err
+	}
+
+	// Unmarshal the result as a string.
+	var exists string
+	err = json.Unmarshal(res, &exists)
+	if err != nil {
+		return "", err
+	}
+	return exists, nil
+}
+
+// ExistsAddressesAsync returns an instance of a type that can be used to get the
+// result of the RPC at some future time by invoking the Receive function on the
+// returned instance.
+func (c *Client) ExistsAddressesAsync(addresses []dcrutil.Address) FutureExistsAddressesResult {
+	addrsStr := make([]string, len(addresses))
+	for i := range addresses {
+		addrsStr[i] = addresses[i].EncodeAddress()
+	}
+
+	cmd := dcrjson.NewExistsAddressesCmd(addrsStr)
+	return c.sendCmd(cmd)
+}
+
+// ExistsAddresses returns information about whether or not an address exists
+// in the blockchain or memory pool.
+//
+// NOTE: This is a dcrd extension.
+func (c *Client) ExistsAddresses(addresses []dcrutil.Address) (string, error) {
+	return c.ExistsAddressesAsync(addresses).Receive()
+}
+
 // FutureExistsLiveTicketResult is a future promise to deliver the result
 // of a FutureExistsLiveTicketResultAsync RPC invocation (or an
 // applicable error).
@@ -260,6 +303,53 @@ func (c *Client) ExistsMempoolTxs(hashes []*chainhash.Hash) (string, error) {
 	return c.ExistsMempoolTxsAsync(hashes).Receive()
 }
 
+// FutureLiveTicketsResult is a future promise to deliver the result
+// of a FutureLiveTicketsResultAsync RPC invocation (or an applicable error).
+type FutureLiveTicketsResult chan *response
+
+// Receive waits for the response promised by the future and returns all
+// currently missed tickets from the missed ticket database.
+func (r FutureLiveTicketsResult) Receive() ([]*chainhash.Hash, error) {
+	res, err := receiveFuture(r)
+	if err != nil {
+		return nil, err
+	}
+
+	// Unmarshal the result as a dcrjson.LiveTicketsResult.
+	var container dcrjson.LiveTicketsResult
+	err = json.Unmarshal(res, &container)
+	if err != nil {
+		return nil, err
+	}
+
+	liveTickets := make([]*chainhash.Hash, 0, len(container.Tickets))
+	for _, ticketStr := range container.Tickets {
+		h, err := chainhash.NewHashFromStr(ticketStr)
+		if err != nil {
+			return nil, err
+		}
+		liveTickets = append(liveTickets, h)
+	}
+
+	return liveTickets, nil
+}
+
+// LiveTicketsAsync returns an instance of a type that can be used to get the
+// result of the RPC at some future time by invoking the Receive function on the
+// returned instance.
+func (c *Client) LiveTicketsAsync() FutureLiveTicketsResult {
+	cmd := dcrjson.NewLiveTicketsCmd()
+	return c.sendCmd(cmd)
+}
+
+// LiveTickets returns all currently missed tickets from the missed
+// ticket database in the daemon.
+//
+// NOTE: This is a dcrd extension.
+func (c *Client) LiveTickets() ([]*chainhash.Hash, error) {
+	return c.LiveTicketsAsync().Receive()
+}
+
 // FutureMissedTicketsResult is a future promise to deliver the result
 // of a FutureMissedTicketsResultAsync RPC invocation (or an applicable error).
 type FutureMissedTicketsResult chan *response
@@ -272,7 +362,7 @@ func (r FutureMissedTicketsResult) Receive() ([]*chainhash.Hash, error) {
 		return nil, err
 	}
 
-	// Unmarshal the result as a bool.
+	// Unmarshal the result as a dcrjson.MissedTicketsResult.
 	var container dcrjson.MissedTicketsResult
 	err = json.Unmarshal(res, &container)
 	if err != nil {
