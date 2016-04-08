@@ -962,7 +962,8 @@ func (b *blockManager) handleInvMsg(imsg *invMsg) {
 	// we already have and request more blocks to prevent them.
 	for i, iv := range invVects {
 		// Ignore unsupported inventory types.
-		if iv.Type != wire.InvTypeBlock && iv.Type != wire.InvTypeTx {
+		if iv.Type != wire.InvTypeBlock && iv.Type != wire.InvTypeTx &&
+			iv.Type != wire.InvTypeWitnessTx && iv.Type != wire.InvTypeWitnessBlock {
 			continue
 		}
 
@@ -1049,6 +1050,8 @@ func (b *blockManager) handleInvMsg(imsg *invMsg) {
 		requestQueue = requestQueue[1:]
 
 		switch iv.Type {
+		case wire.InvTypeFilteredWitnessBlock:
+			fallthrough
 		case wire.InvTypeBlock:
 			// Request the block if there is not already a pending
 			// request.
@@ -1069,6 +1072,8 @@ func (b *blockManager) handleInvMsg(imsg *invMsg) {
 				numRequested++
 			}
 
+		case wire.InvTypeWitnessTx:
+			fallthrough
 		case wire.InvTypeTx:
 			// Request the transaction if there is not already a
 			// pending request.
