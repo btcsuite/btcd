@@ -1531,7 +1531,7 @@ func newPeerConfig(sp *serverPeer) *peer.Config {
 		ChainParams:      sp.server.chainParams,
 		Services:         sp.server.services,
 		DisableRelayTx:   cfg.BlocksOnly,
-		ProtocolVersion:  70011,
+		ProtocolVersion:  wire.WitnessVersion,
 	}
 }
 
