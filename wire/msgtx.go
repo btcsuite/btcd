@@ -450,7 +450,7 @@ func (msg *MsgTx) BtcEncode(w io.Writer, pver uint32, enc MessageEncoding) error
 	// field for the MsgTx aren't 0x00, then this indicates the transaction
 	// is to be encoded using the new witness inclusionary structure defined
 	// in BIP0141.
-	if enc == WitnessEncoding {
+	if enc == WitnessEncoding && !msg.NoWitness() {
 		// After the txn's Version field, we include two additional
 		// bytes specific to the witness encoding. The first byte is an
 		// always 0 marker byte, which allows decoders to distinguish a
@@ -489,9 +489,9 @@ func (msg *MsgTx) BtcEncode(w io.Writer, pver uint32, enc MessageEncoding) error
 	}
 
 	// If this transaction is a witness transaction, and the witness encoded
-	// is desired (signaled by pver=1), then encode the witness for each of
-	// the inputs within the transaction.
-	if enc == WitnessEncoding {
+	// is desired, then encode the witness for each of the inputs within the
+	// transaction.
+	if enc == WitnessEncoding && !msg.NoWitness() {
 		for _, ti := range msg.TxIn {
 			err = writeTxWitness(w, pver, msg.Version, ti.Witness)
 			if err != nil {
@@ -507,6 +507,18 @@ func (msg *MsgTx) BtcEncode(w io.Writer, pver uint32, enc MessageEncoding) error
 	}
 
 	return nil
+}
+
+// NoWitness returns true if none of the inputs within the transaction contain
+// witness data, and false otherwise.
+func (msg *MsgTx) NoWitness() bool {
+	for _, txIn := range msg.TxIn {
+		if len(txIn.Witness) != 0 {
+			return false
+		}
+	}
+
+	return true
 }
 
 // Serialize encodes the transaction to w using a format that suitable for
