@@ -204,7 +204,7 @@ func (msg *MsgTx) TxSha() ShaHash {
 // the Segregated Witness commitment of all the witnesses within a block. If a
 // transaction has no witness data, then the witness sha, is the same as its txid.
 func (msg *MsgTx) WitnessSha() ShaHash {
-	if len(msg.TxIn[0].Witness) == 0 {
+	if msg.NoWitness() {
 		return msg.TxSha()
 	} else {
 		buf := bytes.NewBuffer(make([]byte, 0, msg.SerializeSizeWitness()))
