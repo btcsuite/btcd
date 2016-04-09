@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"math"
 	"runtime"
+	"time"
 
 	"github.com/btcsuite/btcd/txscript"
 	"github.com/btcsuite/btcd/wire"
@@ -275,10 +276,13 @@ func checkBlockScripts(block *btcutil.Block, utxoView *UtxoViewpoint,
 	}
 
 	// Validate all of the inputs.
+	start := time.Now()
 	validator := newTxValidator(utxoView, scriptFlags, sigCache, hashCache)
 	if err := validator.Validate(txValItems); err != nil {
 		return err
 	}
+	elapsed := time.Since(start)
+	log.Infof("block %v took %v to verify", block.Sha(), elapsed)
 
 	// If the HashCache is present, once we have validated the block, we no
 	// longer need the cached hashes for these transactions, so we purge
