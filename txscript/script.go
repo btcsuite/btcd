@@ -756,7 +756,6 @@ func GetWitnessSigOpCount(sigScript, pkScript []byte, witness wire.TxWitness) in
 // witness program. If the version of the witness program is unable to be
 // extracted, then 0 is returned for the sig op count.
 func getWitnessSigOps(witnessProgram []byte, witness [][]byte) int {
-
 	// Attempt to extract the witness program version.
 	witnessVersion, _, err := ExtractWitnessProgramInfo(witnessProgram)
 	if err != nil {
@@ -766,9 +765,9 @@ func getWitnessSigOps(witnessProgram []byte, witness [][]byte) int {
 	switch witnessVersion {
 	case 0:
 		switch {
-		case len(witnessProgram) == 20:
+		case len(witnessProgram) == 22:
 			return 1
-		case len(witnessProgram) == 32 && len(witness) > 0:
+		case len(witnessProgram) == 34 && len(witness) > 0:
 			pkScript := witness[len(witness)-1]
 			pops, err := parseScript(pkScript)
 			if err != nil {
