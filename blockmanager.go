@@ -6,8 +6,6 @@ package main
 
 import (
 	"container/list"
-	"crypto/rand"
-	"math/big"
 	"net"
 	"os"
 	"path/filepath"
@@ -519,12 +517,7 @@ func (b *blockManager) handleTxMsg(tmsg *txMsg) {
 		// Do not request this transaction again until a new block
 		// has been processed.
 		b.rejectedTxns[*txHash] = struct{}{}
-		lerr := b.limitMap(b.rejectedTxns, maxRejectedTxns)
-		if lerr != nil {
-			bmgrLog.Warnf("Failed to limit the number of "+
-				"rejected transactions: %v", lerr)
-			delete(b.rejectedTxns, *txHash)
-		}
+		b.limitMap(b.rejectedTxns, maxRejectedTxns)
 
 		// When the error is a rule error, it means the transaction was
 		// simply rejected as opposed to something actually going wrong,
@@ -1096,16 +1089,7 @@ func (b *blockManager) handleInvMsg(imsg *invMsg) {
 			// request.
 			if _, exists := b.requestedBlocks[iv.Hash]; !exists {
 				b.requestedBlocks[iv.Hash] = struct{}{}
-				err := b.limitMap(b.requestedBlocks,
-					maxRequestedBlocks)
-				if err != nil {
-					bmgrLog.Warnf("Failed to limit the "+
-						"number of requested "+
-						"blocks: %v", err)
-					delete(b.requestedBlocks, iv.Hash)
-					continue
-				}
-
+				b.limitMap(b.requestedBlocks, maxRequestedBlocks)
 				imsg.peer.requestedBlocks[iv.Hash] = struct{}{}
 				gdmsg.AddInvVect(iv)
 				numRequested++
@@ -1116,15 +1100,7 @@ func (b *blockManager) handleInvMsg(imsg *invMsg) {
 			// pending request.
 			if _, exists := b.requestedTxns[iv.Hash]; !exists {
 				b.requestedTxns[iv.Hash] = struct{}{}
-				err := b.limitMap(b.requestedTxns,
-					maxRequestedTxns)
-				if err != nil {
-					bmgrLog.Warnf("Failed to limit the "+
-						"number of requested "+
-						"transactions: %v", err)
-					delete(b.requestedTxns, iv.Hash)
-					continue
-				}
+				b.limitMap(b.requestedTxns, maxRequestedTxns)
 				imsg.peer.requestedTxns[iv.Hash] = struct{}{}
 				gdmsg.AddInvVect(iv)
 				numRequested++
@@ -1144,35 +1120,23 @@ func (b *blockManager) handleInvMsg(imsg *invMsg) {
 // limitMap is a helper function for maps that require a maximum limit by
 // evicting a random rejected transaction if adding a new value would cause it
 // to overflow the maximum allowed.
-func (b *blockManager) limitMap(m map[wire.ShaHash]struct{}, limit int) error {
+func (b *blockManager) limitMap(m map[wire.ShaHash]struct{}, limit int) {
 	if len(m)+1 > limit {
-		// Generate a cryptographically random hash.
-		randHashBytes := make([]byte, wire.HashSize)
-		_, err := rand.Read(randHashBytes)
-		if err != nil {
-			return err
-		}
-		randHashNum := new(big.Int).SetBytes(randHashBytes)
-
-		// Try to find the first entry that is greater than the random
-		// hash.  Use the first entry (which is already pseudorandom due
-		// to Go's range statement over maps) as a fallback if none of
-		// the hashes in the map are larger than the random hash.
-		var foundHash *wire.ShaHash
+		// Remove a random entry from the map.  This relies on the fact
+		// that Go's range statement iterates starting at a random item.
+		// It should also be noted that the aforementioned behavior is
+		// not 100% guaranteed by the Go spec, so it's possible that a
+		// particular Go compiler doesn't implement it, but that is
+		// still fine because there are really only a few ways efficient
+		// map iteration could be implemented and in any case an
+		// adversary would still have to be able to pull off preimage
+		// attacks on the hashing function in order to target eviction
+		// of specific entries in that case anyways.
 		for txHash := range m {
-			if foundHash == nil {
-				foundHash = &txHash
-			}
-			txHashNum := blockchain.ShaHashToBig(&txHash)
-			if txHashNum.Cmp(randHashNum) > 0 {
-				foundHash = &txHash
-				break
-			}
+			delete(m, txHash)
+			return
 		}
-		delete(m, *foundHash)
 	}
-
-	return nil
 }
 
 // blockHandler is the main handler for the block manager.  It must be run
