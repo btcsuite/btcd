@@ -67,12 +67,11 @@ func (h *HashCache) AddSigHashes(tx *wire.MsgTx) {
 
 // ContainsHashes returns true if the partial sighashes for the passed
 // transaction currently exist within the HashCache, and false otherwise.
-func (h *HashCache) ContainsHashes(tx *wire.MsgTx) bool {
+func (h *HashCache) ContainsHashes(txid *wire.ShaHash) bool {
 	h.RLock()
 	defer h.RUnlock()
 
-	txid := tx.TxSha()
-	_, found := h.sigHashes[txid]
+	_, found := h.sigHashes[*txid]
 	return found
 }
 
@@ -80,22 +79,19 @@ func (h *HashCache) ContainsHashes(tx *wire.MsgTx) bool {
 // the passed transaction. This function also returns an additional boolean
 // value indicating if the sighashes for the passed transaction were found to
 // be present within the HashCache.
-func (h *HashCache) GetSigHashes(tx *wire.MsgTx) (*TxSigHashes, bool) {
+func (h *HashCache) GetSigHashes(txid *wire.ShaHash) (*TxSigHashes, bool) {
 	h.RLock()
 	defer h.RUnlock()
 
-	txid := tx.TxSha()
-	item, found := h.sigHashes[txid]
-
+	item, found := h.sigHashes[*txid]
 	return item, found
 }
 
 // PurgeSigHashes removes all partial sighashes from the HashCache belonging to
 // the passed transaction.
-func (h *HashCache) PurgeSigHashes(tx *wire.MsgTx) {
+func (h *HashCache) PurgeSigHashes(txid *wire.ShaHash) {
 	h.Lock()
 	defer h.Unlock()
 
-	txid := tx.TxSha()
-	delete(h.sigHashes, txid)
+	delete(h.sigHashes, *txid)
 }
