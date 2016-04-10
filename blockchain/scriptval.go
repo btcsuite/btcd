@@ -20,6 +20,7 @@ type txValidateItem struct {
 	txInIndex int
 	txIn      *wire.TxIn
 	tx        *btcutil.Tx
+	sigHashes *txscript.TxSigHashes
 }
 
 // txValidator provides a type which asynchronously validates transaction
@@ -87,7 +88,7 @@ out:
 			sigScript := txIn.SignatureScript
 			inputAmount := txEntry.AmountByIndex(originTxIndex)
 			vm, err := txscript.NewEngine(pkScript, txVI.tx.MsgTx(),
-				txVI.txInIndex, v.flags, v.sigCache, v.hashCache,
+				txVI.txInIndex, v.flags, v.sigCache, txVI.sigHashes,
 				inputAmount)
 			if err != nil {
 				str := fmt.Sprintf("failed to parse input "+
@@ -202,10 +203,18 @@ func ValidateTransactionScripts(tx *btcutil.Tx, utxoView *UtxoViewpoint,
 	flags txscript.ScriptFlags, sigCache *txscript.SigCache,
 	hashCache *txscript.HashCache) error {
 
-	msgTx := tx.MsgTx()
-	if !hashCache.ContainsHashes(msgTx) {
-		hashCache.AddSigHashes(msgTx)
+	// If the hashcache doesn't yet has the sighash midstate for this
+	// transaction, then we'll compute them now so we can re-use them
+	// amongst all worker validation goroutines.
+	if !hashCache.ContainsHashes(tx.Sha()) {
+		hashCache.AddSigHashes(tx.MsgTx())
 	}
+
+	// The same pointer to the transaction's sighash midstate will be
+	// re-used amongst all validation goroutines. By pre-computing the
+	// sighash here instead of during validation, we ensure the sighashes
+	// are only computed once.
+	cachedHashes, _ := hashCache.GetSigHashes(tx.Sha())
 
 	// Collect all of the transaction inputs and required information for
 	// validation.
@@ -221,6 +230,7 @@ func ValidateTransactionScripts(tx *btcutil.Tx, utxoView *UtxoViewpoint,
 			txInIndex: txInIdx,
 			txIn:      txIn,
 			tx:        tx,
+			sigHashes: cachedHashes,
 		}
 		txValItems = append(txValItems, txVI)
 	}
@@ -248,7 +258,7 @@ func checkBlockScripts(block *btcutil.Block, utxoView *UtxoViewpoint,
 	}
 	txValItems := make([]*txValidateItem, 0, numInputs)
 	for _, tx := range block.Transactions() {
-		msgTx := tx.MsgTx()
+		sha := tx.Sha()
 
 		// If the HashCache is present, and it doesn't yet contain the
 		// partial sighashes for this transaction, then we add the
@@ -256,11 +266,12 @@ func checkBlockScripts(block *btcutil.Block, utxoView *UtxoViewpoint,
 		// advantage of the potential speed savings due to the new
 		// digest algorithm (BIP0143).
 		// TODO(roasbeef): guard with segwit script flag
-		if hashCache != nil && !hashCache.ContainsHashes(msgTx) {
-			hashCache.AddSigHashes(msgTx)
+		if hashCache != nil && !hashCache.ContainsHashes(sha) {
+			hashCache.AddSigHashes(tx.MsgTx())
 		}
 
-		for txInIdx, txIn := range msgTx.TxIn {
+		cachedHashes, _ := hashCache.GetSigHashes(sha)
+		for txInIdx, txIn := range tx.MsgTx().TxIn {
 			// Skip coinbases.
 			if txIn.PreviousOutPoint.Index == math.MaxUint32 {
 				continue
@@ -270,6 +281,7 @@ func checkBlockScripts(block *btcutil.Block, utxoView *UtxoViewpoint,
 				txInIndex: txInIdx,
 				txIn:      txIn,
 				tx:        tx,
+				sigHashes: cachedHashes,
 			}
 			txValItems = append(txValItems, txVI)
 		}
@@ -289,7 +301,7 @@ func checkBlockScripts(block *btcutil.Block, utxoView *UtxoViewpoint,
 	// them from the cache.
 	if hashCache != nil {
 		for _, tx := range block.Transactions() {
-			hashCache.PurgeSigHashes(tx.MsgTx())
+			hashCache.PurgeSigHashes(tx.Sha())
 		}
 	}
 
