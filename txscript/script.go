@@ -421,17 +421,13 @@ func calcWitnessSignatureHash(subScript []parsedOpcode, sigHashes *TxSigHashes,
 		return nil
 	}
 
-	// Copy tha transaction, we don't need to clear any of the sigScripts
-	// since we don't modify or utilize them.
-	txCopy := tx.Copy()
-
 	// We'll utilize this buffer throughout to incrementally calculate
 	// the signature hash for this transaction.
 	var sigHash bytes.Buffer
 
 	// First write out, then encode the transaction's version number.
 	var bVersion [4]byte
-	binary.LittleEndian.PutUint32(bVersion[:], uint32(txCopy.Version))
+	binary.LittleEndian.PutUint32(bVersion[:], uint32(tx.Version))
 	sigHash.Write(bVersion[:])
 
 	// Next write out the the possibly pre-calculated hashes for the
@@ -458,10 +454,10 @@ func calcWitnessSignatureHash(subScript []parsedOpcode, sigHashes *TxSigHashes,
 		sigHash.Write(zeroHash[:])
 	}
 
-	// Next, write the oint being spent.
-	sigHash.Write(txCopy.TxIn[idx].PreviousOutPoint.Hash[:])
+	// Next, write the outpoint being spent.
+	sigHash.Write(tx.TxIn[idx].PreviousOutPoint.Hash[:])
 	var bIndex [4]byte
-	binary.LittleEndian.PutUint32(bIndex[:], txCopy.TxIn[idx].PreviousOutPoint.Index)
+	binary.LittleEndian.PutUint32(bIndex[:], tx.TxIn[idx].PreviousOutPoint.Index)
 	sigHash.Write(bIndex[:])
 
 	// Remove all instances of OP_CODESEPARATOR from the script.
@@ -495,7 +491,7 @@ func calcWitnessSignatureHash(subScript []parsedOpcode, sigHashes *TxSigHashes,
 	binary.LittleEndian.PutUint64(bAmount[:], uint64(amt))
 	sigHash.Write(bAmount[:])
 	var bSequence [4]byte
-	binary.LittleEndian.PutUint32(bSequence[:], txCopy.TxIn[idx].Sequence)
+	binary.LittleEndian.PutUint32(bSequence[:], tx.TxIn[idx].Sequence)
 	sigHash.Write(bSequence[:])
 
 	// If the current signature mode isn't single, or none, then we can
@@ -506,13 +502,13 @@ func calcWitnessSignatureHash(subScript []parsedOpcode, sigHashes *TxSigHashes,
 		hashType&SigHashNone != SigHashNone {
 		sigHash.Write(sigHashes.HashOutputs[:])
 	} else if hashType&sigHashMask == SigHashSingle { // TODO(roasbeef): verify range above
-		wire.WriteTxOut(&sigHash, 0, 0, txCopy.TxOut[idx])
+		wire.WriteTxOut(&sigHash, 0, 0, tx.TxOut[idx])
 	}
 
 	// Finally, write out the transaction's locktime, and the sig hash
 	// type.
 	var bLockTime [4]byte
-	binary.LittleEndian.PutUint32(bLockTime[:], txCopy.LockTime)
+	binary.LittleEndian.PutUint32(bLockTime[:], tx.LockTime)
 	sigHash.Write(bLockTime[:])
 	var bHashType [4]byte
 	binary.LittleEndian.PutUint32(bHashType[:], uint32(hashType))
