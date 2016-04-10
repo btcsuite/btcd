@@ -465,8 +465,8 @@ func loadConfig() (*config, []string, error) {
 		activeNetParams = &segNet4Params
 	}
 	if numNets > 1 {
-		str := "%s: The testnet, regtest, and simnet params can't be " +
-			"used together -- choose one of the three"
+		str := "%s: The testnet, regtest, segnet, and simnet params " +
+			"can't be used together -- choose one of the four"
 		err := fmt.Errorf(str, funcName)
 		fmt.Fprintln(os.Stderr, err)
 		fmt.Fprintln(os.Stderr, usageMessage)

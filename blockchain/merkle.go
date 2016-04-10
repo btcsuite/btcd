@@ -14,6 +14,19 @@ import (
 	"github.com/btcsuite/btcutil"
 )
 
+const (
+	// CoinbaseWitnessDataLen is the required length of the only element within
+	// the coinbase's witness data if the coinbase transaction contains a
+	// witness commitment.
+	CoinbaseWitnessDataLen = 32
+
+	// CoinbaseWitnessPkScriptLength is the length of the public key script
+	// containing an OP_RETURN, the WitnessMagicBytes, and the witness
+	// commitment itself. In order to be a valid candidate for the output
+	// containing the witness commitment
+	CoinbaseWitnessPkScriptLength = 38
+)
+
 var (
 	// WitnessMagicBytes is the prefix marker within a public key script to
 	// indicate that this output holds the witness commitment for a block.
@@ -107,7 +120,7 @@ func BuildMerkleTreeStore(transactions []*btcutil.Tx, witness bool) []*wire.ShaH
 			merkles[i] = &zeroHash
 		case witness:
 			// TODO(roasbeef): cache this in btcutil too
-			wSha := tx.MsgTx().WitnessSha()
+			wSha := tx.MsgTx().WitnessHash()
 			merkles[i] = &wSha
 		default:
 			merkles[i] = tx.Sha()
@@ -143,7 +156,7 @@ func BuildMerkleTreeStore(transactions []*btcutil.Tx, witness bool) []*wire.ShaH
 
 // ExtractWitnessCommitment attempts to locate, and return the witness
 // commitment for a block. The witness commitment is of the form:
-// SHA256(witness root || witness nonce).The function additionally returns a
+// SHA256(witness root || witness nonce). The function additionally returns a
 // boolean indicating if the witness root was located within any of the txOut's
 // in the passed transaction. The witness commitment is stored as the data push
 // for an OP_RETURN with special magic bytes to aide in location.
@@ -162,8 +175,9 @@ func ExtractWitnessCommitment(tx *btcutil.Tx) ([]byte, bool) {
 		// The public key script that contains the witness commitment
 		// must shared a prefix with the WitnessMagicBytes, and be at
 		// least 38 bytes.
-		if bytes.HasPrefix(msgTx.TxOut[i].PkScript, WitnessMagicBytes) &&
-			len(msgTx.TxOut[i].PkScript) >= 38 {
+		pkScript := msgTx.TxOut[i].PkScript
+		if len(pkScript) >= 38 &&
+			bytes.HasPrefix(pkScript, WitnessMagicBytes) {
 
 			// The witness commitment itself is a 32-byte hash
 			// directly after the WitnessMagicBytes. The remaining
@@ -192,26 +206,34 @@ func ValidateWitnessCommitment(blk *btcutil.Block) error {
 			msgTx := tx.MsgTx()
 			if len(msgTx.TxIn[0].Witness) != 0 {
 				str := fmt.Sprintf("block contains transaction with witness" +
-					" data, yet not witness commitment present")
+					" data, yet no witness commitment present")
 				return ruleError(ErrUnexpectedWitness, str)
 			}
 		}
 		return nil
 	}
 
-	// If the witness commitment can be located, then the coinbase
-	// transaction MUST have exactly one witness element within its witness
-	// data. Additionally, that element must be exactly 32-byte.
-	if len(coinbaseTx.MsgTx().TxIn[0].Witness) != 1 ||
-		len(coinbaseTx.MsgTx().TxIn[0].Witness[0]) != 32 {
-		str := fmt.Sprintf("the coinbase transaction must have exactly " +
-			"one item within its witness stack, and that item " +
-			"should be exactly 32-bytes")
+	// At this point the block contains a witness commitment, so the
+	// coinbase transaction MUST have exactly one witness element within
+	// its witness data and that element must be exactly
+	// CoinbaseWitnessDataLen bytes.
+	coinbaseWitness := coinbaseTx.MsgTx().TxIn[0].Witness
+	if len(coinbaseWitness) != 1 {
+		str := fmt.Sprintf("the coinbase transaction has %d items in "+
+			"its witness stack when only one is allowed",
+			len(coinbaseWitness))
+		return ruleError(ErrInvalidWitnessCommitment, str)
+	}
+	witnessNonce := coinbaseWitness[0]
+	if len(witnessNonce) != CoinbaseWitnessDataLen {
+		str := fmt.Sprintf("the coinbase transaction witness nonce "+
+			"has %d bytes when it must be %d bytes",
+			len(witnessNonce), CoinbaseWitnessDataLen)
 		return ruleError(ErrInvalidWitnessCommitment, str)
 	}
 
-	// Finally, with the preliminary checks out of the way, we can finally
-	// check if the extracted witnessCommitment is equal to:
+	// Finally, with the preliminary checks out of the way, we can check if
+	// the extracted witnessCommitment is equal to:
 	// SHA256(witnessMerkleRoot || witnessNonce). Where witnessNonce is the
 	// coinbase transaction's only witness item.
 	witnessMerkleTree := BuildMerkleTreeStore(blk.Transactions(), true)
@@ -219,7 +241,7 @@ func ValidateWitnessCommitment(blk *btcutil.Block) error {
 
 	witnessPreimage := make([]byte, 64)
 	copy(witnessPreimage[:], witnessMerkleRoot[:])
-	copy(witnessPreimage[32:], coinbaseTx.MsgTx().TxIn[0].Witness[0])
+	copy(witnessPreimage[32:], witnessNonce)
 
 	if !bytes.Equal(wire.DoubleSha256(witnessPreimage), witnessCommitment) {
 		str := "witness commitment does not match"

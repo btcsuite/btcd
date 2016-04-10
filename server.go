@@ -218,6 +218,7 @@ type serverPeer struct {
 	*peer.Peer
 
 	server          *server
+	witnessMtx      sync.Mutex
 	witnessEnabled  bool
 	persistent      bool
 	continueHash    *wire.ShaHash
@@ -407,7 +408,9 @@ func (sp *serverPeer) OnVersion(p *peer.Peer, msg *wire.MsgVersion) {
 	if p.ProtocolVersion() >= wire.WitnessVersion &&
 		p.Services()&wire.SFNodeWitness == wire.SFNodeWitness {
 
+		sp.witnessMtx.Lock()
 		sp.witnessEnabled = true
+		sp.witnessMtx.Unlock()
 	}
 
 	// Add valid peer to the server.
