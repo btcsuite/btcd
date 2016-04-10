@@ -501,8 +501,12 @@ func calcWitnessSignatureHash(subScript []parsedOpcode, sigHashes *TxSigHashes,
 	if hashType&SigHashSingle != SigHashSingle &&
 		hashType&SigHashNone != SigHashNone {
 		sigHash.Write(sigHashes.HashOutputs[:])
-	} else if hashType&sigHashMask == SigHashSingle { // TODO(roasbeef): verify range above
-		wire.WriteTxOut(&sigHash, 0, 0, tx.TxOut[idx])
+	} else if hashType&sigHashMask == SigHashSingle && idx < len(tx.TxOut) {
+		var b bytes.Buffer
+		wire.WriteTxOut(&b, 0, 0, tx.TxOut[idx])
+		sigHash.Write(wire.DoubleSha256(b.Bytes()))
+	} else if hashType&sigHashMask == SigHashSingle && idx >= len(tx.TxOut) {
+		sigHash.Write(zeroHash[:])
 	}
 
 	// Finally, write out the transaction's locktime, and the sig hash
@@ -514,8 +518,7 @@ func calcWitnessSignatureHash(subScript []parsedOpcode, sigHashes *TxSigHashes,
 	binary.LittleEndian.PutUint32(bHashType[:], uint32(hashType))
 	sigHash.Write(bHashType[:])
 
-	hsh := wire.DoubleSha256SH(sigHash.Bytes())
-	return hsh.Bytes()
+	return wire.DoubleSha256(sigHash.Bytes())
 }
 
 // calcSignatureHash will, given a script and hash type for the current script

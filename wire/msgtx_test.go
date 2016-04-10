@@ -257,7 +257,7 @@ func TestWTxSha(t *testing.T) {
 		t.Errorf("TxSha: wrong hash - got %v, want %v",
 			spew.Sprint(txid), spew.Sprint(wantHashTxid))
 	}
-	wtxid := msgTx.WitnessSha()
+	wtxid := msgTx.WitnessHash()
 	if !wtxid.IsEqual(wantHashWTxid) {
 		t.Errorf("WTxSha: wrong hash - got %v, want %v",
 			spew.Sprint(wtxid), spew.Sprint(wantHashWTxid))
@@ -265,7 +265,7 @@ func TestWTxSha(t *testing.T) {
 
 	// The wtxid of a coinbase transaction should be the zero hash.
 	var zeroHash wire.ShaHash
-	coinbaseWtxID := multiTx.WitnessSha()
+	coinbaseWtxID := multiTx.WitnessHash()
 	if !coinbaseWtxID.IsEqual(&zeroHash) {
 		t.Errorf("wtxid for a coinbase transaction should be the zero "+
 			"hash, is instead %v", spew.Sprint(coinbaseWtxID))

@@ -35,8 +35,9 @@ var (
 	// can have for the simulation test network.  It is the value 2^255 - 1.
 	simNetPowLimit = new(big.Int).Sub(new(big.Int).Lsh(bigOne, 255), bigOne)
 
-	// segnet4 has a pow limit of 1e01ffff which is 19 0-bits in front, I think
-	// TODO(roasbeef): comment fixes
+	// segnet4PowLimit is the highest proof of work value a Bitcoin block
+	// can have for the segregated witness test network.  It is the value
+	// 2^233 - 1.
 	segnet4PowLimit = new(big.Int).Sub(new(big.Int).Lsh(bigOne, 233), bigOne)
 )
 
@@ -281,8 +282,7 @@ var TestNet3Params = Params{
 }
 
 // SegNet4Params defines the network parameters for the test Bitcoin network
-// (version 4).  Not to be confused with the regression test network, this
-// network is sometimes simply called "testnet".
+// (version 4).
 var SegNet4Params = Params{
 	Name:        "segnet",
 	Net:         wire.SegNet4,

@@ -55,8 +55,8 @@ var simNetParams = params{
 	rpcPort: "18556",
 }
 
-// segNet4Params contains parameters specific to the simulation test network
-// (wire.SegNet4).
+// segNet4Params contains parameters specific to the segregated witness test
+// network. (wire.SegNet4).
 var segNet4Params = params{
 	Params:  &chaincfg.SegNet4Params,
 	rpcPort: "28902",

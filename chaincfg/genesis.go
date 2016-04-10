@@ -163,7 +163,7 @@ var segNetGenesisBlock = wire.MsgBlock{
 		PrevBlock:  wire.ShaHash{},           // 0000000000000000000000000000000000000000000000000000000000000000
 		MerkleRoot: segNetGenesisMerkleRoot,  // 4a5e1e4baab89f3a32518a88c31bc87f618f76673e2cc77ab2127b7afdeda33b
 		Timestamp:  time.Unix(1452831101, 0), // 2016-01-15 04:11:41 +0000 UTC
-		Bits:       0x1e01ffff,               // ?? [000007ffff000000000000000000000000000000000000000000000000000000]
+		Bits:       0x1e01ffff,               // 503447551 [000001ffff000000000000000000000000000000000000000000000000000000]
 		Nonce:      0x00000000,               // 0.  They didn't even try.
 	},
 	Transactions: []*wire.MsgTx{&genesisCoinbaseTx},
