@@ -318,8 +318,8 @@ out:
 		// with false when conditions that trigger a stale block, so
 		// a new block template can be generated.  When the return is
 		// true a solution was found, so submit the solved block.
-		if m.solveBlock(template.block, curHeight+1, ticker, quit) {
-			block := btcutil.NewBlock(template.block)
+		if m.solveBlock(template.Block, curHeight+1, ticker, quit) {
+			block := btcutil.NewBlock(template.Block)
 			m.submitBlock(block)
 		}
 	}
@@ -580,8 +580,8 @@ func (m *CPUMiner) GenerateNBlocks(n uint32) ([]*wire.ShaHash, error) {
 		// with false when conditions that trigger a stale block, so
 		// a new block template can be generated.  When the return is
 		// true a solution was found, so submit the solved block.
-		if m.solveBlock(template.block, curHeight+1, ticker, nil) {
-			block := btcutil.NewBlock(template.block)
+		if m.solveBlock(template.Block, curHeight+1, ticker, nil) {
+			block := btcutil.NewBlock(template.Block)
 			m.submitBlock(block)
 			blockHashes[i] = block.Sha()
 			i++
