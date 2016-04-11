@@ -2466,10 +2466,6 @@ func newServer(listenAddrs []string, db database.DB, chainParams *chaincfg.Param
 		}
 	}
 
-	sigCache, err := txscript.NewSigCache(cfg.SigCacheMaxSize)
-	if err != nil {
-		return nil, err
-	}
 	s := server{
 		listeners:            listeners,
 		chainParams:          chainParams,
@@ -2490,7 +2486,7 @@ func newServer(listenAddrs []string, db database.DB, chainParams *chaincfg.Param
 		db:                   db,
 		timeSource:           blockchain.NewMedianTime(),
 		services:             services,
-		sigCache:             sigCache,
+		sigCache:             txscript.NewSigCache(cfg.SigCacheMaxSize),
 	}
 
 	// Create the transaction and address indexes if needed.

@@ -193,10 +193,8 @@ func TestScriptInvalidTests(t *testing.T) {
 			err)
 		return
 	}
-	sigCache, err := NewSigCache(10)
-	if err != nil {
-		t.Fatalf("unable to create sigcache: %v", err)
-	}
+	sigCache := NewSigCache(10)
+
 	sigCacheToggle := []bool{true, false}
 	for _, useSigCache := range sigCacheToggle {
 		for i, test := range tests {
@@ -261,10 +259,9 @@ func TestScriptValidTests(t *testing.T) {
 			err)
 		return
 	}
-	sigCache, err := NewSigCache(10)
-	if err != nil {
-		t.Fatalf("unable to create sigcache: %v", err)
-	}
+
+	sigCache := NewSigCache(10)
+
 	sigCacheToggle := []bool{true, false}
 	for _, useSigCache := range sigCacheToggle {
 		for i, test := range tests {
