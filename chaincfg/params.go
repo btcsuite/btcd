@@ -11,31 +11,6 @@ import (
 	"github.com/btcsuite/btcd/wire"
 )
 
-// These variables are the chain proof-of-work limit parameters for each default
-// network.
-var (
-	// bigOne is 1 represented as a big.Int.  It is defined here to avoid
-	// the overhead of creating it multiple times.
-	bigOne = big.NewInt(1)
-
-	// mainPowLimit is the highest proof of work value a Bitcoin block can
-	// have for the main network.  It is the value 2^224 - 1.
-	mainPowLimit = new(big.Int).Sub(new(big.Int).Lsh(bigOne, 224), bigOne)
-
-	// regressionPowLimit is the highest proof of work value a Bitcoin block
-	// can have for the regression test network.  It is the value 2^255 - 1.
-	regressionPowLimit = new(big.Int).Sub(new(big.Int).Lsh(bigOne, 255), bigOne)
-
-	// testNet3PowLimit is the highest proof of work value a Bitcoin block
-	// can have for the test network (version 3).  It is the value
-	// 2^224 - 1.
-	testNet3PowLimit = new(big.Int).Sub(new(big.Int).Lsh(bigOne, 224), bigOne)
-
-	// simNetPowLimit is the highest proof of work value a Bitcoin block
-	// can have for the simulation test network.  It is the value 2^255 - 1.
-	simNetPowLimit = new(big.Int).Sub(new(big.Int).Lsh(bigOne, 255), bigOne)
-)
-
 // Checkpoint identifies a known good point in the block chain.  Using
 // checkpoints allows a few optimizations for old blocks during initial download
 // and also prevents forks from old blocks.
@@ -115,7 +90,7 @@ var MainNetParams = Params{
 	// Chain parameters
 	GenesisBlock:           &genesisBlock,
 	GenesisHash:            &genesisHash,
-	PowLimit:               mainPowLimit,
+	PowLimit:               newBigFromHex("00000000ffffffffffffffffffffffffffffffffffffffffffffffffffffffff"),
 	PowLimitBits:           0x1d00ffff,
 	SubsidyHalvingInterval: 210000,
 	ResetMinDifficulty:     false,
@@ -182,7 +157,7 @@ var RegressionNetParams = Params{
 	// Chain parameters
 	GenesisBlock:           &regTestGenesisBlock,
 	GenesisHash:            &regTestGenesisHash,
-	PowLimit:               regressionPowLimit,
+	PowLimit:               newBigFromHex("7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"),
 	PowLimitBits:           0x207fffff,
 	SubsidyHalvingInterval: 150,
 	ResetMinDifficulty:     true,
@@ -234,7 +209,7 @@ var TestNet3Params = Params{
 	// Chain parameters
 	GenesisBlock:           &testNet3GenesisBlock,
 	GenesisHash:            &testNet3GenesisHash,
-	PowLimit:               testNet3PowLimit,
+	PowLimit:               newBigFromHex("00000000ffffffffffffffffffffffffffffffffffffffffffffffffffffffff"),
 	PowLimitBits:           0x1d00ffff,
 	SubsidyHalvingInterval: 210000,
 	ResetMinDifficulty:     true,
@@ -288,7 +263,7 @@ var SimNetParams = Params{
 	// Chain parameters
 	GenesisBlock:           &simNetGenesisBlock,
 	GenesisHash:            &simNetGenesisHash,
-	PowLimit:               simNetPowLimit,
+	PowLimit:               newBigFromHex("7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"),
 	PowLimitBits:           0x207fffff,
 	SubsidyHalvingInterval: 210000,
 	ResetMinDifficulty:     true,
@@ -441,4 +416,15 @@ func newShaHashFromStr(hexStr string) *wire.ShaHash {
 		panic(err)
 	}
 	return sha
+}
+
+// newBigFromHex converts the passed big-endian hex string into a big integer.
+// It will panic if there is an error since it will only (and must only) be
+// called with hard-coded, and therefore known good, values.
+func newBigFromHex(hexStr string) *big.Int {
+	r, ok := new(big.Int).SetString(hexStr, 16)
+	if !ok {
+		panic("invalid hex in source file: " + hexStr)
+	}
+	return r
 }
