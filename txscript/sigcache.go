@@ -43,11 +43,11 @@ type SigCache struct {
 // exist in the SigCache at any particular moment. Random entries are evicted
 // to make room for new entries that would cause the number of entries in the
 // cache to exceed the max.
-func NewSigCache(maxEntries uint) (*SigCache, error) {
+func NewSigCache(maxEntries uint) *SigCache {
 	return &SigCache{
 		validSigs:  make(map[wire.ShaHash]sigCacheEntry, maxEntries),
 		maxEntries: maxEntries,
-	}, nil
+	}
 }
 
 // Exists returns true if an existing entry of 'sig' over 'sigHash' for public
@@ -89,6 +89,5 @@ func (s *SigCache) Add(sigHash wire.ShaHash, sig *btcec.Signature, pubKey *btcec
 			break
 		}
 	}
-
 	s.validSigs[sigHash] = sigCacheEntry{sig, pubKey}
 }
