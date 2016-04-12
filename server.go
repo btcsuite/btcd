@@ -184,7 +184,6 @@ type server struct {
 	blockManager         *blockManager
 	txMemPool            *txMemPool
 	cpuMiner             *CPUMiner
-	relayNtfnChan        chan *btcutil.Tx
 	modifyRebroadcastInv chan interface{}
 	pendingPeers         chan *serverPeer
 	newPeers             chan *serverPeer
@@ -958,6 +957,31 @@ func (s *server) RemoveRebroadcastInventory(iv *wire.InvVect) {
 	}
 
 	s.modifyRebroadcastInv <- broadcastInventoryDel(iv)
+}
+
+// AnnounceNewTransactions generates and relays inventory vectors and notifies
+// both websocket and getblocktemplate long poll clients of the passed
+// transactions.  This function should be called whenever new transactions
+// are added to the mempool.
+func (s *server) AnnounceNewTransactions(newTxs []*btcutil.Tx) {
+	// Generate and relay inventory vectors for all newly accepted
+	// transactions into the memory pool due to the original being
+	// accepted.
+	for _, tx := range newTxs {
+		// Generate the inventory vector and relay it.
+		iv := wire.NewInvVect(wire.InvTypeTx, tx.Sha())
+		s.RelayInventory(iv, tx)
+
+		if s.rpcServer != nil {
+			// Notify websocket clients about mempool transactions.
+			s.rpcServer.ntfnMgr.NotifyMempoolTx(tx, true)
+
+			// Potentially notify any getblocktemplate long poll clients
+			// about stale block templates due to the new transaction.
+			s.rpcServer.gbtWorkState.NotifyMempoolTx(
+				s.txMemPool.LastUpdated())
+		}
+	}
 }
 
 // pushTxMsg sends a tx message for the provided transaction hash to the
@@ -1870,8 +1894,8 @@ func (s *server) BanPeer(sp *serverPeer) {
 	s.banPeers <- sp
 }
 
-// RelayInventory relays the passed inventory to all connected peers that are
-// not already known to have it.
+// RelayInventory relays the passed inventory vector to all connected peers
+// that are not already known to have it.
 func (s *server) RelayInventory(invVect *wire.InvVect, data interface{}) {
 	s.relayInv <- relayMsg{invVect: invVect, data: data}
 }
@@ -2007,45 +2031,6 @@ func (s *server) UpdatePeerHeights(latestBlkSha *wire.ShaHash, latestHeight int3
 	}
 }
 
-// relayTransactionsHandler relays transactions sent on relayNtfnChan to other
-// peers and to the RPC infrastructure if necessary.  It must be run as a
-// goroutine.
-func (s *server) relayTransactionsHandler() {
-out:
-	for {
-		select {
-		case tx := <-s.relayNtfnChan:
-			// Generate an inv and relay it.
-			inv := wire.NewInvVect(wire.InvTypeTx, tx.Sha())
-			s.RelayInventory(inv, tx)
-
-			if s.rpcServer != nil {
-				// Notify websocket clients about mempool transactions.
-				s.rpcServer.ntfnMgr.NotifyMempoolTx(tx, true)
-
-				// Potentially notify any getblocktemplate long poll clients
-				// about stale block templates due to the new transaction.
-				s.rpcServer.gbtWorkState.NotifyMempoolTx(
-					s.txMemPool.LastUpdated())
-			}
-
-		case <-s.quit:
-			break out
-		}
-	}
-
-	// Drain channels before exiting so nothing is left waiting around to send.
-cleanup:
-	for {
-		select {
-		case <-s.relayNtfnChan:
-		default:
-			break cleanup
-		}
-	}
-	s.wg.Done()
-}
-
 // rebroadcastHandler keeps track of user submitted inventories that we have
 // sent out but have not yet made it into a block. We periodically rebroadcast
 // them in case our peers restarted or otherwise lost track of them.
@@ -2124,9 +2109,6 @@ func (s *server) Start() {
 	// managers.
 	s.wg.Add(1)
 	go s.peerHandler()
-
-	s.wg.Add(1)
-	go s.relayTransactionsHandler()
 
 	if s.nat != nil {
 		s.wg.Add(1)
@@ -2479,7 +2461,6 @@ func newServer(listenAddrs []string, db database.DB, chainParams *chaincfg.Param
 		relayInv:             make(chan relayMsg, cfg.MaxPeers),
 		broadcast:            make(chan broadcastMsg, cfg.MaxPeers),
 		quit:                 make(chan struct{}),
-		relayNtfnChan:        make(chan *btcutil.Tx, cfg.MaxPeers),
 		modifyRebroadcastInv: make(chan interface{}),
 		peerHeightsUpdate:    make(chan updatePeerHeightsMsg),
 		nat:                  nat,
@@ -2538,7 +2519,6 @@ func newServer(listenAddrs []string, db database.DB, chainParams *chaincfg.Param
 		},
 		FetchUtxoView: s.blockManager.chain.FetchUtxoView,
 		Chain:         s.blockManager.chain,
-		RelayNtfnChan: s.relayNtfnChan,
 		SigCache:      s.sigCache,
 		TimeSource:    s.timeSource,
 		AddrIndex:     s.addrIndex,
