@@ -52,10 +52,6 @@ type mempoolConfig struct {
 	// the current best chain.
 	Chain *blockchain.BlockChain
 
-	// RelayNtfnChan defines the channel to send newly accepted transactions
-	// to.  If unset or set to nil, notifications will not be sent.
-	RelayNtfnChan chan *btcutil.Tx
-
 	// SigCache defines a signature cache to use.
 	SigCache *txscript.SigCache
 
@@ -751,7 +747,9 @@ func (mp *txMemPool) MaybeAcceptTransaction(tx *btcutil.Tx, isNew, rateLimit boo
 // ProcessOrphans.  See the comment for ProcessOrphans for more details.
 //
 // This function MUST be called with the mempool lock held (for writes).
-func (mp *txMemPool) processOrphans(hash *wire.ShaHash) {
+func (mp *txMemPool) processOrphans(hash *wire.ShaHash) []*btcutil.Tx {
+	var acceptedTxns []*btcutil.Tx
+
 	// Start with processing at least the passed hash.
 	processHashes := list.New()
 	processHashes.PushBack(hash)
@@ -807,10 +805,9 @@ func (mp *txMemPool) processOrphans(hash *wire.ShaHash) {
 				continue
 			}
 
-			// Notify the caller of the new tx added to mempool.
-			if mp.cfg.RelayNtfnChan != nil {
-				mp.cfg.RelayNtfnChan <- tx
-			}
+			// Add this transaction to the list of transactions
+			// that are no longer orphans.
+			acceptedTxns = append(acceptedTxns, tx)
 
 			// Add this transaction to the list of transactions to
 			// process so any orphans that depend on this one are
@@ -828,6 +825,8 @@ func (mp *txMemPool) processOrphans(hash *wire.ShaHash) {
 			processHashes.PushBack(orphanHash)
 		}
 	}
+
+	return acceptedTxns
 }
 
 // ProcessOrphans determines if there are any orphans which depend on the passed
@@ -836,11 +835,16 @@ func (mp *txMemPool) processOrphans(hash *wire.ShaHash) {
 // newly accepted transactions (to detect further orphans which may no longer be
 // orphans) until there are no more.
 //
+// It returns a slice of transactions added to the mempool.  A nil slice means
+// no transactions were moved from the orphan pool to the mempool.
+//
 // This function is safe for concurrent access.
-func (mp *txMemPool) ProcessOrphans(hash *wire.ShaHash) {
+func (mp *txMemPool) ProcessOrphans(hash *wire.ShaHash) []*btcutil.Tx {
 	mp.Lock()
-	mp.processOrphans(hash)
+	acceptedTxns := mp.processOrphans(hash)
 	mp.Unlock()
+
+	return acceptedTxns
 }
 
 // ProcessTransaction is the main workhorse for handling insertion of new
@@ -848,8 +852,13 @@ func (mp *txMemPool) ProcessOrphans(hash *wire.ShaHash) {
 // such as rejecting duplicate transactions, ensuring transactions follow all
 // rules, orphan transaction handling, and insertion into the memory pool.
 //
+// It returns a slice of transactions added to the mempool.  When the
+// error is nil, the list will include the passed transaction itself along
+// with any additional orphan transaactions that were added as a result of
+// the passed one being accepted.
+//
 // This function is safe for concurrent access.
-func (mp *txMemPool) ProcessTransaction(tx *btcutil.Tx, allowOrphan, rateLimit bool) error {
+func (mp *txMemPool) ProcessTransaction(tx *btcutil.Tx, allowOrphan, rateLimit bool) ([]*btcutil.Tx, error) {
 	// Protect concurrent access.
 	mp.Lock()
 	defer mp.Unlock()
@@ -859,47 +868,50 @@ func (mp *txMemPool) ProcessTransaction(tx *btcutil.Tx, allowOrphan, rateLimit b
 	// Potentially accept the transaction to the memory pool.
 	missingParents, err := mp.maybeAcceptTransaction(tx, true, rateLimit)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	if len(missingParents) == 0 {
-		// Notify the caller that the tx was added to the mempool.
-		if mp.cfg.RelayNtfnChan != nil {
-			mp.cfg.RelayNtfnChan <- tx
-		}
-
 		// Accept any orphan transactions that depend on this
 		// transaction (they may no longer be orphans if all inputs
 		// are now available) and repeat for those accepted
 		// transactions until there are no more.
-		mp.processOrphans(tx.Sha())
-	} else {
-		// The transaction is an orphan (has inputs missing).  Reject
-		// it if the flag to allow orphans is not set.
-		if !allowOrphan {
-			// Only use the first missing parent transaction in
-			// the error message.
-			//
-			// NOTE: RejectDuplicate is really not an accurate
-			// reject code here, but it matches the reference
-			// implementation and there isn't a better choice due
-			// to the limited number of reject codes.  Missing
-			// inputs is assumed to mean they are already spent
-			// which is not really always the case.
-			str := fmt.Sprintf("orphan transaction %v references "+
-				"outputs of unknown or fully-spent "+
-				"transaction %v", tx.Sha(), missingParents[0])
-			return txRuleError(wire.RejectDuplicate, str)
-		}
+		newTxs := mp.processOrphans(tx.Sha())
 
-		// Potentially add the orphan transaction to the orphan pool.
-		err := mp.maybeAddOrphan(tx)
-		if err != nil {
-			return err
-		}
+		acceptedTxs := make([]*btcutil.Tx, len(newTxs)+1)
+		// Add the parent transaction first so remote nodes
+		// do not add orphans.
+		acceptedTxs[0] = tx
+		copy(acceptedTxs[1:], newTxs)
+
+		return acceptedTxs, nil
 	}
 
-	return nil
+	// The transaction is an orphan (has inputs missing).  Reject
+	// it if the flag to allow orphans is not set.
+	if !allowOrphan {
+		// Only use the first missing parent transaction in
+		// the error message.
+		//
+		// NOTE: RejectDuplicate is really not an accurate
+		// reject code here, but it matches the reference
+		// implementation and there isn't a better choice due
+		// to the limited number of reject codes.  Missing
+		// inputs is assumed to mean they are already spent
+		// which is not really always the case.
+		str := fmt.Sprintf("orphan transaction %v references "+
+			"outputs of unknown or fully-spent "+
+			"transaction %v", tx.Sha(), missingParents[0])
+		return nil, txRuleError(wire.RejectDuplicate, str)
+	}
+
+	// Potentially add the orphan transaction to the orphan pool.
+	err = mp.maybeAddOrphan(tx)
+	if err != nil {
+		return nil, err
+	}
+
+	return nil, nil
 }
 
 // Count returns the number of transactions in the main pool.  It does not
