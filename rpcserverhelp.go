@@ -447,7 +447,7 @@ var helpDescsEnUS = map[string]string{
 	// GetRawMempoolCmd help.
 	"getrawmempool--synopsis":   "Returns information about all of the transactions currently in the memory pool.",
 	"getrawmempool-verbose":     "Returns JSON object when true or an array of transaction hashes when false",
-	"getrawmempool-txtype":      "Type of tx to return.",
+	"getrawmempool-txtype":      "Type of tx to return. (all/regular/tickets/votes/revocations)",
 	"getrawmempool--condition0": "verbose=false",
 	"getrawmempool--condition1": "verbose=true",
 	"getrawmempool--result0":    "Array of transaction hashes",

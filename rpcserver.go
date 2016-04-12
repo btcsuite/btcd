@@ -3364,7 +3364,23 @@ func handleGetRawMempool(s *rpcServer, cmd interface{}, closeChan <-chan struct{
 	c := cmd.(*dcrjson.GetRawMempoolCmd)
 	mp := s.server.txMemPool
 	descs := mp.TxDescs()
+	var txType stake.TxType
 
+	if c.TxType != nil {
+		switch *c.TxType {
+		case string(dcrjson.GRMRegular):
+			txType = stake.TxTypeRegular
+		case string(dcrjson.GRMTickets):
+			txType = stake.TxTypeSStx
+		case string(dcrjson.GRMVotes):
+			txType = stake.TxTypeSSGen
+		case string(dcrjson.GRMRevocations):
+			txType = stake.TxTypeSSRtx
+		case string(dcrjson.GRMAll):
+		default:
+			return nil, fmt.Errorf("Invalid transaction type")
+		}
+	}
 	if c.Verbose != nil && *c.Verbose {
 		result := make(map[string]*dcrjson.GetRawMempoolVerboseResult,
 			len(descs))
@@ -3378,30 +3394,9 @@ func handleGetRawMempool(s *rpcServer, cmd interface{}, closeChan <-chan struct{
 		mp.RLock()
 		defer mp.RUnlock()
 		for _, desc := range descs {
-			// If we're interested in a specific transaction type,
-			// skip all the transactions which are not this type.
-			if c.TxType != nil {
-				switch *c.TxType {
-				case string(dcrjson.GRMRegular):
-					if desc.Type != stake.TxTypeRegular {
-						continue
-					}
-				case string(dcrjson.GRMTickets):
-					if desc.Type != stake.TxTypeSStx {
-						continue
-					}
-				case string(dcrjson.GRMVotes):
-					if desc.Type != stake.TxTypeSSGen {
-						continue
-					}
-				case string(dcrjson.GRMRevocations):
-					if desc.Type != stake.TxTypeSSRtx {
-						continue
-					}
-				case string(dcrjson.GRMAll):
-					fallthrough
-				default:
-				}
+			if desc.Type != txType && c.TxType != nil &&
+				*c.TxType != string(dcrjson.GRMAll) {
+				continue
 			}
 
 			// Calculate the starting and current priority from the
@@ -3443,30 +3438,10 @@ func handleGetRawMempool(s *rpcServer, cmd interface{}, closeChan <-chan struct{
 	descsLen := len(descs)
 	hashStrings := make([]string, 0, descsLen)
 	for i := 0; i < descsLen; i++ {
-		if c.TxType != nil {
-			switch *c.TxType {
-			case string(dcrjson.GRMRegular):
-				if descs[i].Type != stake.TxTypeRegular {
-					continue
-				}
-			case string(dcrjson.GRMTickets):
-				if descs[i].Type != stake.TxTypeSStx {
-					continue
-				}
-			case string(dcrjson.GRMVotes):
-				if descs[i].Type != stake.TxTypeSSGen {
-					continue
-				}
-			case string(dcrjson.GRMRevocations):
-				if descs[i].Type != stake.TxTypeSSRtx {
-					continue
-				}
-			case string(dcrjson.GRMAll):
-				fallthrough
-			default:
-			}
+		if descs[i].Type != txType && c.TxType != nil &&
+			*c.TxType != string(dcrjson.GRMAll) {
+			continue
 		}
-
 		hashStrings = append(hashStrings, descs[i].Tx.Sha().String())
 	}
 
