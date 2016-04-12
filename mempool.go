@@ -710,16 +710,20 @@ func calcMinRequiredTxRelayFee(serializedSize int64,
 	// divide the transaction size by 1000 to convert to kilobytes.  Also,
 	// integer division is used so fees only increase on full kilobyte
 	// boundaries.
-	var minTxRelayFee dcrutil.Amount
+	var minRelayTxFee dcrutil.Amount
 	switch {
 	case params == &chaincfg.MainNetParams:
-		minTxRelayFee = minTxRelayFeeMainNet
-	case params == &chaincfg.MainNetParams:
-		minTxRelayFee = minTxRelayFeeTestNet
+		minRelayTxFee = minTxRelayFeeMainNet
+	case params == &chaincfg.TestNetParams:
+		minRelayTxFee = minTxRelayFeeTestNet
 	default:
-		minTxRelayFee = minTxRelayFeeTestNet
+		minRelayTxFee = minTxRelayFeeTestNet
 	}
-	minFee := (1 + serializedSize/1000) * int64(minTxRelayFee)
+	minFee := (serializedSize * int64(minRelayTxFee)) / 1000
+
+	if minFee == 0 && minRelayTxFee > 0 {
+		minFee = int64(minRelayTxFee)
+	}
 
 	// Set the minimum fee to the maximum possible value if the calculated
 	// fee is not in the valid range for monetary amounts.
