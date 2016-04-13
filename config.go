@@ -43,7 +43,7 @@ const (
 	defaultBlockMaxSize      = 375000
 	blockMaxSizeMin          = 1000
 	blockMaxSizeMax          = wire.MaxBlockPayload - 1000
-	defaultBlockPrioritySize = 50000
+	defaultBlockPrioritySize = 20000
 	defaultGenerate          = false
 	defaultAddrIndex         = false
 	defaultNonAggressive     = false

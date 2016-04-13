@@ -35,6 +35,9 @@ const (
 	// coinbaseFlags is some extra data appended to the coinbase script
 	// sig.
 	coinbaseFlags = "/dcrd/"
+
+	// kilobyte is the size of a kilobyte.
+	kilobyte = 1000
 )
 
 // txPrioItem houses a transaction along with extra information that allows the
@@ -108,6 +111,48 @@ func (pq *txPriorityQueue) SetLessFunc(lessFunc txPriorityQueueLessFunc) {
 	heap.Init(pq)
 }
 
+// stakePriority is an integer that is used to sort stake transactions
+// by importance when they enter the min heap for block construction.
+// 2 is for votes (highest), followed by 1 for tickets (2nd highest),
+// followed by 0 for regular transactions and revocations (lowest).
+type stakePriority int
+
+const (
+	regOrRevocPriority stakePriority = iota
+	ticketPriority
+	votePriority
+)
+
+// stakePriority assigns a stake priority based on a transaction type.
+func txStakePriority(txType stake.TxType) stakePriority {
+	prio := regOrRevocPriority
+	switch txType {
+	case stake.TxTypeSSGen:
+		prio = votePriority
+	case stake.TxTypeSStx:
+		prio = ticketPriority
+	}
+
+	return prio
+}
+
+// compareStakePriority compares the stake priority of two transactions.
+// It uses votes > tickets > regular transactions or revocations. It
+// returns 1 if i > j, 0 if i == j, and -1 if i < j in terms of stake
+// priority.
+func compareStakePriority(i, j *txPrioItem) int {
+	iStakePriority := txStakePriority(i.txType)
+	jStakePriority := txStakePriority(j.txType)
+
+	if iStakePriority > jStakePriority {
+		return 1
+	}
+	if iStakePriority < jStakePriority {
+		return -1
+	}
+	return 0
+}
+
 // txPQByPriority sorts a txPriorityQueue by transaction priority and then fees
 // per kilobyte.
 func txPQByPriority(pq *txPriorityQueue, i, j int) bool {
@@ -117,7 +162,27 @@ func txPQByPriority(pq *txPriorityQueue, i, j int) bool {
 		return pq.items[i].feePerKB > pq.items[j].feePerKB
 	}
 	return pq.items[i].priority > pq.items[j].priority
+}
 
+// txPQByStakeAndPriority sorts a txPriorityQueue by stake priority then
+// transaction priority, and then fees per kilobyte.
+func txPQByStakeAndPriority(pq *txPriorityQueue, i, j int) bool {
+	// Sort by stake priority, continue if they're the same stake priority.
+	cmp := compareStakePriority(pq.items[i], pq.items[j])
+	if cmp == 1 {
+		return true
+	}
+	if cmp == -1 {
+		return false
+	}
+
+	// Using > here so that pop gives the highest priority item as opposed
+	// to the lowest.  Sort by priority first, then fee.
+	if pq.items[i].priority == pq.items[j].priority {
+		return pq.items[i].feePerKB > pq.items[j].feePerKB
+	}
+
+	return pq.items[i].priority > pq.items[j].priority
 }
 
 // txPQByFee sorts a txPriorityQueue by fees per kilobyte and then transaction
@@ -131,21 +196,72 @@ func txPQByFee(pq *txPriorityQueue, i, j int) bool {
 	return pq.items[i].feePerKB > pq.items[j].feePerKB
 }
 
+// txPQByStakeAndFee sorts a txPriorityQueue by stake priority, followed by
+// fees per kilobyte, and then transaction priority.
+func txPQByStakeAndFee(pq *txPriorityQueue, i, j int) bool {
+	// Sort by stake priority, continue if they're the same stake priority.
+	cmp := compareStakePriority(pq.items[i], pq.items[j])
+	if cmp == 1 {
+		return true
+	}
+	if cmp == -1 {
+		return false
+	}
+
+	// Using > here so that pop gives the highest fee item as opposed
+	// to the lowest.  Sort by fee first, then priority.
+	if pq.items[i].feePerKB == pq.items[j].feePerKB {
+		return pq.items[i].priority > pq.items[j].priority
+	}
+
+	// The stake priorities are equal, so return based on fees
+	// per KB.
+	return pq.items[i].feePerKB > pq.items[j].feePerKB
+}
+
+// txPQByStakeAndFeeAndThenPriority sorts a txPriorityQueue by stake priority,
+// followed by fees per kilobyte, and then if the transaction type is regular
+// or a revocation it sorts it by priority.
+func txPQByStakeAndFeeAndThenPriority(pq *txPriorityQueue, i, j int) bool {
+	// Sort by stake priority, continue if they're the same stake priority.
+	cmp := compareStakePriority(pq.items[i], pq.items[j])
+	if cmp == 1 {
+		return true
+	}
+	if cmp == -1 {
+		return false
+	}
+
+	bothAreLowStakePriority :=
+		txStakePriority(pq.items[i].txType) == regOrRevocPriority &&
+			txStakePriority(pq.items[j].txType) == regOrRevocPriority
+
+	// Use fees per KB on high stake priority transactions.
+	if !bothAreLowStakePriority {
+		return pq.items[i].feePerKB > pq.items[j].feePerKB
+	}
+
+	// Both transactions are of low stake importance. Use > here so that
+	// pop gives the highest priority item as opposed to the lowest.
+	// Sort by priority first, then fee.
+	if pq.items[i].priority == pq.items[j].priority {
+		return pq.items[i].feePerKB > pq.items[j].feePerKB
+	}
+
+	return pq.items[i].priority > pq.items[j].priority
+}
+
 // newTxPriorityQueue returns a new transaction priority queue that reserves the
-// passed amount of space for the elements.  The new priority queue uses either
-// the txPQByPriority or the txPQByFee compare function depending on the
-// sortByFee parameter and is already initialized for use with heap.Push/Pop.
-// The priority queue can grow larger than the reserved space, but extra copies
-// of the underlying array can be avoided by reserving a sane value.
-func newTxPriorityQueue(reserve int, sortByFee bool) *txPriorityQueue {
+// passed amount of space for the elements.  The new priority queue uses the
+// less than function lessFunc to sort the items in the min heap. The priority
+// queue can grow larger than the reserved space, but extra copies of the
+// underlying array can be avoided by reserving a sane value.
+func newTxPriorityQueue(reserve int, lessFunc func(*txPriorityQueue, int,
+	int) bool) *txPriorityQueue {
 	pq := &txPriorityQueue{
 		items: make([]*txPrioItem, 0, reserve),
 	}
-	if sortByFee {
-		pq.SetLessFunc(txPQByFee)
-	} else {
-		pq.SetLessFunc(txPQByPriority)
-	}
+	pq.SetLessFunc(lessFunc)
 	return pq
 }
 
@@ -1107,11 +1223,12 @@ func NewBlockTemplate(mempool *txMemPool,
 	// whether or not there is an area allocated for high-priority
 	// transactions.
 	mempoolTxns := mempool.TxDescs()
-	// Disable sort by fee because we sort according to tx priority first,
-	// which is for stake. Decred TODO: Clean this up so we pile on stake tx
-	// first, then sort remaining tx by fee.
 	sortedByFee := cfg.BlockPrioritySize == 0
-	priorityQueue := newTxPriorityQueue(len(mempoolTxns), sortedByFee)
+	lessFunc := txPQByStakeAndFeeAndThenPriority
+	if sortedByFee {
+		lessFunc = txPQByStakeAndFee
+	}
+	priorityQueue := newTxPriorityQueue(len(mempoolTxns), lessFunc)
 
 	// Create a slice to hold the transactions to be included in the
 	// generated block with reserved space.  Also create a transaction
@@ -1264,32 +1381,14 @@ mempoolLoop:
 		txSize := tx.MsgTx().SerializeSize()
 		prioItem.priority = calcPriority(tx, inputValueAge)
 
-		// Votes are extremely high priority. Hackish fix, this should be
-		// better fixed later. Other stake transactions should next be
-		// added. TODO Make appropriate heaps for the other transaction
-		// types, or a new priority class.
-		if isSSGen {
-			prioItem.priority += (math.MaxFloat64 / 1.5)
-		} else if tx.Tree() == dcrutil.TxTreeStake {
-			// Prioritize other stake tx below this.
-			prioItem.priority += 1.0e9
-		}
-
 		// Calculate the fee in Atoms/KB.
 		// NOTE: This is a more precise value than the one calculated
 		// during calcMinRelayFee which rounds up to the nearest full
 		// kilobyte boundary.  This is beneficial since it provides an
 		// incentive to create smaller transactions.
-		prioItem.feePerKB = float64(txDesc.Fee) / (float64(txSize) / 1000)
+		prioItem.feePerKB = (float64(txDesc.Fee) * float64(kilobyte)) /
+			float64(txSize)
 		prioItem.fee = txDesc.Fee
-
-		// Votes are extremely high priority. Hackish fix by Decred.
-		if isSSGen {
-			prioItem.feePerKB += (math.MaxFloat64 / 1.5)
-		} else if tx.Tree() == dcrutil.TxTreeStake {
-			// Prioritize other stake tx below this.
-			prioItem.feePerKB += 1.0e9
-		}
 
 		// Add the transaction to the priority queue to mark it ready
 		// for inclusion in the block unless it has dependencies.
@@ -1360,7 +1459,8 @@ mempoolLoop:
 		delete(dependers, *tx.Sha())
 
 		// Skip if we already have too many SStx.
-		if isSStx && (numSStx > int(math.MaxUint8)) {
+		if isSStx && (numSStx >=
+			int(mempool.server.chainParams.MaxFreshStakePerBlock)) {
 			minrLog.Tracef("Skipping sstx %s because it would exceed "+
 				"the max number of sstx allowed in a block", tx.Sha())
 			logSkippedDeps(tx, deps)
@@ -1523,7 +1623,8 @@ mempoolLoop:
 		blockSize += txSize
 		blockSigOps += numSigOps
 
-		// Accumulate the SStxs in the block, because only 255 are allowed.
+		// Accumulate the SStxs in the block, because only a certain number
+		// are allowed.
 		if isSStx {
 			numSStx++
 		}
