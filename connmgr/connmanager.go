@@ -160,8 +160,10 @@ out:
 	for {
 		select {
 		case cr := <-cm.newConnections:
-			connectionID := atomic.AddUint32(&cm.connectionCount, 1)
-			cm.connections[connectionID] = cr.Conn
+			if cr.Err != nil {
+				connectionID := atomic.AddUint32(&cm.connectionCount, 1)
+				cm.connections[connectionID] = cr.Conn
+			}
 
 		case connectionID := <-cm.closeConnections:
 			c := cm.connections[connectionID]
