@@ -1275,9 +1275,8 @@ func (state *gbtWorkState) notifyLongPollers(latestHash *wire.ShaHash, lastGener
 func (state *gbtWorkState) NotifyBlockConnected(blockSha *wire.ShaHash) {
 	go func() {
 		state.Lock()
-		defer state.Unlock()
-
 		state.notifyLongPollers(blockSha, state.lastTxUpdate)
+		state.Unlock()
 	}()
 }
 

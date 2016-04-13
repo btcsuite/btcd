@@ -265,9 +265,10 @@ func (mp *txMemPool) isTransactionInPool(hash *wire.ShaHash) bool {
 func (mp *txMemPool) IsTransactionInPool(hash *wire.ShaHash) bool {
 	// Protect concurrent access.
 	mp.RLock()
-	defer mp.RUnlock()
+	inPool := mp.isTransactionInPool(hash)
+	mp.RUnlock()
 
-	return mp.isTransactionInPool(hash)
+	return inPool
 }
 
 // isOrphanInPool returns whether or not the passed transaction already exists
@@ -289,9 +290,10 @@ func (mp *txMemPool) isOrphanInPool(hash *wire.ShaHash) bool {
 func (mp *txMemPool) IsOrphanInPool(hash *wire.ShaHash) bool {
 	// Protect concurrent access.
 	mp.RLock()
-	defer mp.RUnlock()
+	inPool := mp.isOrphanInPool(hash)
+	mp.RUnlock()
 
-	return mp.isOrphanInPool(hash)
+	return inPool
 }
 
 // haveTransaction returns whether or not the passed transaction already exists
@@ -309,9 +311,10 @@ func (mp *txMemPool) haveTransaction(hash *wire.ShaHash) bool {
 func (mp *txMemPool) HaveTransaction(hash *wire.ShaHash) bool {
 	// Protect concurrent access.
 	mp.RLock()
-	defer mp.RUnlock()
+	haveTx := mp.haveTransaction(hash)
+	mp.RUnlock()
 
-	return mp.haveTransaction(hash)
+	return haveTx
 }
 
 // removeTransaction is the internal function which implements the public
@@ -356,9 +359,8 @@ func (mp *txMemPool) removeTransaction(tx *btcutil.Tx, removeRedeemers bool) {
 func (mp *txMemPool) RemoveTransaction(tx *btcutil.Tx, removeRedeemers bool) {
 	// Protect concurrent access.
 	mp.Lock()
-	defer mp.Unlock()
-
 	mp.removeTransaction(tx, removeRedeemers)
+	mp.Unlock()
 }
 
 // RemoveDoubleSpends removes all transactions which spend outputs spent by the
@@ -371,7 +373,6 @@ func (mp *txMemPool) RemoveTransaction(tx *btcutil.Tx, removeRedeemers bool) {
 func (mp *txMemPool) RemoveDoubleSpends(tx *btcutil.Tx) {
 	// Protect concurrent access.
 	mp.Lock()
-	defer mp.Unlock()
 
 	for _, txIn := range tx.MsgTx().TxIn {
 		if txRedeemer, ok := mp.outpoints[txIn.PreviousOutPoint]; ok {
@@ -380,6 +381,8 @@ func (mp *txMemPool) RemoveDoubleSpends(tx *btcutil.Tx) {
 			}
 		}
 	}
+
+	mp.Unlock()
 }
 
 // addTransaction adds the passed transaction to the memory pool.  It should
@@ -463,9 +466,10 @@ func (mp *txMemPool) fetchInputUtxos(tx *btcutil.Tx) (*blockchain.UtxoViewpoint,
 func (mp *txMemPool) FetchTransaction(txHash *wire.ShaHash) (*btcutil.Tx, error) {
 	// Protect concurrent access.
 	mp.RLock()
-	defer mp.RUnlock()
+	txDesc, exists := mp.pool[*txHash]
+	mp.RUnlock()
 
-	if txDesc, exists := mp.pool[*txHash]; exists {
+	if exists {
 		return txDesc.Tx, nil
 	}
 
@@ -742,9 +746,10 @@ func (mp *txMemPool) maybeAcceptTransaction(tx *btcutil.Tx, isNew, rateLimit boo
 func (mp *txMemPool) MaybeAcceptTransaction(tx *btcutil.Tx, isNew, rateLimit bool) ([]*wire.ShaHash, error) {
 	// Protect concurrent access.
 	mp.Lock()
-	defer mp.Unlock()
+	hashes, err := mp.maybeAcceptTransaction(tx, isNew, rateLimit)
+	mp.Unlock()
 
-	return mp.maybeAcceptTransaction(tx, isNew, rateLimit)
+	return hashes, err
 }
 
 // processOrphans is the internal function which implements the public
@@ -850,11 +855,11 @@ func (mp *txMemPool) ProcessOrphans(hash *wire.ShaHash) {
 //
 // This function is safe for concurrent access.
 func (mp *txMemPool) ProcessTransaction(tx *btcutil.Tx, allowOrphan, rateLimit bool) error {
+	txmpLog.Tracef("Processing transaction %v", tx.Sha())
+
 	// Protect concurrent access.
 	mp.Lock()
 	defer mp.Unlock()
-
-	txmpLog.Tracef("Processing transaction %v", tx.Sha())
 
 	// Potentially accept the transaction to the memory pool.
 	missingParents, err := mp.maybeAcceptTransaction(tx, true, rateLimit)
@@ -908,9 +913,10 @@ func (mp *txMemPool) ProcessTransaction(tx *btcutil.Tx, allowOrphan, rateLimit b
 // This function is safe for concurrent access.
 func (mp *txMemPool) Count() int {
 	mp.RLock()
-	defer mp.RUnlock()
+	count := len(mp.pool)
+	mp.RUnlock()
 
-	return len(mp.pool)
+	return count
 }
 
 // TxShas returns a slice of hashes for all of the transactions in the memory
@@ -919,7 +925,6 @@ func (mp *txMemPool) Count() int {
 // This function is safe for concurrent access.
 func (mp *txMemPool) TxShas() []*wire.ShaHash {
 	mp.RLock()
-	defer mp.RUnlock()
 
 	hashes := make([]*wire.ShaHash, len(mp.pool))
 	i := 0
@@ -929,6 +934,7 @@ func (mp *txMemPool) TxShas() []*wire.ShaHash {
 		i++
 	}
 
+	mp.RUnlock()
 	return hashes
 }
 
@@ -938,7 +944,6 @@ func (mp *txMemPool) TxShas() []*wire.ShaHash {
 // This function is safe for concurrent access.
 func (mp *txMemPool) TxDescs() []*mempoolTxDesc {
 	mp.RLock()
-	defer mp.RUnlock()
 
 	descs := make([]*mempoolTxDesc, len(mp.pool))
 	i := 0
@@ -947,6 +952,7 @@ func (mp *txMemPool) TxDescs() []*mempoolTxDesc {
 		i++
 	}
 
+	mp.RUnlock()
 	return descs
 }
 
@@ -957,7 +963,6 @@ func (mp *txMemPool) TxDescs() []*mempoolTxDesc {
 // concurrent access as required by the interface contract.
 func (mp *txMemPool) MiningDescs() []*mining.TxDesc {
 	mp.RLock()
-	defer mp.RUnlock()
 
 	descs := make([]*mining.TxDesc, len(mp.pool))
 	i := 0
@@ -966,6 +971,7 @@ func (mp *txMemPool) MiningDescs() []*mining.TxDesc {
 		i++
 	}
 
+	mp.RUnlock()
 	return descs
 }
 

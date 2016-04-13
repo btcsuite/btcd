@@ -48,12 +48,10 @@ func (m *mruNonceMap) String() string {
 // This function is safe for concurrent access.
 func (m *mruNonceMap) Exists(nonce uint64) bool {
 	m.mtx.Lock()
-	defer m.mtx.Unlock()
+	_, exists := m.nonceMap[nonce]
+	m.mtx.Unlock()
 
-	if _, exists := m.nonceMap[nonce]; exists {
-		return true
-	}
-	return false
+	return exists
 }
 
 // Add adds the passed nonce to the map and handles eviction of the oldest item
@@ -107,12 +105,13 @@ func (m *mruNonceMap) Add(nonce uint64) {
 // This function is safe for concurrent access.
 func (m *mruNonceMap) Delete(nonce uint64) {
 	m.mtx.Lock()
-	defer m.mtx.Unlock()
 
 	if node, exists := m.nonceMap[nonce]; exists {
 		m.nonceList.Remove(node)
 		delete(m.nonceMap, nonce)
 	}
+
+	m.mtx.Unlock()
 }
 
 // newMruNonceMap returns a new nonce map that is limited to the number of

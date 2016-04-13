@@ -283,9 +283,10 @@ func (sp *serverPeer) setDisableRelayTx(disable bool) {
 // It is safe for concurrent access.
 func (sp *serverPeer) relayTxDisabled() bool {
 	sp.relayMtx.Lock()
-	defer sp.relayMtx.Unlock()
+	isDisabled := sp.disableRelayTx
+	sp.relayMtx.Unlock()
 
-	return sp.disableRelayTx
+	return isDisabled
 }
 
 // pushAddrMsg sends an addr message to the connected peer using the provided
