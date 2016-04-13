@@ -1352,9 +1352,10 @@ func (c *wsClient) QueueNotification(marshalledJSON []byte) error {
 // Disconnected returns whether or not the websocket client is disconnected.
 func (c *wsClient) Disconnected() bool {
 	c.Lock()
-	defer c.Unlock()
+	isDisconnected := c.disconnected
+	c.Unlock()
 
-	return c.disconnected
+	return isDisconnected
 }
 
 // Disconnect disconnects the websocket client.

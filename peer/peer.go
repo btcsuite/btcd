@@ -485,7 +485,6 @@ func (p *Peer) AddKnownInventory(invVect *wire.InvVect) {
 // This function is safe for concurrent access.
 func (p *Peer) StatsSnapshot() *StatsSnap {
 	p.statsMtx.RLock()
-	defer p.statsMtx.RUnlock()
 
 	p.flagsMtx.Lock()
 	id := p.id
@@ -496,7 +495,7 @@ func (p *Peer) StatsSnapshot() *StatsSnap {
 	p.flagsMtx.Unlock()
 
 	// Get a copy of all relevant flags and stats.
-	return &StatsSnap{
+	statsSnap := &StatsSnap{
 		ID:             id,
 		Addr:           addr,
 		UserAgent:      userAgent,
@@ -515,6 +514,9 @@ func (p *Peer) StatsSnapshot() *StatsSnap {
 		LastPingMicros: p.lastPingMicros,
 		LastPingTime:   p.lastPingTime,
 	}
+
+	p.statsMtx.RUnlock()
+	return statsSnap
 }
 
 // ID returns the peer id.
@@ -522,9 +524,10 @@ func (p *Peer) StatsSnapshot() *StatsSnap {
 // This function is safe for concurrent access.
 func (p *Peer) ID() int32 {
 	p.flagsMtx.Lock()
-	defer p.flagsMtx.Unlock()
+	id := p.id
+	p.flagsMtx.Unlock()
 
-	return p.id
+	return id
 }
 
 // NA returns the peer network address.
@@ -532,9 +535,10 @@ func (p *Peer) ID() int32 {
 // This function is safe for concurrent access.
 func (p *Peer) NA() *wire.NetAddress {
 	p.flagsMtx.Lock()
-	defer p.flagsMtx.Unlock()
+	na := p.na
+	p.flagsMtx.Unlock()
 
-	return p.na
+	return na
 }
 
 // Addr returns the peer address.
@@ -558,9 +562,10 @@ func (p *Peer) Inbound() bool {
 // This function is safe for concurrent access.
 func (p *Peer) Services() wire.ServiceFlag {
 	p.flagsMtx.Lock()
-	defer p.flagsMtx.Unlock()
+	services := p.services
+	p.flagsMtx.Unlock()
 
-	return p.services
+	return services
 }
 
 // UserAgent returns the user agent of the remote peer.
@@ -568,9 +573,10 @@ func (p *Peer) Services() wire.ServiceFlag {
 // This function is safe for concurrent access.
 func (p *Peer) UserAgent() string {
 	p.flagsMtx.Lock()
-	defer p.flagsMtx.Unlock()
+	userAgent := p.userAgent
+	p.flagsMtx.Unlock()
 
-	return p.userAgent
+	return userAgent
 }
 
 // LastAnnouncedBlock returns the last announced block of the remote peer.
@@ -578,9 +584,10 @@ func (p *Peer) UserAgent() string {
 // This function is safe for concurrent access.
 func (p *Peer) LastAnnouncedBlock() *chainhash.Hash {
 	p.statsMtx.RLock()
-	defer p.statsMtx.RUnlock()
+	lastAnnouncedBlock := p.lastAnnouncedBlock
+	p.statsMtx.RUnlock()
 
-	return p.lastAnnouncedBlock
+	return lastAnnouncedBlock
 }
 
 // LastPingNonce returns the last ping nonce of the remote peer.
@@ -588,9 +595,10 @@ func (p *Peer) LastAnnouncedBlock() *chainhash.Hash {
 // This function is safe for concurrent access.
 func (p *Peer) LastPingNonce() uint64 {
 	p.statsMtx.RLock()
-	defer p.statsMtx.RUnlock()
+	lastPingNonce := p.lastPingNonce
+	p.statsMtx.RUnlock()
 
-	return p.lastPingNonce
+	return lastPingNonce
 }
 
 // LastPingTime returns the last ping time of the remote peer.
@@ -598,9 +606,10 @@ func (p *Peer) LastPingNonce() uint64 {
 // This function is safe for concurrent access.
 func (p *Peer) LastPingTime() time.Time {
 	p.statsMtx.RLock()
-	defer p.statsMtx.RUnlock()
+	lastPingTime := p.lastPingTime
+	p.statsMtx.RUnlock()
 
-	return p.lastPingTime
+	return lastPingTime
 }
 
 // LastPingMicros returns the last ping micros of the remote peer.
@@ -608,9 +617,10 @@ func (p *Peer) LastPingTime() time.Time {
 // This function is safe for concurrent access.
 func (p *Peer) LastPingMicros() int64 {
 	p.statsMtx.RLock()
-	defer p.statsMtx.RUnlock()
+	lastPingMicros := p.lastPingMicros
+	p.statsMtx.RUnlock()
 
-	return p.lastPingMicros
+	return lastPingMicros
 }
 
 // VersionKnown returns the whether or not the version of a peer is known
@@ -619,9 +629,10 @@ func (p *Peer) LastPingMicros() int64 {
 // This function is safe for concurrent access.
 func (p *Peer) VersionKnown() bool {
 	p.flagsMtx.Lock()
-	defer p.flagsMtx.Unlock()
+	versionKnown := p.versionKnown
+	p.flagsMtx.Unlock()
 
-	return p.versionKnown
+	return versionKnown
 }
 
 // VerAckReceived returns whether or not a verack message was received by the
@@ -630,9 +641,10 @@ func (p *Peer) VersionKnown() bool {
 // This function is safe for concurrent access.
 func (p *Peer) VerAckReceived() bool {
 	p.flagsMtx.Lock()
-	defer p.flagsMtx.Unlock()
+	verAckReceived := p.verAckReceived
+	p.flagsMtx.Unlock()
 
-	return p.verAckReceived
+	return verAckReceived
 }
 
 // ProtocolVersion returns the peer protocol version.
@@ -640,9 +652,10 @@ func (p *Peer) VerAckReceived() bool {
 // This function is safe for concurrent access.
 func (p *Peer) ProtocolVersion() uint32 {
 	p.flagsMtx.Lock()
-	defer p.flagsMtx.Unlock()
+	protocolVersion := p.protocolVersion
+	p.flagsMtx.Unlock()
 
-	return p.protocolVersion
+	return protocolVersion
 }
 
 // LastBlock returns the last block of the peer.
@@ -650,9 +663,10 @@ func (p *Peer) ProtocolVersion() uint32 {
 // This function is safe for concurrent access.
 func (p *Peer) LastBlock() int32 {
 	p.statsMtx.RLock()
-	defer p.statsMtx.RUnlock()
+	lastBlock := p.lastBlock
+	p.statsMtx.RUnlock()
 
-	return p.lastBlock
+	return lastBlock
 }
 
 // LastSend returns the last send time of the peer.
@@ -688,9 +702,10 @@ func (p *Peer) BytesReceived() uint64 {
 // This function is safe for concurrent access.
 func (p *Peer) TimeConnected() time.Time {
 	p.statsMtx.RLock()
-	defer p.statsMtx.RUnlock()
+	timeConnected := p.timeConnected
+	p.statsMtx.RUnlock()
 
-	return p.timeConnected
+	return timeConnected
 }
 
 // TimeOffset returns the number of seconds the local time was offset from the
@@ -700,9 +715,10 @@ func (p *Peer) TimeConnected() time.Time {
 // This function is safe for concurrent access.
 func (p *Peer) TimeOffset() int64 {
 	p.statsMtx.RLock()
-	defer p.statsMtx.RUnlock()
+	timeOffset := p.timeOffset
+	p.statsMtx.RUnlock()
 
-	return p.timeOffset
+	return timeOffset
 }
 
 // StartingHeight returns the last known height the peer reported during the
@@ -711,9 +727,10 @@ func (p *Peer) TimeOffset() int64 {
 // This function is safe for concurrent access.
 func (p *Peer) StartingHeight() int32 {
 	p.statsMtx.RLock()
-	defer p.statsMtx.RUnlock()
+	startingHeight := p.startingHeight
+	p.statsMtx.RUnlock()
 
-	return p.startingHeight
+	return startingHeight
 }
 
 // WantsHeaders returns if the peer wants header messages instead of
@@ -722,9 +739,10 @@ func (p *Peer) StartingHeight() int32 {
 // This function is safe for concurrent access.
 func (p *Peer) WantsHeaders() bool {
 	p.flagsMtx.Lock()
-	defer p.flagsMtx.Unlock()
+	sendHeadersPreferred := p.sendHeadersPreferred
+	p.flagsMtx.Unlock()
 
-	return p.sendHeadersPreferred
+	return sendHeadersPreferred
 }
 
 // localVersionMsg creates a version message that can be used to send to the
@@ -1029,9 +1047,6 @@ func (p *Peer) handlePingMsg(msg *wire.MsgPing) {
 // version > BIP0031Version).  There is no effect for older clients or when a
 // ping was not previously sent.
 func (p *Peer) handlePongMsg(msg *wire.MsgPong) {
-	p.statsMtx.Lock()
-	defer p.statsMtx.Unlock()
-
 	// Arguably we could use a buffered channel here sending data
 	// in a fifo manner whenever we send a ping, or a list keeping track of
 	// the times of each ping. For now we just make a best effort and
@@ -1039,12 +1054,14 @@ func (p *Peer) handlePongMsg(msg *wire.MsgPong) {
 	// and overlapping pings will be ignored. It is unlikely to occur
 	// without large usage of the ping rpc call since we ping infrequently
 	// enough that if they overlap we would have timed out the peer.
-	if p.ProtocolVersion() > wire.BIP0031Version && p.lastPingNonce != 0 &&
-		msg.Nonce == p.lastPingNonce {
-
-		p.lastPingMicros = time.Now().Sub(p.lastPingTime).Nanoseconds()
-		p.lastPingMicros /= 1000 // convert to usec.
-		p.lastPingNonce = 0
+	if p.ProtocolVersion() > wire.BIP0031Version {
+		p.statsMtx.Lock()
+		if p.lastPingNonce != 0 && msg.Nonce == p.lastPingNonce {
+			p.lastPingMicros = time.Now().Sub(p.lastPingTime).Nanoseconds()
+			p.lastPingMicros /= 1000 // convert to usec.
+			p.lastPingNonce = 0
+		}
+		p.statsMtx.Unlock()
 	}
 }
 

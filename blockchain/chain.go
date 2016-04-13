@@ -245,9 +245,9 @@ func (b *BlockChain) DisableVerify(disable bool) {
 // This function is safe for concurrent access.
 func (b *BlockChain) HaveBlock(hash *chainhash.Hash) (bool, error) {
 	b.chainLock.RLock()
-	defer b.chainLock.RUnlock()
-
 	exists, err := b.blockExists(hash)
+	b.chainLock.RUnlock()
+
 	if err != nil {
 		return false, err
 	}
@@ -268,13 +268,10 @@ func (b *BlockChain) IsKnownOrphan(hash *chainhash.Hash) bool {
 	// Protect concurrent access.  Using a read lock only so multiple
 	// readers can query without blocking each other.
 	b.orphanLock.RLock()
-	defer b.orphanLock.RUnlock()
+	_, exists := b.orphans[*hash]
+	b.orphanLock.RUnlock()
 
-	if _, exists := b.orphans[*hash]; exists {
-		return true
-	}
-
-	return false
+	return exists
 }
 
 // GetOrphanRoot returns the head of the chain for the provided hash from the
