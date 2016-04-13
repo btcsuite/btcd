@@ -68,6 +68,7 @@ var runServiceCommand func(string) error
 //
 // See loadConfig for details on the configuration load process.
 type config struct {
+	DcrdHomeDir        string        `short:"A" long:"appdata" description:"Path to dcrd home directory"`
 	ShowVersion        bool          `short:"V" long:"version" description:"Display version information and exit"`
 	ConfigFile         string        `short:"C" long:"configfile" description:"Path to configuration file"`
 	DataDir            string        `short:"b" long:"datadir" description:"Directory to store data"`
@@ -313,6 +314,7 @@ func newConfigParser(cfg *config, so *serviceOptions, options flags.Options) *fl
 func loadConfig() (*config, []string, error) {
 	// Default config.
 	cfg := config{
+		DcrdHomeDir:       dcrdHomeDir,
 		ConfigFile:        defaultConfigFile,
 		DebugLevel:        defaultLogLevel,
 		MaxPeers:          defaultMaxPeers,
@@ -369,6 +371,18 @@ func loadConfig() (*config, []string, error) {
 			fmt.Fprintln(os.Stderr, err)
 		}
 		os.Exit(0)
+	}
+
+	// Update the home directory for dcrd if specified. Since the home
+	// directory is updated, other variables need to be updated to
+	// reflect the new changes.
+	if len(preCfg.DcrdHomeDir) > 0 {
+		cfg.DcrdHomeDir, _ = filepath.Abs(preCfg.DcrdHomeDir)
+		cfg.ConfigFile = filepath.Join(cfg.DcrdHomeDir, defaultConfigFilename)
+		cfg.DataDir = filepath.Join(cfg.DcrdHomeDir, defaultDataDirname)
+		cfg.RPCKey = filepath.Join(cfg.DcrdHomeDir, "rpc.key")
+		cfg.RPCCert = filepath.Join(cfg.DcrdHomeDir, "rpc.cert")
+		cfg.LogDir = filepath.Join(cfg.DcrdHomeDir, defaultLogDirname)
 	}
 
 	// Load additional config from file.

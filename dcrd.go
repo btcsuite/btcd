@@ -44,6 +44,8 @@ func dcrdMain(serverChan chan<- *server) error {
 
 	// Show version at startup.
 	dcrdLog.Infof("Version %s", version())
+	// Show dcrd home dir location
+	dcrdLog.Debugf("Dcrd home dir: %s", cfg.DcrdHomeDir)
 
 	// Enable http profiling server if requested.
 	if cfg.Profile != "" {
