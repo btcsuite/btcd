@@ -16,10 +16,6 @@ import (
 	"github.com/btcsuite/btcutil"
 )
 
-const (
-	maxUint32 = 1<<32 - 1
-)
-
 var (
 	// hashIndexBucketName is the name of the db bucket used to house to the
 	// block hash -> block height index.
@@ -617,16 +613,6 @@ func serializeUtxoEntry(entry *UtxoEntry) ([]byte, error) {
 	headerCode, numBitmapBytes, err := utxoEntryHeaderCode(entry, highIndex)
 	if err != nil {
 		return nil, err
-	}
-
-	// The number of bitmap bytes must not exceed a max uint32.  This could
-	// only happen if the number of txouts in a transaction were to exceed
-	// (2^32 - 1)*8 == (2^35 - 8).  This should never happen, but assert
-	// the condition because if it ever becomes true some distant time in
-	// the future, the code must be changed.
-	if numBitmapBytes > maxUint32 {
-		return nil, AssertError("unspentness bitmap too large to " +
-			"serialize")
 	}
 
 	// Calculate the size needed to serialize the entry.
