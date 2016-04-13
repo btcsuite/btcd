@@ -175,6 +175,12 @@ out:
 			break out
 		}
 	}
+
+	// Close connections
+	for _, c := range cm.connections {
+		c.Close()
+	}
+
 	cm.wg.Done()
 }
 
@@ -225,6 +231,7 @@ func (cm *ConnManager) Disconnect(connectionID uint32) {
 // Use Start to begin processing asynchronous connection management.
 func New(cfg *Config, amgr *addrmgr.AddrManager, connHandler func(<-chan *ConnResult)) (*ConnManager, error) {
 	cm := ConnManager{
+		cfg:              cfg,
 		newConnections:   make(chan *ConnResult, cfg.MaxConnections),
 		closeConnections: make(chan uint32, cfg.MaxConnections),
 
