@@ -281,7 +281,8 @@ type processBlockMsg struct {
 // processTransactionResponse is a response sent to the reply channel of a
 // processTransactionMsg.
 type processTransactionResponse struct {
-	err error
+	acceptedTxs []*dcrutil.Tx
+	err         error
 }
 
 // processTransactionMsg is a message type to be sent across the message
@@ -910,7 +911,7 @@ func (b *blockManager) handleTxMsg(tmsg *txMsg) {
 	// Process the transaction to include validation, insertion in the
 	// memory pool, orphan handling, etc.
 	allowOrphans := cfg.MaxOrphanTxs > 0
-	err := tmsg.peer.server.txMemPool.ProcessTransaction(tmsg.tx,
+	acceptedTxs, err := b.server.txMemPool.ProcessTransaction(tmsg.tx,
 		allowOrphans, true, true)
 
 	// Remove transaction from request maps. Either the mempool/chain
@@ -941,6 +942,8 @@ func (b *blockManager) handleTxMsg(tmsg *txMsg) {
 			false)
 		return
 	}
+
+	b.server.AnnounceNewTransactions(acceptedTxs)
 }
 
 // current returns true if we believe we are synced with our peers, false if we
@@ -2072,10 +2075,11 @@ out:
 				}
 
 			case processTransactionMsg:
-				err := b.server.txMemPool.ProcessTransaction(msg.tx,
+				acceptedTxs, err := b.server.txMemPool.ProcessTransaction(msg.tx,
 					msg.allowOrphans, msg.rateLimit, msg.allowHighFees)
 				msg.reply <- processTransactionResponse{
-					err: err,
+					acceptedTxs: acceptedTxs,
+					err:         err,
 				}
 
 			case isCurrentMsg:
@@ -2278,7 +2282,8 @@ func (b *blockManager) handleNotifyMsg(notification *blockchain.Notification) {
 			b.server.txMemPool.RemoveTransaction(tx, false)
 			b.server.txMemPool.RemoveDoubleSpends(tx)
 			b.server.txMemPool.RemoveOrphan(tx.Sha())
-			b.server.txMemPool.ProcessOrphans(tx.Sha())
+			acceptedTxs := b.server.txMemPool.ProcessOrphans(tx.Sha())
+			b.server.AnnounceNewTransactions(acceptedTxs)
 		}
 
 		for _, stx := range block.STransactions()[0:] {
@@ -2753,11 +2758,12 @@ func (b *blockManager) ProcessBlock(block *dcrutil.Block,
 // a block chain.  It is funneled through the block manager since blockchain is
 // not safe for concurrent access.
 func (b *blockManager) ProcessTransaction(tx *dcrutil.Tx, allowOrphans bool,
-	rateLimit bool, allowHighFees bool) error {
+	rateLimit bool, allowHighFees bool) ([]*dcrutil.Tx, error) {
 	reply := make(chan processTransactionResponse, 1)
-	b.msgChan <- processTransactionMsg{tx, allowOrphans, rateLimit, allowHighFees, reply}
+	b.msgChan <- processTransactionMsg{tx, allowOrphans, rateLimit,
+		allowHighFees, reply}
 	response := <-reply
-	return response.err
+	return response.acceptedTxs, response.err
 }
 
 // FetchTransactionStore makes use of FetchTransactionStore on an internal

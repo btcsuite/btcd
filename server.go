@@ -169,8 +169,34 @@ func (s *server) RemoveRebroadcastInventory(iv *wire.InvVect) {
 	s.modifyRebroadcastInv <- broadcastInventoryDel(iv)
 }
 
+// both websocket and getblocktemplate long poll clients of the passed
 func (p *peerState) Count() int {
 	return len(p.peers) + len(p.outboundPeers) + len(p.persistentPeers)
+}
+
+// AnnounceNewTransactions generates and relays inventory vectors and notifies
+// both websocket and getblocktemplate long poll clients of the passed
+// transactions.  This function should be called whenever new transactions
+// are added to the mempool.
+func (s *server) AnnounceNewTransactions(newTxs []*dcrutil.Tx) {
+	// Generate and relay inventory vectors for all newly accepted
+	// transactions into the memory pool due to the original being
+	// accepted.
+	for _, tx := range newTxs {
+		// Generate the inventory vector and relay it.
+		iv := wire.NewInvVect(wire.InvTypeTx, tx.Sha())
+		s.RelayInventory(iv, tx)
+
+		if s.rpcServer != nil {
+			// Notify websocket clients about mempool transactions.
+			s.rpcServer.ntfnMgr.NotifyMempoolTx(tx, true)
+
+			// Potentially notify any getblocktemplate long poll clients
+			// about stale block templates due to the new transaction.
+			s.rpcServer.gbtWorkState.NotifyMempoolTx(
+				s.txMemPool.LastUpdated())
+		}
+	}
 }
 
 func (p *peerState) OutboundCount() int {
@@ -823,8 +849,8 @@ func (s *server) BanPeer(p *peer) {
 	s.banPeers <- p
 }
 
-// RelayInventory relays the passed inventory to all connected peers that are
-// not already known to have it.
+// RelayInventory relays the passed inventory vector to all connected peers
+// that are not already known to have it.
 func (s *server) RelayInventory(invVect *wire.InvVect, data interface{}) {
 	s.relayInv <- relayMsg{invVect: invVect, data: data}
 }
