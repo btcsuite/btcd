@@ -137,17 +137,19 @@ type BestState struct {
 	Height    int32         // The height of the block.
 	Bits      uint32        // The difficulty bits of the block.
 	BlockSize uint64        // The size of the block.
+	BlockCost uint64        // The cost of the block.
 	NumTxns   uint64        // The number of txns in the block.
 	TotalTxns uint64        // The total number of txns in the chain.
 }
 
 // newBestState returns a new best stats instance for the given parameters.
-func newBestState(node *blockNode, blockSize, numTxns, totalTxns uint64) *BestState {
+func newBestState(node *blockNode, blockSize, blockCost, numTxns, totalTxns uint64) *BestState {
 	return &BestState{
 		Hash:      node.hash,
 		Height:    node.height,
 		Bits:      node.bits,
 		BlockSize: blockSize,
+		BlockCost: blockCost,
 		NumTxns:   numTxns,
 		TotalTxns: totalTxns,
 	}
@@ -780,7 +782,8 @@ func (b *BlockChain) connectBlock(node *blockNode, block *btcutil.Block, view *U
 	b.stateLock.RUnlock()
 	numTxns := uint64(len(block.MsgBlock().Transactions))
 	blockSize := uint64(block.MsgBlock().SerializeSizeWitness())
-	state := newBestState(node, blockSize, numTxns, curTotalTxns+numTxns)
+	blockCost := uint64(GetBlockCost(block))
+	state := newBestState(node, blockSize, blockCost, numTxns, curTotalTxns+numTxns)
 
 	// Atomically insert info into the database.
 	err := b.db.Update(func(dbTx database.Tx) error {
@@ -904,8 +907,9 @@ func (b *BlockChain) disconnectBlock(node *blockNode, block *btcutil.Block, view
 	b.stateLock.RUnlock()
 	numTxns := uint64(len(prevBlock.MsgBlock().Transactions))
 	blockSize := uint64(prevBlock.MsgBlock().SerializeSizeWitness())
+	blockCost := uint64(GetBlockCost(prevBlock))
 	newTotalTxns := curTotalTxns - uint64(len(block.MsgBlock().Transactions))
-	state := newBestState(prevNode, blockSize, numTxns, newTotalTxns)
+	state := newBestState(prevNode, blockSize, blockCost, numTxns, newTotalTxns)
 
 	err = b.db.Update(func(dbTx database.Tx) error {
 		// Update best block state.

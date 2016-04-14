@@ -1061,9 +1061,9 @@ func (b *BlockChain) createChainState() error {
 
 	// Initialize the state related to the best block.
 	numTxns := uint64(len(genesisBlock.MsgBlock().Transactions))
-	// TODO(roasbeef): add block cost into best state, or just replace?
 	blockSize := uint64(genesisBlock.MsgBlock().SerializeSizeWitness())
-	b.stateSnapshot = newBestState(b.bestNode, blockSize, numTxns, numTxns)
+	blockCost := uint64(GetBlockCost(genesisBlock))
+	b.stateSnapshot = newBestState(b.bestNode, blockSize, blockCost, numTxns, numTxns)
 
 	// Create the initial the database chain state including creating the
 	// necessary index buckets and inserting the genesis block.
@@ -1143,7 +1143,7 @@ func (b *BlockChain) initChainState() error {
 			return err
 		}
 		var block wire.MsgBlock
-		err = block.Deserialize(bytes.NewReader(blockBytes))
+		err = block.DeserializeWitness(bytes.NewReader(blockBytes))
 		if err != nil {
 			return err
 		}
@@ -1165,9 +1165,11 @@ func (b *BlockChain) initChainState() error {
 
 		// Initialize the state related to the best block.
 		blockSize := uint64(len(blockBytes))
+		// TODO(roasbeef): versions for both MsgBlock and btcutil.Block
+		blockCost := uint64(GetBlockCost(btcutil.NewBlock(&block)))
 		numTxns := uint64(len(block.Transactions))
-		b.stateSnapshot = newBestState(b.bestNode, blockSize, numTxns,
-			state.totalTxns)
+		b.stateSnapshot = newBestState(b.bestNode, blockSize, blockCost,
+			numTxns, state.totalTxns)
 
 		isStateInitialized = true
 		return nil
