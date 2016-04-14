@@ -204,7 +204,7 @@ func ValidateWitnessCommitment(blk *btcutil.Block) error {
 	if !witnessFound {
 		for _, tx := range blk.Transactions() {
 			msgTx := tx.MsgTx()
-			if len(msgTx.TxIn[0].Witness) != 0 {
+			if msgTx.HasWitness() {
 				str := fmt.Sprintf("block contains transaction with witness" +
 					" data, yet no witness commitment present")
 				return ruleError(ErrUnexpectedWitness, str)

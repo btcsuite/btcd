@@ -219,13 +219,13 @@ func (msg *MsgTx) TxSha() ShaHash {
 // block. If a transaction has no witness data, then the witness sha, is the
 // same as its txid.
 func (msg *MsgTx) WitnessHash() ShaHash {
-	if msg.NoWitness() {
-		return msg.TxSha()
-	} else {
+	if msg.HasWitness() {
 		buf := bytes.NewBuffer(make([]byte, 0, msg.SerializeSizeWitness()))
 		_ = msg.SerializeWitness(buf)
 		return DoubleSha256SH(buf.Bytes())
 	}
+
+	return msg.TxSha()
 }
 
 // Copy creates a deep copy of a transaction so that the original does not get
@@ -474,7 +474,7 @@ func (msg *MsgTx) BtcEncode(w io.Writer, pver uint32, enc MessageEncoding) error
 	// field for the MsgTx aren't 0x00, then this indicates the transaction
 	// is to be encoded using the new witness inclusionary structure defined
 	// in BIP0141.
-	if enc == WitnessEncoding && !msg.NoWitness() {
+	if enc == WitnessEncoding && msg.HasWitness() {
 		// After the txn's Version field, we include two additional
 		// bytes specific to the witness encoding. The first byte is an
 		// always 0x00 marker byte, which allows decoders to distinguish
@@ -516,7 +516,7 @@ func (msg *MsgTx) BtcEncode(w io.Writer, pver uint32, enc MessageEncoding) error
 	// If this transaction is a witness transaction, and the witness encoded
 	// is desired, then encode the witness for each of the inputs within the
 	// transaction.
-	if enc == WitnessEncoding && !msg.NoWitness() {
+	if enc == WitnessEncoding && msg.HasWitness() {
 		for _, ti := range msg.TxIn {
 			err = writeTxWitness(w, pver, msg.Version, ti.Witness)
 			if err != nil {
@@ -534,16 +534,16 @@ func (msg *MsgTx) BtcEncode(w io.Writer, pver uint32, enc MessageEncoding) error
 	return nil
 }
 
-// NoWitness returns true if none of the inputs within the transaction contain
-// witness data, and false otherwise.
-func (msg *MsgTx) NoWitness() bool {
+// HasWitness returns false if none of the inputs within the transaction contain
+// witness data, true false otherwise.
+func (msg *MsgTx) HasWitness() bool {
 	for _, txIn := range msg.TxIn {
 		if len(txIn.Witness) != 0 {
-			return false
+			return true
 		}
 	}
 
-	return true
+	return false
 }
 
 // Serialize encodes the transaction to w using a format that suitable for
@@ -597,7 +597,7 @@ func (msg *MsgTx) SerializeSize() int {
 func (msg *MsgTx) SerializeSizeWitness() int {
 	n := msg.SerializeSize()
 
-	if msg.TxIn[0].Witness != nil {
+	if msg.HasWitness() {
 		// The marker, and flag fields take up two additional bytes.
 		n += 2
 
