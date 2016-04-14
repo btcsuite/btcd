@@ -1055,7 +1055,7 @@ func (b *blockManager) handleInvMsg(imsg *invMsg) {
 		requestQueue = requestQueue[1:]
 
 		switch iv.Type {
-		case wire.InvTypeFilteredWitnessBlock:
+		case wire.InvTypeWitnessBlock:
 			fallthrough
 		case wire.InvTypeBlock:
 			// Request the block if there is not already a pending
