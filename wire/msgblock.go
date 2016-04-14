@@ -156,8 +156,7 @@ func (msg *MsgBlock) DeserializeTxLoc(r *bytes.Buffer) ([]TxLoc, error) {
 	for i := uint64(0); i < txCount; i++ {
 		txLocs[i].TxStart = fullLen - r.Len()
 		tx := MsgTx{}
-		// TODO(roasbeef): witness bool?
-		err := tx.Deserialize(r)
+		err := tx.DeserializeWitness(r)
 		if err != nil {
 			return nil, err
 		}
