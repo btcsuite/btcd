@@ -46,7 +46,7 @@ const (
 	defaultGenerate              = false
 	defaultMaxOrphanTransactions = 1000
 	defaultMaxOrphanTxSize       = 5000
-	defaultSigCacheMaxSize       = 50000
+	defaultSigCacheMaxSize       = 100000
 	defaultTxIndex               = false
 	defaultAddrIndex             = false
 )
