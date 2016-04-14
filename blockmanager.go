@@ -454,7 +454,7 @@ func (b *blockManager) handleTxMsg(tmsg *txMsg) {
 	// Process the transaction to include validation, insertion in the
 	// memory pool, orphan handling, etc.
 	allowOrphans := cfg.MaxOrphanTxs > 0
-	err := b.server.txMemPool.ProcessTransaction(tmsg.tx,
+	acceptedTxs, err := b.server.txMemPool.ProcessTransaction(tmsg.tx,
 		allowOrphans, true)
 
 	// Remove transaction from request maps. Either the mempool/chain
@@ -489,6 +489,8 @@ func (b *blockManager) handleTxMsg(tmsg *txMsg) {
 			false)
 		return
 	}
+
+	b.server.AnnounceNewTransactions(acceptedTxs)
 }
 
 // current returns true if we believe we are synced with our peers, false if we
@@ -1209,7 +1211,8 @@ func (b *blockManager) handleNotifyMsg(notification *blockchain.Notification) {
 			b.server.txMemPool.RemoveTransaction(tx, false)
 			b.server.txMemPool.RemoveDoubleSpends(tx)
 			b.server.txMemPool.RemoveOrphan(tx.Sha())
-			b.server.txMemPool.ProcessOrphans(tx.Sha())
+			acceptedTxs := b.server.txMemPool.ProcessOrphans(tx.Sha())
+			b.server.AnnounceNewTransactions(acceptedTxs)
 		}
 
 		if r := b.server.rpcServer; r != nil {
