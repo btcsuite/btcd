@@ -127,7 +127,7 @@ certificate into the default system Certificate Authority list.
 
 **3. Set your mining software url to use https.**<br />
 
-`$ cgminer -o https://127.0.0.1:8334 -u rpcuser -p rpcpassword`
+`$ cgminer -o https://127.0.0.1:9109 -u rpcuser -p rpcpassword`
 
 <a name="Help" />
 ### 3. Help

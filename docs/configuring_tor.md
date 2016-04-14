@@ -90,7 +90,7 @@ address.
 
 ```text
 HiddenServiceDir /var/tor/dcrd
-HiddenServicePort 8333 127.0.0.1:8333
+HiddenServicePort 9108 127.0.0.1:9108
 ```
 
 Once Tor is configured to provide the hidden service and you have obtained your

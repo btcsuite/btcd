@@ -45,7 +45,7 @@ differences between dcrd and bitcoind as far as how RPCs are serviced:
 Websockets are the preferred transport for dcrd RPC and are used by applications
 such as [dcrwallet](https://github.com/decred/dcrwallet) for inter-process
 communication with dcrd.  The websocket connection endpoint for dcrd is
-`wss://your_ip_or_domain:8334/ws`.
+`wss://your_ip_or_domain:9109/ws`.
 
 In addition to the [standard API](#Methods), an [extension API](#WSExtMethods)
 has been developed that is exclusive to clients using Websockets. In its current
@@ -69,7 +69,7 @@ indicates, the [Websocket-specific extension](#WSExtMethods) methods can only be
 accessed when connected via Websockets.
 
 As mentioned in the [overview](#Overview), the websocket connection endpoint for
-dcrd is `wss://your_ip_or_domain:8334/ws`.
+dcrd is `wss://your_ip_or_domain:9109/ws`.
 
 The most important differences between the two transports as it pertains to the
 JSON-RPC API are:
@@ -238,8 +238,8 @@ the method name for further details such as parameter and return information.
 |Description|Returns information about manually added (persistent) peers.|
 |Returns (dns=false)|`["ip:port", ...]`|
 |Returns (dns=true)|`[ (json array of objects)`<br />&nbsp;&nbsp;`{ (json object)`<br />&nbsp;&nbsp;&nbsp;&nbsp;`"addednode": "ip_or_domain",  (string) the ip address or domain of the added peer`<br />&nbsp;&nbsp;&nbsp;&nbsp;`"connected": true or false,  (boolean) whether or not the peer is currently connected`<br />&nbsp;&nbsp;&nbsp;&nbsp;`"addresses": [  (json array or objects) DNS lookup and connection information about the peer`<br />&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;`{ (json object)`<br />&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;`"address": "ip",  (string) the ip address for this DNS entry`<br />&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;`"connected": "inbound/outbound/false"  (string) the connection 'direction' (if connected)`<br />&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;`}, ...`<br />&nbsp;&nbsp;&nbsp;&nbsp;`]`<br />&nbsp;&nbsp;`}, ...`<br />`]`|
-|Example Return (dns=false)|`["192.168.0.10:8333", "mydomain.org:8333"]`|
-|Example Return (dns=true)|`[`<br />&nbsp;&nbsp;`{`<br />&nbsp;&nbsp;&nbsp;&nbsp;`"addednode": "mydomain.org:8333",`<br />&nbsp;&nbsp;&nbsp;&nbsp;`"connected": true,`<br />&nbsp;&nbsp;&nbsp;&nbsp;`"addresses": [`<br />&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;`{`<br />&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;`"address": "1.2.3.4",`<br />&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;`"connected": "outbound"`<br />&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;`},`<br />&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;`{`<br />&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;`"address": "5.6.7.8",`<br />&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;`"connected": "false"`<br />&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;`}`<br />&nbsp;&nbsp;&nbsp;&nbsp;`]`<br />&nbsp;&nbsp;`}`<br />`]`|
+|Example Return (dns=false)|`["192.168.0.10:9108", "mydomain.org:9108"]`|
+|Example Return (dns=true)|`[`<br />&nbsp;&nbsp;`{`<br />&nbsp;&nbsp;&nbsp;&nbsp;`"addednode": "mydomain.org:9108",`<br />&nbsp;&nbsp;&nbsp;&nbsp;`"connected": true,`<br />&nbsp;&nbsp;&nbsp;&nbsp;`"addresses": [`<br />&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;`{`<br />&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;`"address": "1.2.3.4",`<br />&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;`"connected": "outbound"`<br />&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;`},`<br />&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;`{`<br />&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;`"address": "5.6.7.8",`<br />&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;`"connected": "false"`<br />&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;`}`<br />&nbsp;&nbsp;&nbsp;&nbsp;`]`<br />&nbsp;&nbsp;`}`<br />`]`|
 [Return to Overview](#MethodOverview)<br />
 
 ***
@@ -397,7 +397,7 @@ the method name for further details such as parameter and return information.
 |Parameters|None|
 |Description|Returns data about each connected network peer as an array of json objects.|
 |Returns|`[`<br />&nbsp;&nbsp;`{`<br />&nbsp;&nbsp;&nbsp;&nbsp;`"addr": "host:port",  (string) the ip address and port of the peer`<br />&nbsp;&nbsp;&nbsp;&nbsp;`"services": "00000001",  (string) the services supported by the peer`<br />&nbsp;&nbsp;&nbsp;&nbsp;`"lastrecv": n,  (numeric) time the last message was received in seconds since 1 Jan 1970 GMT`<br />&nbsp;&nbsp;&nbsp;&nbsp;`"lastsend": n,  (numeric) time the last message was sent in seconds since 1 Jan 1970 GMT`<br />&nbsp;&nbsp;&nbsp;&nbsp;`"bytessent": n,  (numeric) total bytes sent`<br />&nbsp;&nbsp;&nbsp;&nbsp;`"bytesrecv": n,  (numeric) total bytes received`<br />&nbsp;&nbsp;&nbsp;&nbsp;`"conntime": n,  (numeric) time the connection was made in seconds since 1 Jan 1970 GMT`<br />&nbsp;&nbsp;&nbsp;&nbsp;`"pingtime": n,  (numeric) number of microseconds the last ping took`<br />&nbsp;&nbsp;&nbsp;&nbsp;`"pingwait": n,  (numeric) number of microseconds a queued ping has been waiting for a response`<br />&nbsp;&nbsp;&nbsp;&nbsp;`"version": n,  (numeric) the protocol version of the peer`<br />&nbsp;&nbsp;&nbsp;&nbsp;`"subver": "useragent",  (string) the user agent of the peer`<br />&nbsp;&nbsp;&nbsp;&nbsp;`"inbound": true_or_false,  (boolean) whether or not the peer is an inbound connection`<br />&nbsp;&nbsp;&nbsp;&nbsp;`"startingheight": n,  (numeric) the latest block height the peer knew about when the connection was established`<br />&nbsp;&nbsp;&nbsp;&nbsp;`"currentheight": n,  (numeric) the latest block height the peer is known to have relayed since connected`<br />&nbsp;&nbsp;&nbsp;&nbsp;`"syncnode": true_or_false,  (boolean) whether or not the peer is the sync peer`<br />&nbsp;&nbsp;`}, ...`<br />`]`|
-|Example Return|`[`<br />&nbsp;&nbsp;`{`<br />&nbsp;&nbsp;&nbsp;&nbsp;`"addr": "178.172.xxx.xxx:8333",`<br />&nbsp;&nbsp;&nbsp;&nbsp;`"services": "00000001",`<br />&nbsp;&nbsp;&nbsp;&nbsp;`"lastrecv": 1388183523,`<br />&nbsp;&nbsp;&nbsp;&nbsp;`"lastsend": 1388185470,`<br />&nbsp;&nbsp;&nbsp;&nbsp;`"bytessent": 287592965,`<br />&nbsp;&nbsp;&nbsp;&nbsp;`"bytesrecv": 780340,`<br />&nbsp;&nbsp;&nbsp;&nbsp;`"conntime": 1388182973,`<br />&nbsp;&nbsp;&nbsp;&nbsp;`"pingtime": 405551,`<br />&nbsp;&nbsp;&nbsp;&nbsp;`"pingwait": 183023,`<br />&nbsp;&nbsp;&nbsp;&nbsp;`"version": 70001,`<br />&nbsp;&nbsp;&nbsp;&nbsp;`"subver": "/dcrd:0.4.0/",`<br />&nbsp;&nbsp;&nbsp;&nbsp;`"inbound": false,`<br />&nbsp;&nbsp;&nbsp;&nbsp;`"startingheight": 276921,`<br />&nbsp;&nbsp;&nbsp;&nbsp;`"currentheight": 276955,`<br/>&nbsp;&nbsp;&nbsp;&nbsp;`"syncnode": true,`<br />&nbsp;&nbsp;`}`<br />`]`|
+|Example Return|`[`<br />&nbsp;&nbsp;`{`<br />&nbsp;&nbsp;&nbsp;&nbsp;`"addr": "178.172.xxx.xxx:9108",`<br />&nbsp;&nbsp;&nbsp;&nbsp;`"services": "00000001",`<br />&nbsp;&nbsp;&nbsp;&nbsp;`"lastrecv": 1388183523,`<br />&nbsp;&nbsp;&nbsp;&nbsp;`"lastsend": 1388185470,`<br />&nbsp;&nbsp;&nbsp;&nbsp;`"bytessent": 287592965,`<br />&nbsp;&nbsp;&nbsp;&nbsp;`"bytesrecv": 780340,`<br />&nbsp;&nbsp;&nbsp;&nbsp;`"conntime": 1388182973,`<br />&nbsp;&nbsp;&nbsp;&nbsp;`"pingtime": 405551,`<br />&nbsp;&nbsp;&nbsp;&nbsp;`"pingwait": 183023,`<br />&nbsp;&nbsp;&nbsp;&nbsp;`"version": 70001,`<br />&nbsp;&nbsp;&nbsp;&nbsp;`"subver": "/dcrd:0.4.0/",`<br />&nbsp;&nbsp;&nbsp;&nbsp;`"inbound": false,`<br />&nbsp;&nbsp;&nbsp;&nbsp;`"startingheight": 276921,`<br />&nbsp;&nbsp;&nbsp;&nbsp;`"currentheight": 276955,`<br/>&nbsp;&nbsp;&nbsp;&nbsp;`"syncnode": true,`<br />&nbsp;&nbsp;`}`<br />`]`|
 [Return to Overview](#MethodOverview)<br />
 
 ***
@@ -982,7 +982,7 @@ func main() {
 	// not long-lived, the connection will be closed as soon as the program
 	// exits.
 	connCfg := &dcrrpcclient.ConnConfig{
-		Host:         "localhost:8334",
+		Host:         "localhost:9109",
 		Endpoint:     "ws",
 		User:         "yourrpcuser",
 		Pass:         "yourrpcpass",
@@ -1044,7 +1044,7 @@ func main() {
 	// not long-lived, the connection will be closed as soon as the program
 	// exits.
 	connCfg := &dcrrpcclient.ConnConfig{
-		Host:         "localhost:18334",
+		Host:         "localhost:19109",
 		Endpoint:     "ws",
 		User:         "yourrpcuser",
 		Pass:         "yourrpcpass",
@@ -1143,7 +1143,7 @@ func main() {
 
 	// Create a new RPC client using websockets.
 	connCfg := &dcrrpcclient.ConnConfig{
-		Host:         "localhost:8334",
+		Host:         "localhost:9109",
 		Endpoint:     "ws",
 		User:         "yourrpcuser",
 		Pass:         "yourrpcpass",
@@ -1212,7 +1212,7 @@ var password = "yourpassword";
 // Initiate the websocket connection.  The dcrd generated certificate acts as
 // its own certificate authority, so it needs to be specified in the 'ca' array
 // for the certificate to properly validate.
-var ws = new WebSocket('wss://127.0.0.1:8334/ws', {
+var ws = new WebSocket('wss://127.0.0.1:9109/ws', {
   headers: {
     'Authorization': 'Basic '+new Buffer(user+':'+password).toString('base64')
   },
