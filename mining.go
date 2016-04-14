@@ -1188,6 +1188,7 @@ func NewBlockTemplate(mempool *txMemPool,
 				err := blockManager.ForceReorganization(*prevHash, newHead)
 				if err != nil {
 					minrLog.Errorf("failed to reorganize to new parent: %v", err)
+					continue
 				}
 
 				// Check to make sure we actually have the transactions
@@ -1950,9 +1951,10 @@ mempoolLoop:
 		int((mempool.server.chainParams.TicketsPerBlock / 2) + 1)
 	if nextBlockHeight >= stakeValidationHeight &&
 		voters < minimumVotesRequired {
-		minrLog.Debugf("incongruent number of voters in mempool " +
+		minrLog.Warnf("incongruent number of voters in mempool " +
 			"vs mempool.voters; not enough voters found")
-		return nil, nil
+		return handleTooFewVoters(nextBlockHeight, payToAddress,
+			mempool.server.blockManager)
 	}
 
 	// Correct transaction index fraud proofs for any transactions that
