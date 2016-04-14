@@ -123,7 +123,7 @@ out:
 	for {
 		select {
 		case <-cm.wakeup:
-			if cm.connectionCount < cm.cfg.MaxOutboundPeers {
+			if atomic.LoadUint32(&cm.connectionCount) < cm.cfg.MaxOutboundPeers {
 				addr := cm.amgr.GetAddress("any")
 				if addr == nil {
 					break
