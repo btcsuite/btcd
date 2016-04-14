@@ -191,6 +191,7 @@ type ScriptPubKeyResult struct {
 	ReqSigs   int32    `json:"reqSigs,omitempty"`
 	Type      string   `json:"type"`
 	Addresses []string `json:"addresses,omitempty"`
+	CommitAmt *float64 `json:"commitamt,omitempty"`
 }
 
 // GetTxOutResult models the data from the gettxout command.

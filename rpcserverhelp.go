@@ -112,6 +112,7 @@ var helpDescsEnUS = map[string]string{
 	"scriptpubkeyresult-reqSigs":   "The number of required signatures",
 	"scriptpubkeyresult-type":      "The type of the script (e.g. 'pubkeyhash')",
 	"scriptpubkeyresult-addresses": "The decred addresses associated with this script",
+	"scriptpubkeyresult-commitamt": "The ticket commitment value if the script is for a staking commitment",
 
 	// Vout help.
 	"vout-value":        "The amount in DCR",

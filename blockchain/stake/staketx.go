@@ -319,6 +319,23 @@ func AddrFromSStxPkScrCommitment(pkScript []byte,
 	return addr, err
 }
 
+// AmountFromSStxPkScrCommitment extracts a commitment amount from a
+// ticket commitment pkScript.
+func AmountFromSStxPkScrCommitment(pkScript []byte) (dcrutil.Amount, error) {
+	if len(pkScript) < SStxPKHMinOutSize {
+		return 0, stakeRuleError(ErrSStxBadCommitAmount, "short read "+
+			"of sstx commit pkscript")
+	}
+
+	// The MSB (sign), not used ever normally, encodes whether
+	// or not it is a P2PKH or P2SH for the input.
+	amtEncoded := make([]byte, 8, 8)
+	copy(amtEncoded, pkScript[22:30])
+	amtEncoded[7] &= ^uint8(1 << 7) // Clear bit for P2SH flag
+
+	return dcrutil.Amount(binary.LittleEndian.Uint64(amtEncoded)), nil
+}
+
 // GetSSGenStakeOutputInfo takes an SSGen tx as input and scans through its
 // outputs, returning the amount of the output and the PKH or SH that it was
 // sent to.

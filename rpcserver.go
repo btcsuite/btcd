@@ -88,6 +88,10 @@ const (
 
 	// merkleRootPairSize
 	merkleRootPairSize = 64
+
+	// sstxCommitmentString is the string to insert when a verbose
+	// transaction output's pkscript type is a ticket commitment.
+	sstxCommitmentString = "sstxcommitment"
 )
 
 var (
@@ -1291,6 +1295,7 @@ func createVinList(mtx *wire.MsgTx) []dcrjson.Vin {
 // createVoutList returns a slice of JSON objects for the outputs of the passed
 // transaction.
 func createVoutList(mtx *wire.MsgTx, chainParams *chaincfg.Params) []dcrjson.Vout {
+	txType := stake.DetermineTxType(dcrutil.NewTx(mtx))
 	voutList := make([]dcrjson.Vout, len(mtx.TxOut))
 	for i, v := range mtx.TxOut {
 		voutList[i].N = uint32(i)
@@ -1313,6 +1318,32 @@ func createVoutList(mtx *wire.MsgTx, chainParams *chaincfg.Params) []dcrjson.Vou
 
 		if addrs == nil {
 			voutList[i].ScriptPubKey.Addresses = nil
+
+			// Decode commitment outputs for tickets and set the
+			// type correctly.
+			if txType == stake.TxTypeSStx && (i > 0) && (i%2 != 0) {
+				addr, err := stake.AddrFromSStxPkScrCommitment(v.PkScript,
+					chainParams)
+				if err != nil {
+					rpcsLog.Warnf("failed to decode ticket commitment addr "+
+						"output for tx hash %v, output idx %v", mtx.TxSha(),
+						i)
+					continue
+				}
+				amt, err := stake.AmountFromSStxPkScrCommitment(v.PkScript)
+				if err != nil {
+					rpcsLog.Warnf("failed to decode ticket commitment amt "+
+						"output for tx hash %v, output idx %v", mtx.TxSha(),
+						i)
+					continue
+				}
+				amtCoin := amt.ToCoin()
+
+				voutList[i].ScriptPubKey.Type = sstxCommitmentString
+				voutList[i].ScriptPubKey.Addresses = make([]string, 1)
+				voutList[i].ScriptPubKey.Addresses[0] = addr.EncodeAddress()
+				voutList[i].ScriptPubKey.CommitAmt = &amtCoin
+			}
 		} else {
 			voutList[i].ScriptPubKey.Addresses = make([]string, len(addrs))
 			for j, addr := range addrs {
