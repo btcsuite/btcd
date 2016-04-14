@@ -50,6 +50,13 @@ type ConnResult struct {
 	Err       error
 }
 
+// ConnRequest handles a new Connect request
+type ConnRequest struct {
+	Addr      string
+	Permanent bool
+	Result    chan *ConnResult
+}
+
 // ConnManager provides a generic connection manager for the bitcoin network.
 type ConnManager struct {
 	cfg  *Config
@@ -60,7 +67,7 @@ type ConnManager struct {
 	quit   chan struct{}
 
 	connectionCount      uint32
-	newConnections       chan *ConnResult
+	newConnections       chan *ConnRequest
 	closeConnections     chan uint32
 	connections          map[uint32]net.Conn
 	outboundGroups       map[string]int
@@ -159,11 +166,17 @@ func (cm *ConnManager) connectionHandler() {
 out:
 	for {
 		select {
-		case cr := <-cm.newConnections:
-			if cr.Err != nil {
-				connectionID := atomic.AddUint32(&cm.connectionCount, 1)
-				cm.connections[connectionID] = cr.Conn
+		case req := <-cm.newConnections:
+			connectionID := atomic.AddUint32(&cm.connectionCount, 1)
+			conn, err := cm.cfg.Dial("tcp", req.Addr)
+			res := &ConnResult{
+				Addr:      req.Addr,
+				Permanent: req.Permanent,
+				Conn:      conn,
+				Err:       err,
 			}
+			req.Result <- res
+			cm.connections[connectionID] = conn
 
 		case connectionID := <-cm.closeConnections:
 			c := cm.connections[connectionID]
@@ -180,7 +193,9 @@ out:
 
 	// Close connections
 	for _, c := range cm.connections {
-		c.Close()
+		if c != nil {
+			c.Close()
+		}
 	}
 
 	cm.wg.Done()
@@ -210,17 +225,12 @@ func (cm *ConnManager) Stop() {
 // returns a chan with the connection result.
 func (cm *ConnManager) Connect(addr string, permanent bool) <-chan *ConnResult {
 	c := make(chan *ConnResult)
-	go func() {
-		conn, err := cm.cfg.Dial("tcp", addr)
-		result := &ConnResult{
-			Addr:      addr,
-			Permanent: permanent,
-			Conn:      conn,
-			Err:       err,
-		}
-		cm.newConnections <- result
-		c <- result
-	}()
+	req := &ConnRequest{
+		Addr:      addr,
+		Permanent: permanent,
+		Result:    c,
+	}
+	cm.newConnections <- req
 	return c
 }
 
@@ -234,7 +244,7 @@ func (cm *ConnManager) Disconnect(connectionID uint32) {
 func New(cfg *Config, amgr *addrmgr.AddrManager, connHandler func(<-chan *ConnResult)) (*ConnManager, error) {
 	cm := ConnManager{
 		cfg:              cfg,
-		newConnections:   make(chan *ConnResult, cfg.MaxConnections),
+		newConnections:   make(chan *ConnRequest, cfg.MaxConnections),
 		closeConnections: make(chan uint32, cfg.MaxConnections),
 
 		quit:                 make(chan struct{}),
