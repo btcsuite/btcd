@@ -589,7 +589,7 @@ func (*wsNotificationManager) removeSpentRequest(ops map[wire.OutPoint]map[chan 
 func txHexString(tx *btcutil.Tx) string {
 	buf := bytes.NewBuffer(make([]byte, 0, tx.MsgTx().SerializeSize()))
 	// Ignore Serialize's error, as writing to a bytes.buffer cannot fail.
-	tx.MsgTx().Serialize(buf)
+	tx.MsgTx().SerializeWitness(buf)
 	return hex.EncodeToString(buf.Bytes())
 }
 
