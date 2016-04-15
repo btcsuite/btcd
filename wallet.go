@@ -786,7 +786,7 @@ func (c *Client) PurchaseTicketAsync(fromAccount string,
 	spendLimit dcrutil.Amount) FuturePurchaseTicketResult {
 
 	cmd := dcrjson.NewPurchaseTicketCmd(fromAccount, spendLimit.ToCoin(),
-		nil, nil, nil)
+		nil, nil, nil, nil, nil, nil, nil)
 
 	return c.sendCmd(cmd)
 }
