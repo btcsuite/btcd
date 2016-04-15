@@ -341,6 +341,17 @@ func (sp *serverPeer) addBanScore(persistent, transient uint32, reason string) {
 	}
 }
 
+// OnVerAck is invoked when a peer receives a verack bitcoin message.
+func (sp *serverPeer) OnVerAck(p *peer.Peer, msg *wire.MsgVerAck) {
+	// TODO: Tell the peer to send headers instead of inv's if it is
+	// able to.
+	/*
+		if p.ProtocolVersion() >= wire.SendHeadersVersion {
+			p.QueueMessage(wire.NewMsgSendHeaders(), nil)
+		}
+	*/
+}
+
 // OnVersion is invoked when a peer receives a version bitcoin message
 // and is used to negotiate the protocol version details as well as kick start
 // the communications.
@@ -1302,6 +1313,23 @@ func (s *server) handleRelayInvMsg(state *peerState, msg relayMsg) {
 			return
 		}
 
+		if msg.invVect.Type == wire.InvTypeBlock && sp.WantsHeaders() {
+			blockHeader, ok := msg.data.(wire.BlockHeader)
+			if !ok {
+				peerLog.Warnf("Underlying data for headers" +
+					" is not a block header")
+				return
+			}
+			msgHeaders := wire.NewMsgHeaders()
+			if err := msgHeaders.AddBlockHeader(&blockHeader); err != nil {
+				peerLog.Errorf("Failed to add block"+
+					" header: %v", err)
+				return
+			}
+			sp.QueueMessage(msgHeaders, nil)
+			return
+		}
+
 		if msg.invVect.Type == wire.InvTypeTx {
 			// Don't relay the transaction to the peer when it has
 			// transaction relaying disabled.
@@ -1501,6 +1529,7 @@ func disconnectPeer(peerList map[int32]*serverPeer, compareFunc func(*serverPeer
 func newPeerConfig(sp *serverPeer) *peer.Config {
 	return &peer.Config{
 		Listeners: peer.MessageListeners{
+			OnVerAck:      sp.OnVerAck,
 			OnVersion:     sp.OnVersion,
 			OnMemPool:     sp.OnMemPool,
 			OnTx:          sp.OnTx,
@@ -1533,7 +1562,7 @@ func newPeerConfig(sp *serverPeer) *peer.Config {
 		ChainParams:      sp.server.chainParams,
 		Services:         sp.server.services,
 		DisableRelayTx:   cfg.BlocksOnly,
-		ProtocolVersion:  70011,
+		ProtocolVersion:  wire.SendHeadersVersion,
 	}
 }
 
