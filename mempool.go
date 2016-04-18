@@ -2025,13 +2025,13 @@ func (mp *txMemPool) ProcessTransaction(tx *dcrutil.Tx, allowOrphan,
 	txmpLog.Tracef("Processing transaction %v", tx.Sha())
 
 	// Potentially accept the transaction to the memory pool.
-	var isOrphan bool
-	_, err := mp.maybeAcceptTransaction(tx, true, rateLimit)
+	missingParents, err := mp.maybeAcceptTransaction(tx, true, rateLimit)
 	if err != nil {
 		return err
 	}
 
-	if !isOrphan {
+	// If len(missingParents) == 0 then we know the tx is NOT an orphan
+	if len(missingParents) == 0 {
 		// Generate the inventory vector and relay it.
 		iv := wire.NewInvVect(wire.InvTypeTx, tx.Sha())
 		mp.server.RelayInventory(iv, tx)
@@ -2040,42 +2040,43 @@ func (mp *txMemPool) ProcessTransaction(tx *dcrutil.Tx, allowOrphan,
 		// transaction (they are no longer orphans) and repeat for those
 		// accepted transactions until there are no more.
 		mp.processOrphans(tx.Sha())
-	} else {
-		// The transaction is an orphan (has inputs missing).  Reject
-		// it if the flag to allow orphans is not set.
-		if !allowOrphan {
-			// NOTE: RejectDuplicate is really not an accurate
-			// reject code here, but it matches the reference
-			// implementation and there isn't a better choice due
-			// to the limited number of reject codes.  Missing
-			// inputs is assumed to mean they are already spent
-			// which is not really always the case.
-			var buf bytes.Buffer
-			buf.WriteString("transaction spends unknown inputs; includes " +
-				"inputs: \n")
-			lenIn := len(tx.MsgTx().TxIn)
-			for i, txIn := range tx.MsgTx().TxIn {
-				str := fmt.Sprintf("[%v]: %v, %v, %v",
-					i,
-					txIn.PreviousOutPoint.Hash,
-					txIn.PreviousOutPoint.Index,
-					txIn.PreviousOutPoint.Tree)
-				buf.WriteString(str)
-				if i != lenIn-1 {
-					buf.WriteString("\n")
-				}
+		return nil
+	}
+
+	// The transaction is an orphan (has inputs missing).  Reject
+	// it if the flag to allow orphans is not set.
+	if !allowOrphan {
+		// NOTE: RejectDuplicate is really not an accurate
+		// reject code here, but it matches the reference
+		// implementation and there isn't a better choice due
+		// to the limited number of reject codes.  Missing
+		// inputs is assumed to mean they are already spent
+		// which is not really always the case.
+		var buf bytes.Buffer
+		buf.WriteString("transaction spends unknown inputs; includes " +
+			"inputs: \n")
+		lenIn := len(tx.MsgTx().TxIn)
+		for i, txIn := range tx.MsgTx().TxIn {
+			str := fmt.Sprintf("[%v]: %v, %v, %v",
+				i,
+				txIn.PreviousOutPoint.Hash,
+				txIn.PreviousOutPoint.Index,
+				txIn.PreviousOutPoint.Tree)
+			buf.WriteString(str)
+			if i != lenIn-1 {
+				buf.WriteString("\n")
 			}
-			txmpLog.Debugf("%v", buf.String())
-
-			return txRuleError(wire.RejectDuplicate,
-				"transaction spends unknown inputs")
 		}
+		txmpLog.Debugf("%v", buf.String())
 
-		// Potentially add the orphan transaction to the orphan pool.
-		err := mp.maybeAddOrphan(tx)
-		if err != nil {
-			return err
-		}
+		return txRuleError(wire.RejectDuplicate,
+			"transaction spends unknown inputs")
+	}
+
+	// Potentially add the orphan transaction to the orphan pool.
+	err = mp.maybeAddOrphan(tx)
+	if err != nil {
+		return err
 	}
 
 	return nil
