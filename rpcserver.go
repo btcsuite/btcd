@@ -4422,6 +4422,8 @@ func handleSearchRawTransactions(s *rpcServer, cmd interface{},
 func handleSendRawTransaction(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (interface{}, error) {
 	c := cmd.(*dcrjson.SendRawTransactionCmd)
 	// Deserialize and send off to tx relay
+
+	allowHighFees := *c.AllowHighFees
 	hexStr := c.HexTx
 	if len(hexStr)%2 != 0 {
 		hexStr = "0" + hexStr
@@ -4440,7 +4442,7 @@ func handleSendRawTransaction(s *rpcServer, cmd interface{}, closeChan <-chan st
 	}
 
 	tx := dcrutil.NewTx(msgtx)
-	err = s.server.blockManager.ProcessTransaction(tx, false, false)
+	err = s.server.blockManager.ProcessTransaction(tx, false, false, allowHighFees)
 	if err != nil {
 		// When the error is a rule error, it means the transaction was
 		// simply rejected as opposed to something actually going wrong,

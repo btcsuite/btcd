@@ -1477,7 +1477,7 @@ func detectTxType(tx *dcrutil.Tx) stake.TxType {
 // This should probably be done at the bottom using "IsSStx" etc functions.
 // It should also set the dcrutil tree type for the tx as well.
 func (mp *txMemPool) maybeAcceptTransaction(tx *dcrutil.Tx, isNew,
-	rateLimit bool) ([]*chainhash.Hash, error) {
+	rateLimit, allowHighFees bool) ([]*chainhash.Hash, error) {
 	txHash := tx.Sha()
 
 	// Don't accept the transaction if it already exists in the pool.  This
@@ -1752,6 +1752,19 @@ func (mp *txMemPool) maybeAcceptTransaction(tx *dcrutil.Tx, isNew,
 		return nil, txRuleError(wire.RejectInsufficientFee, str)
 	}
 
+	// Check whether allowHighFees is set to false (default), if so, then make sure
+	// the current fee is sensible.  100 * above the minimum fee/kb seems to be a
+	// reasonable amount to check.  If people would like to avoid this check
+	// then they can AllowHighFees = true
+	if !allowHighFees {
+		maxFee := calcMinRequiredTxRelayFee(serializedSize*100, int64(minRelayTxFee))
+		if txFee > maxFee {
+			err = fmt.Errorf("transaction %v has %v fee which is above the "+
+				"allowHighFee check threshold amount of %v", txHash,
+				txFee, maxFee)
+			return nil, err
+		}
+	}
 	// Require that free transactions have sufficient priority to be mined
 	// in the next block.  Transactions which are being added back to the
 	// memory pool from blocks that have been disconnected during a reorg
@@ -1856,7 +1869,7 @@ func (mp *txMemPool) MaybeAcceptTransaction(tx *dcrutil.Tx, isNew,
 	mp.Lock()
 	defer mp.Unlock()
 
-	return mp.maybeAcceptTransaction(tx, isNew, rateLimit)
+	return mp.maybeAcceptTransaction(tx, isNew, rateLimit, true)
 }
 
 // processOrphans is the internal function which implements the public
@@ -1905,7 +1918,7 @@ func (mp *txMemPool) processOrphans(hash *chainhash.Hash) {
 
 			// Potentially accept the transaction into the
 			// transaction pool.
-			missingParents, err := mp.maybeAcceptTransaction(tx, true, true)
+			missingParents, err := mp.maybeAcceptTransaction(tx, true, true, true)
 			if err != nil {
 				// TODO: Remove orphans that depend on this
 				// failed transaction.
@@ -2019,7 +2032,7 @@ func (mp *txMemPool) ProcessOrphans(hash *chainhash.Hash) {
 //
 // This function is safe for concurrent access.
 func (mp *txMemPool) ProcessTransaction(tx *dcrutil.Tx, allowOrphan,
-	rateLimit bool) error {
+	rateLimit, allowHighFees bool) error {
 	// Protect concurrent access.
 	mp.Lock()
 	defer mp.Unlock()
@@ -2027,7 +2040,7 @@ func (mp *txMemPool) ProcessTransaction(tx *dcrutil.Tx, allowOrphan,
 	txmpLog.Tracef("Processing transaction %v", tx.Sha())
 
 	// Potentially accept the transaction to the memory pool.
-	missingParents, err := mp.maybeAcceptTransaction(tx, true, rateLimit)
+	missingParents, err := mp.maybeAcceptTransaction(tx, true, rateLimit, allowHighFees)
 	if err != nil {
 		return err
 	}
