@@ -77,7 +77,7 @@ const (
 	// minTxRelayFeeMainNet is the minimum fee in atoms that is required for a
 	// transaction to be treated as free for relay and mining purposes.  It
 	// is also used to help determine if a transaction is considered dust
-	// and as a base for calculating minimum required fees for larger
+	// and as a base for calculating minimum required fees per KB for larger
 	// transactions.  This value is in Atom/1000 bytes.
 	minTxRelayFeeMainNet = 1e5
 
@@ -85,12 +85,12 @@ const (
 	// networks.
 	minTxRelayFeeTestNet = 1e3
 
-	// minTxFeeForMempoolMainNet is the minimum fee in atoms that is required
-	// for a transaction to enter the mempool on MainNet.
+	// minTxFeeForMempoolMainNet is the minimum fee per KB in atoms that is
+	// required for a transaction to enter the mempool on MainNet.
 	minTxFeeForMempoolMainNet = 1e6
 
-	// minTxFeeForMempoolMainNet is the minimum fee in atoms that is required
-	// for a transaction to enter the mempool on TestNet or SimNet.
+	// minTxFeeForMempoolMainNet is the minimum fee per KB in atoms that is
+	// required for a transaction to enter the mempool on TestNet or SimNet.
 	minTxFeeForMempoolTestNet = 1e2
 
 	// maxSSGensDoubleSpends is the maximum number of SSGen double spends
@@ -702,27 +702,18 @@ func checkInputsStandard(tx *dcrutil.Tx,
 // calcMinRequiredTxRelayFee returns the minimum transaction fee required for a
 // transaction with the passed serialized size to be accepted into the memory
 // pool and relayed.
-func calcMinRequiredTxRelayFee(serializedSize int64,
-	params *chaincfg.Params) int64 {
+func calcMinRequiredTxRelayFee(serializedSize, minRelayTxFee int64) int64 {
 	// Calculate the minimum fee for a transaction to be allowed into the
 	// mempool and relayed by scaling the base fee (which is the minimum
 	// free transaction relay fee).  minTxRelayFee is in Atom/KB, so
 	// divide the transaction size by 1000 to convert to kilobytes.  Also,
 	// integer division is used so fees only increase on full kilobyte
 	// boundaries.
-	var minRelayTxFee dcrutil.Amount
-	switch {
-	case params == &chaincfg.MainNetParams:
-		minRelayTxFee = minTxRelayFeeMainNet
-	case params == &chaincfg.TestNetParams:
-		minRelayTxFee = minTxRelayFeeTestNet
-	default:
-		minRelayTxFee = minTxRelayFeeTestNet
-	}
-	minFee := (serializedSize * int64(minRelayTxFee)) / 1000
+
+	minFee := (serializedSize * minRelayTxFee) / 1000
 
 	if minFee == 0 && minRelayTxFee > 0 {
-		minFee = int64(minRelayTxFee)
+		minFee = minRelayTxFee
 	}
 
 	// Set the minimum fee to the maximum possible value if the calculated
@@ -1706,6 +1697,17 @@ func (mp *txMemPool) maybeAcceptTransaction(tx *dcrutil.Tx, isNew,
 			txHash, numSigOps, maxSigOpsPerTx)
 		return nil, txRuleError(wire.RejectNonstandard, str)
 	}
+
+	var minRelayTxFee dcrutil.Amount
+	switch {
+	case mp.server.chainParams == &chaincfg.MainNetParams:
+		minRelayTxFee = minTxRelayFeeMainNet
+	case mp.server.chainParams == &chaincfg.TestNetParams:
+		minRelayTxFee = minTxRelayFeeTestNet
+	default:
+		minRelayTxFee = minTxRelayFeeTestNet
+	}
+
 	// Don't allow transactions with fees too low to get into a mined block.
 	//
 	// Most miners allow a free transaction area in blocks they mine to go
@@ -1718,7 +1720,7 @@ func (mp *txMemPool) maybeAcceptTransaction(tx *dcrutil.Tx, isNew,
 	// transaction does not exceeed 1000 less than the reserved space for
 	// high-priority transactions, don't require a fee for it.
 	serializedSize := int64(tx.MsgTx().SerializeSize())
-	minFee := calcMinRequiredTxRelayFee(serializedSize, mp.server.chainParams)
+	minFee := calcMinRequiredTxRelayFee(serializedSize, int64(minRelayTxFee))
 	if txType == stake.TxTypeRegular { // Non-stake only
 		if serializedSize >= (defaultBlockPrioritySize-1000) && txFee < minFee {
 			str := fmt.Sprintf("transaction %v has %v fees which is under "+
@@ -1741,12 +1743,12 @@ func (mp *txMemPool) maybeAcceptTransaction(tx *dcrutil.Tx, isNew,
 	default:
 		feeThreshold = minTxFeeForMempoolTestNet
 	}
-	feePerKB := float64(txFee) / (float64(serializedSize) / 1000.0)
-	if (float64(feePerKB) < float64(feeThreshold)) &&
-		txType != stake.TxTypeSSGen {
-		str := fmt.Sprintf("transaction %v has %v fees per kb which "+
-			"is under the required threshold amount of %d", txHash, feePerKB,
-			feeThreshold)
+
+	minThreshold := calcMinRequiredTxRelayFee(serializedSize, feeThreshold)
+	if (txFee < minThreshold) && txType != stake.TxTypeSSGen {
+		str := fmt.Sprintf("transaction %v has a %v fee which "+
+			"is under the required threshold amount of %d", txHash, txFee,
+			minThreshold)
 		return nil, txRuleError(wire.RejectInsufficientFee, str)
 	}
 
