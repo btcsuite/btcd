@@ -1359,8 +1359,8 @@ func (b *BlockChain) forceHeadReorganization(formerBest chainhash.Hash,
 
 	// Child to reorganize to is missing.
 	if newBestNode == nil {
-		ruleError(ErrForceReorgMissingChild, "missing child of common parent "+
-			"for forced reorg")
+		return ruleError(ErrForceReorgMissingChild, "missing child of "+
+			"common parent for forced reorg")
 	}
 
 	newBestBlock, err := b.getBlockFromHash(&newBest)

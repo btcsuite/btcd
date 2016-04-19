@@ -912,7 +912,7 @@ func (b *BlockChain) checkDupTxs(node *blockNode, parentNode *blockNode,
 	if err != nil {
 		str := fmt.Sprintf("Failed dup tx check of TxTreeRegular of cur "+
 			"block: %v", err.Error())
-		ruleError(ErrDuplicateTx, str)
+		return ruleError(ErrDuplicateTx, str)
 	}
 
 	return nil
