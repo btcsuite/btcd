@@ -661,11 +661,11 @@ var helpDescsEnUS = map[string]string{
 	"ticket-hash":                    "Hash of the ticket.",
 
 	// LiveTickets help.
-	"livetickets--synopsis":     "Reguest tickets the live ticket hashes from the ticket database",
+	"livetickets--synopsis":     "Request tickets the live ticket hashes from the ticket database",
 	"liveticketsresult-tickets": "List of live tickets",
 
 	// MissedTickets help.
-	"missedtickets--synopsis":     "Reguest tickets the client missed",
+	"missedtickets--synopsis":     "Request tickets the client missed",
 	"missedticketsresult-tickets": "List of missed tickets",
 
 	// GetCoinSupply help
