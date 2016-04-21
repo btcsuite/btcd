@@ -6,7 +6,6 @@ package wire
 
 import (
 	"bytes"
-	"encoding/binary"
 	"fmt"
 	"io"
 	"strconv"
@@ -243,12 +242,11 @@ func (msg *MsgTx) Copy() *MsgTx {
 // See Deserialize for decoding transactions stored to disk, such as in a
 // database, as opposed to decoding transactions from the wire.
 func (msg *MsgTx) BtcDecode(r io.Reader, pver uint32) error {
-	var buf [4]byte
-	_, err := io.ReadFull(r, buf[:])
+	version, err := binarySerializer.Uint32(r, littleEndian)
 	if err != nil {
 		return err
 	}
-	msg.Version = int32(binary.LittleEndian.Uint32(buf[:]))
+	msg.Version = int32(version)
 
 	count, err := ReadVarInt(r, pver)
 	if err != nil {
@@ -300,11 +298,10 @@ func (msg *MsgTx) BtcDecode(r io.Reader, pver uint32) error {
 		msg.TxOut[i] = &to
 	}
 
-	_, err = io.ReadFull(r, buf[:])
+	msg.LockTime, err = binarySerializer.Uint32(r, littleEndian)
 	if err != nil {
 		return err
 	}
-	msg.LockTime = binary.LittleEndian.Uint32(buf[:])
 
 	return nil
 }
@@ -331,9 +328,7 @@ func (msg *MsgTx) Deserialize(r io.Reader) error {
 // See Serialize for encoding transactions to be stored to disk, such as in a
 // database, as opposed to encoding transactions for the wire.
 func (msg *MsgTx) BtcEncode(w io.Writer, pver uint32) error {
-	var buf [4]byte
-	binary.LittleEndian.PutUint32(buf[:], uint32(msg.Version))
-	_, err := w.Write(buf[:])
+	err := binarySerializer.PutUint32(w, littleEndian, uint32(msg.Version))
 	if err != nil {
 		return err
 	}
@@ -364,8 +359,7 @@ func (msg *MsgTx) BtcEncode(w io.Writer, pver uint32) error {
 		}
 	}
 
-	binary.LittleEndian.PutUint32(buf[:], msg.LockTime)
-	_, err = w.Write(buf[:])
+	err = binarySerializer.PutUint32(w, littleEndian, msg.LockTime)
 	if err != nil {
 		return err
 	}
@@ -479,12 +473,11 @@ func readOutPoint(r io.Reader, pver uint32, version int32, op *OutPoint) error {
 		return err
 	}
 
-	var buf [4]byte
-	_, err = io.ReadFull(r, buf[:])
+	op.Index, err = binarySerializer.Uint32(r, littleEndian)
 	if err != nil {
 		return err
 	}
-	op.Index = binary.LittleEndian.Uint32(buf[:])
+
 	return nil
 }
 
@@ -496,9 +489,7 @@ func writeOutPoint(w io.Writer, pver uint32, version int32, op *OutPoint) error 
 		return err
 	}
 
-	var buf [4]byte
-	binary.LittleEndian.PutUint32(buf[:], op.Index)
-	_, err = w.Write(buf[:])
+	err = binarySerializer.PutUint32(w, littleEndian, op.Index)
 	if err != nil {
 		return err
 	}
@@ -521,12 +512,10 @@ func readTxIn(r io.Reader, pver uint32, version int32, ti *TxIn) error {
 		return err
 	}
 
-	var buf [4]byte
-	_, err = io.ReadFull(r, buf[:])
+	err = readElement(r, &ti.Sequence)
 	if err != nil {
 		return err
 	}
-	ti.Sequence = binary.LittleEndian.Uint32(buf[:])
 
 	return nil
 }
@@ -544,9 +533,7 @@ func writeTxIn(w io.Writer, pver uint32, version int32, ti *TxIn) error {
 		return err
 	}
 
-	var buf [4]byte
-	binary.LittleEndian.PutUint32(buf[:], ti.Sequence)
-	_, err = w.Write(buf[:])
+	err = binarySerializer.PutUint32(w, littleEndian, ti.Sequence)
 	if err != nil {
 		return err
 	}
@@ -557,12 +544,10 @@ func writeTxIn(w io.Writer, pver uint32, version int32, ti *TxIn) error {
 // readTxOut reads the next sequence of bytes from r as a transaction output
 // (TxOut).
 func readTxOut(r io.Reader, pver uint32, version int32, to *TxOut) error {
-	var buf [8]byte
-	_, err := io.ReadFull(r, buf[:])
+	err := readElement(r, &to.Value)
 	if err != nil {
 		return err
 	}
-	to.Value = int64(binary.LittleEndian.Uint64(buf[:]))
 
 	to.PkScript, err = ReadVarBytes(r, pver, MaxMessagePayload,
 		"transaction output public key script")
@@ -576,9 +561,7 @@ func readTxOut(r io.Reader, pver uint32, version int32, to *TxOut) error {
 // writeTxOut encodes to into the bitcoin protocol encoding for a transaction
 // output (TxOut) to w.
 func writeTxOut(w io.Writer, pver uint32, version int32, to *TxOut) error {
-	var buf [8]byte
-	binary.LittleEndian.PutUint64(buf[:], uint64(to.Value))
-	_, err := w.Write(buf[:])
+	err := binarySerializer.PutUint64(w, littleEndian, uint64(to.Value))
 	if err != nil {
 		return err
 	}
