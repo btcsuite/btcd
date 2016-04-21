@@ -35,7 +35,7 @@ func main() {
 		log.Fatal(err)
 	}
 	connCfg := &dcrrpcclient.ConnConfig{
-		Host:         "localhost:18332",
+		Host:         "localhost:9110",
 		Endpoint:     "ws",
 		User:         "yourrpcuser",
 		Pass:         "yourrpcpass",
