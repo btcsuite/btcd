@@ -638,15 +638,61 @@ var helpDescsEnUS = map[string]string{
 	"rescan-outpoints":  "List of transaction outpoints to include in the rescan",
 	"rescan-endblock":   "Hash of final block to rescan",
 
+	// -------- Decred-specific help --------
+
 	// EstimateFee help.
 	"estimatefee--synopsis": "Returns the estimated fee in dcr/kb.",
 	"estimatefee-numblocks": "(unused)",
 	"estimatefee--result0":  "Estimated fee.",
 
+	// GetCoinSupply help
+	"getcoinsupply--synopsis": "Returns current total coin supply in atoms",
+	"getcoinsupply--result0":  "Current coin supply in atoms",
+
+	// LiveTickets help.
+	"livetickets--synopsis":     "Request tickets the live ticket hashes from the ticket database",
+	"liveticketsresult-tickets": "List of live tickets",
+
+	// MissedTickets help.
+	"missedtickets--synopsis":     "Request tickets the client missed",
+	"missedticketsresult-tickets": "List of missed tickets",
+
 	// TicketBuckets help.
 	"ticketbuckets--synopsis": "Request for the number of tickets currently in each bucket of the ticket database.",
 	"ticketbucket-tickets":    "Number of tickets in bucket.",
 	"ticketbucket-number":     "Bucket number.",
+
+	// TicketFeeInfo help.
+	"ticketfeeinfo--synopsis":            "Get various information about ticket fees from the mempool, blocks, and difficulty windows",
+	"ticketfeeinfo-blocks":               "The number of blocks, starting from the chain tip and descending, to return fee information about",
+	"ticketfeeinfo-windows":              "The number of difficulty windows to return ticket fee information about",
+	"ticketfeeinforesult-feeinfomempool": "Ticket fee information for all tickets in the mempool",
+	"ticketfeeinforesult-feeinfoblocks":  "Ticket fee information for a given list of blocks descending from the chain tip",
+	"ticketfeeinforesult-feeinfowindows": "Ticket fee information for a window period where the stake difficulty was the same",
+
+	"ticketfeeinfomempool-number": "Number of tickets in the mempool",
+	"ticketfeeinfomempool-min":    "Minimum ticket fee in the mempool",
+	"ticketfeeinfomempool-max":    "Maximum ticket fee in the mempool",
+	"ticketfeeinfomempool-mean":   "Mean of ticket fees in the mempool",
+	"ticketfeeinfomempool-median": "Median of ticket fees in the mempool",
+	"ticketfeeinfomempool-stddev": "Standard deviation of ticket fees in the mempool",
+
+	"ticketfeeinfoblock-height": "Height of the block",
+	"ticketfeeinfoblock-number": "Number of tickets in the block",
+	"ticketfeeinfoblock-min":    "Minimum ticket fee in the block",
+	"ticketfeeinfoblock-max":    "Maximum ticket fee in the block",
+	"ticketfeeinfoblock-mean":   "Mean of ticket fees in the block",
+	"ticketfeeinfoblock-median": "Median of ticket fees in the block",
+	"ticketfeeinfoblock-stddev": "Standard deviation of ticket fees in the block",
+
+	"ticketfeeinfowindow-startheight": "First block in the window (inclusive)",
+	"ticketfeeinfowindow-endheight":   "Last block in the window (exclusive)",
+	"ticketfeeinfowindow-number":      "Number of tickets in the window",
+	"ticketfeeinfowindow-min":         "Minimum ticket fee in the window",
+	"ticketfeeinfowindow-max":         "Maximum ticket fee in the window",
+	"ticketfeeinfowindow-mean":        "Mean of ticket fees in the window",
+	"ticketfeeinfowindow-median":      "Median of ticket fees in the window",
+	"ticketfeeinfowindow-stddev":      "Standard deviation of ticket fees in the window",
 
 	// TicketsForAddress help.
 	"ticketsforaddress--synopsis":     "Request all the tickets for an address.",
@@ -659,18 +705,6 @@ var helpDescsEnUS = map[string]string{
 	"ticketsforbucketresult-tickets": "Result for the ticketsfor bucket command.",
 	"ticket-owner":                   "Address owning the ticket.",
 	"ticket-hash":                    "Hash of the ticket.",
-
-	// LiveTickets help.
-	"livetickets--synopsis":     "Request tickets the live ticket hashes from the ticket database",
-	"liveticketsresult-tickets": "List of live tickets",
-
-	// MissedTickets help.
-	"missedtickets--synopsis":     "Request tickets the client missed",
-	"missedticketsresult-tickets": "List of missed tickets",
-
-	// GetCoinSupply help
-	"getcoinsupply--synopsis": "Returns current total coin supply in atoms",
-	"getcoinsupply--result0":  "Current coin supply in atoms",
 }
 
 // rpcResultTypes specifies the result types that each RPC command can return.
@@ -728,6 +762,7 @@ var rpcResultTypes = map[string][]interface{}{
 	"setgenerate":           nil,
 	"stop":                  []interface{}{(*string)(nil)},
 	"submitblock":           []interface{}{nil, (*string)(nil)},
+	"ticketfeeinfo":         []interface{}{(*dcrjson.TicketFeeInfoResult)(nil)},
 	"ticketsforaddress":     []interface{}{(*dcrjson.TicketsForAddressResult)(nil)},
 	"validateaddress":       []interface{}{(*dcrjson.ValidateAddressChainResult)(nil)},
 	"verifychain":           []interface{}{(*bool)(nil)},

@@ -17,6 +17,7 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"math"
 	"math/big"
 	"math/rand"
 	"net"
@@ -200,6 +201,7 @@ var rpcHandlersBeforeInit = map[string]commandHandler{
 	"setgenerate":           handleSetGenerate,
 	"stop":                  handleStop,
 	"submitblock":           handleSubmitBlock,
+	"ticketfeeinfo":         handleTicketFeeInfo,
 	"ticketsforaddress":     handleTicketsForAddress,
 	"validateaddress":       handleValidateAddress,
 	"verifychain":           handleVerifyChain,
@@ -4544,7 +4546,258 @@ func handleSubmitBlock(s *rpcServer, cmd interface{}, closeChan <-chan struct{})
 	return nil, nil
 }
 
-// handleTicketsForAddress implements the  command.
+// min gets the minimum amount from a slice of amounts.
+func min(s []dcrutil.Amount) dcrutil.Amount {
+	if len(s) == 0 {
+		return 0
+	}
+
+	min := s[0]
+	for i := range s {
+		if s[i] < min {
+			min = s[i]
+		}
+	}
+
+	return min
+}
+
+// max gets the maximum amount from a slice of amounts.
+func max(s []dcrutil.Amount) dcrutil.Amount {
+	max := dcrutil.Amount(0)
+	for i := range s {
+		if s[i] > max {
+			max = s[i]
+		}
+	}
+
+	return max
+}
+
+// mean gets the mean amount from a slice of amounts.
+func mean(s []dcrutil.Amount) dcrutil.Amount {
+	sum := dcrutil.Amount(0)
+	for i := range s {
+		sum += s[i]
+	}
+
+	if len(s) == 0 {
+		return 0
+	}
+
+	return sum / dcrutil.Amount(len(s))
+}
+
+// median gets the median amount from a slice of amounts.
+func median(s []dcrutil.Amount) dcrutil.Amount {
+	if len(s) == 0 {
+		return 0
+	}
+
+	middle := len(s) / 2
+	return s[middle]
+}
+
+// stdDev gets the standard deviation amount from a slice of amounts.
+func stdDev(s []dcrutil.Amount) dcrutil.Amount {
+	var total float64
+	mean := mean(s)
+
+	for i := range s {
+		total += math.Pow(s[i].ToCoin()-mean.ToCoin(), 2)
+	}
+	if len(s)-1 == 0 {
+		return 0
+	}
+	v := total / float64(len(s)-1)
+
+	// Not concerned with an error here, it'll return
+	// zero if the amount is too small.
+	amt, _ := dcrutil.NewAmount(math.Sqrt(v))
+
+	return amt
+}
+
+// ticketFeeInfoForMempool returns the ticket fee information for the
+// memory pool.
+func ticketFeeInfoForMempool(s *rpcServer) *dcrjson.TicketFeeInfoMempool {
+	txDs := s.server.txMemPool.TxDescs()
+	ticketFees := make([]dcrutil.Amount, 0, len(txDs))
+	for _, txD := range txDs {
+		if txD.Type == stake.TxTypeSStx {
+			feePerKb := (dcrutil.Amount(txD.Fee)) * 1000 /
+				dcrutil.Amount(txD.Tx.MsgTx().SerializeSize())
+			ticketFees = append(ticketFees, feePerKb)
+		}
+	}
+
+	return &dcrjson.TicketFeeInfoMempool{
+		Number: uint32(len(ticketFees)),
+		Min:    min(ticketFees).ToCoin(),
+		Max:    max(ticketFees).ToCoin(),
+		Mean:   mean(ticketFees).ToCoin(),
+		Median: median(ticketFees).ToCoin(),
+		StdDev: stdDev(ticketFees).ToCoin(),
+	}
+}
+
+// calcFee calculates the fee of a transaction that has its fraud proofs
+// properly set.
+func calcFeePerKb(tx *dcrutil.Tx) dcrutil.Amount {
+	var in dcrutil.Amount
+	for _, txIn := range tx.MsgTx().TxIn {
+		in += dcrutil.Amount(txIn.ValueIn)
+	}
+	var out dcrutil.Amount
+	for _, txOut := range tx.MsgTx().TxOut {
+		out += dcrutil.Amount(txOut.Value)
+	}
+
+	return ((in - out) * 1000) / dcrutil.Amount(tx.MsgTx().SerializeSize())
+}
+
+// ticketFeeInfoForBlock fetches the ticket fee information for a given
+// block.
+func ticketFeeInfoForBlock(s *rpcServer, height int64) (*dcrjson.TicketFeeInfoBlock, error) {
+	hash, err := s.server.db.FetchBlockShaByHeight(height)
+	if err != nil {
+		return nil, err
+	}
+
+	bl, err := s.server.db.FetchBlockBySha(hash)
+	if err != nil {
+		return nil, err
+	}
+
+	ticketNum := bl.MsgBlock().Header.FreshStake
+	ticketFees := make([]dcrutil.Amount, int(ticketNum))
+	itr := 0
+	for _, stx := range bl.STransactions() {
+		txType := stake.DetermineTxType(stx)
+		if txType == stake.TxTypeSStx {
+			ticketFees[itr] = calcFeePerKb(stx)
+			itr++
+		}
+	}
+
+	return &dcrjson.TicketFeeInfoBlock{
+		Height: uint32(height),
+		Number: uint32(ticketNum),
+		Min:    min(ticketFees).ToCoin(),
+		Max:    max(ticketFees).ToCoin(),
+		Mean:   mean(ticketFees).ToCoin(),
+		Median: median(ticketFees).ToCoin(),
+		StdDev: stdDev(ticketFees).ToCoin(),
+	}, nil
+}
+
+// ticketFeeInfoForRange fetches the ticket fee information for a given
+// range from [start, end).
+func ticketFeeInfoForRange(s *rpcServer, start int64, end int64) (*dcrjson.TicketFeeInfoWindow, error) {
+	hashes, err := s.server.db.FetchHeightRange(start, end)
+	if err != nil {
+		return nil, err
+	}
+
+	var ticketFees []dcrutil.Amount
+	for i := range hashes {
+		bl, err := s.server.db.FetchBlockBySha(&hashes[i])
+		if err != nil {
+			return nil, err
+		}
+
+		for _, stx := range bl.STransactions() {
+			txType := stake.DetermineTxType(stx)
+			if txType == stake.TxTypeSStx {
+				ticketFees = append(ticketFees, calcFeePerKb(stx))
+			}
+		}
+	}
+
+	return &dcrjson.TicketFeeInfoWindow{
+		StartHeight: uint32(start),
+		EndHeight:   uint32(end),
+		Number:      uint32(len(ticketFees)),
+		Min:         min(ticketFees).ToCoin(),
+		Max:         max(ticketFees).ToCoin(),
+		Mean:        mean(ticketFees).ToCoin(),
+		Median:      median(ticketFees).ToCoin(),
+		StdDev:      stdDev(ticketFees).ToCoin(),
+	}, nil
+}
+
+// handleTicketFeeInfo implements the ticketfeeinfo command.
+func handleTicketFeeInfo(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (interface{}, error) {
+	c := cmd.(*dcrjson.TicketFeeInfoCmd)
+
+	cs := s.server.blockManager.chainState
+	cs.Lock()
+	bestHeight := cs.newestHeight
+	cs.Unlock()
+
+	// Memory pool first.
+	feeInfoMempool := ticketFeeInfoForMempool(s)
+
+	// Blocks requested, descending from the chain tip.
+	var feeInfoBlocks []dcrjson.TicketFeeInfoBlock
+	if c.Blocks > 0 {
+		start := bestHeight
+		end := bestHeight - int64(c.Blocks)
+
+		for i := start; i > end; i-- {
+			feeInfo, err := ticketFeeInfoForBlock(s, i)
+			if err != nil {
+				return nil, err
+			}
+			feeInfoBlocks = append(feeInfoBlocks, *feeInfo)
+		}
+	}
+
+	var feeInfoWindows []dcrjson.TicketFeeInfoWindow
+	if c.Windows > 0 {
+		// The first window is special because it may not be finished.
+		// Perform this first and return if it's the only window the
+		// user wants. Otherwise, append and continue.
+		winLen := s.server.chainParams.StakeDiffWindowSize
+		lastChange := (bestHeight / winLen) * winLen
+
+		feeInfo, err := ticketFeeInfoForRange(s, lastChange, bestHeight+1)
+		if err != nil {
+			return nil, err
+		}
+		feeInfoWindows = append(feeInfoWindows, *feeInfo)
+
+		// We need data on windows from before this. Start from
+		// the last adjustment and move backwards through window
+		// lengths, calulating the fees data and appending it
+		// each time.
+		if c.Windows > 1 {
+			// Go down to the last height requested, except
+			// in the case that the user has specified to
+			// many windows. In that case, just proceed to the
+			// first block.
+			end := int64(-1)
+			if lastChange-int64(c.Windows)*winLen > end {
+				end = lastChange - int64(c.Windows)*winLen
+			}
+			for i := lastChange; i > end+winLen; i -= winLen {
+				feeInfo, err := ticketFeeInfoForRange(s, i-winLen, i)
+				if err != nil {
+					return nil, err
+				}
+				feeInfoWindows = append(feeInfoWindows, *feeInfo)
+			}
+		}
+	}
+
+	return &dcrjson.TicketFeeInfoResult{
+		FeeInfoMempool: *feeInfoMempool,
+		FeeInfoBlocks:  feeInfoBlocks,
+		FeeInfoWindows: feeInfoWindows,
+	}, nil
+}
+
+// handleTicketsForAddress implements the ticketsforaddress command.
 func handleTicketsForAddress(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (interface{}, error) {
 	c := cmd.(*dcrjson.TicketsForAddressCmd)
 

@@ -140,6 +140,21 @@ func NewRebroadcastWinnersCmd() *RebroadcastWinnersCmd {
 	return &RebroadcastWinnersCmd{}
 }
 
+// TicketFeeInfoCmd defines the ticketsfeeinfo JSON-RPC command.
+type TicketFeeInfoCmd struct {
+	Blocks  uint32
+	Windows uint32
+}
+
+// NewTicketFeeInfoCmd returns a new instance which can be used to issue a
+// JSON-RPC ticket fee info command.
+func NewTicketFeeInfoCmd(blocks uint32, windows uint32) *TicketFeeInfoCmd {
+	return &TicketFeeInfoCmd{
+		Blocks:  blocks,
+		Windows: windows,
+	}
+}
+
 // TicketsForAddressCmd defines the ticketsforbucket JSON-RPC command.
 type TicketsForAddressCmd struct {
 	Address string
@@ -167,5 +182,6 @@ func init() {
 	MustRegisterCmd("missedtickets", (*MissedTicketsCmd)(nil), flags)
 	MustRegisterCmd("rebroadcastmissed", (*RebroadcastMissedCmd)(nil), flags)
 	MustRegisterCmd("rebroadcastwinners", (*RebroadcastWinnersCmd)(nil), flags)
+	MustRegisterCmd("ticketfeeinfo", (*TicketFeeInfoCmd)(nil), flags)
 	MustRegisterCmd("ticketsforaddress", (*TicketsForAddressCmd)(nil), flags)
 }
