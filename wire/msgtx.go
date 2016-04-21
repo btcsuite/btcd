@@ -263,14 +263,16 @@ func (msg *MsgTx) BtcDecode(r io.Reader, pver uint32) error {
 		return messageError("MsgTx.BtcDecode", str)
 	}
 
+	// Deserialize the inputs.
+	txIns := make([]TxIn, count)
 	msg.TxIn = make([]*TxIn, count)
 	for i := uint64(0); i < count; i++ {
-		ti := TxIn{}
-		err = readTxIn(r, pver, msg.Version, &ti)
+		ti := &txIns[i]
+		err = readTxIn(r, pver, msg.Version, ti)
 		if err != nil {
 			return err
 		}
-		msg.TxIn[i] = &ti
+		msg.TxIn[i] = ti
 	}
 
 	count, err = ReadVarInt(r, pver)
@@ -288,14 +290,16 @@ func (msg *MsgTx) BtcDecode(r io.Reader, pver uint32) error {
 		return messageError("MsgTx.BtcDecode", str)
 	}
 
+	// Deserialize the outputs.
+	txOuts := make([]TxOut, count)
 	msg.TxOut = make([]*TxOut, count)
 	for i := uint64(0); i < count; i++ {
-		to := TxOut{}
-		err = readTxOut(r, pver, msg.Version, &to)
+		to := &txOuts[i]
+		err = readTxOut(r, pver, msg.Version, to)
 		if err != nil {
 			return err
 		}
-		msg.TxOut[i] = &to
+		msg.TxOut[i] = to
 	}
 
 	msg.LockTime, err = binarySerializer.Uint32(r, littleEndian)
