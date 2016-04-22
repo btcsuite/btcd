@@ -416,38 +416,6 @@ func (c *Client) ListLockUnspent() ([]*wire.OutPoint, error) {
 	return c.ListLockUnspentAsync().Receive()
 }
 
-// FutureSetTxFeeResult is a future promise to deliver the result of a
-// SetTxFeeAsync RPC invocation (or an applicable error).
-type FutureSetTxFeeResult chan *response
-
-// Receive waits for the response promised by the future and returns the result
-// of setting an optional transaction fee per KB that helps ensure transactions
-// are processed quickly.  Most transaction are 1KB.
-func (r FutureSetTxFeeResult) Receive() error {
-	_, err := receiveFuture(r)
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
-// SetTxFeeAsync returns an instance of a type that can be used to get the
-// result of the RPC at some future time by invoking the Receive function on the
-// returned instance.
-//
-// See SetTxFee for the blocking version and more details.
-func (c *Client) SetTxFeeAsync(fee dcrutil.Amount) FutureSetTxFeeResult {
-	cmd := dcrjson.NewSetTxFeeCmd(fee.ToCoin())
-	return c.sendCmd(cmd)
-}
-
-// SetTxFee sets an optional transaction fee per KB that helps ensure
-// transactions are processed quickly.  Most transaction are 1KB.
-func (c *Client) SetTxFee(fee dcrutil.Amount) error {
-	return c.SetTxFeeAsync(fee).Receive()
-}
-
 // FutureSendToAddressResult is a future promise to deliver the result of a
 // SendToAddressAsync RPC invocation (or an applicable error).
 type FutureSendToAddressResult chan *response
@@ -763,30 +731,57 @@ type FuturePurchaseTicketResult chan *response
 // Receive waits for the response promised by the future and returns the hash
 // of the transaction sending multiple amounts to multiple addresses using the
 // provided account as a source of funds.
-func (r FuturePurchaseTicketResult) Receive() (*chainhash.Hash, error) {
+func (r FuturePurchaseTicketResult) Receive() ([]*chainhash.Hash, error) {
 	res, err := receiveFuture(r)
 	if err != nil {
 		return nil, err
 	}
 
-	// Unmashal result as a string.
-	var txHash string
-	err = json.Unmarshal(res, &txHash)
+	// Unmashal result as a string slice.
+	var txHashesStr []string
+	err = json.Unmarshal(res, &txHashesStr)
 	if err != nil {
 		return nil, err
 	}
 
-	return chainhash.NewHashFromStr(txHash)
+	txHashes := make([]*chainhash.Hash, len(txHashesStr))
+	for i := range txHashesStr {
+		h, err := chainhash.NewHashFromStr(txHashesStr[i])
+		if err != nil {
+			return nil, err
+		}
+		txHashes[i] = h
+	}
+
+	return txHashes, nil
 }
 
 // PurchaseTicketAsync takes an account and a spending limit and returns a
 // future chan to recieve the transactions representing the purchased tickets
 // when they come.
 func (c *Client) PurchaseTicketAsync(fromAccount string,
-	spendLimit dcrutil.Amount) FuturePurchaseTicketResult {
+	spendLimit dcrutil.Amount, minConf *int, ticketAddress dcrutil.Address,
+	numTickets *int, poolAddress dcrutil.Address, poolFees *dcrutil.Amount,
+	expiry *int) FuturePurchaseTicketResult {
+	// Parse the addresses into pointers to strings
+	// for the purpose of the command.
+	var ticketAddrStrPtr *string
+	if ticketAddress != nil {
+		ticketAddrStr := ticketAddress.EncodeAddress()
+		ticketAddrStrPtr = &ticketAddrStr
+	}
+
+	var poolAddrStrPtr *string
+	if poolAddress != nil {
+		poolAddrStr := poolAddress.EncodeAddress()
+		poolAddrStrPtr = &poolAddrStr
+	}
+
+	poolFeesFloat := poolFees.ToCoin()
 
 	cmd := dcrjson.NewPurchaseTicketCmd(fromAccount, spendLimit.ToCoin(),
-		nil, nil, nil, nil, nil, nil, nil)
+		minConf, ticketAddrStrPtr, numTickets, poolAddrStrPtr, &poolFeesFloat,
+		expiry, nil)
 
 	return c.sendCmd(cmd)
 }
@@ -794,9 +789,12 @@ func (c *Client) PurchaseTicketAsync(fromAccount string,
 // PurchaseTicket takes an account and a spending limit and calls the async
 // puchasetickets command.
 func (c *Client) PurchaseTicket(fromAccount string,
-	spendLimit dcrutil.Amount) (*chainhash.Hash, error) {
+	spendLimit dcrutil.Amount, minConf *int, ticketAddress dcrutil.Address,
+	numTickets *int, poolAddress dcrutil.Address, poolFees *dcrutil.Amount,
+	expiry *int) ([]*chainhash.Hash, error) {
 
-	return c.PurchaseTicketAsync(fromAccount, spendLimit).Receive()
+	return c.PurchaseTicketAsync(fromAccount, spendLimit, minConf, ticketAddress,
+		numTickets, poolAddress, poolFees, expiry).Receive()
 }
 
 // SStx generation RPC call handling
@@ -2819,6 +2817,43 @@ func (c *Client) AccountSyncAddressIndex(account string, branch uint32, index in
 	return c.AccountSyncAddressIndexAsync(account, branch, index).Receive()
 }
 
+// FutureAddTicketResult is a future promise to deliver the result of a
+// AddTicketAsync RPC invocation (or an applicable error).
+type FutureAddTicketResult chan *response
+
+// Receive waits for the response promised by the future and returns the info
+// provided by the server.
+func (r FutureAddTicketResult) Receive() error {
+	_, err := receiveFuture(r)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// AddTicketAsync returns an instance of a type that can be used to get the result
+// of the RPC at some future time by invoking the Receive function on the
+// returned instance.
+//
+// See AddTicket for the blocking version and more details.
+func (c *Client) AddTicketAsync(rawHex string) FutureAddTicketResult {
+	cmd := dcrjson.NewAddTicketCmd(rawHex)
+	return c.sendCmd(cmd)
+}
+
+// AddTicket manually adds a new ticket to the wallet stake manager. This is used
+// to override normal security settings to insert tickets which would not
+// otherwise be added to the wallet.
+func (c *Client) AddTicket(ticket *dcrutil.Tx) error {
+	ticketB, err := ticket.MsgTx().Bytes()
+	if err != nil {
+		return err
+	}
+
+	return c.AddTicketAsync(hex.EncodeToString(ticketB)).Receive()
+}
+
 // NOTE: While getinfo is implemented here (in wallet.go), a dcrd chain server
 // will respond to getinfo requests as well, excluding any wallet information.
 
@@ -3034,6 +3069,36 @@ func (c *Client) ListScripts() ([][]byte, error) {
 	return c.ListScriptsAsync().Receive()
 }
 
+// FutureSetTicketFeeResult is a future promise to deliver the result of a
+// SetTicketFeeAsync RPC invocation (or an applicable error).
+type FutureSetTicketFeeResult chan *response
+
+// Receive waits for the response promised by the future and returns the info
+// provided by the server.
+func (r FutureSetTicketFeeResult) Receive() error {
+	_, err := receiveFuture(r)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// SetTicketFeeAsync returns an instance of a type that can be used to
+// get the result of the RPC at some future time by invoking the Receive
+// function on the returned instance.
+//
+// See SetTicketFee for the blocking version and more details.
+func (c *Client) SetTicketFeeAsync(fee dcrutil.Amount) FutureSetTicketFeeResult {
+	cmd := dcrjson.NewSetTicketFeeCmd(fee.ToCoin())
+	return c.sendCmd(cmd)
+}
+
+// SetTicketFee sets the ticket fee per KB amount.
+func (c *Client) SetTicketFee(fee dcrutil.Amount) error {
+	return c.SetTicketFeeAsync(fee).Receive()
+}
+
 // FutureSetTicketVoteBitsResult is a future promise to deliver the result of a
 // SetTicketVoteBitsAsync RPC invocation (or an applicable error).
 type FutureSetTicketVoteBitsResult chan *response
@@ -3064,6 +3129,73 @@ func (c *Client) SetTicketVoteBitsAsync(hash *chainhash.Hash, voteBits uint16) F
 // bits are used in the future for a vote.
 func (c *Client) SetTicketVoteBits(hash *chainhash.Hash, voteBits uint16) error {
 	return c.SetTicketVoteBitsAsync(hash, voteBits).Receive()
+}
+
+// FutureSetTxFeeResult is a future promise to deliver the result of a
+// SetTxFeeAsync RPC invocation (or an applicable error).
+type FutureSetTxFeeResult chan *response
+
+// Receive waits for the response promised by the future.
+func (r FutureSetTxFeeResult) Receive() error {
+	_, err := receiveFuture(r)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// SetTxFeeAsync returns an instance of a type that can be used to
+// get the result of the RPC at some future time by invoking the Receive
+// function on the returned instance.
+//
+// See SetTxFee for the blocking version and more details.
+func (c *Client) SetTxFeeAsync(fee dcrutil.Amount) FutureSetTxFeeResult {
+	cmd := dcrjson.NewSetTxFeeCmd(fee.ToCoin())
+	return c.sendCmd(cmd)
+}
+
+// SetTxFee sets the transaction fee per KB amount.
+func (c *Client) SetTxFee(fee dcrutil.Amount) error {
+	return c.SetTxFeeAsync(fee).Receive()
+}
+
+// FutureStakePoolUserInfoResult is a future promise to deliver the result of a
+// GetInfoAsync RPC invocation (or an applicable error).
+type FutureStakePoolUserInfoResult chan *response
+
+// Receive waits for the response promised by the future and returns the info
+// provided by the server.
+func (r FutureStakePoolUserInfoResult) Receive() (*dcrjson.StakePoolUserInfoResult, error) {
+	res, err := receiveFuture(r)
+	if err != nil {
+		return nil, err
+	}
+
+	// Unmarshal result as a stakepooluserinfo result object.
+	var infoRes dcrjson.StakePoolUserInfoResult
+	err = json.Unmarshal(res, &infoRes)
+	if err != nil {
+		return nil, err
+	}
+
+	return &infoRes, nil
+}
+
+// StakePoolUserInfoAsync returns an instance of a type that can be used to
+// get the result of the RPC at some future time by invoking the Receive
+// function on the returned instance.
+//
+// See GetInfo for the blocking version and more details.
+func (c *Client) StakePoolUserInfoAsync(addr dcrutil.Address) FutureStakePoolUserInfoResult {
+	cmd := dcrjson.NewStakePoolUserInfoCmd(addr.EncodeAddress())
+	return c.sendCmd(cmd)
+}
+
+// StakePoolUserInfo returns a list of tickets and information about them
+// that are paying to the passed address.
+func (c *Client) StakePoolUserInfo(addr dcrutil.Address) (*dcrjson.StakePoolUserInfoResult, error) {
+	return c.StakePoolUserInfoAsync(addr).Receive()
 }
 
 // FutureTicketsForAddressResult is a future promise to deliver the result of a

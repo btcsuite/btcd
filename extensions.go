@@ -17,6 +17,40 @@ import (
 	"github.com/decred/dcrutil"
 )
 
+// FutureCreateEncryptedWalletResult is a future promise to deliver the error
+// result of a CreateEncryptedWalletAsync RPC invocation.
+type FutureCreateEncryptedWalletResult chan *response
+
+// Receive waits for and returns the error response promised by the future.
+func (r FutureCreateEncryptedWalletResult) Receive() error {
+	_, err := receiveFuture(r)
+	return err
+}
+
+// CreateEncryptedWalletAsync returns an instance of a type that can be used to
+// get the result of the RPC at some future time by invoking the Receive
+// function on the returned instance.
+//
+// See CreateEncryptedWallet for the blocking version and more details.
+//
+// NOTE: This is a dcrwallet extension.
+func (c *Client) CreateEncryptedWalletAsync(passphrase string) FutureCreateEncryptedWalletResult {
+	cmd := dcrjson.NewCreateEncryptedWalletCmd(passphrase)
+	return c.sendCmd(cmd)
+}
+
+// CreateEncryptedWallet requests the creation of an encrypted wallet.  Wallets
+// managed by dcrwallet are only written to disk with encrypted private keys,
+// and generating wallets on the fly is impossible as it requires user input for
+// the encryption passphrase.  This RPC specifies the passphrase and instructs
+// the wallet creation.  This may error if a wallet is already opened, or the
+// new wallet cannot be written to disk.
+//
+// NOTE: This is a dcrwallet extension.
+func (c *Client) CreateEncryptedWallet(passphrase string) error {
+	return c.CreateEncryptedWalletAsync(passphrase).Receive()
+}
+
 // FutureDebugLevelResult is a future promise to deliver the result of a
 // DebugLevelAsync RPC invocation (or an applicable error).
 type FutureDebugLevelResult chan *response
@@ -65,38 +99,52 @@ func (c *Client) DebugLevel(levelSpec string) (string, error) {
 	return c.DebugLevelAsync(levelSpec).Receive()
 }
 
-// FutureCreateEncryptedWalletResult is a future promise to deliver the error
-// result of a CreateEncryptedWalletAsync RPC invocation.
-type FutureCreateEncryptedWalletResult chan *response
+// FutureEstimateStakeDiffResult is a future promise to deliver the result of a
+// EstimateStakeDiffAsync RPC invocation (or an applicable error).
+type FutureEstimateStakeDiffResult chan *response
 
-// Receive waits for and returns the error response promised by the future.
-func (r FutureCreateEncryptedWalletResult) Receive() error {
-	_, err := receiveFuture(r)
-	return err
+// Receive waits for the response promised by the future and returns the hash
+// and height of the block in the longest (best) chain.
+func (r FutureEstimateStakeDiffResult) Receive() (dcrutil.Amount, error) {
+	res, err := receiveFuture(r)
+	if err != nil {
+		return 0, err
+	}
+
+	// Unmarsal result as a estimatestakediff result object.
+	var est float64
+	err = json.Unmarshal(res, &est)
+	if err != nil {
+		return 0, err
+	}
+
+	// Convert to amount.
+	amt, err := dcrutil.NewAmount(est)
+	if err != nil {
+		return 0, err
+	}
+
+	return amt, nil
 }
 
-// CreateEncryptedWalletAsync returns an instance of a type that can be used to
-// get the result of the RPC at some future time by invoking the Receive
-// function on the returned instance.
+// EstimateStakeDiffAsync returns an instance of a type that can be used to get the
+// result of the RPC at some future time by invoking the Receive function on the
+// returned instance.
 //
-// See CreateEncryptedWallet for the blocking version and more details.
+// See EstimateStakeDiff for the blocking version and more details.
 //
-// NOTE: This is a dcrwallet extension.
-func (c *Client) CreateEncryptedWalletAsync(passphrase string) FutureCreateEncryptedWalletResult {
-	cmd := dcrjson.NewCreateEncryptedWalletCmd(passphrase)
+// NOTE: This is a dcrd extension.
+func (c *Client) EstimateStakeDiffAsync(tickets *uint32) FutureEstimateStakeDiffResult {
+	cmd := dcrjson.NewEstimateStakeDiffCmd(tickets)
 	return c.sendCmd(cmd)
 }
 
-// CreateEncryptedWallet requests the creation of an encrypted wallet.  Wallets
-// managed by dcrwallet are only written to disk with encrypted private keys,
-// and generating wallets on the fly is impossible as it requires user input for
-// the encryption passphrase.  This RPC specifies the passphrase and instructs
-// the wallet creation.  This may error if a wallet is already opened, or the
-// new wallet cannot be written to disk.
+// EstimateStakeDiff returns the minimum, maximum, and expected next stake
+// difficulty.
 //
-// NOTE: This is a dcrwallet extension.
-func (c *Client) CreateEncryptedWallet(passphrase string) error {
-	return c.CreateEncryptedWalletAsync(passphrase).Receive()
+// NOTE: This is a dcrd extension.
+func (c *Client) EstimateStakeDiff(tickets *uint32) (dcrutil.Amount, error) {
+	return c.EstimateStakeDiffAsync(tickets).Receive()
 }
 
 // FutureExistsAddressResult is a future promise to deliver the result
@@ -303,6 +351,299 @@ func (c *Client) ExistsMempoolTxs(hashes []*chainhash.Hash) (string, error) {
 	return c.ExistsMempoolTxsAsync(hashes).Receive()
 }
 
+// FutureExportWatchingWalletResult is a future promise to deliver the result of
+// an ExportWatchingWalletAsync RPC invocation (or an applicable error).
+type FutureExportWatchingWalletResult chan *response
+
+// Receive waits for the response promised by the future and returns the
+// exported wallet.
+func (r FutureExportWatchingWalletResult) Receive() ([]byte, []byte, error) {
+	res, err := receiveFuture(r)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	// Unmarshal result as a JSON object.
+	var obj map[string]interface{}
+	err = json.Unmarshal(res, &obj)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	// Check for the wallet and tx string fields in the object.
+	base64Wallet, ok := obj["wallet"].(string)
+	if !ok {
+		return nil, nil, fmt.Errorf("unexpected response type for "+
+			"exportwatchingwallet 'wallet' field: %T\n",
+			obj["wallet"])
+	}
+	base64TxStore, ok := obj["tx"].(string)
+	if !ok {
+		return nil, nil, fmt.Errorf("unexpected response type for "+
+			"exportwatchingwallet 'tx' field: %T\n",
+			obj["tx"])
+	}
+
+	walletBytes, err := base64.StdEncoding.DecodeString(base64Wallet)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	txStoreBytes, err := base64.StdEncoding.DecodeString(base64TxStore)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return walletBytes, txStoreBytes, nil
+
+}
+
+// ExportWatchingWalletAsync returns an instance of a type that can be used to
+// get the result of the RPC at some future time by invoking the Receive
+// function on the returned instance.
+//
+// See ExportWatchingWallet for the blocking version and more details.
+//
+// NOTE: This is a dcrwallet extension.
+func (c *Client) ExportWatchingWalletAsync(account string) FutureExportWatchingWalletResult {
+	cmd := dcrjson.NewExportWatchingWalletCmd(&account, dcrjson.Bool(true))
+	return c.sendCmd(cmd)
+}
+
+// ExportWatchingWallet returns the raw bytes for a watching-only version of
+// wallet.bin and tx.bin, respectively, for the specified account that can be
+// used by dcrwallet to enable a wallet which does not have the private keys
+// necessary to spend funds.
+//
+// NOTE: This is a dcrwallet extension.
+func (c *Client) ExportWatchingWallet(account string) ([]byte, []byte, error) {
+	return c.ExportWatchingWalletAsync(account).Receive()
+}
+
+// FutureGetBestBlockResult is a future promise to deliver the result of a
+// GetBestBlockAsync RPC invocation (or an applicable error).
+type FutureGetBestBlockResult chan *response
+
+// Receive waits for the response promised by the future and returns the hash
+// and height of the block in the longest (best) chain.
+func (r FutureGetBestBlockResult) Receive() (*chainhash.Hash, int32, error) {
+	res, err := receiveFuture(r)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	// Unmarsal result as a getbestblock result object.
+	var bestBlock dcrjson.GetBestBlockResult
+
+	err = json.Unmarshal(res, &bestBlock)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	// Convert hash string.
+	hash, err := chainhash.NewHashFromStr(bestBlock.Hash)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	return hash, bestBlock.Height, nil
+}
+
+// GetBestBlockAsync returns an instance of a type that can be used to get the
+// result of the RPC at some future time by invoking the Receive function on the
+// returned instance.
+//
+// See GetBestBlock for the blocking version and more details.
+//
+// NOTE: This is a dcrd extension.
+func (c *Client) GetBestBlockAsync() FutureGetBestBlockResult {
+	cmd := dcrjson.NewGetBestBlockCmd()
+	return c.sendCmd(cmd)
+}
+
+// GetBestBlock returns the hash and height of the block in the longest (best)
+// chain.
+//
+// NOTE: This is a dcrd extension.
+func (c *Client) GetBestBlock() (*chainhash.Hash, int32, error) {
+	return c.GetBestBlockAsync().Receive()
+}
+
+// FutureGetCurrentNetResult is a future promise to deliver the result of a
+// GetCurrentNetAsync RPC invocation (or an applicable error).
+type FutureGetCurrentNetResult chan *response
+
+// Receive waits for the response promised by the future and returns the network
+// the server is running on.
+func (r FutureGetCurrentNetResult) Receive() (wire.CurrencyNet, error) {
+	res, err := receiveFuture(r)
+	if err != nil {
+		return 0, err
+	}
+
+	// Unmarshal result as an int64.
+	var net int64
+	err = json.Unmarshal(res, &net)
+	if err != nil {
+		return 0, err
+	}
+
+	return wire.CurrencyNet(net), nil
+}
+
+// GetCurrentNetAsync returns an instance of a type that can be used to get the
+// result of the RPC at some future time by invoking the Receive function on the
+// returned instance.
+//
+// See GetCurrentNet for the blocking version and more details.
+//
+// NOTE: This is a dcrd extension.
+func (c *Client) GetCurrentNetAsync() FutureGetCurrentNetResult {
+	cmd := dcrjson.NewGetCurrentNetCmd()
+	return c.sendCmd(cmd)
+}
+
+// GetCurrentNet returns the network the server is running on.
+//
+// NOTE: This is a dcrd extension.
+func (c *Client) GetCurrentNet() (wire.CurrencyNet, error) {
+	return c.GetCurrentNetAsync().Receive()
+}
+
+// FutureGetStakeDifficultyResult is a future promise to deliver the result of a
+// GetStakeDifficultyAsync RPC invocation (or an applicable error).
+type FutureGetStakeDifficultyResult chan *response
+
+// Receive waits for the response promised by the future and returns the network
+// the server is running on.
+func (r FutureGetStakeDifficultyResult) Receive() (*dcrjson.GetStakeDifficultyResult, error) {
+	res, err := receiveFuture(r)
+	if err != nil {
+		return nil, err
+	}
+
+	// Unmarshal result as a dcrjson.GetStakeDifficultyResult.
+	var gsdr dcrjson.GetStakeDifficultyResult
+	err = json.Unmarshal(res, &gsdr)
+	if err != nil {
+		return nil, err
+	}
+
+	return &gsdr, nil
+}
+
+// GetStakeDifficultyAsync returns an instance of a type that can be used to
+// get the result of the RPC at some future time by invoking the Receive
+// function on the returned instance.
+//
+// See GetStakeDifficulty for the blocking version and more details.
+//
+// NOTE: This is a dcrd extension.
+func (c *Client) GetStakeDifficultyAsync() FutureGetStakeDifficultyResult {
+	cmd := dcrjson.NewGetStakeDifficultyCmd()
+	return c.sendCmd(cmd)
+}
+
+// GetStakeDifficulty returns the current and next stake difficulty.
+//
+// NOTE: This is a dcrd extension.
+func (c *Client) GetStakeDifficulty() (*dcrjson.GetStakeDifficultyResult, error) {
+	return c.GetStakeDifficultyAsync().Receive()
+}
+
+// FutureGetTicketPoolValueResult is a future promise to deliver the result of a
+// GetTicketPoolValueAsync RPC invocation (or an applicable error).
+type FutureGetTicketPoolValueResult chan *response
+
+// Receive waits for the response promised by the future and returns the network
+// the server is running on.
+func (r FutureGetTicketPoolValueResult) Receive() (dcrutil.Amount, error) {
+	res, err := receiveFuture(r)
+	if err != nil {
+		return 0, err
+	}
+
+	// Unmarshal result as a float64.
+	var val float64
+	err = json.Unmarshal(res, &val)
+	if err != nil {
+		return 0, err
+	}
+
+	// Convert to an amount.
+	amt, err := dcrutil.NewAmount(val)
+	if err != nil {
+		return 0, err
+	}
+
+	return amt, nil
+}
+
+// GetTicketPoolValueAsync returns an instance of a type that can be used to
+// get the result of the RPC at some future time by invoking the Receive
+// function on the returned instance.
+//
+// See GetTicketPoolValue for the blocking version and more details.
+//
+// NOTE: This is a dcrd extension.
+func (c *Client) GetTicketPoolValueAsync() FutureGetTicketPoolValueResult {
+	cmd := dcrjson.NewGetTicketPoolValueCmd()
+	return c.sendCmd(cmd)
+}
+
+// GetTicketPoolValue returns the value of the live ticket pool.
+//
+// NOTE: This is a dcrd extension.
+func (c *Client) GetTicketPoolValue() (dcrutil.Amount, error) {
+	return c.GetTicketPoolValueAsync().Receive()
+}
+
+// FutureListAddressTransactionsResult is a future promise to deliver the result
+// of a ListAddressTransactionsAsync RPC invocation (or an applicable error).
+type FutureListAddressTransactionsResult chan *response
+
+// Receive waits for the response promised by the future and returns information
+// about all transactions associated with the provided addresses.
+func (r FutureListAddressTransactionsResult) Receive() ([]dcrjson.ListTransactionsResult, error) {
+	res, err := receiveFuture(r)
+	if err != nil {
+		return nil, err
+	}
+
+	// Unmarshal the result as an array of listtransactions objects.
+	var transactions []dcrjson.ListTransactionsResult
+	err = json.Unmarshal(res, &transactions)
+	if err != nil {
+		return nil, err
+	}
+	return transactions, nil
+}
+
+// ListAddressTransactionsAsync returns an instance of a type that can be used
+// to get the result of the RPC at some future time by invoking the Receive
+// function on the returned instance.
+//
+// See ListAddressTransactions for the blocking version and more details.
+//
+// NOTE: This is a dcrd extension.
+func (c *Client) ListAddressTransactionsAsync(addresses []dcrutil.Address, account string) FutureListAddressTransactionsResult {
+	// Convert addresses to strings.
+	addrs := make([]string, 0, len(addresses))
+	for _, addr := range addresses {
+		addrs = append(addrs, addr.EncodeAddress())
+	}
+	cmd := dcrjson.NewListAddressTransactionsCmd(addrs, &account)
+	return c.sendCmd(cmd)
+}
+
+// ListAddressTransactions returns information about all transactions associated
+// with the provided addresses.
+//
+// NOTE: This is a dcrwallet extension.
+func (c *Client) ListAddressTransactions(addresses []dcrutil.Address, account string) ([]dcrjson.ListTransactionsResult, error) {
+	return c.ListAddressTransactionsAsync(addresses, account).Receive()
+}
+
 // FutureLiveTicketsResult is a future promise to deliver the result
 // of a FutureLiveTicketsResultAsync RPC invocation (or an applicable error).
 type FutureLiveTicketsResult chan *response
@@ -397,211 +738,6 @@ func (c *Client) MissedTickets() ([]*chainhash.Hash, error) {
 	return c.MissedTicketsAsync().Receive()
 }
 
-// FutureListAddressTransactionsResult is a future promise to deliver the result
-// of a ListAddressTransactionsAsync RPC invocation (or an applicable error).
-type FutureListAddressTransactionsResult chan *response
-
-// Receive waits for the response promised by the future and returns information
-// about all transactions associated with the provided addresses.
-func (r FutureListAddressTransactionsResult) Receive() ([]dcrjson.ListTransactionsResult, error) {
-	res, err := receiveFuture(r)
-	if err != nil {
-		return nil, err
-	}
-
-	// Unmarshal the result as an array of listtransactions objects.
-	var transactions []dcrjson.ListTransactionsResult
-	err = json.Unmarshal(res, &transactions)
-	if err != nil {
-		return nil, err
-	}
-	return transactions, nil
-}
-
-// ListAddressTransactionsAsync returns an instance of a type that can be used
-// to get the result of the RPC at some future time by invoking the Receive
-// function on the returned instance.
-//
-// See ListAddressTransactions for the blocking version and more details.
-//
-// NOTE: This is a dcrd extension.
-func (c *Client) ListAddressTransactionsAsync(addresses []dcrutil.Address, account string) FutureListAddressTransactionsResult {
-	// Convert addresses to strings.
-	addrs := make([]string, 0, len(addresses))
-	for _, addr := range addresses {
-		addrs = append(addrs, addr.EncodeAddress())
-	}
-	cmd := dcrjson.NewListAddressTransactionsCmd(addrs, &account)
-	return c.sendCmd(cmd)
-}
-
-// ListAddressTransactions returns information about all transactions associated
-// with the provided addresses.
-//
-// NOTE: This is a dcrwallet extension.
-func (c *Client) ListAddressTransactions(addresses []dcrutil.Address, account string) ([]dcrjson.ListTransactionsResult, error) {
-	return c.ListAddressTransactionsAsync(addresses, account).Receive()
-}
-
-// FutureGetBestBlockResult is a future promise to deliver the result of a
-// GetBestBlockAsync RPC invocation (or an applicable error).
-type FutureGetBestBlockResult chan *response
-
-// Receive waits for the response promised by the future and returns the hash
-// and height of the block in the longest (best) chain.
-func (r FutureGetBestBlockResult) Receive() (*chainhash.Hash, int32, error) {
-	res, err := receiveFuture(r)
-	if err != nil {
-		return nil, 0, err
-	}
-
-	// Unmarsal result as a getbestblock result object.
-	var bestBlock dcrjson.GetBestBlockResult
-
-	err = json.Unmarshal(res, &bestBlock)
-	if err != nil {
-		return nil, 0, err
-	}
-
-	// Convert hash string.
-	hash, err := chainhash.NewHashFromStr(bestBlock.Hash)
-	if err != nil {
-		return nil, 0, err
-	}
-
-	return hash, bestBlock.Height, nil
-}
-
-// GetBestBlockAsync returns an instance of a type that can be used to get the
-// result of the RPC at some future time by invoking the Receive function on the
-// returned instance.
-//
-// See GetBestBlock for the blocking version and more details.
-//
-// NOTE: This is a dcrd extension.
-func (c *Client) GetBestBlockAsync() FutureGetBestBlockResult {
-	cmd := dcrjson.NewGetBestBlockCmd()
-	return c.sendCmd(cmd)
-}
-
-// GetBestBlock returns the hash and height of the block in the longest (best)
-// chain.
-//
-// NOTE: This is a dcrd extension.
-func (c *Client) GetBestBlock() (*chainhash.Hash, int32, error) {
-	return c.GetBestBlockAsync().Receive()
-}
-
-// FutureGetCurrentNetResult is a future promise to deliver the result of a
-// GetCurrentNetAsync RPC invocation (or an applicable error).
-type FutureGetCurrentNetResult chan *response
-
-// Receive waits for the response promised by the future and returns the network
-// the server is running on.
-func (r FutureGetCurrentNetResult) Receive() (wire.CurrencyNet, error) {
-	res, err := receiveFuture(r)
-	if err != nil {
-		return 0, err
-	}
-
-	// Unmarshal result as an int64.
-	var net int64
-	err = json.Unmarshal(res, &net)
-	if err != nil {
-		return 0, err
-	}
-
-	return wire.CurrencyNet(net), nil
-}
-
-// GetCurrentNetAsync returns an instance of a type that can be used to get the
-// result of the RPC at some future time by invoking the Receive function on the
-// returned instance.
-//
-// See GetCurrentNet for the blocking version and more details.
-//
-// NOTE: This is a dcrd extension.
-func (c *Client) GetCurrentNetAsync() FutureGetCurrentNetResult {
-	cmd := dcrjson.NewGetCurrentNetCmd()
-	return c.sendCmd(cmd)
-}
-
-// GetCurrentNet returns the network the server is running on.
-//
-// NOTE: This is a dcrd extension.
-func (c *Client) GetCurrentNet() (wire.CurrencyNet, error) {
-	return c.GetCurrentNetAsync().Receive()
-}
-
-// FutureExportWatchingWalletResult is a future promise to deliver the result of
-// an ExportWatchingWalletAsync RPC invocation (or an applicable error).
-type FutureExportWatchingWalletResult chan *response
-
-// Receive waits for the response promised by the future and returns the
-// exported wallet.
-func (r FutureExportWatchingWalletResult) Receive() ([]byte, []byte, error) {
-	res, err := receiveFuture(r)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	// Unmarshal result as a JSON object.
-	var obj map[string]interface{}
-	err = json.Unmarshal(res, &obj)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	// Check for the wallet and tx string fields in the object.
-	base64Wallet, ok := obj["wallet"].(string)
-	if !ok {
-		return nil, nil, fmt.Errorf("unexpected response type for "+
-			"exportwatchingwallet 'wallet' field: %T\n",
-			obj["wallet"])
-	}
-	base64TxStore, ok := obj["tx"].(string)
-	if !ok {
-		return nil, nil, fmt.Errorf("unexpected response type for "+
-			"exportwatchingwallet 'tx' field: %T\n",
-			obj["tx"])
-	}
-
-	walletBytes, err := base64.StdEncoding.DecodeString(base64Wallet)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	txStoreBytes, err := base64.StdEncoding.DecodeString(base64TxStore)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	return walletBytes, txStoreBytes, nil
-
-}
-
-// ExportWatchingWalletAsync returns an instance of a type that can be used to
-// get the result of the RPC at some future time by invoking the Receive
-// function on the returned instance.
-//
-// See ExportWatchingWallet for the blocking version and more details.
-//
-// NOTE: This is a dcrwallet extension.
-func (c *Client) ExportWatchingWalletAsync(account string) FutureExportWatchingWalletResult {
-	cmd := dcrjson.NewExportWatchingWalletCmd(&account, dcrjson.Bool(true))
-	return c.sendCmd(cmd)
-}
-
-// ExportWatchingWallet returns the raw bytes for a watching-only version of
-// wallet.bin and tx.bin, respectively, for the specified account that can be
-// used by dcrwallet to enable a wallet which does not have the private keys
-// necessary to spend funds.
-//
-// NOTE: This is a dcrwallet extension.
-func (c *Client) ExportWatchingWallet(account string) ([]byte, []byte, error) {
-	return c.ExportWatchingWalletAsync(account).Receive()
-}
-
 // FutureSessionResult is a future promise to deliver the result of a
 // SessionAsync RPC invocation (or an applicable error).
 type FutureSessionResult chan *response
@@ -648,4 +784,153 @@ func (c *Client) SessionAsync() FutureSessionResult {
 // NOTE: This is a decred extension.
 func (c *Client) Session() (*dcrjson.SessionResult, error) {
 	return c.SessionAsync().Receive()
+}
+
+// FutureTicketFeeInfoResult is a future promise to deliver the result of a
+// TicketFeeInfoAsync RPC invocation (or an applicable error).
+type FutureTicketFeeInfoResult chan *response
+
+// Receive waits for the response promised by the future and returns the
+// ticketfeeinfo result.
+func (r FutureTicketFeeInfoResult) Receive() (*dcrjson.TicketFeeInfoResult, error) {
+	res, err := receiveFuture(r)
+	if err != nil {
+		return nil, err
+	}
+
+	// Unmarsal result as a ticketfeeinfo result object.
+	var tfir dcrjson.TicketFeeInfoResult
+	err = json.Unmarshal(res, &tfir)
+	if err != nil {
+		return nil, err
+	}
+
+	return &tfir, nil
+}
+
+// TicketFeeInfoAsync returns an instance of a type that can be used to get the result
+// of the RPC at some future time by invoking the Receive function on the
+// returned instance.
+//
+// See TicketFeeInfo for the blocking version and more details.
+//
+// NOTE: This is a decred extension.
+func (c *Client) TicketFeeInfoAsync(blocks *uint32, windows *uint32) FutureTicketFeeInfoResult {
+	// Not supported in HTTP POST mode.
+	if c.config.HTTPPostMode {
+		return newFutureError(ErrWebsocketsRequired)
+	}
+
+	cmd := dcrjson.NewTicketFeeInfoCmd(blocks, windows)
+	return c.sendCmd(cmd)
+}
+
+// TicketFeeInfo returns information about ticket fees.
+//
+// This RPC requires the client to be running in websocket mode.
+//
+// NOTE: This is a decred extension.
+func (c *Client) TicketFeeInfo(blocks *uint32, windows *uint32) (*dcrjson.TicketFeeInfoResult, error) {
+	return c.TicketFeeInfoAsync(blocks, windows).Receive()
+}
+
+// FutureTicketVWAPResult is a future promise to deliver the result of a
+// TicketVWAPAsync RPC invocation (or an applicable error).
+type FutureTicketVWAPResult chan *response
+
+// Receive waits for the response promised by the future and returns the
+// ticketvwap result.
+func (r FutureTicketVWAPResult) Receive() (dcrutil.Amount, error) {
+	res, err := receiveFuture(r)
+	if err != nil {
+		return 0, err
+	}
+
+	// Unmarsal result as a ticketvwap result object.
+	var vwap float64
+	err = json.Unmarshal(res, &vwap)
+	if err != nil {
+		return 0, err
+	}
+
+	amt, err := dcrutil.NewAmount(vwap)
+	if err != nil {
+		return 0, err
+	}
+
+	return amt, nil
+}
+
+// TicketVWAPAsync returns an instance of a type that can be used to get the result
+// of the RPC at some future time by invoking the Receive function on the
+// returned instance.
+//
+// See TicketVWAP for the blocking version and more details.
+//
+// NOTE: This is a decred extension.
+func (c *Client) TicketVWAPAsync(start *uint32, end *uint32) FutureTicketVWAPResult {
+	// Not supported in HTTP POST mode.
+	if c.config.HTTPPostMode {
+		return newFutureError(ErrWebsocketsRequired)
+	}
+
+	cmd := dcrjson.NewTicketVWAPCmd(start, end)
+	return c.sendCmd(cmd)
+}
+
+// TicketVWAP returns the vwap weighted average price of tickets.
+//
+// This RPC requires the client to be running in websocket mode.
+//
+// NOTE: This is a decred extension.
+func (c *Client) TicketVWAP(start *uint32, end *uint32) (dcrutil.Amount, error) {
+	return c.TicketVWAPAsync(start, end).Receive()
+}
+
+// FutureTxFeeInfoResult is a future promise to deliver the result of a
+// TxFeeInfoAsync RPC invocation (or an applicable error).
+type FutureTxFeeInfoResult chan *response
+
+// Receive waits for the response promised by the future and returns the
+// txfeeinfo result.
+func (r FutureTxFeeInfoResult) Receive() (*dcrjson.TxFeeInfoResult, error) {
+	res, err := receiveFuture(r)
+	if err != nil {
+		return nil, err
+	}
+
+	// Unmarsal result as a txfeeinfo result object.
+	var tfir dcrjson.TxFeeInfoResult
+	err = json.Unmarshal(res, &tfir)
+	if err != nil {
+		return nil, err
+	}
+
+	return &tfir, nil
+}
+
+// TxFeeInfoAsync returns an instance of a type that can be used to get the result
+// of the RPC at some future time by invoking the Receive function on the
+// returned instance.
+//
+// See TxFeeInfo for the blocking version and more details.
+//
+// NOTE: This is a decred extension.
+func (c *Client) TxFeeInfoAsync(blocks *uint32, start *uint32, end *uint32) FutureTxFeeInfoResult {
+	// Not supported in HTTP POST mode.
+	if c.config.HTTPPostMode {
+		return newFutureError(ErrWebsocketsRequired)
+	}
+
+	cmd := dcrjson.NewTxFeeInfoCmd(blocks, start, end)
+	return c.sendCmd(cmd)
+}
+
+// TxFeeInfo returns information about tx fees.
+//
+// This RPC requires the client to be running in websocket mode.
+//
+// NOTE: This is a decred extension.
+func (c *Client) TxFeeInfo(blocks *uint32, start *uint32, end *uint32) (*dcrjson.TxFeeInfoResult, error) {
+	return c.TxFeeInfoAsync(blocks, start, end).Receive()
 }
