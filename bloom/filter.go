@@ -167,7 +167,7 @@ func (bf *Filter) Matches(data []byte) bool {
 func (bf *Filter) matchesOutPoint(outpoint *wire.OutPoint) bool {
 	// Serialize
 	var buf [wire.HashSize + 4]byte
-	copy(buf[:], outpoint.Hash.Bytes())
+	copy(buf[:], outpoint.Hash[:])
 	binary.LittleEndian.PutUint32(buf[wire.HashSize:], outpoint.Index)
 
 	return bf.matches(buf[:])
@@ -217,9 +217,9 @@ func (bf *Filter) Add(data []byte) {
 // AddShaHash adds the passed wire.ShaHash to the Filter.
 //
 // This function is safe for concurrent access.
-func (bf *Filter) AddShaHash(sha *wire.ShaHash) {
+func (bf *Filter) AddShaHash(hash *wire.ShaHash) {
 	bf.mtx.Lock()
-	bf.add(sha.Bytes())
+	bf.add(hash[:])
 	bf.mtx.Unlock()
 }
 
@@ -229,7 +229,7 @@ func (bf *Filter) AddShaHash(sha *wire.ShaHash) {
 func (bf *Filter) addOutPoint(outpoint *wire.OutPoint) {
 	// Serialize
 	var buf [wire.HashSize + 4]byte
-	copy(buf[:], outpoint.Hash.Bytes())
+	copy(buf[:], outpoint.Hash[:])
 	binary.LittleEndian.PutUint32(buf[wire.HashSize:], outpoint.Index)
 
 	bf.add(buf[:])
@@ -272,7 +272,7 @@ func (bf *Filter) maybeAddOutpoint(pkScript []byte, outHash *wire.ShaHash, outId
 func (bf *Filter) matchTxAndUpdate(tx *btcutil.Tx) bool {
 	// Check if the filter matches the hash of the transaction.
 	// This is useful for finding transactions when they appear in a block.
-	matched := bf.matches(tx.Sha().Bytes())
+	matched := bf.matches(tx.Sha()[:])
 
 	// Check if the filter matches any data elements in the public key
 	// scripts of any of the outputs.  When it does, add the outpoint that
