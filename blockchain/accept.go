@@ -1,4 +1,4 @@
-// Copyright (c) 2013-2016 The btcsuite developers
+// Copyright (c) 2013-2017 The btcsuite developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -28,9 +28,9 @@ func (b *BlockChain) maybeAcceptBlock(block *btcutil.Block, flags BehaviorFlags)
 
 	// Get a block node for the block previous to this one.  Will be nil
 	// if this is the genesis block.
-	prevNode, err := b.getPrevNodeFromBlock(block)
+	prevNode, err := b.index.PrevNodeFromBlock(block)
 	if err != nil {
-		log.Errorf("getPrevNodeFromBlock: %v", err)
+		log.Errorf("PrevNodeFromBlock: %v", err)
 		return false, err
 	}
 

@@ -1,4 +1,4 @@
-// Copyright (c) 2016 The btcsuite developers
+// Copyright (c) 2016-2017 The btcsuite developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -117,7 +117,7 @@ func (c bitConditionChecker) Condition(node *blockNode) (bool, error) {
 	// accessing node.parent directly as it will dynamically create previous
 	// block nodes as needed.  This helps allow only the pieces of the chain
 	// that are needed to remain in memory.
-	prevNode, err := c.chain.getPrevNodeFromNode(node)
+	prevNode, err := c.chain.index.PrevNodeFromNode(node)
 	if err != nil {
 		return false, err
 	}
@@ -248,7 +248,7 @@ func (b *BlockChain) warnUnknownRuleActivations(node *blockNode) error {
 	// accessing node.parent directly as it will dynamically create previous
 	// block nodes as needed.  This helps allow only the pieces of the chain
 	// that are needed to remain in memory.
-	prevNode, err := b.getPrevNodeFromNode(node)
+	prevNode, err := b.index.PrevNodeFromNode(node)
 	if err != nil {
 		return err
 	}
@@ -309,7 +309,7 @@ func (b *BlockChain) warnUnknownVersions(node *blockNode) error {
 		// simply accessing node.parent directly as it will dynamically
 		// create previous block nodes as needed.  This helps allow only
 		// the pieces of the chain that are needed to remain in memory.
-		node, err = b.getPrevNodeFromNode(node)
+		node, err = b.index.PrevNodeFromNode(node)
 		if err != nil {
 			return err
 		}

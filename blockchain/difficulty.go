@@ -207,9 +207,9 @@ func (b *BlockChain) findPrevTestNetDifficulty(startNode *blockNode) (uint32, er
 		// helps allow only the pieces of the chain that are needed
 		// to remain in memory.
 		var err error
-		iterNode, err = b.getPrevNodeFromNode(iterNode)
+		iterNode, err = b.index.PrevNodeFromNode(iterNode)
 		if err != nil {
-			log.Errorf("getPrevNodeFromNode: %v", err)
+			log.Errorf("PrevNodeFromNode: %v", err)
 			return 0, err
 		}
 	}
@@ -277,7 +277,7 @@ func (b *BlockChain) calcNextRequiredDifficulty(lastNode *blockNode, newBlockTim
 		// helps allow only the pieces of the chain that are needed
 		// to remain in memory.
 		var err error
-		firstNode, err = b.getPrevNodeFromNode(firstNode)
+		firstNode, err = b.index.PrevNodeFromNode(firstNode)
 		if err != nil {
 			return 0, err
 		}

@@ -671,9 +671,9 @@ func (b *BlockChain) checkBlockHeaderContext(header *wire.BlockHeader, prevNode 
 
 		// Ensure the timestamp for the block header is after the
 		// median time of the last several blocks (medianTimeBlocks).
-		medianTime, err := b.calcPastMedianTime(prevNode)
+		medianTime, err := b.index.CalcPastMedianTime(prevNode)
 		if err != nil {
-			log.Errorf("calcPastMedianTime: %v", err)
+			log.Errorf("CalcPastMedianTime: %v", err)
 			return err
 		}
 		if !header.Timestamp.After(medianTime) {

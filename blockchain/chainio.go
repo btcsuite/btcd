@@ -1086,7 +1086,7 @@ func (b *BlockChain) createChainState() error {
 	b.bestNode = node
 
 	// Add the new node to the index which is used for faster lookups.
-	b.index[*node.hash] = node
+	b.index.AddNode(node)
 
 	// Initialize the state related to the best block.  Since it is the
 	// genesis block, use its timestamp for the median time.
@@ -1186,13 +1186,11 @@ func (b *BlockChain) initChainState() error {
 		node.workSum = state.workSum
 		b.bestNode = node
 
-		// Add the new node to the indices for faster lookups.
-		prevHash := node.parentHash
-		b.index[*node.hash] = node
-		b.depNodes[*prevHash] = append(b.depNodes[*prevHash], node)
+		// Add the new node to the block index.
+		b.index.AddNode(node)
 
 		// Calculate the median time for the block.
-		medianTime, err := b.calcPastMedianTime(node)
+		medianTime, err := b.index.CalcPastMedianTime(node)
 		if err != nil {
 			return err
 		}
@@ -1910,7 +1908,7 @@ func (b *BlockChain) initThresholdCaches() error {
 	// accessing b.bestNode.parent directly as it will dynamically create
 	// previous block nodes as needed.  This helps allow only the pieces of
 	// the chain that are needed to remain in memory.
-	prevNode, err := b.getPrevNodeFromNode(b.bestNode)
+	prevNode, err := b.index.PrevNodeFromNode(b.bestNode)
 	if err != nil {
 		return err
 	}

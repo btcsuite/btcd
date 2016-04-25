@@ -1,4 +1,4 @@
-// Copyright (c) 2013-2016 The btcsuite developers
+// Copyright (c) 2013-2017 The btcsuite developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -38,14 +38,14 @@ type BlockLocator []*chainhash.Hash
 //  - If the passed hash is not currently known, the block locator will only
 //    consist of the passed hash
 //
-// This function MUST be called with the chain state lock held (for reads).
-func (b *BlockChain) blockLocatorFromHash(hash *chainhash.Hash) BlockLocator {
+// This function MUST be called with the block index lock held (for reads).
+func (bi *blockIndex) blockLocatorFromHash(hash *chainhash.Hash) BlockLocator {
 	// The locator contains the requested hash at the very least.
 	locator := make(BlockLocator, 0, wire.MaxBlockLocatorsPerMsg)
 	locator = append(locator, hash)
 
 	// Nothing more to do if a locator for the genesis hash was requested.
-	if hash.IsEqual(b.chainParams.GenesisHash) {
+	if hash.IsEqual(bi.chainParams.GenesisHash) {
 		return locator
 	}
 
@@ -54,13 +54,13 @@ func (b *BlockChain) blockLocatorFromHash(hash *chainhash.Hash) BlockLocator {
 	// which it forks from the main chain.
 	blockHeight := int32(-1)
 	forkHeight := int32(-1)
-	node, exists := b.index[*hash]
+	node, exists := bi.index[*hash]
 	if !exists {
 		// Try to look up the height for passed block hash.  Assume an
 		// error means it doesn't exist and just return the locator for
 		// the block itself.
 		var height int32
-		err := b.db.View(func(dbTx database.Tx) error {
+		err := bi.db.View(func(dbTx database.Tx) error {
 			var err error
 			height, err = dbFetchHeightByHash(dbTx, hash)
 			return err
@@ -93,7 +93,7 @@ func (b *BlockChain) blockLocatorFromHash(hash *chainhash.Hash) BlockLocator {
 	// could fail is if there is something wrong with the database which
 	// will be caught in short order anyways and it's also safe to ignore
 	// block locators.
-	_ = b.db.View(func(dbTx database.Tx) error {
+	_ = bi.db.View(func(dbTx database.Tx) error {
 		iterNode := node
 		increment := int32(1)
 		for len(locator) < wire.MaxBlockLocatorsPerMsg-1 {
@@ -112,7 +112,7 @@ func (b *BlockChain) blockLocatorFromHash(hash *chainhash.Hash) BlockLocator {
 			// height.
 			if forkHeight != -1 && blockHeight > forkHeight {
 				// Intentionally use parent field instead of the
-				// getPrevNodeFromNode function since we don't
+				// PrevNodeFromNode function since we don't
 				// want to dynamically load nodes when building
 				// block locators.  Side chain blocks should
 				// always be in memory already, and if they
@@ -144,7 +144,7 @@ func (b *BlockChain) blockLocatorFromHash(hash *chainhash.Hash) BlockLocator {
 	})
 
 	// Append the appropriate genesis block.
-	locator = append(locator, b.chainParams.GenesisHash)
+	locator = append(locator, bi.chainParams.GenesisHash)
 	return locator
 }
 
@@ -162,7 +162,9 @@ func (b *BlockChain) blockLocatorFromHash(hash *chainhash.Hash) BlockLocator {
 // This function is safe for concurrent access.
 func (b *BlockChain) BlockLocatorFromHash(hash *chainhash.Hash) BlockLocator {
 	b.chainLock.RLock()
-	locator := b.blockLocatorFromHash(hash)
+	b.index.RLock()
+	locator := b.index.blockLocatorFromHash(hash)
+	b.index.RUnlock()
 	b.chainLock.RUnlock()
 	return locator
 }
@@ -173,7 +175,9 @@ func (b *BlockChain) BlockLocatorFromHash(hash *chainhash.Hash) BlockLocator {
 // This function is safe for concurrent access.
 func (b *BlockChain) LatestBlockLocator() (BlockLocator, error) {
 	b.chainLock.RLock()
-	locator := b.blockLocatorFromHash(b.bestNode.hash)
+	b.index.RLock()
+	locator := b.index.blockLocatorFromHash(b.bestNode.hash)
+	b.index.RUnlock()
 	b.chainLock.RUnlock()
 	return locator, nil
 }
