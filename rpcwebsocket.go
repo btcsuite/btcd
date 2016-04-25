@@ -41,6 +41,15 @@ const (
 	websocketSendBufferSize = 50
 )
 
+type semaphore chan struct{}
+
+func makeSemaphore(n int) semaphore {
+	return make(chan struct{}, n)
+}
+
+func (s semaphore) acquire() { s <- struct{}{} }
+func (s semaphore) release() { <-s }
+
 // timeZeroVal is simply the zero value for a time.Time and is used to avoid
 // creating multiple instances.
 var timeZeroVal time.Time
@@ -66,14 +75,6 @@ var wsHandlersBeforeInit = map[string]wsCommandHandler{
 	"rescan":                      handleRescan,
 	"stopnotifyblocks":            handleStopNotifyBlocks,
 	"stopnotifynewtransactions":   handleStopNotifyNewTransactions,
-}
-
-// wsAsyncHandlers holds the websocket commands which should be run
-// asynchronously to the main input handler goroutine.  This allows long-running
-// operations to run concurrently (and one at a time) while still responding
-// to the majority of normal requests which can be answered quickly.
-var wsAsyncHandlers = map[string]struct{}{
-	"rescan": {},
 }
 
 // WebsocketHandler handles a new websocket client by creating a new wsClient,
@@ -1256,178 +1257,11 @@ type wsClient struct {
 	filterData *wsClientFilter
 
 	// Networking infrastructure.
-	asyncStarted bool
-	asyncChan    chan *parsedRPCCmd
-	ntfnChan     chan []byte
-	sendChan     chan wsResponse
-	quit         chan struct{}
-	wg           sync.WaitGroup
-}
-
-// handleMessage is the main handler for incoming requests.  It enforces
-// authentication, parses the incoming json, looks up and executes handlers
-// (including pass through for standard RPC commands), and sends the appropriate
-// response.  It also detects commands which are marked as long-running and
-// sends them off to the asyncHander for processing.
-func (c *wsClient) handleMessage(msg []byte) {
-	if !c.authenticated {
-		// Disconnect immediately if the provided command fails to
-		// parse when the client is not already authenticated.
-		var request dcrjson.Request
-		if err := json.Unmarshal(msg, &request); err != nil {
-			c.Disconnect()
-			return
-		}
-		parsedCmd := parseCmd(&request)
-		if parsedCmd.err != nil {
-			c.Disconnect()
-			return
-		}
-
-		// Disconnect immediately if the first command is not
-		// authenticate when not already authenticated.
-		authCmd, ok := parsedCmd.cmd.(*dcrjson.AuthenticateCmd)
-		if !ok {
-			rpcsLog.Warnf("Unauthenticated websocket message " +
-				"received")
-			c.Disconnect()
-			return
-		}
-
-		// Check credentials.
-		login := authCmd.Username + ":" + authCmd.Passphrase
-		auth := "Basic " + base64.StdEncoding.EncodeToString([]byte(login))
-		authHash := sha256.Sum256([]byte(auth))
-		cmp := subtle.ConstantTimeCompare(authHash[:], c.server.authsha[:])
-		limitcmp := subtle.ConstantTimeCompare(authHash[:], c.server.limitauthsha[:])
-		if cmp != 1 && limitcmp != 1 {
-			rpcsLog.Warnf("Auth failure.")
-			c.Disconnect()
-			return
-		}
-		c.authenticated = true
-		c.isAdmin = cmp == 1
-
-		// Marshal and send response.
-		reply, err := createMarshalledReply(parsedCmd.id, nil, nil)
-		if err != nil {
-			rpcsLog.Errorf("Failed to marshal authenticate reply: "+
-				"%v", err.Error())
-			return
-		}
-		c.SendMessage(reply, nil)
-		return
-	}
-
-	// Attempt to parse the raw message into a JSON-RPC request.
-	var request dcrjson.Request
-	if err := json.Unmarshal(msg, &request); err != nil {
-		jsonErr := &dcrjson.RPCError{
-			Code:    dcrjson.ErrRPCParse.Code,
-			Message: "Failed to parse request: " + err.Error(),
-		}
-
-		// Marshal and send response.
-		reply, err := createMarshalledReply(nil, nil, jsonErr)
-		if err != nil {
-			rpcsLog.Errorf("Failed to marshal parse failure "+
-				"reply: %v", err)
-			return
-		}
-		c.SendMessage(reply, nil)
-		return
-	}
-	// Requests with no ID (notifications) must not have a response per the
-	// JSON-RPC spec.
-	if request.ID == nil {
-		return
-	}
-
-	// Check if the user is limited and disconnect client if unauthorized
-	if !c.isAdmin {
-		if _, ok := rpcLimited[request.Method]; !ok {
-			jsonErr := &dcrjson.RPCError{
-				Code:    dcrjson.ErrRPCInvalidParams.Code,
-				Message: "limited user not authorized for this method",
-			}
-			// Marshal and send response.
-			reply, err := createMarshalledReply(request.ID, nil, jsonErr)
-			if err != nil {
-				rpcsLog.Errorf("Failed to marshal parse failure "+
-					"reply: %v", err)
-				return
-			}
-			c.SendMessage(reply, nil)
-			return
-		}
-	}
-
-	// Attempt to parse the JSON-RPC request into a known concrete command.
-	cmd := parseCmd(&request)
-	if cmd.err != nil {
-		// Marshal and send response.
-		reply, err := createMarshalledReply(cmd.id, nil, cmd.err)
-		if err != nil {
-			rpcsLog.Errorf("Failed to marshal parse failure "+
-				"reply: %v", err)
-			return
-		}
-		c.SendMessage(reply, nil)
-		return
-	}
-	rpcsLog.Debugf("Received command <%s> from %s", cmd.method, c.addr)
-
-	// Disconnect if already authenticated and another authenticate command
-	// is received.
-	if _, ok := cmd.cmd.(*dcrjson.AuthenticateCmd); ok {
-		rpcsLog.Warnf("Websocket client %s is already authenticated",
-			c.addr)
-		c.Disconnect()
-		return
-	}
-
-	// When the command is marked as a long-running command, send it off
-	// to the asyncHander goroutine for processing.
-	if _, ok := wsAsyncHandlers[cmd.method]; ok {
-		// Start up the async goroutine for handling long-running
-		// requests asynchonrously if needed.
-		if !c.asyncStarted {
-			rpcsLog.Tracef("Starting async handler for %s", c.addr)
-			c.wg.Add(1)
-			go c.asyncHandler()
-			c.asyncStarted = true
-		}
-		c.asyncChan <- cmd
-		return
-	}
-
-	// Lookup the websocket extension for the command and if it doesn't
-	// exist fallback to handling the command as a standard command.
-	wsHandler, ok := wsHandlers[cmd.method]
-	if !ok {
-		// No websocket-specific handler so handle like a legacy
-		// RPC connection.
-		result, jsonErr := c.server.standardCmdResult(cmd, nil)
-		reply, err := createMarshalledReply(cmd.id, result, jsonErr)
-		if err != nil {
-			rpcsLog.Errorf("Failed to marshal reply for <%s> "+
-				"command: %v", cmd.method, err)
-			return
-		}
-
-		c.SendMessage(reply, nil)
-		return
-	}
-
-	// Invoke the handler and marshal and send response.
-	result, jsonErr := wsHandler(c, cmd.cmd)
-	reply, err := createMarshalledReply(cmd.id, result, jsonErr)
-	if err != nil {
-		rpcsLog.Errorf("Failed to marshal reply for <%s> command: %v",
-			cmd.method, err)
-		return
-	}
-	c.SendMessage(reply, nil)
+	serviceRequestSem semaphore
+	ntfnChan          chan []byte
+	sendChan          chan wsResponse
+	quit              chan struct{}
+	wg                sync.WaitGroup
 }
 
 // inHandler handles all incoming messages for the websocket connection.  It
@@ -1452,13 +1286,170 @@ out:
 			}
 			break out
 		}
-		c.handleMessage(msg)
+
+		var request dcrjson.Request
+		err = json.Unmarshal(msg, &request)
+		if err != nil {
+			if !c.authenticated {
+				break out
+			}
+
+			jsonErr := &dcrjson.RPCError{
+				Code:    dcrjson.ErrRPCParse.Code,
+				Message: "Failed to parse request: " + err.Error(),
+			}
+			reply, err := createMarshalledReply(nil, nil, jsonErr)
+			if err != nil {
+				rpcsLog.Errorf("Failed to marshal parse failure "+
+					"reply: %v", err)
+				continue
+			}
+			c.SendMessage(reply, nil)
+			continue
+		}
+
+		// Requests with no ID (notifications) must not have a response per the
+		// JSON-RPC spec.
+		if request.ID == nil {
+			if !c.authenticated {
+				break out
+			}
+			continue
+		}
+
+		cmd := parseCmd(&request)
+		if cmd.err != nil {
+			if !c.authenticated {
+				break out
+			}
+
+			reply, err := createMarshalledReply(cmd.id, nil, cmd.err)
+			if err != nil {
+				rpcsLog.Errorf("Failed to marshal parse failure "+
+					"reply: %v", err)
+				continue
+			}
+			c.SendMessage(reply, nil)
+			continue
+		}
+		rpcsLog.Debugf("Received command <%s> from %s", cmd.method, c.addr)
+
+		// Check auth.  The client is immediately disconnected if the
+		// first request of an unauthentiated websocket client is not
+		// the authenticate request, an authenticate request is received
+		// when the client is already authenticated, or incorrect
+		// authentication credentials are provided in the request.
+		switch authCmd, ok := cmd.cmd.(*dcrjson.AuthenticateCmd); {
+		case c.authenticated && ok:
+			rpcsLog.Warnf("Websocket client %s is already authenticated",
+				c.addr)
+			break out
+		case !c.authenticated && !ok:
+			rpcsLog.Warnf("Unauthenticated websocket message " +
+				"received")
+			break out
+		case !c.authenticated:
+			// Check credentials.
+			login := authCmd.Username + ":" + authCmd.Passphrase
+			auth := "Basic " + base64.StdEncoding.EncodeToString([]byte(login))
+			authSha := sha256.Sum256([]byte(auth))
+			cmp := subtle.ConstantTimeCompare(authSha[:], c.server.authsha[:])
+			limitcmp := subtle.ConstantTimeCompare(authSha[:], c.server.limitauthsha[:])
+			if cmp != 1 && limitcmp != 1 {
+				rpcsLog.Warnf("Auth failure.")
+				break out
+			}
+			c.authenticated = true
+			c.isAdmin = cmp == 1
+
+			// Marshal and send response.
+			reply, err := createMarshalledReply(cmd.id, nil, nil)
+			if err != nil {
+				rpcsLog.Errorf("Failed to marshal authenticate reply: "+
+					"%v", err.Error())
+				continue
+			}
+			c.SendMessage(reply, nil)
+			continue
+		}
+
+		// Check if the client is using limited RPC credentials and
+		// error when not authorized to call this RPC.
+		if !c.isAdmin {
+			if _, ok := rpcLimited[request.Method]; !ok {
+				jsonErr := &dcrjson.RPCError{
+					Code:    dcrjson.ErrRPCInvalidParams.Code,
+					Message: "limited user not authorized for this method",
+				}
+				// Marshal and send response.
+				reply, err := createMarshalledReply(request.ID, nil, jsonErr)
+				if err != nil {
+					rpcsLog.Errorf("Failed to marshal parse failure "+
+						"reply: %v", err)
+					continue
+				}
+				c.SendMessage(reply, nil)
+				continue
+			}
+		}
+
+		// Asynchronously handle the request.  A semaphore is used to
+		// limit the number of concurrent requests currently being
+		// serviced.  If the semaphore can not be acquired, simply wait
+		// until a request finished before reading the next RPC request
+		// from the websocket client.
+		//
+		// This could be a little fancier by timing out and erroring
+		// when it takes too long to service the request, but if that is
+		// done, the read of the next request should not be blocked by
+		// this semaphore, otherwise the next request will be read and
+		// will probably sit here for another few seconds before timing
+		// out as well.  This will cause the total timeout duration for
+		// later requests to be much longer than the check here would
+		// imply.
+		//
+		// If a timeout is added, the semaphore acquiring should be
+		// moved inside of the new goroutine with a select statement
+		// that also reads a time.After channel.  This will unblock the
+		// read of the next request from the websocket client and allow
+		// many requests to be waited on concurrently.
+		c.serviceRequestSem.acquire()
+		go func() {
+			c.serviceRequest(cmd)
+			c.serviceRequestSem.release()
+		}()
 	}
 
 	// Ensure the connection is closed.
 	c.Disconnect()
 	c.wg.Done()
 	rpcsLog.Tracef("Websocket client input handler done for %s", c.addr)
+}
+
+// serviceRequest services a parsed RPC request by looking up and executing the
+// appropiate RPC handler.  The response is marshalled and sent to the websocket
+// client.
+func (c *wsClient) serviceRequest(r *parsedRPCCmd) {
+	var (
+		result interface{}
+		err    error
+	)
+
+	// Lookup the websocket extension for the command and if it doesn't
+	// exist fallback to handling the command as a standard command.
+	wsHandler, ok := wsHandlers[r.method]
+	if ok {
+		result, err = wsHandler(c, r.cmd)
+	} else {
+		result, err = c.server.standardCmdResult(r, nil)
+	}
+	reply, err := createMarshalledReply(r.id, result, err)
+	if err != nil {
+		rpcsLog.Errorf("Failed to marshal reply for <%s> "+
+			"command: %v", r.method, err)
+		return
+	}
+	c.SendMessage(reply, nil)
 }
 
 // notificationQueueHandler handles the queuing of outgoing notifications for
@@ -1576,96 +1567,6 @@ cleanup:
 	rpcsLog.Tracef("Websocket client output handler done for %s", c.addr)
 }
 
-// asyncHandler handles all long-running requests such as rescans which are
-// not run directly in the inHandler routine unlike most requests.  This allows
-// normal quick requests to continue to be processed and responded to even while
-// lengthy operations are underway.  Only one long-running operation is
-// permitted at a time, so multiple long-running requests are queued and
-// serialized.  It must be run as a goroutine.  Also, this goroutine is not
-// started until/if the first long-running request is made.
-func (c *wsClient) asyncHandler() {
-	asyncHandlerDoneChan := make(chan struct{}, 1) // nonblocking sync
-	pendingCmds := list.New()
-	waiting := false
-
-	// runHandler runs the handler for the passed command and sends the
-	// reply.
-	runHandler := func(parsedCmd *parsedRPCCmd) {
-		wsHandler, ok := wsHandlers[parsedCmd.method]
-		if !ok {
-			rpcsLog.Warnf("No handler for command <%s>",
-				parsedCmd.method)
-			return
-		}
-
-		// Invoke the handler and marshal and send response.
-		result, jsonErr := wsHandler(c, parsedCmd.cmd)
-		reply, err := createMarshalledReply(parsedCmd.id, result,
-			jsonErr)
-		if err != nil {
-			rpcsLog.Errorf("Failed to marshal reply for <%s> "+
-				"command: %v", parsedCmd.method, err)
-			return
-		}
-		c.SendMessage(reply, nil)
-	}
-
-out:
-	for {
-		select {
-		case cmd := <-c.asyncChan:
-			if !waiting {
-				c.wg.Add(1)
-				go func(cmd *parsedRPCCmd) {
-					runHandler(cmd)
-					asyncHandlerDoneChan <- struct{}{}
-					c.wg.Done()
-				}(cmd)
-			} else {
-				pendingCmds.PushBack(cmd)
-			}
-			waiting = true
-
-		case <-asyncHandlerDoneChan:
-			// No longer waiting if there are no more messages in
-			// the pending messages queue.
-			next := pendingCmds.Front()
-			if next == nil {
-				waiting = false
-				continue
-			}
-
-			// Notify the outHandler about the next item to
-			// asynchronously send.
-			element := pendingCmds.Remove(next)
-			c.wg.Add(1)
-			go func(cmd *parsedRPCCmd) {
-				runHandler(cmd)
-				asyncHandlerDoneChan <- struct{}{}
-				c.wg.Done()
-			}(element.(*parsedRPCCmd))
-
-		case <-c.quit:
-			break out
-		}
-	}
-
-	// Drain any wait channels before exiting so nothing is left waiting
-	// around to send.
-cleanup:
-	for {
-		select {
-		case <-c.asyncChan:
-		case <-asyncHandlerDoneChan:
-		default:
-			break cleanup
-		}
-	}
-
-	c.wg.Done()
-	rpcsLog.Tracef("Websocket client async handler done for %s", c.addr)
-}
-
 // SendMessage sends the passed json to the websocket client.  It is backed
 // by a buffered channel, so it will not block until the send channel is full.
 // Note however that QueueNotification must be used for sending async
@@ -1763,16 +1664,16 @@ func newWebsocketClient(server *rpcServer, conn *websocket.Conn,
 	}
 
 	client := &wsClient{
-		conn:          conn,
-		addr:          remoteAddr,
-		authenticated: authenticated,
-		isAdmin:       isAdmin,
-		sessionID:     sessionID,
-		server:        server,
-		ntfnChan:      make(chan []byte, 1),        // nonblocking sync
-		asyncChan:     make(chan *parsedRPCCmd, 1), // nonblocking sync
-		sendChan:      make(chan wsResponse, websocketSendBufferSize),
-		quit:          make(chan struct{}),
+		conn:              conn,
+		addr:              remoteAddr,
+		authenticated:     authenticated,
+		isAdmin:           isAdmin,
+		sessionID:         sessionID,
+		server:            server,
+		serviceRequestSem: makeSemaphore(cfg.RPCMaxConcurrentReqs),
+		ntfnChan:          make(chan []byte, 1), // nonblocking sync
+		sendChan:          make(chan wsResponse, websocketSendBufferSize),
+		quit:              make(chan struct{}),
 	}
 	return client, nil
 }
