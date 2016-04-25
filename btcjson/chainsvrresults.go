@@ -123,6 +123,9 @@ type GetBlockTemplateResult struct {
 	CoinbaseValue *int64                     `json:"coinbasevalue,omitempty"`
 	WorkID        string                     `json:"workid,omitempty"`
 
+	// Witness commitment defined in BIP 0141.
+	DefaultWitnessCommitment string `json:"default_witness_commitment,omitempty"`
+
 	// Optional long polling from BIP 0022.
 	LongPollID  string `json:"longpollid,omitempty"`
 	LongPollURI string `json:"longpolluri,omitempty"`
