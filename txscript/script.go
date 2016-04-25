@@ -105,8 +105,8 @@ func parseScriptTemplate(script []byte, opcodes *[256]opcode) ([]parsedOpcode, e
 	retScript := make([]parsedOpcode, 0, len(script))
 	for i := 0; i < len(script); {
 		instr := script[i]
-		op := opcodes[instr]
-		pop := parsedOpcode{opcode: &op}
+		op := &opcodes[instr]
+		pop := parsedOpcode{opcode: op}
 
 		// Parse data out of instruction.
 		switch {
