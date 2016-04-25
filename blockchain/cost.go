@@ -56,8 +56,8 @@ func GetTxVirtualSize(tx *btcutil.Tx) int64 {
 func GetBlockCost(blk *btcutil.Block) int64 {
 	msgBlock := blk.MsgBlock()
 
-	baseSize := msgBlock.SerializeSize()
-	totalSize := msgBlock.SerializeSizeWitness()
+	baseSize := msgBlock.SerializeSizeStripped()
+	totalSize := msgBlock.SerializeSize()
 
 	// (baseSize * 3) + totalSize
 	return int64((baseSize * (WitnessScaleFactor - 1)) + totalSize)
@@ -71,8 +71,8 @@ func GetBlockCost(blk *btcutil.Block) int64 {
 func GetTransactionCost(tx *btcutil.Tx) int64 {
 	msgTx := tx.MsgTx()
 
-	baseSize := msgTx.SerializeSize()
-	totalSize := msgTx.SerializeSizeWitness()
+	baseSize := msgTx.SerializeSizeStripped()
+	totalSize := msgTx.SerializeSize()
 
 	// (baseSize * 3) + totalSize
 	return int64((baseSize * (WitnessScaleFactor - 1)) + totalSize)

@@ -208,8 +208,8 @@ func (msg *MsgTx) TxSha() ShaHash {
 	// Ignore the error returns since the only way the encode could fail
 	// is being out of memory or due to nil pointers, both of which would
 	// cause a run-time panic.
-	buf := bytes.NewBuffer(make([]byte, 0, msg.SerializeSize()))
-	_ = msg.Serialize(buf)
+	buf := bytes.NewBuffer(make([]byte, 0, msg.SerializeSizeStripped()))
+	_ = msg.SerializeNoWitness(buf)
 	return DoubleSha256SH(buf.Bytes())
 }
 
@@ -220,8 +220,8 @@ func (msg *MsgTx) TxSha() ShaHash {
 // same as its txid.
 func (msg *MsgTx) WitnessHash() ShaHash {
 	if msg.HasWitness() {
-		buf := bytes.NewBuffer(make([]byte, 0, msg.SerializeSizeWitness()))
-		_ = msg.SerializeWitness(buf)
+		buf := bytes.NewBuffer(make([]byte, 0, msg.SerializeSize()))
+		_ = msg.Serialize(buf)
 		return DoubleSha256SH(buf.Bytes())
 	}
 
@@ -448,14 +448,14 @@ func (msg *MsgTx) Deserialize(r io.Reader) error {
 	// At the current time, there is no difference between the wire encoding
 	// at protocol version 0 and the stable long-term storage format.  As
 	// a result, make use of BtcDecode.
-	return msg.BtcDecode(r, 0, BaseEncoding)
+	return msg.BtcDecode(r, 0, WitnessEncoding)
 }
 
-// DeserializeWitness decodes a transaction from r into the receiver, where the
-// encoded transaction format within r may possibly utilize the new serialization
-// format created to encode transactions bearing witness data within inputs.
-func (msg *MsgTx) DeserializeWitness(r io.Reader) error {
-	return msg.BtcDecode(r, 0, WitnessEncoding)
+// DeserializeNoWitness decodes a transaction from r into the receiver, where
+// the transaction encoding format within r MUST NOT utilize the new serialization
+// format created to encode transaction bearing witness data within inputs.
+func (msg *MsgTx) DeserializeNoWitness(r io.Reader) error {
+	return msg.BtcDecode(r, 0, BaseEncoding)
 }
 
 // BtcEncode encodes the receiver to w using the bitcoin protocol encoding.
@@ -560,22 +560,24 @@ func (msg *MsgTx) Serialize(w io.Writer) error {
 	// At the current time, there is no difference between the wire encoding
 	// at protocol version 0 and the stable long-term storage format.  As
 	// a result, make use of BtcEncode.
-	return msg.BtcEncode(w, 0, BaseEncoding)
-}
-
-// SerializeWitness encodes the transaction to w in an identical manner to
-// Serialize, however this encoding also includes the witnesses (if any)
-// for all inputs within the transaction.
-func (msg *MsgTx) SerializeWitness(w io.Writer) error {
-	// Passing a pver of WitnessVersion to BtcEncode for MsgTx indicates
-	// that the transaction's witnesses (if any) should be serialized
-	// according to the new serialization structure defined in BIP0141.
+	//
+	// Passing a encoding type of WitnessEncoding to BtcEncode for MsgTx
+	// indicates that the transaction's witnesses (if any) should be
+	// serialized according to the new serialization structure defined in
+	// BIP0141.
 	return msg.BtcEncode(w, 0, WitnessEncoding)
 }
 
-// SerializeSize returns the number of bytes it would take to serialize the
-// the transaction.
-func (msg *MsgTx) SerializeSize() int {
+// SerializeWitness encodes the transaction to w in an identical manner to
+// Serialize, however even if the source transaction has inputs with witness
+// data, the old serialization format will still be used.
+func (msg *MsgTx) SerializeNoWitness(w io.Writer) error {
+	return msg.BtcEncode(w, 0, BaseEncoding)
+}
+
+// baseSize returns the serialized size of the transaction without accounting
+// for any witness data.
+func (msg *MsgTx) baseSize() int {
 	// Version 4 bytes + LockTime 4 bytes + Serialized varint size for the
 	// number of transaction inputs and outputs.
 	n := 8 + VarIntSerializeSize(uint64(len(msg.TxIn))) +
@@ -592,10 +594,10 @@ func (msg *MsgTx) SerializeSize() int {
 	return n
 }
 
-// SerializeSizeWitness returns the number of bytes it would take to serialize
-// the *witness* transaction.
-func (msg *MsgTx) SerializeSizeWitness() int {
-	n := msg.SerializeSize()
+// SerializeSize returns the number of bytes it would take to serialize the
+// the transaction.
+func (msg *MsgTx) SerializeSize() int {
+	n := msg.baseSize()
 
 	if msg.HasWitness() {
 		// The marker, and flag fields take up two additional bytes.
@@ -609,6 +611,12 @@ func (msg *MsgTx) SerializeSizeWitness() int {
 	}
 
 	return n
+}
+
+// SerializeSizeStripped returns the number of bytes it would take to serialize
+// the transaction, excluding any included witness data.
+func (msg *MsgTx) SerializeSizeStripped() int {
+	return msg.baseSize()
 }
 
 // Command returns the protocol command string for the message.  This is part

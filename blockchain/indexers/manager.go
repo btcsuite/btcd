@@ -467,7 +467,7 @@ func dbFetchTx(dbTx database.Tx, hash *wire.ShaHash) (*wire.MsgTx, error) {
 
 	// Deserialize the transaction.
 	var msgTx wire.MsgTx
-	err = msgTx.DeserializeWitness(bytes.NewReader(txBytes))
+	err = msgTx.Deserialize(bytes.NewReader(txBytes))
 	if err != nil {
 		return nil, err
 	}

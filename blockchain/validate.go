@@ -74,8 +74,8 @@ var (
 func CalculateBlockCost(blk *btcutil.Block) int64 {
 	msgBlock := blk.MsgBlock()
 
-	baseCost := msgBlock.SerializeSize() * (WitnessScaleFactor - 1)
-	witCost := msgBlock.SerializeSizeWitness()
+	baseCost := msgBlock.SerializeSizeStripped() * (WitnessScaleFactor - 1)
+	witCost := msgBlock.SerializeSize()
 
 	//  cost = (size * 3) + witSize
 	return int64(baseCost + witCost)
@@ -87,8 +87,8 @@ func CalculateBlockCost(blk *btcutil.Block) int64 {
 func CalculateTransactionCost(tx *btcutil.Tx) int64 {
 	msgTx := tx.MsgTx()
 
-	baseCost := msgTx.SerializeSize() * (WitnessScaleFactor - 1)
-	witCost := msgTx.SerializeSizeWitness()
+	baseCost := msgTx.SerializeSizeStripped() * (WitnessScaleFactor - 1)
+	witCost := msgTx.SerializeSize()
 
 	return int64(baseCost + witCost)
 }
@@ -232,7 +232,7 @@ func CheckTransactionSanity(tx *btcutil.Tx) error {
 
 	// A transaction must not exceed the maximum allowed block payload when
 	// serialized.
-	serializedTxSize := tx.MsgTx().SerializeSize()
+	serializedTxSize := tx.MsgTx().SerializeSizeStripped()
 	if serializedTxSize > MaxBlockBaseSize {
 		str := fmt.Sprintf("serialized transaction is too big - got "+
 			"%d, max %d", serializedTxSize, MaxBlockBaseSize)
@@ -506,10 +506,10 @@ func checkBlockSanity(block *btcutil.Block, powLimit *big.Int, timeSource Median
 
 	// A block must not exceed the maximum allowed block payload when
 	// serialized.
-	serializedSize := msgBlock.SerializeSize()
+	serializedSize := msgBlock.SerializeSizeStripped()
 	if serializedSize > MaxBlockBaseSize {
 		str := fmt.Sprintf("serialized block is too big - got %d, "+
-			"max %d", serializedSize, wire.MaxBlockPayload)
+			"max %d", serializedSize, MaxBlockBaseSize)
 		return ruleError(ErrBlockTooBig, str)
 	}
 

@@ -317,10 +317,10 @@ var SegNet4Params = Params{
 
 	// Address encoding magics
 	PubKeyHashAddrID:        0x1e, // starts with D
-	ScriptHashAddrID:        0x32, // starts with ?
-	PrivateKeyID:            0x9e, // starts with ?
+	ScriptHashAddrID:        0x32, // starts with M
 	WitnessPubKeyHashAddrID: 0x02, // starts with Gg
 	WitnessScriptHashAddrID: 0x27, // starts with ?
+	PrivateKeyID:            0x9e, // starts with ?
 
 	// BIP32 hierarchical deterministic extended key magics
 	HDPrivateKeyID: [4]byte{0x05, 0x35, 0x83, 0x94}, // starts with sprv

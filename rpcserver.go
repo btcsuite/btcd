@@ -761,7 +761,7 @@ func createTxRawResult(chainParams *chaincfg.Params, mtx *wire.MsgTx,
 		Hex:  mtxHex,
 		Txid: txHash,
 		Hash: mtx.WitnessHash().String(),
-		Size: int32(mtx.SerializeSizeWitness()),
+		Size: int32(mtx.SerializeSize()),
 		// TODO(roasbeef): create mtx version
 		Vsize:    int32(blockchain.GetTxVirtualSize(btcutil.NewTx(mtx))),
 		Vin:      createVinList(mtx),
@@ -795,7 +795,7 @@ func handleDecodeRawTransaction(s *rpcServer, cmd interface{}, closeChan <-chan 
 		return nil, rpcDecodeHexError(hexStr)
 	}
 	var mtx wire.MsgTx
-	err = mtx.DeserializeWitness(bytes.NewReader(serializedTx))
+	err = mtx.Deserialize(bytes.NewReader(serializedTx))
 	if err != nil {
 		return nil, &btcjson.RPCError{
 			Code:    btcjson.ErrRPCDeserialization,
@@ -1092,7 +1092,7 @@ func handleGetBlock(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (i
 		Confirmations: uint64(1 + best.Height - blockHeight),
 		Height:        int64(blockHeight),
 		Size:          int32(len(blkBytes)),
-		StrippedSize:  int32(blk.MsgBlock().SerializeSize()),
+		StrippedSize:  int32(blk.MsgBlock().SerializeSizeStripped()),
 		Cost:          int32(blockchain.GetBlockCost(blk)),
 		Bits:          strconv.FormatInt(int64(blockHeader.Bits), 16),
 		Difficulty:    getDifficultyRatio(blockHeader.Bits),
@@ -1555,7 +1555,7 @@ func (state *gbtWorkState) blockTemplateResult(useCoinbaseValue bool, submitOld 
 
 		// Serialize the transaction for later conversion to hex.
 		txBuf := bytes.NewBuffer(make([]byte, 0, tx.SerializeSize()))
-		if err := tx.SerializeWitness(txBuf); err != nil {
+		if err := tx.Serialize(txBuf); err != nil {
 			context := "Failed to serialize transaction"
 			return nil, internalRPCError(err.Error(), context)
 		}
@@ -1622,7 +1622,7 @@ func (state *gbtWorkState) blockTemplateResult(useCoinbaseValue bool, submitOld 
 		// Serialize the transaction for conversion to hex.
 		tx := msgBlock.Transactions[0]
 		txBuf := bytes.NewBuffer(make([]byte, 0, tx.SerializeSize()))
-		if err := tx.SerializeWitness(txBuf); err != nil {
+		if err := tx.Serialize(txBuf); err != nil {
 			context := "Failed to serialize transaction"
 			return nil, internalRPCError(err.Error(), context)
 		}
@@ -1942,7 +1942,7 @@ func handleGetBlockTemplateProposal(s *rpcServer, request *btcjson.TemplateReque
 		}
 	}
 	var msgBlock wire.MsgBlock
-	if err := msgBlock.DeserializeWitness(bytes.NewReader(dataBytes)); err != nil {
+	if err := msgBlock.Deserialize(bytes.NewReader(dataBytes)); err != nil {
 		return nil, &btcjson.RPCError{
 			Code:    btcjson.ErrRPCDeserialization,
 			Message: "Block decode failed: " + err.Error(),
@@ -2057,7 +2057,7 @@ func handleGetMempoolInfo(s *rpcServer, cmd interface{}, closeChan <-chan struct
 
 	var numBytes int64
 	for _, txD := range mempoolTxns {
-		numBytes += int64(txD.Tx.MsgTx().SerializeSizeWitness())
+		numBytes += int64(txD.Tx.MsgTx().SerializeSize())
 	}
 
 	ret := &btcjson.GetMempoolInfoResult{
@@ -2279,7 +2279,7 @@ func handleGetRawMempool(s *rpcServer, cmd interface{}, closeChan <-chan struct{
 			}
 
 			mpd := &btcjson.GetRawMempoolVerboseResult{
-				Size:             int32(tx.MsgTx().SerializeSizeWitness()),
+				Size:             int32(tx.MsgTx().SerializeSize()),
 				Fee:              btcutil.Amount(desc.Fee).ToBTC(),
 				Time:             desc.Added.Unix(),
 				Height:           int64(desc.Height),
@@ -2381,7 +2381,7 @@ func handleGetRawTransaction(s *rpcServer, cmd interface{}, closeChan <-chan str
 
 		// Deserialize the transaction
 		var msgTx wire.MsgTx
-		err = msgTx.DeserializeWitness(bytes.NewReader(txBytes))
+		err = msgTx.Deserialize(bytes.NewReader(txBytes))
 		if err != nil {
 			context := "Failed to deserialize transaction"
 			return nil, internalRPCError(err.Error(), context)
@@ -3018,7 +3018,7 @@ func fetchInputTxos(s *rpcServer, tx *wire.MsgTx) (map[wire.OutPoint]wire.TxOut,
 
 		// Deserialize the transaction
 		var msgTx wire.MsgTx
-		err = msgTx.DeserializeWitness(bytes.NewReader(txBytes))
+		err = msgTx.Deserialize(bytes.NewReader(txBytes))
 		if err != nil {
 			context := "Failed to deserialize transaction"
 			return nil, internalRPCError(err.Error(), context)
@@ -3378,8 +3378,7 @@ func handleSearchRawTransactions(s *rpcServer, cmd interface{}, closeChan <-chan
 		if rtx.tx == nil {
 			// Deserialize the transaction.
 			mtx = new(wire.MsgTx)
-			// TODO(roasbeef): make Deserialize the default?
-			err := mtx.DeserializeWitness(bytes.NewReader(rtx.txBytes))
+			err := mtx.Deserialize(bytes.NewReader(rtx.txBytes))
 			if err != nil {
 				context := "Failed to deserialize transaction"
 				return nil, internalRPCError(err.Error(),
@@ -3470,7 +3469,7 @@ func handleSendRawTransaction(s *rpcServer, cmd interface{}, closeChan <-chan st
 		return nil, rpcDecodeHexError(hexStr)
 	}
 	msgtx := wire.NewMsgTx()
-	err = msgtx.DeserializeWitness(bytes.NewReader(serializedTx))
+	err = msgtx.Deserialize(bytes.NewReader(serializedTx))
 	if err != nil {
 		return nil, &btcjson.RPCError{
 			Code:    btcjson.ErrRPCDeserialization,

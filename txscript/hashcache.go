@@ -14,6 +14,7 @@ import (
 // This partial set of sighashes may be re-used within each input across a
 // transaction when validating all inputs. As a result, validation complexity
 // for SigHashAll can be reduced by a polynomial factor.
+// TODO(roasbeef): rename to SighashMidState
 type TxSigHashes struct {
 	HashPrevOuts wire.ShaHash
 	HashSequence wire.ShaHash

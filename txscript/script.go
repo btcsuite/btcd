@@ -613,7 +613,7 @@ func calcSignatureHash(
 	// transaction and the hash type (encoded as a 4-byte little-endian
 	// value) appended.
 	var wbuf bytes.Buffer
-	txCopy.Serialize(&wbuf)
+	txCopy.SerializeNoWitness(&wbuf)
 	binary.Write(&wbuf, binary.LittleEndian, hashType)
 	return wire.DoubleSha256(wbuf.Bytes())
 }

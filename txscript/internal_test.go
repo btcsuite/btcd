@@ -3771,10 +3771,8 @@ func TestWitnessSigHash(t *testing.T) {
 	}
 	r := bytes.NewReader(txRaw)
 
-	// Although the above encoded transaction is missing the flag, and
-	// marker bytes, decode it as a segwit tx anyway.
 	tx := wire.NewMsgTx()
-	if err := tx.DeserializeWitness(r); err != nil {
+	if err := tx.Deserialize(r); err != nil {
 		t.Fatalf("unable to decode: %v", err)
 	}
 

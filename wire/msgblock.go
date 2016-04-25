@@ -105,19 +105,19 @@ func (msg *MsgBlock) Deserialize(r io.Reader) error {
 	// At the current time, there is no difference between the wire encoding
 	// at protocol version 0 and the stable long-term storage format.  As
 	// a result, make use of BtcDecode.
-	return msg.BtcDecode(r, 0, BaseEncoding)
-}
-
-// DeserializeWitness decodes a block from r into the receiver similar to
-// Deserialize, however DeserializeWitness is capable of properly deserializing
-// a block containing transactions with inputs that contains witness data
-// (if any).
-func (msg *MsgBlock) DeserializeWitness(r io.Reader) error {
+	//
 	// Passing an encoding type of WitnessEncoding to BtcEncode for
 	// indicates that the transactions within the block are expected to be
 	// serialized according to the new serialization structure defined in
 	// BIP0141.
 	return msg.BtcDecode(r, 0, WitnessEncoding)
+}
+
+// DeserializeWitness decodes a block from r into the receiver similar to
+// Deserialize, however DeserializeWitness strips all (if any) witness data
+// from the transactions within the block before encoding them.
+func (msg *MsgBlock) DeserializeNoWitness(r io.Reader) error {
+	return msg.BtcDecode(r, 0, BaseEncoding)
 }
 
 // DeserializeTxLoc decodes r in the same manner Deserialize does, but it takes
@@ -156,7 +156,7 @@ func (msg *MsgBlock) DeserializeTxLoc(r *bytes.Buffer) ([]TxLoc, error) {
 	for i := uint64(0); i < txCount; i++ {
 		txLocs[i].TxStart = fullLen - r.Len()
 		tx := MsgTx{}
-		err := tx.DeserializeWitness(r)
+		err := tx.Deserialize(r)
 		if err != nil {
 			return nil, err
 		}
@@ -205,23 +205,24 @@ func (msg *MsgBlock) Serialize(w io.Writer) error {
 	// At the current time, there is no difference between the wire encoding
 	// at protocol version 0 and the stable long-term storage format.  As
 	// a result, make use of BtcEncode.
-	return msg.BtcEncode(w, 0, BaseEncoding)
-}
-
-// SerializeWitness encodes a block to w using an identical format to Serialize,
-// with the addition of encoding the witness data for each transaction found
-// within the block. This method is provided in additon to the regular
-// Serialize, in order to allow one to selectively encode transaction witness
-// data to upgraded peers that are able to process the new encoding.
-func (msg *MsgBlock) SerializeWitness(w io.Writer) error {
+	//
 	// Passing WitnessEncoding as the encoding type here indicates that
 	// each of the transactions should be serialized using the witness
 	// serialization structure defined in BIP0141.
 	return msg.BtcEncode(w, 0, WitnessEncoding)
 }
 
+// SerializeWitness encodes a block to w using an identical format to Serialize,
+// with all (if any) witness data stripped from all transactions.
+// This method is provided in additon to the regular Serialize, in order to
+// allow one to selectively encode transaction witness data to non-upgraded
+// peers which are unaware of the new encoding.
+func (msg *MsgBlock) SerializeNoWitness(w io.Writer) error {
+	return msg.BtcEncode(w, 0, BaseEncoding)
+}
+
 // SerializeSize returns the number of bytes it would take to serialize the
-// "base" byte within the block.
+// block, factoring in any witness data within transaction.
 func (msg *MsgBlock) SerializeSize() int {
 	// Block header bytes + Serialized varint size for the number of
 	// transactions.
@@ -234,15 +235,15 @@ func (msg *MsgBlock) SerializeSize() int {
 	return n
 }
 
-// SerializeWitness returns the number of bytes it would take to serialize the
-// block, including any witness data (if any).
-func (msg *MsgBlock) SerializeSizeWitness() int {
+// SerializeSizeStripped returns the number of bytes it would take to serialize
+// the block, excluding any witness data (if any).
+func (msg *MsgBlock) SerializeSizeStripped() int {
 	// Block header bytes + Serialized varint size for the number of
 	// transactions.
 	n := blockHeaderLen + VarIntSerializeSize(uint64(len(msg.Transactions)))
 
 	for _, tx := range msg.Transactions {
-		n += tx.SerializeSizeWitness()
+		n += tx.SerializeSizeStripped()
 	}
 
 	return n

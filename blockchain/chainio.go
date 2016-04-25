@@ -1061,7 +1061,7 @@ func (b *BlockChain) createChainState() error {
 
 	// Initialize the state related to the best block.
 	numTxns := uint64(len(genesisBlock.MsgBlock().Transactions))
-	blockSize := uint64(genesisBlock.MsgBlock().SerializeSizeWitness())
+	blockSize := uint64(genesisBlock.MsgBlock().SerializeSize())
 	blockCost := uint64(GetBlockCost(genesisBlock))
 	b.stateSnapshot = newBestState(b.bestNode, blockSize, blockCost, numTxns, numTxns)
 
@@ -1143,7 +1143,7 @@ func (b *BlockChain) initChainState() error {
 			return err
 		}
 		var block wire.MsgBlock
-		err = block.DeserializeWitness(bytes.NewReader(blockBytes))
+		err = block.Deserialize(bytes.NewReader(blockBytes))
 		if err != nil {
 			return err
 		}
