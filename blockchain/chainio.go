@@ -1047,14 +1047,12 @@ func dbPutBestState(dbTx database.Tx, snapshot *BestState, workSum *big.Int) err
 // genesis block.  This includes creating the necessary buckets and inserting
 // the genesis block, so it must only be called on an uninitialized database.
 func (b *BlockChain) createChainState() error {
-	// Create a new node from the genesis block and set it as both the root
-	// node and the best node.
+	// Create a new node from the genesis block and set it as the best node.
 	genesisBlock := btcutil.NewBlock(b.chainParams.GenesisBlock)
 	header := &genesisBlock.MsgBlock().Header
 	node := newBlockNode(header, genesisBlock.Sha(), 0)
 	node.inMainChain = true
 	b.bestNode = node
-	b.root = node
 
 	// Add the new node to the index which is used for faster lookups.
 	b.index[*node.hash] = node
@@ -1147,15 +1145,13 @@ func (b *BlockChain) initChainState() error {
 			return err
 		}
 
-		// Create a new node and set it as both the root node and the
-		// best node.  The preceding nodes will be loaded on demand as
-		// needed.
+		// Create a new node and set it as the best node.  The preceding
+		// nodes will be loaded on demand as needed.
 		header := &block.Header
 		node := newBlockNode(header, &state.hash, int32(state.height))
 		node.inMainChain = true
 		node.workSum = state.workSum
 		b.bestNode = node
-		b.root = node
 
 		// Add the new node to the indices for faster lookups.
 		prevHash := node.parentHash
