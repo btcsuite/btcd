@@ -270,7 +270,13 @@ func checkBlockScripts(block *btcutil.Block, utxoView *UtxoViewpoint,
 			hashCache.AddSigHashes(tx.MsgTx())
 		}
 
-		cachedHashes, _ := hashCache.GetSigHashes(sha)
+		var cachedHashes *txscript.TxSigHashes
+		if hashCache != nil {
+			cachedHashes, _ = hashCache.GetSigHashes(sha)
+		} else {
+			cachedHashes = txscript.NewTxSigHashes(tx.MsgTx())
+		}
+
 		for txInIdx, txIn := range tx.MsgTx().TxIn {
 			// Skip coinbases.
 			if txIn.PreviousOutPoint.Index == math.MaxUint32 {
