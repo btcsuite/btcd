@@ -337,8 +337,9 @@ var helpDescsEnUS = map[string]string{
 	"getdifficulty--result0":  "The difficulty",
 
 	// GetStakeDifficultyCmd help.
-	"getstakedifficulty--synopsis": "Returns the proof-of-stake difficulty.",
-	"getstakedifficulty--result0":  "The stake difficulty",
+	"getstakedifficulty--synopsis":     "Returns the proof-of-stake difficulty.",
+	"getstakedifficultyresult-current": "The current top block's stake difficulty",
+	"getstakedifficultyresult-next":    "The calculated stake difficulty of the next block",
 
 	// GetGenerateCmd help.
 	"getgenerate--synopsis": "Returns if the server is set to generate coins (mine) or not.",
@@ -736,7 +737,7 @@ var rpcResultTypes = map[string][]interface{}{
 	"getconnectioncount":    []interface{}{(*int32)(nil)},
 	"getcurrentnet":         []interface{}{(*uint32)(nil)},
 	"getdifficulty":         []interface{}{(*float64)(nil)},
-	"getstakedifficulty":    []interface{}{(*float64)(nil)},
+	"getstakedifficulty":    []interface{}{(*dcrjson.GetStakeDifficultyResult)(nil)},
 	"getgenerate":           []interface{}{(*bool)(nil)},
 	"gethashespersec":       []interface{}{(*float64)(nil)},
 	"getinfo":               []interface{}{(*dcrjson.InfoChainResult)(nil)},

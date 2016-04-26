@@ -5,6 +5,13 @@
 
 package dcrjson
 
+// GetStakeDifficultyResult models the data returned from the
+// getstakedifficulty command.
+type GetStakeDifficultyResult struct {
+	CurrentStakeDifficulty float64 `json:"current"`
+	NextStakeDifficulty    float64 `json:"next"`
+}
+
 // LiveTicketsResult models the data returned from the livetickets
 // command.
 type LiveTicketsResult struct {

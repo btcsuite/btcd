@@ -3606,9 +3606,20 @@ func handleGetStakeDifficulty(s *rpcServer, cmd interface{}, closeChan <-chan st
 			Message: "Error getting stake difficulty: " + err.Error(),
 		}
 	}
-	sDiff := dcrutil.Amount(blockHeader.SBits)
+	currentSdiff := dcrutil.Amount(blockHeader.SBits)
 
-	return sDiff.ToCoin(), nil
+	nextSdiff, err := s.server.blockManager.CalcNextRequiredStakeDifficulty()
+	if err != nil {
+		return nil, err
+	}
+	nextSdiffAmount := dcrutil.Amount(nextSdiff)
+
+	sDiffResult := &dcrjson.GetStakeDifficultyResult{
+		CurrentStakeDifficulty: currentSdiff.ToCoin(),
+		NextStakeDifficulty:    nextSdiffAmount.ToCoin(),
+	}
+
+	return sDiffResult, nil
 }
 
 // handleGetTicketPoolValue implements the getticketpoolvalue command.
