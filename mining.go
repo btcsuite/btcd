@@ -609,7 +609,7 @@ mempoolLoop:
 			prioItem.feePerKB < int64(policy.TxMinFreeFee) &&
 			blockPlusTxSize >= policy.BlockMinSize {
 
-			minrLog.Tracef("Skipping tx %s with feePerKB %.2f "+
+			minrLog.Tracef("Skipping tx %s with feePerKB %d "+
 				"< TxMinFreeFee %d and block size %d >= "+
 				"minBlockSize %d", tx.Sha(), prioItem.feePerKB,
 				policy.TxMinFreeFee, blockPlusTxSize,
@@ -682,7 +682,7 @@ mempoolLoop:
 		txFees = append(txFees, prioItem.fee)
 		txSigOpCounts = append(txSigOpCounts, numSigOps)
 
-		minrLog.Tracef("Adding tx %s (priority %.2f, feePerKB %.2f)",
+		minrLog.Tracef("Adding tx %s (priority %.2f, feePerKB %d)",
 			prioItem.tx.Sha(), prioItem.priority, prioItem.feePerKB)
 
 		// Add transactions which depend on this one (and also do not
