@@ -79,19 +79,19 @@ const (
 	// is also used to help determine if a transaction is considered dust
 	// and as a base for calculating minimum required fees per KB for larger
 	// transactions.  This value is in Atom/1000 bytes.
-	minTxRelayFeeMainNet = 1e5
+	minTxRelayFeeMainNet = 1e6
 
 	// minTxRelayFeeTestNet is the minimum relay fee for the Test and Simulation
 	// networks.
 	minTxRelayFeeTestNet = 1e3
 
-	// minTxFeeForMempoolMainNet is the minimum fee per KB in atoms that is
-	// required for a transaction to enter the mempool on MainNet.
-	minTxFeeForMempoolMainNet = 1e6
+	// minTicketFeeMainNet is the minimum fee per KB in atoms that is
+	// required for a ticket to enter the mempool on MainNet.
+	minTicketFeeMainNet = 1e6
 
-	// minTxFeeForMempoolMainNet is the minimum fee per KB in atoms that is
-	// required for a transaction to enter the mempool on TestNet or SimNet.
-	minTxFeeForMempoolTestNet = 1e2
+	// minTicketFeeTestNet is the minimum fee per KB in atoms that is
+	// required for a ticekt to enter the mempool on TestNet or SimNet.
+	minTicketFeeTestNet = 1e3
 
 	// maxSSGensDoubleSpends is the maximum number of SSGen double spends
 	// allowed in the pool.
@@ -1719,6 +1719,7 @@ func (mp *txMemPool) maybeAcceptTransaction(tx *dcrutil.Tx, isNew,
 	// which is more desirable.  Therefore, as long as the size of the
 	// transaction does not exceeed 1000 less than the reserved space for
 	// high-priority transactions, don't require a fee for it.
+	// This applies to non-stake transactions only.
 	serializedSize := int64(tx.MsgTx().SerializeSize())
 	minFee := calcMinRequiredTxRelayFee(serializedSize, int64(minRelayTxFee))
 	if txType == stake.TxTypeRegular { // Non-stake only
@@ -1730,45 +1731,11 @@ func (mp *txMemPool) maybeAcceptTransaction(tx *dcrutil.Tx, isNew,
 		}
 	}
 
-	// Set an absolute threshold for rejection and obey it. This prevents
-	// unnecessary transaction spam. We only enforce this for transactions
-	// we expect to have fees. Votes are mandatory, so we skip the check
-	// on them.
-	var feeThreshold int64
-	switch {
-	case mp.server.chainParams == &chaincfg.MainNetParams:
-		feeThreshold = minTxFeeForMempoolMainNet
-	case mp.server.chainParams == &chaincfg.TestNetParams:
-		feeThreshold = minTxFeeForMempoolTestNet
-	default:
-		feeThreshold = minTxFeeForMempoolTestNet
-	}
-
-	minThreshold := calcMinRequiredTxRelayFee(serializedSize, feeThreshold)
-	if (txFee < minThreshold) && txType != stake.TxTypeSSGen {
-		str := fmt.Sprintf("transaction %v has a %v fee which "+
-			"is under the required threshold amount of %d", txHash, txFee,
-			minThreshold)
-		return nil, txRuleError(wire.RejectInsufficientFee, str)
-	}
-
-	// Check whether allowHighFees is set to false (default), if so, then make sure
-	// the current fee is sensible.  100 * above the minimum fee/kb seems to be a
-	// reasonable amount to check.  If people would like to avoid this check
-	// then they can AllowHighFees = true
-	if !allowHighFees {
-		maxFee := calcMinRequiredTxRelayFee(serializedSize*100, int64(minRelayTxFee))
-		if txFee > maxFee {
-			err = fmt.Errorf("transaction %v has %v fee which is above the "+
-				"allowHighFee check threshold amount of %v", txHash,
-				txFee, maxFee)
-			return nil, err
-		}
-	}
 	// Require that free transactions have sufficient priority to be mined
 	// in the next block.  Transactions which are being added back to the
 	// memory pool from blocks that have been disconnected during a reorg
 	// are exempted.
+	// This applies to non-stake transactions only.
 	if isNew && !cfg.NoRelayPriority && txFee < minFee &&
 		txType == stake.TxTypeRegular {
 		txD := &TxDesc{
@@ -1788,6 +1755,7 @@ func (mp *txMemPool) maybeAcceptTransaction(tx *dcrutil.Tx, isNew,
 
 	// Free-to-relay transactions are rate limited here to prevent
 	// penny-flooding with tiny transactions as a form of attack.
+	// This applies to non-stake transactions only.
 	if rateLimit && txFee < minFee && txType == stake.TxTypeRegular {
 		nowUnix := time.Now().Unix()
 		// we decay passed data with an exponentially decaying ~10
@@ -1808,6 +1776,44 @@ func (mp *txMemPool) maybeAcceptTransaction(tx *dcrutil.Tx, isNew,
 		txmpLog.Tracef("rate limit: curTotal %v, nextTotal: %v, "+
 			"limit %v", oldTotal, mp.pennyTotal,
 			cfg.FreeTxRelayLimit*10*1000)
+	}
+
+	// Set an absolute threshold for ticket rejection and obey it. Tickets
+	// are treated differently in the mempool because they have a set
+	// difficulty and generally a window in which they expire.
+	//
+	// This applies to tickets transactions only.
+	var ticketFeeThreshold int64
+	switch {
+	case mp.server.chainParams == &chaincfg.MainNetParams:
+		ticketFeeThreshold = minTicketFeeMainNet
+	case mp.server.chainParams == &chaincfg.TestNetParams:
+		ticketFeeThreshold = minTicketFeeTestNet
+	default:
+		ticketFeeThreshold = minTicketFeeTestNet
+	}
+
+	minTicketFee := calcMinRequiredTxRelayFee(serializedSize, ticketFeeThreshold)
+	if (txFee < minTicketFee) && txType == stake.TxTypeSStx {
+		str := fmt.Sprintf("transaction %v has a %v fee which "+
+			"is under the required threshold amount of %d", txHash, txFee,
+			minTicketFee)
+		return nil, txRuleError(wire.RejectInsufficientFee, str)
+	}
+
+	// Check whether allowHighFees is set to false (default), if so, then make sure
+	// the current fee is sensible.  100 * above the minimum fee/kb seems to be a
+	// reasonable amount to check.  If people would like to avoid this check
+	// then they can AllowHighFees = true
+	if !allowHighFees {
+		maxFee := calcMinRequiredTxRelayFee(serializedSize*100,
+			int64(minRelayTxFee))
+		if txFee > maxFee {
+			err = fmt.Errorf("transaction %v has %v fee which is above the "+
+				"allowHighFee check threshold amount of %v", txHash,
+				txFee, maxFee)
+			return nil, err
+		}
 	}
 
 	// Verify crypto signatures for each input and reject the transaction if
