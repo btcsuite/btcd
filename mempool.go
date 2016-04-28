@@ -93,6 +93,10 @@ const (
 	// required for a ticekt to enter the mempool on TestNet or SimNet.
 	minTicketFeeTestNet = 1e3
 
+	// maxRelayFeeMultiplier is the factor that we disallow fees / kb above
+	// the minimum tx fee.
+	maxRelayFeeMultiplier = 100
+
 	// maxSSGensDoubleSpends is the maximum number of SSGen double spends
 	// allowed in the pool.
 	maxSSGensDoubleSpends = 5
@@ -1806,7 +1810,7 @@ func (mp *txMemPool) maybeAcceptTransaction(tx *dcrutil.Tx, isNew,
 	// reasonable amount to check.  If people would like to avoid this check
 	// then they can AllowHighFees = true
 	if !allowHighFees {
-		maxFee := calcMinRequiredTxRelayFee(serializedSize*100,
+		maxFee := calcMinRequiredTxRelayFee(serializedSize*maxRelayFeeMultiplier,
 			int64(minRelayTxFee))
 		if txFee > maxFee {
 			err = fmt.Errorf("transaction %v has %v fee which is above the "+
