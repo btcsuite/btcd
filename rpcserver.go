@@ -204,6 +204,8 @@ var rpcHandlersBeforeInit = map[string]commandHandler{
 	"submitblock":           handleSubmitBlock,
 	"ticketfeeinfo":         handleTicketFeeInfo,
 	"ticketsforaddress":     handleTicketsForAddress,
+	"ticketvwap":            handleTicketVWAP,
+	"txfeeinfo":             handleTxFeeInfo,
 	"validateaddress":       handleValidateAddress,
 	"verifychain":           handleVerifyChain,
 	"verifymessage":         handleVerifyMessage,
@@ -4712,20 +4714,20 @@ func stdDev(s []dcrutil.Amount) dcrutil.Amount {
 	return amt
 }
 
-// ticketFeeInfoForMempool returns the ticket fee information for the
+// feeInfoForMempool returns the fee information for the passed tx type in the
 // memory pool.
-func ticketFeeInfoForMempool(s *rpcServer) *dcrjson.TicketFeeInfoMempool {
+func feeInfoForMempool(s *rpcServer, txType stake.TxType) *dcrjson.FeeInfoMempool {
 	txDs := s.server.txMemPool.TxDescs()
 	ticketFees := make([]dcrutil.Amount, 0, len(txDs))
 	for _, txD := range txDs {
-		if txD.Type == stake.TxTypeSStx {
+		if txD.Type == txType {
 			feePerKb := (dcrutil.Amount(txD.Fee)) * 1000 /
 				dcrutil.Amount(txD.Tx.MsgTx().SerializeSize())
 			ticketFees = append(ticketFees, feePerKb)
 		}
 	}
 
-	return &dcrjson.TicketFeeInfoMempool{
+	return &dcrjson.FeeInfoMempool{
 		Number: uint32(len(ticketFees)),
 		Min:    min(ticketFees).ToCoin(),
 		Max:    max(ticketFees).ToCoin(),
@@ -4750,9 +4752,9 @@ func calcFeePerKb(tx *dcrutil.Tx) dcrutil.Amount {
 	return ((in - out) * 1000) / dcrutil.Amount(tx.MsgTx().SerializeSize())
 }
 
-// ticketFeeInfoForBlock fetches the ticket fee information for a given
+// feeInfoForBlock fetches the ticket fee information for a given tx type in a
 // block.
-func ticketFeeInfoForBlock(s *rpcServer, height int64) (*dcrjson.TicketFeeInfoBlock, error) {
+func ticketFeeInfoForBlock(s *rpcServer, height int64, txType stake.TxType) (*dcrjson.FeeInfoBlock, error) {
 	hash, err := s.server.db.FetchBlockShaByHeight(height)
 	if err != nil {
 		return nil, err
@@ -4763,60 +4765,94 @@ func ticketFeeInfoForBlock(s *rpcServer, height int64) (*dcrjson.TicketFeeInfoBl
 		return nil, err
 	}
 
-	ticketNum := bl.MsgBlock().Header.FreshStake
-	ticketFees := make([]dcrutil.Amount, int(ticketNum))
+	txNum := 0
+	switch txType {
+	case stake.TxTypeRegular:
+		txNum = len(bl.MsgBlock().Transactions) - 1
+	case stake.TxTypeSStx:
+		txNum = int(bl.MsgBlock().Header.FreshStake)
+	case stake.TxTypeSSGen:
+		txNum = int(bl.MsgBlock().Header.Voters)
+	case stake.TxTypeSSRtx:
+		txNum = int(bl.MsgBlock().Header.Revocations)
+	}
+
+	txFees := make([]dcrutil.Amount, txNum)
 	itr := 0
-	for _, stx := range bl.STransactions() {
-		txType := stake.DetermineTxType(stx)
-		if txType == stake.TxTypeSStx {
-			ticketFees[itr] = calcFeePerKb(stx)
+	if txType == stake.TxTypeRegular {
+		for i, tx := range bl.Transactions() {
+			// Skip the coin base.
+			if i == 0 {
+				continue
+			}
+
+			txFees[itr] = calcFeePerKb(tx)
 			itr++
+		}
+	} else {
+		for _, stx := range bl.STransactions() {
+			thisTxType := stake.DetermineTxType(stx)
+			if thisTxType == txType {
+				txFees[itr] = calcFeePerKb(stx)
+				itr++
+			}
 		}
 	}
 
-	return &dcrjson.TicketFeeInfoBlock{
+	return &dcrjson.FeeInfoBlock{
 		Height: uint32(height),
-		Number: uint32(ticketNum),
-		Min:    min(ticketFees).ToCoin(),
-		Max:    max(ticketFees).ToCoin(),
-		Mean:   mean(ticketFees).ToCoin(),
-		Median: median(ticketFees).ToCoin(),
-		StdDev: stdDev(ticketFees).ToCoin(),
+		Number: uint32(txNum),
+		Min:    min(txFees).ToCoin(),
+		Max:    max(txFees).ToCoin(),
+		Mean:   mean(txFees).ToCoin(),
+		Median: median(txFees).ToCoin(),
+		StdDev: stdDev(txFees).ToCoin(),
 	}, nil
 }
 
 // ticketFeeInfoForRange fetches the ticket fee information for a given
 // range from [start, end).
-func ticketFeeInfoForRange(s *rpcServer, start int64, end int64) (*dcrjson.TicketFeeInfoWindow, error) {
+func ticketFeeInfoForRange(s *rpcServer, start int64, end int64, txType stake.TxType) (*dcrjson.FeeInfoWindow, error) {
 	hashes, err := s.server.db.FetchHeightRange(start, end)
 	if err != nil {
 		return nil, err
 	}
 
-	var ticketFees []dcrutil.Amount
+	var txFees []dcrutil.Amount
 	for i := range hashes {
 		bl, err := s.server.db.FetchBlockBySha(&hashes[i])
 		if err != nil {
 			return nil, err
 		}
 
-		for _, stx := range bl.STransactions() {
-			txType := stake.DetermineTxType(stx)
-			if txType == stake.TxTypeSStx {
-				ticketFees = append(ticketFees, calcFeePerKb(stx))
+		if txType == stake.TxTypeRegular {
+			for i, tx := range bl.Transactions() {
+				// Skip the coin base.
+				if i == 0 {
+					continue
+				}
+
+				txFees = append(txFees, calcFeePerKb(tx))
+			}
+		} else {
+			for _, stx := range bl.STransactions() {
+				thisTxType := stake.DetermineTxType(stx)
+				if thisTxType == txType {
+					txFees = append(txFees, calcFeePerKb(stx))
+				}
 			}
 		}
 	}
 
-	return &dcrjson.TicketFeeInfoWindow{
+	return &dcrjson.FeeInfoWindow{
 		StartHeight: uint32(start),
 		EndHeight:   uint32(end),
-		Number:      uint32(len(ticketFees)),
-		Min:         min(ticketFees).ToCoin(),
-		Max:         max(ticketFees).ToCoin(),
-		Mean:        mean(ticketFees).ToCoin(),
-		Median:      median(ticketFees).ToCoin(),
-		StdDev:      stdDev(ticketFees).ToCoin(),
+		Number:      uint32(len(txFees)),
+		Min:         min(txFees).ToCoin(),
+		Max:         max(txFees).ToCoin(),
+		Mean:        mean(txFees).ToCoin(),
+		Median:      median(txFees).ToCoin(),
+		StdDev:      stdDev(txFees).ToCoin(),
 	}, nil
 }
 
@@ -4830,16 +4866,20 @@ func handleTicketFeeInfo(s *rpcServer, cmd interface{}, closeChan <-chan struct{
 	cs.Unlock()
 
 	// Memory pool first.
-	feeInfoMempool := ticketFeeInfoForMempool(s)
+	feeInfoMempool := feeInfoForMempool(s, stake.TxTypeSStx)
 
 	// Blocks requested, descending from the chain tip.
-	var feeInfoBlocks []dcrjson.TicketFeeInfoBlock
-	if c.Blocks > 0 {
+	var feeInfoBlocks []dcrjson.FeeInfoBlock
+	blocks := uint32(0)
+	if c.Blocks != nil {
+		blocks = *c.Blocks
+	}
+	if blocks > 0 {
 		start := bestHeight
-		end := bestHeight - int64(c.Blocks)
+		end := bestHeight - int64(blocks)
 
 		for i := start; i > end; i-- {
-			feeInfo, err := ticketFeeInfoForBlock(s, i)
+			feeInfo, err := ticketFeeInfoForBlock(s, i, stake.TxTypeSStx)
 			if err != nil {
 				return nil, err
 			}
@@ -4847,15 +4887,20 @@ func handleTicketFeeInfo(s *rpcServer, cmd interface{}, closeChan <-chan struct{
 		}
 	}
 
-	var feeInfoWindows []dcrjson.TicketFeeInfoWindow
-	if c.Windows > 0 {
+	var feeInfoWindows []dcrjson.FeeInfoWindow
+	windows := uint32(0)
+	if c.Windows != nil {
+		windows = *c.Windows
+	}
+	if windows > 0 {
 		// The first window is special because it may not be finished.
 		// Perform this first and return if it's the only window the
 		// user wants. Otherwise, append and continue.
 		winLen := s.server.chainParams.StakeDiffWindowSize
 		lastChange := (bestHeight / winLen) * winLen
 
-		feeInfo, err := ticketFeeInfoForRange(s, lastChange, bestHeight+1)
+		feeInfo, err := ticketFeeInfoForRange(s, lastChange, bestHeight+1,
+			stake.TxTypeSStx)
 		if err != nil {
 			return nil, err
 		}
@@ -4865,17 +4910,18 @@ func handleTicketFeeInfo(s *rpcServer, cmd interface{}, closeChan <-chan struct{
 		// the last adjustment and move backwards through window
 		// lengths, calulating the fees data and appending it
 		// each time.
-		if c.Windows > 1 {
+		if windows > 1 {
 			// Go down to the last height requested, except
 			// in the case that the user has specified to
 			// many windows. In that case, just proceed to the
 			// first block.
 			end := int64(-1)
-			if lastChange-int64(c.Windows)*winLen > end {
-				end = lastChange - int64(c.Windows)*winLen
+			if lastChange-int64(windows)*winLen > end {
+				end = lastChange - int64(windows)*winLen
 			}
 			for i := lastChange; i > end+winLen; i -= winLen {
-				feeInfo, err := ticketFeeInfoForRange(s, i-winLen, i)
+				feeInfo, err := ticketFeeInfoForRange(s, i-winLen, i,
+					stake.TxTypeSStx)
 				if err != nil {
 					return nil, err
 				}
@@ -4916,6 +4962,171 @@ func handleTicketsForAddress(s *rpcServer, cmd interface{}, closeChan <-chan str
 		Tickets: ticketStrings,
 	}
 	return reply, nil
+}
+
+// handleTicketVWAP implements the ticketvwap command.
+func handleTicketVWAP(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (interface{}, error) {
+	c := cmd.(*dcrjson.TicketVWAPCmd)
+
+	// The default VWAP is for the past WorkDiffWindows * WorkDiffWindowSize
+	// many blocks.
+	_, bestHeight := s.server.blockManager.chainState.Best()
+	start := uint32(0)
+	if c.Start == nil {
+		toEval := activeNetParams.WorkDiffWindows *
+			activeNetParams.WorkDiffWindowSize
+		startI64 := bestHeight - toEval
+
+		// Use 1 as the first block if there aren't
+		// enough blocks.
+		if startI64 <= 0 {
+			start = 1
+		} else {
+			start = uint32(startI64)
+		}
+	} else {
+		start = *c.Start
+	}
+
+	end := uint32(bestHeight)
+	if c.End != nil {
+		end = *c.End
+	}
+	if start > end {
+		errStr := fmt.Sprintf("start height %v is beyond end height %v",
+			start, end)
+		return nil, &dcrjson.RPCError{
+			Code:    dcrjson.ErrRPCMisc,
+			Message: errStr,
+		}
+	}
+	if end > uint32(bestHeight) {
+		errStr := fmt.Sprintf("end height %v is beyond blockchain tip height %v",
+			end, bestHeight)
+		return nil, &dcrjson.RPCError{
+			Code:    dcrjson.ErrRPCMisc,
+			Message: errStr,
+		}
+	}
+
+	// Calculate the volume weighted average price of a ticket for the
+	// given range.
+	ticketNum := int64(0)
+	totalValue := int64(0)
+	for i := start; i <= end; i++ {
+		blockHash, err := s.server.db.FetchBlockShaByHeight(int64(i))
+		if err != nil {
+			return nil, err
+		}
+
+		blockHeader, err := s.server.db.FetchBlockHeaderBySha(blockHash)
+		if err != nil {
+			return nil, err
+		}
+
+		ticketNum += int64(blockHeader.FreshStake)
+		totalValue += int64(blockHeader.SBits) * int64(blockHeader.FreshStake)
+	}
+	vwap := int64(0)
+	if ticketNum > 0 {
+		vwap = totalValue / ticketNum
+	}
+
+	return dcrutil.Amount(vwap).ToCoin(), nil
+}
+
+// handleTxFeeInfo implements the txfeeinfo command.
+func handleTxFeeInfo(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (interface{}, error) {
+	c := cmd.(*dcrjson.TxFeeInfoCmd)
+
+	cs := s.server.blockManager.chainState
+	cs.Lock()
+	bestHeight := cs.newestHeight
+	cs.Unlock()
+
+	// Memory pool first.
+	feeInfoMempool := feeInfoForMempool(s, stake.TxTypeRegular)
+
+	// Blocks requested, descending from the chain tip.
+	var feeInfoBlocks []dcrjson.FeeInfoBlock
+	blocks := uint32(0)
+	if c.Blocks != nil {
+		blocks = *c.Blocks
+	}
+	if blocks > 0 {
+		start := bestHeight
+		end := bestHeight - int64(blocks)
+
+		for i := start; i > end; i-- {
+			feeInfo, err := ticketFeeInfoForBlock(s, i, stake.TxTypeRegular)
+			if err != nil {
+				return nil, err
+			}
+			feeInfoBlocks = append(feeInfoBlocks, *feeInfo)
+		}
+	}
+
+	// Get the fee info for the range requested, unless none is given.
+	// The default range is for the past WorkDiffWindowSize many blocks.
+	var feeInfoRange dcrjson.FeeInfoRange
+
+	start := uint32(0)
+	if c.RangeStart == nil {
+		toEval := activeNetParams.WorkDiffWindowSize
+		startI64 := bestHeight - toEval
+
+		// Use 1 as the first block if there aren't
+		// enough blocks.
+		if startI64 <= 0 {
+			start = 1
+		} else {
+			start = uint32(startI64)
+		}
+	} else {
+		start = *c.RangeStart
+	}
+
+	end := uint32(bestHeight)
+	if c.RangeEnd != nil {
+		end = *c.RangeEnd
+	}
+	if start > end {
+		errStr := fmt.Sprintf("start height %v is beyond end height %v",
+			start, end)
+		return nil, &dcrjson.RPCError{
+			Code:    dcrjson.ErrRPCMisc,
+			Message: errStr,
+		}
+	}
+	if end > uint32(bestHeight) {
+		errStr := fmt.Sprintf("end height %v is beyond blockchain tip height %v",
+			end, bestHeight)
+		return nil, &dcrjson.RPCError{
+			Code:    dcrjson.ErrRPCMisc,
+			Message: errStr,
+		}
+	}
+
+	feeInfo, err := ticketFeeInfoForRange(s, int64(start), int64(end+1),
+		stake.TxTypeRegular)
+	if err != nil {
+		return nil, err
+	}
+
+	feeInfoRange = dcrjson.FeeInfoRange{
+		Number: feeInfo.Number,
+		Min:    feeInfo.Min,
+		Max:    feeInfo.Max,
+		Mean:   feeInfo.Mean,
+		Median: feeInfo.Median,
+		StdDev: feeInfo.StdDev,
+	}
+
+	return &dcrjson.TxFeeInfoResult{
+		FeeInfoMempool: *feeInfoMempool,
+		FeeInfoBlocks:  feeInfoBlocks,
+		FeeInfoRange:   feeInfoRange,
+	}, nil
 }
 
 // handleValidateAddress implements the validateaddress command.

@@ -154,13 +154,13 @@ func NewRebroadcastWinnersCmd() *RebroadcastWinnersCmd {
 
 // TicketFeeInfoCmd defines the ticketsfeeinfo JSON-RPC command.
 type TicketFeeInfoCmd struct {
-	Blocks  uint32
-	Windows uint32
+	Blocks  *uint32
+	Windows *uint32
 }
 
 // NewTicketFeeInfoCmd returns a new instance which can be used to issue a
 // JSON-RPC ticket fee info command.
-func NewTicketFeeInfoCmd(blocks uint32, windows uint32) *TicketFeeInfoCmd {
+func NewTicketFeeInfoCmd(blocks *uint32, windows *uint32) *TicketFeeInfoCmd {
 	return &TicketFeeInfoCmd{
 		Blocks:  blocks,
 		Windows: windows,
@@ -176,6 +176,38 @@ type TicketsForAddressCmd struct {
 // JSON-RPC tickets for bucket command.
 func NewTicketsForAddressCmd(addr string) *TicketsForAddressCmd {
 	return &TicketsForAddressCmd{addr}
+}
+
+// TicketVWAPCmd defines the ticketvwap JSON-RPC command.
+type TicketVWAPCmd struct {
+	Start *uint32
+	End   *uint32
+}
+
+// NewTicketVWAPCmd returns a new instance which can be used to issue a
+// JSON-RPC ticket volume weight average price command.
+func NewTicketVWAPCmd(start *uint32, end *uint32) *TicketVWAPCmd {
+	return &TicketVWAPCmd{
+		Start: start,
+		End:   end,
+	}
+}
+
+// TxFeeInfoCmd defines the ticketsfeeinfo JSON-RPC command.
+type TxFeeInfoCmd struct {
+	Blocks     *uint32
+	RangeStart *uint32
+	RangeEnd   *uint32
+}
+
+// NewTxFeeInfoCmd returns a new instance which can be used to issue a
+// JSON-RPC ticket fee info command.
+func NewTxFeeInfoCmd(blocks *uint32, start *uint32, end *uint32) *TxFeeInfoCmd {
+	return &TxFeeInfoCmd{
+		Blocks:     blocks,
+		RangeStart: start,
+		RangeEnd:   end,
+	}
 }
 
 func init() {
@@ -197,4 +229,6 @@ func init() {
 	MustRegisterCmd("rebroadcastwinners", (*RebroadcastWinnersCmd)(nil), flags)
 	MustRegisterCmd("ticketfeeinfo", (*TicketFeeInfoCmd)(nil), flags)
 	MustRegisterCmd("ticketsforaddress", (*TicketsForAddressCmd)(nil), flags)
+	MustRegisterCmd("ticketvwap", (*TicketVWAPCmd)(nil), flags)
+	MustRegisterCmd("txfeeinfo", (*TxFeeInfoCmd)(nil), flags)
 }

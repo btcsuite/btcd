@@ -39,18 +39,8 @@ type Ticket struct {
 	Owner string `json:"owner"`
 }
 
-// TicketFeeInfoMempool is ticket fee information about the mempool.
-type TicketFeeInfoMempool struct {
-	Number uint32  `json:"number"`
-	Min    float64 `json:"min"`
-	Max    float64 `json:"max"`
-	Mean   float64 `json:"mean"`
-	Median float64 `json:"median"`
-	StdDev float64 `json:"stddev"`
-}
-
-// TicketFeeInfoBlock is ticket fee information about a block.
-type TicketFeeInfoBlock struct {
+// FeeInfoBlock is ticket fee information about a block.
+type FeeInfoBlock struct {
 	Height uint32  `json:"height"`
 	Number uint32  `json:"number"`
 	Min    float64 `json:"min"`
@@ -60,8 +50,28 @@ type TicketFeeInfoBlock struct {
 	StdDev float64 `json:"stddev"`
 }
 
-// TicketFeeInfoWindow is ticket fee information about an adjustment window.
-type TicketFeeInfoWindow struct {
+// FeeInfoMempool is ticket fee information about the mempool.
+type FeeInfoMempool struct {
+	Number uint32  `json:"number"`
+	Min    float64 `json:"min"`
+	Max    float64 `json:"max"`
+	Mean   float64 `json:"mean"`
+	Median float64 `json:"median"`
+	StdDev float64 `json:"stddev"`
+}
+
+// FeeInfoRange is ticket fee information about a range.
+type FeeInfoRange struct {
+	Number uint32  `json:"number"`
+	Min    float64 `json:"min"`
+	Max    float64 `json:"max"`
+	Mean   float64 `json:"mean"`
+	Median float64 `json:"median"`
+	StdDev float64 `json:"stddev"`
+}
+
+// FeeInfoWindow is ticket fee information about an adjustment window.
+type FeeInfoWindow struct {
 	StartHeight uint32  `json:"startheight"`
 	EndHeight   uint32  `json:"endheight"`
 	Number      uint32  `json:"number"`
@@ -75,13 +85,21 @@ type TicketFeeInfoWindow struct {
 // TicketFeeInfoResult models the data returned from the ticketfeeinfo command.
 // command.
 type TicketFeeInfoResult struct {
-	FeeInfoMempool TicketFeeInfoMempool  `json:"feeinfomempool"`
-	FeeInfoBlocks  []TicketFeeInfoBlock  `json:"feeinfoblocks"`
-	FeeInfoWindows []TicketFeeInfoWindow `json:"feeinfowindows"`
+	FeeInfoMempool FeeInfoMempool  `json:"feeinfomempool"`
+	FeeInfoBlocks  []FeeInfoBlock  `json:"feeinfoblocks"`
+	FeeInfoWindows []FeeInfoWindow `json:"feeinfowindows"`
 }
 
 // TicketsForAddressResult models the data returned from the ticketforaddress
 // command.
 type TicketsForAddressResult struct {
 	Tickets []string `json:"tickets"`
+}
+
+// TxFeeInfoResult models the data returned from the ticketfeeinfo command.
+// command.
+type TxFeeInfoResult struct {
+	FeeInfoMempool FeeInfoMempool `json:"feeinfomempool"`
+	FeeInfoBlocks  []FeeInfoBlock `json:"feeinfoblocks"`
+	FeeInfoRange   FeeInfoRange   `json:"feeinforange"`
 }
