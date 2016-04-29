@@ -7,6 +7,18 @@
 
 package dcrjson
 
+// EstimateStakeDiffCmd defines the eststakedifficulty JSON-RPC command.
+type EstimateStakeDiffCmd struct {
+	Tickets *uint32
+}
+
+// NewEstimateStakeDiffCmd defines the eststakedifficulty JSON-RPC command.
+func NewEstimateStakeDiffCmd(tickets *uint32) *EstimateStakeDiffCmd {
+	return &EstimateStakeDiffCmd{
+		Tickets: tickets,
+	}
+}
+
 // ExistsAddressCmd defines the existsaddress JSON-RPC command.
 type ExistsAddressCmd struct {
 	Address string
@@ -170,6 +182,7 @@ func init() {
 	// No special flags for commands in this file.
 	flags := UsageFlag(0)
 
+	MustRegisterCmd("estimatestakediff", (*EstimateStakeDiffCmd)(nil), flags)
 	MustRegisterCmd("existsaddress", (*ExistsAddressCmd)(nil), flags)
 	MustRegisterCmd("existsaddresses", (*ExistsAddressesCmd)(nil), flags)
 	MustRegisterCmd("existsliveticket", (*ExistsLiveTicketCmd)(nil), flags)

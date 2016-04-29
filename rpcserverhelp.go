@@ -646,6 +646,14 @@ var helpDescsEnUS = map[string]string{
 	"estimatefee-numblocks": "(unused)",
 	"estimatefee--result0":  "Estimated fee.",
 
+	// EstimateStakeDiff help.
+	"estimatestakediff--synopsis":      "Estimate the next minimum, maximum, expected, and user-specified stake difficulty",
+	"estimatestakediff-tickets":        "Use this number of new tickets in blocks to estimate the next difficulty",
+	"estimatestakediffresult-min":      "Minimum estimate for stake difficulty",
+	"estimatestakediffresult-max":      "Maximum estimate for stake difficulty",
+	"estimatestakediffresult-expected": "Expected estimate for stake difficulty",
+	"estimatestakediffresult-user":     "Estimate for stake difficulty with the passed user amount of tickets",
+
 	// GetCoinSupply help
 	"getcoinsupply--synopsis": "Returns current total coin supply in atoms",
 	"getcoinsupply--result0":  "Current coin supply in atoms",
@@ -721,6 +729,7 @@ var rpcResultTypes = map[string][]interface{}{
 	"decoderawtransaction":  []interface{}{(*dcrjson.TxRawDecodeResult)(nil)},
 	"decodescript":          []interface{}{(*dcrjson.DecodeScriptResult)(nil)},
 	"estimatefee":           []interface{}{(*float64)(nil)},
+	"estimatestakediff":     []interface{}{(*dcrjson.EstimateStakeDiffResult)(nil)},
 	"existsaddress":         []interface{}{(*bool)(nil)},
 	"existsaddresses":       []interface{}{(*string)(nil)},
 	"existsliveticket":      []interface{}{(*bool)(nil)},

@@ -158,6 +158,21 @@ type calcNextReqStakeDifficultyMsg struct {
 	reply chan calcNextReqStakeDifficultyResponse
 }
 
+// estimateNextStakeDifficultyResponse is a response sent to the reply channel of a
+// estimateNextStakeDifficultyMsg query.
+type estimateNextStakeDifficultyResponse struct {
+	stakeDifficulty int64
+	err             error
+}
+
+// estimateNextStakeDifficultyMsg is a message type to be sent across the message
+// channel for requesting the required stake difficulty of the next block.
+type estimateNextStakeDifficultyMsg struct {
+	ticketsInWindow int64
+	useMax          bool
+	reply           chan estimateNextStakeDifficultyResponse
+}
+
 // getBlockFromHashResponse is a response sent to the reply channel of a
 // getBlockFromHashMsg query.
 type getBlockFromHashResponse struct {
@@ -239,7 +254,7 @@ type getTopBlockResponse struct {
 	err   error
 }
 
-// calcNextReqStakeDifficultyMsg is a message type to be sent across the message
+// getTopBlockMsg is a message type to be sent across the message
 // channel for requesting the required stake difficulty of the next block.
 type getTopBlockMsg struct {
 	reply chan getTopBlockResponse
@@ -1836,6 +1851,14 @@ out:
 					err:             err,
 				}
 
+			case estimateNextStakeDifficultyMsg:
+				stakeDiff, err := b.blockChain.EstimateNextStakeDifficulty(
+					msg.ticketsInWindow, msg.useMax)
+				msg.reply <- estimateNextStakeDifficultyResponse{
+					stakeDifficulty: stakeDiff,
+					err:             err,
+				}
+
 			case forceReorganizationMsg:
 				err := b.blockChain.ForceHeadReorganization(
 					msg.formerBest,
@@ -2635,6 +2658,23 @@ func (b *blockManager) CalcNextRequiredDiffNode(hash *chainhash.Hash,
 func (b *blockManager) CalcNextRequiredStakeDifficulty() (int64, error) {
 	reply := make(chan calcNextReqStakeDifficultyResponse)
 	b.msgChan <- calcNextReqStakeDifficultyMsg{reply: reply}
+	response := <-reply
+	return response.stakeDifficulty, response.err
+}
+
+// EstimateNextStakeDifficulty estimates what the next stake difficulty will be
+// based on the current stake difficulty, the most recently added blocks to the
+// blockchain, and a user passed variable called ticketsInWindow that supplies
+// the number of tickets to be added in the remaining blocks to be mined for this
+// window period.
+func (b *blockManager) EstimateNextStakeDifficulty(ticketsInWindow int64,
+	useMax bool) (int64, error) {
+	reply := make(chan estimateNextStakeDifficultyResponse)
+	b.msgChan <- estimateNextStakeDifficultyMsg{
+		ticketsInWindow: ticketsInWindow,
+		useMax:          useMax,
+		reply:           reply,
+	}
 	response := <-reply
 	return response.stakeDifficulty, response.err
 }

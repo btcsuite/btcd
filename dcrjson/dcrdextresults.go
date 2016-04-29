@@ -12,6 +12,15 @@ type GetStakeDifficultyResult struct {
 	NextStakeDifficulty    float64 `json:"next"`
 }
 
+// EstimateStakeDiffResult models the data returned from the estimatestakediff
+// command.
+type EstimateStakeDiffResult struct {
+	Min      float64  `json:"min"`
+	Max      float64  `json:"max"`
+	Expected float64  `json:"expected"`
+	User     *float64 `json:"user,omitempty"`
+}
+
 // LiveTicketsResult models the data returned from the livetickets
 // command.
 type LiveTicketsResult struct {

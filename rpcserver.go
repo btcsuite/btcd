@@ -159,6 +159,7 @@ var rpcHandlersBeforeInit = map[string]commandHandler{
 	"decoderawtransaction":  handleDecodeRawTransaction,
 	"decodescript":          handleDecodeScript,
 	"estimatefee":           handleEstimateFee,
+	"estimatestakediff":     handleEstimateStakeDiff,
 	"existsaddress":         handleExistsAddress,
 	"existsaddresses":       handleExistsAddresses,
 	"existsliveticket":      handleExistsLiveTicket,
@@ -1483,6 +1484,88 @@ func handleEstimateFee(s *rpcServer, cmd interface{},
 	closeChan <-chan struct{}) (interface{}, error) {
 
 	return 0.01, nil
+}
+
+// handleEstimateStakeDiff implements the estimatestakediff command.
+func handleEstimateStakeDiff(s *rpcServer, cmd interface{},
+	closeChan <-chan struct{}) (interface{}, error) {
+	c := cmd.(*dcrjson.EstimateStakeDiffCmd)
+
+	// Minimum possible stake difficulty.
+	min, err := s.server.blockManager.EstimateNextStakeDifficulty(0, false)
+	if err != nil {
+		return nil, &dcrjson.RPCError{
+			Code:    dcrjson.ErrRPCMisc,
+			Message: err.Error(),
+		}
+	}
+
+	// Maximum possible stake difficulty.
+	max, err := s.server.blockManager.EstimateNextStakeDifficulty(0, true)
+	if err != nil {
+		return nil, &dcrjson.RPCError{
+			Code:    dcrjson.ErrRPCMisc,
+			Message: err.Error(),
+		}
+	}
+
+	// The expected stake difficulty. Average the number of fresh stake
+	// since the last retarget to get the number of tickets per block,
+	// then use that to estimate the next stake difficulty.
+	_, bestHeight := s.server.blockManager.chainState.Best()
+	lastAdjustment := (bestHeight / activeNetParams.StakeDiffWindowSize) *
+		activeNetParams.StakeDiffWindowSize
+	nextAdjustment := ((bestHeight / activeNetParams.StakeDiffWindowSize) + 1) *
+		activeNetParams.StakeDiffWindowSize
+	totalTickets := 0
+	for i := lastAdjustment; i <= bestHeight; i++ {
+		hash, err := s.server.db.FetchBlockShaByHeight(i)
+		if err != nil {
+			return nil, err
+		}
+
+		bl, err := s.server.db.FetchBlockBySha(hash)
+		if err != nil {
+			return nil, err
+		}
+
+		totalTickets += int(bl.MsgBlock().Header.FreshStake)
+	}
+	blocksSince := float64(bestHeight - lastAdjustment + 1)
+	remaining := float64(nextAdjustment - bestHeight - 1)
+	averagePerBlock := float64(totalTickets) / blocksSince
+	expectedTickets := int64(math.Floor(averagePerBlock * remaining))
+	expected, err := s.server.blockManager.EstimateNextStakeDifficulty(
+		expectedTickets, false)
+	if err != nil {
+		return nil, &dcrjson.RPCError{
+			Code:    dcrjson.ErrRPCMisc,
+			Message: err.Error(),
+		}
+	}
+
+	// User-specified stake difficulty, if they asked for one.
+	var userEstFltPtr *float64
+	if c.Tickets != nil {
+		userEst, err :=
+			s.server.blockManager.EstimateNextStakeDifficulty(int64(*c.Tickets),
+				false)
+		if err != nil {
+			return nil, &dcrjson.RPCError{
+				Code:    dcrjson.ErrRPCMisc,
+				Message: err.Error(),
+			}
+		}
+		userEstFlt := dcrutil.Amount(userEst).ToCoin()
+		userEstFltPtr = &userEstFlt
+	}
+
+	return &dcrjson.EstimateStakeDiffResult{
+		Min:      dcrutil.Amount(min).ToCoin(),
+		Max:      dcrutil.Amount(max).ToCoin(),
+		Expected: dcrutil.Amount(expected).ToCoin(),
+		User:     userEstFltPtr,
+	}, nil
 }
 
 // handleExistsAddress implements the existsaddress command.
