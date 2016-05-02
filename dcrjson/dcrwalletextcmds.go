@@ -63,6 +63,13 @@ func NewAccountSyncAddressIndexCmd(acct string, branch int,
 	}
 }
 
+// AddTicketCmd forces a ticket into the wallet stake manager, for example if
+// someone made an invalid ticket for a stake pool and the pool manager wanted
+// to manually add it.
+type AddTicketCmd struct {
+	TicketHex string `json:"tickethex"`
+}
+
 // ConsolidateCmd is a type handling custom marshaling and
 // unmarshaling of consolidate JSON wallet extension
 // commands.
@@ -568,6 +575,19 @@ func NewSignRawTransactionsCmd(hexEncodedTxs []string,
 	}
 }
 
+// StakePoolUserInfoCmd defines the stakepooluserinfo JSON-RPC command.
+type StakePoolUserInfoCmd struct {
+	User string
+}
+
+// NewStakePoolUserInfoCmd returns a new instance which can be used to issue a
+// signrawtransactions JSON-RPC command.
+func NewStakePoolUserInfoCmd(user string) *StakePoolUserInfoCmd {
+	return &StakePoolUserInfoCmd{
+		User: user,
+	}
+}
+
 // WalletInfoCmd defines the walletinfo JSON-RPC command.
 type WalletInfoCmd struct {
 }
@@ -586,6 +606,7 @@ func init() {
 	MustRegisterCmd("accountaddressindex", (*AccountAddressIndexCmd)(nil), flags)
 	MustRegisterCmd("accountfetchaddresses", (*AccountFetchAddressesCmd)(nil), flags)
 	MustRegisterCmd("accountsyncaddressindex", (*AccountSyncAddressIndexCmd)(nil), flags)
+	MustRegisterCmd("addticket", (*AddTicketCmd)(nil), flags)
 	MustRegisterCmd("consolidate", (*ConsolidateCmd)(nil), flags)
 	MustRegisterCmd("createrawsstx", (*CreateRawSStxCmd)(nil), flags)
 	MustRegisterCmd("createrawssgentx", (*CreateRawSSGenTxCmd)(nil), flags)
@@ -621,5 +642,6 @@ func init() {
 	MustRegisterCmd("setticketmaxprice", (*SetTicketMaxPriceCmd)(nil), flags)
 	MustRegisterCmd("setticketvotebits", (*SetTicketVoteBitsCmd)(nil), flags)
 	MustRegisterCmd("signrawtransactions", (*SignRawTransactionsCmd)(nil), flags)
+	MustRegisterCmd("stakepooluserinfo", (*StakePoolUserInfoCmd)(nil), flags)
 	MustRegisterCmd("walletinfo", (*WalletInfoCmd)(nil), flags)
 }
