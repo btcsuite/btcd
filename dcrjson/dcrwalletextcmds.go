@@ -70,6 +70,11 @@ type AddTicketCmd struct {
 	TicketHex string `json:"tickethex"`
 }
 
+// NewAddTicketCmd creates a new AddTicketCmd.
+func NewAddTicketCmd(ticketHex string) *AddTicketCmd {
+	return &AddTicketCmd{TicketHex: ticketHex}
+}
+
 // ConsolidateCmd is a type handling custom marshaling and
 // unmarshaling of consolidate JSON wallet extension
 // commands.
