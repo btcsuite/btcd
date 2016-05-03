@@ -26,7 +26,7 @@ import (
 
 const (
 	// MaxProtocolVersion is the max protocol version the peer supports.
-	MaxProtocolVersion = 70011
+	MaxProtocolVersion = wire.SendHeadersVersion
 
 	// outputBufferSize is the number of elements the output channels use.
 	outputBufferSize = 50
@@ -175,6 +175,10 @@ type MessageListeners struct {
 	// OnReject is invoked when a peer receives a reject bitcoin message.
 	OnReject func(p *Peer, msg *wire.MsgReject)
 
+	// OnSendHeaders is invoked when a peer receives a sendheaders bitcoin
+	// message.
+	OnSendHeaders func(p *Peer, msg *wire.MsgSendHeaders)
+
 	// OnRead is invoked when a peer receives a bitcoin message.  It
 	// consists of the number of bytes read, the message, and whether or not
 	// an error in the read occurred.  Typically, callers will opt to use
@@ -298,7 +302,7 @@ func newNetAddress(addr net.Addr, services wire.ServiceFlag) (*wire.NetAddress, 
 // shutdown)
 type outMsg struct {
 	msg      wire.Message
-	doneChan chan struct{}
+	doneChan chan<- struct{}
 }
 
 // stallControlCmd represents the command of a stall control message.
@@ -401,15 +405,16 @@ type Peer struct {
 	cfg     Config
 	inbound bool
 
-	flagsMtx        sync.Mutex // protects the peer flags below
-	na              *wire.NetAddress
-	id              int32
-	userAgent       string
-	services        wire.ServiceFlag
-	versionKnown    bool
-	protocolVersion uint32
-	versionSent     bool
-	verAckReceived  bool
+	flagsMtx             sync.Mutex // protects the peer flags below
+	na                   *wire.NetAddress
+	id                   int32
+	userAgent            string
+	services             wire.ServiceFlag
+	versionKnown         bool
+	protocolVersion      uint32
+	sendHeadersPreferred bool // peer sent a sendheaders message
+	versionSent          bool
+	verAckReceived       bool
 
 	knownInventory     *mruInventoryMap
 	prevGetBlocksMtx   sync.Mutex
@@ -723,6 +728,17 @@ func (p *Peer) StartingHeight() int32 {
 	defer p.statsMtx.RUnlock()
 
 	return p.startingHeight
+}
+
+// WantsHeaders returns if the peer wants header messages instead of
+// inventory vectors for blocks.
+//
+// This function is safe for concurrent access.
+func (p *Peer) WantsHeaders() bool {
+	p.flagsMtx.Lock()
+	defer p.flagsMtx.Unlock()
+
+	return p.sendHeadersPreferred
 }
 
 // pushVersionMsg sends a version message to the connected peer using the
@@ -1634,9 +1650,18 @@ out:
 				p.cfg.Listeners.OnReject(p, msg)
 			}
 
+		case *wire.MsgSendHeaders:
+			p.flagsMtx.Lock()
+			p.sendHeadersPreferred = true
+			p.flagsMtx.Unlock()
+
+			if p.cfg.Listeners.OnSendHeaders != nil {
+				p.cfg.Listeners.OnSendHeaders(p, msg)
+			}
+
 		default:
-			log.Debugf("Received unhandled message of type %v:",
-				rmsg.Command())
+			log.Debugf("Received unhandled message of type %v "+
+				"from %v", rmsg.Command(), p)
 		}
 		p.stallControl <- stallControlMsg{sccHandlerDone, rmsg}
 
@@ -1897,7 +1922,7 @@ cleanup:
 // QueueMessage adds the passed bitcoin message to the peer send queue.
 //
 // This function is safe for concurrent access.
-func (p *Peer) QueueMessage(msg wire.Message, doneChan chan struct{}) {
+func (p *Peer) QueueMessage(msg wire.Message, doneChan chan<- struct{}) {
 	// Avoid risk of deadlock if goroutine already exited.  The goroutine
 	// we will be sending to hangs around until it knows for a fact that
 	// it is marked as disconnected and *then* it drains the channels.

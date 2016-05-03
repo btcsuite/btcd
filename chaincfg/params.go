@@ -337,31 +337,10 @@ var (
 )
 
 var (
-	registeredNets = map[wire.BitcoinNet]struct{}{
-		MainNetParams.Net:       {},
-		TestNet3Params.Net:      {},
-		RegressionNetParams.Net: {},
-		SimNetParams.Net:        {},
-	}
-
-	pubKeyHashAddrIDs = map[byte]struct{}{
-		MainNetParams.PubKeyHashAddrID:  {},
-		TestNet3Params.PubKeyHashAddrID: {}, // shared with regtest
-		SimNetParams.PubKeyHashAddrID:   {},
-	}
-
-	scriptHashAddrIDs = map[byte]struct{}{
-		MainNetParams.ScriptHashAddrID:  {},
-		TestNet3Params.ScriptHashAddrID: {}, // shared with regtest
-		SimNetParams.ScriptHashAddrID:   {},
-	}
-
-	// Testnet is shared with regtest.
-	hdPrivToPubKeyIDs = map[[4]byte][]byte{
-		MainNetParams.HDPrivateKeyID:  MainNetParams.HDPublicKeyID[:],
-		TestNet3Params.HDPrivateKeyID: TestNet3Params.HDPublicKeyID[:],
-		SimNetParams.HDPrivateKeyID:   SimNetParams.HDPublicKeyID[:],
-	}
+	registeredNets    = make(map[wire.BitcoinNet]struct{})
+	pubKeyHashAddrIDs = make(map[byte]struct{})
+	scriptHashAddrIDs = make(map[byte]struct{})
+	hdPrivToPubKeyIDs = make(map[[4]byte][]byte)
 )
 
 // Register registers the network parameters for a Bitcoin network.  This may
@@ -382,6 +361,14 @@ func Register(params *Params) error {
 	scriptHashAddrIDs[params.ScriptHashAddrID] = struct{}{}
 	hdPrivToPubKeyIDs[params.HDPrivateKeyID] = params.HDPublicKeyID[:]
 	return nil
+}
+
+// mustRegister performs the same function as Register except it panics if there
+// is an error.  This should only be called from package init functions.
+func mustRegister(params *Params) {
+	if err := Register(params); err != nil {
+		panic("failed to register network: " + err.Error())
+	}
 }
 
 // IsPubKeyHashAddrID returns whether the id is an identifier known to prefix a
@@ -441,4 +428,12 @@ func newShaHashFromStr(hexStr string) *wire.ShaHash {
 		panic(err)
 	}
 	return sha
+}
+
+func init() {
+	// Register all default networks when the package is initialized.
+	mustRegister(&MainNetParams)
+	mustRegister(&TestNet3Params)
+	mustRegister(&RegressionNetParams)
+	mustRegister(&SimNetParams)
 }

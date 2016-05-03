@@ -1,4 +1,4 @@
-// Copyright (c) 2013 The btcsuite developers
+// Copyright (c) 2013-2016 The btcsuite developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -12,7 +12,6 @@ import (
 	"github.com/btcsuite/btcd/blockchain"
 	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/btcsuite/btcd/database"
-	_ "github.com/btcsuite/btcd/database/ldb"
 	"github.com/btcsuite/btcd/wire"
 )
 
@@ -23,16 +22,12 @@ var (
 )
 
 // loadBlockDB opens the block database and returns a handle to it.
-func loadBlockDB() (database.Db, error) {
+func loadBlockDB() (database.DB, error) {
 	// The database name is based on the database type.
-	dbType := cfg.DbType
-	dbName := blockDbNamePrefix + "_" + dbType
-	if dbType == "sqlite" {
-		dbName = dbName + ".db"
-	}
+	dbName := blockDbNamePrefix + "_" + cfg.DbType
 	dbPath := filepath.Join(cfg.DataDir, dbName)
 	fmt.Printf("Loading block database from '%s'\n", dbPath)
-	db, err := database.OpenDB(dbType, dbPath)
+	db, err := database.Open(cfg.DbType, dbPath, activeNetParams.Net)
 	if err != nil {
 		return nil, err
 	}
@@ -44,16 +39,14 @@ func loadBlockDB() (database.Db, error) {
 // candidates at the last checkpoint that is already hard coded into btcchain
 // since there is no point in finding candidates before already existing
 // checkpoints.
-func findCandidates(db database.Db, latestHash *wire.ShaHash) ([]*chaincfg.Checkpoint, error) {
+func findCandidates(chain *blockchain.BlockChain, latestHash *wire.ShaHash) ([]*chaincfg.Checkpoint, error) {
 	// Start with the latest block of the main chain.
-	block, err := db.FetchBlockBySha(latestHash)
+	block, err := chain.BlockByHash(latestHash)
 	if err != nil {
 		return nil, err
 	}
 
-	// Setup chain and get the latest checkpoint.  Ignore notifications
-	// since they aren't needed for this util.
-	chain := blockchain.New(db, activeNetParams, nil, nil)
+	// Get the latest known checkpoint.
 	latestCheckpoint := chain.LatestCheckpoint()
 	if latestCheckpoint == nil {
 		// Set the latest checkpoint to the genesis block if there isn't
@@ -115,7 +108,7 @@ func findCandidates(db database.Db, latestHash *wire.ShaHash) ([]*chaincfg.Check
 		}
 
 		prevHash := &block.MsgBlock().Header.PrevBlock
-		block, err = db.FetchBlockBySha(prevHash)
+		block, err = chain.BlockByHash(prevHash)
 		if err != nil {
 			return nil, err
 		}
@@ -155,17 +148,24 @@ func main() {
 	}
 	defer db.Close()
 
-	// Get the latest block hash and height from the database and report
-	// status.
-	latestHash, height, err := db.NewestSha()
+	// Setup chain.  Ignore notifications since they aren't needed for this
+	// util.
+	chain, err := blockchain.New(&blockchain.Config{
+		DB:          db,
+		ChainParams: activeNetParams,
+	})
 	if err != nil {
-		fmt.Fprintln(os.Stderr, err)
+		fmt.Fprintf(os.Stderr, "failed to initialize chain: %v\n", err)
 		return
 	}
-	fmt.Printf("Block database loaded with block height %d\n", height)
+
+	// Get the latest block hash and height from the database and report
+	// status.
+	best := chain.BestSnapshot()
+	fmt.Printf("Block database loaded with block height %d\n", best.Height)
 
 	// Find checkpoint candidates.
-	candidates, err := findCandidates(db, latestHash)
+	candidates, err := findCandidates(chain, best.Hash)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "Unable to identify candidates:", err)
 		return

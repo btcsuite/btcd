@@ -2,13 +2,12 @@
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
-package chaincfg_test
+package chaincfg
 
 import (
 	"bytes"
 	"testing"
 
-	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/davecgh/go-spew/spew"
 )
 
@@ -17,7 +16,7 @@ import (
 func TestGenesisBlock(t *testing.T) {
 	// Encode the genesis block to raw bytes.
 	var buf bytes.Buffer
-	err := chaincfg.MainNetParams.GenesisBlock.Serialize(&buf)
+	err := MainNetParams.GenesisBlock.Serialize(&buf)
 	if err != nil {
 		t.Fatalf("TestGenesisBlock: %v", err)
 	}
@@ -30,11 +29,11 @@ func TestGenesisBlock(t *testing.T) {
 	}
 
 	// Check hash of the block against expected hash.
-	hash := chaincfg.MainNetParams.GenesisBlock.BlockSha()
-	if !chaincfg.MainNetParams.GenesisHash.IsEqual(&hash) {
+	hash := MainNetParams.GenesisBlock.BlockSha()
+	if !MainNetParams.GenesisHash.IsEqual(&hash) {
 		t.Fatalf("TestGenesisBlock: Genesis block hash does not "+
 			"appear valid - got %v, want %v", spew.Sdump(hash),
-			spew.Sdump(chaincfg.MainNetParams.GenesisHash))
+			spew.Sdump(MainNetParams.GenesisHash))
 	}
 }
 
@@ -43,7 +42,7 @@ func TestGenesisBlock(t *testing.T) {
 func TestRegTestGenesisBlock(t *testing.T) {
 	// Encode the genesis block to raw bytes.
 	var buf bytes.Buffer
-	err := chaincfg.RegressionNetParams.GenesisBlock.Serialize(&buf)
+	err := RegressionNetParams.GenesisBlock.Serialize(&buf)
 	if err != nil {
 		t.Fatalf("TestRegTestGenesisBlock: %v", err)
 	}
@@ -57,11 +56,11 @@ func TestRegTestGenesisBlock(t *testing.T) {
 	}
 
 	// Check hash of the block against expected hash.
-	hash := chaincfg.RegressionNetParams.GenesisBlock.BlockSha()
-	if !chaincfg.RegressionNetParams.GenesisHash.IsEqual(&hash) {
+	hash := RegressionNetParams.GenesisBlock.BlockSha()
+	if !RegressionNetParams.GenesisHash.IsEqual(&hash) {
 		t.Fatalf("TestRegTestGenesisBlock: Genesis block hash does "+
 			"not appear valid - got %v, want %v", spew.Sdump(hash),
-			spew.Sdump(chaincfg.RegressionNetParams.GenesisHash))
+			spew.Sdump(RegressionNetParams.GenesisHash))
 	}
 }
 
@@ -70,7 +69,7 @@ func TestRegTestGenesisBlock(t *testing.T) {
 func TestTestNet3GenesisBlock(t *testing.T) {
 	// Encode the genesis block to raw bytes.
 	var buf bytes.Buffer
-	err := chaincfg.TestNet3Params.GenesisBlock.Serialize(&buf)
+	err := TestNet3Params.GenesisBlock.Serialize(&buf)
 	if err != nil {
 		t.Fatalf("TestTestNet3GenesisBlock: %v", err)
 	}
@@ -84,11 +83,11 @@ func TestTestNet3GenesisBlock(t *testing.T) {
 	}
 
 	// Check hash of the block against expected hash.
-	hash := chaincfg.TestNet3Params.GenesisBlock.BlockSha()
-	if !chaincfg.TestNet3Params.GenesisHash.IsEqual(&hash) {
+	hash := TestNet3Params.GenesisBlock.BlockSha()
+	if !TestNet3Params.GenesisHash.IsEqual(&hash) {
 		t.Fatalf("TestTestNet3GenesisBlock: Genesis block hash does "+
 			"not appear valid - got %v, want %v", spew.Sdump(hash),
-			spew.Sdump(chaincfg.TestNet3Params.GenesisHash))
+			spew.Sdump(TestNet3Params.GenesisHash))
 	}
 }
 
@@ -97,7 +96,7 @@ func TestTestNet3GenesisBlock(t *testing.T) {
 func TestSimNetGenesisBlock(t *testing.T) {
 	// Encode the genesis block to raw bytes.
 	var buf bytes.Buffer
-	err := chaincfg.SimNetParams.GenesisBlock.Serialize(&buf)
+	err := SimNetParams.GenesisBlock.Serialize(&buf)
 	if err != nil {
 		t.Fatalf("TestSimNetGenesisBlock: %v", err)
 	}
@@ -111,11 +110,11 @@ func TestSimNetGenesisBlock(t *testing.T) {
 	}
 
 	// Check hash of the block against expected hash.
-	hash := chaincfg.SimNetParams.GenesisBlock.BlockSha()
-	if !chaincfg.SimNetParams.GenesisHash.IsEqual(&hash) {
+	hash := SimNetParams.GenesisBlock.BlockSha()
+	if !SimNetParams.GenesisHash.IsEqual(&hash) {
 		t.Fatalf("TestSimNetGenesisBlock: Genesis block hash does "+
 			"not appear valid - got %v, want %v", spew.Sdump(hash),
-			spew.Sdump(chaincfg.SimNetParams.GenesisHash))
+			spew.Sdump(SimNetParams.GenesisHash))
 	}
 }
 

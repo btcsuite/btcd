@@ -1,4 +1,4 @@
-// Copyright (c) 2013-2014 The btcsuite developers
+// Copyright (c) 2013-2016 The btcsuite developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -13,6 +13,7 @@ import (
 	"runtime"
 	"runtime/pprof"
 
+	"github.com/btcsuite/btcd/blockchain/indexers"
 	"github.com/btcsuite/btcd/limits"
 )
 
@@ -81,22 +82,32 @@ func btcdMain(serverChan chan<- *server) error {
 	}
 	defer db.Close()
 
-	if cfg.DropAddrIndex {
-		btcdLog.Info("Deleting entire addrindex.")
-		err := db.DeleteAddrIndex()
-		if err != nil {
-			btcdLog.Errorf("Unable to delete the addrindex: %v", err)
-			return err
-		}
-		btcdLog.Info("Successfully deleted addrindex, exiting")
-		return nil
-	}
-
 	// Ensure the database is sync'd and closed on Ctrl+C.
 	addInterruptHandler(func() {
 		btcdLog.Infof("Gracefully shutting down the database...")
-		db.RollbackClose()
+		db.Close()
 	})
+
+	// Drop indexes and exit if requested.
+	//
+	// NOTE: The order is important here because dropping the tx index also
+	// drops the address index since it relies on it.
+	if cfg.DropAddrIndex {
+		if err := indexers.DropAddrIndex(db); err != nil {
+			btcdLog.Errorf("%v", err)
+			return err
+		}
+
+		return nil
+	}
+	if cfg.DropTxIndex {
+		if err := indexers.DropTxIndex(db); err != nil {
+			btcdLog.Errorf("%v", err)
+			return err
+		}
+
+		return nil
+	}
 
 	// Create server and start it.
 	server, err := newServer(cfg.Listeners, db, activeNetParams.Params)
