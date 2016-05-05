@@ -14,6 +14,7 @@ import (
 	"math/big"
 	"sort"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/decred/dcrd/blockchain"
@@ -142,6 +143,9 @@ type VoteTx struct {
 // blocks and relayed to other peers.  It is safe for concurrent access from
 // multiple peers.
 type txMemPool struct {
+	// The following variables must only be used atomically.
+	lastUpdated int64 // last time pool was updated.
+
 	sync.RWMutex
 	server        *server
 	pool          map[chainhash.Hash]*TxDesc
@@ -154,9 +158,8 @@ type txMemPool struct {
 	votes    map[chainhash.Hash][]*VoteTx
 	votesMtx sync.Mutex
 
-	lastUpdated   time.Time // last time pool was updated.
-	pennyTotal    float64   // exponentially decaying total for penny spends.
-	lastPennyUnix int64     // unix time of last ``penny spend''
+	pennyTotal    float64 // exponentially decaying total for penny spends.
+	lastPennyUnix int64   // unix time of last ``penny spend''
 }
 
 // insertVote inserts a vote into the map of block votes.
@@ -767,7 +770,7 @@ func (mp *txMemPool) removeTransaction(tx *dcrutil.Tx, removeRedeemers bool) {
 			delete(mp.outpoints, txIn.PreviousOutPoint)
 		}
 		delete(mp.pool, *txHash)
-		mp.lastUpdated = time.Now()
+		atomic.StoreInt64(&mp.lastUpdated, time.Now().Unix())
 	}
 
 	// Remove the transaction and its addresses from the address index.
@@ -831,7 +834,7 @@ func (mp *txMemPool) addTransaction(
 	for _, txIn := range tx.MsgTx().TxIn {
 		mp.outpoints[txIn.PreviousOutPoint] = tx
 	}
-	mp.lastUpdated = time.Now()
+	atomic.StoreInt64(&mp.lastUpdated, time.Now().Unix())
 }
 
 // fetchReferencedOutputScripts looks up and returns all the scriptPubKeys
@@ -1557,7 +1560,7 @@ func (mp *txMemPool) maybeAcceptTransaction(tx *dcrutil.Tx, isNew,
 
 		// Potentially notify any getblocktemplate long poll clients
 		// about stale block templates due to the new transaction.
-		mp.server.rpcServer.gbtWorkState.NotifyMempoolTx(mp.lastUpdated)
+		mp.server.rpcServer.gbtWorkState.NotifyMempoolTx(mp.LastUpdated())
 	}
 
 	return nil, nil
@@ -1858,10 +1861,7 @@ func (mp *txMemPool) TxDescs() []*TxDesc {
 //
 // This function is safe for concurrent access.
 func (mp *txMemPool) LastUpdated() time.Time {
-	mp.RLock()
-	defer mp.RUnlock()
-
-	return mp.lastUpdated
+	return time.Unix(atomic.LoadInt64(&mp.lastUpdated), 0)
 }
 
 // CheckIfTxsExist checks a list of transaction hashes against the mempool
