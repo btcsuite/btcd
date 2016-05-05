@@ -16,6 +16,10 @@ var interruptChannel chan os.Signal
 // to be invoked on SIGINT (Ctrl+C) signals.
 var addHandlerChannel = make(chan func())
 
+// signals defines the default signals to catch in order to do a proper
+// shutdown.
+var signals = []os.Signal{os.Interrupt}
+
 // mainInterruptHandler listens for SIGINT (Ctrl+C) signals on the
 // interruptChannel and invokes the registered interruptCallbacks accordingly.
 // It also listens for callback registration.  It must be run as a goroutine.
@@ -32,16 +36,17 @@ func mainInterruptHandler() {
 
 	for {
 		select {
-		case <-interruptChannel:
+		case sig := <-interruptChannel:
 			// Ignore more than one shutdown signal.
 			if isShutdown {
-				btcdLog.Infof("Received SIGINT (Ctrl+C).  " +
-					"Already shutting down...")
+				btcdLog.Infof("Received signal (%s).  "+
+					"Already shutting down...", sig)
 				continue
 			}
 
 			isShutdown = true
-			btcdLog.Infof("Received SIGINT (Ctrl+C).  Shutting down...")
+			btcdLog.Infof("Received signal (%s).  Shutting down...",
+				sig)
 
 			// Run handlers in LIFO order.
 			for i := range interruptCallbacks {
@@ -74,7 +79,7 @@ func addInterruptHandler(handler func()) {
 	// all other callbacks and exits if not already done.
 	if interruptChannel == nil {
 		interruptChannel = make(chan os.Signal, 1)
-		signal.Notify(interruptChannel, os.Interrupt)
+		signal.Notify(interruptChannel, signals...)
 		go mainInterruptHandler()
 	}
 
