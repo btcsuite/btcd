@@ -1138,6 +1138,7 @@ func NewBlockTemplate(mempool *txMemPool,
 	prevHash := chainState.newestHash
 	nextBlockHeight := chainState.newestHeight + 1
 	poolSize := chainState.nextPoolSize
+	requiredStakeDifficulty := chainState.nextStakeDifficulty
 	finalState := chainState.nextFinalState
 	winningTickets := make([]chainhash.Hash, len(chainState.winningTickets),
 		len(chainState.winningTickets))
@@ -1206,14 +1207,6 @@ func NewBlockTemplate(mempool *txMemPool,
 				}
 			}
 		}
-	}
-
-	// Get the next required stake difficulty so we can determine SStx
-	// eligibility.
-	requiredStakeDifficulty, err := blockManager.CalcNextRequiredStakeDifficulty()
-	if err != nil {
-		return nil, miningRuleError(ErrGetStakeDifficulty, "couldn't get "+
-			"stake difficulty")
 	}
 
 	// Get the current memory pool transactions and create a priority queue

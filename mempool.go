@@ -1260,10 +1260,24 @@ func (mp *txMemPool) maybeAcceptTransaction(tx *dcrutil.Tx, isNew,
 		}
 	}
 
-	isSSGen, _ := stake.IsSSGen(tx)
-	isSSRtx, _ := stake.IsSSRtx(tx)
-	if isSSGen || isSSRtx {
-		if isSSGen {
+	// If the transaction is a ticket, ensure that it meets the next
+	// stake difficulty.
+	if txType == stake.TxTypeSStx {
+		mp.server.blockManager.chainState.Lock()
+		sDiff := mp.server.blockManager.chainState.nextStakeDifficulty
+		mp.server.blockManager.chainState.Unlock()
+
+		if tx.MsgTx().TxOut[0].Value < sDiff {
+			str := fmt.Sprintf("transaction %v has not enough funds "+
+				"to meet stake difficuly (ticket diff %v < next diff %v)",
+				txHash, tx.MsgTx().TxOut[0].Value, sDiff)
+			return nil, txRuleError(wire.RejectInsufficientFee, str)
+		}
+	}
+
+	// Handle stake transaction double spending exceptions.
+	if (txType == stake.TxTypeSSGen) || (txType == stake.TxTypeSSRtx) {
+		if txType == stake.TxTypeSSGen {
 			ssGenAlreadyFound := 0
 			for _, mpTx := range mp.pool {
 				if mpTx.GetType() == stake.TxTypeSSGen {
@@ -1282,7 +1296,7 @@ func (mp *txMemPool) maybeAcceptTransaction(tx *dcrutil.Tx, isNew,
 			}
 		}
 
-		if isSSRtx {
+		if txType == stake.TxTypeSSRtx {
 			for _, mpTx := range mp.pool {
 				if mpTx.GetType() == stake.TxTypeSSRtx {
 					if mpTx.Tx.MsgTx().TxIn[0].PreviousOutPoint ==
@@ -1388,7 +1402,8 @@ func (mp *txMemPool) maybeAcceptTransaction(tx *dcrutil.Tx, isNew,
 	// the coinbase address itself can contain signature operations, the
 	// maximum allowed signature operations per transaction is less than
 	// the maximum allowed signature operations per block.
-	numSigOps, err := blockchain.CountP2SHSigOps(tx, false, isSSGen, txStore)
+	numSigOps, err := blockchain.CountP2SHSigOps(tx, false,
+		(txType == stake.TxTypeSSGen), txStore)
 	if err != nil {
 		if cerr, ok := err.(blockchain.RuleError); ok {
 			return nil, chainRuleError(cerr)
@@ -1396,7 +1411,7 @@ func (mp *txMemPool) maybeAcceptTransaction(tx *dcrutil.Tx, isNew,
 		return nil, err
 	}
 
-	numSigOps += blockchain.CountSigOps(tx, false, isSSGen)
+	numSigOps += blockchain.CountSigOps(tx, false, (txType == stake.TxTypeSSGen))
 	if numSigOps > maxSigOpsPerTx {
 		str := fmt.Sprintf("transaction %v has too many sigops: %d > %d",
 			txHash, numSigOps, maxSigOpsPerTx)

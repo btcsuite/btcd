@@ -469,15 +469,16 @@ type headerNode struct {
 // is inserted and protecting it with a mutex.
 type chainState struct {
 	sync.Mutex
-	newestHash        *chainhash.Hash
-	newestHeight      int64
-	nextFinalState    [6]byte
-	nextPoolSize      uint32
-	winningTickets    []chainhash.Hash
-	missedTickets     []chainhash.Hash
-	curBlockHeader    *wire.BlockHeader
-	pastMedianTime    time.Time
-	pastMedianTimeErr error
+	newestHash          *chainhash.Hash
+	newestHeight        int64
+	nextFinalState      [6]byte
+	nextPoolSize        uint32
+	nextStakeDifficulty int64
+	winningTickets      []chainhash.Hash
+	missedTickets       []chainhash.Hash
+	curBlockHeader      *wire.BlockHeader
+	pastMedianTime      time.Time
+	pastMedianTimeErr   error
 }
 
 // Best returns the block hash and height known for the tip of the best known
@@ -609,6 +610,7 @@ func (b *blockManager) updateChainState(newestHash *chainhash.Hash,
 	newestHeight int64,
 	finalState [6]byte,
 	poolSize uint32,
+	nextStakeDiff int64,
 	winningTickets []chainhash.Hash,
 	missedTickets []chainhash.Hash,
 	curBlockHeader *wire.BlockHeader) {
@@ -627,6 +629,7 @@ func (b *blockManager) updateChainState(newestHash *chainhash.Hash,
 
 	b.chainState.nextFinalState = finalState
 	b.chainState.nextPoolSize = poolSize
+	b.chainState.nextStakeDifficulty = nextStakeDiff
 	b.chainState.winningTickets = winningTickets
 	b.chainState.missedTickets = missedTickets
 	b.chainState.curBlockHeader = curBlockHeader
@@ -1330,32 +1333,31 @@ func (b *blockManager) handleBlockMsg(bmsg *blockMsg) {
 			// Retrieve the current block header.
 			curBlockHeader := b.blockChain.GetCurrentBlockHeader()
 
-			if r != nil {
+			nextStakeDiff, errSDiff :=
+				b.blockChain.CalcNextRequiredStakeDifficulty()
+			if errSDiff != nil {
+				bmgrLog.Warnf("Failed to get next stake difficulty "+
+					"calculation: %v", err)
+			}
+			if r != nil && errSDiff == nil {
 				// Update registered websocket clients on the
 				// current stake difficulty.
-				nextStakeDiff, err :=
-					b.blockChain.CalcNextRequiredStakeDifficulty()
-				if err != nil {
-					bmgrLog.Warnf("Failed to get next stake difficulty "+
-						"calculation: %v", err)
-
-				} else {
-					r.ntfnMgr.NotifyStakeDifficulty(
-						&StakeDifficultyNtfnData{
-							*newestSha,
-							newestHeight,
-							nextStakeDiff,
-						})
-					b.server.txMemPool.PruneStakeTx(nextStakeDiff,
-						b.chainState.newestHeight)
-					b.server.txMemPool.PruneExpiredTx(b.chainState.newestHeight)
-				}
+				r.ntfnMgr.NotifyStakeDifficulty(
+					&StakeDifficultyNtfnData{
+						*newestSha,
+						newestHeight,
+						nextStakeDiff,
+					})
+				b.server.txMemPool.PruneStakeTx(nextStakeDiff,
+					b.chainState.newestHeight)
+				b.server.txMemPool.PruneExpiredTx(b.chainState.newestHeight)
 			}
 
 			b.updateChainState(newestSha,
 				newestHeight,
 				lotteryData.finalState,
 				lotteryData.poolSize,
+				nextStakeDiff,
 				lotteryData.ntfnData.Tickets,
 				missedTickets,
 				curBlockHeader)
@@ -1888,27 +1890,26 @@ out:
 					}
 					b.blockLotteryDataCacheMutex.Unlock()
 
+					// Update registered websocket clients on the
+					// current stake difficulty.
+					nextStakeDiff, errSDiff :=
+						b.blockChain.CalcNextRequiredStakeDifficulty()
+					if err != nil {
+						bmgrLog.Warnf("Failed to get next stake difficulty "+
+							"calculation: %v", err)
+					}
 					r := b.server.rpcServer
-					if r != nil {
-						// Update registered websocket clients on the
-						// current stake difficulty.
-						nextStakeDiff, err :=
-							b.blockChain.CalcNextRequiredStakeDifficulty()
-						if err != nil {
-							bmgrLog.Warnf("Failed to get next stake difficulty "+
-								"calculation: %v", err)
-						} else {
-							r.ntfnMgr.NotifyStakeDifficulty(
-								&StakeDifficultyNtfnData{
-									*newestSha,
-									newestHeight,
-									nextStakeDiff,
-								})
-							b.server.txMemPool.PruneStakeTx(nextStakeDiff,
-								b.chainState.newestHeight)
-							b.server.txMemPool.PruneExpiredTx(
-								b.chainState.newestHeight)
-						}
+					if r != nil && errSDiff == nil {
+						r.ntfnMgr.NotifyStakeDifficulty(
+							&StakeDifficultyNtfnData{
+								*newestSha,
+								newestHeight,
+								nextStakeDiff,
+							})
+						b.server.txMemPool.PruneStakeTx(nextStakeDiff,
+							b.chainState.newestHeight)
+						b.server.txMemPool.PruneExpiredTx(
+							b.chainState.newestHeight)
 					}
 
 					missedTickets := b.blockChain.GetMissedTickets()
@@ -1919,6 +1920,7 @@ out:
 						newestHeight,
 						lotteryData.finalState,
 						lotteryData.poolSize,
+						nextStakeDiff,
 						lotteryData.ntfnData.Tickets,
 						missedTickets,
 						curBlockHeader)
@@ -2058,6 +2060,7 @@ out:
 						newestHeight,
 						lotteryData.finalState,
 						lotteryData.poolSize,
+						nextStakeDiff,
 						lotteryData.ntfnData.Tickets,
 						missedTickets,
 						curBlockHeader)
@@ -2928,13 +2931,18 @@ func newBlockManager(s *server) (*blockManager, error) {
 		return nil, err
 	}
 
-	// Retrieve the current block header.
+	// Retrieve the current block header and next stake difficulty.
 	curBlockHeader := bm.blockChain.GetCurrentBlockHeader()
+	nextStakeDiff, err := bm.blockChain.CalcNextRequiredStakeDifficulty()
+	if err != nil {
+		return nil, err
+	}
 
 	bm.updateChainState(newestHash,
 		height,
 		fs,
 		uint32(ps),
+		nextStakeDiff,
 		wt,
 		missedTickets,
 		curBlockHeader)
