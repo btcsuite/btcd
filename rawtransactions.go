@@ -432,15 +432,15 @@ func (r FutureCreateRawSSRtxResult) Receive() (*wire.MsgTx, error) {
 // function on the returned instance.
 //
 // See CreateRawSSRtx for the blocking version and more details.
-func (c *Client) CreateRawSSRtxAsync(inputs []dcrjson.TransactionInput) FutureCreateRawSSRtxResult {
-
-	cmd := dcrjson.NewCreateRawSSRtxCmd(inputs)
+func (c *Client) CreateRawSSRtxAsync(inputs []dcrjson.TransactionInput, fee dcrutil.Amount) FutureCreateRawSSRtxResult {
+	feeF64 := fee.ToCoin()
+	cmd := dcrjson.NewCreateRawSSRtxCmd(inputs, &feeF64)
 	return c.sendCmd(cmd)
 }
 
 // CreateRawSSRtx returns a new SSR transactionm (revoking an sstx).
-func (c *Client) CreateRawSSRtx(inputs []dcrjson.TransactionInput) (*wire.MsgTx, error) {
-	return c.CreateRawSSRtxAsync(inputs).Receive()
+func (c *Client) CreateRawSSRtx(inputs []dcrjson.TransactionInput, fee dcrutil.Amount) (*wire.MsgTx, error) {
+	return c.CreateRawSSRtxAsync(inputs, fee).Receive()
 }
 
 // FutureSendRawTransactionResult is a future promise to deliver the result
