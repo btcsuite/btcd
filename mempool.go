@@ -18,7 +18,6 @@ import (
 
 	"github.com/decred/dcrd/blockchain"
 	"github.com/decred/dcrd/blockchain/stake"
-	"github.com/decred/dcrd/chaincfg"
 	"github.com/decred/dcrd/chaincfg/chainhash"
 	"github.com/decred/dcrd/database"
 	"github.com/decred/dcrd/txscript"
@@ -73,24 +72,17 @@ const (
 	// in a multi-signature transaction output script for it to be
 	// considered standard.
 	maxStandardMultiSigKeys = 3
-	// minTxRelayFeeMainNet is the minimum fee in atoms that is required for a
+
+	// minTxRelayFee is the minimum fee in atoms that is required for a
 	// transaction to be treated as free for relay and mining purposes.  It
 	// is also used to help determine if a transaction is considered dust
 	// and as a base for calculating minimum required fees per KB for larger
 	// transactions.  This value is in Atom/1000 bytes.
-	minTxRelayFeeMainNet = 1e6
-
-	// minTxRelayFeeTestNet is the minimum relay fee for the Test and Simulation
-	// networks.
-	minTxRelayFeeTestNet = 1e3
+	minTxRelayFee = 1e6
 
 	// minTicketFeeMainNet is the minimum fee per KB in atoms that is
 	// required for a ticket to enter the mempool on MainNet.
-	minTicketFeeMainNet = 1e6
-
-	// minTicketFeeTestNet is the minimum fee per KB in atoms that is
-	// required for a ticekt to enter the mempool on TestNet or SimNet.
-	minTicketFeeTestNet = 1e3
+	minTicketFee = 1e6
 
 	// maxRelayFeeMultiplier is the factor that we disallow fees / kb above
 	// the minimum tx fee.
@@ -479,16 +471,6 @@ func (mp *txMemPool) checkTransactionStandard(tx *dcrutil.Tx, txType stake.TxTyp
 			}
 			str := fmt.Sprintf("transaction output %d: %v", i, err)
 			return txRuleError(rejectCode, str)
-		}
-
-		var minTxRelayFee dcrutil.Amount
-		switch {
-		case mp.server.chainParams == &chaincfg.MainNetParams:
-			minTxRelayFee = minTxRelayFeeMainNet
-		case mp.server.chainParams == &chaincfg.MainNetParams:
-			minTxRelayFee = minTxRelayFeeTestNet
-		default:
-			minTxRelayFee = minTxRelayFeeTestNet
 		}
 
 		// Accumulate the number of outputs which only carry data.  For
@@ -1411,16 +1393,6 @@ func (mp *txMemPool) maybeAcceptTransaction(tx *dcrutil.Tx, isNew,
 		return nil, txRuleError(wire.RejectNonstandard, str)
 	}
 
-	var minRelayTxFee dcrutil.Amount
-	switch {
-	case mp.server.chainParams == &chaincfg.MainNetParams:
-		minRelayTxFee = minTxRelayFeeMainNet
-	case mp.server.chainParams == &chaincfg.TestNetParams:
-		minRelayTxFee = minTxRelayFeeTestNet
-	default:
-		minRelayTxFee = minTxRelayFeeTestNet
-	}
-
 	// Don't allow transactions with fees too low to get into a mined block.
 	//
 	// Most miners allow a free transaction area in blocks they mine to go
@@ -1434,7 +1406,7 @@ func (mp *txMemPool) maybeAcceptTransaction(tx *dcrutil.Tx, isNew,
 	// high-priority transactions, don't require a fee for it.
 	// This applies to non-stake transactions only.
 	serializedSize := int64(tx.MsgTx().SerializeSize())
-	minFee := calcMinRequiredTxRelayFee(serializedSize, int64(minRelayTxFee))
+	minFee := calcMinRequiredTxRelayFee(serializedSize, minTxRelayFee)
 	if txType == stake.TxTypeRegular { // Non-stake only
 		if serializedSize >= (defaultBlockPrioritySize-1000) && txFee < minFee {
 			str := fmt.Sprintf("transaction %v has %v fees which is under "+
@@ -1496,17 +1468,7 @@ func (mp *txMemPool) maybeAcceptTransaction(tx *dcrutil.Tx, isNew,
 	// difficulty and generally a window in which they expire.
 	//
 	// This applies to tickets transactions only.
-	var ticketFeeThreshold int64
-	switch {
-	case mp.server.chainParams == &chaincfg.MainNetParams:
-		ticketFeeThreshold = minTicketFeeMainNet
-	case mp.server.chainParams == &chaincfg.TestNetParams:
-		ticketFeeThreshold = minTicketFeeTestNet
-	default:
-		ticketFeeThreshold = minTicketFeeTestNet
-	}
-
-	minTicketFee := calcMinRequiredTxRelayFee(serializedSize, ticketFeeThreshold)
+	minTicketFee := calcMinRequiredTxRelayFee(serializedSize, minTicketFee)
 	if (txFee < minTicketFee) && txType == stake.TxTypeSStx {
 		str := fmt.Sprintf("transaction %v has a %v fee which "+
 			"is under the required threshold amount of %d", txHash, txFee,
@@ -1520,7 +1482,7 @@ func (mp *txMemPool) maybeAcceptTransaction(tx *dcrutil.Tx, isNew,
 	// then they can AllowHighFees = true
 	if !allowHighFees {
 		maxFee := calcMinRequiredTxRelayFee(serializedSize*maxRelayFeeMultiplier,
-			int64(minRelayTxFee))
+			minTxRelayFee)
 		if txFee > maxFee {
 			err = fmt.Errorf("transaction %v has %v fee which is above the "+
 				"allowHighFee check threshold amount of %v", txHash,

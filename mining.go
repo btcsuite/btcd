@@ -1412,15 +1412,6 @@ mempoolLoop:
 	// release should fix it. TODO
 	blockSigOps := int64(0)
 	totalFees := int64(0)
-	var minTxRelayFee dcrutil.Amount
-	switch {
-	case mempool.server.chainParams == &chaincfg.MainNetParams:
-		minTxRelayFee = minTxRelayFeeMainNet
-	case mempool.server.chainParams == &chaincfg.MainNetParams:
-		minTxRelayFee = minTxRelayFeeTestNet
-	default:
-		minTxRelayFee = minTxRelayFeeTestNet
-	}
 
 	numSStx := 0
 
@@ -1540,7 +1531,7 @@ mempoolLoop:
 
 		// Skip free transactions once the block is larger than the
 		// minimum block size, except for stake transactions.
-		if sortedByFee && (prioItem.feePerKB < float64(minTxRelayFee)) &&
+		if sortedByFee && (prioItem.feePerKB < minTxRelayFee) &&
 			(tx.Tree() != dcrutil.TxTreeStake) &&
 			(blockPlusTxSize >= cfg.BlockMinSize) {
 

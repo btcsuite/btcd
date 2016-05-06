@@ -3507,15 +3507,6 @@ func handleGetInfo(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (in
 		context := "Failed to get block"
 		return nil, internalRPCError(err.Error(), context)
 	}
-	var minTxRelayFee dcrutil.Amount
-	switch {
-	case s.server.chainParams == &chaincfg.MainNetParams:
-		minTxRelayFee = minTxRelayFeeMainNet
-	case s.server.chainParams == &chaincfg.MainNetParams:
-		minTxRelayFee = minTxRelayFeeTestNet
-	default:
-		minTxRelayFee = minTxRelayFeeTestNet
-	}
 
 	ret := &dcrjson.InfoChainResult{
 		Version:         int32(1000000*appMajor + 10000*appMinor + 100*appPatch),
@@ -3526,7 +3517,7 @@ func handleGetInfo(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (in
 		Proxy:           cfg.Proxy,
 		Difficulty:      getDifficultyRatio(blkHeader.Bits),
 		TestNet:         cfg.TestNet,
-		RelayFee:        float64(minTxRelayFee) / dcrutil.AtomsPerCoin,
+		RelayFee:        minTxRelayFee / dcrutil.AtomsPerCoin,
 	}
 
 	return ret, nil
