@@ -67,6 +67,20 @@ type txPriorityQueue struct {
 	items    []*txPrioItem
 }
 
+// Contains checks to see whether the passed txPrioItem currently exists within
+// the priority queue.
+func (pq *txPriorityQueue) Contains(prioItem *txPrioItem) bool {
+	itemHash := prioItem.tx.Sha()
+	for i := range pq.items {
+		thisItemHash := pq.items[i].tx.Sha()
+		if *itemHash == *thisItemHash {
+			return true
+		}
+	}
+
+	return false
+}
+
 // Len returns the number of items in the priority queue.  It is part of the
 // heap.Interface implementation.
 func (pq *txPriorityQueue) Len() int {
@@ -695,7 +709,7 @@ mempoolLoop:
 				// one.
 				item := e.Value.(*txPrioItem)
 				delete(item.dependsOn, *tx.Sha())
-				if len(item.dependsOn) == 0 {
+				if len(item.dependsOn) == 0 && !priorityQueue.Contains(item) {
 					heap.Push(priorityQueue, item)
 				}
 			}
