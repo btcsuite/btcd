@@ -1528,17 +1528,13 @@ func (tmdb *TicketDB) unpushMatureTicketsAtHeight(height int64) (SStxMemMap,
 	return tempTickets, nil
 }
 
-// RemoveBlockToHeight is the main work horse for removing blocks from the
+// removeBlockToHeight is the main work horse for removing blocks from the
 // TicketDB. This function will remove all blocks until reaching the block at
 // height.
 //
-// This function is safe for concurrent access.
-func (tmdb *TicketDB) RemoveBlockToHeight(height int64) (map[int64]SStxMemMap,
+// This function is unsafe for concurrent access.
+func (tmdb *TicketDB) removeBlockToHeight(height int64) (map[int64]SStxMemMap,
 	map[int64]SStxMemMap, map[int64]SStxMemMap, error) {
-
-	tmdb.mtx.Lock()
-	defer tmdb.mtx.Unlock()
-
 	if height < tmdb.StakeEnabledHeight {
 		return nil, nil, nil, fmt.Errorf("TicketDB Error: tried to remove " +
 			"blocks to before minimum maturation height!")
@@ -1588,6 +1584,17 @@ func (tmdb *TicketDB) RemoveBlockToHeight(height int64) (map[int64]SStxMemMap,
 	return unmaturedTicketMap, unrevokedTicketMap, unspentTicketMap, nil
 }
 
+// RemoveBlockToHeight is the exported version of removeBlockToHeight.
+//
+// This function is safe for concurrent access.
+func (tmdb *TicketDB) RemoveBlockToHeight(height int64) (map[int64]SStxMemMap,
+	map[int64]SStxMemMap, map[int64]SStxMemMap, error) {
+	tmdb.mtx.Lock()
+	defer tmdb.mtx.Unlock()
+
+	return tmdb.removeBlockToHeight(height)
+}
+
 // rescanTicketDB is the internal function which implements the public
 // RescanTicketDB.  See the comment for RescanTicketDB for more details.
 //
@@ -1603,6 +1610,83 @@ func (tmdb *TicketDB) rescanTicketDB() error {
 		return nil
 	}
 
+	// Find out what block the TMDB was previously synced to.
+	curTmdbHeight := tmdb.getTopBlock()
+
+	// If we're synced to some old height that the database
+	// already has, begin resyncing from this height instead
+	// of the genesis block.
+	if curTmdbHeight > 0 {
+		// The spent ticket map doesn't store the hashes of the
+		// blocks, so instead review the listed votes. The votes
+		// are dependent on the block hash of the previous block,
+		// so if they line up we know the previous block before
+		// curTmdbHeight is correct.
+		spentBl, _ := tmdb.maps.spentTicketMap[curTmdbHeight]
+		spendHashes := make(map[chainhash.Hash]struct{})
+		for _, td := range spentBl {
+			spendHashes[td.SpendHash] = struct{}{}
+		}
+
+		h, err := tmdb.database.FetchBlockShaByHeight(curTmdbHeight)
+		if err != nil {
+			return err
+		}
+
+		blCur, err := tmdb.database.FetchBlockBySha(h)
+		if err != nil {
+			return err
+		}
+
+		failedToFindBlock := false
+		for _, stx := range blCur.STransactions() {
+			if is, _ := IsSSGen(stx); is {
+				voteHash := stx.Sha()
+				_, ok := spendHashes[*voteHash]
+				if !ok {
+					failedToFindBlock = true
+				}
+			}
+		}
+
+		// We found a matching block in the database at
+		// curTmdbHeight-1, so sync to it.
+		if !failedToFindBlock {
+			log.Infof("Found a previously good height %v in the old "+
+				"stake database, attempting to sync to tip from it",
+				curTmdbHeight)
+
+			// Remove the top block.
+			_, _, _, err = tmdb.removeBlockToHeight(curTmdbHeight - 1)
+			if err != nil {
+				return err
+			}
+
+			// Reinsert the top block and sync to the best chain
+			// height.
+			for i := curTmdbHeight; i <= height; i++ {
+				h, err := tmdb.database.FetchBlockShaByHeight(i)
+				if err != nil {
+					return err
+				}
+
+				bl, err := tmdb.database.FetchBlockBySha(h)
+				if err != nil {
+					return err
+				}
+
+				_, _, _, err = tmdb.insertBlock(bl)
+				if err != nil {
+					return err
+				}
+			}
+
+			return nil
+		}
+	}
+
+	// We aren't able to resync from a previous height, so do the
+	// entire thing from the genesis block.
 	var freshTms TicketMaps
 	freshTms.ticketMap = make([]SStxMemMap, BucketsSize, BucketsSize)
 	freshTms.spentTicketMap = make(map[int64]SStxMemMap)
