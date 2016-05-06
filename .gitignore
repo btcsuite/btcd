@@ -17,6 +17,7 @@ btcd.db
 # Folders
 _obj
 _test
+vendor
 
 # Architecture specific extensions/prefixes
 *.[568vq]

@@ -6,10 +6,11 @@ sudo: false
 before_install:
   - gotools=golang.org/x/tools
 install:
-  - go get -d -t -v ./...
+  - go get -v github.com/Masterminds/glide
+  - glide install
   - go get -v $gotools/cmd/cover
-  - go get -v github.com/bradfitz/goimports
   - go get -v github.com/golang/lint/golint
 script:
   - export PATH=$PATH:$HOME/gopath/bin
+  - export GO15VENDOREXPERIMENT=1
   - ./goclean.sh
