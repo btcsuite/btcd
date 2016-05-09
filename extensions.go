@@ -105,26 +105,20 @@ type FutureEstimateStakeDiffResult chan *response
 
 // Receive waits for the response promised by the future and returns the hash
 // and height of the block in the longest (best) chain.
-func (r FutureEstimateStakeDiffResult) Receive() (dcrutil.Amount, error) {
+func (r FutureEstimateStakeDiffResult) Receive() (*dcrjson.EstimateStakeDiffResult, error) {
 	res, err := receiveFuture(r)
 	if err != nil {
-		return 0, err
+		return nil, err
 	}
 
 	// Unmarsal result as a estimatestakediff result object.
-	var est float64
+	var est dcrjson.EstimateStakeDiffResult
 	err = json.Unmarshal(res, &est)
 	if err != nil {
-		return 0, err
+		return nil, err
 	}
 
-	// Convert to amount.
-	amt, err := dcrutil.NewAmount(est)
-	if err != nil {
-		return 0, err
-	}
-
-	return amt, nil
+	return &est, nil
 }
 
 // EstimateStakeDiffAsync returns an instance of a type that can be used to get the
@@ -143,7 +137,7 @@ func (c *Client) EstimateStakeDiffAsync(tickets *uint32) FutureEstimateStakeDiff
 // difficulty.
 //
 // NOTE: This is a dcrd extension.
-func (c *Client) EstimateStakeDiff(tickets *uint32) (dcrutil.Amount, error) {
+func (c *Client) EstimateStakeDiff(tickets *uint32) (*dcrjson.EstimateStakeDiffResult, error) {
 	return c.EstimateStakeDiffAsync(tickets).Receive()
 }
 
