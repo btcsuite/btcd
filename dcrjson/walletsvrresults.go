@@ -57,26 +57,45 @@ type InfoWalletResult struct {
 	Errors          string  `json:"errors"`
 }
 
+// ListTransactionsTxType defines the type used in the listtransactions JSON-RPC
+// result for the TxType command field.
+type ListTransactionsTxType string
+
+const (
+	// LTTTRegular indicates a regular transaction.
+	LTTTRegular ListTransactionsTxType = "regular"
+
+	// LTTTTicket indicates a ticket.
+	LTTTTicket ListTransactionsTxType = "ticket"
+
+	// LTTTVote indicates a vote.
+	LTTTVote ListTransactionsTxType = "vote"
+
+	// LTTTRevocation indicates a revocation.
+	LTTTRevocation ListTransactionsTxType = "revocation"
+)
+
 // ListTransactionsResult models the data from the listtransactions command.
 type ListTransactionsResult struct {
-	Account           string   `json:"account"`
-	Address           string   `json:"address,omitempty"`
-	Amount            float64  `json:"amount"`
-	BlockHash         string   `json:"blockhash,omitempty"`
-	BlockIndex        *int64   `json:"blockindex,omitempty"`
-	BlockTime         int64    `json:"blocktime,omitempty"`
-	Category          string   `json:"category"`
-	Confirmations     int64    `json:"confirmations"`
-	Fee               *float64 `json:"fee,omitempty"`
-	Generated         bool     `json:"generated,omitempty"`
-	InvolvesWatchOnly bool     `json:"involveswatchonly,omitempty"`
-	Time              int64    `json:"time"`
-	TimeReceived      int64    `json:"timereceived"`
-	TxID              string   `json:"txid"`
-	Vout              uint32   `json:"vout"`
-	WalletConflicts   []string `json:"walletconflicts"`
-	Comment           string   `json:"comment,omitempty"`
-	OtherAccount      string   `json:"otheraccount,omitempty"`
+	Account           string                  `json:"account"`
+	Address           string                  `json:"address,omitempty"`
+	Amount            float64                 `json:"amount"`
+	BlockHash         string                  `json:"blockhash,omitempty"`
+	BlockIndex        *int64                  `json:"blockindex,omitempty"`
+	BlockTime         int64                   `json:"blocktime,omitempty"`
+	Category          string                  `json:"category"`
+	Confirmations     int64                   `json:"confirmations"`
+	Fee               *float64                `json:"fee,omitempty"`
+	Generated         bool                    `json:"generated,omitempty"`
+	InvolvesWatchOnly bool                    `json:"involveswatchonly,omitempty"`
+	Time              int64                   `json:"time"`
+	TimeReceived      int64                   `json:"timereceived"`
+	TxID              string                  `json:"txid"`
+	TxType            *ListTransactionsTxType `json:"txtype,omitempty"`
+	Vout              uint32                  `json:"vout"`
+	WalletConflicts   []string                `json:"walletconflicts"`
+	Comment           string                  `json:"comment,omitempty"`
+	OtherAccount      string                  `json:"otheraccount,omitempty"`
 }
 
 // ListReceivedByAccountResult models the data from the listreceivedbyaccount
