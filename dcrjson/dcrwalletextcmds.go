@@ -144,12 +144,14 @@ func NewCreateRawSSGenTxCmd(inputs []TransactionInput,
 // unmarshaling of createrawssrtx JSON RPC commands.
 type CreateRawSSRtxCmd struct {
 	Inputs []TransactionInput
+	Fee    *float64
 }
 
 // NewCreateRawSSRtxCmd creates a new CreateRawSSRtxCmd.
-func NewCreateRawSSRtxCmd(inputs []TransactionInput) *CreateRawSSRtxCmd {
+func NewCreateRawSSRtxCmd(inputs []TransactionInput, fee *float64) *CreateRawSSRtxCmd {
 	return &CreateRawSSRtxCmd{
 		Inputs: inputs,
+		Fee:    fee,
 	}
 }
 

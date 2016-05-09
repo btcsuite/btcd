@@ -79,6 +79,7 @@ var helpDescsEnUS = map[string]string{
 		"The signrawtransaction RPC command provided by wallet must be used to sign the resulting transaction.",
 	"createrawssrtx--result0": "Hex-encoded bytes of the serialized transaction",
 	"createrawssrtx-inputs":   "The inputs to the transaction of type sstxinput",
+	"createrawssrtx-fee":      "The fee to apply to the revocation in Coins",
 
 	// CreateRawTransactionCmd help.
 	"createrawtransaction--synopsis": "Returns a new transaction spending the provided inputs and sending to the provided addresses.\n" +

@@ -1111,6 +1111,19 @@ func handleCreateRawSSRtx(s *rpcServer,
 		}
 	}
 
+	// Decode the fee as coins.
+	var feeAmt dcrutil.Amount
+	if c.Fee != nil {
+		var err error
+		feeAmt, err = dcrutil.NewAmount(*c.Fee)
+		if err != nil {
+			return nil, dcrjson.RPCError{
+				Code:    dcrjson.ErrRPCInvalidParameter,
+				Message: "Invalid fee amount given",
+			}
+		}
+	}
+
 	// 1. Fetch the SStx, then calculate all the values we'll need later for
 	// the generation of the SSGen tx outputs.
 	//
@@ -1188,8 +1201,14 @@ func handleCreateRawSSRtx(s *rpcServer,
 
 	// 3. Add all the OP_SSRTX tagged outputs.
 
+	// Calculate the output values from this data.
+	ssrtxCalcAmts := stake.GetStakeRewards(sstxAmts,
+		sstxmtx.TxOut[0].Value,
+		0) // No subsidy for a revocation
+
 	// Add all the SSRtx-tagged transaction outputs to the transaction after
 	// performing some validity checks.
+	feeApplied := false
 	for i, ssrtxPkh := range ssrtxPkhs {
 		// Ensure amount is in the valid range for monetary amounts.
 		if sstxAmts[i] <= 0 || sstxAmts[i] > dcrutil.MaxAmount {
@@ -1226,7 +1245,12 @@ func handleCreateRawSSRtx(s *rpcServer,
 		}
 
 		// Add the txout to our SSGen tx.
-		txOut := wire.NewTxOut(sstxAmts[i], ssrtxOutScript)
+		amt := ssrtxCalcAmts[i]
+		if !feeApplied && int64(feeAmt) < amt {
+			amt -= int64(feeAmt)
+			feeApplied = true
+		}
+		txOut := wire.NewTxOut(amt, ssrtxOutScript)
 		mtx.AddTxOut(txOut)
 	}
 
@@ -1234,9 +1258,6 @@ func handleCreateRawSSRtx(s *rpcServer,
 	ssrtxTx := dcrutil.NewTx(mtx)
 	_, err = stake.IsSSRtx(ssrtxTx)
 	if err != nil {
-		//mtxHex, err := messageToHex(mtx)
-		//str := fmt.Sprintf("raw ssrtx tx output: %v", mtxHex)
-		//panic(str)
 		return nil, err
 	}
 
