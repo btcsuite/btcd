@@ -763,25 +763,45 @@ func (c *Client) PurchaseTicketAsync(fromAccount string,
 	spendLimit dcrutil.Amount, minConf *int, ticketAddress dcrutil.Address,
 	numTickets *int, poolAddress dcrutil.Address, poolFees *dcrutil.Amount,
 	expiry *int) FuturePurchaseTicketResult {
-	// Parse the addresses into pointers to strings
-	// for the purpose of the command.
-	var ticketAddrStrPtr *string
+	// An empty string is used to keep the sendCmd
+	// passing of the command from accidentally
+	// removing certain fields. We fill in the
+	// default values of the other arguments as
+	// well for the same reason.
+
+	minConfVal := 1
+	if minConf != nil {
+		minConfVal = *minConf
+	}
+
+	ticketAddrStr := ""
 	if ticketAddress != nil {
-		ticketAddrStr := ticketAddress.EncodeAddress()
-		ticketAddrStrPtr = &ticketAddrStr
+		ticketAddrStr = ticketAddress.EncodeAddress()
 	}
 
-	var poolAddrStrPtr *string
+	numTicketsVal := 1
+	if numTickets != nil {
+		numTicketsVal = *numTickets
+	}
+
+	poolAddrStr := ""
 	if poolAddress != nil {
-		poolAddrStr := poolAddress.EncodeAddress()
-		poolAddrStrPtr = &poolAddrStr
+		poolAddrStr = poolAddress.EncodeAddress()
 	}
 
-	poolFeesFloat := poolFees.ToCoin()
+	poolFeesFloat := 0.0
+	if poolFees != nil {
+		poolFeesFloat = poolFees.ToCoin()
+	}
+
+	expiryVal := 0
+	if expiry != nil {
+		expiryVal = *expiry
+	}
 
 	cmd := dcrjson.NewPurchaseTicketCmd(fromAccount, spendLimit.ToCoin(),
-		minConf, ticketAddrStrPtr, numTickets, poolAddrStrPtr, &poolFeesFloat,
-		expiry, nil)
+		&minConfVal, &ticketAddrStr, &numTicketsVal, &poolAddrStr,
+		&poolFeesFloat, &expiryVal, nil)
 
 	return c.sendCmd(cmd)
 }
