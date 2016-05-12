@@ -20,6 +20,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/btcsuite/btcd/connmgr"
 	"github.com/btcsuite/btcd/database"
 	_ "github.com/btcsuite/btcd/database/ffldb"
 	"github.com/btcsuite/btcd/mempool"
@@ -860,7 +861,7 @@ func loadConfig() (*config, []string, error) {
 		cfg.dial = proxy.Dial
 		if !cfg.NoOnion {
 			cfg.lookup = func(host string) ([]net.IP, error) {
-				return torLookupIP(host, cfg.Proxy)
+				return connmgr.TorLookupIP(host, cfg.Proxy)
 			}
 		}
 	}
@@ -900,7 +901,7 @@ func loadConfig() (*config, []string, error) {
 			return proxy.Dial(a, b)
 		}
 		cfg.onionlookup = func(host string) ([]net.IP, error) {
-			return torLookupIP(host, cfg.OnionProxy)
+			return connmgr.TorLookupIP(host, cfg.OnionProxy)
 		}
 	} else {
 		cfg.oniondial = cfg.dial
