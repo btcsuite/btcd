@@ -201,3 +201,5 @@ information.
     * [chainhash](https://github.com/decred/dcrd/tree/master/chaincfg/chainhash) -
 	  Provides a generic hash type and associated functions that allows the
 	  specific hash algorithm to be abstracted.
+    * [connmgr](https://github.com/decred/dcrd/tree/master/connmgr) -
+      Package connmgr implements a generic Decred network connection manager.

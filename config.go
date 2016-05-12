@@ -1,5 +1,5 @@
 // Copyright (c) 2013-2016 The btcsuite developers
-// Copyright (c) 2015-2016 The Decred developers
+// Copyright (c) 2015-2017 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -23,6 +23,7 @@ import (
 
 	flags "github.com/btcsuite/go-flags"
 	"github.com/btcsuite/go-socks/socks"
+	"github.com/decred/dcrd/connmgr"
 	"github.com/decred/dcrd/database"
 	_ "github.com/decred/dcrd/database/ffldb"
 	"github.com/decred/dcrd/mempool"
@@ -882,7 +883,7 @@ func loadConfig() (*config, []string, error) {
 		cfg.dial = proxy.Dial
 		if !cfg.NoOnion {
 			cfg.lookup = func(host string) ([]net.IP, error) {
-				return torLookupIP(host, cfg.Proxy)
+				return connmgr.TorLookupIP(host, cfg.Proxy)
 			}
 		}
 	}
@@ -922,7 +923,7 @@ func loadConfig() (*config, []string, error) {
 			return proxy.Dial(a, b)
 		}
 		cfg.onionlookup = func(host string) ([]net.IP, error) {
-			return torLookupIP(host, cfg.OnionProxy)
+			return connmgr.TorLookupIP(host, cfg.OnionProxy)
 		}
 	} else {
 		cfg.oniondial = cfg.dial
