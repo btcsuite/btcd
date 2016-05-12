@@ -11,6 +11,7 @@ import (
 	"github.com/btcsuite/btcd/addrmgr"
 	"github.com/btcsuite/btcd/blockchain"
 	"github.com/btcsuite/btcd/blockchain/indexers"
+	"github.com/btcsuite/btcd/connmgr"
 	"github.com/btcsuite/btcd/database"
 	"github.com/btcsuite/btcd/mempool"
 	"github.com/btcsuite/btcd/peer"
@@ -33,6 +34,7 @@ var (
 	backendLog = seelog.Disabled
 	adxrLog    = btclog.Disabled
 	amgrLog    = btclog.Disabled
+	cmgrLog    = btclog.Disabled
 	bcdbLog    = btclog.Disabled
 	bmgrLog    = btclog.Disabled
 	btcdLog    = btclog.Disabled
@@ -51,6 +53,7 @@ var (
 var subsystemLoggers = map[string]btclog.Logger{
 	"ADXR": adxrLog,
 	"AMGR": amgrLog,
+	"CMGR": cmgrLog,
 	"BCDB": bcdbLog,
 	"BMGR": bmgrLog,
 	"BTCD": btcdLog,
@@ -96,6 +99,10 @@ func useLogger(subsystemID string, logger btclog.Logger) {
 	case "AMGR":
 		amgrLog = logger
 		addrmgr.UseLogger(logger)
+
+	case "CMGR":
+		cmgrLog = logger
+		connmgr.UseLogger(logger)
 
 	case "BCDB":
 		bcdbLog = logger

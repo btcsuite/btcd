@@ -2,7 +2,7 @@
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
-package main
+package connmgr
 
 import (
 	"fmt"
@@ -48,7 +48,7 @@ func decayFactor(t int64) float64 {
 	return math.Exp(-1.0 * float64(t) * lambda)
 }
 
-// dynamicBanScore provides dynamic ban scores consisting of a persistent and a
+// DynamicBanScore provides dynamic ban scores consisting of a persistent and a
 // decaying component. The persistent score could be utilized to create simple
 // additive banning policies similar to those found in other bitcoin node
 // implementations.
@@ -56,11 +56,11 @@ func decayFactor(t int64) float64 {
 // The decaying score enables the creation of evasive logic which handles
 // misbehaving peers (especially application layer DoS attacks) gracefully
 // by disconnecting and banning peers attempting various kinds of flooding.
-// dynamicBanScore allows these two approaches to be used in tandem.
+// DynamicBanScore allows these two approaches to be used in tandem.
 //
-// Zero value: Values of type dynamicBanScore are immediately ready for use upon
+// Zero value: Values of type DynamicBanScore are immediately ready for use upon
 // declaration.
-type dynamicBanScore struct {
+type DynamicBanScore struct {
 	lastUnix   int64
 	transient  float64
 	persistent uint32
@@ -68,7 +68,7 @@ type dynamicBanScore struct {
 }
 
 // String returns the ban score as a human-readable string.
-func (s *dynamicBanScore) String() string {
+func (s *DynamicBanScore) String() string {
 	s.Lock()
 	r := fmt.Sprintf("persistent %v + transient %v at %v = %v as of now",
 		s.persistent, s.transient, s.lastUnix, s.Int())
@@ -80,7 +80,7 @@ func (s *dynamicBanScore) String() string {
 // scores.
 //
 // This function is safe for concurrent access.
-func (s *dynamicBanScore) Int() uint32 {
+func (s *DynamicBanScore) Int() uint32 {
 	s.Lock()
 	r := s.int(time.Now())
 	s.Unlock()
@@ -91,7 +91,7 @@ func (s *dynamicBanScore) Int() uint32 {
 // passed as parameters. The resulting score is returned.
 //
 // This function is safe for concurrent access.
-func (s *dynamicBanScore) Increase(persistent, transient uint32) uint32 {
+func (s *DynamicBanScore) Increase(persistent, transient uint32) uint32 {
 	s.Lock()
 	r := s.increase(persistent, transient, time.Now())
 	s.Unlock()
@@ -101,7 +101,7 @@ func (s *dynamicBanScore) Increase(persistent, transient uint32) uint32 {
 // Reset set both persistent and decaying scores to zero.
 //
 // This function is safe for concurrent access.
-func (s *dynamicBanScore) Reset() {
+func (s *DynamicBanScore) Reset() {
 	s.Lock()
 	s.persistent = 0
 	s.transient = 0
@@ -114,7 +114,7 @@ func (s *dynamicBanScore) Reset() {
 //
 // This function is not safe for concurrent access. It is intended to be used
 // internally and during testing.
-func (s *dynamicBanScore) int(t time.Time) uint32 {
+func (s *DynamicBanScore) int(t time.Time) uint32 {
 	dt := t.Unix() - s.lastUnix
 	if s.transient < 1 || dt < 0 || Lifetime < dt {
 		return s.persistent
@@ -128,7 +128,7 @@ func (s *dynamicBanScore) int(t time.Time) uint32 {
 // resulting score is returned.
 //
 // This function is not safe for concurrent access.
-func (s *dynamicBanScore) increase(persistent, transient uint32, t time.Time) uint32 {
+func (s *DynamicBanScore) increase(persistent, transient uint32, t time.Time) uint32 {
 	s.persistent += persistent
 	tu := t.Unix()
 	dt := tu - s.lastUnix

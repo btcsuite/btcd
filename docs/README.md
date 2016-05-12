@@ -259,3 +259,5 @@ information.
     * [chainhash](https://github.com/btcsuite/btcd/tree/master/chaincfg/chainhash) -
           Provides a generic hash type and associated functions that allows the
           specific hash algorithm to be abstracted.
+    * [connmgr](https://github.com/btcsuite/btcd/tree/master/connmgr) -
+          Package connmgr implements a generic Bitcoin network connection manager.
