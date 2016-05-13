@@ -12,7 +12,12 @@ interface.  The functions are only exported while the tests are being run.
 
 package txscript
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/decred/dcrd/chaincfg/chainhash"
+	"github.com/decred/dcrd/wire"
+)
 
 // TstMaxScriptSize makes the internal maxScriptSize constant available to the
 // test package.
@@ -82,6 +87,12 @@ func TstRemoveOpcodeByData(pkscript []byte, data []byte) ([]byte, error) {
 func (vm *Engine) TstSetPC(script, off int) {
 	vm.scriptIdx = script
 	vm.scriptOff = off
+}
+
+// TstCalcSignatureHash is an exported version for testing.
+func TstCalcSignatureHash(script []parsedOpcode, hashType SigHashType,
+	tx *wire.MsgTx, idx int, cachedPrefix *chainhash.Hash) ([]byte, error) {
+	return calcSignatureHash(script, hashType, tx, idx, cachedPrefix)
 }
 
 // Internal tests for opcode parsing with bad data templates.

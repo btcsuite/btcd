@@ -532,13 +532,14 @@ func TestCalcSignatureHash(t *testing.T) {
 	pops, _ := txscript.TstParseScript([]byte{0x01, 0x01, 0x02, 0x03})
 
 	// Test prefix caching.
-	msg1, err := txscript.CalcSignatureHash(pops, txscript.SigHashAll, tx, 0, nil)
+	msg1, err := txscript.TstCalcSignatureHash(pops, txscript.SigHashAll, tx, 0,
+		nil)
 	if err != nil {
 		t.Fatalf("unexpected error %v", err.Error())
 	}
 
 	prefixHash := tx.TxSha()
-	msg2, err := txscript.CalcSignatureHash(pops, txscript.SigHashAll, tx, 0,
+	msg2, err := txscript.TstCalcSignatureHash(pops, txscript.SigHashAll, tx, 0,
 		&prefixHash)
 	if err != nil {
 		t.Fatalf("unexpected error %v", err.Error())
@@ -563,7 +564,7 @@ func TestCalcSignatureHash(t *testing.T) {
 
 	// Move the index and make sure that we get a whole new hash, despite
 	// using the same TxOuts.
-	msg3, err := txscript.CalcSignatureHash(pops, txscript.SigHashAll, tx, 1,
+	msg3, err := txscript.TstCalcSignatureHash(pops, txscript.SigHashAll, tx, 1,
 		&prefixHash)
 	if err != nil {
 		t.Fatalf("unexpected error %v", err.Error())

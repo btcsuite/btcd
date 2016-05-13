@@ -281,13 +281,40 @@ func removeOpcodeByData(pkscript []parsedOpcode, data []byte) []parsedOpcode {
 		}
 	}
 	return retScript
-
 }
 
-// CalcSignatureHash is an exported version for testing.
-func CalcSignatureHash(script []parsedOpcode, hashType SigHashType,
-	tx *wire.MsgTx, idx int, cachedPrefix *chainhash.Hash) ([]byte, error) {
-	return calcSignatureHash(script, hashType, tx, idx, cachedPrefix)
+// optimizedWitnessSigningHash is a fast calculation of the witness for
+// signing to be used when signing with the SigHashAll optimization flag on.
+// It writes the serialized pkScript as it would be in the form of a serialized
+// msgTx with a witness signing version to a buffer, then hashes that.
+func optimizedWitnessSigningHash(script []parsedOpcode, hashType SigHashType,
+	tx *wire.MsgTx, idx int) (chainhash.Hash, error) {
+	var buf bytes.Buffer
+	var versionB [4]byte
+	if hashType&sigHashMask != SigHashAllValue {
+		binary.LittleEndian.PutUint32(versionB[:],
+			uint32(wire.WitnessSigningMsgTxVersion()))
+		buf.Write(versionB[:])
+	} else {
+		binary.LittleEndian.PutUint32(versionB[:],
+			uint32(wire.WitnessValueSigningMsgTxVersion()))
+		buf.Write(versionB[:])
+	}
+	txInLen := len(tx.TxIn)
+	wire.WriteVarInt(&buf, uint64(txInLen))
+	for i := 0; i < idx; i++ {
+		buf.WriteByte(0x00)
+	}
+	sigScript, _ := unparseScript(script)
+	err := wire.WriteVarBytes(&buf, sigScript)
+	if err != nil {
+		return chainhash.Hash{}, err
+	}
+	for i := idx + 1; i < txInLen; i++ {
+		buf.WriteByte(0x00)
+	}
+
+	return chainhash.HashFuncH(buf.Bytes()), nil
 }
 
 // calcSignatureHash will, given a script and hash type for the current script
@@ -295,6 +322,14 @@ func CalcSignatureHash(script []parsedOpcode, hashType SigHashType,
 // verification.
 func calcSignatureHash(script []parsedOpcode, hashType SigHashType,
 	tx *wire.MsgTx, idx int, cachedPrefix *chainhash.Hash) ([]byte, error) {
+	// Only use the optimization for SigHashAll with
+	// SigHashAnyoneCanPay disabled, which makes up
+	// the vast majority of outputs on the blockchain.
+	usesOptimization := cachedPrefix != nil &&
+		(hashType&sigHashMask == SigHashAll) &&
+		(hashType&SigHashAnyOneCanPay == 0) &&
+		chaincfg.SigHashOptimization
+
 	// The SigHashSingle signature type signs only the corresponding input
 	// and output (the output with the same index number as the input).
 	//
@@ -322,62 +357,86 @@ func calcSignatureHash(script []parsedOpcode, hashType SigHashType,
 	}
 
 	// Remove all instances of OP_CODESEPARATOR from the script.
+	// Decred: OP_CODESEPARATOR is disabled, remove?
 	script = removeOpcode(script, OP_CODESEPARATOR)
 
 	// Make a deep copy of the transaction, zeroing out the script for all
-	// inputs that are not currently being processed.
-	txCopy := tx.Copy()
-	for i := range txCopy.TxIn {
-		if i == idx {
-			// UnparseScript cannot fail here because removeOpcode
-			// above only returns a valid script.
-			sigScript, _ := unparseScript(script)
-			txCopy.TxIn[idx].SignatureScript = sigScript
+	// inputs that are not currently being processed. If the SigHashAll
+	// optimization is enabled, calculate the witness hash by quickly
+	// writing the version and pkScript to a buffer and then hashing it.
+	var txCopy *wire.MsgTx
+	var witnessHash chainhash.Hash
+	if usesOptimization {
+		var err error
+		witnessHash, err = optimizedWitnessSigningHash(script, hashType, tx, idx)
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		// No optimization available, or optimization disabled.
+		// Do the complete copying of the transaction.
+		txCopy = tx.Copy()
+		for i := range txCopy.TxIn {
+			if i == idx {
+				// UnparseScript cannot fail here because removeOpcode
+				// above only returns a valid script.
+				sigScript, _ := unparseScript(script)
+				txCopy.TxIn[idx].SignatureScript = sigScript
+			} else {
+				txCopy.TxIn[i].SignatureScript = nil
+			}
+		}
+
+		switch hashType & sigHashMask {
+		case SigHashNone:
+			txCopy.TxOut = txCopy.TxOut[0:0] // Empty slice.
+			for i := range txCopy.TxIn {
+				if i != idx {
+					txCopy.TxIn[i].Sequence = 0
+				}
+			}
+
+		case SigHashSingle:
+			// Resize output array to up to and including requested index.
+			txCopy.TxOut = txCopy.TxOut[:idx+1]
+
+			// All but current output get zeroed out.
+			for i := 0; i < idx; i++ {
+				txCopy.TxOut[i].Value = -1
+				txCopy.TxOut[i].PkScript = nil
+			}
+
+			// Sequence on all other inputs is 0, too.
+			for i := range txCopy.TxIn {
+				if i != idx {
+					txCopy.TxIn[i].Sequence = 0
+				}
+			}
+
+		default:
+			// Consensus treats undefined hashtypes like normal SigHashAll
+			// for purposes of hash generation.
+			fallthrough
+		case SigHashOld:
+			fallthrough
+		case SigHashAllValue:
+			fallthrough
+		case SigHashAll:
+			// Nothing special here.
+		}
+		if hashType&SigHashAnyOneCanPay != 0 {
+			txCopy.TxIn = txCopy.TxIn[idx : idx+1]
+			idx = 0
+		}
+
+		// If the ValueIn is to be included in what we're signing, sign
+		// the witness hash that includes it. Otherwise, just sign the
+		// prefix and signature scripts.
+		if hashType&sigHashMask != SigHashAllValue {
+			witnessHash = txCopy.TxShaWitnessSigning()
 		} else {
-			txCopy.TxIn[i].SignatureScript = nil
+			witnessHash = txCopy.TxShaWitnessValueSigning()
 		}
-	}
-
-	switch hashType & sigHashMask {
-	case SigHashNone:
-		txCopy.TxOut = txCopy.TxOut[0:0] // Empty slice.
-		for i := range txCopy.TxIn {
-			if i != idx {
-				txCopy.TxIn[i].Sequence = 0
-			}
-		}
-
-	case SigHashSingle:
-		// Resize output array to up to and including requested index.
-		txCopy.TxOut = txCopy.TxOut[:idx+1]
-
-		// All but current output get zeroed out.
-		for i := 0; i < idx; i++ {
-			txCopy.TxOut[i].Value = -1
-			txCopy.TxOut[i].PkScript = nil
-		}
-
-		// Sequence on all other inputs is 0, too.
-		for i := range txCopy.TxIn {
-			if i != idx {
-				txCopy.TxIn[i].Sequence = 0
-			}
-		}
-
-	default:
-		// Consensus treats undefined hashtypes like normal SigHashAll
-		// for purposes of hash generation.
-		fallthrough
-	case SigHashOld:
-		fallthrough
-	case SigHashAllValue:
-		fallthrough
-	case SigHashAll:
-		// Nothing special here.
-	}
-	if hashType&SigHashAnyOneCanPay != 0 {
-		txCopy.TxIn = txCopy.TxIn[idx : idx+1]
-		idx = 0
 	}
 
 	// The final hash (message to sign) is the hash of:
@@ -387,31 +446,20 @@ func calcSignatureHash(script []parsedOpcode, hashType SigHashType,
 	var wbuf bytes.Buffer
 	binary.Write(&wbuf, binary.LittleEndian, uint32(hashType))
 
-	// Optimization for SIGHASH_ALL. In this case, the prefix hash is
-	// the same as the transaction hash because only the inputs have
-	// been modified, so don't bother to do the wasteful O(N^2) extra
-	// hash here.
+	// Optimization for SIGHASH_ALL. This almost fixes the O(N^2)
+	// behaviour seen in Bitcoin, except N many 0x00 bytes are
+	// written during the serialization of the witness. TODO:
+	// Add a softfork flag that changes writing N many 0x00 bytes
+	// to simply writing the index.
 	// The caching only works if the "anyone can pay flag" is also
 	// disabled.
 	var prefixHash chainhash.Hash
-	if cachedPrefix != nil &&
-		(hashType&sigHashMask == SigHashAll) &&
-		(hashType&SigHashAnyOneCanPay == 0) &&
-		chaincfg.SigHashOptimization {
+	if usesOptimization {
 		prefixHash = *cachedPrefix
 	} else {
 		prefixHash = txCopy.TxSha()
 	}
 
-	// If the ValueIn is to be included in what we're signing, sign
-	// the witness hash that includes it. Otherwise, just sign the
-	// prefix and signature scripts.
-	var witnessHash chainhash.Hash
-	if hashType&sigHashMask != SigHashAllValue {
-		witnessHash = txCopy.TxShaWitnessSigning()
-	} else {
-		witnessHash = txCopy.TxShaWitnessValueSigning()
-	}
 	wbuf.Write(prefixHash.Bytes())
 	wbuf.Write(witnessHash.Bytes())
 	return chainhash.HashFuncB(wbuf.Bytes()), nil
