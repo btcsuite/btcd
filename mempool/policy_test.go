@@ -7,8 +7,8 @@ package mempool
 import (
 	"bytes"
 	"testing"
+	"time"
 
-	"github.com/btcsuite/btcd/blockchain"
 	"github.com/btcsuite/btcd/btcec"
 	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
@@ -466,11 +466,11 @@ func TestCheckTransactionStandard(t *testing.T) {
 		},
 	}
 
-	timeSource := blockchain.NewMedianTime()
+	pastMedianTime := time.Now()
 	for _, test := range tests {
 		// Ensure standardness is as expected.
 		err := checkTransactionStandard(btcutil.NewTx(&test.tx),
-			test.height, timeSource, DefaultMinRelayTxFee)
+			test.height, pastMedianTime, DefaultMinRelayTxFee)
 		if err == nil && test.isStandard {
 			// Test passes since function returned standard for a
 			// transaction which is intended to be standard.

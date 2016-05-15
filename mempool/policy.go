@@ -6,6 +6,7 @@ package mempool
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/btcsuite/btcd/blockchain"
 	"github.com/btcsuite/btcd/txscript"
@@ -326,7 +327,9 @@ func isDust(txOut *wire.TxOut, minRelayTxFee btcutil.Amount) bool {
 // finalized, conforming to more stringent size constraints, having scripts
 // of recognized forms, and not containing "dust" outputs (those that are
 // so small it costs more to process them than they are worth).
-func checkTransactionStandard(tx *btcutil.Tx, height int32, timeSource blockchain.MedianTimeSource, minRelayTxFee btcutil.Amount) error {
+func checkTransactionStandard(tx *btcutil.Tx, height int32,
+	medianTimePast time.Time, minRelayTxFee btcutil.Amount) error {
+
 	// The transaction must be a currently supported version.
 	msgTx := tx.MsgTx()
 	if msgTx.Version > wire.TxVersion || msgTx.Version < 1 {
@@ -338,8 +341,7 @@ func checkTransactionStandard(tx *btcutil.Tx, height int32, timeSource blockchai
 
 	// The transaction must be finalized to be standard and therefore
 	// considered for inclusion in a block.
-	adjustedTime := timeSource.AdjustedTime()
-	if !blockchain.IsFinalizedTransaction(tx, height, adjustedTime) {
+	if !blockchain.IsFinalizedTransaction(tx, height, medianTimePast) {
 		return txRuleError(wire.RejectNonstandard,
 			"transaction is not finalized")
 	}
