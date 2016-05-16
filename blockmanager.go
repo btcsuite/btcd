@@ -1026,6 +1026,8 @@ func (b *blockManager) checkBlockForHiddenVotes(block *dcrutil.Block) {
 	// Now that we have the template, grab the votes and compare
 	// them with those found in the newly added block. If we don't
 	// the votes, they will need to be added to our block template.
+	// Here we map the vote by their ticket hashes, since the vote
+	// hash itself varies with the settings of voteBits.
 	var newVotes []*dcrutil.Tx
 	var oldTickets []*dcrutil.Tx
 	var oldRevocations []*dcrutil.Tx
@@ -1040,8 +1042,8 @@ func (b *blockManager) checkBlockForHiddenVotes(block *dcrutil.Block) {
 		for _, stx := range templateBlock.STransactions() {
 			txType := stake.DetermineTxType(stx)
 			if txType == stake.TxTypeSSGen {
-				h := stx.Sha()
-				oldVoteMap[*h] = struct{}{}
+				ticketH := stx.MsgTx().TxIn[1].PreviousOutPoint.Hash
+				oldVoteMap[ticketH] = struct{}{}
 				newVotes = append(newVotes, stx)
 			}
 
@@ -1058,8 +1060,8 @@ func (b *blockManager) checkBlockForHiddenVotes(block *dcrutil.Block) {
 		// Check the votes seen in the block. If the votes
 		// are new, append them.
 		for _, vote := range votesFromBlock {
-			h := vote.Sha()
-			if _, exists := oldVoteMap[*h]; !exists {
+			ticketH := vote.MsgTx().TxIn[1].PreviousOutPoint.Hash
+			if _, exists := oldVoteMap[ticketH]; !exists {
 				newVotes = append(newVotes, vote)
 			}
 		}
