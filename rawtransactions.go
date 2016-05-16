@@ -775,7 +775,8 @@ func (r FutureSearchRawTransactionsResult) Receive() ([]*wire.MsgTx, error) {
 func (c *Client) SearchRawTransactionsAsync(address dcrutil.Address, skip, count int) FutureSearchRawTransactionsResult {
 	addr := address.EncodeAddress()
 	verbose := dcrjson.Int(0)
-	cmd := dcrjson.NewSearchRawTransactionsCmd(addr, verbose, &skip, &count)
+	cmd := dcrjson.NewSearchRawTransactionsCmd(addr, verbose, &skip, &count,
+		nil)
 	return c.sendCmd(cmd)
 }
 
@@ -797,14 +798,14 @@ type FutureSearchRawTransactionsVerboseResult chan *response
 
 // Receive waits for the response promised by the future and returns the
 // found raw transactions.
-func (r FutureSearchRawTransactionsVerboseResult) Receive() ([]*dcrjson.TxRawResult, error) {
+func (r FutureSearchRawTransactionsVerboseResult) Receive() ([]*dcrjson.SearchRawTransactionsResult, error) {
 	res, err := receiveFuture(r)
 	if err != nil {
 		return nil, err
 	}
 
 	// Unmarshal as an array of raw transaction results.
-	var result []*dcrjson.TxRawResult
+	var result []*dcrjson.SearchRawTransactionsResult
 	err = json.Unmarshal(res, &result)
 	if err != nil {
 		return nil, err
@@ -818,10 +819,17 @@ func (r FutureSearchRawTransactionsVerboseResult) Receive() ([]*dcrjson.TxRawRes
 // function on the returned instance.
 //
 // See SearchRawTransactionsVerbose for the blocking version and more details.
-func (c *Client) SearchRawTransactionsVerboseAsync(address dcrutil.Address, skip, count int) FutureSearchRawTransactionsVerboseResult {
+func (c *Client) SearchRawTransactionsVerboseAsync(address dcrutil.Address, skip,
+	count int, includePrevOut bool) FutureSearchRawTransactionsVerboseResult {
+
 	addr := address.EncodeAddress()
 	verbose := dcrjson.Int(1)
-	cmd := dcrjson.NewSearchRawTransactionsCmd(addr, verbose, &skip, &count)
+	var prevOut *int
+	if includePrevOut {
+		prevOut = dcrjson.Int(1)
+	}
+	cmd := dcrjson.NewSearchRawTransactionsCmd(addr, verbose, &skip, &count,
+		prevOut)
 	return c.sendCmd(cmd)
 }
 
@@ -832,6 +840,10 @@ func (c *Client) SearchRawTransactionsVerboseAsync(address dcrutil.Address, skip
 // specifically been enabled.
 //
 // See SearchRawTransactions to retrieve a list of raw transactions instead.
-func (c *Client) SearchRawTransactionsVerbose(address dcrutil.Address, skip, count int) ([]*dcrjson.TxRawResult, error) {
-	return c.SearchRawTransactionsVerboseAsync(address, skip, count).Receive()
+func (c *Client) SearchRawTransactionsVerbose(address dcrutil.Address, skip,
+	count int, includePrevOut bool) ([]*dcrjson.SearchRawTransactionsResult,
+	error) {
+
+	return c.SearchRawTransactionsVerboseAsync(address, skip, count,
+		includePrevOut).Receive()
 }
