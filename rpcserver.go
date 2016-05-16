@@ -2208,16 +2208,26 @@ func handleGetBlockHeader(s *rpcServer, cmd interface{}, closeChan <-chan struct
 		blockHeaderReply := dcrjson.GetBlockHeaderVerboseResult{
 			Hash:          c.Hash,
 			Confirmations: uint64(1 + maxIdx - blk.Height()),
-			Height:        int32(blk.Height()),
 			Version:       msgBlock.Header.Version,
-			MerkleRoot:    msgBlock.Header.MerkleRoot.String(),
-			NextHash:      hashNextStr,
 			PreviousHash:  msgBlock.Header.PrevBlock.String(),
-			Nonce:         uint64(msgBlock.Header.Nonce),
-			Time:          msgBlock.Header.Timestamp.Unix(),
+			MerkleRoot:    msgBlock.Header.MerkleRoot.String(),
+			StakeRoot:     msgBlock.Header.StakeRoot.String(),
+			VoteBits:      msgBlock.Header.VoteBits,
+			FinalState:    hex.EncodeToString(msgBlock.Header.FinalState[:]),
+			Voters:        msgBlock.Header.Voters,
+			FreshStake:    msgBlock.Header.FreshStake,
+			Revocations:   msgBlock.Header.Revocations,
+			PoolSize:      msgBlock.Header.PoolSize,
 			Bits:          strconv.FormatInt(int64(msgBlock.Header.Bits), 16),
+			SBits:         dcrutil.Amount(msgBlock.Header.SBits).ToCoin(),
+			Height:        msgBlock.Header.Height,
+			Size:          msgBlock.Header.Size,
+			Time:          msgBlock.Header.Timestamp.Unix(),
+			Nonce:         msgBlock.Header.Nonce,
 			Difficulty:    getDifficultyRatio(msgBlock.Header.Bits),
+			NextHash:      hashNextStr,
 		}
+
 		return blockHeaderReply, nil
 	}
 

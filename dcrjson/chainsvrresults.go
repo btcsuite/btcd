@@ -13,14 +13,23 @@ import "encoding/json"
 type GetBlockHeaderVerboseResult struct {
 	Hash          string  `json:"hash"`
 	Confirmations uint64  `json:"confirmations"`
-	Height        int32   `json:"height"`
 	Version       int32   `json:"version"`
-	MerkleRoot    string  `json:"merkleroot"`
-	Time          int64   `json:"time"`
-	Nonce         uint64  `json:"nonce"`
-	Bits          string  `json:"bits"`
-	Difficulty    float64 `json:"difficulty"`
 	PreviousHash  string  `json:"previousblockhash,omitempty"`
+	MerkleRoot    string  `json:"merkleroot"`
+	StakeRoot     string  `json:"stakeroot"`
+	VoteBits      uint16  `json:"votebits"`
+	FinalState    string  `json:"finalstate"`
+	Voters        uint16  `json:"voters"`
+	FreshStake    uint8   `json:"freshstake"`
+	Revocations   uint8   `json:"revocations"`
+	PoolSize      uint32  `json:"poolsize"`
+	Bits          string  `json:"bits"`
+	SBits         float64 `json:"sbits"`
+	Height        uint32  `json:"height"`
+	Size          uint32  `json:"size"`
+	Time          int64   `json:"time"`
+	Nonce         uint32  `json:"nonce"`
+	Difficulty    float64 `json:"difficulty"`
 	NextHash      string  `json:"nextblockhash,omitempty"`
 }
 
