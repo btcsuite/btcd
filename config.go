@@ -48,6 +48,7 @@ const (
 	defaultAddrIndex         = false
 	defaultNonAggressive     = false
 	defaultNoMiningStateSync = false
+	defaultAllowOldVotes     = false
 )
 
 var (
@@ -124,6 +125,7 @@ type config struct {
 	DropAddrIndex      bool          `long:"dropaddrindex" description:"Deletes the address-based transaction index from the database on start up, and the exits."`
 	NonAggressive      bool          `long:"nonaggressive" description:"Disable mining off of the parent block of the blockchain if there aren't enough voters"`
 	NoMiningStateSync  bool          `long:"nominingstatesync" description:"Disable synchronizing the mining state with other nodes"`
+	AllowOldVotes      bool          `long:"allowoldvotes" description:"Enable the addition of very old votes to the mempool"`
 	onionlookup        func(string) ([]net.IP, error)
 	lookup             func(string) ([]net.IP, error)
 	oniondial          func(string, string) (net.Conn, error)
@@ -334,6 +336,7 @@ func loadConfig() (*config, []string, error) {
 		Generate:          defaultGenerate,
 		NoAddrIndex:       defaultAddrIndex,
 		NoMiningStateSync: defaultNoMiningStateSync,
+		AllowOldVotes:     defaultAllowOldVotes,
 	}
 
 	// Service options which are only added on Windows.

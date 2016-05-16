@@ -109,6 +109,10 @@ const (
 	// of height before SSGen relating to that block are pruned.
 	heightDiffToPruneVotes = 10
 
+	// If a vote is on a block whose height is before tip minus this
+	// amount, reject it from being added to the mempool.
+	maximumVoteAgeDelta = 1440
+
 	// maxNullDataOutputs is the maximum number of OP_RETURN null data
 	// pushes in a transaction, after which it is considered non-standard.
 	maxNullDataOutputs = 4
@@ -1142,29 +1146,6 @@ func (mp *txMemPool) FilterTransactionsByAddress(
 	return nil, fmt.Errorf("address does not have any transactions in the pool")
 }
 
-// This function detects whether or not a transaction is a stake transaction and,
-// if it is, also returns the type of stake transaction.
-func detectTxType(tx *dcrutil.Tx) stake.TxType {
-	// Check to see if it's an SStx
-	if pass, _ := stake.IsSStx(tx); pass {
-		return stake.TxTypeSStx
-	}
-
-	// Check to see if it's an SSGen
-	if pass, _ := stake.IsSSGen(tx); pass {
-		return stake.TxTypeSSGen
-	}
-
-	// Check to see if it's an SSGen
-	if pass, _ := stake.IsSSRtx(tx); pass {
-		return stake.TxTypeSSRtx
-	}
-
-	// If it's none of these things, it's a malformed or non-standard stake tx
-	// which will be rejected during other checks or a regular tx.
-	return stake.TxTypeRegular
-}
-
 // maybeAcceptTransaction is the internal function which implements the public
 // MaybeAcceptTransaction.  See the comment for MaybeAcceptTransaction for
 // more details.
@@ -1229,7 +1210,7 @@ func (mp *txMemPool) maybeAcceptTransaction(tx *dcrutil.Tx, isNew,
 	// Determine what type of transaction we're dealing with (regular or stake).
 	// Then, be sure to set the tx tree correctly as it's possible a use submitted
 	// it to the network with TxTreeUnknown.
-	txType := detectTxType(tx)
+	txType := stake.DetermineTxType(tx)
 	if txType == stake.TxTypeRegular {
 		tx.SetTree(dcrutil.TxTreeRegular)
 	} else {
@@ -1317,6 +1298,24 @@ func (mp *txMemPool) maybeAcceptTransaction(tx *dcrutil.Tx, isNew,
 			return nil, err
 		}
 	}
+
+	// Votes that are on too old of blocks are rejected.
+	if txType == stake.TxTypeSSGen {
+		_, voteHeight, err := stake.GetSSGenBlockVotedOn(tx)
+		if err != nil {
+			return nil, err
+		}
+
+		if (int64(voteHeight) < curHeight-maximumVoteAgeDelta) &&
+			!cfg.AllowOldVotes {
+			str := fmt.Sprintf("transaction %v votes on old "+
+				"block height of %v which is before the "+
+				"current cutoff height of %v",
+				tx.Sha(), voteHeight, curHeight-maximumVoteAgeDelta)
+			return nil, txRuleError(wire.RejectNonstandard, str)
+		}
+	}
+
 	// Fetch all of the transactions referenced by the inputs to this
 	// transaction.  This function also attempts to fetch the transaction
 	// itself to be used for detecting a duplicate transaction without
@@ -1693,7 +1692,7 @@ func (mp *txMemPool) PruneStakeTx(requiredStakeDifficulty, height int64) {
 
 func (mp *txMemPool) pruneStakeTx(requiredStakeDifficulty, height int64) {
 	for _, tx := range mp.pool {
-		txType := detectTxType(tx.Tx)
+		txType := stake.DetermineTxType(tx.Tx)
 		if txType == stake.TxTypeSStx &&
 			tx.Height+int64(heightDiffToPruneTicket) < height {
 			mp.removeTransaction(tx.Tx, true)
