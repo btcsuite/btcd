@@ -1968,7 +1968,7 @@ out:
 
 			case fetchTransactionStoreMsg:
 				txStore, err := b.blockChain.FetchTransactionStore(msg.tx,
-					msg.isTreeValid)
+					msg.isTreeValid, false)
 				msg.reply <- fetchTransactionStoreResponse{
 					TxStore: txStore,
 					err:     err,

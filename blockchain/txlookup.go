@@ -721,7 +721,7 @@ func (b *BlockChain) fetchInputTransactions(node *blockNode, block *dcrutil.Bloc
 // IsValid indicates if the current block on head has had its TxTreeRegular
 // validated by the stake voters.
 func (b *BlockChain) FetchTransactionStore(tx *dcrutil.Tx,
-	isValid bool) (TxStore, error) {
+	isValid bool, includeSpent bool) (TxStore, error) {
 	isSSGen, _ := stake.IsSSGen(tx)
 
 	// Create a set of needed transactions from the transactions referenced
@@ -739,10 +739,9 @@ func (b *BlockChain) FetchTransactionStore(tx *dcrutil.Tx,
 	}
 
 	// Request the input transactions from the point of view of the end of
-	// the main chain without including fully spent transactions in the
-	// results.  Fully spent transactions are only needed for chain
-	// reorganization which does not apply here.
-	txStore := fetchTxStoreMain(b.db, txNeededSet, false)
+	// the main chain with or without without including fully spent transactions
+	// in the results.
+	txStore := fetchTxStoreMain(b.db, txNeededSet, includeSpent)
 
 	topBlock, err := b.getBlockFromHash(b.bestChain.hash)
 	if err != nil {

@@ -1321,6 +1321,79 @@ func createVinList(mtx *wire.MsgTx) []dcrjson.Vin {
 	return vinList
 }
 
+// createVinList returns a slice of JSON objects for the inputs of the passed
+// transaction.
+func createVinListPrevOut(s *rpcServer, mtx *wire.MsgTx, chainParams *chaincfg.Params, vinExtra int) []dcrjson.VinPrevOut {
+
+	// Coinbase transactions only have a single txin by definition.
+	vinList := make([]dcrjson.VinPrevOut, len(mtx.TxIn))
+	if blockchain.IsCoinBaseTx(mtx) {
+		txIn := mtx.TxIn[0]
+		vinList[0].Coinbase = hex.EncodeToString(txIn.SignatureScript)
+		vinList[0].Sequence = txIn.Sequence
+		return vinList
+	}
+
+	// Lookup all of the referenced transactions needed to populate the
+	// previous output information if requested.
+	var txStore blockchain.TxStore
+	if vinExtra != 0 {
+		tx := dcrutil.NewTx(mtx)
+		txStoreNew, err := s.server.txMemPool.fetchInputTransactions(tx, true)
+		if err == nil {
+			txStore = txStoreNew
+		}
+	}
+
+	for i, txIn := range mtx.TxIn {
+		// The disassembled string will contain [error] inline
+		// if the script doesn't fully parse, so ignore the
+		// error here.
+		disbuf, _ := txscript.DisasmString(txIn.SignatureScript)
+
+		vinEntry := &vinList[i]
+		vinEntry.Txid = txIn.PreviousOutPoint.Hash.String()
+		vinEntry.Vout = txIn.PreviousOutPoint.Index
+		vinEntry.Sequence = txIn.Sequence
+		vinEntry.ScriptSig = &dcrjson.ScriptSig{
+			Asm: disbuf,
+			Hex: hex.EncodeToString(txIn.SignatureScript),
+		}
+
+		// Only populate previous output information if requested and
+		// available.
+		if vinExtra == 0 || len(txStore) == 0 {
+			continue
+		}
+		txData := txStore[txIn.PreviousOutPoint.Hash]
+		if txData == nil {
+			continue
+		}
+
+		originTxOut := txData.Tx.MsgTx().TxOut[txIn.PreviousOutPoint.Index]
+
+		// Ignore the error here since an error means the script
+		// couldn't parse and there is no additional information about
+		// it anyways.
+		var strAddrs []string
+		_, addrs, _, _ := txscript.ExtractPkScriptAddrs(
+			txscript.DefaultScriptVersion, originTxOut.PkScript, chainParams)
+		if addrs != nil {
+			strAddrs = make([]string, len(addrs))
+			for j, addr := range addrs {
+				strAddrs[j] = addr.EncodeAddress()
+			}
+		}
+
+		vinEntry.PrevOut = &dcrjson.PrevOut{
+			Addresses: strAddrs,
+			Value:     dcrutil.Amount(originTxOut.Value).ToCoin(),
+		}
+	}
+
+	return vinList
+}
+
 // createVoutList returns a slice of JSON objects for the outputs of the passed
 // transaction.
 func createVoutList(mtx *wire.MsgTx, chainParams *chaincfg.Params) []dcrjson.Vout {
@@ -1382,6 +1455,38 @@ func createVoutList(mtx *wire.MsgTx, chainParams *chaincfg.Params) []dcrjson.Vou
 	}
 
 	return voutList
+}
+
+// createSearchRawTransactionsResult converts the passed transaction and associated parameters
+// to a raw transaction JSON object, possibly with vin.PrevOut section.
+func createSearchRawTransactionsResult(s *rpcServer, chainParams *chaincfg.Params,
+	mtx *wire.MsgTx, txHash string, blkHeader *wire.BlockHeader, blkHash string,
+	blkHeight int64, chainHeight int64,
+	vinExtra int) (*dcrjson.SearchRawTransactionsResult, error) {
+
+	mtxHex, err := messageToHex(mtx)
+	if err != nil {
+		return nil, err
+	}
+
+	txReply := &dcrjson.SearchRawTransactionsResult{
+		Hex:      mtxHex,
+		Txid:     txHash,
+		Vout:     createVoutList(mtx, chainParams),
+		Vin:      createVinListPrevOut(s, mtx, chainParams, vinExtra),
+		Version:  mtx.Version,
+		LockTime: mtx.LockTime,
+	}
+
+	if blkHeader != nil {
+		// This is not a typo, they are identical in bitcoind as well.
+		txReply.Time = blkHeader.Timestamp.Unix()
+		txReply.Blocktime = blkHeader.Timestamp.Unix()
+		txReply.BlockHash = blkHash
+		txReply.Confirmations = uint64(1 + chainHeight - blkHeight)
+	}
+
+	return txReply, nil
 }
 
 // createTxRawResult converts the passed transaction and associated parameters
@@ -3630,7 +3735,7 @@ func handleGetRawMempool(s *rpcServer, cmd interface{}, closeChan <-chan struct{
 			// the tx's inputs.  Use zeros if one or more of the
 			// input transactions can't be found for some reason.
 			var startingPriority, currentPriority float64
-			inputTxs, err := mp.fetchInputTransactions(desc.Tx)
+			inputTxs, err := mp.fetchInputTransactions(desc.Tx, false)
 			if err == nil {
 				startingPriority = desc.StartingPriority(inputTxs)
 				currentPriority = desc.CurrentPriority(inputTxs,
@@ -4582,7 +4687,7 @@ func handleSearchRawTransactions(s *rpcServer, cmd interface{},
 		return nil, internalRPCError(err.Error(), context)
 	}
 
-	rawTxns := make([]dcrjson.TxRawResult, len(addressTxs), len(addressTxs))
+	rawTxns := make([]dcrjson.SearchRawTransactionsResult, len(addressTxs), len(addressTxs))
 	for i, txReply := range addressTxs {
 		txHash := txReply.Sha.String()
 		mtx := txReply.Tx
@@ -4594,7 +4699,6 @@ func handleSearchRawTransactions(s *rpcServer, cmd interface{},
 		var blkHeader *wire.BlockHeader
 		var blkHashStr string
 		var blkHeight int64
-		var blkIndex uint32
 		if txReply.BlkSha != nil {
 			blkHeader, err = s.server.db.FetchBlockHeaderBySha(txReply.BlkSha)
 			if err != nil {
@@ -4606,12 +4710,10 @@ func handleSearchRawTransactions(s *rpcServer, cmd interface{},
 			}
 			blkHashStr = txReply.BlkSha.String()
 			blkHeight = txReply.Height
-			blkIndex = txReply.Index
 		}
 
-		rawTxn, err := createTxRawResult(s.server.chainParams, mtx,
-			txHash, blkIndex, blkHeader, blkHashStr, blkHeight,
-			maxIdx)
+		rawTxn, err := createSearchRawTransactionsResult(s, s.server.chainParams,
+			mtx, txHash, blkHeader, blkHashStr, blkHeight, maxIdx, *c.VinExtra)
 		if err != nil {
 			return nil, err
 		}
