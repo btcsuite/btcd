@@ -748,8 +748,8 @@ func (db *MemDb) DropAddrIndexForBlock(*chainhash.Hash, int64,
 
 // FetchTxsForAddr isn't currently implemented. This is a part of the database.Db
 // interface implementation.
-func (db *MemDb) FetchTxsForAddr(dcrutil.Address, int, int) ([]*database.TxListReply, error) {
-	return nil, database.ErrNotImplemented
+func (db *MemDb) FetchTxsForAddr(dcrutil.Address, int, int) ([]*database.TxListReply, int, error) {
+	return nil, 0, database.ErrNotImplemented
 }
 
 // PurgeAddrIndex isn't currently implemented. This is a part of the database.Db

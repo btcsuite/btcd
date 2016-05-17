@@ -93,12 +93,12 @@ func testAddrIndexOperations(t *testing.T, db database.Db, newestBlock *dcrutil.
 
 	// Test enforcement of constraints for "limit" and "skip"
 	var fakeAddr dcrutil.Address
-	_, err = db.FetchTxsForAddr(fakeAddr, -1, 0)
+	_, _, err = db.FetchTxsForAddr(fakeAddr, -1, 0)
 	if err == nil {
 		t.Fatalf("Negative value for skip passed, should return an error")
 	}
 
-	_, err = db.FetchTxsForAddr(fakeAddr, 0, -1)
+	_, _, err = db.FetchTxsForAddr(fakeAddr, 0, -1)
 	if err == nil {
 		t.Fatalf("Negative value for limit passed, should return an error")
 	}
@@ -145,7 +145,7 @@ func testAddrIndexOperations(t *testing.T, db database.Db, newestBlock *dcrutil.
 	assertAddrIndexTipIsUpdated(db, t, newestSha, newestBlockIdx)
 
 	// Check index retrieval.
-	txReplies, err := db.FetchTxsForAddr(testAddrs[0], 0, 1000)
+	txReplies, _, err := db.FetchTxsForAddr(testAddrs[0], 0, 1000)
 	if err != nil {
 		t.Fatalf("FetchTxsForAddr failed to correctly fetch txs for an "+
 			"address, err %v", err)
@@ -180,7 +180,7 @@ func testAddrIndexOperations(t *testing.T, db database.Db, newestBlock *dcrutil.
 	}
 
 	// Former index should no longer exist.
-	txReplies, err = db.FetchTxsForAddr(testAddrs[0], 0, 1000)
+	txReplies, _, err = db.FetchTxsForAddr(testAddrs[0], 0, 1000)
 	if err != nil {
 		t.Fatalf("Unable to fetch transactions for address: %v", err)
 	}
@@ -592,9 +592,13 @@ func TestLimitAndSkipFetchTxsForAddr(t *testing.T) {
 	}
 
 	// Try skipping the first 4 results, should get 6 in return.
-	txReply, err := testDb.db.FetchTxsForAddr(targetAddr, 4, 100000)
+	txReply, txSkipped, err := testDb.db.FetchTxsForAddr(targetAddr, 4, 100000)
 	if err != nil {
 		t.Fatalf("Unable to fetch transactions for address: %v", err)
+	}
+	if txSkipped != 4 {
+		t.Fatalf("Did not correctly return skipped amount"+
+			" got %v txs, expected %v", txSkipped, 4)
 	}
 	if len(txReply) != 6 {
 		t.Fatalf("Did not correctly skip forward in txs for address reply"+
@@ -602,9 +606,13 @@ func TestLimitAndSkipFetchTxsForAddr(t *testing.T) {
 	}
 
 	// Limit the number of results to 3.
-	txReply, err = testDb.db.FetchTxsForAddr(targetAddr, 0, 3)
+	txReply, txSkipped, err = testDb.db.FetchTxsForAddr(targetAddr, 0, 3)
 	if err != nil {
 		t.Fatalf("Unable to fetch transactions for address: %v", err)
+	}
+	if txSkipped != 0 {
+		t.Fatalf("Did not correctly return skipped amount"+
+			" got %v txs, expected %v", txSkipped, 0)
 	}
 	if len(txReply) != 3 {
 		t.Fatalf("Did not correctly limit in txs for address reply"+
@@ -612,9 +620,13 @@ func TestLimitAndSkipFetchTxsForAddr(t *testing.T) {
 	}
 
 	// Skip 1, limit 5.
-	txReply, err = testDb.db.FetchTxsForAddr(targetAddr, 1, 5)
+	txReply, txSkipped, err = testDb.db.FetchTxsForAddr(targetAddr, 1, 5)
 	if err != nil {
 		t.Fatalf("Unable to fetch transactions for address: %v", err)
+	}
+	if txSkipped != 1 {
+		t.Fatalf("Did not correctly return skipped amount"+
+			" got %v txs, expected %v", txSkipped, 1)
 	}
 	if len(txReply) != 5 {
 		t.Fatalf("Did not correctly limit in txs for address reply"+

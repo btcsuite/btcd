@@ -1729,7 +1729,7 @@ func handleExistsAddress(s *rpcServer, cmd interface{},
 	numRequested = 1
 
 	// Check the blockchain for the relevant address usage.
-	tlr, err := s.server.db.FetchTxsForAddr(addr, numToSkip, numRequested)
+	tlr, _, err := s.server.db.FetchTxsForAddr(addr, numToSkip, numRequested)
 	if err == nil && tlr != nil {
 		return true, nil
 	}
@@ -1780,7 +1780,8 @@ func handleExistsAddresses(s *rpcServer, cmd interface{},
 		numRequested = 1
 
 		// Check the blockchain for the relevant address usage.
-		tlr, err := s.server.db.FetchTxsForAddr(addr, numToSkip, numRequested)
+		tlr, _, err := s.server.db.FetchTxsForAddr(addr, numToSkip,
+			numRequested)
 		if err == nil && tlr != nil {
 			exists[i] = true
 		}
@@ -4586,6 +4587,43 @@ func handleRebroadcastWinners(s *rpcServer, cmd interface{}, closeChan <-chan st
 	return nil, nil
 }
 
+// getMempoolTxsForAddressRange looks up and returns all transactions from the
+// mempool related to the given address. The, `limit` parameter
+// should be the max number of transactions to be returned. Additionally, if the
+// caller wishes to seek forward in the results some amount, the 'seek'
+// represents how many results to skip.
+// It will return the array of fetched transactions, along with the amount
+// of transactions that were actually skipped.
+func getMempoolTxsForAddressRange(s *rpcServer, addr dcrutil.Address, skip int,
+	limit int) ([]*database.TxListReply, int, error) {
+
+	memPoolTxs, err := s.server.txMemPool.FilterTransactionsByAddress(addr)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	// If we're asked to skip more transactions than we have,
+	// we skip them all and return an empty slice.
+	if skip >= len(memPoolTxs) {
+		return nil, len(memPoolTxs), nil
+	}
+
+	var result []*database.TxListReply
+
+	// Otherwise, calculate the range we have to return and return it.
+	rangeEnd := skip + limit
+	if rangeEnd > len(memPoolTxs) {
+		rangeEnd = len(memPoolTxs)
+	}
+
+	for _, tx := range memPoolTxs[skip:rangeEnd] {
+		txReply := &database.TxListReply{Tx: tx.MsgTx(), Sha: tx.Sha()}
+		result = append(result, txReply)
+	}
+
+	return result, skip, nil
+}
+
 // handleSearchRawTransaction implements the searchrawtransactions command.
 func handleSearchRawTransactions(s *rpcServer, cmd interface{},
 	closeChan <-chan struct{}) (interface{}, error) {
@@ -4616,7 +4654,7 @@ func handleSearchRawTransactions(s *rpcServer, cmd interface{},
 
 	var addressTxs []*database.TxListReply
 
-	var numRequested, numToSkip int
+	var numRequested, numToSkip, skipped int
 	if c.Count != nil {
 		numRequested = *c.Count
 		if numRequested < 0 {
@@ -4634,9 +4672,10 @@ func handleSearchRawTransactions(s *rpcServer, cmd interface{},
 	// first, we want to return results in order of occurrence/dependency so
 	// we'll check the mempool only if there aren't enough results returned
 	// by the database.
-	dbTxs, err := s.server.db.FetchTxsForAddr(addr, numToSkip,
+	dbTxs, dbSkipped, err := s.server.db.FetchTxsForAddr(addr, numToSkip,
 		numRequested-len(addressTxs))
 	if err == nil {
+		skipped += dbSkipped
 		for _, txReply := range dbTxs {
 			addressTxs = append(addressTxs, txReply)
 		}
@@ -4646,14 +4685,12 @@ func handleSearchRawTransactions(s *rpcServer, cmd interface{},
 	// dependency. This might be something we want to do in the future when we
 	// return results for the client's convenience, or leave it to the client.
 	if len(addressTxs) < numRequested {
-		memPoolTxs, err := s.server.txMemPool.FilterTransactionsByAddress(addr)
+		memPoolTxs, memPoolSkipped, err := getMempoolTxsForAddressRange(s, addr,
+			numToSkip-skipped, numRequested-len(addressTxs))
 		if err == nil {
-			for _, tx := range memPoolTxs {
-				txReply := &database.TxListReply{Tx: tx.MsgTx(), Sha: tx.Sha()}
+			skipped += memPoolSkipped
+			for _, txReply := range memPoolTxs {
 				addressTxs = append(addressTxs, txReply)
-				if len(addressTxs) == numRequested {
-					break
-				}
 			}
 		}
 	}

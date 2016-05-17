@@ -144,8 +144,9 @@ type Db interface {
 	// Additionally, if the caller wishes to skip forward in the results
 	// some amount, the 'seek' represents how many results to skip.
 	// NOTE: Values for both `seek` and `limit` MUST be positive.
-	FetchTxsForAddr(addr dcrutil.Address, skip int,
-		limit int) ([]*TxListReply, error)
+	// It will return the array of fetched transactions, along with the amount
+	// of transactions that were actually skipped.
+	FetchTxsForAddr(addr dcrutil.Address, skip int, limit int) ([]*TxListReply, int, error)
 
 	// PurgeAddrIndex deletes the entire addrindex stored within the DB.
 	PurgeAddrIndex() error
