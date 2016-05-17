@@ -126,6 +126,7 @@ type config struct {
 	NonAggressive      bool          `long:"nonaggressive" description:"Disable mining off of the parent block of the blockchain if there aren't enough voters"`
 	NoMiningStateSync  bool          `long:"nominingstatesync" description:"Disable synchronizing the mining state with other nodes"`
 	AllowOldVotes      bool          `long:"allowoldvotes" description:"Enable the addition of very old votes to the mempool"`
+	NoPeerBloomFilters bool          `long:"nopeerbloomfilters" description:"Disable bloom filtering support."`
 	onionlookup        func(string) ([]net.IP, error)
 	lookup             func(string) ([]net.IP, error)
 	oniondial          func(string, string) (net.Conn, error)

@@ -13,7 +13,11 @@ import (
 
 const (
 	// ProtocolVersion is the latest protocol version this package supports.
-	ProtocolVersion uint32 = 1
+	ProtocolVersion uint32 = 2
+
+	// BIP0111Version is the protocol version which added the SFNodeBloom
+	// service flag.
+	BIP0111Version uint32 = 2
 )
 
 // ServiceFlag identifies services supported by a decred peer.
@@ -22,11 +26,23 @@ type ServiceFlag uint64
 const (
 	// SFNodeNetwork is a flag used to indicate a peer is a full node.
 	SFNodeNetwork ServiceFlag = 1 << iota
+
+	// SFNodeBloom is a flag used to indiciate a peer supports bloom
+	// filtering.
+	SFNodeBloom
 )
 
 // Map of service flags back to their constant names for pretty printing.
 var sfStrings = map[ServiceFlag]string{
 	SFNodeNetwork: "SFNodeNetwork",
+	SFNodeBloom:   "SFNodeBloom",
+}
+
+// orderedSFStrings is an ordered list of service flags from highest to
+// lowest.
+var orderedSFStrings = []ServiceFlag{
+	SFNodeNetwork,
+	SFNodeBloom,
 }
 
 // String returns the ServiceFlag in human-readable form.

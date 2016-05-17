@@ -17,7 +17,7 @@ import (
 func TestMiningStateWire(t *testing.T) {
 	// Empty tx message.
 	sampleMSMsg := wire.NewMsgMiningState()
-	sampleMSMsg.ProtocolVersion = wire.ProtocolVersion
+	sampleMSMsg.Version = 1
 	sampleMSMsg.Height = 123456
 
 	fakeBlock, _ := chainhash.NewHashFromStr("4433221144332211443322114" +
@@ -75,7 +75,7 @@ func TestMiningStateWire(t *testing.T) {
 		buf  []byte               // Wire encoding
 		pver uint32               // Protocol version for wire encoding
 	}{
-		// Latest protocol version sample message.
+		// Version 1 sample message with the latest protocol version.
 		{
 			sampleMSMsg,
 			sampleMSMsg,

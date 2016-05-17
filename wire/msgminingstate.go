@@ -25,10 +25,10 @@ const MaxMSVotesAtHeadPerMsg = 40 // 8 * 5
 // the maximum number of blocks per message and the maximum number of votes per
 // message.
 type MsgMiningState struct {
-	ProtocolVersion uint32
-	Height          uint32
-	BlockHashes     []*chainhash.Hash
-	VoteHashes      []*chainhash.Hash
+	Version     uint32
+	Height      uint32
+	BlockHashes []*chainhash.Hash
+	VoteHashes  []*chainhash.Hash
 }
 
 // AddBlockHash adds a new block hash to the message.
@@ -58,7 +58,7 @@ func (msg *MsgMiningState) AddVoteHash(hash *chainhash.Hash) error {
 // BtcDecode decodes r using the protocol encoding into the receiver.
 // This is part of the Message interface implementation.
 func (msg *MsgMiningState) BtcDecode(r io.Reader, pver uint32) error {
-	err := readElement(r, &msg.ProtocolVersion)
+	err := readElement(r, &msg.Version)
 	if err != nil {
 		return err
 	}
@@ -116,7 +116,7 @@ func (msg *MsgMiningState) BtcDecode(r io.Reader, pver uint32) error {
 // BtcEncode encodes the receiver to w using the protocol encoding.
 // This is part of the Message interface implementation.
 func (msg *MsgMiningState) BtcEncode(w io.Writer, pver uint32) error {
-	err := writeElement(w, msg.ProtocolVersion)
+	err := writeElement(w, msg.Version)
 	if err != nil {
 		return err
 	}
@@ -189,9 +189,9 @@ func (msg *MsgMiningState) MaxPayloadLength(pver uint32) uint32 {
 // the Message interface using the defaults for the fields.
 func NewMsgMiningState() *MsgMiningState {
 	return &MsgMiningState{
-		ProtocolVersion: ProtocolVersion,
-		Height:          0,
-		BlockHashes:     make([]*chainhash.Hash, 0, MaxMSBlocksAtHeadPerMsg),
-		VoteHashes:      make([]*chainhash.Hash, 0, MaxMSVotesAtHeadPerMsg),
+		Version:     1,
+		Height:      0,
+		BlockHashes: make([]*chainhash.Hash, 0, MaxMSBlocksAtHeadPerMsg),
+		VoteHashes:  make([]*chainhash.Hash, 0, MaxMSVotesAtHeadPerMsg),
 	}
 }

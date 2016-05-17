@@ -32,16 +32,16 @@ import (
 )
 
 const (
-	// These constants are used by the DNS seed code to pick a random last seen
-	// time.
+	// These constants are used by the DNS seed code to pick a random last
+	// seen time.
 	secondsIn3Days int32 = 24 * 60 * 60 * 3
 	secondsIn4Days int32 = 24 * 60 * 60 * 4
 )
 
 const (
-	// supportedServices describes which services are supported by the
-	// server.
-	supportedServices = wire.SFNodeNetwork
+	// defaultServices describes the default services that are supported by
+	// the server.
+	defaultServices = wire.SFNodeNetwork | wire.SFNodeBloom
 
 	// defaultMaxOutbound is the default number of max outbound peers.
 	defaultMaxOutbound = 8
@@ -114,6 +114,7 @@ type server struct {
 	db                   database.Db
 	timeSource           blockchain.MedianTimeSource
 	tmdb                 *stake.TicketDB
+	services             wire.ServiceFlag
 }
 
 type peerState struct {
@@ -1254,7 +1255,7 @@ out:
 					continue out
 				}
 				na := wire.NewNetAddressIPPort(externalip, uint16(listenPort),
-					wire.SFNodeNetwork)
+					s.services)
 				err = s.addrManager.AddLocalAddress(na, addrmgr.UpnpPrio)
 				if err != nil {
 					// XXX DeletePortMapping?
@@ -1290,6 +1291,11 @@ func newServer(listenAddrs []string,
 	nonce, err := wire.RandomUint64()
 	if err != nil {
 		return nil, err
+	}
+
+	services := defaultServices
+	if cfg.NoPeerBloomFilters {
+		services &^= wire.SFNodeBloom
 	}
 
 	amgr := addrmgr.New(cfg.DataDir, dcrdLookup)
@@ -1329,7 +1335,7 @@ func newServer(listenAddrs []string,
 					eport = uint16(port)
 				}
 				na, err := amgr.HostToNetAddress(host, eport,
-					wire.SFNodeNetwork)
+					services)
 				if err != nil {
 					srvrLog.Warnf("Not adding %s as "+
 						"externalip: %v", sip, err)
@@ -1365,7 +1371,7 @@ func newServer(listenAddrs []string,
 					continue
 				}
 				na := wire.NewNetAddressIPPort(ip,
-					uint16(port), wire.SFNodeNetwork)
+					uint16(port), services)
 				if discover {
 					err = amgr.AddLocalAddress(na, addrmgr.InterfacePrio)
 					if err != nil {
@@ -1437,6 +1443,7 @@ func newServer(listenAddrs []string,
 		db:                   database,
 		tmdb:                 tmdb,
 		timeSource:           blockchain.NewMedianTime(),
+		services:             services,
 	}
 	bm, err := newBlockManager(&s)
 	if err != nil {
