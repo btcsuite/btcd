@@ -321,12 +321,16 @@ type PrevOut struct {
 
 // VinPrevOut is like Vin except it includes PrevOut.  It is used by searchrawtransaction
 type VinPrevOut struct {
-	Coinbase  string     `json:"coinbase"`
-	Txid      string     `json:"txid"`
-	Vout      uint32     `json:"vout"`
-	ScriptSig *ScriptSig `json:"scriptSig"`
-	PrevOut   *PrevOut   `json:"prevOut"`
-	Sequence  uint32     `json:"sequence"`
+	Coinbase    string     `json:"coinbase"`
+	Txid        string     `json:"txid"`
+	Vout        uint32     `json:"vout"`
+	Tree        int8       `json:"tree"`
+	AmountIn    *float64   `json:"amountin,omitempty"`
+	BlockHeight *uint32    `json:"blockheight,omitempty"`
+	BlockIndex  *uint32    `json:"blockindex,omitempty"`
+	ScriptSig   *ScriptSig `json:"scriptSig"`
+	PrevOut     *PrevOut   `json:"prevOut"`
+	Sequence    uint32     `json:"sequence"`
 }
 
 // IsCoinBase returns a bool to show if a Vin is a Coinbase one or not.
@@ -348,17 +352,25 @@ func (v *VinPrevOut) MarshalJSON() ([]byte, error) {
 	}
 
 	txStruct := struct {
-		Txid      string     `json:"txid"`
-		Vout      uint32     `json:"vout"`
-		ScriptSig *ScriptSig `json:"scriptSig"`
-		PrevOut   *PrevOut   `json:"prevOut,omitempty"`
-		Sequence  uint32     `json:"sequence"`
+		Txid        string     `json:"txid"`
+		Vout        uint32     `json:"vout"`
+		Tree        int8       `json:"tree"`
+		AmountIn    *float64   `json:"amountin,omitempty"`
+		BlockHeight *uint32    `json:"blockheight,omitempty"`
+		BlockIndex  *uint32    `json:"blockindex,omitempty"`
+		ScriptSig   *ScriptSig `json:"scriptSig"`
+		PrevOut     *PrevOut   `json:"prevOut,omitempty"`
+		Sequence    uint32     `json:"sequence"`
 	}{
-		Txid:      v.Txid,
-		Vout:      v.Vout,
-		ScriptSig: v.ScriptSig,
-		PrevOut:   v.PrevOut,
-		Sequence:  v.Sequence,
+		Txid:        v.Txid,
+		Vout:        v.Vout,
+		Tree:        v.Tree,
+		AmountIn:    v.AmountIn,
+		BlockHeight: v.BlockHeight,
+		BlockIndex:  v.BlockIndex,
+		ScriptSig:   v.ScriptSig,
+		PrevOut:     v.PrevOut,
+		Sequence:    v.Sequence,
 	}
 	return json.Marshal(txStruct)
 }

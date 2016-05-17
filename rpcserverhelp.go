@@ -101,12 +101,16 @@ var helpDescsEnUS = map[string]string{
 	"prevout-value":     "previous output value",
 
 	// VinPrevOut help.
-	"vinprevout-coinbase":  "The hex-encoded bytes of the signature script (coinbase txns only)",
-	"vinprevout-txid":      "The hash of the origin transaction (non-coinbase txns only)",
-	"vinprevout-vout":      "The index of the output being redeemed from the origin transaction (non-coinbase txns only)",
-	"vinprevout-scriptSig": "The signature script used to redeem the origin transaction as a JSON object (non-coinbase txns only)",
-	"vinprevout-prevOut":   "Data from the origin transaction output with index vout.",
-	"vinprevout-sequence":  "The script sequence number",
+	"vinprevout-coinbase":    "The hex-encoded bytes of the signature script (coinbase txns only)",
+	"vinprevout-txid":        "The hash of the origin transaction (non-coinbase txns only)",
+	"vinprevout-vout":        "The index of the output being redeemed from the origin transaction (non-coinbase txns only)",
+	"vinprevout-tree":        "The transaction tree of the origin transaction",
+	"vinprevout-amountin":    "The amount in for this transaction input, in coins",
+	"vinprevout-blockheight": "The height of the block that includes the origin transaction",
+	"vinprevout-blockindex":  "The merkle tree index of the origin transaction",
+	"vinprevout-scriptSig":   "The signature script used to redeem the origin transaction as a JSON object (non-coinbase txns only)",
+	"vinprevout-prevOut":     "Data from the origin transaction output with index vout.",
+	"vinprevout-sequence":    "The script sequence number",
 
 	// Vin help.
 	"vin-coinbase":    "The hex-encoded bytes of the signature script (coinbase txns only)",

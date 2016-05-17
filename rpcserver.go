@@ -1364,6 +1364,18 @@ func createVinListPrevOut(s *rpcServer, mtx *wire.MsgTx, chainParams *chaincfg.P
 		vinEntry := &vinList[i]
 		vinEntry.Txid = txIn.PreviousOutPoint.Hash.String()
 		vinEntry.Vout = txIn.PreviousOutPoint.Index
+		vinEntry.Tree = txIn.PreviousOutPoint.Tree
+
+		// Use the null block index as a flag to indicate if
+		// it was found in the mempool. If so, do not set the
+		// Vin entries for BlockHeight and BlockIndex.
+		if txIn.BlockIndex != wire.NullBlockIndex {
+			amtCoin := dcrutil.Amount(txIn.ValueIn).ToCoin()
+			vinEntry.AmountIn = &amtCoin
+			vinEntry.BlockHeight = &txIn.BlockHeight
+			vinEntry.BlockIndex = &txIn.BlockIndex
+		}
+
 		vinEntry.Sequence = txIn.Sequence
 		vinEntry.ScriptSig = &dcrjson.ScriptSig{
 			Asm: disbuf,
