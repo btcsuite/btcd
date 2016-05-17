@@ -1,4 +1,4 @@
-// Copyright (c) 2013-2014 The btcsuite developers
+// Copyright (c) 2013-2015 The btcsuite developers
 // Copyright (c) 2015 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
@@ -6,6 +6,7 @@
 package main
 
 import (
+	"bytes"
 	"container/list"
 	"fmt"
 
@@ -22,7 +23,19 @@ type MruInventoryMap struct {
 
 // String returns the map as a human-readable string.
 func (m MruInventoryMap) String() string {
-	return fmt.Sprintf("<%d>%v", m.limit, m.invMap)
+	lastEntryNum := len(m.invMap) - 1
+	curEntry := 0
+	buf := bytes.NewBufferString("[")
+	for iv := range m.invMap {
+		buf.WriteString(fmt.Sprintf("%v", iv))
+		if curEntry < lastEntryNum {
+			buf.WriteString(", ")
+		}
+		curEntry++
+	}
+	buf.WriteString("]")
+
+	return fmt.Sprintf("<%d>%s", m.limit, buf.String())
 }
 
 // Exists returns whether or not the passed inventory item is in the map.
@@ -34,7 +47,8 @@ func (m *MruInventoryMap) Exists(iv *wire.InvVect) bool {
 }
 
 // Add adds the passed inventory to the map and handles eviction of the oldest
-// item if adding the new item would exceed the max limit.
+// item if adding the new item would exceed the max limit.  Adding an existing
+// item makes it the most recently used item.
 func (m *MruInventoryMap) Add(iv *wire.InvVect) {
 	// When the limit is zero, nothing can be added to the map, so just
 	// return.
@@ -54,10 +68,7 @@ func (m *MruInventoryMap) Add(iv *wire.InvVect) {
 	// node so a new one doesn't have to be allocated.
 	if uint(len(m.invMap))+1 > m.limit {
 		node := m.invList.Back()
-		lru, ok := node.Value.(*wire.InvVect)
-		if !ok {
-			return
-		}
+		lru := node.Value.(*wire.InvVect)
 
 		// Evict least recently used item.
 		delete(m.invMap, *lru)

@@ -6,7 +6,6 @@
 package wire
 
 import (
-	"bytes"
 	"crypto/rand"
 	"encoding/binary"
 	"fmt"
@@ -435,13 +434,6 @@ func writeVarInt(w io.Writer, pver uint32, val uint64) error {
 	return err
 }
 
-// WriteVarInt is the exported form of writeVarBytes. It uses the latest
-// version of the wire protocol as stored in the package.
-func WriteVarInt(buf *bytes.Buffer, val uint64) error {
-	w := io.Writer(buf)
-	return writeVarInt(w, ProtocolVersion, val)
-}
-
 // VarIntSerializeSize returns the number of bytes it would take to serialize
 // val as a variable length integer.
 func VarIntSerializeSize(val uint64) int {
@@ -541,7 +533,7 @@ func readVarBytes(r io.Reader, pver uint32, maxAllowed uint32,
 	return b, nil
 }
 
-// writeVarBytes serializes a variable length byte array to w as a varInt
+// writeVarInt serializes a variable length byte array to w as a varInt
 // containing the number of bytes, followed by the bytes themselves.
 func writeVarBytes(w io.Writer, pver uint32, bytes []byte) error {
 	slen := uint64(len(bytes))
@@ -555,13 +547,6 @@ func writeVarBytes(w io.Writer, pver uint32, bytes []byte) error {
 		return err
 	}
 	return nil
-}
-
-// WriteVarBytes is the exported form of writeVarBytes. It uses the latest
-// version of the wire protocol as stored in the package.
-func WriteVarBytes(buf *bytes.Buffer, bytes []byte) error {
-	w := io.Writer(buf)
-	return writeVarBytes(w, ProtocolVersion, bytes)
 }
 
 // randomUint64 returns a cryptographically random uint64 value.  This
