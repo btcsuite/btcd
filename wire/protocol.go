@@ -54,9 +54,9 @@ func (f ServiceFlag) String() string {
 
 	// Add individual bit flags.
 	s := ""
-	for flag, name := range sfStrings {
+	for _, flag := range orderedSFStrings {
 		if f&flag == flag {
-			s += name + "|"
+			s += sfStrings[flag] + "|"
 			f -= flag
 		}
 	}
