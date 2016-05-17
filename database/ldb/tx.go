@@ -13,6 +13,7 @@ import (
 
 	"github.com/btcsuite/golangcrypto/ripemd160"
 	"github.com/btcsuite/goleveldb/leveldb"
+	"github.com/btcsuite/goleveldb/leveldb/iterator"
 	"github.com/btcsuite/goleveldb/leveldb/util"
 
 	"github.com/decred/dcrd/chaincfg/chainhash"
@@ -438,6 +439,13 @@ func bytesPrefix(prefix []byte) *util.Range {
 	return &util.Range{Start: prefix, Limit: limit}
 }
 
+func advanceIterator(iter iterator.IteratorSeeker, reverse bool) bool {
+	if reverse {
+		return iter.Prev()
+	}
+	return iter.Next()
+}
+
 // FetchTxsForAddr looks up and returns all transactions which either
 // spend from a previously created output of the passed address, or
 // create a new output locked to the passed address. The, `limit` parameter
@@ -445,7 +453,7 @@ func bytesPrefix(prefix []byte) *util.Range {
 // caller wishes to seek forward in the results some amount, the 'seek'
 // represents how many results to skip.
 func (db *LevelDb) FetchTxsForAddr(addr dcrutil.Address, skip int,
-	limit int) ([]*database.TxListReply, int, error) {
+	limit int, reverse bool) ([]*database.TxListReply, int, error) {
 	db.dbLock.Lock()
 	defer db.dbLock.Unlock()
 
@@ -486,7 +494,18 @@ func (db *LevelDb) FetchTxsForAddr(addr dcrutil.Address, skip int,
 
 	iter := db.lDb.NewIterator(bytesPrefix(addrPrefix), nil)
 	skipped := 0
-	for skip != 0 && iter.Next() {
+
+	if reverse {
+		// Go to the last element if reverse iterating.
+		iter.Last()
+		// Skip "one past" the last element so the loops below don't
+		// miss the last element due to Prev() being called first.
+		// We can safely ignore iterator exhaustion since the loops
+		// below will see there's no keys anyway.
+		iter.Next()
+	}
+
+	for skip != 0 && advanceIterator(iter, reverse) {
 		skip--
 		skipped++
 	}
@@ -494,11 +513,7 @@ func (db *LevelDb) FetchTxsForAddr(addr dcrutil.Address, skip int,
 	// Iterate through all address indexes that match the targeted prefix.
 	var replies []*database.TxListReply
 	var rawIndex [database.AddrIndexKeySize]byte
-	for iter.Next() {
-		if limit == 0 {
-			break
-		}
-
+	for advanceIterator(iter, reverse) && limit != 0 {
 		copy(rawIndex[:], iter.Key())
 		addrIndex := unpackTxIndex(rawIndex)
 

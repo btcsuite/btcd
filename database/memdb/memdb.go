@@ -748,7 +748,7 @@ func (db *MemDb) DropAddrIndexForBlock(*chainhash.Hash, int64,
 
 // FetchTxsForAddr isn't currently implemented. This is a part of the database.Db
 // interface implementation.
-func (db *MemDb) FetchTxsForAddr(dcrutil.Address, int, int) ([]*database.TxListReply, int, error) {
+func (db *MemDb) FetchTxsForAddr(dcrutil.Address, int, int, bool) ([]*database.TxListReply, int, error) {
 	return nil, 0, database.ErrNotImplemented
 }
 
