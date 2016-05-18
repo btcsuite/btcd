@@ -88,7 +88,7 @@ func (c *Client) DebugLevelAsync(levelSpec string) FutureDebugLevelResult {
 // DebugLevel dynamically sets the debug logging level to the passed level
 // specification.
 //
-// The levelspec can either a debug level or of the form:
+// The levelspec can be either a debug level or of the form:
 // 	<subsystem>=<level>,<subsystem2>=<level2>,...
 //
 // Additionally, the special keyword 'show' can be used to get a list of the
@@ -426,15 +426,14 @@ func (r FutureGetBestBlockResult) Receive() (*chainhash.Hash, int32, error) {
 		return nil, 0, err
 	}
 
-	// Unmarsal result as a getbestblock result object.
+	// Unmarshal result as a getbestblock result object.
 	var bestBlock dcrjson.GetBestBlockResult
-
 	err = json.Unmarshal(res, &bestBlock)
 	if err != nil {
 		return nil, 0, err
 	}
 
-	// Convert hash string.
+	// Convert to hash from string.
 	hash, err := chainhash.NewHashFromStr(bestBlock.Hash)
 	if err != nil {
 		return nil, 0, err
@@ -744,7 +743,7 @@ func (r FutureSessionResult) Receive() (*dcrjson.SessionResult, error) {
 		return nil, err
 	}
 
-	// Unmarsal result as a session result object.
+	// Unmarshal result as a session result object.
 	var session dcrjson.SessionResult
 	err = json.Unmarshal(res, &session)
 	if err != nil {
