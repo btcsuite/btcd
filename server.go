@@ -27,6 +27,7 @@ import (
 	"github.com/decred/dcrd/chaincfg/chainhash"
 	"github.com/decred/dcrd/database"
 	"github.com/decred/dcrd/dcrjson"
+	"github.com/decred/dcrd/txscript"
 	"github.com/decred/dcrd/wire"
 	"github.com/decred/dcrutil"
 )
@@ -94,6 +95,7 @@ type server struct {
 	bytesReceived        uint64     // Total bytes received from all peers since start.
 	bytesSent            uint64     // Total bytes sent by all peers since start.
 	addrManager          *addrmgr.AddrManager
+	sigCache             *txscript.SigCache
 	rpcServer            *rpcServer
 	blockManager         *blockManager
 	addrIndexer          *addrIndexer
@@ -1444,6 +1446,7 @@ func newServer(listenAddrs []string,
 		tmdb:                 tmdb,
 		timeSource:           blockchain.NewMedianTime(),
 		services:             services,
+		sigCache:             txscript.NewSigCache(cfg.SigCacheMaxSize),
 	}
 	bm, err := newBlockManager(&s)
 	if err != nil {

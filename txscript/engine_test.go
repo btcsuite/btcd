@@ -64,7 +64,7 @@ func TestBadPC(t *testing.T) {
 	pkScript := []byte{txscript.OP_NOP}
 
 	for _, test := range pcTests {
-		vm, err := txscript.NewEngine(pkScript, tx, 0, 0, 0)
+		vm, err := txscript.NewEngine(pkScript, tx, 0, 0, 0, nil)
 		if err != nil {
 			t.Errorf("Failed to create script: %v", err)
 		}
@@ -135,7 +135,7 @@ func TestCheckErrorCondition(t *testing.T) {
 		txscript.OP_TRUE,
 	}
 
-	vm, err := txscript.NewEngine(pkScript, tx, 0, 0, 0)
+	vm, err := txscript.NewEngine(pkScript, tx, 0, 0, 0, nil)
 	if err != nil {
 		t.Errorf("failed to create script: %v", err)
 	}
@@ -216,7 +216,7 @@ func TestInvalidFlagCombinations(t *testing.T) {
 	pkScript := []byte{txscript.OP_NOP}
 
 	for i, test := range tests {
-		_, err := txscript.NewEngine(pkScript, tx, 0, test, 0)
+		_, err := txscript.NewEngine(pkScript, tx, 0, test, 0, nil)
 		if err != txscript.ErrInvalidFlags {
 			t.Fatalf("TestInvalidFlagCombinations #%d unexpected "+
 				"error: %v", i, err)

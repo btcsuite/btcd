@@ -31,6 +31,7 @@ type txValidator struct {
 	resultChan   chan error
 	txStore      TxStore
 	flags        txscript.ScriptFlags
+	sigCache     *txscript.SigCache
 }
 
 // sendResult sends the result of a script pair validation on the internal
@@ -87,7 +88,7 @@ out:
 			version := originMsgTx.TxOut[originTxIndex].Version
 
 			vm, err := txscript.NewEngine(pkScript, txVI.tx.MsgTx(),
-				txVI.txInIndex, v.flags, version)
+				txVI.txInIndex, v.flags, version, v.sigCache)
 			if err != nil {
 				str := fmt.Sprintf("failed to parse input "+
 					"%s:%d which references output %s:%d - "+
@@ -182,12 +183,13 @@ func (v *txValidator) Validate(items []*txValidateItem) error {
 
 // newTxValidator returns a new instance of txValidator to be used for
 // validating transaction scripts asynchronously.
-func newTxValidator(txStore TxStore, flags txscript.ScriptFlags) *txValidator {
+func newTxValidator(txStore TxStore, flags txscript.ScriptFlags, sigCache *txscript.SigCache) *txValidator {
 	return &txValidator{
 		validateChan: make(chan *txValidateItem),
 		quitChan:     make(chan struct{}),
 		resultChan:   make(chan error),
 		txStore:      txStore,
+		sigCache:     sigCache,
 		flags:        flags,
 	}
 }
@@ -195,7 +197,8 @@ func newTxValidator(txStore TxStore, flags txscript.ScriptFlags) *txValidator {
 // ValidateTransactionScripts validates the scripts for the passed transaction
 // using multiple goroutines.
 func ValidateTransactionScripts(tx *dcrutil.Tx, txStore TxStore,
-	flags txscript.ScriptFlags) error {
+	flags txscript.ScriptFlags, sigCache *txscript.SigCache) error {
+
 	// Collect all of the transaction inputs and required information for
 	// validation.
 	txIns := tx.MsgTx().TxIn
@@ -215,7 +218,7 @@ func ValidateTransactionScripts(tx *dcrutil.Tx, txStore TxStore,
 	}
 
 	// Validate all of the inputs.
-	validator := newTxValidator(txStore, flags)
+	validator := newTxValidator(txStore, flags, sigCache)
 	if err := validator.Validate(txValItems); err != nil {
 		return err
 	}
@@ -228,7 +231,7 @@ func ValidateTransactionScripts(tx *dcrutil.Tx, txStore TxStore,
 // the passed block.
 // txTree = true is TxTreeRegular, txTree = false is TxTreeStake.
 func checkBlockScripts(block *dcrutil.Block, txStore TxStore, txTree bool,
-	scriptFlags txscript.ScriptFlags) error {
+	scriptFlags txscript.ScriptFlags, sigCache *txscript.SigCache) error {
 
 	// Collect all of the transaction inputs and required information for
 	// validation for all transactions in the block into a single slice.
@@ -263,7 +266,7 @@ func checkBlockScripts(block *dcrutil.Block, txStore TxStore, txTree bool,
 	}
 
 	// Validate all of the inputs.
-	validator := newTxValidator(txStore, scriptFlags)
+	validator := newTxValidator(txStore, scriptFlags, sigCache)
 	if err := validator.Validate(txValItems); err != nil {
 		return err
 	}

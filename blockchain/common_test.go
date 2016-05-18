@@ -127,7 +127,7 @@ func chainSetup(dbName string, params *chaincfg.Params) (*blockchain.BlockChain,
 	tmdb.Initialize(params, db)
 	tmdb.RescanTicketDB()
 
-	chain := blockchain.New(db, tmdb, params, nil)
+	chain := blockchain.New(db, tmdb, params, nil, nil)
 	return chain, teardown, nil
 }
 

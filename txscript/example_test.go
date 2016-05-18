@@ -170,7 +170,7 @@ func ExampleSignTxOutput() {
 	flags := txscript.ScriptBip16 | txscript.ScriptVerifyDERSignatures |
 		txscript.ScriptDiscourageUpgradableNops
 	vm, err := txscript.NewEngine(originTx.TxOut[0].PkScript, redeemTx, 0,
-		flags, 0)
+		flags, 0, nil)
 	if err != nil {
 		fmt.Println(err)
 		return

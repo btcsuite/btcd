@@ -2406,9 +2406,24 @@ func opcodeCheckSig(op *parsedOpcode, vm *Engine) error {
 		return nil
 	}
 
-	ok := chainec.Secp256k1.Verify(pubKey, hash, signature.GetR(),
-		signature.GetS())
-	vm.dstack.PushBool(ok)
+	var valid bool
+	if vm.sigCache != nil {
+		var sigHash chainhash.Hash
+		copy(sigHash[:], hash)
+
+		valid = vm.sigCache.Exists(sigHash, signature, pubKey)
+		if !valid && chainec.Secp256k1.Verify(pubKey, hash,
+			signature.GetR(), signature.GetS()) {
+
+			vm.sigCache.Add(sigHash, signature, pubKey)
+			valid = true
+		}
+	} else {
+		valid = chainec.Secp256k1.Verify(pubKey, hash, signature.GetR(),
+			signature.GetS())
+	}
+
+	vm.dstack.PushBool(valid)
 	return nil
 }
 
@@ -2594,9 +2609,24 @@ func opcodeCheckMultiSig(op *parsedOpcode, vm *Engine) error {
 			return err
 		}
 
-		//if parsedSig.Verify(hash, parsedPubKey) {
-		if chainec.Secp256k1.Verify(parsedPubKey, hash, parsedSig.GetR(),
-			parsedSig.GetS()) {
+		var valid bool
+		if vm.sigCache != nil {
+			var sigHash chainhash.Hash
+			copy(sigHash[:], hash)
+
+			valid = vm.sigCache.Exists(sigHash, parsedSig, parsedPubKey)
+			if !valid && chainec.Secp256k1.Verify(parsedPubKey, hash,
+				parsedSig.GetR(), parsedSig.GetS()) {
+
+				vm.sigCache.Add(sigHash, parsedSig, parsedPubKey)
+				valid = true
+			}
+		} else {
+			valid = chainec.Secp256k1.Verify(parsedPubKey, hash,
+				parsedSig.GetR(), parsedSig.GetS())
+		}
+
+		if valid {
 			// PubKey verified, move on to the next signature.
 			signatureIdx++
 			numSignatures--

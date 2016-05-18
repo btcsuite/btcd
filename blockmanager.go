@@ -2912,7 +2912,8 @@ func newBlockManager(s *server) (*blockManager, error) {
 		quit:                make(chan struct{}),
 	}
 	bm.progressLogger = newBlockProgressLogger("Processed", bmgrLog)
-	bm.blockChain = blockchain.New(s.db, s.tmdb, s.chainParams, bm.handleNotifyMsg)
+	bm.blockChain = blockchain.New(s.db, s.tmdb, s.chainParams,
+		bm.handleNotifyMsg, s.sigCache)
 	bm.blockChain.DisableCheckpoints(cfg.DisableCheckpoints)
 	if !cfg.DisableCheckpoints {
 		// Initialize the next checkpoint based on the current height.

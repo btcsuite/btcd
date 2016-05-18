@@ -2586,8 +2586,8 @@ func (b *BlockChain) checkConnectBlock(node *blockNode,
 
 		if regularTxTreeValid {
 			// TxTreeRegular of previous block.
-			err = checkBlockScripts(parentBlock, txInputStoreInitial, true,
-				scriptFlags)
+			err = checkBlockScripts(parentBlock, txInputStoreInitial,
+				true, scriptFlags, b.sigCache)
 			if err != nil {
 				log.Tracef("checkBlockScripts failed; error "+
 					"returned on txtreeregular of prev block: %v",
@@ -2597,7 +2597,8 @@ func (b *BlockChain) checkConnectBlock(node *blockNode,
 		}
 
 		// TxTreeStake of current block.
-		err = checkBlockScripts(block, txInputStoreStake, false, scriptFlags)
+		err = checkBlockScripts(block, txInputStoreStake, false,
+			scriptFlags, b.sigCache)
 		if err != nil {
 			log.Tracef("checkBlockScripts failed; error "+
 				"returned on txtreestake of cur block: %v", err.Error())
@@ -2605,7 +2606,8 @@ func (b *BlockChain) checkConnectBlock(node *blockNode,
 		}
 
 		// TxTreeRegular of current block.
-		err = checkBlockScripts(block, txInputStoreRegular, true, scriptFlags)
+		err = checkBlockScripts(block, txInputStoreRegular, true,
+			scriptFlags, b.sigCache)
 		if err != nil {
 			log.Tracef("checkBlockScripts failed; error "+
 				"returned on txtreeregular of cur block: %v", err.Error())

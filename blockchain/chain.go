@@ -18,6 +18,7 @@ import (
 	"github.com/decred/dcrd/chaincfg"
 	"github.com/decred/dcrd/chaincfg/chainhash"
 	"github.com/decred/dcrd/database"
+	"github.com/decred/dcrd/txscript"
 	"github.com/decred/dcrd/wire"
 	"github.com/decred/dcrutil"
 )
@@ -186,6 +187,7 @@ type BlockChain struct {
 	noCheckpoints         bool
 	nextCheckpoint        *chaincfg.Checkpoint
 	checkpointBlock       *dcrutil.Block
+	sigCache              *txscript.SigCache
 }
 
 // StakeValidationHeight returns the height at which proof of stake validation
@@ -1607,7 +1609,8 @@ func maxInt64(a, b int64) int64 {
 // notifications.  The provided callback can be nil if the caller is not
 // interested in receiving notifications.
 func New(db database.Db, tmdb *stake.TicketDB, params *chaincfg.Params,
-	c NotificationCallback) *BlockChain {
+	c NotificationCallback, sigCache *txscript.SigCache) *BlockChain {
+
 	// Generate a checkpoint by height map from the provided checkpoints.
 	var checkpointsByHeight map[int64]*chaincfg.Checkpoint
 	if len(params.Checkpoints) > 0 {
@@ -1630,6 +1633,7 @@ func New(db database.Db, tmdb *stake.TicketDB, params *chaincfg.Params,
 	b := BlockChain{
 		db:                    db,
 		tmdb:                  tmdb,
+		sigCache:              sigCache,
 		chainParams:           params,
 		checkpointsByHeight:   checkpointsByHeight,
 		notifications:         c,

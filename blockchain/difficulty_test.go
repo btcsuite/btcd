@@ -97,7 +97,7 @@ func TestDiff(t *testing.T) {
 		return
 	}
 
-	chain := blockchain.New(db, tmdb, &chaincfg.MainNetParams, nil)
+	chain := blockchain.New(db, tmdb, &chaincfg.MainNetParams, nil, nil)
 
 	//timeSource := blockchain.NewMedianTime()
 

@@ -1596,7 +1596,7 @@ mempoolLoop:
 			continue
 		}
 		err = blockchain.ValidateTransactionScripts(tx, blockTxStore,
-			txscript.StandardVerifyFlags)
+			txscript.StandardVerifyFlags, mempool.server.sigCache)
 		if err != nil {
 			minrLog.Tracef("Skipping tx %s due to error in "+
 				"ValidateTransactionScripts: %v", tx.Sha(), err)

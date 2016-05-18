@@ -81,7 +81,7 @@ func mkGetScript(scripts map[string][]byte) txscript.ScriptDB {
 func checkScripts(msg string, tx *wire.MsgTx, idx int, sigScript, pkScript []byte) error {
 	tx.TxIn[idx].SignatureScript = sigScript
 	vm, err := txscript.NewEngine(pkScript, tx, idx,
-		txscript.ScriptBip16|txscript.ScriptVerifyDERSignatures, 0)
+		txscript.ScriptBip16|txscript.ScriptVerifyDERSignatures, 0, nil)
 	if err != nil {
 		return fmt.Errorf("failed to make script engine for %s: %v",
 			msg, err)
@@ -2305,7 +2305,8 @@ nexttest:
 		scriptFlags := txscript.ScriptBip16 | txscript.ScriptVerifyDERSignatures
 		for j := range tx.TxIn {
 			vm, err := txscript.NewEngine(sigScriptTests[i].
-				inputs[j].txout.PkScript, tx, j, scriptFlags, 0)
+				inputs[j].txout.PkScript, tx, j, scriptFlags, 0,
+				nil)
 			if err != nil {
 				t.Errorf("cannot create script vm for test %v: %v",
 					sigScriptTests[i].name, err)

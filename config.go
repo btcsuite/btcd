@@ -49,6 +49,7 @@ const (
 	defaultNonAggressive     = false
 	defaultNoMiningStateSync = false
 	defaultAllowOldVotes     = false
+	defaultSigCacheMaxSize   = 50000
 )
 
 var (
@@ -127,6 +128,7 @@ type config struct {
 	NoMiningStateSync  bool          `long:"nominingstatesync" description:"Disable synchronizing the mining state with other nodes"`
 	AllowOldVotes      bool          `long:"allowoldvotes" description:"Enable the addition of very old votes to the mempool"`
 	NoPeerBloomFilters bool          `long:"nopeerbloomfilters" description:"Disable bloom filtering support."`
+	SigCacheMaxSize    uint          `long:"sigcachemaxsize" description:"The maximum number of entries in the signature verification cache."`
 	onionlookup        func(string) ([]net.IP, error)
 	lookup             func(string) ([]net.IP, error)
 	oniondial          func(string, string) (net.Conn, error)
@@ -333,6 +335,7 @@ func loadConfig() (*config, []string, error) {
 		BlockMinSize:      defaultBlockMinSize,
 		BlockMaxSize:      defaultBlockMaxSize,
 		BlockPrioritySize: defaultBlockPrioritySize,
+		SigCacheMaxSize:   defaultSigCacheMaxSize,
 		MaxOrphanTxs:      maxOrphanTransactions,
 		Generate:          defaultGenerate,
 		NoAddrIndex:       defaultAddrIndex,

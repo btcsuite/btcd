@@ -54,7 +54,7 @@ func findCandidates(db database.Db, latestHash *chainhash.Hash) ([]*chaincfg.Che
 
 	// Setup chain and get the latest checkpoint.  Ignore notifications
 	// since they aren't needed for this util.
-	chain := blockchain.New(db, nil, activeNetParams, nil)
+	chain := blockchain.New(db, nil, activeNetParams, nil, nil)
 	latestCheckpoint := chain.LatestCheckpoint()
 	if latestCheckpoint == nil {
 		// Set the latest checkpoint to the genesis block if there isn't

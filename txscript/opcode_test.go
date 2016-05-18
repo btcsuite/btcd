@@ -468,7 +468,7 @@ func TestNewlyEnabledOpCodes(t *testing.T) {
 			PkScript: []byte{0x01},
 		})
 		flags := StandardVerifyFlags
-		engine, err := NewEngine(test.pkScript, msgTx, 0, flags, 0)
+		engine, err := NewEngine(test.pkScript, msgTx, 0, flags, 0, nil)
 		if err != nil {
 			t.Errorf("Bad script result for test %v because of error: %v",
 				test.name, err.Error())
@@ -537,7 +537,8 @@ func TestForVMFailure(t *testing.T) {
 				PkScript: []byte{0x01},
 			})
 			flags := StandardVerifyFlags
-			engine, err := NewEngine(tests[j], msgTx, 0, flags, 0)
+			engine, err := NewEngine(tests[j], msgTx, 0, flags, 0,
+				nil)
 
 			if err == nil {
 				engine.Execute()
