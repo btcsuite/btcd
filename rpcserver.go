@@ -445,15 +445,15 @@ func handleNode(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (inter
 	c := cmd.(*dcrjson.NodeCmd)
 
 	var addr string
-	var nodeId uint64
+	var nodeID uint64
 	var errN, err error
 	switch c.SubCmd {
 	case "disconnect":
 		// If we have a valid uint disconnect by node id. Otherwise,
 		// attempt to disconnect by address, returning an error if a
 		// valid IP address is not supplied.
-		if nodeId, errN = strconv.ParseUint(c.Target, 10, 32); errN == nil {
-			err = s.server.DisconnectNodeById(int32(nodeId))
+		if nodeID, errN = strconv.ParseUint(c.Target, 10, 32); errN == nil {
+			err = s.server.DisconnectNodeByID(int32(nodeID))
 		} else {
 			if _, _, errP := net.SplitHostPort(c.Target); errP == nil || net.ParseIP(c.Target) != nil {
 				addr = normalizeAddress(c.Target, activeNetParams.DefaultPort)
@@ -465,7 +465,7 @@ func handleNode(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (inter
 				}
 			}
 		}
-		if err != nil && peerExists(s.server.PeerInfo(), addr, int32(nodeId)) {
+		if err != nil && peerExists(s.server.PeerInfo(), addr, int32(nodeID)) {
 			return nil, &dcrjson.RPCError{
 				Code:    dcrjson.ErrRPCMisc,
 				Message: "can't disconnect a permanent peer, use remove",
@@ -475,8 +475,8 @@ func handleNode(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (inter
 		// If we have a valid uint disconnect by node id. Otherwise,
 		// attempt to disconnect by address, returning an error if a
 		// valid IP address is not supplied.
-		if nodeId, errN = strconv.ParseUint(c.Target, 10, 32); errN == nil {
-			err = s.server.RemoveNodeById(int32(nodeId))
+		if nodeID, errN = strconv.ParseUint(c.Target, 10, 32); errN == nil {
+			err = s.server.RemoveNodeByID(int32(nodeID))
 		} else {
 			if _, _, errP := net.SplitHostPort(c.Target); errP == nil || net.ParseIP(c.Target) != nil {
 				addr = normalizeAddress(c.Target, activeNetParams.DefaultPort)
@@ -488,7 +488,7 @@ func handleNode(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (inter
 				}
 			}
 		}
-		if err != nil && peerExists(s.server.PeerInfo(), addr, int32(nodeId)) {
+		if err != nil && peerExists(s.server.PeerInfo(), addr, int32(nodeID)) {
 			return nil, &dcrjson.RPCError{
 				Code:    dcrjson.ErrRPCMisc,
 				Message: "can't remove a temporary peer, use disconnect",
@@ -533,9 +533,9 @@ func handleNode(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (inter
 // peerExists determines if a certain peer is currently connected given
 // information about all currently connected peers. Peer existence is
 // determined using either a target address or node id.
-func peerExists(peerInfos []*dcrjson.GetPeerInfoResult, addr string, nodeId int32) bool {
+func peerExists(peerInfos []*dcrjson.GetPeerInfoResult, addr string, nodeID int32) bool {
 	for _, peerInfo := range peerInfos {
-		if peerInfo.ID == nodeId || peerInfo.Addr == addr {
+		if peerInfo.ID == nodeID || peerInfo.Addr == addr {
 			return true
 		}
 	}
