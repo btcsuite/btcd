@@ -406,7 +406,7 @@ func (p *peer) handleVersionMsg(msg *wire.MsgVersion) error {
 
 	// Notify and disconnect clients that have a protocol version that is
 	// too old.
-	if msg.ProtocolVersion < 1 { // TODO fix magic number cj
+	if msg.ProtocolVersion < int32(wire.InitialProcotolVersion) {
 		// Send a reject message indicating the protocol version is
 		// obsolete and wait for the message to be sent before
 		// disconnecting.
@@ -756,7 +756,7 @@ func (p *peer) PushMiningStateMsg(height uint32, blockHashes []*chainhash.Hash, 
 func (p *peer) PushRejectMsg(command string, code wire.RejectCode, reason string, hash *chainhash.Hash, wait bool) {
 	// Don't bother sending the reject message if the protocol version
 	// is too low.
-	if p.VersionKnown() && p.ProtocolVersion() < 1 { // TODO fix magic number cj
+	if p.VersionKnown() && p.ProtocolVersion() < wire.InitialProcotolVersion {
 		return
 	}
 
