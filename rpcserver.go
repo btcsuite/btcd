@@ -3517,7 +3517,7 @@ func handleGetInfo(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (in
 		Proxy:           cfg.Proxy,
 		Difficulty:      getDifficultyRatio(blkHeader.Bits),
 		TestNet:         cfg.TestNet,
-		RelayFee:        minTxRelayFee / dcrutil.AtomsPerCoin,
+		RelayFee:        cfg.minRelayTxFee.ToCoin(),
 	}
 
 	return ret, nil

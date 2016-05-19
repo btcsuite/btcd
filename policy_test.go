@@ -25,19 +25,19 @@ func TestCalcMinRequiredTxRelayFee(t *testing.T) {
 		{
 			"zero value with default minimum relay fee",
 			0,
-			minTxRelayFee,
-			int64(minTxRelayFee),
+			defaultMinRelayTxFee,
+			int64(defaultMinRelayTxFee),
 		},
 		{
 			"1000 bytes with default minimum relay fee",
 			1000,
-			minTxRelayFee,
-			int64(minTxRelayFee),
+			defaultMinRelayTxFee,
+			int64(defaultMinRelayTxFee),
 		},
 		{
 			"max standard tx size with default minimum relay fee",
 			maxStandardTxSize,
-			minTxRelayFee,
+			defaultMinRelayTxFee,
 			100000000,
 		},
 		{
@@ -49,7 +49,7 @@ func TestCalcMinRequiredTxRelayFee(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		got := calcMinRequiredTxRelayFee(test.size, int64(test.relayFee))
+		got := calcMinRequiredTxRelayFee(test.size, test.relayFee)
 		if got != test.want {
 			t.Errorf("TestCalcMinRequiredTxRelayFee test '%s' "+
 				"failed: got %v want %v", test.name, got,

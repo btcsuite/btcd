@@ -17,7 +17,7 @@ import (
 // calcMinRequiredTxRelayFee returns the minimum transaction fee required for a
 // transaction with the passed serialized size to be accepted into the memory
 // pool and relayed.
-func calcMinRequiredTxRelayFee(serializedSize, minRelayTxFee int64) int64 {
+func calcMinRequiredTxRelayFee(serializedSize int64, minRelayTxFee dcrutil.Amount) int64 {
 	// Calculate the minimum fee for a transaction to be allowed into the
 	// mempool and relayed by scaling the base fee (which is the minimum
 	// free transaction relay fee).  minTxRelayFee is in Atom/KB, so
@@ -25,10 +25,10 @@ func calcMinRequiredTxRelayFee(serializedSize, minRelayTxFee int64) int64 {
 	// integer division is used so fees only increase on full kilobyte
 	// boundaries.
 
-	minFee := (serializedSize * minRelayTxFee) / 1000
+	minFee := (serializedSize * int64(minRelayTxFee)) / 1000
 
 	if minFee == 0 && minRelayTxFee > 0 {
-		minFee = minRelayTxFee
+		minFee = int64(minRelayTxFee)
 	}
 
 	// Set the minimum fee to the maximum possible value if the calculated

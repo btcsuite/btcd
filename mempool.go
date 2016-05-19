@@ -73,12 +73,12 @@ const (
 	// considered standard.
 	maxStandardMultiSigKeys = 3
 
-	// minTxRelayFee is the minimum fee in atoms that is required for a
-	// transaction to be treated as free for relay and mining purposes.  It
-	// is also used to help determine if a transaction is considered dust
-	// and as a base for calculating minimum required fees per KB for larger
-	// transactions.  This value is in Atom/1000 bytes.
-	minTxRelayFee = 1e6
+	// defaultMinRelayTxFee is the minimum fee in atoms that is required
+	// for a transaction to be treated as free for relay and mining
+	// purposes.  It is also used to help determine if a transaction is
+	// considered dust and as a base for calculating minimum required fees
+	// for larger transactions.  This value is in Atoms/1000 bytes.
+	defaultMinRelayTxFee = dcrutil.Amount(1e6)
 
 	// minTicketFeeMainNet is the minimum fee per KB in atoms that is
 	// required for a ticket to enter the mempool on MainNet.
@@ -478,7 +478,7 @@ func (mp *txMemPool) checkTransactionStandard(tx *dcrutil.Tx, txType stake.TxTyp
 		// "dust".
 		if scriptClass == txscript.NullDataTy {
 			numNullDataOutputs++
-		} else if isDust(txOut, minTxRelayFee) &&
+		} else if isDust(txOut, cfg.minRelayTxFee) &&
 			txType != stake.TxTypeSStx {
 			str := fmt.Sprintf("transaction output %d: payment "+
 				"of %d is dust", i, txOut.Value)
@@ -1406,7 +1406,7 @@ func (mp *txMemPool) maybeAcceptTransaction(tx *dcrutil.Tx, isNew,
 	// high-priority transactions, don't require a fee for it.
 	// This applies to non-stake transactions only.
 	serializedSize := int64(tx.MsgTx().SerializeSize())
-	minFee := calcMinRequiredTxRelayFee(serializedSize, minTxRelayFee)
+	minFee := calcMinRequiredTxRelayFee(serializedSize, cfg.minRelayTxFee)
 	if txType == stake.TxTypeRegular { // Non-stake only
 		if serializedSize >= (defaultBlockPrioritySize-1000) && txFee < minFee {
 			str := fmt.Sprintf("transaction %v has %v fees which is under "+
@@ -1482,7 +1482,7 @@ func (mp *txMemPool) maybeAcceptTransaction(tx *dcrutil.Tx, isNew,
 	// then they can AllowHighFees = true
 	if !allowHighFees {
 		maxFee := calcMinRequiredTxRelayFee(serializedSize*maxRelayFeeMultiplier,
-			minTxRelayFee)
+			cfg.minRelayTxFee)
 		if txFee > maxFee {
 			err = fmt.Errorf("transaction %v has %v fee which is above the "+
 				"allowHighFee check threshold amount of %v", txHash,
