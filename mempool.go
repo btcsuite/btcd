@@ -68,11 +68,6 @@ const (
 	// (1 + 15*74 + 3) + (15*34 + 3) + 23 = 1650
 	maxStandardSigScriptSize = 1650
 
-	// maxStandardMultiSigKeys is the maximum number of public keys allowed
-	// in a multi-signature transaction output script for it to be
-	// considered standard.
-	maxStandardMultiSigKeys = 3
-
 	// defaultMinRelayTxFee is the minimum fee in atoms that is required
 	// for a transaction to be treated as free for relay and mining
 	// purposes.  It is also used to help determine if a transaction is

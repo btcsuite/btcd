@@ -14,6 +14,13 @@ import (
 	"github.com/decred/dcrutil"
 )
 
+const (
+	// maxStandardMultiSigKeys is the maximum number of public keys allowed
+	// in a multi-signature transaction output script for it to be
+	// considered standard.
+	maxStandardMultiSigKeys = 3
+)
+
 // calcMinRequiredTxRelayFee returns the minimum transaction fee required for a
 // transaction with the passed serialized size to be accepted into the memory
 // pool and relayed.
@@ -24,7 +31,6 @@ func calcMinRequiredTxRelayFee(serializedSize int64, minRelayTxFee dcrutil.Amoun
 	// divide the transaction size by 1000 to convert to kilobytes.  Also,
 	// integer division is used so fees only increase on full kilobyte
 	// boundaries.
-
 	minFee := (serializedSize * int64(minRelayTxFee)) / 1000
 
 	if minFee == 0 && minRelayTxFee > 0 {
@@ -87,6 +93,7 @@ func calcPriority(tx *dcrutil.Tx, inputValueAge float64) float64 {
 // contribute no additional input age to the transaction.
 func calcInputValueAge(txDesc *TxDesc, txStore blockchain.TxStore,
 	nextBlockHeight int64) float64 {
+
 	var totalInputAge float64
 	for _, txIn := range txDesc.Tx.MsgTx().TxIn {
 		originHash := &txIn.PreviousOutPoint.Hash
@@ -124,9 +131,9 @@ func calcInputValueAge(txDesc *TxDesc, txStore blockchain.TxStore,
 // process like OP_DUP OP_CHECKSIG OP_DROP repeated a large number of times
 // followed by a final OP_TRUE.
 // Decred TODO: I think this is okay, but we'll see with simnet.
-func checkInputsStandard(tx *dcrutil.Tx,
-	txType stake.TxType,
+func checkInputsStandard(tx *dcrutil.Tx, txType stake.TxType,
 	txStore blockchain.TxStore) error {
+
 	// NOTE: The reference implementation also does a coinbase check here,
 	// but coinbases have already been rejected prior to calling this
 	// function so no need to recheck.
@@ -235,10 +242,11 @@ func checkPkScriptStandard(version uint16, pkScript []byte,
 }
 
 // isDust returns whether or not the passed transaction output amount is
-// considered dust or not.  Dust is defined in terms of the minimum transaction
-// relay fee.  In particular, if the cost to the network to spend coins is more
-// than 1/3 of the minimum transaction relay fee, it is considered dust.
-func isDust(txOut *wire.TxOut, minTxRelayFee dcrutil.Amount) bool {
+// considered dust or not based on the passed minimum transaction relay fee.
+// Dust is defined in terms of the minimum transaction relay fee.  In
+// particular, if the cost to the network to spend coins is more than 1/3 of the
+// minimum transaction relay fee, it is considered dust.
+func isDust(txOut *wire.TxOut, minRelayTxFee dcrutil.Amount) bool {
 	// Unspendable outputs are considered dust.
 	if txscript.IsUnspendable(txOut.PkScript) {
 		return true
@@ -305,8 +313,7 @@ func isDust(txOut *wire.TxOut, minTxRelayFee dcrutil.Amount) bool {
 	//
 	// The following is equivalent to (value/totalSize) * (1/3) * 1000
 	// without needing to do floating point math.
-
-	return txOut.Value*1000/(3*int64(totalSize)) < int64(minTxRelayFee)
+	return txOut.Value*1000/(3*int64(totalSize)) < int64(minRelayTxFee)
 }
 
 // minInt is a helper function to return the minimum of two ints.  This avoids
