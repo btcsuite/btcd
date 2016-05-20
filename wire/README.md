@@ -1,36 +1,23 @@
 wire
 ====
 
-[![ISC License]
+[![Build Status](http://img.shields.io/travis/decred/dcrd.svg)]
+(https://travis-ci.org/decred/dcrd) [![ISC License]
 (http://img.shields.io/badge/license-ISC-blue.svg)](http://copyfree.org)
+[![GoDoc](https://img.shields.io/badge/godoc-reference-blue.svg)]
+(http://godoc.org/github.com/decred/dcrd/wire)
 
 Package wire implements the decred wire protocol.  A comprehensive suite of
 tests with 100% test coverage is provided to ensure proper functionality.
-
-There is an associated blog post about the release of this package
-[here](https://blog.conformal.com/btcwire-the-bitcoin-wire-protocol-package-from-dcrd/).
 
 This package has intentionally been designed so it can be used as a standalone
 package for any projects needing to interface with decred peers at the wire
 protocol level.
 
-## Documentation
-
-[![GoDoc](https://img.shields.io/badge/godoc-reference-blue.svg)]
-(http://godoc.org/github.com/decred/dcrd/wire)
-
-Full `go doc` style documentation for the project can be viewed online without
-installing this package by using the GoDoc site here:
-http://godoc.org/github.com/decred/dcrd/wire
-
-You can also view the documentation locally once the package is installed with
-the `godoc` tool by running `godoc -http=":6060"` and pointing your browser to
-http://localhost:6060/pkg/github.com/decred/dcrd/wire
-
-## Installation
+## Installation and Updating
 
 ```bash
-$ go get github.com/decred/dcrd/wire
+$ go get -u github.com/decred/dcrd/wire
 ```
 
 ## Decred Message Overview

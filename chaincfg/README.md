@@ -1,7 +1,11 @@
 chaincfg
 ========
 
+[![Build Status](http://img.shields.io/travis/decred/dcrd.svg)]
+(https://travis-ci.org/decred/dcrd) [![ISC License]
 (http://img.shields.io/badge/license-ISC-blue.svg)](http://copyfree.org)
+[![GoDoc](https://img.shields.io/badge/godoc-reference-blue.svg)]
+(http://godoc.org/github.com/decred/dcrd/chaincfg)
 
 Package chaincfg defines chain configuration parameters for the three standard
 Decred networks and provides the ability for callers to define their own custom
@@ -51,23 +55,10 @@ func main() {
 }
 ```
 
-## Documentation
-
-[![GoDoc](https://img.shields.io/badge/godoc-reference-blue.svg)]
-(http://godoc.org/github.com/decred/dcrd/chaincfg)
-
-Full `go doc` style documentation for the project can be viewed online without
-installing this package by using the GoDoc site
-[here](http://godoc.org/github.com/decred/dcrd/chaincfg).
-
-You can also view the documentation locally once the package is installed with
-the `godoc` tool by running `godoc -http=":6060"` and pointing your browser to
-http://localhost:6060/pkg/github.com/decred/dcrd/chaincfg
-
-## Installation
+## Installation and Updating
 
 ```bash
-$ go get github.com/decred/dcrd/chaincfg
+$ go get -u github.com/decred/dcrd/chaincfg
 ```
 
 ## License

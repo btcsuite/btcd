@@ -1,10 +1,13 @@
 dcrjson
 =======
 
-[![ISC License]
+[![Build Status](http://img.shields.io/travis/decred/dcrd.svg)]
+(https://travis-ci.org/decred/dcrd) [![ISC License]
 (http://img.shields.io/badge/license-ISC-blue.svg)](http://copyfree.org)
+[![GoDoc](https://img.shields.io/badge/godoc-reference-blue.svg)]
+(http://godoc.org/github.com/decred/dcrd/dcrjson)
 
-Package btcjson implements concrete types for marshalling to and from the
+Package dcrjson implements concrete types for marshalling to and from the
 bitcoin JSON-RPC API.  A comprehensive suite of tests is provided to ensure
 proper functionality.
 
@@ -15,48 +18,35 @@ projects needing to marshal to and from bitcoin JSON-RPC requests and responses.
 Note that although it's possible to use this package directly to implement an
 RPC client, it is not recommended since it is only intended as an infrastructure
 package.  Instead, RPC clients should use the
-[btcrpcclient](https://github.com/decred/btcrpcclient) package which provides
+[dcrrpcclient](https://github.com/decred/dcrrpcclient) package which provides
 a full blown RPC client with many features such as automatic connection
 management, websocket support, automatic notification re-registration on
 reconnect, and conversion from the raw underlying RPC types (strings, floats,
 ints, etc) to higher-level types with many nice and useful properties.
 
-## Documentation
-
-[![GoDoc](https://img.shields.io/badge/godoc-reference-blue.svg)]
-(http://godoc.org/github.com/decred/dcrd/btcjson)
-
-Full `go doc` style documentation for the project can be viewed online without
-installing this package by using the GoDoc site
-[here](http://godoc.org/github.com/decred/dcrd/btcjson).
-
-You can also view the documentation locally once the package is installed with
-the `godoc` tool by running `godoc -http=":6060"` and pointing your browser to
-http://localhost:6060/pkg/github.com/decred/dcrd/btcjson
-
-## Installation
+## Installation and Updating
 
 ```bash
-$ go get github.com/decred/dcrd/btcjson
+$ go get -u github.com/decred/dcrd/dcrjson
 ```
 
 ## Examples
 
 * [Marshal Command]
-  (http://godoc.org/github.com/decred/dcrd/btcjson#example-MarshalCmd)  
+  (http://godoc.org/github.com/decred/dcrd/dcrjson#example-MarshalCmd)  
   Demonstrates how to create and marshal a command into a JSON-RPC request.
 
 * [Unmarshal Command]
-  (http://godoc.org/github.com/decred/dcrd/btcjson#example-UnmarshalCmd)  
+  (http://godoc.org/github.com/decred/dcrd/dcrjson#example-UnmarshalCmd)  
   Demonstrates how to unmarshal a JSON-RPC request and then unmarshal the
   concrete request into a concrete command.
 
 * [Marshal Response]
-  (http://godoc.org/github.com/decred/dcrd/btcjson#example-MarshalResponse)  
+  (http://godoc.org/github.com/decred/dcrd/dcrjson#example-MarshalResponse)  
   Demonstrates how to marshal a JSON-RPC response.
 
 * [Unmarshal Response]
-  (http://godoc.org/github.com/decred/dcrd/btcjson#example-package--UnmarshalResponse)  
+  (http://godoc.org/github.com/decred/dcrd/dcrjson#example-package--UnmarshalResponse)  
   Demonstrates how to unmarshal a JSON-RPC response and then unmarshal the
   result field in the response to a concrete type.
 
@@ -82,5 +72,5 @@ verify the signature perform the following:
 
 ## License
 
-Package btcjson is licensed under the [copyfree](http://copyfree.org) ISC
+Package dcrjson is licensed under the [copyfree](http://copyfree.org) ISC
 License.
