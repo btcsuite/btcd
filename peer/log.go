@@ -1,25 +1,19 @@
-// Copyright (c) 2013-2014 The btcsuite developers
-// Copyright (c) 2015 The Decred developers
+// Copyright (c) 2015 The btcsuite developers
+// Copyright (c) 2016 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
-package main
+package peer
 
 import (
+	"errors"
 	"fmt"
-	"os"
+	"io"
 	"strings"
 	"time"
 
 	"github.com/btcsuite/btclog"
-	"github.com/btcsuite/seelog"
-
-	"github.com/decred/dcrd/addrmgr"
-	"github.com/decred/dcrd/blockchain"
-	"github.com/decred/dcrd/blockchain/stake"
 	"github.com/decred/dcrd/chaincfg/chainhash"
-	"github.com/decred/dcrd/database"
-	"github.com/decred/dcrd/peer"
 	"github.com/decred/dcrd/txscript"
 	"github.com/decred/dcrd/wire"
 )
@@ -30,179 +24,63 @@ const (
 	maxRejectReasonLen = 250
 )
 
-// Loggers per subsytem.  Note that backendLog is a seelog logger that all of
-// the subsystem loggers route their messages to.  When adding new subsystems,
-// add a reference here, to the subsystemLoggers map, and the useLogger
-// function.
-var (
-	backendLog = seelog.Disabled
-	adxrLog    = btclog.Disabled
-	amgrLog    = btclog.Disabled
-	bcdbLog    = btclog.Disabled
-	bmgrLog    = btclog.Disabled
-	dcrdLog    = btclog.Disabled
-	chanLog    = btclog.Disabled
-	discLog    = btclog.Disabled
-	minrLog    = btclog.Disabled
-	peerLog    = btclog.Disabled
-	rpcsLog    = btclog.Disabled
-	scrpLog    = btclog.Disabled
-	srvrLog    = btclog.Disabled
-	stkeLog    = btclog.Disabled
-	txmpLog    = btclog.Disabled
-)
+// log is a logger that is initialized with no output filters.  This
+// means the package will not perform any logging by default until the caller
+// requests it.
+var log btclog.Logger
 
-// subsystemLoggers maps each subsystem identifier to its associated logger.
-var subsystemLoggers = map[string]btclog.Logger{
-	"ADXR": adxrLog,
-	"AMGR": amgrLog,
-	"BCDB": bcdbLog,
-	"BMGR": bmgrLog,
-	"DCRD": dcrdLog,
-	"CHAN": chanLog,
-	"DISC": discLog,
-	"MINR": minrLog,
-	"PEER": peerLog,
-	"RPCS": rpcsLog,
-	"SCRP": scrpLog,
-	"SRVR": srvrLog,
-	"STKE": stkeLog,
-	"TXMP": txmpLog,
+// The default amount of logging is none.
+func init() {
+	DisableLog()
 }
 
-// logClosure is used to provide a closure over expensive logging operations
-// so don't have to be performed when the logging level doesn't warrant it.
+// DisableLog disables all library log output.  Logging output is disabled
+// by default until either UseLogger or SetLogWriter are called.
+func DisableLog() {
+	log = btclog.Disabled
+}
+
+// UseLogger uses a specified Logger to output package logging info.
+// This should be used in preference to SetLogWriter if the caller is also
+// using btclog.
+func UseLogger(logger btclog.Logger) {
+	log = logger
+}
+
+// SetLogWriter uses a specified io.Writer to output package logging info.
+// This allows a caller to direct package logging output without needing a
+// dependency on seelog.  If the caller is also using btclog, UseLogger should
+// be used instead.
+func SetLogWriter(w io.Writer, level string) error {
+	if w == nil {
+		return errors.New("nil writer")
+	}
+
+	lvl, ok := btclog.LogLevelFromString(level)
+	if !ok {
+		return errors.New("invalid log level")
+	}
+
+	l, err := btclog.NewLoggerFromWriter(w, lvl)
+	if err != nil {
+		return err
+	}
+
+	UseLogger(l)
+	return nil
+}
+
+// LogClosure is a closure that can be printed with %v to be used to
+// generate expensive-to-create data for a detailed log level and avoid doing
+// the work if the data isn't printed.
 type logClosure func() string
 
-// String invokes the underlying function and returns the result.
 func (c logClosure) String() string {
 	return c()
 }
 
-// newLogClosure returns a new closure over a function that returns a string
-// which itself provides a Stringer interface so that it can be used with the
-// logging system.
 func newLogClosure(c func() string) logClosure {
 	return logClosure(c)
-}
-
-// useLogger updates the logger references for subsystemID to logger.  Invalid
-// subsystems are ignored.
-func useLogger(subsystemID string, logger btclog.Logger) {
-	if _, ok := subsystemLoggers[subsystemID]; !ok {
-		return
-	}
-	subsystemLoggers[subsystemID] = logger
-
-	switch subsystemID {
-	case "ADXR":
-		adxrLog = logger
-
-	case "AMGR":
-		amgrLog = logger
-		addrmgr.UseLogger(logger)
-
-	case "BCDB":
-		bcdbLog = logger
-		database.UseLogger(logger)
-
-	case "BMGR":
-		bmgrLog = logger
-
-	case "DCRD":
-		dcrdLog = logger
-
-	case "CHAN":
-		chanLog = logger
-		blockchain.UseLogger(logger)
-
-	case "DISC":
-		discLog = logger
-
-	case "MINR":
-		minrLog = logger
-
-	case "PEER":
-		peerLog = logger
-		peer.UseLogger(logger)
-
-	case "RPCS":
-		rpcsLog = logger
-
-	case "SCRP":
-		scrpLog = logger
-		txscript.UseLogger(logger)
-
-	case "SRVR":
-		srvrLog = logger
-
-	case "STKE":
-		stkeLog = logger
-		stake.UseLogger(logger)
-
-	case "TXMP":
-		txmpLog = logger
-	}
-}
-
-// initSeelogLogger initializes a new seelog logger that is used as the backend
-// for all logging subsytems.
-func initSeelogLogger(logFile string) {
-	config := `
-	<seelog type="adaptive" mininterval="2000000" maxinterval="100000000"
-		critmsgcount="500" minlevel="trace">
-		<outputs formatid="all">
-			<console />
-			<rollingfile type="size" filename="%s" maxsize="10485760" maxrolls="3" />
-		</outputs>
-		<formats>
-			<format id="all" format="%%Time %%Date [%%LEV] %%Msg%%n" />
-		</formats>
-	</seelog>`
-	config = fmt.Sprintf(config, logFile)
-
-	logger, err := seelog.LoggerFromConfigAsString(config)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "failed to create logger: %v", err)
-		os.Exit(1)
-	}
-
-	backendLog = logger
-}
-
-// setLogLevel sets the logging level for provided subsystem.  Invalid
-// subsystems are ignored.  Uninitialized subsystems are dynamically created as
-// needed.
-func setLogLevel(subsystemID string, logLevel string) {
-	// Ignore invalid subsystems.
-	logger, ok := subsystemLoggers[subsystemID]
-	if !ok {
-		return
-	}
-
-	// Default to info if the log level is invalid.
-	level, ok := btclog.LogLevelFromString(logLevel)
-	if !ok {
-		level = btclog.InfoLvl
-	}
-
-	// Create new logger for the subsystem if needed.
-	if logger == btclog.Disabled {
-		logger = btclog.NewSubsystemLogger(backendLog, subsystemID+": ")
-		useLogger(subsystemID, logger)
-	}
-	logger.SetLevel(level)
-}
-
-// setLogLevels sets the log level for all subsystem loggers to the passed
-// level.  It also dynamically creates the subsystem loggers as needed, so it
-// can be used to initialize the logging system.
-func setLogLevels(logLevel string) {
-	// Configure all sub-systems with the new logging level.  Dynamically
-	// create loggers as needed.
-	for subsystemID := range subsystemLoggers {
-		setLogLevel(subsystemID, logLevel)
-	}
 }
 
 // directionString is a helper function that returns a string that represents
@@ -218,7 +96,7 @@ func directionString(inbound bool) string {
 func formatLockTime(lockTime uint32) string {
 	// The lock time field of a transaction is either a block height at
 	// which the transaction is finalized or a timestamp depending on if the
-	// value is before the txscript.LockTimeThreshold.  When it is under the
+	// value is before the lockTimeThreshold.  When it is under the
 	// threshold it is a block height.
 	if lockTime < txscript.LockTimeThreshold {
 		return fmt.Sprintf("height %d", lockTime)
@@ -362,11 +240,4 @@ func messageSummary(msg wire.Message) string {
 
 	// No summary for other messages.
 	return ""
-}
-
-// fatalf logs a string, then cleanly exits.
-func fatalf(str string) {
-	dcrdLog.Errorf("Unable to create profiler: %v", str)
-	backendLog.Flush()
-	os.Exit(1)
 }

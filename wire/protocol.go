@@ -13,7 +13,7 @@ import (
 
 const (
 	// InitialProcotolVersion is the initial protocol version for the
-	// current network.
+	// network.
 	InitialProcotolVersion uint32 = 1
 
 	// ProtocolVersion is the latest protocol version this package supports.

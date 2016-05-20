@@ -3,26 +3,34 @@
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
-package main
+package peer
 
 import (
 	"bytes"
 	"container/list"
 	"fmt"
+	"sync"
 
 	"github.com/decred/dcrd/wire"
 )
 
-// MruInventoryMap provides a map that is limited to a maximum number of items
-// with eviction for the oldest entry when the limit is exceeded.
+// MruInventoryMap provides a concurrency safe map that is limited to a maximum
+// number of items with eviction for the oldest entry when the limit is
+// exceeded.
 type MruInventoryMap struct {
+	invMtx  sync.Mutex
 	invMap  map[wire.InvVect]*list.Element // nearly O(1) lookups
 	invList *list.List                     // O(1) insert, update, delete
 	limit   uint
 }
 
 // String returns the map as a human-readable string.
-func (m MruInventoryMap) String() string {
+//
+// This function is safe for concurrent access.
+func (m *MruInventoryMap) String() string {
+	m.invMtx.Lock()
+	defer m.invMtx.Unlock()
+
 	lastEntryNum := len(m.invMap) - 1
 	curEntry := 0
 	buf := bytes.NewBufferString("[")
@@ -39,7 +47,12 @@ func (m MruInventoryMap) String() string {
 }
 
 // Exists returns whether or not the passed inventory item is in the map.
+//
+// This function is safe for concurrent access.
 func (m *MruInventoryMap) Exists(iv *wire.InvVect) bool {
+	m.invMtx.Lock()
+	defer m.invMtx.Unlock()
+
 	if _, exists := m.invMap[*iv]; exists {
 		return true
 	}
@@ -49,7 +62,12 @@ func (m *MruInventoryMap) Exists(iv *wire.InvVect) bool {
 // Add adds the passed inventory to the map and handles eviction of the oldest
 // item if adding the new item would exceed the max limit.  Adding an existing
 // item makes it the most recently used item.
+//
+// This function is safe for concurrent access.
 func (m *MruInventoryMap) Add(iv *wire.InvVect) {
+	m.invMtx.Lock()
+	defer m.invMtx.Unlock()
+
 	// When the limit is zero, nothing can be added to the map, so just
 	// return.
 	if m.limit == 0 {
@@ -88,7 +106,12 @@ func (m *MruInventoryMap) Add(iv *wire.InvVect) {
 }
 
 // Delete deletes the passed inventory item from the map (if it exists).
+//
+// This function is safe for concurrent access.
 func (m *MruInventoryMap) Delete(iv *wire.InvVect) {
+	m.invMtx.Lock()
+	defer m.invMtx.Unlock()
+
 	if node, exists := m.invMap[*iv]; exists {
 		m.invList.Remove(node)
 		delete(m.invMap, *iv)

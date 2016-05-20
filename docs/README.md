@@ -183,8 +183,12 @@ information.
 * The Decred-related Go Packages:
     * [dcrrpcclient](https://github.com/decred/dcrrpcclient) - Implements a
 	  robust and easy to use Websocket-enabled Decred JSON-RPC client
+    * [dcrjson](https://github.com/decred/dcrjson) - Provides an extensive API
+	  for the underlying JSON-RPC command and return values
     * [wire](https://github.com/decred/dcrd/tree/master/wire) - Implements the
 	  Decred wire protocol
+    * [peer](https://github.com/decred/dcrd/tree/master/peer) -
+	  Provides a common base for creating and managing Decred network peers.
     * [blockchain](https://github.com/decred/dcrd/tree/master/blockchain) -
 	  Implements Decred block handling and chain selection rules
     * [txscript](https://github.com/decred/dcrd/tree/master/txscript) -

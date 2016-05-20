@@ -3,7 +3,7 @@
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
-package main
+package peer
 
 import (
 	"crypto/rand"
@@ -53,7 +53,7 @@ testLoop:
 
 		// Ensure the limited number of most recent entries in the
 		// inventory vector list exist.
-		for j := numInvVects - 1; j >= numInvVects-test.limit; j-- {
+		for j := numInvVects - test.limit; j < numInvVects; j++ {
 			if !mruInvMap.Exists(invVects[j]) {
 				t.Errorf("Exists #%d (%s) entry %s does not "+
 					"exist", i, test.name, *invVects[j])
@@ -63,7 +63,7 @@ testLoop:
 
 		// Ensure the entries before the limited number of most recent
 		// entries in the inventory vector list do not exist.
-		for j := numInvVects - test.limit - 1; j >= 0; j-- {
+		for j := 0; j < numInvVects-test.limit; j++ {
 			if mruInvMap.Exists(invVects[j]) {
 				t.Errorf("Exists #%d (%s) entry %s exists", i,
 					test.name, *invVects[j])
