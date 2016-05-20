@@ -1558,7 +1558,7 @@ mempoolLoop:
 				prioItem.priority, minHighPriority)
 
 			sortedByFee = true
-			priorityQueue.SetLessFunc(txPQByFee)
+			priorityQueue.SetLessFunc(txPQByStakeAndFee)
 
 			// Put the transaction back into the priority queue and
 			// skip it so it is re-priortized by fees if it won't
