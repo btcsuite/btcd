@@ -17,6 +17,11 @@ import (
 	"github.com/decred/dcrutil"
 )
 
+var (
+	// zeroUint32 is the zero value for a uint32.
+	zeroUint32 = uint32(0)
+)
+
 // FutureCreateEncryptedWalletResult is a future promise to deliver the error
 // result of a CreateEncryptedWalletAsync RPC invocation.
 type FutureCreateEncryptedWalletResult chan *response
@@ -812,6 +817,15 @@ func (c *Client) TicketFeeInfoAsync(blocks *uint32, windows *uint32) FutureTicke
 	// Not supported in HTTP POST mode.
 	if c.config.HTTPPostMode {
 		return newFutureError(ErrWebsocketsRequired)
+	}
+
+	// Avoid passing actual nil values, since they can cause arguments
+	// not to pass. Pass zero values instead.
+	if blocks == nil {
+		blocks = &zeroUint32
+	}
+	if windows == nil {
+		windows = &zeroUint32
 	}
 
 	cmd := dcrjson.NewTicketFeeInfoCmd(blocks, windows)
