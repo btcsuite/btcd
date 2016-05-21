@@ -52,12 +52,32 @@ func TestChainSvrCmds(t *testing.T) {
 					{Txid: "123", Vout: 1},
 				}
 				amounts := map[string]float64{"456": .0123}
-				return dcrjson.NewCreateRawTransactionCmd(txInputs, amounts)
+				return dcrjson.NewCreateRawTransactionCmd(txInputs, amounts, nil)
 			},
 			marshalled: `{"jsonrpc":"1.0","method":"createrawtransaction","params":[[{"txid":"123","vout":1,"tree":0}],{"456":0.0123}],"id":1}`,
 			unmarshalled: &dcrjson.CreateRawTransactionCmd{
 				Inputs:  []dcrjson.TransactionInput{{Txid: "123", Vout: 1}},
 				Amounts: map[string]float64{"456": .0123},
+			},
+		},
+		{
+			name: "createrawtransaction optional",
+			newCmd: func() (interface{}, error) {
+				return dcrjson.NewCmd("createrawtransaction", `[{"txid":"123","vout":1,"tree":0}]`,
+					`{"456":0.0123}`, 12312333333)
+			},
+			staticCmd: func() interface{} {
+				txInputs := []dcrjson.TransactionInput{
+					{Txid: "123", Vout: 1},
+				}
+				amounts := map[string]float64{"456": .0123}
+				return dcrjson.NewCreateRawTransactionCmd(txInputs, amounts, dcrjson.Int64(12312333333))
+			},
+			marshalled: `{"jsonrpc":"1.0","method":"createrawtransaction","params":[[{"txid":"123","vout":1,"tree":0}],{"456":0.0123},12312333333],"id":1}`,
+			unmarshalled: &dcrjson.CreateRawTransactionCmd{
+				Inputs:   []dcrjson.TransactionInput{{Txid: "123", Vout: 1}},
+				Amounts:  map[string]float64{"456": .0123},
+				LockTime: dcrjson.Int64(12312333333),
 			},
 		},
 		{
