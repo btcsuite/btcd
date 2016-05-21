@@ -2288,11 +2288,12 @@ func (b *blockManager) handleNotifyMsg(notification *blockchain.Notification) {
 		// Remove all of the regular and stake transactions in the
 		// connected block from the transaction pool.  Also, remove any
 		// transactions which are now double spends as a result of these
-		// new transactions.  Note that removing a transaction from
-		// no longer an orphan.  Note that removing a transaction from
+		// new transactions.  Finally, remove any transaction that is
+		// no longer an orphan. Transactions which depend on a confirmed
 		// transaction are NOT removed recursively because they are still
-		// recursively. Do not remove the coinbase [1:] of the regular tx
-		// tree.
+		// valid.  Also, the coinbase of the regular tx tree is skipped
+		// because the memory pool doesn't (and can't) have regular
+		// tree coinbase transactions in it.
 		for _, tx := range parentBlock.Transactions()[1:] {
 			b.server.txMemPool.RemoveTransaction(tx, false)
 			b.server.txMemPool.RemoveDoubleSpends(tx)
