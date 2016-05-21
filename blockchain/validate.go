@@ -157,13 +157,14 @@ func CheckTransactionSanity(tx *dcrutil.Tx, params *chaincfg.Params) error {
 			return ruleError(ErrBadTxOutValue, str)
 		}
 
-		// TODO(davec): No need to check < 0 here as atom is
-		// guaranteed to be positive per the above check.  Also need
-		// to add overflow checks.
+		// Two's complement int64 overflow guarantees that any overflow
+		// is detected and reported.  This is impossible for Decred, but
+		// perhaps possible if an alt increases the total money supply.
 		totalAtom += atom
 		if totalAtom < 0 {
 			str := fmt.Sprintf("total value of all transaction "+
-				"outputs has negative value of %v", totalAtom)
+				"outputs exceeds max allowed value of %v",
+				dcrutil.MaxAmount)
 			return ruleError(ErrBadTxOutValue, str)
 		}
 		if totalAtom > dcrutil.MaxAmount {
