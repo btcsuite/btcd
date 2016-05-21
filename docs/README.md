@@ -70,11 +70,48 @@ details on how to install on the supported operating systems.
 <a name="PosixInstallation" />
 **2.1.2 Linux/BSD/MacOSX/POSIX Installation**<br />
 
-* Install Go according to the installation instructions here: http://golang.org/doc/install
-* Run the following command to ensure your Go version is at least version 1.2: `$ go version`
-* Run the following command to obtain btcd, its dependencies, and install it: `$ go get github.com/btcsuite/btcd/...`<br />
-  * To upgrade, run the following command: `$ go get -u github.com/btcsuite/btcd/...`
-* Run btcd: `$ btcd`
+- Install Go according to the installation instructions here:
+  http://golang.org/doc/install
+
+- Ensure Go was installed properly and is a supported version:
+
+```bash
+$ go version
+$ go env GOROOT GOPATH
+```
+
+NOTE: The `GOROOT` and `GOPATH` above must not be the same path.  It is
+recommended that `GOPATH` is set to a directory in your home directory such as
+`~/goprojects` to avoid write permission issues.  It is also recommended to add
+`$GOPATH/bin` to your `PATH` at this point.
+
+**NOTE:** If you are using Go 1.5, you must manually enable the vendor
+experiment by setting the `GO15VENDOREXPERIMENT` environment variable to `1`.
+This step is not required for Go 1.6.
+
+- Run the following commands to obtain btcd, all dependencies, and install it:
+
+```bash
+$ go get -u github.com/Masterminds/glide
+$ git clone https://github.com/btcsuite/btcd $GOPATH/src/github.com/btcsuite/btcd
+$ cd $GOPATH/src/github.com/btcsuite/btcd
+$ glide install
+$ go install . ./cmd/...
+```
+
+- btcd (and utilities) will now be installed in ```$GOPATH/bin```.  If you did
+  not already add the bin directory to your system path during Go installation,
+  we recommend you do so now.
+
+**Updating**
+
+- Run the following commands to update btcd, all dependencies, and install it:
+
+```bash
+$ cd $GOPATH/src/github.com/btcsuite/btcd
+$ git pull && glide install
+$ go install . ./cmd/...
+```
 
 <a name="GentooInstallation" />
 **2.1.2.1 Gentoo Linux Installation**<br />
