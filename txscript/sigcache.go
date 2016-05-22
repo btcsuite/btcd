@@ -84,7 +84,7 @@ func (s *SigCache) Add(sigHash wire.ShaHash, sig *btcec.Signature, pubKey *btcec
 	// If adding this new entry will put us over the max number of allowed
 	// entries, then evict an entry.
 	if uint(len(s.validSigs)+1) > s.maxEntries {
-		// Remove a random entry from the map relying on the random
+		// Remove a random entry from the map. Relying on the random
 		// starting point of Go's map iteration. It's worth noting that
 		// the random iteration starting point is not 100% guaranteed
 		// by the spec, however most Go compilers support it.
