@@ -75,6 +75,7 @@ type Params struct {
 	Name        string
 	Net         wire.CurrencyNet
 	DefaultPort string
+	DNSSeeds    []string
 
 	// Starting block for the network (block 0).
 	GenesisBlock *wire.MsgBlock
@@ -271,6 +272,12 @@ var MainNetParams = Params{
 	Name:        "mainnet",
 	Net:         wire.MainNet,
 	DefaultPort: "9108",
+	DNSSeeds: []string{
+		"mainnet-seed.decred.mindcry.org",
+		"mainnet-seed.decred.netpurgatory.com",
+		"mainnet.decredseed.org",
+		"mainnet-seed.decred.org",
+	},
 
 	// Chain parameters
 	GenesisBlock:             &genesisBlock,
@@ -352,6 +359,12 @@ var TestNetParams = Params{
 	Name:        "testnet",
 	Net:         wire.TestNet,
 	DefaultPort: "19108",
+	DNSSeeds: []string{
+		"testnet-seed.decred.mindcry.org",
+		"testnet-seed.decred.netpurgatory.org",
+		"testnet.decredseed.org",
+		"testnet-seed.decred.org",
+	},
 
 	// Chain parameters
 	GenesisBlock:             &testNetGenesisBlock,
@@ -435,6 +448,7 @@ var SimNetParams = Params{
 	Name:        "simnet",
 	Net:         wire.SimNet,
 	DefaultPort: "18555",
+	DNSSeeds:    []string{}, // NOTE: There must NOT be any seeds.
 
 	// Chain parameters
 	GenesisBlock:             &simNetGenesisBlock,

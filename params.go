@@ -18,8 +18,7 @@ var activeNetParams = &mainNetParams
 // network and test networks.
 type params struct {
 	*chaincfg.Params
-	rpcPort  string
-	dnsSeeds []string
+	rpcPort string
 }
 
 // mainNetParams contains parameters specific to the main network
@@ -31,12 +30,6 @@ type params struct {
 var mainNetParams = params{
 	Params:  &chaincfg.MainNetParams,
 	rpcPort: "9109",
-	dnsSeeds: []string{
-		"mainnet-seed.decred.mindcry.org",
-		"mainnet-seed.decred.netpurgatory.com",
-		"mainnet.decredseed.org",
-		"mainnet-seed.decred.org",
-	},
 }
 
 // testNetParams contains parameters specific to the test network (version 0)
@@ -45,20 +38,13 @@ var mainNetParams = params{
 var testNetParams = params{
 	Params:  &chaincfg.TestNetParams,
 	rpcPort: "19109",
-	dnsSeeds: []string{
-		"testnet-seed.decred.mindcry.org",
-		"testnet-seed.decred.netpurgatory.org",
-		"testnet.decredseed.org",
-		"testnet-seed.decred.org",
-	},
 }
 
 // simNetParams contains parameters specific to the simulation test network
 // (wire.SimNet).
 var simNetParams = params{
-	Params:   &chaincfg.SimNetParams,
-	rpcPort:  "19556",
-	dnsSeeds: []string{}, // NOTE: There must NOT be any seeds.
+	Params:  &chaincfg.SimNetParams,
+	rpcPort: "19556",
 }
 
 // netName returns the name used when referring to a decred network.  At the
