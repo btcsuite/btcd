@@ -1592,7 +1592,8 @@ func (mp *txMemPool) processOrphans(hash *chainhash.Hash) []*dcrutil.Tx {
 
 			// Potentially accept the transaction into the
 			// transaction pool.
-			missingParents, err := mp.maybeAcceptTransaction(tx, true, true, true)
+			missingParents, err := mp.maybeAcceptTransaction(tx,
+				true, true, true)
 			if err != nil {
 				// TODO: Remove orphans that depend on this
 				// failed transaction.
@@ -1733,8 +1734,9 @@ func (mp *txMemPool) ProcessTransaction(tx *dcrutil.Tx, allowOrphan,
 	// If len(missingParents) == 0 then we know the tx is NOT an orphan
 	if len(missingParents) == 0 {
 		// Accept any orphan transactions that depend on this
-		// transaction (they are no longer orphans) and repeat for those
-		// accepted transactions until there are no more.
+		// transaction (they are no longer orphans if all inputs are
+		// now available) and repeat for those accepted transactions
+		// until there are no more.
 		newTxs := mp.processOrphans(tx.Sha())
 		acceptedTxs := make([]*dcrutil.Tx, len(newTxs)+1)
 
