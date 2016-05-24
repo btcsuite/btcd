@@ -2629,7 +2629,9 @@ func (b *blockManager) requestFromPeer(p *serverPeer, blocks, txs []*chainhash.H
 		b.requestedEverTxns[*vh] = 0
 	}
 
-	p.QueueMessage(msgResp, nil)
+	if len(msgResp.InvList) > 0 {
+		p.QueueMessage(msgResp, nil)
+	}
 
 	return nil
 }

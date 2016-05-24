@@ -578,6 +578,11 @@ func (sp *serverPeer) OnHeaders(p *peer.Peer, msg *wire.MsgHeaders) {
 // handleGetData is invoked when a peer receives a getdata wire message and is
 // used to deliver block and transaction information.
 func (sp *serverPeer) OnGetData(p *peer.Peer, msg *wire.MsgGetData) {
+	// Ignore empty getdata messages.
+	if len(msg.InvList) == 0 {
+		return
+	}
+
 	numAdded := 0
 	notFound := wire.NewMsgNotFound()
 
