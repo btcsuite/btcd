@@ -5,10 +5,15 @@
 package main
 
 import (
+	"bytes"
 	"math/big"
 	"testing"
 
+	"github.com/decred/dcrd/blockchain"
+	"github.com/decred/dcrd/blockchain/stake"
+	"github.com/decred/dcrd/chaincfg"
 	"github.com/decred/dcrd/chaincfg/chainec"
+	"github.com/decred/dcrd/chaincfg/chainhash"
 	"github.com/decred/dcrd/txscript"
 	"github.com/decred/dcrd/wire"
 	"github.com/decred/dcrutil"
@@ -262,6 +267,254 @@ func TestDust(t *testing.T) {
 		if res != test.isDust {
 			t.Fatalf("Dust test '%s' failed: want %v got %v",
 				test.name, test.isDust, res)
+			continue
+		}
+	}
+}
+
+// TestCheckTransactionStandard tests the checkTransactionStandard API.
+func TestCheckTransactionStandard(t *testing.T) {
+	// Create some dummy, but otherwise standard, data for transactions.
+	prevOutHash, err := chainhash.NewHashFromStr("01")
+	if err != nil {
+		t.Fatalf("NewShaHashFromStr: unexpected error: %v", err)
+	}
+	dummyPrevOut := wire.OutPoint{Hash: *prevOutHash, Index: 1, Tree: 0}
+	dummySigScript := bytes.Repeat([]byte{0x00}, 65)
+	dummyTxIn := wire.TxIn{
+		PreviousOutPoint: dummyPrevOut,
+		Sequence:         wire.MaxTxInSequenceNum,
+		ValueIn:          0,
+		BlockHeight:      0,
+		BlockIndex:       0,
+		SignatureScript:  dummySigScript,
+	}
+	addrHash := [20]byte{0x01}
+	addr, err := dcrutil.NewAddressPubKeyHash(addrHash[:],
+		&chaincfg.TestNetParams, chainec.ECTypeSecp256k1)
+	if err != nil {
+		t.Fatalf("NewAddressPubKeyHash: unexpected error: %v", err)
+	}
+	dummyPkScript, err := txscript.PayToAddrScript(addr)
+	if err != nil {
+		t.Fatalf("PayToAddrScript: unexpected error: %v", err)
+	}
+	dummyTxOut := wire.TxOut{
+		Value:    100000000, // 1 BTC
+		Version:  0,
+		PkScript: dummyPkScript,
+	}
+
+	tests := []struct {
+		name       string
+		tx         wire.MsgTx
+		height     int64
+		isStandard bool
+		code       wire.RejectCode
+	}{
+		{
+			name: "Typical pay-to-pubkey-hash transaction",
+			tx: wire.MsgTx{
+				Version:  1,
+				TxIn:     []*wire.TxIn{&dummyTxIn},
+				TxOut:    []*wire.TxOut{&dummyTxOut},
+				LockTime: 0,
+			},
+			height:     300000,
+			isStandard: true,
+		},
+		{
+			name: "Transaction version too high",
+			tx: wire.MsgTx{
+				Version:  int32(wire.TxVersion + 1),
+				TxIn:     []*wire.TxIn{&dummyTxIn},
+				TxOut:    []*wire.TxOut{&dummyTxOut},
+				LockTime: 0,
+			},
+			height:     300000,
+			isStandard: false,
+			code:       wire.RejectNonstandard,
+		},
+		{
+			name: "Transaction is not finalized",
+			tx: wire.MsgTx{
+				Version: 1,
+				TxIn: []*wire.TxIn{{
+					PreviousOutPoint: dummyPrevOut,
+					SignatureScript:  dummySigScript,
+					Sequence:         0,
+				}},
+				TxOut:    []*wire.TxOut{&dummyTxOut},
+				LockTime: 300001,
+			},
+			height:     300000,
+			isStandard: false,
+			code:       wire.RejectNonstandard,
+		},
+		{
+			name: "Transaction size is too large",
+			tx: wire.MsgTx{
+				Version: 1,
+				TxIn:    []*wire.TxIn{&dummyTxIn},
+				TxOut: []*wire.TxOut{{
+					Value: 0,
+					PkScript: bytes.Repeat([]byte{0x00},
+						maxStandardTxSize+1),
+				}},
+				LockTime: 0,
+			},
+			height:     300000,
+			isStandard: false,
+			code:       wire.RejectNonstandard,
+		},
+		{
+			name: "Signature script size is too large",
+			tx: wire.MsgTx{
+				Version: 1,
+				TxIn: []*wire.TxIn{{
+					PreviousOutPoint: dummyPrevOut,
+					SignatureScript: bytes.Repeat([]byte{0x00},
+						maxStandardSigScriptSize+1),
+					Sequence: wire.MaxTxInSequenceNum,
+				}},
+				TxOut:    []*wire.TxOut{&dummyTxOut},
+				LockTime: 0,
+			},
+			height:     300000,
+			isStandard: false,
+			code:       wire.RejectNonstandard,
+		},
+		{
+			name: "Signature script that does more than push data",
+			tx: wire.MsgTx{
+				Version: 1,
+				TxIn: []*wire.TxIn{{
+					PreviousOutPoint: dummyPrevOut,
+					SignatureScript: []byte{
+						txscript.OP_CHECKSIGVERIFY},
+					Sequence: wire.MaxTxInSequenceNum,
+				}},
+				TxOut:    []*wire.TxOut{&dummyTxOut},
+				LockTime: 0,
+			},
+			height:     300000,
+			isStandard: false,
+			code:       wire.RejectNonstandard,
+		},
+		{
+			name: "Valid but non standard public key script",
+			tx: wire.MsgTx{
+				Version: 1,
+				TxIn:    []*wire.TxIn{&dummyTxIn},
+				TxOut: []*wire.TxOut{{
+					Value:    100000000,
+					PkScript: []byte{txscript.OP_TRUE},
+				}},
+				LockTime: 0,
+			},
+			height:     300000,
+			isStandard: false,
+			code:       wire.RejectNonstandard,
+		},
+		{
+			name: "More than four nulldata outputs",
+			tx: wire.MsgTx{
+				Version: 1,
+				TxIn:    []*wire.TxIn{&dummyTxIn},
+				TxOut: []*wire.TxOut{{
+					Value:    0,
+					PkScript: []byte{txscript.OP_RETURN},
+				}, {
+					Value:    0,
+					PkScript: []byte{txscript.OP_RETURN},
+				}, {
+					Value:    0,
+					PkScript: []byte{txscript.OP_RETURN},
+				}, {
+					Value:    0,
+					PkScript: []byte{txscript.OP_RETURN},
+				}, {
+					Value:    0,
+					PkScript: []byte{txscript.OP_RETURN},
+				}},
+				LockTime: 0,
+			},
+			height:     300000,
+			isStandard: false,
+			code:       wire.RejectNonstandard,
+		},
+		{
+			name: "Dust output",
+			tx: wire.MsgTx{
+				Version: 1,
+				TxIn:    []*wire.TxIn{&dummyTxIn},
+				TxOut: []*wire.TxOut{{
+					Value:    0,
+					PkScript: dummyPkScript,
+				}},
+				LockTime: 0,
+			},
+			height:     300000,
+			isStandard: false,
+			code:       wire.RejectDust,
+		},
+		{
+			name: "One nulldata output with 0 amount (standard)",
+			tx: wire.MsgTx{
+				Version: 1,
+				TxIn:    []*wire.TxIn{&dummyTxIn},
+				TxOut: []*wire.TxOut{{
+					Value:    0,
+					PkScript: []byte{txscript.OP_RETURN},
+				}},
+				LockTime: 0,
+			},
+			height:     300000,
+			isStandard: true,
+		},
+	}
+
+	timeSource := blockchain.NewMedianTime()
+	for _, test := range tests {
+		// Ensure standardness is as expected.
+		tx := dcrutil.NewTx(&test.tx)
+		err := checkTransactionStandard(tx, stake.DetermineTxType(tx),
+			test.height, timeSource, defaultMinRelayTxFee)
+		if err == nil && test.isStandard {
+			// Test passes since function returned standard for a
+			// transaction which is intended to be standard.
+			continue
+		}
+		if err == nil && !test.isStandard {
+			t.Errorf("checkTransactionStandard (%s): standard when "+
+				"it should not be", test.name)
+			continue
+		}
+		if err != nil && test.isStandard {
+			t.Errorf("checkTransactionStandard (%s): nonstandard "+
+				"when it should not be: %v", test.name, err)
+			continue
+		}
+
+		// Ensure error type is a TxRuleError inside of a RuleError.
+		rerr, ok := err.(RuleError)
+		if !ok {
+			t.Errorf("checkTransactionStandard (%s): unexpected "+
+				"error type - got %T", test.name, err)
+			continue
+		}
+		txrerr, ok := rerr.Err.(TxRuleError)
+		if !ok {
+			t.Errorf("checkTransactionStandard (%s): unexpected "+
+				"error type - got %T", test.name, rerr.Err)
+			continue
+		}
+
+		// Ensure the reject code is the expected one.
+		if txrerr.RejectCode != test.code {
+			t.Errorf("checkTransactionStandard (%s): unexpected "+
+				"error code - got %v, want %v", test.name,
+				txrerr.RejectCode, test.code)
 			continue
 		}
 	}
