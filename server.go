@@ -2495,7 +2495,15 @@ func newServer(listenAddrs []string, database database.Db, tmdb *stake.TicketDB,
 	}
 	s.blockManager = bm
 	s.txMemPool = newTxMemPool(&s)
-	s.cpuMiner = newCPUMiner(&s)
+
+	// Create the mining policy based on the configuration options.
+	policy := miningPolicy{
+		BlockMinSize:      cfg.BlockMinSize,
+		BlockMaxSize:      cfg.BlockMaxSize,
+		BlockPrioritySize: cfg.BlockPrioritySize,
+		TxMinFreeFee:      cfg.minRelayTxFee,
+	}
+	s.cpuMiner = newCPUMiner(&policy, &s)
 
 	if !cfg.NoAddrIndex {
 		ai, err := newAddrIndexer(&s)
@@ -2506,7 +2514,7 @@ func newServer(listenAddrs []string, database database.Db, tmdb *stake.TicketDB,
 	}
 
 	if !cfg.DisableRPC {
-		s.rpcServer, err = newRPCServer(cfg.RPCListeners, &s)
+		s.rpcServer, err = newRPCServer(cfg.RPCListeners, &policy, &s)
 		if err != nil {
 			return nil, err
 		}
