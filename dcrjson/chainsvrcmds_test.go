@@ -1,5 +1,5 @@
 // Copyright (c) 2014 The btcsuite developers
-// Copyright (c) 2015 The Decred developers
+// Copyright (c) 2016 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -714,16 +714,17 @@ func TestChainSvrCmds(t *testing.T) {
 				return dcrjson.NewCmd("searchrawtransactions", "1Address")
 			},
 			staticCmd: func() interface{} {
-				return dcrjson.NewSearchRawTransactionsCmd("1Address", nil, nil, nil, nil, nil)
+				return dcrjson.NewSearchRawTransactionsCmd("1Address", nil, nil, nil, nil, nil, nil)
 			},
 			marshalled: `{"jsonrpc":"1.0","method":"searchrawtransactions","params":["1Address"],"id":1}`,
 			unmarshalled: &dcrjson.SearchRawTransactionsCmd{
-				Address:  "1Address",
-				Verbose:  dcrjson.Int(1),
-				Skip:     dcrjson.Int(0),
-				Count:    dcrjson.Int(100),
-				VinExtra: dcrjson.Int(0),
-				Reverse:  dcrjson.Bool(false),
+				Address:     "1Address",
+				Verbose:     dcrjson.Int(1),
+				Skip:        dcrjson.Int(0),
+				Count:       dcrjson.Int(100),
+				VinExtra:    dcrjson.Int(0),
+				Reverse:     dcrjson.Bool(false),
+				FilterAddrs: nil,
 			},
 		},
 		{
@@ -733,16 +734,17 @@ func TestChainSvrCmds(t *testing.T) {
 			},
 			staticCmd: func() interface{} {
 				return dcrjson.NewSearchRawTransactionsCmd("1Address",
-					dcrjson.Int(0), nil, nil, nil, nil)
+					dcrjson.Int(0), nil, nil, nil, nil, nil)
 			},
 			marshalled: `{"jsonrpc":"1.0","method":"searchrawtransactions","params":["1Address",0],"id":1}`,
 			unmarshalled: &dcrjson.SearchRawTransactionsCmd{
-				Address:  "1Address",
-				Verbose:  dcrjson.Int(0),
-				Skip:     dcrjson.Int(0),
-				Count:    dcrjson.Int(100),
-				VinExtra: dcrjson.Int(0),
-				Reverse:  dcrjson.Bool(false),
+				Address:     "1Address",
+				Verbose:     dcrjson.Int(0),
+				Skip:        dcrjson.Int(0),
+				Count:       dcrjson.Int(100),
+				VinExtra:    dcrjson.Int(0),
+				Reverse:     dcrjson.Bool(false),
+				FilterAddrs: nil,
 			},
 		},
 		{
@@ -752,16 +754,17 @@ func TestChainSvrCmds(t *testing.T) {
 			},
 			staticCmd: func() interface{} {
 				return dcrjson.NewSearchRawTransactionsCmd("1Address",
-					dcrjson.Int(0), dcrjson.Int(5), nil, nil, nil)
+					dcrjson.Int(0), dcrjson.Int(5), nil, nil, nil, nil)
 			},
 			marshalled: `{"jsonrpc":"1.0","method":"searchrawtransactions","params":["1Address",0,5],"id":1}`,
 			unmarshalled: &dcrjson.SearchRawTransactionsCmd{
-				Address:  "1Address",
-				Verbose:  dcrjson.Int(0),
-				Skip:     dcrjson.Int(5),
-				Count:    dcrjson.Int(100),
-				VinExtra: dcrjson.Int(0),
-				Reverse:  dcrjson.Bool(false),
+				Address:     "1Address",
+				Verbose:     dcrjson.Int(0),
+				Skip:        dcrjson.Int(5),
+				Count:       dcrjson.Int(100),
+				VinExtra:    dcrjson.Int(0),
+				Reverse:     dcrjson.Bool(false),
+				FilterAddrs: nil,
 			},
 		},
 		{
@@ -771,16 +774,17 @@ func TestChainSvrCmds(t *testing.T) {
 			},
 			staticCmd: func() interface{} {
 				return dcrjson.NewSearchRawTransactionsCmd("1Address",
-					dcrjson.Int(0), dcrjson.Int(5), dcrjson.Int(10), nil, nil)
+					dcrjson.Int(0), dcrjson.Int(5), dcrjson.Int(10), nil, nil, nil)
 			},
 			marshalled: `{"jsonrpc":"1.0","method":"searchrawtransactions","params":["1Address",0,5,10],"id":1}`,
 			unmarshalled: &dcrjson.SearchRawTransactionsCmd{
-				Address:  "1Address",
-				Verbose:  dcrjson.Int(0),
-				Skip:     dcrjson.Int(5),
-				Count:    dcrjson.Int(10),
-				VinExtra: dcrjson.Int(0),
-				Reverse:  dcrjson.Bool(false),
+				Address:     "1Address",
+				Verbose:     dcrjson.Int(0),
+				Skip:        dcrjson.Int(5),
+				Count:       dcrjson.Int(10),
+				VinExtra:    dcrjson.Int(0),
+				Reverse:     dcrjson.Bool(false),
+				FilterAddrs: nil,
 			},
 		},
 		{
@@ -790,16 +794,17 @@ func TestChainSvrCmds(t *testing.T) {
 			},
 			staticCmd: func() interface{} {
 				return dcrjson.NewSearchRawTransactionsCmd("1Address",
-					dcrjson.Int(0), dcrjson.Int(5), dcrjson.Int(10), dcrjson.Int(1), nil)
+					dcrjson.Int(0), dcrjson.Int(5), dcrjson.Int(10), dcrjson.Int(1), nil, nil)
 			},
 			marshalled: `{"jsonrpc":"1.0","method":"searchrawtransactions","params":["1Address",0,5,10,1],"id":1}`,
 			unmarshalled: &dcrjson.SearchRawTransactionsCmd{
-				Address:  "1Address",
-				Verbose:  dcrjson.Int(0),
-				Skip:     dcrjson.Int(5),
-				Count:    dcrjson.Int(10),
-				VinExtra: dcrjson.Int(1),
-				Reverse:  dcrjson.Bool(false),
+				Address:     "1Address",
+				Verbose:     dcrjson.Int(0),
+				Skip:        dcrjson.Int(5),
+				Count:       dcrjson.Int(10),
+				VinExtra:    dcrjson.Int(1),
+				Reverse:     dcrjson.Bool(false),
+				FilterAddrs: nil,
 			},
 		},
 		{
@@ -809,16 +814,39 @@ func TestChainSvrCmds(t *testing.T) {
 			},
 			staticCmd: func() interface{} {
 				return dcrjson.NewSearchRawTransactionsCmd("1Address",
-					dcrjson.Int(0), dcrjson.Int(5), dcrjson.Int(10), dcrjson.Int(1), dcrjson.Bool(true))
+					dcrjson.Int(0), dcrjson.Int(5), dcrjson.Int(10),
+					dcrjson.Int(1), dcrjson.Bool(true), nil)
 			},
 			marshalled: `{"jsonrpc":"1.0","method":"searchrawtransactions","params":["1Address",0,5,10,1,true],"id":1}`,
 			unmarshalled: &dcrjson.SearchRawTransactionsCmd{
-				Address:  "1Address",
-				Verbose:  dcrjson.Int(0),
-				Skip:     dcrjson.Int(5),
-				Count:    dcrjson.Int(10),
-				VinExtra: dcrjson.Int(1),
-				Reverse:  dcrjson.Bool(true),
+				Address:     "1Address",
+				Verbose:     dcrjson.Int(0),
+				Skip:        dcrjson.Int(5),
+				Count:       dcrjson.Int(10),
+				VinExtra:    dcrjson.Int(1),
+				Reverse:     dcrjson.Bool(true),
+				FilterAddrs: nil,
+			},
+		},
+		{
+			name: "searchrawtransactions",
+			newCmd: func() (interface{}, error) {
+				return dcrjson.NewCmd("searchrawtransactions", "1Address", 0, 5, 10, 1, true, []string{"1Address"})
+			},
+			staticCmd: func() interface{} {
+				return dcrjson.NewSearchRawTransactionsCmd("1Address",
+					dcrjson.Int(0), dcrjson.Int(5), dcrjson.Int(10),
+					dcrjson.Int(1), dcrjson.Bool(true), &[]string{"1Address"})
+			},
+			marshalled: `{"jsonrpc":"1.0","method":"searchrawtransactions","params":["1Address",0,5,10,1,true,["1Address"]],"id":1}`,
+			unmarshalled: &dcrjson.SearchRawTransactionsCmd{
+				Address:     "1Address",
+				Verbose:     dcrjson.Int(0),
+				Skip:        dcrjson.Int(5),
+				Count:       dcrjson.Int(10),
+				VinExtra:    dcrjson.Int(1),
+				Reverse:     dcrjson.Bool(true),
+				FilterAddrs: &[]string{"1Address"},
 			},
 		},
 		{

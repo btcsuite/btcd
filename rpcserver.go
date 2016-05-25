@@ -1355,22 +1355,43 @@ func createVinList(mtx *wire.MsgTx) []dcrjson.Vin {
 	return vinList
 }
 
+// stringInSlice returns true if string a is found in array list.
+func stringInSlice(a string, list []string) bool {
+	for _, b := range list {
+		if b == a {
+			return true
+		}
+	}
+	return false
+}
+
 // createVinList returns a slice of JSON objects for the inputs of the passed
 // transaction.
-func createVinListPrevOut(s *rpcServer, mtx *wire.MsgTx, chainParams *chaincfg.Params, vinExtra int) []dcrjson.VinPrevOut {
+func createVinListPrevOut(s *rpcServer, mtx *wire.MsgTx, chainParams *chaincfg.Params,
+	vinExtra int, filterAddrMap map[string]struct{}) []dcrjson.VinPrevOut {
+
+	// We use a dynamically sized list to accomodate address filter.
+	vinList := make([]dcrjson.VinPrevOut, 0, len(mtx.TxIn))
+
 	// Coinbase transactions only have a single txin by definition.
-	vinList := make([]dcrjson.VinPrevOut, len(mtx.TxIn))
 	if blockchain.IsCoinBaseTx(mtx) {
+		// include tx only if filterAddrMap is empty because coinbase has no address
+		// and so would never match a non-empty filter.
+		if len(filterAddrMap) != 0 {
+			return vinList
+		}
+		var vinEntry dcrjson.VinPrevOut
 		txIn := mtx.TxIn[0]
-		vinList[0].Coinbase = hex.EncodeToString(txIn.SignatureScript)
-		vinList[0].Sequence = txIn.Sequence
+		vinEntry.Coinbase = hex.EncodeToString(txIn.SignatureScript)
+		vinEntry.Sequence = txIn.Sequence
+		vinList = append(vinList, vinEntry)
 		return vinList
 	}
 
 	// Lookup all of the referenced transactions needed to populate the
 	// previous output information if requested.
 	var txStore blockchain.TxStore
-	if vinExtra != 0 {
+	if vinExtra != 0 || len(filterAddrMap) > 0 {
 		tx := dcrutil.NewTx(mtx)
 		txStoreNew, err := s.server.txMemPool.fetchInputTransactions(tx, true)
 		if err == nil {
@@ -1378,13 +1399,43 @@ func createVinListPrevOut(s *rpcServer, mtx *wire.MsgTx, chainParams *chaincfg.P
 		}
 	}
 
-	for i, txIn := range mtx.TxIn {
+	for _, txIn := range mtx.TxIn {
+		// reset filter flag for each.
+		passesFilter := len(filterAddrMap) == 0
+
 		// The disassembled string will contain [error] inline
 		// if the script doesn't fully parse, so ignore the
 		// error here.
 		disbuf, _ := txscript.DisasmString(txIn.SignatureScript)
 
-		vinEntry := &vinList[i]
+		txData := txStore[txIn.PreviousOutPoint.Hash]
+		if txData == nil {
+			continue
+		}
+
+		originTxOut := txData.Tx.MsgTx().TxOut[txIn.PreviousOutPoint.Index]
+
+		// Ignore the error here since an error means the script
+		// couldn't parse and there is no additional information about
+		// it anyways.
+		_, addrs, _, _ := txscript.ExtractPkScriptAddrs(
+			txscript.DefaultScriptVersion, originTxOut.PkScript, chainParams)
+		encodedAddrs := make([]string, len(addrs))
+		for j, addr := range addrs {
+			encodedAddrs[j] = addr.EncodeAddress()
+
+			if len(filterAddrMap) > 0 {
+				if _, exists := filterAddrMap[encodedAddrs[j]]; exists {
+					passesFilter = true
+				}
+			}
+		}
+
+		if !passesFilter {
+			continue
+		}
+
+		var vinEntry dcrjson.VinPrevOut
 		vinEntry.Txid = txIn.PreviousOutPoint.Hash.String()
 		vinEntry.Vout = txIn.PreviousOutPoint.Index
 		vinEntry.Tree = txIn.PreviousOutPoint.Tree
@@ -1405,35 +1456,15 @@ func createVinListPrevOut(s *rpcServer, mtx *wire.MsgTx, chainParams *chaincfg.P
 			Hex: hex.EncodeToString(txIn.SignatureScript),
 		}
 
-		// Only populate previous output information if requested and
-		// available.
-		if vinExtra == 0 || len(txStore) == 0 {
-			continue
-		}
-		txData := txStore[txIn.PreviousOutPoint.Hash]
-		if txData == nil {
-			continue
-		}
-
-		originTxOut := txData.Tx.MsgTx().TxOut[txIn.PreviousOutPoint.Index]
-
-		// Ignore the error here since an error means the script
-		// couldn't parse and there is no additional information about
-		// it anyways.
-		var strAddrs []string
-		_, addrs, _, _ := txscript.ExtractPkScriptAddrs(
-			txscript.DefaultScriptVersion, originTxOut.PkScript, chainParams)
-		if addrs != nil {
-			strAddrs = make([]string, len(addrs))
-			for j, addr := range addrs {
-				strAddrs[j] = addr.EncodeAddress()
+		// Only populate previous output information if requested
+		if vinExtra != 0 {
+			vinEntry.PrevOut = &dcrjson.PrevOut{
+				Addresses: encodedAddrs,
+				Value:     dcrutil.Amount(originTxOut.Value).ToCoin(),
 			}
 		}
 
-		vinEntry.PrevOut = &dcrjson.PrevOut{
-			Addresses: strAddrs,
-			Value:     dcrutil.Amount(originTxOut.Value).ToCoin(),
-		}
+		vinList = append(vinList, vinEntry)
 	}
 
 	return vinList
@@ -1441,62 +1472,86 @@ func createVinListPrevOut(s *rpcServer, mtx *wire.MsgTx, chainParams *chaincfg.P
 
 // createVoutList returns a slice of JSON objects for the outputs of the passed
 // transaction.
-func createVoutList(mtx *wire.MsgTx, chainParams *chaincfg.Params) []dcrjson.Vout {
+func createVoutList(mtx *wire.MsgTx, chainParams *chaincfg.Params,
+	filterAddrMap map[string]struct{}) []dcrjson.Vout {
+
 	txType := stake.DetermineTxType(dcrutil.NewTx(mtx))
-	voutList := make([]dcrjson.Vout, len(mtx.TxOut))
+	voutList := make([]dcrjson.Vout, 0, len(mtx.TxOut))
 	for i, v := range mtx.TxOut {
-		voutList[i].N = uint32(i)
-		voutList[i].Value = dcrutil.Amount(v.Value).ToCoin()
-		voutList[i].Version = v.Version
+		// reset filter flag for each.
+		passesFilter := len(filterAddrMap) == 0
 
 		// The disassembled string will contain [error] inline if the
 		// script doesn't fully parse, so ignore the error here.
 		disbuf, _ := txscript.DisasmString(v.PkScript)
-		voutList[i].ScriptPubKey.Asm = disbuf
-		voutList[i].ScriptPubKey.Hex = hex.EncodeToString(v.PkScript)
 
-		// Ignore the error here since an error means the script
-		// couldn't parse and there is no additional information about
-		// it anyways.
-		scriptClass, addrs, reqSigs, _ := txscript.ExtractPkScriptAddrs(
-			v.Version, v.PkScript, chainParams)
-		voutList[i].ScriptPubKey.Type = scriptClass.String()
-		voutList[i].ScriptPubKey.ReqSigs = int32(reqSigs)
-
-		if addrs == nil {
-			voutList[i].ScriptPubKey.Addresses = nil
-
-			// Decode commitment outputs for tickets and set the
-			// type correctly.
-			if txType == stake.TxTypeSStx && (i > 0) && (i%2 != 0) {
-				addr, err := stake.AddrFromSStxPkScrCommitment(v.PkScript,
-					chainParams)
-				if err != nil {
-					rpcsLog.Warnf("failed to decode ticket commitment addr "+
-						"output for tx hash %v, output idx %v", mtx.TxSha(),
-						i)
-					continue
-				}
-				amt, err := stake.AmountFromSStxPkScrCommitment(v.PkScript)
-				if err != nil {
-					rpcsLog.Warnf("failed to decode ticket commitment amt "+
-						"output for tx hash %v, output idx %v", mtx.TxSha(),
-						i)
-					continue
-				}
-				amtCoin := amt.ToCoin()
-
-				voutList[i].ScriptPubKey.Type = sstxCommitmentString
-				voutList[i].ScriptPubKey.Addresses = make([]string, 1)
-				voutList[i].ScriptPubKey.Addresses[0] = addr.EncodeAddress()
-				voutList[i].ScriptPubKey.CommitAmt = &amtCoin
+		// Attempt to extract addresses from the public key script.  In
+		// the case of stake submission transactions, the odd outputs
+		// contain a commitment address, so detect that case
+		// accordingly.
+		var addrs []dcrutil.Address
+		var scriptClass string
+		var reqSigs int
+		var commitAmt *dcrutil.Amount
+		if txType == stake.TxTypeSStx && (i%2 != 0) {
+			scriptClass = sstxCommitmentString
+			addr, err := stake.AddrFromSStxPkScrCommitment(v.PkScript,
+				chainParams)
+			if err != nil {
+				rpcsLog.Warnf("failed to decode ticket "+
+					"commitment addr output for tx hash "+
+					"%v, output idx %v", mtx.TxSha(), i)
+			} else {
+				addrs = []dcrutil.Address{addr}
+			}
+			amt, err := stake.AmountFromSStxPkScrCommitment(v.PkScript)
+			if err != nil {
+				rpcsLog.Warnf("failed to decode ticket "+
+					"commitment amt output for tx hash %v"+
+					", output idx %v", mtx.TxSha(), i)
+			} else {
+				commitAmt = &amt
 			}
 		} else {
-			voutList[i].ScriptPubKey.Addresses = make([]string, len(addrs))
-			for j, addr := range addrs {
-				voutList[i].ScriptPubKey.Addresses[j] = addr.EncodeAddress()
+			// Ignore the error here since an error means the script
+			// couldn't parse and there is no additional information
+			// about it anyways.
+			var sc txscript.ScriptClass
+			sc, addrs, reqSigs, _ = txscript.ExtractPkScriptAddrs(
+				v.Version, v.PkScript, chainParams)
+			scriptClass = sc.String()
+		}
+
+		encodedAddrs := make([]string, len(addrs))
+		for j, addr := range addrs {
+			encodedAddrs[j] = addr.EncodeAddress()
+
+			if len(filterAddrMap) > 0 {
+				if _, exists := filterAddrMap[encodedAddrs[j]]; exists {
+					passesFilter = true
+				}
 			}
 		}
+
+		if !passesFilter {
+			continue
+		}
+
+		var vout dcrjson.Vout
+		voutSPK := &vout.ScriptPubKey
+		vout.N = uint32(i)
+		vout.Value = dcrutil.Amount(v.Value).ToCoin()
+		vout.Version = v.Version
+		voutSPK.Addresses = encodedAddrs
+		voutSPK.Asm = disbuf
+		voutSPK.Hex = hex.EncodeToString(v.PkScript)
+		voutSPK.Type = scriptClass
+		voutSPK.ReqSigs = int32(reqSigs)
+		if commitAmt != nil {
+			voutSPK.CommitAmt = dcrjson.Float64(commitAmt.ToCoin())
+		}
+
+		voutList = append(voutList, vout)
 	}
 
 	return voutList
@@ -1506,19 +1561,25 @@ func createVoutList(mtx *wire.MsgTx, chainParams *chaincfg.Params) []dcrjson.Vou
 // to a raw transaction JSON object, possibly with vin.PrevOut section.
 func createSearchRawTransactionsResult(s *rpcServer, chainParams *chaincfg.Params,
 	mtx *wire.MsgTx, txHash string, blkHeader *wire.BlockHeader, blkHash string,
-	blkHeight int64, chainHeight int64,
-	vinExtra int) (*dcrjson.SearchRawTransactionsResult, error) {
+	blkHeight int64, chainHeight int64, vinExtra int,
+	filterAddrMap map[string]struct{}) (*dcrjson.SearchRawTransactionsResult, error) {
 
-	mtxHex, err := messageToHex(mtx)
-	if err != nil {
-		return nil, err
+	// omit hex if filterAddrMap are present.  When filtering, typically the
+	// goal is to reduce unnecessary bloat in the result.
+	var mtxHex string
+	if len(filterAddrMap) == 0 {
+		mtxHexTmp, err := messageToHex(mtx)
+		if err != nil {
+			return nil, err
+		}
+		mtxHex = mtxHexTmp
 	}
 
 	txReply := &dcrjson.SearchRawTransactionsResult{
 		Hex:      mtxHex,
 		Txid:     txHash,
-		Vout:     createVoutList(mtx, chainParams),
-		Vin:      createVinListPrevOut(s, mtx, chainParams, vinExtra),
+		Vout:     createVoutList(mtx, chainParams, filterAddrMap),
+		Vin:      createVinListPrevOut(s, mtx, chainParams, vinExtra, filterAddrMap),
 		Version:  mtx.Version,
 		LockTime: mtx.LockTime,
 	}
@@ -1549,7 +1610,7 @@ func createTxRawResult(chainParams *chaincfg.Params, mtx *wire.MsgTx,
 	txReply := &dcrjson.TxRawResult{
 		Hex:         mtxHex,
 		Txid:        txHash,
-		Vout:        createVoutList(mtx, chainParams),
+		Vout:        createVoutList(mtx, chainParams, nil),
 		Vin:         createVinList(mtx),
 		Version:     mtx.Version,
 		LockTime:    mtx.LockTime,
@@ -1598,7 +1659,7 @@ func handleDecodeRawTransaction(s *rpcServer, cmd interface{}, closeChan <-chan 
 		Locktime: mtx.LockTime,
 		Expiry:   mtx.Expiry,
 		Vin:      createVinList(&mtx),
-		Vout:     createVoutList(&mtx, s.server.chainParams),
+		Vout:     createVoutList(&mtx, s.server.chainParams, nil),
 	}
 	return txReply, nil
 }
@@ -4835,8 +4896,18 @@ func handleSearchRawTransactions(s *rpcServer, cmd interface{},
 			blkHeight = txReply.Height
 		}
 
+		// c.FilterAddrs can be nil, empty or non-empty.  Here we normalize that
+		// to a non-nil array (empty or non-empty) to avoid future nil checks.
+		filterAddrMap := make(map[string]struct{})
+		if c.FilterAddrs != nil && len(*c.FilterAddrs) > 0 {
+			for _, addr := range *c.FilterAddrs {
+				filterAddrMap[addr] = struct{}{}
+			}
+		}
+
 		rawTxn, err := createSearchRawTransactionsResult(s, s.server.chainParams,
-			mtx, txHash, blkHeader, blkHashStr, blkHeight, maxIdx, *c.VinExtra)
+			mtx, txHash, blkHeader, blkHashStr, blkHeight, maxIdx,
+			*c.VinExtra, filterAddrMap)
 		if err != nil {
 			return nil, err
 		}
