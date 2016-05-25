@@ -411,7 +411,7 @@ type Peer struct {
 	versionSent     bool
 	verAckReceived  bool
 
-	knownInventory     *MruInventoryMap
+	knownInventory     *mruInventoryMap
 	prevGetBlocksMtx   sync.Mutex
 	prevGetBlocksBegin *chainhash.Hash
 	prevGetBlocksStop  *chainhash.Hash
@@ -2002,7 +2002,7 @@ func newPeerBase(cfg *Config, inbound bool) *Peer {
 
 	p := Peer{
 		inbound:         inbound,
-		knownInventory:  NewMruInventoryMap(maxKnownInventory),
+		knownInventory:  newMruInventoryMap(maxKnownInventory),
 		stallControl:    make(chan stallControlMsg, 1), // nonblocking sync
 		outputQueue:     make(chan outMsg, outputBufferSize),
 		sendQueue:       make(chan outMsg, 1),   // nonblocking sync
