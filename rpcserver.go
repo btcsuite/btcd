@@ -3862,15 +3862,15 @@ func handleGetRawMempool(s *rpcServer, cmd interface{}, closeChan <-chan struct{
 				continue
 			}
 
-			// Calculate the starting and current priority from the
-			// the tx's inputs.  Use zeros if one or more of the
-			// input transactions can't be found for some reason.
-			var startingPriority, currentPriority float64
-			inputTxs, err := mp.fetchInputTransactions(desc.Tx, false)
+			// Calculate the current priority from the the tx's
+			// inputs.  Use zero if one or more of the input
+			// transactions can't be found for some reason.
+			tx := desc.Tx
+			var currentPriority float64
+			inputTxs, err := mp.fetchInputTransactions(tx, false)
 			if err == nil {
-				startingPriority = desc.StartingPriority(inputTxs)
-				currentPriority = desc.CurrentPriority(inputTxs,
-					newestHeight+1)
+				currentPriority = calcPriority(tx.MsgTx(),
+					inputTxs, newestHeight+1)
 			}
 
 			mpd := &dcrjson.GetRawMempoolVerboseResult{
@@ -3878,7 +3878,7 @@ func handleGetRawMempool(s *rpcServer, cmd interface{}, closeChan <-chan struct{
 				Fee:              dcrutil.Amount(desc.Fee).ToCoin(),
 				Time:             desc.Added.Unix(),
 				Height:           desc.Height,
-				StartingPriority: startingPriority,
+				StartingPriority: desc.StartingPriority,
 				CurrentPriority:  currentPriority,
 				Depends:          make([]string, 0),
 			}

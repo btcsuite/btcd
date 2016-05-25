@@ -1396,14 +1396,14 @@ mempoolLoop:
 		// Calculate the final transaction priority using the input
 		// value age sum as well as the adjusted transaction size.  The
 		// formula is: sum(inputValue * inputAge) / adjustedTxSize
-		txSize := tx.MsgTx().SerializeSize()
-		prioItem.priority = calcPriority(tx, inputValueAge)
+		prioItem.priority = calcPriority(tx.MsgTx(), txStore, nextBlockHeight)
 
 		// Calculate the fee in Atoms/KB.
 		// NOTE: This is a more precise value than the one calculated
 		// during calcMinRelayFee which rounds up to the nearest full
 		// kilobyte boundary.  This is beneficial since it provides an
 		// incentive to create smaller transactions.
+		txSize := tx.MsgTx().SerializeSize()
 		prioItem.feePerKB = (float64(txDesc.Fee) * float64(kilobyte)) /
 			float64(txSize)
 		prioItem.fee = txDesc.Fee

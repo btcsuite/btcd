@@ -82,7 +82,7 @@ type TxDesc struct {
 	Added            time.Time    // Time when added to pool.
 	Height           int64        // Blockheight when added to pool.
 	Fee              int64        // Transaction fees.
-	startingPriority float64      // Priority when added to the pool.
+	StartingPriority float64      // Priority when added to the pool.
 }
 
 // GetType returns what TxType a given TxDesc is.
@@ -656,19 +656,18 @@ func (mp *txMemPool) RemoveDoubleSpends(tx *dcrutil.Tx) {
 // helper for maybeAcceptTransaction.
 //
 // This function MUST be called with the mempool lock held (for writes).
-func (mp *txMemPool) addTransaction(
-	tx *dcrutil.Tx,
-	txType stake.TxType,
-	height,
-	fee int64) {
+func (mp *txMemPool) addTransaction(txStore blockchain.TxStore, tx *dcrutil.Tx,
+	txType stake.TxType, height, fee int64) {
+
 	// Add the transaction to the pool and mark the referenced outpoints
 	// as spent by the pool.
 	mp.pool[*tx.Sha()] = &TxDesc{
-		Tx:     tx,
-		Type:   txType,
-		Added:  time.Now(),
-		Height: height,
-		Fee:    fee,
+		Tx:               tx,
+		Type:             txType,
+		Added:            time.Now(),
+		Height:           height,
+		Fee:              fee,
+		StartingPriority: calcPriority(tx.MsgTx(), txStore, height),
 	}
 	for _, txIn := range tx.MsgTx().TxIn {
 		mp.outpoints[txIn.PreviousOutPoint] = tx
@@ -817,30 +816,6 @@ func (mp *txMemPool) FindTxForAddr(addr dcrutil.Address) []*dcrutil.Tx {
 	defer mp.Unlock()
 
 	return mp.findTxForAddr(addr)
-}
-
-// StartingPriority calculates the priority of this tx descriptor's underlying
-// transaction relative to when it was first added to the mempool.  The result
-// is lazily computed and then cached for subsequent function calls.
-func (td *TxDesc) StartingPriority(txStore blockchain.TxStore) float64 {
-	// Return our cached result.
-	if td.startingPriority != float64(0) {
-		return td.startingPriority
-	}
-
-	// Compute our starting priority caching the result.
-	inputAge := calcInputValueAge(td, txStore, td.Height)
-	td.startingPriority = calcPriority(td.Tx, inputAge)
-
-	return td.startingPriority
-}
-
-// CurrentPriority calculates the current priority of this tx descriptor's
-// underlying transaction relative to the next block height.
-func (td *TxDesc) CurrentPriority(txStore blockchain.TxStore,
-	nextBlockHeight int64) float64 {
-	inputAge := calcInputValueAge(td, txStore, nextBlockHeight)
-	return calcPriority(td.Tx, inputAge)
 }
 
 // checkPoolDoubleSpend checks whether or not the passed transaction is
@@ -1283,13 +1258,9 @@ func (mp *txMemPool) maybeAcceptTransaction(tx *dcrutil.Tx, isNew,
 	// This applies to non-stake transactions only.
 	if isNew && !cfg.NoRelayPriority && txFee < minFee &&
 		txType == stake.TxTypeRegular {
-		txD := &TxDesc{
-			Tx:     tx,
-			Added:  time.Now(),
-			Height: curHeight,
-			Fee:    txFee,
-		}
-		currentPriority := txD.CurrentPriority(txStore, nextBlockHeight)
+
+		currentPriority := calcPriority(tx.MsgTx(), txStore,
+			nextBlockHeight)
 		if currentPriority <= minHighPriority {
 			str := fmt.Sprintf("transaction %v has insufficient "+
 				"priority (%g <= %g)", txHash,
@@ -1363,7 +1334,7 @@ func (mp *txMemPool) maybeAcceptTransaction(tx *dcrutil.Tx, isNew,
 	}
 
 	// Add to transaction pool.
-	mp.addTransaction(tx, txType, curHeight, txFee)
+	mp.addTransaction(txStore, tx, txType, curHeight, txFee)
 
 	// If it's an SSGen (vote), insert it into the list of
 	// votes.
