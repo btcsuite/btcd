@@ -1541,6 +1541,7 @@ func newPeerConfig(sp *serverPeer) *peer.Config {
 		UserAgentVersion: userAgentVersion,
 		ChainParams:      sp.server.chainParams,
 		Services:         sp.server.services,
+		DisableRelayTx:   false,
 	}
 }
 
