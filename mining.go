@@ -703,9 +703,7 @@ func medianAdjustedTime(chainState *chainState,
 // valid from the perspective of the mainchain (not necessarily
 // the mempool or block) before inserting into a tx tree.
 // If it fails the check, it returns false; otherwise true.
-func maybeInsertStakeTx(mp *txMemPool, stx *dcrutil.Tx, treeValid bool) bool {
-	bm := mp.server.blockManager
-
+func maybeInsertStakeTx(bm *blockManager, stx *dcrutil.Tx, treeValid bool) bool {
 	missingInput := false
 
 	txStore, err := bm.FetchTransactionStore(stx, treeValid)
@@ -1714,7 +1712,7 @@ mempoolLoop:
 
 		if isSSGen, _ := stake.IsSSGen(tx); isSSGen {
 			txCopy := dcrutil.NewTxDeepTxIns(tx.MsgTx())
-			if maybeInsertStakeTx(mempool, txCopy, treeValid) {
+			if maybeInsertStakeTx(blockManager, txCopy, treeValid) {
 				vb := stake.GetSSGenVoteBits(txCopy)
 				voteBitsVoters = append(voteBitsVoters, vb)
 				blockTxnsStake = append(blockTxnsStake, txCopy)
@@ -1820,7 +1818,7 @@ mempoolLoop:
 			// Quick check for difficulty here.
 			if tx.MsgTx().TxOut[0].Value >= requiredStakeDifficulty {
 				txCopy := dcrutil.NewTxDeepTxIns(tx.MsgTx())
-				if maybeInsertStakeTx(mempool, txCopy, treeValid) {
+				if maybeInsertStakeTx(blockManager, txCopy, treeValid) {
 					blockTxnsStake = append(blockTxnsStake, txCopy)
 					freshStake++
 				}
@@ -1843,7 +1841,7 @@ mempoolLoop:
 		isSSRtx, _ := stake.IsSSRtx(tx)
 		if tx.Tree() == dcrutil.TxTreeStake && isSSRtx {
 			txCopy := dcrutil.NewTxDeepTxIns(tx.MsgTx())
-			if maybeInsertStakeTx(mempool, txCopy, treeValid) {
+			if maybeInsertStakeTx(blockManager, txCopy, treeValid) {
 				blockTxnsStake = append(blockTxnsStake, txCopy)
 				revocations++
 			}

@@ -2494,7 +2494,32 @@ func newServer(listenAddrs []string, database database.Db, tmdb *stake.TicketDB,
 		return nil, err
 	}
 	s.blockManager = bm
-	s.txMemPool = newTxMemPool(&s)
+
+	txC := mempoolConfig{
+		ChainParams:           chainParams,
+		DisableRelayPriority:  cfg.NoRelayPriority,
+		EnableAddrIndex:       !cfg.NoAddrIndex,
+		FetchTransactionStore: s.blockManager.blockChain.FetchTransactionStore,
+		FreeTxRelayLimit:      cfg.FreeTxRelayLimit,
+		MaxOrphanTxs:          cfg.MaxOrphanTxs,
+		MinRelayTxFee:         cfg.minRelayTxFee,
+		NewestSha: func() (*chainhash.Hash, int64, error) {
+			bm.chainState.Lock()
+			hash := bm.chainState.newestHash
+			height := bm.chainState.newestHeight
+			bm.chainState.Unlock()
+			return hash, height, nil
+		},
+		NextStakeDifficulty: func() (int64, error) {
+			bm.chainState.Lock()
+			sDiff := bm.chainState.nextStakeDifficulty
+			bm.chainState.Unlock()
+			return sDiff, nil
+		},
+		SigCache:   s.sigCache,
+		TimeSource: s.timeSource,
+	}
+	s.txMemPool = newTxMemPool(&txC)
 
 	// Create the mining policy based on the configuration options.
 	policy := miningPolicy{
