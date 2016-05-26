@@ -74,27 +74,21 @@ const (
 	maxNullDataOutputs = 4
 )
 
-// TxDesc is a descriptor containing a transaction in the mempool and the
-// metadata we store about it.
-type TxDesc struct {
-	Tx               *dcrutil.Tx  // Transaction.
-	Type             stake.TxType // Transcation type.
-	Added            time.Time    // Time when added to pool.
-	Height           int64        // Blockheight when added to pool.
-	Fee              int64        // Transaction fees.
-	StartingPriority float64      // Priority when added to the pool.
-}
-
-// GetType returns what TxType a given TxDesc is.
-func (td *TxDesc) GetType() stake.TxType {
-	return td.Type
-}
-
 // VoteTx is a struct describing a block vote (SSGen).
 type VoteTx struct {
 	SsgenHash chainhash.Hash // Vote
 	SstxHash  chainhash.Hash // Ticket
 	Vote      bool
+}
+
+// mempoolTxDesc is a descriptor containing a transaction in the mempool along
+// with additional metadata.
+type mempoolTxDesc struct {
+	miningTxDesc
+
+	// StartingPriority is the priority of the transaction when it was added
+	// to the pool.
+	StartingPriority float64
 }
 
 // txMemPool is used as a source of transactions that need to be mined into
@@ -106,7 +100,7 @@ type txMemPool struct {
 
 	sync.RWMutex
 	server        *server
-	pool          map[chainhash.Hash]*TxDesc
+	pool          map[chainhash.Hash]*mempoolTxDesc
 	orphans       map[chainhash.Hash]*dcrutil.Tx
 	orphansByPrev map[chainhash.Hash]map[chainhash.Hash]*dcrutil.Tx
 	addrindex     map[string]map[chainhash.Hash]struct{} // maps address to txs
@@ -357,6 +351,9 @@ func (mp *txMemPool) SortParentsByVotes(currentTopBlock chainhash.Hash,
 
 	return sortedBlocks, err
 }
+
+// Ensure the txMemPool type implements the mining.TxSource interface.
+var _ TxSource = (*txMemPool)(nil)
 
 // removeOrphan is the internal function which implements the public
 // RemoveOrphan.  See the comment for RemoveOrphan for more details.
@@ -661,12 +658,14 @@ func (mp *txMemPool) addTransaction(txStore blockchain.TxStore, tx *dcrutil.Tx,
 
 	// Add the transaction to the pool and mark the referenced outpoints
 	// as spent by the pool.
-	mp.pool[*tx.Sha()] = &TxDesc{
-		Tx:               tx,
-		Type:             txType,
-		Added:            time.Now(),
-		Height:           height,
-		Fee:              fee,
+	mp.pool[*tx.Sha()] = &mempoolTxDesc{
+		miningTxDesc: miningTxDesc{
+			Tx:     tx,
+			Type:   txType,
+			Added:  time.Now(),
+			Height: height,
+			Fee:    fee,
+		},
 		StartingPriority: calcPriority(tx.MsgTx(), txStore, height),
 	}
 	for _, txIn := range tx.MsgTx().TxIn {
@@ -952,8 +951,8 @@ func (mp *txMemPool) FilterTransactionsByAddress(
 	if txs, exists := mp.addrindex[addr.EncodeAddress()]; exists {
 		addressTxs := make([]*dcrutil.Tx, 0, len(txs))
 		for txHash := range txs {
-			if tx, exists := mp.pool[txHash]; exists {
-				addressTxs = append(addressTxs, tx.Tx)
+			if txD, exists := mp.pool[txHash]; exists {
+				addressTxs = append(addressTxs, txD.Tx)
 			}
 		}
 		return addressTxs, nil
@@ -1072,7 +1071,7 @@ func (mp *txMemPool) maybeAcceptTransaction(tx *dcrutil.Tx, isNew,
 		if txType == stake.TxTypeSSGen {
 			ssGenAlreadyFound := 0
 			for _, mpTx := range mp.pool {
-				if mpTx.GetType() == stake.TxTypeSSGen {
+				if mpTx.Type == stake.TxTypeSSGen {
 					if mpTx.Tx.MsgTx().TxIn[1].PreviousOutPoint ==
 						tx.MsgTx().TxIn[1].PreviousOutPoint {
 						ssGenAlreadyFound++
@@ -1090,7 +1089,7 @@ func (mp *txMemPool) maybeAcceptTransaction(tx *dcrutil.Tx, isNew,
 
 		if txType == stake.TxTypeSSRtx {
 			for _, mpTx := range mp.pool {
-				if mpTx.GetType() == stake.TxTypeSSRtx {
+				if mpTx.Type == stake.TxTypeSSRtx {
 					if mpTx.Tx.MsgTx().TxIn[0].PreviousOutPoint ==
 						tx.MsgTx().TxIn[0].PreviousOutPoint {
 						str := fmt.Sprintf("transaction %v in the pool "+
@@ -1645,14 +1644,33 @@ func (mp *txMemPool) TxShas() []*chainhash.Hash {
 // The descriptors are to be treated as read only.
 //
 // This function is safe for concurrent access.
-func (mp *txMemPool) TxDescs() []*TxDesc {
+func (mp *txMemPool) TxDescs() []*mempoolTxDesc {
 	mp.RLock()
 	defer mp.RUnlock()
 
-	descs := make([]*TxDesc, len(mp.pool))
+	descs := make([]*mempoolTxDesc, len(mp.pool))
 	i := 0
 	for _, desc := range mp.pool {
 		descs[i] = desc
+		i++
+	}
+
+	return descs
+}
+
+// MiningDescs returns a slice of mining descriptors for all the transactions
+// in the pool.
+//
+// This is part of the TxSource interface implementation and is safe for
+// concurrent access as required by the interface contract.
+func (mp *txMemPool) MiningDescs() []*miningTxDesc {
+	mp.RLock()
+	defer mp.RUnlock()
+
+	descs := make([]*miningTxDesc, len(mp.pool))
+	i := 0
+	for _, desc := range mp.pool {
+		descs[i] = &desc.miningTxDesc
 		i++
 	}
 
@@ -1691,7 +1709,7 @@ func (mp *txMemPool) CheckIfTxsExist(hashes []chainhash.Hash) bool {
 func newTxMemPool(server *server) *txMemPool {
 	memPool := &txMemPool{
 		server:        server,
-		pool:          make(map[chainhash.Hash]*TxDesc),
+		pool:          make(map[chainhash.Hash]*mempoolTxDesc),
 		orphans:       make(map[chainhash.Hash]*dcrutil.Tx),
 		orphansByPrev: make(map[chainhash.Hash]map[chainhash.Hash]*dcrutil.Tx),
 		outpoints:     make(map[wire.OutPoint]*dcrutil.Tx),

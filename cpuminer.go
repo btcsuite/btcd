@@ -60,6 +60,7 @@ var (
 type CPUMiner struct {
 	sync.Mutex
 	policy            *miningPolicy
+	txSource          TxSource
 	server            *server
 	numWorkers        uint32
 	started           bool
@@ -212,7 +213,7 @@ func (m *CPUMiner) solveBlock(msgBlock *wire.MsgBlock, ticker *time.Ticker,
 
 	// Initial state.
 	lastGenerated := time.Now()
-	lastTxUpdate := m.server.txMemPool.LastUpdated()
+	lastTxUpdate := m.txSource.LastUpdated()
 	hashesCompleted := uint64(0)
 
 	// Note that the entire extra nonce range is iterated and the offset is
@@ -244,9 +245,10 @@ func (m *CPUMiner) solveBlock(msgBlock *wire.MsgBlock, ticker *time.Ticker,
 				// has been updated since the block template was
 				// generated and it has been at least 3 seconds,
 				// or if it's been one minute.
-				if (lastTxUpdate != m.server.txMemPool.LastUpdated() &&
+				if (lastTxUpdate != m.txSource.LastUpdated() &&
 					time.Now().After(lastGenerated.Add(3*time.Second))) ||
 					time.Now().After(lastGenerated.Add(60*time.Second)) {
+
 					return false
 				}
 
@@ -327,8 +329,7 @@ out:
 		// Create a new block template using the available transactions
 		// in the memory pool as a source of transactions to potentially
 		// include in the block.
-		template, err := NewBlockTemplate(m.policy, m.server.txMemPool,
-			payToAddr)
+		template, err := NewBlockTemplate(m.policy, m.server, payToAddr)
 		m.submitBlockLock.Unlock()
 		if err != nil {
 			errStr := fmt.Sprintf("Failed to create new block "+
@@ -607,8 +608,7 @@ func (m *CPUMiner) GenerateNBlocks(n uint32) ([]*chainhash.Hash, error) {
 		// Create a new block template using the available transactions
 		// in the memory pool as a source of transactions to potentially
 		// include in the block.
-		template, err := NewBlockTemplate(m.policy, m.server.txMemPool,
-			payToAddr)
+		template, err := NewBlockTemplate(m.policy, m.server, payToAddr)
 		m.submitBlockLock.Unlock()
 		if err != nil {
 			errStr := fmt.Sprintf("Failed to create new block "+
@@ -652,6 +652,7 @@ func (m *CPUMiner) GenerateNBlocks(n uint32) ([]*chainhash.Hash, error) {
 func newCPUMiner(policy *miningPolicy, s *server) *CPUMiner {
 	return &CPUMiner{
 		policy:            policy,
+		txSource:          s.txMemPool,
 		server:            s,
 		numWorkers:        defaultNumWorkers,
 		updateNumWorkers:  make(chan struct{}),

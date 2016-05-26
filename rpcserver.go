@@ -2652,8 +2652,7 @@ func (state *gbtWorkState) updateBlockTemplate(s *rpcServer, useCoinbaseValue bo
 		// block template doesn't include the coinbase, so the caller
 		// will ultimately create their own coinbase which pays to the
 		// appropriate address(es).
-		blkTemplate, err := NewBlockTemplate(s.policy, s.server.txMemPool,
-			payAddr)
+		blkTemplate, err := NewBlockTemplate(s.policy, s.server, payAddr)
 		if err != nil {
 			return internalRPCError("Failed to create new block "+
 				"template: "+err.Error(), "")
@@ -3610,15 +3609,15 @@ func handleGetInfo(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (in
 
 // handleGetMempoolInfo implements the getmempoolinfo command.
 func handleGetMempoolInfo(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (interface{}, error) {
-	txD := s.server.txMemPool.TxDescs()
+	mempoolTxns := s.server.txMemPool.TxDescs()
 
 	var numBytes int64
-	for _, desc := range txD {
-		numBytes += int64(desc.Tx.MsgTx().SerializeSize())
+	for _, txD := range mempoolTxns {
+		numBytes += int64(txD.Tx.MsgTx().SerializeSize())
 	}
 
 	ret := &dcrjson.GetMempoolInfoResult{
-		Size:  int64(len(txD)),
+		Size:  int64(len(mempoolTxns)),
 		Bytes: numBytes,
 	}
 
@@ -3874,7 +3873,7 @@ func handleGetRawMempool(s *rpcServer, cmd interface{}, closeChan <-chan struct{
 			}
 
 			mpd := &dcrjson.GetRawMempoolVerboseResult{
-				Size:             int32(desc.Tx.MsgTx().SerializeSize()),
+				Size:             int32(tx.MsgTx().SerializeSize()),
 				Fee:              dcrutil.Amount(desc.Fee).ToCoin(),
 				Time:             desc.Added.Unix(),
 				Height:           desc.Height,
@@ -3882,7 +3881,7 @@ func handleGetRawMempool(s *rpcServer, cmd interface{}, closeChan <-chan struct{
 				CurrentPriority:  currentPriority,
 				Depends:          make([]string, 0),
 			}
-			for _, txIn := range desc.Tx.MsgTx().TxIn {
+			for _, txIn := range tx.MsgTx().TxIn {
 				hash := &txIn.PreviousOutPoint.Hash
 				if s.server.txMemPool.haveTransaction(hash) {
 					mpd.Depends = append(mpd.Depends,
@@ -3890,7 +3889,7 @@ func handleGetRawMempool(s *rpcServer, cmd interface{}, closeChan <-chan struct{
 				}
 			}
 
-			result[desc.Tx.Sha().String()] = mpd
+			result[tx.Sha().String()] = mpd
 		}
 
 		return result, nil
@@ -4267,8 +4266,7 @@ func handleGetWorkRequest(s *rpcServer) (interface{}, error) {
 		// Choose a payment address at random.
 		payToAddr := cfg.miningAddrs[rand.Intn(len(cfg.miningAddrs))]
 
-		template, err := NewBlockTemplate(s.policy, s.server.txMemPool,
-			payToAddr)
+		template, err := NewBlockTemplate(s.policy, s.server, payToAddr)
 		if err != nil {
 			context := "Failed to create new block template"
 			return nil, internalRPCError(err.Error(), context)
