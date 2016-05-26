@@ -18,6 +18,7 @@ import (
 	"github.com/decred/dcrd/chaincfg"
 	"github.com/decred/dcrd/chaincfg/chainhash"
 	"github.com/decred/dcrd/database"
+	"github.com/decred/dcrd/mining"
 	"github.com/decred/dcrd/txscript"
 	"github.com/decred/dcrd/wire"
 	"github.com/decred/dcrutil"
@@ -39,67 +40,6 @@ const (
 	// kilobyte is the size of a kilobyte.
 	kilobyte = 1000
 )
-
-// miningTxDesc is a descriptor about a transaction in a transaction source
-// along with additional metadata.
-type miningTxDesc struct {
-	// Tx is the transaction associated with the entry.
-	Tx *dcrutil.Tx
-
-	// Type is the type of the transaction associated with the entry.
-	Type stake.TxType
-
-	// Added is the time when the entry was added to the source pool.
-	Added time.Time
-
-	// Height is the block height when the entry was added to the the source
-	// pool.
-	Height int64
-
-	// Fee is the total fee the transaction associated with the entry pays.
-	Fee int64
-}
-
-// TxSource represents a source of transactions to consider for inclusion in
-// new blocks.
-//
-// The interface contract requires that all of these methods are safe for
-// concurrent access with respect to the source.
-type TxSource interface {
-	// LastUpdated returns the last time a transaction was added to or
-	// removed from the source pool.
-	LastUpdated() time.Time
-
-	// MiningDescs returns a slice of mining descriptors for all the
-	// transactions in the source pool.
-	MiningDescs() []*miningTxDesc
-
-	// HaveTransaction returns whether or not the passed transaction hash
-	// exists in the source pool.
-	HaveTransaction(hash *chainhash.Hash) bool
-}
-
-// miningPolicy houses the policy (configuration parameters) which is used to
-// control the generation of block templates.  See the documentation for
-// NewBlockTemplate for more details on each of these parameters are used.
-type miningPolicy struct {
-	// BlockMinSize is the minimum block size in bytes to be used when
-	// generating a block template.
-	BlockMinSize uint32
-
-	// BlockMaxSize is the maximum block size in bytes to be used when
-	// generating a block template.
-	BlockMaxSize uint32
-
-	// BlockPrioritySize is the size in bytes for high-priority / low-fee
-	// transactions to be used when generating a block template.
-	BlockPrioritySize uint32
-
-	// TxMinFreeFee is the minimum fee in Atoms/kB that is required for a
-	// transaction to be treated as free for mining purposes (block template
-	// generation).  This value is in Atoms/1000 bytes.
-	TxMinFreeFee dcrutil.Amount
-}
 
 // txPrioItem houses a transaction along with extra information that allows the
 // transaction to be prioritized and track dependencies on other transactions
@@ -1167,14 +1107,14 @@ func handleCreatedBlockTemplate(blockTemplate *BlockTemplate,
 //
 //  This function returns nil, nil if there are not enough voters on any of
 //  the current top blocks to create a new block template.
-func NewBlockTemplate(policy *miningPolicy, server *server,
+func NewBlockTemplate(policy *mining.Policy, server *server,
 	payToAddress dcrutil.Address) (*BlockTemplate, error) {
 
 	// TODO: The mempool should be completely separated via the TxSource
 	// interface so this function is fully decoupled.
 	mempool := server.txMemPool
 
-	var txSource TxSource = server.txMemPool
+	var txSource mining.TxSource = server.txMemPool
 	blockManager := server.blockManager
 	timeSource := server.timeSource
 	chainState := &blockManager.chainState

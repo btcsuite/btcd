@@ -41,6 +41,7 @@ import (
 	"github.com/decred/dcrd/chaincfg/chainhash"
 	"github.com/decred/dcrd/database"
 	"github.com/decred/dcrd/dcrjson"
+	"github.com/decred/dcrd/mining"
 	"github.com/decred/dcrd/txscript"
 	"github.com/decred/dcrd/wire"
 
@@ -5684,7 +5685,7 @@ func handleVerifyMessage(s *rpcServer, cmd interface{}, closeChan <-chan struct{
 type rpcServer struct {
 	started      int32
 	shutdown     int32
-	policy       *miningPolicy
+	policy       *mining.Policy
 	server       *server
 	authsha      [fastsha256.Size]byte
 	limitauthsha [fastsha256.Size]byte
@@ -6168,7 +6169,7 @@ func genCertPair(certFile, keyFile string) error {
 }
 
 // newRPCServer returns a new instance of the rpcServer struct.
-func newRPCServer(listenAddrs []string, policy *miningPolicy, s *server) (*rpcServer, error) {
+func newRPCServer(listenAddrs []string, policy *mining.Policy, s *server) (*rpcServer, error) {
 	rpc := rpcServer{
 		policy:       policy,
 		server:       s,

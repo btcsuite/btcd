@@ -26,6 +26,7 @@ import (
 	"github.com/decred/dcrd/chaincfg"
 	"github.com/decred/dcrd/chaincfg/chainhash"
 	"github.com/decred/dcrd/database"
+	"github.com/decred/dcrd/mining"
 	"github.com/decred/dcrd/peer"
 	"github.com/decred/dcrd/txscript"
 	"github.com/decred/dcrd/wire"
@@ -2522,7 +2523,7 @@ func newServer(listenAddrs []string, database database.Db, tmdb *stake.TicketDB,
 	s.txMemPool = newTxMemPool(&txC)
 
 	// Create the mining policy based on the configuration options.
-	policy := miningPolicy{
+	policy := mining.Policy{
 		BlockMinSize:      cfg.BlockMinSize,
 		BlockMaxSize:      cfg.BlockMaxSize,
 		BlockPrioritySize: cfg.BlockPrioritySize,
