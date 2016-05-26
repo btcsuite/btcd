@@ -2524,6 +2524,8 @@ func newServer(listenAddrs []string, database database.Db, tmdb *stake.TicketDB,
 	s.txMemPool = newTxMemPool(&txC)
 
 	// Create the mining policy based on the configuration options.
+	// NOTE: The CPU miner relies on the mempool, so the mempool has to be
+	// created before calling the function to create the CPU miner.
 	policy := mining.Policy{
 		BlockMinSize:      cfg.BlockMinSize,
 		BlockMaxSize:      cfg.BlockMaxSize,

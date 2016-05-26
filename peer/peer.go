@@ -749,7 +749,7 @@ func (p *Peer) pushVersionMsg() error {
 		}
 	}
 
-	theirNa := p.na
+	theirNA := p.na
 
 	// If we are behind a proxy and the connection comes from the proxy then
 	// we return an unroutable address as their address. This is to prevent
@@ -758,7 +758,7 @@ func (p *Peer) pushVersionMsg() error {
 		proxyaddress, _, err := net.SplitHostPort(p.cfg.Proxy)
 		// invalid proxy means poorly configured, be on the safe side.
 		if err != nil || p.na.IP.String() == proxyaddress {
-			theirNa = &wire.NetAddress{
+			theirNA = &wire.NetAddress{
 				Timestamp: time.Now(),
 				IP:        net.IP([]byte{0, 0, 0, 0}),
 			}
@@ -783,7 +783,7 @@ func (p *Peer) pushVersionMsg() error {
 	sentNonces.Add(nonce)
 
 	// Version message.
-	msg := wire.NewMsgVersion(ourNA, theirNa, nonce, int32(blockNum))
+	msg := wire.NewMsgVersion(ourNA, theirNA, nonce, int32(blockNum))
 	msg.AddUserAgent(p.cfg.UserAgentName, p.cfg.UserAgentVersion)
 
 	// XXX: bitcoind appears to always enable the full node services flag
