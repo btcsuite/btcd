@@ -2954,6 +2954,55 @@ func (c *Client) GetStakeInfo() (*dcrjson.GetStakeInfoResult, error) {
 	return c.GetStakeInfoAsync().Receive()
 }
 
+// FutureGetTicketsResult is a future promise to deliver the result of a
+// GetTickets RPC invocation (or an applicable error).
+type FutureGetTicketsResult chan *response
+
+// Receive waits for the response promised by the future and returns the info
+// provided by the server.
+func (r FutureGetTicketsResult) Receive() ([]*chainhash.Hash, error) {
+	res, err := receiveFuture(r)
+	if err != nil {
+		return nil, err
+	}
+
+	// Unmarshal result as a ticketsforaddress result object.
+	var tixRes dcrjson.GetTicketsResult
+	err = json.Unmarshal(res, &tixRes)
+	if err != nil {
+		return nil, err
+	}
+
+	tickets := make([]*chainhash.Hash, len(tixRes.Hashes))
+	for i := range tixRes.Hashes {
+		h, err := chainhash.NewHashFromStr(tixRes.Hashes[i])
+		if err != nil {
+			return nil, err
+		}
+
+		tickets[i] = h
+	}
+
+	return tickets, nil
+}
+
+// GetTicketsAsync returns an instance of a type that can be used to
+// get the result of the RPC at some future time by invoking the Receive
+// function on the returned instance.
+//
+// See GetTicketsfor the blocking version and more details.
+func (c *Client) GetTicketsAsync(includeImmature bool) FutureGetTicketsResult {
+	cmd := dcrjson.NewGetTicketsCmd(includeImmature)
+	return c.sendCmd(cmd)
+}
+
+// GetTickets returns a list of the tickets owned by the wallet, partially
+// or in full. The flag includeImmature is used to indicate if non mature
+// tickets should also be returned.
+func (c *Client) GetTickets(includeImmature bool) ([]*chainhash.Hash, error) {
+	return c.GetTicketsAsync(includeImmature).Receive()
+}
+
 // FutureGetTicketVoteBitsResult is a future promise to deliver the result of a
 // GetTicketVoteBitsAsync RPC invocation (or an applicable error).
 type FutureGetTicketVoteBitsResult chan *response
