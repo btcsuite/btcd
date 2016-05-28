@@ -394,10 +394,14 @@ type HostToNetAddrFunc func(host string, port uint16,
 // of specific types that typically require common special handling are
 // provided as a convenience.
 type Peer struct {
-	started    int32
-	connected  int32
-	disconnect int32 // only to be used atomically
-	conn       net.Conn
+	// The following variables must only be used atomically
+	started       int32
+	connected     int32
+	disconnect    int32
+	bytesReceived uint64
+	bytesSent     uint64
+
+	conn net.Conn
 
 	// These fields are set at creation time and never modified, so they are
 	// safe to read from concurrently without a mutex.
@@ -430,8 +434,6 @@ type Peer struct {
 	timeConnected      time.Time
 	lastSend           time.Time
 	lastRecv           time.Time
-	bytesReceived      uint64
-	bytesSent          uint64
 	startingHeight     int32
 	lastBlock          int32
 	lastAnnouncedBlock *chainhash.Hash
@@ -512,8 +514,8 @@ func (p *Peer) StatsSnapshot() *StatsSnap {
 		Services:       services,
 		LastSend:       p.lastSend,
 		LastRecv:       p.lastRecv,
-		BytesSent:      p.bytesSent,
-		BytesRecv:      p.bytesReceived,
+		BytesSent:      atomic.LoadUint64(&p.bytesSent),
+		BytesRecv:      atomic.LoadUint64(&p.bytesReceived),
 		ConnTime:       p.timeConnected,
 		TimeOffset:     p.timeOffset,
 		Version:        protocolVersion,
@@ -688,20 +690,14 @@ func (p *Peer) LastRecv() time.Time {
 //
 // This function is safe for concurrent access.
 func (p *Peer) BytesSent() uint64 {
-	p.statsMtx.RLock()
-	defer p.statsMtx.RUnlock()
-
-	return p.bytesSent
+	return atomic.LoadUint64(&p.bytesSent)
 }
 
 // BytesReceived returns the total number of bytes received by the peer.
 //
 // This function is safe for concurrent access.
 func (p *Peer) BytesReceived() uint64 {
-	p.statsMtx.RLock()
-	defer p.statsMtx.RUnlock()
-
-	return p.bytesReceived
+	return atomic.LoadUint64(&p.bytesReceived)
 }
 
 // TimeConnected returns the time at which the peer connected.
@@ -1104,9 +1100,7 @@ func (p *Peer) handlePongMsg(msg *wire.MsgPong) {
 func (p *Peer) readMessage() (wire.Message, []byte, error) {
 	n, msg, buf, err := wire.ReadMessageN(p.conn, p.ProtocolVersion(),
 		p.cfg.ChainParams.Net)
-	p.statsMtx.Lock()
-	p.bytesReceived += uint64(n)
-	p.statsMtx.Unlock()
+	atomic.AddUint64(&p.bytesReceived, uint64(n))
 	if p.cfg.Listeners.OnRead != nil {
 		p.cfg.Listeners.OnRead(p, n, msg, err)
 	}
@@ -1181,9 +1175,7 @@ func (p *Peer) writeMessage(msg wire.Message) error {
 	// Write the message to the peer.
 	n, err := wire.WriteMessageN(p.conn, msg, p.ProtocolVersion(),
 		p.cfg.ChainParams.Net)
-	p.statsMtx.Lock()
-	p.bytesSent += uint64(n)
-	p.statsMtx.Unlock()
+	atomic.AddUint64(&p.bytesSent, uint64(n))
 	if p.cfg.Listeners.OnWrite != nil {
 		p.cfg.Listeners.OnWrite(p, n, msg, err)
 	}
