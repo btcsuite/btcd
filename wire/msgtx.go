@@ -541,7 +541,7 @@ func (msg *MsgTx) Copy() *MsgTx {
 // decodePrefix decodes a transaction prefix and stores the contents
 // in the embedded msgTx.
 func (msg *MsgTx) decodePrefix(r io.Reader, pver uint32) error {
-	count, err := readVarInt(r, pver)
+	count, err := ReadVarInt(r, pver)
 	if err != nil {
 		return err
 	}
@@ -567,7 +567,7 @@ func (msg *MsgTx) decodePrefix(r io.Reader, pver uint32) error {
 		msg.TxIn[i] = &ti
 	}
 
-	count, err = readVarInt(r, pver)
+	count, err = ReadVarInt(r, pver)
 	if err != nil {
 		return err
 	}
@@ -613,7 +613,7 @@ func (msg *MsgTx) decodeWitness(r io.Reader, pver uint32, isFull bool) error {
 	// Witness only; generate the TxIn list and fill out only the
 	// sigScripts.
 	if !isFull {
-		count, err := readVarInt(r, pver)
+		count, err := ReadVarInt(r, pver)
 		if err != nil {
 			return err
 		}
@@ -643,7 +643,7 @@ func (msg *MsgTx) decodeWitness(r io.Reader, pver uint32, isFull bool) error {
 		// the number of signature scripts, check to make sure it's the
 		// same as the number of TxIns we currently have, then fill in
 		// the signature scripts.
-		count, err := readVarInt(r, pver)
+		count, err := ReadVarInt(r, pver)
 		if err != nil {
 			return err
 		}
@@ -690,7 +690,7 @@ func (msg *MsgTx) decodeWitness(r io.Reader, pver uint32, isFull bool) error {
 func (msg *MsgTx) decodeWitnessSigning(r io.Reader, pver uint32) error {
 	// Witness only for signing; generate the TxIn list and fill out only the
 	// sigScripts.
-	count, err := readVarInt(r, pver)
+	count, err := ReadVarInt(r, pver)
 	if err != nil {
 		return err
 	}
@@ -723,7 +723,7 @@ func (msg *MsgTx) decodeWitnessSigning(r io.Reader, pver uint32) error {
 func (msg *MsgTx) decodeWitnessValueSigning(r io.Reader, pver uint32) error {
 	// Witness only for signing; generate the TxIn list and fill out only the
 	// sigScripts.
-	count, err := readVarInt(r, pver)
+	count, err := ReadVarInt(r, pver)
 	if err != nil {
 		return err
 	}
@@ -816,7 +816,7 @@ func (msg *MsgTx) LegacyBtcDecode(r io.Reader, pver uint32) error {
 	}
 	msg.Version = int32(binary.LittleEndian.Uint32(buf[:]))
 
-	count, err := readVarInt(r, pver)
+	count, err := ReadVarInt(r, pver)
 	if err != nil {
 		return err
 	}
@@ -841,7 +841,7 @@ func (msg *MsgTx) LegacyBtcDecode(r io.Reader, pver uint32) error {
 		msg.TxIn[i] = &ti
 	}
 
-	count, err = readVarInt(r, pver)
+	count, err = ReadVarInt(r, pver)
 	if err != nil {
 		return err
 	}
@@ -911,7 +911,7 @@ func (msg *MsgTx) FromBytes(b []byte) error {
 func (msg *MsgTx) encodePrefix(w io.Writer, pver uint32) error {
 	var buf [4]byte
 	count := uint64(len(msg.TxIn))
-	err := writeVarInt(w, pver, count)
+	err := WriteVarInt(w, pver, count)
 	if err != nil {
 		return err
 	}
@@ -924,7 +924,7 @@ func (msg *MsgTx) encodePrefix(w io.Writer, pver uint32) error {
 	}
 
 	count = uint64(len(msg.TxOut))
-	err = writeVarInt(w, pver, count)
+	err = WriteVarInt(w, pver, count)
 	if err != nil {
 		return err
 	}
@@ -954,7 +954,7 @@ func (msg *MsgTx) encodePrefix(w io.Writer, pver uint32) error {
 // encodeWitness encodes a transaction witness into a writer.
 func (msg *MsgTx) encodeWitness(w io.Writer, pver uint32) error {
 	count := uint64(len(msg.TxIn))
-	err := writeVarInt(w, pver, count)
+	err := WriteVarInt(w, pver, count)
 	if err != nil {
 		return err
 	}
@@ -972,7 +972,7 @@ func (msg *MsgTx) encodeWitness(w io.Writer, pver uint32) error {
 // encodeWitnessSigning encodes a transaction witness into a writer for signing.
 func (msg *MsgTx) encodeWitnessSigning(w io.Writer, pver uint32) error {
 	count := uint64(len(msg.TxIn))
-	err := writeVarInt(w, pver, count)
+	err := WriteVarInt(w, pver, count)
 	if err != nil {
 		return err
 	}
@@ -991,7 +991,7 @@ func (msg *MsgTx) encodeWitnessSigning(w io.Writer, pver uint32) error {
 // signing, with the value included.
 func (msg *MsgTx) encodeWitnessValueSigning(w io.Writer, pver uint32) error {
 	count := uint64(len(msg.TxIn))
-	err := writeVarInt(w, pver, count)
+	err := WriteVarInt(w, pver, count)
 	if err != nil {
 		return err
 	}
@@ -1073,7 +1073,7 @@ func (msg *MsgTx) LegacyBtcEncode(w io.Writer, pver uint32) error {
 	}
 
 	count := uint64(len(msg.TxIn))
-	err = writeVarInt(w, pver, count)
+	err = WriteVarInt(w, pver, count)
 	if err != nil {
 		return err
 	}
@@ -1086,7 +1086,7 @@ func (msg *MsgTx) LegacyBtcEncode(w io.Writer, pver uint32) error {
 	}
 
 	count = uint64(len(msg.TxOut))
-	err = writeVarInt(w, pver, count)
+	err = WriteVarInt(w, pver, count)
 	if err != nil {
 		return err
 	}
@@ -1510,7 +1510,7 @@ func readTxInWitness(r io.Reader, pver uint32, version int32, ti *TxIn) error {
 	ti.BlockIndex = binary.LittleEndian.Uint32(buf4[:])
 
 	// Signature script.
-	ti.SignatureScript, err = readVarBytes(r, pver, MaxMessagePayload,
+	ti.SignatureScript, err = ReadVarBytes(r, pver, MaxMessagePayload,
 		"transaction input signature script")
 	if err != nil {
 		return err
@@ -1525,7 +1525,7 @@ func readTxInWitnessSigning(r io.Reader, pver uint32, version int32,
 	var err error
 
 	// Signature script.
-	ti.SignatureScript, err = readVarBytes(r, pver, MaxMessagePayload,
+	ti.SignatureScript, err = ReadVarBytes(r, pver, MaxMessagePayload,
 		"transaction input signature script")
 	if err != nil {
 		return err
@@ -1549,7 +1549,7 @@ func readTxInWitnessValueSigning(r io.Reader, pver uint32, version int32,
 	ti.ValueIn = int64(binary.LittleEndian.Uint64(buf8[:]))
 
 	// Signature script.
-	ti.SignatureScript, err = readVarBytes(r, pver, MaxMessagePayload,
+	ti.SignatureScript, err = ReadVarBytes(r, pver, MaxMessagePayload,
 		"transaction input signature script")
 	if err != nil {
 		return err
@@ -1568,7 +1568,7 @@ func legacyReadTxIn(r io.Reader, pver uint32, version int32, ti *TxIn) error {
 	}
 	ti.PreviousOutPoint = op
 
-	ti.SignatureScript, err = readVarBytes(r, pver, MaxMessagePayload,
+	ti.SignatureScript, err = ReadVarBytes(r, pver, MaxMessagePayload,
 		"transaction input signature script")
 	if err != nil {
 		return err
@@ -1592,7 +1592,7 @@ func legacyWriteTxIn(w io.Writer, pver uint32, version int32, ti *TxIn) error {
 		return err
 	}
 
-	err = writeVarBytes(w, pver, ti.SignatureScript)
+	err = WriteVarBytes(w, pver, ti.SignatureScript)
 	if err != nil {
 		return err
 	}
@@ -1652,7 +1652,7 @@ func writeTxInWitness(w io.Writer, pver uint32, version int32, ti *TxIn) error {
 	}
 
 	// Write the signature script.
-	err = writeVarBytes(w, pver, ti.SignatureScript)
+	err = WriteVarBytes(w, pver, ti.SignatureScript)
 	if err != nil {
 		return err
 	}
@@ -1667,7 +1667,7 @@ func writeTxInWitnessSigning(w io.Writer, pver uint32, version int32,
 	var err error
 
 	// Only write the signature script.
-	err = writeVarBytes(w, pver, ti.SignatureScript)
+	err = WriteVarBytes(w, pver, ti.SignatureScript)
 	if err != nil {
 		return err
 	}
@@ -1690,7 +1690,7 @@ func writeTxInWitnessValueSigning(w io.Writer, pver uint32, version int32,
 	}
 
 	// Signature script.
-	err = writeVarBytes(w, pver, ti.SignatureScript)
+	err = WriteVarBytes(w, pver, ti.SignatureScript)
 	if err != nil {
 		return err
 	}
@@ -1715,7 +1715,7 @@ func readTxOut(r io.Reader, pver uint32, version int32, to *TxOut) error {
 	}
 	to.Version = binary.LittleEndian.Uint16(buf2[:])
 
-	to.PkScript, err = readVarBytes(r, pver, MaxMessagePayload,
+	to.PkScript, err = ReadVarBytes(r, pver, MaxMessagePayload,
 		"transaction output public key script")
 	if err != nil {
 		return err
@@ -1741,7 +1741,7 @@ func writeTxOut(w io.Writer, pver uint32, version int32, to *TxOut) error {
 		return err
 	}
 
-	err = writeVarBytes(w, pver, to.PkScript)
+	err = WriteVarBytes(w, pver, to.PkScript)
 	if err != nil {
 		return err
 	}
@@ -1758,7 +1758,7 @@ func legacyReadTxOut(r io.Reader, pver uint32, version int32, to *TxOut) error {
 	}
 	to.Value = int64(binary.LittleEndian.Uint64(buf[:]))
 
-	to.PkScript, err = readVarBytes(r, pver, MaxMessagePayload,
+	to.PkScript, err = ReadVarBytes(r, pver, MaxMessagePayload,
 		"transaction output public key script")
 	if err != nil {
 		return err
@@ -1777,7 +1777,7 @@ func legacyWriteTxOut(w io.Writer, pver uint32, version int32, to *TxOut) error 
 		return err
 	}
 
-	err = writeVarBytes(w, pver, to.PkScript)
+	err = WriteVarBytes(w, pver, to.PkScript)
 	if err != nil {
 		return err
 	}

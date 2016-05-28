@@ -79,7 +79,7 @@ func (msg *MsgBlock) BtcDecode(r io.Reader, pver uint32) error {
 		return err
 	}
 
-	txCount, err := readVarInt(r, pver)
+	txCount, err := ReadVarInt(r, pver)
 	if err != nil {
 		return err
 	}
@@ -108,7 +108,7 @@ func (msg *MsgBlock) BtcDecode(r io.Reader, pver uint32) error {
 	// tx tree.
 	// It would be possible to cause memory exhaustion and panics without
 	// a sane upper bound on this count.
-	stakeTxCount, err := readVarInt(r, pver)
+	stakeTxCount, err := ReadVarInt(r, pver)
 	if err != nil {
 		return err
 	}
@@ -168,7 +168,7 @@ func (msg *MsgBlock) DeserializeTxLoc(r *bytes.Buffer) ([]TxLoc, []TxLoc, error)
 		return nil, nil, err
 	}
 
-	txCount, err := readVarInt(r, 0)
+	txCount, err := ReadVarInt(r, 0)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -197,7 +197,7 @@ func (msg *MsgBlock) DeserializeTxLoc(r *bytes.Buffer) ([]TxLoc, []TxLoc, error)
 		txLocs[i].TxLen = (fullLen - r.Len()) - txLocs[i].TxStart
 	}
 
-	stakeTxCount, err := readVarInt(r, 0)
+	stakeTxCount, err := ReadVarInt(r, 0)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -240,7 +240,7 @@ func (msg *MsgBlock) BtcEncode(w io.Writer, pver uint32) error {
 		return err
 	}
 
-	err = writeVarInt(w, pver, uint64(len(msg.Transactions)))
+	err = WriteVarInt(w, pver, uint64(len(msg.Transactions)))
 	if err != nil {
 		return err
 	}
@@ -252,7 +252,7 @@ func (msg *MsgBlock) BtcEncode(w io.Writer, pver uint32) error {
 		}
 	}
 
-	err = writeVarInt(w, pver, uint64(len(msg.STransactions)))
+	err = WriteVarInt(w, pver, uint64(len(msg.STransactions)))
 	if err != nil {
 		return err
 	}

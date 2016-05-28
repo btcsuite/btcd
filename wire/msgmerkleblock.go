@@ -69,7 +69,7 @@ func (msg *MsgMerkleBlock) BtcDecode(r io.Reader, pver uint32) error {
 	}
 
 	// Read num block locator hashes and limit to max.
-	count, err := readVarInt(r, pver)
+	count, err := ReadVarInt(r, pver)
 	if err != nil {
 		return err
 	}
@@ -95,7 +95,7 @@ func (msg *MsgMerkleBlock) BtcDecode(r io.Reader, pver uint32) error {
 	}
 
 	// Read num block locator hashes for stake and limit to max.
-	scount, err := readVarInt(r, pver)
+	scount, err := ReadVarInt(r, pver)
 	if err != nil {
 		return err
 	}
@@ -115,7 +115,7 @@ func (msg *MsgMerkleBlock) BtcDecode(r io.Reader, pver uint32) error {
 		msg.AddSTxHash(&sha)
 	}
 
-	msg.Flags, err = readVarBytes(r, pver, maxFlagsPerMerkleBlock,
+	msg.Flags, err = ReadVarBytes(r, pver, maxFlagsPerMerkleBlock,
 		"merkle block flags size")
 	if err != nil {
 		return err
@@ -159,7 +159,7 @@ func (msg *MsgMerkleBlock) BtcEncode(w io.Writer, pver uint32) error {
 		return err
 	}
 
-	err = writeVarInt(w, pver, uint64(numHashes))
+	err = WriteVarInt(w, pver, uint64(numHashes))
 	if err != nil {
 		return err
 	}
@@ -175,7 +175,7 @@ func (msg *MsgMerkleBlock) BtcEncode(w io.Writer, pver uint32) error {
 		return err
 	}
 
-	err = writeVarInt(w, pver, uint64(numSHashes))
+	err = WriteVarInt(w, pver, uint64(numSHashes))
 	if err != nil {
 		return err
 	}
@@ -186,7 +186,7 @@ func (msg *MsgMerkleBlock) BtcEncode(w io.Writer, pver uint32) error {
 		}
 	}
 
-	err = writeVarBytes(w, pver, msg.Flags)
+	err = WriteVarBytes(w, pver, msg.Flags)
 	if err != nil {
 		return err
 	}

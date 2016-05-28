@@ -121,7 +121,7 @@ var blockOne = MsgBlock{
 // a single byte variable length integer.
 func BenchmarkWriteVarInt1(b *testing.B) {
 	for i := 0; i < b.N; i++ {
-		writeVarInt(ioutil.Discard, 0, 1)
+		WriteVarInt(ioutil.Discard, 0, 1)
 	}
 }
 
@@ -129,7 +129,7 @@ func BenchmarkWriteVarInt1(b *testing.B) {
 // a three byte variable length integer.
 func BenchmarkWriteVarInt3(b *testing.B) {
 	for i := 0; i < b.N; i++ {
-		writeVarInt(ioutil.Discard, 0, 65535)
+		WriteVarInt(ioutil.Discard, 0, 65535)
 	}
 }
 
@@ -137,7 +137,7 @@ func BenchmarkWriteVarInt3(b *testing.B) {
 // a five byte variable length integer.
 func BenchmarkWriteVarInt5(b *testing.B) {
 	for i := 0; i < b.N; i++ {
-		writeVarInt(ioutil.Discard, 0, 4294967295)
+		WriteVarInt(ioutil.Discard, 0, 4294967295)
 	}
 }
 
@@ -145,7 +145,7 @@ func BenchmarkWriteVarInt5(b *testing.B) {
 // a nine byte variable length integer.
 func BenchmarkWriteVarInt9(b *testing.B) {
 	for i := 0; i < b.N; i++ {
-		writeVarInt(ioutil.Discard, 0, 18446744073709551615)
+		WriteVarInt(ioutil.Discard, 0, 18446744073709551615)
 	}
 }
 
@@ -154,7 +154,7 @@ func BenchmarkWriteVarInt9(b *testing.B) {
 func BenchmarkReadVarInt1(b *testing.B) {
 	buf := []byte{0x01}
 	for i := 0; i < b.N; i++ {
-		readVarInt(bytes.NewReader(buf), 0)
+		ReadVarInt(bytes.NewReader(buf), 0)
 	}
 }
 
@@ -163,7 +163,7 @@ func BenchmarkReadVarInt1(b *testing.B) {
 func BenchmarkReadVarInt3(b *testing.B) {
 	buf := []byte{0x0fd, 0xff, 0xff}
 	for i := 0; i < b.N; i++ {
-		readVarInt(bytes.NewReader(buf), 0)
+		ReadVarInt(bytes.NewReader(buf), 0)
 	}
 }
 
@@ -172,7 +172,7 @@ func BenchmarkReadVarInt3(b *testing.B) {
 func BenchmarkReadVarInt5(b *testing.B) {
 	buf := []byte{0xfe, 0xff, 0xff, 0xff, 0xff}
 	for i := 0; i < b.N; i++ {
-		readVarInt(bytes.NewReader(buf), 0)
+		ReadVarInt(bytes.NewReader(buf), 0)
 	}
 }
 
@@ -181,7 +181,7 @@ func BenchmarkReadVarInt5(b *testing.B) {
 func BenchmarkReadVarInt9(b *testing.B) {
 	buf := []byte{0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff}
 	for i := 0; i < b.N; i++ {
-		readVarInt(bytes.NewReader(buf), 0)
+		ReadVarInt(bytes.NewReader(buf), 0)
 	}
 }
 
