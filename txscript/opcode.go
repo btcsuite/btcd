@@ -23,8 +23,8 @@ import (
 
 var optimizeSigVerification = chaincfg.SigHashOptimization
 
-// An opcode defines the information related to a txscript opcode.  opfunc if
-// present is the function to call to perform the opcode on the script.  The
+// An opcode defines the information related to a txscript opcode.  opfunc, if
+// present, is the function to call to perform the opcode on the script.  The
 // current script is passed in as a slice with the first member being the opcode
 // itself.
 type opcode struct {
@@ -1120,7 +1120,7 @@ func opcodeToAltStack(op *parsedOpcode, vm *Engine) error {
 // opcodeFromAltStack removes the top item from the alternate data stack and
 // pushes it onto the main data stack.
 //
-// Main data stack transformation: [... x1 x2 x3] -> [... x1 x2 x3 y1]
+// Main data stack transformation: [... x1 x2 x3] -> [... x1 x2 x3 y3]
 // Alt data stack transformation:  [... y1 y2 y3] -> [... y1 y2]
 func opcodeFromAltStack(op *parsedOpcode, vm *Engine) error {
 	so, err := vm.astack.PopByteArray()
@@ -1177,8 +1177,8 @@ func opcode2Swap(op *parsedOpcode, vm *Engine) error {
 
 // opcodeIfDup duplicates the top item of the stack if it is not zero.
 //
-// Stack transformation (x1==0): [... x1] -> [...]
-// Stack transformation (x1!=0): [... x1] -> [... x1]
+// Stack transformation (x1==0): [... x1] -> [... x1]
+// Stack transformation (x1!=0): [... x1] -> [... x1 x1]
 func opcodeIfDup(op *parsedOpcode, vm *Engine) error {
 	so, err := vm.dstack.PeekByteArray(0)
 	if err != nil {
@@ -2442,7 +2442,7 @@ func opcodeCheckSigVerify(op *parsedOpcode, vm *Engine) error {
 
 // parsedSigInfo houses a raw signature along with its parsed form and a flag
 // for whether or not it has already been parsed.  It is used to prevent parsing
-// the same signature multiple times when verify a multisig.
+// the same signature multiple times when verifying a multisig.
 type parsedSigInfo struct {
 	signature       []byte
 	parsedSignature chainec.Signature
