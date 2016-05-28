@@ -19,7 +19,7 @@ import (
 const MaxUserAgentLen = 2000
 
 // DefaultUserAgent for wire in the stack
-const DefaultUserAgent = "/dcrwire:0.1.0/"
+const DefaultUserAgent = "/dcrwire:0.2.0/"
 
 // MsgVersion implements the Message interface and represents a decred version
 // message.  It is used for a peer to advertise itself as soon as an outbound

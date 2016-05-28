@@ -1,5 +1,5 @@
-// Copyright (c) 2013-2015 The btcsuite developers
-// Copyright (c) 2015 The Decred developers
+// Copyright (c) 2013-2016 The btcsuite developers
+// Copyright (c) 2015-2016 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -17,11 +17,15 @@ const (
 	InitialProcotolVersion uint32 = 1
 
 	// ProtocolVersion is the latest protocol version this package supports.
-	ProtocolVersion uint32 = 2
+	ProtocolVersion uint32 = 3
 
 	// BIP0111Version is the protocol version which added the SFNodeBloom
 	// service flag.
 	BIP0111Version uint32 = 2
+
+	// SendHeadersVersion is the protocol version which added a new
+	// sendheaders message.
+	SendHeadersVersion uint32 = 3
 )
 
 // ServiceFlag identifies services supported by a decred peer.
