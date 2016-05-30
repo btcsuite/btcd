@@ -842,7 +842,7 @@ func testFetchTxByShaListCommon(tc *testContext, includeSpent bool) bool {
 			spentBuf := expectedSpentBuf(tc, i)
 			if !reflect.DeepEqual(txD.TxSpent, spentBuf) {
 				stakeInChecksDontPass := false
-				for txoIdx, _ := range spentBuf {
+				for txoIdx := range spentBuf {
 					if txD.TxSpent[txoIdx] != spentBuf[txoIdx] {
 						op := wire.OutPoint{
 							Hash:  *txHash,

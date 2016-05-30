@@ -40,7 +40,7 @@ func testReorganization(t *testing.T, dbType string) {
 	// Find where chain forks
 	var forkHash chainhash.Hash
 	var forkHeight int64
-	for i, _ := range blocks {
+	for i := range blocks {
 		if blocks[i].Sha().IsEqual(blocksReorg[i].Sha()) {
 			blkHash := blocks[i].Sha()
 			forkHash = *blkHash

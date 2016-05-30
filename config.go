@@ -732,9 +732,9 @@ func loadConfig() (*config, []string, error) {
 	// addresses.
 	if !cfg.DisableRPC && cfg.DisableTLS {
 		allowedTLSListeners := map[string]struct{}{
-			"localhost": struct{}{},
-			"127.0.0.1": struct{}{},
-			"::1":       struct{}{},
+			"localhost": {},
+			"127.0.0.1": {},
+			"::1":       {},
 		}
 		for _, addr := range cfg.RPCListeners {
 			host, _, err := net.SplitHostPort(addr)

@@ -563,39 +563,39 @@ var (
 
 var (
 	registeredNets = map[wire.CurrencyNet]struct{}{
-		MainNetParams.Net: struct{}{},
-		TestNetParams.Net: struct{}{},
-		SimNetParams.Net:  struct{}{},
+		MainNetParams.Net: {},
+		TestNetParams.Net: {},
+		SimNetParams.Net:  {},
 	}
 
 	pubKeyAddrIDs = map[[2]byte]struct{}{
-		MainNetParams.PubKeyAddrID: struct{}{},
-		TestNetParams.PubKeyAddrID: struct{}{},
-		SimNetParams.PubKeyAddrID:  struct{}{},
+		MainNetParams.PubKeyAddrID: {},
+		TestNetParams.PubKeyAddrID: {},
+		SimNetParams.PubKeyAddrID:  {},
 	}
 
 	pubKeyHashAddrIDs = map[[2]byte]struct{}{
-		MainNetParams.PubKeyHashAddrID: struct{}{},
-		TestNetParams.PubKeyHashAddrID: struct{}{},
-		SimNetParams.PubKeyHashAddrID:  struct{}{},
+		MainNetParams.PubKeyHashAddrID: {},
+		TestNetParams.PubKeyHashAddrID: {},
+		SimNetParams.PubKeyHashAddrID:  {},
 	}
 
 	pkhEdwardsAddrIDs = map[[2]byte]struct{}{
-		MainNetParams.PKHEdwardsAddrID: struct{}{},
-		TestNetParams.PKHEdwardsAddrID: struct{}{},
-		SimNetParams.PKHEdwardsAddrID:  struct{}{},
+		MainNetParams.PKHEdwardsAddrID: {},
+		TestNetParams.PKHEdwardsAddrID: {},
+		SimNetParams.PKHEdwardsAddrID:  {},
 	}
 
 	pkhSchnorrAddrIDs = map[[2]byte]struct{}{
-		MainNetParams.PKHSchnorrAddrID: struct{}{},
-		TestNetParams.PKHSchnorrAddrID: struct{}{},
-		SimNetParams.PKHSchnorrAddrID:  struct{}{},
+		MainNetParams.PKHSchnorrAddrID: {},
+		TestNetParams.PKHSchnorrAddrID: {},
+		SimNetParams.PKHSchnorrAddrID:  {},
 	}
 
 	scriptHashAddrIDs = map[[2]byte]struct{}{
-		MainNetParams.ScriptHashAddrID: struct{}{},
-		TestNetParams.ScriptHashAddrID: struct{}{},
-		SimNetParams.ScriptHashAddrID:  struct{}{},
+		MainNetParams.ScriptHashAddrID: {},
+		TestNetParams.ScriptHashAddrID: {},
+		SimNetParams.ScriptHashAddrID:  {},
 	}
 
 	hdPrivToPubKeyIDs = map[[4]byte][]byte{

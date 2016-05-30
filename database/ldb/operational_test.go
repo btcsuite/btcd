@@ -125,7 +125,7 @@ func testAddrIndexOperations(t *testing.T, db database.Db, newestBlock *dcrutil.
 	// Create a fake index.
 	blktxLoc, _, _ := newestBlock.TxLoc()
 	testIndex = []*database.TxAddrIndex{
-		&database.TxAddrIndex{
+		{
 			Hash160:  hash160Bytes,
 			Height:   uint32(newestBlockIdx),
 			TxOffset: uint32(blktxLoc[0].TxStart),

@@ -560,7 +560,7 @@ func TestOutboundPeer(t *testing.T) {
 	}
 
 	// Test Queue Inv
-	fakeBlockHash := &chainhash.Hash{0x00, 0x01}
+	fakeBlockHash := &chainhash.Hash{0: 0x00, 1: 0x01}
 	fakeInv := wire.NewInvVect(wire.InvTypeBlock, fakeBlockHash)
 	p.QueueInventory(fakeInv)
 	p.AddKnownInventory(fakeInv)

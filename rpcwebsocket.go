@@ -77,7 +77,7 @@ var wsHandlersBeforeInit = map[string]wsCommandHandler{
 // operations to run concurrently (and one at a time) while still responding
 // to the majority of normal requests which can be answered quickly.
 var wsAsyncHandlers = map[string]struct{}{
-	"rescan": struct{}{},
+	"rescan": {},
 }
 
 // WebsocketHandler handles a new websocket client by creating a new wsClient,
