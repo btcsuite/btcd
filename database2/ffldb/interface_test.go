@@ -330,7 +330,7 @@ func testCursorInterface(tc *testContext, bucket database.Bucket) bool {
 			return false
 		}
 
-		// Ensure foward iteration works as expected after seeking.
+		// Ensure forward iteration works as expected after seeking.
 		middleIdx := (len(sortedValues) - 1) / 2
 		seekKey := sortedValues[middleIdx].key
 		curIdx = middleIdx
@@ -650,7 +650,7 @@ func testMetadataManualTxInterface(tc *testContext) bool {
 	//
 	// Otherwise, a read-write transaction is created, the values are
 	// written, standard bucket tests for read-write transactions are
-	// performed, and then the transaction is either commited or rolled
+	// performed, and then the transaction is either committed or rolled
 	// back depending on the flag.
 	bucket1Name := []byte("bucket1")
 	populateValues := func(writable, rollback bool, putValues []keyPair) bool {

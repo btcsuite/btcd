@@ -2940,7 +2940,7 @@ func newBlockManager(s *server) (*blockManager, error) {
 	}
 	bmgrLog.Infof("Block index generation complete")
 
-	// Initialize the chain state now that the intial block node index has
+	// Initialize the chain state now that the initial block node index has
 	// been generated.
 
 	// Query the DB for the current winning ticket data.

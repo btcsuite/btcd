@@ -451,7 +451,7 @@ type DB interface {
 	// Update invokes the passed function in the context of a managed
 	// read-write transaction.  Any errors returned from the user-supplied
 	// function will cause the transaction to be rolled back and are
-	// returned from this function.  Otherwise, the transaction is commited
+	// returned from this function.  Otherwise, the transaction is committed
 	// when the user-supplied function returns a nil error.
 	//
 	// Calling Rollback or Commit on the transaction passed to the

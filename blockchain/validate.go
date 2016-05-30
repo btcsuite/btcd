@@ -1371,10 +1371,10 @@ func CheckTransactionInputs(tx *dcrutil.Tx, txHeight int64, txStore TxStore,
 	// ----------------------------------------------------------------------------
 
 	// SSTX -----------------------------------------------------------------------
-	// 1. Check and make sure that the output amounts in the committments to the
+	// 1. Check and make sure that the output amounts in the commitments to the
 	//     ticket are correctly calculated.
 
-	// 1. Check and make sure that the output amounts in the committments to the
+	// 1. Check and make sure that the output amounts in the commitments to the
 	// ticket are correctly calculated.
 	isSStx, _ := stake.IsSStx(tx)
 	if isSStx {

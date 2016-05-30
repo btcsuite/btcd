@@ -382,7 +382,7 @@ type HostToNetAddrFunc func(host string, port uint16,
 // communications via the peer-to-peer protocol.  It provides full duplex
 // reading and writing, automatic handling of the initial handshake process,
 // querying of usage statistics and other information about the remote peer such
-// as its address, user agent, and protocol version, output message queueing,
+// as its address, user agent, and protocol version, output message queuing,
 // inventory trickling, and the ability to dynamically register and unregister
 // callbacks for handling decred protocol messages.
 //
@@ -1279,9 +1279,9 @@ out:
 
 			case sccReceiveMessage:
 				// Remove received messages from the expected
-				// reponse map.  Since certain commands expect
-				// one of a group of responses, remove everyting
-				// in the expected group accordingly.
+				// response map.  Since certain commands expect
+				// one of a group of responses, remove
+				// everything in the expected group accordingly.
 				switch msgCmd := msg.message.Command(); msgCmd {
 				case wire.CmdBlock:
 					fallthrough
@@ -1623,10 +1623,10 @@ out:
 	log.Tracef("Peer input handler done for %s", p)
 }
 
-// queueHandler handles the queueing of outgoing data for the peer. This runs
-// as a muxer for various sources of input so we can ensure that server and
-// peer handlers will not block on us sending a message.
-// We then pass the data on to outHandler to be actually written.
+// queueHandler handles the queuing of outgoing data for the peer. This runs as
+// a muxer for various sources of input so we can ensure that server and peer
+// handlers will not block on us sending a message.  That data is then passed on
+// to outHandler to be actually written.
 func (p *Peer) queueHandler() {
 	pendingMsgs := list.New()
 	invSendQueue := list.New()

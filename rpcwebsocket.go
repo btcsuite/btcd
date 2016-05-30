@@ -37,7 +37,7 @@ const (
 	// websocketSendBufferSize is the number of elements the send channel
 	// can queue before blocking.  Note that this only applies to requests
 	// handled directly in the websocket client input handler or the async
-	// handler since notifications have their own queueing mechanism
+	// handler since notifications have their own queuing mechanism
 	// independent of the send channel buffer.
 	websocketSendBufferSize = 50
 )
@@ -207,7 +207,7 @@ func (m *wsNotificationManager) queueHandler() {
 func (m *wsNotificationManager) NotifyBlockConnected(block *dcrutil.Block) {
 	// As NotifyBlockConnected will be called by the block manager
 	// and the RPC server may no longer be running, use a select
-	// statement to unblock enqueueing the notification once the RPC
+	// statement to unblock enqueuing the notification once the RPC
 	// server has begun shutting down.
 	select {
 	case m.queueNotification <- (*notificationBlockConnected)(block):
@@ -220,7 +220,7 @@ func (m *wsNotificationManager) NotifyBlockConnected(block *dcrutil.Block) {
 func (m *wsNotificationManager) NotifyBlockDisconnected(block *dcrutil.Block) {
 	// As NotifyBlockDisconnected will be called by the block manager
 	// and the RPC server may no longer be running, use a select
-	// statement to unblock enqueueing the notification once the RPC
+	// statement to unblock enqueuing the notification once the RPC
 	// server has begun shutting down.
 	select {
 	case m.queueNotification <- (*notificationBlockDisconnected)(block):
@@ -233,7 +233,7 @@ func (m *wsNotificationManager) NotifyBlockDisconnected(block *dcrutil.Block) {
 func (m *wsNotificationManager) NotifyReorganization(rd *blockchain.ReorganizationNtfnsData) {
 	// As NotifyReorganization will be called by the block manager
 	// and the RPC server may no longer be running, use a select
-	// statement to unblock enqueueing the notification once the RPC
+	// statement to unblock enqueuing the notification once the RPC
 	// server has begun shutting down.
 	select {
 	case m.queueNotification <- (*notificationReorganization)(rd):
@@ -247,7 +247,7 @@ func (m *wsNotificationManager) NotifyWinningTickets(
 	wtnd *WinningTicketsNtfnData) {
 	// As NotifyWinningTickets will be called by the block manager
 	// and the RPC server may no longer be running, use a select
-	// statement to unblock enqueueing the notification once the RPC
+	// statement to unblock enqueuing the notification once the RPC
 	// server has begun shutting down.
 	select {
 	case m.queueNotification <- (*notificationWinningTickets)(wtnd):
@@ -262,7 +262,7 @@ func (m *wsNotificationManager) NotifySpentAndMissedTickets(
 	tnd *blockchain.TicketNotificationsData) {
 	// As NotifySpentAndMissedTickets will be called by the block manager
 	// and the RPC server may no longer be running, use a select
-	// statement to unblock enqueueing the notification once the RPC
+	// statement to unblock enqueuing the notification once the RPC
 	// server has begun shutting down.
 	select {
 	case m.queueNotification <- (*notificationSpentAndMissedTickets)(tnd):
@@ -276,7 +276,7 @@ func (m *wsNotificationManager) NotifyNewTickets(
 	tnd *blockchain.TicketNotificationsData) {
 	// As NotifyNewTickets will be called by the block manager
 	// and the RPC server may no longer be running, use a select
-	// statement to unblock enqueueing the notification once the RPC
+	// statement to unblock enqueuing the notification once the RPC
 	// server has begun shutting down.
 	select {
 	case m.queueNotification <- (*notificationNewTickets)(tnd):
@@ -290,7 +290,7 @@ func (m *wsNotificationManager) NotifyStakeDifficulty(
 	stnd *StakeDifficultyNtfnData) {
 	// As NotifyNewTickets will be called by the block manager
 	// and the RPC server may no longer be running, use a select
-	// statement to unblock enqueueing the notification once the RPC
+	// statement to unblock enqueuing the notification once the RPC
 	// server has begun shutting down.
 	select {
 	case m.queueNotification <- (*notificationStakeDifficulty)(stnd):
@@ -310,7 +310,7 @@ func (m *wsNotificationManager) NotifyMempoolTx(tx *dcrutil.Tx, isNew bool) {
 
 	// As NotifyMempoolTx will be called by mempool and the RPC server
 	// may no longer be running, use a select statement to unblock
-	// enqueueing the notification once the RPC server has begun
+	// enqueuing the notification once the RPC server has begun
 	// shutting down.
 	select {
 	case m.queueNotification <- n:
@@ -1488,11 +1488,11 @@ out:
 	rpcsLog.Tracef("Websocket client input handler done for %s", c.addr)
 }
 
-// notificationQueueHandler handles the queueing of outgoing notifications for
+// notificationQueueHandler handles the queuing of outgoing notifications for
 // the websocket client.  This runs as a muxer for various sources of input to
-// ensure that queueing up notifications to be sent will not block.  Otherwise,
+// ensure that queuing up notifications to be sent will not block.  Otherwise,
 // slow clients could bog down the other systems (such as the mempool or block
-// manager) which are queueing the data.  The data is passed on to outHandler to
+// manager) which are queuing the data.  The data is passed on to outHandler to
 // actually be written.  It must be run as a goroutine.
 func (c *wsClient) notificationQueueHandler() {
 	ntfnSentChan := make(chan bool, 1) // nonblocking sync
@@ -1779,7 +1779,7 @@ func (c *wsClient) WaitForShutdown() {
 // manager, websocket connection, remote address, and whether or not the client
 // has already been authenticated (via HTTP Basic access authentication).  The
 // returned client is ready to start.  Once started, the client will process
-// incoming and outgoing messages in separate goroutines complete with queueing
+// incoming and outgoing messages in separate goroutines complete with queuing
 // and asynchrous handling for long-running operations.
 func newWebsocketClient(server *rpcServer, conn *websocket.Conn,
 	remoteAddr string, authenticated bool, isAdmin bool) (*wsClient, error) {
@@ -2289,9 +2289,8 @@ func recoverFromReorg(db database.Db, minBlock, maxBlock int64,
 	return hashList, nil
 }
 
-// descendantBlock returns the appropiate JSON-RPC error if a current block
-// 'cur' fetched during a reorganize is not a direct child of the parent block
-// 'prev'.
+// descendantBlock returns the appropriate JSON-RPC error if a current block
+// fetched during a reorganize is not a direct child of the parent block hash.
 func descendantBlock(prev, cur *dcrutil.Block) error {
 	if prev == nil || cur == nil {
 		return fmt.Errorf("descendantBlock passed nil block pointer")

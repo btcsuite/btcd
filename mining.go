@@ -988,7 +988,7 @@ func handleTooFewVoters(nextHeight int64,
 // handleCreatedBlockTemplate stores a successfully created block template to
 // the appropriate cache if needed, then returns the template to the miner to
 // work on. The stored template is a copy of the template, to prevent races
-// from occuring in case the template is mined on by the CPUminer.
+// from occurring in case the template is mined on by the CPUminer.
 func handleCreatedBlockTemplate(blockTemplate *BlockTemplate,
 	bm *blockManager) (*BlockTemplate, error) {
 	curTemplate := bm.GetCurrentTemplate()

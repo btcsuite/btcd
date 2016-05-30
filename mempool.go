@@ -1021,7 +1021,7 @@ func (mp *txMemPool) FetchTransaction(txHash *chainhash.Hash) (*dcrutil.Tx,
 
 // FilterTransactionsByAddress returns all transactions currently in the
 // mempool that either create an output to the passed address or spend a
-// previously created ouput to the address.
+// previously created output to the address.
 func (mp *txMemPool) FilterTransactionsByAddress(
 	addr dcrutil.Address) ([]*dcrutil.Tx, error) {
 	// Protect concurrent access.
@@ -1544,7 +1544,7 @@ func (mp *txMemPool) processOrphans(hash *chainhash.Hash) []*dcrutil.Tx {
 	return acceptedTxns
 }
 
-// PruneStakeTx is the function which is called everytime a new block is
+// PruneStakeTx is the function which is called every time a new block is
 // processed.  The idea is any outstanding SStx that hasn't been mined in a
 // certain period of time (CoinbaseMaturity) and the submitted SStx's
 // stake difficulty is below the current required stake difficulty should be

@@ -47,7 +47,7 @@ below.
 
 Transactions
 
-The Tx interface provides facilities for rolling back or commiting changes that
+The Tx interface provides facilities for rolling back or committing changes that
 took place while the transaction was active.  It also provides the root metadata
 bucket under which all keys, values, and nested buckets are stored.  A
 transaction can either be read-only or read-write and managed or unmanaged.

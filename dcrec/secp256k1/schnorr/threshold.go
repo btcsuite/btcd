@@ -70,7 +70,7 @@ func nonceRFC6979(privkey []byte, hash []byte, extra []byte,
 }
 
 // generateNoncePair deterministically generate a nonce pair for use in
-// partial signing of a message. Returns a public key (nonce to disseminate)
+// partial signing of a message. Returns a public key (nonce to dissemanate)
 // and a private nonce to keep as a secret for the signer.
 func generateNoncePair(curve *secp256k1.KoblitzCurve, msg []byte, priv []byte,
 	nonceFunction func([]byte, []byte, []byte, []byte) []byte, extra []byte,

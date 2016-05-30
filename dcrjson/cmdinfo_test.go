@@ -12,7 +12,7 @@ import (
 	"github.com/decred/dcrd/dcrjson"
 )
 
-// TestCmdMethod tests the CmdMethod function to ensure it retuns the expected
+// TestCmdMethod tests the CmdMethod function to ensure it returns the expected
 // methods and errors.
 func TestCmdMethod(t *testing.T) {
 	t.Parallel()

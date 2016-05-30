@@ -54,7 +54,7 @@ func CombinePubkeys(curve *TwistedEdwardsCurve,
 }
 
 // generateNoncePair deterministically generate a nonce pair for use in
-// partial signing of a message. Returns a public key (nonce to disseminate)
+// partial signing of a message. Returns a public key (nonce to dissemanate)
 // and a private nonce to keep as a secret for the signer.
 func generateNoncePair(curve *TwistedEdwardsCurve, msg []byte, priv []byte,
 	nonceFunction func(*TwistedEdwardsCurve, []byte, []byte, []byte,

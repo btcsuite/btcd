@@ -562,7 +562,7 @@ func (tmdb *TicketDB) removeLiveTicket(ticket *TicketData) error {
 			"delete does not exist!", ticket.SStxHash)
 	}
 
-	// Make sure that the tickets are indentical in the unlikely case of a hash
+	// Make sure that the tickets are identical in the unlikely case of a hash
 	// collision
 	if *tmdb.maps.ticketMap[ticket.Prefix][ticket.SStxHash] != *ticket {
 		return fmt.Errorf("TicketDB err @ removeLiveTicket: ticket " +
@@ -590,7 +590,7 @@ func (tmdb *TicketDB) removeSpentTicket(spendHeight int64, ticket *TicketData) e
 			"delete does not exist! %v", ticket.SStxHash)
 	}
 
-	// Make sure that the tickets are indentical in the unlikely case of a hash
+	// Make sure that the tickets are identical in the unlikely case of a hash
 	// collision
 	if *tmdb.maps.spentTicketMap[spendHeight][ticket.SStxHash] != *ticket {
 		return fmt.Errorf("TicketDB err @ removeSpentTicket: ticket hash " +
@@ -616,7 +616,7 @@ func (tmdb *TicketDB) removeMissedTicket(ticket *TicketData) error {
 			"delete does not exist! %v", ticket.SStxHash)
 	}
 
-	// Make sure that the tickets are indentical in the unlikely case of a hash
+	// Make sure that the tickets are identical in the unlikely case of a hash
 	// collision
 	if *tmdb.maps.missedTicketMap[ticket.SStxHash] != *ticket {
 		return fmt.Errorf("TicketDB err @ removeMissedTicket: ticket hash " +
@@ -643,7 +643,7 @@ func (tmdb *TicketDB) removeRevokedTicket(ticket *TicketData) error {
 			"delete does not exist! %v", ticket.SStxHash)
 	}
 
-	// Make sure that the tickets are indentical in the unlikely case of a hash
+	// Make sure that the tickets are identical in the unlikely case of a hash
 	// collision.
 	if *tmdb.maps.revokedTicketMap[ticket.SStxHash] != *ticket {
 		return fmt.Errorf("TicketDB err @ removeRevokedTicket: ticket hash " +
@@ -721,7 +721,7 @@ func (tmdb *TicketDB) CheckLiveTicket(txHash chainhash.Hash) (bool, error) {
 }
 
 // CheckMissedTicket checks for the existence of a missed ticket in the missed
-// ticket map. Assumes missedTicketMap is intialized.
+// ticket map. Assumes missedTicketMap is initialized.
 //
 // This function is safe for concurrent access.
 func (tmdb *TicketDB) CheckMissedTicket(txHash chainhash.Hash) bool {
@@ -735,7 +735,7 @@ func (tmdb *TicketDB) CheckMissedTicket(txHash chainhash.Hash) bool {
 }
 
 // CheckRevokedTicket checks for the existence of a revoked ticket in the
-// revoked ticket map. Assumes missedTicketMap is intialized.
+// revoked ticket map. Assumes missedTicketMap is initialized.
 //
 // This function is safe for concurrent access.
 func (tmdb *TicketDB) CheckRevokedTicket(txHash chainhash.Hash) bool {
@@ -1306,7 +1306,7 @@ func (tmdb *TicketDB) unspendTickets(height int64) (SStxMemMap, error) {
 // getNewTicketsFromHeight loads a block from leveldb and parses SStx from it using
 // chain/stake's IsSStx function.
 // This is intended to be used to get ticket numbers from the MAIN CHAIN as
-// decribed in the DB.
+// described in the DB.
 // SIDE CHAIN evaluation should be instantiated in package:chain.
 //
 // This function MUST be called with the tmdb lock held (for reads).

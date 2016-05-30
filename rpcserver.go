@@ -217,7 +217,7 @@ var rpcHandlersBeforeInit = map[string]commandHandler{
 	"verifymessage":         handleVerifyMessage,
 }
 
-// list of commands that we recognise, but for which dcrd has no support because
+// list of commands that we recognize, but for which dcrd has no support because
 // it lacks support for wallet functionality. For these commands the user
 // should ask a connected instance of dcrwallet.
 var rpcAskWallet = map[string]struct{}{
@@ -1371,7 +1371,7 @@ func stringInSlice(a string, list []string) bool {
 func createVinListPrevOut(s *rpcServer, mtx *wire.MsgTx, chainParams *chaincfg.Params,
 	vinExtra int, filterAddrMap map[string]struct{}) []dcrjson.VinPrevOut {
 
-	// Use a dynamically sized list to accomodate the address filter.
+	// Use a dynamically sized list to accommodate the address filter.
 	vinList := make([]dcrjson.VinPrevOut, 0, len(mtx.TxIn))
 
 	// Coinbase transactions only have a single txin by definition.
@@ -1723,7 +1723,7 @@ func handleDecodeScript(s *rpcServer, cmd interface{}, closeChan <-chan struct{}
 }
 
 // handleEstimateFee implenents the estimatefee command.
-// TODO this is a very basic implimentation.  It should be
+// TODO this is a very basic implementation.  It should be
 // modified to match the bitcoin-core one.
 func handleEstimateFee(s *rpcServer, cmd interface{},
 	closeChan <-chan struct{}) (interface{}, error) {
@@ -2102,7 +2102,7 @@ func handleGetAddedNodeInfo(s *rpcServer, cmd interface{}, closeChan <-chan stru
 	c := cmd.(*dcrjson.GetAddedNodeInfoCmd)
 
 	// Retrieve a list of persistent (added) peers from the decred server
-	// and filter the list of peer per the specified address (if any).
+	// and filter the list of peers per the specified address (if any).
 	peers := s.server.AddedNodeInfo()
 	if c.Node != nil {
 		node := *c.Node
@@ -2218,9 +2218,9 @@ func handleGetBestBlockHash(s *rpcServer, cmd interface{}, closeChan <-chan stru
 // minimum difficulty using the passed bits field from the header of a block.
 func getDifficultyRatio(bits uint32) float64 {
 	// The minimum difficulty is the max possible proof-of-work limit bits
-	// converted back to a number.  Note this is not the same as the the
-	// proof of work limit directly because the block difficulty is encoded
-	// in a block with the compact form which loses precision.
+	// converted back to a number.  Note this is not the same as the proof of
+	// work limit directly because the block difficulty is encoded in a block
+	// with the compact form which loses precision.
 	max := blockchain.CompactToBig(activeNetParams.PowLimitBits)
 	target := blockchain.CompactToBig(bits)
 
@@ -2616,10 +2616,10 @@ func (state *gbtWorkState) templateUpdateChan(prevHash *chainhash.Hash, lastGene
 // updateBlockTemplate creates or updates a block template for the work state.
 // A new block template will be generated when the current best block has
 // changed or the transactions in the memory pool have been updated and it has
-// been some time has passed since the last template was generated.  Otherwise,
-// the timestamp for the existing block template is updated (and possibly the
+// been long enough since the last template was generated.  Otherwise, the
+// timestamp for the existing block template is updated (and possibly the
 // difficulty on testnet per the consesus rules).  Finally, if the
-// useCoinbaseValue flag is flase and the existing block template does not
+// useCoinbaseValue flag is false and the existing block template does not
 // already contain a valid payment address, the block template will be updated
 // with a randomly selected payment address from the list of configured
 // addresses.
@@ -2829,7 +2829,7 @@ func (state *gbtWorkState) blockTemplateResult(bm *blockManager,
 		// depends on.  This is necessary since the created block must
 		// ensure proper ordering of the dependencies.  A map is used
 		// before creating the final array to prevent duplicate entries
-		// when mutiple inputs reference the same transaction.
+		// when multiple inputs reference the same transaction.
 		dependsMap := make(map[int64]struct{})
 		for _, txIn := range tx.TxIn {
 			if idx, ok := txIndex[txIn.PreviousOutPoint.Hash]; ok {
@@ -3095,7 +3095,7 @@ func (state *gbtWorkState) blockTemplateResult(bm *blockManager,
 	return &reply, nil
 }
 
-// handleGetBlockTemplateLongPoll a helper for handleGetBlockTemplateRequest
+// handleGetBlockTemplateLongPoll is a helper for handleGetBlockTemplateRequest
 // which deals with handling long polling for block templates.  When a caller
 // sends a request with a long poll ID that was previously returned, a response
 // is not sent until the caller should stop working on the previous block
@@ -3117,8 +3117,8 @@ func handleGetBlockTemplateLongPoll(s *rpcServer, longPollID string, useCoinbase
 		return nil, err
 	}
 
-	// Just return the current block template if the the long poll ID
-	// provided by the caller is invalid.
+	// Just return the current block template if the long poll ID provided by
+	// the caller is invalid.
 	prevHash, lastGenerated, err := decodeTemplateID(longPollID)
 	if err != nil {
 		result, err := state.blockTemplateResult(s.server.blockManager,
@@ -3156,8 +3156,8 @@ func handleGetBlockTemplateLongPoll(s *rpcServer, longPollID string, useCoinbase
 
 	// Register the previous hash and last generated time for notifications
 	// Get a channel that will be notified when the template associated with
-	// the provided ID is is stale and a new block template should be
-	// returned to the caller.
+	// the provided ID is stale and a new block template should be returned to
+	// the caller.
 	longPollChan := state.templateUpdateChan(prevHash, lastGenerated)
 	state.Unlock()
 
@@ -4398,7 +4398,7 @@ func handleGetWorkRequest(s *rpcServer) (interface{}, error) {
 	data = data[:getworkDataLen]
 	copy(data[wire.MaxBlockHeaderPayload:], blake256Pad)
 
-	// The final result reverses the each of the fields to little endian.
+	// The final result reverses each of the fields to little endian.
 	// In particular, the data, hash1, and midstate fields are treated as
 	// arrays of uint32s (per the internal sha256 hashing state) which are
 	// in big endian, and thus each 4 bytes is byte swapped.  The target is
