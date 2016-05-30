@@ -8,9 +8,7 @@ dcrd
 dcrd is a Decred full node implementation written in Go (golang).
 
 This project is currently under active development and is in a Beta state.  It
-is extremely stable and has been in production use for over 6 months as of May
-2014, however there are still a couple of major features we want to add before
-we come out of beta.
+is extremely stable and has been in production use since October 2013.
 
 It properly downloads, validates, and serves the block chain using the exact
 rules (including bugs) for block acceptance as Bitcoin Core.  We have taken
@@ -31,8 +29,8 @@ blog entry [here](https://blog.conformal.com/dcrd-not-your-moms-bitcoin-daemon)
 for more details.  This means you can't actually make or receive payments
 directly with dcrd.  That functionality is provided by the
 [dcrwallet](https://github.com/decred/dcrwallet) and
-[btcgui](https://github.com/decred/btcgui) projects which are both under
-active development.
+[Paymetheus](https://github.com/decred/Paymetheus) (Windows-only) projects
+which are both under active development.
 
 ## Requirements
 

@@ -26,9 +26,7 @@ dcrd is a full node decred implementation written in [Go](http://golang.org),
 licensed under the [copyfree](http://www.copyfree.org) ISC License.
 
 This project is currently under active development and is in a Beta state. It is
-extremely stable and has been in production use for over 6 months as of May
-2014, however there are still a couple of major features we want to add before
-we come out of beta.
+extremely stable and has been in production use since February 2016.
 
 It also properly relays newly mined blocks, maintains a transaction pool, and
 relays individual transactions that have not yet made it into a block. It
