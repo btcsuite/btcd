@@ -7,6 +7,7 @@ package blockchain
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/decred/dcrd/chaincfg/chainhash"
 	"github.com/decred/dcrutil"
@@ -123,6 +124,12 @@ func (b *BlockChain) ProcessBlock(block *dcrutil.Block,
 
 	blockHash := block.Sha()
 	log.Tracef("Processing block %v", blockHash)
+	currentTime := time.Now()
+	defer func() {
+		elapsedTime := time.Since(currentTime)
+		log.Debugf("Block %v (height %v) finished processing in %s",
+			blockHash, block.Height(), elapsedTime)
+	}()
 
 	// The block must not already exist in the main chain or side chains.
 	exists, err := b.blockExists(blockHash)
