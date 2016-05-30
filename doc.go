@@ -112,6 +112,7 @@ Application Options:
       --nopeerbloomfilters  Disable bloom filtering support.
       --sigcachemaxsize=    The maximum number of entries in the signature
                             verification cache.
+      --blocksonly          Do not accept transactions from remote peers.
 
 Help Options:
   -h, --help           Show this help message

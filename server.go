@@ -565,6 +565,12 @@ func (sp *serverPeer) OnMiningState(p *peer.Peer, msg *wire.MsgMiningState) {
 // serialize all transactions through a single thread transactions don't rely on
 // the previous one in a linear fashion like blocks.
 func (sp *serverPeer) OnTx(p *peer.Peer, msg *wire.MsgTx) {
+	if cfg.BlocksOnly {
+		peerLog.Tracef("Ignoring tx %v from %v - blocksonly enabled",
+			msg.TxSha(), p)
+		return
+	}
+
 	// Add the transaction to the known inventory for the peer.
 	// Convert the raw MsgTx to a dcrutil.Tx which provides some convenience
 	// methods and things such as hash caching.
@@ -610,7 +616,31 @@ func (sp *serverPeer) OnBlock(p *peer.Peer, msg *wire.MsgBlock, buf []byte) {
 // accordingly.  We pass the message down to blockmanager which will call
 // QueueMessage with any appropriate responses.
 func (sp *serverPeer) OnInv(p *peer.Peer, msg *wire.MsgInv) {
-	sp.server.blockManager.QueueInv(msg, sp)
+	if !cfg.BlocksOnly {
+		if len(msg.InvList) > 0 {
+			sp.server.blockManager.QueueInv(msg, sp)
+		}
+		return
+	}
+
+	newInv := wire.NewMsgInvSizeHint(uint(len(msg.InvList)))
+	for _, invVect := range msg.InvList {
+		if invVect.Type == wire.InvTypeTx {
+			peerLog.Infof("Peer %v is announcing transactions -- "+
+				"disconnecting", p)
+			p.Disconnect()
+			return
+		}
+		err := newInv.AddInvVect(invVect)
+		if err != nil {
+			peerLog.Errorf("Failed to add inventory vector: %v", err)
+			break
+		}
+	}
+
+	if len(newInv.InvList) > 0 {
+		sp.server.blockManager.QueueInv(newInv, sp)
+	}
 }
 
 // OnHeaders is invoked when a peer receives a headers wire message.  The
@@ -1591,7 +1621,7 @@ func newPeerConfig(sp *serverPeer) *peer.Config {
 		UserAgentVersion: userAgentVersion,
 		ChainParams:      sp.server.chainParams,
 		Services:         sp.server.services,
-		DisableRelayTx:   false,
+		DisableRelayTx:   cfg.BlocksOnly,
 		ProtocolVersion:  wire.BIP0111Version,
 	}
 }
