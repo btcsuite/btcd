@@ -381,6 +381,9 @@ func TestPeerListeners(t *testing.T) {
 			OnReject: func(p *peer.Peer, msg *wire.MsgReject) {
 				ok <- msg
 			},
+			OnSendHeaders: func(p *peer.Peer, msg *wire.MsgSendHeaders) {
+				ok <- msg
+			},
 		},
 		UserAgentName:    "peer",
 		UserAgentVersion: "1.0",
@@ -503,8 +506,12 @@ func TestPeerListeners(t *testing.T) {
 		// only one version message is allowed
 		// only one verack message is allowed
 		{
-			"OnMsgReject",
+			"OnReject",
 			wire.NewMsgReject("block", wire.RejectDuplicate, "dupe block"),
+		},
+		{
+			"OnSendHeaders",
+			wire.NewMsgSendHeaders(),
 		},
 	}
 	t.Logf("Running %d tests", len(tests))
