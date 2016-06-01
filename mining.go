@@ -284,11 +284,30 @@ func containsTxIns(txs []*dcrutil.Tx, tx *dcrutil.Tx) bool {
 // details about the fees and the number of signature operations for each
 // transaction in the block.
 type BlockTemplate struct {
-	block           *wire.MsgBlock
-	fees            []int64
-	sigOpCounts     []int64
-	height          int64
-	validPayAddress bool
+	// Block is a block that is ready to be solved by miners.  Thus, it is
+	// completely valid with the exception of satisfying the proof-of-work
+	// requirement.
+	Block *wire.MsgBlock
+
+	// Fees contains the amount of fees each transaction in the generated
+	// template pays in base units.  Since the first transaction is the
+	// coinbase, the first entry (offset 0) will contain the negative of the
+	// sum of the fees of all other transactions.
+	Fees []int64
+
+	// SigOpCounts contains the number of signature operations each
+	// transaction in the generated template performs.
+	SigOpCounts []int64
+
+	// Height is the height at which the block template connects to the main
+	// chain.
+	Height int64
+
+	// ValidPayAddress indicates whether or not the template coinbase pays
+	// to an address or is redeemable by anyone.  See the documentation on
+	// NewBlockTemplate for details on which this can be useful to generate
+	// templates without a coinbase payment address.
+	ValidPayAddress bool
 }
 
 // hashExistsInList checks if a hash exists in a list of hashes.
@@ -354,23 +373,23 @@ func standardCoinbaseOpReturn(height uint32, extraNonces []uint64) ([]byte,
 // getCoinbaseExtranonce extracts the extranonce from a block template's
 // coinbase transaction.
 func (bt *BlockTemplate) getCoinbaseExtranonces() []uint64 {
-	if len(bt.block.Transactions[0].TxOut) < 2 {
+	if len(bt.Block.Transactions[0].TxOut) < 2 {
 		return []uint64{0, 0, 0, 0}
 	}
 
-	if len(bt.block.Transactions[0].TxOut[1].PkScript) < 38 {
+	if len(bt.Block.Transactions[0].TxOut[1].PkScript) < 38 {
 		return []uint64{0, 0, 0, 0}
 	}
 
 	ens := make([]uint64, 4, 4) // 32-bytes
 	ens[0] = binary.LittleEndian.Uint64(
-		bt.block.Transactions[0].TxOut[1].PkScript[6:14])
+		bt.Block.Transactions[0].TxOut[1].PkScript[6:14])
 	ens[1] = binary.LittleEndian.Uint64(
-		bt.block.Transactions[0].TxOut[1].PkScript[14:22])
+		bt.Block.Transactions[0].TxOut[1].PkScript[14:22])
 	ens[2] = binary.LittleEndian.Uint64(
-		bt.block.Transactions[0].TxOut[1].PkScript[22:30])
+		bt.Block.Transactions[0].TxOut[1].PkScript[22:30])
 	ens[3] = binary.LittleEndian.Uint64(
-		bt.block.Transactions[0].TxOut[1].PkScript[30:38])
+		bt.Block.Transactions[0].TxOut[1].PkScript[30:38])
 
 	return ens
 }
@@ -691,32 +710,32 @@ func deepCopyBlockTemplate(blockTemplate *BlockTemplate) *BlockTemplate {
 
 	// Deep copy the header, which we hash on.
 	headerCopy := wire.BlockHeader{
-		Version:     blockTemplate.block.Header.Version,
-		PrevBlock:   blockTemplate.block.Header.PrevBlock,
-		MerkleRoot:  blockTemplate.block.Header.MerkleRoot,
-		StakeRoot:   blockTemplate.block.Header.StakeRoot,
-		VoteBits:    blockTemplate.block.Header.VoteBits,
-		FinalState:  blockTemplate.block.Header.FinalState,
-		Voters:      blockTemplate.block.Header.Voters,
-		FreshStake:  blockTemplate.block.Header.FreshStake,
-		Revocations: blockTemplate.block.Header.Revocations,
-		PoolSize:    blockTemplate.block.Header.PoolSize,
-		Timestamp:   blockTemplate.block.Header.Timestamp,
-		Bits:        blockTemplate.block.Header.Bits,
-		SBits:       blockTemplate.block.Header.SBits,
-		Nonce:       blockTemplate.block.Header.Nonce,
-		Height:      blockTemplate.block.Header.Height,
-		Size:        blockTemplate.block.Header.Size,
+		Version:     blockTemplate.Block.Header.Version,
+		PrevBlock:   blockTemplate.Block.Header.PrevBlock,
+		MerkleRoot:  blockTemplate.Block.Header.MerkleRoot,
+		StakeRoot:   blockTemplate.Block.Header.StakeRoot,
+		VoteBits:    blockTemplate.Block.Header.VoteBits,
+		FinalState:  blockTemplate.Block.Header.FinalState,
+		Voters:      blockTemplate.Block.Header.Voters,
+		FreshStake:  blockTemplate.Block.Header.FreshStake,
+		Revocations: blockTemplate.Block.Header.Revocations,
+		PoolSize:    blockTemplate.Block.Header.PoolSize,
+		Timestamp:   blockTemplate.Block.Header.Timestamp,
+		Bits:        blockTemplate.Block.Header.Bits,
+		SBits:       blockTemplate.Block.Header.SBits,
+		Nonce:       blockTemplate.Block.Header.Nonce,
+		Height:      blockTemplate.Block.Header.Height,
+		Size:        blockTemplate.Block.Header.Size,
 	}
 
 	// Copy transactions pointers. Duplicate the coinbase
 	// transaction, because it might update it by modifying
 	// the extra nonce.
-	transactionsCopy := make([]*wire.MsgTx, len(blockTemplate.block.Transactions),
-		len(blockTemplate.block.Transactions))
+	transactionsCopy := make([]*wire.MsgTx, len(blockTemplate.Block.Transactions),
+		len(blockTemplate.Block.Transactions))
 	coinbaseCopy :=
-		dcrutil.NewTxDeep(blockTemplate.block.Transactions[0])
-	for i, mtx := range blockTemplate.block.Transactions {
+		dcrutil.NewTxDeep(blockTemplate.Block.Transactions[0])
+	for i, mtx := range blockTemplate.Block.Transactions {
 		if i == 0 {
 			transactionsCopy[i] = coinbaseCopy.MsgTx()
 		} else {
@@ -725,9 +744,9 @@ func deepCopyBlockTemplate(blockTemplate *BlockTemplate) *BlockTemplate {
 	}
 
 	sTransactionsCopy := make([]*wire.MsgTx,
-		len(blockTemplate.block.STransactions),
-		len(blockTemplate.block.STransactions))
-	for i, mtx := range blockTemplate.block.STransactions {
+		len(blockTemplate.Block.STransactions),
+		len(blockTemplate.Block.STransactions))
+	for i, mtx := range blockTemplate.Block.STransactions {
 		sTransactionsCopy[i] = mtx
 	}
 
@@ -737,23 +756,23 @@ func deepCopyBlockTemplate(blockTemplate *BlockTemplate) *BlockTemplate {
 		STransactions: sTransactionsCopy,
 	}
 
-	fees := make([]int64, len(blockTemplate.fees), len(blockTemplate.fees))
-	for i, f := range blockTemplate.fees {
+	fees := make([]int64, len(blockTemplate.Fees), len(blockTemplate.Fees))
+	for i, f := range blockTemplate.Fees {
 		fees[i] = f
 	}
 
-	sigOps := make([]int64, len(blockTemplate.sigOpCounts),
-		len(blockTemplate.sigOpCounts))
-	for i, s := range blockTemplate.sigOpCounts {
+	sigOps := make([]int64, len(blockTemplate.SigOpCounts),
+		len(blockTemplate.SigOpCounts))
+	for i, s := range blockTemplate.SigOpCounts {
 		sigOps[i] = s
 	}
 
 	return &BlockTemplate{
-		block:           msgBlockCopy,
-		fees:            fees,
-		sigOpCounts:     sigOps,
-		height:          blockTemplate.height,
-		validPayAddress: blockTemplate.validPayAddress,
+		Block:           msgBlockCopy,
+		Fees:            fees,
+		SigOpCounts:     sigOps,
+		Height:          blockTemplate.Height,
+		ValidPayAddress: blockTemplate.ValidPayAddress,
 	}
 }
 
@@ -776,7 +795,7 @@ func handleTooFewVoters(nextHeight int64,
 	bestHeader := chainState.GetTopBlockHeader()
 	if curTemplate != nil {
 		if !bestHeader.PrevBlock.IsEqual(
-			&curTemplate.block.Header.PrevBlock) {
+			&curTemplate.Block.Header.PrevBlock) {
 			minrLog.Debugf("Cached mining templates are no longer current, " +
 				"resetting")
 			bm.SetCurrentTemplate(nil)
@@ -796,12 +815,12 @@ func handleTooFewVoters(nextHeight int64,
 				if err != nil {
 					return nil, err
 				}
-				cptCopy.block.Header.Timestamp = ts
+				cptCopy.Block.Header.Timestamp = ts
 
 				// If we're on testnet, the time since this last block
 				// listed as the parent must be taken into consideration.
 				if bm.server.chainParams.ResetMinDifficulty {
-					parentHash := cptCopy.block.Header.PrevBlock
+					parentHash := cptCopy.Block.Header.PrevBlock
 
 					requiredDifficulty, err :=
 						bm.CalcNextRequiredDiffNode(&parentHash, ts)
@@ -810,7 +829,7 @@ func handleTooFewVoters(nextHeight int64,
 							err.Error())
 					}
 
-					cptCopy.block.Header.Bits = requiredDifficulty
+					cptCopy.Block.Header.Bits = requiredDifficulty
 				}
 
 				// Choose a new extranonce value that is one greater
@@ -818,15 +837,15 @@ func handleTooFewVoters(nextHeight int64,
 				// same block and choose the same winners as before.
 				ens := cptCopy.getCoinbaseExtranonces()
 				ens[0]++
-				UpdateExtraNonce(cptCopy.block, cptCopy.height, ens)
+				UpdateExtraNonce(cptCopy.Block, cptCopy.Height, ens)
 
 				// Update extranonce of the original template too, so
 				// we keep getting unique numbers.
-				UpdateExtraNonce(curTemplate.block, curTemplate.height, ens)
+				UpdateExtraNonce(curTemplate.Block, curTemplate.Height, ens)
 
 				// Make sure the block validates.
-				block := dcrutil.NewBlockDeepCopyCoinbase(cptCopy.block)
-				block.SetHeight(cptCopy.height)
+				block := dcrutil.NewBlockDeepCopyCoinbase(cptCopy.Block)
+				block.SetHeight(cptCopy.Height)
 				if err := blockchain.CheckWorklessBlockSanity(block,
 					bm.server.timeSource,
 					bm.server.chainParams); err != nil {
@@ -934,11 +953,11 @@ func handleTooFewVoters(nextHeight int64,
 				btMsgBlock.Header.Size = uint32(btMsgBlock.SerializeSize())
 
 				bt := &BlockTemplate{
-					block:           btMsgBlock,
-					fees:            []int64{0},
-					sigOpCounts:     []int64{0},
-					height:          int64(topBlock.MsgBlock().Header.Height),
-					validPayAddress: miningAddress != nil,
+					Block:           btMsgBlock,
+					Fees:            []int64{0},
+					SigOpCounts:     []int64{0},
+					Height:          int64(topBlock.MsgBlock().Header.Height),
+					ValidPayAddress: miningAddress != nil,
 				}
 
 				// Recalculate the merkle roots. Use a temporary 'immutable'
@@ -953,7 +972,7 @@ func handleTooFewVoters(nextHeight int64,
 
 				// Make sure the block validates.
 				btBlock := dcrutil.NewBlockDeepCopyCoinbase(btMsgBlock)
-				btBlock.SetHeight(bt.height)
+				btBlock.SetHeight(bt.Height)
 				if err := blockchain.CheckWorklessBlockSanity(btBlock,
 					bm.server.timeSource,
 					bm.server.chainParams); err != nil {
@@ -993,7 +1012,7 @@ func handleCreatedBlockTemplate(blockTemplate *BlockTemplate,
 	bm *blockManager) (*BlockTemplate, error) {
 	curTemplate := bm.GetCurrentTemplate()
 
-	nextBlockHeight := blockTemplate.height
+	nextBlockHeight := blockTemplate.Height
 	stakeValidationHeight := bm.server.chainParams.StakeValidationHeight
 	// This is where we begin storing block templates, when either the
 	// program is freshly started or the chain is matured to stake
@@ -1009,7 +1028,7 @@ func handleCreatedBlockTemplate(blockTemplate *BlockTemplate,
 	// template as the currenct template.
 	if curTemplate != nil &&
 		nextBlockHeight >= stakeValidationHeight-1 {
-		if curTemplate.height < nextBlockHeight {
+		if curTemplate.Height < nextBlockHeight {
 			bm.SetParentTemplate(curTemplate)
 			bm.SetCurrentTemplate(blockTemplate)
 		}
@@ -1017,7 +1036,7 @@ func handleCreatedBlockTemplate(blockTemplate *BlockTemplate,
 
 	// Overwrite the old cached block if it's out of date.
 	if curTemplate != nil {
-		if curTemplate.height == nextBlockHeight {
+		if curTemplate.Height == nextBlockHeight {
 			bm.SetCurrentTemplate(blockTemplate)
 		}
 	}
@@ -2070,11 +2089,11 @@ mempoolLoop:
 		dcrutil.Amount(msgBlock.Header.SBits).ToCoin())
 
 	blockTemplate := &BlockTemplate{
-		block:           &msgBlock,
-		fees:            txFees,
-		sigOpCounts:     txSigOpCounts,
-		height:          nextBlockHeight,
-		validPayAddress: payToAddress != nil,
+		Block:           &msgBlock,
+		Fees:            txFees,
+		SigOpCounts:     txSigOpCounts,
+		Height:          nextBlockHeight,
+		ValidPayAddress: payToAddress != nil,
 	}
 
 	return handleCreatedBlockTemplate(blockTemplate, server.blockManager)

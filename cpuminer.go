@@ -347,7 +347,7 @@ out:
 		// This prevents you from causing memory exhaustion issues
 		// when mining aggressively in a simulation network.
 		if cfg.SimNet {
-			if m.minedOnParents[template.block.Header.PrevBlock] >=
+			if m.minedOnParents[template.Block.Header.PrevBlock] >=
 				maxSimnetToMine {
 				minrLog.Tracef("too many blocks mined on parent, stopping " +
 					"until there are enough votes on these to make a new " +
@@ -360,10 +360,10 @@ out:
 		// with false when conditions that trigger a stale block, so
 		// a new block template can be generated.  When the return is
 		// true a solution was found, so submit the solved block.
-		if m.solveBlock(template.block, ticker, quit) {
-			block := dcrutil.NewBlock(template.block)
+		if m.solveBlock(template.Block, ticker, quit) {
+			block := dcrutil.NewBlock(template.Block)
 			m.submitBlock(block)
-			m.minedOnParents[template.block.Header.PrevBlock]++
+			m.minedOnParents[template.Block.Header.PrevBlock]++
 		}
 	}
 
@@ -628,8 +628,8 @@ func (m *CPUMiner) GenerateNBlocks(n uint32) ([]*chainhash.Hash, error) {
 		// with false when conditions that trigger a stale block, so
 		// a new block template can be generated.  When the return is
 		// true a solution was found, so submit the solved block.
-		if m.solveBlock(template.block, ticker, nil) {
-			block := dcrutil.NewBlock(template.block)
+		if m.solveBlock(template.Block, ticker, nil) {
+			block := dcrutil.NewBlock(template.Block)
 			m.submitBlock(block)
 			blockHashes[i] = block.Sha()
 			i++

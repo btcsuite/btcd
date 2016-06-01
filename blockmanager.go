@@ -1039,14 +1039,14 @@ func (b *blockManager) checkBlockForHiddenVotes(block *dcrutil.Block) {
 	// need to use the current template.
 	var template *BlockTemplate
 	if b.cachedCurrentTemplate != nil {
-		if b.cachedCurrentTemplate.height ==
+		if b.cachedCurrentTemplate.Height ==
 			block.Height() {
 			template = b.cachedCurrentTemplate
 		}
 	}
 	if template == nil &&
 		b.cachedParentTemplate != nil {
-		if b.cachedParentTemplate.height ==
+		if b.cachedParentTemplate.Height ==
 			block.Height() {
 			template = b.cachedParentTemplate
 		}
@@ -1059,7 +1059,7 @@ func (b *blockManager) checkBlockForHiddenVotes(block *dcrutil.Block) {
 
 	// Make sure that the template has the same parent
 	// as the new block.
-	if template.block.Header.PrevBlock !=
+	if template.Block.Header.PrevBlock !=
 		block.MsgBlock().Header.PrevBlock {
 		bmgrLog.Warnf("error found while trying to check incoming " +
 			"block for hidden votes: template did not have the " +
@@ -1078,8 +1078,8 @@ func (b *blockManager) checkBlockForHiddenVotes(block *dcrutil.Block) {
 	oldVoteMap := make(map[chainhash.Hash]struct{},
 		int(b.server.chainParams.TicketsPerBlock))
 	if template != nil {
-		templateBlock := dcrutil.NewBlock(template.block)
-		templateBlock.SetHeight(template.height)
+		templateBlock := dcrutil.NewBlock(template.Block)
+		templateBlock.SetHeight(template.Height)
 
 		// Add all the votes found in our template. Keep their
 		// hashes in a map for easy lookup in the next loop.
@@ -1128,20 +1128,20 @@ func (b *blockManager) checkBlockForHiddenVotes(block *dcrutil.Block) {
 	// for both the underlying template msgBlock and a new slice
 	// of transaction pointers so that a new merkle root can be
 	// calculated.
-	template.block.ClearSTransactions()
+	template.Block.ClearSTransactions()
 	updatedTxTreeStake := make([]*dcrutil.Tx, 0,
 		votesTotal+len(oldTickets)+len(oldRevocations))
 	for _, vote := range newVotes {
 		updatedTxTreeStake = append(updatedTxTreeStake, vote)
-		template.block.AddSTransaction(vote.MsgTx())
+		template.Block.AddSTransaction(vote.MsgTx())
 	}
 	for _, ticket := range oldTickets {
 		updatedTxTreeStake = append(updatedTxTreeStake, ticket)
-		template.block.AddSTransaction(ticket.MsgTx())
+		template.Block.AddSTransaction(ticket.MsgTx())
 	}
 	for _, revocation := range oldRevocations {
 		updatedTxTreeStake = append(updatedTxTreeStake, revocation)
-		template.block.AddSTransaction(revocation.MsgTx())
+		template.Block.AddSTransaction(revocation.MsgTx())
 	}
 
 	// Create a new coinbase and update the coinbase pointer
@@ -1162,9 +1162,9 @@ func (b *blockManager) checkBlockForHiddenVotes(block *dcrutil.Block) {
 		return
 	}
 	coinbase, err := createCoinbaseTx(
-		template.block.Transactions[0].TxIn[0].SignatureScript,
+		template.Block.Transactions[0].TxIn[0].SignatureScript,
 		opReturnPkScript,
-		int64(template.block.Header.Height),
+		int64(template.Block.Header.Height),
 		cfg.miningAddrs[rand.Intn(len(cfg.miningAddrs))],
 		uint16(votesTotal),
 		b.server.chainParams)
@@ -1173,13 +1173,13 @@ func (b *blockManager) checkBlockForHiddenVotes(block *dcrutil.Block) {
 			"block with extra found voters")
 		return
 	}
-	template.block.Transactions[0] = coinbase.MsgTx()
+	template.Block.Transactions[0] = coinbase.MsgTx()
 
 	// Patch the header. First, reconstruct the merkle trees, then
 	// correct the number of voters, and finally recalculate the size.
 	var updatedTxTreeRegular []*dcrutil.Tx
 	updatedTxTreeRegular = append(updatedTxTreeRegular, coinbase)
-	for i, mtx := range template.block.Transactions {
+	for i, mtx := range template.Block.Transactions {
 		// Coinbase
 		if i == 0 {
 			continue
@@ -1188,11 +1188,11 @@ func (b *blockManager) checkBlockForHiddenVotes(block *dcrutil.Block) {
 		updatedTxTreeRegular = append(updatedTxTreeRegular, tx)
 	}
 	merkles := blockchain.BuildMerkleTreeStore(updatedTxTreeRegular)
-	template.block.Header.StakeRoot = *merkles[len(merkles)-1]
+	template.Block.Header.StakeRoot = *merkles[len(merkles)-1]
 	smerkles := blockchain.BuildMerkleTreeStore(updatedTxTreeStake)
-	template.block.Header.Voters = uint16(votesTotal)
-	template.block.Header.StakeRoot = *smerkles[len(smerkles)-1]
-	template.block.Header.Size = uint32(template.block.SerializeSize())
+	template.Block.Header.Voters = uint16(votesTotal)
+	template.Block.Header.StakeRoot = *smerkles[len(smerkles)-1]
+	template.Block.Header.Size = uint32(template.Block.SerializeSize())
 
 	return
 }
