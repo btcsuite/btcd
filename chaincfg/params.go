@@ -562,47 +562,13 @@ var (
 )
 
 var (
-	registeredNets = map[wire.CurrencyNet]struct{}{
-		MainNetParams.Net: {},
-		TestNetParams.Net: {},
-		SimNetParams.Net:  {},
-	}
-
-	pubKeyAddrIDs = map[[2]byte]struct{}{
-		MainNetParams.PubKeyAddrID: {},
-		TestNetParams.PubKeyAddrID: {},
-		SimNetParams.PubKeyAddrID:  {},
-	}
-
-	pubKeyHashAddrIDs = map[[2]byte]struct{}{
-		MainNetParams.PubKeyHashAddrID: {},
-		TestNetParams.PubKeyHashAddrID: {},
-		SimNetParams.PubKeyHashAddrID:  {},
-	}
-
-	pkhEdwardsAddrIDs = map[[2]byte]struct{}{
-		MainNetParams.PKHEdwardsAddrID: {},
-		TestNetParams.PKHEdwardsAddrID: {},
-		SimNetParams.PKHEdwardsAddrID:  {},
-	}
-
-	pkhSchnorrAddrIDs = map[[2]byte]struct{}{
-		MainNetParams.PKHSchnorrAddrID: {},
-		TestNetParams.PKHSchnorrAddrID: {},
-		SimNetParams.PKHSchnorrAddrID:  {},
-	}
-
-	scriptHashAddrIDs = map[[2]byte]struct{}{
-		MainNetParams.ScriptHashAddrID: {},
-		TestNetParams.ScriptHashAddrID: {},
-		SimNetParams.ScriptHashAddrID:  {},
-	}
-
-	hdPrivToPubKeyIDs = map[[4]byte][]byte{
-		MainNetParams.HDPrivateKeyID: MainNetParams.HDPublicKeyID[:],
-		TestNetParams.HDPrivateKeyID: TestNetParams.HDPublicKeyID[:],
-		SimNetParams.HDPrivateKeyID:  SimNetParams.HDPublicKeyID[:],
-	}
+	registeredNets    = make(map[wire.CurrencyNet]struct{})
+	pubKeyAddrIDs     = make(map[[2]byte]struct{})
+	pubKeyHashAddrIDs = make(map[[2]byte]struct{})
+	pkhEdwardsAddrIDs = make(map[[2]byte]struct{})
+	pkhSchnorrAddrIDs = make(map[[2]byte]struct{})
+	scriptHashAddrIDs = make(map[[2]byte]struct{})
+	hdPrivToPubKeyIDs = make(map[[4]byte][]byte)
 )
 
 // Register registers the network parameters for a Decred network.  This may
@@ -624,6 +590,14 @@ func Register(params *Params) error {
 	scriptHashAddrIDs[params.ScriptHashAddrID] = struct{}{}
 	hdPrivToPubKeyIDs[params.HDPrivateKeyID] = params.HDPublicKeyID[:]
 	return nil
+}
+
+// mustRegister performs the same function as Register except it panics if there
+// is an error.  This should only be called from package init functions.
+func mustRegister(params *Params) {
+	if err := Register(params); err != nil {
+		panic("failed to register network: " + err.Error())
+	}
 }
 
 // IsPubKeyAddrID returns whether the id is an identifier known to prefix a
@@ -725,4 +699,11 @@ func (p *Params) BlockOneSubsidy() int64 {
 // proportions.
 func (p *Params) TotalSubsidyProportions() uint16 {
 	return p.WorkRewardProportion + p.StakeRewardProportion + p.BlockTaxProportion
+}
+
+func init() {
+	// Register all default networks when the package is initialized.
+	mustRegister(&MainNetParams)
+	mustRegister(&TestNetParams)
+	mustRegister(&SimNetParams)
 }
