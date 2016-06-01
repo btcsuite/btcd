@@ -23,6 +23,7 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -5115,8 +5116,16 @@ func median(s []dcrutil.Amount) dcrutil.Amount {
 		return 0
 	}
 
+	sort.Sort(dcrutil.AmountSorter(s))
+
 	middle := len(s) / 2
-	return s[middle]
+
+	if len(s) == 0 {
+		return 0
+	} else if (len(s) % 2) != 0 {
+		return s[middle]
+	}
+	return (s[middle] + s[middle-1]) / 2
 }
 
 // stdDev gets the standard deviation amount from a slice of amounts.
