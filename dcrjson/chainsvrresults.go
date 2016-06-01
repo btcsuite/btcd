@@ -261,7 +261,7 @@ type Vin struct {
 	Vout        uint32     `json:"vout"`
 	Tree        int8       `json:"tree"`
 	Sequence    uint32     `json:"sequence"`
-	AmountIn    int64      `json:"amountin"`
+	AmountIn    float64    `json:"amountin"`
 	BlockHeight uint32     `json:"blockheight"`
 	BlockIndex  uint32     `json:"blockindex"`
 	ScriptSig   *ScriptSig `json:"scriptSig"`
@@ -276,11 +276,11 @@ func (v *Vin) IsCoinBase() bool {
 func (v *Vin) MarshalJSON() ([]byte, error) {
 	if v.IsCoinBase() {
 		coinbaseStruct := struct {
-			AmountIn    int64  `json:"amountin"`
-			BlockHeight uint32 `json:"blockheight"`
-			BlockIndex  uint32 `json:"blockindex"`
-			Coinbase    string `json:"coinbase"`
-			Sequence    uint32 `json:"sequence"`
+			AmountIn    float64 `json:"amountin"`
+			BlockHeight uint32  `json:"blockheight"`
+			BlockIndex  uint32  `json:"blockindex"`
+			Coinbase    string  `json:"coinbase"`
+			Sequence    uint32  `json:"sequence"`
 		}{
 			AmountIn:    v.AmountIn,
 			BlockHeight: v.BlockHeight,
@@ -296,7 +296,7 @@ func (v *Vin) MarshalJSON() ([]byte, error) {
 		Vout        uint32     `json:"vout"`
 		Tree        int8       `json:"tree"`
 		Sequence    uint32     `json:"sequence"`
-		AmountIn    int64      `json:"amountin"`
+		AmountIn    float64    `json:"amountin"`
 		BlockHeight uint32     `json:"blockheight"`
 		BlockIndex  uint32     `json:"blockindex"`
 		ScriptSig   *ScriptSig `json:"scriptSig"`
