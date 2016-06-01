@@ -7,6 +7,8 @@ package dcrutil_test
 
 import (
 	"math"
+	"reflect"
+	"sort"
 	"testing"
 
 	. "github.com/decred/dcrutil"
@@ -305,6 +307,46 @@ func TestAmountMulF64(t *testing.T) {
 		a := test.amt.MulF64(test.mul)
 		if a != test.res {
 			t.Errorf("%v: expected %v got %v", test.name, test.res, a)
+		}
+	}
+}
+
+func TestAmountSorter(t *testing.T) {
+	tests := []struct {
+		name string
+		as   []Amount
+		want []Amount
+	}{
+		{
+			name: "Sort zero length slice of Amounts",
+			as:   []Amount{},
+			want: []Amount{},
+		},
+		{
+			name: "Sort 1-element slice of Amounts",
+			as:   []Amount{7},
+			want: []Amount{7},
+		},
+		{
+			name: "Sort 2-element slice of Amounts",
+			as:   []Amount{7, 5},
+			want: []Amount{5, 7},
+		},
+		{
+			name: "Sort 6-element slice of Amounts",
+			as:   []Amount{0, 9e8, 4e6, 4e6, 3, 9e12},
+			want: []Amount{0, 3, 4e6, 4e6, 9e8, 9e12},
+		},
+	}
+
+	for i, test := range tests {
+		result := make([]Amount, len(test.as))
+		copy(result, test.as)
+		sort.Sort(AmountSorter(result))
+		if !reflect.DeepEqual(result, test.want) {
+			t.Errorf("AmountSorter #%d got %v want %v", i, result,
+				test.want)
+			continue
 		}
 	}
 }

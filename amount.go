@@ -121,3 +121,26 @@ func (a Amount) String() string {
 func (a Amount) MulF64(f float64) Amount {
 	return round(float64(a) * f)
 }
+
+// AmountSorter implements sort.Interface to allow a slice of Amounts to
+// be sorted.
+type AmountSorter []Amount
+
+// Len returns the number of Amounts in the slice.  It is part of the
+// sort.Interface implementation.
+func (s AmountSorter) Len() int {
+	return len(s)
+}
+
+// Swap swaps the Amounts at the passed indices.  It is part of the
+// sort.Interface implementation.
+func (s AmountSorter) Swap(i, j int) {
+	s[i], s[j] = s[j], s[i]
+}
+
+// Less returns whether the Amount with index i should sort before the
+// Amount with index j.  It is part of the sort.Interface
+// implementation.
+func (s AmountSorter) Less(i, j int) bool {
+	return s[i] < s[j]
+}
