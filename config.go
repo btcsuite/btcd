@@ -27,30 +27,32 @@ import (
 )
 
 const (
-	defaultConfigFilename    = "dcrd.conf"
-	defaultDataDirname       = "data"
-	defaultLogLevel          = "info"
-	defaultLogDirname        = "logs"
-	defaultLogFilename       = "dcrd.log"
-	defaultMaxPeers          = 125
-	defaultBanDuration       = time.Hour * 24
-	defaultBanThreshold      = 100
-	defaultMaxRPCClients     = 10
-	defaultMaxRPCWebsockets  = 25
-	defaultVerifyEnabled     = false
-	defaultDbType            = "leveldb"
-	defaultFreeTxRelayLimit  = 15.0
-	defaultBlockMinSize      = 0
-	defaultBlockMaxSize      = 375000
-	blockMaxSizeMin          = 1000
-	blockMaxSizeMax          = wire.MaxBlockPayload - 1000
-	defaultBlockPrioritySize = 20000
-	defaultGenerate          = false
-	defaultAddrIndex         = false
-	defaultNonAggressive     = false
-	defaultNoMiningStateSync = false
-	defaultAllowOldVotes     = false
-	defaultSigCacheMaxSize   = 50000
+	defaultConfigFilename        = "dcrd.conf"
+	defaultDataDirname           = "data"
+	defaultLogLevel              = "info"
+	defaultLogDirname            = "logs"
+	defaultLogFilename           = "dcrd.log"
+	defaultMaxPeers              = 125
+	defaultBanDuration           = time.Hour * 24
+	defaultBanThreshold          = 100
+	defaultMaxRPCClients         = 10
+	defaultMaxRPCWebsockets      = 25
+	defaultVerifyEnabled         = false
+	defaultDbType                = "leveldb"
+	defaultFreeTxRelayLimit      = 15.0
+	defaultBlockMinSize          = 0
+	defaultBlockMaxSize          = 375000
+	blockMaxSizeMin              = 1000
+	blockMaxSizeMax              = wire.MaxBlockPayload - 1000
+	defaultBlockPrioritySize     = 20000
+	defaultGenerate              = false
+	defaultAddrIndex             = false
+	defaultNonAggressive         = false
+	defaultNoMiningStateSync     = false
+	defaultAllowOldVotes         = false
+	defaultMaxOrphanTransactions = 1000
+	defaultMaxOrphanTxSize       = 5000
+	defaultSigCacheMaxSize       = 50000
 )
 
 var (
@@ -352,8 +354,8 @@ func loadConfig() (*config, []string, error) {
 		BlockMinSize:      defaultBlockMinSize,
 		BlockMaxSize:      defaultBlockMaxSize,
 		BlockPrioritySize: defaultBlockPrioritySize,
+		MaxOrphanTxs:      defaultMaxOrphanTransactions,
 		SigCacheMaxSize:   defaultSigCacheMaxSize,
-		MaxOrphanTxs:      maxOrphanTransactions,
 		Generate:          defaultGenerate,
 		NoAddrIndex:       defaultAddrIndex,
 		NoMiningStateSync: defaultNoMiningStateSync,

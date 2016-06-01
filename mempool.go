@@ -32,20 +32,6 @@ const (
 	// contextual transaction information provided in a transaction store.
 	mempoolHeight = 0x7fffffff
 
-	// maxOrphanTransactions is the maximum number of orphan transactions
-	// that can be queued.
-	maxOrphanTransactions = 1000
-
-	// maxOrphanTxSize is the maximum size allowed for orphan transactions.
-	// This helps prevent memory exhaustion attacks from sending a lot of
-	// of big orphans.
-	maxOrphanTxSize = 5000
-
-	// maxSigOpsPerTx is the maximum number of signature operations
-	// in a single transaction we will relay or mine.  It is a fraction
-	// of the max signature operations for a block.
-	maxSigOpsPerTx = blockchain.MaxSigOpsPerBlock / 5
-
 	// minTicketFee is the minimum fee per KB in atoms that is required for
 	// a ticket to enter the mempool.
 	minTicketFee = 1e6
@@ -99,28 +85,12 @@ type mempoolConfig struct {
 	// associated with.
 	ChainParams *chaincfg.Params
 
-	// DisableRelayPriority defines whether to relay free or low-fee
-	// transactions that do not have enough priority to be relayed.
-	DisableRelayPriority bool
-
 	// EnableAddrIndex defines whether the address index should be enabled.
 	EnableAddrIndex bool
 
 	// FetchTransactionStore defines the function to use to fetch
 	// transacation information.
 	FetchTransactionStore func(*dcrutil.Tx, bool, bool) (blockchain.TxStore, error)
-
-	// FreeTxRelayLimit defines the given amount in thousands of bytes
-	// per minute that transactions with no fee are rate limited to.
-	FreeTxRelayLimit float64
-
-	// MaxOrphanTxs defines the maximum number of orphan transactions to
-	// keep in memory.
-	MaxOrphanTxs int
-
-	// MinRelayTxFee defines the minimum transaction fee in BTC/kB to be
-	// considered a non-zero fee.
-	MinRelayTxFee dcrutil.Amount
 
 	// NewestSha defines the function to retrieve the newest sha.
 	NewestSha func() (*chainhash.Hash, int64, error)
@@ -131,11 +101,45 @@ type mempoolConfig struct {
 	// This function must be safe for concurrent access.
 	NextStakeDifficulty func() (int64, error)
 
+	// Policy defines the various mempool configuration options related
+	// to policy.
+	Policy mempoolPolicy
+
 	// SigCache defines a signature cache to use.
 	SigCache *txscript.SigCache
 
 	// TimeSource defines the timesource to use.
 	TimeSource blockchain.MedianTimeSource
+}
+
+// mempoolPolicy houses the policy (configuration parameters) which is used to
+// control the mempool.
+type mempoolPolicy struct {
+	// DisableRelayPriority defines whether to relay free or low-fee
+	// transactions that do not have enough priority to be relayed.
+	DisableRelayPriority bool
+
+	// FreeTxRelayLimit defines the given amount in thousands of bytes
+	// per minute that transactions with no fee are rate limited to.
+	FreeTxRelayLimit float64
+
+	// MaxOrphanTxs is the maximum number of orphan transactions
+	// that can be queued.
+	MaxOrphanTxs int
+
+	// MaxOrphanTxSize is the maximum size allowed for orphan transactions.
+	// This helps prevent memory exhaustion attacks from sending a lot of
+	// of big orphans.
+	MaxOrphanTxSize int
+
+	// MaxSigOpsPerTx is the maximum number of signature operations
+	// in a single transaction we will relay or mine.  It is a fraction
+	// of the max signature operations for a block.
+	MaxSigOpsPerTx int
+
+	// MinRelayTxFee defines the minimum transaction fee in BTC/kB to be
+	// considered a non-zero fee.
+	MinRelayTxFee dcrutil.Amount
 }
 
 // txMemPool is used as a source of transactions that need to be mined into
@@ -448,7 +452,9 @@ func (mp *txMemPool) RemoveOrphan(txHash *chainhash.Hash) {
 //
 // This function MUST be called with the mempool lock held (for writes).
 func (mp *txMemPool) limitNumOrphans() error {
-	if len(mp.orphans)+1 > mp.cfg.MaxOrphanTxs && mp.cfg.MaxOrphanTxs > 0 {
+	if len(mp.orphans)+1 > mp.cfg.Policy.MaxOrphanTxs &&
+		mp.cfg.Policy.MaxOrphanTxs > 0 {
+
 		// Generate a cryptographically random hash.
 		randHashBytes := make([]byte, chainhash.HashSize)
 		_, err := rand.Read(randHashBytes)
@@ -514,13 +520,13 @@ func (mp *txMemPool) maybeAddOrphan(tx *dcrutil.Tx) error {
 	//
 	// Note that the number of orphan transactions in the orphan pool is
 	// also limited, so this equates to a maximum memory used of
-	// maxOrphanTxSize * mp.cfg.MaxOrphanTxs (which is ~5MB using the default
-	// values at the time this comment was written).
+	// mp.cfg.Policy.MaxOrphanTxSize * mp.cfg.Policy.MaxOrphanTxs (which is ~5MB
+	// using the default values at the time this comment was written).
 	serializedLen := tx.MsgTx().SerializeSize()
-	if serializedLen > maxOrphanTxSize {
+	if serializedLen > mp.cfg.Policy.MaxOrphanTxSize {
 		str := fmt.Sprintf("orphan transaction size of %d bytes is "+
 			"larger than max allowed size of %d bytes",
-			serializedLen, maxOrphanTxSize)
+			serializedLen, mp.cfg.Policy.MaxOrphanTxSize)
 		return txRuleError(wire.RejectNonstandard, str)
 	}
 
@@ -1116,7 +1122,7 @@ func (mp *txMemPool) maybeAcceptTransaction(tx *dcrutil.Tx, isNew,
 	// forbid their relaying.
 	if !activeNetParams.RelayNonStdTxs {
 		err := checkTransactionStandard(tx, txType, nextBlockHeight,
-			mp.cfg.TimeSource, mp.cfg.MinRelayTxFee)
+			mp.cfg.TimeSource, mp.cfg.Policy.MinRelayTxFee)
 		if err != nil {
 			// Attempt to extract a reject code from the error so
 			// it can be retained.  When not possible, fall back to
@@ -1304,9 +1310,9 @@ func (mp *txMemPool) maybeAcceptTransaction(tx *dcrutil.Tx, isNew,
 	}
 
 	numSigOps += blockchain.CountSigOps(tx, false, (txType == stake.TxTypeSSGen))
-	if numSigOps > maxSigOpsPerTx {
+	if numSigOps > mp.cfg.Policy.MaxSigOpsPerTx {
 		str := fmt.Sprintf("transaction %v has too many sigops: %d > %d",
-			txHash, numSigOps, maxSigOpsPerTx)
+			txHash, numSigOps, mp.cfg.Policy.MaxSigOpsPerTx)
 		return nil, txRuleError(wire.RejectNonstandard, str)
 	}
 
@@ -1323,7 +1329,8 @@ func (mp *txMemPool) maybeAcceptTransaction(tx *dcrutil.Tx, isNew,
 	// high-priority transactions, don't require a fee for it.
 	// This applies to non-stake transactions only.
 	serializedSize := int64(tx.MsgTx().SerializeSize())
-	minFee := calcMinRequiredTxRelayFee(serializedSize, mp.cfg.MinRelayTxFee)
+	minFee := calcMinRequiredTxRelayFee(serializedSize,
+		mp.cfg.Policy.MinRelayTxFee)
 	if txType == stake.TxTypeRegular { // Non-stake only
 		if serializedSize >= (defaultBlockPrioritySize-1000) && txFee < minFee {
 			str := fmt.Sprintf("transaction %v has %v fees which is under "+
@@ -1339,7 +1346,7 @@ func (mp *txMemPool) maybeAcceptTransaction(tx *dcrutil.Tx, isNew,
 	// are exempted.
 	//
 	// This applies to non-stake transactions only.
-	if isNew && !mp.cfg.DisableRelayPriority && txFee < minFee &&
+	if isNew && !mp.cfg.Policy.DisableRelayPriority && txFee < minFee &&
 		txType == stake.TxTypeRegular {
 
 		currentPriority := calcPriority(tx.MsgTx(), txStore,
@@ -1364,7 +1371,7 @@ func (mp *txMemPool) maybeAcceptTransaction(tx *dcrutil.Tx, isNew,
 		mp.lastPennyUnix = nowUnix
 
 		// Are we still over the limit?
-		if mp.pennyTotal >= mp.cfg.FreeTxRelayLimit*10*1000 {
+		if mp.pennyTotal >= mp.cfg.Policy.FreeTxRelayLimit*10*1000 {
 			str := fmt.Sprintf("transaction %v has been rejected "+
 				"by the rate limiter due to low fees", txHash)
 			return nil, txRuleError(wire.RejectInsufficientFee, str)
@@ -1374,7 +1381,7 @@ func (mp *txMemPool) maybeAcceptTransaction(tx *dcrutil.Tx, isNew,
 		mp.pennyTotal += float64(serializedSize)
 		txmpLog.Tracef("rate limit: curTotal %v, nextTotal: %v, "+
 			"limit %v", oldTotal, mp.pennyTotal,
-			mp.cfg.FreeTxRelayLimit*10*1000)
+			mp.cfg.Policy.FreeTxRelayLimit*10*1000)
 	}
 
 	// Set an absolute threshold for ticket rejection and obey it. Tickets

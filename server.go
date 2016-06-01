@@ -2577,12 +2577,8 @@ func newServer(listenAddrs []string, database database.Db, tmdb *stake.TicketDB,
 
 	txC := mempoolConfig{
 		ChainParams:           chainParams,
-		DisableRelayPriority:  cfg.NoRelayPriority,
 		EnableAddrIndex:       !cfg.NoAddrIndex,
 		FetchTransactionStore: s.blockManager.blockChain.FetchTransactionStore,
-		FreeTxRelayLimit:      cfg.FreeTxRelayLimit,
-		MaxOrphanTxs:          cfg.MaxOrphanTxs,
-		MinRelayTxFee:         cfg.minRelayTxFee,
 		NewestSha: func() (*chainhash.Hash, int64, error) {
 			bm.chainState.Lock()
 			hash := bm.chainState.newestHash
@@ -2595,6 +2591,14 @@ func newServer(listenAddrs []string, database database.Db, tmdb *stake.TicketDB,
 			sDiff := bm.chainState.nextStakeDifficulty
 			bm.chainState.Unlock()
 			return sDiff, nil
+		},
+		Policy: mempoolPolicy{
+			DisableRelayPriority: cfg.NoRelayPriority,
+			FreeTxRelayLimit:     cfg.FreeTxRelayLimit,
+			MaxOrphanTxs:         cfg.MaxOrphanTxs,
+			MaxOrphanTxSize:      defaultMaxOrphanTxSize,
+			MaxSigOpsPerTx:       blockchain.MaxSigOpsPerBlock / 5,
+			MinRelayTxFee:        cfg.minRelayTxFee,
 		},
 		SigCache:   s.sigCache,
 		TimeSource: s.timeSource,
