@@ -397,19 +397,6 @@ type existsLiveTicketsResponse struct {
 	err    error
 }
 
-// ticketPoolValueMsg handles a request for obtaining the current total value
-// of all the locked stake in the ticket pool.
-type ticketPoolValueMsg struct {
-	reply chan ticketPoolValueResponse
-}
-
-// ticketPoolValueResponse is a response to the reply channel of a
-// ticketPoolValueMsg.
-type ticketPoolValueResponse struct {
-	Amount dcrutil.Amount
-	err    error
-}
-
 // liveTicketsMsg handles a request for obtaining the current ticket hashes
 // in the live ticket pool.
 type liveTicketsMsg struct {
@@ -2191,13 +2178,6 @@ out:
 					err:    err,
 				}
 
-			case ticketPoolValueMsg:
-				amt, err := b.blockChain.TicketPoolValue()
-				msg.reply <- ticketPoolValueResponse{
-					Amount: amt,
-					err:    err,
-				}
-
 			case liveTicketsMsg:
 				live, err := b.blockChain.LiveTickets()
 				msg.reply <- liveTicketsResponse{
@@ -2910,10 +2890,7 @@ func (b *blockManager) ExistsLiveTickets(hashes []*chainhash.Hash) ([]bool, erro
 // TicketPoolValue returns the current value of the total stake in the ticket
 // pool.
 func (b *blockManager) TicketPoolValue() (dcrutil.Amount, error) {
-	reply := make(chan ticketPoolValueResponse)
-	b.msgChan <- ticketPoolValueMsg{reply: reply}
-	response := <-reply
-	return response.Amount, response.err
+	return b.blockChain.TicketPoolValue()
 }
 
 // LiveTickets returns the live tickets currently in the staking pool.
