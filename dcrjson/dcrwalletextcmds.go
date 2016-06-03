@@ -281,12 +281,14 @@ func NewGetWalletFeeCmd() *GetWalletFeeCmd {
 // ImportScriptCmd is a type for handling custom marshaling and
 // unmarshaling of importscript JSON wallet extension commands.
 type ImportScriptCmd struct {
-	Hex string
+	Hex      string
+	Rescan   *bool `jsonrpcdefault:"true"`
+	ScanFrom *int
 }
 
 // NewImportScriptCmd creates a new GetImportScriptCmd.
-func NewImportScriptCmd(hex string) *ImportScriptCmd {
-	return &ImportScriptCmd{hex}
+func NewImportScriptCmd(hex string, rescan *bool, scanFrom *int) *ImportScriptCmd {
+	return &ImportScriptCmd{hex, rescan, scanFrom}
 }
 
 // ListScriptsCmd is a type for handling custom marshaling and

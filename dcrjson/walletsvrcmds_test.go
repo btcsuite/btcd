@@ -356,7 +356,7 @@ func TestWalletSvrCmds(t *testing.T) {
 				return dcrjson.NewCmd("importprivkey", "abc")
 			},
 			staticCmd: func() interface{} {
-				return dcrjson.NewImportPrivKeyCmd("abc", nil, nil)
+				return dcrjson.NewImportPrivKeyCmd("abc", nil, nil, nil)
 			},
 			marshalled: `{"jsonrpc":"1.0","method":"importprivkey","params":["abc"],"id":1}`,
 			unmarshalled: &dcrjson.ImportPrivKeyCmd{
@@ -371,7 +371,7 @@ func TestWalletSvrCmds(t *testing.T) {
 				return dcrjson.NewCmd("importprivkey", "abc", "label")
 			},
 			staticCmd: func() interface{} {
-				return dcrjson.NewImportPrivKeyCmd("abc", dcrjson.String("label"), nil)
+				return dcrjson.NewImportPrivKeyCmd("abc", dcrjson.String("label"), nil, nil)
 			},
 			marshalled: `{"jsonrpc":"1.0","method":"importprivkey","params":["abc","label"],"id":1}`,
 			unmarshalled: &dcrjson.ImportPrivKeyCmd{
@@ -386,13 +386,29 @@ func TestWalletSvrCmds(t *testing.T) {
 				return dcrjson.NewCmd("importprivkey", "abc", "label", false)
 			},
 			staticCmd: func() interface{} {
-				return dcrjson.NewImportPrivKeyCmd("abc", dcrjson.String("label"), dcrjson.Bool(false))
+				return dcrjson.NewImportPrivKeyCmd("abc", dcrjson.String("label"), dcrjson.Bool(false), nil)
 			},
 			marshalled: `{"jsonrpc":"1.0","method":"importprivkey","params":["abc","label",false],"id":1}`,
 			unmarshalled: &dcrjson.ImportPrivKeyCmd{
 				PrivKey: "abc",
 				Label:   dcrjson.String("label"),
 				Rescan:  dcrjson.Bool(false),
+			},
+		},
+		{
+			name: "importprivkey optional3",
+			newCmd: func() (interface{}, error) {
+				return dcrjson.NewCmd("importprivkey", "abc", "label", false, 12345)
+			},
+			staticCmd: func() interface{} {
+				return dcrjson.NewImportPrivKeyCmd("abc", dcrjson.String("label"), dcrjson.Bool(false), dcrjson.Int(12345))
+			},
+			marshalled: `{"jsonrpc":"1.0","method":"importprivkey","params":["abc","label",false,12345],"id":1}`,
+			unmarshalled: &dcrjson.ImportPrivKeyCmd{
+				PrivKey:  "abc",
+				Label:    dcrjson.String("label"),
+				Rescan:   dcrjson.Bool(false),
+				ScanFrom: dcrjson.Int(12345),
 			},
 		},
 		{

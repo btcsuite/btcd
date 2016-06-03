@@ -235,9 +235,10 @@ func NewGetTransactionCmd(txHash string, includeWatchOnly *bool) *GetTransaction
 
 // ImportPrivKeyCmd defines the importprivkey JSON-RPC command.
 type ImportPrivKeyCmd struct {
-	PrivKey string
-	Label   *string
-	Rescan  *bool `jsonrpcdefault:"true"`
+	PrivKey  string
+	Label    *string
+	Rescan   *bool `jsonrpcdefault:"true"`
+	ScanFrom *int
 }
 
 // NewImportPrivKeyCmd returns a new instance which can be used to issue a
@@ -245,11 +246,12 @@ type ImportPrivKeyCmd struct {
 //
 // The parameters which are pointers indicate they are optional.  Passing nil
 // for optional parameters will use the default value.
-func NewImportPrivKeyCmd(privKey string, label *string, rescan *bool) *ImportPrivKeyCmd {
+func NewImportPrivKeyCmd(privKey string, label *string, rescan *bool, scanFrom *int) *ImportPrivKeyCmd {
 	return &ImportPrivKeyCmd{
-		PrivKey: privKey,
-		Label:   label,
-		Rescan:  rescan,
+		PrivKey:  privKey,
+		Label:    label,
+		Rescan:   rescan,
+		ScanFrom: scanFrom,
 	}
 }
 
