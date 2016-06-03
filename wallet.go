@@ -2583,7 +2583,7 @@ func (c *Client) ImportPrivKeyAsync(privKeyWIF *dcrutil.WIF) FutureImportPrivKey
 		wif = privKeyWIF.String()
 	}
 
-	cmd := dcrjson.NewImportPrivKeyCmd(wif, nil, nil)
+	cmd := dcrjson.NewImportPrivKeyCmd(wif, nil, nil, nil)
 	return c.sendCmd(cmd)
 }
 
@@ -2604,7 +2604,7 @@ func (c *Client) ImportPrivKeyLabelAsync(privKeyWIF *dcrutil.WIF, label string) 
 		wif = privKeyWIF.String()
 	}
 
-	cmd := dcrjson.NewImportPrivKeyCmd(wif, &label, nil)
+	cmd := dcrjson.NewImportPrivKeyCmd(wif, &label, nil, nil)
 	return c.sendCmd(cmd)
 }
 
@@ -2625,7 +2625,7 @@ func (c *Client) ImportPrivKeyRescanAsync(privKeyWIF *dcrutil.WIF, label string,
 		wif = privKeyWIF.String()
 	}
 
-	cmd := dcrjson.NewImportPrivKeyCmd(wif, &label, &rescan)
+	cmd := dcrjson.NewImportPrivKeyCmd(wif, &label, &rescan, nil)
 	return c.sendCmd(cmd)
 }
 
@@ -2634,6 +2634,30 @@ func (c *Client) ImportPrivKeyRescanAsync(privKeyWIF *dcrutil.WIF, label string,
 // the block history is scanned for transactions addressed to provided privKey.
 func (c *Client) ImportPrivKeyRescan(privKeyWIF *dcrutil.WIF, label string, rescan bool) error {
 	return c.ImportPrivKeyRescanAsync(privKeyWIF, label, rescan).Receive()
+}
+
+// ImportPrivKeyRescanFromAsync returns an instance of a type that can be used to
+// get the result of the RPC at some future time by invoking the Receive function o
+// n the
+// returned instance.
+//
+// See ImportPrivKey for the blocking version and more details.
+func (c *Client) ImportPrivKeyRescanFromAsync(privKeyWIF *dcrutil.WIF, label string, rescan bool, scanFrom int) FutureImportPrivKeyResult {
+	wif := ""
+	if privKeyWIF != nil {
+		wif = privKeyWIF.String()
+	}
+
+	cmd := dcrjson.NewImportPrivKeyCmd(wif, &label, &rescan, &scanFrom)
+	return c.sendCmd(cmd)
+}
+
+// ImportPrivKeyRescanFrom imports the passed private key which must be the wallet
+// import format (WIF). It sets the account label to the one provided. When rescan
+// is true, the block history from block scanFrom is scanned for transactions
+// addressed to provided privKey.
+func (c *Client) ImportPrivKeyRescanFrom(privKeyWIF *dcrutil.WIF, label string, rescan bool, scanFrom int) error {
+	return c.ImportPrivKeyRescanFromAsync(privKeyWIF, label, rescan, scanFrom).Receive()
 }
 
 // FutureImportPubKeyResult is a future promise to deliver the result of an
@@ -2707,13 +2731,56 @@ func (c *Client) ImportScriptAsync(script []byte) FutureImportScriptResult {
 		scriptStr = hex.EncodeToString(script)
 	}
 
-	cmd := dcrjson.NewImportScriptCmd(scriptStr)
+	cmd := dcrjson.NewImportScriptCmd(scriptStr, nil, nil)
 	return c.sendCmd(cmd)
 }
 
 // ImportScript attempts to import a byte code script into wallet.
 func (c *Client) ImportScript(script []byte) error {
 	return c.ImportScriptAsync(script).Receive()
+}
+
+// ImportScriptRescanAsync returns an instance of a type that can be used to
+// get the result of the RPC at some future time by invoking the Receive
+// function on the returned instance.
+//
+// See ImportScript for the blocking version and more details.
+func (c *Client) ImportScriptRescanAsync(script []byte, rescan bool) FutureImportScriptResult {
+	scriptStr := ""
+	if script != nil {
+		scriptStr = hex.EncodeToString(script)
+	}
+
+	cmd := dcrjson.NewImportScriptCmd(scriptStr, &rescan, nil)
+	return c.sendCmd(cmd)
+}
+
+// ImportScriptRescan attempts to import a byte code script into wallet. It also
+// allows the user to choose whether or not they do a rescan.
+func (c *Client) ImportScriptRescan(script []byte, rescan bool) error {
+	return c.ImportScriptRescanAsync(script, rescan).Receive()
+}
+
+// ImportScriptRescanFromAsync returns an instance of a type that can be used to
+// get the result of the RPC at some future time by invoking the Receive
+// function on the returned instance.
+//
+// See ImportScript for the blocking version and more details.
+func (c *Client) ImportScriptRescanFromAsync(script []byte, rescan bool, scanFrom int) FutureImportScriptResult {
+	scriptStr := ""
+	if script != nil {
+		scriptStr = hex.EncodeToString(script)
+	}
+
+	cmd := dcrjson.NewImportScriptCmd(scriptStr, &rescan, &scanFrom)
+	return c.sendCmd(cmd)
+}
+
+// ImportScriptRescanFrom attempts to import a byte code script into wallet. It
+// also allows the user to choose whether or not they do a rescan, and which
+// height to rescan from.
+func (c *Client) ImportScriptRescanFrom(script []byte, rescan bool, scanFrom int) error {
+	return c.ImportScriptRescanFromAsync(script, rescan, scanFrom).Receive()
 }
 
 // ***********************
