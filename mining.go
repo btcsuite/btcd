@@ -1435,12 +1435,8 @@ mempoolLoop:
 		// Store if this is an SSRtx or not.
 		isSSRtx := prioItem.txType == stake.TxTypeSSRtx
 
-		// Grab the list of transactions which depend on this one (if
-		// any) and remove the entry for this transaction as it will
-		// either be included or skipped, but in either case the deps
-		// are no longer needed.
+		// Grab the list of transactions which depend on this one (if any).
 		deps := dependers[*tx.Hash()]
-		delete(dependers, *tx.Hash())
 
 		// Skip if we already have too many SStx.
 		if isSStx && (numSStx >=
