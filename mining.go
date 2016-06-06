@@ -554,12 +554,8 @@ mempoolLoop:
 		prioItem := heap.Pop(priorityQueue).(*txPrioItem)
 		tx := prioItem.tx
 
-		// Grab the list of transactions which depend on this one (if
-		// any) and remove the entry for this transaction as it will
-		// either be included or skipped, but in either case the deps
-		// are no longer needed.
+		// Grab the list of transactions which depend on this one (if any).
 		deps := dependers[*tx.Hash()]
-		delete(dependers, *tx.Hash())
 
 		// Enforce maximum block size.  Also check for overflow.
 		txSize := uint32(tx.MsgTx().SerializeSize())
