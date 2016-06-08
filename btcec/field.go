@@ -330,67 +330,40 @@ func (f *fieldVal) Normalize() *fieldVal {
 	// Note that the if/else here intentionally does the bitwise OR with
 	// zero even though it won't change the value to ensure constant time
 	// between the branches.
-	var mask int32
-	if t0 < fieldPrimeWordZero {
-		mask |= -1
-	} else {
-		mask |= 0
+
+	subtractP := false
+
+	if t9 == fieldMSBMask && t8 == fieldBaseMask && t7 == fieldBaseMask && t6 == fieldBaseMask && t5 == fieldBaseMask && t4 == fieldBaseMask && t3 == fieldBaseMask && t2 == fieldBaseMask {
+		if t1 > fieldPrimeWordOne {
+			subtractP = true
+		} else if t1 == fieldPrimeWordOne {
+			if t0 >= fieldPrimeWordZero {
+				subtractP = true
+			}
+		}
 	}
-	if t1 < fieldPrimeWordOne {
-		mask |= -1
-	} else {
-		mask |= 0
+
+	if subtractP {
+
+		borrow := uint32(0)
+		if t0 < fieldPrimeWordZero {
+			t0 = (1 << fieldBase) + t0 - uint32(fieldPrimeWordZero)
+			borrow = 1
+		} else {
+			t0 = t0 - fieldPrimeWordZero
+			borrow = 0
+		}
+
+		t1 = t1 - fieldPrimeWordOne - borrow
+		t2 = 0
+		t3 = 0
+		t4 = 0
+		t5 = 0
+		t6 = 0
+		t7 = 0
+		t8 = 0
+		t9 = 0
 	}
-	if t2 < fieldBaseMask {
-		mask |= -1
-	} else {
-		mask |= 0
-	}
-	if t3 < fieldBaseMask {
-		mask |= -1
-	} else {
-		mask |= 0
-	}
-	if t4 < fieldBaseMask {
-		mask |= -1
-	} else {
-		mask |= 0
-	}
-	if t5 < fieldBaseMask {
-		mask |= -1
-	} else {
-		mask |= 0
-	}
-	if t6 < fieldBaseMask {
-		mask |= -1
-	} else {
-		mask |= 0
-	}
-	if t7 < fieldBaseMask {
-		mask |= -1
-	} else {
-		mask |= 0
-	}
-	if t8 < fieldBaseMask {
-		mask |= -1
-	} else {
-		mask |= 0
-	}
-	if t9 < fieldMSBMask {
-		mask |= -1
-	} else {
-		mask |= 0
-	}
-	t0 = t0 - uint32(^mask&fieldPrimeWordZero)
-	t1 = t1 - uint32(^mask&fieldPrimeWordOne)
-	t2 = t2 & uint32(mask)
-	t3 = t3 & uint32(mask)
-	t4 = t4 & uint32(mask)
-	t5 = t5 & uint32(mask)
-	t6 = t6 & uint32(mask)
-	t7 = t7 & uint32(mask)
-	t8 = t8 & uint32(mask)
-	t9 = t9 & uint32(mask)
 
 	// Finally, set the normalized and reduced words.
 	f.n[0] = t0
