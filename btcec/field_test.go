@@ -493,6 +493,8 @@ func TestAdd2(t *testing.T) {
 		{"fffffffffffffffffffffffffffffffffffffffffffffffffffffffefffffc2e", "1", "0"},
 		// secp256k1 prime + 1
 		{"fffffffffffffffffffffffffffffffffffffffffffffffffffffffefffffc2f", "1", "1"},
+		// close but over the secp256k1 prime
+		{"fffffffffffffffffffffffffffffffffffffffffffffffffffffff000000000", "f1ffff000", "1ffff3d1"},
 		// Random samples.
 		{
 			"ad82b8d1cc136e23e9fd77fe2c7db1fe5a2ecbfcbde59ab3529758334f862d28",
@@ -605,6 +607,12 @@ func TestMul(t *testing.T) {
 		{"1", "0", "0"},
 		{"0", "1", "0"},
 		{"1", "1", "1"},
+		// slightly over prime
+		{
+			"ffffffffffffffffffffffffffffffffffffffffffffffffffffffff1ffff",
+			"1000",
+			"1ffff3d1",
+		},
 		// secp256k1 prime-1 * 2
 		{
 			"fffffffffffffffffffffffffffffffffffffffffffffffffffffffefffffc2e",
