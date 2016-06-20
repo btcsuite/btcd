@@ -1,5 +1,5 @@
-// Copyright (c) 2013-2014 The btcsuite developers
-// Copyright (c) 2013-2014 Dave Collins
+// Copyright (c) 2013-2016 The btcsuite developers
+// Copyright (c) 2013-2016 Dave Collins
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -94,14 +94,16 @@ const (
 	fieldMSBMask = (1 << fieldMSBBits) - 1
 
 	// fieldPrimeWordZero is word zero of the secp256k1 prime in the
-	// internal field representation.  It is used during modular reduction
-	// and negation.
+	// internal field representation.  It is used during negation.
 	fieldPrimeWordZero = 0x3fffc2f
 
 	// fieldPrimeWordOne is word one of the secp256k1 prime in the
-	// internal field representation.  It is used during modular reduction
-	// and negation.
+	// internal field representation.  It is used during negation.
 	fieldPrimeWordOne = 0x3ffffbf
+
+	// primeLowBits is the lower 2*fieldBase bits of the secp256k1 prime in
+	// its standard normalized form.  It is used during modular reduction.
+	primeLowBits = 0xffffefffffc2f
 )
 
 // fieldVal implements optimized fixed-precision arithmetic over the
@@ -331,12 +333,8 @@ func (f *fieldVal) Normalize() *fieldVal {
 	// zero even though it won't change the value to ensure constant time
 	// between the branches.
 	var mask int32
-	if t0 < fieldPrimeWordZero {
-		mask |= -1
-	} else {
-		mask |= 0
-	}
-	if t1 < fieldPrimeWordOne {
+	lowBits := uint64(t1)<<fieldBase | uint64(t0)
+	if lowBits < primeLowBits {
 		mask |= -1
 	} else {
 		mask |= 0
@@ -381,8 +379,9 @@ func (f *fieldVal) Normalize() *fieldVal {
 	} else {
 		mask |= 0
 	}
-	t0 = t0 - uint32(^mask&fieldPrimeWordZero)
-	t1 = t1 - uint32(^mask&fieldPrimeWordOne)
+	lowBits -= ^uint64(mask) & primeLowBits
+	t0 = uint32(lowBits & fieldBaseMask)
+	t1 = uint32((lowBits >> fieldBase) & fieldBaseMask)
 	t2 = t2 & uint32(mask)
 	t3 = t3 & uint32(mask)
 	t4 = t4 & uint32(mask)
