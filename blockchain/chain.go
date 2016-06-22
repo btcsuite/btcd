@@ -511,6 +511,51 @@ func (b *BlockChain) getPrevNodeFromNode(node *blockNode) (*blockNode, error) {
 	return prevBlockNode, err
 }
 
+// relativeNode returns the ancestor block a relative 'distance' blocks before
+// the passed anchor block. While iterating backwards through the chain, any
+// block nodes which aren't in the memory chain are loaded in dynamically.
+//
+// This function MUST be called with the chain state lock held (for writes).
+func (b *BlockChain) relativeNode(anchor *blockNode, distance uint32) (*blockNode, error) {
+	var err error
+	iterNode := anchor
+
+	err = b.db.View(func(dbTx database.Tx) error {
+		// Walk backwards in the chian until we've gone 'distance'
+		// steps back.
+		for i := distance; i > 0; i-- {
+			switch {
+			// If the parent of this node has already been loaded
+			// into memory, then we can follow the link without
+			// hitting the database.
+			case iterNode.parent != nil:
+				iterNode = iterNode.parent
+
+			// If this node is the genesis block, then we can't go
+			// back any further, so we exit immediately.
+			case iterNode.hash.IsEqual(b.chainParams.GenesisHash):
+				return nil
+
+			// Otherwise, load the block node from the database,
+			// pulling it into the memory cache in the processes.
+			default:
+				iterNode, err = b.loadBlockNode(dbTx,
+					iterNode.parentHash)
+				if err != nil {
+					return err
+				}
+			}
+		}
+
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return iterNode, nil
+}
+
 // removeBlockNode removes the passed block node from the memory chain by
 // unlinking all of its children and removing it from the the node and
 // dependency indices.
@@ -543,52 +588,6 @@ func (b *BlockChain) removeBlockNode(node *blockNode) error {
 		// longer any nodes which depend on the parent hash.
 		if len(b.depNodes[*prevHash]) == 0 {
 			delete(b.depNodes, *prevHash)
-		}
-	}
-
-	return nil
-}
-
-// pruneBlockNodes removes references to old block nodes which are no longer
-// needed so they may be garbage collected.  In order to validate block rules
-// and choose the best chain, only a portion of the nodes which form the block
-// chain are needed in memory.  This function walks the chain backwards from the
-// current best chain to find any nodes before the first needed block node.
-//
-// This function MUST be called with the chain state lock held (for writes).
-func (b *BlockChain) pruneBlockNodes() error {
-	// Walk the chain backwards to find what should be the new root node.
-	// Intentionally use node.parent instead of getPrevNodeFromNode since
-	// the latter loads the node and the goal is to find nodes still in
-	// memory that can be pruned.
-	newRootNode := b.bestNode
-	for i := int32(0); i < b.minMemoryNodes-1 && newRootNode != nil; i++ {
-		newRootNode = newRootNode.parent
-	}
-
-	// Nothing to do if there are not enough nodes.
-	if newRootNode == nil || newRootNode.parent == nil {
-		return nil
-	}
-
-	// Push the nodes to delete on a list in reverse order since it's easier
-	// to prune them going forwards than it is backwards.  This will
-	// typically end up being a single node since pruning is currently done
-	// just before each new node is created.  However, that might be tuned
-	// later to only prune at intervals, so the code needs to account for
-	// the possibility of multiple nodes.
-	deleteNodes := list.New()
-	for node := newRootNode.parent; node != nil; node = node.parent {
-		deleteNodes.PushFront(node)
-	}
-
-	// Loop through each node to prune, unlink its children, remove it from
-	// the dependency index, and remove it from the node index.
-	for e := deleteNodes.Front(); e != nil; e = e.Next() {
-		node := e.Value.(*blockNode)
-		err := b.removeBlockNode(node)
-		if err != nil {
-			return err
 		}
 	}
 
@@ -677,6 +676,156 @@ func (b *BlockChain) calcPastMedianTime(startNode *blockNode) (time.Time, error)
 	// changed to an even number, this code will be wrong.
 	medianTimestamp := timestamps[numNodes/2]
 	return medianTimestamp, nil
+}
+
+// CalcPastMedianTime calculates the median time of the previous few blocks
+// prior to, and including, the end of the current best chain.  It is primarily
+// used to ensure new blocks have sane timestamps.
+//
+// This function is safe for concurrent access.
+func (b *BlockChain) CalcPastMedianTime() (time.Time, error) {
+	b.chainLock.Lock()
+	defer b.chainLock.Unlock()
+
+	return b.calcPastMedianTime(b.bestNode)
+}
+
+// SequenceLock represents the converted relative lock-time in seconds, and
+// absolute block-height for a transaction input's relative lock-times.
+// According to SequenceLock, after the referenced input has been confirmed
+// within a block, a transaction spending that input can be included into a
+// block either after 'seconds' (according to past median time), or once the
+// 'BlockHeight' has been reached.
+type SequenceLock struct {
+	Seconds     int64
+	BlockHeight int32
+}
+
+// CalcSequenceLock computes a relative lock-time SequenceLock for the passed
+// transaction using the passed UtxoViewpoint to obtain the past median time
+// for blocks in which the referenced inputs of the transactions were included
+// within. The generated SequenceLock lock can be used in conjunction with a
+// block height, and adjusted median block time to determine if all the inputs
+// referenced within a transaction have reached sufficient maturity allowing
+// the candidate transaction to be included in a block.
+//
+// This function is safe for concurrent access.
+func (b *BlockChain) CalcSequenceLock(tx *btcutil.Tx, utxoView *UtxoViewpoint,
+	mempool bool) (*SequenceLock, error) {
+
+	b.chainLock.Lock()
+	defer b.chainLock.Unlock()
+
+	return b.calcSequenceLock(tx, utxoView, mempool)
+}
+
+// calcSequenceLock computes the relative lock-times for the passed
+// transaction. See the exported version, CalcSequenceLock for further details.
+//
+// This function MUST be called with the chain state lock held (for writes).
+func (b *BlockChain) calcSequenceLock(tx *btcutil.Tx, utxoView *UtxoViewpoint,
+	mempool bool) (*SequenceLock, error) {
+
+	mTx := tx.MsgTx()
+
+	// A value of -1 for each relative lock type represents a relative time
+	// lock value that will allow a transaction to be included in a block
+	// at any given height or time. This value is returned as the relative
+	// lock time in the case that BIP 68 is disabled, or has not yet been
+	// activated.
+	sequenceLock := &SequenceLock{Seconds: -1, BlockHeight: -1}
+
+	// If the transaction's version is less than 2, and BIP 68 has not yet
+	// been activated then sequence locks are disabled. Additionally,
+	// sequence locks don't apply to coinbase transactions Therefore, we
+	// return sequence lock values of -1 indicating that this transaction
+	// can be included within a block at any given height or time.
+	// TODO(roasbeef): check version bits state or pass as param
+	// * true should be replaced with a version bits state check
+	sequenceLockActive := mTx.Version >= 2 && (mempool || true)
+	if !sequenceLockActive || IsCoinBase(tx) {
+		return sequenceLock, nil
+	}
+
+	// Grab the next height to use for inputs present in the mempool.
+	nextHeight := b.BestSnapshot().Height + 1
+
+	for txInIndex, txIn := range mTx.TxIn {
+		utxo := utxoView.LookupEntry(&txIn.PreviousOutPoint.Hash)
+		if utxo == nil {
+			str := fmt.Sprintf("unable to find unspent output "+
+				"%v referenced from transaction %s:%d",
+				txIn.PreviousOutPoint, tx.Hash(), txInIndex)
+			return sequenceLock, ruleError(ErrMissingTx, str)
+		}
+
+		// If the input height is set to the mempool height, then we
+		// assume the transaction makes it into the next block when
+		// evaluating its sequence blocks.
+		inputHeight := utxo.BlockHeight()
+		if inputHeight == 0x7fffffff {
+			inputHeight = nextHeight
+		}
+
+		// Given a sequence number, we apply the relative time lock
+		// mask in order to obtain the time lock delta required before
+		// this input can be spent.
+		sequenceNum := txIn.Sequence
+		relativeLock := int64(sequenceNum & wire.SequenceLockTimeMask)
+
+		switch {
+		// Relative time locks are disabled for this input, so we can
+		// skip any further calculation.
+		case sequenceNum&wire.SequenceLockTimeDisabled == wire.SequenceLockTimeDisabled:
+			continue
+		case sequenceNum&wire.SequenceLockTimeIsSeconds == wire.SequenceLockTimeIsSeconds:
+			// This input requires a relative time lock expressed
+			// in seconds before it can be spent. Therefore, we
+			// need to query for the block prior to the one in
+			// which this input was included within so we can
+			// compute the past median time for the block prior to
+			// the one which included this referenced output.
+			// TODO: caching should be added to keep this speedy
+			inputDepth := uint32(b.bestNode.height-inputHeight) + 1
+			blockNode, err := b.relativeNode(b.bestNode, inputDepth)
+			if err != nil {
+				return sequenceLock, err
+			}
+
+			// With all the necessary block headers loaded into
+			// memory, we can now finally calculate the MTP of the
+			// block prior to the one which included the output
+			// being spent.
+			medianTime, err := b.calcPastMedianTime(blockNode)
+			if err != nil {
+				return sequenceLock, err
+			}
+
+			// Time based relative time-locks as defined by BIP 68
+			// have a time granularity of RelativeLockSeconds, so
+			// we shift left by this amount to convert to the
+			// proper relative time-lock. We also subtract one from
+			// the relative lock to maintain the original lockTime
+			// semantics.
+			timeLockSeconds := (relativeLock << wire.SequenceLockTimeGranularity) - 1
+			timeLock := medianTime.Unix() + timeLockSeconds
+			if timeLock > sequenceLock.Seconds {
+				sequenceLock.Seconds = timeLock
+			}
+		default:
+			// The relative lock-time for this input is expressed
+			// in blocks so we calculate the relative offset from
+			// the input's height as its converted absolute
+			// lock-time. We subtract one from the relative lock in
+			// order to maintain the original lockTime semantics.
+			blockHeight := inputHeight + int32(relativeLock-1)
+			if blockHeight > sequenceLock.BlockHeight {
+				sequenceLock.BlockHeight = blockHeight
+			}
+		}
+	}
+
+	return sequenceLock, nil
 }
 
 // getReorganizeNodes finds the fork point between the main chain and the passed

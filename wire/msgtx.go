@@ -39,6 +39,13 @@ const (
 	// when masked against the transaction input sequence number.
 	SequenceLockTimeMask = 0x0000ffff
 
+	// SequenceLockTimeGranularity is the defined time based granularity
+	// for seconds-based relative time locks. When converting from seconds
+	// to a sequence number, the value is right shifted by this amount,
+	// therefore the granularity of relative time locks in 512 or 2^9
+	// seconds. Enforced relative lock times are multiples of 512 seconds.
+	SequenceLockTimeGranularity = 9
+
 	// defaultTxInOutAlloc is the default size used for the backing array for
 	// transaction inputs and outputs.  The array will dynamically grow as needed,
 	// but this figure is intended to provide enough space for the number of
