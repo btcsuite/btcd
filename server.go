@@ -1670,7 +1670,6 @@ func (s *server) establishConn(sp *serverPeer) error {
 		return err
 	}
 	sp.Connect(conn)
-	srvrLog.Debugf("Connected to %s", sp.Addr())
 	s.addrManager.Attempt(sp.NA())
 	return nil
 }

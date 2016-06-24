@@ -1932,6 +1932,7 @@ func (p *Peer) start() error {
 	case <-time.After(negotiateTimeout):
 		return errors.New("protocol negotiation timeout")
 	}
+	log.Debugf("Connected to %s", p.Addr())
 
 	// The protocol has been negotiated successfully so start processing input
 	// and output messages.
