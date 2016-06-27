@@ -412,20 +412,19 @@ func loadConfig() (*config, []string, error) {
 	}
 
 	// Load additional config from file.
-	var configFileError error
 	parser := newConfigParser(&cfg, &serviceOpts, flags.Default)
 	if !(preCfg.SimNet) || preCfg.ConfigFile !=
 		defaultConfigFile {
 
 		err := flags.NewIniParser(parser).ParseFile(preCfg.ConfigFile)
 		if err != nil {
-			if _, ok := err.(*os.PathError); !ok {
-				fmt.Fprintf(os.Stderr, "Error parsing config "+
-					"file: %v\n", err)
+			_, ok := err.(*os.PathError)
+			if !ok || preCfg.ConfigFile != defaultConfigFile {
+				fmt.Fprintf(os.Stderr, "Error parsing config file: %v\n",
+					err)
 				fmt.Fprintln(os.Stderr, usageMessage)
 				return nil, nil, err
 			}
-			configFileError = err
 		}
 	}
 
@@ -866,13 +865,6 @@ func loadConfig() (*config, []string, error) {
 		cfg.onionlookup = func(a string) ([]net.IP, error) {
 			return nil, errors.New("tor has been disabled")
 		}
-	}
-
-	// Warn about missing config file only after all other configuration is
-	// done.  This prevents the warning on help messages and invalid
-	// options.  Note this should go directly before the return.
-	if configFileError != nil {
-		dcrdLog.Warnf("%v", configFileError)
 	}
 
 	return &cfg, remainingArgs, nil

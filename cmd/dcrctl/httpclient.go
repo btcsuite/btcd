@@ -44,7 +44,10 @@ func newHTTPClient(cfg *config) (*http.Client, error) {
 		}
 
 		pool := x509.NewCertPool()
-		pool.AppendCertsFromPEM(pem)
+		if ok := pool.AppendCertsFromPEM(pem); !ok {
+			return nil, fmt.Errorf("invalid certificate file: %v",
+				cfg.RPCCert)
+		}
 		tlsConfig = &tls.Config{
 			RootCAs:            pool,
 			InsecureSkipVerify: cfg.TLSSkipVerify,
