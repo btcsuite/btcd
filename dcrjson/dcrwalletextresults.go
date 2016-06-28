@@ -31,6 +31,7 @@ type GetMultisigOutInfoResult struct {
 // GetStakeInfoResult models the data returned from the getstakeinfo
 // command.
 type GetStakeInfoResult struct {
+	BlockHeight      int64   `json:"blockheight"`
 	PoolSize         uint32  `json:"poolsize"`
 	Difficulty       float64 `json:"difficulty"`
 	AllMempoolTix    uint32  `json:"allmempooltix"`
