@@ -313,7 +313,7 @@ func NewBlock(msgBlock *wire.MsgBlock) *Block {
 	return &Block{
 		hash:        msgBlock.BlockSha(),
 		msgBlock:    msgBlock,
-		blockHeight: BlockHeightUnknown,
+		blockHeight: int64(msgBlock.Header.Height),
 	}
 }
 
@@ -390,6 +390,7 @@ func NewBlockFromBytes(serializedBlock []byte) (*Block, error) {
 		return nil, err
 	}
 	b.serializedBlock = serializedBlock
+	b.SetHeight(int64(b.msgBlock.Header.Height))
 	return b, nil
 }
 
@@ -406,7 +407,7 @@ func NewBlockFromReader(r io.Reader) (*Block, error) {
 	b := Block{
 		hash:        msgBlock.BlockSha(),
 		msgBlock:    &msgBlock,
-		blockHeight: BlockHeightUnknown,
+		blockHeight: int64(msgBlock.Header.Height),
 	}
 	return &b, nil
 }
@@ -418,6 +419,6 @@ func NewBlockFromBlockAndBytes(msgBlock *wire.MsgBlock, serializedBlock []byte) 
 		hash:            msgBlock.BlockSha(),
 		msgBlock:        msgBlock,
 		serializedBlock: serializedBlock,
-		blockHeight:     BlockHeightUnknown,
+		blockHeight:     int64(msgBlock.Header.Height),
 	}
 }
