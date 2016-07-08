@@ -14,7 +14,7 @@ import (
 	"golang.org/x/crypto/ssh/terminal"
 )
 
-func execute(quit chan bool, protected *bool, cfg *config, line string) {
+func execute(quit chan bool, protected *bool, cfg *config, line string, clear *bool) {
 	switch line {
 	case "h":
 		fallthrough
@@ -22,6 +22,7 @@ func execute(quit chan bool, protected *bool, cfg *config, line string) {
 		fmt.Printf("[h]elp          print this message\n")
 		fmt.Printf("[l]ist          list all available commands\n")
 		fmt.Printf("[p]rotect       toggle protected mode (for passwords)\n")
+		fmt.Printf("[c]lear         clear command history\n")
 		fmt.Printf("[q]uit/ctrl+d   exit\n")
 		fmt.Printf("Enter commands with arguments to execute them.\n")
 	case "l":
@@ -41,6 +42,10 @@ func execute(quit chan bool, protected *bool, cfg *config, line string) {
 		}
 		*protected = true
 		return
+	case "c":
+		fallthrough
+	case "clear":
+		*clear = true
 	default:
 		args := strings.Split(line, " ")
 
@@ -170,6 +175,7 @@ func startTerminal(c *config) {
 	done := make(chan bool)
 	initState, err := terminal.GetState(0)
 	protected := false
+	clear := false
 	if err != nil {
 		fmt.Printf("error getting terminal state: %v\n", err.Error())
 		return
@@ -192,7 +198,13 @@ func startTerminal(c *config) {
 					done <- true
 				}
 			}
-			execute(done, &protected, c, ln)
+			execute(done, &protected, c, ln, &clear)
+			if clear {
+				fmt.Println("Clearing history...")
+				terminal.MakeRaw(int(os.Stdin.Fd()))
+				n = terminal.NewTerminal(os.Stdin, "> ")
+				clear = false
+			}
 		}
 	}()
 	select {
