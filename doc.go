@@ -78,6 +78,11 @@ Application Options:
       --profile=            Enable HTTP profiling on given port -- NOTE port
                             must be between 1024 and 65536
       --cpuprofile=         Write CPU profile to the specified file
+      --memprofile=         Write mem profile to the specified file
+      --dumpblockchain=     Write blockchain as a gob-encoded map to the
+                            specified file
+      --miningtimeoffset=   Offset the mining timestamp of a block by this many
+                            seconds (positive values are in the past)
   -d, --debuglevel=         Logging level for all subsystems {trace, debug,
                             info, warn, error, critical} -- You may also specify
                             <subsystem>=<level>,<subsystem2>=<level>,... to set
@@ -109,6 +114,11 @@ Application Options:
                             only supported by leveldb.
       --dropaddrindex       Deletes the address-based transaction index from the
                             database on start up, and the exits.
+      --nonaggressive       Disable mining off of the parent block of the blockchain
+                            if there aren't enough voters
+      --nominingstatesync   Disable synchronizing the mining state with other nodes
+      --allowoldvotes       Enable the addition of very old votes to the mempool
+
       --nopeerbloomfilters  Disable bloom filtering support.
       --sigcachemaxsize=    The maximum number of entries in the signature
                             verification cache.
