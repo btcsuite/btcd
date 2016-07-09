@@ -50,11 +50,11 @@ type KoblitzCurve struct {
 	// optimizations in ScalarMult.
 
 	// lambda must fulfill lambda^3 = 1 mod N where N is the order of G.
-	lambda *big.Int
+	Lambda *big.Int
 
 	// beta must fulfill beta^3 = 1 mod P where P is the prime field of the
 	// curve.
-	beta *fieldVal
+	Beta *fieldVal
 
 	// See the EndomorphismVectors in gensecp256k1.go to see how these are
 	// derived.
@@ -479,6 +479,7 @@ func (curve *KoblitzCurve) Add(x1, y1, x2, y2 *big.Int) (*big.Int, *big.Int) {
 // performs faster point doubling than the generic routine since less arithmetic
 // is needed due to the ability to avoid multiplication by the z value.
 func (curve *KoblitzCurve) doubleZ1EqualsOne(x1, y1, x3, y3, z3 *fieldVal) {
+
 	// This function uses the assumptions that z1 is 1, thus the point
 	// doubling formulas reduce to:
 	//
@@ -515,8 +516,10 @@ func (curve *KoblitzCurve) doubleZ1EqualsOne(x1, y1, x3, y3, z3 *fieldVal) {
 	x3.Set(&d).MulInt(2).Negate(16)          // X3 = -(2*D) (mag: 17)
 	x3.Add(&f)                               // X3 = F+X3 (mag: 18)
 	f.Set(x3).Negate(18).Add(&d).Normalize() // F = D-X3 (mag: 1)
-	y3.Set(&c).MulInt(8).Negate(8)           // Y3 = -(8*C) (mag: 9)
-	y3.Add(f.Mul(&e))                        // Y3 = E*F+Y3 (mag: 10)
+
+	y3.Set(&c).MulInt(8).Negate(8).Normalize() // Y3 = -(8*C) (mag: 9)
+	f.Mul(&e).Normalize()                      // F = F*E
+	y3.Add(&f)                                 // Y3 = E*F+Y3 (mag: 10)
 
 	// Normalize the field values back to a magnitude of 1.
 	x3.Normalize()
@@ -564,8 +567,10 @@ func (curve *KoblitzCurve) doubleGeneric(x1, y1, z1, x3, y3, z3 *fieldVal) {
 	x3.Set(&d).MulInt(2).Negate(16)          // X3 = -(2*D) (mag: 17)
 	x3.Add(&f)                               // X3 = F+X3 (mag: 18)
 	f.Set(x3).Negate(18).Add(&d).Normalize() // F = D-X3 (mag: 1)
-	y3.Set(&c).MulInt(8).Negate(8)           // Y3 = -(8*C) (mag: 9)
-	y3.Add(f.Mul(&e))                        // Y3 = E*F+Y3 (mag: 10)
+
+	y3.Set(&c).MulInt(8).Negate(8).Normalize() // Y3 = -(8*C) (mag: 9)
+	f.Mul(&e).Normalize()                      // F = E*F
+	y3.Add(&f)                                 // Y3 = F+Y3 (mag: 10)
 
 	// Normalize the field values back to a magnitude of 1.
 	x3.Normalize()
@@ -747,9 +752,9 @@ func NAF(k []byte) ([]byte, []byte) {
 	}
 	if carry {
 		retPos[0] = 1
+		return retPos, retNeg
 	}
-
-	return retPos, retNeg
+	return retPos[1:], retNeg[1:]
 }
 
 // ScalarMult returns k*(Bx, By) where k is a big endian integer.
@@ -772,7 +777,7 @@ func (curve *KoblitzCurve) ScalarMult(Bx, By *big.Int, k []byte) (*big.Int, *big
 
 	// NOTE: ϕ(x,y) = (βx,y).  The Jacobian z coordinate is 1, so this math
 	// goes through.
-	p2x := new(fieldVal).Mul2(p1x, curve.beta)
+	p2x := new(fieldVal).Mul2(p1x, curve.Beta)
 	p2y := new(fieldVal).Set(p1y)
 	p2yNeg := new(fieldVal).NegateVal(p2y, 1)
 	p2z := new(fieldVal).SetInt(1)
@@ -829,7 +834,6 @@ func (curve *KoblitzCurve) ScalarMult(Bx, By *big.Int, k []byte) (*big.Int, *big
 		for j := 7; j >= 0; j-- {
 			// Q = 2 * Q
 			curve.doubleJacobian(qx, qy, qz, qx, qy, qz)
-
 			if k1BytePos&0x80 == 0x80 {
 				curve.addJacobian(qx, qy, qz, p1x, p1y, p1z,
 					qx, qy, qz)
@@ -932,8 +936,8 @@ func initS256() {
 	//
 	// They have also been independently derived from the code in the
 	// EndomorphismVectors function in gensecp256k1.go.
-	secp256k1.lambda = fromHex("5363AD4CC05C30E0A5261C028812645A122E22EA20816678DF02967C1B23BD72")
-	secp256k1.beta = new(fieldVal).SetHex("7AE96A2B657C07106E64479EAC3434E99CF0497512F58995C1396C28719501EE")
+	secp256k1.Lambda = fromHex("5363AD4CC05C30E0A5261C028812645A122E22EA20816678DF02967C1B23BD72")
+	secp256k1.Beta = new(fieldVal).SetHex("7AE96A2B657C07106E64479EAC3434E99CF0497512F58995C1396C28719501EE")
 	secp256k1.a1 = fromHex("3086D221A7D46BCDE86C90E49284EB15")
 	secp256k1.b1 = fromHex("-E4437ED6010E88286F547FA90ABFE4C3")
 	secp256k1.a2 = fromHex("114CA50F7A8E2F3F657C1108D9D44CFD8")
