@@ -125,7 +125,7 @@ func (b *BlockChain) processOrphans(hash *wire.ShaHash, flags BehaviorFlags) err
 // when the error is nil.
 //
 // This function is safe for concurrent access.
-func (b *BlockChain) ProcessBlock(block *btcutil.Block, timeSource MedianTimeSource, flags BehaviorFlags) (bool, error) {
+func (b *BlockChain) ProcessBlock(block *btcutil.Block, flags BehaviorFlags) (bool, error) {
 	b.chainLock.Lock()
 	defer b.chainLock.Unlock()
 
@@ -152,7 +152,7 @@ func (b *BlockChain) ProcessBlock(block *btcutil.Block, timeSource MedianTimeSou
 	}
 
 	// Perform preliminary sanity checks on the block and its transactions.
-	err = checkBlockSanity(block, b.chainParams.PowLimit, timeSource, flags)
+	err = checkBlockSanity(block, b.chainParams.PowLimit, b.timeSource, flags)
 	if err != nil {
 		return false, err
 	}

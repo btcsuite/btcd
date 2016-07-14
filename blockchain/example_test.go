@@ -41,27 +41,25 @@ func ExampleBlockChain_ProcessBlock() {
 	// Create a new BlockChain instance using the underlying database for
 	// the main bitcoin network.  This example does not demonstrate some
 	// of the other available configuration options such as specifying a
-	// notification callback and signature cache.
+	// notification callback and signature cache.  Also, the caller would
+	// ordinarily keep a reference to the median time source and add time
+	// values obtained from other peers on the network so the local time is
+	// adjusted to be in agreement with other peers.
 	chain, err := blockchain.New(&blockchain.Config{
 		DB:          db,
 		ChainParams: &chaincfg.MainNetParams,
+		TimeSource:  blockchain.NewMedianTime(),
 	})
 	if err != nil {
 		fmt.Printf("Failed to create chain instance: %v\n", err)
 		return
 	}
 
-	// Create a new median time source that is required by the upcoming
-	// call to ProcessBlock.  Ordinarily this would also add time values
-	// obtained from other peers on the network so the local time is
-	// adjusted to be in agreement with other peers.
-	timeSource := blockchain.NewMedianTime()
-
 	// Process a block.  For this example, we are going to intentionally
 	// cause an error by trying to process the genesis block which already
 	// exists.
 	genesisBlock := btcutil.NewBlock(chaincfg.MainNetParams.GenesisBlock)
-	isOrphan, err := chain.ProcessBlock(genesisBlock, timeSource, blockchain.BFNone)
+	isOrphan, err := chain.ProcessBlock(genesisBlock, blockchain.BFNone)
 	if err != nil {
 		fmt.Printf("Failed to process block: %v\n", err)
 		return

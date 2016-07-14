@@ -110,6 +110,7 @@ func chainSetup(dbName string) (*blockchain.BlockChain, func(), error) {
 	chain, err := blockchain.New(&blockchain.Config{
 		DB:          db,
 		ChainParams: &chaincfg.MainNetParams,
+		TimeSource:  blockchain.NewMedianTime(),
 	})
 	if err != nil {
 		teardown()

@@ -164,6 +164,7 @@ type BlockChain struct {
 	checkpointsByHeight map[int32]*chaincfg.Checkpoint
 	db                  database.DB
 	chainParams         *chaincfg.Params
+	timeSource          MedianTimeSource
 	notifications       NotificationCallback
 	sigCache            *txscript.SigCache
 	indexManager        IndexManager
@@ -1331,7 +1332,7 @@ func (b *BlockChain) connectBestChain(node *blockNode, block *btcutil.Block, fla
 //  - Latest block has a timestamp newer than 24 hours ago
 //
 // This function is safe for concurrent access.
-func (b *BlockChain) IsCurrent(timeSource MedianTimeSource) bool {
+func (b *BlockChain) IsCurrent() bool {
 	b.chainLock.RLock()
 	defer b.chainLock.RUnlock()
 
@@ -1344,7 +1345,7 @@ func (b *BlockChain) IsCurrent(timeSource MedianTimeSource) bool {
 
 	// Not current if the latest best block has a timestamp before 24 hours
 	// ago.
-	minus24Hours := timeSource.AdjustedTime().Add(-24 * time.Hour)
+	minus24Hours := b.timeSource.AdjustedTime().Add(-24 * time.Hour)
 	if b.bestNode.timestamp.Before(minus24Hours) {
 		return false
 	}
@@ -1397,6 +1398,14 @@ type Config struct {
 	// This field is required.
 	ChainParams *chaincfg.Params
 
+	// TimeSource defines the median time source to use for things such as
+	// block processing and determining whether or not the chain is current.
+	//
+	// The caller is expected to keep a reference to the time source as well
+	// and add time samples from other peers on the network so the local
+	// time is adjusted to be in agreement with other peers.
+	TimeSource MedianTimeSource
+
 	// Notifications defines a callback to which notifications will be sent
 	// when various events take place.  See the documentation for
 	// Notification and NotificationType for details on the types and
@@ -1448,6 +1457,7 @@ func New(config *Config) (*BlockChain, error) {
 		checkpointsByHeight: checkpointsByHeight,
 		db:                  config.DB,
 		chainParams:         params,
+		timeSource:          config.TimeSource,
 		notifications:       config.Notifications,
 		sigCache:            config.SigCache,
 		indexManager:        config.IndexManager,
