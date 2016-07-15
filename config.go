@@ -6,8 +6,12 @@
 package main
 
 import (
+	"bufio"
+	"crypto/rand"
+	"encoding/base64"
 	"errors"
 	"fmt"
+	"io"
 	"net"
 	"os"
 	"path/filepath"
@@ -415,6 +419,13 @@ func loadConfig() (*config, []string, error) {
 	parser := newConfigParser(&cfg, &serviceOpts, flags.Default)
 	if !(preCfg.SimNet) || preCfg.ConfigFile !=
 		defaultConfigFile {
+
+		if _, err := os.Stat(preCfg.ConfigFile); os.IsNotExist(err) {
+			err := createDefaultConfigFile(preCfg.ConfigFile)
+			if err != nil {
+				dcrdLog.Warnf("Error creating a default config file: %v", err)
+			}
+		}
 
 		err := flags.NewIniParser(parser).ParseFile(preCfg.ConfigFile)
 		if err != nil {
@@ -868,6 +879,67 @@ func loadConfig() (*config, []string, error) {
 	}
 
 	return &cfg, remainingArgs, nil
+}
+
+// createDefaultConfig copies the file sample-dcrd.conf to the given destination
+// path, and populates it with some randomly generated RPC username and
+// password.
+func createDefaultConfigFile(destinationPath string) error {
+	// Create the destination directory if it does not exists
+	os.MkdirAll(filepath.Dir(destinationPath), 0700)
+
+	// We get the sample config file path, which is in the same directory as this file.
+	_, path, _, _ := runtime.Caller(0)
+	sampleConfigPath := filepath.Join(filepath.Dir(path), "sample-dcrd.conf")
+
+	// We generate a random user and password
+	randomBytes := make([]byte, 20)
+	_, err := rand.Read(randomBytes)
+	if err != nil {
+		return err
+	}
+	generatedRPCUser := base64.StdEncoding.EncodeToString(randomBytes)
+
+	_, err = rand.Read(randomBytes)
+	if err != nil {
+		return err
+	}
+	generatedRPCPass := base64.StdEncoding.EncodeToString(randomBytes)
+
+	src, err := os.Open(sampleConfigPath)
+	if err != nil {
+		return err
+	}
+	defer src.Close()
+
+	dest, err := os.OpenFile(destinationPath, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0700)
+	if err != nil {
+		return err
+	}
+	defer dest.Close()
+
+	// We copy every line from the sample config file to the destination,
+	// only replacing the two lines for rpcuser and rpcpass
+	reader := bufio.NewReader(src)
+	for err != io.EOF {
+		var line string
+		line, err = reader.ReadString('\n')
+		if err != nil && err != io.EOF {
+			return err
+		}
+
+		if strings.Contains(line, "rpcuser=") {
+			line = "rpcuser=" + string(generatedRPCUser) + "\n"
+		} else if strings.Contains(line, "rpcpass=") {
+			line = "rpcpass=" + string(generatedRPCPass) + "\n"
+		}
+
+		if _, err := dest.WriteString(line); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 // dcrdDial connects to the address on the named network using the appropriate

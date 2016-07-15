@@ -7,9 +7,11 @@ package main
 
 import (
 	"fmt"
+	"io/ioutil"
 	"net"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 
 	"github.com/decred/dcrd/dcrjson"
@@ -211,6 +213,13 @@ func loadConfig() (*config, []string, error) {
 		os.Exit(0)
 	}
 
+	if _, err := os.Stat(preCfg.ConfigFile); os.IsNotExist(err) {
+		err := createDefaultConfigFile(preCfg.ConfigFile)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error creating a default config file: %v\n", err)
+		}
+	}
+
 	// Load additional config from file.
 	parser := flags.NewParser(&cfg, flags.Default)
 	err = flags.NewIniParser(parser).ParseFile(preCfg.ConfigFile)
@@ -264,4 +273,57 @@ func loadConfig() (*config, []string, error) {
 		cfg.SimNet, cfg.Wallet)
 
 	return &cfg, remainingArgs, nil
+}
+
+// createDefaultConfig creates a basic config file at the given destination path.
+// For this it tries to read the dcrd config file at its default path, and extract
+// the RPC user and password from it.
+func createDefaultConfigFile(destinationPath string) error {
+	// Create the destination directory if it does not exists
+	os.MkdirAll(filepath.Dir(destinationPath), 0700)
+
+	// Read dcrd.conf from its default path
+	dcrdConfigPath := filepath.Join(dcrdHomeDir, "dcrd.conf")
+	dcrdConfigFile, err := os.Open(dcrdConfigPath)
+	if err != nil {
+		return err
+	}
+	defer dcrdConfigFile.Close()
+	content, err := ioutil.ReadAll(dcrdConfigFile)
+	if err != nil {
+		return err
+	}
+
+	// Extract the rpcuser
+	rpcUserRegexp, err := regexp.Compile(`(?m)^\s*rpcuser=([^\s]+)`)
+	if err != nil {
+		return err
+	}
+	userSubmatches := rpcUserRegexp.FindSubmatch(content)
+	if userSubmatches == nil {
+		// No user found, nothing to do
+		return nil
+	}
+
+	// Extract the rpcpass
+	rpcPassRegexp, err := regexp.Compile(`(?m)^\s*rpcpass=([^\s]+)`)
+	if err != nil {
+		return err
+	}
+	passSubmatches := rpcPassRegexp.FindSubmatch(content)
+	if passSubmatches == nil {
+		// No password found, nothing to do
+		return nil
+	}
+
+	// Create the destination file and write the rpcuser and rpcpass to it
+	dest, err := os.OpenFile(destinationPath, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0700)
+	if err != nil {
+		return err
+	}
+	defer dest.Close()
+
+	dest.WriteString(fmt.Sprintf("rpcuser=%s\nrpcpass=%s", string(userSubmatches[1]), string(passSubmatches[1])))
+
+	return nil
 }
