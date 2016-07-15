@@ -2,3 +2,4 @@ cmd/dcrd/dcrd
 cmd/dcrd/dcrctl
 *~
 *.pyc
+vendor/

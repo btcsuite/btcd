@@ -77,10 +77,39 @@ Install a newer MSI
 
 #### Linux/BSD/MacOSX/POSIX - Build from Source
 
-- Run the following command to update dcrd, all dependencies, and install it:
+- **Glide**
 
-```bash
-$ go get -u -v github.com/decred/dcrd/...
+  Glide is used to manage project dependencies and provide reproducible builds.
+  To install:
+
+  `go get -u github.com/Masterminds/glide`
+
+Unfortunately, the use of `glide` prevents a handy tool such as `go get` from
+automatically downloading, building, and installing the source in a single
+command.  Instead, the latest project and dependency sources must be first
+obtained manually with `git` and `glide`, and then `go` is used to build and
+install the project.
+
+**Getting the source**:
+
+For a first time installation, the project and dependency sources can be
+obtained manually with `git` and `glide` (create directories as needed):
+
+```
+git clone https://github.com/decred/dcrd $GOPATH/src/github.com/decred/dcrd
+cd $GOPATH/src/github.com/decred/dcrd
+glide install
+go install $(glide nv)
+```
+
+To update an existing source tree, pull the latest changes and install the
+matching dependencies:
+
+```
+cd $GOPATH/src/github.com/decred/dcrd
+git pull
+glide install
+go install $(glide nv)
 ```
 
 ## Getting Started

@@ -10,9 +10,9 @@
 set -ex
 
 # Automatic checks
-test -z "$(gofmt -l -w . | tee /dev/stderr)"
-test -z "$(goimports -l -w . | tee /dev/stderr)"
-test -z "$(golint ./... | grep -v 'ALL_CAPS\|OP_\|NewFieldVal\|RpcCommand\|RpcRawCommand\|RpcSend\|Dns' | tee /dev/stderr)"
+test -z "$(gofmt -l -w $(glide novendor) | tee /dev/stderr)"
+test -z "$(goimports -l -w $(glide novendor) | tee /dev/stderr)"
+test -z "$(golint $(glide novendor) | grep -v 'ALL_CAPS\|OP_\|NewFieldVal\|RpcCommand\|RpcRawCommand\|RpcSend\|Dns' | tee /dev/stderr)"
 test -z "$(go tool vet . 2>&1 | grep -v 'Example\|newestSha' | tee /dev/stderr)"
 env GORACE="halt_on_error=1" go test -v -race ./...
 
@@ -23,7 +23,8 @@ echo "mode: count" > profile.cov
 
 # Standard go tooling behavior is to ignore dirs with leading underscores.
 for dir in $(find . -maxdepth 10 -not -path '.' -not -path './.git*' \
-    -not -path '*/_*' -not -path './cmd*' -not -path './release*' -type d)
+    -not -path '*/_*' -not -path './cmd*' -not -path './release*' \
+    -not -path './vendor*' -type d)
 do
 if ls $dir/*.go &> /dev/null; then
   go test -covermode=count -coverprofile=$dir/profile.tmp $dir

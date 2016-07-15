@@ -1,16 +1,18 @@
 language: go
 go:
-  - 1.5.3
-  - 1.6
+  - 1.5.4
+  - 1.6.2
 sudo: false
 before_install:
   - gotools=golang.org/x/tools
+  - export GO15VENDOREXPERIMENT=1
 install:
-  - go get -d -t -v ./...
+  - go get -v github.com/Masterminds/glide
+  - glide install
+  - go install -v . ./cmd/...
   - go get -v $gotools/cmd/cover
   - go get -v github.com/bradfitz/goimports
   - go get -v github.com/golang/lint/golint
+  - go get -v github.com/davecgh/go-spew/spew
 script:
   - export PATH=$PATH:$HOME/gopath/bin
-  - go install ./...
-  - ./goclean.sh
