@@ -238,7 +238,7 @@ func (b *BlockChain) HaveBlock(hash *wire.ShaHash) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	return b.IsKnownOrphan(hash) || exists, nil
+	return exists || b.IsKnownOrphan(hash), nil
 }
 
 // IsKnownOrphan returns whether the passed hash is currently a known orphan.
