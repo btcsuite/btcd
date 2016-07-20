@@ -17,8 +17,6 @@ import (
 func execute(quit chan bool, protected *bool, cfg *config, line string, clear *bool) {
 	switch line {
 	case "h":
-		fallthrough
-	case "help":
 		fmt.Printf("[h]elp          print this message\n")
 		fmt.Printf("[l]ist          list all available commands\n")
 		fmt.Printf("[p]rotect       toggle protected mode (for passwords)\n")
