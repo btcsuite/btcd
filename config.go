@@ -57,6 +57,7 @@ const (
 	defaultMaxOrphanTransactions = 1000
 	defaultMaxOrphanTxSize       = 5000
 	defaultSigCacheMaxSize       = 50000
+	sampleConfigFilename         = "sample-dcrd.conf"
 )
 
 var (
@@ -421,7 +422,7 @@ func loadConfig() (*config, []string, error) {
 		defaultConfigFile {
 
 		if _, err := os.Stat(preCfg.ConfigFile); os.IsNotExist(err) {
-			err := createDefaultConfigFile(preCfg.ConfigFile)
+			err := createDefaultConfigFile()
 			if err != nil {
 				dcrdLog.Warnf("Error creating a default config file: %v", err)
 			}
@@ -881,20 +882,41 @@ func loadConfig() (*config, []string, error) {
 	return &cfg, remainingArgs, nil
 }
 
-// createDefaultConfig copies the file sample-dcrd.conf to the given destination
-// path, and populates it with some randomly generated RPC username and
-// password.
-func createDefaultConfigFile(destinationPath string) error {
-	// Create the destination directory if it does not exists
-	os.MkdirAll(filepath.Dir(destinationPath), 0700)
+// findSampleConfigPathWindows looks in %PROGRAMFILES% for the sample
+// configuration file. If it finds it, it returns it. Otherwise, an error
+// is returned.
+func findSampleConfigPathWindows() (string, error) {
+	winProgramFiles := os.Getenv("PROGRAMFILES")
+	winPFConfig := filepath.Join(winProgramFiles, "Decred", "Dcrd",
+		sampleConfigFilename)
+	_, err := os.Stat(winPFConfig)
+	if err == nil {
+		return winPFConfig, nil
+	}
+	if !os.IsNotExist(err) {
+		return "", err
+	}
 
-	// We get the sample config file path, which is in the same directory as this file.
-	_, path, _, _ := runtime.Caller(0)
-	sampleConfigPath := filepath.Join(filepath.Dir(path), "sample-dcrd.conf")
+	return "", errors.New("could not find sample configuration to make new " +
+		"automated configuration file from")
+}
 
-	// We generate a random user and password
+// createDefaultConfigFile copies the file sample-dcrd.conf to the given
+// destination path, and populates it with some randomly generated RPC username
+// and password. It will only do this if the operating system is Windows.
+func createDefaultConfigFile() error {
+	if runtime.GOOS != "windows" {
+		return nil
+	}
+
+	sampleConfigPath, err := findSampleConfigPathWindows()
+	if err != nil {
+		return err
+	}
+
+	// We generate a random user and password.
 	randomBytes := make([]byte, 20)
-	_, err := rand.Read(randomBytes)
+	_, err = rand.Read(randomBytes)
 	if err != nil {
 		return err
 	}
@@ -912,14 +934,16 @@ func createDefaultConfigFile(destinationPath string) error {
 	}
 	defer src.Close()
 
-	dest, err := os.OpenFile(destinationPath, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0700)
+	destinationPath := filepath.Join(dcrdHomeDir, defaultConfigFilename)
+	dest, err := os.OpenFile(destinationPath, os.O_RDWR|os.O_CREATE|os.O_TRUNC,
+		0644)
 	if err != nil {
 		return err
 	}
 	defer dest.Close()
 
 	// We copy every line from the sample config file to the destination,
-	// only replacing the two lines for rpcuser and rpcpass
+	// only replacing the two lines for rpcuser and rpcpass.
 	reader := bufio.NewReader(src)
 	for err != io.EOF {
 		var line string
