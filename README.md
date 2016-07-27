@@ -7,62 +7,25 @@ dcrd
 
 dcrd is a Decred full node implementation written in Go (golang).
 
+This acts as a chain daemon for the [Decred](https://decred.org) cryptocurrency.
+dcrd maintains the entire past transactional ledger of Decred and allows
+ relaying of transactions to other Decred nodes across the world.  To read more 
+about Decred please see the 
+[project documentation](https://docs.decred.org/#overview).
+
+Note: To send or receive funds and join Proof-of-Stake mining, you will also need
+[dcrwallet](https://github.com/decred/dcrwallet).
+
 This project is currently under active development and is in a Beta state.  It
-is extremely stable and has been in production use since October 2013.
+is extremely stable and has been in production use since February 2016.  
 
-It properly downloads, validates, and serves the block chain using the exact
-rules (including bugs) for block acceptance as Bitcoin Core.  We have taken
-great care to avoid dcrd causing a fork to the block chain.  It passes all of
-the 'official' block acceptance tests
-(https://github.com/TheBlueMatt/test-scripts) as well as all of the JSON test
-data in the Bitcoin Core code.
+It is forked from [btcd](https://github.com/btcsuite/btcd) which is a bitcoin full 
+node implementation written in Go.  btcd is a ongoing project under active 
+development.  Because dcrd is constantly synced with btcd codebase, it will 
+get the benefit of btcd's ongoing upgrades to peer and connection handling, 
+database optimization and other blockchain related technology improvements.
 
-It also relays newly mined blocks, maintains a transaction pool, and relays
-individual transactions that have not yet made it into a block.  It ensures all
-transactions admitted to the pool follow the rules required by the block chain
-and also includes the same checks which filter transactions based on
-miner requirements ("standard" transactions) as Bitcoin Core.
-
-One key difference between dcrd and Bitcoin Core is that dcrd does *NOT* include
-wallet functionality and this was a very intentional design decision.  See the
-blog entry [here](https://blog.conformal.com/dcrd-not-your-moms-bitcoin-daemon)
-for more details.  This means you can't actually make or receive payments
-directly with dcrd.  That functionality is provided by the
-[dcrwallet](https://github.com/decred/dcrwallet) and
-[Paymetheus](https://github.com/decred/Paymetheus) (Windows-only) projects
-which are both under active development.
-
-## Requirements
-
-[Go](http://golang.org) 1.5 or newer.
-
-## Installation
-
-#### Windows - MSI Available
-
-https://github.com/decred/dcrd/releases
-
-#### Linux/BSD/MacOSX/POSIX - Build from Source
-
-- Install Go according to the installation instructions here:
-  http://golang.org/doc/install
-
-- Ensure Go was installed properly and is a supported version:
-
-```bash
-$ go version
-$ go env GOROOT GOPATH
-```
-
-NOTE: The `GOROOT` and `GOPATH` above must not be the same path.  It is
-recommended that `GOPATH` is set to a directory in your home directory such as
-`~/goprojects` to avoid write permission issues.
-
-- Run the following command to obtain dcrd, all dependencies, and install it:
-
-```bash
-$ go get -u github.com/decred/dcrd/...
-```
+## Getting Started
 
 - dcrd (and utilities) will now be installed in either ```$GOROOT/bin``` or
   ```$GOPATH/bin``` depending on your configuration.  If you did not already
@@ -112,27 +75,17 @@ glide install
 go install $(glide nv)
 ```
 
-## Getting Started
+For more information about decred and how to set up your software please go to
+our docs page at [docs.decred.org](https://docs.decred.org/getting-started/overview/).  
 
-dcrd has several configuration options avilable to tweak how it runs, but all
-of the basic operations described in the intro section work with zero
-configuration.
+## Contact 
 
-#### Windows (Installed from MSI)
+If you have any further questions you can find us at:
 
-Launch dcrd from your Start menu.
-
-#### Linux/BSD/POSIX/Source
-
-```bash
-$ ./dcrd
-````
-
-## IRC
-
-- irc.freenode.net
-- channel #decred
+- irc.freenode.net (channel #decred)
 - [webchat](https://webchat.freenode.net/?channels=decred)
+- forum.decred.org
+- decred.slack.com
 
 ## Issue Tracker
 
