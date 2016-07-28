@@ -302,19 +302,16 @@ out:
 			case *notificationBlockConnected:
 				block := (*btcutil.Block)(n)
 
-				// Skip iterating through all txs if no
-				// tx notification requests exist.
-				if len(watchedOutPoints) != 0 || len(watchedAddrs) != 0 {
-					for _, tx := range block.Transactions() {
-						m.notifyForTx(watchedOutPoints,
-							watchedAddrs, tx, block)
-					}
+				// Skip iterating through all txs if no tx
+				// notification requests exist.
+				if len(watchedOutPoints) == 0 &&
+					len(watchedAddrs) == 0 &&
+					len(blockNotifications) == 0 {
+					continue
 				}
 
-				if len(blockNotifications) != 0 {
-					m.notifyBlockConnected(blockNotifications,
-						block)
-				}
+				m.notifyBlockConnected(blockNotifications,
+					watchedOutPoints, watchedAddrs, block)
 
 			case *notificationBlockDisconnected:
 				m.notifyBlockDisconnected(blockNotifications,
@@ -412,21 +409,90 @@ func (m *wsNotificationManager) UnregisterBlockUpdates(wsc *wsClient) {
 	m.queueNotification <- (*notificationUnregisterBlocks)(wsc)
 }
 
+// subscribedClients returns a map of all client quit channels for clients
+// that are registered to receive notifications regarding tx.
+func (m *wsNotificationManager) subscribedClients(tx *btcutil.Tx,
+	watchedOutPoints map[wire.OutPoint]map[chan struct{}]*wsClient,
+	watchedAddrs map[string]map[chan struct{}]*wsClient) map[chan struct{}]struct{} {
+
+	// Use a map of client quit channels as keys to prevent duplicates when
+	// multiple inputs and/or outputs are relevant to the client.
+	subscribed := make(map[chan struct{}]struct{})
+
+	msgTx := tx.MsgTx()
+	if len(watchedOutPoints) != 0 {
+		for _, input := range msgTx.TxIn {
+			prevOut := &input.PreviousOutPoint
+			cmap := watchedOutPoints[*prevOut]
+			for clientQuitChan, wsc := range cmap {
+				m.removeSpentRequest(watchedOutPoints, wsc, prevOut)
+				subscribed[clientQuitChan] = struct{}{}
+			}
+		}
+	}
+	if len(watchedAddrs) != 0 {
+		for i, output := range msgTx.TxOut {
+			_, txAddrs, _, err := txscript.ExtractPkScriptAddrs(
+				output.PkScript, m.server.server.chainParams)
+			if err != nil {
+				// Non-address outputs can not be subscribed to.
+				continue
+			}
+			for _, txAddr := range txAddrs {
+				op := []*wire.OutPoint{
+					wire.NewOutPoint(tx.Sha(), uint32(i)),
+				}
+				cmap := watchedAddrs[txAddr.EncodeAddress()]
+				for clientQuitChan, wsc := range cmap {
+					m.addSpentRequests(watchedOutPoints, wsc, op)
+					subscribed[clientQuitChan] = struct{}{}
+				}
+			}
+		}
+	}
+
+	return subscribed
+}
+
 // notifyBlockConnected notifies websocket clients that have registered for
 // block updates when a block is connected to the main chain.
-func (*wsNotificationManager) notifyBlockConnected(clients map[chan struct{}]*wsClient,
+func (m *wsNotificationManager) notifyBlockConnected(clients map[chan struct{}]*wsClient,
+	watchedOutPoints map[wire.OutPoint]map[chan struct{}]*wsClient,
+	watchedAddrs map[string]map[chan struct{}]*wsClient,
 	block *btcutil.Block) {
 
 	// Notify interested websocket clients about the connected block.
-	ntfn := btcjson.NewBlockConnectedNtfn(block.Sha().String(),
-		int32(block.Height()), block.MsgBlock().Header.Timestamp.Unix())
-	marshalledJSON, err := btcjson.MarshalCmd(nil, ntfn)
-	if err != nil {
-		rpcsLog.Error("Failed to marshal block connected notification: "+
-			"%v", err)
-		return
+	ntfn := btcjson.NewBlockConnectedNtfn(block.Sha().String(), block.Height(),
+		block.MsgBlock().Header.Timestamp.Unix(), nil)
+
+	// Search for relevant txs for each client and save them serialized in
+	// hex encoding for the notification.
+	subscribedTxs := make(map[chan struct{}][]string)
+	for _, tx := range block.Transactions() {
+		var txHex string
+		subscribedClients := m.subscribedClients(tx, watchedOutPoints,
+			watchedAddrs)
+		for c := range subscribedClients {
+			if txHex == "" {
+				txHex = txHexString(tx)
+			}
+			subscribedTxs[c] = append(subscribedTxs[c], txHex)
+		}
 	}
-	for _, wsc := range clients {
+
+	for clientQuitChan, wsc := range clients {
+		// Add the previously discovered relevant transactions for this
+		// client, if any.
+		ntfn.SubscribedTxs = subscribedTxs[clientQuitChan]
+
+		// Marshal notification.
+		marshalledJSON, err := btcjson.MarshalCmd(nil, ntfn)
+		if err != nil {
+			rpcsLog.Errorf("Failed to marshal block connected "+
+				"notification: %v", err)
+			continue
+		}
+
 		wsc.QueueNotification(marshalledJSON)
 	}
 }

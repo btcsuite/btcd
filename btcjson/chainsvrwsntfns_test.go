@@ -1,4 +1,4 @@
-// Copyright (c) 2014 The btcsuite developers
+// Copyright (c) 2014-2016 The btcsuite developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -31,16 +31,17 @@ func TestChainSvrWsNtfns(t *testing.T) {
 		{
 			name: "blockconnected",
 			newNtfn: func() (interface{}, error) {
-				return btcjson.NewCmd("blockconnected", "123", 100000, 123456789)
+				return btcjson.NewCmd("blockconnected", "123", 100000, 123456789, []string{"a", "b", "c"})
 			},
 			staticNtfn: func() interface{} {
-				return btcjson.NewBlockConnectedNtfn("123", 100000, 123456789)
+				return btcjson.NewBlockConnectedNtfn("123", 100000, 123456789, []string{"a", "b", "c"})
 			},
-			marshalled: `{"jsonrpc":"1.0","method":"blockconnected","params":["123",100000,123456789],"id":null}`,
+			marshalled: `{"jsonrpc":"1.0","method":"blockconnected","params":["123",100000,123456789,["a","b","c"]],"id":null}`,
 			unmarshalled: &btcjson.BlockConnectedNtfn{
-				Hash:   "123",
-				Height: 100000,
-				Time:   123456789,
+				Hash:          "123",
+				Height:        100000,
+				Time:          123456789,
+				SubscribedTxs: []string{"a", "b", "c"},
 			},
 		},
 		{

@@ -678,9 +678,9 @@ user.  Click the method name for further details such as parameter and return in
 |1|[authenticate](#authenticate)|Authenticate the connection against the username and passphrase configured for the RPC server.<br /><font color="orange">NOTE: This is only required if an HTTP Authorization header is not being used.</font>|None|
 |2|[notifyblocks](#notifyblocks)|Send notifications when a block is connected or disconnected from the best chain.|[blockconnected](#blockconnected) and [blockdisconnected](#blockdisconnected)|
 |3|[stopnotifyblocks](#stopnotifyblocks)|Cancel registered notifications for whenever a block is connected or disconnected from the main (best) chain. |None|
-|4|[notifyreceived](#notifyreceived)|Send notifications when a txout spends to an address.|[recvtx](#recvtx) and [redeemingtx](#redeemingtx)|
+|4|[notifyreceived](#notifyreceived)|Send notifications when a txout spends to an address.|[recvtx](#recvtx), [redeemingtx](#redeemingtx), and [blockconnected](#blockconnected)|
 |5|[stopnotifyreceived](#stopnotifyreceived)|Cancel registered notifications for when a txout spends to any of the passed addresses.|None|
-|6|[notifyspent](#notifyspent)|Send notification when a txout is spent.|[redeemingtx](#redeemingtx)|
+|6|[notifyspent](#notifyspent)|Send notification when a txout is spent.|[redeemingtx](#redeemingtx) and [blockconnected](#blockconnected)|
 |7|[stopnotifyspent](#stopnotifyspent)|Cancel registered spending notifications for each passed outpoint.|None|
 |8|[rescan](#rescan)|Rescan block chain for transactions to addresses and spent transaction outpoints.|[recvtx](#recvtx), [redeemingtx](#redeemingtx), [rescanprogress](#rescanprogress), and [rescanfinished](#rescanfinished) |
 |9|[notifynewtransactions](#notifynewtransactions)|Send notifications for all new transactions as they are accepted into the mempool.|[txaccepted](#txaccepted) or [txacceptedverbose](#txacceptedverbose)|
@@ -732,9 +732,9 @@ user.  Click the method name for further details such as parameter and return in
 |   |   |
 |---|---|
 |Method|notifyreceived|
-|Notifications|[recvtx](#recvtx) and [redeemingtx](#redeemingtx)|
+|Notifications|[recvtx](#recvtx), [redeemingtx](#redeemingtx), and [blockconnected](#blockconnected)|
 |Parameters|1. Addresses (JSON array, required)<br />&nbsp;`[ (json array of strings)`<br />&nbsp;&nbsp;`"bitcoinaddress", (string) the bitcoin address`<br />&nbsp;&nbsp;`...`<br />&nbsp;`]`|
-|Description|Send a recvtx notification when a transaction added to mempool or appears in a newly-attached block contains a txout pkScript sending to any of the passed addresses.  Matching outpoints are automatically registered for redeemingtx notifications.|
+|Description|Send a notification when a transaction added to mempool or attached to the main chain contains a txout pkScript sending to any of the passed addresses.  Matching outpoints are automatically registered for redeemingtx notifications.  Unmined transactions are sent in recvtx and redeemingtx notifications, while transactions attached to the main chain are included in a blockconnected notification when blockconnected notifications have also been requested.|
 |Returns|Nothing|
 [Return to Overview](#WSExtMethodOverview)<br />
 
@@ -758,9 +758,9 @@ user.  Click the method name for further details such as parameter and return in
 |   |   |
 |---|---|
 |Method|notifyspent|
-|Notifications|[redeemingtx](#redeemingtx)|
+|Notifications|[redeemingtx](#redeemingtx) and [blockconnected](#blockconnected)|
 |Parameters|1. Outpoints (JSON array, required)<br />&nbsp;`[ (JSON array)`<br />&nbsp;&nbsp;`{ (JSON object)`<br />&nbsp;&nbsp;&nbsp;`"hash":"data", (string) the hex-encoded bytes of the outpoint hash`<br />&nbsp;&nbsp;&nbsp;`"index":n (numeric) the txout index of the outpoint`<br />&nbsp;&nbsp;`},`<br />&nbsp;&nbsp;`...`<br />&nbsp;`]`|
-|Description|Send a redeemingtx notification when a transaction spending an outpoint appears in mempool (if relayed to this btcd instance) and when such a transaction first appears in a newly-attached block.|
+|Description|Send a notification when a transaction spending an outpoint appears in mempool (if relayed to this btcd instance) and when such a transaction first appears in a newly-attached block.  Unmined transactions are sent as a redeemingtx notification while redeeming transactions included in a block attached to the main chain are included in the blockconnected notification when blockconnected notifications have also been requested.|
 |Returns|Nothing|
 [Return to Overview](#WSExtMethodOverview)<br />
 
@@ -861,9 +861,9 @@ The following is an overview of the JSON-RPC notifications used for Websocket co
 |---|---|
 |Method|blockconnected|
 |Request|[notifyblocks](#notifyblocks)|
-|Parameters|1. BlockHash (string) hex-encoded bytes of the attached block hash<br />2. BlockHeight (numeric) height of the attached block<br />3. BlockTime (numeric) unix time of the attached block|
+|Parameters|1. BlockHash (string) hex-encoded bytes of the attached block hash<br />2. BlockHeight (numeric) height of the attached block<br />3. BlockTime (numeric) unix time of the attached block<br />4. SubscribedTxs (array of string) hex-encoded bytes of each relevant transaction from the block subscribed to with the notifyreceived and notifyspent requests|
 |Description|Notifies when a block has been added to the main chain.  Notification is sent to all connected clients.|
-|Example|Example blockconnected notification for mainnet block 280330 (newlines added for readability):<br />`{`<br />&nbsp;`"jsonrpc": "1.0",`<br />&nbsp;`"method": "blockconnected",`<br />&nbsp;`"params":`<br />&nbsp;&nbsp;`[`<br />&nbsp;&nbsp;&nbsp;`"000000000000000004cbdfe387f4df44b914e464ca79838a8ab777b3214dbffd",`<br />&nbsp;&nbsp;&nbsp;`280330,`<br />&nbsp;&nbsp;&nbsp;`1389636265`<br />&nbsp;&nbsp;`],`<br />&nbsp;`"id": null`<br />`}`|
+|Example|Example blockconnected notification for mainnet block 280330 (newlines added for readability):<br />`{`<br />&nbsp;`"jsonrpc": "1.0",`<br />&nbsp;`"method": "blockconnected",`<br />&nbsp;`"params":`<br />&nbsp;&nbsp;`[`<br />&nbsp;&nbsp;&nbsp;`"000000000000000004cbdfe387f4df44b914e464ca79838a8ab777b3214dbffd",`<br />&nbsp;&nbsp;&nbsp;`280330,`<br />&nbsp;&nbsp;&nbsp;`1389636265,`<br />&nbsp;&nbsp;&nbsp;`["0100000001000000000000000000000000000000000000000000000000000000..."]`<br />&nbsp;&nbsp;`],`<br />&nbsp;`"id": null`<br />`}`|
 [Return to Overview](#NotificationOverview)<br />
 
 ***
@@ -887,9 +887,9 @@ The following is an overview of the JSON-RPC notifications used for Websocket co
 |---|---|
 |Method|recvtx|
 |Request|[rescan](#rescan) or [notifyreceived](#notifyreceived)|
-|Parameters|1. Transaction (string) full transaction encoded as a hex string<br />2. Block details (object, optional) details about a block and the index of the transaction within a block, if the transaction is mined|
+|Parameters|1. Transaction (string) full transaction encoded as a hex string<br />2. Block details (object, optional) details about a block and the index of the transaction within a block when the transation is notified as part of a rescan|
 |Description|Notifies a client when a transaction is processed that contains at least a single output with a pkScript sending to a requested address.  If multiple outputs send to requested addresses, a single notification is sent.  If a mempool (unmined) transaction is processed, the block details object (second parameter) is excluded.|
-|Example|Example recvtx notification for mainnet transaction 61d3696de4c888730cbe06b0ad8ecb6d72d6108e893895aa9bc067bd7eba3fad when processed by mempool (newlines added for readability):<br />`{`<br />&nbsp;`"jsonrpc": "1.0",`<br />&nbsp;`"method": "recvtx",`<br />&nbsp;`"params":`<br />&nbsp;&nbsp;`[`<br />&nbsp;&nbsp;&nbsp;`"010000000114d9ff358894c486b4ae11c2a8cf7851b1df64c53d2e511278eff17c22fb737300000000..."`<br />&nbsp;&nbsp;`],`<br />&nbsp;`"id": null`<br />`}`<br />The recvtx notification for the same txout, after the transaction was mined into block 276425:<br />`{`<br />&nbsp;`"jsonrpc": "1.0",`<br />&nbsp;`"method": "recvtx",`<br />&nbsp;`"params":`<br />&nbsp;&nbsp;`[`<br />&nbsp;&nbsp;&nbsp;`"010000000114d9ff358894c486b4ae11c2a8cf7851b1df64c53d2e511278eff17c22fb737300000000...",`<br />&nbsp;&nbsp;&nbsp;`{`<br />&nbsp;&nbsp;&nbsp;&nbsp;`"height": 276425,`<br />&nbsp;&nbsp;&nbsp;&nbsp;`"hash": "000000000000000325474bb799b9e591f965ca4461b72cb7012b808db92bb2fc",`<br />&nbsp;&nbsp;&nbsp;&nbsp;`"index": 684,`<br />&nbsp;&nbsp;&nbsp;&nbsp;`"time": 1387737310`<br />&nbsp;&nbsp;&nbsp;`}`<br />&nbsp;&nbsp;`],`<br />&nbsp;`"id": null`<br />`}`|
+|Example|Example recvtx notification for mainnet transaction 61d3696de4c888730cbe06b0ad8ecb6d72d6108e893895aa9bc067bd7eba3fad when processed by mempool (newlines added for readability):<br />`{`<br />&nbsp;`"jsonrpc": "1.0",`<br />&nbsp;`"method": "recvtx",`<br />&nbsp;`"params":`<br />&nbsp;&nbsp;`[`<br />&nbsp;&nbsp;&nbsp;`"010000000114d9ff358894c486b4ae11c2a8cf7851b1df64c53d2e511278eff17c22fb737300000000..."`<br />&nbsp;&nbsp;`],`<br />&nbsp;`"id": null`<br />`}`<br />The recvtx notification for the same txout when discovered during a rescan:<br />`{`<br />&nbsp;`"jsonrpc": "1.0",`<br />&nbsp;`"method": "recvtx",`<br />&nbsp;`"params":`<br />&nbsp;&nbsp;`[`<br />&nbsp;&nbsp;&nbsp;`"010000000114d9ff358894c486b4ae11c2a8cf7851b1df64c53d2e511278eff17c22fb737300000000...",`<br />&nbsp;&nbsp;&nbsp;`{`<br />&nbsp;&nbsp;&nbsp;&nbsp;`"height": 276425,`<br />&nbsp;&nbsp;&nbsp;&nbsp;`"hash": "000000000000000325474bb799b9e591f965ca4461b72cb7012b808db92bb2fc",`<br />&nbsp;&nbsp;&nbsp;&nbsp;`"index": 684,`<br />&nbsp;&nbsp;&nbsp;&nbsp;`"time": 1387737310`<br />&nbsp;&nbsp;&nbsp;`}`<br />&nbsp;&nbsp;`],`<br />&nbsp;`"id": null`<br />`}`|
 [Return to Overview](#NotificationOverview)<br />
 
 ***
@@ -900,9 +900,9 @@ The following is an overview of the JSON-RPC notifications used for Websocket co
 |---|---|
 |Method|redeemingtx|
 |Requests|[notifyspent](#notifyspent) and [rescan](#rescan)|
-|Parameters|1. Transaction (string) full transaction encoded as a hex string<br />2. Block details (object, optional) details about a block and the index of the transaction within a block, if the transaction is mined|
+|Parameters|1. Transaction (string) full transaction encoded as a hex string<br />2. Block details (object, optional) details about a block and the index of the transaction within a block when the transaction is notified as part of a rescan|
 |Description|Notifies a client when an registered outpoint is spent by a transaction accepted to mempool and/or mined into a block.|
-|Example|Example redeemingtx notification for mainnet outpoint 61d3696de4c888730cbe06b0ad8ecb6d72d6108e893895aa9bc067bd7eba3fad:0 after being spent by transaction 4ad0c16ac973ff675dec1f3e5f1273f1c45be2a63554343f21b70240a1e43ece (newlines added for readability):<br />`{`<br />&nbsp;`"jsonrpc": "1.0",`<br />&nbsp;`"method": "redeemingtx",`<br />&nbsp;`"params":`<br />&nbsp;&nbsp;`[`<br />&nbsp;&nbsp;&nbsp;`"0100000003ad3fba7ebd67c09baa9538898e10d6726dcb8eadb006be0c7388c8e46d69d3610000000..."`<br />&nbsp;&nbsp;`],`<br />&nbsp;`"id": null`<br />`}`<br />The redeemingtx notification for the same txout, after the spending transaction was mined into block 279143:<br />`{`<br />&nbsp;`"jsonrpc": "1.0",`<br />&nbsp;`"method": "recvtx",`<br />&nbsp;`"params":`<br />&nbsp;&nbsp;`[`<br />&nbsp;&nbsp;&nbsp;`"0100000003ad3fba7ebd67c09baa9538898e10d6726dcb8eadb006be0c7388c8e46d69d3610000000...",`<br />&nbsp;&nbsp;&nbsp;`{`<br />&nbsp;&nbsp;&nbsp;&nbsp;`"height": 279143,`<br />&nbsp;&nbsp;&nbsp;&nbsp;`"hash": "00000000000000017188b968a371bab95aa43522665353b646e41865abae02a4",`<br />&nbsp;&nbsp;&nbsp;&nbsp;`"index": 6,`<br />&nbsp;&nbsp;&nbsp;&nbsp;`"time": 1389115004`<br />&nbsp;&nbsp;&nbsp;`}`<br />&nbsp;&nbsp;`],`<br />&nbsp;`"id": null`<br />`}`|
+|Example|Example redeemingtx notification for mainnet outpoint 61d3696de4c888730cbe06b0ad8ecb6d72d6108e893895aa9bc067bd7eba3fad:0 after being spent by transaction 4ad0c16ac973ff675dec1f3e5f1273f1c45be2a63554343f21b70240a1e43ece (newlines added for readability):<br />`{`<br />&nbsp;`"jsonrpc": "1.0",`<br />&nbsp;`"method": "redeemingtx",`<br />&nbsp;`"params":`<br />&nbsp;&nbsp;`[`<br />&nbsp;&nbsp;&nbsp;`"0100000003ad3fba7ebd67c09baa9538898e10d6726dcb8eadb006be0c7388c8e46d69d3610000000..."`<br />&nbsp;&nbsp;`],`<br />&nbsp;`"id": null`<br />`}`<br />The redeemingtx notification for the same txout when discovered during a rescan:<br />`{`<br />&nbsp;`"jsonrpc": "1.0",`<br />&nbsp;`"method": "recvtx",`<br />&nbsp;`"params":`<br />&nbsp;&nbsp;`[`<br />&nbsp;&nbsp;&nbsp;`"0100000003ad3fba7ebd67c09baa9538898e10d6726dcb8eadb006be0c7388c8e46d69d3610000000...",`<br />&nbsp;&nbsp;&nbsp;`{`<br />&nbsp;&nbsp;&nbsp;&nbsp;`"height": 279143,`<br />&nbsp;&nbsp;&nbsp;&nbsp;`"hash": "00000000000000017188b968a371bab95aa43522665353b646e41865abae02a4",`<br />&nbsp;&nbsp;&nbsp;&nbsp;`"index": 6,`<br />&nbsp;&nbsp;&nbsp;&nbsp;`"time": 1389115004`<br />&nbsp;&nbsp;&nbsp;`}`<br />&nbsp;&nbsp;`],`<br />&nbsp;`"id": null`<br />`}`|
 [Return to Overview](#NotificationOverview)<br />
 
 ***
