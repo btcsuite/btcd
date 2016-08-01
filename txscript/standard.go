@@ -351,6 +351,24 @@ func PayToAddrScript(addr btcutil.Address) ([]byte, error) {
 	return nil, ErrUnsupportedAddress
 }
 
+// NullDataScript creates a provably prunable script
+// containing OP_RETURN followed by the passed data.
+func NullDataScript(data []byte) ([]byte, error) {
+	if len(data) > MaxDataCarrierSize {
+		return nil, ErrStackLongScript
+	}
+
+	return unparseScript([]parsedOpcode{
+		parsedOpcode{
+			opcode: &opcodeArray[OP_RETURN],
+		},
+		parsedOpcode{
+			opcode: &opcodeArray[OP_PUSHDATA1],
+			data:   data,
+		},
+	})
+}
+
 // MultiSigScript returns a valid script for a multisignature redemption where
 // nrequired of the keys in pubkeys are required to have signed the transaction
 // for success.  An ErrBadNumRequired will be returned if nrequired is larger
