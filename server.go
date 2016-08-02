@@ -1831,17 +1831,17 @@ out:
 				break
 			}
 
-			// Check that we don't have a pending connection to this addr.
-			addrStr := addrmgr.NetAddressKey(addr.NetAddress())
-			if _, ok := state.pendingPeers[addrStr]; ok {
-				continue
-			}
-
 			tries++
 			// After 100 bad tries exit the loop and we'll try again
 			// later.
 			if tries > 100 {
 				break
+			}
+
+			// Check that we don't have a pending connection to this addr.
+			addrStr := addrmgr.NetAddressKey(addr.NetAddress())
+			if _, ok := state.pendingPeers[addrStr]; ok {
+				continue
 			}
 
 			// XXX if we have limited that address skip
