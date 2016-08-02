@@ -3511,19 +3511,17 @@ func handleGetCoinSupply(s *rpcServer, cmd interface{}, closeChan <-chan struct{
 		return s.coinSupplyTotal, nil
 	}
 
-	for i := 0; int64(i) < tipHeight+1; i++ {
-		if i == 0 {
-			continue
-		}
+	for i := 0; i < int(tipHeight/params.ReductionInterval); i++ {
+		base = base * params.MulSubsidy / params.DivSubsidy
+	}
+
+	isValid := true
+	for i := int(tipHeight); i > 0; i-- {
 		if i == 1 {
 			supply += params.BlockOneSubsidy()
 			continue
 		}
 
-		if i%int(params.ReductionInterval) == 0 {
-			base *= params.MulSubsidy
-			base /= params.DivSubsidy
-		}
 		blockSha, err := s.server.db.FetchBlockShaByHeight(int64(i))
 		if err != nil {
 			context := "Failed to get block hash by height"
@@ -3535,13 +3533,17 @@ func handleGetCoinSupply(s *rpcServer, cmd interface{}, closeChan <-chan struct{
 			return nil, internalRPCError(err.Error(), context)
 		}
 		voters := int64(bh.Voters)
-		work := ((base * int64(params.WorkRewardProportion)) /
-			int64(params.TotalSubsidyProportions()))
+		var work, tax int64
+		// If block was voted no, exclude work and tax
+		if isValid {
+			work = ((base * int64(params.WorkRewardProportion)) /
+				int64(params.TotalSubsidyProportions()))
+			tax = ((base * int64(params.BlockTaxProportion)) /
+				int64(params.TotalSubsidyProportions()))
+		}
 		stake := ((base * int64(params.StakeRewardProportion)) /
 			(int64(params.TicketsPerBlock) * int64(params.TotalSubsidyProportions()))) *
 			voters
-		tax := ((base * int64(params.BlockTaxProportion)) /
-			int64(params.TotalSubsidyProportions()))
 
 		if int64(i) < params.StakeValidationHeight {
 			supply += (work + tax)
@@ -3550,6 +3552,11 @@ func handleGetCoinSupply(s *rpcServer, cmd interface{}, closeChan <-chan struct{
 			work = work * voters / int64(params.TicketsPerBlock)
 			tax = tax * voters / int64(params.TicketsPerBlock)
 			supply += (work + stake + tax)
+		}
+		isValid = dcrutil.IsFlagSet16(bh.VoteBits, dcrutil.BlockValid)
+
+		if i%int(params.ReductionInterval) == 0 {
+			base = base * params.DivSubsidy / params.MulSubsidy
 		}
 	}
 
