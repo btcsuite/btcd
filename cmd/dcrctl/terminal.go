@@ -14,7 +14,7 @@ import (
 	"golang.org/x/crypto/ssh/terminal"
 )
 
-func execute(quit chan bool, protected *bool, cfg *config, line string, clear *bool) {
+func execute(quit chan bool, protected *bool, cfg *config, line string, clear *bool, state *terminal.State) {
 	switch line {
 	case "h":
 		fmt.Printf("[h]elp          print this message\n")
@@ -80,7 +80,9 @@ func execute(quit chan bool, protected *bool, cfg *config, line string, clear *b
 		params := make([]interface{}, 0, len(args[1:]))
 		for _, arg := range args[1:] {
 			if arg == "-" {
+				terminal.Restore(int(os.Stdin.Fd()), state)
 				param, err := bio.ReadString('\n')
+				state, _ = terminal.MakeRaw(int(os.Stdin.Fd()))
 				if err != nil && err != io.EOF {
 					fmt.Fprintf(os.Stderr, "Failed to read data "+
 						"from stdin: %v\n", err)
@@ -171,7 +173,7 @@ func startTerminal(c *config) {
 	fmt.Printf("Enter h for [h]elp.\n")
 	fmt.Printf("Enter q for [q]uit.\n")
 	done := make(chan bool)
-	initState, err := terminal.GetState(0)
+	initState, err := terminal.GetState(int(os.Stdin.Fd()))
 	protected := false
 	clear := false
 	if err != nil {
@@ -180,7 +182,7 @@ func startTerminal(c *config) {
 	}
 
 	go func() {
-		terminal.MakeRaw(int(os.Stdin.Fd()))
+		termState, _ := terminal.MakeRaw(int(os.Stdin.Fd()))
 		n := terminal.NewTerminal(os.Stdin, "> ")
 		for {
 			var ln string
@@ -196,10 +198,11 @@ func startTerminal(c *config) {
 					done <- true
 				}
 			}
-			execute(done, &protected, c, ln, &clear)
+			execute(done, &protected, c, ln, &clear, termState)
+
 			if clear {
 				fmt.Println("Clearing history...")
-				terminal.MakeRaw(int(os.Stdin.Fd()))
+				termState, _ = terminal.MakeRaw(int(os.Stdin.Fd()))
 				n = terminal.NewTerminal(os.Stdin, "> ")
 				clear = false
 			}
@@ -208,7 +211,7 @@ func startTerminal(c *config) {
 	select {
 	case <-done:
 		fmt.Printf("exiting...\n")
-		terminal.Restore(0, initState)
+		terminal.Restore(int(os.Stdin.Fd()), initState)
 		close(done)
 	}
 }
