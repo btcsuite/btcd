@@ -1,4 +1,4 @@
-// Copyright (c) 2013-2015 The btcsuite developers
+// Copyright (c) 2013-2016 The btcsuite developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/wire"
 )
 
@@ -289,7 +290,7 @@ func calcSignatureHash(script []parsedOpcode, hashType SigHashType, tx *wire.Msg
 	// cleverly construct transactions which can steal those coins provided
 	// they can reuse signatures.
 	if hashType&sigHashMask == SigHashSingle && idx >= len(tx.TxOut) {
-		var hash wire.ShaHash
+		var hash chainhash.Hash
 		hash[0] = 0x01
 		return hash[:]
 	}
@@ -357,7 +358,7 @@ func calcSignatureHash(script []parsedOpcode, hashType SigHashType, tx *wire.Msg
 	var wbuf bytes.Buffer
 	txCopy.Serialize(&wbuf)
 	binary.Write(&wbuf, binary.LittleEndian, hashType)
-	return wire.DoubleSha256(wbuf.Bytes())
+	return chainhash.DoubleHashB(wbuf.Bytes())
 }
 
 // asSmallInt returns the passed opcode, which must be true according to

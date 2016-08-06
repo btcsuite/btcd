@@ -26,6 +26,7 @@ import (
 	"time"
 
 	"github.com/btcsuite/btcd/chaincfg"
+	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/database"
 	"github.com/btcsuite/btcd/wire"
 	"github.com/btcsuite/btcutil"
@@ -1120,10 +1121,10 @@ func testFetchBlockIOMissing(tc *testContext, tx database.Tx) bool {
 	// Test the individual block APIs one block at a time to ensure they
 	// return the expected error.  Also, build the data needed to test the
 	// bulk APIs below while looping.
-	allBlockHashes := make([]wire.ShaHash, len(tc.blocks))
+	allBlockHashes := make([]chainhash.Hash, len(tc.blocks))
 	allBlockRegions := make([]database.BlockRegion, len(tc.blocks))
 	for i, block := range tc.blocks {
-		blockHash := block.Sha()
+		blockHash := block.Hash()
 		allBlockHashes[i] = *blockHash
 
 		txLocs, err := block.TxLoc()
@@ -1225,12 +1226,12 @@ func testFetchBlockIO(tc *testContext, tx database.Tx) bool {
 
 	// Test the individual block APIs one block at a time.  Also, build the
 	// data needed to test the bulk APIs below while looping.
-	allBlockHashes := make([]wire.ShaHash, len(tc.blocks))
+	allBlockHashes := make([]chainhash.Hash, len(tc.blocks))
 	allBlockBytes := make([][]byte, len(tc.blocks))
 	allBlockTxLocs := make([][]wire.TxLoc, len(tc.blocks))
 	allBlockRegions := make([]database.BlockRegion, len(tc.blocks))
 	for i, block := range tc.blocks {
-		blockHash := block.Sha()
+		blockHash := block.Hash()
 		allBlockHashes[i] = *blockHash
 
 		blockBytes, err := block.Bytes()
@@ -1322,7 +1323,7 @@ func testFetchBlockIO(tc *testContext, tx database.Tx) bool {
 
 		// Ensure fetching a block that doesn't exist returns the
 		// expected error.
-		badBlockHash := &wire.ShaHash{}
+		badBlockHash := &chainhash.Hash{}
 		testName := fmt.Sprintf("FetchBlock(%s) invalid block",
 			badBlockHash)
 		wantErrCode := database.ErrBlockNotFound
@@ -1465,9 +1466,9 @@ func testFetchBlockIO(tc *testContext, tx database.Tx) bool {
 	// Ensure fetching blocks for which one doesn't exist returns the
 	// expected error.
 	testName := "FetchBlocks invalid hash"
-	badBlockHashes := make([]wire.ShaHash, len(allBlockHashes)+1)
+	badBlockHashes := make([]chainhash.Hash, len(allBlockHashes)+1)
 	copy(badBlockHashes, allBlockHashes)
-	badBlockHashes[len(badBlockHashes)-1] = wire.ShaHash{}
+	badBlockHashes[len(badBlockHashes)-1] = chainhash.Hash{}
 	wantErrCode := database.ErrBlockNotFound
 	_, err = tx.FetchBlocks(badBlockHashes)
 	if !checkDbError(tc.t, testName, err, wantErrCode) {
@@ -1487,7 +1488,7 @@ func testFetchBlockIO(tc *testContext, tx database.Tx) bool {
 	testName = "FetchBlockRegions invalid hash"
 	badBlockRegions := make([]database.BlockRegion, len(allBlockRegions)+1)
 	copy(badBlockRegions, allBlockRegions)
-	badBlockRegions[len(badBlockRegions)-1].Hash = &wire.ShaHash{}
+	badBlockRegions[len(badBlockRegions)-1].Hash = &chainhash.Hash{}
 	wantErrCode = database.ErrBlockNotFound
 	_, err = tx.FetchBlockRegions(badBlockRegions)
 	if !checkDbError(tc.t, testName, err, wantErrCode) {
@@ -1843,10 +1844,10 @@ func testClosedTxInterface(tc *testContext, tx database.Tx) bool {
 	// Test the individual block APIs one block at a time to ensure they
 	// return the expected error.  Also, build the data needed to test the
 	// bulk APIs below while looping.
-	allBlockHashes := make([]wire.ShaHash, len(tc.blocks))
+	allBlockHashes := make([]chainhash.Hash, len(tc.blocks))
 	allBlockRegions := make([]database.BlockRegion, len(tc.blocks))
 	for i, block := range tc.blocks {
-		blockHash := block.Sha()
+		blockHash := block.Hash()
 		allBlockHashes[i] = *blockHash
 
 		txLocs, err := block.TxLoc()
@@ -2014,7 +2015,7 @@ func testConcurrecy(tc *testContext) bool {
 	// test failures on slower systems.
 	startTime := time.Now()
 	err := tc.db.View(func(tx database.Tx) error {
-		_, err := tx.FetchBlock(tc.blocks[0].Sha())
+		_, err := tx.FetchBlock(tc.blocks[0].Hash())
 		if err != nil {
 			return err
 		}
@@ -2039,7 +2040,7 @@ func testConcurrecy(tc *testContext) bool {
 	reader := func(blockNum int) {
 		err := tc.db.View(func(tx database.Tx) error {
 			time.Sleep(sleepTime)
-			_, err := tx.FetchBlock(tc.blocks[blockNum].Sha())
+			_, err := tx.FetchBlock(tc.blocks[blockNum].Hash())
 			if err != nil {
 				return err
 			}

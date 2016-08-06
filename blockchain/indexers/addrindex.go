@@ -11,6 +11,7 @@ import (
 
 	"github.com/btcsuite/btcd/blockchain"
 	"github.com/btcsuite/btcd/chaincfg"
+	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/database"
 	"github.com/btcsuite/btcd/txscript"
 	"github.com/btcsuite/btcd/wire"
@@ -125,7 +126,7 @@ var (
 
 // fetchBlockHashFunc defines a callback function to use in order to convert a
 // serialized block ID to an associated block hash.
-type fetchBlockHashFunc func(serializedID []byte) (*wire.ShaHash, error)
+type fetchBlockHashFunc func(serializedID []byte) (*chainhash.Hash, error)
 
 // serializeAddrIndexEntry serializes the provided block id and transaction
 // location according to the format described in detail above.
@@ -568,8 +569,8 @@ type AddrIndex struct {
 	// This allows fairly efficient updates when transactions are removed
 	// once they are included into a block.
 	unconfirmedLock sync.RWMutex
-	txnsByAddr      map[[addrKeySize]byte]map[wire.ShaHash]*btcutil.Tx
-	addrsByTx       map[wire.ShaHash]map[[addrKeySize]byte]struct{}
+	txnsByAddr      map[[addrKeySize]byte]map[chainhash.Hash]*btcutil.Tx
+	addrsByTx       map[chainhash.Hash]map[[addrKeySize]byte]struct{}
 }
 
 // Ensure the AddrIndex type implements the Indexer interface.
@@ -703,7 +704,7 @@ func (idx *AddrIndex) ConnectBlock(dbTx database.Tx, block *btcutil.Block, view 
 	}
 
 	// Get the internal block ID associated with the block.
-	blockID, err := dbFetchBlockIDByHash(dbTx, block.Sha())
+	blockID, err := dbFetchBlockIDByHash(dbTx, block.Hash())
 	if err != nil {
 		return err
 	}
@@ -771,7 +772,7 @@ func (idx *AddrIndex) TxRegionsForAddress(dbTx database.Tx, addr btcutil.Address
 	err = idx.db.View(func(dbTx database.Tx) error {
 		// Create closure to lookup the block hash given the ID using
 		// the database transaction.
-		fetchBlockHash := func(id []byte) (*wire.ShaHash, error) {
+		fetchBlockHash := func(id []byte) (*chainhash.Hash, error) {
 			// Deserialize and populate the result.
 			return dbFetchBlockHashBySerializedID(dbTx, id)
 		}
@@ -809,16 +810,16 @@ func (idx *AddrIndex) indexUnconfirmedAddresses(pkScript []byte, tx *btcutil.Tx)
 		idx.unconfirmedLock.Lock()
 		addrIndexEntry := idx.txnsByAddr[addrKey]
 		if addrIndexEntry == nil {
-			addrIndexEntry = make(map[wire.ShaHash]*btcutil.Tx)
+			addrIndexEntry = make(map[chainhash.Hash]*btcutil.Tx)
 			idx.txnsByAddr[addrKey] = addrIndexEntry
 		}
-		addrIndexEntry[*tx.Sha()] = tx
+		addrIndexEntry[*tx.Hash()] = tx
 
 		// Add a mapping from the transaction to the address.
-		addrsByTxEntry := idx.addrsByTx[*tx.Sha()]
+		addrsByTxEntry := idx.addrsByTx[*tx.Hash()]
 		if addrsByTxEntry == nil {
 			addrsByTxEntry = make(map[[addrKeySize]byte]struct{})
-			idx.addrsByTx[*tx.Sha()] = addrsByTxEntry
+			idx.addrsByTx[*tx.Hash()] = addrsByTxEntry
 		}
 		addrsByTxEntry[addrKey] = struct{}{}
 		idx.unconfirmedLock.Unlock()
@@ -862,7 +863,7 @@ func (idx *AddrIndex) AddUnconfirmedTx(tx *btcutil.Tx, utxoView *blockchain.Utxo
 // (memory-only) address index.
 //
 // This function is safe for concurrent access.
-func (idx *AddrIndex) RemoveUnconfirmedTx(hash *wire.ShaHash) {
+func (idx *AddrIndex) RemoveUnconfirmedTx(hash *chainhash.Hash) {
 	idx.unconfirmedLock.Lock()
 	defer idx.unconfirmedLock.Unlock()
 
@@ -920,8 +921,8 @@ func NewAddrIndex(db database.DB, chainParams *chaincfg.Params) *AddrIndex {
 	return &AddrIndex{
 		db:          db,
 		chainParams: chainParams,
-		txnsByAddr:  make(map[[addrKeySize]byte]map[wire.ShaHash]*btcutil.Tx),
-		addrsByTx:   make(map[wire.ShaHash]map[[addrKeySize]byte]struct{}),
+		txnsByAddr:  make(map[[addrKeySize]byte]map[chainhash.Hash]*btcutil.Tx),
+		addrsByTx:   make(map[chainhash.Hash]map[[addrKeySize]byte]struct{}),
 	}
 }
 

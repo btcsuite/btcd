@@ -1,4 +1,4 @@
-// Copyright (c) 2013-2015 The btcsuite developers
+// Copyright (c) 2013-2016 The btcsuite developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -12,6 +12,8 @@ import (
 	"net"
 	"os"
 	"testing"
+
+	"github.com/btcsuite/btcd/chaincfg/chainhash"
 )
 
 // genesisCoinbaseTx is the coinbase transaction for the genesis blocks for
@@ -21,7 +23,7 @@ var genesisCoinbaseTx = MsgTx{
 	TxIn: []*TxIn{
 		{
 			PreviousOutPoint: OutPoint{
-				Hash:  ShaHash{},
+				Hash:  chainhash.Hash{},
 				Index: 0xffffffff,
 			},
 			SignatureScript: []byte{
@@ -194,7 +196,7 @@ func BenchmarkReadOutPoint(b *testing.B) {
 // transaction output point.
 func BenchmarkWriteOutPoint(b *testing.B) {
 	op := &OutPoint{
-		Hash:  ShaHash{},
+		Hash:  chainhash.Hash{},
 		Index: 0,
 	}
 	for i := 0; i < b.N; i++ {
@@ -383,9 +385,9 @@ func BenchmarkDecodeGetHeaders(b *testing.B) {
 	pver := ProtocolVersion
 	var m MsgGetHeaders
 	for i := 0; i < MaxBlockLocatorsPerMsg; i++ {
-		hash, err := NewShaHashFromStr(fmt.Sprintf("%x", i))
+		hash, err := chainhash.NewHashFromStr(fmt.Sprintf("%x", i))
 		if err != nil {
-			b.Fatalf("NewShaHashFromStr: unexpected error: %v", err)
+			b.Fatalf("NewHashFromStr: unexpected error: %v", err)
 		}
 		m.AddBlockLocatorHash(hash)
 	}
@@ -413,9 +415,9 @@ func BenchmarkDecodeHeaders(b *testing.B) {
 	pver := ProtocolVersion
 	var m MsgHeaders
 	for i := 0; i < MaxBlockHeadersPerMsg; i++ {
-		hash, err := NewShaHashFromStr(fmt.Sprintf("%x", i))
+		hash, err := chainhash.NewHashFromStr(fmt.Sprintf("%x", i))
 		if err != nil {
-			b.Fatalf("NewShaHashFromStr: unexpected error: %v", err)
+			b.Fatalf("NewHashFromStr: unexpected error: %v", err)
 		}
 		m.AddBlockHeader(NewBlockHeader(hash, hash, 0, uint32(i)))
 	}
@@ -443,9 +445,9 @@ func BenchmarkDecodeGetBlocks(b *testing.B) {
 	pver := ProtocolVersion
 	var m MsgGetBlocks
 	for i := 0; i < MaxBlockLocatorsPerMsg; i++ {
-		hash, err := NewShaHashFromStr(fmt.Sprintf("%x", i))
+		hash, err := chainhash.NewHashFromStr(fmt.Sprintf("%x", i))
 		if err != nil {
-			b.Fatalf("NewShaHashFromStr: unexpected error: %v", err)
+			b.Fatalf("NewHashFromStr: unexpected error: %v", err)
 		}
 		m.AddBlockLocatorHash(hash)
 	}
@@ -500,9 +502,9 @@ func BenchmarkDecodeInv(b *testing.B) {
 	pver := ProtocolVersion
 	var m MsgInv
 	for i := 0; i < MaxInvPerMsg; i++ {
-		hash, err := NewShaHashFromStr(fmt.Sprintf("%x", i))
+		hash, err := chainhash.NewHashFromStr(fmt.Sprintf("%x", i))
 		if err != nil {
-			b.Fatalf("NewShaHashFromStr: unexpected error: %v", err)
+			b.Fatalf("NewHashFromStr: unexpected error: %v", err)
 		}
 		m.AddInvVect(NewInvVect(InvTypeBlock, hash))
 	}
@@ -530,9 +532,9 @@ func BenchmarkDecodeNotFound(b *testing.B) {
 	pver := ProtocolVersion
 	var m MsgNotFound
 	for i := 0; i < MaxInvPerMsg; i++ {
-		hash, err := NewShaHashFromStr(fmt.Sprintf("%x", i))
+		hash, err := chainhash.NewHashFromStr(fmt.Sprintf("%x", i))
 		if err != nil {
-			b.Fatalf("NewShaHashFromStr: unexpected error: %v", err)
+			b.Fatalf("NewHashFromStr: unexpected error: %v", err)
 		}
 		m.AddInvVect(NewInvVect(InvTypeBlock, hash))
 	}
@@ -559,15 +561,15 @@ func BenchmarkDecodeMerkleBlock(b *testing.B) {
 	// Create a message with random data.
 	pver := ProtocolVersion
 	var m MsgMerkleBlock
-	hash, err := NewShaHashFromStr(fmt.Sprintf("%x", 10000))
+	hash, err := chainhash.NewHashFromStr(fmt.Sprintf("%x", 10000))
 	if err != nil {
-		b.Fatalf("NewShaHashFromStr: unexpected error: %v", err)
+		b.Fatalf("NewHashFromStr: unexpected error: %v", err)
 	}
 	m.Header = *NewBlockHeader(hash, hash, 0, uint32(10000))
 	for i := 0; i < 105; i++ {
-		hash, err := NewShaHashFromStr(fmt.Sprintf("%x", i))
+		hash, err := chainhash.NewHashFromStr(fmt.Sprintf("%x", i))
 		if err != nil {
-			b.Fatalf("NewShaHashFromStr: unexpected error: %v", err)
+			b.Fatalf("NewHashFromStr: unexpected error: %v", err)
 		}
 		m.AddTxHash(hash)
 		if i%8 == 0 {
@@ -591,17 +593,17 @@ func BenchmarkDecodeMerkleBlock(b *testing.B) {
 	}
 }
 
-// BenchmarkTxSha performs a benchmark on how long it takes to hash a
+// BenchmarkTxHash performs a benchmark on how long it takes to hash a
 // transaction.
-func BenchmarkTxSha(b *testing.B) {
+func BenchmarkTxHash(b *testing.B) {
 	for i := 0; i < b.N; i++ {
-		genesisCoinbaseTx.TxSha()
+		genesisCoinbaseTx.TxHash()
 	}
 }
 
-// BenchmarkDoubleSha256 performs a benchmark on how long it takes to perform a
-// double sha 256 returning a byte slice.
-func BenchmarkDoubleSha256(b *testing.B) {
+// BenchmarkDoubleHashB performs a benchmark on how long it takes to perform a
+// double hash returning a byte slice.
+func BenchmarkDoubleHashB(b *testing.B) {
 	var buf bytes.Buffer
 	if err := genesisCoinbaseTx.Serialize(&buf); err != nil {
 		b.Errorf("Serialize: unexpected error: %v", err)
@@ -611,13 +613,13 @@ func BenchmarkDoubleSha256(b *testing.B) {
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		_ = DoubleSha256(txBytes)
+		_ = chainhash.DoubleHashB(txBytes)
 	}
 }
 
-// BenchmarkDoubleSha256SH performs a benchmark on how long it takes to perform
-// a double sha 256 returning a ShaHash.
-func BenchmarkDoubleSha256SH(b *testing.B) {
+// BenchmarkDoubleHashH performs a benchmark on how long it takes to perform
+// a double hash returning a chainhash.Hash.
+func BenchmarkDoubleHashH(b *testing.B) {
 	var buf bytes.Buffer
 	if err := genesisCoinbaseTx.Serialize(&buf); err != nil {
 		b.Errorf("Serialize: unexpected error: %v", err)
@@ -627,6 +629,6 @@ func BenchmarkDoubleSha256SH(b *testing.B) {
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		_ = DoubleSha256SH(txBytes)
+		_ = chainhash.DoubleHashH(txBytes)
 	}
 }

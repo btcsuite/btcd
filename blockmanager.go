@@ -15,6 +15,7 @@ import (
 
 	"github.com/btcsuite/btcd/blockchain"
 	"github.com/btcsuite/btcd/chaincfg"
+	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/database"
 	"github.com/btcsuite/btcd/wire"
 	"github.com/btcsuite/btcutil"
@@ -34,20 +35,20 @@ const (
 	blockDbNamePrefix = "blocks"
 
 	// maxRejectedTxns is the maximum number of rejected transactions
-	// shas to store in memory.
+	// hashes to store in memory.
 	maxRejectedTxns = 1000
 
 	// maxRequestedBlocks is the maximum number of requested block
-	// shas to store in memory.
+	// hashes to store in memory.
 	maxRequestedBlocks = wire.MaxInvPerMsg
 
 	// maxRequestedTxns is the maximum number of requested transactions
-	// shas to store in memory.
+	// hashes to store in memory.
 	maxRequestedTxns = wire.MaxInvPerMsg
 )
 
 // zeroHash is the zero value hash (all zeros).  It is defined as a convenience.
-var zeroHash wire.ShaHash
+var zeroHash chainhash.Hash
 
 // newPeerMsg signifies a newly connected peer to the block handler.
 type newPeerMsg struct {
@@ -130,7 +131,7 @@ type pauseMsg struct {
 // between checkpoints.
 type headerNode struct {
 	height int32
-	sha    *wire.ShaHash
+	hash   *chainhash.Hash
 }
 
 // chainState tracks the state of the best chain as blocks are inserted.  This
@@ -141,7 +142,7 @@ type headerNode struct {
 // is inserted and protecting it with a mutex.
 type chainState struct {
 	sync.Mutex
-	newestHash        *wire.ShaHash
+	newestHash        *chainhash.Hash
 	newestHeight      int32
 	pastMedianTime    time.Time
 	pastMedianTimeErr error
@@ -151,7 +152,7 @@ type chainState struct {
 // chain.
 //
 // This function is safe for concurrent access.
-func (c *chainState) Best() (*wire.ShaHash, int32) {
+func (c *chainState) Best() (*chainhash.Hash, int32) {
 	c.Lock()
 	defer c.Unlock()
 
@@ -165,9 +166,9 @@ type blockManager struct {
 	started           int32
 	shutdown          int32
 	chain             *blockchain.BlockChain
-	rejectedTxns      map[wire.ShaHash]struct{}
-	requestedTxns     map[wire.ShaHash]struct{}
-	requestedBlocks   map[wire.ShaHash]struct{}
+	rejectedTxns      map[chainhash.Hash]struct{}
+	requestedTxns     map[chainhash.Hash]struct{}
+	requestedBlocks   map[chainhash.Hash]struct{}
 	progressLogger    *blockProgressLogger
 	receivedLogBlocks int64
 	receivedLogTx     int64
@@ -187,7 +188,7 @@ type blockManager struct {
 
 // resetHeaderState sets the headers-first mode state to values appropriate for
 // syncing from a new peer.
-func (b *blockManager) resetHeaderState(newestHash *wire.ShaHash, newestHeight int32) {
+func (b *blockManager) resetHeaderState(newestHash *chainhash.Hash, newestHeight int32) {
 	b.headersFirstMode = false
 	b.headerList.Init()
 	b.startHeader = nil
@@ -196,7 +197,7 @@ func (b *blockManager) resetHeaderState(newestHash *wire.ShaHash, newestHeight i
 	// block into the header pool.  This allows the next downloaded header
 	// to prove it links to the chain properly.
 	if b.nextCheckpoint != nil {
-		node := headerNode{height: newestHeight, sha: newestHash}
+		node := headerNode{height: newestHeight, hash: newestHash}
 		b.headerList.PushBack(&node)
 	}
 }
@@ -205,7 +206,7 @@ func (b *blockManager) resetHeaderState(newestHash *wire.ShaHash, newestHeight i
 // This allows fast access to chain information since btcchain is currently not
 // safe for concurrent access and the block manager is typically quite busy
 // processing block and inventory.
-func (b *blockManager) updateChainState(newestHash *wire.ShaHash, newestHeight int32) {
+func (b *blockManager) updateChainState(newestHash *chainhash.Hash, newestHeight int32) {
 	b.chainState.Lock()
 	defer b.chainState.Unlock()
 
@@ -290,7 +291,7 @@ func (b *blockManager) startSync(peers *list.List) {
 		// Clear the requestedBlocks if the sync peer changes, otherwise
 		// we may ignore blocks we need that the last sync peer failed
 		// to send.
-		b.requestedBlocks = make(map[wire.ShaHash]struct{})
+		b.requestedBlocks = make(map[chainhash.Hash]struct{})
 
 		locator, err := b.chain.LatestBlockLocator()
 		if err != nil {
@@ -440,7 +441,7 @@ func (b *blockManager) handleTxMsg(tmsg *txMsg) {
 	// spec to proliferate.  While this is not ideal, there is no check here
 	// to disconnect peers for sending unsolicited transactions to provide
 	// interoperability.
-	txHash := tmsg.tx.Sha()
+	txHash := tmsg.tx.Hash()
 
 	// Ignore transactions that we have already rejected.  Do not
 	// send a reject message here because if the transaction was already
@@ -517,8 +518,8 @@ func (b *blockManager) current() bool {
 // handleBlockMsg handles block messages from all peers.
 func (b *blockManager) handleBlockMsg(bmsg *blockMsg) {
 	// If we didn't ask for this block then the peer is misbehaving.
-	blockSha := bmsg.block.Sha()
-	if _, exists := bmsg.peer.requestedBlocks[*blockSha]; !exists {
+	blockHash := bmsg.block.Hash()
+	if _, exists := bmsg.peer.requestedBlocks[*blockHash]; !exists {
 		// The regression test intentionally sends some blocks twice
 		// to test duplicate block insertion fails.  Don't disconnect
 		// the peer or ignore the block when we're in regression test
@@ -526,7 +527,7 @@ func (b *blockManager) handleBlockMsg(bmsg *blockMsg) {
 		// duplicate blocks.
 		if !cfg.RegressionTest {
 			bmgrLog.Warnf("Got unrequested block %v from %s -- "+
-				"disconnecting", blockSha, bmsg.peer.Addr())
+				"disconnecting", blockHash, bmsg.peer.Addr())
 			bmsg.peer.Disconnect()
 			return
 		}
@@ -545,9 +546,9 @@ func (b *blockManager) handleBlockMsg(bmsg *blockMsg) {
 		firstNodeEl := b.headerList.Front()
 		if firstNodeEl != nil {
 			firstNode := firstNodeEl.Value.(*headerNode)
-			if blockSha.IsEqual(firstNode.sha) {
+			if blockHash.IsEqual(firstNode.hash) {
 				behaviorFlags |= blockchain.BFFastAdd
-				if firstNode.sha.IsEqual(b.nextCheckpoint.Hash) {
+				if firstNode.hash.IsEqual(b.nextCheckpoint.Hash) {
 					isCheckpointBlock = true
 				} else {
 					b.headerList.Remove(firstNodeEl)
@@ -559,8 +560,8 @@ func (b *blockManager) handleBlockMsg(bmsg *blockMsg) {
 	// Remove block from request maps. Either chain will know about it and
 	// so we shouldn't have any more instances of trying to fetch it, or we
 	// will fail the insert and thus we'll retry next time we get an inv.
-	delete(bmsg.peer.requestedBlocks, *blockSha)
-	delete(b.requestedBlocks, *blockSha)
+	delete(bmsg.peer.requestedBlocks, *blockHash)
+	delete(b.requestedBlocks, *blockHash)
 
 	// Process the block to include validation, best chain selection, orphan
 	// handling, etc.
@@ -571,11 +572,11 @@ func (b *blockManager) handleBlockMsg(bmsg *blockMsg) {
 		// it as such.  Otherwise, something really did go wrong, so log
 		// it as an actual error.
 		if _, ok := err.(blockchain.RuleError); ok {
-			bmgrLog.Infof("Rejected block %v from %s: %v", blockSha,
+			bmgrLog.Infof("Rejected block %v from %s: %v", blockHash,
 				bmsg.peer, err)
 		} else {
 			bmgrLog.Errorf("Failed to process block %v: %v",
-				blockSha, err)
+				blockHash, err)
 		}
 		if dbErr, ok := err.(database.Error); ok && dbErr.ErrorCode ==
 			database.ErrCorruption {
@@ -586,21 +587,21 @@ func (b *blockManager) handleBlockMsg(bmsg *blockMsg) {
 		// send it.
 		code, reason := errToRejectErr(err)
 		bmsg.peer.PushRejectMsg(wire.CmdBlock, code, reason,
-			blockSha, false)
+			blockHash, false)
 		return
 	}
 
 	// Meta-data about the new block this peer is reporting. We use this
 	// below to update this peer's lastest block height and the heights of
-	// other peers based on their last announced block sha. This allows us
-	// to dynamically update the block heights of peers, avoiding stale heights
-	// when looking for a new sync peer. Upon acceptance of a block or
-	// recognition of an orphan, we also use this information to update
+	// other peers based on their last announced block hash. This allows us
+	// to dynamically update the block heights of peers, avoiding stale
+	// heights when looking for a new sync peer. Upon acceptance of a block
+	// or recognition of an orphan, we also use this information to update
 	// the block heights over other peers who's invs may have been ignored
 	// if we are actively syncing while the chain is not yet current or
 	// who may have lost the lock announcment race.
 	var heightUpdate int32
-	var blkShaUpdate *wire.ShaHash
+	var blkHashUpdate *chainhash.Hash
 
 	// Request the parents for the orphan block from the peer that sent it.
 	if isOrphan {
@@ -620,11 +621,11 @@ func (b *blockManager) handleBlockMsg(bmsg *blockMsg) {
 				bmgrLog.Debugf("Extracted height of %v from "+
 					"orphan block", cbHeight)
 				heightUpdate = int32(cbHeight)
-				blkShaUpdate = blockSha
+				blkHashUpdate = blockHash
 			}
 		}
 
-		orphanRoot := b.chain.GetOrphanRoot(blockSha)
+		orphanRoot := b.chain.GetOrphanRoot(blockHash)
 		locator, err := b.chain.LatestBlockLocator()
 		if err != nil {
 			bmgrLog.Warnf("Failed to get block locator for the "+
@@ -646,17 +647,17 @@ func (b *blockManager) handleBlockMsg(bmsg *blockMsg) {
 		// Update this peer's latest block height, for future
 		// potential sync node candidacy.
 		heightUpdate = best.Height
-		blkShaUpdate = best.Hash
+		blkHashUpdate = best.Hash
 
 		// Clear the rejected transactions.
-		b.rejectedTxns = make(map[wire.ShaHash]struct{})
+		b.rejectedTxns = make(map[chainhash.Hash]struct{})
 
 		// Allow any clients performing long polling via the
 		// getblocktemplate RPC to be notified when the new block causes
 		// their old block template to become stale.
 		rpcServer := b.server.rpcServer
 		if rpcServer != nil {
-			rpcServer.gbtWorkState.NotifyBlockConnected(blockSha)
+			rpcServer.gbtWorkState.NotifyBlockConnected(blockHash)
 		}
 	}
 
@@ -664,10 +665,10 @@ func (b *blockManager) handleBlockMsg(bmsg *blockMsg) {
 	// the server for updating peer heights if this is an orphan or our
 	// chain is "current". This avoids sending a spammy amount of messages
 	// if we're syncing the chain from scratch.
-	if blkShaUpdate != nil && heightUpdate != 0 {
+	if blkHashUpdate != nil && heightUpdate != 0 {
 		bmsg.peer.UpdateLastBlockHeight(heightUpdate)
 		if isOrphan || b.current() {
-			go b.server.UpdatePeerHeights(blkShaUpdate, int32(heightUpdate), bmsg.peer)
+			go b.server.UpdatePeerHeights(blkHashUpdate, int32(heightUpdate), bmsg.peer)
 		}
 	}
 
@@ -695,7 +696,7 @@ func (b *blockManager) handleBlockMsg(bmsg *blockMsg) {
 	prevHash := b.nextCheckpoint.Hash
 	b.nextCheckpoint = b.findNextHeaderCheckpoint(prevHeight)
 	if b.nextCheckpoint != nil {
-		locator := blockchain.BlockLocator([]*wire.ShaHash{prevHash})
+		locator := blockchain.BlockLocator([]*chainhash.Hash{prevHash})
 		err := bmsg.peer.PushGetHeadersMsg(locator, b.nextCheckpoint.Hash)
 		if err != nil {
 			bmgrLog.Warnf("Failed to send getheaders message to "+
@@ -714,7 +715,7 @@ func (b *blockManager) handleBlockMsg(bmsg *blockMsg) {
 	b.headersFirstMode = false
 	b.headerList.Init()
 	bmgrLog.Infof("Reached the final checkpoint -- switching to normal mode")
-	locator := blockchain.BlockLocator([]*wire.ShaHash{blockSha})
+	locator := blockchain.BlockLocator([]*chainhash.Hash{blockHash})
 	err = bmsg.peer.PushGetBlocksMsg(locator, &zeroHash)
 	if err != nil {
 		bmgrLog.Warnf("Failed to send getblocks message to peer %s: %v",
@@ -744,7 +745,7 @@ func (b *blockManager) fetchHeaderBlocks() {
 			continue
 		}
 
-		iv := wire.NewInvVect(wire.InvTypeBlock, node.sha)
+		iv := wire.NewInvVect(wire.InvTypeBlock, node.hash)
 		haveInv, err := b.haveInventory(iv)
 		if err != nil {
 			bmgrLog.Warnf("Unexpected failure when checking for "+
@@ -752,8 +753,8 @@ func (b *blockManager) fetchHeaderBlocks() {
 				"fetch: %v", err)
 		}
 		if !haveInv {
-			b.requestedBlocks[*node.sha] = struct{}{}
-			b.syncPeer.requestedBlocks[*node.sha] = struct{}{}
+			b.requestedBlocks[*node.hash] = struct{}{}
+			b.syncPeer.requestedBlocks[*node.hash] = struct{}{}
 			gdmsg.AddInvVect(iv)
 			numRequested++
 		}
@@ -787,9 +788,9 @@ func (b *blockManager) handleHeadersMsg(hmsg *headersMsg) {
 	// Process all of the received headers ensuring each one connects to the
 	// previous and that checkpoints match.
 	receivedCheckpoint := false
-	var finalHash *wire.ShaHash
+	var finalHash *chainhash.Hash
 	for _, blockHeader := range msg.Headers {
-		blockHash := blockHeader.BlockSha()
+		blockHash := blockHeader.BlockHash()
 		finalHash = &blockHash
 
 		// Ensure there is a previous header to compare against.
@@ -803,9 +804,9 @@ func (b *blockManager) handleHeadersMsg(hmsg *headersMsg) {
 
 		// Ensure the header properly connects to the previous one and
 		// add it to the list of headers.
-		node := headerNode{sha: &blockHash}
+		node := headerNode{hash: &blockHash}
 		prevNode := prevNodeEl.Value.(*headerNode)
-		if prevNode.sha.IsEqual(&blockHeader.PrevBlock) {
+		if prevNode.hash.IsEqual(&blockHeader.PrevBlock) {
 			node.height = prevNode.height + 1
 			e := b.headerList.PushBack(&node)
 			if b.startHeader == nil {
@@ -821,17 +822,17 @@ func (b *blockManager) handleHeadersMsg(hmsg *headersMsg) {
 
 		// Verify the header at the next checkpoint height matches.
 		if node.height == b.nextCheckpoint.Height {
-			if node.sha.IsEqual(b.nextCheckpoint.Hash) {
+			if node.hash.IsEqual(b.nextCheckpoint.Hash) {
 				receivedCheckpoint = true
 				bmgrLog.Infof("Verified downloaded block "+
 					"header against checkpoint at height "+
-					"%d/hash %s", node.height, node.sha)
+					"%d/hash %s", node.height, node.hash)
 			} else {
 				bmgrLog.Warnf("Block header at height %d/hash "+
 					"%s from peer %s does NOT match "+
 					"expected checkpoint hash of %s -- "+
 					"disconnecting", node.height,
-					node.sha, hmsg.peer.Addr(),
+					node.hash, hmsg.peer.Addr(),
 					b.nextCheckpoint.Hash)
 				hmsg.peer.Disconnect()
 				return
@@ -858,7 +859,7 @@ func (b *blockManager) handleHeadersMsg(hmsg *headersMsg) {
 	// This header is not a checkpoint, so request the next batch of
 	// headers starting from the latest known header and ending with the
 	// next checkpoint.
-	locator := blockchain.BlockLocator([]*wire.ShaHash{finalHash})
+	locator := blockchain.BlockLocator([]*chainhash.Hash{finalHash})
 	err := hmsg.peer.PushGetHeadersMsg(locator, b.nextCheckpoint.Hash)
 	if err != nil {
 		bmgrLog.Warnf("Failed to send getheaders message to "+
@@ -1067,7 +1068,7 @@ func (b *blockManager) handleInvMsg(imsg *invMsg) {
 // limitMap is a helper function for maps that require a maximum limit by
 // evicting a random transaction if adding a new value would cause it to
 // overflow the maximum allowed.
-func (b *blockManager) limitMap(m map[wire.ShaHash]struct{}, limit int) {
+func (b *blockManager) limitMap(m map[chainhash.Hash]struct{}, limit int) {
 	if len(m)+1 > limit {
 		// Remove a random entry from the map.  For most compilers, Go's
 		// range statement iterates starting at a random item although
@@ -1139,7 +1140,7 @@ out:
 				// their old block template to become stale.
 				rpcServer := b.server.rpcServer
 				if rpcServer != nil {
-					rpcServer.gbtWorkState.NotifyBlockConnected(msg.block.Sha())
+					rpcServer.gbtWorkState.NotifyBlockConnected(msg.block.Hash())
 				}
 
 				msg.reply <- processBlockResponse{
@@ -1188,7 +1189,7 @@ func (b *blockManager) handleNotifyMsg(notification *blockchain.Notification) {
 		}
 
 		// Generate the inventory vector and relay it.
-		iv := wire.NewInvVect(wire.InvTypeBlock, block.Sha())
+		iv := wire.NewInvVect(wire.InvTypeBlock, block.Hash())
 		b.server.RelayInventory(iv, block.MsgBlock().Header)
 
 	// A block has been connected to the main block chain.
@@ -1209,8 +1210,8 @@ func (b *blockManager) handleNotifyMsg(notification *blockchain.Notification) {
 		for _, tx := range block.Transactions()[1:] {
 			b.server.txMemPool.RemoveTransaction(tx, false)
 			b.server.txMemPool.RemoveDoubleSpends(tx)
-			b.server.txMemPool.RemoveOrphan(tx.Sha())
-			acceptedTxs := b.server.txMemPool.ProcessOrphans(tx.Sha())
+			b.server.txMemPool.RemoveOrphan(tx.Hash())
+			acceptedTxs := b.server.txMemPool.ProcessOrphans(tx.Hash())
 			b.server.AnnounceNewTransactions(acceptedTxs)
 		}
 
@@ -1219,7 +1220,7 @@ func (b *blockManager) handleNotifyMsg(notification *blockchain.Notification) {
 			// all the transactions (except the coinbase) as no
 			// longer needing rebroadcasting.
 			for _, tx := range block.Transactions()[1:] {
-				iv := wire.NewInvVect(wire.InvTypeTx, tx.Sha())
+				iv := wire.NewInvVect(wire.InvTypeTx, tx.Hash())
 				b.server.RemoveRebroadcastInventory(iv)
 			}
 
@@ -1387,9 +1388,9 @@ func (b *blockManager) Pause() chan<- struct{} {
 func newBlockManager(s *server, indexManager blockchain.IndexManager) (*blockManager, error) {
 	bm := blockManager{
 		server:          s,
-		rejectedTxns:    make(map[wire.ShaHash]struct{}),
-		requestedTxns:   make(map[wire.ShaHash]struct{}),
-		requestedBlocks: make(map[wire.ShaHash]struct{}),
+		rejectedTxns:    make(map[chainhash.Hash]struct{}),
+		requestedTxns:   make(map[chainhash.Hash]struct{}),
+		requestedBlocks: make(map[chainhash.Hash]struct{}),
 		progressLogger:  newBlockProgressLogger("Processed", bmgrLog),
 		msgChan:         make(chan interface{}, cfg.MaxPeers*3),
 		headerList:      list.New(),

@@ -12,6 +12,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/davecgh/go-spew/spew"
 )
 
@@ -48,9 +49,9 @@ func TestMerkleBlock(t *testing.T) {
 	data := make([]byte, 32)
 	for i := 0; i < maxTxPerBlock; i++ {
 		rand.Read(data)
-		hash, err := NewShaHash(data)
+		hash, err := chainhash.NewHash(data)
 		if err != nil {
-			t.Errorf("NewShaHash failed: %v\n", err)
+			t.Errorf("NewHash failed: %v\n", err)
 			return
 		}
 
@@ -62,9 +63,9 @@ func TestMerkleBlock(t *testing.T) {
 
 	// Add one more Tx to test failure.
 	rand.Read(data)
-	hash, err := NewShaHash(data)
+	hash, err := chainhash.NewHash(data)
 	if err != nil {
-		t.Errorf("NewShaHash failed: %v\n", err)
+		t.Errorf("NewHash failed: %v\n", err)
 		return
 	}
 
@@ -371,13 +372,13 @@ func TestMerkleBlockOverflowErrors(t *testing.T) {
 var merkleBlockOne = MsgMerkleBlock{
 	Header: BlockHeader{
 		Version: 1,
-		PrevBlock: ShaHash([HashSize]byte{ // Make go vet happy.
+		PrevBlock: chainhash.Hash([chainhash.HashSize]byte{ // Make go vet happy.
 			0x6f, 0xe2, 0x8c, 0x0a, 0xb6, 0xf1, 0xb3, 0x72,
 			0xc1, 0xa6, 0xa2, 0x46, 0xae, 0x63, 0xf7, 0x4f,
 			0x93, 0x1e, 0x83, 0x65, 0xe1, 0x5a, 0x08, 0x9c,
 			0x68, 0xd6, 0x19, 0x00, 0x00, 0x00, 0x00, 0x00,
 		}),
-		MerkleRoot: ShaHash([HashSize]byte{ // Make go vet happy.
+		MerkleRoot: chainhash.Hash([chainhash.HashSize]byte{ // Make go vet happy.
 			0x98, 0x20, 0x51, 0xfd, 0x1e, 0x4b, 0xa7, 0x44,
 			0xbb, 0xbe, 0x68, 0x0e, 0x1f, 0xee, 0x14, 0x67,
 			0x7b, 0xa1, 0xa3, 0xc3, 0x54, 0x0b, 0xf7, 0xb1,
@@ -388,8 +389,8 @@ var merkleBlockOne = MsgMerkleBlock{
 		Nonce:     0x9962e301,               // 2573394689
 	},
 	Transactions: 1,
-	Hashes: []*ShaHash{
-		(*ShaHash)(&[HashSize]byte{ // Make go vet happy.
+	Hashes: []*chainhash.Hash{
+		(*chainhash.Hash)(&[chainhash.HashSize]byte{ // Make go vet happy.
 			0x98, 0x20, 0x51, 0xfd, 0x1e, 0x4b, 0xa7, 0x44,
 			0xbb, 0xbe, 0x68, 0x0e, 0x1f, 0xee, 0x14, 0x67,
 			0x7b, 0xa1, 0xa3, 0xc3, 0x54, 0x0b, 0xf7, 0xb1,

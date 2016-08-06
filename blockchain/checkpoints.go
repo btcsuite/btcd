@@ -8,9 +8,9 @@ import (
 	"fmt"
 
 	"github.com/btcsuite/btcd/chaincfg"
+	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/database"
 	"github.com/btcsuite/btcd/txscript"
-	"github.com/btcsuite/btcd/wire"
 	"github.com/btcsuite/btcutil"
 )
 
@@ -18,13 +18,13 @@ import (
 // best block chain that a good checkpoint candidate must be.
 const CheckpointConfirmations = 2016
 
-// newShaHashFromStr converts the passed big-endian hex string into a
-// wire.ShaHash.  It only differs from the one available in wire in that
+// newHashFromStr converts the passed big-endian hex string into a
+// chainhash.Hash.  It only differs from the one available in chainhash in that
 // it ignores the error since it will only (and must only) be called with
 // hard-coded, and therefore known good, hashes.
-func newShaHashFromStr(hexStr string) *wire.ShaHash {
-	sha, _ := wire.NewShaHashFromStr(hexStr)
-	return sha
+func newHashFromStr(hexStr string) *chainhash.Hash {
+	hash, _ := chainhash.NewHashFromStr(hexStr)
+	return hash
 }
 
 // DisableCheckpoints provides a mechanism to disable validation against
@@ -85,7 +85,7 @@ func (b *BlockChain) LatestCheckpoint() *chaincfg.Checkpoint {
 // checkpoint data for the passed block height.
 //
 // This function MUST be called with the chain lock held (for reads).
-func (b *BlockChain) verifyCheckpoint(height int32, hash *wire.ShaHash) bool {
+func (b *BlockChain) verifyCheckpoint(height int32, hash *chainhash.Hash) bool {
 	if b.noCheckpoints || len(b.chainParams.Checkpoints) == 0 {
 		return true
 	}
@@ -269,7 +269,7 @@ func (b *BlockChain) IsCheckpointCandidate(block *btcutil.Block) (bool, error) {
 	var isCandidate bool
 	err := b.db.View(func(dbTx database.Tx) error {
 		// A checkpoint must be in the main chain.
-		blockHeight, err := dbFetchHeightByHash(dbTx, block.Sha())
+		blockHeight, err := dbFetchHeightByHash(dbTx, block.Hash())
 		if err != nil {
 			// Only return an error if it's not due to the block not
 			// being in the main chain.

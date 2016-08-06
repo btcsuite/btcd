@@ -14,7 +14,7 @@ func TestInvalidHashStr(t *testing.T) {
 			t.Errorf("Expected panic for invalid hash, got nil")
 		}
 	}()
-	newShaHashFromStr("banana")
+	newHashFromStr("banana")
 }
 
 // TestMustRegisterPanic ensures the mustRegister function panics when used to

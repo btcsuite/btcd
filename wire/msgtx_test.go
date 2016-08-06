@@ -11,6 +11,7 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/davecgh/go-spew/spew"
 )
 
@@ -20,9 +21,9 @@ func TestTx(t *testing.T) {
 
 	// Block 100000 hash.
 	hashStr := "3ba27aa200b1cecaad478d2b00432346c3f1f3986da1afd33e506"
-	hash, err := NewShaHashFromStr(hashStr)
+	hash, err := chainhash.NewHashFromStr(hashStr)
 	if err != nil {
-		t.Errorf("NewShaHashFromStr: %v", err)
+		t.Errorf("NewHashFromStr: %v", err)
 	}
 
 	// Ensure the command is expected value.
@@ -127,13 +128,13 @@ func TestTx(t *testing.T) {
 	return
 }
 
-// TestTxSha tests the ability to generate the hash of a transaction accurately.
-func TestTxSha(t *testing.T) {
+// TestTxHash tests the ability to generate the hash of a transaction accurately.
+func TestTxHash(t *testing.T) {
 	// Hash of first transaction from block 113875.
 	hashStr := "f051e59b5e2503ac626d03aaeac8ab7be2d72ba4b7e97119c5852d70d52dcb86"
-	wantHash, err := NewShaHashFromStr(hashStr)
+	wantHash, err := chainhash.NewHashFromStr(hashStr)
 	if err != nil {
-		t.Errorf("NewShaHashFromStr: %v", err)
+		t.Errorf("NewHashFromStr: %v", err)
 		return
 	}
 
@@ -141,7 +142,7 @@ func TestTxSha(t *testing.T) {
 	msgTx := NewMsgTx()
 	txIn := TxIn{
 		PreviousOutPoint: OutPoint{
-			Hash:  ShaHash{},
+			Hash:  chainhash.Hash{},
 			Index: 0xffffffff,
 		},
 		SignatureScript: []byte{0x04, 0x31, 0xdc, 0x00, 0x1b, 0x01, 0x62},
@@ -168,9 +169,9 @@ func TestTxSha(t *testing.T) {
 	msgTx.LockTime = 0
 
 	// Ensure the hash produced is expected.
-	txHash := msgTx.TxSha()
+	txHash := msgTx.TxHash()
 	if !txHash.IsEqual(wantHash) {
-		t.Errorf("TxSha: wrong hash - got %v, want %v",
+		t.Errorf("TxHash: wrong hash - got %v, want %v",
 			spew.Sprint(txHash), spew.Sprint(wantHash))
 	}
 }
@@ -645,7 +646,7 @@ var multiTx = &MsgTx{
 	TxIn: []*TxIn{
 		{
 			PreviousOutPoint: OutPoint{
-				Hash:  ShaHash{},
+				Hash:  chainhash.Hash{},
 				Index: 0xffffffff,
 			},
 			SignatureScript: []byte{

@@ -441,7 +441,7 @@ func testBlockFileErrors(tc *testContext) bool {
 
 	// Ensure errors in readBlock and readBlockRegion when requesting a file
 	// number that doesn't exist.
-	block0Hash := tc.blocks[0].Sha()
+	block0Hash := tc.blocks[0].Hash()
 	testName = "readBlock invalid file number"
 	invalidLoc := blockLocation{
 		blockFileNum: ^uint32(0),
@@ -530,7 +530,7 @@ func testCorruption(tc *testContext) bool {
 	// Ensure corruption is detected by intentionally modifying the bytes
 	// stored to the mock file and reading the block.
 	block0Bytes, _ := tc.blocks[0].Bytes()
-	block0Hash := tc.blocks[0].Sha()
+	block0Hash := tc.blocks[0].Hash()
 	tests := []struct {
 		offset      uint32
 		fixChecksum bool

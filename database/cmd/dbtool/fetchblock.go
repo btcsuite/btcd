@@ -9,8 +9,8 @@ import (
 	"errors"
 	"time"
 
+	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/database"
-	"github.com/btcsuite/btcd/wire"
 )
 
 // fetchBlockCmd defines the configuration options for the fetchblock command.
@@ -31,7 +31,7 @@ func (cmd *fetchBlockCmd) Execute(args []string) error {
 	if len(args) < 1 {
 		return errors.New("required block hash parameter not specified")
 	}
-	blockHash, err := wire.NewShaHashFromStr(args[0])
+	blockHash, err := chainhash.NewHashFromStr(args[0])
 	if err != nil {
 		return err
 	}

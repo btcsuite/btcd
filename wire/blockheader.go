@@ -1,4 +1,4 @@
-// Copyright (c) 2013-2015 The btcsuite developers
+// Copyright (c) 2013-2016 The btcsuite developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -8,6 +8,8 @@ import (
 	"bytes"
 	"io"
 	"time"
+
+	"github.com/btcsuite/btcd/chaincfg/chainhash"
 )
 
 // BlockVersion is the current latest supported block version.
@@ -16,7 +18,7 @@ const BlockVersion = 4
 // MaxBlockHeaderPayload is the maximum number of bytes a block header can be.
 // Version 4 bytes + Timestamp 4 bytes + Bits 4 bytes + Nonce 4 bytes +
 // PrevBlock and MerkleRoot hashes.
-const MaxBlockHeaderPayload = 16 + (HashSize * 2)
+const MaxBlockHeaderPayload = 16 + (chainhash.HashSize * 2)
 
 // BlockHeader defines information about a block and is used in the bitcoin
 // block (MsgBlock) and headers (MsgHeaders) messages.
@@ -25,10 +27,10 @@ type BlockHeader struct {
 	Version int32
 
 	// Hash of the previous block in the block chain.
-	PrevBlock ShaHash
+	PrevBlock chainhash.Hash
 
 	// Merkle tree reference to hash of all transactions for the block.
-	MerkleRoot ShaHash
+	MerkleRoot chainhash.Hash
 
 	// Time the block was created.  This is, unfortunately, encoded as a
 	// uint32 on the wire and therefore is limited to 2106.
@@ -45,8 +47,8 @@ type BlockHeader struct {
 // header.
 const blockHeaderLen = 80
 
-// BlockSha computes the block identifier hash for the given block header.
-func (h *BlockHeader) BlockSha() ShaHash {
+// BlockHash computes the block identifier hash for the given block header.
+func (h *BlockHeader) BlockHash() chainhash.Hash {
 	// Encode the header and double sha256 everything prior to the number of
 	// transactions.  Ignore the error returns since there is no way the
 	// encode could fail except being out of memory which would cause a
@@ -54,7 +56,7 @@ func (h *BlockHeader) BlockSha() ShaHash {
 	var buf bytes.Buffer
 	_ = writeBlockHeader(&buf, 0, h)
 
-	return DoubleSha256SH(buf.Bytes())
+	return chainhash.DoubleHashH(buf.Bytes())
 }
 
 // BtcDecode decodes r using the bitcoin protocol encoding into the receiver.
@@ -96,8 +98,8 @@ func (h *BlockHeader) Serialize(w io.Writer) error {
 // NewBlockHeader returns a new BlockHeader using the provided previous block
 // hash, merkle root hash, difficulty bits, and nonce used to generate the
 // block with defaults for the remaining fields.
-func NewBlockHeader(prevHash *ShaHash, merkleRootHash *ShaHash, bits uint32,
-	nonce uint32) *BlockHeader {
+func NewBlockHeader(prevHash *chainhash.Hash, merkleRootHash *chainhash.Hash,
+	bits uint32, nonce uint32) *BlockHeader {
 
 	// Limit the timestamp to one second precision since the protocol
 	// doesn't support better.

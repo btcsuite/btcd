@@ -1,4 +1,4 @@
-// Copyright (c) 2013-2015 The btcsuite developers
+// Copyright (c) 2013-2016 The btcsuite developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -15,6 +15,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	. "github.com/btcsuite/btcd/txscript"
 	"github.com/btcsuite/btcd/wire"
 	"github.com/btcsuite/btcutil"
@@ -159,15 +160,15 @@ func parseScriptFlags(flagStr string) (ScriptFlags, error) {
 func createSpendingTx(sigScript, pkScript []byte) *wire.MsgTx {
 	coinbaseTx := wire.NewMsgTx()
 
-	outPoint := wire.NewOutPoint(&wire.ShaHash{}, ^uint32(0))
+	outPoint := wire.NewOutPoint(&chainhash.Hash{}, ^uint32(0))
 	txIn := wire.NewTxIn(outPoint, []byte{OP_0, OP_0})
 	txOut := wire.NewTxOut(0, pkScript)
 	coinbaseTx.AddTxIn(txIn)
 	coinbaseTx.AddTxOut(txOut)
 
 	spendingTx := wire.NewMsgTx()
-	coinbaseTxSha := coinbaseTx.TxSha()
-	outPoint = wire.NewOutPoint(&coinbaseTxSha, 0)
+	coinbaseTxHash := coinbaseTx.TxHash()
+	outPoint = wire.NewOutPoint(&coinbaseTxHash, 0)
 	txIn = wire.NewTxIn(outPoint, sigScript)
 	txOut = wire.NewTxOut(0, nil)
 
@@ -405,14 +406,14 @@ testloop:
 
 			previoustx, ok := input[0].(string)
 			if !ok {
-				t.Errorf("bad test (%dth input sha not string)"+
+				t.Errorf("bad test (%dth input hash not string)"+
 					"%d: %v", j, i, test)
 				continue testloop
 			}
 
-			prevhash, err := wire.NewShaHashFromStr(previoustx)
+			prevhash, err := chainhash.NewHashFromStr(previoustx)
 			if err != nil {
-				t.Errorf("bad test (%dth input sha not sha %v)"+
+				t.Errorf("bad test (%dth input hash not hash %v)"+
 					"%d: %v", j, err, i, test)
 				continue testloop
 			}
@@ -547,14 +548,14 @@ testloop:
 
 			previoustx, ok := input[0].(string)
 			if !ok {
-				t.Errorf("bad test (%dth input sha not string)"+
+				t.Errorf("bad test (%dth input hash not string)"+
 					"%d: %v", j, i, test)
 				continue
 			}
 
-			prevhash, err := wire.NewShaHashFromStr(previoustx)
+			prevhash, err := chainhash.NewHashFromStr(previoustx)
 			if err != nil {
-				t.Errorf("bad test (%dth input sha not sha %v)"+
+				t.Errorf("bad test (%dth input hash not hash %v)"+
 					"%d: %v", j, err, i, test)
 				continue
 			}
@@ -656,8 +657,8 @@ func TestCalcSignatureHash(t *testing.T) {
 		hash := TstCalcSignatureHash(parsedScript, hashType, tx,
 			int(test[2].(float64)))
 
-		expectedHash, _ := wire.NewShaHashFromStr(test[4].(string))
-		if !bytes.Equal(hash, expectedHash.Bytes()) {
+		expectedHash, _ := chainhash.NewHashFromStr(test[4].(string))
+		if !bytes.Equal(hash, expectedHash[:]) {
 			t.Errorf("TestCalcSignatureHash failed test #%d: "+
 				"Signature hash mismatch.", i)
 		}

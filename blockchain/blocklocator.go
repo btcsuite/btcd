@@ -5,6 +5,7 @@
 package blockchain
 
 import (
+	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/database"
 	"github.com/btcsuite/btcd/wire"
 )
@@ -24,7 +25,7 @@ import (
 //
 // The block locator for block 17a would be the hashes of blocks:
 // [17a 16a 15 14 13 12 11 10 9 8 6 2 genesis]
-type BlockLocator []*wire.ShaHash
+type BlockLocator []*chainhash.Hash
 
 // blockLocatorFromHash returns a block locator for the passed block hash.
 // See BlockLocator for details on the algotirhm used to create a block locator.
@@ -38,7 +39,7 @@ type BlockLocator []*wire.ShaHash
 //    consist of the passed hash
 //
 // This function MUST be called with the chain state lock held (for reads).
-func (b *BlockChain) blockLocatorFromHash(hash *wire.ShaHash) BlockLocator {
+func (b *BlockChain) blockLocatorFromHash(hash *chainhash.Hash) BlockLocator {
 	// The locator contains the requested hash at the very least.
 	locator := make(BlockLocator, 0, wire.MaxBlockLocatorsPerMsg)
 	locator = append(locator, hash)
@@ -159,7 +160,7 @@ func (b *BlockChain) blockLocatorFromHash(hash *wire.ShaHash) BlockLocator {
 //    consist of the passed hash
 //
 // This function is safe for concurrent access.
-func (b *BlockChain) BlockLocatorFromHash(hash *wire.ShaHash) BlockLocator {
+func (b *BlockChain) BlockLocatorFromHash(hash *chainhash.Hash) BlockLocator {
 	b.chainLock.RLock()
 	locator := b.blockLocatorFromHash(hash)
 	b.chainLock.RUnlock()

@@ -1,4 +1,4 @@
-// Copyright (c) 2013-2015 The btcsuite developers
+// Copyright (c) 2013-2016 The btcsuite developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -7,6 +7,8 @@ package wire
 import (
 	"fmt"
 	"io"
+
+	"github.com/btcsuite/btcd/chaincfg/chainhash"
 )
 
 // MaxBlockLocatorsPerMsg is the maximum number of block locator hashes allowed
@@ -30,12 +32,12 @@ const MaxBlockLocatorsPerMsg = 500
 // closer to the genesis block you get.
 type MsgGetBlocks struct {
 	ProtocolVersion    uint32
-	BlockLocatorHashes []*ShaHash
-	HashStop           ShaHash
+	BlockLocatorHashes []*chainhash.Hash
+	HashStop           chainhash.Hash
 }
 
 // AddBlockLocatorHash adds a new block locator hash to the message.
-func (msg *MsgGetBlocks) AddBlockLocatorHash(hash *ShaHash) error {
+func (msg *MsgGetBlocks) AddBlockLocatorHash(hash *chainhash.Hash) error {
 	if len(msg.BlockLocatorHashes)+1 > MaxBlockLocatorsPerMsg {
 		str := fmt.Sprintf("too many block locator hashes for message [max %v]",
 			MaxBlockLocatorsPerMsg)
@@ -67,8 +69,8 @@ func (msg *MsgGetBlocks) BtcDecode(r io.Reader, pver uint32) error {
 
 	// Create a contiguous slice of hashes to deserialize into in order to
 	// reduce the number of allocations.
-	locatorHashes := make([]ShaHash, count)
-	msg.BlockLocatorHashes = make([]*ShaHash, 0, count)
+	locatorHashes := make([]chainhash.Hash, count)
+	msg.BlockLocatorHashes = make([]*chainhash.Hash, 0, count)
 	for i := uint64(0); i < count; i++ {
 		hash := &locatorHashes[i]
 		err := readElement(r, hash)
@@ -132,16 +134,16 @@ func (msg *MsgGetBlocks) Command() string {
 func (msg *MsgGetBlocks) MaxPayloadLength(pver uint32) uint32 {
 	// Protocol version 4 bytes + num hashes (varInt) + max block locator
 	// hashes + hash stop.
-	return 4 + MaxVarIntPayload + (MaxBlockLocatorsPerMsg * HashSize) + HashSize
+	return 4 + MaxVarIntPayload + (MaxBlockLocatorsPerMsg * chainhash.HashSize) + chainhash.HashSize
 }
 
 // NewMsgGetBlocks returns a new bitcoin getblocks message that conforms to the
 // Message interface using the passed parameters and defaults for the remaining
 // fields.
-func NewMsgGetBlocks(hashStop *ShaHash) *MsgGetBlocks {
+func NewMsgGetBlocks(hashStop *chainhash.Hash) *MsgGetBlocks {
 	return &MsgGetBlocks{
 		ProtocolVersion:    ProtocolVersion,
-		BlockLocatorHashes: make([]*ShaHash, 0, MaxBlockLocatorsPerMsg),
+		BlockLocatorHashes: make([]*chainhash.Hash, 0, MaxBlockLocatorsPerMsg),
 		HashStop:           *hashStop,
 	}
 }

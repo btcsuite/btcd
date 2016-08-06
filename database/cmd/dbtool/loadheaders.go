@@ -7,8 +7,8 @@ package main
 import (
 	"time"
 
+	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/database"
-	"github.com/btcsuite/btcd/wire"
 )
 
 // headersCmd defines the configuration options for the loadheaders command.
@@ -52,7 +52,7 @@ func (cmd *headersCmd) Execute(args []string) error {
 			numLoaded := 0
 			startTime := time.Now()
 			blockIdxBucket.ForEach(func(k, v []byte) error {
-				var hash wire.ShaHash
+				var hash chainhash.Hash
 				copy(hash[:], k)
 				_, err := tx.FetchBlockHeader(&hash)
 				if err != nil {
@@ -75,9 +75,9 @@ func (cmd *headersCmd) Execute(args []string) error {
 	// Bulk load headers.
 	err = db.View(func(tx database.Tx) error {
 		blockIdxBucket := tx.Metadata().Bucket(blockIdxName)
-		hashes := make([]wire.ShaHash, 0, 500000)
+		hashes := make([]chainhash.Hash, 0, 500000)
 		blockIdxBucket.ForEach(func(k, v []byte) error {
-			var hash wire.ShaHash
+			var hash chainhash.Hash
 			copy(hash[:], k)
 			hashes = append(hashes, hash)
 			return nil

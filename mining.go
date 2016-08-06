@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/btcsuite/btcd/blockchain"
+	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/mining"
 	"github.com/btcsuite/btcd/txscript"
 	"github.com/btcsuite/btcd/wire"
@@ -53,7 +54,7 @@ type txPrioItem struct {
 	// on.  It will only be set when the transaction references other
 	// transactions in the source pool and hence must come after them in
 	// a block.
-	dependsOn map[wire.ShaHash]struct{}
+	dependsOn map[chainhash.Hash]struct{}
 }
 
 // txPriorityQueueLessFunc describes a function that can be used as a compare
@@ -236,7 +237,7 @@ func createCoinbaseTx(coinbaseScript []byte, nextBlockHeight int32, addr btcutil
 	tx.AddTxIn(&wire.TxIn{
 		// Coinbase transactions have no inputs, so previous outpoint is
 		// zero hash and max index.
-		PreviousOutPoint: *wire.NewOutPoint(&wire.ShaHash{},
+		PreviousOutPoint: *wire.NewOutPoint(&chainhash.Hash{},
 			wire.MaxPrevOutIndex),
 		SignatureScript: coinbaseScript,
 		Sequence:        wire.MaxTxInSequenceNum,
@@ -276,7 +277,7 @@ func logSkippedDeps(tx *btcutil.Tx, deps *list.List) {
 	for e := deps.Front(); e != nil; e = e.Next() {
 		item := e.Value.(*txPrioItem)
 		minrLog.Tracef("Skipping tx %s since it depends on %s\n",
-			item.tx.Sha(), tx.Sha())
+			item.tx.Hash(), tx.Hash())
 	}
 }
 
@@ -436,7 +437,7 @@ func NewBlockTemplate(policy *mining.Policy, server *server, payToAddress btcuti
 	// dependsOn map kept with each dependent transaction helps quickly
 	// determine which dependent transactions are now eligible for inclusion
 	// in the block once each transaction has been included.
-	dependers := make(map[wire.ShaHash]*list.List)
+	dependers := make(map[chainhash.Hash]*list.List)
 
 	// Create slices to hold the fees and number of signature operations
 	// for each of the selected transactions and add an entry for the
@@ -458,13 +459,13 @@ mempoolLoop:
 		// non-finalized transactions.
 		tx := txDesc.Tx
 		if blockchain.IsCoinBase(tx) {
-			minrLog.Tracef("Skipping coinbase tx %s", tx.Sha())
+			minrLog.Tracef("Skipping coinbase tx %s", tx.Hash())
 			continue
 		}
 		if !blockchain.IsFinalizedTransaction(tx, nextBlockHeight,
 			timeSource.AdjustedTime()) {
 
-			minrLog.Tracef("Skipping non-finalized tx %s", tx.Sha())
+			minrLog.Tracef("Skipping non-finalized tx %s", tx.Hash())
 			continue
 		}
 
@@ -476,7 +477,7 @@ mempoolLoop:
 		utxos, err := blockManager.chain.FetchUtxoView(tx)
 		if err != nil {
 			minrLog.Warnf("Unable to fetch utxo view for tx %s: "+
-				"%v", tx.Sha(), err)
+				"%v", tx.Hash(), err)
 			continue
 		}
 
@@ -493,7 +494,7 @@ mempoolLoop:
 					minrLog.Tracef("Skipping tx %s because "+
 						"it references unspent output "+
 						"%s which is not available",
-						tx.Sha(), txIn.PreviousOutPoint)
+						tx.Hash(), txIn.PreviousOutPoint)
 					continue mempoolLoop
 				}
 
@@ -508,7 +509,7 @@ mempoolLoop:
 				depList.PushBack(prioItem)
 				if prioItem.dependsOn == nil {
 					prioItem.dependsOn = make(
-						map[wire.ShaHash]struct{})
+						map[chainhash.Hash]struct{})
 				}
 				prioItem.dependsOn[*originHash] = struct{}{}
 
@@ -562,15 +563,15 @@ mempoolLoop:
 		// any) and remove the entry for this transaction as it will
 		// either be included or skipped, but in either case the deps
 		// are no longer needed.
-		deps := dependers[*tx.Sha()]
-		delete(dependers, *tx.Sha())
+		deps := dependers[*tx.Hash()]
+		delete(dependers, *tx.Hash())
 
 		// Enforce maximum block size.  Also check for overflow.
 		txSize := uint32(tx.MsgTx().SerializeSize())
 		blockPlusTxSize := blockSize + txSize
 		if blockPlusTxSize < blockSize || blockPlusTxSize >= policy.BlockMaxSize {
 			minrLog.Tracef("Skipping tx %s because it would exceed "+
-				"the max block size", tx.Sha())
+				"the max block size", tx.Hash())
 			logSkippedDeps(tx, deps)
 			continue
 		}
@@ -581,7 +582,7 @@ mempoolLoop:
 		if blockSigOps+numSigOps < blockSigOps ||
 			blockSigOps+numSigOps > blockchain.MaxSigOpsPerBlock {
 			minrLog.Tracef("Skipping tx %s because it would "+
-				"exceed the maximum sigops per block", tx.Sha())
+				"exceed the maximum sigops per block", tx.Hash())
 			logSkippedDeps(tx, deps)
 			continue
 		}
@@ -589,7 +590,7 @@ mempoolLoop:
 			blockUtxos)
 		if err != nil {
 			minrLog.Tracef("Skipping tx %s due to error in "+
-				"CountP2SHSigOps: %v", tx.Sha(), err)
+				"CountP2SHSigOps: %v", tx.Hash(), err)
 			logSkippedDeps(tx, deps)
 			continue
 		}
@@ -598,7 +599,7 @@ mempoolLoop:
 			blockSigOps+numSigOps > blockchain.MaxSigOpsPerBlock {
 			minrLog.Tracef("Skipping tx %s because it would "+
 				"exceed the maximum sigops per block (p2sh)",
-				tx.Sha())
+				tx.Hash())
 			logSkippedDeps(tx, deps)
 			continue
 		}
@@ -611,7 +612,7 @@ mempoolLoop:
 
 			minrLog.Tracef("Skipping tx %s with feePerKB %d "+
 				"< TxMinFreeFee %d and block size %d >= "+
-				"minBlockSize %d", tx.Sha(), prioItem.feePerKB,
+				"minBlockSize %d", tx.Hash(), prioItem.feePerKB,
 				policy.TxMinFreeFee, blockPlusTxSize,
 				policy.BlockMinSize)
 			logSkippedDeps(tx, deps)
@@ -653,7 +654,7 @@ mempoolLoop:
 			blockUtxos)
 		if err != nil {
 			minrLog.Tracef("Skipping tx %s due to error in "+
-				"CheckTransactionInputs: %v", tx.Sha(), err)
+				"CheckTransactionInputs: %v", tx.Hash(), err)
 			logSkippedDeps(tx, deps)
 			continue
 		}
@@ -661,7 +662,7 @@ mempoolLoop:
 			txscript.StandardVerifyFlags, server.sigCache)
 		if err != nil {
 			minrLog.Tracef("Skipping tx %s due to error in "+
-				"ValidateTransactionScripts: %v", tx.Sha(), err)
+				"ValidateTransactionScripts: %v", tx.Hash(), err)
 			logSkippedDeps(tx, deps)
 			continue
 		}
@@ -683,7 +684,7 @@ mempoolLoop:
 		txSigOpCounts = append(txSigOpCounts, numSigOps)
 
 		minrLog.Tracef("Adding tx %s (priority %.2f, feePerKB %d)",
-			prioItem.tx.Sha(), prioItem.priority, prioItem.feePerKB)
+			prioItem.tx.Hash(), prioItem.priority, prioItem.feePerKB)
 
 		// Add transactions which depend on this one (and also do not
 		// have any other unsatisified dependencies) to the priority
@@ -694,7 +695,7 @@ mempoolLoop:
 				// there are no more dependencies after this
 				// one.
 				item := e.Value.(*txPrioItem)
-				delete(item.dependsOn, *tx.Sha())
+				delete(item.dependsOn, *tx.Hash())
 				if len(item.dependsOn) == 0 {
 					heap.Push(priorityQueue, item)
 				}

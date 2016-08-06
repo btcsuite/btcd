@@ -15,6 +15,7 @@ import (
 
 	"github.com/btcsuite/btcd/blockchain"
 	"github.com/btcsuite/btcd/chaincfg"
+	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/database"
 	_ "github.com/btcsuite/btcd/database/ffldb"
 	"github.com/btcsuite/btcd/wire"
@@ -146,7 +147,7 @@ func loadUtxoView(filename string) (*blockchain.UtxoViewpoint, error) {
 	view := blockchain.NewUtxoViewpoint()
 	for {
 		// Hash of the utxo entry.
-		var hash wire.ShaHash
+		var hash chainhash.Hash
 		_, err := io.ReadAtLeast(r, hash[:], len(hash[:]))
 		if err != nil {
 			// Expected EOF at the right offset.

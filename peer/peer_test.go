@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/btcsuite/btcd/chaincfg"
+	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/peer"
 	"github.com/btcsuite/btcd/wire"
 	"github.com/btcsuite/go-socks/socks"
@@ -450,7 +451,7 @@ func TestPeerListeners(t *testing.T) {
 		},
 		{
 			"OnBlock",
-			wire.NewMsgBlock(wire.NewBlockHeader(&wire.ShaHash{}, &wire.ShaHash{}, 1, 1)),
+			wire.NewMsgBlock(wire.NewBlockHeader(&chainhash.Hash{}, &chainhash.Hash{}, 1, 1)),
 		},
 		{
 			"OnInv",
@@ -470,7 +471,7 @@ func TestPeerListeners(t *testing.T) {
 		},
 		{
 			"OnGetBlocks",
-			wire.NewMsgGetBlocks(&wire.ShaHash{}),
+			wire.NewMsgGetBlocks(&chainhash.Hash{}),
 		},
 		{
 			"OnGetHeaders",
@@ -490,7 +491,7 @@ func TestPeerListeners(t *testing.T) {
 		},
 		{
 			"OnMerkleBlock",
-			wire.NewMsgMerkleBlock(wire.NewBlockHeader(&wire.ShaHash{}, &wire.ShaHash{}, 1, 1)),
+			wire.NewMsgMerkleBlock(wire.NewBlockHeader(&chainhash.Hash{}, &chainhash.Hash{}, 1, 1)),
 		},
 		// only one version message is allowed
 		// only one verack message is allowed
@@ -522,7 +523,7 @@ func TestPeerListeners(t *testing.T) {
 func TestOutboundPeer(t *testing.T) {
 
 	peerCfg := &peer.Config{
-		NewestBlock: func() (*wire.ShaHash, int32, error) {
+		NewestBlock: func() (*chainhash.Hash, int32, error) {
 			return nil, 0, errors.New("newest block not found")
 		},
 		UserAgentName:    "peer",
@@ -562,7 +563,7 @@ func TestOutboundPeer(t *testing.T) {
 	}
 
 	// Test Queue Inv
-	fakeBlockHash := &wire.ShaHash{0: 0x00, 1: 0x01}
+	fakeBlockHash := &chainhash.Hash{0: 0x00, 1: 0x01}
 	fakeInv := wire.NewInvVect(wire.InvTypeBlock, fakeBlockHash)
 
 	// Should be noops as the peer could not connect.
@@ -578,9 +579,9 @@ func TestOutboundPeer(t *testing.T) {
 	p.Disconnect()
 
 	// Test NewestBlock
-	var newestBlock = func() (*wire.ShaHash, int32, error) {
+	var newestBlock = func() (*chainhash.Hash, int32, error) {
 		hashStr := "14a0810ac680a3eb3f82edc878cea25ec41d6b790744e5daeef"
-		hash, err := wire.NewShaHashFromStr(hashStr)
+		hash, err := chainhash.NewHashFromStr(hashStr)
 		if err != nil {
 			return nil, 0, err
 		}
@@ -598,16 +599,16 @@ func TestOutboundPeer(t *testing.T) {
 	p1.Connect(c1)
 
 	// Test update latest block
-	latestBlockSha, err := wire.NewShaHashFromStr("1a63f9cdff1752e6375c8c76e543a71d239e1a2e5c6db1aa679")
+	latestBlockHash, err := chainhash.NewHashFromStr("1a63f9cdff1752e6375c8c76e543a71d239e1a2e5c6db1aa679")
 	if err != nil {
-		t.Errorf("NewShaHashFromStr: unexpected err %v\n", err)
+		t.Errorf("NewHashFromStr: unexpected err %v\n", err)
 		return
 	}
-	p1.UpdateLastAnnouncedBlock(latestBlockSha)
+	p1.UpdateLastAnnouncedBlock(latestBlockHash)
 	p1.UpdateLastBlockHeight(234440)
-	if p1.LastAnnouncedBlock() != latestBlockSha {
+	if p1.LastAnnouncedBlock() != latestBlockHash {
 		t.Errorf("LastAnnouncedBlock: wrong block - got %v, want %v",
-			p1.LastAnnouncedBlock(), latestBlockSha)
+			p1.LastAnnouncedBlock(), latestBlockHash)
 		return
 	}
 
@@ -637,11 +638,11 @@ func TestOutboundPeer(t *testing.T) {
 		t.Errorf("PushAddrMsg: unexpected err %v\n", err)
 		return
 	}
-	if err := p2.PushGetBlocksMsg(nil, &wire.ShaHash{}); err != nil {
+	if err := p2.PushGetBlocksMsg(nil, &chainhash.Hash{}); err != nil {
 		t.Errorf("PushGetBlocksMsg: unexpected err %v\n", err)
 		return
 	}
-	if err := p2.PushGetHeadersMsg(nil, &wire.ShaHash{}); err != nil {
+	if err := p2.PushGetHeadersMsg(nil, &chainhash.Hash{}); err != nil {
 		t.Errorf("PushGetHeadersMsg: unexpected err %v\n", err)
 		return
 	}

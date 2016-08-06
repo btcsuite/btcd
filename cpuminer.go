@@ -1,4 +1,4 @@
-// Copyright (c) 2014 The btcsuite developers
+// Copyright (c) 2014-2016 The btcsuite developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/btcsuite/btcd/blockchain"
+	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/mining"
 	"github.com/btcsuite/btcd/wire"
 	"github.com/btcsuite/btcutil"
@@ -155,7 +156,7 @@ func (m *CPUMiner) submitBlock(block *btcutil.Block) bool {
 	// The block was accepted.
 	coinbaseTx := block.MsgBlock().Transactions[0].TxOut[0]
 	minrLog.Infof("Block submitted via CPU miner accepted (hash %s, "+
-		"amount %v)", block.Sha(), btcutil.Amount(coinbaseTx.Value))
+		"amount %v)", block.Hash(), btcutil.Amount(coinbaseTx.Value))
 	return true
 }
 
@@ -238,12 +239,12 @@ func (m *CPUMiner) solveBlock(msgBlock *wire.MsgBlock, blockHeight int32,
 			// increment the number of hashes completed for each
 			// attempt accordingly.
 			header.Nonce = i
-			hash := header.BlockSha()
+			hash := header.BlockHash()
 			hashesCompleted += 2
 
 			// The block is solved when the new block hash is less
 			// than the target difficulty.  Yay!
-			if blockchain.ShaHashToBig(&hash).Cmp(targetDifficulty) <= 0 {
+			if blockchain.HashToBig(&hash).Cmp(targetDifficulty) <= 0 {
 				m.updateHashes <- hashesCompleted
 				return true
 			}
@@ -508,7 +509,7 @@ func (m *CPUMiner) NumWorkers() int32 {
 // detecting when it is performing stale work and reacting accordingly by
 // generating a new block template.  When a block is solved, it is submitted.
 // The function returns a list of the hashes of generated blocks.
-func (m *CPUMiner) GenerateNBlocks(n uint32) ([]*wire.ShaHash, error) {
+func (m *CPUMiner) GenerateNBlocks(n uint32) ([]*chainhash.Hash, error) {
 	m.Lock()
 
 	// Respond with an error if there's virtually 0 chance of CPU-mining a block.
@@ -538,7 +539,7 @@ func (m *CPUMiner) GenerateNBlocks(n uint32) ([]*wire.ShaHash, error) {
 	minrLog.Tracef("Generating %d blocks", n)
 
 	i := uint32(0)
-	blockHashes := make([]*wire.ShaHash, n, n)
+	blockHashes := make([]*chainhash.Hash, n, n)
 
 	// Start a ticker which is used to signal checks for stale work and
 	// updates to the speed monitor.
@@ -583,7 +584,7 @@ func (m *CPUMiner) GenerateNBlocks(n uint32) ([]*wire.ShaHash, error) {
 		if m.solveBlock(template.Block, curHeight+1, ticker, nil) {
 			block := btcutil.NewBlock(template.Block)
 			m.submitBlock(block)
-			blockHashes[i] = block.Sha()
+			blockHashes[i] = block.Hash()
 			i++
 			if i == n {
 				minrLog.Tracef("Generated %d blocks", i)
