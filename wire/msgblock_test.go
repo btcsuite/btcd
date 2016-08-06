@@ -1,8 +1,8 @@
-// Copyright (c) 2013-2015 The btcsuite developers
+// Copyright (c) 2013-2016 The btcsuite developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
-package wire_test
+package wire
 
 import (
 	"bytes"
@@ -11,24 +11,23 @@ import (
 	"testing"
 	"time"
 
-	"github.com/btcsuite/btcd/wire"
 	"github.com/davecgh/go-spew/spew"
 )
 
 // TestBlock tests the MsgBlock API.
 func TestBlock(t *testing.T) {
-	pver := wire.ProtocolVersion
+	pver := ProtocolVersion
 
 	// Block 1 header.
 	prevHash := &blockOne.Header.PrevBlock
 	merkleHash := &blockOne.Header.MerkleRoot
 	bits := blockOne.Header.Bits
 	nonce := blockOne.Header.Nonce
-	bh := wire.NewBlockHeader(prevHash, merkleHash, bits, nonce)
+	bh := NewBlockHeader(prevHash, merkleHash, bits, nonce)
 
 	// Ensure the command is expected value.
 	wantCmd := "block"
-	msg := wire.NewMsgBlock(bh)
+	msg := NewMsgBlock(bh)
 	if cmd := msg.Command(); cmd != wantCmd {
 		t.Errorf("NewMsgBlock: wrong command - got %v want %v",
 			cmd, wantCmd)
@@ -74,13 +73,13 @@ func TestBlock(t *testing.T) {
 func TestBlockTxShas(t *testing.T) {
 	// Block 1, transaction 1 hash.
 	hashStr := "0e3e2357e806b6cdb1f70b54c3a3a17b6714ee1f0e68bebb44a74b1efd512098"
-	wantHash, err := wire.NewShaHashFromStr(hashStr)
+	wantHash, err := NewShaHashFromStr(hashStr)
 	if err != nil {
 		t.Errorf("NewShaHashFromStr: %v", err)
 		return
 	}
 
-	wantShas := []wire.ShaHash{*wantHash}
+	wantShas := []ShaHash{*wantHash}
 	shas, err := blockOne.TxShas()
 	if err != nil {
 		t.Errorf("TxShas: %v", err)
@@ -95,7 +94,7 @@ func TestBlockTxShas(t *testing.T) {
 func TestBlockSha(t *testing.T) {
 	// Block 1 hash.
 	hashStr := "839a8e6886ab5951d76f411475428afc90947ee320161bbf18eb6048"
-	wantHash, err := wire.NewShaHashFromStr(hashStr)
+	wantHash, err := NewShaHashFromStr(hashStr)
 	if err != nil {
 		t.Errorf("NewShaHashFromStr: %v", err)
 	}
@@ -112,11 +111,11 @@ func TestBlockSha(t *testing.T) {
 // of transaction inputs and outputs and protocol versions.
 func TestBlockWire(t *testing.T) {
 	tests := []struct {
-		in     *wire.MsgBlock // Message to encode
-		out    *wire.MsgBlock // Expected decoded message
-		buf    []byte         // Wire encoding
-		txLocs []wire.TxLoc   // Expected transaction locations
-		pver   uint32         // Protocol version for wire encoding
+		in     *MsgBlock // Message to encode
+		out    *MsgBlock // Expected decoded message
+		buf    []byte    // Wire encoding
+		txLocs []TxLoc   // Expected transaction locations
+		pver   uint32    // Protocol version for wire encoding
 	}{
 		// Latest protocol version.
 		{
@@ -124,7 +123,7 @@ func TestBlockWire(t *testing.T) {
 			&blockOne,
 			blockOneBytes,
 			blockOneTxLocs,
-			wire.ProtocolVersion,
+			ProtocolVersion,
 		},
 
 		// Protocol version BIP0035Version.
@@ -133,7 +132,7 @@ func TestBlockWire(t *testing.T) {
 			&blockOne,
 			blockOneBytes,
 			blockOneTxLocs,
-			wire.BIP0035Version,
+			BIP0035Version,
 		},
 
 		// Protocol version BIP0031Version.
@@ -142,7 +141,7 @@ func TestBlockWire(t *testing.T) {
 			&blockOne,
 			blockOneBytes,
 			blockOneTxLocs,
-			wire.BIP0031Version,
+			BIP0031Version,
 		},
 
 		// Protocol version NetAddressTimeVersion.
@@ -151,7 +150,7 @@ func TestBlockWire(t *testing.T) {
 			&blockOne,
 			blockOneBytes,
 			blockOneTxLocs,
-			wire.NetAddressTimeVersion,
+			NetAddressTimeVersion,
 		},
 
 		// Protocol version MultipleAddressVersion.
@@ -160,7 +159,7 @@ func TestBlockWire(t *testing.T) {
 			&blockOne,
 			blockOneBytes,
 			blockOneTxLocs,
-			wire.MultipleAddressVersion,
+			MultipleAddressVersion,
 		},
 	}
 
@@ -180,7 +179,7 @@ func TestBlockWire(t *testing.T) {
 		}
 
 		// Decode the message from wire format.
-		var msg wire.MsgBlock
+		var msg MsgBlock
 		rbuf := bytes.NewReader(test.buf)
 		err = msg.BtcDecode(rbuf, test.pver)
 		if err != nil {
@@ -204,12 +203,12 @@ func TestBlockWireErrors(t *testing.T) {
 	pver := uint32(60002)
 
 	tests := []struct {
-		in       *wire.MsgBlock // Value to encode
-		buf      []byte         // Wire encoding
-		pver     uint32         // Protocol version for wire encoding
-		max      int            // Max size of fixed buffer to induce errors
-		writeErr error          // Expected write error
-		readErr  error          // Expected read error
+		in       *MsgBlock // Value to encode
+		buf      []byte    // Wire encoding
+		pver     uint32    // Protocol version for wire encoding
+		max      int       // Max size of fixed buffer to induce errors
+		writeErr error     // Expected write error
+		readErr  error     // Expected read error
 	}{
 		// Force error in version.
 		{&blockOne, blockOneBytes, pver, 0, io.ErrShortWrite, io.EOF},
@@ -241,7 +240,7 @@ func TestBlockWireErrors(t *testing.T) {
 		}
 
 		// Decode from wire format.
-		var msg wire.MsgBlock
+		var msg MsgBlock
 		r := newFixedReader(test.max, test.buf)
 		err = msg.BtcDecode(r, test.pver)
 		if err != test.readErr {
@@ -255,10 +254,10 @@ func TestBlockWireErrors(t *testing.T) {
 // TestBlockSerialize tests MsgBlock serialize and deserialize.
 func TestBlockSerialize(t *testing.T) {
 	tests := []struct {
-		in     *wire.MsgBlock // Message to encode
-		out    *wire.MsgBlock // Expected decoded message
-		buf    []byte         // Serialized data
-		txLocs []wire.TxLoc   // Expected transaction locations
+		in     *MsgBlock // Message to encode
+		out    *MsgBlock // Expected decoded message
+		buf    []byte    // Serialized data
+		txLocs []TxLoc   // Expected transaction locations
 	}{
 		{
 			&blockOne,
@@ -284,7 +283,7 @@ func TestBlockSerialize(t *testing.T) {
 		}
 
 		// Deserialize the block.
-		var block wire.MsgBlock
+		var block MsgBlock
 		rbuf := bytes.NewReader(test.buf)
 		err = block.Deserialize(rbuf)
 		if err != nil {
@@ -299,7 +298,7 @@ func TestBlockSerialize(t *testing.T) {
 
 		// Deserialize the block while gathering transaction location
 		// information.
-		var txLocBlock wire.MsgBlock
+		var txLocBlock MsgBlock
 		br := bytes.NewBuffer(test.buf)
 		txLocs, err := txLocBlock.DeserializeTxLoc(br)
 		if err != nil {
@@ -323,11 +322,11 @@ func TestBlockSerialize(t *testing.T) {
 // decode of MsgBlock to confirm error paths work correctly.
 func TestBlockSerializeErrors(t *testing.T) {
 	tests := []struct {
-		in       *wire.MsgBlock // Value to encode
-		buf      []byte         // Serialized data
-		max      int            // Max size of fixed buffer to induce errors
-		writeErr error          // Expected write error
-		readErr  error          // Expected read error
+		in       *MsgBlock // Value to encode
+		buf      []byte    // Serialized data
+		max      int       // Max size of fixed buffer to induce errors
+		writeErr error     // Expected write error
+		readErr  error     // Expected read error
 	}{
 		// Force error in version.
 		{&blockOne, blockOneBytes, 0, io.ErrShortWrite, io.EOF},
@@ -359,7 +358,7 @@ func TestBlockSerializeErrors(t *testing.T) {
 		}
 
 		// Deserialize the block.
-		var block wire.MsgBlock
+		var block MsgBlock
 		r := newFixedReader(test.max, test.buf)
 		err = block.Deserialize(r)
 		if err != test.readErr {
@@ -368,7 +367,7 @@ func TestBlockSerializeErrors(t *testing.T) {
 			continue
 		}
 
-		var txLocBlock wire.MsgBlock
+		var txLocBlock MsgBlock
 		br := bytes.NewBuffer(test.buf[0:test.max])
 		_, err = txLocBlock.DeserializeTxLoc(br)
 		if err != test.readErr {
@@ -411,14 +410,14 @@ func TestBlockOverflowErrors(t *testing.T) {
 				0x01, 0xe3, 0x62, 0x99, // Nonce
 				0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
 				0xff, // TxnCount
-			}, pver, &wire.MessageError{},
+			}, pver, &MessageError{},
 		},
 	}
 
 	t.Logf("Running %d tests", len(tests))
 	for i, test := range tests {
 		// Decode from wire format.
-		var msg wire.MsgBlock
+		var msg MsgBlock
 		r := bytes.NewReader(test.buf)
 		err := msg.BtcDecode(r, test.pver)
 		if reflect.TypeOf(err) != reflect.TypeOf(test.err) {
@@ -451,11 +450,11 @@ func TestBlockOverflowErrors(t *testing.T) {
 // various blocks is accurate.
 func TestBlockSerializeSize(t *testing.T) {
 	// Block with no transactions.
-	noTxBlock := wire.NewMsgBlock(&blockOne.Header)
+	noTxBlock := NewMsgBlock(&blockOne.Header)
 
 	tests := []struct {
-		in   *wire.MsgBlock // Block to encode
-		size int            // Expected serialized size
+		in   *MsgBlock // Block to encode
+		size int       // Expected serialized size
 	}{
 		// Block with no transactions.
 		{noTxBlock, 81},
@@ -475,16 +474,17 @@ func TestBlockSerializeSize(t *testing.T) {
 	}
 }
 
-var blockOne = wire.MsgBlock{
-	Header: wire.BlockHeader{
+// blockOne is the first block in the mainnet block chain.
+var blockOne = MsgBlock{
+	Header: BlockHeader{
 		Version: 1,
-		PrevBlock: wire.ShaHash([wire.HashSize]byte{ // Make go vet happy.
+		PrevBlock: ShaHash([HashSize]byte{ // Make go vet happy.
 			0x6f, 0xe2, 0x8c, 0x0a, 0xb6, 0xf1, 0xb3, 0x72,
 			0xc1, 0xa6, 0xa2, 0x46, 0xae, 0x63, 0xf7, 0x4f,
 			0x93, 0x1e, 0x83, 0x65, 0xe1, 0x5a, 0x08, 0x9c,
 			0x68, 0xd6, 0x19, 0x00, 0x00, 0x00, 0x00, 0x00,
 		}),
-		MerkleRoot: wire.ShaHash([wire.HashSize]byte{ // Make go vet happy.
+		MerkleRoot: ShaHash([HashSize]byte{ // Make go vet happy.
 			0x98, 0x20, 0x51, 0xfd, 0x1e, 0x4b, 0xa7, 0x44,
 			0xbb, 0xbe, 0x68, 0x0e, 0x1f, 0xee, 0x14, 0x67,
 			0x7b, 0xa1, 0xa3, 0xc3, 0x54, 0x0b, 0xf7, 0xb1,
@@ -495,13 +495,13 @@ var blockOne = wire.MsgBlock{
 		Bits:      0x1d00ffff,               // 486604799
 		Nonce:     0x9962e301,               // 2573394689
 	},
-	Transactions: []*wire.MsgTx{
+	Transactions: []*MsgTx{
 		{
 			Version: 1,
-			TxIn: []*wire.TxIn{
+			TxIn: []*TxIn{
 				{
-					PreviousOutPoint: wire.OutPoint{
-						Hash:  wire.ShaHash{},
+					PreviousOutPoint: OutPoint{
+						Hash:  ShaHash{},
 						Index: 0xffffffff,
 					},
 					SignatureScript: []byte{
@@ -510,7 +510,7 @@ var blockOne = wire.MsgBlock{
 					Sequence: 0xffffffff,
 				},
 			},
-			TxOut: []*wire.TxOut{
+			TxOut: []*TxOut{
 				{
 					Value: 0x12a05f200,
 					PkScript: []byte{
@@ -576,6 +576,6 @@ var blockOneBytes = []byte{
 }
 
 // Transaction location information for block one transactions.
-var blockOneTxLocs = []wire.TxLoc{
+var blockOneTxLocs = []TxLoc{
 	{TxStart: 81, TxLen: 134},
 }

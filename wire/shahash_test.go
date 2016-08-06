@@ -1,15 +1,13 @@
-// Copyright (c) 2013-2015 The btcsuite developers
+// Copyright (c) 2013-2016 The btcsuite developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
-package wire_test
+package wire
 
 import (
 	"bytes"
 	"encoding/hex"
 	"testing"
-
-	"github.com/btcsuite/btcd/wire"
 )
 
 // TestShaHash tests the ShaHash API.
@@ -17,7 +15,7 @@ func TestShaHash(t *testing.T) {
 
 	// Hash of block 234439.
 	blockHashStr := "14a0810ac680a3eb3f82edc878cea25ec41d6b790744e5daeef"
-	blockHash, err := wire.NewShaHashFromStr(blockHashStr)
+	blockHash, err := NewShaHashFromStr(blockHashStr)
 	if err != nil {
 		t.Errorf("NewShaHashFromStr: %v", err)
 	}
@@ -30,15 +28,15 @@ func TestShaHash(t *testing.T) {
 		0xa6, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 	}
 
-	hash, err := wire.NewShaHash(buf)
+	hash, err := NewShaHash(buf)
 	if err != nil {
 		t.Errorf("NewShaHash: unexpected error %v", err)
 	}
 
 	// Ensure proper size.
-	if len(hash) != wire.HashSize {
+	if len(hash) != HashSize {
 		t.Errorf("NewShaHash: hash length mismatch - got: %v, want: %v",
-			len(hash), wire.HashSize)
+			len(hash), HashSize)
 	}
 
 	// Ensure contents match.
@@ -70,8 +68,8 @@ func TestShaHash(t *testing.T) {
 	}
 
 	// Invalid size for NewShaHash.
-	invalidHash := make([]byte, wire.HashSize+1)
-	_, err = wire.NewShaHash(invalidHash)
+	invalidHash := make([]byte, HashSize+1)
+	_, err = NewShaHash(invalidHash)
 	if err == nil {
 		t.Errorf("NewShaHash: failed to received expected err - got: nil")
 	}
@@ -81,7 +79,7 @@ func TestShaHash(t *testing.T) {
 func TestShaHashString(t *testing.T) {
 	// Block 100000 hash.
 	wantStr := "000000000003ba27aa200b1cecaad478d2b00432346c3f1f3986da1afd33e506"
-	hash := wire.ShaHash([wire.HashSize]byte{ // Make go vet happy.
+	hash := ShaHash([HashSize]byte{ // Make go vet happy.
 		0x06, 0xe5, 0x33, 0xfd, 0x1a, 0xda, 0x86, 0x39,
 		0x1f, 0x3f, 0x6c, 0x34, 0x32, 0x04, 0xb0, 0xd2,
 		0x78, 0xd4, 0xaa, 0xec, 0x1c, 0x0b, 0x20, 0xaa,
@@ -99,7 +97,7 @@ func TestShaHashString(t *testing.T) {
 func TestNewShaHashFromStr(t *testing.T) {
 	tests := []struct {
 		in   string
-		want wire.ShaHash
+		want ShaHash
 		err  error
 	}{
 		// Genesis hash.
@@ -119,14 +117,14 @@ func TestNewShaHashFromStr(t *testing.T) {
 		// Empty string.
 		{
 			"",
-			wire.ShaHash{},
+			ShaHash{},
 			nil,
 		},
 
 		// Single digit hash.
 		{
 			"1",
-			wire.ShaHash([wire.HashSize]byte{ // Make go vet happy.
+			ShaHash([HashSize]byte{ // Make go vet happy.
 				0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 				0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 				0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
@@ -138,7 +136,7 @@ func TestNewShaHashFromStr(t *testing.T) {
 		// Block 203707 with stripped leading zeros.
 		{
 			"3264bc2ac36a60840790ba1d475d01367e7c723da941069e9dc",
-			wire.ShaHash([wire.HashSize]byte{ // Make go vet happy.
+			ShaHash([HashSize]byte{ // Make go vet happy.
 				0xdc, 0xe9, 0x69, 0x10, 0x94, 0xda, 0x23, 0xc7,
 				0xe7, 0x67, 0x13, 0xd0, 0x75, 0xd4, 0xa1, 0x0b,
 				0x79, 0x40, 0x08, 0xa6, 0x36, 0xac, 0xc2, 0x4b,
@@ -150,14 +148,14 @@ func TestNewShaHashFromStr(t *testing.T) {
 		// Hash string that is too long.
 		{
 			"01234567890123456789012345678901234567890123456789012345678912345",
-			wire.ShaHash{},
-			wire.ErrHashStrSize,
+			ShaHash{},
+			ErrHashStrSize,
 		},
 
 		// Hash string that is contains non-hex chars.
 		{
 			"abcdefg",
-			wire.ShaHash{},
+			ShaHash{},
 			hex.InvalidByteError('g'),
 		},
 	}
@@ -166,7 +164,7 @@ func TestNewShaHashFromStr(t *testing.T) {
 	unexpectedResultStr := "NewShaHashFromStr #%d got: %v want: %v"
 	t.Logf("Running %d tests", len(tests))
 	for i, test := range tests {
-		result, err := wire.NewShaHashFromStr(test.in)
+		result, err := NewShaHashFromStr(test.in)
 		if err != test.err {
 			t.Errorf(unexpectedErrStr, i, err, test.err)
 			continue
