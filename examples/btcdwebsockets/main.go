@@ -10,7 +10,7 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/btcsuite/btcd/wire"
+	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcrpcclient"
 	"github.com/btcsuite/btcutil"
 )
@@ -21,10 +21,10 @@ func main() {
 	// for notifications.  See the documentation of the btcrpcclient
 	// NotificationHandlers type for more details about each handler.
 	ntfnHandlers := btcrpcclient.NotificationHandlers{
-		OnBlockConnected: func(hash *wire.ShaHash, height int32, time time.Time) {
+		OnBlockConnected: func(hash *chainhash.Hash, height int32, time time.Time) {
 			log.Printf("Block connected: %v (%d) %v", hash, height, time)
 		},
-		OnBlockDisconnected: func(hash *wire.ShaHash, height int32, time time.Time) {
+		OnBlockDisconnected: func(hash *chainhash.Hash, height int32, time time.Time) {
 			log.Printf("Block disconnected: %v (%d) %v", hash, height, time)
 		},
 	}

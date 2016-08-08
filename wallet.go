@@ -1,4 +1,4 @@
-// Copyright (c) 2014-2015 The btcsuite developers
+// Copyright (c) 2014-2016 The btcsuite developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -10,6 +10,7 @@ import (
 
 	"github.com/btcsuite/btcd/btcjson"
 	"github.com/btcsuite/btcd/chaincfg"
+	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/wire"
 	"github.com/btcsuite/btcutil"
 )
@@ -45,7 +46,7 @@ func (r FutureGetTransactionResult) Receive() (*btcjson.GetTransactionResult, er
 // the returned instance.
 //
 // See GetTransaction for the blocking version and more details.
-func (c *Client) GetTransactionAsync(txHash *wire.ShaHash) FutureGetTransactionResult {
+func (c *Client) GetTransactionAsync(txHash *chainhash.Hash) FutureGetTransactionResult {
 	hash := ""
 	if txHash != nil {
 		hash = txHash.String()
@@ -58,7 +59,7 @@ func (c *Client) GetTransactionAsync(txHash *wire.ShaHash) FutureGetTransactionR
 // GetTransaction returns detailed information about a wallet transaction.
 //
 // See GetRawTransaction to return the raw transaction instead.
-func (c *Client) GetTransaction(txHash *wire.ShaHash) (*btcjson.GetTransactionResult, error) {
+func (c *Client) GetTransaction(txHash *chainhash.Hash) (*btcjson.GetTransactionResult, error) {
 	return c.GetTransactionAsync(txHash).Receive()
 }
 
@@ -268,7 +269,7 @@ func (r FutureListSinceBlockResult) Receive() (*btcjson.ListSinceBlockResult, er
 // the returned instance.
 //
 // See ListSinceBlock for the blocking version and more details.
-func (c *Client) ListSinceBlockAsync(blockHash *wire.ShaHash) FutureListSinceBlockResult {
+func (c *Client) ListSinceBlockAsync(blockHash *chainhash.Hash) FutureListSinceBlockResult {
 	var hash *string
 	if blockHash != nil {
 		hash = btcjson.String(blockHash.String())
@@ -283,7 +284,7 @@ func (c *Client) ListSinceBlockAsync(blockHash *wire.ShaHash) FutureListSinceBlo
 // minimum confirmations as a filter.
 //
 // See ListSinceBlockMinConf to override the minimum number of confirmations.
-func (c *Client) ListSinceBlock(blockHash *wire.ShaHash) (*btcjson.ListSinceBlockResult, error) {
+func (c *Client) ListSinceBlock(blockHash *chainhash.Hash) (*btcjson.ListSinceBlockResult, error) {
 	return c.ListSinceBlockAsync(blockHash).Receive()
 }
 
@@ -292,7 +293,7 @@ func (c *Client) ListSinceBlock(blockHash *wire.ShaHash) (*btcjson.ListSinceBloc
 // function on the returned instance.
 //
 // See ListSinceBlockMinConf for the blocking version and more details.
-func (c *Client) ListSinceBlockMinConfAsync(blockHash *wire.ShaHash, minConfirms int) FutureListSinceBlockResult {
+func (c *Client) ListSinceBlockMinConfAsync(blockHash *chainhash.Hash, minConfirms int) FutureListSinceBlockResult {
 	var hash *string
 	if blockHash != nil {
 		hash = btcjson.String(blockHash.String())
@@ -307,7 +308,7 @@ func (c *Client) ListSinceBlockMinConfAsync(blockHash *wire.ShaHash, minConfirms
 // number of minimum confirmations as a filter.
 //
 // See ListSinceBlock to use the default minimum number of confirmations.
-func (c *Client) ListSinceBlockMinConf(blockHash *wire.ShaHash, minConfirms int) (*btcjson.ListSinceBlockResult, error) {
+func (c *Client) ListSinceBlockMinConf(blockHash *chainhash.Hash, minConfirms int) (*btcjson.ListSinceBlockResult, error) {
 	return c.ListSinceBlockMinConfAsync(blockHash, minConfirms).Receive()
 }
 
@@ -386,7 +387,7 @@ func (r FutureListLockUnspentResult) Receive() ([]*wire.OutPoint, error) {
 	// Create a slice of outpoints from the transaction input structs.
 	ops := make([]*wire.OutPoint, len(inputs))
 	for i, input := range inputs {
-		sha, err := wire.NewShaHashFromStr(input.Txid)
+		sha, err := chainhash.NewHashFromStr(input.Txid)
 		if err != nil {
 			return nil, err
 		}
@@ -451,7 +452,7 @@ type FutureSendToAddressResult chan *response
 
 // Receive waits for the response promised by the future and returns the hash
 // of the transaction sending the passed amount to the given address.
-func (r FutureSendToAddressResult) Receive() (*wire.ShaHash, error) {
+func (r FutureSendToAddressResult) Receive() (*chainhash.Hash, error) {
 	res, err := receiveFuture(r)
 	if err != nil {
 		return nil, err
@@ -464,7 +465,7 @@ func (r FutureSendToAddressResult) Receive() (*wire.ShaHash, error) {
 		return nil, err
 	}
 
-	return wire.NewShaHashFromStr(txHash)
+	return chainhash.NewHashFromStr(txHash)
 }
 
 // SendToAddressAsync returns an instance of a type that can be used to get the
@@ -486,7 +487,7 @@ func (c *Client) SendToAddressAsync(address btcutil.Address, amount btcutil.Amou
 //
 // NOTE: This function requires to the wallet to be unlocked.  See the
 // WalletPassphrase function for more details.
-func (c *Client) SendToAddress(address btcutil.Address, amount btcutil.Amount) (*wire.ShaHash, error) {
+func (c *Client) SendToAddress(address btcutil.Address, amount btcutil.Amount) (*chainhash.Hash, error) {
 	return c.SendToAddressAsync(address, amount).Receive()
 }
 
@@ -517,7 +518,7 @@ func (c *Client) SendToAddressCommentAsync(address btcutil.Address,
 //
 // NOTE: This function requires to the wallet to be unlocked.  See the
 // WalletPassphrase function for more details.
-func (c *Client) SendToAddressComment(address btcutil.Address, amount btcutil.Amount, comment, commentTo string) (*wire.ShaHash, error) {
+func (c *Client) SendToAddressComment(address btcutil.Address, amount btcutil.Amount, comment, commentTo string) (*chainhash.Hash, error) {
 	return c.SendToAddressCommentAsync(address, amount, comment,
 		commentTo).Receive()
 }
@@ -530,7 +531,7 @@ type FutureSendFromResult chan *response
 // Receive waits for the response promised by the future and returns the hash
 // of the transaction sending amount to the given address using the provided
 // account as a source of funds.
-func (r FutureSendFromResult) Receive() (*wire.ShaHash, error) {
+func (r FutureSendFromResult) Receive() (*chainhash.Hash, error) {
 	res, err := receiveFuture(r)
 	if err != nil {
 		return nil, err
@@ -543,7 +544,7 @@ func (r FutureSendFromResult) Receive() (*wire.ShaHash, error) {
 		return nil, err
 	}
 
-	return wire.NewShaHashFromStr(txHash)
+	return chainhash.NewHashFromStr(txHash)
 }
 
 // SendFromAsync returns an instance of a type that can be used to get the
@@ -566,7 +567,7 @@ func (c *Client) SendFromAsync(fromAccount string, toAddress btcutil.Address, am
 //
 // NOTE: This function requires to the wallet to be unlocked.  See the
 // WalletPassphrase function for more details.
-func (c *Client) SendFrom(fromAccount string, toAddress btcutil.Address, amount btcutil.Amount) (*wire.ShaHash, error) {
+func (c *Client) SendFrom(fromAccount string, toAddress btcutil.Address, amount btcutil.Amount) (*chainhash.Hash, error) {
 	return c.SendFromAsync(fromAccount, toAddress, amount).Receive()
 }
 
@@ -591,7 +592,7 @@ func (c *Client) SendFromMinConfAsync(fromAccount string, toAddress btcutil.Addr
 //
 // NOTE: This function requires to the wallet to be unlocked.  See the
 // WalletPassphrase function for more details.
-func (c *Client) SendFromMinConf(fromAccount string, toAddress btcutil.Address, amount btcutil.Amount, minConfirms int) (*wire.ShaHash, error) {
+func (c *Client) SendFromMinConf(fromAccount string, toAddress btcutil.Address, amount btcutil.Amount, minConfirms int) (*chainhash.Hash, error) {
 	return c.SendFromMinConfAsync(fromAccount, toAddress, amount,
 		minConfirms).Receive()
 }
@@ -624,7 +625,7 @@ func (c *Client) SendFromCommentAsync(fromAccount string,
 // WalletPassphrase function for more details.
 func (c *Client) SendFromComment(fromAccount string, toAddress btcutil.Address,
 	amount btcutil.Amount, minConfirms int,
-	comment, commentTo string) (*wire.ShaHash, error) {
+	comment, commentTo string) (*chainhash.Hash, error) {
 
 	return c.SendFromCommentAsync(fromAccount, toAddress, amount,
 		minConfirms, comment, commentTo).Receive()
@@ -638,7 +639,7 @@ type FutureSendManyResult chan *response
 // Receive waits for the response promised by the future and returns the hash
 // of the transaction sending multiple amounts to multiple addresses using the
 // provided account as a source of funds.
-func (r FutureSendManyResult) Receive() (*wire.ShaHash, error) {
+func (r FutureSendManyResult) Receive() (*chainhash.Hash, error) {
 	res, err := receiveFuture(r)
 	if err != nil {
 		return nil, err
@@ -651,7 +652,7 @@ func (r FutureSendManyResult) Receive() (*wire.ShaHash, error) {
 		return nil, err
 	}
 
-	return wire.NewShaHashFromStr(txHash)
+	return chainhash.NewHashFromStr(txHash)
 }
 
 // SendManyAsync returns an instance of a type that can be used to get the
@@ -676,7 +677,7 @@ func (c *Client) SendManyAsync(fromAccount string, amounts map[btcutil.Address]b
 //
 // NOTE: This function requires to the wallet to be unlocked.  See the
 // WalletPassphrase function for more details.
-func (c *Client) SendMany(fromAccount string, amounts map[btcutil.Address]btcutil.Amount) (*wire.ShaHash, error) {
+func (c *Client) SendMany(fromAccount string, amounts map[btcutil.Address]btcutil.Amount) (*chainhash.Hash, error) {
 	return c.SendManyAsync(fromAccount, amounts).Receive()
 }
 
@@ -709,7 +710,7 @@ func (c *Client) SendManyMinConfAsync(fromAccount string,
 // WalletPassphrase function for more details.
 func (c *Client) SendManyMinConf(fromAccount string,
 	amounts map[btcutil.Address]btcutil.Amount,
-	minConfirms int) (*wire.ShaHash, error) {
+	minConfirms int) (*chainhash.Hash, error) {
 
 	return c.SendManyMinConfAsync(fromAccount, amounts, minConfirms).Receive()
 }
@@ -744,7 +745,7 @@ func (c *Client) SendManyCommentAsync(fromAccount string,
 // WalletPassphrase function for more details.
 func (c *Client) SendManyComment(fromAccount string,
 	amounts map[btcutil.Address]btcutil.Amount, minConfirms int,
-	comment string) (*wire.ShaHash, error) {
+	comment string) (*chainhash.Hash, error) {
 
 	return c.SendManyCommentAsync(fromAccount, amounts, minConfirms,
 		comment).Receive()

@@ -1,4 +1,4 @@
-// Copyright (c) 2014-2015 The btcsuite developers
+// Copyright (c) 2014-2016 The btcsuite developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -10,6 +10,7 @@ import (
 	"encoding/json"
 
 	"github.com/btcsuite/btcd/btcjson"
+	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/wire"
 	"github.com/btcsuite/btcutil"
 )
@@ -20,7 +21,7 @@ type FutureGetBestBlockHashResult chan *response
 
 // Receive waits for the response promised by the future and returns the hash of
 // the best block in the longest block chain.
-func (r FutureGetBestBlockHashResult) Receive() (*wire.ShaHash, error) {
+func (r FutureGetBestBlockHashResult) Receive() (*chainhash.Hash, error) {
 	res, err := receiveFuture(r)
 	if err != nil {
 		return nil, err
@@ -32,7 +33,7 @@ func (r FutureGetBestBlockHashResult) Receive() (*wire.ShaHash, error) {
 	if err != nil {
 		return nil, err
 	}
-	return wire.NewShaHashFromStr(txHashStr)
+	return chainhash.NewHashFromStr(txHashStr)
 }
 
 // GetBestBlockHashAsync returns an instance of a type that can be used to get
@@ -47,7 +48,7 @@ func (c *Client) GetBestBlockHashAsync() FutureGetBestBlockHashResult {
 
 // GetBestBlockHash returns the hash of the best block in the longest block
 // chain.
-func (c *Client) GetBestBlockHash() (*wire.ShaHash, error) {
+func (c *Client) GetBestBlockHash() (*chainhash.Hash, error) {
 	return c.GetBestBlockHashAsync().Receive()
 }
 
@@ -90,7 +91,7 @@ func (r FutureGetBlockResult) Receive() (*btcutil.Block, error) {
 // returned instance.
 //
 // See GetBlock for the blocking version and more details.
-func (c *Client) GetBlockAsync(blockHash *wire.ShaHash) FutureGetBlockResult {
+func (c *Client) GetBlockAsync(blockHash *chainhash.Hash) FutureGetBlockResult {
 	hash := ""
 	if blockHash != nil {
 		hash = blockHash.String()
@@ -104,7 +105,7 @@ func (c *Client) GetBlockAsync(blockHash *wire.ShaHash) FutureGetBlockResult {
 //
 // See GetBlockVerbose to retrieve a data structure with information about the
 // block instead.
-func (c *Client) GetBlock(blockHash *wire.ShaHash) (*btcutil.Block, error) {
+func (c *Client) GetBlock(blockHash *chainhash.Hash) (*btcutil.Block, error) {
 	return c.GetBlockAsync(blockHash).Receive()
 }
 
@@ -134,7 +135,7 @@ func (r FutureGetBlockVerboseResult) Receive() (*btcjson.GetBlockVerboseResult, 
 // the returned instance.
 //
 // See GetBlockVerbose for the blocking version and more details.
-func (c *Client) GetBlockVerboseAsync(blockHash *wire.ShaHash, verboseTx bool) FutureGetBlockVerboseResult {
+func (c *Client) GetBlockVerboseAsync(blockHash *chainhash.Hash, verboseTx bool) FutureGetBlockVerboseResult {
 	hash := ""
 	if blockHash != nil {
 		hash = blockHash.String()
@@ -148,7 +149,7 @@ func (c *Client) GetBlockVerboseAsync(blockHash *wire.ShaHash, verboseTx bool) F
 // about a block given its hash.
 //
 // See GetBlock to retrieve a raw block instead.
-func (c *Client) GetBlockVerbose(blockHash *wire.ShaHash, verboseTx bool) (*btcjson.GetBlockVerboseResult, error) {
+func (c *Client) GetBlockVerbose(blockHash *chainhash.Hash, verboseTx bool) (*btcjson.GetBlockVerboseResult, error) {
 	return c.GetBlockVerboseAsync(blockHash, verboseTx).Receive()
 }
 
@@ -231,7 +232,7 @@ type FutureGetBlockHashResult chan *response
 
 // Receive waits for the response promised by the future and returns the hash of
 // the block in the best block chain at the given height.
-func (r FutureGetBlockHashResult) Receive() (*wire.ShaHash, error) {
+func (r FutureGetBlockHashResult) Receive() (*chainhash.Hash, error) {
 	res, err := receiveFuture(r)
 	if err != nil {
 		return nil, err
@@ -243,7 +244,7 @@ func (r FutureGetBlockHashResult) Receive() (*wire.ShaHash, error) {
 	if err != nil {
 		return nil, err
 	}
-	return wire.NewShaHashFromStr(txHashStr)
+	return chainhash.NewHashFromStr(txHashStr)
 }
 
 // GetBlockHashAsync returns an instance of a type that can be used to get the
@@ -258,7 +259,7 @@ func (c *Client) GetBlockHashAsync(blockHeight int64) FutureGetBlockHashResult {
 
 // GetBlockHash returns the hash of the block in the best block chain at the
 // given height.
-func (c *Client) GetBlockHash(blockHeight int64) (*wire.ShaHash, error) {
+func (c *Client) GetBlockHash(blockHeight int64) (*chainhash.Hash, error) {
 	return c.GetBlockHashAsync(blockHeight).Receive()
 }
 
@@ -268,7 +269,7 @@ type FutureGetRawMempoolResult chan *response
 
 // Receive waits for the response promised by the future and returns the hashes
 // of all transactions in the memory pool.
-func (r FutureGetRawMempoolResult) Receive() ([]*wire.ShaHash, error) {
+func (r FutureGetRawMempoolResult) Receive() ([]*chainhash.Hash, error) {
 	res, err := receiveFuture(r)
 	if err != nil {
 		return nil, err
@@ -282,9 +283,9 @@ func (r FutureGetRawMempoolResult) Receive() ([]*wire.ShaHash, error) {
 	}
 
 	// Create a slice of ShaHash arrays from the string slice.
-	txHashes := make([]*wire.ShaHash, 0, len(txHashStrs))
+	txHashes := make([]*chainhash.Hash, 0, len(txHashStrs))
 	for _, hashStr := range txHashStrs {
-		txHash, err := wire.NewShaHashFromStr(hashStr)
+		txHash, err := chainhash.NewHashFromStr(hashStr)
 		if err != nil {
 			return nil, err
 		}
@@ -308,7 +309,7 @@ func (c *Client) GetRawMempoolAsync() FutureGetRawMempoolResult {
 //
 // See GetRawMempoolVerbose to retrieve data structures with information about
 // the transactions instead.
-func (c *Client) GetRawMempool() ([]*wire.ShaHash, error) {
+func (c *Client) GetRawMempool() ([]*chainhash.Hash, error) {
 	return c.GetRawMempoolAsync().Receive()
 }
 
@@ -476,7 +477,7 @@ func (r FutureGetTxOutResult) Receive() (*btcjson.GetTxOutResult, error) {
 // the returned instance.
 //
 // See GetTxOut for the blocking version and more details.
-func (c *Client) GetTxOutAsync(txHash *wire.ShaHash, index uint32, mempool bool) FutureGetTxOutResult {
+func (c *Client) GetTxOutAsync(txHash *chainhash.Hash, index uint32, mempool bool) FutureGetTxOutResult {
 	hash := ""
 	if txHash != nil {
 		hash = txHash.String()
@@ -488,6 +489,6 @@ func (c *Client) GetTxOutAsync(txHash *wire.ShaHash, index uint32, mempool bool)
 
 // GetTxOut returns the transaction output info if it's unspent and
 // nil, otherwise.
-func (c *Client) GetTxOut(txHash *wire.ShaHash, index uint32, mempool bool) (*btcjson.GetTxOutResult, error) {
+func (c *Client) GetTxOut(txHash *chainhash.Hash, index uint32, mempool bool) (*btcjson.GetTxOutResult, error) {
 	return c.GetTxOutAsync(txHash, index, mempool).Receive()
 }

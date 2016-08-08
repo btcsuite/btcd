@@ -10,6 +10,7 @@ import (
 	"fmt"
 
 	"github.com/btcsuite/btcd/btcjson"
+	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/wire"
 	"github.com/btcsuite/btcutil"
 )
@@ -148,7 +149,7 @@ type FutureGetBestBlockResult chan *response
 
 // Receive waits for the response promised by the future and returns the hash
 // and height of the block in the longest (best) chain.
-func (r FutureGetBestBlockResult) Receive() (*wire.ShaHash, int32, error) {
+func (r FutureGetBestBlockResult) Receive() (*chainhash.Hash, int32, error) {
 	res, err := receiveFuture(r)
 	if err != nil {
 		return nil, 0, err
@@ -162,7 +163,7 @@ func (r FutureGetBestBlockResult) Receive() (*wire.ShaHash, int32, error) {
 	}
 
 	// Convert to hash from string.
-	hash, err := wire.NewShaHashFromStr(bestBlock.Hash)
+	hash, err := chainhash.NewHashFromStr(bestBlock.Hash)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -186,7 +187,7 @@ func (c *Client) GetBestBlockAsync() FutureGetBestBlockResult {
 // chain.
 //
 // NOTE: This is a btcd extension.
-func (c *Client) GetBestBlock() (*wire.ShaHash, int32, error) {
+func (c *Client) GetBestBlock() (*chainhash.Hash, int32, error) {
 	return c.GetBestBlockAsync().Receive()
 }
 

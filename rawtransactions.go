@@ -1,4 +1,4 @@
-// Copyright (c) 2014-2015 The btcsuite developers
+// Copyright (c) 2014-2016 The btcsuite developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -10,6 +10,7 @@ import (
 	"encoding/json"
 
 	"github.com/btcsuite/btcd/btcjson"
+	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/wire"
 	"github.com/btcsuite/btcutil"
 )
@@ -95,7 +96,7 @@ func (r FutureGetRawTransactionResult) Receive() (*btcutil.Tx, error) {
 // the returned instance.
 //
 // See GetRawTransaction for the blocking version and more details.
-func (c *Client) GetRawTransactionAsync(txHash *wire.ShaHash) FutureGetRawTransactionResult {
+func (c *Client) GetRawTransactionAsync(txHash *chainhash.Hash) FutureGetRawTransactionResult {
 	hash := ""
 	if txHash != nil {
 		hash = txHash.String()
@@ -109,7 +110,7 @@ func (c *Client) GetRawTransactionAsync(txHash *wire.ShaHash) FutureGetRawTransa
 //
 // See GetRawTransactionVerbose to obtain additional information about the
 // transaction.
-func (c *Client) GetRawTransaction(txHash *wire.ShaHash) (*btcutil.Tx, error) {
+func (c *Client) GetRawTransaction(txHash *chainhash.Hash) (*btcutil.Tx, error) {
 	return c.GetRawTransactionAsync(txHash).Receive()
 }
 
@@ -141,7 +142,7 @@ func (r FutureGetRawTransactionVerboseResult) Receive() (*btcjson.TxRawResult, e
 // function on the returned instance.
 //
 // See GetRawTransactionVerbose for the blocking version and more details.
-func (c *Client) GetRawTransactionVerboseAsync(txHash *wire.ShaHash) FutureGetRawTransactionVerboseResult {
+func (c *Client) GetRawTransactionVerboseAsync(txHash *chainhash.Hash) FutureGetRawTransactionVerboseResult {
 	hash := ""
 	if txHash != nil {
 		hash = txHash.String()
@@ -155,7 +156,7 @@ func (c *Client) GetRawTransactionVerboseAsync(txHash *wire.ShaHash) FutureGetRa
 // its hash.
 //
 // See GetRawTransaction to obtain only the transaction already deserialized.
-func (c *Client) GetRawTransactionVerbose(txHash *wire.ShaHash) (*btcjson.TxRawResult, error) {
+func (c *Client) GetRawTransactionVerbose(txHash *chainhash.Hash) (*btcjson.TxRawResult, error) {
 	return c.GetRawTransactionVerboseAsync(txHash).Receive()
 }
 
@@ -263,7 +264,7 @@ type FutureSendRawTransactionResult chan *response
 // Receive waits for the response promised by the future and returns the result
 // of submitting the encoded transaction to the server which then relays it to
 // the network.
-func (r FutureSendRawTransactionResult) Receive() (*wire.ShaHash, error) {
+func (r FutureSendRawTransactionResult) Receive() (*chainhash.Hash, error) {
 	res, err := receiveFuture(r)
 	if err != nil {
 		return nil, err
@@ -276,7 +277,7 @@ func (r FutureSendRawTransactionResult) Receive() (*wire.ShaHash, error) {
 		return nil, err
 	}
 
-	return wire.NewShaHashFromStr(txHashStr)
+	return chainhash.NewHashFromStr(txHashStr)
 }
 
 // SendRawTransactionAsync returns an instance of a type that can be used to get
@@ -301,7 +302,7 @@ func (c *Client) SendRawTransactionAsync(tx *wire.MsgTx, allowHighFees bool) Fut
 
 // SendRawTransaction submits the encoded transaction to the server which will
 // then relay it to the network.
-func (c *Client) SendRawTransaction(tx *wire.MsgTx, allowHighFees bool) (*wire.ShaHash, error) {
+func (c *Client) SendRawTransaction(tx *wire.MsgTx, allowHighFees bool) (*chainhash.Hash, error) {
 	return c.SendRawTransactionAsync(tx, allowHighFees).Receive()
 }
 
