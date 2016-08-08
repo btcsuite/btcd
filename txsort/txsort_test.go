@@ -1,4 +1,4 @@
-// Copyright (c) 2015 The btcsuite developers
+// Copyright (c) 2015-2016 The btcsuite developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -96,7 +96,7 @@ func TestSort(t *testing.T) {
 		// Sort the transaction and ensure the resulting hash is the
 		// expected value.
 		sortedTx := txsort.Sort(&tx)
-		if got := sortedTx.TxSha().String(); got != test.sortedHash {
+		if got := sortedTx.TxHash().String(); got != test.sortedHash {
 			t.Errorf("Sort (%s): sorted hash does not match "+
 				"expected - got %v, want %v", test.name, got,
 				test.sortedHash)
@@ -104,7 +104,7 @@ func TestSort(t *testing.T) {
 		}
 
 		// Ensure the original transaction is not modified.
-		if got := tx.TxSha().String(); got != test.unsortedHash {
+		if got := tx.TxHash().String(); got != test.unsortedHash {
 			t.Errorf("Sort (%s): unsorted hash does not match "+
 				"expected - got %v, want %v", test.name, got,
 				test.unsortedHash)
@@ -114,7 +114,7 @@ func TestSort(t *testing.T) {
 		// Now sort the transaction using the mutable version and ensure
 		// the resulting hash is the expected value.
 		txsort.InPlaceSort(&tx)
-		if got := tx.TxSha().String(); got != test.sortedHash {
+		if got := tx.TxHash().String(); got != test.sortedHash {
 			t.Errorf("SortMutate (%s): sorted hash does not match "+
 				"expected - got %v, want %v", test.name, got,
 				test.sortedHash)

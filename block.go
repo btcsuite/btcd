@@ -1,4 +1,4 @@
-// Copyright (c) 2013-2014 The btcsuite developers
+// Copyright (c) 2013-2016 The btcsuite developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"io"
 
+	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/wire"
 )
 
@@ -31,12 +32,12 @@ func (e OutOfRangeError) Error() string {
 // transactions on their first access so subsequent accesses don't have to
 // repeat the relatively expensive hashing operations.
 type Block struct {
-	msgBlock        *wire.MsgBlock // Underlying MsgBlock
-	serializedBlock []byte         // Serialized bytes for the block
-	blockSha        *wire.ShaHash  // Cached block hash
-	blockHeight     int32          // Height in the main block chain
-	transactions    []*Tx          // Transactions
-	txnsGenerated   bool           // ALL wrapped transactions generated
+	msgBlock        *wire.MsgBlock  // Underlying MsgBlock
+	serializedBlock []byte          // Serialized bytes for the block
+	blockHash       *chainhash.Hash // Cached block hash
+	blockHeight     int32           // Height in the main block chain
+	transactions    []*Tx           // Transactions
+	txnsGenerated   bool            // ALL wrapped transactions generated
 }
 
 // MsgBlock returns the underlying wire.MsgBlock for the Block.
@@ -67,19 +68,19 @@ func (b *Block) Bytes() ([]byte, error) {
 	return serializedBlock, nil
 }
 
-// Sha returns the block identifier hash for the Block.  This is equivalent to
-// calling BlockSha on the underlying wire.MsgBlock, however it caches the
+// Hash returns the block identifier hash for the Block.  This is equivalent to
+// calling BlockHash on the underlying wire.MsgBlock, however it caches the
 // result so subsequent calls are more efficient.
-func (b *Block) Sha() *wire.ShaHash {
+func (b *Block) Hash() *chainhash.Hash {
 	// Return the cached block hash if it has already been generated.
-	if b.blockSha != nil {
-		return b.blockSha
+	if b.blockHash != nil {
+		return b.blockHash
 	}
 
 	// Cache the block hash and return it.
-	sha := b.msgBlock.BlockSha()
-	b.blockSha = &sha
-	return &sha
+	hash := b.msgBlock.BlockHash()
+	b.blockHash = &hash
+	return &hash
 }
 
 // Tx returns a wrapped transaction (btcutil.Tx) for the transaction at the
@@ -145,12 +146,12 @@ func (b *Block) Transactions() []*Tx {
 	return b.transactions
 }
 
-// TxSha returns the hash for the requested transaction number in the Block.
+// TxHash returns the hash for the requested transaction number in the Block.
 // The supplied index is 0 based.  That is to say, the first transaction in the
-// block is txNum 0.  This is equivalent to calling TxSha on the underlying
+// block is txNum 0.  This is equivalent to calling TxHash on the underlying
 // wire.MsgTx, however it caches the result so subsequent calls are more
 // efficient.
-func (b *Block) TxSha(txNum int) (*wire.ShaHash, error) {
+func (b *Block) TxHash(txNum int) (*chainhash.Hash, error) {
 	// Attempt to get a wrapped transaction for the specified index.  It
 	// will be created lazily if needed or simply return the cached version
 	// if it has already been generated.
@@ -161,7 +162,7 @@ func (b *Block) TxSha(txNum int) (*wire.ShaHash, error) {
 
 	// Defer to the wrapped transaction which will return the cached hash if
 	// it has already been generated.
-	return tx.Sha(), nil
+	return tx.Hash(), nil
 }
 
 // TxLoc returns the offsets and lengths of each transaction in a raw block.

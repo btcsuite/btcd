@@ -1,4 +1,4 @@
-// Copyright (c) 2013-2014 The btcsuite developers
+// Copyright (c) 2013-2016 The btcsuite developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -10,7 +10,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/btcsuite/btcd/wire"
+	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcutil"
 	"github.com/davecgh/go-spew/spew"
 )
@@ -35,18 +35,18 @@ func TestTx(t *testing.T) {
 	}
 
 	// Hash for block 100,000 transaction 0.
-	wantShaStr := "8c14f0db3df150123e6f3dbbf30f8b955a8249b62ac1d1ff16284aefa3d06d87"
-	wantSha, err := wire.NewShaHashFromStr(wantShaStr)
+	wantHashStr := "8c14f0db3df150123e6f3dbbf30f8b955a8249b62ac1d1ff16284aefa3d06d87"
+	wantHash, err := chainhash.NewHashFromStr(wantHashStr)
 	if err != nil {
-		t.Errorf("NewShaHashFromStr: %v", err)
+		t.Errorf("NewHashFromStr: %v", err)
 	}
 
-	// Request the sha multiple times to test generation and caching.
+	// Request the hash multiple times to test generation and caching.
 	for i := 0; i < 2; i++ {
-		sha := tx.Sha()
-		if !sha.IsEqual(wantSha) {
-			t.Errorf("Sha #%d mismatched sha - got %v, want %v", i,
-				sha, wantSha)
+		hash := tx.Hash()
+		if !hash.IsEqual(wantHash) {
+			t.Errorf("Hash #%d mismatched hash - got %v, want %v", i,
+				hash, wantHash)
 		}
 	}
 }

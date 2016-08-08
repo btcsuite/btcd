@@ -1,3 +1,7 @@
+// Copyright (c) 2014-2016 The btcsuite developers
+// Use of this source code is governed by an ISC
+// license that can be found in the LICENSE file.
+
 package coinset_test
 
 import (
@@ -6,20 +10,20 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/btcsuite/btcd/wire"
+	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcutil"
 	"github.com/btcsuite/btcutil/coinset"
 	"github.com/btcsuite/fastsha256"
 )
 
 type TestCoin struct {
-	TxHash     *wire.ShaHash
+	TxHash     *chainhash.Hash
 	TxIndex    uint32
 	TxValue    btcutil.Amount
 	TxNumConfs int64
 }
 
-func (c *TestCoin) Hash() *wire.ShaHash   { return c.TxHash }
+func (c *TestCoin) Hash() *chainhash.Hash { return c.TxHash }
 func (c *TestCoin) Index() uint32         { return c.TxIndex }
 func (c *TestCoin) Value() btcutil.Amount { return c.TxValue }
 func (c *TestCoin) PkScript() []byte      { return nil }
@@ -29,7 +33,7 @@ func (c *TestCoin) ValueAge() int64       { return int64(c.TxValue) * c.TxNumCon
 func NewCoin(index int64, value btcutil.Amount, numConfs int64) coinset.Coin {
 	h := fastsha256.New()
 	h.Write([]byte(fmt.Sprintf("%d", index)))
-	hash, _ := wire.NewShaHash(h.Sum(nil))
+	hash, _ := chainhash.NewHash(h.Sum(nil))
 	c := &TestCoin{
 		TxHash:     hash,
 		TxIndex:    0,

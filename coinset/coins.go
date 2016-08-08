@@ -1,3 +1,7 @@
+// Copyright (c) 2014-2016 The btcsuite developers
+// Use of this source code is governed by an ISC
+// license that can be found in the LICENSE file.
+
 package coinset
 
 import (
@@ -5,13 +9,14 @@ import (
 	"errors"
 	"sort"
 
+	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/wire"
 	"github.com/btcsuite/btcutil"
 )
 
 // Coin represents a spendable transaction outpoint
 type Coin interface {
-	Hash() *wire.ShaHash
+	Hash() *chainhash.Hash
 	Index() uint32
 	Value() btcutil.Amount
 	PkScript() []byte
@@ -354,8 +359,8 @@ type SimpleCoin struct {
 var _ Coin = &SimpleCoin{}
 
 // Hash returns the hash value of the transaction on which the Coin is an output
-func (c *SimpleCoin) Hash() *wire.ShaHash {
-	return c.Tx.Sha()
+func (c *SimpleCoin) Hash() *chainhash.Hash {
+	return c.Tx.Hash()
 }
 
 // Index returns the index of the output on the transaction which the Coin represents

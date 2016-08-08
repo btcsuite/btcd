@@ -1,4 +1,4 @@
-// Copyright (c) 2013, 2014 The btcsuite developers
+// Copyright (c) 2013-2016 The btcsuite developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -9,6 +9,7 @@ import (
 	"encoding/hex"
 	"testing"
 
+	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/wire"
 	"github.com/btcsuite/btcutil"
 	"github.com/btcsuite/btcutil/bloom"
@@ -37,13 +38,13 @@ func TestMerkleBlock3(t *testing.T) {
 	f := bloom.NewFilter(10, 0, 0.000001, wire.BloomUpdateAll)
 
 	inputStr := "63194f18be0af63f2c6bc9dc0f777cbefed3d9415c4af83f3ee3a3d669c00cb5"
-	sha, err := wire.NewShaHashFromStr(inputStr)
+	hash, err := chainhash.NewHashFromStr(inputStr)
 	if err != nil {
-		t.Errorf("TestMerkleBlock3 NewShaHashFromStr failed: %v", err)
+		t.Errorf("TestMerkleBlock3 NewHashFromStr failed: %v", err)
 		return
 	}
 
-	f.AddShaHash(sha)
+	f.AddHash(hash)
 
 	mBlock, _ := bloom.NewMerkleBlock(blk, f)
 

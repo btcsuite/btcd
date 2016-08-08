@@ -1,4 +1,4 @@
-// Copyright (c) 2013-2014 The btcsuite developers
+// Copyright (c) 2013-2016 The btcsuite developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -11,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/wire"
 	"github.com/btcsuite/btcutil"
 	"github.com/davecgh/go-spew/spew"
@@ -35,23 +36,23 @@ func TestBlock(t *testing.T) {
 	}
 
 	// Hash for block 100,000.
-	wantShaStr := "3ba27aa200b1cecaad478d2b00432346c3f1f3986da1afd33e506"
-	wantSha, err := wire.NewShaHashFromStr(wantShaStr)
+	wantHashStr := "3ba27aa200b1cecaad478d2b00432346c3f1f3986da1afd33e506"
+	wantHash, err := chainhash.NewHashFromStr(wantHashStr)
 	if err != nil {
-		t.Errorf("NewShaHashFromStr: %v", err)
+		t.Errorf("NewHashFromStr: %v", err)
 	}
 
-	// Request the sha multiple times to test generation and caching.
+	// Request the hash multiple times to test generation and caching.
 	for i := 0; i < 2; i++ {
-		sha := b.Sha()
-		if !sha.IsEqual(wantSha) {
-			t.Errorf("Sha #%d mismatched sha - got %v, want %v", i,
-				sha, wantSha)
+		hash := b.Hash()
+		if !hash.IsEqual(wantHash) {
+			t.Errorf("Hash #%d mismatched hash - got %v, want %v",
+				i, hash, wantHash)
 		}
 	}
 
-	// Shas for the transactions in Block100000.
-	wantTxShas := []string{
+	// Hashes for the transactions in Block100000.
+	wantTxHashes := []string{
 		"8c14f0db3df150123e6f3dbbf30f8b955a8249b62ac1d1ff16284aefa3d06d87",
 		"fff2525b8931402dd09222c50775608f75787bd2b87e56995a7bdd30f79702c4",
 		"6359f0868171b1d194cbee1af2f16ea598ae8fad666d9b012c8ed2b79a236ec4",
@@ -61,14 +62,15 @@ func TestBlock(t *testing.T) {
 	// Create a new block to nuke all cached data.
 	b = btcutil.NewBlock(&Block100000)
 
-	// Request sha for all transactions one at a time via Tx.
-	for i, txSha := range wantTxShas {
-		wantSha, err := wire.NewShaHashFromStr(txSha)
+	// Request hash for all transactions one at a time via Tx.
+	for i, txHash := range wantTxHashes {
+		wantHash, err := chainhash.NewHashFromStr(txHash)
 		if err != nil {
-			t.Errorf("NewShaHashFromStr: %v", err)
+			t.Errorf("NewHashFromStr: %v", err)
 		}
 
-		// Request the sha multiple times to test generation and caching.
+		// Request the hash multiple times to test generation and
+		// caching.
 		for j := 0; j < 2; j++ {
 			tx, err := b.Tx(i)
 			if err != nil {
@@ -76,10 +78,10 @@ func TestBlock(t *testing.T) {
 				continue
 			}
 
-			sha := tx.Sha()
-			if !sha.IsEqual(wantSha) {
-				t.Errorf("Sha #%d mismatched sha - got %v, "+
-					"want %v", j, sha, wantSha)
+			hash := tx.Hash()
+			if !hash.IsEqual(wantHash) {
+				t.Errorf("Hash #%d mismatched hash - got %v, "+
+					"want %v", j, hash, wantHash)
 				continue
 			}
 		}
@@ -94,24 +96,24 @@ func TestBlock(t *testing.T) {
 		transactions := b.Transactions()
 
 		// Ensure we get the expected number of transactions.
-		if len(transactions) != len(wantTxShas) {
+		if len(transactions) != len(wantTxHashes) {
 			t.Errorf("Transactions #%d mismatched number of "+
 				"transactions - got %d, want %d", i,
-				len(transactions), len(wantTxShas))
+				len(transactions), len(wantTxHashes))
 			continue
 		}
 
-		// Ensure all of the shas match.
+		// Ensure all of the hashes match.
 		for j, tx := range transactions {
-			wantSha, err := wire.NewShaHashFromStr(wantTxShas[j])
+			wantHash, err := chainhash.NewHashFromStr(wantTxHashes[j])
 			if err != nil {
-				t.Errorf("NewShaHashFromStr: %v", err)
+				t.Errorf("NewHashFromStr: %v", err)
 			}
 
-			sha := tx.Sha()
-			if !sha.IsEqual(wantSha) {
-				t.Errorf("Transactions #%d mismatched shas - "+
-					"got %v, want %v", j, sha, wantSha)
+			hash := tx.Hash()
+			if !hash.IsEqual(wantHash) {
+				t.Errorf("Transactions #%d mismatched hashes "+
+					"- got %v, want %v", j, hash, wantHash)
 				continue
 			}
 		}
@@ -262,15 +264,15 @@ func TestBlockErrors(t *testing.T) {
 			"got %v, want %v", err, io.EOF)
 	}
 
-	// Ensure TxSha returns expected error on invalid indices.
-	_, err = b.TxSha(-1)
+	// Ensure TxHash returns expected error on invalid indices.
+	_, err = b.TxHash(-1)
 	if _, ok := err.(btcutil.OutOfRangeError); !ok {
-		t.Errorf("TxSha: wrong error - got: %v <%T>, "+
+		t.Errorf("TxHash: wrong error - got: %v <%T>, "+
 			"want: <%T>", err, err, btcutil.OutOfRangeError(""))
 	}
-	_, err = b.TxSha(len(Block100000.Transactions) + 1)
+	_, err = b.TxHash(len(Block100000.Transactions) + 1)
 	if _, ok := err.(btcutil.OutOfRangeError); !ok {
-		t.Errorf("TxSha: wrong error - got: %v <%T>, "+
+		t.Errorf("TxHash: wrong error - got: %v <%T>, "+
 			"want: <%T>", err, err, btcutil.OutOfRangeError(""))
 	}
 
@@ -302,13 +304,13 @@ func TestBlockErrors(t *testing.T) {
 var Block100000 = wire.MsgBlock{
 	Header: wire.BlockHeader{
 		Version: 1,
-		PrevBlock: wire.ShaHash([32]byte{ // Make go vet happy.
+		PrevBlock: chainhash.Hash([32]byte{ // Make go vet happy.
 			0x50, 0x12, 0x01, 0x19, 0x17, 0x2a, 0x61, 0x04,
 			0x21, 0xa6, 0xc3, 0x01, 0x1d, 0xd3, 0x30, 0xd9,
 			0xdf, 0x07, 0xb6, 0x36, 0x16, 0xc2, 0xcc, 0x1f,
 			0x1c, 0xd0, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00,
 		}), // 000000000002d01c1fccc21636b607dfd930d31d01c3a62104612a1719011250
-		MerkleRoot: wire.ShaHash([32]byte{ // Make go vet happy.
+		MerkleRoot: chainhash.Hash([32]byte{ // Make go vet happy.
 			0x66, 0x57, 0xa9, 0x25, 0x2a, 0xac, 0xd5, 0xc0,
 			0xb2, 0x94, 0x09, 0x96, 0xec, 0xff, 0x95, 0x22,
 			0x28, 0xc3, 0x06, 0x7c, 0xc3, 0x8d, 0x48, 0x85,
@@ -324,7 +326,7 @@ var Block100000 = wire.MsgBlock{
 			TxIn: []*wire.TxIn{
 				{
 					PreviousOutPoint: wire.OutPoint{
-						Hash:  wire.ShaHash{},
+						Hash:  chainhash.Hash{},
 						Index: 0xffffffff,
 					},
 					SignatureScript: []byte{
@@ -358,7 +360,7 @@ var Block100000 = wire.MsgBlock{
 			TxIn: []*wire.TxIn{
 				{
 					PreviousOutPoint: wire.OutPoint{
-						Hash: wire.ShaHash([32]byte{ // Make go vet happy.
+						Hash: chainhash.Hash([32]byte{ // Make go vet happy.
 							0x03, 0x2e, 0x38, 0xe9, 0xc0, 0xa8, 0x4c, 0x60,
 							0x46, 0xd6, 0x87, 0xd1, 0x05, 0x56, 0xdc, 0xac,
 							0xc4, 0x1d, 0x27, 0x5e, 0xc5, 0x5f, 0xc0, 0x07,
@@ -427,7 +429,7 @@ var Block100000 = wire.MsgBlock{
 			TxIn: []*wire.TxIn{
 				{
 					PreviousOutPoint: wire.OutPoint{
-						Hash: wire.ShaHash([32]byte{ // Make go vet happy.
+						Hash: chainhash.Hash([32]byte{ // Make go vet happy.
 							0xc3, 0x3e, 0xbf, 0xf2, 0xa7, 0x09, 0xf1, 0x3d,
 							0x9f, 0x9a, 0x75, 0x69, 0xab, 0x16, 0xa3, 0x27,
 							0x86, 0xaf, 0x7d, 0x7e, 0x2d, 0xe0, 0x92, 0x65,
@@ -495,7 +497,7 @@ var Block100000 = wire.MsgBlock{
 			TxIn: []*wire.TxIn{
 				{
 					PreviousOutPoint: wire.OutPoint{
-						Hash: wire.ShaHash([32]byte{ // Make go vet happy.
+						Hash: chainhash.Hash([32]byte{ // Make go vet happy.
 							0x0b, 0x60, 0x72, 0xb3, 0x86, 0xd4, 0xa7, 0x73,
 							0x23, 0x52, 0x37, 0xf6, 0x4c, 0x11, 0x26, 0xac,
 							0x3b, 0x24, 0x0c, 0x84, 0xb9, 0x17, 0xa3, 0x90,
