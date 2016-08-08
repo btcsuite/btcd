@@ -142,7 +142,6 @@ type config struct {
 	BlockMaxSize       uint32        `long:"blockmaxsize" description:"Maximum block size in bytes to be used when creating a block"`
 	BlockPrioritySize  uint32        `long:"blockprioritysize" description:"Size in bytes for high-priority/low-fee transactions when creating a block"`
 	GetWorkKeys        []string      `long:"getworkkey" description:"DEPRECATED -- Use the --miningaddr option instead"`
-	NoAddrIndex        bool          `long:"addrindex" description:"Disable building and maintaining a full address index. Currently only supported by leveldb. Will prevent wallet resyncing from seed."`
 	DropAddrIndex      bool          `long:"dropaddrindex" description:"Deletes the address-based transaction index from the database on start up, and then exits."`
 	NonAggressive      bool          `long:"nonaggressive" description:"Disable mining off of the parent block of the blockchain if there aren't enough voters"`
 	NoMiningStateSync  bool          `long:"nominingstatesync" description:"Disable synchronizing the mining state with other nodes"`
@@ -156,6 +155,7 @@ type config struct {
 	dial               func(string, string) (net.Conn, error)
 	miningAddrs        []dcrutil.Address
 	minRelayTxFee      dcrutil.Amount
+	NoAddrIndex        bool
 }
 
 // serviceOptions defines the configuration options for the daemon as a service on
