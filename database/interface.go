@@ -8,7 +8,7 @@
 package database
 
 import (
-	"github.com/btcsuite/btcd/wire"
+	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcutil"
 )
 
@@ -198,7 +198,7 @@ type Bucket interface {
 // BlockRegion specifies a particular region of a block identified by the
 // specified hash, given an offset and length.
 type BlockRegion struct {
-	Hash   *wire.ShaHash
+	Hash   *chainhash.Hash
 	Offset uint32
 	Len    uint32
 }
@@ -237,7 +237,7 @@ type Tx interface {
 	//   - ErrTxClosed if the transaction has already been closed
 	//
 	// Other errors are possible depending on the implementation.
-	HasBlock(hash *wire.ShaHash) (bool, error)
+	HasBlock(hash *chainhash.Hash) (bool, error)
 
 	// HasBlocks returns whether or not the blocks with the provided hashes
 	// exist in the database.
@@ -247,7 +247,7 @@ type Tx interface {
 	//   - ErrTxClosed if the transaction has already been closed
 	//
 	// Other errors are possible depending on the implementation.
-	HasBlocks(hashes []wire.ShaHash) ([]bool, error)
+	HasBlocks(hashes []chainhash.Hash) ([]bool, error)
 
 	// FetchBlockHeader returns the raw serialized bytes for the block
 	// header identified by the given hash.  The raw bytes are in the format
@@ -270,7 +270,7 @@ type Tx interface {
 	// has ended results in undefined behavior.  This constraint prevents
 	// additional data copies and allows support for memory-mapped database
 	// implementations.
-	FetchBlockHeader(hash *wire.ShaHash) ([]byte, error)
+	FetchBlockHeader(hash *chainhash.Hash) ([]byte, error)
 
 	// FetchBlockHeaders returns the raw serialized bytes for the block
 	// headers identified by the given hashes.  The raw bytes are in the
@@ -297,7 +297,7 @@ type Tx interface {
 	// has ended results in undefined behavior.  This constraint prevents
 	// additional data copies and allows support for memory-mapped database
 	// implementations.
-	FetchBlockHeaders(hashes []wire.ShaHash) ([][]byte, error)
+	FetchBlockHeaders(hashes []chainhash.Hash) ([][]byte, error)
 
 	// FetchBlock returns the raw serialized bytes for the block identified
 	// by the given hash.  The raw bytes are in the format returned by
@@ -314,7 +314,7 @@ type Tx interface {
 	// has ended results in undefined behavior.  This constraint prevents
 	// additional data copies and allows support for memory-mapped database
 	// implementations.
-	FetchBlock(hash *wire.ShaHash) ([]byte, error)
+	FetchBlock(hash *chainhash.Hash) ([]byte, error)
 
 	// FetchBlocks returns the raw serialized bytes for the blocks
 	// identified by the given hashes.  The raw bytes are in the format
@@ -332,7 +332,7 @@ type Tx interface {
 	// has ended results in undefined behavior.  This constraint prevents
 	// additional data copies and allows support for memory-mapped database
 	// implementations.
-	FetchBlocks(hashes []wire.ShaHash) ([][]byte, error)
+	FetchBlocks(hashes []chainhash.Hash) ([][]byte, error)
 
 	// FetchBlockRegion returns the raw serialized bytes for the given
 	// block region.

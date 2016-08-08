@@ -1,4 +1,4 @@
-// Copyright (c) 2013-2014 The btcsuite developers
+// Copyright (c) 2013-2016 The btcsuite developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -9,7 +9,7 @@ import (
 
 	"github.com/btcsuite/btcd/blockchain"
 	"github.com/btcsuite/btcd/chaincfg"
-	"github.com/btcsuite/btcd/wire"
+	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcutil"
 )
 
@@ -92,9 +92,9 @@ func TestHaveBlock(t *testing.T) {
 	}
 
 	for i, test := range tests {
-		hash, err := wire.NewShaHashFromStr(test.hash)
+		hash, err := chainhash.NewHashFromStr(test.hash)
 		if err != nil {
-			t.Errorf("NewShaHashFromStr: %v", err)
+			t.Errorf("NewHashFromStr: %v", err)
 			continue
 		}
 

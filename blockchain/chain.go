@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/btcsuite/btcd/chaincfg"
+	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/database"
 	"github.com/btcsuite/btcd/txscript"
 	"github.com/btcsuite/btcd/wire"
@@ -44,13 +45,13 @@ type blockNode struct {
 	children []*blockNode
 
 	// hash is the double sha 256 of the block.
-	hash *wire.ShaHash
+	hash *chainhash.Hash
 
 	// parentHash is the double sha 256 of the parent block.  This is kept
 	// here over simply relying on parent.hash directly since block nodes
 	// are sparse and the parent node might not be in memory when its hash
 	// is needed.
-	parentHash *wire.ShaHash
+	parentHash *chainhash.Hash
 
 	// height is the position in the block chain.
 	height int32
@@ -74,13 +75,13 @@ type blockNode struct {
 // completely disconnected from the chain and the workSum value is just the work
 // for the passed block.  The work sum is updated accordingly when the node is
 // inserted into a chain.
-func newBlockNode(blockHeader *wire.BlockHeader, blockSha *wire.ShaHash, height int32) *blockNode {
+func newBlockNode(blockHeader *wire.BlockHeader, blockHash *chainhash.Hash, height int32) *blockNode {
 	// Make a copy of the hash so the node doesn't keep a reference to part
 	// of the full block/block header preventing it from being garbage
 	// collected.
 	prevHash := blockHeader.PrevBlock
 	node := blockNode{
-		hash:       blockSha,
+		hash:       blockHash,
 		parentHash: &prevHash,
 		workSum:    CalcWork(blockHeader.Bits),
 		height:     height,
@@ -133,12 +134,12 @@ func removeChildNode(children []*blockNode, node *blockNode) []*blockNode {
 // However, the returned snapshot must be treated as immutable since it is
 // shared by all callers.
 type BestState struct {
-	Hash      *wire.ShaHash // The hash of the block.
-	Height    int32         // The height of the block.
-	Bits      uint32        // The difficulty bits of the block.
-	BlockSize uint64        // The size of the block.
-	NumTxns   uint64        // The number of txns in the block.
-	TotalTxns uint64        // The total number of txns in the chain.
+	Hash      *chainhash.Hash // The hash of the block.
+	Height    int32           // The height of the block.
+	Bits      uint32          // The difficulty bits of the block.
+	BlockSize uint64          // The size of the block.
+	NumTxns   uint64          // The number of txns in the block.
+	TotalTxns uint64          // The total number of txns in the chain.
 }
 
 // newBestState returns a new best stats instance for the given parameters.
@@ -181,16 +182,16 @@ type BlockChain struct {
 	// These fields are related to the memory block index.  They are
 	// protected by the chain lock.
 	bestNode *blockNode
-	index    map[wire.ShaHash]*blockNode
-	depNodes map[wire.ShaHash][]*blockNode
+	index    map[chainhash.Hash]*blockNode
+	depNodes map[chainhash.Hash][]*blockNode
 
 	// These fields are related to handling of orphan blocks.  They are
 	// protected by a combination of the chain lock and the orphan lock.
 	orphanLock   sync.RWMutex
-	orphans      map[wire.ShaHash]*orphanBlock
-	prevOrphans  map[wire.ShaHash][]*orphanBlock
+	orphans      map[chainhash.Hash]*orphanBlock
+	prevOrphans  map[chainhash.Hash][]*orphanBlock
 	oldestOrphan *orphanBlock
-	blockCache   map[wire.ShaHash]*btcutil.Block
+	blockCache   map[chainhash.Hash]*btcutil.Block
 
 	// These fields are related to checkpoint handling.  They are protected
 	// by the chain lock.
@@ -230,7 +231,7 @@ func (b *BlockChain) DisableVerify(disable bool) {
 // be like part of the main chain, on a side chain, or in the orphan pool.
 //
 // This function is safe for concurrent access.
-func (b *BlockChain) HaveBlock(hash *wire.ShaHash) (bool, error) {
+func (b *BlockChain) HaveBlock(hash *chainhash.Hash) (bool, error) {
 	b.chainLock.RLock()
 	defer b.chainLock.RUnlock()
 
@@ -251,7 +252,7 @@ func (b *BlockChain) HaveBlock(hash *wire.ShaHash) (bool, error) {
 // duplicate orphans and react accordingly.
 //
 // This function is safe for concurrent access.
-func (b *BlockChain) IsKnownOrphan(hash *wire.ShaHash) bool {
+func (b *BlockChain) IsKnownOrphan(hash *chainhash.Hash) bool {
 	// Protect concurrent access.  Using a read lock only so multiple
 	// readers can query without blocking each other.
 	b.orphanLock.RLock()
@@ -268,7 +269,7 @@ func (b *BlockChain) IsKnownOrphan(hash *wire.ShaHash) bool {
 // map of orphan blocks.
 //
 // This function is safe for concurrent access.
-func (b *BlockChain) GetOrphanRoot(hash *wire.ShaHash) *wire.ShaHash {
+func (b *BlockChain) GetOrphanRoot(hash *chainhash.Hash) *chainhash.Hash {
 	// Protect concurrent access.  Using a read lock only so multiple
 	// readers can query without blocking each other.
 	b.orphanLock.RLock()
@@ -298,7 +299,7 @@ func (b *BlockChain) removeOrphanBlock(orphan *orphanBlock) {
 	defer b.orphanLock.Unlock()
 
 	// Remove the orphan block from the orphan pool.
-	orphanHash := orphan.block.Sha()
+	orphanHash := orphan.block.Hash()
 	delete(b.orphans, *orphanHash)
 
 	// Remove the reference from the previous orphan index too.  An indexing
@@ -308,7 +309,7 @@ func (b *BlockChain) removeOrphanBlock(orphan *orphanBlock) {
 	prevHash := &orphan.block.MsgBlock().Header.PrevBlock
 	orphans := b.prevOrphans[*prevHash]
 	for i := 0; i < len(orphans); i++ {
-		hash := orphans[i].block.Sha()
+		hash := orphans[i].block.Hash()
 		if hash.IsEqual(orphanHash) {
 			copy(orphans[i:], orphans[i+1:])
 			orphans[len(orphans)-1] = nil
@@ -366,7 +367,7 @@ func (b *BlockChain) addOrphanBlock(block *btcutil.Block) {
 		block:      block,
 		expiration: expiration,
 	}
-	b.orphans[*block.Sha()] = oBlock
+	b.orphans[*block.Hash()] = oBlock
 
 	// Add to previous hash lookup index for faster dependency lookups.
 	prevHash := &block.MsgBlock().Header.PrevBlock
@@ -382,7 +383,7 @@ func (b *BlockChain) addOrphanBlock(block *btcutil.Block) {
 //
 // This function MUST be called with the chain state lock held (for writes).
 // The database transaction may be read-only.
-func (b *BlockChain) loadBlockNode(dbTx database.Tx, hash *wire.ShaHash) (*blockNode, error) {
+func (b *BlockChain) loadBlockNode(dbTx database.Tx, hash *chainhash.Hash) (*blockNode, error) {
 	// Load the block header and height from the db.
 	blockHeader, err := dbFetchHeaderByHash(dbTx, hash)
 	if err != nil {
@@ -732,7 +733,7 @@ func (b *BlockChain) getReorganizeNodes(node *blockNode) (*list.List, *list.List
 // dbMaybeStoreBlock stores the provided block in the database if it's not
 // already there.
 func dbMaybeStoreBlock(dbTx database.Tx, block *btcutil.Block) error {
-	hasBlock, err := dbTx.HasBlock(block.Sha())
+	hasBlock, err := dbTx.HasBlock(block.Hash())
 	if err != nil {
 		return err
 	}
@@ -787,7 +788,7 @@ func (b *BlockChain) connectBlock(node *blockNode, block *btcutil.Block, view *U
 
 		// Add the block hash and height to the block index which tracks
 		// the main chain.
-		err = dbPutBlockIndex(dbTx, block.Sha(), node.height)
+		err = dbPutBlockIndex(dbTx, block.Hash(), node.height)
 		if err != nil {
 			return err
 		}
@@ -802,7 +803,7 @@ func (b *BlockChain) connectBlock(node *blockNode, block *btcutil.Block, view *U
 
 		// Update the transaction spend journal by adding a record for
 		// the block that contains all txos spent by it.
-		err = dbPutSpendJournalEntry(dbTx, block.Sha(), stxos)
+		err = dbPutSpendJournalEntry(dbTx, block.Hash(), stxos)
 		if err != nil {
 			return err
 		}
@@ -911,7 +912,7 @@ func (b *BlockChain) disconnectBlock(node *blockNode, block *btcutil.Block, view
 
 		// Remove the block hash and height from the block index which
 		// tracks the main chain.
-		err = dbRemoveBlockIndex(dbTx, block.Sha(), node.height)
+		err = dbRemoveBlockIndex(dbTx, block.Hash(), node.height)
 		if err != nil {
 			return err
 		}
@@ -926,7 +927,7 @@ func (b *BlockChain) disconnectBlock(node *blockNode, block *btcutil.Block, view
 
 		// Update the transaction spend journal by removing the record
 		// that contains all txos spent by the block .
-		err = dbRemoveSpendJournalEntry(dbTx, block.Sha())
+		err = dbRemoveSpendJournalEntry(dbTx, block.Hash())
 		if err != nil {
 			return err
 		}
@@ -1243,7 +1244,7 @@ func (b *BlockChain) connectBestChain(node *blockNode, block *btcutil.Block, fla
 	}
 	if fastAdd {
 		log.Warnf("fastAdd set in the side chain case? %v\n",
-			block.Sha())
+			block.Hash())
 	}
 
 	// We're extending (or creating) a side chain which may or may not
@@ -1462,11 +1463,11 @@ func New(config *Config) (*BlockChain, error) {
 		sigCache:            config.SigCache,
 		indexManager:        config.IndexManager,
 		bestNode:            nil,
-		index:               make(map[wire.ShaHash]*blockNode),
-		depNodes:            make(map[wire.ShaHash][]*blockNode),
-		orphans:             make(map[wire.ShaHash]*orphanBlock),
-		prevOrphans:         make(map[wire.ShaHash][]*orphanBlock),
-		blockCache:          make(map[wire.ShaHash]*btcutil.Block),
+		index:               make(map[chainhash.Hash]*blockNode),
+		depNodes:            make(map[chainhash.Hash][]*blockNode),
+		orphans:             make(map[chainhash.Hash]*orphanBlock),
+		prevOrphans:         make(map[chainhash.Hash][]*orphanBlock),
+		blockCache:          make(map[chainhash.Hash]*btcutil.Block),
 	}
 
 	// Initialize the chain state from the passed database.  When the db

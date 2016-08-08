@@ -7,9 +7,9 @@ package blockchain
 import (
 	"fmt"
 
+	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/database"
 	"github.com/btcsuite/btcd/txscript"
-	"github.com/btcsuite/btcd/wire"
 	"github.com/btcsuite/btcutil"
 )
 
@@ -172,19 +172,19 @@ func newUtxoEntry(version int32, isCoinBase bool, blockHeight int32) *UtxoEntry 
 // The unspent outputs are needed by other transactions for things such as
 // script validation and double spend prevention.
 type UtxoViewpoint struct {
-	entries  map[wire.ShaHash]*UtxoEntry
-	bestHash wire.ShaHash
+	entries  map[chainhash.Hash]*UtxoEntry
+	bestHash chainhash.Hash
 }
 
 // BestHash returns the hash of the best block in the chain the view currently
 // respresents.
-func (view *UtxoViewpoint) BestHash() *wire.ShaHash {
+func (view *UtxoViewpoint) BestHash() *chainhash.Hash {
 	return &view.bestHash
 }
 
 // SetBestHash sets the hash of the best block in the chain the view currently
 // respresents.
-func (view *UtxoViewpoint) SetBestHash(hash *wire.ShaHash) {
+func (view *UtxoViewpoint) SetBestHash(hash *chainhash.Hash) {
 	view.bestHash = *hash
 }
 
@@ -192,7 +192,7 @@ func (view *UtxoViewpoint) SetBestHash(hash *wire.ShaHash) {
 // current state of the view.  It will return nil if the passed transaction
 // hash does not exist in the view or is otherwise not available such as when
 // it has been disconnected during a reorg.
-func (view *UtxoViewpoint) LookupEntry(txHash *wire.ShaHash) *UtxoEntry {
+func (view *UtxoViewpoint) LookupEntry(txHash *chainhash.Hash) *UtxoEntry {
 	entry, ok := view.entries[*txHash]
 	if !ok {
 		return nil
@@ -208,11 +208,11 @@ func (view *UtxoViewpoint) LookupEntry(txHash *wire.ShaHash) *UtxoEntry {
 func (view *UtxoViewpoint) AddTxOuts(tx *btcutil.Tx, blockHeight int32) {
 	// When there are not already any utxos associated with the transaction,
 	// add a new entry for it to the view.
-	entry := view.LookupEntry(tx.Sha())
+	entry := view.LookupEntry(tx.Hash())
 	if entry == nil {
 		entry = newUtxoEntry(tx.MsgTx().Version, IsCoinBase(tx),
 			blockHeight)
-		view.entries[*tx.Sha()] = entry
+		view.entries[*tx.Hash()] = entry
 	} else {
 		entry.blockHeight = blockHeight
 	}
@@ -321,7 +321,7 @@ func (view *UtxoViewpoint) connectTransactions(block *btcutil.Block, stxos *[]sp
 
 	// Update the best hash for view to include this block since all of its
 	// transactions have been connected.
-	view.SetBestHash(block.Sha())
+	view.SetBestHash(block.Hash())
 	return nil
 }
 
@@ -349,11 +349,11 @@ func (view *UtxoViewpoint) disconnectTransactions(block *btcutil.Block, stxos []
 		// because the code relies on its existence in the view in order
 		// to signal modifications have happened.
 		isCoinbase := txIdx == 0
-		entry := view.entries[*tx.Sha()]
+		entry := view.entries[*tx.Hash()]
 		if entry == nil {
 			entry = newUtxoEntry(tx.MsgTx().Version, isCoinbase,
 				block.Height())
-			view.entries[*tx.Sha()] = entry
+			view.entries[*tx.Hash()] = entry
 		}
 		entry.modified = true
 		entry.sparseOutputs = make(map[uint32]*utxoOutput)
@@ -416,7 +416,7 @@ func (view *UtxoViewpoint) disconnectTransactions(block *btcutil.Block, stxos []
 }
 
 // Entries returns the underlying map that stores of all the utxo entries.
-func (view *UtxoViewpoint) Entries() map[wire.ShaHash]*UtxoEntry {
+func (view *UtxoViewpoint) Entries() map[chainhash.Hash]*UtxoEntry {
 	return view.entries
 }
 
@@ -440,7 +440,7 @@ func (view *UtxoViewpoint) commit() {
 // Upon completion of this function, the view will contain an entry for each
 // requested transaction.  Fully spent transactions, or those which otherwise
 // don't exist, will result in a nil entry in the view.
-func (view *UtxoViewpoint) fetchUtxosMain(db database.DB, txSet map[wire.ShaHash]struct{}) error {
+func (view *UtxoViewpoint) fetchUtxosMain(db database.DB, txSet map[chainhash.Hash]struct{}) error {
 	// Nothing to do if there are no requested hashes.
 	if len(txSet) == 0 {
 		return nil
@@ -472,14 +472,14 @@ func (view *UtxoViewpoint) fetchUtxosMain(db database.DB, txSet map[wire.ShaHash
 // fetchUtxos loads utxo details about provided set of transaction hashes into
 // the view from the database as needed unless they already exist in the view in
 // which case they are ignored.
-func (view *UtxoViewpoint) fetchUtxos(db database.DB, txSet map[wire.ShaHash]struct{}) error {
+func (view *UtxoViewpoint) fetchUtxos(db database.DB, txSet map[chainhash.Hash]struct{}) error {
 	// Nothing to do if there are no requested hashes.
 	if len(txSet) == 0 {
 		return nil
 	}
 
 	// Filter entries that are already in the view.
-	txNeededSet := make(map[wire.ShaHash]struct{})
+	txNeededSet := make(map[chainhash.Hash]struct{})
 	for hash := range txSet {
 		// Already loaded into the current view.
 		if _, ok := view.entries[hash]; ok {
@@ -501,16 +501,16 @@ func (view *UtxoViewpoint) fetchInputUtxos(db database.DB, block *btcutil.Block)
 	// Build a map of in-flight transactions because some of the inputs in
 	// this block could be referencing other transactions earlier in this
 	// block which are not yet in the chain.
-	txInFlight := map[wire.ShaHash]int{}
+	txInFlight := map[chainhash.Hash]int{}
 	transactions := block.Transactions()
 	for i, tx := range transactions {
-		txInFlight[*tx.Sha()] = i
+		txInFlight[*tx.Hash()] = i
 	}
 
 	// Loop through all of the transaction inputs (except for the coinbase
 	// which has no inputs) collecting them into sets of what is needed and
 	// what is already known (in-flight).
-	txNeededSet := make(map[wire.ShaHash]struct{})
+	txNeededSet := make(map[chainhash.Hash]struct{})
 	for i, tx := range transactions[1:] {
 		for _, txIn := range tx.MsgTx().TxIn {
 			// It is acceptable for a transaction input to reference
@@ -550,7 +550,7 @@ func (view *UtxoViewpoint) fetchInputUtxos(db database.DB, block *btcutil.Block)
 // NewUtxoViewpoint returns a new empty unspent transaction output view.
 func NewUtxoViewpoint() *UtxoViewpoint {
 	return &UtxoViewpoint{
-		entries: make(map[wire.ShaHash]*UtxoEntry),
+		entries: make(map[chainhash.Hash]*UtxoEntry),
 	}
 }
 
@@ -568,8 +568,8 @@ func (b *BlockChain) FetchUtxoView(tx *btcutil.Tx) (*UtxoViewpoint, error) {
 	// inputs of the passed transaction.  Also, add the passed transaction
 	// itself as a way for the caller to detect duplicates that are not
 	// fully spent.
-	txNeededSet := make(map[wire.ShaHash]struct{})
-	txNeededSet[*tx.Sha()] = struct{}{}
+	txNeededSet := make(map[chainhash.Hash]struct{})
+	txNeededSet[*tx.Hash()] = struct{}{}
 	if !IsCoinBase(tx) {
 		for _, txIn := range tx.MsgTx().TxIn {
 			txNeededSet[txIn.PreviousOutPoint.Hash] = struct{}{}
@@ -593,7 +593,7 @@ func (b *BlockChain) FetchUtxoView(tx *btcutil.Tx) (*UtxoViewpoint, error) {
 //
 // This function is safe for concurrent access however the returned entry (if
 // any) is NOT.
-func (b *BlockChain) FetchUtxoEntry(txHash *wire.ShaHash) (*UtxoEntry, error) {
+func (b *BlockChain) FetchUtxoEntry(txHash *chainhash.Hash) (*UtxoEntry, error) {
 	b.chainLock.RLock()
 	defer b.chainLock.RUnlock()
 

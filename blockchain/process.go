@@ -7,8 +7,8 @@ package blockchain
 import (
 	"fmt"
 
+	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/database"
-	"github.com/btcsuite/btcd/wire"
 	"github.com/btcsuite/btcutil"
 )
 
@@ -41,7 +41,7 @@ const (
 // the main chain or any side chains.
 //
 // This function MUST be called with the chain state lock held (for reads).
-func (b *BlockChain) blockExists(hash *wire.ShaHash) (bool, error) {
+func (b *BlockChain) blockExists(hash *chainhash.Hash) (bool, error) {
 	// Check memory chain first (could be main chain or side chain blocks).
 	if _, ok := b.index[*hash]; ok {
 		return true, nil
@@ -66,11 +66,11 @@ func (b *BlockChain) blockExists(hash *wire.ShaHash) (bool, error) {
 // are needed to pass along to maybeAcceptBlock.
 //
 // This function MUST be called with the chain state lock held (for writes).
-func (b *BlockChain) processOrphans(hash *wire.ShaHash, flags BehaviorFlags) error {
+func (b *BlockChain) processOrphans(hash *chainhash.Hash, flags BehaviorFlags) error {
 	// Start with processing at least the passed hash.  Leave a little room
 	// for additional orphan blocks that need to be processed without
 	// needing to grow the array in the common case.
-	processHashes := make([]*wire.ShaHash, 0, 10)
+	processHashes := make([]*chainhash.Hash, 0, 10)
 	processHashes = append(processHashes, hash)
 	for len(processHashes) > 0 {
 		// Pop the first hash to process from the slice.
@@ -96,7 +96,7 @@ func (b *BlockChain) processOrphans(hash *wire.ShaHash, flags BehaviorFlags) err
 			}
 
 			// Remove the orphan from the orphan pool.
-			orphanHash := orphan.block.Sha()
+			orphanHash := orphan.block.Hash()
 			b.removeOrphanBlock(orphan)
 			i--
 
@@ -132,7 +132,7 @@ func (b *BlockChain) ProcessBlock(block *btcutil.Block, flags BehaviorFlags) (bo
 	fastAdd := flags&BFFastAdd == BFFastAdd
 	dryRun := flags&BFDryRun == BFDryRun
 
-	blockHash := block.Sha()
+	blockHash := block.Hash()
 	log.Tracef("Processing block %v", blockHash)
 
 	// The block must not already exist in the main chain or side chains.

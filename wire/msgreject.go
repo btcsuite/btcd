@@ -1,4 +1,4 @@
-// Copyright (c) 2014-2015 The btcsuite developers
+// Copyright (c) 2014-2016 The btcsuite developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -7,6 +7,8 @@ package wire
 import (
 	"fmt"
 	"io"
+
+	"github.com/btcsuite/btcd/chaincfg/chainhash"
 )
 
 // RejectCode represents a numeric value by which a remote peer indicates
@@ -66,7 +68,7 @@ type MsgReject struct {
 
 	// Hash identifies a specific block or transaction that was rejected
 	// and therefore only applies the MsgBlock and MsgTx messages.
-	Hash ShaHash
+	Hash chainhash.Hash
 }
 
 // BtcDecode decodes r using the bitcoin protocol encoding into the receiver.

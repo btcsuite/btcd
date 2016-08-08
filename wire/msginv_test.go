@@ -10,6 +10,7 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/davecgh/go-spew/spew"
 )
 
@@ -36,7 +37,7 @@ func TestInv(t *testing.T) {
 	}
 
 	// Ensure inventory vectors are added properly.
-	hash := ShaHash{}
+	hash := chainhash.Hash{}
 	iv := NewInvVect(InvTypeBlock, &hash)
 	err := msg.AddInvVect(iv)
 	if err != nil {
@@ -74,16 +75,16 @@ func TestInv(t *testing.T) {
 func TestInvWire(t *testing.T) {
 	// Block 203707 hash.
 	hashStr := "3264bc2ac36a60840790ba1d475d01367e7c723da941069e9dc"
-	blockHash, err := NewShaHashFromStr(hashStr)
+	blockHash, err := chainhash.NewHashFromStr(hashStr)
 	if err != nil {
-		t.Errorf("NewShaHashFromStr: %v", err)
+		t.Errorf("NewHashFromStr: %v", err)
 	}
 
 	// Transation 1 of Block 203707 hash.
 	hashStr = "d28a3dc7392bf00a9855ee93dd9a81eff82a2c4fe57fbd42cfe71b487accfaf0"
-	txHash, err := NewShaHashFromStr(hashStr)
+	txHash, err := chainhash.NewHashFromStr(hashStr)
 	if err != nil {
-		t.Errorf("NewShaHashFromStr: %v", err)
+		t.Errorf("NewHashFromStr: %v", err)
 	}
 
 	iv := NewInvVect(InvTypeBlock, blockHash)
@@ -239,9 +240,9 @@ func TestInvWireErrors(t *testing.T) {
 
 	// Block 203707 hash.
 	hashStr := "3264bc2ac36a60840790ba1d475d01367e7c723da941069e9dc"
-	blockHash, err := NewShaHashFromStr(hashStr)
+	blockHash, err := chainhash.NewHashFromStr(hashStr)
 	if err != nil {
-		t.Errorf("NewShaHashFromStr: %v", err)
+		t.Errorf("NewHashFromStr: %v", err)
 	}
 
 	iv := NewInvVect(InvTypeBlock, blockHash)

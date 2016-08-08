@@ -1,4 +1,4 @@
-// Copyright (c) 2013-2015 The btcsuite developers
+// Copyright (c) 2013-2016 The btcsuite developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -7,6 +7,8 @@ package wire
 import (
 	"fmt"
 	"io"
+
+	"github.com/btcsuite/btcd/chaincfg/chainhash"
 )
 
 const (
@@ -15,7 +17,7 @@ const (
 	MaxInvPerMsg = 50000
 
 	// Maximum payload size for an inventory vector.
-	maxInvVectPayload = 4 + HashSize
+	maxInvVectPayload = 4 + chainhash.HashSize
 )
 
 // InvType represents the allowed types of inventory vectors.  See InvVect.
@@ -50,12 +52,12 @@ func (invtype InvType) String() string {
 // as specified by the Type field, that a peer wants, has, or does not have to
 // another peer.
 type InvVect struct {
-	Type InvType // Type of data
-	Hash ShaHash // Hash of the data
+	Type InvType        // Type of data
+	Hash chainhash.Hash // Hash of the data
 }
 
 // NewInvVect returns a new InvVect using the provided type and hash.
-func NewInvVect(typ InvType, hash *ShaHash) *InvVect {
+func NewInvVect(typ InvType, hash *chainhash.Hash) *InvVect {
 	return &InvVect{
 		Type: typ,
 		Hash: *hash,

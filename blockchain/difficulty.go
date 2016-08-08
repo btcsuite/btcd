@@ -8,7 +8,7 @@ import (
 	"math/big"
 	"time"
 
-	"github.com/btcsuite/btcd/wire"
+	"github.com/btcsuite/btcd/chaincfg/chainhash"
 )
 
 const (
@@ -52,11 +52,11 @@ var (
 	oneLsh256 = new(big.Int).Lsh(bigOne, 256)
 )
 
-// ShaHashToBig converts a wire.ShaHash into a big.Int that can be used to
+// HashToBig converts a chainhash.Hash into a big.Int that can be used to
 // perform math comparisons.
-func ShaHashToBig(hash *wire.ShaHash) *big.Int {
-	// A ShaHash is in little-endian, but the big package wants the bytes
-	// in big-endian, so reverse them.
+func HashToBig(hash *chainhash.Hash) *big.Int {
+	// A Hash is in little-endian, but the big package wants the bytes in
+	// big-endian, so reverse them.
 	buf := *hash
 	blen := len(buf)
 	for i := 0; i < blen/2; i++ {

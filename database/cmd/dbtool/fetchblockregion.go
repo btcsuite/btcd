@@ -10,8 +10,8 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/database"
-	"github.com/btcsuite/btcd/wire"
 )
 
 // blockRegionCmd defines the configuration options for the fetchblockregion
@@ -44,7 +44,7 @@ func (cmd *blockRegionCmd) Execute(args []string) error {
 	}
 
 	// Parse arguments.
-	blockHash, err := wire.NewShaHashFromStr(args[0])
+	blockHash, err := chainhash.NewHashFromStr(args[0])
 	if err != nil {
 		return err
 	}
@@ -78,7 +78,7 @@ func (cmd *blockRegionCmd) Execute(args []string) error {
 			return err
 		}
 		log.Infof("Loaded block region in %v", time.Now().Sub(startTime))
-		log.Infof("Double SHA256: %s", wire.DoubleSha256SH(regionBytes))
+		log.Infof("Double Hash: %s", chainhash.DoubleHashH(regionBytes))
 		log.Infof("Region Hex: %s", hex.EncodeToString(regionBytes))
 		return nil
 	})

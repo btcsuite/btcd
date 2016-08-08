@@ -61,7 +61,7 @@ out:
 				str := fmt.Sprintf("unable to find input "+
 					"transaction %v referenced from "+
 					"transaction %v", originTxHash,
-					txVI.tx.Sha())
+					txVI.tx.Hash())
 				err := ruleError(ErrMissingTx, str)
 				v.sendResult(err)
 				break out
@@ -74,7 +74,7 @@ out:
 				str := fmt.Sprintf("unable to find unspent "+
 					"output %v script referenced from "+
 					"transaction %s:%d",
-					txIn.PreviousOutPoint, txVI.tx.Sha(),
+					txIn.PreviousOutPoint, txVI.tx.Hash(),
 					txVI.txInIndex)
 				err := ruleError(ErrBadTxInput, str)
 				v.sendResult(err)
@@ -89,7 +89,7 @@ out:
 				str := fmt.Sprintf("failed to parse input "+
 					"%s:%d which references output %s:%d - "+
 					"%v (input script bytes %x, prev output "+
-					"script bytes %x)", txVI.tx.Sha(),
+					"script bytes %x)", txVI.tx.Hash(),
 					txVI.txInIndex, originTxHash,
 					originTxIndex, err, sigScript, pkScript)
 				err := ruleError(ErrScriptMalformed, str)
@@ -102,7 +102,7 @@ out:
 				str := fmt.Sprintf("failed to validate input "+
 					"%s:%d which references output %s:%d - "+
 					"%v (input script bytes %x, prev output "+
-					"script bytes %x)", txVI.tx.Sha(),
+					"script bytes %x)", txVI.tx.Hash(),
 					txVI.txInIndex, originTxHash,
 					originTxIndex, err, sigScript, pkScript)
 				err := ruleError(ErrScriptValidation, str)

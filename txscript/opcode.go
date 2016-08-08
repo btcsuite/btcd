@@ -1,4 +1,4 @@
-// Copyright (c) 2013-2015 The btcsuite developers
+// Copyright (c) 2013-2016 The btcsuite developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -13,6 +13,7 @@ import (
 	"hash"
 
 	"github.com/btcsuite/btcd/btcec"
+	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/wire"
 	"github.com/btcsuite/fastsha256"
 	"github.com/btcsuite/golangcrypto/ripemd160"
@@ -1833,7 +1834,7 @@ func opcodeHash256(op *parsedOpcode, vm *Engine) error {
 		return err
 	}
 
-	vm.dstack.PushByteArray(wire.DoubleSha256(buf))
+	vm.dstack.PushByteArray(chainhash.DoubleHashB(buf))
 	return nil
 }
 
@@ -1934,7 +1935,7 @@ func opcodeCheckSig(op *parsedOpcode, vm *Engine) error {
 
 	var valid bool
 	if vm.sigCache != nil {
-		var sigHash wire.ShaHash
+		var sigHash chainhash.Hash
 		copy(sigHash[:], hash)
 
 		valid = vm.sigCache.Exists(sigHash, signature, pubKey)
@@ -2148,7 +2149,7 @@ func opcodeCheckMultiSig(op *parsedOpcode, vm *Engine) error {
 
 		var valid bool
 		if vm.sigCache != nil {
-			var sigHash wire.ShaHash
+			var sigHash chainhash.Hash
 			copy(sigHash[:], hash)
 
 			valid = vm.sigCache.Exists(sigHash, parsedSig, parsedPubKey)

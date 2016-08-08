@@ -24,6 +24,7 @@ import (
 	"github.com/btcsuite/btcd/blockchain"
 	"github.com/btcsuite/btcd/blockchain/indexers"
 	"github.com/btcsuite/btcd/chaincfg"
+	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/database"
 	"github.com/btcsuite/btcd/mining"
 	"github.com/btcsuite/btcd/peer"
@@ -99,7 +100,7 @@ type relayMsg struct {
 // updates, peer heights will be kept up to date, allowing for fresh data when
 // selecting sync peer candidacy.
 type updatePeerHeightsMsg struct {
-	newSha     *wire.ShaHash
+	newHash    *chainhash.Hash
 	newHeight  int32
 	originPeer *serverPeer
 }
@@ -218,12 +219,12 @@ type serverPeer struct {
 
 	server          *server
 	persistent      bool
-	continueHash    *wire.ShaHash
+	continueHash    *chainhash.Hash
 	relayMtx        sync.Mutex
 	disableRelayTx  bool
 	requestQueue    []*wire.InvVect
-	requestedTxns   map[wire.ShaHash]struct{}
-	requestedBlocks map[wire.ShaHash]struct{}
+	requestedTxns   map[chainhash.Hash]struct{}
+	requestedBlocks map[chainhash.Hash]struct{}
 	filter          *bloom.Filter
 	knownAddresses  map[string]struct{}
 	banScore        dynamicBanScore
@@ -239,8 +240,8 @@ func newServerPeer(s *server, isPersistent bool) *serverPeer {
 	return &serverPeer{
 		server:          s,
 		persistent:      isPersistent,
-		requestedTxns:   make(map[wire.ShaHash]struct{}),
-		requestedBlocks: make(map[wire.ShaHash]struct{}),
+		requestedTxns:   make(map[chainhash.Hash]struct{}),
+		requestedBlocks: make(map[chainhash.Hash]struct{}),
 		filter:          bloom.LoadFilter(nil),
 		knownAddresses:  make(map[string]struct{}),
 		quit:            make(chan struct{}),
@@ -251,7 +252,7 @@ func newServerPeer(s *server, isPersistent bool) *serverPeer {
 
 // newestBlock returns the current best block hash and height using the format
 // required by the configuration for the peer package.
-func (sp *serverPeer) newestBlock() (*wire.ShaHash, int32, error) {
+func (sp *serverPeer) newestBlock() (*chainhash.Hash, int32, error) {
 	best := sp.server.blockManager.chain.BestSnapshot()
 	return best.Hash, best.Height, nil
 }
@@ -427,7 +428,7 @@ func (sp *serverPeer) OnMemPool(p *peer.Peer, msg *wire.MsgMemPool) {
 	for i, txDesc := range txDescs {
 		// Another thread might have removed the transaction from the
 		// pool since the initial query.
-		hash := txDesc.Tx.Sha()
+		hash := txDesc.Tx.Hash()
 		if !txMemPool.IsTransactionInPool(hash) {
 			continue
 		}
@@ -457,7 +458,7 @@ func (sp *serverPeer) OnMemPool(p *peer.Peer, msg *wire.MsgMemPool) {
 func (sp *serverPeer) OnTx(p *peer.Peer, msg *wire.MsgTx) {
 	if cfg.BlocksOnly {
 		peerLog.Tracef("Ignoring tx %v from %v - blocksonly enabled",
-			msg.TxSha(), p)
+			msg.TxHash(), p)
 		return
 	}
 
@@ -465,7 +466,7 @@ func (sp *serverPeer) OnTx(p *peer.Peer, msg *wire.MsgTx) {
 	// Convert the raw MsgTx to a btcutil.Tx which provides some convenience
 	// methods and things such as hash caching.
 	tx := btcutil.NewTx(msg)
-	iv := wire.NewInvVect(wire.InvTypeTx, tx.Sha())
+	iv := wire.NewInvVect(wire.InvTypeTx, tx.Hash())
 	p.AddKnownInventory(iv)
 
 	// Queue the transaction up to be handled by the block manager and
@@ -485,7 +486,7 @@ func (sp *serverPeer) OnBlock(p *peer.Peer, msg *wire.MsgBlock, buf []byte) {
 	block := btcutil.NewBlockFromBlockAndBytes(msg, buf)
 
 	// Add the block to the known inventory for the peer.
-	iv := wire.NewInvVect(wire.InvTypeBlock, block.Sha())
+	iv := wire.NewInvVect(wire.InvTypeBlock, block.Hash())
 	p.AddKnownInventory(iv)
 
 	// Queue the block up to be handled by the block
@@ -970,7 +971,7 @@ func (s *server) AnnounceNewTransactions(newTxs []*btcutil.Tx) {
 	// accepted.
 	for _, tx := range newTxs {
 		// Generate the inventory vector and relay it.
-		iv := wire.NewInvVect(wire.InvTypeTx, tx.Sha())
+		iv := wire.NewInvVect(wire.InvTypeTx, tx.Hash())
 		s.RelayInventory(iv, tx)
 
 		if s.rpcServer != nil {
@@ -987,14 +988,14 @@ func (s *server) AnnounceNewTransactions(newTxs []*btcutil.Tx) {
 
 // pushTxMsg sends a tx message for the provided transaction hash to the
 // connected peer.  An error is returned if the transaction hash is not known.
-func (s *server) pushTxMsg(sp *serverPeer, sha *wire.ShaHash, doneChan chan<- struct{}, waitChan <-chan struct{}) error {
+func (s *server) pushTxMsg(sp *serverPeer, hash *chainhash.Hash, doneChan chan<- struct{}, waitChan <-chan struct{}) error {
 	// Attempt to fetch the requested transaction from the pool.  A
 	// call could be made to check for existence first, but simply trying
 	// to fetch a missing transaction results in the same behavior.
-	tx, err := s.txMemPool.FetchTransaction(sha)
+	tx, err := s.txMemPool.FetchTransaction(hash)
 	if err != nil {
 		peerLog.Tracef("Unable to fetch tx %v from transaction "+
-			"pool: %v", sha, err)
+			"pool: %v", hash, err)
 
 		if doneChan != nil {
 			doneChan <- struct{}{}
@@ -1014,7 +1015,7 @@ func (s *server) pushTxMsg(sp *serverPeer, sha *wire.ShaHash, doneChan chan<- st
 
 // pushBlockMsg sends a block message for the provided block hash to the
 // connected peer.  An error is returned if the block hash is not known.
-func (s *server) pushBlockMsg(sp *serverPeer, hash *wire.ShaHash, doneChan chan<- struct{}, waitChan <-chan struct{}) error {
+func (s *server) pushBlockMsg(sp *serverPeer, hash *chainhash.Hash, doneChan chan<- struct{}, waitChan <-chan struct{}) error {
 	// Fetch the raw block bytes from the database.
 	var blockBytes []byte
 	err := sp.server.db.View(func(dbTx database.Tx) error {
@@ -1080,7 +1081,7 @@ func (s *server) pushBlockMsg(sp *serverPeer, hash *wire.ShaHash, doneChan chan<
 // the connected peer.  Since a merkle block requires the peer to have a filter
 // loaded, this call will simply be ignored if there is no filter loaded.  An
 // error is returned if the block hash is not known.
-func (s *server) pushMerkleBlockMsg(sp *serverPeer, hash *wire.ShaHash, doneChan chan<- struct{}, waitChan <-chan struct{}) error {
+func (s *server) pushMerkleBlockMsg(sp *serverPeer, hash *chainhash.Hash, doneChan chan<- struct{}, waitChan <-chan struct{}) error {
 	// Do not send a response if the peer doesn't have a filter loaded.
 	if !sp.filter.IsLoaded() {
 		if doneChan != nil {
@@ -1145,17 +1146,17 @@ func (s *server) handleUpdatePeerHeights(state *peerState, umsg updatePeerHeight
 
 		// This is a pointer to the underlying memory which doesn't
 		// change.
-		latestBlkSha := sp.LastAnnouncedBlock()
+		latestBlkHash := sp.LastAnnouncedBlock()
 
 		// Skip this peer if it hasn't recently announced any new blocks.
-		if latestBlkSha == nil {
+		if latestBlkHash == nil {
 			return
 		}
 
 		// If the peer has recently announced a block, and this block
 		// matches our newly accepted block, then update their block
 		// height.
-		if *latestBlkSha == *umsg.newSha {
+		if *latestBlkHash == *umsg.newHash {
 			sp.UpdateLastBlockHeight(umsg.newHeight)
 			sp.UpdateLastAnnouncedBlock(nil)
 		}
@@ -2036,9 +2037,9 @@ func (s *server) NetTotals() (uint64, uint64) {
 // the latest connected main chain block, or a recognized orphan. These height
 // updates allow us to dynamically refresh peer heights, ensuring sync peer
 // selection has access to the latest block heights for each peer.
-func (s *server) UpdatePeerHeights(latestBlkSha *wire.ShaHash, latestHeight int32, updateSource *serverPeer) {
+func (s *server) UpdatePeerHeights(latestBlkHash *chainhash.Hash, latestHeight int32, updateSource *serverPeer) {
 	s.peerHeightsUpdate <- updatePeerHeightsMsg{
-		newSha:     latestBlkSha,
+		newHash:    latestBlkHash,
 		newHeight:  latestHeight,
 		originPeer: updateSource,
 	}

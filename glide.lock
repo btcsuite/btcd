@@ -1,14 +1,14 @@
 hash: 9b8ff781a12daad991983e9a421a320e905eecc4e9ff0b0643e790f472bc78c8
-updated: 2016-05-06T10:10:16.348595-05:00
+updated: 2016-08-08T12:54:38.3626881-05:00
 imports:
 - name: github.com/btcsuite/btclog
   version: f96df2375f37300305f329b8e5258764b4f19a7f
 - name: github.com/btcsuite/btcutil
-  version: 2c26dd81a59fd671a2218d63ad138a6dd4d693bd
+  version: 22c91fa80a5e90e3feda26cf6d43adc249306188
   subpackages:
   - .
-  - bloom
   - base58
+  - bloom
 - name: github.com/btcsuite/fastsha256
   version: 302ad4db268b46f9ebda3078f6f7397f96047735
 - name: github.com/btcsuite/go-flags
@@ -25,17 +25,17 @@ imports:
   version: 7834afc9e8cd15233b6c3d97e12674a31ca24602
   subpackages:
   - leveldb
+  - leveldb/cache
   - leveldb/comparer
   - leveldb/errors
   - leveldb/filter
   - leveldb/iterator
-  - leveldb/opt
-  - leveldb/util
-  - leveldb/cache
   - leveldb/journal
   - leveldb/memdb
+  - leveldb/opt
   - leveldb/storage
   - leveldb/table
+  - leveldb/util
 - name: github.com/btcsuite/seelog
   version: 313961b101eb55f65ae0f03ddd4e322731763b6c
 - name: github.com/btcsuite/snappy-go
@@ -47,11 +47,11 @@ imports:
   subpackages:
   - eventlog
   - mgr
-  - svc
   - registry
+  - svc
   - winapi
 - name: github.com/davecgh/go-spew
   version: 5215b55f46b2b919f50a1df0eaa5886afe4e3b3d
   subpackages:
   - spew
-devImports: []
+testImports: []

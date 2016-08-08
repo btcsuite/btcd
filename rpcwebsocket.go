@@ -20,6 +20,7 @@ import (
 
 	"github.com/btcsuite/btcd/blockchain"
 	"github.com/btcsuite/btcd/btcjson"
+	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/database"
 	"github.com/btcsuite/btcd/txscript"
 	"github.com/btcsuite/btcd/wire"
@@ -418,7 +419,7 @@ func (*wsNotificationManager) notifyBlockConnected(clients map[chan struct{}]*ws
 	block *btcutil.Block) {
 
 	// Notify interested websocket clients about the connected block.
-	ntfn := btcjson.NewBlockConnectedNtfn(block.Sha().String(),
+	ntfn := btcjson.NewBlockConnectedNtfn(block.Hash().String(),
 		int32(block.Height()), block.MsgBlock().Header.Timestamp.Unix())
 	marshalledJSON, err := btcjson.MarshalCmd(nil, ntfn)
 	if err != nil {
@@ -442,7 +443,7 @@ func (*wsNotificationManager) notifyBlockDisconnected(clients map[chan struct{}]
 	}
 
 	// Notify interested websocket clients about the disconnected block.
-	ntfn := btcjson.NewBlockDisconnectedNtfn(block.Sha().String(),
+	ntfn := btcjson.NewBlockDisconnectedNtfn(block.Hash().String(),
 		int32(block.Height()), block.MsgBlock().Header.Timestamp.Unix())
 	marshalledJSON, err := btcjson.MarshalCmd(nil, ntfn)
 	if err != nil {
@@ -470,7 +471,7 @@ func (m *wsNotificationManager) UnregisterNewMempoolTxsUpdates(wsc *wsClient) {
 // notifyForNewTx notifies websocket clients that have registered for updates
 // when a new transaction is added to the memory pool.
 func (m *wsNotificationManager) notifyForNewTx(clients map[chan struct{}]*wsClient, tx *btcutil.Tx) {
-	txShaStr := tx.Sha().String()
+	txHashStr := tx.Hash().String()
 	mtx := tx.MsgTx()
 
 	var amount int64
@@ -478,7 +479,7 @@ func (m *wsNotificationManager) notifyForNewTx(clients map[chan struct{}]*wsClie
 		amount += txOut.Value
 	}
 
-	ntfn := btcjson.NewTxAcceptedNtfn(txShaStr, btcutil.Amount(amount).ToBTC())
+	ntfn := btcjson.NewTxAcceptedNtfn(txHashStr, btcutil.Amount(amount).ToBTC())
 	marshalledJSON, err := btcjson.MarshalCmd(nil, ntfn)
 	if err != nil {
 		rpcsLog.Errorf("Failed to marshal tx notification: %s", err.Error())
@@ -495,7 +496,7 @@ func (m *wsNotificationManager) notifyForNewTx(clients map[chan struct{}]*wsClie
 			}
 
 			net := m.server.server.chainParams
-			rawTx, err := createTxRawResult(net, mtx, txShaStr, nil,
+			rawTx, err := createTxRawResult(net, mtx, txHashStr, nil,
 				"", 0, 0)
 			if err != nil {
 				return
@@ -601,7 +602,7 @@ func blockDetails(block *btcutil.Block, txIndex int) *btcjson.BlockDetails {
 	}
 	return &btcjson.BlockDetails{
 		Height: int32(block.Height()),
-		Hash:   block.Sha().String(),
+		Hash:   block.Hash().String(),
 		Index:  txIndex,
 		Time:   block.MsgBlock().Header.Timestamp.Unix(),
 	}
@@ -654,7 +655,7 @@ func (m *wsNotificationManager) notifyForTxOuts(ops map[wire.OutPoint]map[chan s
 				continue
 			}
 
-			op := []*wire.OutPoint{wire.NewOutPoint(tx.Sha(), uint32(i))}
+			op := []*wire.OutPoint{wire.NewOutPoint(tx.Hash(), uint32(i))}
 			for wscQuit, wsc := range cmap {
 				m.addSpentRequests(ops, wsc, op)
 
@@ -1607,7 +1608,7 @@ func checkAddressValidity(addrs []string) error {
 func deserializeOutpoints(serializedOuts []btcjson.OutPoint) ([]*wire.OutPoint, error) {
 	outpoints := make([]*wire.OutPoint, 0, len(serializedOuts))
 	for i := range serializedOuts {
-		blockHash, err := wire.NewShaHashFromStr(serializedOuts[i].Hash)
+		blockHash, err := chainhash.NewHashFromStr(serializedOuts[i].Hash)
 		if err != nil {
 			return nil, rpcDecodeHexError(serializedOuts[i].Hash)
 		}
@@ -1747,7 +1748,7 @@ func rescanBlock(wsc *wsClient, lookups *rescanKeys, blk *btcutil.Block) {
 				}
 
 				outpoint := wire.OutPoint{
-					Hash:  *tx.Sha(),
+					Hash:  *tx.Hash(),
 					Index: uint32(txOutIdx),
 				}
 				lookups.unspent[outpoint] = struct{}{}
@@ -1786,7 +1787,7 @@ func rescanBlock(wsc *wsClient, lookups *rescanKeys, blk *btcutil.Block) {
 // range of blocks.  If this condition does not hold true, the JSON-RPC error
 // for an unrecoverable reorganize is returned.
 func recoverFromReorg(chain *blockchain.BlockChain, minBlock, maxBlock int32,
-	lastBlock *wire.ShaHash) ([]wire.ShaHash, error) {
+	lastBlock *chainhash.Hash) ([]chainhash.Hash, error) {
 
 	hashList, err := chain.HeightRange(minBlock, maxBlock)
 	if err != nil {
@@ -1818,7 +1819,7 @@ func recoverFromReorg(chain *blockchain.BlockChain, minBlock, maxBlock int32,
 
 // descendantBlock returns the appropriate JSON-RPC error if a current block
 // fetched during a reorganize is not a direct child of the parent block hash.
-func descendantBlock(prevHash *wire.ShaHash, curBlock *btcutil.Block) error {
+func descendantBlock(prevHash *chainhash.Hash, curBlock *btcutil.Block) error {
 	curHash := &curBlock.MsgBlock().Header.PrevBlock
 	if !prevHash.IsEqual(curHash) {
 		rpcsLog.Errorf("Stopping rescan for reorged block %v "+
@@ -1847,7 +1848,7 @@ func handleRescan(wsc *wsClient, icmd interface{}) (interface{}, error) {
 	outpoints := make([]*wire.OutPoint, 0, len(cmd.OutPoints))
 	for i := range cmd.OutPoints {
 		cmdOutpoint := &cmd.OutPoints[i]
-		blockHash, err := wire.NewShaHashFromStr(cmdOutpoint.Hash)
+		blockHash, err := chainhash.NewHashFromStr(cmdOutpoint.Hash)
 		if err != nil {
 			return nil, rpcDecodeHexError(cmdOutpoint.Hash)
 		}
@@ -1922,7 +1923,7 @@ func handleRescan(wsc *wsClient, icmd interface{}) (interface{}, error) {
 
 	chain := wsc.server.chain
 
-	minBlockHash, err := wire.NewShaHashFromStr(cmd.BeginBlock)
+	minBlockHash, err := chainhash.NewHashFromStr(cmd.BeginBlock)
 	if err != nil {
 		return nil, rpcDecodeHexError(cmd.BeginBlock)
 	}
@@ -1936,7 +1937,7 @@ func handleRescan(wsc *wsClient, icmd interface{}) (interface{}, error) {
 
 	maxBlock := int32(math.MaxInt32)
 	if cmd.EndBlock != nil {
-		maxBlockHash, err := wire.NewShaHashFromStr(*cmd.EndBlock)
+		maxBlockHash, err := chainhash.NewHashFromStr(*cmd.EndBlock)
 		if err != nil {
 			return nil, rpcDecodeHexError(*cmd.EndBlock)
 		}
@@ -1952,7 +1953,7 @@ func handleRescan(wsc *wsClient, icmd interface{}) (interface{}, error) {
 	// lastBlock and lastBlockHash track the previously-rescanned block.
 	// They equal nil when no previous blocks have been rescanned.
 	var lastBlock *btcutil.Block
-	var lastBlockHash *wire.ShaHash
+	var lastBlockHash *chainhash.Hash
 
 	// A ticker is created to wait at least 10 seconds before notifying the
 	// websocket client of the current progress completed by the rescan.
@@ -2094,7 +2095,7 @@ fetchRange:
 			default:
 				rescanBlock(wsc, &lookups, blk)
 				lastBlock = blk
-				lastBlockHash = blk.Sha()
+				lastBlockHash = blk.Hash()
 			}
 
 			// Periodically notify the client of the progress

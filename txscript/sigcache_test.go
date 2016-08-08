@@ -1,4 +1,4 @@
-// Copyright (c) 2015 The btcsuite developers
+// Copyright (c) 2015-2016 The btcsuite developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -9,19 +9,19 @@ import (
 	"testing"
 
 	"github.com/btcsuite/btcd/btcec"
-	"github.com/btcsuite/btcd/wire"
+	"github.com/btcsuite/btcd/chaincfg/chainhash"
 )
 
 // genRandomSig returns a random message, a signature of the message under the
 // public key and the public key. This function is used to generate randomized
 // test data.
-func genRandomSig() (*wire.ShaHash, *btcec.Signature, *btcec.PublicKey, error) {
+func genRandomSig() (*chainhash.Hash, *btcec.Signature, *btcec.PublicKey, error) {
 	privKey, err := btcec.NewPrivateKey(btcec.S256())
 	if err != nil {
 		return nil, nil, nil, err
 	}
 
-	var msgHash wire.ShaHash
+	var msgHash chainhash.Hash
 	if _, err := rand.Read(msgHash[:]); err != nil {
 		return nil, nil, nil, err
 	}

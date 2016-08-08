@@ -13,12 +13,13 @@ import (
 
 	"github.com/btcsuite/btcd/blockchain"
 	"github.com/btcsuite/btcd/blockchain/indexers"
+	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/database"
 	"github.com/btcsuite/btcd/wire"
 	"github.com/btcsuite/btcutil"
 )
 
-var zeroHash = wire.ShaHash{}
+var zeroHash = chainhash.Hash{}
 
 // importResults houses the stats and result as an import operation.
 type importResults struct {
@@ -103,8 +104,8 @@ func (bi *blockImporter) processBlock(serializedBlock []byte) (bool, error) {
 	bi.receivedLogTx += int64(len(block.MsgBlock().Transactions))
 
 	// Skip blocks that already exist.
-	blockSha := block.Sha()
-	exists, err := bi.chain.HaveBlock(blockSha)
+	blockHash := block.Hash()
+	exists, err := bi.chain.HaveBlock(blockHash)
 	if err != nil {
 		return false, err
 	}
@@ -134,7 +135,7 @@ func (bi *blockImporter) processBlock(serializedBlock []byte) (bool, error) {
 	}
 	if isOrphan {
 		return false, fmt.Errorf("import file contains an orphan "+
-			"block: %v", blockSha)
+			"block: %v", blockHash)
 	}
 
 	return true, nil

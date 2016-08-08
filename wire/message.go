@@ -9,6 +9,8 @@ import (
 	"fmt"
 	"io"
 	"unicode/utf8"
+
+	"github.com/btcsuite/btcd/chaincfg/chainhash"
 )
 
 // MessageHeaderSize is the number of bytes in a bitcoin message header.
@@ -237,7 +239,7 @@ func WriteMessageN(w io.Writer, msg Message, pver uint32, btcnet BitcoinNet) (in
 	hdr.magic = btcnet
 	hdr.command = cmd
 	hdr.length = uint32(lenp)
-	copy(hdr.checksum[:], DoubleSha256(payload)[0:4])
+	copy(hdr.checksum[:], chainhash.DoubleHashB(payload)[0:4])
 
 	// Encode the header for the message.  This is done to a buffer
 	// rather than directly to the writer since writeElements doesn't
@@ -338,7 +340,7 @@ func ReadMessageN(r io.Reader, pver uint32, btcnet BitcoinNet) (int, Message, []
 	}
 
 	// Test checksum.
-	checksum := DoubleSha256(payload)[0:4]
+	checksum := chainhash.DoubleHashB(payload)[0:4]
 	if !bytes.Equal(checksum[:], hdr.checksum[:]) {
 		str := fmt.Sprintf("payload checksum failed - header "+
 			"indicates %v, but actual checksum is %v.",
