@@ -15,6 +15,7 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"math"
 	"net"
 	"net/http"
 	"net/url"
@@ -266,7 +267,7 @@ type (
 	// the embedded ID (from the response) is nil.  Otherwise, it is a
 	// response.
 	inMessage struct {
-		ID *uint64 `json:"id"`
+		ID *float64 `json:"id"`
 		*rawNotification
 		*rawResponse
 	}
@@ -337,12 +338,18 @@ func (c *Client) handleMessage(msg []byte) {
 		return
 	}
 
+	// ensure that in.ID can be converted to an integer without loss of precision
+	if *in.ID < 0 || *in.ID != math.Trunc(*in.ID) {
+		log.Warn("Malformed response: invalid identifier")
+		return
+	}
+
 	if in.rawResponse == nil {
 		log.Warn("Malformed response: missing result and error")
 		return
 	}
 
-	id := *in.ID
+	id := uint64(*in.ID)
 	log.Tracef("Received response for id %d (result %s)", id, in.Result)
 	request := c.removeRequest(id)
 
