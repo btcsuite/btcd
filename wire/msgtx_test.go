@@ -1,8 +1,8 @@
-// Copyright (c) 2013-2015 The btcsuite developers
+// Copyright (c) 2013-2016 The btcsuite developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
-package wire_test
+package wire
 
 import (
 	"bytes"
@@ -11,24 +11,23 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/btcsuite/btcd/wire"
 	"github.com/davecgh/go-spew/spew"
 )
 
 // TestTx tests the MsgTx API.
 func TestTx(t *testing.T) {
-	pver := wire.ProtocolVersion
+	pver := ProtocolVersion
 
 	// Block 100000 hash.
 	hashStr := "3ba27aa200b1cecaad478d2b00432346c3f1f3986da1afd33e506"
-	hash, err := wire.NewShaHashFromStr(hashStr)
+	hash, err := NewShaHashFromStr(hashStr)
 	if err != nil {
 		t.Errorf("NewShaHashFromStr: %v", err)
 	}
 
 	// Ensure the command is expected value.
 	wantCmd := "tx"
-	msg := wire.NewMsgTx()
+	msg := NewMsgTx()
 	if cmd := msg.Command(); cmd != wantCmd {
 		t.Errorf("NewMsgAddr: wrong command - got %v want %v",
 			cmd, wantCmd)
@@ -48,7 +47,7 @@ func TestTx(t *testing.T) {
 	// NOTE: This is a block hash and made up index, but we're only
 	// testing package functionality.
 	prevOutIndex := uint32(1)
-	prevOut := wire.NewOutPoint(hash, prevOutIndex)
+	prevOut := NewOutPoint(hash, prevOutIndex)
 	if !prevOut.Hash.IsEqual(hash) {
 		t.Errorf("NewOutPoint: wrong hash - got %v, want %v",
 			spew.Sprint(&prevOut.Hash), spew.Sprint(hash))
@@ -65,7 +64,7 @@ func TestTx(t *testing.T) {
 
 	// Ensure we get the same transaction input back out.
 	sigScript := []byte{0x04, 0x31, 0xdc, 0x00, 0x1b, 0x01, 0x62}
-	txIn := wire.NewTxIn(prevOut, sigScript)
+	txIn := NewTxIn(prevOut, sigScript)
 	if !reflect.DeepEqual(&txIn.PreviousOutPoint, prevOut) {
 		t.Errorf("NewTxIn: wrong prev outpoint - got %v, want %v",
 			spew.Sprint(&txIn.PreviousOutPoint),
@@ -92,7 +91,7 @@ func TestTx(t *testing.T) {
 		0xa6, // 65-byte signature
 		0xac, // OP_CHECKSIG
 	}
-	txOut := wire.NewTxOut(txValue, pkScript)
+	txOut := NewTxOut(txValue, pkScript)
 	if txOut.Value != txValue {
 		t.Errorf("NewTxOut: wrong pk script - got %v, want %v",
 			txOut.Value, txValue)
@@ -132,23 +131,23 @@ func TestTx(t *testing.T) {
 func TestTxSha(t *testing.T) {
 	// Hash of first transaction from block 113875.
 	hashStr := "f051e59b5e2503ac626d03aaeac8ab7be2d72ba4b7e97119c5852d70d52dcb86"
-	wantHash, err := wire.NewShaHashFromStr(hashStr)
+	wantHash, err := NewShaHashFromStr(hashStr)
 	if err != nil {
 		t.Errorf("NewShaHashFromStr: %v", err)
 		return
 	}
 
 	// First transaction from block 113875.
-	msgTx := wire.NewMsgTx()
-	txIn := wire.TxIn{
-		PreviousOutPoint: wire.OutPoint{
-			Hash:  wire.ShaHash{},
+	msgTx := NewMsgTx()
+	txIn := TxIn{
+		PreviousOutPoint: OutPoint{
+			Hash:  ShaHash{},
 			Index: 0xffffffff,
 		},
 		SignatureScript: []byte{0x04, 0x31, 0xdc, 0x00, 0x1b, 0x01, 0x62},
 		Sequence:        0xffffffff,
 	}
-	txOut := wire.TxOut{
+	txOut := TxOut{
 		Value: 5000000000,
 		PkScript: []byte{
 			0x41, // OP_DATA_65
@@ -180,7 +179,7 @@ func TestTxSha(t *testing.T) {
 // of transaction inputs and outputs and protocol versions.
 func TestTxWire(t *testing.T) {
 	// Empty tx message.
-	noTx := wire.NewMsgTx()
+	noTx := NewMsgTx()
 	noTx.Version = 1
 	noTxEncoded := []byte{
 		0x01, 0x00, 0x00, 0x00, // Version
@@ -190,17 +189,17 @@ func TestTxWire(t *testing.T) {
 	}
 
 	tests := []struct {
-		in   *wire.MsgTx // Message to encode
-		out  *wire.MsgTx // Expected decoded message
-		buf  []byte      // Wire encoding
-		pver uint32      // Protocol version for wire encoding
+		in   *MsgTx // Message to encode
+		out  *MsgTx // Expected decoded message
+		buf  []byte // Wire encoding
+		pver uint32 // Protocol version for wire encoding
 	}{
 		// Latest protocol version with no transactions.
 		{
 			noTx,
 			noTx,
 			noTxEncoded,
-			wire.ProtocolVersion,
+			ProtocolVersion,
 		},
 
 		// Latest protocol version with multiple transactions.
@@ -208,7 +207,7 @@ func TestTxWire(t *testing.T) {
 			multiTx,
 			multiTx,
 			multiTxEncoded,
-			wire.ProtocolVersion,
+			ProtocolVersion,
 		},
 
 		// Protocol version BIP0035Version with no transactions.
@@ -216,7 +215,7 @@ func TestTxWire(t *testing.T) {
 			noTx,
 			noTx,
 			noTxEncoded,
-			wire.BIP0035Version,
+			BIP0035Version,
 		},
 
 		// Protocol version BIP0035Version with multiple transactions.
@@ -224,7 +223,7 @@ func TestTxWire(t *testing.T) {
 			multiTx,
 			multiTx,
 			multiTxEncoded,
-			wire.BIP0035Version,
+			BIP0035Version,
 		},
 
 		// Protocol version BIP0031Version with no transactions.
@@ -232,7 +231,7 @@ func TestTxWire(t *testing.T) {
 			noTx,
 			noTx,
 			noTxEncoded,
-			wire.BIP0031Version,
+			BIP0031Version,
 		},
 
 		// Protocol version BIP0031Version with multiple transactions.
@@ -240,7 +239,7 @@ func TestTxWire(t *testing.T) {
 			multiTx,
 			multiTx,
 			multiTxEncoded,
-			wire.BIP0031Version,
+			BIP0031Version,
 		},
 
 		// Protocol version NetAddressTimeVersion with no transactions.
@@ -248,7 +247,7 @@ func TestTxWire(t *testing.T) {
 			noTx,
 			noTx,
 			noTxEncoded,
-			wire.NetAddressTimeVersion,
+			NetAddressTimeVersion,
 		},
 
 		// Protocol version NetAddressTimeVersion with multiple transactions.
@@ -256,7 +255,7 @@ func TestTxWire(t *testing.T) {
 			multiTx,
 			multiTx,
 			multiTxEncoded,
-			wire.NetAddressTimeVersion,
+			NetAddressTimeVersion,
 		},
 
 		// Protocol version MultipleAddressVersion with no transactions.
@@ -264,7 +263,7 @@ func TestTxWire(t *testing.T) {
 			noTx,
 			noTx,
 			noTxEncoded,
-			wire.MultipleAddressVersion,
+			MultipleAddressVersion,
 		},
 
 		// Protocol version MultipleAddressVersion with multiple transactions.
@@ -272,7 +271,7 @@ func TestTxWire(t *testing.T) {
 			multiTx,
 			multiTx,
 			multiTxEncoded,
-			wire.MultipleAddressVersion,
+			MultipleAddressVersion,
 		},
 	}
 
@@ -292,7 +291,7 @@ func TestTxWire(t *testing.T) {
 		}
 
 		// Decode the message from wire format.
-		var msg wire.MsgTx
+		var msg MsgTx
 		rbuf := bytes.NewReader(test.buf)
 		err = msg.BtcDecode(rbuf, test.pver)
 		if err != nil {
@@ -316,12 +315,12 @@ func TestTxWireErrors(t *testing.T) {
 	pver := uint32(60002)
 
 	tests := []struct {
-		in       *wire.MsgTx // Value to encode
-		buf      []byte      // Wire encoding
-		pver     uint32      // Protocol version for wire encoding
-		max      int         // Max size of fixed buffer to induce errors
-		writeErr error       // Expected write error
-		readErr  error       // Expected read error
+		in       *MsgTx // Value to encode
+		buf      []byte // Wire encoding
+		pver     uint32 // Protocol version for wire encoding
+		max      int    // Max size of fixed buffer to induce errors
+		writeErr error  // Expected write error
+		readErr  error  // Expected read error
 	}{
 		// Force error in version.
 		{multiTx, multiTxEncoded, pver, 0, io.ErrShortWrite, io.EOF},
@@ -361,7 +360,7 @@ func TestTxWireErrors(t *testing.T) {
 		}
 
 		// Decode from wire format.
-		var msg wire.MsgTx
+		var msg MsgTx
 		r := newFixedReader(test.max, test.buf)
 		err = msg.BtcDecode(r, test.pver)
 		if err != test.readErr {
@@ -374,7 +373,7 @@ func TestTxWireErrors(t *testing.T) {
 
 // TestTxSerialize tests MsgTx serialize and deserialize.
 func TestTxSerialize(t *testing.T) {
-	noTx := wire.NewMsgTx()
+	noTx := NewMsgTx()
 	noTx.Version = 1
 	noTxEncoded := []byte{
 		0x01, 0x00, 0x00, 0x00, // Version
@@ -384,10 +383,10 @@ func TestTxSerialize(t *testing.T) {
 	}
 
 	tests := []struct {
-		in           *wire.MsgTx // Message to encode
-		out          *wire.MsgTx // Expected decoded message
-		buf          []byte      // Serialized data
-		pkScriptLocs []int       // Expected output script locations
+		in           *MsgTx // Message to encode
+		out          *MsgTx // Expected decoded message
+		buf          []byte // Serialized data
+		pkScriptLocs []int  // Expected output script locations
 	}{
 		// No transactions.
 		{
@@ -422,7 +421,7 @@ func TestTxSerialize(t *testing.T) {
 		}
 
 		// Deserialize the transaction.
-		var tx wire.MsgTx
+		var tx MsgTx
 		rbuf := bytes.NewReader(test.buf)
 		err = tx.Deserialize(rbuf)
 		if err != nil {
@@ -460,11 +459,11 @@ func TestTxSerialize(t *testing.T) {
 // of MsgTx to confirm error paths work correctly.
 func TestTxSerializeErrors(t *testing.T) {
 	tests := []struct {
-		in       *wire.MsgTx // Value to encode
-		buf      []byte      // Serialized data
-		max      int         // Max size of fixed buffer to induce errors
-		writeErr error       // Expected write error
-		readErr  error       // Expected read error
+		in       *MsgTx // Value to encode
+		buf      []byte // Serialized data
+		max      int    // Max size of fixed buffer to induce errors
+		writeErr error  // Expected write error
+		readErr  error  // Expected read error
 	}{
 		// Force error in version.
 		{multiTx, multiTxEncoded, 0, io.ErrShortWrite, io.EOF},
@@ -504,7 +503,7 @@ func TestTxSerializeErrors(t *testing.T) {
 		}
 
 		// Deserialize the transaction.
-		var tx wire.MsgTx
+		var tx MsgTx
 		r := newFixedReader(test.max, test.buf)
 		err = tx.Deserialize(r)
 		if err != test.readErr {
@@ -538,7 +537,7 @@ func TestTxOverflowErrors(t *testing.T) {
 				0x00, 0x00, 0x00, 0x01, // Version
 				0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
 				0xff, // Varint for number of input transactions
-			}, pver, txVer, &wire.MessageError{},
+			}, pver, txVer, &MessageError{},
 		},
 
 		// Transaction that claims to have ~uint64(0) outputs.
@@ -548,7 +547,7 @@ func TestTxOverflowErrors(t *testing.T) {
 				0x00, // Varint for number of input transactions
 				0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
 				0xff, // Varint for number of output transactions
-			}, pver, txVer, &wire.MessageError{},
+			}, pver, txVer, &MessageError{},
 		},
 
 		// Transaction that has an input with a signature script that
@@ -564,7 +563,7 @@ func TestTxOverflowErrors(t *testing.T) {
 				0xff, 0xff, 0xff, 0xff, // Prevous output index
 				0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
 				0xff, // Varint for length of signature script
-			}, pver, txVer, &wire.MessageError{},
+			}, pver, txVer, &MessageError{},
 		},
 
 		// Transaction that has an output with a public key script
@@ -584,14 +583,14 @@ func TestTxOverflowErrors(t *testing.T) {
 				0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // Transaction amount
 				0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
 				0xff, // Varint for length of public key script
-			}, pver, txVer, &wire.MessageError{},
+			}, pver, txVer, &MessageError{},
 		},
 	}
 
 	t.Logf("Running %d tests", len(tests))
 	for i, test := range tests {
 		// Decode from wire format.
-		var msg wire.MsgTx
+		var msg MsgTx
 		r := bytes.NewReader(test.buf)
 		err := msg.BtcDecode(r, test.pver)
 		if reflect.TypeOf(err) != reflect.TypeOf(test.err) {
@@ -615,12 +614,12 @@ func TestTxOverflowErrors(t *testing.T) {
 // transactions is accurate.
 func TestTxSerializeSize(t *testing.T) {
 	// Empty tx message.
-	noTx := wire.NewMsgTx()
+	noTx := NewMsgTx()
 	noTx.Version = 1
 
 	tests := []struct {
-		in   *wire.MsgTx // Tx to encode
-		size int         // Expected serialized size
+		in   *MsgTx // Tx to encode
+		size int    // Expected serialized size
 	}{
 		// No inputs or outpus.
 		{noTx, 10},
@@ -641,12 +640,12 @@ func TestTxSerializeSize(t *testing.T) {
 }
 
 // multiTx is a MsgTx with an input and output and used in various tests.
-var multiTx = &wire.MsgTx{
+var multiTx = &MsgTx{
 	Version: 1,
-	TxIn: []*wire.TxIn{
+	TxIn: []*TxIn{
 		{
-			PreviousOutPoint: wire.OutPoint{
-				Hash:  wire.ShaHash{},
+			PreviousOutPoint: OutPoint{
+				Hash:  ShaHash{},
 				Index: 0xffffffff,
 			},
 			SignatureScript: []byte{
@@ -655,7 +654,7 @@ var multiTx = &wire.MsgTx{
 			Sequence: 0xffffffff,
 		},
 	},
-	TxOut: []*wire.TxOut{
+	TxOut: []*TxOut{
 		{
 			Value: 0x12a05f200,
 			PkScript: []byte{

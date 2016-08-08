@@ -1,22 +1,20 @@
-// Copyright (c) 2013-2015 The btcsuite developers
+// Copyright (c) 2013-2016 The btcsuite developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
-package wire_test
+package wire
 
 import (
 	"bytes"
 	"testing"
-
-	"github.com/btcsuite/btcd/wire"
 )
 
 func TestMemPool(t *testing.T) {
-	pver := wire.ProtocolVersion
+	pver := ProtocolVersion
 
 	// Ensure the command is expected value.
 	wantCmd := "mempool"
-	msg := wire.NewMsgMemPool()
+	msg := NewMsgMemPool()
 	if cmd := msg.Command(); cmd != wantCmd {
 		t.Errorf("NewMsgMemPool: wrong command - got %v want %v",
 			cmd, wantCmd)
@@ -40,7 +38,7 @@ func TestMemPool(t *testing.T) {
 
 	// Older protocol versions should fail encode since message didn't
 	// exist yet.
-	oldPver := wire.BIP0035Version - 1
+	oldPver := BIP0035Version - 1
 	err = msg.BtcEncode(&buf, oldPver)
 	if err == nil {
 		s := "encode of MsgMemPool passed for old protocol version %v err <%v>"
@@ -48,7 +46,7 @@ func TestMemPool(t *testing.T) {
 	}
 
 	// Test decode with latest protocol version.
-	readmsg := wire.NewMsgMemPool()
+	readmsg := NewMsgMemPool()
 	err = readmsg.BtcDecode(&buf, pver)
 	if err != nil {
 		t.Errorf("decode of MsgMemPool failed [%v] err <%v>", buf, err)

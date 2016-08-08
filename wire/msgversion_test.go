@@ -1,8 +1,8 @@
-// Copyright (c) 2013-2015 The btcsuite developers
+// Copyright (c) 2013-2016 The btcsuite developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
-package wire_test
+package wire
 
 import (
 	"bytes"
@@ -13,33 +13,32 @@ import (
 	"testing"
 	"time"
 
-	"github.com/btcsuite/btcd/wire"
 	"github.com/davecgh/go-spew/spew"
 )
 
 // TestVersion tests the MsgVersion API.
 func TestVersion(t *testing.T) {
-	pver := wire.ProtocolVersion
+	pver := ProtocolVersion
 
 	// Create version message data.
 	lastBlock := int32(234234)
 	tcpAddrMe := &net.TCPAddr{IP: net.ParseIP("127.0.0.1"), Port: 8333}
-	me, err := wire.NewNetAddress(tcpAddrMe, wire.SFNodeNetwork)
+	me, err := NewNetAddress(tcpAddrMe, SFNodeNetwork)
 	if err != nil {
 		t.Errorf("NewNetAddress: %v", err)
 	}
 	tcpAddrYou := &net.TCPAddr{IP: net.ParseIP("192.168.0.1"), Port: 8333}
-	you, err := wire.NewNetAddress(tcpAddrYou, wire.SFNodeNetwork)
+	you, err := NewNetAddress(tcpAddrYou, SFNodeNetwork)
 	if err != nil {
 		t.Errorf("NewNetAddress: %v", err)
 	}
-	nonce, err := wire.RandomUint64()
+	nonce, err := RandomUint64()
 	if err != nil {
 		t.Errorf("RandomUint64: error generating nonce: %v", err)
 	}
 
 	// Ensure we get the correct data back out.
-	msg := wire.NewMsgVersion(me, you, nonce, lastBlock)
+	msg := NewMsgVersion(me, you, nonce, lastBlock)
 	if msg.ProtocolVersion != int32(pver) {
 		t.Errorf("NewMsgVersion: wrong protocol version - got %v, want %v",
 			msg.ProtocolVersion, pver)
@@ -56,9 +55,9 @@ func TestVersion(t *testing.T) {
 		t.Errorf("NewMsgVersion: wrong nonce - got %v, want %v",
 			msg.Nonce, nonce)
 	}
-	if msg.UserAgent != wire.DefaultUserAgent {
+	if msg.UserAgent != DefaultUserAgent {
 		t.Errorf("NewMsgVersion: wrong user agent - got %v, want %v",
-			msg.UserAgent, wire.DefaultUserAgent)
+			msg.UserAgent, DefaultUserAgent)
 	}
 	if msg.LastBlock != lastBlock {
 		t.Errorf("NewMsgVersion: wrong last block - got %v, want %v",
@@ -70,7 +69,7 @@ func TestVersion(t *testing.T) {
 	}
 
 	msg.AddUserAgent("myclient", "1.2.3", "optional", "comments")
-	customUserAgent := wire.DefaultUserAgent + "myclient:1.2.3(optional; comments)/"
+	customUserAgent := DefaultUserAgent + "myclient:1.2.3(optional; comments)/"
 	if msg.UserAgent != customUserAgent {
 		t.Errorf("AddUserAgent: wrong user agent - got %s, want %s",
 			msg.UserAgent, customUserAgent)
@@ -85,10 +84,10 @@ func TestVersion(t *testing.T) {
 
 	// accounting for ":", "/"
 	err = msg.AddUserAgent(strings.Repeat("t",
-		wire.MaxUserAgentLen-len(customUserAgent)-2+1), "")
-	if _, ok := err.(*wire.MessageError); !ok {
+		MaxUserAgentLen-len(customUserAgent)-2+1), "")
+	if _, ok := err.(*MessageError); !ok {
 		t.Errorf("AddUserAgent: expected error not received "+
-			"- got %v, want %T", err, wire.MessageError{})
+			"- got %v, want %T", err, MessageError{})
 
 	}
 
@@ -98,7 +97,7 @@ func TestVersion(t *testing.T) {
 			msg.Services, 0)
 
 	}
-	if msg.HasService(wire.SFNodeNetwork) {
+	if msg.HasService(SFNodeNetwork) {
 		t.Errorf("HasService: SFNodeNetwork service is set")
 	}
 
@@ -123,18 +122,18 @@ func TestVersion(t *testing.T) {
 	}
 
 	// Ensure adding the full service node flag works.
-	msg.AddService(wire.SFNodeNetwork)
-	if msg.Services != wire.SFNodeNetwork {
+	msg.AddService(SFNodeNetwork)
+	if msg.Services != SFNodeNetwork {
 		t.Errorf("AddService: wrong services - got %v, want %v",
-			msg.Services, wire.SFNodeNetwork)
+			msg.Services, SFNodeNetwork)
 	}
-	if !msg.HasService(wire.SFNodeNetwork) {
+	if !msg.HasService(SFNodeNetwork) {
 		t.Errorf("HasService: SFNodeNetwork service not set")
 	}
 
 	// Use a fake connection.
 	conn := &fakeConn{localAddr: tcpAddrMe, remoteAddr: tcpAddrYou}
-	msg, err = wire.NewMsgVersionFromConn(conn, nonce, lastBlock)
+	msg, err = NewMsgVersionFromConn(conn, nonce, lastBlock)
 	if err != nil {
 		t.Errorf("NewMsgVersionFromConn: %v", err)
 	}
@@ -154,10 +153,10 @@ func TestVersion(t *testing.T) {
 		localAddr:  &net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 8333},
 		remoteAddr: tcpAddrYou,
 	}
-	msg, err = wire.NewMsgVersionFromConn(conn, nonce, lastBlock)
-	if err != wire.ErrInvalidNetAddr {
+	msg, err = NewMsgVersionFromConn(conn, nonce, lastBlock)
+	if err != ErrInvalidNetAddr {
 		t.Errorf("NewMsgVersionFromConn: expected error not received "+
-			"- got %v, want %v", err, wire.ErrInvalidNetAddr)
+			"- got %v, want %v", err, ErrInvalidNetAddr)
 	}
 
 	// Use a fake connection with remote UDP addresses to force a failure.
@@ -165,10 +164,10 @@ func TestVersion(t *testing.T) {
 		localAddr:  tcpAddrMe,
 		remoteAddr: &net.UDPAddr{IP: net.ParseIP("192.168.0.1"), Port: 8333},
 	}
-	msg, err = wire.NewMsgVersionFromConn(conn, nonce, lastBlock)
-	if err != wire.ErrInvalidNetAddr {
+	msg, err = NewMsgVersionFromConn(conn, nonce, lastBlock)
+	if err != ErrInvalidNetAddr {
 		t.Errorf("NewMsgVersionFromConn: expected error not received "+
-			"- got %v, want %v", err, wire.ErrInvalidNetAddr)
+			"- got %v, want %v", err, ErrInvalidNetAddr)
 	}
 
 	return
@@ -187,17 +186,17 @@ func TestVersionWire(t *testing.T) {
 	verRelayTxFalseEncoded[len(verRelayTxFalseEncoded)-1] = 0
 
 	tests := []struct {
-		in   *wire.MsgVersion // Message to encode
-		out  *wire.MsgVersion // Expected decoded message
-		buf  []byte           // Wire encoding
-		pver uint32           // Protocol version for wire encoding
+		in   *MsgVersion // Message to encode
+		out  *MsgVersion // Expected decoded message
+		buf  []byte      // Wire encoding
+		pver uint32      // Protocol version for wire encoding
 	}{
 		// Latest protocol version.
 		{
 			baseVersionBIP0037,
 			baseVersionBIP0037,
 			baseVersionBIP0037Encoded,
-			wire.ProtocolVersion,
+			ProtocolVersion,
 		},
 
 		// Protocol version BIP0037Version with relay transactions field
@@ -206,7 +205,7 @@ func TestVersionWire(t *testing.T) {
 			baseVersionBIP0037,
 			baseVersionBIP0037,
 			baseVersionBIP0037Encoded,
-			wire.BIP0037Version,
+			BIP0037Version,
 		},
 
 		// Protocol version BIP0037Version with relay transactions field
@@ -215,7 +214,7 @@ func TestVersionWire(t *testing.T) {
 			verRelayTxFalse,
 			verRelayTxFalse,
 			verRelayTxFalseEncoded,
-			wire.BIP0037Version,
+			BIP0037Version,
 		},
 
 		// Protocol version BIP0035Version.
@@ -223,7 +222,7 @@ func TestVersionWire(t *testing.T) {
 			baseVersion,
 			baseVersion,
 			baseVersionEncoded,
-			wire.BIP0035Version,
+			BIP0035Version,
 		},
 
 		// Protocol version BIP0031Version.
@@ -231,7 +230,7 @@ func TestVersionWire(t *testing.T) {
 			baseVersion,
 			baseVersion,
 			baseVersionEncoded,
-			wire.BIP0031Version,
+			BIP0031Version,
 		},
 
 		// Protocol version NetAddressTimeVersion.
@@ -239,7 +238,7 @@ func TestVersionWire(t *testing.T) {
 			baseVersion,
 			baseVersion,
 			baseVersionEncoded,
-			wire.NetAddressTimeVersion,
+			NetAddressTimeVersion,
 		},
 
 		// Protocol version MultipleAddressVersion.
@@ -247,7 +246,7 @@ func TestVersionWire(t *testing.T) {
 			baseVersion,
 			baseVersion,
 			baseVersionEncoded,
-			wire.MultipleAddressVersion,
+			MultipleAddressVersion,
 		},
 	}
 
@@ -267,7 +266,7 @@ func TestVersionWire(t *testing.T) {
 		}
 
 		// Decode the message from wire format.
-		var msg wire.MsgVersion
+		var msg MsgVersion
 		rbuf := bytes.NewBuffer(test.buf)
 		err = msg.BtcDecode(rbuf, test.pver)
 		if err != nil {
@@ -289,7 +288,7 @@ func TestVersionWireErrors(t *testing.T) {
 	// because the test data is using bytes encoded with that protocol
 	// version.
 	pver := uint32(60002)
-	wireErr := &wire.MessageError{}
+	wireErr := &MessageError{}
 
 	// Ensure calling MsgVersion.BtcDecode with a non *bytes.Buffer returns
 	// error.
@@ -302,12 +301,12 @@ func TestVersionWireErrors(t *testing.T) {
 	// Copy the base version and change the user agent to exceed max limits.
 	bvc := *baseVersion
 	exceedUAVer := &bvc
-	newUA := "/" + strings.Repeat("t", wire.MaxUserAgentLen-8+1) + ":0.0.1/"
+	newUA := "/" + strings.Repeat("t", MaxUserAgentLen-8+1) + ":0.0.1/"
 	exceedUAVer.UserAgent = newUA
 
 	// Encode the new UA length as a varint.
 	var newUAVarIntBuf bytes.Buffer
-	err := wire.TstWriteVarInt(&newUAVarIntBuf, pver, uint64(len(newUA)))
+	err := WriteVarInt(&newUAVarIntBuf, pver, uint64(len(newUA)))
 	if err != nil {
 		t.Errorf("WriteVarInt: error %v", err)
 	}
@@ -324,12 +323,12 @@ func TestVersionWireErrors(t *testing.T) {
 	copy(exceedUAVerEncoded[83+len(newUA):], baseVersionEncoded[97:100])
 
 	tests := []struct {
-		in       *wire.MsgVersion // Value to encode
-		buf      []byte           // Wire encoding
-		pver     uint32           // Protocol version for wire encoding
-		max      int              // Max size of fixed buffer to induce errors
-		writeErr error            // Expected write error
-		readErr  error            // Expected read error
+		in       *MsgVersion // Value to encode
+		buf      []byte      // Wire encoding
+		pver     uint32      // Protocol version for wire encoding
+		max      int         // Max size of fixed buffer to induce errors
+		writeErr error       // Expected write error
+		readErr  error       // Expected read error
 	}{
 		// Force error in protocol version.
 		{baseVersion, baseVersionEncoded, pver, 0, io.ErrShortWrite, io.EOF},
@@ -353,7 +352,7 @@ func TestVersionWireErrors(t *testing.T) {
 		// it's optional.
 		{
 			baseVersionBIP0037, baseVersionBIP0037Encoded,
-			wire.BIP0037Version, 101, io.ErrShortWrite, nil,
+			BIP0037Version, 101, io.ErrShortWrite, nil,
 		},
 		// Force error due to user agent too big
 		{exceedUAVer, exceedUAVerEncoded, pver, newLen, wireErr, wireErr},
@@ -370,9 +369,9 @@ func TestVersionWireErrors(t *testing.T) {
 			continue
 		}
 
-		// For errors which are not of type wire.MessageError, check
-		// them for equality.
-		if _, ok := err.(*wire.MessageError); !ok {
+		// For errors which are not of type MessageError, check them for
+		// equality.
+		if _, ok := err.(*MessageError); !ok {
 			if err != test.writeErr {
 				t.Errorf("BtcEncode #%d wrong error got: %v, "+
 					"want: %v", i, err, test.writeErr)
@@ -381,7 +380,7 @@ func TestVersionWireErrors(t *testing.T) {
 		}
 
 		// Decode from wire format.
-		var msg wire.MsgVersion
+		var msg MsgVersion
 		buf := bytes.NewBuffer(test.buf[0:test.max])
 		err = msg.BtcDecode(buf, test.pver)
 		if reflect.TypeOf(err) != reflect.TypeOf(test.readErr) {
@@ -390,9 +389,9 @@ func TestVersionWireErrors(t *testing.T) {
 			continue
 		}
 
-		// For errors which are not of type wire.MessageError, check
-		// them for equality.
-		if _, ok := err.(*wire.MessageError); !ok {
+		// For errors which are not of type MessageError, check them for
+		// equality.
+		if _, ok := err.(*MessageError); !ok {
 			if err != test.readErr {
 				t.Errorf("BtcDecode #%d wrong error got: %v, "+
 					"want: %v", i, err, test.readErr)
@@ -407,13 +406,13 @@ func TestVersionWireErrors(t *testing.T) {
 func TestVersionOptionalFields(t *testing.T) {
 	// onlyRequiredVersion is a version message that only contains the
 	// required versions and all other values set to their default values.
-	onlyRequiredVersion := wire.MsgVersion{
+	onlyRequiredVersion := MsgVersion{
 		ProtocolVersion: 60002,
-		Services:        wire.SFNodeNetwork,
+		Services:        SFNodeNetwork,
 		Timestamp:       time.Unix(0x495fab29, 0), // 2009-01-03 12:15:05 -0600 CST)
-		AddrYou: wire.NetAddress{
+		AddrYou: NetAddress{
 			Timestamp: time.Time{}, // Zero value -- no timestamp in version
-			Services:  wire.SFNodeNetwork,
+			Services:  SFNodeNetwork,
 			IP:        net.ParseIP("192.168.0.1"),
 			Port:      8333,
 		},
@@ -424,9 +423,9 @@ func TestVersionOptionalFields(t *testing.T) {
 	// addrMeVersion is a version message that contains all fields through
 	// the AddrMe field.
 	addrMeVersion := onlyRequiredVersion
-	addrMeVersion.AddrMe = wire.NetAddress{
+	addrMeVersion.AddrMe = NetAddress{
 		Timestamp: time.Time{}, // Zero value -- no timestamp in version
-		Services:  wire.SFNodeNetwork,
+		Services:  SFNodeNetwork,
 		IP:        net.ParseIP("127.0.0.1"),
 		Port:      8333,
 	}
@@ -455,40 +454,40 @@ func TestVersionOptionalFields(t *testing.T) {
 	copy(lastBlockVersionEncoded, baseVersionEncoded)
 
 	tests := []struct {
-		msg  *wire.MsgVersion // Expected message
-		buf  []byte           // Wire encoding
-		pver uint32           // Protocol version for wire encoding
+		msg  *MsgVersion // Expected message
+		buf  []byte      // Wire encoding
+		pver uint32      // Protocol version for wire encoding
 	}{
 		{
 			&onlyRequiredVersion,
 			onlyRequiredVersionEncoded,
-			wire.ProtocolVersion,
+			ProtocolVersion,
 		},
 		{
 			&addrMeVersion,
 			addrMeVersionEncoded,
-			wire.ProtocolVersion,
+			ProtocolVersion,
 		},
 		{
 			&nonceVersion,
 			nonceVersionEncoded,
-			wire.ProtocolVersion,
+			ProtocolVersion,
 		},
 		{
 			&uaVersion,
 			uaVersionEncoded,
-			wire.ProtocolVersion,
+			ProtocolVersion,
 		},
 		{
 			&lastBlockVersion,
 			lastBlockVersionEncoded,
-			wire.ProtocolVersion,
+			ProtocolVersion,
 		},
 	}
 
 	for i, test := range tests {
 		// Decode the message from wire format.
-		var msg wire.MsgVersion
+		var msg MsgVersion
 		rbuf := bytes.NewBuffer(test.buf)
 		err := msg.BtcDecode(rbuf, test.pver)
 		if err != nil {
@@ -504,19 +503,19 @@ func TestVersionOptionalFields(t *testing.T) {
 }
 
 // baseVersion is used in the various tests as a baseline MsgVersion.
-var baseVersion = &wire.MsgVersion{
+var baseVersion = &MsgVersion{
 	ProtocolVersion: 60002,
-	Services:        wire.SFNodeNetwork,
+	Services:        SFNodeNetwork,
 	Timestamp:       time.Unix(0x495fab29, 0), // 2009-01-03 12:15:05 -0600 CST)
-	AddrYou: wire.NetAddress{
+	AddrYou: NetAddress{
 		Timestamp: time.Time{}, // Zero value -- no timestamp in version
-		Services:  wire.SFNodeNetwork,
+		Services:  SFNodeNetwork,
 		IP:        net.ParseIP("192.168.0.1"),
 		Port:      8333,
 	},
-	AddrMe: wire.NetAddress{
+	AddrMe: NetAddress{
 		Timestamp: time.Time{}, // Zero value -- no timestamp in version
-		Services:  wire.SFNodeNetwork,
+		Services:  SFNodeNetwork,
 		IP:        net.ParseIP("127.0.0.1"),
 		Port:      8333,
 	},
@@ -550,19 +549,19 @@ var baseVersionEncoded = []byte{
 
 // baseVersionBIP0037 is used in the various tests as a baseline MsgVersion for
 // BIP0037.
-var baseVersionBIP0037 = &wire.MsgVersion{
+var baseVersionBIP0037 = &MsgVersion{
 	ProtocolVersion: 70001,
-	Services:        wire.SFNodeNetwork,
+	Services:        SFNodeNetwork,
 	Timestamp:       time.Unix(0x495fab29, 0), // 2009-01-03 12:15:05 -0600 CST)
-	AddrYou: wire.NetAddress{
+	AddrYou: NetAddress{
 		Timestamp: time.Time{}, // Zero value -- no timestamp in version
-		Services:  wire.SFNodeNetwork,
+		Services:  SFNodeNetwork,
 		IP:        net.ParseIP("192.168.0.1"),
 		Port:      8333,
 	},
-	AddrMe: wire.NetAddress{
+	AddrMe: NetAddress{
 		Timestamp: time.Time{}, // Zero value -- no timestamp in version
-		Services:  wire.SFNodeNetwork,
+		Services:  SFNodeNetwork,
 		IP:        net.ParseIP("127.0.0.1"),
 		Port:      8333,
 	},
