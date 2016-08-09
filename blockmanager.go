@@ -973,10 +973,8 @@ func (b *blockManager) handleTxMsg(tmsg *txMsg) {
 // current returns true if we believe we are synced with our peers, false if we
 // still have blocks to check
 func (b *blockManager) current() bool {
-	if !cfg.TestNet {
-		if !b.blockChain.IsCurrent(b.server.timeSource) {
-			return false
-		}
+	if !b.blockChain.IsCurrent(b.server.timeSource) {
+		return false
 	}
 
 	// if blockChain thinks we are current and we have no syncPeer it

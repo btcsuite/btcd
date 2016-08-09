@@ -1582,10 +1582,9 @@ func (b *BlockChain) IsCurrent(timeSource MedianTimeSource) bool {
 	}
 
 	// Not current if the latest best block has a timestamp before 24 hours
-	// ago and is on mainnet.
+	// ago.
 	minus24Hours := timeSource.AdjustedTime().Add(-24 * time.Hour)
-	if b.bestChain.timestamp.Before(minus24Hours) &&
-		b.chainParams.Name == "mainnet" {
+	if b.bestChain.timestamp.Before(minus24Hours) {
 		return false
 	}
 
