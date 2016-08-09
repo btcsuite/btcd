@@ -3492,9 +3492,7 @@ func handleGetBlockTemplate(s *rpcServer, cmd interface{}, closeChan <-chan stru
 
 // handleGetCoinSupply implements the getcoinsupply command.
 func handleGetCoinSupply(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (interface{}, error) {
-	var supply int64
 	params := s.server.chainParams
-	base := params.BaseSubsidy
 	_, tipHeight, err := s.server.db.NewestSha()
 	if err != nil {
 		return nil, &dcrjson.RPCError{
@@ -3511,17 +3509,30 @@ func handleGetCoinSupply(s *rpcServer, cmd interface{}, closeChan <-chan struct{
 		return s.coinSupplyTotal, nil
 	}
 
-	for i := 0; i < int(tipHeight/params.ReductionInterval); i++ {
-		base = base * params.MulSubsidy / params.DivSubsidy
-	}
-
-	isValid := true
-	for i := int(tipHeight); i > 0; i-- {
+	var supply int64
+	prevBlockRegSubsidy := int64(0)
+	for i := int64(1); i <= tipHeight; i++ {
 		if i == 1 {
 			supply += params.BlockOneSubsidy()
 			continue
 		}
 
+		// Handle blocks from before stake validation was
+		// happening. The first validated tx tree regular
+		// is at height params.StakeValidationHeight-1, so
+		// store and update the tx tree regular coinbase
+		// subsidy.
+		if i < params.StakeValidationHeight {
+			work := blockchain.CalcBlockWorkSubsidy(i,
+				params.TicketsPerBlock, params)
+			tax := blockchain.CalcBlockTaxSubsidy(i, params.TicketsPerBlock,
+				params)
+			supply = supply + work + tax
+			prevBlockRegSubsidy = work + tax
+			continue
+		}
+
+		// Handle rejection of the previous block.
 		blockSha, err := s.server.db.FetchBlockShaByHeight(int64(i))
 		if err != nil {
 			context := "Failed to get block hash by height"
@@ -3532,32 +3543,30 @@ func handleGetCoinSupply(s *rpcServer, cmd interface{}, closeChan <-chan struct{
 			context := "Failed to get blockheader by hash"
 			return nil, internalRPCError(err.Error(), context)
 		}
-		voters := int64(bh.Voters)
-		var work, tax int64
-		// If block was voted no, exclude work and tax
-		if isValid {
-			work = ((base * int64(params.WorkRewardProportion)) /
-				int64(params.TotalSubsidyProportions()))
-			tax = ((base * int64(params.BlockTaxProportion)) /
-				int64(params.TotalSubsidyProportions()))
+		isValid := dcrutil.IsFlagSet16(bh.VoteBits, dcrutil.BlockValid)
+		if !isValid {
+			supply -= prevBlockRegSubsidy
 		}
-		stake := ((base * int64(params.StakeRewardProportion)) /
-			(int64(params.TicketsPerBlock) * int64(params.TotalSubsidyProportions()))) *
-			voters
 
-		if int64(i) < params.StakeValidationHeight {
-			supply += (work + tax)
-		} else {
-			// Make sure to reduce work and tax subsidy based on number of voters
-			work = work * voters / int64(params.TicketsPerBlock)
-			tax = tax * voters / int64(params.TicketsPerBlock)
-			supply += (work + stake + tax)
-		}
-		isValid = dcrutil.IsFlagSet16(bh.VoteBits, dcrutil.BlockValid)
+		// Handle the stake voters and the scaling penalty
+		// caused by an absence of stake voters.
+		work := blockchain.CalcBlockWorkSubsidy(i,
+			bh.Voters, params)
+		stake := blockchain.CalcStakeVoteSubsidy(i, params) *
+			int64(bh.Voters)
+		tax := blockchain.CalcBlockTaxSubsidy(i, bh.Voters,
+			params)
 
-		if i%int(params.ReductionInterval) == 0 {
-			base = base * params.DivSubsidy / params.MulSubsidy
+		// If we're at the tip, the tx tree regular has not
+		// yet been validated. Do not add this amount and
+		// break.
+		if i == tipHeight {
+			supply = supply + stake
+			break
 		}
+
+		supply = supply + work + tax + stake
+		prevBlockRegSubsidy = work + tax
 	}
 
 	s.coinSupplyHeight = tipHeight
