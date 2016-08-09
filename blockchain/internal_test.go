@@ -19,8 +19,8 @@ import (
 
 // TstSetCoinbaseMaturity makes the ability to set the coinbase maturity
 // available to the test package.
-func TstSetCoinbaseMaturity(maturity int32) {
-	coinbaseMaturity = maturity
+func (b *BlockChain) TstSetCoinbaseMaturity(maturity uint16) {
+	b.chainParams.CoinbaseMaturity = maturity
 }
 
 // TstTimeSorter makes the internal timeSorter type available to the test

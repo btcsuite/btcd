@@ -2104,6 +2104,11 @@ func handleGetNetworkHashPS(s *rpcServer, cmd interface{}, closeChan <-chan stru
 		endHeight = best.Height
 	}
 
+	// Calculate the number of blocks per retarget interval based on the
+	// chain parameters.
+	blocksPerRetarget := int32(s.server.chainParams.TargetTimespan /
+		s.server.chainParams.TargetTimePerBlock)
+
 	// Calculate the starting block height based on the passed number of
 	// blocks.  When the passed value is negative, use the last block the
 	// difficulty changed as the starting height.  Also make sure the
@@ -2114,7 +2119,7 @@ func handleGetNetworkHashPS(s *rpcServer, cmd interface{}, closeChan <-chan stru
 	}
 	var startHeight int32
 	if numBlocks <= 0 {
-		startHeight = endHeight - ((endHeight % blockchain.BlocksPerRetarget) + 1)
+		startHeight = endHeight - ((endHeight % blocksPerRetarget) + 1)
 	} else {
 		startHeight = endHeight - numBlocks
 	}
