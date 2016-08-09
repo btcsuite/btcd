@@ -309,6 +309,7 @@ var MainNetParams = Params{
 	Checkpoints: []Checkpoint{
 		{440, newHashFromStr("0000000000002203eb2c95ee96906730bb56b2985e174518f90eb4db29232d93")},
 		{24480, newHashFromStr("0000000000000c9d4239c4ef7ef3fb5aaeed940244bc69c57c8c5e1f071b28a6")},
+		{48590, newHashFromStr("0000000000000d5e0de21a96d3c965f5f2db2c82612acd7389c140c9afe92ba7")},
 	},
 
 	// Mempool parameters
@@ -393,7 +394,13 @@ var TestNetParams = Params{
 	BlockTaxProportion:    1,
 
 	// Checkpoints ordered from oldest to newest.
-	Checkpoints: []Checkpoint{},
+	Checkpoints: []Checkpoint{
+		{2900, newHashFromStr("000000000012475b579cd16d670f42982648e5dbf81d84960c83fd1990d84cbe")},
+		{27550, newHashFromStr("00000000183a9f9b8fa6accc32c7abb2456a8e0e12baf045788a74114dbbebe3")},
+		{61540, newHashFromStr("0000000003bc7461b7cd821fb258de72b9b0c7604b1a5346d29eb132d846ccb0")},
+		{97110, newHashFromStr("0000000006ae0065cf97102844854966d907d6e50ab18894679fbad1dfc017b4")},
+		{132220, newHashFromStr("000000000372a1bf5ad5c42361672bfeae6a513ad25ab9eaf4590f890e090c36")},
+	},
 
 	// Mempool parameters
 	RelayNonStdTxs: true,
