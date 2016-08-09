@@ -784,6 +784,9 @@ func (b *blockManager) syncMiningStateAfterSync(sp *serverPeer) {
 		for {
 			select {
 			case <-ticker.C:
+				if !sp.Connected() {
+					return
+				}
 				if b.IsCurrent() {
 					msg := wire.NewMsgGetMiningState()
 					sp.QueueMessage(msg, nil)
