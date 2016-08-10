@@ -3508,7 +3508,10 @@ func handleSetGenerate(s *rpcServer, cmd interface{}, closeChan <-chan struct{})
 
 // handleStop implements the stop command.
 func handleStop(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (interface{}, error) {
-	s.server.Stop()
+	select {
+	case s.requestProcessShutdown <- struct{}{}:
+	default:
+	}
 	return "btcd stopping.", nil
 }
 
@@ -3678,23 +3681,24 @@ func handleVerifyMessage(s *rpcServer, cmd interface{}, closeChan <-chan struct{
 // rpcServer holds the items the rpc server may need to access (config,
 // shutdown, main server, etc.)
 type rpcServer struct {
-	started      int32
-	shutdown     int32
-	policy       *mining.Policy
-	server       *server
-	chain        *blockchain.BlockChain
-	authsha      [fastsha256.Size]byte
-	limitauthsha [fastsha256.Size]byte
-	ntfnMgr      *wsNotificationManager
-	numClients   int32
-	statusLines  map[int]string
-	statusLock   sync.RWMutex
-	wg           sync.WaitGroup
-	listeners    []net.Listener
-	workState    *workState
-	gbtWorkState *gbtWorkState
-	helpCacher   *helpCacher
-	quit         chan int
+	started                int32
+	shutdown               int32
+	policy                 *mining.Policy
+	server                 *server
+	chain                  *blockchain.BlockChain
+	authsha                [fastsha256.Size]byte
+	limitauthsha           [fastsha256.Size]byte
+	ntfnMgr                *wsNotificationManager
+	numClients             int32
+	statusLines            map[int]string
+	statusLock             sync.RWMutex
+	wg                     sync.WaitGroup
+	listeners              []net.Listener
+	workState              *workState
+	gbtWorkState           *gbtWorkState
+	helpCacher             *helpCacher
+	requestProcessShutdown chan struct{}
+	quit                   chan int
 }
 
 // httpStatusLine returns a response Status-Line (RFC 2616 Section 6.1)
@@ -3776,6 +3780,13 @@ func (s *rpcServer) Stop() error {
 	s.wg.Wait()
 	rpcsLog.Infof("RPC server shutdown complete")
 	return nil
+}
+
+// RequestedProcessShutdown returns a channel that is sent to when an authorized
+// RPC client requests the process to shutdown.  If the request can not be read
+// immediately, it is dropped.
+func (s *rpcServer) RequestedProcessShutdown() <-chan struct{} {
+	return s.requestProcessShutdown
 }
 
 // limitConnections responds with a 503 service unavailable and returns true if
@@ -4159,14 +4170,15 @@ func genCertPair(certFile, keyFile string) error {
 // newRPCServer returns a new instance of the rpcServer struct.
 func newRPCServer(listenAddrs []string, policy *mining.Policy, s *server) (*rpcServer, error) {
 	rpc := rpcServer{
-		policy:       policy,
-		server:       s,
-		chain:        s.blockManager.chain,
-		statusLines:  make(map[int]string),
-		workState:    newWorkState(),
-		gbtWorkState: newGbtWorkState(s.timeSource),
-		helpCacher:   newHelpCacher(),
-		quit:         make(chan int),
+		policy:                 policy,
+		server:                 s,
+		chain:                  s.blockManager.chain,
+		statusLines:            make(map[int]string),
+		workState:              newWorkState(),
+		gbtWorkState:           newGbtWorkState(s.timeSource),
+		helpCacher:             newHelpCacher(),
+		requestProcessShutdown: make(chan struct{}),
+		quit: make(chan int),
 	}
 	if cfg.RPCUser != "" && cfg.RPCPass != "" {
 		login := cfg.RPCUser + ":" + cfg.RPCPass

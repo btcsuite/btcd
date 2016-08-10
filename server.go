@@ -2555,6 +2555,12 @@ func newServer(listenAddrs []string, db database.DB, chainParams *chaincfg.Param
 		if err != nil {
 			return nil, err
 		}
+
+		// Signal process shutdown when the RPC server requests it.
+		go func() {
+			<-s.rpcServer.RequestedProcessShutdown()
+			shutdownRequestChannel <- struct{}{}
+		}()
 	}
 
 	return &s, nil

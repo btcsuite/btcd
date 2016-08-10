@@ -19,8 +19,7 @@ import (
 )
 
 var (
-	cfg             *config
-	shutdownChannel = make(chan struct{})
+	cfg *config
 )
 
 // winServiceMain is only invoked on Windows.  It detects when btcd is running
@@ -41,6 +40,12 @@ func btcdMain(serverChan chan<- *server) error {
 	}
 	cfg = tcfg
 	defer backendLog.Flush()
+
+	// Get a channel that will be closed when a shutdown signal has been
+	// triggered either from an OS signal such as SIGINT (Ctrl+C) or from
+	// another subsystem such as the RPC server.
+	interruptedChan := interruptListener()
+	defer btcdLog.Info("Shutdown complete")
 
 	// Show version at startup.
 	btcdLog.Infof("Version %s", version())
@@ -75,19 +80,27 @@ func btcdMain(serverChan chan<- *server) error {
 		return err
 	}
 
+	// Return now if an interrupt signal was triggered.
+	if interruptRequested(interruptedChan) {
+		return nil
+	}
+
 	// Load the block database.
 	db, err := loadBlockDB()
 	if err != nil {
 		btcdLog.Errorf("%v", err)
 		return err
 	}
-	defer db.Close()
-
-	// Ensure the database is sync'd and closed on Ctrl+C.
-	addInterruptHandler(func() {
+	defer func() {
+		// Ensure the database is sync'd and closed on shutdown.
 		btcdLog.Infof("Gracefully shutting down the database...")
 		db.Close()
-	})
+	}()
+
+	// Return now if an interrupt signal was triggered.
+	if interruptRequested(interruptedChan) {
+		return nil
+	}
 
 	// Drop indexes and exit if requested.
 	//
@@ -118,32 +131,21 @@ func btcdMain(serverChan chan<- *server) error {
 			cfg.Listeners, err)
 		return err
 	}
-	addInterruptHandler(func() {
+	defer func() {
 		btcdLog.Infof("Gracefully shutting down the server...")
 		server.Stop()
 		server.WaitForShutdown()
-	})
+		srvrLog.Infof("Server shutdown complete")
+	}()
 	server.Start()
 	if serverChan != nil {
 		serverChan <- server
 	}
 
-	// Monitor for graceful server shutdown and signal the main goroutine
-	// when done.  This is done in a separate goroutine rather than waiting
-	// directly so the main goroutine can be signaled for shutdown by either
-	// a graceful shutdown or from the main interrupt handler.  This is
-	// necessary since the main goroutine must be kept running long enough
-	// for the interrupt handler goroutine to finish.
-	go func() {
-		server.WaitForShutdown()
-		srvrLog.Infof("Server shutdown complete")
-		shutdownChannel <- struct{}{}
-	}()
-
-	// Wait for shutdown signal from either a graceful server stop or from
-	// the interrupt handler.
-	<-shutdownChannel
-	btcdLog.Info("Shutdown complete")
+	// Wait until the interrupt signal is received from an OS signal or
+	// shutdown is requested through one of the subsystems such as the RPC
+	// server.
+	<-interruptedChan
 	return nil
 }
 
