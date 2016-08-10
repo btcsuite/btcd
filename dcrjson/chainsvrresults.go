@@ -342,10 +342,12 @@ func (v *VinPrevOut) IsCoinBase() bool {
 func (v *VinPrevOut) MarshalJSON() ([]byte, error) {
 	if v.IsCoinBase() {
 		coinbaseStruct := struct {
-			Coinbase string `json:"coinbase"`
-			Sequence uint32 `json:"sequence"`
+			Coinbase string   `json:"coinbase"`
+			AmountIn *float64 `json:"amountin,omitempty"`
+			Sequence uint32   `json:"sequence"`
 		}{
 			Coinbase: v.Coinbase,
+			AmountIn: v.AmountIn,
 			Sequence: v.Sequence,
 		}
 		return json.Marshal(coinbaseStruct)

@@ -1394,10 +1394,12 @@ func createVinListPrevOut(s *rpcServer, mtx *wire.MsgTx, chainParams *chaincfg.P
 			return vinList
 		}
 
-		var vinEntry dcrjson.VinPrevOut
 		txIn := mtx.TxIn[0]
-		vinEntry.Coinbase = hex.EncodeToString(txIn.SignatureScript)
-		vinEntry.Sequence = txIn.Sequence
+		vinEntry := dcrjson.VinPrevOut{
+			Coinbase: hex.EncodeToString(txIn.SignatureScript),
+			AmountIn: dcrjson.Float64(dcrutil.Amount(txIn.ValueIn).ToCoin()),
+			Sequence: txIn.Sequence,
+		}
 		vinList = append(vinList, vinEntry)
 		return vinList
 	}
