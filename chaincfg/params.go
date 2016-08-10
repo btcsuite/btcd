@@ -7,6 +7,7 @@ package chaincfg
 import (
 	"errors"
 	"math/big"
+	"time"
 
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/wire"
@@ -53,19 +54,70 @@ type Checkpoint struct {
 // used by Bitcoin applications to differentiate networks as well as addresses
 // and keys for one network from those intended for use on another network.
 type Params struct {
-	Name        string
-	Net         wire.BitcoinNet
-	DefaultPort string
-	DNSSeeds    []string
+	// Name defines a human-readable identifier for the network.
+	Name string
 
-	// Chain parameters
-	GenesisBlock           *wire.MsgBlock
-	GenesisHash            *chainhash.Hash
-	PowLimit               *big.Int
-	PowLimitBits           uint32
-	SubsidyHalvingInterval int32
-	ResetMinDifficulty     bool
-	GenerateSupported      bool
+	// Net defines the magic bytes used to identify the network.
+	Net wire.BitcoinNet
+
+	// DefaultPort defines the default peer-to-peer port for the network.
+	DefaultPort string
+
+	// DNSSeeds defines a list of DNS seeds for the network that are used
+	// as one method to discover peers.
+	DNSSeeds []string
+
+	// GenesisBlock defines the first block of the chain.
+	GenesisBlock *wire.MsgBlock
+
+	// GenesisHash is the starting block hash.
+	GenesisHash *chainhash.Hash
+
+	// PowLimit defines the highest allowed proof of work value for a block
+	// as a uint256.
+	PowLimit *big.Int
+
+	// PowLimitBits defines the highest allowed proof of work value for a
+	// block in compact form.
+	PowLimitBits uint32
+
+	// CoinbaseMaturity is the number of blocks required before newly mined
+	// coins (coinbase transactions) can be spent.
+	CoinbaseMaturity uint16
+
+	// SubsidyReductionInterval is the interval of blocks before the subsidy
+	// is reduced.
+	SubsidyReductionInterval int32
+
+	// TargetTimespan is the desired amount of time that should elapse
+	// before the block difficulty requirement is examined to determine how
+	// it should be changed in order to maintain the desired block
+	// generation rate.
+	TargetTimespan time.Duration
+
+	// TargetTimePerBlock is the desired amount of time to generate each
+	// block.
+	TargetTimePerBlock time.Duration
+
+	// RetargetAdjustmentFactor is the adjustment factor used to limit
+	// the minimum and maximum amount of adjustment that can occur between
+	// difficulty retargets.
+	RetargetAdjustmentFactor int64
+
+	// ReduceMinDifficulty defines whether the network should reduce the
+	// minimum required difficulty after a long enough period of time has
+	// passed without finding a block.  This is really only useful for test
+	// networks and should not be set on a main network.
+	ReduceMinDifficulty bool
+
+	// MinDiffReductionTime is the amount of time after which the minimum
+	// required difficulty should be reduced when a block hasn't been found.
+	//
+	// NOTE: This only applies if ReduceMinDifficulty is true.
+	MinDiffReductionTime time.Duration
+
+	// GenerateSupported specifies whether or not CPU mining is allowed.
+	GenerateSupported bool
 
 	// Checkpoints ordered from oldest to newest.
 	Checkpoints []Checkpoint
@@ -114,13 +166,18 @@ var MainNetParams = Params{
 	},
 
 	// Chain parameters
-	GenesisBlock:           &genesisBlock,
-	GenesisHash:            &genesisHash,
-	PowLimit:               mainPowLimit,
-	PowLimitBits:           0x1d00ffff,
-	SubsidyHalvingInterval: 210000,
-	ResetMinDifficulty:     false,
-	GenerateSupported:      false,
+	GenesisBlock:             &genesisBlock,
+	GenesisHash:              &genesisHash,
+	PowLimit:                 mainPowLimit,
+	PowLimitBits:             0x1d00ffff,
+	CoinbaseMaturity:         100,
+	SubsidyReductionInterval: 210000,
+	TargetTimespan:           time.Hour * 24 * 14, // 14 days
+	TargetTimePerBlock:       time.Minute * 10,    // 10 minutes
+	RetargetAdjustmentFactor: 4,                   // 25% less, 400% more
+	ReduceMinDifficulty:      false,
+	MinDiffReductionTime:     0,
+	GenerateSupported:        false,
 
 	// Checkpoints ordered from oldest to newest.
 	Checkpoints: []Checkpoint{
@@ -181,13 +238,18 @@ var RegressionNetParams = Params{
 	DNSSeeds:    []string{},
 
 	// Chain parameters
-	GenesisBlock:           &regTestGenesisBlock,
-	GenesisHash:            &regTestGenesisHash,
-	PowLimit:               regressionPowLimit,
-	PowLimitBits:           0x207fffff,
-	SubsidyHalvingInterval: 150,
-	ResetMinDifficulty:     true,
-	GenerateSupported:      true,
+	GenesisBlock:             &regTestGenesisBlock,
+	GenesisHash:              &regTestGenesisHash,
+	PowLimit:                 regressionPowLimit,
+	PowLimitBits:             0x207fffff,
+	CoinbaseMaturity:         100,
+	SubsidyReductionInterval: 150,
+	TargetTimespan:           time.Hour * 24 * 14, // 14 days
+	TargetTimePerBlock:       time.Minute * 10,    // 10 minutes
+	RetargetAdjustmentFactor: 4,                   // 25% less, 400% more
+	ReduceMinDifficulty:      true,
+	MinDiffReductionTime:     time.Minute * 20, // TargetTimePerBlock * 2
+	GenerateSupported:        true,
 
 	// Checkpoints ordered from oldest to newest.
 	Checkpoints: nil,
@@ -233,13 +295,18 @@ var TestNet3Params = Params{
 	},
 
 	// Chain parameters
-	GenesisBlock:           &testNet3GenesisBlock,
-	GenesisHash:            &testNet3GenesisHash,
-	PowLimit:               testNet3PowLimit,
-	PowLimitBits:           0x1d00ffff,
-	SubsidyHalvingInterval: 210000,
-	ResetMinDifficulty:     true,
-	GenerateSupported:      false,
+	GenesisBlock:             &testNet3GenesisBlock,
+	GenesisHash:              &testNet3GenesisHash,
+	PowLimit:                 testNet3PowLimit,
+	PowLimitBits:             0x1d00ffff,
+	CoinbaseMaturity:         100,
+	SubsidyReductionInterval: 210000,
+	TargetTimespan:           time.Hour * 24 * 14, // 14 days
+	TargetTimePerBlock:       time.Minute * 10,    // 10 minutes
+	RetargetAdjustmentFactor: 4,                   // 25% less, 400% more
+	ReduceMinDifficulty:      true,
+	MinDiffReductionTime:     time.Minute * 20, // TargetTimePerBlock * 2
+	GenerateSupported:        false,
 
 	// Checkpoints ordered from oldest to newest.
 	Checkpoints: []Checkpoint{
@@ -287,13 +354,18 @@ var SimNetParams = Params{
 	DNSSeeds:    []string{}, // NOTE: There must NOT be any seeds.
 
 	// Chain parameters
-	GenesisBlock:           &simNetGenesisBlock,
-	GenesisHash:            &simNetGenesisHash,
-	PowLimit:               simNetPowLimit,
-	PowLimitBits:           0x207fffff,
-	SubsidyHalvingInterval: 210000,
-	ResetMinDifficulty:     true,
-	GenerateSupported:      true,
+	GenesisBlock:             &simNetGenesisBlock,
+	GenesisHash:              &simNetGenesisHash,
+	PowLimit:                 simNetPowLimit,
+	PowLimitBits:             0x207fffff,
+	CoinbaseMaturity:         100,
+	SubsidyReductionInterval: 210000,
+	TargetTimespan:           time.Hour * 24 * 14, // 14 days
+	TargetTimePerBlock:       time.Minute * 10,    // 10 minutes
+	RetargetAdjustmentFactor: 4,                   // 25% less, 400% more
+	ReduceMinDifficulty:      true,
+	MinDiffReductionTime:     time.Minute * 20, // TargetTimePerBlock * 2
+	GenerateSupported:        true,
 
 	// Checkpoints ordered from oldest to newest.
 	Checkpoints: nil,

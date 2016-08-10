@@ -45,18 +45,9 @@ const (
 	// baseSubsidy is the starting subsidy amount for mined blocks.  This
 	// value is halved every SubsidyHalvingInterval blocks.
 	baseSubsidy = 50 * btcutil.SatoshiPerBitcoin
-
-	// CoinbaseMaturity is the number of blocks required before newly
-	// mined bitcoins (coinbase transactions) can be spent.
-	CoinbaseMaturity = 100
 )
 
 var (
-	// coinbaseMaturity is the internal variable used for validating the
-	// spending of coinbase outputs.  A variable rather than the exported
-	// constant is used because the tests need the ability to modify it.
-	coinbaseMaturity = int32(CoinbaseMaturity)
-
 	// zeroHash is the zero value for a chainhash.Hash and is defined as
 	// a package level variable to avoid the need to create a new instance
 	// every time a check is needed.
@@ -182,18 +173,18 @@ func isBIP0030Node(node *blockNode) bool {
 // newly generated blocks awards as well as validating the coinbase for blocks
 // has the expected value.
 //
-// The subsidy is halved every SubsidyHalvingInterval blocks.  Mathematically
-// this is: baseSubsidy / 2^(height/subsidyHalvingInterval)
+// The subsidy is halved every SubsidyReductionInterval blocks.  Mathematically
+// this is: baseSubsidy / 2^(height/SubsidyReductionInterval)
 //
 // At the target block generation rate for the main network, this is
 // approximately every 4 years.
 func CalcBlockSubsidy(height int32, chainParams *chaincfg.Params) int64 {
-	if chainParams.SubsidyHalvingInterval == 0 {
+	if chainParams.SubsidyReductionInterval == 0 {
 		return baseSubsidy
 	}
 
 	// Equivalent to: baseSubsidy / 2^(height/subsidyHalvingInterval)
-	return baseSubsidy >> uint(height/chainParams.SubsidyHalvingInterval)
+	return baseSubsidy >> uint(height/chainParams.SubsidyReductionInterval)
 }
 
 // CheckTransactionSanity performs some preliminary checks on a transaction to
@@ -833,7 +824,7 @@ func (b *BlockChain) checkBIP0030(node *blockNode, block *btcutil.Block, view *U
 //
 // NOTE: The transaction MUST have already been sanity checked with the
 // CheckTransactionSanity function prior to calling this function.
-func CheckTransactionInputs(tx *btcutil.Tx, txHeight int32, utxoView *UtxoViewpoint) (int64, error) {
+func CheckTransactionInputs(tx *btcutil.Tx, txHeight int32, utxoView *UtxoViewpoint, chainParams *chaincfg.Params) (int64, error) {
 	// Coinbase transactions have no inputs.
 	if IsCoinBase(tx) {
 		return 0, nil
@@ -857,6 +848,7 @@ func CheckTransactionInputs(tx *btcutil.Tx, txHeight int32, utxoView *UtxoViewpo
 		if utxoEntry.IsCoinBase() {
 			originHeight := int32(utxoEntry.BlockHeight())
 			blocksSincePrev := txHeight - originHeight
+			coinbaseMaturity := int32(chainParams.CoinbaseMaturity)
 			if blocksSincePrev < coinbaseMaturity {
 				str := fmt.Sprintf("tried to spend coinbase "+
 					"transaction %v from height %v at "+
@@ -1050,7 +1042,8 @@ func (b *BlockChain) checkConnectBlock(node *blockNode, block *btcutil.Block, vi
 	// bounds.
 	var totalFees int64
 	for _, tx := range transactions {
-		txFee, err := CheckTransactionInputs(tx, node.height, view)
+		txFee, err := CheckTransactionInputs(tx, node.height, view,
+			b.chainParams)
 		if err != nil {
 			return err
 		}

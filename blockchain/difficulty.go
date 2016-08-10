@@ -11,37 +11,6 @@ import (
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
 )
 
-const (
-	// targetTimespan is the desired amount of time that should elapse
-	// before block difficulty requirement is examined to determine how
-	// it should be changed in order to maintain the desired block
-	// generation rate.
-	targetTimespan = time.Hour * 24 * 14
-
-	// targetSpacing is the desired amount of time to generate each block.
-	targetSpacing = time.Minute * 10
-
-	// BlocksPerRetarget is the number of blocks between each difficulty
-	// retarget.  It is calculated based on the desired block generation
-	// rate.
-	BlocksPerRetarget = int32(targetTimespan / targetSpacing)
-
-	// retargetAdjustmentFactor is the adjustment factor used to limit
-	// the minimum and maximum amount of adjustment that can occur between
-	// difficulty retargets.
-	retargetAdjustmentFactor = 4
-
-	// minRetargetTimespan is the minimum amount of adjustment that can
-	// occur between difficulty retargets.  It equates to 25% of the
-	// previous difficulty.
-	minRetargetTimespan = int64(targetTimespan / retargetAdjustmentFactor)
-
-	// maxRetargetTimespan is the maximum amount of adjustment that can
-	// occur between difficulty retargets.  It equates to 400% of the
-	// previous difficulty.
-	maxRetargetTimespan = int64(targetTimespan * retargetAdjustmentFactor)
-)
-
 var (
 	// bigOne is 1 represented as a big.Int.  It is defined here to avoid
 	// the overhead of creating it multiple times.
@@ -190,13 +159,13 @@ func CalcWork(bits uint32) *big.Int {
 func (b *BlockChain) calcEasiestDifficulty(bits uint32, duration time.Duration) uint32 {
 	// Convert types used in the calculations below.
 	durationVal := int64(duration)
-	adjustmentFactor := big.NewInt(retargetAdjustmentFactor)
+	adjustmentFactor := big.NewInt(b.chainParams.RetargetAdjustmentFactor)
 
 	// The test network rules allow minimum difficulty blocks after more
 	// than twice the desired amount of time needed to generate a block has
 	// elapsed.
-	if b.chainParams.ResetMinDifficulty {
-		if durationVal > int64(targetSpacing)*2 {
+	if b.chainParams.ReduceMinDifficulty {
+		if durationVal > int64(b.chainParams.MinDiffReductionTime) {
 			return b.chainParams.PowLimitBits
 		}
 	}
@@ -208,7 +177,7 @@ func (b *BlockChain) calcEasiestDifficulty(bits uint32, duration time.Duration) 
 	newTarget := CompactToBig(bits)
 	for durationVal > 0 && newTarget.Cmp(b.chainParams.PowLimit) < 0 {
 		newTarget.Mul(newTarget, adjustmentFactor)
-		durationVal -= maxRetargetTimespan
+		durationVal -= b.maxRetargetTimespan
 	}
 
 	// Limit new value to the proof of work limit.
@@ -227,7 +196,7 @@ func (b *BlockChain) findPrevTestNetDifficulty(startNode *blockNode) (uint32, er
 	// Search backwards through the chain for the last block without
 	// the special rule applied.
 	iterNode := startNode
-	for iterNode != nil && iterNode.height%BlocksPerRetarget != 0 &&
+	for iterNode != nil && iterNode.height%b.blocksPerRetarget != 0 &&
 		iterNode.bits == b.chainParams.PowLimitBits {
 
 		// Get the previous block node.  This function is used over
@@ -267,15 +236,15 @@ func (b *BlockChain) calcNextRequiredDifficulty(lastNode *blockNode, newBlockTim
 
 	// Return the previous block's difficulty requirements if this block
 	// is not at a difficulty retarget interval.
-	if (lastNode.height+1)%BlocksPerRetarget != 0 {
-		// The test network rules allow minimum difficulty blocks after
-		// more than twice the desired amount of time needed to generate
-		// a block has elapsed.
-		if b.chainParams.ResetMinDifficulty {
-			// Return minimum difficulty when more than twice the
-			// desired amount of time needed to generate a block has
-			// elapsed.
-			allowMinTime := lastNode.timestamp.Add(targetSpacing * 2)
+	if (lastNode.height+1)%b.blocksPerRetarget != 0 {
+		// For networks that support it, allow special reduction of the
+		// required difficulty once too much time has elapsed without
+		// mining a block.
+		if b.chainParams.ReduceMinDifficulty {
+			// Return minimum difficulty when more than the desired
+			// amount of time has elapsed without mining a block.
+			reductionTime := b.chainParams.MinDiffReductionTime
+			allowMinTime := lastNode.timestamp.Add(reductionTime)
 			if newBlockTime.After(allowMinTime) {
 				return b.chainParams.PowLimitBits, nil
 			}
@@ -298,7 +267,7 @@ func (b *BlockChain) calcNextRequiredDifficulty(lastNode *blockNode, newBlockTim
 	// Get the block node at the previous retarget (targetTimespan days
 	// worth of blocks).
 	firstNode := lastNode
-	for i := int32(0); i < BlocksPerRetarget-1 && firstNode != nil; i++ {
+	for i := int32(0); i < b.blocksPerRetarget-1 && firstNode != nil; i++ {
 		// Get the previous block node.  This function is used over
 		// simply accessing firstNode.parent directly as it will
 		// dynamically create previous block nodes as needed.  This
@@ -319,10 +288,10 @@ func (b *BlockChain) calcNextRequiredDifficulty(lastNode *blockNode, newBlockTim
 	// difficulty.
 	actualTimespan := lastNode.timestamp.UnixNano() - firstNode.timestamp.UnixNano()
 	adjustedTimespan := actualTimespan
-	if actualTimespan < minRetargetTimespan {
-		adjustedTimespan = minRetargetTimespan
-	} else if actualTimespan > maxRetargetTimespan {
-		adjustedTimespan = maxRetargetTimespan
+	if actualTimespan < b.minRetargetTimespan {
+		adjustedTimespan = b.minRetargetTimespan
+	} else if actualTimespan > b.maxRetargetTimespan {
+		adjustedTimespan = b.maxRetargetTimespan
 	}
 
 	// Calculate new target difficulty as:
@@ -332,7 +301,7 @@ func (b *BlockChain) calcNextRequiredDifficulty(lastNode *blockNode, newBlockTim
 	// result.
 	oldTarget := CompactToBig(lastNode.bits)
 	newTarget := new(big.Int).Mul(oldTarget, big.NewInt(adjustedTimespan))
-	newTarget.Div(newTarget, big.NewInt(int64(targetTimespan)))
+	newTarget.Div(newTarget, big.NewInt(int64(b.chainParams.TargetTimespan)))
 
 	// Limit new value to the proof of work limit.
 	if newTarget.Cmp(b.chainParams.PowLimit) > 0 {
@@ -349,7 +318,7 @@ func (b *BlockChain) calcNextRequiredDifficulty(lastNode *blockNode, newBlockTim
 	log.Debugf("New target %08x (%064x)", newTargetBits, CompactToBig(newTargetBits))
 	log.Debugf("Actual timespan %v, adjusted timespan %v, target timespan %v",
 		time.Duration(actualTimespan), time.Duration(adjustedTimespan),
-		targetTimespan)
+		b.chainParams.TargetTimespan)
 
 	return newTargetBits, nil
 }

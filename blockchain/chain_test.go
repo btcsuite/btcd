@@ -46,7 +46,7 @@ func TestHaveBlock(t *testing.T) {
 	// Since we're not dealing with the real block chain, disable
 	// checkpoints and set the coinbase maturity to 1.
 	chain.DisableCheckpoints(true)
-	blockchain.TstSetCoinbaseMaturity(1)
+	chain.TstSetCoinbaseMaturity(1)
 
 	for i := 1; i < len(blocks); i++ {
 		isOrphan, err := chain.ProcessBlock(blocks[i], blockchain.BFNone)

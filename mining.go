@@ -651,7 +651,7 @@ mempoolLoop:
 		// Ensure the transaction inputs pass all of the necessary
 		// preconditions before allowing it to be added to the block.
 		_, err = blockchain.CheckTransactionInputs(tx, nextBlockHeight,
-			blockUtxos)
+			blockUtxos, activeNetParams.Params)
 		if err != nil {
 			minrLog.Tracef("Skipping tx %s due to error in "+
 				"CheckTransactionInputs: %v", tx.Hash(), err)
@@ -781,7 +781,7 @@ func UpdateBlockTime(msgBlock *wire.MsgBlock, bManager *blockManager) error {
 
 	// If running on a network that requires recalculating the difficulty,
 	// do so now.
-	if activeNetParams.ResetMinDifficulty {
+	if activeNetParams.ReduceMinDifficulty {
 		difficulty, err := bManager.chain.CalcNextRequiredDifficulty(
 			newTimestamp)
 		if err != nil {

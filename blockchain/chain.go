@@ -24,12 +24,6 @@ const (
 	// maxOrphanBlocks is the maximum number of orphan blocks that can be
 	// queued.
 	maxOrphanBlocks = 100
-
-	// minMemoryNodes is the minimum number of consecutive nodes needed
-	// in memory in order to perform all necessary validation.  It is used
-	// to determine when it's safe to prune nodes from memory without
-	// causing constant dynamic reloading.
-	minMemoryNodes = BlocksPerRetarget
 )
 
 // blockNode represents a block within the block chain and is primarily used to
@@ -169,6 +163,22 @@ type BlockChain struct {
 	notifications       NotificationCallback
 	sigCache            *txscript.SigCache
 	indexManager        IndexManager
+
+	// The following fields are calculated based upon the provided chain
+	// parameters.  They are also set when the instance is created and
+	// can't be changed afterwards, so there is no need to protect them with
+	// a separate mutex.
+	//
+	// minMemoryNodes is the minimum number of consecutive nodes needed
+	// in memory in order to perform all necessary validation.  It is used
+	// to determine when it's safe to prune nodes from memory without
+	// causing constant dynamic reloading.  This is typically the same value
+	// as blocksPerRetarget, but it is separated here for tweakability and
+	// testability.
+	minRetargetTimespan int64 // target timespan / adjustment factor
+	maxRetargetTimespan int64 // target timespan * adjustment factor
+	blocksPerRetarget   int32 // target timespan / target time per block
+	minMemoryNodes      int32
 
 	// chainLock protects concurrent access to the vast majority of the
 	// fields in this struct below this point.
@@ -553,7 +563,7 @@ func (b *BlockChain) pruneBlockNodes() error {
 	// the latter loads the node and the goal is to find nodes still in
 	// memory that can be pruned.
 	newRootNode := b.bestNode
-	for i := int32(0); i < minMemoryNodes-1 && newRootNode != nil; i++ {
+	for i := int32(0); i < b.minMemoryNodes-1 && newRootNode != nil; i++ {
 		newRootNode = newRootNode.parent
 	}
 
@@ -1454,6 +1464,9 @@ func New(config *Config) (*BlockChain, error) {
 		}
 	}
 
+	targetTimespan := int64(params.TargetTimespan)
+	targetTimePerBlock := int64(params.TargetTimePerBlock)
+	adjustmentFactor := params.RetargetAdjustmentFactor
 	b := BlockChain{
 		checkpointsByHeight: checkpointsByHeight,
 		db:                  config.DB,
@@ -1462,6 +1475,10 @@ func New(config *Config) (*BlockChain, error) {
 		notifications:       config.Notifications,
 		sigCache:            config.SigCache,
 		indexManager:        config.IndexManager,
+		minRetargetTimespan: targetTimespan / adjustmentFactor,
+		maxRetargetTimespan: targetTimespan * adjustmentFactor,
+		blocksPerRetarget:   int32(targetTimespan / targetTimePerBlock),
+		minMemoryNodes:      int32(targetTimespan / targetTimePerBlock),
 		bestNode:            nil,
 		index:               make(map[chainhash.Hash]*blockNode),
 		depNodes:            make(map[chainhash.Hash][]*blockNode),

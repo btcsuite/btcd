@@ -596,7 +596,7 @@ func (mp *txMemPool) maybeAcceptTransaction(tx *btcutil.Tx, isNew, rateLimit boo
 	// Also returns the fees associated with the transaction which will be
 	// used later.
 	txFee, err := blockchain.CheckTransactionInputs(tx, nextBlockHeight,
-		utxoView)
+		utxoView, activeNetParams.Params)
 	if err != nil {
 		if cerr, ok := err.(blockchain.RuleError); ok {
 			return nil, chainRuleError(cerr)
