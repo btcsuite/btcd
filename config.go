@@ -935,6 +935,10 @@ func createDefaultConfigFile() error {
 	defer src.Close()
 
 	destinationPath := filepath.Join(dcrdHomeDir, defaultConfigFilename)
+	err = os.MkdirAll(dcrdHomeDir, 0700)
+	if err != nil {
+		return err
+	}
 	dest, err := os.OpenFile(destinationPath, os.O_RDWR|os.O_CREATE|os.O_TRUNC,
 		0644)
 	if err != nil {
