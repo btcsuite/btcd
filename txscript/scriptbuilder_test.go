@@ -38,6 +38,7 @@ func TestScriptBuilderAddOp(t *testing.T) {
 		},
 	}
 
+	// Run tests and individually add each op via AddOp.
 	builder := txscript.NewScriptBuilder()
 	t.Logf("Running %d tests", len(tests))
 	for i, test := range tests {
@@ -58,6 +59,25 @@ func TestScriptBuilderAddOp(t *testing.T) {
 			continue
 		}
 	}
+
+	// Run tests and bulk add ops via AddOps.
+	t.Logf("Running %d tests", len(tests))
+	for i, test := range tests {
+		builder.Reset()
+		result, err := builder.AddOps(test.opcodes).Script()
+		if err != nil {
+			t.Errorf("ScriptBuilder.AddOps #%d (%s) unexpected "+
+				"error: %v", i, test.name, err)
+			continue
+		}
+		if !bytes.Equal(result, test.expected) {
+			t.Errorf("ScriptBuilder.AddOps #%d (%s) wrong result\n"+
+				"got: %x\nwant: %x", i, test.name, result,
+				test.expected)
+			continue
+		}
+	}
+
 }
 
 // TestScriptBuilderAddInt64 tests that pushing signed integers to a script via
