@@ -73,6 +73,27 @@ func (b *ScriptBuilder) AddOp(opcode byte) *ScriptBuilder {
 	return b
 }
 
+// AddOps pushes the passed opcodes to the end of the script.  The script will
+// not be modified if pushing the opcodes would cause the script to exceed the
+// maximum allowed script engine size.
+func (b *ScriptBuilder) AddOps(opcodes []byte) *ScriptBuilder {
+	if b.err != nil {
+		return b
+	}
+
+	// Pushes that would cause the script to exceed the largest allowed
+	// script size would result in a non-canonical script.
+	if len(b.script)+len(opcodes) > maxScriptSize {
+		str := fmt.Sprintf("adding opcodes would exceed the maximum "+
+			"allowed canonical script length of %d", maxScriptSize)
+		b.err = ErrScriptNotCanonical(str)
+		return b
+	}
+
+	b.script = append(b.script, opcodes...)
+	return b
+}
+
 // canonicalDataSize returns the number of bytes the canonical encoding of the
 // data will take.
 func canonicalDataSize(data []byte) int {

@@ -203,7 +203,7 @@ func mergeScripts(chainParams *chaincfg.Params, tx *wire.MsgTx, idx int,
 
 		// Reappend the script and return the result.
 		builder := NewScriptBuilder()
-		builder.script = mergedScript
+		builder.AddOps(mergedScript)
 		builder.AddData(script)
 		finalScript, _ := builder.Script()
 		return finalScript
@@ -394,10 +394,9 @@ func SignTxOutput(chainParams *chaincfg.Params, tx *wire.MsgTx, idx int,
 			return nil, err
 		}
 
-		// This is a bad thing. Append the p2sh script as the last
-		// push in the script.
+		// Append the p2sh script as the last push in the script.
 		builder := NewScriptBuilder()
-		builder.script = realSigScript
+		builder.AddOps(realSigScript)
 		builder.AddData(sigScript)
 
 		sigScript, _ = builder.Script()
