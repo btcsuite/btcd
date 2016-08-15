@@ -426,18 +426,11 @@ func (sp *serverPeer) OnMemPool(p *peer.Peer, msg *wire.MsgMemPool) {
 	invMsg := wire.NewMsgInvSizeHint(uint(len(txDescs)))
 
 	for i, txDesc := range txDescs {
-		// Another thread might have removed the transaction from the
-		// pool since the initial query.
-		hash := txDesc.Tx.Hash()
-		if !txMemPool.IsTransactionInPool(hash) {
-			continue
-		}
-
 		// Either add all transactions when there is no bloom filter,
 		// or only the transactions that match the filter when there is
 		// one.
 		if !sp.filter.IsLoaded() || sp.filter.MatchTxAndUpdate(txDesc.Tx) {
-			iv := wire.NewInvVect(wire.InvTypeTx, hash)
+			iv := wire.NewInvVect(wire.InvTypeTx, txDesc.Tx.Hash())
 			invMsg.AddInvVect(iv)
 			if i+1 >= wire.MaxInvPerMsg {
 				break
