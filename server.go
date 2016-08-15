@@ -1827,7 +1827,8 @@ func (s *server) peerHandler() {
 	}
 
 	// if nothing else happens, wake us up soon.
-	time.AfterFunc(10*time.Second, func() { s.wakeup <- struct{}{} })
+	wakeupAfter := 10 * time.Second
+	timer := time.AfterFunc(wakeupAfter, func() { s.wakeup <- struct{}{} })
 
 out:
 	for {
@@ -1946,9 +1947,7 @@ out:
 
 		// We need more peers, wake up in ten seconds and try again.
 		if state.NeedMoreOutbound() {
-			time.AfterFunc(10*time.Second, func() {
-				s.wakeup <- struct{}{}
-			})
+			timer.Reset(wakeupAfter)
 		}
 	}
 
