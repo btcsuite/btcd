@@ -145,8 +145,9 @@ type Client struct {
 	requestList *list.List
 
 	// Notifications.
-	ntfnHandlers *NotificationHandlers
-	ntfnState    *notificationState
+	ntfnHandlers  *NotificationHandlers
+	ntfnStateLock sync.Mutex
+	ntfnState     *notificationState
 
 	// Networking infrastructure.
 	sendChan        chan []byte
@@ -233,8 +234,8 @@ func (c *Client) trackRegisteredNtfns(cmd interface{}) {
 		return
 	}
 
-	c.ntfnState.Lock()
-	defer c.ntfnState.Unlock()
+	c.ntfnStateLock.Lock()
+	defer c.ntfnStateLock.Unlock()
 
 	switch bcmd := cmd.(type) {
 	case *btcjson.NotifyBlocksCmd:
@@ -498,7 +499,9 @@ func (c *Client) reregisterNtfns() error {
 	// the notification state (while not under the lock of course) which
 	// also register it with the remote RPC server, so this prevents double
 	// registrations.
+	c.ntfnStateLock.Lock()
 	stateCopy := c.ntfnState.Copy()
+	c.ntfnStateLock.Unlock()
 
 	// Reregister notifyblocks if needed.
 	if stateCopy.notifyBlocks {

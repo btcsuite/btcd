@@ -10,7 +10,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"sync"
 	"time"
 
 	"github.com/btcsuite/btcd/btcjson"
@@ -32,7 +31,6 @@ var (
 // registered notification so the state can be automatically re-established on
 // reconnect.
 type notificationState struct {
-	sync.Mutex
 	notifyBlocks       bool
 	notifyNewTx        bool
 	notifyNewTxVerbose bool
@@ -41,12 +39,7 @@ type notificationState struct {
 }
 
 // Copy returns a deep copy of the receiver.
-//
-// This function is safe for concurrent access.
 func (s *notificationState) Copy() *notificationState {
-	s.Lock()
-	defer s.Unlock()
-
 	var stateCopy notificationState
 	stateCopy.notifyBlocks = s.notifyBlocks
 	stateCopy.notifyNewTx = s.notifyNewTx
