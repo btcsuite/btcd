@@ -1,15 +1,12 @@
 language: go
 go:
-  - 1.5.4
   - 1.6.3
+  - 1.7
 sudo: false
-before_install:
-  - gotools=golang.org/x/tools
-  - export GO15VENDOREXPERIMENT=1
 install:
   - go get -v github.com/Masterminds/glide
   - glide install
-  - go get -v $gotools/cmd/cover
+  - go get -v golang.org/x/tools/cmd/cover
   - go get -v github.com/golang/lint/golint
 script:
   - export PATH=$PATH:$HOME/gopath/bin

@@ -85,10 +85,6 @@ recommended that `GOPATH` is set to a directory in your home directory such as
 `~/goprojects` to avoid write permission issues.  It is also recommended to add
 `$GOPATH/bin` to your `PATH` at this point.
 
-**NOTE:** If you are using Go 1.5, you must manually enable the vendor
-experiment by setting the `GO15VENDOREXPERIMENT` environment variable to `1`.
-This step is not required for Go 1.6.
-
 - Run the following commands to obtain btcd, all dependencies, and install it:
 
 ```bash
