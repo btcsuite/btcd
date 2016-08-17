@@ -47,7 +47,10 @@ func (s *notificationState) Copy() *notificationState {
 	s.Lock()
 	defer s.Unlock()
 
-	stateCopy := *s
+	var stateCopy notificationState
+	stateCopy.notifyBlocks = s.notifyBlocks
+	stateCopy.notifyNewTx = s.notifyNewTx
+	stateCopy.notifyNewTxVerbose = s.notifyNewTxVerbose
 	stateCopy.notifyReceived = make(map[string]struct{})
 	for addr := range s.notifyReceived {
 		stateCopy.notifyReceived[addr] = struct{}{}
