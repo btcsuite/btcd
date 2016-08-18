@@ -33,7 +33,7 @@ which are both under active development.
 
 ## Requirements
 
-[Go](http://golang.org) 1.5 or newer.
+[Go](http://golang.org) 1.6 or newer.
 
 ## Installation
 
@@ -57,10 +57,6 @@ NOTE: The `GOROOT` and `GOPATH` above must not be the same path.  It is
 recommended that `GOPATH` is set to a directory in your home directory such as
 `~/goprojects` to avoid write permission issues.  It is also recommended to add
 `$GOPATH/bin` to your `PATH` at this point.
-
-**NOTE:** If you are using Go 1.5, you must manually enable the vendor
-experiment by setting the `GO15VENDOREXPERIMENT` environment variable to `1`.
-This step is not required for Go 1.6.
 
 - Run the following commands to obtain btcd, all dependencies, and install it:
 
