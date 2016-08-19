@@ -141,26 +141,14 @@ type MessageListeners struct {
 	OnGetHeaders func(p *Peer, msg *wire.MsgGetHeaders)
 
 	// OnFilterAdd is invoked when a peer receives a filteradd bitcoin message.
-	// Peers that do not advertise support for bloom filters and negotiate to a
-	// protocol version before BIP0111 will simply ignore the message while
-	// those that negotiate to the BIP0111 protocol version or higher will be
-	// immediately disconnected.
 	OnFilterAdd func(p *Peer, msg *wire.MsgFilterAdd)
 
 	// OnFilterClear is invoked when a peer receives a filterclear bitcoin
 	// message.
-	// Peers that do not advertise support for bloom filters and negotiate to a
-	// protocol version before BIP0111 will simply ignore the message while
-	// those that negotiate to the BIP0111 protocol version or higher will be
-	// immediately disconnected.
 	OnFilterClear func(p *Peer, msg *wire.MsgFilterClear)
 
 	// OnFilterLoad is invoked when a peer receives a filterload bitcoin
 	// message.
-	// Peers that do not advertise support for bloom filters and negotiate to a
-	// protocol version before BIP0111 will simply ignore the message while
-	// those that negotiate to the BIP0111 protocol version or higher will be
-	// immediately disconnected.
 	OnFilterLoad func(p *Peer, msg *wire.MsgFilterLoad)
 
 	// OnMerkleBlock  is invoked when a peer receives a merkleblock bitcoin
@@ -1021,24 +1009,6 @@ func (p *Peer) handleRemoteVersionMsg(msg *wire.MsgVersion) error {
 	return nil
 }
 
-// isValidBIP0111 is a helper function for the bloom filter commands to check
-// BIP0111 compliance.
-func (p *Peer) isValidBIP0111(cmd string) bool {
-	if p.Services()&wire.SFNodeBloom != wire.SFNodeBloom {
-		if p.ProtocolVersion() >= wire.BIP0111Version {
-			log.Debugf("%s sent an unsupported %s "+
-				"request -- disconnecting", p, cmd)
-			p.Disconnect()
-		} else {
-			log.Debugf("Ignoring %s request from %s -- bloom "+
-				"support is disabled", cmd, p)
-		}
-		return false
-	}
-
-	return true
-}
-
 // handlePingMsg is invoked when a peer receives a ping bitcoin message.  For
 // recent clients (protocol version > BIP0031Version), it replies with a pong
 // message.  For older clients, it does nothing and anything other than failure
@@ -1531,17 +1501,17 @@ out:
 			}
 
 		case *wire.MsgFilterAdd:
-			if p.isValidBIP0111(msg.Command()) && p.cfg.Listeners.OnFilterAdd != nil {
+			if p.cfg.Listeners.OnFilterAdd != nil {
 				p.cfg.Listeners.OnFilterAdd(p, msg)
 			}
 
 		case *wire.MsgFilterClear:
-			if p.isValidBIP0111(msg.Command()) && p.cfg.Listeners.OnFilterClear != nil {
+			if p.cfg.Listeners.OnFilterClear != nil {
 				p.cfg.Listeners.OnFilterClear(p, msg)
 			}
 
 		case *wire.MsgFilterLoad:
-			if p.isValidBIP0111(msg.Command()) && p.cfg.Listeners.OnFilterLoad != nil {
+			if p.cfg.Listeners.OnFilterLoad != nil {
 				p.cfg.Listeners.OnFilterLoad(p, msg)
 			}
 

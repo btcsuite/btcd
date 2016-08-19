@@ -789,11 +789,52 @@ func (sp *serverPeer) OnGetHeaders(p *peer.Peer, msg *wire.MsgGetHeaders) {
 	p.QueueMessage(headersMsg, nil)
 }
 
+// enforceNodeBloomFlag disconnects the peer if the server is not configured to
+// allow bloom filters.  Additionally, if the peer has negotiated to a protocol
+// version  that is high enough to observe the bloom filter service support bit,
+// it will be banned since it is intentionally violating the protocol.
+func (sp *serverPeer) enforceNodeBloomFlag(cmd string) bool {
+	if sp.server.services&wire.SFNodeBloom != wire.SFNodeBloom {
+		// Ban the peer if the protocol version is high enough that the
+		// peer is knowingly violating the protocol and banning is
+		// enabled.
+		//
+		// NOTE: Even though the addBanScore function already examines
+		// whether or not banning is enabled, it is checked here as well
+		// to ensure the violation is logged and the peer is
+		// disconnected regardless.
+		if sp.ProtocolVersion() >= wire.BIP0111Version &&
+			!cfg.DisableBanning {
+
+			// Disonnect the peer regardless of whether it was
+			// banned.
+			sp.addBanScore(100, 0, cmd)
+			sp.Disconnect()
+			return false
+		}
+
+		// Disconnect the peer regardless of protocol version or banning
+		// state.
+		peerLog.Debugf("%s sent an unsupported %s request -- "+
+			"disconnecting", sp, cmd)
+		sp.Disconnect()
+		return false
+	}
+
+	return true
+}
+
 // OnFilterAdd is invoked when a peer receives a filteradd bitcoin
 // message and is used by remote peers to add data to an already loaded bloom
 // filter.  The peer will be disconnected if a filter is not loaded when this
-// message is received.
+// message is received or the server is not configured to allow bloom filters.
 func (sp *serverPeer) OnFilterAdd(p *peer.Peer, msg *wire.MsgFilterAdd) {
+	// Disconnect and/or ban depending on the node bloom services flag and
+	// negotiated protocol version.
+	if !sp.enforceNodeBloomFlag(msg.Command()) {
+		return
+	}
+
 	if sp.filter.IsLoaded() {
 		peerLog.Debugf("%s sent a filteradd request with no filter "+
 			"loaded -- disconnecting", p)
@@ -807,8 +848,14 @@ func (sp *serverPeer) OnFilterAdd(p *peer.Peer, msg *wire.MsgFilterAdd) {
 // OnFilterClear is invoked when a peer receives a filterclear bitcoin
 // message and is used by remote peers to clear an already loaded bloom filter.
 // The peer will be disconnected if a filter is not loaded when this message is
-// received.
+// received  or the server is not configured to allow bloom filters.
 func (sp *serverPeer) OnFilterClear(p *peer.Peer, msg *wire.MsgFilterClear) {
+	// Disconnect and/or ban depending on the node bloom services flag and
+	// negotiated protocol version.
+	if !sp.enforceNodeBloomFlag(msg.Command()) {
+		return
+	}
+
 	if !sp.filter.IsLoaded() {
 		peerLog.Debugf("%s sent a filterclear request with no "+
 			"filter loaded -- disconnecting", p)
@@ -822,7 +869,15 @@ func (sp *serverPeer) OnFilterClear(p *peer.Peer, msg *wire.MsgFilterClear) {
 // OnFilterLoad is invoked when a peer receives a filterload bitcoin
 // message and it used to load a bloom filter that should be used for
 // delivering merkle blocks and associated transactions that match the filter.
+// The peer will be disconnected if the server is not configured to allow bloom
+// filters.
 func (sp *serverPeer) OnFilterLoad(p *peer.Peer, msg *wire.MsgFilterLoad) {
+	// Disconnect and/or ban depending on the node bloom services flag and
+	// negotiated protocol version.
+	if !sp.enforceNodeBloomFlag(msg.Command()) {
+		return
+	}
+
 	sp.setDisableRelayTx(false)
 
 	sp.filter.Reload(msg)
