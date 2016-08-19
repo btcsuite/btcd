@@ -33,6 +33,7 @@ import (
 	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/database"
+	"github.com/btcsuite/btcd/mempool"
 	"github.com/btcsuite/btcd/mining"
 	"github.com/btcsuite/btcd/txscript"
 	"github.com/btcsuite/btcd/wire"
@@ -2227,53 +2228,14 @@ func handleGetPeerInfo(s *rpcServer, cmd interface{}, closeChan <-chan struct{})
 func handleGetRawMempool(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (interface{}, error) {
 	c := cmd.(*btcjson.GetRawMempoolCmd)
 	mp := s.server.txMemPool
-	descs := mp.TxDescs()
 
 	if c.Verbose != nil && *c.Verbose {
-		result := make(map[string]*btcjson.GetRawMempoolVerboseResult,
-			len(descs))
-
-		best := s.chain.BestSnapshot()
-
-		mp.RLock()
-		defer mp.RUnlock()
-		for _, desc := range descs {
-			// Calculate the current priority based on the inputs to
-			// the transaction.  Use zero if one or more of the
-			// input transactions can't be found for some reason.
-			tx := desc.Tx
-			var currentPriority float64
-			utxos, err := mp.fetchInputUtxos(tx)
-			if err == nil {
-				currentPriority = calcPriority(tx.MsgTx(),
-					utxos, best.Height+1)
-			}
-
-			mpd := &btcjson.GetRawMempoolVerboseResult{
-				Size:             int32(tx.MsgTx().SerializeSize()),
-				Fee:              btcutil.Amount(desc.Fee).ToBTC(),
-				Time:             desc.Added.Unix(),
-				Height:           int64(desc.Height),
-				StartingPriority: desc.StartingPriority,
-				CurrentPriority:  currentPriority,
-				Depends:          make([]string, 0),
-			}
-			for _, txIn := range tx.MsgTx().TxIn {
-				hash := &txIn.PreviousOutPoint.Hash
-				if s.server.txMemPool.haveTransaction(hash) {
-					mpd.Depends = append(mpd.Depends,
-						hash.String())
-				}
-			}
-
-			result[tx.Hash().String()] = mpd
-		}
-
-		return result, nil
+		return mp.RawMempoolVerbose(), nil
 	}
 
 	// The response is simply an array of the transaction hashes if the
 	// verbose flag is not set.
+	descs := mp.TxDescs()
 	hashStrings := make([]string, len(descs))
 	for i := range hashStrings {
 		hashStrings[i] = descs[i].Tx.Hash().String()
@@ -3452,7 +3414,7 @@ func handleSendRawTransaction(s *rpcServer, cmd interface{}, closeChan <-chan st
 		// so log it as an actual error.  In both cases, a JSON-RPC
 		// error is returned to the client with the deserialization
 		// error code (to match bitcoind behavior).
-		if _, ok := err.(RuleError); ok {
+		if _, ok := err.(mempool.RuleError); ok {
 			rpcsLog.Debugf("Rejected transaction %v: %v", tx.Hash(),
 				err)
 		} else {

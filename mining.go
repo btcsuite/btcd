@@ -12,6 +12,7 @@ import (
 
 	"github.com/btcsuite/btcd/blockchain"
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
+	"github.com/btcsuite/btcd/mempool"
 	"github.com/btcsuite/btcd/mining"
 	"github.com/btcsuite/btcd/txscript"
 	"github.com/btcsuite/btcd/wire"
@@ -26,10 +27,6 @@ const (
 	// for generated block version could allow creation of invalid blocks
 	// for the updated version.
 	generatedBlockVersion = 4
-
-	// minHighPriority is the minimum priority value that allows a
-	// transaction to be considered high priority.
-	minHighPriority = btcutil.SatoshiPerBitcoin * 144.0 / 250
 
 	// blockHeaderOverhead is the max number of bytes it takes to serialize
 	// a block header and max possible transaction count.
@@ -522,7 +519,7 @@ mempoolLoop:
 		// Calculate the final transaction priority using the input
 		// value age sum as well as the adjusted transaction size.  The
 		// formula is: sum(inputValue * inputAge) / adjustedTxSize
-		prioItem.priority = calcPriority(tx.MsgTx(), utxos,
+		prioItem.priority = mempool.CalcPriority(tx.MsgTx(), utxos,
 			nextBlockHeight)
 
 		// Calculate the fee in Satoshi/kB.
@@ -623,13 +620,13 @@ mempoolLoop:
 		// the priority size or there are no more high-priority
 		// transactions.
 		if !sortedByFee && (blockPlusTxSize >= policy.BlockPrioritySize ||
-			prioItem.priority <= minHighPriority) {
+			prioItem.priority <= mempool.MinHighPriority) {
 
 			minrLog.Tracef("Switching to sort by fees per "+
 				"kilobyte blockSize %d >= BlockPrioritySize "+
 				"%d || priority %.2f <= minHighPriority %.2f",
 				blockPlusTxSize, policy.BlockPrioritySize,
-				prioItem.priority, minHighPriority)
+				prioItem.priority, mempool.MinHighPriority)
 
 			sortedByFee = true
 			priorityQueue.SetLessFunc(txPQByFee)
@@ -641,7 +638,7 @@ mempoolLoop:
 			// final one in the high-priority section, so just fall
 			// though to the code below so it is added now.
 			if blockPlusTxSize > policy.BlockPrioritySize ||
-				prioItem.priority < minHighPriority {
+				prioItem.priority < mempool.MinHighPriority {
 
 				heap.Push(priorityQueue, prioItem)
 				continue

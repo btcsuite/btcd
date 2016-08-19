@@ -22,6 +22,7 @@ import (
 
 	"github.com/btcsuite/btcd/database"
 	_ "github.com/btcsuite/btcd/database/ffldb"
+	"github.com/btcsuite/btcd/mempool"
 	"github.com/btcsuite/btcd/wire"
 	"github.com/btcsuite/btcutil"
 	flags "github.com/btcsuite/go-flags"
@@ -46,7 +47,6 @@ const (
 	defaultBlockMaxSize          = 750000
 	blockMaxSizeMin              = 1000
 	blockMaxSizeMax              = wire.MaxBlockPayload - 1000
-	defaultBlockPrioritySize     = 50000
 	defaultGenerate              = false
 	defaultMaxOrphanTransactions = 1000
 	defaultMaxOrphanTxSize       = 5000
@@ -344,11 +344,11 @@ func loadConfig() (*config, []string, error) {
 		DbType:            defaultDbType,
 		RPCKey:            defaultRPCKeyFile,
 		RPCCert:           defaultRPCCertFile,
-		MinRelayTxFee:     defaultMinRelayTxFee.ToBTC(),
+		MinRelayTxFee:     mempool.DefaultMinRelayTxFee.ToBTC(),
 		FreeTxRelayLimit:  defaultFreeTxRelayLimit,
 		BlockMinSize:      defaultBlockMinSize,
 		BlockMaxSize:      defaultBlockMaxSize,
-		BlockPrioritySize: defaultBlockPrioritySize,
+		BlockPrioritySize: mempool.DefaultBlockPrioritySize,
 		MaxOrphanTxs:      defaultMaxOrphanTransactions,
 		SigCacheMaxSize:   defaultSigCacheMaxSize,
 		Generate:          defaultGenerate,
