@@ -15,10 +15,10 @@ import (
 
 // MaxUserAgentLen is the maximum allowed length for the user agent field in a
 // version message (MsgVersion).
-const MaxUserAgentLen = 2000
+const MaxUserAgentLen = 256
 
 // DefaultUserAgent for wire in the stack
-const DefaultUserAgent = "/btcwire:0.4.0/"
+const DefaultUserAgent = "/btcwire:0.4.1/"
 
 // MsgVersion implements the Message interface and represents a bitcoin version
 // message.  It is used for a peer to advertise itself as soon as an outbound
