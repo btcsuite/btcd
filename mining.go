@@ -1,4 +1,4 @@
-// Copyright (c) 2014-2015 The btcsuite developers
+// Copyright (c) 2014-2016 The btcsuite developers
 // Copyright (c) 2015 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
@@ -34,7 +34,8 @@ func (r FutureGenerateResult) Receive() ([]*chainhash.Hash, error) {
 		return nil, err
 	}
 
-	// Convert each block hash to a chainhash.Hash and store a pointer to each.
+	// Convert each block hash to a chainhash.Hash and store a pointer to
+	// each.
 	convertedResult := make([]*chainhash.Hash, len(result))
 	for i, hashString := range result {
 		convertedResult[i], err = chainhash.NewHashFromStr(hashString)

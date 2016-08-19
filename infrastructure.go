@@ -1,4 +1,4 @@
-// Copyright (c) 2014-2015 The btcsuite developers
+// Copyright (c) 2014-2016 The btcsuite developers
 // Copyright (c) 2015-2016 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
@@ -14,7 +14,9 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"io/ioutil"
+	"math"
 	"net"
 	"net/http"
 	"net/url"
@@ -145,8 +147,9 @@ type Client struct {
 	requestList *list.List
 
 	// Notifications.
-	ntfnHandlers *NotificationHandlers
-	ntfnState    *notificationState
+	ntfnHandlers  *NotificationHandlers
+	ntfnStateLock sync.Mutex
+	ntfnState     *notificationState
 
 	// Networking infrastructure.
 	sendChan        chan []byte
@@ -233,8 +236,8 @@ func (c *Client) trackRegisteredNtfns(cmd interface{}) {
 		return
 	}
 
-	c.ntfnState.Lock()
-	defer c.ntfnState.Unlock()
+	c.ntfnStateLock.Lock()
+	defer c.ntfnStateLock.Unlock()
 
 	switch bcmd := cmd.(type) {
 	case *dcrjson.NotifyWinningTicketsCmd:
@@ -279,7 +282,7 @@ type (
 	// the embedded ID (from the response) is nil.  Otherwise, it is a
 	// response.
 	inMessage struct {
-		ID *uint64 `json:"id"`
+		ID *float64 `json:"id"`
 		*rawNotification
 		*rawResponse
 	}
@@ -350,12 +353,18 @@ func (c *Client) handleMessage(msg []byte) {
 		return
 	}
 
+	// ensure that in.ID can be converted to an integer without loss of precision
+	if *in.ID < 0 || *in.ID != math.Trunc(*in.ID) {
+		log.Warn("Malformed response: invalid identifier")
+		return
+	}
+
 	if in.rawResponse == nil {
 		log.Warn("Malformed response: missing result and error")
 		return
 	}
 
-	id := *in.ID
+	id := uint64(*in.ID)
 	log.Tracef("Received response for id %d (result %s)", id, in.Result)
 	request := c.removeRequest(id)
 
@@ -376,6 +385,28 @@ func (c *Client) handleMessage(msg []byte) {
 	request.responseChan <- &response{result: result, err: err}
 }
 
+// shouldLogReadError returns whether or not the passed error, which is expected
+// to have come from reading from the websocket connection in wsInHandler,
+// should be logged.
+func (c *Client) shouldLogReadError(err error) bool {
+	// No logging when the connetion is being forcibly disconnected.
+	select {
+	case <-c.shutdown:
+		return false
+	default:
+	}
+
+	// No logging when the connection has been disconnected.
+	if err == io.EOF {
+		return false
+	}
+	if opErr, ok := err.(*net.OpError); ok && !opErr.Temporary() {
+		return false
+	}
+
+	return true
+}
+
 // wsInHandler handles all incoming messages for the websocket connection
 // associated with the client.  It must be run as a goroutine.
 func (c *Client) wsInHandler() {
@@ -393,7 +424,7 @@ out:
 		_, msg, err := c.wsConn.ReadMessage()
 		if err != nil {
 			// Log the error if it's not due to disconnecting.
-			if _, ok := err.(*net.OpError); !ok {
+			if c.shouldLogReadError(err) {
 				log.Errorf("Websocket receive error from "+
 					"%s: %v", c.config.Host, err)
 			}
@@ -482,7 +513,9 @@ func (c *Client) reregisterNtfns() error {
 	// the notification state (while not under the lock of course) which
 	// also register it with the remote RPC server, so this prevents double
 	// registrations.
+	c.ntfnStateLock.Lock()
 	stateCopy := c.ntfnState.Copy()
+	c.ntfnStateLock.Unlock()
 
 	// Reregister notifyblocks if needed.
 	if stateCopy.notifyBlocks {
@@ -1228,7 +1261,7 @@ func dial(config *ConnConfig) (*websocket.Conn, error) {
 
 // New creates a new RPC client based on the provided connection configuration
 // details.  The notification handlers parameter may be nil if you are not
-// interested in receiving notifications and will be ignored when if the
+// interested in receiving notifications and will be ignored if the
 // configuration is set to run in HTTP POST mode.
 func New(config *ConnConfig, ntfnHandlers *NotificationHandlers) (*Client, error) {
 	// Either open a websocket connection or create an HTTP client depending

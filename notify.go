@@ -1,4 +1,4 @@
-// Copyright (c) 2014-2015 The btcsuite developers
+// Copyright (c) 2014-2016 The btcsuite developers
 // Copyright (c) 2015 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
@@ -12,7 +12,6 @@ import (
 	"errors"
 	"fmt"
 	"strconv"
-	"sync"
 	"time"
 
 	"github.com/decred/dcrd/chaincfg/chainhash"
@@ -34,7 +33,6 @@ var (
 // registered notification so the state can be automatically re-established on
 // reconnect.
 type notificationState struct {
-	sync.Mutex
 	notifyBlocks                bool
 	notifyWinningTickets        bool
 	notifySpentAndMissedTickets bool
@@ -47,13 +45,11 @@ type notificationState struct {
 }
 
 // Copy returns a deep copy of the receiver.
-//
-// This function is safe for concurrent access.
 func (s *notificationState) Copy() *notificationState {
-	s.Lock()
-	defer s.Unlock()
-
-	stateCopy := *s
+	var stateCopy notificationState
+	stateCopy.notifyBlocks = s.notifyBlocks
+	stateCopy.notifyNewTx = s.notifyNewTx
+	stateCopy.notifyNewTxVerbose = s.notifyNewTxVerbose
 	stateCopy.notifyReceived = make(map[string]struct{})
 	for addr := range s.notifyReceived {
 		stateCopy.notifyReceived[addr] = struct{}{}
@@ -633,8 +629,8 @@ func parseChainNtfnParams(params []json.RawMessage) (*chainhash.Hash,
 	}
 
 	// Unmarshal first parameter as a string.
-	var blockShaStr string
-	err := json.Unmarshal(params[0], &blockShaStr)
+	var blockHashStr string
+	err := json.Unmarshal(params[0], &blockHashStr)
 	if err != nil {
 		return nil, 0, time.Time{}, 0, err
 	}
@@ -660,8 +656,8 @@ func parseChainNtfnParams(params []json.RawMessage) (*chainhash.Hash,
 		return nil, 0, time.Time{}, 0, err
 	}
 
-	// Create ShaHash from block sha string.
-	blockSha, err := chainhash.NewHashFromStr(blockShaStr)
+	// Create hash from block hash string.
+	blockHash, err := chainhash.NewHashFromStr(blockHashStr)
 	if err != nil {
 		return nil, 0, time.Time{}, 0, err
 	}
@@ -669,7 +665,7 @@ func parseChainNtfnParams(params []json.RawMessage) (*chainhash.Hash,
 	// Create time.Time from unix time.
 	blockTime := time.Unix(blockTimeUnix, 0)
 
-	return blockSha, blockHeight, blockTime, voteBits, nil
+	return blockHash, blockHeight, blockTime, voteBits, nil
 }
 
 func parseReorganizationNtfnParams(params []json.RawMessage) (*chainhash.Hash,
@@ -1053,8 +1049,8 @@ func parseTxAcceptedNtfnParams(params []json.RawMessage) (*chainhash.Hash,
 	}
 
 	// Unmarshal first parameter as a string.
-	var txShaStr string
-	err := json.Unmarshal(params[0], &txShaStr)
+	var txHashStr string
+	err := json.Unmarshal(params[0], &txHashStr)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -1073,12 +1069,12 @@ func parseTxAcceptedNtfnParams(params []json.RawMessage) (*chainhash.Hash,
 	}
 
 	// Decode string encoding of transaction sha.
-	txSha, err := chainhash.NewHashFromStr(txShaStr)
+	txHash, err := chainhash.NewHashFromStr(txHashStr)
 	if err != nil {
 		return nil, 0, err
 	}
 
-	return txSha, dcrutil.Amount(amt), nil
+	return txHash, dcrutil.Amount(amt), nil
 }
 
 // parseTxAcceptedVerboseNtfnParams parses out details about a raw transaction
@@ -1843,9 +1839,9 @@ func (c *Client) RescanAsync(startBlock *chainhash.Hash,
 	}
 
 	// Convert block hashes to strings.
-	var startBlockShaStr string
+	var startBlockHashStr string
 	if startBlock != nil {
-		startBlockShaStr = startBlock.String()
+		startBlockHashStr = startBlock.String()
 	}
 
 	// Convert addresses to strings.
@@ -1860,7 +1856,7 @@ func (c *Client) RescanAsync(startBlock *chainhash.Hash,
 		ops = append(ops, newOutPointFromWire(op))
 	}
 
-	cmd := dcrjson.NewRescanCmd(startBlockShaStr, addrs, ops, nil)
+	cmd := dcrjson.NewRescanCmd(startBlockHashStr, addrs, ops, nil)
 	return c.sendCmd(cmd)
 }
 
@@ -1920,12 +1916,12 @@ func (c *Client) RescanEndBlockAsync(startBlock *chainhash.Hash,
 	}
 
 	// Convert block hashes to strings.
-	var startBlockShaStr, endBlockShaStr string
+	var startBlockHashStr, endBlockHashStr string
 	if startBlock != nil {
-		startBlockShaStr = startBlock.String()
+		startBlockHashStr = startBlock.String()
 	}
 	if endBlock != nil {
-		endBlockShaStr = endBlock.String()
+		endBlockHashStr = endBlock.String()
 	}
 
 	// Convert addresses to strings.
@@ -1940,8 +1936,8 @@ func (c *Client) RescanEndBlockAsync(startBlock *chainhash.Hash,
 		ops = append(ops, newOutPointFromWire(op))
 	}
 
-	cmd := dcrjson.NewRescanCmd(startBlockShaStr, addrs, ops,
-		&endBlockShaStr)
+	cmd := dcrjson.NewRescanCmd(startBlockHashStr, addrs, ops,
+		&endBlockHashStr)
 	return c.sendCmd(cmd)
 }
 
