@@ -6,6 +6,7 @@ sudo: false
 install:
   - go get -v github.com/Masterminds/glide
   - glide install
+  - go install . ./cmd/...
   - go get -v golang.org/x/tools/cmd/cover
   - go get -v github.com/golang/lint/golint
 script:
