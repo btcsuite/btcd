@@ -199,6 +199,30 @@ func testJoinMempools(r *Harness, t *testing.T) {
 		t.Fatalf("coinbase spend failed: %v", err)
 	}
 
+	// Wait until the transaction shows up to ensure the two mempools are
+	// not the same.
+	harnessSynced := make(chan struct{})
+	go func() {
+		for {
+			poolHashes, err := harness.Node.GetRawMempool()
+			if err != nil {
+				t.Fatalf("failed to retrieve harness mempool: %v", err)
+			}
+			if len(poolHashes) > 0 {
+				break
+			}
+			time.Sleep(time.Millisecond * 100)
+		}
+		harnessSynced <- struct{}{}
+	}()
+	select {
+	case <-harnessSynced:
+	case <-time.After(time.Minute):
+		t.Fatalf("harness node never received transaction")
+	}
+
+	// This select case should fall through to the default as the goroutine
+	// should be blocked on the JoinNodes calls.
 	poolsSynced := make(chan struct{})
 	go func() {
 		if err := JoinNodes(nodeSlice, Mempools); err != nil {
@@ -206,9 +230,6 @@ func testJoinMempools(r *Harness, t *testing.T) {
 		}
 		poolsSynced <- struct{}{}
 	}()
-
-	// This select case should fall through to the default as the goroutine
-	// should be blocked on the JoinNodes calls.
 	select {
 	case <-poolsSynced:
 		t.Fatalf("mempools detected as synced yet harness1 has a new tx")
@@ -230,7 +251,7 @@ func testJoinMempools(r *Harness, t *testing.T) {
 	case <-poolsSynced:
 		// fall through
 	case <-time.After(time.Minute):
-		t.Fatalf("block heights never detected as synced")
+		t.Fatalf("mempools never detected as synced")
 	}
 
 }
