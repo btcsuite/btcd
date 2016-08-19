@@ -1,14 +1,17 @@
 hash: 9b8ff781a12daad991983e9a421a320e905eecc4e9ff0b0643e790f472bc78c8
-updated: 2016-08-08T12:54:38.3626881-05:00
+updated: 2016-08-16T23:18:48.976672741-05:00
 imports:
 - name: github.com/btcsuite/btclog
   version: f96df2375f37300305f329b8e5258764b4f19a7f
+- name: github.com/btcsuite/btcrpcclient
+  version: f584dbd2e595fcce72fe88440886d4935371ae6b
 - name: github.com/btcsuite/btcutil
   version: 22c91fa80a5e90e3feda26cf6d43adc249306188
   subpackages:
   - .
   - base58
   - bloom
+  - hdkeychain
 - name: github.com/btcsuite/fastsha256
   version: 302ad4db268b46f9ebda3078f6f7397f96047735
 - name: github.com/btcsuite/go-flags
