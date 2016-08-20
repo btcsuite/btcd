@@ -104,25 +104,25 @@ func assertConnectedTo(t *testing.T, nodeA *Harness, nodeB *Harness) {
 }
 
 func testConnectNode(r *Harness, t *testing.T) {
-	// Create a fresh test harnesses.
+	// Create a fresh test harness.
 	harness, err := New(&chaincfg.SimNetParams, nil, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := harness.SetUp(true, 0); err != nil {
+	if err := harness.SetUp(false, 0); err != nil {
 		t.Fatalf("unable to complete rpctest setup: %v", err)
 	}
 	defer harness.TearDown()
 
-	// Establish a p2p connection the main harness to our new local
+	// Establish a p2p connection from our new local harness to the main
 	// harness.
-	if err := ConnectNode(r, harness); err != nil {
-		t.Fatalf("unable to connect harness1 to harness2: %v", err)
+	if err := ConnectNode(harness, r); err != nil {
+		t.Fatalf("unable to connect local to main harness: %v", err)
 	}
 
-	// The main harness should show up in our loca harness' peer's list,
+	// The main harness should show up in our local harness' peer's list,
 	// and vice verse.
-	assertConnectedTo(t, r, harness)
+	assertConnectedTo(t, harness, r)
 }
 
 func testTearDownAll(t *testing.T) {
@@ -169,12 +169,23 @@ func testActiveHarnesses(r *Harness, t *testing.T) {
 }
 
 func testJoinMempools(r *Harness, t *testing.T) {
-	// Create a new local test harnesses, starting at the same height.
+	// Assert main test harness has no transactions in its mempool.
+	pooledHashes, err := r.Node.GetRawMempool()
+	if err != nil {
+		t.Fatalf("unable to get mempool for main test harness: %v", err)
+	}
+	if len(pooledHashes) != 0 {
+		t.Fatal("main test harness mempool not empty")
+	}
+
+	// Create a local test harness with only the genesis block.  The nodes
+	// will be synced below so the same transaction can be sent to both
+	// nodes without it being an orphan.
 	harness, err := New(&chaincfg.SimNetParams, nil, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := harness.SetUp(true, 25); err != nil {
+	if err := harness.SetUp(false, 0); err != nil {
 		t.Fatalf("unable to complete rpctest setup: %v", err)
 	}
 	defer harness.TearDown()
@@ -184,42 +195,75 @@ func testJoinMempools(r *Harness, t *testing.T) {
 	// Both mempools should be considered synced as they are empty.
 	// Therefore, this should return instantly.
 	if err := JoinNodes(nodeSlice, Mempools); err != nil {
-		t.Fatalf("unable to join node on block height: %v", err)
+		t.Fatalf("unable to join node on mempools: %v", err)
 	}
 
-	// Generate a coinbase spend to a new address within harness1's
+	// Generate a coinbase spend to a new address within the main harness'
 	// mempool.
-	addr, err := harness.NewAddress()
+	addr, err := r.NewAddress()
 	addrScript, err := txscript.PayToAddrScript(addr)
 	if err != nil {
 		t.Fatalf("unable to generate pkscript to addr: %v", err)
 	}
 	output := wire.NewTxOut(5e8, addrScript)
-	if _, err = harness.SendOutputs([]*wire.TxOut{output}, 10); err != nil {
+	testTx, err := r.CreateTransaction([]*wire.TxOut{output}, 10)
+	if err != nil {
 		t.Fatalf("coinbase spend failed: %v", err)
 	}
+	if _, err := r.Node.SendRawTransaction(testTx, true); err != nil {
+		t.Fatalf("send transaction failed: %v", err)
+	}
 
+	// Wait until the transaction shows up to ensure the two mempools are
+	// not the same.
+	harnessSynced := make(chan struct{})
+	go func() {
+		for {
+			poolHashes, err := r.Node.GetRawMempool()
+			if err != nil {
+				t.Fatalf("failed to retrieve harness mempool: %v", err)
+			}
+			if len(poolHashes) > 0 {
+				break
+			}
+			time.Sleep(time.Millisecond * 100)
+		}
+		harnessSynced <- struct{}{}
+	}()
+	select {
+	case <-harnessSynced:
+	case <-time.After(time.Minute):
+		t.Fatalf("harness node never received transaction")
+	}
+
+	// This select case should fall through to the default as the goroutine
+	// should be blocked on the JoinNodes call.
 	poolsSynced := make(chan struct{})
 	go func() {
 		if err := JoinNodes(nodeSlice, Mempools); err != nil {
-			t.Fatalf("unable to join node on node mempools: %v", err)
+			t.Fatalf("unable to join node on mempools: %v", err)
 		}
 		poolsSynced <- struct{}{}
 	}()
-
-	// This select case should fall through to the default as the goroutine
-	// should be blocked on the JoinNodes calls.
 	select {
 	case <-poolsSynced:
-		t.Fatalf("mempools detected as synced yet harness1 has a new tx")
+		t.Fatalf("mempools detected as synced yet harness has a new tx")
 	default:
 	}
 
-	// Establish an outbound connection from harness1 to harness2. After
-	// the initial handshake both nodes should exchange inventory resulting
-	// in a synced mempool.
-	if err := ConnectNode(r, harness); err != nil {
+	// Establish an outbound connection from the local harness to the main
+	// harness and wait for the chains to be synced.
+	if err := ConnectNode(harness, r); err != nil {
 		t.Fatalf("unable to connect harnesses: %v", err)
+	}
+	if err := JoinNodes(nodeSlice, Blocks); err != nil {
+		t.Fatalf("unable to join node on blocks: %v", err)
+	}
+
+	// Send the transaction to the local harness which will result in synced
+	// mempools.
+	if _, err := harness.Node.SendRawTransaction(testTx, true); err != nil {
+		t.Fatalf("send transaction failed: %v", err)
 	}
 
 	// Select once again with a special timeout case after 1 minute. The
@@ -230,36 +274,27 @@ func testJoinMempools(r *Harness, t *testing.T) {
 	case <-poolsSynced:
 		// fall through
 	case <-time.After(time.Minute):
-		t.Fatalf("block heights never detected as synced")
+		t.Fatalf("mempools never detected as synced")
 	}
-
 }
 
 func testJoinBlocks(r *Harness, t *testing.T) {
-	// Create two test harnesses, with one being 5 block ahead of the other
-	// with respect to block height.
-	harness1, err := New(&chaincfg.SimNetParams, nil, nil)
+	// Create a second harness with only the genesis block so it is behind
+	// the main harness.
+	harness, err := New(&chaincfg.SimNetParams, nil, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := harness1.SetUp(true, 30); err != nil {
+	if err := harness.SetUp(false, 0); err != nil {
 		t.Fatalf("unable to complete rpctest setup: %v", err)
 	}
-	defer harness1.TearDown()
-	harness2, err := New(&chaincfg.SimNetParams, nil, nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := harness2.SetUp(true, 25); err != nil {
-		t.Fatalf("unable to complete rpctest setup: %v", err)
-	}
-	defer harness2.TearDown()
+	defer harness.TearDown()
 
-	nodeSlice := []*Harness{harness1, harness2}
+	nodeSlice := []*Harness{r, harness}
 	blocksSynced := make(chan struct{})
 	go func() {
 		if err := JoinNodes(nodeSlice, Blocks); err != nil {
-			t.Fatalf("unable to join node on block height: %v", err)
+			t.Fatalf("unable to join node on blocks: %v", err)
 		}
 		blocksSynced <- struct{}{}
 	}()
@@ -268,14 +303,14 @@ func testJoinBlocks(r *Harness, t *testing.T) {
 	// should be blocked on the JoinNodes calls.
 	select {
 	case <-blocksSynced:
-		t.Fatalf("blocks detected as synced yet harness2 is 5 blocks behind")
+		t.Fatalf("blocks detected as synced yet local harness is behind")
 	default:
 	}
 
-	// Extend harness2's chain by 5 blocks, this should cause JoinNodes to
-	// finally unblock and return.
-	if _, err := harness2.Node.Generate(5); err != nil {
-		t.Fatalf("unable to generate blocks: %v", err)
+	// Connect the local harness to the main harness which will sync the
+	// chains.
+	if err := ConnectNode(harness, r); err != nil {
+		t.Fatalf("unable to connect harnesses: %v", err)
 	}
 
 	// Select once again with a special timeout case after 1 minute. The
@@ -286,7 +321,7 @@ func testJoinBlocks(r *Harness, t *testing.T) {
 	case <-blocksSynced:
 		// fall through
 	case <-time.After(time.Minute):
-		t.Fatalf("block heights never detected as synced")
+		t.Fatalf("blocks never detected as synced")
 	}
 }
 
@@ -378,12 +413,12 @@ func testMemWalletReorg(r *Harness, t *testing.T) {
 
 	// Now connect this local harness to the main harness then wait for
 	// their chains to synchronize.
-	if err := ConnectNode(r, harness); err != nil {
+	if err := ConnectNode(harness, r); err != nil {
 		t.Fatalf("unable to connect harnesses: %v", err)
 	}
 	nodeSlice := []*Harness{r, harness}
 	if err := JoinNodes(nodeSlice, Blocks); err != nil {
-		t.Fatalf("unable to join node on block height: %v", err)
+		t.Fatalf("unable to join node on blocks: %v", err)
 	}
 
 	// The original wallet should now have a balance of 0 BTC as its entire
@@ -440,8 +475,8 @@ var harnessTestCases = []HarnessTestCase{
 	testSendOutputs,
 	testConnectNode,
 	testActiveHarnesses,
-	testJoinMempools,
 	testJoinBlocks,
+	testJoinMempools, // Depends on results of testJoinBlocks
 	testGenerateAndSubmitBlock,
 	testMemWalletReorg,
 	testMemWalletLockedOutputs,

@@ -10,6 +10,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcrpcclient"
 )
 
@@ -48,8 +49,8 @@ func JoinNodes(nodes []*Harness, joinType JoinType) error {
 func syncMempools(nodes []*Harness) error {
 	poolsMatch := false
 
+retry:
 	for !poolsMatch {
-	retry:
 		firstPool, err := nodes[0].Node.GetRawMempool()
 		if err != nil {
 			return err
@@ -58,7 +59,7 @@ func syncMempools(nodes []*Harness) error {
 		// If all nodes have an identical mempool with respect to the
 		// first node, then we're done. Otherwise, drop back to the top
 		// of the loop and retry after a short wait period.
-		for _, node := range nodes[:1] {
+		for _, node := range nodes[1:] {
 			nodePool, err := node.Node.GetRawMempool()
 			if err != nil {
 				return err
@@ -66,7 +67,7 @@ func syncMempools(nodes []*Harness) error {
 
 			if !reflect.DeepEqual(firstPool, nodePool) {
 				time.Sleep(time.Millisecond * 100)
-				goto retry
+				continue retry
 			}
 		}
 
@@ -76,25 +77,26 @@ func syncMempools(nodes []*Harness) error {
 	return nil
 }
 
-// syncBlocks blocks until all nodes report the same block height.
+// syncBlocks blocks until all nodes report the same best chain.
 func syncBlocks(nodes []*Harness) error {
 	blocksMatch := false
 
+retry:
 	for !blocksMatch {
-	retry:
-		blockHeights := make(map[int64]struct{})
-
+		var prevHash *chainhash.Hash
+		var prevHeight int32
 		for _, node := range nodes {
-			blockHeight, err := node.Node.GetBlockCount()
+			blockHash, blockHeight, err := node.Node.GetBestBlock()
 			if err != nil {
 				return err
 			}
+			if prevHash != nil && (*blockHash != *prevHash ||
+				blockHeight != prevHeight) {
 
-			blockHeights[blockHeight] = struct{}{}
-			if len(blockHeights) > 1 {
 				time.Sleep(time.Millisecond * 100)
-				goto retry
+				continue retry
 			}
+			prevHash, prevHeight = blockHash, blockHeight
 		}
 
 		blocksMatch = true
