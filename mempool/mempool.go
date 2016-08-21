@@ -55,9 +55,9 @@ type Config struct {
 	// transaction output information.
 	FetchUtxoView func(*btcutil.Tx) (*blockchain.UtxoViewpoint, error)
 
-	// Chain defines the concurrent safe block chain instance which houses
+	// BestHeight defines the function to use to access the block height of
 	// the current best chain.
-	Chain *blockchain.BlockChain
+	BestHeight func() int32
 
 	// SigCache defines a signature cache to use.
 	SigCache *txscript.SigCache
@@ -532,8 +532,8 @@ func (mp *TxPool) maybeAcceptTransaction(tx *btcutil.Tx, isNew, rateLimit bool) 
 	// Get the current height of the main chain.  A standalone transaction
 	// will be mined into the next block at best, so its height is at least
 	// one more than the current height.
-	best := mp.cfg.Chain.BestSnapshot()
-	nextBlockHeight := best.Height + 1
+	bestHeight := mp.cfg.BestHeight()
+	nextBlockHeight := bestHeight + 1
 
 	// Don't allow non-standard transactions if the network parameters
 	// forbid their relaying.
@@ -733,7 +733,7 @@ func (mp *TxPool) maybeAcceptTransaction(tx *btcutil.Tx, isNew, rateLimit bool) 
 	}
 
 	// Add to transaction pool.
-	mp.addTransaction(utxoView, tx, best.Height, txFee)
+	mp.addTransaction(utxoView, tx, bestHeight, txFee)
 
 	log.Debugf("Accepted transaction %v (pool size: %v)", txHash,
 		len(mp.pool))
@@ -1007,7 +1007,7 @@ func (mp *TxPool) RawMempoolVerbose() map[string]*btcjson.GetRawMempoolVerboseRe
 
 	result := make(map[string]*btcjson.GetRawMempoolVerboseResult,
 		len(mp.pool))
-	best := mp.cfg.Chain.BestSnapshot()
+	bestHeight := mp.cfg.BestHeight()
 
 	for _, desc := range mp.pool {
 		// Calculate the current priority based on the inputs to
@@ -1018,7 +1018,7 @@ func (mp *TxPool) RawMempoolVerbose() map[string]*btcjson.GetRawMempoolVerboseRe
 		utxos, err := mp.fetchInputUtxos(tx)
 		if err == nil {
 			currentPriority = CalcPriority(tx.MsgTx(), utxos,
-				best.Height+1)
+				bestHeight+1)
 		}
 
 		mpd := &btcjson.GetRawMempoolVerboseResult{

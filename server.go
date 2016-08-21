@@ -2527,7 +2527,7 @@ func newServer(listenAddrs []string, db database.DB, chainParams *chaincfg.Param
 		},
 		ChainParams:   chainParams,
 		FetchUtxoView: s.blockManager.chain.FetchUtxoView,
-		Chain:         s.blockManager.chain,
+		BestHeight:    func() int32 { return bm.chain.BestSnapshot().Height },
 		SigCache:      s.sigCache,
 		TimeSource:    s.timeSource,
 		AddrIndex:     s.addrIndex,
