@@ -59,6 +59,11 @@ type Config struct {
 	// the current best chain.
 	BestHeight func() int32
 
+	// MedianTimePast defines the function to use in order to access the
+	// median time past calculated from the point-of-view of the current
+	// chain tip within the best chain.
+	MedianTimePast func() time.Time
+
 	// SigCache defines a signature cache to use.
 	SigCache *txscript.SigCache
 

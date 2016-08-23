@@ -9,6 +9,7 @@ import (
 	"reflect"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/btcsuite/btcd/blockchain"
 	"github.com/btcsuite/btcd/btcec"
@@ -24,8 +25,9 @@ import (
 // transations to be appear as though they are spending completely valid utxos.
 type fakeChain struct {
 	sync.RWMutex
-	utxos         *blockchain.UtxoViewpoint
-	currentHeight int32
+	utxos          *blockchain.UtxoViewpoint
+	currentHeight  int32
+	medianTimePast time.Time
 }
 
 // FetchUtxoView loads utxo details about the input transactions referenced by
@@ -69,6 +71,23 @@ func (s *fakeChain) BestHeight() int32 {
 func (s *fakeChain) SetHeight(height int32) {
 	s.Lock()
 	s.currentHeight = height
+	s.Unlock()
+}
+
+// MedianTimePast returns the current median time past associated with the fake
+// chain instance.
+func (s *fakeChain) MedianTimePast() time.Time {
+	s.RLock()
+	mtp := s.medianTimePast
+	s.RUnlock()
+	return mtp
+}
+
+// SetMedianTimePast sets the current median time past associated with the fake
+// chain instance.
+func (s *fakeChain) SetMedianTimePast(mtp time.Time) {
+	s.Lock()
+	s.medianTimePast = mtp
 	s.Unlock()
 }
 
@@ -282,12 +301,12 @@ func newPoolHarness(chainParams *chaincfg.Params) (*poolHarness, []spendableOutp
 				MaxSigOpsPerTx:       blockchain.MaxSigOpsPerBlock / 5,
 				MinRelayTxFee:        1000, // 1 Satoshi per byte
 			},
-			ChainParams:   chainParams,
-			FetchUtxoView: chain.FetchUtxoView,
-			BestHeight:    chain.BestHeight,
-			SigCache:      nil,
-			TimeSource:    blockchain.NewMedianTime(),
-			AddrIndex:     nil,
+			ChainParams:    chainParams,
+			FetchUtxoView:  chain.FetchUtxoView,
+			BestHeight:     chain.BestHeight,
+			MedianTimePast: chain.MedianTimePast,
+			SigCache:       nil,
+			AddrIndex:      nil,
 		}),
 	}
 
