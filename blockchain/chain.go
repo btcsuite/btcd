@@ -134,7 +134,7 @@ type BestState struct {
 	BlockSize  uint64          // The size of the block.
 	NumTxns    uint64          // The number of txns in the block.
 	TotalTxns  uint64          // The total number of txns in the chain.
-	MedianTime time.Time       // Median time as per CalcPastMedianTime.
+	MedianTime time.Time       // Median time as per calcPastMedianTime.
 }
 
 // newBestState returns a new best stats instance for the given parameters.
@@ -680,18 +680,6 @@ func (b *BlockChain) calcPastMedianTime(startNode *blockNode) (time.Time, error)
 	// changed to an even number, this code will be wrong.
 	medianTimestamp := timestamps[numNodes/2]
 	return medianTimestamp, nil
-}
-
-// CalcPastMedianTime calculates the median time of the previous few blocks
-// prior to, and including, the end of the current best chain.  It is primarily
-// used to ensure new blocks have sane timestamps.
-//
-// This function is safe for concurrent access.
-func (b *BlockChain) CalcPastMedianTime() (time.Time, error) {
-	b.chainLock.Lock()
-	defer b.chainLock.Unlock()
-
-	return b.calcPastMedianTime(b.bestNode)
 }
 
 // getReorganizeNodes finds the fork point between the main chain and the passed

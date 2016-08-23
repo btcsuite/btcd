@@ -213,12 +213,8 @@ func (b *blockManager) updateChainState(newestHash *chainhash.Hash, newestHeight
 
 	b.chainState.newestHash = newestHash
 	b.chainState.newestHeight = newestHeight
-	medianTime, err := b.chain.CalcPastMedianTime()
-	if err != nil {
-		b.chainState.pastMedianTimeErr = err
-	} else {
-		b.chainState.pastMedianTime = medianTime
-	}
+	b.chainState.pastMedianTime = b.chain.BestSnapshot().MedianTime
+	b.chainState.pastMedianTimeErr = nil
 }
 
 // findNextHeaderCheckpoint returns the next checkpoint after the passed height.
