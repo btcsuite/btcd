@@ -405,7 +405,7 @@ func (c *Client) VerifyChain() (bool, error) {
 // the returned instance.
 //
 // See VerifyChainLevel for the blocking version and more details.
-func (c *Client) VerifyChainLevelAsync(checkLevel int32) FutureVerifyChainResult {
+func (c *Client) VerifyChainLevelAsync(checkLevel int64) FutureVerifyChainResult {
 	cmd := dcrjson.NewVerifyChainCmd(&checkLevel, nil)
 	return c.sendCmd(cmd)
 }
@@ -419,7 +419,7 @@ func (c *Client) VerifyChainLevelAsync(checkLevel int32) FutureVerifyChainResult
 //
 // See VerifyChain to use the default check level and VerifyChainBlocks to
 // override the number of blocks to verify.
-func (c *Client) VerifyChainLevel(checkLevel int32) (bool, error) {
+func (c *Client) VerifyChainLevel(checkLevel int64) (bool, error) {
 	return c.VerifyChainLevelAsync(checkLevel).Receive()
 }
 
@@ -428,7 +428,7 @@ func (c *Client) VerifyChainLevel(checkLevel int32) (bool, error) {
 // the returned instance.
 //
 // See VerifyChainBlocks for the blocking version and more details.
-func (c *Client) VerifyChainBlocksAsync(checkLevel, numBlocks int32) FutureVerifyChainResult {
+func (c *Client) VerifyChainBlocksAsync(checkLevel, numBlocks int64) FutureVerifyChainResult {
 	cmd := dcrjson.NewVerifyChainCmd(&checkLevel, &numBlocks)
 	return c.sendCmd(cmd)
 }
@@ -444,7 +444,7 @@ func (c *Client) VerifyChainBlocksAsync(checkLevel, numBlocks int32) FutureVerif
 // current longest chain.
 //
 // See VerifyChain and VerifyChainLevel to use defaults.
-func (c *Client) VerifyChainBlocks(checkLevel, numBlocks int32) (bool, error) {
+func (c *Client) VerifyChainBlocks(checkLevel, numBlocks int64) (bool, error) {
 	return c.VerifyChainBlocksAsync(checkLevel, numBlocks).Receive()
 }
 
