@@ -108,6 +108,10 @@ Application Options:
       --sigcachemaxsize=    The maximum number of entries in the signature
                             verification cache.
       --blocksonly          Do not accept transactions from remote peers.
+      --relaynonstd         Relay non-standard transactions regardless of the
+                            default settings for the active network.
+      --rejectnonstd        Reject non-standard transactions regardless of the
+                            default settings for the active network.
 
 Help Options:
   -h, --help           Show this help message
