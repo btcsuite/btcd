@@ -101,7 +101,12 @@ var primaryHarness *rpctest.Harness
 
 func TestMain(m *testing.M) {
 	var err error
-	primaryHarness, err = rpctest.New(&chaincfg.SimNetParams, nil, nil)
+
+	// In order to properly test scenarios on as if we were on mainnet,
+	// ensure that non-standard transactions aren't accepted into the
+	// mempool or relayed.
+	btcdCfg := []string{"--rejectnonstd"}
+	primaryHarness, err = rpctest.New(&chaincfg.SimNetParams, nil, btcdCfg)
 	if err != nil {
 		fmt.Println("unable to create primary harness: ", err)
 		os.Exit(1)
